@@ -1,0 +1,14 @@
+* ber in lstr
+* handle OOM gracefully
+* link palloc red_zones and check integrety on prelease
+* handle follow failure gracefully
+* add comparer in repo
+* auto tests
+* support cheap palloc_create/palloc_destroy
+* reliable palloc stats (optional verbose)
+* EINTR handling
+* snapshot saving timer
+* remote_hot_standby status - show status 'connection' when connecting
+* rate limit io during dump
+* SEGV
+** with too small arena, when snapshot reading

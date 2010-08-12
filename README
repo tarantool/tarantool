@@ -1,0 +1,16 @@
+Taranool.
+
+Yet another in-memory database.
+
+Key features:
+ * fast
+ * log streaming replication
+ * hot standby
+ * simple binary protocol
+ * memcached protocol emulation
+ * extensibility
+
+
+Cons:
+ * only tested on x86/Linux and x86/FreeBSD
+ * gcc is required to build

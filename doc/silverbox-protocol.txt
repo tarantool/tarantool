@@ -1,0 +1,81 @@
+
+varint32 - int32 BER encoding (http://perldoc.perl.org/perlpacktut.html#Another-Portable-Binary-Encoding)
+field_t = <size, varint32><data, char *>
+tuple_t = <field[1], field_t>...<field[n], field_t>
+key_t = <key_cardinality, int32_t><key_fields, tuple_t>
+
+ret_code:
+  * 0x******00 - ok
+  * 0x******01 - retry later
+  * 0x******02 - permanent error
+flags:
+  * BOX_RETURN_TUPLE = 0x01
+
+* Insert (msg = 13)
+  * Query:
+    * <n, uint32_t> - namespace number
+    * <flags, uint32_t>
+    * <cardinality, uint32_t> - tuple cardinality
+      * <field[0], field_t>
+      * ...
+      * <field[cardinality - 1], field_t>
+  * Answer:
+    * <ret_code, uint32_t>
+    * <tuples_affected, uint32_t>
+    if (flags & BOX_RETURN_TUPLE)
+      * <tuple_data_size, uint32_t>
+      * <cardinality, uint32_t>
+      * <tuple_data, tuple_t>
+* Select (msg = 17)
+  * Query:
+    * <n, uint32_t> - namespace number
+    * <index_n, uint32_t> - index to use
+    * <offset, uint32_t> - offset (applied to the whole resultset)
+    * <limit, uint32_t> - limit (the same)
+    * <count, uint32_t> - number of keys to select by
+      * <key[0], key_t>
+      * ...
+      * <key[count - 1], key_t>
+  * Answer:
+    * <ret_code, uint32_t>
+    * <count, uint32_t> - tuples in answer
+      * tuple[0]:
+        * <tuple_data_size, uint32_t>
+        * <cardinality, uint32_t>
+        * <tuple_data, tuple_t>
+      * ...
+      * tuple[count - 1]:
+        * ...
+* Update fields (msg = 19)
+  * Query:
+    * <n, uint32_t> - namespace number
+    * <flags, uint32_t>
+    * <key, key_t> // for now key cardinality of 1 is only allowed
+    * <op_cnt, uint32_t> - number of operations to do
+      * op[0]:
+        * <fieldno, uint32_t> - number of field to update
+        * <op, uint8_t> - operation:
+          * 0 - set
+          * 1 - add
+          * 2 - and
+          * 3 - xor
+          * 4 - or
+        * <argument, field_t> - argument for operation, limitations:
+          * for add - int32_t
+          * for and, or, xor - uint32_t
+      * ...
+      * op[op_cnt - 1]:
+        * ...
+  * Answer:
+    * <ret_code, uint32_t>
+    * <tuples_affected, uint32_t>
+    if (flags & BOX_RETURN_TUPLE)
+      * <tuple_data_size, uint32_t>
+      * <cardinality, uint32_t>
+      * <tuple_data, tuple_t>
+* Delete (msg = 20)
+  * Query:
+    * <n, uint32_t> - namespace number
+    * <key, key_t> // for now key cardinality of 1 is only allowed
+  * Answer:
+    * <ret_code, uint32_t>

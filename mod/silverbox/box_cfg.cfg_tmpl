@@ -1,0 +1,62 @@
+
+## BOX
+
+# Snapshot directory (where snapshots get saved/read)
+snap_dir="."
+
+# WAL directory (where WAL get saved/read)
+wal_dir="."
+
+# Primary port (where updates are accepted)
+primary_port=0
+
+# Secondary port (where only selects are accepted)
+secondary_port=0
+
+# warn about requests which take longer to process
+too_long_threshold=0.5
+
+# custom proc title is appended after normal
+custom_proc_title=NULL
+
+# Memcached emulation is enabled if memcached == 1
+memcached=0
+# namespace used for memcached emulation
+memcached_namespace=23
+# maximum rows to consider per expire loop iteration
+memcached_expire_per_loop=1024
+# tarantool will try iterate all rows within this time
+memcached_expire_full_sweep=3600
+
+# Write no more rows in WAL
+rows_per_wal=500000
+
+# fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay seconds ago
+# WARNING: actually, several last requsts may stall for much longer
+wal_fsync_delay=0
+
+# size of WAL writer requests buffer
+wal_writer_inbox_size=128
+
+# Local hot standby (if enabled server will run in locale hot standby mode
+# continuously fetching WAL records from shared local directory
+local_hot_standby=0
+# delay in fractional seconds between successive re-readings of wal_dir
+wal_dir_rescan_delay=0.1
+
+# Remote hot standby (if enabled server will run in hot standby mode
+# continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
+remote_hot_standby=0
+wal_feeder_ipaddr=NULL
+wal_feeder_port=0
+
+
+namespace = [
+  enabled = 0
+  cardinality = -1
+  estimated_rows = 0
+  index = [
+    type = "NUM"
+    key_position = -1
+  ]
+]

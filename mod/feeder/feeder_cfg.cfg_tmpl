@@ -1,0 +1,8 @@
+
+# feed WAL to remote replicas
+# feeder accepts it's clients on wal_feeder_bind_ipaddr:wal_feeder_bind_port
+wal_feeder_bind_ipaddr=NULL
+wal_feeder_bind_port=0
+
+# Directory with WAL files to serve
+wal_feeder_dir=NULL

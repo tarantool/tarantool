@@ -1,0 +1,12 @@
+.gitignore
+.gdb_history
+TAGS
+_*
+*.cfg
+config.mk
+lcov
+*.o
+*.d
+tarantool*
+*.snap
+*.xlog
