@@ -28,17 +28,27 @@ endif
 endif
 
 # this global rules are always defined
-module ?= silverbox
+ifeq (,$(module))
+all: 
+	@echo "Valid targets are:"
+	@echo "	_release_box/tarantool_silverbox"
+	@echo "	_release_feeder/tarantool_feeder"
+	@echo "	_debug_box/tarantool_silverbox"
+	@echo "	_debug_feeder/tarantool_feeder"
+	@echo "	clean"
+else
 all: tarantool_$(module)
+endif
 
 ifeq ("$(origin module)", "command line")
 .PHONY: clean
 clean:
+	@echo "	CLEAN $(module)"
 	@rm -rf $(obj) $(dep) tarantool_$(module) _* lcov test
 else
 .PHONY: clean
 clean:
-	@for mod in mod/*; do make --no-print-directory module=`basename $$mod` clean; done
+	@for mod in mod/*; do $(MAKE) --no-print-directory module=`basename $$mod` clean; done
 endif
 .PHONY: TAGS
 tags:
@@ -64,7 +74,11 @@ endif
 CFLAGS += -I$(SRCDIR) -I$(SRCDIR)/include
 LIBS += -lm
 
-subdirs = third_party mod/$(module) cfg core
+subdirs += third_party
+ifneq (,$(module))
+  subdirs += mod/$(module)
+endif
+subdirs += cfg core
 include $(foreach dir,$(subdirs),$(SRCDIR)/$(dir)/Makefile)
 
 tarantool_$(module): $(obj)
