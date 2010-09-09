@@ -38,7 +38,7 @@
 #include <tbuf.h>
 #include <say.h>
 
-#define SLAB_ALIGN_PTR(ptr) (void *)((size_t)(ptr) & ~(SLAB_SIZE - 1))
+#define SLAB_ALIGN_PTR(ptr) (void *)((uintptr_t)(ptr) & ~(SLAB_SIZE - 1))
 
 #ifdef SLAB_DEBUG
 #undef NDEBUG
@@ -164,7 +164,7 @@ salloc_init(size_t size, size_t minimal, double factor)
 	if (!arena_init(&arena, size))
 		return false;
 
-	slab_classes_init(minimal, factor);
+	slab_classes_init(MAX(sizeof(void *),minimal), factor);
 	return true;
 }
 

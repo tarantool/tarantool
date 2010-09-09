@@ -223,7 +223,7 @@ initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_fa
 static void
 initialize_minimal()
 {
-	initialize(0.04, 4, 2);
+	initialize(0.1, 4, 2);
 }
 
 int
