@@ -95,10 +95,10 @@ xrealloc(void *ptr, size_t size)
 	return ret;
 }
 
+#if CORO_ASM
 void
 save_rbp(void **rbp)
 {
-#if CORO_ASM
 #  if __amd64
 	asm("movq %%rbp, %0"::"m"(*rbp));
 #  elif __i386
@@ -106,9 +106,7 @@ save_rbp(void **rbp)
 #  else
 #  error unsupported architecture
 #  endif
-#endif
 }
-
 
 void *main_stack_frame;
 static void
@@ -132,12 +130,15 @@ print_trace(FILE *f)
 		frame = frame->rbp;
 	}
 }
+#endif
 
 void __attribute__((noreturn))
 assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)
 {
 	fprintf(stderr, "%s:%i: %s: assertion %s failed.\n", file, line, function, assertion);
+#if CORO_ASM
 	print_trace(stderr);
+#endif
 	close_all_xcpt(0);
 	abort();
 }

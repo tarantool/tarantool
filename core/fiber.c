@@ -104,7 +104,9 @@ fiber_call(struct fiber *callee)
 	fiber = callee;
 	*sp++ = caller;
 
+#if CORO_ASM
 	save_rbp(&caller->rbp);
+#endif
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }
@@ -116,7 +118,9 @@ yield(void)
 	struct fiber *caller = fiber;
 
 	fiber = callee;
+#if CORO_ASM
 	save_rbp(&caller->rbp);
+#endif
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }

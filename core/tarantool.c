@@ -235,7 +235,9 @@ main(int argc, char **argv)
 	int n_accepted, n_skipped;
 	FILE *f;
 
+#if CORO_ASM
 	save_rbp(&main_stack_frame);
+#endif
 	master_pid = getpid();
 	stat_init();
 	palloc_init();
