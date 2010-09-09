@@ -25,6 +25,8 @@
  */
 
 #include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #include <fiber.h>
 #include <util.h>
