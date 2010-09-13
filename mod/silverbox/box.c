@@ -86,10 +86,12 @@ box_hook_t *before_commit_update_hook;
 static void
 run_hooks(struct box_txn *txn, box_hook_t *hook)
 {
-	for (int i = 0; hook[i] != NULL; i++) {
-		int result = (*hook[i])(txn);
-		if (result != ERR_CODE_OK)
-			box_raise(result, "hook returned error");
+	if (hook != NULL) {
+		for (int i = 0; hook[i] != NULL; i++) {
+			int result = (*hook[i])(txn);
+			if (result != ERR_CODE_OK)
+				box_raise(result, "hook returned error");
+		}
 	}
 }
 
@@ -1221,7 +1223,20 @@ mod_init(void)
 				      cfg.rows_per_wal, cfg.wal_fsync_delay, cfg.snap_io_rate_limit,
 				      cfg.wal_writer_inbox_size, init_storage ? RECOVER_READONLY : 0, NULL);
 
-	custom_init(); /* initialize hashes _after_ starting wal writer */
+	/* initialize hashes _after_ starting wal writer */
+	if (cfg.memcached != 0) {
+		int n = cfg.memcached_namespace > 0 ? cfg.memcached_namespace : MEMCACHED_NAMESPACE;
+		namespace[n].enabled = true;
+		namespace[n].index[0].map.str_map = kh_init(lstr2ptr_map, NULL);
+		namespace[n].index[0].find = index_find_hash_str;
+		namespace[n].index[0].remove = index_remove_hash_str;
+		namespace[n].index[0].replace = index_replace_hash_str;
+		memcached_index = &namespace[n].index[0];
+		memcached_index->key_position = 0;
+		memcached_index->type = INDEX_STR;
+	} else {
+		custom_init();
+	}
 
 	if (init_storage)
 		return;
@@ -1238,11 +1253,6 @@ mod_init(void)
 	}
 
 	if (cfg.memcached != 0) {
-		int n = cfg.memcached_namespace > 0 ? cfg.memcached_namespace : MEMCACHED_NAMESPACE;
-		memcached_index = &namespace[n].index[0];
-		memcached_index->key_position = 0;
-		memcached_index->type = INDEX_STR;
-
 		fiber_server(tcp_server, cfg.primary_port, memcached_handler, NULL, memcached_bound_to_primary);
 	} else {
 		if (cfg.secondary_port != 0)
