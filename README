@@ -1,6 +1,7 @@
-Taranool.
+Taranool/Silverbox
 
-Yet another in-memory database.
+Taranool: in-memory storage framework
+Silverbox: Yet another in-memory key-value database
 
 Key features:
  * fast
@@ -14,3 +15,15 @@ Key features:
 Cons:
  * only tested on x86/Linux and x86/FreeBSD
  * gcc is required to build
+
+
+How to run:
+
+1) compile
+	make _release_box/tarantool_silverbox
+2) customize config
+	emacs cfg/tarantool_silverbox_cfg.cfg
+3) initialize storage
+        _release_box/tarantool_silverbox --config cfg/tarantool_silverbox_cfg.cfg --init_storage
+4) run
+	_release_box/tarantool_silverbox --config cfg/tarantool_silverbox_cfg.cfg
