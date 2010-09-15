@@ -660,6 +660,7 @@ read_log(const char *filename, row_reader reader,
 	struct log_io_class class;
 	struct tbuf *row;
 
+	memset(&i, 0, sizeof(i));
 	memset(&class, 0, sizeof(class));
 
 	if (strstr(filename, xlog_suffix)) {
@@ -698,6 +699,8 @@ recover_snap(struct recovery_state *r)
 	struct tbuf *row;
 	int result = -1;
 	i64 lsn;
+
+	memset(&i, 0, sizeof(i));
 
 	if (setjmp(fiber->exc) != 0) {
 		result = -1;
@@ -759,6 +762,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 	struct tbuf *row;
 	int result;
 
+	memset(&i, 0, sizeof(i));
 	iter_open(l, &i, read_rows);
 
 	while ((row = iter_inner(&i, (void *)1))) {
@@ -1226,6 +1230,8 @@ snapshot_save(struct recovery_state *r, void (*f)(struct log_io_iter *))
 	struct log_io *snap;
 	char final_filename[PATH_MAX + 1];
 	char *dot;
+
+	memset(&i, 0, sizeof(i));
 
 	snap = open_for_write(r, &r->snap_class, confirmed_lsn(r), -1);
 	if (snap == NULL)
