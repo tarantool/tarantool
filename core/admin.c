@@ -166,6 +166,12 @@ tr11:
 #line 139 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st87;
+tr22:
+#line 126 "core/admin.rl"
+	{strend = p;}
+#line 138 "core/admin.rl"
+	{ say_info("PRS"); mod_exec(strstart, strend - strstart, out); end(out); }
+	goto st87;
 tr26:
 #line 128 "core/admin.rl"
 	{tbuf_append(out, help, sizeof(help));}
@@ -225,11 +231,17 @@ st87:
 	if ( ++p == pe )
 		goto _test_eof87;
 case 87:
-#line 229 "core/admin.c"
+#line 235 "core/admin.c"
 	goto st0;
 tr12:
 #line 139 "core/admin.rl"
 	{slab_validate(); ok(out);}
+	goto st7;
+tr23:
+#line 126 "core/admin.rl"
+	{strend = p;}
+#line 138 "core/admin.rl"
+	{ say_info("PRS"); mod_exec(strstart, strend - strstart, out); end(out); }
 	goto st7;
 tr27:
 #line 128 "core/admin.rl"
@@ -290,7 +302,7 @@ st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 294 "core/admin.c"
+#line 306 "core/admin.c"
 	if ( (*p) == 10 )
 		goto st87;
 	goto st0;
@@ -351,38 +363,20 @@ st14:
 	if ( ++p == pe )
 		goto _test_eof14;
 case 14:
+	switch( (*p) ) {
+		case 10: goto st0;
+		case 13: goto st0;
+	}
 	goto tr20;
 tr20:
 #line 126 "core/admin.rl"
 	{strstart = p;}
 	goto st15;
-tr23:
-#line 126 "core/admin.rl"
-	{strend = p;}
-#line 138 "core/admin.rl"
-	{ mod_exec(strstart, strend - strstart, out); end(out); }
-	goto st15;
 st15:
 	if ( ++p == pe )
 		goto _test_eof15;
 case 15:
-#line 370 "core/admin.c"
-	switch( (*p) ) {
-		case 10: goto tr22;
-		case 13: goto tr23;
-	}
-	goto st15;
-tr22:
-#line 126 "core/admin.rl"
-	{strend = p;}
-#line 138 "core/admin.rl"
-	{ mod_exec(strstart, strend - strstart, out); end(out); }
-	goto st88;
-st88:
-	if ( ++p == pe )
-		goto _test_eof88;
-case 88:
-#line 386 "core/admin.c"
+#line 380 "core/admin.c"
 	switch( (*p) ) {
 		case 10: goto tr22;
 		case 13: goto tr23;
@@ -1070,7 +1064,6 @@ case 86:
 	_test_eof13: cs = 13; goto _test_eof; 
 	_test_eof14: cs = 14; goto _test_eof; 
 	_test_eof15: cs = 15; goto _test_eof; 
-	_test_eof88: cs = 88; goto _test_eof; 
 	_test_eof16: cs = 16; goto _test_eof; 
 	_test_eof17: cs = 17; goto _test_eof; 
 	_test_eof18: cs = 18; goto _test_eof; 
