@@ -914,8 +914,13 @@ recover(struct recovery_state *r, i64 lsn)
 	say_info("recovery start");
 	if (lsn == 0) {
 		result = recover_snap(r);
-		if (result < 0)
+		if (result < 0) {
+			if (greatest_lsn(&r->snap_class) <= 0) {
+				say_crit("don't you forget to initialize storage with --init_storage switch?");
+				_exit(1);
+			}
 			panic("snapshot recovery failed");
+		}
 		say_info("snapshot recovered, confirmed lsn:%"PRIi64, confirmed_lsn(r));
 	} else {
 		/*
