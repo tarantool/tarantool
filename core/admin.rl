@@ -123,7 +123,7 @@ admin_dispatch(void)
 		coredump = "co"("r"("e"("d"("u"("m"("p")?)?)?)?)?)?;
 		snapshot = "sn"("a"("p"("s"("h"("o"("t")?)?)?)?)?)?;
 		exec = "e"("x"("e"("c")?)?)?;
-		string = any+ >{strstart = p;}  %{strend = p;};
+		string = any+ >{strstart = fpc;}  %{strend = fpc;};
 
 		commands = (help			%{tbuf_append(out, help, sizeof(help));}|
 			    quit			%{return 0;}				|
@@ -135,7 +135,7 @@ admin_dispatch(void)
 			    show " " stat		%{stat_print(out);end(out);}		|
 			    save " " coredump		%{coredump(60); ok(out);}		|
 			    save " " snapshot		%{snapshot(NULL, 0); ok(out);}		|
-			    exec " " string		%{ mod_exec(strstart, strstart - strend, out); end(out); }		|
+			    exec " " string		%{ mod_exec(strstart, strend - strstart, out); end(out); }		|
 			    check " " slab		%{slab_validate(); ok(out);});
 
 	        main := commands eol;
