@@ -49,7 +49,9 @@ static const char help[] =
 	"show palloc\r\n"
 	"show stat\r\n"
 	"save coredump\r\n"
-	"save snapshot\r\n";
+	"save snapshot\r\n"
+	"exec module command\r\n"
+	;
 
 
 static const char unknown_command[] = "unknown command. try typing help.\r\n";
@@ -77,6 +79,7 @@ admin_dispatch(void)
 	struct tbuf *out = tbuf_alloc(fiber->pool);
 	int cs;
 	char *p, *pe;
+	char *strstart, *strend;
 
 	while ((pe = memchr(fiber->rbuf->data, '\n', fiber->rbuf->len)) == NULL) {
 		if (fiber_bread(fiber->rbuf, 1) <= 0)
@@ -119,6 +122,8 @@ admin_dispatch(void)
 		save = "sa"("v"("e")?)?;
 		coredump = "co"("r"("e"("d"("u"("m"("p")?)?)?)?)?)?;
 		snapshot = "sn"("a"("p"("s"("h"("o"("t")?)?)?)?)?)?;
+		exec = "e"("x"("e"("c")?)?)?;
+		string = any+ >{strstart = p;}  %{strend = p;};
 
 		commands = (help			%{tbuf_append(out, help, sizeof(help));}|
 			    quit			%{return 0;}				|
@@ -130,6 +135,7 @@ admin_dispatch(void)
 			    show " " stat		%{stat_print(out);end(out);}		|
 			    save " " coredump		%{coredump(60); ok(out);}		|
 			    save " " snapshot		%{snapshot(NULL, 0); ok(out);}		|
+			    exec " " string		%{ mod_exec(strstart, strstart - strend, out); end(out); }		|
 			    check " " slab		%{slab_validate(); ok(out);});
 
 	        main := commands eol;

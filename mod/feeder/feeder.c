@@ -148,3 +148,9 @@ mod_init(void)
 exit:
 	exit(EXIT_FAILURE);
 }
+
+void
+mod_exec(char *str __unused__, int len __unused__, struct tbuf *out) {
+    tbuf_printf(out, "Unimplemented");
+} 
+

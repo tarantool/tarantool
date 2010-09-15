@@ -1313,3 +1313,9 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  lsn: %"PRIi64"\r\n", confirmed_lsn(recovery_state));
 	tbuf_printf(out, "  status: %s\r\n", status);
 }
+
+void
+mod_exec(char *str __unused__, int len __unused__, struct tbuf *out) {
+    tbuf_printf(out, "Unimplemented");
+} 
+

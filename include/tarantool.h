@@ -38,6 +38,7 @@ void mod_init (void);
 int mod_cat(const char *filename);
 void mod_snapshot(struct log_io_iter *);
 void mod_info(struct tbuf *out);
+void mod_exec(char *str, int len, struct tbuf *out);
 
 extern struct tarantool_module module;
 extern struct tarantool_cfg cfg;
