@@ -360,7 +360,7 @@ tr23:
 #line 126 "core/admin.rl"
 	{strend = p;}
 #line 138 "core/admin.rl"
-	{ mod_exec(strstart, strstart - strend, out); end(out); }
+	{ mod_exec(strstart, strend - strstart, out); end(out); }
 	goto st15;
 st15:
 	if ( ++p == pe )
@@ -376,7 +376,7 @@ tr22:
 #line 126 "core/admin.rl"
 	{strend = p;}
 #line 138 "core/admin.rl"
-	{ mod_exec(strstart, strstart - strend, out); end(out); }
+	{ mod_exec(strstart, strend - strstart, out); end(out); }
 	goto st88;
 st88:
 	if ( ++p == pe )
