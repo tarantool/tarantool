@@ -440,14 +440,14 @@ close_log(struct log_io **lptr)
 
 	if (l->class->eof_marker_size > 0 && l->mode == LOG_WRITE) {
 		if (fwrite(&l->class->eof_marker, l->class->eof_marker_size, 1, l->f) != 1)
-			say_error("can't write eof_marker to xlog");
+			say_error("can't write eof_marker");
 	}
 
 	if (ev_is_active(&l->stat))
 		ev_stat_stop(&l->stat);
 	r = fclose(l->f);
 	if (r < 0)
-		say_error("can't close xlog");
+		say_error("can't close");
 	free(l);
 	*lptr = NULL;
 	return r;
@@ -637,7 +637,7 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 		goto error;
 	}
 
-	say_info("creating xlog `%s'", l->filename);
+	say_info("creating `%s'", l->filename);
 	write_header(l);
 	return l;
 error:
