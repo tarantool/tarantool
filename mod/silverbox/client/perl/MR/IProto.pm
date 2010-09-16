@@ -213,12 +213,15 @@ sub _a_send {
     $self->{_connecting} = 0;
     $self->{_timedout} = 0;
     while(length $self->{_write_buf}) {
+        local $! = 0;
         my $res = syswrite($self->{sock}, $self->{_write_buf});
         if(defined $res && $res == 0) {
+            _debug $self "$!" and next if $!{EINTR};
             $self->{_error} .= "Server unexpectedly closed connection (${\length $self->{_write_buf}} bytes unwritten)";
             return;
         }
         if(!defined $res) {
+            _debug $self "$!" and next if $!{EINTR};
             $self->{_timedout} = !!$!{EAGAIN};
             $self->{_error} .= $! unless $self->{_async} && $!{EAGAIN};
             return;
@@ -240,6 +243,7 @@ sub _a_recv {
     $self->{_connecting} = 0;
     $self->{_timedout} = 0;
     while(1) {
+        local $! = 0;
         my $res;
         while($self->{_to_read} and $res = sysread($self->{sock}, my $buffer, $self->{_to_read} ) ) {
             $self->{_to_read} -= $res;
@@ -247,10 +251,12 @@ sub _a_recv {
             $self->{debug} >= 6 && _debug_dump $self '_a_recv: ', $buffer;
         }
         if(defined $res && $res == 0 && $self->{_to_read}) {
+            _debug $self "$!" and next if $!{EINTR};
             $self->{_error} .= "Server unexpectedly closed connection ($self->{_to_read} bytes unread)";
             return;
         }
         if(!defined $res) {
+            _debug $self "$!" and next if $!{EINTR};
             $self->{_timedout} = !!$!{EAGAIN};
             $self->{_error} .= $! unless $self->{_async} && $!{EAGAIN};
             return;
@@ -416,13 +422,18 @@ sub _connect
     IO::Handle::blocking($sock,0) if $async;
 
     my $sin = Socket::sockaddr_in($server->{'port'}, Socket::inet_aton($server->{'host'}));
-    unless(connect($sock, $sin)) {
-        $self->{_timedout} = !!$!{EINPROGRESS};
-        if(!$async || !$!{EINPROGRESS}) {
-            $$err .= "cannot connect: $!";
-            close $sock;
-            return undef;
+    while(1) {
+        local $! = 0;
+        unless(connect($sock, $sin)) {
+            _debug $self "$!" and next if $!{EINTR};
+            $self->{_timedout} = !!$!{EINPROGRESS};
+            if (!$async || !$!{EINPROGRESS}) {
+                $$err .= "cannot connect: $!";
+                close $sock;
+                return undef;
+            }
         }
+        last;
     }
 
     if($self->{tcp_nodelay}) {
@@ -467,6 +478,7 @@ sub _debug
     $server &&= "$server($sock) ";
 
     warn("MR::IProto: $server$msg\n");
+    1;
 }
 
 sub _debug_dump
