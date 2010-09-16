@@ -41,7 +41,7 @@
 static const char help[] =
 	"available commands:\r\n"
 	"help\r\n"
-	"quit\r\n"
+	"exit\r\n"
 	"show info\r\n"
 	"show fiber\r\n"
 	"show configuration\r\n"
@@ -118,7 +118,7 @@ admin_dispatch(void)
 		palloc = "pa"("l"("l"("o"("c")?)?)?)?;
 		stat = "st"("a"("t")?)?;
 		help = "h"("e"("l"("p")?)?)?;
-		quit = "q"("u"("i"("t")?)?)?;
+		exit = "e"("x"("i"("t")?)?)?;
 		save = "sa"("v"("e")?)?;
 		coredump = "co"("r"("e"("d"("u"("m"("p")?)?)?)?)?)?;
 		snapshot = "sn"("a"("p"("s"("h"("o"("t")?)?)?)?)?)?;
@@ -126,7 +126,7 @@ admin_dispatch(void)
 		string = [^\r\n]+ >{strstart = p;}  %{strend = p;};
 
 		commands = (help			%{tbuf_append(out, help, sizeof(help));}|
-			    quit			%{return 0;}				|
+			    exit			%{return 0;}				|
 			    show " " info		%{mod_info(out); end(out);}		|
 			    show " " fiber		%{fiber_info(out);end(out);}		|
 			    show " " configuration 	%show_configuration			|
