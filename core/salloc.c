@@ -61,6 +61,7 @@ struct slab {
 	size_t items;
 	struct slab_item *free;
 	struct slab_class *class;
+	void *brk;
 	struct arena *arena;
 	 TAILQ_ENTRY(slab) link;
 	 TAILQ_ENTRY(slab) free_link;
@@ -180,33 +181,25 @@ salloc_destroy(void)
 static void
 format_slab(struct arena *arena, struct slab_class *class, struct slab *slab)
 {
-	char *p;
-	struct slab_item *prev, *curr = NULL;
-
 	assert(class->item_size <= MAX_SLAB_ITEM);
 
 	slab->magic = SLAB_MAGIC;
-	slab->free = (void *)((char *)slab + sizeof(struct slab));
+	slab->free = NULL;
 	slab->class = class;
 	slab->arena = arena;
-
-	curr = NULL;
-	prev = slab->free;
-	for (p = (char *)slab + sizeof(struct slab) + class->item_size + sizeof(red_zone);
-	     p + class->item_size < (char *)slab + SLAB_SIZE;
-	     p += class->item_size + sizeof(red_zone))
-	{
-		curr = (struct slab_item *)p;
-		prev->next = curr;
-		memcpy((char *)prev + class->item_size, red_zone, sizeof(red_zone));
-		prev = curr;
-	}
-	curr->next = NULL;
-	memcpy((char *)curr + class->item_size, red_zone, sizeof(red_zone));
+	slab->items = 0;
+	slab->used = 0;
+	slab->brk = (void *)slab + sizeof(struct slab);
 
 	SLIST_INSERT_HEAD(&class->slabs, slab, class_link);
 	TAILQ_INSERT_HEAD(&class->free_slabs, slab, free_link);
 	TAILQ_INSERT_HEAD(&slabs, slab, link);
+}
+
+static bool
+full_formated(struct slab *slab)
+{
+	return slab->brk + slab->class->item_size >= (void *)slab + SLAB_SIZE;
 }
 
 void
@@ -252,8 +245,8 @@ slab_of(struct slab_class *class)
 static bool
 valid_item(struct slab *slab, void *item)
 {
-	return (u8*)item >= (u8 *)(slab) + sizeof(struct slab) &&
-		(u8*)item < (u8 *)(slab) + sizeof(struct slab) + SLAB_SIZE;
+	return (void *)item >= (void *)(slab) + sizeof(struct slab) &&
+		(void *)item < (void *)(slab) + sizeof(struct slab) + SLAB_SIZE;
 }
 #endif
 
@@ -270,17 +263,25 @@ salloc(size_t size)
 	if ((slab = slab_of(class)) == NULL)
 		return NULL;
 
-	assert(valid_item(slab, slab->free));
+	if (slab->free == NULL) {
+		assert(valid_item(slab, slab->brk));
+		item = slab->brk;
+		memcpy((void *)item + class->item_size, red_zone, sizeof(red_zone));
+		slab->brk += class->item_size + sizeof(red_zone);
+	} else {
+		assert(valid_item(slab, slab->free));
+		item = slab->free;
 
-	item = slab->free;
-	VALGRIND_MAKE_MEM_DEFINED(item, sizeof(void *));
-	slab->free = item->next;
-	VALGRIND_MAKE_MEM_UNDEFINED(item, sizeof(void *));
+		VALGRIND_MAKE_MEM_DEFINED(item, sizeof(void *));
+		slab->free = item->next;
+		VALGRIND_MAKE_MEM_UNDEFINED(item, sizeof(void *));
+	}
+
+	if (full_formated(slab) && slab->free == NULL)
+		TAILQ_REMOVE(&class->free_slabs, slab, free_link);
+
 	slab->used += class->item_size + sizeof(red_zone);
 	slab->items += 1;
-
-	if (slab->free == NULL)
-		TAILQ_REMOVE(&class->free_slabs, slab, free_link);
 
 	VALGRIND_MALLOCLIKE_BLOCK(item, class->item_size, sizeof(red_zone), 0);
 	return (void *)item;
@@ -294,7 +295,7 @@ sfree(void *ptr)
 	struct slab_class *class = slab->class;
 	struct slab_item *item = ptr;
 
-	if (slab->free == NULL)
+	if (full_formated(slab) && slab->free == NULL)
 		TAILQ_INSERT_TAIL(&class->free_slabs, slab, free_link);
 
 	assert(valid_item(slab, item));
@@ -317,18 +318,19 @@ slab_stat(struct tbuf *t)
 	for (int i = 0; i < slab_active_classes; i++) {
 		slabs = items = used = free = 0;
 		SLIST_FOREACH(slab, &slab_classes[i].slabs, class_link) {
-			if (slab->free != NULL)
-				free += SLAB_SIZE - slab->used - sizeof(struct slab);
+			free += SLAB_SIZE - slab->used - sizeof(struct slab);
 			items += slab->items;
 			used += sizeof(struct slab) + slab->used;
 			total_used += sizeof(struct slab) + slab->used;
 			slabs++;
 		}
-		if (used == 0)
+
+		if (slabs == 0)
 			continue;
 
 		tbuf_printf(t, "     - { item_size: %- 5i, slabs: %- 3i, items: %- 11"PRIi64", bytes_used: %- 12"PRIi64", bytes_free: %- 12"PRIi64" }\n",
 			    (int)slab_classes[i].item_size, slabs, items, used, free);
+
 	}
 	tbuf_printf(t, "  items_used: %.2f\n", (double)total_used / arena.size * 100);
 	tbuf_printf(t, "  arena_used: %.2f\n", (double)arena.used / arena.size * 100);
