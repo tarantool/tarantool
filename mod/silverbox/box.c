@@ -1234,6 +1234,7 @@ mod_init(void)
 		memcached_index = &namespace[n].index[0];
 		memcached_index->key_position = 0;
 		memcached_index->type = INDEX_STR;
+		memcached_index->namespace = &namespace[n];
 	} else {
 		custom_init();
 	}
