@@ -286,7 +286,9 @@ static int
 cmp_i64(const void *_a, const void *_b)
 {
 	const i64 *a = _a, *b = _b;
-	return *a - *b;
+        if (*a == *b)
+                return 0;
+        return (*a > *b) ? 1 : -1;
 }
 
 static ssize_t
@@ -323,8 +325,11 @@ scan_dir(struct log_io_class *class, i64 ** ret_lsn)
 			continue;
 		}
 
-		if (lsn[i] == LLONG_MAX || lsn[i] == LLONG_MIN)
-			goto out;
+		if (lsn[i] == LLONG_MAX || lsn[i] == LLONG_MIN) {
+			say_warn("can't parse `%s', skipping", dent->d_name);
+			continue;
+		}
+
 		i++;
 		if (i == size) {
 			i64 *n = palloc(fiber->pool, sizeof(i64) * size * 2);
