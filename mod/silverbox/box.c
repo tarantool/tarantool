@@ -1315,7 +1315,8 @@ mod_info(struct tbuf *out)
 }
 
 void
-mod_exec(char *str __unused__, int len __unused__, struct tbuf *out) {
-    tbuf_printf(out, "Unimplemented");
-} 
+mod_exec(char *str __unused__, int len __unused__, struct tbuf *out)
+{
+    tbuf_printf(out, "unimplemented\r\n");
+}
 

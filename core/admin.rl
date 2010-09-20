@@ -118,25 +118,25 @@ admin_dispatch(void)
 		palloc = "pa"("l"("l"("o"("c")?)?)?)?;
 		stat = "st"("a"("t")?)?;
 		help = "h"("e"("l"("p")?)?)?;
-		exit = "e"("x"("i"("t")?)?)?;
+		exit = "e"("x"("i"("t")?)?)? | "q"("u"("i"("t")?)?)?;
 		save = "sa"("v"("e")?)?;
 		coredump = "co"("r"("e"("d"("u"("m"("p")?)?)?)?)?)?;
 		snapshot = "sn"("a"("p"("s"("h"("o"("t")?)?)?)?)?)?;
-		exec = "e"("x"("e"("c")?)?)?;
+		exec = "ex"("e"("c")?)?;
 		string = [^\r\n]+ >{strstart = p;}  %{strend = p;};
 
-		commands = (help			%{tbuf_append(out, help, sizeof(help));}|
-			    exit			%{return 0;}				|
-			    show " " info		%{mod_info(out); end(out);}		|
-			    show " " fiber		%{fiber_info(out);end(out);}		|
-			    show " " configuration 	%show_configuration			|
-			    show " " slab		%{slab_stat(out);end(out);}		|
-			    show " " palloc		%{palloc_stat(out);end(out);}		|
-			    show " " stat		%{stat_print(out);end(out);}		|
-			    save " " coredump		%{coredump(60); ok(out);}		|
-			    save " " snapshot		%{snapshot(NULL, 0); ok(out);}		|
-			    exec " " string		%{ say_info("PRS"); mod_exec(strstart, strend - strstart, out); end(out); }		|
-			    check " " slab		%{slab_validate(); ok(out);});
+		commands = (help			%{tbuf_append(out, help, sizeof(help));}		|
+			    exit			%{return 0;}						|
+			    show " "+ info		%{mod_info(out); end(out);}				|
+			    show " "+ fiber		%{fiber_info(out);end(out);}				|
+			    show " "+ configuration 	%show_configuration					|
+			    show " "+ slab		%{slab_stat(out);end(out);}				|
+			    show " "+ palloc		%{palloc_stat(out);end(out);}				|
+			    show " "+ stat		%{stat_print(out);end(out);}				|
+			    save " "+ coredump		%{coredump(60); ok(out);}				|
+			    save " "+ snapshot		%{snapshot(NULL, 0); ok(out);}				|
+			    exec " "+ string		%{mod_exec(strstart, strend - strstart, out); end(out);}|
+			    check " "+ slab		%{slab_validate(); ok(out);});
 
 	        main := commands eol;
 		write init;
