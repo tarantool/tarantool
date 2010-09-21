@@ -582,7 +582,7 @@ memcached_handler(void *_data __unused__)
 	stats.curr_connections++;
 	int r, p;
 	int batch_count;
-	int i = 0;
+
 	for (;;) {
 		batch_count = 0;
 		if ((r = fiber_bread(fiber->rbuf, 1)) <= 0) {
@@ -615,10 +615,7 @@ memcached_handler(void *_data __unused__)
 		}
 
 		stats.bytes_written += r;
-		fiber_cleanup();
-
-		if (i++ % 20 == 0)
-			fiber_gc();
+		fiber_gc();
 
 		if (p == 1 && fiber->rbuf->len > 0) {
 			batch_count = 0;

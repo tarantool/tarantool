@@ -251,6 +251,9 @@ fiber_gc(void)
 
 	fiber_cleanup();
 
+	if (palloc_allocated(fiber->pool) < 128 * 1024)
+		return;
+
 	tmp = fiber->pool;
 	fiber->pool = ex_pool;
 	ex_pool = tmp;

@@ -373,3 +373,9 @@ palloc_name(struct palloc_pool *pool, const char *new_name)
 		pool->name = new_name;
 	return old_name;
 }
+
+size_t
+palloc_allocated(struct palloc_pool *pool)
+{
+	return pool->allocated;
+}

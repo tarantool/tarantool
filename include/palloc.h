@@ -46,6 +46,7 @@ struct palloc_pool *palloc_create_pool2(const char *name, size_t initial_size);
 struct palloc_pool *palloc_create_pool(const char *name);
 void palloc_destroy(struct palloc_pool *);
 const char *palloc_name(struct palloc_pool *, const char *);
+size_t palloc_allocated(struct palloc_pool *);
 size_t palloc_greatest_size(void);
 
 void palloc_stat(struct tbuf *buf);
