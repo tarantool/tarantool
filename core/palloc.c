@@ -55,6 +55,7 @@ SLIST_HEAD(chunk_list_head, chunk);
 struct chunk_class {
 	int i;
 	i64 size;
+	int chunks_count;
 	struct chunk_list_head chunks;
 	 TAILQ_ENTRY(chunk_class) link;
 };
@@ -102,10 +103,11 @@ palloc_init(void)
 
 	for (size_t size = 4096; size <= 1 << 16; size *= 2) {
 		class = malloc(sizeof(struct chunk_class));
-		class->i = class_count++;
 		if (class == NULL)
 			return 0;
 
+		class->i = class_count++;
+		class->chunks_count = 0;
 		class->size = size - sizeof(struct chunk);
 		SLIST_INIT(&class->chunks);
 		TAILQ_INSERT_TAIL(&classes, class, link);
@@ -162,6 +164,7 @@ next_chunk_for(struct palloc_pool * restrict pool, size_t size)
 	if (chunk == NULL)
 		return NULL;
 
+	class->chunks_count++;
 	chunk->magic = chunk_magic;
 	chunk->allocated = 0;
 	chunk->size = class->size;
@@ -326,14 +329,12 @@ palloc_stat(struct tbuf *buf)
 	tbuf_printf(buf, "palloc statistic:\n");
 	tbuf_printf(buf, "  classes:\n");
 	TAILQ_FOREACH(class, &classes, link) {
-		int free_chunks = 0, busy_chunks = 0;
+		int free_chunks = 0;
 		SLIST_FOREACH(chunk, &class->chunks, free_link)
 			free_chunks++;
-		SLIST_FOREACH(chunk, &class->chunks, busy_link)
-			busy_chunks++;
 
-		tbuf_printf(buf, "    - { tsize: %- 8"PRIi64", free_chunks: %- 6i, busy_chunks: %- 6i }\n",
-			    class->size, free_chunks, busy_chunks);
+		tbuf_printf(buf, "    - { size: %- 8"PRIi64", free_chunks: %- 6i, busy_chunks: %- 6i }\n",
+			    class->size, free_chunks, class->chunks_count - free_chunks);
 	}
 	tbuf_printf(buf, "  pools:\n");
 
