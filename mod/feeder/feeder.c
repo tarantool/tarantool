@@ -31,6 +31,8 @@
 #include <fiber.h>
 #include <util.h>
 
+static char *custom_proc_title;
+
 static int
 send_row(struct recovery_state *r __unused__, const struct tbuf *t)
 {
@@ -61,7 +63,7 @@ recover_feed_slave(int sock)
 	fiber->has_peer = true;
 	fiber->fd = sock;
 	fiber->name = "feeder";
-	set_proc_title("feeder:client_handler %s", fiber_peer_name(fiber));
+	set_proc_title("feeder:client_handler%s %s", custom_proc_title, fiber_peer_name(fiber));
 
 	ev_default_loop(0);
 
@@ -96,7 +98,16 @@ mod_init(void)
 	if (cfg.wal_feeder_dir == NULL)
 		panic("can't start feeder without wal_feeder_dir");
 
-	set_proc_title("feeder:acceptor %s:%i",
+	if (cfg.custom_proc_title == NULL)
+		custom_proc_title = "";
+	else {
+		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
+		strcat(custom_proc_title, "@");
+		strcat(custom_proc_title, cfg.custom_proc_title);
+	}
+
+	set_proc_title("feeder:acceptor%s %s:%i",
+		       custom_proc_title,
 		       cfg.wal_feeder_bind_ipaddr == NULL ? "ANY" : cfg.wal_feeder_bind_ipaddr,
 		       cfg.wal_feeder_bind_port);
 

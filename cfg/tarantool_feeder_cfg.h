@@ -72,6 +72,9 @@ typedef struct tarantool_cfg {
 
 	/* Directory with WAL files to serve */
 	char*	wal_feeder_dir;
+
+	/* custom proc title is appended after normal */
+	char*	custom_proc_title;
 } tarantool_cfg;
 
 int fill_default_tarantool_cfg(tarantool_cfg *c);

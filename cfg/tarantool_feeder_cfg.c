@@ -46,6 +46,7 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->wal_feeder_bind_ipaddr = NULL;
 	c->wal_feeder_bind_port = 0;
 	c->wal_feeder_dir = NULL;
+	c->custom_proc_title = NULL;
 	return 0;
 }
 
@@ -102,6 +103,9 @@ static NameAtom _name__wal_feeder_bind_port[] = {
 };
 static NameAtom _name__wal_feeder_dir[] = {
 	{ "wal_feeder_dir", -1, NULL }
+};
+static NameAtom _name__custom_proc_title[] = {
+	{ "custom_proc_title", -1, NULL }
 };
 
 #define ARRAYALLOC(x,n,t)  do {                                     \
@@ -301,6 +305,14 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		 if (opt->paramValue.stringval && c->wal_feeder_dir == NULL)
 			return CNF_NOMEMORY;
 	}
+	else if ( cmpNameAtoms( opt->name, _name__custom_proc_title) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		errno = 0;
+		c->custom_proc_title = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		 if (opt->paramValue.stringval && c->custom_proc_title == NULL)
+			return CNF_NOMEMORY;
+	}
 	else {
 		return CNF_MISSED;
 	}
@@ -415,6 +427,7 @@ typedef enum IteratorState {
 	S_name__wal_feeder_bind_ipaddr,
 	S_name__wal_feeder_bind_port,
 	S_name__wal_feeder_dir,
+	S_name__custom_proc_title,
 	_S_Finished
 } IteratorState;
 
@@ -629,6 +642,16 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "wal_feeder_dir");
+			i->state = S_name__custom_proc_title;
+			return buf;
+		case S_name__custom_proc_title:
+			*v = (c->custom_proc_title) ? strdup(c->custom_proc_title) : NULL;
+			if (*v == NULL && c->custom_proc_title) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "custom_proc_title");
 			i->state = _S_Finished;
 			return buf;
 		case _S_Finished:
