@@ -226,8 +226,7 @@ restart:
 			goto out;
 		}
 
-		if (row_count % 1000 == 0)
-			prelease(fiber->pool);
+		prelease_after(fiber->pool, 128 * 1024);
 
 		if (++row_count % 100000 == 0) {
 			ev_now_update();

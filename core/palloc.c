@@ -277,6 +277,13 @@ prelease(struct palloc_pool *pool)
 	next_chunk_for(pool, 128);
 }
 
+void
+prelease_after(struct palloc_pool *pool, size_t after)
+{
+	if (pool->allocated > after)
+		prelease(pool);
+}
+
 struct palloc_pool *
 palloc_create_pool2(const char *name, size_t initial_size)
 {
