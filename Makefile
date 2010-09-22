@@ -11,13 +11,13 @@ OBJDIR:=$(shell $(ECHO) $(filter _%,$(MAKECMDGOALS)) | tr ' ' '\n' | cut -d/ -f1
 ifeq (,$(SUB_MAKE))
 ifneq (,$(OBJDIR))
 .SUFFIXES:
-MAKEFLAGS += -rR --no-print-directory SRCDIR=$(CURDIR) VPATH=$(CURDIR)
+MAKEFLAGS += -rR --no-print-directory VPATH=$(CURDIR)
 FILTERED_MAKECMDGOALS=$(subst $@/,,$(filter $@/%,$(MAKECMDGOALS)))
 MODULE=$(subst tarantool_,,$(FILTERED_MAKECMDGOALS))
 .PHONY: $(OBJDIR)
 $(OBJDIR):
 	+@mkdir -p $@
-	+@$(MAKE) -C $@ -f $(CURDIR)/Makefile OBJDIR=$@ module=$(MODULE) $(FILTERED_MAKECMDGOALS)
+	+@$(MAKE) -C $@ -f $(CURDIR)/Makefile SRCDIR=$(CURDIR) OBJDIR=$@ module=$(MODULE) $(FILTERED_MAKECMDGOALS)
 
 Makefile: ;
 %.mk :: ;
@@ -55,7 +55,7 @@ tags:
 	ctags -R -e -f TAGS
 
 # then SRCDIR is defined, build type is selected and it's time to define build rules
-ifneq (,$(SRCDIR))
+ifeq ("$(origin SRCDIR)", "command line")
 -include $(SRCDIR)/config.mk $(SRCDIR)/scripts/config.mk
 include $(SRCDIR)/scripts/config_def.mk
 
