@@ -438,7 +438,12 @@ my %update_ops = (
 my %update_arg_fmt = (
     (map { $_ => 'l' } OP_ADD),
     (map { $_ => 'L' } OP_AND, OP_XOR, OP_OR),
-    (map { $_ => 'a*' } OP_SPLICE),
+);
+
+my %ops_type = (
+    (map { $_ => 'any'    } OP_SET),
+    (map { $_ => 'number' } OP_ADD, OP_AND, OP_XOR, OP_OR),
+    (map { $_ => 'string' } OP_SPLICE),
 );
 
 BEGIN {
@@ -471,6 +476,7 @@ sub UpdateMulti {
     foreach (@op) {
         confess "$self->{name}: bad op <$_>" if ref ne 'ARRAY' or @$_ != 3;
         my ($field_num, $op, $value) = @$_;
+        my $field_type = $namespace->{string_keys}->{$field_num} ? 'string' : 'number';
 
         my $is_array = 0;
         if ($op eq 'bit_set') {
@@ -490,6 +496,8 @@ sub UpdateMulti {
             ($op, $value) = &$op($value);
             $op = $update_ops{$op} if exists $update_ops{$op};
         }
+
+        confess "Are you sure you want to apply `$ops_type{$op}' operation to $field_type field?" if $ops_type{$op} ne $field_type && $ops_type{$op} ne 'any';
 
         $value = [ $value ] unless ref $value;
         confess "dunno what to do with ref `$value'" if ref $value ne 'ARRAY';
