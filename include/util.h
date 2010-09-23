@@ -72,12 +72,13 @@
 
 #ifndef TYPEALIGN
 #define TYPEALIGN(ALIGNVAL,LEN)  \
-        (((long) (LEN) + ((ALIGNVAL) - 1)) & ~((long) ((ALIGNVAL) - 1)))
+        (((uintptr_t) (LEN) + ((ALIGNVAL) - 1)) & ~((uintptr_t) ((ALIGNVAL) - 1)))
 
 #define SHORTALIGN(LEN)                 TYPEALIGN(sizeof(int16_t), (LEN))
 #define INTALIGN(LEN)                   TYPEALIGN(sizeof(int32_t), (LEN))
 #define MAXALIGN(LEN)                   TYPEALIGN(sizeof(int64_t), (LEN))
 #define PTRALIGN(LEN)                   TYPEALIGN(sizeof(void*), (LEN))
+#define CACHEALIGN(LEN)			TYPEALIGN(32, (LEN))
 #endif
 
 
