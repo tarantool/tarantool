@@ -36,6 +36,7 @@
 #include <say.h>
 #include <stat.h>
 #include <tarantool.h>
+#include <tbuf.h>
 #include <util.h>
 
 static const char help[] =
