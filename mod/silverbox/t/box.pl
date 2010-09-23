@@ -71,7 +71,7 @@ ok $box->Cutend(13, 6 => 2), 'cutend op';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, 'EPEND666APPE'], 'select/cutend';
 
 ok $box->Substr(13, 6 => [3,4,'12345']), 'substr op';
-is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, 'EPE123456APPEND'], 'select/substr';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, 'EPE123456APPE'], 'select/substr';
 
 
 
