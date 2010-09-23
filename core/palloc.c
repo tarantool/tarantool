@@ -40,14 +40,13 @@
 
 struct chunk {
 	uint32_t magic;
+	void *brk;
+	size_t free;
 	size_t size;
-	size_t allocated;
 
-	struct chunk_class * restrict class;
+	struct chunk_class *class;
 	 SLIST_ENTRY(chunk) busy_link;
 	 SLIST_ENTRY(chunk) free_link;
-
-	unsigned char data[0];
 };
 
 SLIST_HEAD(chunk_list_head, chunk);
@@ -101,7 +100,7 @@ palloc_init(void)
 	class_count = 0;
 	TAILQ_INIT(&classes);
 
-	for (size_t size = 4096; size <= 1 << 16; size *= 2) {
+	for (size_t size = 4096 * 8; size <= 1 << 16; size *= 2) {
 		class = malloc(sizeof(struct chunk_class));
 		if (class == NULL)
 			return 0;
@@ -131,7 +130,7 @@ poison_chunk(struct chunk *chunk)
 {
 	(void)chunk;		/* arg used */
 #ifdef PALLOC_POISON
-	memset(chunk->data, poison_char, chunk->size);
+	memset((void *)chunk + sizeof(struct chunk), poison_char, chunk->size);
 	VALGRIND_MAKE_MEM_NOACCESS(chunk->data, chunk->size);
 #endif
 }
@@ -166,8 +165,9 @@ next_chunk_for(struct palloc_pool * restrict pool, size_t size)
 
 	class->chunks_count++;
 	chunk->magic = chunk_magic;
-	chunk->allocated = 0;
 	chunk->size = class->size;
+	chunk->free = chunk->size - sizeof(struct chunk);
+	chunk->brk = (void *)chunk + sizeof(struct chunk);
 	chunk->class = class;
       found:
 	assert(chunk != NULL && chunk->magic == chunk_magic);
@@ -175,23 +175,6 @@ next_chunk_for(struct palloc_pool * restrict pool, size_t size)
 
 	poison_chunk(chunk);
 	return chunk;
-}
-
-
-static void *
-alloc_from_chunk(struct chunk *chunk, size_t size)
-{
-	assert(chunk != NULL);
-	assert(chunk->magic == chunk_magic);
-	assert(chunk->size >= chunk->allocated);
-
-	if (likely(chunk->size - chunk->allocated >= size)) {
-		void *ptr = chunk->data + chunk->allocated;	// TODO: align ptr
-		chunk->allocated += size;
-		return ptr;
-	} else {
-		return NULL;
-	}
 }
 
 
@@ -214,40 +197,48 @@ poisoned(const char *b, size_t size)
 static void * __noinline__
 palloc_slow_path(struct palloc_pool * restrict pool, size_t size)
 {
-	struct chunk * restrict chunk;
+	struct chunk *chunk;
 	chunk = next_chunk_for(pool, size);
-	assert(chunk != NULL);
-	return alloc_from_chunk(chunk, size);
+	if (chunk == NULL)
+		abort();
+
+	assert(chunk->free >= size);
+	void *ptr = chunk->brk;
+	chunk->brk += size;
+	chunk->free -= size;
+	return ptr;
 }
 
-void *
-palloc(struct palloc_pool *pool, size_t size)
+void * __attribute__((regparm(2)))
+palloc(struct palloc_pool * restrict pool, size_t size)
 {
 	assert(size < palloc_greatest_size());
-	size_t rz_size = size + PALLOC_REDZONE * 2;
+	const size_t rz_size = size + PALLOC_REDZONE * 2;
 	struct chunk * restrict chunk = SLIST_FIRST(&pool->chunks);
 	void *ptr;
 
 	pool->allocated += rz_size;
-	ptr = alloc_from_chunk(chunk, rz_size);
-	if (unlikely(ptr == NULL))
+
+	if (likely(chunk->free >= rz_size)) {
+		ptr = chunk->brk;
+		chunk->brk += rz_size;
+		chunk->free -= rz_size;
+	} else
 		ptr = palloc_slow_path(pool, rz_size);
 
-	assert(ptr != NULL);
 	assert(poisoned(ptr + PALLOC_REDZONE, size) == NULL);
 	VALGRIND_MEMPOOL_ALLOC(pool, ptr + PALLOC_REDZONE, size);
+
 	return ptr + PALLOC_REDZONE;
 }
 
-void *
+void * __attribute__((regparm(2)))
 p0alloc(struct palloc_pool *pool, size_t size)
 {
 	void * ptr;
 
 	ptr = palloc(pool, size);
-	if (ptr)
-		memset(ptr, 0, size);
-
+	memset(ptr, 0, size);
 	return ptr;
 }
 
@@ -257,7 +248,7 @@ palloca(struct palloc_pool *pool, size_t size, size_t align)
 	void * ptr;
 
 	ptr = palloc(pool, size + align);
-	return (void*)TYPEALIGN(align, (uintptr_t)ptr); 
+	return (void*)TYPEALIGN(align, (uintptr_t)ptr);
 }
 
 void
@@ -269,7 +260,8 @@ prelease(struct palloc_pool *pool)
 	     chunk != NULL;
 	     chunk = SLIST_NEXT(chunk, busy_link))
 	{
-		chunk->allocated = 0;
+		chunk->free = chunk->size - sizeof(struct chunk);
+		chunk->brk = (void *)chunk + sizeof(struct chunk);
 		SLIST_INSERT_HEAD(&chunk->class->chunks, chunk, free_link);
 		poison_chunk(chunk);
 	}
