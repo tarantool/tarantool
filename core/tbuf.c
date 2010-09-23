@@ -58,10 +58,10 @@ tbuf_alloc(struct palloc_pool *pool)
 {
 	const size_t initial_size = 128 - sizeof(struct tbuf);
 	struct tbuf *e = palloc(pool, sizeof(*e) + initial_size);
-	e->pool = pool;
-	e->data = (char *)e + sizeof(*e);
-	e->size = initial_size;
 	e->len = 0;
+	e->size = initial_size;
+	e->data = (char *)e + sizeof(*e);
+	e->pool = pool;
 	poison(e->data, e->size);
 	tbuf_assert(e);
 	return e;
@@ -147,16 +147,6 @@ tbuf_reset(struct tbuf *b)
 	tbuf_assert(b);
 	poison(b->data, b->len);
 	b->len = 0;
-}
-
-void
-tbuf_append(struct tbuf *b, const void *data, size_t len)
-{
-	tbuf_assert(b);
-	tbuf_ensure(b, len + 1);
-	memcpy(b->data + b->len, data, len);
-	b->len += len;
-	*(((char *)b->data) + b->len) = '\0';
 }
 
 void
