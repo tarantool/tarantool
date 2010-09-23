@@ -651,15 +651,13 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
                 .data = args_data,
                 .pool = NULL
         };
-        static struct tbuf new_field = {
-                .len = 0,
-                .size = 0,
-                .data = NULL,
-                .pool = NULL
-        };
+        static struct tbuf *new_field = NULL;
         void *offset_field, *length_field, *list_field;
         u32 offset_size, length_size, list_size;
         i32 offset, length;
+
+        if (new_field == NULL)
+                new_field = tbuf_alloc(fiber->pool);
 
         offset_field = read_field(&args);
         length_field = read_field(&args);
@@ -705,12 +703,12 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
         say_debug("do_field_splice: offset = %i, length = %i, list_size = %u",
                   offset, length, list_size);
 
-        new_field.len = 0;
-        tbuf_append(&new_field, field->data, offset);
-        tbuf_append(&new_field, list_field, list_size);
-        tbuf_append(&new_field, field->data + offset + length, field->len - (offset + length));
+        new_field->len = 0;
+        tbuf_append(new_field, field->data, offset);
+        tbuf_append(new_field, list_field, list_size);
+        tbuf_append(new_field, field->data + offset + length, field->len - (offset + length));
 
-        *field = new_field;
+        *field = *new_field;
 }
 
 static int __noinline__
