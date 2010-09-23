@@ -1,17 +1,16 @@
 use ExtUtils::MakeMaker;
 
-use 5.005003;
-
 WriteMakefile(
-#    'LIB' => '/usr/local/mpop/lib',
-#    dist	=> {
-#	            PREOP	=> 'pod2text Lemmatizer.pm | tee README >$(DISTVNAME)/README; chmod -R u=rwX,go=rX . ;',
-#	            COMPRESS	=> 'gzip -9v',
-#	            SUFFIX	=> '.gz',
-#	           },
-    NAME => "MR::SilverBox",
-    VERSION_FROM => "MR/SilverBox.pm",
-    MAKEFILE  => 'Makefile',
-#    CCFLAGS   => `pkg-config --cflags lemmatizer`,
-#    LIBS      => `pkg-config  --libs lemmatizer`,
+    NAME          => "MR::SilverBox",
+    VERSION_FROM  => "MR/SilverBox.pm",
+    MAKEFILE      => 'Makefile',
+    PREREQ_PM     => {
+        'Scalar::Util'      => 0,
+        'List::Util'        => 0,
+        'List::MoreUtils'   => 0,
+        'Time::HiRes'       => 0,
+        'String::CRC32'     => 0,
+        'Exporter'          => 0,
+        'Fcntl'             => 0,
+    },
 );
