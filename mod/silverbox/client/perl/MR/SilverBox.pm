@@ -486,13 +486,13 @@ sub UpdateMulti {
             $op = $update_ops{$op};
         }
 
-        $value = [ $value ] unless ref $value;
-        confess "dunno what to do with ref `$value'" if ref $value ne 'ARRAY';
-
         while(ref $op eq 'CODE') {
             ($op, $value) = &$op($value);
             $op = $update_ops{$op} if exists $update_ops{$op};
         }
+
+        $value = [ $value ] unless ref $value;
+        confess "dunno what to do with ref `$value'" if ref $value ne 'ARRAY';
 
         confess "bad fieldnum: $field_num" if $field_num >= @$fmt;
         $value = pack($update_arg_fmt{$op} || $fmt->[$field_num], @$value);

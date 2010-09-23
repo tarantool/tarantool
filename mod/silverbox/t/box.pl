@@ -8,9 +8,12 @@ BEGIN {
 use FindBin qw($Bin);
 use lib "$Bin";
 use TBox ();
+use Carp qw/confess/;
 
 use Test::More qw/no_plan/;
 use Test::Exception;
+
+local $SIG{__DIE__} = \&confess;
 
 our $CLASS;
 BEGIN { $CLASS = $ENV{BOXCLASS} || 'MR::SilverBox'; eval "require $CLASS" or die $@; }
