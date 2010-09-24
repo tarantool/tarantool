@@ -33,18 +33,34 @@ extern bool box_updates_allowed;
 void memcached_handler(void *_data __unused__);
 
 struct namespace;
+struct box_tuple;
+
+#include <third_party/sptree.h>
+SPTREE_DEF(str_t, struct box_tuple *, realloc);
+
+// #include <mod/silverbox/tree.h>
+
+
 
 struct index {
-	struct box_tuple *(*find)(struct index *index, int key_len, void *key);
-	void (*remove)(struct index *index, void *key);
-	void (*replace)(struct index *index, void *key, void *value);
+	struct box_tuple *(*find)(struct index *index, void *key); /* only for unique lookups */
+	struct box_tuple *(*find_by_tuple)(struct index *index, struct box_tuple *pattern);
+	void (*remove)(struct index *index, struct box_tuple *);
+	void (*replace)(struct index *index, struct box_tuple *);
+	void (*iterator_init)(struct index *, struct box_tuple *pattern);
+	struct box_tuple * (*iterator_next)(struct index *);
 	union {
-                khash_t(lstr2ptr_map) *str_map;
-                khash_t(int2ptr_map) *int_map;
-        } map;
+                khash_t(lstr2ptr_map) *str_hash;
+                khash_t(int2ptr_map) *int_hash;
+		sptree_str_t *str_tree;
+        } idx;
+	void *iterator;
+	bool iterator_empty;
+
 	struct namespace *namespace;
 	int key_position;
-	enum { INDEX_NUM, INDEX_STR } type;
+	int key_cardinality;
+	enum { INDEX_HASH_NUM, INDEX_HASH_STR, INDEX_TREE_STR } type;
 };
 
 extern struct index *memcached_index;
@@ -64,7 +80,6 @@ struct box_tuple {
         u32 cardinality;
         u8 data[0];
 } __packed__;
-
 
 struct box_txn {
         int op;
@@ -126,7 +141,7 @@ enum box_mode {
 
 ENUM(messages, MESSAGES);
 
-struct box_tuple *index_find(struct index *index, int key_len, void *key);
+struct box_tuple *index_find(struct index *index, void *key);
 
 struct box_txn *txn_alloc(u32 flags);
 u32 box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data);

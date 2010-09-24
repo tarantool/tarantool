@@ -117,7 +117,7 @@ delete(struct box_txn *txn, void *key)
 static struct box_tuple *
 find(void *key)
 {
-	return index_find(memcached_index, 1, key);
+	return memcached_index->find(memcached_index, key);
 }
 
 static struct meta *
@@ -192,7 +192,7 @@ flush_all(void *data)
 {
 	uintptr_t delay = (uintptr_t)data;
 	fiber_sleep(delay - ev_now());
-	khash_t(lstr2ptr_map) *map = memcached_index->map.str_map;
+	khash_t(lstr2ptr_map) *map = memcached_index->idx.str_hash;
 	for (khiter_t i = kh_begin(map); i != kh_end(map); i++) {
 		if (kh_exist(map, i)) {
 			struct box_tuple *tuple = kh_value(map, i);
@@ -636,7 +636,7 @@ void
 memcached_expire(void *data __unused__)
 {
 	static khiter_t i;
-	khash_t(lstr2ptr_map) *map = memcached_index->map.str_map;
+	khash_t(lstr2ptr_map) *map = memcached_index->idx.str_hash;
 
 	say_info("memcached expire fiber started");
 	for (;;) {

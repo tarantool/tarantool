@@ -58,5 +58,6 @@ namespace = [
   index = [
     type = "NUM"
     key_position = -1
+    key_cardinality = 1
   ]
 ]
