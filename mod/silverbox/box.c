@@ -641,7 +641,6 @@ do_field_arith(u8 op, struct tbuf *field, void *arg, u32 arg_size)
         }
 }
 
-#define MINUS_ZERO 0x10000000
 static void
 do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 {
@@ -651,13 +650,13 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
                 .data = args_data,
                 .pool = NULL
         };
-        static struct tbuf *new_field = NULL;
+        struct tbuf *new_field = NULL;
         void *offset_field, *length_field, *list_field;
         u32 offset_size, length_size, list_size;
         i32 offset, length;
+        u32 noffset, nlength; /* normalized values */
 
-        if (new_field == NULL)
-                new_field = tbuf_alloc(fiber->pool);
+        new_field = tbuf_alloc(fiber->pool);
 
         offset_field = read_field(&args);
         length_field = read_field(&args);
@@ -667,46 +666,56 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 
         offset_size = load_varint32(&offset_field);
         if (offset_size == 0)
-                offset = 0;
+                noffset = 0;
         else if (offset_size == sizeof(offset)) {
                 offset = pick_u32(offset_field, &offset_field);
-                if (offset == MINUS_ZERO)
-                        offset = field->len;
-                else if (offset < 0 )
-                        offset += field->len;
+                if (offset < 0 ) {
+                        if (field->len < -offset)
+                                box_raise(ERR_CODE_ILLEGAL_PARAMS,
+                                          "do_field_splice: noffset is negative");
+                        noffset = offset + field->len;
+                } else
+                        noffset = offset;
         } else
                 box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad size of offset field");
+        if (noffset > field->len)
+                noffset = field->len;
 
         length_size = load_varint32(&length_field);
         if (length_size == 0)
-                length = field->len - offset;
+                nlength = field->len - noffset;
         else if (length_size == sizeof(length)) {
                 if (offset_size == 0)
                         box_raise(ERR_CODE_ILLEGAL_PARAMS,
                                   "do_field_splice: offset field is empty but length is not");
 
                 length = pick_u32(length_field, &length_field);
-                if (length < 0)
-                        length += field->len - offset;
+                if (length < 0) {
+                        if ((field->len - noffset) < -length)
+                                nlength = 0;
+                        else
+                                nlength = length + field->len - noffset;
+                } else
+                        nlength = length;
         } else
                 box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad size of length field");
+        if (nlength > (field->len - noffset))
+                nlength = field->len - noffset;
 
         list_size = load_varint32(&list_field);
         if (list_size > 0 && length_size == 0)
                 box_raise(ERR_CODE_ILLEGAL_PARAMS,
                           "do_field_splice: length field is empty but list is not");
+        if (list_size > (UINT32_MAX - (field->len - nlength)))
+                box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: list_size is too long");
 
-        if ((offset + length) > field->len)
-                box_raise(ERR_CODE_ILLEGAL_PARAMS,
-                          "do_field_splice: (offset + length) > field->len");
-
-        say_debug("do_field_splice: offset = %i, length = %i, list_size = %u",
-                  offset, length, list_size);
+        say_debug("do_field_splice: noffset = %i, nlength = %i, list_size = %u",
+                  noffset, nlength, list_size);
 
         new_field->len = 0;
-        tbuf_append(new_field, field->data, offset);
+        tbuf_append(new_field, field->data, noffset);
         tbuf_append(new_field, list_field, list_size);
-        tbuf_append(new_field, field->data + offset + length, field->len - (offset + length));
+        tbuf_append(new_field, field->data + noffset + nlength, field->len - (noffset + nlength));
 
         *field = *new_field;
 }
