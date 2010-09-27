@@ -76,7 +76,42 @@ is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, '
 ok $box->Substr(13, 6 => [3,4,'12345']), 'substr op';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, 'EPE123456APPE'], 'select/substr';
 
+ok $box->UpdateMulti(13, [6 => splice => [0]]), 'generic splice (offset = 0)';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, ''], 'select/splice (offset = 0)';
 
+cleanup 13;
+
+ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'insert';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/insert';
+
+throws_ok sub { $box->UpdateMulti(13, [6 => splice => [-10]]) }, qr/Illegal parametrs/, "splice/bad_params_1";
+
+ok $box->UpdateMulti(13, [6 => splice => [100]]), "splice/big_offset";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [5]]), "splice/cut_tail_pos_offset";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '12345'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [-2]]), "splice/cut_tail_neg_offset";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123'], 'select';
+
+ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'replace';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [8, 1000]]), "splice/big_pos_length";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '12345678'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [1, -1000]]), "splice/big_neg_length";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '12345678'], 'select';
+
+ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'replace';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [0x7fffffff]]), "splice/max_offset";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [1, 2]], [6 => splice => [-2, -1, 'qwe']]), "splice/multi";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '14567qwe9'], 'select';
 
 $box = $CLASS->new(def_param);
 ok $box->isa($CLASS), 'connect';
