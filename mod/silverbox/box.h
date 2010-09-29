@@ -41,14 +41,14 @@ SPTREE_DEF(str_t, struct box_tuple *, realloc);
 // #include <mod/silverbox/tree.h>
 
 
-
+#define MAX_IDX_FIELDS 10
 struct index {
 	struct box_tuple *(*find)(struct index *index, void *key); /* only for unique lookups */
 	struct box_tuple *(*find_by_tuple)(struct index *index, struct box_tuple *pattern);
 	void (*remove)(struct index *index, struct box_tuple *);
-	void (*replace)(struct index *index, struct box_tuple *);
+	void (*replace)(struct index *index, struct box_tuple *, struct box_tuple *);
 	void (*iterator_init)(struct index *, struct box_tuple *pattern);
-	struct box_tuple * (*iterator_next)(struct index *);
+	struct box_tuple * (*iterator_next)(struct index *, struct box_tuple *pattern);
 	union {
                 khash_t(lstr2ptr_map) *str_hash;
                 khash_t(int2ptr_map) *int_hash;
@@ -58,8 +58,17 @@ struct index {
 	bool iterator_empty;
 
 	struct namespace *namespace;
-	int key_position;
-	int key_cardinality;
+
+        u32 key_fieldno[MAX_IDX_FIELDS];
+        u32 key_cardinality;
+
+        struct {
+                void *field;
+                u32 size;
+        } *search_field;
+        i8 *cmp_map;
+        u32 search_tuple_cardinality;
+
 	enum { INDEX_HASH_NUM, INDEX_HASH_STR, INDEX_TREE_STR } type;
 };
 
@@ -101,7 +110,8 @@ struct box_txn {
 enum tuple_flags {
 	WAL_WAIT = 0x1,
 	GHOST    = 0x2,
-	NEW      = 0x4
+	NEW      = 0x4,
+        SEARCH   = 0x8
 };
 
 enum box_mode {
