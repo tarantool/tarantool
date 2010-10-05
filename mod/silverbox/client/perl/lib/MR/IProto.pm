@@ -2,7 +2,7 @@ package MR::IProto;
 
 use strict;
 
-use Socket qw(PF_INET SOCK_STREAM SOL_SOCKET SO_SNDTIMEO SO_RCVTIMEO TCP_NODELAY);
+use Socket qw(PF_INET SOCK_STREAM SOL_SOCKET SO_SNDTIMEO SO_RCVTIMEO SO_KEEPALIVE TCP_NODELAY);
 use String::CRC32 qw(crc32);
 use Time::HiRes qw/time sleep/;
 use Fcntl;
@@ -32,7 +32,7 @@ sub RR                          () { 1 }
 sub HASH                        () { 2 }
 sub KETAMA                      () { 3 }
 
-sub confess (@) { die @_ };
+sub confess { die @_ };
 
 sub DisconnectAll {
     close $_ foreach (values %sockets);
@@ -52,6 +52,7 @@ sub new {
     $self->{retry_delay}          = $args->{retry_delay} || DEFAULT_RETRY_DELAY();
     $self->{dump_no_ints}         = 1 if $args->{dump_no_ints};
     $self->{tcp_nodelay}          = 1 if $args->{tcp_nodelay};
+    $self->{tcp_keepalive}        = $args->{tcp_keepalive} || 0;
     $self->{param}                = $args->{param};
     $self->{_last_server}         = '';
 
@@ -144,8 +145,7 @@ sub _parse_servers {
             push @servers, { host => $host, port => $port, ok => 1, repr => "$host:$port" } for (1..$weight);
         } else {
             my ($host, $port) = $server =~ /(.+):(\d+)/;
-            push @servers, { host => $host, port => $port, repr => "$host:$port" }
-
+            push @servers, { host => $host, port => $port, repr => "$host:$port" };
         }
     }
     $self->{$key} = \@servers;
@@ -400,8 +400,11 @@ sub _connect {
         socket($sock, PF_INET, SOCK_STREAM, $proto);
     };
 
-    _set_sock_timeout $sock, $self->{timeout_timeval} unless $async;
-    _set_blocking($sock,0) if $async;
+    if ($async) {
+        _set_blocking($sock,0);
+    } else {
+        _set_sock_timeout $sock, $self->{timeout_timeval};
+    }
 
     my $sin = Socket::sockaddr_in($server->{'port'}, Socket::inet_aton($server->{'host'}));
     while(1) {
@@ -422,6 +425,10 @@ sub _connect {
         setsockopt($sock, $PROTO_TCP, TCP_NODELAY, 1);
     }
 
+    if($self->{tcp_keepalive}) {
+        setsockopt($sock, SOL_SOCKET, SO_KEEPALIVE, 1);
+    }
+
     $self->{debug} >= 1 && _debug $self "connected";
     return $sockets{$server->{repr}} = $sock;
 }
@@ -432,7 +439,7 @@ sub SetTimeout {
 
     my $sec  = int $timeout; # seconds
     my $usec = int( ($timeout - $sec) * 1_000_000 ); # micro-seconds
-    $self->{timeout_timeval} = pack "LL", $sec, $usec; # struct timeval;
+    $self->{timeout_timeval} = pack "L!L!", $sec, $usec; # struct timeval;
 
     _set_sock_timeout $sockets{$_}, $self->{timeout_timeval}
         for

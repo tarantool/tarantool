@@ -2,7 +2,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
     NAME          => "MR::SilverBox",
-    VERSION_FROM  => "MR/SilverBox.pm",
+    VERSION_FROM  => "lib/MR/SilverBox.pm",
     MAKEFILE      => 'Makefile',
     PREREQ_PM     => {
         'Scalar::Util'      => 0,

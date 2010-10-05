@@ -1,4 +1,5 @@
 Makefile.PL
-MR/IProto.pm
-MR/SilverBox.pm
-MR/Storage/Const.pm
+MANIFEST
+lib/MR/IProto.pm
+lib/MR/SilverBox.pm
+lib/MR/Storage/Const.pm

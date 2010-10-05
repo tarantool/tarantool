@@ -348,9 +348,9 @@ sub Select {
     confess q/Select isnt callable in void context/ unless defined wantarray;
     my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace use_index raw want next_rows limit offset/);
     my ($self, @keys) = @_;
-    @keys = @{$keys[0]} if ref $keys[0] eq 'ARRAY';
+    @keys = @{$keys[0]} if ref $keys[0] eq 'ARRAY' and 1 == @{$param->{index}->{keys}} || ref $keys[0]->[0] eq 'ARRAY';
 
-    $self->_debug("$self->{name}: SELECT($namespace->{namespace})[@{[map{ref$_?qq{[@$_]}:$_}@keys]}]") if $self->{debug} >= 3;
+    $self->_debug("$self->{name}: SELECT($namespace->{namespace}/$param->{use_index})[@{[map{ref$_?qq{[@$_]}:$_}@keys]}]") if $self->{debug} >= 3;
 
     my ($msg,$payload);
     if(exists $param->{next_rows}) {
@@ -420,7 +420,7 @@ my %update_ops = (
     or          => OP_OR,
     splice      => sub {
         confess "value for operation splice must be an ARRAYREF of <int[, int[, string]]>" if ref $_[0] ne 'ARRAY' || @{$_[0]} < 1;
-        $_[0]->[0] = 0x10000000 unless defined $_[0]->[0];
+        $_[0]->[0] = 0x7FFFFFFF unless defined $_[0]->[0];
         $_[0]->[0] = pack 'l', $_[0]->[0];
         $_[0]->[1] = defined $_[0]->[1] ? pack 'l', $_[0]->[1] : '';
         $_[0]->[2] = '' unless defined $_[0]->[2];
