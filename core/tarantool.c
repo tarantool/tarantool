@@ -351,7 +351,6 @@ main(int argc, char **argv)
 #ifdef STORAGE
 	if (role == cat) {
 		initialize_minimal();
-		mod_init();
 		if (access(cat_filename, R_OK) == -1) {
 			say_syserror("access(\"%s\")", cat_filename);
 			exit(EX_OSFILE);
