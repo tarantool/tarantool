@@ -1268,11 +1268,18 @@ custom_init(void)
 		namespace[i].cardinality = cfg.namespace[i]->cardinality;
 		int estimated_rows = cfg.namespace[i]->estimated_rows;
 
+		if (cfg.namespace[i]->index == NULL)
+			panic("(namespace = %"PRIu32") at least one index must be defined", i);
+
 		for (int j = 0; j < nelem(namespace[i].index); j++) {
                         u32 max_key_fieldno = 0;
 
 			if (cfg.namespace[i]->index[j] == NULL)
 				break;
+
+			if (cfg.namespace[i]->index[j]->key_fields == NULL)
+				panic("(namespace = %"PRIu32" index = %"PRIu32") "
+				      "at least one field must be defined", i, j);
 
                         for (int k = 0; cfg.namespace[i]->index[j]->key_fields[k] != NULL; k++) {
                                 if (k >= nelem(namespace[i].index[j].key_fieldno))
