@@ -57,7 +57,8 @@ namespace = [
   estimated_rows = 0
   index = [
     type = "NUM"
-    key_position = -1
-    key_cardinality = 1
+    key_fields = [
+      fieldno = -1
+    ]
   ]
 ]
