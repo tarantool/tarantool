@@ -3765,7 +3765,7 @@ memcached_expire(void *data __unused__)
 
 		fiber_gc();
 
-		double delay = cfg.memcached_expire_per_loop * cfg.memcached_expire_full_sweep / (map->size + 1);
+		double delay = (double)cfg.memcached_expire_per_loop * cfg.memcached_expire_full_sweep / (map->size + 1);
 		if (delay > 1)
 			delay = 1;
 		fiber_sleep(delay);
