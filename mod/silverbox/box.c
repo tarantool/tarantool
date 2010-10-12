@@ -39,8 +39,13 @@
 #include <tarantool.h>
 #include <tbuf.h>
 #include <util.h>
+// #include <third_party/sptree.h>
 
 #include <mod/silverbox/box.h>
+
+
+#define ASTERISK UINT32_MAX
+
 
 bool box_updates_allowed = false;
 static char *status = "unknown";
@@ -117,30 +122,86 @@ tuple_field(struct box_tuple *tuple, size_t i)
         return field;
 }
 
+/*
+ * Compare tuples only by fields defined in index->key_fieldno[].
+ * Return:
+ *      Common meaning:
+ *              < 0  - a is smaler than b
+ *              == 0 - a is equal to b
+ *              > 0  - a is greater than b
+ *      Custom treatment (by absolute value):
+ *              1 - differ in some index field (both tuple consists of it)
+ *              2 - one tuple doesn't consist of some index field
+ *              3 - one tuple is a search pattern
+ *              4 - differ in pointers
+ */
+static int
+tuple_compare(struct box_tuple **tuple_a, struct box_tuple **tuple_b, struct index *index)
+{
+	void *a = (*tuple_a)->data, *b = (*tuple_b)->data;
+
+        // init cmp_map
+	for (int i = 0; i < index->search_tuple_cardinality; i++) {
+                i8 r = 0;
+                u32 al = 0, bl = 0;
+                bool has_a = false, has_b = false;
+
+                if (i >= (* tuple_a)->cardinality)
+                        // tuple_a doesn't have more fields
+                        r -= 2;
+                else {
+                        al = load_varint32(&a);
+                        has_a = true;
+                }
+                if (i >= (* tuple_b)->cardinality)
+                        // tuple_b doesn't have more fields
+                        r += 2;
+                else {
+		        bl = load_varint32(&b);
+                        has_b = true;
+                }
+
+                if (has_a && has_b) {
+                        if (al == ASTERISK || bl == ASTERISK)
+                                // comparison with asterisk
+                                r = 0;
+		        else if(al != bl)
+		                r =  al > bl ? 1 : -1;
+                        else {
+                                i32 cmp = memcmp(a, b, al);
+
+                                r = cmp > 0 ? 1 : cmp == 0 ? 0 : -1;
+                        }
+                }
+
+                index->cmp_map[i] = r;
+
+		a += al == ASTERISK ? 0 : al;
+		b += bl == ASTERISK ? 0 : bl;
+	}
+
+        for (int i = 0; i < index->key_cardinality; ++i)
+                if (index->cmp_map[index->key_fieldno[i]] != 0)
+                        return index->cmp_map[index->key_fieldno[i]];
+
+        if ((* tuple_a)->flags & SEARCH)
+                return -3;
+
+        if ((* tuple_b)->flags & SEARCH)
+                return 3;
+
+        if (*tuple_a > *tuple_b)
+                return 4;
+        else if (*tuple_a < *tuple_b)
+                return -4;
+
+        return 0;
+}
+
 #define foreach_index(n, index_var)					\
 	for (struct index *index_var = namespace[(n)].index;		\
-	     index_var->key_position >= 0;				\
+	     index_var->key_cardinality != 0;				\
 	     index_var++)
-
-struct box_tuple *
-index_find(struct index *index, int key_len, void *key)
-{
-	return index->find(index, key_len, key);
-}
-
-void
-index_remove(struct index *index, struct box_tuple *tuple)
-{
-	void *key = tuple_field(tuple, index->key_position);
-	index->remove(index, key);
-}
-
-void
-index_replace(struct index *index, struct box_tuple *tuple)
-{
-	void *key = tuple_field(tuple, index->key_position);
-	index->replace(index, key, tuple);
-}
 
 
 static void
@@ -209,14 +270,15 @@ tuple_print(struct tbuf *buf, uint8_t cardinality, void *f)
 static struct box_tuple *
 tuple_alloc(size_t size)
 {
-        size += sizeof(struct box_tuple);
-        struct box_tuple *tuple = salloc(size);
+        struct box_tuple *tuple = salloc(sizeof(struct box_tuple) + size);
 
         if (tuple == NULL)
 		box_raise(ERR_CODE_MEMORY_ISSUE, "can't allocate tuple");
 
         tuple->flags = tuple->refs = 0;
 	tuple->flags |= NEW;
+	tuple->bsize = size;
+
         say_debug("tuple_alloc(%zu) = %p", size, tuple);
         return tuple;
 }
@@ -251,20 +313,26 @@ tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
 	tuple_ref(tuple, +1);
 }
 
+static struct box_tuple *
+uniq_find_by_tuple(struct index *self, struct box_tuple *tuple)
+{
+	void *key = tuple_field(tuple, self->key_fieldno[0]);
+	if (key == NULL)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "invalid tuple, can't find key");
+	return self->find(self, key);
+}
 
 static struct box_tuple *
-index_find_hash_num(struct index *self, int key_len, void *key)
+index_find_hash_num(struct index *self, void *key)
 {
 	struct box_tuple *ret = NULL;
 	u32 key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
-	if (key_len != 1)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key must be single valued");
 	if (key_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
 
-	assoc_find(int2ptr_map, self->map.int_map, num, ret);
+	assoc_find(int2ptr_map, self->idx.int_hash, num, ret);
 #ifdef DEBUG
 	say_debug("index_find_hash_num(%i, key:%i, tuple:%p)", self->namespace->n, num, ret);
 #endif
@@ -272,120 +340,213 @@ index_find_hash_num(struct index *self, int key_len, void *key)
 }
 
 static struct box_tuple *
-index_find_hash_str(struct index *self, int key_len, void *key)
+index_find_hash_str(struct index *self, void *key)
 {
 	struct box_tuple *ret = NULL;
-	u32 size;
 
-	if (key_len != 1)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key must be single valued");
-
-	assoc_find(lstr2ptr_map, self->map.str_map, key, ret);
-	size = load_varint32(&key);
+	assoc_find(lstr2ptr_map, self->idx.str_hash, key, ret);
 #ifdef DEBUG
+	u32 size = load_varint32(&key);
 	say_debug("index_find_hash_str(%i, key:(%i)'%.*s', tuple:%p)", self->namespace->n, size, size, (u8 *)key, ret);
 #endif
 	return ret;
 }
 
-static void
-index_remove_hash_num(struct index *self, void *key)
+
+static struct box_tuple *
+alloc_search_tuple(struct index *index, int key_cardinality, void *key)
 {
+	struct box_tuple *tuple;
+        void *key_field = key;
+	u32 key_data_len = 0;
+
+        memset(index->search_field, 0, sizeof(index->search_field[0]) * index->search_tuple_cardinality);
+
+	for (int i = 0; i < key_cardinality; i++) {
+                u32 size;
+
+                index->search_field[index->key_fieldno[i]].field = key_field;
+		size = load_varint32(&key_field);
+                index->search_field[index->key_fieldno[i]].size = size +
+                        (key_field - index->search_field[index->key_fieldno[i]].field);
+
+                key_data_len += index->search_field[index->key_fieldno[i]].size;
+		key_field += size;
+	}
+
+	tuple = tuple_alloc(
+                (index->search_tuple_cardinality - key_cardinality) * varint32_sizeof(ASTERISK) +
+                key_data_len);
+	tuple->cardinality = index->search_tuple_cardinality;
+        tuple->flags |= SEARCH;
+
+        void *p = tuple->data;
+        for (int i = 0; i < index->search_tuple_cardinality; i++) {
+                if (index->search_field[i].field == NULL)
+                        p = save_varint32(p, ASTERISK);
+                else {
+                        memcpy(p, index->search_field[i].field, index->search_field[i].size);
+                        p += index->search_field[i].size;
+                }
+        }
+
+	return tuple;
+}
+
+static struct box_tuple *
+index_find_tree_str(struct index *self, void *key)
+{
+	struct box_tuple *tuple = alloc_search_tuple(self, 1, key);
+	struct box_tuple **ret = sptree_str_t_find(self->idx.str_tree, &tuple);
+	tuple_free(tuple);
+
+	if (ret)
+		return *ret;
+	return NULL;
+}
+
+
+static void
+index_remove_hash_num(struct index *self, struct box_tuple *tuple)
+{
+	void *key = tuple_field(tuple, self->key_fieldno[0]);
 	unsigned int key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
         if(key_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
-	assoc_delete(int2ptr_map, self->map.int_map, num);
+	assoc_delete(int2ptr_map, self->idx.int_hash, num);
 #ifdef DEBUG
 	say_debug("index_remove_hash_num(%i, key:%i)", self->namespace->n, num);
 #endif
 }
 
 static void
-index_remove_hash_str(struct index *self, void *key)
+index_remove_hash_str(struct index *self, struct box_tuple *tuple)
 {
-	assoc_delete(lstr2ptr_map, self->map.str_map, key);
+	void *key = tuple_field(tuple, self->key_fieldno[0]);
+	assoc_delete(lstr2ptr_map, self->idx.str_hash, key);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
 	say_debug("index_remove_hash_str(%i, key:'%.*s')", self->namespace->n, size, (u8 *)key);
 #endif
 }
 
+
 static void
-index_replace_hash_num(struct index *self, void *key, void *value)
+index_remove_tree_str(struct index *self, struct box_tuple *tuple)
 {
+	sptree_str_t_delete(self->idx.str_tree, &tuple);
+}
+
+
+static void
+index_replace_hash_num(struct index *self, struct box_tuple *old_tuple __unused__, struct box_tuple *tuple)
+{
+	void *key = tuple_field(tuple, self->key_fieldno[0]);
 	u32 key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
         if(key_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
-	assoc_replace(int2ptr_map, self->map.int_map, num, value);
+	assoc_replace(int2ptr_map, self->idx.int_hash, num, tuple);
 #ifdef DEBUG
-	say_debug("index_replace_hash_num(%i, key:%i, tuple:%p)", self->namespace->n, num, value);
+	say_debug("index_replace_hash_num(%i, key:%i, tuple:%p)", self->namespace->n, num, tuple);
 #endif
 }
 
 static void
-index_replace_hash_str(struct index *self, void *key, void *value)
+index_replace_hash_str(struct index *self, struct box_tuple *old_tuple __unused__, struct box_tuple *tuple)
 {
-	assoc_replace(lstr2ptr_map, self->map.str_map, key, value);
+	void *key = tuple_field(tuple, self->key_fieldno[0]);
+	assoc_replace(lstr2ptr_map, self->idx.str_hash, key, tuple);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
-	say_debug("index_replace_hash_str(%i, key:'%.*s', tuple:%p)", self->namespace->n, size, (u8 *)key, value);
+	say_debug("index_replace_hash_str(%i, key:'%.*s', tuple:%p)", self->namespace->n, size, (u8 *)key, tuple);
 #endif
+}
+
+static void
+index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+{
+        if (old_tuple)
+                index_remove_tree_str(self, old_tuple);
+	sptree_str_t_insert(self->idx.str_tree, &tuple);
+}
+
+static void
+index_iterator_init_tree_str(struct index *self, struct box_tuple *pattern)
+{
+	sptree_str_t_iterator_init_set(self->idx.str_tree,
+				       (struct sptree_str_t_iterator **)&self->iterator,
+				       &pattern);
+}
+
+
+static struct box_tuple *
+index_iterator_next_tree_str(struct index *self, struct box_tuple *pattern)
+{
+        struct box_tuple *tuple;
+	spnode_t node = sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
+
+        if (node == SPNIL)
+                return NULL;
+
+        tuple = *(self->idx.str_tree->members + node);
+
+        i32 r = tuple_compare(&pattern, &tuple, self);
+        if (r == -2 || r == -3)
+                return tuple;
+
+        return NULL;
+}
+
+
+static void
+validate_indeces(struct box_txn *txn)
+{
+	if (namespace[txn->n].index[1].key_cardinality != 0) { /* there is more then one index */
+		foreach_index(txn->n, index) {
+                        if (index->type == INDEX_TREE_STR)
+                                /* Don't check non unique indexes */
+                                continue;
+
+			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
+
+			if(tuple != NULL && tuple != txn->old_tuple)
+				box_raise(ERR_CODE_ILLEGAL_PARAMS, "unique index violation");
+		}
+	}
 }
 
 static int __noinline__
 prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 {
-        uint8_t *key;
-
         assert(data != NULL);
 	if (cardinality == 0)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "cardinality can't be equal to 0");
-	if(data->len == 0 || data->len != valid_tuple(data, cardinality))
+	if (data->len == 0 || data->len != valid_tuple(data, cardinality))
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "tuple encoding error");
 
         txn->tuple = tuple_alloc(data->len);
 	tuple_txn_ref(txn, txn->tuple);
         txn->tuple->cardinality = cardinality;
-        txn->tuple->bsize = data->len;
         memcpy(txn->tuple->data, data->data, data->len);
-        key = tuple_field(txn->tuple, txn->index->key_position);
-        if(key == NULL)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "invalid tuple: can't find key");
 
-	txn->old_tuple = index_find(txn->index, 1, key);
+
+	txn->old_tuple = txn->index->find_by_tuple(txn->index, txn->tuple);
+
 	if (txn->old_tuple != NULL)
 		tuple_txn_ref(txn, txn->old_tuple);
 
-	if (namespace[txn->n].index[1].key_position >= 0) { /* there is more then one index */
-		foreach_index(txn->n, index) {
-			void *key = tuple_field(txn->tuple, index->key_position);
-			if(key == NULL)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "invalid tuple, can't find key");
-
-			struct box_tuple *tuple = index_find(index, 1, key);
-
-			/*
-			 * tuple referenced by secondary keys
-			 * must be same as tuple referenced by index[0]
-			 * if tuple nonexistent (NULL) - it must be nonexistent in all indeces
-			 */
-			if(tuple != txn->old_tuple) {
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "index violation");
-			}
-		}
-	}
-
+	validate_indeces(txn);
         run_hooks(txn, before_commit_update_hook);
 
         if (txn->old_tuple != NULL) {
 #ifndef NDEBUG
                 void *ka, *kb;
-		ka = tuple_field(txn->tuple, txn->index->key_position);
-                kb = tuple_field(txn->old_tuple, txn->index->key_position);
+		ka = tuple_field(txn->tuple, txn->index->key_fieldno[0]);
+                kb = tuple_field(txn->old_tuple, txn->index->key_fieldno[0]);
 		int kal, kab;
 		kal = load_varint32(&ka);
 		kab = load_varint32(&kb);
@@ -400,7 +561,7 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		 */
 
 		foreach_index(txn->n, index)
-			index_replace(index, txn->tuple);
+			index->replace(index, NULL, txn->tuple);
 
                 lock_tuple(txn, txn->tuple);
 		txn->tuple->flags |= GHOST;
@@ -416,7 +577,7 @@ commit_replace(struct box_txn *txn)
 
         if (txn->old_tuple != NULL) {
 		foreach_index(txn->n, index)
-			index_replace(index, txn->tuple);
+			index->replace(index, txn->old_tuple, txn->tuple);
 
 		tuple_ref(txn->old_tuple, -1);
         }
@@ -439,7 +600,7 @@ rollback_replace(struct box_txn *txn)
 
         if (txn->tuple && txn->tuple->flags & GHOST) {
 		foreach_index(txn->n, index)
-			index_remove(index, txn->tuple);
+			index->remove(index, txn->tuple);
         }
 }
 
@@ -468,7 +629,7 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
         if(key == NULL)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "invalid key");
 
-        txn->old_tuple = index_find(txn->index, 1, key);
+        txn->old_tuple = txn->index->find(txn->index, key);
         if (txn->old_tuple == NULL) {
                 if (!txn->in_recover) {
                         int tuples_affected = 0;
@@ -507,11 +668,6 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 			xor = read_u32(data);
 			add = read_u32(data);
 
-			foreach_index(txn->n, index) {
-				if(index->key_position == field_no)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS, "update of indexed field");
-			}
-
 			if(field_no >= txn->old_tuple->cardinality)
 				box_raise(ERR_CODE_ILLEGAL_PARAMS, "update of field beyond tuple cardinality");
 
@@ -542,11 +698,6 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 			void *arg;
 
 			field_no = read_u32(data);
-
-			foreach_index(txn->n, index) {
-				if(index->key_position == field_no)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS, "update of indexed field");
-			}
 
 			if(field_no >= txn->old_tuple->cardinality)
 				box_raise(ERR_CODE_ILLEGAL_PARAMS, "update of field beyond tuple cardinality");
@@ -595,7 +746,6 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 		bsize += fields[i]->len + varint32_sizeof(fields[i]->len);
         txn->tuple = tuple_alloc(bsize);
 	tuple_txn_ref(txn, txn->tuple);
-        txn->tuple->bsize = bsize;
         txn->tuple->cardinality = txn->old_tuple->cardinality;
 
         uint8_t *p = txn->tuple->data;
@@ -605,6 +755,7 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
                 p += fields[i]->len;
         }
 
+	validate_indeces(txn);
         run_hooks(txn, before_commit_update_hook);
 
 	if(data->len != 0)
@@ -640,28 +791,61 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bo
 	add_iov(found, sizeof(*found));
 	*found = 0;
 
-        for (u32 i = 0; i < count; i++) {
-		if (!old_format) {
+	if (txn->index->type == INDEX_TREE_STR) {
+		for (u32 i = 0; i < count; i++) {
 			u32 key_len = read_u32(data);
-			if (key_len != 1)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "key must be single valued");
+			void *key = read_field(data);
+
+			/* advance remaining fields of a key */
+			for (int i = 1; i < key_len; i++)
+				read_field(data);
+
+			struct box_tuple *pattern = alloc_search_tuple(txn->index, key_len, key);
+			txn->index->iterator_init(txn->index, pattern);
+
+			while ((tuple = txn->index->iterator_next(txn->index, pattern)) != NULL) {
+				if (tuple->flags & GHOST)
+					continue;
+
+				if (offset > 0) {
+					offset--;
+					continue;
+				}
+
+				(*found)++;
+				tuple_add_iov(txn, tuple);
+
+				if (--limit == 0)
+					break;
+			}
+			tuple_free(pattern);
+			if (limit == 0)
+				break;
 		}
-		void *key = read_field(data);
-		tuple = index_find(txn->index, 1, key);
-                if (tuple == NULL || tuple->flags & GHOST)
-                        continue;
+	} else {
+		for (u32 i = 0; i < count; i++) {
+			if (!old_format) {
+				u32 key_len = read_u32(data);
+				if (key_len != 1)
+					box_raise(ERR_CODE_ILLEGAL_PARAMS, "key must be single valued");
+			}
+			void *key = read_field(data);
+			tuple = txn->index->find(txn->index, key);
+			if (tuple == NULL || tuple->flags & GHOST)
+				continue;
 
-		if (offset > 0) {
-			offset--;
-			continue;
+			if (offset > 0) {
+				offset--;
+				continue;
+			}
+
+			(*found)++;
+			tuple_add_iov(txn, tuple);
+
+			if (--limit == 0)
+				break;
 		}
-
-                (*found)++;
-                tuple_add_iov(txn, tuple);
-
-		if (--limit == 0)
-			break;
-        }
+	}
 
 	if(data->len != 0)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "can't unpack request");
@@ -673,7 +857,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bo
 static int __noinline__
 prepare_delete(struct box_txn *txn, void *key)
 {
-        txn->old_tuple = index_find(txn->index, 1, key);
+        txn->old_tuple = txn->index->find(txn->index, key);
 
         if(txn->old_tuple == NULL) {
                 if (!txn->in_recover) {
@@ -699,7 +883,7 @@ commit_delete(struct box_txn *txn)
         }
 
 	foreach_index(txn->n, index)
-		index_remove(index, txn->old_tuple);
+		index->remove(index, txn->old_tuple);
         tuple_ref(txn->old_tuple, -1);
 
         return;
@@ -852,7 +1036,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 		if (i > MAX_IDX)
 			box_raise(ERR_CODE_ILLEGAL_PARAMS, "index too big");
 		txn->index = &namespace[txn->n].index[i];
-		if (txn->index->key_position < 0)
+		if (txn->index->key_cardinality == 0)
 			box_raise(ERR_CODE_ILLEGAL_PARAMS, "index is invalid");
 
 		stat_collect(messages_strs[op], 1);
@@ -1005,7 +1189,7 @@ snap_apply(struct recovery_state *r __unused__, const struct tbuf *t)
 		return -1;
 	}
 	txn->index = &namespace[txn->n].index[0];
-	assert(txn->index->key_position >= 0);
+	assert(txn->index->key_cardinality > 0);
 
 	struct tbuf *b = palloc(fiber->pool, sizeof(*b));
 	b->data = row->data;
@@ -1084,38 +1268,102 @@ custom_init(void)
 		namespace[i].cardinality = cfg.namespace[i]->cardinality;
 		int estimated_rows = cfg.namespace[i]->estimated_rows;
 
+		if (cfg.namespace[i]->index == NULL)
+			panic("(namespace = %"PRIu32") at least one index must be defined", i);
+
 		for (int j = 0; j < nelem(namespace[i].index); j++) {
+                        u32 max_key_fieldno = 0;
+
 			if (cfg.namespace[i]->index[j] == NULL)
 				break;
 
-			namespace[i].index[j].key_position = cfg.namespace[i]->index[j]->key_position;
-			if (namespace[i].index[j].key_position == -1)
-				continue;
+			if (cfg.namespace[i]->index[j]->key_fields == NULL)
+				panic("(namespace = %"PRIu32" index = %"PRIu32") "
+				      "at least one field must be defined", i, j);
 
+                        for (int k = 0; cfg.namespace[i]->index[j]->key_fields[k] != NULL; k++) {
+                                if (k >= nelem(namespace[i].index[j].key_fieldno))
+                                        panic("too many fields in key");
+
+		                namespace[i].index[j].key_fieldno[k] =
+                                        cfg.namespace[i]->index[j]->key_fields[k]->fieldno;
+			        if (namespace[i].index[j].key_fieldno[k] == -1)
+				        break;
+
+                                namespace[i].index[j].key_cardinality++;
+                                max_key_fieldno = MAX(max_key_fieldno,
+                                                      namespace[i].index[j].key_fieldno[k]);
+                        }
+                        if (namespace[i].index[j].key_cardinality == 0)
+                                continue;
+
+                        namespace[i].index[j].search_tuple_cardinality = max_key_fieldno + 1;
+
+                        namespace[i].index[j].search_field =
+                                salloc(sizeof(namespace[i].index[j].search_field[0]) *
+                                       namespace[i].index[j].search_tuple_cardinality);
+                        if (namespace[i].index[j].search_field == NULL)
+                                panic("can't allocate search_field for index");
+
+                        namespace[i].index[j].cmp_map = salloc(
+                                sizeof(namespace[i].index[j].cmp_map[0]) *
+                                namespace[i].index[j].search_tuple_cardinality);
+                        if (namespace[i].index[j].cmp_map == NULL)
+                                panic("can't allocate cmp_map for index");
 
 			if (strcmp(cfg.namespace[i]->index[j]->type, "NUM") == 0) {
 				namespace[i].index[j].find = index_find_hash_num;
+				namespace[i].index[j].find_by_tuple = uniq_find_by_tuple;
 				namespace[i].index[j].remove = index_remove_hash_num;
 				namespace[i].index[j].replace = index_replace_hash_num;
 				namespace[i].index[j].namespace = &namespace[i];
-				namespace[i].index[j].type = INDEX_NUM;
-				namespace[i].index[j].map.int_map = kh_init(int2ptr_map, NULL);
+				namespace[i].index[j].type = INDEX_HASH_NUM;
+				namespace[i].index[j].idx.int_hash = kh_init(int2ptr_map, NULL);
+				if (namespace[i].index[j].key_cardinality != 1)
+					panic("hash NUM index must have key_cardinality = 1");
+
 				if (estimated_rows > 0)
-					kh_resize(int2ptr_map, namespace[i].index[j].map.int_map, estimated_rows);
+					kh_resize(int2ptr_map, namespace[i].index[j].idx.int_hash, estimated_rows);
 			} else if (strcmp(cfg.namespace[i]->index[j]->type, "STR") == 0) {
 				namespace[i].index[j].find = index_find_hash_str;
+				namespace[i].index[j].find_by_tuple = uniq_find_by_tuple;
 				namespace[i].index[j].remove = index_remove_hash_str;
 				namespace[i].index[j].replace = index_replace_hash_str;
 				namespace[i].index[j].namespace = &namespace[i];
-				namespace[i].index[j].type = INDEX_STR;
-				namespace[i].index[j].map.str_map = kh_init(lstr2ptr_map, NULL);
+				namespace[i].index[j].type = INDEX_HASH_STR;
+				namespace[i].index[j].idx.str_hash = kh_init(lstr2ptr_map, NULL);
+				if (namespace[i].index[j].key_cardinality != 1)
+					panic("hash NUM index must have key_cardinality = 1");
+
 				if (estimated_rows > 0)
-					kh_resize(lstr2ptr_map, namespace[i].index[j].map.str_map, estimated_rows);
+					kh_resize(lstr2ptr_map, namespace[i].index[j].idx.str_hash, estimated_rows);
+			} else if (strcmp(cfg.namespace[i]->index[j]->type, "TREE_STR") == 0) {
+				namespace[i].index[j].find = index_find_tree_str;
+				namespace[i].index[j].find_by_tuple = uniq_find_by_tuple;
+				namespace[i].index[j].remove = index_remove_tree_str;
+				namespace[i].index[j].replace = index_replace_tree_str;
+				namespace[i].index[j].iterator_init = index_iterator_init_tree_str;
+				namespace[i].index[j].iterator_next = index_iterator_next_tree_str;
+				namespace[i].index[j].namespace = &namespace[i];
+				namespace[i].index[j].type = INDEX_TREE_STR;
+
+				namespace[i].index[j].idx.str_tree = palloc(eter_pool, sizeof(*namespace[i].index[j].idx.str_tree));
+
+				sptree_str_t_init(namespace[i].index[j].idx.str_tree,
+						  0, 0, 0,
+						  (void *)tuple_compare,
+						  &namespace[i].index[j]);
 			} else {
 				say_warn("unknown index type `%s'", cfg.namespace[i]->index[j]->type);
 				continue;
 			}
 		}
+
+                if (namespace[i].index[0].key_cardinality == 0)
+                        panic("namespace must have at least one index");
+                if (namespace[i].index[0].type == INDEX_TREE_STR)
+                        panic("namespace first index must be unique");
+
 		namespace[i].enabled = true;
 		namespace[i].n = i;
 		say_info("namespace %i successfully configured", i);
@@ -1180,7 +1428,7 @@ memcached_bound_to_primary(void *data __unused__)
 {
 	box_bound_to_primary(NULL);
 
-	if (!cfg.remote_hot_standby) {
+	if (0 && !cfg.remote_hot_standby) {
 		struct fiber *expire = fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
 		if (expire == NULL)
 			panic("can't stared expire fiber");
@@ -1194,8 +1442,10 @@ mod_init(void)
 {
 	for (int i = 0; i < nelem(namespace); i++) {
 		namespace[i].enabled = false;
-		for (int j = 0; j < MAX_IDX; j++)
-			namespace[i].index[j].key_position = -1;
+		for (int j = 0; j < MAX_IDX; j++) {
+			namespace[i].index[j].key_cardinality = 0;
+                        namespace[i].index[j].search_tuple_cardinality = 0;
+                }
 	}
 
 	if (cfg.custom_proc_title == NULL)
@@ -1227,13 +1477,17 @@ mod_init(void)
 	if (cfg.memcached != 0) {
 		int n = cfg.memcached_namespace > 0 ? cfg.memcached_namespace : MEMCACHED_NAMESPACE;
 		namespace[n].enabled = true;
-		namespace[n].index[0].map.str_map = kh_init(lstr2ptr_map, NULL);
+
+		namespace[n].index[0].idx.str_hash = kh_init(lstr2ptr_map, NULL);
 		namespace[n].index[0].find = index_find_hash_str;
+		namespace[n].index[0].find_by_tuple = uniq_find_by_tuple;
 		namespace[n].index[0].remove = index_remove_hash_str;
 		namespace[n].index[0].replace = index_replace_hash_str;
+
 		memcached_index = &namespace[n].index[0];
-		memcached_index->key_position = 0;
-		memcached_index->type = INDEX_STR;
+		memcached_index->key_fieldno[0] = 0;
+                memcached_index->key_cardinality = 1;
+		memcached_index->type = INDEX_HASH_STR;
 		memcached_index->namespace = &namespace[n];
 	} else {
 		custom_init();
@@ -1284,8 +1538,8 @@ mod_snapshot(struct log_io_iter *i)
                 if (!namespace[n].enabled)
 			continue;
 
-		assoc_foreach(namespace[n].index[0].map.int_map, k) {
-			tuple = kh_value(namespace[n].index[0].map.int_map, k);
+		assoc_foreach(namespace[n].index[0].idx.int_hash, k) {
+			tuple = kh_value(namespace[n].index[0].idx.int_hash, k);
 
 			if (tuple->flags & GHOST) // do not save fictive rows
 				continue;
