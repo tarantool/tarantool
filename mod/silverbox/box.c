@@ -502,6 +502,23 @@ index_iterator_next_tree_str(struct index *self, struct box_tuple *pattern)
 }
 
 
+static void
+validate_indeces(struct box_txn *txn)
+{
+	if (namespace[txn->n].index[1].key_cardinality != 0) { /* there is more then one index */
+		foreach_index(txn->n, index) {
+                        if (index->type == INDEX_TREE_STR)
+                                /* Don't check non unique indexes */
+                                continue;
+
+			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
+
+			if(tuple != NULL && tuple != txn->old_tuple)
+				box_raise(ERR_CODE_ILLEGAL_PARAMS, "unique index violation");
+		}
+	}
+}
+
 static int __noinline__
 prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 {
@@ -522,25 +539,7 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 	if (txn->old_tuple != NULL)
 		tuple_txn_ref(txn, txn->old_tuple);
 
-	if (namespace[txn->n].index[1].key_cardinality != 0) { /* there is more then one index */
-		foreach_index(txn->n, index) {
-                        if (index->type == INDEX_TREE_STR)
-                                /* Don't check non unique indexes */
-                                continue;
-
-			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
-
-			/*
-			 * tuple referenced by secondary keys
-			 * must be same as tuple referenced by index[0]
-			 * if tuple nonexistent (NULL) - it must be nonexistent in all indeces
-			 */
-			if(tuple != txn->old_tuple) {
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "index violation");
-			}
-		}
-	}
-
+	validate_indeces(txn);
         run_hooks(txn, before_commit_update_hook);
 
         if (txn->old_tuple != NULL) {
@@ -756,6 +755,7 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
                 p += fields[i]->len;
         }
 
+	validate_indeces(txn);
         run_hooks(txn, before_commit_update_hook);
 
 	if(data->len != 0)
