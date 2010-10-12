@@ -334,7 +334,7 @@ index_find_hash_num(struct index *self, void *key)
 
 	assoc_find(int2ptr_map, self->idx.int_hash, num, ret);
 #ifdef DEBUG
-	say_debug("index_find_hash_num(%i, key:%i, tuple:%p)", self->namespace->n, num, ret);
+	say_debug("index_find_hash_num(self:%p, key:%i) = %p", self, num, ret);
 #endif
 	return ret;
 }
@@ -347,7 +347,7 @@ index_find_hash_str(struct index *self, void *key)
 	assoc_find(lstr2ptr_map, self->idx.str_hash, key, ret);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
-	say_debug("index_find_hash_str(%i, key:(%i)'%.*s', tuple:%p)", self->namespace->n, size, size, (u8 *)key, ret);
+	say_debug("index_find_hash_str(self:%p, key:(%i)'%.*s') = %p", self, size, size, (u8 *)key, ret);
 #endif
 	return ret;
 }
@@ -417,7 +417,7 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
 	assoc_delete(int2ptr_map, self->idx.int_hash, num);
 #ifdef DEBUG
-	say_debug("index_remove_hash_num(%i, key:%i)", self->namespace->n, num);
+	say_debug("index_remove_hash_num(self:%p, key:%i)", self, num);
 #endif
 }
 
@@ -428,7 +428,7 @@ index_remove_hash_str(struct index *self, struct box_tuple *tuple)
 	assoc_delete(lstr2ptr_map, self->idx.str_hash, key);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
-	say_debug("index_remove_hash_str(%i, key:'%.*s')", self->namespace->n, size, (u8 *)key);
+	say_debug("index_remove_hash_str(self:%p, key:'%.*s')", self, size, (u8 *)key);
 #endif
 }
 
@@ -441,28 +441,41 @@ index_remove_tree_str(struct index *self, struct box_tuple *tuple)
 
 
 static void
-index_replace_hash_num(struct index *self, struct box_tuple *old_tuple __unused__, struct box_tuple *tuple)
+index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_fieldno[0]);
 	u32 key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
+	if (old_tuple != NULL) {
+		void *old_key = tuple_field(old_tuple, self->key_fieldno[0]);
+		load_varint32(&old_key);
+		u32 old_num = *(u32 *)old_key;
+		assoc_delete(int2ptr_map, self->idx.int_hash, old_num);
+	}
+
         if(key_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
 	assoc_replace(int2ptr_map, self->idx.int_hash, num, tuple);
 #ifdef DEBUG
-	say_debug("index_replace_hash_num(%i, key:%i, tuple:%p)", self->namespace->n, num, tuple);
+	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%i", self, old_tuple, tuple, num);
 #endif
 }
 
 static void
-index_replace_hash_str(struct index *self, struct box_tuple *old_tuple __unused__, struct box_tuple *tuple)
+index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_fieldno[0]);
+
+	if (old_tuple != NULL) {
+		void *old_key = tuple_field(old_tuple, self->key_fieldno[0]);
+		assoc_delete(lstr2ptr_map, self->idx.str_hash, old_key);
+	}
+
 	assoc_replace(lstr2ptr_map, self->idx.str_hash, key, tuple);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
-	say_debug("index_replace_hash_str(%i, key:'%.*s', tuple:%p)", self->namespace->n, size, (u8 *)key, tuple);
+	say_debug("index_replace_hash_str(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'", self, old_tuple, tuple, size, (u8 *)key);
 #endif
 }
 
