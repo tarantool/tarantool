@@ -1,12 +1,11 @@
-# $Id: Const.pm,v 1.12 2010/06/17 13:35:13 dubravsky Exp $
-
 use strict;
 use Exporter;
 
 package MR::Storage::Const;
 use base qw/Exporter/;
 
-use vars qw/@EXPORT_OK %EXPORT_TAGS %ERRORS/;
+use vars qw/$VERSION @EXPORT_OK %EXPORT_TAGS %ERRORS/;
+$VERSION = 0;
 
 my (@ERRORS);
 $EXPORT_TAGS{all}    = \@EXPORT_OK;

@@ -1,0 +1,5 @@
+Makefile.PL
+MANIFEST
+lib/MR/IProto.pm
+lib/MR/SilverBox.pm
+lib/MR/Storage/Const.pm

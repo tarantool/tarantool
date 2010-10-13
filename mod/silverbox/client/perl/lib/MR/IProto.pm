@@ -1,21 +1,16 @@
 package MR::IProto;
 
-# $Id: IProto.pm,v 1.166 2010/04/20 15:02:49 nevinitsin Exp $
-
 use strict;
 
-use Exporter;
-use base qw/Exporter/;
-
-our @EXPORT_OK = qw/ipro/;
-
-use Socket qw(PF_INET SOCK_STREAM SOL_SOCKET SO_SNDTIMEO SO_RCVTIMEO TCP_NODELAY);
-use IO::Handle ();
-use Errno qw( EINPROGRESS EWOULDBLOCK EISCONN EAGAIN );
-use Carp qw(carp confess);
-use vars qw($PROTO_TCP %sockets);
+use Socket qw(PF_INET SOCK_STREAM SOL_SOCKET SO_SNDTIMEO SO_RCVTIMEO SO_KEEPALIVE TCP_NODELAY);
 use String::CRC32 qw(crc32);
 use Time::HiRes qw/time sleep/;
+use Fcntl;
+
+use vars qw($VERSION $PROTO_TCP %sockets);
+$VERSION = 0;
+
+use overload '""' => sub { "$_[0]->{name}\[$_[0]->{_last_server}]" };
 
 BEGIN {
     if (eval {require 5.8.3}) {
@@ -26,56 +21,49 @@ BEGIN {
     }
 }
 
-sub ipro ($) { # $ stands for LPS, % stands for LPS with 2-byte len.
-    my $s = $_[0];
-    $s =~ s{\$}{L/a*}g;
-    $s =~ s{\%}{S/a*}g;
-    $s =~ s{\s}{}gs;
-    return $s;
-}
-
-*mPOP::RemoteStorTimeOut = sub { 0 } unless defined &mPOP::RemoteStorTimeOut;
-
 $PROTO_TCP = 0;
 %sockets = ();
 
-sub DEFAULT_RETRY_DELAY() { 0 }
-sub DEFAULT_MAX_REQUEST_RETRIES() { 2 };
-sub DEFAULT_TIMEOUT () { 2 };
-sub RR () { 1 }
-sub HASH () { 2 }
-sub KETAMA () { 3 }
+sub DEFAULT_RETRY_DELAY         () { 0 }
+sub DEFAULT_MAX_REQUEST_RETRIES () { 2 }
+sub DEFAULT_TIMEOUT             () { 2 }
 
-sub DisconnectAll
-{
+sub RR                          () { 1 }
+sub HASH                        () { 2 }
+sub KETAMA                      () { 3 }
+
+sub confess { die @_ };
+
+sub DisconnectAll {
     close $_ foreach (values %sockets);
     %sockets = ();
 }
 
-sub new
-{
-    my $class = shift;
+sub new {
+    my ($class, $args) = @_;
     my $self = {};
     bless $self, $class;
 
-    my ($args) = @_;
+    $self->{debug}                = $args->{debug} || 0;
+    $self->{balance}              = $args->{balance} && $args->{balance} eq 'hash-crc32' ? HASH() : RR();
+    $self->{balance}              = KETAMA() if $args->{balance} && $args->{balance} eq 'ketama';
+    $self->{rotateservers}        = 1 unless $args->{norotateservers};
+    $self->{max_request_retries}  = $args->{max_request_retries} || DEFAULT_MAX_REQUEST_RETRIES();
+    $self->{retry_delay}          = $args->{retry_delay} || DEFAULT_RETRY_DELAY();
+    $self->{dump_no_ints}         = 1 if $args->{dump_no_ints};
+    $self->{tcp_nodelay}          = 1 if $args->{tcp_nodelay};
+    $self->{tcp_keepalive}        = $args->{tcp_keepalive} || 0;
+    $self->{param}                = $args->{param};
+    $self->{_last_server}         = '';
 
-    $self->{debug} = defined($args->{debug}) ? $args->{debug} : mPOP::Config::GetValue('IProtoDebug');
-    $self->{balance} = $args->{balance} && $args->{balance} eq 'hash-crc32' ? HASH() : RR();
-    $self->{balance} = KETAMA() if ($args->{balance} && $args->{balance} eq 'ketama');
-    $self->{rotateservers} = 1 unless $args->{norotateservers};
-    $self->{max_request_retries} = $args->{max_request_retries} || DEFAULT_MAX_REQUEST_RETRIES();
-    $self->{retry_delay} = $args->{retry_delay} || DEFAULT_RETRY_DELAY();
-    $self->{dump_no_ints} = 1 if $args->{dump_no_ints};
-    $self->{tcp_nodelay} = 1 if $args->{tcp_nodelay};
-    $self->{param} = $args->{param};
+    $self->{name} = $args->{name} or ($self->{name}) = caller;
 
-    my $servers = $args->{servers} || confess("MR::IProto->new: no servers given");
+    my $servers = $args->{servers} || confess("${class}->new: no servers given");
     _parse_servers $self 'servers', $servers;
 
     if ($self->{balance} == RR()) {
         $self->{aviable_servers} = [@{$self->{servers}}]; #make copy
-        $servers = $args->{broadcast_servers} || ''; # confess("MR::IProto->new: no broadcast servers given");
+        $servers = $args->{broadcast_servers} || ''; # confess("${class}->new: no broadcast servers given");
         _parse_servers $self 'broadcast_servers', $servers;
     } elsif ($self->{balance} == KETAMA()) {
         $self->{'ketama'} = [];
@@ -91,7 +79,7 @@ sub new
     my $timeout = exists $args->{timeout} ? $args->{timeout} : DEFAULT_TIMEOUT();
     SetTimeout $self $timeout;
 
-    confess "MR::Iproto: no servers given" unless @{$self->{servers}};
+    confess "${class}: no servers given" unless @{$self->{servers}};
     return $self;
 }
 
@@ -99,8 +87,7 @@ sub GetParam {
     return $_[0]->{param};
 }
 
-sub Chat
-{
+sub Chat {
     my ($self, %message) = @_;
 
     confess "wrong msg id" unless exists($message{msg});
@@ -147,8 +134,7 @@ sub Chat1 {
 # private methods
 # order of method declaration is important, see perlobj
 
-sub _parse_servers
-{
+sub _parse_servers {
     my ($self, $key, $line) = @_;
     my @servers;
     my $weighted = $self->{balance} == HASH();
@@ -159,21 +145,10 @@ sub _parse_servers
             push @servers, { host => $host, port => $port, ok => 1, repr => "$host:$port" } for (1..$weight);
         } else {
             my ($host, $port) = $server =~ /(.+):(\d+)/;
-            push @servers, { host => $host, port => $port, repr => "$host:$port" }
-
+            push @servers, { host => $host, port => $port, repr => "$host:$port" };
         }
     }
     $self->{$key} = \@servers;
-}
-
-sub _stats {
-    my ($start_time, $server) = @_;
-    return unless $start_time;
-
-    my $repr = "$server->{host}:$server->{port}";
-    $repr =~ s/\./_/g;
-
-    $mPOP::Carbon::bulk{"wallclock_iproto.$repr"} += time() - $start_time;
 }
 
 sub _chat {
@@ -203,7 +178,7 @@ sub _a_init {
     $self->{_start_time} = time;
     $self->{_connecting} = 1;
     $self->{sock} = $sockets{$server->{repr}} || _connect $self $server, \$self->{_error}, $async;
-    IO::Handle::blocking($self->{sock},!$async) if $self->{sock};
+    _set_blocking($self->{sock},!$async) if $self->{sock};
     return $self->{sock};
 }
 
@@ -283,7 +258,6 @@ sub _a_close {
     $error = '' unless defined $error;
     $self->{_timedout} ||= $error eq 'timeout';
     $self->{_error} ||= $error;
-    _stats($self->{_start_time}, $self->{_server});
     my $ret;
     if ($self->{_error} || $self->{_timedout}) {
         _close_sock $self $self->{_server}; # something went wrong, close socket just in case
@@ -328,8 +302,7 @@ sub _a_clear {
     delete $self->{_write_buf};
 }
 
-sub _select_server
-{
+sub _select_server {
     my ($self, $key) = @_;
     my $n = @{$self->{servers}};
     while($n--) {
@@ -341,14 +314,15 @@ sub _select_server
             $self->{current_server} = $self->_balance_hash($key);
         }
         last unless $self->{current_server};
-        $self->_mark_server_bad if mPOP::RemoteStorTimeOut("iproto:$self->{current_server}->{repr}");
         last if $self->{current_server};
+    }
+    if($self->{current_server}) {
+        $self->{_last_server} = $self->{current_server}->{repr};
     }
     return $self->{current_server};
 }
 
-sub _mark_server_bad
-{
+sub _mark_server_bad {
     my ($self) = @_;
     if ($self->{balance} == HASH()) {
         delete($self->{current_server}->{ok});
@@ -356,8 +330,7 @@ sub _mark_server_bad
     delete($self->{current_server});
 }
 
-sub _balance_rr
-{
+sub _balance_rr {
     my ($self) = @_;
     if (scalar(@{$self->{servers}}) == 1) {
         return $self->{servers}->[0];
@@ -367,8 +340,7 @@ sub _balance_rr
     }
 }
 
-sub _balance_hash
-{
+sub _balance_hash {
     my ($self, $key) = @_;
     my ($hash_, $hash, $server);
 
@@ -382,8 +354,7 @@ sub _balance_hash
     return $self->{servers}->[rand @{$self->{servers}}]; #last resort
 }
 
-sub _balance_ketama
-{
+sub _balance_ketama {
     my ($self, $key) = @_;
 
     my $idx = crc32($key);
@@ -404,8 +375,19 @@ sub _set_sock_timeout ($$) { # not a class method!
     );
 }
 
-sub _connect
-{
+sub _set_blocking ($$) {
+    my ($sock, $blocking) = @_;
+    my $flags = 0;
+    fcntl($sock, F_GETFL, $flags) or die $!;
+    if($blocking) {
+        $flags &= ~O_NONBLOCK;
+    } else {
+        $flags |=  O_NONBLOCK;
+    }
+    fcntl($sock, F_SETFL, $flags) or die $!;
+}
+
+sub _connect {
     my ($self, $server, $err, $async) = @_;
 
     $self->{_timedout} = 0;
@@ -418,8 +400,11 @@ sub _connect
         socket($sock, PF_INET, SOCK_STREAM, $proto);
     };
 
-    _set_sock_timeout $sock, $self->{timeout_timeval} unless $async;
-    IO::Handle::blocking($sock,0) if $async;
+    if ($async) {
+        _set_blocking($sock,0);
+    } else {
+        _set_sock_timeout $sock, $self->{timeout_timeval};
+    }
 
     my $sin = Socket::sockaddr_in($server->{'port'}, Socket::inet_aton($server->{'host'}));
     while(1) {
@@ -440,6 +425,10 @@ sub _connect
         setsockopt($sock, $PROTO_TCP, TCP_NODELAY, 1);
     }
 
+    if($self->{tcp_keepalive}) {
+        setsockopt($sock, SOL_SOCKET, SO_KEEPALIVE, 1);
+    }
+
     $self->{debug} >= 1 && _debug $self "connected";
     return $sockets{$server->{repr}} = $sock;
 }
@@ -450,7 +439,7 @@ sub SetTimeout {
 
     my $sec  = int $timeout; # seconds
     my $usec = int( ($timeout - $sec) * 1_000_000 ); # micro-seconds
-    $self->{timeout_timeval} = pack "LL", $sec, $usec; # struct timeval;
+    $self->{timeout_timeval} = pack "L!L!", $sec, $usec; # struct timeval;
 
     _set_sock_timeout $sockets{$_}, $self->{timeout_timeval}
         for
@@ -459,8 +448,7 @@ sub SetTimeout {
                     @{ $self->{servers} };
 }
 
-sub _close_sock
-{
+sub _close_sock {
     my ($self, $server) = @_;
 
     if ($sockets{$server->{repr}}) {
@@ -470,19 +458,17 @@ sub _close_sock
     }
 }
 
-sub _debug
-{
+sub _debug {
     my ($self, $msg)= @_;
     my $server = $self->{current_server} && $self->{current_server}->{repr};
     my $sock = $self->{sock} || 'none';
     $server &&= "$server($sock) ";
 
-    warn("MR::IProto: $server$msg\n");
+    warn("$self->{name}: $server$msg\n");
     1;
 }
 
-sub _debug_dump
-{
+sub _debug_dump {
     my ($self, $msg, $datum) = @_;
     my $server = $self->{current_server} && $self->{current_server}->{repr};
     my $sock = $self->{sock} || 'none';
@@ -493,35 +479,37 @@ sub _debug_dump
         $msg .= ' > ';
     }
     $msg .= join(' ', map { sprintf "%02x", $_ } unpack("C*", $datum));
-    warn("MR::IProto: $server$msg\n");
+    warn("$self->{name}: $server$msg\n");
 }
 
-1;
-
 package MR::IProto::Async;
-use Carp qw/confess/;
 use Time::HiRes qw/time/;
 use List::Util qw/min shuffle/;
-use Data::Dumper;
-use MR::IProto ();
 
 sub DEFAULT_TIMEOUT()           { 10 }
 sub DEFAULT_TIMEOUT_SINGLE()    {  4 }
 sub DEFAULT_TIMEOUT_CONNECT()   {  1 }
-
 sub DEFAULT_RETRY()             {  3 }
+sub IPROTO_CLASS()              { 'MR::IProto' }
+
+use overload '""' => sub { $_[0]->{name}.'[async]' };
+
+BEGIN { *confess = \&MR::IProto::confess }
 
 sub new {
     my ($class, %opt) = @_;
+    ($opt{name}) = caller unless $opt{name};
     my $self = bless {
-        timeout                     => $opt{timeout} || DEFAULT_TIMEOUT(),                  # over-all-requests timeout
-        timeout_single              => $opt{timeout_single} || DEFAULT_TIMEOUT_SINGLE(),    # per-request timeout
-        timeout_connect             => $opt{timeout_connect} || DEFAULT_TIMEOUT_CONNECT(),  # timeout to do connect()
-        max_request_retries         => $opt{max_request_retries} || DEFAULT_RETRY(),
-        debug                       => defined($opt{debug}) ? $opt{debug} : mPOP::Config::GetValue('IProtoDebug'),
+        name                        => $opt{name},
+        iproto_class                => $opt{iproto_class}         || $class->IPROTO_CLASS,
+        timeout                     => $opt{timeout}              || $class->DEFAULT_TIMEOUT(),          # over-all-requests timeout
+        timeout_single              => $opt{timeout_single}       || $class->DEFAULT_TIMEOUT_SINGLE(),   # per-request timeout
+        timeout_connect             => $opt{timeout_connect}      || $class->DEFAULT_TIMEOUT_CONNECT(),  # timeout to do connect()
+        max_request_retries         => $opt{max_request_retries}  || $class->DEFAULT_RETRY(),
+        debug                       => $opt{debug}                || 0,
         servers                     => [ ],
         requests                    => [ @{$opt{requests}||[]} ],
-        nreqs                       => 0,
+        nreqs                       => $opt{requests} ? scalar(@{$opt{requests}}) : 0,
         servers_used                => {},
         nserver                     => 0,
         working                     => {},
@@ -627,10 +615,10 @@ sub Results {
     }
 
     my $t9 = time;
-    warn sprintf "MR::IProto::Async: fetched %d requests for %.4f sec (%d/%d done)\n", $self->{nreqs}, $t9-$t0, scalar@done, $nreqs;
+    warn sprintf "$self->{name}: fetched %d requests for %.4f sec (%d/%d done)\n", $self->{nreqs}, $t9-$t0, scalar@done, $nreqs;
 
     if(%$working) {
-        warn "MR::IProto::Async: ${\scalar values %$working} requests not fetched\n";
+        warn "$self->{name}: ${\scalar values %$working} requests not fetched\n";
         $_->{_conn}->_a_close($err) for values %$working;
         # warn "return nothing\n";
         # return;
@@ -655,7 +643,7 @@ sub _init_req {
     $req->{_server} = undef;
 
     my $server = _select_server $self or return '0E0';
-    my $conn = MR::IProto->new({
+    my $conn = $self->{iproto_class}->new({
         servers => $server->{repr},
         debug   => $self->{debug},
     });
@@ -674,11 +662,12 @@ sub _init_req {
     ++$req->{_try};
     ++$self->{nreqs};
 
-    return $conn;
+    return $conn && 1;
 }
 
 sub _select_server {
-    my ($self) = @_;
+    my ($self, $disable_servers) = @_;
+    $disable_servers ||= {};
 
     my $servers = $self->{servers};
     my $servers_used = $self->{servers_used};
@@ -688,7 +677,7 @@ sub _select_server {
     while($i <= @$servers) {
         my $repr = $servers->[($i+$nserver)%@$servers]->{repr};
         next if $servers_used->{$repr};
-        next if mPOP::RemoteStorTimeOut("iproto:$repr");
+        next if $disable_servers->{$repr};
         last;
     } continue {
         ++$i;
@@ -726,10 +715,7 @@ sub _parse_servers {
 
 sub _die {
     my ($self, @e) = @_;
-    local $Data::Dumper::Terse = 1;
-    local $Data::Dumper::Indent = 2;
-    local $Data::Dumper::Maxdepth = 0;
-    confess join('; ', @e, Dumper($self));
+    die "$self->{name}: ".join('; ', @e);
 }
 
 1;

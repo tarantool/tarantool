@@ -8,11 +8,17 @@ BEGIN {
 use FindBin qw($Bin);
 use lib "$Bin";
 use TBox ();
+use Carp qw/confess/;
 
 use Test::More qw/no_plan/;
 use Test::Exception;
 
-use constant ILL_PARAM => qr/MR::SilverBox: Error 00000202/;
+local $SIG{__DIE__} = \&confess;
+
+our $CLASS;
+BEGIN { $CLASS = $ENV{BOXCLASS} || 'MR::SilverBox'; eval "require $CLASS" or die $@; }
+
+use constant ILL_PARAM => qr/$CLASS: Error 00000202/;
 use constant TOO_BIG_FIELD => qr/too big field/;
 
 my $box;
@@ -27,6 +33,7 @@ sub cleanup ($) {
 sub def_param  {
     my $format = shift || 'l& SSLL';
     return { servers => $server,
+             name    => $CLASS,
              namespaces => [ {
                  indexes => [ {
                      index_name   => 'primary_id',
@@ -40,13 +47,81 @@ sub def_param  {
                  default_index => 'primary_id',
              } ]}
 }
-$box = MR::SilverBox->new(def_param);
-ok $box->isa('MR::SilverBox'), 'connect';
+
+$box = $CLASS->new(def_param('l&SSLL&'));
+ok $box->isa($CLASS), 'connect';
+cleanup 13;
+
+ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '777'), 'insert';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '777'], 'select/insert';
+
+ok $box->Insert(13, q/some_email@test.mail.ru/, 2, 2, 3, 4, '666'), 'replace';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 2, 3, 4, '666'], 'select/replace';
+
+ok $box->Update(13, 3 => 1) == 1, 'update of some field';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, '666'], 'select/update';
+
+ok $box->Append( 13, 6 => 'APPEND') , 'append op';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, '666APPEND'], 'select/append';
+
+ok $box->Prepend(13, 6 => 'PREPEND'), 'prepend op';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, 'PREPEND666APPEND'], 'select/prepend';
+
+ok $box->Cutbeg(13, 6 => 2), 'cutbeg op';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, 'EPEND666APPEND'], 'select/cutbeg';
+
+ok $box->Cutend(13, 6 => 2), 'cutend op';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, 'EPEND666APPE'], 'select/cutend';
+
+ok $box->Substr(13, 6 => [3,4,'12345']), 'substr op';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, 'EPE123456APPE'], 'select/substr';
+
+ok $box->UpdateMulti(13, [6 => splice => [0]]), 'generic splice (offset = 0)';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, ''], 'select/splice (offset = 0)';
 
 cleanup 13;
+
+ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'insert';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/insert';
+
+throws_ok sub { $box->UpdateMulti(13, [6 => splice => [-10]]) }, qr/Illegal parametrs/, "splice/bad_params_1";
+
+ok $box->UpdateMulti(13, [6 => splice => [100]]), "splice/big_offset";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [5]]), "splice/cut_tail_pos_offset";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '12345'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [-2]]), "splice/cut_tail_neg_offset";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123'], 'select';
+
+ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'replace';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [8, 1000]]), "splice/big_pos_length";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '12345678'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [1, -1000]]), "splice/big_neg_length";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '12345678'], 'select';
+
+ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'replace';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [0x7fffffff]]), "splice/max_offset";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select';
+
+ok $box->UpdateMulti(13, [6 => splice => [1, 2]], [6 => splice => [-2, -1, 'qwe']]), "splice/multi";
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '14567qwe9'], 'select';
+
+$box = $CLASS->new(def_param);
+ok $box->isa($CLASS), 'connect';
+cleanup 13;
+
 ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4), 'insert';
 ok $box->Insert(13, q/some_email@test.mail.ru/, 2, 2, 3, 4), 'replace';
+
 ok $box->Update(13, 3 => 1) == 1, 'update of some field';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4], 'select/update';
 
 cleanup 14;
 ok $box->Insert(14, 'aaa@test.mail.ru', 0, 0, 1, 1), 'insert';
@@ -63,15 +138,15 @@ is_deeply scalar $box->Select('aaa@test.mail.ru', {use_index => 'primary_email'}
 
 
 
-$box = MR::SilverBox->new(def_param);
-ok $box->isa('MR::SilverBox'), 'connect';
+$box = $CLASS->new(def_param);
+ok $box->isa($CLASS), 'connect';
 
 
 
 for (1..3) {
     %MR::IProto::sockets = ();
-    $box = MR::SilverBox->new(def_param);
-    ok $box->isa('MR::SilverBox'), 'connect';
+    $box = $CLASS->new(def_param);
+    ok $box->isa($CLASS), 'connect';
 
     cleanup 14;
 
@@ -187,9 +262,9 @@ ok $box->UpdateMulti($id, ([5 => set => 1]) x 127, {update_flags => 1}), 'big up
 # CANT TEST throws_ok sub { $box->UpdateMulti($id, ([5 => set => 1]) x 128) }, ILL_PARAM, 'too big update multi';
 throws_ok sub { $box->UpdateMulti($id, ([5 => set => 1]) x 129) }, qr/too many op/, 'too big update multi';
 {
-    my $box = MR::SilverBox->new(def_param(q/l& SSL&/));
+    my $box = $CLASS->new(def_param(q/l& SSL&/));
     my @tuple = @tuple;
-    ok $box->isa('MR::SilverBox'), 'connect';
+    ok $box->isa($CLASS), 'connect';
 
     ok $box->UpdateMulti($id, map { [5 => set => 'x' x 127] } (1..127)), 'big update multi';
     $tuple[5] = 'x' x 127;
@@ -202,10 +277,10 @@ throws_ok sub { $box->UpdateMulti($id, ([5 => set => 1]) x 129) }, qr/too many o
 }
 
 {
-    my $box = MR::SilverBox->new(def_param(q/l& &&&&/));
+    my $box = $CLASS->new(def_param(q/l& &&&&/));
     my @tuple = @tuple;
     my $id = $tuple[0];
-    ok $box->isa('MR::SilverBox'), 'connect';
+    ok $box->isa($CLASS), 'connect';
 
     ok $box->UpdateMulti($id, [2 => set => 'ab'], [5 => set => 'z' x 127], {update_flags => 1}), 'update multi no teplate';
     $tuple[2] = 'ab';
@@ -256,7 +331,7 @@ is_deeply [$box->Select($tuple[0], $tuple[0])], [\@tuple, \@tuple], 'select in s
 is_deeply scalar $box->Select($tuple[0], $tuple[0], {want => 'arrayref'}), [\@tuple, \@tuple], 'select want => arrrayref';
 
 {
-    my $box = MR::SilverBox->new(
+    my $box = $CLASS->new(
         { %{def_param()},
           hashify => sub {
               my ($namespace, $row) = @_;

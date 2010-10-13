@@ -617,6 +617,108 @@ rollback_replace(struct box_txn *txn)
         }
 }
 
+static void
+do_field_arith(u8 op, struct tbuf *field, void *arg, u32 arg_size)
+{
+	if (field->len != 4)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "num op on field with length != 4");
+	if (arg_size != 4)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "num op with arg not u32");
+
+	switch(op) {
+	case 1:
+		*(i32 *)field->data += *(i32 *)arg;
+		break;
+	case 2:
+		*(u32 *)field->data &= *(u32 *)arg;
+		break;
+	case 3:
+		*(u32 *)field->data ^= *(u32 *)arg;
+		break;
+	case 4:
+		*(u32 *)field->data |= *(u32 *)arg;
+		break;
+        }
+}
+
+static void
+do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
+{
+        struct tbuf args = {
+                .len = args_data_size,
+                .size = args_data_size,
+                .data = args_data,
+                .pool = NULL
+        };
+        struct tbuf *new_field = NULL;
+        void *offset_field, *length_field, *list_field;
+        u32 offset_size, length_size, list_size;
+        i32 offset, length;
+        u32 noffset, nlength; /* normalized values */
+
+        new_field = tbuf_alloc(fiber->pool);
+
+        offset_field = read_field(&args);
+        length_field = read_field(&args);
+        list_field = read_field(&args);
+        if (args.len != 0)
+                box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad args");
+
+        offset_size = load_varint32(&offset_field);
+        if (offset_size == 0)
+                noffset = 0;
+        else if (offset_size == sizeof(offset)) {
+                offset = pick_u32(offset_field, &offset_field);
+                if (offset < 0 ) {
+                        if (field->len < -offset)
+                                box_raise(ERR_CODE_ILLEGAL_PARAMS,
+                                          "do_field_splice: noffset is negative");
+                        noffset = offset + field->len;
+                } else
+                        noffset = offset;
+        } else
+                box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad size of offset field");
+        if (noffset > field->len)
+                noffset = field->len;
+
+        length_size = load_varint32(&length_field);
+        if (length_size == 0)
+                nlength = field->len - noffset;
+        else if (length_size == sizeof(length)) {
+                if (offset_size == 0)
+                        box_raise(ERR_CODE_ILLEGAL_PARAMS,
+                                  "do_field_splice: offset field is empty but length is not");
+
+                length = pick_u32(length_field, &length_field);
+                if (length < 0) {
+                        if ((field->len - noffset) < -length)
+                                nlength = 0;
+                        else
+                                nlength = length + field->len - noffset;
+                } else
+                        nlength = length;
+        } else
+                box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad size of length field");
+        if (nlength > (field->len - noffset))
+                nlength = field->len - noffset;
+
+        list_size = load_varint32(&list_field);
+        if (list_size > 0 && length_size == 0)
+                box_raise(ERR_CODE_ILLEGAL_PARAMS,
+                          "do_field_splice: length field is empty but list is not");
+        if (list_size > (UINT32_MAX - (field->len - nlength)))
+                box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: list_size is too long");
+
+        say_debug("do_field_splice: noffset = %i, nlength = %i, list_size = %u",
+                  noffset, nlength, list_size);
+
+        new_field->len = 0;
+        tbuf_append(new_field, field->data, noffset);
+        tbuf_append(new_field, list_field, list_size);
+        tbuf_append(new_field, field->data + noffset + nlength, field->len - (noffset + nlength));
+
+        *field = *new_field;
+}
 
 static int __noinline__
 prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
@@ -718,8 +820,8 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 			struct tbuf *sptr_field = fields[field_no];
 
 			op = read_u8(data);
-			if (op > 4)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "op is not 0, 1, 2, 3 or 4");
+			if (op > 5)
+				box_raise(ERR_CODE_ILLEGAL_PARAMS, "op is not 0, 1, 2, 3, 4 or 5");
 			arg = read_field(data);
 			arg_size = load_varint32(&arg);
 
@@ -728,24 +830,16 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 				sptr_field->len = arg_size;
 				memcpy(sptr_field->data, arg, arg_size);
 			} else {
-				if (sptr_field->len != 4)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS, "num op on field with length != 4");
-				if (arg_size != 4)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS, "num op with arg not u32");
-
 				switch(op) {
 				case 1:
-					*(i32 *)sptr_field->data += *(i32 *)arg;
-					break;
 				case 2:
-					*(u32 *)sptr_field->data &= *(u32 *)arg;
-					break;
 				case 3:
-					*(u32 *)sptr_field->data ^= *(u32 *)arg;
-					break;
 				case 4:
-					*(u32 *)sptr_field->data |= *(u32 *)arg;
+                                        do_field_arith(op, sptr_field, arg, arg_size);
 					break;
+                                case 5:
+                                        do_field_splice(sptr_field, arg, arg_size);
+                                        break;
 				}
 			}
 		}
