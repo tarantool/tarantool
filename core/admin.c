@@ -38,6 +38,7 @@
 #include <say.h>
 #include <stat.h>
 #include <tarantool.h>
+#include <tbuf.h>
 #include <util.h>
 
 static const char help[] =
@@ -59,7 +60,7 @@ static const char help[] =
 static const char unknown_command[] = "unknown command. try typing help.\r\n";
 
 
-#line 63 "/home/vostrikov/repo/tarantool/core/admin.c"
+#line 64 "/home/vostrikov/repo/tarantool/core/admin.c"
 static const int admin_start = 1;
 static const int admin_first_final = 88;
 static const int admin_error = 0;
@@ -67,7 +68,7 @@ static const int admin_error = 0;
 static const int admin_en_main = 1;
 
 
-#line 62 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 63 "/home/vostrikov/repo/tarantool/core/admin.rl"
 
 
 static void
@@ -99,12 +100,12 @@ admin_dispatch(void)
 	p = fiber->rbuf->data;
 
 	
-#line 103 "/home/vostrikov/repo/tarantool/core/admin.c"
+#line 104 "/home/vostrikov/repo/tarantool/core/admin.c"
 	{
 	cs = admin_start;
 	}
 
-#line 108 "/home/vostrikov/repo/tarantool/core/admin.c"
+#line 109 "/home/vostrikov/repo/tarantool/core/admin.c"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -165,33 +166,33 @@ case 6:
 	}
 	goto st0;
 tr11:
-#line 139 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 140 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st88;
 tr18:
-#line 129 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 130 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{return 0;}
 	goto st88;
 tr27:
-#line 126 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 127 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{strend = p;}
-#line 138 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 139 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{mod_exec(strstart, strend - strstart, out); end(out);}
 	goto st88;
 tr31:
-#line 128 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 129 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{tbuf_append(out, help, sizeof(help));}
 	goto st88;
 tr44:
-#line 136 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 137 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st88;
 tr53:
-#line 137 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 138 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{snapshot(NULL, 0); ok(out);}
 	goto st88;
 tr70:
-#line 93 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 94 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -210,59 +211,59 @@ tr70:
 		}
 	goto st88;
 tr84:
-#line 131 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 132 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{fiber_info(out);end(out);}
 	goto st88;
 tr90:
-#line 130 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 131 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{mod_info(out); end(out);}
 	goto st88;
 tr95:
-#line 134 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 135 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{palloc_stat(out);end(out);}
 	goto st88;
 tr103:
-#line 133 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 134 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{slab_stat(out);end(out);}
 	goto st88;
 tr107:
-#line 135 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 136 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{stat_print(out);end(out);}
 	goto st88;
 st88:
 	if ( ++p == pe )
 		goto _test_eof88;
 case 88:
-#line 237 "/home/vostrikov/repo/tarantool/core/admin.c"
+#line 238 "/home/vostrikov/repo/tarantool/core/admin.c"
 	goto st0;
 tr12:
-#line 139 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 140 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
 tr19:
-#line 129 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 130 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{return 0;}
 	goto st7;
 tr28:
-#line 126 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 127 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{strend = p;}
-#line 138 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 139 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{mod_exec(strstart, strend - strstart, out); end(out);}
 	goto st7;
 tr32:
-#line 128 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 129 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{tbuf_append(out, help, sizeof(help));}
 	goto st7;
 tr45:
-#line 136 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 137 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
 tr54:
-#line 137 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 138 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{snapshot(NULL, 0); ok(out);}
 	goto st7;
 tr71:
-#line 93 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 94 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -281,30 +282,30 @@ tr71:
 		}
 	goto st7;
 tr85:
-#line 131 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 132 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{fiber_info(out);end(out);}
 	goto st7;
 tr91:
-#line 130 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 131 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{mod_info(out); end(out);}
 	goto st7;
 tr96:
-#line 134 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 135 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{palloc_stat(out);end(out);}
 	goto st7;
 tr104:
-#line 133 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 134 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{slab_stat(out);end(out);}
 	goto st7;
 tr108:
-#line 135 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 136 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{stat_print(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 308 "/home/vostrikov/repo/tarantool/core/admin.c"
+#line 309 "/home/vostrikov/repo/tarantool/core/admin.c"
 	if ( (*p) == 10 )
 		goto st88;
 	goto st0;
@@ -385,28 +386,28 @@ case 15:
 	}
 	goto tr24;
 tr24:
-#line 126 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 127 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{strstart = p;}
 	goto st16;
 st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-#line 396 "/home/vostrikov/repo/tarantool/core/admin.c"
+#line 397 "/home/vostrikov/repo/tarantool/core/admin.c"
 	switch( (*p) ) {
 		case 10: goto tr27;
 		case 13: goto tr28;
 	}
 	goto st16;
 tr25:
-#line 126 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 127 "/home/vostrikov/repo/tarantool/core/admin.rl"
 	{strstart = p;}
 	goto st17;
 st17:
 	if ( ++p == pe )
 		goto _test_eof17;
 case 17:
-#line 410 "/home/vostrikov/repo/tarantool/core/admin.c"
+#line 411 "/home/vostrikov/repo/tarantool/core/admin.c"
 	switch( (*p) ) {
 		case 10: goto tr27;
 		case 13: goto tr28;
@@ -1165,7 +1166,7 @@ case 87:
 	_out: {}
 	}
 
-#line 144 "/home/vostrikov/repo/tarantool/core/admin.rl"
+#line 145 "/home/vostrikov/repo/tarantool/core/admin.rl"
 
 
 	fiber->rbuf->len -= (void *)pe - (void *)fiber->rbuf->data;

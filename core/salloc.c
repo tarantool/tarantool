@@ -188,7 +188,7 @@ format_slab(struct slab_class *class, struct slab *slab)
 	slab->class = class;
 	slab->items = 0;
 	slab->used = 0;
-	slab->brk = (void *)slab + sizeof(struct slab);
+	slab->brk = (void *)CACHEALIGN((void *)slab + sizeof(struct slab));
 
 	TAILQ_INSERT_HEAD(&class->slabs, slab, class_link);
 	TAILQ_INSERT_HEAD(&class->free_slabs, slab, class_free_link);

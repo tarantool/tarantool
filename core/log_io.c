@@ -45,6 +45,7 @@
 #include <third_party/crc32.h>
 #include <util.h>
 #include <pickle.h>
+#include <tbuf.h>
 
 const u32 snap_marker_v04 = -1U;
 const u64 xlog_marker_v04 = -1ULL;

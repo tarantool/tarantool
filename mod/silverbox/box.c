@@ -905,8 +905,7 @@ commit_delete(struct box_txn *txn)
 struct box_txn *
 txn_alloc(u32 flags)
 {
-	struct box_txn *txn = palloc(fiber->pool, sizeof(*txn));
-	memset(txn, 0, sizeof(*txn));
+	struct box_txn *txn = p0alloc(fiber->pool, sizeof(*txn));
 	txn->ref_tuples = tbuf_alloc(fiber->pool);
 	txn->flags |= flags; /* note - select will overwrite this flags */
 	return txn;
