@@ -1,5 +1,5 @@
 use FindBin qw($Bin);
-use lib "$Bin/../client/perl";
+use lib "$Bin/../client/perl/lib";
 
 use MR::SilverBox;
 

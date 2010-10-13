@@ -144,7 +144,7 @@ sub _chat {
 
             my $full_code = ($ret_code->[1] << 8) + $ret_code->[0];
             $message = $self->{errstrclass}->ErrorStr($full_code);
-            $self->_debug("$self->{name}: $message");
+            $self->_debug("$self->{name}: $message") if $self->{debug} >= 1;
             if ($ret_code->[0] == 2) { #fatal error
                 $self->_raise($message) if $self->{raise};
                 return 0;
@@ -157,7 +157,7 @@ sub _chat {
             }
         } else {
             $message ||= $ret->{fail} || $ret->{timeout};
-            $self->_debug("$self->{name}: $message");
+            $self->_debug("$self->{name}: $message") if $self->{debug} >= 1;
         }
 
         last unless --$retry;
