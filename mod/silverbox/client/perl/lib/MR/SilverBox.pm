@@ -26,6 +26,7 @@ sub new {
     $self->{name}            = $arg->{name}      || ref$class || $class;
     $self->{timeout}         = $arg->{timeout}   || 23;
     $self->{retry    }       = $arg->{retry}     || 1;
+    $self->{select_retry}    = $arg->{select_retry} || 3;
     $self->{softretry}       = $arg->{softretry} || 3;
     $self->{debug}           = $arg->{'debug'}   || 0;
     $self->{ipdebug}         = $arg->{'ipdebug'} || 0;
@@ -153,6 +154,7 @@ sub _chat {
             # retry if error is soft even in case of update e.g. ROW_LOCK
             if ($ret_code->[0] == 1 and --$soft_retry > 0) {
                 --$retry if $retry > 1;
+                sleep 1;
                 next;
             }
         } else {
@@ -326,7 +328,7 @@ sub SelectUnion {
         msg      => 18,
         payload  => pack("L (a*)*", scalar(@reqs), map { $_->{payload} } @reqs),
         unpack   => sub { $self->_unpack_select_multi([map { $_->{namespace} } @reqs], "SMULTI", @_) },
-        retry    => 3,
+        retry    => $self->{select_retry},
         timeout  => $param->{timeout} || $self->{select_timeout},
     ) or return;
     confess __LINE__."$self->{name}: something wrong" if @$r != @reqs;
@@ -360,16 +362,16 @@ sub Select {
         $payload = pack("LL a*", $namespace->{namespace}, $param->{next_rows}, join('',@keys)),
     } else {
         $msg = 17;
-        $payload = $self->_PackSelect($param, $namespace, @keys) or return [];
+        $payload = $self->_PackSelect($param, $namespace, @keys);
     }
 
     my $r = [];
-    if (@keys) {
+    if (@keys && $payload) {
         $r = $self->_chat(
             msg      => $msg,
             payload  => $payload,
             unpack   => sub { $self->_unpack_select($namespace, "SELECT", @_) },
-            retry    => 3,
+            retry    => $self->{select_retry},
             timeout  => $param->{timeout} || $self->{select_timeout},
         );
     }
