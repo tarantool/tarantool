@@ -5,39 +5,29 @@
 ECHO=/bin/echo
 CAT=/bin/cat
 
-# make magick
+# make magic
 SUB_MAKE:=$(filter _%,$(notdir $(CURDIR)))
 OBJDIR:=$(shell $(ECHO) $(filter _%,$(MAKECMDGOALS)) | tr ' ' '\n' | cut -d/ -f1 | sort | uniq)
 ifeq (,$(SUB_MAKE))
-ifneq (,$(OBJDIR))
-.SUFFIXES:
-MAKEFLAGS += -rR --no-print-directory VPATH=$(CURDIR)
-FILTERED_MAKECMDGOALS=$(subst $@/,,$(filter $@/%,$(MAKECMDGOALS)))
-MODULE=$(subst tarantool_,,$(FILTERED_MAKECMDGOALS))
-.PHONY: $(OBJDIR)
-$(OBJDIR):
+  ifneq (,$(OBJDIR))
+    .SUFFIXES:
+    MAKEFLAGS += -rR --no-print-directory VPATH=$(CURDIR)
+    FILTERED_MAKECMDGOALS=$(subst $@/,,$(filter $@/%,$(MAKECMDGOALS)))
+    module=$(subst tarantool_,,$(FILTERED_MAKECMDGOALS))
+    .PHONY: $(OBJDIR)
+    $(OBJDIR):
 	+@mkdir -p $@
-	+@$(MAKE) -C $@ -f $(CURDIR)/Makefile SRCDIR=$(CURDIR) OBJDIR=$@ module=$(MODULE) $(FILTERED_MAKECMDGOALS)
+	+@$(MAKE) -C $@ -f $(CURDIR)/Makefile SRCDIR=$(CURDIR) OBJDIR=$@ module=$(module) $(FILTERED_MAKECMDGOALS)
 
-Makefile: ;
-%.mk :: ;
-% :: $(OBJDIR) ; @:
+    Makefile: ;
+    %.mk :: ;
+    % :: $(OBJDIR) ; @:
+  else
+    SRCDIR:=$(CURDIR)
+    include $(SRCDIR)/scripts/rules.mk
+  endif
 else
-SRCDIR:=$(CURDIR)
-endif
-endif
-
-# this global rules are always defined
-ifeq (,$(module))
-all: 
-	@echo "Valid targets are:"
-	@echo "	_release_box/tarantool_silverbox"
-	@echo "	_release_feeder/tarantool_feeder"
-	@echo "	_debug_box/tarantool_silverbox"
-	@echo "	_debug_feeder/tarantool_feeder"
-	@echo "	clean"
-else
-all: tarantool_$(module)
+  include $(SRCDIR)/scripts/rules.mk
 endif
 
 ifeq ("$(origin module)", "command line")
@@ -51,103 +41,8 @@ clean:
 	@for mod in mod/*; do $(MAKE) --no-print-directory module=`basename $$mod` clean; done
 endif
 .PHONY: TAGS
-tags:
+TAGS:
 	ctags -R -e -f TAGS
-
-# then SRCDIR is defined, build type is selected and it's time to define build rules
-ifeq ("$(origin SRCDIR)", "command line")
--include $(SRCDIR)/config.mk $(SRCDIR)/scripts/config.mk
-include $(SRCDIR)/scripts/config_def.mk
-
-ifeq (_debug,$(OBJDIR))
-  DEBUG=0
-else ifeq (_test,$(OBJDIR))
- CFLAGS += --coverage -DCOVERAGE -DNDEBUG
-else ifeq (_coverage,$(OBJDIR))
- CFLAGS += --coverage -DCOVERAGE
-endif
-
-# build dir includes going first
-ifneq (,$(OBJDIR))
-CFLAGS += -I$(SRCDIR)/$(OBJDIR) -I$(SRCDIR)/$(OBJDIR)/include
-endif
-CFLAGS += -I$(SRCDIR) -I$(SRCDIR)/include
-LIBS += -lm
-
-subdirs += third_party
-ifneq (,$(module))
-  subdirs += mod/$(module)
-endif
-subdirs += cfg core
-include $(foreach dir,$(subdirs),$(SRCDIR)/$(dir)/Makefile)
-
-tarantool_$(module): $(obj)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) $^ -o $@
-
-ifdef I
-$(info * build with $(filter -D%,$(CFLAGS)))
-endif
-
-# makefile change will force rebuild
-$(obj): $(wildcard ../*.mk) $(wildcard ../scripts/*.mk)
-$(obj): $(foreach dir,$(subdirs),$(SRCDIR)/$(dir)/Makefile)
-$(obj): Makefile
-
-dep = $(patsubst %.o,%.d,$(obj)) $(patsubst %.o,%.pd,$(obj))
--include $(dep)
-
-ifneq (,$(OBJDIR))
-%.o: %.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -MD -c $< -o $@
-	@sed -n -f $(SRCDIR)/scripts/slurp.sed \
-		-f $(SRCDIR)/scripts/fixdep.sed \
-		-e 's!$(SRCDIR)/!!; p' \
-		< $(@:.o=.d) > $(@:.o=.pd)
-else
-%.o: %.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -MD -c $< -o $@
-endif
-
-# code gen targets
-.PRECIOUS: %.h %.c %.dot
-ifeq ($(HAVE_RAGEL),1)
-%.c: %.rl
-	@mkdir -p $(dir $@)
-	$(RAGEL) -G2 $< -o $@
-
-%.dot: %.rl
-	@mkdir -p $(dir $@)
-	$(RAGEL) -p -V $< -o $(basename $@).dot
-
-%.png: %.dot
-	@mkdir -p $(dir $@)
-	$(DOT) -Tpng $< -o $(basename $@).png
-endif
-ifeq ($(HAVE_CONFETTI),1)
-%.cfg: %.cfg_tmpl
-	@mkdir -p $(dir $@)
-	$(CONFETTI) -i $< -n tarantool_cfg -f $@
-
-%.h: %.cfg_tmpl
-	@mkdir -p $(dir $@)
-	$(CONFETTI) -i $< -n tarantool_cfg -h $@
-
-%.c: %.cfg_tmpl
-	@mkdir -p $(dir $@)
-	$(CONFETTI) -i $< -n tarantool_cfg -c $@
-endif
-
-ifeq ($(HAVE_GIT),1)
-tarantool_version.h: FORCE
-	@echo -n "const char tarantool_version_string[] = " > $@_
-	@git show HEAD | sed 's/commit \(.*\)/\"\1/;q' | tr -d \\n >> $@_
-	@git diff --quiet || (echo -n ' AND'; git diff --shortstat) | tr -d \\n >> $@_
-	@echo '";' >> $@_
-	@diff -q $@ $@_ 2>/dev/null >/dev/null || ($(ECHO) "	GEN	" $(notdir $@); cp $@_ $@)
-FORCE:
-endif
 
 
 ifeq ("$(origin V)", "command line")
@@ -159,6 +54,4 @@ ifeq (,$(VERBOSE))
   $(eval override DOT = @$(ECHO) "	DOT	" $$@; $(DOT))
   $(eval override CONFETTI = @$(ECHO) "	CNF	" $$@; $(CONFETTI))
   $(eval override CAT = @$(ECHO) "	CAT	" $$@; $(CAT))
-endif
-
 endif
