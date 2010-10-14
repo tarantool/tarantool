@@ -42,9 +42,9 @@
 
 #ifdef SLAB_DEBUG
 #undef NDEBUG
-u8 red_zone[4] = {0xfa, 0xfa, 0xfa, 0xfa};
+u8 red_zone[4] = { 0xfa, 0xfa, 0xfa, 0xfa };
 #else
-u8 red_zone[0] = {};
+u8 red_zone[0] = { };
 #endif
 
 const u32 SLAB_MAGIC = 0x51abface;
@@ -62,10 +62,10 @@ struct slab {
 	struct slab_item *free;
 	struct slab_class *class;
 	void *brk;
-	SLIST_ENTRY(slab) link;
-	SLIST_ENTRY(slab) free_link;
-	TAILQ_ENTRY(slab) class_free_link;
-	TAILQ_ENTRY(slab) class_link;
+	 SLIST_ENTRY(slab) link;
+	 SLIST_ENTRY(slab) free_link;
+	 TAILQ_ENTRY(slab) class_free_link;
+	 TAILQ_ENTRY(slab) class_link;
 };
 
 SLIST_HEAD(slab_slist_head, slab);
@@ -109,7 +109,7 @@ slab_classes_init(size_t minimal, double factor)
 		slab_classes[i].item_size = size - sizeof(red_zone);
 		TAILQ_INIT(&slab_classes[i].free_slabs);
 
-		size = MAX((size_t) (size * factor) & ~(ptr_size - 1),
+		size = MAX((size_t)(size * factor) & ~(ptr_size - 1),
 			   (size + ptr_size) & ~(ptr_size - 1));
 	}
 
@@ -165,7 +165,7 @@ salloc_init(size_t size, size_t minimal, double factor)
 	if (!arena_init(&arena, size))
 		return false;
 
-	slab_classes_init(MAX(sizeof(void *),minimal), factor);
+	slab_classes_init(MAX(sizeof(void *), minimal), factor);
 	return true;
 }
 
@@ -257,7 +257,7 @@ static bool
 valid_item(struct slab *slab, void *item)
 {
 	return (void *)item >= (void *)(slab) + sizeof(struct slab) &&
-		(void *)item < (void *)(slab) + sizeof(struct slab) + SLAB_SIZE;
+	    (void *)item < (void *)(slab) + sizeof(struct slab) + SLAB_SIZE;
 }
 #endif
 
@@ -346,7 +346,9 @@ slab_stat(struct tbuf *t)
 		if (slabs == 0)
 			continue;
 
-		tbuf_printf(t, "     - { item_size: %- 5i, slabs: %- 3i, items: %- 11"PRIi64", bytes_used: %- 12"PRIi64", bytes_free: %- 12"PRIi64" }\n",
+		tbuf_printf(t,
+			    "     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
+			    ", bytes_used: %- 12" PRIi64 ", bytes_free: %- 12" PRIi64 " }\n",
 			    (int)slab_classes[i].item_size, slabs, items, used, free);
 
 	}

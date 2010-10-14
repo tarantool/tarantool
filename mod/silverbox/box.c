@@ -43,9 +43,7 @@
 
 #include <mod/silverbox/box.h>
 
-
 #define ASTERISK UINT32_MAX
-
 
 bool box_updates_allowed = false;
 static char *status = "unknown";
@@ -56,15 +54,14 @@ const int MEMCACHED_NAMESPACE = 23;
 static char *custom_proc_title;
 
 /* hooks */
-typedef int (*box_hook_t)(struct box_txn *txn);
-
+typedef int (*box_hook_t) (struct box_txn * txn);
 
 struct namespace namespace[256];
 
 struct box_snap_row {
-        u32 namespace;
-        u32 tuple_size;
-        u32 data_size;
+	u32 namespace;
+	u32 tuple_size;
+	u32 data_size;
 	u8 data[];
 } __packed__;
 
@@ -74,9 +71,7 @@ box_snap_row(const struct tbuf *t)
 	return (struct box_snap_row *)t->data;
 }
 
-
 static void tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple);
-
 
 box_hook_t *before_commit_update_hook;
 
@@ -87,13 +82,12 @@ box_hook_t *before_commit_update_hook;
 		raise(n, err);						\
 	})
 
-
 static void
-run_hooks(struct box_txn *txn, box_hook_t *hook)
+run_hooks(struct box_txn *txn, box_hook_t * hook)
 {
 	if (hook != NULL) {
 		for (int i = 0; hook[i] != NULL; i++) {
-			int result = (*hook[i])(txn);
+			int result = (*hook[i]) (txn);
 			if (result != ERR_CODE_OK)
 				box_raise(result, "hook returned error");
 		}
@@ -103,23 +97,22 @@ run_hooks(struct box_txn *txn, box_hook_t *hook)
 void *
 next_field(void *f)
 {
-        u32 size = load_varint32(&f);
-        return (u8 *)f + size;
+	u32 size = load_varint32(&f);
+	return (u8 *)f + size;
 }
-
 
 void *
 tuple_field(struct box_tuple *tuple, size_t i)
 {
 	void *field = tuple->data;
 
-        if (i >= tuple->cardinality)
-                return NULL;
+	if (i >= tuple->cardinality)
+		return NULL;
 
-        while (i-- > 0)
-                field = next_field(field);
+	while (i-- > 0)
+		field = next_field(field);
 
-        return field;
+	return field;
 }
 
 /*
@@ -140,62 +133,62 @@ tuple_compare(struct box_tuple **tuple_a, struct box_tuple **tuple_b, struct ind
 {
 	void *a = (*tuple_a)->data, *b = (*tuple_b)->data;
 
-        // init cmp_map
+	// init cmp_map
 	for (int i = 0; i < index->search_tuple_cardinality; i++) {
-                i8 r = 0;
-                u32 al = 0, bl = 0;
-                bool has_a = false, has_b = false;
+		i8 r = 0;
+		u32 al = 0, bl = 0;
+		bool has_a = false, has_b = false;
 
-                if (i >= (* tuple_a)->cardinality)
-                        // tuple_a doesn't have more fields
-                        r -= 2;
-                else {
-                        al = load_varint32(&a);
-                        has_a = true;
-                }
-                if (i >= (* tuple_b)->cardinality)
-                        // tuple_b doesn't have more fields
-                        r += 2;
-                else {
-		        bl = load_varint32(&b);
-                        has_b = true;
-                }
+		if (i >= (*tuple_a)->cardinality)
+			// tuple_a doesn't have more fields
+			r -= 2;
+		else {
+			al = load_varint32(&a);
+			has_a = true;
+		}
+		if (i >= (*tuple_b)->cardinality)
+			// tuple_b doesn't have more fields
+			r += 2;
+		else {
+			bl = load_varint32(&b);
+			has_b = true;
+		}
 
-                if (has_a && has_b) {
-                        if (al == ASTERISK || bl == ASTERISK)
-                                // comparison with asterisk
-                                r = 0;
-		        else if(al != bl)
-		                r =  al > bl ? 1 : -1;
-                        else {
-                                i32 cmp = memcmp(a, b, al);
+		if (has_a && has_b) {
+			if (al == ASTERISK || bl == ASTERISK)
+				// comparison with asterisk
+				r = 0;
+			else if (al != bl)
+				r = al > bl ? 1 : -1;
+			else {
+				i32 cmp = memcmp(a, b, al);
 
-                                r = cmp > 0 ? 1 : cmp == 0 ? 0 : -1;
-                        }
-                }
+				r = cmp > 0 ? 1 : cmp == 0 ? 0 : -1;
+			}
+		}
 
-                index->cmp_map[i] = r;
+		index->cmp_map[i] = r;
 
 		a += al == ASTERISK ? 0 : al;
 		b += bl == ASTERISK ? 0 : bl;
 	}
 
-        for (int i = 0; i < index->key_cardinality; ++i)
-                if (index->cmp_map[index->key_fieldno[i]] != 0)
-                        return index->cmp_map[index->key_fieldno[i]];
+	for (int i = 0; i < index->key_cardinality; ++i)
+		if (index->cmp_map[index->key_fieldno[i]] != 0)
+			return index->cmp_map[index->key_fieldno[i]];
 
-        if ((* tuple_a)->flags & SEARCH)
-                return -3;
+	if ((*tuple_a)->flags & SEARCH)
+		return -3;
 
-        if ((* tuple_b)->flags & SEARCH)
-                return 3;
+	if ((*tuple_b)->flags & SEARCH)
+		return 3;
 
-        if (*tuple_a > *tuple_b)
-                return 4;
-        else if (*tuple_a < *tuple_b)
-                return -4;
+	if (*tuple_a > *tuple_b)
+		return 4;
+	else if (*tuple_a < *tuple_b)
+		return -4;
 
-        return 0;
+	return 0;
 }
 
 #define foreach_index(n, index_var)					\
@@ -203,106 +196,101 @@ tuple_compare(struct box_tuple **tuple_a, struct box_tuple **tuple_b, struct ind
 	     index_var->key_cardinality != 0;				\
 	     index_var++)
 
-
 static void
 lock_tuple(struct box_txn *txn, struct box_tuple *tuple)
 {
-        if (tuple->flags & WAL_WAIT)
+	if (tuple->flags & WAL_WAIT)
 		box_raise(ERR_CODE_NODE_IS_RO, "tuple is locked");
 
 	say_debug("lock_tuple(%p)", tuple);
-        txn->lock_tuple = tuple;
-        tuple->flags |= WAL_WAIT;
+	txn->lock_tuple = tuple;
+	tuple->flags |= WAL_WAIT;
 }
-
 
 static void
 unlock_tuples(struct box_txn *txn)
 {
-        if (txn->lock_tuple) {
-                txn->lock_tuple->flags &= ~WAL_WAIT;
+	if (txn->lock_tuple) {
+		txn->lock_tuple->flags &= ~WAL_WAIT;
 		txn->lock_tuple = NULL;
 	}
 }
 
-
 static void
-field_print(struct tbuf *buf,  void *f)
+field_print(struct tbuf *buf, void *f)
 {
-        uint32_t size;
+	uint32_t size;
 
-        size = load_varint32(&f);
+	size = load_varint32(&f);
 
-        if (size == 2)
-                tbuf_printf(buf, "%i:", *(u16 *)f);
+	if (size == 2)
+		tbuf_printf(buf, "%i:", *(u16 *)f);
 
-        if (size == 4)
-                tbuf_printf(buf, "%i:", *(u32 *)f);
+	if (size == 4)
+		tbuf_printf(buf, "%i:", *(u32 *)f);
 
-        while (size-- > 0) {
-                if (0x20 <= *(u8 *)f && *(u8 *)f < 0x7f)
-                        tbuf_printf(buf, "%c", *(u8 *)f++);
-                else
-                        tbuf_printf(buf, "\\x%02X", *(u8 *)f++);
-        }
+	while (size-- > 0) {
+		if (0x20 <= *(u8 *)f && *(u8 *)f < 0x7f)
+			tbuf_printf(buf, "%c", *(u8 *)f++);
+		else
+			tbuf_printf(buf, "\\x%02X", *(u8 *)f++);
+	}
 
 }
 
 static void
 tuple_print(struct tbuf *buf, uint8_t cardinality, void *f)
 {
-        tbuf_printf(buf, "<");
+	tbuf_printf(buf, "<");
 
-        for(size_t i = 0; i < cardinality; i++, f = next_field(f)) {
-                tbuf_printf(buf, "\"");
-                field_print(buf, f);
-                tbuf_printf(buf, "\"");
+	for (size_t i = 0; i < cardinality; i++, f = next_field(f)) {
+		tbuf_printf(buf, "\"");
+		field_print(buf, f);
+		tbuf_printf(buf, "\"");
 
-                if (likely(i + 1 < cardinality))
-                        tbuf_printf(buf, ", ");
+		if (likely(i + 1 < cardinality))
+			tbuf_printf(buf, ", ");
 
-        }
+	}
 
-        tbuf_printf(buf, ">");
+	tbuf_printf(buf, ">");
 }
-
 
 static struct box_tuple *
 tuple_alloc(size_t size)
 {
-        struct box_tuple *tuple = salloc(sizeof(struct box_tuple) + size);
+	struct box_tuple *tuple = salloc(sizeof(struct box_tuple) + size);
 
-        if (tuple == NULL)
+	if (tuple == NULL)
 		box_raise(ERR_CODE_MEMORY_ISSUE, "can't allocate tuple");
 
-        tuple->flags = tuple->refs = 0;
+	tuple->flags = tuple->refs = 0;
 	tuple->flags |= NEW;
 	tuple->bsize = size;
 
-        say_debug("tuple_alloc(%zu) = %p", size, tuple);
-        return tuple;
+	say_debug("tuple_alloc(%zu) = %p", size, tuple);
+	return tuple;
 }
-
 
 static void
 tuple_free(struct box_tuple *tuple)
 {
-        say_debug("tuple_free(%p)", tuple);
+	say_debug("tuple_free(%p)", tuple);
 	assert(tuple->refs == 0);
-        sfree(tuple);
+	sfree(tuple);
 }
 
 static void
 tuple_ref(struct box_tuple *tuple, int count)
 {
 	assert(tuple->refs + count >= 0);
-        tuple->refs += count;
+	tuple->refs += count;
 
 	if (tuple->refs > 0)
 		tuple->flags &= ~NEW;
 
 	if (tuple->refs == 0)
-                tuple_free(tuple);
+		tuple_free(tuple);
 }
 
 void
@@ -347,48 +335,48 @@ index_find_hash_str(struct index *self, void *key)
 	assoc_find(lstr2ptr_map, self->idx.str_hash, key, ret);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
-	say_debug("index_find_hash_str(self:%p, key:(%i)'%.*s') = %p", self, size, size, (u8 *)key, ret);
+	say_debug("index_find_hash_str(self:%p, key:(%i)'%.*s') = %p", self, size, size, (u8 *)key,
+		  ret);
 #endif
 	return ret;
 }
-
 
 static struct box_tuple *
 alloc_search_tuple(struct index *index, int key_cardinality, void *key)
 {
 	struct box_tuple *tuple;
-        void *key_field = key;
+	void *key_field = key;
 	u32 key_data_len = 0;
 
-        memset(index->search_field, 0, sizeof(index->search_field[0]) * index->search_tuple_cardinality);
+	memset(index->search_field, 0,
+	       sizeof(index->search_field[0]) * index->search_tuple_cardinality);
 
 	for (int i = 0; i < key_cardinality; i++) {
-                u32 size;
+		u32 size;
 
-                index->search_field[index->key_fieldno[i]].field = key_field;
+		index->search_field[index->key_fieldno[i]].field = key_field;
 		size = load_varint32(&key_field);
-                index->search_field[index->key_fieldno[i]].size = size +
-                        (key_field - index->search_field[index->key_fieldno[i]].field);
+		index->search_field[index->key_fieldno[i]].size = size +
+		    (key_field - index->search_field[index->key_fieldno[i]].field);
 
-                key_data_len += index->search_field[index->key_fieldno[i]].size;
+		key_data_len += index->search_field[index->key_fieldno[i]].size;
 		key_field += size;
 	}
 
-	tuple = tuple_alloc(
-                (index->search_tuple_cardinality - key_cardinality) * varint32_sizeof(ASTERISK) +
-                key_data_len);
+	tuple = tuple_alloc((index->search_tuple_cardinality -
+			     key_cardinality) * varint32_sizeof(ASTERISK) + key_data_len);
 	tuple->cardinality = index->search_tuple_cardinality;
-        tuple->flags |= SEARCH;
+	tuple->flags |= SEARCH;
 
-        void *p = tuple->data;
-        for (int i = 0; i < index->search_tuple_cardinality; i++) {
-                if (index->search_field[i].field == NULL)
-                        p = save_varint32(p, ASTERISK);
-                else {
-                        memcpy(p, index->search_field[i].field, index->search_field[i].size);
-                        p += index->search_field[i].size;
-                }
-        }
+	void *p = tuple->data;
+	for (int i = 0; i < index->search_tuple_cardinality; i++) {
+		if (index->search_field[i].field == NULL)
+			p = save_varint32(p, ASTERISK);
+		else {
+			memcpy(p, index->search_field[i].field, index->search_field[i].size);
+			p += index->search_field[i].size;
+		}
+	}
 
 	return tuple;
 }
@@ -405,7 +393,6 @@ index_find_tree_str(struct index *self, void *key)
 	return NULL;
 }
 
-
 static void
 index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 {
@@ -413,7 +400,7 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 	unsigned int key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
-        if(key_size != 4)
+	if (key_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
 	assoc_delete(int2ptr_map, self->idx.int_hash, num);
 #ifdef DEBUG
@@ -432,13 +419,11 @@ index_remove_hash_str(struct index *self, struct box_tuple *tuple)
 #endif
 }
 
-
 static void
 index_remove_tree_str(struct index *self, struct box_tuple *tuple)
 {
 	sptree_str_t_delete(self->idx.str_tree, &tuple);
 }
-
 
 static void
 index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
@@ -454,11 +439,12 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 		assoc_delete(int2ptr_map, self->idx.int_hash, old_num);
 	}
 
-        if(key_size != 4)
+	if (key_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
 	assoc_replace(int2ptr_map, self->idx.int_hash, num, tuple);
 #ifdef DEBUG
-	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%i", self, old_tuple, tuple, num);
+	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%i", self, old_tuple,
+		  tuple, num);
 #endif
 }
 
@@ -475,15 +461,16 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 	assoc_replace(lstr2ptr_map, self->idx.str_hash, key, tuple);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
-	say_debug("index_replace_hash_str(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'", self, old_tuple, tuple, size, (u8 *)key);
+	say_debug("index_replace_hash_str(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'", self,
+		  old_tuple, tuple, size, (u8 *)key);
 #endif
 }
 
 static void
 index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
-        if (old_tuple)
-                index_remove_tree_str(self, old_tuple);
+	if (old_tuple)
+		index_remove_tree_str(self, old_tuple);
 	sptree_str_t_insert(self->idx.str_tree, &tuple);
 }
 
@@ -491,42 +478,39 @@ static void
 index_iterator_init_tree_str(struct index *self, struct box_tuple *pattern)
 {
 	sptree_str_t_iterator_init_set(self->idx.str_tree,
-				       (struct sptree_str_t_iterator **)&self->iterator,
-				       &pattern);
+				       (struct sptree_str_t_iterator **)&self->iterator, &pattern);
 }
-
 
 static struct box_tuple *
 index_iterator_next_tree_str(struct index *self, struct box_tuple *pattern)
 {
-        struct box_tuple *tuple;
+	struct box_tuple *tuple;
 	spnode_t node = sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
 
-        if (node == SPNIL)
-                return NULL;
+	if (node == SPNIL)
+		return NULL;
 
-        tuple = *(self->idx.str_tree->members + node);
+	tuple = *(self->idx.str_tree->members + node);
 
-        i32 r = tuple_compare(&pattern, &tuple, self);
-        if (r == -2 || r == -3)
-                return tuple;
+	i32 r = tuple_compare(&pattern, &tuple, self);
+	if (r == -2 || r == -3)
+		return tuple;
 
-        return NULL;
+	return NULL;
 }
-
 
 static void
 validate_indeces(struct box_txn *txn)
 {
-	if (namespace[txn->n].index[1].key_cardinality != 0) { /* there is more then one index */
+	if (namespace[txn->n].index[1].key_cardinality != 0) {	/* there is more then one index */
 		foreach_index(txn->n, index) {
-                        if (index->type == INDEX_TREE_STR)
-                                /* Don't check non unique indexes */
-                                continue;
+			if (index->type == INDEX_TREE_STR)
+				/* Don't check non unique indexes */
+				continue;
 
 			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
 
-			if(tuple != NULL && tuple != txn->old_tuple)
+			if (tuple != NULL && tuple != txn->old_tuple)
 				box_raise(ERR_CODE_ILLEGAL_PARAMS, "unique index violation");
 		}
 	}
@@ -535,17 +519,16 @@ validate_indeces(struct box_txn *txn)
 static int __noinline__
 prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 {
-        assert(data != NULL);
+	assert(data != NULL);
 	if (cardinality == 0)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "cardinality can't be equal to 0");
 	if (data->len == 0 || data->len != valid_tuple(data, cardinality))
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "tuple encoding error");
 
-        txn->tuple = tuple_alloc(data->len);
+	txn->tuple = tuple_alloc(data->len);
 	tuple_txn_ref(txn, txn->tuple);
-        txn->tuple->cardinality = cardinality;
-        memcpy(txn->tuple->data, data->data, data->len);
-
+	txn->tuple->cardinality = cardinality;
+	memcpy(txn->tuple->data, data->data, data->len);
 
 	txn->old_tuple = txn->index->find_by_tuple(txn->index, txn->tuple);
 
@@ -553,20 +536,20 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		tuple_txn_ref(txn, txn->old_tuple);
 
 	validate_indeces(txn);
-        run_hooks(txn, before_commit_update_hook);
+	run_hooks(txn, before_commit_update_hook);
 
-        if (txn->old_tuple != NULL) {
+	if (txn->old_tuple != NULL) {
 #ifndef NDEBUG
-                void *ka, *kb;
+		void *ka, *kb;
 		ka = tuple_field(txn->tuple, txn->index->key_fieldno[0]);
-                kb = tuple_field(txn->old_tuple, txn->index->key_fieldno[0]);
+		kb = tuple_field(txn->old_tuple, txn->index->key_fieldno[0]);
 		int kal, kab;
 		kal = load_varint32(&ka);
 		kab = load_varint32(&kb);
 		assert(kal == kab && memcmp(ka, kb, kal) == 0);
 #endif
 		lock_tuple(txn, txn->old_tuple);
-        } else {
+	} else {
 		/*
 		 * if tuple doesn't exist insert GHOST tuple in indeces
 		 * in order to avoid race condition
@@ -574,36 +557,36 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		 */
 
 		foreach_index(txn->n, index)
-			index->replace(index, NULL, txn->tuple);
+		    index->replace(index, NULL, txn->tuple);
 
-                lock_tuple(txn, txn->tuple);
+		lock_tuple(txn, txn->tuple);
 		txn->tuple->flags |= GHOST;
-        }
+	}
 
-        return -1;
+	return -1;
 }
 
 static void
 commit_replace(struct box_txn *txn)
 {
-        int tuples_affected = 1;
+	int tuples_affected = 1;
 
-        if (txn->old_tuple != NULL) {
+	if (txn->old_tuple != NULL) {
 		foreach_index(txn->n, index)
-			index->replace(index, txn->old_tuple, txn->tuple);
+		    index->replace(index, txn->old_tuple, txn->tuple);
 
 		tuple_ref(txn->old_tuple, -1);
-        }
+	}
 
 	txn->tuple->flags &= ~GHOST;
 	tuple_ref(txn->tuple, +1);
 
-        if (!(txn->flags & BOX_QUIET) && !txn->in_recover) {
-                add_iov_dup(&tuples_affected, sizeof(uint32_t));
+	if (!(txn->flags & BOX_QUIET) && !txn->in_recover) {
+		add_iov_dup(&tuples_affected, sizeof(uint32_t));
 
-                if (txn->flags & BOX_RETURN_TUPLE)
-                        tuple_add_iov(txn, txn->tuple);
-        }
+		if (txn->flags & BOX_RETURN_TUPLE)
+			tuple_add_iov(txn, txn->tuple);
+	}
 }
 
 static void
@@ -611,10 +594,10 @@ rollback_replace(struct box_txn *txn)
 {
 	say_debug("rollback_replace: txn->tuple:%p", txn->tuple);
 
-        if (txn->tuple && txn->tuple->flags & GHOST) {
+	if (txn->tuple && txn->tuple->flags & GHOST) {
 		foreach_index(txn->n, index)
-			index->remove(index, txn->tuple);
-        }
+		    index->remove(index, txn->tuple);
+	}
 }
 
 static void
@@ -625,7 +608,7 @@ do_field_arith(u8 op, struct tbuf *field, void *arg, u32 arg_size)
 	if (arg_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "num op with arg not u32");
 
-	switch(op) {
+	switch (op) {
 	case 1:
 		*(i32 *)field->data += *(i32 *)arg;
 		break;
@@ -638,94 +621,94 @@ do_field_arith(u8 op, struct tbuf *field, void *arg, u32 arg_size)
 	case 4:
 		*(u32 *)field->data |= *(u32 *)arg;
 		break;
-        }
+	}
 }
 
 static void
 do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 {
-        struct tbuf args = {
-                .len = args_data_size,
-                .size = args_data_size,
-                .data = args_data,
-                .pool = NULL
-        };
-        struct tbuf *new_field = NULL;
-        void *offset_field, *length_field, *list_field;
-        u32 offset_size, length_size, list_size;
-        i32 offset, length;
-        u32 noffset, nlength; /* normalized values */
+	struct tbuf args = {
+		.len = args_data_size,
+		.size = args_data_size,
+		.data = args_data,
+		.pool = NULL
+	};
+	struct tbuf *new_field = NULL;
+	void *offset_field, *length_field, *list_field;
+	u32 offset_size, length_size, list_size;
+	i32 offset, length;
+	u32 noffset, nlength;	/* normalized values */
 
-        new_field = tbuf_alloc(fiber->pool);
+	new_field = tbuf_alloc(fiber->pool);
 
-        offset_field = read_field(&args);
-        length_field = read_field(&args);
-        list_field = read_field(&args);
-        if (args.len != 0)
-                box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad args");
+	offset_field = read_field(&args);
+	length_field = read_field(&args);
+	list_field = read_field(&args);
+	if (args.len != 0)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad args");
 
-        offset_size = load_varint32(&offset_field);
-        if (offset_size == 0)
-                noffset = 0;
-        else if (offset_size == sizeof(offset)) {
-                offset = pick_u32(offset_field, &offset_field);
-                if (offset < 0 ) {
-                        if (field->len < -offset)
-                                box_raise(ERR_CODE_ILLEGAL_PARAMS,
-                                          "do_field_splice: noffset is negative");
-                        noffset = offset + field->len;
-                } else
-                        noffset = offset;
-        } else
-                box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad size of offset field");
-        if (noffset > field->len)
-                noffset = field->len;
+	offset_size = load_varint32(&offset_field);
+	if (offset_size == 0)
+		noffset = 0;
+	else if (offset_size == sizeof(offset)) {
+		offset = pick_u32(offset_field, &offset_field);
+		if (offset < 0) {
+			if (field->len < -offset)
+				box_raise(ERR_CODE_ILLEGAL_PARAMS,
+					  "do_field_splice: noffset is negative");
+			noffset = offset + field->len;
+		} else
+			noffset = offset;
+	} else
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad size of offset field");
+	if (noffset > field->len)
+		noffset = field->len;
 
-        length_size = load_varint32(&length_field);
-        if (length_size == 0)
-                nlength = field->len - noffset;
-        else if (length_size == sizeof(length)) {
-                if (offset_size == 0)
-                        box_raise(ERR_CODE_ILLEGAL_PARAMS,
-                                  "do_field_splice: offset field is empty but length is not");
+	length_size = load_varint32(&length_field);
+	if (length_size == 0)
+		nlength = field->len - noffset;
+	else if (length_size == sizeof(length)) {
+		if (offset_size == 0)
+			box_raise(ERR_CODE_ILLEGAL_PARAMS,
+				  "do_field_splice: offset field is empty but length is not");
 
-                length = pick_u32(length_field, &length_field);
-                if (length < 0) {
-                        if ((field->len - noffset) < -length)
-                                nlength = 0;
-                        else
-                                nlength = length + field->len - noffset;
-                } else
-                        nlength = length;
-        } else
-                box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad size of length field");
-        if (nlength > (field->len - noffset))
-                nlength = field->len - noffset;
+		length = pick_u32(length_field, &length_field);
+		if (length < 0) {
+			if ((field->len - noffset) < -length)
+				nlength = 0;
+			else
+				nlength = length + field->len - noffset;
+		} else
+			nlength = length;
+	} else
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: bad size of length field");
+	if (nlength > (field->len - noffset))
+		nlength = field->len - noffset;
 
-        list_size = load_varint32(&list_field);
-        if (list_size > 0 && length_size == 0)
-                box_raise(ERR_CODE_ILLEGAL_PARAMS,
-                          "do_field_splice: length field is empty but list is not");
-        if (list_size > (UINT32_MAX - (field->len - nlength)))
-                box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: list_size is too long");
+	list_size = load_varint32(&list_field);
+	if (list_size > 0 && length_size == 0)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS,
+			  "do_field_splice: length field is empty but list is not");
+	if (list_size > (UINT32_MAX - (field->len - nlength)))
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "do_field_splice: list_size is too long");
 
-        say_debug("do_field_splice: noffset = %i, nlength = %i, list_size = %u",
-                  noffset, nlength, list_size);
+	say_debug("do_field_splice: noffset = %i, nlength = %i, list_size = %u",
+		  noffset, nlength, list_size);
 
-        new_field->len = 0;
-        tbuf_append(new_field, field->data, noffset);
-        tbuf_append(new_field, list_field, list_size);
-        tbuf_append(new_field, field->data + noffset + nlength, field->len - (noffset + nlength));
+	new_field->len = 0;
+	tbuf_append(new_field, field->data, noffset);
+	tbuf_append(new_field, list_field, list_size);
+	tbuf_append(new_field, field->data + noffset + nlength, field->len - (noffset + nlength));
 
-        *field = *new_field;
+	*field = *new_field;
 }
 
 static int __noinline__
 prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 {
-        struct tbuf **fields;
-        void *field;
-        int i;
+	struct tbuf **fields;
+	void *field;
+	int i;
 	void *key;
 	u32 op_cnt;
 
@@ -737,37 +720,34 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 	key = read_field(data);
 	op_cnt = read_u32(data);
 
-	if(op_cnt > 128)
+	if (op_cnt > 128)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "too many ops");
-	if(op_cnt == 0)
+	if (op_cnt == 0)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "no ops");
-        if(key == NULL)
+	if (key == NULL)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "invalid key");
 
-        txn->old_tuple = txn->index->find(txn->index, key);
-        if (txn->old_tuple == NULL) {
-                if (!txn->in_recover) {
-                        int tuples_affected = 0;
-                        add_iov_dup(&tuples_affected, sizeof(uint32_t));
-                }
-                return ERR_CODE_OK;
-        }
+	txn->old_tuple = txn->index->find(txn->index, key);
+	if (txn->old_tuple == NULL) {
+		if (!txn->in_recover) {
+			int tuples_affected = 0;
+			add_iov_dup(&tuples_affected, sizeof(uint32_t));
+		}
+		return ERR_CODE_OK;
+	}
 
 	lock_tuple(txn, txn->old_tuple);
 
 	fields = palloc(fiber->pool, (txn->old_tuple->cardinality + 1) * sizeof(struct tbuf *));
 	memset(fields, 0, (txn->old_tuple->cardinality + 1) * sizeof(struct tbuf *));
 
-        for (i = 0, field = (uint8_t *)txn->old_tuple->data;
-	     i < txn->old_tuple->cardinality;
-	     i++)
-	{
+	for (i = 0, field = (uint8_t *)txn->old_tuple->data; i < txn->old_tuple->cardinality; i++) {
 		fields[i] = tbuf_alloc(fiber->pool);
 
 		u32 field_size = load_varint32(&field);
 		tbuf_append(fields[i], field, field_size);
 		field += field_size;
-        }
+	}
 
 	if (old_format) {
 		while (op_cnt-- > 0) {
@@ -783,23 +763,26 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 			xor = read_u32(data);
 			add = read_u32(data);
 
-			if(field_no >= txn->old_tuple->cardinality)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "update of field beyond tuple cardinality");
+			if (field_no >= txn->old_tuple->cardinality)
+				box_raise(ERR_CODE_ILLEGAL_PARAMS,
+					  "update of field beyond tuple cardinality");
 
 			struct tbuf *sptr_field = fields[field_no];
 
 			new_field_size = load_varint32(&new_field);
 			if (new_field_size) {
-				if(and != 0 || xor != 0 || add != 0)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS, "and or xor or add != 0");
+				if (and != 0 || xor != 0 || add != 0)
+					box_raise(ERR_CODE_ILLEGAL_PARAMS,
+						  "and or xor or add != 0");
 				tbuf_ensure(sptr_field, new_field_size);
 				sptr_field->len = new_field_size;
 				memcpy(sptr_field->data, new_field, new_field_size);
 			} else {
 				uint32_t *num;
-				if(sptr_field->len != 4)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS, "num op on field with length != 4");
-				num = (uint32_t *)sptr_field->data; /* FIXME: align && endianes */
+				if (sptr_field->len != 4)
+					box_raise(ERR_CODE_ILLEGAL_PARAMS,
+						  "num op on field with length != 4");
+				num = (uint32_t *)sptr_field->data;	/* FIXME: align && endianes */
 
 				*num &= and;
 				*num ^= xor;
@@ -814,8 +797,9 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 
 			field_no = read_u32(data);
 
-			if(field_no >= txn->old_tuple->cardinality)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "update of field beyond tuple cardinality");
+			if (field_no >= txn->old_tuple->cardinality)
+				box_raise(ERR_CODE_ILLEGAL_PARAMS,
+					  "update of field beyond tuple cardinality");
 
 			struct tbuf *sptr_field = fields[field_no];
 
@@ -830,68 +814,67 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 				sptr_field->len = arg_size;
 				memcpy(sptr_field->data, arg, arg_size);
 			} else {
-				switch(op) {
+				switch (op) {
 				case 1:
 				case 2:
 				case 3:
 				case 4:
-                                        do_field_arith(op, sptr_field, arg, arg_size);
+					do_field_arith(op, sptr_field, arg, arg_size);
 					break;
-                                case 5:
-                                        do_field_splice(sptr_field, arg, arg_size);
-                                        break;
+				case 5:
+					do_field_splice(sptr_field, arg, arg_size);
+					break;
 				}
 			}
 		}
 	}
 
-        if(data->len != 0)
+	if (data->len != 0)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "can't unpack request");
 
-        size_t bsize = 0;
-        for (int i = 0; i < txn->old_tuple->cardinality; i++)
+	size_t bsize = 0;
+	for (int i = 0; i < txn->old_tuple->cardinality; i++)
 		bsize += fields[i]->len + varint32_sizeof(fields[i]->len);
-        txn->tuple = tuple_alloc(bsize);
+	txn->tuple = tuple_alloc(bsize);
 	tuple_txn_ref(txn, txn->tuple);
-        txn->tuple->cardinality = txn->old_tuple->cardinality;
+	txn->tuple->cardinality = txn->old_tuple->cardinality;
 
-        uint8_t *p = txn->tuple->data;
-        for (int i = 0; i < txn->old_tuple->cardinality; i++) {
+	uint8_t *p = txn->tuple->data;
+	for (int i = 0; i < txn->old_tuple->cardinality; i++) {
 		p = save_varint32(p, fields[i]->len);
-                memcpy(p, fields[i]->data, fields[i]->len);
-                p += fields[i]->len;
-        }
+		memcpy(p, fields[i]->data, fields[i]->len);
+		p += fields[i]->len;
+	}
 
 	validate_indeces(txn);
-        run_hooks(txn, before_commit_update_hook);
+	run_hooks(txn, before_commit_update_hook);
 
-	if(data->len != 0)
+	if (data->len != 0)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "can't unpack request");
-        return -1;
+	return -1;
 }
 
 static void
 tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple)
 {
-        tuple_txn_ref(txn, tuple);
+	tuple_txn_ref(txn, tuple);
 
 	if (txn->old_format) {
-                add_iov_dup(&tuple->bsize, sizeof(uint16_t));
-                add_iov_dup(&tuple->cardinality, sizeof(uint8_t));
-                add_iov(tuple->data, tuple->bsize);
-        } else
-                add_iov(&tuple->bsize,
+		add_iov_dup(&tuple->bsize, sizeof(uint16_t));
+		add_iov_dup(&tuple->cardinality, sizeof(uint8_t));
+		add_iov(tuple->data, tuple->bsize);
+	} else
+		add_iov(&tuple->bsize,
 			tuple->bsize +
 			field_sizeof(struct box_tuple, bsize) +
 			field_sizeof(struct box_tuple, cardinality));
 }
 
-
 static int __noinline__
 process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bool old_format)
 {
-        struct box_tuple *tuple;
-        uint32_t *found;
+	struct box_tuple *tuple;
+	uint32_t *found;
 	u32 count = read_u32(data);
 
 	found = palloc(fiber->pool, sizeof(*found));
@@ -934,7 +917,8 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bo
 			if (!old_format) {
 				u32 key_len = read_u32(data);
 				if (key_len != 1)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS, "key must be single valued");
+					box_raise(ERR_CODE_ILLEGAL_PARAMS,
+						  "key must be single valued");
 			}
 			void *key = read_field(data);
 			tuple = txn->index->find(txn->index, key);
@@ -954,46 +938,44 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bo
 		}
 	}
 
-	if(data->len != 0)
+	if (data->len != 0)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "can't unpack request");
 
-        return ERR_CODE_OK;
+	return ERR_CODE_OK;
 }
-
 
 static int __noinline__
 prepare_delete(struct box_txn *txn, void *key)
 {
-        txn->old_tuple = txn->index->find(txn->index, key);
+	txn->old_tuple = txn->index->find(txn->index, key);
 
-        if(txn->old_tuple == NULL) {
-                if (!txn->in_recover) {
-                        u32 tuples_affected = 0;
-                        add_iov_dup(&tuples_affected, sizeof(tuples_affected));
-                }
-                return ERR_CODE_OK;
-        } else {
+	if (txn->old_tuple == NULL) {
+		if (!txn->in_recover) {
+			u32 tuples_affected = 0;
+			add_iov_dup(&tuples_affected, sizeof(tuples_affected));
+		}
+		return ERR_CODE_OK;
+	} else {
 		tuple_txn_ref(txn, txn->old_tuple);
 	}
 
-        lock_tuple(txn, txn->old_tuple);
-        return -1;
+	lock_tuple(txn, txn->old_tuple);
+	return -1;
 }
-
 
 static void
 commit_delete(struct box_txn *txn)
 {
-        if (!(txn->flags & BOX_QUIET) && !txn->in_recover) {
-                int tuples_affected = 1;
-                add_iov_dup(&tuples_affected, sizeof(tuples_affected));
-        }
+	if (!(txn->flags & BOX_QUIET) && !txn->in_recover) {
+		int tuples_affected = 1;
+		add_iov_dup(&tuples_affected, sizeof(tuples_affected));
+	}
 
 	foreach_index(txn->n, index)
-		index->remove(index, txn->old_tuple);
-        tuple_ref(txn->old_tuple, -1);
+	    index->remove(index, txn->old_tuple);
+	tuple_ref(txn->old_tuple, -1);
 
-        return;
+	return;
 }
 
 struct box_txn *
@@ -1001,10 +983,9 @@ txn_alloc(u32 flags)
 {
 	struct box_txn *txn = p0alloc(fiber->pool, sizeof(*txn));
 	txn->ref_tuples = tbuf_alloc(fiber->pool);
-	txn->flags |= flags; /* note - select will overwrite this flags */
+	txn->flags |= flags;	/* note - select will overwrite this flags */
 	return txn;
 }
-
 
 void
 txn_cleanup(struct box_txn *txn)
@@ -1036,46 +1017,46 @@ txn_cleanup(struct box_txn *txn)
 static void
 txn_commit(struct box_txn *txn)
 {
-        if (txn->op == 0)
-                return;
+	if (txn->op == 0)
+		return;
 
-        say_debug("box_commit(op:%s)", messages_strs[txn->op]);
+	say_debug("box_commit(op:%s)", messages_strs[txn->op]);
 
 	unlock_tuples(txn);
 
-        if (txn->op == DELETE)
-                commit_delete(txn);
-        else
-                commit_replace(txn);
+	if (txn->op == DELETE)
+		commit_delete(txn);
+	else
+		commit_replace(txn);
 }
 
 static void
 txn_abort(struct box_txn *txn)
 {
-        if (txn->op == 0)
+	if (txn->op == 0)
 		return;
-        say_debug("box_rollback(op:%s)", messages_strs[txn->op]);
+	say_debug("box_rollback(op:%s)", messages_strs[txn->op]);
 
 	unlock_tuples(txn);
 
 	if (txn->op == DELETE)
-                return;
+		return;
 
-        if (txn->op == INSERT)
-                rollback_replace(txn);
+	if (txn->op == INSERT)
+		rollback_replace(txn);
 }
 
 static bool
 op_is_select(u32 op)
 {
-	return  op == SELECT || op == SELECT_LIMIT;
+	return op == SELECT || op == SELECT_LIMIT;
 }
 
 u32
 box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 {
-        u32 cardinality;
-        int ret_code;
+	u32 cardinality;
+	int ret_code;
 	void *data__data = data->data;
 	u32 data__len = data->len;
 	int saved_iov_cnt = fiber->iov_cnt;
@@ -1087,10 +1068,10 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 	say_debug("box_dispach(%i)", op);
 
 	if (!txn->in_recover) {
-                if (!op_is_select(op) && (mode == RO || !box_updates_allowed)) {
-                        say_error("can't process %i command on RO port", op);
-                        return ERR_CODE_NONMASTER;
-                }
+		if (!op_is_select(op) && (mode == RO || !box_updates_allowed)) {
+			say_error("can't process %i command on RO port", op);
+			return ERR_CODE_NONMASTER;
+		}
 
 		fiber_register_cleanup((void *)txn_cleanup, txn);
 	}
@@ -1099,7 +1080,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 	txn->n = read_u32(data);
 	txn->index = &namespace[txn->n].index[0];
 
-	if(!namespace[txn->n].enabled) {
+	if (!namespace[txn->n].enabled) {
 		say_warn("namespace %i is not enabled", txn->n);
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "namespace is not enabled");
 	}
@@ -1109,17 +1090,20 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 	void *key;
 	u32 key_len;
 
-        switch (op) {
-        case INSERT:
-                txn->flags = read_u32(data);
+	switch (op) {
+	case INSERT:
+		txn->flags = read_u32(data);
 		cardinality = read_u32(data);
-		if (namespace[txn->n].cardinality > 0 && namespace[txn->n].cardinality != cardinality)
-			box_raise(ERR_CODE_ILLEGAL_PARAMS, "tuple cardinality must match namespace cardinality");
+		if (namespace[txn->n].cardinality > 0
+		    && namespace[txn->n].cardinality != cardinality)
+			box_raise(ERR_CODE_ILLEGAL_PARAMS,
+				  "tuple cardinality must match namespace cardinality");
 		if (!txn->in_recover && txn->n == 3 && cardinality != 14)
-			box_raise(ERR_CODE_ILLEGAL_PARAMS, "tuple cardinality must match namespace cardinality");
-                ret_code = prepare_replace(txn, cardinality, data);
+			box_raise(ERR_CODE_ILLEGAL_PARAMS,
+				  "tuple cardinality must match namespace cardinality");
+		ret_code = prepare_replace(txn, cardinality, data);
 		stat_collect(messages_strs[op], 1);
-                break;
+		break;
 
 	case DELETE:
 		key_len = read_u32(data);
@@ -1127,41 +1111,41 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 			box_raise(ERR_CODE_ILLEGAL_PARAMS, "key must be single valued");
 
 		key = read_field(data);
-		if(data->len != 0)
+		if (data->len != 0)
 			box_raise(ERR_CODE_ILLEGAL_PARAMS, "can't unpack request");
 
 		ret_code = prepare_delete(txn, key);
 		stat_collect(messages_strs[op], 1);
-                break;
+		break;
 
-	case SELECT: {
-		u32 i = read_u32(data);
-		u32 offset = read_u32(data);
-		u32 limit = read_u32(data);
+	case SELECT:{
+			u32 i = read_u32(data);
+			u32 offset = read_u32(data);
+			u32 limit = read_u32(data);
 
-		if (i > MAX_IDX)
-			box_raise(ERR_CODE_ILLEGAL_PARAMS, "index too big");
-		txn->index = &namespace[txn->n].index[i];
-		if (txn->index->key_cardinality == 0)
-			box_raise(ERR_CODE_ILLEGAL_PARAMS, "index is invalid");
+			if (i > MAX_IDX)
+				box_raise(ERR_CODE_ILLEGAL_PARAMS, "index too big");
+			txn->index = &namespace[txn->n].index[i];
+			if (txn->index->key_cardinality == 0)
+				box_raise(ERR_CODE_ILLEGAL_PARAMS, "index is invalid");
 
-		stat_collect(messages_strs[op], 1);
-                return process_select(txn, limit, offset, data, false);
-	}
+			stat_collect(messages_strs[op], 1);
+			return process_select(txn, limit, offset, data, false);
+		}
 
-        case UPDATE_FIELDS:
+	case UPDATE_FIELDS:
 		txn->flags = read_u32(data);
 		stat_collect(messages_strs[op], 1);
-                ret_code = prepare_update_fields(txn, data, false);
-                break;
+		ret_code = prepare_update_fields(txn, data, false);
+		break;
 
 	default:
-                say_error("silverbox_dispach: unsupported command = %"PRIi32"", op);
-                return ERR_CODE_ILLEGAL_PARAMS;
-        }
+		say_error("silverbox_dispach: unsupported command = %" PRIi32 "", op);
+		return ERR_CODE_ILLEGAL_PARAMS;
+	}
 
 	if (ret_code == -1) {
-                if (!txn->in_recover) {
+		if (!txn->in_recover) {
 			struct tbuf *t = tbuf_alloc(fiber->pool);
 			tbuf_append(t, &op, sizeof(op));
 			tbuf_append(t, data__data, data__len);
@@ -1177,17 +1161,15 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 		if (stop - start > cfg.too_long_threshold)
 			say_warn("too long %s: %.3f sec", messages_strs[op], stop - start);
 		return 0;
-        }
-
+	}
 
 	return ret_code;
 
-abort:
+      abort:
 	fiber->iov_cnt = saved_iov_cnt;
 	txn_abort(txn);
 	return ret_code;
 }
-
 
 static int
 box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
@@ -1199,70 +1181,81 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	b->len = row->len;
 	u32 op = row->type;
 
-        u32 n, key_len;
-        void *key;
-        u32 cardinality, field_no;
-        u32 flags;
-        u32 op_cnt;
+	u32 n, key_len;
+	void *key;
+	u32 cardinality, field_no;
+	u32 flags;
+	u32 op_cnt;
 
-	tbuf_printf(buf, "lsn:%"PRIi64" ", row->lsn);
+	tbuf_printf(buf, "lsn:%" PRIi64 " ", row->lsn);
 
-	say_debug("b->len:%"PRIu32, b->len);
-        n = read_u32(b);
+	say_debug("b->len:%" PRIu32, b->len);
+	n = read_u32(b);
 
-        tbuf_printf(buf, "%s ", messages_strs[op]);
-        tbuf_printf(buf, "n:%i ", n);
+	tbuf_printf(buf, "%s ", messages_strs[op]);
+	tbuf_printf(buf, "n:%i ", n);
 
-        switch (op) {
-        case INSERT:
-                flags = read_u32(b);
+	switch (op) {
+	case INSERT:
+		flags = read_u32(b);
 		cardinality = read_u32(b);
-		if (b->len != valid_tuple(b, cardinality)) abort();
-                tuple_print(buf, cardinality, b->data);
-                break;
+		if (b->len != valid_tuple(b, cardinality))
+			abort();
+		tuple_print(buf, cardinality, b->data);
+		break;
 
 	case DELETE:
 		key_len = read_u32(b);
 		key = read_field(b);
-		if (b->len != 0) abort();
+		if (b->len != 0)
+			abort();
 		tuple_print(buf, key_len, key);
-                break;
+		break;
 
-        case UPDATE_FIELDS:
+	case UPDATE_FIELDS:
 		flags = read_u32(b);
 		key_len = read_u32(b);
-                key = read_field(b);
+		key = read_field(b);
 		op_cnt = read_u32(b);
 
 		tbuf_printf(buf, "flags:%08X ", flags);
-                tuple_print(buf, key_len, key);
+		tuple_print(buf, key_len, key);
 
 		while (op_cnt-- > 0) {
 			field_no = read_u32(b);
 			u8 op = read_u8(b);
 			void *arg = read_field(b);
 
-                        tbuf_printf(buf, " [field_no:%i op:", field_no);
-			switch(op) {
-			case 0: tbuf_printf(buf, "set "); break;
-			case 1: tbuf_printf(buf, "add "); break;
-			case 2: tbuf_printf(buf, "and "); break;
-			case 3: tbuf_printf(buf, "xor "); break;
-			case 4: tbuf_printf(buf, "or "); break;
+			tbuf_printf(buf, " [field_no:%i op:", field_no);
+			switch (op) {
+			case 0:
+				tbuf_printf(buf, "set ");
+				break;
+			case 1:
+				tbuf_printf(buf, "add ");
+				break;
+			case 2:
+				tbuf_printf(buf, "and ");
+				break;
+			case 3:
+				tbuf_printf(buf, "xor ");
+				break;
+			case 4:
+				tbuf_printf(buf, "or ");
+				break;
 			}
-                        tuple_print(buf, 1, arg);
+			tuple_print(buf, 1, arg);
 			tbuf_printf(buf, "] ");
 		}
 		break;
-        default:
-                tbuf_printf(buf, "unknown wal op %" PRIi32, op);
-        }
-        return 0;
+	default:
+		tbuf_printf(buf, "unknown wal op %" PRIi32, op);
+	}
+	return 0;
 }
 
-
 struct tbuf *
-box_snap_reader(FILE * f, struct palloc_pool *pool)
+box_snap_reader(FILE *f, struct palloc_pool *pool)
 {
 	struct tbuf *row = tbuf_alloc(pool);
 	const int header_size = sizeof(*box_snap_row(row));
@@ -1278,14 +1271,13 @@ box_snap_reader(FILE * f, struct palloc_pool *pool)
 	return row;
 }
 
-
 static int
 snap_apply(struct recovery_state *r __unused__, const struct tbuf *t)
 {
 	struct box_snap_row *row = box_snap_row(t);
-        struct box_txn *txn = txn_alloc(0);
+	struct box_txn *txn = txn_alloc(0);
 	txn->in_recover = true;
-        txn->n = row->namespace;
+	txn->n = row->namespace;
 
 	if (txn->n == 25)
 		return 0;
@@ -1301,12 +1293,12 @@ snap_apply(struct recovery_state *r __unused__, const struct tbuf *t)
 	b->data = row->data;
 	b->len = row->data_size;
 
-        if (prepare_replace(txn, row->tuple_size, b) != -1) {
-                say_error("unable prepare");
-                return -1;
-        }
+	if (prepare_replace(txn, row->tuple_size, b) != -1) {
+		say_error("unable prepare");
+		return -1;
+	}
 
-        txn->op = INSERT;
+	txn->op = INSERT;
 	txn_commit(txn);
 	txn_cleanup(txn);
 	return 0;
@@ -1316,7 +1308,7 @@ static int
 xlog_apply(struct recovery_state *r __unused__, const struct tbuf *t)
 {
 	struct row_v04 *row = row_v04(t);
-        struct box_txn *txn = txn_alloc(0);
+	struct box_txn *txn = txn_alloc(0);
 	txn->in_recover = true;
 
 	assert(row->lsn > confirmed_lsn(r));
@@ -1338,7 +1330,7 @@ snap_print(struct recovery_state *r __unused__, const struct tbuf *t)
 	struct tbuf *out = tbuf_alloc(t->pool);
 	struct box_snap_row *row = box_snap_row(t);
 
-	tuple_print(out, row->tuple_size , row->data);
+	tuple_print(out, row->tuple_size, row->data);
 	printf("n:%i %*s\n", row->namespace, (int)out->len, (char *)out->data);
 	return 0;
 }
@@ -1352,7 +1344,6 @@ xlog_print(struct recovery_state *r __unused__, const struct tbuf *t)
 		printf("%*s\n", (int)out->len, (char *)out->data);
 	return res;
 }
-
 
 static void
 custom_init(void)
@@ -1375,47 +1366,47 @@ custom_init(void)
 		int estimated_rows = cfg.namespace[i]->estimated_rows;
 
 		if (cfg.namespace[i]->index == NULL)
-			panic("(namespace = %"PRIu32") at least one index must be defined", i);
+			panic("(namespace = %" PRIu32 ") at least one index must be defined", i);
 
 		for (int j = 0; j < nelem(namespace[i].index); j++) {
-                        u32 max_key_fieldno = 0;
+			u32 max_key_fieldno = 0;
 
 			if (cfg.namespace[i]->index[j] == NULL)
 				break;
 
 			if (cfg.namespace[i]->index[j]->key_fields == NULL)
-				panic("(namespace = %"PRIu32" index = %"PRIu32") "
+				panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
 				      "at least one field must be defined", i, j);
 
-                        for (int k = 0; cfg.namespace[i]->index[j]->key_fields[k] != NULL; k++) {
-                                if (k >= nelem(namespace[i].index[j].key_fieldno))
-                                        panic("too many fields in key");
+			for (int k = 0; cfg.namespace[i]->index[j]->key_fields[k] != NULL; k++) {
+				if (k >= nelem(namespace[i].index[j].key_fieldno))
+					panic("too many fields in key");
 
-		                namespace[i].index[j].key_fieldno[k] =
-                                        cfg.namespace[i]->index[j]->key_fields[k]->fieldno;
-			        if (namespace[i].index[j].key_fieldno[k] == -1)
-				        break;
+				namespace[i].index[j].key_fieldno[k] =
+				    cfg.namespace[i]->index[j]->key_fields[k]->fieldno;
+				if (namespace[i].index[j].key_fieldno[k] == -1)
+					break;
 
-                                namespace[i].index[j].key_cardinality++;
-                                max_key_fieldno = MAX(max_key_fieldno,
-                                                      namespace[i].index[j].key_fieldno[k]);
-                        }
-                        if (namespace[i].index[j].key_cardinality == 0)
-                                continue;
+				namespace[i].index[j].key_cardinality++;
+				max_key_fieldno = MAX(max_key_fieldno,
+						      namespace[i].index[j].key_fieldno[k]);
+			}
+			if (namespace[i].index[j].key_cardinality == 0)
+				continue;
 
-                        namespace[i].index[j].search_tuple_cardinality = max_key_fieldno + 1;
+			namespace[i].index[j].search_tuple_cardinality = max_key_fieldno + 1;
 
-                        namespace[i].index[j].search_field =
-                                salloc(sizeof(namespace[i].index[j].search_field[0]) *
-                                       namespace[i].index[j].search_tuple_cardinality);
-                        if (namespace[i].index[j].search_field == NULL)
-                                panic("can't allocate search_field for index");
+			namespace[i].index[j].search_field =
+			    salloc(sizeof(namespace[i].index[j].search_field[0]) *
+				   namespace[i].index[j].search_tuple_cardinality);
+			if (namespace[i].index[j].search_field == NULL)
+				panic("can't allocate search_field for index");
 
-                        namespace[i].index[j].cmp_map = salloc(
-                                sizeof(namespace[i].index[j].cmp_map[0]) *
-                                namespace[i].index[j].search_tuple_cardinality);
-                        if (namespace[i].index[j].cmp_map == NULL)
-                                panic("can't allocate cmp_map for index");
+			namespace[i].index[j].cmp_map =
+			    salloc(sizeof(namespace[i].index[j].cmp_map[0]) *
+				   namespace[i].index[j].search_tuple_cardinality);
+			if (namespace[i].index[j].cmp_map == NULL)
+				panic("can't allocate cmp_map for index");
 
 			if (strcmp(cfg.namespace[i]->index[j]->type, "NUM") == 0) {
 				namespace[i].index[j].find = index_find_hash_num;
@@ -1429,7 +1420,8 @@ custom_init(void)
 					panic("hash NUM index must have key_cardinality = 1");
 
 				if (estimated_rows > 0)
-					kh_resize(int2ptr_map, namespace[i].index[j].idx.int_hash, estimated_rows);
+					kh_resize(int2ptr_map, namespace[i].index[j].idx.int_hash,
+						  estimated_rows);
 			} else if (strcmp(cfg.namespace[i]->index[j]->type, "STR") == 0) {
 				namespace[i].index[j].find = index_find_hash_str;
 				namespace[i].index[j].find_by_tuple = uniq_find_by_tuple;
@@ -1442,7 +1434,8 @@ custom_init(void)
 					panic("hash NUM index must have key_cardinality = 1");
 
 				if (estimated_rows > 0)
-					kh_resize(lstr2ptr_map, namespace[i].index[j].idx.str_hash, estimated_rows);
+					kh_resize(lstr2ptr_map, namespace[i].index[j].idx.str_hash,
+						  estimated_rows);
 			} else if (strcmp(cfg.namespace[i]->index[j]->type, "TREE_STR") == 0) {
 				namespace[i].index[j].find = index_find_tree_str;
 				namespace[i].index[j].find_by_tuple = uniq_find_by_tuple;
@@ -1453,29 +1446,29 @@ custom_init(void)
 				namespace[i].index[j].namespace = &namespace[i];
 				namespace[i].index[j].type = INDEX_TREE_STR;
 
-				namespace[i].index[j].idx.str_tree = palloc(eter_pool, sizeof(*namespace[i].index[j].idx.str_tree));
+				namespace[i].index[j].idx.str_tree =
+				    palloc(eter_pool, sizeof(*namespace[i].index[j].idx.str_tree));
 
 				sptree_str_t_init(namespace[i].index[j].idx.str_tree,
 						  0, 0, 0,
-						  (void *)tuple_compare,
-						  &namespace[i].index[j]);
+						  (void *)tuple_compare, &namespace[i].index[j]);
 			} else {
-				say_warn("unknown index type `%s'", cfg.namespace[i]->index[j]->type);
+				say_warn("unknown index type `%s'",
+					 cfg.namespace[i]->index[j]->type);
 				continue;
 			}
 		}
 
-                if (namespace[i].index[0].key_cardinality == 0)
-                        panic("namespace must have at least one index");
-                if (namespace[i].index[0].type == INDEX_TREE_STR)
-                        panic("namespace first index must be unique");
+		if (namespace[i].index[0].key_cardinality == 0)
+			panic("namespace must have at least one index");
+		if (namespace[i].index[0].type == INDEX_TREE_STR)
+			panic("namespace first index must be unique");
 
 		namespace[i].enabled = true;
 		namespace[i].n = i;
 		say_info("namespace %i successfully configured", i);
 	}
 }
-
 
 static u32
 box_process_ro(u32 op, struct tbuf *request_data)
@@ -1501,8 +1494,7 @@ title(const char *fmt, ...)
 
 	if (cfg.memcached)
 		set_proc_title("memcached:%s%s pri:%i adm:%i",
-			       buf, custom_proc_title,
-			       cfg.primary_port, cfg.admin_port);
+			       buf, custom_proc_title, cfg.primary_port, cfg.admin_port);
 	else
 		set_proc_title("box:%s%s pri:%i sec:%i adm:%i",
 			       buf, custom_proc_title,
@@ -1517,7 +1509,8 @@ box_bound_to_primary(void *data __unused__)
 	if (cfg.remote_hot_standby) {
 		say_info("starting remote hot standby");
 		status = palloc(eter_pool, 64);
-		snprintf(status, 64, "hot_standby/%s:%i%s", cfg.wal_feeder_ipaddr, cfg.wal_feeder_port, custom_proc_title);
+		snprintf(status, 64, "hot_standby/%s:%i%s", cfg.wal_feeder_ipaddr,
+			 cfg.wal_feeder_port, custom_proc_title);
 		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
 
 		title("hot_standby/%s:%i", cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
@@ -1535,13 +1528,13 @@ memcached_bound_to_primary(void *data __unused__)
 	box_bound_to_primary(NULL);
 
 	if (0 && !cfg.remote_hot_standby) {
-		struct fiber *expire = fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
+		struct fiber *expire =
+		    fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
 		if (expire == NULL)
 			panic("can't stared expire fiber");
 		fiber_call(expire);
 	}
 }
-
 
 void
 mod_init(void)
@@ -1550,8 +1543,8 @@ mod_init(void)
 		namespace[i].enabled = false;
 		for (int j = 0; j < MAX_IDX; j++) {
 			namespace[i].index[j].key_cardinality = 0;
-                        namespace[i].index[j].search_tuple_cardinality = 0;
-                }
+			namespace[i].index[j].search_tuple_cardinality = 0;
+		}
 	}
 
 	if (cfg.custom_proc_title == NULL)
@@ -1571,13 +1564,15 @@ mod_init(void)
 
 	if (cfg.remote_hot_standby) {
 		if (cfg.wal_feeder_ipaddr == NULL || cfg.wal_feeder_port == 0)
-			panic("wal_feeder_ipaddr & wal_feeder_port must be provided in remote_hot_standby mode");
+			panic
+			    ("wal_feeder_ipaddr & wal_feeder_port must be provided in remote_hot_standby mode");
 	}
 
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
 				      box_snap_reader, snap_apply, xlog_apply,
 				      cfg.rows_per_wal, cfg.wal_fsync_delay, cfg.snap_io_rate_limit,
-				      cfg.wal_writer_inbox_size, init_storage ? RECOVER_READONLY : 0, NULL);
+				      cfg.wal_writer_inbox_size,
+				      init_storage ? RECOVER_READONLY : 0, NULL);
 
 	/* initialize hashes _after_ starting wal writer */
 	if (cfg.memcached != 0) {
@@ -1592,7 +1587,7 @@ mod_init(void)
 
 		memcached_index = &namespace[n].index[0];
 		memcached_index->key_fieldno[0] = 0;
-                memcached_index->key_cardinality = 1;
+		memcached_index->key_cardinality = 1;
 		memcached_index->type = INDEX_HASH_STR;
 		memcached_index->namespace = &namespace[n];
 	} else {
@@ -1614,13 +1609,16 @@ mod_init(void)
 	}
 
 	if (cfg.memcached != 0) {
-		fiber_server(tcp_server, cfg.primary_port, memcached_handler, NULL, memcached_bound_to_primary);
+		fiber_server(tcp_server, cfg.primary_port, memcached_handler, NULL,
+			     memcached_bound_to_primary);
 	} else {
 		if (cfg.secondary_port != 0)
-			fiber_server(tcp_server, cfg.secondary_port, iproto_interact, box_process_ro, NULL);
+			fiber_server(tcp_server, cfg.secondary_port, iproto_interact,
+				     box_process_ro, NULL);
 
 		if (cfg.primary_port != 0)
-			fiber_server(tcp_server, cfg.primary_port, iproto_interact, box_process, box_bound_to_primary);
+			fiber_server(tcp_server, cfg.primary_port, iproto_interact, box_process,
+				     box_bound_to_primary);
 	}
 
 	say_info("initialized");
@@ -1638,16 +1636,16 @@ mod_snapshot(struct log_io_iter *i)
 	struct tbuf *row = tbuf_alloc(fiber->pool);
 	struct box_snap_row header;
 	struct box_tuple *tuple;
-        khiter_t k;
+	khiter_t k;
 
-	for(uint32_t n = 0; n < nelem(namespace); ++n) {
-                if (!namespace[n].enabled)
+	for (uint32_t n = 0; n < nelem(namespace); ++n) {
+		if (!namespace[n].enabled)
 			continue;
 
 		assoc_foreach(namespace[n].index[0].idx.int_hash, k) {
 			tuple = kh_value(namespace[n].index[0].idx.int_hash, k);
 
-			if (tuple->flags & GHOST) // do not save fictive rows
+			if (tuple->flags & GHOST)	// do not save fictive rows
 				continue;
 
 			header.namespace = n;
@@ -1660,7 +1658,7 @@ mod_snapshot(struct log_io_iter *i)
 
 			snapshot_write_row(i, row);
 		}
-        }
+	}
 }
 
 void
@@ -1670,14 +1668,13 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  version: \"%s\"\r\n", tarantool_version());
 	tbuf_printf(out, "  uptime: %i\r\n", (int)tarantool_uptime());
 	tbuf_printf(out, "  pid: %i\r\n", getpid());
-	tbuf_printf(out, "  wal_writer_pid: %"PRIi64"\r\n", (i64)wal_writer(recovery_state)->pid);
-	tbuf_printf(out, "  lsn: %"PRIi64"\r\n", confirmed_lsn(recovery_state));
+	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 "\r\n", (i64)wal_writer(recovery_state)->pid);
+	tbuf_printf(out, "  lsn: %" PRIi64 "\r\n", confirmed_lsn(recovery_state));
 	tbuf_printf(out, "  status: %s\r\n", status);
 }
 
 void
 mod_exec(char *str __unused__, int len __unused__, struct tbuf *out)
 {
-    tbuf_printf(out, "unimplemented\r\n");
+	tbuf_printf(out, "unimplemented\r\n");
 }
-

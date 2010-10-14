@@ -48,7 +48,7 @@ send_row(struct recovery_state *r __unused__, const struct tbuf *t)
 		data += bytes;
 	}
 
-	say_debug("send row: %"PRIu32" bytes %s", t->len, tbuf_to_hex(t));
+	say_debug("send row: %" PRIu32 " bytes %s", t->len, tbuf_to_hex(t));
 
 	return 0;
 }
@@ -75,15 +75,12 @@ recover_feed_slave(int sock)
 	}
 
 	log_io = recover_init(NULL, cfg.wal_feeder_dir,
-			      NULL, NULL, send_row,
-			      0, 0, 0, 
-			      64, RECOVER_READONLY, false);
+			      NULL, NULL, send_row, 0, 0, 0, 64, RECOVER_READONLY, false);
 
 	recover(log_io, lsn);
 	recover_follow(log_io, 0.1);
 	ev_loop(0);
 }
-
 
 void
 mod_init(void)
@@ -134,7 +131,7 @@ mod_init(void)
 		goto exit;
 	}
 
-	if (bind(server, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+	if (bind(server, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
 		say_syserror("bind");
 		goto exit;
 	}
@@ -156,12 +153,12 @@ mod_init(void)
 		if (child == 0)
 			recover_feed_slave(client);
 	}
-exit:
+      exit:
 	exit(EXIT_FAILURE);
 }
 
 void
-mod_exec(char *str __unused__, int len __unused__, struct tbuf *out) {
-    tbuf_printf(out, "Unimplemented");
-} 
-
+mod_exec(char *str __unused__, int len __unused__, struct tbuf *out)
+{
+	tbuf_printf(out, "Unimplemented");
+}

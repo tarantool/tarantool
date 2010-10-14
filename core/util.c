@@ -125,15 +125,14 @@ print_trace(FILE *f)
 	}
 	fprintf(f, "backtrace:\n");
 	while (stack_bottom <= (void *)frame && (void *)frame < stack_top) {
-		fprintf(f, "  - { frame: %p, pc: %p }\n",
-			frame + 2 * sizeof(void *), frame->ret);
+		fprintf(f, "  - { frame: %p, pc: %p }\n", frame + 2 * sizeof(void *), frame->ret);
 		frame = frame->rbp;
 	}
 }
 #endif
 
-void __attribute__((noreturn))
-assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)
+void __attribute__ ((noreturn))
+    assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)
 {
 	fprintf(stderr, "%s:%i: %s: assertion %s failed.\n", file, line, function, assertion);
 #if CORO_ASM

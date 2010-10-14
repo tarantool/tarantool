@@ -61,7 +61,7 @@ const char *xlog_mark = "XLOG\n";
 
 #define ROW_EOF (void *)1
 
-static struct tbuf *row_reader_v04(FILE * f, struct palloc_pool *pool);
+static struct tbuf *row_reader_v04(FILE *f, struct palloc_pool *pool);
 
 struct log_io_iter {
 	struct tarantool_coro coro;
@@ -72,7 +72,6 @@ struct log_io_iter {
 	bool eof;
 	int io_rate_limit;
 };
-
 
 i64
 confirmed_lsn(struct recovery_state *r)
@@ -93,14 +92,13 @@ confirm_lsn(struct recovery_state *r, i64 lsn)
 
 	if (r->confirmed_lsn < lsn) {
 		if (r->confirmed_lsn + 1 != lsn)
-			say_warn("non consecutive lsn, last confirmed:%"PRIi64
-				 " new:%"PRIi64" diff: %"PRIi64,
+			say_warn("non consecutive lsn, last confirmed:%" PRIi64
+				 " new:%" PRIi64 " diff: %" PRIi64,
 				 r->confirmed_lsn, lsn, lsn - r->confirmed_lsn);
 		r->confirmed_lsn = lsn;
 		return 0;
 	} else {
-		say_warn("lsn double confirmed:%"PRIi64,
-			    r->confirmed_lsn);
+		say_warn("lsn double confirmed:%" PRIi64, r->confirmed_lsn);
 	}
 
 	return -1;
@@ -129,7 +127,8 @@ snap_class(struct log_io_class *c)
 	c->rows_per_file = 0;
 }
 
-static i64 row_v04_lsn(const struct tbuf *t)
+static i64
+row_v04_lsn(const struct tbuf *t)
 {
 	return row_v04(t)->lsn;
 }
@@ -147,7 +146,7 @@ xlog04_class(struct log_io_class *c)
 	c->eof_marker = xlog_eof_marker_v04;
 	c->eof_marker_size = sizeof(xlog_eof_marker_v04);
 
-	c->rows_per_file = 50000; /* sane defaults */
+	c->rows_per_file = 50000;	/* sane defaults */
 	c->fsync_delay = 0;
 }
 
@@ -173,7 +172,6 @@ close_iter(struct log_io_iter *i)
 	tarantool_coro_destroy(&i->coro);
 }
 
-
 static void
 read_rows(struct log_io_iter *i)
 {
@@ -190,7 +188,7 @@ read_rows(struct log_io_iter *i)
 		  l->class->marker, l->class->marker_size);
 
 	good_offset = ftello(l->f);
-restart:
+      restart:
 	if (marker_offset > 0)
 		fseeko(l->f, marker_offset + 1, SEEK_SET);
 
@@ -207,7 +205,7 @@ restart:
 		}
 		marker_offset = ftello(l->f) - l->class->marker_size;
 		if (good_offset != marker_offset)
-			say_warn("skipped %"PRI_OFFT" bytes after %"PRI_OFFT" offset",
+			say_warn("skipped %" PRI_OFFT " bytes after %" PRI_OFFT " offset",
 				 marker_offset - good_offset, good_offset);
 		say_debug("magic found at %" PRI_OFFT, marker_offset);
 
@@ -234,7 +232,7 @@ restart:
 			say_info("%.1fM rows processed", row_count / 1000000.);
 		}
 	}
-eof:
+      eof:
 	/*
 	 * then only two cases of fully read file:
 	 * 1. eof_marker_size > 0 and it is the last record in file
@@ -259,7 +257,7 @@ eof:
 		goto out;
 	}
 
-out:
+      out:
 	l->rows += row_count;
 
 	fseeko(l->f, good_offset, SEEK_SET);	/* seek back to last known good offset */
@@ -274,25 +272,24 @@ out:
 }
 
 static void
-iter_open(struct log_io *l, struct log_io_iter *i, void (*iterator)(struct log_io_iter *i))
+iter_open(struct log_io *l, struct log_io_iter *i, void (*iterator) (struct log_io_iter * i))
 {
 	memset(i, 0, sizeof(*i));
 	i->log = l;
 	tarantool_coro_create(&i->coro, (void *)iterator, i);
 }
 
-
 static int
 cmp_i64(const void *_a, const void *_b)
 {
 	const i64 *a = _a, *b = _b;
-        if (*a == *b)
-                return 0;
-        return (*a > *b) ? 1 : -1;
+	if (*a == *b)
+		return 0;
+	return (*a > *b) ? 1 : -1;
 }
 
 static ssize_t
-scan_dir(struct log_io_class *class, i64 ** ret_lsn)
+scan_dir(struct log_io_class *class, i64 **ret_lsn)
 {
 	DIR *dh = NULL;
 	struct dirent *dent;
@@ -345,7 +342,7 @@ scan_dir(struct log_io_class *class, i64 ** ret_lsn)
 
 	*ret_lsn = lsn;
 	result = i;
-out:
+      out:
 	if (errno != 0)
 		say_syserror("error reading directory `%s'", class->dirname);
 
@@ -390,13 +387,12 @@ find_including_file(struct log_io_class *class, i64 target_lsn)
 	 * is not known beforehand. so, we simply return the last one.
 	 */
 
-out:
+      out:
 	return *lsn;
 }
 
-
 static struct tbuf *
-row_reader_v04(FILE * f, struct palloc_pool *pool)
+row_reader_v04(FILE *f, struct palloc_pool *pool)
 {
 	const int header_size = offsetof(struct row_v04, data);
 	struct tbuf *m = tbuf_alloc(pool);
@@ -523,7 +519,8 @@ format_filename(char *filename, struct log_io_class *class, i64 lsn, int suffix)
 		filename = buf;
 
 	switch (suffix) {
-	case 0: snprintf(filename, PATH_MAX, "%s/%020" PRIi64 "%s",
+	case 0:
+		snprintf(filename, PATH_MAX, "%s/%020" PRIi64 "%s",
 			 class->dirname, lsn, class->suffix);
 		break;
 	case -1:
@@ -539,7 +536,8 @@ format_filename(char *filename, struct log_io_class *class, i64 lsn, int suffix)
 }
 
 static struct log_io *
-open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 lsn, int suffix, const char *filename)
+open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 lsn, int suffix,
+	      const char *filename)
 {
 	char filetype[32], version[32], buf[32];
 	struct log_io *l = NULL;
@@ -600,7 +598,7 @@ open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 ls
 	}
 
 	return l;
-error:
+      error:
 	say_error("open_for_read: failed to open `%s': %s", l->filename, error);
 	if (l != NULL) {
 		if (l->f != NULL)
@@ -630,7 +628,7 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	format_filename(l->filename, class, lsn, suffix);
 	say_debug("find_log for writing `%s'", l->filename);
 
-	fd = open(l->filename, O_WRONLY|O_CREAT|O_EXCL|O_APPEND, 0664);
+	fd = open(l->filename, O_WRONLY | O_CREAT | O_EXCL | O_APPEND, 0664);
 	if (fd < 0) {
 		error = strerror(errno);
 		goto error;
@@ -645,7 +643,7 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	say_info("creating `%s'", l->filename);
 	write_header(l);
 	return l;
-error:
+      error:
 	say_error("find_log: failed to open `%s': %s", l->filename, error);
 	if (l != NULL) {
 		if (l->f != NULL)
@@ -737,7 +735,7 @@ recover_snap(struct recovery_state *r)
 	result = i.error;
 	if (result == 0)
 		r->lsn = r->confirmed_lsn = lsn;
-out:
+      out:
 	if (result != 0)
 		say_error("failure reading snapshot");
 
@@ -788,7 +786,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		}
 	}
 	result = i.error;
-out:
+      out:
 	/*
 	 * since we don't close log_io
 	 * we must rewind log_io to last known
@@ -834,15 +832,17 @@ recover_remaining_wals(struct recovery_state *r)
 		/* if newer WAL appeared in directory before current_wal was fully read try reread last */
 		if (r->current_wal != NULL) {
 			if (r->current_wal->retry++ < 3) {
-				say_warn("try reread `%s' despite newer WAL exists", r->current_wal->filename);
+				say_warn("try reread `%s' despite newer WAL exists",
+					 r->current_wal->filename);
 				goto recover_current_wal;
 			} else {
-				say_warn("wal `%s' wasn't correctly closed", r->current_wal->filename);
+				say_warn("wal `%s' wasn't correctly closed",
+					 r->current_wal->filename);
 				close_log(&r->current_wal);
 			}
 		}
 
-		current_lsn = confirmed_lsn(r) + 1; /* TODO: find better way looking for next xlog */
+		current_lsn = confirmed_lsn(r) + 1;	/* TODO: find better way looking for next xlog */
 		next_wal = open_for_read(r, &r->wal_class, current_lsn, suffix, NULL);
 		if (next_wal == NULL) {
 			if (suffix++ < 10)
@@ -854,7 +854,7 @@ recover_remaining_wals(struct recovery_state *r)
 		r->current_wal = next_wal;
 		say_info("recover from `%s'", r->current_wal->filename);
 
-	recover_current_wal:
+	      recover_current_wal:
 		rows_before = r->current_wal->rows;
 		result = recover_wal(r, r->current_wal);
 		if (result < 0) {
@@ -887,7 +887,8 @@ recover_remaining_wals(struct recovery_state *r)
 		}
 
 		if (result == LOG_EOF) {
-			say_info("done `%s' confirmed_lsn:%"PRIi64, r->current_wal->filename, confirmed_lsn(r));
+			say_info("done `%s' confirmed_lsn:%" PRIi64, r->current_wal->filename,
+				 confirmed_lsn(r));
 			close_log(&r->current_wal);
 		}
 		suffix = 0;
@@ -921,12 +922,13 @@ recover(struct recovery_state *r, i64 lsn)
 		result = recover_snap(r);
 		if (result < 0) {
 			if (greatest_lsn(&r->snap_class) <= 0) {
-				say_crit("don't you forget to initialize storage with --init_storage switch?");
+				say_crit
+				    ("don't you forget to initialize storage with --init_storage switch?");
 				_exit(1);
 			}
 			panic("snapshot recovery failed");
 		}
-		say_info("snapshot recovered, confirmed lsn:%"PRIi64, confirmed_lsn(r));
+		say_info("snapshot recovered, confirmed lsn:%" PRIi64, confirmed_lsn(r));
 	} else {
 		/*
 		 * note, that recovery start with lsn _NEXT_ to confirmed one
@@ -942,7 +944,7 @@ recover(struct recovery_state *r, i64 lsn)
 		i64 next_lsn = confirmed_lsn(r) + 1;
 		i64 lsn = find_including_file(&r->wal_class, next_lsn);
 		if (lsn <= 0) {
-			say_error("can't find wal containing record with lsn:%"PRIi64, next_lsn);
+			say_error("can't find wal containing record with lsn:%" PRIi64, next_lsn);
 			result = -1;
 			goto out;
 		} else {
@@ -955,17 +957,16 @@ recover(struct recovery_state *r, i64 lsn)
 	}
 
 	result = recover_remaining_wals(r);
-	say_info("wals recovered, confirmed lsn: %"PRIi64, confirmed_lsn(r));
-out:
+	say_info("wals recovered, confirmed lsn: %" PRIi64, confirmed_lsn(r));
+      out:
 	prelease(fiber->pool);
 	return result;
 }
 
-
-static void recover_follow_file(ev_stat * w, int revents __unused__);
+static void recover_follow_file(ev_stat *w, int revents __unused__);
 
 static void
-recover_follow_dir(ev_timer * w, int revents __unused__)
+recover_follow_dir(ev_timer *w, int revents __unused__)
 {
 	struct recovery_state *r = w->data;
 	struct log_io *wal = r->current_wal;
@@ -982,7 +983,7 @@ recover_follow_dir(ev_timer * w, int revents __unused__)
 }
 
 static void
-recover_follow_file(ev_stat * w, int revents __unused__)
+recover_follow_file(ev_stat *w, int revents __unused__)
 {
 	struct recovery_state *r = w->data;
 	int result;
@@ -990,7 +991,8 @@ recover_follow_file(ev_stat * w, int revents __unused__)
 	if (result < 0)
 		panic("recover failed: %i", result);
 	if (result == LOG_EOF) {
-		say_info("done `%s' confirmed_lsn:%"PRIi64, r->current_wal->filename, confirmed_lsn(r));
+		say_info("done `%s' confirmed_lsn:%" PRIi64, r->current_wal->filename,
+			 confirmed_lsn(r));
 		close_log(&r->current_wal);
 		recover_follow_dir((ev_timer *)w, 0);
 	}
@@ -1086,8 +1088,7 @@ write_to_disk_v04(void *_state, struct tbuf *t)
 
 	rows++;
 	if (wal->class->rows_per_file <= rows ||
-	    (wal_write_request(t)->lsn + 1) % wal->class->rows_per_file == 0 )
-	{
+	    (wal_write_request(t)->lsn + 1) % wal->class->rows_per_file == 0) {
 		wal_to_close = wal;
 		wal = NULL;
 		rows = 0;
@@ -1097,7 +1098,7 @@ write_to_disk_v04(void *_state, struct tbuf *t)
 	tbuf_append(reply, &result, sizeof(result));
 	return reply;
 
-fail:
+      fail:
 	result = 1;
 	tbuf_append(reply, &result, sizeof(result));
 	return reply;
@@ -1109,7 +1110,7 @@ wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data)
 	struct tbuf *m = tbuf_alloc(data->pool);
 	struct msg *a;
 
-	say_debug("wal_write lsn=%"PRIi64, lsn);
+	say_debug("wal_write lsn=%" PRIi64, lsn);
 	tbuf_reserve(m, sizeof(struct wal_write_request) + data->len);
 	wal_write_request(m)->lsn = lsn;
 	wal_write_request(m)->len = data->len;
@@ -1122,14 +1123,14 @@ wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data)
 	a = read_inbox();
 
 	u32 reply = read_u32(a->msg);
-	say_debug("wal_write reply=%"PRIu32, reply);
+	say_debug("wal_write reply=%" PRIu32, reply);
 	if (reply != 0)
 		say_warn("wal writer returned error status");
 	return reply == 0;
 }
 
 bool
-wal_write_v04(struct recovery_state * r, int op, const u8 *data, size_t len)
+wal_write_v04(struct recovery_state *r, int op, const u8 *data, size_t len)
 {
 	i64 lsn = next_lsn(r, 0);
 	struct tbuf *m = tbuf_alloc(fiber->pool);
@@ -1144,7 +1145,7 @@ wal_write_v04(struct recovery_state * r, int op, const u8 *data, size_t len)
 		return true;
 	}
 
-	say_warn("wal_write failed, txn lsn:%"PRIi64 " aborted", lsn);
+	say_warn("wal_write failed, txn lsn:%" PRIi64 " aborted", lsn);
 	return false;
 }
 
@@ -1177,7 +1178,6 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 	return r;
 }
 
-
 static void
 write_rows(struct log_io_iter *i)
 {
@@ -1187,7 +1187,7 @@ write_rows(struct log_io_iter *i)
 	goto start;
 	for (;;) {
 		coro_transfer(&i->coro.ctx, &fiber->coro.ctx);
-	start:
+	      start:
 		row = i->to;
 
 		if (fwrite(&l->class->marker, l->class->marker_size, 1, l->f) != 1)
@@ -1197,7 +1197,6 @@ write_rows(struct log_io_iter *i)
 			panic("fwrite");
 	}
 }
-
 
 void
 snapshot_write_row(struct log_io_iter *i, struct tbuf *row)
@@ -1234,7 +1233,7 @@ snapshot_write_row(struct log_io_iter *i, struct tbuf *row)
 }
 
 void
-snapshot_save(struct recovery_state *r, void (*f)(struct log_io_iter *))
+snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 {
 	struct log_io_iter i;
 	struct log_io *snap;
@@ -1260,7 +1259,7 @@ snapshot_save(struct recovery_state *r, void (*f)(struct log_io_iter *))
 	say_info("saving snapshot `%s'", final_filename);
 	f(&i);
 
-        if (fsync(fileno(snap->f)) < 0)
+	if (fsync(fileno(snap->f)) < 0)
 		panic("fsync");
 
 	if (rename(snap->filename, final_filename) != 0)

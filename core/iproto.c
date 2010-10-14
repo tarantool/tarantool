@@ -50,7 +50,7 @@ iproto_parse(struct tbuf *in)
 void
 iproto_interact(void *data)
 {
-	uint32_t(*callback) (uint32_t msg, struct tbuf *requst_data) = data;
+	uint32_t (*callback) (uint32_t msg, struct tbuf *requst_data) = data;
 	struct tbuf *request;
 	struct iproto_header_retcode *reply;
 	ssize_t r;

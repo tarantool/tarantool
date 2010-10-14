@@ -43,38 +43,35 @@ u32 valid_tuple(struct tbuf *buf, u32 cardinality);
 
 size_t varint32_sizeof(u32);
 
-
-inline static u32
-load_varint32(void **data)
+inline static u32 load_varint32(void **data)
 {
 	u8 *b = *data;
 
-	if(!(b[0] & 0x80)) {
+	if (!(b[0] & 0x80)) {
 		*data += 1;
 		return (b[0] & 0x7f);
 	}
-	if(!(b[1] & 0x80)) {
+	if (!(b[1] & 0x80)) {
 		*data += 2;
 		return (b[0] & 0x7f) << 7 | (b[1] & 0x7f);
 	}
-	if(!(b[2] & 0x80)) {
+	if (!(b[2] & 0x80)) {
 		*data += 3;
 		return (b[0] & 0x7f) << 14 | (b[1] & 0x7f) << 7 | (b[2] & 0x7f);
 	}
-	if(!(b[3] & 0x80)) {
+	if (!(b[3] & 0x80)) {
 		*data += 4;
 		return (b[0] & 0x7f) << 21 | (b[1] & 0x7f) << 14 |
-			(b[2] & 0x7f) << 7 | (b[3] & 0x7f);
+		    (b[2] & 0x7f) << 7 | (b[3] & 0x7f);
 	}
-	if(!(b[4] & 0x80)) {
+	if (!(b[4] & 0x80)) {
 		*data += 5;
 		return (b[0] & 0x7f) << 28 | (b[1] & 0x7f) << 21 |
-			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
+		    (b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
 
 	assert(false);
 	return 0;
 }
-
 
 #endif

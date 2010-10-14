@@ -24,7 +24,9 @@ static inline khint_t __ac_X31_hash_lstr(void *s)
 	khint_t l;
 	l = load_varint32(&s);
 	khint_t h = 0;
-	if (l) for (; l-- ; s++) h = (h << 5) - h + *(u8 *)s;
+	if (l)
+		for (; l--; s++)
+			h = (h << 5) - h + *(u8 *)s;
 	return h;
 }
 
@@ -35,7 +37,7 @@ static inline int lstrcmp(void *a, void *b)
 	al = load_varint32(&a);
 	bl = load_varint32(&b);
 
-	if(al != bl)
+	if (al != bl)
 		return bl - al;
 	return memcmp(a, b, al);
 }
@@ -44,11 +46,10 @@ static inline int lstrcmp(void *a, void *b)
 #define kh_lstr_hash_func(key) ({ void *_k = key; unsigned int l = load_varint32(&_k); MurmurHash2(_k, l, 13); })
 #define kh_lstr_hash_equal(a, b) (lstrcmp(a, b) == 0)
 
-KHASH_INIT(lstr2ptr_map, void*, ptr_t, 1, kh_lstr_hash_func, kh_lstr_hash_equal, xrealloc)
-KHASH_INIT(ptr_set, uint64_t, char, 0, kh_int64_hash_func, kh_int64_hash_equal, xrealloc);
+KHASH_INIT(lstr2ptr_map, void *, ptr_t, 1, kh_lstr_hash_func, kh_lstr_hash_equal, xrealloc)
+    KHASH_INIT(ptr_set, uint64_t, char, 0, kh_int64_hash_func, kh_int64_hash_equal, xrealloc);
 
 void assoc_init(void);
-
 
 #define assoc_clear(hash_name, hash) kh_clear(hash_name, hash)
 
@@ -89,7 +90,6 @@ void assoc_init(void);
                                                     \
         _k;                                         \
 })
-
 
 #define assoc_foreach(hash, kiter)                                    \
         for (kiter = kh_begin(hash); kiter != kh_end(hash); ++kiter)  \

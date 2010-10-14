@@ -38,7 +38,6 @@
 #include <log_io.h>
 #include "log_io_internal.h"
 
-
 static struct tbuf *
 row_reader_v04(struct palloc_pool *pool)
 {
@@ -58,10 +57,9 @@ row_reader_v04(struct palloc_pool *pool)
 	}
 	m->len += row_v04(m)->len;
 
-	say_debug("read row bytes:%"PRIu32" %s", m->len, tbuf_to_hex(m));
+	say_debug("read row bytes:%" PRIu32 " %s", m->len, tbuf_to_hex(m));
 	return m;
 }
-
 
 static void
 pull_from_remote(void *state)
@@ -89,7 +87,7 @@ pull_from_remote(void *state)
 			lsn = confirmed_lsn(r) + 1;
 			fiber_write(&lsn, sizeof(lsn));
 
-			say_crit("starting remote recovery from lsn:%"PRIi64, lsn);
+			say_crit("starting remote recovery from lsn:%" PRIi64, lsn);
 			warning_said = false;
 		}
 
@@ -116,7 +114,6 @@ pull_from_remote(void *state)
 	}
 }
 
-
 struct fiber *
 recover_follow_remote(struct recovery_state *r, char *ip_addr, int port)
 {
@@ -131,7 +128,6 @@ recover_follow_remote(struct recovery_state *r, char *ip_addr, int port)
 	f = fiber_create(name, -1, -1, pull_from_remote, r);
 	if (f == NULL)
 		return NULL;
-
 
 	if (inet_aton(ip_addr, &server) < 0) {
 		say_syserror("inet_aton: %s", ip_addr);
