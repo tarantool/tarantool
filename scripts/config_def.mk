@@ -26,7 +26,7 @@ endif
 
 ifeq ($(OS), Linux)
   CFLAGS += -DLinux -D_FILE_OFFSET_BITS=64  -DEV_USE_INOTIFY -D_GNU_SOURCE
-  ifeq ($(DEBUG), 2)
+  ifdef DEBUG
     CFLAGS += -DHAVE_VALGRIND
   endif
 endif
@@ -35,14 +35,8 @@ ifeq (,$(filter -g%,$(CFLAGS)))
 CFLAGS += -g3 -ggdb
 endif
 
-ifdef DEBUG
-  CFLAGS += -DDEBUG -fno-omit-frame-pointer
-else
- CFLAGS += -DNDEBUG
-endif
-
 ifeq (,$(filter -O%,$(CFLAGS)))
-  ifeq ($(DEBUG), 2)
+  ifdef DEBUG
     CFLAGS += -O0
   else
     CFLAGS += -O2

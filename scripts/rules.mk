@@ -14,11 +14,14 @@ endif
 -include $(SRCDIR)/config.mk $(SRCDIR)/scripts/config.mk
 include $(SRCDIR)/scripts/config_def.mk
 
-ifneq (,$(findstring _debug,$(OBJDIR)))
-  DEBUG=0
+ifneq (,$(findstring _release,$(OBJDIR)))
+  CFLAGS += -DNDEBUG
+else ifneq (,$(findstring _debug,$(OBJDIR)))
+  DEBUG=1
+  CFLAGS += -DDEBUG -fno-omit-frame-pointer
 else ifneq (,$(findstring _test,$(OBJDIR)))
  CFLAGS += --coverage -DCOVERAGE -DNDEBUG
-else ifneq (,$(findstring_coverage,$(OBJDIR)))
+else ifneq (,$(findstring _coverage,$(OBJDIR)))
  CFLAGS += --coverage -DCOVERAGE
 endif
 
