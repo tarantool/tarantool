@@ -136,10 +136,10 @@ poison_chunk(struct chunk *chunk)
 }
 
 static struct chunk *
-next_chunk_for(struct palloc_pool * restrict pool, size_t size)
+next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 {
-	struct chunk * restrict chunk = SLIST_FIRST(&pool->chunks);
-	struct chunk_class * restrict class;
+	struct chunk *restrict chunk = SLIST_FIRST(&pool->chunks);
+	struct chunk_class *restrict class;
 
 	if (chunk != NULL)
 		class = chunk->class;
@@ -177,7 +177,6 @@ next_chunk_for(struct palloc_pool * restrict pool, size_t size)
 	return chunk;
 }
 
-
 #ifndef NDEBUG
 static const char *
 poisoned(const char *b, size_t size)
@@ -193,9 +192,8 @@ poisoned(const char *b, size_t size)
 }
 #endif
 
-
-static void * __noinline__
-palloc_slow_path(struct palloc_pool * restrict pool, size_t size)
+static void *__noinline__
+palloc_slow_path(struct palloc_pool *restrict pool, size_t size)
 {
 	struct chunk *chunk;
 	chunk = next_chunk_for(pool, size);
@@ -209,12 +207,12 @@ palloc_slow_path(struct palloc_pool * restrict pool, size_t size)
 	return ptr;
 }
 
-void * __attribute__((regparm(2)))
-palloc(struct palloc_pool * restrict pool, size_t size)
+void *__regparm2__
+palloc(struct palloc_pool *restrict pool, size_t size)
 {
 	assert(size < palloc_greatest_size());
 	const size_t rz_size = size + PALLOC_REDZONE * 2;
-	struct chunk * restrict chunk = SLIST_FIRST(&pool->chunks);
+	struct chunk *restrict chunk = SLIST_FIRST(&pool->chunks);
 	void *ptr;
 
 	pool->allocated += rz_size;
@@ -232,10 +230,10 @@ palloc(struct palloc_pool * restrict pool, size_t size)
 	return ptr + PALLOC_REDZONE;
 }
 
-void * __attribute__((regparm(2)))
+void *__regparm2__
 p0alloc(struct palloc_pool *pool, size_t size)
 {
-	void * ptr;
+	void *ptr;
 
 	ptr = palloc(pool, size);
 	memset(ptr, 0, size);
@@ -245,10 +243,10 @@ p0alloc(struct palloc_pool *pool, size_t size)
 void *
 palloca(struct palloc_pool *pool, size_t size, size_t align)
 {
-	void * ptr;
+	void *ptr;
 
 	ptr = palloc(pool, size + align);
-	return (void*)TYPEALIGN(align, (uintptr_t)ptr);
+	return (void *)TYPEALIGN(align, (uintptr_t)ptr);
 }
 
 void
@@ -256,10 +254,8 @@ prelease(struct palloc_pool *pool)
 {
 	struct chunk *chunk;
 
-	for (chunk = SLIST_FIRST(&pool->chunks);
-	     chunk != NULL;
-	     chunk = SLIST_NEXT(chunk, busy_link))
-	{
+	for (chunk = SLIST_FIRST(&pool->chunks); chunk != NULL;
+	     chunk = SLIST_NEXT(chunk, busy_link)) {
 		chunk->free = chunk->size - sizeof(struct chunk);
 		chunk->brk = (void *)chunk + sizeof(struct chunk);
 		SLIST_INSERT_HEAD(&chunk->class->chunks, chunk, free_link);
@@ -323,10 +319,12 @@ palloc_stat(struct tbuf *buf)
 	TAILQ_FOREACH(class, &classes, link) {
 		int free_chunks = 0;
 		SLIST_FOREACH(chunk, &class->chunks, free_link)
-			free_chunks++;
+		    free_chunks++;
 
-		tbuf_printf(buf, "    - { size: %- 8"PRIi64", free_chunks: %- 6i, busy_chunks: %- 6i }\n",
-			    class->size, free_chunks, class->chunks_count - free_chunks);
+		tbuf_printf(buf,
+			    "    - { size: %- 8" PRIi64
+			    ", free_chunks: %- 6i, busy_chunks: %- 6i }\n", class->size,
+			    free_chunks, class->chunks_count - free_chunks);
 	}
 	tbuf_printf(buf, "  pools:\n");
 
@@ -347,7 +345,7 @@ palloc_stat(struct tbuf *buf)
 			TAILQ_FOREACH(class, &classes, link) {
 				if (chunks[class->i] == 0)
 					continue;
-				tbuf_printf(buf, "        - { size: %- 7"PRIi64", used: %i }\n",
+				tbuf_printf(buf, "        - { size: %- 7" PRIi64 ", used: %i }\n",
 					    class->size, chunks[class->i]);
 
 				if (indent == 0)

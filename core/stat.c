@@ -94,7 +94,7 @@ stat_print(struct tbuf *buf)
 }
 
 void
-stat_age(ev_timer * timer, int events __unused__)
+stat_age(ev_timer *timer, int events __unused__)
 {
 	khash_t(char2int) * last = stats[SECS - 1];
 	for (int i = 0; i < SECS - 1; i++) {

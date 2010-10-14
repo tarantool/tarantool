@@ -40,7 +40,7 @@
 struct log_io;
 struct recovery_state;
 typedef int (*row_handler) (struct recovery_state *, const struct tbuf *);
-typedef struct tbuf *(*row_reader) (FILE * f, struct palloc_pool * pool);
+typedef struct tbuf *(*row_reader) (FILE *f, struct palloc_pool * pool);
 
 struct row_v04 {
 	i64 lsn;		/* this used to be tid */
@@ -69,20 +69,21 @@ static inline struct row_v05 *row_v05(const struct tbuf *t)
 }
 
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
-				    row_reader snap_row_reader, row_handler snap_row_handler, row_handler xlog_row_handler,
-				    int rows_per_file, double fsync_delay, double snap_io_rate_limit,
-				    int inbox_size, int flags, void *data);
+				    row_reader snap_row_reader, row_handler snap_row_handler,
+				    row_handler xlog_row_handler, int rows_per_file,
+				    double fsync_delay, double snap_io_rate_limit, int inbox_size,
+				    int flags, void *data);
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recover_finalize(struct recovery_state *r);
-bool wal_write_v04(struct recovery_state *r, int op, const u8 * data, size_t len);
+bool wal_write_v04(struct recovery_state *r, int op, const u8 *data, size_t len);
 
 /* recovery accessors */
 struct palloc_pool *recovery_pool(struct recovery_state *r);
 int confirm_lsn(struct recovery_state *r, i64 lsn);
 int64_t confirmed_lsn(struct recovery_state *r);
 int64_t next_lsn(struct recovery_state *r, i64 new_lsn);
-struct child * wal_writer(struct recovery_state *r);
+struct child *wal_writer(struct recovery_state *r);
 
 int read_log(const char *filename, row_reader reader,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);
@@ -91,5 +92,5 @@ struct fiber *recover_follow_remote(struct recovery_state *r, char *ip_addr, int
 
 struct log_io_iter;
 void snapshot_write_row(struct log_io_iter *i, struct tbuf *row);
-void snapshot_save(struct recovery_state *r, void (*loop)(struct log_io_iter *));
+void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io_iter *));
 #endif

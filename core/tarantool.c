@@ -62,8 +62,8 @@ enum tarantool_role role = def;
 
 extern int daemonize(int nochdir, int noclose);
 
-
-const char *tarantool_version(void)
+const char *
+tarantool_version(void)
 {
 	return tarantool_version_string;
 }
@@ -88,7 +88,7 @@ snapshot(void *ev __unused__, int events __unused__)
 		return;
 
 	fiber->name = "dumper";
-	set_proc_title("dumper (%"PRIu32")", getppid());
+	set_proc_title("dumper (%" PRIu32 ")", getppid());
 	close_all_xcpt(1, sayfd);
 	snapshot_save(recovery_state, mod_snapshot);
 #ifdef COVERAGE
@@ -103,7 +103,7 @@ sig_child(int signal __unused__)
 {
 	int child_status;
 	/* TODO: watch child status & destroy corresponding fibers */
-	while (waitpid(-1, &child_status, WNOHANG) > 0);
+	while (waitpid(-1, &child_status, WNOHANG) > 0) ;
 }
 
 static void
@@ -118,7 +118,6 @@ sig_int(int signal)
 			usleep(1000);
 		}
 	}
-
 #ifdef COVERAGE
 	__gcov_flush();
 #endif
@@ -166,17 +165,16 @@ signal_init(void)
 		goto error;
 
 	return;
-error:
+      error:
 	say_syserror("sigaction");
 	exit(EX_OSERR);
 }
-
 
 static void
 create_pid(void)
 {
 	FILE *f;
-	char buf[16] = {0};
+	char buf[16] = { 0 };
 	pid_t pid;
 
 	if (cfg.pid_file == NULL)
@@ -206,8 +204,6 @@ remove_pid(void)
 {
 	unlink(cfg.pid_file);
 }
-
-
 
 static void
 initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_factor)
@@ -244,44 +240,44 @@ main(int argc, char **argv)
 
 	const char *short_opt = "c:pvVD";
 	const struct option long_opt[] = {
-		{ .name = "config",
-		  .has_arg = 1,
-		  .flag = NULL,
-		  .val = 'c' },
+		{.name = "config",
+		 .has_arg = 1,
+		 .flag = NULL,
+		 .val = 'c'},
 #ifdef STORAGE
-		{ .name = "cat",
-		  .has_arg = 1,
-		  .flag = NULL,
-		  .val = 'C' },
-		{ .name = "init_storage",
-		  .has_arg = 0,
-		  .flag = NULL,
-		  .val = 'I'},
+		{.name = "cat",
+		 .has_arg = 1,
+		 .flag = NULL,
+		 .val = 'C'},
+		{.name = "init_storage",
+		 .has_arg = 0,
+		 .flag = NULL,
+		 .val = 'I'},
 #endif
-		{ .name = "create_pid",
-		  .has_arg = 0,
-		  .flag = NULL,
-		  .val = 'p'},
-		{ .name = "verbose",
-		  .has_arg = 0,
-		  .flag = NULL,
-		  .val = 'v'},
-		{ .name = "version",
-		  .has_arg = 0,
-		  .flag = NULL,
-		  .val = 'V'},
-		{ .name = "daemonize",
-		  .has_arg = 0,
-		  .flag = NULL,
-		  .val = 'D'},
-		{ .name = NULL,
-		  .has_arg = 0,
-		  .flag = NULL,
-		  .val = 0 }
+		{.name = "create_pid",
+		 .has_arg = 0,
+		 .flag = NULL,
+		 .val = 'p'},
+		{.name = "verbose",
+		 .has_arg = 0,
+		 .flag = NULL,
+		 .val = 'v'},
+		{.name = "version",
+		 .has_arg = 0,
+		 .flag = NULL,
+		 .val = 'V'},
+		{.name = "daemonize",
+		 .has_arg = 0,
+		 .flag = NULL,
+		 .val = 'D'},
+		{.name = NULL,
+		 .has_arg = 0,
+		 .flag = NULL,
+		 .val = 0}
 	};
 
 	while ((c = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
-                switch (c) {
+		switch (c) {
 		case 'V':
 			puts(tarantool_version());
 			return 0;
@@ -290,7 +286,7 @@ main(int argc, char **argv)
 				panic("no arg given");
 			cfg_filename = strdup(optarg);
 			break;
-                case 'C':
+		case 'C':
 			if (optarg == NULL)
 				panic("no arg given");
 			cat_filename = strdup(optarg);
@@ -383,7 +379,7 @@ main(int argc, char **argv)
 	}
 
 	if (cfg.coredump) {
-		struct rlimit c = {0,0};
+		struct rlimit c = { 0, 0 };
 		if (getrlimit(RLIMIT_CORE, &c) < 0) {
 			say_syserror("getrlimit");
 			exit(EX_OSERR);
@@ -393,15 +389,13 @@ main(int argc, char **argv)
 			say_syserror("setrlimit");
 			exit(EX_OSERR);
 		}
-
 #ifdef Linux
-		if (prctl(PR_SET_DUMPABLE,1,0,0,0) < 0) {
+		if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) < 0) {
 			say_syserror("prctl");
 			exit(EX_OSERR);
 		}
 #endif
 	}
-
 #ifdef STORAGE
 	if (init_storage) {
 		initialize_minimal();

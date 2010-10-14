@@ -35,7 +35,7 @@ enum log_mode {
 struct log_io_class {
 	ev_timer timer;
 
-	i64 (*row_lsn)(const struct tbuf *);
+	 i64(*row_lsn) (const struct tbuf *);
 	row_handler handler;
 	row_reader reader;
 	u64 marker, eof_marker;
@@ -63,7 +63,7 @@ struct log_io {
 struct recovery_state {
 	i64 lsn, confirmed_lsn;
 
-	struct log_io *current_wal; /* the WAL we'r currently reading/writing from/to */
+	struct log_io *current_wal;	/* the WAL we'r currently reading/writing from/to */
 	struct log_io_class snap_class, wal_class;
 	struct child *wal_writer;
 	void *data;

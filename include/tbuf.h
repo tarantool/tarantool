@@ -49,8 +49,7 @@ static inline void tbuf_ensure(struct tbuf *e, size_t required)
 		tbuf_ensure_resize(e, required);
 }
 
-static inline void
-tbuf_append(struct tbuf *b, const void *data, size_t len)
+static inline void tbuf_append(struct tbuf *b, const void *data, size_t len)
 {
 	tbuf_ensure(b, len + 1);
 	memcpy(b->data + b->len, data, len);

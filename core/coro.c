@@ -41,7 +41,7 @@
 extern void *main_stack_frame;
 
 struct tarantool_coro *
-tarantool_coro_create(struct tarantool_coro *coro, void (*f)(void *), void *data)
+tarantool_coro_create(struct tarantool_coro *coro, void (*f) (void *), void *data)
 {
 	const int page = sysconf(_SC_PAGESIZE);
 
@@ -56,7 +56,7 @@ tarantool_coro_create(struct tarantool_coro *coro, void (*f)(void *), void *data
 	/* TODO: guard pages */
 	coro->stack_size = page * 16;
 	coro->stack = mmap(0, coro->stack_size, PROT_READ | PROT_WRITE | PROT_EXEC,
-			  MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
 	if (coro->stack == MAP_FAILED)
 		return NULL;

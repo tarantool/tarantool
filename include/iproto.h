@@ -34,7 +34,7 @@ static inline struct iproto_header *iproto(const struct tbuf *t)
 struct iproto_interactor;
 
 struct iproto_interactor
-*iproto_interactor(uint32_t(*interact) (uint32_t msg, uint8_t * data, size_t len));
+*iproto_interactor(uint32_t (*interact) (uint32_t msg, uint8_t *data, size_t len));
 
 void iproto_interact(void *);
 

@@ -81,11 +81,11 @@
 #define CACHEALIGN(LEN)			TYPEALIGN(32, (LEN))
 #endif
 
-
 #define __packed__ __attribute__((packed))
 #define __noinline__ __attribute__((noinline))
 #define __unused__ __attribute__((unused))
 #define __cleanup__(f) __attribute__((cleanup (f)))
+#define __regparm2__  __attribute__((regparm(2)))
 
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -110,12 +110,10 @@ void *xrealloc(void *ptr, size_t size);
 
 void __gcov_flush();
 
-
 struct frame {
 	struct frame *rbp;
 	void *ret;
 };
-
 
 void save_rbp(void **rbp);
 extern void *main_stack_frame;
@@ -125,7 +123,7 @@ extern void *main_stack_frame;
 #else
 #  define assert(pred) ((pred) ? (void)(0) : assert_fail (#pred, __FILE__, __LINE__, __FUNCTION__))
 void assert_fail(const char *assertion, const char *file,
-		 unsigned int line, const char *function) __attribute__((noreturn));
+		 unsigned int line, const char *function) __attribute__ ((noreturn));
 #endif
 
 #endif

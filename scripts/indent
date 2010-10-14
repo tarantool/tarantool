@@ -19,7 +19,7 @@ do
 			;;
 	esac
 
-	PARAM="$PARAM "$(gcc -E -I. -Iinclude $f | perl scripts/usertypes2indent.pl)
+	PARAM="$PARAM "$(gcc -E -I. -Iinclude -DSTORAGE -DTARANTOOL_CONFIG='<cfg/tarantool_silverbox_cfg.h>' $f | perl scripts/usertypes2indent.pl)
 
 	$INDENT $PARAM $f
 done

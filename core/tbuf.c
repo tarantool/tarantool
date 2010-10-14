@@ -44,11 +44,10 @@
 #  define poison(ptr, len)
 #endif
 
-
 static void
-tbuf_assert(const struct tbuf * b)
+tbuf_assert(const struct tbuf *b)
 {
-	(void)b; /* arg used :-) */
+	(void)b;		/* arg used :-) */
 	assert(b->len <= b->size);
 	assert(b->size <= palloc_greatest_size());
 }
@@ -132,7 +131,7 @@ tbuf_peek(struct tbuf *b, size_t count)
 }
 
 size_t
-tbuf_reserve(struct tbuf * b, size_t count)
+tbuf_reserve(struct tbuf *b, size_t count)
 {
 	tbuf_assert(b);
 	tbuf_ensure(b, count);

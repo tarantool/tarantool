@@ -196,19 +196,19 @@ static inline void bert_take_bytes(struct tbuf *b, size_t n)
 static inline void bert_pack_u8(struct tbuf *b, uint8_t v)
 {
 	size_t o = tbuf_reserve(b, sizeof(uint8_t));
-	*(uint8_t *) (b->data + o) = v;
+	*(uint8_t *)(b->data + o) = v;
 }
 
 static inline void bert_pack_n16(struct tbuf *b, uint16_t v)
 {
 	size_t o = tbuf_reserve(b, sizeof(uint16_t));
-	*(uint16_t *) (b->data + o) = htons(v);
+	*(uint16_t *)(b->data + o) = htons(v);
 }
 
 static inline void bert_pack_n32(struct tbuf *b, uint32_t v)
 {
 	size_t o = tbuf_reserve(b, sizeof(uint32_t));
-	*(uint32_t *) (b->data + o) = htonl(v);
+	*(uint32_t *)(b->data + o) = htonl(v);
 }
 
 static inline void bert_pack_header(struct tbuf *b)
@@ -235,7 +235,7 @@ static inline void bert_pack_int(struct tbuf *b, int64_t v)
 {
 	if (0 <= v && v <= 255) {
 		bert_pack_u8(b, ERL_SMALL_INT);
-		bert_pack_u8(b, (uint8_t) v);
+		bert_pack_u8(b, (uint8_t)v);
 		return;
 	}
 
@@ -247,15 +247,15 @@ static inline void bert_pack_int(struct tbuf *b, int64_t v)
 
 	bert_pack_u8(b, ERL_SMALL_BIGNUM);
 	size_t n = tbuf_reserve(b, sizeof(uint8_t));
-	*(uint8_t *) (b->data + n) = 0;
+	*(uint8_t *)(b->data + n) = 0;
 	bert_pack_u8(b, v < 0);
 	if (v < 0)
 		v = -v;
 	while (v) {
 		size_t o = tbuf_reserve(b, sizeof(uint8_t));
-		*(uint8_t *) (b->data + o) = v;
+		*(uint8_t *)(b->data + o) = v;
 		v >>= 8;
-		(*(uint8_t *) (b->data + n))++;
+		(*(uint8_t *)(b->data + n))++;
 	}
 }
 

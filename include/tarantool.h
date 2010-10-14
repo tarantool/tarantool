@@ -32,9 +32,8 @@
 #include <log_io.h>
 #include TARANTOOL_CONFIG
 
-
 struct recovery_state *recovery_state;
-void mod_init (void);
+void mod_init(void);
 int mod_cat(const char *filename);
 void mod_snapshot(struct log_io_iter *);
 void mod_info(struct tbuf *out);

@@ -30,7 +30,7 @@
 #include <tbuf.h>
 #include <palloc.h>
 #include <fiber.h>
-#include <iproto.h> /* for err codes */
+#include <iproto.h>		/* for err codes */
 #include <pickle.h>
 
 /* caller must ensure that there is space in target */
@@ -53,7 +53,6 @@ save_varint32(u8 *target, u32 value)
 
 	return target;
 }
-
 
 inline static void
 append_byte(struct tbuf *b, u8 byte)
@@ -80,14 +79,13 @@ write_varint32(struct tbuf *b, u32 value)
 	append_byte(b, (u8)((value) & 0x7F));
 }
 
-
 u32
 read_u32(struct tbuf *b)
 {
 	if (b->len < 4)
 		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
 
-	u32 r = *(u32 *)b->data; /* FIXME: endianess & aligment */
+	u32 r = *(u32 *)b->data;	/* FIXME: endianess & aligment */
 	b->size -= 4;
 	b->len -= 4;
 	b->data += 4;
@@ -117,7 +115,7 @@ read_varint32(struct tbuf *buf)
 
 	if (len < 1)
 		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
-	if(!(b[0] & 0x80)) {
+	if (!(b[0] & 0x80)) {
 		buf->data += 1;
 		buf->size -= 1;
 		buf->len -= 1;
@@ -126,7 +124,7 @@ read_varint32(struct tbuf *buf)
 
 	if (len < 2)
 		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
-	if(!(b[1] & 0x80)) {
+	if (!(b[1] & 0x80)) {
 		buf->data += 2;
 		buf->size -= 2;
 		buf->len -= 2;
@@ -134,7 +132,7 @@ read_varint32(struct tbuf *buf)
 	}
 	if (len < 3)
 		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
-	if(!(b[2] & 0x80)) {
+	if (!(b[2] & 0x80)) {
 		buf->data += 3;
 		buf->size -= 3;
 		buf->len -= 3;
@@ -143,28 +141,27 @@ read_varint32(struct tbuf *buf)
 
 	if (len < 4)
 		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
-	if(!(b[3] & 0x80)) {
+	if (!(b[3] & 0x80)) {
 		buf->data += 4;
 		buf->size -= 4;
 		buf->len -= 4;
 		return (b[0] & 0x7f) << 21 | (b[1] & 0x7f) << 14 |
-			(b[2] & 0x7f) << 7 | (b[3] & 0x7f);
+		    (b[2] & 0x7f) << 7 | (b[3] & 0x7f);
 	}
 
 	if (len < 5)
 		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
-	if(!(b[4] & 0x80)) {
+	if (!(b[4] & 0x80)) {
 		buf->data += 5;
 		buf->size -= 5;
 		buf->len -= 5;
 		return (b[0] & 0x7f) << 28 | (b[1] & 0x7f) << 21 |
-			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
+		    (b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
 
 	raise(ERR_CODE_UNKNOWN_ERROR, "imposible happend");
 	return 0;
 }
-
 
 u32
 pick_u32(void *data, void **rest)
@@ -189,7 +186,6 @@ read_field(struct tbuf *buf)
 	buf->data += data_len;
 	return p;
 }
-
 
 u32
 valid_tuple(struct tbuf *buf, u32 cardinality)

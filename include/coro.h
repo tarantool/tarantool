@@ -36,8 +36,8 @@ struct tarantool_coro {
 	size_t stack_size;
 };
 
-struct tarantool_coro *
-tarantool_coro_create(struct tarantool_coro *ctx, void (*f)(void *), void *data);
+struct tarantool_coro *tarantool_coro_create(struct tarantool_coro *ctx, void (*f) (void *),
+					     void *data);
 void tarantool_coro_destroy(struct tarantool_coro *ctx);
 
 #endif

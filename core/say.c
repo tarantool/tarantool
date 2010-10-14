@@ -65,8 +65,8 @@ say_logger_init(int nonblock)
 {
 	int pipefd[2];
 	pid_t pid;
-	char *argv[] = {"/bin/sh", "-c", cfg.logger, NULL};
-	char *envp[] = {NULL};
+	char *argv[] = { "/bin/sh", "-c", cfg.logger, NULL };
+	char *envp[] = { NULL };
 
 	if (cfg.logger != NULL) {
 		if (pipe(pipefd) == -1) {
@@ -93,7 +93,7 @@ say_logger_init(int nonblock)
 	} else {
 		sayfd = STDERR_FILENO;
 	}
-out:
+      out:
 	if (nonblock)
 		set_nonblock(sayfd);
 }
