@@ -213,7 +213,6 @@ initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_fa
 		panic("can't initialize slab allocator");
 
 	fiber_init();
-	signal_init();
 }
 
 static void
@@ -426,6 +425,7 @@ main(int argc, char **argv)
 	ev_signal_start(ev_sig);
 
 	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
+	signal_init();
 	ev_default_loop(0);
 
 	mod_init();
