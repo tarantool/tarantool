@@ -86,10 +86,29 @@ struct palloc_pool *eter_pool;
 #define PALLOC_POISON
 #endif
 
-size_t
+static size_t
 palloc_greatest_size(void)
 {
 	return (1 << 22) - sizeof(struct chunk);
+}
+
+
+static struct chunk_class *
+class_init(size_t size)
+{
+	struct chunk_class *class;
+
+	class = malloc(sizeof(struct chunk_class));
+	if (class == NULL)
+		return NULL;
+
+	class->i = class_count++;
+	class->chunks_count = 0;
+	class->size = size;
+	SLIST_INIT(&class->chunks);
+	TAILQ_INSERT_TAIL(&classes, class, link);
+
+	return class;
 }
 
 int
@@ -101,24 +120,16 @@ palloc_init(void)
 	TAILQ_INIT(&classes);
 
 	for (size_t size = 4096 * 8; size <= 1 << 16; size *= 2) {
-		class = malloc(sizeof(struct chunk_class));
-		if (class == NULL)
+		if (class_init(size) == NULL)
 			return 0;
-
-		class->i = class_count++;
-		class->chunks_count = 0;
-		class->size = size - sizeof(struct chunk);
-		SLIST_INIT(&class->chunks);
-		TAILQ_INSERT_TAIL(&classes, class, link);
 	}
 
-	class = malloc(sizeof(struct chunk_class));
-	class->i = class_count++;
-	if (class == NULL)
+	if (class_init(palloc_greatest_size()) == NULL)
 		return 0;
-	class->size = palloc_greatest_size();
-	SLIST_INIT(&class->chunks);
-	TAILQ_INSERT_TAIL(&classes, class, link);
+
+	if ((class = class_init(-1)) == NULL)
+		return 0;
+
 	TAILQ_NEXT(class, link) = NULL;
 
 	eter_pool = palloc_create_pool("eter_pool");
@@ -140,6 +151,7 @@ next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 {
 	struct chunk *restrict chunk = SLIST_FIRST(&pool->chunks);
 	struct chunk_class *restrict class;
+	size_t chunk_size;
 
 	if (chunk != NULL)
 		class = chunk->class;
@@ -149,8 +161,7 @@ next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 	while (class != NULL && class->size < size)
 		class = TAILQ_NEXT(class, link);
 
-	if (class == NULL)
-		return NULL;
+	assert(class != NULL);
 
 	chunk = SLIST_FIRST(&class->chunks);
 	if (chunk != NULL) {
@@ -158,15 +169,20 @@ next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 		goto found;
 	}
 
-	chunk = malloc(class->size + sizeof(struct chunk));
+	if (size > palloc_greatest_size())
+		chunk_size = size;
+	else
+		chunk_size = class->size;
+
+	chunk = malloc(chunk_size + sizeof(struct chunk));
 
 	if (chunk == NULL)
 		return NULL;
 
 	class->chunks_count++;
 	chunk->magic = chunk_magic;
-	chunk->size = class->size;
-	chunk->free = chunk->size - sizeof(struct chunk);
+	chunk->size = chunk_size;
+	chunk->free = chunk_size;
 	chunk->brk = (void *)chunk + sizeof(struct chunk);
 	chunk->class = class;
       found:
@@ -210,7 +226,6 @@ palloc_slow_path(struct palloc_pool *restrict pool, size_t size)
 void *__regparm2__
 palloc(struct palloc_pool *restrict pool, size_t size)
 {
-	assert(size < palloc_greatest_size());
 	const size_t rz_size = size + PALLOC_REDZONE * 2;
 	struct chunk *restrict chunk = SLIST_FIRST(&pool->chunks);
 	void *ptr;
@@ -252,14 +267,18 @@ palloca(struct palloc_pool *pool, size_t size, size_t align)
 void
 prelease(struct palloc_pool *pool)
 {
-	struct chunk *chunk;
+	struct chunk *chunk, *next_chunk;
 
-	for (chunk = SLIST_FIRST(&pool->chunks); chunk != NULL;
-	     chunk = SLIST_NEXT(chunk, busy_link)) {
-		chunk->free = chunk->size - sizeof(struct chunk);
-		chunk->brk = (void *)chunk + sizeof(struct chunk);
-		SLIST_INSERT_HEAD(&chunk->class->chunks, chunk, free_link);
-		poison_chunk(chunk);
+	for (chunk = SLIST_FIRST(&pool->chunks); chunk != NULL; chunk = next_chunk) {
+		next_chunk = SLIST_NEXT(chunk, busy_link);
+		if (chunk->size <= palloc_greatest_size()) {
+			chunk->free = chunk->size - sizeof(struct chunk);
+			chunk->brk = (void *)chunk + sizeof(struct chunk);
+			SLIST_INSERT_HEAD(&chunk->class->chunks, chunk, free_link);
+			poison_chunk(chunk);
+		} else {
+			free(chunk);
+		}
 	}
 
 	SLIST_INIT(&pool->chunks);

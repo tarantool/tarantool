@@ -49,7 +49,6 @@ tbuf_assert(const struct tbuf *b)
 {
 	(void)b;		/* arg used :-) */
 	assert(b->len <= b->size);
-	assert(b->size <= palloc_greatest_size());
 }
 
 struct tbuf *
@@ -76,11 +75,6 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 
 	while (new_size - e->len < required)
 		new_size *= 2;
-
-	if (unlikely(new_size > palloc_greatest_size())) {
-		new_size = palloc_greatest_size();
-		assert(new_size - e->len >= required);
-	}
 
 	void *p = palloc(e->pool, new_size);
 
