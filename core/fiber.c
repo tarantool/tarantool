@@ -43,7 +43,6 @@
 #include <third_party/khash.h>
 
 #include <debug.h>
-#include <bert.h>
 #include <fiber.h>
 #include <palloc.h>
 #include <salloc.h>
