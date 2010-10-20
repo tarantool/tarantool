@@ -37,6 +37,7 @@ sub new {
     $self->{select_timeout}  = $arg->{select_timeout} || $self->{timeout};
     $self->{iprotoclass}     = $arg->{iprotoclass} || $class->IPROTOCLASS;
     $self->{errstrclass}     = $arg->{errstrclass} || $class->ERRSTRCLASS;
+    $self->{_last_error}     = 0;
 
     $arg->{namespaces} = [@{ $arg->{namespaces} }];
     my %namespaces;
@@ -51,8 +52,9 @@ sub new {
         confess "ns[$namespace] bad format `$ns->{format}'" if $ns->{format} =~ m/[^&lLsScC ]/;
         $ns->{format} =~ s/\s+//g;
         my @f = split //, $ns->{format};
-        $ns->{unpack_format} = join('', map { /&/ ? 'w/a*' : "x$_" } @f );
-        $ns->{field_format}  = [        map { /&/ ? 'a*'   : $_    } @f ];
+        $ns->{byfield_unpack_format} = [ map { /&/ ? 'w/a*' : "x$_" } @f ];
+        $ns->{field_format}  = [         map { /&/ ? 'a*'   : $_    } @f ];
+        $ns->{unpack_format}  = join('', @{$ns->{byfield_unpack_format}});
         $ns->{append_for_unpack} = '' unless defined $ns->{append_for_unpack};
         $ns->{check_keys} = {};
         $ns->{string_keys} = { map { $_ => 1 } grep { $f[$_] eq '&' } 0..$#f };
@@ -108,19 +110,28 @@ sub _connect {
     });
 }
 
+sub ErrorStr {
+    my ($self, $code) = @_;
+    return $self->{_last_error_msg} if $self->{_last_error} eq 'fail';
+    return $self->{errstrclass}->ErrorStr($code || $self->{_last_error});
+}
+
+sub Error {
+    return $_[0]->{_last_error};
+}
+
 sub _chat {
     my ($self, %param) = @_;
     my $orig_unpack = delete $param{unpack};
-    my $soft_error = {}; # exception, any ref will do
 
     $param{unpack} = sub {
         my $data = $_[0];
         confess __LINE__."$self->{name}: [common]: Bad response" if length $data < 4;
-        my @err_code = unpack('CCCC', substr($data, 0, 4, ''));
+        my ($full_code, @err_code) = unpack('LX[L]CCCC', substr($data, 0, 4, ''));
         # $err_code[0] = severity: 0 -> ok, 1 -> transient, 2 -> permanent;
         # $err_code[1] = description;
         # $err_code[3] = da box project;
-        return (\@err_code, \$data);
+        return (\@err_code, \$data, $full_code);
     };
 
     my $timeout = $param{timeout} || $self->{timeout};
@@ -131,19 +142,20 @@ sub _chat {
     while ($retry > 0) {
         $retry_count++;
 
+        $self->{_last_error} = 0x77777777;
         $self->{server}->SetTimeout($timeout);
         my $ret = $self->{server}->Chat1(%param);
         my $message;
 
         if (exists $ret->{ok}) {
-            my ($ret_code, $data) = @{$ret->{ok}};
+            my ($ret_code, $data, $full_code) = @{$ret->{ok}};
+            $self->{_last_error} = $full_code;
             if ($ret_code->[0] == 0) {
                 my $ret = $orig_unpack->($$data,$ret_code->[3]);
                 confess __LINE__."$self->{name}: [common]: Bad response (more data left)" if length $$data > 0;
                 return $ret;
             }
 
-            my $full_code = ($ret_code->[1] << 8) + $ret_code->[0];
             $message = $self->{errstrclass}->ErrorStr($full_code);
             $self->_debug("$self->{name}: $message") if $self->{debug} >= 1;
             if ($ret_code->[0] == 2) { #fatal error
@@ -157,8 +169,9 @@ sub _chat {
                 sleep 1;
                 next;
             }
-        } else {
-            $message ||= $ret->{fail} || $ret->{timeout};
+        } else { # timeout has caused the failure if $ret->{timeout}
+            $self->{_last_error} = 'fail';
+            $message ||= $self->{_last_error_msg} = $ret->{fail};
             $self->_debug("$self->{name}: $message") if $self->{debug} >= 1;
         }
 
@@ -306,13 +319,28 @@ sub _PackSelect {
     my ($self, $param, $namespace, @keys) = @_;
     return '' unless @keys;
     $self->_pack_keys($namespace, $param->{index}, @keys);
-    return pack("LLLLL a*", $namespace->{namespace}, $param->{index}->{id}, $param->{offset} || 0, $param->{limit} || scalar(@keys), scalar(@keys), join('',@keys));
+    my $format = "";
+    if ($param->{format}) {
+        my $f = $namespace->{byfield_unpack_format};
+        $param->{unpack_format} = join '', map { $f->[$_->{field}] } @{$param->{format}};
+        $format = pack 'L*', scalar @{$param->{format}}, map {
+            if($_->{full}) {
+                $_->{offset} = 0;
+                $_->{length} = 'max';
+            }
+            $_->{length} = 0xFFFFFFFF if $_->{length} eq 'max';
+            @$_{qw/field offset length/}
+        } @{$param->{format}};
+    }
+    return pack("LLLL a* La*", $namespace->{namespace}, $param->{index}->{id}, $param->{offset} || 0, $param->{limit} || scalar(@keys), $format, scalar(@keys), join('',@keys));
 }
 
 sub SelectUnion {
-    my ($param) = $_[0]->_validate_param(\@_, qw/raw/);
+    confess "not supported yet";
+    my ($param) = $_[0]->_validate_param(\@_, qw/raw raise/);
     my ($self, @reqs) = @_;
     return [] unless @reqs;
+    local $self->{raise} = $param->{raise} if defined $param->{raise};
     confess "bad param" if grep { ref $_ ne 'ARRAY' } @reqs;
     $param->{raw} ||= $self->{default_raw};
     $param->{want} ||= 0;
@@ -348,8 +376,9 @@ sub _PostSelect {
 
 sub Select {
     confess q/Select isnt callable in void context/ unless defined wantarray;
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace use_index raw want next_rows limit offset/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace use_index raw want next_rows limit offset raise hashify/);
     my ($self, @keys) = @_;
+    local $self->{raise} = $param->{raise} if defined $param->{raise};
     @keys = @{$keys[0]} if ref $keys[0] eq 'ARRAY' and 1 == @{$param->{index}->{keys}} || ref $keys[0]->[0] eq 'ARRAY';
 
     $self->_debug("$self->{name}: SELECT($namespace->{namespace}/$param->{use_index})[@{[map{ref$_?qq{[@$_]}:$_}@keys]}]") if $self->{debug} >= 3;
@@ -361,9 +390,11 @@ sub Select {
         $self->_pack_keys($namespace, $param->{index}, @keys);
         $payload = pack("LL a*", $namespace->{namespace}, $param->{next_rows}, join('',@keys)),
     } else {
-        $msg = 17;
         $payload = $self->_PackSelect($param, $namespace, @keys);
+        $msg = $param->{format} ? 21 : 17;
     }
+
+    local $namespace->{unpack_format} = $param->{unpack_format} if $param->{unpack_format};
 
     my $r = [];
     if (@keys && $payload) {
@@ -373,13 +404,13 @@ sub Select {
             unpack   => sub { $self->_unpack_select($namespace, "SELECT", @_) },
             retry    => $self->{select_retry},
             timeout  => $param->{timeout} || $self->{select_timeout},
-        );
+        ) or return;
     }
 
     $param->{raw} ||= $self->{default_raw};
     $param->{want} ||= !1;
 
-    $self->_PostSelect($r, { hashify => $namespace->{hashify}||$self->{hashify}, %$param, namespace => $namespace });
+    $self->_PostSelect($r, { hashify => $param->{hashify}||$namespace->{hashify}||$self->{hashify}, %$param, namespace => $namespace });
 
     return $r if $param->{want} eq 'arrayref';
 
