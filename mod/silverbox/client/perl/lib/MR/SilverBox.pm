@@ -32,8 +32,8 @@ sub new {
     $self->{ipdebug}         = $arg->{'ipdebug'} || 0;
     $self->{raise}           = 1;
     $self->{raise}           = $arg->{raise} if exists $arg->{raise};
-    $self->{default_raw}     = exists $arg->{default_raw} ? $arg->{default_raw} : 0;
     $self->{hashify}         = $arg->{'hashify'} if exists $arg->{'hashify'};
+    $self->{default_raw}     = exists $arg->{default_raw} ? $arg->{default_raw} : !$self->{hashify};
     $self->{select_timeout}  = $arg->{select_timeout} || $self->{timeout};
     $self->{iprotoclass}     = $arg->{iprotoclass} || $class->IPROTOCLASS;
     $self->{errstrclass}     = $arg->{errstrclass} || $class->ERRSTRCLASS;
@@ -193,7 +193,7 @@ sub _validate_param {
     my $param = ref $args->[-1] eq 'HASH' ? pop @$args: {};
 
     foreach my $pname (keys %$param) {
-        confess "$self->{name}: unknown param $pname\n" if grep { $_ eq $pname } @pnames == 0;
+        confess "$self->{name}: unknown param $pname\n" if 0 == grep { $_ eq $pname } @pnames;
     }
 
     $param->{namespace} = $self->{default_namespace} unless defined $param->{namespace};
@@ -323,48 +323,16 @@ sub _PackSelect {
     if ($param->{format}) {
         my $f = $namespace->{byfield_unpack_format};
         $param->{unpack_format} = join '', map { $f->[$_->{field}] } @{$param->{format}};
-        $format = pack 'L*', scalar @{$param->{format}}, map {
+        $format = pack 'l*', scalar @{$param->{format}}, map {
             if($_->{full}) {
                 $_->{offset} = 0;
                 $_->{length} = 'max';
             }
-            $_->{length} = 0xFFFFFFFF if $_->{length} eq 'max';
+            $_->{length} = 0x7FFFFFFF if $_->{length} eq 'max';
             @$_{qw/field offset length/}
         } @{$param->{format}};
     }
     return pack("LLLL a* La*", $namespace->{namespace}, $param->{index}->{id}, $param->{offset} || 0, $param->{limit} || scalar(@keys), $format, scalar(@keys), join('',@keys));
-}
-
-sub SelectUnion {
-    confess "not supported yet";
-    my ($param) = $_[0]->_validate_param(\@_, qw/raw raise/);
-    my ($self, @reqs) = @_;
-    return [] unless @reqs;
-    local $self->{raise} = $param->{raise} if defined $param->{raise};
-    confess "bad param" if grep { ref $_ ne 'ARRAY' } @reqs;
-    $param->{raw} ||= $self->{default_raw};
-    $param->{want} ||= 0;
-    for my $req (@reqs) {
-        my ($param, $namespace) = $self->_validate_param($req, qw/namespace use_index raw limit offset/);
-        $req = {
-            payload   => $self->_PackSelect($param, $namespace, $req),
-            param     => $param,
-            namespace => $namespace,
-        };
-    }
-    my $r = $self->_chat(
-        msg      => 18,
-        payload  => pack("L (a*)*", scalar(@reqs), map { $_->{payload} } @reqs),
-        unpack   => sub { $self->_unpack_select_multi([map { $_->{namespace} } @reqs], "SMULTI", @_) },
-        retry    => $self->{select_retry},
-        timeout  => $param->{timeout} || $self->{select_timeout},
-    ) or return;
-    confess __LINE__."$self->{name}: something wrong" if @$r != @reqs;
-    my $ea = each_arrayref $r, \@reqs;
-    while(my ($res, $req) = $ea->()) {
-        $self->_PostSelect($res, { hashify => $req->{namespace}->{hashify}||$self->{hashify}, %$param, %{$req->{param}}, namespace => $req->{namespace} });
-    }
-    return $r;
 }
 
 sub _PostSelect {
@@ -374,9 +342,10 @@ sub _PostSelect {
     }
 }
 
+my @select_param_ok = qw/namespace use_index raw want next_rows limit offset raise hashify timeout format/;
 sub Select {
     confess q/Select isnt callable in void context/ unless defined wantarray;
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace use_index raw want next_rows limit offset raise hashify/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, @select_param_ok);
     my ($self, @keys) = @_;
     local $self->{raise} = $param->{raise} if defined $param->{raise};
     @keys = @{$keys[0]} if ref $keys[0] eq 'ARRAY' and 1 == @{$param->{index}->{keys}} || ref $keys[0]->[0] eq 'ARRAY';
@@ -407,7 +376,7 @@ sub Select {
         ) or return;
     }
 
-    $param->{raw} ||= $self->{default_raw};
+    $param->{raw} = $self->{default_raw} unless exists $param->{raw};
     $param->{want} ||= !1;
 
     $self->_PostSelect($r, { hashify => $param->{hashify}||$namespace->{hashify}||$self->{hashify}, %$param, namespace => $namespace });
@@ -420,6 +389,38 @@ sub Select {
         confess "$self->{name}: too many keys in scalar context" if @keys > 1;
         return $r->[0];
     }
+}
+
+sub SelectUnion {
+    confess "not supported yet";
+    my ($param) = $_[0]->_validate_param(\@_, qw/raw raise/);
+    my ($self, @reqs) = @_;
+    return [] unless @reqs;
+    local $self->{raise} = $param->{raise} if defined $param->{raise};
+    confess "bad param" if grep { ref $_ ne 'ARRAY' } @reqs;
+    $param->{raw} = $self->{default_raw} unless exists $param->{raw};
+    $param->{want} ||= 0;
+    for my $req (@reqs) {
+        my ($param, $namespace) = $self->_validate_param($req, @select_param_ok);
+        $req = {
+            payload   => $self->_PackSelect($param, $namespace, $req),
+            param     => $param,
+            namespace => $namespace,
+        };
+    }
+    my $r = $self->_chat(
+        msg      => 18,
+        payload  => pack("L (a*)*", scalar(@reqs), map { $_->{payload} } @reqs),
+        unpack   => sub { $self->_unpack_select_multi([map { $_->{namespace} } @reqs], "SMULTI", @_) },
+        retry    => $self->{select_retry},
+        timeout  => $param->{timeout} || $self->{select_timeout},
+    ) or return;
+    confess __LINE__."$self->{name}: something wrong" if @$r != @reqs;
+    my $ea = each_arrayref $r, \@reqs;
+    while(my ($res, $req) = $ea->()) {
+        $self->_PostSelect($res, { hashify => $req->{namespace}->{hashify}||$self->{hashify}, %$param, %{$req->{param}}, namespace => $req->{namespace} });
+    }
+    return $r;
 }
 
 sub Delete {
