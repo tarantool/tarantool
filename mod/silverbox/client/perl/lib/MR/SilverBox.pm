@@ -494,7 +494,7 @@ BEGIN {
 }
 
 sub UpdateMulti {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace want_result _flags/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace want_result _flags raw/);
     my ($self, $key, @op) = @_;
 
     $self->_debug("$self->{name}: UPDATEMULTI($namespace->{namespace}=$key)[@{[map{qq{[@$_]}}@op]}]") if $self->{debug} >= 3;
