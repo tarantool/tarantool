@@ -183,13 +183,13 @@ $tuple[5] |= (1 << 15);
 $tuple[5] &= ~(1 << 16);
 is_deeply scalar $box->Select($id), \@tuple, 'bit_set + bit_clear';
 
-$box->Bit($id, 5, set => 4095, bit_set => (1 << 5), bit_clear => (1 << 6), {update_flags => 1});
+$box->Bit($id, 5, set => 4095, bit_set => (1 << 5), bit_clear => (1 << 6));
 $tuple[5] = 4095;
 $tuple[5] |= (1 << 5);
 $tuple[5] &= ~(1 << 6);
 is_deeply scalar $box->Select($id), \@tuple, 'set + bit_set + bit_clear';
 
-$box->Bit($id, 5, set => 123, {update_flags => 1});
+$box->Bit($id, 5, set => 123);
 $tuple[5] = 123;
 is_deeply scalar $box->Select($id), \@tuple, 'set via Bit';
 
@@ -199,11 +199,11 @@ is_deeply scalar $box->Select($id), \@tuple, 'set via Bit';
 ## Num ops
 
 # zero namespace
-$box->Num($id, 5, num_add => 1, {update_flags => 1});
+$box->Num($id, 5, num_add => 1);
 $tuple[5] += 1;
 is_deeply scalar $box->Select($id), \@tuple, 'num_add';
 
-$box->Num($id, 5, num_sub => 1, {update_flags => 1});
+$box->Num($id, 5, num_sub => 1);
 $tuple[5] -= 1;
 is_deeply scalar $box->Select($id), \@tuple, 'num_sub';
 
@@ -227,7 +227,7 @@ throws_ok sub { $box->Num($id, 5, hxxxxx => 123) }, qr/unknown op 'hxxxxx'/, 'ba
 
 ### AndXorAdd
 
-$box->AndXorAdd($id, 5, 4095, 5, 10, {update_flags => 1});
+$box->AndXorAdd($id, 5, 4095, 5, 10);
 $tuple[5] &= 4095;
 $tuple[5] ^= 5;
 $tuple[5] += 10;
@@ -258,7 +258,7 @@ ok 0 == $box->Delete($id), 'delete by id';
 cleanup $id;
 ok $box->Insert(@tuple), 'insert';
 
-ok $box->UpdateMulti($id, ([5 => set => 1]) x 127, {update_flags => 1}), 'big update multi';
+ok $box->UpdateMulti($id, ([5 => set => 1]) x 127), 'big update multi';
 # CANT TEST throws_ok sub { $box->UpdateMulti($id, ([5 => set => 1]) x 128) }, ILL_PARAM, 'too big update multi';
 throws_ok sub { $box->UpdateMulti($id, ([5 => set => 1]) x 129) }, qr/too many op/, 'too big update multi';
 {
@@ -282,7 +282,7 @@ throws_ok sub { $box->UpdateMulti($id, ([5 => set => 1]) x 129) }, qr/too many o
     my $id = $tuple[0];
     ok $box->isa($CLASS), 'connect';
 
-    ok $box->UpdateMulti($id, [2 => set => 'ab'], [5 => set => 'z' x 127], {update_flags => 1}), 'update multi no teplate';
+    ok $box->UpdateMulti($id, [2 => set => 'ab'], [5 => set => 'z' x 127]), 'update multi no teplate';
     $tuple[2] = 'ab';
     $tuple[5] = 'z' x 127;
     my @r = @{$box->Select($id)};
@@ -304,7 +304,7 @@ throws_ok sub { $box->UpdateMulti($id, '') }, qr/bad op/, 'bad op';
     ok $box->Insert(@tuple), 'insert';
 
     my @op = ([4 => num_add => 300], [5 => num_sub => 100], [5 => set => 1414], [5 => bit_set => 1 | 2], [5 => bit_clear => 2]);
-    ok $box->UpdateMulti($tuple[0], @op, {update_base => 1, update_flags => 1}), 'update multi';
+    ok $box->UpdateMulti($tuple[0], @op), 'update multi';
     my @tuple_new = @tuple;
     $tuple_new[4] += 300;
     $tuple_new[5] -= 100;
@@ -315,9 +315,9 @@ throws_ok sub { $box->UpdateMulti($id, '') }, qr/bad op/, 'bad op';
 
     cleanup 14;
     ok $box->Insert(@tuple), 'insert';
-    is_deeply scalar $box->UpdateMulti($tuple[0], @op, {update_base => 1, update_flags => 1, want_result => 1}), \@tuple_new, 'update multi, want_result';
+    is_deeply scalar $box->UpdateMulti($tuple[0], @op, {want_result => 1}), \@tuple_new, 'update multi, want_result';
 
-    ok 0 == $box->UpdateMulti(15, [4 => num_add => 300], [5 => num_sub => 100], [5 => set => 1414], {update_base => 1, update_flags => 1}), 'update multi of nonexist';
+    ok 0 == $box->UpdateMulti(15, [4 => num_add => 300], [5 => num_sub => 100], [5 => set => 1414]), 'update multi of nonexist';
 }
 
 
