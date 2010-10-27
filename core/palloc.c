@@ -53,7 +53,7 @@ SLIST_HEAD(chunk_list_head, chunk);
 
 struct chunk_class {
 	int i;
-	i64 size;
+	u32 size;
 	int chunks_count;
 	struct chunk_list_head chunks;
 	 TAILQ_ENTRY(chunk_class) link;
@@ -158,8 +158,11 @@ next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 	else
 		class = TAILQ_FIRST(&classes);
 
-	while (class != NULL && class->size < size)
-		class = TAILQ_NEXT(class, link);
+	if (class->size != -1) {
+		while (class != NULL && class->size < size)
+			class = TAILQ_NEXT(class, link);
+	} else
+		class = TAILQ_PREV(class, class_tailq_head, link);
 
 	assert(class != NULL);
 
@@ -341,7 +344,7 @@ palloc_stat(struct tbuf *buf)
 		    free_chunks++;
 
 		tbuf_printf(buf,
-			    "    - { size: %- 8" PRIi64
+			    "    - { size: %"PRIu32
 			    ", free_chunks: %- 6i, busy_chunks: %- 6i }\n", class->size,
 			    free_chunks, class->chunks_count - free_chunks);
 	}
@@ -364,7 +367,7 @@ palloc_stat(struct tbuf *buf)
 			TAILQ_FOREACH(class, &classes, link) {
 				if (chunks[class->i] == 0)
 					continue;
-				tbuf_printf(buf, "        - { size: %- 7" PRIi64 ", used: %i }\n",
+				tbuf_printf(buf, "        - { size: %"PRIu32", used: %i }\n",
 					    class->size, chunks[class->i]);
 
 				if (indent == 0)
