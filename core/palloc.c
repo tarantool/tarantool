@@ -158,11 +158,11 @@ next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 	else
 		class = TAILQ_FIRST(&classes);
 
-	if (class->size != -1) {
-		while (class != NULL && class->size < size)
-			class = TAILQ_NEXT(class, link);
-	} else
+	if (class->size == -1)
 		class = TAILQ_PREV(class, class_tailq_head, link);
+
+	while (class != NULL && class->size < size)
+		class = TAILQ_NEXT(class, link);
 
 	assert(class != NULL);
 
