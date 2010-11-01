@@ -275,7 +275,7 @@ prelease(struct palloc_pool *pool)
 	for (chunk = SLIST_FIRST(&pool->chunks); chunk != NULL; chunk = next_chunk) {
 		next_chunk = SLIST_NEXT(chunk, busy_link);
 		if (chunk->size <= palloc_greatest_size()) {
-			chunk->free = chunk->size - sizeof(struct chunk);
+			chunk->free = chunk->size;
 			chunk->brk = (void *)chunk + sizeof(struct chunk);
 			SLIST_INSERT_HEAD(&chunk->class->chunks, chunk, free_link);
 			poison_chunk(chunk);
