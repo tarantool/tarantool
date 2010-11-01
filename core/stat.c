@@ -28,39 +28,56 @@
 #include <tarantool_ev.h>
 #include <tbuf.h>
 #include <say.h>
+#include <stat.h>
 
 #include <third_party/khash.h>
 
-KHASH_MAP_INIT_STR(char2int, i64, realloc);
-
 #define SECS 5
-static
-khash_t(char2int) *
-stats[SECS], *stats_all;
 static ev_timer timer;
 
-void
-stat_collect(const char *name, int value)
+struct {
+	char *name;
+	i64 value[SECS + 1];
+} *stats = NULL;
+static int stats_size = 0;
+static int stats_max = 0;
+static int base = 0;
+
+
+int
+stat_register(char **name, size_t count)
 {
-	int ret;
-	khiter_t k;
+	int initial_base = base;
 
-	k = kh_put(char2int, stats[0], name, &ret);
-	if (ret == 0) {
-		kh_value(stats[0], k) += value;
-	} else {
-		kh_key(stats[0], k) = name;
-		kh_value(stats[0], k) = value;
+	for (int i = 0; i < count; i++, name++, base++) {
+		if (stats_size <= base) {
+			stats_size += 1024;
+			stats = realloc(stats, sizeof(*stats) * stats_size);
+			if (stats == NULL)
+				abort();
+		}
+
+		stats[base].name = *name;
+
+		if (*name == NULL)
+			continue;
+
+		for (int i = 0; i < SECS + 1; i++)
+			stats[base].value[i] = 0;
+
+		stats_max = base;
 	}
 
-	k = kh_put(char2int, stats_all, name, &ret);
-	if (ret == 0) {
-		kh_value(stats_all, k) += value;
-	} else {
-		kh_key(stats_all, k) = name;
-		kh_value(stats_all, k) = value;
-	}
+	return initial_base;
 }
+
+void
+stat_collect(int base, int name, i64 value)
+{
+	stats[base + name].value[0] += value;
+	stats[base + name].value[SECS] += value;
+}
+
 
 void
 stat_print(struct tbuf *buf)
@@ -68,50 +85,43 @@ stat_print(struct tbuf *buf)
 	int max_len = 0;
 	tbuf_printf(buf, "statistics:\n");
 
-	for (khiter_t k = kh_begin(stats_all); k != kh_end(stats_all); ++k) {
-		if (!kh_exist(stats_all, k))
+	for (int i = 0; i < stats_max; i++) {
+		if (stats[i].name == NULL)
 			continue;
-
-		const char *key = kh_key(stats_all, k);
-		max_len = MAX(max_len, strlen(key));
+		max_len = MAX(max_len, strlen(stats[i].name));
 	}
 
-	for (khiter_t k = kh_begin(stats_all); k != kh_end(stats_all); ++k) {
-		if (!kh_exist(stats_all, k))
+	for (int i = 0; i < stats_max; i++) {
+		if (stats[i].name == NULL)
 			continue;
 
-		const char *key = kh_key(stats_all, k);
-		int value = 0;
-		for (int i = 0; i < SECS; i++) {
-			khiter_t j = kh_get(char2int, stats[i], key);
-			if (j != kh_end(stats[i]))
-				value += kh_value(stats[i], j);
-		}
-		tbuf_printf(buf, "  %s:%*s{ rps:%- 6i, total:%- 12" PRIi64 " }\n",
-			    key, 1 + max_len - (int)strlen(key), " ",
-			    value / SECS, kh_value(stats_all, k));
+		int diff = 0;
+		for (int j = 0; j < SECS; j++)
+			diff += stats[i].value[j];
+
+		diff /= SECS;
+
+		tbuf_printf(buf, "  %s:%*s{ rps: %- 6i, total: %- 12" PRIi64 " }\n",
+			    stats[i].name, 1 + max_len - (int)strlen(stats[i].name), " ",
+			    diff, stats[i].value[SECS]);
 	}
 }
 
 void
 stat_age(ev_timer *timer, int events __unused__)
 {
-	khash_t(char2int) * last = stats[SECS - 1];
-	for (int i = 0; i < SECS - 1; i++) {
-		stats[i + 1] = stats[i];
+	for (int i = 0; stats[i].name != NULL; i++) {
+		for (int j = 0; j < SECS - 1; j++)
+			stats[i].value[j + 1] = stats[i].value[j];
+		stats[i].value[0] = 0;
 	}
-	stats[0] = last;
-	kh_clear(char2int, last);
+
 	ev_timer_again(timer);
 }
 
 void
 stat_init(void)
 {
-	stats_all = kh_init(char2int, NULL);
-	for (int i = 0; i < SECS; i++)
-		stats[i] = kh_init(char2int, NULL);
-
 	ev_init(&timer, stat_age);
 	timer.repeat = 1.;
 	ev_timer_again(&timer);

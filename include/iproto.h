@@ -67,5 +67,5 @@ void iproto_interact(void *);
 	_(ERR_CODE_UNKNOWN_ERROR,         0x00002702)
 
 ENUM(error_codes, ERROR_CODES);
-extern const char *error_codes_strs[];
+extern char *error_codes_strs[];
 #endif

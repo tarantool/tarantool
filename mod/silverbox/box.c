@@ -48,6 +48,7 @@
 bool box_updates_allowed = false;
 static char *status = "unknown";
 
+static int stat_base;
 STRS(messages, MESSAGES);
 
 const int MEMCACHED_NAMESPACE = 23;
@@ -1102,7 +1103,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 			box_raise(ERR_CODE_ILLEGAL_PARAMS,
 				  "tuple cardinality must match namespace cardinality");
 		ret_code = prepare_replace(txn, cardinality, data);
-		stat_collect(messages_strs[op], 1);
+		stat_collect(stat_base, op, 1);
 		break;
 
 	case DELETE:
@@ -1115,7 +1116,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 			box_raise(ERR_CODE_ILLEGAL_PARAMS, "can't unpack request");
 
 		ret_code = prepare_delete(txn, key);
-		stat_collect(messages_strs[op], 1);
+		stat_collect(stat_base, op, 1);
 		break;
 
 	case SELECT:{
@@ -1129,13 +1130,13 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 			if (txn->index->key_cardinality == 0)
 				box_raise(ERR_CODE_ILLEGAL_PARAMS, "index is invalid");
 
-			stat_collect(messages_strs[op], 1);
+			stat_collect(stat_base, op, 1);
 			return process_select(txn, limit, offset, data, false);
 		}
 
 	case UPDATE_FIELDS:
 		txn->flags = read_u32(data);
-		stat_collect(messages_strs[op], 1);
+		stat_collect(stat_base, op, 1);
 		ret_code = prepare_update_fields(txn, data, false);
 		break;
 
@@ -1539,6 +1540,7 @@ memcached_bound_to_primary(void *data __unused__)
 void
 mod_init(void)
 {
+	stat_base = stat_register(messages_strs, messages_MAX);
 	for (int i = 0; i < nelem(namespace); i++) {
 		namespace[i].enabled = false;
 		for (int j = 0; j < MAX_IDX; j++) {

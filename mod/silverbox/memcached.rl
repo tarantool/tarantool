@@ -40,6 +40,16 @@
 #include <mod/silverbox/box.h>
 #include <stat.h>
 
+
+#define STAT(_)					\
+        _(MEMC_GET, 1)				\
+        _(MEMC_GET_MISS, 2)			\
+	_(MEMC_GET_HIT, 3)
+
+ENUM(memcached_stat, STAT);
+STRS(memcached_stat, STAT);
+int stat_base;
+
 struct index *memcached_index;
 
 /* memcached tuple format:
@@ -370,7 +380,7 @@ memcached_dispatch(struct box_txn *txn)
 		action get {
 			txn->op = SELECT;
 			fiber_register_cleanup((void *)txn_cleanup, txn);
-			stat_collect("MEMC_GET", 1);
+			stat_collect(stat_base, MEMC_GET, 1);
 			stats.cmd_get++;
 			say_debug("nesuring space for %i keys", keys->len);
 			iov_ensure(keys_count * 5 + 1);
@@ -390,7 +400,7 @@ memcached_dispatch(struct box_txn *txn)
 				key_len = load_varint32(&key);
 
 				if (tuple == NULL || tuple->flags & GHOST) {
-					stat_collect("MEMC_GET_MISS", 1);
+					stat_collect(stat_base, MEMC_GET_MISS, 1);
 					stats.get_misses++;
 					continue;
 				}
@@ -417,11 +427,11 @@ memcached_dispatch(struct box_txn *txn)
 
 				if (m->exptime > 0 && m->exptime < ev_now()) {
 					stats.get_misses++;
-					stat_collect("MEMC_GET_MISS", 1);
+					stat_collect(stat_base, MEMC_GET_MISS, 1);
 					continue;
 				} else {
 					stats.get_hits++;
-					stat_collect("MEMC_GET_HIT", 1);
+					stat_collect(stat_base, MEMC_GET_HIT, 1);
 				}
 
 				tuple_txn_ref(txn, tuple);
@@ -627,6 +637,12 @@ exit:
 	fiber_sleep(0.01);
 	say_debug("exit");
 	stats.curr_connections--; /* FIXME: nonlocal exit via exception will leak this counter */
+}
+
+void
+memcached_init(void)
+{
+	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 }
 
 void

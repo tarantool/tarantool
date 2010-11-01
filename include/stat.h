@@ -30,7 +30,8 @@
 #include <tbuf.h>
 
 void stat_init(void);
-void stat_collect(const char *key, int value);
+int stat_register(char **name, size_t count);
+void stat_collect(int base, int name, i64 value);
 void stat_print(struct tbuf *buf);
 
 #endif
