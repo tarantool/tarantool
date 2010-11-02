@@ -4,7 +4,7 @@ INDENT=$(which gindent 2>/dev/null || which indent 2>/dev/null)
 
 for f in $@
 do
-	PARAM="-npro -kr -i8 -ts8 -sob -l100 -ss -ncs -cp1
+	PARAM="-npro -kr -i8 -ts8 -ci8 -sob -l100 -ss -ncs -cp1
 		-T bool"
 
 	case "$f" in
