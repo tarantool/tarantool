@@ -39,7 +39,7 @@
 #define ENUM_STRS_MEMBER(s, v) [s] = #s,
 #define ENUM(enum_name, enum_members) enum enum_name {enum_members(ENUM_MEMBER) enum_name##_MAX}
 #define STRS(enum_name, enum_members) \
-	const char *enum_name##_strs[enum_name##_MAX + 1] = {enum_members(ENUM_STRS_MEMBER) '\0'}
+	char *enum_name##_strs[enum_name##_MAX + 1] = {enum_members(ENUM_STRS_MEMBER) '\0'}
 
 // Macros for printf functions
 #include <inttypes.h>
