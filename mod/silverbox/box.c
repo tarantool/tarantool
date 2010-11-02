@@ -561,7 +561,7 @@ validate_indeces(struct box_txn *txn)
 			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
 
 			if (tuple != NULL && tuple != txn->old_tuple)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "unique index violation");
+				box_raise(ERR_CODE_INDEX_VIOLATION, "unique index violation");
 		}
 	}
 }

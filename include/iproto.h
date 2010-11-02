@@ -67,7 +67,8 @@ void iproto_interact(void *);
 	/* other generic error codes */					\
 	_(ERR_CODE_UNKNOWN_ERROR,         0x00002702) \
         _(ERR_CODE_NODE_NOT_FOUND,	  0x00003102) \
-	_(ERR_CODE_NODE_FOUND,		  0x00003702)
+	_(ERR_CODE_NODE_FOUND,		  0x00003702) \
+	_(ERR_CODE_INDEX_VIOLATION,	  0x00003802)
 
 ENUM(error_codes, ERROR_CODES);
 extern char *error_codes_strs[];
