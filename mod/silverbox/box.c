@@ -586,10 +586,10 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		tuple_txn_ref(txn, txn->old_tuple);
 
 	if (txn->flags & BOX_ADD && txn->old_tuple != NULL)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "tuple doesn't exist");
+		box_raise(ERR_CODE_NODE_FOUND, "tuple found");
 
 	if (txn->flags & BOX_REPLACE && txn->old_tuple == NULL)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "tuple does exist");
+		box_raise(ERR_CODE_NODE_NOT_FOUND, "tuple not found");
 
 	validate_indeces(txn);
 	run_hooks(txn, before_commit_update_hook);
