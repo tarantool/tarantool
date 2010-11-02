@@ -10,7 +10,7 @@ use lib "$Bin";
 use TBox ();
 use Carp qw/confess/;
 
-use Test::More qw/no_plan/;
+use Test::More tests => 178;
 use Test::Exception;
 
 local $SIG{__DIE__} = \&confess;
@@ -18,7 +18,11 @@ local $SIG{__DIE__} = \&confess;
 our $CLASS;
 BEGIN { $CLASS = $ENV{BOXCLASS} || 'MR::SilverBox'; eval "require $CLASS" or die $@; }
 
-use constant ILL_PARAM => qr/$CLASS: Error 00000202/;
+use constant ILL_PARAM         => qr/$CLASS: Error 00000202/;
+use constant TUPLE_NOT_EXISTS  => qr/$CLASS: Error 00003102/;
+use constant TUPLE_EXISTS      => qr/$CLASS: Error 00003702/;
+use constant INDEX_VIOLATION   => qr/$CLASS: Error 00003802/;
+
 use constant TOO_BIG_FIELD => qr/too big field/;
 
 my $box;
@@ -112,6 +116,36 @@ is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '
 
 ok $box->UpdateMulti(13, [6 => splice => [1, 2]], [6 => splice => [-2, -1, 'qwe']]), "splice/multi";
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '14567qwe9'], 'select';
+
+
+
+cleanup 13;
+cleanup 14;
+throws_ok sub { $box->Replace(13, q/some_email@test.mail.ru/, 5, 5, 5, 5, '555555555')}, TUPLE_NOT_EXISTS, 'replace';
+
+ok $box->Add(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'add';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/add';
+
+throws_ok sub { $box->Add(13, q/some_email@test.mail.ru/, 5, 5, 5, 5, '555555555')}, TUPLE_EXISTS, 'add2';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/add2';
+is_deeply scalar $box->Select(q/some_email@test.mail.ru/, {use_index => "primary_email"}), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/add2';
+
+throws_ok sub { $box->Add(14, q/some_email@test.mail.ru/, 5, 5, 5, 5, '555555555')}, INDEX_VIOLATION, 'add3';
+
+ok $box->Add(14, q/some1email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'add4';
+is_deeply scalar $box->Select(14), [14, 'some1email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/add4';
+is_deeply scalar $box->Select(q/some1email@test.mail.ru/, {use_index => "primary_email"}), [14, 'some1email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/add4';
+
+throws_ok sub { $box->Replace(13, q/some1email@test.mail.ru/, 6, 6, 6, 6, '666666666')}, INDEX_VIOLATION, 'replace';
+throws_ok sub { $box->Set(13, q/some1email@test.mail.ru/, 6, 6, 6, 6, '666666666')}, INDEX_VIOLATION, 'set';
+
+ok $box->Set(13, q/some_email@test.mail.ru/, 5, 5, 5, 5, '555555555'), 'set';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 5, 5, 5, 5, '555555555'], 'select/set';
+
+ok $box->Replace(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'replace';
+is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/replace';
+
+
 
 $box = $CLASS->new(def_param);
 ok $box->isa($CLASS), 'connect';

@@ -8,7 +8,12 @@ use List::MoreUtils qw/each_arrayref/;
 use MR::IProto ();
 use MR::Storage::Const ();
 
-use constant WANT_RESULT => 1;
+use constant {
+    WANT_RESULT       => 1,
+    INSERT_ADD        => 2,
+    INSERT_REPLACE    => 4,
+};
+
 
 sub IPROTOCLASS () { 'MR::IProto' }
 sub ERRSTRCLASS () { 'MR::Storage::Const::Errors::SilverBox' }
@@ -185,7 +190,7 @@ sub _chat {
 
 sub _raise {
     my ($self, $msg) = @_;
-    die $msg;
+    die "$self->{name}: $msg";
 }
 
 sub _validate_param {
@@ -205,14 +210,39 @@ sub _validate_param {
     return ($param, map { /namespace/ ? $self->{namespaces}->{$param->{namespace}} : $param->{$_} } @pnames);
 }
 
+sub Add { # store tuple if tuple identified by primary key _does_not_ exist
+    my $param = @_ && ref $_[-1] eq 'HASH' ? pop : {};
+    $param->{action} = 'add';
+    $_[0]->Insert(@_[1..$#_], $param);
+}
+
+sub Set { # store tuple _anyway_
+    my $param = @_ && ref $_[-1] eq 'HASH' ? pop : {};
+    $param->{action} = 'set';
+    $_[0]->Insert(@_[1..$#_], $param);
+}
+
+sub Replace { # store tuple if tuple identified by primary key _does_ exist
+    my $param = @_ && ref $_[-1] eq 'HASH' ? pop : {};
+    $param->{action} = 'replace';
+    $_[0]->Insert(@_[1..$#_], $param);
+}
 
 sub Insert {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace _flags/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace _flags action/);
     my ($self, @tuple) = @_;
 
     $self->_debug("$self->{name}: INSERT(@{[map {qq{`$_'}} @tuple]})") if $self->{debug} >= 3;
 
     my $flags = $param->{_flags} || 0;
+    $param->{action} ||= 'set';
+    if ($param->{action} eq 'add') {
+        $flags |= INSERT_ADD;
+    } elsif ($param->{action} eq 'replace') {
+        $flags |= INSERT_REPLACE;
+    } elsif ($param->{action} ne 'set') {
+        confess "$self->{name}: Bad insert action `$param->{action}'";
+    }
     my $chkkey = $namespace->{check_keys};
     my $fmt = $namespace->{field_format};
     for (0..$#tuple) {

@@ -98,7 +98,7 @@ sub Chat {
 
     for (my $try = 1; $try <= $retries; $try++) {
         sleep $self->{retry_delay} if $try > 1 && $self->{retry_delay};
-        $self->{debug} >= 1 && _debug $self "chat msg=$message{msg} $try of $retries total";
+        $self->{debug} >= 2 && _debug $self "chat msg=$message{msg} $try of $retries total";
         my $ret = $self->Chat1(%message);
 
         if ($ret->{ok}) {
@@ -117,7 +117,7 @@ sub Chat1 {
 
     my $server = _select_server $self $message{key};
     unless($server) {
-        $self->{_error} .= 'All servers blocked by remote_stor_pinger';
+        $self->{_error} ||= 'Could not find a valid server';
         return;
     }
 
@@ -191,12 +191,12 @@ sub _a_send {
         local $! = 0;
         my $res = syswrite($self->{sock}, $self->{_write_buf});
         if(defined $res && $res == 0) {
-            _debug $self "$!" and next if $!{EINTR};
+            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
             $self->{_error} .= "Server unexpectedly closed connection (${\length $self->{_write_buf}} bytes unwritten)";
             return;
         }
         if(!defined $res) {
-            _debug $self "$!" and next if $!{EINTR};
+            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
             $self->{_timedout} = !!$!{EAGAIN};
             $self->{_error} .= $! unless $self->{_async} && $!{EAGAIN};
             return;
@@ -226,12 +226,12 @@ sub _a_recv {
             $self->{debug} >= 6 && _debug_dump $self '_a_recv: ', $buffer;
         }
         if(defined $res && $res == 0 && $self->{_to_read}) {
-            _debug $self "$!" and next if $!{EINTR};
+            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
             $self->{_error} .= "Server unexpectedly closed connection ($self->{_to_read} bytes unread)";
             return;
         }
         if(!defined $res) {
-            _debug $self "$!" and next if $!{EINTR};
+            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
             $self->{_timedout} = !!$!{EAGAIN};
             $self->{_error} .= $! unless $self->{_async} && $!{EAGAIN};
             return;
@@ -262,7 +262,7 @@ sub _a_close {
     if ($self->{_error} || $self->{_timedout}) {
         _close_sock $self $self->{_server}; # something went wrong, close socket just in case
         $self->{_error} = "Timeout ($self->{_error})" if $self->{_timedout};
-        $self->{debug} >= 0 && _debug $self "failed with: $self->{_error}";
+        $self->{debug} >= 1 && _debug $self "failed with: $self->{_error}";
         $ret = { fail => $self->{_error}, timeout => $self->{_timedout} };
     } else {
         $self->{debug} >= 5 && _debug_dump $self '_unpack_body: ', $self->{_buf};
@@ -302,6 +302,10 @@ sub _a_clear {
     delete $self->{_write_buf};
 }
 
+sub _n_servers {
+    return scalar @{$_[0]->{servers}};
+}
+
 sub _select_server {
     my ($self, $key) = @_;
     my $n = @{$self->{servers}};
@@ -323,11 +327,12 @@ sub _select_server {
 }
 
 sub _mark_server_bad {
-    my ($self) = @_;
+    my ($self, $remove_last_server) = @_;
     if ($self->{balance} == HASH()) {
         delete($self->{current_server}->{ok});
     }
     delete($self->{current_server});
+    $self->{_last_server} = '' if $remove_last_server;
 }
 
 sub _balance_rr {
@@ -410,7 +415,7 @@ sub _connect {
     while(1) {
         local $! = 0;
         unless(connect($sock, $sin)) {
-            _debug $self "$!" and next if $!{EINTR};
+            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
             $self->{_timedout} = !!$!{EINPROGRESS};
             if (!$async || !$!{EINPROGRESS}) {
                 $$err .= "cannot connect: $!";
@@ -429,7 +434,7 @@ sub _connect {
         setsockopt($sock, SOL_SOCKET, SO_KEEPALIVE, 1);
     }
 
-    $self->{debug} >= 1 && _debug $self "connected";
+    $self->{debug} >= 2 && _debug $self "connected";
     return $sockets{$server->{repr}} = $sock;
 }
 
@@ -452,7 +457,7 @@ sub _close_sock {
     my ($self, $server) = @_;
 
     if ($sockets{$server->{repr}}) {
-        $self->{debug} >= 1 && _debug $self 'closing socket';
+        $self->{debug} >= 2 && _debug $self 'closing socket';
         close $sockets{$server->{repr}};
         delete $sockets{$server->{repr}};
     }
@@ -460,7 +465,7 @@ sub _close_sock {
 
 sub _debug {
     my ($self, $msg)= @_;
-    my $server = $self->{current_server} && $self->{current_server}->{repr};
+    my $server = $self->{current_server} && $self->{current_server}->{repr} || $self->{_last_server} || '';
     my $sock = $self->{sock} || 'none';
     $server &&= "$server($sock) ";
 

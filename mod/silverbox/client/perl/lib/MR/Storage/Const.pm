@@ -84,6 +84,8 @@ BEGIN {
     0x00003400  => q{Error during iconv},
     0x00003500  => q{Event isn't contained in this node},
     0x00003600  => q{Proxy reply: destination node timed out},
+    0x00003700  => q{Node found},
+    0x00003800  => q{Index violation},
 );
 
 sub ErrorText {
