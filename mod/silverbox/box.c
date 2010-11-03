@@ -1614,15 +1614,58 @@ build_indexes(void)
 {
 	for (u32 n = 0; n < nelem(namespace); ++n) {
 		u32 n_tuples;
+		struct tree_index_member *members[nelem(namespace[n].index)] = { NULL };
 
 		if (namespace[n].enabled == false)
 			continue;
 
 		n_tuples = kh_size(namespace[n].index[0].idx.hash);
 
+		say_info("build_indexes: n = %" PRIu32 ": build arrays", n);
+
+		khiter_t k;
+		u32 i = 0;
+		assoc_foreach(namespace[n].index[0].idx.hash, k) {
+			for (u32 idx = 0;; idx++) {
+				struct index *index = &namespace[n].index[idx];
+				struct tree_index_member *member;
+				struct tree_index_member *m;
+
+				if (index->key_cardinality == 0)
+					break;
+
+				if (index->type != TREE)
+					continue;
+
+				member = members[idx];
+				if (member == NULL) {
+					member = malloc(n_tuples * SIZEOF_TREE_INDEX_MEMBER(index));
+					if (member == NULL)
+						panic("build_indexes: malloc failed: %m");
+
+					members[idx] = member;
+				}
+
+				m = (struct tree_index_member *)
+				    ((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
+
+				tuple2tree_index_member(index,
+							kh_value(namespace[n].index[0].idx.hash,
+								 k),
+							&m);
+			}
+
+			++i;
+		}
+
+		ev_now_update();
+		say_info("build_indexes: n = %" PRIu32 ": build trees", n);
+
 		for (u32 idx = 0;; idx++) {
 			struct index *index = &namespace[n].index[idx];
-			struct tree_index_member *members;
+			struct tree_index_member *member = members[idx];
+
+			assert(member);
 
 			if (index->key_cardinality == 0)
 				break;
@@ -1632,32 +1675,12 @@ build_indexes(void)
 
 			assert(index->enabled == false);
 
-			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": build array", n,
-				 idx);
-
-			members = malloc(n_tuples * SIZEOF_TREE_INDEX_MEMBER(index));
-			if (members == NULL)
-				panic("build_indexes: malloc failed: %m");
-
-			khiter_t k;
-			struct tree_index_member *member = members;
-			assoc_foreach(namespace[n].index[0].idx.hash, k) {
-				tuple2tree_index_member(index,
-							kh_value(namespace[n].index[0].idx.hash,
-								 k),
-							&member);
-
-				member = (struct tree_index_member *)
-				         ((char *)member + SIZEOF_TREE_INDEX_MEMBER(index));
-			}
-
-			ev_now_update();
 			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": build tree", n,
 				 idx);
 
 			sptree_str_t_init(index->idx.tree,
 					  SIZEOF_TREE_INDEX_MEMBER(index),
-					  members, n_tuples, 0,
+					  member, n_tuples, 0,
 					  (void *)tree_index_member_compare, index);
 			index->enabled = true;
 
