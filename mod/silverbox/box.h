@@ -49,12 +49,15 @@ struct field {
 enum field_data_type { NUM, STR };
 
 struct tree_index_member {
-	struct field *key;
 	struct box_tuple *tuple;
+	struct field key[];
 };
 
+#define SIZEOF_TREE_INDEX_MEMBER(index) \
+	(sizeof(struct tree_index_member) + sizeof(struct field) * (index)->key_cardinality)
+
 #include <third_party/sptree.h>
-SPTREE_DEF(str_t, struct tree_index_member, realloc);
+SPTREE_DEF(str_t, realloc);
 
 // #include <mod/silverbox/tree.h>
 
@@ -89,7 +92,7 @@ struct index {
 		u32 field_cmp_order_cnt;
 	};
 
-	struct field *parsed_key;
+	struct tree_index_member *search_pattern;
 
 	enum { HASH, TREE } type;
 };

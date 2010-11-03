@@ -365,15 +365,16 @@ index_find_hash_str(struct index *self, void *key)
 }
 
 static struct tree_index_member *
-tuple2tree_index_member(struct index *index, struct box_tuple *tuple)
+tuple2tree_index_member(struct index *index,
+			struct box_tuple *tuple, struct tree_index_member **member_p)
 {
-	struct tree_index_member *member = palloc(fiber->pool, sizeof(*member));
+	struct tree_index_member *member;
 	void *tuple_data = tuple->data;
-	struct field *parsed_key;
 
-	parsed_key = salloc(sizeof(index->parsed_key[0]) * index->key_cardinality);
-	if (parsed_key == NULL)
-		box_raise(ERR_CODE_MEMORY_ISSUE, "tuple2tree_index_member: can't alloc parsed_key");
+	if (member_p == NULL || *member_p == NULL)
+		member = palloc(fiber->pool, SIZEOF_TREE_INDEX_MEMBER(index));
+	else
+		member = *member_p;
 
 	for (i32 i = 0; i < index->field_cmp_order_cnt; ++i) {
 		struct field f;
@@ -392,48 +393,43 @@ tuple2tree_index_member(struct index *index, struct box_tuple *tuple)
 		if (index->field_cmp_order[i] == -1)
 			continue;
 
-		parsed_key[index->field_cmp_order[i]] = f;
+		member->key[index->field_cmp_order[i]] = f;
 	}
 
-	member->key = parsed_key;
 	member->tuple = tuple;
 
-	return member;
-}
+	if (member_p)
+		*member_p = member;
 
-static void
-tree_index_member_free(struct tree_index_member *member)
-{
-	sfree(member->key);
+	return member;
 }
 
 static struct tree_index_member *
 alloc_search_pattern(struct index *index, int key_cardinality, void *key)
 {
-	static struct tree_index_member member;
+	struct tree_index_member *pattern = index->search_pattern;
 	void *key_field = key;
 
 	assert(key_cardinality <= index->key_cardinality);
 
 	for (i32 i = 0; i < index->key_cardinality; ++i)
-		index->parsed_key[i] = ASTERISK;
+		pattern->key[i] = ASTERISK;
 	for (int i = 0; i < key_cardinality; i++) {
 		u32 len;
 
-		len = index->parsed_key[i].len = load_varint32(&key_field);
-		if (len <= sizeof(index->parsed_key[i].data)) {
-			memset(index->parsed_key[i].data, 0, sizeof(index->parsed_key[i].data));
-			memcpy(index->parsed_key[i].data, key_field, len);
+		len = pattern->key[i].len = load_varint32(&key_field);
+		if (len <= sizeof(pattern->key[i].data)) {
+			memset(pattern->key[i].data, 0, sizeof(pattern->key[i].data));
+			memcpy(pattern->key[i].data, key_field, len);
 		} else
-			index->parsed_key[i].data_ptr = key_field;
+			pattern->key[i].data_ptr = key_field;
 
 		key_field += len;
 	}
 
-	member.key = index->parsed_key;
-	member.tuple = NULL;
+	pattern->tuple = NULL;
 
-	return &member;
+	return pattern;
 }
 
 static struct box_tuple *
@@ -477,9 +473,8 @@ index_remove_hash_str(struct index *self, struct box_tuple *tuple)
 static void
 index_remove_tree_str(struct index *self, struct box_tuple *tuple)
 {
-	struct tree_index_member *member = tuple2tree_index_member(self, tuple);
+	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 	sptree_str_t_delete(self->idx.str_tree, member);
-	tree_index_member_free(member);
 }
 
 static void
@@ -526,7 +521,7 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 static void
 index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
-	struct tree_index_member *member = tuple2tree_index_member(self, tuple);
+	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 
 	if (old_tuple)
 		index_remove_tree_str(self, old_tuple);
@@ -543,13 +538,11 @@ index_iterator_init_tree_str(struct index *self, struct tree_index_member *patte
 static struct box_tuple *
 index_iterator_next_tree_str(struct index *self, struct tree_index_member *pattern)
 {
-	struct tree_index_member *member;
-	spnode_t node = sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
+	struct tree_index_member *member =
+		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
 
-	if (node == SPNIL)
+	if (member == NULL)
 		return NULL;
-
-	member = self->idx.str_tree->members + node;
 
 	i32 r = tree_index_member_compare(pattern, member, self);
 	if (r == -2)
@@ -1496,10 +1489,7 @@ custom_init(void)
 				index->field_cmp_order[index->key_field[k].fieldno] = k;
 			}
 
-			index->parsed_key =
-				salloc(sizeof(index->parsed_key[0]) * index->key_cardinality);
-			if (index->parsed_key == NULL)
-				panic("can't allocate parsed_key for index");
+			index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 
 			if (strcmp(cfg.namespace[i]->index[j]->type, "HASH") == 0) {
 				if (index->key_cardinality != 1)
@@ -1657,15 +1647,20 @@ build_indexes(void)
 			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": build array", n,
 				 idx);
 
-			members = malloc(n_tuples * sizeof(members[0]));
+			members = malloc(n_tuples * SIZEOF_TREE_INDEX_MEMBER(index));
 			if (members == NULL)
-				panic("build_indexes: realloc failed: %m");
+				panic("build_indexes: malloc failed: %m");
 
-			u32 i = 0;
 			khiter_t k;
+			struct tree_index_member *member = members;
 			assoc_foreach(namespace[n].index[0].idx.hash, k) {
-				members[i++] = *tuple2tree_index_member(index,
-					kh_value(namespace[n].index[0].idx.hash, k));
+				tuple2tree_index_member(index,
+							kh_value(namespace[n].index[0].idx.hash,
+								 k),
+							&member);
+
+				member = (struct tree_index_member *)
+				         ((char *)member + SIZEOF_TREE_INDEX_MEMBER(index));
 			}
 
 			ev_now_update();
@@ -1673,6 +1668,7 @@ build_indexes(void)
 				 idx);
 
 			sptree_str_t_init(index->idx.str_tree,
+					  SIZEOF_TREE_INDEX_MEMBER(index),
 					  members, n_tuples, 0,
 					  (void *)tree_index_member_compare, index);
 			index->enabled = true;
@@ -1755,7 +1751,7 @@ mod_init(void)
 
 	recover(recovery_state, 0);
 
-	title("build indexes");
+	title("build_indexes");
 
 	build_indexes();
 
