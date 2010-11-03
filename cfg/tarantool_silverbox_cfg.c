@@ -78,15 +78,17 @@ acceptDefault_name__namespace(tarantool_cfg_namespace *c) {
 
 static int
 acceptDefault_name__namespace__index(tarantool_cfg_namespace_index *c) {
-	c->type = strdup("NUM");
+	c->type = strdup("HASH");
 	if (c->type == NULL) return CNF_NOMEMORY;
-	c->key_fields = NULL;
+	c->key_field = NULL;
 	return 0;
 }
 
 static int
-acceptDefault_name__namespace__index__key_fields(tarantool_cfg_namespace_index_key_fields *c) {
+acceptDefault_name__namespace__index__key_field(tarantool_cfg_namespace_index_key_field *c) {
 	c->fieldno = -1;
+	c->type = strdup("NUM");
+	if (c->type == NULL) return CNF_NOMEMORY;
 	return 0;
 }
 
@@ -206,11 +208,17 @@ static NameAtom _name__namespace__index__type[] = {
 	{ "index", -1, _name__namespace__index__type + 2 },
 	{ "type", -1, NULL }
 };
-static NameAtom _name__namespace__index__key_fields__fieldno[] = {
-	{ "namespace", -1, _name__namespace__index__key_fields__fieldno + 1 },
-	{ "index", -1, _name__namespace__index__key_fields__fieldno + 2 },
-	{ "key_fields", -1, _name__namespace__index__key_fields__fieldno + 3 },
+static NameAtom _name__namespace__index__key_field__fieldno[] = {
+	{ "namespace", -1, _name__namespace__index__key_field__fieldno + 1 },
+	{ "index", -1, _name__namespace__index__key_field__fieldno + 2 },
+	{ "key_field", -1, _name__namespace__index__key_field__fieldno + 3 },
 	{ "fieldno", -1, NULL }
+};
+static NameAtom _name__namespace__index__key_field__type[] = {
+	{ "namespace", -1, _name__namespace__index__key_field__type + 1 },
+	{ "index", -1, _name__namespace__index__key_field__type + 2 },
+	{ "key_field", -1, _name__namespace__index__key_field__type + 3 },
+	{ "type", -1, NULL }
 };
 
 #define ARRAYALLOC(x,n,t)  do {                                     \
@@ -609,19 +617,30 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		 if (opt->paramValue.stringval && c->namespace[opt->name->index]->index[opt->name->next->index]->type == NULL)
 			return CNF_NOMEMORY;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_fields__fieldno) ) {
+	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field__fieldno) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace);
 		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index);
-		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_fields, opt->name->next->next->index + 1, _name__namespace__index__key_fields);
+		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field);
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->key_fields[opt->name->next->next->index]->fieldno = i32;
+		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->fieldno = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field__type) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace);
+		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index);
+		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field);
+		errno = 0;
+		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		 if (opt->paramValue.stringval && c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL)
+			return CNF_NOMEMORY;
 	}
 	else {
 		return CNF_MISSED;
@@ -758,8 +777,9 @@ typedef enum IteratorState {
 	S_name__namespace__estimated_rows,
 	S_name__namespace__index,
 	S_name__namespace__index__type,
-	S_name__namespace__index__key_fields,
-	S_name__namespace__index__key_fields__fieldno,
+	S_name__namespace__index__key_field,
+	S_name__namespace__index__key_field__fieldno,
+	S_name__namespace__index__key_field__type,
 	_S_Finished
 } IteratorState;
 
@@ -767,7 +787,7 @@ struct tarantool_cfg_iterator_t {
 	IteratorState	state;
 	int	idx_name__namespace;
 	int	idx_name__namespace__index;
-	int	idx_name__namespace__index__key_fields;
+	int	idx_name__namespace__index__key_field;
 };
 
 tarantool_cfg_iterator_t*
@@ -1149,8 +1169,9 @@ again:
 		case S_name__namespace__estimated_rows:
 		case S_name__namespace__index:
 		case S_name__namespace__index__type:
-		case S_name__namespace__index__key_fields:
-		case S_name__namespace__index__key_fields__fieldno:
+		case S_name__namespace__index__key_field:
+		case S_name__namespace__index__key_field__fieldno:
+		case S_name__namespace__index__key_field__type:
 			if (c->namespace && c->namespace[i->idx_name__namespace]) {
 				switch(i->state) {
 					case S_name__namespace:
@@ -1190,8 +1211,9 @@ again:
 					case S_name__namespace__index:
 						i->state = S_name__namespace__index;
 					case S_name__namespace__index__type:
-					case S_name__namespace__index__key_fields:
-					case S_name__namespace__index__key_fields__fieldno:
+					case S_name__namespace__index__key_field:
+					case S_name__namespace__index__key_field__fieldno:
+					case S_name__namespace__index__key_field__type:
 						if (c->namespace[i->idx_name__namespace]->index && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]) {
 							switch(i->state) {
 								case S_name__namespace__index:
@@ -1203,25 +1225,36 @@ again:
 										return NULL;
 									}
 									snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].type", i->idx_name__namespace, i->idx_name__namespace__index);
-									i->state = S_name__namespace__index__key_fields;
+									i->state = S_name__namespace__index__key_field;
 									return buf;
-								case S_name__namespace__index__key_fields:
-									i->state = S_name__namespace__index__key_fields;
-								case S_name__namespace__index__key_fields__fieldno:
-									if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_fields && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_fields[i->idx_name__namespace__index__key_fields]) {
+								case S_name__namespace__index__key_field:
+									i->state = S_name__namespace__index__key_field;
+								case S_name__namespace__index__key_field__fieldno:
+								case S_name__namespace__index__key_field__type:
+									if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]) {
 										switch(i->state) {
-											case S_name__namespace__index__key_fields:
-											case S_name__namespace__index__key_fields__fieldno:
+											case S_name__namespace__index__key_field:
+											case S_name__namespace__index__key_field__fieldno:
 												*v = malloc(32);
 												if (*v == NULL) {
 													free(i);
 													out_warning(CNF_NOMEMORY, "No memory to output value");
 													return NULL;
 												}
-												sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_fields[i->idx_name__namespace__index__key_fields]->fieldno);
-												snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].key_fields[%d].fieldno", i->idx_name__namespace, i->idx_name__namespace__index, i->idx_name__namespace__index__key_fields);
-												i->state = S_name__namespace__index__key_fields;
-												i->idx_name__namespace__index__key_fields++;
+												sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->fieldno);
+												snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].key_field[%d].fieldno", i->idx_name__namespace, i->idx_name__namespace__index, i->idx_name__namespace__index__key_field);
+												i->state = S_name__namespace__index__key_field__type;
+												return buf;
+											case S_name__namespace__index__key_field__type:
+												*v = (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) ? strdup(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) : NULL;
+												if (*v == NULL && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) {
+													free(i);
+													out_warning(CNF_NOMEMORY, "No memory to output value");
+													return NULL;
+												}
+												snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].key_field[%d].type", i->idx_name__namespace, i->idx_name__namespace__index, i->idx_name__namespace__index__key_field);
+												i->state = S_name__namespace__index__key_field;
+												i->idx_name__namespace__index__key_field++;
 												return buf;
 											default:
 												break;
@@ -1230,7 +1263,7 @@ again:
 									else {
 										i->state = S_name__namespace__index;
 										i->idx_name__namespace__index++;
-										i->idx_name__namespace__index__key_fields = 0;
+										i->idx_name__namespace__index__key_field = 0;
 										goto again;
 									}
 								default:
@@ -1241,7 +1274,7 @@ again:
 							i->state = S_name__namespace;
 							i->idx_name__namespace++;
 							i->idx_name__namespace__index = 0;
-							i->idx_name__namespace__index__key_fields = 0;
+							i->idx_name__namespace__index__key_field = 0;
 							goto again;
 						}
 					default:

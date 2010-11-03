@@ -43,8 +43,6 @@
 
 #include <mod/silverbox/box.h>
 
-#define ASTERISK UINT32_MAX
-
 bool box_updates_allowed = false;
 static char *status = "unknown";
 
@@ -53,6 +51,13 @@ STRS(messages, MESSAGES);
 
 const int MEMCACHED_NAMESPACE = 23;
 static char *custom_proc_title;
+
+const struct field ASTERISK = {
+	.len = UINT32_MAX,
+	{
+		.data_ptr = NULL,
+	}
+};
 
 /* hooks */
 typedef int (*box_hook_t) (struct box_txn * txn);
@@ -116,78 +121,94 @@ tuple_field(struct box_tuple *tuple, size_t i)
 	return field;
 }
 
+bool
+field_is_num(void *field)
+{
+	u32 len = load_varint32(&field);
+
+	if (len == sizeof(u32))
+		return true;
+
+	return false;
+}
+
+#define IS_ASTERISK(f) ((f)->len == ASTERISK.len && (f)->data_ptr == ASTERISK.data_ptr)
+static i8
+field_compare(struct field *f1, struct field *f2, enum field_data_type type)
+{
+	i8 r;
+
+	if (IS_ASTERISK(f1) || IS_ASTERISK(f2))
+		r = 0;
+	else {
+		if (type == NUM) {
+			assert(f1->len == f2->len);
+			assert(f1->len == sizeof(f1->u32));
+
+			r = f1->u32 >f2->u32 ? 1 : f1->u32 == f2->u32 ? 0 : -1;
+		} else {
+			i32 cmp;
+			void *f1_data, *f2_data;
+
+			f1_data = f1->len <= sizeof(f1->data) ? f1->data : f1->data_ptr;
+			f2_data = f2->len <= sizeof(f2->data) ? f2->data : f2->data_ptr;
+
+			cmp = memcmp(f1_data, f2_data, MIN(f1->len, f2->len));
+
+			if (cmp > 0)
+				r = 1;
+			else if (cmp < 0)
+				r = -1;
+			else if (f1->len == f2->len)
+				r = 0;
+			else if (f1->len > f2->len)
+				r = 1;
+			else
+				r = -1;
+		}
+	}
+
+	return r;
+}
+
 /*
- * Compare tuples only by fields defined in index->key_fieldno[].
+ * Compare index_tree_members only by fields defined in index->field_cmp_order.
  * Return:
  *      Common meaning:
  *              < 0  - a is smaler than b
  *              == 0 - a is equal to b
  *              > 0  - a is greater than b
  *      Custom treatment (by absolute value):
- *              1 - differ in some index field (both tuple consists of it)
- *              2 - one tuple doesn't consist of some index field
- *              3 - one tuple is a search pattern
- *              4 - differ in pointers
+ *              1 - differ in some key field
+ *              2 - one tuple is a search pattern
+ *              3 - differ in pointers
  */
 static int
-tuple_compare(struct box_tuple **tuple_a, struct box_tuple **tuple_b, struct index *index)
+tree_index_member_compare(struct tree_index_member *member_a, struct tree_index_member *member_b,
+			  struct index *index)
 {
-	void *a = (*tuple_a)->data, *b = (*tuple_b)->data;
+	i8 r = 0;
 
-	// init cmp_map
-	for (int i = 0; i < index->search_tuple_cardinality; i++) {
-		i8 r = 0;
-		u32 al = 0, bl = 0;
-		bool has_a = false, has_b = false;
+	for (i32 i = 0, end = index->key_cardinality; i < end; ++i) {
+		r = field_compare(&member_a->key[i], &member_b->key[i], index->key_field[i].type);
 
-		if (i >= (*tuple_a)->cardinality)
-			// tuple_a doesn't have more fields
-			r -= 2;
-		else {
-			al = load_varint32(&a);
-			has_a = true;
-		}
-		if (i >= (*tuple_b)->cardinality)
-			// tuple_b doesn't have more fields
-			r += 2;
-		else {
-			bl = load_varint32(&b);
-			has_b = true;
-		}
-
-		if (has_a && has_b) {
-			if (al == ASTERISK || bl == ASTERISK)
-				// comparison with asterisk
-				r = 0;
-			else if (al != bl)
-				r = al > bl ? 1 : -1;
-			else {
-				i32 cmp = memcmp(a, b, al);
-
-				r = cmp > 0 ? 1 : cmp == 0 ? 0 : -1;
-			}
-		}
-
-		index->cmp_map[i] = r;
-
-		a += al == ASTERISK ? 0 : al;
-		b += bl == ASTERISK ? 0 : bl;
+		if (r != 0)
+			break;
 	}
 
-	for (int i = 0; i < index->key_cardinality; ++i)
-		if (index->cmp_map[index->key_fieldno[i]] != 0)
-			return index->cmp_map[index->key_fieldno[i]];
+	if (r != 0)
+		return r;
 
-	if ((*tuple_a)->flags & SEARCH)
-		return -3;
+	if (member_a->tuple == NULL)
+		return -2;
 
-	if ((*tuple_b)->flags & SEARCH)
+	if (member_b->tuple == NULL)
+		return 2;
+
+	if (member_a->tuple > member_b->tuple)
 		return 3;
-
-	if (*tuple_a > *tuple_b)
-		return 4;
-	else if (*tuple_a < *tuple_b)
-		return -4;
+	else if (member_a->tuple < member_b->tuple)
+		return -3;
 
 	return 0;
 }
@@ -195,7 +216,8 @@ tuple_compare(struct box_tuple **tuple_a, struct box_tuple **tuple_b, struct ind
 #define foreach_index(n, index_var)					\
 	for (struct index *index_var = namespace[(n)].index;		\
 	     index_var->key_cardinality != 0;				\
-	     index_var++)
+	     index_var++)						\
+		if (index_var->enabled)
 
 static void
 lock_tuple(struct box_txn *txn, struct box_tuple *tuple)
@@ -305,7 +327,7 @@ tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
 static struct box_tuple *
 uniq_find_by_tuple(struct index *self, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_fieldno[0]);
+	void *key = tuple_field(tuple, self->key_field->fieldno);
 	if (key == NULL)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "invalid tuple, can't find key");
 	return self->find(self, key);
@@ -342,62 +364,94 @@ index_find_hash_str(struct index *self, void *key)
 	return ret;
 }
 
-static struct box_tuple *
-alloc_search_tuple(struct index *index, int key_cardinality, void *key)
+static struct tree_index_member *
+tuple2tree_index_member(struct index *index, struct box_tuple *tuple)
 {
-	struct box_tuple *tuple;
+	struct tree_index_member *member = palloc(fiber->pool, sizeof(*member));
+	void *tuple_data = tuple->data;
+	struct field *parsed_key;
+
+	parsed_key = salloc(sizeof(index->parsed_key[0]) * index->key_cardinality);
+	if (parsed_key == NULL)
+		box_raise(ERR_CODE_MEMORY_ISSUE, "tuple2tree_index_member: can't alloc parsed_key");
+
+	for (i32 i = 0; i < index->field_cmp_order_cnt; ++i) {
+		struct field f;
+
+		if (i < tuple->cardinality) {
+			f.len = load_varint32(&tuple_data);
+			if (f.len <= sizeof(f.data)) {
+				memset(f.data, 0, sizeof(f.data));
+				memcpy(f.data, tuple_data, f.len);
+			} else
+				f.data_ptr = tuple_data;
+			tuple_data += f.len;
+		} else
+			f = ASTERISK;
+
+		if (index->field_cmp_order[i] == -1)
+			continue;
+
+		parsed_key[index->field_cmp_order[i]] = f;
+	}
+
+	member->key = parsed_key;
+	member->tuple = tuple;
+
+	return member;
+}
+
+static void
+tree_index_member_free(struct tree_index_member *member)
+{
+	sfree(member->key);
+}
+
+static struct tree_index_member *
+alloc_search_pattern(struct index *index, int key_cardinality, void *key)
+{
+	static struct tree_index_member member;
 	void *key_field = key;
-	u32 key_data_len = 0;
 
-	memset(index->search_field, 0,
-	       sizeof(index->search_field[0]) * index->search_tuple_cardinality);
+	assert(key_cardinality <= index->key_cardinality);
 
+	for (i32 i = 0; i < index->key_cardinality; ++i)
+		index->parsed_key[i] = ASTERISK;
 	for (int i = 0; i < key_cardinality; i++) {
-		u32 size;
+		u32 len;
 
-		index->search_field[index->key_fieldno[i]].field = key_field;
-		size = load_varint32(&key_field);
-		index->search_field[index->key_fieldno[i]].size = size +
-		    (key_field - index->search_field[index->key_fieldno[i]].field);
+		len = index->parsed_key[i].len = load_varint32(&key_field);
+		if (len <= sizeof(index->parsed_key[i].data)) {
+			memset(index->parsed_key[i].data, 0, sizeof(index->parsed_key[i].data));
+			memcpy(index->parsed_key[i].data, key_field, len);
+		} else
+			index->parsed_key[i].data_ptr = key_field;
 
-		key_data_len += index->search_field[index->key_fieldno[i]].size;
-		key_field += size;
+		key_field += len;
 	}
 
-	tuple = tuple_alloc((index->search_tuple_cardinality -
-			     key_cardinality) * varint32_sizeof(ASTERISK) + key_data_len);
-	tuple->cardinality = index->search_tuple_cardinality;
-	tuple->flags |= SEARCH;
+	member.key = index->parsed_key;
+	member.tuple = NULL;
 
-	void *p = tuple->data;
-	for (int i = 0; i < index->search_tuple_cardinality; i++) {
-		if (index->search_field[i].field == NULL)
-			p = save_varint32(p, ASTERISK);
-		else {
-			memcpy(p, index->search_field[i].field, index->search_field[i].size);
-			p += index->search_field[i].size;
-		}
-	}
-
-	return tuple;
+	return &member;
 }
 
 static struct box_tuple *
 index_find_tree_str(struct index *self, void *key)
 {
-	struct box_tuple *tuple = alloc_search_tuple(self, 1, key);
-	struct box_tuple **ret = sptree_str_t_find(self->idx.str_tree, &tuple);
-	tuple_free(tuple);
+	struct tree_index_member *pattern = alloc_search_pattern(self, 1, key);
+	struct tree_index_member *ret = sptree_str_t_find(self->idx.str_tree, pattern);
 
 	if (ret)
-		return *ret;
+		return ret->tuple;
+
 	return NULL;
 }
 
 static void
 index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_fieldno[0]);
+	void *key = tuple_field(tuple, self->key_field->fieldno);
 	unsigned int key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
@@ -412,7 +466,7 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 static void
 index_remove_hash_str(struct index *self, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_fieldno[0]);
+	void *key = tuple_field(tuple, self->key_field->fieldno);
 	assoc_delete(lstr2ptr_map, self->idx.str_hash, key);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
@@ -423,18 +477,20 @@ index_remove_hash_str(struct index *self, struct box_tuple *tuple)
 static void
 index_remove_tree_str(struct index *self, struct box_tuple *tuple)
 {
-	sptree_str_t_delete(self->idx.str_tree, &tuple);
+	struct tree_index_member *member = tuple2tree_index_member(self, tuple);
+	sptree_str_t_delete(self->idx.str_tree, member);
+	tree_index_member_free(member);
 }
 
 static void
 index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_fieldno[0]);
+	void *key = tuple_field(tuple, self->key_field->fieldno);
 	u32 key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
 	if (old_tuple != NULL) {
-		void *old_key = tuple_field(old_tuple, self->key_fieldno[0]);
+		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
 		load_varint32(&old_key);
 		u32 old_num = *(u32 *)old_key;
 		assoc_delete(int2ptr_map, self->idx.int_hash, old_num);
@@ -452,10 +508,10 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 static void
 index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_fieldno[0]);
+	void *key = tuple_field(tuple, self->key_field->fieldno);
 
 	if (old_tuple != NULL) {
-		void *old_key = tuple_field(old_tuple, self->key_fieldno[0]);
+		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
 		assoc_delete(lstr2ptr_map, self->idx.str_hash, old_key);
 	}
 
@@ -470,32 +526,34 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 static void
 index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
+	struct tree_index_member *member = tuple2tree_index_member(self, tuple);
+
 	if (old_tuple)
 		index_remove_tree_str(self, old_tuple);
-	sptree_str_t_insert(self->idx.str_tree, &tuple);
+	sptree_str_t_insert(self->idx.str_tree, member);
 }
 
 static void
-index_iterator_init_tree_str(struct index *self, struct box_tuple *pattern)
+index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern)
 {
 	sptree_str_t_iterator_init_set(self->idx.str_tree,
-				       (struct sptree_str_t_iterator **)&self->iterator, &pattern);
+				       (struct sptree_str_t_iterator **)&self->iterator, pattern);
 }
 
 static struct box_tuple *
-index_iterator_next_tree_str(struct index *self, struct box_tuple *pattern)
+index_iterator_next_tree_str(struct index *self, struct tree_index_member *pattern)
 {
-	struct box_tuple *tuple;
+	struct tree_index_member *member;
 	spnode_t node = sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
 
 	if (node == SPNIL)
 		return NULL;
 
-	tuple = *(self->idx.str_tree->members + node);
+	member = self->idx.str_tree->members + node;
 
-	i32 r = tuple_compare(&pattern, &tuple, self);
-	if (r == -2 || r == -3)
-		return tuple;
+	i32 r = tree_index_member_compare(pattern, member, self);
+	if (r == -2)
+		return member->tuple;
 
 	return NULL;
 }
@@ -505,7 +563,17 @@ validate_indeces(struct box_txn *txn)
 {
 	if (namespace[txn->n].index[1].key_cardinality != 0) {	/* there is more then one index */
 		foreach_index(txn->n, index) {
-			if (index->type == INDEX_TREE_STR)
+			for (u32 f = 0; f < index->key_cardinality; ++f) {
+				void *field;
+
+				if (index->key_field[f].type == STR)
+					continue;
+
+				field = tuple_field(txn->tuple, index->key_field[f].fieldno);
+				if (!field_is_num(field))
+					box_raise(ERR_CODE_ILLEGAL_PARAMS, "field must be NUM");
+			}
+			if (index->type == TREE)
 				/* Don't check non unique indexes */
 				continue;
 
@@ -542,8 +610,8 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 	if (txn->old_tuple != NULL) {
 #ifndef NDEBUG
 		void *ka, *kb;
-		ka = tuple_field(txn->tuple, txn->index->key_fieldno[0]);
-		kb = tuple_field(txn->old_tuple, txn->index->key_fieldno[0]);
+		ka = tuple_field(txn->tuple, txn->index->key_field->fieldno);
+		kb = tuple_field(txn->old_tuple, txn->index->key_field->fieldno);
 		int kal, kab;
 		kal = load_varint32(&ka);
 		kab = load_varint32(&kb);
@@ -558,7 +626,7 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		 */
 
 		foreach_index(txn->n, index)
-		    index->replace(index, NULL, txn->tuple);
+			index->replace(index, NULL, txn->tuple);
 
 		lock_tuple(txn, txn->tuple);
 		txn->tuple->flags |= GHOST;
@@ -574,7 +642,7 @@ commit_replace(struct box_txn *txn)
 
 	if (txn->old_tuple != NULL) {
 		foreach_index(txn->n, index)
-		    index->replace(index, txn->old_tuple, txn->tuple);
+			index->replace(index, txn->old_tuple, txn->tuple);
 
 		tuple_ref(txn->old_tuple, -1);
 	}
@@ -597,7 +665,7 @@ rollback_replace(struct box_txn *txn)
 
 	if (txn->tuple && txn->tuple->flags & GHOST) {
 		foreach_index(txn->n, index)
-		    index->remove(index, txn->tuple);
+			index->remove(index, txn->tuple);
 	}
 }
 
@@ -882,7 +950,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bo
 	add_iov(found, sizeof(*found));
 	*found = 0;
 
-	if (txn->index->type == INDEX_TREE_STR) {
+	if (txn->index->type == TREE) {
 		for (u32 i = 0; i < count; i++) {
 			u32 key_len = read_u32(data);
 			void *key = read_field(data);
@@ -891,7 +959,8 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bo
 			for (int i = 1; i < key_len; i++)
 				read_field(data);
 
-			struct box_tuple *pattern = alloc_search_tuple(txn->index, key_len, key);
+			struct tree_index_member *pattern =
+				alloc_search_pattern(txn->index, key_len, key);
 			txn->index->iterator_init(txn->index, pattern);
 
 			while ((tuple = txn->index->iterator_next(txn->index, pattern)) != NULL) {
@@ -909,7 +978,6 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bo
 				if (--limit == 0)
 					break;
 			}
-			tuple_free(pattern);
 			if (limit == 0)
 				break;
 		}
@@ -973,7 +1041,7 @@ commit_delete(struct box_txn *txn)
 	}
 
 	foreach_index(txn->n, index)
-	    index->remove(index, txn->old_tuple);
+		index->remove(index, txn->old_tuple);
 	tuple_ref(txn->old_tuple, -1);
 
 	return;
@@ -1370,103 +1438,129 @@ custom_init(void)
 			panic("(namespace = %" PRIu32 ") at least one index must be defined", i);
 
 		for (int j = 0; j < nelem(namespace[i].index); j++) {
+			struct index *index = &namespace[i].index[j];
 			u32 max_key_fieldno = 0;
 
 			if (cfg.namespace[i]->index[j] == NULL)
 				break;
 
-			if (cfg.namespace[i]->index[j]->key_fields == NULL)
+			if (cfg.namespace[i]->index[j]->key_field == NULL)
 				panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
 				      "at least one field must be defined", i, j);
 
-			for (int k = 0; cfg.namespace[i]->index[j]->key_fields[k] != NULL; k++) {
-				if (k >= nelem(namespace[i].index[j].key_fieldno))
-					panic("too many fields in key");
-
-				namespace[i].index[j].key_fieldno[k] =
-				    cfg.namespace[i]->index[j]->key_fields[k]->fieldno;
-				if (namespace[i].index[j].key_fieldno[k] == -1)
+			for (int k = 0; cfg.namespace[i]->index[j]->key_field[k] != NULL; k++) {
+				if (cfg.namespace[i]->index[j]->key_field[k]->fieldno == -1)
 					break;
 
-				namespace[i].index[j].key_cardinality++;
-				max_key_fieldno = MAX(max_key_fieldno,
-						      namespace[i].index[j].key_fieldno[k]);
+				max_key_fieldno =
+					MAX(max_key_fieldno,
+					    cfg.namespace[i]->index[j]->key_field[k]->fieldno);
+
+				++index->key_cardinality;
 			}
-			if (namespace[i].index[j].key_cardinality == 0)
+
+			if (index->key_cardinality == 0)
 				continue;
 
-			namespace[i].index[j].search_tuple_cardinality = max_key_fieldno + 1;
+			index->key_field = salloc(sizeof(index->key_field[0]) *
+						  index->key_cardinality);
+			if (index->key_field == NULL)
+				panic("can't allocate key_field for index");
 
-			namespace[i].index[j].search_field =
-			    salloc(sizeof(namespace[i].index[j].search_field[0]) *
-				   namespace[i].index[j].search_tuple_cardinality);
-			if (namespace[i].index[j].search_field == NULL)
-				panic("can't allocate search_field for index");
+			index->field_cmp_order_cnt = max_key_fieldno + 1;
+			index->field_cmp_order =
+				salloc(sizeof(index->field_cmp_order[0]) *
+				       index->field_cmp_order_cnt);
+			if (index->field_cmp_order == NULL)
+				panic("can't allocate field_cmp_order for index");
+			memset(index->field_cmp_order, -1,
+			       sizeof(index->field_cmp_order[0]) * index->field_cmp_order_cnt);
 
-			namespace[i].index[j].cmp_map =
-			    salloc(sizeof(namespace[i].index[j].cmp_map[0]) *
-				   namespace[i].index[j].search_tuple_cardinality);
-			if (namespace[i].index[j].cmp_map == NULL)
-				panic("can't allocate cmp_map for index");
+			for (int k = 0; cfg.namespace[i]->index[j]->key_field[k] != NULL; k++) {
+				if (cfg.namespace[i]->index[j]->key_field[k]->fieldno == -1)
+					break;
 
-			if (strcmp(cfg.namespace[i]->index[j]->type, "NUM") == 0) {
-				namespace[i].index[j].find = index_find_hash_num;
-				namespace[i].index[j].find_by_tuple = uniq_find_by_tuple;
-				namespace[i].index[j].remove = index_remove_hash_num;
-				namespace[i].index[j].replace = index_replace_hash_num;
-				namespace[i].index[j].namespace = &namespace[i];
-				namespace[i].index[j].type = INDEX_HASH_NUM;
-				namespace[i].index[j].idx.int_hash = kh_init(int2ptr_map, NULL);
-				if (namespace[i].index[j].key_cardinality != 1)
-					panic("hash NUM index must have key_cardinality = 1");
+				index->key_field[k].fieldno =
+					cfg.namespace[i]->index[j]->key_field[k]->fieldno;
+				if (strcmp(cfg.namespace[i]->index[j]->key_field[k]->type, "NUM") ==
+				    0)
+					index->key_field[k].type = NUM;
+				else if (strcmp(cfg.namespace[i]->index[j]->key_field[k]->type,
+						"STR") == 0)
+					index->key_field[k].type = STR;
+				else
+					panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
+					      "unknown field data type: `%s'",
+					      i, j, cfg.namespace[i]->index[j]->key_field[k]->type);
 
-				if (estimated_rows > 0)
-					kh_resize(int2ptr_map, namespace[i].index[j].idx.int_hash,
-						  estimated_rows);
-			} else if (strcmp(cfg.namespace[i]->index[j]->type, "STR") == 0) {
-				namespace[i].index[j].find = index_find_hash_str;
-				namespace[i].index[j].find_by_tuple = uniq_find_by_tuple;
-				namespace[i].index[j].remove = index_remove_hash_str;
-				namespace[i].index[j].replace = index_replace_hash_str;
-				namespace[i].index[j].namespace = &namespace[i];
-				namespace[i].index[j].type = INDEX_HASH_STR;
-				namespace[i].index[j].idx.str_hash = kh_init(lstr2ptr_map, NULL);
-				if (namespace[i].index[j].key_cardinality != 1)
-					panic("hash NUM index must have key_cardinality = 1");
-
-				if (estimated_rows > 0)
-					kh_resize(lstr2ptr_map, namespace[i].index[j].idx.str_hash,
-						  estimated_rows);
-			} else if (strcmp(cfg.namespace[i]->index[j]->type, "TREE_STR") == 0) {
-				namespace[i].index[j].find = index_find_tree_str;
-				namespace[i].index[j].find_by_tuple = uniq_find_by_tuple;
-				namespace[i].index[j].remove = index_remove_tree_str;
-				namespace[i].index[j].replace = index_replace_tree_str;
-				namespace[i].index[j].iterator_init = index_iterator_init_tree_str;
-				namespace[i].index[j].iterator_next = index_iterator_next_tree_str;
-				namespace[i].index[j].namespace = &namespace[i];
-				namespace[i].index[j].type = INDEX_TREE_STR;
-
-				namespace[i].index[j].idx.str_tree =
-				    palloc(eter_pool, sizeof(*namespace[i].index[j].idx.str_tree));
-
-				sptree_str_t_init(namespace[i].index[j].idx.str_tree,
-						  0, 0, 0,
-						  (void *)tuple_compare, &namespace[i].index[j]);
-			} else {
-				say_warn("unknown index type `%s'",
-					 cfg.namespace[i]->index[j]->type);
-				continue;
+				index->field_cmp_order[index->key_field[k].fieldno] = k;
 			}
+
+			index->parsed_key =
+				salloc(sizeof(index->parsed_key[0]) * index->key_cardinality);
+			if (index->parsed_key == NULL)
+				panic("can't allocate parsed_key for index");
+
+			if (strcmp(cfg.namespace[i]->index[j]->type, "HASH") == 0) {
+				if (index->key_cardinality != 1)
+					panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
+					      "hash index must have single-filed key", i, j);
+
+				index->enabled = true;
+				index->type = HASH;
+
+				if (index->key_field->type == NUM) {
+					index->find = index_find_hash_num;
+					index->find_by_tuple = uniq_find_by_tuple;
+					index->remove = index_remove_hash_num;
+					index->replace = index_replace_hash_num;
+					index->namespace = &namespace[i];
+					index->idx.int_hash = kh_init(int2ptr_map, NULL);
+
+					if (estimated_rows > 0)
+						kh_resize(int2ptr_map, index->idx.int_hash,
+							  estimated_rows);
+				} else {
+					index->find = index_find_hash_str;
+					index->find_by_tuple = uniq_find_by_tuple;
+					index->remove = index_remove_hash_str;
+					index->replace = index_replace_hash_str;
+					index->namespace = &namespace[i];
+					index->idx.str_hash = kh_init(lstr2ptr_map, NULL);
+
+					if (estimated_rows > 0)
+						kh_resize(lstr2ptr_map, index->idx.str_hash,
+							  estimated_rows);
+				}
+			} else if (strcmp(cfg.namespace[i]->index[j]->type, "TREE") == 0) {
+				index->enabled = false;
+				index->type = TREE;
+
+				index->find = index_find_tree_str;
+				index->find_by_tuple = uniq_find_by_tuple;
+				index->remove = index_remove_tree_str;
+				index->replace = index_replace_tree_str;
+				index->iterator_init = index_iterator_init_tree_str;
+				index->iterator_next = index_iterator_next_tree_str;
+				index->namespace = &namespace[i];
+
+				index->idx.str_tree =
+					palloc(eter_pool, sizeof(*index->idx.str_tree));
+			} else
+				panic("namespace = %" PRIu32 " index = %" PRIu32 ") "
+				      "unknown index type `%s'",
+				      i, j, cfg.namespace[i]->index[j]->type);
 		}
 
 		if (namespace[i].index[0].key_cardinality == 0)
-			panic("namespace must have at least one index");
-		if (namespace[i].index[0].type == INDEX_TREE_STR)
-			panic("namespace first index must be unique");
+			panic("(namespace = %" PRIu32 ") namespace must have at least one index",
+			      i);
+		if (namespace[i].index[0].type != HASH)
+			panic("(namespace = %" PRIu32 ") namespace first index must be HASH", i);
 
 		namespace[i].enabled = true;
 		namespace[i].n = i;
+
 		say_info("namespace %i successfully configured", i);
 	}
 }
@@ -1530,10 +1624,62 @@ memcached_bound_to_primary(void *data __unused__)
 
 	if (0 && !cfg.remote_hot_standby) {
 		struct fiber *expire =
-		    fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
+			fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
 		if (expire == NULL)
 			panic("can't stared expire fiber");
 		fiber_call(expire);
+	}
+}
+
+static void
+build_indexes(void)
+{
+	for (u32 n = 0; n < nelem(namespace); ++n) {
+		u32 n_tuples;
+
+		if (namespace[n].enabled == false)
+			continue;
+
+		n_tuples = kh_size(namespace[n].index[0].idx.hash);
+
+		for (u32 idx = 0;; idx++) {
+			struct index *index = &namespace[n].index[idx];
+			struct tree_index_member *members;
+
+			if (index->key_cardinality == 0)
+				break;
+
+			if (index->type != TREE)
+				continue;
+
+			assert(index->enabled == false);
+
+			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": build array", n,
+				 idx);
+
+			members = malloc(n_tuples * sizeof(members[0]));
+			if (members == NULL)
+				panic("build_indexes: realloc failed: %m");
+
+			u32 i = 0;
+			khiter_t k;
+			assoc_foreach(namespace[n].index[0].idx.hash, k) {
+				members[i++] = *tuple2tree_index_member(index,
+					kh_value(namespace[n].index[0].idx.hash, k));
+			}
+
+			ev_now_update();
+			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": build tree", n,
+				 idx);
+
+			sptree_str_t_init(index->idx.str_tree,
+					  members, n_tuples, 0,
+					  (void *)tree_index_member_compare, index);
+			index->enabled = true;
+
+			ev_now_update();
+			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": end", n, idx);
+		}
 	}
 }
 
@@ -1543,10 +1689,8 @@ mod_init(void)
 	stat_base = stat_register(messages_strs, messages_MAX);
 	for (int i = 0; i < nelem(namespace); i++) {
 		namespace[i].enabled = false;
-		for (int j = 0; j < MAX_IDX; j++) {
+		for (int j = 0; j < MAX_IDX; j++)
 			namespace[i].index[j].key_cardinality = 0;
-			namespace[i].index[j].search_tuple_cardinality = 0;
-		}
 	}
 
 	if (cfg.custom_proc_title == NULL)
@@ -1566,8 +1710,7 @@ mod_init(void)
 
 	if (cfg.remote_hot_standby) {
 		if (cfg.wal_feeder_ipaddr == NULL || cfg.wal_feeder_port == 0)
-			panic
-			    ("wal_feeder_ipaddr & wal_feeder_port must be provided in remote_hot_standby mode");
+			panic("wal_feeder_ipaddr & wal_feeder_port must be provided in remote_hot_standby mode");
 	}
 
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
@@ -1579,27 +1722,42 @@ mod_init(void)
 	/* initialize hashes _after_ starting wal writer */
 	if (cfg.memcached != 0) {
 		int n = cfg.memcached_namespace > 0 ? cfg.memcached_namespace : MEMCACHED_NAMESPACE;
-		namespace[n].enabled = true;
 
-		namespace[n].index[0].idx.str_hash = kh_init(lstr2ptr_map, NULL);
-		namespace[n].index[0].find = index_find_hash_str;
-		namespace[n].index[0].find_by_tuple = uniq_find_by_tuple;
-		namespace[n].index[0].remove = index_remove_hash_str;
-		namespace[n].index[0].replace = index_replace_hash_str;
+		cfg.namespace = palloc(eter_pool, (n + 1) * sizeof(cfg.namespace[0]));
+		for (u32 i = 0; i <= n; ++i) {
+			cfg.namespace[i] = palloc(eter_pool, sizeof(cfg.namespace[0][0]));
+			cfg.namespace[i]->enabled = false;
+		}
+
+		cfg.namespace[n]->enabled = true;
+		cfg.namespace[n]->cardinality = -1;
+		cfg.namespace[n]->estimated_rows = 0;
+		cfg.namespace[n]->index = palloc(eter_pool, 2 * sizeof(cfg.namespace[n]->index[0]));
+		cfg.namespace[n]->index[0] =
+			palloc(eter_pool, sizeof(cfg.namespace[n]->index[0][0]));
+		cfg.namespace[n]->index[1] = NULL;
+		cfg.namespace[n]->index[0]->type = "HASH";
+		cfg.namespace[n]->index[0]->key_field =
+			palloc(eter_pool, 2 * sizeof(cfg.namespace[n]->index[0]->key_field[0]));
+		cfg.namespace[n]->index[0]->key_field[0] =
+			palloc(eter_pool, sizeof(cfg.namespace[n]->index[0]->key_field[0][0]));
+		cfg.namespace[n]->index[0]->key_field[1] = NULL;
+		cfg.namespace[n]->index[0]->key_field[0]->fieldno = 0;
+		cfg.namespace[n]->index[0]->key_field[0]->type = "STR";
 
 		memcached_index = &namespace[n].index[0];
-		memcached_index->key_fieldno[0] = 0;
-		memcached_index->key_cardinality = 1;
-		memcached_index->type = INDEX_HASH_STR;
-		memcached_index->namespace = &namespace[n];
-	} else {
-		custom_init();
 	}
+
+	custom_init();
 
 	if (init_storage)
 		return;
 
 	recover(recovery_state, 0);
+
+	title("build indexes");
+
+	build_indexes();
 
 	title("orphan");
 

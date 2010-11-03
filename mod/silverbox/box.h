@@ -35,22 +35,42 @@ void memcached_handler(void *_data __unused__);
 struct namespace;
 struct box_tuple;
 
+struct field {
+	u32 len;
+	union {
+		u32 u32;
+
+		u8 data[sizeof(void *)];
+
+		void *data_ptr;
+	};
+};
+
+enum field_data_type { NUM, STR };
+
+struct tree_index_member {
+	struct field *key;
+	struct box_tuple *tuple;
+};
+
 #include <third_party/sptree.h>
-SPTREE_DEF(str_t, struct box_tuple *, realloc);
+SPTREE_DEF(str_t, struct tree_index_member, realloc);
 
 // #include <mod/silverbox/tree.h>
 
-#define MAX_IDX_FIELDS 10
 struct index {
+	bool enabled;
+
 	struct box_tuple *(*find) (struct index * index, void *key);	/* only for unique lookups */
 	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
 	void (*remove) (struct index * index, struct box_tuple *);
 	void (*replace) (struct index * index, struct box_tuple *, struct box_tuple *);
-	void (*iterator_init) (struct index *, struct box_tuple * pattern);
-	struct box_tuple *(*iterator_next) (struct index *, struct box_tuple * pattern);
+	void (*iterator_init) (struct index *, struct tree_index_member * pattern);
+	struct box_tuple *(*iterator_next) (struct index *, struct tree_index_member * pattern);
 	union {
 		khash_t(lstr2ptr_map) * str_hash;
 		khash_t(int2ptr_map) * int_hash;
+		khash_t(int2ptr_map) * hash;
 		sptree_str_t *str_tree;
 	} idx;
 	void *iterator;
@@ -58,17 +78,20 @@ struct index {
 
 	struct namespace *namespace;
 
-	u32 key_fieldno[MAX_IDX_FIELDS];
-	u32 key_cardinality;
-
 	struct {
-		void *field;
-		u32 size;
-	} *search_field;
-	i8 *cmp_map;
-	u32 search_tuple_cardinality;
+		struct {
+			u32 fieldno;
+			enum field_data_type type;
+		} *key_field;
+		u32 key_cardinality;
 
-	enum { INDEX_HASH_NUM, INDEX_HASH_STR, INDEX_TREE_STR } type;
+		u32 *field_cmp_order;
+		u32 field_cmp_order_cnt;
+	};
+
+	struct field *parsed_key;
+
+	enum { HASH, TREE } type;
 };
 
 extern struct index *memcached_index;
