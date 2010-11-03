@@ -533,7 +533,7 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  10
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   47
+#define YYLAST   46
 
 /* YYNTOKENS -- Number of terminals.  */
 #define YYNTOKENS  15
@@ -590,7 +590,7 @@ static const yytype_uint8 yyprhs[] =
 {
        0,     0,     3,     5,     7,     9,    11,    16,    18,    22,
       27,    31,    33,    36,    40,    44,    48,    52,    56,    62,
-      68,    74,    76,    77,    82
+      69,    75,    77,    78,    82
 };
 
 /* YYRHS -- A `-1'-separated list of the rules' RHS.  */
@@ -602,9 +602,9 @@ static const yytype_int8 yyrhs[] =
       -1,    22,    -1,    21,    22,    -1,    19,    11,     6,    -1,
       19,    11,     5,    -1,    19,    11,     7,    -1,    19,    11,
        3,    -1,    19,    11,     4,    -1,    19,    11,    12,    21,
-      13,    -1,    19,    11,     8,    24,     9,    -1,    20,    11,
-      12,    21,    13,    -1,    14,    -1,    -1,    12,    21,    13,
-      23,    -1,    24,    12,    21,    13,    -1
+      13,    -1,    19,    11,     8,    24,    23,     9,    -1,    20,
+      11,    12,    21,    13,    -1,    14,    -1,    -1,    12,    21,
+      13,    -1,    24,    23,    12,    21,    13,    -1
 };
 
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
@@ -650,8 +650,8 @@ static const yytype_uint8 yyr1[] =
 static const yytype_uint8 yyr2[] =
 {
        0,     2,     1,     1,     1,     1,     4,     1,     3,     4,
-       3,     1,     2,     3,     3,     3,     3,     3,     5,     5,
-       5,     1,     0,     4,     4
+       3,     1,     2,     3,     3,     3,     3,     3,     5,     6,
+       5,     1,     0,     3,     5
 };
 
 /* YYDEFACT[STATE-NAME] -- Default rule to reduce with in state
@@ -661,33 +661,33 @@ static const yytype_uint8 yydefact[] =
 {
        0,     3,     4,     0,     5,     0,     0,     0,     2,    11,
        1,     0,     0,     0,     0,    12,     0,     8,    10,    16,
-      17,    14,    13,    15,     0,     0,     0,     6,     0,     0,
-       0,     0,     0,    19,     0,    18,    20,    22,     0,    21,
-      23,    24
+      17,    14,    13,    15,     0,     0,     0,     6,     0,    22,
+       0,     0,     0,    21,     0,    18,    20,    23,    19,     0,
+       0,    24
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-      -1,     3,     4,     5,     6,     7,     8,     9,    40,    29
+      -1,     3,     4,     5,     6,     7,     8,     9,    34,    29
 };
 
 /* YYPACT[STATE-NUM] -- Index in YYTABLE of the portion describing
    STATE-NUM.  */
-#define YYPACT_NINF -17
+#define YYPACT_NINF -25
 static const yytype_int8 yypact[] =
 {
-      17,   -17,   -17,    14,     8,    19,    15,    26,    17,   -17,
-     -17,    21,    17,    28,    27,   -17,    29,   -17,   -17,   -17,
-     -17,   -17,   -17,   -17,    30,    17,    17,    32,    17,    16,
-      -2,     0,     2,   -17,    17,   -17,   -17,    31,     4,   -17,
-     -17,   -17
+       9,   -25,   -25,    19,     6,    -7,    -6,    10,     9,   -25,
+     -25,    23,     9,    33,    16,   -25,    24,   -25,   -25,   -25,
+     -25,   -25,   -25,   -25,    30,     9,     9,    20,     9,    29,
+       3,     5,     7,   -25,    18,   -25,   -25,   -25,   -25,     9,
+      22,   -25
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -17,   -17,   -17,   -17,    34,    35,   -16,    -8,   -17,   -17
+     -25,   -25,   -25,   -25,    32,    34,   -24,    -8,   -25,   -25
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]].  What to do in state STATE-NUM.  If
@@ -697,20 +697,20 @@ static const yytype_int8 yypgoto[] =
 #define YYTABLE_NINF -10
 static const yytype_int8 yytable[] =
 {
-      15,     1,     2,     1,     2,     1,     2,     1,     2,    30,
-      31,    35,    32,    36,    10,    37,    11,    41,    38,    -7,
-       1,     2,    15,    15,    15,    33,    13,    16,    34,    12,
-      15,    19,    20,    21,    22,    23,    24,    14,    27,    26,
-      25,     0,    28,    -9,     0,    39,    17,    18
+      15,    30,    31,    12,    32,    13,     1,     2,     1,     2,
+       1,     2,     1,     2,    11,    40,    35,    -7,    36,    10,
+      37,    14,    15,    15,    15,     1,     2,    38,    26,    16,
+      39,    -9,    15,    27,     0,    41,    19,    20,    21,    22,
+      23,    24,    28,    33,    17,    25,    18
 };
 
 static const yytype_int8 yycheck[] =
 {
-       8,     3,     4,     3,     4,     3,     4,     3,     4,    25,
-      26,    13,    28,    13,     0,    13,     8,    13,    34,    11,
-       3,     4,    30,    31,    32,     9,    11,     6,    12,    10,
-      38,     3,     4,     5,     6,     7,     8,    11,     9,    12,
-      12,    -1,    12,    11,    -1,    14,    12,    12
+       8,    25,    26,    10,    28,    11,     3,     4,     3,     4,
+       3,     4,     3,     4,     8,    39,    13,    11,    13,     0,
+      13,    11,    30,    31,    32,     3,     4,     9,    12,     6,
+      12,    11,    40,     9,    -1,    13,     3,     4,     5,     6,
+       7,     8,    12,    14,    12,    12,    12
 };
 
 /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
@@ -720,8 +720,8 @@ static const yytype_uint8 yystos[] =
        0,     3,     4,    16,    17,    18,    19,    20,    21,    22,
        0,     8,    10,    11,    11,    22,     6,    19,    20,     3,
        4,     5,     6,     7,     8,    12,    12,     9,    12,    24,
-      21,    21,    21,     9,    12,    13,    13,    13,    21,    14,
-      23,    13
+      21,    21,    21,    14,    23,    13,    13,    13,     9,    12,
+      21,    13
 };
 
 #define yyerrok		(yyerrstatus = 0)
@@ -1670,7 +1670,7 @@ yyreduce:
 
 /* Line 1455 of yacc.c  */
 #line 137 "prscfg.y"
-    { (yyvsp[(4) - (5)].node)->name = (yyvsp[(1) - (5)].atom); (yyval.node) = (yyvsp[(4) - (5)].node); }
+    { (yyvsp[(4) - (6)].node)->name = (yyvsp[(1) - (6)].atom); (yyval.node) = (yyvsp[(4) - (6)].node); }
     break;
 
   case 20:
@@ -1703,8 +1703,8 @@ yyreduce:
 			NameAtom	*idx;
 
 			MakeAtom(idx, NULL);
-			MakeScalarParam(str, struct, idx, (yyvsp[(2) - (4)].node)); 
-			SetParent( str, (yyvsp[(2) - (4)].node) );
+			MakeScalarParam(str, struct, idx, (yyvsp[(2) - (3)].node)); 
+			SetParent( str, (yyvsp[(2) - (3)].node) );
 			SetIndex( str, 0 );
 			MakeScalarParam((yyval.node), array, NULL, str);
 			SetParent( (yyval.node), str );
@@ -1720,12 +1720,12 @@ yyreduce:
 			NameAtom	*idx;
 
 			MakeAtom(idx, NULL);
-			MakeScalarParam(str, struct, idx, (yyvsp[(3) - (4)].node)); 
-			SetParent(str, (yyvsp[(3) - (4)].node));
-			SetIndex(str, (yyvsp[(1) - (4)].node)->paramValue.arrayval->name->index + 1);
-			MakeList((yyvsp[(1) - (4)].node)->paramValue.arrayval, str, (yyvsp[(1) - (4)].node)->paramValue.arrayval); 
-			SetParent((yyvsp[(1) - (4)].node), str);
-			(yyval.node) = (yyvsp[(1) - (4)].node);
+			MakeScalarParam(str, struct, idx, (yyvsp[(4) - (5)].node)); 
+			SetParent(str, (yyvsp[(4) - (5)].node));
+			SetIndex(str, (yyvsp[(1) - (5)].node)->paramValue.arrayval->name->index + 1);
+			MakeList((yyvsp[(1) - (5)].node)->paramValue.arrayval, str, (yyvsp[(1) - (5)].node)->paramValue.arrayval); 
+			SetParent((yyvsp[(1) - (5)].node), str);
+			(yyval.node) = (yyvsp[(1) - (5)].node);
 		}
     break;
 
