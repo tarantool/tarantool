@@ -462,7 +462,7 @@ static void
 index_remove_tree_str(struct index *self, struct box_tuple *tuple)
 {
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
-	sptree_str_t_delete(self->idx.str_tree, member);
+	sptree_str_t_delete(self->idx.tree, member);
 }
 
 static void
@@ -513,13 +513,13 @@ index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct b
 
 	if (old_tuple)
 		index_remove_tree_str(self, old_tuple);
-	sptree_str_t_insert(self->idx.str_tree, member);
+	sptree_str_t_insert(self->idx.tree, member);
 }
 
 static void
 index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern)
 {
-	sptree_str_t_iterator_init_set(self->idx.str_tree,
+	sptree_str_t_iterator_init_set(self->idx.tree,
 				       (struct sptree_str_t_iterator **)&self->iterator, pattern);
 }
 
@@ -1522,8 +1522,8 @@ custom_init(void)
 				index->iterator_next = index_iterator_next_tree_str;
 				index->namespace = &namespace[i];
 
-				index->idx.str_tree =
-					palloc(eter_pool, sizeof(*index->idx.str_tree));
+				index->idx.tree =
+					palloc(eter_pool, sizeof(*index->idx.tree));
 			} else
 				panic("namespace = %" PRIu32 " index = %" PRIu32 ") "
 				      "unknown index type `%s'",
@@ -1655,7 +1655,7 @@ build_indexes(void)
 			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": build tree", n,
 				 idx);
 
-			sptree_str_t_init(index->idx.str_tree,
+			sptree_str_t_init(index->idx.tree,
 					  SIZEOF_TREE_INDEX_MEMBER(index),
 					  members, n_tuples, 0,
 					  (void *)tree_index_member_compare, index);

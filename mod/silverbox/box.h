@@ -74,7 +74,7 @@ struct index {
 		khash_t(lstr2ptr_map) * str_hash;
 		khash_t(int2ptr_map) * int_hash;
 		khash_t(int2ptr_map) * hash;
-		sptree_str_t *str_tree;
+		sptree_str_t *tree;
 	} idx;
 	void *iterator;
 	bool iterator_empty;
