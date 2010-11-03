@@ -432,18 +432,6 @@ alloc_search_pattern(struct index *index, int key_cardinality, void *key)
 	return pattern;
 }
 
-static struct box_tuple *
-index_find_tree_str(struct index *self, void *key)
-{
-	struct tree_index_member *pattern = alloc_search_pattern(self, 1, key);
-	struct tree_index_member *ret = sptree_str_t_find(self->idx.str_tree, pattern);
-
-	if (ret)
-		return ret->tuple;
-
-	return NULL;
-}
-
 static void
 index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 {
@@ -1526,8 +1514,8 @@ custom_init(void)
 				index->enabled = false;
 				index->type = TREE;
 
-				index->find = index_find_tree_str;
-				index->find_by_tuple = uniq_find_by_tuple;
+				index->find = NULL;
+				index->find_by_tuple = NULL;
 				index->remove = index_remove_tree_str;
 				index->replace = index_replace_tree_str;
 				index->iterator_init = index_iterator_init_tree_str;
