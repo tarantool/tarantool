@@ -430,6 +430,7 @@ main(int argc, char **argv)
 
 	mod_init();
 	admin_init();
+	prelease(fiber->pool);
 	say_crit("log level %i", cfg.log_level);
 	say_crit("entering event loop");
 	if (cfg.io_collect_interval > 0)
