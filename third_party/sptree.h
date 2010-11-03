@@ -144,6 +144,8 @@ sptree_##name##_init(sptree_##name *t, elemtype *m,                             
                                                                                           \
     if (t->nmember == 1) {                                                                \
         t->root = 0;                                                                      \
+	_SET_SPNODE_RIGHT(0, SPNIL);							  \
+	_SET_SPNODE_LEFT(0, SPNIL);							  \
     } else if (t->nmember > 1)    {                                                       \
         qsort_arg(t->members, t->nmember, sizeof(elemtype), t->compare, t->arg);          \
         /* create tree */                                                                 \
