@@ -26,7 +26,7 @@ endif
 
 ifeq ($(OS), Linux)
   CFLAGS += -DLinux -D_FILE_OFFSET_BITS=64  -DEV_USE_INOTIFY -D_GNU_SOURCE
-  ifdef DEBUG
+  ifeq ($(DEBUG), 1)
     CFLAGS += -DHAVE_VALGRIND
   endif
 endif
@@ -36,7 +36,7 @@ CFLAGS += -g3 -ggdb
 endif
 
 ifeq (,$(filter -O%,$(CFLAGS)))
-  ifdef DEBUG
+  ifeq ($(DEBUG), 1)
     CFLAGS += -O0
   else
     CFLAGS += -O2
