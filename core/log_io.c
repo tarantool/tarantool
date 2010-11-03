@@ -501,8 +501,6 @@ write_header(struct log_io *l)
 
 	time(&tm);
 	ctime_r(&tm, buf);
-	/* 20 bytes is hardcoded timestring length in silverspoon */
-	//buf[19] = '\n';
 	if (fwrite(buf, strlen(buf), 1, l->f) != 1)
 		return -1;
 
