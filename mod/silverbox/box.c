@@ -1613,13 +1613,14 @@ static void
 build_indexes(void)
 {
 	for (u32 n = 0; n < nelem(namespace); ++n) {
-		u32 n_tuples;
+		u32 n_tuples, estimated_tuples;
 		struct tree_index_member *members[nelem(namespace[n].index)] = { NULL };
 
 		if (namespace[n].enabled == false)
 			continue;
 
 		n_tuples = kh_size(namespace[n].index[0].idx.hash);
+		estimated_tuples = n_tuples * 1.2;
 
 		say_info("build_indexes: n = %" PRIu32 ": build arrays", n);
 
@@ -1639,7 +1640,8 @@ build_indexes(void)
 
 				member = members[idx];
 				if (member == NULL) {
-					member = malloc(n_tuples * SIZEOF_TREE_INDEX_MEMBER(index));
+					member = malloc(estimated_tuples *
+							SIZEOF_TREE_INDEX_MEMBER(index));
 					if (member == NULL)
 						panic("build_indexes: malloc failed: %m");
 
@@ -1680,7 +1682,7 @@ build_indexes(void)
 
 			sptree_str_t_init(index->idx.tree,
 					  SIZEOF_TREE_INDEX_MEMBER(index),
-					  member, n_tuples, 0,
+					  member, n_tuples, estimated_tuples,
 					  (void *)tree_index_member_compare, index);
 			index->enabled = true;
 
