@@ -33,6 +33,7 @@ u8 *save_varint32(u8 *target, u32 value);
 void write_varint32(struct tbuf *b, u32 value);
 
 u8 read_u8(struct tbuf *b);
+u16 read_u16(struct tbuf *b);
 u32 read_u32(struct tbuf *b);
 u32 read_varint32(struct tbuf *buf);
 void *read_field(struct tbuf *buf);

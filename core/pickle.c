@@ -79,6 +79,20 @@ write_varint32(struct tbuf *b, u32 value)
 	append_byte(b, (u8)((value) & 0x7F));
 }
 
+u16
+read_u16(struct tbuf *b)
+{
+	if (b->len < 2)
+		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
+
+	u16 r = *(u16 *)b->data;	/* FIXME: endianess & aligment */
+	b->size -= 2;
+	b->len -= 2;
+	b->data += 2;
+
+	return r;
+}
+
 u32
 read_u32(struct tbuf *b)
 {
