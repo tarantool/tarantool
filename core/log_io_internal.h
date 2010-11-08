@@ -33,11 +33,7 @@ enum log_mode {
 };
 
 struct log_io_class {
-	ev_timer timer;
-
-	 i64(*row_lsn) (const struct tbuf *);
-	row_handler handler;
-	row_reader reader;
+	row_reader *reader;
 	u64 marker, eof_marker;
 	size_t marker_size, eof_marker_size;
 	size_t rows_per_file;
@@ -64,10 +60,18 @@ struct recovery_state {
 	i64 lsn, confirmed_lsn;
 
 	struct log_io *current_wal;	/* the WAL we'r currently reading/writing from/to */
-	struct log_io_class snap_class, wal_class;
+	struct log_io_class **snap_class, **wal_class, *snap_prefered_class, *wal_prefered_class;
 	struct child *wal_writer;
-	void *data;
+
+	/* handlers will be presented by most new format of data
+	   log_io_class->reader is responsible of converting data from old format */
+	row_handler *wal_row_handler, *snap_row_handler;
+	ev_timer wal_timer;
+
 	int snap_io_rate_limit;
+
+	/* pointer to user supplied custom data */
+	void *data;
 };
 
 struct wal_write_request {

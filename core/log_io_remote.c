@@ -98,14 +98,14 @@ pull_from_remote(void *state)
 			continue;
 		}
 
-		if (r->wal_class.handler(r, row) < 0)
+		if (r->wal_row_handler(r, row) < 0)
 			panic("replication failure: can't apply row");
 
-		if (wal_write(r, r->wal_class.row_lsn(row), row) == false)
+		if (wal_write(r, row_v11(row)->lsn, row) == false)
 			panic("replication failure: can't write row to WAL");
 
-		next_lsn(r, r->wal_class.row_lsn(row));
-		confirm_lsn(r, r->wal_class.row_lsn(row));
+		next_lsn(r, row_v11(row)->lsn);
+		confirm_lsn(r, row_v11(row)->lsn);
 
 		if (rows++ % 1000 == 0) {
 			prelease(fiber->pool);
