@@ -1673,8 +1673,6 @@ build_indexes(void)
 			struct index *index = &namespace[n].index[idx];
 			struct tree_index_member *member = members[idx];
 
-			assert(member);
-
 			if (index->key_cardinality == 0)
 				break;
 
@@ -1686,6 +1684,7 @@ build_indexes(void)
 			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": build tree", n,
 				 idx);
 
+			/* if n_tuples == 0 then estimated_tuples = 0, member == NULL, tree is empty */
 			sptree_str_t_init(index->idx.tree,
 					  SIZEOF_TREE_INDEX_MEMBER(index),
 					  member, n_tuples, estimated_tuples,
@@ -1745,7 +1744,7 @@ mod_init(void)
 		}
 
 		cfg.namespace[n]->enabled = true;
-		cfg.namespace[n]->cardinality = -1;
+		cfg.namespace[n]->cardinality = 1;
 		cfg.namespace[n]->estimated_rows = 0;
 		cfg.namespace[n]->index = palloc(eter_pool, 2 * sizeof(cfg.namespace[n]->index[0]));
 		cfg.namespace[n]->index[0] =
