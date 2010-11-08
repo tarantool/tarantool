@@ -1741,7 +1741,7 @@ mod_init(void)
 		}
 
 		cfg.namespace[n]->enabled = true;
-		cfg.namespace[n]->cardinality = 1;
+		cfg.namespace[n]->cardinality = 4;
 		cfg.namespace[n]->estimated_rows = 0;
 		cfg.namespace[n]->index = palloc(eter_pool, 2 * sizeof(cfg.namespace[n]->index[0]));
 		cfg.namespace[n]->index[0] =
