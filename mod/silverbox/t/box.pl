@@ -10,7 +10,7 @@ use lib "$Bin";
 use TBox ();
 use Carp qw/confess/;
 
-use Test::More tests => 178;
+use Test::More tests => 182;
 use Test::Exception;
 
 local $SIG{__DIE__} = \&confess;
@@ -414,6 +414,10 @@ ok $box->isa('MR::SilverBox'), 'connect';
 
 my @tuple1 = (13, 'mail.ru', 123);
 cleanup $tuple1[0];
+
+my @tuple2 = (14, 'mail.ru', 456);
+cleanup $tuple2[0];
+
 ok $box->Insert(@tuple1);
 
 is_deeply [$box->Select([[$tuple1[0]]])], [\@tuple1], 'select by primary_num1 index';
@@ -421,8 +425,6 @@ is_deeply [$box->Select([[$tuple1[1]]], { use_index => 'secondary_str2' })], [\@
 is_deeply [$box->Select([[$tuple1[1], $tuple1[2]]], { use_index => 'secondary_complex' })], [\@tuple1], 'select by secondary_complex index';
 is_deeply [$box->Select([[$tuple1[1]]], { use_index => 'secondary_complex' })], [\@tuple1], 'select by secondary_complex index, partial key';
 
-my @tuple2 = (14, 'mail.ru', 456);
-cleanup $tuple2[0];
 ok $box->Insert(@tuple2);
 
 is_deeply [$box->Select([[$tuple2[0]]])], [\@tuple2], 'select by primary_num1 index';
