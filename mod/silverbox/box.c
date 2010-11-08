@@ -1154,9 +1154,6 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 		    && namespace[txn->n].cardinality != cardinality)
 			box_raise(ERR_CODE_ILLEGAL_PARAMS,
 				  "tuple cardinality must match namespace cardinality");
-		if (!txn->in_recover && txn->n == 3 && cardinality != 14)
-			box_raise(ERR_CODE_ILLEGAL_PARAMS,
-				  "tuple cardinality must match namespace cardinality");
 		ret_code = prepare_replace(txn, cardinality, data);
 		stat_collect(stat_base, op, 1);
 		break;
