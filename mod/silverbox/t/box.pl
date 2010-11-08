@@ -395,3 +395,31 @@ is_deeply [$box->Select([[$tuple2[0]]])], [\@tuple2], 'select by primary_num1 in
 is_deeply [$box->Select([[$tuple1[1]]], { use_index => 'secondary_str2', limit => 2, offset => 0 })], [\@tuple1, \@tuple2], 'select by secondary_str2 index';
 is_deeply [$box->Select([[$tuple2[1], $tuple2[2]]], { use_index => 'secondary_complex' })], [\@tuple2], 'select by secondary_complex index';
 
+## Check index constrains
+sub def_param_bad {
+    my $format = 'l&&';
+    return { servers => $server,
+             namespaces => [ {
+                 indexes => [ {
+                     index_name   => 'primary_num1',
+                     keys         => [0],
+                 }, {
+                     index_name   => 'secondary_str2',
+                     keys         => [1],
+                 }, {
+                     index_name   => 'secondary_complex',
+                     keys         => [1, 2],
+                 } ],
+                 namespace     => 26,
+                 format        => $format,
+                 default_index => 'primary_num1',
+             } ]}
+}
+
+$box = MR::SilverBox->new(def_param_bad);
+ok $box->isa('MR::SilverBox'), 'connect';
+
+my @tuple_bad = (13, 'mail.ru', '123');
+cleanup $tuple_bad[0];
+throws_ok sub { $box->Insert(@tuple_bad) }, qr/Illegal parametrs/, "index_constains/bad_field_type";
+
