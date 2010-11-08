@@ -144,6 +144,8 @@ enum box_mode {
 };
 
 #define BOX_RETURN_TUPLE 1
+#define BOX_ADD 2
+#define BOX_REPLACE 4
 #define BOX_QUIET 8
 
 /*

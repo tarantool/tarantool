@@ -561,7 +561,7 @@ validate_indeces(struct box_txn *txn)
 			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
 
 			if (tuple != NULL && tuple != txn->old_tuple)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "unique index violation");
+				box_raise(ERR_CODE_INDEX_VIOLATION, "unique index violation");
 		}
 	}
 }
@@ -584,6 +584,12 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 
 	if (txn->old_tuple != NULL)
 		tuple_txn_ref(txn, txn->old_tuple);
+
+	if (txn->flags & BOX_ADD && txn->old_tuple != NULL)
+		box_raise(ERR_CODE_NODE_FOUND, "tuple found");
+
+	if (txn->flags & BOX_REPLACE && txn->old_tuple == NULL)
+		box_raise(ERR_CODE_NODE_NOT_FOUND, "tuple not found");
 
 	validate_indeces(txn);
 	run_hooks(txn, before_commit_update_hook);
