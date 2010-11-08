@@ -1053,6 +1053,8 @@ recover(struct recovery_state *r, i64 lsn)
 	}
 
 	result = recover_remaining_wals(r);
+	if (result < 0)
+		panic("recover failed");
 	say_info("wals recovered, confirmed lsn: %" PRIi64, confirmed_lsn(r));
       out:
 	prelease(fiber->pool);
@@ -1085,7 +1087,7 @@ recover_follow_file(ev_stat *w, int revents __unused__)
 	int result;
 	result = recover_wal(r, r->current_wal);
 	if (result < 0)
-		panic("recover failed: %i", result);
+		panic("recover failed");
 	if (result == LOG_EOF) {
 		say_info("done `%s' confirmed_lsn:%" PRIi64, r->current_wal->filename,
 			 confirmed_lsn(r));
