@@ -105,6 +105,8 @@ vsay(int level, const char *error, const char *format, va_list ap)
 	size_t p = 0, len = PIPE_BUF;
 	static char buf[PIPE_BUF];
 
+	ev_now_update();
+
 	if (peer_name == NULL)
 		peer_name = "_";
 

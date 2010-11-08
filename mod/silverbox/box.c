@@ -1663,7 +1663,6 @@ build_indexes(void)
 			++i;
 		}
 
-		ev_now_update();
 		say_info("build_indexes: n = %" PRIu32 ": build trees", n);
 
 		for (u32 idx = 0;; idx++) {
@@ -1688,7 +1687,6 @@ build_indexes(void)
 					  (void *)tree_index_member_compare, index);
 			index->enabled = true;
 
-			ev_now_update();
 			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": end", n, idx);
 		}
 	}

@@ -228,10 +228,8 @@ read_rows(struct log_io_iter *i)
 
 		prelease_after(fiber->pool, 128 * 1024);
 
-		if (++row_count % 100000 == 0) {
-			ev_now_update();
+		if (++row_count % 100000 == 0)
 			say_info("%.1fM rows processed", row_count / 1000000.);
-		}
 	}
       eof:
 	/*
@@ -1054,7 +1052,6 @@ write_to_disk_v04(void *_state, struct tbuf *t)
 	u32 result = 0;
 	int suffix = 0;
 
-	ev_now_update();
 	/* caller requested termination */
 	if (t == NULL) {
 		if (wal != NULL)
@@ -1237,10 +1234,8 @@ snapshot_write_row(struct log_io_iter *i, struct tbuf *row)
 		}
 	}
 	coro_transfer(&fiber->coro.ctx, &i->coro.ctx);
-	if (++rows % 100000 == 0) {
-		ev_now_update();
+	if (++rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
-	}
 }
 
 void
@@ -1266,7 +1261,6 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 	dot = strrchr(final_filename, '.');
 	*dot = 0;
 
-	ev_now_update();
 	say_info("saving snapshot `%s'", final_filename);
 	f(&i);
 
@@ -1278,6 +1272,5 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 
 	close_log(&snap);
 
-	ev_now_update();
 	say_info("done");
 }
