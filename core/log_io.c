@@ -112,6 +112,7 @@ next_lsn(struct recovery_state *r, i64 new_lsn)
 	else
 		r->lsn = new_lsn;
 
+	say_debug("next_lsn(%p, %"PRIi64") => %"PRIi64, r, new_lsn, r->lsn);
 	return r->lsn;
 }
 
@@ -769,11 +770,13 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 	iter_open(l, &i, read_rows);
 
 	while ((row = iter_inner(&i, (void *)1))) {
-		if (r && l->class->row_lsn(row) <= confirmed_lsn(r)) {
+		i64 lsn = l->class->row_lsn(row);
+		if (r && lsn <= confirmed_lsn(r)) {
 			say_debug("skipping too young row");
 			continue;
 		}
 
+		/*  after handler(r, row) returned, row may be modified, do not use it */
 		if (l->class->handler(r, row) < 0) {
 			say_error("row_handler returned error");
 			result = -1;
@@ -781,8 +784,8 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		}
 
 		if (r) {
-			next_lsn(r, l->class->row_lsn(row));
-			confirm_lsn(r, l->class->row_lsn(row));
+			next_lsn(r, lsn);
+			confirm_lsn(r, lsn);
 		}
 	}
 	result = i.error;
@@ -1014,6 +1017,7 @@ recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay)
 void
 recover_finalize(struct recovery_state *r)
 {
+	int result;
 	if (ev_is_active(&r->wal_class.timer))
 		ev_timer_stop(&r->wal_class.timer);
 
@@ -1022,8 +1026,15 @@ recover_finalize(struct recovery_state *r)
 			ev_stat_stop(&r->current_wal->stat);
 	}
 
-	if (recover_remaining_wals(r) < 0)
+	result = recover_remaining_wals(r);
+	if (result < 0)
 		panic("unable to scucessfully finalize recovery");
+
+	if (r->current_wal != NULL && result != LOG_EOF) {
+		say_warn("wal `%s' wasn't correctly closed",
+			 r->current_wal->filename);
+		close_log(&r->current_wal);
+	}
 }
 
 static struct wal_write_request *
