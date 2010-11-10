@@ -37,11 +37,12 @@
 
 #define RECOVER_READONLY 1
 
+extern const u16 default_tag;
+
 struct log_io;
 struct recovery_state;
 typedef int (row_handler)(struct recovery_state *, struct tbuf *);
 typedef struct tbuf *(row_reader)(FILE *f, struct palloc_pool * pool);
-
 struct row_v04 {
 	i64 lsn;		/* this used to be tid */
 	u16 type;

@@ -47,6 +47,7 @@
 #include <pickle.h>
 #include <tbuf.h>
 
+const u16 default_tag = 0;
 const u32 snap_marker_v04 = -1U;
 const u64 xlog_marker_v04 = -1ULL;
 const u64 xlog_eof_marker_v04 = 0;
@@ -240,21 +241,23 @@ read_rows(struct log_io_iter *i)
 		fseeko(l->f, marker_offset + 1, SEEK_SET);
 
 	for (;;) {
-		say_debug("read_rows: loop start offt %" PRI_OFFT, ftello(l->f));
+		say_debug("read_rows: loop start offt 0x%08" PRI_XFFT, ftello(l->f));
 		if (fread(&magic, l->class->marker_size, 1, l->f) != 1)
 			goto eof;
 
 		while ((magic & marker_mask) != l->class->marker) {
 			int c = fgetc(l->f);
-			if (c == EOF)
+			if (c == EOF) {
+				say_debug("eof while looking for magic");
 				goto eof;
+			}
 			magic = (magic >> 8) | (((u64)c & 0xff) << ((l->class->marker_size - 1) * 8));
 		}
 		marker_offset = ftello(l->f) - l->class->marker_size;
 		if (good_offset != marker_offset)
-			say_warn("skipped %" PRI_OFFT " bytes after %" PRI_OFFT " offset",
+			say_warn("skipped %" PRI_OFFT " bytes after 0x%08" PRI_XFFT " offset",
 				 marker_offset - good_offset, good_offset);
-		say_debug("magic found at %" PRI_OFFT, marker_offset);
+		say_debug("magic found at 0x%08" PRI_XFFT, marker_offset);
 
 		row = l->class->reader(l->f, fiber->pool);
 		if (row == ROW_EOF)
@@ -446,7 +449,6 @@ convert_to_v11(struct tbuf *orig, i64 lsn)
 	row_v11(row)->tm = 0;
 	row_v11(row)->len = orig->len;
 
-	u16 default_tag = 0;
 	tbuf_append(row, &default_tag, sizeof(default_tag));
 	tbuf_append(row, orig->data, orig->len);
 	return row;
@@ -607,10 +609,15 @@ write_header(struct log_io *l)
 	if (fwrite(l->class->version, strlen(l->class->version), 1, l->f) != 1)
 		return -1;
 
-	time(&tm);
-	ctime_r(&tm, buf);
-	if (fwrite(buf, strlen(buf), 1, l->f) != 1)
-		return -1;
+	if (strcmp(l->class->version, v11) == 0) {
+		if (fwrite("\n", 1, 1, l->f) != 1)
+			return -1;
+	} else {
+		time(&tm);
+		ctime_r(&tm, buf);
+		if (fwrite(buf, strlen(buf), 1, l->f) != 1)
+			return -1;
+	}
 
 	return 0;
 }
@@ -644,7 +651,7 @@ static struct log_io *
 open_for_read(struct recovery_state *recover, struct log_io_class **class, i64 lsn, int suffix,
 	      const char *filename)
 {
-	char filetype[32], version[32], buf[32];
+	char filetype[32], version[32], buf[256];
 	struct log_io *l = NULL;
 	char *r;
 	char *error = "unknown error";
@@ -702,10 +709,22 @@ open_for_read(struct recovery_state *recover, struct log_io_class **class, i64 l
 	}
 	l->class = *class;
 
-	r = fgets(buf, sizeof(buf), l->f);	/* skip line with time */
-	if (r == NULL) {
-		error = "header reading failed";
-		goto error;
+	if (strcmp(version, v11) == 0) {
+		for (;;) {
+			r = fgets(buf, sizeof(buf), l->f);
+			if (r == NULL) {
+				error = "header reading failed";
+				goto error;
+			}
+			if (strcmp(r, "\n") == 0 || strcmp(r, "\r\n") == 0)
+				break;
+		}
+	} else {
+		r = fgets(buf, sizeof(buf), l->f);	/* skip line with time */
+		if (r == NULL) {
+			error = "header reading failed";
+			goto error;
+		}
 	}
 
 	return l;
@@ -1196,8 +1215,8 @@ write_to_disk(void *_state, struct tbuf *t)
 	row_v11(header)->data_crc32c =
 		crc32c(0, wal_write_request(t)->data, wal_write_request(t)->len);
 	row_v11(header)->header_crc32c =
-		crc32c(0, header->data + offsetof(struct row_v11, lsn),
-		       offsetof(struct row_v11, data) - offsetof(struct row_v11, lsn));
+		crc32c(0, header->data + field_sizeof(struct row_v11, header_crc32c),
+		       sizeof(struct row_v11) - field_sizeof(struct row_v11, header_crc32c));
 
 	if (fwrite(header->data, header->len, 1, wal->f) != 1) {
 		say_syserror("can't write row header to wal");
@@ -1290,18 +1309,33 @@ static void
 write_rows(struct log_io_iter *i)
 {
 	struct log_io *l = i->log;
-	struct tbuf *row;
+	struct tbuf *row, *data;
+
+	row = tbuf_alloc(eter_pool);
+	tbuf_ensure(row, sizeof(struct row_v11));
+	row->len = sizeof(struct row_v11);
 
 	goto start;
 	for (;;) {
 		coro_transfer(&i->coro.ctx, &fiber->coro.ctx);
 	      start:
-		row = i->to;
+		data = i->to;
 
 		if (fwrite(&l->class->marker, l->class->marker_size, 1, l->f) != 1)
 			panic("fwrite");
 
+		row_v11(row)->lsn = 0; /* unused */
+		row_v11(row)->tm = ev_now();
+		row_v11(row)->len = data->len;
+		row_v11(row)->data_crc32c = crc32c(0, data->data, data->len);
+		row_v11(row)->header_crc32c =
+			crc32c(0, row->data + field_sizeof(struct row_v11, header_crc32c),
+			       sizeof(struct row_v11) - field_sizeof(struct row_v11, header_crc32c));
+
 		if (fwrite(row->data, row->len, 1, l->f) != 1)
+			panic("fwrite");
+
+		if (fwrite(data->data, data->len, 1, l->f) != 1)
 			panic("fwrite");
 	}
 }

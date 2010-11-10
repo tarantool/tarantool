@@ -1199,7 +1199,6 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 	if (ret_code == -1) {
 		if (!txn->in_recover) {
 			struct tbuf *t = tbuf_alloc(fiber->pool);
-			u16 default_tag = 0;
 			tbuf_append(t, &default_tag, sizeof(default_tag));
 			tbuf_append(t, &op, sizeof(op));
 			tbuf_append(t, req.data, req.len);
@@ -1835,6 +1834,7 @@ mod_snapshot(struct log_io_iter *i)
 			header.data_size = tuple->bsize;
 
 			tbuf_reset(row);
+			tbuf_append(row, &default_tag, sizeof(default_tag));
 			tbuf_append(row, &header, sizeof(header));
 			tbuf_append(row, tuple->data, tuple->bsize);
 
