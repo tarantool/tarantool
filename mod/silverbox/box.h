@@ -64,6 +64,8 @@ SPTREE_DEF(str_t, realloc);
 struct index {
 	bool enabled;
 
+	bool unique;
+
 	struct box_tuple *(*find) (struct index * index, void *key);	/* only for unique lookups */
 	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
 	void (*remove) (struct index * index, struct box_tuple *);

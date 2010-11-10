@@ -15,6 +15,7 @@ typedef struct tarantool_cfg_namespace_index_key_field {
 
 typedef struct tarantool_cfg_namespace_index {
 	char*	type;
+	int32_t	unique;
 	tarantool_cfg_namespace_index_key_field**	key_field;
 } tarantool_cfg_namespace_index;
 

@@ -10,7 +10,7 @@ use lib "$Bin";
 use TBox ();
 use Carp qw/confess/;
 
-use Test::More tests => 182;
+use Test::More tests => 201;
 use Test::Exception;
 
 local $SIG{__DIE__} = \&confess;
@@ -458,4 +458,58 @@ ok $box->isa('MR::SilverBox'), 'connect';
 my @tuple_bad = (13, 'mail.ru', '123');
 cleanup $tuple_bad[0];
 throws_ok sub { $box->Insert(@tuple_bad) }, qr/Illegal parametrs/, "index_constains/bad_field_type";
+
+
+## Check unique tree index
+sub def_param_unique {
+    my $format = 'l&&&';
+    return { servers => $server,
+             namespaces => [ {
+                 indexes => [ {
+		     index_name   => 'id',
+		     keys         => [0],
+		 }, {
+                     index_name   => 'email',
+                     keys         => [1],
+                 }, {
+                     index_name   => 'firstname',
+                     keys         => [2],
+                 }, {
+                     index_name   => 'lastname',
+                     keys         => [3],
+                 } , {
+		     index_name   => 'fullname',
+		     keys         => [2, 3]
+		 } ],
+                 namespace     => 27,
+                 format        => $format,
+                 default_index => 'id',
+             } ]}
+}
+
+$box = MR::SilverBox->new(def_param_unique);
+ok $box->isa('MR::SilverBox'), 'connect';
+
+my $tuples = [ [1, 'rtokarev@corp.mail.ru', 'Roman', 'Tokarev'],
+	       [2, 'vostrikov@corp.mail.ru', 'Yuri', 'Vostrikov'],
+	       [3, 'aleinikov@corp.mail.ru', 'Roman', 'Aleinikov'],
+	       [4, 'roman.s.tokarev@gmail.com', 'Roman', 'Tokarev'],
+	       [5, 'vostrikov@corp.mail.ru', 'delamon', 'delamon'] ];
+
+foreach my $tuple (@$tuples) {
+	cleanup $tuple->[0];
+}
+
+foreach my $tuple (@$tuples) {
+	if ($tuple == $tuples->[-1] || $tuple == $tuples->[-2]) {
+		throws_ok sub { $box->Insert(@$tuple) }, qr/Index violation/, "unique_tree_index/insert \'$tuple->[0]\'";
+	} else {
+		ok $box->Insert(@$tuple), "unique_tree_index/insert \'$tuple->[0]\'";
+	}
+}
+
+my @res = $box->Select([map $_->[0], @$tuples], { limit => 100 });
+foreach my $r (@res) {
+	ok sub { return $r != $tuples->[-1] && $r != $tuples->[-2] };
+}
 

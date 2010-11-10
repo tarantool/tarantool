@@ -78,8 +78,9 @@ acceptDefault_name__namespace(tarantool_cfg_namespace *c) {
 
 static int
 acceptDefault_name__namespace__index(tarantool_cfg_namespace_index *c) {
-	c->type = strdup("HASH");
+	c->type = strdup("");
 	if (c->type == NULL) return CNF_NOMEMORY;
+	c->unique = -1;
 	c->key_field = NULL;
 	return 0;
 }
@@ -87,7 +88,7 @@ acceptDefault_name__namespace__index(tarantool_cfg_namespace_index *c) {
 static int
 acceptDefault_name__namespace__index__key_field(tarantool_cfg_namespace_index_key_field *c) {
 	c->fieldno = -1;
-	c->type = strdup("NUM");
+	c->type = strdup("");
 	if (c->type == NULL) return CNF_NOMEMORY;
 	return 0;
 }
@@ -207,6 +208,11 @@ static NameAtom _name__namespace__index__type[] = {
 	{ "namespace", -1, _name__namespace__index__type + 1 },
 	{ "index", -1, _name__namespace__index__type + 2 },
 	{ "type", -1, NULL }
+};
+static NameAtom _name__namespace__index__unique[] = {
+	{ "namespace", -1, _name__namespace__index__unique + 1 },
+	{ "index", -1, _name__namespace__index__unique + 2 },
+	{ "unique", -1, NULL }
 };
 static NameAtom _name__namespace__index__key_field__fieldno[] = {
 	{ "namespace", -1, _name__namespace__index__key_field__fieldno + 1 },
@@ -617,6 +623,19 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		 if (opt->paramValue.stringval && c->namespace[opt->name->index]->index[opt->name->next->index]->type == NULL)
 			return CNF_NOMEMORY;
 	}
+	else if ( cmpNameAtoms( opt->name, _name__namespace__index__unique) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace);
+		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index);
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		c->namespace[opt->name->index]->index[opt->name->next->index]->unique = i32;
+	}
 	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field__fieldno) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
@@ -777,6 +796,7 @@ typedef enum IteratorState {
 	S_name__namespace__estimated_rows,
 	S_name__namespace__index,
 	S_name__namespace__index__type,
+	S_name__namespace__index__unique,
 	S_name__namespace__index__key_field,
 	S_name__namespace__index__key_field__fieldno,
 	S_name__namespace__index__key_field__type,
@@ -1169,6 +1189,7 @@ again:
 		case S_name__namespace__estimated_rows:
 		case S_name__namespace__index:
 		case S_name__namespace__index__type:
+		case S_name__namespace__index__unique:
 		case S_name__namespace__index__key_field:
 		case S_name__namespace__index__key_field__fieldno:
 		case S_name__namespace__index__key_field__type:
@@ -1211,6 +1232,7 @@ again:
 					case S_name__namespace__index:
 						i->state = S_name__namespace__index;
 					case S_name__namespace__index__type:
+					case S_name__namespace__index__unique:
 					case S_name__namespace__index__key_field:
 					case S_name__namespace__index__key_field__fieldno:
 					case S_name__namespace__index__key_field__type:
@@ -1225,6 +1247,17 @@ again:
 										return NULL;
 									}
 									snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].type", i->idx_name__namespace, i->idx_name__namespace__index);
+									i->state = S_name__namespace__index__unique;
+									return buf;
+								case S_name__namespace__index__unique:
+									*v = malloc(32);
+									if (*v == NULL) {
+										free(i);
+										out_warning(CNF_NOMEMORY, "No memory to output value");
+										return NULL;
+									}
+									sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->unique);
+									snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].unique", i->idx_name__namespace, i->idx_name__namespace__index);
 									i->state = S_name__namespace__index__key_field;
 									return buf;
 								case S_name__namespace__index__key_field:
