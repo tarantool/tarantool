@@ -248,7 +248,7 @@ read_rows(struct log_io_iter *i)
 			int c = fgetc(l->f);
 			if (c == EOF)
 				goto eof;
-			magic = (magic << 8) + (c & 0xff);
+			magic = (magic >> 8) | (((u64)c & 0xff) << ((l->class->marker_size - 1) * 8));
 		}
 		marker_offset = ftello(l->f) - l->class->marker_size;
 		if (good_offset != marker_offset)
