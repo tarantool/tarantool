@@ -1336,9 +1336,9 @@ snap_apply(struct recovery_state *r __unused__, struct tbuf *t)
 	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
 		return -1;
 
-	/* ignore tag for now */
 	u16 tag  = read_u16(t);
-	assert(tag == 0);
+	if (tag != 0)
+		return -1;
 
 	row = box_snap_row(t);
 	txn->in_recover = true;
@@ -1379,8 +1379,10 @@ xlog_apply(struct recovery_state *r __unused__, struct tbuf *t)
 	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
 		return -1;
 
-	u16 tag  = read_u16(t);
-	assert(tag == 0);
+	u16 tag = read_u16(t);
+	if (tag != 0)
+		return -1;
+
 	u16 type = read_u16(t);
 	if (box_dispach(txn, RW, type, t) != 0)
 		return -1;
