@@ -436,11 +436,27 @@ find_including_file(struct log_io_class *class, i64 target_lsn)
 	return *lsn;
 }
 
+struct tbuf *
+convert_to_v11(struct tbuf *orig, i64 lsn)
+{
+	struct tbuf *row = tbuf_alloc(orig->pool);
+	tbuf_ensure(row, sizeof(struct row_v11));
+	row->len = sizeof(struct row_v11);
+	row_v11(row)->lsn = lsn;
+	row_v11(row)->tm = 0;
+	row_v11(row)->len = orig->len;
+
+	u16 default_tag = 0;
+	tbuf_append(row, &default_tag, sizeof(default_tag));
+	tbuf_append(row, orig->data, orig->len);
+	return row;
+}
+
 static struct tbuf *
 row_reader_v04(FILE *f, struct palloc_pool *pool)
 {
 	const int header_size = offsetof(struct row_v04, data);
-	struct tbuf *m = tbuf_alloc(pool), *v11;
+	struct tbuf *m = tbuf_alloc(pool);
 	u32 crc, calculated_crc;
 
 	/*
@@ -477,17 +493,11 @@ row_reader_v04(FILE *f, struct palloc_pool *pool)
 	say_debug("read row v04 success lsn:%" PRIi64, row_v04(m)->lsn);
 
 	/* we're copying row data twice here, it's ok since this is legacy function */
-	v11 = tbuf_alloc(pool);
-	tbuf_ensure(v11, sizeof(struct row_v11));
-	v11->len = sizeof(struct row_v11);
-	row_v11(v11)->lsn = row_v04(m)->lsn;
-	row_v11(v11)->tm = 0;
-	row_v11(v11)->len = row_v04(m)->len;
-	u16 default_tag = 0;
-	tbuf_append(v11, &default_tag, sizeof(default_tag));
-	tbuf_append(v11, &row_v04(m)->type, sizeof(row_v04(m)->type));
-	tbuf_append(v11, row_v04(m)->data, row_v04(m)->len);
-	return v11;
+	struct tbuf *data = tbuf_alloc(pool);
+	tbuf_append(data, &row_v04(m)->type, sizeof(row_v04(m)->type));
+	tbuf_append(data, row_v04(m)->data, row_v04(m)->len);
+
+	return convert_to_v11(data, row_v04(m)->lsn);
 }
 
 

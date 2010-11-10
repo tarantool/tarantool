@@ -1313,7 +1313,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 struct tbuf *
 box_snap_reader(FILE *f, struct palloc_pool *pool)
 {
-	struct tbuf *row = tbuf_alloc(pool), *v11;
+	struct tbuf *row = tbuf_alloc(pool);
 	const int header_size = sizeof(*box_snap_row(row));
 
 	tbuf_reserve(row, header_size);
@@ -1324,13 +1324,7 @@ box_snap_reader(FILE *f, struct palloc_pool *pool)
 	if (fread(box_snap_row(row)->data, box_snap_row(row)->data_size, 1, f) != 1)
 		return NULL;
 
-	v11 = tbuf_alloc(pool);
-	tbuf_ensure(v11, sizeof(struct row_v11));
-	v11->len = sizeof(struct row_v11);
-	u16 default_tag = 0;
-	tbuf_append(v11, &default_tag, sizeof(default_tag));
-	tbuf_append(v11, row->data, row->len);
-	return v11;
+	return convert_to_v11(row, 0);
 }
 
 static int
