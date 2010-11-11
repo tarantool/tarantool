@@ -56,10 +56,11 @@ namespace = [
   cardinality = -1
   estimated_rows = 0
   index = [
-    type = "HASH"
+    type = ""
+    unique = -1
     key_field = [
       fieldno = -1
-      type = "NUM"
+      type = ""
     ]
   ]
 ]

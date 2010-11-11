@@ -205,10 +205,12 @@ tree_index_member_compare(struct tree_index_member *member_a, struct tree_index_
 	if (member_b->tuple == NULL)
 		return 2;
 
-	if (member_a->tuple > member_b->tuple)
-		return 3;
-	else if (member_a->tuple < member_b->tuple)
-		return -3;
+	if (index->unique == false) {
+		if (member_a->tuple > member_b->tuple)
+			return 3;
+		else if (member_a->tuple < member_b->tuple)
+			return -3;
+	}
 
 	return 0;
 }
@@ -325,7 +327,7 @@ tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
 }
 
 static struct box_tuple *
-uniq_find_by_tuple(struct index *self, struct box_tuple *tuple)
+index_find_hash_by_tuple(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	if (key == NULL)
@@ -430,6 +432,22 @@ alloc_search_pattern(struct index *index, int key_cardinality, void *key)
 	pattern->tuple = NULL;
 
 	return pattern;
+}
+
+static struct box_tuple *
+index_find_tree(struct index *self, void *key)
+{
+	struct tree_index_member *member = (struct tree_index_member *)key;
+
+	return sptree_str_t_find(self->idx.tree, member);
+}
+
+static struct box_tuple *
+index_find_tree_by_tuple(struct index *self, struct box_tuple *tuple)
+{
+	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
+
+	return self->find(self, member);
 }
 
 static void
@@ -554,7 +572,7 @@ validate_indeces(struct box_txn *txn)
 				if (!field_is_num(field))
 					box_raise(ERR_CODE_ILLEGAL_PARAMS, "field must be NUM");
 			}
-			if (index->type == TREE)
+			if (index->type == TREE && index->unique == false)
 				/* Don't check non unique indexes */
 				continue;
 
@@ -1496,6 +1514,14 @@ custom_init(void)
 
 			index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 
+			if (cfg.namespace[i]->index[j]->unique == 0)
+				index->unique = false;
+			else if (cfg.namespace[i]->index[j]->unique == 1)
+				index->unique = true;
+			else
+				panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
+				      "unique property is undefined", i, j);
+
 			if (strcmp(cfg.namespace[i]->index[j]->type, "HASH") == 0) {
 				if (index->key_cardinality != 1)
 					panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
@@ -1504,9 +1530,13 @@ custom_init(void)
 				index->enabled = true;
 				index->type = HASH;
 
+				if (index->unique == false)
+					panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
+					      "hash index must be unique", i, j);
+
 				if (index->key_field->type == NUM) {
 					index->find = index_find_hash_num;
-					index->find_by_tuple = uniq_find_by_tuple;
+					index->find_by_tuple = index_find_hash_by_tuple;
 					index->remove = index_remove_hash_num;
 					index->replace = index_replace_hash_num;
 					index->namespace = &namespace[i];
@@ -1517,7 +1547,7 @@ custom_init(void)
 							  estimated_rows);
 				} else {
 					index->find = index_find_hash_str;
-					index->find_by_tuple = uniq_find_by_tuple;
+					index->find_by_tuple = index_find_hash_by_tuple;
 					index->remove = index_remove_hash_str;
 					index->replace = index_replace_hash_str;
 					index->namespace = &namespace[i];
@@ -1531,16 +1561,15 @@ custom_init(void)
 				index->enabled = false;
 				index->type = TREE;
 
-				index->find = NULL;
-				index->find_by_tuple = NULL;
+				index->find = index_find_tree;
+				index->find_by_tuple = index_find_tree_by_tuple;
 				index->remove = index_remove_tree_str;
 				index->replace = index_replace_tree_str;
 				index->iterator_init = index_iterator_init_tree_str;
 				index->iterator_next = index_iterator_next_tree_str;
 				index->namespace = &namespace[i];
 
-				index->idx.tree =
-					palloc(eter_pool, sizeof(*index->idx.tree));
+				index->idx.tree = palloc(eter_pool, sizeof(*index->idx.tree));
 			} else
 				panic("namespace = %" PRIu32 " index = %" PRIu32 ") "
 				      "unknown index type `%s'",
@@ -1666,7 +1695,7 @@ build_indexes(void)
 				}
 
 				m = (struct tree_index_member *)
-				    ((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
+					((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
 
 				tuple2tree_index_member(index,
 							kh_value(namespace[n].index[0].idx.hash,
