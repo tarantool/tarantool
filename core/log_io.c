@@ -76,6 +76,19 @@ struct log_io_iter {
 	int io_rate_limit;
 };
 
+struct row_v04 {
+	i64 lsn;		/* this used to be tid */
+	u16 type;
+	u32 len;
+	u8 data[];
+} __packed__;
+
+static inline struct row_v04 *row_v04(const struct tbuf *t)
+{
+	return (struct row_v04 *)t->data;
+}
+
+
 int
 confirm_lsn(struct recovery_state *r, i64 lsn)
 {

@@ -98,13 +98,6 @@ struct wal_write_request {
 	u8 data[];
 } __packed__;
 
-struct row_v04 {
-	i64 lsn;		/* this used to be tid */
-	u16 type;
-	u32 len;
-	u8 data[];
-} __packed__;
-
 struct row_v11 {
 	u32 header_crc32c;
 	i64 lsn;
@@ -113,11 +106,6 @@ struct row_v11 {
 	u32 data_crc32c;
 	u8 data[];
 } __packed__;
-
-static inline struct row_v04 *row_v04(const struct tbuf *t)
-{
-	return (struct row_v04 *)t->data;
-}
 
 static inline struct row_v11 *row_v11(const struct tbuf *t)
 {
