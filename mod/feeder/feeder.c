@@ -34,7 +34,7 @@
 static char *custom_proc_title;
 
 static int
-send_row(struct recovery_state *r __unused__, const struct tbuf *t)
+send_row(struct recovery_state *r __unused__, struct tbuf *t)
 {
 	u8 *data = t->data;
 	ssize_t bytes, len = t->len;
