@@ -999,7 +999,7 @@ recover_remaining_wals(struct recovery_state *r)
 			if (suffix++ < 10)
 				continue;
 
-			say_error("too many filename confilcters");
+			say_error("too many filename conflicters");
 			result = -1;
 			break;
 		} else {
