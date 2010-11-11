@@ -37,11 +37,13 @@
 
 #define RECOVER_READONLY 1
 
+extern const u16 default_tag;
+extern const u32 default_version;
+
 struct log_io;
 struct recovery_state;
-typedef int (*row_handler) (struct recovery_state *, const struct tbuf *);
-typedef struct tbuf *(*row_reader) (FILE *f, struct palloc_pool * pool);
-
+typedef int (row_handler) (struct recovery_state *, struct tbuf *);
+typedef struct tbuf *(row_reader) (FILE *f, struct palloc_pool *pool);
 struct row_v04 {
 	i64 lsn;		/* this used to be tid */
 	u16 type;
@@ -49,12 +51,12 @@ struct row_v04 {
 	u8 data[];
 } __packed__;
 
-struct row_v05 {
+struct row_v11 {
+	u32 header_crc32c;
 	i64 lsn;
 	double tm;
 	u32 len;
 	u32 data_crc32c;
-	u32 header_crc32c;
 	u8 data[];
 } __packed__;
 
@@ -63,10 +65,12 @@ static inline struct row_v04 *row_v04(const struct tbuf *t)
 	return (struct row_v04 *)t->data;
 }
 
-static inline struct row_v05 *row_v05(const struct tbuf *t)
+static inline struct row_v11 *row_v11(const struct tbuf *t)
 {
-	return (struct row_v05 *)t->data;
+	return (struct row_v11 *)t->data;
 }
+
+struct tbuf *convert_to_v11(struct tbuf *orig, i64 lsn);
 
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
 				    row_reader snap_row_reader, row_handler snap_row_handler,
@@ -76,7 +80,7 @@ struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_d
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recover_finalize(struct recovery_state *r);
-bool wal_write_v04(struct recovery_state *r, int op, const u8 *data, size_t len);
+bool wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data);
 
 /* recovery accessors */
 struct palloc_pool *recovery_pool(struct recovery_state *r);
@@ -88,7 +92,9 @@ struct child *wal_writer(struct recovery_state *r);
 int read_log(const char *filename, row_reader reader,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);
 
-struct fiber *recover_follow_remote(struct recovery_state *r, char *ip_addr, int port);
+int default_remote_row_handler(struct recovery_state *r, struct tbuf *row);
+struct fiber *recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
+				    int (*handler) (struct recovery_state *r, struct tbuf *row));
 
 struct log_io_iter;
 void snapshot_write_row(struct log_io_iter *i, struct tbuf *row);

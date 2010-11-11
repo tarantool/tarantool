@@ -34,7 +34,7 @@
 static char *custom_proc_title;
 
 static int
-send_row(struct recovery_state *r __unused__, const struct tbuf *t)
+send_row(struct recovery_state *r __unused__, struct tbuf *t)
 {
 	u8 *data = t->data;
 	ssize_t bytes, len = t->len;
@@ -57,6 +57,7 @@ static void
 recover_feed_slave(int sock)
 {
 	struct recovery_state *log_io;
+	struct tbuf *ver;
 	i64 lsn;
 	ssize_t r;
 
@@ -73,6 +74,10 @@ recover_feed_slave(int sock)
 			say_syserror("read");
 		exit(EXIT_SUCCESS);
 	}
+
+	ver = tbuf_alloc(fiber->pool);
+	tbuf_append(ver, &default_version, sizeof(default_version));
+	send_row(NULL, ver);
 
 	log_io = recover_init(NULL, cfg.wal_feeder_dir,
 			      NULL, NULL, send_row, 0, 0, 0, 64, RECOVER_READONLY, false);

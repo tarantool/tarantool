@@ -1109,12 +1109,11 @@ op_is_select(u32 op)
 }
 
 u32
-box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
+box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 {
 	u32 cardinality;
 	int ret_code;
-	void *data__data = data->data;
-	u32 data__len = data->len;
+	struct tbuf req = { .data = data->data, .len = data->len };
 	int saved_iov_cnt = fiber->iov_cnt;
 	ev_tstamp start = ev_now(), stop;
 
@@ -1200,13 +1199,16 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data)
 	if (ret_code == -1) {
 		if (!txn->in_recover) {
 			struct tbuf *t = tbuf_alloc(fiber->pool);
+			tbuf_append(t, &default_tag, sizeof(default_tag));
 			tbuf_append(t, &op, sizeof(op));
-			tbuf_append(t, data__data, data__len);
+			tbuf_append(t, req.data, req.len);
 
-			if (!wal_write_v04(recovery_state, op, data__data, data__len)) {
+			i64 lsn = next_lsn(recovery_state, 0);
+			if (!wal_write(recovery_state, lsn, t)) {
 				ret_code = ERR_CODE_UNKNOWN_ERROR;
 				goto abort;
 			}
+			confirm_lsn(recovery_state, lsn);
 		}
 		txn_commit(txn);
 
@@ -1321,14 +1323,24 @@ box_snap_reader(FILE *f, struct palloc_pool *pool)
 	if (fread(box_snap_row(row)->data, box_snap_row(row)->data_size, 1, f) != 1)
 		return NULL;
 
-	return row;
+	return convert_to_v11(row, 0);
 }
 
 static int
-snap_apply(struct recovery_state *r __unused__, const struct tbuf *t)
+snap_apply(struct recovery_state *r __unused__, struct tbuf *t)
 {
-	struct box_snap_row *row = box_snap_row(t);
+	struct box_snap_row *row;
 	struct box_txn *txn = txn_alloc(0);
+
+	/* drop wal header */
+	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
+		return -1;
+
+	u16 tag  = read_u16(t);
+	if (tag != 0)
+		return -1;
+
+	row = box_snap_row(t);
 	txn->in_recover = true;
 	txn->n = row->namespace;
 
@@ -1358,19 +1370,21 @@ snap_apply(struct recovery_state *r __unused__, const struct tbuf *t)
 }
 
 static int
-xlog_apply(struct recovery_state *r __unused__, const struct tbuf *t)
+xlog_apply(struct recovery_state *r __unused__, struct tbuf *t)
 {
-	struct row_v04 *row = row_v04(t);
 	struct box_txn *txn = txn_alloc(0);
 	txn->in_recover = true;
 
-	assert(row->lsn > confirmed_lsn(r));
+	/* drop wal header */
+	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
+		return -1;
 
-	struct tbuf *b = palloc(fiber->pool, sizeof(*b));
-	b->data = row->data;
-	b->len = row->len;
+	u16 tag = read_u16(t);
+	if (tag != 0)
+		return -1;
 
-	if (box_dispach(txn, RW, row->type, b) != 0)
+	u16 type = read_u16(t);
+	if (box_dispach(txn, RW, type, t) != 0)
 		return -1;
 
 	txn_cleanup(txn);
@@ -1378,7 +1392,7 @@ xlog_apply(struct recovery_state *r __unused__, const struct tbuf *t)
 }
 
 static int
-snap_print(struct recovery_state *r __unused__, const struct tbuf *t)
+snap_print(struct recovery_state *r __unused__, struct tbuf *t)
 {
 	struct tbuf *out = tbuf_alloc(t->pool);
 	struct box_snap_row *row = box_snap_row(t);
@@ -1389,7 +1403,7 @@ snap_print(struct recovery_state *r __unused__, const struct tbuf *t)
 }
 
 static int
-xlog_print(struct recovery_state *r __unused__, const struct tbuf *t)
+xlog_print(struct recovery_state *r __unused__, struct tbuf *t)
 {
 	struct tbuf *out = tbuf_alloc(t->pool);
 	int res = box_xlog_sprint(out, t);
@@ -1587,7 +1601,7 @@ box_bound_to_primary(void *data __unused__)
 		status = palloc(eter_pool, 64);
 		snprintf(status, 64, "hot_standby/%s:%i%s", cfg.wal_feeder_ipaddr,
 			 cfg.wal_feeder_port, custom_proc_title);
-		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
+		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port, default_remote_row_handler);
 
 		title("hot_standby/%s:%i", cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
 	} else {
@@ -1822,6 +1836,7 @@ mod_snapshot(struct log_io_iter *i)
 			header.data_size = tuple->bsize;
 
 			tbuf_reset(row);
+			tbuf_append(row, &default_tag, sizeof(default_tag));
 			tbuf_append(row, &header, sizeof(header));
 			tbuf_append(row, tuple->data, tuple->bsize);
 

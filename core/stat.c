@@ -43,7 +43,6 @@ static int stats_size = 0;
 static int stats_max = 0;
 static int base = 0;
 
-
 int
 stat_register(char **name, size_t count)
 {
@@ -78,7 +77,6 @@ stat_collect(int base, int name, i64 value)
 	stats[base + name].value[SECS] += value;
 }
 
-
 void
 stat_print(struct tbuf *buf)
 {
@@ -110,6 +108,9 @@ stat_print(struct tbuf *buf)
 void
 stat_age(ev_timer *timer, int events __unused__)
 {
+	if (stats == NULL)
+		return;
+
 	for (int i = 0; stats[i].name != NULL; i++) {
 		for (int j = 0; j < SECS - 1; j++)
 			stats[i].value[j + 1] = stats[i].value[j];
