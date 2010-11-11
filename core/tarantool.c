@@ -111,7 +111,7 @@ sig_int(int signal)
 {
 	say_info("SIGINT or SIGTERM recieved, terminating");
 
-	if (recovery_state != NULL) {
+	if (recovery_state !=NULL) {
 		struct child *writer = wal_writer(recovery_state);
 		if (writer && writer->out && writer->out->fd > 0) {
 			close(writer->out->fd);

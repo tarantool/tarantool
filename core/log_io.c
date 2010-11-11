@@ -116,7 +116,7 @@ next_lsn(struct recovery_state *r, i64 new_lsn)
 	else
 		r->lsn = new_lsn;
 
-	say_debug("next_lsn(%p, %"PRIi64") => %"PRIi64, r, new_lsn, r->lsn);
+	say_debug("next_lsn(%p, %" PRIi64 ") => %" PRIi64, r, new_lsn, r->lsn);
 	return r->lsn;
 }
 
@@ -252,7 +252,8 @@ read_rows(struct log_io_iter *i)
 				say_debug("eof while looking for magic");
 				goto eof;
 			}
-			magic = (magic >> 8) | (((u64)c & 0xff) << ((l->class->marker_size - 1) * 8));
+			magic >>= 8;
+			magic |= (((u64)c & 0xff) << ((l->class->marker_size - 1) * 8));
 		}
 		marker_offset = ftello(l->f) - l->class->marker_size;
 		if (good_offset != marker_offset)
@@ -503,7 +504,6 @@ row_reader_v04(FILE *f, struct palloc_pool *pool)
 	return convert_to_v11(data, row_v04(m)->lsn);
 }
 
-
 static struct tbuf *
 row_reader_v11(FILE *f, struct palloc_pool *pool)
 {
@@ -541,7 +541,6 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 	say_debug("read row v11 success lsn:%" PRIi64, row_v11(m)->lsn);
 	return m;
 }
-
 
 int
 close_log(struct log_io **lptr)
@@ -1004,7 +1003,8 @@ recover_remaining_wals(struct recovery_state *r)
 			result = -1;
 			break;
 		} else {
-			name = format_filename(NULL, r->wal_prefered_class, current_lsn, suffix + 1);
+			name = format_filename(NULL, r->wal_prefered_class,
+					       current_lsn, suffix + 1);
 			if (access(name, F_OK) == 0) {
 				say_error("found conflicter `%s' after successful reading", name);
 				result = -1;
@@ -1048,8 +1048,7 @@ recover(struct recovery_state *r, i64 lsn)
 		result = recover_snap(r);
 		if (result < 0) {
 			if (greatest_lsn(r->snap_prefered_class) <= 0) {
-				say_crit
-				    ("don't you forget to initialize storage with --init_storage switch?");
+				say_crit("don't you forget to initialize storage with --init_storage switch?");
 				_exit(1);
 			}
 			panic("snapshot recovery failed");
@@ -1157,8 +1156,7 @@ recover_finalize(struct recovery_state *r)
 		panic("unable to scucessfully finalize recovery");
 
 	if (r->current_wal != NULL && result != LOG_EOF) {
-		say_warn("wal `%s' wasn't correctly closed",
-			 r->current_wal->filename);
+		say_warn("wal `%s' wasn't correctly closed", r->current_wal->filename);
 		close_log(&r->current_wal);
 	}
 }
@@ -1277,7 +1275,6 @@ wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data)
 	return reply == 0;
 }
 
-
 struct recovery_state *
 recover_init(const char *snap_dirname, const char *wal_dirname,
 	     row_reader snap_row_reader, row_handler snap_row_handler, row_handler wal_row_handler,
@@ -1325,13 +1322,14 @@ write_rows(struct log_io_iter *i)
 		if (fwrite(&l->class->marker, l->class->marker_size, 1, l->f) != 1)
 			panic("fwrite");
 
-		row_v11(row)->lsn = 0; /* unused */
+		row_v11(row)->lsn = 0;	/* unused */
 		row_v11(row)->tm = ev_now();
 		row_v11(row)->len = data->len;
 		row_v11(row)->data_crc32c = crc32c(0, data->data, data->len);
 		row_v11(row)->header_crc32c =
 			crc32c(0, row->data + field_sizeof(struct row_v11, header_crc32c),
-			       sizeof(struct row_v11) - field_sizeof(struct row_v11, header_crc32c));
+			       sizeof(struct row_v11) - field_sizeof(struct row_v11,
+								     header_crc32c));
 
 		if (fwrite(row->data, row->len, 1, l->f) != 1)
 			panic("fwrite");

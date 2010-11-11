@@ -42,8 +42,8 @@ extern const u32 default_version;
 
 struct log_io;
 struct recovery_state;
-typedef int (row_handler)(struct recovery_state *, struct tbuf *);
-typedef struct tbuf *(row_reader)(FILE *f, struct palloc_pool * pool);
+typedef int (row_handler) (struct recovery_state *, struct tbuf *);
+typedef struct tbuf *(row_reader) (FILE *f, struct palloc_pool *pool);
 struct row_v04 {
 	i64 lsn;		/* this used to be tid */
 	u16 type;
@@ -92,11 +92,9 @@ struct child *wal_writer(struct recovery_state *r);
 int read_log(const char *filename, row_reader reader,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);
 
-
 int default_remote_row_handler(struct recovery_state *r, struct tbuf *row);
 struct fiber *recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
-				    int (*handler)(struct recovery_state *r, struct tbuf *row));
-
+				    int (*handler) (struct recovery_state *r, struct tbuf *row));
 
 struct log_io_iter;
 void snapshot_write_row(struct log_io_iter *i, struct tbuf *row);

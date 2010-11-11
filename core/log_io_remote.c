@@ -38,12 +38,10 @@
 #include <log_io.h>
 #include "log_io_internal.h"
 
-
 struct remote_state {
 	struct recovery_state *r;
-	int (*handler)(struct recovery_state *r, struct tbuf *row);
+	int (*handler) (struct recovery_state *r, struct tbuf *row);
 };
-
 
 static struct tbuf *
 row_reader_v11(struct palloc_pool *pool)
@@ -113,7 +111,7 @@ remote_read_row(i64 initial_lsn)
 
 		return row;
 
-	err:
+	      err:
 		if (err != NULL && !warning_said) {
 			say_info("%s", err);
 			say_info("will retry every %i second", reconnect_delay);
@@ -140,7 +138,6 @@ pull_from_remote(void *state)
 	}
 }
 
-
 int
 default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 {
@@ -164,7 +161,8 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 }
 
 struct fiber *
-recover_follow_remote(struct recovery_state *r, char *ip_addr, int port, int (*handler)(struct recovery_state *r, struct tbuf *row))
+recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
+		      int (*handler) (struct recovery_state *r, struct tbuf *row))
 {
 	char *name;
 	struct fiber *f;

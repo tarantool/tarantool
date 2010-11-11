@@ -160,7 +160,7 @@ read_varint32(struct tbuf *buf)
 		buf->size -= 4;
 		buf->len -= 4;
 		return (b[0] & 0x7f) << 21 | (b[1] & 0x7f) << 14 |
-		    (b[2] & 0x7f) << 7 | (b[3] & 0x7f);
+			(b[2] & 0x7f) << 7 | (b[3] & 0x7f);
 	}
 
 	if (len < 5)
@@ -170,7 +170,7 @@ read_varint32(struct tbuf *buf)
 		buf->size -= 5;
 		buf->len -= 5;
 		return (b[0] & 0x7f) << 28 | (b[1] & 0x7f) << 21 |
-		    (b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
+			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
 
 	raise(ERR_CODE_UNKNOWN_ERROR, "imposible happend");

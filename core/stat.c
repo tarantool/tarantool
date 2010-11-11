@@ -43,7 +43,6 @@ static int stats_size = 0;
 static int stats_max = 0;
 static int base = 0;
 
-
 int
 stat_register(char **name, size_t count)
 {
@@ -77,7 +76,6 @@ stat_collect(int base, int name, i64 value)
 	stats[base + name].value[0] += value;
 	stats[base + name].value[SECS] += value;
 }
-
 
 void
 stat_print(struct tbuf *buf)

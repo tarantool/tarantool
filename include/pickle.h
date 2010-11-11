@@ -63,12 +63,12 @@ inline static u32 load_varint32(void **data)
 	if (!(b[3] & 0x80)) {
 		*data += 4;
 		return (b[0] & 0x7f) << 21 | (b[1] & 0x7f) << 14 |
-		    (b[2] & 0x7f) << 7 | (b[3] & 0x7f);
+			(b[2] & 0x7f) << 7 | (b[3] & 0x7f);
 	}
 	if (!(b[4] & 0x80)) {
 		*data += 5;
 		return (b[0] & 0x7f) << 28 | (b[1] & 0x7f) << 21 |
-		    (b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
+			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
 
 	assert(false);
