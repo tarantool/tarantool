@@ -1248,12 +1248,12 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 static int
 box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 {
-	struct row_v04 *row = row_v04(t);
+	struct row_v11 *row = row_v11(t);
 
 	struct tbuf *b = palloc(fiber->pool, sizeof(*b));
 	b->data = row->data;
 	b->len = row->len;
-	u32 op = row->type;
+	u16 tag, op;
 
 	u32 n, key_len;
 	void *key;
@@ -1264,10 +1264,12 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	tbuf_printf(buf, "lsn:%" PRIi64 " ", row->lsn);
 
 	say_debug("b->len:%" PRIu32, b->len);
+
+	tag = read_u16(b);
+	op = read_u16(b);
 	n = read_u32(b);
 
-	tbuf_printf(buf, "%s ", messages_strs[op]);
-	tbuf_printf(buf, "n:%i ", n);
+	tbuf_printf(buf, "tm:%.3f t:%"PRIu16 " %s n:%i", row->tm, tag, messages_strs[op], n);
 
 	switch (op) {
 	case INSERT:
