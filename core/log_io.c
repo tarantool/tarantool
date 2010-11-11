@@ -449,7 +449,7 @@ convert_to_v11(struct tbuf *orig, i64 lsn)
 	row->len = sizeof(struct row_v11);
 	row_v11(row)->lsn = lsn;
 	row_v11(row)->tm = 0;
-	row_v11(row)->len = orig->len;
+	row_v11(row)->len = orig->len + sizeof(default_tag);
 
 	tbuf_append(row, &default_tag, sizeof(default_tag));
 	tbuf_append(row, orig->data, orig->len);
