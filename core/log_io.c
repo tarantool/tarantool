@@ -1177,6 +1177,9 @@ write_to_disk(void *_state, struct tbuf *t)
 	u32 result = 0;
 	int suffix = 0;
 
+	/* we're not running inside ev_loop, so update ev_now manually */
+	ev_now_update();
+
 	/* caller requested termination */
 	if (t == NULL) {
 		if (wal != NULL)

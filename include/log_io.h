@@ -84,7 +84,7 @@ struct recovery_state {
 	   log_io_class->reader is responsible of converting data from old format */
 	row_handler *wal_row_handler, *snap_row_handler;
 	ev_timer wal_timer;
-	ev_tstamp recovery_lag;
+	ev_tstamp recovery_lag, recovery_last_update_tstamp;
 
 	int snap_io_rate_limit;
 

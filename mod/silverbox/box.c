@@ -1886,6 +1886,8 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  pid: %i\r\n", getpid());
 	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 "\r\n", (i64)recovery_state->wal_writer->pid);
 	tbuf_printf(out, "  lsn: %" PRIi64 "\r\n", recovery_state->confirmed_lsn);
+	tbuf_printf(out, "  recovery_lag: %.3f\r\n", recovery_state->recovery_lag);
+	tbuf_printf(out, "  recovery_last_update: %.3f\r\n", recovery_state->recovery_last_update_tstamp);
 	tbuf_printf(out, "  status: %s\r\n", status);
 }
 
