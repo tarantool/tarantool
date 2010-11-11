@@ -38,6 +38,7 @@
 #define RECOVER_READONLY 1
 
 extern const u16 default_tag;
+extern const u32 default_version;
 
 struct log_io;
 struct recovery_state;
@@ -91,7 +92,11 @@ struct child *wal_writer(struct recovery_state *r);
 int read_log(const char *filename, row_reader reader,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);
 
-struct fiber *recover_follow_remote(struct recovery_state *r, char *ip_addr, int port);
+
+int default_remote_row_handler(struct recovery_state *r, struct tbuf *row);
+struct fiber *recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
+				    int (*handler)(struct recovery_state *r, struct tbuf *row));
+
 
 struct log_io_iter;
 void snapshot_write_row(struct log_io_iter *i, struct tbuf *row);

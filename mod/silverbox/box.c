@@ -1601,7 +1601,7 @@ box_bound_to_primary(void *data __unused__)
 		status = palloc(eter_pool, 64);
 		snprintf(status, 64, "hot_standby/%s:%i%s", cfg.wal_feeder_ipaddr,
 			 cfg.wal_feeder_port, custom_proc_title);
-		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
+		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port, default_remote_row_handler);
 
 		title("hot_standby/%s:%i", cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
 	} else {

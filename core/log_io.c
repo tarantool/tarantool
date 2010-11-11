@@ -48,6 +48,7 @@
 #include <tbuf.h>
 
 const u16 default_tag = 0;
+const u32 default_version = 11;
 const u32 snap_marker_v04 = -1U;
 const u64 xlog_marker_v04 = -1ULL;
 const u64 xlog_eof_marker_v04 = 0;
