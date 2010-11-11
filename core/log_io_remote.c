@@ -116,6 +116,7 @@ remote_read_row(i64 initial_lsn)
 			say_info("will retry every %i second", reconnect_delay);
 			warning_said = true;
 		}
+		fiber_close();
 		fiber_sleep(reconnect_delay);
 	}
 }
