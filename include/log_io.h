@@ -85,9 +85,7 @@ bool wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data);
 /* recovery accessors */
 struct palloc_pool *recovery_pool(struct recovery_state *r);
 int confirm_lsn(struct recovery_state *r, i64 lsn);
-int64_t confirmed_lsn(struct recovery_state *r);
 int64_t next_lsn(struct recovery_state *r, i64 new_lsn);
-struct child *wal_writer(struct recovery_state *r);
 
 int read_log(const char *filename, row_reader reader,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);

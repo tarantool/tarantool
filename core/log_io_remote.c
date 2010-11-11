@@ -36,11 +36,11 @@
 
 #include <say.h>
 #include <log_io.h>
-#include "log_io_internal.h"
+#include <log_io_internal.h>
 
 struct remote_state {
 	struct recovery_state *r;
-	int (*handler) (struct recovery_state *r, struct tbuf *row);
+	int (*handler) (struct recovery_state * r, struct tbuf *row);
 };
 
 static struct tbuf *
@@ -128,7 +128,7 @@ pull_from_remote(void *state)
 	struct tbuf *row;
 
 	for (;;) {
-		row = remote_read_row(confirmed_lsn(h->r) + 1);
+		row = remote_read_row(h->r->confirmed_lsn + 1);
 		h->r->recovery_lag = ev_now() - row_v11(row)->tm;
 
 		if (h->handler(h->r, row) < 0)

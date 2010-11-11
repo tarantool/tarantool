@@ -44,6 +44,7 @@
 #include <fiber.h>
 #include <iproto.h>
 #include <log_io.h>
+#include <log_io_internal.h>
 #include <palloc.h>
 #include <salloc.h>
 #include <say.h>
@@ -111,8 +112,8 @@ sig_int(int signal)
 {
 	say_info("SIGINT or SIGTERM recieved, terminating");
 
-	if (recovery_state !=NULL) {
-		struct child *writer = wal_writer(recovery_state);
+	if (recovery_state != NULL) {
+		struct child *writer = recovery_state->wal_writer;
 		if (writer && writer->out && writer->out->fd > 0) {
 			close(writer->out->fd);
 			usleep(1000);

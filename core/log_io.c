@@ -39,7 +39,7 @@
 
 #include <fiber.h>
 #include <log_io.h>
-#include "log_io_internal.h"
+#include <log_io_internal.h>
 #include <palloc.h>
 #include <say.h>
 #include <third_party/crc32.h>
@@ -76,18 +76,6 @@ struct log_io_iter {
 	bool eof;
 	int io_rate_limit;
 };
-
-i64
-confirmed_lsn(struct recovery_state *r)
-{
-	return r->confirmed_lsn;
-}
-
-struct child *
-wal_writer(struct recovery_state *r)
-{
-	return r->wal_writer;
-}
 
 int
 confirm_lsn(struct recovery_state *r, i64 lsn)
@@ -893,7 +881,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 	while ((row = iter_inner(&i, (void *)1))) {
 		i64 lsn = row_v11(row)->lsn;
-		if (r && lsn <= confirmed_lsn(r)) {
+		if (r && lsn <= r->confirmed_lsn) {
 			say_debug("skipping too young row");
 			continue;
 		}
@@ -946,14 +934,14 @@ recover_remaining_wals(struct recovery_state *r)
 	i64 current_lsn, wal_greatest_lsn;
 	size_t rows_before;
 
-	current_lsn = confirmed_lsn(r) + 1;
+	current_lsn = r->confirmed_lsn + 1;
 	wal_greatest_lsn = greatest_lsn(r->wal_prefered_class);
 
 	/* if the caller already opened WAL for us, recover from it first */
 	if (r->current_wal != NULL)
 		goto recover_current_wal;
 
-	while (confirmed_lsn(r) < wal_greatest_lsn) {
+	while (r->confirmed_lsn < wal_greatest_lsn) {
 		/* if newer WAL appeared in directory before current_wal was fully read try reread last */
 		if (r->current_wal != NULL) {
 			if (r->current_wal->retry++ < 3) {
@@ -967,7 +955,7 @@ recover_remaining_wals(struct recovery_state *r)
 			}
 		}
 
-		current_lsn = confirmed_lsn(r) + 1;	/* TODO: find better way looking for next xlog */
+		current_lsn = r->confirmed_lsn + 1;	/* TODO: find better way looking for next xlog */
 		next_wal = open_for_read(r, r->wal_class, current_lsn, suffix, NULL);
 		if (next_wal == NULL) {
 			if (suffix++ < 10)
@@ -1014,7 +1002,7 @@ recover_remaining_wals(struct recovery_state *r)
 
 		if (result == LOG_EOF) {
 			say_info("done `%s' confirmed_lsn:%" PRIi64, r->current_wal->filename,
-				 confirmed_lsn(r));
+				 r->confirmed_lsn);
 			close_log(&r->current_wal);
 		}
 		suffix = 0;
@@ -1024,7 +1012,7 @@ recover_remaining_wals(struct recovery_state *r)
 	 * it's not a fatal error then last wal is empty
 	 * but if we lost some logs it is fatal error
 	 */
-	if (wal_greatest_lsn > confirmed_lsn(r) + 1) {
+	if (wal_greatest_lsn > r->confirmed_lsn + 1) {
 		say_error("not all wals have been successfuly read");
 		result = -1;
 	}
@@ -1053,7 +1041,7 @@ recover(struct recovery_state *r, i64 lsn)
 			}
 			panic("snapshot recovery failed");
 		}
-		say_info("snapshot recovered, confirmed lsn:%" PRIi64, confirmed_lsn(r));
+		say_info("snapshot recovered, confirmed lsn:%" PRIi64, r->confirmed_lsn);
 	} else {
 		/*
 		 * note, that recovery start with lsn _NEXT_ to confirmed one
@@ -1066,7 +1054,7 @@ recover(struct recovery_state *r, i64 lsn)
 	 * so find wal which contains record with next lsn
 	 */
 	if (r->current_wal == NULL) {
-		i64 next_lsn = confirmed_lsn(r) + 1;
+		i64 next_lsn = r->confirmed_lsn + 1;
 		i64 lsn = find_including_file(r->wal_prefered_class, next_lsn);
 		if (lsn <= 0) {
 			say_error("can't find wal containing record with lsn:%" PRIi64, next_lsn);
@@ -1084,7 +1072,7 @@ recover(struct recovery_state *r, i64 lsn)
 	result = recover_remaining_wals(r);
 	if (result < 0)
 		panic("recover failed");
-	say_info("wals recovered, confirmed lsn: %" PRIi64, confirmed_lsn(r));
+	say_info("wals recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
       out:
 	prelease(fiber->pool);
 	return result;
@@ -1119,7 +1107,7 @@ recover_follow_file(ev_stat *w, int revents __unused__)
 		panic("recover failed");
 	if (result == LOG_EOF) {
 		say_info("done `%s' confirmed_lsn:%" PRIi64, r->current_wal->filename,
-			 confirmed_lsn(r));
+			 r->confirmed_lsn);
 		close_log(&r->current_wal);
 		recover_follow_dir((ev_timer *)w, 0);
 	}
@@ -1381,7 +1369,7 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 
 	memset(&i, 0, sizeof(i));
 
-	snap = open_for_write(r, r->snap_prefered_class, confirmed_lsn(r), -1);
+	snap = open_for_write(r, r->snap_prefered_class, r->confirmed_lsn, -1);
 	if (snap == NULL)
 		panic("can't open snap for writing");
 

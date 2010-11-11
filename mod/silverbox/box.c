@@ -32,6 +32,7 @@
 #include <fiber.h>
 #include <iproto.h>
 #include <log_io.h>
+#include <log_io_internal.h>
 #include <pickle.h>
 #include <salloc.h>
 #include <say.h>
@@ -1354,7 +1355,7 @@ snap_apply(struct recovery_state *r __unused__, struct tbuf *t)
 	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
 		return -1;
 
-	u16 tag  = read_u16(t);
+	u16 tag = read_u16(t);
 	if (tag != 0)
 		return -1;
 
@@ -1630,7 +1631,8 @@ box_bound_to_primary(void *data __unused__)
 		status = palloc(eter_pool, 64);
 		snprintf(status, 64, "hot_standby/%s:%i%s", cfg.wal_feeder_ipaddr,
 			 cfg.wal_feeder_port, custom_proc_title);
-		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port, default_remote_row_handler);
+		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port,
+				      default_remote_row_handler);
 
 		title("hot_standby/%s:%i", cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
 	} else {
@@ -1881,8 +1883,8 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  version: \"%s\"\r\n", tarantool_version());
 	tbuf_printf(out, "  uptime: %i\r\n", (int)tarantool_uptime());
 	tbuf_printf(out, "  pid: %i\r\n", getpid());
-	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 "\r\n", (i64)wal_writer(recovery_state)->pid);
-	tbuf_printf(out, "  lsn: %" PRIi64 "\r\n", confirmed_lsn(recovery_state));
+	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 "\r\n", (i64)recovery_state->wal_writer->pid);
+	tbuf_printf(out, "  lsn: %" PRIi64 "\r\n", recovery_state->confirmed_lsn);
 	tbuf_printf(out, "  status: %s\r\n", status);
 }
 
