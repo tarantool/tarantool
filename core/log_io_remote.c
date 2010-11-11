@@ -36,7 +36,6 @@
 
 #include <say.h>
 #include <log_io.h>
-#include <log_io_internal.h>
 
 struct remote_state {
 	struct recovery_state *r;

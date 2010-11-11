@@ -39,7 +39,6 @@
 
 #include <fiber.h>
 #include <log_io.h>
-#include <log_io_internal.h>
 #include <palloc.h>
 #include <say.h>
 #include <third_party/crc32.h>
