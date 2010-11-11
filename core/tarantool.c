@@ -417,6 +417,7 @@ main(int argc, char **argv)
 
 #if defined(UTILITY)
 	initialize_minimal();
+	signal_init();
 	mod_init();
 #elif defined(STORAGE)
 	ev_signal *ev_sig;
