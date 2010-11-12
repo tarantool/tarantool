@@ -1206,7 +1206,7 @@ tr195:
 			fiber_register_cleanup((void *)txn_cleanup, txn);
 			stat_collect(stat_base, MEMC_GET, 1);
 			stats.cmd_get++;
-			say_debug("ensuring space for %i keys", keys_count);
+			say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
 			iov_ensure(keys_count * 5 + 1);
 			while (keys_count-- > 0) {
 				struct box_tuple *tuple;
