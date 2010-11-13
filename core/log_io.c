@@ -1360,25 +1360,24 @@ snapshot_write_row(struct log_io_iter *i, struct tbuf *row)
 {
 	static int rows;
 	static int bytes;
-	static struct timeval last;
+	static ev_tstamp last = 0;
 
 	i->to = row;
 	if (i->io_rate_limit > 0) {
-		if (last.tv_sec == 0)
-			gettimeofday(&last, NULL);
-		bytes += row->len;
+		ev_now_update();
+
+		if (last == 0)
+			last = ev_now();
+
+		bytes += row->len + sizeof(struct row_v11);
 
 		while (bytes >= i->io_rate_limit) {
-			struct timeval now;
-			useconds_t elapsed;
+			ev_tstamp elapsed = ev_now() - last;
+			if (elapsed < 1)
+				usleep(((1 - elapsed) * 1000000));
 
-			gettimeofday(&now, NULL);
-			elapsed = (now.tv_sec - last.tv_sec) * 1000000 + now.tv_usec - last.tv_usec;
-
-			if (elapsed < 1000000)
-				usleep(1000000 - elapsed);
-
-			gettimeofday(&last, NULL);
+			ev_now_update();
+			last = ev_now();
 			bytes -= i->io_rate_limit;
 		}
 	}
