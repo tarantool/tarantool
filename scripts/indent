@@ -2,6 +2,8 @@
 INDENT=$(which gindent 2>/dev/null || which indent 2>/dev/null)
 [ -z $INDENT ] && echo indent binary not found && exit 1
 
+CPP_FLAGS="-I. -Iinclude -DCORO_ASM -DSTORAGE"
+
 for f in $@
 do
 	PARAM="-npro -kr -i8 -ts8 -ci8 -sob -l100 -ss -ncs -cp1
@@ -19,7 +21,7 @@ do
 			;;
 	esac
 
-	PARAM="$PARAM "$(gcc -E -I. -Iinclude -DSTORAGE -DTARANTOOL_CONFIG='<cfg/tarantool_silverbox_cfg.h>' $f | perl scripts/usertypes2indent.pl)
+	PARAM="$PARAM "$(scripts/custom_types $f $CPP_FLAGS | grep -v '^"_' | sed 's/"//g; s/^/-T /')
 
 	$INDENT $PARAM $f
 done
