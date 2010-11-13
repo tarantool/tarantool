@@ -568,22 +568,9 @@ close_log(struct log_io **lptr)
 static int
 flush_log(struct log_io *l)
 {
-
-	static double last = 0;
-	double now;
-	struct timeval t;
-
 	if (fflush(l->f) < 0)
 		return -1;
 
-	if (gettimeofday(&t, NULL) < 0) {
-		say_syserror("gettimeofday");
-		return -1;
-	}
-	now = t.tv_sec + t.tv_usec / 1000000.;
-
-	if (l->class->fsync_delay == 0 || now - last < l->class->fsync_delay)
-		return 0;
 #ifdef Linux
 	if (fdatasync(fileno(l->f)) < 0) {
 		say_syserror("fdatasync");
@@ -595,7 +582,6 @@ flush_log(struct log_io *l)
 		return -1;
 	}
 #endif
-	last = now;
 	return 0;
 }
 
@@ -1173,6 +1159,7 @@ static struct tbuf *
 write_to_disk(void *_state, struct tbuf *t)
 {
 	static struct log_io *wal = NULL, *wal_to_close = NULL;
+	static ev_tstamp last_flush = 0;
 	static size_t rows = 0;
 	struct tbuf *reply, *header;
 	struct recovery_state *r = _state;
@@ -1232,9 +1219,12 @@ write_to_disk(void *_state, struct tbuf *t)
 		goto fail;
 	}
 
-	if (flush_log(wal) < 0) {
-		say_syserror("can't flush wal");
-		goto fail;
+	if (wal->class->fsync_delay > 0 && ev_now() - last_flush >= wal->class->fsync_delay) {
+		if (flush_log(wal) < 0) {
+			say_syserror("can't flush wal");
+			goto fail;
+		}
+		last_flush = ev_now();
 	}
 
 	rows++;
