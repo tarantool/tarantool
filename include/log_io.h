@@ -55,6 +55,7 @@ struct log_io_class {
 	size_t marker_size, eof_marker_size;
 	size_t rows_per_file;
 	double fsync_delay;
+	bool panic_if_error;
 
 	const char *filetype;
 	const char *version;
@@ -123,6 +124,8 @@ int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recover_finalize(struct recovery_state *r);
 bool wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data);
+
+void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 
 /* recovery accessors */
 struct palloc_pool *recovery_pool(struct recovery_state *r);

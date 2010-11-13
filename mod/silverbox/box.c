@@ -1775,6 +1775,7 @@ mod_init(void)
 				      init_storage ? RECOVER_READONLY : 0, NULL);
 
 	recovery_state->snap_io_rate_limit = cfg.snap_io_rate_limit * 1024 * 1024;
+	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
 	/* initialize hashes _after_ starting wal writer */
 	if (cfg.memcached != 0) {

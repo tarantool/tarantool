@@ -60,6 +60,8 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->wal_writer_inbox_size = 128;
 	c->local_hot_standby = 0;
 	c->wal_dir_rescan_delay = 0.1;
+	c->panic_on_snap_error = 1;
+	c->panic_on_wal_error = 0;
 	c->remote_hot_standby = 0;
 	c->wal_feeder_ipaddr = NULL;
 	c->wal_feeder_port = 0;
@@ -182,6 +184,12 @@ static NameAtom _name__local_hot_standby[] = {
 };
 static NameAtom _name__wal_dir_rescan_delay[] = {
 	{ "wal_dir_rescan_delay", -1, NULL }
+};
+static NameAtom _name__panic_on_snap_error[] = {
+	{ "panic_on_snap_error", -1, NULL }
+};
+static NameAtom _name__panic_on_wal_error[] = {
+	{ "panic_on_wal_error", -1, NULL }
 };
 static NameAtom _name__remote_hot_standby[] = {
 	{ "remote_hot_standby", -1, NULL }
@@ -547,6 +555,28 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if ( (c->wal_dir_rescan_delay == 0 || c->wal_dir_rescan_delay == -HUGE_VAL || c->wal_dir_rescan_delay == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 	}
+	else if ( cmpNameAtoms( opt->name, _name__panic_on_snap_error) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		c->panic_on_snap_error = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__panic_on_wal_error) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		c->panic_on_wal_error = i32;
+	}
 	else if ( cmpNameAtoms( opt->name, _name__remote_hot_standby) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
@@ -787,6 +817,8 @@ typedef enum IteratorState {
 	S_name__wal_writer_inbox_size,
 	S_name__local_hot_standby,
 	S_name__wal_dir_rescan_delay,
+	S_name__panic_on_snap_error,
+	S_name__panic_on_wal_error,
 	S_name__remote_hot_standby,
 	S_name__wal_feeder_ipaddr,
 	S_name__wal_feeder_port,
@@ -1148,6 +1180,28 @@ again:
 			}
 			sprintf(*v, "%g", c->wal_dir_rescan_delay);
 			snprintf(buf, PRINTBUFLEN-1, "wal_dir_rescan_delay");
+			i->state = S_name__panic_on_snap_error;
+			return buf;
+		case S_name__panic_on_snap_error:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%"PRId32, c->panic_on_snap_error);
+			snprintf(buf, PRINTBUFLEN-1, "panic_on_snap_error");
+			i->state = S_name__panic_on_wal_error;
+			return buf;
+		case S_name__panic_on_wal_error:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%"PRId32, c->panic_on_wal_error);
+			snprintf(buf, PRINTBUFLEN-1, "panic_on_wal_error");
 			i->state = S_name__remote_hot_standby;
 			return buf;
 		case S_name__remote_hot_standby:

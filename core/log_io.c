@@ -266,6 +266,8 @@ read_rows(struct log_io_iter *i)
 			goto eof;
 
 		if (row == NULL) {
+			if (l->class->panic_if_error)
+				panic("failed to read row");
 			say_warn("failed to read row");
 			goto restart;
 		}
@@ -1303,6 +1305,18 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 		r->wal_writer = spawn_child("wal_writer", inbox_size, write_to_disk, r);
 
 	return r;
+}
+
+void
+recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error)
+{
+	struct log_io_class **class;
+
+	for (class = r->wal_class; *class; class++)
+		(*class)->panic_if_error = on_wal_error;
+
+	for (class = r->snap_class; *class; class++)
+		(*class)->panic_if_error = on_snap_error;
 }
 
 static void

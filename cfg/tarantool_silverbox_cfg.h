@@ -136,6 +136,13 @@ typedef struct tarantool_cfg {
 	double	wal_dir_rescan_delay;
 
 	/*
+	 * panic if where is error reading snap or wal
+	 * be default panic any snapshot reading error  and ignore errors then reading wals
+	 */
+	int32_t	panic_on_snap_error;
+	int32_t	panic_on_wal_error;
+
+	/*
 	 * Remote hot standby (if enabled server will run in hot standby mode
 	 * continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
 	 */
