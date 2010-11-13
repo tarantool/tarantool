@@ -157,6 +157,8 @@ mod_init(void)
 		}
 		if (child == 0)
 			recover_feed_slave(client);
+		else
+			close(client);
 	}
       exit:
 	exit(EXIT_FAILURE);
