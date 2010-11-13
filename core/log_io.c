@@ -1350,19 +1350,23 @@ snapshot_write_row(struct log_io_iter *i, struct tbuf *row)
 {
 	static int rows;
 	static int bytes;
+	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
 	i->to = row;
 	if (i->io_rate_limit > 0) {
-		ev_now_update();
-
-		if (last == 0)
+		if (last == 0) {
+			ev_now_update();
 			last = ev_now();
+		}
 
 		bytes += row->len + sizeof(struct row_v11);
 
 		while (bytes >= i->io_rate_limit) {
-			ev_tstamp elapsed = ev_now() - last;
+			flush_log(i->log);
+
+			ev_now_update();
+			elapsed = ev_now() - last;
 			if (elapsed < 1)
 				usleep(((1 - elapsed) * 1000000));
 
