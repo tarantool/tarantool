@@ -873,8 +873,13 @@ static int
 recover_wal(struct recovery_state *r, struct log_io *l)
 {
 	struct log_io_iter i;
-	struct tbuf *row;
+	struct tbuf *row = NULL;
 	int result;
+
+	if (setjmp(fiber->exc) != 0) {
+		result = -1;
+		goto out;
+	}
 
 	memset(&i, 0, sizeof(i));
 	iter_open(l, &i, read_rows);
