@@ -127,8 +127,6 @@ bool wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 
-/* recovery accessors */
-struct palloc_pool *recovery_pool(struct recovery_state *r);
 int confirm_lsn(struct recovery_state *r, i64 lsn);
 int64_t next_lsn(struct recovery_state *r, i64 new_lsn);
 
