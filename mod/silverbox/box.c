@@ -1770,9 +1770,11 @@ mod_init(void)
 
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
 				      box_snap_reader, snap_apply, xlog_apply,
-				      cfg.rows_per_wal, cfg.wal_fsync_delay, cfg.snap_io_rate_limit,
+				      cfg.rows_per_wal, cfg.wal_fsync_delay,
 				      cfg.wal_writer_inbox_size,
 				      init_storage ? RECOVER_READONLY : 0, NULL);
+
+	recovery_state->snap_io_rate_limit = cfg.snap_io_rate_limit * 1024 * 1024;
 
 	/* initialize hashes _after_ starting wal writer */
 	if (cfg.memcached != 0) {

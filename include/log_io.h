@@ -117,7 +117,7 @@ struct tbuf *convert_to_v11(struct tbuf *orig, i64 lsn);
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
 				    row_reader snap_row_reader, row_handler snap_row_handler,
 				    row_handler xlog_row_handler, int rows_per_file,
-				    double fsync_delay, double snap_io_rate_limit, int inbox_size,
+				    double fsync_delay, int inbox_size,
 				    int flags, void *data);
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);

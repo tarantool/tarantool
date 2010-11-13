@@ -40,7 +40,6 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->logger = NULL;
 	c->logger_nonblock = 1;
 	c->io_collect_interval = 0;
-	c->snap_io_rate_limit = 0;
 	c->backlog = 1024;
 	c->readahead = 16320;
 	c->snap_dir = strdup(".");
@@ -55,6 +54,7 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->memcached_namespace = 23;
 	c->memcached_expire_per_loop = 1024;
 	c->memcached_expire_full_sweep = 3600;
+	c->snap_io_rate_limit = 0;
 	c->rows_per_wal = 500000;
 	c->wal_fsync_delay = 0;
 	c->wal_writer_inbox_size = 128;
@@ -129,9 +129,6 @@ static NameAtom _name__logger_nonblock[] = {
 static NameAtom _name__io_collect_interval[] = {
 	{ "io_collect_interval", -1, NULL }
 };
-static NameAtom _name__snap_io_rate_limit[] = {
-	{ "snap_io_rate_limit", -1, NULL }
-};
 static NameAtom _name__backlog[] = {
 	{ "backlog", -1, NULL }
 };
@@ -167,6 +164,9 @@ static NameAtom _name__memcached_expire_per_loop[] = {
 };
 static NameAtom _name__memcached_expire_full_sweep[] = {
 	{ "memcached_expire_full_sweep", -1, NULL }
+};
+static NameAtom _name__snap_io_rate_limit[] = {
+	{ "snap_io_rate_limit", -1, NULL }
 };
 static NameAtom _name__rows_per_wal[] = {
 	{ "rows_per_wal", -1, NULL }
@@ -367,14 +367,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if ( (c->io_collect_interval == 0 || c->io_collect_interval == -HUGE_VAL || c->io_collect_interval == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		errno = 0;
-		c->snap_io_rate_limit = strtod(opt->paramValue.numberval, NULL);
-		if ( (c->snap_io_rate_limit == 0 || c->snap_io_rate_limit == -HUGE_VAL || c->snap_io_rate_limit == HUGE_VAL) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-	}
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
@@ -494,6 +486,14 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		c->memcached_expire_full_sweep = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		errno = 0;
+		c->snap_io_rate_limit = strtod(opt->paramValue.numberval, NULL);
+		if ( (c->snap_io_rate_limit == 0 || c->snap_io_rate_limit == -HUGE_VAL || c->snap_io_rate_limit == HUGE_VAL) && errno == ERANGE)
+			return CNF_WRONGRANGE;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__rows_per_wal) ) {
 		if (opt->paramType != numberType )
@@ -769,7 +769,6 @@ typedef enum IteratorState {
 	S_name__logger,
 	S_name__logger_nonblock,
 	S_name__io_collect_interval,
-	S_name__snap_io_rate_limit,
 	S_name__backlog,
 	S_name__readahead,
 	S_name__snap_dir,
@@ -782,6 +781,7 @@ typedef enum IteratorState {
 	S_name__memcached_namespace,
 	S_name__memcached_expire_per_loop,
 	S_name__memcached_expire_full_sweep,
+	S_name__snap_io_rate_limit,
 	S_name__rows_per_wal,
 	S_name__wal_fsync_delay,
 	S_name__wal_writer_inbox_size,
@@ -953,17 +953,6 @@ again:
 			}
 			sprintf(*v, "%g", c->io_collect_interval);
 			snprintf(buf, PRINTBUFLEN-1, "io_collect_interval");
-			i->state = S_name__snap_io_rate_limit;
-			return buf;
-		case S_name__snap_io_rate_limit:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%g", c->snap_io_rate_limit);
-			snprintf(buf, PRINTBUFLEN-1, "snap_io_rate_limit");
 			i->state = S_name__backlog;
 			return buf;
 		case S_name__backlog:
@@ -1093,6 +1082,17 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->memcached_expire_full_sweep);
 			snprintf(buf, PRINTBUFLEN-1, "memcached_expire_full_sweep");
+			i->state = S_name__snap_io_rate_limit;
+			return buf;
+		case S_name__snap_io_rate_limit:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%g", c->snap_io_rate_limit);
+			snprintf(buf, PRINTBUFLEN-1, "snap_io_rate_limit");
 			i->state = S_name__rows_per_wal;
 			return buf;
 		case S_name__rows_per_wal:

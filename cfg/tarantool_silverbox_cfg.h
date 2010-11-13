@@ -72,9 +72,6 @@ typedef struct tarantool_cfg {
 	/* delay between loop iteraions */
 	double	io_collect_interval;
 
-	/* do not write snapshot faster then snap_io_rate_limit MBytes/sec */
-	double	snap_io_rate_limit;
-
 	/* size of listen backlog */
 	int32_t	backlog;
 
@@ -113,6 +110,9 @@ typedef struct tarantool_cfg {
 
 	/* tarantool will try iterate all rows within this time */
 	int32_t	memcached_expire_full_sweep;
+
+	/* do not write snapshot faster then snap_io_rate_limit MBytes/sec */
+	double	snap_io_rate_limit;
 
 	/* Write no more rows in WAL */
 	int32_t	rows_per_wal;

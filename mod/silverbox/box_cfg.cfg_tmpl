@@ -28,6 +28,11 @@ memcached_expire_per_loop=1024
 # tarantool will try iterate all rows within this time
 memcached_expire_full_sweep=3600
 
+
+# do not write snapshot faster then snap_io_rate_limit MBytes/sec
+snap_io_rate_limit=0.0
+
+
 # Write no more rows in WAL
 rows_per_wal=500000
 

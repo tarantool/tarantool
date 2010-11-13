@@ -1281,7 +1281,7 @@ wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data)
 struct recovery_state *
 recover_init(const char *snap_dirname, const char *wal_dirname,
 	     row_reader snap_row_reader, row_handler snap_row_handler, row_handler wal_row_handler,
-	     int rows_per_file, double fsync_delay, double snap_io_rate_limit,
+	     int rows_per_file, double fsync_delay,
 	     int inbox_size, int flags, void *data)
 {
 	struct recovery_state *r = p0alloc(eter_pool, sizeof(*r));
@@ -1299,10 +1299,9 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_prefered_class->rows_per_file = rows_per_file;
 	r->wal_prefered_class->fsync_delay = fsync_delay;
 
-	if ((flags & RECOVER_READONLY) == 0) {
+	if ((flags & RECOVER_READONLY) == 0)
 		r->wal_writer = spawn_child("wal_writer", inbox_size, write_to_disk, r);
-		r->snap_io_rate_limit = snap_io_rate_limit * 1024 * 1024;
-	}
+
 	return r;
 }
 
