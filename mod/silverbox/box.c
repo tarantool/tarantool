@@ -1216,8 +1216,10 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 
 	if (ret_code == -1) {
 		if (!txn->in_recover) {
+			fiber_peer_name(fiber); /* fill the cookie */
 			struct tbuf *t = tbuf_alloc(fiber->pool);
 			tbuf_append(t, &default_tag, sizeof(default_tag));
+			tbuf_append(t, &fiber->cookie, sizeof(fiber->cookie));
 			tbuf_append(t, &op, sizeof(op));
 			tbuf_append(t, req.data, req.len);
 
@@ -1253,6 +1255,8 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	b->data = row->data;
 	b->len = row->len;
 	u16 tag, op;
+	u64 cookie;
+	struct sockaddr_in *peer = (void *)&cookie;
 
 	u32 n, key_len;
 	void *key;
@@ -1265,10 +1269,13 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	say_debug("b->len:%" PRIu32, b->len);
 
 	tag = read_u16(b);
+	cookie = read_u64(b);
 	op = read_u16(b);
 	n = read_u32(b);
 
-	tbuf_printf(buf, "tm:%.3f t:%"PRIu16 " %s n:%i", row->tm, tag, messages_strs[op], n);
+	tbuf_printf(buf, "tm:%.3f t:%"PRIu16 " %s:%d %s n:%i",
+		    row->tm, tag, inet_ntoa(peer->sin_addr), ntohs(peer->sin_port),
+		    messages_strs[op], n);
 
 	switch (op) {
 	case INSERT:
@@ -1402,6 +1409,9 @@ xlog_apply(struct recovery_state *r __unused__, struct tbuf *t)
 	u16 tag = read_u16(t);
 	if (tag != 0)
 		return -1;
+
+	u64 cookie = read_u64(t);
+	(void)cookie;
 
 	u16 type = read_u16(t);
 	if (box_dispach(txn, RW, type, t) != 0)
@@ -1872,6 +1882,7 @@ mod_snapshot(struct log_io_iter *i)
 
 			tbuf_reset(row);
 			tbuf_append(row, &default_tag, sizeof(default_tag));
+			tbuf_append(row, &default_cookie, sizeof(default_cookie));
 			tbuf_append(row, &header, sizeof(header));
 			tbuf_append(row, tuple->data, tuple->bsize);
 

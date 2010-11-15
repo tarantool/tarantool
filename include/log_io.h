@@ -38,6 +38,7 @@
 #define RECOVER_READONLY 1
 
 extern const u16 default_tag;
+extern const u64 default_cookie;
 extern const u32 default_version;
 
 struct recovery_state;

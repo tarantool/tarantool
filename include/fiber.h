@@ -81,6 +81,7 @@ struct fiber {
 
 	void *data;
 
+	u64 cookie;
 	bool has_peer;
 	char peer_name[32];
 	bool reading_inbox;

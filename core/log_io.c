@@ -47,6 +47,7 @@
 #include <tbuf.h>
 
 const u16 default_tag = 0;
+const u64 default_cookie = 0;
 const u32 default_version = 11;
 const u32 snap_marker_v04 = -1U;
 const u64 xlog_marker_v04 = -1ULL;
@@ -451,9 +452,10 @@ convert_to_v11(struct tbuf *orig, i64 lsn)
 	row->len = sizeof(struct row_v11);
 	row_v11(row)->lsn = lsn;
 	row_v11(row)->tm = 0;
-	row_v11(row)->len = orig->len + sizeof(default_tag);
+	row_v11(row)->len = orig->len + sizeof(default_tag) + sizeof(default_cookie);
 
 	tbuf_append(row, &default_tag, sizeof(default_tag));
+	tbuf_append(row, &default_cookie, sizeof(default_cookie));
 	tbuf_append(row, orig->data, orig->len);
 	return row;
 }
