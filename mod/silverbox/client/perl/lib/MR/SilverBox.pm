@@ -372,7 +372,7 @@ sub _PostSelect {
     }
 }
 
-my @select_param_ok = qw/namespace use_index raw want next_rows limit offset raise hashify timeout format/;
+my @select_param_ok = qw/namespace use_index raw want next_rows limit offset raise hashify timeout format hash_by/;
 sub Select {
     confess q/Select isnt callable in void context/ unless defined wantarray;
     my ($param, $namespace) = $_[0]->_validate_param(\@_, @select_param_ok);
@@ -410,6 +410,22 @@ sub Select {
     $param->{want} ||= !1;
 
     $self->_PostSelect($r, { hashify => $param->{hashify}||$namespace->{hashify}||$self->{hashify}, %$param, namespace => $namespace });
+
+    if(defined(my $p = $param->{hash_by})) {
+        my %h;
+        if(@$r) {
+            if (ref $r->[0] eq 'HASH') {
+                confess "Bad hash_by `$p' for HASH" unless exists $r->[0]->{$p};
+                $h{$_->{$p}} = $_ for @$r;
+            } elsif(ref $r->[0] eq 'ARRAY') {
+                confess "Bad hash_by `$p' for ARRAY" unless $p =~ m/^\d+$/ && $p >= 0 && $p < @{$r->[0]};
+                $h{$_->[$p]} = $_ for @$r;
+            } else {
+                confess "i dont know how to hash_by ".ref($r->[0]);
+            }
+        }
+        return \%h;
+    }
 
     return $r if $param->{want} eq 'arrayref';
 
