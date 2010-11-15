@@ -79,47 +79,22 @@ write_varint32(struct tbuf *b, u32 value)
 	append_byte(b, (u8)((value) & 0x7F));
 }
 
-u16
-read_u16(struct tbuf *b)
-{
-	if (b->len < 2)
-		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
+#define read_u(bits)							\
+	u##bits read_u##bits(struct tbuf *b)				\
+	{								\
+		if (b->len < (bits)/8)					\
+			raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short"); \
+		u##bits r = *(u##bits *)b->data;			\
+		b->size -= (bits)/8;					\
+		b->len -= (bits)/8;					\
+		b->data += (bits)/8;					\
+		return r;						\
+	}
 
-	u16 r = *(u16 *)b->data;	/* FIXME: endianess & aligment */
-	b->size -= 2;
-	b->len -= 2;
-	b->data += 2;
-
-	return r;
-}
-
-u32
-read_u32(struct tbuf *b)
-{
-	if (b->len < 4)
-		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
-
-	u32 r = *(u32 *)b->data;	/* FIXME: endianess & aligment */
-	b->size -= 4;
-	b->len -= 4;
-	b->data += 4;
-
-	return r;
-}
-
-u8
-read_u8(struct tbuf *b)
-{
-	if (b->len < 1)
-		raise(ERR_CODE_UNKNOWN_ERROR, "buffer too short");
-
-	u8 r = *(u8 *)b->data;
-	b->size -= 1;
-	b->len -= 1;
-	b->data += 1;
-
-	return r;
-}
+read_u(8)
+read_u(16)
+read_u(32)
+read_u(64)
 
 u32
 read_varint32(struct tbuf *buf)

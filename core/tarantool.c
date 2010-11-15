@@ -44,7 +44,6 @@
 #include <fiber.h>
 #include <iproto.h>
 #include <log_io.h>
-#include <log_io_internal.h>
 #include <palloc.h>
 #include <salloc.h>
 #include <say.h>

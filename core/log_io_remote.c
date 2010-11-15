@@ -36,34 +36,43 @@
 
 #include <say.h>
 #include <log_io.h>
-#include <log_io_internal.h>
+#include <pickle.h>
 
 struct remote_state {
 	struct recovery_state *r;
 	int (*handler) (struct recovery_state * r, struct tbuf *row);
 };
 
+static u32
+row_v11_len(struct tbuf *r)
+{
+	if (r->len < sizeof(struct row_v11))
+		return 0;
+
+	if (r->len < sizeof(struct row_v11) + row_v11(r)->len)
+		return 0;
+
+	return sizeof(struct row_v11) + row_v11(r)->len;
+}
+
 static struct tbuf *
-row_reader_v11(struct palloc_pool *pool)
+row_reader_v11()
 {
 	const int header_size = sizeof(struct row_v11);
-	struct tbuf *m = tbuf_alloc(pool);
-	tbuf_ensure(m, header_size);
+	struct tbuf *m;
 
-	if (fiber_read(m->data, header_size) != header_size) {
-		say_error("unexpected eof reading row header");
-		return NULL;
+	for (;;) {
+		if (row_v11_len(fiber->rbuf) != 0) {
+			m = tbuf_split(fiber->rbuf, row_v11_len(fiber->rbuf));
+			say_debug("read row bytes:%" PRIu32 " %s", m->len, tbuf_to_hex(m));
+			return m;
+		}
+
+		if (fiber_bread(fiber->rbuf, header_size) <= 0) {
+			say_error("unexpected eof reading row header");
+			return NULL;
+		}
 	}
-	tbuf_ensure(m, header_size + row_v11(m)->len);
-	m->len = header_size + row_v11(m)->len;
-
-	if (fiber_read(row_v11(m)->data, row_v11(m)->len) != row_v11(m)->len) {
-		say_error("unexpected eof reading row body");
-		return NULL;
-	}
-
-	say_debug("read row bytes:%" PRIu32 " %s", m->len, tbuf_to_hex(m));
-	return m;
 }
 
 static struct tbuf *
@@ -117,6 +126,7 @@ remote_read_row(i64 initial_lsn)
 			say_info("will retry every %i second", reconnect_delay);
 			warning_said = true;
 		}
+		fiber_close();
 		fiber_sleep(reconnect_delay);
 	}
 }
@@ -127,14 +137,20 @@ pull_from_remote(void *state)
 	struct remote_state *h = state;
 	struct tbuf *row;
 
+	if (setjmp(fiber->exc) != 0)
+		fiber_close();
+
 	for (;;) {
 		row = remote_read_row(h->r->confirmed_lsn + 1);
 		h->r->recovery_lag = ev_now() - row_v11(row)->tm;
+		h->r->recovery_last_update_tstamp = ev_now();
 
-		if (h->handler(h->r, row) < 0)
+		if (h->handler(h->r, row) < 0) {
+			fiber_close();
 			continue;
+		}
 
-		prelease_after(fiber->pool, 128 * 1024);
+		fiber_gc();
 	}
 }
 
@@ -143,15 +159,19 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 {
 	struct tbuf *data;
 	i64 lsn = row_v11(row)->lsn;
+	u16 tag;
 
 	/* save row data since wal_row_handler may clobber it */
 	data = tbuf_alloc(row->pool);
 	tbuf_append(data, row_v11(row)->data, row_v11(row)->len);
 
-	if (r->wal_row_handler(r, row) < 0)
+	if (r->row_handler(r, row) < 0)
 		panic("replication failure: can't apply row");
 
-	if (wal_write(r, lsn, data) == false)
+	tag = read_u16(data);
+	(void)read_u64(data); /* drop the cookie */
+
+	if (wal_write(r, tag, r->cookie, lsn, data) == false)
 		panic("replication failure: can't write row to WAL");
 
 	next_lsn(r, lsn);
@@ -193,6 +213,7 @@ recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
 	memcpy(&addr->sin_addr.s_addr, &server, sizeof(server));
 	addr->sin_port = htons(port);
 	f->data = addr;
+	memcpy(&r->cookie, &addr, MIN(sizeof(r->cookie), sizeof(addr)));
 	fiber_call(f);
 	return f;
 }

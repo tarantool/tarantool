@@ -384,6 +384,8 @@ fiber_peer_name(struct fiber *fiber)
 	snprintf(fiber->peer_name, sizeof(fiber->peer_name),
 		 "%s:%d", inet_ntoa(peer.sin_addr), ntohs(peer.sin_port));
 
+	fiber->cookie = 0;
+	memcpy(&fiber->cookie, &peer, MIN(sizeof(peer), sizeof(fiber->cookie)));
 	return fiber->peer_name;
 }
 

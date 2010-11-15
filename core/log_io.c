@@ -39,7 +39,6 @@
 
 #include <fiber.h>
 #include <log_io.h>
-#include <log_io_internal.h>
 #include <palloc.h>
 #include <say.h>
 #include <third_party/crc32.h>
@@ -47,7 +46,9 @@
 #include <pickle.h>
 #include <tbuf.h>
 
-const u16 default_tag = 0;
+const u16 snap_tag = -1;
+const u16 wal_tag = -2;
+const u64 default_cookie = 0;
 const u32 default_version = 11;
 const u32 snap_marker_v04 = -1U;
 const u64 xlog_marker_v04 = -1ULL;
@@ -76,6 +77,19 @@ struct log_io_iter {
 	bool eof;
 	int io_rate_limit;
 };
+
+struct row_v04 {
+	i64 lsn;		/* this used to be tid */
+	u16 type;
+	u32 len;
+	u8 data[];
+} __packed__;
+
+static inline struct row_v04 *row_v04(const struct tbuf *t)
+{
+	return (struct row_v04 *)t->data;
+}
+
 
 int
 confirm_lsn(struct recovery_state *r, i64 lsn)
@@ -254,6 +268,8 @@ read_rows(struct log_io_iter *i)
 			goto eof;
 
 		if (row == NULL) {
+			if (l->class->panic_if_error)
+				panic("failed to read row");
 			say_warn("failed to read row");
 			goto restart;
 		}
@@ -430,16 +446,17 @@ find_including_file(struct log_io_class *class, i64 target_lsn)
 }
 
 struct tbuf *
-convert_to_v11(struct tbuf *orig, i64 lsn)
+convert_to_v11(struct tbuf *orig, u16 tag, i64 lsn)
 {
 	struct tbuf *row = tbuf_alloc(orig->pool);
 	tbuf_ensure(row, sizeof(struct row_v11));
 	row->len = sizeof(struct row_v11);
 	row_v11(row)->lsn = lsn;
 	row_v11(row)->tm = 0;
-	row_v11(row)->len = orig->len;
+	row_v11(row)->len = orig->len + sizeof(tag) + sizeof(default_cookie);
 
-	tbuf_append(row, &default_tag, sizeof(default_tag));
+	tbuf_append(row, &tag, sizeof(tag));
+	tbuf_append(row, &default_cookie, sizeof(default_cookie));
 	tbuf_append(row, orig->data, orig->len);
 	return row;
 }
@@ -489,7 +506,7 @@ row_reader_v04(FILE *f, struct palloc_pool *pool)
 	tbuf_append(data, &row_v04(m)->type, sizeof(row_v04(m)->type));
 	tbuf_append(data, row_v04(m)->data, row_v04(m)->len);
 
-	return convert_to_v11(data, row_v04(m)->lsn);
+	return convert_to_v11(data, wal_tag, row_v04(m)->lsn);
 }
 
 static struct tbuf *
@@ -554,22 +571,9 @@ close_log(struct log_io **lptr)
 static int
 flush_log(struct log_io *l)
 {
-
-	static double last = 0;
-	double now;
-	struct timeval t;
-
 	if (fflush(l->f) < 0)
 		return -1;
 
-	if (gettimeofday(&t, NULL) < 0) {
-		say_syserror("gettimeofday");
-		return -1;
-	}
-	now = t.tv_sec + t.tv_usec / 1000000.;
-
-	if (l->class->fsync_delay == 0 || now - last < l->class->fsync_delay)
-		return 0;
 #ifdef Linux
 	if (fdatasync(fileno(l->f)) < 0) {
 		say_syserror("fdatasync");
@@ -581,7 +585,6 @@ flush_log(struct log_io *l)
 		return -1;
 	}
 #endif
-	last = now;
 	return 0;
 }
 
@@ -838,7 +841,7 @@ recover_snap(struct recovery_state *r)
 	say_info("recover from `%s'", snap->filename);
 
 	while ((row = iter_inner(&i, (void *)1))) {
-		if (r->snap_row_handler(r, row) < 0) {
+		if (r->row_handler(r, row) < 0) {
 			result = -1;
 			goto out;
 		}
@@ -873,8 +876,13 @@ static int
 recover_wal(struct recovery_state *r, struct log_io *l)
 {
 	struct log_io_iter i;
-	struct tbuf *row;
+	struct tbuf *row = NULL;
 	int result;
+
+	if (setjmp(fiber->exc) != 0) {
+		result = -1;
+		goto out;
+	}
 
 	memset(&i, 0, sizeof(i));
 	iter_open(l, &i, read_rows);
@@ -887,7 +895,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		}
 
 		/*  after handler(r, row) returned, row may be modified, do not use it */
-		if (r->wal_row_handler(r, row) < 0) {
+		if (r->row_handler(r, row) < 0) {
 			say_error("row_handler returned error");
 			result = -1;
 			goto out;
@@ -1159,11 +1167,15 @@ static struct tbuf *
 write_to_disk(void *_state, struct tbuf *t)
 {
 	static struct log_io *wal = NULL, *wal_to_close = NULL;
+	static ev_tstamp last_flush = 0;
 	static size_t rows = 0;
 	struct tbuf *reply, *header;
 	struct recovery_state *r = _state;
 	u32 result = 0;
 	int suffix = 0;
+
+	/* we're not running inside ev_loop, so update ev_now manually */
+	ev_now_update();
 
 	/* caller requested termination */
 	if (t == NULL) {
@@ -1215,9 +1227,12 @@ write_to_disk(void *_state, struct tbuf *t)
 		goto fail;
 	}
 
-	if (flush_log(wal) < 0) {
-		say_syserror("can't flush wal");
-		goto fail;
+	if (wal->class->fsync_delay > 0 && ev_now() - last_flush >= wal->class->fsync_delay) {
+		if (flush_log(wal) < 0) {
+			say_syserror("can't flush wal");
+			goto fail;
+		}
+		last_flush = ev_now();
 	}
 
 	rows++;
@@ -1239,16 +1254,19 @@ write_to_disk(void *_state, struct tbuf *t)
 }
 
 bool
-wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data)
+wal_write(struct recovery_state *r, u16 tag, u64 cookie, i64 lsn, struct tbuf *row)
 {
-	struct tbuf *m = tbuf_alloc(data->pool);
+	struct tbuf *m = tbuf_alloc(row->pool);
 	struct msg *a;
 
 	say_debug("wal_write lsn=%" PRIi64, lsn);
-	tbuf_reserve(m, sizeof(struct wal_write_request) + data->len);
+	tbuf_reserve(m, sizeof(struct wal_write_request) + sizeof(tag) + sizeof(cookie) + row->len);
+	m->len = sizeof(struct wal_write_request);
 	wal_write_request(m)->lsn = lsn;
-	wal_write_request(m)->len = data->len;
-	memcpy(wal_write_request(m)->data, data->data, data->len);
+	wal_write_request(m)->len = row->len + sizeof(tag) + sizeof(cookie);
+	tbuf_append(m, &tag, sizeof(tag));
+	tbuf_append(m, &cookie, sizeof(cookie));
+	tbuf_append(m, row->data, row->len);
 
 	if (write_inbox(r->wal_writer->out, m) == false) {
 		say_warn("wal writer inbox is full");
@@ -1265,15 +1283,14 @@ wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data)
 
 struct recovery_state *
 recover_init(const char *snap_dirname, const char *wal_dirname,
-	     row_reader snap_row_reader, row_handler snap_row_handler, row_handler wal_row_handler,
-	     int rows_per_file, double fsync_delay, double snap_io_rate_limit,
+	     row_reader snap_row_reader, row_handler row_handler,
+	     int rows_per_file, double fsync_delay,
 	     int inbox_size, int flags, void *data)
 {
 	struct recovery_state *r = p0alloc(eter_pool, sizeof(*r));
 
 	r->wal_timer.data = r;
-	r->snap_row_handler = snap_row_handler;
-	r->wal_row_handler = wal_row_handler;
+	r->row_handler = row_handler;
 	r->data = data;
 
 	r->snap_class = snap_classes(snap_row_reader, snap_dirname);
@@ -1284,11 +1301,22 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_prefered_class->rows_per_file = rows_per_file;
 	r->wal_prefered_class->fsync_delay = fsync_delay;
 
-	if ((flags & RECOVER_READONLY) == 0) {
+	if ((flags & RECOVER_READONLY) == 0)
 		r->wal_writer = spawn_child("wal_writer", inbox_size, write_to_disk, r);
-		r->snap_io_rate_limit = snap_io_rate_limit * 1024 * 1024;
-	}
+
 	return r;
+}
+
+void
+recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error)
+{
+	struct log_io_class **class;
+
+	for (class = r->wal_class; *class; class++)
+		(*class)->panic_if_error = on_wal_error;
+
+	for (class = r->snap_class; *class; class++)
+		(*class)->panic_if_error = on_snap_error;
 }
 
 static void
@@ -1328,29 +1356,36 @@ write_rows(struct log_io_iter *i)
 }
 
 void
-snapshot_write_row(struct log_io_iter *i, struct tbuf *row)
+snapshot_write_row(struct log_io_iter *i, u16 tag, struct tbuf *row)
 {
 	static int rows;
 	static int bytes;
-	static struct timeval last;
+	ev_tstamp elapsed;
+	static ev_tstamp last = 0;
+	struct tbuf *wal_row = tbuf_alloc(row->pool);
 
-	i->to = row;
+	tbuf_append(wal_row, &tag, sizeof(tag));
+	tbuf_append(wal_row, row->data, row->len);
+
+	i->to = wal_row;
 	if (i->io_rate_limit > 0) {
-		if (last.tv_sec == 0)
-			gettimeofday(&last, NULL);
-		bytes += row->len;
+		if (last == 0) {
+			ev_now_update();
+			last = ev_now();
+		}
+
+		bytes += row->len + sizeof(struct row_v11);
 
 		while (bytes >= i->io_rate_limit) {
-			struct timeval now;
-			useconds_t elapsed;
+			flush_log(i->log);
 
-			gettimeofday(&now, NULL);
-			elapsed = (now.tv_sec - last.tv_sec) * 1000000 + now.tv_usec - last.tv_usec;
+			ev_now_update();
+			elapsed = ev_now() - last;
+			if (elapsed < 1)
+				usleep(((1 - elapsed) * 1000000));
 
-			if (elapsed < 1000000)
-				usleep(1000000 - elapsed);
-
-			gettimeofday(&last, NULL);
+			ev_now_update();
+			last = ev_now();
 			bytes -= i->io_rate_limit;
 		}
 	}

@@ -40,7 +40,6 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->logger = NULL;
 	c->logger_nonblock = 1;
 	c->io_collect_interval = 0;
-	c->snap_io_rate_limit = 0;
 	c->backlog = 1024;
 	c->readahead = 16320;
 	c->wal_feeder_bind_ipaddr = NULL;
@@ -85,9 +84,6 @@ static NameAtom _name__logger_nonblock[] = {
 };
 static NameAtom _name__io_collect_interval[] = {
 	{ "io_collect_interval", -1, NULL }
-};
-static NameAtom _name__snap_io_rate_limit[] = {
-	{ "snap_io_rate_limit", -1, NULL }
 };
 static NameAtom _name__backlog[] = {
 	{ "backlog", -1, NULL }
@@ -246,14 +242,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		c->io_collect_interval = strtod(opt->paramValue.numberval, NULL);
 		if ( (c->io_collect_interval == 0 || c->io_collect_interval == -HUGE_VAL || c->io_collect_interval == HUGE_VAL) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		errno = 0;
-		c->snap_io_rate_limit = strtod(opt->paramValue.numberval, NULL);
-		if ( (c->snap_io_rate_limit == 0 || c->snap_io_rate_limit == -HUGE_VAL || c->snap_io_rate_limit == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
@@ -421,7 +409,6 @@ typedef enum IteratorState {
 	S_name__logger,
 	S_name__logger_nonblock,
 	S_name__io_collect_interval,
-	S_name__snap_io_rate_limit,
 	S_name__backlog,
 	S_name__readahead,
 	S_name__wal_feeder_bind_ipaddr,
@@ -578,17 +565,6 @@ again:
 			}
 			sprintf(*v, "%g", c->io_collect_interval);
 			snprintf(buf, PRINTBUFLEN-1, "io_collect_interval");
-			i->state = S_name__snap_io_rate_limit;
-			return buf;
-		case S_name__snap_io_rate_limit:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%g", c->snap_io_rate_limit);
-			snprintf(buf, PRINTBUFLEN-1, "snap_io_rate_limit");
 			i->state = S_name__backlog;
 			return buf;
 		case S_name__backlog:

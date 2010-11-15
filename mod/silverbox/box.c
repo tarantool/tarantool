@@ -32,7 +32,6 @@
 #include <fiber.h>
 #include <iproto.h>
 #include <log_io.h>
-#include <log_io_internal.h>
 #include <pickle.h>
 #include <salloc.h>
 #include <say.h>
@@ -1217,13 +1216,13 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 
 	if (ret_code == -1) {
 		if (!txn->in_recover) {
+			fiber_peer_name(fiber); /* fill the cookie */
 			struct tbuf *t = tbuf_alloc(fiber->pool);
-			tbuf_append(t, &default_tag, sizeof(default_tag));
 			tbuf_append(t, &op, sizeof(op));
 			tbuf_append(t, req.data, req.len);
 
 			i64 lsn = next_lsn(recovery_state, 0);
-			if (!wal_write(recovery_state, lsn, t)) {
+			if (!wal_write(recovery_state, wal_tag, fiber->cookie, lsn, t)) {
 				ret_code = ERR_CODE_UNKNOWN_ERROR;
 				goto abort;
 			}
@@ -1248,12 +1247,14 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 static int
 box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 {
-	struct row_v04 *row = row_v04(t);
+	struct row_v11 *row = row_v11(t);
 
 	struct tbuf *b = palloc(fiber->pool, sizeof(*b));
 	b->data = row->data;
 	b->len = row->len;
-	u32 op = row->type;
+	u16 tag, op;
+	u64 cookie;
+	struct sockaddr_in *peer = (void *)&cookie;
 
 	u32 n, key_len;
 	void *key;
@@ -1264,10 +1265,15 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	tbuf_printf(buf, "lsn:%" PRIi64 " ", row->lsn);
 
 	say_debug("b->len:%" PRIu32, b->len);
+
+	tag = read_u16(b);
+	cookie = read_u64(b);
+	op = read_u16(b);
 	n = read_u32(b);
 
-	tbuf_printf(buf, "%s ", messages_strs[op]);
-	tbuf_printf(buf, "n:%i ", n);
+	tbuf_printf(buf, "tm:%.3f t:%"PRIu16 " %s:%d %s n:%i",
+		    row->tm, tag, inet_ntoa(peer->sin_addr), ntohs(peer->sin_port),
+		    messages_strs[op], n);
 
 	switch (op) {
 	case INSERT:
@@ -1342,29 +1348,16 @@ box_snap_reader(FILE *f, struct palloc_pool *pool)
 	if (fread(box_snap_row(row)->data, box_snap_row(row)->data_size, 1, f) != 1)
 		return NULL;
 
-	return convert_to_v11(row, 0);
+	return convert_to_v11(row, snap_tag, 0);
 }
 
 static int
-snap_apply(struct recovery_state *r __unused__, struct tbuf *t)
+snap_apply(struct box_txn *txn, struct tbuf *t)
 {
 	struct box_snap_row *row;
-	struct box_txn *txn = txn_alloc(0);
-
-	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
-		return -1;
-
-	u16 tag = read_u16(t);
-	if (tag != 0)
-		return -1;
 
 	row = box_snap_row(t);
-	txn->in_recover = true;
 	txn->n = row->namespace;
-
-	if (txn->n == 25)
-		return 0;
 
 	if (!namespace[txn->n].enabled) {
 		say_error("namespace %i is not configured", txn->n);
@@ -1384,23 +1377,15 @@ snap_apply(struct recovery_state *r __unused__, struct tbuf *t)
 
 	txn->op = INSERT;
 	txn_commit(txn);
-	txn_cleanup(txn);
 	return 0;
 }
 
 static int
-xlog_apply(struct recovery_state *r __unused__, struct tbuf *t)
+wal_apply(struct box_txn *txn, struct tbuf *t)
 {
-	struct box_txn *txn = txn_alloc(0);
-	txn->in_recover = true;
 
-	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
-		return -1;
-
-	u16 tag = read_u16(t);
-	if (tag != 0)
-		return -1;
+	u64 cookie = read_u64(t);
+	(void)cookie;
 
 	u16 type = read_u16(t);
 	if (box_dispach(txn, RW, type, t) != 0)
@@ -1409,6 +1394,32 @@ xlog_apply(struct recovery_state *r __unused__, struct tbuf *t)
 	txn_cleanup(txn);
 	return 0;
 }
+
+static int
+recover_row(struct recovery_state *r __unused__, struct tbuf *t)
+{
+	struct box_txn *txn = txn_alloc(0);
+	int result = -1;
+	txn->in_recover = true;
+
+	/* drop wal header */
+	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
+		return -1;
+
+	u16 tag = read_u16(t);
+	if (tag == wal_tag) {
+		result = wal_apply(txn, t);
+	} else if (tag == snap_tag) {
+		result = snap_apply(txn, t);
+	} else {
+		say_error("unknown row tag: %i", (int)tag);
+		return -1;
+	}
+
+	txn_cleanup(txn);
+	return result;
+}
+
 
 static int
 snap_print(struct recovery_state *r __unused__, struct tbuf *t)
@@ -1768,10 +1779,13 @@ mod_init(void)
 	}
 
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
-				      box_snap_reader, snap_apply, xlog_apply,
-				      cfg.rows_per_wal, cfg.wal_fsync_delay, cfg.snap_io_rate_limit,
+				      box_snap_reader, recover_row,
+				      cfg.rows_per_wal, cfg.wal_fsync_delay,
 				      cfg.wal_writer_inbox_size,
 				      init_storage ? RECOVER_READONLY : 0, NULL);
+
+	recovery_state->snap_io_rate_limit = cfg.snap_io_rate_limit * 1024 * 1024;
+	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
 	/* initialize hashes _after_ starting wal writer */
 	if (cfg.memcached != 0) {
@@ -1867,11 +1881,10 @@ mod_snapshot(struct log_io_iter *i)
 			header.data_size = tuple->bsize;
 
 			tbuf_reset(row);
-			tbuf_append(row, &default_tag, sizeof(default_tag));
 			tbuf_append(row, &header, sizeof(header));
 			tbuf_append(row, tuple->data, tuple->bsize);
 
-			snapshot_write_row(i, row);
+			snapshot_write_row(i, snap_tag, row);
 		}
 	}
 }
@@ -1885,6 +1898,8 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  pid: %i\r\n", getpid());
 	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 "\r\n", (i64)recovery_state->wal_writer->pid);
 	tbuf_printf(out, "  lsn: %" PRIi64 "\r\n", recovery_state->confirmed_lsn);
+	tbuf_printf(out, "  recovery_lag: %.3f\r\n", recovery_state->recovery_lag);
+	tbuf_printf(out, "  recovery_last_update: %.3f\r\n", recovery_state->recovery_last_update_tstamp);
 	tbuf_printf(out, "  status: %s\r\n", status);
 }
 

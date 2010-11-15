@@ -54,9 +54,6 @@ typedef struct tarantool_cfg {
 	/* delay between loop iteraions */
 	double	io_collect_interval;
 
-	/* do not write snapshot faster then snap_io_rate_limit MBytes/sec */
-	double	snap_io_rate_limit;
-
 	/* size of listen backlog */
 	int32_t	backlog;
 
