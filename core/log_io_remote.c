@@ -169,7 +169,7 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 		panic("replication failure: can't apply row");
 
 	tag = read_u16(data);
-	(void)read_u32(data); /* drop the cookie */
+	(void)read_u64(data); /* drop the cookie */
 
 	if (wal_write(r, tag, r->cookie, lsn, data) == false)
 		panic("replication failure: can't write row to WAL");
