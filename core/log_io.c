@@ -46,8 +46,8 @@
 #include <pickle.h>
 #include <tbuf.h>
 
-const u16 snap_tag = 1;
-const u16 wal_tag = 2;
+const u16 snap_tag = -1;
+const u16 wal_tag = -2;
 const u64 default_cookie = 0;
 const u32 default_version = 11;
 const u32 snap_marker_v04 = -1U;
