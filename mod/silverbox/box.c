@@ -1222,7 +1222,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 			tbuf_append(t, req.data, req.len);
 
 			i64 lsn = next_lsn(recovery_state, 0);
-			if (!wal_write(recovery_state, default_tag, fiber->cookie, lsn, t)) {
+			if (!wal_write(recovery_state, wal_tag, fiber->cookie, lsn, t)) {
 				ret_code = ERR_CODE_UNKNOWN_ERROR;
 				goto abort;
 			}
@@ -1348,29 +1348,16 @@ box_snap_reader(FILE *f, struct palloc_pool *pool)
 	if (fread(box_snap_row(row)->data, box_snap_row(row)->data_size, 1, f) != 1)
 		return NULL;
 
-	return convert_to_v11(row, 0);
+	return convert_to_v11(row, snap_tag, 0);
 }
 
 static int
-snap_apply(struct recovery_state *r __unused__, struct tbuf *t)
+snap_apply(struct box_txn *txn, struct tbuf *t)
 {
 	struct box_snap_row *row;
-	struct box_txn *txn = txn_alloc(0);
-
-	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
-		return -1;
-
-	u16 tag = read_u16(t);
-	if (tag != 0)
-		return -1;
 
 	row = box_snap_row(t);
-	txn->in_recover = true;
 	txn->n = row->namespace;
-
-	if (txn->n == 25)
-		return 0;
 
 	if (!namespace[txn->n].enabled) {
 		say_error("namespace %i is not configured", txn->n);
@@ -1390,23 +1377,12 @@ snap_apply(struct recovery_state *r __unused__, struct tbuf *t)
 
 	txn->op = INSERT;
 	txn_commit(txn);
-	txn_cleanup(txn);
 	return 0;
 }
 
 static int
-xlog_apply(struct recovery_state *r __unused__, struct tbuf *t)
+wal_apply(struct box_txn *txn, struct tbuf *t)
 {
-	struct box_txn *txn = txn_alloc(0);
-	txn->in_recover = true;
-
-	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
-		return -1;
-
-	u16 tag = read_u16(t);
-	if (tag != 0)
-		return -1;
 
 	u64 cookie = read_u64(t);
 	(void)cookie;
@@ -1418,6 +1394,32 @@ xlog_apply(struct recovery_state *r __unused__, struct tbuf *t)
 	txn_cleanup(txn);
 	return 0;
 }
+
+static int
+recover_row(struct recovery_state *r __unused__, struct tbuf *t)
+{
+	struct box_txn *txn = txn_alloc(0);
+	int result = -1;
+	txn->in_recover = true;
+
+	/* drop wal header */
+	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
+		return -1;
+
+	u16 tag = read_u16(t);
+	if (tag == wal_tag) {
+		result = wal_apply(txn, t);
+	} else if (tag == snap_tag) {
+		result = snap_apply(txn, t);
+	} else {
+		say_error("unknown row tag: %i", (int)tag);
+		return -1;
+	}
+
+	txn_cleanup(txn);
+	return result;
+}
+
 
 static int
 snap_print(struct recovery_state *r __unused__, struct tbuf *t)
@@ -1777,7 +1779,7 @@ mod_init(void)
 	}
 
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
-				      box_snap_reader, snap_apply, xlog_apply,
+				      box_snap_reader, recover_row,
 				      cfg.rows_per_wal, cfg.wal_fsync_delay,
 				      cfg.wal_writer_inbox_size,
 				      init_storage ? RECOVER_READONLY : 0, NULL);
@@ -1879,12 +1881,10 @@ mod_snapshot(struct log_io_iter *i)
 			header.data_size = tuple->bsize;
 
 			tbuf_reset(row);
-			tbuf_append(row, &default_tag, sizeof(default_tag));
-			tbuf_append(row, &default_cookie, sizeof(default_cookie));
 			tbuf_append(row, &header, sizeof(header));
 			tbuf_append(row, tuple->data, tuple->bsize);
 
-			snapshot_write_row(i, default_tag, row);
+			snapshot_write_row(i, snap_tag, row);
 		}
 	}
 }

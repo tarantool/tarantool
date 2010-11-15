@@ -46,7 +46,8 @@
 #include <pickle.h>
 #include <tbuf.h>
 
-const u16 default_tag = 0;
+const u16 snap_tag = 1;
+const u16 wal_tag = 2;
 const u64 default_cookie = 0;
 const u32 default_version = 11;
 const u32 snap_marker_v04 = -1U;
@@ -445,16 +446,16 @@ find_including_file(struct log_io_class *class, i64 target_lsn)
 }
 
 struct tbuf *
-convert_to_v11(struct tbuf *orig, i64 lsn)
+convert_to_v11(struct tbuf *orig, u16 tag, i64 lsn)
 {
 	struct tbuf *row = tbuf_alloc(orig->pool);
 	tbuf_ensure(row, sizeof(struct row_v11));
 	row->len = sizeof(struct row_v11);
 	row_v11(row)->lsn = lsn;
 	row_v11(row)->tm = 0;
-	row_v11(row)->len = orig->len + sizeof(default_tag) + sizeof(default_cookie);
+	row_v11(row)->len = orig->len + sizeof(tag) + sizeof(default_cookie);
 
-	tbuf_append(row, &default_tag, sizeof(default_tag));
+	tbuf_append(row, &tag, sizeof(tag));
 	tbuf_append(row, &default_cookie, sizeof(default_cookie));
 	tbuf_append(row, orig->data, orig->len);
 	return row;
@@ -505,7 +506,7 @@ row_reader_v04(FILE *f, struct palloc_pool *pool)
 	tbuf_append(data, &row_v04(m)->type, sizeof(row_v04(m)->type));
 	tbuf_append(data, row_v04(m)->data, row_v04(m)->len);
 
-	return convert_to_v11(data, row_v04(m)->lsn);
+	return convert_to_v11(data, wal_tag, row_v04(m)->lsn);
 }
 
 static struct tbuf *
@@ -840,7 +841,7 @@ recover_snap(struct recovery_state *r)
 	say_info("recover from `%s'", snap->filename);
 
 	while ((row = iter_inner(&i, (void *)1))) {
-		if (r->snap_row_handler(r, row) < 0) {
+		if (r->row_handler(r, row) < 0) {
 			result = -1;
 			goto out;
 		}
@@ -894,7 +895,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		}
 
 		/*  after handler(r, row) returned, row may be modified, do not use it */
-		if (r->wal_row_handler(r, row) < 0) {
+		if (r->row_handler(r, row) < 0) {
 			say_error("row_handler returned error");
 			result = -1;
 			goto out;
@@ -1282,15 +1283,14 @@ wal_write(struct recovery_state *r, u16 tag, u64 cookie, i64 lsn, struct tbuf *r
 
 struct recovery_state *
 recover_init(const char *snap_dirname, const char *wal_dirname,
-	     row_reader snap_row_reader, row_handler snap_row_handler, row_handler wal_row_handler,
+	     row_reader snap_row_reader, row_handler row_handler,
 	     int rows_per_file, double fsync_delay,
 	     int inbox_size, int flags, void *data)
 {
 	struct recovery_state *r = p0alloc(eter_pool, sizeof(*r));
 
 	r->wal_timer.data = r;
-	r->snap_row_handler = snap_row_handler;
-	r->wal_row_handler = wal_row_handler;
+	r->row_handler = row_handler;
 	r->data = data;
 
 	r->snap_class = snap_classes(snap_row_reader, snap_dirname);

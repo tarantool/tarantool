@@ -165,7 +165,7 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 	data = tbuf_alloc(row->pool);
 	tbuf_append(data, row_v11(row)->data, row_v11(row)->len);
 
-	if (r->wal_row_handler(r, row) < 0)
+	if (r->row_handler(r, row) < 0)
 		panic("replication failure: can't apply row");
 
 	tag = read_u16(data);

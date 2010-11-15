@@ -37,7 +37,7 @@
 
 #define RECOVER_READONLY 1
 
-extern const u16 default_tag;
+extern const u16 wal_tag, snap_tag;
 extern const u64 default_cookie;
 extern const u32 default_version;
 
@@ -82,9 +82,10 @@ struct recovery_state {
 	struct log_io_class **snap_class, **wal_class, *snap_prefered_class, *wal_prefered_class;
 	struct child *wal_writer;
 
-	/* handlers will be presented by most new format of data
+	/* row_handler will be presented by most recent format of data
 	   log_io_class->reader is responsible of converting data from old format */
-	row_handler *wal_row_handler, *snap_row_handler;
+	row_handler *row_handler;
+
 	ev_timer wal_timer;
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
 
@@ -115,12 +116,11 @@ static inline struct row_v11 *row_v11(const struct tbuf *t)
 	return (struct row_v11 *)t->data;
 }
 
-struct tbuf *convert_to_v11(struct tbuf *orig, i64 lsn);
+struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, i64 lsn);
 
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
-				    row_reader snap_row_reader, row_handler snap_row_handler,
-				    row_handler xlog_row_handler, int rows_per_file,
-				    double fsync_delay, int inbox_size,
+				    row_reader snap_row_reader, row_handler row_handler,
+				    int rows_per_file, double fsync_delay, int inbox_size,
 				    int flags, void *data);
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
