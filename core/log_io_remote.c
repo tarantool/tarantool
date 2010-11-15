@@ -36,6 +36,7 @@
 
 #include <say.h>
 #include <log_io.h>
+#include <pickle.h>
 
 struct remote_state {
 	struct recovery_state *r;
@@ -158,6 +159,7 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 {
 	struct tbuf *data;
 	i64 lsn = row_v11(row)->lsn;
+	u16 tag;
 
 	/* save row data since wal_row_handler may clobber it */
 	data = tbuf_alloc(row->pool);
@@ -166,7 +168,10 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 	if (r->wal_row_handler(r, row) < 0)
 		panic("replication failure: can't apply row");
 
-	if (wal_write(r, lsn, data) == false)
+	tag = read_u16(data);
+	(void)read_u32(data); /* drop the cookie */
+
+	if (wal_write(r, tag, r->cookie, lsn, data) == false)
 		panic("replication failure: can't write row to WAL");
 
 	next_lsn(r, lsn);
@@ -208,6 +213,7 @@ recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
 	memcpy(&addr->sin_addr.s_addr, &server, sizeof(server));
 	addr->sin_port = htons(port);
 	f->data = addr;
+	memcpy(&r->cookie, &addr, MIN(sizeof(r->cookie), sizeof(addr)));
 	fiber_call(f);
 	return f;
 }

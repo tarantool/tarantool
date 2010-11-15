@@ -89,6 +89,7 @@ struct recovery_state {
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
 
 	int snap_io_rate_limit;
+	u64 cookie;
 
 	/* pointer to user supplied custom data */
 	void *data;
@@ -124,7 +125,7 @@ struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_d
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recover_finalize(struct recovery_state *r);
-bool wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data);
+bool wal_write(struct recovery_state *r, u16 tag, u64 cookie, i64 lsn, struct tbuf *data);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 
@@ -139,7 +140,7 @@ struct fiber *recover_follow_remote(struct recovery_state *r, char *ip_addr, int
 				    int (*handler) (struct recovery_state *r, struct tbuf *row));
 
 struct log_io_iter;
-void snapshot_write_row(struct log_io_iter *i, struct tbuf *row);
+void snapshot_write_row(struct log_io_iter *i, u16 tag, struct tbuf *row);
 void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io_iter *));
 
 #endif

@@ -1218,13 +1218,11 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 		if (!txn->in_recover) {
 			fiber_peer_name(fiber); /* fill the cookie */
 			struct tbuf *t = tbuf_alloc(fiber->pool);
-			tbuf_append(t, &default_tag, sizeof(default_tag));
-			tbuf_append(t, &fiber->cookie, sizeof(fiber->cookie));
 			tbuf_append(t, &op, sizeof(op));
 			tbuf_append(t, req.data, req.len);
 
 			i64 lsn = next_lsn(recovery_state, 0);
-			if (!wal_write(recovery_state, lsn, t)) {
+			if (!wal_write(recovery_state, default_tag, fiber->cookie, lsn, t)) {
 				ret_code = ERR_CODE_UNKNOWN_ERROR;
 				goto abort;
 			}
@@ -1886,7 +1884,7 @@ mod_snapshot(struct log_io_iter *i)
 			tbuf_append(row, &header, sizeof(header));
 			tbuf_append(row, tuple->data, tuple->bsize);
 
-			snapshot_write_row(i, row);
+			snapshot_write_row(i, default_tag, row);
 		}
 	}
 }

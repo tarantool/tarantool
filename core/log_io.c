@@ -1253,16 +1253,19 @@ write_to_disk(void *_state, struct tbuf *t)
 }
 
 bool
-wal_write(struct recovery_state *r, i64 lsn, struct tbuf *data)
+wal_write(struct recovery_state *r, u16 tag, u64 cookie, i64 lsn, struct tbuf *row)
 {
-	struct tbuf *m = tbuf_alloc(data->pool);
+	struct tbuf *m = tbuf_alloc(row->pool);
 	struct msg *a;
 
 	say_debug("wal_write lsn=%" PRIi64, lsn);
-	tbuf_reserve(m, sizeof(struct wal_write_request) + data->len);
+	tbuf_reserve(m, sizeof(struct wal_write_request) + sizeof(tag) + sizeof(cookie) + row->len);
+	m->len = sizeof(struct wal_write_request);
 	wal_write_request(m)->lsn = lsn;
-	wal_write_request(m)->len = data->len;
-	memcpy(wal_write_request(m)->data, data->data, data->len);
+	wal_write_request(m)->len = row->len + sizeof(tag) + sizeof(cookie);
+	tbuf_append(m, &tag, sizeof(tag));
+	tbuf_append(m, &cookie, sizeof(cookie));
+	tbuf_append(m, row->data, row->len);
 
 	if (write_inbox(r->wal_writer->out, m) == false) {
 		say_warn("wal writer inbox is full");
@@ -1353,14 +1356,18 @@ write_rows(struct log_io_iter *i)
 }
 
 void
-snapshot_write_row(struct log_io_iter *i, struct tbuf *row)
+snapshot_write_row(struct log_io_iter *i, u16 tag, struct tbuf *row)
 {
 	static int rows;
 	static int bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
+	struct tbuf *wal_row = tbuf_alloc(row->pool);
 
-	i->to = row;
+	tbuf_append(wal_row, &tag, sizeof(tag));
+	tbuf_append(wal_row, row->data, row->len);
+
+	i->to = wal_row;
 	if (i->io_rate_limit > 0) {
 		if (last == 0) {
 			ev_now_update();
