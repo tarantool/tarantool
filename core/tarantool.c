@@ -341,6 +341,7 @@ main(int argc, char **argv)
 
 	fill_default_tarantool_cfg(&cfg);
 	parse_cfg_file_tarantool_cfg(&cfg, f, 0, &n_accepted, &n_skipped);
+	check_cfg_tarantool_cfg(&cfg);
 	fclose(f);
 
 #ifdef STORAGE

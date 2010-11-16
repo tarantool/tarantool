@@ -10,5 +10,14 @@ out_warning(ConfettyError v, char *format, ...)
 	(void)v; /* make gcc happy */
 	va_list ap;
 	va_start(ap, format);
-	vsay(S_WARN, NULL, format, ap);
+	switch (v) {
+	case CNF_NOTSET:
+		vsay(S_FATAL, NULL, format, ap);
+		panic("can't read config");
+
+		break;
+
+	default:
+		vsay(S_WARN, NULL, format, ap);
+	}
 }

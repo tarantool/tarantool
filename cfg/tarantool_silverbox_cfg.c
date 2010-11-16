@@ -756,6 +756,10 @@ acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, i
 				out_warning(r, "Not enough memory to accept '%s' option", dumpOptDef(opt->name));
 				if (n_skipped) (*n_skipped)++;
 				break;
+			case CNF_NOTSET:
+				out_warning(r, "Option '%s' is not set (or has a default value)", dumpOptDef(opt->name));
+				if (n_skipped) (*n_skipped)++;
+				break;
 			default:
 				out_warning(r, "Unknown error for '%s' option", dumpOptDef(opt->name));
 				if (n_skipped) (*n_skipped)++;
@@ -1376,5 +1380,29 @@ again:
 			free(i);
 	}
 	return NULL;
+}
+
+/************** Checking of required fields  **************/
+int
+check_cfg_tarantool_cfg(tarantool_cfg *c) {
+	tarantool_cfg_iterator_t iterator, *i = &iterator;
+	int	res = 0;
+
+	i->idx_name__namespace = 0;
+	while (c->namespace && c->namespace[i->idx_name__namespace]) {
+		i->idx_name__namespace__index = 0;
+		while (c->namespace[i->idx_name__namespace]->index && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]) {
+			i->idx_name__namespace__index__key_field = 0;
+			while (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]) {
+				i->idx_name__namespace__index__key_field++;
+			}
+
+			i->idx_name__namespace__index++;
+		}
+
+		i->idx_name__namespace++;
+	}
+
+	return res;
 }
 
