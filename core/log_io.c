@@ -1227,6 +1227,12 @@ write_to_disk(void *_state, struct tbuf *t)
 		goto fail;
 	}
 
+	/* flush stdio buffer to keep feeder in sync */
+	if (fflush(wal->f) < 0) {
+		say_syserror("can't flush wal");
+		goto fail;
+	}
+
 	if (wal->class->fsync_delay > 0 && ev_now() - last_flush >= wal->class->fsync_delay) {
 		if (flush_log(wal) < 0) {
 			say_syserror("can't flush wal");
