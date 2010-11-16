@@ -1425,7 +1425,16 @@ static int
 snap_print(struct recovery_state *r __unused__, struct tbuf *t)
 {
 	struct tbuf *out = tbuf_alloc(t->pool);
-	struct box_snap_row *row = box_snap_row(t);
+	struct box_snap_row *row;
+	struct row_v11 *raw_row = row_v11(t);
+
+	struct tbuf *b = palloc(fiber->pool, sizeof(*b));
+	b->data = raw_row->data;
+	b->len = raw_row->len;
+
+	(void)read_u16(b);
+
+	row = box_snap_row(b);
 
 	tuple_print(out, row->tuple_size, row->data);
 	printf("n:%i %*s\n", row->namespace, (int)out->len, (char *)out->data);
