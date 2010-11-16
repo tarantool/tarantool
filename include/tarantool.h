@@ -30,7 +30,7 @@
 #include <tbuf.h>
 #include <util.h>
 #include <log_io.h>
-#include <cfg/tarantool_cfg.h>
+#include TARANTOOL_CONFIG
 
 struct recovery_state *recovery_state;
 void mod_init(void);
