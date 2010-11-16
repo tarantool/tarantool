@@ -116,7 +116,7 @@ static inline struct row_v11 *row_v11(const struct tbuf *t)
 	return (struct row_v11 *)t->data;
 }
 
-struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, i64 lsn);
+struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, const u64 *cookie, i64 lsn);
 
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
 				    row_reader snap_row_reader, row_handler row_handler,

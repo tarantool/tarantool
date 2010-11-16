@@ -1348,7 +1348,7 @@ box_snap_reader(FILE *f, struct palloc_pool *pool)
 	if (fread(box_snap_row(row)->data, box_snap_row(row)->data_size, 1, f) != 1)
 		return NULL;
 
-	return convert_to_v11(row, snap_tag, 0);
+	return convert_to_v11(row, snap_tag, NULL, 0);
 }
 
 static int
