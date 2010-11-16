@@ -1861,7 +1861,7 @@ mod_cat(const char *filename)
 void
 mod_snapshot(struct log_io_iter *i)
 {
-	struct tbuf *row = tbuf_alloc(fiber->pool);
+	struct tbuf *row;
 	struct box_snap_row header;
 	struct box_tuple *tuple;
 	khiter_t k;
@@ -1880,7 +1880,7 @@ mod_snapshot(struct log_io_iter *i)
 			header.tuple_size = tuple->cardinality;
 			header.data_size = tuple->bsize;
 
-			tbuf_reset(row);
+			row = tbuf_alloc(fiber->pool);
 			tbuf_append(row, &header, sizeof(header));
 			tbuf_append(row, tuple->data, tuple->bsize);
 

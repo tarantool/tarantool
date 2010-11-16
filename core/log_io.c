@@ -1361,6 +1361,8 @@ write_rows(struct log_io_iter *i)
 
 		if (fwrite(data->data, data->len, 1, l->f) != 1)
 			panic("fwrite");
+
+		prelease_after(fiber->pool, 128 * 1024);
 	}
 }
 
@@ -1371,7 +1373,7 @@ snapshot_write_row(struct log_io_iter *i, u16 tag, struct tbuf *row)
 	static int bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
-	struct tbuf *wal_row = tbuf_alloc(row->pool);
+	struct tbuf *wal_row = tbuf_alloc(fiber->pool);
 
 	tbuf_append(wal_row, &tag, sizeof(tag));
 	tbuf_append(wal_row, row->data, row->len);
