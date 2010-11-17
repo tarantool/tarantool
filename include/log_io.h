@@ -116,7 +116,7 @@ static inline struct row_v11 *row_v11(const struct tbuf *t)
 	return (struct row_v11 *)t->data;
 }
 
-struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, const u64 *cookie, i64 lsn);
+struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, u64 cookie, i64 lsn);
 
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
 				    row_reader snap_row_reader, row_handler row_handler,
@@ -140,7 +140,7 @@ struct fiber *recover_follow_remote(struct recovery_state *r, char *ip_addr, int
 				    int (*handler) (struct recovery_state *r, struct tbuf *row));
 
 struct log_io_iter;
-void snapshot_write_row(struct log_io_iter *i, u16 tag, struct tbuf *row);
+void snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row);
 void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io_iter *));
 
 #endif

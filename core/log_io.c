@@ -446,20 +446,17 @@ find_including_file(struct log_io_class *class, i64 target_lsn)
 }
 
 struct tbuf *
-convert_to_v11(struct tbuf *orig, u16 tag, const u64 *cookie, i64 lsn)
+convert_to_v11(struct tbuf *orig, u16 tag, const u64 cookie, i64 lsn)
 {
 	struct tbuf *row = tbuf_alloc(orig->pool);
 	tbuf_ensure(row, sizeof(struct row_v11));
 	row->len = sizeof(struct row_v11);
 	row_v11(row)->lsn = lsn;
 	row_v11(row)->tm = 0;
-	row_v11(row)->len = orig->len + sizeof(tag);
-	if (cookie)
-		row_v11(row)->len += sizeof(*cookie);
+	row_v11(row)->len = orig->len + sizeof(tag) + sizeof(cookie);
 
 	tbuf_append(row, &tag, sizeof(tag));
-	if (cookie)
-		tbuf_append(row, cookie, sizeof(*cookie));
+	tbuf_append(row, &cookie, sizeof(cookie));
 	tbuf_append(row, orig->data, orig->len);
 	return row;
 }
@@ -509,7 +506,7 @@ row_reader_v04(FILE *f, struct palloc_pool *pool)
 	tbuf_append(data, &row_v04(m)->type, sizeof(row_v04(m)->type));
 	tbuf_append(data, row_v04(m)->data, row_v04(m)->len);
 
-	return convert_to_v11(data, wal_tag, &default_cookie, row_v04(m)->lsn);
+	return convert_to_v11(data, wal_tag, default_cookie, row_v04(m)->lsn);
 }
 
 static struct tbuf *
@@ -1367,7 +1364,7 @@ write_rows(struct log_io_iter *i)
 }
 
 void
-snapshot_write_row(struct log_io_iter *i, u16 tag, struct tbuf *row)
+snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
 {
 	static int rows;
 	static int bytes;
@@ -1376,6 +1373,7 @@ snapshot_write_row(struct log_io_iter *i, u16 tag, struct tbuf *row)
 	struct tbuf *wal_row = tbuf_alloc(fiber->pool);
 
 	tbuf_append(wal_row, &tag, sizeof(tag));
+	tbuf_append(wal_row, &cookie, sizeof(cookie));
 	tbuf_append(wal_row, row->data, row->len);
 
 	i->to = wal_row;

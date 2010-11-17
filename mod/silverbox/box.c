@@ -1348,13 +1348,15 @@ box_snap_reader(FILE *f, struct palloc_pool *pool)
 	if (fread(box_snap_row(row)->data, box_snap_row(row)->data_size, 1, f) != 1)
 		return NULL;
 
-	return convert_to_v11(row, snap_tag, NULL, 0);
+	return convert_to_v11(row, snap_tag, default_cookie, 0);
 }
 
 static int
 snap_apply(struct box_txn *txn, struct tbuf *t)
 {
 	struct box_snap_row *row;
+
+	read_u64(t); /* drop cookie */
 
 	row = box_snap_row(t);
 	txn->n = row->namespace;
@@ -1383,9 +1385,7 @@ snap_apply(struct box_txn *txn, struct tbuf *t)
 static int
 wal_apply(struct box_txn *txn, struct tbuf *t)
 {
-
-	u64 cookie = read_u64(t);
-	(void)cookie;
+	read_u64(t); /* drop cookie */
 
 	u16 type = read_u16(t);
 	if (box_dispach(txn, RW, type, t) != 0)
@@ -1432,7 +1432,8 @@ snap_print(struct recovery_state *r __unused__, struct tbuf *t)
 	b->data = raw_row->data;
 	b->len = raw_row->len;
 
-	(void)read_u16(b);
+	(void)read_u16(b); /* drop tag */
+	(void)read_u64(b); /* drop cookie */
 
 	row = box_snap_row(b);
 
@@ -1893,7 +1894,7 @@ mod_snapshot(struct log_io_iter *i)
 			tbuf_append(row, &header, sizeof(header));
 			tbuf_append(row, tuple->data, tuple->bsize);
 
-			snapshot_write_row(i, snap_tag, row);
+			snapshot_write_row(i, snap_tag, default_cookie, row);
 		}
 	}
 }
