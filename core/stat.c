@@ -108,11 +108,11 @@ stat_print(struct tbuf *buf)
 void
 stat_age(ev_timer *timer, int events __unused__)
 {
-	if (stats == NULL)
-		return;
+	for (int i = 0; i < stats_max; i++) {
+		if (stats[i].name == NULL)
+			continue;
 
-	for (int i = 0; stats[i].name != NULL; i++) {
-		for (int j = 0; j < SECS - 1; j++)
+		for (int j = SECS - 2; j >= 0;  j--)
 			stats[i].value[j + 1] = stats[i].value[j];
 		stats[i].value[0] = 0;
 	}
