@@ -9,14 +9,27 @@ package MR::IProto;
 use Moose;
 use AnyEvent;
 use Errno;
+use Scalar::Util qw(weaken);
 use MR::IProto::Cluster;
-use MR::IProto::Message;
+
+has prefix => (
+    is  => 'ro',
+    isa => 'Str',
+    default => __PACKAGE__,
+);
 
 has cluster => (
     is  => 'ro',
     isa => 'MR::IProto::Cluster',
     required => 1,
     coerce   => 1,
+    trigger  => sub {
+        my ($self, $new) = @_;
+        foreach my $server ( @{$new->servers} ) {
+            $server->debug_cb($self->debug_cb) unless $server->has_debug_cb();
+        }
+        return;
+    },
 );
 
 has rotateservers => (
@@ -43,6 +56,24 @@ has debug => (
     default => 0,
 );
 
+has debug_cb => (
+    is  => 'rw',
+    isa => 'CodeRef',
+    lazy_build => 1,
+);
+
+has _callbacks => (
+    is  => 'ro',
+    isa => 'HashRef[CodeRef]',
+    lazy_build => 1,
+);
+
+has _reply_class => (
+    is  => 'ro',
+    isa => 'HashRef[ClassName]',
+    lazy_build => 1,
+);
+
 =head1 PUBLIC METHODS
 
 =over
@@ -51,21 +82,95 @@ has debug => (
 
 sub chat {
     my ($self, $message, $callback) = @_;
+    if($callback) {
+        die "Method must be called in void context if you want to use async" if defined wantarray;
+        $self->_chat($message, $callback);
+        return;
+    }
+    else {
+        die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
+        my ($data, $error, $errno);
+        my $exit = AnyEvent->condvar();
+        $self->chat($message, sub {
+            ($data, $error) = @_;
+            $errno = $!;
+            $exit->send();
+            return;
+        });
+        $exit->recv();
+        $! = $errno;
+        die $error if $error;
+        return $data;
+    }
+}
+
+sub _chat {
+    my ($self, $message, $callback) = @_;
     die "Callback must be specified" unless $callback;
     die "Method must be called in void context" if defined wantarray;
-    my $server = $self->cluster->server($message->key);
-    $server->send_message($message, $callback);
+
+    my ($req_msg, $key, $body, $unpack);
+    # MR::IProto::Message OO-API
+    if( blessed($message) ) {
+        $req_msg = $message->msg;
+        $key = $message->key;
+        $body = $message->data;
+    }
+    # Old-style compatible API
+    else {
+        $req_msg = $message->{msg};
+        $body = exists $message->{payload} ? $message->{payload}
+            : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{$message->{data}}
+            : $message->{data};
+        $unpack = $message->{no_reply} ? sub { 0 } : $message->{unpack};
+    }
+
+    my $req_sync;
+    for( 1 .. 10 ) {
+        $req_sync = int(rand 0xffffffff);
+        last unless exists $self->_callbacks->{$req_sync};
+    }
+    $self->_callbacks->{$req_sync} = $callback;
+    my $header = pack 'L3', $req_msg, length $body, $req_sync;
+    my $server = $self->cluster->server( $key );
+
+    weaken($self);
+    $server->send_message($req_sync, $header, $body, sub {
+        my ($resp_msg, $resp_sync, $data, $error) = @_;
+        if ($error) {
+            if( $self->rotateservers ) {
+                $self->_debug(2, "chat: failed");
+                $server->active(0);
+            }
+            delete($self->_callbacks->{$req_sync})->(undef, $error);
+        }
+        else {
+            if ($unpack) {
+                $data = [ $unpack->($data) ];
+            }
+            else {
+                if( my $data_class = $self->_reply_class->{$resp_msg} ) {
+                    $data = $data_class->new($data);
+                }
+                else {
+                    $error = sprintf "Unknown message code %d", $resp_msg;
+                    $data = undef;
+                }
+            }
+            delete($self->_callbacks->{$resp_sync})->($data, $error);
+        }
+        return;
+    });
     return;
 }
 
 sub Chat {
     my $self = shift;
     my $message = @_ == 1 ? shift : { @_ };
-    $message = MR::IProto::Message->new($message) if ref $message eq 'HASH';
     my $retries = $self->max_request_retries;
     for (my $try = 1; $try <= $retries; $try++) {
         sleep $self->retry_delay if $try > 1 && $self->retry_delay;
-        $self->_debug(1, sprintf "chat msg=%d $try of $retries total", $message->msg);
+        $self->_debug(1, sprintf "chat msg=%d $try of $retries total", $message->{msg});
         my $ret = $self->Chat1($message);
         if ($ret->{ok}) {
             return wantarray ? @{$ret->{ok}} : $ret->{ok}->[0];
@@ -77,22 +182,8 @@ sub Chat {
 sub Chat1 {
     my $self = shift;
     my $message = @_ == 1 ? shift : { @_ };
-    $message = MR::IProto::Message->new($message) if ref $message eq 'HASH';
-    my $server = $self->cluster->server($message->key);
-    my ($data, $error, $timeout);
-    my $exit = AnyEvent->condvar();
-    $server->send_message($message, sub {
-        ($data, $error) = @_;
-        $timeout = $! == Errno::ETIMEDOUT;
-        $exit->send();
-        return;
-    });
-    $exit->recv();
-    if( $error && $self->rotateservers ) {
-        $self->_debug(2, "chat: failed");
-        $server->active(0);
-    }
-    return $error ? { fail => $error, timeout => $timeout }
+    my $data = eval { $self->chat($message) };
+    return $@ ? { fail => $@, timeout => $! == Errno::ETIMEDOUT }
         : { ok => $data };
 }
 
@@ -105,7 +196,7 @@ sub Chat1 {
 =cut
 
 sub BUILDARGS {
-    my $self = shift;
+    my $class = shift;
     my %args = @_ == 1 ? %{shift()} : @_;
     $args{rotateservers} = 0 if delete $args{norotateservers};
     if( $args{servers} ) {
@@ -129,13 +220,38 @@ sub BUILDARGS {
         ];
         $args{cluster} = MR::IProto::Cluster->new(%clusterargs);
     }
-    return $self->SUPER::BUILDARGS(%args);
+    return $class->SUPER::BUILDARGS(%args);
+}
+
+sub _build_debug_cb {
+    my ($self) = @_;
+    my $prefix = $self->prefix;
+    return sub {
+        my ($msg) = @_;
+        warn sprintf "%s: %s\n", $prefix, $msg;
+        return;
+    };
+}
+
+sub _build__callbacks {
+    my ($self) = @_;
+    return {};
+}
+
+sub _build__reply_class {
+    my ($self) = @_;
+    my $re = sprintf '^%s::.*::Reply$', $self->prefix;
+    my %reply = map { $_->msg => $_ }
+        grep $_->can('msg'),
+        grep /$re/,
+        MR::IProto::Message->meta->subclasses();
+    return \%reply;
 }
 
 sub _debug {
     my ($self, $level, $msg) = @_;
     return if $self->debug < $level;
-    warn sprintf "%s\n", $msg;
+    $self->debug_cb->($msg);
     return;
 }
 

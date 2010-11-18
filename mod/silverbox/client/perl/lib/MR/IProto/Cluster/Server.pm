@@ -70,6 +70,12 @@ has debug => (
     default => 0,
 );
 
+has debug_cb => (
+    is  => 'rw',
+    isa => 'CodeRef',
+    lazy_build => 1,
+);
+
 has dump_no_ints => (
     is  => 'ro',
     isa => 'Bool',
@@ -104,56 +110,66 @@ has _callbacks => (
     lazy_build => 1,
 );
 
+has _read_reply => (
+    is  => 'ro',
+    isa => 'CodeRef',
+    lazy_build => 1,
+);
+
 sub send_message {
-    my ($self, $message, $callback) = @_;
-    $message = MR::IProto::Message->new($message) if ref $message eq 'HASH';
-    $self->_callbacks->{$callback} = $callback;
-    push @{$self->_queue}, [ $message, $callback ];
-    $self->_try_to_send_one_more();
+    my $self = shift;
+    push @{$self->_queue}, [ @_ ];
+    $self->_try_to_send();
     return;
 }
 
 sub _send_message {
-    my ($self, $message, $callback) = @_;
+    my ($self, $sync, $header, $payload, $callback) = @_;
     weaken($self);
     $self->_inc_in_progress();
-    $self->_debug_dump(5, 'send header: ', $message->header);
-    $self->_debug_dump(5, 'send payload: ', $message->payload);
-    $self->_handle->push_write( $message->message );
-    $self->_handle->push_read( chunk => 12, sub {
-        my ($handle, $data) = @_;
-        $self->_debug_dump(6, 'recv header: ', $data);
-        my ($response_msg, $payload_length, $response_sync) = unpack('L3', $data);
-        if( $response_msg == $message->msg and $response_sync == $message->sync ) {
-            $handle->unshift_read( chunk => $payload_length, sub {
-                my ($handle, $data) = @_;
-                $self->_debug_dump(6, 'recv payload: ', $data);
-                delete $self->_callbacks->{$callback};
-                $self->_dec_in_progress();
-                $callback->([$message->unpack->($data)]);
-                $self->_try_to_send_one_more();
-                return;
-            });
-        }
-        else {
-            $self->_dec_in_progress();
-            $handle->_error(0, 0, sprintf "unexpected reply msg($response_msg != %s) or sync($response_sync != %s)", $message->msg, $message->sync);
-            $self->_try_to_send_one_more();
-            return;
-        }
-        return;
-    });
+    $self->_callbacks->{$sync} = $callback;
+    $self->_debug_dump(5, 'send header: ', $header);
+    $self->_debug_dump(5, 'send payload: ', $payload);
+    $self->_handle->push_write( $header . $payload );
+    $self->_handle->push_read( chunk => 12, $self->_read_reply );
     return;
 }
 
-sub _try_to_send_one_more {
+sub _build__read_reply {
     my ($self) = @_;
-    if( $self->_in_progress < $self->max_parallel ) {
-        if( my $task = shift @{ $self->_queue } ) {
-            $self->_send_message(@$task);
-        }
+    weaken($self);
+    return sub {
+        my ($handle, $data) = @_;
+        $self->_debug_dump(6, 'recv header: ', $data);
+        my ($msg, $payload_length, $sync) = unpack('L3', $data);
+        $handle->unshift_read( chunk => $payload_length, sub {
+            my ($handle, $data) = @_;
+            $self->_debug_dump(6, 'recv payload: ', $data);
+            $self->_dec_in_progress();
+            delete($self->_callbacks->{$sync})->($msg, $sync, $data);
+            $self->_try_to_send();
+            return;
+        });
+        return;
+    };
+}
+
+sub _try_to_send {
+    my ($self) = @_;
+    while( $self->_in_progress < $self->max_parallel && (my $task = shift @{ $self->_queue }) ) {
+        $self->_send_message(@$task);
     }
     return;
+}
+
+sub _build_debug_cb {
+    my ($self) = @_;
+    my $prefix = $self->prefix;
+    return sub {
+        my ($msg) = @_;
+        warn sprintf "%s: %s\n", $prefix, $msg;
+        return;
+    };
 }
 
 sub _build__handle {
@@ -176,11 +192,15 @@ sub _build__handle {
         on_error   => sub {
             my ($handle, $fatal, $message) = @_;
             $self->_debug(0, ($fatal ? 'fatal ' : '') . 'error: ' . $message);
-            $_->(undef, $message) foreach values %{$self->_callbacks};
+            foreach( values %{$self->_callbacks} ) {
+                $self->_dec_in_progress();
+                $_->(undef, undef, undef, $message);
+            }
             $self->_clear_handle();
             $self->_clear_callbacks();
             $self->_debug(1, 'closing socket');
             $handle->destroy();
+            $self->_try_to_send();
             return;
         },
         on_timeout => sub {
@@ -204,18 +224,19 @@ sub _build__callbacks {
 sub _debug {
     my ($self, $level, $msg) = @_;
     return if $self->debug < $level;
-    warn sprintf "%s:%d: %s\n", $self->host, $self->port, $msg;
+    $self->debug_cb->( sprintf "%s:%d: %s", $self->host, $self->port, $msg );
     return;
 }
 
 sub _debug_dump {
     my ($self, $level, $msg, $datum) = @_;
+    return if $self->debug < $level;
     unless($self->dump_no_ints) {
         $msg .= join(' ', unpack('L*', $datum));
         $msg .= ' > ';
     }
     $msg .= join(' ', map { sprintf "%02x", $_ } unpack("C*", $datum));
-    warn sprintf "%s:%d: %s\n", $self->host, $self->port, $msg;
+    $self->debug_cb->( sprintf "%s:%d: %s", $self->host, $self->port, $msg );
     return;
 }
 
