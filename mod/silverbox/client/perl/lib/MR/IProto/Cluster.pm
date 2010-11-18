@@ -2,13 +2,40 @@ package MR::IProto::Cluster;
 
 =head1 NAME
 
+MR::IProto::Cluster - cluster of servers
+
 =head1 DESCRIPTION
+
+This class is used to implement balancing between several servers.
 
 =cut
 
 use Moose;
 use Moose::Util::TypeConstraints;
 use MR::IProto::Cluster::Server;
+
+=head1 EXPORTED CONSTANTS
+
+=over
+
+=item RR
+
+Round robin algorithm
+
+=item HASH
+
+Hashing algorithm using CRC32
+
+=item KETAMA
+
+Ketama algorithm
+
+=back
+
+=cut
+
+use Exporter 'import';
+our @EXPORT_OK = qw( RR HASH KETAMA );
 
 coerce 'MR::IProto::Cluster'
     => from 'Str'
@@ -43,6 +70,18 @@ coerce 'MR::IProto::Balance'
             : RR;
     };
 
+=head1 ATTRIBUTES
+
+=over
+
+=item balance
+
+Balancing algorithms.
+Possible values are constants: RR, HASH, KETAMA.
+Or their string analogs: 'round-robin', 'hash-crc32', 'ketama'.
+
+=cut
+
 has balance => (
     is  => 'ro',
     isa => 'MR::IProto::Balance',
@@ -50,12 +89,22 @@ has balance => (
     coerce  => 1,
 );
 
+=item servers
+
+ArrayRef of L<MR::IProto::Cluster::Server>.
+
+=cut
+
 has servers => (
     is  => 'ro',
     isa => 'MR::IProto::Cluster::Servers',
     required => 1,
     coerce   => 1,
 );
+
+=back
+
+=cut
 
 has _ketama => (
     is  => 'ro',
@@ -73,6 +122,10 @@ has _rr_servers => (
 
 =over
 
+=item server( $key? )
+
+Get server from balancing using C<$key>.
+
 =cut
 
 sub server {
@@ -85,19 +138,9 @@ sub server {
     return $self->$method($key);
 }
 
-
 =back
 
-=head1 PROTECTED METHODS
-
-=over
-
 =cut
-
-#sub BUILDARGS {
-#    my $class = shift;
-#    my %args = @_ == 1 ? @{shift()} : @_;
-#}
 
 sub _build__ketama {
     my $self = shift;
@@ -148,7 +191,9 @@ sub _balance_ketama {
     return $self->_ketama->[0]->[1];
 }
 
-=back
+=head1 SEE ALSO
+
+L<MR::IProto>, L<MR::IProto::Cluster::Server>.
 
 =cut
 

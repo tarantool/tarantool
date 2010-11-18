@@ -2,7 +2,11 @@ package MR::IProto::Cluster::Server;
 
 =head1 NAME
 
+MR::IProto::Cluster::Server - server
+
 =head1 DESCRIPTION
+
+This class is used to implement all communication with one server.
 
 =cut
 
@@ -22,11 +26,27 @@ coerce 'MR::IProto::Cluster::Server'
         );
     };
 
+=head1 ATTRIBUTES
+
+=over
+
+=item host
+
+Host name or IP address.
+
+=cut
+
 has host => (
     is  => 'ro',
     isa => 'Str',
     required => 1,
 );
+
+=item port
+
+Port number.
+
+=cut
 
 has port => (
     is  => 'ro',
@@ -34,11 +54,23 @@ has port => (
     required => 1,
 );
 
+=item timeout
+
+Timeout of connect, read and write operations.
+
+=cut
+
 has timeout => (
     is  => 'ro',
     isa => 'Num',
     default => 2,
 );
+
+=item tcp_nodelay
+
+Enable TCP_NODELAY.
+
+=cut
 
 has tcp_nodelay => (
     is  => 'ro',
@@ -46,11 +78,23 @@ has tcp_nodelay => (
     default => 1,
 );
 
+=item tcp_keepalive
+
+Enable SO_KEEPALIVE.
+
+=cut
+
 has tcp_keepalive => (
     is  => 'ro',
     isa => 'Int',
     default => 0,
 );
+
+=item max_parallel
+
+Max amount of simultaneous request.
+
+=cut
 
 has max_parallel => (
     is  => 'ro',
@@ -58,11 +102,23 @@ has max_parallel => (
     default => 10,
 );
 
+=item active
+
+Is server used in balancing.
+
+=cut
+
 has active => (
     is  => 'rw',
     isa => 'Bool',
     default => 1,
 );
+
+=item debug
+
+Deug level.
+
+=cut
 
 has debug => (
     is  => 'rw',
@@ -70,16 +126,32 @@ has debug => (
     default => 0,
 );
 
+=item debug_cb
+
+Callback which is called when debug message is written.
+
+=cut
+
 has debug_cb => (
     is  => 'rw',
     isa => 'CodeRef',
     lazy_build => 1,
 );
 
+=item dump_no_ints
+
+Skip print of integers in dump.
+
+=cut
+
 has dump_no_ints => (
     is  => 'ro',
     isa => 'Bool',
 );
+
+=back
+
+=cut
 
 has _handle => (
     is  => 'ro',
@@ -116,14 +188,37 @@ has _read_reply => (
     lazy_build => 1,
 );
 
-sub send_message {
+=head1 PUBLIC METHODS
+
+=over
+
+=item send
+
+Enqueue message send.
+For list of arguments see L</_send>.
+
+=cut
+
+sub send {
     my $self = shift;
     push @{$self->_queue}, [ @_ ];
     $self->_try_to_send();
     return;
 }
 
-sub _send_message {
+=back
+
+=head1 PROTECTED METHODS
+
+=over
+
+=item _send( $sync, $header, $payload, $callback )
+
+Send message to server.
+
+=cut
+
+sub _send {
     my ($self, $sync, $header, $payload, $callback) = @_;
     weaken($self);
     $self->_inc_in_progress();
@@ -157,7 +252,7 @@ sub _build__read_reply {
 sub _try_to_send {
     my ($self) = @_;
     while( $self->_in_progress < $self->max_parallel && (my $task = shift @{ $self->_queue }) ) {
-        $self->_send_message(@$task);
+        $self->_send(@$task);
     }
     return;
 }
@@ -239,6 +334,14 @@ sub _debug_dump {
     $self->debug_cb->( sprintf "%s:%d: %s", $self->host, $self->port, $msg );
     return;
 }
+
+=back
+
+=head1 SEE ALSO
+
+L<MR::IProto>, L<MR::IProto::Cluster>.
+
+=cut
 
 no Moose;
 __PACKAGE__->meta->make_immutable();
