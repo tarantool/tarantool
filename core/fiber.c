@@ -685,7 +685,6 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 			break;
 		}
 		*request_size = ntohl(*request_size);
-		assert(*request_size < 4 * 1024 * 1024);
 
 		if (read_atleast(fd, request, *request_size) < 0) {
 			result = EXIT_SUCCESS;
