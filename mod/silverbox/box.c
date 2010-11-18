@@ -1815,6 +1815,7 @@ mod_init(void)
 			palloc(eter_pool, sizeof(cfg.namespace[n]->index[0][0]));
 		cfg.namespace[n]->index[1] = NULL;
 		cfg.namespace[n]->index[0]->type = "HASH";
+		cfg.namespace[n]->index[0]->unique = 1;
 		cfg.namespace[n]->index[0]->key_field =
 			palloc(eter_pool, 2 * sizeof(cfg.namespace[n]->index[0]->key_field[0]));
 		cfg.namespace[n]->index[0]->key_field[0] =
