@@ -138,6 +138,31 @@ sub server {
     return $self->$method($key);
 }
 
+=item timeout( $new? )
+
+Used to set C<$new> timeout value to all servers.
+If argument is skipped and timeout is equal for all servers then returns
+it value, if timeout is different then returns undef.
+
+=cut
+
+sub timeout {
+    my $self = shift;
+    if(@_) {
+        my $timeout = shift;
+        $_->timeout($timeout) foreach @{$self->servers};
+        return $timeout;
+    }
+    else {
+        my $timeout;
+        foreach my $t ( map $_->timeout, @{$self->servers} ) {
+            return if defined $timeout && $timeout != $t;
+            $timeout = $t unless defined $timeout;
+        }
+        return $timeout;
+    }
+}
+
 =back
 
 =cut
@@ -160,7 +185,7 @@ sub _build__rr_servers {
 
 sub _balance_rr {
     my ($self) = @_;
-    $self->clear_rr_servers() if @{$self->_rr_servers} == 0;
+    $self->_clear_rr_servers() if @{$self->_rr_servers} == 0;
     return splice(@{$self->_rr_servers}, int(rand(@{$self->_rr_servers})), 1);
 }
 

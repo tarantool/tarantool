@@ -91,6 +91,7 @@ use Moose;
 use AnyEvent;
 use Errno;
 use Scalar::Util qw(weaken);
+use Time::HiRes;
 use MR::IProto::Cluster;
 
 =head1 ATTRIBUTES
@@ -107,7 +108,7 @@ are located. Used to find reply message classes.
 has prefix => (
     is  => 'ro',
     isa => 'Str',
-    default => __PACKAGE__,
+    default => sub { ref shift },
 );
 
 =item cluster
@@ -124,6 +125,7 @@ has cluster => (
     isa => 'MR::IProto::Cluster',
     required => 1,
     coerce   => 1,
+    handles  => [qw( timeout )],
     trigger  => sub {
         my ($self, $new) = @_;
         foreach my $server ( @{$new->servers} ) {
@@ -167,7 +169,7 @@ Delay between request retries.
 
 has retry_delay => (
     is  => 'ro',
-    isa => 'Int',
+    isa => 'Num',
     default => 0,
 );
 
@@ -198,12 +200,6 @@ has debug_cb => (
 =back
 
 =cut
-
-has _callbacks => (
-    is  => 'ro',
-    isa => 'HashRef[CodeRef]',
-    lazy_build => 1,
-);
 
 has _reply_class => (
     is  => 'ro',
@@ -270,7 +266,7 @@ sub Chat {
     my $message = @_ == 1 ? shift : { @_ };
     my $retries = $self->max_request_retries;
     for (my $try = 1; $try <= $retries; $try++) {
-        sleep $self->retry_delay if $try > 1 && $self->retry_delay;
+        Time::HiRes::sleep($self->retry_delay) if $try > 1 && $self->retry_delay;
         $self->_debug(1, sprintf "chat msg=%d $try of $retries total", $message->{msg});
         my $ret = $self->Chat1($message);
         if ($ret->{ok}) {
@@ -283,9 +279,15 @@ sub Chat {
 sub Chat1 {
     my $self = shift;
     my $message = @_ == 1 ? shift : { @_ };
-    my $data = eval { $self->chat($message) };
+    my $data = eval { $self->send($message) };
     return $@ ? { fail => $@, timeout => $! == Errno::ETIMEDOUT }
         : { ok => $data };
+}
+
+sub SetTimeout {
+    my ($self, $timeout) = @_;
+    $self->timeout($timeout);
+    return;
 }
 
 =back
@@ -324,11 +326,15 @@ See L<Moose::Manual::Construction/BUILDARGS> for more information.
 
 =cut
 
-sub BUILDARGS {
+around BUILDARGS => sub {
+    my $orig = shift;
     my $class = shift;
     my %args = @_ == 1 ? %{shift()} : @_;
+    $args{prefix} = $args{name} if exists $args{name};
     $args{rotateservers} = 0 if delete $args{norotateservers};
     if( $args{servers} ) {
+        my $cluster_class = $args{cluster_class} || 'MR::IProto::Cluster';
+        my $server_class = $args{server_class} || 'MR::IProto::Cluster::Server';
         my %srvargs;
         $srvargs{debug} = $args{debug} if exists $args{debug};
         $srvargs{timeout} = delete $args{timeout} if exists $args{timeout};
@@ -340,17 +346,17 @@ sub BUILDARGS {
         $clusterargs{servers} = [
             map {
                 my ($host, $port) = /^(.+):(\d+)$/;
-                MR::IProto::Cluster::Server->new(
+                $server_class->new(
                     %srvargs,
                     host => $host,
                     port => $port,
                 );
             } split /,/, delete $args{servers}
         ];
-        $args{cluster} = MR::IProto::Cluster->new(%clusterargs);
+        $args{cluster} = $cluster_class->new(%clusterargs);
     }
-    return $class->SUPER::BUILDARGS(%args);
-}
+    return $class->$orig(%args);
+};
 
 sub _build_debug_cb {
     my ($self) = @_;
@@ -436,39 +442,40 @@ sub _send {
         $unpack = $message->{no_reply} ? sub { 0 } : $message->{unpack};
     }
 
-    my $req_sync;
-    for( 1 .. 10 ) {
-        $req_sync = int(rand 0xffffffff);
-        last unless exists $self->_callbacks->{$req_sync};
-    }
-    $self->_callbacks->{$req_sync} = $callback;
-    my $header = pack 'L3', $req_msg, length $body, $req_sync;
-    my $server = $self->cluster->server( $key );
-
     weaken($self);
-    $server->send($req_sync, $header, $body, sub {
-        my ($resp_msg, $resp_sync, $data, $error) = @_;
+    my $server = $self->cluster->server( $key );
+    $server->send($req_msg, $body, sub {
+        my ($resp_msg, $data, $error) = @_;
         if ($error) {
             if( $self->rotateservers ) {
-                $self->_debug(2, "chat: failed");
+                $self->_debug(2, "send: failed");
                 $server->active(0);
             }
-            delete($self->_callbacks->{$req_sync})->(undef, $error);
+            $callback->(undef, $error);
         }
         else {
-            if ($unpack) {
-                $data = [ $unpack->($data) ];
-            }
-            else {
-                if( my $data_class = $self->_reply_class->{$resp_msg} ) {
-                    $data = $data_class->new($data);
+            my $ok = eval {
+                die "Request and reply message code is different: $resp_msg != $req_msg\n"
+                    unless $resp_msg == $req_msg;
+                if ($unpack) {
+                    $data = [ $unpack->($data) ];
                 }
                 else {
-                    $error = sprintf "Unknown message code %d", $resp_msg;
-                    $data = undef;
+                    if( my $data_class = $self->_reply_class->{$resp_msg} ) {
+                        $data = $data_class->new($data);
+                    }
+                    else {
+                        die sprintf "Unknown message code $resp_msg\n";
+                    }
                 }
+                1;
+            };
+            if($ok) {
+                $callback->($data);
             }
-            delete($self->_callbacks->{$resp_sync})->($data, $error);
+            else {
+                $callback->(undef, $@);
+            }
         }
         return;
     });

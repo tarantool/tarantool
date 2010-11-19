@@ -54,16 +54,33 @@ has port => (
     required => 1,
 );
 
+=item connect_timeout
+
+Timeout of connect operation.
+
+=cut
+
+has connect_timeout => (
+    is  => 'rw',
+    isa => 'Num',
+    default => 2,
+);
+
 =item timeout
 
-Timeout of connect, read and write operations.
+Timeout of read and write operations.
 
 =cut
 
 has timeout => (
-    is  => 'ro',
+    is  => 'rw',
     isa => 'Num',
     default => 2,
+    trigger => sub {
+        my ($self, $new) = @_;
+        $self->_handle->timeout($new) if $self->_has_handle();
+        return;
+    },
 );
 
 =item tcp_nodelay
@@ -212,17 +229,19 @@ sub send {
 
 =over
 
-=item _send( $sync, $header, $payload, $callback )
+=item _send( $msg, $payload, $callback )
 
 Send message to server.
 
 =cut
 
 sub _send {
-    my ($self, $sync, $header, $payload, $callback) = @_;
-    weaken($self);
+    my ($self, $msg, $payload, $callback) = @_;
+    my $sync = $self->_choose_sync();
+    my $header = pack 'L3', $msg, length $payload, $sync;
     $self->_inc_in_progress();
     $self->_callbacks->{$sync} = $callback;
+    $self->_send_started($sync, $msg, $payload);
     $self->_debug_dump(5, 'send header: ', $header);
     $self->_debug_dump(5, 'send payload: ', $payload);
     $self->_handle->push_write( $header . $payload );
@@ -241,7 +260,8 @@ sub _build__read_reply {
             my ($handle, $data) = @_;
             $self->_debug_dump(6, 'recv payload: ', $data);
             $self->_dec_in_progress();
-            delete($self->_callbacks->{$sync})->($msg, $sync, $data);
+            $self->_recv_finished($sync, $msg, $data);
+            delete($self->_callbacks->{$sync})->($msg, $data);
             $self->_try_to_send();
             return;
         });
@@ -259,10 +279,9 @@ sub _try_to_send {
 
 sub _build_debug_cb {
     my ($self) = @_;
-    my $prefix = $self->prefix;
     return sub {
         my ($msg) = @_;
-        warn sprintf "%s: %s\n", $prefix, $msg;
+        warn "$msg\n";
         return;
     };
 }
@@ -277,7 +296,7 @@ sub _build__handle {
         keepalive  => $self->tcp_keepalive,
         timeout    => $self->timeout,
         on_prepare => sub {
-            return $self->timeout;
+            return $self->connect_timeout;
         },
         on_connect => sub {
             my ($handle) = @_;
@@ -287,9 +306,10 @@ sub _build__handle {
         on_error   => sub {
             my ($handle, $fatal, $message) = @_;
             $self->_debug(0, ($fatal ? 'fatal ' : '') . 'error: ' . $message);
-            foreach( values %{$self->_callbacks} ) {
+            foreach my $sync ( keys %{$self->_callbacks} ) {
                 $self->_dec_in_progress();
-                $_->(undef, undef, undef, $message);
+                $self->_recv_finished($sync, undef, undef, $message);
+                $self->_callbacks->{$sync}->(undef, undef, $message);
             }
             $self->_clear_handle();
             $self->_clear_callbacks();
@@ -314,6 +334,38 @@ sub _build__queue {
 sub _build__callbacks {
     my ($self) = @_;
     return {};
+}
+
+sub _choose_sync {
+    my ($self) = @_;
+    my $sync;
+    for( 1 .. 50 ) {
+        $sync = int(rand 0xffffffff);
+        return $sync unless exists $self->_callbacks->{$sync};
+    }
+    die "Can't choose sync value after 50 iterations";
+}
+
+=item _send_started( $sync, $message, $data )
+
+This method is called when message is started to send.
+
+=cut
+
+sub _send_started {
+    my ($self, $sync, $msg, $data) = @_;
+    return;
+}
+
+=item _recv_finished( $sync, $message, $data, $error )
+
+This method is called when message is received.
+
+=cut
+
+sub _recv_finished {
+    my ($self, $sync, $msg, $data, $error) = @_;
+    return;
 }
 
 sub _debug {
