@@ -62,6 +62,21 @@ const struct field ASTERISK = {
 /* hooks */
 typedef int (*box_hook_t) (struct box_txn * txn);
 
+
+/*
+  For tuples of size below this threshold, when sending a tuple
+  to the client, make a deep copy of the tuple for the duration
+  of sending rather than increment a reference counter.
+  This is necessary to avoid excessive page splits when taking
+  a snapshot: many small tuples can be accessed by clients
+  immediately after the snapshot process has forked off,
+  thus incrementing tuple ref count, and causing the OS to
+  create a copy of the memory page for the forked
+  child.
+*/
+
+const int BOX_REF_THRESHOLD = 8196;
+
 struct namespace namespace[256];
 
 struct box_snap_row {
@@ -887,12 +902,18 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 static void
 tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple)
 {
-	tuple_txn_ref(txn, tuple);
+	size_t len;
 
-	add_iov(&tuple->bsize,
-		tuple->bsize +
+	len = tuple->bsize +
 		field_sizeof(struct box_tuple, bsize) +
-		field_sizeof(struct box_tuple, cardinality));
+		field_sizeof(struct box_tuple, cardinality);
+
+	if (len > BOX_REF_THRESHOLD) {
+		tuple_txn_ref(txn, tuple);
+		add_iov(&tuple->bsize, len);
+	} else {
+		add_iov_dup(&tuple->bsize, len);
+	}
 }
 
 static int __noinline__
