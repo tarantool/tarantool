@@ -1,38 +1,48 @@
-# $Id: SilverBox.pm,v 1.49 2010/06/18 08:52:42 nevinitsin Exp $
 package MR::SilverBox;
 
 use strict;
 use warnings;
-use MR::IProto ();
-use MR::Storage::Const ();
 use Scalar::Util qw/looks_like_number/;
 use List::MoreUtils qw/each_arrayref/;
-use Carp qw/confess/;
 
-use constant WANT_RESULT => 1;
-use constant UPDATE_BASE => 2;
-use constant UPDATE_FLAGS => 4;
+use MR::IProto ();
+use MR::Storage::Const ();
+
+use constant {
+    WANT_RESULT       => 1,
+    INSERT_ADD        => 2,
+    INSERT_REPLACE    => 4,
+};
 
 
-sub new
-{
+sub IPROTOCLASS () { 'MR::IProto' }
+sub ERRSTRCLASS () { 'MR::Storage::Const::Errors::SilverBox' }
+
+use vars qw/$VERSION/;
+$VERSION = 0;
+
+BEGIN { *confess = \&MR::IProto::confess }
+
+sub new {
     my ($class, $arg) = @_;
     my $self;
 
     $arg = { %$arg };
-    $self->{name}  = $arg->{name} || ref$class || $class;
-    $self->{timeout}   = $arg->{timeout}   || 23;
-    $self->{retry    } = $arg->{retry}     || 1;
-    $self->{softretry} = $arg->{softretry} || 3;
-    $self->{debug}     = $arg->{'debug'}   || 0;
-    $self->{ipdebug}   = $arg->{'ipdebug'} || 0;
-    $self->{raise}     = 1;
-    $self->{raise}     = $arg->{raise} if exists $arg->{raise};
-#    $self->{default_namespace} = exists $arg->{default_namespace} ? $arg->{default_namespace} : 0;
-    $self->{default_raw} = exists $arg->{default_raw} ? $arg->{default_raw} : 0;
-    $self->{hashify} = $arg->{'hashify'} if exists $arg->{'hashify'};
-#    $self->{string_key} = exists $arg->{string_key} ? $arg->{string_key} : { 1 => 'string' };
-    $self->{select_timeout} = $arg->{select_timeout} || $self->{timeout};
+    $self->{name}            = $arg->{name}      || ref$class || $class;
+    $self->{timeout}         = $arg->{timeout}   || 23;
+    $self->{retry    }       = $arg->{retry}     || 1;
+    $self->{select_retry}    = $arg->{select_retry} || 3;
+    $self->{softretry}       = $arg->{softretry} || 3;
+    $self->{debug}           = $arg->{'debug'}   || 0;
+    $self->{ipdebug}         = $arg->{'ipdebug'} || 0;
+    $self->{raise}           = 1;
+    $self->{raise}           = $arg->{raise} if exists $arg->{raise};
+    $self->{hashify}         = $arg->{'hashify'} if exists $arg->{'hashify'};
+    $self->{default_raw}     = exists $arg->{default_raw} ? $arg->{default_raw} : !$self->{hashify};
+    $self->{select_timeout}  = $arg->{select_timeout} || $self->{timeout};
+    $self->{iprotoclass}     = $arg->{iprotoclass} || $class->IPROTOCLASS;
+    $self->{errstrclass}     = $arg->{errstrclass} || $class->ERRSTRCLASS;
+    $self->{_last_error}     = 0;
 
     $arg->{namespaces} = [@{ $arg->{namespaces} }];
     my %namespaces;
@@ -47,8 +57,9 @@ sub new
         confess "ns[$namespace] bad format `$ns->{format}'" if $ns->{format} =~ m/[^&lLsScC ]/;
         $ns->{format} =~ s/\s+//g;
         my @f = split //, $ns->{format};
-        $ns->{unpack_format} = join('', map { /&/ ? 'w/a*' : "x$_" } @f );
-        $ns->{field_format}  = [        map { /&/ ? 'a*'   : $_    } @f ];
+        $ns->{byfield_unpack_format} = [ map { /&/ ? 'w/a*' : "x$_" } @f ];
+        $ns->{field_format}  = [         map { /&/ ? 'a*'   : $_    } @f ];
+        $ns->{unpack_format}  = join('', @{$ns->{byfield_unpack_format}});
         $ns->{append_for_unpack} = '' unless defined $ns->{append_for_unpack};
         $ns->{check_keys} = {};
         $ns->{string_keys} = { map { $_ => 1 } grep { $f[$_] eq '&' } 0..$#f };
@@ -96,25 +107,36 @@ sub _debug {
 
 sub _connect {
     my ($self, $servers) = @_;
+    $self->{server} = $self->{iprotoclass}->new({
+        servers       => $servers,
+        name          => $self->{name},
+        debug         => $self->{'ipdebug'},
+        dump_no_ints  => 1,
+    });
+}
 
-    $self->{'server'} = MR::IProto->new({ servers => $servers,
-                                          debug => $self->{'ipdebug'},
-                                          dump_no_ints => 1 });
+sub ErrorStr {
+    my ($self, $code) = @_;
+    return $self->{_last_error_msg} if $self->{_last_error} eq 'fail';
+    return $self->{errstrclass}->ErrorStr($code || $self->{_last_error});
+}
+
+sub Error {
+    return $_[0]->{_last_error};
 }
 
 sub _chat {
     my ($self, %param) = @_;
     my $orig_unpack = delete $param{unpack};
-    my $soft_error = {}; # exception, any ref will do
 
     $param{unpack} = sub {
         my $data = $_[0];
         confess __LINE__."$self->{name}: [common]: Bad response" if length $data < 4;
-        my @err_code = unpack('CCCC', substr($data, 0, 4, ''));
+        my ($full_code, @err_code) = unpack('LX[L]CCCC', substr($data, 0, 4, ''));
         # $err_code[0] = severity: 0 -> ok, 1 -> transient, 2 -> permanent;
         # $err_code[1] = description;
         # $err_code[3] = da box project;
-        return (\@err_code, \$data);
+        return (\@err_code, \$data, $full_code);
     };
 
     my $timeout = $param{timeout} || $self->{timeout};
@@ -125,31 +147,37 @@ sub _chat {
     while ($retry > 0) {
         $retry_count++;
 
+        $self->{_last_error} = 0x77777777;
         $self->{server}->SetTimeout($timeout);
         my $ret = $self->{server}->Chat1(%param);
         my $message;
 
         if (exists $ret->{ok}) {
-            my ($ret_code, $data) = @{$ret->{ok}};
+            my ($ret_code, $data, $full_code) = @{$ret->{ok}};
+            $self->{_last_error} = $full_code;
             if ($ret_code->[0] == 0) {
                 my $ret = $orig_unpack->($$data,$ret_code->[3]);
                 confess __LINE__."$self->{name}: [common]: Bad response (more data left)" if length $$data > 0;
                 return $ret;
             }
 
-            my $full_code = ($ret_code->[1] << 8) + $ret_code->[0];
-            $message = MR::Storage::Const::Errors::SilverBox->ErrorStr($full_code);
-            confess "$self->{name}: $message" if $ret_code->[0] == 2; #fatal error
-            $self->_debug("$self->{name}: $message");
+            $message = $self->{errstrclass}->ErrorStr($full_code);
+            $self->_debug("$self->{name}: $message") if $self->{debug} >= 1;
+            if ($ret_code->[0] == 2) { #fatal error
+                $self->_raise($message) if $self->{raise};
+                return 0;
+            }
 
             # retry if error is soft even in case of update e.g. ROW_LOCK
             if ($ret_code->[0] == 1 and --$soft_retry > 0) {
                 --$retry if $retry > 1;
+                sleep 1;
                 next;
             }
-        } else {
-            $message ||= $ret->{fail} || $ret->{timeout};
-            $self->_debug("$self->{name}: $message");
+        } else { # timeout has caused the failure if $ret->{timeout}
+            $self->{_last_error} = 'fail';
+            $message ||= $self->{_last_error_msg} = $ret->{fail};
+            $self->_debug("$self->{name}: $message") if $self->{debug} >= 1;
         }
 
         last unless --$retry;
@@ -157,16 +185,20 @@ sub _chat {
         sleep 1;
     };
 
-    confess "$self->{name}: no success after $retry_count tries\n" if $self->{raise};
+    $self->_raise("no success after $retry_count tries\n") if $self->{raise};
 }
 
-sub _validate_param
-{
+sub _raise {
+    my ($self, $msg) = @_;
+    die "$self->{name}: $msg";
+}
+
+sub _validate_param {
     my ($self, $args, @pnames) = @_;
     my $param = ref $args->[-1] eq 'HASH' ? pop @$args: {};
 
     foreach my $pname (keys %$param) {
-        confess "$self->{name}: unknown param $pname\n" if grep { $_ eq $pname } @pnames == 0;
+        confess "$self->{name}: unknown param $pname\n" if 0 == grep { $_ eq $pname } @pnames;
     }
 
     $param->{namespace} = $self->{default_namespace} unless defined $param->{namespace};
@@ -178,17 +210,39 @@ sub _validate_param
     return ($param, map { /namespace/ ? $self->{namespaces}->{$param->{namespace}} : $param->{$_} } @pnames);
 }
 
+sub Add { # store tuple if tuple identified by primary key _does_not_ exist
+    my $param = @_ && ref $_[-1] eq 'HASH' ? pop : {};
+    $param->{action} = 'add';
+    $_[0]->Insert(@_[1..$#_], $param);
+}
 
-sub Insert
-{
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace update_base/);
+sub Set { # store tuple _anyway_
+    my $param = @_ && ref $_[-1] eq 'HASH' ? pop : {};
+    $param->{action} = 'set';
+    $_[0]->Insert(@_[1..$#_], $param);
+}
+
+sub Replace { # store tuple if tuple identified by primary key _does_ exist
+    my $param = @_ && ref $_[-1] eq 'HASH' ? pop : {};
+    $param->{action} = 'replace';
+    $_[0]->Insert(@_[1..$#_], $param);
+}
+
+sub Insert {
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace _flags action/);
     my ($self, @tuple) = @_;
 
     $self->_debug("$self->{name}: INSERT(@{[map {qq{`$_'}} @tuple]})") if $self->{debug} >= 3;
 
-    my $flags = 0;
-    $flags |= UPDATE_BASE if $param->{update_base};
-
+    my $flags = $param->{_flags} || 0;
+    $param->{action} ||= 'set';
+    if ($param->{action} eq 'add') {
+        $flags |= INSERT_ADD;
+    } elsif ($param->{action} eq 'replace') {
+        $flags |= INSERT_REPLACE;
+    } elsif ($param->{action} ne 'set') {
+        confess "$self->{name}: Bad insert action `$param->{action}'";
+    }
     my $chkkey = $namespace->{check_keys};
     my $fmt = $namespace->{field_format};
     for (0..$#tuple) {
@@ -259,8 +313,7 @@ sub _unpack_affected {
 }
 
 sub NPRM () { 3 }
-sub _pack_keys
-{
+sub _pack_keys {
     my ($self, $ns, $idx) = @_;
 
     my $keys   = $idx->{keys};
@@ -296,37 +349,20 @@ sub _PackSelect {
     my ($self, $param, $namespace, @keys) = @_;
     return '' unless @keys;
     $self->_pack_keys($namespace, $param->{index}, @keys);
-    return pack("LLLLL a*", $namespace->{namespace}, $param->{index}->{id}, $param->{offset} || 0, $param->{limit} || scalar(@keys), scalar(@keys), join('',@keys));
-}
-
-sub SelectUnion {
-    my ($param) = $_[0]->_validate_param(\@_, qw/raw/);
-    my ($self, @reqs) = @_;
-    return [] unless @reqs;
-    confess "bad param" if grep { ref $_ ne 'ARRAY' } @reqs;
-    $param->{raw} ||= $self->{default_raw};
-    $param->{want} ||= 0;
-    for my $req (@reqs) {
-        my ($param, $namespace) = $self->_validate_param($req, qw/namespace use_index raw limit offset/);
-        $req = {
-            payload   => $self->_PackSelect($param, $namespace, $req),
-            param     => $param,
-            namespace => $namespace,
-        };
+    my $format = "";
+    if ($param->{format}) {
+        my $f = $namespace->{byfield_unpack_format};
+        $param->{unpack_format} = join '', map { $f->[$_->{field}] } @{$param->{format}};
+        $format = pack 'l*', scalar @{$param->{format}}, map {
+            if($_->{full}) {
+                $_->{offset} = 0;
+                $_->{length} = 'max';
+            }
+            $_->{length} = 0x7FFFFFFF if $_->{length} eq 'max';
+            @$_{qw/field offset length/}
+        } @{$param->{format}};
     }
-    my $r = $self->_chat(
-        msg      => 18,
-        payload  => pack("L (a*)*", scalar(@reqs), map { $_->{payload} } @reqs),
-        unpack   => sub { $self->_unpack_select_multi([map { $_->{namespace} } @reqs], "SMULTI", @_) },
-        retry    => 3,
-        timeout  => $param->{timeout} || $self->{select_timeout},
-    ) or return;
-    confess __LINE__."$self->{name}: something wrong" if @$r != @reqs;
-    my $ea = each_arrayref $r, \@reqs;
-    while(my ($res, $req) = $ea->()) {
-        $self->_PostSelect($res, { hashify => $req->{namespace}->{hashify}||$self->{hashify}, %$param, %{$req->{param}}, namespace => $req->{namespace} });
-    }
-    return $r;
+    return pack("LLLL a* La*", $namespace->{namespace}, $param->{index}->{id}, $param->{offset} || 0, $param->{limit} || scalar(@keys), $format, scalar(@keys), join('',@keys));
 }
 
 sub _PostSelect {
@@ -336,14 +372,15 @@ sub _PostSelect {
     }
 }
 
-sub Select
-{
+my @select_param_ok = qw/namespace use_index raw want next_rows limit offset raise hashify timeout format hash_by/;
+sub Select {
     confess q/Select isnt callable in void context/ unless defined wantarray;
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace use_index raw want next_rows limit offset/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, @select_param_ok);
     my ($self, @keys) = @_;
-    @keys = @{$keys[0]} if ref $keys[0] eq 'ARRAY';
+    local $self->{raise} = $param->{raise} if defined $param->{raise};
+    @keys = @{$keys[0]} if ref $keys[0] eq 'ARRAY' and 1 == @{$param->{index}->{keys}} || ref $keys[0]->[0] eq 'ARRAY';
 
-    $self->_debug("$self->{name}: SELECT($namespace->{namespace})[@{[map{ref$_?qq{[@$_]}:$_}@keys]}]") if $self->{debug} >= 3;
+    $self->_debug("$self->{name}: SELECT($namespace->{namespace}/$param->{use_index})[@{[map{ref$_?qq{[@$_]}:$_}@keys]}]") if $self->{debug} >= 3;
 
     my ($msg,$payload);
     if(exists $param->{next_rows}) {
@@ -352,25 +389,43 @@ sub Select
         $self->_pack_keys($namespace, $param->{index}, @keys);
         $payload = pack("LL a*", $namespace->{namespace}, $param->{next_rows}, join('',@keys)),
     } else {
-        $msg = 17;
-        $payload = $self->_PackSelect($param, $namespace, @keys) or return [];
+        $payload = $self->_PackSelect($param, $namespace, @keys);
+        $msg = $param->{format} ? 21 : 17;
     }
 
+    local $namespace->{unpack_format} = $param->{unpack_format} if $param->{unpack_format};
+
     my $r = [];
-    if (@keys) {
+    if (@keys && $payload) {
         $r = $self->_chat(
             msg      => $msg,
             payload  => $payload,
             unpack   => sub { $self->_unpack_select($namespace, "SELECT", @_) },
-            retry    => 3,
+            retry    => $self->{select_retry},
             timeout  => $param->{timeout} || $self->{select_timeout},
-        );
+        ) or return;
     }
 
-    $param->{raw} ||= $self->{default_raw};
+    $param->{raw} = $self->{default_raw} unless exists $param->{raw};
     $param->{want} ||= !1;
 
-    $self->_PostSelect($r, { hashify => $namespace->{hashify}||$self->{hashify}, %$param, namespace => $namespace });
+    $self->_PostSelect($r, { hashify => $param->{hashify}||$namespace->{hashify}||$self->{hashify}, %$param, namespace => $namespace });
+
+    if(defined(my $p = $param->{hash_by})) {
+        my %h;
+        if(@$r) {
+            if (ref $r->[0] eq 'HASH') {
+                confess "Bad hash_by `$p' for HASH" unless exists $r->[0]->{$p};
+                $h{$_->{$p}} = $_ for @$r;
+            } elsif(ref $r->[0] eq 'ARRAY') {
+                confess "Bad hash_by `$p' for ARRAY" unless $p =~ m/^\d+$/ && $p >= 0 && $p < @{$r->[0]};
+                $h{$_->[$p]} = $_ for @$r;
+            } else {
+                confess "i dont know how to hash_by ".ref($r->[0]);
+            }
+        }
+        return \%h;
+    }
 
     return $r if $param->{want} eq 'arrayref';
 
@@ -382,8 +437,39 @@ sub Select
     }
 }
 
-sub Delete
-{
+sub SelectUnion {
+    confess "not supported yet";
+    my ($param) = $_[0]->_validate_param(\@_, qw/raw raise/);
+    my ($self, @reqs) = @_;
+    return [] unless @reqs;
+    local $self->{raise} = $param->{raise} if defined $param->{raise};
+    confess "bad param" if grep { ref $_ ne 'ARRAY' } @reqs;
+    $param->{raw} = $self->{default_raw} unless exists $param->{raw};
+    $param->{want} ||= 0;
+    for my $req (@reqs) {
+        my ($param, $namespace) = $self->_validate_param($req, @select_param_ok);
+        $req = {
+            payload   => $self->_PackSelect($param, $namespace, $req),
+            param     => $param,
+            namespace => $namespace,
+        };
+    }
+    my $r = $self->_chat(
+        msg      => 18,
+        payload  => pack("L (a*)*", scalar(@reqs), map { $_->{payload} } @reqs),
+        unpack   => sub { $self->_unpack_select_multi([map { $_->{namespace} } @reqs], "SMULTI", @_) },
+        retry    => $self->{select_retry},
+        timeout  => $param->{timeout} || $self->{select_timeout},
+    ) or return;
+    confess __LINE__."$self->{name}: something wrong" if @$r != @reqs;
+    my $ea = each_arrayref $r, \@reqs;
+    while(my ($res, $req) = $ea->()) {
+        $self->_PostSelect($res, { hashify => $req->{namespace}->{hashify}||$self->{hashify}, %$param, %{$req->{param}}, namespace => $req->{namespace} });
+    }
+    return $r;
+}
+
+sub Delete {
     my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace/);
     my ($self, $key) = @_;
 
@@ -404,6 +490,7 @@ sub OP_ADD          () { 1 }
 sub OP_AND          () { 2 }
 sub OP_XOR          () { 3 }
 sub OP_OR           () { 4 }
+sub OP_SPLICE       () { 5 }
 
 my %update_ops = (
     set         => OP_SET,
@@ -411,16 +498,49 @@ my %update_ops = (
     and         => OP_AND,
     xor         => OP_XOR,
     or          => OP_OR,
+    splice      => sub {
+        confess "value for operation splice must be an ARRAYREF of <int[, int[, string]]>" if ref $_[0] ne 'ARRAY' || @{$_[0]} < 1;
+        $_[0]->[0] = 0x7FFFFFFF unless defined $_[0]->[0];
+        $_[0]->[0] = pack 'l', $_[0]->[0];
+        $_[0]->[1] = defined $_[0]->[1] ? pack 'l', $_[0]->[1] : '';
+        $_[0]->[2] = '' unless defined $_[0]->[2];
+        return (OP_SPLICE, [ pack '(w/a)*', @{$_[0]} ]);
+    },
+    append      => sub { splice => [undef,  0,     $_[0]] },
+    prepend     => sub { splice => [0,      0,     $_[0]] },
+    cutbeg      => sub { splice => [0,      $_[0], ''   ] },
+    cutend      => sub { splice => [-$_[0], $_[0], ''   ] },
+    substr      => 'splice',
 );
+
+!ref $_ && m/^\D/ and $_ = $update_ops{$_} || die "bad link" for values %update_ops;
 
 my %update_arg_fmt = (
     (map { $_ => 'l' } OP_ADD),
     (map { $_ => 'L' } OP_AND, OP_XOR, OP_OR),
 );
 
-sub UpdateMulti
-{
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace want_result update_base update_flags/);
+my %ops_type = (
+    (map { $_ => 'any'    } OP_SET),
+    (map { $_ => 'number' } OP_ADD, OP_AND, OP_XOR, OP_OR),
+    (map { $_ => 'string' } OP_SPLICE),
+);
+
+BEGIN {
+    for my $op (qw/Append Prepend Cutbeg Cutend Substr/) {
+        eval q/
+            sub /.$op.q/ {
+                my $param = ref $_[-1] eq 'HASH' ? pop : {};
+                my ($self, $key, $field_num, $val) = @_;
+                $self->UpdateMulti($key, [ $field_num => /.lc($op).q/ => $val ], $param);
+            }
+            1;
+        / or die $@;
+    }
+}
+
+sub UpdateMulti {
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace want_result _flags raw/);
     my ($self, $key, @op) = @_;
 
     $self->_debug("$self->{name}: UPDATEMULTI($namespace->{namespace}=$key)[@{[map{qq{[@$_]}}@op]}]") if $self->{debug} >= 3;
@@ -428,17 +548,17 @@ sub UpdateMulti
     confess "$self->{name}\->UpdateMulti: for now key cardinality of 1 is only allowed" unless 1 == @{$param->{index}->{keys}};
     confess "$self->{name}: too many op" if scalar @op > 128;
 
-    my $flags = 0;
+    my $flags = $param->{_flags} || 0;
     $flags |= WANT_RESULT if $param->{want_result};
-    $flags |= UPDATE_BASE if $param->{update_base};
-    $flags |= UPDATE_FLAGS if $param->{update_flags};
 
     my $fmt = $namespace->{field_format};
 
     foreach (@op) {
         confess "$self->{name}: bad op <$_>" if ref ne 'ARRAY' or @$_ != 3;
         my ($field_num, $op, $value) = @$_;
+        my $field_type = $namespace->{string_keys}->{$field_num} ? 'string' : 'number';
 
+        my $is_array = 0;
         if ($op eq 'bit_set') {
             $op = OP_OR;
         } elsif ($op eq 'bit_clear') {
@@ -452,9 +572,18 @@ sub UpdateMulti
             $op = $update_ops{$op};
         }
 
-        confess "dunno what to do with ref `$value'" if ref $value;
+        while(ref $op eq 'CODE') {
+            ($op, $value) = &$op($value);
+            $op = $update_ops{$op} if exists $update_ops{$op};
+        }
+
+        confess "Are you sure you want to apply `$ops_type{$op}' operation to $field_type field?" if $ops_type{$op} ne $field_type && $ops_type{$op} ne 'any';
+
+        $value = [ $value ] unless ref $value;
+        confess "dunno what to do with ref `$value'" if ref $value ne 'ARRAY';
+
         confess "bad fieldnum: $field_num" if $field_num >= @$fmt;
-        $value = pack($update_arg_fmt{$op} || $fmt->[$field_num], $value);
+        $value = pack($update_arg_fmt{$op} || $fmt->[$field_num], @$value);
         $_ = pack('LCw/a*', $field_num, $op, $value);
     }
 
@@ -467,15 +596,13 @@ sub UpdateMulti
     );
 }
 
-sub Update
-{
+sub Update {
     my $param = ref $_[-1] eq 'HASH' ? pop : {};
     my ($self, $key, $field_num, $value) = @_;
     $self->UpdateMulti($key, [$field_num => set => $value ], $param);
 }
 
-sub AndXorAdd
-{
+sub AndXorAdd {
     my $param = ref $_[-1] eq 'HASH' ? pop : {};
     my ($self, $key, $field_num, $and, $xor, $add) = @_;
     my @upd;
@@ -485,8 +612,7 @@ sub AndXorAdd
     $self->UpdateMulti($key, @upd, $param);
 }
 
-sub Bit
-{
+sub Bit {
     my $param = ref $_[-1] eq 'HASH' ? pop : {};
     my ($self, $key, $field_num, %arg) = @_;
     confess "$self->{name}: unknown op '@{[keys %arg]}'"  if grep { not /^(bit_clear|bit_set|set)$/ } keys(%arg);
@@ -501,8 +627,7 @@ sub Bit
     $self->UpdateMulti($key, @op, $param);
 }
 
-sub Num
-{
+sub Num {
     my $param = ref $_[-1] eq 'HASH' ? pop : {};
     my ($self, $key, $field_num, %arg) = @_;
     confess "$self->{name}: unknown op '@{[keys %arg]}'"  if grep { not /^(num_add|num_sub|set)$/ } keys(%arg);

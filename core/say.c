@@ -65,8 +65,8 @@ say_logger_init(int nonblock)
 {
 	int pipefd[2];
 	pid_t pid;
-	char *argv[] = {"/bin/sh", "-c", cfg.logger, NULL};
-	char *envp[] = {NULL};
+	char *argv[] = { "/bin/sh", "-c", cfg.logger, NULL };
+	char *envp[] = { NULL };
 
 	if (cfg.logger != NULL) {
 		if (pipe(pipefd) == -1) {
@@ -93,7 +93,7 @@ say_logger_init(int nonblock)
 	} else {
 		sayfd = STDERR_FILENO;
 	}
-out:
+      out:
 	if (nonblock)
 		set_nonblock(sayfd);
 }
@@ -104,6 +104,8 @@ vsay(int level, const char *error, const char *format, va_list ap)
 	char *peer_name = fiber_peer_name(fiber);
 	size_t p = 0, len = PIPE_BUF;
 	static char buf[PIPE_BUF];
+
+	ev_now_update();
 
 	if (peer_name == NULL)
 		peer_name = "_";

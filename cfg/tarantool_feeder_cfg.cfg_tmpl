@@ -42,9 +42,6 @@ logger_nonblock=1
 # delay between loop iteraions
 io_collect_interval=0.0
 
-# do not write snapshot faster then snap_io_rate_limit MBytes/sec
-snap_io_rate_limit=0.0
-
 # size of listen backlog
 backlog=1024
 
@@ -57,3 +54,6 @@ wal_feeder_bind_port=0
 
 # Directory with WAL files to serve
 wal_feeder_dir=NULL
+
+# custom proc title is appended after normal
+custom_proc_title=NULL

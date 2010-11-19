@@ -31,8 +31,10 @@
 #include <fiber.h>
 #include <util.h>
 
+static char *custom_proc_title;
+
 static int
-send_row(struct recovery_state *r __unused__, const struct tbuf *t)
+send_row(struct recovery_state *r __unused__, struct tbuf *t)
 {
 	u8 *data = t->data;
 	ssize_t bytes, len = t->len;
@@ -46,7 +48,7 @@ send_row(struct recovery_state *r __unused__, const struct tbuf *t)
 		data += bytes;
 	}
 
-	say_debug("send row: %"PRIu32" bytes %s", t->len, tbuf_to_hex(t));
+	say_debug("send row: %" PRIu32 " bytes %s", t->len, tbuf_to_hex(t));
 
 	return 0;
 }
@@ -55,13 +57,14 @@ static void
 recover_feed_slave(int sock)
 {
 	struct recovery_state *log_io;
+	struct tbuf *ver;
 	i64 lsn;
 	ssize_t r;
 
 	fiber->has_peer = true;
 	fiber->fd = sock;
 	fiber->name = "feeder";
-	set_proc_title("feeder:client_handler %s", fiber_peer_name(fiber));
+	set_proc_title("feeder:client_handler%s %s", custom_proc_title, fiber_peer_name(fiber));
 
 	ev_default_loop(0);
 
@@ -72,16 +75,17 @@ recover_feed_slave(int sock)
 		exit(EXIT_SUCCESS);
 	}
 
+	ver = tbuf_alloc(fiber->pool);
+	tbuf_append(ver, &default_version, sizeof(default_version));
+	send_row(NULL, ver);
+
 	log_io = recover_init(NULL, cfg.wal_feeder_dir,
-			      NULL, NULL, send_row,
-			      0, 0, 0, 
-			      64, RECOVER_READONLY, false);
+			      NULL, send_row, 0, 0, 64, RECOVER_READONLY, false);
 
 	recover(log_io, lsn);
 	recover_follow(log_io, 0.1);
 	ev_loop(0);
 }
-
 
 void
 mod_init(void)
@@ -96,7 +100,16 @@ mod_init(void)
 	if (cfg.wal_feeder_dir == NULL)
 		panic("can't start feeder without wal_feeder_dir");
 
-	set_proc_title("feeder:acceptor %s:%i",
+	if (cfg.custom_proc_title == NULL)
+		custom_proc_title = "";
+	else {
+		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
+		strcat(custom_proc_title, "@");
+		strcat(custom_proc_title, cfg.custom_proc_title);
+	}
+
+	set_proc_title("feeder:acceptor%s %s:%i",
+		       custom_proc_title,
 		       cfg.wal_feeder_bind_ipaddr == NULL ? "ANY" : cfg.wal_feeder_bind_ipaddr,
 		       cfg.wal_feeder_bind_port);
 
@@ -123,7 +136,7 @@ mod_init(void)
 		goto exit;
 	}
 
-	if (bind(server, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+	if (bind(server, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
 		say_syserror("bind");
 		goto exit;
 	}
@@ -144,7 +157,15 @@ mod_init(void)
 		}
 		if (child == 0)
 			recover_feed_slave(client);
+		else
+			close(client);
 	}
-exit:
+      exit:
 	exit(EXIT_FAILURE);
+}
+
+void
+mod_exec(char *str __unused__, int len __unused__, struct tbuf *out)
+{
+	tbuf_printf(out, "Unimplemented");
 }

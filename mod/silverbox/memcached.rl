@@ -40,6 +40,16 @@
 #include <mod/silverbox/box.h>
 #include <stat.h>
 
+
+#define STAT(_)					\
+        _(MEMC_GET, 1)				\
+        _(MEMC_GET_MISS, 2)			\
+	_(MEMC_GET_HIT, 3)
+
+ENUM(memcached_stat, STAT);
+STRS(memcached_stat, STAT);
+int stat_base;
+
 struct index *memcached_index;
 
 /* memcached tuple format:
@@ -117,7 +127,7 @@ delete(struct box_txn *txn, void *key)
 static struct box_tuple *
 find(void *key)
 {
-	return index_find(memcached_index, 1, key);
+	return memcached_index->find(memcached_index, key);
 }
 
 static struct meta *
@@ -192,7 +202,7 @@ flush_all(void *data)
 {
 	uintptr_t delay = (uintptr_t)data;
 	fiber_sleep(delay - ev_now());
-	khash_t(lstr2ptr_map) *map = memcached_index->map.str_map;
+	khash_t(lstr2ptr_map) *map = memcached_index->idx.str_hash;
 	for (khiter_t i = kh_begin(map); i != kh_end(map); i++) {
 		if (kh_exist(map, i)) {
 			struct box_tuple *tuple = kh_value(map, i);
@@ -370,9 +380,9 @@ memcached_dispatch(struct box_txn *txn)
 		action get {
 			txn->op = SELECT;
 			fiber_register_cleanup((void *)txn_cleanup, txn);
-			stat_collect("MEMC_GET", 1);
+			stat_collect(stat_base, MEMC_GET, 1);
 			stats.cmd_get++;
-			say_debug("nesuring space for %i keys", keys->len);
+			say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
 			iov_ensure(keys_count * 5 + 1);
 			while (keys_count-- > 0) {
 				struct box_tuple *tuple;
@@ -390,7 +400,7 @@ memcached_dispatch(struct box_txn *txn)
 				key_len = load_varint32(&key);
 
 				if (tuple == NULL || tuple->flags & GHOST) {
-					stat_collect("MEMC_GET_MISS", 1);
+					stat_collect(stat_base, MEMC_GET_MISS, 1);
 					stats.get_misses++;
 					continue;
 				}
@@ -417,11 +427,11 @@ memcached_dispatch(struct box_txn *txn)
 
 				if (m->exptime > 0 && m->exptime < ev_now()) {
 					stats.get_misses++;
-					stat_collect("MEMC_GET_MISS", 1);
+					stat_collect(stat_base, MEMC_GET_MISS, 1);
 					continue;
 				} else {
 					stats.get_hits++;
-					stat_collect("MEMC_GET_HIT", 1);
+					stat_collect(stat_base, MEMC_GET_HIT, 1);
 				}
 
 				tuple_txn_ref(txn, tuple);
@@ -582,7 +592,7 @@ memcached_handler(void *_data __unused__)
 	stats.curr_connections++;
 	int r, p;
 	int batch_count;
-	int i = 0;
+
 	for (;;) {
 		batch_count = 0;
 		if ((r = fiber_bread(fiber->rbuf, 1)) <= 0) {
@@ -615,10 +625,7 @@ memcached_handler(void *_data __unused__)
 		}
 
 		stats.bytes_written += r;
-		fiber_cleanup();
-
-		if (i++ % 20 == 0)
-			fiber_gc();
+		fiber_gc();
 
 		if (p == 1 && fiber->rbuf->len > 0) {
 			batch_count = 0;
@@ -633,10 +640,16 @@ exit:
 }
 
 void
+memcached_init(void)
+{
+	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
+}
+
+void
 memcached_expire(void *data __unused__)
 {
 	static khiter_t i;
-	khash_t(lstr2ptr_map) *map = memcached_index->map.str_map;
+	khash_t(lstr2ptr_map) *map = memcached_index->idx.str_hash;
 
 	say_info("memcached expire fiber started");
 	for (;;) {
@@ -669,7 +682,7 @@ memcached_expire(void *data __unused__)
 
 		fiber_gc();
 
-		double delay = cfg.memcached_expire_per_loop * cfg.memcached_expire_full_sweep / (map->size + 1);
+		double delay = (double)cfg.memcached_expire_per_loop * cfg.memcached_expire_full_sweep / (map->size + 1);
 		if (delay > 1)
 			delay = 1;
 		fiber_sleep(delay);

@@ -40,12 +40,12 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->logger = NULL;
 	c->logger_nonblock = 1;
 	c->io_collect_interval = 0;
-	c->snap_io_rate_limit = 0;
 	c->backlog = 1024;
 	c->readahead = 16320;
 	c->wal_feeder_bind_ipaddr = NULL;
 	c->wal_feeder_bind_port = 0;
 	c->wal_feeder_dir = NULL;
+	c->custom_proc_title = NULL;
 	return 0;
 }
 
@@ -85,9 +85,6 @@ static NameAtom _name__logger_nonblock[] = {
 static NameAtom _name__io_collect_interval[] = {
 	{ "io_collect_interval", -1, NULL }
 };
-static NameAtom _name__snap_io_rate_limit[] = {
-	{ "snap_io_rate_limit", -1, NULL }
-};
 static NameAtom _name__backlog[] = {
 	{ "backlog", -1, NULL }
 };
@@ -102,6 +99,9 @@ static NameAtom _name__wal_feeder_bind_port[] = {
 };
 static NameAtom _name__wal_feeder_dir[] = {
 	{ "wal_feeder_dir", -1, NULL }
+};
+static NameAtom _name__custom_proc_title[] = {
+	{ "custom_proc_title", -1, NULL }
 };
 
 #define ARRAYALLOC(x,n,t)  do {                                     \
@@ -244,14 +244,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if ( (c->io_collect_interval == 0 || c->io_collect_interval == -HUGE_VAL || c->io_collect_interval == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		errno = 0;
-		c->snap_io_rate_limit = strtod(opt->paramValue.numberval, NULL);
-		if ( (c->snap_io_rate_limit == 0 || c->snap_io_rate_limit == -HUGE_VAL || c->snap_io_rate_limit == HUGE_VAL) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-	}
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
@@ -299,6 +291,14 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		c->wal_feeder_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		 if (opt->paramValue.stringval && c->wal_feeder_dir == NULL)
+			return CNF_NOMEMORY;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__custom_proc_title) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		errno = 0;
+		c->custom_proc_title = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		 if (opt->paramValue.stringval && c->custom_proc_title == NULL)
 			return CNF_NOMEMORY;
 	}
 	else {
@@ -366,6 +366,10 @@ acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, i
 				out_warning(r, "Not enough memory to accept '%s' option", dumpOptDef(opt->name));
 				if (n_skipped) (*n_skipped)++;
 				break;
+			case CNF_NOTSET:
+				out_warning(r, "Option '%s' is not set (or has a default value)", dumpOptDef(opt->name));
+				if (n_skipped) (*n_skipped)++;
+				break;
 			default:
 				out_warning(r, "Unknown error for '%s' option", dumpOptDef(opt->name));
 				if (n_skipped) (*n_skipped)++;
@@ -409,12 +413,12 @@ typedef enum IteratorState {
 	S_name__logger,
 	S_name__logger_nonblock,
 	S_name__io_collect_interval,
-	S_name__snap_io_rate_limit,
 	S_name__backlog,
 	S_name__readahead,
 	S_name__wal_feeder_bind_ipaddr,
 	S_name__wal_feeder_bind_port,
 	S_name__wal_feeder_dir,
+	S_name__custom_proc_title,
 	_S_Finished
 } IteratorState;
 
@@ -565,17 +569,6 @@ again:
 			}
 			sprintf(*v, "%g", c->io_collect_interval);
 			snprintf(buf, PRINTBUFLEN-1, "io_collect_interval");
-			i->state = S_name__snap_io_rate_limit;
-			return buf;
-		case S_name__snap_io_rate_limit:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%g", c->snap_io_rate_limit);
-			snprintf(buf, PRINTBUFLEN-1, "snap_io_rate_limit");
 			i->state = S_name__backlog;
 			return buf;
 		case S_name__backlog:
@@ -629,6 +622,16 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "wal_feeder_dir");
+			i->state = S_name__custom_proc_title;
+			return buf;
+		case S_name__custom_proc_title:
+			*v = (c->custom_proc_title) ? strdup(c->custom_proc_title) : NULL;
+			if (*v == NULL && c->custom_proc_title) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "custom_proc_title");
 			i->state = _S_Finished;
 			return buf;
 		case _S_Finished:
@@ -639,5 +642,14 @@ again:
 			free(i);
 	}
 	return NULL;
+}
+
+/************** Checking of required fields  **************/
+int
+check_cfg_tarantool_cfg(tarantool_cfg *c) {
+	tarantool_cfg_iterator_t iterator, *i = &iterator;
+	int	res = 0;
+
+	return res;
 }
 

@@ -19,8 +19,8 @@ Cons:
 
 How to run:
 
-1) compile
-	make _release_box/tarantool_silverbox
+1) compile (note GNU make is required)
+	(g)make _release_box/tarantool_silverbox
 2) customize config
 	emacs cfg/tarantool_silverbox_cfg.cfg
 3) initialize storage

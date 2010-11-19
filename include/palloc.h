@@ -32,20 +32,22 @@
 #include <stdint.h>
 
 #include <tbuf.h>
+#include <util.h>
 #include <third_party/queue.h>
 
 struct palloc_pool;
 extern struct palloc_pool *eter_pool;
 int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size);
-void *p0alloc(struct palloc_pool *pool, size_t size);
+void *palloc(struct palloc_pool *pool, size_t size) __regparm2__;
+void *p0alloc(struct palloc_pool *pool, size_t size) __regparm2__;
 void *palloca(struct palloc_pool *pool, size_t size, size_t align);
 void prelease(struct palloc_pool *pool);
+void prelease_after(struct palloc_pool *pool, size_t after);
 struct palloc_pool *palloc_create_pool2(const char *name, size_t initial_size);
 struct palloc_pool *palloc_create_pool(const char *name);
 void palloc_destroy(struct palloc_pool *);
 const char *palloc_name(struct palloc_pool *, const char *);
-size_t palloc_greatest_size(void);
+size_t palloc_allocated(struct palloc_pool *);
 
 void palloc_stat(struct tbuf *buf);
 

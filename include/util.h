@@ -39,7 +39,7 @@
 #define ENUM_STRS_MEMBER(s, v) [s] = #s,
 #define ENUM(enum_name, enum_members) enum enum_name {enum_members(ENUM_MEMBER) enum_name##_MAX}
 #define STRS(enum_name, enum_members) \
-	const char *enum_name##_strs[enum_name##_MAX + 1] = {enum_members(ENUM_STRS_MEMBER) '\0'}
+	char *enum_name##_strs[enum_name##_MAX + 1] = {enum_members(ENUM_STRS_MEMBER) '\0'}
 
 // Macros for printf functions
 #include <inttypes.h>
@@ -47,10 +47,12 @@
 #define PRI_SZ  "lu"
 #define PRI_SSZ "ld"
 #define PRI_OFFT "lu"
+#define PRI_XFFT "lx"
 #else
 #define PRI_SZ  "u"
 #define PRI_SSZ "d"
 #define PRI_OFFT "llu"
+#define PRI_XFFT "llx"
 #endif
 
 #define nelem(x)     (sizeof((x))/sizeof((x)[0]))
@@ -72,19 +74,20 @@
 
 #ifndef TYPEALIGN
 #define TYPEALIGN(ALIGNVAL,LEN)  \
-        (((long) (LEN) + ((ALIGNVAL) - 1)) & ~((long) ((ALIGNVAL) - 1)))
+        (((uintptr_t) (LEN) + ((ALIGNVAL) - 1)) & ~((uintptr_t) ((ALIGNVAL) - 1)))
 
 #define SHORTALIGN(LEN)                 TYPEALIGN(sizeof(int16_t), (LEN))
 #define INTALIGN(LEN)                   TYPEALIGN(sizeof(int32_t), (LEN))
 #define MAXALIGN(LEN)                   TYPEALIGN(sizeof(int64_t), (LEN))
 #define PTRALIGN(LEN)                   TYPEALIGN(sizeof(void*), (LEN))
+#define CACHEALIGN(LEN)			TYPEALIGN(32, (LEN))
 #endif
-
 
 #define __packed__ __attribute__((packed))
 #define __noinline__ __attribute__((noinline))
 #define __unused__ __attribute__((unused))
 #define __cleanup__(f) __attribute__((cleanup (f)))
+#define __regparm2__  __attribute__((regparm(2)))
 
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -109,12 +112,10 @@ void *xrealloc(void *ptr, size_t size);
 
 void __gcov_flush();
 
-
 struct frame {
 	struct frame *rbp;
 	void *ret;
 };
-
 
 void save_rbp(void **rbp);
 extern void *main_stack_frame;
@@ -124,7 +125,7 @@ extern void *main_stack_frame;
 #else
 #  define assert(pred) ((pred) ? (void)(0) : assert_fail (#pred, __FILE__, __LINE__, __FUNCTION__))
 void assert_fail(const char *assertion, const char *file,
-		 unsigned int line, const char *function) __attribute__((noreturn));
+		 unsigned int line, const char *function) __attribute__ ((noreturn));
 #endif
 
 #endif

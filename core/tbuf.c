@@ -44,13 +44,11 @@
 #  define poison(ptr, len)
 #endif
 
-
 static void
-tbuf_assert(const struct tbuf * b)
+tbuf_assert(const struct tbuf *b)
 {
-	(void)b; /* arg used :-) */
+	(void)b;		/* arg used :-) */
 	assert(b->len <= b->size);
-	assert(b->size <= palloc_greatest_size());
 }
 
 struct tbuf *
@@ -58,10 +56,10 @@ tbuf_alloc(struct palloc_pool *pool)
 {
 	const size_t initial_size = 128 - sizeof(struct tbuf);
 	struct tbuf *e = palloc(pool, sizeof(*e) + initial_size);
-	e->pool = pool;
-	e->data = (char *)e + sizeof(*e);
-	e->size = initial_size;
 	e->len = 0;
+	e->size = initial_size;
+	e->data = (char *)e + sizeof(*e);
+	e->pool = pool;
 	poison(e->data, e->size);
 	tbuf_assert(e);
 	return e;
@@ -77,11 +75,6 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 
 	while (new_size - e->len < required)
 		new_size *= 2;
-
-	if (unlikely(new_size > palloc_greatest_size())) {
-		new_size = palloc_greatest_size();
-		assert(new_size - e->len >= required);
-	}
 
 	void *p = palloc(e->pool, new_size);
 
@@ -132,7 +125,7 @@ tbuf_peek(struct tbuf *b, size_t count)
 }
 
 size_t
-tbuf_reserve(struct tbuf * b, size_t count)
+tbuf_reserve(struct tbuf *b, size_t count)
 {
 	tbuf_assert(b);
 	tbuf_ensure(b, count);
@@ -147,16 +140,6 @@ tbuf_reset(struct tbuf *b)
 	tbuf_assert(b);
 	poison(b->data, b->len);
 	b->len = 0;
-}
-
-void
-tbuf_append(struct tbuf *b, const void *data, size_t len)
-{
-	tbuf_assert(b);
-	tbuf_ensure(b, len + 1);
-	memcpy(b->data + b->len, data, len);
-	b->len += len;
-	*(((char *)b->data) + b->len) = '\0';
 }
 
 void

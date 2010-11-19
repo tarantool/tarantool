@@ -54,9 +54,6 @@ typedef struct tarantool_cfg {
 	/* delay between loop iteraions */
 	double	io_collect_interval;
 
-	/* do not write snapshot faster then snap_io_rate_limit MBytes/sec */
-	double	snap_io_rate_limit;
-
 	/* size of listen backlog */
 	int32_t	backlog;
 
@@ -72,12 +69,17 @@ typedef struct tarantool_cfg {
 
 	/* Directory with WAL files to serve */
 	char*	wal_feeder_dir;
+
+	/* custom proc title is appended after normal */
+	char*	custom_proc_title;
 } tarantool_cfg;
 
 int fill_default_tarantool_cfg(tarantool_cfg *c);
 void parse_cfg_file_tarantool_cfg(tarantool_cfg *c, FILE *fh, int check_rdonly, int *n_accepted, int *n_skipped);
 
 void parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly, int *n_accepted, int *n_skipped);
+
+int check_cfg_tarantool_cfg(tarantool_cfg *c);
 
 typedef struct tarantool_cfg_iterator_t tarantool_cfg_iterator_t;
 tarantool_cfg_iterator_t* tarantool_cfg_iterator_init();

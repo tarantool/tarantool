@@ -34,7 +34,7 @@ static inline struct iproto_header *iproto(const struct tbuf *t)
 struct iproto_interactor;
 
 struct iproto_interactor
-*iproto_interactor(uint32_t(*interact) (uint32_t msg, uint8_t * data, size_t len));
+*iproto_interactor(uint32_t (*interact) (uint32_t msg, uint8_t *data, size_t len));
 
 void iproto_interact(void *);
 
@@ -64,8 +64,12 @@ void iproto_interact(void *);
 	_(ERR_CODE_NOTHING,               0x00002400) /* nothing to do (not an error) */ \
 	_(ERR_CODE_UPDATE_ID,             0x00002502) /* id's update */ \
 	_(ERR_CODE_WRONG_VERSION,         0x00002602)	/* unsupported version of protocol */ \
-	_(ERR_CODE_UNKNOWN_ERROR,         0x00002702)
+	/* other generic error codes */					\
+	_(ERR_CODE_UNKNOWN_ERROR,         0x00002702) \
+        _(ERR_CODE_NODE_NOT_FOUND,	  0x00003102) \
+	_(ERR_CODE_NODE_FOUND,		  0x00003702) \
+	_(ERR_CODE_INDEX_VIOLATION,	  0x00003802)
 
 ENUM(error_codes, ERROR_CODES);
-extern const char *error_codes_strs[];
+extern char *error_codes_strs[];
 #endif

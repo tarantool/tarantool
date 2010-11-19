@@ -1,5 +1,25 @@
 #!/bin/sh
 INDENT=$(which gindent 2>/dev/null || which indent 2>/dev/null)
 [ -z $INDENT ] && echo indent binary not found && exit 1
-PARAM="-npro -kr -i8 -ts8 -sob -l100 -ss -ncs -cp1"
-$INDENT $PARAM $@
+
+for f in $@
+do
+	PARAM="-npro -kr -i8 -ts8 -ci8 -sob -l100 -ss -ncs -cp1
+		-T bool"
+
+	case "$f" in
+		*.c)
+			PARAM="$PARAM -psl"
+			;;
+		*.h)
+			;;
+		*)
+			echo "Unknown file type: $f"
+			exit 1;
+			;;
+	esac
+
+	PARAM="$PARAM "$(scripts/custom_types $f -I. -Iinclude -DCORO_ASM -DSTORAGE -DTARANTOOL_CONFIG='<cfg/tarantool_silverbox_cfg.h>' | grep -v '^"_' | sed 's/"//g; s/^/-T /')
+
+	$INDENT $PARAM $f
+done

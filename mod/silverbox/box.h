@@ -33,18 +33,70 @@ extern bool box_updates_allowed;
 void memcached_handler(void *_data __unused__);
 
 struct namespace;
+struct box_tuple;
+
+struct field {
+	u32 len;
+	union {
+		u32 u32;
+
+		u8 data[sizeof(void *)];
+
+		void *data_ptr;
+	};
+};
+
+enum field_data_type { NUM, STR };
+
+struct tree_index_member {
+	struct box_tuple *tuple;
+	struct field key[];
+};
+
+#define SIZEOF_TREE_INDEX_MEMBER(index) \
+	(sizeof(struct tree_index_member) + sizeof(struct field) * (index)->key_cardinality)
+
+#include <third_party/sptree.h>
+SPTREE_DEF(str_t, realloc);
+
+// #include <mod/silverbox/tree.h>
 
 struct index {
-	struct box_tuple *(*find)(struct index *index, int key_len, void *key);
-	void (*remove)(struct index *index, void *key);
-	void (*replace)(struct index *index, void *key, void *value);
+	bool enabled;
+
+	bool unique;
+
+	struct box_tuple *(*find) (struct index * index, void *key);	/* only for unique lookups */
+	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
+	void (*remove) (struct index * index, struct box_tuple *);
+	void (*replace) (struct index * index, struct box_tuple *, struct box_tuple *);
+	void (*iterator_init) (struct index *, struct tree_index_member * pattern);
+	struct box_tuple *(*iterator_next) (struct index *, struct tree_index_member * pattern);
 	union {
-                khash_t(lstr2ptr_map) *str_map;
-                khash_t(int2ptr_map) *int_map;
-        } map;
+		khash_t(lstr2ptr_map) * str_hash;
+		khash_t(int2ptr_map) * int_hash;
+		khash_t(int2ptr_map) * hash;
+		sptree_str_t *tree;
+	} idx;
+	void *iterator;
+	bool iterator_empty;
+
 	struct namespace *namespace;
-	int key_position;
-	enum { INDEX_NUM, INDEX_STR } type;
+
+	struct {
+		struct {
+			u32 fieldno;
+			enum field_data_type type;
+		} *key_field;
+		u32 key_cardinality;
+
+		u32 *field_cmp_order;
+		u32 field_cmp_order_cnt;
+	};
+
+	struct tree_index_member *search_pattern;
+
+	enum { HASH, TREE } type;
 };
 
 extern struct index *memcached_index;
@@ -58,35 +110,34 @@ struct namespace {
 };
 
 struct box_tuple {
-        u16 refs;
-        u16 flags;
-        u32 bsize;
-        u32 cardinality;
-        u8 data[0];
+	u16 refs;
+	u16 flags;
+	u32 bsize;
+	u32 cardinality;
+	u8 data[0];
 } __packed__;
 
-
 struct box_txn {
-        int op;
-        u32 flags;
+	int op;
+	u32 flags;
 
 	struct namespace *namespace;
-        struct index *index;
-        int n;
+	struct index *index;
+	int n;
 
 	struct tbuf *ref_tuples;
-        struct box_tuple *old_tuple;
-        struct box_tuple *tuple;
+	struct box_tuple *old_tuple;
+	struct box_tuple *tuple;
 	struct box_tuple *lock_tuple;
 
 	bool in_recover, old_format;
 };
 
-
 enum tuple_flags {
 	WAL_WAIT = 0x1,
-	GHOST    = 0x2,
-	NEW      = 0x4
+	GHOST = 0x2,
+	NEW = 0x4,
+	SEARCH = 0x8
 };
 
 enum box_mode {
@@ -95,8 +146,9 @@ enum box_mode {
 };
 
 #define BOX_RETURN_TUPLE 1
+#define BOX_ADD 2
+#define BOX_REPLACE 4
 #define BOX_QUIET 8
-
 
 /*
     deprecated commands:
@@ -126,10 +178,10 @@ enum box_mode {
 
 ENUM(messages, MESSAGES);
 
-struct box_tuple *index_find(struct index *index, int key_len, void *key);
+struct box_tuple *index_find(struct index *index, void *key);
 
 struct box_txn *txn_alloc(u32 flags);
-u32 box_dispach(struct box_txn *txn, enum box_mode mode, u32 op, struct tbuf *data);
+u32 box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data);
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
 void txn_cleanup(struct box_txn *txn);
 

@@ -45,6 +45,7 @@ typedef	enum ConfettyError {
 	CNF_WRONGRANGE,
 	CNF_NOMEMORY,
 	CNF_SYNTAXERROR,
+	CNF_NOTSET,
 	CNF_INTERNALERROR
 } ConfettyError;
 

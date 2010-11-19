@@ -67,8 +67,8 @@ write_config() {
     local admin_port=${3:?}
 
     cat <<-EOF > $test_dir/$file_name.cfg
-	log_level = 2
-	slab_alloc_arena = 1
+	log_level = 4
+	slab_alloc_arena = 0.1
 	
 	work_dir = "$test_dir"
 	snap_dir = "storage/snap"
@@ -89,46 +89,141 @@ write_config() {
 	wal_feeder_port = 24444
 	
 	namespace[0].enabled = 1
-	namespace[0].index[0].type = "NUM"
-	namespace[0].index[0].key_position = 0
-	namespace[0].index[1].type = "STR"
-	namespace[0].index[1].key_position = 1
+	namespace[0].index[0].type = "HASH"
+	namespace[0].index[0].unique = 1
+	namespace[0].index[0].key_field[0].fieldno = 0
+	namespace[0].index[0].key_field[0].type = "NUM"
+	namespace[0].index[1].type = "HASH"
+	namespace[0].index[1].unique = 1
+	namespace[0].index[1].key_field[0].fieldno = 1
+	namespace[0].index[1].key_field[0].type = "STR"
 	
 	namespace[3].enabled = 1
-	namespace[3].index[0].type = "NUM"
-	namespace[3].index[0].key_position = 0
+	namespace[3].index[0].type = "HASH"
+	namespace[3].index[0].unique = 1
+	namespace[3].index[0].key_field[0].fieldno = 0
+	namespace[3].index[0].key_field[0].type = "NUM"
 	
 	namespace[5].enabled = 1
-	namespace[5].index[0].type = "NUM"
-	namespace[5].index[0].key_position = 0
+	namespace[5].index[0].type = "HASH"
+	namespace[5].index[0].unique = 1
+	namespace[5].index[0].key_field[0].fieldno = 0
+	namespace[5].index[0].key_field[0].type = "NUM"
 	
 	namespace[11].enabled = 1
-	namespace[11].index[0].type = "NUM"
-	namespace[11].index[0].key_position = 0
+	namespace[11].index[0].type = "HASH"
+	namespace[11].index[0].unique = 1
+	namespace[11].index[0].key_field[0].fieldno = 0
+	namespace[11].index[0].key_field[0].type = "NUM"
 	
 	namespace[19].enabled = 1
-	namespace[19].index[0].type = "STR"
-	namespace[19].index[0].key_position = 0
+	namespace[19].index[0].type = "HASH"
+	namespace[19].index[0].unique = 1
+	namespace[19].index[0].key_field[0].fieldno = 0
+	namespace[19].index[0].key_field[0].type = "STR"
 	
 	namespace[22].enabled = 1
-	namespace[22].index[0].type = NUM
-	namespace[22].index[0].key_position = 0
+	namespace[22].index[0].type = "HASH"
+	namespace[22].index[0].unique = 1
+	namespace[22].index[0].key_field[0].fieldno = 0
+	namespace[22].index[0].key_field[0].type = "NUM"
 	
 	namespace[23].enabled = 1
-	namespace[23].index[0].type = NUM
-	namespace[23].index[0].key_position = 0
+	namespace[23].index[0].type = "HASH"
+	namespace[23].index[0].unique = 1
+	namespace[23].index[0].key_field[0].fieldno = 0
+	namespace[23].index[0].key_field[0].type = "NUM"
 	
 	namespace[24].enabled = 1
-	# namespace[24].dual_to = 25
-	namespace[24].index[0].type = "NUM"
-	namespace[24].index[0].key_position = 0
-	namespace[24].index[1].type = "STR"
-	namespace[24].index[1].key_position = 1
+	namespace[24].index[0].type = "HASH"
+	namespace[24].index[0].unique = 1
+	namespace[24].index[0].key_field[0].fieldno = 0
+	namespace[24].index[0].key_field[0].type = "NUM"
+	namespace[24].index[1].type = "HASH"
+	namespace[24].index[1].unique = 1
+	namespace[24].index[1].key_field[0].fieldno = 1
+	namespace[24].index[1].key_field[0].type = "STR"
 	
 	#namespace[25].enabled = 0
 	#namespace[25].dual_to = 24
-	#namespace[25].index[0].type = "STR"
-	#namespace[25].index[0].key_position = 1
+	#namespace[25].index[0].type = "HASH"
+	#namespace[25].index[0].key_field[0].fieldno = 1
+	#namespace[25].index[0].key_field[0].type = "STR"
+
+	namespace[26].enabled = 1
+	namespace[26].index[0].type = "HASH"
+	namespace[26].index[0].unique = 1
+	namespace[26].index[0].key_field[0].fieldno = 0
+	namespace[26].index[0].key_field[0].type = "NUM"
+	namespace[26].index[1].type = "TREE"
+	namespace[26].index[1].unique = 0
+	namespace[26].index[1].key_field[0].fieldno = 1
+	namespace[26].index[1].key_field[0].type = "STR"
+	namespace[26].index[2].type = "TREE"
+	namespace[26].index[2].unique = 1
+	namespace[26].index[2].key_field[0].fieldno = 1
+	namespace[26].index[2].key_field[0].type = "STR"
+	namespace[26].index[2].key_field[1].fieldno = 2
+	namespace[26].index[2].key_field[1].type = "NUM"
+
+	namespace[27] = {
+		enabled = 1
+
+		# Email
+		index[0] = {
+			type = "HASH"
+			unique = 1
+
+			key_field[0] = {
+				type = "NUM"
+				fieldno = 0
+			}
+		}
+		index[1] = {
+			type = "TREE"
+			unique = 1
+
+			key_field[0] = {
+				type = "STR"
+				fieldno = 1
+			}
+		}
+		# FirstName
+		index[2] = {
+			type = "TREE"
+			unique = 0
+
+			key_field[0] = {
+				type = "STR"
+				fieldno = 2
+			}
+		}
+		# LastName
+		index[3] = {
+			type = "TREE"
+			unique = 0
+
+			key_field[0] = {
+				type = "STR"
+				fieldno = 3
+			}
+		}
+		# FullName
+		index[4] = {
+			type = "TREE"
+			unique = 1
+
+			key_field[0] = {
+				type = "STR"
+				fieldno = 2
+			}
+			key_field[1] = {
+				type = "STR"
+				fieldno = 3
+			}
+		}
+	}
+
 EOF
 }
 

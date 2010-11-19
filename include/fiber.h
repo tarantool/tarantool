@@ -34,7 +34,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-
 #include <tarantool_ev.h>
 #include <palloc.h>
 #include <tbuf.h>
@@ -69,7 +68,7 @@ struct fiber {
 	struct tbuf *rbuf;
 	struct tbuf *cleanup;
 
-	SLIST_ENTRY(fiber) link, zombie_link;
+	 SLIST_ENTRY(fiber) link, zombie_link;
 
 	struct ring *inbox;
 
@@ -82,6 +81,7 @@ struct fiber {
 
 	void *data;
 
+	u64 cookie;
 	bool has_peer;
 	char peer_name[32];
 	bool reading_inbox;
@@ -121,9 +121,7 @@ void raise_(int);
 struct msg *read_inbox(void);
 int fiber_bread(struct tbuf *, size_t v);
 
-
-inline static void
-add_iov_unsafe(void *buf, size_t len)
+inline static void add_iov_unsafe(void *buf, size_t len)
 {
 	struct iovec *v;
 	assert(fiber->iov->size - fiber->iov->len >= sizeof(*v));
@@ -134,14 +132,12 @@ add_iov_unsafe(void *buf, size_t len)
 	fiber->iov_cnt++;
 }
 
-inline static void
-iov_ensure(size_t count)
+inline static void iov_ensure(size_t count)
 {
 	tbuf_ensure(fiber->iov, sizeof(struct iovec) * count);
 }
 
-inline static void
-add_iov(void *buf, size_t len)
+inline static void add_iov(void *buf, size_t len)
 {
 	iov_ensure(1);
 	add_iov_unsafe(buf, len);
@@ -149,8 +145,8 @@ add_iov(void *buf, size_t len)
 
 void add_iov_dup(void *buf, size_t len);
 bool write_inbox(struct fiber *recipient, struct tbuf *msg);
-int inbox_size(struct fiber * recipient);
-void wait_inbox(struct fiber * recipient);
+int inbox_size(struct fiber *recipient);
+void wait_inbox(struct fiber *recipient);
 
 char *fiber_peer_name(struct fiber *fiber);
 ssize_t fiber_read(void *buf, size_t count);
@@ -170,12 +166,11 @@ typedef enum fiber_server_type {
 	udp_server
 } fiber_server_type;
 
-struct fiber *fiber_server(fiber_server_type type, int port, void (*handler)(void *), void *,
-			   void (*on_bind)(void *));
+struct fiber *fiber_server(fiber_server_type type, int port, void (*handler) (void *), void *,
+			   void (*on_bind) (void *));
 
 struct child *spawn_child(const char *name,
 			  int inbox_size,
-			  struct tbuf *(*handler) (void *, struct tbuf *),
-			  void *state);
+			  struct tbuf *(*handler) (void *, struct tbuf *), void *state);
 
 #endif

@@ -28,6 +28,10 @@ memcached_expire_per_loop=1024
 # tarantool will try iterate all rows within this time
 memcached_expire_full_sweep=3600
 
+
+# do not write snapshot faster then snap_io_rate_limit MBytes/sec
+snap_io_rate_limit=0.0
+
 # Write no more rows in WAL
 rows_per_wal=500000
 
@@ -44,6 +48,12 @@ local_hot_standby=0
 # delay in fractional seconds between successive re-readings of wal_dir
 wal_dir_rescan_delay=0.1
 
+
+# panic if where is error reading snap or wal
+# be default panic any snapshot reading error  and ignore errors then reading wals
+panic_on_snap_error=1
+panic_on_wal_error=0
+
 # Remote hot standby (if enabled server will run in hot standby mode
 # continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
 remote_hot_standby=0
@@ -56,7 +66,11 @@ namespace = [
   cardinality = -1
   estimated_rows = 0
   index = [
-    type = "NUM"
-    key_position = -1
+    type = ""
+    unique = -1
+    key_field = [
+      fieldno = -1
+      type = ""
+    ]
   ]
 ]

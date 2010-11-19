@@ -40,7 +40,6 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->logger = NULL;
 	c->logger_nonblock = 1;
 	c->io_collect_interval = 0;
-	c->snap_io_rate_limit = 0;
 	c->backlog = 1024;
 	c->readahead = 16320;
 	c->snap_dir = strdup(".");
@@ -55,11 +54,14 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->memcached_namespace = 23;
 	c->memcached_expire_per_loop = 1024;
 	c->memcached_expire_full_sweep = 3600;
+	c->snap_io_rate_limit = 0;
 	c->rows_per_wal = 500000;
 	c->wal_fsync_delay = 0;
 	c->wal_writer_inbox_size = 128;
 	c->local_hot_standby = 0;
 	c->wal_dir_rescan_delay = 0.1;
+	c->panic_on_snap_error = 1;
+	c->panic_on_wal_error = 0;
 	c->remote_hot_standby = 0;
 	c->wal_feeder_ipaddr = NULL;
 	c->wal_feeder_port = 0;
@@ -78,9 +80,18 @@ acceptDefault_name__namespace(tarantool_cfg_namespace *c) {
 
 static int
 acceptDefault_name__namespace__index(tarantool_cfg_namespace_index *c) {
-	c->type = strdup("NUM");
+	c->type = strdup("");
 	if (c->type == NULL) return CNF_NOMEMORY;
-	c->key_position = -1;
+	c->unique = -1;
+	c->key_field = NULL;
+	return 0;
+}
+
+static int
+acceptDefault_name__namespace__index__key_field(tarantool_cfg_namespace_index_key_field *c) {
+	c->fieldno = -1;
+	c->type = strdup("");
+	if (c->type == NULL) return CNF_NOMEMORY;
 	return 0;
 }
 
@@ -120,9 +131,6 @@ static NameAtom _name__logger_nonblock[] = {
 static NameAtom _name__io_collect_interval[] = {
 	{ "io_collect_interval", -1, NULL }
 };
-static NameAtom _name__snap_io_rate_limit[] = {
-	{ "snap_io_rate_limit", -1, NULL }
-};
 static NameAtom _name__backlog[] = {
 	{ "backlog", -1, NULL }
 };
@@ -159,6 +167,9 @@ static NameAtom _name__memcached_expire_per_loop[] = {
 static NameAtom _name__memcached_expire_full_sweep[] = {
 	{ "memcached_expire_full_sweep", -1, NULL }
 };
+static NameAtom _name__snap_io_rate_limit[] = {
+	{ "snap_io_rate_limit", -1, NULL }
+};
 static NameAtom _name__rows_per_wal[] = {
 	{ "rows_per_wal", -1, NULL }
 };
@@ -173,6 +184,12 @@ static NameAtom _name__local_hot_standby[] = {
 };
 static NameAtom _name__wal_dir_rescan_delay[] = {
 	{ "wal_dir_rescan_delay", -1, NULL }
+};
+static NameAtom _name__panic_on_snap_error[] = {
+	{ "panic_on_snap_error", -1, NULL }
+};
+static NameAtom _name__panic_on_wal_error[] = {
+	{ "panic_on_wal_error", -1, NULL }
 };
 static NameAtom _name__remote_hot_standby[] = {
 	{ "remote_hot_standby", -1, NULL }
@@ -200,10 +217,22 @@ static NameAtom _name__namespace__index__type[] = {
 	{ "index", -1, _name__namespace__index__type + 2 },
 	{ "type", -1, NULL }
 };
-static NameAtom _name__namespace__index__key_position[] = {
-	{ "namespace", -1, _name__namespace__index__key_position + 1 },
-	{ "index", -1, _name__namespace__index__key_position + 2 },
-	{ "key_position", -1, NULL }
+static NameAtom _name__namespace__index__unique[] = {
+	{ "namespace", -1, _name__namespace__index__unique + 1 },
+	{ "index", -1, _name__namespace__index__unique + 2 },
+	{ "unique", -1, NULL }
+};
+static NameAtom _name__namespace__index__key_field__fieldno[] = {
+	{ "namespace", -1, _name__namespace__index__key_field__fieldno + 1 },
+	{ "index", -1, _name__namespace__index__key_field__fieldno + 2 },
+	{ "key_field", -1, _name__namespace__index__key_field__fieldno + 3 },
+	{ "fieldno", -1, NULL }
+};
+static NameAtom _name__namespace__index__key_field__type[] = {
+	{ "namespace", -1, _name__namespace__index__key_field__type + 1 },
+	{ "index", -1, _name__namespace__index__key_field__type + 2 },
+	{ "key_field", -1, _name__namespace__index__key_field__type + 3 },
+	{ "type", -1, NULL }
 };
 
 #define ARRAYALLOC(x,n,t)  do {                                     \
@@ -346,14 +375,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if ( (c->io_collect_interval == 0 || c->io_collect_interval == -HUGE_VAL || c->io_collect_interval == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		errno = 0;
-		c->snap_io_rate_limit = strtod(opt->paramValue.numberval, NULL);
-		if ( (c->snap_io_rate_limit == 0 || c->snap_io_rate_limit == -HUGE_VAL || c->snap_io_rate_limit == HUGE_VAL) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-	}
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
@@ -474,6 +495,14 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGRANGE;
 		c->memcached_expire_full_sweep = i32;
 	}
+	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		errno = 0;
+		c->snap_io_rate_limit = strtod(opt->paramValue.numberval, NULL);
+		if ( (c->snap_io_rate_limit == 0 || c->snap_io_rate_limit == -HUGE_VAL || c->snap_io_rate_limit == HUGE_VAL) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+	}
 	else if ( cmpNameAtoms( opt->name, _name__rows_per_wal) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
@@ -525,6 +554,28 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->wal_dir_rescan_delay = strtod(opt->paramValue.numberval, NULL);
 		if ( (c->wal_dir_rescan_delay == 0 || c->wal_dir_rescan_delay == -HUGE_VAL || c->wal_dir_rescan_delay == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__panic_on_snap_error) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		c->panic_on_snap_error = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__panic_on_wal_error) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		c->panic_on_wal_error = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__remote_hot_standby) ) {
 		if (opt->paramType != numberType )
@@ -602,7 +653,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		 if (opt->paramValue.stringval && c->namespace[opt->name->index]->index[opt->name->next->index]->type == NULL)
 			return CNF_NOMEMORY;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_position) ) {
+	else if ( cmpNameAtoms( opt->name, _name__namespace__index__unique) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace);
@@ -613,7 +664,32 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->key_position = i32;
+		c->namespace[opt->name->index]->index[opt->name->next->index]->unique = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field__fieldno) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace);
+		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index);
+		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field);
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->fieldno = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field__type) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace);
+		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index);
+		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field);
+		errno = 0;
+		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		 if (opt->paramValue.stringval && c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL)
+			return CNF_NOMEMORY;
 	}
 	else {
 		return CNF_MISSED;
@@ -680,6 +756,10 @@ acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, i
 				out_warning(r, "Not enough memory to accept '%s' option", dumpOptDef(opt->name));
 				if (n_skipped) (*n_skipped)++;
 				break;
+			case CNF_NOTSET:
+				out_warning(r, "Option '%s' is not set (or has a default value)", dumpOptDef(opt->name));
+				if (n_skipped) (*n_skipped)++;
+				break;
 			default:
 				out_warning(r, "Unknown error for '%s' option", dumpOptDef(opt->name));
 				if (n_skipped) (*n_skipped)++;
@@ -723,7 +803,6 @@ typedef enum IteratorState {
 	S_name__logger,
 	S_name__logger_nonblock,
 	S_name__io_collect_interval,
-	S_name__snap_io_rate_limit,
 	S_name__backlog,
 	S_name__readahead,
 	S_name__snap_dir,
@@ -736,11 +815,14 @@ typedef enum IteratorState {
 	S_name__memcached_namespace,
 	S_name__memcached_expire_per_loop,
 	S_name__memcached_expire_full_sweep,
+	S_name__snap_io_rate_limit,
 	S_name__rows_per_wal,
 	S_name__wal_fsync_delay,
 	S_name__wal_writer_inbox_size,
 	S_name__local_hot_standby,
 	S_name__wal_dir_rescan_delay,
+	S_name__panic_on_snap_error,
+	S_name__panic_on_wal_error,
 	S_name__remote_hot_standby,
 	S_name__wal_feeder_ipaddr,
 	S_name__wal_feeder_port,
@@ -750,7 +832,10 @@ typedef enum IteratorState {
 	S_name__namespace__estimated_rows,
 	S_name__namespace__index,
 	S_name__namespace__index__type,
-	S_name__namespace__index__key_position,
+	S_name__namespace__index__unique,
+	S_name__namespace__index__key_field,
+	S_name__namespace__index__key_field__fieldno,
+	S_name__namespace__index__key_field__type,
 	_S_Finished
 } IteratorState;
 
@@ -758,6 +843,7 @@ struct tarantool_cfg_iterator_t {
 	IteratorState	state;
 	int	idx_name__namespace;
 	int	idx_name__namespace__index;
+	int	idx_name__namespace__index__key_field;
 };
 
 tarantool_cfg_iterator_t*
@@ -903,17 +989,6 @@ again:
 			}
 			sprintf(*v, "%g", c->io_collect_interval);
 			snprintf(buf, PRINTBUFLEN-1, "io_collect_interval");
-			i->state = S_name__snap_io_rate_limit;
-			return buf;
-		case S_name__snap_io_rate_limit:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%g", c->snap_io_rate_limit);
-			snprintf(buf, PRINTBUFLEN-1, "snap_io_rate_limit");
 			i->state = S_name__backlog;
 			return buf;
 		case S_name__backlog:
@@ -1043,6 +1118,17 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->memcached_expire_full_sweep);
 			snprintf(buf, PRINTBUFLEN-1, "memcached_expire_full_sweep");
+			i->state = S_name__snap_io_rate_limit;
+			return buf;
+		case S_name__snap_io_rate_limit:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%g", c->snap_io_rate_limit);
+			snprintf(buf, PRINTBUFLEN-1, "snap_io_rate_limit");
 			i->state = S_name__rows_per_wal;
 			return buf;
 		case S_name__rows_per_wal:
@@ -1098,6 +1184,28 @@ again:
 			}
 			sprintf(*v, "%g", c->wal_dir_rescan_delay);
 			snprintf(buf, PRINTBUFLEN-1, "wal_dir_rescan_delay");
+			i->state = S_name__panic_on_snap_error;
+			return buf;
+		case S_name__panic_on_snap_error:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%"PRId32, c->panic_on_snap_error);
+			snprintf(buf, PRINTBUFLEN-1, "panic_on_snap_error");
+			i->state = S_name__panic_on_wal_error;
+			return buf;
+		case S_name__panic_on_wal_error:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%"PRId32, c->panic_on_wal_error);
+			snprintf(buf, PRINTBUFLEN-1, "panic_on_wal_error");
 			i->state = S_name__remote_hot_standby;
 			return buf;
 		case S_name__remote_hot_standby:
@@ -1139,7 +1247,10 @@ again:
 		case S_name__namespace__estimated_rows:
 		case S_name__namespace__index:
 		case S_name__namespace__index__type:
-		case S_name__namespace__index__key_position:
+		case S_name__namespace__index__unique:
+		case S_name__namespace__index__key_field:
+		case S_name__namespace__index__key_field__fieldno:
+		case S_name__namespace__index__key_field__type:
 			if (c->namespace && c->namespace[i->idx_name__namespace]) {
 				switch(i->state) {
 					case S_name__namespace:
@@ -1179,7 +1290,10 @@ again:
 					case S_name__namespace__index:
 						i->state = S_name__namespace__index;
 					case S_name__namespace__index__type:
-					case S_name__namespace__index__key_position:
+					case S_name__namespace__index__unique:
+					case S_name__namespace__index__key_field:
+					case S_name__namespace__index__key_field__fieldno:
+					case S_name__namespace__index__key_field__type:
 						if (c->namespace[i->idx_name__namespace]->index && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]) {
 							switch(i->state) {
 								case S_name__namespace__index:
@@ -1191,20 +1305,58 @@ again:
 										return NULL;
 									}
 									snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].type", i->idx_name__namespace, i->idx_name__namespace__index);
-									i->state = S_name__namespace__index__key_position;
+									i->state = S_name__namespace__index__unique;
 									return buf;
-								case S_name__namespace__index__key_position:
+								case S_name__namespace__index__unique:
 									*v = malloc(32);
 									if (*v == NULL) {
 										free(i);
 										out_warning(CNF_NOMEMORY, "No memory to output value");
 										return NULL;
 									}
-									sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_position);
-									snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].key_position", i->idx_name__namespace, i->idx_name__namespace__index);
-									i->state = S_name__namespace__index;
-									i->idx_name__namespace__index++;
+									sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->unique);
+									snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].unique", i->idx_name__namespace, i->idx_name__namespace__index);
+									i->state = S_name__namespace__index__key_field;
 									return buf;
+								case S_name__namespace__index__key_field:
+									i->state = S_name__namespace__index__key_field;
+								case S_name__namespace__index__key_field__fieldno:
+								case S_name__namespace__index__key_field__type:
+									if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]) {
+										switch(i->state) {
+											case S_name__namespace__index__key_field:
+											case S_name__namespace__index__key_field__fieldno:
+												*v = malloc(32);
+												if (*v == NULL) {
+													free(i);
+													out_warning(CNF_NOMEMORY, "No memory to output value");
+													return NULL;
+												}
+												sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->fieldno);
+												snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].key_field[%d].fieldno", i->idx_name__namespace, i->idx_name__namespace__index, i->idx_name__namespace__index__key_field);
+												i->state = S_name__namespace__index__key_field__type;
+												return buf;
+											case S_name__namespace__index__key_field__type:
+												*v = (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) ? strdup(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) : NULL;
+												if (*v == NULL && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) {
+													free(i);
+													out_warning(CNF_NOMEMORY, "No memory to output value");
+													return NULL;
+												}
+												snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].key_field[%d].type", i->idx_name__namespace, i->idx_name__namespace__index, i->idx_name__namespace__index__key_field);
+												i->state = S_name__namespace__index__key_field;
+												i->idx_name__namespace__index__key_field++;
+												return buf;
+											default:
+												break;
+										}
+									}
+									else {
+										i->state = S_name__namespace__index;
+										i->idx_name__namespace__index++;
+										i->idx_name__namespace__index__key_field = 0;
+										goto again;
+									}
 								default:
 									break;
 							}
@@ -1213,6 +1365,7 @@ again:
 							i->state = S_name__namespace;
 							i->idx_name__namespace++;
 							i->idx_name__namespace__index = 0;
+							i->idx_name__namespace__index__key_field = 0;
 							goto again;
 						}
 					default:
@@ -1227,5 +1380,29 @@ again:
 			free(i);
 	}
 	return NULL;
+}
+
+/************** Checking of required fields  **************/
+int
+check_cfg_tarantool_cfg(tarantool_cfg *c) {
+	tarantool_cfg_iterator_t iterator, *i = &iterator;
+	int	res = 0;
+
+	i->idx_name__namespace = 0;
+	while (c->namespace && c->namespace[i->idx_name__namespace]) {
+		i->idx_name__namespace__index = 0;
+		while (c->namespace[i->idx_name__namespace]->index && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]) {
+			i->idx_name__namespace__index__key_field = 0;
+			while (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]) {
+				i->idx_name__namespace__index__key_field++;
+			}
+
+			i->idx_name__namespace__index++;
+		}
+
+		i->idx_name__namespace++;
+	}
+
+	return res;
 }
 

@@ -28,6 +28,7 @@
 #define TARANTOOL_TBUF_H
 
 #include <stddef.h>
+#include <string.h>
 
 #include <util.h>
 
@@ -46,6 +47,14 @@ static inline void tbuf_ensure(struct tbuf *e, size_t required)
 	assert(e->len <= e->size);
 	if (unlikely(e->size - e->len < required))
 		tbuf_ensure_resize(e, required);
+}
+
+static inline void tbuf_append(struct tbuf *b, const void *data, size_t len)
+{
+	tbuf_ensure(b, len + 1);
+	memcpy(b->data + b->len, data, len);
+	b->len += len;
+	*(((char *)b->data) + b->len) = '\0';
 }
 
 struct tbuf *tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig);

@@ -46,9 +46,9 @@ extern int sayfd;
 
 void say_logger_init(int nonblock);
 void vsay(int level, const char *error, const char *format, va_list ap)
-	__attribute__ ((format(FORMAT_PRINTF, 3, 0)));
+    __attribute__ ((format(FORMAT_PRINTF, 3, 0)));
 void _say(int level, const char *error, const char *format, ...)
-	__attribute__ ((format(FORMAT_PRINTF, 3, 4)));
+    __attribute__ ((format(FORMAT_PRINTF, 3, 4)));
 
 #define say(level, ...) ({ if(cfg.log_level >= level) _say(level, __VA_ARGS__); })
 

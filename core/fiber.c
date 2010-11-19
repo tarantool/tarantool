@@ -43,7 +43,6 @@
 #include <third_party/khash.h>
 
 #include <debug.h>
-#include <bert.h>
 #include <fiber.h>
 #include <palloc.h>
 #include <salloc.h>
@@ -91,7 +90,6 @@ KHASH_MAP_INIT_INT(fid2fiber, void *, realloc);
 static
 khash_t(fid2fiber) *
     fibers_registry;
-
 
 void
 fiber_call(struct fiber *callee)
@@ -172,7 +170,6 @@ ev_schedule(ev_watcher *watcher, int event __unused__)
 	fiber_call(watcher->data);
 }
 
-
 static struct fiber *
 fid2fiber(int fid)
 {
@@ -251,6 +248,9 @@ fiber_gc(void)
 
 	fiber_cleanup();
 
+	if (palloc_allocated(fiber->pool) < 128 * 1024)
+		return;
+
 	tmp = fiber->pool;
 	fiber->pool = ex_pool;
 	ex_pool = tmp;
@@ -294,7 +294,6 @@ fiber_zombificate(struct fiber *f)
 
 	SLIST_INSERT_HEAD(&zombie_fibers, f, zombie_link);
 }
-
 
 static void
 fiber_loop(void *data __unused__)
@@ -362,7 +361,6 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
 	return fiber;
 }
 
-
 char *
 fiber_peer_name(struct fiber *fiber)
 {
@@ -386,6 +384,8 @@ fiber_peer_name(struct fiber *fiber)
 	snprintf(fiber->peer_name, sizeof(fiber->peer_name),
 		 "%s:%d", inet_ntoa(peer.sin_addr), ntohs(peer.sin_port));
 
+	fiber->cookie = 0;
+	memcpy(&fiber->cookie, &peer, MIN(sizeof(peer), sizeof(fiber->cookie)));
 	return fiber->peer_name;
 }
 
@@ -412,13 +412,13 @@ ring_size(struct ring *inbox)
 }
 
 int
-inbox_size(struct fiber * recipient)
+inbox_size(struct fiber *recipient)
 {
-        return ring_size(recipient->inbox);
+	return ring_size(recipient->inbox);
 }
 
 void
-wait_inbox(struct fiber * recipient)
+wait_inbox(struct fiber *recipient)
 {
 	while (ring_size(recipient->inbox) == 0) {
 		recipient->reading_inbox = true;
@@ -428,7 +428,7 @@ wait_inbox(struct fiber * recipient)
 }
 
 bool
-write_inbox(struct fiber * recipient, struct tbuf * msg)
+write_inbox(struct fiber *recipient, struct tbuf *msg)
 {
 	struct ring *inbox = recipient->inbox;
 	if (ring_size(inbox) == inbox->size - 1)
@@ -485,8 +485,6 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 	return r;
 }
 
-
-
 void
 add_iov_dup(void *buf, size_t len)
 {
@@ -531,7 +529,7 @@ fiber_flush_output(void)
 		for (int i = 0; i < iov_cnt; i++)
 			rem += iov[i].iov_len;
 
-		say_syserror("client unexpectedly gone, %"PRI_SZ" bytes unwritten", rem);
+		say_syserror("client unexpectedly gone, %" PRI_SZ " bytes unwritten", rem);
 		result = r;
 	} else
 		result = bytes;
@@ -602,7 +600,7 @@ fiber_connect(struct sockaddr_in *addr)
 	if (set_nonblock(fiber->fd) < 0)
 		goto error;
 
-	if (connect(fiber->fd, (struct sockaddr*)addr, sizeof(*addr)) < 0) {
+	if (connect(fiber->fd, (struct sockaddr *)addr, sizeof(*addr)) < 0) {
 		if (errno != EINPROGRESS)
 			goto error;
 	}
@@ -620,7 +618,7 @@ fiber_connect(struct sockaddr_in *addr)
 
 	unwait(EV_WRITE);
 	return fiber->fd;
-error:
+      error:
 	unwait(EV_WRITE);
 	fiber_close();
 	return fiber->fd;
@@ -687,7 +685,6 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 			break;
 		}
 		*request_size = ntohl(*request_size);
-		assert(*request_size < 4 * 1024 * 1024);
 
 		if (read_atleast(fd, request, *request_size) < 0) {
 			result = EXIT_SUCCESS;
@@ -792,7 +789,8 @@ sock2inbox(void *_data __unused__)
 }
 
 struct child *
-spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, struct tbuf *), void *state)
+spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, struct tbuf *),
+	    void *state)
 {
 	char *proxy_name, *child_name;
 	int socks[2];
@@ -887,7 +885,7 @@ tcp_server_handler(void *data)
 		say_info("bound to TCP port %i", server->port);
 		break;
 
-	sleep_and_retry:
+	      sleep_and_retry:
 		if (!warning_said) {
 			say_warn("port %i is already in use, "
 				 "will retry binding after 0.1 seconds.", server->port);
@@ -959,7 +957,7 @@ udp_server_handler(void *data)
 		say_info("bound to UDP port %i", server->port);
 		break;
 
-	sleep_and_retry:
+	      sleep_and_retry:
 		if (!warning_said) {
 			say_warn("port %i is already in use, "
 				 "will retry binding after 0.1 seconds.", server->port);
@@ -973,16 +971,17 @@ udp_server_handler(void *data)
 
 	while (1) {
 #define MAXUDPPACKETLEN	128
-		char		buf[MAXUDPPACKETLEN];
-		struct		sockaddr_in addr;
-		socklen_t	addrlen;
-		ssize_t		sz;
+		char buf[MAXUDPPACKETLEN];
+		struct sockaddr_in addr;
+		socklen_t addrlen;
+		ssize_t sz;
 
 		wait_for(EV_READ);
 
-		for(;;) {
+		for (;;) {
 			addrlen = sizeof(addr);
-			sz = recvfrom(fiber->fd, buf, MAXUDPPACKETLEN, MSG_DONTWAIT,  (struct sockaddr *)&addr, &addrlen);
+			sz = recvfrom(fiber->fd, buf, MAXUDPPACKETLEN, MSG_DONTWAIT,
+				      (struct sockaddr *)&addr, &addrlen);
 
 			if (sz <= 0) {
 				if (!(errno == EAGAIN || errno == EWOULDBLOCK))
@@ -992,7 +991,7 @@ udp_server_handler(void *data)
 				if (server->handler) {
 					server->handler(data);
 				} else {
-					void (*f)(char *, int) = data;
+					void (*f) (char *, int) = data;
 					f(buf, (int)sz);
 				}
 			}
@@ -1001,8 +1000,8 @@ udp_server_handler(void *data)
 }
 
 struct fiber *
-fiber_server(fiber_server_type type, int port, void (*handler)(void *data), void *data,
-	     void (*on_bind)(void *data))
+fiber_server(fiber_server_type type, int port, void (*handler) (void *data), void *data,
+	     void (*on_bind) (void *data))
 {
 	char *server_name;
 	struct fiber_server *server;
@@ -1010,7 +1009,8 @@ fiber_server(fiber_server_type type, int port, void (*handler)(void *data), void
 
 	server_name = palloc(eter_pool, 64);
 	snprintf(server_name, 64, "%i/acceptor", port);
-	s = fiber_create(server_name, -1, -1, (type == tcp_server) ? tcp_server_handler : udp_server_handler, data);
+	s = fiber_create(server_name, -1, -1,
+			 (type == tcp_server) ? tcp_server_handler : udp_server_handler, data);
 	s->data = server = palloc(eter_pool, sizeof(struct fiber_server));
 	assert(server != NULL);
 	server->port = port;
@@ -1042,8 +1042,7 @@ fiber_info(struct tbuf *out)
 
 		struct frame *frame = fiber->rbp;
 		tbuf_printf(out, "    backtrace:\n");
-		while (stack_bottom < (void *)frame && (void *)frame < stack_top)
-		{
+		while (stack_bottom < (void *)frame && (void *)frame < stack_top) {
 			tbuf_printf(out, "        - { frame: %p, pc: %p }\n",
 				    frame + 2 * sizeof(void *), frame->ret);
 			frame = frame->rbp;
@@ -1051,7 +1050,6 @@ fiber_info(struct tbuf *out)
 #endif
 	}
 }
-
 
 void
 fiber_init(void)
@@ -1070,4 +1068,3 @@ fiber_init(void)
 	fiber = &sched;
 	last_used_fid = 100;
 }
-
