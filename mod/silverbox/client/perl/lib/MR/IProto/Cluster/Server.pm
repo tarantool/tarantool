@@ -261,8 +261,8 @@ sub _build__read_reply {
             $self->_debug_dump(6, 'recv payload: ', $data);
             $self->_dec_in_progress();
             $self->_recv_finished($sync, $msg, $data);
-            delete($self->_callbacks->{$sync})->($msg, $data);
             $self->_try_to_send();
+            delete($self->_callbacks->{$sync})->($msg, $data);
             return;
         });
         return;
@@ -306,16 +306,18 @@ sub _build__handle {
         on_error   => sub {
             my ($handle, $fatal, $message) = @_;
             $self->_debug(0, ($fatal ? 'fatal ' : '') . 'error: ' . $message);
+            my @callbacks;
             foreach my $sync ( keys %{$self->_callbacks} ) {
                 $self->_dec_in_progress();
                 $self->_recv_finished($sync, undef, undef, $message);
-                $self->_callbacks->{$sync}->(undef, undef, $message);
+                push @callbacks, $self->_callbacks->{$sync};
             }
             $self->_clear_handle();
             $self->_clear_callbacks();
             $self->_debug(1, 'closing socket');
             $handle->destroy();
             $self->_try_to_send();
+            $_->(undef, undef, $message) foreach @callbacks;
             return;
         },
         on_timeout => sub {

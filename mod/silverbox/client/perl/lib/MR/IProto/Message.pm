@@ -48,6 +48,17 @@ sub key {
     return $self->$method();
 }
 
+=item allow_retry
+
+If request retry is allowed.
+
+=cut
+
+sub allow_retry {
+    my ($self) = @_;
+    return 0;
+}
+
 =back
 
 =head1 PROTECTED METHODS

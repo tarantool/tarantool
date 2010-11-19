@@ -216,7 +216,7 @@ has _reply_class => (
 Constructor.
 See L</ATTRIBUTES> and L</BUILDARGS> for more information about allowed arguments.
 
-=item send( [ $message | \%message ], $callback? )
+=item send( [ $message | \%args ], $callback? )
 
 Send C<$message> to server and receive reply.
 
@@ -233,7 +233,8 @@ be called in scalar context.
 
 Request C<$message> can be instance of L<MR::IProto::Message> subclass.
 In this case reply will be also subclass of L<MR::IProto::Message>.
-Or it can be passed as hash reference with keys described in L</_send>.
+Or it can be passed as C<\%args> hash reference with keys described
+in L</_send>.
 
 =cut
 
@@ -261,19 +262,60 @@ sub send {
     }
 }
 
+=item send_bulk( \@messages, $callback? )
+
+Send all of messages in C<\@messages> and return result (sync-mode) or
+call callback (async-mode) after all replies was received.
+Result is returned as ArrayRef[HashRef], where internal hash contains two
+keys: C<data> and C<error>. Replies in result can be returned in order
+different then order of requests.
+
+See L</_send> for more information about of message data. Either
+C<$message> or C<\%args> allowed as content of C<\@messages>.
+
+=cut
+
+sub send_bulk {
+    my ($self, $messages, $callback) = @_;
+    my @result;
+    my $cv = AnyEvent->condvar();
+    if($callback) {
+        die "Method must be called in void context if you want to use async" if defined wantarray;
+        $cv->begin( sub { $callback->(\@result) } );
+    }
+    else {
+        die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
+        $cv->begin();
+    }
+    foreach my $message ( @$messages ) {
+        $cv->begin();
+        $self->_send($message, sub {
+            my ($data, $error) = @_;
+            push @result, {
+                data  => $data,
+                error => $error,
+            };
+            $cv->end();
+            return;
+        });
+    }
+    $cv->end();
+    if($callback) {
+        return;
+    }
+    else {
+        $cv->recv();
+        return \@result;
+    }
+}
+
 sub Chat {
     my $self = shift;
     my $message = @_ == 1 ? shift : { @_ };
-    my $retries = $self->max_request_retries;
-    for (my $try = 1; $try <= $retries; $try++) {
-        Time::HiRes::sleep($self->retry_delay) if $try > 1 && $self->retry_delay;
-        $self->_debug(1, sprintf "chat msg=%d $try of $retries total", $message->{msg});
-        my $ret = $self->Chat1($message);
-        if ($ret->{ok}) {
-            return wantarray ? @{$ret->{ok}} : $ret->{ok}->[0];
-        }
-    }
-    return;
+    $message->{allow_retry} = 1 if ref $message eq 'HASH';
+    my $data = eval { $self->send($message) };
+    return if $@;
+    return wantarray ? @$data : $data->[0];
 }
 
 sub Chat1 {
@@ -383,12 +425,13 @@ sub _build__reply_class {
     return \%reply;
 }
 
-=item _send( [ $message | \%message ], $callback? )
+=item _send( [ $message | \%args ], $callback? )
 
 Pure asyncronious internal implementation of send.
 
-If message is passed as hash reference then it must contain
-following keys:
+C<$message> is an instance of L<MR::IProto::Message>.
+If C<\%args> hash reference is passed instead of C<$message> then it can
+contain following keys:
 
 =over
 
@@ -417,6 +460,11 @@ Code reference which is used to unpack reply.
 
 Message have no reply.
 
+=item allow_retry
+
+Is retry is allowed. Values of attributes L</max_request_retries> and
+L</retry_delay> is used if retry is allowed.
+
 =back
 
 =cut
@@ -426,12 +474,13 @@ sub _send {
     die "Callback must be specified" unless $callback;
     die "Method must be called in void context" if defined wantarray;
 
-    my ($req_msg, $key, $body, $unpack);
+    my ($req_msg, $key, $body, $unpack, $retry);
     # MR::IProto::Message OO-API
     if( blessed($message) ) {
         $req_msg = $message->msg;
         $key = $message->key;
         $body = $message->data;
+        $retry = $message->allow_retry ? $self->max_request_retries : 1;
     }
     # Old-style compatible API
     else {
@@ -440,20 +489,42 @@ sub _send {
             : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{$message->{data}}
             : $message->{data};
         $unpack = $message->{no_reply} ? sub { 0 } : $message->{unpack};
+        $retry = $message->{allow_retry} ? $self->max_request_retries : 1;
     }
 
+    my $try = 1;
     weaken($self);
-    my $server = $self->cluster->server( $key );
-    $server->send($req_msg, $body, sub {
+    my ($sub, $server);
+    my $do_try = sub {
+        $self->_debug(2, "send msg=$req_msg try $try of $retry total");
+        $server = $self->cluster->server( $key );
+        $server->send($req_msg, $body, $sub);
+    };
+    $sub = sub {
         my ($resp_msg, $data, $error) = @_;
         if ($error) {
             if( $self->rotateservers ) {
                 $self->_debug(2, "send: failed");
                 $server->active(0);
             }
-            $callback->(undef, $error);
+            if( $try++ < $retry ) {
+                my $timer;
+                $timer = AnyEvent->timer(
+                    after => $self->retry_delay,
+                    cb    => sub {
+                        undef $timer;
+                        $do_try->();
+                        return;
+                    },
+                );
+            }
+            else {
+                undef $do_try;
+                $callback->(undef, $error);
+            }
         }
         else {
+            undef $do_try;
             my $ok = eval {
                 die "Request and reply message code is different: $resp_msg != $req_msg\n"
                     unless $resp_msg == $req_msg;
@@ -478,7 +549,8 @@ sub _send {
             }
         }
         return;
-    });
+    };
+    $do_try->();
     return;
 }
 
