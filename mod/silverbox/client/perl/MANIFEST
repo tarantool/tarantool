@@ -1,5 +1,8 @@
 Makefile.PL
 MANIFEST
 lib/MR/IProto.pm
+lib/MR/IProto/Cluster.pm
+lib/MR/IProto/Cluster/Server.pm
+lib/MR/IProto/Message.pm
 lib/MR/SilverBox.pm
 lib/MR/Storage/Const.pm
