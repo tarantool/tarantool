@@ -52,8 +52,8 @@ void _say(int level, const char *error, const char *format, ...)
 
 #define say(level, ...) ({ if(cfg.log_level >= level) _say(level, __VA_ARGS__); })
 
-#define panic(...) ({ say(S_FATAL, NULL, "PANIC "__FILE__":" __VA_ARGS__); exit(EXIT_FAILURE); })
-#define panic_syserror(...) ({ say(S_FATAL, strerror(errno), "PANIC "__FILE__":" __VA_ARGS__); exit(EXIT_FAILURE); })
+#define panic(...) ({ say(S_FATAL, NULL, "PANIC "__FILE__": " __VA_ARGS__); exit(EXIT_FAILURE); })
+#define panic_syserror(...) ({ say(S_FATAL, strerror(errno), "PANIC "__FILE__": " __VA_ARGS__); exit(EXIT_FAILURE); })
 #define say_syserror(...) say(S_ERROR, strerror(errno), __VA_ARGS__)
 #define say_error(...) say(S_ERROR, NULL, __VA_ARGS__)
 #define say_crit(...)  say(S_CRIT, NULL, __VA_ARGS__)

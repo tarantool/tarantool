@@ -54,6 +54,7 @@
 
 static pid_t master_pid;
 char *cfg_filename = "tarantool.cfg";
+struct tbuf *cfg_out = NULL;
 struct tarantool_cfg cfg;
 
 bool init_storage;
@@ -61,6 +62,55 @@ bool init_storage;
 enum tarantool_role role = def;
 
 extern int daemonize(int nochdir, int noclose);
+
+static i32
+load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
+{
+	FILE *f;
+	i32 n_accepted, n_skipped;
+
+	tbuf_reset(cfg_out);
+
+	f = fopen(cfg_filename, "r");
+	if (f == NULL) {
+		tbuf_printf(cfg_out, "\tcan't open config `%s'", cfg_filename);
+
+		return -1;
+	}
+
+	if (fill_default_tarantool_cfg(conf) != 0)
+		return -1;
+
+	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly, &n_accepted, &n_skipped);
+	fclose(f);
+	if (n_accepted == 0 || n_skipped != 0)
+		return -1;
+
+	if (check_cfg_tarantool_cfg(conf) != 0)
+		return -1;
+
+	return mod_chkconfig(conf);
+}
+
+i32
+reload_cfg(struct tbuf *out)
+{
+	struct tarantool_cfg new_cfg;
+	i32 ret;
+
+	ret = load_cfg(&new_cfg, 1);
+	tbuf_append(out, cfg_out->data, cfg_out->len);
+
+	if (ret == -1)
+		return -1;
+
+	mod_reloadconfig(&cfg, &new_cfg);
+
+	// TODO: need to destroy old config (free arrays)
+	cfg = new_cfg;
+
+	return 0;
+}
 
 const char *
 tarantool_version(void)
@@ -227,8 +277,6 @@ main(int argc, char **argv)
 	int c, verbose = 0;
 	char *cat_filename = NULL;
 	bool be_daemon = false;
-	int n_accepted, n_skipped;
-	FILE *f;
 
 #if CORO_ASM
 	save_rbp(&main_stack_frame);
@@ -269,6 +317,10 @@ main(int argc, char **argv)
 		 .has_arg = 0,
 		 .flag = NULL,
 		 .val = 'D'},
+		{.name = "chkconfig",
+		 .has_arg = 0,
+		 .flag = NULL,
+		 .val = 'k'},
 		{.name = NULL,
 		 .has_arg = 0,
 		 .flag = NULL,
@@ -302,6 +354,9 @@ main(int argc, char **argv)
 		case 'I':
 			init_storage = true;
 			break;
+		case 'k':
+			role = chkconfig;
+			break;
 		}
 	}
 
@@ -319,6 +374,7 @@ main(int argc, char **argv)
 		fprintf(stderr, "	-p, --create_pid\n");
 		fprintf(stderr, "	-v, --verbose\n");
 		fprintf(stderr, "	-D, --daemonize\n");
+		fprintf(stderr, "	--chkconfig\n");
 
 		return 0;
 	}
@@ -335,14 +391,19 @@ main(int argc, char **argv)
 		cfg_filename = full_path;
 	}
 
-	f = fopen(cfg_filename, "r");
-	if (f == NULL)
-		panic("can't open config `%s'", cfg_filename);
+	cfg_out = tbuf_alloc(eter_pool);
+	assert(cfg_out);
 
-	fill_default_tarantool_cfg(&cfg);
-	parse_cfg_file_tarantool_cfg(&cfg, f, 0, &n_accepted, &n_skipped);
-	check_cfg_tarantool_cfg(&cfg);
-	fclose(f);
+	if (role == chkconfig) {
+		if (load_cfg(&cfg, 0) == -1)
+			fprintf(stderr, "%.*s\n", cfg_out->len, (char *)cfg_out->data);
+
+		return 0;
+	}
+
+	if (load_cfg(&cfg, 0) == -1)
+		panic("can't load config:\n"
+		      "%.*s", cfg_out->len, (char *)cfg_out->data);
 
 #ifdef STORAGE
 	if (role == cat) {

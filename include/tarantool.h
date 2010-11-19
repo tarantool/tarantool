@@ -34,6 +34,8 @@
 
 struct recovery_state *recovery_state;
 void mod_init(void);
+i32 mod_chkconfig(struct tarantool_cfg *conf);
+void mod_reloadconfig(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
 int mod_cat(const char *filename);
 void mod_snapshot(struct log_io_iter *);
 void mod_info(struct tbuf *out);
@@ -41,8 +43,10 @@ void mod_exec(char *str, int len, struct tbuf *out);
 
 extern struct tarantool_module module;
 extern struct tarantool_cfg cfg;
+extern struct tbuf *cfg_out;
 extern char *cfg_filename;
 extern bool init_storage;
+i32 reload_cfg(struct tbuf *out);
 void snapshot(void *ev __unused__, int events __unused__);
 const char *tarantool_version(void);
 void tarantool_info(struct tbuf *out);
@@ -51,7 +55,7 @@ double tarantool_uptime(void);
 char **init_set_proc_title(int argc, char **argv);
 void set_proc_title(const char *format, ...);
 
-enum tarantool_role { usage, cat, def };
+enum tarantool_role { usage, cat, def, chkconfig };
 extern enum tarantool_role role;
 
 #endif

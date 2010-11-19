@@ -151,17 +151,13 @@ tbuf_append_field(struct tbuf *b, void *f)
 	tbuf_append(b, s, next - s);
 }
 
-void
-tbuf_printf(struct tbuf *b, const char *format, ...)
+void tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 {
-	va_list args;
 	int printed_len;
 	size_t free_len = b->size - b->len;
 
 	tbuf_assert(b);
-	va_start(args, format);
-	printed_len = vsnprintf(((char *)b->data) + b->len, free_len, format, args);
-	va_end(args);
+	printed_len = vsnprintf(((char *)b->data) + b->len, free_len, format, ap);
 
 	/*
 	 * if buffer too short, resize buffer and
@@ -170,12 +166,20 @@ tbuf_printf(struct tbuf *b, const char *format, ...)
 	if (free_len <= printed_len) {
 		tbuf_ensure(b, printed_len + 1);
 		free_len = b->size - b->len - 1;
-		va_start(args, format);
-		printed_len = vsnprintf(((char *)b->data) + b->len, free_len, format, args);
-		va_end(args);
+		printed_len = vsnprintf(((char *)b->data) + b->len, free_len, format, ap);
 	}
 
 	b->len += printed_len;
+}
+
+void
+tbuf_printf(struct tbuf *b, const char *format, ...)
+{
+	va_list args;
+
+	va_start(args, format);
+	tbuf_vprintf(b, format, args);
+	va_end(args);
 }
 
 /* for debug printing */

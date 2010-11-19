@@ -52,6 +52,7 @@ static const char help[] =
 	"save coredump\r\n"
 	"save snapshot\r\n"
 	"exec module command\r\n"
+	"reload configuration\r\n"
 	;
 
 
@@ -125,6 +126,7 @@ admin_dispatch(void)
 		snapshot = "sn"("a"("p"("s"("h"("o"("t")?)?)?)?)?)?;
 		exec = "ex"("e"("c")?)?;
 		string = [^\r\n]+ >{strstart = p;}  %{strend = p;};
+		reload = "re"("l"("o"("a"("d")?)?)?)?;
 
 		commands = (help			%{tbuf_append(out, help, sizeof(help));}		|
 			    exit			%{return 0;}						|
@@ -137,7 +139,8 @@ admin_dispatch(void)
 			    save " "+ coredump		%{coredump(60); ok(out);}				|
 			    save " "+ snapshot		%{snapshot(NULL, 0); ok(out);}				|
 			    exec " "+ string		%{mod_exec(strstart, strend - strstart, out); end(out);}|
-			    check " "+ slab		%{slab_validate(); ok(out);});
+			    check " "+ slab		%{slab_validate(); ok(out);}				|
+			    reload " "+ configuration	%{if (reload_cfg(out)) { end(out); } else { ok(out); }});
 
 	        main := commands eol;
 		write init;

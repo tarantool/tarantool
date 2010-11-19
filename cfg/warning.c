@@ -7,17 +7,13 @@
 void
 out_warning(ConfettyError v, char *format, ...)
 {
-	(void)v; /* make gcc happy */
 	va_list ap;
+
+	(void)v; /* make gcc happy */
+
 	va_start(ap, format);
-	switch (v) {
-	case CNF_NOTSET:
-		vsay(S_FATAL, NULL, format, ap);
-		panic("can't read config");
-
-		break;
-
-	default:
-		vsay(S_WARN, NULL, format, ap);
-	}
+	tbuf_printf(cfg_out, "\t");
+	tbuf_vprintf(cfg_out, format, ap);
+	tbuf_printf(cfg_out, "\n");
+	va_end(ap);
 }
