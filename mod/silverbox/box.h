@@ -130,7 +130,7 @@ struct box_txn {
 	struct box_tuple *tuple;
 	struct box_tuple *lock_tuple;
 
-	bool in_recover, old_format;
+	bool in_recover;
 };
 
 enum tuple_flags {

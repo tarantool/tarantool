@@ -778,7 +778,7 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 }
 
 static int __noinline__
-prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
+prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 {
 	struct tbuf **fields;
 	void *field;
@@ -786,11 +786,9 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 	void *key;
 	u32 op_cnt;
 
-	if (!old_format) {
-		u32 key_len = read_u32(data);
-		if (key_len != 1)
-			box_raise(ERR_CODE_ILLEGAL_PARAMS, "key must be single valued");
-	}
+	u32 key_len = read_u32(data);
+	if (key_len != 1)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key must be single valued");
 	key = read_field(data);
 	op_cnt = read_u32(data);
 
@@ -823,82 +821,40 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data, bool old_format)
 		field += field_size;
 	}
 
-	if (old_format) {
-		while (op_cnt-- > 0) {
-			u8 field_no;
-			void *new_field;
-			u32 and, xor;
-			i32 add;
-			u32 new_field_size;
+	while (op_cnt-- > 0) {
+		u8 op;
+		u32 field_no, arg_size;
+		void *arg;
 
-			field_no = read_u8(data);
-			new_field = read_field(data);
-			and = read_u32(data);
-			xor = read_u32(data);
-			add = read_u32(data);
+		field_no = read_u32(data);
 
-			if (field_no >= txn->old_tuple->cardinality)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS,
-					  "update of field beyond tuple cardinality");
+		if (field_no >= txn->old_tuple->cardinality)
+			box_raise(ERR_CODE_ILLEGAL_PARAMS,
+				  "update of field beyond tuple cardinality");
 
-			struct tbuf *sptr_field = fields[field_no];
+		struct tbuf *sptr_field = fields[field_no];
 
-			new_field_size = load_varint32(&new_field);
-			if (new_field_size) {
-				if (and != 0 || xor != 0 || add != 0)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS,
-						  "and or xor or add != 0");
-				tbuf_ensure(sptr_field, new_field_size);
-				sptr_field->len = new_field_size;
-				memcpy(sptr_field->data, new_field, new_field_size);
-			} else {
-				uint32_t *num;
-				if (sptr_field->len != 4)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS,
-						  "num op on field with length != 4");
-				num = (uint32_t *)sptr_field->data;	/* FIXME: align && endianes */
+		op = read_u8(data);
+		if (op > 5)
+			box_raise(ERR_CODE_ILLEGAL_PARAMS, "op is not 0, 1, 2, 3, 4 or 5");
+		arg = read_field(data);
+		arg_size = load_varint32(&arg);
 
-				*num &= and;
-				*num ^= xor;
-				*num += add;
-			}
-		}
-	} else {
-		while (op_cnt-- > 0) {
-			u8 op;
-			u32 field_no, arg_size;
-			void *arg;
-
-			field_no = read_u32(data);
-
-			if (field_no >= txn->old_tuple->cardinality)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS,
-					  "update of field beyond tuple cardinality");
-
-			struct tbuf *sptr_field = fields[field_no];
-
-			op = read_u8(data);
-			if (op > 5)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "op is not 0, 1, 2, 3, 4 or 5");
-			arg = read_field(data);
-			arg_size = load_varint32(&arg);
-
-			if (op == 0) {
-				tbuf_ensure(sptr_field, arg_size);
-				sptr_field->len = arg_size;
-				memcpy(sptr_field->data, arg, arg_size);
-			} else {
-				switch (op) {
-				case 1:
-				case 2:
-				case 3:
-				case 4:
-					do_field_arith(op, sptr_field, arg, arg_size);
-					break;
-				case 5:
-					do_field_splice(sptr_field, arg, arg_size);
-					break;
-				}
+		if (op == 0) {
+			tbuf_ensure(sptr_field, arg_size);
+			sptr_field->len = arg_size;
+			memcpy(sptr_field->data, arg, arg_size);
+		} else {
+			switch (op) {
+			case 1:
+			case 2:
+			case 3:
+			case 4:
+				do_field_arith(op, sptr_field, arg, arg_size);
+				break;
+			case 5:
+				do_field_splice(sptr_field, arg, arg_size);
+				break;
 			}
 		}
 	}
@@ -933,19 +889,14 @@ tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple)
 {
 	tuple_txn_ref(txn, tuple);
 
-	if (txn->old_format) {
-		add_iov_dup(&tuple->bsize, sizeof(uint16_t));
-		add_iov_dup(&tuple->cardinality, sizeof(uint8_t));
-		add_iov(tuple->data, tuple->bsize);
-	} else
-		add_iov(&tuple->bsize,
-			tuple->bsize +
-			field_sizeof(struct box_tuple, bsize) +
-			field_sizeof(struct box_tuple, cardinality));
+	add_iov(&tuple->bsize,
+		tuple->bsize +
+		field_sizeof(struct box_tuple, bsize) +
+		field_sizeof(struct box_tuple, cardinality));
 }
 
 static int __noinline__
-process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bool old_format)
+process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 {
 	struct box_tuple *tuple;
 	uint32_t *found;
@@ -988,12 +939,10 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data, bo
 		}
 	} else {
 		for (u32 i = 0; i < count; i++) {
-			if (!old_format) {
-				u32 key_len = read_u32(data);
-				if (key_len != 1)
-					box_raise(ERR_CODE_ILLEGAL_PARAMS,
-						  "key must be single valued");
-			}
+			u32 key_len = read_u32(data);
+			if (key_len != 1)
+				box_raise(ERR_CODE_ILLEGAL_PARAMS,
+					  "key must be single valued");
 			void *key = read_field(data);
 			tuple = txn->index->find(txn->index, key);
 			if (tuple == NULL || tuple->flags & GHOST)
@@ -1200,13 +1149,13 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 				box_raise(ERR_CODE_ILLEGAL_PARAMS, "index is invalid");
 
 			stat_collect(stat_base, op, 1);
-			return process_select(txn, limit, offset, data, false);
+			return process_select(txn, limit, offset, data);
 		}
 
 	case UPDATE_FIELDS:
 		txn->flags = read_u32(data);
 		stat_collect(stat_base, op, 1);
-		ret_code = prepare_update_fields(txn, data, false);
+		ret_code = prepare_update_fields(txn, data);
 		break;
 
 	default:
