@@ -8,6 +8,7 @@ WriteMakefile(
         'Scalar::Util'      => 0,
         'List::Util'        => 0,
         'List::MoreUtils'   => 0,
+        'Moose'             => 0,
         'Time::HiRes'       => 0,
         'String::CRC32'     => 0,
         'Exporter'          => 0,
