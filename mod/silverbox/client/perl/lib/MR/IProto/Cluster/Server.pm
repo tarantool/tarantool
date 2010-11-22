@@ -63,7 +63,7 @@ Timeout of connect operation.
 has connect_timeout => (
     is  => 'rw',
     isa => 'Num',
-    default => 2,
+    default => 5,
 );
 
 =item timeout
@@ -75,7 +75,7 @@ Timeout of read and write operations.
 has timeout => (
     is  => 'rw',
     isa => 'Num',
-    default => 2,
+    default => 5,
     trigger => sub {
         my ($self, $new) = @_;
         $self->_handle->timeout($new) if $self->_has_handle();
@@ -312,6 +312,7 @@ sub _build__handle {
                 $self->_recv_finished($sync, undef, undef, $message);
                 push @callbacks, $self->_callbacks->{$sync};
             }
+            $self->active(0);
             $self->_clear_handle();
             $self->_clear_callbacks();
             $self->_debug(1, 'closing socket');
@@ -322,6 +323,7 @@ sub _build__handle {
         },
         on_timeout => sub {
             my ($handle) = @_;
+            return unless keys %{$self->_callbacks};
             $handle->_error( Errno::ETIMEDOUT ) if keys %{$self->_callbacks};
             return;
         },

@@ -35,7 +35,7 @@ but requires some more CPU):
         arg2 => 2,
     );
     my $response = $client->send($request);
-    # $response isa My::Project::Message::MyOperation::Reply.
+    # $response isa My::Project::Message::MyOperation::Response.
     # Of cource, both message classes (request and reply) must
     # be implemented by user.
 
@@ -78,7 +78,7 @@ L<MR::IProto::Message> for each message type, one for request message
 and another for reply.
 This classes must be named as C<prefix::*::suffix>, where I<prefix>
 must be passed to constructor of L<MR::IProto> as value of L</prefix>
-attribute and I<suffix> is either C<Request> or C<Reply>.
+attribute and I<suffix> is either C<Request> or C<Response>.
 This classes must be loaded before first message through client object
 will be sent.
 
@@ -91,8 +91,8 @@ use Moose;
 use AnyEvent;
 use Errno;
 use Scalar::Util qw(weaken);
-use Time::HiRes;
 use MR::IProto::Cluster;
+use MR::IProto::Error;
 
 =head1 ATTRIBUTES
 
@@ -133,19 +133,6 @@ has cluster => (
         }
         return;
     },
-);
-
-=item rotateservers
-
-Are servers must be excluded from balancing if connection error
-was occured.
-
-=cut
-
-has rotateservers => (
-    is  => 'ro',
-    isa => 'Bool',
-    default => 1,
 );
 
 =item max_request_retries
@@ -228,7 +215,7 @@ passed to callback as second argument. Additional information can be extracted
 from C<$!> variable.
 
 In sync mode (when C<$callback> argument is skipped) all errors are raised
-and C<$!> is also set. Reply is returned from method, so method B<must>
+and C<$!> is also set. Response is returned from method, so method B<must>
 be called in scalar context.
 
 Request C<$message> can be instance of L<MR::IProto::Message> subclass.
@@ -266,11 +253,13 @@ sub send {
 
 Send all of messages in C<\@messages> and return result (sync-mode) or
 call callback (async-mode) after all replies was received.
-Result is returned as ArrayRef[HashRef], where internal hash contains two
-keys: C<data> and C<error>. Replies in result can be returned in order
-different then order of requests.
+Result is returned as array reference, which values can be instances of
+L<MR::IProto::Response> or L<MR::IProto::Error> if request was passed
+as object, or hash with keys C<data> and C<error> if message was passed
+as C<\%args>.
+Replies in result can be returned in order different then order of requests.
 
-See L</_send> for more information about of message data. Either
+See L</_send> for more information about message data. Either
 C<$message> or C<\%args> allowed as content of C<\@messages>.
 
 =cut
@@ -291,10 +280,8 @@ sub send_bulk {
         $cv->begin();
         $self->_send($message, sub {
             my ($data, $error) = @_;
-            push @result, {
-                data  => $data,
-                error => $error,
-            };
+            push @result, blessed($data) ? $data
+                : { data => $data, error => $error };
             $cv->end();
             return;
         });
@@ -312,7 +299,7 @@ sub send_bulk {
 sub Chat {
     my $self = shift;
     my $message = @_ == 1 ? shift : { @_ };
-    $message->{allow_retry} = 1 if ref $message eq 'HASH';
+    $message->{retry} = 1 if ref $message eq 'HASH';
     my $data = eval { $self->send($message) };
     return if $@;
     return wantarray ? @$data : $data->[0];
@@ -345,10 +332,6 @@ some additional arguments to constructor is allowed:
 
 =over
 
-=item norotateservers
-
-Negative to attribute L</rotateservers>.
-
 =item servers
 
 C<host:port> pairs separated by comma used to create
@@ -373,7 +356,6 @@ around BUILDARGS => sub {
     my $class = shift;
     my %args = @_ == 1 ? %{shift()} : @_;
     $args{prefix} = $args{name} if exists $args{name};
-    $args{rotateservers} = 0 if delete $args{norotateservers};
     if( $args{servers} ) {
         my $cluster_class = $args{cluster_class} || 'MR::IProto::Cluster';
         my $server_class = $args{server_class} || 'MR::IProto::Cluster::Server';
@@ -417,11 +399,11 @@ sub _build__callbacks {
 
 sub _build__reply_class {
     my ($self) = @_;
-    my $re = sprintf '^%s::.*::Reply$', $self->prefix;
+    my $re = sprintf '^%s::', $self->prefix;
     my %reply = map { $_->msg => $_ }
         grep $_->can('msg'),
         grep /$re/,
-        MR::IProto::Message->meta->subclasses();
+        MR::IProto::Response->meta->subclasses();
     return \%reply;
 }
 
@@ -460,7 +442,7 @@ Code reference which is used to unpack reply.
 
 Message have no reply.
 
-=item allow_retry
+=item retry
 
 Is retry is allowed. Values of attributes L</max_request_retries> and
 L</retry_delay> is used if retry is allowed.
@@ -480,7 +462,7 @@ sub _send {
         $req_msg = $message->msg;
         $key = $message->key;
         $body = $message->data;
-        $retry = $message->allow_retry ? $self->max_request_retries : 1;
+        $retry = $message->retry ? $self->max_request_retries : 1;
     }
     # Old-style compatible API
     else {
@@ -488,25 +470,23 @@ sub _send {
         $body = exists $message->{payload} ? $message->{payload}
             : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{$message->{data}}
             : $message->{data};
-        $unpack = $message->{no_reply} ? sub { 0 } : $message->{unpack};
-        $retry = $message->{allow_retry} ? $self->max_request_retries : 1;
+        $unpack = $message->{no_reply} ? sub { 0 } : $message->{unpack} or die "unpack or no_reply must be specified";
+        $retry = $message->{retry} ? $self->max_request_retries : 1;
     }
 
     my $try = 1;
     weaken($self);
     my ($sub, $server);
     my $do_try = sub {
-        $self->_debug(2, "send msg=$req_msg try $try of $retry total");
+        my ($by_resp) = @_;
+        $self->_debug(2, sprintf "send msg=%d try %d of %d total", $req_msg, $try, $by_resp ? $self->max_request_retries : $retry );
         $server = $self->cluster->server( $key );
         $server->send($req_msg, $body, $sub);
     };
     $sub = sub {
         my ($resp_msg, $data, $error) = @_;
         if ($error) {
-            if( $self->rotateservers ) {
-                $self->_debug(2, "send: failed");
-                $server->active(0);
-            }
+            $self->_debug(2, "send: failed");
             if( $try++ < $retry ) {
                 my $timer;
                 $timer = AnyEvent->timer(
@@ -520,11 +500,15 @@ sub _send {
             }
             else {
                 undef $do_try;
-                $callback->(undef, $error);
+                my $errobj = $unpack ? undef : MR::IProto::Error->new(
+                    request => $message,
+                    error   => $error,
+                    errno   => 0+$!,
+                );
+                $callback->($errobj, $error);
             }
         }
         else {
-            undef $do_try;
             my $ok = eval {
                 die "Request and reply message code is different: $resp_msg != $req_msg\n"
                     unless $resp_msg == $req_msg;
@@ -533,7 +517,7 @@ sub _send {
                 }
                 else {
                     if( my $data_class = $self->_reply_class->{$resp_msg} ) {
-                        $data = $data_class->new($data);
+                        $data = $data_class->new( data => $data, request => $message );
                     }
                     else {
                         die sprintf "Unknown message code $resp_msg\n";
@@ -542,10 +526,30 @@ sub _send {
                 1;
             };
             if($ok) {
-                $callback->($data);
+                if( !$unpack && $data->retry && $try++ < $self->max_request_retries ) {
+                    my $timer;
+                    $timer = AnyEvent->timer(
+                        after => $self->retry_delay,
+                        cb    => sub {
+                            undef $timer;
+                            $do_try->(1);
+                            return;
+                        },
+                    );
+                }
+                else {
+                    undef $do_try;
+                    $callback->($data);
+                }
             }
             else {
-                $callback->(undef, $@);
+                undef $do_try;
+                my $errobj = $unpack ? undef : MR::IProto::Error->new(
+                    request => $message,
+                    error   => $@,
+                    errno   => 0+$!,
+                );
+                $callback->($errobj, $@);
             }
         }
         return;

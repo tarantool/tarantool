@@ -30,37 +30,6 @@ has data => (
 
 =back
 
-=head1 PUBLIC METHODS
-
-=over
-
-=item key
-
-Returns key value.
-You must implement L</key_attr> method in your subclass to use this feature.
-
-=cut
-
-sub key {
-    my ($self) = @_;
-    return undef unless $self->can('key_attr');
-    my $method = $self->key_attr;
-    return $self->$method();
-}
-
-=item allow_retry
-
-If request retry is allowed.
-
-=cut
-
-sub allow_retry {
-    my ($self) = @_;
-    return 0;
-}
-
-=back
-
 =head1 PROTECTED METHODS
 
 =over
@@ -77,8 +46,13 @@ See L<Moose::Manual::Construction/BUILDARGS> for more information.
 around BUILDARGS => sub {
     my $orig = shift;
     my $class = shift;
-    if( @_ == 1 && !ref $_[0] ) {
-        return $class->$orig( $class->_parse_data(@_) );
+    my $args = @_ == 1 ? $_[0] : { @_ };
+    if( exists $args->{data} ) {
+        my $parsed_args = $class->_parse_data($args->{data});
+        my $tail = delete $parsed_args->{data};
+        warn "Not all data was parsed" if defined $tail && length $tail;
+        @$args{ keys %$parsed_args } = values %$parsed_args;
+        return $class->$orig($args);
     }
     else {
         return $class->$orig(@_);
