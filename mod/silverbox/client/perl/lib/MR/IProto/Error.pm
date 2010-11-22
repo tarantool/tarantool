@@ -54,6 +54,33 @@ has request => (
 
 =back
 
+=head1 PUBLIC METHODS
+
+=over
+
+=item is_error
+
+Always returns true.
+
+=cut
+
+sub is_error {
+    return 1;
+}
+
+=item error_message
+
+Error message text.
+
+=cut
+
+sub error_message {
+    my ($self) = @_;
+    return $self->error;
+}
+
+=back
+
 =cut
 
 no Moose;

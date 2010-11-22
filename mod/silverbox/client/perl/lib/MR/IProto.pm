@@ -88,9 +88,9 @@ L<AnyEvent> is recomended.
 =cut
 
 use Moose;
-use AnyEvent;
 use Errno;
 use Scalar::Util qw(weaken);
+use Time::HiRes;
 use MR::IProto::Cluster;
 use MR::IProto::Error;
 
@@ -235,14 +235,11 @@ sub send {
     else {
         die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
         my ($data, $error, $errno);
-        my $exit = AnyEvent->condvar();
         $self->_send($message, sub {
             ($data, $error) = @_;
             $errno = $!;
-            $exit->send();
             return;
-        });
-        $exit->recv();
+        }, 1);
         $! = $errno;
         die $error if $error;
         return $data;
@@ -258,6 +255,8 @@ L<MR::IProto::Response> or L<MR::IProto::Error> if request was passed
 as object, or hash with keys C<data> and C<error> if message was passed
 as C<\%args>.
 Replies in result can be returned in order different then order of requests.
+
+B<Warning!> Anyway asynchronous connection is used.
 
 See L</_send> for more information about message data. Either
 C<$message> or C<\%args> allowed as content of C<\@messages>.
@@ -452,7 +451,7 @@ L</retry_delay> is used if retry is allowed.
 =cut
 
 sub _send {
-    my ($self, $message, $callback) = @_;
+    my ($self, $message, $callback, $sync) = @_;
     die "Callback must be specified" unless $callback;
     die "Method must be called in void context" if defined wantarray;
 
@@ -477,29 +476,41 @@ sub _send {
     my $try = 1;
     weaken($self);
     my ($sub, $server);
+    my $xsync = $sync ? 'sync' : 'async';
     my $do_try = sub {
         my ($by_resp) = @_;
         $self->_debug(2, sprintf "send msg=%d try %d of %d total", $req_msg, $try, $by_resp ? $self->max_request_retries : $retry );
         $server = $self->cluster->server( $key );
-        $server->send($req_msg, $body, $sub);
+        $server->$xsync->send($req_msg, $body, $sub);
     };
+    my $next_try = $sync
+        ? sub {
+            my ($by_resp) = @_;
+            my $timer;
+            $timer = AnyEvent->timer(
+                after => $self->retry_delay,
+                cb    => sub {
+                    undef $timer;
+                    $do_try->($by_resp);
+                    return;
+                },
+            );
+        }
+        : sub {
+            my ($by_resp) = @_;
+            Time::HiRes::sleep($self->retry_delay);
+            $do_try->($by_resp);
+            return;
+        };
     $sub = sub {
         my ($resp_msg, $data, $error) = @_;
         if ($error) {
             $self->_debug(2, "send: failed");
             if( $try++ < $retry ) {
-                my $timer;
-                $timer = AnyEvent->timer(
-                    after => $self->retry_delay,
-                    cb    => sub {
-                        undef $timer;
-                        $do_try->();
-                        return;
-                    },
-                );
+                $next_try->();
             }
             else {
-                undef $do_try;
+                undef $next_try;
                 my $errobj = $unpack ? undef : MR::IProto::Error->new(
                     request => $message,
                     error   => $error,
@@ -527,23 +538,15 @@ sub _send {
             };
             if($ok) {
                 if( !$unpack && $data->retry && $try++ < $self->max_request_retries ) {
-                    my $timer;
-                    $timer = AnyEvent->timer(
-                        after => $self->retry_delay,
-                        cb    => sub {
-                            undef $timer;
-                            $do_try->(1);
-                            return;
-                        },
-                    );
+                    $next_try->(1);
                 }
                 else {
-                    undef $do_try;
+                    undef $next_try;
                     $callback->($data);
                 }
             }
             else {
-                undef $do_try;
+                undef $next_try;
                 my $errobj = $unpack ? undef : MR::IProto::Error->new(
                     request => $message,
                     error   => $@,

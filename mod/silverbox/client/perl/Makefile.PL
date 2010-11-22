@@ -11,6 +11,7 @@ WriteMakefile(
         'List::MoreUtils'   => 0,
         'Moose'             => 0,
         'String::CRC32'     => 0,
+        'Time::HiRes'       => 0,
         'Exporter'          => 0,
     },
 );

@@ -12,9 +12,9 @@ This class is used to implement all communication with one server.
 
 use Moose;
 use Moose::Util::TypeConstraints;
+use MR::IProto::Connection::Async;
+use MR::IProto::Connection::Sync;
 use MR::IProto::Message;
-use AnyEvent::Handle;
-use Scalar::Util qw(weaken);
 
 coerce 'MR::IProto::Cluster::Server'
     => from 'Str'
@@ -78,7 +78,8 @@ has timeout => (
     default => 5,
     trigger => sub {
         my ($self, $new) = @_;
-        $self->_handle->timeout($new) if $self->_has_handle();
+        $self->async->set_timeout($new) if $self->has_async();
+        $self->sync->set_timeout($new) if $self->has_sync();
         return;
     },
 );
@@ -166,62 +167,17 @@ has dump_no_ints => (
     isa => 'Bool',
 );
 
-=back
-
-=cut
-
-has _handle => (
+has async => (
     is  => 'ro',
-    isa => 'AnyEvent::Handle',
+    isa => 'MR::IProto::Connection::Async',
     lazy_build => 1,
 );
 
-has _queue => (
+has sync => (
     is  => 'ro',
-    isa => 'ArrayRef',
+    isa => 'MR::IProto::Connection::Sync',
     lazy_build => 1,
 );
-
-has _in_progress => (
-    is  => 'ro',
-    isa => 'Int',
-    default => 0,
-    traits  => ['Counter'],
-    handles => {
-        _inc_in_progress => 'inc',
-        _dec_in_progress => 'dec',
-    },
-);
-
-has _callbacks => (
-    is  => 'ro',
-    isa => 'HashRef',
-    lazy_build => 1,
-);
-
-has _read_reply => (
-    is  => 'ro',
-    isa => 'CodeRef',
-    lazy_build => 1,
-);
-
-=head1 PUBLIC METHODS
-
-=over
-
-=item send
-
-Enqueue message send.
-For list of arguments see L</_send>.
-
-=cut
-
-sub send {
-    my $self = shift;
-    push @{$self->_queue}, [ @_ ];
-    $self->_try_to_send();
-    return;
-}
 
 =back
 
@@ -229,52 +185,16 @@ sub send {
 
 =over
 
-=item _send( $msg, $payload, $callback )
-
-Send message to server.
-
 =cut
 
-sub _send {
-    my ($self, $msg, $payload, $callback) = @_;
-    my $sync = $self->_choose_sync();
-    my $header = pack 'L3', $msg, length $payload, $sync;
-    $self->_inc_in_progress();
-    $self->_callbacks->{$sync} = $callback;
-    $self->_send_started($sync, $msg, $payload);
-    $self->_debug_dump(5, 'send header: ', $header);
-    $self->_debug_dump(5, 'send payload: ', $payload);
-    $self->_handle->push_write( $header . $payload );
-    $self->_handle->push_read( chunk => 12, $self->_read_reply );
-    return;
+sub _build_async {
+    my ($self) = @_;
+    return MR::IProto::Connection::Async->new( server => $self );
 }
 
-sub _build__read_reply {
+sub _build_sync {
     my ($self) = @_;
-    weaken($self);
-    return sub {
-        my ($handle, $data) = @_;
-        $self->_debug_dump(6, 'recv header: ', $data);
-        my ($msg, $payload_length, $sync) = unpack('L3', $data);
-        $handle->unshift_read( chunk => $payload_length, sub {
-            my ($handle, $data) = @_;
-            $self->_debug_dump(6, 'recv payload: ', $data);
-            $self->_dec_in_progress();
-            $self->_recv_finished($sync, $msg, $data);
-            $self->_try_to_send();
-            delete($self->_callbacks->{$sync})->($msg, $data);
-            return;
-        });
-        return;
-    };
-}
-
-sub _try_to_send {
-    my ($self) = @_;
-    while( $self->_in_progress < $self->max_parallel && (my $task = shift @{ $self->_queue }) ) {
-        $self->_send(@$task);
-    }
-    return;
+    return MR::IProto::Connection::Sync->new( server => $self );
 }
 
 sub _build_debug_cb {
@@ -284,70 +204,6 @@ sub _build_debug_cb {
         warn "$msg\n";
         return;
     };
-}
-
-sub _build__handle {
-    my ($self) = @_;
-    $self->_debug(4, "connecting");
-    weaken($self);
-    return AnyEvent::Handle->new(
-        connect    => [ $self->host, $self->port ],
-        no_delay   => $self->tcp_nodelay,
-        keepalive  => $self->tcp_keepalive,
-        timeout    => $self->timeout,
-        on_prepare => sub {
-            return $self->connect_timeout;
-        },
-        on_connect => sub {
-            my ($handle) = @_;
-            $self->_debug(1, "connected");
-            return;
-        },
-        on_error   => sub {
-            my ($handle, $fatal, $message) = @_;
-            $self->_debug(0, ($fatal ? 'fatal ' : '') . 'error: ' . $message);
-            my @callbacks;
-            foreach my $sync ( keys %{$self->_callbacks} ) {
-                $self->_dec_in_progress();
-                $self->_recv_finished($sync, undef, undef, $message);
-                push @callbacks, $self->_callbacks->{$sync};
-            }
-            $self->active(0);
-            $self->_clear_handle();
-            $self->_clear_callbacks();
-            $self->_debug(1, 'closing socket');
-            $handle->destroy();
-            $self->_try_to_send();
-            $_->(undef, undef, $message) foreach @callbacks;
-            return;
-        },
-        on_timeout => sub {
-            my ($handle) = @_;
-            return unless keys %{$self->_callbacks};
-            $handle->_error( Errno::ETIMEDOUT ) if keys %{$self->_callbacks};
-            return;
-        },
-    );
-}
-
-sub _build__queue {
-    my ($self) = @_;
-    return [];
-}
-
-sub _build__callbacks {
-    my ($self) = @_;
-    return {};
-}
-
-sub _choose_sync {
-    my ($self) = @_;
-    my $sync;
-    for( 1 .. 50 ) {
-        $sync = int(rand 0xffffffff);
-        return $sync unless exists $self->_callbacks->{$sync};
-    }
-    die "Can't choose sync value after 50 iterations";
 }
 
 =item _send_started( $sync, $message, $data )
