@@ -11,7 +11,7 @@ if error was occured.
 
 =cut
 
-use Moose;
+use Mouse;
 
 =head1 PUBLIC ATTRIBUTES
 
@@ -83,7 +83,7 @@ sub error_message {
 
 =cut
 
-no Moose;
+no Mouse;
 __PACKAGE__->meta->make_immutable();
 
 1;

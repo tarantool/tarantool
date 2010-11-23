@@ -10,8 +10,8 @@ This class is used to implement all communication with one server.
 
 =cut
 
-use Moose;
-use Moose::Util::TypeConstraints;
+use Mouse;
+use Mouse::Util::TypeConstraints;
 use MR::IProto::Connection::Async;
 use MR::IProto::Connection::Sync;
 use MR::IProto::Message;
@@ -255,7 +255,7 @@ L<MR::IProto>, L<MR::IProto::Cluster>.
 
 =cut
 
-no Moose;
+no Mouse;
 __PACKAGE__->meta->make_immutable();
 
 1;

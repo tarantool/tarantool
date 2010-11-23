@@ -87,8 +87,9 @@ L<AnyEvent> is recomended.
 
 =cut
 
-use Moose;
+use Mouse;
 use Errno;
+use MRO::Compat;
 use Scalar::Util qw(weaken);
 use Time::HiRes;
 use MR::IProto::Cluster;
@@ -346,7 +347,7 @@ Is passed directly to constructor of L<MR::IProto::Cluster>.
 
 =back
 
-See L<Moose::Manual::Construction/BUILDARGS> for more information.
+See L<Mouse::Manual::Construction/BUILDARGS> for more information.
 
 =cut
 
@@ -402,7 +403,8 @@ sub _build__reply_class {
     my %reply = map { $_->msg => $_ }
         grep $_->can('msg'),
         grep /$re/,
-        MR::IProto::Response->meta->subclasses();
+        # MR::IProto::Response->meta->subclasses();
+        @{ mro::get_isarev('MR::IProto::Response') };
     return \%reply;
 }
 
@@ -576,7 +578,7 @@ L<MR::IProto::Cluster>, L<MR::IProto::Cluster::Server>, L<MR::IProto::Message>.
 
 =cut
 
-no Moose;
+no Mouse;
 __PACKAGE__->meta->make_immutable();
 
 1;

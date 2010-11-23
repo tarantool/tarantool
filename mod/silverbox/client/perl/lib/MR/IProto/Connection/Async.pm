@@ -10,7 +10,7 @@ Used to perform asynchronous communication.
 
 =cut
 
-use Moose;
+use Mouse;
 extends 'MR::IProto::Connection';
 
 use AnyEvent::Handle;
@@ -29,14 +29,9 @@ has _queue => (
 );
 
 has _in_progress => (
-    is  => 'ro',
+    is  => 'rw',
     isa => 'Int',
     default => 0,
-    traits  => ['Counter'],
-    handles => {
-        _inc_in_progress => 'inc',
-        _dec_in_progress => 'dec',
-    },
 );
 
 has _callbacks => (
@@ -97,7 +92,6 @@ sub _send {
     my ($self, $msg, $payload, $callback) = @_;
     my $sync = $self->_choose_sync();
     my $header = $self->_pack_header($msg, length $payload, $sync);
-    $self->_inc_in_progress();
     $self->_callbacks->{$sync} = $callback;
     $self->_send_started($sync, $msg, $payload);
     $self->_debug_dump(5, 'send header: ', $header);
@@ -117,7 +111,6 @@ sub _build__read_reply {
         $handle->unshift_read( chunk => $payload_length, sub {
             my ($handle, $data) = @_;
             $self->_debug_dump(6, 'recv payload: ', $data);
-            $self->_dec_in_progress();
             $self->_recv_finished($sync, $msg, $data);
             $self->_try_to_send();
             delete($self->_callbacks->{$sync})->($msg, $data);
@@ -157,11 +150,10 @@ sub _build__handle {
             $self->_debug(0, ($fatal ? 'fatal ' : '') . 'error: ' . $message);
             my @callbacks;
             foreach my $sync ( keys %{$self->_callbacks} ) {
-                $self->_dec_in_progress();
                 $self->_recv_finished($sync, undef, undef, $message);
                 push @callbacks, $self->_callbacks->{$sync};
             }
-            $self->active(0);
+            $self->server->active(0);
             $self->_clear_handle();
             $self->_clear_callbacks();
             $self->_debug(1, 'closing socket');
@@ -199,6 +191,18 @@ around _choose_sync => sub {
     die "Can't choose sync value after 50 iterations";
 };
 
+before _send_started => sub {
+    my ($self) = @_;
+    $self->_in_progress( $self->_in_progress + 1 );
+    return;
+};
+
+after _recv_finished => sub {
+    my ($self) = @_;
+    $self->_in_progress( $self->_in_progress - 1 );
+    return;
+};
+
 =back
 
 =head1 SEE ALSO
@@ -207,7 +211,7 @@ L<MR::IProto::Connection>, L<MR::IProto::Cluster::Server>.
 
 =cut
 
-no Moose;
+no Mouse;
 __PACKAGE__->meta->make_immutable();
 
 1;

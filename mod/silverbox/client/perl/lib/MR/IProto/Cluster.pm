@@ -10,8 +10,8 @@ This class is used to implement balancing between several servers.
 
 =cut
 
-use Moose;
-use Moose::Util::TypeConstraints;
+use Mouse;
+use Mouse::Util::TypeConstraints;
 use MR::IProto::Cluster::Server;
 
 =head1 EXPORTED CONSTANTS
@@ -108,7 +108,7 @@ has servers => (
 
 has _ketama => (
     is  => 'ro',
-    isa => '',
+    isa => 'ArrayRef[ArrayRef]',
     lazy_build => 1,
 );
 
@@ -222,7 +222,7 @@ L<MR::IProto>, L<MR::IProto::Cluster::Server>.
 
 =cut
 
-no Moose;
+no Mouse;
 __PACKAGE__->meta->make_immutable();
 
 1;

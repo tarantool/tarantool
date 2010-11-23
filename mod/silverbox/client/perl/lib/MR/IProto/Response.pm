@@ -10,7 +10,7 @@ Base class for all response messages.
 
 =cut
 
-use Moose;
+use Mouse;
 extends 'MR::IProto::Message';
 
 =head1 PUBLIC ATTRIBUTES
@@ -50,7 +50,7 @@ sub retry {
 
 =cut
 
-no Moose;
+no Mouse;
 __PACKAGE__->meta->make_immutable();
 
 1;

@@ -10,7 +10,7 @@ Used to perform synchronous communication.
 
 =cut
 
-use Moose;
+use Mouse;
 extends 'MR::IProto::Connection';
 
 use IO::Socket::INET;
@@ -79,6 +79,7 @@ sub send {
             close($self->_socket);
             $self->_clear_socket();
         }
+        $self->server->active(0);
         $callback->(undef, undef, $@);
     }
     return;
@@ -129,5 +130,8 @@ sub _set_timeout {
 L<MR::IProto::Connection>, L<MR::IProto::Cluster::Server>.
 
 =cut
+
+no Mouse;
+__PACKAGE__->meta->make_immutable();
 
 1;

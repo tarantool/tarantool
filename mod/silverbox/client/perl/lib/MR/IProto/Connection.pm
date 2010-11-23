@@ -10,7 +10,7 @@ Base class for sync and async connections.
 
 =cut
 
-use Moose;
+use Mouse;
 
 =head1 server
 
@@ -61,7 +61,7 @@ sub _choose_sync {
     return int(rand 0xffffffff);
 }
 
-no Moose;
+no Mouse;
 __PACKAGE__->meta->make_immutable();
 
 1;

@@ -10,7 +10,7 @@ Base class for all messages sent throught iproto protocol.
 
 =cut
 
-use Moose;
+use Mouse;
 
 =head1 ATTRIBUTES
 
@@ -39,7 +39,7 @@ has data => (
 If C<$data> is passed as argument then it unpacked and object is
 created based on information contained in it.
 
-See L<Moose::Manual::Construction/BUILDARGS> for more information.
+See L<Mouse::Manual::Construction/BUILDARGS> for more information.
 
 =cut
 
@@ -95,7 +95,7 @@ L<MR::IProto>.
 
 =cut
 
-no Moose;
+no Mouse;
 __PACKAGE__->meta->make_immutable();
 
 1;
