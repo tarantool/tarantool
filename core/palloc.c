@@ -235,7 +235,7 @@ palloc(struct palloc_pool *restrict pool, size_t size)
 
 	pool->allocated += rz_size;
 
-	if (likely(chunk->free >= rz_size)) {
+	if (likely(chunk != NULL && chunk->free >= rz_size)) {
 		ptr = chunk->brk;
 		chunk->brk += rz_size;
 		chunk->free -= rz_size;
@@ -287,7 +287,6 @@ prelease(struct palloc_pool *pool)
 	SLIST_INIT(&pool->chunks);
 	VALGRIND_MEMPOOL_TRIM(pool, NULL, 0);
 	pool->allocated = 0;
-	next_chunk_for(pool, 128);
 }
 
 void
@@ -298,7 +297,7 @@ prelease_after(struct palloc_pool *pool, size_t after)
 }
 
 struct palloc_pool *
-palloc_create_pool2(const char *name, size_t initial_size)
+palloc_create_pool(const char *name)
 {
 	struct palloc_pool *pool = malloc(sizeof(struct palloc_pool));
 	assert(pool != NULL);
@@ -306,17 +305,8 @@ palloc_create_pool2(const char *name, size_t initial_size)
 	pool->name = name;
 	SLIST_INIT(&pool->chunks);
 	SLIST_INSERT_HEAD(&pools, pool, link);
-	if (initial_size < 128)
-		initial_size = 128;
-	next_chunk_for(pool, initial_size);
 	VALGRIND_CREATE_MEMPOOL(pool, PALLOC_REDZONE, 0);
 	return pool;
-}
-
-struct palloc_pool *
-palloc_create_pool(const char *name)
-{
-	return palloc_create_pool2(name, 128);
 }
 
 void
