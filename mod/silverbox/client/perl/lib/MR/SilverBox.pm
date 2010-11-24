@@ -504,7 +504,7 @@ my %update_ops = (
         $_[0]->[0] = pack 'l', $_[0]->[0];
         $_[0]->[1] = defined $_[0]->[1] ? pack 'l', $_[0]->[1] : '';
         $_[0]->[2] = '' unless defined $_[0]->[2];
-        return (OP_SPLICE, [ pack '(w/a)*', @{$_[0]} ]);
+        return (OP_SPLICE, [ pack '(w/a*)*', @{$_[0]} ]);
     },
     append      => sub { splice => [undef,  0,     $_[0]] },
     prepend     => sub { splice => [0,      0,     $_[0]] },
