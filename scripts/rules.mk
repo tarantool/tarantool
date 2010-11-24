@@ -99,10 +99,7 @@ endif
 
 ifeq ($(HAVE_GIT),1)
 tarantool_version.h: FORCE
-	@echo -n "const char tarantool_version_string[] = " > $@_
-	@git show HEAD | sed 's/commit \(.*\)/\"\1/;q' | tr -d \\n >> $@_
-	@git diff --quiet || (echo -n ' AND'; git diff --shortstat) | tr -d \\n >> $@_
-	@echo '";' >> $@_
+	@$(SRCDIR)/scripts/make_version.sh > $@_
 	@diff -q $@ $@_ 2>/dev/null >/dev/null || ($(ECHO) "	GEN	" $(notdir $@); cp $@_ $@)
 FORCE:
 endif
