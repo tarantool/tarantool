@@ -55,6 +55,7 @@ sub send {
         while( $to_read ) {
             my $read = sysread($self->_socket, my $buf, $to_read);
             die $! unless defined $read;
+            die "EOF during read of header" if $read == 0;
             $resp_header .= $buf;
             $to_read -= $read;
         }
@@ -66,6 +67,7 @@ sub send {
         while( $to_read ) {
             my $read = sysread($self->_socket, my $buf, $to_read);
             die $! unless defined $read;
+            die "EOF during read of payload" if $read == 0;
             $resp_payload .= $buf;
             $to_read -= $read;
         }
