@@ -195,7 +195,7 @@ sub _raise {
 
 sub _validate_param {
     my ($self, $args, @pnames) = @_;
-    my $param = ref $args->[-1] eq 'HASH' ? pop @$args: {};
+    my $param = ref $args->[-1] eq 'HASH' ? {%{pop @$args}} : {};
 
     foreach my $pname (keys %$param) {
         confess "$self->{name}: unknown param $pname\n" if 0 == grep { $_ eq $pname } @pnames;
@@ -354,6 +354,7 @@ sub _PackSelect {
         my $f = $namespace->{byfield_unpack_format};
         $param->{unpack_format} = join '', map { $f->[$_->{field}] } @{$param->{format}};
         $format = pack 'l*', scalar @{$param->{format}}, map {
+            $_ = { %$_ };
             if($_->{full}) {
                 $_->{offset} = 0;
                 $_->{length} = 'max';
@@ -504,7 +505,7 @@ my %update_ops = (
         $_[0]->[0] = pack 'l', $_[0]->[0];
         $_[0]->[1] = defined $_[0]->[1] ? pack 'l', $_[0]->[1] : '';
         $_[0]->[2] = '' unless defined $_[0]->[2];
-        return (OP_SPLICE, [ pack '(w/a)*', @{$_[0]} ]);
+        return (OP_SPLICE, [ pack '(w/a*)*', @{$_[0]} ]);
     },
     append      => sub { splice => [undef,  0,     $_[0]] },
     prepend     => sub { splice => [0,      0,     $_[0]] },
