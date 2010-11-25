@@ -498,9 +498,9 @@ sptree_##name##_iterator_init_set(sptree_##name *t, sptree_##name##_iterator **i
         *i = realloc(*i, sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 1));            \
                                                                                           \
     (*i)->t = t;                                                                          \
+    (*i)->level = -1;                                                                     \
     if (t->root == SPNIL) return;                                                         \
                                                                                           \
-    (*i)->level = -1;                                                                     \
     (*i)->max_depth = t->max_depth;                                                       \
     (*i)->stack[0] = t->root;                                                             \
                                                                                           \
