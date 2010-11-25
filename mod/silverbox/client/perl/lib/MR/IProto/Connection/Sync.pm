@@ -13,6 +13,7 @@ Used to perform synchronous communication.
 use Mouse;
 extends 'MR::IProto::Connection';
 
+use Errno;
 use IO::Socket::INET;
 use Socket qw( TCP_NODELAY SO_KEEPALIVE SO_SNDTIMEO SO_RCVTIMEO );
 
@@ -75,6 +76,7 @@ sub send {
         $callback->($resp_msg, $resp_payload);
     }
     else {
+        $! = Errno::ETIMEDOUT if $! == Errno::EINPROGRESS; # Hack over IO::Socket behaviour
         if($self->_has_socket()) {
             close($self->_socket);
             $self->_clear_socket();

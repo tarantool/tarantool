@@ -300,17 +300,17 @@ sub Chat {
     my $self = shift;
     my $message = @_ == 1 ? shift : { @_ };
     $message->{retry} = 1 if ref $message eq 'HASH';
-    my $data = eval { $self->send($message) };
-    return if $@;
+    my $data;
+    eval { $data = $self->send($message); 1 } or return;
     return wantarray ? @$data : $data->[0];
 }
 
 sub Chat1 {
     my $self = shift;
     my $message = @_ == 1 ? shift : { @_ };
-    my $data = eval { $self->send($message) };
-    return $@ ? { fail => $@, timeout => $! == Errno::ETIMEDOUT }
-        : { ok => $data };
+    my $data;
+    return eval { $data = $self->send($message); 1 } ? { ok => $data }
+        : { fail => $@, timeout => $! == Errno::ETIMEDOUT };
 }
 
 sub SetTimeout {
@@ -488,6 +488,12 @@ sub _send {
     my $next_try = $sync
         ? sub {
             my ($by_resp) = @_;
+            Time::HiRes::sleep($self->retry_delay);
+            $do_try->($by_resp);
+            return;
+        }
+        : sub {
+            my ($by_resp) = @_;
             my $timer;
             $timer = AnyEvent->timer(
                 after => $self->retry_delay,
@@ -497,12 +503,6 @@ sub _send {
                     return;
                 },
             );
-        }
-        : sub {
-            my ($by_resp) = @_;
-            Time::HiRes::sleep($self->retry_delay);
-            $do_try->($by_resp);
-            return;
         };
     $sub = sub {
         my ($resp_msg, $data, $error) = @_;
@@ -549,12 +549,13 @@ sub _send {
             }
             else {
                 undef $next_try;
+                my $error = $@;
                 my $errobj = $unpack ? undef : MR::IProto::Error->new(
                     request => $message,
-                    error   => $@,
+                    error   => $error,
                     errno   => 0+$!,
                 );
-                $callback->($errobj, $@);
+                $callback->($errobj, $error);
             }
         }
         return;
