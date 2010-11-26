@@ -2,6 +2,7 @@ CC ?= gcc
 RAGEL ?= ragel
 DOT ?= dot
 CONFETTI ?= confetti
+GIT ?= git
 
 HAVE_GIT ?= 1
 
