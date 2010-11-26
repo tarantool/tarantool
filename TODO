@@ -1,14 +1,5 @@
-* ber in lstr
-* handle OOM gracefully
-* link palloc red_zones and check integrety on prelease
-* handle follow failure gracefully
-* add comparer in repo
-* auto tests
-* support cheap palloc_create/palloc_destroy
-* reliable palloc stats (optional verbose)
-* EINTR handling
-* snapshot saving timer
-* remote_hot_standby status - show status 'connection' when connecting
-* rate limit io during dump
-* SEGV
-** with too small arena, when snapshot reading
+We're using launchpad for tasks tracking and bugs.
+Please use blueprints.launchpad.net/tarantool and
+bugs.launchpad.net/tarantool respectively.
+
+Thank you for your interest in tarantool!
