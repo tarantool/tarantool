@@ -82,14 +82,14 @@ sub set_timeout {
 
 =over
 
-=item _send( $msg, $payload, $callback )
+=item _send( $msg, $payload, $callback, $no_reply )
 
 Send message to server.
 
 =cut
 
 sub _send {
-    my ($self, $msg, $payload, $callback) = @_;
+    my ($self, $msg, $payload, $callback, $no_reply) = @_;
     my $sync = $self->_choose_sync();
     my $header = $self->_pack_header($msg, length $payload, $sync);
     $self->_callbacks->{$sync} = $callback;
@@ -97,7 +97,14 @@ sub _send {
     $self->_debug_dump(5, 'send header: ', $header);
     $self->_debug_dump(5, 'send payload: ', $payload);
     $self->_handle->push_write( $header . $payload );
-    $self->_handle->push_read( chunk => 12, $self->_read_reply );
+    if( $no_reply ) {
+        $self->_recv_finished($sync, undef, undef);
+        $self->_try_to_send();
+        delete($self->_callbacks->{$sync})->(undef, undef);
+    }
+    else {
+        $self->_handle->push_read( chunk => 12, $self->_read_reply );
+    }
     return;
 }
 

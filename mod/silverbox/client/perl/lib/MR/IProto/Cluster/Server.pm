@@ -63,7 +63,7 @@ Timeout of connect operation.
 has connect_timeout => (
     is  => 'rw',
     isa => 'Num',
-    default => 5,
+    default => 2,
 );
 
 =item timeout
@@ -75,7 +75,7 @@ Timeout of read and write operations.
 has timeout => (
     is  => 'rw',
     isa => 'Num',
-    default => 5,
+    default => 2,
     trigger => sub {
         my ($self, $new) = @_;
         $self->async->set_timeout($new) if $self->has_async();

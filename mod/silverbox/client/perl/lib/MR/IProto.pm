@@ -36,7 +36,7 @@ but requires some more CPU):
     );
     my $response = $client->send($request);
     # $response isa My::Project::Message::MyOperation::Response.
-    # Of cource, both message classes (request and reply) must
+    # Of course, both message classes (request and reply) must
     # be implemented by user.
 
 Or without them (not recommended because of unclean architecture):
@@ -457,12 +457,15 @@ sub _send {
     die "Callback must be specified" unless $callback;
     die "Method must be called in void context" if defined wantarray;
 
-    my ($req_msg, $key, $body, $unpack, $retry);
+    my ($req_msg, $key, $body, $unpack, $retry, $response_class, $no_reply);
     # MR::IProto::Message OO-API
     if( blessed($message) ) {
         $req_msg = $message->msg;
         $key = $message->key;
         $body = $message->data;
+        $response_class = $self->_reply_class->{$req_msg};
+        die sprintf "Cannot find response class for message code $req_msg\n" unless $response_class;
+        $no_reply = $response_class->isa('MR::IProto::NoResponse');
         $retry = $message->retry ? $self->max_request_retries : 1;
     }
     # Old-style compatible API
@@ -471,7 +474,8 @@ sub _send {
         $body = exists $message->{payload} ? $message->{payload}
             : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{$message->{data}}
             : $message->{data};
-        $unpack = $message->{no_reply} ? sub { 0 } : $message->{unpack} or die "unpack or no_reply must be specified";
+        $no_reply = $message->{no_reply};
+        $unpack = $no_reply ? sub { 0 } : $message->{unpack} or die "unpack or no_reply must be specified";
         $retry = $message->{retry} ? $self->max_request_retries : 1;
     }
 
@@ -483,7 +487,7 @@ sub _send {
         my ($by_resp) = @_;
         $self->_debug(2, sprintf "send msg=%d try %d of %d total", $req_msg, $try, $by_resp ? $self->max_request_retries : $retry );
         $server = $self->cluster->server( $key );
-        $server->$xsync->send($req_msg, $body, $sub);
+        $server->$xsync->send($req_msg, $body, $sub, $no_reply);
     };
     my $next_try = $sync
         ? sub {
@@ -524,17 +528,12 @@ sub _send {
         else {
             my $ok = eval {
                 die "Request and reply message code is different: $resp_msg != $req_msg\n"
-                    unless $resp_msg == $req_msg;
+                    unless $no_reply || $resp_msg == $req_msg;
                 if ($unpack) {
                     $data = [ $unpack->($data) ];
                 }
                 else {
-                    if( my $data_class = $self->_reply_class->{$resp_msg} ) {
-                        $data = $data_class->new( data => $data, request => $message );
-                    }
-                    else {
-                        die sprintf "Unknown message code $resp_msg\n";
-                    }
+                    $data = $response_class->new( data => $data, request => $message );
                 }
                 1;
             };

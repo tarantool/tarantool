@@ -34,10 +34,10 @@ See L<MR::IProto::Connection/send> for more information.
 =cut
 
 sub send {
-    my ($self, $msg, $payload, $callback) = @_;
-    my ($resp_msg, $resp_payload);
+    my ($self, $msg, $payload, $callback, $no_reply) = @_;
+    my ($sync, $resp_msg, $resp_payload);
     my $ok = eval {
-        my $sync = $self->_choose_sync();
+        $sync = $self->_choose_sync();
         my $header = $self->_pack_header($msg, length $payload, $sync);
         $self->_send_started($sync, $msg, $payload);
         $self->_debug_dump(5, 'send header: ', $header);
@@ -50,31 +50,34 @@ sub send {
             substr $write, 0, $written, '';
         }
 
-        my $resp_header;
-        my $to_read = 12;
-        while( $to_read ) {
-            my $read = sysread($self->_socket, my $buf, $to_read);
-            die $! unless defined $read;
-            die "EOF during read of header" if $read == 0;
-            $resp_header .= $buf;
-            $to_read -= $read;
-        }
-        $self->_debug_dump(6, 'recv header: ', $resp_header);
-        ($resp_msg, my $resp_length, my $resp_sync) = $self->_unpack_header($resp_header);
-        die "Request and reply sync is different: $resp_msg != $msg" unless $resp_msg == $msg;
+        unless( $no_reply ) {
+            my $resp_header;
+            my $to_read = 12;
+            while( $to_read ) {
+                my $read = sysread($self->_socket, my $buf, $to_read);
+                die $! unless defined $read;
+                die "EOF during read of header" if $read == 0;
+                $resp_header .= $buf;
+                $to_read -= $read;
+            }
+            $self->_debug_dump(6, 'recv header: ', $resp_header);
+            ($resp_msg, my $resp_length, my $resp_sync) = $self->_unpack_header($resp_header);
+            die "Request and reply sync is different: $resp_sync != $sync" unless $resp_sync == $sync;
 
-        $to_read = $resp_length;
-        while( $to_read ) {
-            my $read = sysread($self->_socket, my $buf, $to_read);
-            die $! unless defined $read;
-            die "EOF during read of payload" if $read == 0;
-            $resp_payload .= $buf;
-            $to_read -= $read;
+            $to_read = $resp_length;
+            while( $to_read ) {
+                my $read = sysread($self->_socket, my $buf, $to_read);
+                die $! unless defined $read;
+                die "EOF during read of payload" if $read == 0;
+                $resp_payload .= $buf;
+                $to_read -= $read;
+            }
+            $self->_debug_dump(6, 'recv payload: ', $resp_payload);
         }
-        $self->_debug_dump(6, 'recv payload: ', $resp_payload);
         1;
     };
     if($ok) {
+        $self->_recv_finished($sync, $resp_msg, $resp_payload);
         $callback->($resp_msg, $resp_payload);
     }
     else {
@@ -84,7 +87,9 @@ sub send {
             $self->_clear_socket();
         }
         $self->server->active(0);
-        $callback->(undef, undef, $@);
+        my $error = $@;
+        $self->_recv_finished($sync, undef, undef, $error);
+        $callback->(undef, undef, $error);
     }
     return;
 }
