@@ -78,9 +78,6 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 		return -1;
 	}
 
-	if (fill_default_tarantool_cfg(conf) != 0)
-		return -1;
-
 	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly, &n_accepted, &n_skipped);
 	fclose(f);
 	if (n_accepted == 0 || n_skipped != 0)
@@ -98,15 +95,25 @@ reload_cfg(struct tbuf *out)
 	struct tarantool_cfg new_cfg;
 	i32 ret;
 
+	if (dup_tarantool_cfg(&new_cfg, &cfg) != 0) {
+		destroy_tarantool_cfg(&new_cfg);
+
+		return -1;
+	}
+
 	ret = load_cfg(&new_cfg, 1);
 	tbuf_append(out, cfg_out->data, cfg_out->len);
 
-	if (ret == -1)
+	if (ret == -1) {
+		destroy_tarantool_cfg(&new_cfg);
+
 		return -1;
+	}
 
 	mod_reloadconfig(&cfg, &new_cfg);
 
-	// TODO: need to destroy old config (free arrays)
+	destroy_tarantool_cfg(&cfg);
+
 	cfg = new_cfg;
 
 	return 0;
@@ -395,13 +402,13 @@ main(int argc, char **argv)
 	assert(cfg_out);
 
 	if (role == chkconfig) {
-		if (load_cfg(&cfg, 0) == -1)
-			fprintf(stderr, "%.*s\n", cfg_out->len, (char *)cfg_out->data);
+		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0)
+			fprintf(stderr, "FAILED\n%.*s\n", cfg_out->len, (char *)cfg_out->data);
 
 		return 0;
 	}
 
-	if (load_cfg(&cfg, 0) == -1)
+	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0)
 		panic("can't load config:\n"
 		      "%.*s", cfg_out->len, (char *)cfg_out->data);
 

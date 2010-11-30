@@ -104,14 +104,15 @@ static NameAtom _name__custom_proc_title[] = {
 	{ "custom_proc_title", -1, NULL }
 };
 
-#define ARRAYALLOC(x,n,t)  do {                                     \
+#define ARRAYALLOC(x,n,t,_chk_ro)  do {                             \
    int l = 0, ar;                                                   \
    __typeof__(x) y = (x), t;                                        \
    if ( (n) <= 0 ) return CNF_WRONGINDEX; /* wrong index */         \
    while(y && *y) {                                                 \
        l++; y++;                                                    \
    }                                                                \
-   if ( (n) >= l ) {                                                \
+   if ( (n) >= (l + 1) ) {                                          \
+      if (_chk_ro)  return CNF_RDONLY;                              \
       if ( (x) == NULL )                                            \
           t = y = malloc( ((n)+1) * sizeof( __typeof__(*(x))) );    \
       else {                                                        \
@@ -138,7 +139,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		errno = 0;
 		c->username = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		 if (opt->paramValue.stringval && c->username == NULL)
+		if (opt->paramValue.stringval && c->username == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__coredump) ) {
@@ -178,9 +179,10 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		errno = 0;
-		c->slab_alloc_arena = strtod(opt->paramValue.numberval, NULL);
-		if ( (c->slab_alloc_arena == 0 || c->slab_alloc_arena == -HUGE_VAL || c->slab_alloc_arena == HUGE_VAL) && errno == ERANGE)
+		double dbl = strtod(opt->paramValue.numberval, NULL);
+		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		c->slab_alloc_arena = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__slab_alloc_minimal) ) {
 		if (opt->paramType != numberType )
@@ -197,16 +199,17 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		errno = 0;
-		c->slab_alloc_factor = strtod(opt->paramValue.numberval, NULL);
-		if ( (c->slab_alloc_factor == 0 || c->slab_alloc_factor == -HUGE_VAL || c->slab_alloc_factor == HUGE_VAL) && errno == ERANGE)
+		double dbl = strtod(opt->paramValue.numberval, NULL);
+		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		c->slab_alloc_factor = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__work_dir) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		errno = 0;
 		c->work_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		 if (opt->paramValue.stringval && c->work_dir == NULL)
+		if (opt->paramValue.stringval && c->work_dir == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__pid_file) ) {
@@ -214,7 +217,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		errno = 0;
 		c->pid_file = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		 if (opt->paramValue.stringval && c->pid_file == NULL)
+		if (opt->paramValue.stringval && c->pid_file == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__logger) ) {
@@ -222,7 +225,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		errno = 0;
 		c->logger = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		 if (opt->paramValue.stringval && c->logger == NULL)
+		if (opt->paramValue.stringval && c->logger == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__logger_nonblock) ) {
@@ -240,9 +243,10 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		errno = 0;
-		c->io_collect_interval = strtod(opt->paramValue.numberval, NULL);
-		if ( (c->io_collect_interval == 0 || c->io_collect_interval == -HUGE_VAL || c->io_collect_interval == HUGE_VAL) && errno == ERANGE)
+		double dbl = strtod(opt->paramValue.numberval, NULL);
+		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		c->io_collect_interval = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
 		if (opt->paramType != numberType )
@@ -271,7 +275,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		errno = 0;
 		c->wal_feeder_bind_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		 if (opt->paramValue.stringval && c->wal_feeder_bind_ipaddr == NULL)
+		if (opt->paramValue.stringval && c->wal_feeder_bind_ipaddr == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_bind_port) ) {
@@ -290,7 +294,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		errno = 0;
 		c->wal_feeder_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		 if (opt->paramValue.stringval && c->wal_feeder_dir == NULL)
+		if (opt->paramValue.stringval && c->wal_feeder_dir == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__custom_proc_title) ) {
@@ -298,7 +302,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		errno = 0;
 		c->custom_proc_title = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		 if (opt->paramValue.stringval && c->custom_proc_title == NULL)
+		if (opt->paramValue.stringval && c->custom_proc_title == NULL)
 			return CNF_NOMEMORY;
 	}
 	else {
@@ -651,5 +655,69 @@ check_cfg_tarantool_cfg(tarantool_cfg *c) {
 	int	res = 0;
 
 	return res;
+}
+
+/************** Duplicate config  **************/
+
+int
+dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
+	tarantool_cfg_iterator_t iterator, *i = &iterator;
+
+	dst->username = src->username == NULL ? NULL : strdup(src->username);
+	if (src->username != NULL && dst->username == NULL)
+		return CNF_NOMEMORY;
+	dst->coredump = src->coredump;
+	dst->admin_port = src->admin_port;
+	dst->log_level = src->log_level;
+	dst->slab_alloc_arena = src->slab_alloc_arena;
+	dst->slab_alloc_minimal = src->slab_alloc_minimal;
+	dst->slab_alloc_factor = src->slab_alloc_factor;
+	dst->work_dir = src->work_dir == NULL ? NULL : strdup(src->work_dir);
+	if (src->work_dir != NULL && dst->work_dir == NULL)
+		return CNF_NOMEMORY;
+	dst->pid_file = src->pid_file == NULL ? NULL : strdup(src->pid_file);
+	if (src->pid_file != NULL && dst->pid_file == NULL)
+		return CNF_NOMEMORY;
+	dst->logger = src->logger == NULL ? NULL : strdup(src->logger);
+	if (src->logger != NULL && dst->logger == NULL)
+		return CNF_NOMEMORY;
+	dst->logger_nonblock = src->logger_nonblock;
+	dst->io_collect_interval = src->io_collect_interval;
+	dst->backlog = src->backlog;
+	dst->readahead = src->readahead;
+	dst->wal_feeder_bind_ipaddr = src->wal_feeder_bind_ipaddr == NULL ? NULL : strdup(src->wal_feeder_bind_ipaddr);
+	if (src->wal_feeder_bind_ipaddr != NULL && dst->wal_feeder_bind_ipaddr == NULL)
+		return CNF_NOMEMORY;
+	dst->wal_feeder_bind_port = src->wal_feeder_bind_port;
+	dst->wal_feeder_dir = src->wal_feeder_dir == NULL ? NULL : strdup(src->wal_feeder_dir);
+	if (src->wal_feeder_dir != NULL && dst->wal_feeder_dir == NULL)
+		return CNF_NOMEMORY;
+	dst->custom_proc_title = src->custom_proc_title == NULL ? NULL : strdup(src->custom_proc_title);
+	if (src->custom_proc_title != NULL && dst->custom_proc_title == NULL)
+		return CNF_NOMEMORY;
+
+	return CNF_OK;
+}
+
+/************** Destroy config  **************/
+
+void
+destroy_tarantool_cfg(tarantool_cfg* c) {
+	tarantool_cfg_iterator_t iterator, *i = &iterator;
+
+	if (c->username != NULL)
+		free(c->username);
+	if (c->work_dir != NULL)
+		free(c->work_dir);
+	if (c->pid_file != NULL)
+		free(c->pid_file);
+	if (c->logger != NULL)
+		free(c->logger);
+	if (c->wal_feeder_bind_ipaddr != NULL)
+		free(c->wal_feeder_bind_ipaddr);
+	if (c->wal_feeder_dir != NULL)
+		free(c->wal_feeder_dir);
+	if (c->custom_proc_title != NULL)
+		free(c->custom_proc_title);
 }
 
