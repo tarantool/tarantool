@@ -13,6 +13,7 @@ This class is used to implement balancing between several servers.
 use Mouse;
 use Mouse::Util::TypeConstraints;
 use MR::IProto::Cluster::Server;
+use String::CRC32 qw(crc32);
 
 =head1 EXPORTED CONSTANTS
 
@@ -118,6 +119,12 @@ has _rr_servers => (
     lazy_build => 1,
 );
 
+has _hash_servers => (
+    is  => 'rw',
+    isa => 'MR::IProto::Cluster::Servers',
+    lazy_build => 1,
+);
+
 =head1 PUBLIC METHODS
 
 =over
@@ -175,12 +182,17 @@ sub _build__ketama {
            push @ketama, [crc32($server->host.$server->port.$i), $server];
         }
     }
-    return sort { $a->[0] cmp $b->[0] } @ketama;
+    return [ sort { $a->[0] cmp $b->[0] } @ketama ];
 }
 
 sub _build__rr_servers {
     my ($self) = @_;
     return [ @{ $self->servers } ];
+}
+
+sub _build__hash_servers {
+    my ($self) = @_;
+    return [ map { my @s; my $s = $_; push @s, $s for ( 1 .. $s->weight ); @s } @{ $self->servers } ];
 }
 
 sub _balance_rr {
@@ -193,19 +205,21 @@ sub _balance_hash {
     my ($self, $key) = @_;
     my ($hash_, $hash, $server);
 
+    die "Cannot balance hash without key" unless defined $key;
     $hash = $hash_ = crc32($key) >> 16;
     for (0..19) {
-        $server = $self->servers->[$hash % @{$self->servers}];
+        $server = $self->_hash_servers->[$hash % @{$self->_hash_servers}];
         return $server if $server->active;
         $hash += crc32($_, $hash_) >> 16;
     }
 
-    return $self->servers->[rand @{$self->servers}]; #last resort
+    return $self->_hash_servers->[rand @{$self->_hash_servers}]; #last resort
 }
 
 sub _balance_ketama {
     my ($self, $key) = @_;
 
+    die "Cannot balance ketama without key" unless defined $key;
     my $idx = crc32($key);
 
     foreach (@{$self->_ketama}) {

@@ -369,11 +369,12 @@ around BUILDARGS => sub {
         $clusterargs{balance} = delete $args{balance} if exists $args{balance};
         $clusterargs{servers} = [
             map {
-                my ($host, $port) = /^(.+):(\d+)$/;
+                my ($host, $port, $weight) = split /:/, $_;
                 $server_class->new(
                     %srvargs,
                     host => $host,
                     port => $port,
+                    defined $weight ? ( weight => $weight ) : (),
                 );
             } split /,/, delete $args{servers}
         ];

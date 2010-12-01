@@ -19,10 +19,11 @@ use MR::IProto::Message;
 coerce 'MR::IProto::Cluster::Server'
     => from 'Str'
     => via {
-        my ($host, $port) = split /:/, $_;
+        my ($host, $port, $weight) = split /:/, $_;
         __PACKAGE__->new(
             host => $host,
             port => $port,
+            defined $weight ? ( weight => $weight ) : (),
         );
     };
 
@@ -52,6 +53,18 @@ has port => (
     is  => 'ro',
     isa => 'Int',
     required => 1,
+);
+
+=item weight
+
+Server weight.
+
+=cut
+
+has weight => (
+    is  => 'ro',
+    isa => 'Int',
+    default => 1,
 );
 
 =item connect_timeout
