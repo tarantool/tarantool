@@ -46,6 +46,12 @@ has _read_reply => (
     lazy_build => 1,
 );
 
+has _no_reply => (
+    is  => 'ro',
+    isa => 'ArrayRef',
+    lazy_build => 1,
+);
+
 =head1 PUBLIC METHODS
 
 =over
@@ -98,9 +104,7 @@ sub _send {
     $self->_debug_dump(5, 'send payload: ', $payload);
     $self->_handle->push_write( $header . $payload );
     if( $no_reply ) {
-        $self->_recv_finished($sync, undef, undef);
-        $self->_try_to_send();
-        delete($self->_callbacks->{$sync})->(undef, undef);
+        push @{$self->_no_reply}, $sync;
     }
     else {
         $self->_handle->push_read( chunk => 12, $self->_read_reply );
@@ -163,6 +167,7 @@ sub _build__handle {
             $self->server->active(0);
             $self->_clear_handle();
             $self->_clear_callbacks();
+            $self->_clear_no_reply();
             $self->_debug(1, 'closing socket');
             $handle->destroy();
             $self->_try_to_send();
@@ -173,6 +178,16 @@ sub _build__handle {
             my ($handle) = @_;
             return unless keys %{$self->_callbacks};
             $handle->_error( Errno::ETIMEDOUT ) if keys %{$self->_callbacks};
+            return;
+        },
+        on_drain => sub {
+            my ($handle) = @_;
+            foreach my $sync ( @{$self->_no_reply} ) {
+                $self->_recv_finished($sync, undef, undef);
+                delete($self->_callbacks->{$sync})->(undef, undef);
+            }
+            $self->_clear_no_reply();
+            $self->_try_to_send();
             return;
         },
     );
@@ -186,6 +201,11 @@ sub _build__queue {
 sub _build__callbacks {
     my ($self) = @_;
     return {};
+}
+
+sub _build__no_reply {
+    my ($self) = @_;
+    return [];
 }
 
 around _choose_sync => sub {
