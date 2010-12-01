@@ -81,13 +81,14 @@ sub send {
         $callback->($resp_msg, $resp_payload);
     }
     else {
+        my $error = $@ =~ /^(.*?) at \S+ line \d+/s ? $1 : $@;
+        $self->_debug(0, "error: $error");
         $! = Errno::ETIMEDOUT if $! == Errno::EINPROGRESS; # Hack over IO::Socket behaviour
         if($self->_has_socket()) {
             close($self->_socket);
             $self->_clear_socket();
         }
         $self->server->active(0);
-        my $error = $@;
         $self->_recv_finished($sync, undef, undef, $error);
         $callback->(undef, undef, $error);
     }

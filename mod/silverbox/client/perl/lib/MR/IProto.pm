@@ -310,7 +310,7 @@ sub Chat1 {
     my $message = @_ == 1 ? shift : { @_ };
     my $data;
     return eval { $data = $self->send($message); 1 } ? { ok => $data }
-        : { fail => $@, timeout => $! == Errno::ETIMEDOUT };
+        : { fail => $@ =~ /^(.*?) at \S+ line \d+/s ? $1 : $@, timeout => $! == Errno::ETIMEDOUT };
 }
 
 sub SetTimeout {
