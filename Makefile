@@ -34,7 +34,7 @@ ifeq ("$(origin module)", "command line")
 .PHONY: clean
 clean:
 	@echo "	CLEAN $(module)"
-	@rm -rf $(obj) $(dep) tarantool_$(module) _* lcov test
+	@rm -rf $(obj) $(dep) tarantool_$(module) _* lcov
 else
 .PHONY: clean
 clean:
