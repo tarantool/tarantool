@@ -155,6 +155,9 @@ void tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 {
 	int printed_len;
 	size_t free_len = b->size - b->len;
+	va_list ap_copy;
+
+	va_copy(ap_copy, ap);
 
 	tbuf_assert(b);
 	printed_len = vsnprintf(((char *)b->data) + b->len, free_len, format, ap);
@@ -166,7 +169,7 @@ void tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 	if (free_len <= printed_len) {
 		tbuf_ensure(b, printed_len + 1);
 		free_len = b->size - b->len - 1;
-		printed_len = vsnprintf(((char *)b->data) + b->len, free_len, format, ap);
+		printed_len = vsnprintf(((char *)b->data) + b->len, free_len, format, ap_copy);
 	}
 
 	b->len += printed_len;
