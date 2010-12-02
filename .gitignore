@@ -2,11 +2,12 @@
 .gdb_history
 TAGS
 _*
-*.cfg
 config.mk
 lcov
 *.o
 *.d
-tarantool*
 *.snap
 *.xlog
+tarantool_version.h
+tarantool_version.h_
+test/var
