@@ -558,6 +558,8 @@ sub _send_now {
                 $next_try->();
             }
             else {
+                undef $sub;
+                undef $do_try;
                 undef $next_try;
                 $self->_report_error($unpack ? undef : $message, $callback, $error);
             }
@@ -579,6 +581,8 @@ sub _send_now {
                     $next_try->(1);
                 }
                 else {
+                    undef $sub;
+                    undef $do_try;
                     undef $next_try;
                     $self->_in_progress( $self->_in_progress - 1 );
                     $self->_try_to_send();
@@ -586,6 +590,8 @@ sub _send_now {
                 }
             }
             else {
+                undef $sub;
+                undef $do_try;
                 undef $next_try;
                 $self->_report_error($unpack ? undef : $message, $callback, $@);
             }
