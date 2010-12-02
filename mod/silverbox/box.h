@@ -73,10 +73,10 @@ struct index {
 	void (*iterator_init) (struct index *, struct tree_index_member * pattern);
 	struct box_tuple *(*iterator_next) (struct index *, struct tree_index_member * pattern);
 	union {
-		khash_t(lstr2ptr_map) * str_hash;
-		khash_t(int2ptr_map) * int_hash;
-		khash_t(int642ptr_map) * int64_hash;
-		khash_t(int2ptr_map) * hash;
+		khash_t(lstr_ptr_map) * str_hash;
+		khash_t(int_ptr_map) * int_hash;
+		khash_t(int64_ptr_map) * int64_hash;
+		khash_t(int_ptr_map) * hash;
 		sptree_str_t *tree;
 	} idx;
 	void *iterator;

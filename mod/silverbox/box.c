@@ -360,7 +360,7 @@ index_find_hash_num(struct index *self, void *key)
 	if (key_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
 
-	assoc_find(int2ptr_map, self->idx.int_hash, num, ret);
+	assoc_find(int_ptr_map, self->idx.int_hash, num, ret);
 #ifdef DEBUG
 	say_debug("index_find_hash_num(self:%p, key:%i) = %p", self, num, ret);
 #endif
@@ -377,7 +377,7 @@ index_find_hash_num64(struct index *self, void *key)
 	if (key_size != 8)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
 
-	assoc_find(int642ptr_map, self->idx.int64_hash, num, ret);
+	assoc_find(int64_ptr_map, self->idx.int64_hash, num, ret);
 #ifdef DEBUG
 	say_debug("index_find_hash_num(self:%p, key:%"PRIu64") = %p", self, num, ret);
 #endif
@@ -389,7 +389,7 @@ index_find_hash_str(struct index *self, void *key)
 {
 	struct box_tuple *ret = NULL;
 
-	assoc_find(lstr2ptr_map, self->idx.str_hash, key, ret);
+	assoc_find(lstr_ptr_map, self->idx.str_hash, key, ret);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
 	say_debug("index_find_hash_str(self:%p, key:(%i)'%.*s') = %p", self, size, size, (u8 *)key,
@@ -491,7 +491,7 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 
 	if (key_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
-	assoc_delete(int2ptr_map, self->idx.int_hash, num);
+	assoc_delete(int_ptr_map, self->idx.int_hash, num);
 #ifdef DEBUG
 	say_debug("index_remove_hash_num(self:%p, key:%i)", self, num);
 #endif
@@ -506,7 +506,7 @@ index_remove_hash_num64(struct index *self, struct box_tuple *tuple)
 
 	if (key_size != 8)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
-	assoc_delete(int642ptr_map, self->idx.int64_hash, num);
+	assoc_delete(int64_ptr_map, self->idx.int64_hash, num);
 #ifdef DEBUG
 	say_debug("index_remove_hash_num(self:%p, key:%"PRIu64")", self, num);
 #endif
@@ -516,7 +516,7 @@ static void
 index_remove_hash_str(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
-	assoc_delete(lstr2ptr_map, self->idx.str_hash, key);
+	assoc_delete(lstr_ptr_map, self->idx.str_hash, key);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
 	say_debug("index_remove_hash_str(self:%p, key:'%.*s')", self, size, (u8 *)key);
@@ -541,12 +541,12 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
 		load_varint32(&old_key);
 		u32 old_num = *(u32 *)old_key;
-		assoc_delete(int2ptr_map, self->idx.int_hash, old_num);
+		assoc_delete(int_ptr_map, self->idx.int_hash, old_num);
 	}
 
 	if (key_size != 4)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
-	assoc_replace(int2ptr_map, self->idx.int_hash, num, tuple);
+	assoc_replace(int_ptr_map, self->idx.int_hash, num, tuple);
 #ifdef DEBUG
 	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%i", self, old_tuple,
 		  tuple, num);
@@ -564,12 +564,12 @@ index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
 		load_varint32(&old_key);
 		u64 old_num = *(u64 *)old_key;
-		assoc_delete(int642ptr_map, self->idx.int64_hash, old_num);
+		assoc_delete(int64_ptr_map, self->idx.int64_hash, old_num);
 	}
 
 	if (key_size != 8)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
-	assoc_replace(int642ptr_map, self->idx.int64_hash, num, tuple);
+	assoc_replace(int64_ptr_map, self->idx.int64_hash, num, tuple);
 #ifdef DEBUG
 	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%"PRIu64, self, old_tuple,
 		  tuple, num);
@@ -583,10 +583,10 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
-		assoc_delete(lstr2ptr_map, self->idx.str_hash, old_key);
+		assoc_delete(lstr_ptr_map, self->idx.str_hash, old_key);
 	}
 
-	assoc_replace(lstr2ptr_map, self->idx.str_hash, key, tuple);
+	assoc_replace(lstr_ptr_map, self->idx.str_hash, key, tuple);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
 	say_debug("index_replace_hash_str(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'", self,
@@ -1590,10 +1590,10 @@ custom_init(void)
 					index->remove = index_remove_hash_num;
 					index->replace = index_replace_hash_num;
 					index->namespace = &namespace[i];
-					index->idx.int_hash = kh_init(int2ptr_map, NULL);
+					index->idx.int_hash = kh_init(int_ptr_map, NULL);
 
 					if (estimated_rows > 0)
-						kh_resize(int2ptr_map, index->idx.int_hash,
+						kh_resize(int_ptr_map, index->idx.int_hash,
 							  estimated_rows);
 				} else if (index->key_field->type == NUM64) {
 					index->find = index_find_hash_num64;
@@ -1601,10 +1601,10 @@ custom_init(void)
 					index->remove = index_remove_hash_num64;
 					index->replace = index_replace_hash_num64;
 					index->namespace = &namespace[i];
-					index->idx.int64_hash = kh_init(int642ptr_map, NULL);
+					index->idx.int64_hash = kh_init(int64_ptr_map, NULL);
 
 					if (estimated_rows > 0)
-						kh_resize(int642ptr_map, index->idx.int64_hash,
+						kh_resize(int64_ptr_map, index->idx.int64_hash,
 							  estimated_rows);
 				} else {
 					index->find = index_find_hash_str;
@@ -1612,10 +1612,10 @@ custom_init(void)
 					index->remove = index_remove_hash_str;
 					index->replace = index_replace_hash_str;
 					index->namespace = &namespace[i];
-					index->idx.str_hash = kh_init(lstr2ptr_map, NULL);
+					index->idx.str_hash = kh_init(lstr_ptr_map, NULL);
 
 					if (estimated_rows > 0)
-						kh_resize(lstr2ptr_map, index->idx.str_hash,
+						kh_resize(lstr_ptr_map, index->idx.str_hash,
 							  estimated_rows);
 				}
 			} else if (strcmp(cfg.namespace[i]->index[j]->type, "TREE") == 0) {

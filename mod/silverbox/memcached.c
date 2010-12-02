@@ -211,7 +211,7 @@ flush_all(void *data)
 {
 	uintptr_t delay = (uintptr_t)data;
 	fiber_sleep(delay - ev_now());
-	khash_t(lstr2ptr_map) *map = memcached_index->idx.str_hash;
+	khash_t(lstr_ptr_map) *map = memcached_index->idx.str_hash;
 	for (khiter_t i = kh_begin(map); i != kh_end(map); i++) {
 		if (kh_exist(map, i)) {
 			struct box_tuple *tuple = kh_value(map, i);
@@ -3745,7 +3745,7 @@ void
 memcached_expire(void *data __unused__)
 {
 	static khiter_t i;
-	khash_t(lstr2ptr_map) *map = memcached_index->idx.str_hash;
+	khash_t(lstr_ptr_map) *map = memcached_index->idx.str_hash;
 
 	say_info("memcached expire fiber started");
 	for (;;) {
