@@ -136,6 +136,18 @@ has cluster => (
     },
 );
 
+=item max_parallel
+
+Max amount of simultaneous request to all servers.
+
+=cut
+
+has max_parallel => (
+    is  => 'ro',
+    isa => 'Int',
+    default => 1000,
+);
+
 =item max_request_retries
 
 Max amount of request retries which must be sent to different servers
@@ -193,6 +205,18 @@ has _reply_class => (
     is  => 'ro',
     isa => 'HashRef[ClassName]',
     lazy_build => 1,
+);
+
+has _queue => (
+    is  => 'ro',
+    isa => 'ArrayRef',
+    lazy_build => 1,
+);
+
+has _in_progress => (
+    is  => 'rw',
+    isa => 'Int',
+    default => 0,
 );
 
 =head1 PUBLIC METHODS
@@ -409,6 +433,11 @@ sub _build__reply_class {
     return \%reply;
 }
 
+sub _build__queue {
+    my ($self) = @_;
+    return [];
+}
+
 =item _send( [ $message | \%args ], $callback? )
 
 Pure asyncronious internal implementation of send.
@@ -457,7 +486,24 @@ sub _send {
     my ($self, $message, $callback, $sync) = @_;
     die "Callback must be specified" unless $callback;
     die "Method must be called in void context" if defined wantarray;
+    return $self->_send_now($message, $callback, $sync) if $sync;
+    push @{$self->_queue}, [ $message, $callback ];
+    $self->_try_to_send();
+    return;
+}
 
+sub _try_to_send {
+    my ($self) = @_;
+    while( $self->_in_progress < $self->max_parallel && (my $task = shift @{ $self->_queue }) ) {
+        eval { $self->_send_now(@$task); 1 }
+            or $self->_report_error(@$task, $@);
+    }
+    return;
+}
+
+sub _send_now {
+    my ($self, $message, $callback, $sync) = @_;
+    $self->_in_progress( $self->_in_progress + 1 );
     my ($req_msg, $key, $body, $unpack, $retry, $response_class, $no_reply);
     # MR::IProto::Message OO-API
     if( blessed($message) ) {
@@ -472,6 +518,7 @@ sub _send {
     # Old-style compatible API
     else {
         $req_msg = $message->{msg};
+        $key = $message->{key};
         $body = exists $message->{payload} ? $message->{payload}
             : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{$message->{data}}
             : $message->{data};
@@ -518,12 +565,7 @@ sub _send {
             }
             else {
                 undef $next_try;
-                my $errobj = $unpack ? undef : MR::IProto::Error->new(
-                    request => $message,
-                    error   => $error,
-                    errno   => 0+$!,
-                );
-                $callback->($errobj, $error);
+                $self->_report_error($unpack ? undef : $message, $callback, $error);
             }
         }
         else {
@@ -544,23 +586,34 @@ sub _send {
                 }
                 else {
                     undef $next_try;
+                    $self->_in_progress( $self->_in_progress - 1 );
+                    $self->_try_to_send();
                     $callback->($data);
                 }
             }
             else {
                 undef $next_try;
-                my $error = $@;
-                my $errobj = $unpack ? undef : MR::IProto::Error->new(
-                    request => $message,
-                    error   => $error,
-                    errno   => 0+$!,
-                );
-                $callback->($errobj, $error);
+                $self->_report_error($unpack ? undef : $message, $callback, $@);
             }
         }
         return;
     };
     $do_try->();
+    return;
+}
+
+sub _report_error {
+    my ($self, $request, $callback, $error) = @_;
+    my $errobj = $request
+        ? MR::IProto::Error->new(
+            request => $request,
+            error   => $error,
+            errno   => 0+$!,
+        )
+        : undef;
+    $self->_in_progress( $self->_in_progress - 1 );
+    $self->_try_to_send();
+    $callback->($errobj, $error);
     return;
 }
 
