@@ -10,7 +10,7 @@ use lib "$Bin";
 use TBox ();
 use Carp qw/confess/;
 
-use Test::More tests => 201;
+use Test::More tests => 218;
 use Test::Exception;
 
 local $SIG{__DIE__} = \&confess;
@@ -513,3 +513,36 @@ foreach my $r (@res) {
 	ok sub { return $r != $tuples->[-1] && $r != $tuples->[-2] };
 }
 
+
+
+
+## Check u64 index
+# note, that u64 keys are emulated via pack('ll') since default ubuntu perl doesn't support pack('q')
+sub def_param_u64 {
+    my $format = '&&&&';
+    return { servers => $server,
+             namespaces => [ {
+                 indexes => [ {
+		     index_name   => 'id',
+		     keys         => [0],
+		 } ],
+                 namespace     => 20,
+                 format        => $format,
+                 default_index => 'id',
+             } ]}
+}
+
+$box = MR::SilverBox->new(def_param_u64);
+ok $box->isa('MR::SilverBox'), 'connect';
+
+$_->[0] = pack('ll', $_->[0], 0) foreach @$tuples;
+
+foreach my $tuple (@$tuples) {
+	cleanup $tuple->[0];
+}
+
+foreach my $tuple (@$tuples) {
+    ok $box->Insert(@$tuple), "unique_tree_index/insert \'$tuple->[0]\'";
+}
+
+is_deeply($tuples, [$box->Select([map $_->[0], @$tuples])]);

@@ -368,6 +368,23 @@ index_find_hash_num(struct index *self, void *key)
 }
 
 static struct box_tuple *
+index_find_hash_num64(struct index *self, void *key)
+{
+	struct box_tuple *ret = NULL;
+	u32 key_size = load_varint32(&key);
+	u64 num = *(u64 *)key;
+
+	if (key_size != 8)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
+
+	assoc_find(int642ptr_map, self->idx.int64_hash, num, ret);
+#ifdef DEBUG
+	say_debug("index_find_hash_num(self:%p, key:%"PRIu64") = %p", self, num, ret);
+#endif
+	return ret;
+}
+
+static struct box_tuple *
 index_find_hash_str(struct index *self, void *key)
 {
 	struct box_tuple *ret = NULL;
@@ -481,6 +498,21 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 }
 
 static void
+index_remove_hash_num64(struct index *self, struct box_tuple *tuple)
+{
+	void *key = tuple_field(tuple, self->key_field->fieldno);
+	unsigned int key_size = load_varint32(&key);
+	u64 num = *(u64 *)key;
+
+	if (key_size != 8)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
+	assoc_delete(int642ptr_map, self->idx.int64_hash, num);
+#ifdef DEBUG
+	say_debug("index_remove_hash_num(self:%p, key:%"PRIu64")", self, num);
+#endif
+}
+
+static void
 index_remove_hash_str(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
@@ -517,6 +549,29 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 	assoc_replace(int2ptr_map, self->idx.int_hash, num, tuple);
 #ifdef DEBUG
 	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%i", self, old_tuple,
+		  tuple, num);
+#endif
+}
+
+static void
+index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+{
+	void *key = tuple_field(tuple, self->key_field->fieldno);
+	u32 key_size = load_varint32(&key);
+	u64 num = *(u64 *)key;
+
+	if (old_tuple != NULL) {
+		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
+		load_varint32(&old_key);
+		u64 old_num = *(u64 *)old_key;
+		assoc_delete(int642ptr_map, self->idx.int64_hash, old_num);
+	}
+
+	if (key_size != 8)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
+	assoc_replace(int642ptr_map, self->idx.int64_hash, num, tuple);
+#ifdef DEBUG
+	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%"PRIu64, self, old_tuple,
 		  tuple, num);
 #endif
 }
@@ -1490,9 +1545,12 @@ custom_init(void)
 
 				index->key_field[k].fieldno =
 					cfg.namespace[i]->index[j]->key_field[k]->fieldno;
-				if (strcmp(cfg.namespace[i]->index[j]->key_field[k]->type, "NUM") ==
-				    0)
+				if (strcmp(cfg.namespace[i]->index[j]->key_field[k]->type,
+					   "NUM") == 0)
 					index->key_field[k].type = NUM;
+				else if (strcmp(cfg.namespace[i]->index[j]->key_field[k]->type,
+						"NUM64") == 0)
+					index->key_field[k].type = NUM64;
 				else if (strcmp(cfg.namespace[i]->index[j]->key_field[k]->type,
 						"STR") == 0)
 					index->key_field[k].type = STR;
@@ -1536,6 +1594,17 @@ custom_init(void)
 
 					if (estimated_rows > 0)
 						kh_resize(int2ptr_map, index->idx.int_hash,
+							  estimated_rows);
+				} else if (index->key_field->type == NUM64) {
+					index->find = index_find_hash_num64;
+					index->find_by_tuple = index_find_hash_by_tuple;
+					index->remove = index_remove_hash_num64;
+					index->replace = index_replace_hash_num64;
+					index->namespace = &namespace[i];
+					index->idx.int64_hash = kh_init(int642ptr_map, NULL);
+
+					if (estimated_rows > 0)
+						kh_resize(int642ptr_map, index->idx.int64_hash,
 							  estimated_rows);
 				} else {
 					index->find = index_find_hash_str;

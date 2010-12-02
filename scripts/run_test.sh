@@ -12,7 +12,7 @@ kill_all () {
         test -f $pid_file && kill $(cat $pid_file)
     done
     sleep 1
-    ps -eopid,cmd | grep [t]arantul
+    ps -eopid,cmd | grep [t]arantool
 }
 
 trap 'kill_all' EXIT
@@ -121,6 +121,12 @@ write_config() {
 	namespace[19].index[0].unique = 1
 	namespace[19].index[0].key_field[0].fieldno = 0
 	namespace[19].index[0].key_field[0].type = "STR"
+
+	namespace[20].enabled = 1
+	namespace[20].index[0].type = "HASH"
+	namespace[20].index[0].unique = 1
+	namespace[20].index[0].key_field[0].fieldno = 0
+	namespace[20].index[0].key_field[0].type = "NUM64"
 	
 	namespace[22].enabled = 1
 	namespace[22].index[0].type = "HASH"

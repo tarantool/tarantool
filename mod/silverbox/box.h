@@ -46,7 +46,7 @@ struct field {
 	};
 };
 
-enum field_data_type { NUM, STR };
+enum field_data_type { NUM, NUM64, STR };
 
 struct tree_index_member {
 	struct box_tuple *tuple;
@@ -75,6 +75,7 @@ struct index {
 	union {
 		khash_t(lstr2ptr_map) * str_hash;
 		khash_t(int2ptr_map) * int_hash;
+		khash_t(int642ptr_map) * int64_hash;
 		khash_t(int2ptr_map) * hash;
 		sptree_str_t *tree;
 	} idx;

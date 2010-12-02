@@ -13,6 +13,7 @@
 typedef void *ptr_t;
 
 KHASH_MAP_INIT_INT(int2ptr_map, ptr_t, realloc);
+KHASH_MAP_INIT_INT(int642ptr_map, ptr_t, realloc);
 KHASH_MAP_INIT_STR(str2ptr_map, ptr_t, realloc);
 KHASH_MAP_INIT_INT(int2int_map, uint32_t, realloc);
 KHASH_MAP_INIT_INT(seen, int32_t, realloc);
