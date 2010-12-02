@@ -113,6 +113,7 @@ sub set_timeout {
 
 sub _build__socket {
     my ($self) = @_;
+    $self->_debug(4, "connecting");
     my $socket = IO::Socket::INET->new(
         PeerHost => $self->host,
         PeerPort => $self->port,
@@ -122,6 +123,7 @@ sub _build__socket {
     $socket->sockopt(SO_KEEPALIVE, 1) if $self->tcp_keepalive;
     $socket->setsockopt((getprotobyname('tcp'))[2], TCP_NODELAY, 1) if $self->tcp_nodelay;
     $self->_set_timeout($socket, $self->timeout) if $self->timeout;
+    $self->_debug(1, "connected");
     return $socket;
 }
 

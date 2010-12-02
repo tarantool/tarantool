@@ -127,13 +127,6 @@ has cluster => (
     required => 1,
     coerce   => 1,
     handles  => [qw( timeout )],
-    trigger  => sub {
-        my ($self, $new) = @_;
-        foreach my $server ( @{$new->servers} ) {
-            $server->debug_cb($self->debug_cb) unless $server->has_debug_cb();
-        }
-        return;
-    },
 );
 
 =item max_parallel
@@ -375,6 +368,7 @@ See L<Mouse::Manual::Construction/BUILDARGS> for more information.
 
 =cut
 
+my %servers;
 around BUILDARGS => sub {
     my $orig = shift;
     my $class = shift;
@@ -394,7 +388,7 @@ around BUILDARGS => sub {
         $clusterargs{servers} = [
             map {
                 my ($host, $port, $weight) = split /:/, $_;
-                $server_class->new(
+                $servers{"$host:$port"} ||= $server_class->new(
                     %srvargs,
                     host => $host,
                     port => $port,
