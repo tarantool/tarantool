@@ -1639,13 +1639,11 @@ memcached_bound_to_primary(void *data __unused__)
 {
 	box_bound_to_primary(NULL);
 
-	if (0 && !cfg.remote_hot_standby) {
-		struct fiber *expire =
-			fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
-		if (expire == NULL)
-			panic("can't stared expire fiber");
-		fiber_call(expire);
-	}
+	struct fiber *expire =
+		fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
+	if (expire == NULL)
+		panic("can't start the expire fiber");
+	fiber_call(expire);
 }
 
 static void
@@ -1749,6 +1747,9 @@ mod_init(void)
 	if (cfg.memcached != 0) {
 		if (cfg.secondary_port != 0)
 			panic("in memcached mode secondary_port must be 0");
+		if (cfg.remote_hot_standby)
+			panic("remote replication is not supported in memcached mode.");
+
 		memcached_init();
 	}
 
