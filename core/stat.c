@@ -44,11 +44,11 @@ static int stats_max = 0;
 static int base = 0;
 
 int
-stat_register(char **name, size_t count)
+stat_register(char **name, size_t max_idx)
 {
 	int initial_base = base;
 
-	for (int i = 0; i < count; i++, name++, base++) {
+	for (int i = 0; i < max_idx; i++, name++, base++) {
 		if (stats_size <= base) {
 			stats_size += 1024;
 			stats = realloc(stats, sizeof(*stats) * stats_size);
