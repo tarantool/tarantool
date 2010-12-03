@@ -44,7 +44,8 @@
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
         _(MEMC_GET_MISS, 2)			\
-	_(MEMC_GET_HIT, 3)
+	_(MEMC_GET_HIT, 3)			\
+	_(MEMC_EXPIRED_KEYS, 4)
 
 ENUM(memcached_stat, STAT);
 STRS(memcached_stat, STAT);
@@ -657,6 +658,8 @@ memcached_expire(void *data __unused__)
 			i = kh_begin(map);
 
 		struct tbuf *keys_to_delete = tbuf_alloc(fiber->pool);
+		int expired_keys = 0;
+
 		for (int j = 0; j < cfg.memcached_expire_per_loop; j++, i++) {
 			if (i == kh_end(map)) {
 				i = kh_begin(map);
@@ -678,7 +681,9 @@ memcached_expire(void *data __unused__)
 		while (keys_to_delete->len > 0) {
 			struct box_txn *txn = txn_alloc(BOX_QUIET);
 			delete(txn, read_field(keys_to_delete));
+			expired_keys++;
 		}
+		stat_collect(stat_base, MEMC_EXPIRED_KEYS, expired_keys);
 
 		fiber_gc();
 

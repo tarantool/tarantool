@@ -1749,6 +1749,7 @@ mod_init(void)
 	if (cfg.memcached != 0) {
 		if (cfg.secondary_port != 0)
 			panic("in memcached mode secondary_port must be 0");
+		memcached_init();
 	}
 
 	title("loading");
