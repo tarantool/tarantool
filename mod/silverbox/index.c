@@ -605,5 +605,3 @@ index_tree(struct index *index, struct namespace *namespace, size_t estimated_ro
 	index->iterator_next = index_iterator_next_tree_str;
 	index->idx.tree = palloc(eter_pool, sizeof(*index->idx.tree));
 }
-
-index_setup[0] = index_tree;

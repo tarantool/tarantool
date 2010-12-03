@@ -98,8 +98,6 @@ struct index {
 	     index_var++)						\
 		if (index_var->enabled)
 
-extern void (*index_setup[])(struct index *index, struct namespace *namespace, size_t estimated_rows);
-
 void index_hash_num(struct index *index, struct namespace *namespace, size_t estimated_rows);
 void index_hash_num64(struct index *index, struct namespace *namespace, size_t estimated_rows);
 void index_hash_str(struct index *index, struct namespace *namespace, size_t estimated_rows);
