@@ -9,6 +9,8 @@
  */
 
 typedef struct tarantool_cfg {
+	unsigned char __confetti_flags;
+
 
 	/* username to switch to */
 	char*	username;
@@ -86,7 +88,9 @@ int dup_tarantool_cfg(tarantool_cfg *dst, tarantool_cfg *src);
 
 void destroy_tarantool_cfg(tarantool_cfg *c);
 
-typedef struct tarantool_cfg_iterator_t tarantool_cfg_iterator_t;
+char *cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly)
+
+;typedef struct tarantool_cfg_iterator_t tarantool_cfg_iterator_t;
 tarantool_cfg_iterator_t* tarantool_cfg_iterator_init();
 char* tarantool_cfg_iterator_next(tarantool_cfg_iterator_t* i, tarantool_cfg *c, char **v);
 

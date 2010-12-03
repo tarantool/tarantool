@@ -92,29 +92,54 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 i32
 reload_cfg(struct tbuf *out)
 {
-	struct tarantool_cfg new_cfg;
+	struct tarantool_cfg new_cfg1, new_cfg2;
 	i32 ret;
 
-	if (dup_tarantool_cfg(&new_cfg, &cfg) != 0) {
-		destroy_tarantool_cfg(&new_cfg);
+	// Load with checking readonly params
+	if (dup_tarantool_cfg(&new_cfg1, &cfg) != 0) {
+		destroy_tarantool_cfg(&new_cfg1);
 
 		return -1;
 	}
-
-	ret = load_cfg(&new_cfg, 1);
+	ret = load_cfg(&new_cfg1, 1);
 	tbuf_append(out, cfg_out->data, cfg_out->len);
-
 	if (ret == -1) {
-		destroy_tarantool_cfg(&new_cfg);
+		destroy_tarantool_cfg(&new_cfg1);
 
 		return -1;
 	}
 
-	mod_reloadconfig(&cfg, &new_cfg);
+	// Load without checking readonly params
+	if (fill_default_tarantool_cfg(&new_cfg2) != 0) {
+		destroy_tarantool_cfg(&new_cfg2);
+
+		return -1;
+	}
+	ret = load_cfg(&new_cfg2, 0);
+	tbuf_append(out, cfg_out->data, cfg_out->len);
+	if (ret == -1) {
+		destroy_tarantool_cfg(&new_cfg1);
+
+		return -1;
+	}
+
+	// Compare only readonly params
+	char *diff = cmp_tarantool_cfg(&new_cfg1, &new_cfg2, 1);
+	if (diff != NULL) {
+		destroy_tarantool_cfg(&new_cfg1);
+		destroy_tarantool_cfg(&new_cfg2);
+
+		tbuf_printf(out, "\tCould not accept read only '%s' option\n", diff);
+
+		return -1;
+	}
+	destroy_tarantool_cfg(&new_cfg1);
+
+	mod_reloadconfig(&cfg, &new_cfg2);
 
 	destroy_tarantool_cfg(&cfg);
 
-	cfg = new_cfg;
+	cfg = new_cfg2;
 
 	return 0;
 }

@@ -104,8 +104,9 @@ static NameAtom _name__custom_proc_title[] = {
 	{ "custom_proc_title", -1, NULL }
 };
 
-#define ARRAYALLOC(x,n,t,_chk_ro)  do {                             \
+#define ARRAYALLOC(x,n,t,_chk_ro) ({                                \
    int l = 0, ar;                                                   \
+   int was_realloced = 0;                                           \
    __typeof__(x) y = (x), t;                                        \
    if ( (n) <= 0 ) return CNF_WRONGINDEX; /* wrong index */         \
    while(y && *y) {                                                 \
@@ -128,8 +129,10 @@ static NameAtom _name__custom_proc_title[] = {
           if ( (ar = acceptDefault##t(*y)) != 0 ) return ar;        \
           y++;                                                      \
       }                                                             \
+      was_realloced = 1;                                            \
    }                                                                \
-} while(0)
+   was_realloced;                                                   \
+})
 
 static ConfettyError
 acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
@@ -719,5 +722,154 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 		free(c->wal_feeder_dir);
 	if (c->custom_proc_title != NULL)
 		free(c->custom_proc_title);
+}
+
+/************** Compare config  **************/
+
+int
+confetti_strcmp(char *s1, char *s2) {
+	if (s1 == NULL || s2 == NULL) {
+		if (s1 != s2)
+			return s1 == NULL ? -1 : 1;
+		else
+			return 0;
+	}
+
+	return strcmp(s1, s2);
+}
+
+char *
+cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
+	tarantool_cfg_iterator_t iterator1, iterator2, *i1 = &iterator1, *i2 = &iterator2;
+	static char diff[PRINTBUFLEN];
+
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->username, c2->username) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->username");
+
+			return diff;
+}
+	}
+	if (!only_check_rdonly) {
+		if (c1->coredump != c2->coredump) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->coredump");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (c1->admin_port != c2->admin_port) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->admin_port");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (c1->log_level != c2->log_level) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->log_level");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (c1->slab_alloc_arena != c2->slab_alloc_arena) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->slab_alloc_arena");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (c1->slab_alloc_minimal != c2->slab_alloc_minimal) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->slab_alloc_minimal");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (c1->slab_alloc_factor != c2->slab_alloc_factor) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->slab_alloc_factor");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->work_dir, c2->work_dir) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->work_dir");
+
+			return diff;
+}
+	}
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->pid_file, c2->pid_file) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->pid_file");
+
+			return diff;
+}
+	}
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->logger, c2->logger) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->logger");
+
+			return diff;
+}
+	}
+	if (!only_check_rdonly) {
+		if (c1->logger_nonblock != c2->logger_nonblock) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->logger_nonblock");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (c1->io_collect_interval != c2->io_collect_interval) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->io_collect_interval");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (c1->backlog != c2->backlog) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->backlog");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (c1->readahead != c2->readahead) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->readahead");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->wal_feeder_bind_ipaddr, c2->wal_feeder_bind_ipaddr) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_bind_ipaddr");
+
+			return diff;
+}
+	}
+	if (!only_check_rdonly) {
+		if (c1->wal_feeder_bind_port != c2->wal_feeder_bind_port) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_bind_port");
+
+			return diff;
+		}
+	}
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->wal_feeder_dir, c2->wal_feeder_dir) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_dir");
+
+			return diff;
+}
+	}
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->custom_proc_title, c2->custom_proc_title) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->custom_proc_title");
+
+			return diff;
+}
+	}
+
+	return 0;
 }
 
