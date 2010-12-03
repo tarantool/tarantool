@@ -406,6 +406,7 @@ sub _build_debug_cb {
     my $prefix = $self->prefix;
     return sub {
         my ($msg) = @_;
+        chomp $msg;
         warn sprintf "%s: %s\n", $prefix, $msg;
         return;
     };
@@ -498,107 +499,128 @@ sub _try_to_send {
 sub _send_now {
     my ($self, $message, $callback, $sync) = @_;
     $self->_in_progress( $self->_in_progress + 1 );
-    my ($req_msg, $key, $body, $unpack, $retry, $response_class, $no_reply);
+    my %args;
     # MR::IProto::Message OO-API
     if( blessed($message) ) {
-        $req_msg = $message->msg;
-        $key = $message->key;
-        $body = $message->data;
-        $response_class = $self->_reply_class->{$req_msg};
-        die sprintf "Cannot find response class for message code $req_msg\n" unless $response_class;
-        $no_reply = $response_class->isa('MR::IProto::NoResponse');
-        $retry = $message->retry ? $self->max_request_retries : 1;
+        my $response_class = $self->_reply_class->{$message->msg};
+        die sprintf "Cannot find response class for message code %d\n", $message->msg unless $response_class;
+        %args = (
+            request        => $message,
+            msg            => $message->msg,
+            key            => $message->key,
+            body           => $message->data,
+            response_class => $response_class,
+            no_reply       => $response_class->isa('MR::IProto::NoResponse'),
+            retry          => $message->retry ? $self->max_request_retries : 1,
+        );
     }
     # Old-style compatible API
     else {
-        $req_msg = $message->{msg};
-        $key = $message->{key};
-        $body = exists $message->{payload} ? $message->{payload}
-            : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{$message->{data}}
-            : $message->{data};
-        $no_reply = $message->{no_reply};
-        $unpack = $no_reply ? sub { 0 } : $message->{unpack} or die "unpack or no_reply must be specified";
-        $retry = $message->{retry} ? $self->max_request_retries : 1;
+        die "unpack or no_reply must be specified" unless $message->{unpack} || $message->{no_reply};
+        %args = (
+            msg      => $message->{msg},
+            key      => $message->{key},
+            body     => exists $message->{payload} ? $message->{payload}
+                : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{$message->{data}}
+                : $message->{data},
+            no_reply => $message->{no_reply},
+            unpack   => $message->{unpack},
+            retry    => $message->{retry} ? $self->max_request_retries : 1,
+        );
     }
 
     my $try = 1;
     weaken($self);
-    my ($sub, $server);
-    my $xsync = $sync ? 'sync' : 'async';
-    my $do_try = sub {
-        my ($by_resp) = @_;
-        $self->_debug(2, sprintf "send msg=%d try %d of %d total", $req_msg, $try, $by_resp ? $self->max_request_retries : $retry );
-        $server = $self->cluster->server( $key );
-        $server->$xsync->send($req_msg, $body, $sub, $no_reply);
+    my $handler;
+    $handler = sub {
+        $self->_server_callback(
+            [\$handler, \%args, $callback, $sync, \$try],
+            [@_],
+        );
+        return;
     };
-    my $next_try = $sync
-        ? sub {
-            my ($by_resp) = @_;
-            Time::HiRes::sleep($self->retry_delay);
-            $do_try->($by_resp);
-            return;
-        }
-        : sub {
-            my ($by_resp) = @_;
-            my $timer;
-            $timer = AnyEvent->timer(
-                after => $self->retry_delay,
-                cb    => sub {
-                    undef $timer;
-                    $do_try->($by_resp);
-                    return;
-                },
-            );
-        };
-    $sub = sub {
-        my ($resp_msg, $data, $error) = @_;
+    $self->_send_try($sync, \%args, $handler, $try);
+    return;
+}
+
+sub _send_try {
+    my ($self, $sync, $args, $handler, $try, $by_resp) = @_;
+    my $xsync = $sync ? 'sync' : 'async';
+    $self->_debug(2, sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $by_resp ? $self->max_request_retries : $args->{retry} );
+    my $server = $self->cluster->server( $args->{key} );
+    $server->$xsync->send($args->{msg}, $args->{body}, $handler, $args->{no_reply});
+    return;
+}
+
+sub _send_retry {
+    my ($self, @in) = @_;
+    my ($sync) = @in;
+    if( $sync ) {
+        Time::HiRes::sleep($self->retry_delay);
+        $self->_send_try(@in);
+    }
+    else {
+        my $timer;
+        $timer = AnyEvent->timer(
+            after => $self->retry_delay,
+            cb    => sub {
+                undef $timer;
+                $self->_send_try(@in);
+                return;
+            },
+        );
+    }
+    return;
+}
+
+sub _server_callback {
+    my ($self, $req_args, $resp_args) = @_;
+    my ($handler, $args, $callback, $sync, $try) = @$req_args;
+    my ($resp_msg, $data, $error) = @$resp_args;
+    eval {
         if ($error) {
             $self->_debug(2, "send: failed");
-            if( $try++ < $retry ) {
-                $next_try->();
+            if( $$try++ < $args->{retry} ) {
+                $self->_send_retry($sync, $args, $$handler, $$try);
             }
             else {
-                undef $sub;
-                undef $do_try;
-                undef $next_try;
-                $self->_report_error($unpack ? undef : $message, $callback, $error);
+                undef $$handler;
+                $self->_report_error($args->{request}, $callback, $error);
             }
         }
         else {
             my $ok = eval {
-                die "Request and reply message code is different: $resp_msg != $req_msg\n"
-                    unless $no_reply || $resp_msg == $req_msg;
-                if ($unpack) {
-                    $data = [ $unpack->($data) ];
+                die "Request and reply message code is different: $resp_msg != $args->{msg}\n"
+                    unless $args->{no_reply} || $resp_msg == $args->{msg};
+                if( $args->{request} ) {
+                    $data = $args->{response_class}->new( data => $data, request => $args->{request} );
                 }
                 else {
-                    $data = $response_class->new( data => $data, request => $message );
+                    $data = $args->{no_reply} ? [ 0 ] : [ $args->{unpack}->($data) ];
                 }
                 1;
             };
             if($ok) {
-                if( !$unpack && $data->retry && $try++ < $self->max_request_retries ) {
-                    $next_try->(1);
+                if( $args->{request} && $data->retry && $$try++ < $self->max_request_retries ) {
+                    $self->_send_retry($sync, $args, $$handler, $$try, 1);
                 }
                 else {
-                    undef $sub;
-                    undef $do_try;
-                    undef $next_try;
+                    undef $$handler;
                     $self->_in_progress( $self->_in_progress - 1 );
                     $self->_try_to_send();
                     $callback->($data);
                 }
             }
             else {
-                undef $sub;
-                undef $do_try;
-                undef $next_try;
-                $self->_report_error($unpack ? undef : $message, $callback, $@);
+                undef $$handler;
+                $self->_report_error($args->{request}, $callback, $@);
             }
         }
-        return;
+        1;
+    } or do {
+        undef $$handler;
+        $self->_debug(0, "unhandled fatal error: $@");
     };
-    $do_try->();
     return;
 }
 

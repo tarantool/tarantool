@@ -214,6 +214,7 @@ sub _build_debug_cb {
     my ($self) = @_;
     return sub {
         my ($msg) = @_;
+        chomp $msg;
         warn "MR::IProto: $msg\n";
         return;
     };
