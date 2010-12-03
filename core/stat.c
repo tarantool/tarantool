@@ -83,13 +83,13 @@ stat_print(struct tbuf *buf)
 	int max_len = 0;
 	tbuf_printf(buf, "statistics:\n");
 
-	for (int i = 0; i < stats_max; i++) {
+	for (int i = 0; i <= stats_max; i++) {
 		if (stats[i].name == NULL)
 			continue;
 		max_len = MAX(max_len, strlen(stats[i].name));
 	}
 
-	for (int i = 0; i < stats_max; i++) {
+	for (int i = 0; i <= stats_max; i++) {
 		if (stats[i].name == NULL)
 			continue;
 
@@ -108,7 +108,7 @@ stat_print(struct tbuf *buf)
 void
 stat_age(ev_timer *timer, int events __unused__)
 {
-	for (int i = 0; i < stats_max; i++) {
+	for (int i = 0; i <= stats_max; i++) {
 		if (stats[i].name == NULL)
 			continue;
 
