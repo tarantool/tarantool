@@ -40,6 +40,8 @@
 #include <say.h>
 #include <coro.h>
 
+#define FIBER_EXIT -1
+
 struct msg {
 	uint32_t sender_fid;
 	struct tbuf *msg;
