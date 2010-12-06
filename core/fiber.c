@@ -110,6 +110,24 @@ fiber_call(struct fiber *callee)
 }
 
 void
+fiber_raise(struct fiber *callee, jmp_buf exc, int value)
+{
+	struct fiber *caller = fiber;
+
+	assert(sp - call_stack < 8);
+	assert(caller);
+
+	fiber = callee;
+	*sp++ = caller;
+
+#if CORO_ASM
+	save_rbp(&caller->rbp);
+#endif
+	callee->csw++;
+	coro_save_and_longjmp(&caller->coro.ctx, exc, value);
+}
+
+void
 yield(void)
 {
 	struct fiber *callee = *(--sp);
