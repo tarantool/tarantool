@@ -62,64 +62,64 @@ class Options:
   """Handle options of test-runner"""
   def __init__(self):
     """Add all program options, with their defaults. We assume
-    that the program is started from the directory where it is
-    located"""
+       that the program is started from the directory where it is
+       located"""
 
     parser = argparse.ArgumentParser(
-      description = "Tarantool regression test suite front-end. \
-This program must be started from its working directory (" +
-os.path.abspath(os.path.dirname(sys.argv[0])) + ").")
+        description = "Tarantool regression test suite front-end. \
+        This program must be started from its working directory (" +
+        os.path.abspath(os.path.dirname(sys.argv[0])) + ").")
 
     parser.epilog = "For a complete description, use 'pydoc ./" +\
-      os.path.basename(sys.argv[0]) + "'"
+        os.path.basename(sys.argv[0]) + "'"
 
     parser.add_argument(
-      "tests",
-      metavar="list of tests",
-      nargs="*",
-      default = [""],
-      help="""Can be empty. List of tests names, to look for in suites. Each
-      name is used as a substring to look for in the path to test file,
-      e.g.  "show" will run all tests that have "show" in their name in all
-      suites, "box/show" will only enable tests starting with "show" in
-      "box" suite. Default: run all tests in all specified suites.""")
+        "tests",
+        metavar="list of tests",
+        nargs="*",
+        default = [""],
+        help="""Can be empty. List of test names, to look for in suites. Each
+        name is used as a substring to look for in the path to test file,
+        e.g. "show" will run all tests that have "show" in their name in all
+        suites, "box/show" will only enable tests starting with "show" in
+        "box" suite. Default: run all tests in all specified suites.""")
 
     parser.add_argument(
-      "--suite",
-      dest = 'suites',
-      metavar = "suite",
-      nargs="*",
-      default = ["box"],
-      help = """List of tests suites to look for tests in. Default: "box".""")
+        "--suite",
+        dest = 'suites',
+        metavar = "suite",
+        nargs="*",
+        default = ["box"],
+        help = """List of tests suites to look for tests in. Default: "box".""")
 
     parser.add_argument(
-      "--force",
-      dest = "is_force",
-      action = "store_true",
-      default = False,
-      help = "Go on with other tests in case of an individual test failure."
-             " Default: false.")
+        "--force",
+        dest = "is_force",
+        action = "store_true",
+        default = False,
+        help = "Go on with other tests in case of an individual test failure."
+               " Default: false.")
 
     parser.add_argument(
-      "--start-and-exit",
-      dest = "start_and_exit",
-      action = "store_true",
-      default = False,
-      help = "Start the server from the first specified suite and"
-      "exit without running any tests. Default: false.")
+        "--start-and-exit",
+        dest = "start_and_exit",
+        action = "store_true",
+        default = False,
+        help = "Start the server from the first specified suite and"
+        "exit without running any tests. Default: false.")
 
     parser.add_argument(
-      "--bindir",
-      dest = "bindir",
-      default = "../_debug_box",
-      help = "Path to server binary."
-             " Default: " + "../_debug_box.")
+        "--bindir",
+        dest = "bindir",
+        default = "../_debug_box",
+        help = "Path to server binary."
+               " Default: " + "../_debug_box.")
 
     parser.add_argument(
-      "--vardir",
-      dest = "vardir",
-      default = "var",
-      help = "Path to data directory. Default: var.")
+        "--vardir",
+        dest = "vardir",
+        default = "var",
+        help = "Path to data directory. Default: var.")
 
     self.check(parser)
     self.args = parser.parse_args()
@@ -142,6 +142,7 @@ class Server:
   of each suite, and stopped at the end."""
 
   def __init__(self, args, config, pidfile):
+    """Set server options: path to configuration file, pid file, exe, etc."""
     self.args = args
     self.path_to_config = config
     self.path_to_pidfile = os.path.join(args.vardir, pidfile)
@@ -152,8 +153,9 @@ class Server:
   def start(self):
     """Start server instance: check if the old one exists, kill it
     if necessary, create necessary directories and files, start
-    the server. Currently this is implemented for tarantool_silverbox
-    only."""
+    the server. The server working directory is taken from 'vardir',
+    specified in the prgoram options.
+    Currently this is implemented for tarantool_silverbox only."""
 
     if not self.is_started:
       print "Starting the server..."
@@ -176,33 +178,37 @@ class Server:
       shutil.copy(self.path_to_config, self.args.vardir)
 
       subprocess.check_call([self.abspath_to_exe, "--init_storage"],
-          cwd = self.args.vardir,
-          stdout = subprocess.PIPE,
-          stderr = subprocess.PIPE)
+                            cwd = self.args.vardir,
+                            stdout = subprocess.PIPE,
+                            stderr = subprocess.PIPE)
 
       if self.args.start_and_exit:
         subprocess.check_call([self.abspath_to_exe, "--daemonize"],
-            cwd = self.args.vardir,
-            stdout = subprocess.PIPE,
-            stderr = subprocess.PIPE)
+                              cwd = self.args.vardir,
+                              stdout = subprocess.PIPE,
+                              stderr = subprocess.PIPE)
       else:
         self.server = pexpect.spawn(self.abspath_to_exe,
-            cwd = self.args.vardir)
+                                    cwd = self.args.vardir)
         self.logfile_read = sys.stdout
         self.server.expect_exact("entering event loop")
 
       version = subprocess.Popen([self.abspath_to_exe, "--version"],
-        cwd = self.args.vardir,
-        stdout = subprocess.PIPE).stdout.read().rstrip()
+                                 cwd = self.args.vardir,
+                                 stdout = subprocess.PIPE).stdout.read().rstrip()
 
       print "Started {0} {1}.".format(os.path.basename(self.abspath_to_exe),
-        version)
+                                      version)
+
+# Set is_started flag, to nicely support cleanup during an exception.
       self.is_started = True
     else:
       print "The server is already started."
 
   def stop(self):
-    """Stop server instance."""
+    """Stop server instance. Do nothing if the server is not started,
+    to properly shut down the server in case of an exception during
+    start up."""
     if self.is_started:
       print "Stopping the server..."
       self.server.terminate()
@@ -213,12 +219,12 @@ class Server:
 
   def find_exe(self):
     """Locate server executable in the bindir. We just take
-    the first thing we find."""
+    the first thing looking like an exe in there."""
 
     if (os.access(self.args.bindir, os.F_OK) == False or
         stat.S_ISDIR(os.stat(self.args.bindir).st_mode) == False):
       raise TestRunException("Directory " + self.args.bindir +
-      " doesn't exist")
+                             " doesn't exist")
 
     for f in os.listdir(self.args.bindir):
       f = os.path.join(self.args.bindir, f)
@@ -226,7 +232,7 @@ class Server:
       if stat.S_ISREG(st_mode) and st_mode & stat.S_IXUSR:
         return f
     raise TestRunException("Can't find server executable in " + 
-      self.args.bindir)
+                           self.args.bindir)
 
   def kill_old_server(self):
     """Kill old server instance if it exists."""
@@ -244,51 +250,57 @@ class Server:
       pass
 
 class Test:
+  """An individual test file. A test can run itself, and remembers
+  its completion state."""
   def __init__(self, name, client):
+    """Initialize test properties: path to test file, path to 
+    temporary result file, path to the client program, test status."""
     self.name = name
     self.client = os.path.join(".", client)
     self.result = name.replace(".test", ".result")
     self.is_executed = False
-    self.passed = None
+    self.is_client_ok = None
     self.is_equal_result = None
+
+  def passed(self):
+    """Return true if this test was run successfully."""
+    return self.is_executed and self.is_client_ok and self.is_equal_result
 
   def run(self, is_force):
     """Execute the client program, giving it test as stdin,
     result as stdout. If the client program aborts, print
     its output to stdout, and raise an exception. Else, comprare
     result and reject files. If there is a difference, print it to
-    stdout and raise an exception."""
+    stdout and raise an exception. The exception is raised only
+    if is_force flag is not set."""
 
     sys.stdout.write("{0}".format(self.name))
 
     with open(self.name, "r") as test:
       with open(self.result, "w+") as result:
-        self.passed = \
+        self.is_client_ok = \
           subprocess.call([self.client], stdin = test, stdout = result) == 0
     
     self.is_executed = True
 
-    if self.passed:
-      self.is_equal_result = filecmp.cmp(self.name, self.result);
+    if self.is_client_ok:
+      self.is_equal_result = filecmp.cmp(self.name, self.result)
 
-    if self.passed and self.is_equal_result:
+    if self.is_client_ok and self.is_equal_result:
       print "\t\t\t[ pass ]"
+      os.remove(self.result)
     else:
       print "\t\t\t[ fail ]"
-      if not self.passed:
+      where = ""
+      if not self.is_client_ok:
         self.print_diagnostics()
+        where = ": client execution aborted"
       else:
         self.print_unidiff()
-        
-    if not is_force:
-      if not self.passed:
-        raise TestRunException("Failed to run test " + self.name +
-         ": client execution aborted")
-      elif not self.is_equal_result:
-        raise TestRunException("Failed to run test " + self.name +
-         ": wrong test output")
+        where = ": wrong test output"
+      if not is_force:
+        raise TestRunException("Failed to run test " + self.name + where)
 
-    os.remove(self.result)
 
   def print_diagnostics(self):
     """Print 10 lines of client program output leading to test
@@ -301,29 +313,32 @@ class Test:
         sys.stdout.write(line)
 
   def print_unidiff(self):
-    """Print a unified diff between .test and .result files. used
+    """Print a unified diff between .test and .result files. Used
     to establish the cause of a failure when .test differs
-    from .result"""
+    from .result."""
 
     print "Test failed! Result content mismatch:"
     with open(self.name, "r") as test:
       with open(self.result, "r") as result:
         test_time = time.ctime(os.stat(self.name).st_mtime)
         result_time = time.ctime(os.stat(self.result).st_mtime)
-        for line in difflib.unified_diff(test.readlines(),
-          result.readlines(), self.name, self.result,
-          test_time, result_time):
+        diff = difflib.unified_diff(test.readlines(),
+                                    result.readlines(),
+                                    self.name,
+                                    self.result,
+                                    test_time,
+                                    result_time)
+        for line in diff:
           sys.stdout.write(line)
             
 
 class TestSuite:
-# Dont' forget to update epilog
   """Each test suite contains a number of related tests files,
   located in the same directory on disk. Each test file has
   extention .test and contains a listing of server commands,
   followed by their output. The commands are executed, and
   obtained results are compared with pre-recorded output. In case
-  of comparision difference, an exception is raised. A test suite
+  of a comparision difference, an exception is raised. A test suite
   must also contain suite.ini, which describes how to start the
   server for this suite, the client program to execute individual
   tests and other suite properties. The server is started once per
@@ -367,11 +382,17 @@ class TestSuite:
     print longsep
     print "TEST\t\t\t\tRESULT"
     print shortsep
+    failed_tests = []
 
     for test in self.tests:
       test.run(self.args.is_force)
+      if not test.passed():
+        failed_tests.append(test.name)
 
     print shortsep
+    if len(failed_tests):
+      print "Failed {0} tests: {1}.".format(len(failed_tests),
+                                            ", ".join(failed_tests))
     server.stop();
 
 #######################################################################
