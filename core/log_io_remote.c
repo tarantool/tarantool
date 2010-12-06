@@ -38,11 +38,6 @@
 #include <log_io.h>
 #include <pickle.h>
 
-struct remote_state {
-	struct recovery_state *r;
-	int (*handler) (struct recovery_state * r, struct tbuf *row);
-};
-
 static u32
 row_v11_len(struct tbuf *r)
 {
@@ -137,8 +132,17 @@ pull_from_remote(void *state)
 	struct remote_state *h = state;
 	struct tbuf *row;
 
-	if (setjmp(fiber->exc) != 0)
-		fiber_close();
+	switch (setjmp(fiber->exc)) {
+		case 0:
+			break;
+
+		case FIBER_EXIT:
+			fiber_close();
+			return;
+
+		default:
+			fiber_close();
+	}
 
 	for (;;) {
 		row = remote_read_row(h->r->confirmed_lsn + 1);
