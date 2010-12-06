@@ -226,6 +226,7 @@ main(int argc, char **argv)
 {
 	int c, verbose = 0;
 	char *cat_filename = NULL;
+	char *cfg_paramname = NULL;
 	bool be_daemon = false;
 	int n_accepted, n_skipped;
 	FILE *f;
@@ -269,6 +270,10 @@ main(int argc, char **argv)
 		 .has_arg = 0,
 		 .flag = NULL,
 		 .val = 'D'},
+		{.name = "cfg_get",
+		 .has_arg = 1,
+		 .flag = NULL,
+		 .val = 'g'},
 		{.name = NULL,
 		 .has_arg = 0,
 		 .flag = NULL,
@@ -302,6 +307,10 @@ main(int argc, char **argv)
 		case 'I':
 			init_storage = true;
 			break;
+		case 'g':
+			role = cfg_get;
+			cfg_paramname = strdup(optarg);
+			break;
 		}
 	}
 
@@ -319,6 +328,7 @@ main(int argc, char **argv)
 		fprintf(stderr, "	-p, --create_pid\n");
 		fprintf(stderr, "	-v, --verbose\n");
 		fprintf(stderr, "	-D, --daemonize\n");
+		fprintf(stderr, "	--cfg_get=paramname\n");
 
 		return 0;
 	}
@@ -354,6 +364,25 @@ main(int argc, char **argv)
 		return mod_cat(cat_filename);
 	}
 #endif
+
+	if (role == cfg_get) {
+		tarantool_cfg_iterator_t *i;
+		char *key, *value;
+
+		i = tarantool_cfg_iterator_init();
+		while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
+			if (strcmp(key, cfg_paramname) == 0) {
+				printf("%s\n", value);
+				free(value);
+
+				return 0;
+			}
+
+			free(value);
+		}
+
+		return 0;
+	}
 
 	cfg.log_level += verbose;
 

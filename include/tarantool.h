@@ -51,7 +51,7 @@ double tarantool_uptime(void);
 char **init_set_proc_title(int argc, char **argv);
 void set_proc_title(const char *format, ...);
 
-enum tarantool_role { usage, cat, def };
+enum tarantool_role { usage, cat, def, cfg_get };
 extern enum tarantool_role role;
 
 #endif
