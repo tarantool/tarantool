@@ -33,9 +33,8 @@ struct field {
 	u32 len;
 	union {
 		u32 u32;
-
+		u64 u64;
 		u8 data[sizeof(void *)];
-
 		void *data_ptr;
 	};
 };

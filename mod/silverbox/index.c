@@ -80,6 +80,11 @@ field_compare(struct field *f1, struct field *f2, enum field_data_type type)
 			assert(f1->len == sizeof(f1->u32));
 
 			r = f1->u32 >f2->u32 ? 1 : f1->u32 == f2->u32 ? 0 : -1;
+		} else if (type == NUM64) {
+			assert(f1->len == f2->len);
+			assert(f1->len == sizeof(f1->u64));
+
+			r = f1->u64 >f2->u64 ? 1 : f1->u64 == f2->u64 ? 0 : -1;
 		} else {
 			i32 cmp;
 			void *f1_data, *f2_data;
