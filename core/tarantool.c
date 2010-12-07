@@ -381,7 +381,7 @@ main(int argc, char **argv)
 			free(value);
 		}
 
-		return 0;
+		return 1;
 	}
 
 	cfg.log_level += verbose;
