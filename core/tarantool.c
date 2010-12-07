@@ -427,8 +427,11 @@ main(int argc, char **argv)
 	assert(cfg_out);
 
 	if (role == chkconfig) {
-		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0)
+		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
 			fprintf(stderr, "FAILED\n%.*s\n", cfg_out->len, (char *)cfg_out->data);
+
+			return 1;
+		}
 
 		return 0;
 	}
