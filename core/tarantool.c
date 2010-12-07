@@ -221,6 +221,23 @@ initialize_minimal()
 	initialize(0.1, 4, 2);
 }
 
+static void
+print_usage(void)
+{
+	puts("usage:");
+	puts("	-h, --help");
+	puts("	-c, --config=filename");
+#ifdef STORAGE
+	puts("	--cat=filename");
+	puts("	--init_storage");
+#endif
+	puts("	-V, --version");
+	puts("	-p, --create_pid");
+	puts("	-v, --verbose");
+	puts("	-D, --daemonize");
+	puts("	--cfg_get=paramname");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -238,8 +255,12 @@ main(int argc, char **argv)
 	stat_init();
 	palloc_init();
 
-	const char *short_opt = "c:pvVD";
+	const char *short_opt = "hc:pvVD";
 	const struct option long_opt[] = {
+		{.name = "help",
+		 .has_arg = 0,
+		 .flag = NULL,
+		 .val = 'h'},
 		{.name = "config",
 		 .has_arg = 1,
 		 .flag = NULL,
@@ -311,26 +332,15 @@ main(int argc, char **argv)
 			role = cfg_get;
 			cfg_paramname = strdup(optarg);
 			break;
+		case 'h':
+			print_usage();
+			return 0;
 		}
 	}
 
-	if (argc != optind)
-		panic("not all args were parsed");
-
-	if (role == usage) {
-		fprintf(stderr, "usage:\n");
-		fprintf(stderr, "	-c, --config=filename\n");
-#ifdef STORAGE
-		fprintf(stderr, "	--cat=filename\n");
-		fprintf(stderr, "	--init_storage\n");
-#endif
-		fprintf(stderr, "	-V, --version\n");
-		fprintf(stderr, "	-p, --create_pid\n");
-		fprintf(stderr, "	-v, --verbose\n");
-		fprintf(stderr, "	-D, --daemonize\n");
-		fprintf(stderr, "	--cfg_get=paramname\n");
-
-		return 0;
+	if (argc != optind) {
+		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
+		exit(EX_USAGE);
 	}
 
 	if (cfg_filename[0] != '/') {
