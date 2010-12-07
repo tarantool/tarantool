@@ -107,6 +107,12 @@ has servers => (
 
 =cut
 
+has _one => (
+    is  => 'ro',
+    isa => 'Maybe[MR::IProto::Cluster::Server]',
+    lazy_build => 1,
+);
+
 has _ketama => (
     is  => 'ro',
     isa => 'ArrayRef[ArrayRef]',
@@ -137,8 +143,8 @@ Get server from balancing using C<$key>.
 
 sub server {
     my ($self, $key) = @_;
-    my $n = @{$self->servers};
-    return $self->servers->[0] if $n == 1;
+    my $one = $self->_one;
+    return $one if defined $one;
     my $method = $self->balance == RR ? '_balance_rr'
         : $self->balance == KETAMA ? '_balance_ketama'
         : '_balance_hash';
@@ -173,6 +179,11 @@ sub timeout {
 =back
 
 =cut
+
+sub _build__one {
+    my ($self) = @_;
+    return @{$self->servers} == 1 ? $self->servers->[0] : undef;
+}
 
 sub _build__ketama {
     my $self = shift;

@@ -253,7 +253,7 @@ sub send {
     else {
         die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
         my ($data, $error, $errno);
-        $self->_send($message, sub {
+        $self->_send_now($message, sub {
             ($data, $error) = @_;
             $errno = $!;
             return;
@@ -297,7 +297,7 @@ sub send_bulk {
         $cv->begin();
         $self->_send($message, sub {
             my ($data, $error) = @_;
-            push @result, blessed($data) ? $data
+            push @result, ref $data ne 'HASH' ? $data
                 : { data => $data, error => $error };
             $cv->end();
             return;
@@ -478,55 +478,53 @@ L</retry_delay> is used if retry is allowed.
 =cut
 
 sub _send {
-    my ($self, $message, $callback, $sync) = @_;
-    die "Callback must be specified" unless $callback;
-    die "Method must be called in void context" if defined wantarray;
-    return $self->_send_now($message, $callback, $sync) if $sync;
-    push @{$self->_queue}, [ $message, $callback ];
-    $self->_try_to_send();
+    my ($self, $message, $callback) = @_;
+    if( $self->_in_progress < $self->max_parallel ) {
+        $self->_in_progress( $self->_in_progress + 1 );
+        eval { $self->_send_now($message, $callback); 1 }
+            or $self->_report_error($message, $callback, $@);
+    }
+    else {
+        push @{$self->_queue}, [ $message, $callback ];
+    }
     return;
 }
 
-sub _try_to_send {
+sub _finish_and_start {
     my ($self) = @_;
-    while( $self->_in_progress < $self->max_parallel && (my $task = shift @{ $self->_queue }) ) {
+    if( my $task = shift @{$self->_queue} ) {
         eval { $self->_send_now(@$task); 1 }
             or $self->_report_error(@$task, $@);
+    }
+    else {
+        $self->_in_progress( $self->_in_progress - 1 );
     }
     return;
 }
 
 sub _send_now {
     my ($self, $message, $callback, $sync) = @_;
-    $self->_in_progress( $self->_in_progress + 1 );
-    my %args;
+    my $args;
     # MR::IProto::Message OO-API
-    if( blessed($message) ) {
+    if( ref $message ne 'HASH' ) {
         my $response_class = $self->_reply_class->{$message->msg};
         die sprintf "Cannot find response class for message code %d\n", $message->msg unless $response_class;
-        %args = (
+        $args = {
             request        => $message,
             msg            => $message->msg,
             key            => $message->key,
             body           => $message->data,
             response_class => $response_class,
             no_reply       => $response_class->isa('MR::IProto::NoResponse'),
-            retry          => $message->retry ? $self->max_request_retries : 1,
-        );
+        };
     }
     # Old-style compatible API
     else {
         die "unpack or no_reply must be specified" unless $message->{unpack} || $message->{no_reply};
-        %args = (
-            msg      => $message->{msg},
-            key      => $message->{key},
-            body     => exists $message->{payload} ? $message->{payload}
-                : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{$message->{data}}
-                : $message->{data},
-            no_reply => $message->{no_reply},
-            unpack   => $message->{unpack},
-            retry    => $message->{retry} ? $self->max_request_retries : 1,
-        );
+        $args = $message;
+        $args->{body} = exists $args->{payload} ? delete $args->{payload}
+            : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{ delete $message->{data} }
+            : delete $message->{data};
     }
 
     my $try = 1;
@@ -534,19 +532,19 @@ sub _send_now {
     my $handler;
     $handler = sub {
         $self->_server_callback(
-            [\$handler, \%args, $callback, $sync, \$try],
+            [\$handler, $args, $callback, $sync, \$try],
             [@_],
         );
         return;
     };
-    $self->_send_try($sync, \%args, $handler, $try);
+    $self->_send_try($sync, $args, $handler, $try);
     return;
 }
 
 sub _send_try {
-    my ($self, $sync, $args, $handler, $try, $by_resp) = @_;
+    my ($self, $sync, $args, $handler, $try) = @_;
     my $xsync = $sync ? 'sync' : 'async';
-    $self->_debug(2, sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $by_resp ? $self->max_request_retries : $args->{retry} );
+    $self->_debug(sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $self->max_request_retries ) if $self->debug >= 2;
     my $server = $self->cluster->server( $args->{key} );
     $server->$xsync->send($args->{msg}, $args->{body}, $handler, $args->{no_reply});
     return;
@@ -579,20 +577,21 @@ sub _server_callback {
     my ($resp_msg, $data, $error) = @$resp_args;
     eval {
         if ($error) {
-            $self->_debug(2, "send: failed");
-            if( $$try++ < $args->{retry} ) {
+            $self->_debug("send: failed") if $self->debug >= 2;
+            my $retry = defined $args->{request} ? $args->{request}->retry() : $args->{retry};
+            if( $retry && $$try++ < $self->max_request_retries ) {
                 $self->_send_retry($sync, $args, $$handler, $$try);
             }
             else {
                 undef $$handler;
-                $self->_report_error($args->{request}, $callback, $error);
+                $self->_report_error($args->{request}, $callback, $error, $sync);
             }
         }
         else {
             my $ok = eval {
                 die "Request and reply message code is different: $resp_msg != $args->{msg}\n"
                     unless $args->{no_reply} || $resp_msg == $args->{msg};
-                if( $args->{request} ) {
+                if( defined $args->{request} ) {
                     $data = $args->{response_class}->new( data => $data, request => $args->{request} );
                 }
                 else {
@@ -601,31 +600,30 @@ sub _server_callback {
                 1;
             };
             if($ok) {
-                if( $args->{request} && $data->retry && $$try++ < $self->max_request_retries ) {
-                    $self->_send_retry($sync, $args, $$handler, $$try, 1);
+                if( defined $args->{request} && $data->retry && $$try++ < $self->max_request_retries ) {
+                    $self->_send_retry($sync, $args, $$handler, $$try);
                 }
                 else {
                     undef $$handler;
-                    $self->_in_progress( $self->_in_progress - 1 );
-                    $self->_try_to_send();
+                    $self->_finish_and_start() unless $sync;
                     $callback->($data);
                 }
             }
             else {
                 undef $$handler;
-                $self->_report_error($args->{request}, $callback, $@);
+                $self->_report_error($args->{request}, $callback, $@, $sync);
             }
         }
         1;
     } or do {
         undef $$handler;
-        $self->_debug(0, "unhandled fatal error: $@");
+        $self->_debug("unhandled fatal error: $@");
     };
     return;
 }
 
 sub _report_error {
-    my ($self, $request, $callback, $error) = @_;
+    my ($self, $request, $callback, $error, $sync) = @_;
     my $errobj = $request
         ? MR::IProto::Error->new(
             request => $request,
@@ -633,16 +631,13 @@ sub _report_error {
             errno   => 0+$!,
         )
         : undef;
-    $self->_in_progress( $self->_in_progress - 1 );
-    $self->_try_to_send();
+    $self->_finish_and_start() unless $sync;
     $callback->($errobj, $error);
     return;
 }
 
 sub _debug {
-    my ($self, $level, $msg) = @_;
-    return if $self->debug < $level;
-    $self->debug_cb->($msg);
+    $_[0]->debug_cb->($_[1]);
     return;
 }
 

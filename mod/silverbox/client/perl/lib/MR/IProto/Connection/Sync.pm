@@ -36,60 +36,65 @@ See L<MR::IProto::Connection/send> for more information.
 sub send {
     my ($self, $msg, $payload, $callback, $no_reply) = @_;
     my ($sync, $resp_msg, $resp_payload);
+    my $server = $self->server;
     my $ok = eval {
         $sync = $self->_choose_sync();
+        $server->_send_started($sync, $msg, $payload);
+        my $socket = $self->_socket;
         my $header = $self->_pack_header($msg, length $payload, $sync);
-        $self->_send_started($sync, $msg, $payload);
-        $self->_debug_dump(5, 'send header: ', $header);
-        $self->_debug_dump(5, 'send payload: ', $payload);
+        if( $server->debug >= 5 ) {
+            $server->_debug_dump('send header: ', $header);
+            $server->_debug_dump('send payload: ', $payload);
+        }
 
         my $write = $header . $payload;
         while( length $write ) {
-            my $written = syswrite($self->_socket, $write);
+            my $written = syswrite($socket, $write);
             die $! unless defined $written;
             substr $write, 0, $written, '';
         }
 
         unless( $no_reply ) {
+            my $dump_resp = $server->debug >= 6;
             my $resp_header;
             my $to_read = 12;
             while( $to_read ) {
-                my $read = sysread($self->_socket, my $buf, $to_read);
+                my $read = sysread($socket, my $buf, $to_read);
                 die $! unless defined $read;
                 die "EOF during read of header" if $read == 0;
                 $resp_header .= $buf;
                 $to_read -= $read;
             }
-            $self->_debug_dump(6, 'recv header: ', $resp_header);
+            $server->_debug_dump('recv header: ', $resp_header) if $dump_resp;
             ($resp_msg, my $resp_length, my $resp_sync) = $self->_unpack_header($resp_header);
             die "Request and reply sync is different: $resp_sync != $sync" unless $resp_sync == $sync;
 
             $to_read = $resp_length;
             while( $to_read ) {
-                my $read = sysread($self->_socket, my $buf, $to_read);
+                my $read = sysread($socket, my $buf, $to_read);
                 die $! unless defined $read;
                 die "EOF during read of payload" if $read == 0;
                 $resp_payload .= $buf;
                 $to_read -= $read;
             }
-            $self->_debug_dump(6, 'recv payload: ', $resp_payload);
+            $server->_debug_dump('recv payload: ', $resp_payload) if $dump_resp;
         }
         1;
     };
     if($ok) {
-        $self->_recv_finished($sync, $resp_msg, $resp_payload);
+        $server->_recv_finished($sync, $resp_msg, $resp_payload);
         $callback->($resp_msg, $resp_payload);
     }
     else {
         my $error = $@ =~ /^(.*?) at \S+ line \d+/s ? $1 : $@;
-        $self->_debug(0, "error: $error");
+        $server->_debug("error: $error");
         $! = Errno::ETIMEDOUT if $! == Errno::EINPROGRESS; # Hack over IO::Socket behaviour
         if($self->_has_socket()) {
             close($self->_socket);
             $self->_clear_socket();
         }
-        $self->server->active(0);
-        $self->_recv_finished($sync, undef, undef, $error);
+        $server->active(0);
+        $server->_recv_finished($sync, undef, undef, $error);
         $callback->(undef, undef, $error);
     }
     return;
@@ -113,7 +118,8 @@ sub set_timeout {
 
 sub _build__socket {
     my ($self) = @_;
-    $self->_debug(4, "connecting");
+    my $server = $self->server;
+    $server->_debug("connecting") if $server->debug >= 4;
     my $socket = IO::Socket::INET->new(
         PeerHost => $self->host,
         PeerPort => $self->port,
@@ -123,7 +129,7 @@ sub _build__socket {
     $socket->sockopt(SO_KEEPALIVE, 1) if $self->tcp_keepalive;
     $socket->setsockopt((getprotobyname('tcp'))[2], TCP_NODELAY, 1) if $self->tcp_nodelay;
     $self->_set_timeout($socket, $self->timeout) if $self->timeout;
-    $self->_debug(1, "connected");
+    $server->_debug("connected") if $server->debug >= 4;
     return $socket;
 }
 

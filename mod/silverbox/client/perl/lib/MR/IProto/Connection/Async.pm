@@ -52,6 +52,12 @@ has _no_reply => (
     lazy_build => 1,
 );
 
+has _on_drain => (
+    is  => 'ro',
+    isa => 'CodeRef',
+    lazy_build => 1,
+);
+
 =head1 PUBLIC METHODS
 
 =over
@@ -65,8 +71,13 @@ For list of arguments see L</_send>.
 
 sub send {
     my $self = shift;
-    push @{$self->_queue}, [ @_ ];
-    $self->_try_to_send();
+    if( $self->_in_progress < $self->max_parallel ) {
+        $self->_in_progress( $self->_in_progress + 1 );
+        $self->_send(@_);
+    }
+    else {
+        push @{$self->_queue}, [@_];
+    }
     return;
 }
 
@@ -98,32 +109,40 @@ sub _send {
     my ($self, $msg, $payload, $callback, $no_reply) = @_;
     my $sync = $self->_choose_sync();
     my $header = $self->_pack_header($msg, length $payload, $sync);
+    my $server = $self->server;
     $self->_callbacks->{$sync} = $callback;
-    $self->_send_started($sync, $msg, $payload);
-    $self->_debug_dump(5, 'send header: ', $header);
-    $self->_debug_dump(5, 'send payload: ', $payload);
-    $self->_handle->push_write( $header . $payload );
+    $server->_send_started($sync, $msg, $payload);
+    if( $server->debug >= 5 ) {
+        $server->_debug_dump('send header: ', $header);
+        $server->_debug_dump('send payload: ', $payload);
+    }
+    my $handle = $self->_handle;
+    $handle->push_write( $header . $payload );
     if( $no_reply ) {
         push @{$self->_no_reply}, $sync;
+        $handle->on_drain( $self->_on_drain ) unless defined $handle->{on_drain};
     }
     else {
-        $self->_handle->push_read( chunk => 12, $self->_read_reply );
+        $handle->push_read( chunk => 12, $self->_read_reply );
     }
     return;
 }
 
 sub _build__read_reply {
     my ($self) = @_;
+    my $server = $self->server;
     weaken($self);
+    weaken($server);
     return sub {
         my ($handle, $data) = @_;
-        $self->_debug_dump(6, 'recv header: ', $data);
+        my $dump_resp = $server->debug >= 6;
+        $server->_debug_dump('recv header: ', $data) if $dump_resp;
         my ($msg, $payload_length, $sync) = $self->_unpack_header($data);
         $handle->unshift_read( chunk => $payload_length, sub {
             my ($handle, $data) = @_;
-            $self->_debug_dump(6, 'recv payload: ', $data);
-            $self->_recv_finished($sync, $msg, $data);
-            $self->_try_to_send();
+            $server->_debug_dump('recv payload: ', $data) if $dump_resp;
+            $server->_recv_finished($sync, $msg, $data);
+            $self->_finish_and_start();
             delete($self->_callbacks->{$sync})->($msg, $data);
             return;
         });
@@ -134,15 +153,29 @@ sub _build__read_reply {
 sub _try_to_send {
     my ($self) = @_;
     while( $self->_in_progress < $self->max_parallel && (my $task = shift @{ $self->_queue }) ) {
+        $self->_in_progress( $self->_in_progress + 1 );
         $self->_send(@$task);
+    }
+    return;
+}
+
+sub _finish_and_start {
+    my ($self) = @_;
+    if( my $task = shift @{$self->_queue} ) {
+        $self->_send(@$task);
+    }
+    else {
+        $self->_in_progress( $self->_in_progress - 1 );
     }
     return;
 }
 
 sub _build__handle {
     my ($self) = @_;
-    $self->_debug(4, "connecting");
+    my $server = $self->server;
+    $server->_debug("connecting") if $server->debug >= 4;
     weaken($self);
+    weaken($server);
     return AnyEvent::Handle->new(
         connect    => [ $self->host, $self->port ],
         no_delay   => $self->tcp_nodelay,
@@ -153,22 +186,23 @@ sub _build__handle {
         },
         on_connect => sub {
             my ($handle) = @_;
-            $self->_debug(1, "connected");
+            $server->_debug("connected") if $server->debug >= 1;
             return;
         },
         on_error   => sub {
             my ($handle, $fatal, $message) = @_;
-            $self->_debug(0, ($fatal ? 'fatal ' : '') . 'error: ' . $message);
+            $server->_debug(($fatal ? 'fatal ' : '') . 'error: ' . $message);
             my @callbacks;
             foreach my $sync ( keys %{$self->_callbacks} ) {
-                $self->_recv_finished($sync, undef, undef, $message);
+                $server->_recv_finished($sync, undef, undef, $message);
+                $self->_in_progress( $self->_in_progress - 1 );
                 push @callbacks, $self->_callbacks->{$sync};
             }
-            $self->server->active(0);
+            $server->active(0);
             $self->_clear_handle();
             $self->_clear_callbacks();
             $self->_clear_no_reply();
-            $self->_debug(1, 'closing socket');
+            $server->_debug('closing socket') if $server->debug >= 1;
             $handle->destroy();
             $self->_try_to_send();
             $_->(undef, undef, $message) foreach @callbacks;
@@ -180,17 +214,28 @@ sub _build__handle {
             $handle->_error( Errno::ETIMEDOUT ) if keys %{$self->_callbacks};
             return;
         },
-        on_drain => sub {
-            my ($handle) = @_;
+    );
+}
+
+sub _build__on_drain {
+    my ($self) = @_;
+    my $server = $self->server;
+    weaken($self);
+    weaken($server);
+    return sub {
+        my ($handle) = @_;
+        if( $self->_has_no_reply() ) {
             foreach my $sync ( @{$self->_no_reply} ) {
-                $self->_recv_finished($sync, undef, undef);
+                $server->_recv_finished($sync, undef, undef);
+                $self->_in_progress( $self->_in_progress - 1 );
                 delete($self->_callbacks->{$sync})->(undef, undef);
             }
             $self->_clear_no_reply();
             $self->_try_to_send();
-            return;
-        },
-    );
+            $handle->on_drain(undef);
+        }
+        return;
+    };
 }
 
 sub _build__queue {
@@ -211,23 +256,12 @@ sub _build__no_reply {
 around _choose_sync => sub {
     my ($orig, $self) = @_;
     my $sync;
+    my $callbacks = $self->_callbacks;
     for( 1 .. 50 ) {
         $sync = $self->$orig();
-        return $sync unless exists $self->_callbacks->{$sync};
+        return $sync unless exists $callbacks->{$sync};
     }
     die "Can't choose sync value after 50 iterations";
-};
-
-before _send_started => sub {
-    my ($self) = @_;
-    $self->_in_progress( $self->_in_progress + 1 );
-    return;
-};
-
-after _recv_finished => sub {
-    my ($self) = @_;
-    $self->_in_progress( $self->_in_progress - 1 );
-    return;
 };
 
 =back

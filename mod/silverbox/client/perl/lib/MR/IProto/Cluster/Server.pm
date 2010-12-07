@@ -227,7 +227,6 @@ This method is called when message is started to send.
 =cut
 
 sub _send_started {
-    my ($self, $sync, $msg, $data) = @_;
     return;
 }
 
@@ -238,20 +237,17 @@ This method is called when message is received.
 =cut
 
 sub _recv_finished {
-    my ($self, $sync, $msg, $data, $error) = @_;
     return;
 }
 
 sub _debug {
-    my ($self, $level, $msg) = @_;
-    return if $self->debug < $level;
+    my ($self, $msg) = @_;
     $self->debug_cb->( sprintf "%s:%d: %s", $self->host, $self->port, $msg );
     return;
 }
 
 sub _debug_dump {
-    my ($self, $level, $msg, $datum) = @_;
-    return if $self->debug < $level;
+    my ($self, $msg, $datum) = @_;
     unless($self->dump_no_ints) {
         $msg .= join(' ', unpack('L*', $datum));
         $msg .= ' > ';
