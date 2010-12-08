@@ -262,9 +262,12 @@ struct coro_context {
 };
 
 # define coro_transfer(p,n) do { if (!coro_setjmp ((p)->env)) coro_longjmp ((n)->env); } while (0)
+# define coro_save_and_longjmp(p,j,v) do { if (!coro_setjmp ((p)->env)) longjmp (j,v); } while (0)
 # define coro_destroy(ctx) (void *)(ctx)
 
 #elif CORO_ASM
+
+# include <setjmp.h> /* for jmp_buf */
 
 struct coro_context {
   void **sp; /* must be at offset 0 */
@@ -272,6 +275,8 @@ struct coro_context {
 
 void __attribute__ ((noinline, regparm(2)))
 coro_transfer (coro_context *prev, coro_context *next);
+void __attribute__ ((noinline, regparm(3)))
+coro_save_and_longjmp (coro_context *prev, jmp_buf jump, int value);
 
 # define coro_destroy(ctx) (void *)(ctx)
 
