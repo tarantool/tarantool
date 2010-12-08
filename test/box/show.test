@@ -4,6 +4,7 @@ r>   INSERT:        { rps:  0    , total:  0           }
 r>   SELECT_LIMIT:  { rps:  0    , total:  0           }
 r>   SELECT:        { rps:  0    , total:  0           }
 r>   UPDATE_FIELDS: { rps:  0    , total:  0           }
+r>   DELETE:        { rps:  0    , total:  0           }
 r> ---
 r> 
 show configuration
