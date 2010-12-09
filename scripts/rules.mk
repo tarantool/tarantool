@@ -103,5 +103,6 @@ tarantool_version.h: FORCE
 	@$(GIT) describe HEAD | tr -d \\n >> $@_
 	@echo '";' >> $@_
 	@diff -q $@ $@_ 2>/dev/null >/dev/null || ($(ECHO) "	GEN	" $(notdir $@); cp $@_ $@)
+	@rm $@_
 FORCE:
 endif

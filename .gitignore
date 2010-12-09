@@ -9,5 +9,4 @@ lcov
 *.snap
 *.xlog
 tarantool_version.h
-tarantool_version.h_
 test/var
