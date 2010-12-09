@@ -53,6 +53,25 @@ class Options:
         dest = "port",
         default = 33015,
         help = "Server port to connect to. Default: 33015")
+
+    parser.add_argument(
+        "--result-prefix",
+        metavar = "prefix",
+        dest = "result_prefix",
+        help = """Skip input lines that have the given prefix (e.g. "r> ".
+        Prepend the prefix to all output lines. If not set, nothing is
+        skipped and output is printed as-is. This option is used
+        to pipe in .test files, automatically skipping test output.
+        Without this option the program may be used as an interactive
+        client. See also --prompt.""")
+
+    parser.add_argument(
+        "--prompt",
+        metavar = "prompt",
+        dest = "prompt",
+        default = "\033[92mtarantool> \033[0m",
+        help = """Command prompt. Set to "" for no prompt. Default:
+        tarantool> """)
     
     self.args = parser.parse_args()
 
@@ -101,16 +120,23 @@ def main():
   options = Options()
   try:
     with Connection(options.args.host, options.args.port) as con:
-      res_sep = "r> "
+      result_prefix = options.args.result_prefix
+      prompt = options.args.prompt
+      if prompt != "":
+        sys.stdout.write(prompt)
       for line in iter(sys.stdin.readline, ""):
-        if line.find(res_sep) == 0:
+        if result_prefix != None and line.find(result_prefix) == 0:
           continue
-        print line,
         output = con.execute(line)
-        print res_sep, string.join(output.split("\n"), "\n"+res_sep)
+        if result_prefix != None:
+          print line, result_prefix, string.join(output.split("\n"),
+                                               "\n" + result_prefix)
+        else:
+          sys.stdout.write(output)
+        sys.stdout.write(prompt)
 
     return 0
-  except (RuntimeError, socket.error) as e:
+  except (RuntimeError, socket.error, KeyboardInterrupt) as e:
     print "Fatal error: ", repr(e)
     return -1
 

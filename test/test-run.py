@@ -39,6 +39,7 @@ import time
 import collections
 import difflib
 import filecmp
+import shlex
 
 #
 # Run a collection of tests.
@@ -279,7 +280,8 @@ class Test:
     with open(self.name, "r") as test:
       with open(self.result, "w+") as result:
         self.is_client_ok = \
-          subprocess.call([self.client], stdin = test, stdout = result) == 0
+          subprocess.call(shlex.split(self.client),
+                          stdin = test, stdout = result) == 0
     
     self.is_executed = True
 
