@@ -54,61 +54,56 @@ const struct field ASTERISK = {
 typedef int (*box_hook_t) (struct box_txn * txn);
 
 
-/*
-  For tuples of size below this threshold, when sending a tuple
-  to the client, make a deep copy of the tuple for the duration
-  of sending rather than increment a reference counter.
-  This is necessary to avoid excessive page splits when taking
-  a snapshot: many small tuples can be accessed by clients
-  immediately after the snapshot process has forked off,
-  thus incrementing tuple ref count, and causing the OS to
-  create a copy of the memory page for the forked
-  child.
-*/
 
 #define IS_ASTERISK(f) ((f)->len == ASTERISK.len && (f)->data_ptr == ASTERISK.data_ptr)
+
+/** Compare two fields of an index key.
+ *
+ * @retval 0  two fields are equal
+ * @retval -1 f2 is less than f1
+ * @retval 1 f2 is greater than f1
+ */
+
 static i8
 field_compare(struct field *f1, struct field *f2, enum field_data_type type)
 {
-	i8 r;
-
 	if (IS_ASTERISK(f1) || IS_ASTERISK(f2))
-		r = 0;
-	else {
-		if (type == NUM) {
-			assert(f1->len == f2->len);
-			assert(f1->len == sizeof(f1->u32));
+		return 0;
 
-			r = f1->u32 >f2->u32 ? 1 : f1->u32 == f2->u32 ? 0 : -1;
-		} else if (type == NUM64) {
-			assert(f1->len == f2->len);
-			assert(f1->len == sizeof(f1->u64));
+	if (type == NUM) {
+		assert(f1->len == f2->len);
+		assert(f1->len == sizeof(f1->u32));
 
-			r = f1->u64 >f2->u64 ? 1 : f1->u64 == f2->u64 ? 0 : -1;
-		} else {
-			i32 cmp;
-			void *f1_data, *f2_data;
+		return f1->u32 >f2->u32 ? 1 : f1->u32 == f2->u32 ? 0 : -1;
+	} else if (type == NUM64) {
+		assert(f1->len == f2->len);
+		assert(f1->len == sizeof(f1->u64));
 
-			f1_data = f1->len <= sizeof(f1->data) ? f1->data : f1->data_ptr;
-			f2_data = f2->len <= sizeof(f2->data) ? f2->data : f2->data_ptr;
+		return f1->u64 >f2->u64 ? 1 : f1->u64 == f2->u64 ? 0 : -1;
+	} else if (type == STR) {
+		i32 cmp;
+		void *f1_data, *f2_data;
 
-			cmp = memcmp(f1_data, f2_data, MIN(f1->len, f2->len));
+		f1_data = f1->len <= sizeof(f1->data) ? f1->data : f1->data_ptr;
+		f2_data = f2->len <= sizeof(f2->data) ? f2->data : f2->data_ptr;
 
-			if (cmp > 0)
-				r = 1;
-			else if (cmp < 0)
-				r = -1;
-			else if (f1->len == f2->len)
-				r = 0;
-			else if (f1->len > f2->len)
-				r = 1;
-			else
-				r = -1;
-		}
+		cmp = memcmp(f1_data, f2_data, MIN(f1->len, f2->len));
+
+		if (cmp > 0)
+			return 1;
+		else if (cmp < 0)
+			return -1;
+		else if (f1->len == f2->len)
+			return 0;
+		else if (f1->len > f2->len)
+			return 1;
+		else
+			return -1;
 	}
 
-	return r;
+	panic("imposible happend");
 }
+
 
 /*
  * Compare index_tree_members only by fields defined in index->field_cmp_order.

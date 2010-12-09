@@ -29,12 +29,24 @@
 
 #include <mod/silverbox/assoc.h>
 
+/**
+ * A field reference used for TREE indexes. Either stores a copy
+ * of the corresponding field in the tuple or points to that field
+ * in the tuple (depending on field length).
+ */
+
 struct field {
+	/** Field data length. */
 	u32 len;
+	/** Actual field data. For small fields we store the value
+	 * of the field (u32, u64, strings up to 8 bytes), for
+	 * longer fields, we store a pointer to field data in the
+	 * tuple in the primary index.
+	 */
 	union {
 		u32 u32;
 		u64 u64;
-		u8 data[sizeof(void *)];
+		u8 data[sizeof(u64)];
 		void *data_ptr;
 	};
 };
