@@ -62,8 +62,8 @@ class Options:
   """Handle options of test-runner"""
   def __init__(self):
     """Add all program options, with their defaults. We assume
-       that the program is started from the directory where it is
-       located"""
+    that the program is started from the directory where it is
+    located"""
 
     parser = argparse.ArgumentParser(
         description = "Tarantool regression test suite front-end. \
@@ -403,7 +403,7 @@ def main():
   options = Options()
 
   try:
-    print "Started", "".join(sys.argv)
+    print "Started", " ".join(sys.argv)
     suites = []
     for suite_name in options.args.suites:
       suites.append(TestSuite(suite_name, options.args))

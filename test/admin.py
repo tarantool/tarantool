@@ -39,21 +39,21 @@ class Options:
     """Add all program options, with their defaults."""
 
     parser = argparse.ArgumentParser(
-      description = "Tarantool regression test suite client.")
+        description = "Tarantool regression test suite client.")
 
     parser.add_argument(
-      "--host",
-      dest = 'host',
-      metavar = "host",
-      default = "localhost",
-      help = "Host to connect to. Default: localhost")
+        "--host",
+        dest = 'host',
+        metavar = "host",
+        default = "localhost",
+        help = "Host to connect to. Default: localhost")
 
     parser.add_argument(
-      "--port",
-      dest = "port",
-      default = 33015,
-      help = "Server port to connect to. Default: 33015")
-
+        "--port",
+        dest = "port",
+        default = 33015,
+        help = "Server port to connect to. Default: 33015")
+    
     self.args = parser.parse_args()
 
 
@@ -64,8 +64,7 @@ class Connection:
     self.is_connected = False
 
   def connect(self):
-    self.socket = socket.socket(
-      socket.AF_INET, socket.SOCK_STREAM)
+    self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     self.socket.connect((self.host, self.port))
     self.is_connected = True
 
@@ -104,11 +103,12 @@ def main():
     with Connection(options.args.host, options.args.port) as con:
       res_sep = "r> "
       for line in iter(sys.stdin.readline, ""):
-	if line.find(res_sep) == 0:
-	  continue
-	print line,
-	output = con.execute(line)
+        if line.find(res_sep) == 0:
+          continue
+        print line,
+        output = con.execute(line)
         print res_sep, string.join(output.split("\n"), "\n"+res_sep)
+
     return 0
   except (RuntimeError, socket.error) as e:
     print "Fatal error: ", repr(e)
