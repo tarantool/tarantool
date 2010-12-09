@@ -12,9 +12,10 @@
 
 typedef void *ptr_t;
 
-KHASH_MAP_INIT_INT(int2ptr_map, ptr_t, realloc);
-KHASH_MAP_INIT_STR(str2ptr_map, ptr_t, realloc);
-KHASH_MAP_INIT_INT(int2int_map, uint32_t, realloc);
+KHASH_MAP_INIT_INT(int_ptr_map, ptr_t, realloc);
+KHASH_MAP_INIT_INT(int64_ptr_map, ptr_t, realloc);
+KHASH_MAP_INIT_STR(str_ptr_map, ptr_t, realloc);
+KHASH_MAP_INIT_INT(int_int_map, uint32_t, realloc);
 KHASH_MAP_INIT_INT(seen, int32_t, realloc);
 KHASH_SET_INIT_INT(seen_set, realloc);
 KHASH_SET_INIT_INT(int_set, realloc);
@@ -46,8 +47,8 @@ static inline int lstrcmp(void *a, void *b)
 #define kh_lstr_hash_func(key) ({ void *_k = key; unsigned int l = load_varint32(&_k); MurmurHash2(_k, l, 13); })
 #define kh_lstr_hash_equal(a, b) (lstrcmp(a, b) == 0)
 
-KHASH_INIT(lstr2ptr_map, void *, ptr_t, 1, kh_lstr_hash_func, kh_lstr_hash_equal, xrealloc)
-    KHASH_INIT(ptr_set, uint64_t, char, 0, kh_int64_hash_func, kh_int64_hash_equal, xrealloc);
+KHASH_INIT(lstr_ptr_map, void *, ptr_t, 1, kh_lstr_hash_func, kh_lstr_hash_equal, xrealloc);
+KHASH_INIT(ptr_set, uint64_t, char, 0, kh_int64_hash_func, kh_int64_hash_equal, xrealloc);
 
 void assoc_init(void);
 
