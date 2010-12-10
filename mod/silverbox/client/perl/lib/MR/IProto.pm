@@ -507,11 +507,12 @@ sub _send_now {
     my $args;
     # MR::IProto::Message OO-API
     if( ref $message ne 'HASH' ) {
-        my $response_class = $self->_reply_class->{$message->msg};
-        die sprintf "Cannot find response class for message code %d\n", $message->msg unless $response_class;
+        my $msg = $message->msg;
+        my $response_class = $self->_reply_class->{$msg};
+        die sprintf "Cannot find response class for message code %d\n", $msg unless $response_class;
         $args = {
             request        => $message,
-            msg            => $message->msg,
+            msg            => $msg,
             key            => $message->key,
             body           => $message->data,
             response_class => $response_class,
@@ -578,7 +579,9 @@ sub _server_callback {
     eval {
         if ($error) {
             $self->_debug("send: failed") if $self->debug >= 2;
-            my $retry = defined $args->{request} ? $args->{request}->retry() : $args->{retry};
+            my $retry = defined $args->{request} ? $args->{request}->retry()
+                : ref $args->{retry} eq 'CODE' ? $args->{retry}->()
+                : $args->{retry};
             if( $retry && $$try++ < $self->max_request_retries ) {
                 $self->_send_retry($sync, $args, $$handler, $$try);
             }
@@ -603,6 +606,9 @@ sub _server_callback {
                 if( defined $args->{request} && $data->retry && $$try++ < $self->max_request_retries ) {
                     $self->_send_retry($sync, $args, $$handler, $$try);
                 }
+                elsif( defined $args->{is_retry} && $args->{is_retry}->($data) && $$try++ < $self->max_request_retries ) {
+                    $self->_send_retry($sync, $args, $$handler, $$try);
+                }
                 else {
                     undef $$handler;
                     $self->_finish_and_start() unless $sync;
@@ -624,7 +630,7 @@ sub _server_callback {
 
 sub _report_error {
     my ($self, $request, $callback, $error, $sync) = @_;
-    my $errobj = $request
+    my $errobj = defined $request && ref $request ne 'HASH'
         ? MR::IProto::Error->new(
             request => $request,
             error   => $error,

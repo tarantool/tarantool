@@ -42,8 +42,46 @@ Is request retry must be done.
 =cut
 
 sub retry {
-    my ($self) = @_;
     return 0;
+}
+
+=back
+
+=head1 PROTECTED METHODS
+
+=over
+
+=item BUILDARGS( %args | \%args | $data )
+
+If C<$data> is passed as argument then it unpacked and object is
+created based on information contained in it.
+
+See L<Mouse::Manual::Construction/BUILDARGS> for more information.
+
+=cut
+
+around BUILDARGS => sub {
+    my ($orig, $class, %args) = @_;
+    if( exists $args{data} ) {
+        my $parsed_args = $class->_parse_data($args{data});
+        my $tail = delete $parsed_args->{data};
+        warn "Not all data was parsed" if defined $tail && length $tail;
+        return $class->$orig(%$parsed_args, %args);
+    }
+    else {
+        return $class->$orig(%args);
+    }
+};
+
+=item _parse_data( $data )
+
+You B<must> implement this method in you subclass to unpack your object.
+Returns hashref of attributes which will be passed to constructor.
+
+=cut
+
+sub _parse_data {
+    return { data => $_[1] };
 }
 
 =back

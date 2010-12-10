@@ -13,6 +13,10 @@ Base class for all request messages.
 use Mouse;
 extends 'MR::IProto::Message';
 
+has '+data' => (
+    lazy_build => 1,
+);
+
 =head1 PUBLIC METHODS
 
 =over
@@ -20,15 +24,12 @@ extends 'MR::IProto::Message';
 =item key
 
 Returns key value.
-You must implement L</key_attr> method in your subclass to use this feature.
+You must reimplement this method in your subclass to use this feature.
 
 =cut
 
 sub key {
-    my ($self) = @_;
-    return undef unless $self->can('key_attr');
-    my $method = $self->key_attr;
-    return $self->$method();
+    return undef;
 }
 
 =item retry
@@ -38,8 +39,28 @@ If request retry is allowed.
 =cut
 
 sub retry {
-    my ($self) = @_;
     return 0;
+}
+
+=back
+
+=head1 PROTECTED METHODS
+
+=over
+
+=item key_attr
+
+Class method which must return name of key attribute.
+
+=item _build_data
+
+You B<must> implement this method in you subclass to pack your object.
+Returns packed data.
+
+=cut
+
+sub _build_data {
+    return '';
 }
 
 =back
