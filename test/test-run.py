@@ -90,7 +90,7 @@ class Options:
         dest = 'suites',
         metavar = "suite",
         nargs="*",
-        default = ["box"],
+        default = ["box", "cmd"],
         help = """List of tests suites to look for tests in. Default: "box".""")
 
     parser.add_argument(
@@ -180,6 +180,7 @@ class Server:
 
       subprocess.check_call([self.abspath_to_exe, "--init_storage"],
                             cwd = self.args.vardir,
+# catch stdout/stderr to not clutter output
                             stdout = subprocess.PIPE,
                             stderr = subprocess.PIPE)
 
@@ -267,7 +268,7 @@ class Test:
     """Return true if this test was run successfully."""
     return self.is_executed and self.is_client_ok and self.is_equal_result
 
-  def run(self, is_force):
+  def run(self, test_env):
     """Execute the client program, giving it test as stdin,
     result as stdout. If the client program aborts, print
     its output to stdout, and raise an exception. Else, comprare
@@ -275,12 +276,20 @@ class Test:
     stdout and raise an exception. The exception is raised only
     if is_force flag is not set."""
 
+    def subst_test_env(arg):
+      if len(arg) and arg[0] == '$':
+        return test_env[arg[1:]]
+      else:
+        return arg
+
+    args = map(subst_test_env, shlex.split(self.client))
+
     sys.stdout.write("{0}".format(self.name))
 
     with open(self.name, "r") as test:
       with open(self.result, "w+") as result:
         self.is_client_ok = \
-          subprocess.call(shlex.split(self.client),
+          subprocess.call(args,
                           stdin = test, stdout = result) == 0
     
     self.is_executed = True
@@ -300,7 +309,7 @@ class Test:
       else:
         self.print_unidiff()
         where = ": wrong test output"
-      if not is_force:
+      if not test_env["is_force"]:
         raise TestRunException("Failed to run test " + self.name + where)
 
 
@@ -385,9 +394,11 @@ class TestSuite:
     print "TEST\t\t\t\tRESULT"
     print shortsep
     failed_tests = []
+    test_env = { "is_force" : self.args.is_force,
+                  "server" : server.abspath_to_exe }
 
     for test in self.tests:
-      test.run(self.args.is_force)
+      test.run(test_env)
       if not test.passed():
         failed_tests.append(test.name)
 
