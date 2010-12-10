@@ -54,7 +54,7 @@ sub new {
         confess "ns[$namespace] no indexes defined" unless $ns->{indexes} && @{$ns->{indexes}};
         $namespaces{$namespace} = $ns;
         $namespaces{$ns->{name}} = $ns if $ns->{name};
-        confess "ns[$namespace] bad format `$ns->{format}'" if $ns->{format} =~ m/[^&lLsScC ]/;
+        confess "ns[$namespace] bad format `$ns->{format}'" if $ns->{format} =~ m/[^&lLsScCqQ ]/;
         $ns->{format} =~ s/\s+//g;
         my @f = split //, $ns->{format};
         $ns->{byfield_unpack_format} = [ map { /&/ ? 'w/a*' : "x$_" } @f ];
