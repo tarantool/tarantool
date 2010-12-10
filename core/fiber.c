@@ -1053,13 +1053,15 @@ fiber_info(struct tbuf *out)
 		tbuf_printf(out, "    stack: %p\n", stack_top);
 
 #if CORO_ASM
+		tbuf_printf(out, "    exc: %p, frame: %p\n", ((void **)fiber->exc)[3], ((void **)fiber->exc)[3] + 2 * sizeof(void *));
+
 		void *stack_bottom = fiber->coro.stack;
 
 		struct frame *frame = fiber->rbp;
 		tbuf_printf(out, "    backtrace:\n");
 		while (stack_bottom < (void *)frame && (void *)frame < stack_top) {
-			tbuf_printf(out, "        - { frame: %p, pc: %p }\n",
-				    frame + 2 * sizeof(void *), frame->ret);
+			tbuf_printf(out, "        - { rbp: %p, frame: %p, pc: %p }\n",
+				    frame, (void *)frame + 2 * sizeof(void *), frame->ret);
 			frame = frame->rbp;
 		}
 #endif
