@@ -95,26 +95,13 @@ xrealloc(void *ptr, size_t size)
 	return ret;
 }
 
-#if CORO_ASM
-void
-save_rbp(void **rbp)
-{
-#  if __amd64
-	asm("movq %%rbp, %0"::"m"(*rbp));
-#  elif __i386
-	asm("movl %%ebp, %0"::"m"(*rbp));
-#  else
-#  error unsupported architecture
-#  endif
-}
-
 void *main_stack_frame;
 static void
 print_trace(FILE *f)
 {
 	void *dummy;
 	struct frame *frame;
-	save_rbp(&dummy);
+	save_rbp(dummy);
 	frame = dummy;
 
 	void *stack_top = fiber->coro.stack + fiber->coro.stack_size;
@@ -129,7 +116,6 @@ print_trace(FILE *f)
 		frame = frame->rbp;
 	}
 }
-#endif
 
 void __attribute__ ((noreturn))
     assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)

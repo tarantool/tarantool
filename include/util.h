@@ -117,7 +117,18 @@ struct frame {
 	void *ret;
 };
 
-void save_rbp(void **rbp);
+#if CORO_ASM
+#  if __amd64
+#    define save_rbp(rbp) asm("movq %%rbp, %0"::"m"(rbp))
+#  elif __i386
+#    define save_rbp(rbp) asm("movl %%ebp, %0"::"m"(rbp))
+#  else
+#  error unsupported architecture
+#  endif
+# else
+#   define save_rbp(rbp) (void)0
+#endif
+
 extern void *main_stack_frame;
 
 #ifdef NDEBUG
