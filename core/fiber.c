@@ -87,9 +87,7 @@ fiber_msg(const struct tbuf *buf)
 }
 
 KHASH_MAP_INIT_INT(fid2fiber, void *, realloc);
-static
-khash_t(fid2fiber) *
-    fibers_registry;
+static khash_t(fid2fiber) *fibers_registry;
 
 void
 fiber_call(struct fiber *callee)
@@ -1036,10 +1034,12 @@ fiber_server(fiber_server_type type, int port, void (*handler) (void *data), voi
 	return s;
 }
 
+
 void
 fiber_info(struct tbuf *out)
 {
 	struct fiber *fiber;
+
 	tbuf_printf(out, "fibers:\n");
 	SLIST_FOREACH(fiber, &fibers, link) {
 		void *stack_top = fiber->coro.stack + fiber->coro.stack_size;
@@ -1052,16 +1052,21 @@ fiber_info(struct tbuf *out)
 		tbuf_printf(out, "    peer: %s\n", fiber_peer_name(fiber));
 		tbuf_printf(out, "    stack: %p\n", stack_top);
 
-#if CORO_ASM
+#if defined(__x86) || defined (__amd64) || defined(__i386)
 		tbuf_printf(out, "    exc: %p, frame: %p\n", ((void **)fiber->exc)[3], ((void **)fiber->exc)[3] + 2 * sizeof(void *));
 
 		void *stack_bottom = fiber->coro.stack;
-
 		struct frame *frame = fiber->rbp;
 		tbuf_printf(out, "    backtrace:\n");
 		while (stack_bottom < (void *)frame && (void *)frame < stack_top) {
-			tbuf_printf(out, "        - { rbp: %p, frame: %p, pc: %p }\n",
+			tbuf_printf(out, "        - { rbp: %p, frame: %p, pc: %p",
 				    frame, (void *)frame + 2 * sizeof(void *), frame->ret);
+#ifdef RESOLVE_SYMBOLS
+			struct fsym *s = addr2sym(frame->ret);
+			if (s)
+				tbuf_printf(out, " <%s+%i>", s->name, frame->ret - s->addr);
+#endif
+			tbuf_printf(out, " }\n");
 			frame = frame->rbp;
 		}
 #endif

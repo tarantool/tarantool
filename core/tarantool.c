@@ -69,6 +69,7 @@ tarantool_version(void)
 }
 
 static double start_time;
+
 double
 tarantool_uptime(void)
 {
@@ -442,6 +443,9 @@ main(int argc, char **argv)
 		atexit(remove_pid);
 	}
 
+#ifdef RESOLVE_SYMBOLS
+	load_syms(argv[0]);
+#endif
 	argv = init_set_proc_title(argc, argv);
 
 #if defined(UTILITY)

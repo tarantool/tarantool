@@ -21,6 +21,11 @@ core/tarantool_ev.o: CFLAGS += -U_FORTIFY_SOURCE \
 			      -Wno-parentheses \
 			      -Wno-unused
 
+ifeq (1,$(RESOLVE_SYMBOLS))
+ LDFLAGS += -rdynamic -lbfd
+ CFLAGS += -DRESOLVE_SYMBOLS
+endif
+
 ifneq (,$(TRACE))
  obj += core/trace.o
  $(TRACE): CFLAGS += -finstrument-functions
