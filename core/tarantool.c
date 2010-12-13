@@ -50,15 +50,14 @@
 #include <stat.h>
 #include <tarantool.h>
 #include <util.h>
+#include <third_party/gopt/gopt.h>
 #include <tarantool_version.h>
 
 static pid_t master_pid;
-char *cfg_filename = "tarantool.cfg";
+const char *cfg_filename = "tarantool.cfg";
 struct tarantool_cfg cfg;
 
 bool init_storage;
-
-enum tarantool_role role = def;
 
 extern int daemonize(int nochdir, int noclose);
 
@@ -221,30 +220,12 @@ initialize_minimal()
 	initialize(0.1, 4, 2);
 }
 
-static void
-print_usage(void)
-{
-	puts("usage:");
-	puts("	-h, --help");
-	puts("	-c, --config=filename");
-#ifdef STORAGE
-	puts("	--cat=filename");
-	puts("	--init_storage");
-#endif
-	puts("	-V, --version");
-	puts("	-p, --create_pid");
-	puts("	-v, --verbose");
-	puts("	-D, --daemonize");
-	puts("	--cfg_get=paramname");
-}
 
 int
 main(int argc, char **argv)
 {
-	int c, verbose = 0;
-	char *cat_filename = NULL;
-	char *cfg_paramname = NULL;
-	bool be_daemon = false;
+	const char *cat_filename = NULL;
+	const char *cfg_paramname = NULL;
 	int n_accepted, n_skipped;
 	FILE *f;
 
@@ -255,90 +236,44 @@ main(int argc, char **argv)
 	stat_init();
 	palloc_init();
 
-	const char *short_opt = "hc:pvVD";
-	const struct option long_opt[] = {
-		{.name = "help",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'h'},
-		{.name = "config",
-		 .has_arg = 1,
-		 .flag = NULL,
-		 .val = 'c'},
+	const void *opt_def =
+		gopt_start(gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
+				       NULL, "display this help"),
+			   gopt_option('c', GOPT_ARG, gopt_shorts('c'), gopt_longs("config"),
+				       "=<filename>", "path to config file"),
+			   gopt_option('v', 0, gopt_shorts('V'), gopt_longs("version"),
+				       NULL, "print version"),
 #ifdef STORAGE
-		{.name = "cat",
-		 .has_arg = 1,
-		 .flag = NULL,
-		 .val = 'C'},
-		{.name = "init_storage",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'I'},
+			   gopt_option('C', 0, gopt_shorts(0), gopt_longs("cat"),
+				       "=<filename>", "cat file to stdout in readable format"),
+			   gopt_option('I', 0, gopt_shorts(0), gopt_longs("init_storage", "init-storage"),
+				       NULL, "initialize storage"),
 #endif
-		{.name = "create_pid",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'p'},
-		{.name = "verbose",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'v'},
-		{.name = "version",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'V'},
-		{.name = "daemonize",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'D'},
-		{.name = "cfg_get",
-		 .has_arg = 1,
-		 .flag = NULL,
-		 .val = 'g'},
-		{.name = NULL,
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 0}
-	};
+			   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
+				       NULL, "increase log level"),
+			   gopt_option('D', 0, gopt_shorts('D'), gopt_longs("daemonize"),
+				       NULL, "daemonize"),
+			   gopt_option('g', GOPT_ARG, gopt_shorts(0), gopt_longs("cfg_get", "cfg-get"),
+				       "=<key>", "return value from config described by key"));
 
-	while ((c = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
-		switch (c) {
-		case 'V':
-			puts(tarantool_version());
-			return 0;
-		case 'c':
-			if (optarg == NULL)
-				panic("no arg given");
-			cfg_filename = strdup(optarg);
-			break;
-		case 'C':
-			if (optarg == NULL)
-				panic("no arg given");
-			cat_filename = strdup(optarg);
-			role = cat;
-		case 'v':
-			verbose++;
-			break;
-		case 'p':
-			cfg.pid_file = "tarantool.pid";
-			break;
-		case 'D':
-			be_daemon = true;
-			break;
-		case 'I':
-			init_storage = true;
-			break;
-		case 'g':
-			role = cfg_get;
-			cfg_paramname = strdup(optarg);
-			break;
-		case 'h':
-			print_usage();
-			return 0;
-		}
+	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
+
+	if (gopt(opt, 'V')){
+		puts(tarantool_version());
+		return 0;
 	}
 
-	if (argc != optind) {
+	if (gopt(opt, 'h')) {
+		puts("usage:");
+		gopt_help(opt_def);
+		return 0;
+	}
+
+	/* If config filename given in command line it will override the default */
+	gopt_arg(opt, 'c', &cfg_filename);
+	cfg.log_level += gopt(opt, 'v');
+
+	if (argc != 1) {
 		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
 		exit(EX_USAGE);
 	}
@@ -365,7 +300,7 @@ main(int argc, char **argv)
 	fclose(f);
 
 #ifdef STORAGE
-	if (role == cat) {
+	if (gopt_arg(opt, 'C', &cat_filename)) {
 		initialize_minimal();
 		if (access(cat_filename, R_OK) == -1) {
 			say_syserror("access(\"%s\")", cat_filename);
@@ -375,7 +310,7 @@ main(int argc, char **argv)
 	}
 #endif
 
-	if (role == cfg_get) {
+	if (gopt_arg(opt, 'g', &cfg_paramname)) {
 		tarantool_cfg_iterator_t *i;
 		char *key, *value;
 
@@ -393,8 +328,6 @@ main(int argc, char **argv)
 
 		return 1;
 	}
-
-	cfg.log_level += verbose;
 
 	if (cfg.work_dir != NULL && chdir(cfg.work_dir) == -1)
 		say_syserror("can't chdir to `%s'", cfg.work_dir);
@@ -436,7 +369,8 @@ main(int argc, char **argv)
 #endif
 	}
 #ifdef STORAGE
-	if (init_storage) {
+	if (gopt(opt, 'I')) {
+		init_storage = true;
 		initialize_minimal();
 		mod_init();
 		next_lsn(recovery_state, 1);
@@ -445,7 +379,7 @@ main(int argc, char **argv)
 		exit(EXIT_SUCCESS);
 	}
 #endif
-	if (be_daemon)
+	if (gopt(opt, 'D'))
 		daemonize(1, 1);
 
 	if (cfg.pid_file != NULL) {
