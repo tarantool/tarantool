@@ -104,9 +104,8 @@ static NameAtom _name__custom_proc_title[] = {
 	{ "custom_proc_title", -1, NULL }
 };
 
-#define ARRAYALLOC(x,n,t,_chk_ro) ({                                \
+#define ARRAYALLOC(x,n,t,_chk_ro, __flags)  do {                    \
    int l = 0, ar;                                                   \
-   int was_realloced = 0;                                           \
    __typeof__(x) y = (x), t;                                        \
    if ( (n) <= 0 ) return CNF_WRONGINDEX; /* wrong index */         \
    while(y && *y) {                                                 \
@@ -127,12 +126,11 @@ static NameAtom _name__custom_proc_title[] = {
           *y = malloc( sizeof( __typeof__(**(x))) );                \
           if (*y == NULL)  return CNF_NOMEMORY;                     \
           if ( (ar = acceptDefault##t(*y)) != 0 ) return ar;        \
+          (*y)->__confetti_flags |= __flags;		             \
           y++;                                                      \
       }                                                             \
-      was_realloced = 1;                                            \
    }                                                                \
-   was_realloced;                                                   \
-})
+} while(0)
 
 static ConfettyError
 acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
@@ -314,6 +312,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	return CNF_OK;
 }
 
+static void cleanFlags(tarantool_cfg* c, OptDef* opt);
+
 #define PRINTBUFLEN	8192
 static char*
 dumpOptDef(NameAtom *atom) {
@@ -335,6 +335,7 @@ dumpOptDef(NameAtom *atom) {
 static void
 acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, int *n_skipped) {
 	ConfettyError	r;
+	OptDef		*orig_opt = opt;
 
 	if (n_accepted) *n_accepted=0;
 	if (n_skipped) *n_skipped=0;
@@ -385,6 +386,8 @@ acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, i
 
 		opt = opt->next;
 	}
+
+	cleanFlags(c, orig_opt);
 }
 
 void
@@ -658,6 +661,12 @@ check_cfg_tarantool_cfg(tarantool_cfg *c) {
 	int	res = 0;
 
 	return res;
+}
+
+static void
+cleanFlags(tarantool_cfg* c, OptDef* opt) {
+	tarantool_cfg_iterator_t iterator, *i = &iterator;
+
 }
 
 /************** Duplicate config  **************/
