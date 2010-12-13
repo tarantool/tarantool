@@ -132,7 +132,9 @@ class Options:
     starting directory."""
 
     if not os.path.exists(os.path.basename(sys.argv[0])):
-      parser.print_help()
+# print first 6 lines of help
+      short_help = "\n".join(parser.format_help().split("\n")[0:6])
+      print short_help
       exit(-1)
 
 
