@@ -30,6 +30,11 @@ else
   include $(SRCDIR)/scripts/rules.mk
 endif
 
+.PHONY: test
+test:
+	cd ./test && ./test-run.py
+
+
 ifeq ("$(origin module)", "command line")
 .PHONY: clean
 clean:
