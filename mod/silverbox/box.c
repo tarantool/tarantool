@@ -99,7 +99,7 @@ box_hook_t *before_commit_update_hook;
 #define box_raise(n, err)						\
 	({								\
 		if (n != ERR_CODE_NODE_IS_RO)				\
-			say_warn("box.c:%i %s/%s", __LINE__, error_codes_strs[(n)], err); \
+			say_warn("%s/%s", error_codes_strs[(n)], err);	\
 		raise(n, err);						\
 	})
 

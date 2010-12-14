@@ -99,19 +99,40 @@ say_logger_init(int nonblock)
 }
 
 void
-vsay(int level, const char *error, const char *format, va_list ap)
+vsay(int level, const char *filename, int line, const char *error, const char *format, va_list ap)
 {
 	char *peer_name = fiber_peer_name(fiber);
 	size_t p = 0, len = PIPE_BUF;
+	const char *f;
 	static char buf[PIPE_BUF];
+
+	if (booting) {
+		fprintf(stderr, "%s: ", binary_filename);
+		vfprintf(stderr, format, ap);
+		if (error)
+			fprintf(stderr, ": %s", error);
+		fprintf(stderr, "\n");
+		fflush(stderr);
+		return;
+	}
 
 	ev_now_update();
 
 	if (peer_name == NULL)
 		peer_name = "_";
 
-	p += snprintf(buf + p, len - p, "%.3f %i %i/%s %s %c> ",
-		      ev_now(), getpid(), fiber->fid, fiber->name, peer_name, level_to_char(level));
+	for (f = filename; *f; f++)
+		if (*f == '/' && *(f + 1) != '\0')
+			filename = f + 1;
+
+	p += snprintf(buf + p, len - p, "%.3f %i %i/%s %s",
+		      ev_now(), getpid(), fiber->fid, fiber->name, peer_name);
+
+	if (level == S_WARN || level == S_ERROR)
+		p += snprintf(buf + p, len - p, " %s:%i", filename, line);
+
+	p += snprintf(buf + p, len - p, " %c> ", level_to_char(level));
+	/* until here it is guaranteed that p < len */
 
 	p += vsnprintf(buf + p, len - p, format, ap);
 	if (error && p < len - 1)
@@ -122,12 +143,18 @@ vsay(int level, const char *error, const char *format, va_list ap)
 
 	int r = write(sayfd, buf, p + 1);
 	(void)r;
+
+	if (S_FATAL && sayfd != STDERR_FILENO) {
+		r = write(STDERR_FILENO, buf, p + 1);
+		(void)r;
+	}
 }
 
 void
-_say(int level, const char *error, const char *format, ...)
+_say(int level, const char *filename, int line, const char *error, const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
-	vsay(level, error, format, ap);
+	vsay(level, filename, line, error, format, ap);
+	va_end(ap);
 }

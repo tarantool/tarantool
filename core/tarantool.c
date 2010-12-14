@@ -55,9 +55,10 @@
 
 static pid_t master_pid;
 const char *cfg_filename = "tarantool.cfg";
+char *binary_filename;
 struct tarantool_cfg cfg;
 
-bool init_storage;
+bool init_storage, booting = true;
 
 extern int daemonize(int nochdir, int noclose);
 
@@ -176,9 +177,6 @@ create_pid(void)
 	char buf[16] = { 0 };
 	pid_t pid;
 
-	if (cfg.pid_file == NULL)
-		panic("no pid file is specified in config");
-
 	f = fopen(cfg.pid_file, "a+");
 	if (f == NULL)
 		panic_syserror("can't open pid file");
@@ -186,12 +184,12 @@ create_pid(void)
 	if (fgets(buf, sizeof(buf), f) != NULL && strlen(buf) > 0) {
 		pid = strtol(buf, NULL, 10);
 		if (pid > 0 && kill(pid, 0) == 0)
-			panic("deamon is running");
+			panic("i am already running");
 		else
 			say_info("updating stale pid file");
 		fseeko(f, 0, SEEK_SET);
 		if (ftruncate(fileno(f), 0) == -1)
-			panic_syserror("ftruncate");
+			panic_syserror("ftruncate(`%s')", cfg.pid_file);
 	}
 
 	fprintf(f, "%i\n", getpid());
@@ -209,7 +207,7 @@ initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_fa
 {
 
 	if (!salloc_init(slab_alloc_arena * (1 << 30), slab_alloc_minimal, slab_alloc_factor))
-		panic("can't initialize slab allocator");
+		panic_syserror("can't initialize slab allocator");
 
 	fiber_init();
 }
@@ -226,6 +224,7 @@ main(int argc, char **argv)
 {
 	const char *cat_filename = NULL;
 	const char *cfg_paramname = NULL;
+	char *cfg_filename_fullpath;
 	int n_accepted, n_skipped;
 	FILE *f;
 
@@ -257,6 +256,7 @@ main(int argc, char **argv)
 				       "=<key>", "return value from config described by key"));
 
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
+	binary_filename = argv[0];
 
 	if (gopt(opt, 'V')){
 		puts(tarantool_version());
@@ -279,25 +279,30 @@ main(int argc, char **argv)
 	}
 
 	if (cfg_filename[0] != '/') {
-		char *full_path = malloc(PATH_MAX);
-		if (getcwd(full_path, PATH_MAX - strlen(cfg_filename) - 1) == NULL) {
+		cfg_filename_fullpath = malloc(PATH_MAX);
+		if (getcwd(cfg_filename_fullpath, PATH_MAX - strlen(cfg_filename) - 1) == NULL) {
 			say_syserror("getcwd");
 			exit(EX_OSERR);
 		}
 
-		strcat(full_path, "/");
-		strcat(full_path, cfg_filename);
-		cfg_filename = full_path;
-	}
+		strcat(cfg_filename_fullpath, "/");
+		strcat(cfg_filename_fullpath, cfg_filename);
 
-	f = fopen(cfg_filename, "r");
+		f = fopen(cfg_filename_fullpath, "r");
+		free(cfg_filename_fullpath);
+	} else
+		f = fopen(cfg_filename, "r");
+
 	if (f == NULL)
-		panic("can't open config `%s'", cfg_filename);
+		panic_syserror("can't open config `%s'", cfg_filename);
 
 	fill_default_tarantool_cfg(&cfg);
 	parse_cfg_file_tarantool_cfg(&cfg, f, 0, &n_accepted, &n_skipped);
 	check_cfg_tarantool_cfg(&cfg);
 	fclose(f);
+
+	if (n_accepted == 0 || n_skipped > 0)
+		panic("where were errors in config file");
 
 #ifdef STORAGE
 	if (gopt_arg(opt, 'C', &cat_filename)) {
@@ -307,6 +312,16 @@ main(int argc, char **argv)
 			exit(EX_OSFILE);
 		}
 		return mod_cat(cat_filename);
+	}
+
+	if (gopt(opt, 'I')) {
+		init_storage = true;
+		initialize_minimal();
+		mod_init();
+		next_lsn(recovery_state, 1);
+		confirm_lsn(recovery_state, 1);
+		snapshot_save(recovery_state, mod_snapshot);
+		exit(EXIT_SUCCESS);
 	}
 #endif
 
@@ -331,8 +346,6 @@ main(int argc, char **argv)
 
 	if (cfg.work_dir != NULL && chdir(cfg.work_dir) == -1)
 		say_syserror("can't chdir to `%s'", cfg.work_dir);
-
-	say_logger_init(cfg.logger_nonblock);
 
 	if (cfg.username != NULL) {
 		if (getuid() == 0 || geteuid() == 0) {
@@ -368,17 +381,7 @@ main(int argc, char **argv)
 		}
 #endif
 	}
-#ifdef STORAGE
-	if (gopt(opt, 'I')) {
-		init_storage = true;
-		initialize_minimal();
-		mod_init();
-		next_lsn(recovery_state, 1);
-		confirm_lsn(recovery_state, 1);
-		snapshot_save(recovery_state, mod_snapshot);
-		exit(EXIT_SUCCESS);
-	}
-#endif
+
 	if (gopt(opt, 'D'))
 		daemonize(1, 1);
 
@@ -388,6 +391,9 @@ main(int argc, char **argv)
 	}
 
 	argv = init_set_proc_title(argc, argv);
+
+	say_logger_init(cfg.logger_nonblock);
+	booting = false;
 
 #if defined(UTILITY)
 	initialize_minimal();
