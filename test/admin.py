@@ -33,13 +33,14 @@ import argparse
 import socket
 import sys
 import string
+import lib.admin
 
 class Options:
   def __init__(self):
     """Add all program options, with their defaults."""
 
     parser = argparse.ArgumentParser(
-        description = "Tarantool regression test suite client.")
+        description = "Tarantool administrative console client.")
 
     parser.add_argument(
         "--host",
@@ -76,55 +77,20 @@ class Options:
     self.args = parser.parse_args()
 
 
-class Connection:
-  def __init__(self, host, port):
-    self.host = host
-    self.port = port
-    self.is_connected = False
-
-  def connect(self):
-    self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self.socket.connect((self.host, self.port))
-    self.is_connected = True
-
-  def disconnect(self):
-    if self.is_connected:
-      self.socket.close()
-      self.is_connected = False
-
-  def execute(self, command):
-    self.socket.sendall(command)
-
-    bufsiz = 4096
-    res = ""
-
-    while True:
-      buf = self.socket.recv(bufsiz)
-      if not buf:
-	break
-      res+= buf;
-      if res.rfind("---\n"):
-	break
-
-    return res
-
-  def __enter__(self):
-    self.connect()
-    return self
-
-  def __exit__(self, type, value, tb):
-    self.disconnect()
-
-
 def main():
   options = Options()
   try:
-    with Connection(options.args.host, options.args.port) as con:
+    with lib.admin.Connection(options.args.host, options.args.port) as con:
       result_prefix = options.args.result_prefix
       prompt = options.args.prompt
       if prompt != "":
         sys.stdout.write(prompt)
-      for line in iter(sys.stdin.readline, ""):
+# We need line-buffering, and thus don't use 'for' loop
+      while True:
+        line = sys.stdin.readline()
+        sys.stdout.flush()
+        if not line:
+          break;
         if result_prefix != None and line.find(result_prefix) == 0:
           continue
         output = con.execute(line)
@@ -134,6 +100,7 @@ def main():
         else:
           sys.stdout.write(output)
         sys.stdout.write(prompt)
+        sys.stdout.flush()
 
     return 0
   except (RuntimeError, socket.error, KeyboardInterrupt) as e:

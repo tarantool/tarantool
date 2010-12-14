@@ -61,7 +61,11 @@ def main():
   try:
     result_prefix = args.result_prefix
 
-    for line in iter(sys.stdin.readline, ""):
+# We need line-buffering, and thus don't use 'for' loop
+    while True:
+      line = sys.stdin.readline()
+      if not line:
+        break;
       if result_prefix != None and line.find(result_prefix) == 0:
         continue
       path = string.join([args.bin, line])
@@ -73,6 +77,7 @@ def main():
                                                "\n" + result_prefix)
       else:
         sys.stdout.write(output)
+      sys.stdout.flush()
 
     return 0
   except RuntimeError as e:
