@@ -1,0 +1,7 @@
+tarantool_silverbox --no-such-option
+/opt/local/work/tarantool/_debug_box/tarantool_silverbox: unrecognized option '--no-such-option'
+<time> <pid> 0/(null) _ F> PANIC /opt/local/work/tarantool/core/tarantool.c:deamon is running
+
+tarantool_silverbox --version
+1.3.minor-<rev>-<commit>
+

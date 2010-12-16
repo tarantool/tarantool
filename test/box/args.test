@@ -1,0 +1,6 @@
+sys.stdout.push_filter("^\d+\.\d+ \d+", "<time> <pid>")
+server.test_option("--no-such-option")
+sys.stdout.pop_filter()
+sys.stdout.push_filter("(\d\.\d)\.\d-\d+-\S+", "\\1.minor-<rev>-<commit>")
+server.test_option("--version")
+sys.stdout.pop_filter()

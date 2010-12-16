@@ -90,6 +90,16 @@ class TarantoolSilverboxServer:
     else:
       print "The server is not started."
 
+  def test_option(self, option_list_str):
+      args = [self.abspath_to_exe] + option_list_str.split()
+      print " ".join([os.path.basename(self.abspath_to_exe)] + args[1:])
+      output = subprocess.Popen(args,
+                                cwd = self.args.vardir,
+                                stdout = subprocess.PIPE,
+                                stderr = subprocess.STDOUT).stdout.read()
+      print output
+
+
   def find_exe(self):
     """Locate server executable in the bindir. We just take
     the first thing looking like an exe in there."""

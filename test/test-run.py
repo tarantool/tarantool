@@ -67,7 +67,7 @@ class Options:
         dest = 'suites',
         metavar = "suite",
         nargs="*",
-        default = ["box", "cmd"],
+        default = ["box"],
         help = """List of tests suites to look for tests in. Default: "box"
         and "cmd".""")
 

@@ -9,7 +9,12 @@ import collections
 import difflib
 import filecmp
 import shlex
+import time
 from tarantool_silverbox_server import TarantoolSilverboxServer 
+import lib.admin
+import lib.tarantool_preprocessor
+import re
+import cStringIO
 
 class TestRunException(RuntimeError):
   """A common exception to use across the program."""
@@ -17,6 +22,32 @@ class TestRunException(RuntimeError):
     self.message = message
   def __str__(self):
     return self.message
+
+class FilteredStream:
+  """Helper class to filter .result file output"""
+  def __init__(self, filename):
+    self.stream = open(filename, "w+")
+    self.filters = []
+  def write(self, fragment):
+    """Apply all filters, then write result to the undelrying stream.
+    Do line-oriented filtering: the fragment doesn't have to represent
+    just one line."""
+    fragment_stream = cStringIO.StringIO(fragment)
+    for line in fragment_stream:
+      for pattern, replacement in self.filters:
+        line = re.sub(pattern, replacement, line)
+      self.stream.write(line)
+
+  def push_filter(self, pattern, replacement):
+    self.filters.append([pattern, replacement])
+  def pop_filter(self):
+    self.filters.pop()
+  def clear_all_filters(self):
+    filters = []
+  def close(self):
+    self.clear_all_filters()
+    self.stream.close()
+
 
 class Test:
   """An individual test file. A test can run itself, and remembers
@@ -26,56 +57,63 @@ class Test:
     temporary result file, path to the client program, test status."""
     self.name = name
     self.result = name.replace(".test", ".result")
+    self.reject = name.replace(".test", ".reject")
     self.suite_ini = suite_ini
     self.is_executed = False
-    self.is_client_ok = None
+    self.is_executed_ok = None
     self.is_equal_result = None
 
   def passed(self):
     """Return true if this test was run successfully."""
-    return self.is_executed and self.is_client_ok and self.is_equal_result
+    return self.is_executed and self.is_executed_ok and self.is_equal_result
 
   def run(self):
-    """Execute the client program, giving it test as stdin,
-    result as stdout. If the client program aborts, print
-    its output to stdout, and raise an exception. Else, comprare
-    result and reject files. If there is a difference, print it to
-    stdout and raise an exception. The exception is raised only
-    if is_force flag is not set."""
-
-    def subst_test_env(arg):
-      if len(arg) and arg[0] == '$':
-        return self.suite_ini[arg[1:]]
-      else:
-        return arg
-
-    client = os.path.join(".", self.suite_ini["client"])
-    args = map(subst_test_env, shlex.split(client))
+    """Execute the test assuming it's a python program.
+    If the test aborts, print its output to stdout, and raise
+    an exception. Else, comprare result and reject files.
+    If there is a difference, print it to stdout and raise an
+    exception. The exception is raised only if is_force flag is
+    not set."""
 
     sys.stdout.write(self.name)
 # for better diagnostics in case of a long-running test
     sys.stdout.flush()
 
-    with open(self.name, "r") as test:
-      with open(self.result, "w+") as result:
-        self.is_client_ok = \
-          subprocess.call(args,
-                          stdin = test, stdout = result) == 0
-    
+    diagnostics = "unknown"
+    save_stdout = sys.stdout
+    with lib.admin.Connection(self.suite_ini["host"],
+                              self.suite_ini["port"]) as admin:
+      try:
+        sys.stdout = FilteredStream(self.reject)
+        server = self.suite_ini["server"]
+        execfile(self.name, globals(), locals())
+        self.is_executed_ok = True
+      except Exception as e:
+        print e
+        diagnostics = str(e)
+      finally:
+        if sys.stdout and sys.stdout != save_stdout:
+          sys.stdout.close()
+        sys.stdout = save_stdout;
+
     self.is_executed = True
 
-    if self.is_client_ok:
-      self.is_equal_result = filecmp.cmp(self.name, self.result)
+    if self.is_executed_ok and os.path.isfile(self.result):
+        self.is_equal_result = filecmp.cmp(self.result, self.reject)
 
-    if self.is_client_ok and self.is_equal_result:
+    if self.is_executed_ok and self.is_equal_result:
       print "\t\t\t[ pass ]"
-      os.remove(self.result)
+      os.remove(self.reject)
+    elif (self.is_executed_ok and not self.is_equal_result and not
+        os.path.isfile(self.result)):
+      os.rename(self.reject, self.result)
+      print "\t\t\t[ NEW ]"
     else:
       print "\t\t\t[ fail ]"
       where = ""
-      if not self.is_client_ok:
+      if not self.is_executed_ok:
         self.print_diagnostics()
-        where = ": client execution aborted"
+        where = ": test execution aborted, reason '{0}'".format(diagnostics)
       else:
         self.print_unidiff()
         where = ": wrong test output"
@@ -88,8 +126,8 @@ class Test:
     failure. Used to diagnose a failure of the client program"""
 
     print "Test failed! Last 10 lines of the result file:"
-    with open(self.result, "r+") as result:
-      tail_10 = collections.deque(result, 10)
+    with open(self.reject, "r+") as reject:
+      tail_10 = collections.deque(reject, 10)
       for line in tail_10:
         sys.stdout.write(line)
 
@@ -99,16 +137,16 @@ class Test:
     from .result."""
 
     print "Test failed! Result content mismatch:"
-    with open(self.name, "r") as test:
-      with open(self.result, "r") as result:
-        test_time = time.ctime(os.stat(self.name).st_mtime)
+    with open(self.result, "r") as result:
+      with open(self.reject, "r") as reject:
         result_time = time.ctime(os.stat(self.result).st_mtime)
-        diff = difflib.unified_diff(test.readlines(),
-                                    result.readlines(),
-                                    self.name,
+        reject_time = time.ctime(os.stat(self.reject).st_mtime)
+        diff = difflib.unified_diff(result.readlines(),
+                                    reject.readlines(),
                                     self.result,
-                                    test_time,
-                                    result_time)
+                                    self.reject,
+                                    result_time,
+                                    reject_time)
         for line in diff:
           sys.stdout.write(line)
             
@@ -164,7 +202,7 @@ class TestSuite:
       dummy_section_name = "tarantool_silverbox"
       config.readfp(TarantoolConfigFile(fp, dummy_section_name))
       self.ini["pidfile"] = config.get(dummy_section_name, "pid_file")
-      self.ini["port"] = config.get(dummy_section_name, "admin_port")
+      self.ini["port"] = int(config.get(dummy_section_name, "admin_port"))
 
     print "Collecting tests in \"" + self.path + "\": " +\
       self.ini["description"] + "."
@@ -193,7 +231,7 @@ class TestSuite:
     print "TEST\t\t\t\tRESULT"
     print shortsep
     failed_tests = []
-    self.ini["server"] = server.abspath_to_exe
+    self.ini["server"] = server
 
     for test in self.tests:
       test.run()

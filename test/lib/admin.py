@@ -24,12 +24,14 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 import socket
 import sys
 import string
+import cStringIO
 
 class Connection:
   def __init__(self, host, port):
     self.host = host
     self.port = port
     self.is_connected = False
+    self.stream = cStringIO.StringIO()
 
   def connect(self):
     self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -50,12 +52,34 @@ class Connection:
     while True:
       buf = self.socket.recv(bufsiz)
       if not buf:
-	break
-      res+= buf;
-      if res.rfind("---\n"):
-	break
+        break
+      res = res + buf;
+      if (res.rfind("\n---\r\n") >= 0 or
+          res.rfind("module command\r\n") >= 0 or
+          res.rfind("try typing help.\r\n") >= 0 or
+          res.rfind("ok\r\n") >= 0):
+        break
 
     return res
+  def write(self, fragment):
+    """This is to support print >> admin, "command" syntax.
+    For every print statement, write is invoked twice: one to
+    write the command itself, and another to write \n. We should
+    accumulate all writes until we receive \n. When we receive it,
+    we execute the command, and rewind the stream."""
+       
+    newline_pos = fragment.rfind("\n")
+    while newline_pos >= 0:
+      self.stream.write(fragment[:newline_pos+1])
+      statement = self.stream.getvalue()
+      sys.stdout.write(statement)
+      sys.stdout.write(self.execute(statement))
+      fragment = fragment[newline_pos+1:]
+      newline_pos = fragment.rfind("\n")
+      self.stream.seek(0)
+      self.stream.truncate()
+
+    self.stream.write(fragment)
 
   def __enter__(self):
     self.connect()
