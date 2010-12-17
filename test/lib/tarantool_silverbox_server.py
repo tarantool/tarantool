@@ -104,18 +104,18 @@ class TarantoolSilverboxServer:
     """Locate server executable in the bindir. We just take
     the first thing looking like an exe in there."""
 
+    print "  Looking for server binary in {0}...".format(self.args.bindir)
     if (os.access(self.args.bindir, os.F_OK) == False or
         stat.S_ISDIR(os.stat(self.args.bindir).st_mode) == False):
-      raise TestRunException("Directory " + self.args.bindir +
-                             " doesn't exist")
+      raise RuntimeError("Directory " + self.args.bindir + " doesn't exist")
 
     for f in os.listdir(self.args.bindir):
       f = os.path.join(self.args.bindir, f)
       st_mode = os.stat(f).st_mode
       if stat.S_ISREG(st_mode) and st_mode & stat.S_IXUSR:
         return f
-    raise TestRunException("Can't find server executable in " + 
-                           self.args.bindir)
+      raise RuntimeError("Can't find server executable in " +
+                         self.args.bindir)
 
   def kill_old_server(self):
     """Kill old server instance if it exists."""

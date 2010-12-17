@@ -132,7 +132,7 @@ def main():
     for suite in suites:
       suite.run_all()
   except RuntimeError as e:
-    print "\nFatal error: ", e, ". Execution aborted."
+    print "\nFatal error: {0}. Execution aborted.".format(e)
     return (-1)
 
   return 0
