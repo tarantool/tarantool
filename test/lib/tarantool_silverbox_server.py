@@ -114,8 +114,8 @@ class TarantoolSilverboxServer:
       st_mode = os.stat(f).st_mode
       if stat.S_ISREG(st_mode) and st_mode & stat.S_IXUSR:
         return f
-      raise RuntimeError("Can't find server executable in " +
-                         self.args.bindir)
+
+    raise RuntimeError("Can't find server executable in " + self.args.bindir)
 
   def kill_old_server(self):
     """Kill old server instance if it exists."""
