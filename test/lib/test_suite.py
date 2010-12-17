@@ -34,10 +34,13 @@ class FilteredStream:
     just one line."""
     fragment_stream = cStringIO.StringIO(fragment)
     for line in fragment_stream:
+      original_len = len(line.strip())
       for pattern, replacement in self.filters:
         line = re.sub(pattern, replacement, line)
-      self.stream.write(line)
-
+# don't write lines that are completely filtered out:
+        if original_len and len(line.strip()) == 0:
+          return
+      self.stream.write(line) 
   def push_filter(self, pattern, replacement):
     self.filters.append([pattern, replacement])
   def pop_filter(self):
