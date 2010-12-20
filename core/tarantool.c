@@ -54,7 +54,8 @@
 #include <tarantool_version.h>
 
 static pid_t master_pid;
-const char *cfg_filename = "tarantool.cfg";
+#define DEFAULT_CFG_FILENAME "tarantool.cfg"
+const char *cfg_filename = DEFAULT_CFG_FILENAME;
 struct tarantool_cfg cfg;
 
 bool init_storage;
@@ -237,35 +238,44 @@ main(int argc, char **argv)
 	palloc_init();
 
 	const void *opt_def =
-		gopt_start(gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
-				       NULL, "display this help"),
-			   gopt_option('c', GOPT_ARG, gopt_shorts('c'), gopt_longs("config"),
-				       "=<filename>", "path to config file"),
-			   gopt_option('v', 0, gopt_shorts('V'), gopt_longs("version"),
-				       NULL, "print version"),
+		gopt_start(
+			   gopt_option('g', GOPT_ARG, gopt_shorts(0),
+						   gopt_longs("cfg-get", "cfg_get"),
+						   "=KEY", "return a value from configuration file described by KEY"),
+			   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
+						   gopt_longs("config"),
+						   "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
 #ifdef STORAGE
 			   gopt_option('C', 0, gopt_shorts(0), gopt_longs("cat"),
-				       "=<filename>", "cat file to stdout in readable format"),
-			   gopt_option('I', 0, gopt_shorts(0), gopt_longs("init_storage", "init-storage"),
-				       NULL, "initialize storage"),
+						   "=FILE", "cat snapshot file to stdout in readable format and exit"),
+			   gopt_option('I', 0, gopt_shorts(0),
+						   gopt_longs("init-storage", "init_storage"),
+						   NULL, "initialize storage (an empty snapshot file) and exit"),
 #endif
 			   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
-				       NULL, "increase log level"),
+						   NULL, "increase verbosity level in log messages"),
 			   gopt_option('D', 0, gopt_shorts('D'), gopt_longs("daemonize"),
-				       NULL, "daemonize"),
-			   gopt_option('g', GOPT_ARG, gopt_shorts(0), gopt_longs("cfg_get", "cfg-get"),
-				       "=<key>", "return value from config described by key"));
+						   NULL, "redirect input/output streams to a log file and run as daemon"),
+               gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
+						   NULL, "display this help and exit"),
+			   gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
+						   NULL, "print program version and exit"));
 
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 
-	if (gopt(opt, 'V')){
+	if (gopt(opt, 'v')){
 		puts(tarantool_version());
 		return 0;
 	}
 
 	if (gopt(opt, 'h')) {
-		puts("usage:");
+		puts("Tarantool -- an efficient in-memory data store.");
+		printf("Usage: %s [OPTIONS]\n", basename(argv[0]));
+		puts("");
 		gopt_help(opt_def);
+		puts("");
+		puts("Please visit project home page at http://launchpad.net/tarantool");
+		puts("to see online documentation, submit bugs or contribute a patch.");
 		return 0;
 	}
 

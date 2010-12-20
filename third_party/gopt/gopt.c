@@ -268,10 +268,13 @@ void gopt_free( void *vptr_opts ){
 
 void gopt_help(const void *opt_def){
   const struct opt_spec_s *opt = opt_def;
+  /* -h, --help          print help */
+  /*                    ^ this is HELP_MSG_OFFSET */
+  const int HELP_MSG_OFFSET = 21;
   while (opt->key) {
     const char *shorts = opt->shorts;
     char has_shorts = 0;
-    printf("\t");
+    printf("  ");
     if (*shorts) {
       has_shorts = 1;
       printf("-%c", *shorts++);
@@ -285,9 +288,10 @@ void gopt_help(const void *opt_def){
       else
 	printf("  ");
       if (opt->help_arg)
-	printf("--%s%-*s", *longs, 25 - strlen(*longs), opt->help_arg);
+	printf("--%s%-*s", *longs, HELP_MSG_OFFSET - strlen(*longs),
+               opt->help_arg);
       else
-	printf("--%-*s", 25, *longs);
+	printf("--%-*s", HELP_MSG_OFFSET, *longs);
     }
     if (opt->help)
       puts(opt->help);
