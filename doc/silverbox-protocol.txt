@@ -28,9 +28,9 @@
 
 <packet> ::= <request> | <response>
 
-<request> ::= <header><body>
+<request> ::= <header><request_body>
 
-<response> ::= <header><return_code><body>
+<response> ::= <header><return_code><response_body>
 
 ;
 ; <header> has a fixed structure of three 4-byte integers (12 bytes):
@@ -46,7 +46,7 @@
 ; - 19    -- <update>
 ; - 20    -- <delete>
 ; - 65280 -- <ping>
-; This list is scarce since a number of old commands
+; This list is sparse since a number of old commands
 ; were deprecated and removed.
 
 <type> ::= <int32>
@@ -54,8 +54,10 @@
 ;
 ; <body_length> tells the sender or receiver the length of data
 ; that follows the header. If there is no data, <body_length> is 0.
+; However, <request_body> or <response_body> are always present.
 ;
-; Note, that <ping> request body is empty; <ping>; request packet
+; The only exception is <ping>: its request body is empty, and
+; so is response. In other words, <ping> request packet
 ; consists solely of a 12-byte header (65280, 0, 0)
 ; and gets the same 12-byte header in response.
 
@@ -74,14 +76,23 @@
 
 <request_id> ::= <int32>
 
-; <body> holds actual command data.
+; <request_body> holds actual command data.
 ; Its format and interpretation are defined by the value of
 ; request <type>.
 
-<body> ::= <select_request_body> | <select_response_body> |
-           <insert_request_body> | <insert_response_body> |
-           <update_request_body> | <update_response_body> |
-           <delete_request_body> | <delete_response_body>
+<request_body> ::= <select_request_body> |
+                   <insert_request_body> |
+                   <update_request_body> |
+                   <delete_request_body>
+
+;
+; <response_body> carries command reply
+; 
+
+<response_body> ::= <select_response_body> |
+                    <insert_response_body> |
+                    <update_response_body> |
+                    <delete_response_body>
 
 ; <select_request_body> (required <header> <type> is 17):
 ;
@@ -119,6 +130,7 @@
 ; key count in the disjunctive set
 
 <count> ::= <int32>
+
 ;
 ; A tuple that represents a search key simply lists all key
 ; fields, preceded with key cardinality (number of list
@@ -137,15 +149,20 @@
 
 ;
 ; A field represents a single atom of storage. In key/value
-; paradigm, Tarantool's "value" is a list of fields.
+; paradigm, Tarantool's "value" is a sequence of fields.
 ; A single unit of storage, therefore, must contain all fields
 ; of all (possibly multipart) keys and zero or more fields
 ; treated as "data". To do a <select> the user only needs to
-; define fields of the key that is used for search.
+; define fields of those key that is used for search.
 ;
 
 <field> ::= <data_length_ber><data>
 
+;
+; BER-encoded integer
+;
+
+<data_length_ber> ::= <int8>+
 ;
 ; SELECT may return zero, one or several tuples.
 ; <select_response_body> starts with the number of found
@@ -255,7 +272,7 @@
 ;
 ; The server response, in addition to response header and body,
 ; contains a return code. It's a 4-byte integer, that has
-; a higher 1-byte completion status part, and a lower 3-byte
+; a lower 1-byte completion status part, and a higher 3-byte
 ; error code part.
 ;
 
@@ -271,55 +288,55 @@
 ; 1  - try again; An indicator of an intermittent error.
 ;      Usually is returned when two clients attempt to change
 ;      the same tuple simultaneously.
-;      XXX: how can this happen in a single-threaded application?
+;      (<update> is not always done atomically)
 ; 2  - error
 ;
 ; The error code holds the actual error. Existing error codes include:
 ;
 ;  Completion status 0 (success)
 ;  -----------------------------
-;  0  -- ERR_CODE_OK
+;  0x00000000 -- ERR_CODE_OK
 ;
-;  36 -- ERR_CODE_NOTHING
-;        The query does not support data modification or return
+;  0x00003600 -- ERR_CODE_NOTHING
+;                The query does not support data modification or return
 ;
 ;  Completion status 1 (try again)
 ;  -------------------------------
-;  4  -- ERR_CODE_NODE_IS_RO
-;        The requested data is blocked from modification
+;  0x00000401 -- ERR_CODE_NODE_IS_RO
+;                The requested data is blocked from modification
 ;
-;  6  -- ERR_CODE_NODE_IS_LOCKED
-;        The requested data is not available
+;  0x00000601 -- ERR_CODE_NODE_IS_LOCKED
+;                The requested data is not available
 ;
-;  7  -- ERR_CODE_MEMORY_ISSUE
-;        An error occurred when allocating memory
+;  0x00000701 -- ERR_CODE_MEMORY_ISSUE
+;                An error occurred when allocating memory
 ;
 ;  Completion status 2 (error)
 ;  ---------------------------
 ;
-;  1  -- ERR_CODE_NONMASTER
-;        An attempt was made to change data on a read-only port
+;  0x00000102  -- ERR_CODE_NONMASTER
+;                 An attempt was made to change data on a read-only port
 ;
-;  2  -- ERR_CODE_ILLEGAL_PARAMS
-;        Malformed query
+;  0x00000202  -- ERR_CODE_ILLEGAL_PARAMS
+;                 Malformed query
 ;
-;  10 -- ERR_CODE_UNSUPPORTED_COMMAND
-;        The query is not recognized
+;  0x00000a02 -- ERR_CODE_UNSUPPORTED_COMMAND
+;                The query is not recognized
 ;
-;  30 -- ERR_CODE_WRONG_FIELD, 0x00001e02:
-;         An unknown field was requested
+;  0x00001e02 -- ERR_CODE_WRONG_FIELD
+;                An unknown field was requested
 ;
-;  31 -- ERR_CODE_WRONG_NUMBER
-;        An out-of-range numeric value was included in the query
+;  0x00001f02 -- ERR_CODE_WRONG_NUMBER
+;                An out-of-range numeric value was included in the query
 ;
-;  32 -- ERR_CODE_DUPLICATE
-;        An attempt was made to create an object with an existing key.
+;  0x00002002 -- ERR_CODE_DUPLICATE
+;                An attempt was made to create an object with an existing key.
 ;
-;  38 -- ERR_CODE_WRONG_VERSION
-;        The protocol version is not supported
+;  0x000026002 -- ERR_CODE_WRONG_VERSION
+;                 The protocol version is not supported
 ;
-;  39 -- ERR_CODE_UNKNOWN_ERROR
-;        Unknown error
+;  0x000027002 -- ERR_CODE_UNKNOWN_ERROR
+;                 Unknown error
 ;
 ; Convenience macros that define hexadecimal constants for <int32>
 ; return codes (completion status + code) can be found in

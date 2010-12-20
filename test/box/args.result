@@ -1,0 +1,21 @@
+tarantool_silverbox --no-such-option
+tarantool_silverbox: unrecognized option '--no-such-option'
+<time> <pid> 0/(null) _ F> PANIC tarantool.c:deamon is running
+
+tarantool_silverbox --help
+tarantool_silverbox: unrecognized option '--help'
+<time> <pid> 0/(null) _ F> PANIC tarantool.c:deamon is running
+
+tarantool_silverbox --config
+tarantool_silverbox: option '--config' requires an argument
+<time> <pid> 0/(null) _ F> PANIC tarantool.c:deamon is running
+
+tarantool_silverbox --config tarantool.cfg
+<time> <pid> 0/(null) _ F> PANIC tarantool.c:deamon is running
+
+tarantool_silverbox --daemonize
+<time> <pid> 0/(null) _ F> PANIC tarantool.c:deamon is running
+
+tarantool_silverbox --version
+1.3.minor-<rev>-<commit>
+

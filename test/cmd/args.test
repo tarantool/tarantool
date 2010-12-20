@@ -1,8 +1,0 @@
---config
-r>  
---verbose
-r>  
---config tarantool.cfg
-r>  
---foo
-r>  
