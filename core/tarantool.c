@@ -263,7 +263,7 @@ main(int argc, char **argv)
 
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 
-	if (gopt(opt, 'v')){
+	if (gopt(opt, 'V')){
 		puts(tarantool_version());
 		return 0;
 	}
