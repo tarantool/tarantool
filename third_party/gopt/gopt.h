@@ -31,34 +31,40 @@ read http://www.purposeful.co.uk/tfl/
 #define gopt_longs( ... )       (const char**)(const char*[]){ __VA_ARGS__, NULL }
 
 
+/** Returns a pointer for use in the following calls. Prints to
+ * stderr and call exit() on error.
+ */
 void *gopt_sort( int *argc, const char **argv, const void *opt_specs );
-/* returns a pointer for use in the following calls
- * prints to stderr and call exit() on error
+
+/** Returns the number of times the option was specified which
+ * will be 0 or 1 unless GOPT_REPEAT was used.
  */
 size_t gopt( const void *opts, int key );
-/* returns the number of times the option was specified
- * which will be 0 or 1 unless GOPT_REPEAT was used
+
+/** Returns the number of times the option was specified writes
+ * a pointer to the option argument from the first (or only)
+ * occurrence to *arg.
  */
 size_t gopt_arg( const void *opts, int key, const char **arg );
-/* returns the number of times the option was specified
- * writes a pointer to the option argument from the first (or only) occurance to *arg
+
+/** Returns a pointer to the ith (starting at zero) occurrence of
+ * the option, or NULL if it was not specified that many times.
  */
 const char *gopt_arg_i( const void *opts, int key, size_t i );
-/* returns a pointer to the ith (starting at zero) occurance
- * of the option, or NULL if it was not specified that many times
+
+/** Returns the number of times the option was specified writes
+ * pointers to the option arguments in the order of occurrence to
+ * args[]. Writes at most args_len pointers if the return value is
+ * less than args_len, also writes a null pointer.
  */
 size_t gopt_args( const void *opts, int key, const char **args, size_t args_len );
-/* returns the number of times the option was specified
- * writes pointers to the option arguments in the order of occurance to args[].
- * writes at most args_len pointers
- * if the return value is less than args_len, also writes a null pointer
+
+/** Releases memory allocated in the corresponding call to
+ * gopt_sort(); opts can no longer be used.
  */
 void gopt_free( void *opts );
-/* releases memory allocated in the corresponding call to gopt_sort()
- * opts can no longer be used 
- */
 
+/** Prints descriptions for all options. */
 void gopt_help(const void *opt_def);
-/* prints options description */
 
 #endif /* GOPT_H_INCLUDED */
