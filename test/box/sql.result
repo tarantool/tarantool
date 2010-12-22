@@ -1,0 +1,25 @@
+ping
+ok
+---
+select * from t0
+An error occurred: ERR_CODE_ILLEGAL_PARAMS, 'Illegal parameters'
+insert into t0 values (1, "I am a tuple")
+Insert OK, 1 row affected
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'I am a tuple']
+select * from t0 where k0 = 0
+No match
+select * from t0 where k0 = 2
+No match
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'I am a tuple']
+save snapshot
+ok
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'I am a tuple']
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'I am a tuple']

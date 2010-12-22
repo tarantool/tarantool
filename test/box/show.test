@@ -1,5 +1,9 @@
 # encoding: tarantool
-#
+# 
+# clear statistics:
+server.stop(True)
+server.install(True)
+server.start(True)
 exec admin "show stat"
 exec admin "help"
 exec admin "show configuration"

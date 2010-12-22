@@ -10,9 +10,9 @@ import difflib
 import filecmp
 import shlex
 import time
-from tarantool_silverbox_server import TarantoolSilverboxServer 
-import lib.admin
-import lib.tarantool_preprocessor
+from tarantool_silverbox_server import TarantoolSilverboxServer
+from tarantool_connection import AdminConnection, DataConnection
+import tarantool_preprocessor
 import re
 import cStringIO
 
@@ -40,7 +40,7 @@ class FilteredStream:
 # don't write lines that are completely filtered out:
         if original_len and len(line.strip()) == 0:
           return
-      self.stream.write(line) 
+      self.stream.write(line)
   def push_filter(self, pattern, replacement):
     self.filters.append([pattern, replacement])
   def pop_filter(self):
@@ -56,7 +56,7 @@ class Test:
   """An individual test file. A test can run itself, and remembers
   its completion state."""
   def __init__(self, name, suite_ini):
-    """Initialize test properties: path to test file, path to 
+    """Initialize test properties: path to test file, path to
     temporary result file, path to the client program, test status."""
     self.name = name
     self.result = name.replace(".test", ".result")
@@ -84,20 +84,27 @@ class Test:
 
     diagnostics = "unknown"
     save_stdout = sys.stdout
-    with lib.admin.Connection(self.suite_ini["host"],
-                              self.suite_ini["port"]) as admin:
-      try:
-        sys.stdout = FilteredStream(self.reject)
-        server = self.suite_ini["server"]
-        execfile(self.name, globals(), locals())
-        self.is_executed_ok = True
-      except Exception as e:
-        print e
-        diagnostics = str(e)
-      finally:
-        if sys.stdout and sys.stdout != save_stdout:
-          sys.stdout.close()
-        sys.stdout = save_stdout;
+    admin = AdminConnection(self.suite_ini["host"],
+                            self.suite_ini["admin_port"])
+    sql = DataConnection(self.suite_ini["host"],
+                         self.suite_ini["port"])
+    server = self.suite_ini["server"]
+    try:
+      admin.connect()
+      sql.connect()
+      sys.stdout = FilteredStream(self.reject)
+      server = self.suite_ini["server"]
+      execfile(self.name, globals(), locals())
+      self.is_executed_ok = True
+    except Exception as e:
+      print e
+      diagnostics = str(e)
+    finally:
+      if sys.stdout and sys.stdout != save_stdout:
+        sys.stdout.close()
+      sys.stdout = save_stdout;
+      admin.disconnect()
+      sql.disconnect()
 
     self.is_executed = True
 
@@ -152,7 +159,7 @@ class Test:
                                     reject_time)
         for line in diff:
           sys.stdout.write(line)
-            
+
 class TarantoolConfigFile:
   """ConfigParser can't read files without sections, work it around"""
   def __init__(self, fp, section_name):
@@ -163,7 +170,7 @@ class TarantoolConfigFile:
       section_name = self.section_name
       self.section_name = None
       return section_name
-    # tarantool.cfg puts string values in quotes 
+    # tarantool.cfg puts string values in quote
     return self.fp.readline().replace("\"", '')
 
 
@@ -183,34 +190,37 @@ class TestSuite:
     """Initialize a test suite: check that it exists and contains
     a syntactically correct configuration file. Then create
     a test instance for each found test."""
-    self.path = suite_path
     self.args = args
     self.tests = []
-
-    if os.access(self.path, os.F_OK) == False:
-      raise TestRunException("Suite \"" + self.path + "\" doesn't exist")
-
-# read the suite config
-    config = ConfigParser.ConfigParser()
-    config.read(os.path.join(self.path, "suite.ini"))
-    self.ini = dict(config.items("default"))
-# import the necessary module for test suite client
-
+    self.ini = {}
+    self.ini["suite_path"] = suite_path
     self.ini["host"] = "localhost"
     self.ini["is_force"] = self.args.is_force
 
+    if os.access(suite_path, os.F_OK) == False:
+      raise TestRunException("Suite \"" + suite_path +\
+                             "\" doesn't exist")
+
+# read the suite config
+    config = ConfigParser.ConfigParser()
+    config.read(os.path.join(suite_path, "suite.ini"))
+    self.ini.update(dict(config.items("default")))
+    self.ini["config"] = os.path.join(suite_path, self.ini["config"])
+# import the necessary module for test suite client
+
 # now read the server config, we need some properties from it
 
-    with open(os.path.join(self.path, self.ini["config"])) as fp:
+    with open(self.ini["config"]) as fp:
       dummy_section_name = "tarantool_silverbox"
       config.readfp(TarantoolConfigFile(fp, dummy_section_name))
       self.ini["pidfile"] = config.get(dummy_section_name, "pid_file")
-      self.ini["port"] = int(config.get(dummy_section_name, "admin_port"))
+      self.ini["admin_port"] = int(config.get(dummy_section_name, "admin_port"))
+      self.ini["port"] = int(config.get(dummy_section_name, "primary_port"))
 
-    print "Collecting tests in \"" + self.path + "\": " +\
+    print "Collecting tests in \"" + suite_path + "\": " +\
       self.ini["description"] + "."
 
-    for test_name in glob.glob(os.path.join(self.path, "*.test")):
+    for test_name in glob.glob(os.path.join(suite_path, "*.test")):
       for test_pattern in self.args.tests:
         if test_name.find(test_pattern) != -1:
           self.tests.append(Test(test_name, self.ini))
@@ -219,10 +229,8 @@ class TestSuite:
   def run_all(self):
     """For each file in the test suite, run client program
     assuming each file represents an individual test."""
-    server = TarantoolSilverboxServer(self.args,
-                                      os.path.join(self.path,
-                                                   self.ini["config"]),
-                                      self.ini["pidfile"])
+    server = TarantoolSilverboxServer(self.args, self.ini)
+    server.install()
     server.start()
     if self.args.start_and_exit:
       print "  Start and exit requested, exiting..."

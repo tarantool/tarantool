@@ -1,0 +1,18 @@
+# encoding: tarantool
+exec sql 'ping'
+# xxx: bug -- currently selects no rows
+exec sql 'select * from t0'
+exec sql 'insert into t0 values (1, "I am a tuple")'
+exec sql 'select * from t0 where k0 = 1'
+# currently there is no way to find out how many records
+# a namespace contains 
+exec sql 'select * from t0 where k0 = 0'
+exec sql 'select * from t0 where k0 = 2'
+server.restart()
+exec sql 'select * from t0 where k0 = 1'
+exec admin "save snapshot"
+exec sql 'select * from t0 where k0 = 1'
+server.restart()
+exec sql 'select * from t0 where k0 = 1'
+
+# vim: syntax=python

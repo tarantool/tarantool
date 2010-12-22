@@ -924,6 +924,11 @@ tcp_server_handler(void *data)
 				close(fd);
 				continue;
 			}
+			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
+				       &one, sizeof(one)) == -1) {
+				say_syserror("setsockopt failed");
+				/* Do nothing, not a fatal error.  */
+			}
 
 			snprintf(name, sizeof(name), "%i/handler", server->port);
 			h = fiber_create(name, fd, -1, server->handler, data);

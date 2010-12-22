@@ -15,14 +15,14 @@
 ;
 ; int32 - a 32-bit integer in big-endian format (Intel x86)
 ;
-; int32_ber - a 1 to 5 byte BER encoding of a 32 bit integer
+; int32_varint - a 1 to 5 byte representation of an integer
 ;
-; BER stands for Basic Encoding Rules, and allows to unequivocally
-; compact a 32-bit integer into 1 to 5 bytes depending on its value.
-; For more information, see
-; http://en.wikipedia.org/wiki/Basic_Encoding_Rules and
-; http://www.itu.int/ITU-T/studygroups/com17/languages/X.690-0207.pdf,
-; chapter 8.3 Encoding of an Integer Value
+; This is what Perl's "pack" function calls "BER compressed 
+; integer (BER stands for Basic Encoding Rules, but in reality it
+; has little to do with ASN.1 standard). 
+; See http://en.wikipedia.org/wiki/LEB128
+; for encoding description, or core/pickle.c for implementation
+; in tarantool.
 
 ; All requests and responses utilize the same basic structure:
 
@@ -30,7 +30,7 @@
 
 <request> ::= <header><request_body>
 
-<response> ::= <header><return_code><response_body>
+<response> ::= <header><return_code>{<response_body>}
 
 ;
 ; <header> has a fixed structure of three 4-byte integers (12 bytes):
@@ -54,7 +54,7 @@
 ;
 ; <body_length> tells the sender or receiver the length of data
 ; that follows the header. If there is no data, <body_length> is 0.
-; However, <request_body> or <response_body> are always present.
+; However, <request_body> is always present.
 ;
 ; The only exception is <ping>: its request body is empty, and
 ; so is response. In other words, <ping> request packet
@@ -76,7 +76,8 @@
 
 <request_id> ::= <int32>
 
-; <request_body> holds actual command data.
+; <request_body> holds actual command data. It is 
+; only present if <return_code> is 0 (success).
 ; Its format and interpretation are defined by the value of
 ; request <type>.
 
@@ -101,6 +102,10 @@
 ; a limit (set to 4294967295 for no limit), and one or several
 ; keys to use in lookup. When more than one key is given, they
 ; specify a disjunctive search condition (key1 or key2 or ...).
+;
+; Note, that <tuple> is mandatory, and tuple <count>
+; must be non-zero.
+; To select all keys in the namespace, use
 ;
 
 <select_request_body> ::= <namespace_no><index_no>
@@ -156,13 +161,13 @@
 ; define fields of those key that is used for search.
 ;
 
-<field> ::= <data_length_ber><data>
+<field> ::= <int32_varint><data>
 
 ;
-; BER-encoded integer
+; Compressed integer
 ;
 
-<data_length_ber> ::= <int8>+
+<int32_varint> ::= <int8>+
 ;
 ; SELECT may return zero, one or several tuples.
 ; <select_response_body> starts with the number of found
@@ -184,7 +189,7 @@
 ; boundaries: in Tarantool, tuples have variable cardinality.
 ;
 
-<fq_tuple> ::= <size><cardinality><field>+
+<fq_tuple> ::= <size><cardinality><tuple>
 
 <size> ::= <int32>
 
@@ -199,7 +204,7 @@
 ; The only defined flag BOX_RETURN_TUPLE (0x01) indicates
 ; that it is required to return the inserted tuple back:
 
-<flags> ::= 0 | 1
+<flags> ::= <int32>
 
 ;
 ; A tuple may already exist. In that case INSERT
@@ -264,7 +269,7 @@
 
 ;
 ; Return the number of deleted tuples.
-; Currently it's always 1
+; Currently it's always 0 or 1
 ;
 
 <delete_response_body> ::= <count>
@@ -296,9 +301,6 @@
 ;  Completion status 0 (success)
 ;  -----------------------------
 ;  0x00000000 -- ERR_CODE_OK
-;
-;  0x00003600 -- ERR_CODE_NOTHING
-;                The query does not support data modification or return
 ;
 ;  Completion status 1 (try again)
 ;  -------------------------------

@@ -88,6 +88,14 @@ class Options:
         "exit without running any tests. Default: false.")
 
     parser.add_argument(
+        "--gdb",
+        dest = "gdb",
+        action = "store_true",
+        default = False,
+        help = "Start the server under 'gdb' debugger. Default: false."
+        " See also --start-and-exit.")
+
+    parser.add_argument(
         "--bindir",
         dest = "bindir",
         default = "../_debug_box",
