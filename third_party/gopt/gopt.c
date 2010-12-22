@@ -268,10 +268,21 @@ void gopt_free( void *vptr_opts ){
 
 void gopt_help(const void *opt_def){
   const struct opt_spec_s *opt = opt_def;
-  /* -h, --help          print help */
-  /*                    ^ this is HELP_MSG_OFFSET */
-  const int HELP_MSG_OFFSET = 21;
-  while (opt->key) {
+
+  /*
+   * layout:
+   * padding: 2 spaces ("  ")
+   * short option: 4 chars, padded with spaces ("    " or "-x  " or "-x, ")
+   * long option: 20 chars, padded with spaces ("--option                ")
+   * help: rest of line: 54
+   * help padding: 25 spaces
+   */
+
+  const int long_opt_width = 18; /* not counting leading "--" */
+  const int help_width = 54;
+  const char *help_padding = "                         ";
+
+    while (opt->key) {
     const char *shorts = opt->shorts;
     char has_shorts = 0;
     printf("  ");
@@ -288,14 +299,26 @@ void gopt_help(const void *opt_def){
       else
 	printf("  ");
       if (opt->help_arg)
-	printf("--%s%-*s", *longs, HELP_MSG_OFFSET - strlen(*longs),
+	printf("--%s%-*s", *longs, long_opt_width - strlen(*longs),
                opt->help_arg);
       else
-	printf("--%-*s", HELP_MSG_OFFSET, *longs);
+	printf("--%-*s", long_opt_width, *longs);
     }
-    if (opt->help)
-      puts(opt->help);
-    else
+    if (opt->help) {
+      const char *help = opt->help;
+      while (strlen(help) > help_width) {
+	const char *p = help + help_width;
+	while (p > help && *p != ' ')
+	  p--;
+	if (p == help)
+	  p = help + help_width;
+	printf("%.*s\n", p - help, help);
+	help = p;
+	if (strlen(help))
+	  printf(help_padding);
+      }
+      puts(help);
+    } else
       puts("");
     opt++;
   }
