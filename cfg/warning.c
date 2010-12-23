@@ -12,12 +12,12 @@ out_warning(ConfettyError v, char *format, ...)
 	va_start(ap, format);
 	switch (v) {
 	case CNF_NOTSET:
-		vsay(S_FATAL, NULL, format, ap);
+		vsay(S_FATAL, __FILE__, __LINE__, NULL, format, ap);
 		panic("can't read config");
 
 		break;
 
 	default:
-		vsay(S_WARN, NULL, format, ap);
+		vsay(S_WARN, __FILE__, __LINE__, NULL, format, ap);
 	}
 }
