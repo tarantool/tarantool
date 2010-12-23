@@ -184,9 +184,9 @@ create_pid(void)
 	if (fgets(buf, sizeof(buf), f) != NULL && strlen(buf) > 0) {
 		pid = strtol(buf, NULL, 10);
 		if (pid > 0 && kill(pid, 0) == 0)
-			panic("i am already running");
+			panic("the daemon is already running");
 		else
-			say_info("updating stale pid file");
+			say_info("updating a stale pid file");
 		fseeko(f, 0, SEEK_SET);
 		if (ftruncate(fileno(f), 0) == -1)
 			panic_syserror("ftruncate(`%s')", cfg.pid_file);
@@ -302,7 +302,7 @@ main(int argc, char **argv)
 	fclose(f);
 
 	if (n_accepted == 0 || n_skipped > 0)
-		panic("where were errors in config file");
+		panic("there were errors in the config file");
 
 #ifdef STORAGE
 	if (gopt_arg(opt, 'C', &cat_filename)) {
