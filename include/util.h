@@ -98,6 +98,8 @@ typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
 
+#define CRLF "\r\n"
+
 #ifdef GCC
 # define FORMAT_PRINTF gnu_printf
 #else
