@@ -71,6 +71,6 @@ namespace = [
     key_field = [
       fieldno = -1, ro, required
       type = "", ro, required
-    ]
-  ]
-]
+    ], ro, required
+  ], ro, required
+], ro, required

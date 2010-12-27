@@ -200,6 +200,9 @@ static NameAtom _name__wal_feeder_ipaddr[] = {
 static NameAtom _name__wal_feeder_port[] = {
 	{ "wal_feeder_port", -1, NULL }
 };
+static NameAtom _name__namespace[] = {
+	{ "namespace", -1, NULL }
+};
 static NameAtom _name__namespace__enabled[] = {
 	{ "namespace", -1, _name__namespace__enabled + 1 },
 	{ "enabled", -1, NULL }
@@ -212,6 +215,10 @@ static NameAtom _name__namespace__estimated_rows[] = {
 	{ "namespace", -1, _name__namespace__estimated_rows + 1 },
 	{ "estimated_rows", -1, NULL }
 };
+static NameAtom _name__namespace__index[] = {
+	{ "namespace", -1, _name__namespace__index + 1 },
+	{ "index", -1, NULL }
+};
 static NameAtom _name__namespace__index__type[] = {
 	{ "namespace", -1, _name__namespace__index__type + 1 },
 	{ "index", -1, _name__namespace__index__type + 2 },
@@ -221,6 +228,11 @@ static NameAtom _name__namespace__index__unique[] = {
 	{ "namespace", -1, _name__namespace__index__unique + 1 },
 	{ "index", -1, _name__namespace__index__unique + 2 },
 	{ "unique", -1, NULL }
+};
+static NameAtom _name__namespace__index__key_field[] = {
+	{ "namespace", -1, _name__namespace__index__key_field + 1 },
+	{ "index", -1, _name__namespace__index__key_field + 2 },
+	{ "key_field", -1, NULL }
 };
 static NameAtom _name__namespace__index__key_field__fieldno[] = {
 	{ "namespace", -1, _name__namespace__index__key_field__fieldno + 1 },
@@ -678,7 +690,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__namespace__enabled) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
 		errno = 0;
@@ -694,7 +706,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__namespace__cardinality) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
 		errno = 0;
@@ -710,7 +722,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__namespace__estimated_rows) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
 		errno = 0;
@@ -726,10 +738,10 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__namespace__index__type) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
 		errno = 0;
@@ -742,10 +754,10 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__namespace__index__unique) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
 		errno = 0;
@@ -761,13 +773,13 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field__fieldno) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
 		errno = 0;
@@ -783,13 +795,13 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field__type) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field, 0, CNF_FLAG_STRUCT_NEW);
+		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field, check_rdonly, CNF_FLAG_STRUCT_NEW);
 		if (c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
 		errno = 0;
@@ -1506,12 +1518,23 @@ check_cfg_tarantool_cfg(tarantool_cfg *c) {
 		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__primary_port));
 	}
 
+	if (c->namespace == NULL) {
+		res++;
+		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace));
+	}
+
 	i->idx_name__namespace = 0;
 	while (c->namespace && c->namespace[i->idx_name__namespace]) {
 		if (c->namespace[i->idx_name__namespace]->enabled == 0) {
 			res++;
 			_name__namespace__enabled->index = i->idx_name__namespace;
 			out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__enabled));
+		}
+
+		if (c->namespace[i->idx_name__namespace]->index == NULL) {
+			res++;
+			_name__namespace__index->index = i->idx_name__namespace;
+			out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__index));
 		}
 
 		i->idx_name__namespace__index = 0;
@@ -1528,6 +1551,13 @@ check_cfg_tarantool_cfg(tarantool_cfg *c) {
 				_name__namespace__index__unique->next->index = i->idx_name__namespace__index;
 				_name__namespace__index__unique->index = i->idx_name__namespace;
 				out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__index__unique));
+			}
+
+			if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field == NULL) {
+				res++;
+				_name__namespace__index__key_field->next->index = i->idx_name__namespace__index;
+				_name__namespace__index__key_field->index = i->idx_name__namespace;
+				out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__index__key_field));
 			}
 
 			i->idx_name__namespace__index__key_field = 0;
@@ -2020,34 +2050,28 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 				i1->idx_name__namespace__index__key_field++;
 				i2->idx_name__namespace__index__key_field++;
 			}
-			if (!only_check_rdonly) {
-				if (!(c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field == c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field && c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field == NULL) && (c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field == NULL || c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field == NULL || c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field[i1->idx_name__namespace__index__key_field] != NULL || c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field[i2->idx_name__namespace__index__key_field] != NULL)) {
-					snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]->key_field[]");
+			if (!(c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field == c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field && c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field == NULL) && (c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field == NULL || c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field == NULL || c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field[i1->idx_name__namespace__index__key_field] != NULL || c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field[i2->idx_name__namespace__index__key_field] != NULL)) {
+				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]->key_field[]");
 
-					return diff;
-				}
+				return diff;
 			}
 
 			i1->idx_name__namespace__index++;
 			i2->idx_name__namespace__index++;
 		}
-		if (!only_check_rdonly) {
-			if (!(c1->namespace[i1->idx_name__namespace]->index == c2->namespace[i2->idx_name__namespace]->index && c1->namespace[i1->idx_name__namespace]->index == NULL) && (c1->namespace[i1->idx_name__namespace]->index == NULL || c2->namespace[i2->idx_name__namespace]->index == NULL || c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index] != NULL || c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index] != NULL)) {
-				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]");
+		if (!(c1->namespace[i1->idx_name__namespace]->index == c2->namespace[i2->idx_name__namespace]->index && c1->namespace[i1->idx_name__namespace]->index == NULL) && (c1->namespace[i1->idx_name__namespace]->index == NULL || c2->namespace[i2->idx_name__namespace]->index == NULL || c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index] != NULL || c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index] != NULL)) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]");
 
-				return diff;
-			}
+			return diff;
 		}
 
 		i1->idx_name__namespace++;
 		i2->idx_name__namespace++;
 	}
-	if (!only_check_rdonly) {
-		if (!(c1->namespace == c2->namespace && c1->namespace == NULL) && (c1->namespace == NULL || c2->namespace == NULL || c1->namespace[i1->idx_name__namespace] != NULL || c2->namespace[i2->idx_name__namespace] != NULL)) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]");
+	if (!(c1->namespace == c2->namespace && c1->namespace == NULL) && (c1->namespace == NULL || c2->namespace == NULL || c1->namespace[i1->idx_name__namespace] != NULL || c2->namespace[i2->idx_name__namespace] != NULL)) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]");
 
-			return diff;
-		}
+		return diff;
 	}
 
 	return 0;
