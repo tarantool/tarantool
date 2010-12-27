@@ -1,0 +1,18 @@
+# encoding: tarantool
+#
+os.rename("var/tarantool.cfg", "var/tarantool.cfg.old")
+
+os.symlink("../box/tarantool_bad1.cfg", "var/tarantool.cfg")
+exec admin "reload configuration"
+
+os.unlink("var/tarantool.cfg")
+os.symlink("../box/tarantool_bad2.cfg", "var/tarantool.cfg")
+exec admin "reload configuration"
+
+os.unlink("var/tarantool.cfg")
+os.symlink("../box/tarantool_good.cfg", "var/tarantool.cfg")
+exec admin "reload configuration"
+
+os.unlink("var/tarantool.cfg")
+os.rename("var/tarantool.cfg.old", "var/tarantool.cfg")
+# vim: syntax=python
