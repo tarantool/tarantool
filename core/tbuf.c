@@ -151,7 +151,8 @@ tbuf_append_field(struct tbuf *b, void *f)
 	tbuf_append(b, s, next - s);
 }
 
-void tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
+void
+tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 {
 	int printed_len;
 	size_t free_len = b->size - b->len;

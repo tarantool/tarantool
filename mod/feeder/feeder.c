@@ -87,13 +87,15 @@ recover_feed_slave(int sock)
 	ev_loop(0);
 }
 
-i32 mod_chkconfig(struct tarantool_cfg *conf __unused__)
+i32
+mod_chkconfig(struct tarantool_cfg *conf __unused__)
 {
 	return 0;
 }
 
-void mod_reloadconfig(struct tarantool_cfg *old_conf __unused__,
-		      struct tarantool_cfg *new_conf __unused__)
+void
+mod_reloadconfig(struct tarantool_cfg *old_conf __unused__,
+		 struct tarantool_cfg *new_conf __unused__)
 {
 	return;
 }

@@ -114,7 +114,6 @@ reload_cfg(struct tbuf *out)
 
 		return -1;
 	}
-
 	// Load without checking readonly params
 	if (fill_default_tarantool_cfg(&new_cfg2) != 0) {
 		destroy_tarantool_cfg(&new_cfg2);
@@ -128,7 +127,6 @@ reload_cfg(struct tbuf *out)
 
 		return -1;
 	}
-
 	// Compare only readonly params
 	char *diff = cmp_tarantool_cfg(&new_cfg1, &new_cfg2, 1);
 	if (diff != NULL) {
@@ -306,7 +304,6 @@ initialize_minimal()
 	initialize(0.1, 4, 2);
 }
 
-
 int
 main(int argc, char **argv)
 {
@@ -349,7 +346,7 @@ main(int argc, char **argv)
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 	binary_filename = argv[0];
 
-	if (gopt(opt, 'V')){
+	if (gopt(opt, 'V')) {
 		puts(tarantool_version());
 		return 0;
 	}

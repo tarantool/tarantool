@@ -55,7 +55,6 @@ static char *custom_proc_title;
 /* hooks */
 typedef int (*box_hook_t) (struct box_txn * txn);
 
-
 /*
   For tuples of size below this threshold, when sending a tuple
   to the client, make a deep copy of the tuple for the duration
@@ -227,7 +226,6 @@ tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
 	tbuf_append(txn->ref_tuples, &tuple, sizeof(struct box_tuple *));
 	tuple_ref(tuple, +1);
 }
-
 
 static int __noinline__
 prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
@@ -871,7 +869,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	op = read_u16(b);
 	n = read_u32(b);
 
-	tbuf_printf(buf, "tm:%.3f t:%"PRIu16 " %s:%d %s n:%i",
+	tbuf_printf(buf, "tm:%.3f t:%" PRIu16 " %s:%d %s n:%i",
 		    row->tm, tag, inet_ntoa(peer->sin_addr), ntohs(peer->sin_port),
 		    messages_strs[op], n);
 
@@ -1019,7 +1017,6 @@ recover_row(struct recovery_state *r __unused__, struct tbuf *t)
 	txn_cleanup(txn);
 	return result;
 }
-
 
 static int
 snap_print(struct recovery_state *r __unused__, struct tbuf *t)
@@ -1243,20 +1240,21 @@ memcached_bound_to_primary(void *data __unused__)
 {
 	box_bound_to_primary(NULL);
 
-	struct fiber *expire =
-		fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
+	struct fiber *expire = fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
 	if (expire == NULL)
 		panic("can't start the expire fiber");
 	fiber_call(expire);
 }
 
-i32 mod_chkconfig(struct tarantool_cfg *conf __unused__)
+i32
+mod_chkconfig(struct tarantool_cfg *conf __unused__)
 {
 	return 0;
 }
 
-void mod_reloadconfig(struct tarantool_cfg *old_conf __unused__,
-		      struct tarantool_cfg *new_conf __unused__)
+void
+mod_reloadconfig(struct tarantool_cfg *old_conf __unused__,
+		 struct tarantool_cfg *new_conf __unused__)
 {
 	return;
 }
@@ -1416,10 +1414,12 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  version: \"%s\"\r\n", tarantool_version());
 	tbuf_printf(out, "  uptime: %i\r\n", (int)tarantool_uptime());
 	tbuf_printf(out, "  pid: %i\r\n", getpid());
-	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 "\r\n", (i64)recovery_state->wal_writer->pid);
+	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 "\r\n",
+		    (i64) recovery_state->wal_writer->pid);
 	tbuf_printf(out, "  lsn: %" PRIi64 "\r\n", recovery_state->confirmed_lsn);
 	tbuf_printf(out, "  recovery_lag: %.3f\r\n", recovery_state->recovery_lag);
-	tbuf_printf(out, "  recovery_last_update: %.3f\r\n", recovery_state->recovery_last_update_tstamp);
+	tbuf_printf(out, "  recovery_last_update: %.3f\r\n",
+		    recovery_state->recovery_last_update_tstamp);
 	tbuf_printf(out, "  status: %s\r\n", status);
 }
 
