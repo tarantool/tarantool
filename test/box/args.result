@@ -4,6 +4,7 @@ Usage: tarantool_silverbox [OPTIONS]
 
       --cfg-get=KEY       return a value from configuration file described by
                           KEY
+      --chkconfig         check config file
   -c, --config=FILE       path to configuration file (default: tarantool.cfg)
       --cat=FILE          cat snapshot file to stdout in readable format and
                           exit
@@ -23,6 +24,7 @@ Usage: tarantool_silverbox [OPTIONS]
 
       --cfg-get=KEY       return a value from configuration file described by
                           KEY
+      --chkconfig         check config file
   -c, --config=FILE       path to configuration file (default: tarantool.cfg)
       --cat=FILE          cat snapshot file to stdout in readable format and
                           exit
