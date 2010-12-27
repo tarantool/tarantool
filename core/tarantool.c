@@ -79,7 +79,7 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 		f = fopen(cfg_filename, "r");
 
 	if (f == NULL) {
-		tbuf_printf(cfg_out, "\tcan't open config `%s'", cfg_filename);
+		tbuf_printf(cfg_out, "\r\n\tcan't open config `%s'", cfg_filename);
 
 		return -1;
 	}
@@ -135,7 +135,7 @@ reload_cfg(struct tbuf *out)
 		destroy_tarantool_cfg(&new_cfg1);
 		destroy_tarantool_cfg(&new_cfg2);
 
-		tbuf_printf(out, "\tCould not accept read only '%s' option\n", diff);
+		tbuf_printf(out, "\r\n\tCould not accept read only '%s' option", diff);
 
 		return -1;
 	}
@@ -390,7 +390,8 @@ main(int argc, char **argv)
 
 	if (gopt(opt, 'k')) {
 		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
-			say_error("FAILED\n%.*s\n", cfg_out->len, (char *)cfg_out->data);
+			say_error("chkconfig FAILED"
+				  "%.*s", cfg_out->len, (char *)cfg_out->data);
 
 			return 1;
 		}
@@ -399,7 +400,7 @@ main(int argc, char **argv)
 	}
 
 	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0)
-		panic("can't load config:\n"
+		panic("can't load config:"
 		      "%.*s", cfg_out->len, (char *)cfg_out->data);
 
 #ifdef STORAGE

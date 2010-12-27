@@ -1,5 +1,5 @@
 
-#line 1 "core/admin.rl"
+#line 1 "/home/scorpio/repo/tarantool/core/admin.rl"
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -61,7 +61,7 @@ static const char help[] =
 static const char unknown_command[] = "unknown command. try typing help.\r\n";
 
 
-#line 65 "core/admin.c"
+#line 65 "/home/scorpio/repo/tarantool/core/admin.c"
 static const int admin_start = 1;
 static const int admin_first_final = 108;
 static const int admin_error = 0;
@@ -69,13 +69,20 @@ static const int admin_error = 0;
 static const int admin_en_main = 1;
 
 
-#line 64 "core/admin.rl"
+#line 64 "/home/scorpio/repo/tarantool/core/admin.rl"
 
 
 static void
 ok(struct tbuf *out)
 {
 	tbuf_printf(out, "ok\r\n");
+}
+
+static void
+fail(struct tbuf *out, struct tbuf *err)
+{
+	tbuf_printf(out, "fail"
+			 "%.*s\r\n", err->len, (char *)err->data);
 }
 
 static void
@@ -88,6 +95,7 @@ static int
 admin_dispatch(void)
 {
 	struct tbuf *out = tbuf_alloc(fiber->pool);
+	struct tbuf *err = tbuf_alloc(fiber->pool);
 	int cs;
 	char *p, *pe;
 	char *strstart, *strend;
@@ -101,12 +109,12 @@ admin_dispatch(void)
 	p = fiber->rbuf->data;
 
 	
-#line 105 "core/admin.c"
+#line 113 "/home/scorpio/repo/tarantool/core/admin.c"
 	{
 	cs = admin_start;
 	}
 
-#line 110 "core/admin.c"
+#line 118 "/home/scorpio/repo/tarantool/core/admin.c"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -168,37 +176,37 @@ case 6:
 	}
 	goto st0;
 tr12:
-#line 142 "core/admin.rl"
+#line 150 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st108;
 tr19:
-#line 132 "core/admin.rl"
+#line 140 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{return 0;}
 	goto st108;
 tr28:
-#line 128 "core/admin.rl"
+#line 136 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{strend = p;}
-#line 141 "core/admin.rl"
+#line 149 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{mod_exec(strstart, strend - strstart, out); end(out);}
 	goto st108;
 tr32:
-#line 131 "core/admin.rl"
+#line 139 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{tbuf_append(out, help, sizeof(help));}
 	goto st108;
 tr43:
-#line 143 "core/admin.rl"
-	{if (reload_cfg(out)) { end(out); } else { ok(out); }}
+#line 151 "/home/scorpio/repo/tarantool/core/admin.rl"
+	{if (reload_cfg(err)) { fail(out, err); } else { ok(out); }}
 	goto st108;
 tr66:
-#line 139 "core/admin.rl"
+#line 147 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st108;
 tr75:
-#line 140 "core/admin.rl"
+#line 148 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{snapshot(NULL, 0); ok(out);}
 	goto st108;
 tr92:
-#line 95 "core/admin.rl"
+#line 103 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -217,63 +225,63 @@ tr92:
 		}
 	goto st108;
 tr106:
-#line 134 "core/admin.rl"
+#line 142 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{fiber_info(out);end(out);}
 	goto st108;
 tr112:
-#line 133 "core/admin.rl"
+#line 141 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{mod_info(out); end(out);}
 	goto st108;
 tr117:
-#line 137 "core/admin.rl"
+#line 145 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{palloc_stat(out);end(out);}
 	goto st108;
 tr125:
-#line 136 "core/admin.rl"
+#line 144 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{slab_stat(out);end(out);}
 	goto st108;
 tr129:
-#line 138 "core/admin.rl"
+#line 146 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{stat_print(out);end(out);}
 	goto st108;
 st108:
 	if ( ++p == pe )
 		goto _test_eof108;
 case 108:
-#line 244 "core/admin.c"
+#line 252 "/home/scorpio/repo/tarantool/core/admin.c"
 	goto st0;
 tr13:
-#line 142 "core/admin.rl"
+#line 150 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
 tr20:
-#line 132 "core/admin.rl"
+#line 140 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{return 0;}
 	goto st7;
 tr29:
-#line 128 "core/admin.rl"
+#line 136 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{strend = p;}
-#line 141 "core/admin.rl"
+#line 149 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{mod_exec(strstart, strend - strstart, out); end(out);}
 	goto st7;
 tr33:
-#line 131 "core/admin.rl"
+#line 139 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{tbuf_append(out, help, sizeof(help));}
 	goto st7;
 tr44:
-#line 143 "core/admin.rl"
-	{if (reload_cfg(out)) { end(out); } else { ok(out); }}
+#line 151 "/home/scorpio/repo/tarantool/core/admin.rl"
+	{if (reload_cfg(err)) { fail(out, err); } else { ok(out); }}
 	goto st7;
 tr67:
-#line 139 "core/admin.rl"
+#line 147 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
 tr76:
-#line 140 "core/admin.rl"
+#line 148 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{snapshot(NULL, 0); ok(out);}
 	goto st7;
 tr93:
-#line 95 "core/admin.rl"
+#line 103 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -292,30 +300,30 @@ tr93:
 		}
 	goto st7;
 tr107:
-#line 134 "core/admin.rl"
+#line 142 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{fiber_info(out);end(out);}
 	goto st7;
 tr113:
-#line 133 "core/admin.rl"
+#line 141 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{mod_info(out); end(out);}
 	goto st7;
 tr118:
-#line 137 "core/admin.rl"
+#line 145 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{palloc_stat(out);end(out);}
 	goto st7;
 tr126:
-#line 136 "core/admin.rl"
+#line 144 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{slab_stat(out);end(out);}
 	goto st7;
 tr130:
-#line 138 "core/admin.rl"
+#line 146 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{stat_print(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 319 "core/admin.c"
+#line 327 "/home/scorpio/repo/tarantool/core/admin.c"
 	if ( (*p) == 10 )
 		goto st108;
 	goto st0;
@@ -396,28 +404,28 @@ case 15:
 	}
 	goto tr25;
 tr25:
-#line 128 "core/admin.rl"
+#line 136 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{strstart = p;}
 	goto st16;
 st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-#line 407 "core/admin.c"
+#line 415 "/home/scorpio/repo/tarantool/core/admin.c"
 	switch( (*p) ) {
 		case 10: goto tr28;
 		case 13: goto tr29;
 	}
 	goto st16;
 tr26:
-#line 128 "core/admin.rl"
+#line 136 "/home/scorpio/repo/tarantool/core/admin.rl"
 	{strstart = p;}
 	goto st17;
 st17:
 	if ( ++p == pe )
 		goto _test_eof17;
 case 17:
-#line 421 "core/admin.c"
+#line 429 "/home/scorpio/repo/tarantool/core/admin.c"
 	switch( (*p) ) {
 		case 10: goto tr28;
 		case 13: goto tr29;
@@ -1381,7 +1389,7 @@ case 107:
 	_out: {}
 	}
 
-#line 148 "core/admin.rl"
+#line 156 "/home/scorpio/repo/tarantool/core/admin.rl"
 
 
 	fiber->rbuf->len -= (void *)pe - (void *)fiber->rbuf->data;

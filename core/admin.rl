@@ -70,6 +70,13 @@ ok(struct tbuf *out)
 }
 
 static void
+fail(struct tbuf *out, struct tbuf *err)
+{
+	tbuf_printf(out, "fail"
+			 "%.*s\r\n", err->len, (char *)err->data);
+}
+
+static void
 end(struct tbuf *out)
 {
 	tbuf_printf(out, "---\r\n");
@@ -79,6 +86,7 @@ static int
 admin_dispatch(void)
 {
 	struct tbuf *out = tbuf_alloc(fiber->pool);
+	struct tbuf *err = tbuf_alloc(fiber->pool);
 	int cs;
 	char *p, *pe;
 	char *strstart, *strend;
@@ -140,7 +148,7 @@ admin_dispatch(void)
 			    save " "+ snapshot		%{snapshot(NULL, 0); ok(out);}				|
 			    exec " "+ string		%{mod_exec(strstart, strend - strstart, out); end(out);}|
 			    check " "+ slab		%{slab_validate(); ok(out);}				|
-			    reload " "+ configuration	%{if (reload_cfg(out)) { end(out); } else { ok(out); }});
+			    reload " "+ configuration	%{if (reload_cfg(err)) { fail(out, err); } else { ok(out); }});
 
 	        main := commands eol;
 		write init;
