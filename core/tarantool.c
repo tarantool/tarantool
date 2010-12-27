@@ -56,6 +56,7 @@
 static pid_t master_pid;
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
 const char *cfg_filename = DEFAULT_CFG_FILENAME;
+char *cfg_filename_fullpath = NULL;
 struct tbuf *cfg_out = NULL;
 char *binary_filename;
 struct tarantool_cfg cfg;
@@ -72,7 +73,11 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 
 	tbuf_reset(cfg_out);
 
-	f = fopen(cfg_filename, "r");
+	if (cfg_filename_fullpath != NULL)
+		f = fopen(cfg_filename_fullpath, "r");
+	else
+		f = fopen(cfg_filename, "r");
+
 	if (f == NULL) {
 		tbuf_printf(cfg_out, "\tcan't open config `%s'", cfg_filename);
 
@@ -307,8 +312,6 @@ main(int argc, char **argv)
 {
 	const char *cat_filename = NULL;
 	const char *cfg_paramname = NULL;
-	char *cfg_filename_fullpath;
-	FILE *f;
 
 #if CORO_ASM
 	save_rbp(&main_stack_frame);
@@ -380,14 +383,7 @@ main(int argc, char **argv)
 
 		strcat(cfg_filename_fullpath, "/");
 		strcat(cfg_filename_fullpath, cfg_filename);
-
-		f = fopen(cfg_filename_fullpath, "r");
-		free(cfg_filename_fullpath);
-	} else
-		f = fopen(cfg_filename, "r");
-
-	if (f == NULL)
-		panic_syserror("can't open config `%s'", cfg_filename);
+	}
 
 	cfg_out = tbuf_alloc(eter_pool);
 	assert(cfg_out);
