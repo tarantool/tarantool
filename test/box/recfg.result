@@ -14,7 +14,30 @@ fail
 ---
 reload configuration
 fail
+	Option 'primary_port' is not set (or has a default value)
 	Option 'namespace[0].enabled' is not set (or has a default value)
+	Option 'namespace[0].index[0].type' is not set (or has a default value)
+	Option 'namespace[0].index[0].key_field[0].fieldno' is not set (or has a default value)
+---
+reload configuration
+fail
+	Option 'namespace' is not set (or has a default value)
+---
+reload configuration
+fail
+	Could not accept read only 'namespace[1].enabled' option
+---
+reload configuration
+fail
+	Could not accept read only 'namespace[0].index[0].key_field[1].fieldno' option
 ---
 reload configuration
 ok
+reload configuration
+fail
+	gram_yyerror: syntax error, unexpected $end, expecting KEY_P or NULL_P at line 1
+---
+reload configuration
+fail
+	can't open config `tarantool.cfg'
+---
