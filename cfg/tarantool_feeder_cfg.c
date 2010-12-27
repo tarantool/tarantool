@@ -139,6 +139,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->username == NULL) || strcmp(opt->paramValue.stringval, c->username) != 0))
+			return CNF_RDONLY;
 		c->username = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->username == NULL)
 			return CNF_NOMEMORY;
@@ -152,6 +154,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		if (check_rdonly && c->coredump != i32)
+			return CNF_RDONLY;
 		c->coredump = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__admin_port) ) {
@@ -163,6 +167,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		if (check_rdonly && c->admin_port != i32)
+			return CNF_RDONLY;
 		c->admin_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__log_level) ) {
@@ -183,6 +189,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		double dbl = strtod(opt->paramValue.numberval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		if (check_rdonly && c->slab_alloc_arena != dbl)
+			return CNF_RDONLY;
 		c->slab_alloc_arena = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__slab_alloc_minimal) ) {
@@ -194,6 +202,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		if (check_rdonly && c->slab_alloc_minimal != i32)
+			return CNF_RDONLY;
 		c->slab_alloc_minimal = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__slab_alloc_factor) ) {
@@ -203,12 +213,16 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		double dbl = strtod(opt->paramValue.numberval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		if (check_rdonly && c->slab_alloc_factor != dbl)
+			return CNF_RDONLY;
 		c->slab_alloc_factor = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__work_dir) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->work_dir == NULL) || strcmp(opt->paramValue.stringval, c->work_dir) != 0))
+			return CNF_RDONLY;
 		c->work_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->work_dir == NULL)
 			return CNF_NOMEMORY;
@@ -217,6 +231,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->pid_file == NULL) || strcmp(opt->paramValue.stringval, c->pid_file) != 0))
+			return CNF_RDONLY;
 		c->pid_file = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->pid_file == NULL)
 			return CNF_NOMEMORY;
@@ -225,6 +241,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->logger == NULL) || strcmp(opt->paramValue.stringval, c->logger) != 0))
+			return CNF_RDONLY;
 		c->logger = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->logger == NULL)
 			return CNF_NOMEMORY;
@@ -238,6 +256,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		if (check_rdonly && c->logger_nonblock != i32)
+			return CNF_RDONLY;
 		c->logger_nonblock = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__io_collect_interval) ) {
@@ -247,6 +267,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		double dbl = strtod(opt->paramValue.numberval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		if (check_rdonly && c->io_collect_interval != dbl)
+			return CNF_RDONLY;
 		c->io_collect_interval = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
@@ -258,6 +280,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		if (check_rdonly && c->backlog != i32)
+			return CNF_RDONLY;
 		c->backlog = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__readahead) ) {
@@ -275,6 +299,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_feeder_bind_ipaddr == NULL) || strcmp(opt->paramValue.stringval, c->wal_feeder_bind_ipaddr) != 0))
+			return CNF_RDONLY;
 		c->wal_feeder_bind_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->wal_feeder_bind_ipaddr == NULL)
 			return CNF_NOMEMORY;
@@ -288,12 +314,16 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
+		if (check_rdonly && c->wal_feeder_bind_port != i32)
+			return CNF_RDONLY;
 		c->wal_feeder_bind_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_dir) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_feeder_dir == NULL) || strcmp(opt->paramValue.stringval, c->wal_feeder_dir) != 0))
+			return CNF_RDONLY;
 		c->wal_feeder_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->wal_feeder_dir == NULL)
 			return CNF_NOMEMORY;
@@ -302,6 +332,8 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->custom_proc_title == NULL) || strcmp(opt->paramValue.stringval, c->custom_proc_title) != 0))
+			return CNF_RDONLY;
 		c->custom_proc_title = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->custom_proc_title == NULL)
 			return CNF_NOMEMORY;
@@ -660,6 +692,21 @@ check_cfg_tarantool_cfg(tarantool_cfg *c) {
 	tarantool_cfg_iterator_t iterator, *i = &iterator;
 	int	res = 0;
 
+	if (c->wal_feeder_bind_ipaddr == NULL) {
+		res++;
+		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__wal_feeder_bind_ipaddr));
+	}
+
+	if (c->wal_feeder_bind_port == 0) {
+		res++;
+		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__wal_feeder_bind_port));
+	}
+
+	if (c->wal_feeder_dir == NULL) {
+		res++;
+		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__wal_feeder_dir));
+	}
+
 	return res;
 }
 
@@ -752,26 +799,20 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 	tarantool_cfg_iterator_t iterator1, iterator2, *i1 = &iterator1, *i2 = &iterator2;
 	static char diff[PRINTBUFLEN];
 
-	if (!only_check_rdonly) {
-		if (confetti_strcmp(c1->username, c2->username) != 0) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->username");
+	if (confetti_strcmp(c1->username, c2->username) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->username");
 
-			return diff;
+		return diff;
 }
-	}
-	if (!only_check_rdonly) {
-		if (c1->coredump != c2->coredump) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->coredump");
+	if (c1->coredump != c2->coredump) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->coredump");
 
-			return diff;
-		}
+		return diff;
 	}
-	if (!only_check_rdonly) {
-		if (c1->admin_port != c2->admin_port) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->admin_port");
+	if (c1->admin_port != c2->admin_port) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->admin_port");
 
-			return diff;
-		}
+		return diff;
 	}
 	if (!only_check_rdonly) {
 		if (c1->log_level != c2->log_level) {
@@ -780,68 +821,50 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 			return diff;
 		}
 	}
-	if (!only_check_rdonly) {
-		if (c1->slab_alloc_arena != c2->slab_alloc_arena) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->slab_alloc_arena");
+	if (c1->slab_alloc_arena != c2->slab_alloc_arena) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->slab_alloc_arena");
 
-			return diff;
-		}
+		return diff;
 	}
-	if (!only_check_rdonly) {
-		if (c1->slab_alloc_minimal != c2->slab_alloc_minimal) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->slab_alloc_minimal");
+	if (c1->slab_alloc_minimal != c2->slab_alloc_minimal) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->slab_alloc_minimal");
 
-			return diff;
-		}
+		return diff;
 	}
-	if (!only_check_rdonly) {
-		if (c1->slab_alloc_factor != c2->slab_alloc_factor) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->slab_alloc_factor");
+	if (c1->slab_alloc_factor != c2->slab_alloc_factor) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->slab_alloc_factor");
 
-			return diff;
-		}
+		return diff;
 	}
-	if (!only_check_rdonly) {
-		if (confetti_strcmp(c1->work_dir, c2->work_dir) != 0) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->work_dir");
+	if (confetti_strcmp(c1->work_dir, c2->work_dir) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->work_dir");
 
-			return diff;
+		return diff;
 }
-	}
-	if (!only_check_rdonly) {
-		if (confetti_strcmp(c1->pid_file, c2->pid_file) != 0) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->pid_file");
+	if (confetti_strcmp(c1->pid_file, c2->pid_file) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->pid_file");
 
-			return diff;
+		return diff;
 }
-	}
-	if (!only_check_rdonly) {
-		if (confetti_strcmp(c1->logger, c2->logger) != 0) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->logger");
+	if (confetti_strcmp(c1->logger, c2->logger) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->logger");
 
-			return diff;
+		return diff;
 }
-	}
-	if (!only_check_rdonly) {
-		if (c1->logger_nonblock != c2->logger_nonblock) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->logger_nonblock");
+	if (c1->logger_nonblock != c2->logger_nonblock) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->logger_nonblock");
 
-			return diff;
-		}
+		return diff;
 	}
-	if (!only_check_rdonly) {
-		if (c1->io_collect_interval != c2->io_collect_interval) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->io_collect_interval");
+	if (c1->io_collect_interval != c2->io_collect_interval) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->io_collect_interval");
 
-			return diff;
-		}
+		return diff;
 	}
-	if (!only_check_rdonly) {
-		if (c1->backlog != c2->backlog) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->backlog");
+	if (c1->backlog != c2->backlog) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->backlog");
 
-			return diff;
-		}
+		return diff;
 	}
 	if (!only_check_rdonly) {
 		if (c1->readahead != c2->readahead) {
@@ -850,34 +873,26 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 			return diff;
 		}
 	}
-	if (!only_check_rdonly) {
-		if (confetti_strcmp(c1->wal_feeder_bind_ipaddr, c2->wal_feeder_bind_ipaddr) != 0) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_bind_ipaddr");
+	if (confetti_strcmp(c1->wal_feeder_bind_ipaddr, c2->wal_feeder_bind_ipaddr) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_bind_ipaddr");
 
-			return diff;
+		return diff;
 }
-	}
-	if (!only_check_rdonly) {
-		if (c1->wal_feeder_bind_port != c2->wal_feeder_bind_port) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_bind_port");
+	if (c1->wal_feeder_bind_port != c2->wal_feeder_bind_port) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_bind_port");
 
-			return diff;
-		}
+		return diff;
 	}
-	if (!only_check_rdonly) {
-		if (confetti_strcmp(c1->wal_feeder_dir, c2->wal_feeder_dir) != 0) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_dir");
+	if (confetti_strcmp(c1->wal_feeder_dir, c2->wal_feeder_dir) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_dir");
 
-			return diff;
+		return diff;
 }
-	}
-	if (!only_check_rdonly) {
-		if (confetti_strcmp(c1->custom_proc_title, c2->custom_proc_title) != 0) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->custom_proc_title");
+	if (confetti_strcmp(c1->custom_proc_title, c2->custom_proc_title) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->custom_proc_title");
 
-			return diff;
+		return diff;
 }
-	}
 
 	return 0;
 }

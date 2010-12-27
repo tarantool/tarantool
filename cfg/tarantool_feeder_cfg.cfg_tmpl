@@ -5,55 +5,56 @@ void out_warning(ConfettyError r, char *format, ...);
 %}
 
 # username to switch to
-username=NULL
+username=NULL, ro
 
 # save core on abort/assert
-coredump=0
+coredump=0, ro
 
 # admin port
 # used for admin's connections
-admin_port=0
+admin_port=0, ro
 
 # Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5
 log_level=4
 
 # Size of slab arena in GiBs
-slab_alloc_arena=1.0
+slab_alloc_arena=1.0, ro
 # Size of minimal allocation unit
-slab_alloc_minimal=64
+slab_alloc_minimal=64, ro
 # Growth factor, each subsecuent unit size is factor * prev unit size
-slab_alloc_factor=2.0
+slab_alloc_factor=2.0, ro
 
 # working directory (daemon will chdir(2) to it)
-work_dir=NULL
+work_dir=NULL, ro
 
 # name of pid file
-pid_file="tarantool.pid"
+pid_file="tarantool.pid", ro
 
 # logger command will be executed via /bin/sh -c {}
 # example: 'exec cronolog /var/log/taranul/%Y-%m/%Y-%m-%d/tarantool.log'
 # example: 'exec extra/logger.pl /var/log/taranul/tarantool.log'
 # when logger is not configured all logging going to STDERR
-logger=NULL
+logger=NULL, ro
 
 # make logging nonblocking, this potentially can loss some logging data
-logger_nonblock=1
+logger_nonblock=1, ro
 
 # delay between loop iteraions
-io_collect_interval=0.0
+io_collect_interval=0.0, ro
 
 # size of listen backlog
-backlog=1024
+backlog=1024, ro
 
 # network io readahead
 readahead=16320
+
 # feed WAL to remote replicas
 # feeder accepts it's clients on wal_feeder_bind_ipaddr:wal_feeder_bind_port
-wal_feeder_bind_ipaddr=NULL
-wal_feeder_bind_port=0
+wal_feeder_bind_ipaddr=NULL, ro, required
+wal_feeder_bind_port=0, ro, required
 
 # Directory with WAL files to serve
-wal_feeder_dir=NULL
+wal_feeder_dir=NULL, ro, required
 
 # custom proc title is appended after normal
-custom_proc_title=NULL
+custom_proc_title=NULL, ro

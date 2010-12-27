@@ -2,27 +2,27 @@
 ## BOX
 
 # Snapshot directory (where snapshots get saved/read)
-snap_dir="."
+snap_dir=".", ro
 
 # WAL directory (where WAL get saved/read)
-wal_dir="."
+wal_dir=".", ro
 
 # Primary port (where updates are accepted)
-primary_port=0
+primary_port=0, ro, required
 
 # Secondary port (where only selects are accepted)
-secondary_port=0
+secondary_port=0, ro
 
 # warn about requests which take longer to process
 too_long_threshold=0.5
 
 # custom proc title is appended after normal
-custom_proc_title=NULL
+custom_proc_title=NULL, ro
 
 # Memcached emulation is enabled if memcached == 1
-memcached=0
+memcached=0, ro
 # namespace used for memcached emulation
-memcached_namespace=23
+memcached_namespace=23, ro
 # maximum rows to consider per expire loop iteration
 memcached_expire_per_loop=1024
 # tarantool will try iterate all rows within this time
@@ -30,47 +30,47 @@ memcached_expire_full_sweep=3600
 
 
 # do not write snapshot faster then snap_io_rate_limit MBytes/sec
-snap_io_rate_limit=0.0
+snap_io_rate_limit=0.0, ro
 
 # Write no more rows in WAL
-rows_per_wal=500000
+rows_per_wal=500000, ro
 
 # fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay seconds ago
 # WARNING: actually, several last requsts may stall for much longer
-wal_fsync_delay=0
+wal_fsync_delay=0, ro
 
 # size of WAL writer requests buffer
-wal_writer_inbox_size=128
+wal_writer_inbox_size=128, ro
 
 # Local hot standby (if enabled server will run in locale hot standby mode
 # continuously fetching WAL records from shared local directory
-local_hot_standby=0
+local_hot_standby=0, ro
 # delay in fractional seconds between successive re-readings of wal_dir
-wal_dir_rescan_delay=0.1
+wal_dir_rescan_delay=0.1, ro
 
 
 # panic if where is error reading snap or wal
 # be default panic any snapshot reading error  and ignore errors then reading wals
-panic_on_snap_error=1
-panic_on_wal_error=0
+panic_on_snap_error=1, ro
+panic_on_wal_error=0, ro
 
 # Remote hot standby (if enabled server will run in hot standby mode
 # continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
-remote_hot_standby=0
-wal_feeder_ipaddr=NULL
-wal_feeder_port=0
+remote_hot_standby=0, ro
+wal_feeder_ipaddr=NULL, ro
+wal_feeder_port=0, ro
 
 
 namespace = [
-  enabled = 0
-  cardinality = -1
-  estimated_rows = 0
+  enabled = 0, ro, required
+  cardinality = -1, ro
+  estimated_rows = 0, ro
   index = [
-    type = ""
-    unique = -1
+    type = "", ro, required
+    unique = -1, ro, required
     key_field = [
-      fieldno = -1
-      type = ""
+      fieldno = -1, ro, required
+      type = "", ro, required
     ]
   ]
 ]

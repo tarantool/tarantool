@@ -5,72 +5,73 @@ void out_warning(ConfettyError r, char *format, ...);
 %}
 
 # username to switch to
-username=NULL
+username=NULL, ro
 
 # save core on abort/assert
-coredump=0
+coredump=0, ro
 
 # admin port
 # used for admin's connections
-admin_port=0
+admin_port=0, ro
 
 # Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5
 log_level=4
 
 # Size of slab arena in GiBs
-slab_alloc_arena=1.0
+slab_alloc_arena=1.0, ro
 # Size of minimal allocation unit
-slab_alloc_minimal=64
+slab_alloc_minimal=64, ro
 # Growth factor, each subsecuent unit size is factor * prev unit size
-slab_alloc_factor=2.0
+slab_alloc_factor=2.0, ro
 
 # working directory (daemon will chdir(2) to it)
-work_dir=NULL
+work_dir=NULL, ro
 
 # name of pid file
-pid_file="tarantool.pid"
+pid_file="tarantool.pid", ro
 
 # logger command will be executed via /bin/sh -c {}
 # example: 'exec cronolog /var/log/taranul/%Y-%m/%Y-%m-%d/tarantool.log'
 # example: 'exec extra/logger.pl /var/log/taranul/tarantool.log'
 # when logger is not configured all logging going to STDERR
-logger=NULL
+logger=NULL, ro
 
 # make logging nonblocking, this potentially can loss some logging data
-logger_nonblock=1
+logger_nonblock=1, ro
 
 # delay between loop iteraions
-io_collect_interval=0.0
+io_collect_interval=0.0, ro
 
 # size of listen backlog
-backlog=1024
+backlog=1024, ro
 
 # network io readahead
 readahead=16320
+
 ## BOX
 
 # Snapshot directory (where snapshots get saved/read)
-snap_dir="."
+snap_dir=".", ro
 
 # WAL directory (where WAL get saved/read)
-wal_dir="."
+wal_dir=".", ro
 
 # Primary port (where updates are accepted)
-primary_port=0
+primary_port=0, ro, required
 
 # Secondary port (where only selects are accepted)
-secondary_port=0
+secondary_port=0, ro
 
 # warn about requests which take longer to process
 too_long_threshold=0.5
 
 # custom proc title is appended after normal
-custom_proc_title=NULL
+custom_proc_title=NULL, ro
 
 # Memcached emulation is enabled if memcached == 1
-memcached=0
+memcached=0, ro
 # namespace used for memcached emulation
-memcached_namespace=23
+memcached_namespace=23, ro
 # maximum rows to consider per expire loop iteration
 memcached_expire_per_loop=1024
 # tarantool will try iterate all rows within this time
@@ -78,47 +79,47 @@ memcached_expire_full_sweep=3600
 
 
 # do not write snapshot faster then snap_io_rate_limit MBytes/sec
-snap_io_rate_limit=0.0
+snap_io_rate_limit=0.0, ro
 
 # Write no more rows in WAL
-rows_per_wal=500000
+rows_per_wal=500000, ro
 
 # fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay seconds ago
 # WARNING: actually, several last requsts may stall for much longer
-wal_fsync_delay=0
+wal_fsync_delay=0, ro
 
 # size of WAL writer requests buffer
-wal_writer_inbox_size=128
+wal_writer_inbox_size=128, ro
 
 # Local hot standby (if enabled server will run in locale hot standby mode
 # continuously fetching WAL records from shared local directory
-local_hot_standby=0
+local_hot_standby=0, ro
 # delay in fractional seconds between successive re-readings of wal_dir
-wal_dir_rescan_delay=0.1
+wal_dir_rescan_delay=0.1, ro
 
 
 # panic if where is error reading snap or wal
 # be default panic any snapshot reading error  and ignore errors then reading wals
-panic_on_snap_error=1
-panic_on_wal_error=0
+panic_on_snap_error=1, ro
+panic_on_wal_error=0, ro
 
 # Remote hot standby (if enabled server will run in hot standby mode
 # continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
-remote_hot_standby=0
-wal_feeder_ipaddr=NULL
-wal_feeder_port=0
+remote_hot_standby=0, ro
+wal_feeder_ipaddr=NULL, ro
+wal_feeder_port=0, ro
 
 
 namespace = [
-  enabled = 0
-  cardinality = -1
-  estimated_rows = 0
+  enabled = 0, ro, required
+  cardinality = -1, ro
+  estimated_rows = 0, ro
   index = [
-    type = ""
-    unique = -1
+    type = "", ro, required
+    unique = -1, ro, required
     key_field = [
-      fieldno = -1
-      type = ""
+      fieldno = -1, ro, required
+      type = "", ro, required
     ]
   ]
 ]
