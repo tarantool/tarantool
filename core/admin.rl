@@ -70,16 +70,17 @@ ok(struct tbuf *out)
 }
 
 static void
+end(struct tbuf *out)
+{
+	tbuf_printf(out, "---\r\n");
+}
+
+static void
 fail(struct tbuf *out, struct tbuf *err)
 {
 	tbuf_printf(out, "fail"
 			 "%.*s\r\n", err->len, (char *)err->data);
-}
-
-static void
-end(struct tbuf *out)
-{
-	tbuf_printf(out, "---\r\n");
+	end(out);
 }
 
 static int
