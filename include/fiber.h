@@ -40,6 +40,8 @@
 #include <say.h>
 #include <coro.h>
 
+#define FIBER_EXIT -1
+
 struct msg {
 	uint32_t sender_fid;
 	struct tbuf *msg;
@@ -156,6 +158,7 @@ ssize_t fiber_flush_output(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
 void fiber_call(struct fiber *callee);
+void fiber_raise(struct fiber *callee, jmp_buf exc, int value);
 int fiber_connect(struct sockaddr_in *addr);
 void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);

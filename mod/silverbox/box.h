@@ -27,77 +27,14 @@
 #ifndef TARANTOOL_SILVERBOX_H
 #define TARANTOOL_SILVERBOX_H
 
-#include <mod/silverbox/assoc.h>
+#include <mod/silverbox/index.h>
 
 extern bool box_updates_allowed;
 void memcached_handler(void *_data __unused__);
 
 struct namespace;
 struct box_tuple;
-
-struct field {
-	u32 len;
-	union {
-		u32 u32;
-
-		u8 data[sizeof(void *)];
-
-		void *data_ptr;
-	};
-};
-
-enum field_data_type { NUM, STR };
-
-struct tree_index_member {
-	struct box_tuple *tuple;
-	struct field key[];
-};
-
-#define SIZEOF_TREE_INDEX_MEMBER(index) \
-	(sizeof(struct tree_index_member) + sizeof(struct field) * (index)->key_cardinality)
-
-#include <third_party/sptree.h>
-SPTREE_DEF(str_t, realloc);
-
-// #include <mod/silverbox/tree.h>
-
-struct index {
-	bool enabled;
-
-	bool unique;
-
-	struct box_tuple *(*find) (struct index * index, void *key);	/* only for unique lookups */
-	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
-	void (*remove) (struct index * index, struct box_tuple *);
-	void (*replace) (struct index * index, struct box_tuple *, struct box_tuple *);
-	void (*iterator_init) (struct index *, struct tree_index_member * pattern);
-	struct box_tuple *(*iterator_next) (struct index *, struct tree_index_member * pattern);
-	union {
-		khash_t(lstr2ptr_map) * str_hash;
-		khash_t(int2ptr_map) * int_hash;
-		khash_t(int2ptr_map) * hash;
-		sptree_str_t *tree;
-	} idx;
-	void *iterator;
-	bool iterator_empty;
-
-	struct namespace *namespace;
-
-	struct {
-		struct {
-			u32 fieldno;
-			enum field_data_type type;
-		} *key_field;
-		u32 key_cardinality;
-
-		u32 *field_cmp_order;
-		u32 field_cmp_order_cnt;
-	};
-
-	struct tree_index_member *search_pattern;
-
-	enum { HASH, TREE } type;
-};
+struct index;
 
 extern struct index *memcached_index;
 
@@ -108,6 +45,9 @@ struct namespace {
 	int cardinality;
 	struct index index[MAX_IDX];
 };
+
+extern struct namespace *namespace;
+extern const int namespace_count;
 
 struct box_tuple {
 	u16 refs;
@@ -178,7 +118,12 @@ enum box_mode {
 
 ENUM(messages, MESSAGES);
 
-struct box_tuple *index_find(struct index *index, void *key);
+#define box_raise(n, err)						\
+	({								\
+		if (n != ERR_CODE_NODE_IS_RO)				\
+			say_warn("%s/%s", error_codes_strs[(n)], err);	\
+		raise(n, err);						\
+	})
 
 struct box_txn *txn_alloc(u32 flags);
 u32 box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data);
@@ -189,5 +134,6 @@ void *next_field(void *f);
 void append_field(struct tbuf *b, void *f);
 void *tuple_field(struct box_tuple *tuple, size_t i);
 
+void memcached_init(void);
 void memcached_expire(void *data __unused__);
 #endif

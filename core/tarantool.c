@@ -50,16 +50,17 @@
 #include <stat.h>
 #include <tarantool.h>
 #include <util.h>
+#include <third_party/gopt/gopt.h>
 #include <tarantool_version.h>
 
 static pid_t master_pid;
-char *cfg_filename = "tarantool.cfg";
+#define DEFAULT_CFG_FILENAME "tarantool.cfg"
+const char *cfg_filename = DEFAULT_CFG_FILENAME;
 struct tbuf *cfg_out = NULL;
+char *binary_filename;
 struct tarantool_cfg cfg;
 
-bool init_storage;
-
-enum tarantool_role role = def;
+bool init_storage, booting = true;
 
 extern int daemonize(int nochdir, int noclose);
 
@@ -259,9 +260,6 @@ create_pid(void)
 	char buf[16] = { 0 };
 	pid_t pid;
 
-	if (cfg.pid_file == NULL)
-		panic("no pid file is specified in config");
-
 	f = fopen(cfg.pid_file, "a+");
 	if (f == NULL)
 		panic_syserror("can't open pid file");
@@ -269,12 +267,12 @@ create_pid(void)
 	if (fgets(buf, sizeof(buf), f) != NULL && strlen(buf) > 0) {
 		pid = strtol(buf, NULL, 10);
 		if (pid > 0 && kill(pid, 0) == 0)
-			panic("deamon is running");
+			panic("the daemon is already running");
 		else
-			say_info("updating stale pid file");
+			say_info("updating a stale pid file");
 		fseeko(f, 0, SEEK_SET);
 		if (ftruncate(fileno(f), 0) == -1)
-			panic_syserror("ftruncate");
+			panic_syserror("ftruncate(`%s')", cfg.pid_file);
 	}
 
 	fprintf(f, "%i\n", getpid());
@@ -292,7 +290,7 @@ initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_fa
 {
 
 	if (!salloc_init(slab_alloc_arena * (1 << 30), slab_alloc_minimal, slab_alloc_factor))
-		panic("can't initialize slab allocator");
+		panic_syserror("can't initialize slab allocator");
 
 	fiber_init();
 }
@@ -303,12 +301,14 @@ initialize_minimal()
 	initialize(0.1, 4, 2);
 }
 
+
 int
 main(int argc, char **argv)
 {
-	int c, verbose = 0;
-	char *cat_filename = NULL;
-	bool be_daemon = false;
+	const char *cat_filename = NULL;
+	const char *cfg_paramname = NULL;
+	char *cfg_filename_fullpath;
+	FILE *f;
 
 #if CORO_ASM
 	save_rbp(&main_stack_frame);
@@ -317,118 +317,84 @@ main(int argc, char **argv)
 	stat_init();
 	palloc_init();
 
-	const char *short_opt = "c:pvVD";
-	const struct option long_opt[] = {
-		{.name = "config",
-		 .has_arg = 1,
-		 .flag = NULL,
-		 .val = 'c'},
+	const void *opt_def =
+		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
+				       gopt_longs("cfg-get", "cfg_get"),
+				       "=KEY", "return a value from configuration file described by KEY"),
+			   gopt_option('k', 0, gopt_shorts(0),
+				       gopt_longs("chkconfig"),
+				       NULL, "check config file"),
+			   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
+				       gopt_longs("config"),
+				       "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
 #ifdef STORAGE
-		{.name = "cat",
-		 .has_arg = 1,
-		 .flag = NULL,
-		 .val = 'C'},
-		{.name = "init_storage",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'I'},
+			   gopt_option('C', 0, gopt_shorts(0), gopt_longs("cat"),
+				       "=FILE", "cat snapshot file to stdout in readable format and exit"),
+			   gopt_option('I', 0, gopt_shorts(0),
+				       gopt_longs("init-storage", "init_storage"),
+				       NULL, "initialize storage (an empty snapshot file) and exit"),
 #endif
-		{.name = "create_pid",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'p'},
-		{.name = "verbose",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'v'},
-		{.name = "version",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'V'},
-		{.name = "daemonize",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'D'},
-		{.name = "chkconfig",
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 'k'},
-		{.name = NULL,
-		 .has_arg = 0,
-		 .flag = NULL,
-		 .val = 0}
-	};
+			   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
+				       NULL, "increase verbosity level in log messages"),
+			   gopt_option('D', 0, gopt_shorts('D'), gopt_longs("daemonize"),
+				       NULL, "redirect input/output streams to a log file and run as daemon"),
+			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
+				       NULL, "display this help and exit"),
+			   gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
+				       NULL, "print program version and exit"));
 
-	while ((c = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
-		switch (c) {
-		case 'V':
-			puts(tarantool_version());
-			return 0;
-		case 'c':
-			if (optarg == NULL)
-				panic("no arg given");
-			cfg_filename = strdup(optarg);
-			break;
-		case 'C':
-			if (optarg == NULL)
-				panic("no arg given");
-			cat_filename = strdup(optarg);
-			role = cat;
-		case 'v':
-			verbose++;
-			break;
-		case 'p':
-			cfg.pid_file = "tarantool.pid";
-			break;
-		case 'D':
-			be_daemon = true;
-			break;
-		case 'I':
-			init_storage = true;
-			break;
-		case 'k':
-			role = chkconfig;
-			break;
-		}
-	}
+	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
+	binary_filename = argv[0];
 
-	if (argc != optind)
-		panic("not all args were parsed");
-
-	if (role == usage) {
-		fprintf(stderr, "usage:\n");
-		fprintf(stderr, "	-c, --config=filename\n");
-#ifdef STORAGE
-		fprintf(stderr, "	--cat=filename\n");
-		fprintf(stderr, "	--init_storage\n");
-#endif
-		fprintf(stderr, "	-V, --version\n");
-		fprintf(stderr, "	-p, --create_pid\n");
-		fprintf(stderr, "	-v, --verbose\n");
-		fprintf(stderr, "	-D, --daemonize\n");
-		fprintf(stderr, "	--chkconfig\n");
-
+	if (gopt(opt, 'V')){
+		puts(tarantool_version());
 		return 0;
 	}
 
+	if (gopt(opt, 'h')) {
+		puts("Tarantool -- an efficient in-memory data store.");
+		printf("Usage: %s [OPTIONS]\n", basename(argv[0]));
+		puts("");
+		gopt_help(opt_def);
+		puts("");
+		puts("Please visit project home page at http://launchpad.net/tarantool");
+		puts("to see online documentation, submit bugs or contribute a patch.");
+		return 0;
+	}
+
+	/* If config filename given in command line it will override the default */
+	gopt_arg(opt, 'c', &cfg_filename);
+	cfg.log_level += gopt(opt, 'v');
+
+	if (argc != 1) {
+		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
+		exit(EX_USAGE);
+	}
+
 	if (cfg_filename[0] != '/') {
-		char *full_path = malloc(PATH_MAX);
-		if (getcwd(full_path, PATH_MAX - strlen(cfg_filename) - 1) == NULL) {
+		cfg_filename_fullpath = malloc(PATH_MAX);
+		if (getcwd(cfg_filename_fullpath, PATH_MAX - strlen(cfg_filename) - 1) == NULL) {
 			say_syserror("getcwd");
 			exit(EX_OSERR);
 		}
 
-		strcat(full_path, "/");
-		strcat(full_path, cfg_filename);
-		cfg_filename = full_path;
-	}
+		strcat(cfg_filename_fullpath, "/");
+		strcat(cfg_filename_fullpath, cfg_filename);
+
+		f = fopen(cfg_filename_fullpath, "r");
+		free(cfg_filename_fullpath);
+	} else
+		f = fopen(cfg_filename, "r");
+
+	if (f == NULL)
+		panic_syserror("can't open config `%s'", cfg_filename);
 
 	cfg_out = tbuf_alloc(eter_pool);
 	assert(cfg_out);
 
-	if (role == chkconfig) {
+	if (gopt(opt, 'k')) {
 		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
-			fprintf(stderr, "FAILED\n%.*s\n", cfg_out->len, (char *)cfg_out->data);
+			say_error("FAILED\n%.*s\n", cfg_out->len, (char *)cfg_out->data);
 
 			return 1;
 		}
@@ -441,7 +407,7 @@ main(int argc, char **argv)
 		      "%.*s", cfg_out->len, (char *)cfg_out->data);
 
 #ifdef STORAGE
-	if (role == cat) {
+	if (gopt_arg(opt, 'C', &cat_filename)) {
 		initialize_minimal();
 		if (access(cat_filename, R_OK) == -1) {
 			say_syserror("access(\"%s\")", cat_filename);
@@ -449,14 +415,39 @@ main(int argc, char **argv)
 		}
 		return mod_cat(cat_filename);
 	}
+
+	if (gopt(opt, 'I')) {
+		init_storage = true;
+		initialize_minimal();
+		mod_init();
+		next_lsn(recovery_state, 1);
+		confirm_lsn(recovery_state, 1);
+		snapshot_save(recovery_state, mod_snapshot);
+		exit(EXIT_SUCCESS);
+	}
 #endif
 
-	cfg.log_level += verbose;
+	if (gopt_arg(opt, 'g', &cfg_paramname)) {
+		tarantool_cfg_iterator_t *i;
+		char *key, *value;
+
+		i = tarantool_cfg_iterator_init();
+		while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
+			if (strcmp(key, cfg_paramname) == 0) {
+				printf("%s\n", value);
+				free(value);
+
+				return 0;
+			}
+
+			free(value);
+		}
+
+		return 1;
+	}
 
 	if (cfg.work_dir != NULL && chdir(cfg.work_dir) == -1)
 		say_syserror("can't chdir to `%s'", cfg.work_dir);
-
-	say_logger_init(cfg.logger_nonblock);
 
 	if (cfg.username != NULL) {
 		if (getuid() == 0 || geteuid() == 0) {
@@ -492,17 +483,8 @@ main(int argc, char **argv)
 		}
 #endif
 	}
-#ifdef STORAGE
-	if (init_storage) {
-		initialize_minimal();
-		mod_init();
-		next_lsn(recovery_state, 1);
-		confirm_lsn(recovery_state, 1);
-		snapshot_save(recovery_state, mod_snapshot);
-		exit(EXIT_SUCCESS);
-	}
-#endif
-	if (be_daemon)
+
+	if (gopt(opt, 'D'))
 		daemonize(1, 1);
 
 	if (cfg.pid_file != NULL) {
@@ -511,6 +493,9 @@ main(int argc, char **argv)
 	}
 
 	argv = init_set_proc_title(argc, argv);
+
+	say_logger_init(cfg.logger_nonblock);
+	booting = false;
 
 #if defined(UTILITY)
 	initialize_minimal();

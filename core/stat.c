@@ -44,11 +44,11 @@ static int stats_max = 0;
 static int base = 0;
 
 int
-stat_register(char **name, size_t count)
+stat_register(char **name, size_t max_idx)
 {
 	int initial_base = base;
 
-	for (int i = 0; i < count; i++, name++, base++) {
+	for (int i = 0; i < max_idx; i++, name++, base++) {
 		if (stats_size <= base) {
 			stats_size += 1024;
 			stats = realloc(stats, sizeof(*stats) * stats_size);
@@ -83,13 +83,13 @@ stat_print(struct tbuf *buf)
 	int max_len = 0;
 	tbuf_printf(buf, "statistics:\n");
 
-	for (int i = 0; i < stats_max; i++) {
+	for (int i = 0; i <= stats_max; i++) {
 		if (stats[i].name == NULL)
 			continue;
 		max_len = MAX(max_len, strlen(stats[i].name));
 	}
 
-	for (int i = 0; i < stats_max; i++) {
+	for (int i = 0; i <= stats_max; i++) {
 		if (stats[i].name == NULL)
 			continue;
 
@@ -108,7 +108,7 @@ stat_print(struct tbuf *buf)
 void
 stat_age(ev_timer *timer, int events __unused__)
 {
-	for (int i = 0; i < stats_max; i++) {
+	for (int i = 0; i <= stats_max; i++) {
 		if (stats[i].name == NULL)
 			continue;
 

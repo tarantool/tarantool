@@ -99,7 +99,10 @@ endif
 
 ifeq ($(HAVE_GIT),1)
 tarantool_version.h: FORCE
-	@$(SRCDIR)/scripts/make_version.sh > $@_
+	@echo -n 'const char tarantool_version_string[] = "' > $@_
+	@$(GIT) describe HEAD | tr -d \\n >> $@_
+	@echo '";' >> $@_
 	@diff -q $@ $@_ 2>/dev/null >/dev/null || ($(ECHO) "	GEN	" $(notdir $@); cp $@_ $@)
+	@rm $@_
 FORCE:
 endif

@@ -44,7 +44,8 @@
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
         _(MEMC_GET_MISS, 2)			\
-	_(MEMC_GET_HIT, 3)
+	_(MEMC_GET_HIT, 3)			\
+	_(MEMC_EXPIRED_KEYS, 4)
 
 ENUM(memcached_stat, STAT);
 STRS(memcached_stat, STAT);
@@ -202,7 +203,7 @@ flush_all(void *data)
 {
 	uintptr_t delay = (uintptr_t)data;
 	fiber_sleep(delay - ev_now());
-	khash_t(lstr2ptr_map) *map = memcached_index->idx.str_hash;
+	khash_t(lstr_ptr_map) *map = memcached_index->idx.str_hash;
 	for (khiter_t i = kh_begin(map); i != kh_end(map); i++) {
 		if (kh_exist(map, i)) {
 			struct box_tuple *tuple = kh_value(map, i);
@@ -649,7 +650,7 @@ void
 memcached_expire(void *data __unused__)
 {
 	static khiter_t i;
-	khash_t(lstr2ptr_map) *map = memcached_index->idx.str_hash;
+	khash_t(lstr_ptr_map) *map = memcached_index->idx.str_hash;
 
 	say_info("memcached expire fiber started");
 	for (;;) {
@@ -657,6 +658,8 @@ memcached_expire(void *data __unused__)
 			i = kh_begin(map);
 
 		struct tbuf *keys_to_delete = tbuf_alloc(fiber->pool);
+		int expired_keys = 0;
+
 		for (int j = 0; j < cfg.memcached_expire_per_loop; j++, i++) {
 			if (i == kh_end(map)) {
 				i = kh_begin(map);
@@ -678,7 +681,9 @@ memcached_expire(void *data __unused__)
 		while (keys_to_delete->len > 0) {
 			struct box_txn *txn = txn_alloc(BOX_QUIET);
 			delete(txn, read_field(keys_to_delete));
+			expired_keys++;
 		}
+		stat_collect(stat_base, MEMC_EXPIRED_KEYS, expired_keys);
 
 		fiber_gc();
 

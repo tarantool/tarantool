@@ -96,6 +96,11 @@ struct recovery_state {
 	void *data;
 };
 
+struct remote_state {
+	struct recovery_state *r;
+	int (*handler) (struct recovery_state * r, struct tbuf *row);
+};
+
 struct wal_write_request {
 	i64 lsn;
 	u32 len;

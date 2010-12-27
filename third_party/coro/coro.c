@@ -150,6 +150,40 @@ trampoline (int sig)
        #endif
        "\tret\n"
   );
+  asm (
+       ".text\n"
+       ".globl coro_save_and_longjmp\n"
+       ".type coro_save_and_longjmp, @function\n"
+       "coro_save_and_longjmp:\n"
+       #if __amd64
+         #define NUM_SAVED 6
+         "\tpush %rbp\n"
+         "\tpush %rbx\n"
+         "\tpush %r12\n"
+         "\tpush %r13\n"
+         "\tpush %r14\n"
+         "\tpush %r15\n"
+         "\tmov  %rsp, (%rdi)\n"
+         "\tmovq %rsi, %rdi\n"
+         "\tsubq $8, %rsp\n"
+         "\tmovl %edx, %esi\n"
+         "\tcall longjmp\n"
+       #elif __i386
+         #define NUM_SAVED 4
+         "\tpush %ebp\n"
+         "\tpush %ebx\n"
+         "\tpush %esi\n"
+         "\tpush %edi\n"
+         "\tmov  %esp, (%eax)\n"
+         "\tsubl  $0x28,%esp\n"
+         "\tmovl %ecx,0x4(%esp)\n"
+         "\tmovl %edx,(%esp)\n"
+         "\tcall longjmp\n"
+       #else
+         #error unsupported architecture
+       #endif
+       "\tret\n"
+  );
 
 # endif
 

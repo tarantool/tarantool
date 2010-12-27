@@ -30,11 +30,16 @@ else
   include $(SRCDIR)/scripts/rules.mk
 endif
 
+.PHONY: test
+test:
+	cd ./test && ./test-run.py
+
+
 ifeq ("$(origin module)", "command line")
 .PHONY: clean
 clean:
 	@echo "	CLEAN $(module)"
-	@rm -rf $(obj) $(dep) tarantool_$(module) _* lcov test
+	@rm -rf $(obj) $(dep) tarantool_$(module) _* lcov
 else
 .PHONY: clean
 clean:

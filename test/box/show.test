@@ -1,0 +1,19 @@
+# encoding: tarantool
+#
+exec admin "show stat"
+exec admin "help"
+exec admin "show configuration"
+exec admin "show stat"
+exec admin "save coredump"
+exec admin "save snapshot"
+exec admin "exec module command"
+sys.stdout.push_filter("(\d\.\d)\.\d-\d+-\S+", "\\1.minor-<rev>-<commit>")
+sys.stdout.push_filter("pid: \d+", "pid: <pid>")
+exec admin "show info"
+sys.stdout.clear_all_filters()
+sys.stdout.push_filter(".*", "")
+exec admin "show fiber"
+exec admin "show slab"
+exec admin "show palloc"
+sys.stdout.clear_all_filters()
+# vim: syntax=python

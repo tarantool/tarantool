@@ -44,8 +44,9 @@ void mod_exec(char *str, int len, struct tbuf *out);
 extern struct tarantool_module module;
 extern struct tarantool_cfg cfg;
 extern struct tbuf *cfg_out;
-extern char *cfg_filename;
-extern bool init_storage;
+extern const char *cfg_filename;
+extern bool init_storage, booting;
+extern char *binary_filename;
 i32 reload_cfg(struct tbuf *out);
 void snapshot(void *ev __unused__, int events __unused__);
 const char *tarantool_version(void);
@@ -54,8 +55,5 @@ double tarantool_uptime(void);
 
 char **init_set_proc_title(int argc, char **argv);
 void set_proc_title(const char *format, ...);
-
-enum tarantool_role { usage, cat, def, chkconfig };
-extern enum tarantool_role role;
 
 #endif

@@ -1,81 +1,345 @@
+; Mail.RU IPROTO protocol, Tarantool/Silverbox subset.
+;
+; The latest version of this document can be found in
+; tarantool source tree, doc/silverbox-protocol.txt
+;
+; IPROTO is a binary request/response protocol that features a
+; complete access to Tarantool functionality, including:
+; - request multiplexing, e.g. ability to asynchronously issue
+;   multiple requests via the same connection
+; - response format that supports zero-copy writes
+;
+; The atoms of representation in the protocol include:
+;
+; int8 - a single 8-bit byte (i.e. an octet)
+;
+; int32 - a 32-bit integer in big-endian format (Intel x86)
+;
+; int32_ber - a 1 to 5 byte BER encoding of a 32 bit integer
+;
+; BER stands for Basic Encoding Rules, and allows to unequivocally
+; compact a 32-bit integer into 1 to 5 bytes depending on its value.
+; For more information, see
+; http://en.wikipedia.org/wiki/Basic_Encoding_Rules and
+; http://www.itu.int/ITU-T/studygroups/com17/languages/X.690-0207.pdf,
+; chapter 8.3 Encoding of an Integer Value
 
-varint32 - int32 BER encoding (http://perldoc.perl.org/perlpacktut.html#Another-Portable-Binary-Encoding)
-field_t = <size, varint32><data, char *>
-tuple_t = <field[1], field_t>...<field[n], field_t>
-key_t = <key_cardinality, int32_t><key_fields, tuple_t>
+; All requests and responses utilize the same basic structure:
 
-ret_code:
-  * 0x******00 - ok
-  * 0x******01 - retry later
-  * 0x******02 - permanent error
-flags:
-  * BOX_RETURN_TUPLE = 0x01
+<packet> ::= <request> | <response>
 
-* Insert (msg = 13)
-  * Query:
-    * <n, uint32_t> - namespace number
-    * <flags, uint32_t>
-    * <cardinality, uint32_t> - tuple cardinality
-      * <field[0], field_t>
-      * ...
-      * <field[cardinality - 1], field_t>
-  * Answer:
-    * <ret_code, uint32_t>
-    * <tuples_affected, uint32_t>
-    if (flags & BOX_RETURN_TUPLE)
-      * <tuple_data_size, uint32_t>
-      * <cardinality, uint32_t>
-      * <tuple_data, tuple_t>
-* Select (msg = 17)
-  * Query:
-    * <n, uint32_t> - namespace number
-    * <index_n, uint32_t> - index to use
-    * <offset, uint32_t> - offset (applied to the whole resultset)
-    * <limit, uint32_t> - limit (the same)
-    * <count, uint32_t> - number of keys to select by
-      * <key[0], key_t>
-      * ...
-      * <key[count - 1], key_t>
-  * Answer:
-    * <ret_code, uint32_t>
-    * <count, uint32_t> - tuples in answer
-      * tuple[0]:
-        * <tuple_data_size, uint32_t>
-        * <cardinality, uint32_t>
-        * <tuple_data, tuple_t>
-      * ...
-      * tuple[count - 1]:
-        * ...
-* Update fields (msg = 19)
-  * Query:
-    * <n, uint32_t> - namespace number
-    * <flags, uint32_t>
-    * <key, key_t> // for now key cardinality of 1 is only allowed
-    * <op_cnt, uint32_t> - number of operations to do
-      * op[0]:
-        * <fieldno, uint32_t> - number of field to update
-        * <op, uint8_t> - operation:
-          * 0 - set
-          * 1 - add
-          * 2 - and
-          * 3 - xor
-          * 4 - or
-        * <argument, field_t> - argument for operation, limitations:
-          * for add - int32_t
-          * for and, or, xor - uint32_t
-      * ...
-      * op[op_cnt - 1]:
-        * ...
-  * Answer:
-    * <ret_code, uint32_t>
-    * <tuples_affected, uint32_t>
-    if (flags & BOX_RETURN_TUPLE)
-      * <tuple_data_size, uint32_t>
-      * <cardinality, uint32_t>
-      * <tuple_data, tuple_t>
-* Delete (msg = 20)
-  * Query:
-    * <n, uint32_t> - namespace number
-    * <key, key_t> // for now key cardinality of 1 is only allowed
-  * Answer:
-    * <ret_code, uint32_t>
+<request> ::= <header><request_body>
+
+<response> ::= <header><return_code><response_body>
+
+;
+; <header> has a fixed structure of three 4-byte integers (12 bytes):
+
+<header> ::= <type><body_length><request_id>
+
+; <type> represents a request type, a single server command,
+; such as PING, SELECT, UPDATE, DELETE, INSERT, etc.
+; <type> is replicated intact in the response header.
+; The currently supported types are:
+; - 13    -- <insert>
+; - 17    -- <select>
+; - 19    -- <update>
+; - 20    -- <delete>
+; - 65280 -- <ping>
+; This list is sparse since a number of old commands
+; were deprecated and removed.
+
+<type> ::= <int32>
+
+;
+; <body_length> tells the sender or receiver the length of data
+; that follows the header. If there is no data, <body_length> is 0.
+; However, <request_body> or <response_body> are always present.
+;
+; The only exception is <ping>: its request body is empty, and
+; so is response. In other words, <ping> request packet
+; consists solely of a 12-byte header (65280, 0, 0)
+; and gets the same 12-byte header in response.
+
+<body_length> ::= <int32>
+
+;
+; <request_id> is a unique request identifier set by the client,
+; The identifier is necessary to allow request multiplexing --
+; i.e. sending multiple requests through the same connection
+; before fetching a response to any of them.
+; The value of the identifier currently bears no meaning to the
+; server. Similarly to request <type>, it's simply copied to the
+; response header as-is.
+; Consequently, <request_id> can be 0 or two requests
+; can have an identical id.
+
+<request_id> ::= <int32>
+
+; <request_body> holds actual command data.
+; Its format and interpretation are defined by the value of
+; request <type>.
+
+<request_body> ::= <select_request_body> |
+                   <insert_request_body> |
+                   <update_request_body> |
+                   <delete_request_body>
+
+;
+; <response_body> carries command reply
+; 
+
+<response_body> ::= <select_response_body> |
+                    <insert_response_body> |
+                    <update_response_body> |
+                    <delete_response_body>
+
+; <select_request_body> (required <header> <type> is 17):
+;
+; Specify which namespace to query, which index in the namespace
+; to use, offset in the resulting tuple set (set to 0 for no offset),
+; a limit (set to 4294967295 for no limit), and one or several
+; keys to use in lookup. When more than one key is given, they
+; specify a disjunctive search condition (key1 or key2 or ...).
+;
+
+<select_request_body> ::= <namespace_no><index_no>
+                          <offset><limit><count><tuple>+
+
+; Namespace number is a non-negative integer, starting from 0.
+; All namespaces are defined in the server configuration file,
+; and then referred to by numeric id.
+
+<namespace_no> ::= <int32>
+
+; Tarantool supports HASH and TREE indexes. Indexes are
+; enumerated similarly to namespaces, starting from 0.
+; Each namespace has at least index #0, which defines
+; the primary key.
+
+<index_no> ::= <int32>
+
+; offset in the result set
+
+<offset> ::= <int32>
+
+; limit for the result set
+
+<limit> ::= <int32>
+
+; key count in the disjunctive set
+
+<count> ::= <int32>
+
+;
+; A tuple that represents a search key simply lists all key
+; fields, preceded with key cardinality (number of list
+; elements). Each key in <select_request_body> can have a
+; different cardinality.
+
+<tuple> ::= <cardinality><field>+
+
+;
+; If a key is not fully specified, i.e. has smaller cardinality
+; than the corresponding index, each unspecified field is treated
+; as a wildcard.
+;
+
+<cardinality> ::= <int32>
+
+;
+; A field represents a single atom of storage. In key/value
+; paradigm, Tarantool's "value" is a sequence of fields.
+; A single unit of storage, therefore, must contain all fields
+; of all (possibly multipart) keys and zero or more fields
+; treated as "data". To do a <select> the user only needs to
+; define fields of those key that is used for search.
+;
+
+<field> ::= <data_length_ber><data>
+
+;
+; BER-encoded integer
+;
+
+<data_length_ber> ::= <int8>+
+;
+; SELECT may return zero, one or several tuples.
+; <select_response_body> starts with the number of found
+; tuples:
+;
+
+<select_response_body> ::= <count><fq_tuple>*
+
+;
+; Tuples returned by the server (we call them "fully qualified")
+; are always preceded with calculated information:
+; total size of the tuple and number of fields in it.
+; This is how the tuple is stored on server side.
+; While this information can be often derived from body length,
+; it allows the recipient to simplify memory allocation and tuple
+; decoding. Certain requests, such as
+; <select>, can return more than one tuple. In that case
+; fully qualified tuples are also used to identify tuple
+; boundaries: in Tarantool, tuples have variable cardinality.
+;
+
+<fq_tuple> ::= <size><cardinality><field>+
+
+<size> ::= <int32>
+
+;
+; It is not possible to insert more than one tuple at a time.
+; Thus <insert_request_body> (<header> <type> = 13) simply
+; holds one tuple, and which namespace to put it into.
+;
+
+<insert_request_body> ::= <namespace_no><flags><tuple>
+
+; The only defined flag BOX_RETURN_TUPLE (0x01) indicates
+; that it is required to return the inserted tuple back:
+
+<flags> ::= 0 | 1
+
+;
+; A tuple may already exist. In that case INSERT
+; returns 0 for tuple count in response. If BOX_RETURN_TUPLE
+; is set, the inserted tuple will be sent back:
+
+<insert_response_body> ::= <count> | <count><fq_tuple>
+
+; <update> request, <type> = 19 is similar to <insert>:
+; - <namespace_no>: same as in <select> or <insert>
+; - <flags>, <tuple>: same as in <insert>
+; Index number for tuple lookup does not need to be provided,
+; since only primary key updates are allowed.
+; Moreover, <tuple> cardinality is always 1, since currently
+; primary keys are always single-dimensioned.
+; - <count> specifies possibly zero operation count
+;
+
+<update_request_body> ::= <namespace_no><flags><tuple><count><operation>+
+
+;
+; Operations are optional and exist primarily to allow
+; updates of individual fields.
+;
+
+<operation> ::= <field_no><op_code><op_arg>
+
+;
+; Field index, specifies argument(s) of the operation
+;
+
+<field_no> ::= <int32>
+
+;
+; 0 - assign operation argument to field <field_no>
+; The rest of operations are only defined for 32-bit integer
+; types:
+; 1 - add argument to field <field_no>, both arguments
+; are treated as signed 32-bit ints
+; 2 - bitwise AND of argument and field <field_no>
+; 3 - bitwise XOR of argument and field <field_no>
+; 4 - bitwise OR of argument and field <field_no>
+
+<op_code> ::= 0 | 1 | 2 | 3
+
+;
+; It's an error to specify an argument of a type that
+; differs from expected type.
+;
+
+<op_arg> ::= <field>
+
+<update_response_body> ::= <insert_response_body>
+
+;
+; <delete>, request <type> = 20
+; Similarly to updates, <delete> always uses the
+; primary key.
+;
+
+<delete_request_body> ::= <namespace_no><tuple>
+
+;
+; Return the number of deleted tuples.
+; Currently it's always 1
+;
+
+<delete_response_body> ::= <count>
+
+;
+; The server response, in addition to response header and body,
+; contains a return code. It's a 4-byte integer, that has
+; a lower 1-byte completion status part, and a higher 3-byte
+; error code part.
+;
+
+<return_code> ::= <int32>
+
+; Currently, the completion status is complementary:
+; it can be deduced from the error code.
+;
+; Currently there are only 3 completion status codes
+; in use:
+; 0  - success; The only possible error code with this status is
+       0, ERR_CODE_OK
+; 1  - try again; An indicator of an intermittent error.
+;      Usually is returned when two clients attempt to change
+;      the same tuple simultaneously.
+;      (<update> is not always done atomically)
+; 2  - error
+;
+; The error code holds the actual error. Existing error codes include:
+;
+;  Completion status 0 (success)
+;  -----------------------------
+;  0x00000000 -- ERR_CODE_OK
+;
+;  0x00003600 -- ERR_CODE_NOTHING
+;                The query does not support data modification or return
+;
+;  Completion status 1 (try again)
+;  -------------------------------
+;  0x00000401 -- ERR_CODE_NODE_IS_RO
+;                The requested data is blocked from modification
+;
+;  0x00000601 -- ERR_CODE_NODE_IS_LOCKED
+;                The requested data is not available
+;
+;  0x00000701 -- ERR_CODE_MEMORY_ISSUE
+;                An error occurred when allocating memory
+;
+;  Completion status 2 (error)
+;  ---------------------------
+;
+;  0x00000102  -- ERR_CODE_NONMASTER
+;                 An attempt was made to change data on a read-only port
+;
+;  0x00000202  -- ERR_CODE_ILLEGAL_PARAMS
+;                 Malformed query
+;
+;  0x00000a02 -- ERR_CODE_UNSUPPORTED_COMMAND
+;                The query is not recognized
+;
+;  0x00001e02 -- ERR_CODE_WRONG_FIELD
+;                An unknown field was requested
+;
+;  0x00001f02 -- ERR_CODE_WRONG_NUMBER
+;                An out-of-range numeric value was included in the query
+;
+;  0x00002002 -- ERR_CODE_DUPLICATE
+;                An attempt was made to create an object with an existing key.
+;
+;  0x000026002 -- ERR_CODE_WRONG_VERSION
+;                 The protocol version is not supported
+;
+;  0x000027002 -- ERR_CODE_UNKNOWN_ERROR
+;                 Unknown error
+;
+; Convenience macros that define hexadecimal constants for <int32>
+; return codes (completion status + code) can be found in
+; include/iproto.h.
+;
+; vim: syntax=bnf
