@@ -52,6 +52,7 @@ static const char help[] =
 	"save coredump\r\n"
 	"save snapshot\r\n"
 	"exec module command\r\n"
+	"reload configuration\r\n"
 	;
 
 
@@ -74,10 +75,19 @@ end(struct tbuf *out)
 	tbuf_printf(out, "---\r\n");
 }
 
+static void
+fail(struct tbuf *out, struct tbuf *err)
+{
+	tbuf_printf(out, "fail"
+			 "%.*s\r\n", err->len, (char *)err->data);
+	end(out);
+}
+
 static int
 admin_dispatch(void)
 {
 	struct tbuf *out = tbuf_alloc(fiber->pool);
+	struct tbuf *err = tbuf_alloc(fiber->pool);
 	int cs;
 	char *p, *pe;
 	char *strstart, *strend;
@@ -125,6 +135,7 @@ admin_dispatch(void)
 		snapshot = "sn"("a"("p"("s"("h"("o"("t")?)?)?)?)?)?;
 		exec = "ex"("e"("c")?)?;
 		string = [^\r\n]+ >{strstart = p;}  %{strend = p;};
+		reload = "re"("l"("o"("a"("d")?)?)?)?;
 
 		commands = (help			%{tbuf_append(out, help, sizeof(help));}		|
 			    exit			%{return 0;}						|
@@ -137,7 +148,8 @@ admin_dispatch(void)
 			    save " "+ coredump		%{coredump(60); ok(out);}				|
 			    save " "+ snapshot		%{snapshot(NULL, 0); ok(out);}				|
 			    exec " "+ string		%{mod_exec(strstart, strend - strstart, out); end(out);}|
-			    check " "+ slab		%{slab_validate(); ok(out);});
+			    check " "+ slab		%{slab_validate(); ok(out);}				|
+			    reload " "+ configuration	%{if (reload_cfg(err)) { fail(out, err); } else { ok(out); }});
 
 	        main := commands eol;
 		write init;
