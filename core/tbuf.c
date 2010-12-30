@@ -175,7 +175,7 @@ tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 
 	b->len += printed_len;
 
-	va_end(ap);
+	va_end(ap_copy);
 }
 
 void
