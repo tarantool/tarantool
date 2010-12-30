@@ -34,8 +34,8 @@
 
 struct recovery_state *recovery_state;
 void mod_init(void);
-i32 mod_chkconfig(struct tarantool_cfg *conf);
-void mod_reloadconfig(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
+i32 mod_check_config(struct tarantool_cfg *conf);
+void mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
 int mod_cat(const char *filename);
 void mod_snapshot(struct log_io_iter *);
 void mod_info(struct tbuf *out);

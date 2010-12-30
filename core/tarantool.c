@@ -92,7 +92,7 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	if (check_cfg_tarantool_cfg(conf) != 0)
 		return -1;
 
-	return mod_chkconfig(conf);
+	return mod_check_config(conf);
 }
 
 i32
@@ -139,7 +139,7 @@ reload_cfg(struct tbuf *out)
 	}
 	destroy_tarantool_cfg(&new_cfg1);
 
-	mod_reloadconfig(&cfg, &new_cfg2);
+	mod_reload_config(&cfg, &new_cfg2);
 
 	destroy_tarantool_cfg(&cfg);
 
@@ -322,7 +322,7 @@ main(int argc, char **argv)
 				       gopt_longs("cfg-get", "cfg_get"),
 				       "=KEY", "return a value from configuration file described by KEY"),
 			   gopt_option('k', 0, gopt_shorts(0),
-				       gopt_longs("chkconfig"),
+				       gopt_longs("check_config"),
 				       NULL, "check config file"),
 			   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
 				       gopt_longs("config"),
@@ -387,7 +387,7 @@ main(int argc, char **argv)
 
 	if (gopt(opt, 'k')) {
 		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
-			say_error("chkconfig FAILED"
+			say_error("check_config FAILED"
 				  "%.*s", cfg_out->len, (char *)cfg_out->data);
 
 			return 1;
