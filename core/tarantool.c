@@ -307,7 +307,9 @@ initialize_minimal()
 int
 main(int argc, char **argv)
 {
+#ifdef STORAGE
 	const char *cat_filename = NULL;
+#endif
 	const char *cfg_paramname = NULL;
 
 #if CORO_ASM
