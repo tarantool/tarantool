@@ -269,7 +269,6 @@ sub Insert {
 
 sub _unpack_select {
     my ($self, $ns, $debug_prefix) = @_;
-    local *@;
     $debug_prefix ||= "SELECT";
     confess __LINE__."$self->{name}: [$debug_prefix]: Bad response" if length $_[3] < 4;
     my $result_count = unpack('L', substr($_[3], 0, 4, ''));
