@@ -15,6 +15,7 @@ from tarantool_connection import AdminConnection, DataConnection
 import tarantool_preprocessor
 import re
 import cStringIO
+import string
 
 class TestRunException(RuntimeError):
   """A common exception to use across the program."""
@@ -78,7 +79,7 @@ class Test:
     exception. The exception is raised only if is_force flag is
     not set."""
 
-    sys.stdout.write(self.name)
+    sys.stdout.write(string.ljust(self.name, 31))
 # for better diagnostics in case of a long-running test
     sys.stdout.flush()
 
@@ -112,14 +113,14 @@ class Test:
         self.is_equal_result = filecmp.cmp(self.result, self.reject)
 
     if self.is_executed_ok and self.is_equal_result:
-      print "\t\t\t[ pass ]"
+      print "[ pass ]"
       os.remove(self.reject)
     elif (self.is_executed_ok and not self.is_equal_result and not
         os.path.isfile(self.result)):
       os.rename(self.reject, self.result)
-      print "\t\t\t[ NEW ]"
+      print "[ NEW ]"
     else:
-      print "\t\t\t[ fail ]"
+      print "[ fail ]"
       where = ""
       if not self.is_executed_ok:
         self.print_diagnostics()
@@ -239,7 +240,7 @@ class TestSuite:
     longsep = "=============================================================================="
     shortsep = "------------------------------------------------------------"
     print longsep
-    print "TEST\t\t\t\tRESULT"
+    print string.ljust("TEST", 31), "RESULT"
     print shortsep
     failed_tests = []
     self.ini["server"] = server
