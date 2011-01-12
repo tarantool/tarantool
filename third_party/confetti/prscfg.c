@@ -1952,7 +1952,7 @@ yyreturn:
 
 static int
 prscfg_yyerror(prscfg_yyscan_t yyscanner, char *msg) {
-	out_warning(CNF_SYNTAXERROR, "gram_yyerror: %s at line %d\n", msg, prscfgGetLineNo(yyscanner));
+	out_warning(CNF_SYNTAXERROR, "gram_yyerror: %s at line %d", msg, prscfgGetLineNo(yyscanner));
 	return 0;
 }
 
@@ -4343,7 +4343,7 @@ void prscfg_yyfree (void * ptr , yyscan_t yyscanner)
 
 static int
 scan_yyerror(char *msg, int lineno) {
-    out_warning(CNF_SYNTAXERROR, "scan_yyerror: %s at line %d\n", msg, lineno);
+    out_warning(CNF_SYNTAXERROR, "scan_yyerror: %s at line %d", msg, lineno);
 	return 0;
 }
 

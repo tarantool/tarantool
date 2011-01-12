@@ -56,12 +56,97 @@
 static pid_t master_pid;
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
 const char *cfg_filename = DEFAULT_CFG_FILENAME;
+char *cfg_filename_fullpath = NULL;
+struct tbuf *cfg_out = NULL;
 char *binary_filename;
 struct tarantool_cfg cfg;
 
 bool init_storage, booting = true;
 
 extern int daemonize(int nochdir, int noclose);
+
+static i32
+load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
+{
+	FILE *f;
+	i32 n_accepted, n_skipped;
+
+	tbuf_reset(cfg_out);
+
+	if (cfg_filename_fullpath != NULL)
+		f = fopen(cfg_filename_fullpath, "r");
+	else
+		f = fopen(cfg_filename, "r");
+
+	if (f == NULL) {
+		tbuf_printf(cfg_out, "\r\n\tcan't open config `%s'", cfg_filename);
+
+		return -1;
+	}
+
+	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly, &n_accepted, &n_skipped);
+	fclose(f);
+	if (n_accepted == 0 || n_skipped != 0)
+		return -1;
+
+	if (check_cfg_tarantool_cfg(conf) != 0)
+		return -1;
+
+	return mod_check_config(conf);
+}
+
+i32
+reload_cfg(struct tbuf *out)
+{
+	struct tarantool_cfg new_cfg1, new_cfg2;
+	i32 ret;
+
+	// Load with checking readonly params
+	if (dup_tarantool_cfg(&new_cfg1, &cfg) != 0) {
+		destroy_tarantool_cfg(&new_cfg1);
+
+		return -1;
+	}
+	ret = load_cfg(&new_cfg1, 1);
+	tbuf_append(out, cfg_out->data, cfg_out->len);
+	if (ret == -1) {
+		destroy_tarantool_cfg(&new_cfg1);
+
+		return -1;
+	}
+	// Load without checking readonly params
+	if (fill_default_tarantool_cfg(&new_cfg2) != 0) {
+		destroy_tarantool_cfg(&new_cfg2);
+
+		return -1;
+	}
+	ret = load_cfg(&new_cfg2, 0);
+	tbuf_append(out, cfg_out->data, cfg_out->len);
+	if (ret == -1) {
+		destroy_tarantool_cfg(&new_cfg1);
+
+		return -1;
+	}
+	// Compare only readonly params
+	char *diff = cmp_tarantool_cfg(&new_cfg1, &new_cfg2, 1);
+	if (diff != NULL) {
+		destroy_tarantool_cfg(&new_cfg1);
+		destroy_tarantool_cfg(&new_cfg2);
+
+		tbuf_printf(out, "\r\n\tCould not accept read only '%s' option", diff);
+
+		return -1;
+	}
+	destroy_tarantool_cfg(&new_cfg1);
+
+	mod_reload_config(&cfg, &new_cfg2);
+
+	destroy_tarantool_cfg(&cfg);
+
+	cfg = new_cfg2;
+
+	return 0;
+}
 
 const char *
 tarantool_version(void)
@@ -219,15 +304,13 @@ initialize_minimal()
 	initialize(0.1, 4, 2);
 }
 
-
 int
 main(int argc, char **argv)
 {
+#ifdef STORAGE
 	const char *cat_filename = NULL;
+#endif
 	const char *cfg_paramname = NULL;
-	char *cfg_filename_fullpath;
-	int n_accepted, n_skipped;
-	FILE *f;
 
 #if CORO_ASM
 	save_rbp(&main_stack_frame);
@@ -240,6 +323,9 @@ main(int argc, char **argv)
 		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
 				       gopt_longs("cfg-get", "cfg_get"),
 				       "=KEY", "return a value from configuration file described by KEY"),
+			   gopt_option('k', 0, gopt_shorts(0),
+				       gopt_longs("check_config"),
+				       NULL, "check config file"),
 			   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
 				       gopt_longs("config"),
 				       "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
@@ -262,7 +348,7 @@ main(int argc, char **argv)
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 	binary_filename = argv[0];
 
-	if (gopt(opt, 'V')){
+	if (gopt(opt, 'V')) {
 		puts(tarantool_version());
 		return 0;
 	}
@@ -296,22 +382,25 @@ main(int argc, char **argv)
 
 		strcat(cfg_filename_fullpath, "/");
 		strcat(cfg_filename_fullpath, cfg_filename);
+	}
 
-		f = fopen(cfg_filename_fullpath, "r");
-		free(cfg_filename_fullpath);
-	} else
-		f = fopen(cfg_filename, "r");
+	cfg_out = tbuf_alloc(eter_pool);
+	assert(cfg_out);
 
-	if (f == NULL)
-		panic_syserror("can't open config `%s'", cfg_filename);
+	if (gopt(opt, 'k')) {
+		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
+			say_error("check_config FAILED"
+				  "%.*s", cfg_out->len, (char *)cfg_out->data);
 
-	fill_default_tarantool_cfg(&cfg);
-	parse_cfg_file_tarantool_cfg(&cfg, f, 0, &n_accepted, &n_skipped);
-	check_cfg_tarantool_cfg(&cfg);
-	fclose(f);
+			return 1;
+		}
 
-	if (n_accepted == 0 || n_skipped > 0)
-		panic("there were errors in the config file");
+		return 0;
+	}
+
+	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0)
+		panic("can't load config:"
+		      "%.*s", cfg_out->len, (char *)cfg_out->data);
 
 #ifdef STORAGE
 	if (gopt_arg(opt, 'C', &cat_filename)) {
