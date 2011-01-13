@@ -108,6 +108,16 @@ class Options:
         default = "var",
         help = "Path to data directory. Default: var.")
 
+    parser.add_argument(
+        "--mem",
+        dest = "mem",
+        action = "store_true",
+        default = False,
+        help = """Run test suite in memory, using tmpfs or ramdisk.
+        Is used only if vardir is not an absolute path. In that case
+        vardir is sym-linked to /dev/shm/<vardir>.
+        Linux only. Default: true""")
+
     self.check(parser)
     self.args = parser.parse_args()
 

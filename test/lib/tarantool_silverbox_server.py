@@ -34,6 +34,14 @@ def prepare_gdb(args, vardir):
     print >>gdbinit, "run"
   return args
 
+
+def check_tmpfs_exists():
+  return os.uname()[0] in 'Linux' and os.path.isdir("/dev/shm")
+
+def create_tmpfs_vardir(vardir):
+  os.mkdir(os.path.join("/dev/shm", vardir))
+  os.symlink(os.path.join("/dev/shm", vardir), vardir)
+
 class TarantoolSilverboxServer:
   """Server represents a single server instance. Normally, the
   program operates with only one server, but in future we may add
@@ -56,6 +64,8 @@ class TarantoolSilverboxServer:
     specified in the prgoram options.
     Currently this is implemented for tarantool_silverbox only."""
 
+    vardir = self.args.vardir
+
     if not silent:
       print "Installing the server..."
 
@@ -68,15 +78,24 @@ class TarantoolSilverboxServer:
 
     if not silent:
       print "  Creating and populating working directory in " +\
-      self.args.vardir + "..."
+      vardir + "..."
 
-    if os.access(self.args.vardir, os.F_OK):
+    if os.access(vardir, os.F_OK):
       if not silent:
         print "  Found old vardir, deleting..."
       self.kill_old_server()
-      shutil.rmtree(self.args.vardir, ignore_errors = True)
+      if os.path.islink(vardir):
+        shutil.rmtree(os.readlink(vardir), ignore_errors = True)
+        os.remove(vardir)
+      else:
+        shutil.rmtree(vardir, ignore_errors = True)
 
-    os.mkdir(self.args.vardir)
+    if (self.args.mem == True and check_tmpfs_exists() and
+        os.path.basename(vardir) == vardir):
+      create_tmpfs_vardir(vardir)
+    else:
+      os.mkdir(vardir)
+
     shutil.copy(self.suite_ini["config"], self.args.vardir)
 
     subprocess.check_call([self.abspath_to_exe, "--init_storage"],
