@@ -63,7 +63,6 @@ size_t tbuf_reserve(struct tbuf *b, size_t count);
 void tbuf_reset(struct tbuf *b);
 void *tbuf_peek(struct tbuf *b, size_t count);
 
-void tbuf_append(struct tbuf *b, const void *data, size_t len);
 void tbuf_append_field(struct tbuf *b, void *f);
 void tbuf_printf(struct tbuf *b, const char *format, ...)
     __attribute__ ((format(FORMAT_PRINTF, 2, 3)));

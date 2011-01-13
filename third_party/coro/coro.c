@@ -305,11 +305,7 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, long ssiz
 
 # elif CORO_ASM
 
-  extern void * main_stack_frame;
-
   ctx->sp = (void **)(ssize + (char *)sptr);
-  *--ctx->sp = (void *)main_stack_frame;
-  *--ctx->sp = (void *)main_stack_frame;
   *--ctx->sp = (void *)0xdeadbeef; /* needed for alignment only */
   *--ctx->sp = (void *)coro_init;
   ctx->sp -= NUM_SAVED;

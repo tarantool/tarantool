@@ -89,6 +89,16 @@ fiber_msg(const struct tbuf *buf)
 KHASH_MAP_INIT_INT(fid2fiber, void *, realloc);
 static khash_t(fid2fiber) *fibers_registry;
 
+static void
+update_frame_address(struct fiber *fiber)
+{
+#ifdef BACKTRACE
+	fiber->last_frame = frame_addess();
+#else
+	(void)fiber;
+#endif
+}
+
 void
 fiber_call(struct fiber *callee)
 {
@@ -100,7 +110,7 @@ fiber_call(struct fiber *callee)
 	fiber = callee;
 	*sp++ = caller;
 
-	save_rbp(caller->rbp);
+	update_frame_address(caller);
 
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
@@ -117,7 +127,7 @@ fiber_raise(struct fiber *callee, jmp_buf exc, int value)
 	fiber = callee;
 	*sp++ = caller;
 
-	save_rbp(caller->rbp);
+	update_frame_address(caller);
 
 	callee->csw++;
 	coro_save_and_longjmp(&caller->coro.ctx, exc, value);
@@ -130,7 +140,7 @@ yield(void)
 	struct fiber *caller = fiber;
 
 	fiber = callee;
-	save_rbp(caller->rbp);
+	update_frame_address(caller);
 
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
@@ -1051,24 +1061,11 @@ fiber_info(struct tbuf *out)
 		tbuf_printf(out, "    fd: %4i\n", fiber->fd);
 		tbuf_printf(out, "    peer: %s\n", fiber_peer_name(fiber));
 		tbuf_printf(out, "    stack: %p\n", stack_top);
-
-#if defined(__x86) || defined (__amd64) || defined(__i386)
-		tbuf_printf(out, "    exc: %p, frame: %p\n", ((void **)fiber->exc)[3], ((void **)fiber->exc)[3] + 2 * sizeof(void *));
-
-		void *stack_bottom = fiber->coro.stack;
-		struct frame *frame = fiber->rbp;
-		tbuf_printf(out, "    backtrace:\n");
-		while (stack_bottom < (void *)frame && (void *)frame < stack_top) {
-			tbuf_printf(out, "        - { rbp: %p, frame: %p, pc: %p",
-				    frame, (void *)frame + 2 * sizeof(void *), frame->ret);
-#ifdef RESOLVE_SYMBOLS
-			struct fsym *s = addr2sym(frame->ret);
-			if (s)
-				tbuf_printf(out, " <%s+%i>", s->name, frame->ret - s->addr);
-#endif
-			tbuf_printf(out, " }\n");
-			frame = frame->rbp;
-		}
+		tbuf_printf(out, "    exc: %p, frame: %p\n",
+			    ((void **)fiber->exc)[3], ((void **)fiber->exc)[3] + 2 * sizeof(void *));
+#ifdef BACKTRACE
+		tbuf_printf(out, "    backtrace:\n%s",
+			    backtrace(fiber->last_frame, fiber->coro.stack, fiber->coro.stack_size));
 #endif
 	}
 }

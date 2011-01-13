@@ -232,11 +232,13 @@ main(int argc, char **argv)
 	int n_accepted, n_skipped;
 	FILE *f;
 
-	save_rbp(main_stack_frame);
-
 	master_pid = getpid();
 	stat_init();
 	palloc_init();
+
+#ifdef RESOLVE_SYMBOLS
+	load_symbols(argv[0]);
+#endif
 
 	const char *short_opt = "c:pvVD";
 	const struct option long_opt[] = {
@@ -443,9 +445,6 @@ main(int argc, char **argv)
 		atexit(remove_pid);
 	}
 
-#ifdef RESOLVE_SYMBOLS
-	load_syms(argv[0]);
-#endif
 	argv = init_set_proc_title(argc, argv);
 
 #if defined(UTILITY)

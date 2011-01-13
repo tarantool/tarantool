@@ -112,29 +112,23 @@ void *xrealloc(void *ptr, size_t size);
 
 void __gcov_flush();
 
-struct frame {
-	struct frame *rbp;
-	void *ret;
-};
 
-#if __amd64
-#  define save_rbp(rbp) asm("movq %%rbp, %0"::"m"(rbp))
-#elif __i386
-#  define save_rbp(rbp) asm("movl %%ebp, %0"::"m"(rbp))
-#else
-#  define save_rbp(rbp) (void)0
+extern void *__libc_stack_end;
+
+#if __GNUC__ && (defined(__x86) || defined (__amd64) || defined(__i386))
+#define BACKTRACE
+#define frame_addess() __builtin_frame_address(0)
+char *backtrace(void *frame, void *stack, size_t stack_size);
 #endif
 
-extern void *main_stack_frame;
-
 #ifdef RESOLVE_SYMBOLS
-struct fsym {
-	void* addr;
+struct symbol {
+	void *addr;
 	const char *name;
 	void *end;
 };
-struct fsym *addr2sym(void *addr);
-void load_syms(const char *name);
+struct symbol *addr2symbol(void *addr);
+void load_symbols(const char *name);
 #endif
 
 #ifdef NDEBUG
