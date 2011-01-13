@@ -56,7 +56,7 @@ struct ring {
 struct fiber {
 	ev_io io;
 #ifdef BACKTRACE
-	void *last_frame;
+	void *last_stack_frame;
 #endif
 	int csw;
 	struct tarantool_coro coro;

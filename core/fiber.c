@@ -90,10 +90,10 @@ KHASH_MAP_INIT_INT(fid2fiber, void *, realloc);
 static khash_t(fid2fiber) *fibers_registry;
 
 static void
-update_frame_address(struct fiber *fiber)
+update_last_stack_frame(struct fiber *fiber)
 {
 #ifdef BACKTRACE
-	fiber->last_frame = frame_addess();
+	fiber->last_stack_frame = frame_addess();
 #else
 	(void)fiber;
 #endif
@@ -110,7 +110,7 @@ fiber_call(struct fiber *callee)
 	fiber = callee;
 	*sp++ = caller;
 
-	update_frame_address(caller);
+	update_last_stack_frame(caller);
 
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
@@ -127,7 +127,7 @@ fiber_raise(struct fiber *callee, jmp_buf exc, int value)
 	fiber = callee;
 	*sp++ = caller;
 
-	update_frame_address(caller);
+	update_last_stack_frame(caller);
 
 	callee->csw++;
 	coro_save_and_longjmp(&caller->coro.ctx, exc, value);
@@ -140,7 +140,7 @@ yield(void)
 	struct fiber *caller = fiber;
 
 	fiber = callee;
-	update_frame_address(caller);
+	update_last_stack_frame(caller);
 
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
@@ -1065,7 +1065,8 @@ fiber_info(struct tbuf *out)
 			    ((void **)fiber->exc)[3], ((void **)fiber->exc)[3] + 2 * sizeof(void *));
 #ifdef BACKTRACE
 		tbuf_printf(out, "    backtrace:\n%s",
-			    backtrace(fiber->last_frame, fiber->coro.stack, fiber->coro.stack_size));
+			    backtrace(fiber->last_stack_frame,
+				      fiber->coro.stack, fiber->coro.stack_size));
 #endif
 	}
 }
