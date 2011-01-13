@@ -27,3 +27,29 @@ delete from t0 where k0 = 1
 Delete OK, 1 row affected
 select * from t0 where k0 = 1
 No match
+update t0 set k1 = "I am a new tuple" where k0=1
+Insert OK, 0 row affected
+select * from t0 where k0 = 1
+No match
+insert into t0 values (1, "I am a new tuple")
+Insert OK, 1 row affected
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'I am a new tuple']
+update t0 set k1 = "I am the newest tuple" where k0=1
+Insert OK, 1 row affected
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'I am the newest tuple']
+update t0 set k1 = "Huh", k2 = "Oh-ho-ho" where k0=1
+An error occurred: ERR_CODE_ILLEGAL_PARAMS, 'Illegal parameters'
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'I am the newest tuple']
+insert into t0 values (1, "I am a new tuple", "stub")
+Insert OK, 1 row affected
+update t0 set k1 = "Huh", k2 = "Oh-ho-ho" where k0=1
+Insert OK, 1 row affected
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'Huh', 'Oh-ho-ho']

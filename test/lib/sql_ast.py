@@ -4,11 +4,16 @@ import ctypes
 
 # IPROTO header is always 3 4-byte ints:
 # command code, length, request id
-IPROTO_HEADER_LEN = 12
-INSERT_REQUEST_FIXED_LEN = 8
-DELETE_REQUEST_FIXED_LEN = 4
-SELECT_REQUEST_FIXED_LEN = 20
+INT_FIELD_LEN = 4
+INT_BER_MAX_LEN = 5
+IPROTO_HEADER_LEN = 3*INT_FIELD_LEN
+INSERT_REQUEST_FIXED_LEN = 2*INT_FIELD_LEN
+UPDATE_REQUEST_FIXED_LEN = 2*INT_FIELD_LEN
+DELETE_REQUEST_FIXED_LEN = INT_FIELD_LEN
+SELECT_REQUEST_FIXED_LEN = 5*INT_FIELD_LEN
 PACKET_BUF_LEN = 2048
+
+UPDATE_SET_FIELD_OPCODE = 0
 
 # command code in IPROTO header
 
@@ -52,7 +57,6 @@ def format_error(return_code):
   return "An error occurred: {0}, \'{1}'".format(ER[return_code][0],
                                                  ER[return_code][1])
 
-object_no_re = re.compile("[a-z_]*", re.I)
 
 def save_varint32(value):
   """Implement Perl pack's 'w' option, aka base 128 encoding."""
@@ -93,33 +97,48 @@ def opt_resize_buf(buf, newsize):
   return buf
 
 
+def pack_field(value, buf, offset):
+  if type(value) is int:
+    buf = opt_resize_buf(buf, offset + INT_FIELD_LEN)
+    struct.pack_into("<cL", buf, offset, chr(INT_FIELD_LEN), value)
+    offset += INT_FIELD_LEN + 1
+  elif type(value) is str:
+    opt_resize_buf(buf, offset + INT_BER_MAX_LEN + len(value))
+    value_len_ber = save_varint32(len(value))
+    struct.pack_into("{0}s{1}s".format(len(value_len_ber), len(value)),
+                     buf, offset, value_len_ber, value)
+    offset += len(value_len_ber) + len(value)
+  else:
+    raise RuntimeError("Unsupported value type in value list")
+  return (buf, offset)
+
+
 def pack_tuple(value_list, buf, offset):
   """Represents <tuple> rule in tarantool protocol description.
      Pack tuple into a binary representation.
      buf and offset are in-out parameters, offset is advanced
      to the amount of bytes that it took to pack the tuple"""
   # length of int field: 1 byte - field len (is always 4), 4 bytes - data
-  INT_FIELD_LEN = 4
   # max length of compressed integer
-  INT_BER_MAX_LEN = 5
   cardinality = len(value_list)
   struct.pack_into("<L", buf, offset, cardinality)
   offset += INT_FIELD_LEN
   for value in value_list:
-    if type(value) is int:
-      buf = opt_resize_buf(buf, offset + INT_FIELD_LEN)
-      struct.pack_into("<cL", buf, offset, chr(INT_FIELD_LEN), value)
-      offset += INT_FIELD_LEN + 1
-    elif type(value) is str:
-      opt_resize_buf(buf, offset + INT_BER_MAX_LEN + len(value))
-      value_len_ber = save_varint32(len(value))
-      struct.pack_into("{0}s{1}s".format(len(value_len_ber), len(value)),
-                       buf, offset, value_len_ber, value)
-      offset += len(value_len_ber) + len(value)
-    else:
-      raise RuntimeError("Unsupported value type in value list")
+    (buf, offset) = pack_field(value, buf, offset)
   return buf, offset
 
+def pack_operation_list(update_list, buf, offset):
+  buf = opt_resize_buf(buf, offset + INT_FIELD_LEN)
+  struct.pack_into("<L", buf, offset, len(update_list))
+  offset += INT_FIELD_LEN
+  for update in update_list:
+    opt_resize_buf(buf, offset + INT_FIELD_LEN + 1)
+    struct.pack_into("<Lc", buf, offset,
+                     update[0],
+                     chr(UPDATE_SET_FIELD_OPCODE))
+    offset += INT_FIELD_LEN + 1
+    (buf, offset) = pack_field(update[1], buf, offset)
+  return (buf, offset)
 
 def unpack_tuple(response, offset):
   (size,cardinality) = struct.unpack("<LL", response[offset:offset + 8])
@@ -133,6 +152,7 @@ def unpack_tuple(response, offset):
       (data,) = struct.unpack("<L", data)
     res.append(data)
   return str(res), offset
+
    
 class StatementPing:
   reqeust_type = PING_REQUEST_TYPE
@@ -146,7 +166,7 @@ class StatementInsert(StatementPing):
   reqeust_type = INSERT_REQUEST_TYPE
 
   def __init__(self, table_name, value_list):
-    self.namespace_no = int(object_no_re.sub("", table_name))
+    self.namespace_no = table_name
     self.flags = 0
     self.value_list = value_list
 
@@ -168,16 +188,34 @@ class StatementUpdate(StatementPing):
   reqeust_type = UPDATE_REQUEST_TYPE
 
   def __init__(self, table_name, update_list, where):
-    self.namespace_no = int(object_no_re.sub("", table_name))
+    self.namespace_no = table_name
+    self.flags = 0
+    key_no = where[0]
+    if key_no != 0:
+      raise RuntimeError("UPDATE can only be made by the primary key (#0)")
+    self.value_list = where[1:]
     self.update_list = update_list
-    self.where = where
+
+  def pack(self):
+    buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
+    struct.pack_into("<LL", buf, 0, self.namespace_no, self.flags)
+    (buf, offset) = pack_tuple(self.value_list, buf, UPDATE_REQUEST_FIXED_LEN)
+    (buf, offset) = pack_operation_list(self.update_list, buf, offset)
+    return buf[:offset]
+
+  def unpack(self, response):
+    (return_code,) = struct.unpack("<L", response[:4])
+    if return_code:
+      return format_error(return_code)
+    (result_code, row_count) = struct.unpack("<LL", response)
+    return "Insert OK, {0} row affected".format(row_count)
 
 class StatementDelete(StatementPing):
   reqeust_type = DELETE_REQUEST_TYPE
 
   def __init__(self, table_name, where):
-    self.namespace_no = int(object_no_re.sub("", table_name))
-    key_no = int(object_no_re.sub("", where[0]))
+    self.namespace_no = table_name
+    key_no = where[0]
     if key_no != 0:
       raise RuntimeError("DELETE can only be made by the primary key (#0)")
     self.value_list = where[1:]
@@ -199,10 +237,9 @@ class StatementSelect(StatementPing):
   reqeust_type = SELECT_REQUEST_TYPE
 
   def __init__(self, table_name, where):
-    self.namespace_no = int(object_no_re.sub("", table_name))
+    self.namespace_no = table_name
     if where:
-      (index, key) = where
-      self.index_no = int(object_no_re.sub("", index))
+      (self.index_no, key) = where
       self.key = [key]
     else:
       self.index_no = 0

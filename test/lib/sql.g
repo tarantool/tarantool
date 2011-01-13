@@ -1,4 +1,7 @@
 import sql_ast
+import re
+
+object_no_re = re.compile("[a-z_]*", re.I)
 
 %%
 
@@ -26,18 +29,18 @@ parser sql:
                       select {{ stmt = select }} |
                       ping {{ stmt = ping }}) END {{ return stmt }}
                       
-    rule insert:      INSERT [INTO] ID VALUES value_list
-                      {{ return sql_ast.StatementInsert(ID, value_list) }}
-    rule update:      UPDATE ID SET update_list opt_where 
-                      {{ return sql_ast.StatementUpdate(ID, update_list, opt_where) }}
-    rule delete:      DELETE FROM ID  opt_where
-                      {{ return sql_ast.StatementDelete(ID, opt_where) }}
-    rule select:      SELECT '\*' FROM ID opt_where
-                      {{ return sql_ast.StatementSelect(ID, opt_where) }}
+    rule insert:      INSERT [INTO] ident VALUES value_list
+                      {{ return sql_ast.StatementInsert(ident, value_list) }}
+    rule update:      UPDATE ident SET update_list opt_where 
+                      {{ return sql_ast.StatementUpdate(ident, update_list, opt_where) }}
+    rule delete:      DELETE FROM ident opt_where
+                      {{ return sql_ast.StatementDelete(ident, opt_where) }}
+    rule select:      SELECT '\*' FROM ident opt_where
+                      {{ return sql_ast.StatementSelect(ident, opt_where) }}
     rule ping:        PING
                       {{ return sql_ast.StatementPing() }}
-    rule predicate:   ID '=' constant
-                      {{ return (ID, constant) }}
+    rule predicate:   ident '=' constant
+                      {{ return (ident, constant) }}
     rule opt_where:   {{ return None }}
                       | WHERE predicate
                       {{ return predicate }}
@@ -49,6 +52,7 @@ parser sql:
                       {{ return update_list }}
     rule expr:        constant {{ return constant }}
     rule constant:    NUM {{ return int(NUM) }} | STR {{ return STR[1:-1] }}
+    rule ident:       ID {{ return int(object_no_re.sub("", ID)) }}
 %%
 
 # SQL is case-insensitive, but in yapps it's not possible to
