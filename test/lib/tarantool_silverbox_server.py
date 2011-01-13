@@ -28,10 +28,12 @@ def prepare_gdb(args, vardir):
     term = os.environ["TERM"]
   else:
     term = "xterm"
-  args = [ "/bin/sh", "-c", '{0} -e gdb {1}'.format(term, args[0])]
-  with open(os.path.join(vardir, ".gdbinit"), "w") as gdbinit:
-    print >>gdbinit, "break main"
-    print >>gdbinit, "run"
+
+  if term not in ["xterm", "rxvt", "urxvt", "gnome-terminal", "konsole"]:
+    raise RuntimeError("--gdb: unsupported terminal {0}".format(term))
+
+  gdbargs = '{0} -e gdb {1} -ex "break main" -ex "run"'.format(term, args[0])
+  args = [ "/bin/sh", "-c", gdbargs ]
   return args
 
 
