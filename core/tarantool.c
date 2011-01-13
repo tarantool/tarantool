@@ -332,7 +332,7 @@ main(int argc, char **argv)
 				       gopt_longs("config"),
 				       "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
 #ifdef STORAGE
-			   gopt_option('C', 0, gopt_shorts(0), gopt_longs("cat"),
+			   gopt_option('C', GOPT_ARG, gopt_shorts(0), gopt_longs("cat"),
 				       "=FILE", "cat snapshot file to stdout in readable format and exit"),
 			   gopt_option('I', 0, gopt_shorts(0),
 				       gopt_longs("init-storage", "init_storage"),
