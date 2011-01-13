@@ -38,8 +38,6 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-extern void *main_stack_frame;
-
 struct tarantool_coro *
 tarantool_coro_create(struct tarantool_coro *coro, void (*f) (void *), void *data)
 {

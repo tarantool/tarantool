@@ -155,6 +155,7 @@ tarantool_version(void)
 }
 
 static double start_time;
+
 double
 tarantool_uptime(void)
 {
@@ -312,12 +313,13 @@ main(int argc, char **argv)
 #endif
 	const char *cfg_paramname = NULL;
 
-#if CORO_ASM
-	save_rbp(&main_stack_frame);
-#endif
 	master_pid = getpid();
 	stat_init();
 	palloc_init();
+
+#ifdef RESOLVE_SYMBOLS
+	load_symbols(argv[0]);
+#endif
 
 	const void *opt_def =
 		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),

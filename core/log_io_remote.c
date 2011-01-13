@@ -51,7 +51,7 @@ row_v11_len(struct tbuf *r)
 }
 
 static struct tbuf *
-row_reader_v11()
+remote_row_reader_v11()
 {
 	const int header_size = sizeof(struct row_v11);
 	struct tbuf *m;
@@ -107,7 +107,7 @@ remote_read_row(i64 initial_lsn)
 			err = NULL;
 		}
 
-		row = row_reader_v11(fiber->pool);
+		row = remote_row_reader_v11(fiber->pool);
 		if (row == NULL) {
 			err = "can't read row";
 			goto err;
