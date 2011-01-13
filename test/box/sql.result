@@ -23,3 +23,7 @@ Found 1 tuple:
 select * from t0 where k0 = 1
 Found 1 tuple:
 [1, 'I am a tuple']
+delete from t0 where k0 = 1
+Delete OK, 1 row affected
+select * from t0 where k0 = 1
+No match

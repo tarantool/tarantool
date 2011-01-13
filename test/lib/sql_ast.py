@@ -6,6 +6,7 @@ import ctypes
 # command code, length, request id
 IPROTO_HEADER_LEN = 12
 INSERT_REQUEST_FIXED_LEN = 8
+DELETE_REQUEST_FIXED_LEN = 4
 SELECT_REQUEST_FIXED_LEN = 20
 PACKET_BUF_LEN = 2048
 
@@ -93,6 +94,10 @@ def opt_resize_buf(buf, newsize):
 
 
 def pack_tuple(value_list, buf, offset):
+  """Represents <tuple> rule in tarantool protocol description.
+     Pack tuple into a binary representation.
+     buf and offset are in-out parameters, offset is advanced
+     to the amount of bytes that it took to pack the tuple"""
   # length of int field: 1 byte - field len (is always 4), 4 bytes - data
   INT_FIELD_LEN = 4
   # max length of compressed integer
@@ -172,7 +177,23 @@ class StatementDelete(StatementPing):
 
   def __init__(self, table_name, where):
     self.namespace_no = int(object_no_re.sub("", table_name))
-    self.where = where
+    key_no = int(object_no_re.sub("", where[0]))
+    if key_no != 0:
+      raise RuntimeError("DELETE can only be made by the primary key (#0)")
+    self.value_list = where[1:]
+
+  def pack(self):
+    buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
+    (buf, offset) = pack_tuple(self.value_list, buf, DELETE_REQUEST_FIXED_LEN)
+    struct.pack_into("<L", buf, 0, self.namespace_no)
+    return buf[:offset]
+
+  def unpack(self, response):
+    (return_code,) = struct.unpack("<L", response[:4])
+    if return_code:
+      return format_error(return_code)
+    (result_code, row_count) = struct.unpack("<LL", response)
+    return "Delete OK, {0} row affected".format(row_count)
 
 class StatementSelect(StatementPing):
   reqeust_type = SELECT_REQUEST_TYPE
