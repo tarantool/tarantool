@@ -53,3 +53,23 @@ Insert OK, 1 row affected
 select * from t0 where k0 = 1
 Found 1 tuple:
 [1, 'Huh', 'Oh-ho-ho']
+update t0 set k1 = "", k2 = "" where k0=1
+Insert OK, 1 row affected
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, '', '']
+update t0 set k1 = 2, k2 = 3 where k0=1
+Insert OK, 1 row affected
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 2, 3]
+insert into t0 values (0)
+Insert OK, 1 row affected
+select * from t0 where k0=0
+Found 1 tuple:
+[0]
+insert into t0 values (4294967295)
+Insert OK, 1 row affected
+select * from t0 where k0=4294967295
+Found 1 tuple:
+[4294967295]
