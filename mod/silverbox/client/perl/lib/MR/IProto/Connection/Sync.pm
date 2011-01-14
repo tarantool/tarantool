@@ -50,8 +50,12 @@ sub send {
         my $write = $header . $payload;
         while( length $write ) {
             my $written = syswrite($socket, $write);
-            die $! unless defined $written;
-            substr $write, 0, $written, '';
+            if (!defined $written) {
+                $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_SNDTIMEO behaviour
+                die $!;
+            } else {
+                substr $write, 0, $written, '';
+            }
         }
 
         unless( $no_reply ) {
@@ -60,10 +64,15 @@ sub send {
             my $to_read = 12;
             while( $to_read ) {
                 my $read = sysread($socket, my $buf, $to_read);
-                die $! unless defined $read;
-                die "EOF during read of header" if $read == 0;
-                $resp_header .= $buf;
-                $to_read -= $read;
+                if (!defined $read) {
+                    $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_RCVTIMEO behaviour
+                    die $!;
+                } elsif ($read == 0) {
+                    die "EOF during read of header";
+                } else {
+                    $resp_header .= $buf;
+                    $to_read -= $read;
+                }
             }
             $server->_debug_dump('recv header: ', $resp_header) if $dump_resp;
             ($resp_msg, my $resp_length, my $resp_sync) = $self->_unpack_header($resp_header);
@@ -72,10 +81,15 @@ sub send {
             $to_read = $resp_length;
             while( $to_read ) {
                 my $read = sysread($socket, my $buf, $to_read);
-                die $! unless defined $read;
-                die "EOF during read of payload" if $read == 0;
-                $resp_payload .= $buf;
-                $to_read -= $read;
+                if (!defined $read) {
+                    $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_RCVTIMEO behaviour
+                    die $!;
+                } elsif ($read == 0) {
+                    die "EOF during read of payload";
+                } else {
+                    $resp_payload .= $buf;
+                    $to_read -= $read;
+                }
             }
             $server->_debug_dump('recv payload: ', $resp_payload) if $dump_resp;
         }
