@@ -1,11 +1,48 @@
 import os
-import stat 
+import stat
 import shutil
 import subprocess
 import pexpect
 import sys
 import signal
 import time
+import socket
+
+def wait_until_connected(host, port):
+  """Wait until the server is started and accepting connections"""
+  is_connected = False
+  while not is_connected:
+    try:
+      sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+      sock.connect((host, port))
+      is_connected = True
+      sock.close()
+    except socket.error as e:
+      time.sleep(0.001)
+
+
+def prepare_gdb(args, vardir):
+  """Prepare server startup argumetns to run under gdb.
+  Create .gdbinit config file"""
+  if "TERM" in os.environ:
+    term = os.environ["TERM"]
+  else:
+    term = "xterm"
+
+  if term not in ["xterm", "rxvt", "urxvt", "gnome-terminal", "konsole"]:
+    raise RuntimeError("--gdb: unsupported terminal {0}".format(term))
+
+  gdbargs = '{0} -e gdb {1} -ex "break main" -ex "run"'.format(term, args[0])
+  args = [ "/bin/sh", "-c", gdbargs ]
+  return args
+
+
+def check_tmpfs_exists():
+  return os.uname()[0] in 'Linux' and os.path.isdir("/dev/shm")
+
+def create_tmpfs_vardir(vardir):
+  os.mkdir(os.path.join("/dev/shm", vardir))
+  os.symlink(os.path.join("/dev/shm", vardir), vardir)
 
 class TarantoolSilverboxServer:
   """Server represents a single server instance. Normally, the
@@ -13,82 +50,119 @@ class TarantoolSilverboxServer:
   replication slaves. The server is started once at the beginning
   of each suite, and stopped at the end."""
 
-  def __init__(self, args, config, pidfile):
+  def __init__(self, args, suite_ini):
     """Set server options: path to configuration file, pid file, exe, etc."""
     self.args = args
-    self.path_to_config = config
-    self.path_to_pidfile = os.path.join(args.vardir, pidfile)
+    self.suite_ini = suite_ini
+    self.path_to_pidfile = os.path.join(args.vardir, suite_ini["pidfile"])
     self.path_to_exe = None
     self.abspath_to_exe = None
     self.is_started = False
 
-  def start(self):
+  def install(self, silent = False):
     """Start server instance: check if the old one exists, kill it
     if necessary, create necessary directories and files, start
     the server. The server working directory is taken from 'vardir',
     specified in the prgoram options.
     Currently this is implemented for tarantool_silverbox only."""
 
-    if not self.is_started:
-      print "Starting the server..."
+    vardir = self.args.vardir
 
-      if self.path_to_exe == None:
-        self.path_to_exe = self.find_exe() 
-        self.abspath_to_exe = os.path.abspath(self.path_to_exe)
+    if not silent:
+      print "Installing the server..."
 
+    if self.path_to_exe == None:
+      self.path_to_exe = self.find_exe()
+      self.abspath_to_exe = os.path.abspath(self.path_to_exe)
+
+    if not silent:
       print "  Found executable at " + self.path_to_exe + "."
 
+    if not silent:
       print "  Creating and populating working directory in " +\
-      self.args.vardir + "..." 
+      vardir + "..."
 
-      if os.access(self.args.vardir, os.F_OK):
+    if os.access(vardir, os.F_OK):
+      if not silent:
         print "  Found old vardir, deleting..."
-        self.kill_old_server()
-        shutil.rmtree(self.args.vardir, ignore_errors = True)
-
-      os.mkdir(self.args.vardir)
-      shutil.copy(self.path_to_config, self.args.vardir)
-
-      subprocess.check_call([self.abspath_to_exe, "--init_storage"],
-                            cwd = self.args.vardir,
-# catch stdout/stderr to not clutter output
-                            stdout = subprocess.PIPE,
-                            stderr = subprocess.PIPE)
-
-      if self.args.start_and_exit:
-        subprocess.check_call([self.abspath_to_exe, "--daemonize"],
-                              cwd = self.args.vardir,
-                              stdout = subprocess.PIPE,
-                              stderr = subprocess.PIPE)
+      self.kill_old_server()
+      if os.path.islink(vardir):
+        shutil.rmtree(os.readlink(vardir), ignore_errors = True)
+        os.remove(vardir)
       else:
-        self.server = pexpect.spawn(self.abspath_to_exe,
-                                    cwd = self.args.vardir)
-        self.logfile_read = sys.stdout
-        self.server.expect_exact("entering event loop")
+        shutil.rmtree(vardir, ignore_errors = True)
 
-      version = subprocess.Popen([self.abspath_to_exe, "--version"],
-                                 cwd = self.args.vardir,
-                                 stdout = subprocess.PIPE).stdout.read().rstrip()
+    if (self.args.mem == True and check_tmpfs_exists() and
+        os.path.basename(vardir) == vardir):
+      create_tmpfs_vardir(vardir)
+    else:
+      os.mkdir(vardir)
 
-      print "Started {0} {1}.".format(os.path.basename(self.abspath_to_exe),
-                                      version)
+    shutil.copy(self.suite_ini["config"], self.args.vardir)
+
+    subprocess.check_call([self.abspath_to_exe, "--init_storage"],
+                          cwd = self.args.vardir,
+# catch stdout/stderr to not clutter output
+                          stdout = subprocess.PIPE,
+                          stderr = subprocess.PIPE)
+
+    version = subprocess.Popen([self.abspath_to_exe, "--version"],
+                               cwd = self.args.vardir,
+                               stdout = subprocess.PIPE).stdout.read().rstrip()
+
+    if not silent:
+      print "Starting {0} {1}.".format(os.path.basename(self.abspath_to_exe),
+                                       version)
+    
+  def start(self, silent = False):
+
+    if self.is_started:
+      if not silent:
+        print "The server is already started."
+      return
+
+    if not silent:
+      print "Starting the server..."
+
+    args = [self.abspath_to_exe]
+
+    if self.args.start_and_exit:
+      args.append("--daemonize")
+    if self.args.gdb:
+      args = prepare_gdb(args, self.args.vardir)
+
+    self.server = pexpect.spawn(args[0], args[1:], cwd = self.args.vardir)
+# wait until the server is connectedk
+
+    if self.args.gdb and self.args.start_and_exit:
+      time.sleep(1)
+    elif not self.args.start_and_exit and not self.args.gdb:
+      self.server.expect_exact("entering event loop")
+    else:
+      wait_until_connected(self.suite_ini["host"], self.suite_ini["port"])
 
 # Set is_started flag, to nicely support cleanup during an exception.
-      self.is_started = True
-    else:
-      print "The server is already started."
+    self.is_started = True
 
-  def stop(self):
+
+  def stop(self, silent = False):
     """Stop server instance. Do nothing if the server is not started,
     to properly shut down the server in case of an exception during
     start up."""
     if self.is_started:
-      print "Stopping the server..."
+      if not silent:
+        print "Stopping the server..."
+      if self.args.gdb:
+        self.kill_old_server(True)
       self.server.terminate()
       self.server.expect(pexpect.EOF)
       self.is_started = False
-    else:
+    elif not silent:
       print "The server is not started."
+
+  def restart(self):
+    self.stop(True)
+    self.start(True)
 
   def test_option(self, option_list_str):
       args = [self.abspath_to_exe] + option_list_str.split()
@@ -117,18 +191,19 @@ class TarantoolSilverboxServer:
 
     raise RuntimeError("Can't find server executable in " + self.args.bindir)
 
-  def kill_old_server(self):
+  def kill_old_server(self, silent = False):
     """Kill old server instance if it exists."""
     if os.access(self.path_to_pidfile, os.F_OK) == False:
       return # Nothing to do
     pid = 0
     with open(self.path_to_pidfile) as f:
-      pid = int(f.read()) 
-    print "  Found old server, pid {0}, killing...".format(pid)
+      pid = int(f.read())
+    if not silent:
+      print "  Found old server, pid {0}, killing...".format(pid)
     try:
       os.kill(pid, signal.SIGTERM)
       while os.kill(pid, 0) != -1:
-        time.sleep(0.01)
+        time.sleep(0.001)
     except OSError:
       pass
 

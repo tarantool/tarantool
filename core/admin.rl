@@ -51,7 +51,8 @@ static const char *help =
 	" - show stat" CRLF
 	" - save coredump" CRLF
 	" - save snapshot" CRLF
-	" - exec module command" CRLF;
+	" - exec module command" CRLF
+	" - reload configuration" CRLF;
 
 
 static const char unknown_command[] = "unknown command. try typing help." CRLF;
@@ -82,10 +83,19 @@ ok(struct tbuf *out)
 	end(out);
 }
 
+static void
+fail(struct tbuf *out, struct tbuf *err)
+{
+	start(out);
+	tbuf_printf(out, "fail:%.*s" CRLF, err->len, (char *)err->data);
+	end(out);
+}
+
 static int
 admin_dispatch(void)
 {
 	struct tbuf *out = tbuf_alloc(fiber->pool);
+	struct tbuf *err = tbuf_alloc(fiber->pool);
 	int cs;
 	char *p, *pe;
 	char *strstart, *strend;
@@ -129,6 +139,13 @@ admin_dispatch(void)
 			end(out);
 		}
 
+		action reload_configuration {
+			if (reload_cfg(err))
+				fail(out, err);
+			else
+				ok(out);
+		}
+
 		eol = "\n" | "\r\n";
 		show = "sh"("o"("w")?)?;
 		info = "in"("f"("o")?)?;
@@ -146,6 +163,7 @@ admin_dispatch(void)
 		snapshot = "sn"("a"("p"("s"("h"("o"("t")?)?)?)?)?)?;
 		exec = "ex"("e"("c")?)?;
 		string = [^\r\n]+ >{strstart = p;}  %{strend = p;};
+		reload = "re"("l"("o"("a"("d")?)?)?)?;
 
 		commands = (help			%help						|
 			    exit			%{return 0;}					|
@@ -158,7 +176,8 @@ admin_dispatch(void)
 			    save " "+ coredump		%{coredump(60); ok(out);}			|
 			    save " "+ snapshot		%{snapshot(NULL, 0); ok(out);}			|
 			    exec " "+ string		%mod_exec					|
-			    check " "+ slab		%{slab_validate(); ok(out);});
+			    check " "+ slab		%{slab_validate(); ok(out);}			|
+			    reload " "+ configuration	%reload_configuration);
 
 	        main := commands eol;
 		write init;

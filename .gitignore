@@ -14,3 +14,4 @@ lcov
 tarantool_version.h
 test/var
 test/lib/*.pyc
+test/lib/*/*.pyc

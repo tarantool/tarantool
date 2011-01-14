@@ -148,7 +148,7 @@ read_varint32(struct tbuf *buf)
 			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
 
-	raise(ERR_CODE_UNKNOWN_ERROR, "imposible happend");
+	raise(ERR_CODE_UNKNOWN_ERROR, "impossible happened");
 	return 0;
 }
 

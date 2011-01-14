@@ -18,7 +18,7 @@ ifneq (,$(findstring _release,$(OBJDIR)))
   CFLAGS += -DNDEBUG
 else ifneq (,$(findstring _debug,$(OBJDIR)))
   DEBUG=1
-  CFLAGS += -DDEBUG -fno-omit-frame-pointer
+  CFLAGS += -DDEBUG -fno-omit-frame-pointer -O0 -ggdb
 else ifneq (,$(findstring _test,$(OBJDIR)))
  CFLAGS += --coverage -DCOVERAGE -DNDEBUG
 else ifneq (,$(findstring _coverage,$(OBJDIR)))

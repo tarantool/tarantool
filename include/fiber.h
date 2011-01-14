@@ -39,6 +39,7 @@
 #include <tbuf.h>
 #include <say.h>
 #include <coro.h>
+#include <util.h>
 
 #define FIBER_EXIT -1
 
@@ -54,8 +55,8 @@ struct ring {
 
 struct fiber {
 	ev_io io;
-#if CORO_ASM
-	void *rbp;
+#ifdef BACKTRACE
+	void *last_stack_frame;
 #endif
 	int csw;
 	struct tarantool_coro coro;

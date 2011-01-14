@@ -26,8 +26,13 @@ import sys
 import string
 import cStringIO
 import yaml
+import re
+import sql
+import struct
 
-class Connection:
+is_admin_re = re.compile("^\s*(show|save|exec|exit|help)", re.I)
+
+class AdminConnection:
   def __init__(self, host, port):
     self.host = host
     self.port = port
@@ -36,6 +41,7 @@ class Connection:
 
   def connect(self):
     self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
     self.socket.connect((self.host, self.port))
     self.is_connected = True
 
@@ -44,7 +50,22 @@ class Connection:
       self.socket.close()
       self.is_connected = False
 
+  def reconnect(self):
+    self.disconnect()
+    self.connect()
+
+  def opt_reconnect(self):
+    try:
+      if self.socket.recv(0, socket.MSG_DONTWAIT) == '':
+        self.reconnect()
+    except socket.error:
+      pass
+
   def execute(self, command):
+    self.opt_reconnect()
+    return self.execute_no_reconnect(command)
+
+  def execute_no_reconnect(self, command):
     self.socket.sendall(command)
 
     bufsiz = 4096
@@ -87,4 +108,30 @@ class Connection:
 
   def __exit__(self, type, value, tb):
     self.disconnect()
+
+class DataConnection(AdminConnection):
+  def execute_no_reconnect(self, command):
+    statement = sql.parse("sql", command)
+    if statement == None:
+      return "You have an error in your SQL syntax\n"
+
+    payload = statement.pack()
+    header = struct.pack("<lll", statement.reqeust_type, len(payload), 0)
+
+    self.socket.sendall(header)
+    if len(payload):
+      self.socket.sendall(payload)
+
+    IPROTO_HEADER_SIZE = 12
+
+    header = self.socket.recv(IPROTO_HEADER_SIZE, socket.MSG_WAITALL)
+
+    response_len = struct.unpack("<lll", header)[1]
+
+    if response_len:
+      response = self.socket.recv(response_len, socket.MSG_WAITALL) 
+    else:
+      response = None
+    
+    return statement.unpack(response) + "\n"
 

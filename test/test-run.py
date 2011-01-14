@@ -88,6 +88,14 @@ class Options:
         "exit without running any tests. Default: false.")
 
     parser.add_argument(
+        "--gdb",
+        dest = "gdb",
+        action = "store_true",
+        default = False,
+        help = "Start the server under 'gdb' debugger. Default: false."
+        " See also --start-and-exit.")
+
+    parser.add_argument(
         "--bindir",
         dest = "bindir",
         default = "../_debug_box",
@@ -99,6 +107,16 @@ class Options:
         dest = "vardir",
         default = "var",
         help = "Path to data directory. Default: var.")
+
+    parser.add_argument(
+        "--mem",
+        dest = "mem",
+        action = "store_true",
+        default = False,
+        help = """Run test suite in memory, using tmpfs or ramdisk.
+        Is used only if vardir is not an absolute path. In that case
+        vardir is sym-linked to /dev/shm/<vardir>.
+        Linux only. Default: true""")
 
     self.check(parser)
     self.args = parser.parse_args()

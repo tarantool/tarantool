@@ -27,6 +27,7 @@
 #ifndef TARANTOOL_TBUF_H
 #define TARANTOOL_TBUF_H
 
+#include <stdarg.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -63,10 +64,11 @@ size_t tbuf_reserve(struct tbuf *b, size_t count);
 void tbuf_reset(struct tbuf *b);
 void *tbuf_peek(struct tbuf *b, size_t count);
 
-void tbuf_append(struct tbuf *b, const void *data, size_t len);
 void tbuf_append_field(struct tbuf *b, void *f);
+void tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
+	__attribute__ ((format(FORMAT_PRINTF, 2, 0)));
 void tbuf_printf(struct tbuf *b, const char *format, ...)
-    __attribute__ ((format(FORMAT_PRINTF, 2, 3)));
+	__attribute__ ((format(FORMAT_PRINTF, 2, 3)));
 
 char *tbuf_to_hex(const struct tbuf *x);
 #endif

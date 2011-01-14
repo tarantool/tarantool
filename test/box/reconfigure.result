@@ -1,0 +1,30 @@
+reload configuration
+fail: [Could not accept read only 'slab_alloc_arena' option, Could not accept read
+    only 'pid_file' option, Could not accept read only 'primary_port' option, Could
+    not accept read only 'secondary_port' option, Could not accept read only 'admin_port'
+    option, Could not accept read only 'rows_per_wal' option, 'Could not accept read
+    only ''namespace[0].enabled'' option', 'Could not accept read only ''namespace[0].index[0].type''
+    option', 'Could not accept read only ''namespace[0].index[0].unique'' option',
+  'Could not accept read only ''namespace[0].index[0].key_field[0].fieldno'' option',
+  'Could not accept read only ''namespace[0].index[0].key_field[0].type'' option']
+reload configuration
+fail: [Option 'primary_port' is not set (or has a default value), 'Option ''namespace[0].enabled''
+    is not set (or has a default value)', 'Option ''namespace[0].index[0].type'' is
+    not set (or has a default value)', 'Option ''namespace[0].index[0].key_field[0].fieldno''
+    is not set (or has a default value)']
+reload configuration
+fail: [Option 'namespace' is not set (or has a default value)]
+reload configuration
+fail: ['Could not accept read only ''namespace[1].enabled'' option']
+reload configuration
+fail: ['Could not accept read only ''namespace[0].index[0].key_field[1].fieldno''
+    option']
+reload configuration
+ok
+...
+reload configuration
+fail:
+- {gram_yyerror: 'syntax error, unexpected $end, expecting KEY_P or NULL_P at line
+    1'}
+reload configuration
+fail: [can't open config `tarantool.cfg']

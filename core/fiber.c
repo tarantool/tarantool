@@ -87,9 +87,17 @@ fiber_msg(const struct tbuf *buf)
 }
 
 KHASH_MAP_INIT_INT(fid2fiber, void *, realloc);
-static
-khash_t(fid2fiber) *
-    fibers_registry;
+static khash_t(fid2fiber) *fibers_registry;
+
+static void
+update_last_stack_frame(struct fiber *fiber)
+{
+#ifdef BACKTRACE
+	fiber->last_stack_frame = frame_addess();
+#else
+	(void)fiber;
+#endif
+}
 
 void
 fiber_call(struct fiber *callee)
@@ -102,9 +110,8 @@ fiber_call(struct fiber *callee)
 	fiber = callee;
 	*sp++ = caller;
 
-#if CORO_ASM
-	save_rbp(&caller->rbp);
-#endif
+	update_last_stack_frame(caller);
+
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }
@@ -120,9 +127,8 @@ fiber_raise(struct fiber *callee, jmp_buf exc, int value)
 	fiber = callee;
 	*sp++ = caller;
 
-#if CORO_ASM
-	save_rbp(&caller->rbp);
-#endif
+	update_last_stack_frame(caller);
+
 	callee->csw++;
 	coro_save_and_longjmp(&caller->coro.ctx, exc, value);
 }
@@ -134,9 +140,8 @@ yield(void)
 	struct fiber *caller = fiber;
 
 	fiber = callee;
-#if CORO_ASM
-	save_rbp(&caller->rbp);
-#endif
+	update_last_stack_frame(caller);
+
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }
@@ -924,6 +929,11 @@ tcp_server_handler(void *data)
 				close(fd);
 				continue;
 			}
+			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
+				       &one, sizeof(one)) == -1) {
+				say_syserror("setsockopt failed");
+				/* Do nothing, not a fatal error.  */
+			}
 
 			snprintf(name, sizeof(name), "%i/handler", server->port);
 			h = fiber_create(name, fd, -1, server->handler, data);
@@ -1039,32 +1049,29 @@ fiber_server(fiber_server_type type, int port, void (*handler) (void *data), voi
 	return s;
 }
 
+
 void
 fiber_info(struct tbuf *out)
 {
 	struct fiber *fiber;
-	tbuf_printf(out, "fibers:" CRLF);
+
+	tbuf_printf(out, "fibers:\n");
 	SLIST_FOREACH(fiber, &fibers, link) {
 		void *stack_top = fiber->coro.stack + fiber->coro.stack_size;
 
-		tbuf_printf(out, "  - fid: %4i" CRLF, fiber->fid);
-		tbuf_printf(out, "    csw: %i" CRLF, fiber->csw);
-		tbuf_printf(out, "    name: %s" CRLF, fiber->name);
-		tbuf_printf(out, "    inbox: %i" CRLF, ring_size(fiber->inbox));
-		tbuf_printf(out, "    fd: %4i" CRLF, fiber->fd);
-		tbuf_printf(out, "    peer: %s" CRLF, fiber_peer_name(fiber));
-		tbuf_printf(out, "    stack: %p" CRLF, stack_top);
-
-#if CORO_ASM
-		void *stack_bottom = fiber->coro.stack;
-
-		struct frame *frame = fiber->rbp;
-		tbuf_printf(out, "    backtrace:" CRLF);
-		while (stack_bottom < (void *)frame && (void *)frame < stack_top) {
-			tbuf_printf(out, "        - { frame: %p, pc: %p }" CRLF,
-				    frame + 2 * sizeof(void *), frame->ret);
-			frame = frame->rbp;
-		}
+		tbuf_printf(out, "  - fid: %4i\n", fiber->fid);
+		tbuf_printf(out, "    csw: %i\n", fiber->csw);
+		tbuf_printf(out, "    name: %s\n", fiber->name);
+		tbuf_printf(out, "    inbox: %i\n", ring_size(fiber->inbox));
+		tbuf_printf(out, "    fd: %4i\n", fiber->fd);
+		tbuf_printf(out, "    peer: %s\n", fiber_peer_name(fiber));
+		tbuf_printf(out, "    stack: %p\n", stack_top);
+		tbuf_printf(out, "    exc: %p\n", ((void **)fiber->exc)[3]);
+		tbuf_printf(out, "    exc_frame: %p, \n", ((void **)fiber->exc)[3] + 2 * sizeof(void *));
+#ifdef BACKTRACE
+		tbuf_printf(out, "    backtrace:\n%s",
+			    backtrace(fiber->last_stack_frame,
+				      fiber->coro.stack, fiber->coro.stack_size));
 #endif
 	}
 }

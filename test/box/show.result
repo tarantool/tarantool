@@ -7,7 +7,8 @@ statistics:
   UPDATE_FIELDS: {rps: 0, total: 0}
 help
 available commands: [help, exit, show info, show fiber, show configuration, show slab,
-  show palloc, show stat, save coredump, save snapshot, exec module command]
+  show palloc, show stat, save coredump, save snapshot, exec module command, reload
+    configuration]
 show configuration
 configuration: {admin_port: '33015', backlog: '1024', coredump: '0', custom_proc_title: (null),
   io_collect_interval: '0', local_hot_standby: '0', log_level: '4', logger: (null),
