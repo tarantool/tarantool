@@ -116,7 +116,7 @@ class Options:
         help = """Run test suite in memory, using tmpfs or ramdisk.
         Is used only if vardir is not an absolute path. In that case
         vardir is sym-linked to /dev/shm/<vardir>.
-        Linux only. Default: true""")
+        Linux only. Default: false""")
 
     self.check(parser)
     self.args = parser.parse_args()
