@@ -17,7 +17,7 @@ class sqlScanner(runtime.Scanner):
         ("'='", re.compile('=')),
         ("'\\*'", re.compile('\\*')),
         ('\\s+', re.compile('\\s+')),
-        ('NUM', re.compile('[0-9]+')),
+        ('NUM', re.compile('[+-]?[0-9]+')),
         ('ID', re.compile('[a-z_]+[0-9]+')),
         ('STR', re.compile('"([^\\"]+|\\\\.)*"')),
         ('PING', re.compile('ping')),

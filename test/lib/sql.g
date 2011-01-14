@@ -8,7 +8,7 @@ object_no_re = re.compile("[a-z_]*", re.I)
 parser sql:
 
     ignore:           '\\s+'
-    token NUM:        '[0-9]+'
+    token NUM:        '[+-]?[0-9]+'
     token ID:         '[a-z_]+[0-9]+' 
     token STR:        '"([^\\"]+|\\\\.)*"'
     token PING:       'ping'
