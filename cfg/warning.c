@@ -12,7 +12,7 @@ out_warning(ConfettyError v, char *format, ...)
 	(void)v; /* make gcc happy */
 
 	va_start(ap, format);
-	tbuf_printf(cfg_out, "\r\n\t");
+	tbuf_printf(cfg_out, "\r\n - ");
 	tbuf_vprintf(cfg_out, format, ap);
 	va_end(ap);
 }

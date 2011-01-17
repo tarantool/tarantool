@@ -39,47 +39,55 @@
 #include <tbuf.h>
 #include <util.h>
 
-static const char help[] =
-	"available commands:\r\n"
-	"help\r\n"
-	"exit\r\n"
-	"show info\r\n"
-	"show fiber\r\n"
-	"show configuration\r\n"
-	"show slab\r\n"
-	"show palloc\r\n"
-	"show stat\r\n"
-	"save coredump\r\n"
-	"save snapshot\r\n"
-	"exec module command\r\n"
-	"reload configuration\r\n"
-	;
+static const char *help =
+	"available commands:" CRLF
+	" - help" CRLF
+	" - exit" CRLF
+	" - show info" CRLF
+	" - show fiber" CRLF
+	" - show configuration" CRLF
+	" - show slab" CRLF
+	" - show palloc" CRLF
+	" - show stat" CRLF
+	" - save coredump" CRLF
+	" - save snapshot" CRLF
+	" - exec module command" CRLF
+	" - reload configuration" CRLF;
 
 
-static const char unknown_command[] = "unknown command. try typing help.\r\n";
+static const char unknown_command[] = "unknown command. try typing help." CRLF;
 
 %%{
 	machine admin;
 	write data;
 }%%
 
-static void
-ok(struct tbuf *out)
-{
-	tbuf_printf(out, "ok\r\n");
-}
 
 static void
 end(struct tbuf *out)
 {
-	tbuf_printf(out, "---\r\n");
+	tbuf_printf(out, "..." CRLF);
+}
+
+static void
+start(struct tbuf *out)
+{
+	tbuf_printf(out, "---" CRLF);
+}
+
+static void
+ok(struct tbuf *out)
+{
+	start(out);
+	tbuf_printf(out, "ok" CRLF);
+	end(out);
 }
 
 static void
 fail(struct tbuf *out, struct tbuf *err)
 {
-	tbuf_printf(out, "fail"
-			 "%.*s\r\n", err->len, (char *)err->data);
+	start(out);
+	tbuf_printf(out, "fail:%.*s" CRLF, err->len, (char *)err->data);
 	end(out);
 }
 
@@ -105,17 +113,37 @@ admin_dispatch(void)
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
 
-			tbuf_printf(out, "configuration:\n");
+			start(out);
+			tbuf_printf(out, "configuration:" CRLF);
 			i = tarantool_cfg_iterator_init();
 			while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
 				if (value) {
-					tbuf_printf(out, "  %s: \"%s\"\n", key, value);
+					tbuf_printf(out, "  %s: \"%s\"" CRLF, key, value);
 					free(value);
 				} else {
-					tbuf_printf(out, "  %s: (null)\n", key);
+					tbuf_printf(out, "  %s: (null)" CRLF, key);
 				}
 			}
 			end(out);
+		}
+
+		action help {
+			start(out);
+			tbuf_append(out, help, strlen(help));
+			end(out);
+		}
+
+		action mod_exec {
+			start(out);
+			mod_exec(strstart, strend - strstart, out);
+			end(out);
+		}
+
+		action reload_configuration {
+			if (reload_cfg(err))
+				fail(out, err);
+			else
+				ok(out);
 		}
 
 		eol = "\n" | "\r\n";
@@ -137,19 +165,19 @@ admin_dispatch(void)
 		string = [^\r\n]+ >{strstart = p;}  %{strend = p;};
 		reload = "re"("l"("o"("a"("d")?)?)?)?;
 
-		commands = (help			%{tbuf_append(out, help, sizeof(help));}		|
-			    exit			%{return 0;}						|
-			    show " "+ info		%{mod_info(out); end(out);}				|
-			    show " "+ fiber		%{fiber_info(out);end(out);}				|
-			    show " "+ configuration 	%show_configuration					|
-			    show " "+ slab		%{slab_stat(out);end(out);}				|
-			    show " "+ palloc		%{palloc_stat(out);end(out);}				|
-			    show " "+ stat		%{stat_print(out);end(out);}				|
-			    save " "+ coredump		%{coredump(60); ok(out);}				|
-			    save " "+ snapshot		%{snapshot(NULL, 0); ok(out);}				|
-			    exec " "+ string		%{mod_exec(strstart, strend - strstart, out); end(out);}|
-			    check " "+ slab		%{slab_validate(); ok(out);}				|
-			    reload " "+ configuration	%{if (reload_cfg(err)) { fail(out, err); } else { ok(out); }});
+		commands = (help			%help						|
+			    exit			%{return 0;}					|
+			    show " "+ info		%{start(out); mod_info(out); end(out);}		|
+			    show " "+ fiber		%{start(out); fiber_info(out); end(out);}	|
+			    show " "+ configuration 	%show_configuration				|
+			    show " "+ slab		%{start(out); slab_stat(out); end(out);}	|
+			    show " "+ palloc		%{start(out); palloc_stat(out); end(out);}	|
+			    show " "+ stat		%{start(out); stat_print(out);end(out);}	|
+			    save " "+ coredump		%{coredump(60); ok(out);}			|
+			    save " "+ snapshot		%{snapshot(NULL, 0); ok(out);}			|
+			    exec " "+ string		%mod_exec					|
+			    check " "+ slab		%{slab_validate(); ok(out);}			|
+			    reload " "+ configuration	%reload_configuration);
 
 	        main := commands eol;
 		write init;
@@ -159,8 +187,11 @@ admin_dispatch(void)
 	fiber->rbuf->len -= (void *)pe - (void *)fiber->rbuf->data;
 	fiber->rbuf->data = pe;
 
-	if (p != pe)
+	if (p != pe) {
+		start(out);
 		tbuf_append(out, unknown_command, sizeof(unknown_command));
+		end(out);
+	}
 
 	return fiber_write(out->data, out->len);
 }

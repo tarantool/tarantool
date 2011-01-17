@@ -25,6 +25,7 @@ import socket
 import sys
 import string
 import cStringIO
+import yaml
 import re
 import sql
 import struct
@@ -75,11 +76,12 @@ class AdminConnection:
       if not buf:
         break
       res = res + buf;
-      if (res.rfind("\n---\r\n") >= 0 or
-          res.rfind("module command\r\n") >= 0 or
-          res.rfind("try typing help.\r\n") >= 0 or
-          res.rfind("ok\r\n") >= 0):
+      if (res.rfind("\r\n...\r\n") >= 0):
         break
+
+    # validate yaml by parsing it
+    yaml.load(res)
+
     return res
 
   def write(self, fragment):
