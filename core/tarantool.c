@@ -64,6 +64,7 @@ struct tarantool_cfg cfg;
 bool init_storage, booting = true;
 
 extern int daemonize(int nochdir, int noclose);
+void out_warning(int v, char *format, ...);
 
 static i32
 load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
@@ -79,7 +80,7 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 		f = fopen(cfg_filename, "r");
 
 	if (f == NULL) {
-		tbuf_printf(cfg_out, "\r\n\tcan't open config `%s'", cfg_filename);
+		out_warning(0, "can't open config `%s'", cfg_filename);
 
 		return -1;
 	}
@@ -133,7 +134,7 @@ reload_cfg(struct tbuf *out)
 		destroy_tarantool_cfg(&new_cfg1);
 		destroy_tarantool_cfg(&new_cfg2);
 
-		tbuf_printf(out, "\r\n\tCould not accept read only '%s' option", diff);
+		out_warning(0, "tCould not accept read only '%s' option", diff);
 
 		return -1;
 	}

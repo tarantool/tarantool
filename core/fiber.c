@@ -1066,8 +1066,8 @@ fiber_info(struct tbuf *out)
 		tbuf_printf(out, "    fd: %4i\n", fiber->fd);
 		tbuf_printf(out, "    peer: %s\n", fiber_peer_name(fiber));
 		tbuf_printf(out, "    stack: %p\n", stack_top);
-		tbuf_printf(out, "    exc: %p, frame: %p\n",
-			    ((void **)fiber->exc)[3], ((void **)fiber->exc)[3] + 2 * sizeof(void *));
+		tbuf_printf(out, "    exc: %p\n", ((void **)fiber->exc)[3]);
+		tbuf_printf(out, "    exc_frame: %p, \n", ((void **)fiber->exc)[3] + 2 * sizeof(void *));
 #ifdef BACKTRACE
 		tbuf_printf(out, "    backtrace:\n%s",
 			    backtrace(fiber->last_stack_frame,

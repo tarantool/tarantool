@@ -332,7 +332,7 @@ slab_stat(struct tbuf *t)
 	struct slab *slab;
 	int slabs;
 	i64 items, used, free, total_used = 0;
-	tbuf_printf(t, "slab statistics:\n  classes:\n");
+	tbuf_printf(t, "slab statistics:\n  classes:" CRLF);
 	for (int i = 0; i < slab_active_classes; i++) {
 		slabs = items = used = free = 0;
 		TAILQ_FOREACH(slab, &slab_classes[i].slabs, class_link) {
@@ -348,12 +348,12 @@ slab_stat(struct tbuf *t)
 
 		tbuf_printf(t,
 			    "     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
-			    ", bytes_used: %- 12" PRIi64 ", bytes_free: %- 12" PRIi64 " }\n",
+			    ", bytes_used: %- 12" PRIi64 ", bytes_free: %- 12" PRIi64 " }" CRLF,
 			    (int)slab_classes[i].item_size, slabs, items, used, free);
 
 	}
-	tbuf_printf(t, "  items_used: %.2f\n", (double)total_used / arena.size * 100);
-	tbuf_printf(t, "  arena_used: %.2f\n", (double)arena.used / arena.size * 100);
+	tbuf_printf(t, "  items_used: %.2f" CRLF, (double)total_used / arena.size * 100);
+	tbuf_printf(t, "  arena_used: %.2f" CRLF, (double)arena.used / arena.size * 100);
 }
 
 void

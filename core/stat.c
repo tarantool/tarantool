@@ -81,7 +81,7 @@ void
 stat_print(struct tbuf *buf)
 {
 	int max_len = 0;
-	tbuf_printf(buf, "statistics:\n");
+	tbuf_printf(buf, "statistics:" CRLF);
 
 	for (int i = 0; i <= stats_max; i++) {
 		if (stats[i].name == NULL)
@@ -99,7 +99,7 @@ stat_print(struct tbuf *buf)
 
 		diff /= SECS;
 
-		tbuf_printf(buf, "  %s:%*s{ rps: %- 6i, total: %- 12" PRIi64 " }\n",
+		tbuf_printf(buf, "  %s:%*s{ rps: %- 6i, total: %- 12" PRIi64 " }" CRLF,
 			    stats[i].name, 1 + max_len - (int)strlen(stats[i].name), " ",
 			    diff, stats[i].value[SECS]);
 	}
