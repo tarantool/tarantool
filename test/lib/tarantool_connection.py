@@ -79,7 +79,9 @@ class AdminConnection:
       if (res.rfind("\r\n...\r\n") >= 0):
         break
 
-    res = yaml.dump(yaml.load(res))
+    # validate yaml by parsing it
+    yaml.load(res)
+
     return res
 
   def write(self, fragment):

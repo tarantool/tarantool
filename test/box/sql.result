@@ -16,6 +16,7 @@ select * from t0 where k0 = 1
 Found 1 tuple:
 [1, 'I am a tuple']
 save snapshot
+---
 ok
 ...
 select * from t0 where k0 = 1

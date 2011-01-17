@@ -1,43 +1,104 @@
 show stat
+---
 statistics:
-  DELETE: {rps: 0, total: 0}
-  INSERT: {rps: 0, total: 0}
-  SELECT: {rps: 0, total: 0}
-  SELECT_LIMIT: {rps: 0, total: 0}
-  UPDATE_FIELDS: {rps: 0, total: 0}
+  INSERT:        { rps:  0    , total:  0           }
+  SELECT_LIMIT:  { rps:  0    , total:  0           }
+  SELECT:        { rps:  0    , total:  0           }
+  UPDATE_FIELDS: { rps:  0    , total:  0           }
+  DELETE:        { rps:  0    , total:  0           }
+...
 help
-available commands: [help, exit, show info, show fiber, show configuration, show slab,
-  show palloc, show stat, save coredump, save snapshot, exec module command, reload
-    configuration]
+---
+available commands:
+ - help
+ - exit
+ - show info
+ - show fiber
+ - show configuration
+ - show slab
+ - show palloc
+ - show stat
+ - save coredump
+ - save snapshot
+ - exec module command
+ - reload configuration
+...
 show configuration
-configuration: {admin_port: '33015', backlog: '1024', coredump: '0', custom_proc_title: (null),
-  io_collect_interval: '0', local_hot_standby: '0', log_level: '4', logger: (null),
-  logger_nonblock: '1', memcached: '0', memcached_expire_full_sweep: '3600', memcached_expire_per_loop: '1024',
-  memcached_namespace: '23', 'namespace[0].cardinality': '-1', 'namespace[0].enabled': '1',
-  'namespace[0].estimated_rows': '0', 'namespace[0].index[0].key_field[0].fieldno': '0',
-  'namespace[0].index[0].key_field[0].type': NUM, 'namespace[0].index[0].type': HASH,
-  'namespace[0].index[0].unique': '1', panic_on_snap_error: '1', panic_on_wal_error: '0',
-  pid_file: box.pid, primary_port: '33013', readahead: '16320', remote_hot_standby: '0',
-  rows_per_wal: '50', secondary_port: '33014', slab_alloc_arena: '0.1', slab_alloc_factor: '2',
-  slab_alloc_minimal: '64', snap_dir: ., snap_io_rate_limit: '0', too_long_threshold: '0.5',
-  username: (null), wal_dir: ., wal_dir_rescan_delay: '0.1', wal_feeder_ipaddr: (null),
-  wal_feeder_port: '0', wal_fsync_delay: '0', wal_writer_inbox_size: '128', work_dir: (null)}
+---
+configuration:
+  username: (null)
+  coredump: "0"
+  admin_port: "33015"
+  log_level: "4"
+  slab_alloc_arena: "0.1"
+  slab_alloc_minimal: "64"
+  slab_alloc_factor: "2"
+  work_dir: (null)
+  pid_file: "box.pid"
+  logger: (null)
+  logger_nonblock: "1"
+  io_collect_interval: "0"
+  backlog: "1024"
+  readahead: "16320"
+  snap_dir: "."
+  wal_dir: "."
+  primary_port: "33013"
+  secondary_port: "33014"
+  too_long_threshold: "0.5"
+  custom_proc_title: (null)
+  memcached: "0"
+  memcached_namespace: "23"
+  memcached_expire_per_loop: "1024"
+  memcached_expire_full_sweep: "3600"
+  snap_io_rate_limit: "0"
+  rows_per_wal: "50"
+  wal_fsync_delay: "0"
+  wal_writer_inbox_size: "128"
+  local_hot_standby: "0"
+  wal_dir_rescan_delay: "0.1"
+  panic_on_snap_error: "1"
+  panic_on_wal_error: "0"
+  remote_hot_standby: "0"
+  wal_feeder_ipaddr: (null)
+  wal_feeder_port: "0"
+  namespace[0].enabled: "1"
+  namespace[0].cardinality: "-1"
+  namespace[0].estimated_rows: "0"
+  namespace[0].index[0].type: "HASH"
+  namespace[0].index[0].unique: "1"
+  namespace[0].index[0].key_field[0].fieldno: "0"
+  namespace[0].index[0].key_field[0].type: "NUM"
+...
 show stat
+---
 statistics:
-  DELETE: {rps: 0, total: 0}
-  INSERT: {rps: 0, total: 0}
-  SELECT: {rps: 0, total: 0}
-  SELECT_LIMIT: {rps: 0, total: 0}
-  UPDATE_FIELDS: {rps: 0, total: 0}
+  INSERT:        { rps:  0    , total:  0           }
+  SELECT_LIMIT:  { rps:  0    , total:  0           }
+  SELECT:        { rps:  0    , total:  0           }
+  UPDATE_FIELDS: { rps:  0    , total:  0           }
+  DELETE:        { rps:  0    , total:  0           }
+...
 save coredump
+---
 ok
 ...
 save snapshot
+---
 ok
 ...
 exec module command
+---
 unimplemented
 ...
 show info
-info: {lsn: 1, pid: <pid>, recovery_lag: 0.0, recovery_last_update: 0.0, status: primary,
-  uptime: 0, version: 1.3.minor-<rev>-<commit> wal_writer_pid: <pid>}
+---
+info:
+  version: "1.3.minor-<rev>-<commit>
+  uptime: 0
+  pid: <pid>
+  wal_writer_pid: <pid>
+  lsn: 1
+  recovery_lag: 0.000
+  recovery_last_update: 0.000
+  status: primary
+...
