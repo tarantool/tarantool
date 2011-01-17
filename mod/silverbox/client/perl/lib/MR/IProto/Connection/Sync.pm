@@ -52,7 +52,7 @@ sub send {
             my $written = syswrite($socket, $write);
             if (!defined $written) {
                 $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_SNDTIMEO behaviour
-                die $!;
+                die "send: $!";
             } else {
                 substr $write, 0, $written, '';
             }
@@ -66,9 +66,9 @@ sub send {
                 my $read = sysread($socket, my $buf, $to_read);
                 if (!defined $read) {
                     $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_RCVTIMEO behaviour
-                    die $!;
+                    die "recv: $!";
                 } elsif ($read == 0) {
-                    die "EOF during read of header";
+                    die "recv: Unexpected end-of-file";
                 } else {
                     $resp_header .= $buf;
                     $to_read -= $read;
@@ -83,9 +83,9 @@ sub send {
                 my $read = sysread($socket, my $buf, $to_read);
                 if (!defined $read) {
                     $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_RCVTIMEO behaviour
-                    die $!;
+                    die "recv: $!";
                 } elsif ($read == 0) {
-                    die "EOF during read of payload";
+                    die "recv: Unexpected end-of-file";
                 } else {
                     $resp_payload .= $buf;
                     $to_read -= $read;
@@ -102,7 +102,6 @@ sub send {
     else {
         my $error = $@ =~ /^(.*?) at \S+ line \d+/s ? $1 : $@;
         $server->_debug("error: $error");
-        $! = Errno::ETIMEDOUT if $! == Errno::EINPROGRESS; # Hack over IO::Socket behaviour
         if($self->_has_socket()) {
             close($self->_socket);
             $self->_clear_socket();
@@ -139,7 +138,15 @@ sub _build__socket {
         PeerPort => $self->port,
         Proto    => 'tcp',
         Timeout  => $self->connect_timeout,
-    ) or die $@;
+    ) or do {
+        $@ =~ s/^IO::Socket::INET: (?:connect: )?//;
+        if ($@ eq 'timeout') {
+            # Hack over IO::Socket behaviour
+            $! = Errno::ETIMEDOUT;
+            $@ = "$!";
+        }
+        die "connect: $@";
+    };
     $socket->sockopt(SO_KEEPALIVE, 1) if $self->tcp_keepalive;
     $socket->setsockopt((getprotobyname('tcp'))[2], TCP_NODELAY, 1) if $self->tcp_nodelay;
     $self->_set_timeout($socket, $self->timeout) if $self->timeout;
