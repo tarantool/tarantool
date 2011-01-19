@@ -10,7 +10,7 @@ parser sql:
     ignore:           '\\s+'
     token NUM:        '[+-]?[0-9]+'
     token ID:         '[a-z_]+[0-9]+' 
-    token STR:        '"([^\\"]+|\\\\.)*"'
+    token STR:        '\'([^\']+|\\\\.)*\''
     token PING:       'ping'
     token INSERT:     'insert'
     token UPDATE:     'update'

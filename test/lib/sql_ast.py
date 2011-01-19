@@ -208,7 +208,7 @@ class StatementUpdate(StatementPing):
     if return_code:
       return format_error(return_code)
     (result_code, row_count) = struct.unpack("<LL", response)
-    return "Insert OK, {0} row affected".format(row_count)
+    return "Update OK, {0} row affected".format(row_count)
 
 class StatementDelete(StatementPing):
   reqeust_type = DELETE_REQUEST_TYPE

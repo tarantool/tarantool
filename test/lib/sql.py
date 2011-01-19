@@ -19,7 +19,7 @@ class sqlScanner(runtime.Scanner):
         ('\\s+', re.compile('\\s+')),
         ('NUM', re.compile('[+-]?[0-9]+')),
         ('ID', re.compile('[a-z_]+[0-9]+')),
-        ('STR', re.compile('"([^\\"]+|\\\\.)*"')),
+        ('STR', re.compile("'([^']+|\\\\.)*'")),
         ('PING', re.compile('ping')),
         ('INSERT', re.compile('insert')),
         ('UPDATE', re.compile('update')),
