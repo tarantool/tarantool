@@ -30,7 +30,7 @@ import re
 import sql
 import struct
 
-is_admin_re = re.compile("^\s*(show|save|exec|exit|help)", re.I)
+is_admin_re = re.compile("^\s*(show|save|exec|exit|reload|help)", re.I)
 
 class AdminConnection:
   def __init__(self, host, port):
