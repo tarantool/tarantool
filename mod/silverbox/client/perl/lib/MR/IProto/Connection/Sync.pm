@@ -51,8 +51,10 @@ sub send {
         while( length $write ) {
             my $written = syswrite($socket, $write);
             if (!defined $written) {
-                $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_SNDTIMEO behaviour
-                die "send: $!";
+                if ($! != Errno::EINTR) {
+                    $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_SNDTIMEO behaviour
+                    die "send: $!";
+                }
             } else {
                 substr $write, 0, $written, '';
             }
@@ -65,8 +67,10 @@ sub send {
             while( $to_read ) {
                 my $read = sysread($socket, my $buf, $to_read);
                 if (!defined $read) {
-                    $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_RCVTIMEO behaviour
-                    die "recv: $!";
+                    if ($! != Errno::EINTR) {
+                        $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_RCVTIMEO behaviour
+                        die "recv: $!";
+                    }
                 } elsif ($read == 0) {
                     die "recv: Unexpected end-of-file";
                 } else {
@@ -82,8 +86,10 @@ sub send {
             while( $to_read ) {
                 my $read = sysread($socket, my $buf, $to_read);
                 if (!defined $read) {
-                    $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_RCVTIMEO behaviour
-                    die "recv: $!";
+                    if ($! != Errno::EINTR) {
+                        $! = Errno::ETIMEDOUT if $! == Errno::EAGAIN; # Hack over SO_RCVTIMEO behaviour
+                        die "recv: $!";
+                    }
                 } elsif ($read == 0) {
                     die "recv: Unexpected end-of-file";
                 } else {
