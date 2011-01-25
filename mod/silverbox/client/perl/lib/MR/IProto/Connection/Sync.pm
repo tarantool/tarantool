@@ -40,7 +40,19 @@ sub send {
     my $ok = eval {
         $sync = $self->_choose_sync();
         $server->_send_started($sync, $msg, $payload);
+
         my $socket = $self->_socket;
+        vec((my $rin = ''), fileno($socket), 1) = 1;
+        if (select((my $rout = $rin), undef, undef, 0) > 0) {
+            if (sysread($socket, my $buf, 1)) {
+                die "More then 0 bytes was received when nothing was waited for";
+            } else {
+                # Connection was closed by other side, socket is in CLOSE_WAIT state, reconnecting
+                $self->_clear_socket();
+                $socket = $self->_socket;
+            }
+        }
+
         my $header = $self->_pack_header($msg, length $payload, $sync);
         if( $server->debug >= 5 ) {
             $server->_debug_dump('send header: ', $header);
