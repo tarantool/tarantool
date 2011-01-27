@@ -98,7 +98,9 @@ def opt_resize_buf(buf, newsize):
 
 
 def pack_field(value, buf, offset):
-  if type(value) is int:
+  if type(value) is int or type(value) is long:
+    if value > 0xffffffff:
+      raise RuntimeError("Integer value is too big")
     buf = opt_resize_buf(buf, offset + INT_FIELD_LEN)
     struct.pack_into("<cL", buf, offset, chr(INT_FIELD_LEN), value)
     offset += INT_FIELD_LEN + 1
@@ -150,8 +152,11 @@ def unpack_tuple(response, offset):
     offset += data_len
     if data_len == 4:
       (data,) = struct.unpack("<L", data)
-    res.append(data)
-  return str(res), offset
+      res.append((str(data)))
+    else:
+      res.append("'" + data + "'")
+
+  return '[' + ', '.join(res) + ']', offset
 
    
 class StatementPing:
