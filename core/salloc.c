@@ -118,10 +118,6 @@ slab_classes_init(size_t minimal, double factor)
 	slab_active_classes = i;
 }
 
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-
 static bool
 arena_init(struct arena *arena, size_t size)
 {
@@ -129,9 +125,8 @@ arena_init(struct arena *arena, size_t size)
 	arena->size = size - size % SLAB_SIZE;
 	arena->mmap_size = size - size % SLAB_SIZE + SLAB_SIZE;	/* spend SLAB_SIZE bytes on align :-( */
 
-	arena->mmap_base =
-	    mmap(NULL, arena->mmap_size, PROT_READ | PROT_WRITE,
-		 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	arena->mmap_base = mmap(NULL, arena->mmap_size,
+				PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (arena->mmap_base == MAP_FAILED) {
 		say_syserror("mmap");
 		return false;

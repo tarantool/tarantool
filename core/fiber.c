@@ -384,6 +384,27 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
 	return fiber;
 }
 
+/*
+ * note, we can't release memory allocated via palloc(eter_pool, ...)
+ * so, struct fiber and some of its members are leaked forever
+ */
+
+void
+fiber_destroy_all()
+{
+	struct fiber *f;
+	SLIST_FOREACH(f, &fibers, link) {
+		if (f == fiber) /* do not destroy running fiber */
+			continue;
+		if (strcmp(f->name, "sched") == 0)
+			continue;
+
+		palloc_destroy_pool(f->pool);
+		tarantool_coro_destroy(&f->coro);
+	}
+}
+
+
 char *
 fiber_peer_name(struct fiber *fiber)
 {

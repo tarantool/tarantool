@@ -177,6 +177,8 @@ snapshot(void *ev __unused__, int events __unused__)
 
 	fiber->name = "dumper";
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
+	fiber_destroy_all();
+	palloc_unmap_unused();
 	close_all_xcpt(1, sayfd);
 	snapshot_save(recovery_state, mod_snapshot);
 #ifdef COVERAGE

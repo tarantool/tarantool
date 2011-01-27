@@ -44,7 +44,8 @@ void *palloca(struct palloc_pool *pool, size_t size, size_t align);
 void prelease(struct palloc_pool *pool);
 void prelease_after(struct palloc_pool *pool, size_t after);
 struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy(struct palloc_pool *);
+void palloc_destroy_pool(struct palloc_pool *);
+void palloc_unmap_unused(void);
 const char *palloc_name(struct palloc_pool *, const char *);
 size_t palloc_allocated(struct palloc_pool *);
 

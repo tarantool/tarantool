@@ -141,4 +141,9 @@ void assert_fail(const char *assertion, const char *file,
 		 unsigned int line, const char *function) __attribute__ ((noreturn));
 #endif
 
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
+
 #endif

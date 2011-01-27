@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/mman.h>
 
 #include <debug.h>
 #include <palloc.h>
@@ -119,8 +120,14 @@ palloc_init(void)
 	class_count = 0;
 	TAILQ_INIT(&classes);
 
+	/*
+	 * since chunks are allocated via mmap
+	 * size must by multiply of 4096 minus sizeof(struct chunk)
+	 * TODO: should we use sysconf(_SC_PAGESIZE)?
+	 */
+
 	for (size_t size = 4096 * 8; size <= 1 << 16; size *= 2) {
-		if (class_init(size) == NULL)
+		if (class_init(size - sizeof(struct chunk)) == NULL)
 			return 0;
 	}
 
@@ -172,15 +179,18 @@ next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 		goto found;
 	}
 
-	if (size > palloc_greatest_size())
+	if (size > palloc_greatest_size()) {
 		chunk_size = size;
-	else
+		chunk = malloc(sizeof(struct chunk) + chunk_size);
+		if (chunk == NULL)
+			return NULL;
+	} else {
 		chunk_size = class->size;
-
-	chunk = malloc(chunk_size + sizeof(struct chunk));
-
-	if (chunk == NULL)
-		return NULL;
+		chunk = mmap(NULL, sizeof(struct chunk) + chunk_size,
+			     PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		if (chunk == MAP_FAILED)
+			return NULL;
+	}
 
 	class->chunks_count++;
 	chunk->magic = chunk_magic;
@@ -310,12 +320,25 @@ palloc_create_pool(const char *name)
 }
 
 void
-palloc_destroy(struct palloc_pool *pool)
+palloc_destroy_pool(struct palloc_pool *pool)
 {
 	SLIST_REMOVE(&pools, pool, palloc_pool, link);
 	prelease(pool);
 	VALGRIND_DESTROY_MEMPOOL(pool);
 	free(pool);
+}
+
+void
+palloc_unmap_unused(void)
+{
+	struct chunk_class *class;
+	struct chunk *chunk, *next_chunk;
+
+	TAILQ_FOREACH(class, &classes, link) {
+		SLIST_FOREACH_SAFE(chunk, &class->chunks, free_link, next_chunk)
+			munmap(chunk, class->size + sizeof(struct chunk));
+		SLIST_INIT(&class->chunks);
+	}
 }
 
 void
