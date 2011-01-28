@@ -24,6 +24,7 @@
  * SUCH DAMAGE.
  */
 
+#include "config.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -574,7 +575,7 @@ flush_log(struct log_io *l)
 	if (fflush(l->f) < 0)
 		return -1;
 
-#ifdef Linux
+#ifdef TARGET_OS_LINUX
 	if (fdatasync(fileno(l->f)) < 0) {
 		say_syserror("fdatasync");
 		return -1;

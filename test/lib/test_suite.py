@@ -54,13 +54,15 @@ class FilteredStream:
 
 
 class Test:
-  """An individual test file. A test can run itself, and remembers
-  its completion state."""
+  """An individual test file. A test object can run itself
+  and remembers completion state of the run."""
   def __init__(self, name, suite_ini):
     """Initialize test properties: path to test file, path to
     temporary result file, path to the client program, test status."""
     self.name = name
     self.result = name.replace(".test", ".result")
+    self.tmp_result = os.path.join(suite_ini["vardir"],
+                                   os.path.basename(self.result))
     self.reject = name.replace(".test", ".reject")
     self.suite_ini = suite_ini
     self.is_executed = False
@@ -93,8 +95,9 @@ class Test:
     try:
       admin.connect()
       sql.connect()
-      sys.stdout = FilteredStream(self.reject)
+      sys.stdout = FilteredStream(self.tmp_result)
       server = self.suite_ini["server"]
+      vardir = self.suite_ini["vardir"]
       execfile(self.name, globals(), locals())
       self.is_executed_ok = True
     except Exception as e:
@@ -110,16 +113,17 @@ class Test:
     self.is_executed = True
 
     if self.is_executed_ok and os.path.isfile(self.result):
-        self.is_equal_result = filecmp.cmp(self.result, self.reject)
+        self.is_equal_result = filecmp.cmp(self.result, self.tmp_result)
 
     if self.is_executed_ok and self.is_equal_result:
       print "[ pass ]"
-      os.remove(self.reject)
+      os.remove(self.tmp_result)
     elif (self.is_executed_ok and not self.is_equal_result and not
         os.path.isfile(self.result)):
-      os.rename(self.reject, self.result)
+      os.rename(self.tmp_result, self.result)
       print "[ NEW ]"
     else:
+      os.rename(self.tmp_result, self.reject)
       print "[ fail ]"
       where = ""
       if not self.is_executed_ok:
@@ -197,6 +201,7 @@ class TestSuite:
     self.ini["suite_path"] = suite_path
     self.ini["host"] = "localhost"
     self.ini["is_force"] = self.args.is_force
+    self.ini["vardir"] = args.vardir
 
     if os.access(suite_path, os.F_OK) == False:
       raise TestRunException("Suite \"" + suite_path +\

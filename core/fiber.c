@@ -42,12 +42,12 @@
 #include <third_party/queue.h>
 #include <third_party/khash.h>
 
-#include <debug.h>
 #include <fiber.h>
 #include <palloc.h>
 #include <salloc.h>
 #include <say.h>
 #include <tarantool.h>
+#include TARANTOOL_CONFIG
 #include <tarantool_ev.h>
 #include <tbuf.h>
 #include <util.h>
@@ -92,11 +92,11 @@ static khash_t(fid2fiber) *fibers_registry;
 static void
 update_last_stack_frame(struct fiber *fiber)
 {
-#ifdef BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	fiber->last_stack_frame = frame_addess();
 #else
 	(void)fiber;
-#endif
+#endif /* ENABLE_BACKTRACE */
 }
 
 void
@@ -1068,11 +1068,11 @@ fiber_info(struct tbuf *out)
 		tbuf_printf(out, "    stack: %p\n", stack_top);
 		tbuf_printf(out, "    exc: %p\n", ((void **)fiber->exc)[3]);
 		tbuf_printf(out, "    exc_frame: %p, \n", ((void **)fiber->exc)[3] + 2 * sizeof(void *));
-#ifdef BACKTRACE
+#ifdef ENABLE_BACKTRACE
 		tbuf_printf(out, "    backtrace:\n%s",
 			    backtrace(fiber->last_stack_frame,
 				      fiber->coro.stack, fiber->coro.stack_size));
-#endif
+#endif /* ENABLE_BACKTRACE */
 	}
 }
 

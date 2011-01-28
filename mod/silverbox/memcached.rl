@@ -37,6 +37,7 @@
 #include <pickle.h>
 
 #include <tarantool.h>
+#include <cfg/tarantool_silverbox_cfg.h>
 #include <mod/silverbox/box.h>
 #include <stat.h>
 
@@ -698,4 +699,5 @@ memcached_expire(void *data __unused__)
  * Local Variables:
  * mode: c
  * End:
+ * vim: syntax=c
  */

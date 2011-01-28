@@ -40,6 +40,7 @@
 #include <tbuf.h>
 #include <util.h>
 
+#include <cfg/tarantool_silverbox_cfg.h>
 #include <mod/silverbox/box.h>
 #include <mod/silverbox/index.h>
 

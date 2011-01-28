@@ -199,17 +199,7 @@ void coro_destroy (coro_context *ctx);
     && !defined(CORO_SJLJ) && !defined(CORO_LINUX) \
     && !defined(CORO_IRIX) && !defined(CORO_ASM) \
     && !defined(CORO_PTHREAD)
-# if defined(WINDOWS)
-#  define CORO_LOSER 1 /* you don't win with windoze */
-# elif defined(__linux) && (defined(__x86) || defined (__amd64))
-#  define CORO_ASM 1
-# elif defined(HAVE_UCONTEXT_H)
-#  define CORO_UCONTEXT 1
-# elif defined(HAVE_SETJMP_H) && defined(HAVE_SIGALTSTACK)
-#  define CORO_SJLJ 1
-# else
-error unknown or unsupported architecture
-# endif
+#error unknown or unsupported architecture
 #endif
 
 /*****************************************************************************/
