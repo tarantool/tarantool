@@ -106,8 +106,8 @@ Send message to server.
 =cut
 
 sub _send {
-    my ($self, $msg, $payload, $callback, $no_reply) = @_;
-    my $sync = $self->_choose_sync();
+    my ($self, $msg, $payload, $callback, $no_reply, $sync) = @_;
+    $sync = $self->_choose_sync() unless defined $sync;
     my $header = $self->_pack_header($msg, length $payload, $sync);
     my $server = $self->server;
     $self->_callbacks->{$sync} = $callback;

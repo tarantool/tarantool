@@ -34,11 +34,11 @@ See L<MR::IProto::Connection/send> for more information.
 =cut
 
 sub send {
-    my ($self, $msg, $payload, $callback, $no_reply) = @_;
-    my ($sync, $resp_msg, $resp_payload);
+    my ($self, $msg, $payload, $callback, $no_reply, $sync) = @_;
+    my ($resp_msg, $resp_payload);
     my $server = $self->server;
     my $ok = eval {
-        $sync = $self->_choose_sync();
+        $sync = $self->_choose_sync() unless defined $sync;
         $server->_send_started($sync, $msg, $payload);
 
         my $socket = $self->_socket;

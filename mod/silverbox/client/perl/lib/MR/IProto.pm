@@ -547,7 +547,7 @@ sub _send_try {
     my $xsync = $sync ? 'sync' : 'async';
     $self->_debug(sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $self->max_request_retries ) if $self->debug >= 2;
     my $server = $self->cluster->server( $args->{key} );
-    $server->$xsync->send($args->{msg}, $args->{body}, $handler, $args->{no_reply});
+    $server->$xsync->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
     return;
 }
 
