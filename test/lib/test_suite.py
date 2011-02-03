@@ -56,16 +56,19 @@ class FilteredStream:
 class Test:
   """An individual test file. A test can run itself, and remembers
   its completion state."""
-  def __init__(self, name, suite_ini):
+  def __init__(self, name, args, suite_ini):
     """Initialize test properties: path to test file, path to
     temporary result file, path to the client program, test status."""
     self.name = name
     self.result = name.replace(".test", ".result")
     self.reject = name.replace(".test", ".reject")
+    self.valgrind_log = args.vardir + "/valgrind.log"
+    self.args = args
     self.suite_ini = suite_ini
     self.is_executed = False
     self.is_executed_ok = None
     self.is_equal_result = None
+    self.is_valgrind_clean = True
 
   def passed(self):
     """Return true if this test was run successfully."""
@@ -112,7 +115,10 @@ class Test:
     if self.is_executed_ok and os.path.isfile(self.result):
         self.is_equal_result = filecmp.cmp(self.result, self.reject)
 
-    if self.is_executed_ok and self.is_equal_result:
+    if self.args.valgrind:
+      self.is_valgrind_clean = os.path.getsize(self.valgrind_log) == 0
+
+    if self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
       print "[ pass ]"
       os.remove(self.reject)
     elif (self.is_executed_ok and not self.is_equal_result and not
@@ -125,6 +131,9 @@ class Test:
       if not self.is_executed_ok:
         self.print_diagnostics()
         where = ": test execution aborted, reason '{0}'".format(diagnostics)
+      elif not self.is_valgrind_clean:
+        print "Test failed! Valgrind reports errors" \
+	      " (see {0}/valgrind.log)".format(self.args.vardir)
       else:
         self.print_unidiff()
         where = ": wrong test output"
@@ -224,7 +233,7 @@ class TestSuite:
     for test_name in glob.glob(os.path.join(suite_path, "*.test")):
       for test_pattern in self.args.tests:
         if test_name.find(test_pattern) != -1:
-          self.tests.append(Test(test_name, self.ini))
+          self.tests.append(Test(test_name, self.args, self.ini))
     print "Found " + str(len(self.tests)) + " tests."
 
   def run_all(self):

@@ -96,6 +96,19 @@ class Options:
         " See also --start-and-exit.")
 
     parser.add_argument(
+        "--valgrind",
+        dest = "valgrind",
+        action = "store_true",
+        default = False,
+        help = "Start the server under 'valgrind'. Default: false.")
+
+    parser.add_argument(
+        "--valgrind-args",
+        dest = "valgrind_args",
+        default = "--tool=memcheck",
+        help = "Arguments passed to 'valgrind'. Default: --tool=memcheck.")
+
+    parser.add_argument(
         "--bindir",
         dest = "bindir",
         default = "../_debug_box",

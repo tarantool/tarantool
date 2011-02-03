@@ -7,6 +7,7 @@ import sys
 import signal
 import time
 import socket
+import daemon
 
 def wait_until_connected(host, port):
   """Wait until the server is started and accepting connections"""
@@ -32,8 +33,14 @@ def prepare_gdb(args, vardir):
   if term not in ["xterm", "rxvt", "urxvt", "gnome-terminal", "konsole"]:
     raise RuntimeError("--gdb: unsupported terminal {0}".format(term))
 
-  gdbargs = '{0} -e gdb {1} -ex "break main" -ex "run"'.format(term, args[0])
-  args = [ "/bin/sh", "-c", gdbargs ]
+  args = [ term, "-e ", "gdb", "-ex", "break main", "-ex", "run"] + args
+  return args
+
+
+def prepare_valgrind(args, valgrind_args, vardir):
+  "Prepare server startup argumetns to run under valgrind."
+  args = ([ "valgrind", "--log-file=valgrind.log", "--quiet" ] +
+          valgrind_args.split(",") + args)
   return args
 
 
@@ -113,7 +120,7 @@ class TarantoolSilverboxServer:
     if not silent:
       print "Starting {0} {1}.".format(os.path.basename(self.abspath_to_exe),
                                        version)
-    
+
   def start(self, silent = False):
 
     if self.is_started:
@@ -126,14 +133,27 @@ class TarantoolSilverboxServer:
 
     args = [self.abspath_to_exe]
 
-    if self.args.start_and_exit:
+    if (self.args.start_and_exit and not self.args.valgrind
+        and not self.args.gdb):
       args.append("--daemonize")
     if self.args.gdb:
       args = prepare_gdb(args, self.args.vardir)
+    elif self.args.valgrind:
+      args = prepare_valgrind(args, self.args.valgrind_args, self.args.vardir)
 
-    self.server = pexpect.spawn(args[0], args[1:], cwd = self.args.vardir)
+    if self.args.start_and_exit and self.args.valgrind:
+      pid = os.fork()
+      if pid > 0:
+        os.wait()
+      else:
+        with daemon.DaemonContext(working_directory = self.args.vardir):
+	  os.execvp(args[0], args)
+    else:
+      self.server = pexpect.spawn(args[0], args[1:], cwd = self.args.vardir)
+      if self.args.start_and_exit:
+        self.server.wait()
+
 # wait until the server is connectedk
-
     if self.args.gdb and self.args.start_and_exit:
       time.sleep(1)
     elif not self.args.start_and_exit and not self.args.gdb:

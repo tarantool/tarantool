@@ -58,8 +58,11 @@ class AdminConnection:
     try:
       if self.socket.recv(0, socket.MSG_DONTWAIT) == '':
         self.reconnect()
-    except socket.error:
-      pass
+    except socket.error as e:
+      if e.errno == 11:
+        pass
+      else:
+        self.reconnect()
 
   def execute(self, command):
     self.opt_reconnect()
