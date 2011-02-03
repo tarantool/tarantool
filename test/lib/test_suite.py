@@ -131,12 +131,12 @@ class Test:
       if not self.is_executed_ok:
         self.print_diagnostics()
         where = ": test execution aborted, reason '{0}'".format(diagnostics)
-      elif not self.is_valgrind_clean:
-        print "Test failed! Valgrind reports errors" \
-	      " (see {0}/valgrind.log)".format(self.args.vardir)
-      else:
+      elif not self.is_equal_result:
         self.print_unidiff()
         where = ": wrong test output"
+      if not self.is_valgrind_clean:
+        print "Test failed! Valgrind reports errors" \
+	      " (see {0}/valgrind.log)".format(self.args.vardir)
       if not self.suite_ini["is_force"]:
         raise TestRunException("Failed to run test " + self.name + where)
 
