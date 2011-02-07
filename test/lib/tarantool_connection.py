@@ -112,6 +112,14 @@ class AdminConnection:
     self.disconnect()
 
 class DataConnection(AdminConnection):
+
+  def recvall(self, length):
+    res = ""
+    while len(res) < length:
+      buf = self.socket.recv(length - len(res))
+      res = res + buf
+    return res
+
   def execute_no_reconnect(self, command):
     statement = sql.parse("sql", command)
     if statement == None:
@@ -126,12 +134,12 @@ class DataConnection(AdminConnection):
 
     IPROTO_HEADER_SIZE = 12
 
-    header = self.socket.recv(IPROTO_HEADER_SIZE, socket.MSG_WAITALL)
+    header = self.recvall(IPROTO_HEADER_SIZE)
 
     response_len = struct.unpack("<lll", header)[1]
 
     if response_len:
-      response = self.socket.recv(response_len, socket.MSG_WAITALL) 
+      response = self.recvall(response_len)
     else:
       response = None
     

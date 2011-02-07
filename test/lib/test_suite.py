@@ -16,6 +16,7 @@ import tarantool_preprocessor
 import re
 import cStringIO
 import string
+import traceback
 
 class TestRunException(RuntimeError):
   """A common exception to use across the program."""
@@ -101,7 +102,7 @@ class Test:
       execfile(self.name, globals(), locals())
       self.is_executed_ok = True
     except Exception as e:
-      print e
+      traceback.print_exc(e)
       diagnostics = str(e)
     finally:
       if sys.stdout and sys.stdout != save_stdout:
