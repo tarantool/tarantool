@@ -82,10 +82,6 @@ class Test:
     exception. The exception is raised only if is_force flag is
     not set."""
 
-    sys.stdout.write(string.ljust(self.name, 31))
-# for better diagnostics in case of a long-running test
-    sys.stdout.flush()
-
     diagnostics = "unknown"
     save_stdout = sys.stdout
     admin = AdminConnection(self.suite_ini["host"],
@@ -213,6 +209,10 @@ class TestSuite:
     config.read(os.path.join(suite_path, "suite.ini"))
     self.ini.update(dict(config.items("default")))
     self.ini["config"] = os.path.join(suite_path, self.ini["config"])
+    if self.ini.has_key("disabled"):
+      self.ini["disabled"] = dict.fromkeys(self.ini["disabled"].split(" "))
+    else:
+      self.ini["disabled"] = dict()
 # import the necessary module for test suite client
 
 # now read the server config, we need some properties from it
@@ -252,9 +252,16 @@ class TestSuite:
     self.ini["server"] = server
 
     for test in self.tests:
-      test.run()
-      if not test.passed():
-        failed_tests.append(test.name)
+      sys.stdout.write(string.ljust(test.name, 31))
+# for better diagnostics in case of a long-running test
+      sys.stdout.flush()
+
+      if os.path.basename(test.name) in self.ini["disabled"]:
+        print "[ skip ]"
+      else:
+        test.run()
+        if not test.passed():
+          failed_tests.append(test.name)
 
     print shortsep
     if len(failed_tests):

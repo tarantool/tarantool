@@ -32,9 +32,6 @@ from lib.test_suite import TestSuite, TestRunException
 #
 # Run a collection of tests.
 #
-# @todo
-# --gdb
-# put class definitions into separate files
 
 class Options:
   """Handle options of test-runner"""
