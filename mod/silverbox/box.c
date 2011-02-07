@@ -750,11 +750,13 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 
 	txn->op = op;
 	txn->n = read_u32(data);
+	if (txn->n > nelem(namespace) - 1)
+		box_raise(ERR_CODE_NO_SUCH_NAMESPACE, "bad namespace number");
 	txn->index = &namespace[txn->n].index[0];
 
 	if (!namespace[txn->n].enabled) {
 		say_warn("namespace %i is not enabled", txn->n);
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "namespace is not enabled");
+		box_raise(ERR_CODE_NO_SUCH_NAMESPACE, "namespace is not enabled");
 	}
 
 	txn->namespace = &namespace[txn->n];
