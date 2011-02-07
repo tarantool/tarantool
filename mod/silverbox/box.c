@@ -750,7 +750,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 
 	txn->op = op;
 	txn->n = read_u32(data);
-	if (txn->n > nelem(namespace) - 1)
+	if (txn->n > namespace_count - 1)
 		box_raise(ERR_CODE_NO_SUCH_NAMESPACE, "bad namespace number");
 	txn->index = &namespace[txn->n].index[0];
 
