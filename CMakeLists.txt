@@ -57,12 +57,10 @@ set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2")
 set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 
 #
-# Enable 'make tags' target.
+# Enable 'make TAGS' target.
 #
-add_custom_target(tags
-    COMMAND ctags -R -e -f TAGS
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    )
+add_custom_target(TAGS COMMAND ctags -R -e -f TAGS
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #
 # Define TARANTOOL_VERSION -- a string constant with tarantool version.
