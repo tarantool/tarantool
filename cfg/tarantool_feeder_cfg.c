@@ -126,7 +126,7 @@ static NameAtom _name__custom_proc_title[] = {
           *y = malloc( sizeof( __typeof__(**(x))) );                \
           if (*y == NULL)  return CNF_NOMEMORY;                     \
           if ( (ar = acceptDefault##t(*y)) != 0 ) return ar;        \
-          (*y)->__confetti_flags |= __flags;		             \
+          (*y)->__confetti_flags = __flags;                         \
           y++;                                                      \
       }                                                             \
    }                                                                \

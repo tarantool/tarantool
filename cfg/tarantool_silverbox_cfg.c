@@ -269,7 +269,7 @@ static NameAtom _name__namespace__index__key_field__type[] = {
           *y = malloc( sizeof( __typeof__(**(x))) );                \
           if (*y == NULL)  return CNF_NOMEMORY;                     \
           if ( (ar = acceptDefault##t(*y)) != 0 ) return ar;        \
-          (*y)->__confetti_flags |= __flags;		             \
+          (*y)->__confetti_flags = __flags;                         \
           y++;                                                      \
       }                                                             \
    }                                                                \
