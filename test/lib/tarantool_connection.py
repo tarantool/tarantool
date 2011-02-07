@@ -29,6 +29,7 @@ import yaml
 import re
 import sql
 import struct
+import errno
 
 is_admin_re = re.compile("^\s*(show|save|exec|exit|reload|help)", re.I)
 
@@ -55,11 +56,15 @@ class AdminConnection:
     self.connect()
 
   def opt_reconnect(self):
+    """ On a socket which was disconnected, recv of 0 bytes immediately
+        returns with no data. On a socket which is alive, it returns EAGAIN.
+        Make use of this property and detect whether or not the socket is
+        dead. Reconnect a dead socket, do nothing if the socket is good."""
     try:
       if self.socket.recv(0, socket.MSG_DONTWAIT) == '':
         self.reconnect()
     except socket.error as e:
-      if e.errno == 11:
+      if e.errno == errno.EAGAIN:
         pass
       else:
         self.reconnect()

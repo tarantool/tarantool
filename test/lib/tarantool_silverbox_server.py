@@ -23,9 +23,8 @@ def wait_until_connected(host, port):
       time.sleep(0.001)
 
 
-def prepare_gdb(args, vardir):
-  """Prepare server startup argumetns to run under gdb.
-  Create .gdbinit config file"""
+def prepare_gdb(args):
+  """Prepare server startup arguments to run under gdb."""
   if "TERM" in os.environ:
     term = os.environ["TERM"]
   else:
@@ -38,10 +37,10 @@ def prepare_gdb(args, vardir):
   return args
 
 
-def prepare_valgrind(args, valgrind_args, vardir):
-  "Prepare server startup argumetns to run under valgrind."
+def prepare_valgrind(args, valgrind_opts):
+  "Prepare server startup arguments to run under valgrind."
   args = ([ "valgrind", "--log-file=valgrind.log", "--quiet" ] +
-          valgrind_args.split(",") + args)
+          valgrind_opts.split(" ") + args)
   return args
 
 
@@ -135,13 +134,13 @@ class TarantoolSilverboxServer:
 
     args = [self.abspath_to_exe]
 
-    if (self.args.start_and_exit and not self.args.valgrind
-        and not self.args.gdb):
+    if (self.args.start_and_exit and
+        not self.args.valgrind and not self.args.gdb):
       args.append("--daemonize")
     if self.args.gdb:
-      args = prepare_gdb(args, self.args.vardir)
+      args = prepare_gdb(args)
     elif self.args.valgrind:
-      args = prepare_valgrind(args, self.args.valgrind_args, self.args.vardir)
+      args = prepare_valgrind(args, self.args.valgrind_opts)
 
     if self.args.start_and_exit and self.args.valgrind:
       pid = os.fork()

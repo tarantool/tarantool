@@ -46,7 +46,7 @@ class Options:
 
     parser.add_argument(
         "tests",
-        metavar="list of tests",
+        metavar="test",
         nargs="*",
         default = [""],
         help="""Can be empty. List of test names, to look for in suites. Each
@@ -68,50 +68,52 @@ class Options:
         dest = "is_force",
         action = "store_true",
         default = False,
-        help = "Go on with other tests in case of an individual test failure."
-               " Default: false.")
+        help = """Go on with other tests in case of an individual test failure.
+                 Default: false.""")
 
     parser.add_argument(
         "--start-and-exit",
         dest = "start_and_exit",
         action = "store_true",
         default = False,
-        help = "Start the server from the first specified suite and"
-        "exit without running any tests. Default: false.")
+        help = """Start the server from the first specified suite and
+         exit without running any tests. Default: false.""")
 
     parser.add_argument(
         "--gdb",
         dest = "gdb",
         action = "store_true",
         default = False,
-        help = "Start the server under 'gdb' debugger. Default: false."
-        " See also --start-and-exit.")
+        help = """Start the server under 'gdb' debugger.
+        See also --start-and-exit. This option is mutually exclusive with
+        --valgrind. Default: false.""")
 
     parser.add_argument(
         "--valgrind",
         dest = "valgrind",
         action = "store_true",
         default = False,
-        help = "Start the server under 'valgrind'. Default: false.")
+        help = "Run the server under 'valgrind'. Default: false.")
 
     parser.add_argument(
-        "--valgrind-args",
-        dest = "valgrind_args",
+        "--valgrind-opts",
+        dest = "valgrind_opts",
         default = "--tool=memcheck",
-        help = "Arguments passed to 'valgrind'. Default: --tool=memcheck.")
+        help = """Arguments passed to 'valgrind'.
+        You can also use VALGRIND_OPTS environment variable. This option
+        is mutually exclusive with --gdb. Default: --tool=memcheck.""")
 
     parser.add_argument(
         "--bindir",
         dest = "bindir",
         default = "../core",
-        help = "Path to server binary."
-               " Default: " + "../core.")
+        help = """Path to server binary. Default: " + "../core.""")
 
     parser.add_argument(
         "--vardir",
         dest = "vardir",
         default = "var",
-        help = "Path to data directory. Default: var.")
+        help = """Path to data directory. Default: var.""")
 
     parser.add_argument(
         "--mem",
@@ -121,9 +123,19 @@ class Options:
         help = """Run test suite in memory, using tmpfs or ramdisk.
         Is used only if vardir is not an absolute path. In that case
         vardir is sym-linked to /dev/shm/<vardir>.
-        Linux only. Default: false""")
+        Linux only. Default: false.""")
 
     self.args = parser.parse_args()
+    self.check()
+
+  def check(self):
+    """Check the arguments for correctness."""
+    check_error = False
+    if self.args.gdb and self.args.valgrind:
+      print "Error: option --gdb is not compatible with option --valgrind"
+      check_error = True
+    if check_error:
+      exit(-1)
 
 #######################################################################
 # Program body

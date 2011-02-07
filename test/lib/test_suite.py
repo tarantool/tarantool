@@ -54,6 +54,19 @@ class FilteredStream:
     self.stream.close()
 
 
+def check_valgrind_log(path_to_log):
+  """ Check that there were no warnings in the log."""
+  return os.path.getsize(path_to_log) != 0
+
+
+def print_tail_n(filename, num_lines):
+  """Print N last lines of a file."""
+  with open(filename, "r+") as logfile:
+    tail_n = collections.deque(logfile, num_lines)
+    for line in tail_n:
+      sys.stdout.write(line)
+
+
 class Test:
   """An individual test file. A test object can run itself
   and remembers completion state of the run."""
@@ -65,7 +78,6 @@ class Test:
     self.tmp_result = os.path.join(suite_ini["vardir"],
                                    os.path.basename(self.result))
     self.reject = name.replace(".test", ".reject")
-    self.valgrind_log = args.vardir + "/valgrind.log"
     self.args = args
     self.suite_ini = suite_ini
     self.is_executed = False
@@ -116,7 +128,8 @@ class Test:
         self.is_equal_result = filecmp.cmp(self.result, self.tmp_result)
 
     if self.args.valgrind:
-      self.is_valgrind_clean = os.path.getsize(self.valgrind_log) == 0
+      self.is_valgrind_clean = \
+      check_valgrind_log(self.suite_ini["valgrind_log"]) == False
 
     if self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
       print "[ pass ]"
@@ -130,27 +143,27 @@ class Test:
       print "[ fail ]"
       where = ""
       if not self.is_executed_ok:
-        self.print_diagnostics()
+        self.print_diagnostics(self.reject,
+            "Test failed! Last 10 lines of the result file:")
         where = ": test execution aborted, reason '{0}'".format(diagnostics)
       elif not self.is_equal_result:
         self.print_unidiff()
         where = ": wrong test output"
-      if not self.is_valgrind_clean:
-        print "Test failed! Valgrind reports errors" \
-	      " (see {0}/valgrind.log)".format(self.args.vardir)
+      elif not self.is_valgrind_clean:
+        self.print_diagnostics(self.suite_ini["valgrind_log"],
+                               "Test failed! Last 10 lines of valgrind.log:")
+        where = ": there were warnings in valgrind.log"
+
       if not self.suite_ini["is_force"]:
         raise TestRunException("Failed to run test " + self.name + where)
 
 
-  def print_diagnostics(self):
+  def print_diagnostics(self, logfile, message):
     """Print 10 lines of client program output leading to test
     failure. Used to diagnose a failure of the client program"""
 
-    print "Test failed! Last 10 lines of the result file:"
-    with open(self.reject, "r+") as reject:
-      tail_10 = collections.deque(reject, 10)
-      for line in tail_10:
-        sys.stdout.write(line)
+    print message
+    print_tail_n(logfile, 10)
 
   def print_unidiff(self):
     """Print a unified diff between .test and .result files. Used
@@ -208,6 +221,7 @@ class TestSuite:
     self.ini["host"] = "localhost"
     self.ini["is_force"] = self.args.is_force
     self.ini["vardir"] = args.vardir
+    self.ini["valgrind_log"] = os.path.join(args.vardir, "valgrind.log")
 
     if os.access(suite_path, os.F_OK) == False:
       raise TestRunException("Suite \"" + suite_path +\
@@ -277,4 +291,8 @@ class TestSuite:
       print "Failed {0} tests: {1}.".format(len(failed_tests),
                                             ", ".join(failed_tests))
     server.stop();
+
+    if self.args.valgrind and check_valgrind_log(self.ini["valgrind_log"]):
+      print "  Error! There were warnings/errors in valgrind log file:"
+      print_tail_n(self.ini["valgrind_log"], 20)
 
