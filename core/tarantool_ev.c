@@ -24,5 +24,5 @@
  * SUCH DAMAGE.
  */
 
-#include <tarantool_ev.h>
-#include <third_party/libev/ev.c>
+#include "tarantool_ev.h"
+#include "third_party/libev/ev.c"

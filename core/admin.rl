@@ -36,6 +36,7 @@
 #include <say.h>
 #include <stat.h>
 #include <tarantool.h>
+#include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
 
@@ -223,4 +224,5 @@ admin_init(void)
  * Local Variables:
  * mode: c
  * End:
+ * vim: syntax=c
  */

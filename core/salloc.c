@@ -31,7 +31,7 @@
 #include <string.h>
 #include <sys/mman.h>
 
-#include <debug.h>
+#include "third_party/valgrind/memcheck.h"
 #include <third_party/queue.h>
 #include <salloc.h>
 #include <util.h>

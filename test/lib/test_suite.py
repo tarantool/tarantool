@@ -16,6 +16,7 @@ import tarantool_preprocessor
 import re
 import cStringIO
 import string
+import traceback
 
 class TestRunException(RuntimeError):
   """A common exception to use across the program."""
@@ -54,13 +55,15 @@ class FilteredStream:
 
 
 class Test:
-  """An individual test file. A test can run itself, and remembers
-  its completion state."""
+  """An individual test file. A test object can run itself
+  and remembers completion state of the run."""
   def __init__(self, name, args, suite_ini):
     """Initialize test properties: path to test file, path to
     temporary result file, path to the client program, test status."""
     self.name = name
     self.result = name.replace(".test", ".result")
+    self.tmp_result = os.path.join(suite_ini["vardir"],
+                                   os.path.basename(self.result))
     self.reject = name.replace(".test", ".reject")
     self.valgrind_log = args.vardir + "/valgrind.log"
     self.args = args
@@ -82,10 +85,6 @@ class Test:
     exception. The exception is raised only if is_force flag is
     not set."""
 
-    sys.stdout.write(string.ljust(self.name, 31))
-# for better diagnostics in case of a long-running test
-    sys.stdout.flush()
-
     diagnostics = "unknown"
     save_stdout = sys.stdout
     admin = AdminConnection(self.suite_ini["host"],
@@ -96,12 +95,13 @@ class Test:
     try:
       admin.connect()
       sql.connect()
-      sys.stdout = FilteredStream(self.reject)
+      sys.stdout = FilteredStream(self.tmp_result)
       server = self.suite_ini["server"]
+      vardir = self.suite_ini["vardir"]
       execfile(self.name, globals(), locals())
       self.is_executed_ok = True
     except Exception as e:
-      print e
+      traceback.print_exc(e)
       diagnostics = str(e)
     finally:
       if sys.stdout and sys.stdout != save_stdout:
@@ -113,19 +113,20 @@ class Test:
     self.is_executed = True
 
     if self.is_executed_ok and os.path.isfile(self.result):
-        self.is_equal_result = filecmp.cmp(self.result, self.reject)
+        self.is_equal_result = filecmp.cmp(self.result, self.tmp_result)
 
     if self.args.valgrind:
       self.is_valgrind_clean = os.path.getsize(self.valgrind_log) == 0
 
     if self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
       print "[ pass ]"
-      os.remove(self.reject)
+      os.remove(self.tmp_result)
     elif (self.is_executed_ok and not self.is_equal_result and not
         os.path.isfile(self.result)):
-      os.rename(self.reject, self.result)
+      os.rename(self.tmp_result, self.result)
       print "[ NEW ]"
     else:
+      os.rename(self.tmp_result, self.reject)
       print "[ fail ]"
       where = ""
       if not self.is_executed_ok:
@@ -206,6 +207,7 @@ class TestSuite:
     self.ini["suite_path"] = suite_path
     self.ini["host"] = "localhost"
     self.ini["is_force"] = self.args.is_force
+    self.ini["vardir"] = args.vardir
 
     if os.access(suite_path, os.F_OK) == False:
       raise TestRunException("Suite \"" + suite_path +\
@@ -216,6 +218,10 @@ class TestSuite:
     config.read(os.path.join(suite_path, "suite.ini"))
     self.ini.update(dict(config.items("default")))
     self.ini["config"] = os.path.join(suite_path, self.ini["config"])
+    if self.ini.has_key("disabled"):
+      self.ini["disabled"] = dict.fromkeys(self.ini["disabled"].split(" "))
+    else:
+      self.ini["disabled"] = dict()
 # import the necessary module for test suite client
 
 # now read the server config, we need some properties from it
@@ -255,9 +261,16 @@ class TestSuite:
     self.ini["server"] = server
 
     for test in self.tests:
-      test.run()
-      if not test.passed():
-        failed_tests.append(test.name)
+      sys.stdout.write(string.ljust(test.name, 31))
+# for better diagnostics in case of a long-running test
+      sys.stdout.flush()
+
+      if os.path.basename(test.name) in self.ini["disabled"]:
+        print "[ skip ]"
+      else:
+        test.run()
+        if not test.passed():
+          failed_tests.append(test.name)
 
     print shortsep
     if len(failed_tests):

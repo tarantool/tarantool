@@ -36,6 +36,7 @@
 
 #include <fiber.h>
 #include <say.h>
+#include TARANTOOL_CONFIG
 
 int sayfd = STDERR_FILENO;
 
@@ -154,6 +155,8 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 void
 _say(int level, const char *filename, int line, const char *error, const char *format, ...)
 {
+        if (cfg.log_level < level)
+		return;
 	va_list ap;
 	va_start(ap, format);
 	vsay(level, filename, line, error, format, ap);

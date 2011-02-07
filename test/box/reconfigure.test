@@ -2,46 +2,48 @@
 #
 # backup default
 from os.path import abspath
-os.rename("var/tarantool.cfg", "var/tarantool.cfg.old")
+cfg = os.path.join(vardir, "tarantool.cfg")
+oldcfg = os.path.join(vardir, "tarantool.cfg.old")
+os.rename(cfg, oldcfg)
 
 # bad1
-os.symlink(abspath("box/tarantool_bad1.cfg"), "var/tarantool.cfg")
+os.symlink(abspath("box/tarantool_bad1.cfg"), cfg)
 exec admin "reload configuration"
 
 # bad2
-os.unlink("var/tarantool.cfg")
-os.symlink(abspath("box/tarantool_bad2.cfg"), "var/tarantool.cfg")
+os.unlink(cfg)
+os.symlink(abspath("box/tarantool_bad2.cfg"), cfg)
 exec admin "reload configuration"
 
 # bad3
-os.unlink("var/tarantool.cfg")
-os.symlink(abspath("box/tarantool_bad3.cfg"), "var/tarantool.cfg")
+os.unlink(cfg)
+os.symlink(abspath("box/tarantool_bad3.cfg"), cfg)
 exec admin "reload configuration"
 
 # bad4
-os.unlink("var/tarantool.cfg")
-os.symlink(abspath("box/tarantool_bad4.cfg"), "var/tarantool.cfg")
+os.unlink(cfg)
+os.symlink(abspath("box/tarantool_bad4.cfg"), cfg)
 exec admin "reload configuration"
 
 # bad5
-os.unlink("var/tarantool.cfg")
-os.symlink(abspath("box/tarantool_bad5.cfg"), "var/tarantool.cfg")
+os.unlink(cfg)
+os.symlink(abspath("box/tarantool_bad5.cfg"), cfg)
 exec admin "reload configuration"
 
 # good
-os.unlink("var/tarantool.cfg")
-os.symlink(abspath("box/tarantool_good.cfg"), "var/tarantool.cfg")
+os.unlink(cfg)
+os.symlink(abspath("box/tarantool_good.cfg"), cfg)
 exec admin "reload configuration"
 
 # empty
-os.unlink("var/tarantool.cfg")
-os.symlink(abspath("box/tarantool_empty.cfg"), "var/tarantool.cfg")
+os.unlink(cfg)
+os.symlink(abspath("box/tarantool_empty.cfg"), cfg)
 exec admin "reload configuration"
 
 # no config
-os.unlink("var/tarantool.cfg")
+os.unlink(cfg)
 exec admin "reload configuration"
 
 # restore default
-os.rename("var/tarantool.cfg.old", "var/tarantool.cfg")
+os.rename(oldcfg, cfg)
 # vim: syntax=python

@@ -107,7 +107,7 @@ enum box_mode {
         _(UPDATE_FIELDS_OLD, 16)
         _(JUBOX_ALIVE, 11)
 
-    DO NOT use those ids!
+    DO NOT use these ids!
  */
 #define MESSAGES(_)				\
         _(INSERT, 13)				\

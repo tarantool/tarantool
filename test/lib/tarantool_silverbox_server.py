@@ -8,6 +8,7 @@ import signal
 import time
 import socket
 import daemon
+import glob
 
 def wait_until_connected(host, port):
   """Wait until the server is started and accepting connections"""
@@ -93,17 +94,18 @@ class TarantoolSilverboxServer:
       if not silent:
         print "  Found old vardir, deleting..."
       self.kill_old_server()
-      if os.path.islink(vardir):
-        shutil.rmtree(os.readlink(vardir), ignore_errors = True)
-        os.remove(vardir)
-      else:
-        shutil.rmtree(vardir, ignore_errors = True)
-
-    if (self.args.mem == True and check_tmpfs_exists() and
-        os.path.basename(vardir) == vardir):
-      create_tmpfs_vardir(vardir)
+      for filename in (glob.glob(os.path.join(vardir, "*.snap")) +
+                      glob.glob(os.path.join(vardir, "*.inprogress")) +
+                      glob.glob(os.path.join(vardir, "*.xlog")) +
+                      glob.glob(os.path.join(vardir, "*.cfg")) +
+                      glob.glob(os.path.join(vardir, "core"))):
+        os.remove(filename)
     else:
-      os.mkdir(vardir)
+      if (self.args.mem == True and check_tmpfs_exists() and
+          os.path.basename(vardir) == vardir):
+        create_tmpfs_vardir(vardir)
+      else:
+        os.mkdir(vardir)
 
     shutil.copy(self.suite_ini["config"], self.args.vardir)
 

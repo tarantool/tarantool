@@ -52,7 +52,7 @@ void _say(int level, const char *filename, int line, const char *error,
 	  const char *format, ...)
     __attribute__ ((format(FORMAT_PRINTF, 5, 6)));
 
-#define say(level, ...) ({ if(cfg.log_level >= level) _say(level, __FILE__, __LINE__, __VA_ARGS__); })
+#define say(level, ...) ({ _say(level, __FILE__, __LINE__, __VA_ARGS__); })
 
 #define panic(...)		({ say(S_FATAL, NULL, __VA_ARGS__); exit(EXIT_FAILURE); })
 #define panic_syserror(...)	({ say(S_FATAL, strerror(errno), __VA_ARGS__); exit(EXIT_FAILURE); })

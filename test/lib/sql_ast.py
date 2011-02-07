@@ -51,6 +51,7 @@ ER = {
  0x00003102: ("ERR_CODE_NODE_NOT_FOUND"      ,  "")                                       ,
  0x00003702: ("ERR_CODE_NODE_FOUND"          ,  "")                                       ,
  0x00003802: ("ERR_CODE_INDEX_VIOLATION"     ,  "")                                       ,
+ 0x00003902: ("ERR_CODE_NO_SUCH_NAMESPACE"   ,  "No namespace with specified id exists")  ,
 }
 
 def format_error(return_code):

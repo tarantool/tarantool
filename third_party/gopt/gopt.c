@@ -52,6 +52,7 @@ void *gopt_sort( int *argc, const char **argv, const void *opt_specs ){
     size_t opt_count= 1;
     for( ; *arg_p; ++arg_p )
       if( '-' == (*arg_p)[0] && (*arg_p)[1] )
+      {
         if( '-' == (*arg_p)[1] )
           if( (*arg_p)[2] )
             ++opt_count;
@@ -65,6 +66,7 @@ void *gopt_sort( int *argc, const char **argv, const void *opt_specs ){
               break;
             }
         }
+      }
     opts= malloc( opt_count * sizeof(opt_t) );
   }}}
   {
@@ -132,7 +134,7 @@ void *gopt_sort( int *argc, const char **argv, const void *opt_specs ){
               next_option-> arg= strchr( (*arg_p) + 2, '=' ) + 1;
               if( (char*)0 + 1 == next_option-> arg ){
                 ++arg_p;
-                if( !*arg_p || '-' == (*arg_p)[0] && (*arg_p)[1] ){
+                if( !*arg_p || ('-' == (*arg_p)[0] && (*arg_p)[1] )){
                   fprintf( stderr, "%s: --%s: option requires an option argument\n", argv[0], (*(arg_p-1)) + 2 );
                   free( opts );
                   exit( EX_USAGE );
@@ -180,7 +182,7 @@ void *gopt_sort( int *argc, const char **argv, const void *opt_specs ){
 
                   else {
                     ++arg_p;
-                    if( !*arg_p || '-' == (*arg_p)[0] && (*arg_p)[1] ){
+                    if( !*arg_p || ('-' == (*arg_p)[0] && (*arg_p)[1])){
                       fprintf( stderr, "%s: -%c: option requires an option argument\n", argv[0], *short_opt );
                       free( opts );
                       exit( EX_USAGE );
@@ -197,9 +199,9 @@ void *gopt_sort( int *argc, const char **argv, const void *opt_specs ){
             fprintf( stderr, "%s: -%c: unknown option\n", argv[0], *short_opt );
             free( opts );
             exit( EX_USAGE );
-            continue_2: 0;
+            continue_2: ;
           }
-          break_2: 0;
+          break_2: ;
         }}}
       else
         *next_operand++= *arg_p;
@@ -280,7 +282,7 @@ void gopt_help(const void *opt_def){
 
   const int long_opt_width = 18; /* not counting leading "--" */
   const int help_width = 54;
-  const char *help_padding = "                         ";
+  const char help_padding[] = "                         ";
 
     while (opt->key) {
     const char *shorts = opt->shorts;
@@ -299,7 +301,7 @@ void gopt_help(const void *opt_def){
       else
 	printf("  ");
       if (opt->help_arg)
-	printf("--%s%-*s", *longs, long_opt_width - strlen(*longs),
+	printf("--%s%-*s", *longs, long_opt_width - (int) strlen(*longs),
                opt->help_arg);
       else
 	printf("--%-*s", long_opt_width, *longs);
@@ -312,10 +314,10 @@ void gopt_help(const void *opt_def){
 	  p--;
 	if (p == help)
 	  p = help + help_width;
-	printf("%.*s\n", p - help, help);
+	printf("%.*s\n", (int) (p - help), help);
 	help = p;
 	if (strlen(help))
-	  printf(help_padding);
+	  printf("%s", help_padding);
       }
       puts(help);
     } else

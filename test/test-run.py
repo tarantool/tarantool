@@ -32,21 +32,14 @@ from lib.test_suite import TestSuite, TestRunException
 #
 # Run a collection of tests.
 #
-# @todo
-# --gdb
-# put class definitions into separate files
 
 class Options:
   """Handle options of test-runner"""
   def __init__(self):
-    """Add all program options, with their defaults. We assume
-    that the program is started from the directory where it is
-    located"""
+    """Add all program options, with their defaults."""
 
     parser = argparse.ArgumentParser(
-        description = "Tarantool regression test suite front-end. \
-        This program must be started from its working directory (" +
-        os.path.abspath(os.path.dirname(sys.argv[0])) + ").")
+        description = "Tarantool regression test suite front-end.")
 
     parser.epilog = "For a complete description, use 'pydoc ./" +\
         os.path.basename(sys.argv[0]) + "'"
@@ -68,8 +61,7 @@ class Options:
         metavar = "suite",
         nargs="*",
         default = ["box"],
-        help = """List of tests suites to look for tests in. Default: "box"
-        and "cmd".""")
+        help = """List of tests suites to look for tests in. Default: "box".""")
 
     parser.add_argument(
         "--force",
@@ -111,9 +103,9 @@ class Options:
     parser.add_argument(
         "--bindir",
         dest = "bindir",
-        default = "../_debug_box",
+        default = "../core",
         help = "Path to server binary."
-               " Default: " + "../_debug_box.")
+               " Default: " + "../core.")
 
     parser.add_argument(
         "--vardir",
@@ -131,21 +123,7 @@ class Options:
         vardir is sym-linked to /dev/shm/<vardir>.
         Linux only. Default: false""")
 
-    self.check(parser)
     self.args = parser.parse_args()
-
-  def check(self, parser):
-    """Check that the program is started from the directory where
-    it is located. This is necessary to minimize potential confusion
-    with absolute paths, since all default paths are relative to the
-    starting directory."""
-
-    if not os.path.exists(os.path.basename(sys.argv[0])):
-# print first 6 lines of help
-      short_help = "\n".join(parser.format_help().split("\n")[0:6])
-      print short_help
-      exit(-1)
-
 
 #######################################################################
 # Program body
@@ -153,6 +131,10 @@ class Options:
 
 def main():
   options = Options()
+  oldcwd = os.getcwd()
+  # Change the current working directory to where all test
+  # collections are supposed to reside.
+  os.chdir(os.path.dirname(sys.argv[0]))
 
   try:
     print "Started", " ".join(sys.argv)
@@ -165,6 +147,8 @@ def main():
   except RuntimeError as e:
     print "\nFatal error: {0}. Execution aborted.".format(e)
     return (-1)
+  finally:
+    os.chdir(oldcwd)
 
   return 0
 

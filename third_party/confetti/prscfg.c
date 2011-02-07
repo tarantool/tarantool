@@ -1,8 +1,6 @@
 
 #include <third_party/confetti/prscfg.h>
-
 void out_warning(ConfettyError r, char *format, ...);
-
 #include <stdio.h>
 
 typedef struct prscfg_yy_extra_type {
