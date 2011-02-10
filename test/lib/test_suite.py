@@ -150,6 +150,7 @@ class Test:
         self.print_unidiff()
         where = ": wrong test output"
       elif not self.is_valgrind_clean:
+        os.remove(self.reject)
         self.print_diagnostics(self.suite_ini["valgrind_log"],
                                "Test failed! Last 10 lines of valgrind.log:")
         where = ": there were warnings in valgrind.log"
