@@ -29,6 +29,7 @@ import yaml
 import re
 import sql
 import struct
+import errno
 
 is_admin_re = re.compile("^\s*(show|save|exec|exit|reload|help)", re.I)
 
@@ -55,11 +56,18 @@ class AdminConnection:
     self.connect()
 
   def opt_reconnect(self):
+    """ On a socket which was disconnected, recv of 0 bytes immediately
+        returns with no data. On a socket which is alive, it returns EAGAIN.
+        Make use of this property and detect whether or not the socket is
+        dead. Reconnect a dead socket, do nothing if the socket is good."""
     try:
       if self.socket.recv(0, socket.MSG_DONTWAIT) == '':
         self.reconnect()
-    except socket.error:
-      pass
+    except socket.error as e:
+      if e.errno == errno.EAGAIN:
+        pass
+      else:
+        self.reconnect()
 
   def execute(self, command):
     self.opt_reconnect()
@@ -112,6 +120,14 @@ class AdminConnection:
     self.disconnect()
 
 class DataConnection(AdminConnection):
+
+  def recvall(self, length):
+    res = ""
+    while len(res) < length:
+      buf = self.socket.recv(length - len(res))
+      res = res + buf
+    return res
+
   def execute_no_reconnect(self, command):
     statement = sql.parse("sql", command)
     if statement == None:
@@ -126,12 +142,12 @@ class DataConnection(AdminConnection):
 
     IPROTO_HEADER_SIZE = 12
 
-    header = self.socket.recv(IPROTO_HEADER_SIZE, socket.MSG_WAITALL)
+    header = self.recvall(IPROTO_HEADER_SIZE)
 
     response_len = struct.unpack("<lll", header)[1]
 
     if response_len:
-      response = self.socket.recv(response_len, socket.MSG_WAITALL) 
+      response = self.recvall(response_len)
     else:
       response = None
     

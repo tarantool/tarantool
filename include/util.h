@@ -117,13 +117,11 @@ void __gcov_flush();
 
 extern void *__libc_stack_end;
 
-#if __GNUC__ && (defined(__x86) || defined (__amd64) || defined(__i386))
-#define BACKTRACE
-#define frame_addess() __builtin_frame_address(0)
+#ifdef ENABLE_BACKTRACE
 char *backtrace(void *frame, void *stack, size_t stack_size);
-#endif
+#endif /* ENABLE_BACKTRACE */
 
-#ifdef RESOLVE_SYMBOLS
+#ifdef HAVE_BFD
 struct symbol {
 	void *addr;
 	const char *name;
@@ -131,7 +129,7 @@ struct symbol {
 };
 struct symbol *addr2symbol(void *addr);
 void load_symbols(const char *name);
-#endif
+#endif /* HAVE_BFD */
 
 #ifdef NDEBUG
 #  define assert(pred) (void)(0)

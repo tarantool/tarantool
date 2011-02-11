@@ -30,6 +30,7 @@
 
 #include <fiber.h>
 #include <util.h>
+#include "cfg/tarantool_feeder_cfg.h"
 
 static char *custom_proc_title;
 

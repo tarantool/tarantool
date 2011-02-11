@@ -51,6 +51,7 @@ ER = {
  0x00003102: ("ERR_CODE_NODE_NOT_FOUND"      ,  "")                                       ,
  0x00003702: ("ERR_CODE_NODE_FOUND"          ,  "")                                       ,
  0x00003802: ("ERR_CODE_INDEX_VIOLATION"     ,  "")                                       ,
+ 0x00003902: ("ERR_CODE_NO_SUCH_NAMESPACE"   ,  "No namespace with specified id exists")  ,
 }
 
 def format_error(return_code):
@@ -98,7 +99,9 @@ def opt_resize_buf(buf, newsize):
 
 
 def pack_field(value, buf, offset):
-  if type(value) is int:
+  if type(value) is int or type(value) is long:
+    if value > 0xffffffff:
+      raise RuntimeError("Integer value is too big")
     buf = opt_resize_buf(buf, offset + INT_FIELD_LEN)
     struct.pack_into("<cL", buf, offset, chr(INT_FIELD_LEN), value)
     offset += INT_FIELD_LEN + 1
@@ -150,8 +153,11 @@ def unpack_tuple(response, offset):
     offset += data_len
     if data_len == 4:
       (data,) = struct.unpack("<L", data)
-    res.append(data)
-  return str(res), offset
+      res.append((str(data)))
+    else:
+      res.append("'" + data + "'")
+
+  return '[' + ', '.join(res) + ']', offset
 
    
 class StatementPing:

@@ -32,28 +32,21 @@ from lib.test_suite import TestSuite, TestRunException
 #
 # Run a collection of tests.
 #
-# @todo
-# --gdb
-# put class definitions into separate files
 
 class Options:
   """Handle options of test-runner"""
   def __init__(self):
-    """Add all program options, with their defaults. We assume
-    that the program is started from the directory where it is
-    located"""
+    """Add all program options, with their defaults."""
 
     parser = argparse.ArgumentParser(
-        description = "Tarantool regression test suite front-end. \
-        This program must be started from its working directory (" +
-        os.path.abspath(os.path.dirname(sys.argv[0])) + ").")
+        description = "Tarantool regression test suite front-end.")
 
     parser.epilog = "For a complete description, use 'pydoc ./" +\
         os.path.basename(sys.argv[0]) + "'"
 
     parser.add_argument(
         "tests",
-        metavar="list of tests",
+        metavar="test",
         nargs="*",
         default = [""],
         help="""Can be empty. List of test names, to look for in suites. Each
@@ -68,45 +61,59 @@ class Options:
         metavar = "suite",
         nargs="*",
         default = ["box"],
-        help = """List of tests suites to look for tests in. Default: "box"
-        and "cmd".""")
+        help = """List of tests suites to look for tests in. Default: "box".""")
 
     parser.add_argument(
         "--force",
         dest = "is_force",
         action = "store_true",
         default = False,
-        help = "Go on with other tests in case of an individual test failure."
-               " Default: false.")
+        help = """Go on with other tests in case of an individual test failure.
+                 Default: false.""")
 
     parser.add_argument(
         "--start-and-exit",
         dest = "start_and_exit",
         action = "store_true",
         default = False,
-        help = "Start the server from the first specified suite and"
-        "exit without running any tests. Default: false.")
+        help = """Start the server from the first specified suite and
+         exit without running any tests. Default: false.""")
 
     parser.add_argument(
         "--gdb",
         dest = "gdb",
         action = "store_true",
         default = False,
-        help = "Start the server under 'gdb' debugger. Default: false."
-        " See also --start-and-exit.")
+        help = """Start the server under 'gdb' debugger.
+        See also --start-and-exit. This option is mutually exclusive with
+        --valgrind. Default: false.""")
+
+    parser.add_argument(
+        "--valgrind",
+        dest = "valgrind",
+        action = "store_true",
+        default = False,
+        help = "Run the server under 'valgrind'. Default: false.")
+
+    parser.add_argument(
+        "--valgrind-opts",
+        dest = "valgrind_opts",
+        default = "--tool=memcheck",
+        help = """Arguments passed to 'valgrind'.
+        You can also use VALGRIND_OPTS environment variable. This option
+        is mutually exclusive with --gdb. Default: --tool=memcheck.""")
 
     parser.add_argument(
         "--bindir",
         dest = "bindir",
-        default = "../_debug_box",
-        help = "Path to server binary."
-               " Default: " + "../_debug_box.")
+        default = "../core",
+        help = """Path to server binary. Default: " + "../core.""")
 
     parser.add_argument(
         "--vardir",
         dest = "vardir",
         default = "var",
-        help = "Path to data directory. Default: var.")
+        help = """Path to data directory. Default: var.""")
 
     parser.add_argument(
         "--mem",
@@ -116,23 +123,19 @@ class Options:
         help = """Run test suite in memory, using tmpfs or ramdisk.
         Is used only if vardir is not an absolute path. In that case
         vardir is sym-linked to /dev/shm/<vardir>.
-        Linux only. Default: false""")
+        Linux only. Default: false.""")
 
-    self.check(parser)
     self.args = parser.parse_args()
+    self.check()
 
-  def check(self, parser):
-    """Check that the program is started from the directory where
-    it is located. This is necessary to minimize potential confusion
-    with absolute paths, since all default paths are relative to the
-    starting directory."""
-
-    if not os.path.exists(os.path.basename(sys.argv[0])):
-# print first 6 lines of help
-      short_help = "\n".join(parser.format_help().split("\n")[0:6])
-      print short_help
+  def check(self):
+    """Check the arguments for correctness."""
+    check_error = False
+    if self.args.gdb and self.args.valgrind:
+      print "Error: option --gdb is not compatible with option --valgrind"
+      check_error = True
+    if check_error:
       exit(-1)
-
 
 #######################################################################
 # Program body
@@ -140,6 +143,10 @@ class Options:
 
 def main():
   options = Options()
+  oldcwd = os.getcwd()
+  # Change the current working directory to where all test
+  # collections are supposed to reside.
+  os.chdir(os.path.dirname(sys.argv[0]))
 
   try:
     print "Started", " ".join(sys.argv)
@@ -152,6 +159,8 @@ def main():
   except RuntimeError as e:
     print "\nFatal error: {0}. Execution aborted.".format(e)
     return (-1)
+  finally:
+    os.chdir(oldcwd)
 
   return 0
 

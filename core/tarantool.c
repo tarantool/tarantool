@@ -24,6 +24,7 @@
  * SUCH DAMAGE.
  */
 
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +38,7 @@
 #include <getopt.h>
 #include <libgen.h>
 #include <sysexits.h>
-#ifdef Linux
+#ifdef TARGET_OS_LINUX
 # include <sys/prctl.h>
 #endif
 #include <admin.h>
@@ -49,9 +50,10 @@
 #include <say.h>
 #include <stat.h>
 #include <tarantool.h>
+#include TARANTOOL_CONFIG
 #include <util.h>
 #include <third_party/gopt/gopt.h>
-#include <tarantool_version.h>
+
 
 static pid_t master_pid;
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
@@ -152,7 +154,7 @@ reload_cfg(struct tbuf *out)
 const char *
 tarantool_version(void)
 {
-	return tarantool_version_string;
+	return TARANTOOL_VERSION;
 }
 
 static double start_time;
@@ -181,7 +183,7 @@ snapshot(void *ev __unused__, int events __unused__)
 	palloc_unmap_unused();
 	close_all_xcpt(1, sayfd);
 	snapshot_save(recovery_state, mod_snapshot);
-#ifdef COVERAGE
+#ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
 	_exit(EXIT_SUCCESS);
@@ -208,7 +210,7 @@ sig_int(int signal)
 			usleep(1000);
 		}
 	}
-#ifdef COVERAGE
+#ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
 
@@ -477,7 +479,7 @@ main(int argc, char **argv)
 			say_syserror("setrlimit");
 			exit(EX_OSERR);
 		}
-#ifdef Linux
+#ifdef TARGET_OS_LINUX
 		if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) < 0) {
 			say_syserror("prctl");
 			exit(EX_OSERR);

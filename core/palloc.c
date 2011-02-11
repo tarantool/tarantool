@@ -24,6 +24,7 @@
  * SUCH DAMAGE.
  */
 
+#include "config.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -32,7 +33,7 @@
 #include <stdio.h>
 #include <sys/mman.h>
 
-#include <debug.h>
+#include "third_party/valgrind/memcheck.h"
 #include <palloc.h>
 #include <util.h>
 #include <say.h>

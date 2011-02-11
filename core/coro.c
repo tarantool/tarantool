@@ -28,9 +28,8 @@
 #include <string.h>
 #include <sys/mman.h>
 
-#include <third_party/coro/coro.h>
+#include "third_party/valgrind/memcheck.h"
 
-#include <debug.h>
 #include <coro.h>
 #include <palloc.h>
 

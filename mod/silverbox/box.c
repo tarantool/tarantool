@@ -40,6 +40,7 @@
 #include <tbuf.h>
 #include <util.h>
 
+#include <cfg/tarantool_silverbox_cfg.h>
 #include <mod/silverbox/box.h>
 #include <mod/silverbox/index.h>
 
@@ -749,11 +750,13 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 
 	txn->op = op;
 	txn->n = read_u32(data);
+	if (txn->n > namespace_count - 1)
+		box_raise(ERR_CODE_NO_SUCH_NAMESPACE, "bad namespace number");
 	txn->index = &namespace[txn->n].index[0];
 
 	if (!namespace[txn->n].enabled) {
 		say_warn("namespace %i is not enabled", txn->n);
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "namespace is not enabled");
+		box_raise(ERR_CODE_NO_SUCH_NAMESPACE, "namespace is not enabled");
 	}
 
 	txn->namespace = &namespace[txn->n];
@@ -1410,21 +1413,21 @@ mod_snapshot(struct log_io_iter *i)
 void
 mod_info(struct tbuf *out)
 {
-	tbuf_printf(out, "info:\n");
-	tbuf_printf(out, "  version: \"%s\"\r\n", tarantool_version());
-	tbuf_printf(out, "  uptime: %i\r\n", (int)tarantool_uptime());
-	tbuf_printf(out, "  pid: %i\r\n", getpid());
-	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 "\r\n",
+	tbuf_printf(out, "info:" CRLF);
+	tbuf_printf(out, "  version: \"%s\"" CRLF, tarantool_version());
+	tbuf_printf(out, "  uptime: %i" CRLF, (int)tarantool_uptime());
+	tbuf_printf(out, "  pid: %i" CRLF, getpid());
+	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 CRLF,
 		    (i64) recovery_state->wal_writer->pid);
-	tbuf_printf(out, "  lsn: %" PRIi64 "\r\n", recovery_state->confirmed_lsn);
-	tbuf_printf(out, "  recovery_lag: %.3f\r\n", recovery_state->recovery_lag);
-	tbuf_printf(out, "  recovery_last_update: %.3f\r\n",
+	tbuf_printf(out, "  lsn: %" PRIi64 CRLF, recovery_state->confirmed_lsn);
+	tbuf_printf(out, "  recovery_lag: %.3f" CRLF, recovery_state->recovery_lag);
+	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,
 		    recovery_state->recovery_last_update_tstamp);
-	tbuf_printf(out, "  status: %s\r\n", status);
+	tbuf_printf(out, "  status: %s" CRLF, status);
 }
 
 void
 mod_exec(char *str __unused__, int len __unused__, struct tbuf *out)
 {
-	tbuf_printf(out, "unimplemented\r\n");
+	tbuf_printf(out, "unimplemented" CRLF);
 }

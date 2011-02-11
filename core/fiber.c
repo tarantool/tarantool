@@ -42,12 +42,12 @@
 #include <third_party/queue.h>
 #include <third_party/khash.h>
 
-#include <debug.h>
 #include <fiber.h>
 #include <palloc.h>
 #include <salloc.h>
 #include <say.h>
 #include <tarantool.h>
+#include TARANTOOL_CONFIG
 #include <tarantool_ev.h>
 #include <tbuf.h>
 #include <util.h>
@@ -92,11 +92,11 @@ static khash_t(fid2fiber) *fibers_registry;
 static void
 update_last_stack_frame(struct fiber *fiber)
 {
-#ifdef BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	fiber->last_stack_frame = frame_addess();
 #else
 	(void)fiber;
-#endif
+#endif /* ENABLE_BACKTRACE */
 }
 
 void
@@ -1076,24 +1076,25 @@ fiber_info(struct tbuf *out)
 {
 	struct fiber *fiber;
 
-	tbuf_printf(out, "fibers:\n");
+	tbuf_printf(out, "fibers:" CRLF);
 	SLIST_FOREACH(fiber, &fibers, link) {
 		void *stack_top = fiber->coro.stack + fiber->coro.stack_size;
 
-		tbuf_printf(out, "  - fid: %4i\n", fiber->fid);
-		tbuf_printf(out, "    csw: %i\n", fiber->csw);
-		tbuf_printf(out, "    name: %s\n", fiber->name);
-		tbuf_printf(out, "    inbox: %i\n", ring_size(fiber->inbox));
-		tbuf_printf(out, "    fd: %4i\n", fiber->fd);
-		tbuf_printf(out, "    peer: %s\n", fiber_peer_name(fiber));
-		tbuf_printf(out, "    stack: %p\n", stack_top);
-		tbuf_printf(out, "    exc: %p\n", ((void **)fiber->exc)[3]);
-		tbuf_printf(out, "    exc_frame: %p, \n", ((void **)fiber->exc)[3] + 2 * sizeof(void *));
-#ifdef BACKTRACE
-		tbuf_printf(out, "    backtrace:\n%s",
+		tbuf_printf(out, "  - fid: %4i" CRLF, fiber->fid);
+		tbuf_printf(out, "    csw: %i" CRLF, fiber->csw);
+		tbuf_printf(out, "    name: %s" CRLF, fiber->name);
+		tbuf_printf(out, "    inbox: %i" CRLF, ring_size(fiber->inbox));
+		tbuf_printf(out, "    fd: %4i" CRLF, fiber->fd);
+		tbuf_printf(out, "    peer: %s" CRLF, fiber_peer_name(fiber));
+		tbuf_printf(out, "    stack: %p" CRLF, stack_top);
+		tbuf_printf(out, "    exc: %p" CRLF,
+			    ((void **)fiber->exc)[3]);
+		tbuf_printf(out, "    exc_frame: %p,"CRLF, ((void **)fiber->exc)[3] + 2 * sizeof(void *));
+#ifdef ENABLE_BACKTRACE
+		tbuf_printf(out, "    backtrace:" CRLF "%s",
 			    backtrace(fiber->last_stack_frame,
 				      fiber->coro.stack, fiber->coro.stack_size));
-#endif
+#endif /* ENABLE_BACKTRACE */
 	}
 }
 

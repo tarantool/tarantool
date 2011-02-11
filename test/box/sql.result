@@ -75,3 +75,15 @@ Insert OK, 1 row affected
 select * from t0 where k0=4294967295
 Found 1 tuple:
 [4294967295]
+#
+# A test case for: http://bugs.launchpad.net/bugs/712456
+# Verify that when trying to access a non-existing or
+# very large namespace id, no crash occurs.
+#
+
+select * from t1 where k0 = 0
+An error occurred: ERR_CODE_NO_SUCH_NAMESPACE, 'No namespace with specified id exists'
+select * from t65537 where k0 = 0
+An error occurred: ERR_CODE_NO_SUCH_NAMESPACE, 'No namespace with specified id exists'
+select * from t4294967295 where k0 = 0
+An error occurred: ERR_CODE_NO_SUCH_NAMESPACE, 'No namespace with specified id exists'
