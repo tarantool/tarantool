@@ -248,7 +248,7 @@
 ; 3 - bitwise XOR of argument and field <field_no>
 ; 4 - bitwise OR of argument and field <field_no>
 
-<op_code> ::= 0 | 1 | 2 | 3
+<op_code> ::= <int8> # 0 | 1 | 2 | 3
 
 ;
 ; It's an error to specify an argument of a type that
