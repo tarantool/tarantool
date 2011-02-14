@@ -89,10 +89,11 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 
 	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly, &n_accepted, &n_skipped);
 	fclose(f);
-	if (n_accepted == 0 || n_skipped != 0)
-		return -1;
 
 	if (check_cfg_tarantool_cfg(conf) != 0)
+		return -1;
+
+	if (n_accepted == 0 || n_skipped != 0)
 		return -1;
 
 	return mod_check_config(conf);

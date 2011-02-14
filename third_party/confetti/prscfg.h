@@ -49,6 +49,4 @@ typedef	enum ConfettyError {
 	CNF_INTERNALERROR
 } ConfettyError;
 
-#define CNF_FLAG_STRUCT_NEW 0x01
-
 #endif
