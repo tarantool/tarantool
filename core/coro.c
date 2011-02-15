@@ -24,6 +24,7 @@
  * SUCH DAMAGE.
  */
 
+#include "config.h"
 #include <unistd.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -32,10 +33,6 @@
 
 #include <coro.h>
 #include <palloc.h>
-
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
 
 struct tarantool_coro *
 tarantool_coro_create(struct tarantool_coro *coro, void (*f) (void *), void *data)

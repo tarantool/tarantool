@@ -27,6 +27,7 @@
 #ifndef TARANTOOL_FIBER_H
 #define TARANTOOL_FIBER_H
 
+#include "config.h"
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/uio.h>
@@ -55,7 +56,7 @@ struct ring {
 
 struct fiber {
 	ev_io io;
-#ifdef BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	void *last_stack_frame;
 #endif
 	int csw;

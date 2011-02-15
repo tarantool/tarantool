@@ -24,6 +24,8 @@
  * SUCH DAMAGE.
  */
 
+#include "config.h"
+#include <fiber.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -42,7 +44,6 @@
 #include <third_party/queue.h>
 #include <third_party/khash.h>
 
-#include <fiber.h>
 #include <palloc.h>
 #include <salloc.h>
 #include <say.h>
@@ -93,7 +94,7 @@ static void
 update_last_stack_frame(struct fiber *fiber)
 {
 #ifdef ENABLE_BACKTRACE
-	fiber->last_stack_frame = frame_addess();
+	fiber->last_stack_frame = __builtin_frame_address(0);
 #else
 	(void)fiber;
 #endif /* ENABLE_BACKTRACE */
@@ -335,9 +336,6 @@ fiber_loop(void *data __unused__)
 	}
 }
 
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
 
 /* fiber never dies, just become zombie */
 struct fiber *

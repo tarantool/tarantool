@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.6)
 project(Tarantool)
 include(CheckLibraryExists)
 include(CheckIncludeFile)
+include(CheckSymbolExists)
 find_program(ECHO echo)
 find_program(CAT cat)
 find_program(GIT git)
@@ -35,6 +36,9 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
 endif()
+
+check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
+check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
 
 #
 # Tarantool uses 'coro' (coroutines) library # to implement
