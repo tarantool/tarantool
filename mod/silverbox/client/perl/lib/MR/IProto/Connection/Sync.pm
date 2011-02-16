@@ -23,6 +23,11 @@ has _socket => (
     lazy_build => 1,
 );
 
+has _sent => (
+    is  => 'ro',
+    default => sub { [] },
+);
+
 =head1 PUBLIC METHODS
 
 =over
@@ -35,21 +40,23 @@ See L<MR::IProto::Connection/send> for more information.
 
 sub send {
     my ($self, $msg, $payload, $callback, $no_reply, $sync) = @_;
-    my ($resp_msg, $resp_payload);
     my $server = $self->server;
+    my $sent = $self->_sent;
     my $ok = eval {
         $sync = $self->_choose_sync() unless defined $sync;
         $server->_send_started($sync, $msg, $payload);
 
         my $socket = $self->_socket;
-        vec((my $rin = ''), fileno($socket), 1) = 1;
-        if (select((my $rout = $rin), undef, undef, 0) > 0) {
-            if (sysread($socket, my $buf, 1)) {
-                die "More then 0 bytes was received when nothing was waited for";
-            } else {
-                # Connection was closed by other side, socket is in CLOSE_WAIT state, reconnecting
-                $self->_clear_socket();
-                $socket = $self->_socket;
+        unless (@$sent) {
+            vec((my $rin = ''), fileno($socket), 1) = 1;
+            if (select((my $rout = $rin), undef, undef, 0) > 0) {
+                if (sysread($socket, my $buf, 1)) {
+                    die "More then 0 bytes was received when nothing was waited for";
+                } else {
+                    # Connection was closed by other side, socket is in CLOSE_WAIT state, reconnecting
+                    $self->_clear_socket();
+                    $socket = $self->_socket;
+                }
             }
         }
 
@@ -71,9 +78,32 @@ sub send {
                 substr $write, 0, $written, '';
             }
         }
+        1;
+    };
+    if($ok) {
+        if ($no_reply) {
+            $callback->(undef, undef);
+            $server->_recv_finished($sync, undef, undef);
+        } else {
+            push @$sent, [$sync, $callback];
+        }
+    }
+    else {
+        $self->_handle_error($sync, $callback, $@);
+    }
+    return;
+}
 
-        unless( $no_reply ) {
-            my $dump_resp = $server->debug >= 6;
+sub recv_all {
+    my ($self) = @_;
+    my $server = $self->server;
+    my $sent = $self->_sent;
+    my $dump_resp = $server->debug >= 6;
+    while (my $args = shift @$sent) {
+        my ($sync, $callback) = @$args;
+        my ($resp_msg, $resp_payload);
+        my $ok = eval {
+            my $socket = $self->_socket;
             my $resp_header;
             my $to_read = 12;
             while( $to_read ) {
@@ -110,23 +140,15 @@ sub send {
                 }
             }
             $server->_debug_dump('recv payload: ', $resp_payload) if $dump_resp;
+            1;
+        };
+        if($ok) {
+            $server->_recv_finished($sync, $resp_msg, $resp_payload);
+            $callback->($resp_msg, $resp_payload);
         }
-        1;
-    };
-    if($ok) {
-        $server->_recv_finished($sync, $resp_msg, $resp_payload);
-        $callback->($resp_msg, $resp_payload);
-    }
-    else {
-        my $error = $@ =~ /^(.*?) at \S+ line \d+/s ? $1 : $@;
-        $server->_debug("error: $error");
-        if($self->_has_socket()) {
-            close($self->_socket);
-            $self->_clear_socket();
+        else {
+            $self->_handle_error($sync, $callback, $@);
         }
-        $server->active(0);
-        $server->_recv_finished($sync, undef, undef, $error);
-        $callback->(undef, undef, $error);
     }
     return;
 }
@@ -180,6 +202,27 @@ sub _set_timeout {
     $socket->sockopt(SO_SNDTIMEO, $timeval);
     $socket->sockopt(SO_RCVTIMEO, $timeval);
     return;
+}
+
+sub _handle_error {
+    my ($self, $sync, $callback, $error) = @_;
+    $error = $1 if $@ =~ /^(.*?) at \S+ line \d+/s;
+    my $server = $self->server;
+    $server->_debug("error: $error");
+    if($self->_has_socket()) {
+        close($self->_socket);
+        $self->_clear_socket();
+    }
+    $server->active(0);
+    $server->_recv_finished($sync, undef, undef, $error);
+    $callback->(undef, undef, $error);
+    my $sent = $self->_sent;
+    while (my $args = shift @$sent) {
+        my ($sync, $callback) = @$args;
+        $server->_recv_finished($sync, undef, undef, $error);
+        $callback->(undef, undef, $error);
+    }
+    return
 }
 
 =head1 SEE ALSO

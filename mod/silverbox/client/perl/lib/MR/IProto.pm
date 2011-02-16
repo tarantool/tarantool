@@ -252,12 +252,14 @@ sub send {
     }
     else {
         die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
+        my %servers;
         my ($data, $error, $errno);
         $self->_send_now($message, sub {
             ($data, $error) = @_;
             $errno = $!;
             return;
-        }, 1);
+        }, \%servers);
+        $self->_recv_now(\%servers);
         $! = $errno;
         die $error if $error;
         return $data;
@@ -274,8 +276,6 @@ as object, or hash with keys C<data> and C<error> if message was passed
 as C<\%args>.
 Replies in result can be returned in order different then order of requests.
 
-B<Warning!> Anyway asynchronous connection is used.
-
 See L</_send> for more information about message data. Either
 C<$message> or C<\%args> allowed as content of C<\@messages>.
 
@@ -284,31 +284,35 @@ C<$message> or C<\%args> allowed as content of C<\@messages>.
 sub send_bulk {
     my ($self, $messages, $callback) = @_;
     my @result;
-    my $cv = AnyEvent->condvar();
     if($callback) {
         die "Method must be called in void context if you want to use async" if defined wantarray;
+        my $cv = AnyEvent->condvar();
         $cv->begin( sub { $callback->(\@result) } );
-    }
-    else {
-        die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
-        $cv->begin();
-    }
-    foreach my $message ( @$messages ) {
-        $cv->begin();
-        $self->_send($message, sub {
-            my ($data, $error) = @_;
-            push @result, ref $data ne 'HASH' ? $data
-                : { data => $data, error => $error };
-            $cv->end();
-            return;
-        });
-    }
-    $cv->end();
-    if($callback) {
+        foreach my $message ( @$messages ) {
+            $cv->begin();
+            $self->_send($message, sub {
+                my ($data, $error) = @_;
+                push @result, blessed($data) ? $data
+                    : { data => $data, error => $error };
+                $cv->end();
+                return;
+            });
+        }
+        $cv->end();
         return;
     }
     else {
-        $cv->recv();
+        die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
+        my %servers;
+        foreach my $message ( @$messages ) {
+            $self->_send_now($message, sub {
+                my ($data, $error) = @_;
+                push @result, blessed($data) ? $data
+                    : { data => $data, error => $error };
+                return;
+            }, \%servers);
+        }
+        $self->_recv_now(\%servers);
         return \@result;
     }
 }
@@ -547,7 +551,9 @@ sub _send_try {
     my $xsync = $sync ? 'sync' : 'async';
     $self->_debug(sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $self->max_request_retries ) if $self->debug >= 2;
     my $server = $self->cluster->server( $args->{key} );
-    $server->$xsync->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
+    my $connection = $server->$xsync();
+    $connection->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
+    $sync->{$connection} ||= $connection if $sync;
     return;
 }
 
@@ -625,6 +631,12 @@ sub _server_callback {
         undef $$handler;
         $self->_debug("unhandled fatal error: $@");
     };
+    return;
+}
+
+sub _recv_now {
+    my ($self, $servers) = @_;
+    $_->recv_all() foreach values %$servers;
     return;
 }
 
