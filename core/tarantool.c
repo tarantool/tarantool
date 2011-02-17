@@ -137,7 +137,7 @@ reload_cfg(struct tbuf *out)
 		destroy_tarantool_cfg(&new_cfg1);
 		destroy_tarantool_cfg(&new_cfg2);
 
-		out_warning(0, "tCould not accept read only '%s' option", diff);
+		out_warning(0, "Could not accept read only '%s' option", diff);
 
 		return -1;
 	}
@@ -324,6 +324,7 @@ main(int argc, char **argv)
 #ifdef RESOLVE_SYMBOLS
 	load_symbols(argv[0]);
 #endif
+	argv = init_set_proc_title(argc, argv);
 
 	const void *opt_def =
 		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
@@ -493,8 +494,6 @@ main(int argc, char **argv)
 		create_pid();
 		atexit(remove_pid);
 	}
-
-	argv = init_set_proc_title(argc, argv);
 
 	say_logger_init(cfg.logger_nonblock);
 	booting = false;

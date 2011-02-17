@@ -97,6 +97,8 @@ class TarantoolSilverboxServer:
                       glob.glob(os.path.join(vardir, "*.inprogress")) +
                       glob.glob(os.path.join(vardir, "*.xlog")) +
                       glob.glob(os.path.join(vardir, "*.cfg")) +
+                      glob.glob(os.path.join(vardir, "*.log")) +
+                      glob.glob(os.path.join(vardir, "*.core.*")) +
                       glob.glob(os.path.join(vardir, "core"))):
         os.remove(filename)
     else:

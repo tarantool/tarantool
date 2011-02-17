@@ -2,14 +2,15 @@ ev_async_send
 ev_async_start
 ev_async_stop
 ev_backend
+ev_break
 ev_check_start
 ev_check_stop
 ev_child_start
 ev_child_stop
+ev_cleanup_start
+ev_cleanup_stop
 ev_clear_pending
-ev_default_destroy
-ev_default_fork
-ev_default_loop_init
+ev_default_loop
 ev_default_loop_ptr
 ev_depth
 ev_embed_start
@@ -18,6 +19,7 @@ ev_embed_sweep
 ev_embeddable_backends
 ev_feed_event
 ev_feed_fd_event
+ev_feed_signal
 ev_feed_signal_event
 ev_fork_start
 ev_fork_stop
@@ -28,7 +30,6 @@ ev_invoke_pending
 ev_io_start
 ev_io_stop
 ev_iteration
-ev_loop
 ev_loop_destroy
 ev_loop_fork
 ev_loop_new
@@ -44,6 +45,7 @@ ev_prepare_stop
 ev_recommended_backends
 ev_ref
 ev_resume
+ev_run
 ev_set_allocator
 ev_set_invoke_pending_cb
 ev_set_io_collect_interval
@@ -64,7 +66,6 @@ ev_timer_again
 ev_timer_remaining
 ev_timer_start
 ev_timer_stop
-ev_unloop
 ev_unref
 ev_userdata
 ev_verify
