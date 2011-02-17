@@ -1,6 +1,7 @@
 # encoding: tarantool
 #
 from os.path import abspath
+cfg = os.path.join(vardir, "tarantool.cfg")
 
 print """
 # Bug #708685:
@@ -12,7 +13,7 @@ server.stop(True)
 server.install(True)
 # start server from config with holes in namespaces
 os.unlink("var/tarantool.cfg")
-os.symlink(abspath("box/tarantool_#708685.cfg"), "var/tarantool.cfg")
+os.symlink(abspath("box/tarantool_#708685.cfg"), cfg)
 server.start(True)
 # check connection
 exec admin "show stat"
