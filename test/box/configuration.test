@@ -5,6 +5,7 @@ from os.path import abspath
 print """
 # Bug #708685:
 #  Addition of required configuration file options broke backward compatibility
+#  (https://bugs.launchpad.net/bugs/708685)
 """
 # stop current server
 server.stop(True)
