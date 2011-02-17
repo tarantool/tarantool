@@ -10,8 +10,6 @@ lcov
 *.o
 *.a
 *.d
-*.snap
-*.xlog
 test/var
 test/lib/*.pyc
 test/lib/*/*.pyc
