@@ -43,7 +43,7 @@ ok
 reload configuration
 ---
 fail:
- - gram_yyerror: syntax error, unexpected $end, expecting KEY_P or NULL_P at line 1
+ - gram_yyerror: syntax error, unexpected $end, expecting KEY_P or NULL_P or '[' at line 1
 ...
 reload configuration
 ---

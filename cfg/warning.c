@@ -1,8 +1,8 @@
+#include "warning.h"
 #include <stdarg.h>
 
 #include <tarantool.h>
 #include <util.h>
-#include <third_party/confetti/prscfg.h>
 
 /** This is a callback function used by the generated
  * configuration file parser (tarantool_{silverbox, feeder,

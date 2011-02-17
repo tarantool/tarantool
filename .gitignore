@@ -19,6 +19,6 @@ Makefile
 CMakeFiles
 CMakeCache.txt
 cmake_install.cmake
-core/tarantool_silverbox
-core/tarantool_feeder
+mod/silverbox/tarantool_silverbox
+mod/feeder/tarantool_feeder
 include/config.h

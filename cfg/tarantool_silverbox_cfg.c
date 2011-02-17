@@ -11,7 +11,7 @@
  */
 
 
-#include <third_party/confetti/prscfg.h>
+#include "prscfg.h"
 void out_warning(ConfettyError r, char *format, ...);
 #include "cfg/tarantool_silverbox_cfg.h"
 static int

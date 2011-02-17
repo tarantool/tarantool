@@ -160,10 +160,15 @@ typedef struct tarantool_cfg {
 	tarantool_cfg_namespace**	namespace;
 } tarantool_cfg;
 
+#ifndef CNF_FLAG_STRUCT_NEW
 #define CNF_FLAG_STRUCT_NEW	0x01
+#endif
+#ifndef CNF_FLAG_STRUCT_NOTSET
 #define CNF_FLAG_STRUCT_NOTSET	0x02
-
+#endif
+#ifndef CNF_STRUCT_DEFINED
 #define CNF_STRUCT_DEFINED(s) ((s) != NULL && ((s)->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) == 0)
+#endif
 
 int fill_default_tarantool_cfg(tarantool_cfg *c);
 

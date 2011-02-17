@@ -11,7 +11,7 @@
  */
 
 
-#include <third_party/confetti/prscfg.h>
+#include "prscfg.h"
 void out_warning(ConfettyError r, char *format, ...);
 #include "cfg/tarantool_feeder_cfg.h"
 static int
@@ -138,6 +138,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	if ( cmpNameAtoms( opt->name, _name__username) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->username == NULL) || strcmp(opt->paramValue.stringval, c->username) != 0))
 			return CNF_RDONLY;
@@ -148,6 +149,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__coredump) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
@@ -161,6 +163,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__admin_port) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
@@ -174,6 +177,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__log_level) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
@@ -185,6 +189,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__slab_alloc_arena) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		double dbl = strtod(opt->paramValue.numberval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
@@ -196,6 +201,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__slab_alloc_minimal) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
@@ -209,6 +215,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__slab_alloc_factor) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		double dbl = strtod(opt->paramValue.numberval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
@@ -220,6 +227,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__work_dir) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->work_dir == NULL) || strcmp(opt->paramValue.stringval, c->work_dir) != 0))
 			return CNF_RDONLY;
@@ -230,6 +238,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__pid_file) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->pid_file == NULL) || strcmp(opt->paramValue.stringval, c->pid_file) != 0))
 			return CNF_RDONLY;
@@ -240,6 +249,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__logger) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->logger == NULL) || strcmp(opt->paramValue.stringval, c->logger) != 0))
 			return CNF_RDONLY;
@@ -250,6 +260,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__logger_nonblock) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
@@ -263,6 +274,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__io_collect_interval) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		double dbl = strtod(opt->paramValue.numberval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
@@ -274,6 +286,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
@@ -287,6 +300,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__readahead) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
@@ -298,6 +312,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_bind_ipaddr) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_feeder_bind_ipaddr == NULL) || strcmp(opt->paramValue.stringval, c->wal_feeder_bind_ipaddr) != 0))
 			return CNF_RDONLY;
@@ -308,6 +323,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_bind_port) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
@@ -321,6 +337,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_dir) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_feeder_dir == NULL) || strcmp(opt->paramValue.stringval, c->wal_feeder_dir) != 0))
 			return CNF_RDONLY;
@@ -331,6 +348,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	else if ( cmpNameAtoms( opt->name, _name__custom_proc_title) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->custom_proc_title == NULL) || strcmp(opt->paramValue.stringval, c->custom_proc_title) != 0))
 			return CNF_RDONLY;
@@ -696,17 +714,14 @@ check_cfg_tarantool_cfg(tarantool_cfg *c) {
 		res++;
 		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__wal_feeder_bind_ipaddr));
 	}
-
 	if (c->wal_feeder_bind_port == 0) {
 		res++;
 		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__wal_feeder_bind_port));
 	}
-
 	if (c->wal_feeder_dir == NULL) {
 		res++;
 		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__wal_feeder_dir));
 	}
-
 	return res;
 }
 
