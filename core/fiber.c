@@ -673,6 +673,16 @@ read_atleast(int fd, struct tbuf *b, size_t to_read)
 	return 0;
 }
 
+/** Write all data to a socket.
+ *
+ * This function is equivalent to 'write', except it would ensure
+ * that all data is written to the file unless a non-ignorable
+ * error occurs.
+ *
+ * @retval 0  Success
+ *
+ * @reval  1  An error occurred (not EINTR).
+ */
 static int
 write_all(int fd, void *data, size_t len)
 {
