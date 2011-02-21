@@ -48,6 +48,7 @@
  */
 
 #include <third_party/qsort_arg.h>
+#include <stdint.h>
 
 #define min(a, b)   (a) < (b) ? a : b
 
@@ -114,7 +115,7 @@ qsort_arg(void *a, size_t n, size_t es, int (*cmp)(const void *a, const void *b,
 			   *pl,
 			   *pm,
 			   *pn;
-	int			d,
+	intptr_t		d,
 				r,
 				swaptype,
 				presorted;
