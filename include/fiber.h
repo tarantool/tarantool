@@ -114,7 +114,6 @@ extern struct fiber *fiber;
 void fiber_init(void);
 struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
 void fiber_destroy_all();
-void fiber_zombificate(struct fiber *f);
 void wait_for(int events);
 void wait_for_child(pid_t pid);
 void unwait(int events);
