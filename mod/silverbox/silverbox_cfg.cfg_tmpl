@@ -62,15 +62,21 @@ wal_feeder_port=0, ro
 
 
 namespace = [
-  enabled = 0, ro, required
-  cardinality = -1, ro
-  estimated_rows = 0, ro
-  index = [
-    type = "", ro, required
-    unique = -1, ro, required
-    key_field = [
-      fieldno = -1, ro, required
-      type = "", ro, required
-    ], ro, required
-  ], ro, required
+  {
+    enabled = -1, required
+    cardinality = -1
+    estimated_rows = 0
+    index = [
+      {
+        type = "", required
+        unique = -1, required
+        key_field = [
+          {
+            fieldno = -1, required
+            type = "", required
+          }, ro,  required
+        ], required
+      }, ro, required
+    ], required
+  }, ro
 ], ro, required

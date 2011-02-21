@@ -1,0 +1,26 @@
+# encoding: tarantool
+#
+from os.path import abspath
+cfg = os.path.join(vardir, "tarantool.cfg")
+
+print """
+# Bug #708685:
+#  Addition of required configuration file options broke backward
+#  compatibility
+#  (https://bugs.launchpad.net/bugs/708685)
+"""
+# stop current server
+server.stop(True)
+server.install(True)
+# start server from config with holes in namespaces
+os.unlink("var/tarantool.cfg")
+os.symlink(abspath("box/tarantool_bug708685.cfg"), cfg)
+server.start(True)
+# check connection
+exec admin "show stat"
+
+# restore default server
+server.stop(True)
+server.install(True)
+server.start(True)
+# vim: syntax=python

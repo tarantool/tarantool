@@ -139,7 +139,7 @@ backtrace(void *frame_, void *stack, size_t stack_size)
 #ifdef HAVE_BFD
 		struct symbol *s = addr2symbol(frame->ret);
 		if (s != NULL) {
-			r = snprintf(p, len, " <%s+%ld> ", s->name, frame->ret - s->addr);
+			r = snprintf(p, len, " <%s+%"PRI_SZ"> ", s->name, frame->ret - s->addr);
 			if (r >= len)
 				goto out;
 			p += r;

@@ -54,6 +54,7 @@
 #include <util.h>
 #include <stat.h>
 #include <pickle.h>
+#include "diagnostics.h"
 
 static struct fiber sched;
 struct fiber *fiber = &sched;
@@ -153,6 +154,18 @@ fiber_sleep(ev_tstamp delay)
 	ev_timer_set(&fiber->timer, delay, 0.);
 	ev_timer_start(&fiber->timer);
 	yield();
+}
+
+
+/** Wait for a forked child to complete. */
+
+void
+wait_for_child(pid_t pid)
+{
+	ev_child_set(&fiber->cw, pid, 0);
+	ev_child_start(&fiber->cw);
+	yield();
+	ev_child_stop(&fiber->cw);
 }
 
 void
@@ -306,17 +319,22 @@ fiber_gc(void)
 	prelease(ex_pool);
 }
 
-void
-fiber_zombificate(struct fiber *f)
-{
-	f->name = NULL;
-	f->f = NULL;
-	f->data = NULL;
-	unregister_fid(f);
-	f->fid = 0;
-	fiber_alloc(f);
 
-	SLIST_INSERT_HEAD(&zombie_fibers, f, zombie_link);
+/** Destroy the currently active fiber and prepare it for reuse.
+ */
+
+static void
+fiber_zombificate()
+{
+	diag_clear();
+	fiber->name = NULL;
+	fiber->f = NULL;
+	fiber->data = NULL;
+	unregister_fid(fiber);
+	fiber->fid = 0;
+	fiber_alloc(fiber);
+
+	SLIST_INSERT_HEAD(&zombie_fibers, fiber, zombie_link);
 }
 
 static void
@@ -331,7 +349,7 @@ fiber_loop(void *data __unused__)
 		}
 
 		fiber_close();
-		fiber_zombificate(fiber);
+		fiber_zombificate();
 		yield();	/* give control back to scheduler */
 	}
 }
@@ -365,7 +383,8 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
 		fiber_alloc(fiber);
 		ev_init(&fiber->io, (void *)ev_schedule);
 		ev_init(&fiber->timer, (void *)ev_schedule);
-		fiber->io.data = fiber->timer.data = fiber;
+		ev_init(&fiber->cw, (void *)ev_schedule);
+		fiber->io.data = fiber->timer.data = fiber->cw.data = fiber;
 
 		SLIST_INSERT_HEAD(&fibers, fiber, link);
 	}
@@ -692,6 +711,16 @@ read_atleast(int fd, struct tbuf *b, size_t to_read)
 	return 0;
 }
 
+/** Write all data to a socket.
+ *
+ * This function is equivalent to 'write', except it would ensure
+ * that all data is written to the file unless a non-ignorable
+ * error occurs.
+ *
+ * @retval 0  Success
+ *
+ * @reval  1  An error occurred (not EINTR).
+ */
 static int
 write_all(int fd, void *data, size_t len)
 {

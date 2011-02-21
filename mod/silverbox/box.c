@@ -1064,7 +1064,10 @@ custom_init(void)
 		if (cfg.namespace[i] == NULL)
 			break;
 
-		namespace[i].enabled = !!cfg.namespace[i]->enabled;
+		if (!CNF_STRUCT_DEFINED(cfg.namespace[i]))
+			namespace[i].enabled = false;
+		else
+			namespace[i].enabled = !!cfg.namespace[i]->enabled;
 
 		if (!namespace[i].enabled)
 			continue;

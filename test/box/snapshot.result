@@ -1,0 +1,1535 @@
+
+# Verify that the server starts from a pre-recorded snapshot.
+# This way we check that the server can read old snapshots (v11)
+# going forward.
+
+select * from t0 where k0=0
+No match
+select * from t0 where k0=1
+Found 1 tuple:
+[1, 'I am a tuple 1']
+select * from t0 where k0=2
+Found 1 tuple:
+[2, 'I am a tuple 2']
+select * from t0 where k0=3
+Found 1 tuple:
+[3, 'I am a tuple 3']
+select * from t0 where k0=4
+Found 1 tuple:
+[4, 'I am a tuple 4']
+select * from t0 where k0=5
+Found 1 tuple:
+[5, 'I am a tuple 5']
+select * from t0 where k0=6
+Found 1 tuple:
+[6, 'I am a tuple 6']
+select * from t0 where k0=7
+Found 1 tuple:
+[7, 'I am a tuple 7']
+select * from t0 where k0=8
+Found 1 tuple:
+[8, 'I am a tuple 8']
+select * from t0 where k0=9
+Found 1 tuple:
+[9, 'I am a tuple 9']
+select * from t0 where k0=10
+Found 1 tuple:
+[10, 'I am a tuple 10']
+select * from t0 where k0=11
+Found 1 tuple:
+[11, 'I am a tuple 11']
+select * from t0 where k0=12
+Found 1 tuple:
+[12, 'I am a tuple 12']
+select * from t0 where k0=13
+Found 1 tuple:
+[13, 'I am a tuple 13']
+select * from t0 where k0=14
+Found 1 tuple:
+[14, 'I am a tuple 14']
+select * from t0 where k0=15
+Found 1 tuple:
+[15, 'I am a tuple 15']
+select * from t0 where k0=16
+Found 1 tuple:
+[16, 'I am a tuple 16']
+select * from t0 where k0=17
+Found 1 tuple:
+[17, 'I am a tuple 17']
+select * from t0 where k0=18
+Found 1 tuple:
+[18, 'I am a tuple 18']
+select * from t0 where k0=19
+Found 1 tuple:
+[19, 'I am a tuple 19']
+select * from t0 where k0=20
+Found 1 tuple:
+[20, 'I am a tuple 20']
+select * from t0 where k0=21
+Found 1 tuple:
+[21, 'I am a tuple 21']
+select * from t0 where k0=22
+Found 1 tuple:
+[22, 'I am a tuple 22']
+select * from t0 where k0=23
+Found 1 tuple:
+[23, 'I am a tuple 23']
+select * from t0 where k0=24
+Found 1 tuple:
+[24, 'I am a tuple 24']
+select * from t0 where k0=25
+Found 1 tuple:
+[25, 'I am a tuple 25']
+select * from t0 where k0=26
+Found 1 tuple:
+[26, 'I am a tuple 26']
+select * from t0 where k0=27
+Found 1 tuple:
+[27, 'I am a tuple 27']
+select * from t0 where k0=28
+Found 1 tuple:
+[28, 'I am a tuple 28']
+select * from t0 where k0=29
+Found 1 tuple:
+[29, 'I am a tuple 29']
+select * from t0 where k0=30
+Found 1 tuple:
+[30, 'I am a tuple 30']
+select * from t0 where k0=31
+Found 1 tuple:
+[31, 'I am a tuple 31']
+select * from t0 where k0=32
+Found 1 tuple:
+[32, 'I am a tuple 32']
+select * from t0 where k0=33
+Found 1 tuple:
+[33, 'I am a tuple 33']
+select * from t0 where k0=34
+Found 1 tuple:
+[34, 'I am a tuple 34']
+select * from t0 where k0=35
+Found 1 tuple:
+[35, 'I am a tuple 35']
+select * from t0 where k0=36
+Found 1 tuple:
+[36, 'I am a tuple 36']
+select * from t0 where k0=37
+Found 1 tuple:
+[37, 'I am a tuple 37']
+select * from t0 where k0=38
+Found 1 tuple:
+[38, 'I am a tuple 38']
+select * from t0 where k0=39
+Found 1 tuple:
+[39, 'I am a tuple 39']
+select * from t0 where k0=40
+Found 1 tuple:
+[40, 'I am a tuple 40']
+select * from t0 where k0=41
+Found 1 tuple:
+[41, 'I am a tuple 41']
+select * from t0 where k0=42
+Found 1 tuple:
+[42, 'I am a tuple 42']
+select * from t0 where k0=43
+Found 1 tuple:
+[43, 'I am a tuple 43']
+select * from t0 where k0=44
+Found 1 tuple:
+[44, 'I am a tuple 44']
+select * from t0 where k0=45
+Found 1 tuple:
+[45, 'I am a tuple 45']
+select * from t0 where k0=46
+Found 1 tuple:
+[46, 'I am a tuple 46']
+select * from t0 where k0=47
+Found 1 tuple:
+[47, 'I am a tuple 47']
+select * from t0 where k0=48
+Found 1 tuple:
+[48, 'I am a tuple 48']
+select * from t0 where k0=49
+Found 1 tuple:
+[49, 'I am a tuple 49']
+select * from t0 where k0=50
+Found 1 tuple:
+[50, 'I am a tuple 50']
+select * from t0 where k0=51
+Found 1 tuple:
+[51, 'I am a tuple 51']
+select * from t0 where k0=52
+Found 1 tuple:
+[52, 'I am a tuple 52']
+select * from t0 where k0=53
+Found 1 tuple:
+[53, 'I am a tuple 53']
+select * from t0 where k0=54
+Found 1 tuple:
+[54, 'I am a tuple 54']
+select * from t0 where k0=55
+Found 1 tuple:
+[55, 'I am a tuple 55']
+select * from t0 where k0=56
+Found 1 tuple:
+[56, 'I am a tuple 56']
+select * from t0 where k0=57
+Found 1 tuple:
+[57, 'I am a tuple 57']
+select * from t0 where k0=58
+Found 1 tuple:
+[58, 'I am a tuple 58']
+select * from t0 where k0=59
+Found 1 tuple:
+[59, 'I am a tuple 59']
+select * from t0 where k0=60
+Found 1 tuple:
+[60, 'I am a tuple 60']
+select * from t0 where k0=61
+Found 1 tuple:
+[61, 'I am a tuple 61']
+select * from t0 where k0=62
+Found 1 tuple:
+[62, 'I am a tuple 62']
+select * from t0 where k0=63
+Found 1 tuple:
+[63, 'I am a tuple 63']
+select * from t0 where k0=64
+Found 1 tuple:
+[64, 'I am a tuple 64']
+select * from t0 where k0=65
+Found 1 tuple:
+[65, 'I am a tuple 65']
+select * from t0 where k0=66
+Found 1 tuple:
+[66, 'I am a tuple 66']
+select * from t0 where k0=67
+Found 1 tuple:
+[67, 'I am a tuple 67']
+select * from t0 where k0=68
+Found 1 tuple:
+[68, 'I am a tuple 68']
+select * from t0 where k0=69
+Found 1 tuple:
+[69, 'I am a tuple 69']
+select * from t0 where k0=70
+Found 1 tuple:
+[70, 'I am a tuple 70']
+select * from t0 where k0=71
+Found 1 tuple:
+[71, 'I am a tuple 71']
+select * from t0 where k0=72
+Found 1 tuple:
+[72, 'I am a tuple 72']
+select * from t0 where k0=73
+Found 1 tuple:
+[73, 'I am a tuple 73']
+select * from t0 where k0=74
+Found 1 tuple:
+[74, 'I am a tuple 74']
+select * from t0 where k0=75
+Found 1 tuple:
+[75, 'I am a tuple 75']
+select * from t0 where k0=76
+Found 1 tuple:
+[76, 'I am a tuple 76']
+select * from t0 where k0=77
+Found 1 tuple:
+[77, 'I am a tuple 77']
+select * from t0 where k0=78
+Found 1 tuple:
+[78, 'I am a tuple 78']
+select * from t0 where k0=79
+Found 1 tuple:
+[79, 'I am a tuple 79']
+select * from t0 where k0=80
+Found 1 tuple:
+[80, 'I am a tuple 80']
+select * from t0 where k0=81
+Found 1 tuple:
+[81, 'I am a tuple 81']
+select * from t0 where k0=82
+Found 1 tuple:
+[82, 'I am a tuple 82']
+select * from t0 where k0=83
+Found 1 tuple:
+[83, 'I am a tuple 83']
+select * from t0 where k0=84
+Found 1 tuple:
+[84, 'I am a tuple 84']
+select * from t0 where k0=85
+Found 1 tuple:
+[85, 'I am a tuple 85']
+select * from t0 where k0=86
+Found 1 tuple:
+[86, 'I am a tuple 86']
+select * from t0 where k0=87
+Found 1 tuple:
+[87, 'I am a tuple 87']
+select * from t0 where k0=88
+Found 1 tuple:
+[88, 'I am a tuple 88']
+select * from t0 where k0=89
+Found 1 tuple:
+[89, 'I am a tuple 89']
+select * from t0 where k0=90
+Found 1 tuple:
+[90, 'I am a tuple 90']
+select * from t0 where k0=91
+Found 1 tuple:
+[91, 'I am a tuple 91']
+select * from t0 where k0=92
+Found 1 tuple:
+[92, 'I am a tuple 92']
+select * from t0 where k0=93
+Found 1 tuple:
+[93, 'I am a tuple 93']
+select * from t0 where k0=94
+Found 1 tuple:
+[94, 'I am a tuple 94']
+select * from t0 where k0=95
+Found 1 tuple:
+[95, 'I am a tuple 95']
+select * from t0 where k0=96
+Found 1 tuple:
+[96, 'I am a tuple 96']
+select * from t0 where k0=97
+Found 1 tuple:
+[97, 'I am a tuple 97']
+select * from t0 where k0=98
+Found 1 tuple:
+[98, 'I am a tuple 98']
+select * from t0 where k0=99
+Found 1 tuple:
+[99, 'I am a tuple 99']
+select * from t0 where k0=100
+Found 1 tuple:
+[100, 'I am a tuple 100']
+select * from t0 where k0=101
+Found 1 tuple:
+[101, 'I am a tuple 101']
+select * from t0 where k0=102
+Found 1 tuple:
+[102, 'I am a tuple 102']
+select * from t0 where k0=103
+Found 1 tuple:
+[103, 'I am a tuple 103']
+select * from t0 where k0=104
+Found 1 tuple:
+[104, 'I am a tuple 104']
+select * from t0 where k0=105
+Found 1 tuple:
+[105, 'I am a tuple 105']
+select * from t0 where k0=106
+Found 1 tuple:
+[106, 'I am a tuple 106']
+select * from t0 where k0=107
+Found 1 tuple:
+[107, 'I am a tuple 107']
+select * from t0 where k0=108
+Found 1 tuple:
+[108, 'I am a tuple 108']
+select * from t0 where k0=109
+Found 1 tuple:
+[109, 'I am a tuple 109']
+select * from t0 where k0=110
+Found 1 tuple:
+[110, 'I am a tuple 110']
+select * from t0 where k0=111
+Found 1 tuple:
+[111, 'I am a tuple 111']
+select * from t0 where k0=112
+Found 1 tuple:
+[112, 'I am a tuple 112']
+select * from t0 where k0=113
+Found 1 tuple:
+[113, 'I am a tuple 113']
+select * from t0 where k0=114
+Found 1 tuple:
+[114, 'I am a tuple 114']
+select * from t0 where k0=115
+Found 1 tuple:
+[115, 'I am a tuple 115']
+select * from t0 where k0=116
+Found 1 tuple:
+[116, 'I am a tuple 116']
+select * from t0 where k0=117
+Found 1 tuple:
+[117, 'I am a tuple 117']
+select * from t0 where k0=118
+Found 1 tuple:
+[118, 'I am a tuple 118']
+select * from t0 where k0=119
+Found 1 tuple:
+[119, 'I am a tuple 119']
+select * from t0 where k0=120
+Found 1 tuple:
+[120, 'I am a tuple 120']
+select * from t0 where k0=121
+Found 1 tuple:
+[121, 'I am a tuple 121']
+select * from t0 where k0=122
+Found 1 tuple:
+[122, 'I am a tuple 122']
+select * from t0 where k0=123
+Found 1 tuple:
+[123, 'I am a tuple 123']
+select * from t0 where k0=124
+Found 1 tuple:
+[124, 'I am a tuple 124']
+select * from t0 where k0=125
+Found 1 tuple:
+[125, 'I am a tuple 125']
+select * from t0 where k0=126
+Found 1 tuple:
+[126, 'I am a tuple 126']
+select * from t0 where k0=127
+Found 1 tuple:
+[127, 'I am a tuple 127']
+select * from t0 where k0=128
+Found 1 tuple:
+[128, 'I am a tuple 128']
+select * from t0 where k0=129
+Found 1 tuple:
+[129, 'I am a tuple 129']
+select * from t0 where k0=130
+Found 1 tuple:
+[130, 'I am a tuple 130']
+select * from t0 where k0=131
+Found 1 tuple:
+[131, 'I am a tuple 131']
+select * from t0 where k0=132
+Found 1 tuple:
+[132, 'I am a tuple 132']
+select * from t0 where k0=133
+Found 1 tuple:
+[133, 'I am a tuple 133']
+select * from t0 where k0=134
+Found 1 tuple:
+[134, 'I am a tuple 134']
+select * from t0 where k0=135
+Found 1 tuple:
+[135, 'I am a tuple 135']
+select * from t0 where k0=136
+Found 1 tuple:
+[136, 'I am a tuple 136']
+select * from t0 where k0=137
+Found 1 tuple:
+[137, 'I am a tuple 137']
+select * from t0 where k0=138
+Found 1 tuple:
+[138, 'I am a tuple 138']
+select * from t0 where k0=139
+Found 1 tuple:
+[139, 'I am a tuple 139']
+select * from t0 where k0=140
+Found 1 tuple:
+[140, 'I am a tuple 140']
+select * from t0 where k0=141
+Found 1 tuple:
+[141, 'I am a tuple 141']
+select * from t0 where k0=142
+Found 1 tuple:
+[142, 'I am a tuple 142']
+select * from t0 where k0=143
+Found 1 tuple:
+[143, 'I am a tuple 143']
+select * from t0 where k0=144
+Found 1 tuple:
+[144, 'I am a tuple 144']
+select * from t0 where k0=145
+Found 1 tuple:
+[145, 'I am a tuple 145']
+select * from t0 where k0=146
+Found 1 tuple:
+[146, 'I am a tuple 146']
+select * from t0 where k0=147
+Found 1 tuple:
+[147, 'I am a tuple 147']
+select * from t0 where k0=148
+Found 1 tuple:
+[148, 'I am a tuple 148']
+select * from t0 where k0=149
+Found 1 tuple:
+[149, 'I am a tuple 149']
+select * from t0 where k0=150
+Found 1 tuple:
+[150, 'I am a tuple 150']
+select * from t0 where k0=151
+Found 1 tuple:
+[151, 'I am a tuple 151']
+select * from t0 where k0=152
+Found 1 tuple:
+[152, 'I am a tuple 152']
+select * from t0 where k0=153
+Found 1 tuple:
+[153, 'I am a tuple 153']
+select * from t0 where k0=154
+Found 1 tuple:
+[154, 'I am a tuple 154']
+select * from t0 where k0=155
+Found 1 tuple:
+[155, 'I am a tuple 155']
+select * from t0 where k0=156
+Found 1 tuple:
+[156, 'I am a tuple 156']
+select * from t0 where k0=157
+Found 1 tuple:
+[157, 'I am a tuple 157']
+select * from t0 where k0=158
+Found 1 tuple:
+[158, 'I am a tuple 158']
+select * from t0 where k0=159
+Found 1 tuple:
+[159, 'I am a tuple 159']
+select * from t0 where k0=160
+Found 1 tuple:
+[160, 'I am a tuple 160']
+select * from t0 where k0=161
+Found 1 tuple:
+[161, 'I am a tuple 161']
+select * from t0 where k0=162
+Found 1 tuple:
+[162, 'I am a tuple 162']
+select * from t0 where k0=163
+Found 1 tuple:
+[163, 'I am a tuple 163']
+select * from t0 where k0=164
+Found 1 tuple:
+[164, 'I am a tuple 164']
+select * from t0 where k0=165
+Found 1 tuple:
+[165, 'I am a tuple 165']
+select * from t0 where k0=166
+Found 1 tuple:
+[166, 'I am a tuple 166']
+select * from t0 where k0=167
+Found 1 tuple:
+[167, 'I am a tuple 167']
+select * from t0 where k0=168
+Found 1 tuple:
+[168, 'I am a tuple 168']
+select * from t0 where k0=169
+Found 1 tuple:
+[169, 'I am a tuple 169']
+select * from t0 where k0=170
+Found 1 tuple:
+[170, 'I am a tuple 170']
+select * from t0 where k0=171
+Found 1 tuple:
+[171, 'I am a tuple 171']
+select * from t0 where k0=172
+Found 1 tuple:
+[172, 'I am a tuple 172']
+select * from t0 where k0=173
+Found 1 tuple:
+[173, 'I am a tuple 173']
+select * from t0 where k0=174
+Found 1 tuple:
+[174, 'I am a tuple 174']
+select * from t0 where k0=175
+Found 1 tuple:
+[175, 'I am a tuple 175']
+select * from t0 where k0=176
+Found 1 tuple:
+[176, 'I am a tuple 176']
+select * from t0 where k0=177
+Found 1 tuple:
+[177, 'I am a tuple 177']
+select * from t0 where k0=178
+Found 1 tuple:
+[178, 'I am a tuple 178']
+select * from t0 where k0=179
+Found 1 tuple:
+[179, 'I am a tuple 179']
+select * from t0 where k0=180
+Found 1 tuple:
+[180, 'I am a tuple 180']
+select * from t0 where k0=181
+Found 1 tuple:
+[181, 'I am a tuple 181']
+select * from t0 where k0=182
+Found 1 tuple:
+[182, 'I am a tuple 182']
+select * from t0 where k0=183
+Found 1 tuple:
+[183, 'I am a tuple 183']
+select * from t0 where k0=184
+Found 1 tuple:
+[184, 'I am a tuple 184']
+select * from t0 where k0=185
+Found 1 tuple:
+[185, 'I am a tuple 185']
+select * from t0 where k0=186
+Found 1 tuple:
+[186, 'I am a tuple 186']
+select * from t0 where k0=187
+Found 1 tuple:
+[187, 'I am a tuple 187']
+select * from t0 where k0=188
+Found 1 tuple:
+[188, 'I am a tuple 188']
+select * from t0 where k0=189
+Found 1 tuple:
+[189, 'I am a tuple 189']
+select * from t0 where k0=190
+Found 1 tuple:
+[190, 'I am a tuple 190']
+select * from t0 where k0=191
+Found 1 tuple:
+[191, 'I am a tuple 191']
+select * from t0 where k0=192
+Found 1 tuple:
+[192, 'I am a tuple 192']
+select * from t0 where k0=193
+Found 1 tuple:
+[193, 'I am a tuple 193']
+select * from t0 where k0=194
+Found 1 tuple:
+[194, 'I am a tuple 194']
+select * from t0 where k0=195
+Found 1 tuple:
+[195, 'I am a tuple 195']
+select * from t0 where k0=196
+Found 1 tuple:
+[196, 'I am a tuple 196']
+select * from t0 where k0=197
+Found 1 tuple:
+[197, 'I am a tuple 197']
+select * from t0 where k0=198
+Found 1 tuple:
+[198, 'I am a tuple 198']
+select * from t0 where k0=199
+Found 1 tuple:
+[199, 'I am a tuple 199']
+select * from t0 where k0=200
+Found 1 tuple:
+[200, 'I am a tuple 200']
+select * from t0 where k0=201
+Found 1 tuple:
+[201, 'I am a tuple 201']
+select * from t0 where k0=202
+Found 1 tuple:
+[202, 'I am a tuple 202']
+select * from t0 where k0=203
+Found 1 tuple:
+[203, 'I am a tuple 203']
+select * from t0 where k0=204
+Found 1 tuple:
+[204, 'I am a tuple 204']
+select * from t0 where k0=205
+Found 1 tuple:
+[205, 'I am a tuple 205']
+select * from t0 where k0=206
+Found 1 tuple:
+[206, 'I am a tuple 206']
+select * from t0 where k0=207
+Found 1 tuple:
+[207, 'I am a tuple 207']
+select * from t0 where k0=208
+Found 1 tuple:
+[208, 'I am a tuple 208']
+select * from t0 where k0=209
+Found 1 tuple:
+[209, 'I am a tuple 209']
+select * from t0 where k0=210
+Found 1 tuple:
+[210, 'I am a tuple 210']
+select * from t0 where k0=211
+Found 1 tuple:
+[211, 'I am a tuple 211']
+select * from t0 where k0=212
+Found 1 tuple:
+[212, 'I am a tuple 212']
+select * from t0 where k0=213
+Found 1 tuple:
+[213, 'I am a tuple 213']
+select * from t0 where k0=214
+Found 1 tuple:
+[214, 'I am a tuple 214']
+select * from t0 where k0=215
+Found 1 tuple:
+[215, 'I am a tuple 215']
+select * from t0 where k0=216
+Found 1 tuple:
+[216, 'I am a tuple 216']
+select * from t0 where k0=217
+Found 1 tuple:
+[217, 'I am a tuple 217']
+select * from t0 where k0=218
+Found 1 tuple:
+[218, 'I am a tuple 218']
+select * from t0 where k0=219
+Found 1 tuple:
+[219, 'I am a tuple 219']
+select * from t0 where k0=220
+Found 1 tuple:
+[220, 'I am a tuple 220']
+select * from t0 where k0=221
+Found 1 tuple:
+[221, 'I am a tuple 221']
+select * from t0 where k0=222
+Found 1 tuple:
+[222, 'I am a tuple 222']
+select * from t0 where k0=223
+Found 1 tuple:
+[223, 'I am a tuple 223']
+select * from t0 where k0=224
+Found 1 tuple:
+[224, 'I am a tuple 224']
+select * from t0 where k0=225
+Found 1 tuple:
+[225, 'I am a tuple 225']
+select * from t0 where k0=226
+Found 1 tuple:
+[226, 'I am a tuple 226']
+select * from t0 where k0=227
+Found 1 tuple:
+[227, 'I am a tuple 227']
+select * from t0 where k0=228
+Found 1 tuple:
+[228, 'I am a tuple 228']
+select * from t0 where k0=229
+Found 1 tuple:
+[229, 'I am a tuple 229']
+select * from t0 where k0=230
+Found 1 tuple:
+[230, 'I am a tuple 230']
+select * from t0 where k0=231
+Found 1 tuple:
+[231, 'I am a tuple 231']
+select * from t0 where k0=232
+Found 1 tuple:
+[232, 'I am a tuple 232']
+select * from t0 where k0=233
+Found 1 tuple:
+[233, 'I am a tuple 233']
+select * from t0 where k0=234
+Found 1 tuple:
+[234, 'I am a tuple 234']
+select * from t0 where k0=235
+Found 1 tuple:
+[235, 'I am a tuple 235']
+select * from t0 where k0=236
+Found 1 tuple:
+[236, 'I am a tuple 236']
+select * from t0 where k0=237
+Found 1 tuple:
+[237, 'I am a tuple 237']
+select * from t0 where k0=238
+Found 1 tuple:
+[238, 'I am a tuple 238']
+select * from t0 where k0=239
+Found 1 tuple:
+[239, 'I am a tuple 239']
+select * from t0 where k0=240
+Found 1 tuple:
+[240, 'I am a tuple 240']
+select * from t0 where k0=241
+Found 1 tuple:
+[241, 'I am a tuple 241']
+select * from t0 where k0=242
+Found 1 tuple:
+[242, 'I am a tuple 242']
+select * from t0 where k0=243
+Found 1 tuple:
+[243, 'I am a tuple 243']
+select * from t0 where k0=244
+Found 1 tuple:
+[244, 'I am a tuple 244']
+select * from t0 where k0=245
+Found 1 tuple:
+[245, 'I am a tuple 245']
+select * from t0 where k0=246
+Found 1 tuple:
+[246, 'I am a tuple 246']
+select * from t0 where k0=247
+Found 1 tuple:
+[247, 'I am a tuple 247']
+select * from t0 where k0=248
+Found 1 tuple:
+[248, 'I am a tuple 248']
+select * from t0 where k0=249
+Found 1 tuple:
+[249, 'I am a tuple 249']
+select * from t0 where k0=250
+Found 1 tuple:
+[250, 'I am a tuple 250']
+select * from t0 where k0=251
+Found 1 tuple:
+[251, 'I am a tuple 251']
+select * from t0 where k0=252
+Found 1 tuple:
+[252, 'I am a tuple 252']
+select * from t0 where k0=253
+Found 1 tuple:
+[253, 'I am a tuple 253']
+select * from t0 where k0=254
+Found 1 tuple:
+[254, 'I am a tuple 254']
+select * from t0 where k0=255
+Found 1 tuple:
+[255, 'I am a tuple 255']
+select * from t0 where k0=256
+Found 1 tuple:
+[256, 'I am a tuple 256']
+select * from t0 where k0=257
+Found 1 tuple:
+[257, 'I am a tuple 257']
+select * from t0 where k0=258
+Found 1 tuple:
+[258, 'I am a tuple 258']
+select * from t0 where k0=259
+Found 1 tuple:
+[259, 'I am a tuple 259']
+select * from t0 where k0=260
+Found 1 tuple:
+[260, 'I am a tuple 260']
+select * from t0 where k0=261
+Found 1 tuple:
+[261, 'I am a tuple 261']
+select * from t0 where k0=262
+Found 1 tuple:
+[262, 'I am a tuple 262']
+select * from t0 where k0=263
+Found 1 tuple:
+[263, 'I am a tuple 263']
+select * from t0 where k0=264
+Found 1 tuple:
+[264, 'I am a tuple 264']
+select * from t0 where k0=265
+Found 1 tuple:
+[265, 'I am a tuple 265']
+select * from t0 where k0=266
+Found 1 tuple:
+[266, 'I am a tuple 266']
+select * from t0 where k0=267
+Found 1 tuple:
+[267, 'I am a tuple 267']
+select * from t0 where k0=268
+Found 1 tuple:
+[268, 'I am a tuple 268']
+select * from t0 where k0=269
+Found 1 tuple:
+[269, 'I am a tuple 269']
+select * from t0 where k0=270
+Found 1 tuple:
+[270, 'I am a tuple 270']
+select * from t0 where k0=271
+Found 1 tuple:
+[271, 'I am a tuple 271']
+select * from t0 where k0=272
+Found 1 tuple:
+[272, 'I am a tuple 272']
+select * from t0 where k0=273
+Found 1 tuple:
+[273, 'I am a tuple 273']
+select * from t0 where k0=274
+Found 1 tuple:
+[274, 'I am a tuple 274']
+select * from t0 where k0=275
+Found 1 tuple:
+[275, 'I am a tuple 275']
+select * from t0 where k0=276
+Found 1 tuple:
+[276, 'I am a tuple 276']
+select * from t0 where k0=277
+Found 1 tuple:
+[277, 'I am a tuple 277']
+select * from t0 where k0=278
+Found 1 tuple:
+[278, 'I am a tuple 278']
+select * from t0 where k0=279
+Found 1 tuple:
+[279, 'I am a tuple 279']
+select * from t0 where k0=280
+Found 1 tuple:
+[280, 'I am a tuple 280']
+select * from t0 where k0=281
+Found 1 tuple:
+[281, 'I am a tuple 281']
+select * from t0 where k0=282
+Found 1 tuple:
+[282, 'I am a tuple 282']
+select * from t0 where k0=283
+Found 1 tuple:
+[283, 'I am a tuple 283']
+select * from t0 where k0=284
+Found 1 tuple:
+[284, 'I am a tuple 284']
+select * from t0 where k0=285
+Found 1 tuple:
+[285, 'I am a tuple 285']
+select * from t0 where k0=286
+Found 1 tuple:
+[286, 'I am a tuple 286']
+select * from t0 where k0=287
+Found 1 tuple:
+[287, 'I am a tuple 287']
+select * from t0 where k0=288
+Found 1 tuple:
+[288, 'I am a tuple 288']
+select * from t0 where k0=289
+Found 1 tuple:
+[289, 'I am a tuple 289']
+select * from t0 where k0=290
+Found 1 tuple:
+[290, 'I am a tuple 290']
+select * from t0 where k0=291
+Found 1 tuple:
+[291, 'I am a tuple 291']
+select * from t0 where k0=292
+Found 1 tuple:
+[292, 'I am a tuple 292']
+select * from t0 where k0=293
+Found 1 tuple:
+[293, 'I am a tuple 293']
+select * from t0 where k0=294
+Found 1 tuple:
+[294, 'I am a tuple 294']
+select * from t0 where k0=295
+Found 1 tuple:
+[295, 'I am a tuple 295']
+select * from t0 where k0=296
+Found 1 tuple:
+[296, 'I am a tuple 296']
+select * from t0 where k0=297
+Found 1 tuple:
+[297, 'I am a tuple 297']
+select * from t0 where k0=298
+Found 1 tuple:
+[298, 'I am a tuple 298']
+select * from t0 where k0=299
+Found 1 tuple:
+[299, 'I am a tuple 299']
+select * from t0 where k0=300
+Found 1 tuple:
+[300, 'I am a tuple 300']
+select * from t0 where k0=301
+Found 1 tuple:
+[301, 'I am a tuple 301']
+select * from t0 where k0=302
+Found 1 tuple:
+[302, 'I am a tuple 302']
+select * from t0 where k0=303
+Found 1 tuple:
+[303, 'I am a tuple 303']
+select * from t0 where k0=304
+Found 1 tuple:
+[304, 'I am a tuple 304']
+select * from t0 where k0=305
+Found 1 tuple:
+[305, 'I am a tuple 305']
+select * from t0 where k0=306
+Found 1 tuple:
+[306, 'I am a tuple 306']
+select * from t0 where k0=307
+Found 1 tuple:
+[307, 'I am a tuple 307']
+select * from t0 where k0=308
+Found 1 tuple:
+[308, 'I am a tuple 308']
+select * from t0 where k0=309
+Found 1 tuple:
+[309, 'I am a tuple 309']
+select * from t0 where k0=310
+Found 1 tuple:
+[310, 'I am a tuple 310']
+select * from t0 where k0=311
+Found 1 tuple:
+[311, 'I am a tuple 311']
+select * from t0 where k0=312
+Found 1 tuple:
+[312, 'I am a tuple 312']
+select * from t0 where k0=313
+Found 1 tuple:
+[313, 'I am a tuple 313']
+select * from t0 where k0=314
+Found 1 tuple:
+[314, 'I am a tuple 314']
+select * from t0 where k0=315
+Found 1 tuple:
+[315, 'I am a tuple 315']
+select * from t0 where k0=316
+Found 1 tuple:
+[316, 'I am a tuple 316']
+select * from t0 where k0=317
+Found 1 tuple:
+[317, 'I am a tuple 317']
+select * from t0 where k0=318
+Found 1 tuple:
+[318, 'I am a tuple 318']
+select * from t0 where k0=319
+Found 1 tuple:
+[319, 'I am a tuple 319']
+select * from t0 where k0=320
+Found 1 tuple:
+[320, 'I am a tuple 320']
+select * from t0 where k0=321
+Found 1 tuple:
+[321, 'I am a tuple 321']
+select * from t0 where k0=322
+Found 1 tuple:
+[322, 'I am a tuple 322']
+select * from t0 where k0=323
+Found 1 tuple:
+[323, 'I am a tuple 323']
+select * from t0 where k0=324
+Found 1 tuple:
+[324, 'I am a tuple 324']
+select * from t0 where k0=325
+Found 1 tuple:
+[325, 'I am a tuple 325']
+select * from t0 where k0=326
+Found 1 tuple:
+[326, 'I am a tuple 326']
+select * from t0 where k0=327
+Found 1 tuple:
+[327, 'I am a tuple 327']
+select * from t0 where k0=328
+Found 1 tuple:
+[328, 'I am a tuple 328']
+select * from t0 where k0=329
+Found 1 tuple:
+[329, 'I am a tuple 329']
+select * from t0 where k0=330
+Found 1 tuple:
+[330, 'I am a tuple 330']
+select * from t0 where k0=331
+Found 1 tuple:
+[331, 'I am a tuple 331']
+select * from t0 where k0=332
+Found 1 tuple:
+[332, 'I am a tuple 332']
+select * from t0 where k0=333
+Found 1 tuple:
+[333, 'I am a tuple 333']
+select * from t0 where k0=334
+Found 1 tuple:
+[334, 'I am a tuple 334']
+select * from t0 where k0=335
+Found 1 tuple:
+[335, 'I am a tuple 335']
+select * from t0 where k0=336
+Found 1 tuple:
+[336, 'I am a tuple 336']
+select * from t0 where k0=337
+Found 1 tuple:
+[337, 'I am a tuple 337']
+select * from t0 where k0=338
+Found 1 tuple:
+[338, 'I am a tuple 338']
+select * from t0 where k0=339
+Found 1 tuple:
+[339, 'I am a tuple 339']
+select * from t0 where k0=340
+Found 1 tuple:
+[340, 'I am a tuple 340']
+select * from t0 where k0=341
+Found 1 tuple:
+[341, 'I am a tuple 341']
+select * from t0 where k0=342
+Found 1 tuple:
+[342, 'I am a tuple 342']
+select * from t0 where k0=343
+Found 1 tuple:
+[343, 'I am a tuple 343']
+select * from t0 where k0=344
+Found 1 tuple:
+[344, 'I am a tuple 344']
+select * from t0 where k0=345
+Found 1 tuple:
+[345, 'I am a tuple 345']
+select * from t0 where k0=346
+Found 1 tuple:
+[346, 'I am a tuple 346']
+select * from t0 where k0=347
+Found 1 tuple:
+[347, 'I am a tuple 347']
+select * from t0 where k0=348
+Found 1 tuple:
+[348, 'I am a tuple 348']
+select * from t0 where k0=349
+Found 1 tuple:
+[349, 'I am a tuple 349']
+select * from t0 where k0=350
+Found 1 tuple:
+[350, 'I am a tuple 350']
+select * from t0 where k0=351
+Found 1 tuple:
+[351, 'I am a tuple 351']
+select * from t0 where k0=352
+Found 1 tuple:
+[352, 'I am a tuple 352']
+select * from t0 where k0=353
+Found 1 tuple:
+[353, 'I am a tuple 353']
+select * from t0 where k0=354
+Found 1 tuple:
+[354, 'I am a tuple 354']
+select * from t0 where k0=355
+Found 1 tuple:
+[355, 'I am a tuple 355']
+select * from t0 where k0=356
+Found 1 tuple:
+[356, 'I am a tuple 356']
+select * from t0 where k0=357
+Found 1 tuple:
+[357, 'I am a tuple 357']
+select * from t0 where k0=358
+Found 1 tuple:
+[358, 'I am a tuple 358']
+select * from t0 where k0=359
+Found 1 tuple:
+[359, 'I am a tuple 359']
+select * from t0 where k0=360
+Found 1 tuple:
+[360, 'I am a tuple 360']
+select * from t0 where k0=361
+Found 1 tuple:
+[361, 'I am a tuple 361']
+select * from t0 where k0=362
+Found 1 tuple:
+[362, 'I am a tuple 362']
+select * from t0 where k0=363
+Found 1 tuple:
+[363, 'I am a tuple 363']
+select * from t0 where k0=364
+Found 1 tuple:
+[364, 'I am a tuple 364']
+select * from t0 where k0=365
+Found 1 tuple:
+[365, 'I am a tuple 365']
+select * from t0 where k0=366
+Found 1 tuple:
+[366, 'I am a tuple 366']
+select * from t0 where k0=367
+Found 1 tuple:
+[367, 'I am a tuple 367']
+select * from t0 where k0=368
+Found 1 tuple:
+[368, 'I am a tuple 368']
+select * from t0 where k0=369
+Found 1 tuple:
+[369, 'I am a tuple 369']
+select * from t0 where k0=370
+Found 1 tuple:
+[370, 'I am a tuple 370']
+select * from t0 where k0=371
+Found 1 tuple:
+[371, 'I am a tuple 371']
+select * from t0 where k0=372
+Found 1 tuple:
+[372, 'I am a tuple 372']
+select * from t0 where k0=373
+Found 1 tuple:
+[373, 'I am a tuple 373']
+select * from t0 where k0=374
+Found 1 tuple:
+[374, 'I am a tuple 374']
+select * from t0 where k0=375
+Found 1 tuple:
+[375, 'I am a tuple 375']
+select * from t0 where k0=376
+Found 1 tuple:
+[376, 'I am a tuple 376']
+select * from t0 where k0=377
+Found 1 tuple:
+[377, 'I am a tuple 377']
+select * from t0 where k0=378
+Found 1 tuple:
+[378, 'I am a tuple 378']
+select * from t0 where k0=379
+Found 1 tuple:
+[379, 'I am a tuple 379']
+select * from t0 where k0=380
+Found 1 tuple:
+[380, 'I am a tuple 380']
+select * from t0 where k0=381
+Found 1 tuple:
+[381, 'I am a tuple 381']
+select * from t0 where k0=382
+Found 1 tuple:
+[382, 'I am a tuple 382']
+select * from t0 where k0=383
+Found 1 tuple:
+[383, 'I am a tuple 383']
+select * from t0 where k0=384
+Found 1 tuple:
+[384, 'I am a tuple 384']
+select * from t0 where k0=385
+Found 1 tuple:
+[385, 'I am a tuple 385']
+select * from t0 where k0=386
+Found 1 tuple:
+[386, 'I am a tuple 386']
+select * from t0 where k0=387
+Found 1 tuple:
+[387, 'I am a tuple 387']
+select * from t0 where k0=388
+Found 1 tuple:
+[388, 'I am a tuple 388']
+select * from t0 where k0=389
+Found 1 tuple:
+[389, 'I am a tuple 389']
+select * from t0 where k0=390
+Found 1 tuple:
+[390, 'I am a tuple 390']
+select * from t0 where k0=391
+Found 1 tuple:
+[391, 'I am a tuple 391']
+select * from t0 where k0=392
+Found 1 tuple:
+[392, 'I am a tuple 392']
+select * from t0 where k0=393
+Found 1 tuple:
+[393, 'I am a tuple 393']
+select * from t0 where k0=394
+Found 1 tuple:
+[394, 'I am a tuple 394']
+select * from t0 where k0=395
+Found 1 tuple:
+[395, 'I am a tuple 395']
+select * from t0 where k0=396
+Found 1 tuple:
+[396, 'I am a tuple 396']
+select * from t0 where k0=397
+Found 1 tuple:
+[397, 'I am a tuple 397']
+select * from t0 where k0=398
+Found 1 tuple:
+[398, 'I am a tuple 398']
+select * from t0 where k0=399
+Found 1 tuple:
+[399, 'I am a tuple 399']
+select * from t0 where k0=400
+Found 1 tuple:
+[400, 'I am a tuple 400']
+select * from t0 where k0=401
+Found 1 tuple:
+[401, 'I am a tuple 401']
+select * from t0 where k0=402
+Found 1 tuple:
+[402, 'I am a tuple 402']
+select * from t0 where k0=403
+Found 1 tuple:
+[403, 'I am a tuple 403']
+select * from t0 where k0=404
+Found 1 tuple:
+[404, 'I am a tuple 404']
+select * from t0 where k0=405
+Found 1 tuple:
+[405, 'I am a tuple 405']
+select * from t0 where k0=406
+Found 1 tuple:
+[406, 'I am a tuple 406']
+select * from t0 where k0=407
+Found 1 tuple:
+[407, 'I am a tuple 407']
+select * from t0 where k0=408
+Found 1 tuple:
+[408, 'I am a tuple 408']
+select * from t0 where k0=409
+Found 1 tuple:
+[409, 'I am a tuple 409']
+select * from t0 where k0=410
+Found 1 tuple:
+[410, 'I am a tuple 410']
+select * from t0 where k0=411
+Found 1 tuple:
+[411, 'I am a tuple 411']
+select * from t0 where k0=412
+Found 1 tuple:
+[412, 'I am a tuple 412']
+select * from t0 where k0=413
+Found 1 tuple:
+[413, 'I am a tuple 413']
+select * from t0 where k0=414
+Found 1 tuple:
+[414, 'I am a tuple 414']
+select * from t0 where k0=415
+Found 1 tuple:
+[415, 'I am a tuple 415']
+select * from t0 where k0=416
+Found 1 tuple:
+[416, 'I am a tuple 416']
+select * from t0 where k0=417
+Found 1 tuple:
+[417, 'I am a tuple 417']
+select * from t0 where k0=418
+Found 1 tuple:
+[418, 'I am a tuple 418']
+select * from t0 where k0=419
+Found 1 tuple:
+[419, 'I am a tuple 419']
+select * from t0 where k0=420
+Found 1 tuple:
+[420, 'I am a tuple 420']
+select * from t0 where k0=421
+Found 1 tuple:
+[421, 'I am a tuple 421']
+select * from t0 where k0=422
+Found 1 tuple:
+[422, 'I am a tuple 422']
+select * from t0 where k0=423
+Found 1 tuple:
+[423, 'I am a tuple 423']
+select * from t0 where k0=424
+Found 1 tuple:
+[424, 'I am a tuple 424']
+select * from t0 where k0=425
+Found 1 tuple:
+[425, 'I am a tuple 425']
+select * from t0 where k0=426
+Found 1 tuple:
+[426, 'I am a tuple 426']
+select * from t0 where k0=427
+Found 1 tuple:
+[427, 'I am a tuple 427']
+select * from t0 where k0=428
+Found 1 tuple:
+[428, 'I am a tuple 428']
+select * from t0 where k0=429
+Found 1 tuple:
+[429, 'I am a tuple 429']
+select * from t0 where k0=430
+Found 1 tuple:
+[430, 'I am a tuple 430']
+select * from t0 where k0=431
+Found 1 tuple:
+[431, 'I am a tuple 431']
+select * from t0 where k0=432
+Found 1 tuple:
+[432, 'I am a tuple 432']
+select * from t0 where k0=433
+Found 1 tuple:
+[433, 'I am a tuple 433']
+select * from t0 where k0=434
+Found 1 tuple:
+[434, 'I am a tuple 434']
+select * from t0 where k0=435
+Found 1 tuple:
+[435, 'I am a tuple 435']
+select * from t0 where k0=436
+Found 1 tuple:
+[436, 'I am a tuple 436']
+select * from t0 where k0=437
+Found 1 tuple:
+[437, 'I am a tuple 437']
+select * from t0 where k0=438
+Found 1 tuple:
+[438, 'I am a tuple 438']
+select * from t0 where k0=439
+Found 1 tuple:
+[439, 'I am a tuple 439']
+select * from t0 where k0=440
+Found 1 tuple:
+[440, 'I am a tuple 440']
+select * from t0 where k0=441
+Found 1 tuple:
+[441, 'I am a tuple 441']
+select * from t0 where k0=442
+Found 1 tuple:
+[442, 'I am a tuple 442']
+select * from t0 where k0=443
+Found 1 tuple:
+[443, 'I am a tuple 443']
+select * from t0 where k0=444
+Found 1 tuple:
+[444, 'I am a tuple 444']
+select * from t0 where k0=445
+Found 1 tuple:
+[445, 'I am a tuple 445']
+select * from t0 where k0=446
+Found 1 tuple:
+[446, 'I am a tuple 446']
+select * from t0 where k0=447
+Found 1 tuple:
+[447, 'I am a tuple 447']
+select * from t0 where k0=448
+Found 1 tuple:
+[448, 'I am a tuple 448']
+select * from t0 where k0=449
+Found 1 tuple:
+[449, 'I am a tuple 449']
+select * from t0 where k0=450
+Found 1 tuple:
+[450, 'I am a tuple 450']
+select * from t0 where k0=451
+Found 1 tuple:
+[451, 'I am a tuple 451']
+select * from t0 where k0=452
+Found 1 tuple:
+[452, 'I am a tuple 452']
+select * from t0 where k0=453
+Found 1 tuple:
+[453, 'I am a tuple 453']
+select * from t0 where k0=454
+Found 1 tuple:
+[454, 'I am a tuple 454']
+select * from t0 where k0=455
+Found 1 tuple:
+[455, 'I am a tuple 455']
+select * from t0 where k0=456
+Found 1 tuple:
+[456, 'I am a tuple 456']
+select * from t0 where k0=457
+Found 1 tuple:
+[457, 'I am a tuple 457']
+select * from t0 where k0=458
+Found 1 tuple:
+[458, 'I am a tuple 458']
+select * from t0 where k0=459
+Found 1 tuple:
+[459, 'I am a tuple 459']
+select * from t0 where k0=460
+Found 1 tuple:
+[460, 'I am a tuple 460']
+select * from t0 where k0=461
+Found 1 tuple:
+[461, 'I am a tuple 461']
+select * from t0 where k0=462
+Found 1 tuple:
+[462, 'I am a tuple 462']
+select * from t0 where k0=463
+Found 1 tuple:
+[463, 'I am a tuple 463']
+select * from t0 where k0=464
+Found 1 tuple:
+[464, 'I am a tuple 464']
+select * from t0 where k0=465
+Found 1 tuple:
+[465, 'I am a tuple 465']
+select * from t0 where k0=466
+Found 1 tuple:
+[466, 'I am a tuple 466']
+select * from t0 where k0=467
+Found 1 tuple:
+[467, 'I am a tuple 467']
+select * from t0 where k0=468
+Found 1 tuple:
+[468, 'I am a tuple 468']
+select * from t0 where k0=469
+Found 1 tuple:
+[469, 'I am a tuple 469']
+select * from t0 where k0=470
+Found 1 tuple:
+[470, 'I am a tuple 470']
+select * from t0 where k0=471
+Found 1 tuple:
+[471, 'I am a tuple 471']
+select * from t0 where k0=472
+Found 1 tuple:
+[472, 'I am a tuple 472']
+select * from t0 where k0=473
+Found 1 tuple:
+[473, 'I am a tuple 473']
+select * from t0 where k0=474
+Found 1 tuple:
+[474, 'I am a tuple 474']
+select * from t0 where k0=475
+Found 1 tuple:
+[475, 'I am a tuple 475']
+select * from t0 where k0=476
+Found 1 tuple:
+[476, 'I am a tuple 476']
+select * from t0 where k0=477
+Found 1 tuple:
+[477, 'I am a tuple 477']
+select * from t0 where k0=478
+Found 1 tuple:
+[478, 'I am a tuple 478']
+select * from t0 where k0=479
+Found 1 tuple:
+[479, 'I am a tuple 479']
+select * from t0 where k0=480
+Found 1 tuple:
+[480, 'I am a tuple 480']
+select * from t0 where k0=481
+Found 1 tuple:
+[481, 'I am a tuple 481']
+select * from t0 where k0=482
+Found 1 tuple:
+[482, 'I am a tuple 482']
+select * from t0 where k0=483
+Found 1 tuple:
+[483, 'I am a tuple 483']
+select * from t0 where k0=484
+Found 1 tuple:
+[484, 'I am a tuple 484']
+select * from t0 where k0=485
+Found 1 tuple:
+[485, 'I am a tuple 485']
+select * from t0 where k0=486
+Found 1 tuple:
+[486, 'I am a tuple 486']
+select * from t0 where k0=487
+Found 1 tuple:
+[487, 'I am a tuple 487']
+select * from t0 where k0=488
+Found 1 tuple:
+[488, 'I am a tuple 488']
+select * from t0 where k0=489
+Found 1 tuple:
+[489, 'I am a tuple 489']
+select * from t0 where k0=490
+Found 1 tuple:
+[490, 'I am a tuple 490']
+select * from t0 where k0=491
+Found 1 tuple:
+[491, 'I am a tuple 491']
+select * from t0 where k0=492
+Found 1 tuple:
+[492, 'I am a tuple 492']
+select * from t0 where k0=493
+Found 1 tuple:
+[493, 'I am a tuple 493']
+select * from t0 where k0=494
+Found 1 tuple:
+[494, 'I am a tuple 494']
+select * from t0 where k0=495
+Found 1 tuple:
+[495, 'I am a tuple 495']
+select * from t0 where k0=496
+Found 1 tuple:
+[496, 'I am a tuple 496']
+select * from t0 where k0=497
+Found 1 tuple:
+[497, 'I am a tuple 497']
+select * from t0 where k0=498
+Found 1 tuple:
+[498, 'I am a tuple 498']
+select * from t0 where k0=499
+Found 1 tuple:
+[499, 'I am a tuple 499']
+select * from t0 where k0=500
+No match
+# Restore the default server...
+#
+# A test case for: http://bugs.launchpad.net/bugs/686411
+# Check that 'save snapshot' does not overwrite a snapshot
+# file that already exists. Verify also that any other
+# error that happens when saving snapshot is propagated
+# to the caller.
+
+insert into t0 values (1, 'first tuple')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+save snapshot
+---
+fail: can't save snapshot, errno 17 (File exists)
+...
+insert into t0 values (2, 'second tuple')
+Insert OK, 1 row affected
+# Make 'var' directory read-only.
+save snapshot
+---
+fail: can't save snapshot, errno 13 (Permission denied)
+...
+delete from t0 where k0 = 1
+Delete OK, 1 row affected
+delete from t0 where k0 = 2
+Delete OK, 1 row affected

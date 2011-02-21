@@ -54,13 +54,14 @@ void _say(int level, const char *filename, int line, const char *error,
 
 #define say(level, ...) ({ _say(level, __FILE__, __LINE__, __VA_ARGS__); })
 
-#define panic(...)		({ say(S_FATAL, NULL, __VA_ARGS__); exit(EXIT_FAILURE); })
-#define panic_syserror(...)	({ say(S_FATAL, strerror(errno), __VA_ARGS__); exit(EXIT_FAILURE); })
-#define say_syserror(...)	say(S_ERROR, strerror(errno), __VA_ARGS__)
-#define say_error(...)		say(S_ERROR, NULL, __VA_ARGS__)
-#define say_crit(...)		say(S_CRIT, NULL, __VA_ARGS__)
-#define say_warn(...)		say(S_WARN, NULL, __VA_ARGS__)
-#define say_info(...)		say(S_INFO, NULL, __VA_ARGS__)
-#define say_debug(...)		say(S_DEBUG, NULL, __VA_ARGS__)
+#define panic_status(status, ...)	({ say(S_FATAL, NULL, __VA_ARGS__); exit(status); })
+#define panic(...)			panic_status(EXIT_FAILURE, __VA_ARGS__)
+#define panic_syserror(...)		({ say(S_FATAL, strerror(errno), __VA_ARGS__); exit(EXIT_FAILURE); })
+#define say_syserror(...)		say(S_ERROR, strerror(errno), __VA_ARGS__)
+#define say_error(...)			say(S_ERROR, NULL, __VA_ARGS__)
+#define say_crit(...)			say(S_CRIT, NULL, __VA_ARGS__)
+#define say_warn(...)			say(S_WARN, NULL, __VA_ARGS__)
+#define say_info(...)			say(S_INFO, NULL, __VA_ARGS__)
+#define say_debug(...)			say(S_DEBUG, NULL, __VA_ARGS__)
 
 #endif

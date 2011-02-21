@@ -1,0 +1,15 @@
+
+# Bug #708685:
+#  Addition of required configuration file options broke backward
+#  compatibility
+#  (https://bugs.launchpad.net/bugs/708685)
+
+show stat
+---
+statistics:
+  INSERT:        { rps:  0    , total:  0           }
+  SELECT_LIMIT:  { rps:  0    , total:  0           }
+  SELECT:        { rps:  0    , total:  0           }
+  UPDATE_FIELDS: { rps:  0    , total:  0           }
+  DELETE:        { rps:  0    , total:  0           }
+...

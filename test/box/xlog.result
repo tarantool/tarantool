@@ -1,0 +1,34 @@
+
+# Inprogress xlog must be renamed before second insert.
+
+insert into t0 values (1, 'first tuple')
+Insert OK, 1 row affected
+00000000000000000002.xlog.inprogress exists
+insert into t0 values (2, 'second tuple')
+Insert OK, 1 row affected
+00000000000000000002.xlog.inprogress has been successfully renamed
+
+# Inprogress xlog must be renamed during regular termination.
+
+insert into t0 values (3, 'third tuple')
+Insert OK, 1 row affected
+00000000000000000004.xlog.inprogress exists
+Stopping the server...
+00000000000000000004.xlog.inprogress has been successfully renamed
+
+# An inprogress xlog fle with one record must be renamed during recovery.
+
+00000000000000000005.xlog.inprogress hash been successfully renamed
+
+# Empty (zero size) inprogress xlog must be deleted during recovery.
+
+00000000000000000006.xlog.inprogress has been successfully deleted
+
+# Empty (header only, no records) inprogress xlog must be deleted
+# during recovery.
+
+00000000000000000006.xlog.inprogress has been successfully deleted
+
+# Inprogress xlog with bad record must be deleted during recovery.
+
+00000000000000000006.xlog.inprogress has been successfully deleted

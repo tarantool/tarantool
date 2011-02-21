@@ -3,6 +3,7 @@ reload configuration
 fail:
  - Could not accept read only 'slab_alloc_arena' option
  - Could not accept read only 'pid_file' option
+ - Could not accept read only 'logger' option
  - Could not accept read only 'primary_port' option
  - Could not accept read only 'secondary_port' option
  - Could not accept read only 'admin_port' option
@@ -43,10 +44,56 @@ ok
 reload configuration
 ---
 fail:
- - gram_yyerror: syntax error, unexpected $end, expecting KEY_P or NULL_P at line 1
+ - gram_yyerror: syntax error, unexpected $end, expecting KEY_P or NULL_P or '[' at line 1
 ...
 reload configuration
 ---
 fail:
  - can't open config `tarantool.cfg'
 ...
+reload configuration
+---
+ok
+...
+#
+# A test case for http://bugs.launchpad.net/bugs/712447:
+# Valgrind reports use of not initialized memory after 'reload
+# configuration'
+#
+insert into t0 values (1, 'tuple')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+reload configuration
+---
+fail:
+ - can't open config `tarantool.cfg'
+...
+insert into t0 values (2, 'tuple 2')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (3, 'tuple 3')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+reload configuration
+---
+ok
+...
+delete from t0 where k0 = 1
+Delete OK, 1 row affected
+delete from t0 where k0 = 2
+Delete OK, 1 row affected
+delete from t0 where k0 = 3
+Delete OK, 1 row affected

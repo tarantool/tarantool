@@ -10,6 +10,13 @@ find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
 
 #
+# This instructs the rest of the build system what product
+# and what modules to produce.
+#
+set (TARANTOOL_PRODUCT "silverbox")
+set (TARANTOOL_MODULES "silverbox" "feeder")
+
+#
 # Set default build type to Debug. This is to ease a developer's
 # life. Release binaries are built by BuildBot automatically anyway.
 #
@@ -44,8 +51,8 @@ check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
 # Tarantool uses 'coro' (coroutines) library # to implement
 # cooperative multi-tasking. Since coro.h is included
 # universally, define the underlying implementation switch
-# in top level CMakeLists.txt, to ensure a consistent header
-# file layout across the entire project.
+# in the top level CMakeLists.txt, to ensure a consistent
+# header file layout across the entire project.
 #
 if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86")
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCORO_ASM")
@@ -146,9 +153,10 @@ if (ENABLE_BACKTRACE)
     endif()
 endif()
 
-
-add_subdirectory(core)
 add_subdirectory(third_party)
+add_subdirectory(cfg)
+add_subdirectory(core)
+add_subdirectory(mod)
 add_subdirectory(test)
 
 #
@@ -161,7 +169,10 @@ configure_file(
     )
 
 message (STATUS "")
-message (STATUS "Successfully configured Tarantool on ${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}, build type '${CMAKE_BUILD_TYPE}'. ")
+message (STATUS "Successfully configured Tarantool infrastructure on ")
+message (STATUS "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}, build type '${CMAKE_BUILD_TYPE}'. ")
+message (STATUS "The product you're building is \"${TARANTOOL_PRODUCT}\", enabled modules are ")
+message (STATUS "${TARANTOOL_MODULES}.")
 message (STATUS "Please check out CMakeCache.txt to view or modify configuration results.")
 message (STATUS "")
 message (STATUS "*** The following options are on in this configuration: ***")

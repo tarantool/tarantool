@@ -9,10 +9,13 @@ exec admin "help"
 exec admin "show configuration"
 exec admin "show stat"
 exec admin "save coredump"
+exec sql "insert into t0 values (1, 'tuple')"
 exec admin "save snapshot"
+exec sql "delete from t0 where k0 = 1"
 exec admin "exec module command"
 sys.stdout.push_filter("(\d\.\d)\.\d-\d+-\S+", "\\1.minor-<rev>-<commit>")
 sys.stdout.push_filter("pid: \d+", "pid: <pid>")
+sys.stdout.push_filter("uptime: \d+", "uptime: <uptime>")
 exec admin "show info"
 sys.stdout.clear_all_filters()
 sys.stdout.push_filter(".*", "")

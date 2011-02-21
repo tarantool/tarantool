@@ -89,10 +89,11 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 
 	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly, &n_accepted, &n_skipped);
 	fclose(f);
-	if (n_accepted == 0 || n_skipped != 0)
-		return -1;
 
 	if (check_cfg_tarantool_cfg(conf) != 0)
+		return -1;
+
+	if (n_accepted == 0 || n_skipped != 0)
 		return -1;
 
 	return mod_check_config(conf);
@@ -111,8 +112,9 @@ reload_cfg(struct tbuf *out)
 		return -1;
 	}
 	ret = load_cfg(&new_cfg1, 1);
-	tbuf_append(out, cfg_out->data, cfg_out->len);
 	if (ret == -1) {
+		tbuf_append(out, cfg_out->data, cfg_out->len);
+
 		destroy_tarantool_cfg(&new_cfg1);
 
 		return -1;
@@ -124,8 +126,9 @@ reload_cfg(struct tbuf *out)
 		return -1;
 	}
 	ret = load_cfg(&new_cfg2, 0);
-	tbuf_append(out, cfg_out->data, cfg_out->len);
 	if (ret == -1) {
+		tbuf_append(out, cfg_out->data, cfg_out->len);
+
 		destroy_tarantool_cfg(&new_cfg1);
 
 		return -1;
@@ -136,7 +139,8 @@ reload_cfg(struct tbuf *out)
 		destroy_tarantool_cfg(&new_cfg1);
 		destroy_tarantool_cfg(&new_cfg2);
 
-		out_warning(0, "tCould not accept read only '%s' option", diff);
+		out_warning(0, "Could not accept read only '%s' option", diff);
+		tbuf_append(out, cfg_out->data, cfg_out->len);
 
 		return -1;
 	}
@@ -166,16 +170,21 @@ tarantool_uptime(void)
 }
 
 #ifdef STORAGE
-void
+int
 snapshot(void *ev __unused__, int events __unused__)
 {
 	pid_t p = fork();
 	if (p < 0) {
 		say_syserror("fork");
-		return;
+		return -1;
 	}
-	if (p > 0)
-		return;
+	if (p > 0) {
+		wait_for_child(p);
+
+		assert(p == fiber->cw.rpid);
+
+		return WEXITSTATUS(fiber->cw.rstatus);
+	}
 
 	fiber->name = "dumper";
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
@@ -187,16 +196,10 @@ snapshot(void *ev __unused__, int events __unused__)
 	__gcov_flush();
 #endif
 	_exit(EXIT_SUCCESS);
+
+	return 0;
 }
 #endif
-
-static void
-sig_child(int signal __unused__)
-{
-	int child_status;
-	/* TODO: watch child status & destroy corresponding fibers */
-	while (waitpid(-1, &child_status, WNOHANG) > 0) ;
-}
 
 static void
 sig_int(int signal)
@@ -230,12 +233,6 @@ signal_init(void)
 	sa.sa_flags = 0;
 	sigemptyset(&sa.sa_mask);
 	if (sigaction(SIGPIPE, &sa, 0) == -1)
-		goto error;
-
-	sa.sa_handler = sig_child;
-	sa.sa_flags = SA_RESTART;
-	sigemptyset(&sa.sa_mask);
-	if (sigaction(SIGCHLD, &sa, NULL) == -1)
 		goto error;
 
 	sa.sa_handler = sig_int;
@@ -325,6 +322,7 @@ main(int argc, char **argv)
 #ifdef RESOLVE_SYMBOLS
 	load_symbols(argv[0]);
 #endif
+	argv = init_set_proc_title(argc, argv);
 
 	const void *opt_def =
 		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
@@ -494,8 +492,6 @@ main(int argc, char **argv)
 		create_pid();
 		atexit(remove_pid);
 	}
-
-	argv = init_set_proc_title(argc, argv);
 
 	say_logger_init(cfg.logger_nonblock);
 	booting = false;

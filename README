@@ -29,7 +29,8 @@ Please follow these steps to compile Tarantool:
 tarantool $ cmake .
 tarantool $ make
 
-'make' will create tarantool_silverbox executable in directory core/.
+'make' will create tarantool_silverbox executable in directory
+mod/silverbox.
 
 There is no 'make install' goal, but no installation
 is required either.
@@ -51,10 +52,10 @@ you could follow these steps:
 tarantool $ emacs cfg/tarantool_silverbox_cfg.cfg # edit the configuration
 # Initialize the storage directory, path to this directory
 # is specified in the configuration file:
-tarantool $ core/tarantool_silverbox --config cfg/tarantool_silverbox_cfg.cfg --init-storage
+tarantool $ mod/silverbox/tarantool_silverbox --config cfg/tarantool_silverbox_cfg.cfg --init-storage
 #
 # run
-tarantool $ core/tarantool_silverbox --config cfg/tarantool_silverbox_cfg.cfg
+tarantool $ mod/silverbox/tarantool_silverbox --config cfg/tarantool_silverbox_cfg.cfg
 
 Please report bugs at http://bugs.launchpad.net/tarantool.
 We also warmly welcome your feedback in the discussion mailing
