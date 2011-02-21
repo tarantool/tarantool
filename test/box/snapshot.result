@@ -1505,3 +1505,31 @@ Found 1 tuple:
 select * from t0 where k0=500
 No match
 # Restore the default server...
+#
+# A test case for: http://bugs.launchpad.net/bugs/686411
+# Check that 'save snapshot' does not overwrite a snapshot
+# file that already exists. Verify also that any other
+# error that happens when saving snapshot is propagated
+# to the caller.
+
+insert into t0 values (1, 'first tuple')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+save snapshot
+---
+fail: can't save snapshot, errno 17 (File exists)
+...
+insert into t0 values (2, 'second tuple')
+Insert OK, 1 row affected
+# Make 'var' directory read-only.
+save snapshot
+---
+fail: can't save snapshot, errno 13 (Permission denied)
+...
+delete from t0 where k0 = 1
+Delete OK, 1 row affected
+delete from t0 where k0 = 2
+Delete OK, 1 row affected

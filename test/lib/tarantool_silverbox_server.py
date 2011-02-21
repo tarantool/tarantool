@@ -116,9 +116,11 @@ class TarantoolSilverboxServer:
                           stdout = subprocess.PIPE,
                           stderr = subprocess.PIPE)
 
-    version = subprocess.Popen([self.abspath_to_exe, "--version"],
-                               cwd = self.args.vardir,
-                               stdout = subprocess.PIPE).stdout.read().rstrip()
+    p = subprocess.Popen([self.abspath_to_exe, "--version"],
+                         cwd = self.args.vardir,
+                         stdout = subprocess.PIPE)
+    version = p.stdout.read().rstrip()
+    p.wait()
 
     if not silent:
       print "Starting {0} {1}.".format(os.path.basename(self.abspath_to_exe),

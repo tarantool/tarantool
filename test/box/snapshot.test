@@ -1,4 +1,5 @@
 # encoding: tarantool
+#
 print """
 # Verify that the server starts from a pre-recorded snapshot.
 # This way we check that the server can read old snapshots (v11)
@@ -15,4 +16,33 @@ server.stop(True)
 os.unlink(snapshot)
 server.start(True)
 
-# vim: syntax=python
+print """#
+# A test case for: http://bugs.launchpad.net/bugs/686411
+# Check that 'save snapshot' does not overwrite a snapshot
+# file that already exists. Verify also that any other
+# error that happens when saving snapshot is propagated
+# to the caller.
+"""
+exec sql "insert into t0 values (1, 'first tuple')"
+exec admin "save snapshot"
+
+# In absence of data modifications, two consecutive
+# 'save snapshot' statements will try to write
+# into the same file, since file name is based
+# on LSN.
+#  Don't allow to overwrite snapshots.
+exec admin "save snapshot"
+#
+# Increment LSN
+exec sql "insert into t0 values (2, 'second tuple')"
+#
+# Check for other errors, e.g. "Permission denied".
+print "# Make 'var' directory read-only."
+os.chmod(vardir, 0555)
+exec admin "save snapshot"
+
+# cleanup
+os.chmod(vardir, 0755)
+exec sql "delete from t0 where k0 = 1"
+exec sql "delete from t0 where k0 = 2"
+# vim: syntax=python spell

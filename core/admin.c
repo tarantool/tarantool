@@ -186,15 +186,15 @@ case 6:
 	}
 	goto st0;
 tr12:
-#line 180 "core/admin.rl"
+#line 193 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st108;
 tr19:
-#line 170 "core/admin.rl"
+#line 183 "core/admin.rl"
 	{return 0;}
 	goto st108;
 tr28:
-#line 166 "core/admin.rl"
+#line 179 "core/admin.rl"
 	{strend = p;}
 #line 137 "core/admin.rl"
 	{
@@ -221,12 +221,23 @@ tr43:
 		}
 	goto st108;
 tr66:
-#line 177 "core/admin.rl"
+#line 190 "core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st108;
 tr75:
-#line 178 "core/admin.rl"
-	{snapshot(NULL, 0); ok(out);}
+#line 150 "core/admin.rl"
+	{
+			int ret = snapshot(NULL, 0);
+
+			if (ret == 0)
+				ok(out);
+			else {
+				tbuf_printf(err, " can't save snapshot, errno %d (%s)",
+					    ret, strerror(ret));
+
+				fail(out, err);
+			}
+		}
 	goto st108;
 tr92:
 #line 113 "core/admin.rl"
@@ -249,41 +260,41 @@ tr92:
 		}
 	goto st108;
 tr106:
-#line 172 "core/admin.rl"
+#line 185 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st108;
 tr112:
-#line 171 "core/admin.rl"
+#line 184 "core/admin.rl"
 	{start(out); mod_info(out); end(out);}
 	goto st108;
 tr117:
-#line 175 "core/admin.rl"
+#line 188 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st108;
 tr125:
-#line 174 "core/admin.rl"
+#line 187 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
 	goto st108;
 tr129:
-#line 176 "core/admin.rl"
+#line 189 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st108;
 st108:
 	if ( ++p == pe )
 		goto _test_eof108;
 case 108:
-#line 276 "core/admin.c"
+#line 287 "core/admin.c"
 	goto st0;
 tr13:
-#line 180 "core/admin.rl"
+#line 193 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
 tr20:
-#line 170 "core/admin.rl"
+#line 183 "core/admin.rl"
 	{return 0;}
 	goto st7;
 tr29:
-#line 166 "core/admin.rl"
+#line 179 "core/admin.rl"
 	{strend = p;}
 #line 137 "core/admin.rl"
 	{
@@ -310,12 +321,23 @@ tr44:
 		}
 	goto st7;
 tr67:
-#line 177 "core/admin.rl"
+#line 190 "core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
 tr76:
-#line 178 "core/admin.rl"
-	{snapshot(NULL, 0); ok(out);}
+#line 150 "core/admin.rl"
+	{
+			int ret = snapshot(NULL, 0);
+
+			if (ret == 0)
+				ok(out);
+			else {
+				tbuf_printf(err, " can't save snapshot, errno %d (%s)",
+					    ret, strerror(ret));
+
+				fail(out, err);
+			}
+		}
 	goto st7;
 tr93:
 #line 113 "core/admin.rl"
@@ -338,30 +360,30 @@ tr93:
 		}
 	goto st7;
 tr107:
-#line 172 "core/admin.rl"
+#line 185 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st7;
 tr113:
-#line 171 "core/admin.rl"
+#line 184 "core/admin.rl"
 	{start(out); mod_info(out); end(out);}
 	goto st7;
 tr118:
-#line 175 "core/admin.rl"
+#line 188 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st7;
 tr126:
-#line 174 "core/admin.rl"
+#line 187 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
 	goto st7;
 tr130:
-#line 176 "core/admin.rl"
+#line 189 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 365 "core/admin.c"
+#line 387 "core/admin.c"
 	if ( (*p) == 10 )
 		goto st108;
 	goto st0;
@@ -442,28 +464,28 @@ case 15:
 	}
 	goto tr25;
 tr25:
-#line 166 "core/admin.rl"
+#line 179 "core/admin.rl"
 	{strstart = p;}
 	goto st16;
 st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-#line 453 "core/admin.c"
+#line 475 "core/admin.c"
 	switch( (*p) ) {
 		case 10: goto tr28;
 		case 13: goto tr29;
 	}
 	goto st16;
 tr26:
-#line 166 "core/admin.rl"
+#line 179 "core/admin.rl"
 	{strstart = p;}
 	goto st17;
 st17:
 	if ( ++p == pe )
 		goto _test_eof17;
 case 17:
-#line 467 "core/admin.c"
+#line 489 "core/admin.c"
 	switch( (*p) ) {
 		case 10: goto tr28;
 		case 13: goto tr29;
@@ -1427,7 +1449,7 @@ case 107:
 	_out: {}
 	}
 
-#line 186 "core/admin.rl"
+#line 199 "core/admin.rl"
 
 
 	fiber->rbuf->len -= (void *)pe - (void *)fiber->rbuf->data;

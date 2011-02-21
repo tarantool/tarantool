@@ -50,7 +50,7 @@ set (recompiled_core_sources
      ${CMAKE_SOURCE_DIR}/core/admin.c
      ${CMAKE_SOURCE_DIR}/core/fiber.c PARENT_SCOPE)
 
-set (common_sources tbuf.c palloc.c util.c
+set (common_sources tbuf.c palloc.c util.c diagnostics.c
     salloc.c pickle.c coro.c stat.c log_io.c
     log_io_remote.c iproto.c)
 

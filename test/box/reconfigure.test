@@ -44,6 +44,32 @@ exec admin "reload configuration"
 os.unlink(cfg)
 exec admin "reload configuration"
 
+# cleanup
 # restore default
 os.rename(oldcfg, cfg)
+exec admin "reload configuration"
+
+print """#
+# A test case for http://bugs.launchpad.net/bugs/712447:
+# Valgrind reports use of not initialized memory after 'reload
+# configuration'
+#"""
+exec sql "insert into t0 values (1, 'tuple')"
+exec admin "save snapshot"
+os.rename(cfg, oldcfg)
+exec admin "reload configuration"
+exec sql "insert into t0 values (2, 'tuple 2')"
+exec admin "save snapshot"
+os.symlink(abspath("box/tarantool_good.cfg"), cfg)
+exec admin "reload configuration"
+exec sql "insert into t0 values (3, 'tuple 3')"
+exec admin "save snapshot"
+# Cleanup
+os.unlink(cfg)
+os.rename(oldcfg, cfg)
+exec admin "reload configuration"
+exec sql "delete from t0 where k0 = 1"
+exec sql "delete from t0 where k0 = 2"
+exec sql "delete from t0 where k0 = 3"
+
 # vim: syntax=python
