@@ -20,3 +20,8 @@ cmake_install.cmake
 mod/silverbox/tarantool_silverbox
 mod/feeder/tarantool_feeder
 include/config.h
+CPackConfig.cmake
+CPackSourceConfig.cmake
+_CPack_Packages
+install_manifest.txt
+tarantool-*.tar.gz

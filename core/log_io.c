@@ -1131,7 +1131,7 @@ recover(struct recovery_state *r, i64 lsn)
 		result = recover_snap(r);
 		if (result < 0) {
 			if (greatest_lsn(r->snap_prefered_class) <= 0) {
-				say_crit("don't you forget to initialize storage with --init_storage switch?");
+				say_crit("didn't you forget to initialize storage with --init-storage switch?");
 				_exit(1);
 			}
 			panic("snapshot recovery failed");

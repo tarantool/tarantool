@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.6)
-project(Tarantool)
+project(tarantool)
 include(CheckLibraryExists)
 include(CheckIncludeFile)
 find_program(ECHO echo)
@@ -72,10 +72,23 @@ add_custom_target(TAGS COMMAND ctags -R -e -f TAGS
 #
 # Define TARANTOOL_VERSION -- a string constant with tarantool version.
 #
+set (TARANTOOL_VERSION "")
 execute_process (COMMAND ${GIT} describe HEAD
     OUTPUT_VARIABLE TARANTOOL_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE
     )
+#
+# Make sure the version is set even if building
+# out of source.
+#
+set (CPACK_PACKAGE_VERSION_MAJOR "1")
+set (CPACK_PACKAGE_VERSION_MINOR "3")
+set (CPACK_PACKAGE_VERSION_PATCH "4")
+if (TARANTOOL_VERSION STREQUAL "")
+    set (TARANTOOL_VERSION
+        "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
+endif()
+
 
 #
 # Set flags for all include files: those maintained by us and
@@ -155,6 +168,10 @@ add_subdirectory(core)
 add_subdirectory(mod)
 add_subdirectory(test)
 
+install (FILES README LICENSE doc/silverbox-protocol.txt
+         DESTINATION doc)
+
+include (cmake/tarantool_cpack.cmake)
 #
 # Output compile-time defines into config.h. Do it at the end
 # of the script to make sure all variables are set.

@@ -24,6 +24,8 @@ function(tarantool_module mod)
   set_target_properties(tarantool_${mod} PROPERTIES COMPILE_FLAGS
       "${core_cflags}")
 
+  install (TARGETS tarantool_${mod} DESTINATION bin)
+
 endfunction()
 
 foreach (module ${TARANTOOL_MODULES})

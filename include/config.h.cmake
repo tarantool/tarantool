@@ -5,7 +5,7 @@
  * config.h.cmake. Please do not modify.
  */
 /*
-  A string with major-minor-patch-commit-id identifier of the
+ * A string with major-minor-patch-commit-id identifier of the
  * release.
  */
 #define TARANTOOL_VERSION "@TARANTOOL_VERSION@"
