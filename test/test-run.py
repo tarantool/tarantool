@@ -147,6 +147,7 @@ def main():
   # Change the current working directory to where all test
   # collections are supposed to reside.
   os.chdir(os.path.dirname(sys.argv[0]))
+  failed_tests = 0
 
   try:
     print "Started", " ".join(sys.argv)
@@ -155,14 +156,14 @@ def main():
       suites.append(TestSuite(suite_name, options.args))
 
     for suite in suites:
-      suite.run_all()
+      failed_tests = suite.run_all()
   except RuntimeError as e:
     print "\nFatal error: {0}. Execution aborted.".format(e)
     return (-1)
   finally:
     os.chdir(oldcwd)
 
-  return 0
+  return -failed_tests 
 
 if __name__ == "__main__":
   exit(main())

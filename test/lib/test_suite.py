@@ -296,4 +296,9 @@ class TestSuite:
     if self.args.valgrind and check_valgrind_log(self.ini["valgrind_log"]):
       print "  Error! There were warnings/errors in valgrind log file:"
       print_tail_n(self.ini["valgrind_log"], 20)
+      return 1
+
+    return len(failed_tests)
+
+
 
