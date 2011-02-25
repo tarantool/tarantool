@@ -34,14 +34,20 @@ mod/silverbox.
 
 There is no 'make install' goal, but no installation
 is required either.
-The simplest way to get started is to use the regression testing
-framework (test/test-run.py) to setup and start the server:
+Tarantool regression testing framework (test/test-run.py) is the
+simplest way to setup and start the server, but it requires a few
+additional Python modules:
+ * daemon
+ * pyyaml
+ * pexpect.
+
+Once all pre-requisites are installed, try:
 
 tarantool $ cd test && ./test-run.py --start-and-exit
 
-This creates a 'var' subdirectory in directory 'test',
-populates it with necessary files used by the server, and
-starts the server. To connect, you could use
+This will create a 'var' subdirectory in directory 'test',
+populate it with necessary files used by the server, and
+start the server. To connect, you could use
 a simplistic command-line client:
 
 tarantool $ ./test/tarantool
