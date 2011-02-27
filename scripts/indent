@@ -19,7 +19,7 @@ do
 			;;
 	esac
 
-	PARAM="$PARAM "$(scripts/custom_types $f -I. -Iinclude -DCORO_ASM -DSTORAGE -DTARANTOOL_CONFIG='<cfg/tarantool_silverbox_cfg.h>' | grep -v '^"_' | sed 's/"//g; s/^/-T /')
+	PARAM="$PARAM "$(scripts/custom_types $f -I. -Iinclude -DCORO_ASM -DSTORAGE -DTARANTOOL_CONFIG='<cfg/tarantool_box_cfg.h>' | grep -v '^"_' | sed 's/"//g; s/^/-T /')
 
 	$INDENT $PARAM $f
 done

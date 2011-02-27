@@ -18,7 +18,7 @@ kill_all () {
 trap 'kill_all' EXIT
 
 test_box() {
-    BOX=localhost:33013 perl -MTest::Harness -e 'runtests(@ARGV)' mod/silverbox/t/box.pl
+    BOX=localhost:33013 perl -MTest::Harness -e 'runtests(@ARGV)' mod/box/t/box.pl
 }
 
 test_admin() {
@@ -49,7 +49,7 @@ lsn() {
 start_tarantool() {
     local type=${1:?}
     shift
-    $build_type/tarantool_silverbox --config $test_dir/$type.cfg $@
+    $build_type/tarantool_box --config $test_dir/$type.cfg $@
     sleep 1
     test -f $test_dir/$type.pid
 }
@@ -240,7 +240,7 @@ prepare() {
 
     # rm -rf $build_type
     test -d $build_type && find $build_type -name \*.gcda -print0 | xargs -0 rm -vf
-    make $build_type/tarantool_silverbox
+    make $build_type/tarantool_box
 }
 
 generate_coverage() {
@@ -253,7 +253,7 @@ generate_coverage() {
 
     lcov -c -d lcov/core -d lcov/mod -o lcov/tarantool.lcov.tmp4
     lcov -r lcov/tarantool.lcov.tmp4 '*/third_party/*' -o lcov/tarantool.lcov.tmp3
-    lcov -r lcov/tarantool.lcov.tmp3 '*/mod/silverbox/memcached.c' -o lcov/tarantool.lcov.tmp2
+    lcov -r lcov/tarantool.lcov.tmp3 '*/mod/box/memcached.c' -o lcov/tarantool.lcov.tmp2
     lcov -r lcov/tarantool.lcov.tmp2 '/usr/include/*' -o lcov/tarantool.lcov.tmp
     lcov -r lcov/tarantool.lcov.tmp '*/core/admin.c' -o lcov/tarantool.lcov
     genhtml -o lcov lcov/tarantool.lcov
@@ -266,7 +266,7 @@ write_config master 33014 33015
 write_config slave 33016 33017
 
 # initialize storage
-$build_type/tarantool_silverbox --config $test_dir/master.cfg --init_storage
+$build_type/tarantool_box --config $test_dir/master.cfg --init_storage
 
 
 # repeat test with different log levels
@@ -275,10 +275,10 @@ test_all
 kill_tarantool master
 
 # # test handling of wal overflow
-# start_tarantool master --silverbox --daemonize
-# perl -Imod/silverbox/t -MTBox -e'eval { $box->Insert(1, q/aaa/, 2, 3, 4, 5); $box->Delete(1);}; exit(1) if $@;'
+# start_tarantool master --box --daemonize
+# perl -Imod/box/t -MTBox -e'eval { $box->Insert(1, q/aaa/, 2, 3, 4, 5); $box->Delete(1);}; exit(1) if $@;'
 # (dd if=/dev/zero of=$test_dir/storage/file 2>/dev/null)
-# perl -Imod/silverbox/t -MTBox -e'eval { $box->Insert(1, q/aaa/, 2, 3, 4, 5, q/a/ x 65000); $box->Delete(1);}; exit(0) if $@;'
+# perl -Imod/box/t -MTBox -e'eval { $box->Insert(1, q/aaa/, 2, 3, 4, 5, q/a/ x 65000); $box->Delete(1);}; exit(0) if $@;'
 # rm $test_dir/storage/file
 # kill_tarantool master
 
@@ -293,7 +293,7 @@ rm -f /var/core/tarantool*
 kill_tarantool master
 
 # start with absolute path to config
-$build_type/tarantool_silverbox --config $test_dir/master.cfg --daemonize
+$build_type/tarantool_box --config $test_dir/master.cfg --daemonize
 sleep 1
 test_all
 kill_tarantool master
@@ -320,8 +320,8 @@ test_all
 kill_tarantool master
 
 # cat snap/xlog
-$build_type/tarantool_silverbox --cat $(ls -tr $test_dir/storage/wal/*.xlog | tail -n1) >/dev/null
-$build_type/tarantool_silverbox --cat $(ls -tr $test_dir/storage/snap/*.snap | tail -n1) >/dev/null
+$build_type/tarantool_box --cat $(ls -tr $test_dir/storage/wal/*.xlog | tail -n1) >/dev/null
+$build_type/tarantool_box --cat $(ls -tr $test_dir/storage/snap/*.snap | tail -n1) >/dev/null
 
 
 # # test local hot standby

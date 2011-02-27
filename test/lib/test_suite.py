@@ -10,7 +10,7 @@ import difflib
 import filecmp
 import shlex
 import time
-from tarantool_silverbox_server import TarantoolSilverboxServer
+from tarantool_box_server import TarantoolBoxServer
 from tarantool_connection import AdminConnection, DataConnection
 import tarantool_preprocessor
 import re
@@ -242,7 +242,7 @@ class TestSuite:
 # now read the server config, we need some properties from it
 
     with open(self.ini["config"]) as fp:
-      dummy_section_name = "tarantool_silverbox"
+      dummy_section_name = "tarantool_box"
       config.readfp(TarantoolConfigFile(fp, dummy_section_name))
       self.ini["pidfile"] = config.get(dummy_section_name, "pid_file")
       self.ini["admin_port"] = int(config.get(dummy_section_name, "admin_port"))
@@ -260,7 +260,7 @@ class TestSuite:
   def run_all(self):
     """For each file in the test suite, run client program
     assuming each file represents an individual test."""
-    server = TarantoolSilverboxServer(self.args, self.ini)
+    server = TarantoolBoxServer(self.args, self.ini)
     server.install()
     server.start()
     if self.args.start_and_exit:

@@ -13,7 +13,7 @@
 
 #include "prscfg.h"
 void out_warning(ConfettyError r, char *format, ...);
-#include "cfg/tarantool_silverbox_cfg.h"
+#include "cfg/tarantool_box_cfg.h"
 static int
 cmpNameAtoms(NameAtom *a, NameAtom *b) {
 	while(a && b) {

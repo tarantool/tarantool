@@ -5,8 +5,8 @@
 #include <util.h>
 
 /** This is a callback function used by the generated
- * configuration file parser (tarantool_{silverbox, feeder,
- * ...}_cfg.c) to complain when something wrong happens.
+ * configuration file parser (tarantool_{box, feeder, ...}_cfg.c)
+ * to complain when something wrong happens.
  */
 
 void

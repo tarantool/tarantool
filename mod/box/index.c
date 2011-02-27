@@ -40,8 +40,8 @@
 #include <tbuf.h>
 #include <util.h>
 
-#include <mod/silverbox/box.h>
-#include <mod/silverbox/index.h>
+#include <mod/box/box.h>
+#include <mod/box/index.h>
 
 const struct field ASTERISK = {
 	.len = UINT32_MAX,

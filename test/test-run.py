@@ -106,8 +106,8 @@ class Options:
     parser.add_argument(
         "--bindir",
         dest = "bindir",
-        default = "../mod/silverbox",
-        help = """Path to server binary. Default: " + "../mod/silverbox.""")
+        default = "../mod/box",
+        help = """Path to server binary. Default: " + "../mod/box.""")
 
     parser.add_argument(
         "--vardir",

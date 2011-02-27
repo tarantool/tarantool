@@ -24,10 +24,10 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_SILVERBOX_INDEX_H
-#define TARANTOOL_SILVERBOX_INDEX_H
+#ifndef TARANTOOL_BOX_INDEX_H
+#define TARANTOOL_BOX_INDEX_H
 
-#include <mod/silverbox/assoc.h>
+#include <mod/box/assoc.h>
 
 /**
  * A field reference used for TREE indexes. Either stores a copy

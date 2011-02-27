@@ -1,5 +1,5 @@
 #! /usr/bin/python 
-"""A simplistic client for tarantool/silverbox: administrative
+"""A simplistic client for tarantool/box: administrative
 console and SQL client.
 
 On startup, establishes a connection to tarantool server.

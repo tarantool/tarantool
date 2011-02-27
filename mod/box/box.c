@@ -40,9 +40,9 @@
 #include <tbuf.h>
 #include <util.h>
 
-#include <cfg/tarantool_silverbox_cfg.h>
-#include <mod/silverbox/box.h>
-#include <mod/silverbox/index.h>
+#include <cfg/tarantool_box_cfg.h>
+#include <mod/box/box.h>
+#include <mod/box/index.h>
 
 bool box_updates_allowed = false;
 static char *status = "unknown";
@@ -811,7 +811,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 		break;
 
 	default:
-		say_error("silverbox_dispach: unsupported command = %" PRIi32 "", op);
+		say_error("box_dispach: unsupported command = %" PRIi32 "", op);
 		return ERR_CODE_ILLEGAL_PARAMS;
 	}
 

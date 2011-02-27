@@ -1,7 +1,7 @@
-; Mail.RU IPROTO protocol, Tarantool/Silverbox subset.
+; Mail.RU IPROTO protocol, Tarantool/Box subset.
 ;
 ; The latest version of this document can be found in
-; tarantool source tree, doc/silverbox-protocol.txt
+; tarantool source tree, doc/box-protocol.txt
 ;
 ; IPROTO is a binary request/response protocol that features a
 ; complete access to Tarantool functionality, including:

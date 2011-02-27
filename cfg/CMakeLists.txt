@@ -1,4 +1,4 @@
-#
+
 # Do not clean the generated configuration files in "make clean"
 #
 set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM 1)

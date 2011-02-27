@@ -24,10 +24,10 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_SILVERBOX_H
-#define TARANTOOL_SILVERBOX_H
+#ifndef TARANTOOL_BOX_H
+#define TARANTOOL_BOX_H
 
-#include <mod/silverbox/index.h>
+#include <mod/box/index.h>
 
 extern bool box_updates_allowed;
 void memcached_handler(void *_data __unused__);

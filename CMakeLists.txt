@@ -12,8 +12,8 @@ find_program(CONFETTI confetti)
 # This instructs the rest of the build system what product
 # and what modules to produce.
 #
-set (TARANTOOL_PRODUCT "silverbox")
-set (TARANTOOL_MODULES "silverbox" "feeder")
+set (TARANTOOL_PRODUCT "box")
+set (TARANTOOL_MODULES "box" "feeder")
 
 #
 # Set default build type to Debug. This is to ease a developer's
@@ -131,7 +131,7 @@ if (ENABLE_GCOV)
     endif()
 endif()
 
-option(ENABLE_TRACE "Enable debug trace of tarantool_silverbox execution to
+option(ENABLE_TRACE "Enable debug trace of tarantool_box execution to
 a file specified in TARANTOOL_TRACE environment variable" ON)
 
 option(ENABLE_BACKTRACE "Enable output of fiber backtrace information in 'show
@@ -168,7 +168,7 @@ add_subdirectory(core)
 add_subdirectory(mod)
 add_subdirectory(test)
 
-install (FILES README LICENSE doc/silverbox-protocol.txt
+install (FILES README LICENSE doc/box-protocol.txt
          DESTINATION doc)
 
 include (cmake/tarantool_cpack.cmake)

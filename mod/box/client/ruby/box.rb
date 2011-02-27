@@ -26,7 +26,7 @@
 
 require 'iproto'
 
-class SilverBox < IProtoRetCode
+class Box < IProtoRetCode
   BOX_RETURN_TUPLE = 0x01
 
   def initialize(host, param = {})

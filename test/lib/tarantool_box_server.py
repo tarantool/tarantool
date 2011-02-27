@@ -51,7 +51,7 @@ def create_tmpfs_vardir(vardir):
   os.mkdir(os.path.join("/dev/shm", vardir))
   os.symlink(os.path.join("/dev/shm", vardir), vardir)
 
-class TarantoolSilverboxServer:
+class TarantoolBoxServer:
   """Server represents a single server instance. Normally, the
   program operates with only one server, but in future we may add
   replication slaves. The server is started once at the beginning
@@ -71,7 +71,7 @@ class TarantoolSilverboxServer:
     if necessary, create necessary directories and files, start
     the server. The server working directory is taken from 'vardir',
     specified in the prgoram options.
-    Currently this is implemented for tarantool_silverbox only."""
+    Currently this is implemented for tarantool_box only."""
 
     vardir = self.args.vardir
 

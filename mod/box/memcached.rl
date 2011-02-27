@@ -37,8 +37,8 @@
 #include <pickle.h>
 
 #include <tarantool.h>
-#include <cfg/tarantool_silverbox_cfg.h>
-#include <mod/silverbox/box.h>
+#include <cfg/tarantool_box_cfg.h>
+#include <mod/box/box.h>
 #include <stat.h>
 
 
@@ -178,7 +178,7 @@ print_stats()
 	tbuf_printf(out, "STAT pid %"PRIu32"\r\n", (u32)getpid());
 	tbuf_printf(out, "STAT uptime %"PRIu32"\r\n", (u32)tarantool_uptime());
 	tbuf_printf(out, "STAT time %"PRIu32"\r\n", (u32)ev_now());
-	tbuf_printf(out, "STAT version 1.2.5 (tarantool/silverbox)\r\n");
+	tbuf_printf(out, "STAT version 1.2.5 (tarantool/box)\r\n");
 	tbuf_printf(out, "STAT pointer_size %"PRI_SZ"\r\n", sizeof(void *)*8);
 	tbuf_printf(out, "STAT curr_items %"PRIu64"\r\n", items);
 	tbuf_printf(out, "STAT total_items %"PRIu64"\r\n", stats.total_items);
