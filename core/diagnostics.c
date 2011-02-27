@@ -24,6 +24,7 @@
 #include "fiber.h"
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 static struct Error oom_error = { ENOMEM, "Out of memory" };
 

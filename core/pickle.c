@@ -24,14 +24,11 @@
  * SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-
-#include <util.h>
+#include "pickle.h"
 #include <tbuf.h>
-#include <palloc.h>
 #include <fiber.h>
 #include <iproto.h>		/* for err codes */
-#include <pickle.h>
+#include "say.h"
 
 /* caller must ensure that there is space in target */
 u8 *

@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_H_INCLUDED
+#define TARANTOOL_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -24,9 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_H
-#define TARANTOOL_H
-
 #include <tbuf.h>
 #include <util.h>
 #include <log_io.h>
@@ -48,7 +47,7 @@ extern const char *cfg_filename;
 extern bool init_storage, booting;
 extern char *binary_filename;
 i32 reload_cfg(struct tbuf *out);
-int snapshot(void *ev __unused__, int events __unused__);
+int snapshot(void * /* ev */, int /* events */);
 const char *tarantool_version(void);
 void tarantool_info(struct tbuf *out);
 double tarantool_uptime(void);
@@ -56,4 +55,4 @@ double tarantool_uptime(void);
 char **init_set_proc_title(int argc, char **argv);
 void set_proc_title(const char *format, ...);
 
-#endif /* TARANTOOL_H */
+#endif /* TARANTOOL_H_INCLUDED */

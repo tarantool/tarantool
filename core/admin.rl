@@ -212,7 +212,7 @@ admin_dispatch(void)
 
 
 static void
-admin_handler(void *_data __unused__)
+admin_handler(void *_data __attribute__((unused)))
 {
 	for (;;) {
 		if (admin_dispatch() <= 0)

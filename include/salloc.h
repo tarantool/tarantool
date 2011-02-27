@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_SALLOC_H_INCLUDED
+#define TARANTOOL_SALLOC_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -24,13 +26,11 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_SALLOC_H
-#define TARANTOOL_SALLOC_H
-
 #include <stddef.h>
 #include <stdbool.h>
+#include "util.h" /* for u64 */
 
-#include <tbuf.h>
+struct tbuf;
 
 bool salloc_init(size_t size, size_t minimal, double factor);
 void salloc_destroy(void);
@@ -39,4 +39,4 @@ void sfree(void *ptr);
 void slab_validate();
 void slab_stat(struct tbuf *buf);
 void slab_stat2(u64 *bytes_used, u64 *items);
-#endif
+#endif /* TARANTOOL_SALLOC_H_INCLUDED */

@@ -23,6 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "salloc.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -33,7 +34,6 @@
 
 #include "third_party/valgrind/memcheck.h"
 #include <third_party/queue.h>
-#include <salloc.h>
 #include <util.h>
 #include <tbuf.h>
 #include <say.h>

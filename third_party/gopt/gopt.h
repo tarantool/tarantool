@@ -1,3 +1,5 @@
+#ifndef GOPT_H_INCLUDED
+#define GOPT_H_INCLUDED
 /* gopt.h version 8.1: tom.viza@gmail.com PUBLIC DOMAIN 2003-8 */
 /*
 I, Tom Vajzovic, am the author of this software and its documentation and
@@ -17,8 +19,6 @@ Before modifying or distributing this software I ask that you would please
 read http://www.purposeful.co.uk/tfl/
 */
 
-#ifndef GOPT_H_INCLUDED
-#define GOPT_H_INCLUDED
 
 #define GOPT_ONCE   0
 #define GOPT_REPEAT 1

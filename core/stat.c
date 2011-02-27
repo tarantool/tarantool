@@ -23,12 +23,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "stat.h"
 
 #include <util.h>
 #include <tarantool_ev.h>
 #include <tbuf.h>
 #include <say.h>
-#include <stat.h>
 
 #include <third_party/khash.h>
 
@@ -106,7 +106,7 @@ stat_print(struct tbuf *buf)
 }
 
 void
-stat_age(ev_timer *timer, int events __unused__)
+stat_age(ev_timer *timer, int events __attribute__((unused)))
 {
 	if (stats == NULL)
 		return;

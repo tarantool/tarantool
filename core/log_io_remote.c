@@ -23,6 +23,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "log_io.h"
+#include "fiber.h"
 
 #include <sys/types.h>
 #include <arpa/inet.h>
@@ -35,7 +37,6 @@
 #include <errno.h>
 
 #include <say.h>
-#include <log_io.h>
 #include <pickle.h>
 
 static u32

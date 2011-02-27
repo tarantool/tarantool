@@ -23,8 +23,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
+#include "tarantool.h"
 #include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,7 +50,6 @@
 #include <salloc.h>
 #include <say.h>
 #include <stat.h>
-#include <tarantool.h>
 #include TARANTOOL_CONFIG
 #include <util.h>
 #include <third_party/gopt/gopt.h>
@@ -171,7 +171,7 @@ tarantool_uptime(void)
 
 #ifdef STORAGE
 int
-snapshot(void *ev __unused__, int events __unused__)
+snapshot(void *ev __attribute__((unused)), int events __attribute__((unused)))
 {
 	pid_t p = fork();
 	if (p < 0) {

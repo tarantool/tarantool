@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_UTIL_H_INCLUDED
+#define TARANTOOL_UTIL_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -23,9 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#ifndef TARANTOOL_UTIL_H
-#define TARANTOOL_UTIL_H
+#include "config.h"
 
 #include <unistd.h>
 
@@ -83,12 +83,6 @@
 #define CACHEALIGN(LEN)			TYPEALIGN(32, (LEN))
 #endif
 
-#define __packed__ __attribute__((packed))
-#define __noinline__ __attribute__((noinline))
-#define __unused__ __attribute__((unused))
-#define __cleanup__(f) __attribute__((cleanup (f)))
-#define __regparm2__  __attribute__((regparm(2)))
-
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -139,4 +133,4 @@ void assert_fail(const char *assertion, const char *file,
 		 unsigned int line, const char *function) __attribute__ ((noreturn));
 #endif
 
-#endif
+#endif /* TARANTOOL_UTIL_H_INCLUDED */

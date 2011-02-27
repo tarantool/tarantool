@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_ADMIN_H_INCLUDED
+#define TARANTOOL_ADMIN_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -24,9 +26,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_ADMIN_H
-#define TARANTOOL_ADMIN_H
 
 int admin_init(void);
 
-#endif
+#endif /* TARANTOOL_ADMIN_H_INCLUDED */

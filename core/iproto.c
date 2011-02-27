@@ -23,13 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "iproto.h"
 
 #include <stdio.h>
 #include <string.h>
 
 #include <palloc.h>
 #include <fiber.h>
-#include <iproto.h>
 #include <tbuf.h>
 #include <say.h>
 

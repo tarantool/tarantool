@@ -35,6 +35,7 @@
 #include <fiber.h>
 #include <util.h>
 #include <pickle.h>
+#include "say.h"
 
 #include <tarantool.h>
 #include <cfg/tarantool_box_cfg.h>
@@ -214,7 +215,7 @@ flush_all(void *data)
 }
 
 
-static int __noinline__
+static int __attribute__((noinline))
 memcached_dispatch(struct box_txn *txn)
 {
 	int cs;
@@ -587,7 +588,7 @@ memcached_dispatch(struct box_txn *txn)
 }
 
 void
-memcached_handler(void *_data __unused__)
+memcached_handler(void *_data __attribute__((unused)))
 {
 	struct box_txn *txn;
 	stats.total_connections++;
@@ -648,7 +649,7 @@ memcached_init(void)
 }
 
 void
-memcached_expire(void *data __unused__)
+memcached_expire(void *data __attribute__((unused)))
 {
 	static khiter_t i;
 	khash_t(lstr_ptr_map) *map = memcached_index->idx.str_hash;

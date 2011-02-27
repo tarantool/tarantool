@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_TBUF_H_INCLUDED
+#define TARANTOOL_TBUF_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -23,9 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#ifndef TARANTOOL_TBUF_H
-#define TARANTOOL_TBUF_H
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -71,4 +70,4 @@ void tbuf_printf(struct tbuf *b, const char *format, ...)
 	__attribute__ ((format(FORMAT_PRINTF, 2, 3)));
 
 char *tbuf_to_hex(const struct tbuf *x);
-#endif
+#endif /* TARANTOOL_TBUF_H_INCLUDED */

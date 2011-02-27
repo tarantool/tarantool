@@ -23,11 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <mod/box/box.h>
 
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <arpa/inet.h>
 
 #include <fiber.h>
 #include <iproto.h>
@@ -41,7 +43,6 @@
 #include <util.h>
 
 #include <cfg/tarantool_box_cfg.h>
-#include <mod/box/box.h>
 #include <mod/box/index.h>
 
 bool box_updates_allowed = false;
@@ -78,7 +79,7 @@ struct box_snap_row {
 	u32 tuple_size;
 	u32 data_size;
 	u8 data[];
-} __packed__;
+} __attribute__((packed));
 
 static inline struct box_snap_row *
 box_snap_row(const struct tbuf *t)
@@ -228,7 +229,7 @@ tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
 	tuple_ref(tuple, +1);
 }
 
-static int __noinline__
+static int __attribute__((noinline))
 prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 {
 	assert(data != NULL);
@@ -421,7 +422,7 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 	*field = *new_field;
 }
 
-static int __noinline__
+static int __attribute__((noinline))
 prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 {
 	struct tbuf **fields;
@@ -545,7 +546,7 @@ tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple)
 	}
 }
 
-static int __noinline__
+static int __attribute__((noinline))
 process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 {
 	struct box_tuple *tuple;
@@ -617,7 +618,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 	return ERR_CODE_OK;
 }
 
-static int __noinline__
+static int __attribute__((noinline))
 prepare_delete(struct box_txn *txn, void *key)
 {
 	txn->old_tuple = txn->index->find(txn->index, key);
@@ -997,7 +998,7 @@ wal_apply(struct box_txn *txn, struct tbuf *t)
 }
 
 static int
-recover_row(struct recovery_state *r __unused__, struct tbuf *t)
+recover_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 {
 	struct box_txn *txn = txn_alloc(0);
 	int result = -1;
@@ -1022,7 +1023,7 @@ recover_row(struct recovery_state *r __unused__, struct tbuf *t)
 }
 
 static int
-snap_print(struct recovery_state *r __unused__, struct tbuf *t)
+snap_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 {
 	struct tbuf *out = tbuf_alloc(t->pool);
 	struct box_snap_row *row;
@@ -1043,7 +1044,7 @@ snap_print(struct recovery_state *r __unused__, struct tbuf *t)
 }
 
 static int
-xlog_print(struct recovery_state *r __unused__, struct tbuf *t)
+xlog_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 {
 	struct tbuf *out = tbuf_alloc(t->pool);
 	int res = box_xlog_sprint(out, t);
@@ -1220,7 +1221,7 @@ title(const char *fmt, ...)
 }
 
 static void
-box_bound_to_primary(void *data __unused__)
+box_bound_to_primary(void *data __attribute__((unused)))
 {
 	recover_finalize(recovery_state);
 
@@ -1242,7 +1243,7 @@ box_bound_to_primary(void *data __unused__)
 }
 
 static void
-memcached_bound_to_primary(void *data __unused__)
+memcached_bound_to_primary(void *data __attribute__((unused)))
 {
 	box_bound_to_primary(NULL);
 
@@ -1253,14 +1254,14 @@ memcached_bound_to_primary(void *data __unused__)
 }
 
 i32
-mod_check_config(struct tarantool_cfg *conf __unused__)
+mod_check_config(struct tarantool_cfg *conf __attribute__((unused)))
 {
 	return 0;
 }
 
 void
-mod_reload_config(struct tarantool_cfg *old_conf __unused__,
-		  struct tarantool_cfg *new_conf __unused__)
+mod_reload_config(struct tarantool_cfg *old_conf __attribute__((unused)),
+		  struct tarantool_cfg *new_conf __attribute__((unused)))
 {
 	return;
 }
@@ -1430,7 +1431,8 @@ mod_info(struct tbuf *out)
 }
 
 void
-mod_exec(char *str __unused__, int len __unused__, struct tbuf *out)
+mod_exec(char *str __attribute__((unused)), int len __attribute__((unused)),
+	 struct tbuf *out)
 {
 	tbuf_printf(out, "unimplemented" CRLF);
 }

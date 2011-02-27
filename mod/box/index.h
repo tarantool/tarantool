@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_BOX_INDEX_H_INCLUDED
+#define TARANTOOL_BOX_INDEX_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -23,10 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#ifndef TARANTOOL_BOX_INDEX_H
-#define TARANTOOL_BOX_INDEX_H
-
 #include <mod/box/assoc.h>
 
 /**
@@ -112,7 +110,7 @@ struct index {
 void index_hash_num(struct index *index, struct namespace *namespace, size_t estimated_rows);
 void index_hash_num64(struct index *index, struct namespace *namespace, size_t estimated_rows);
 void index_hash_str(struct index *index, struct namespace *namespace, size_t estimated_rows);
-void index_tree(struct index *index, struct namespace *namespace, size_t estimated_rows __unused__);
+void index_tree(struct index *index, struct namespace *namespace, size_t /* estimated_rows */);
 
 struct tree_index_member * alloc_search_pattern(struct index *index, int key_cardinality, void *key);
 void index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern);
@@ -122,4 +120,4 @@ struct box_txn;
 void validate_indeces(struct box_txn *txn);
 void build_indexes(void);
 
-#endif
+#endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */

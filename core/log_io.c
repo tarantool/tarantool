@@ -23,6 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "log_io.h"
 
 #include "config.h"
 #include <dirent.h>
@@ -39,13 +40,9 @@
 #include <unistd.h>
 
 #include <fiber.h>
-#include <log_io.h>
-#include <palloc.h>
 #include <say.h>
 #include <third_party/crc32.h>
-#include <util.h>
 #include <pickle.h>
-#include <tbuf.h>
 #include "diagnostics.h"
 
 const u16 snap_tag = -1;
@@ -1173,10 +1170,10 @@ recover(struct recovery_state *r, i64 lsn)
 	return result;
 }
 
-static void recover_follow_file(ev_stat *w, int revents __unused__);
+static void recover_follow_file(ev_stat *w, int revents __attribute__((unused)));
 
 static void
-recover_follow_dir(ev_timer *w, int revents __unused__)
+recover_follow_dir(ev_timer *w, int revents __attribute__((unused)))
 {
 	struct recovery_state *r = w->data;
 	struct log_io *wal = r->current_wal;
@@ -1193,7 +1190,7 @@ recover_follow_dir(ev_timer *w, int revents __unused__)
 }
 
 static void
-recover_follow_file(ev_stat *w, int revents __unused__)
+recover_follow_file(ev_stat *w, int revents __attribute__((unused)))
 {
 	struct recovery_state *r = w->data;
 	int result;

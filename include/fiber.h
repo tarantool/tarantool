@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_FIBER_H_INCLUDED
+#define TARANTOOL_FIBER_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -24,22 +26,17 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_FIBER_H
-#define TARANTOOL_FIBER_H
-
-#include <stdint.h>
-#include <unistd.h>
+#include "config.h"
+#include <stdbool.h>
 #include <sys/uio.h>
-#include <setjmp.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include <tarantool_ev.h>
-#include <palloc.h>
 #include <tbuf.h>
-#include <say.h>
 #include <coro.h>
 #include <util.h>
+#include "third_party/queue.h"
+
 
 #define FIBER_EXIT -1
 
@@ -55,7 +52,7 @@ struct ring {
 
 struct fiber {
 	ev_io io;
-#ifdef BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	void *last_stack_frame;
 #endif
 	int csw;
@@ -72,7 +69,7 @@ struct fiber {
 	struct tbuf *rbuf;
 	struct tbuf *cleanup;
 
-	 SLIST_ENTRY(fiber) link, zombie_link;
+	SLIST_ENTRY(fiber) link, zombie_link;
 
 	struct ring *inbox;
 
@@ -180,4 +177,4 @@ struct child *spawn_child(const char *name,
 			  int inbox_size,
 			  struct tbuf *(*handler) (void *, struct tbuf *), void *state);
 
-#endif
+#endif /* TARANTOOL_FIBER_H_INCLUDED */

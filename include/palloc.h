@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_PALLOC_H_INCLUDED
+#define TARANTOOL_PALLOC_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -24,22 +26,17 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_PALLOC_H
-#define TARANTOOL_PALLOC_H
-
 #include <stddef.h>
-#include <stdbool.h>
 #include <stdint.h>
+#include "util.h"
 
-#include <tbuf.h>
-#include <util.h>
-#include <third_party/queue.h>
+struct tbuf;
 
 struct palloc_pool;
 extern struct palloc_pool *eter_pool;
 int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __regparm2__;
-void *p0alloc(struct palloc_pool *pool, size_t size) __regparm2__;
+void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
+void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
 void *palloca(struct palloc_pool *pool, size_t size, size_t align);
 void prelease(struct palloc_pool *pool);
 void prelease_after(struct palloc_pool *pool, size_t after);
@@ -50,4 +47,4 @@ size_t palloc_allocated(struct palloc_pool *);
 
 void palloc_stat(struct tbuf *buf);
 
-#endif
+#endif /* TARANTOOL_PALLOC_H_INCLUDED */

@@ -23,8 +23,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "util.h"
 
-#include "config.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -39,8 +39,8 @@
 #include <bfd.h>
 #endif /* HAVE_BFD */
 
-#include <util.h>
 #include <fiber.h>
+#include "say.h"
 
 void
 close_all_xcpt(int fdc, ...)

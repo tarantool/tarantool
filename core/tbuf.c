@@ -23,15 +23,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "tbuf.h"
 
 #include <string.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #include <palloc.h>
 #include <pickle.h>
-#include <tbuf.h>
 #include <util.h>
 
 #ifdef POISON

@@ -24,13 +24,13 @@
  * SUCH DAMAGE.
  */
 
-#include <unistd.h>
+#include "coro.h"
+
 #include <string.h>
 #include <sys/mman.h>
 
 #include "third_party/valgrind/memcheck.h"
 
-#include <coro.h>
 #include <palloc.h>
 
 #ifndef MAP_ANONYMOUS

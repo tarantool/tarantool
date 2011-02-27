@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_BOX_H_INCLUDED
+#define TARANTOOL_BOX_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -24,13 +26,10 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_BOX_H
-#define TARANTOOL_BOX_H
-
 #include <mod/box/index.h>
 
 extern bool box_updates_allowed;
-void memcached_handler(void *_data __unused__);
+void memcached_handler(void * /* data */);
 
 struct namespace;
 struct box_tuple;
@@ -55,7 +54,7 @@ struct box_tuple {
 	u32 bsize;
 	u32 cardinality;
 	u8 data[0];
-} __packed__;
+} __attribute__((packed));
 
 struct box_txn {
 	int op;
@@ -135,5 +134,5 @@ void append_field(struct tbuf *b, void *f);
 void *tuple_field(struct box_tuple *tuple, size_t i);
 
 void memcached_init(void);
-void memcached_expire(void *data __unused__);
-#endif
+void memcached_expire(void * /* data */);
+#endif /* TARANTOOL_BOX_H_INCLUDED */

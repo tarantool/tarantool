@@ -27,15 +27,20 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include <fiber.h>
 #include <util.h>
 #include "cfg/tarantool_feeder_cfg.h"
+#include "palloc.h"
+#include "log_io.h"
+#include "say.h"
+#include "tarantool.h"
 
 static char *custom_proc_title;
 
 static int
-send_row(struct recovery_state *r __unused__, struct tbuf *t)
+send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 {
 	u8 *data = t->data;
 	ssize_t bytes, len = t->len;
@@ -89,14 +94,14 @@ recover_feed_slave(int sock)
 }
 
 i32
-mod_check_config(struct tarantool_cfg *conf __unused__)
+mod_check_config(struct tarantool_cfg *conf __attribute__((unused)))
 {
 	return 0;
 }
 
 void
-mod_reload_config(struct tarantool_cfg *old_conf __unused__,
-		  struct tarantool_cfg *new_conf __unused__)
+mod_reload_config(struct tarantool_cfg *old_conf __attribute__((unused)),
+		  struct tarantool_cfg *new_conf __attribute__((unused)))
 {
 	return;
 }
@@ -179,7 +184,8 @@ mod_init(void)
 }
 
 void
-mod_exec(char *str __unused__, int len __unused__, struct tbuf *out)
+mod_exec(char *str __attribute__((unused)), int len __attribute__((unused)),
+	 struct tbuf *out)
 {
 	tbuf_printf(out, "Unimplemented");
 }

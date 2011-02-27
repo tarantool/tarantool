@@ -593,7 +593,8 @@ index_hash_str(struct index *index, struct namespace *namespace, size_t estimate
 }
 
 void
-index_tree(struct index *index, struct namespace *namespace, size_t estimated_rows __unused__)
+index_tree(struct index *index, struct namespace *namespace,
+	   size_t estimated_rows __attribute__((unused)))
 {
 	index->type = TREE;
 	index->namespace = namespace;

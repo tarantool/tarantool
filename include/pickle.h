@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_PICKLE_H_INCLUDED
+#define TARANTOOL_PICKLE_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -23,11 +25,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#ifndef TARANTOOL_PICKLE_H
-#define TARANTOOL_PICKLE_H
+#include <stdbool.h>
 
 #include <util.h>
+
+struct tbuf;
 
 u8 *save_varint32(u8 *target, u32 value);
 void write_varint32(struct tbuf *b, u32 value);
@@ -77,4 +79,4 @@ inline static u32 load_varint32(void **data)
 	return 0;
 }
 
-#endif
+#endif /* TARANTOOL_PICKLE_H_INCLUDED */

@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_CORO_H_INCLUDED
+#define TARANTOOL_CORO_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -23,11 +25,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stddef.h> /* size_t */
 
-#ifndef TARANTOOL_CORO_H
-#define TARANTOOL_CORO_H
-
-#include <stdlib.h>
 #include <third_party/coro/coro.h>
 
 struct tarantool_coro {
@@ -40,4 +39,4 @@ struct tarantool_coro *tarantool_coro_create(struct tarantool_coro *ctx, void (*
 					     void *data);
 void tarantool_coro_destroy(struct tarantool_coro *ctx);
 
-#endif
+#endif /* TARANTOOL_CORO_H_INCLUDED */

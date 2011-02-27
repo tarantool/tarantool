@@ -24,6 +24,7 @@
  * SUCH DAMAGE.
  */
 
+#include "fiber.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -42,7 +43,6 @@
 #include <third_party/queue.h>
 #include <third_party/khash.h>
 
-#include <fiber.h>
 #include <palloc.h>
 #include <salloc.h>
 #include <say.h>
@@ -94,7 +94,7 @@ static void
 update_last_stack_frame(struct fiber *fiber)
 {
 #ifdef ENABLE_BACKTRACE
-	fiber->last_stack_frame = frame_addess();
+	fiber->last_stack_frame = __builtin_frame_address(0);
 #else
 	(void)fiber;
 #endif /* ENABLE_BACKTRACE */
@@ -200,7 +200,7 @@ unwait(int events)
 }
 
 static void
-ev_schedule(ev_watcher *watcher, int event __unused__)
+ev_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 {
 	assert(fiber == &sched);
 	fiber_call(watcher->data);
@@ -337,7 +337,7 @@ fiber_zombificate()
 }
 
 static void
-fiber_loop(void *data __unused__)
+fiber_loop(void *data __attribute__((unused)))
 {
 	while (42) {
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
@@ -774,7 +774,7 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 }
 
 static void
-inbox2sock(void *_data __unused__)
+inbox2sock(void *_data __attribute__((unused)))
 {
 	struct tbuf *msg, *out;
 	struct msg *m;
@@ -806,7 +806,7 @@ inbox2sock(void *_data __unused__)
 }
 
 static void
-sock2inbox(void *_data __unused__)
+sock2inbox(void *_data __attribute__((unused)))
 {
 	struct tbuf *msg, *msg_body;
 	struct fiber *recipient;

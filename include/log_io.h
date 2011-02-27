@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_LOG_IO_H_INCLUDED
+#define TARANTOOL_LOG_IO_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -23,17 +25,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#ifndef TARANTOOL_LOG_IO_H
-#define TARANTOOL_LOG_IO_H
-
+#include <stdbool.h>
 #include <stdio.h>
 #include <limits.h>
 
-#include <fiber.h>
 #include <tarantool_ev.h>
 #include <tbuf.h>
 #include <util.h>
+#include <palloc.h>
+
+struct tbuf;
 
 #define RECOVER_READONLY 1
 
@@ -109,7 +110,7 @@ struct wal_write_request {
 	i64 lsn;
 	u32 len;
 	u8 data[];
-} __packed__;
+} __attribute__((packed));
 
 struct row_v11 {
 	u32 header_crc32c;
@@ -118,7 +119,7 @@ struct row_v11 {
 	u32 len;
 	u32 data_crc32c;
 	u8 data[];
-} __packed__;
+} __attribute__((packed));
 
 static inline struct row_v11 *row_v11(const struct tbuf *t)
 {
@@ -152,4 +153,4 @@ struct log_io_iter;
 void snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row);
 void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io_iter *));
 
-#endif
+#endif /* TARANTOOL_LOG_IO_H_INCLUDED */

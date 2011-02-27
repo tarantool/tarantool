@@ -24,20 +24,13 @@
  * SUCH DAMAGE.
  */
 
-#include "config.h"
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-
+#include "palloc.h"
 #include "third_party/valgrind/memcheck.h"
-#include <palloc.h>
-#include <util.h>
-#include <say.h>
+#include "config.h"
+
+#include <stdlib.h>
+#include <third_party/queue.h>
 #include <tbuf.h>
-#include <stat.h>
 
 struct chunk {
 	uint32_t magic;
@@ -46,8 +39,8 @@ struct chunk {
 	size_t size;
 
 	struct chunk_class *class;
-	 SLIST_ENTRY(chunk) busy_link;
-	 SLIST_ENTRY(chunk) free_link;
+	SLIST_ENTRY(chunk) busy_link;
+	SLIST_ENTRY(chunk) free_link;
 };
 
 SLIST_HEAD(chunk_list_head, chunk);
@@ -212,7 +205,7 @@ poisoned(const char *b, size_t size)
 }
 #endif
 
-static void *__noinline__
+static void * __attribute__((noinline))
 palloc_slow_path(struct palloc_pool *restrict pool, size_t size)
 {
 	struct chunk *chunk;
@@ -227,7 +220,7 @@ palloc_slow_path(struct palloc_pool *restrict pool, size_t size)
 	return ptr;
 }
 
-void *__regparm2__
+void *__attribute((regparm(2)))
 palloc(struct palloc_pool *restrict pool, size_t size)
 {
 	const size_t rz_size = size + PALLOC_REDZONE * 2;
@@ -249,7 +242,7 @@ palloc(struct palloc_pool *restrict pool, size_t size)
 	return ptr + PALLOC_REDZONE;
 }
 
-void *__regparm2__
+void *__attribute__((regparm(2)))
 p0alloc(struct palloc_pool *pool, size_t size)
 {
 	void *ptr;

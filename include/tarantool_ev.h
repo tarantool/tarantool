@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_EV_H_INCLUDED
+#define TARANTOOL_EV_H_INCLUDED
 /*
  * Copyright (C) 2010 Mail.RU
  * Copyright (C) 2010 Yuriy Vostrikov
@@ -44,3 +46,4 @@
 #include <unistd.h>
 
 #include "third_party/libev/ev.h"
+#endif /* TARANTOOL_EV_H_INCLUDED */

@@ -23,6 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "say.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -35,8 +36,8 @@
 #endif
 
 #include <fiber.h>
-#include <say.h>
 #include TARANTOOL_CONFIG
+#include "tarantool.h"
 
 int sayfd = STDERR_FILENO;
 
