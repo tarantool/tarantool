@@ -596,7 +596,8 @@ inprogress_log_unlink(char *filename)
 	assert(strcmp(suffix, inprogress_suffix) == 0);
 #endif
 	if (unlink(filename) != 0) {
-		if (errno == ENONET)
+		/* Don't panic if there is no such file. */
+		if (errno == ENOENT)
 			return 0;
 
 		say_syserror("can't unlink %s", filename);

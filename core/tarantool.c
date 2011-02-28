@@ -313,6 +313,17 @@ main(int argc, char **argv)
 #endif
 	const char *cfg_paramname = NULL;
 
+#ifndef HAVE_LIBC_STACK_END
+/*
+ * GNU libc provides a way to get at the top of the stack. This
+ * is, of course, not standard and doesn't work on non-GNU
+ * systems, such as FreeBSD. But as far as we're concerned, argv
+ * is at the top of the main thread's stack, so save the address
+ * of it.
+ */
+	__libc_stack_end = (void*) &argv;
+#endif
+
 	master_pid = getpid();
 	stat_init();
 	palloc_init();
