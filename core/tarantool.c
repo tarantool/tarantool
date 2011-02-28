@@ -62,6 +62,7 @@ char *cfg_filename_fullpath = NULL;
 struct tbuf *cfg_out = NULL;
 char *binary_filename;
 struct tarantool_cfg cfg;
+struct recovery_state *recovery_state;
 
 bool init_storage, booting = true;
 
@@ -416,27 +417,6 @@ main(int argc, char **argv)
 		panic("can't load config:"
 		      "%.*s", cfg_out->len, (char *)cfg_out->data);
 
-#ifdef STORAGE
-	if (gopt_arg(opt, 'C', &cat_filename)) {
-		initialize_minimal();
-		if (access(cat_filename, R_OK) == -1) {
-			say_syserror("access(\"%s\")", cat_filename);
-			exit(EX_OSFILE);
-		}
-		return mod_cat(cat_filename);
-	}
-
-	if (gopt(opt, 'I')) {
-		init_storage = true;
-		initialize_minimal();
-		mod_init();
-		next_lsn(recovery_state, 1);
-		confirm_lsn(recovery_state, 1);
-		snapshot_save(recovery_state, mod_snapshot);
-		exit(EXIT_SUCCESS);
-	}
-#endif
-
 	if (gopt_arg(opt, 'g', &cfg_paramname)) {
 		tarantool_cfg_iterator_t *i;
 		char *key, *value;
@@ -493,6 +473,27 @@ main(int argc, char **argv)
 		}
 #endif
 	}
+
+#ifdef STORAGE
+	if (gopt_arg(opt, 'C', &cat_filename)) {
+		initialize_minimal();
+		if (access(cat_filename, R_OK) == -1) {
+			say_syserror("access(\"%s\")", cat_filename);
+			exit(EX_OSFILE);
+		}
+		return mod_cat(cat_filename);
+	}
+
+	if (gopt(opt, 'I')) {
+		init_storage = true;
+		initialize_minimal();
+		mod_init();
+		next_lsn(recovery_state, 1);
+		confirm_lsn(recovery_state, 1);
+		snapshot_save(recovery_state, mod_snapshot);
+		exit(EXIT_SUCCESS);
+	}
+#endif
 
 	if (gopt(opt, 'D'))
 		daemonize(1, 1);

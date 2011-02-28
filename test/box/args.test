@@ -13,3 +13,31 @@ sys.stdout.push_filter("(\d)\.\d\.\d(-\d+-\w+)?", "\\1.minor.patch-<rev>-<commit
 server.test_option("--version")
 server.test_option("-V          ")
 sys.stdout.pop_filter()
+
+print """#
+# A test case for Bug#726778 "Gopt broke wal_dir and snap_dir: they are no
+# longer relative to work_dir".
+# https://bugs.launchpad.net/tarantool/+bug/726778
+# After addition of gopt(), we started to chdir() to the working
+# directory after option parsing.
+# Verify that this is not the case, and snap_dir and xlog_dir
+# can be relative to work_dir.
+"""
+import shutil
+shutil.rmtree(os.path.join(vardir, "bug726778"), True)
+cfg = os.path.join(vardir, "bug726778.cfg")
+os.mkdir(os.path.join(vardir, "bug726778"))
+os.mkdir(os.path.join(vardir, "bug726778/snapshots"))
+os.mkdir(os.path.join(vardir, "bug726778/xlogs"))
+
+os.symlink(os.path.abspath("box/bug726778.cfg"), cfg)
+
+sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
+server.test_option("--config=bug726778.cfg --init-storage")
+sys.stdout.pop_filter()
+
+os.unlink(cfg)
+shutil.rmtree(os.path.join(vardir, "bug726778"))
+
+# Args filter cleanup
+# vim: syntax=python

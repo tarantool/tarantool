@@ -96,7 +96,7 @@ struct recovery_state {
 
 	bool finalize;
 
-	/* pointer to user supplied custom data */
+	/* Points to module-specific state */
 	void *data;
 };
 

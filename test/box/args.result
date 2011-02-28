@@ -65,3 +65,18 @@ tarantool_silverbox --version
 tarantool_silverbox -V
 1.minor.patch-<rev>-<commit>
 
+#
+# A test case for Bug#726778 "Gopt broke wal_dir and snap_dir: they are no
+# longer relative to work_dir".
+# https://bugs.launchpad.net/tarantool/+bug/726778
+# After addition of gopt(), we started to chdir() to the working
+# directory after option parsing.
+# Verify that this is not the case, and snap_dir and xlog_dir
+# can be relative to work_dir.
+
+tarantool_silverbox --config=bug726778.cfg --init-storage
+tarantool_silverbox: namespace 0 successfully configured
+tarantool_silverbox: creating `snapshots/00000000000000000001.snap.inprogress'
+tarantool_silverbox: saving snapshot `snapshots/00000000000000000001.snap'
+tarantool_silverbox: done
+
