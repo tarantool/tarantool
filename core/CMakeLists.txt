@@ -74,6 +74,10 @@ endif()
 
 if (ENABLE_BACKTRACE AND HAVE_BFD)
   set (common_libraries ${common_libraries} bfd)
+  if (ENABLE_STATIC)
+     include (FindZLIB)
+     set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES} iberty dl)
+  endif()
 endif()
 
 set (common_libraries ${common_libraries} PARENT_SCOPE) 

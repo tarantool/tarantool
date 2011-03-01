@@ -96,7 +96,7 @@ coredump(int dump_interval)
 }
 
 void *
-xrealloc(void *ptr, size_t size)
+tnt_xrealloc(void *ptr, size_t size)
 {
 	void *ret = realloc(ptr, size);
 	if (size > 0 && ret == NULL)

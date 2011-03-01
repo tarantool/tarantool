@@ -170,6 +170,13 @@ if (ENABLE_BACKTRACE)
     endif()
 endif()
 
+option(ENABLE_STATIC "Perform static linking whenever possible." OFF)
+
+if (ENABLE_STATIC)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static")
+endif()
+
+
 add_subdirectory(third_party)
 add_subdirectory(cfg)
 add_subdirectory(core)
@@ -201,4 +208,5 @@ message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
 message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
 message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE}")
 message (STATUS "Backtrace is with symbol resolve: ${HAVE_BFD}")
+message (STATUS "ENABLE_STATIC: ${ENABLE_STATIC}")
 message (STATUS "")
