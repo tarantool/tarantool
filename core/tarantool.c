@@ -267,6 +267,13 @@ create_pid(void)
 	f = fopen(cfg.pid_file, "a+");
 	if (f == NULL)
 		panic_syserror("can't open pid file");
+	/*
+	 * fopen() is not guaranteed to set the seek position to
+	 * the beginning of file according to ANSI C (and, e.g.,
+	 * on FreeBSD.
+	 */
+	if (fseeko(f, 0, SEEK_SET) != 0)
+		panic_syserror("can't fseek to the beginning of pid file");
 
 	if (fgets(buf, sizeof(buf), f) != NULL && strlen(buf) > 0) {
 		pid = strtol(buf, NULL, 10);
@@ -274,7 +281,8 @@ create_pid(void)
 			panic("the daemon is already running");
 		else
 			say_info("updating a stale pid file");
-		fseeko(f, 0, SEEK_SET);
+		if (fseeko(f, 0, SEEK_SET) != 0)
+			panic_syserror("can't fseek to the beginning of pid file");
 		if (ftruncate(fileno(f), 0) == -1)
 			panic_syserror("ftruncate(`%s')", cfg.pid_file);
 	}
