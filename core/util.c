@@ -42,6 +42,10 @@
 #include <fiber.h>
 #include "say.h"
 
+#ifndef HAVE_LIBC_STACK_END
+void *__libc_stack_end;
+#endif
+
 void
 close_all_xcpt(int fdc, ...)
 {

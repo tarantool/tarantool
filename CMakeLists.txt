@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.6)
 project(tarantool)
 include(CheckLibraryExists)
 include(CheckIncludeFile)
+include(CheckCCompilerFlag)
 find_program(ECHO echo)
 find_program(CAT cat)
 find_program(GIT git)
@@ -42,6 +43,12 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
 endif()
+
+#
+# Some versions of GNU libc define non-portable __libc_stack_end
+# which we use to determine the end (or beginning, actually) of
+# stack. Find whether or not it's present.
+check_library_exists("" __libc_stack_end "" HAVE_LIBC_STACK_END)
 
 #
 # Tarantool uses 'coro' (coroutines) library # to implement
@@ -140,6 +147,7 @@ with gcc. If GNU binutils and binutils-dev libraries are installed, backtrace
 is output with resolved function (symbol) names. Otherwise only frame
 addresses are printed." ${CMAKE_COMPILER_IS_GNUCC})
 
+set (HAVE_BFD False)
 if (ENABLE_BACKTRACE)
     if (NOT ${CMAKE_COMPILER_IS_GNUCC} OR
         NOT (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86"))
@@ -151,7 +159,7 @@ if (ENABLE_BACKTRACE)
     check_library_exists (bfd bfd_init ""  HAVE_BFD_LIB)
     check_include_file(bfd.h HAVE_BFD_H)
     if (HAVE_BFD_LIB AND HAVE_BFD_H)
-        set (HAVE_BFD 1)
+        set (HAVE_BFD True)
         message (STATUS "Found GNU bfd headers and libs, enabling symbol ")
         message (STATUS "resolve in backtraces.")
     elseif (NOT HAVE_BFD_LIB)

@@ -573,7 +573,9 @@ inprogress_log_rename(char *filename)
 	assert(strcmp(suffix, inprogress_suffix) == 0);
 
 	/* Create a new filename without '.inprogress' suffix. */
-	new_filename = strndupa(filename, suffix - filename);
+	new_filename = alloca(suffix - filename + 1);
+	memcpy(new_filename, filename, suffix - filename);
+	new_filename[suffix - filename] = '\0';
 
 	if (rename(filename, new_filename) != 0) {
 		say_syserror("can't rename %s to %s", filename, new_filename);
@@ -593,7 +595,8 @@ inprogress_log_unlink(char *filename)
 	assert(strcmp(suffix, inprogress_suffix) == 0);
 #endif
 	if (unlink(filename) != 0) {
-		if (errno == ENONET)
+		/* Don't panic if there is no such file. */
+		if (errno == ENOENT)
 			return 0;
 
 		say_syserror("can't unlink %s", filename);

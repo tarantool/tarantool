@@ -30,7 +30,7 @@
 #include <util.h>
 #include <log_io.h>
 
-struct recovery_state *recovery_state;
+extern struct recovery_state *recovery_state;
 void mod_init(void);
 struct tarantool_cfg;
 i32 mod_check_config(struct tarantool_cfg *conf);

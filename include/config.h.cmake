@@ -32,6 +32,10 @@
  */
 #cmakedefine HAVE_BFD 1
 /*
+ * Set if this is a GNU system and libc has __libc_stack_end.
+ */
+#cmakedefine HAVE_LIBC_STACK_END 1
+/*
  * vim: syntax=c
  */
 #endif /* TARANTOOL_CONFIG_H_INCLUDED */

@@ -3,8 +3,12 @@
 #
 add_library(ev tarantool_ev.c)
 
-set_source_files_properties(tarantool_ev.c
-    PROPERTIES COMPILE_FLAGS "-Wno-unused-result")
+check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
+
+if (gcc_has_wno_unused_result)
+    set_source_files_properties(tarantool_ev.c
+        PROPERTIES COMPILE_FLAGS "-Wno-unused-result")
+endif()
 
 if (TARGET_OS_LINUX)
 #
