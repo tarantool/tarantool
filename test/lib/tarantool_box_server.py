@@ -162,7 +162,7 @@ class TarantoolBoxServer:
     if self.args.gdb and self.args.start_and_exit:
       time.sleep(1)
     elif not self.args.start_and_exit and not self.args.gdb:
-      self.server.expect_exact("entering event loop")
+      self.server.expect_exact("I am primary")
     else:
       wait_until_connected(self.suite_ini["host"], self.suite_ini["port"])
 
