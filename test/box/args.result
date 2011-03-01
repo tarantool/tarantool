@@ -74,9 +74,9 @@ tarantool_box -V
 # Verify that this is not the case, and snap_dir and xlog_dir
 # can be relative to work_dir.
 
-tarantool_silverbox --config=bug726778.cfg --init-storage
-tarantool_silverbox: namespace 0 successfully configured
-tarantool_silverbox: creating `snapshots/00000000000000000001.snap.inprogress'
-tarantool_silverbox: saving snapshot `snapshots/00000000000000000001.snap'
-tarantool_silverbox: done
+tarantool_box --config=bug726778.cfg --init-storage
+tarantool_box: namespace 0 successfully configured
+tarantool_box: creating `snapshots/00000000000000000001.snap.inprogress'
+tarantool_box: saving snapshot `snapshots/00000000000000000001.snap'
+tarantool_box: done
 
