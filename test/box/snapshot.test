@@ -1,5 +1,8 @@
 # encoding: tarantool
 #
+import yaml
+from signal import SIGUSR1
+
 print """
 # Verify that the server starts from a pre-recorded snapshot.
 # This way we check that the server can read old snapshots (v11)
@@ -45,4 +48,39 @@ exec admin "save snapshot"
 os.chmod(vardir, 0755)
 exec sql "delete from t0 where k0 = 1"
 exec sql "delete from t0 where k0 = 2"
+
+print """#
+# A test case for http://bugs.launchpad.net/bugs/727174
+# "tarantool_silverbox crashes when saving snapshot on SIGUSR1"
+#"""
+
+print """
+# Increment the lsn number, to make sure there is no such snapshot yet
+#"""
+
+exec sql "insert into t0 values (1, 'Test tuple')"
+
+info = yaml.load(admin.execute("show info\n"))["info"]
+
+pid = info["pid"]
+snapshot = str(info["lsn"]).zfill(20) + ".snap"
+snapshot = os.path.join(vardir, snapshot)
+
+iteration = 0
+
+MAX_ITERATIONS = 100
+
+while not os.access(snapshot, os.F_OK) and iteration < MAX_ITERATIONS:
+  if iteration % 10 == 0:
+    os.kill(pid, SIGUSR1)
+  time.sleep(0.1)
+  iteration = iteration + 1
+
+if iteration == 0 or iteration >= MAX_ITERATIONS:
+  print "Snapshot is missing."
+else:
+  print "Snapshot exists."
+
+exec sql "delete from t0 where k0=1"
+
 # vim: syntax=python spell
