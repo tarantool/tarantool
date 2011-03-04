@@ -244,31 +244,22 @@ static void
 signal_init(void)
 {
 	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
 
 	sa.sa_handler = SIG_IGN;
-	sa.sa_flags = 0;
 	sigemptyset(&sa.sa_mask);
+
 	if (sigaction(SIGPIPE, &sa, 0) == -1)
 		goto error;
 
 	sa.sa_handler = sig_int;
-	sa.sa_flags = 0;
-	sigemptyset(&sa.sa_mask);
-	if (sigaction(SIGINT, &sa, 0) == -1)
-		goto error;
 
-	sa.sa_handler = sig_int;
-	sa.sa_flags = 0;
-	sigemptyset(&sa.sa_mask);
-	if (sigaction(SIGTERM, &sa, 0) == -1)
+	if (sigaction(SIGINT, &sa, 0) == -1 ||
+	    sigaction(SIGTERM, &sa, 0) == -1 ||
+	    sigaction(SIGHUP, &sa, 0) == -1)
+	{
 		goto error;
-
-	sa.sa_handler = sig_int;
-	sa.sa_flags = 0;
-	sigemptyset(&sa.sa_mask);
-	if (sigaction(SIGHUP, &sa, 0) == -1)
-		goto error;
-
+	}
 	return;
       error:
 	say_syserror("sigaction");
