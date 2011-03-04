@@ -172,7 +172,7 @@ tarantool_uptime(void)
 
 #ifdef STORAGE
 int
-snapshot(void *ev __unused__, int events __unused__)
+snapshot(void *ev, int events __unused__)
 {
 	pid_t p = fork();
 	if (p < 0) {
@@ -180,10 +180,23 @@ snapshot(void *ev __unused__, int events __unused__)
 		return -1;
 	}
 	if (p > 0) {
+		/*
+		 * If called from a signal handler, we can't
+		 * access any fiber state, and no one is expecting
+		 * to get an execution status. Just return 0 to
+		 * indicate a successful fork.
+		 */
+		if (ev != NULL)
+			return 0;
+		/*
+		 * This is 'save snapshot' call received from the
+		 * administrative console. Check for the child
+		 * exit status and report it back. This is done to
+		 * make 'save snapshot' synchronous, and propagate
+		 * any possible error up to the user.
+		 */
 		wait_for_child(p);
-
 		assert(p == fiber->cw.rpid);
-
 		return WEXITSTATUS(fiber->cw.rstatus);
 	}
 
@@ -222,6 +235,10 @@ sig_int(int signal)
 	} else
 		_exit(EXIT_SUCCESS);
 }
+
+/**
+ * Adjust the process signal mask and add handlers for signals.
+ */
 
 static void
 signal_init(void)
@@ -519,6 +536,8 @@ main(int argc, char **argv)
 	signal_init();
 	mod_init();
 #elif defined(STORAGE)
+	ev_default_loop(EVFLAG_AUTO);
+
 	ev_signal *ev_sig;
 	ev_sig = palloc(eter_pool, sizeof(ev_signal));
 	ev_signal_init(ev_sig, (void *)snapshot, SIGUSR1);
@@ -526,7 +545,6 @@ main(int argc, char **argv)
 
 	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
 	signal_init();
-	ev_default_loop(0);
 
 	mod_init();
 	admin_init();

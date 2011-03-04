@@ -1533,3 +1533,15 @@ delete from t0 where k0 = 1
 Delete OK, 1 row affected
 delete from t0 where k0 = 2
 Delete OK, 1 row affected
+#
+# A test case for http://bugs.launchpad.net/bugs/727174
+# "tarantool_silverbox crashes when saving snapshot on SIGUSR1"
+#
+
+# Increment the lsn number, to make sure there is no such snapshot yet
+#
+insert into t0 values (1, 'Test tuple')
+Insert OK, 1 row affected
+Snapshot exists.
+delete from t0 where k0=1
+Delete OK, 1 row affected
