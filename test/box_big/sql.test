@@ -1,0 +1,14 @@
+# encoding: tarantool
+
+exec sql "insert into t0 values ('Doe', 'Richard')"
+exec sql "insert into t0 values ('Roe', 'Richard')"
+exec sql "insert into t0 values ('Woe', 'Richard')"
+exec sql "insert into t0 values ('Major', 'Tomas')"
+exec sql "insert into t0 values ('Kytes', 'Tomas')"
+exec sql "insert into t0 values ('Stiles', 'Tomas')"
+exec sql "insert into t0 values ('Wales', 'Tomas')"
+exec sql "insert into t0 values ('Callaghan', 'Tomas')"
+# xxx: bug
+exec sql "select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5"
+
+# vim: syntax=python

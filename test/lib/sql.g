@@ -5,6 +5,10 @@ object_no_re = re.compile("[a-z_]*", re.I)
 
 %%
 
+# The grammar below solely covers the functionality provided by
+# Tarantool binary protocol, from which follow all the
+# limitations. For reference please see doc/box-protocol.txt.
+
 parser sql:
 
     ignore:           '\\s+'
@@ -21,6 +25,8 @@ parser sql:
     token WHERE:      'where'
     token VALUES:     'values'
     token SET:        'set'
+    token OR:         'or'
+    token LIMIT:      'limit'
     token END:        '\\s*$'
 
     rule sql:         (insert {{ stmt = insert }} |
@@ -31,19 +37,27 @@ parser sql:
                       
     rule insert:      INSERT [INTO] ident VALUES value_list
                       {{ return sql_ast.StatementInsert(ident, value_list) }}
-    rule update:      UPDATE ident SET update_list opt_where 
-                      {{ return sql_ast.StatementUpdate(ident, update_list, opt_where) }}
-    rule delete:      DELETE FROM ident opt_where
-                      {{ return sql_ast.StatementDelete(ident, opt_where) }}
-    rule select:      SELECT '\*' FROM ident opt_where
-                      {{ return sql_ast.StatementSelect(ident, opt_where) }}
+    rule update:      UPDATE ident SET update_list opt_simple_where
+                      {{ return sql_ast.StatementUpdate(ident, update_list, opt_simple_where) }}
+    rule delete:      DELETE FROM ident opt_simple_where
+                      {{ return sql_ast.StatementDelete(ident, opt_simple_where) }}
+    rule select:      SELECT '\*' FROM ident opt_where opt_limit
+                      {{ return sql_ast.StatementSelect(ident, opt_where, opt_limit) }}
     rule ping:        PING
                       {{ return sql_ast.StatementPing() }}
     rule predicate:   ident '=' constant
                       {{ return (ident, constant) }}
-    rule opt_where:   {{ return None }}
+    rule opt_simple_where:   {{ return None }}
                       | WHERE predicate
                       {{ return predicate }}
+    rule opt_where:   {{ return None }}
+                      | WHERE disjunction
+                      {{ return disjunction }}
+    rule disjunction: predicate {{ disjunction = [predicate] }}
+                      [(OR predicate {{ disjunction.append(predicate) }})+]
+                      {{ return disjunction }}
+    rule opt_limit:   {{ return 0xffffffff }}
+                      | LIMIT NUM {{ return int(NUM) }}
     rule value_list:  '\(' expr {{ value_list = [expr] }}
                           [("," expr {{ value_list.append(expr) }} )+]
                       '\)' {{ return value_list }}

@@ -260,6 +260,8 @@ class TestSuite:
   def run_all(self):
     """For each file in the test suite, run client program
     assuming each file represents an individual test."""
+    if len(self.tests) == 0:
+       return 0
     server = TarantoolBoxServer(self.args, self.ini)
     server.install()
     server.start()
