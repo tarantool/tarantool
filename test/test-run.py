@@ -60,8 +60,9 @@ class Options:
         dest = 'suites',
         metavar = "suite",
         nargs="*",
-        default = ["box"],
-        help = """List of tests suites to look for tests in. Default: "box".""")
+        default = ["box", "box_big"],
+        help = """List of tests suites to look for tests in. Default: "box",
+        "box_big".""")
 
     parser.add_argument(
         "--force",
@@ -156,7 +157,7 @@ def main():
       suites.append(TestSuite(suite_name, options.args))
 
     for suite in suites:
-      failed_tests = suite.run_all()
+      failed_tests += suite.run_all()
   except RuntimeError as e:
     print "\nFatal error: {0}. Execution aborted.".format(e)
     return (-1)

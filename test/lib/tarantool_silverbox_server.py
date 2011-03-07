@@ -33,7 +33,7 @@ def prepare_gdb(args):
   if term not in ["xterm", "rxvt", "urxvt", "gnome-terminal", "konsole"]:
     raise RuntimeError("--gdb: unsupported terminal {0}".format(term))
 
-  args = [ term, "-e ", "gdb", "-ex", "break main", "-ex", "run"] + args
+  args = [ term, "-e", "gdb", "-ex", "break main", "-ex", "run"] + args
   return args
 
 
