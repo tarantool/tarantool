@@ -118,6 +118,7 @@ void wait_for_child(pid_t pid);
 void unwait(int events);
 void yield(void);
 void raise_(int);
+void fiber_destroy_all();
 #define raise(v, err)							\
 	({								\
 		say_debug("raise 0x%x/%s at %s:%i", v, err, __FILE__, __LINE__); \

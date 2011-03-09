@@ -407,18 +407,23 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
  */
 
 void
+fiber_destroy(struct fiber *f)
+{
+	if (f == fiber) /* do not destroy running fiber */
+		return;
+	if (strcmp(f->name, "sched") == 0)
+		return;
+
+	palloc_destroy_pool(f->pool);
+	tarantool_coro_destroy(&f->coro);
+}
+
+void
 fiber_destroy_all()
 {
 	struct fiber *f;
-	SLIST_FOREACH(f, &fibers, link) {
-		if (f == fiber) /* do not destroy running fiber */
-			continue;
-		if (strcmp(f->name, "sched") == 0)
-			continue;
-
-		palloc_destroy_pool(f->pool);
-		tarantool_coro_destroy(&f->coro);
-	}
+	SLIST_FOREACH(f, &fibers, link)
+		fiber_destroy(f);
 }
 
 
