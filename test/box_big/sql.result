@@ -1,3 +1,8 @@
+
+A test case for Bug#729758
+"SELECT fails with a disjunct and small LIMIT"
+https://bugs.launchpad.net/tarantool/+bug/729758
+
 insert into t0 values ('Doe', 'Richard')
 Insert OK, 1 row affected
 insert into t0 values ('Roe', 'Richard')
@@ -15,4 +20,32 @@ Insert OK, 1 row affected
 insert into t0 values ('Callaghan', 'Tomas')
 Insert OK, 1 row affected
 select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5
-An error occurred: ERR_CODE_ILLEGAL_PARAMS, 'Illegal parameters'
+Found 5 tuples:
+['Doe', 'Richard']
+['Roe', 'Richard']
+['Woe', 'Richard']
+['Major', 'Tomas']
+['Kytes', 'Tomas']
+
+A test case for Bug#729879
+"Zero limit is treated the same as no limit"
+https://bugs.launchpad.net/tarantool/+bug/729879
+
+select * from t0 where k1='Richard' or k1='Tomas' limit 0
+No match
+delete from t0 where k0='Doe'
+Delete OK, 1 row affected
+delete from t0 where k0='Roe'
+Delete OK, 1 row affected
+delete from t0 where k0='Woe'
+Delete OK, 1 row affected
+delete from t0 where k0='Major'
+Delete OK, 1 row affected
+delete from t0 where k0='Kytes'
+Delete OK, 1 row affected
+delete from t0 where k0='Stiles'
+Delete OK, 1 row affected
+delete from t0 where k0='Wales'
+Delete OK, 1 row affected
+delete from t0 where k0='Callaghan'
+Delete OK, 1 row affected
