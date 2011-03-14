@@ -27,6 +27,13 @@
 #include "palloc.h"
 #include "third_party/valgrind/memcheck.h"
 #include "config.h"
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <sys/mman.h>
 
 #include <stdlib.h>
 #include <third_party/queue.h>
@@ -47,7 +54,7 @@ SLIST_HEAD(chunk_list_head, chunk);
 
 struct chunk_class {
 	int i;
-	u32 size;
+	u32 allocated_size;
 	int chunks_count;
 	struct chunk_list_head chunks;
 	 TAILQ_ENTRY(chunk_class) link;
@@ -98,7 +105,7 @@ class_init(size_t size)
 
 	class->i = class_count++;
 	class->chunks_count = 0;
-	class->size = size;
+	class->allocated_size = size;
 	SLIST_INIT(&class->chunks);
 	TAILQ_INSERT_TAIL(&classes, class, link);
 
@@ -112,6 +119,12 @@ palloc_init(void)
 
 	class_count = 0;
 	TAILQ_INIT(&classes);
+
+	/*
+	 * since chunks are allocated via mmap
+	 * size must by multiply of 4096 minus sizeof(struct chunk)
+	 * TODO: should we use sysconf(_SC_PAGESIZE)?
+	 */
 
 	for (size_t size = 4096 * 8; size <= 1 << 16; size *= 2) {
 		if (class_init(size) == NULL)
@@ -152,10 +165,10 @@ next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 	else
 		class = TAILQ_FIRST(&classes);
 
-	if (class->size == -1)
+	if (class->allocated_size == -1)
 		class = TAILQ_PREV(class, class_tailq_head, link);
 
-	while (class != NULL && class->size < size)
+	while (class != NULL && class->allocated_size < size + sizeof(struct chunk))
 		class = TAILQ_NEXT(class, link);
 
 	assert(class != NULL);
@@ -166,20 +179,23 @@ next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 		goto found;
 	}
 
-	if (size > palloc_greatest_size())
-		chunk_size = size;
-	else
-		chunk_size = class->size;
-
-	chunk = malloc(chunk_size + sizeof(struct chunk));
-
-	if (chunk == NULL)
-		return NULL;
+	if (size > palloc_greatest_size()) {
+		chunk_size = size + sizeof(struct chunk);
+		chunk = malloc(chunk_size);
+		if (chunk == NULL)
+			return NULL;
+	} else {
+		chunk_size = class->allocated_size;
+		chunk = mmap(NULL, chunk_size,
+			     PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		if (chunk == MAP_FAILED)
+			return NULL;
+	}
 
 	class->chunks_count++;
 	chunk->magic = chunk_magic;
 	chunk->size = chunk_size;
-	chunk->free = chunk_size;
+	chunk->free = chunk_size - sizeof(struct chunk);
 	chunk->brk = (void *)chunk + sizeof(struct chunk);
 	chunk->class = class;
       found:
@@ -304,12 +320,25 @@ palloc_create_pool(const char *name)
 }
 
 void
-palloc_destroy(struct palloc_pool *pool)
+palloc_destroy_pool(struct palloc_pool *pool)
 {
 	SLIST_REMOVE(&pools, pool, palloc_pool, link);
 	prelease(pool);
 	VALGRIND_DESTROY_MEMPOOL(pool);
 	free(pool);
+}
+
+void
+palloc_free_unused(void)
+{
+	struct chunk_class *class;
+	struct chunk *chunk, *next_chunk;
+
+	TAILQ_FOREACH(class, &classes, link) {
+		SLIST_FOREACH_SAFE(chunk, &class->chunks, free_link, next_chunk)
+			munmap(chunk, class->allocated_size);
+		SLIST_INIT(&class->chunks);
+	}
 }
 
 void
@@ -329,7 +358,7 @@ palloc_stat(struct tbuf *buf)
 
 		tbuf_printf(buf,
 			    "    - { size: %"PRIu32
-			    ", free_chunks: %- 6i, busy_chunks: %- 6i }" CRLF, class->size,
+			    ", free_chunks: %- 6i, busy_chunks: %- 6i }" CRLF, class->allocated_size,
 			    free_chunks, class->chunks_count - free_chunks);
 	}
 	tbuf_printf(buf, "  pools:" CRLF);
@@ -352,7 +381,7 @@ palloc_stat(struct tbuf *buf)
 				if (chunks[class->i] == 0)
 					continue;
 				tbuf_printf(buf, "        - { size: %"PRIu32", used: %i }" CRLF,
-					    class->size, chunks[class->i]);
+					    class->allocated_size, chunks[class->i]);
 
 				if (indent == 0)
 					indent = 19;

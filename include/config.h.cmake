@@ -31,6 +31,17 @@
  * Set if the system has bfd.h header and GNU bfd library.
  */
 #cmakedefine HAVE_BFD 1
+#cmakedefine HAVE_MAP_ANON 1
+#cmakedefine HAVE_MAP_ANONYMOUS 1
+#if !defined(HAVE_MAP_ANONYMOUS) && defined(HAVE_MAP_ANON)
+/*
+ * MAP_ANON is deprecated, MAP_ANONYMOUS should be used instead.
+ * Unfortunately, it's not universally present (e.g. not present
+ * on FreeBSD.
+ */
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
 /*
  * Set if this is a GNU system and libc has __libc_stack_end.
  */

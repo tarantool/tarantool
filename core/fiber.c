@@ -25,6 +25,7 @@
  */
 
 #include "fiber.h"
+#include "config.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -353,9 +354,6 @@ fiber_loop(void *data __attribute__((unused)))
 	}
 }
 
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
 
 /* fiber never dies, just become zombie */
 struct fiber *
@@ -402,6 +400,32 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
 
 	return fiber;
 }
+
+/*
+ * note, we can't release memory allocated via palloc(eter_pool, ...)
+ * so, struct fiber and some of its members are leaked forever
+ */
+
+void
+fiber_destroy(struct fiber *f)
+{
+	if (f == fiber) /* do not destroy running fiber */
+		return;
+	if (strcmp(f->name, "sched") == 0)
+		return;
+
+	palloc_destroy_pool(f->pool);
+	tarantool_coro_destroy(&f->coro);
+}
+
+void
+fiber_destroy_all()
+{
+	struct fiber *f;
+	SLIST_FOREACH(f, &fibers, link)
+		fiber_destroy(f);
+}
+
 
 char *
 fiber_peer_name(struct fiber *fiber)
