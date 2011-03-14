@@ -1,4 +1,10 @@
 # encoding: tarantool
+#
+print """
+A test case for Bug#729758
+"SELECT fails with a disjunct and small LIMIT"
+https://bugs.launchpad.net/tarantool/+bug/729758
+"""
 
 exec sql "insert into t0 values ('Doe', 'Richard')"
 exec sql "insert into t0 values ('Roe', 'Richard')"
@@ -8,7 +14,22 @@ exec sql "insert into t0 values ('Kytes', 'Tomas')"
 exec sql "insert into t0 values ('Stiles', 'Tomas')"
 exec sql "insert into t0 values ('Wales', 'Tomas')"
 exec sql "insert into t0 values ('Callaghan', 'Tomas')"
-# xxx: bug
 exec sql "select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5"
 
+print """
+A test case for Bug#729879
+"Zero limit is treated the same as no limit"
+https://bugs.launchpad.net/tarantool/+bug/729879
+"""
+exec sql "select * from t0 where k1='Richard' or k1='Tomas' limit 0"
+
+# Cleanup
+exec sql "delete from t0 where k0='Doe'"
+exec sql "delete from t0 where k0='Roe'"
+exec sql "delete from t0 where k0='Woe'"
+exec sql "delete from t0 where k0='Major'"
+exec sql "delete from t0 where k0='Kytes'"
+exec sql "delete from t0 where k0='Stiles'"
+exec sql "delete from t0 where k0='Wales'"
+exec sql "delete from t0 where k0='Callaghan'"
 # vim: syntax=python

@@ -559,6 +559,11 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 
 	if (txn->index->type == TREE) {
 		for (u32 i = 0; i < count; i++) {
+
+			/* End the loop if reached the limit. */
+			if (limit == *found)
+				goto end;
+
 			u32 key_len = read_u32(data);
 			void *key = read_field(data);
 
@@ -579,17 +584,19 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 					continue;
 				}
 
-				(*found)++;
 				tuple_add_iov(txn, tuple);
 
-				if (--limit == 0)
+				if (limit == ++(*found))
 					break;
 			}
-			if (limit == 0)
-				break;
 		}
 	} else {
 		for (u32 i = 0; i < count; i++) {
+
+			/* End the loop if reached the limit. */
+			if (limit == *found)
+				goto end;
+
 			u32 key_len = read_u32(data);
 			if (key_len != 1)
 				box_raise(ERR_CODE_ILLEGAL_PARAMS,
@@ -604,17 +611,15 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 				continue;
 			}
 
-			(*found)++;
 			tuple_add_iov(txn, tuple);
-
-			if (--limit == 0)
-				break;
+			(*found)++;
 		}
 	}
 
 	if (data->len != 0)
 		box_raise(ERR_CODE_ILLEGAL_PARAMS, "can't unpack request");
 
+end:
 	return ERR_CODE_OK;
 }
 
