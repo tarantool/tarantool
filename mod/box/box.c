@@ -269,17 +269,25 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 #endif
 		lock_tuple(txn, txn->old_tuple);
 	} else {
+		lock_tuple(txn, txn->tuple);
 		/*
-		 * if tuple doesn't exist insert GHOST tuple in indeces
-		 * in order to avoid race condition
-		 * ref count will be incr in commit
+		 * Mark the tuple as ghost before attempting an
+		 * index replace: if it fails, txn_abort() will
+		 * look at the flag and remove the tuple.
 		 */
-
+		txn->tuple->flags |= GHOST;
+		/*
+		 * If the tuple doesn't exist, insert a GHOST
+		 * tuple in all indices in order to avoid a race
+		 * condition when another INSERT comes along:
+		 * a concurrent INSERT, UPDATE, or DELETE, returns
+		 * an error when meets a ghost tuple.
+		 *
+		 * Tuple reference counter will be incremented in
+		 * txn_commit().
+		 */
 		foreach_index(txn->n, index)
 			index->replace(index, NULL, txn->tuple);
-
-		lock_tuple(txn, txn->tuple);
-		txn->tuple->flags |= GHOST;
 	}
 
 	return -1;

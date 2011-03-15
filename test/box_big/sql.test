@@ -1,10 +1,10 @@
 # encoding: tarantool
 #
-print """
-A test case for Bug#729758
-"SELECT fails with a disjunct and small LIMIT"
-https://bugs.launchpad.net/tarantool/+bug/729758
-"""
+print """#
+# A test case for Bug#729758
+# "SELECT fails with a disjunct and small LIMIT"
+# https://bugs.launchpad.net/tarantool/+bug/729758
+#"""
 
 exec sql "insert into t0 values ('Doe', 'Richard')"
 exec sql "insert into t0 values ('Roe', 'Richard')"
@@ -16,11 +16,11 @@ exec sql "insert into t0 values ('Wales', 'Tomas')"
 exec sql "insert into t0 values ('Callaghan', 'Tomas')"
 exec sql "select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5"
 
-print """
-A test case for Bug#729879
-"Zero limit is treated the same as no limit"
-https://bugs.launchpad.net/tarantool/+bug/729879
-"""
+print """#
+# A test case for Bug#729879
+# "Zero limit is treated the same as no limit"
+# https://bugs.launchpad.net/tarantool/+bug/729879
+#"""
 exec sql "select * from t0 where k1='Richard' or k1='Tomas' limit 0"
 
 # Cleanup
@@ -32,4 +32,22 @@ exec sql "delete from t0 where k0='Kytes'"
 exec sql "delete from t0 where k0='Stiles'"
 exec sql "delete from t0 where k0='Wales'"
 exec sql "delete from t0 where k0='Callaghan'"
+
+print """#
+# A test case for Bug#730593
+# "Bad data if incomplete tuple"
+# https://bugs.launchpad.net/tarantool/+bug/730593
+# Verify that if there is an index on, say, field 2,
+# we can't insert tuples with cardinality 1 and
+# get away with it.
+#"""
+exec sql "insert into t0 values ('Britney')"
+exec sql "select * from t0 where k1='Anything'"
+exec sql "insert into t0 values ('Stephanie')"
+exec sql "select * from t0 where k1='Anything'"
+exec sql "insert into t0 values ('Spears', 'Britney')"
+exec sql "select * from t0 where k0='Spears'"
+exec sql "select * from t0 where k1='Anything'"
+exec sql "select * from t0 where k1='Britney'"
+exec sql "delete from t0 where k0='Spears'"
 # vim: syntax=python

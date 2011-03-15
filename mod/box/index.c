@@ -101,7 +101,7 @@ field_compare(struct field *f1, struct field *f2, enum field_data_type type)
 			return -1;
 	}
 
-	panic("imposible happend");
+	panic("impossible happened");
 }
 
 
@@ -347,6 +347,9 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 	u32 key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
+	if (key_size != 4)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
+
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
 		load_varint32(&old_key);
@@ -354,8 +357,6 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 		assoc_delete(int_ptr_map, self->idx.int_hash, old_num);
 	}
 
-	if (key_size != 4)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
 	assoc_replace(int_ptr_map, self->idx.int_hash, num, tuple);
 #ifdef DEBUG
 	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%i", self, old_tuple,
@@ -370,6 +371,9 @@ index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct
 	u32 key_size = load_varint32(&key);
 	u64 num = *(u64 *)key;
 
+	if (key_size != 8)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
+
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
 		load_varint32(&old_key);
@@ -377,8 +381,6 @@ index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct
 		assoc_delete(int64_ptr_map, self->idx.int64_hash, old_num);
 	}
 
-	if (key_size != 8)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
 	assoc_replace(int64_ptr_map, self->idx.int64_hash, num, tuple);
 #ifdef DEBUG
 	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%"PRIu64, self, old_tuple,
@@ -390,6 +392,9 @@ static void
 index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
+
+	if (key == NULL)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "Supplied tuple misses a field which is part of an index");
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -407,6 +412,9 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 static void
 index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
+	if (tuple->cardinality < self->field_cmp_order_cnt)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS, "Supplied tuple misses a field which is part of an index");
+
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 
 	if (old_tuple)
