@@ -72,8 +72,10 @@ class TarantoolBoxServer:
       self.sigchld_handler = signal.SIG_DFL
     else:
       def sigchld_handler(signo, frame):
-        os.wait()
+        os.wait3(os.WNOHANG)
+        print >>sys.stderr, "** The child has terminated abnormally: **"
         traceback.print_stack(frame)
+        signal.signal(signal.SIGCHLD, sigchld_handler)
 
       self.sigchld_handler = sigchld_handler
 
