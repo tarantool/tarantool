@@ -9,6 +9,8 @@ import time
 import socket
 import daemon
 import glob
+import signal
+import traceback
 
 def wait_until_connected(host, port):
   """Wait until the server is started and accepting connections"""
@@ -65,6 +67,16 @@ class TarantoolSilverboxServer:
     self.path_to_exe = None
     self.abspath_to_exe = None
     self.is_started = False
+
+    if self.args.gdb or self.args.start_and_exit:
+      self.sigchld_handler = signal.SIG_DFL
+    else:
+      def sigchld_handler(signo, frame):
+        os.wait()
+        traceback.print_stack(frame)
+
+      self.sigchld_handler = sigchld_handler
+
 
   def install(self, silent = False):
     """Start server instance: check if the old one exists, kill it
@@ -125,6 +137,11 @@ class TarantoolSilverboxServer:
     if not silent:
       print "Starting {0} {1}.".format(os.path.basename(self.abspath_to_exe),
                                        version)
+  def setup_sigchld_handler(self):
+    signal.signal(signal.SIGCHLD, self.sigchld_handler)
+
+  def clear_sigchld_handler(self):
+    signal.signal(signal.SIGCHLD, signal.SIG_DFL)
 
   def start(self, silent = False):
 
@@ -152,7 +169,7 @@ class TarantoolSilverboxServer:
         os.wait()
       else:
         with daemon.DaemonContext(working_directory = self.args.vardir):
-	  os.execvp(args[0], args)
+          os.execvp(args[0], args)
     else:
       self.server = pexpect.spawn(args[0], args[1:], cwd = self.args.vardir)
       if self.args.start_and_exit:
@@ -165,6 +182,8 @@ class TarantoolSilverboxServer:
       self.server.expect_exact("I am primary")
     else:
       wait_until_connected(self.suite_ini["host"], self.suite_ini["port"])
+
+    self.setup_sigchld_handler()
 
 # Set is_started flag, to nicely support cleanup during an exception.
     self.is_started = True
@@ -179,6 +198,8 @@ class TarantoolSilverboxServer:
         print "Stopping the server..."
       if self.args.gdb:
         self.kill_old_server(True)
+      else:
+        self.clear_sigchld_handler()
       self.server.terminate()
       self.server.expect(pexpect.EOF)
       self.is_started = False
@@ -190,13 +211,15 @@ class TarantoolSilverboxServer:
     self.start(True)
 
   def test_option(self, option_list_str):
-      args = [self.abspath_to_exe] + option_list_str.split()
-      print " ".join([os.path.basename(self.abspath_to_exe)] + args[1:])
-      output = subprocess.Popen(args,
-                                cwd = self.args.vardir,
-                                stdout = subprocess.PIPE,
-                                stderr = subprocess.STDOUT).stdout.read()
-      print output
+    args = [self.abspath_to_exe] + option_list_str.split()
+    print " ".join([os.path.basename(self.abspath_to_exe)] + args[1:])
+    self.clear_sigchld_handler()
+    output = subprocess.Popen(args,
+                          cwd = self.args.vardir,
+                          stdout = subprocess.PIPE,
+                          stderr = subprocess.STDOUT).stdout.read()
+    self.setup_sigchld_handler()
+    print output
 
 
   def find_exe(self):

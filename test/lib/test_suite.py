@@ -104,10 +104,11 @@ class Test:
     sql = DataConnection(self.suite_ini["host"],
                          self.suite_ini["port"])
     server = self.suite_ini["server"]
+    stdout_redirect = FilteredStream(self.tmp_result)
     try:
       admin.connect()
       sql.connect()
-      sys.stdout = FilteredStream(self.tmp_result)
+      sys.stdout = stdout_redirect
       server = self.suite_ini["server"]
       vardir = self.suite_ini["vardir"]
       execfile(self.name, globals(), locals())
