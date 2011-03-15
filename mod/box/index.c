@@ -109,7 +109,7 @@ field_compare(struct field *f1, struct field *f2, enum field_data_type type)
  * Compare index_tree_members only by fields defined in index->field_cmp_order.
  * Return:
  *      Common meaning:
- *              < 0  - a is smaler than b
+ *              < 0  - a is smaller than b
  *              == 0 - a is equal to b
  *              > 0  - a is greater than b
  *      Custom treatment (by absolute value):
