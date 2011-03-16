@@ -68,18 +68,6 @@ class TarantoolBoxServer:
     self.abspath_to_exe = None
     self.is_started = False
 
-    if self.args.gdb or self.args.start_and_exit:
-      self.sigchld_handler = signal.SIG_DFL
-    else:
-      def sigchld_handler(signo, frame):
-        os.wait3(os.WNOHANG)
-        print >>sys.stderr, "** The child has terminated abnormally: **"
-        traceback.print_stack(frame)
-        signal.signal(signal.SIGCHLD, sigchld_handler)
-
-      self.sigchld_handler = sigchld_handler
-
-
   def install(self, silent = False):
     """Start server instance: check if the old one exists, kill it
     if necessary, create necessary directories and files, start
@@ -139,11 +127,6 @@ class TarantoolBoxServer:
     if not silent:
       print "Starting {0} {1}.".format(os.path.basename(self.abspath_to_exe),
                                        version)
-  def setup_sigchld_handler(self):
-    signal.signal(signal.SIGCHLD, self.sigchld_handler)
-
-  def clear_sigchld_handler(self):
-    signal.signal(signal.SIGCHLD, signal.SIG_DFL)
 
   def start(self, silent = False):
 
@@ -185,8 +168,6 @@ class TarantoolBoxServer:
     else:
       wait_until_connected(self.suite_ini["host"], self.suite_ini["port"])
 
-    self.setup_sigchld_handler()
-
 # Set is_started flag, to nicely support cleanup during an exception.
     self.is_started = True
 
@@ -200,8 +181,6 @@ class TarantoolBoxServer:
         print "Stopping the server..."
       if self.args.gdb:
         self.kill_old_server(True)
-      else:
-        self.clear_sigchld_handler()
       self.server.terminate()
       self.server.expect(pexpect.EOF)
       self.is_started = False
@@ -215,12 +194,10 @@ class TarantoolBoxServer:
   def test_option(self, option_list_str):
     args = [self.abspath_to_exe] + option_list_str.split()
     print " ".join([os.path.basename(self.abspath_to_exe)] + args[1:])
-    self.clear_sigchld_handler()
     output = subprocess.Popen(args,
                           cwd = self.args.vardir,
                           stdout = subprocess.PIPE,
                           stderr = subprocess.STDOUT).stdout.read()
-    self.setup_sigchld_handler()
     print output
 
 

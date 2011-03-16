@@ -125,6 +125,8 @@ class DataConnection(AdminConnection):
     res = ""
     while len(res) < length:
       buf = self.socket.recv(length - len(res))
+      if len(buf) == 0:
+        raise RuntimeError("recv(): The remote end has gone away")
       res = res + buf
     return res
 
