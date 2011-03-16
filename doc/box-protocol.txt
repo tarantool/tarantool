@@ -163,6 +163,17 @@
 
 <field> ::= <int32_varint><data>
 
+; Tarantool understands only 3 field types: unsigned 4-byte
+; int, unsigned 8-byte int and an octet string.
+; Even this type awareness is very limited: it's only used when
+; the field participates in an index. For example, when a numeric
+; 32-bit index is defined on a field, and a non-32-bit value
+; is supplied for that field, an ERR_CODE_BAD_PARAMS
+; is returned.
+;
+
+<data> ::= <int8>+
+
 ;
 ; Compressed integer
 ;
