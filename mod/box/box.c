@@ -740,7 +740,8 @@ op_is_select(u32 op)
 }
 
 u32
-box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
+box_dispatch(struct box_txn *txn, enum box_mode mode, u16 op,
+	     struct tbuf *data)
 {
 	u32 cardinality;
 	int ret_code;
@@ -751,7 +752,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 	if ((ret_code = setjmp(fiber->exc)) != 0)
 		goto abort;
 
-	say_debug("box_dispach(%i)", op);
+	say_debug("box_dispatch(%i)", op);
 
 	if (!txn->in_recover) {
 		if (!op_is_select(op) && (mode == RO || !box_updates_allowed)) {
@@ -825,7 +826,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 		break;
 
 	default:
-		say_error("box_dispach: unsupported command = %" PRIi32 "", op);
+		say_error("box_dispatch: unsupported command = %" PRIi32 "", op);
 		return ERR_CODE_ILLEGAL_PARAMS;
 	}
 
@@ -1003,7 +1004,7 @@ wal_apply(struct box_txn *txn, struct tbuf *t)
 	read_u64(t); /* drop cookie */
 
 	u16 type = read_u16(t);
-	if (box_dispach(txn, RW, type, t) != 0)
+	if (box_dispatch(txn, RW, type, t) != 0)
 		return -1;
 
 	txn_cleanup(txn);
@@ -1205,13 +1206,13 @@ custom_init(void)
 static u32
 box_process_ro(u32 op, struct tbuf *request_data)
 {
-	return box_dispach(txn_alloc(0), RO, op, request_data);
+	return box_dispatch(txn_alloc(0), RO, op, request_data);
 }
 
 static u32
 box_process(u32 op, struct tbuf *request_data)
 {
-	return box_dispach(txn_alloc(0), RW, op, request_data);
+	return box_dispatch(txn_alloc(0), RW, op, request_data);
 }
 
 static void

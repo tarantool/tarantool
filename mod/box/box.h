@@ -125,7 +125,8 @@ ENUM(messages, MESSAGES);
 	})
 
 struct box_txn *txn_alloc(u32 flags);
-u32 box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data);
+u32 box_dispatch(struct box_txn *txn, enum box_mode mode, u16 op,
+		 struct tbuf *data);
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
 void txn_cleanup(struct box_txn *txn);
 
