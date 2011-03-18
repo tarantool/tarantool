@@ -1,8 +1,5 @@
 # encoding: tarantool
 #
-from os.path import abspath
-cfg = os.path.join(vardir, "tarantool.cfg")
-
 print """
 # Bug #708685:
 #  Addition of required configuration file options broke backward
@@ -10,17 +7,13 @@ print """
 #  (https://bugs.launchpad.net/bugs/708685)
 """
 # stop current server
-server.stop(True)
-server.install(True)
+server.stop()
 # start server from config with holes in namespaces
-os.unlink("var/tarantool.cfg")
-os.symlink(abspath("box/tarantool_bug708685.cfg"), cfg)
-server.start(True)
+server.deploy("box/tarantool_bug708685.cfg")
 # check connection
 exec admin "show stat"
 
 # restore default server
-server.stop(True)
-server.install(True)
-server.start(True)
+server.stop()
+server.deploy(self.suite_ini["config"])
 # vim: syntax=python

@@ -1,9 +1,9 @@
 # encoding: tarantool
 # 
+import sys
 # clear statistics:
-server.stop(True)
-server.install(True)
-server.start(True)
+server.stop()
+server.deploy()
 exec admin "show stat"
 exec admin "help"
 exec admin "show configuration"

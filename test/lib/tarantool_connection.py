@@ -23,26 +23,19 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 
 import socket
 import sys
-import string
 import cStringIO
-import yaml
-import re
-import sql
-import struct
 import errno
 
-is_admin_re = re.compile("^\s*(show|save|exec|exit|reload|help)", re.I)
-
-class AdminConnection:
+class TarantoolConnection:
   def __init__(self, host, port):
     self.host = host
     self.port = port
     self.is_connected = False
     self.stream = cStringIO.StringIO()
-
-  def connect(self):
     self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
+
+  def connect(self):
     self.socket.connect((self.host, self.port))
     self.is_connected = True
 
@@ -53,6 +46,8 @@ class AdminConnection:
 
   def reconnect(self):
     self.disconnect()
+    self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
     self.connect()
 
   def opt_reconnect(self):
@@ -69,28 +64,9 @@ class AdminConnection:
       else:
         self.reconnect()
 
-  def execute(self, command):
+  def execute(self, command, noprint=True):
     self.opt_reconnect()
-    return self.execute_no_reconnect(command)
-
-  def execute_no_reconnect(self, command):
-    self.socket.sendall(command)
-
-    bufsiz = 4096
-    res = ""
-
-    while True:
-      buf = self.socket.recv(bufsiz)
-      if not buf:
-        break
-      res = res + buf;
-      if (res.rfind("\r\n...\r\n") >= 0):
-        break
-
-    # validate yaml by parsing it
-    yaml.load(res)
-
-    return res
+    return self.execute_no_reconnect(command, noprint)
 
   def write(self, fragment):
     """This is to support print >> admin, "command" syntax.
@@ -98,7 +74,7 @@ class AdminConnection:
     write the command itself, and another to write \n. We should
     accumulate all writes until we receive \n. When we receive it,
     we execute the command, and rewind the stream."""
-       
+
     newline_pos = fragment.rfind("\n")
     while newline_pos >= 0:
       self.stream.write(fragment[:newline_pos+1])
@@ -118,38 +94,4 @@ class AdminConnection:
 
   def __exit__(self, type, value, tb):
     self.disconnect()
-
-class DataConnection(AdminConnection):
-
-  def recvall(self, length):
-    res = ""
-    while len(res) < length:
-      buf = self.socket.recv(length - len(res))
-      res = res + buf
-    return res
-
-  def execute_no_reconnect(self, command):
-    statement = sql.parse("sql", command)
-    if statement == None:
-      return "You have an error in your SQL syntax\n"
-
-    payload = statement.pack()
-    header = struct.pack("<lll", statement.reqeust_type, len(payload), 0)
-
-    self.socket.sendall(header)
-    if len(payload):
-      self.socket.sendall(payload)
-
-    IPROTO_HEADER_SIZE = 12
-
-    header = self.recvall(IPROTO_HEADER_SIZE)
-
-    response_len = struct.unpack("<lll", header)[1]
-
-    if response_len:
-      response = self.recvall(response_len)
-    else:
-      response = None
-    
-    return statement.unpack(response) + "\n"
 

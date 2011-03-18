@@ -1,10 +1,11 @@
 # encoding: tarantool
 #
+import os
 from os.path import abspath
 
 # cleanup vardir
-server.stop(True)
-server.install(True)
+server.deploy()
+server.stop()
 
 print """
 # Inprogress xlog must be renamed before second insert.
@@ -12,7 +13,7 @@ print """
 wal_inprogress = os.path.join(vardir, "00000000000000000002.xlog.inprogress")
 wal = os.path.join(vardir, "00000000000000000002.xlog")
 
-server.start(True)
+server.start()
 exec sql "insert into t0 values (1, 'first tuple')"
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress exists"
@@ -21,12 +22,12 @@ exec sql "insert into t0 values (2, 'second tuple')"
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress has been successfully renamed"
-server.stop(True)
+server.stop()
 
 print """
 # Inprogress xlog must be renamed during regular termination.
 """
-server.start(True)
+server.start()
 
 wal_inprogress = os.path.join(vardir, "00000000000000000004.xlog.inprogress")
 wal = os.path.join(vardir, "00000000000000000004.xlog")
@@ -36,7 +37,7 @@ exec sql "insert into t0 values (3, 'third tuple')"
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000004.xlog.inprogress exists"
 
-server.stop(False)
+server.stop(silent=False)
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000004.xlog.inprogress has been successfully renamed"
@@ -50,11 +51,11 @@ wal = os.path.join(vardir, "00000000000000000005.xlog")
 
 os.symlink(abspath("box/unfinished.xlog"), wal_inprogress)
 
-server.start(True)
+server.start()
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000005.xlog.inprogress hash been successfully renamed"
-server.stop(True)
+server.stop()
 
 print """
 # Empty (zero size) inprogress xlog must be deleted during recovery.
@@ -64,11 +65,11 @@ wal_inprogress = os.path.join(vardir, "00000000000000000006.xlog.inprogress")
 wal = os.path.join(vardir, "00000000000000000006.xlog")
 
 os.symlink(abspath("box/empty.xlog"), wal_inprogress)
-server.start(True)
+server.start()
 
 if not os.access(wal_inprogress, os.F_OK) and not os.access(wal, os.F_OK):
    print "00000000000000000006.xlog.inprogress has been successfully deleted"
-server.stop(True)
+server.stop()
 
 print """
 # Empty (header only, no records) inprogress xlog must be deleted
@@ -82,11 +83,11 @@ try:
 except OSError as e:
   print e
 
-server.start(True)
+server.start()
 
 if not os.access(wal_inprogress, os.F_OK) and not os.access(wal, os.F_OK):
    print "00000000000000000006.xlog.inprogress has been successfully deleted"
-server.stop(True)
+server.stop()
 
 print """
 # Inprogress xlog with bad record must be deleted during recovery.
@@ -99,15 +100,13 @@ try:
 except OSError as e:
   print e
 
-server.start(True)
+server.start()
 
 if not os.access(wal_inprogress, os.F_OK) and not os.access(wal, os.F_OK):
    print "00000000000000000006.xlog.inprogress has been successfully deleted"
-server.stop(True)
+server.stop()
 
 # cleanup
-server.stop(True)
-server.install(True)
-server.start(True)
+server.deploy()
 
 # vim: syntax=python

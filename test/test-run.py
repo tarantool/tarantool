@@ -27,7 +27,7 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 import argparse
 import os.path
 import sys
-from lib.test_suite import TestSuite, TestRunException
+from lib.test_suite import TestSuite
 
 #
 # Run a collection of tests.
@@ -56,13 +56,21 @@ class Options:
         "box" suite. Default: run all tests in all specified suites.""")
 
     parser.add_argument(
+        "--module",
+        dest = 'modules',
+        metavar = "module",
+        nargs="*",
+        default = ["silverbox"],
+        help = "List of modules to test. Default: \"silverbox\"")
+
+    parser.add_argument(
         "--suite",
         dest = 'suites',
         metavar = "suite",
         nargs="*",
-        default = ["box", "box_big"],
-        help = """List of tests suites to look for tests in. Default: "box",
-        "box_big".""")
+        default = [],
+        help = """List of tests suites to look for tests in. Default: "" -
+	means find all available.""")
 
     parser.add_argument(
         "--force",
@@ -97,18 +105,10 @@ class Options:
         help = "Run the server under 'valgrind'. Default: false.")
 
     parser.add_argument(
-        "--valgrind-opts",
-        dest = "valgrind_opts",
-        default = "--tool=memcheck",
-        help = """Arguments passed to 'valgrind'.
-        You can also use VALGRIND_OPTS environment variable. This option
-        is mutually exclusive with --gdb. Default: --tool=memcheck.""")
-
-    parser.add_argument(
-        "--bindir",
-        dest = "bindir",
-        default = "../mod/silverbox",
-        help = """Path to server binary. Default: " + "../mod/silverbox.""")
+        "--builddir",
+        dest = "builddir",
+        default = "..",
+        help = """Path to project build directory. Default: " + "../.""")
 
     parser.add_argument(
         "--vardir",
@@ -152,9 +152,20 @@ def main():
 
   try:
     print "Started", " ".join(sys.argv)
+    suite_names = []
+    if options.args.suites != []:
+      suite_names = options.args.suites
+    else:
+      for root, dirs, names in os.walk(os.getcwd()):
+        if "suite.ini" in names:
+	  suite_names.append(os.path.basename(root))
     suites = []
-    for suite_name in options.args.suites:
-      suites.append(TestSuite(suite_name, options.args))
+    for suite_name in suite_names:
+      suite = TestSuite(suite_name, options.args)
+      if suite.ini["module"] not in options.args.modules:
+        continue
+
+      suites.append(suite)
 
     for suite in suites:
       failed_tests += suite.run_all()

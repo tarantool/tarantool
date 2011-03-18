@@ -1,5 +1,5 @@
 add_custom_target(test
-    COMMAND python ${PROJECT_SOURCE_DIR}/test/test-run.py --bindir=${PROJECT_BINARY_DIR}/mod/silverbox --vardir=${PROJECT_BINARY_DIR}/test/var
+    COMMAND python ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --vardir=${PROJECT_BINARY_DIR}/test/var
     )
 
 install (PROGRAMS tarantool DESTINATION bin)
