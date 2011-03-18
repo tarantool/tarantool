@@ -763,7 +763,7 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 
 	txn->op = op;
 	txn->n = read_u32(data);
-	if (txn->n > namespace_count - 1)
+	if (txn->n < 0 || txn->n > namespace_count - 1)
 		box_raise(ERR_CODE_NO_SUCH_NAMESPACE, "bad namespace number");
 	txn->index = &namespace[txn->n].index[0];
 
@@ -1094,6 +1094,8 @@ custom_init(void)
 		for (int j = 0; j < nelem(namespace[i].index); j++) {
 			struct index *index = &namespace[i].index[j];
 			u32 max_key_fieldno = 0;
+
+			memset(index, 0, sizeof(*index));
 
 			if (cfg.namespace[i]->index[j] == NULL)
 				break;
