@@ -219,6 +219,7 @@ class TestSuite:
     try:
       server = Server(self.ini["core"], self.ini["module"])
     except Exception as e:
+      print e
       raise RuntimeError("Unknown server: core = {0}, module = {1}".format(
         self.ini["core"], self.ini["module"]))
     server.deploy(self.ini["config"],
