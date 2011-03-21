@@ -4,6 +4,7 @@ import os
 from os.path import abspath
 
 # cleanup vardir
+server.stop()
 server.deploy()
 server.stop()
 
