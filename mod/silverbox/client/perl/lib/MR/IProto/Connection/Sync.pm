@@ -219,7 +219,7 @@ sub _handle_error {
     }
     $server->active(0);
     my $sent = $self->_sent;
-    my @sent = splice @$sent, 0, $#$sent;
+    my @sent = splice @$sent, 0, scalar @$sent;
     $server->_recv_finished($sync, undef, undef, $error);
     $callback->(undef, undef, $error);
     foreach my $args (@sent) {
