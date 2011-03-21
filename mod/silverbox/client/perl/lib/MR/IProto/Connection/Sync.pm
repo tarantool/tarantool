@@ -206,7 +206,11 @@ sub _set_timeout {
 
 sub _handle_error {
     my ($self, $sync, $callback, $error) = @_;
-    $error = $1 if $@ =~ /^(.*?) at \S+ line \d+/s;
+    if (!$error) {
+        $error = 'Unknown error';
+    } elsif ($error =~ /^(.+?) at \S+ line \d+/s) {
+        $error = $1;
+    }
     my $server = $self->server;
     $server->_debug("error: $error");
     if($self->_has_socket()) {
