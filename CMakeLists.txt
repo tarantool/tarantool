@@ -183,6 +183,7 @@ endif()
 
 add_subdirectory(third_party)
 add_subdirectory(cfg)
+add_subdirectory(connector)
 add_subdirectory(core)
 add_subdirectory(mod)
 add_subdirectory(test)
