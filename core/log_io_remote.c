@@ -107,7 +107,7 @@ remote_read_row(i64 initial_lsn)
 			err = NULL;
 		}
 
-		row = remote_row_reader_v11(fiber->pool);
+		row = remote_row_reader_v11();
 		if (row == NULL) {
 			err = "can't read row";
 			goto err;
