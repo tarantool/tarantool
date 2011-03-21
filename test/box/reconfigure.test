@@ -1,53 +1,26 @@
 # encoding: tarantool
 #
-# backup default
-from os.path import abspath
-cfg = os.path.join(vardir, "tarantool.cfg")
-oldcfg = os.path.join(vardir, "tarantool.cfg.old")
-os.rename(cfg, oldcfg)
-
 # bad1
-os.symlink(abspath("box/tarantool_bad1.cfg"), cfg)
-exec admin "reload configuration"
-
+server.reconfigure("box/tarantool_bad1.cfg")
 # bad2
-os.unlink(cfg)
-os.symlink(abspath("box/tarantool_bad2.cfg"), cfg)
-exec admin "reload configuration"
-
+server.reconfigure("box/tarantool_bad2.cfg")
 # bad3
-os.unlink(cfg)
-os.symlink(abspath("box/tarantool_bad3.cfg"), cfg)
-exec admin "reload configuration"
-
+server.reconfigure("box/tarantool_bad3.cfg")
 # bad4
-os.unlink(cfg)
-os.symlink(abspath("box/tarantool_bad4.cfg"), cfg)
-exec admin "reload configuration"
-
+server.reconfigure("box/tarantool_bad4.cfg")
 # bad5
-os.unlink(cfg)
-os.symlink(abspath("box/tarantool_bad5.cfg"), cfg)
-exec admin "reload configuration"
-
+server.reconfigure("box/tarantool_bad5.cfg")
 # good
-os.unlink(cfg)
-os.symlink(abspath("box/tarantool_good.cfg"), cfg)
-exec admin "reload configuration"
-
+server.reconfigure("box/tarantool_good.cfg")
 # empty
-os.unlink(cfg)
-os.symlink(abspath("box/tarantool_empty.cfg"), cfg)
-exec admin "reload configuration"
+server.reconfigure("box/tarantool_empty.cfg")
 
 # no config
-os.unlink(cfg)
-exec admin "reload configuration"
+server.reconfigure(None)
 
 # cleanup
 # restore default
-os.rename(oldcfg, cfg)
-exec admin "reload configuration"
+server.reconfigure(self.suite_ini["config"])
 
 print """#
 # A test case for http://bugs.launchpad.net/bugs/712447:
@@ -56,18 +29,14 @@ print """#
 #"""
 exec sql "insert into t0 values (1, 'tuple')"
 exec admin "save snapshot"
-os.rename(cfg, oldcfg)
-exec admin "reload configuration"
+server.reconfigure(None)
 exec sql "insert into t0 values (2, 'tuple 2')"
 exec admin "save snapshot"
-os.symlink(abspath("box/tarantool_good.cfg"), cfg)
-exec admin "reload configuration"
+server.reconfigure("box/tarantool_good.cfg")
 exec sql "insert into t0 values (3, 'tuple 3')"
 exec admin "save snapshot"
 # Cleanup
-os.unlink(cfg)
-os.rename(oldcfg, cfg)
-exec admin "reload configuration"
+server.reconfigure(self.suite_ini["config"])
 exec sql "delete from t0 where k0 = 1"
 exec sql "delete from t0 where k0 = 2"
 exec sql "delete from t0 where k0 = 3"

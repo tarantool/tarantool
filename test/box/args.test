@@ -1,3 +1,6 @@
+import sys
+import os
+
 server.test_option("--help")
 server.test_option("-h")
 sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
