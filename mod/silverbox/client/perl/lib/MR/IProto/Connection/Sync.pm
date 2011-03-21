@@ -218,10 +218,11 @@ sub _handle_error {
         $self->_clear_socket();
     }
     $server->active(0);
+    my $sent = $self->_sent;
+    my @sent = splice @$sent, 0, $#$sent;
     $server->_recv_finished($sync, undef, undef, $error);
     $callback->(undef, undef, $error);
-    my $sent = $self->_sent;
-    while (my $args = shift @$sent) {
+    foreach my $args (@sent) {
         my ($sync, $callback) = @$args;
         $server->_recv_finished($sync, undef, undef, $error);
         $callback->(undef, undef, $error);
