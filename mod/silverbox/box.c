@@ -559,6 +559,9 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 	struct box_tuple *tuple;
 	uint32_t *found;
 	u32 count = read_u32(data);
+	if (count == 0)
+		box_raise(ERR_CODE_ILLEGAL_PARAMS,
+			  "tuple count must be greater than zero");
 
 	found = palloc(fiber->pool, sizeof(*found));
 	add_iov(found, sizeof(*found));
