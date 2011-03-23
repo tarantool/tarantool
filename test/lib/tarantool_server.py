@@ -62,12 +62,12 @@ class TarantoolServer(Server):
     p.wait()
     return version
 
-  def start_and_exit(self, args, gdb=None, valgrind=None):
+  def _start_and_exit(self, args, gdb=None, valgrind=None):
     if gdb != None: self.gdb = gdb
     if valgrind != None: self.valgrind = valgrind
 
     if self.valgrind:
-      Server.start_and_exit(self, args)
+      Server._start_and_exit(self, args)
     else:
       if not self.gdb:
         args.append("--daemonize")

@@ -133,7 +133,7 @@ class Server(object):
   def init(self):
     pass
 
-  def start_and_exit(self, args, gdb=None, valgrind=None):
+  def _start_and_exit(self, args, gdb=None, valgrind=None):
     if gdb != None: self.gdb = gdb
     if valgrind != None: self.valgrind = valgrind
 
@@ -169,7 +169,7 @@ class Server(object):
     elif self.valgrind:
       args = prepare_valgrind(args, self.valgrind_log)
     if self.start_and_exit:
-      self.start_and_exit(args)
+      self._start_and_exit(args)
     else:
       self.process = pexpect.spawn(args[0], args[1:], cwd = self.vardir)
 # wait until the server is connectedk
