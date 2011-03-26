@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<book xmlns="http://docbook.org/ns/docbook"
+      xmlns:xi="http://www.w3.org/2001/XInclude" version="5.0">
+<title>Tarantool/Box User Guide, version 1.3.5</title>
+<xi:include href="./intro.xml"/>
+<!--
+     TOC:
+
+     Introduction
+       What it can basically do; 
+
+
+     Installation and Running
+       Command line options reference
+ 
+     Data console and administrative console
+       Data operations
+       Administrative console operations
+         Format of response
+
+     Setting up replication
+       Master-slave replication
+
+     Support of memcached protocol
+
+     Configuration reference
+
+     Log file messages
+
+     Connectors
+       C
+       Ruby 
+         Example
+       Perl
+
+     Frequently Asked Questions
+       Q. What's on your roadmap?
+       Q. I found a bug. What to do?
+
+
+
+     Appendixes:
+       Configuration parameters index
+       Server error codes
+       Glossary of terms
+-->
+</book>

@@ -25,3 +25,6 @@ CPackSourceConfig.cmake
 _CPack_Packages
 install_manifest.txt
 tarantool-*.tar.gz
+doc/tnt.ent
+doc/user/tarantool_user_guide.html
+test/box/protocol

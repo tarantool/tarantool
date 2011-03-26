@@ -46,7 +46,7 @@ Once all pre-requisites are installed, try:
 tarantool $ cd test && ./test-run.py --start-and-exit
 
 This will create a 'var' subdirectory in directory 'test',
-populate it with necessary files used by the server, and
+populate it with necessary files, and
 start the server. To connect, you could use
 a simplistic command-line client:
 
