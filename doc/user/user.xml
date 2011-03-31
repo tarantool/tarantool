@@ -9,7 +9,7 @@
 <title>Tarantool/Box User Guide, version &tnt_version;</title>
 <xi:include href="preface.xml"/>
 <xi:include href="tutorial.xml"/>
-<xi:include href="usage.xml"/>
+<xi:include href="data-model.xml"/>
 <!--
 <xi:include href="replication.xml"/>
 <xi:include href="memcached.xml"/>
@@ -41,7 +41,7 @@
 
      Log file messages
 
-     Format of the binary log
+     Format of the binary log/snapsho
 
      Connectors
        C

@@ -1,0 +1,81 @@
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
+<title>Data and adminsitrative consoles</title>
+<blockquote><para>
+  This chapter provides a reference of Tarantool data operations
+  and administrative commands.
+</para></blockquote>
+<para>
+  Unlike many traditional data servers, Tarantool uses
+  different TCP ports and client/server protocol for data
+  operations and administrative operations.
+  On start up, the server connects to three TCP ports:
+  <simplelist>
+    <member>
+      read/write data port, to handle INSERTs, UPDATEs,
+      DELETEs and SELECTs; the  default value of the port is
+      <literal>33015</literal>,
+    </member>
+    <member>
+      read only port, that only accepts SELECTs
+      <literal>33015</literal>,
+    </member>
+  </simplelist>
+  
+  The data protocol is binary; a complete description is
+  provided in doc/box-protocol.txt. 
+
+  <simplelist>
+    <member>
+      administrative port, which defaults to 
+      /write data port, to handle INSERTs, UPDATEs,
+      DELETEs and SELECTs; the  default value of the port is
+      <literal>33015</literal>,
+    </member>
+    <member>
+      read only port, that only accepts SELECTs
+      <literal>33015</literal>,
+    </member>
+  </simplelist>
+
+</para>
+<para></para>
+  separation of ports is done in part to allow system
+  administrators to secure the read/write port or the
+  administrative port. The values of read-only, read-write and
+  administrative ports can be specified in the configuration file.
+</para>
+<para>
+  How command line client understands what port to use.
+</para>
+
+
+<!--
+<section>
+
+  <title>Data console</title>
+
+  <para>The default data port is 33014. It can be set in the 
+  configuration file. Data console supports asynchronous I/O.
+  Four commands are supported. For a complete protocol manual, see
+  developers guide.
+  </para>
+
+</section>
+
+
+<section>
+  <title>Administrative console</title>
+  <para>YAML output. Provide command reference</para>
+</section>
+-->
+</chapter>
+
+<!--
+vim: tw=66
+vim: spell spelllang=en
+-->

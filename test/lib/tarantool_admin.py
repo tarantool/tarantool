@@ -23,7 +23,10 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 
 import socket
 import yaml
+import re
 from tarantool_connection import TarantoolConnection
+
+is_admin_re = re.compile("^\s*(show|save|exec|exit|reload|help)", re.I)
 
 class TarantoolAdmin(TarantoolConnection):
   def execute_no_reconnect(self, command, noprint):

@@ -20,9 +20,9 @@
   <itemizedlist>
     <listitem>
       <para>Python 2.6 or newer, with
-      <citetitle xlink:href="http://pyyaml.org/wiki/PyYAML">PyYAML</citetitle>,
-      <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon">python-daemon</citetitle> and
-       <citetitle xlink:href="http://pypi.python.org/pypi/pexpect/">python-pexpect</citetitle> modules,</para>
+      <citetitle xlink:href="http://pyyaml.org/wiki/PyYAML" xlink:title="Python YAML parser">PyYAML</citetitle>,
+      <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon" xlink:title="Python daemon">python-daemon</citetitle> and
+       <citetitle xlink:href="http://pypi.python.org/pypi/pexpect/" xlink:title="pure-Python pexpect implementation">python-pexpect</citetitle> modules,</para>
 
       <note><para>
         Python is used to run regression tests and
