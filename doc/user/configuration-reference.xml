@@ -1,0 +1,217 @@
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="configuration-reference">
+
+<title>Configuration reference</title>
+<blockquote><para>
+  This chapter provides a reference of options which
+  can be set in the command line or
+  <filename>tarantool.cfg</filename> configuration file.
+</para></blockquote>
+
+<para>
+Tarantool splits its configuration parameters between command
+line options and a configuration file. Command line flags
+are provided for the most basic properties only: the rest
+must be set in the configuration file.
+At runtime, this allows to disambiguate the source of
+a configuration setting: it unequivocally comes either from
+the command line, or from the options file, but never from
+both.
+</para>
+
+<section>
+<title>Command line options</title>
+  <para>
+    Tarantool follows the <citetitle
+    xlink:href="http://www.gnu.org/prep/standards/standards.html#Command_002dLine-Interfaces">GNU
+    standard</citetitle> for its command line interface: long
+    options start with a double dash (<option>--option</option>),
+    their short counterparts use a single one (<option>-o</option>).
+    For phrases, both dashes and
+    underscores can be used as word separators
+    (<option>--cfg-get</option> and <option>--cfg_get</option> both work).
+    If an option requires an argument, you can either separate it
+    with a space or equals sign (<option>--cfg-get=pid_file</option> and
+    <option>--cfg-get pid_file</option> both work).
+  </para>
+  <itemizedlist>
+    <listitem xml:id="help-option">
+      <para><option>--help</option>, <option>-h</option></para>
+      <para>Print an annotated list of all available options and exit.</para>
+    </listitem>
+
+    <listitem xml:id="version-option">
+      <para><option>--version</option>, <option>-V</option></para>
+      <para>Print product name and version, for example:
+        <programlisting><prompt>$ </prompt> ./tarantool_box --version
+Tarantool/Box 1.4.0-69-g45551dd
+        </programlisting>
+        In this example:
+        <simplelist>
+          <member>
+            <quote>Tarantool</quote> is the name
+            of the reusable asynchronous networking programming framework.
+         </member>
+          <member>
+            <quote>Box</quote> is the name
+            of the storage back-end.
+         </member>
+          <member>
+            The 3-number version follows the standard
+            <literal>&lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;</literal>
+            scheme, in which <literal>&lt;major&gt;</literal> number
+            is changed only rarely, <literal>&lt;minor&gt;</literal>
+            is incremented for each new milestone and
+            indicates possible incompatible changes,
+            and <literal>&lt;patch&gt;</literal> stands for the number of
+            bug fix releases made after the start of the
+            milestone. The optional commit number and
+            commit SHA1 are output for non-released versions
+            only, and indicate how much this particular build has diverged
+            from the last release.
+         </member>
+        </simplelist>
+      </para>
+      <note><para>
+        Tarantool uses <link
+        xlink:href="http://www.kernel.org/pub/software/scm/git/docs/git-describe.html">git describe</link> to produce its version id, and
+        this id can be used at any time to check out the
+        corresponding source from our <link
+        xlink:href="git://github.com/mailru/tarantool.git">git repository</link>.
+      </para></note>
+    </listitem>
+
+    <listitem xml:id="config-option">
+      <para><option>--config=</option><userinput><filename>/path/to/config.file</filename></userinput>, <option>-c</option></para>
+      <para>
+        Tarantool does not start without a configuration file. By
+        default, the server looks for file named
+        <filename>tarantool.cfg</filename> in the current working
+        directory. An alternative location can be provided using
+        this option.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para><option>--check-config</option></para>
+      <para>Check the configuration file for errors. This option is
+        normally used on the command line
+        before <quote>reload configuration</quote>
+        is issued on the administrative port, to ensure that the new
+        configuration is valid. When configuration is
+        indeed correct, the program produces no output and returns <literal>0</literal>.
+        Otherwise, information about discovered error is printed out
+        and the program terminates with a non-zero value.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para><option>--cfg-get=</option><userinput>option_name</userinput></para>
+      <para>Given option name, print option value. If the
+        option does not exist, or the configuration file is
+        incorrect, an error is returned. If the option
+        is not explicitly specified, its default value is used
+        instead. Example:
+        <programlisting><prompt>$ </prompt>./tarantool_box --cfg-get=admin_port
+33015   </programlisting>
+      </para>
+    </listitem>
+    <listitem>
+      <para><option>--init-storage</option></para>
+      <para>Initialize the directory, specified in <emphasis>vardir</emphasis>
+      configuration option by creating an empty snapshot file in
+      it. If <filename>vardir</filename> doesn't contain at
+      least one snapshot, the server does not start. There is no
+      <quote>magic</quote> with automatic initialization of
+      <filename>vardir</filename> on boot to make
+      potential system errors more noticeable. For example, if the
+      operating system reboots and fails to mount the partition on
+      which <filename>vardir</filename> is expected to reside, the
+      <filename>rc.d</filename> or <command>service</command> script
+      responsible for server restart will also fail, thanks to this
+      option.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para><option>--cat</option> <userinput>snapshot.file</userinput></para>
+      <para>Print the snapshot file, pointed to by the argument,
+      in a human-readable form. For each log record, log sequence
+      number, time of entry, operation type and arguments are
+      printed out. Example:
+        <programlisting><prompt>$ </prompt>./tarantool_box --cat 00000000000000000002.xlog
+lsn:2 tm:1301572243.430 t:65534 127.0.0.1:52728 INSERT n:0&lt;"1:\x01\x00\x00\x00"&gt;
+lsn:3 tm:1301572287.509 t:65534 127.0.0.1:52728 INSERT n:0&lt;"1:\x01\x00\x00\x00", "hello"&gt;
+lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 &lt;"1:\x01\x00\x00\x00"&gt; [field_no:1 op:set &lt;"world"&gt;]</programlisting>
+      </para>
+    </listitem>
+  </itemizedlist>
+  <para>
+    The only two options which have effect on a running server are:
+  </para>
+  <itemizedlist>
+    <listitem>
+      <para><option>--verbose</option>, <option>-v</option></para>
+      <para>Increase verbosity level in log messages. This option
+      currently has no effect.</para>
+    </listitem>
+
+    <listitem>
+      <para><option>--background</option>, <option>-b</option></para>
+      <para>Detach from the controlling terminal and run in
+        background.
+        <caution><para>Tarantool uses
+        <filename>stdout</filename> and
+        <filename>stderr</filename> for
+        debug and error log output. When starting the server with
+        option <option>--background</option>, make sure to
+        either redirect its standard out and standard error
+        streams, or provide <emphasis>logger</emphasis> option
+        in the configuration file, since otherwise all logging
+        information will be lost</para></caution>
+      </para>
+    </listitem>
+  </itemizedlist>
+</section>
+
+<section>
+<title>The option file</title>
+<para>
+All advanced configuration parameters must be specified in an option 
+file, which is required for server start.
+If no path to option file is specified on the command line (see
+<option xlink:href="#config-option"
+xlink:title="--config=...">--config</option>), 
+the server looks for a file named <filename>tarantool.cfg</filename>
+in the current working directory.
+</para>
+<para>
+To facilitate centralized and automated configuration
+management, runtime configuration modifications are supported
+solely through <emphasis role="tntadmin"
+xlink:href="tarantool-user-guide#reload-configuration"
+xlink:title="reload configuration"
+xlink:role="http://docbook.org/xlink/role/olink">reload
+configuration</emphasis>
+administrative statement. Thus, the procedure to change Tarantool
+configuration at runtime is to edit the configuration file.
+This ensures that, should the server get killed or restart, no
+unexpected changes to configuration can occur.
+</para>
+<para>
+Not all configuration file settings are changeable at runtime: such
+settings will be specially outlined in this reference.
+</para>
+
+</section>
+</chapter>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

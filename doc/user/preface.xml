@@ -1,12 +1,17 @@
+<!DOCTYPE chapter [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
          xmlns:xlink="http://www.w3.org/1999/xlink">
 <title>Preface</title>
-<section xml:id="intro">
+<section xml:id="preface">
   <title>Tarantool/Box: an overview</title>
   <para>
-    Tarantool/Box, or simply Tarantool, is a high performance
-    key/value storage server.  The code is available for free under
-    the terms of <citetitle
+    <productname>Tarantool/Box</productname>, or simply
+    <productname>Tarantool</productname>,
+    is a high performance key/value storage server.  The code is
+    available for free under the terms of <citetitle
     xlink:href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD
     license</citetitle>. Supported platforms are GNU/Linux and
     FreeBSD.
@@ -65,7 +70,7 @@
   <para>
     <emphasis role="strong">The software is production-ready</emphasis>.
     Tarantool has been developed and is actively used at
-    <citetitle xlink:href="http://api.mail.ru">Mail.Ru</citetitle>
+    <citetitle xlink:href="http://api.mail.ru">Mail.Ru</citetitle>,
     one of the leading Russian web content providers. At Mail.Ru,
     the sowtware serves the <quote>hottest</quote>
     data, such as online users and their sessions, online application
@@ -121,9 +126,29 @@
 
   </para>
 </section>
+<section>
+  <title>Reporting bugs</title>
+  <para>
+    Please report bugs in Tarantool at <link
+    xlink:href="http://bugs.launchpad.net/tarantool"/>. You can
+    contact developers directly on
+    <link xlink:href="irc://irc.freenode.net#tarantool">#tarantool</link>
+    IRC channel or via mailing list,
+    <link xlink:href="https://launchpad.net/~tarantool-developers">tarantool-developers@lists.launchpad.net</link>.
+  </para>
+  <para>
+    <emphasis role="strong">Caution:</emphasis> To prevent spam, Launchpad
+    mailing list software silently drops all mail sent by
+    unregistered users. Registration also
+    allows you to report bug and create feature requests.
+    You can always check whether or not your mail has been
+    delivered in the public mailing list archive, <link
+    xlink:href="https://lists.launchpad.net/tarantool-developers"/>.
+  </para>
+</section>
 
 </chapter>
 <!--
-vim: tw=66
+vim: tw=66 syntax=docbk
 vim: spell spelllang=en
 -->

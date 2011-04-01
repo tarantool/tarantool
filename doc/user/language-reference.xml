@@ -3,47 +3,47 @@
 %tnt;
 ]>
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
-         xmlns:xlink="http://www.w3.org/1999/xlink">
-<title>Data and adminsitrative consoles</title>
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="language-reference">
+
+<title>Language reference</title>
 <blockquote><para>
   This chapter provides a reference of Tarantool data operations
   and administrative commands.
 </para></blockquote>
+<bridgehead renderas="sect2">Digression: data and administrative ports</bridgehead>
 <para>
-  Unlike many traditional data servers, Tarantool uses
-  different TCP ports and client/server protocol for data
-  operations and administrative operations.
+  Unlike many other key/value servers, Tarantool uses
+  different TCP ports and client/server protocols for data
+  manipulation and administrative statements.
   On start up, the server connects to three TCP ports:
-  <simplelist>
-    <member>
-      read/write data port, to handle INSERTs, UPDATEs,
-      DELETEs and SELECTs; the  default value of the port is
-      <literal>33015</literal>,
-    </member>
-    <member>
-      read only port, that only accepts SELECTs
-      <literal>33015</literal>,
-    </member>
-  </simplelist>
+  <itemizedlist>
+    <listitem><para>
+      Read/write data port, to handle INSERTs, UPDATEs,
+      DELETEs and SELECTs.
+      </para>
+      <para>
+      The default value of the port is <literal>33013</literal>,
+      as defined in <emphasis>primary_port</emphasis>
+      configuration option.
+    </para></listitem>
+    <listitem><para>
+      Read only port, which only accepts SELECTs, port number
+      <literal>33014</literal>, as defined in
+      <emphasis>secondary_port</emphasis> configuration option.
+    </para></listitem>
+    <listitem><para>
+      Administrative port, which defaults to <literal>33015</literal>,
+      and is defined in <emphasis>admin_port</emphasis>
+      configuration option.
+    </para></listitem>
+  </itemizedlist>
   
   The data protocol is binary; a complete description is
   provided in doc/box-protocol.txt. 
 
-  <simplelist>
-    <member>
-      administrative port, which defaults to 
-      /write data port, to handle INSERTs, UPDATEs,
-      DELETEs and SELECTs; the  default value of the port is
-      <literal>33015</literal>,
-    </member>
-    <member>
-      read only port, that only accepts SELECTs
-      <literal>33015</literal>,
-    </member>
-  </simplelist>
-
 </para>
-<para></para>
+<para>
   separation of ports is done in part to allow system
   administrators to secure the read/write port or the
   administrative port. The values of read-only, read-write and
@@ -52,7 +52,6 @@
 <para>
   How command line client understands what port to use.
 </para>
-
 
 <!--
 <section>
@@ -68,14 +67,16 @@
 </section>
 
 
+-->
 <section>
   <title>Administrative console</title>
   <para>YAML output. Provide command reference</para>
+  <para><emphasis xml:id="reload-configuration" role="tntadmin">reload
+  configuration</emphasis></para>
 </section>
--->
 </chapter>
 
 <!--
-vim: tw=66
-vim: spell spelllang=en
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
 -->

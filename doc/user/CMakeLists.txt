@@ -1,8 +1,9 @@
 add_custom_target(html ALL
-    COMMAND ${XSLTPROC} --xinclude -o tarantool_user_guide.html
-        http://docbook.sourceforge.net/release/xsl-ns/current/html/docbook.xsl
+    COMMAND ${XSLTPROC}
+        --stringparam collect.xref.targets "all"
+        --xinclude -o tarantool_user_guide.html
+        tnt-html.xsl
         user.xml)
-
 # XMLLINT is not able to validate SCHEMATRON constraints, and
 # therefore is not a good validation tool for DocBook 5.  However,
 # it can validate the entire document, following xinclude
