@@ -1,4 +1,5 @@
 #include <connector/c/client.h>
+#include <include/iproto.h>
 #include <stdio.h>
 
 int main() {
@@ -12,7 +13,7 @@ int main() {
 	    0x0, 0x0, 0x0, 0x0,    0x0, 0x0, 0x0, 0x0,     0x1, 0x0, 0x0, 0x0,
 	    0x4,    0x1, 0x0, 0x0, 0x0 };
     int res = tnt_execute_raw(conn, message, sizeof message);
-    printf("return_code: %d\n", res); // =0
+    printf("%d\n", (res == ERR_CODE_OK));
   }
   {
     /*
@@ -25,7 +26,7 @@ int main() {
 	    0x0, 0x0, 0x0, 0x0,     0x0, 0x0, 0x0, 0x0,     0x0, 0x0, 0x0, 0x0,
 	    0xff, 0xff, 0xff, 0xff, 0x0, 0x0, 0x0, 0x0 };
     int res = tnt_execute_raw(conn, message, sizeof message);
-    printf("return_code: %d\n", res); // =2
+    printf("%d\n", (res == ERR_CODE_ILLEGAL_PARAMS));
   }
 
   tnt_disconnect(conn);

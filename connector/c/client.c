@@ -81,5 +81,12 @@ int tnt_execute_raw(struct tnt_connection *conn, const char *message,
   if (recv(conn->data_port, buf, 2048, 0) < 16)
 	  return 3;
 
-  return buf[12]; // return_code: 0,1,2
+  int ret_code = buf[12];
+  int b = 256;
+  int i = 13;
+  while (i < 16) {
+	  ret_code += (buf[i++] * b);
+	  b *= 256;
+  }
+  return ret_code; // see iproto.h
 }

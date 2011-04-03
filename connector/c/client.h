@@ -54,14 +54,14 @@ struct tnt_connection *tnt_connect(const char *hostname, int port);
 void tnt_disconnect(struct tnt_connection *conn);
 
 /**
- * Execute a statement on a connection
+ * Execute a statement on a Tarantool server.
  *
  * @param conn the connection.
  * @param message a raw message following Tarantool protocol.
  * @param len the length of the message.
  *
- * @return the status code: 0,1,2 if the statement was successufully
- * sent (see Tarantool protocol) or 3 if an error occured.
+ * @return the return code if the statement was successufully sent
+ * (see Tarantool protocol) or 3 if an error occured.
  */
 int tnt_execute_raw(struct tnt_connection *conn, const char *message,
 		    size_t len);
