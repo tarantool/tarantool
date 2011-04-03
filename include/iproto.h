@@ -69,7 +69,8 @@ void iproto_interact(void *);
         _(ERR_CODE_NODE_NOT_FOUND,	  0x00003102) \
 	_(ERR_CODE_NODE_FOUND,		  0x00003702) \
 	_(ERR_CODE_INDEX_VIOLATION,	  0x00003802) \
-	_(ERR_CODE_NO_SUCH_NAMESPACE,	  0x00003902)
+	_(ERR_CODE_NO_SUCH_NAMESPACE,	  0x00003902) \
+	_(ERR_CODE_NO_SUCH_INDEX,	  0x00003a02)
 
 ENUM(error_codes, ERROR_CODES);
 extern char *error_codes_strs[];
