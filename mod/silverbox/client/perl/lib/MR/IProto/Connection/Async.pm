@@ -112,11 +112,11 @@ sub _send {
     my $server = $self->server;
     $self->_callbacks->{$sync} = $callback;
     $server->_send_started($sync, $msg, $payload);
+    my $handle = $self->_handle;
     if( $server->debug >= 5 ) {
         $server->_debug_dump('send header: ', $header);
         $server->_debug_dump('send payload: ', $payload);
     }
-    my $handle = $self->_handle;
     $handle->push_write( $header . $payload );
     if( $no_reply ) {
         push @{$self->_no_reply}, $sync;

@@ -95,6 +95,8 @@ use Time::HiRes;
 use MR::IProto::Cluster;
 use MR::IProto::Error;
 
+with 'MR::IProto::Role::Debuggable';
+
 =head1 ATTRIBUTES
 
 =over
@@ -164,30 +166,6 @@ has retry_delay => (
     is  => 'ro',
     isa => 'Num',
     default => 0,
-);
-
-=item debug
-
-Debug level.
-
-=cut
-
-has debug => (
-    is  => 'rw',
-    isa => 'Int',
-    default => 0,
-);
-
-=item debug_cb
-
-Callback which is called when debug message is written.
-
-=cut
-
-has debug_cb => (
-    is  => 'rw',
-    isa => 'CodeRef',
-    lazy_build => 1,
 );
 
 =back
@@ -392,7 +370,7 @@ around BUILDARGS => sub {
         $clusterargs{servers} = [
             map {
                 my ($host, $port, $weight) = split /:/, $_;
-                $servers{"$host:$port"} ||= $server_class->new(
+                $args{no_pool} ? my $server : $servers{"$host:$port"} ||= $server_class->new(
                     %srvargs,
                     host => $host,
                     port => $port,
@@ -604,7 +582,7 @@ sub _server_callback {
                     $data = $args->{response_class}->new( data => $data, request => $args->{request} );
                 }
                 else {
-                    $data = $args->{no_reply} ? [ 0 ] : [ $args->{unpack}->($data) ];
+                    $data = $args->{no_reply} ? [ 0 ] : [ ref $args->{unpack} eq 'CODE' ? $args->{unpack}->($data) : unpack $args->{unpack}, $data ];
                 }
                 1;
             };
@@ -651,11 +629,6 @@ sub _report_error {
         : undef;
     $self->_finish_and_start() unless $sync;
     $callback->($errobj, $error);
-    return;
-}
-
-sub _debug {
-    $_[0]->debug_cb->($_[1]);
     return;
 }
 

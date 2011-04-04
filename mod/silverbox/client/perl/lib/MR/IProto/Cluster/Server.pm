@@ -16,6 +16,8 @@ use MR::IProto::Connection::Async;
 use MR::IProto::Connection::Sync;
 use MR::IProto::Message;
 
+with 'MR::IProto::Role::Debuggable';
+
 coerce 'MR::IProto::Cluster::Server'
     => from 'Str'
     => via {
@@ -145,39 +147,9 @@ has active => (
     default => 1,
 );
 
-=item debug
-
-Deug level.
-
-=cut
-
-has debug => (
-    is  => 'rw',
-    isa => 'Int',
-    default => 0,
-);
-
-=item debug_cb
-
-Callback which is called when debug message is written.
-
-=cut
-
-has debug_cb => (
+has on_close => (
     is  => 'rw',
     isa => 'CodeRef',
-    lazy_build => 1,
-);
-
-=item dump_no_ints
-
-Skip print of integers in dump.
-
-=cut
-
-has dump_no_ints => (
-    is  => 'ro',
-    isa => 'Bool',
 );
 
 has async => (
@@ -242,17 +214,6 @@ sub _recv_finished {
 
 sub _debug {
     my ($self, $msg) = @_;
-    $self->debug_cb->( sprintf "%s:%d: %s", $self->host, $self->port, $msg );
-    return;
-}
-
-sub _debug_dump {
-    my ($self, $msg, $datum) = @_;
-    unless($self->dump_no_ints) {
-        $msg .= join(' ', unpack('L*', $datum));
-        $msg .= ' > ';
-    }
-    $msg .= join(' ', map { sprintf "%02x", $_ } unpack("C*", $datum));
     $self->debug_cb->( sprintf "%s:%d: %s", $self->host, $self->port, $msg );
     return;
 }
