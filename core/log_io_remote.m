@@ -133,18 +133,6 @@ pull_from_remote(void *state)
 	struct remote_state *h = state;
 	struct tbuf *row;
 
-	switch (setjmp(fiber->exc)) {
-		case 0:
-			break;
-
-		case FIBER_EXIT:
-			fiber_close();
-			return;
-
-		default:
-			fiber_close();
-	}
-
 	for (;;) {
 		row = remote_read_row(h->r->confirmed_lsn + 1);
 		h->r->recovery_lag = ev_now() - row_v11(row)->tm;

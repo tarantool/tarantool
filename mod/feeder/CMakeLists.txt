@@ -1,1 +1,1 @@
-tarantool_module("feeder" feeder.c)
+tarantool_module("feeder" feeder.m)

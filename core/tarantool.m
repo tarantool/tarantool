@@ -53,13 +53,13 @@
 #include TARANTOOL_CONFIG
 #include <util.h>
 #include <third_party/gopt/gopt.h>
+#include <cfg/warning.h>
 
 
 static pid_t master_pid;
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
 const char *cfg_filename = DEFAULT_CFG_FILENAME;
 char *cfg_filename_fullpath = NULL;
-struct tbuf *cfg_out = NULL;
 char *binary_filename;
 struct tarantool_cfg cfg;
 struct recovery_state *recovery_state;
@@ -67,7 +67,6 @@ struct recovery_state *recovery_state;
 bool init_storage, booting = true;
 
 extern int daemonize(int nochdir, int noclose);
-void out_warning(int v, char *format, ...);
 
 static i32
 load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)

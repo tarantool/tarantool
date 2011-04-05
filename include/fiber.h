@@ -40,8 +40,10 @@
 #include <util.h>
 #include "third_party/queue.h"
 
+#include <exceptions.h>
 
-#define FIBER_EXIT -1
+@interface TNTFiberException: TNTException
+@end
 
 struct msg {
 	uint32_t sender_fid;
@@ -75,9 +77,6 @@ struct fiber {
 	SLIST_ENTRY(fiber) link, zombie_link;
 
 	struct ring *inbox;
-
-	jmp_buf exc;
-	const char *errstr;
 
 	const char *name;
 	void (*f) (void *);
@@ -118,11 +117,11 @@ void unwait(int events);
 void yield(void);
 void raise_(int);
 void fiber_destroy_all();
-#define raise(v, err)							\
-	({								\
-		say_debug("raise 0x%x/%s at %s:%i", v, err, __FILE__, __LINE__); \
-		fiber->errstr = (err);					\
-		longjmp(fiber->exc, (v));				\
+#define raise(err...)							     \
+	({								     \
+		const char *_errstr = err"\0";				     \
+		say_debug("raise %s at %s:%i", _errstr, __FILE__, __LINE__); \
+		@throw [TNTException withReason:_errstr];		     \
 	})
 
 struct msg *read_inbox(void);

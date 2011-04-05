@@ -42,7 +42,6 @@ void mod_exec(char *str, int len, struct tbuf *out);
 
 extern struct tarantool_module module;
 extern struct tarantool_cfg cfg;
-extern struct tbuf *cfg_out;
 extern const char *cfg_filename;
 extern bool init_storage, booting;
 extern char *binary_filename;

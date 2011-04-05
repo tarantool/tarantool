@@ -88,4 +88,5 @@ struct Error *diag_get_last_error()
 void diag_clear()
 {
 	error_destroy(fiber->diagnostics);
+	fiber->diagnostics = NULL;
 }

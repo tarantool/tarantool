@@ -56,6 +56,9 @@
 #include <pickle.h>
 #include "diagnostics.h"
 
+@implementation TNTFiberException
+@end
+
 static struct fiber sched;
 struct fiber *fiber = &sched;
 static struct fiber **sp, *call_stack[64];
@@ -342,10 +345,20 @@ fiber_loop(void *data __attribute__((unused)))
 {
 	while (42) {
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
-		if (setjmp(fiber->exc) == 0) {
+		@try {
 			fiber->f(fiber->f_data);
-		} else {
-			panic("fiber %s failure, exiting", fiber->name);
+		}
+		@catch (TNTFiberException *e) {
+			say_info("fiber `%s': exception `TNTFiberException': `%s'", fiber->name, [e Reason]);
+			say_info("fiber `%s': exiting", fiber->name);
+		}
+		@catch (TNTException *e) {
+			say_error("fiber `%s': exception `%s': `%s'", fiber->name, [e name], [e Reason]);
+			panic("fiber `%s': exiting", fiber->name);
+		}
+		@catch (id e) {
+			say_error("fiber `%s': exception `%s'", fiber->name, [e name]);
+			panic("fiber `%s': exiting", fiber->name);
 		}
 
 		fiber_close();
@@ -1119,9 +1132,6 @@ fiber_info(struct tbuf *out)
 		tbuf_printf(out, "    fd: %4i" CRLF, fiber->fd);
 		tbuf_printf(out, "    peer: %s" CRLF, fiber_peer_name(fiber));
 		tbuf_printf(out, "    stack: %p" CRLF, stack_top);
-		tbuf_printf(out, "    exc: %p" CRLF,
-			    ((void **)fiber->exc)[3]);
-		tbuf_printf(out, "    exc_frame: %p,"CRLF, ((void **)fiber->exc)[3] + 2 * sizeof(void *));
 #ifdef ENABLE_BACKTRACE
 		tbuf_printf(out, "    backtrace:" CRLF "%s",
 			    backtrace(fiber->last_stack_frame,

@@ -77,7 +77,7 @@ set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 #
 # Enable 'make TAGS' target.
 #
-add_custom_target(TAGS COMMAND ctags -R -e -f TAGS
+add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m.h -e -f TAGS
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #
@@ -180,6 +180,14 @@ if (ENABLE_STATIC)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static")
 endif()
 
+# CMake believes that Objective C is a flavor of C++, not C,
+# and uses g++ compiler for .m files. Since talking CMake out
+# of this idea is difficult, and since gcc or g++ are only
+# front-ends to the language-specific compiler specified in
+# -x option, simply use CXX flags to build Objective C files.
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
+
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
 
 add_subdirectory(third_party)
 add_subdirectory(cfg)

@@ -28,6 +28,10 @@
 #include <stdbool.h>
 
 #include <util.h>
+#include <exceptions.h>
+
+@interface TNTPickleException: TNTException
+@end
 
 struct tbuf;
 

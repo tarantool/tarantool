@@ -1,8 +1,10 @@
 #include "warning.h"
+
+#include <tbuf.h>
+
 #include <stdarg.h>
 
-#include <tarantool.h>
-#include <util.h>
+struct tbuf *cfg_out = NULL;
 
 /** This is a callback function used by the generated
  * configuration file parser (tarantool_{box, feeder, ...}_cfg.c)

@@ -49,7 +49,7 @@ struct field {
 	};
 };
 
-enum field_data_type { NUM, NUM64, STR };
+enum field_data_type { NUM, NUM64, STRING };
 
 struct tree_index_member {
 	struct box_tuple *tuple;

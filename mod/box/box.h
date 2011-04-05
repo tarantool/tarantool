@@ -27,6 +27,18 @@
  */
 
 #include <mod/box/index.h>
+#include <exceptions.h>
+#include <tbuf.h>
+
+@interface TNTBoxException: TNTException {
+	u32 value;
+}
+
++(id) withReason:(const char *)str withValue:(u32)val;
+
+-(TNTBoxException *) setValue:(u32)val;
+-(u32) Value;
+@end
 
 extern bool box_updates_allowed;
 void memcached_handler(void * /* data */);
@@ -57,7 +69,7 @@ struct box_tuple {
 } __attribute__((packed));
 
 struct box_txn {
-	int op;
+	u16 op;
 	u32 flags;
 
 	struct namespace *namespace;
@@ -69,7 +81,11 @@ struct box_txn {
 	struct box_tuple *tuple;
 	struct box_tuple *lock_tuple;
 
+	size_t saved_iov_cnt;
+	struct tbuf req;
+
 	bool in_recover;
+	bool write_to_wal;
 };
 
 enum tuple_flags {
@@ -117,16 +133,17 @@ enum box_mode {
 
 ENUM(messages, MESSAGES);
 
-#define box_raise(n, err)						\
-	({								\
-		if (n != ERR_CODE_NODE_IS_RO)				\
-			say_warn("%s/%s", error_codes_strs[(n)], err);	\
-		raise(n, err);						\
+#define box_raise(n, err...)						   \
+	({								   \
+		const char *_errstr = err"\0";				   \
+		if (n != ERR_CODE_NODE_IS_RO)				   \
+			say_warn("%s/%s", error_codes_strs[(n)], _errstr); \
+		@throw [TNTBoxException withReason:_errstr withValue:n];   \
 	})
 
 struct box_txn *txn_alloc(u32 flags);
-u32 box_dispatch(struct box_txn *txn, enum box_mode mode, u16 op,
-		 struct tbuf *data);
+u32 box_process(struct box_txn *txn, u32 op, enum box_mode mode, struct tbuf *request_data);
+
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
 void txn_cleanup(struct box_txn *txn);
 

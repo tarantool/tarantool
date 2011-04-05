@@ -80,7 +80,7 @@ field_compare(struct field *f1, struct field *f2, enum field_data_type type)
 		assert(f1->len == sizeof(f1->u64));
 
 		return f1->u64 >f2->u64 ? 1 : f1->u64 == f2->u64 ? 0 : -1;
-	} else if (type == STR) {
+	} else if (type == STRING) {
 		i32 cmp;
 		void *f1_data, *f2_data;
 
@@ -451,7 +451,7 @@ validate_indeces(struct box_txn *txn)
 	if (namespace[txn->n].index[1].key_cardinality != 0) {	/* there is more then one index */
 		foreach_index(txn->n, index) {
 			for (u32 f = 0; f < index->key_cardinality; ++f) {
-				if (index->key_field[f].type == STR)
+				if (index->key_field[f].type == STRING)
 					continue;
 
 				void *field = tuple_field(txn->tuple, index->key_field[f].fieldno);

@@ -10,7 +10,7 @@ add_custom_command(
     OUTPUT ${CMAKE_SOURCE_DIR}/cfg/prscfg.h
            ${CMAKE_SOURCE_DIR}/cfg/prscfg.c
     COMMAND ${ECHO} '%{' > tmp.cfg
-    COMMAND ${CAT} ${CMAKE_SOURCE_DIR}/cfg/warning.h >> tmp.cfg
+    COMMAND ${ECHO} '\#include \"cfg/warning.h\"' >> tmp.cfg
     COMMAND ${ECHO} '%}' >> tmp.cfg
     COMMAND ${CAT} ${CMAKE_SOURCE_DIR}/cfg/core_cfg.cfg_tmpl >> tmp.cfg
     COMMAND ${CONFETTI} -i tmp.cfg -n tarantool_cfg
@@ -37,7 +37,7 @@ add_custom_command(
            ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c
            ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.cfg
     COMMAND ${ECHO} '%{' > ${mod}_tmp.cfg
-    COMMAND ${CAT} ${CMAKE_SOURCE_DIR}/cfg/warning.h >> ${mod}_tmp.cfg
+    COMMAND ${ECHO} '\#include \"cfg/warning.h\"' >> ${mod}_tmp.cfg
     COMMAND ${ECHO} '\#include \"cfg/tarantool_${mod}_cfg.h\"' >> ${mod}_tmp.cfg
     COMMAND ${ECHO} '%}' >> ${mod}_tmp.cfg
     COMMAND ${CAT} ${CMAKE_SOURCE_DIR}/cfg/core_cfg.cfg_tmpl >> ${mod}_tmp.cfg
