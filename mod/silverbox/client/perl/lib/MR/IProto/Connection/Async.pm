@@ -106,18 +106,19 @@ Send message to server.
 =cut
 
 sub _send {
-    my ($self, $msg, $payload, $callback, $no_reply, $sync) = @_;
+    my ($self, $msg, undef, $callback, $no_reply, $sync) = @_;
     $sync = $self->_choose_sync() unless defined $sync;
-    my $header = $self->_pack_header($msg, length $payload, $sync);
+    my $header = $self->_pack_header($msg, length $_[2], $sync);
     my $server = $self->server;
     $self->_callbacks->{$sync} = $callback;
-    $server->_send_started($sync, $msg, $payload);
+    $server->_send_started($sync, $msg, $_[2]);
     my $handle = $self->_handle;
     if( $server->debug >= 5 ) {
         $server->_debug_dump('send header: ', $header);
-        $server->_debug_dump('send payload: ', $payload);
+        $server->_debug_dump('send payload: ', $_[2]);
     }
-    $handle->push_write( $header . $payload );
+    $handle->push_write($header);
+    $handle->push_write($_[2]);
     if( $no_reply ) {
         push @{$self->_no_reply}, $sync;
         $handle->on_drain( $self->_on_drain ) unless defined $handle->{on_drain};
