@@ -910,28 +910,28 @@ recover_snap(struct recovery_state *r)
 
 		lsn = greatest_lsn(r->snap_prefered_class);
 		if (lsn <= 0)
-			raise("can't find snapshot");
+			tnt_raise(tnt_Exception, reason:"can't find snapshot");
 
 		snap = open_for_read(r, r->snap_class, lsn, 0, NULL);
 		if (snap == NULL)
-			raise("can't find/open snapshot");
+			tnt_raise(tnt_Exception, reason:"can't find/open snapshot");
 
 		iter_open(snap, &i, read_rows);
 		say_info("recover from `%s'", snap->filename);
 
 		while ((row = iter_inner(&i, (void *)1))) {
 			if (r->row_handler(r, row) < 0)
-				raise("can't apply row");
+				tnt_raise(tnt_Exception, reason:"can't apply row");
 		}
 		if (i.error != 0)
-			raise("error during snapshot processing");
+			tnt_raise(tnt_Exception, reason:"error during snapshot processing");
 
 		r->lsn = r->confirmed_lsn = lsn;
 
 		return 0;
 	}
-	@catch (TNTException *e) {
-		say_error("TNTException: `%s'", [e Reason]);
+	@catch (tnt_Exception *e) {
+		say_error("TNTException: `%s'", e->_reason);
 		say_error("failure reading snapshot");
 
 		return -1;
@@ -975,7 +975,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 			/*  after handler(r, row) returned, row may be modified, do not use it */
 			if (r->row_handler(r, row) < 0)
-				raise("can't apply row");
+				tnt_raise(tnt_Exception, reason:"can't apply row");
 
 			if (r) {
 				next_lsn(r, lsn);
@@ -984,15 +984,15 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		}
 
 		if (i.error != 0)
-			raise("error during xlog processing");
+			tnt_raise(tnt_Exception, reason:"error during xlog processing");
 
 		if (i.eof)
 			return LOG_EOF;
 
 		return 1;
 	}
-	@catch (TNTException *e) {
-		say_error("TNTException: `%s'", [e Reason]);
+	@catch (tnt_Exception *e) {
+		say_error("TNTException: `%s'", e->_reason);
 		say_error("failure reading xlog");
 
 		return -1;

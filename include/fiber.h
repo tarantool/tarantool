@@ -42,7 +42,7 @@
 
 #include <exceptions.h>
 
-@interface TNTFiberException: TNTException
+@interface tnt_FiberException: tnt_Exception
 @end
 
 struct msg {
@@ -115,14 +115,7 @@ void wait_for(int events);
 void wait_for_child(pid_t pid);
 void unwait(int events);
 void yield(void);
-void raise_(int);
 void fiber_destroy_all();
-#define raise(err...)							     \
-	({								     \
-		const char *_errstr = err"\0";				     \
-		say_debug("raise %s at %s:%i", _errstr, __FILE__, __LINE__); \
-		@throw [TNTException withReason:_errstr];		     \
-	})
 
 struct msg *read_inbox(void);
 int fiber_bread(struct tbuf *, size_t v);

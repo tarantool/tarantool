@@ -30,7 +30,7 @@
 #include <util.h>
 #include <exceptions.h>
 
-@interface TNTPickleException: TNTException
+@interface tnt_PickleException: tnt_Exception
 @end
 
 struct tbuf;

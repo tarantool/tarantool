@@ -30,9 +30,7 @@
 #include <iproto.h>		/* for err codes */
 #include "say.h"
 
-#define pickle_raise(reason...) @throw [TNTPickleException withReason:reason"\0"]
-
-@implementation TNTPickleException
+@implementation tnt_PickleException
 @end
 
 /* caller must ensure that there is space in target */
@@ -81,16 +79,16 @@ write_varint32(struct tbuf *b, u32 value)
 	append_byte(b, (u8)((value) & 0x7F));
 }
 
-#define read_u(bits)					  \
-	u##bits read_u##bits(struct tbuf *b)		  \
-	{						  \
-		if (b->len < (bits)/8)			  \
-			pickle_raise("buffer too short"); \
-		u##bits r = *(u##bits *)b->data;	  \
-		b->size -= (bits)/8;			  \
-		b->len -= (bits)/8;			  \
-		b->data += (bits)/8;			  \
-		return r;				  \
+#define read_u(bits)									\
+	u##bits read_u##bits(struct tbuf *b)						\
+	{										\
+		if (b->len < (bits)/8)							\
+			tnt_raise(tnt_PickleException, reason:"buffer too short");	\
+		u##bits r = *(u##bits *)b->data;					\
+		b->size -= (bits)/8;							\
+		b->len -= (bits)/8;							\
+		b->data += (bits)/8;							\
+		return r;								\
 	}
 
 read_u(8)
@@ -104,8 +102,9 @@ read_varint32(struct tbuf *buf)
 	u8 *b = buf->data;
 	int len = buf->len;
 
-	if (len < 1)
-		pickle_raise("buffer too short");
+	if (len < 1) {
+		tnt_raise(tnt_PickleException, reason:"buffer too short");
+	}
 	if (!(b[0] & 0x80)) {
 		buf->data += 1;
 		buf->size -= 1;
@@ -114,7 +113,7 @@ read_varint32(struct tbuf *buf)
 	}
 
 	if (len < 2)
-		pickle_raise("buffer too short");
+		tnt_raise(tnt_PickleException, reason:"buffer too short");
 	if (!(b[1] & 0x80)) {
 		buf->data += 2;
 		buf->size -= 2;
@@ -122,7 +121,7 @@ read_varint32(struct tbuf *buf)
 		return (b[0] & 0x7f) << 7 | (b[1] & 0x7f);
 	}
 	if (len < 3)
-		pickle_raise("buffer too short");
+		tnt_raise(tnt_PickleException, reason:"buffer too short");
 	if (!(b[2] & 0x80)) {
 		buf->data += 3;
 		buf->size -= 3;
@@ -131,7 +130,7 @@ read_varint32(struct tbuf *buf)
 	}
 
 	if (len < 4)
-		pickle_raise("buffer too short");
+		tnt_raise(tnt_PickleException, reason:"buffer too short");
 	if (!(b[3] & 0x80)) {
 		buf->data += 4;
 		buf->size -= 4;
@@ -141,7 +140,7 @@ read_varint32(struct tbuf *buf)
 	}
 
 	if (len < 5)
-		pickle_raise("buffer too short");
+		tnt_raise(tnt_PickleException, reason:"buffer too short");
 	if (!(b[4] & 0x80)) {
 		buf->data += 5;
 		buf->size -= 5;
@@ -150,7 +149,7 @@ read_varint32(struct tbuf *buf)
 			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
 
-	pickle_raise("impossible happened");
+	tnt_raise(tnt_PickleException, reason:"impossible happened");
 	return 0;
 }
 
@@ -170,7 +169,7 @@ read_field(struct tbuf *buf)
 	u32 data_len = read_varint32(buf);
 
 	if (data_len > buf->len)
-		pickle_raise("buffer too short");
+		tnt_raise(tnt_PickleException, reason:"buffer too short");
 
 	buf->size -= data_len;
 	buf->len -= data_len;

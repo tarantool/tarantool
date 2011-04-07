@@ -111,7 +111,7 @@ store(struct box_txn *txn, void *key, u32 exptime, u32 flags, u32 bytes, u8 *dat
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
-	return box_process(txn, RW, INSERT, req); /* FIXME: handle RW/RO */
+	return box_process(txn, INSERT, req); /* FIXME: handle RW/RO */
 }
 
 static int
@@ -124,7 +124,7 @@ delete(struct box_txn *txn, void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	return box_process(txn, RW, DELETE, req);
+	return box_process(txn, DELETE, req);
 }
 
 static struct box_tuple *

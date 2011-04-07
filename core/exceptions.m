@@ -1,34 +1,35 @@
 #include <exceptions.h>
+#include <say.h>
 
-@implementation TNTException
-+(id) withReason:(const char *)str
+@implementation tnt_Exception
++ alloc
 {
-	static id e = nil;
+	static __thread tnt_Exception *e = nil;
 
 	if (![e isKindOf:self]) {
 		[e free];
-		e = [[self alloc] init];
+		e = [super alloc];
 	}
 
-	return [e setReason:str];
+	return e;
 }
 
--(void) init
+- init:(const char *)file:(unsigned)line reason:(const char *)reason
 {
 	[super init];
 
-	reason = "";
-}
+	_file = file;
+	_line = line;
 
--(TNTException *) setReason:(const char *)str
-{
-	reason = str;
+	_reason = reason;
 
 	return self;
 }
 
--(const char *) Reason
+- init:(const char *)file:(unsigned)line
 {
-	return reason;
+	return [self init:file:line reason:"unknown"];
 }
+
 @end
+

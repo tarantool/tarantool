@@ -30,14 +30,14 @@
 #include <exceptions.h>
 #include <tbuf.h>
 
-@interface TNTBoxException: TNTException {
-	u32 value;
+@interface tnt_BoxException: tnt_Exception {
+	@public
+		u32 _errcode;
 }
 
-+(id) withReason:(const char *)str withValue:(u32)val;
 
--(TNTBoxException *) setValue:(u32)val;
--(u32) Value;
+- init:(const char *)file:(unsigned)line reason:(const char *)reason errcode:(u32)errcode;
+- init:(const char *)file:(unsigned)line errcode:(u32)errcode;
 @end
 
 extern bool box_updates_allowed;
@@ -100,10 +100,15 @@ enum box_mode {
 	RW
 };
 
-#define BOX_RETURN_TUPLE 1
-#define BOX_ADD 2
-#define BOX_REPLACE 4
-#define BOX_QUIET 8
+#define BOX_RETURN_TUPLE		0x01
+#define BOX_ADD				0x02
+#define BOX_REPLACE			0x04
+#define BOX_QUIET			0x08
+#define BOX_NOT_STORE			0x10
+#define BOX_ALLOWED_REQUEST_FLAGS	(BOX_RETURN_TUPLE | \
+					 BOX_ADD | \
+					 BOX_REPLACE | \
+					 BOX_QUIET)
 
 /*
     deprecated commands:
@@ -133,16 +138,8 @@ enum box_mode {
 
 ENUM(messages, MESSAGES);
 
-#define box_raise(n, err...)						   \
-	({								   \
-		const char *_errstr = err"\0";				   \
-		if (n != ERR_CODE_NODE_IS_RO)				   \
-			say_warn("%s/%s", error_codes_strs[(n)], _errstr); \
-		@throw [TNTBoxException withReason:_errstr withValue:n];   \
-	})
-
 struct box_txn *txn_alloc(u32 flags);
-u32 box_process(struct box_txn *txn, u32 op, enum box_mode mode, struct tbuf *request_data);
+u32 box_process(struct box_txn *txn, u32 op, struct tbuf *request_data);
 
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
 void txn_cleanup(struct box_txn *txn);

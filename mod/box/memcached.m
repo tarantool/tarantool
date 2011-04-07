@@ -67,7 +67,7 @@ struct meta {
 } __packed__;
 
 
-#line 71 "mod/box/memcached.c"
+#line 71 "mod/box/memcached.m"
 static const int memcached_start = 1;
 static const int memcached_first_final = 197;
 static const int memcached_error = 0;
@@ -120,7 +120,7 @@ store(struct box_txn *txn, void *key, u32 exptime, u32 flags, u32 bytes, u8 *dat
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
-	return box_process(txn, RW, INSERT, req); /* FIXME: handle RW/RO */
+	return box_process(txn, INSERT, req); /* FIXME: handle RW/RO */
 }
 
 static int
@@ -133,7 +133,7 @@ delete(struct box_txn *txn, void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	return box_process(txn, RW, DELETE, req);
+	return box_process(txn, DELETE, req);
 }
 
 static struct box_tuple *
@@ -264,12 +264,12 @@ memcached_dispatch(struct box_txn *txn)
 })
 
 	
-#line 268 "mod/box/memcached.c"
+#line 268 "mod/box/memcached.m"
 	{
 	cs = memcached_start;
 	}
 
-#line 273 "mod/box/memcached.c"
+#line 273 "mod/box/memcached.m"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -344,7 +344,7 @@ st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 348 "mod/box/memcached.c"
+#line 348 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st7;
 	goto st0;
@@ -365,7 +365,7 @@ st8:
 	if ( ++p == pe )
 		goto _test_eof8;
 case 8:
-#line 369 "mod/box/memcached.c"
+#line 369 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr18;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -379,7 +379,7 @@ st9:
 	if ( ++p == pe )
 		goto _test_eof9;
 case 9:
-#line 383 "mod/box/memcached.c"
+#line 383 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st9;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -393,7 +393,7 @@ st10:
 	if ( ++p == pe )
 		goto _test_eof10;
 case 10:
-#line 397 "mod/box/memcached.c"
+#line 397 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr22;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -411,7 +411,7 @@ st11:
 	if ( ++p == pe )
 		goto _test_eof11;
 case 11:
-#line 415 "mod/box/memcached.c"
+#line 415 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st11;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -425,7 +425,7 @@ st12:
 	if ( ++p == pe )
 		goto _test_eof12;
 case 12:
-#line 429 "mod/box/memcached.c"
+#line 429 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr26;
 		case 13: goto tr27;
@@ -1549,7 +1549,7 @@ st197:
 	if ( ++p == pe )
 		goto _test_eof197;
 case 197:
-#line 1553 "mod/box/memcached.c"
+#line 1553 "mod/box/memcached.m"
 	goto st0;
 tr27:
 #line 503 "mod/box/memcached.rl"
@@ -1563,7 +1563,7 @@ st13:
 	if ( ++p == pe )
 		goto _test_eof13;
 case 13:
-#line 1567 "mod/box/memcached.c"
+#line 1567 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr30;
 	goto st0;
@@ -1575,7 +1575,7 @@ st14:
 	if ( ++p == pe )
 		goto _test_eof14;
 case 14:
-#line 1579 "mod/box/memcached.c"
+#line 1579 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 32: goto st14;
 		case 110: goto st15;
@@ -1679,7 +1679,7 @@ st27:
 	if ( ++p == pe )
 		goto _test_eof27;
 case 27:
-#line 1683 "mod/box/memcached.c"
+#line 1683 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 13: goto st0;
 		case 32: goto st27;
@@ -1705,7 +1705,7 @@ st28:
 	if ( ++p == pe )
 		goto _test_eof28;
 case 28:
-#line 1709 "mod/box/memcached.c"
+#line 1709 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st29;
 	goto st0;
@@ -1726,7 +1726,7 @@ st30:
 	if ( ++p == pe )
 		goto _test_eof30;
 case 30:
-#line 1730 "mod/box/memcached.c"
+#line 1730 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr50;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1740,7 +1740,7 @@ st31:
 	if ( ++p == pe )
 		goto _test_eof31;
 case 31:
-#line 1744 "mod/box/memcached.c"
+#line 1744 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st31;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1754,7 +1754,7 @@ st32:
 	if ( ++p == pe )
 		goto _test_eof32;
 case 32:
-#line 1758 "mod/box/memcached.c"
+#line 1758 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr54;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1772,7 +1772,7 @@ st33:
 	if ( ++p == pe )
 		goto _test_eof33;
 case 33:
-#line 1776 "mod/box/memcached.c"
+#line 1776 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st33;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1786,7 +1786,7 @@ st34:
 	if ( ++p == pe )
 		goto _test_eof34;
 case 34:
-#line 1790 "mod/box/memcached.c"
+#line 1790 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr58;
 		case 13: goto tr59;
@@ -1807,7 +1807,7 @@ st35:
 	if ( ++p == pe )
 		goto _test_eof35;
 case 35:
-#line 1811 "mod/box/memcached.c"
+#line 1811 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr62;
 	goto st0;
@@ -1819,7 +1819,7 @@ st36:
 	if ( ++p == pe )
 		goto _test_eof36;
 case 36:
-#line 1823 "mod/box/memcached.c"
+#line 1823 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 32: goto st36;
 		case 110: goto st37;
@@ -1926,7 +1926,7 @@ st48:
 	if ( ++p == pe )
 		goto _test_eof48;
 case 48:
-#line 1930 "mod/box/memcached.c"
+#line 1930 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st49;
 	goto st0;
@@ -1947,7 +1947,7 @@ st50:
 	if ( ++p == pe )
 		goto _test_eof50;
 case 50:
-#line 1951 "mod/box/memcached.c"
+#line 1951 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr79;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1961,7 +1961,7 @@ st51:
 	if ( ++p == pe )
 		goto _test_eof51;
 case 51:
-#line 1965 "mod/box/memcached.c"
+#line 1965 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st51;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1975,7 +1975,7 @@ st52:
 	if ( ++p == pe )
 		goto _test_eof52;
 case 52:
-#line 1979 "mod/box/memcached.c"
+#line 1979 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr83;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1993,7 +1993,7 @@ st53:
 	if ( ++p == pe )
 		goto _test_eof53;
 case 53:
-#line 1997 "mod/box/memcached.c"
+#line 1997 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st53;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2007,7 +2007,7 @@ st54:
 	if ( ++p == pe )
 		goto _test_eof54;
 case 54:
-#line 2011 "mod/box/memcached.c"
+#line 2011 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr87;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2021,7 +2021,7 @@ st55:
 	if ( ++p == pe )
 		goto _test_eof55;
 case 55:
-#line 2025 "mod/box/memcached.c"
+#line 2025 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st55;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2035,7 +2035,7 @@ st56:
 	if ( ++p == pe )
 		goto _test_eof56;
 case 56:
-#line 2039 "mod/box/memcached.c"
+#line 2039 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr91;
 		case 13: goto tr92;
@@ -2056,7 +2056,7 @@ st57:
 	if ( ++p == pe )
 		goto _test_eof57;
 case 57:
-#line 2060 "mod/box/memcached.c"
+#line 2060 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr95;
 	goto st0;
@@ -2068,7 +2068,7 @@ st58:
 	if ( ++p == pe )
 		goto _test_eof58;
 case 58:
-#line 2072 "mod/box/memcached.c"
+#line 2072 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr95;
 		case 13: goto st57;
@@ -2136,7 +2136,7 @@ st66:
 	if ( ++p == pe )
 		goto _test_eof66;
 case 66:
-#line 2140 "mod/box/memcached.c"
+#line 2140 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr95;
 		case 13: goto st57;
@@ -2185,7 +2185,7 @@ st71:
 	if ( ++p == pe )
 		goto _test_eof71;
 case 71:
-#line 2189 "mod/box/memcached.c"
+#line 2189 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 13: goto st0;
 		case 32: goto st71;
@@ -2211,7 +2211,7 @@ st72:
 	if ( ++p == pe )
 		goto _test_eof72;
 case 72:
-#line 2215 "mod/box/memcached.c"
+#line 2215 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st73;
 	goto st0;
@@ -2232,7 +2232,7 @@ st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 2236 "mod/box/memcached.c"
+#line 2236 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr118;
 		case 13: goto tr119;
@@ -2253,7 +2253,7 @@ st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 2257 "mod/box/memcached.c"
+#line 2257 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr122;
 	goto st0;
@@ -2265,7 +2265,7 @@ st76:
 	if ( ++p == pe )
 		goto _test_eof76;
 case 76:
-#line 2269 "mod/box/memcached.c"
+#line 2269 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr122;
 		case 13: goto st75;
@@ -2333,7 +2333,7 @@ st84:
 	if ( ++p == pe )
 		goto _test_eof84;
 case 84:
-#line 2337 "mod/box/memcached.c"
+#line 2337 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr122;
 		case 13: goto st75;
@@ -2397,7 +2397,7 @@ st90:
 	if ( ++p == pe )
 		goto _test_eof90;
 case 90:
-#line 2401 "mod/box/memcached.c"
+#line 2401 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr141;
 		case 13: goto st91;
@@ -2420,7 +2420,7 @@ st91:
 	if ( ++p == pe )
 		goto _test_eof91;
 case 91:
-#line 2424 "mod/box/memcached.c"
+#line 2424 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr141;
 	goto st0;
@@ -2445,7 +2445,7 @@ st93:
 	if ( ++p == pe )
 		goto _test_eof93;
 case 93:
-#line 2449 "mod/box/memcached.c"
+#line 2449 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr146;
 		case 13: goto tr147;
@@ -2466,7 +2466,7 @@ st94:
 	if ( ++p == pe )
 		goto _test_eof94;
 case 94:
-#line 2470 "mod/box/memcached.c"
+#line 2470 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr141;
 		case 13: goto st91;
@@ -2534,7 +2534,7 @@ st102:
 	if ( ++p == pe )
 		goto _test_eof102;
 case 102:
-#line 2538 "mod/box/memcached.c"
+#line 2538 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr141;
 		case 13: goto st91;
@@ -2619,7 +2619,7 @@ st112:
 	if ( ++p == pe )
 		goto _test_eof112;
 case 112:
-#line 2623 "mod/box/memcached.c"
+#line 2623 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr169;
 	goto st0;
@@ -2644,7 +2644,7 @@ st114:
 	if ( ++p == pe )
 		goto _test_eof114;
 case 114:
-#line 2648 "mod/box/memcached.c"
+#line 2648 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr174;
 		case 13: goto tr175;
@@ -2661,7 +2661,7 @@ st115:
 	if ( ++p == pe )
 		goto _test_eof115;
 case 115:
-#line 2665 "mod/box/memcached.c"
+#line 2665 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr169;
 		case 13: goto st112;
@@ -2729,7 +2729,7 @@ st123:
 	if ( ++p == pe )
 		goto _test_eof123;
 case 123:
-#line 2733 "mod/box/memcached.c"
+#line 2733 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr169;
 		case 13: goto st112;
@@ -2771,7 +2771,7 @@ st127:
 	if ( ++p == pe )
 		goto _test_eof127;
 case 127:
-#line 2775 "mod/box/memcached.c"
+#line 2775 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 13: goto st0;
 		case 32: goto st127;
@@ -2797,7 +2797,7 @@ st128:
 	if ( ++p == pe )
 		goto _test_eof128;
 case 128:
-#line 2801 "mod/box/memcached.c"
+#line 2801 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr195;
 		case 13: goto st129;
@@ -3021,7 +3021,7 @@ st156:
 	if ( ++p == pe )
 		goto _test_eof156;
 case 156:
-#line 3025 "mod/box/memcached.c"
+#line 3025 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st157;
 	goto st0;
@@ -3042,7 +3042,7 @@ st158:
 	if ( ++p == pe )
 		goto _test_eof158;
 case 158:
-#line 3046 "mod/box/memcached.c"
+#line 3046 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr225;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3056,7 +3056,7 @@ st159:
 	if ( ++p == pe )
 		goto _test_eof159;
 case 159:
-#line 3060 "mod/box/memcached.c"
+#line 3060 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st159;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3070,7 +3070,7 @@ st160:
 	if ( ++p == pe )
 		goto _test_eof160;
 case 160:
-#line 3074 "mod/box/memcached.c"
+#line 3074 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr229;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3088,7 +3088,7 @@ st161:
 	if ( ++p == pe )
 		goto _test_eof161;
 case 161:
-#line 3092 "mod/box/memcached.c"
+#line 3092 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st161;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3102,7 +3102,7 @@ st162:
 	if ( ++p == pe )
 		goto _test_eof162;
 case 162:
-#line 3106 "mod/box/memcached.c"
+#line 3106 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr233;
 		case 13: goto tr234;
@@ -3123,7 +3123,7 @@ st163:
 	if ( ++p == pe )
 		goto _test_eof163;
 case 163:
-#line 3127 "mod/box/memcached.c"
+#line 3127 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr237;
 	goto st0;
@@ -3135,7 +3135,7 @@ st164:
 	if ( ++p == pe )
 		goto _test_eof164;
 case 164:
-#line 3139 "mod/box/memcached.c"
+#line 3139 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 32: goto st164;
 		case 110: goto st165;
@@ -3244,7 +3244,7 @@ st176:
 	if ( ++p == pe )
 		goto _test_eof176;
 case 176:
-#line 3248 "mod/box/memcached.c"
+#line 3248 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st177;
 	goto st0;
@@ -3265,7 +3265,7 @@ st178:
 	if ( ++p == pe )
 		goto _test_eof178;
 case 178:
-#line 3269 "mod/box/memcached.c"
+#line 3269 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr255;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3279,7 +3279,7 @@ st179:
 	if ( ++p == pe )
 		goto _test_eof179;
 case 179:
-#line 3283 "mod/box/memcached.c"
+#line 3283 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st179;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3293,7 +3293,7 @@ st180:
 	if ( ++p == pe )
 		goto _test_eof180;
 case 180:
-#line 3297 "mod/box/memcached.c"
+#line 3297 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr259;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3311,7 +3311,7 @@ st181:
 	if ( ++p == pe )
 		goto _test_eof181;
 case 181:
-#line 3315 "mod/box/memcached.c"
+#line 3315 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st181;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3325,7 +3325,7 @@ st182:
 	if ( ++p == pe )
 		goto _test_eof182;
 case 182:
-#line 3329 "mod/box/memcached.c"
+#line 3329 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr263;
 		case 13: goto tr264;
@@ -3346,7 +3346,7 @@ st183:
 	if ( ++p == pe )
 		goto _test_eof183;
 case 183:
-#line 3350 "mod/box/memcached.c"
+#line 3350 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr267;
 	goto st0;
@@ -3358,7 +3358,7 @@ st184:
 	if ( ++p == pe )
 		goto _test_eof184;
 case 184:
-#line 3362 "mod/box/memcached.c"
+#line 3362 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 32: goto st184;
 		case 110: goto st185;

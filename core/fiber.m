@@ -56,7 +56,7 @@
 #include <pickle.h>
 #include "diagnostics.h"
 
-@implementation TNTFiberException
+@implementation tnt_FiberException
 @end
 
 static struct fiber sched;
@@ -348,12 +348,14 @@ fiber_loop(void *data __attribute__((unused)))
 		@try {
 			fiber->f(fiber->f_data);
 		}
-		@catch (TNTFiberException *e) {
-			say_info("fiber `%s': exception `TNTFiberException': `%s'", fiber->name, [e Reason]);
+		@catch (tnt_FiberException *e) {
+			say_info("fiber `%s': exception `tnt_FiberException': `%s'",
+				 fiber->name, e->_reason);
 			say_info("fiber `%s': exiting", fiber->name);
 		}
-		@catch (TNTException *e) {
-			say_error("fiber `%s': exception `%s': `%s'", fiber->name, [e name], [e Reason]);
+		@catch (tnt_Exception *e) {
+			say_error("fiber `%s': exception `%s': `%s'",
+				  fiber->name, [e name], e->_reason);
 			panic("fiber `%s': exiting", fiber->name);
 		}
 		@catch (id e) {
