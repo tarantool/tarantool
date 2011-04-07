@@ -1,0 +1,24 @@
+# encoding: tarantool
+#
+# clear statistics
+server.restart()
+
+print """#
+# check stat_cleanup
+#  add several tuples
+#
+"""
+for i in range(10):
+  exec sql "insert into t0 values ({0}, 'tuple')".format(i)
+exec admin "show stat"
+print """#
+# restart server
+#
+"""
+server.restart()
+print """#
+# statistics must be zero
+#
+"""
+exec admin "show stat"
+# vim: syntax=python
