@@ -1201,7 +1201,7 @@ box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
 {
 	ev_tstamp start = ev_now(), stop;
 
-	stat_collect(stat_base, txn->op, 1);
+	stat_collect(stat_base, op, 1);
 
 	@try {
 		txn_begin(txn, op, request_data);
@@ -1452,6 +1452,7 @@ mod_init(void)
 		return;
 
 	recover(recovery_state, 0);
+	stat_cleanup(stat_base, messages_MAX);
 
 	title("build_indexes");
 

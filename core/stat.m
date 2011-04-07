@@ -130,3 +130,11 @@ stat_init(void)
 	timer.repeat = 1.;
 	ev_timer_again(&timer);
 }
+
+void
+stat_cleanup(int base, size_t max_idx)
+{
+	for (int i = base; i < max_idx; i++)
+		for (int j = 0; j < SECS + 1; j++)
+			stats[i].value[j] = 0;
+}
