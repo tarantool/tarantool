@@ -252,7 +252,6 @@ struct coro_context {
 };
 
 # define coro_transfer(p,n) do { if (!coro_setjmp ((p)->env)) coro_longjmp ((n)->env); } while (0)
-# define coro_save_and_longjmp(p,j,v) do { if (!coro_setjmp ((p)->env)) longjmp (j,v); } while (0)
 # define coro_destroy(ctx) (void *)(ctx)
 
 #elif CORO_ASM

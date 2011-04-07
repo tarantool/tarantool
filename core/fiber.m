@@ -122,20 +122,11 @@ fiber_call(struct fiber *callee)
 }
 
 void
-fiber_raise(struct fiber *callee, jmp_buf exc, int value)
+fiber_raise(struct fiber *callee)
 {
-	struct fiber *caller = fiber;
+	callee->flags |= FIBER_RAISE;
 
-	assert(sp - call_stack < 8);
-	assert(caller);
-
-	fiber = callee;
-	*sp++ = caller;
-
-	update_last_stack_frame(caller);
-
-	callee->csw++;
-	coro_save_and_longjmp(&caller->coro.ctx, exc, value);
+	fiber_call(callee);
 }
 
 void
@@ -149,6 +140,12 @@ yield(void)
 
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
+
+	if (fiber->flags & FIBER_RAISE) {
+		fiber->flags &= ~FIBER_RAISE;
+
+		tnt_raise(tnt_FiberException, reason:"fiber_raise");
+	}
 }
 
 void
@@ -411,6 +408,7 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
 	fiber->f_data = f_data;
 	while (++last_used_fid <= 100) ;	/* fids from 0 to 100 are reserved */
 	fiber->fid = last_used_fid;
+	fiber->flags = 0;
 	register_fid(fiber);
 
 	return fiber;
@@ -502,9 +500,9 @@ void
 wait_inbox(struct fiber *recipient)
 {
 	while (ring_size(recipient->inbox) == 0) {
-		recipient->reading_inbox = true;
+		recipient->flags |= FIBER_READING_INBOX;
 		yield();
-		recipient->reading_inbox = false;
+		recipient->flags &= ~FIBER_READING_INBOX;
 	}
 }
 
@@ -520,7 +518,7 @@ write_inbox(struct fiber *recipient, struct tbuf *msg)
 	inbox->ring[inbox->head]->msg = tbuf_clone(recipient->pool, msg);
 	inbox->head = (inbox->head + 1) % inbox->size;
 
-	if (recipient->reading_inbox)
+	if (recipient->flags & FIBER_READING_INBOX)
 		fiber_call(recipient);
 	return true;
 }
@@ -530,9 +528,9 @@ read_inbox(void)
 {
 	struct ring *restrict inbox = fiber->inbox;
 	while (ring_size(inbox) == 0) {
-		fiber->reading_inbox = true;
+		fiber->flags |= FIBER_READING_INBOX;
 		yield();
-		fiber->reading_inbox = false;
+		fiber->flags &= ~FIBER_READING_INBOX;
 	}
 
 	struct msg *msg = inbox->ring[inbox->tail];
@@ -912,7 +910,7 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		proxy_name = palloc(eter_pool, 64);
 		snprintf(proxy_name, 64, "%s/inbox2sock", name);
 		c->out = fiber_create(proxy_name, socks[1], inbox_size, inbox2sock, NULL);
-		c->out->reading_inbox = true;
+		c->out->flags |= FIBER_READING_INBOX;
 		return c;
 	} else {
 		salloc_destroy();

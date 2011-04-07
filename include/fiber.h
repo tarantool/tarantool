@@ -42,6 +42,9 @@
 
 #include <exceptions.h>
 
+#define FIBER_READING_INBOX 0x1
+#define FIBER_RAISE	    0x2
+
 @interface tnt_FiberException: tnt_Exception
 @end
 
@@ -89,7 +92,8 @@ struct fiber {
 	u64 cookie;
 	bool has_peer;
 	char peer_name[32];
-	bool reading_inbox;
+
+	u32 flags;
 };
 
 SLIST_HEAD(, fiber) fibers, zombie_fibers;
@@ -155,7 +159,7 @@ ssize_t fiber_flush_output(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
 void fiber_call(struct fiber *callee);
-void fiber_raise(struct fiber *callee, jmp_buf exc, int value);
+void fiber_raise(struct fiber *callee);
 int fiber_connect(struct sockaddr_in *addr);
 void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);
