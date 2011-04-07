@@ -614,7 +614,10 @@ sub _server_callback {
 
 sub _recv_now {
     my ($self, $servers) = @_;
-    $_->recv_all() foreach values %$servers;
+    while(my @servers = values %$servers) {
+        %$servers = ();
+        $_->recv_all() foreach @servers;
+    }
     return;
 }
 
