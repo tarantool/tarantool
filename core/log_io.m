@@ -931,7 +931,7 @@ recover_snap(struct recovery_state *r)
 		return 0;
 	}
 	@catch (tnt_Exception *e) {
-		say_error("tnt_Exception: `%s'", e->_reason);
+		say_error("tnt_Exception: `%s'", e->reason);
 		say_error("failure reading snapshot");
 
 		return -1;
@@ -992,7 +992,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		return 1;
 	}
 	@catch (tnt_Exception *e) {
-		say_error("tnt_Exception: `%s'", e->_reason);
+		say_error("tnt_Exception: `%s'", e->reason);
 		say_error("failure reading xlog");
 
 		return -1;

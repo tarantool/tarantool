@@ -32,12 +32,12 @@
 
 @interface tnt_BoxException: tnt_Exception {
 	@public
-		u32 _errcode;
+		u32 errcode;
 }
 
 
-- init:(const char *)file:(unsigned)line reason:(const char *)reason errcode:(u32)errcode;
-- init:(const char *)file:(unsigned)line errcode:(u32)errcode;
+- init:(const char *)p_file:(unsigned)p_line reason:(const char *)p_reason errcode:(u32)p_errcode;
+- init:(const char *)p_file:(unsigned)p_line errcode:(u32)p_errcode;
 @end
 
 extern bool box_updates_allowed;

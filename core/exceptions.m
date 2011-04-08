@@ -14,21 +14,21 @@
 	return e;
 }
 
-- init:(const char *)file:(unsigned)line reason:(const char *)reason
+- init:(const char *)p_file:(unsigned)p_line reason:(const char *)p_reason
 {
 	[super init];
 
-	_file = file;
-	_line = line;
+	file = p_file;
+	line = p_line;
 
-	_reason = reason;
+	reason = p_reason;
 
 	return self;
 }
 
-- init:(const char *)file:(unsigned)line
+- init:(const char *)p_file:(unsigned)p_line
 {
-	return [self init:file:line reason:"unknown"];
+	return [self init:p_file:p_line reason:"unknown"];
 }
 
 @end

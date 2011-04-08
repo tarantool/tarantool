@@ -347,12 +347,12 @@ fiber_loop(void *data __attribute__((unused)))
 		}
 		@catch (tnt_FiberException *e) {
 			say_info("fiber `%s': exception `tnt_FiberException': `%s'",
-				 fiber->name, e->_reason);
+				 fiber->name, e->reason);
 			say_info("fiber `%s': exiting", fiber->name);
 		}
 		@catch (tnt_Exception *e) {
 			say_error("fiber `%s': exception `%s': `%s'",
-				  fiber->name, [e name], e->_reason);
+				  fiber->name, [e name], e->reason);
 			panic("fiber `%s': exiting", fiber->name);
 		}
 		@catch (id e) {

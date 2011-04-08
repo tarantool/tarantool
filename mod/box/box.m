@@ -82,11 +82,11 @@ struct box_snap_row {
 } __attribute__((packed));
 
 @implementation tnt_BoxException
-- init:(const char *)file:(unsigned)line reason:(const char *)reason errcode:(u32)errcode
+- init:(const char *)p_file:(unsigned)p_line reason:(const char *)p_reason errcode:(u32)p_errcode
 {
-	[super init:file:line reason:reason];
+	[super init:p_file:p_line reason:p_reason];
 
-	_errcode = errcode;
+	errcode = p_errcode;
 
 	if (errcode != ERR_CODE_NODE_IS_RO)
 		say_error("tnt_BoxException: %s/`%s' at %s:%i",
@@ -95,9 +95,9 @@ struct box_snap_row {
 	return self;
 }
 
-- init:(const char *)file:(unsigned)line errcode:(u32)errcode
+- init:(const char *)p_file:(unsigned)p_line errcode:(u32)p_errcode
 {
-	return [self init:file:line reason:"unknown" errcode:errcode];
+	return [self init:p_file:p_line reason:"unknown" errcode:p_errcode];
 }
 
 @end
@@ -1213,18 +1213,18 @@ box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
 	@catch (tnt_PickleException *e) {
 		txn_abort(txn);
 
-		say_error("tnt_PickleException: `%s' at %s:%i", e->_reason, e->_file, e->_line);
+		say_error("tnt_PickleException: `%s' at %s:%i", e->reason, e->file, e->line);
 
 		return ERR_CODE_UNKNOWN_ERROR;
 	}
 	@catch (tnt_BoxException *e) {
 		txn_abort(txn);
 
-		if (e->_errcode != ERR_CODE_NODE_IS_RO)
+		if (e->errcode != ERR_CODE_NODE_IS_RO)
 			say_error("tnt_BoxException: %s/`%s' at %s:%i",
-				  error_codes_strs[e->_errcode], e->_reason, e->_file, e->_line);
+				  error_codes_strs[e->errcode], e->reason, e->file, e->line);
 
-		return e->_errcode;
+		return e->errcode;
 	}
 	@catch (id e) {
 		txn_abort(txn);

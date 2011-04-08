@@ -5,15 +5,15 @@
 
 @interface tnt_Exception: Object {
 	@public
-		const char *_file;
-		unsigned _line;
-		const char *_reason;
+		const char *file;
+		unsigned line;
+		const char *reason;
 }
 
 + alloc;
 
-- init:(const char *)file:(unsigned)line reason:(const char*)reason;
-- init:(const char *)file:(unsigned)line;
+- init:(const char *)p_file:(unsigned)p_line reason:(const char*)p_reason;
+- init:(const char *)p_file:(unsigned)p_line;
 @end
 
 #define tnt_raise(class, message) {					\
