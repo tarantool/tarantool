@@ -446,11 +446,14 @@ index_iterator_next_tree_str(struct index *self, struct tree_index_member *patte
 }
 
 void
-validate_indeces(struct box_txn *txn)
+validate_indexes(struct box_txn *txn)
 {
 	if (namespace[txn->n].index[1].key_cardinality != 0) {	/* there is more then one index */
 		foreach_index(txn->n, index) {
 			for (u32 f = 0; f < index->key_cardinality; ++f) {
+				if (index->key_field[f].fieldno >= txn->tuple->cardinality)
+					box_raise(ERR_CODE_ILLEGAL_PARAMS, "tuple is too short");
+
 				if (index->key_field[f].type == STR)
 					continue;
 
