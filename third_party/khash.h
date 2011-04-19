@@ -231,7 +231,8 @@ static const double __ac_HASH_UPPER = 0.77;
         { \
                 if (h && h->flags) { \
                         memset(h->flags, 0xaa, ((h->n_buckets>>4) + 1) * sizeof(uint32_t)); \
-                        h->avg_size = (h->avg_size * (double)h->clears_cnt + (double)h->size) / (double)(++h->clears_cnt); \
+                        h->avg_size = (h->avg_size * (double)h->clears_cnt + (double)h->size) / (double)(h->clears_cnt + 1); \
+			h->clears_cnt++; \
                         h->size = h->n_occupied = 0; \
                         if (h->resize_wat && (h->n_buckets > *(h->resize_wat))) \
                                 kh_resize_##name(h, *(h->resize_wat) - 1); \
