@@ -35,6 +35,7 @@
 
 const uint32_t msg_ping = 0xff00;
 STRS(error_codes, ERROR_CODES);
+DESC_STRS(error_codes, ERROR_CODES);
 
 static struct tbuf *
 iproto_parse(struct tbuf *in)
