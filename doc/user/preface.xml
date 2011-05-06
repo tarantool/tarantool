@@ -8,7 +8,7 @@
 <section xml:id="preface">
   <title>Tarantool/Box: an overview</title>
   <para>
-    <productname>Tarantool/Box</productname>, or simply
+    <productname>Tarantool/Box</productname>, or simply 
     <productname>Tarantool</productname>,
     is a high performance key/value storage server.  The code is
     available for free under the terms of <citetitle
