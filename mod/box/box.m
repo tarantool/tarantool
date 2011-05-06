@@ -280,7 +280,7 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		tnt_raise(tnt_BoxException,
 			  reason:"tuple not found" errcode:ERR_CODE_NODE_NOT_FOUND);
 
-	validate_indeces(txn);
+	validate_indexes(txn);
 	run_hooks(txn, before_commit_update_hook);
 
 	if (txn->old_tuple != NULL) {
@@ -574,7 +574,7 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 		p += fields[i]->len;
 	}
 
-	validate_indeces(txn);
+	validate_indexes(txn);
 	run_hooks(txn, before_commit_update_hook);
 
 	if (data->len != 0)
