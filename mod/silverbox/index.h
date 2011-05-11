@@ -119,7 +119,7 @@ void index_iterator_init_tree_str(struct index *self, struct tree_index_member *
 struct box_tuple * index_iterator_next_tree_str(struct index *self, struct tree_index_member *pattern);
 
 struct box_txn;
-void validate_indeces(struct box_txn *txn);
+void validate_indexes(struct box_txn *txn);
 void build_indexes(void);
 
 #endif
