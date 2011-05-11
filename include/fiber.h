@@ -127,12 +127,12 @@ void raise_(int);
 struct msg *read_inbox(void);
 int fiber_bread(struct tbuf *, size_t v);
 
-inline static void add_iov_unsafe(void *buf, size_t len)
+inline static void add_iov_unsafe(const void *buf, size_t len)
 {
 	struct iovec *v;
 	assert(fiber->iov->size - fiber->iov->len >= sizeof(*v));
 	v = fiber->iov->data + fiber->iov->len;
-	v->iov_base = buf;
+	v->iov_base = (void *)buf;
 	v->iov_len = len;
 	fiber->iov->len += sizeof(*v);
 	fiber->iov_cnt++;
@@ -143,7 +143,7 @@ inline static void iov_ensure(size_t count)
 	tbuf_ensure(fiber->iov, sizeof(struct iovec) * count);
 }
 
-inline static void add_iov(void *buf, size_t len)
+inline static void add_iov(const void *buf, size_t len)
 {
 	iov_ensure(1);
 	add_iov_unsafe(buf, len);

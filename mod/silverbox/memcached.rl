@@ -30,7 +30,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#include <iproto.h>
+#include <errcode.h>
 #include <salloc.h>
 #include <palloc.h>
 #include <fiber.h>
@@ -251,8 +251,8 @@ memcached_dispatch(struct box_txn *txn)
 			add_iov("STORED\r\n", 8);					\
 		} else {								\
 			add_iov("SERVER_ERROR ", 13);					\
-			add_iov(error_codes_desc_strs[ret_code],			\
-				strlen(error_codes_desc_strs[ret_code]));		\
+			add_iov(ERRCODE_DESC(error_codes, ret_code),			\
+				strlen(ERRCODE_DESC(error_codes, ret_code)));		\
 			add_iov("\r\n", 2);						\
 		}									\
 	}										\
@@ -382,8 +382,8 @@ memcached_dispatch(struct box_txn *txn)
 					add_iov("DELETED\r\n", 9);
 				else {
 					add_iov("SERVER_ERROR ", 13);
-					add_iov(error_codes_desc_strs[ret_code],
-						strlen(error_codes_desc_strs[ret_code]));
+					add_iov(ERRCODE_DESC(error_codes, ret_code),
+						strlen(ERRCODE_DESC(error_codes,ret_code)));
 					add_iov("\r\n", 2);
 				}
 			}

@@ -29,8 +29,8 @@
 #include <stdbool.h>
 #include <errno.h>
 
+#include <errcode.h>
 #include <fiber.h>
-#include <iproto.h>
 #include <log_io.h>
 #include <pickle.h>
 #include <salloc.h>

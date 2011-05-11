@@ -30,7 +30,7 @@
 #include <tbuf.h>
 #include <palloc.h>
 #include <fiber.h>
-#include <iproto.h>		/* for err codes */
+#include <errcode.h>
 #include <pickle.h>
 
 /* caller must ensure that there is space in target */

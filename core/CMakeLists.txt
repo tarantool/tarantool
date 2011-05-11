@@ -56,7 +56,7 @@ set (recompiled_core_sources
 
 set (common_sources tbuf.c palloc.c util.c diagnostics.c
     salloc.c pickle.c coro.c stat.c log_io.c
-    log_io_remote.c iproto.c)
+    log_io_remote.c iproto.c errcode.c)
 
 if (ENABLE_TRACE)
   set (common_sources ${common_sources} trace.c)

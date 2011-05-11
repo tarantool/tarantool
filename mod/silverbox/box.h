@@ -118,11 +118,11 @@ enum box_mode {
 
 ENUM(messages, MESSAGES);
 
-#define box_raise(n, err)						\
-	({								\
-		if (n != ERR_CODE_NODE_IS_RO)				\
-			say_warn("%s/%s", error_codes_strs[(n)], err);	\
-		raise(n, err);						\
+#define box_raise(n, err)							\
+	({									\
+		if (n != ERR_CODE_NODE_IS_RO)					\
+			say_warn("%s/%s", ERRCODE_STR(error_codes, n), err);	\
+		raise(n, err);							\
 	})
 
 struct box_txn *txn_alloc(u32 flags);
