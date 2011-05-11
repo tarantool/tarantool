@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#include <errcode.h>
 #include <salloc.h>
 #include <palloc.h>
 #include <fiber.h>
@@ -240,18 +241,22 @@ memcached_dispatch(struct box_txn *txn)
 
 	say_debug("memcached_dispatch '%.*s'", MIN((int)(pe - p), 40) , p);
 
-#define STORE ({							\
-	stats.cmd_set++;						\
-	if (bytes > (1<<20)) {						\
-		add_iov("SERVER_ERROR object too large for cache\r\n", 41); \
-	} else {							\
-		if (store(txn, key, exptime, flags, bytes, data) == 0) { \
-			stats.total_items++;				\
-			add_iov("STORED\r\n", 8);			\
-		} else {						\
-			add_iov("SERVER_ERROR\r\n", 14);		\
-		}							\
-	}								\
+#define STORE ({									\
+	stats.cmd_set++;								\
+	if (bytes > (1<<20)) {								\
+		add_iov("SERVER_ERROR object too large for cache\r\n", 41);		\
+	} else {									\
+		u32 ret_code;								\
+		if ((ret_code = store(txn, key, exptime, flags, bytes, data)) == 0) {	\
+			stats.total_items++;						\
+			add_iov("STORED\r\n", 8);					\
+		} else {								\
+			add_iov("SERVER_ERROR ", 13);					\
+			add_iov(ERRCODE_DESC(error_codes, ret_code),			\
+				strlen(ERRCODE_DESC(error_codes, ret_code)));		\
+			add_iov("\r\n", 2);						\
+		}									\
+	}										\
 })
 
 	%%{
@@ -373,10 +378,15 @@ memcached_dispatch(struct box_txn *txn)
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				add_iov("NOT_FOUND\r\n", 11);
 			} else {
-				if (delete(txn, key) == 0)
+				u32 ret_code;
+				if ((ret_code = delete(txn, key)) == 0)
 					add_iov("DELETED\r\n", 9);
-				else
-					add_iov("SERVER_ERROR\r\n", 14);
+				else {
+					add_iov("SERVER_ERROR ", 13);
+					add_iov(ERRCODE_DESC(error_codes, ret_code),
+						strlen(ERRCODE_DESC(error_codes,ret_code)));
+					add_iov("\r\n", 2);
+				}
 			}
 		}
 

@@ -28,6 +28,7 @@
 #include <tbuf.h>
 #include <fiber.h>
 #include <iproto.h>		/* for err codes */
+#include "errcode.h"
 #include "say.h"
 
 @implementation tnt_PickleException
