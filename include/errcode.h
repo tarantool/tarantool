@@ -11,17 +11,6 @@ struct errcode_record {
 	const char *errdesc;
 };
 
-#define ERRCODE_RECORD_MEMBER(s, f, d) {	\
-	.errstr = #s,				\
-	.errflags = f,				\
-	.errdesc = #d				\
-},
-
-#define ERRCODE_RECORDS(enum_name, enum_members)			\
-	struct errcode_record enum_name##_records[enum_name##_MAX] = {	\
-		enum_members(ERRCODE_RECORD_MEMBER)			\
-	}
-
 #define ERRCODE_STR(enum_name, err) (enum_name##_records[err].errstr)
 #define ERRCODE_VAL(enum_name, err) (((err) << 8) | enum_name##_records[err].errflags)
 #define ERRCODE_DESC(enum_name, err) (enum_name##_records[err].errdesc)
