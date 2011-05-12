@@ -6,7 +6,7 @@
 	.errdesc = #d				\
 },
 
-struct errcode_record error_codes_records[error_codes_MAX] = {
+struct errcode_record tnt_error_codes[tnt_error_codes_enum_MAX] = {
 	ERROR_CODES(ERRCODE_RECORD_MEMBER)
 };
 

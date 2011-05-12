@@ -121,7 +121,7 @@ ENUM(messages, MESSAGES);
 #define box_raise(n, err)							\
 	({									\
 		if (n != ERR_CODE_NODE_IS_RO)					\
-			say_warn("%s/%s", ERRCODE_STR(error_codes, n), err);	\
+			say_warn("%s/%s", tnt_errcode_str(n), err);	\
 		raise(n, err);							\
 	})
 

@@ -260,8 +260,8 @@ memcached_dispatch(struct box_txn *txn)
 			add_iov("STORED\r\n", 8);					\
 		} else {								\
 			add_iov("SERVER_ERROR ", 13);					\
-			add_iov(ERRCODE_DESC(error_codes, ret_code),			\
-				strlen(ERRCODE_DESC(error_codes, ret_code)));		\
+			add_iov(tnt_errcode_desc(ret_code),			\
+				strlen(tnt_errcode_desc(ret_code)));		\
 			add_iov("\r\n", 2);						\
 		}									\
 	}										\
@@ -1078,8 +1078,8 @@ tr141:
 					add_iov("DELETED\r\n", 9);
 				else {
 					add_iov("SERVER_ERROR ", 13);
-					add_iov(ERRCODE_DESC(error_codes, ret_code),
-						strlen(ERRCODE_DESC(error_codes,ret_code)));
+					add_iov(tnt_errcode_desc(ret_code),
+						strlen(tnt_errcode_desc(ret_code)));
 					add_iov("\r\n", 2);
 				}
 			}
@@ -1112,8 +1112,8 @@ tr146:
 					add_iov("DELETED\r\n", 9);
 				else {
 					add_iov("SERVER_ERROR ", 13);
-					add_iov(ERRCODE_DESC(error_codes, ret_code),
-						strlen(ERRCODE_DESC(error_codes,ret_code)));
+					add_iov(tnt_errcode_desc(ret_code),
+						strlen(tnt_errcode_desc(ret_code)));
 					add_iov("\r\n", 2);
 				}
 			}
@@ -1142,8 +1142,8 @@ tr157:
 					add_iov("DELETED\r\n", 9);
 				else {
 					add_iov("SERVER_ERROR ", 13);
-					add_iov(ERRCODE_DESC(error_codes, ret_code),
-						strlen(ERRCODE_DESC(error_codes,ret_code)));
+					add_iov(tnt_errcode_desc(ret_code),
+						strlen(tnt_errcode_desc(ret_code)));
 					add_iov("\r\n", 2);
 				}
 			}

@@ -7,13 +7,9 @@
 
 struct errcode_record {
 	const char *errstr;
-	uint32_t errflags;
 	const char *errdesc;
+	uint8_t errflags;
 };
-
-#define ERRCODE_STR(enum_name, err) (enum_name##_records[err].errstr)
-#define ERRCODE_VAL(enum_name, err) (((err) << 8) | enum_name##_records[err].errflags)
-#define ERRCODE_DESC(enum_name, err) (enum_name##_records[err].errdesc)
 
 #define ERROR_CODES(_)					    \
 	/*  0 */_(ERR_CODE_OK,				0, "OK") \
@@ -79,7 +75,34 @@ struct errcode_record {
 	/* 56 */_(ERR_CODE_INDEX_VIOLATION,		2, "Some index violation occur") \
 	/* 57 */_(ERR_CODE_NO_SUCH_NAMESPACE,		2, "There is no such namespace")
 
-ENUM0(error_codes, ERROR_CODES);
-extern struct errcode_record error_codes_records[];
+ENUM0(tnt_error_codes_enum, ERROR_CODES);
+extern struct errcode_record tnt_error_codes[];
 
-#endif
+/**
+ * Return a string representation of error name, e.g.
+ * "ERR_CODE_OK".
+ */
+
+static inline const char *tnt_errcode_str(uint32_t errcode)
+{
+	return tnt_error_codes[errcode].errstr;
+}
+
+
+/** Return a 4-byte numeric error code, with status flags. */
+
+static inline uint32_t tnt_errcode_val(uint32_t errcode)
+{
+	return (errcode << 8) | tnt_error_codes[errcode].errflags;
+}
+
+
+/** Return a description of the error. */
+
+static inline const char *tnt_errcode_desc(uint32_t errcode)
+{
+	return tnt_error_codes[errcode].errdesc;
+}
+
+
+#endif /* TARANTOOL_ERRCODE_H */

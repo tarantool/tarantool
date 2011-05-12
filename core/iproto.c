@@ -76,7 +76,7 @@ iproto_interact(void *data)
 				request->len = iproto(request)->len;
 				request->data = iproto(request)->data;
 				u32 err = callback(msg_code, request);
-				reply->ret_code = ERRCODE_VAL(error_codes, err);
+				reply->ret_code = tnt_errcode_val(err);
 
 				/*
 				 * retcode is uint32_t and included int struct iproto_header_retcode
