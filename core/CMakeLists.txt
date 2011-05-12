@@ -1,12 +1,12 @@
 #
 # libev library
 #
-add_library(ev tarantool_ev.m)
+add_library(ev tarantool_ev.c)
 
 check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
 
 if (gcc_has_wno_unused_result)
-    set_source_files_properties(tarantool_ev.m
+    set_source_files_properties(tarantool_ev.c
         PROPERTIES COMPILE_FLAGS "-Wno-unused-result")
 endif()
 
