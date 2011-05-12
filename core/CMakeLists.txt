@@ -1,12 +1,12 @@
 #
 # libev library
 #
-add_library(ev tarantool_ev.m)
+add_library(ev tarantool_ev.c)
 
 check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
 
 if (gcc_has_wno_unused_result)
-    set_source_files_properties(tarantool_ev.m
+    set_source_files_properties(tarantool_ev.c
         PROPERTIES COMPILE_FLAGS "-Wno-unused-result")
 endif()
 
@@ -56,7 +56,7 @@ set (recompiled_core_sources
 
 set (common_sources tbuf.m palloc.m util.m diagnostics.m
     salloc.m pickle.m coro.m stat.m log_io.m
-    log_io_remote.m iproto.m exceptions.m)
+    log_io_remote.m iproto.m exceptions.m errcode.c)
 
 if (ENABLE_TRACE)
   set (common_sources ${common_sources} trace.m)

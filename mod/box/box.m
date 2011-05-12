@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 
+#include <errcode.h>
 #include <fiber.h>
 #include <iproto.h>
 #include <log_io.h>
@@ -90,7 +91,7 @@ struct box_snap_row {
 
 	if (errcode != ERR_CODE_NODE_IS_RO)
 		say_error("tnt_BoxException: %s/`%s' at %s:%i",
-			  error_codes_strs[errcode], reason, file, line);
+			  tnt_errcode_desc(errcode), reason, file, line);
 
 	return self;
 }
@@ -1222,7 +1223,8 @@ box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
 
 		if (e->errcode != ERR_CODE_NODE_IS_RO)
 			say_error("tnt_BoxException: %s/`%s' at %s:%i",
-				  error_codes_strs[e->errcode], e->reason, e->file, e->line);
+				  tnt_errcode_desc(e->errcode),
+				  e->reason, e->file, e->line);
 
 		return e->errcode;
 	}

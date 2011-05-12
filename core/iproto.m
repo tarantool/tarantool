@@ -28,13 +28,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <errcode.h>
 #include <palloc.h>
 #include <fiber.h>
 #include <tbuf.h>
 #include <say.h>
 
 const uint32_t msg_ping = 0xff00;
-STRS(error_codes, ERROR_CODES);
 
 static struct tbuf *
 iproto_parse(struct tbuf *in)
@@ -75,7 +75,8 @@ iproto_interact(void *data)
 				u32 msg_code = iproto(request)->msg_code;
 				request->len = iproto(request)->len;
 				request->data = iproto(request)->data;
-				reply->ret_code = callback(msg_code, request);
+				u32 err = callback(msg_code, request);
+				reply->ret_code = tnt_errcode_val(err);
 
 				/*
 				 * retcode is uint32_t and included int struct iproto_header_retcode
