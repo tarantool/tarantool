@@ -3,7 +3,11 @@ project(tarantool)
 include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
+<<<<<<< HEAD
 include(CheckSymbolExists)
+=======
+include(TestBigEndian)
+>>>>>>> master-stable
 find_program(ECHO echo)
 find_program(CAT cat)
 find_program(GIT git)
@@ -50,6 +54,24 @@ endif()
 
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
+
+test_big_endian(HAVE_BYTE_ORDER_BIG_ENDIAN)
+
+#
+# We do not perform host-to-network byte order translation,
+# and simply assume the machine is little-endian.
+# We also do not bother with trying to avoid unaligned
+# word access. Refuse to compile on rare hardware such as
+# Sparc or Itanium.
+#
+if (${HAVE_BYTE_ORDER_BIG_ENDIAN} OR
+    ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "sparc" OR
+    ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "ia64" OR
+    ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^alpha")
+    message (FATAL_ERROR "Unsupported architecture -- ${CMAKE_SYSTEM_PROCESSOR}, ")
+    message (FATAL_ERROR "Tarantool currently only supports little-endian hardware")
+    message (FATAL_ERROR "with unaligned word access.")
+endif()
 
 #
 # Some versions of GNU libc define non-portable __libc_stack_end

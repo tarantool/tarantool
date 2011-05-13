@@ -123,15 +123,9 @@ int tnt_execute_raw(struct tnt_connection *tnt, const char *message,
 	if (tnt_res) {
 		memset(tnt_res, 0, sizeof *tnt_res);
 
-		int ret_code = buf[12];
-		int b = 256;
-		int i = 13;
-		while (i < 16) {
-			ret_code += (buf[i++] * b);
-			b *= 256;
-		}
-
-		tnt_res->errcode = ret_code; /* see iproto.h */
+		/* @fixme: we may want to support big-endian some
+		 * day. */
+		tnt_res->errcode = * (uint32_t*) (buf+12); /* see iproto.h */
 	}
 	return 0;
 }

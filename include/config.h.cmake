@@ -47,6 +47,10 @@
  */
 #cmakedefine HAVE_LIBC_STACK_END 1
 /*
+ * Defined if this is a big-endian system.
+ */
+#cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
+/*
  * vim: syntax=c
  */
 #endif /* TARANTOOL_CONFIG_H_INCLUDED */
