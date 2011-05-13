@@ -448,7 +448,7 @@ main(int argc, char **argv)
 
 		i = tarantool_cfg_iterator_init();
 		while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
-			if (strcmp(key, cfg_paramname) == 0) {
+			if (strcmp(key, cfg_paramname) == 0 && value != NULL) {
 				printf("%s\n", value);
 				free(value);
 

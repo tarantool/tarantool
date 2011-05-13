@@ -38,6 +38,8 @@ Usage: tarantool_silverbox [OPTIONS]
 Please visit project home page at http://launchpad.net/tarantool
 to see online documentation, submit bugs or contribute a patch.
 
+tarantool_silverbox --cfg-get=custom_proc_title
+
 tarantool_silverbox -Z
 tarantool_silverbox: -Z: unknown option
 
