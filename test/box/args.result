@@ -38,6 +38,8 @@ Usage: tarantool_box [OPTIONS]
 Please visit project home page at http://launchpad.net/tarantool
 to see online documentation, submit bugs or contribute a patch.
 
+tarantool_box --cfg-get=custom_proc_title
+
 tarantool_box -Z
 tarantool_box: -Z: unknown option
 

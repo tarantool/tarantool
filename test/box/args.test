@@ -4,6 +4,9 @@ import os
 server.test_option("--help")
 server.test_option("-h")
 sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
+# Test a cfg-get for something that is not in the config
+# file (used to crash, Bug#748599
+server.test_option("--cfg-get=custom_proc_title")
 server.test_option("-Z")
 server.test_option("--no-such-option")
 server.test_option("--version --no-such-option")
