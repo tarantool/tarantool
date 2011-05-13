@@ -899,12 +899,12 @@ box_dispach(struct box_txn *txn, struct tbuf *data)
 
 			if (i > MAX_IDX)
 				tnt_raise(tnt_BoxException,
-					  reason:"index too big" errcode:ERR_CODE_ILLEGAL_PARAMS);
+					  reason:"index too big" errcode:ERR_CODE_NO_SUCH_INDEX);
 			txn->index = &namespace[txn->n].index[i];
 			if (txn->index->key_cardinality == 0)
 				tnt_raise(tnt_BoxException,
 					  reason:"index is invalid"
-					  errcode:ERR_CODE_ILLEGAL_PARAMS);
+					  errcode:ERR_CODE_NO_SUCH_INDEX);
 
 			process_select(txn, limit, offset, data);
 			break;

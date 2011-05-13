@@ -3,11 +3,8 @@ project(tarantool)
 include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
-<<<<<<< HEAD
 include(CheckSymbolExists)
-=======
 include(TestBigEndian)
->>>>>>> master-stable
 find_program(ECHO echo)
 find_program(CAT cat)
 find_program(GIT git)
