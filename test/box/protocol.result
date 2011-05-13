@@ -1,2 +1,2 @@
 return_code: 0
-return_code: 2
+return_code: ERR_CODE_ILLEGAL_PARAMS, "Illegal parameters"

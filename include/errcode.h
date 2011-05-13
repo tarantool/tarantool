@@ -14,7 +14,7 @@ struct errcode_record {
 #define ERROR_CODES(_)					    \
 	/*  0 */_(ERR_CODE_OK,				0, "OK") \
 	/*  1 */_(ERR_CODE_NONMASTER,			2, "Non master connection, but it should be") \
-	/*  2 */_(ERR_CODE_ILLEGAL_PARAMS,		2, "Illegal parametrs") \
+	/*  2 */_(ERR_CODE_ILLEGAL_PARAMS,		2, "Illegal parameters") \
 	/*  3 */_(ERR_CODE_BAD_UID,			2, "Uid is not from this storage range") \
 	/*  4 */_(ERR_CODE_NODE_IS_RO,			1, "Node is marked as read-only") \
 	/*  5 */_(ERR_CODE_NODE_IS_NOT_LOCKED,		1, "Node isn't locked") \
