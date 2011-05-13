@@ -812,10 +812,10 @@ box_dispach(struct box_txn *txn, enum box_mode mode, u16 op, struct tbuf *data)
 			u32 limit = read_u32(data);
 
 			if (i > MAX_IDX)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "index too big");
+				box_raise(ERR_CODE_NO_SUCH_INDEX, "index too big");
 			txn->index = &namespace[txn->n].index[i];
 			if (txn->index->key_cardinality == 0)
-				box_raise(ERR_CODE_ILLEGAL_PARAMS, "index is invalid");
+				box_raise(ERR_CODE_NO_SUCH_INDEX, "index is invalid");
 
 			stat_collect(stat_base, op, 1);
 			return process_select(txn, limit, offset, data);
