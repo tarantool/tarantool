@@ -1,4 +1,5 @@
 #include <connector/c/client.h>
+#include <include/errcode.h>
 #include <stdio.h>
 
 /** Server connection. Reused between tests. */
@@ -12,7 +13,7 @@ void test_ping()
 		0x0, 0x0, 0x0, 0x0,    0x0, 0x0, 0x0, 0x0,
 		0x0, 0x0, 0x0, 0x0,    0x1, 0x0, 0x0, 0x0,
 		0x4, 0x1, 0x0, 0x0, 0x0 };
-	int res = tnt_execute_raw(conn, message, sizeof message);
+	int res = tnt_execute_raw(conn, message, sizeof message, 0);
 	printf("return_code: %d\n", res); /* =0 */
 }
 
@@ -28,8 +29,11 @@ void test_bug702397()
 		0x11, 0x0, 0x0, 0x0,    0x14, 0x0, 0x0, 0x0,    0x0, 0x0, 0x0, 0x0,
 		0x0, 0x0, 0x0, 0x0,     0x0, 0x0, 0x0, 0x0,     0x0, 0x0, 0x0, 0x0,
 		0xff, 0xff, 0xff, 0xff, 0x0, 0x0, 0x0, 0x0 };
-	int res = tnt_execute_raw(conn, message, sizeof message);
-	printf("return_code: %d\n", res); // =2
+	struct tnt_result tnt_res;
+	int res = tnt_execute_raw(conn, message, sizeof message, &tnt_res);
+	printf("return_code: %s, %s\n",
+	       tnt_errcode_str(tnt_res.errcode >> 8),
+	       tnt_errcode_desc(tnt_res.errcode >> 8));
 }
 
 int main()
@@ -42,5 +46,5 @@ int main()
 	test_bug702397();
 
 	tnt_disconnect(conn);
-  return 0;
+	return 0;
 }
