@@ -10,7 +10,7 @@ Usage: tarantool_box [OPTIONS]
                           exit
       --init-storage      initialize storage (an empty snapshot file) and exit
   -v, --verbose           increase verbosity level in log messages
-  -D, --daemonize         redirect input/output streams to a log file and run as
+  -B, --background        redirect input/output streams to a log file and run as
                           daemon
   -h, --help              display this help and exit
   -V, --version           print program version and exit
@@ -30,7 +30,7 @@ Usage: tarantool_box [OPTIONS]
                           exit
       --init-storage      initialize storage (an empty snapshot file) and exit
   -v, --verbose           increase verbosity level in log messages
-  -D, --daemonize         redirect input/output streams to a log file and run as
+  -B, --background        redirect input/output streams to a log file and run as
                           daemon
   -h, --help              display this help and exit
   -V, --version           print program version and exit
@@ -59,6 +59,9 @@ tarantool_box --config tarantool.cfg
 tarantool_box: the daemon is already running
 
 tarantool_box --daemonize
+tarantool_box: --daemonize: unknown option
+
+tarantool_box --background
 tarantool_box: the daemon is already running
 
 tarantool_box --version

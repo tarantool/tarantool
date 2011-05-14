@@ -370,7 +370,7 @@ main(int argc, char **argv)
 #endif
 			   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
 				       NULL, "increase verbosity level in log messages"),
-			   gopt_option('D', 0, gopt_shorts('D'), gopt_longs("daemonize"),
+			   gopt_option('B', 0, gopt_shorts('B'), gopt_longs("background"),
 				       NULL, "redirect input/output streams to a log file and run as daemon"),
 			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
 				       NULL, "display this help and exit"),
@@ -512,7 +512,7 @@ main(int argc, char **argv)
 	}
 #endif
 
-	if (gopt(opt, 'D'))
+	if (gopt(opt, 'B'))
 		daemonize(1, 1);
 
 	if (cfg.pid_file != NULL) {
