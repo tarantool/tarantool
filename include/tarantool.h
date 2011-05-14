@@ -33,6 +33,8 @@
 extern struct recovery_state *recovery_state;
 void mod_init(void);
 struct tarantool_cfg;
+
+extern const char *mod_name;
 i32 mod_check_config(struct tarantool_cfg *conf);
 void mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
 int mod_cat(const char *filename);
@@ -40,7 +42,6 @@ void mod_snapshot(struct log_io_iter *);
 void mod_info(struct tbuf *out);
 void mod_exec(char *str, int len, struct tbuf *out);
 
-extern struct tarantool_module module;
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern bool init_storage, booting;

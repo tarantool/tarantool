@@ -46,6 +46,8 @@
 #include <cfg/tarantool_box_cfg.h>
 #include <mod/box/index.h>
 
+const char *mod_name = "Box";
+
 bool box_updates_allowed = false;
 static char *status = "unknown";
 

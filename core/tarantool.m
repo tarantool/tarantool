@@ -381,7 +381,7 @@ main(int argc, char **argv)
 	binary_filename = argv[0];
 
 	if (gopt(opt, 'V')) {
-		puts(tarantool_version());
+		printf("Tarantool/%s %s\n", mod_name, tarantool_version());
 		return 0;
 	}
 

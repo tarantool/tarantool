@@ -62,10 +62,10 @@ tarantool_box --daemonize
 tarantool_box: the daemon is already running
 
 tarantool_box --version
-1.minor.patch-<rev>-<commit>
+Tarantool/Box 1.minor.patch-<rev>-<commit>
 
 tarantool_box -V
-1.minor.patch-<rev>-<commit>
+Tarantool/Box 1.minor.patch-<rev>-<commit>
 
 #
 # A test case for Bug#726778 "Gopt broke wal_dir and snap_dir: they are no
