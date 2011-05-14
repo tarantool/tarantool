@@ -45,6 +45,8 @@
 #include <mod/silverbox/box.h>
 #include <mod/silverbox/index.h>
 
+const char *mod_name = "Silverbox";
+
 bool box_updates_allowed = false;
 static char *status = "unknown";
 
