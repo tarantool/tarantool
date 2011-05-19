@@ -181,32 +181,50 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
 
 <section>
 <title>The option file</title>
-<para>
-All advanced configuration parameters must be specified in an option 
-file, which is required for server start.
-If no path to option file is specified on the command line (see
-<option xlink:href="#config-option"
-xlink:title="--config=...">--config</option>), 
-the server looks for a file named <filename>tarantool.cfg</filename>
-in the current working directory.
-</para>
-<para>
-To facilitate centralized and automated configuration
-management, runtime configuration modifications are supported
-solely through <emphasis role="tntadmin"
-xlink:href="tarantool-user-guide#reload-configuration"
-xlink:title="reload configuration"
-xlink:role="http://docbook.org/xlink/role/olink">reload
-configuration</emphasis>
-administrative statement. Thus, the procedure to change Tarantool
-configuration at runtime is to edit the configuration file.
-This ensures that, should the server get killed or restart, no
-unexpected changes to configuration can occur.
-</para>
-<para>
-Not all configuration file settings are changeable at runtime: such
-settings will be specially outlined in this reference.
-</para>
+  <para>
+    All advanced configuration parameters must be specified in an
+    option file, which is required for server start.  If no path to
+    option file is specified on the command line (see
+    <option xlink:href="#config-option"
+    xlink:title="--config=...">--config</option>),
+    the server looks for a file named <filename>tarantool.cfg</filename>
+    in the current working directory.
+  </para>
+  <para>
+    To facilitate centralized and automated configuration
+    management, runtime configuration modifications are supported
+    solely through <emphasis role="tntadmin"
+    xlink:href="tarantool-user-guide#reload-configuration"
+    xlink:title="reload configuration"
+    xlink:role="http://docbook.org/xlink/role/olink">reload
+    configuration</emphasis> administrative statement. Thus, the
+    procedure to change Tarantool configuration at runtime is to
+    edit the configuration file.  This ensures that, should the
+    server get killed or restart, no unexpected changes to
+    configuration can occur.
+  </para>
+  <para>
+    Not all configuration file settings are changeable at runtime:
+    such settings will be highlighted in this reference.
+  </para>
+  <para>
+    Tarantool maintains a set of all allowed configuration
+    parameters in two template files, which are easy to maintain
+    and extend:
+    <filename xlink:href="https://github.com/mailru/tarantool/blob/master/cfg/core_cfg.cfg_tmpl">cfg/core_cfg.cfg_tmpl</filename>,
+    <filename xlink:href="https://github.com/mailru/tarantool/blob/master/mod/box/box_cfg.cfg_tmpl">mod/box/box_cfg.cfg_tmpl</filename>.
+    These files can always be used as a reference for any
+    parameter in this manual.
+  </para>
+
+  <para>In addition, two working examples can be found in the source tree:
+    <filename xlink:href="https://github.com/mailru/tarantool/blob/master/test/box/tarantool.cfg">test/box/tarantool.cfg</filename>,
+    <filename xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_big/tarantool.cfg">test/box_big/tarantool.cfg</filename>.
+  </para>
+  <section>
+    <title>Basic parameters</title>
+    <para>Parameter1</para>
+  </section>
 
 </section>
 </chapter>
