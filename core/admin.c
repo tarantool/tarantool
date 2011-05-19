@@ -1457,7 +1457,7 @@ case 107:
 
 	if (p != pe) {
 		start(out);
-		tbuf_append(out, unknown_command, sizeof(unknown_command));
+		tbuf_append(out, unknown_command, sizeof(unknown_command) - 1);
 		end(out);
 	}
 
