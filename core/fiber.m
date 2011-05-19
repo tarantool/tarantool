@@ -122,11 +122,43 @@ fiber_call(struct fiber *callee)
 }
 
 void
-fiber_raise(struct fiber *callee)
+fiber_wake(struct fiber *f)
 {
-	callee->flags |= FIBER_RAISE;
+	ev_async_start(&f->async);
+	ev_async_send(&f->async);
+}
 
-	fiber_call(callee);
+void
+fiber_cancel(struct fiber *f)
+{
+	f->flags |= FIBER_CANCEL;
+
+	if (f->flags & FIBER_CANCELLABLE)
+		fiber_wake(f);
+
+	f->waiter = fiber;
+
+	yield();
+}
+
+void
+fiber_testcancel(void)
+{
+	if (!(fiber->flags & FIBER_CANCELLABLE))
+		return;
+
+	if (!(fiber->flags & FIBER_CANCEL))
+		return;
+
+	tnt_raise(tnt_FiberException, reason:"fiber_testcancel: fiber to be canceled");
+}
+
+void fiber_setcancelstate(bool enable)
+{
+	if (enable == true)
+		fiber->flags |= FIBER_CANCELLABLE;
+	else
+		fiber->flags &= ~FIBER_CANCELLABLE;
 }
 
 void
@@ -141,11 +173,8 @@ yield(void)
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 
-	if (fiber->flags & FIBER_RAISE) {
-		fiber->flags &= ~FIBER_RAISE;
-
-		tnt_raise(tnt_FiberException, reason:"fiber_raise");
-	}
+	if (fiber->flags & FIBER_CANCEL && fiber->flags & FIBER_CANCELLABLE)
+		tnt_raise(tnt_FiberException, reason:"yield: fiber to be canceled");
 }
 
 void
@@ -348,6 +377,10 @@ fiber_loop(void *data __attribute__((unused)))
 		@catch (tnt_FiberException *e) {
 			say_info("fiber `%s': exception `tnt_FiberException': `%s'",
 				 fiber->name, e->reason);
+
+			if (fiber->waiter != NULL)
+				fiber_call(fiber->waiter);
+
 			say_info("fiber `%s': exiting", fiber->name);
 		}
 		@catch (tnt_Exception *e) {
@@ -394,9 +427,10 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
 
 		fiber_alloc(fiber);
 		ev_init(&fiber->io, (void *)ev_schedule);
+		ev_async_init(&fiber->async, (void *)ev_schedule);
 		ev_init(&fiber->timer, (void *)ev_schedule);
 		ev_init(&fiber->cw, (void *)ev_schedule);
-		fiber->io.data = fiber->timer.data = fiber->cw.data = fiber;
+		fiber->io.data = fiber->async.data = fiber->timer.data = fiber->cw.data = fiber;
 
 		SLIST_INSERT_HEAD(&fibers, fiber, link);
 	}
@@ -409,6 +443,7 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
 	while (++last_used_fid <= 100) ;	/* fids from 0 to 100 are reserved */
 	fiber->fid = last_used_fid;
 	fiber->flags = 0;
+	fiber->waiter = NULL;
 	register_fid(fiber);
 
 	return fiber;

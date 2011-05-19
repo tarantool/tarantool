@@ -43,7 +43,8 @@
 #include <exceptions.h>
 
 #define FIBER_READING_INBOX 0x1
-#define FIBER_RAISE	    0x2
+#define FIBER_CANCELLABLE   0x2
+#define FIBER_CANCEL        0x4
 
 @interface tnt_FiberException: tnt_Exception
 @end
@@ -60,6 +61,7 @@ struct ring {
 
 struct fiber {
 	ev_io io;
+	ev_async async;
 #ifdef ENABLE_BACKTRACE
 	void *last_stack_frame;
 #endif
@@ -94,6 +96,8 @@ struct fiber {
 	char peer_name[32];
 
 	u32 flags;
+
+	struct fiber *waiter;
 };
 
 SLIST_HEAD(, fiber) fibers, zombie_fibers;
@@ -159,7 +163,10 @@ ssize_t fiber_flush_output(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
 void fiber_call(struct fiber *callee);
-void fiber_raise(struct fiber *callee);
+void fiber_wake(struct fiber *f);
+void fiber_cancel(struct fiber *f);
+void fiber_testcancel(void);
+void fiber_setcancelstate(bool enable);
 int fiber_connect(struct sockaddr_in *addr);
 void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);
