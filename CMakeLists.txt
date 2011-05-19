@@ -189,7 +189,7 @@ add_subdirectory(connector)
 add_subdirectory(core)
 add_subdirectory(mod)
 add_subdirectory(test)
-add_subdirectory(doc)
+add_subdirectory(doc EXCLUDE_FROM_ALL)
 
 install (FILES README LICENSE doc/box-protocol.txt
          DESTINATION doc)
