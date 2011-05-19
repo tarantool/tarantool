@@ -27,6 +27,18 @@
  */
 
 #include <mod/box/index.h>
+#include <exceptions.h>
+#include <tbuf.h>
+
+@interface tnt_BoxException: tnt_Exception {
+	@public
+		u32 errcode;
+}
+
+
+- init:(const char *)p_file:(unsigned)p_line reason:(const char *)p_reason errcode:(u32)p_errcode;
+- init:(const char *)p_file:(unsigned)p_line errcode:(u32)p_errcode;
+@end
 
 extern bool box_updates_allowed;
 void memcached_handler(void * /* data */);
@@ -57,7 +69,7 @@ struct box_tuple {
 } __attribute__((packed));
 
 struct box_txn {
-	int op;
+	u16 op;
 	u32 flags;
 
 	struct namespace *namespace;
@@ -69,7 +81,11 @@ struct box_txn {
 	struct box_tuple *tuple;
 	struct box_tuple *lock_tuple;
 
+	size_t saved_iov_cnt;
+	struct tbuf req;
+
 	bool in_recover;
+	bool write_to_wal;
 };
 
 enum tuple_flags {
@@ -84,10 +100,15 @@ enum box_mode {
 	RW
 };
 
-#define BOX_RETURN_TUPLE 1
-#define BOX_ADD 2
-#define BOX_REPLACE 4
-#define BOX_QUIET 8
+#define BOX_RETURN_TUPLE		0x01
+#define BOX_ADD				0x02
+#define BOX_REPLACE			0x04
+#define BOX_QUIET			0x08
+#define BOX_NOT_STORE			0x10
+#define BOX_ALLOWED_REQUEST_FLAGS	(BOX_RETURN_TUPLE | \
+					 BOX_ADD | \
+					 BOX_REPLACE | \
+					 BOX_QUIET)
 
 /*
     deprecated commands:
@@ -117,16 +138,9 @@ enum box_mode {
 
 ENUM(messages, MESSAGES);
 
-#define box_raise(n, err)						\
-	({								\
-		if (n != ERR_CODE_NODE_IS_RO)				\
-			say_warn("%s/%s", error_codes_strs[(n)], err);	\
-		raise(n, err);						\
-	})
-
 struct box_txn *txn_alloc(u32 flags);
-u32 box_dispatch(struct box_txn *txn, enum box_mode mode, u16 op,
-		 struct tbuf *data);
+u32 box_process(struct box_txn *txn, u32 op, struct tbuf *request_data);
+
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
 void txn_cleanup(struct box_txn *txn);
 

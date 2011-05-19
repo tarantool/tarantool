@@ -4,6 +4,7 @@ include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
 include(CheckSymbolExists)
+include(TestBigEndian)
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
 find_program(XMLLINT xmllint)
@@ -11,6 +12,9 @@ find_program(CAT cat)
 find_program(GIT git)
 find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
+
+
+include(cmake/check_objective_c_compiler.cmake)
 
 #
 # This instructs the rest of the build system what product
@@ -50,6 +54,24 @@ endif()
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
 
+test_big_endian(HAVE_BYTE_ORDER_BIG_ENDIAN)
+
+#
+# We do not perform host-to-network byte order translation,
+# and simply assume the machine is little-endian.
+# We also do not bother with trying to avoid unaligned
+# word access. Refuse to compile on rare hardware such as
+# Sparc or Itanium.
+#
+if (${HAVE_BYTE_ORDER_BIG_ENDIAN} OR
+    ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "sparc" OR
+    ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "ia64" OR
+    ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^alpha")
+    message (FATAL_ERROR "Unsupported architecture -- ${CMAKE_SYSTEM_PROCESSOR}, ")
+    message (FATAL_ERROR "Tarantool currently only supports little-endian hardware")
+    message (FATAL_ERROR "with unaligned word access.")
+endif()
+
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
 # which we use to determine the end (or beginning, actually) of
@@ -79,7 +101,7 @@ set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 #
 # Enable 'make TAGS' target.
 #
-add_custom_target(TAGS COMMAND ctags -R -e -f TAGS
+add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m.h -e -f TAGS
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #
@@ -96,7 +118,7 @@ execute_process (COMMAND ${GIT} describe HEAD
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "4")
-set (CPACK_PACKAGE_VERSION_PATCH "0")
+set (CPACK_PACKAGE_VERSION_PATCH "1")
 if (TARANTOOL_VERSION STREQUAL "")
     set (TARANTOOL_VERSION
         "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
@@ -182,6 +204,14 @@ if (ENABLE_STATIC)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static")
 endif()
 
+# CMake believes that Objective C is a flavor of C++, not C,
+# and uses g++ compiler for .m files. Since talking CMake out
+# of this idea is difficult, and since gcc or g++ are only
+# front-ends to the language-specific compiler specified in
+# -x option, simply use CXX flags to build Objective C files.
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
+
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
 
 add_subdirectory(third_party)
 add_subdirectory(cfg)

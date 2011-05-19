@@ -29,6 +29,10 @@ Please follow these steps to compile Tarantool:
 tarantool $ cmake .
 tarantool $ make
 
+To use a different release type, say, RelWithDebugInfo, use:
+
+tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
+
 'make' will create tarantool_box executable in directory
 mod/box.
 

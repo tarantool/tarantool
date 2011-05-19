@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#include <errcode.h>
 #include <salloc.h>
 #include <palloc.h>
 #include <fiber.h>
@@ -111,7 +112,7 @@ store(struct box_txn *txn, void *key, u32 exptime, u32 flags, u32 bytes, u8 *dat
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
-	return box_dispatch(txn, RW, INSERT, req); /* FIXME: handle RW/RO */
+	return box_process(txn, INSERT, req); /* FIXME: handle RW/RO */
 }
 
 static int
@@ -124,7 +125,7 @@ delete(struct box_txn *txn, void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	return box_dispatch(txn, RW, DELETE, req);
+	return box_process(txn, DELETE, req);
 }
 
 static struct box_tuple *
@@ -240,18 +241,22 @@ memcached_dispatch(struct box_txn *txn)
 
 	say_debug("memcached_dispatch '%.*s'", MIN((int)(pe - p), 40) , p);
 
-#define STORE ({							\
-	stats.cmd_set++;						\
-	if (bytes > (1<<20)) {						\
-		add_iov("SERVER_ERROR object too large for cache\r\n", 41); \
-	} else {							\
-		if (store(txn, key, exptime, flags, bytes, data) == 0) { \
-			stats.total_items++;				\
-			add_iov("STORED\r\n", 8);			\
-		} else {						\
-			add_iov("SERVER_ERROR\r\n", 14);		\
-		}							\
-	}								\
+#define STORE ({									\
+	stats.cmd_set++;								\
+	if (bytes > (1<<20)) {								\
+		add_iov("SERVER_ERROR object too large for cache\r\n", 41);		\
+	} else {									\
+		u32 ret_code;								\
+		if ((ret_code = store(txn, key, exptime, flags, bytes, data)) == 0) {	\
+			stats.total_items++;						\
+			add_iov("STORED\r\n", 8);					\
+		} else {								\
+			add_iov("SERVER_ERROR ", 13);					\
+			add_iov(tnt_errcode_desc(ret_code),			\
+				strlen(tnt_errcode_desc(ret_code)));		\
+			add_iov("\r\n", 2);						\
+		}									\
+	}										\
 })
 
 	%%{
@@ -373,10 +378,15 @@ memcached_dispatch(struct box_txn *txn)
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				add_iov("NOT_FOUND\r\n", 11);
 			} else {
-				if (delete(txn, key) == 0)
+				u32 ret_code;
+				if ((ret_code = delete(txn, key)) == 0)
 					add_iov("DELETED\r\n", 9);
-				else
-					add_iov("SERVER_ERROR\r\n", 14);
+				else {
+					add_iov("SERVER_ERROR ", 13);
+					add_iov(tnt_errcode_desc(ret_code),
+						strlen(tnt_errcode_desc(ret_code)));
+					add_iov("\r\n", 2);
+				}
 			}
 		}
 

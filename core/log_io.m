@@ -903,53 +903,48 @@ recover_snap(struct recovery_state *r)
 	struct log_io_iter i;
 	struct log_io *snap = NULL;
 	struct tbuf *row;
-	int result = -1;
 	i64 lsn;
 
-	memset(&i, 0, sizeof(i));
+	@try {
+		memset(&i, 0, sizeof(i));
 
-	if (setjmp(fiber->exc) != 0) {
-		result = -1;
-		goto out;
-	}
+		lsn = greatest_lsn(r->snap_prefered_class);
+		if (lsn <= 0)
+			tnt_raise(tnt_Exception, reason:"can't find snapshot");
 
-	lsn = greatest_lsn(r->snap_prefered_class);
+		snap = open_for_read(r, r->snap_class, lsn, 0, NULL);
+		if (snap == NULL)
+			tnt_raise(tnt_Exception, reason:"can't find/open snapshot");
 
-	if (lsn <= 0) {
-		say_error("can't find snapshot");
-		goto out;
-	}
+		iter_open(snap, &i, read_rows);
+		say_info("recover from `%s'", snap->filename);
 
-	snap = open_for_read(r, r->snap_class, lsn, 0, NULL);
-	if (snap == NULL) {
-		say_error("can't find/open snapshot");
-		goto out;
-	}
-
-	iter_open(snap, &i, read_rows);
-	say_info("recover from `%s'", snap->filename);
-
-	while ((row = iter_inner(&i, (void *)1))) {
-		if (r->row_handler(r, row) < 0) {
-			result = -1;
-			goto out;
+		while ((row = iter_inner(&i, (void *)1))) {
+			if (r->row_handler(r, row) < 0)
+				tnt_raise(tnt_Exception, reason:"can't apply row");
 		}
-	}
-	result = i.error;
-	if (result == 0)
+		if (i.error != 0)
+			tnt_raise(tnt_Exception, reason:"error during snapshot processing");
+
 		r->lsn = r->confirmed_lsn = lsn;
-      out:
-	if (result != 0)
+
+		return 0;
+	}
+	@catch (tnt_Exception *e) {
+		say_error("tnt_Exception: `%s'", e->reason);
 		say_error("failure reading snapshot");
 
-	if (i.log != NULL)
-		close_iter(&i);
+		return -1;
+	}
+	@finally {
+		if (i.log != NULL)
+			close_iter(&i);
 
-	if (snap != NULL)
-		close_log(&snap);
+		if (snap != NULL)
+			close_log(&snap);
 
-	prelease(fiber->pool);
-	return result;
+		prelease(fiber->pool);
+	}
 }
 
 /*
@@ -966,56 +961,54 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 {
 	struct log_io_iter i;
 	struct tbuf *row = NULL;
-	int result;
 
-	if (setjmp(fiber->exc) != 0) {
-		result = -1;
-		goto out;
-	}
+	@try {
+		memset(&i, 0, sizeof(i));
+		iter_open(l, &i, read_rows);
 
-	memset(&i, 0, sizeof(i));
-	iter_open(l, &i, read_rows);
+		while ((row = iter_inner(&i, (void *)1))) {
+			i64 lsn = row_v11(row)->lsn;
+			if (r && lsn <= r->confirmed_lsn) {
+				say_debug("skipping too young row");
+				continue;
+			}
 
-	while ((row = iter_inner(&i, (void *)1))) {
-		i64 lsn = row_v11(row)->lsn;
-		if (r && lsn <= r->confirmed_lsn) {
-			say_debug("skipping too young row");
-			continue;
+			/*  after handler(r, row) returned, row may be modified, do not use it */
+			if (r->row_handler(r, row) < 0)
+				tnt_raise(tnt_Exception, reason:"can't apply row");
+
+			if (r) {
+				next_lsn(r, lsn);
+				confirm_lsn(r, lsn);
+			}
 		}
 
-		/*  after handler(r, row) returned, row may be modified, do not use it */
-		if (r->row_handler(r, row) < 0) {
-			say_error("row_handler returned error");
-			result = -1;
-			goto out;
-		}
+		if (i.error != 0)
+			tnt_raise(tnt_Exception, reason:"error during xlog processing");
 
-		if (r) {
-			next_lsn(r, lsn);
-			confirm_lsn(r, lsn);
-		}
-	}
-	result = i.error;
-      out:
-	/*
-	 * since we don't close log_io
-	 * we must rewind log_io to last known
-	 * good position if where was error
-	 */
-	if (row)
-		iter_inner(&i, NULL);
-
-	if (result == 0) {
 		if (i.eof)
-			result = LOG_EOF;
-		else
-			result = 1;
+			return LOG_EOF;
+
+		return 1;
 	}
+	@catch (tnt_Exception *e) {
+		say_error("tnt_Exception: `%s'", e->reason);
+		say_error("failure reading xlog");
 
-	close_iter(&i);
-	prelease(fiber->pool);
+		return -1;
+	}
+	@finally {
+		/*
+		 * since we don't close log_io
+		 * we must rewind log_io to last known
+		 * good position if where was error
+		 */
+		if (row)
+			iter_inner(&i, NULL);
 
-	return result;
+		close_iter(&i);
+		prelease(fiber->pool);
+	}
 }
 
 /*

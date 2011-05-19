@@ -40,8 +40,13 @@
 #include <util.h>
 #include "third_party/queue.h"
 
+#include <exceptions.h>
 
-#define FIBER_EXIT -1
+#define FIBER_READING_INBOX 0x1
+#define FIBER_RAISE	    0x2
+
+@interface tnt_FiberException: tnt_Exception
+@end
 
 struct msg {
 	uint32_t sender_fid;
@@ -76,9 +81,6 @@ struct fiber {
 
 	struct ring *inbox;
 
-	jmp_buf exc;
-	const char *errstr;
-
 	const char *name;
 	void (*f) (void *);
 	void *f_data;
@@ -90,7 +92,8 @@ struct fiber {
 	u64 cookie;
 	bool has_peer;
 	char peer_name[32];
-	bool reading_inbox;
+
+	u32 flags;
 };
 
 SLIST_HEAD(, fiber) fibers, zombie_fibers;
@@ -116,24 +119,17 @@ void wait_for(int events);
 void wait_for_child(pid_t pid);
 void unwait(int events);
 void yield(void);
-void raise_(int);
 void fiber_destroy_all();
-#define raise(v, err)							\
-	({								\
-		say_debug("raise 0x%x/%s at %s:%i", v, err, __FILE__, __LINE__); \
-		fiber->errstr = (err);					\
-		longjmp(fiber->exc, (v));				\
-	})
 
 struct msg *read_inbox(void);
 int fiber_bread(struct tbuf *, size_t v);
 
-inline static void add_iov_unsafe(void *buf, size_t len)
+inline static void add_iov_unsafe(const void *buf, size_t len)
 {
 	struct iovec *v;
 	assert(fiber->iov->size - fiber->iov->len >= sizeof(*v));
 	v = fiber->iov->data + fiber->iov->len;
-	v->iov_base = buf;
+	v->iov_base = (void *)buf;
 	v->iov_len = len;
 	fiber->iov->len += sizeof(*v);
 	fiber->iov_cnt++;
@@ -144,7 +140,7 @@ inline static void iov_ensure(size_t count)
 	tbuf_ensure(fiber->iov, sizeof(struct iovec) * count);
 }
 
-inline static void add_iov(void *buf, size_t len)
+inline static void add_iov(const void *buf, size_t len)
 {
 	iov_ensure(1);
 	add_iov_unsafe(buf, len);
@@ -163,7 +159,7 @@ ssize_t fiber_flush_output(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
 void fiber_call(struct fiber *callee);
-void fiber_raise(struct fiber *callee, jmp_buf exc, int value);
+void fiber_raise(struct fiber *callee);
 int fiber_connect(struct sockaddr_in *addr);
 void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);

@@ -29,8 +29,8 @@
 #include <stdbool.h>
 #include <errno.h>
 
+#include <errcode.h>
 #include <fiber.h>
-#include <iproto.h>
 #include <log_io.h>
 #include <pickle.h>
 #include <salloc.h>
@@ -80,7 +80,7 @@ field_compare(struct field *f1, struct field *f2, enum field_data_type type)
 		assert(f1->len == sizeof(f1->u64));
 
 		return f1->u64 >f2->u64 ? 1 : f1->u64 == f2->u64 ? 0 : -1;
-	} else if (type == STR) {
+	} else if (type == STRING) {
 		i32 cmp;
 		void *f1_data, *f2_data;
 
@@ -156,7 +156,8 @@ index_find_hash_by_tuple(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	if (key == NULL)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "invalid tuple, can't find key");
+		tnt_raise(tnt_BoxException,
+		          reason:"invalid tuple, can't find key" errcode:ERR_CODE_ILLEGAL_PARAMS);
 	return self->find(self, key);
 }
 
@@ -168,7 +169,8 @@ index_find_hash_num(struct index *self, void *key)
 	u32 num = *(u32 *)key;
 
 	if (key_size != 4)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
+		tnt_raise(tnt_BoxException,
+		          reason:"key is not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
 
 	assoc_find(int_ptr_map, self->idx.int_hash, num, ret);
 #ifdef DEBUG
@@ -185,7 +187,8 @@ index_find_hash_num64(struct index *self, void *key)
 	u64 num = *(u64 *)key;
 
 	if (key_size != 8)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
+		tnt_raise(tnt_BoxException,
+		          reason:"key is not u64" errcode:ERR_CODE_ILLEGAL_PARAMS);
 
 	assoc_find(int64_ptr_map, self->idx.int64_hash, num, ret);
 #ifdef DEBUG
@@ -300,7 +303,8 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 	u32 num = *(u32 *)key;
 
 	if (key_size != 4)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
+		tnt_raise(tnt_BoxException,
+			  reason:"key is not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
 	assoc_delete(int_ptr_map, self->idx.int_hash, num);
 #ifdef DEBUG
 	say_debug("index_remove_hash_num(self:%p, key:%i)", self, num);
@@ -315,7 +319,8 @@ index_remove_hash_num64(struct index *self, struct box_tuple *tuple)
 	u64 num = *(u64 *)key;
 
 	if (key_size != 8)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
+		tnt_raise(tnt_BoxException,
+			  reason:"key is not u64" errcode:ERR_CODE_ILLEGAL_PARAMS);
 	assoc_delete(int64_ptr_map, self->idx.int64_hash, num);
 #ifdef DEBUG
 	say_debug("index_remove_hash_num(self:%p, key:%"PRIu64")", self, num);
@@ -348,7 +353,8 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 	u32 num = *(u32 *)key;
 
 	if (key_size != 4)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u32");
+		tnt_raise(tnt_BoxException,
+			  reason:"key is not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -372,7 +378,8 @@ index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct
 	u64 num = *(u64 *)key;
 
 	if (key_size != 8)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "key is not u64");
+		tnt_raise(tnt_BoxException,
+			  reason:"key is not u64" errcode:ERR_CODE_ILLEGAL_PARAMS);
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -394,7 +401,9 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 
 	if (key == NULL)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "Supplied tuple misses a field which is part of an index");
+		tnt_raise(tnt_BoxException,
+			  reason:"Supplied tuple misses a field which is part of an index"
+			  errcode:ERR_CODE_ILLEGAL_PARAMS);
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -413,7 +422,9 @@ static void
 index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	if (tuple->cardinality < self->field_cmp_order_cnt)
-		box_raise(ERR_CODE_ILLEGAL_PARAMS, "Supplied tuple misses a field which is part of an index");
+		tnt_raise(tnt_BoxException,
+			  reason:"Supplied tuple misses a field which is part of an index"
+			  errcode:ERR_CODE_ILLEGAL_PARAMS);
 
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 
@@ -446,22 +457,30 @@ index_iterator_next_tree_str(struct index *self, struct tree_index_member *patte
 }
 
 void
-validate_indeces(struct box_txn *txn)
+validate_indexes(struct box_txn *txn)
 {
 	if (namespace[txn->n].index[1].key_cardinality != 0) {	/* there is more then one index */
 		foreach_index(txn->n, index) {
 			for (u32 f = 0; f < index->key_cardinality; ++f) {
-				if (index->key_field[f].type == STR)
+				if (index->key_field[f].fieldno >= txn->tuple->cardinality)
+					tnt_raise(tnt_BoxException,
+						  reason:"tuple is too short" errcode:ERR_CODE_ILLEGAL_PARAMS);
+
+				if (index->key_field[f].type == STRING)
 					continue;
 
 				void *field = tuple_field(txn->tuple, index->key_field[f].fieldno);
 				u32 len = load_varint32(&field);
 
 				if (index->key_field[f].type == NUM && len != sizeof(u32))
-					box_raise(ERR_CODE_ILLEGAL_PARAMS, "field must be NUM");
+					tnt_raise(tnt_BoxException,
+						  reason:"field must be NUM"
+						  errcode:ERR_CODE_ILLEGAL_PARAMS);
 
 				if (index->key_field[f].type == NUM64 && len != sizeof(u64))
-					box_raise(ERR_CODE_ILLEGAL_PARAMS, "field must be NUM64");
+					tnt_raise(tnt_BoxException,
+						  reason:"field must be NUM64"
+						  errcode:ERR_CODE_ILLEGAL_PARAMS);
 			}
 			if (index->type == TREE && index->unique == false)
 				/* Don't check non unique indexes */
@@ -470,7 +489,9 @@ validate_indeces(struct box_txn *txn)
 			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
 
 			if (tuple != NULL && tuple != txn->old_tuple)
-				box_raise(ERR_CODE_INDEX_VIOLATION, "unique index violation");
+				tnt_raise(tnt_BoxException,
+					  reason:"unique index violation"
+					  errcode:ERR_CODE_INDEX_VIOLATION);
 		}
 	}
 }

@@ -52,5 +52,28 @@ exec sql "select * from t1 where k0 = 0"
 exec sql "select * from t65537 where k0 = 0"
 exec sql "select * from t4294967295 where k0 = 0"
 
+print """
+#
+# A test case for: http://bugs.launchpad.net/bugs/735140
+# Partial REPLACE corrupts index.
+#
+"""
+# clean data and restart with appropriate config
+server.stop()
+server.deploy("box/tarantool_bug735140.cfg")
+server.start()
+
+exec sql "insert into t0 values ('Spears', 'Britney')"
+exec sql "select * from t0 where k0='Spears'"
+exec sql "select * from t0 where k1='Britney'"
+# try to insert the incoplete tuple
+exec sql "insert into t0 values ('Spears')"
+# check that nothing has been updated
+exec sql "select * from t0 where k0='Spears'"
+
+# resore default suite config
+server.stop()
+server.deploy(self.suite_ini["config"])
+server.start()
 
 # vim: syntax=python

@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#include <errcode.h>
 #include <salloc.h>
 #include <palloc.h>
 #include <fiber.h>
@@ -67,7 +68,7 @@ struct meta {
 } __packed__;
 
 
-#line 71 "mod/box/memcached.c"
+#line 72 "mod/box/memcached.m"
 static const int memcached_start = 1;
 static const int memcached_first_final = 197;
 static const int memcached_error = 0;
@@ -75,7 +76,7 @@ static const int memcached_error = 0;
 static const int memcached_en_main = 1;
 
 
-#line 70 "mod/box/memcached.rl"
+#line 71 "mod/box/memcached.rl"
 
 
 
@@ -120,7 +121,7 @@ store(struct box_txn *txn, void *key, u32 exptime, u32 flags, u32 bytes, u8 *dat
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
-	return box_dispatch(txn, RW, INSERT, req); /* FIXME: handle RW/RO */
+	return box_process(txn, INSERT, req); /* FIXME: handle RW/RO */
 }
 
 static int
@@ -133,7 +134,7 @@ delete(struct box_txn *txn, void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	return box_dispatch(txn, RW, DELETE, req);
+	return box_process(txn, DELETE, req);
 }
 
 static struct box_tuple *
@@ -249,27 +250,31 @@ memcached_dispatch(struct box_txn *txn)
 
 	say_debug("memcached_dispatch '%.*s'", MIN((int)(pe - p), 40) , p);
 
-#define STORE ({							\
-	stats.cmd_set++;						\
-	if (bytes > (1<<20)) {						\
-		add_iov("SERVER_ERROR object too large for cache\r\n", 41); \
-	} else {							\
-		if (store(txn, key, exptime, flags, bytes, data) == 0) { \
-			stats.total_items++;				\
-			add_iov("STORED\r\n", 8);			\
-		} else {						\
-			add_iov("SERVER_ERROR\r\n", 14);		\
-		}							\
-	}								\
+#define STORE ({									\
+	stats.cmd_set++;								\
+	if (bytes > (1<<20)) {								\
+		add_iov("SERVER_ERROR object too large for cache\r\n", 41);		\
+	} else {									\
+		u32 ret_code;								\
+		if ((ret_code = store(txn, key, exptime, flags, bytes, data)) == 0) {	\
+			stats.total_items++;						\
+			add_iov("STORED\r\n", 8);					\
+		} else {								\
+			add_iov("SERVER_ERROR ", 13);					\
+			add_iov(tnt_errcode_desc(ret_code),			\
+				strlen(tnt_errcode_desc(ret_code)));		\
+			add_iov("\r\n", 2);						\
+		}									\
+	}										\
 })
 
 	
-#line 268 "mod/box/memcached.c"
+#line 273 "mod/box/memcached.m"
 	{
 	cs = memcached_start;
 	}
 
-#line 273 "mod/box/memcached.c"
+#line 278 "mod/box/memcached.m"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -327,7 +332,7 @@ case 5:
 		goto st0;
 	goto tr15;
 tr15:
-#line 479 "mod/box/memcached.rl"
+#line 489 "mod/box/memcached.rl"
 	{
 			fstart = p;
 			for (; p < pe && *p != ' ' && *p != '\r' && *p != '\n'; p++);
@@ -344,7 +349,7 @@ st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 348 "mod/box/memcached.c"
+#line 353 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st7;
 	goto st0;
@@ -358,49 +363,49 @@ case 7:
 		goto tr17;
 	goto st0;
 tr17:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st8;
 st8:
 	if ( ++p == pe )
 		goto _test_eof8;
 case 8:
-#line 369 "mod/box/memcached.c"
+#line 374 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr18;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st8;
 	goto st0;
 tr18:
-#line 502 "mod/box/memcached.rl"
+#line 512 "mod/box/memcached.rl"
 	{flags = natoq(fstart, p);}
 	goto st9;
 st9:
 	if ( ++p == pe )
 		goto _test_eof9;
 case 9:
-#line 383 "mod/box/memcached.c"
+#line 388 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st9;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr21;
 	goto st0;
 tr21:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st10;
 st10:
 	if ( ++p == pe )
 		goto _test_eof10;
 case 10:
-#line 397 "mod/box/memcached.c"
+#line 402 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr22;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st10;
 	goto st0;
 tr22:
-#line 495 "mod/box/memcached.rl"
+#line 505 "mod/box/memcached.rl"
 	{
 			exptime = natoq(fstart, p);
 			if (exptime > 0 && exptime <= 60*60*24*30)
@@ -411,21 +416,21 @@ st11:
 	if ( ++p == pe )
 		goto _test_eof11;
 case 11:
-#line 415 "mod/box/memcached.c"
+#line 420 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st11;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr25;
 	goto st0;
 tr25:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st12;
 st12:
 	if ( ++p == pe )
 		goto _test_eof12;
 case 12:
-#line 429 "mod/box/memcached.c"
+#line 434 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr26;
 		case 13: goto tr27;
@@ -435,11 +440,11 @@ case 12:
 		goto st12;
 	goto st0;
 tr26:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -460,13 +465,13 @@ tr26:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 263 "mod/box/memcached.rl"
+#line 268 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
@@ -477,9 +482,9 @@ tr26:
 		}
 	goto st197;
 tr30:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -500,13 +505,13 @@ tr30:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 263 "mod/box/memcached.rl"
+#line 268 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
@@ -517,11 +522,11 @@ tr30:
 		}
 	goto st197;
 tr39:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -542,13 +547,13 @@ tr39:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 263 "mod/box/memcached.rl"
+#line 268 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
@@ -559,11 +564,11 @@ tr39:
 		}
 	goto st197;
 tr58:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -584,13 +589,13 @@ tr58:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 292 "mod/box/memcached.rl"
+#line 297 "mod/box/memcached.rl"
 	{
 			struct tbuf *b;
 			void *value;
@@ -619,9 +624,9 @@ tr58:
 		}
 	goto st197;
 tr62:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -642,13 +647,13 @@ tr62:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 292 "mod/box/memcached.rl"
+#line 297 "mod/box/memcached.rl"
 	{
 			struct tbuf *b;
 			void *value;
@@ -677,11 +682,11 @@ tr62:
 		}
 	goto st197;
 tr71:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -702,13 +707,13 @@ tr71:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 292 "mod/box/memcached.rl"
+#line 297 "mod/box/memcached.rl"
 	{
 			struct tbuf *b;
 			void *value;
@@ -737,11 +742,11 @@ tr71:
 		}
 	goto st197;
 tr91:
-#line 504 "mod/box/memcached.rl"
+#line 514 "mod/box/memcached.rl"
 	{cas = natoq(fstart, p);}
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -762,13 +767,13 @@ tr91:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 281 "mod/box/memcached.rl"
+#line 286 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
@@ -781,9 +786,9 @@ tr91:
 		}
 	goto st197;
 tr95:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -804,13 +809,13 @@ tr95:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 281 "mod/box/memcached.rl"
+#line 286 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
@@ -823,11 +828,11 @@ tr95:
 		}
 	goto st197;
 tr105:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -848,13 +853,13 @@ tr105:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 281 "mod/box/memcached.rl"
+#line 286 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
@@ -867,17 +872,17 @@ tr105:
 		}
 	goto st197;
 tr118:
-#line 505 "mod/box/memcached.rl"
+#line 515 "mod/box/memcached.rl"
 	{incr = natoq(fstart, p);}
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 319 "mod/box/memcached.rl"
+#line 324 "mod/box/memcached.rl"
 	{
 			struct meta *m;
 			struct tbuf *b;
@@ -930,15 +935,15 @@ tr118:
 		}
 	goto st197;
 tr122:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 319 "mod/box/memcached.rl"
+#line 324 "mod/box/memcached.rl"
 	{
 			struct meta *m;
 			struct tbuf *b;
@@ -991,17 +996,17 @@ tr122:
 		}
 	goto st197;
 tr132:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 319 "mod/box/memcached.rl"
+#line 324 "mod/box/memcached.rl"
 	{
 			struct meta *m;
 			struct tbuf *b;
@@ -1054,92 +1059,107 @@ tr132:
 		}
 	goto st197;
 tr141:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 370 "mod/box/memcached.rl"
+#line 375 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				add_iov("NOT_FOUND\r\n", 11);
 			} else {
-				if (delete(txn, key) == 0)
+				u32 ret_code;
+				if ((ret_code = delete(txn, key)) == 0)
 					add_iov("DELETED\r\n", 9);
-				else
-					add_iov("SERVER_ERROR\r\n", 14);
+				else {
+					add_iov("SERVER_ERROR ", 13);
+					add_iov(tnt_errcode_desc(ret_code),
+						strlen(tnt_errcode_desc(ret_code)));
+					add_iov("\r\n", 2);
+				}
 			}
 		}
 	goto st197;
 tr146:
-#line 495 "mod/box/memcached.rl"
+#line 505 "mod/box/memcached.rl"
 	{
 			exptime = natoq(fstart, p);
 			if (exptime > 0 && exptime <= 60*60*24*30)
 				exptime = exptime + ev_now();
 		}
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 370 "mod/box/memcached.rl"
+#line 375 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				add_iov("NOT_FOUND\r\n", 11);
 			} else {
-				if (delete(txn, key) == 0)
+				u32 ret_code;
+				if ((ret_code = delete(txn, key)) == 0)
 					add_iov("DELETED\r\n", 9);
-				else
-					add_iov("SERVER_ERROR\r\n", 14);
+				else {
+					add_iov("SERVER_ERROR ", 13);
+					add_iov(tnt_errcode_desc(ret_code),
+						strlen(tnt_errcode_desc(ret_code)));
+					add_iov("\r\n", 2);
+				}
 			}
 		}
 	goto st197;
 tr157:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 370 "mod/box/memcached.rl"
+#line 375 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				add_iov("NOT_FOUND\r\n", 11);
 			} else {
-				if (delete(txn, key) == 0)
+				u32 ret_code;
+				if ((ret_code = delete(txn, key)) == 0)
 					add_iov("DELETED\r\n", 9);
-				else
-					add_iov("SERVER_ERROR\r\n", 14);
+				else {
+					add_iov("SERVER_ERROR ", 13);
+					add_iov(tnt_errcode_desc(ret_code),
+						strlen(tnt_errcode_desc(ret_code)));
+					add_iov("\r\n", 2);
+				}
 			}
 		}
 	goto st197;
 tr169:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 460 "mod/box/memcached.rl"
+#line 470 "mod/box/memcached.rl"
 	{
 			if (flush_delay > 0) {
 				struct fiber *f = fiber_create("flush_all", -1, -1, flush_all, (void *)flush_delay);
@@ -1151,17 +1171,17 @@ tr169:
 		}
 	goto st197;
 tr174:
-#line 506 "mod/box/memcached.rl"
+#line 516 "mod/box/memcached.rl"
 	{flush_delay = natoq(fstart, p);}
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 460 "mod/box/memcached.rl"
+#line 470 "mod/box/memcached.rl"
 	{
 			if (flush_delay > 0) {
 				struct fiber *f = fiber_create("flush_all", -1, -1, flush_all, (void *)flush_delay);
@@ -1173,17 +1193,17 @@ tr174:
 		}
 	goto st197;
 tr185:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 460 "mod/box/memcached.rl"
+#line 470 "mod/box/memcached.rl"
 	{
 			if (flush_delay > 0) {
 				struct fiber *f = fiber_create("flush_all", -1, -1, flush_all, (void *)flush_delay);
@@ -1195,15 +1215,15 @@ tr185:
 		}
 	goto st197;
 tr195:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 383 "mod/box/memcached.rl"
+#line 393 "mod/box/memcached.rl"
 	{
 			txn->op = SELECT;
 			fiber_register_cleanup((void *)txn_cleanup, txn);
@@ -1282,25 +1302,25 @@ tr195:
 		}
 	goto st197;
 tr213:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 474 "mod/box/memcached.rl"
+#line 484 "mod/box/memcached.rl"
 	{
 			return 0;
 		}
 	goto st197;
 tr233:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -1321,13 +1341,13 @@ tr233:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 272 "mod/box/memcached.rl"
+#line 277 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
@@ -1338,9 +1358,9 @@ tr233:
 		}
 	goto st197;
 tr237:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -1361,13 +1381,13 @@ tr237:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 272 "mod/box/memcached.rl"
+#line 277 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
@@ -1378,11 +1398,11 @@ tr237:
 		}
 	goto st197;
 tr246:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -1403,13 +1423,13 @@ tr246:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 272 "mod/box/memcached.rl"
+#line 277 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
@@ -1420,11 +1440,11 @@ tr246:
 		}
 	goto st197;
 tr263:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -1445,22 +1465,22 @@ tr263:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 258 "mod/box/memcached.rl"
+#line 263 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			STORE;
 		}
 	goto st197;
 tr267:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -1481,24 +1501,24 @@ tr267:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 258 "mod/box/memcached.rl"
+#line 263 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			STORE;
 		}
 	goto st197;
 tr276:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 508 "mod/box/memcached.rl"
+#line 518 "mod/box/memcached.rl"
 	{
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
 			while (fiber->rbuf->len - parsed < bytes + 2) {
@@ -1519,28 +1539,28 @@ tr276:
 				goto exit;
 			}
 		}
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 258 "mod/box/memcached.rl"
+#line 263 "mod/box/memcached.rl"
 	{
 			key = read_field(keys);
 			STORE;
 		}
 	goto st197;
 tr281:
-#line 535 "mod/box/memcached.rl"
+#line 545 "mod/box/memcached.rl"
 	{ p++; }
-#line 529 "mod/box/memcached.rl"
+#line 539 "mod/box/memcached.rl"
 	{
 			done = true;
 			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
 			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
 		}
-#line 470 "mod/box/memcached.rl"
+#line 480 "mod/box/memcached.rl"
 	{
 			print_stats();
 		}
@@ -1549,33 +1569,33 @@ st197:
 	if ( ++p == pe )
 		goto _test_eof197;
 case 197:
-#line 1553 "mod/box/memcached.c"
+#line 1573 "mod/box/memcached.m"
 	goto st0;
 tr27:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
 	goto st13;
 tr40:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st13;
 st13:
 	if ( ++p == pe )
 		goto _test_eof13;
 case 13:
-#line 1567 "mod/box/memcached.c"
+#line 1587 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr30;
 	goto st0;
 tr28:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
 	goto st14;
 st14:
 	if ( ++p == pe )
 		goto _test_eof14;
 case 14:
-#line 1579 "mod/box/memcached.c"
+#line 1599 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 32: goto st14;
 		case 110: goto st15;
@@ -1668,18 +1688,18 @@ case 26:
 		goto tr45;
 	goto st0;
 tr45:
-#line 543 "mod/box/memcached.rl"
+#line 553 "mod/box/memcached.rl"
 	{append = true; }
 	goto st27;
 tr209:
-#line 544 "mod/box/memcached.rl"
+#line 554 "mod/box/memcached.rl"
 	{append = false;}
 	goto st27;
 st27:
 	if ( ++p == pe )
 		goto _test_eof27;
 case 27:
-#line 1683 "mod/box/memcached.c"
+#line 1703 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 13: goto st0;
 		case 32: goto st27;
@@ -1688,7 +1708,7 @@ case 27:
 		goto st0;
 	goto tr46;
 tr46:
-#line 479 "mod/box/memcached.rl"
+#line 489 "mod/box/memcached.rl"
 	{
 			fstart = p;
 			for (; p < pe && *p != ' ' && *p != '\r' && *p != '\n'; p++);
@@ -1705,7 +1725,7 @@ st28:
 	if ( ++p == pe )
 		goto _test_eof28;
 case 28:
-#line 1709 "mod/box/memcached.c"
+#line 1729 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st29;
 	goto st0;
@@ -1719,49 +1739,49 @@ case 29:
 		goto tr49;
 	goto st0;
 tr49:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st30;
 st30:
 	if ( ++p == pe )
 		goto _test_eof30;
 case 30:
-#line 1730 "mod/box/memcached.c"
+#line 1750 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr50;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st30;
 	goto st0;
 tr50:
-#line 502 "mod/box/memcached.rl"
+#line 512 "mod/box/memcached.rl"
 	{flags = natoq(fstart, p);}
 	goto st31;
 st31:
 	if ( ++p == pe )
 		goto _test_eof31;
 case 31:
-#line 1744 "mod/box/memcached.c"
+#line 1764 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st31;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr53;
 	goto st0;
 tr53:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st32;
 st32:
 	if ( ++p == pe )
 		goto _test_eof32;
 case 32:
-#line 1758 "mod/box/memcached.c"
+#line 1778 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr54;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st32;
 	goto st0;
 tr54:
-#line 495 "mod/box/memcached.rl"
+#line 505 "mod/box/memcached.rl"
 	{
 			exptime = natoq(fstart, p);
 			if (exptime > 0 && exptime <= 60*60*24*30)
@@ -1772,21 +1792,21 @@ st33:
 	if ( ++p == pe )
 		goto _test_eof33;
 case 33:
-#line 1776 "mod/box/memcached.c"
+#line 1796 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st33;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr57;
 	goto st0;
 tr57:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st34;
 st34:
 	if ( ++p == pe )
 		goto _test_eof34;
 case 34:
-#line 1790 "mod/box/memcached.c"
+#line 1810 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr58;
 		case 13: goto tr59;
@@ -1796,30 +1816,30 @@ case 34:
 		goto st34;
 	goto st0;
 tr59:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
 	goto st35;
 tr72:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st35;
 st35:
 	if ( ++p == pe )
 		goto _test_eof35;
 case 35:
-#line 1811 "mod/box/memcached.c"
+#line 1831 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr62;
 	goto st0;
 tr60:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
 	goto st36;
 st36:
 	if ( ++p == pe )
 		goto _test_eof36;
 case 36:
-#line 1823 "mod/box/memcached.c"
+#line 1843 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 32: goto st36;
 		case 110: goto st37;
@@ -1909,7 +1929,7 @@ case 47:
 		goto st0;
 	goto tr76;
 tr76:
-#line 479 "mod/box/memcached.rl"
+#line 489 "mod/box/memcached.rl"
 	{
 			fstart = p;
 			for (; p < pe && *p != ' ' && *p != '\r' && *p != '\n'; p++);
@@ -1926,7 +1946,7 @@ st48:
 	if ( ++p == pe )
 		goto _test_eof48;
 case 48:
-#line 1930 "mod/box/memcached.c"
+#line 1950 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st49;
 	goto st0;
@@ -1940,49 +1960,49 @@ case 49:
 		goto tr78;
 	goto st0;
 tr78:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st50;
 st50:
 	if ( ++p == pe )
 		goto _test_eof50;
 case 50:
-#line 1951 "mod/box/memcached.c"
+#line 1971 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr79;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st50;
 	goto st0;
 tr79:
-#line 502 "mod/box/memcached.rl"
+#line 512 "mod/box/memcached.rl"
 	{flags = natoq(fstart, p);}
 	goto st51;
 st51:
 	if ( ++p == pe )
 		goto _test_eof51;
 case 51:
-#line 1965 "mod/box/memcached.c"
+#line 1985 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st51;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr82;
 	goto st0;
 tr82:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st52;
 st52:
 	if ( ++p == pe )
 		goto _test_eof52;
 case 52:
-#line 1979 "mod/box/memcached.c"
+#line 1999 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr83;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st52;
 	goto st0;
 tr83:
-#line 495 "mod/box/memcached.rl"
+#line 505 "mod/box/memcached.rl"
 	{
 			exptime = natoq(fstart, p);
 			if (exptime > 0 && exptime <= 60*60*24*30)
@@ -1993,49 +2013,49 @@ st53:
 	if ( ++p == pe )
 		goto _test_eof53;
 case 53:
-#line 1997 "mod/box/memcached.c"
+#line 2017 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st53;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr86;
 	goto st0;
 tr86:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st54;
 st54:
 	if ( ++p == pe )
 		goto _test_eof54;
 case 54:
-#line 2011 "mod/box/memcached.c"
+#line 2031 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr87;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st54;
 	goto st0;
 tr87:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
 	goto st55;
 st55:
 	if ( ++p == pe )
 		goto _test_eof55;
 case 55:
-#line 2025 "mod/box/memcached.c"
+#line 2045 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st55;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr90;
 	goto st0;
 tr90:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st56;
 st56:
 	if ( ++p == pe )
 		goto _test_eof56;
 case 56:
-#line 2039 "mod/box/memcached.c"
+#line 2059 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr91;
 		case 13: goto tr92;
@@ -2045,30 +2065,30 @@ case 56:
 		goto st56;
 	goto st0;
 tr106:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st57;
 tr92:
-#line 504 "mod/box/memcached.rl"
+#line 514 "mod/box/memcached.rl"
 	{cas = natoq(fstart, p);}
 	goto st57;
 st57:
 	if ( ++p == pe )
 		goto _test_eof57;
 case 57:
-#line 2060 "mod/box/memcached.c"
+#line 2080 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr95;
 	goto st0;
 tr93:
-#line 504 "mod/box/memcached.rl"
+#line 514 "mod/box/memcached.rl"
 	{cas = natoq(fstart, p);}
 	goto st58;
 st58:
 	if ( ++p == pe )
 		goto _test_eof58;
 case 58:
-#line 2072 "mod/box/memcached.c"
+#line 2092 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr95;
 		case 13: goto st57;
@@ -2129,14 +2149,14 @@ case 65:
 	}
 	goto st0;
 tr107:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st66;
 st66:
 	if ( ++p == pe )
 		goto _test_eof66;
 case 66:
-#line 2140 "mod/box/memcached.c"
+#line 2160 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr95;
 		case 13: goto st57;
@@ -2174,18 +2194,18 @@ case 70:
 		goto tr113;
 	goto st0;
 tr113:
-#line 552 "mod/box/memcached.rl"
+#line 562 "mod/box/memcached.rl"
 	{incr_sign = -1;}
 	goto st71;
 tr202:
-#line 551 "mod/box/memcached.rl"
+#line 561 "mod/box/memcached.rl"
 	{incr_sign = 1; }
 	goto st71;
 st71:
 	if ( ++p == pe )
 		goto _test_eof71;
 case 71:
-#line 2189 "mod/box/memcached.c"
+#line 2209 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 13: goto st0;
 		case 32: goto st71;
@@ -2194,7 +2214,7 @@ case 71:
 		goto st0;
 	goto tr114;
 tr114:
-#line 479 "mod/box/memcached.rl"
+#line 489 "mod/box/memcached.rl"
 	{
 			fstart = p;
 			for (; p < pe && *p != ' ' && *p != '\r' && *p != '\n'; p++);
@@ -2211,7 +2231,7 @@ st72:
 	if ( ++p == pe )
 		goto _test_eof72;
 case 72:
-#line 2215 "mod/box/memcached.c"
+#line 2235 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st73;
 	goto st0;
@@ -2225,14 +2245,14 @@ case 73:
 		goto tr117;
 	goto st0;
 tr117:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st74;
 st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 2236 "mod/box/memcached.c"
+#line 2256 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr118;
 		case 13: goto tr119;
@@ -2242,30 +2262,30 @@ case 74:
 		goto st74;
 	goto st0;
 tr133:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st75;
 tr119:
-#line 505 "mod/box/memcached.rl"
+#line 515 "mod/box/memcached.rl"
 	{incr = natoq(fstart, p);}
 	goto st75;
 st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 2257 "mod/box/memcached.c"
+#line 2277 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr122;
 	goto st0;
 tr120:
-#line 505 "mod/box/memcached.rl"
+#line 515 "mod/box/memcached.rl"
 	{incr = natoq(fstart, p);}
 	goto st76;
 st76:
 	if ( ++p == pe )
 		goto _test_eof76;
 case 76:
-#line 2269 "mod/box/memcached.c"
+#line 2289 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr122;
 		case 13: goto st75;
@@ -2326,14 +2346,14 @@ case 83:
 	}
 	goto st0;
 tr134:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st84;
 st84:
 	if ( ++p == pe )
 		goto _test_eof84;
 case 84:
-#line 2337 "mod/box/memcached.c"
+#line 2357 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr122;
 		case 13: goto st75;
@@ -2380,7 +2400,7 @@ case 89:
 		goto st0;
 	goto tr140;
 tr140:
-#line 479 "mod/box/memcached.rl"
+#line 489 "mod/box/memcached.rl"
 	{
 			fstart = p;
 			for (; p < pe && *p != ' ' && *p != '\r' && *p != '\n'; p++);
@@ -2397,7 +2417,7 @@ st90:
 	if ( ++p == pe )
 		goto _test_eof90;
 case 90:
-#line 2401 "mod/box/memcached.c"
+#line 2421 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr141;
 		case 13: goto st91;
@@ -2405,7 +2425,7 @@ case 90:
 	}
 	goto st0;
 tr147:
-#line 495 "mod/box/memcached.rl"
+#line 505 "mod/box/memcached.rl"
 	{
 			exptime = natoq(fstart, p);
 			if (exptime > 0 && exptime <= 60*60*24*30)
@@ -2413,14 +2433,14 @@ tr147:
 		}
 	goto st91;
 tr158:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st91;
 st91:
 	if ( ++p == pe )
 		goto _test_eof91;
 case 91:
-#line 2424 "mod/box/memcached.c"
+#line 2444 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr141;
 	goto st0;
@@ -2438,14 +2458,14 @@ case 92:
 		goto tr144;
 	goto st0;
 tr144:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st93;
 st93:
 	if ( ++p == pe )
 		goto _test_eof93;
 case 93:
-#line 2449 "mod/box/memcached.c"
+#line 2469 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr146;
 		case 13: goto tr147;
@@ -2455,7 +2475,7 @@ case 93:
 		goto st93;
 	goto st0;
 tr148:
-#line 495 "mod/box/memcached.rl"
+#line 505 "mod/box/memcached.rl"
 	{
 			exptime = natoq(fstart, p);
 			if (exptime > 0 && exptime <= 60*60*24*30)
@@ -2466,7 +2486,7 @@ st94:
 	if ( ++p == pe )
 		goto _test_eof94;
 case 94:
-#line 2470 "mod/box/memcached.c"
+#line 2490 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr141;
 		case 13: goto st91;
@@ -2527,14 +2547,14 @@ case 101:
 	}
 	goto st0;
 tr159:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st102;
 st102:
 	if ( ++p == pe )
 		goto _test_eof102;
 case 102:
-#line 2538 "mod/box/memcached.c"
+#line 2558 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr141;
 		case 13: goto st91;
@@ -2608,18 +2628,18 @@ case 111:
 	}
 	goto st0;
 tr186:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st112;
 tr175:
-#line 506 "mod/box/memcached.rl"
+#line 516 "mod/box/memcached.rl"
 	{flush_delay = natoq(fstart, p);}
 	goto st112;
 st112:
 	if ( ++p == pe )
 		goto _test_eof112;
 case 112:
-#line 2623 "mod/box/memcached.c"
+#line 2643 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr169;
 	goto st0;
@@ -2637,14 +2657,14 @@ case 113:
 		goto tr172;
 	goto st0;
 tr172:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st114;
 st114:
 	if ( ++p == pe )
 		goto _test_eof114;
 case 114:
-#line 2648 "mod/box/memcached.c"
+#line 2668 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr174;
 		case 13: goto tr175;
@@ -2654,14 +2674,14 @@ case 114:
 		goto st114;
 	goto st0;
 tr176:
-#line 506 "mod/box/memcached.rl"
+#line 516 "mod/box/memcached.rl"
 	{flush_delay = natoq(fstart, p);}
 	goto st115;
 st115:
 	if ( ++p == pe )
 		goto _test_eof115;
 case 115:
-#line 2665 "mod/box/memcached.c"
+#line 2685 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr169;
 		case 13: goto st112;
@@ -2722,14 +2742,14 @@ case 122:
 	}
 	goto st0;
 tr187:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st123;
 st123:
 	if ( ++p == pe )
 		goto _test_eof123;
 case 123:
-#line 2733 "mod/box/memcached.c"
+#line 2753 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr169;
 		case 13: goto st112;
@@ -2760,18 +2780,18 @@ case 126:
 	}
 	goto st0;
 tr191:
-#line 548 "mod/box/memcached.rl"
+#line 558 "mod/box/memcached.rl"
 	{show_cas = false;}
 	goto st127;
 tr198:
-#line 549 "mod/box/memcached.rl"
+#line 559 "mod/box/memcached.rl"
 	{show_cas = true;}
 	goto st127;
 st127:
 	if ( ++p == pe )
 		goto _test_eof127;
 case 127:
-#line 2775 "mod/box/memcached.c"
+#line 2795 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 13: goto st0;
 		case 32: goto st127;
@@ -2780,7 +2800,7 @@ case 127:
 		goto st0;
 	goto tr193;
 tr193:
-#line 479 "mod/box/memcached.rl"
+#line 489 "mod/box/memcached.rl"
 	{
 			fstart = p;
 			for (; p < pe && *p != ' ' && *p != '\r' && *p != '\n'; p++);
@@ -2797,7 +2817,7 @@ st128:
 	if ( ++p == pe )
 		goto _test_eof128;
 case 128:
-#line 2801 "mod/box/memcached.c"
+#line 2821 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr195;
 		case 13: goto st129;
@@ -3004,7 +3024,7 @@ case 155:
 		goto st0;
 	goto tr222;
 tr222:
-#line 479 "mod/box/memcached.rl"
+#line 489 "mod/box/memcached.rl"
 	{
 			fstart = p;
 			for (; p < pe && *p != ' ' && *p != '\r' && *p != '\n'; p++);
@@ -3021,7 +3041,7 @@ st156:
 	if ( ++p == pe )
 		goto _test_eof156;
 case 156:
-#line 3025 "mod/box/memcached.c"
+#line 3045 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st157;
 	goto st0;
@@ -3035,49 +3055,49 @@ case 157:
 		goto tr224;
 	goto st0;
 tr224:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st158;
 st158:
 	if ( ++p == pe )
 		goto _test_eof158;
 case 158:
-#line 3046 "mod/box/memcached.c"
+#line 3066 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr225;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st158;
 	goto st0;
 tr225:
-#line 502 "mod/box/memcached.rl"
+#line 512 "mod/box/memcached.rl"
 	{flags = natoq(fstart, p);}
 	goto st159;
 st159:
 	if ( ++p == pe )
 		goto _test_eof159;
 case 159:
-#line 3060 "mod/box/memcached.c"
+#line 3080 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st159;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr228;
 	goto st0;
 tr228:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st160;
 st160:
 	if ( ++p == pe )
 		goto _test_eof160;
 case 160:
-#line 3074 "mod/box/memcached.c"
+#line 3094 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr229;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st160;
 	goto st0;
 tr229:
-#line 495 "mod/box/memcached.rl"
+#line 505 "mod/box/memcached.rl"
 	{
 			exptime = natoq(fstart, p);
 			if (exptime > 0 && exptime <= 60*60*24*30)
@@ -3088,21 +3108,21 @@ st161:
 	if ( ++p == pe )
 		goto _test_eof161;
 case 161:
-#line 3092 "mod/box/memcached.c"
+#line 3112 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st161;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr232;
 	goto st0;
 tr232:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st162;
 st162:
 	if ( ++p == pe )
 		goto _test_eof162;
 case 162:
-#line 3106 "mod/box/memcached.c"
+#line 3126 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr233;
 		case 13: goto tr234;
@@ -3112,30 +3132,30 @@ case 162:
 		goto st162;
 	goto st0;
 tr234:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
 	goto st163;
 tr247:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st163;
 st163:
 	if ( ++p == pe )
 		goto _test_eof163;
 case 163:
-#line 3127 "mod/box/memcached.c"
+#line 3147 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr237;
 	goto st0;
 tr235:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
 	goto st164;
 st164:
 	if ( ++p == pe )
 		goto _test_eof164;
 case 164:
-#line 3139 "mod/box/memcached.c"
+#line 3159 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 32: goto st164;
 		case 110: goto st165;
@@ -3227,7 +3247,7 @@ case 175:
 		goto st0;
 	goto tr252;
 tr252:
-#line 479 "mod/box/memcached.rl"
+#line 489 "mod/box/memcached.rl"
 	{
 			fstart = p;
 			for (; p < pe && *p != ' ' && *p != '\r' && *p != '\n'; p++);
@@ -3244,7 +3264,7 @@ st176:
 	if ( ++p == pe )
 		goto _test_eof176;
 case 176:
-#line 3248 "mod/box/memcached.c"
+#line 3268 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st177;
 	goto st0;
@@ -3258,49 +3278,49 @@ case 177:
 		goto tr254;
 	goto st0;
 tr254:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st178;
 st178:
 	if ( ++p == pe )
 		goto _test_eof178;
 case 178:
-#line 3269 "mod/box/memcached.c"
+#line 3289 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr255;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st178;
 	goto st0;
 tr255:
-#line 502 "mod/box/memcached.rl"
+#line 512 "mod/box/memcached.rl"
 	{flags = natoq(fstart, p);}
 	goto st179;
 st179:
 	if ( ++p == pe )
 		goto _test_eof179;
 case 179:
-#line 3283 "mod/box/memcached.c"
+#line 3303 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st179;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr258;
 	goto st0;
 tr258:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st180;
 st180:
 	if ( ++p == pe )
 		goto _test_eof180;
 case 180:
-#line 3297 "mod/box/memcached.c"
+#line 3317 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto tr259;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto st180;
 	goto st0;
 tr259:
-#line 495 "mod/box/memcached.rl"
+#line 505 "mod/box/memcached.rl"
 	{
 			exptime = natoq(fstart, p);
 			if (exptime > 0 && exptime <= 60*60*24*30)
@@ -3311,21 +3331,21 @@ st181:
 	if ( ++p == pe )
 		goto _test_eof181;
 case 181:
-#line 3315 "mod/box/memcached.c"
+#line 3335 "mod/box/memcached.m"
 	if ( (*p) == 32 )
 		goto st181;
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr262;
 	goto st0;
 tr262:
-#line 478 "mod/box/memcached.rl"
+#line 488 "mod/box/memcached.rl"
 	{ fstart = p; }
 	goto st182;
 st182:
 	if ( ++p == pe )
 		goto _test_eof182;
 case 182:
-#line 3329 "mod/box/memcached.c"
+#line 3349 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 10: goto tr263;
 		case 13: goto tr264;
@@ -3335,30 +3355,30 @@ case 182:
 		goto st182;
 	goto st0;
 tr264:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
 	goto st183;
 tr277:
-#line 537 "mod/box/memcached.rl"
+#line 547 "mod/box/memcached.rl"
 	{ noreply = true; }
 	goto st183;
 st183:
 	if ( ++p == pe )
 		goto _test_eof183;
 case 183:
-#line 3350 "mod/box/memcached.c"
+#line 3370 "mod/box/memcached.m"
 	if ( (*p) == 10 )
 		goto tr267;
 	goto st0;
 tr265:
-#line 503 "mod/box/memcached.rl"
+#line 513 "mod/box/memcached.rl"
 	{bytes = natoq(fstart, p);}
 	goto st184;
 st184:
 	if ( ++p == pe )
 		goto _test_eof184;
 case 184:
-#line 3362 "mod/box/memcached.c"
+#line 3382 "mod/box/memcached.m"
 	switch( (*p) ) {
 		case 32: goto st184;
 		case 110: goto st185;
@@ -3654,7 +3674,7 @@ case 196:
 	_out: {}
 	}
 
-#line 562 "mod/box/memcached.rl"
+#line 572 "mod/box/memcached.rl"
 
 
 	if (!done) {

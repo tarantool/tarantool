@@ -53,13 +53,13 @@
 #include TARANTOOL_CONFIG
 #include <util.h>
 #include <third_party/gopt/gopt.h>
+#include <cfg/warning.h>
 
 
 static pid_t master_pid;
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
 const char *cfg_filename = DEFAULT_CFG_FILENAME;
 char *cfg_filename_fullpath = NULL;
-struct tbuf *cfg_out = NULL;
 char *binary_filename;
 struct tarantool_cfg cfg;
 struct recovery_state *recovery_state;
@@ -67,7 +67,6 @@ struct recovery_state *recovery_state;
 bool init_storage, booting = true;
 
 extern int daemonize(int nochdir, int noclose);
-void out_warning(int v, char *format, ...);
 
 static i32
 load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
@@ -371,7 +370,7 @@ main(int argc, char **argv)
 #endif
 			   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
 				       NULL, "increase verbosity level in log messages"),
-			   gopt_option('D', 0, gopt_shorts('D'), gopt_longs("daemonize"),
+			   gopt_option('B', 0, gopt_shorts('B'), gopt_longs("background"),
 				       NULL, "redirect input/output streams to a log file and run as daemon"),
 			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
 				       NULL, "display this help and exit"),
@@ -382,7 +381,7 @@ main(int argc, char **argv)
 	binary_filename = argv[0];
 
 	if (gopt(opt, 'V')) {
-		puts(tarantool_version());
+		printf("Tarantool/%s %s\n", mod_name, tarantool_version());
 		return 0;
 	}
 
@@ -441,7 +440,7 @@ main(int argc, char **argv)
 
 		i = tarantool_cfg_iterator_init();
 		while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
-			if (strcmp(key, cfg_paramname) == 0) {
+			if (strcmp(key, cfg_paramname) == 0 && value != NULL) {
 				printf("%s\n", value);
 				free(value);
 
@@ -513,7 +512,7 @@ main(int argc, char **argv)
 	}
 #endif
 
-	if (gopt(opt, 'D'))
+	if (gopt(opt, 'B'))
 		daemonize(1, 1);
 
 	if (cfg.pid_file != NULL) {

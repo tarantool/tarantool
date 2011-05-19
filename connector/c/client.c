@@ -32,54 +32,100 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+/*
+ * Please keep as many data structures defined in .c as possible
+ * to increase forward ABI compatibility.
+ */
+
+
+struct tnt_connection
+{
+	/** The socket used to get connected to the server. */
+	int data_port;
+};
+
+
+/** A helper to get the DNS resolution done.
+ */
+
 static
 struct sockaddr_in
-get_sockaddr_in(const char *hostname, unsigned short port) {
-  struct sockaddr_in result;
+get_sockaddr_in(const char *hostname, unsigned short port)
+{
+	struct sockaddr_in result;
 
-  memset((void*)(&result), 0, sizeof(result));
-  result.sin_family = AF_INET;
-  result.sin_port   = htons(port);
+	memset((void*)(&result), 0, sizeof(result));
+	result.sin_family = AF_INET;
+	result.sin_port   = htons(port);
 
-  struct hostent *host = gethostbyname(hostname);
-  if (host != 0)
-	  memcpy((void*)(&result.sin_addr),
-		 (void*)(host->h_addr), host->h_length);
+	/* @todo: start using gethostbyname_r */
+	struct hostent *host = gethostbyname(hostname);
+	if (host != 0)
+		memcpy((void*)(&result.sin_addr),
+		       (void*)(host->h_addr), host->h_length);
 
-  return result;
+	return result;
 }
 
-struct tnt_connection *tnt_connect(const char *hostname, int port) {
-  int fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (fd < 0)
-	  return NULL;
 
-  int opt = 1;
-  if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) == -1)
-	  return NULL;
+struct tnt_connection *tnt_connect(const char *hostname, int port)
+{
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (fd < 0)
+		return NULL;
 
-  struct sockaddr_in addr = get_sockaddr_in(hostname, port);
-  if (connect(fd, (struct sockaddr*)&addr, sizeof addr))
-	  return NULL;
+	/*
+	 * We set TCP_NODELAY since we're not strictly
+	 * request/response.
+         */
+	int opt = 1;
+	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) == -1)
+		return NULL;
 
-  struct tnt_connection *conn = malloc(sizeof(struct tnt_connection));
-  conn->data_port = fd;
-  return conn;
+	struct sockaddr_in addr = get_sockaddr_in(hostname, port);
+	if (connect(fd, (struct sockaddr*)&addr, sizeof addr))
+		return NULL;
+
+	struct tnt_connection *tnt = malloc(sizeof(struct tnt_connection));
+	if (tnt == NULL) {
+		close(fd);
+		return NULL;
+	}
+	tnt->data_port = fd;
+	return tnt;
 }
 
-void tnt_disconnect(struct tnt_connection *conn) {
-  close(conn->data_port);
-  free(conn);
+
+void tnt_disconnect(struct tnt_connection *tnt)
+{
+	close(tnt->data_port);
+	free(tnt);
 }
 
-int tnt_execute_raw(struct tnt_connection *conn, const char *message,
-		    size_t len) {
-  if (send(conn->data_port, message, len, 0) < 0)
-	  return 3;
 
-  char buf[2048];
-  if (recv(conn->data_port, buf, 2048, 0) < 16)
-	  return 3;
+/** Send the binary blob message to the server, read the response
+ * and learn as much from it as possible.
+ *
+ * @return 0 on success, 1 on error.
+ */
 
-  return buf[12]; // return_code: 0,1,2
+int tnt_execute_raw(struct tnt_connection *tnt, const char *message,
+		    size_t len, struct tnt_result *tnt_res)
+{
+	if (send(tnt->data_port, message, len, 0) < 0)
+		return -1;
+
+	char buf[2048];
+
+	if (recv(tnt->data_port, buf, 2048, 0) < 16)
+		return -1;
+
+	if (tnt_res) {
+		memset(tnt_res, 0, sizeof *tnt_res);
+
+		/* @fixme: we may want to support big-endian some
+		 * day. */
+		tnt_res->errcode = * (uint32_t*) (buf+12); /* see iproto.h */
+	}
+	return 0;
 }

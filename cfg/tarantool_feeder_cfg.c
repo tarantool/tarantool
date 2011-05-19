@@ -11,8 +11,7 @@
  */
 
 
-#include "prscfg.h"
-void out_warning(ConfettyError r, char *format, ...);
+#include "cfg/warning.h"
 #include "cfg/tarantool_feeder_cfg.h"
 static int
 cmpNameAtoms(NameAtom *a, NameAtom *b) {

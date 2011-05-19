@@ -35,8 +35,10 @@
 #endif
 
 /* Macros to define enum and corresponding strings. */
-#define ENUM_MEMBER(s, v) s = v,
-#define ENUM_STRS_MEMBER(s, v) [s] = #s,
+#define ENUM0_MEMBER(s, ...) s,
+#define ENUM_MEMBER(s, v, ...) s = v,
+#define ENUM_STRS_MEMBER(s, v, ...) [s] = #s,
+#define ENUM0(enum_name, enum_members) enum enum_name {enum_members(ENUM0_MEMBER) enum_name##_MAX}
 #define ENUM(enum_name, enum_members) enum enum_name {enum_members(ENUM_MEMBER) enum_name##_MAX}
 #define STRS(enum_name, enum_members) \
 	char *enum_name##_strs[enum_name##_MAX + 1] = {enum_members(ENUM_STRS_MEMBER) '\0'}

@@ -87,3 +87,22 @@ select * from t65537 where k0 = 0
 An error occurred: ERR_CODE_NO_SUCH_NAMESPACE, 'No namespace with specified id exists'
 select * from t4294967295 where k0 = 0
 An error occurred: ERR_CODE_NO_SUCH_NAMESPACE, 'No namespace with specified id exists'
+
+#
+# A test case for: http://bugs.launchpad.net/bugs/735140
+# Partial REPLACE corrupts index.
+#
+
+insert into t0 values ('Spears', 'Britney')
+Insert OK, 1 row affected
+select * from t0 where k0='Spears'
+Found 1 tuple:
+['Spears', 'Britney']
+select * from t0 where k1='Britney'
+Found 1 tuple:
+['Spears', 'Britney']
+insert into t0 values ('Spears')
+An error occurred: ERR_CODE_ILLEGAL_PARAMS, 'Illegal parameters'
+select * from t0 where k0='Spears'
+Found 1 tuple:
+['Spears', 'Britney']
