@@ -462,11 +462,14 @@ fiber_loop(void *data __attribute__((unused)))
 	}
 }
 
+/** Set fiber name. 
+* @Param[in] name the new name of the fiber. Truncated to FIBER_NAME_MAXLEN.
+*/
+
 void
 fiber_set_name(struct fiber *fiber, const char *name)
 {
-	if (name == NULL)
-		name = "undefined";
+	assert(name != NULL);
 	snprintf(fiber->name, sizeof(fiber->name), "%s", name);
 }
 
@@ -490,7 +493,7 @@ fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void 
 		if (tarantool_coro_create(&fiber->coro, fiber_loop, NULL) == NULL)
 			return NULL;
 
-		fiber->pool = palloc_create_pool(NULL);
+		fiber->pool = palloc_create_pool(name);
 		fiber->inbox = palloc(eter_pool, (sizeof(*fiber->inbox) +
 						  inbox_size * sizeof(struct tbuf *)));
 		fiber->inbox->size = inbox_size;

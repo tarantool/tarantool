@@ -1,0 +1,29 @@
+
+<para>
+
+
+
+
+
+arantool is a single-threaded server that supports cooperative multi-processing, developed with work accounting for high loads (e.g. tens of thousands of RPS). It is possible to divide the system functionality into two logical groups: core and module. Currently, modules are installed into the system at compilation time. The core level includes the base functionality, such as network communications, operations on binary logs, replication over the network, fast switchover to the reserve server, etc. The modules implement the business logic of a concrete application, using the core API.
+
+Tarantool/Silverbox is a key-based memory-based data store. Storage of data in memory allows the use of simpler algorithms, decrease of the number of processor instructions, and, most importantly, avoidance of the slowest component in any server system, the hard disk. Database performance of saved information in memory is noticeably higher than that of equivalent systems, which utilize the disk.
+
+It was developed for internal goals of the company Mail.Ru. Once deployed the system proved to be attractive for a number of different projects in the company, and was subsequently adopted by them. The high productivity and reliability of the system under heavy loads made it possible to increase the stability of the services that adopted Tarantool. The first version of the server, which implemented the basic goals for a storage family, went online in 2008. Since that time, Tarantool server has been reworked and perfected for providing specialized storage. The code is written in C and uses gcc extensions.
+
+Basics
+
+Tarantool’s custom allocators avoid external fragmentation of base memory and degradation of performance when working with large numbers of small objects;
+The system is optimized for work with large volumes of data;
+Tarantool uses snapshot files, which contain the state of the database at the time of copy to disk;
+Transaction logging in binary log files preserves all changes to database state, allowing automatic restoration of information after system reboot;
+The system provides high availability, automatic switchover to an available replica in case of crash of any part of the system;
+The system is fully compatible with the memcached protocol;
+Local replicas allow system update without interruption to client services;
+The system provides data replication over the network;
+Tarantool supplies a simply binary protocol for replication, supporting the creation of additional logic.
+The system currently builds only under gcc;
+Tarantool has currently been tested only under Linux;
+When very frequent and rapid changes are made in a large quantity of data, the saving of the snapshot requires a large amount of memory.
+
+</para>

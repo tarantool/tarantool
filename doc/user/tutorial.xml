@@ -1,0 +1,126 @@
+<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
+<title>Getting started</title>
+<blockquote><para>
+  This chapter describes the contents
+  of binary and source package download, explains how to
+  start/stop the server, connect to it with a command line client.
+</para></blockquote>
+
+<para>
+  Tarantool is distributed in binary and source code form.
+  Binary packages use <filename>tarantool-<replaceable>&lt;version&gt;</replaceable>-<replaceable>&lt;OS&gt;</replaceable>-<replaceable>&lt;machine&gt;</replaceable>.tar.gz</filename> naming scheme. Source packages are
+  named simply <filename>tarantool-<replaceable>&lt;version&gt;</replaceable>-src.tar.gz</filename>.
+  You can find out the canonical name of your operating system
+  and machine type with <command>uname -o</command> and <command>uname
+-m</command> respectively.
+  Besides the downloaded package, you will need the following
+  software:
+
+  <itemizedlist>
+    <listitem>
+      <para>Python 2.6 or newer, with
+      <citetitle xlink:href="http://pyyaml.org/wiki/PyYAML" xlink:title="Python YAML parser">PyYAML</citetitle>,
+      <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon" xlink:title="Python daemon">python-daemon</citetitle> and
+       <citetitle xlink:href="http://pypi.python.org/pypi/pexpect/" xlink:title="pure-Python pexpect implementation">python-pexpect</citetitle> modules,</para>
+
+      <note><para>
+        Python is used to run regression tests and
+        <command>tarantool</command> command-line client.
+        If you do not plan to run tests you may skip this step.
+      </para></note>
+    </listitem>
+  </itemizedlist>
+    To build Tarantool from source, additionally:
+  <itemizedlist>
+    <listitem><para>CMake 2.6 or newer,</para></listitem>
+    <listitem><para>GCC 4.4 or newer.</para></listitem>
+  </itemizedlist>
+</para>
+<para>
+  After download, unpack the binary package, an own directory will be created:
+  <programlisting>
+  <prompt>$ </prompt><command>tar</command> <option>zxvf</option> <filename>package-name.tar.gz</filename></programlisting>
+  The binary download contains just two subdirectories:
+  <filename>bin</filename> and <filename>doc</filename>.
+  The server, by default, looks for its configuration file in
+  the current working directory. There is a correct
+  and minimalistic <filename>tarantool.cfg</filename> in directory
+  <filename>bin</filename>, thus the server can be started
+  right out of it:
+  <programlisting>
+  <prompt>$ </prompt><command>cd package-name/bin &amp;&amp; ./tarantool_box</command>
+  ...
+  1301424353.416 3459 104/33013/acceptor _ I> I am primary
+  1301424353.416 3459 1/sched _ I> initialized</programlisting>
+
+  To stop the server, simply press <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
+</para>
+<para>
+  Once the server is started, you can connect to it and issue
+  queries using a command line client implemented in Python:
+  <programlisting>
+  <prompt>$ </prompt><command>cd package-name/bin &amp;&amp; ./tarantool</command>
+  <prompt>tarantool> </prompt> <userinput>show info</userinput>
+  <computeroutput>
+  ---
+  info:
+    version: "1.4.0-17-g50c60ae"
+    uptime: 548
+    pid: 3459
+    wal_writer_pid: 3461
+    lsn: 1
+    recovery_lag: 0.000
+    recovery_last_update: 0.000
+    status: primary</computeroutput></programlisting>
+</para>
+<para>
+  <bridgehead renderas="sect2">Compiling from source</bridgehead>
+
+  To use a source package, a few additional steps are
+  necessary: configuration and build. The easiest way to configure
+  a source directory with CMake is by requesting an in-source build:
+  <programlisting>
+  <prompt>$ </prompt><command>cd</command> <filename>package-name</filename> &amp;&amp; <command>cmake</command> .</programlisting>
+  Upon successful configuration, CMake prints the status
+  of optional features:
+  <programlisting>
+  -- *** The following options are on in this configuration: ***
+  -- ENABLE_GCOV: ON
+  -- ENABLE_TRACE: ON
+  -- ENABLE_BACKTRACE: ON
+  -- Backtrace is with symbol resolve: True
+  -- ENABLE_STATIC: OFF
+  --
+  -- Configuring done
+  -- Generating done</programlisting>
+  Now type 'make' to build Tarantool.
+  <programlisting>
+  <prompt>$ </prompt><command>make</command>
+  ...
+  Linking C executable tarantool_box
+  [100%] Built target tarantool_box</programlisting>
+  When <command>make</command> is complete, the server can be
+  started right out of the in-source build. Use Tarantool
+  regression testing framework:
+  <programlisting><prompt>$ </prompt><command>./test/run</command> <option>--start-and-exit</option></programlisting>
+  It will create necessary files in directory
+  <filename>./test/var/</filename>, and fire off the server with
+  minimal configuration.
+  The command line client is located in the same directory:
+  <programlisting><prompt>$ </prompt><command>./test/tarantool</command></programlisting>
+</para>
+<sidebar>
+<para>
+  Congratulations, you have the server up and running.
+  Check out the remaining chapters of this manual to learn
+  more about available commands, contents of tarantool.cfg,
+  replication and high availability with Tarantool.
+</para>
+</sidebar>
+
+</chapter>
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en
+-->

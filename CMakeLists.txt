@@ -6,6 +6,8 @@ include(CheckCCompilerFlag)
 include(CheckSymbolExists)
 include(TestBigEndian)
 find_program(ECHO echo)
+find_program(XSLTPROC xsltproc)
+find_program(XMLLINT xmllint)
 find_program(CAT cat)
 find_program(GIT git)
 find_program(RAGEL ragel)
@@ -217,6 +219,7 @@ add_subdirectory(connector)
 add_subdirectory(core)
 add_subdirectory(mod)
 add_subdirectory(test)
+add_subdirectory(doc EXCLUDE_FROM_ALL)
 
 install (FILES README LICENSE doc/box-protocol.txt
          DESTINATION doc)
@@ -229,6 +232,10 @@ include (cmake/tarantool_cpack.cmake)
 configure_file(
     "${PROJECT_SOURCE_DIR}/include/config.h.cmake"
     "${PROJECT_BINARY_DIR}/include/config.h"
+    )
+configure_file(
+    "${PROJECT_SOURCE_DIR}/doc/tnt.ent.cmake"
+    "${PROJECT_BINARY_DIR}/doc/tnt.ent"
     )
 
 message (STATUS "")

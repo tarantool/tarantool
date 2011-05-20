@@ -1,0 +1,154 @@
+<!DOCTYPE chapter [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
+<title>Preface</title>
+<section xml:id="preface">
+  <title>Tarantool/Box: an overview</title>
+  <para>
+    <productname>Tarantool/Box</productname>, or simply 
+    <productname>Tarantool</productname>,
+    is a high performance key/value storage server.  The code is
+    available for free under the terms of <citetitle
+    xlink:href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD
+    license</citetitle>. Supported platforms are GNU/Linux and
+    FreeBSD.
+
+  </para>
+
+  <para>
+    The server <emphasis role="strong">maintains all its data in
+    random-access memory</emphasis>, and therefore can handle read
+    requests blazingly fast.  At the same time, a copy of the data
+    is kept on non-volatile storage (a disk drive), and inserts
+    and updates are performed atomically.
+  </para>
+
+  <para>
+    To ensure atomicity, consistency and crash-safety of the
+    persistent copy, a write-ahead
+    log (WAL) is maintained, and each change is recorded
+    in the WAL before it is considered complete.
+  </para>
+
+  <para>
+    If update and delete rate is high, a constantly growing
+    write-ahead log file (or files) can pose a disk space problem,
+    and significantly increase time necessary to restart from disk.
+    A simple solution is employed: the server <emphasis
+    role="strong">can be requested to save a concise
+    snapshot</emphasis> of
+    its current data. The underlying operating system's
+    <quote>copy-on-write</quote> feature is employed to take the
+    snapshot in a quick, resource-savvy and non-blocking manner.
+    The <quote>copy-on-write</quote> technique guarantees that
+    snapshotting has minimal impact on server performance.
+  </para>
+
+  <para>
+    Tarantool supports replication. Replicas may run locally or
+    on a remote host. Tarantool replication
+    is asynchronous and does not block writes to the
+    master. When or if the master becomes unavailable, the replica
+    can be switched to assume the role of the master.
+  </para>
+
+  <para>
+    <emphasis role="strong">Tarantool is lock-free</emphasis>.
+    Instead of the underlying operating system's concurrency
+    primitives, Tarantool uses cooperative multitasking environment
+    to simultaneously operate on thousands of connections. While
+    this approach limits server scalability to a single CPU core, in
+    practice it removes competition for the memory bus and sets the
+    scalability limit to the top of memory and network throughput.
+    CPU utilization of a typical highly-loaded Tarantool server is
+    under 10%.
+  </para>
+
+  <para>
+    <emphasis role="strong">The software is production-ready</emphasis>.
+    Tarantool has been developed and is actively used at
+    <citetitle xlink:href="http://api.mail.ru">Mail.Ru</citetitle>,
+    one of the leading Russian web content providers. At Mail.Ru,
+    the sowtware serves the <quote>hottest</quote>
+    data, such as online users and their sessions, online application
+    properties, the map between users and their serving shards.
+  </para>
+
+  <para>
+    To conclude, Tarantool/Box is ideal for highly volatile and/or
+    highly accessed Web data. With Tarantool, performance overhead
+    on serving data is minimal: a single server can easily deal with
+    tens or even hundreds of thousands of requests per second.
+    Snapshots can be made when Web user activity is at its lowest,
+    for example at night, and thus add little or no restraint on the
+    top throughput of the system.  If the master becomes
+    unavailable, a replica can assume the role of the master with
+    minimal downtime.
+  </para>
+</section>
+<section>
+  <title>Conventions</title>
+  <para>
+    This manual is written in <citetitle
+    xlink:href="http://www.docbook.org/tdg5/en/html/docbook.html">DocBook
+    5</citetitle> XML markup language and is using the standard <citetitle
+    xlink:href="http://docbook.sourceforge.net/release/xsl/current/doc/">DocbBook
+    XSL</citetitle> formatting conventions:
+  </para>
+  <para>
+    UNIX shell command input is prefixed with '$ ' and is 
+    formatted using a fixed-width font:
+    <programlisting>
+      <prompt>$ </prompt>tarantool_box <option>--daemonize</option>
+    </programlisting>
+  </para>
+  <para>
+    The same formatting style is used for file names:
+    <filename>/path/to/var/dir</filename>.
+  </para>
+
+  <para>
+    Text that represents user input is formatted in boldface:
+    <programlisting>
+      <prompt>$ </prompt><userinput>your input here</userinput>
+    </programlisting>
+
+  </para>
+
+  <para>
+    Within user input, replaceables are printed in italics:
+    <programlisting>
+      <prompt>$ </prompt><userinput>tarantool_box <replaceable>--option</replaceable></userinput>
+    </programlisting>
+
+  </para>
+</section>
+<section>
+  <title>Reporting bugs</title>
+  <para>
+    Please report bugs in Tarantool at <link
+    xlink:href="http://bugs.launchpad.net/tarantool"/>. You can
+    contact developers directly on
+    <link xlink:href="irc://irc.freenode.net#tarantool">#tarantool</link>
+    IRC channel or via mailing list,
+    <link xlink:href="https://launchpad.net/~tarantool-developers">tarantool-developers@lists.launchpad.net</link>.
+  </para>
+  <para>
+    <emphasis role="strong">Caution:</emphasis> To prevent spam, Launchpad
+    mailing list software silently drops all mail sent by
+    unregistered users. Registration also
+    allows you to report bug and create feature requests.
+    You can always check whether or not your mail has been
+    delivered in the public mailing list archive, <link
+    xlink:href="https://lists.launchpad.net/tarantool-developers"/>.
+  </para>
+</section>
+
+</chapter>
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en
+-->

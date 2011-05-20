@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<book xmlns="http://docbook.org/ns/docbook" version="5.0"
+      xmlns:xi="http://www.w3.org/2001/XInclude" 
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xml:id="tarantool-user-guide">
+<title>Tarantool/Box User Guide, version &tnt_version;</title>
+<xi:include href="preface.xml"/>
+<xi:include href="tutorial.xml"/>
+<xi:include href="data-model.xml"/>
+<xi:include href="language-reference.xml"/>
+<xi:include href="configuration-reference.xml"/>
+<!--
+<xi:include href="replication.xml"/>
+<xi:include href="memcached.xml"/>
+<xi:include href="configuration.xml"/>
+<xi:include href="logging.xml"/>
+<xi:include href="connectors.xml"/>
+<xi:include href="appendix.xml"/>
+-->
+<!--
+     TOC:
+
+     Introduction
+       What it can basically do; 
+
+     Installation and Running
+       Command line options reference
+ 
+     Data console and administrative console
+       Data operations
+       Administrative console operations
+         Format of response
+
+     Setting up replication
+       Master-slave replication
+
+     Support of memcached protocol
+
+     Configuration reference
+
+     Log file messages
+
+     Format of the binary log/snapshot
+
+     Tarantool command line shell
+
+     Connectors
+       C
+       Ruby 
+         Example
+       Perl
+
+     Product release cycle
+
+     Frequently Asked Questions
+       Q. What's on your roadmap?
+       Q. I found a bug. What to do?
+       What can possibly go wrong during compile:
+       as exception - old python
+       - confetti not found - explain what is going on
+       gcc compilation error: type 'VERBOSE=1 make' and
+       check out the exact error.
+
+     Appendixes:
+       Configuration parameters index
+       Server error codes
+       Glossary of terms
+-->
+</book>
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

@@ -39,6 +39,8 @@
 #include <third_party/queue.h>
 #include <tbuf.h>
 
+#define PALLOC_POOL_NAME_MAXLEN 16
+
 struct chunk {
 	uint32_t magic;
 	void *brk;
@@ -66,7 +68,7 @@ struct palloc_pool {
 	struct chunk_list_head chunks;
 	 SLIST_ENTRY(palloc_pool) link;
 	size_t allocated;
-	char name[16];
+	char name[PALLOC_POOL_NAME_MAXLEN];
 };
 
 SLIST_HEAD(palloc_pool_head, palloc_pool) pools;
@@ -393,8 +395,7 @@ palloc_stat(struct tbuf *buf)
 void
 palloc_set_name(struct palloc_pool *pool, const char *name)
 {
-	if (name == NULL)
-		name = "undefined";
+	assert(name != NULL);
 	snprintf(pool->name, sizeof(pool->name), "%s", name);
 }
 

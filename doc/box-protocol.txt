@@ -76,8 +76,7 @@
 
 <request_id> ::= <int32>
 
-; <request_body> holds actual command data. It is 
-; only present if <return_code> is 0 (success).
+; <request_body> holds actual command data.
 ; Its format and interpretation are defined by the value of
 ; request <type>.
 
@@ -88,6 +87,7 @@
 
 ;
 ; <response_body> carries command reply
+; It is only present if <return_code> is 0 (success).
 ; 
 
 <response_body> ::= <select_response_body> |
@@ -105,7 +105,6 @@
 ;
 ; Note, that <tuple> is mandatory, and tuple <count>
 ; must be non-zero.
-; To select all keys in the namespace, use
 ;
 
 <select_request_body> ::= <namespace_no><index_no>
@@ -158,7 +157,7 @@
 ; A single unit of storage, therefore, must contain all fields
 ; of all (possibly multipart) keys and zero or more fields
 ; treated as "data". To do a <select> the user only needs to
-; define fields of those key that is used for search.
+; define fields of the key used for search.
 ;
 
 <field> ::= <int32_varint><data>
@@ -237,7 +236,7 @@
 <update_request_body> ::= <namespace_no><flags><tuple><count><operation>+
 
 ;
-; Operations are optional and exist primarily to allow
+; Operations are optional and exist solely to allow
 ; updates of individual fields.
 ;
 
@@ -279,15 +278,15 @@
 <delete_request_body> ::= <namespace_no><tuple>
 
 ;
-; Return the number of deleted tuples.
-; Currently it's always 0 or 1
+; <delete> returns the number of deleted tuples.
+; Currently it's always either 0 or 1.
 ;
 
 <delete_response_body> ::= <count>
 
 ;
 ; The server response, in addition to response header and body,
-; contains a return code. It's a 4-byte integer, that has
+; contains a return code. It's a 4-byte integer, which has
 ; a lower 1-byte completion status part, and a higher 3-byte
 ; error code part.
 ;
@@ -295,10 +294,8 @@
 <return_code> ::= <int32>
 
 ; Currently, the completion status is complementary:
-; it can be deduced from the error code.
-;
-; Currently there are only 3 completion status codes
-; in use:
+; it can be deduced from the error code. There are only
+; 3 completion status codes in use:
 ; 0  - success; The only possible error code with this status is
        0, ERR_CODE_OK
 ; 1  - try again; An indicator of an intermittent error.
@@ -351,7 +348,7 @@
 ;  0x000027002 -- ERR_CODE_UNKNOWN_ERROR
 ;                 Unknown error
 ;
-; Convenience macros that define hexadecimal constants for <int32>
+; Convenience that define hexadecimal constants for <int32>
 ; return codes (completion status + code) can be found in
 ; include/iproto.h.
 ;

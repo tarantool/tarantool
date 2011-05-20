@@ -42,6 +42,8 @@
 
 #include <exceptions.h>
 
+#define FIBER_NAME_MAXLEN 16
+
 #define FIBER_READING_INBOX 0x1
 #define FIBER_CANCELLABLE   0x2
 #define FIBER_CANCEL        0x4
@@ -83,7 +85,7 @@ struct fiber {
 
 	struct ring *inbox;
 
-	char name[16];
+	char name[FIBER_NAME_MAXLEN];
 	void (*f) (void *);
 	void *f_data;
 
