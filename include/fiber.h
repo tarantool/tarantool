@@ -42,6 +42,8 @@
 
 #include <exceptions.h>
 
+#define FIBER_NAME_MAXLEN 16
+
 #define FIBER_READING_INBOX 0x1
 #define FIBER_RAISE	    0x2
 
@@ -81,7 +83,7 @@ struct fiber {
 
 	struct ring *inbox;
 
-	const char *name;
+	char name[FIBER_NAME_MAXLEN];
 	void (*f) (void *);
 	void *f_data;
 
@@ -115,6 +117,7 @@ extern struct fiber *fiber;
 
 void fiber_init(void);
 struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
+void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for(int events);
 void wait_for_child(pid_t pid);
 void unwait(int events);
