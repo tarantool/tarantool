@@ -281,7 +281,6 @@ void
 fiber_gc(void)
 {
 	struct palloc_pool *tmp;
-	const char *tmp_name;
 
 	fiber_cleanup();
 
@@ -291,9 +290,8 @@ fiber_gc(void)
 	tmp = fiber->pool;
 	fiber->pool = ex_pool;
 	ex_pool = tmp;
-	tmp_name = palloc_name(fiber->pool, NULL);
-	palloc_name(fiber->pool, palloc_name(ex_pool, NULL));
-	palloc_name(ex_pool, tmp_name);
+	palloc_set_name(fiber->pool, fiber->name);
+	palloc_set_name(ex_pool, "ex_pool");
 
 	fiber->rbuf = tbuf_clone(fiber->pool, fiber->rbuf);
 	fiber->cleanup = tbuf_clone(fiber->pool, fiber->cleanup);
@@ -327,7 +325,7 @@ static void
 fiber_zombificate()
 {
 	diag_clear();
-	fiber->name = NULL;
+	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
 	fiber->data = NULL;
 	unregister_fid(fiber);
@@ -367,9 +365,20 @@ fiber_loop(void *data __attribute__((unused)))
 }
 
 
+/** Set fiber name. 
+* @Param[in] name the new name of the fiber. Truncated to FIBER_NAME_MAXLEN.
+*/
+
+void
+fiber_set_name(struct fiber *fiber, const char *name)
+{
+	assert(name != NULL);
+	snprintf(fiber->name, sizeof(fiber->name), "%s", name);
+}
+
 /* fiber never dies, just become zombie */
 struct fiber *
-fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void *), void *f_data)
+fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *f_data)
 {
 	struct fiber *fiber = NULL;
 	if (inbox_size <= 0)
@@ -387,7 +396,7 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
 		if (tarantool_coro_create(&fiber->coro, fiber_loop, NULL) == NULL)
 			return NULL;
 
-		fiber->pool = palloc_create_pool(fiber->name);
+		fiber->pool = palloc_create_pool(name);
 		fiber->inbox = palloc(eter_pool, (sizeof(*fiber->inbox) +
 						  inbox_size * sizeof(struct tbuf *)));
 		fiber->inbox->size = inbox_size;
@@ -401,14 +410,14 @@ fiber_create(const char *restrict name, int fd, int inbox_size, void (*f) (void 
 		SLIST_INSERT_HEAD(&fibers, fiber, link);
 	}
 
-	fiber->name = name;
-	palloc_name(fiber->pool, name);
 	fiber->fd = fd;
 	fiber->f = f;
 	fiber->f_data = f_data;
 	while (++last_used_fid <= 100) ;	/* fids from 0 to 100 are reserved */
 	fiber->fid = last_used_fid;
 	fiber->flags = 0;
+	fiber_set_name(fiber, name);
+	palloc_set_name(fiber->pool, fiber->name);
 	register_fid(fiber);
 
 	return fiber;
@@ -881,7 +890,7 @@ struct child *
 spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, struct tbuf *),
 	    void *state)
 {
-	char *proxy_name, *child_name;
+	char *proxy_name;
 	int socks[2];
 	int pid;
 
@@ -913,11 +922,12 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		c->out->flags |= FIBER_READING_INBOX;
 		return c;
 	} else {
+		char child_name[sizeof(fiber->name)];
+
 		salloc_destroy();
 		close_all_xcpt(2, socks[0], sayfd);
-		child_name = palloc(eter_pool, 64);
-		snprintf(child_name, 64, "%s/child", name);
-		sched.name = child_name;
+		snprintf(child_name, sizeof(child_name), "%s/child", name);
+		fiber_set_name(&sched, child_name);
 		set_proc_title(name);
 		say_crit("%s initialized", name);
 		blocking_loop(socks[0], handler, state);
@@ -1150,7 +1160,7 @@ fiber_init(void)
 
 	memset(&sched, 0, sizeof(sched));
 	sched.fid = 1;
-	sched.name = "sched";
+	fiber_set_name(&sched, "sched");
 	sched.pool = palloc_create_pool(sched.name);
 
 	sp = call_stack;
