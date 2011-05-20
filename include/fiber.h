@@ -83,7 +83,7 @@ struct fiber {
 
 	struct ring *inbox;
 
-	const char *name;
+	char name[16];
 	void (*f) (void *);
 	void *f_data;
 
@@ -119,6 +119,7 @@ extern struct fiber *fiber;
 
 void fiber_init(void);
 struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
+void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for(int events);
 void wait_for_child(pid_t pid);
 void unwait(int events);
