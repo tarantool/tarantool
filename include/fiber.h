@@ -41,6 +41,8 @@
 #include <coro.h>
 #include <util.h>
 
+#define FIBER_NAME_MAXLEN 16
+
 #define FIBER_EXIT -1
 
 struct msg {
@@ -79,7 +81,7 @@ struct fiber {
 	jmp_buf exc;
 	const char *errstr;
 
-	const char *name;
+	char name[FIBER_NAME_MAXLEN];
 	void (*f) (void *);
 	void *f_data;
 
@@ -112,6 +114,7 @@ extern struct fiber *fiber;
 
 void fiber_init(void);
 struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
+void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for(int events);
 void wait_for_child(pid_t pid);
 void unwait(int events);

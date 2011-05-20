@@ -200,7 +200,7 @@ snapshot(void *ev, int events __unused__)
 		return WEXITSTATUS(fiber->cw.rstatus);
 	}
 
-	fiber->name = "dumper";
+	fiber_set_name(fiber, "dumper");
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
 	close_all_xcpt(1, sayfd);
 	snapshot_save(recovery_state, mod_snapshot);

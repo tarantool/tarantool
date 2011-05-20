@@ -65,7 +65,7 @@ recover_feed_slave(int sock)
 
 	fiber->has_peer = true;
 	fiber->fd = sock;
-	fiber->name = "feeder";
+	fiber_set_name(fiber, "feeder");
 	set_proc_title("feeder:client_handler%s %s", custom_proc_title, fiber_peer_name(fiber));
 
 	ev_default_loop(0);
