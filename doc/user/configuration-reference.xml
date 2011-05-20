@@ -20,7 +20,7 @@ are provided for the most basic properties only: the rest
 must be set in the configuration file.
 At runtime, this allows to disambiguate the source of
 a configuration setting: it unequivocally comes either from
-the command line, or from the options file, but never from
+the command line, or from the configuration file, but never from
 both.
 </para>
 
@@ -182,9 +182,9 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
 <section>
 <title>The option file</title>
   <para>
-    All advanced configuration parameters must be specified in an
-    option file, which is required for server start.  If no path to
-    option file is specified on the command line (see
+    All advanced configuration parameters must be specified in a
+    configuration file, which is required for server start. If no path to
+    the configuration file is specified on the command line (see
     <option xlink:href="#config-option"
     xlink:title="--config=...">--config</option>),
     the server looks for a file named <filename>tarantool.cfg</filename>
@@ -221,10 +221,260 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
     <filename xlink:href="https://github.com/mailru/tarantool/blob/master/test/box/tarantool.cfg">test/box/tarantool.cfg</filename>,
     <filename xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_big/tarantool.cfg">test/box_big/tarantool.cfg</filename>.
   </para>
-  <section>
+  <table frame='all'>
     <title>Basic parameters</title>
-    <para>Parameter1</para>
-  </section>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>username</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>UNIX user name to switch to after start.</entry>
+        </row>
+
+        <row>
+          <entry>work_dir</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>A directory to switch to with chdir(2) after
+          start. Can be relative to the starting directory.
+          If not specified, the current working directory
+          of the server is the same as starting
+          directory.</entry>
+        </row>
+
+        <row>
+          <entry>wal_dir</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>A directory to store the write ahead log files
+          (WAL) in. Can be relative to work_dir. You may choose
+          to separate your snapshots and logs and store them
+          on separate disks. This is how this parameter is most
+          commonly used. If not specified, defaults to work_dir.</entry>
+        </row>
+
+        <row>
+          <entry>snap_dir</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>A directory to store snapshots in. Can be
+          relative to work_dir. If not specified, defaults to
+          work_dir. See also wal_dir.</entry>
+        </row>
+<!--
+        <row>
+          <entry>coredump</entry><entry>0 or 1</entry><entry>0</entry>
+          <entry>Deprecated. Save core on abort/assert? You may
+          turn off the coredump off when using ulimit</entry>
+        </row>
+-->
+        <row>
+          <entry>primary_port</entry>
+          <entry>integer</entry>
+          <entry><emphasis role="strong">none</emphasis></entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>no</entry>
+          <entry>The read/write data port.
+          Has no default value, so <emphasis
+          role="strong">must be specified</emphasis>
+          in the configuration file. Normally set to 33013.
+          Note: a replica also binds to this port, accepts
+          connections, but these connections can only serve
+          reads until the replica becomes a master.</entry>
+        </row>
+
+        <row>
+          <entry>secondary_port</entry>
+          <entry>integer</entry>
+          <entry><emphasis role="strong">none</emphasis></entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>no</entry>
+          <entry>Additional, read-only port. Normally set to
+          33014.</entry>
+        </row>
+
+        <row>
+          <entry>admin_port</entry>
+          <entry>integer</entry>
+          <entry><emphasis role="strong">none</emphasis></entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>no</entry>
+          <entry>The TCP port to listen on for administrative
+          connections. Has no default value, so must be specified.
+          Normally set to 33015.</entry>
+        </row>
+
+
+        <row>
+          <entry>log_level</entry>
+          <entry>integer</entry>
+          <entry>4</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>How verbose the logging is. There are 5 log
+            verbosity classes: 1 -- ERROR, 2 -- CRITICAL, 3 --
+            WARNING, 4 -- INFO, 5 -- DEBUG. By setting log_level,
+            you can enable logging of all classes below or equal
+            to the given level. Tarantool prints its logs to the
+            standard error stream by default, but this can be
+            changed with "logger" configuration parameter.
+          </entry>
+        </row>
+
+        <row>
+          <entry>logger</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>By default, the log is sent to the standard
+          output. If this option is specified, </entry>
+        </row>
+<!--
+
+pid_file="tarantool.pid", ro
+
+# custom proc title is appended after normal
+custom_proc_title=NULL, ro
+
+# logger command will be executed via /bin/sh -c {}
+# example: 'exec cronolog /var/log/taranul/%Y-%m/%Y-%m-%d/tarantool.log'
+# example: 'exec extra/logger.pl /var/log/taranul/tarantool.log'
+# when logger is not configured all logging going to STDERR
+logger=NULL, ro
+
+# make logging nonblocking, this potentially can loss some logging data
+logger_nonblock=1, ro
+
+
+# warn about requests which take longer to process
+too_long_threshold=0.5
+
+Network-related  settings
+******************
+
+Storage parameters.
+******************
+
+## BOX
+
+
+# panic if where is error reading snap or wal
+# be default panic any snapshot reading error  and ignore errors then reading wals
+panic_on_snap_error=1, ro
+panic_on_wal_error=0, ro
+
+# Size of slab arena in GiBs
+slab_alloc_arena=1.0, ro
+# Size of minimal allocation unit
+slab_alloc_minimal=64, ro
+# Growth factor, each subsecuent unit size is factor * prev unit size
+slab_alloc_factor=2.0, ro
+
+namespace = [
+  {
+    enabled = -1, required
+    cardinality = -1
+    estimated_rows = 0
+    index = [
+      {
+        type = "", required
+        unique = -1, required
+        key_field = [
+          {
+            fieldno = -1, required
+            type = "", required
+          }, ro,  required
+        ], required
+      }, ro, required
+    ], required
+  }, ro
+], ro, required
+-->
+
+      </tbody>
+
+    </tgroup>
+  </table>
+
+<!--
+  <table frame='all'>
+    <title>Networking and file I/O</title>
+-->
+<!--
+# network io readahead
+readahead=16320
+# size of listen backlog
+backlog=1024, ro
+
+# delay between loop iterations
+io_collect_interval=0.0, ro
+# do not write snapshot faster then snap_io_rate_limit MBytes/sec
+snap_io_rate_limit=0.0, ro
+
+# Write no more rows in WAL
+rows_per_wal=500000, ro
+
+# fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay seconds ago
+# WARNING: actually, several last requsts may stall for much longer
+wal_fsync_delay=0, ro
+
+# size of WAL writer requests buffer
+wal_writer_inbox_size=128, ro
+-->
+<!--
+  </table>
+
+  <table>
+    <title>Replication</title>
+-->
+<!--
+# Remote hot standby (if enabled server will run in hot standby mode
+# continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
+remote_hot_standby=0, ro
+wal_feeder_ipaddr=NULL, ro
+wal_feeder_port=0, ro
+
+-->
+<!--
+  </table>
+
+  <table>
+    <title>Memcached support</title>
+-->
+<!--
+# Memcached emulation is enabled if memcached == 1
+memcached=0, ro
+# namespace used for memcached emulation
+memcached_namespace=23, ro
+# maximum rows to consider per expire loop iteration
+memcached_expire_per_loop=1024
+# tarantool will try iterate all rows within this time
+memcached_expire_full_sweep=3600
+  </table>
+-->
 
 </section>
 </chapter>
