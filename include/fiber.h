@@ -120,9 +120,7 @@ extern struct fiber *fiber;
 void fiber_init(void);
 struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
 void fiber_set_name(struct fiber *fiber, const char *name);
-void wait_for(int events);
 void wait_for_child(pid_t pid);
-void unwait(int events);
 void yield(void);
 void fiber_destroy_all();
 
@@ -164,7 +162,7 @@ ssize_t fiber_flush_output(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
 void fiber_call(struct fiber *callee);
-void fiber_wake(struct fiber *f);
+void fiber_wakeup(struct fiber *f);
 void fiber_cancel(struct fiber *f);
 void fiber_testcancel(void);
 void fiber_setcancelstate(bool enable);
@@ -175,7 +173,6 @@ int set_nonblock(int sock);
 
 typedef enum fiber_server_type {
 	tcp_server,
-	udp_server
 } fiber_server_type;
 
 struct fiber *fiber_server(fiber_server_type type, int port, void (*handler) (void *), void *,
