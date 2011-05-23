@@ -163,6 +163,7 @@ fiber_cancel(struct fiber *f)
 	if (f->flags & FIBER_CANCELLABLE)
 		fiber_wakeup(f);
 
+	assert(f->waiter == NULL);
 	f->waiter = fiber;
 
 	@try {

@@ -95,7 +95,7 @@ recover_feed_slave(int sock)
 }
 
 i32
-mod_check_config(struct tarantool_cfg *conf __attribute__((unused)))
+mod_check_config(struct tarantool_cfg *conf __attribute__((unused)), bool reload __attribute__((unused)))
 {
 	return 0;
 }

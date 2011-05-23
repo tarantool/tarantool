@@ -57,5 +57,9 @@ class Box(TarantoolConnection):
     else:
       response = None
 
+    if not noprint:
+      print command
+      print statement.unpack(response)
+
     return statement.unpack(response) + "\n"
 

@@ -45,6 +45,7 @@
 #include <admin.h>
 #include <fiber.h>
 #include <iproto.h>
+#include <latch.h>
 #include <log_io.h>
 #include <palloc.h>
 #include <salloc.h>
@@ -69,7 +70,7 @@ bool init_storage, booting = true;
 extern int daemonize(int nochdir, int noclose);
 
 static i32
-load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
+load_cfg(struct tarantool_cfg *conf, i32 check_rdonly, bool reload)
 {
 	FILE *f;
 	i32 n_accepted, n_skipped;
@@ -96,11 +97,11 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	if (n_accepted == 0 || n_skipped != 0)
 		return -1;
 
-	return mod_check_config(conf);
+	return mod_check_config(conf, reload);
 }
 
-i32
-reload_cfg(struct tbuf *out)
+static i32
+reload_cfg_safe(struct tbuf *out)
 {
 	struct tarantool_cfg new_cfg1, new_cfg2;
 	i32 ret;
@@ -111,7 +112,7 @@ reload_cfg(struct tbuf *out)
 
 		return -1;
 	}
-	ret = load_cfg(&new_cfg1, 1);
+	ret = load_cfg(&new_cfg1, 1, true);
 	if (ret == -1) {
 		tbuf_append(out, cfg_out->data, cfg_out->len);
 
@@ -125,7 +126,7 @@ reload_cfg(struct tbuf *out)
 
 		return -1;
 	}
-	ret = load_cfg(&new_cfg2, 0);
+	ret = load_cfg(&new_cfg2, 0, true);
 	if (ret == -1) {
 		tbuf_append(out, cfg_out->data, cfg_out->len);
 
@@ -153,6 +154,30 @@ reload_cfg(struct tbuf *out)
 	cfg = new_cfg2;
 
 	return 0;
+}
+
+i32
+reload_cfg(struct tbuf *out)
+{
+	static struct tnt_latch *latch = NULL;
+	i32 ret;
+
+	if (latch == NULL) {
+		latch = palloc(eter_pool, sizeof(*latch));
+		tnt_latch_init(latch);
+	}
+
+	if (tnt_latch_trylock(latch) == false) {
+		out_warning(0, "Could not reload configuration: it is reloading right now");
+
+		return -1;
+	}
+
+	ret = reload_cfg_safe(out);
+
+	tnt_latch_unlock(latch);
+
+	return ret;
 }
 
 const char *
@@ -420,7 +445,7 @@ main(int argc, char **argv)
 	assert(cfg_out);
 
 	if (gopt(opt, 'k')) {
-		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
+		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0, false) != 0) {
 			say_error("check_config FAILED"
 				  "%.*s", cfg_out->len, (char *)cfg_out->data);
 
@@ -430,7 +455,7 @@ main(int argc, char **argv)
 		return 0;
 	}
 
-	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0)
+	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0, false) != 0)
 		panic("can't load config:"
 		      "%.*s", cfg_out->len, (char *)cfg_out->data);
 

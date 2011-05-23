@@ -33,3 +33,11 @@ class TarantoolBoxServer(TarantoolServer):
                           stdout = subprocess.PIPE,
                           stderr = subprocess.PIPE)
 
+  def wait_sync(self, lsn):
+    synced = 0
+    while synced == 0:
+      synced = 1
+      data = self.admin.execute("show info\n", noprint=True)
+      info = yaml.load(data)["info"]
+      if (info["lsn"] != lsn):
+        synced = 0
