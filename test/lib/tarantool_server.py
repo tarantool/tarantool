@@ -70,7 +70,7 @@ class TarantoolServer(Server):
       Server._start_and_exit(self, args)
     else:
       if not self.gdb:
-        args.append("--daemonize")
+        args.append("--background")
       else:
         raise RuntimeError("'--gdb' and '--start-and-exit' can't be defined together")
       self.server = pexpect.spawn(args[0], args[1:], cwd = self.vardir)
