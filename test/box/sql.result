@@ -106,7 +106,6 @@ An error occurred: ERR_CODE_ILLEGAL_PARAMS, 'Illegal parameters'
 select * from t0 where k0='Spears'
 Found 1 tuple:
 ['Spears', 'Britney']
-
 #
 # A test case for: http://bugs.launchpad.net/bugs/716683
 # Admin console should not stall on unknown command.
