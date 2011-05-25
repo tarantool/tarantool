@@ -16,6 +16,12 @@ feeder.deploy("box_replication/feeder.cfg",
 	      feeder.find_exe(self.args.builddir),
 	      os.path.join(self.args.vardir, "feeder"))
 
+# Startup secondary master feeder.
+secondary_feeder = TarantoolFeederServer()
+secondary_feeder.deploy("box_replication/feeder_secondary.cfg",
+			secondary_feeder.find_exe(self.args.builddir),
+			os.path.join(self.args.vardir, "feeder_secondary"))
+
 # Startup replication server.
 slave = TarantoolBoxServer()
 slave.deploy("box_replication/tarantool_slave.cfg",
@@ -32,7 +38,25 @@ print """
 # Insert several tuples.
 #
 """
-for i in range(1, 10):
+for i in range(1, 5):
+	master.sql.execute("insert into t0 values ({0}, 'the tuple #{0}')".format(i),
+			   silent=False)
+
+print """
+#
+# Reconfigure slave to replicate from secondary feeder.
+#
+"""
+slave.reconfigure("box_replication/tarantool_slave_secondary_feeder_replication.cfg")
+feeder.stop()
+feeder.cleanup(True)
+
+print """
+#
+# Insert more tuples.
+#
+"""
+for i in range(5, 10):
 	master.sql.execute("insert into t0 values ({0}, 'the tuple #{0}')".format(i),
 			   silent=False)
 
@@ -101,8 +125,8 @@ master.sql.execute("select * from t0 where k0 = 100",
 # Cleanup.
 beholder.stop()
 beholder.cleanup(True)
-feeder.stop()
-feeder.cleanup(True)
+secondary_feeder.stop()
+secondary_feeder.cleanup(True)
 slave_feeder.stop()
 slave_feeder.cleanup(True)
 slave.stop()

@@ -11,6 +11,20 @@ insert into t0 values (3, 'the tuple #3')
 Insert OK, 1 row affected
 insert into t0 values (4, 'the tuple #4')
 Insert OK, 1 row affected
+
+#
+# Reconfigure slave to replicate from secondary feeder.
+#
+
+reload configuration
+---
+ok
+...
+
+#
+# Insert more tuples.
+#
+
 insert into t0 values (5, 'the tuple #5')
 Insert OK, 1 row affected
 insert into t0 values (6, 'the tuple #6')
