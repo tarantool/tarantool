@@ -86,6 +86,8 @@ typedef struct tarantool_cfg {
 #define CNF_STRUCT_DEFINED(s) ((s) != NULL && ((s)->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) == 0)
 #endif
 
+void init_tarantool_cfg(tarantool_cfg *c);
+
 int fill_default_tarantool_cfg(tarantool_cfg *c);
 
 void parse_cfg_file_tarantool_cfg(tarantool_cfg *c, FILE *fh, int check_rdonly, int *n_accepted, int *n_skipped);

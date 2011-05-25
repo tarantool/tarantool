@@ -24,8 +24,52 @@ cmpNameAtoms(NameAtom *a, NameAtom *b) {
 	return (a == NULL && b == NULL) ? 1 : 0;
 }
 
+void
+init_tarantool_cfg(tarantool_cfg *c) {
+	c->__confetti_flags = 0;
+
+	c->username = NULL;
+	c->coredump = 0;
+	c->admin_port = 0;
+	c->log_level = 0;
+	c->slab_alloc_arena = 0;
+	c->slab_alloc_minimal = 0;
+	c->slab_alloc_factor = 0;
+	c->work_dir = NULL;
+	c->pid_file = NULL;
+	c->logger = NULL;
+	c->logger_nonblock = 0;
+	c->io_collect_interval = 0;
+	c->backlog = 0;
+	c->readahead = 0;
+	c->snap_dir = NULL;
+	c->wal_dir = NULL;
+	c->primary_port = 0;
+	c->secondary_port = 0;
+	c->too_long_threshold = 0;
+	c->custom_proc_title = NULL;
+	c->memcached = 0;
+	c->memcached_namespace = 0;
+	c->memcached_expire_per_loop = 0;
+	c->memcached_expire_full_sweep = 0;
+	c->snap_io_rate_limit = 0;
+	c->rows_per_wal = 0;
+	c->wal_fsync_delay = 0;
+	c->wal_writer_inbox_size = 0;
+	c->local_hot_standby = 0;
+	c->wal_dir_rescan_delay = 0;
+	c->panic_on_snap_error = 0;
+	c->panic_on_wal_error = 0;
+	c->remote_hot_standby = 0;
+	c->wal_feeder_ipaddr = NULL;
+	c->wal_feeder_port = 0;
+	c->namespace = NULL;
+}
+
 int
 fill_default_tarantool_cfg(tarantool_cfg *c) {
+	c->__confetti_flags = 0;
+
 	c->username = NULL;
 	c->coredump = 0;
 	c->admin_port = 0;

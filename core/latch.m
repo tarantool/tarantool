@@ -27,21 +27,39 @@ void
 tnt_latch_init(struct tnt_latch *latch)
 {
 	latch->locked = false;
+	latch->owner = NULL;
 }
 
-bool
+void
+tnt_latch_destroy(struct tnt_latch *latch)
+{
+	assert(latch->locked == false);
+
+	latch->owner = NULL;
+}
+
+int
 tnt_latch_trylock(struct tnt_latch *latch)
 {
-	if (latch->locked)
-		return false;
+	if (latch->locked) {
+		assert(latch->owner != fiber);
+
+		return -1;
+	}
+
+	assert(latch->owner == NULL);
 
 	latch->locked = true;
+	latch->owner = fiber;
 
-	return true;
+	return 0;
 }
 
 void
 tnt_latch_unlock(struct tnt_latch *latch)
 {
+	assert(latch->owner == fiber);
+
 	latch->locked = false;
+	latch->owner = NULL;
 }

@@ -34,7 +34,7 @@ class Box(TarantoolConnection):
       res = res + buf
     return res
 
-  def execute_no_reconnect(self, command, noprint=True):
+  def execute_no_reconnect(self, command, silent=True):
     statement = sql.parse("sql", command)
     if statement == None:
       return "You have an error in your SQL syntax\n"
@@ -57,7 +57,7 @@ class Box(TarantoolConnection):
     else:
       response = None
 
-    if not noprint:
+    if not silent:
       print command
       print statement.unpack(response)
 

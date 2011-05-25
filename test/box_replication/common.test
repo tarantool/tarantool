@@ -34,7 +34,7 @@ print """
 """
 for i in range(1, 10):
 	master.sql.execute("insert into t0 values ({0}, 'the tuple #{0}')".format(i),
-			   noprint=False)
+			   silent=False)
 
 print """
 #
@@ -43,7 +43,7 @@ print """
 """
 for i in range(1, 10):
 	master.sql.execute("select * from t0 where k0 = {0}".format(i),
-			   noprint=False)
+			   silent=False)
 
 slave.wait_sync(10)
 
@@ -54,7 +54,7 @@ print """
 """
 for i in range(1,10):
 	slave.sql.execute("select * from t0 where k0 = {0}".format(i),
-			  noprint=False)
+			  silent=False)
 
 print """
 #
@@ -62,7 +62,7 @@ print """
 #
 """
 slave.sql.execute("insert into t0 values (100, 'the tuple #100')",
-		  noprint=False)
+		  silent=False)
 
 print """
 #
@@ -77,9 +77,9 @@ print """
 #
 """
 slave.sql.execute("insert into t0 values (100, 'the tuple #100')",
-		  noprint=False)
+		  silent=False)
 slave.sql.execute("select * from t0 where k0 = 100",
-		  noprint=False)
+		  silent=False)
 
 print """
 #
@@ -96,13 +96,17 @@ print """
 master.reconfigure("box_replication/tarantool_to_slave.cfg")
 master.wait_sync(11)
 master.sql.execute("select * from t0 where k0 = 100",
-		   noprint=False)
+		   silent=False)
 
 # Cleanup.
 beholder.stop()
+beholder.cleanup(True)
 feeder.stop()
-slave.stop()
+feeder.cleanup(True)
 slave_feeder.stop()
+slave_feeder.cleanup(True)
+slave.stop()
+slave.cleanup(True)
 server.stop()
 server.deploy(self.suite_ini["config"])
 

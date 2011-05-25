@@ -24,8 +24,34 @@ cmpNameAtoms(NameAtom *a, NameAtom *b) {
 	return (a == NULL && b == NULL) ? 1 : 0;
 }
 
+void
+init_tarantool_cfg(tarantool_cfg *c) {
+	c->__confetti_flags = 0;
+
+	c->username = NULL;
+	c->coredump = 0;
+	c->admin_port = 0;
+	c->log_level = 0;
+	c->slab_alloc_arena = 0;
+	c->slab_alloc_minimal = 0;
+	c->slab_alloc_factor = 0;
+	c->work_dir = NULL;
+	c->pid_file = NULL;
+	c->logger = NULL;
+	c->logger_nonblock = 0;
+	c->io_collect_interval = 0;
+	c->backlog = 0;
+	c->readahead = 0;
+	c->wal_feeder_bind_ipaddr = NULL;
+	c->wal_feeder_bind_port = 0;
+	c->wal_feeder_dir = NULL;
+	c->custom_proc_title = NULL;
+}
+
 int
 fill_default_tarantool_cfg(tarantool_cfg *c) {
+	c->__confetti_flags = 0;
+
 	c->username = NULL;
 	c->coredump = 0;
 	c->admin_port = 0;

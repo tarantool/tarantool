@@ -23,16 +23,20 @@
  * SUCH DAMAGE.
  */
 
+#include <fiber.h>
+
 #include <stdbool.h>
 
 /*
  * Internal implementation of a container for a mutex like object
  * with similar interface. It's used boolean variable because of
  * single threaded nature of tarantool. But it's rather simple to change
- * this varibable to a mutex object to maintain multi threaded aproach.
+ * this variable to a mutex object to maintain multi threaded approach.
  */
 struct tnt_latch {
 	bool locked;
+
+	struct fiber *owner;
 };
 
 /**
@@ -42,12 +46,16 @@ struct tnt_latch {
  */
 void tnt_latch_init(struct tnt_latch *latch);
 /**
+ * Destroy the given latch.
+ */
+void tnt_latch_destroy(struct tnt_latch *latch);
+/**
  * Set the latch to the locked state. If it's already locked
- * returns false value immediatly.
+ * returns -1 value immediately otherwise returns 0.
  *
  * @param latch Latch to be locked.
  */
-bool tnt_latch_trylock(struct tnt_latch *latch);
+int tnt_latch_trylock(struct tnt_latch *latch);
 /**
  * Unlock the locked latch.
  *

@@ -46,13 +46,13 @@ class TarantoolServer(Server):
       config.readfp(TarantoolConfigFile(fp, dummy_section_name))
       self.pidfile = config.get(dummy_section_name, "pid_file")
 
-  def reconfigure(self, config, noprint=False):
+  def reconfigure(self, config, silent=False):
     if config == None:
       os.unlink(os.path.join(self.vardir, self.default_config_name))
     else:
       self.config = os.path.abspath(config)
       shutil.copy(self.config, os.path.join(self.vardir, self.default_config_name))
-    self.admin.execute("reload configuration\n", noprint=noprint)
+    self.admin.execute("reload configuration\n", silent=silent)
 
   def version(self):
     p = subprocess.Popen([self.binary, "--version"],

@@ -1396,27 +1396,31 @@ memcached_bound_to_primary(void *data __attribute__((unused)))
 }
 
 i32
-mod_check_config(struct tarantool_cfg *new_conf, bool reload)
+mod_check_config(struct tarantool_cfg *conf)
 {
-	if (!reload)
-		return 0;
+	if (conf->remote_hot_standby > 0 && conf->local_hot_standby > 0) {
+		out_warning(0, "Remote and local hot standby modes "
+			       "can't be enabled simultaneously");
 
-	if (cfg.remote_hot_standby != new_conf->remote_hot_standby) {
+		return -1;
+	}
+
+	return 0;
+}
+
+i32
+mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
+{
+	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby) {
 		if (recovery_state->finalize != true) {
 			out_warning(0, "Could not propagate %s before local recovery finished",
-				    cfg.remote_hot_standby == true ? "slave to master" :
+				    old_conf->remote_hot_standby == true ? "slave to master" :
 				    "master to slave");
 
 			return -1;
 		}
 	}
 
-	return 0;
-}
-
-void
-mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
-{
 	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby) {
 		/* Local recovery must be finalized at this point */
 		assert(recovery_state->finalize == true);
@@ -1427,7 +1431,7 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 		    old_conf->wal_feeder_port != new_conf->wal_feeder_port))
 		remote_recovery_restart(new_conf);
 
-	return;
+	return 0;
 }
 
 void
