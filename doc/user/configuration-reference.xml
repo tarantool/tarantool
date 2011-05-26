@@ -221,6 +221,7 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
     <filename xlink:href="https://github.com/mailru/tarantool/blob/master/test/box/tarantool.cfg">test/box/tarantool.cfg</filename>,
     <filename xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_big/tarantool.cfg">test/box_big/tarantool.cfg</filename>.
   </para>
+
   <table frame='all'>
     <title>Basic parameters</title>
     <tgroup cols='6' colsep='1' rowsep='1'>
@@ -308,83 +309,66 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
         <row>
           <entry>secondary_port</entry>
           <entry>integer</entry>
-          <entry><emphasis role="strong">none</emphasis></entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>none</entry>
+          <entry>no</entry>
           <entry>no</entry>
           <entry>Additional, read-only port. Normally set to
-          33014.</entry>
+          33014. Not used unless is set.</entry>
         </row>
 
         <row>
           <entry>admin_port</entry>
           <entry>integer</entry>
-          <entry><emphasis role="strong">none</emphasis></entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>none</entry>
+          <entry>no</entry>
           <entry>no</entry>
           <entry>The TCP port to listen on for administrative
-          connections. Has no default value, so must be specified.
-          Normally set to 33015.</entry>
+          connections. Has no default value. Not used unless
+          assigned a value. Normally set to 33015.</entry>
         </row>
 
-
         <row>
-          <entry>log_level</entry>
-          <entry>integer</entry>
-          <entry>4</entry>
+          <entry>pid_file</entry>
+          <entry>string</entry>
+          <entry>tarantool.pid</entry>
           <entry>no</entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>How verbose the logging is. There are 5 log
-            verbosity classes: 1 -- ERROR, 2 -- CRITICAL, 3 --
-            WARNING, 4 -- INFO, 5 -- DEBUG. By setting log_level,
-            you can enable logging of all classes below or equal
-            to the given level. Tarantool prints its logs to the
-            standard error stream by default, but this can be
-            changed with "logger" configuration parameter.
-          </entry>
+          <entry>no</entry>
+          <entry>Store the process id in this file. Can be
+          relative to work_dir.</entry>
         </row>
 
         <row>
-          <entry>logger</entry>
+          <entry>custom_proc_title</entry>
           <entry>string</entry>
           <entry>""</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>By default, the log is sent to the standard
-          output. If this option is specified, </entry>
+          <entry>
+            <para>Inject the given string into process title
+            (what's shown in COMMAND column of <command>ps</command>
+            and <command>top</command> commands). For example,
+            an unmodified Tarantool/Box process group looks like:
+            </para>
+<programlisting>kostja@shmita:~$ ps -a -o command | grep box
+tarantool: box:primary pri:33013 sec:33014 adm:33015</programlisting>
+          <para>After "sessions" custom_proc_title is injected it
+          looks like:</para>
+<programlisting>kostja@shmita:~$ ps -a -o command | grep box
+tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
+          </entry>
         </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
 <!--
-
-pid_file="tarantool.pid", ro
-
-# custom proc title is appended after normal
-custom_proc_title=NULL, ro
-
-# logger command will be executed via /bin/sh -c {}
-# example: 'exec cronolog /var/log/taranul/%Y-%m/%Y-%m-%d/tarantool.log'
-# example: 'exec extra/logger.pl /var/log/taranul/tarantool.log'
-# when logger is not configured all logging going to STDERR
-logger=NULL, ro
-
-# make logging nonblocking, this potentially can loss some logging data
-logger_nonblock=1, ro
-
-
-# warn about requests which take longer to process
-too_long_threshold=0.5
-
-Network-related  settings
-******************
 
 Storage parameters.
 ******************
 
 ## BOX
 
-
-# panic if where is error reading snap or wal
-# be default panic any snapshot reading error  and ignore errors then reading wals
-panic_on_snap_error=1, ro
-panic_on_wal_error=0, ro
 
 # Size of slab arena in GiBs
 slab_alloc_arena=1.0, ro
@@ -412,10 +396,169 @@ namespace = [
     ], required
   }, ro
 ], ro, required
+
+# panic if where is error reading snap or wal
+# be default panic any snapshot reading error  and ignore errors then reading wals
+panic_on_snap_error=1, ro
+panic_on_wal_error=0, ro
+
 -->
 
-      </tbody>
+  <table frame='all'>
+    <title>Logging</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
 
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>log_level</entry>
+          <entry>integer</entry>
+          <entry>4</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>How verbose the logging is. There are 5 log
+            verbosity classes: 1 -- ERROR, 2 -- CRITICAL, 3 --
+            WARNING, 4 -- INFO, 5 -- DEBUG. By setting log_level,
+            you can enable logging of all classes below or equal
+            to the given level. Tarantool prints its logs to the
+            standard error stream by default, but this can be
+            changed with "logger" configuration parameter.
+          </entry>
+        </row>
+
+        <row>
+          <entry>logger</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>By default, the log is sent to the standard
+          error stream (<filename>stderr</filename>). If this
+          option is given, Tarantool creates a child process,
+          executes the given command in it, and pipes its standard
+          output to the standard input of the created process.
+          Example setting: <command>tee --append
+          tarantool.log</command> (this will duplicate log output
+          to <filename>stdout</filename> and a log file).
+          </entry>
+        </row>
+
+        <row>
+          <entry>logger_nonblock</entry>
+          <entry>integer</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>If this option is given, Tarantool does not
+          block on the log file descriptor when it's not
+          ready for write, and drops the message instead. If
+          log_level is high, and a lot of messages go to the log
+          file, setting this option to 1 may improve logging
+          performance at the cost of some log messages getting
+          lost.</entry>
+        </row>
+
+        <row>
+          <entry>too_long_threshold</entry>
+          <entry>float</entry>
+          <entry>0.5</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>If processing a request takes longer than the
+          given value (in seconds), warn about it in the log.
+          Has effect only if log_level is no less than 3
+          (WARNING).</entry>
+        </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all'>
+    <title>Memcached protocol support</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>memcached</entry>
+          <entry>integer</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Turn on Memcached mode. In this mode, Tarantool
+            does not use secondary_port, and speaks memcached
+            protocol on the primary port. In particular,
+            memcached-style flags are supported, and expiration
+            time can be set on tuples. Unlike Memcached, all data
+            still goes to the binary log and to the replica, if
+            latter one is set up, which means that power outage
+            does not lead to a loss of all data.
+          </entry>
+        </row>
+
+        <row>
+          <entry>memcached_namespace</entry>
+          <entry>integer</entry>
+          <entry>23</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Namespace id to store memcached data in. The
+          format of tuple is [key, metadata, value], with a hash
+          index based on the key. </entry>
+        </row>
+
+        <row>
+          <entry>memcached_expire_per_loop</entry>
+          <entry>integer</entry>
+          <entry>1024</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>How many records to consider per iteration of the
+            expiration loop. Tuple expiration is performed in a separate
+            <quote>green</quote> thread within our cooperative multitasking
+            framework and this setting effectively limits how long
+            the expiration loop stays on CPU uninterrupted.
+          </entry>
+        </row>
+
+        <row>
+          <entry>memcached_expire_full_sweep</entry>
+          <entry>integer</entry>
+          <entry>3600</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>Try to make sure that every tuple is considered
+            for expiration within this time frame (in seconds).
+            Together with memcached_expire_per_loop this defines
+            how often the expiration <quote>green</quote> thread
+            is scheduled on CPU.
+          </entry>
+        </row>
+
+      </tbody>
     </tgroup>
   </table>
 
@@ -424,10 +567,16 @@ namespace = [
     <title>Networking and file I/O</title>
 -->
 <!--
+Network-related  settings
+******************
+
 # network io readahead
 readahead=16320
 # size of listen backlog
 backlog=1024, ro
+
+Replication settings
+********************
 
 # delay between loop iterations
 io_collect_interval=0.0, ro
@@ -463,17 +612,6 @@ wal_feeder_port=0, ro
 
   <table>
     <title>Memcached support</title>
--->
-<!--
-# Memcached emulation is enabled if memcached == 1
-memcached=0, ro
-# namespace used for memcached emulation
-memcached_namespace=23, ro
-# maximum rows to consider per expire loop iteration
-memcached_expire_per_loop=1024
-# tarantool will try iterate all rows within this time
-memcached_expire_full_sweep=3600
-  </table>
 -->
 
 </section>
