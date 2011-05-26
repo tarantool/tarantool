@@ -124,6 +124,19 @@ tbuf_peek(struct tbuf *b, size_t count)
 	return NULL;
 }
 
+void *
+tbuf_ltrim(struct tbuf *b, size_t count)
+{
+	void *p = NULL;
+
+	tbuf_assert(b);
+	if (count <= b->len) {
+		p = memmove(b->data, b->data + count, b->len - count);
+		b->len -= count;
+	}
+	return p;
+}
+
 size_t
 tbuf_reserve(struct tbuf *b, size_t count)
 {

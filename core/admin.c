@@ -1452,8 +1452,7 @@ case 107:
 #line 199 "core/admin.rl"
 
 
-	fiber->rbuf->len -= (void *)pe - (void *)fiber->rbuf->data;
-	fiber->rbuf->data = pe;
+	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);
 
 	if (p != pe) {
 		start(out);

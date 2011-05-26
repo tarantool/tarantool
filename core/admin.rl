@@ -198,8 +198,7 @@ admin_dispatch(void)
 		write exec;
 	}%%
 
-	fiber->rbuf->len -= (void *)pe - (void *)fiber->rbuf->data;
-	fiber->rbuf->data = pe;
+	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);
 
 	if (p != pe) {
 		start(out);

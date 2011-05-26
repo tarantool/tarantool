@@ -63,6 +63,7 @@ struct tbuf *tbuf_split(struct tbuf *e, size_t at);
 size_t tbuf_reserve(struct tbuf *b, size_t count);
 void tbuf_reset(struct tbuf *b);
 void *tbuf_peek(struct tbuf *b, size_t count);
+void *tbuf_ltrim(struct tbuf *b, size_t count);
 
 void tbuf_append_field(struct tbuf *b, void *f);
 void tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
