@@ -124,17 +124,16 @@ tbuf_peek(struct tbuf *b, size_t count)
 	return NULL;
 }
 
-void *
+/** Remove first count bytes from the beginning. */
+
+void
 tbuf_ltrim(struct tbuf *b, size_t count)
 {
-	void *p = NULL;
-
 	tbuf_assert(b);
-	if (count <= b->len) {
-		p = memmove(b->data, b->data + count, b->len - count);
-		b->len -= count;
-	}
-	return p;
+	assert(count <= b->len);
+
+	memmove(b->data, b->data + count, b->len - count);
+	b->len -= count;
 }
 
 size_t
