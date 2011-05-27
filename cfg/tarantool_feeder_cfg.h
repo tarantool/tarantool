@@ -15,7 +15,10 @@ typedef struct tarantool_cfg {
 	/* username to switch to */
 	char*	username;
 
-	/* save core on abort/assert */
+	/*
+	 * save core on abort/assert
+	 * deprecated; use ulimit instead
+	 */
 	int32_t	coredump;
 
 	/*
@@ -27,13 +30,13 @@ typedef struct tarantool_cfg {
 	/* Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5 */
 	int32_t	log_level;
 
-	/* Size of slab arena in GiBs */
+	/* Size of slab arena in GB */
 	double	slab_alloc_arena;
 
 	/* Size of minimal allocation unit */
 	int32_t	slab_alloc_minimal;
 
-	/* Growth factor, each subsecuent unit size is factor * prev unit size */
+	/* Growth factor, each subsequent unit size is factor * prev unit size */
 	double	slab_alloc_factor;
 
 	/* working directory (daemon will chdir(2) to it) */
@@ -44,16 +47,16 @@ typedef struct tarantool_cfg {
 
 	/*
 	 * logger command will be executed via /bin/sh -c {}
-	 * example: 'exec cronolog /var/log/taranul/%Y-%m/%Y-%m-%d/tarantool.log'
-	 * example: 'exec extra/logger.pl /var/log/taranul/tarantool.log'
+	 * example: 'exec cronolog /var/log/tarantool/%Y-%m/%Y-%m-%d/tarantool.log'
+	 * example: 'exec extra/logger.pl /var/log/tarantool/tarantool.log'
 	 * when logger is not configured all logging going to STDERR
 	 */
 	char*	logger;
 
-	/* make logging nonblocking, this potentially can loss some logging data */
+	/* make logging nonblocking, this potentially can lose some logging data */
 	int32_t	logger_nonblock;
 
-	/* delay between loop iteraions */
+	/* delay between loop iterations */
 	double	io_collect_interval;
 
 	/* size of listen backlog */

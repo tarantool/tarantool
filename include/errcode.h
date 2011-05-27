@@ -72,7 +72,7 @@ struct errcode_record {
 	/* 53 */_(ERR_CODE_UNUSED53,			0, "Unused53") \
 	/* 54 */_(ERR_CODE_UNUSED54,			0, "Unused54") \
 	/* 55 */_(ERR_CODE_NODE_FOUND,			2, "Node is found") \
-	/* 56 */_(ERR_CODE_INDEX_VIOLATION,		2, "Some index violation occur") \
+	/* 56 */_(ERR_CODE_INDEX_VIOLATION,		2, "Constraint violation") \
 	/* 57 */_(ERR_CODE_NO_SUCH_NAMESPACE,		2, "There is no such namespace") \
 	        _(ERR_CODE_NO_SUCH_INDEX,		2, "No index with the given id is defined")
 

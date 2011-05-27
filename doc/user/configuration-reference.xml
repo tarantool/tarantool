@@ -3,6 +3,7 @@
 %tnt;
 ]>
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xi="http://www.w3.org/2001/XInclude" 
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xml:id="configuration-reference">
 
@@ -206,6 +207,14 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
   <para>
     Not all configuration file settings are changeable at runtime:
     such settings will be highlighted in this reference.
+    If the same setting is given more than once, the latest occurrence
+    takes effect.
+    You can always invoke <emphasis role="tntadmin"
+    xlink:href="tarantool-user-guide#show-configuration"
+    xlink:title="show configuration"
+    xlink:role="http://docbook.org/xlink/role/olink">show
+    configuration</emphasis> from the administrative
+    console to show the current configuration.
   </para>
   <para>
     Tarantool maintains a set of all allowed configuration
@@ -362,6 +371,85 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
     </tgroup>
   </table>
 
+  <table frame='all'>
+    <title>Configuring the storage</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>slab_alloc_arena</entry>
+          <entry>float</entry>
+          <entry>1.0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>How much memory Tarantool allocates to actually
+          store tuples, <emphasis role="strong">in
+          gigabytes</emphasis>. When the limit is reached, INSERT
+          or UPDATE requests begin failing with error
+          ERR_CODE_MEMORY_ISSUE. While the server does not go
+          beyond the defined limit to allocate tuples, there is
+          additional memory used to store indexes and connection
+          information.  Depending on actual configuration and
+          workload, Tarantool can consume up to 20-40% of the
+          limit set here.</entry>
+        </row>
+
+        <row>
+          <entry>slab_alloc_minimal</entry>
+          <entry>integer</entry>
+          <entry>64</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Size of the smallest allocation unit. It can be
+          tuned down if most of the tuples are very small.</entry>
+        </row>
+
+        <row>
+          <entry>slab_alloc_factor</entry>
+          <entry>float</entry>
+          <entry>2.0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Use slab_alloc_factor as the multiplier for
+          computing the sizes of memory chunks that tuples are
+          stored in. A lower value  may result in less wasted
+          memory depending on the total amount of memory available
+          and the distribution of item sizes.</entry> 
+        </row>
+
+        <row>
+          <entry>namespace</entry>
+          <entry>array of objects</entry>
+          <entry>none</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry><emphasis role="strong">no</emphasis></entry>
+          <entry>This is the main Tarantool parameter, describing
+          the data structure that users get access to via
+          client/server protocol. It holds an array of
+          entries, and each entry represents a tuple set 
+          served by the server. Every entry is a composite object,
+          best seen as a C programming language "struct"
+          <footnote><xi:include href="namespace.xml"/></footnote>.
+          </entry>
+        </row>
+
+
+      </tbody>
+    </tgroup>
+  </table>
+
 <!--
 
 Storage parameters.
@@ -369,33 +457,6 @@ Storage parameters.
 
 ## BOX
 
-
-# Size of slab arena in GiBs
-slab_alloc_arena=1.0, ro
-# Size of minimal allocation unit
-slab_alloc_minimal=64, ro
-# Growth factor, each subsecuent unit size is factor * prev unit size
-slab_alloc_factor=2.0, ro
-
-namespace = [
-  {
-    enabled = -1, required
-    cardinality = -1
-    estimated_rows = 0
-    index = [
-      {
-        type = "", required
-        unique = -1, required
-        key_field = [
-          {
-            fieldno = -1, required
-            type = "", required
-          }, ro,  required
-        ], required
-      }, ro, required
-    ], required
-  }, ro
-], ro, required
 
 # panic if where is error reading snap or wal
 # be default panic any snapshot reading error  and ignore errors then reading wals

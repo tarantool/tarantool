@@ -70,9 +70,23 @@
 -->
 <section>
   <title>Administrative console</title>
-  <para>YAML output. Provide command reference</para>
+  <para>
+    The administrative console uses a simple text protocol, so you
+    can connect to it using any <command>telnet</command> client,
+    or a tool like <command>rlwrap</command>, if access to
+    readline features is desired. Additionally, Tarantool features
+    its own Python-based client, located in directory <filename>test</filename>, <command>tarantool</command>.
+    Tarantool replies to administrative command in YAML.
+  </para>
+
   <para><emphasis xml:id="reload-configuration" role="tntadmin">reload
-  configuration</emphasis></para>
+  configuration</emphasis>Re-read the configuration file. If the
+  file contains changes to dynamic parameters, update the runtime
+  settings. If configuration syntax is incorrect, or a read-only parameter is    changed, produce an error and do nothing.</para>
+  <para><emphasis xml:id="show-configuration" role="tntadmin">show
+  configuration</emphasis> Show the current settings. Displays all
+  settings, including those that have default values and thus are
+  not necessarily present in the configuration file.</para>
 </section>
 </chapter>
 
