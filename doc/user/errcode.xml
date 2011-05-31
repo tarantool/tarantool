@@ -1,0 +1,77 @@
+<appendix xmlns="http://docbook.org/ns/docbook" version="5.0"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xml:id="errcode">
+
+<title>List of error codes</title>
+
+<para>In the current version of the binary protocol, error message,
+which is normally more descriptive than error code,
+is not present in server response. The actual message may contain
+a file name, a detailed reason or operating system error code.
+All such messages, however, are logged in the error log. When
+using memcached protocol, the error message is sent to the
+client along with the code. Below follow only general descriptions
+of existing codes.</para>
+<variablelist>
+<title>List of error codes</title>
+
+  <varlistentry>
+    <term xml:id="ERR_CODE_NONMASTER" xreflabel="ERR_CODE_NONMASTER">ERR_CODE_NONMASTER</term>
+    <listitem><para>Attempt to execute an update over the
+    secondary (read-only) port or on a running replica.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ERR_CODE_ILLEGAL_PARAMS" xreflabel="ERR_CODE_ILLEGAL_PARAMS">ERR_CODE_ILLEGAL_PARAMS</term>
+    <listitem><para>Illegal parameters. Malformed protocol
+    message.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ERR_CODE_NODE_IS_RO" xreflabel="ERR_CODE_NODE_IS_RO">ERR_CODE_NODE_IS_RO</term>
+    <listitem><para>A parallel update of a tuple is in progress. Try again.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ERR_CODE_MEMORY_ISSUE" xreflabel="ERR_CODE_MEMORY_ISSUE">ERR_CODE_MEMORY_ISSUE</term>
+    <listitem><para>Out of memory: <olink targetptr="slab_alloc_arena"/> limit is reached.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ERR_CODE_WAL_IO" xreflabel="ERR_CODE_WAL_IO">ERR_CODE_WAL_IO</term>
+    <listitem><para>Failed to record the change in the write ahead
+    log. Some sort of disk error.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ERR_CODE_INDEX_VIOLATION" xreflabel="ERR_CODE_INDEX_VIOLATION">ERR_CODE_INDEX_VIOLATION</term>
+    <listitem><para>A unique index constraint violation: a tuple with the same
+    key is already present in the index.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ERR_CODE_NO_SUCH_NAMESPACE" xreflabel="ERR_CODE_NO_SUCH_NAMESPACE">ERR_CODE_NO_SUCH_NAMESPACE</term>
+    <listitem><para>Attempt to access a namespace that is not
+    configured (doesn't exist).
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ERR_CODE_NO_SUCH_INDEX" xreflabel="ERR_CODE_NO_SUCH_INDEX">ERR_CODE_NO_SUCH_INDEX</term>
+    <listitem><para>No index with the given id exists.
+    </para></listitem>
+  </varlistentry>
+
+</variablelist>
+</appendix>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

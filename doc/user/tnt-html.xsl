@@ -7,6 +7,7 @@
 <xsl:import href="html-highlight.xsl"/>
 
 
+<xsl:param name="generate.toc" select="'book toc'"/>
 <xsl:param name="html.stylesheet" select="'tnt.css'"/> 
 <xsl:param name="highlight.source" select="1"/>
 <xsl:param name="highlight.xslthl.config">file:////usr/share/xml/docbook/stylesheet/docbook-xsl-ns/highlighting/xslthl-config.xml</xsl:param>

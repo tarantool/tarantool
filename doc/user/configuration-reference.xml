@@ -194,11 +194,8 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
   <para>
     To facilitate centralized and automated configuration
     management, runtime configuration modifications are supported
-    solely through <emphasis role="tntadmin"
-    xlink:href="tarantool-user-guide#reload-configuration"
-    xlink:title="reload configuration"
-    xlink:role="http://docbook.org/xlink/role/olink">reload
-    configuration</emphasis> administrative statement. Thus, the
+    solely through <olink targetptr="reload-configuration"/>
+    administrative statement. Thus, the
     procedure to change Tarantool configuration at runtime is to
     edit the configuration file.  This ensures that, should the
     server get killed or restart, no unexpected changes to
@@ -209,12 +206,9 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
     such settings will be highlighted in this reference.
     If the same setting is given more than once, the latest occurrence
     takes effect.
-    You can always invoke <emphasis role="tntadmin"
-    xlink:href="tarantool-user-guide#show-configuration"
-    xlink:title="show configuration"
-    xlink:role="http://docbook.org/xlink/role/olink">show
-    configuration</emphasis> from the administrative
-    console to show the current configuration.
+    You can always invoke <olink targetptr="show-configuration"/>
+    from the administrative console to show the current
+    configuration.
   </para>
   <para>
     Tarantool maintains a set of all allowed configuration
@@ -389,7 +383,7 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
       <tbody>
 
         <row>
-          <entry>slab_alloc_arena</entry>
+          <entry xml:id="slab_alloc_arena" xreflabel="slab_alloc_arena">slab_alloc_arena</entry>
           <entry>float</entry>
           <entry>1.0</entry>
           <entry>no</entry>
@@ -398,7 +392,8 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           store tuples, <emphasis role="strong">in
           gigabytes</emphasis>. When the limit is reached, INSERT
           or UPDATE requests begin failing with error
-          ERR_CODE_MEMORY_ISSUE. While the server does not go
+          <olink targetptr="ERR_CODE_MEMORY_ISSUE"/>.
+          While the server does not go
           beyond the defined limit to allocate tuples, there is
           additional memory used to store indexes and connection
           information.  Depending on actual configuration and
@@ -445,24 +440,98 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           </entry>
         </row>
 
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all'>
+    <title>Binary logging, snapshots and replication</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>panic_on_snap_error</entry>
+          <entry>boolean</entry>
+          <entry>1</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>If there is an error reading the snapshot (at
+            server start), abort.</entry>
+        </row>
+
+        <row>
+          <entry>panic_on_wal_error</entry>
+          <entry>boolean</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>If there is an error reading from a write ahead
+          log (at server start), abort.</entry>
+        </row>
 
       </tbody>
     </tgroup>
   </table>
 
 <!--
-
 Storage parameters.
 ******************
 
-## BOX
+Replication settings
+********************
+# Write no more rows in WAL
+rows_per_wal=500000, ro
 
 
-# panic if where is error reading snap or wal
-# be default panic any snapshot reading error  and ignore errors then reading wals
-panic_on_snap_error=1, ro
-panic_on_wal_error=0, ro
+# delay between loop iterations
+io_collect_interval=0.0, ro
+# do not write snapshot faster then snap_io_rate_limit MBytes/sec
+snap_io_rate_limit=0.0, ro
 
+# fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay seconds ago
+# WARNING: actually, several last requsts may stall for much longer
+wal_fsync_delay=0, ro
+
+# size of WAL writer requests buffer
+wal_writer_inbox_size=128, ro
+
+# network io readahead
+readahead=16320
+# size of listen backlog
+backlog=1024, ro
+
+-->
+<!--
+  </table>
+
+  <table>
+    <title>Replication</title>
+-->
+<!--
+# Remote hot standby (if enabled server will run in hot standby mode
+# continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
+remote_hot_standby=0, ro
+wal_feeder_ipaddr=NULL, ro
+wal_feeder_port=0, ro
+
+-->
+<!--
+  </table>
+
+  <table>
+    <title>Memcached support</title>
 -->
 
   <table frame='all'>
@@ -622,58 +691,6 @@ panic_on_wal_error=0, ro
       </tbody>
     </tgroup>
   </table>
-
-<!--
-  <table frame='all'>
-    <title>Networking and file I/O</title>
--->
-<!--
-Network-related  settings
-******************
-
-# network io readahead
-readahead=16320
-# size of listen backlog
-backlog=1024, ro
-
-Replication settings
-********************
-
-# delay between loop iterations
-io_collect_interval=0.0, ro
-# do not write snapshot faster then snap_io_rate_limit MBytes/sec
-snap_io_rate_limit=0.0, ro
-
-# Write no more rows in WAL
-rows_per_wal=500000, ro
-
-# fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay seconds ago
-# WARNING: actually, several last requsts may stall for much longer
-wal_fsync_delay=0, ro
-
-# size of WAL writer requests buffer
-wal_writer_inbox_size=128, ro
--->
-<!--
-  </table>
-
-  <table>
-    <title>Replication</title>
--->
-<!--
-# Remote hot standby (if enabled server will run in hot standby mode
-# continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
-remote_hot_standby=0, ro
-wal_feeder_ipaddr=NULL, ro
-wal_feeder_port=0, ro
-
--->
-<!--
-  </table>
-
-  <table>
-    <title>Memcached support</title>
--->
 
 </section>
 </chapter>

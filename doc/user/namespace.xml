@@ -3,8 +3,7 @@
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xml:id="namespace">
 <bridgehead>Namespace settings explained</bridgehead>
-Namespace is a composite setting, i.e. it has a number
-of properties.
+Namespace is a composite parameter, i.e. it has properties.
 <programlisting language="cpp">
 /*
  * Each tuple consists of fields. Three field types are
@@ -31,10 +30,10 @@ struct index_field_t {
 enum { HASH, TREE } index_type;
 
 struct index_t {
-
-  enum index_type type;
-  bool unique;
   index_field_t key_field[];
+  enum index_type type;
+  /* Secondary index may be non-unique */
+  bool unique;
 };
 
 struct namespace_t

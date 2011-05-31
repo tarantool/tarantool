@@ -96,13 +96,11 @@
     xlink:href="http://www.docbook.org/tdg5/en/html/docbook.html">DocBook
     5</citetitle> XML markup language and is using the standard <citetitle
     xlink:href="http://docbook.sourceforge.net/release/xsl/current/doc/">DocbBook
-    XSL</citetitle> formatting conventions:
-  </para>
+    XSL</citetitle> formatting conventions:</para>
   <para>
     UNIX shell command input is prefixed with '$ ' and is 
     formatted using a fixed-width font:
-    <programlisting>
-      <prompt>$ </prompt>tarantool_box <option>--daemonize</option>
+    <programlisting><prompt>$ </prompt>tarantool_box <option>--daemonize</option>
     </programlisting>
   </para>
   <para>

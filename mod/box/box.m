@@ -820,7 +820,7 @@ txn_commit(struct box_txn *txn)
 
 			i64 lsn = next_lsn(recovery_state, 0);
 			if (!wal_write(recovery_state, wal_tag, fiber->cookie, lsn, t))
-				tnt_raise(tnt_BoxException, errcode:ERR_CODE_UNKNOWN_ERROR);
+				tnt_raise(tnt_BoxException, errcode:ERR_CODE_WAL_IO);
 			confirm_lsn(recovery_state, lsn);
 		}
 
@@ -1218,7 +1218,7 @@ box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
 
 		say_error("tnt_PickleException: `%s' at %s:%i", e->reason, e->file, e->line);
 
-		return ERR_CODE_UNKNOWN_ERROR;
+		return ERR_CODE_ILLEGAL_PARAMS;
 	}
 	@catch (tnt_BoxException *e) {
 		txn_abort(txn);

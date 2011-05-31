@@ -79,11 +79,11 @@
     Tarantool replies to administrative command in YAML.
   </para>
 
-  <para><emphasis xml:id="reload-configuration" role="tntadmin">reload
-  configuration</emphasis>Re-read the configuration file. If the
+  <para><emphasis xml:id="reload-configuration" xreflabel="RELOAD CONFIGURATION" role="tntadmin">reload
+  configuration</emphasis> Re-read the configuration file. If the
   file contains changes to dynamic parameters, update the runtime
   settings. If configuration syntax is incorrect, or a read-only parameter is    changed, produce an error and do nothing.</para>
-  <para><emphasis xml:id="show-configuration" role="tntadmin">show
+  <para><emphasis xml:id="show-configuration" xreflabel="SHOW CONFIGURATION" role="tntadmin">show
   configuration</emphasis> Show the current settings. Displays all
   settings, including those that have default values and thus are
   not necessarily present in the configuration file.</para>

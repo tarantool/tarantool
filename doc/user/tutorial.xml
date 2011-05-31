@@ -34,7 +34,8 @@
     To build Tarantool from source, additionally:
   <itemizedlist>
     <listitem><para>CMake 2.6 or newer,</para></listitem>
-    <listitem><para>GCC 4.4 or newer.</para></listitem>
+    <listitem><para>GCC 4.4 or newer, with gcc-objc (ObjectiveC)
+    language frontend.</para></listitem>
   </itemizedlist>
 </para>
 <para>
@@ -114,7 +115,8 @@
 <para>
   Congratulations, you have the server up and running.
   Check out the remaining chapters of this manual to learn
-  more about available commands, contents of tarantool.cfg,
+  more about available commands, contents of
+  <filename>tarantool.cfg</filename>,
   replication and high availability with Tarantool.
 </para>
 </sidebar>

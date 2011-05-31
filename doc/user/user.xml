@@ -19,8 +19,9 @@
 <xi:include href="configuration.xml"/>
 <xi:include href="logging.xml"/>
 <xi:include href="connectors.xml"/>
-<xi:include href="appendix.xml"/>
+<xi:include href="faq.xml"/>
 -->
+<xi:include href="errcode.xml"/>
 <!--
      TOC:
 
