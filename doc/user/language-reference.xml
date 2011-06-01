@@ -38,9 +38,9 @@
       configuration option.
     </para></listitem>
   </itemizedlist>
-  
+
   The data protocol is binary; a complete description is
-  provided in doc/box-protocol.txt. 
+  provided in doc/box-protocol.txt.
 
 </para>
 <para>
@@ -58,7 +58,7 @@
 
   <title>Data console</title>
 
-  <para>The default data port is 33014. It can be set in the 
+  <para>The default data port is 33014. It can be set in the
   configuration file. Data console supports asynchronous I/O.
   Four commands are supported. For a complete protocol manual, see
   developers guide.
@@ -83,10 +83,29 @@
   configuration</emphasis> Re-read the configuration file. If the
   file contains changes to dynamic parameters, update the runtime
   settings. If configuration syntax is incorrect, or a read-only parameter is    changed, produce an error and do nothing.</para>
-  <para><emphasis xml:id="show-configuration" xreflabel="SHOW CONFIGURATION" role="tntadmin">show
-  configuration</emphasis> Show the current settings. Displays all
+  <para><emphasis xml:id="show-configuration" xreflabel="SHOW CONFIGURATION" role="tntadmin">show configuration</emphasis> Show the current settings. Displays all
   settings, including those that have default values and thus are
   not necessarily present in the configuration file.</para>
+
+  <para><emphasis xml:id="save-snapshot" xreflabel="SAVE SNAPSHOT"
+  role="tntadmin">save snaspshot</emphasis>
+  Take a snapshot of all data and store it in
+  <filename><olink targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
+    To take a snapshot, Tarantool forks and quickly munmap(2)s all
+    memory except one that stores tuples. Since all modern operating
+    systems support virtual memory copy-on-write, this effectively
+    creates a consistent snapshot of all tuples in the child
+    process, which is then written to disk tuple by tuple. Since a
+    snapshot is written
+    sequentially, you can expect a very high write performance
+    (averaging to 70MB/second on modern disks), which means an
+    average database instance gets saved in a matter of minutes.
+    Note, that as long as there are any changes to the parent
+    memory through concurrent updates, there are going to be page
+    splits, and therefore you need to have some extra free memory
+    to run this command. 15%-30% of <olink
+    targetptr="slab_alloc_arena"/> is, on average, sufficient.
+  </para>
 </section>
 </chapter>
 

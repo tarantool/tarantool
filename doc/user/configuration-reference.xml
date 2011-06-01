@@ -3,7 +3,7 @@
 %tnt;
 ]>
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
-         xmlns:xi="http://www.w3.org/2001/XInclude" 
+         xmlns:xi="http://www.w3.org/2001/XInclude"
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xml:id="configuration-reference">
 
@@ -265,7 +265,7 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
         </row>
 
         <row>
-          <entry>wal_dir</entry>
+          <entry xml:id="wal_dir" xreflabel="wal_dir">wal_dir</entry>
           <entry>string</entry>
           <entry>""</entry>
           <entry>no</entry>
@@ -278,14 +278,14 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
         </row>
 
         <row>
-          <entry>snap_dir</entry>
+          <entry xml:id="snap_dir" xreflabel="snap_dir">snap_dir</entry>
           <entry>string</entry>
           <entry>""</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>A directory to store snapshots in. Can be
           relative to work_dir. If not specified, defaults to
-          work_dir. See also wal_dir.</entry>
+          work_dir. See also <olink targetptr="wal_dir"/>.</entry>
         </row>
 <!--
         <row>
@@ -295,7 +295,7 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
         </row>
 -->
         <row>
-          <entry>primary_port</entry>
+          <entry xml:id="primary_port" xreflabel="primary_port">primary_port</entry>
           <entry>integer</entry>
           <entry><emphasis role="strong">none</emphasis></entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
@@ -383,12 +383,15 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
       <tbody>
 
         <row>
-          <entry xml:id="slab_alloc_arena" xreflabel="slab_alloc_arena">slab_alloc_arena</entry>
+          <entry>slab_alloc_arena</entry>
           <entry>float</entry>
           <entry>1.0</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>How much memory Tarantool allocates to actually
+          <entry>
+            <anchor xml:id="slab_alloc_arena" xreflabel="slab_alloc_arena"/>
+            How much memory Tarantool
+          allocates to actually
           store tuples, <emphasis role="strong">in
           gigabytes</emphasis>. When the limit is reached, INSERT
           or UPDATE requests begin failing with error
@@ -421,7 +424,7 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           computing the sizes of memory chunks that tuples are
           stored in. A lower value  may result in less wasted
           memory depending on the total amount of memory available
-          and the distribution of item sizes.</entry> 
+          and the distribution of item sizes.</entry>
         </row>
 
         <row>
@@ -433,7 +436,7 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>This is the main Tarantool parameter, describing
           the data structure that users get access to via
           client/server protocol. It holds an array of
-          entries, and each entry represents a tuple set 
+          entries, and each entry represents a tuple set
           served by the server. Every entry is a composite object,
           best seen as a C programming language "struct"
           <footnote><xi:include href="namespace.xml"/></footnote>.
@@ -445,7 +448,7 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
   </table>
 
   <table frame='all'>
-    <title>Binary logging, snapshots and replication</title>
+    <title>Binary logging and snapshots</title>
     <tgroup cols='6' colsep='1' rowsep='1'>
 
       <thead>
@@ -481,57 +484,151 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           log (at server start), abort.</entry>
         </row>
 
+        <row>
+          <entry>rows_per_wal</entry>
+          <entry>integer</entry>
+          <entry>500000</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>How many log records to store in a single write
+          ahead log file. When this limit is reached, Tarantool
+          creates another WAL file named
+          <filename>&lt;first-lsn-in-wal&gt;.wal</filename>
+          This can be useful for simple rsync-based backups.
+          </entry>
+        </row>
+
+        <row>
+          <entry>snap_io_rate_limit</entry>
+          <entry>float</entry>
+          <entry>0.0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Reduce the throttling effect of <olink
+          targetptr="save-snapshot"/> on the INSERT/UPDATE/DELETE
+          performance by setting a limit on
+          how many megabytes per second it can write to disk.
+          The same can be achieved by splitting <olink
+          targetptr="wal_dir"/> and <olink targetptr="snap_dir"/>
+          locations and moving snapshots to a separate disk.</entry>
+        </row>
+
+        <row>
+          <entry>wal_writer_inbox_size</entry>
+          <entry>integer</entry>
+          <entry>128</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>WAL writer is a separate process whose sole
+          purpose is to write the change log to disk. Every
+          incoming data change is sent to this process and
+          queued for write. This parameter sets the size
+          of the queue. However, it has no effect
+          due to <link
+          xlink:href="https://bugs.launchpad.net/tarantool/+bug/791498">Bug#791498</link>.</entry>
+        </row>
+
+        <row>
+          <entry>readahead</entry>
+          <entry>integer</entry>
+          <entry>16384</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>WAL writer network read-ahead buffer size, in
+          bytes.
+            It's not recommended to change this value until
+            <link xlink:href="https://bugs.launchpad.net/tarantool/+bug/791498">Bug#791498</link>
+            is fixed.
+            </entry>
+        </row>
+
+        <row>
+        <entry>wal_fsync_delay</entry>
+        <entry>integer</entry>
+        <entry>0</entry>
+        <entry>no</entry>
+        <entry>no</entry>
+        <entry>Do not flush the write ahead log to disk more often
+          than once in wal_fsync_delay seconds. By default the
+          delay is zero,
+          that is, the write ahead log is flushed after every write.
+          Setting the delay may be necessary to increase write
+          throughput, but may lead to several last updates being
+          lost in case of a power failure. Such failure, however,
+          does not read to data corruption: all WAL records have a
+          checksum, and only complete records are processed during
+          recovery.</entry>
+        </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all'>
+    <title>Replication</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+        <row>
+          <entry>replication_port</entry>
+          <entry>integer</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Replication port. If non-zero, Tarantool listens
+          on the given port for incoming connections from
+          replicas. See also <olink
+          targetptr="replication_source_port"/>, which complements
+          this setting on the replica side.</entry>
+        </row>
+
+        <row>
+          <entry xml:id="replication_source_port"
+          xreflabel="replication_source_port">replication_source_port</entry>
+          <entry>integer</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>Remote port of the master. If non-zero,
+          replication is on, and Tarantool does not accept updates
+          on <olink targetptr="primary_port"/>. This parameter is
+          dynamic, that is, to enter master mode, simply set the
+          port value to 0 and issue <olink
+          targetptr="reload-configuration"/>.</entry>
+        </row>
+
+        <row>
+          <entry>replication_source_ipaddr</entry>
+          <entry>string</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>IP address of replication master.</entry>
+        </row>
+
       </tbody>
     </tgroup>
   </table>
 
 <!--
-Storage parameters.
-******************
-
-Replication settings
-********************
-# Write no more rows in WAL
-rows_per_wal=500000, ro
-
 
 # delay between loop iterations
 io_collect_interval=0.0, ro
-# do not write snapshot faster then snap_io_rate_limit MBytes/sec
-snap_io_rate_limit=0.0, ro
 
-# fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay seconds ago
-# WARNING: actually, several last requsts may stall for much longer
-wal_fsync_delay=0, ro
-
-# size of WAL writer requests buffer
-wal_writer_inbox_size=128, ro
-
-# network io readahead
-readahead=16320
 # size of listen backlog
 backlog=1024, ro
 
--->
-<!--
-  </table>
-
-  <table>
-    <title>Replication</title>
--->
-<!--
-# Remote hot standby (if enabled server will run in hot standby mode
-# continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
-remote_hot_standby=0, ro
-wal_feeder_ipaddr=NULL, ro
-wal_feeder_port=0, ro
-
--->
-<!--
-  </table>
-
-  <table>
-    <title>Memcached support</title>
 -->
 
   <table frame='all'>
