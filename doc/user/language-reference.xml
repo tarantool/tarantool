@@ -16,7 +16,7 @@
   Unlike many other key/value servers, Tarantool uses
   different TCP ports and client/server protocols for data
   manipulation and administrative statements.
-  On start up, the server connects to three TCP ports:
+  On start up, the server connects to four TCP ports:
   <itemizedlist>
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
@@ -24,60 +24,105 @@
       </para>
       <para>
       The default value of the port is <literal>33013</literal>,
-      as defined in <emphasis>primary_port</emphasis>
+      as defined in <olink targetptr="primary_port"/>
       configuration option.
     </para></listitem>
     <listitem><para>
       Read only port, which only accepts SELECTs, port number
       <literal>33014</literal>, as defined in
-      <emphasis>secondary_port</emphasis> configuration option.
+      <olink targetptr="secondary_port"/> configuration option.
     </para></listitem>
     <listitem><para>
       Administrative port, which defaults to <literal>33015</literal>,
-      and is defined in <emphasis>admin_port</emphasis>
+      and is defined in <olink targetptr="admin_port"/>
       configuration option.
     </para></listitem>
+    <listitem><para>Replication port (see <olink
+        targetptr="replication_port"/>), by default set to
+        <literal>33016</literal>, used to send updates to
+        replicas. Replication is optional, and if its port is not
+        set in the option file, the corresponding server process
+        is not started.
+      </para></listitem>
   </itemizedlist>
-
-  The data protocol is binary; a complete description is
-  provided in doc/box-protocol.txt.
-
-</para>
-<para>
-  separation of ports is done in part to allow system
-  administrators to secure the read/write port or the
-  administrative port. The values of read-only, read-write and
-  administrative ports can be specified in the configuration file.
-</para>
-<para>
-  How command line client understands what port to use.
+  In absence of authentication, this approach allows system
+  administrators to restrict access to read/write or
+  administrative ports. The client, however, has to be aware of
+  the separation, and <command>tarantool</command> command line
+  client will automatically selects the correct port for you
+  with help of a simple regular expression. SELECTs, UPDATEs,
+  INSERTs and DELETEs are sent to the primary port, whereas SHOWs,
+  RELOAD, SAVE and others -- to the administrative port.
 </para>
 
-<!--
 <section>
+  <title>Data manipulation</title>
 
-  <title>Data console</title>
-
-  <para>The default data port is 33014. It can be set in the
-  configuration file. Data console supports asynchronous I/O.
-  Four commands are supported. For a complete protocol manual, see
-  developers guide.
+  <para>Tarantool protocol was designed with focus on asynchronous
+    I/O and easy integration with proxies. Each client
+    request starts with a simple binary header, containing three
+    fields: request type, length, and a numeric id.
   </para>
+  <para>
+    Four basic request types are supported: INSERT, UPDATE, DELETE
+    and SELECT. The mandatory length, present in the header,
+    allows to simplify client or proxy I/O.
+    The server response to a request always carries in its header
+    the same command type and request id.
+    The id makes it possible to always match request to a
+    response, even if the latter arrived out of order.
+  </para>
+  <para>Request type defines the format of the payload.
+    INSERTs and DELETEs can only be made by the primary key, so
+    an index id and key value are always present in these requests.
+    SELECTs and UPDATEs can use secondary keys. UPDATE only needs to
+    list the fields that are actually changed. With this one
+    exception, all commands operate on the whole tuple(s).
+  </para>
+  <para>Unless implementing a client driver, one needn't
+    concern him or her self with the complications of the binary
+    protocol. <olink targetptr="connectors">Language-specific
+    drivers</olink> provide a friendly way to store domain
+    language data structures in Tarantool, and the command line
+    client supports a subset of the standard SQL.
+    A complete description of both, the binary protocol and
+    the supported SQL, is maintained in annotated Backus-Naur
+    form in the source tree: please see
+    <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
+    and
+    <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/sql.txt</filename></link> respectively.
+  </para>
+  <para>The other easy alternative is to access Tarantool using
+  Memcached protocol. </para>
+</section>
 
+<section>
+  <title>Writing stored procedures in Lua</title>
+  <para>
+    Lua.
+  </para>
 </section>
 
 
--->
 <section>
   <title>Administrative console</title>
   <para>
-    The administrative console uses a simple text protocol, so you
-    can connect to it using any <command>telnet</command> client,
-    or a tool like <command>rlwrap</command>, if access to
-    readline features is desired. Additionally, Tarantool features
-    its own Python-based client, located in directory <filename>test</filename>, <command>tarantool</command>.
-    Tarantool replies to administrative command in YAML.
+    The administrative console uses a simple text protocol.
+    All commands are case-insensitive.
+    You can connect to the administrative port using any
+    <command>telnet</command> client, or a tool like
+    <command>rlwrap</command>, if access to readline features is
+    desired. Additionally, Tarantool SQL-capable
+    command line client understands all administrative statements
+    and automatically directs them to the administrative port.
+    The server response to an administrative command even though
+    is always in plain text, can be quite complex,
+    and is encoded with YAML markup to simplify automated parsing.
   </para>
+  <para>To learn about all supported administrative commands, you
+    can type <emphasis role="tntadmin">help</emphasis> in the
+    administrative console. A reference description also follows
+    below:</para>
 
   <para><emphasis xml:id="reload-configuration" xreflabel="RELOAD CONFIGURATION" role="tntadmin">reload
   configuration</emphasis> Re-read the configuration file. If the

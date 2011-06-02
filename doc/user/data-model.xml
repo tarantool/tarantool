@@ -109,7 +109,7 @@
 <para>
   Since not all NoSQL operations can be expressed in SQL, to gain
   complete access to data manipulation functionality one must use
-  a Perl, Python, Ruby or C connector. The client/server protocol
+  a <olink targetptr="connectors">Perl, Python, Ruby or C connector</olink>. The client/server protocol
   is open and documented: an annotated BNF can be found in the
   source tree, file <filename
   xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/protocol.txt</filename>.

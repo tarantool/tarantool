@@ -1,0 +1,23 @@
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="replication">
+
+<title>Replication</title>
+<blockquote><para>
+  How to set up replication?
+</para></blockquote>
+
+<para>
+Replication.
+</para>
+
+</chapter>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

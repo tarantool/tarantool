@@ -41,7 +41,7 @@
 <para>
   After download, unpack the binary package, an own directory will be created:
   <programlisting>
-  <prompt>$ </prompt><command>tar</command> <option>zxvf</option> <filename>package-name.tar.gz</filename></programlisting>
+  <prompt>$ </prompt><command>tar</command> <option>zxvf</option> <filename><replaceable><replaceable>package-name</replaceable></replaceable>.tar.gz</filename></programlisting>
   The binary download contains just two subdirectories:
   <filename>bin</filename> and <filename>doc</filename>.
   The server, by default, looks for its configuration file in
@@ -50,7 +50,7 @@
   <filename>bin</filename>, thus the server can be started
   right out of it:
   <programlisting>
-  <prompt>$ </prompt><command>cd package-name/bin &amp;&amp; ./tarantool_box</command>
+  <prompt>$ </prompt><command>cd <replaceable>package-name</replaceable>/bin &amp;&amp; ./tarantool_box</command>
   ...
   1301424353.416 3459 104/33013/acceptor _ I> I am primary
   1301424353.416 3459 1/sched _ I> initialized</programlisting>
@@ -61,7 +61,7 @@
   Once the server is started, you can connect to it and issue
   queries using a command line client implemented in Python:
   <programlisting>
-  <prompt>$ </prompt><command>cd package-name/bin &amp;&amp; ./tarantool</command>
+  <prompt>$ </prompt><command>cd <replaceable>package-name</replaceable>/bin &amp;&amp; ./tarantool</command>
   <prompt>tarantool> </prompt> <userinput>show info</userinput>
   <computeroutput>
   ---
@@ -82,7 +82,7 @@
   necessary: configuration and build. The easiest way to configure
   a source directory with CMake is by requesting an in-source build:
   <programlisting>
-  <prompt>$ </prompt><command>cd</command> <filename>package-name</filename> &amp;&amp; <command>cmake</command> .</programlisting>
+  <prompt>$ </prompt><command>cd</command> <filename><replaceable>package-name</replaceable></filename> &amp;&amp; <command>cmake</command> .</programlisting>
   Upon successful configuration, CMake prints the status
   of optional features:
   <programlisting>

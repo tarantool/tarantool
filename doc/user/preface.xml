@@ -74,7 +74,8 @@
     one of the leading Russian web content providers. At Mail.Ru,
     the sowtware serves the <quote>hottest</quote>
     data, such as online users and their sessions, online application
-    properties, the map between users and their serving shards.
+    properties, mapping between users and their serving shards,
+    and so on.
   </para>
 
   <para>
@@ -136,11 +137,11 @@
   </para>
   <para>
     <emphasis role="strong">Caution:</emphasis> To prevent spam, Launchpad
-    mailing list software silently drops all mail sent by
-    unregistered users. Registration also
-    allows you to report bug and create feature requests.
+    mailing list software silently drops all mail sent from
+    non-registered email addresses. Launchpad registration also
+    allows you to report bugs and create feature requests.
     You can always check whether or not your mail has been
-    delivered in the public mailing list archive, <link
+    delivered to the mailing list in the public list archive, <link
     xlink:href="https://lists.launchpad.net/tarantool-developers"/>.
   </para>
 </section>

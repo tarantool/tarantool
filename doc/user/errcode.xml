@@ -9,7 +9,7 @@ which is normally more descriptive than error code,
 is not present in server response. The actual message may contain
 a file name, a detailed reason or operating system error code.
 All such messages, however, are logged in the error log. When
-using memcached protocol, the error message is sent to the
+using <emphasis role="strong">Memcached</emphasis> protocol, the error message is sent to the
 client along with the code. Below follow only general descriptions
 of existing codes.</para>
 <variablelist>

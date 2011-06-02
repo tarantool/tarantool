@@ -1,0 +1,57 @@
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="connectors">
+
+<title>Connectors</title>
+<blockquote><para>
+  This chapter documents APIs for various programming languages --
+  C, Perl, Ruby, PHP and Python.
+</para></blockquote>
+
+<para>All connectors are located in srcdir/connector directory. Apart from the native Tarantool client driver, you can always use a <emphasis role="strong">Memcached</emphasis> driver of your choice, after enabling Memcached protocol in the configuration file.</para>
+
+  <section>
+    <title>C</title>
+    <para>
+       Please see (xref here).
+    </para>
+  </section>
+
+  <section>
+    <title>Perl</title>
+    <para>
+       Please see (xref here).
+    </para>
+  </section>
+
+  <section>
+    <title>PHP</title>
+    <para>
+       Please see (xref here).
+    </para>
+  </section>
+
+  <section>
+    <title>Python</title>
+    <para>
+       Please see (xref here).
+    </para>
+  </section>
+
+  <section>
+    <title>Ruby</title>
+    <para>
+       Please see (xref here).
+    </para>
+  </section>
+
+</chapter>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

@@ -12,11 +12,11 @@
 <xi:include href="tutorial.xml"/>
 <xi:include href="data-model.xml"/>
 <xi:include href="language-reference.xml"/>
-<xi:include href="configuration-reference.xml"/>
-<!--
 <xi:include href="replication.xml"/>
+<xi:include href="configuration-reference.xml"/>
+<xi:include href="connectors.xml"/>
+<!--
 <xi:include href="memcached.xml"/>
-<xi:include href="configuration.xml"/>
 <xi:include href="logging.xml"/>
 <xi:include href="connectors.xml"/>
 <xi:include href="faq.xml"/>
