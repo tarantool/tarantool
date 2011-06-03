@@ -16,11 +16,12 @@
   Unlike many other key/value servers, Tarantool uses
   different TCP ports and client/server protocols for data
   manipulation and administrative statements.
-  On start up, the server connects to four TCP ports:
+  On start up, the server can connect to up to five TCP ports:
   <itemizedlist>
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
-      DELETEs and SELECTs.
+      DELETEs and SELECTs. This port speaks the native
+      Tarantool protocol, and provides full access to the server.
       </para>
       <para>
       The default value of the port is <literal>33013</literal>,
@@ -40,18 +41,21 @@
     <listitem><para>Replication port (see <olink
         targetptr="replication_port"/>), by default set to
         <literal>33016</literal>, used to send updates to
-        replicas. Replication is optional, and if its port is not
+        replicas. Replication is optional, and if this port is not
         set in the option file, the corresponding server process
         is not started.
       </para></listitem>
+    <listitem><para>Memcached port. Optional, read-write data port
+      that speaks Memcached protocol. This port is off by default.
+    </para></listitem>
   </itemizedlist>
   In absence of authentication, this approach allows system
   administrators to restrict access to read/write or
   administrative ports. The client, however, has to be aware of
   the separation, and <command>tarantool</command> command line
-  client will automatically selects the correct port for you
+  client automatically selects the correct port for you
   with help of a simple regular expression. SELECTs, UPDATEs,
-  INSERTs and DELETEs are sent to the primary port, whereas SHOWs,
+  INSERTs and DELETEs are sent to the primary port, whereas SHOW,
   RELOAD, SAVE and others -- to the administrative port.
 </para>
 
@@ -77,7 +81,7 @@
     an index id and key value are always present in these requests.
     SELECTs and UPDATEs can use secondary keys. UPDATE only needs to
     list the fields that are actually changed. With this one
-    exception, all commands operate on the whole tuple(s).
+    exception, all commands operate on whole tuple(s).
   </para>
   <para>Unless implementing a client driver, one needn't
     concern him or her self with the complications of the binary
@@ -90,10 +94,25 @@
     form in the source tree: please see
     <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
     and
-    <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/sql.txt</filename></link> respectively.
+    <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link> respectively.
   </para>
-  <para>The other easy alternative is to access Tarantool using
-  Memcached protocol. </para>
+  <section>
+    <title>Memcached protocol</title>
+      <para>If full access to Tarantool functionality is not needed,
+      or there is no readily available connector for the
+      programming language in use, any existing client driver for
+      Memcached will make do as a Tarantool connector.
+      To enable Memcached protocol, turn on
+      <olink targetptr="memcached_port"/> in the option file.
+      Since Memcached has no notion of namespaces or secondary
+      indexes, this port only makes it possible to access one
+      dedicated namespace (see <olink
+      targetptr="memcached_namespace"/>) via its primary key.
+      Unless tuple expiration is enabled with <olink
+      targetptr="memcached_expire"/>, TTL part of the message is
+      stored but ignored.
+  </para>
+  </section>
 </section>
 
 <section>
@@ -112,12 +131,13 @@
     You can connect to the administrative port using any
     <command>telnet</command> client, or a tool like
     <command>rlwrap</command>, if access to readline features is
-    desired. Additionally, Tarantool SQL-capable
-    command line client understands all administrative statements
+    desired. Additionally, <command>tarantool</command>, the
+    SQL-capable command line client,
+    understands all administrative statements
     and automatically directs them to the administrative port.
-    The server response to an administrative command even though
-    is always in plain text, can be quite complex,
-    and is encoded with YAML markup to simplify automated parsing.
+    The server response to an administrative command, even though
+    is always in plain text, can be quite complex.
+    It is encoded using YAML markup to simplify automated parsing.
   </para>
   <para>To learn about all supported administrative commands, you
     can type <emphasis role="tntadmin">help</emphasis> in the
@@ -136,7 +156,8 @@
   role="tntadmin">save snaspshot</emphasis>
   Take a snapshot of all data and store it in
   <filename><olink targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
-    To take a snapshot, Tarantool forks and quickly munmap(2)s all
+    To take a snapshot, Tarantool forks and quickly
+    <function>munmap(2)</function>s all
     memory except one that stores tuples. Since all modern operating
     systems support virtual memory copy-on-write, this effectively
     creates a consistent snapshot of all tuples in the child

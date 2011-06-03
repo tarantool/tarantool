@@ -777,19 +777,27 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
       <tbody>
 
         <row>
-          <entry>memcached</entry>
+          <entry>memcached_port</entry>
           <entry>integer</entry>
           <entry>0</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>Turn on Memcached mode. In this mode, Tarantool
-            does not use secondary_port, and speaks memcached
-            protocol on the primary port. In particular,
-            memcached-style flags are supported, and expiration
-            time can be set on tuples. Unlike Memcached, all data
-            still goes to the binary log and to the replica, if
-            latter one is set up, which means that power outage
-            does not lead to a loss of all data.
+          <entry>
+            <anchor xml:id="memcached_port" xreflabel="memcached_port"/>
+
+          Turn on Memcached protocol support on the given
+            port. All requests on this port are directed to
+            a dedicated namespace, set in <olink
+            targetptr="memcached_namespace"/>.
+            Memcached-style flags are supported and stored
+            along with the value. The expiration time can also be
+            set and is persistent, but is ignored, unless <olink
+            targetptr="memcached_expire"/> is turned on.
+            Unlike Memcached, all data still goes to the binary
+            log and to the replica, if latter one is set up, which
+            means that power outage does not lead to loss of all
+            data. Thanks to data persistence, cache warm up time
+            is also very short.
           </entry>
         </row>
 
@@ -799,9 +807,34 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>23</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>Namespace id to store memcached data in. The
-          format of tuple is [key, metadata, value], with a hash
-          index based on the key. </entry>
+          <entry>
+            <anchor xml:id="memcached_namespace"
+            xreflabel="memcached_namespace"/>
+          Namespace id to store memcached data in. The
+          format of tuple is [key, metadata, value], with a HASH
+          index based on the key. Since the namespace format
+          is defined by Memcached data model, it must not be
+          previously configured.</entry>
+        </row>
+
+        <row>
+          <entry>memcached_expire</entry>
+          <entry>boolean</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>
+            <anchor xml:id="memcached_expire"
+            xreflabel="memcached_expire"/>
+            Turn on tuple time-to-live support in
+            <olink targetptr="memcached_namespace"/>. This
+            effectively turns Tarantool into a "persistent" implementation
+            of Memcached. Since a caching server has
+            significantly different purpose than a data server, in
+            this mode Tarantool turns off replication and does not
+            bind to <olink targetptr="primary_port"/> or <olink
+            targetptr="secondary_port"/>.
+          </entry>
         </row>
 
         <row>

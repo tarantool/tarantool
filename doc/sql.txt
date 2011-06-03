@@ -4,9 +4,10 @@
 ; the standard SQL, to which all clients are strongly encouraged 
 ; to stick.
 ; 
-; Convention: Uppercase letters are used for terminals and literals,
-; which should be typed in intact. Lowercase letters are used
-; for <non-terminals>.
+; Convention: UPPERCASE letters are used for terminals and literals.
+; Lowercase letters are used for <non-terminals>. SQL is
+; case-insensitive, so this convention is present only to imporve
+; legibility of the BNF.
 
 <sql> ::= <insert> | <update> | <delete> | <select>
 
