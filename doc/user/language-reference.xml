@@ -144,34 +144,145 @@
     administrative console. A reference description also follows
     below:</para>
 
-  <para><emphasis xml:id="reload-configuration" xreflabel="RELOAD CONFIGURATION" role="tntadmin">reload
-  configuration</emphasis> Re-read the configuration file. If the
-  file contains changes to dynamic parameters, update the runtime
-  settings. If configuration syntax is incorrect, or a read-only parameter is    changed, produce an error and do nothing.</para>
-  <para><emphasis xml:id="show-configuration" xreflabel="SHOW CONFIGURATION" role="tntadmin">show configuration</emphasis> Show the current settings. Displays all
-  settings, including those that have default values and thus are
-  not necessarily present in the configuration file.</para>
+  <variablelist>
 
-  <para><emphasis xml:id="save-snapshot" xreflabel="SAVE SNAPSHOT"
-  role="tntadmin">save snaspshot</emphasis>
-  Take a snapshot of all data and store it in
-  <filename><olink targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
-    To take a snapshot, Tarantool forks and quickly
-    <function>munmap(2)</function>s all
-    memory except one that stores tuples. Since all modern operating
-    systems support virtual memory copy-on-write, this effectively
-    creates a consistent snapshot of all tuples in the child
-    process, which is then written to disk tuple by tuple. Since a
-    snapshot is written
-    sequentially, you can expect a very high write performance
-    (averaging to 70MB/second on modern disks), which means an
-    average database instance gets saved in a matter of minutes.
-    Note, that as long as there are any changes to the parent
-    memory through concurrent updates, there are going to be page
-    splits, and therefore you need to have some extra free memory
-    to run this command. 15%-30% of <olink
-    targetptr="slab_alloc_arena"/> is, on average, sufficient.
-  </para>
+    <varlistentry>
+      <term xml:id="save-snapshot" xreflabel="SAVE SNAPSHOT">
+        <emphasis role="tntadmin">save snapshot</emphasis>
+      </term>
+      <listitem><para>
+        Take a snapshot of all data and store it in
+        <filename><olink
+        targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
+        To take a snapshot, Tarantool forks and quickly
+        <function>munmap(2)</function>s all memory except one that
+        stores tuples. Since all modern operating systems support
+        virtual memory copy-on-write, this effectively creates a
+        consistent snapshot of all tuples in the child process,
+        which is then written to disk tuple by tuple. Since a
+        snapshot is written sequentially, you can expect a very
+        high write performance (averaging to 70MB/second on modern
+        disks), which means an average database instance gets
+        saved in a matter of minutes.  Note, that as long as there
+        are any changes to the parent memory through concurrent
+        updates, there are going to be page splits, and therefore
+        you need to have some extra free memory to run this
+        command. 15%-30% of <olink targetptr="slab_alloc_arena"/>
+        is, on average, sufficient.
+      </para></listitem>
+    </varlistentry>
+
+
+    <varlistentry>
+      <term xml:id="reload-configuration" xreflabel="RELOAD CONFIGURATION">
+        <emphasis role="tntadmin">reload configuration</emphasis>
+      </term>
+      <listitem><para>
+        Re-read the configuration file. If the file contains
+        changes to dynamic parameters, update the runtime
+        settings. If configuration syntax is incorrect, or a
+        read-only parameter is changed, produce an error and do
+        nothing.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-configuration" xreflabel="SHOW CONFIGURATION">
+        <emphasis role="tntadmin">show configuration</emphasis>
+      </term>
+      <listitem><para>
+        Show the current settings. Displays all settings,
+        including those that have default values and thus are not
+        necessarily present in the configuration file.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-info" xreflabel="SHOW INFO">
+        <emphasis role="tntadmin">show info</emphasis>
+      </term>
+      <listitem><para>
+<programlisting>
+tarantool> show info
+---
+info:
+  version: "1.4.0-30-ge500b95"
+  uptime: 441524
+  pid: 16180
+  wal_writer_pid: 16182
+  lsn: 15481913304
+  recovery_lag: 0.000
+  recovery_last_update: 1306964594.980
+  status: primary
+</programlisting>
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-stat" xreflabel="SHOW STAT">
+        <emphasis role="tntadmin">show stat</emphasis>
+      </term>
+      <listitem><para>
+<programlisting>
+tarantool> show stat
+---
+statistics:
+  INSERT:        { rps:  139  , total:  48207694    }
+  SELECT_LIMIT:  { rps:  0    , total:  0           }
+  SELECT:        { rps:  1246 , total:  388322317   }
+  UPDATE_FIELDS: { rps:  1874 , total:  743350520   }
+  DELETE:        { rps:  147  , total:  48902544    }
+</programlisting>
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-slab" xreflabel="SHOW SLAB">
+        <emphasis role="tntadmin">show slab</emphasis>
+      </term>
+      <listitem><para>
+        Show the statistics of slab allocator. The slab allocator
+        is the main allocator used to store tuples. This can be
+        used to monitor the total memory use and memory
+        fragmentation.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-palloc" xreflabel="SHOW PALLOC">
+        <emphasis role="tntadmin">show palloc</emphasis>
+      </term>
+      <listitem><para>
+        A pool allocator is used for temporary memory, when 
+        serving client requests. Every fiber has an own
+        pool. Shows the current state of pools of all fibers.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="save-coredump" xreflabel="SAVE COREDUMP">
+        <emphasis role="tntadmin">SAVE COREDUMP</emphasis>
+      </term>
+      <listitem><para>
+        Fork and dump a core. Since Tarantool stores all tuples
+        in memory, it can take some time. Mainly useful for
+        debugging.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-fiber" xreflabel="SHOW FIBER">
+        <emphasis role="tntadmin">show fiber</emphasis>
+      </term>
+      <listitem><para>
+        Show all running fibers, with their stack.
+        Mainly useful for debugging.
+      </para></listitem>
+    </varlistentry>
+
+
+  </variablelist>
+
 </section>
 </chapter>
 
