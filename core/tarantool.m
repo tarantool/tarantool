@@ -534,9 +534,9 @@ main(int argc, char **argv)
 	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
 	signal_init();
 
+	replicator_init();
 	mod_init();
 	admin_init();
-	replicator_init();
 
 	prelease(fiber->pool);
 	say_crit("log level %i", cfg.log_level);
