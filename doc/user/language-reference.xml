@@ -215,7 +215,26 @@ info:
   recovery_last_update: 1306964594.980
   status: primary
 </programlisting>
-      </para></listitem>
+      </para>
+      <para>
+        <emphasis role="strong">recovery_lag</emphasis> holds the
+        difference (in seconds) between the current time on the
+        machine (wall clock time) and the time stamp of the last
+        applied record.  In replication setup, this difference can
+        indicate the delay taking place before a change is
+        applied to a replica.
+      </para>
+      <para>
+        <emphasis role="strong">recovery_last_update</emphasis> is
+        the wall clock time of the last change recorded in the
+        write ahead log.
+      </para>
+      <para>
+        <emphasis role="strong">status</emphasis> is
+        either "primary" or "hot_standby/&lt;hostname&gt;".
+      </para>
+
+      </listitem>
     </varlistentry>
 
     <varlistentry>
@@ -240,12 +259,24 @@ statistics:
       <term xml:id="show-slab" xreflabel="SHOW SLAB">
         <emphasis role="tntadmin">show slab</emphasis>
       </term>
-      <listitem><para>
-        Show the statistics of slab allocator. The slab allocator
-        is the main allocator used to store tuples. This can be
-        used to monitor the total memory use and memory
-        fragmentation.
-      </para></listitem>
+      <listitem>
+        <para>
+          Show the statistics of the slab allocator. The slab
+          allocator is the main allocator used to store tuples.
+          This can be used to monitor the total memory use and
+          memory fragmentation.
+        </para>
+        <para>
+          <emphasis role="strong">items_used</emphasis> contains
+          the % of <olink targetptr="slab_alloc_arena"/> already
+          used to store tuples.
+        </para>
+        <para>
+          <emphasis role="strong">arena_used</emphasis> contains
+          the % of <olink targetptr="slab_alloc_arena"/> that is
+          already distributed to the slab allocator.
+        </para>
+      </listitem>
     </varlistentry>
 
     <varlistentry>
@@ -253,7 +284,7 @@ statistics:
         <emphasis role="tntadmin">show palloc</emphasis>
       </term>
       <listitem><para>
-        A pool allocator is used for temporary memory, when 
+        A pool allocator is used for temporary memory, when
         serving client requests. Every fiber has an own
         pool. Shows the current state of pools of all fibers.
       </para></listitem>
@@ -279,7 +310,6 @@ statistics:
         Mainly useful for debugging.
       </para></listitem>
     </varlistentry>
-
 
   </variablelist>
 

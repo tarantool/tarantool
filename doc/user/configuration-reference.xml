@@ -606,7 +606,10 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         </row>
 
         <row>
-          <entry>replication_source_ipaddr</entry>
+          <entry xml:id="replication_source_ipaddr"
+                 xreflabel="replication_source_ipaddr">
+              replication_source_ipaddr
+          </entry>
           <entry>string</entry>
           <entry>0</entry>
           <entry>no</entry>

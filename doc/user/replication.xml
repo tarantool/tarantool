@@ -8,12 +8,142 @@
 
 <title>Replication</title>
 <blockquote><para>
-  How to set up replication?
+  To set up replication, it's necessary to prepare the master,
+  configure a replica, and establish procedures for recovery from
+  a degraded state.
 </para></blockquote>
 
-<para>
-Replication.
-</para>
+<section>
+  <title>Setting up the master</title>
+  <para>
+    To prepare the master for connections from replica, it's only
+    necessary to enable <olink targetptr="replication_port"/> in
+    the configuration file. An example configuration file can be
+    found in <link
+    xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/tarantool.cfg"><filename>test/box_replication/tarantool.cfg</filename></link>. A master with enabled replication_port can accept connections
+    from as many replicas as necessary on that port. Each replica
+    has its own replication state.
+  </para>
+</section>
+<section>
+  <title>Setting up a replica</title>
+  <para>
+    Replica gets all updates from the master by simply shipping
+    the write ahead log (WAL) and applying it.
+    Each record in the WAL has a log sequence number
+    (LSN), operation type (INSERT, UPDATE, DELETE) and a
+    timestamp.
+  </para>
+  <para>
+    For replication to work correctly, the latest LSN
+    on the replica must match or fall behind the latest LSN
+    on the master. If the replica has its own updates,
+    this leads to it getting out of sync since
+    updates from the master having identical LSNs are
+    not applied. Indeed, if replication is on, Tarantool
+    does not accept updates, even on its <olink
+    targetptr="primary_port"/>.
+  </para>
+  <para>
+    To "seed" a new replica, it's only necessary to
+    configure its <olink targetptr="replication_source_port"/>
+    and <olink targetptr="replication_source_ipaddr"/>.
+    These configuration parameters are "dynamic", which allows a
+    replica to become a master and vice versa with help of
+    <olink targetptr="reload-configuration"/> statement.
+    The replica uses these configuration parameters to
+    connect to the master, and request all changes that
+    happened after the latest local LSN. It is therefore
+    necessary to keep WAL files on the master host as long as
+    there are replicas that haven't applied them yet.
+    An example configuration can be found in <link
+    xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/tarantool_slave.cfg"><filename>test/box_replication/tarantool_slave.cfg</filename></link>.
+  </para>
+  <para>
+    In absence of WALs, a replica can be "seeded" at any time
+    with a snapshot file, manually copied from the master.
+  </para>
+
+</section>
+<section>
+  <title>Recovering from a degraded state</title>
+  <para>
+    "Degraded state" is a situation when the master becomes
+    unavailable -- either due to hardware or network failure, or a
+    programming bug. There is no reliable way for a replica to detect
+    that the master is gone for all, since sources of failure and
+    replication environments vary significantly.
+  </para>
+  <para>
+    A separate monitoring script (or scripts, if decision making
+    quorum is desirable) is necessary to detect a master failure.
+    Such script would typically try to update a tuple in an
+    auxiliary namespace on the master, and raise alarm if a
+    network or disk error persists longer than is acceptable.
+  </para>
+  <para>
+    When a master failure is detected, the following needs
+    to be done:
+    <itemizedlist>
+      <listitem>
+        <para>
+          First and foremost, make sure that the master does not
+          accepts updates. This is necessary to prevent the
+          situation when, should the master failure end up being
+          transient, some updates still go to the master, while
+          others already end up on the replica.
+        </para>
+        <para>
+          If the master is available, the easiest way to turn
+          on read-only mode is to turn Tarantool into a replica of
+          itself. This can be done by setting master's <olink
+          targetptr="replication_source_ipaddr"/> and <olink
+          targetptr="replication_source_port"/> to point to self.
+        </para>
+        <para>
+          If the master is not available, best bet is to log into
+          the machine and kill the server, or change the
+          machine's network configuration (DNS, IP address).
+        </para>
+        <para>
+          If the machine is not available, it's perhaps prudent
+          to power it off.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Record the replica's LSN, by issuing <olink
+          targetptr="show-info"/>. This LSN may prove useful if
+          there are updates on the master that never reached
+          the replica.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Propagate the replica to become a master. This is done
+          by setting <olink targetptr="replication_source_port"/>
+          on replica to <constant>0</constant>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Change the application configuration to point to the new
+          master. This can be done either by changing the
+          application's internal routing table, or by setting up
+          old master's IP address on the new master's machine, or
+          using some other approach.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Recover the old master. If there are updates that didn't
+          make it to the new master, they have to be applied
+          manually.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </para>
+</section>
 
 </chapter>
 

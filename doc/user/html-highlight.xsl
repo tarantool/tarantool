@@ -25,7 +25,7 @@ xmlns:xslthl="http://xslthl.sf.net" xmlns="http://www.w3.org/1999/xhtml" exclude
 </xsl:template>
 
 <xsl:template match="xslthl:comment" mode="xslthl">
-  <i class="hl-comment" style="color: blue"><xsl:apply-templates mode="xslthl"/></i>
+  <i class="hl-comment" style="color: silver"><xsl:apply-templates mode="xslthl"/></i>
 </xsl:template>
 
 <xsl:template match="xslthl:directive" mode="xslthl">

@@ -4,8 +4,8 @@
     xmlns:xslthl="http://xslthl.sf.net">
 
 <xsl:import href="http://docbook.sourceforge.net/release/xsl-ns/current/html/docbook.xsl"/> 
-<xsl:import href="html-highlight.xsl"/>
 
+<xsl:import href="html-highlight.xsl"/>
 
 <xsl:param name="generate.toc" select="'book toc'"/>
 <xsl:param name="html.stylesheet" select="'tnt.css'"/> 
