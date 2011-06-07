@@ -42,7 +42,7 @@
 
 #include <exceptions.h>
 
-#define FIBER_NAME_MAXLEN 16
+#define FIBER_NAME_MAXLEN 32
 
 #define FIBER_READING_INBOX 0x1
 #define FIBER_RAISE	    0x2
@@ -175,6 +175,20 @@ typedef enum fiber_server_type {
 
 struct fiber *fiber_server(fiber_server_type type, int port, void (*handler) (void *), void *,
 			   void (*on_bind) (void *));
+
+/**
+ * Create server socket and bind his on port. cfd.bind_ipaddr param using as IP address.
+ *
+ * @param type the fiber server type (TCP or UDP)
+ * @param port the bind ip port.
+ * @param retry the retry flag, if flag up the function will be try again to bind
+ *              socket after delay.
+ * @param delay the bind socket retry delay in sec.
+ *
+ * @return on success, zero is returned. on error, -1 is returned.
+ */
+int
+fiber_serv_socket(struct fiber *fiber, fiber_server_type type, unsigned short port, bool retry, ev_tstamp delay);
 
 struct child *spawn_child(const char *name,
 			  int inbox_size,

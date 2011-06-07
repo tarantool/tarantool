@@ -29,7 +29,7 @@ from tarantool_connection import TarantoolConnection
 is_admin_re = re.compile("^\s*(show|save|exec|exit|reload|help)", re.I)
 
 class TarantoolAdmin(TarantoolConnection):
-  def execute_no_reconnect(self, command, noprint):
+  def execute_no_reconnect(self, command, silent):
     self.socket.sendall(command)
 
     bufsiz = 4096
@@ -46,7 +46,7 @@ class TarantoolAdmin(TarantoolConnection):
     # validate yaml by parsing it
     yaml.load(res)
 
-    if not noprint:
+    if not silent:
       print command.replace('\n', '')
       print res[:-1]
     return res

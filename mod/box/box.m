@@ -1337,12 +1337,12 @@ box_bound_to_primary(void *data __attribute__((unused)))
 	if (cfg.remote_hot_standby) {
 		say_info("starting remote hot standby");
 		status = palloc(eter_pool, 64);
-		snprintf(status, 64, "hot_standby/%s:%i%s", cfg.wal_feeder_ipaddr,
-			 cfg.wal_feeder_port, custom_proc_title);
-		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port,
+		snprintf(status, 64, "hot_standby/%s:%i%s", cfg.replication_source_ipaddr,
+			 cfg.replication_source_port, custom_proc_title);
+		recover_follow_remote(recovery_state, cfg.replication_source_ipaddr, cfg.replication_source_port,
 				      default_remote_row_handler);
 
-		title("hot_standby/%s:%i", cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
+		title("hot_standby/%s:%i", cfg.replication_source_ipaddr, cfg.replication_source_port);
 	} else {
 		say_info("I am primary");
 		status = "primary";
@@ -1407,8 +1407,8 @@ mod_init(void)
 	title("loading");
 
 	if (cfg.remote_hot_standby) {
-		if (cfg.wal_feeder_ipaddr == NULL || cfg.wal_feeder_port == 0)
-			panic("wal_feeder_ipaddr & wal_feeder_port must be provided in remote_hot_standby mode");
+		if (cfg.replication_source_ipaddr == NULL || cfg.replication_source_port == 0)
+			panic("replication_source_ipaddr & replication_source_port must be provided in remote_hot_standby mode");
 	}
 
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,

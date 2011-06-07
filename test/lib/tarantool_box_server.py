@@ -5,6 +5,7 @@ import ConfigParser
 from tarantool_server import TarantoolServer, TarantoolConfigFile
 from tarantool_admin import TarantoolAdmin
 from box import Box
+import time
 
 class TarantoolBoxServer(TarantoolServer):
   def __new__(cls, core="tarantool", module="box"):
@@ -33,3 +34,12 @@ class TarantoolBoxServer(TarantoolServer):
                           stdout = subprocess.PIPE,
                           stderr = subprocess.PIPE)
 
+  def wait_sync(self, lsn):
+    synced = 0
+    while synced == 0:
+      synced = 1
+      data = self.admin.execute("show info\n", silent=True)
+      info = yaml.load(data)["info"]
+      if (info["lsn"] != lsn):
+        synced = 0
+	time.sleep(0.1)

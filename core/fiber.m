@@ -941,56 +941,11 @@ tcp_server_handler(void *data)
 	struct fiber *h;
 	char name[64];
 	int fd;
-	bool warning_said = false;
 	int one = 1;
-	struct sockaddr_in sin;
-	struct linger ling = { 0, 0 };
 
-	if ((fiber->fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-		say_syserror("socket");
+	if (fiber_serv_socket(fiber, tcp_server, server->port, true, 0.1) != 0) {
+		say_error("init server socket on port %i fail", server->port);
 		exit(EX_OSERR);
-	}
-
-	if (setsockopt(fiber->fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) == -1 ||
-	    setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) == -1 ||
-	    setsockopt(fiber->fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1 ||
-	    setsockopt(fiber->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling)) == -1) {
-		say_syserror("setsockopt");
-		exit(EX_OSERR);
-	}
-
-	if (set_nonblock(fiber->fd) == -1)
-		exit(EX_OSERR);
-
-	memset(&sin, 0, sizeof(struct sockaddr_in));
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(server->port);
-	sin.sin_addr.s_addr = INADDR_ANY;
-
-	for (;;) {
-		if (bind(fiber->fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-			if (errno == EADDRINUSE)
-				goto sleep_and_retry;
-			say_syserror("bind");
-			exit(EX_OSERR);
-		}
-		if (listen(fiber->fd, cfg.backlog) == -1) {
-			if (errno == EADDRINUSE)
-				goto sleep_and_retry;
-			say_syserror("listen");
-			exit(EX_OSERR);
-		}
-
-		say_info("bound to TCP port %i", server->port);
-		break;
-
-	      sleep_and_retry:
-		if (!warning_said) {
-			say_warn("port %i is already in use, "
-				 "will retry binding after 0.1 seconds.", server->port);
-			warning_said = true;
-		}
-		fiber_sleep(0.1);
 	}
 
 	if (server->on_bind != NULL)
@@ -1034,40 +989,10 @@ static void
 udp_server_handler(void *data)
 {
 	struct fiber_server *server = fiber->data;
-	bool warning_said = false;
-	struct sockaddr_in sin;
 
-	if ((fiber->fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		say_syserror("socket");
+	if (fiber_serv_socket(fiber, udp_server, server->port, true, 0.1) != 0) {
+		say_error("bind port %i fail", server->port);
 		exit(EX_OSERR);
-	}
-
-	if (set_nonblock(fiber->fd) == -1)
-		exit(EX_OSERR);
-
-	memset(&sin, 0, sizeof(struct sockaddr_in));
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(server->port);
-	sin.sin_addr.s_addr = INADDR_ANY;
-
-	for (;;) {
-		if (bind(fiber->fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-			if (errno == EADDRINUSE)
-				goto sleep_and_retry;
-			say_syserror("bind");
-			exit(EX_OSERR);
-		}
-
-		say_info("bound to UDP port %i", server->port);
-		break;
-
-	      sleep_and_retry:
-		if (!warning_said) {
-			say_warn("port %i is already in use, "
-				 "will retry binding after 0.1 seconds.", server->port);
-			warning_said = true;
-		}
-		fiber_sleep(0.1);
 	}
 
 	if (server->on_bind != NULL)
@@ -1125,6 +1050,142 @@ fiber_server(fiber_server_type type, int port, void (*handler) (void *data), voi
 	return s;
 }
 
+/** create new fiber's socket and set standat options. */
+static int
+create_socket(struct fiber *fiber, fiber_server_type type)
+{
+	int sock_domain = -1;
+	int sock_type = -1;
+	int sock_protocol = -1;
+	bool is_stream_sock = false;
+	int one = 1;
+	struct linger ling = { 0, 0 };
+
+	if (fiber->fd != -1) {
+		say_error("fiber is already has socket");
+		return -1;
+	}
+
+	switch (type) {
+	case tcp_server:
+		sock_domain = AF_INET;
+		sock_type = SOCK_STREAM;
+		sock_protocol = IPPROTO_TCP;
+		is_stream_sock = true;
+		break;
+	case udp_server:
+		sock_domain = AF_INET;
+		sock_type = SOCK_DGRAM;
+		sock_protocol = IPPROTO_UDP;
+		is_stream_sock = false;
+		break;
+	default:
+		say_error("invalid socket type");
+		goto create_socket_fail;
+	}
+
+	fiber->fd = socket(sock_domain, sock_type, sock_protocol);
+	if (fiber->fd == -1) {
+		say_syserror("socket");
+		goto create_socket_fail;
+	}
+
+	if (setsockopt(fiber->fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) != 0) {
+		say_syserror("setsockopt");
+		goto create_socket_fail;
+	}
+
+	if (is_stream_sock) {
+		if (setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) != 0 ||
+	    	    setsockopt(fiber->fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0 ||
+	    	    setsockopt(fiber->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling)) != 0) {
+			say_syserror("setsockopt");
+			goto create_socket_fail;
+		}
+	}
+
+	if (set_nonblock(fiber->fd) == -1) {
+		goto create_socket_fail;
+	}
+
+	return 0;
+
+create_socket_fail:
+
+	if (fiber->fd != -1) {
+		close(fiber->fd);
+	}
+	return -1;
+}
+
+/** Create server socket and bind his on port. */
+int
+fiber_serv_socket(struct fiber *fiber, fiber_server_type type, unsigned short port, bool retry, ev_tstamp delay)
+{
+	const ev_tstamp min_delay = 0.001; /* minimal delay is 1 msec */
+	struct sockaddr_in sin;
+	bool warning_said = false;
+	bool is_stream_sock = false;
+
+	if (type == tcp_server) {
+		is_stream_sock = true;
+	}
+
+	if (delay < min_delay) {
+		delay = min_delay;
+	}
+
+	if (create_socket(fiber, type) != 0) {
+		return -1;
+	}
+
+	/* clean sockaddr_in struct */
+	memset(&sin, 0, sizeof(struct sockaddr_in));
+
+	/* fill sockaddr_in struct */
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(port);
+	if (strcmp(cfg.bind_ipaddr, "INADDR_ANY") == 0) {
+		sin.sin_addr.s_addr = INADDR_ANY;
+	} else {
+		if (!inet_aton(cfg.bind_ipaddr, &sin.sin_addr)) {
+			say_syserror("inet_aton");
+			return -1;
+		}
+	}
+
+	while (true) {
+		if (bind(fiber->fd, (struct sockaddr *)&sin, sizeof(sin)) != 0) {
+			if (retry && (errno == EADDRINUSE)) {
+				/* retry mode, try, to bind after delay */
+				goto sleep_and_retry;
+			}
+			say_syserror("bind");
+			return -1;
+		}
+		if (is_stream_sock && (listen(fiber->fd, cfg.backlog) != 0)) {
+			if (retry && (errno == EADDRINUSE)) {
+				/* retry mode, try, to bind after delay */
+				goto sleep_and_retry;
+			}
+			say_syserror("listen");
+			return -1;
+		}
+
+		say_info("bound to port %i", port);
+		break;
+
+	sleep_and_retry:
+		if (!warning_said) {
+			say_warn("port %i is already in use, "
+				 "will retry binding after %lf seconds.", port, delay);
+			warning_said = true;
+		}
+		fiber_sleep(delay);
+	}
+
+	return 0;
+}
 
 void
 fiber_info(struct tbuf *out)

@@ -24,11 +24,62 @@ cmpNameAtoms(NameAtom *a, NameAtom *b) {
 	return (a == NULL && b == NULL) ? 1 : 0;
 }
 
-int
-fill_default_tarantool_cfg(tarantool_cfg *c) {
+void
+init_tarantool_cfg(tarantool_cfg *c) {
+	c->__confetti_flags = 0;
+
 	c->username = NULL;
+	c->bind_ipaddr = NULL;
 	c->coredump = 0;
 	c->admin_port = 0;
+	c->replication_port = 0;
+	c->replicator_custom_proc_title = NULL;
+	c->log_level = 0;
+	c->slab_alloc_arena = 0;
+	c->slab_alloc_minimal = 0;
+	c->slab_alloc_factor = 0;
+	c->work_dir = NULL;
+	c->pid_file = NULL;
+	c->logger = NULL;
+	c->logger_nonblock = 0;
+	c->io_collect_interval = 0;
+	c->backlog = 0;
+	c->readahead = 0;
+	c->snap_dir = NULL;
+	c->wal_dir = NULL;
+	c->primary_port = 0;
+	c->secondary_port = 0;
+	c->too_long_threshold = 0;
+	c->custom_proc_title = NULL;
+	c->memcached = 0;
+	c->memcached_namespace = 0;
+	c->memcached_expire_per_loop = 0;
+	c->memcached_expire_full_sweep = 0;
+	c->snap_io_rate_limit = 0;
+	c->rows_per_wal = 0;
+	c->wal_fsync_delay = 0;
+	c->wal_writer_inbox_size = 0;
+	c->local_hot_standby = 0;
+	c->wal_dir_rescan_delay = 0;
+	c->panic_on_snap_error = 0;
+	c->panic_on_wal_error = 0;
+	c->remote_hot_standby = 0;
+	c->replication_source_ipaddr = NULL;
+	c->replication_source_port = 0;
+	c->namespace = NULL;
+}
+
+int
+fill_default_tarantool_cfg(tarantool_cfg *c) {
+	c->__confetti_flags = 0;
+
+	c->username = NULL;
+	c->bind_ipaddr = strdup("INADDR_ANY");
+	if (c->bind_ipaddr == NULL) return CNF_NOMEMORY;
+	c->coredump = 0;
+	c->admin_port = 0;
+	c->replication_port = 0;
+	c->replicator_custom_proc_title = NULL;
 	c->log_level = 4;
 	c->slab_alloc_arena = 1;
 	c->slab_alloc_minimal = 64;
@@ -62,8 +113,8 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->panic_on_snap_error = 1;
 	c->panic_on_wal_error = 0;
 	c->remote_hot_standby = 0;
-	c->wal_feeder_ipaddr = NULL;
-	c->wal_feeder_port = 0;
+	c->replication_source_ipaddr = NULL;
+	c->replication_source_port = 0;
 	c->namespace = NULL;
 	return 0;
 }
@@ -97,11 +148,20 @@ acceptDefault_name__namespace__index__key_field(tarantool_cfg_namespace_index_ke
 static NameAtom _name__username[] = {
 	{ "username", -1, NULL }
 };
+static NameAtom _name__bind_ipaddr[] = {
+	{ "bind_ipaddr", -1, NULL }
+};
 static NameAtom _name__coredump[] = {
 	{ "coredump", -1, NULL }
 };
 static NameAtom _name__admin_port[] = {
 	{ "admin_port", -1, NULL }
+};
+static NameAtom _name__replication_port[] = {
+	{ "replication_port", -1, NULL }
+};
+static NameAtom _name__replicator_custom_proc_title[] = {
+	{ "replicator_custom_proc_title", -1, NULL }
 };
 static NameAtom _name__log_level[] = {
 	{ "log_level", -1, NULL }
@@ -193,11 +253,11 @@ static NameAtom _name__panic_on_wal_error[] = {
 static NameAtom _name__remote_hot_standby[] = {
 	{ "remote_hot_standby", -1, NULL }
 };
-static NameAtom _name__wal_feeder_ipaddr[] = {
-	{ "wal_feeder_ipaddr", -1, NULL }
+static NameAtom _name__replication_source_ipaddr[] = {
+	{ "replication_source_ipaddr", -1, NULL }
 };
-static NameAtom _name__wal_feeder_port[] = {
-	{ "wal_feeder_port", -1, NULL }
+static NameAtom _name__replication_source_port[] = {
+	{ "replication_source_port", -1, NULL }
 };
 static NameAtom _name__namespace[] = {
 	{ "namespace", -1, NULL }
@@ -288,6 +348,17 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramValue.stringval && c->username == NULL)
 			return CNF_NOMEMORY;
 	}
+	else if ( cmpNameAtoms( opt->name, _name__bind_ipaddr) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->bind_ipaddr == NULL) || strcmp(opt->paramValue.stringval, c->bind_ipaddr) != 0))
+			return CNF_RDONLY;
+		c->bind_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->bind_ipaddr == NULL)
+			return CNF_NOMEMORY;
+	}
 	else if ( cmpNameAtoms( opt->name, _name__coredump) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
@@ -315,6 +386,31 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (check_rdonly && c->admin_port != i32)
 			return CNF_RDONLY;
 		c->admin_port = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__replication_port) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->replication_port != i32)
+			return CNF_RDONLY;
+		c->replication_port = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__replicator_custom_proc_title) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->replicator_custom_proc_title == NULL) || strcmp(opt->paramValue.stringval, c->replicator_custom_proc_title) != 0))
+			return CNF_RDONLY;
+		c->replicator_custom_proc_title = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->replicator_custom_proc_title == NULL)
+			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__log_level) ) {
 		if (opt->paramType != numberType )
@@ -692,22 +788,18 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->remote_hot_standby != i32)
-			return CNF_RDONLY;
 		c->remote_hot_standby = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_ipaddr) ) {
+	else if ( cmpNameAtoms( opt->name, _name__replication_source_ipaddr) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_feeder_ipaddr == NULL) || strcmp(opt->paramValue.stringval, c->wal_feeder_ipaddr) != 0))
-			return CNF_RDONLY;
-		c->wal_feeder_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->wal_feeder_ipaddr == NULL)
+		c->replication_source_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->replication_source_ipaddr == NULL)
 			return CNF_NOMEMORY;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_port) ) {
+	else if ( cmpNameAtoms( opt->name, _name__replication_source_port) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
@@ -717,9 +809,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->wal_feeder_port != i32)
-			return CNF_RDONLY;
-		c->wal_feeder_port = i32;
+		c->replication_source_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__namespace) ) {
 		if (opt->paramType != arrayType )
@@ -998,8 +1088,11 @@ parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly,
 typedef enum IteratorState {
 	_S_Initial = 0,
 	S_name__username,
+	S_name__bind_ipaddr,
 	S_name__coredump,
 	S_name__admin_port,
+	S_name__replication_port,
+	S_name__replicator_custom_proc_title,
 	S_name__log_level,
 	S_name__slab_alloc_arena,
 	S_name__slab_alloc_minimal,
@@ -1030,8 +1123,8 @@ typedef enum IteratorState {
 	S_name__panic_on_snap_error,
 	S_name__panic_on_wal_error,
 	S_name__remote_hot_standby,
-	S_name__wal_feeder_ipaddr,
-	S_name__wal_feeder_port,
+	S_name__replication_source_ipaddr,
+	S_name__replication_source_port,
 	S_name__namespace,
 	S_name__namespace__enabled,
 	S_name__namespace__cardinality,
@@ -1077,6 +1170,16 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "username");
+			i->state = S_name__bind_ipaddr;
+			return buf;
+		case S_name__bind_ipaddr:
+			*v = (c->bind_ipaddr) ? strdup(c->bind_ipaddr) : NULL;
+			if (*v == NULL && c->bind_ipaddr) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "bind_ipaddr");
 			i->state = S_name__coredump;
 			return buf;
 		case S_name__coredump:
@@ -1099,6 +1202,27 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->admin_port);
 			snprintf(buf, PRINTBUFLEN-1, "admin_port");
+			i->state = S_name__replication_port;
+			return buf;
+		case S_name__replication_port:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%"PRId32, c->replication_port);
+			snprintf(buf, PRINTBUFLEN-1, "replication_port");
+			i->state = S_name__replicator_custom_proc_title;
+			return buf;
+		case S_name__replicator_custom_proc_title:
+			*v = (c->replicator_custom_proc_title) ? strdup(c->replicator_custom_proc_title) : NULL;
+			if (*v == NULL && c->replicator_custom_proc_title) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "replicator_custom_proc_title");
 			i->state = S_name__log_level;
 			return buf;
 		case S_name__log_level:
@@ -1423,27 +1547,27 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->remote_hot_standby);
 			snprintf(buf, PRINTBUFLEN-1, "remote_hot_standby");
-			i->state = S_name__wal_feeder_ipaddr;
+			i->state = S_name__replication_source_ipaddr;
 			return buf;
-		case S_name__wal_feeder_ipaddr:
-			*v = (c->wal_feeder_ipaddr) ? strdup(c->wal_feeder_ipaddr) : NULL;
-			if (*v == NULL && c->wal_feeder_ipaddr) {
+		case S_name__replication_source_ipaddr:
+			*v = (c->replication_source_ipaddr) ? strdup(c->replication_source_ipaddr) : NULL;
+			if (*v == NULL && c->replication_source_ipaddr) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			snprintf(buf, PRINTBUFLEN-1, "wal_feeder_ipaddr");
-			i->state = S_name__wal_feeder_port;
+			snprintf(buf, PRINTBUFLEN-1, "replication_source_ipaddr");
+			i->state = S_name__replication_source_port;
 			return buf;
-		case S_name__wal_feeder_port:
+		case S_name__replication_source_port:
 			*v = malloc(32);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->wal_feeder_port);
-			snprintf(buf, PRINTBUFLEN-1, "wal_feeder_port");
+			sprintf(*v, "%"PRId32, c->replication_source_port);
+			snprintf(buf, PRINTBUFLEN-1, "replication_source_port");
 			i->state = S_name__namespace;
 			return buf;
 		case S_name__namespace:
@@ -1729,8 +1853,15 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->username = src->username == NULL ? NULL : strdup(src->username);
 	if (src->username != NULL && dst->username == NULL)
 		return CNF_NOMEMORY;
+	dst->bind_ipaddr = src->bind_ipaddr == NULL ? NULL : strdup(src->bind_ipaddr);
+	if (src->bind_ipaddr != NULL && dst->bind_ipaddr == NULL)
+		return CNF_NOMEMORY;
 	dst->coredump = src->coredump;
 	dst->admin_port = src->admin_port;
+	dst->replication_port = src->replication_port;
+	dst->replicator_custom_proc_title = src->replicator_custom_proc_title == NULL ? NULL : strdup(src->replicator_custom_proc_title);
+	if (src->replicator_custom_proc_title != NULL && dst->replicator_custom_proc_title == NULL)
+		return CNF_NOMEMORY;
 	dst->log_level = src->log_level;
 	dst->slab_alloc_arena = src->slab_alloc_arena;
 	dst->slab_alloc_minimal = src->slab_alloc_minimal;
@@ -1773,10 +1904,10 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->panic_on_snap_error = src->panic_on_snap_error;
 	dst->panic_on_wal_error = src->panic_on_wal_error;
 	dst->remote_hot_standby = src->remote_hot_standby;
-	dst->wal_feeder_ipaddr = src->wal_feeder_ipaddr == NULL ? NULL : strdup(src->wal_feeder_ipaddr);
-	if (src->wal_feeder_ipaddr != NULL && dst->wal_feeder_ipaddr == NULL)
+	dst->replication_source_ipaddr = src->replication_source_ipaddr == NULL ? NULL : strdup(src->replication_source_ipaddr);
+	if (src->replication_source_ipaddr != NULL && dst->replication_source_ipaddr == NULL)
 		return CNF_NOMEMORY;
-	dst->wal_feeder_port = src->wal_feeder_port;
+	dst->replication_source_port = src->replication_source_port;
 
 	dst->namespace = NULL;
 	if (src->namespace != NULL) {
@@ -1839,6 +1970,10 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 
 	if (c->username != NULL)
 		free(c->username);
+	if (c->bind_ipaddr != NULL)
+		free(c->bind_ipaddr);
+	if (c->replicator_custom_proc_title != NULL)
+		free(c->replicator_custom_proc_title);
 	if (c->work_dir != NULL)
 		free(c->work_dir);
 	if (c->pid_file != NULL)
@@ -1851,8 +1986,8 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 		free(c->wal_dir);
 	if (c->custom_proc_title != NULL)
 		free(c->custom_proc_title);
-	if (c->wal_feeder_ipaddr != NULL)
-		free(c->wal_feeder_ipaddr);
+	if (c->replication_source_ipaddr != NULL)
+		free(c->replication_source_ipaddr);
 
 	if (c->namespace != NULL) {
 		i->idx_name__namespace = 0;
@@ -1919,6 +2054,11 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 }
+	if (confetti_strcmp(c1->bind_ipaddr, c2->bind_ipaddr) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->bind_ipaddr");
+
+		return diff;
+}
 	if (c1->coredump != c2->coredump) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->coredump");
 
@@ -1929,6 +2069,16 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 	}
+	if (c1->replication_port != c2->replication_port) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_port");
+
+		return diff;
+	}
+	if (confetti_strcmp(c1->replicator_custom_proc_title, c2->replicator_custom_proc_title) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replicator_custom_proc_title");
+
+		return diff;
+}
 	if (!only_check_rdonly) {
 		if (c1->log_level != c2->log_level) {
 			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->log_level");
@@ -2084,20 +2234,26 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 	}
-	if (c1->remote_hot_standby != c2->remote_hot_standby) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->remote_hot_standby");
+	if (!only_check_rdonly) {
+		if (c1->remote_hot_standby != c2->remote_hot_standby) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->remote_hot_standby");
 
-		return diff;
+			return diff;
+		}
 	}
-	if (confetti_strcmp(c1->wal_feeder_ipaddr, c2->wal_feeder_ipaddr) != 0) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_ipaddr");
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->replication_source_ipaddr, c2->replication_source_ipaddr) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_source_ipaddr");
 
-		return diff;
+			return diff;
 }
-	if (c1->wal_feeder_port != c2->wal_feeder_port) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_port");
+	}
+	if (!only_check_rdonly) {
+		if (c1->replication_source_port != c2->replication_source_port) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_source_port");
 
-		return diff;
+			return diff;
+		}
 	}
 
 	i1->idx_name__namespace = 0;

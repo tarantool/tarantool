@@ -1,6 +1,10 @@
 # username to switch to
 username=NULL, ro
 
+# tarantool bind ip address
+# all tarantools  (INADDR_ANY defaul value)
+bind_ipaddr="INADDR_ANY", ro
+
 # save core on abort/assert
 # deprecated; use ulimit instead
 coredump=0, ro
@@ -8,6 +12,13 @@ coredump=0, ro
 # admin port
 # used for admin's connections
 admin_port=0, ro
+
+# replication port
+# replicator accepts it's clients on bind_ipaddr:replication_port
+replication_port=0, ro
+
+# replicator custom process title
+replicator_custom_proc_title=NULL, ro
 
 # Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5
 log_level=4

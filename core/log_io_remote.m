@@ -83,7 +83,7 @@ remote_read_row(i64 initial_lsn)
 	for (;;) {
 		if (fiber->fd < 0) {
 			if (fiber_connect(fiber->data) < 0) {
-				err = "can't connect to feeder";
+				err = "can't connect to replicator";
 				goto err;
 			}
 
@@ -102,7 +102,7 @@ remote_read_row(i64 initial_lsn)
 				goto err;
 			}
 
-			say_crit("succefully connected to feeder");
+			say_crit("succefully connected to replicator");
 			say_crit("starting remote recovery from lsn:%" PRIi64, initial_lsn);
 			warning_said = false;
 			err = NULL;
@@ -183,7 +183,7 @@ recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
 	struct sockaddr_in *addr;
 	struct remote_state *h;
 
-	say_crit("initializing remote hot standby, WAL feeder %s:%i", ip_addr, port);
+	say_crit("initializing remote hot standby, WAL replicator %s:%i", ip_addr, port);
 	name = palloc(eter_pool, 64);
 	snprintf(name, 64, "remote_hot_standby/%s:%i", ip_addr, port);
 

@@ -21,7 +21,7 @@ include(cmake/check_objective_c_compiler.cmake)
 # and what modules to produce.
 #
 set (TARANTOOL_PRODUCT "box")
-set (TARANTOOL_MODULES "box" "feeder")
+set (TARANTOOL_MODULES "box")
 
 #
 # Set default build type to Debug. This is to ease a developer's

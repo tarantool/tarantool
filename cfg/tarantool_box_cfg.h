@@ -39,7 +39,16 @@ typedef struct tarantool_cfg {
 	/* username to switch to */
 	char*	username;
 
-	/* save core on abort/assert */
+	/*
+	 * tarantool bind ip address
+	 * all tarantools  (INADDR_ANY defaul value)
+	 */
+	char*	bind_ipaddr;
+
+	/*
+	 * save core on abort/assert
+	 * deprecated; use ulimit instead
+	 */
 	int32_t	coredump;
 
 	/*
@@ -48,16 +57,25 @@ typedef struct tarantool_cfg {
 	 */
 	int32_t	admin_port;
 
+	/*
+	 * replication port
+	 * replicator accepts it's clients on bind_ipaddr:replication_port
+	 */
+	int32_t	replication_port;
+
+	/* replicator custom process title */
+	char*	replicator_custom_proc_title;
+
 	/* Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5 */
 	int32_t	log_level;
 
-	/* Size of slab arena in GiBs */
+	/* Size of slab arena in GB */
 	double	slab_alloc_arena;
 
 	/* Size of minimal allocation unit */
 	int32_t	slab_alloc_minimal;
 
-	/* Growth factor, each subsecuent unit size is factor * prev unit size */
+	/* Growth factor, each subsequent unit size is factor * prev unit size */
 	double	slab_alloc_factor;
 
 	/* working directory (daemon will chdir(2) to it) */
@@ -68,16 +86,16 @@ typedef struct tarantool_cfg {
 
 	/*
 	 * logger command will be executed via /bin/sh -c {}
-	 * example: 'exec cronolog /var/log/taranul/%Y-%m/%Y-%m-%d/tarantool.log'
-	 * example: 'exec extra/logger.pl /var/log/taranul/tarantool.log'
+	 * example: 'exec cronolog /var/log/tarantool/%Y-%m/%Y-%m-%d/tarantool.log'
+	 * example: 'exec extra/logger.pl /var/log/tarantool/tarantool.log'
 	 * when logger is not configured all logging going to STDERR
 	 */
 	char*	logger;
 
-	/* make logging nonblocking, this potentially can loss some logging data */
+	/* make logging nonblocking, this potentially can lose some logging data */
 	int32_t	logger_nonblock;
 
-	/* delay between loop iteraions */
+	/* delay between loop iterations */
 	double	io_collect_interval;
 
 	/* size of listen backlog */
@@ -92,7 +110,7 @@ typedef struct tarantool_cfg {
 	 */
 	char*	snap_dir;
 
-	/* WAL directory (where WAL get saved/read) */
+	/* WAL directory (where WALs get saved/read) */
 	char*	wal_dir;
 
 	/* Primary port (where updates are accepted) */
@@ -101,10 +119,13 @@ typedef struct tarantool_cfg {
 	/* Secondary port (where only selects are accepted) */
 	int32_t	secondary_port;
 
-	/* warn about requests which take longer to process */
+	/* Warn about requests which take longer to process, in seconds. */
 	double	too_long_threshold;
 
-	/* custom proc title is appended after normal */
+	/*
+	 * A custom process list (ps) title string, appended after the standard
+	 * program title.
+	 */
 	char*	custom_proc_title;
 
 	/* Memcached emulation is enabled if memcached == 1 */
@@ -116,47 +137,53 @@ typedef struct tarantool_cfg {
 	/* maximum rows to consider per expire loop iteration */
 	int32_t	memcached_expire_per_loop;
 
-	/* tarantool will try iterate all rows within this time */
+	/* tarantool will try to iterate over all rows within this time */
 	int32_t	memcached_expire_full_sweep;
 
-	/* do not write snapshot faster then snap_io_rate_limit MBytes/sec */
+	/* Do not write into snapshot faster than snap_io_rate_limit MB/sec */
 	double	snap_io_rate_limit;
 
 	/* Write no more rows in WAL */
 	int32_t	rows_per_wal;
 
 	/*
-	 * fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay seconds ago
-	 * WARNING: actually, several last requsts may stall for much longer
+	 * fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay
+	 * seconds ago.
+	 * WARNING: actually, several last requests may stall fsync for much longer
 	 */
 	int32_t	wal_fsync_delay;
 
-	/* size of WAL writer requests buffer */
+	/* size of WAL writer request buffer */
 	int32_t	wal_writer_inbox_size;
 
 	/*
-	 * Local hot standby (if enabled server will run in locale hot standby mode
-	 * continuously fetching WAL records from shared local directory
+	 * Local hot standby (if enabled, the server will run in local hot standby
+	 * mode, continuously fetching WAL records from shared local directory).
 	 */
 	int32_t	local_hot_standby;
 
-	/* delay in fractional seconds between successive re-readings of wal_dir */
+	/*
+	 * Delay, in seconds, between successive re-readings of wal_dir.
+	 * The re-scan is necessary to discover new WAL files or snapshots.
+	 */
 	double	wal_dir_rescan_delay;
 
 	/*
-	 * panic if where is error reading snap or wal
-	 * be default panic any snapshot reading error  and ignore errors then reading wals
+	 * Panic if there is an error reading a snapshot or WAL.
+	 * By default, panic on any snapshot reading error and ignore errors
+	 * when reading WALs.
 	 */
 	int32_t	panic_on_snap_error;
 	int32_t	panic_on_wal_error;
 
 	/*
-	 * Remote hot standby (if enabled server will run in hot standby mode
-	 * continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
+	 * Remote hot standby (if enabled, the server will run in hot standby mode
+	 * continuously fetching WAL records from
+	 * replication_source_ipaddr:replication_source_port
 	 */
 	int32_t	remote_hot_standby;
-	char*	wal_feeder_ipaddr;
-	int32_t	wal_feeder_port;
+	char*	replication_source_ipaddr;
+	int32_t	replication_source_port;
 	tarantool_cfg_namespace**	namespace;
 } tarantool_cfg;
 
@@ -169,6 +196,8 @@ typedef struct tarantool_cfg {
 #ifndef CNF_STRUCT_DEFINED
 #define CNF_STRUCT_DEFINED(s) ((s) != NULL && ((s)->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) == 0)
 #endif
+
+void init_tarantool_cfg(tarantool_cfg *c);
 
 int fill_default_tarantool_cfg(tarantool_cfg *c);
 

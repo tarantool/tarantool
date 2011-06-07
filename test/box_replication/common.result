@@ -1,0 +1,140 @@
+
+#
+# Insert several tuples.
+#
+
+insert into t0 values (1, 'the tuple #1')
+Insert OK, 1 row affected
+insert into t0 values (2, 'the tuple #2')
+Insert OK, 1 row affected
+insert into t0 values (3, 'the tuple #3')
+Insert OK, 1 row affected
+insert into t0 values (4, 'the tuple #4')
+Insert OK, 1 row affected
+
+#
+# Reconfigure slave to replicate from beholder.
+#
+
+reload configuration
+---
+ok
+...
+
+#
+# Insert more tuples.
+#
+
+insert into t0 values (5, 'the tuple #5')
+Insert OK, 1 row affected
+insert into t0 values (6, 'the tuple #6')
+Insert OK, 1 row affected
+insert into t0 values (7, 'the tuple #7')
+Insert OK, 1 row affected
+insert into t0 values (8, 'the tuple #8')
+Insert OK, 1 row affected
+insert into t0 values (9, 'the tuple #9')
+Insert OK, 1 row affected
+
+#
+# Select from master.
+#
+
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'the tuple #1']
+select * from t0 where k0 = 2
+Found 1 tuple:
+[2, 'the tuple #2']
+select * from t0 where k0 = 3
+Found 1 tuple:
+[3, 'the tuple #3']
+select * from t0 where k0 = 4
+Found 1 tuple:
+[4, 'the tuple #4']
+select * from t0 where k0 = 5
+Found 1 tuple:
+[5, 'the tuple #5']
+select * from t0 where k0 = 6
+Found 1 tuple:
+[6, 'the tuple #6']
+select * from t0 where k0 = 7
+Found 1 tuple:
+[7, 'the tuple #7']
+select * from t0 where k0 = 8
+Found 1 tuple:
+[8, 'the tuple #8']
+select * from t0 where k0 = 9
+Found 1 tuple:
+[9, 'the tuple #9']
+
+#
+# Select from master.
+#
+
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'the tuple #1']
+select * from t0 where k0 = 2
+Found 1 tuple:
+[2, 'the tuple #2']
+select * from t0 where k0 = 3
+Found 1 tuple:
+[3, 'the tuple #3']
+select * from t0 where k0 = 4
+Found 1 tuple:
+[4, 'the tuple #4']
+select * from t0 where k0 = 5
+Found 1 tuple:
+[5, 'the tuple #5']
+select * from t0 where k0 = 6
+Found 1 tuple:
+[6, 'the tuple #6']
+select * from t0 where k0 = 7
+Found 1 tuple:
+[7, 'the tuple #7']
+select * from t0 where k0 = 8
+Found 1 tuple:
+[8, 'the tuple #8']
+select * from t0 where k0 = 9
+Found 1 tuple:
+[9, 'the tuple #9']
+
+#
+# Select from slave.
+#
+
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'the tuple #1']
+select * from t0 where k0 = 2
+Found 1 tuple:
+[2, 'the tuple #2']
+select * from t0 where k0 = 3
+Found 1 tuple:
+[3, 'the tuple #3']
+select * from t0 where k0 = 4
+Found 1 tuple:
+[4, 'the tuple #4']
+select * from t0 where k0 = 5
+Found 1 tuple:
+[5, 'the tuple #5']
+select * from t0 where k0 = 6
+Found 1 tuple:
+[6, 'the tuple #6']
+select * from t0 where k0 = 7
+Found 1 tuple:
+[7, 'the tuple #7']
+select * from t0 where k0 = 8
+Found 1 tuple:
+[8, 'the tuple #8']
+select * from t0 where k0 = 9
+Found 1 tuple:
+[9, 'the tuple #9']
+
+#
+# Try to insert into slave.
+#
+
+insert into t0 values (100, 'the tuple #100')
+An error occurred: ERR_CODE_NONMASTER, 'Non master connection, but it should be'

@@ -92,12 +92,14 @@ class Server(object):
         return exe
     raise RuntimeError("Can't find server executable in " + path)
 
-  def cleanup(self):
+  def cleanup(self, full=False):
     trash = []
     for re in self.re_vardir_cleanup:
       trash += glob.glob(os.path.join(self.vardir, re))
     for filename in trash:
       os.remove(filename)
+    if full:
+      shutil.rmtree(self.vardir)
 
   def configure(self, config):
     self.config = os.path.abspath(config)
@@ -193,7 +195,8 @@ class Server(object):
       print "The server is not started."
 
   def deploy(self, config=None, binary=None, vardir=None,
-             mem=None, start_and_exit=None, gdb=None, valgrind=None, silent=True):
+             mem=None, start_and_exit=None, gdb=None, valgrind=None, silent=True,
+             need_init=True):
     if config != None: self.config = config
     if binary != None: self.binary = binary
     if vardir != None: self.vardir = vardir
@@ -204,7 +207,8 @@ class Server(object):
 
     self.configure(self.config)
     self.install(self.binary, self.vardir, self.mem, silent)
-    self.init()
+    if need_init:
+      self.init()
     self.start(self.start_and_exit, self.gdb, self.valgrind, silent)
 
   def restart(self):
