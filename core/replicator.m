@@ -357,12 +357,13 @@ sender_send_sock(int client_sock)
 	control_message->cmsg_type = SCM_RIGHTS;
 	*((int *) CMSG_DATA(control_message)) = client_sock;
 
+	/* wait, when interprocess comm. socke will ready for write */
+	wait_for(EV_WRITE);
+	/* send client socket to replicator porcess */
 	if (sendmsg(fiber->fd, &msg, 0) < 0) {
 		say_syserror("sendmsg");
 	}
-
-	wait_for(EV_WRITE);
-	/* close file descriptor in the main process */
+	/* close client sock in the main process */
 	close(client_sock);
 }
 
