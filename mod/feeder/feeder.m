@@ -71,7 +71,7 @@ recover_feed_slave(int sock)
 	fiber->has_peer = true;
 	fiber->fd = sock;
 	fiber_set_name(fiber, "feeder");
-	set_proc_title("feeder:client_handler%s %s", custom_proc_title, fiber_peer_name(fiber));
+	set_proc_title("replication_relay%s %s", custom_proc_title, fiber_peer_name(fiber));
 
 	ev_default_loop(0);
 
@@ -128,7 +128,7 @@ mod_init(void)
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
-	set_proc_title("feeder:acceptor%s %s:%i",
+	set_proc_title("replication_server%s %s:%i",
 		       custom_proc_title,
 		       cfg.wal_feeder_bind_ipaddr == NULL ? "ANY" : cfg.wal_feeder_bind_ipaddr,
 		       cfg.wal_feeder_bind_port);

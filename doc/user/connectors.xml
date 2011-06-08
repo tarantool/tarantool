@@ -48,7 +48,7 @@
     <title>Ruby</title>
     <para>
        Please see <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/Ruby/Box.rb"><filename>connector/Ruby/Box.rb</filename></link> in the source tree.
+       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/ruby/box.rb"><filename>connector/ruby/box.rb</filename></link> in the source tree.
     </para>
   </section>
 

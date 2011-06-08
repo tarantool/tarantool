@@ -38,31 +38,41 @@
     For replication to work correctly, the latest LSN
     on the replica must match or fall behind the latest LSN
     on the master. If the replica has its own updates,
-    this leads to it getting out of sync since
+    this leads to it getting out of sync, since
     updates from the master having identical LSNs are
     not applied. Indeed, if replication is on, Tarantool
     does not accept updates, even on its <olink
     targetptr="primary_port"/>.
   </para>
   <para>
-    To "seed" a new replica, it's only necessary to
-    configure its <olink targetptr="replication_source_port"/>
-    and <olink targetptr="replication_source_ipaddr"/>.
-    These configuration parameters are "dynamic", which allows a
-    replica to become a master and vice versa with help of
-    <olink targetptr="reload-configuration"/> statement.
-    The replica uses these configuration parameters to
-    connect to the master, and request all changes that
-    happened after the latest local LSN. It is therefore
+    Tarantool always requires a valid snapshot file to boot from:
+    it should be prepared with <olink targetptr="init-storage-option"/> option    or copied from the master.
+  </para>
+  <para>
+    To start replication, configure <olink
+    targetptr="replication_source_port"/> and <olink
+    targetptr="replication_source_ipaddr"/>.
+    Other parameters can also be changed, but existing namespaces and
+    their primary keys on the replica must be identical to ones on the
+    master.
+  </para>
+  <para>
+    Once connected to the master, the replica requests all changes
+    that happened after the latest local LSN. It is therefore
     necessary to keep WAL files on the master host as long as
-    there are replicas that haven't applied them yet.
-    An example configuration can be found in <link
+    there are replicas that haven't applied them yet.  An example
+    configuration can be found in <link
     xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/tarantool_slave.cfg"><filename>test/box_replication/tarantool_slave.cfg</filename></link>.
   </para>
   <para>
     In absence of WALs, a replica can be "seeded" at any time
     with a snapshot file, manually copied from the master.
   </para>
+  <note><simpara>
+    Replication parameters are "dynamic", which allows the
+    replica to become a master and vice versa with help of
+    <olink targetptr="reload-configuration"/> statement.
+  </simpara></note>
 
 </section>
 <section>
@@ -138,7 +148,8 @@
         <para>
           Recover the old master. If there are updates that didn't
           make it to the new master, they have to be applied
-          manually.
+          manually. You can use <olink targetptr="cat-option"/>
+          option to read server logs.
         </para>
       </listitem>
     </itemizedlist>

@@ -123,7 +123,11 @@ Tarantool/Box 1.4.0-69-g45551dd
       </para>
     </listitem>
     <listitem>
-      <para><option>--init-storage</option></para>
+      <para>
+      <option xml:id="init-storage-option"
+            xreflabel="--init-storage">
+          --init-storage
+      </option></para>
       <para>Initialize the directory, specified in <emphasis>vardir</emphasis>
       configuration option by creating an empty snapshot file in
       it. If <filename>vardir</filename> doesn't contain at
@@ -140,7 +144,8 @@ Tarantool/Box 1.4.0-69-g45551dd
     </listitem>
 
     <listitem>
-      <para><option>--cat</option> <userinput>snapshot.file</userinput></para>
+      <para><option xml:id="cat-option" xreflabel="--cat">--cat</option>
+      <userinput>snapshot.file</userinput></para>
       <para>Print the snapshot file, pointed to by the argument,
       in a human-readable form. For each log record, log sequence
       number, time of entry, operation type and arguments are
@@ -344,23 +349,27 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
         </row>
 
         <row>
-          <entry>custom_proc_title</entry>
+          <entry xml:id="custom_proc_title"
+                 xreflabel="custom_proc_title">
+            custom_proc_title
+          </entry>
           <entry>string</entry>
           <entry>""</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>
-            <para>Inject the given string into process title
+            <para>Inject the given string into <olink
+            targetptr="proctitle">server process title</olink>
             (what's shown in COMMAND column of <command>ps</command>
             and <command>top</command> commands). For example,
             an unmodified Tarantool/Box process group looks like:
             </para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool: box:primary pri:33013 sec:33014 adm:33015</programlisting>
+tarantool_box: primary pri:33013 sec:33014 adm:33015</programlisting>
           <para>After "sessions" custom_proc_title is injected it
           looks like:</para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
+tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           </entry>
         </row>
 

@@ -1321,10 +1321,10 @@ title(const char *fmt, ...)
 	va_end(ap);
 
 	if (cfg.memcached)
-		set_proc_title("memcached:%s%s pri:%i adm:%i",
+		set_proc_title("%s%s memcached:%i adm:%i",
 			       buf, custom_proc_title, cfg.primary_port, cfg.admin_port);
 	else
-		set_proc_title("box:%s%s pri:%i sec:%i adm:%i",
+		set_proc_title("%s%s pri:%i sec:%i adm:%i",
 			       buf, custom_proc_title,
 			       cfg.primary_port, cfg.secondary_port, cfg.admin_port);
 }
@@ -1335,14 +1335,14 @@ box_bound_to_primary(void *data __attribute__((unused)))
 	recover_finalize(recovery_state);
 
 	if (cfg.remote_hot_standby) {
-		say_info("starting remote hot standby");
+		say_info("starting a replica");
 		status = palloc(eter_pool, 64);
-		snprintf(status, 64, "hot_standby/%s:%i%s", cfg.wal_feeder_ipaddr,
+		snprintf(status, 64, "replica/%s:%i%s", cfg.wal_feeder_ipaddr,
 			 cfg.wal_feeder_port, custom_proc_title);
 		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port,
 				      default_remote_row_handler);
 
-		title("hot_standby/%s:%i", cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
+		title("replica/%s:%i", cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
 	} else {
 		say_info("I am primary");
 		status = "primary";
@@ -1458,7 +1458,7 @@ mod_init(void)
 	recover(recovery_state, 0);
 	stat_cleanup(stat_base, messages_MAX);
 
-	title("build_indexes");
+	title("building indexes");
 
 	build_indexes();
 
@@ -1467,8 +1467,8 @@ mod_init(void)
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recover_follow(recovery_state, cfg.wal_dir_rescan_delay);
-		status = "hot_standby/local";
-		title("hot_standby/local");
+		status = "hot_standby";
+		title("hot_standby");
 	}
 
 	if (cfg.memcached != 0) {
