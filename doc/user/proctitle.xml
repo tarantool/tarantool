@@ -50,7 +50,7 @@
   <olink targetptr="primary_port"/>, <quote>sec</quote> for <olink
   targetptr="secondary_port"/>, <quote>adm</quote> for <olink
   targetptr="admin_port"/> and <quote>memcached</quote> for <olink
-  targetptr="memcached_port"/> respectively.
+  targetptr="memcached_port"/>.
 </para>
 <para>
   For example:

@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #ifdef HAVE_SYS_PSTAT_H
 #include <sys/pstat.h>		/* for HP-UX */
@@ -217,7 +218,7 @@ init_set_proc_title(int argc, char **argv)
 	ps_buffer_fixed_size = 0;
 #else
 	{
-		char basename_buf[64];
+		char basename_buf[PATH_MAX];
 
 		/*
 		 * At least partially mimic FreeBSD, which for
