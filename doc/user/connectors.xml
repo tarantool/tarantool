@@ -26,7 +26,7 @@
     <title>Perl</title>
     <para>
        The perl client is located in <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/mod/box/client/perl/lib/"><filename>mod/box/client/perl/lib/</filename></link>.
+       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/perl/lib/"><filename>connector/perl/lib/</filename></link>.
     <orderedlist>
 
     <listitem>
