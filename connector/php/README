@@ -1,0 +1,7 @@
+ATTENTION
+This module is experimental and have bugs.
+
+The PHP module for key/value database http://opensource.mail.ru/tarantool/index.eng.html
+
+This module realise the binary protocol. The protocol description is https://github.com/mailru/tarantool/wiki/Iproto.bnf
+
