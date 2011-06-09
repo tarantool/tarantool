@@ -5,16 +5,14 @@ if(!extension_loaded('tarantool')) {
 }
 
 $res = true;
-$tnt = new Tarantool('tfn24');
+//$tnt = new Tarantool( [ $host, $port ]);
 
+$tnt = new Tarantool( );
 
 $tuple = array( 'z', 1025 );
-//$tnt->insert(0,$tuple);
+$tnt->insert(0,$tuple);
 
-$tuple = 'abcds';
-
-$tuple = array('b');
-
+// $count = $tnt->select( 0,0, 'a', [10,10] ); // ns, idx , tuple, limit, offset
 $count = $tnt->select( 0,0, 'a'); // ns, idx , 
 
 echo "count tuples $count\n";
@@ -22,23 +20,4 @@ echo "count tuples $count\n";
 $i=0;
 while ( false != ($res = $tnt->getTuple())) {    
     var_dump($res);  
-//    echo ord($res[1]);
-    echo "----\n";
 }
-
-echo "==============\n";
-$count = $tnt->select( 0,1, 'abc'); // ns, idx , 
-
-echo "count tuples $count\n";
-//
-$i=0;
-while ( false != ($res = $tnt->getTuple())) {    
-    var_dump($res);  
-//    echo ord($res[1]);
-    echo "----\n";
-}
-
-unset($tnt);
-echo "******\n";
-
-?>
