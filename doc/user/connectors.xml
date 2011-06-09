@@ -25,8 +25,115 @@
   <section>
     <title>Perl</title>
     <para>
-       Please see <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/mod/box/client/perl/lib/"><filename>mod/box/client/perl/lib/</filename></link> in the source tree.
+       The perl client is located in <link
+       xlink:href="https://github.com/mailru/tarantool/blob/master/mod/box/client/perl/lib/"><filename>mod/box/client/perl/lib/</filename></link>.
+    <orderedlist>
+
+    <listitem>
+      <simpara><emphasis role="strong">new</emphasis></simpara>
+<programlisting language="perl"><![CDATA[
+     my $box = MR::SilverBox->new({
+            namespaces => [ {
+                indexes => [ {
+                    index_name   => 'primary_id',
+                    keys         => [0],
+                }, {
+                    index_name   => 'primary_email',
+                    keys         => [1],
+                }, ],
+                namespace     => 0,
+                format        => 'l& SSLL',
+                default_index => 'primary_id',
+            } ],
+        },
+        servers      => $server})
+]]></programlisting>
+    </listitem>
+
+    <listitem>
+      <simpara><emphasis role="strong">Insert</emphasis></simpara>
+<programlisting language="perl">
+    $box->Insert(@tuple);
+</programlisting>
+    </listitem>
+
+    <listitem>
+      <simpara><emphasis role="strong">Select</emphasis></simpara>
+<programlisting language="perl"><![CDATA[
+    [\%tuple1, \%tuple2, ...] = $box->Select(@id);
+    \%tuple = $box->Select($id);
+    [\@tuple1, \@tuple2, ...] = $box->Select(@id, {raw => 1});
+    \@tuple = $box->Select($id, {raw => 1});
+    $box->Select($email, {use_index => 1});
+]]></programlisting>
+    </listitem>
+
+    <listitem>
+      <simpara><emphasis role="strong">Update</emphasis>
+      accepts parameters in the last argument just like Select:</simpara>
+<programlisting language="perl"><![CDATA[
+    $key = 1; # key, ID of user by default
+    $field_num = 2; # posititon in tuple, starts from 0, must be >= 1
+    $value = pack('L', 123);  # integer values must be packed
+    $box->Update($key, $field_num, $value);
+]]></programlisting>
+    </listitem>
+
+    <listitem>
+      <simpara><emphasis role="strong">Delete</emphasis></simpara>
+<programlisting language="perl"><![CDATA[
+    $box->Delete($key);
+]]></programlisting>
+    </listitem>
+
+    <listitem>
+      <simpara><emphasis role="strong">AndXorAdd</emphasis>
+      transforms the tuple field at position <quote>$field_num</quote>
+      according to formula <quote>field= ((field &amp; $and_mask) ^ $xor_mask) + $add_value</quote>.
+      </simpara>
+<programlisting language="perl"><![CDATA[
+    $box->AndXorAdd($key, $field_num, $and_mask, $xor_mask, $add_value);
+]]></programlisting>
+    </listitem>
+
+    <listitem>
+      <simpara><emphasis role="strong">Bit</emphasis>
+      performs a bitwise operation on field at position
+      <quote>$field_num</quote>. Unused arguments can be omitted.
+      Note: <quote>set</quote> has a higher precedence than
+      <quote>bit_set</quote> and <quote>bit_clear</quote>.
+      </simpara>
+<programlisting language="perl"><![CDATA[
+     $box->Bit($key, $field_num, bit_clear => $clear_mask, bit_set => $set_mask, set => $set_value);
+     $box->Bit($key, $field_num, bit_set => $set_mask);
+]]></programlisting>
+    </listitem>
+
+    <listitem>
+      <simpara><emphasis role="strong">Num</emphasis>
+      performs a numeric update operation on field at position
+      <quote>$field_num</quote>. Unused arguments can be omitted.
+      Note: again, <quote>set</quote> has a higher precedence than
+      <quote>num_add</quote> and <quote>num_sub</quote>.
+      </simpara>
+<programlisting language="perl"><![CDATA[
+     $box->Num($key, $field_num, set => $set_value, num_add => $add_value, num_sub => $sub_value);
+]]></programlisting>
+    </listitem>
+
+    <listitem>
+      <simpara><emphasis role="strong">Flag</emphasis>
+      sets or clears flags on a tuple, the calling convention 
+      is the same as for <quote>Bit</quote> and <quote>Num</quote>
+      operations.
+      </simpara>
+<programlisting language="perl"><![CDATA[
+     $box->Flags(bit_set => $set_mask, bit_clear => $clear_mask);
+]]></programlisting>
+    </listitem>
+
+    </orderedlist>
+
     </para>
   </section>
 
