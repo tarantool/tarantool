@@ -21,3 +21,10 @@ $i=0;
 while ( false != ($res = $tnt->getTuple())) {    
     var_dump($res);  
 }
+
+echo "delete tuple\n";
+
+$tnt->delete(0,'z');
+
+$count = $tnt->select( 0,0, 'z'); 
+echo "count tuples $count\n";
