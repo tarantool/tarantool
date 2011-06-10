@@ -77,6 +77,12 @@ typedef	struct {
 	Tuple tuple;
 } InsertRequest;
 
+typedef	struct {
+	uint32_t namespaceNo;
+	Tuple tuple;
+} DeleteRequest;
+
+
 #define SELECT_REQUEST_SIZE 20
 typedef	struct {
 	uint32_t namespaceNo;
@@ -131,6 +137,7 @@ zend_function_entry tarantool_class_functions[] = {
 	 PHP_ME(tarantool_class, insert,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, select,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, getTuple,		NULL, ZEND_ACC_PUBLIC)	 	 	 
+	 PHP_ME(tarantool_class, delete,		NULL, ZEND_ACC_PUBLIC)
 	 
 	{NULL, NULL, NULL}	
 };
@@ -198,6 +205,38 @@ static int php_tnt_connect( tarantool_object *ctx TSRMLS_DC) {
 		
 		return 0;
 		
+}
+
+static void php_tnt_tuple2data(HashTable *pht, u_char ** p TSRMLS_DC) {
+	HashPosition pos; 
+	zval **curr;
+	
+	for(zend_hash_internal_pointer_reset_ex(pht, &pos); 
+	  zend_hash_get_current_data_ex(pht, (void **) &curr, &pos) == SUCCESS; 
+	  zend_hash_move_forward_ex(pht, &pos)) { 
+	
+		if (Z_TYPE_PP(curr) == IS_STRING)  {
+			char * strval = Z_STRVAL_PP(curr);
+			int str_len = Z_STRLEN_PP(curr);
+			
+			u_char str_shortlen = (u_char)str_len;
+			
+			**(p++) = str_shortlen;
+			memcpy(*p, strval, str_len);
+			*p += str_len;
+		}
+		/*
+		if (Z_TYPE_PP(curr) == IS_LONG)  {
+		   unsigned long val = Z_LVAL_PP(curr);		
+		   
+		   u_char leb_size = (u_char)leb128_size( val);	
+		   *(p++) = leb_size;
+		   leb128_write( (char *)p, val);
+		   p += leb_size;	
+		} 
+		*/
+	} 
+
 }
 
 /* {{{ proto tarantool::__construct( string string host=localhost, int port=PORT)
@@ -388,12 +427,12 @@ PHP_METHOD(tarantool_class, select )
 	u_char * p = (u_char *)select->tuples ; 
 
 	int * count_elements = (int *)p;
-	*count_elements  = 1;	//!!!! <------- кол-во элементов в  кортеже
-		
-	p += sizeof(uint32_t);
 			
 	switch (Z_TYPE_P(tuple)) {
 		case IS_STRING: {				
+			*count_elements  = 1;	//!!!! <------- кол-во элементов в  кортеже
+			p += sizeof(uint32_t);
+
 				char * strval = Z_STRVAL_P(tuple);
 				int str_len = Z_STRLEN_P(tuple);
 				u_char str_shortlen = (u_char)str_len;
@@ -407,6 +446,9 @@ PHP_METHOD(tarantool_class, select )
 			break;
 
 		case IS_LONG: {
+			*count_elements  = 1;	//!!!! <------- кол-во элементов в  кортеже
+			p += sizeof(uint32_t);
+
 			unsigned long val = Z_LVAL_P(tuple);
 		    u_char leb_size = (u_char)leb128_size( val);	
 		    *(p++) = leb_size;
@@ -417,6 +459,42 @@ PHP_METHOD(tarantool_class, select )
 			}
 			break;
 			
+			
+		case IS_ARRAY: {
+			HashTable *pht;
+			HashPosition pos; 
+			zval **curr;
+
+			*count_elements  = zend_hash_num_elements(Z_ARRVAL_P(tuple));
+			p += sizeof(uint32_t);
+
+			pht = Z_ARRVAL_P(tuple);
+			for(zend_hash_internal_pointer_reset_ex(pht, &pos); 
+				  zend_hash_get_current_data_ex(pht, (void **)&curr, &pos) == SUCCESS; 
+				  zend_hash_move_forward_ex(pht, &pos)) { 
+				
+				if (Z_TYPE_PP(curr) == IS_STRING)  {
+					char * strval = Z_STRVAL_PP(curr);
+					int str_len = Z_STRLEN_PP(curr);
+		//			printf("tuple: len=%d [%s]", str_len, strval );
+					u_char str_shortlen = (u_char)str_len;
+					
+					*(p++) = str_shortlen;
+					memcpy(p, strval, str_len);
+					p += str_len;
+				}
+				if (Z_TYPE_PP(curr) == IS_LONG)  {
+				   unsigned long val = Z_LVAL_PP(curr);		
+				   
+				   u_char leb_size = (u_char)leb128_size( val);	
+				   *(p++) = leb_size;
+				   leb128_write( (char *)p, val);
+				   p += leb_size;	
+				} 
+			} 
+
+		}
+		break;	
 		default : 			
 			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
 			"tuple: unsuport tuple type" ,0 TSRMLS_CC);
@@ -474,7 +552,8 @@ PHP_METHOD(tarantool_class, select )
 /* }}} */
 
 
-
+/* {{{ proto array tarantool::getTuple()
+   return one tuple */
 PHP_METHOD(tarantool_class, getTuple )
 {
 	zval *id;
@@ -516,7 +595,6 @@ PHP_METHOD(tarantool_class, getTuple )
 			"the read body error" ,0 TSRMLS_CC);
 		return;				
 	}
-	
 	
 	ctx->readed += sizeof(SelectResponseTuple);
 
@@ -596,21 +674,159 @@ PHP_METHOD(tarantool_class, getTuple )
 		} // end switch
 
 
-		if (is_string)
+		if (is_string) {
 //			php_printf("tuple element '%s' len=%d\n",bb2, len);	
 			add_next_index_stringl( return_value, bb2 , len , 1);
-		else	
+		} else	
 //			php_printf("tuple element %d\n",bb2, value);	
 			add_next_index_long( return_value, value);
 						
 		p += len+1;		
 	}
 
-//	RETURN_FALSE;
 	efree(buf);
+}
+/* }}} */
+
+/* {{{ proto int tarantool::delete(key)
+   tarantool delete tuple */
+PHP_METHOD(tarantool_class, delete)
+{
+	zval *id;
+	tarantool_object *ctx;
+	long namespace;
+
+	zval* data; 
+
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "Olz", 
+			&id, tarantool_class_entry, &namespace, &data) == FAILURE) {
+		return;
+	}
+		
+	ctx = (tarantool_object *)zend_object_store_get_object(id TSRMLS_CC);	
+	if (!ctx) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"the context is null" ,0 TSRMLS_CC);
+		return;	
+	}		
+	
+	ctx->bodyLen = 0;		
+	ctx->countTuples = 0;	
+	ctx->readedTuples = 0;	
+	ctx->readed	= 0;		
+
+	if (!ctx->stream) {
+		if (php_tnt_connect(ctx TSRMLS_CC)) {
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+				"the can't open remote host " ,0 TSRMLS_DC);	
+			return;	
+		}		
+	}
+
+	char * buf = emalloc(TARANTOOL_BUFSIZE);
+	bzero(buf, TARANTOOL_BUFSIZE);
+	
+	Header * header = (Header *) buf;
+	DeleteRequest * delRequest = (DeleteRequest *) buf + HEADER_SIZE;
+	
+	header->type		= TARANTOOL_DELETE;	
+	header->request_id	= TARANTOOL_REQUEST_ID;	
+
+	delRequest->namespaceNo = namespace;	
+	delRequest->tuple.count = 1; // count in the Tuples		
+		
+	u_char * p = (u_char *) delRequest->tuple.data;
+
+	int * count_elements = (int *)p;
+
+	switch (Z_TYPE_P(data)) {
+		case IS_STRING: {				
+
+			char * strval = Z_STRVAL_P(data);
+			int str_len = Z_STRLEN_P(data);
+			u_char str_shortlen = (u_char)str_len;
+			
+			*(p++) = str_shortlen;
+			memcpy(p, strval, str_len);
+			p += str_len;
+		}
+			break;
+
+		case IS_LONG: {
+
+			unsigned long val = Z_LVAL_P(data);
+		    u_char leb_size = (u_char)leb128_size( val);	
+		    *(p++) = leb_size;
+		    leb128_write( (char *)p, val);
+		    p += leb_size;	
+
+//			printf("tuple: int %d\n", val );		
+			}
+			break;
+
+		case IS_ARRAY: {
+			HashTable *pht;
+			HashPosition pos; 
+			zval **curr;
+
+			delRequest->tuple.count = zend_hash_num_elements(Z_ARRVAL_P(data));
+			pht = Z_ARRVAL_P(data);
+			for(zend_hash_internal_pointer_reset_ex(pht, &pos); 
+				  zend_hash_get_current_data_ex(pht, (void **)&curr, &pos) == SUCCESS; 
+				  zend_hash_move_forward_ex(pht, &pos)) { 
+				
+				if (Z_TYPE_PP(curr) == IS_STRING)  {
+					char * strval = Z_STRVAL_PP(curr);
+					int str_len = Z_STRLEN_PP(curr);
+					u_char str_shortlen = (u_char)str_len;
+					
+					*(p++) = str_shortlen;
+					memcpy(p, strval, str_len);
+					p += str_len;
+				}
+				if (Z_TYPE_PP(curr) == IS_LONG)  {
+				   unsigned long val = Z_LVAL_PP(curr);		
+				   
+				   u_char leb_size = (u_char)leb128_size( val);	
+				   *(p++) = leb_size;
+				   leb128_write( (char *)p, val);
+				   p += leb_size;	
+				} 
+			} 
+
+		}
+		break;	
+		default : 			
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"tuple: unsuport tuple type" ,0 TSRMLS_CC);
+			return;
+	}		
+
+	header->len = (p-delRequest->tuple.data) + sizeof(uint32_t) *2 ; // sizeof(int) + sizeof(int)
+	
+	// write header
+	int len = php_stream_write(ctx->stream, buf , HEADER_SIZE); // 12
+
+	// write tuple	
+	p = (u_char*)delRequest;
+	len = php_stream_write(ctx->stream, (char*)p , header->len ); 
+
+	bzero(buf, header->len + HEADER_SIZE);
+	
+	len = php_stream_read(ctx->stream, buf, TARANTOOL_BUFSIZE);
+
+	if ( *(buf+HEADER_SIZE) == '\0') {
+		int deleted = *(buf+HEADER_SIZE + sizeof(uint32_t));
+		efree(buf);
+		RETURN_LONG(deleted);
+	}		
+	
+	// TODO запомнить код ошибки и вернуть ошибку getLastError()
+	efree(buf);		
+	RETURN_FALSE;
 
 }
-
+/* }}} */
 
 static void printLine( u_char *p ) {
 	u_char b[4];

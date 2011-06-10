@@ -61,6 +61,7 @@ PHP_METHOD( tarantool_class, __construct);
 PHP_METHOD( tarantool_class, insert);
 PHP_METHOD( tarantool_class, select);
 PHP_METHOD( tarantool_class, getTuple);
+PHP_METHOD( tarantool_class, delete);
 
 
 #ifdef ZTS
