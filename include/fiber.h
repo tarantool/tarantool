@@ -45,10 +45,16 @@
 #define FIBER_NAME_MAXLEN 16
 
 #define FIBER_READING_INBOX 0x1
+/** Can this fiber be cancelled? */
 #define FIBER_CANCELLABLE   0x2
+/** Indicates that a fiber has been cancelled. */
 #define FIBER_CANCEL        0x4
 
-@interface tnt_FiberException: tnt_Exception
+/** This is thrown by fiber_* API calls when the fiber is
+ * cancelled.
+ */
+
+@interface tnt_FiberCancelException: tnt_Exception
 @end
 
 struct msg {
@@ -165,8 +171,20 @@ void fiber_cleanup(void);
 void fiber_gc(void);
 void fiber_call(struct fiber *callee);
 void fiber_wakeup(struct fiber *f);
+/** Cancel a fiber. A cancelled fiber will have
+ * tnt_FiberCancelException raised in it.
+ *
+ * A fiber can be cancelled only if it is
+ * FIBER_CANCELLABLE flag is set.
+ */
 void fiber_cancel(struct fiber *f);
+/** Check if the current fiber has been cancelled.  Raises
+ * tnt_FiberCancelException
+ */
 void fiber_testcancel(void);
+/** Make it possible or not possible to cancel the current
+ * fiber.
+ */
 void fiber_setcancelstate(bool enable);
 int fiber_connect(struct sockaddr_in *addr);
 void fiber_sleep(ev_tstamp s);

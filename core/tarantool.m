@@ -100,15 +100,6 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	return mod_check_config(conf);
 }
 
-static void
-swap_tarantool_cfg(struct tarantool_cfg *old_cfg, struct tarantool_cfg *new_cfg)
-{
-	struct tarantool_cfg tmp;
-
-	tmp = *old_cfg;
-	*old_cfg = *new_cfg;
-	*new_cfg = tmp;
-}
 
 i32
 reload_cfg(struct tbuf *out)
@@ -134,10 +125,10 @@ reload_cfg(struct tbuf *out)
 
 		/*
 		  Prepare a copy of the original config file
-		  for confetti, so that it can compare the new 
+		  for confetti, so that it can compare the new
 		  file with the old one when loading the new file.
-		  Load the new file and return an error if the it
-		  contains  a different value for some read-only
+		  Load the new file and return an error if it
+		  contains a different value for some read-only
 		  parameter.
 		*/
 		if (dup_tarantool_cfg(&aux_cfg, &cfg) != 0 ||
@@ -145,8 +136,8 @@ reload_cfg(struct tbuf *out)
 			return -1;
 		/*
 		  Load the new configuration file, but
-		  skip the check for read only parameters. 
-		  new_cfg contains only defaults and 
+		  skip the check for read only parameters.
+		  new_cfg contains only defaults and
 		  new settings.
 		*/
 		if (fill_default_tarantool_cfg(&new_cfg) != 0 ||

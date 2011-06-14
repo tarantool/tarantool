@@ -3,6 +3,12 @@
 
 #include <objc/Object.h>
 
+/** The base class for all exceptions.
+ *
+ * Note: implements garbage collection (see +alloc
+ * implementation).
+ */
+
 @interface tnt_Exception: Object {
 	@public
 		const char *file;
