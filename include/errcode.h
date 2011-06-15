@@ -11,6 +11,17 @@ struct errcode_record {
 	uint8_t errflags;
 };
 
+/*
+ * To add a new error code to Tarantool, extend this array. Please
+ * try to reuse empty slots (ERR_CODE_UNUSED*), if there are any
+ * left.
+ *
+ * !IMPORTANT! Currently you need to manually update the user
+ * guide (doc/user/errcode.xml) and the Python command line client
+ * (test/lib/sql_ast.py) with each added error code. Please don't
+ * forget to do it!
+ */
+
 #define ERROR_CODES(_)					    \
 	/*  0 */_(ERR_CODE_OK,				0, "OK") \
 	/*  1 */_(ERR_CODE_NONMASTER,			2, "Non master connection, but it should be") \
@@ -55,7 +66,7 @@ struct errcode_record {
 	/* 37 */_(ERR_CODE_UPDATE_ID,			2, "Id's update") \
 	/* 38 */_(ERR_CODE_WRONG_VERSION,		2, "Unsupported version of protocol") \
 		/* end of silversearch error codes */					\
-	/* 39 */_(ERR_CODE_UNKNOWN_ERROR,		2, "Unknown error") \
+	/* 39 */_(ERR_CODE_WAL_IO,			2, "Failed to write to disk") \
 	/* 40 */_(ERR_CODE_UNUSED40,			0, "Unused40") \
 	/* 41 */_(ERR_CODE_UNUSED41,			0, "Unused41") \
 	/* 42 */_(ERR_CODE_UNUSED42,			0, "Unused42") \
@@ -72,9 +83,15 @@ struct errcode_record {
 	/* 53 */_(ERR_CODE_UNUSED53,			0, "Unused53") \
 	/* 54 */_(ERR_CODE_UNUSED54,			0, "Unused54") \
 	/* 55 */_(ERR_CODE_NODE_FOUND,			2, "Node is found") \
-	/* 56 */_(ERR_CODE_INDEX_VIOLATION,		2, "Some index violation occur") \
+	/* 56 */_(ERR_CODE_INDEX_VIOLATION,		2, "Constraint violation") \
 	/* 57 */_(ERR_CODE_NO_SUCH_NAMESPACE,		2, "There is no such namespace") \
 	        _(ERR_CODE_NO_SUCH_INDEX,		2, "No index with the given id is defined")
+
+
+/*
+ * !IMPORTANT! Please see an instruction how to add !IMPORTANT!
+ * !IMPORTANT! new errors at start of the file !IMPORTANT!
+ */
 
 ENUM0(tnt_error_codes_enum, ERROR_CODES);
 extern struct errcode_record tnt_error_codes[];

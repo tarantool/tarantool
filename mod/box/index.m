@@ -490,7 +490,7 @@ validate_indexes(struct box_txn *txn)
 
 			if (tuple != NULL && tuple != txn->old_tuple)
 				tnt_raise(tnt_BoxException,
-					  reason:"unique index violation"
+					  reason:"duplicate key in a unique index"
 					  errcode:ERR_CODE_INDEX_VIOLATION);
 		}
 	}

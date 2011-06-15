@@ -823,7 +823,7 @@ txn_commit(struct box_txn *txn)
 
 			i64 lsn = next_lsn(recovery_state, 0);
 			if (!wal_write(recovery_state, wal_tag, fiber->cookie, lsn, t))
-				tnt_raise(tnt_BoxException, errcode:ERR_CODE_UNKNOWN_ERROR);
+				tnt_raise(tnt_BoxException, errcode:ERR_CODE_WAL_IO);
 			confirm_lsn(recovery_state, lsn);
 		}
 
@@ -1070,7 +1070,7 @@ custom_init(void)
 	before_commit_update_hook = calloc(1, sizeof(box_hook_t));
 
 	if (cfg.namespace == NULL)
-		panic("at least one namespace should be configured");
+		panic("at least one namespace must be configured");
 
 	for (int i = 0; i < namespace_count; i++) {
 		if (cfg.namespace[i] == NULL)
@@ -1166,7 +1166,7 @@ custom_init(void)
 			if (strcmp(cfg.namespace[i]->index[j]->type, "HASH") == 0) {
 				if (index->key_cardinality != 1)
 					panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
-					      "hash index must have single-filed key", i, j);
+					      "hash index must have a single-field key", i, j);
 
 				if (index->unique == false)
 					panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
@@ -1221,7 +1221,7 @@ box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
 
 		say_error("tnt_PickleException: `%s' at %s:%i", e->reason, e->file, e->line);
 
-		return ERR_CODE_UNKNOWN_ERROR;
+		return ERR_CODE_ILLEGAL_PARAMS;
 	}
 	@catch (tnt_BoxException *e) {
 		txn_abort(txn);
@@ -1324,10 +1324,10 @@ title(const char *fmt, ...)
 	va_end(ap);
 
 	if (cfg.memcached)
-		set_proc_title("memcached:%s%s pri:%i adm:%i",
+		set_proc_title("%s%s memcached:%i adm:%i",
 			       buf, custom_proc_title, cfg.primary_port, cfg.admin_port);
 	else
-		set_proc_title("box:%s%s pri:%i sec:%i adm:%i",
+		set_proc_title("%s%s pri:%i sec:%i adm:%i",
 			       buf, custom_proc_title,
 			       cfg.primary_port, cfg.secondary_port, cfg.admin_port);
 }
@@ -1336,19 +1336,19 @@ static void
 remote_recovery_restart(struct tarantool_cfg *conf)
 {
 	if (remote_recover) {
-		say_info("shuting downing remote hot standby");
+		say_info("shutting downing the replica");
 		fiber_call(remote_recover);
 	}
 
-	say_info("starting remote hot standby");
+	say_info("starting the replica");
 	remote_recover = recover_follow_remote(recovery_state, conf->wal_feeder_ipaddr,
 					       conf->wal_feeder_port,
 					       default_remote_row_handler);
 
 	status = palloc(eter_pool, 64);
-	snprintf(status, 64, "hot_standby/%s:%i%s", conf->wal_feeder_ipaddr,
+	snprintf(status, 64, "replica/%s:%i%s", conf->wal_feeder_ipaddr,
 		 conf->wal_feeder_port, custom_proc_title);
-	title("hot_standby/%s:%i%s", conf->wal_feeder_ipaddr, conf->wal_feeder_port,
+	title("replica/%s:%i%s", conf->wal_feeder_ipaddr, conf->wal_feeder_port,
 	      custom_proc_title);
 }
 
@@ -1361,7 +1361,7 @@ box_master_or_slave(struct tarantool_cfg *conf)
 		remote_recovery_restart(conf);
 	} else {
 		if (remote_recover) {
-			say_info("shuting downing remote hot standby");
+			say_info("shuting downing the replica");
 			fiber_cancel(remote_recover);
 
 			remote_recover = NULL;
@@ -1517,7 +1517,7 @@ mod_init(void)
 	recover(recovery_state, 0);
 	stat_cleanup(stat_base, messages_MAX);
 
-	title("build_indexes");
+	title("building indexes");
 
 	build_indexes();
 
@@ -1526,8 +1526,8 @@ mod_init(void)
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recover_follow(recovery_state, cfg.wal_dir_rescan_delay);
-		status = "hot_standby/local";
-		title("hot_standby/local");
+		status = "hot_standby";
+		title("hot_standby");
 	}
 
 	if (cfg.memcached != 0) {

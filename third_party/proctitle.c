@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #ifdef HAVE_SYS_PSTAT_H
 #include <sys/pstat.h>		/* for HP-UX */
@@ -216,7 +217,18 @@ init_set_proc_title(int argc, char **argv)
 	 */
 	ps_buffer_fixed_size = 0;
 #else
-	snprintf(ps_buffer, ps_buffer_size, "tarantool: ");
+	{
+		char basename_buf[PATH_MAX];
+
+		/*
+		 * At least partially mimic FreeBSD, which for
+		 * ./a.out outputs:
+		 *
+		 * a.out: custom title here (a.out)
+	         */
+		snprintf(basename_buf, sizeof basename_buf, "%s", argv[0]);
+		snprintf(ps_buffer, ps_buffer_size, "%s: ", basename(basename_buf));
+	}
 
 	ps_buffer_fixed_size = strlen(ps_buffer);
 

@@ -1,6 +1,8 @@
-add_custom_command(OUTPUT tarantool_user_guide.html
-    COMMAND ${XSLTPROC} --xinclude -o tarantool_user_guide.html
-        http://docbook.sourceforge.net/release/xsl-ns/current/html/docbook.xsl
-        user.xml)
+add_custom_target(dev-html ALL
+    COMMAND ${XSLTPROC} --nonet
+        --stringparam collect.xref.targets "all"
+        --xinclude -o tarantool_developer_guide.html
+        ${CMAKE_SOURCE_DIR}/doc/user/tnt-html.xsl
+        developer.xml)
 
 

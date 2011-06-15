@@ -58,7 +58,7 @@ static const char *help =
 	" - reload configuration" CRLF;
 
 
-static const char unknown_command[] = "unknown command. try typing help." CRLF;
+static const char *unknown_command = "unknown command. try typing help." CRLF;
 
 
 #line 65 "core/admin.c"
@@ -1452,12 +1452,11 @@ case 107:
 #line 199 "core/admin.rl"
 
 
-	fiber->rbuf->len -= (void *)pe - (void *)fiber->rbuf->data;
-	fiber->rbuf->data = pe;
+	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);
 
 	if (p != pe) {
 		start(out);
-		tbuf_append(out, unknown_command, sizeof(unknown_command));
+		tbuf_append(out, unknown_command, strlen(unknown_command));
 		end(out);
 	}
 

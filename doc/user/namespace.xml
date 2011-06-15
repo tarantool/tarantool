@@ -1,0 +1,108 @@
+<para xmlns="http://docbook.org/ns/docbook" version="5.0"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xml:id="namespace">
+<bridgehead>Namespace settings explained</bridgehead>
+Namespace is a composite parameter, i.e. it has properties.
+<programlisting language="cpp">
+/*
+ * Each tuple consists of fields. Three field types are
+ * supported.
+ */
+
+enum { STR, NUM, NUM64 } field_type;
+
+/*
+ * Tarantool is interested in field types only inasmuch as
+ * it needs to build indexes on fields. An index
+ * can cover one or more fields.
+ */
+
+struct index_field_t {
+  unsigned int fieldno;
+  enum field_type type;
+};
+
+/*
+ * HASH and TREE index types are supported.
+ */
+
+enum { HASH, TREE } index_type;
+
+struct index_t {
+  index_field_t key_field[];
+  enum index_type type;
+  /* Secondary index may be non-unique */
+  bool unique;
+};
+
+struct namespace_t
+{
+  /* A namespace can be quickly disabled and re-enabled at run time. */
+  bool enabled;
+  /*
+   * A limit on tuple cardinality can be set, to prevent too large tuples
+   * from coming in.
+   */
+  unsigned int cardinality;
+  /* Only used for HASH indexes, to preallocate memory. */
+  unsigned int estimated_rows;
+  struct index_t index[];
+};
+
+/* You can define up to 255 namespaces. */
+struct namespace_t namespace[];
+</programlisting>
+The way a namespace is defined in a configuration file is similar to how
+you would initialize a C structure in a program. For example,
+a minimal storage configuration looks like below:
+<programlisting language="c">
+namespace[0].enabled = 1
+namespace[0].index[0].type = HASH
+namespace[0].index[0].unique = 1
+namespace[0].index[0].key_field[0].fieldno = 0
+namespace[0].index[0].key_field[0].type = NUM64
+</programlisting>
+The parameters listed above are mandatory. Other namespace
+properties are set in the same way.
+An alternative syntax, mainly useful when defining large namespaces, exists:
+<programlisting language="c">
+namespace[0] = {
+    enabled = 1,
+    index = [
+        {
+            type = HASH,
+            key_field = [
+                {
+                    fieldno = 0,
+                    type = NUM64
+                }
+            ]
+        }
+    ]
+}
+</programlisting>
+When defining a namespace,
+please be aware of these restrictions:
+<itemizedlist>
+  <listitem><simpara>at least one namespace must be
+    configured,</simpara></listitem>
+  <listitem><simpara>each configured namespace needs at least one
+    unique index of type HASH,
+  </simpara></listitem>
+  <listitem><simpara>"unique" property doesn't have a default, and
+    must be set explicitly,
+  </simpara></listitem>
+  <listitem><simpara>namespace configuration can not be changed
+    dynamically, currently you need to restart the server even to
+    disable or enable a namespace,
+  </simpara></listitem>
+  <listitem><simpara>HASH indexes may cover only one field and can
+    not be non-unique.
+  </simpara></listitem>
+</itemizedlist>
+</para>
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

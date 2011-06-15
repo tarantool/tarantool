@@ -1399,7 +1399,7 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 	struct recovery_state *r = p0alloc(eter_pool, sizeof(*r));
 
 	if (rows_per_file <= 1)
-		panic("inacceptable value of 'rows_per_file'");
+		panic("unacceptable value of 'rows_per_file'");
 
 	r->wal_timer.data = r;
 	r->row_handler = row_handler;

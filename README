@@ -17,7 +17,11 @@ Caveats:
 
 COMPILATION AND INSTALL
 
-Tarantool uses CMake for configuration management.
+Tarantool is written in C and Objective C.
+To build, you will need GCC Objective C frontend or
+Apple CLang compiler.
+
+CMake is used for configuration management.
 3 standard CMake build types are supported:
  * Debug -- used by project maintainers
  * RelWithDebugInfo -- the most common release configuration,

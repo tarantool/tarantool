@@ -3,6 +3,7 @@
 %tnt;
 ]>
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xi="http://www.w3.org/2001/XInclude"
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xml:id="configuration-reference">
 
@@ -20,7 +21,7 @@ are provided for the most basic properties only: the rest
 must be set in the configuration file.
 At runtime, this allows to disambiguate the source of
 a configuration setting: it unequivocally comes either from
-the command line, or from the options file, but never from
+the command line, or from the configuration file, but never from
 both.
 </para>
 
@@ -122,7 +123,11 @@ Tarantool/Box 1.4.0-69-g45551dd
       </para>
     </listitem>
     <listitem>
-      <para><option>--init-storage</option></para>
+      <para>
+      <option xml:id="init-storage-option"
+            xreflabel="--init-storage">
+          --init-storage
+      </option></para>
       <para>Initialize the directory, specified in <emphasis>vardir</emphasis>
       configuration option by creating an empty snapshot file in
       it. If <filename>vardir</filename> doesn't contain at
@@ -139,7 +144,8 @@ Tarantool/Box 1.4.0-69-g45551dd
     </listitem>
 
     <listitem>
-      <para><option>--cat</option> <userinput>snapshot.file</userinput></para>
+      <para><option xml:id="cat-option" xreflabel="--cat">--cat</option>
+      <userinput>snapshot.file</userinput></para>
       <para>Print the snapshot file, pointed to by the argument,
       in a human-readable form. For each log record, log sequence
       number, time of entry, operation type and arguments are
@@ -179,12 +185,12 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
   </itemizedlist>
 </section>
 
-<section>
+<section xml:id="option-file" xreflabel="option file">
 <title>The option file</title>
   <para>
-    All advanced configuration parameters must be specified in an
-    option file, which is required for server start.  If no path to
-    option file is specified on the command line (see
+    All advanced configuration parameters must be specified in a
+    configuration file, which is required for server start. If no path to
+    the configuration file is specified on the command line (see
     <option xlink:href="#config-option"
     xlink:title="--config=...">--config</option>),
     the server looks for a file named <filename>tarantool.cfg</filename>
@@ -193,11 +199,8 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
   <para>
     To facilitate centralized and automated configuration
     management, runtime configuration modifications are supported
-    solely through <emphasis role="tntadmin"
-    xlink:href="tarantool-user-guide#reload-configuration"
-    xlink:title="reload configuration"
-    xlink:role="http://docbook.org/xlink/role/olink">reload
-    configuration</emphasis> administrative statement. Thus, the
+    solely through <olink targetptr="reload-configuration"/>
+    administrative statement. Thus, the
     procedure to change Tarantool configuration at runtime is to
     edit the configuration file.  This ensures that, should the
     server get killed or restart, no unexpected changes to
@@ -206,6 +209,11 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
   <para>
     Not all configuration file settings are changeable at runtime:
     such settings will be highlighted in this reference.
+    If the same setting is given more than once, the latest occurrence
+    takes effect.
+    You can always invoke <olink targetptr="show-configuration"/>
+    from the administrative console to show the current
+    configuration.
   </para>
   <para>
     Tarantool maintains a set of all allowed configuration
@@ -221,10 +229,657 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
     <filename xlink:href="https://github.com/mailru/tarantool/blob/master/test/box/tarantool.cfg">test/box/tarantool.cfg</filename>,
     <filename xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_big/tarantool.cfg">test/box_big/tarantool.cfg</filename>.
   </para>
-  <section>
+
+  <table frame='all' pgwide='1'>
     <title>Basic parameters</title>
-    <para>Parameter1</para>
-  </section>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>username</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>UNIX user name to switch to after start.</entry>
+        </row>
+
+        <row>
+          <entry>work_dir</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>A directory to switch to with chdir(2) after
+          start. Can be relative to the starting directory.
+          If not specified, the current working directory
+          of the server is the same as starting
+          directory.</entry>
+        </row>
+
+        <row>
+          <entry xml:id="wal_dir" xreflabel="wal_dir">wal_dir</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>A directory to store the write ahead log files
+          (WAL) in. Can be relative to work_dir. You may choose
+          to separate your snapshots and logs and store them
+          on separate disks. This is how this parameter is most
+          commonly used. If not specified, defaults to work_dir.</entry>
+        </row>
+
+        <row>
+          <entry xml:id="snap_dir" xreflabel="snap_dir">snap_dir</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>A directory to store snapshots in. Can be
+          relative to work_dir. If not specified, defaults to
+          work_dir. See also <olink targetptr="wal_dir"/>.</entry>
+        </row>
+<!--
+        <row>
+          <entry>coredump</entry><entry>0 or 1</entry><entry>0</entry>
+          <entry>Deprecated. Save core on abort/assert? You may
+          turn off the coredump off when using ulimit</entry>
+        </row>
+-->
+        <row>
+          <entry xml:id="primary_port" xreflabel="primary_port">primary_port</entry>
+          <entry>integer</entry>
+          <entry><emphasis role="strong">none</emphasis></entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>no</entry>
+          <entry>The read/write data port.
+          Has no default value, so <emphasis
+          role="strong">must be specified</emphasis>
+          in the configuration file. Normally set to 33013.
+          Note: a replica also binds to this port, accepts
+          connections, but these connections can only serve
+          reads until the replica becomes a master.</entry>
+        </row>
+
+        <row>
+          <entry xml:id="secondary_port"
+            xreflabel="secondary_port">secondary_port</entry>
+          <entry>integer</entry>
+          <entry>none</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Additional, read-only port. Normally set to
+          33014. Not used unless is set.</entry>
+        </row>
+
+        <row>
+          <entry xml:id="admin_port" xreflabel="admin_port">admin_port</entry>
+          <entry>integer</entry>
+          <entry>none</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>The TCP port to listen on for administrative
+          connections. Has no default value. Not used unless
+          assigned a value. Normally set to 33015.</entry>
+        </row>
+
+        <row>
+          <entry>pid_file</entry>
+          <entry>string</entry>
+          <entry>tarantool.pid</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Store the process id in this file. Can be
+          relative to work_dir.</entry>
+        </row>
+
+        <row>
+          <entry xml:id="custom_proc_title"
+                 xreflabel="custom_proc_title">
+            custom_proc_title
+          </entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>
+            <para>Inject the given string into <olink
+            targetptr="proctitle">server process title</olink>
+            (what's shown in COMMAND column of <command>ps</command>
+            and <command>top</command> commands). For example,
+            an unmodified Tarantool/Box process group looks like:
+            </para>
+<programlisting>kostja@shmita:~$ ps -a -o command | grep box
+tarantool_box: primary pri:33013 sec:33014 adm:33015</programlisting>
+          <para>After "sessions" custom_proc_title is injected it
+          looks like:</para>
+<programlisting>kostja@shmita:~$ ps -a -o command | grep box
+tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
+          </entry>
+        </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all' pgwide='1'>
+    <title>Configuring the storage</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>slab_alloc_arena</entry>
+          <entry>float</entry>
+          <entry>1.0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>
+            <anchor xml:id="slab_alloc_arena" xreflabel="slab_alloc_arena"/>
+            How much memory Tarantool
+          allocates to actually
+          store tuples, <emphasis role="strong">in
+          gigabytes</emphasis>. When the limit is reached, INSERT
+          or UPDATE requests begin failing with error
+          <olink targetptr="ERR_CODE_MEMORY_ISSUE"/>.
+          While the server does not go
+          beyond the defined limit to allocate tuples, there is
+          additional memory used to store indexes and connection
+          information.  Depending on actual configuration and
+          workload, Tarantool can consume up to 20-40% of the
+          limit set here.</entry>
+        </row>
+
+        <row>
+          <entry>slab_alloc_minimal</entry>
+          <entry>integer</entry>
+          <entry>64</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Size of the smallest allocation unit. It can be
+          tuned down if most of the tuples are very small.</entry>
+        </row>
+
+        <row>
+          <entry>slab_alloc_factor</entry>
+          <entry>float</entry>
+          <entry>2.0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Use slab_alloc_factor as the multiplier for
+          computing the sizes of memory chunks that tuples are
+          stored in. A lower value  may result in less wasted
+          memory depending on the total amount of memory available
+          and the distribution of item sizes.</entry>
+        </row>
+
+        <row>
+          <entry>namespace</entry>
+          <entry>array of objects</entry>
+          <entry>none</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry><emphasis role="strong">no</emphasis></entry>
+          <entry>This is the main Tarantool parameter, describing
+          the data structure that users get access to via
+          client/server protocol. It holds an array of
+          entries, and each entry represents a tuple set
+          served by the server. Every entry is a composite object,
+          best seen as a C programming language "struct"
+          <footnote><xi:include href="namespace.xml"/></footnote>.
+          </entry>
+        </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all' pgwide='1'>
+    <title>Binary logging and snapshots</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>panic_on_snap_error</entry>
+          <entry>boolean</entry>
+          <entry>1</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>If there is an error reading the snapshot (at
+            server start), abort.</entry>
+        </row>
+
+        <row>
+          <entry>panic_on_wal_error</entry>
+          <entry>boolean</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>If there is an error reading from a write ahead
+          log (at server start), abort.</entry>
+        </row>
+
+        <row>
+          <entry>rows_per_wal</entry>
+          <entry>integer</entry>
+          <entry>500000</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>How many log records to store in a single write
+          ahead log file. When this limit is reached, Tarantool
+          creates another WAL file named
+          <filename>&lt;first-lsn-in-wal&gt;.wal</filename>
+          This can be useful for simple rsync-based backups.
+          </entry>
+        </row>
+
+        <row>
+          <entry>snap_io_rate_limit</entry>
+          <entry>float</entry>
+          <entry>0.0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Reduce the throttling effect of <olink
+          targetptr="save-snapshot"/> on the INSERT/UPDATE/DELETE
+          performance by setting a limit on
+          how many megabytes per second it can write to disk.
+          The same can be achieved by splitting <olink
+          targetptr="wal_dir"/> and <olink targetptr="snap_dir"/>
+          locations and moving snapshots to a separate disk.</entry>
+        </row>
+
+        <row>
+          <entry>wal_writer_inbox_size</entry>
+          <entry>integer</entry>
+          <entry>128</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>WAL writer is a separate process whose sole
+          purpose is to write the change log to disk. Every
+          incoming data change is sent to this process and
+          queued for write. This parameter affects the size of the
+          user space buffer that WAL writer uses to queue
+          write requests. By default, up to 128 client
+          connections can have pending updates waiting on disk.
+          </entry>
+        </row>
+
+        <row>
+        <entry>wal_fsync_delay</entry>
+        <entry>integer</entry>
+        <entry>0</entry>
+        <entry>no</entry>
+        <entry>no</entry>
+        <entry>Do not flush the write ahead log to disk more often
+          than once in wal_fsync_delay seconds. By default the
+          delay is zero,
+          that is, the write ahead log is flushed after every write.
+          Setting the delay may be necessary to increase write
+          throughput, but may lead to several last updates being
+          lost in case of a power failure. Such failure, however,
+          does not read to data corruption: all WAL records have a
+          checksum, and only complete records are processed during
+          recovery.</entry>
+        </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all' pgwide='1'>
+    <title>Replication</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+        <row>
+          <entry xml:id="replication_port"
+            xreflabel="replication_port">replication_port</entry>
+          <entry>integer</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>Replication port. If non-zero, Tarantool listens
+          on the given port for incoming connections from
+          replicas. See also <olink
+          targetptr="replication_source_port"/>, which complements
+          this setting on the replica side.</entry>
+        </row>
+
+        <row>
+          <entry xml:id="replication_source_port"
+          xreflabel="replication_source_port">replication_source_port</entry>
+          <entry>integer</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>Remote port of the master. If non-zero,
+          replication is on, and Tarantool does not accept updates
+          on <olink targetptr="primary_port"/>. This parameter is
+          dynamic, that is, to enter master mode, simply set the
+          port value to 0 and issue <olink
+          targetptr="reload-configuration"/>.</entry>
+        </row>
+
+        <row>
+          <entry xml:id="replication_source_ipaddr"
+                 xreflabel="replication_source_ipaddr">
+              replication_source_ipaddr
+          </entry>
+          <entry>string</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>IP address of replication master.</entry>
+        </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all' pgwide='1'>
+    <title>Networking</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>io_collect_interval</entry>
+          <entry>float</entry>
+          <entry>0.0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>If non-zero, a sleep given duration is
+          injected between iterations of the event loop. Can be
+          used to reduce CPU load in deployments in which the
+          number of client connections is large, but requests are
+          not so frequent (for example, each connection issuing
+          just a handful of requests per second). </entry>
+        </row>
+
+        <row>
+          <entry>readahead</entry>
+          <entry>integer</entry>
+          <entry>16384</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>The size of read-ahead buffer associated with
+              a client connection.</entry>
+        </row>
+
+        <row>
+          <entry>backlog</entry>
+          <entry>integer</entry>
+          <entry>1024</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>The size of listen backlog.</entry>
+       </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all' pgwide='1'>
+    <title>Logging</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>log_level</entry>
+          <entry>integer</entry>
+          <entry>4</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>How verbose the logging is. There are 5 log
+            verbosity classes: 1 -- ERROR, 2 -- CRITICAL, 3 --
+            WARNING, 4 -- INFO, 5 -- DEBUG. By setting log_level,
+            you can enable logging of all classes below or equal
+            to the given level. Tarantool prints its logs to the
+            standard error stream by default, but this can be
+            changed with "logger" configuration parameter.
+          </entry>
+        </row>
+
+        <row>
+          <entry>logger</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>By default, the log is sent to the standard
+          error stream (<filename>stderr</filename>). If this
+          option is given, Tarantool creates a child process,
+          executes the given command in it, and pipes its standard
+          output to the standard input of the created process.
+          Example setting: <command>tee --append
+          tarantool.log</command> (this will duplicate log output
+          to <filename>stdout</filename> and a log file).
+          </entry>
+        </row>
+
+        <row>
+          <entry>logger_nonblock</entry>
+          <entry>integer</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>If this option is given, Tarantool does not
+          block on the log file descriptor when it's not
+          ready for write, and drops the message instead. If
+          log_level is high, and a lot of messages go to the log
+          file, setting this option to 1 may improve logging
+          performance at the cost of some log messages getting
+          lost.</entry>
+        </row>
+
+        <row>
+          <entry>too_long_threshold</entry>
+          <entry>float</entry>
+          <entry>0.5</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>If processing a request takes longer than the
+          given value (in seconds), warn about it in the log.
+          Has effect only if log_level is no less than 3
+          (WARNING).</entry>
+        </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all' pgwide='1'>
+    <title>Memcached protocol support</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>memcached_port</entry>
+          <entry>integer</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>
+            <anchor xml:id="memcached_port" xreflabel="memcached_port"/>
+
+          Turn on Memcached protocol support on the given
+            port. All requests on this port are directed to
+            a dedicated namespace, set in <olink
+            targetptr="memcached_namespace"/>.
+            Memcached-style flags are supported and stored
+            along with the value. The expiration time can also be
+            set and is persistent, but is ignored, unless <olink
+            targetptr="memcached_expire"/> is turned on.
+            Unlike Memcached, all data still goes to the binary
+            log and to the replica, if latter one is set up, which
+            means that power outage does not lead to loss of all
+            data. Thanks to data persistence, cache warm up time
+            is also very short.
+          </entry>
+        </row>
+
+        <row>
+          <entry>memcached_namespace</entry>
+          <entry>integer</entry>
+          <entry>23</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>
+            <anchor xml:id="memcached_namespace"
+            xreflabel="memcached_namespace"/>
+          Namespace id to store memcached data in. The
+          format of tuple is [key, metadata, value], with a HASH
+          index based on the key. Since the namespace format
+          is defined by Memcached data model, it must not be
+          previously configured.</entry>
+        </row>
+
+        <row>
+          <entry>memcached_expire</entry>
+          <entry>boolean</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>
+            <anchor xml:id="memcached_expire"
+            xreflabel="memcached_expire"/>
+            Turn on tuple time-to-live support in
+            <olink targetptr="memcached_namespace"/>. This
+            effectively turns Tarantool into a "persistent" implementation
+            of Memcached. Since a caching server has
+            significantly different purpose than a data server, in
+            this mode Tarantool turns off replication and does not
+            bind to <olink targetptr="primary_port"/> or <olink
+            targetptr="secondary_port"/>.
+          </entry>
+        </row>
+
+        <row>
+          <entry>memcached_expire_per_loop</entry>
+          <entry>integer</entry>
+          <entry>1024</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>How many records to consider per iteration of the
+            expiration loop. Tuple expiration is performed in a separate
+            <quote>green</quote> thread within our cooperative multitasking
+            framework and this setting effectively limits how long
+            the expiration loop stays on CPU uninterrupted.
+          </entry>
+        </row>
+
+        <row>
+          <entry>memcached_expire_full_sweep</entry>
+          <entry>integer</entry>
+          <entry>3600</entry>
+          <entry>no</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>Try to make sure that every tuple is considered
+            for expiration within this time frame (in seconds).
+            Together with memcached_expire_per_loop this defines
+            how often the expiration <quote>green</quote> thread
+            is scheduled on CPU.
+          </entry>
+        </row>
+
+      </tbody>
+    </tgroup>
+  </table>
 
 </section>
 </chapter>
