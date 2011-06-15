@@ -186,9 +186,9 @@ recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
 	struct sockaddr_in *addr;
 	struct remote_state *h;
 
-	say_crit("initializing remote hot standby, WAL feeder %s:%i", ip_addr, port);
+	say_crit("initializing the replica, WAL feeder %s:%i", ip_addr, port);
 	name = palloc(eter_pool, 64);
-	snprintf(name, 64, "remote_hot_standby/%s:%i", ip_addr, port);
+	snprintf(name, 64, "replica/%s:%i", ip_addr, port);
 
 	h = palloc(eter_pool, sizeof(*h));
 	h->r = r;
