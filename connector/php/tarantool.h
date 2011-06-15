@@ -46,6 +46,13 @@ extern zend_module_entry tarantool_module_entry;
 
 #define TARANTOOL_REQUEST_ID  8 
 
+#define TARANTOOL_OP_ASSIGN 0 
+#define TARANTOOL_OP_ADD	1 
+#define TARANTOOL_OP_AND	2
+#define TARANTOOL_OP_XOR	3
+#define TARANTOOL_OP_OR		4
+
+
 
 #ifdef ZTS
 #include "TSRM.h"
@@ -62,6 +69,8 @@ PHP_METHOD( tarantool_class, insert);
 PHP_METHOD( tarantool_class, select);
 PHP_METHOD( tarantool_class, getTuple);
 PHP_METHOD( tarantool_class, delete);
+PHP_METHOD( tarantool_class, update);
+PHP_METHOD( tarantool_class, inc);
 
 
 #ifdef ZTS
