@@ -1,4 +1,4 @@
-#! /usr/bin/python 
+#!/usr/bin/env python 
 """A simplistic client for tarantool/box: administrative
 console and SQL client.
 
