@@ -64,9 +64,9 @@ class TarantoolConnection:
       else:
         self.reconnect()
 
-  def execute(self, command, noprint=True):
+  def execute(self, command, silent=True):
     self.opt_reconnect()
-    return self.execute_no_reconnect(command, noprint)
+    return self.execute_no_reconnect(command, silent)
 
   def write(self, fragment):
     """This is to support print >> admin, "command" syntax.

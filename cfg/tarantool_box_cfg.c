@@ -24,8 +24,52 @@ cmpNameAtoms(NameAtom *a, NameAtom *b) {
 	return (a == NULL && b == NULL) ? 1 : 0;
 }
 
+void
+init_tarantool_cfg(tarantool_cfg *c) {
+	c->__confetti_flags = 0;
+
+	c->username = NULL;
+	c->coredump = 0;
+	c->admin_port = 0;
+	c->log_level = 0;
+	c->slab_alloc_arena = 0;
+	c->slab_alloc_minimal = 0;
+	c->slab_alloc_factor = 0;
+	c->work_dir = NULL;
+	c->pid_file = NULL;
+	c->logger = NULL;
+	c->logger_nonblock = 0;
+	c->io_collect_interval = 0;
+	c->backlog = 0;
+	c->readahead = 0;
+	c->snap_dir = NULL;
+	c->wal_dir = NULL;
+	c->primary_port = 0;
+	c->secondary_port = 0;
+	c->too_long_threshold = 0;
+	c->custom_proc_title = NULL;
+	c->memcached = 0;
+	c->memcached_namespace = 0;
+	c->memcached_expire_per_loop = 0;
+	c->memcached_expire_full_sweep = 0;
+	c->snap_io_rate_limit = 0;
+	c->rows_per_wal = 0;
+	c->wal_fsync_delay = 0;
+	c->wal_writer_inbox_size = 0;
+	c->local_hot_standby = 0;
+	c->wal_dir_rescan_delay = 0;
+	c->panic_on_snap_error = 0;
+	c->panic_on_wal_error = 0;
+	c->remote_hot_standby = 0;
+	c->wal_feeder_ipaddr = NULL;
+	c->wal_feeder_port = 0;
+	c->namespace = NULL;
+}
+
 int
 fill_default_tarantool_cfg(tarantool_cfg *c) {
+	c->__confetti_flags = 0;
+
 	c->username = NULL;
 	c->coredump = 0;
 	c->admin_port = 0;
@@ -66,6 +110,13 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->wal_feeder_port = 0;
 	c->namespace = NULL;
 	return 0;
+}
+
+void
+swap_tarantool_cfg(struct tarantool_cfg *c1, struct tarantool_cfg *c2) {
+	struct tarantool_cfg tmpcfg = *c1;
+	*c1 = *c2;
+	*c2 = tmpcfg;
 }
 
 static int
@@ -692,8 +743,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->remote_hot_standby != i32)
-			return CNF_RDONLY;
 		c->remote_hot_standby = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_ipaddr) ) {
@@ -701,8 +750,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_feeder_ipaddr == NULL) || strcmp(opt->paramValue.stringval, c->wal_feeder_ipaddr) != 0))
-			return CNF_RDONLY;
 		c->wal_feeder_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->wal_feeder_ipaddr == NULL)
 			return CNF_NOMEMORY;
@@ -717,8 +764,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->wal_feeder_port != i32)
-			return CNF_RDONLY;
 		c->wal_feeder_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__namespace) ) {
@@ -2084,20 +2129,26 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 	}
-	if (c1->remote_hot_standby != c2->remote_hot_standby) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->remote_hot_standby");
+	if (!only_check_rdonly) {
+		if (c1->remote_hot_standby != c2->remote_hot_standby) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->remote_hot_standby");
 
-		return diff;
+			return diff;
+		}
 	}
-	if (confetti_strcmp(c1->wal_feeder_ipaddr, c2->wal_feeder_ipaddr) != 0) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_ipaddr");
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->wal_feeder_ipaddr, c2->wal_feeder_ipaddr) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_ipaddr");
 
-		return diff;
+			return diff;
 }
-	if (c1->wal_feeder_port != c2->wal_feeder_port) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_port");
+	}
+	if (!only_check_rdonly) {
+		if (c1->wal_feeder_port != c2->wal_feeder_port) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_port");
 
-		return diff;
+			return diff;
+		}
 	}
 
 	i1->idx_name__namespace = 0;

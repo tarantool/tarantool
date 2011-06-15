@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 
+#include <cfg/warning.h>
 #include <errcode.h>
 #include <fiber.h>
 #include <iproto.h>
@@ -56,6 +57,8 @@ STRS(messages, MESSAGES);
 
 const int MEMCACHED_NAMESPACE = 23;
 static char *custom_proc_title;
+
+static struct fiber *remote_recover;
 
 /* hooks */
 typedef int (*box_hook_t) (struct box_txn * txn);
@@ -1330,25 +1333,55 @@ title(const char *fmt, ...)
 }
 
 static void
+remote_recovery_restart(struct tarantool_cfg *conf)
+{
+	if (remote_recover) {
+		say_info("shutting downing the replica");
+		fiber_call(remote_recover);
+	}
+
+	say_info("starting the replica");
+	remote_recover = recover_follow_remote(recovery_state, conf->wal_feeder_ipaddr,
+					       conf->wal_feeder_port,
+					       default_remote_row_handler);
+
+	status = palloc(eter_pool, 64);
+	snprintf(status, 64, "replica/%s:%i%s", conf->wal_feeder_ipaddr,
+		 conf->wal_feeder_port, custom_proc_title);
+	title("replica/%s:%i%s", conf->wal_feeder_ipaddr, conf->wal_feeder_port,
+	      custom_proc_title);
+}
+
+static void
+box_master_or_slave(struct tarantool_cfg *conf)
+{
+	if (conf->remote_hot_standby) {
+		box_updates_allowed = false;
+
+		remote_recovery_restart(conf);
+	} else {
+		if (remote_recover) {
+			say_info("shuting downing the replica");
+			fiber_cancel(remote_recover);
+
+			remote_recover = NULL;
+		}
+
+		say_info("I am primary");
+
+		box_updates_allowed = true;
+
+		status = "primary";
+		title("primary");
+	}
+}
+
+static void
 box_bound_to_primary(void *data __attribute__((unused)))
 {
 	recover_finalize(recovery_state);
 
-	if (cfg.remote_hot_standby) {
-		say_info("starting a replica");
-		status = palloc(eter_pool, 64);
-		snprintf(status, 64, "replica/%s:%i%s", cfg.wal_feeder_ipaddr,
-			 cfg.wal_feeder_port, custom_proc_title);
-		recover_follow_remote(recovery_state, cfg.wal_feeder_ipaddr, cfg.wal_feeder_port,
-				      default_remote_row_handler);
-
-		title("replica/%s:%i", cfg.wal_feeder_ipaddr, cfg.wal_feeder_port);
-	} else {
-		say_info("I am primary");
-		status = "primary";
-		box_updates_allowed = true;
-		title("primary");
-	}
+	box_master_or_slave(&cfg);
 }
 
 static void
@@ -1363,16 +1396,42 @@ memcached_bound_to_primary(void *data __attribute__((unused)))
 }
 
 i32
-mod_check_config(struct tarantool_cfg *conf __attribute__((unused)))
+mod_check_config(struct tarantool_cfg *conf)
 {
+	if (conf->remote_hot_standby > 0 && conf->local_hot_standby > 0) {
+		out_warning(0, "Remote and local hot standby modes "
+			       "can't be enabled simultaneously");
+
+		return -1;
+	}
+
 	return 0;
 }
 
-void
-mod_reload_config(struct tarantool_cfg *old_conf __attribute__((unused)),
-		  struct tarantool_cfg *new_conf __attribute__((unused)))
+i32
+mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
 {
-	return;
+	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby) {
+		if (recovery_state->finalize != true) {
+			out_warning(0, "Could not propagate %s before local recovery finished",
+				    old_conf->remote_hot_standby == true ? "slave to master" :
+				    "master to slave");
+
+			return -1;
+		}
+	}
+
+	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby) {
+		/* Local recovery must be finalized at this point */
+		assert(recovery_state->finalize == true);
+
+		box_master_or_slave(new_conf);
+	} else if (old_conf->remote_hot_standby > 0 &&
+		   (strcmp(old_conf->wal_feeder_ipaddr, new_conf->wal_feeder_ipaddr) != 0 ||
+		    old_conf->wal_feeder_port != new_conf->wal_feeder_port))
+		remote_recovery_restart(new_conf);
+
+	return 0;
 }
 
 void

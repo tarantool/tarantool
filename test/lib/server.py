@@ -92,12 +92,14 @@ class Server(object):
         return exe
     raise RuntimeError("Can't find server executable in " + path)
 
-  def cleanup(self):
+  def cleanup(self, full=False):
     trash = []
     for re in self.re_vardir_cleanup:
       trash += glob.glob(os.path.join(self.vardir, re))
     for filename in trash:
       os.remove(filename)
+    if full:
+      shutil.rmtree(self.vardir)
 
   def configure(self, config):
     self.config = os.path.abspath(config)

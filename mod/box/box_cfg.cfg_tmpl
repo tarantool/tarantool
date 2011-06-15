@@ -59,9 +59,9 @@ panic_on_wal_error=0, ro
 
 # Remote hot standby (if enabled, the server will run in hot standby mode
 # continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
-remote_hot_standby=0, ro
-wal_feeder_ipaddr=NULL, ro
-wal_feeder_port=0, ro
+remote_hot_standby=0
+wal_feeder_ipaddr=NULL
+wal_feeder_port=0
 
 
 namespace = [

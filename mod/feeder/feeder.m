@@ -100,11 +100,11 @@ mod_check_config(struct tarantool_cfg *conf __attribute__((unused)))
 	return 0;
 }
 
-void
+i32
 mod_reload_config(struct tarantool_cfg *old_conf __attribute__((unused)),
 		  struct tarantool_cfg *new_conf __attribute__((unused)))
 {
-	return;
+	return 0;
 }
 
 void
