@@ -9,11 +9,26 @@ $res = true;
 
 $tnt = new Tarantool( );
 
-$tuple = array( 'z', 1025 );
+$tuple = array(1, 'z','abc', 1025 );
 $tnt->insert(0,$tuple);
 
-// $count = $tnt->select( 0,0, 'a', [10,10] ); // ns, idx , tuple, limit, offset
-$count = $tnt->select( 0,0, 'a'); // ns, idx , 
+
+$tuple = array(2, 'z','abd', 1025 );
+$tnt->insert(0,$tuple);
+$tuple = array(3, 'z','abc', 1025 );
+$tnt->insert(0,$tuple);
+$tuple = array(4, 'y','abd', 1025 );
+$tnt->insert(0,$tuple);
+$tuple = array(5, 'y','abc', 1025 );
+$tnt->insert(0,$tuple);
+$tuple = array(6, 'x','abd', 1025 );
+$tnt->insert(0,$tuple);
+$tuple = array(6, 'x','abc', 1025 );
+$tnt->insert(0,$tuple);
+
+
+// $count = $tnt->select( 0,0, 1, [10,10] ); // ns, idx , tuple, limit, offset
+$count = $tnt->select( 0,0, 1); // ns, idx , 
 
 echo "count tuples $count\n";
 
@@ -22,9 +37,58 @@ while ( false != ($res = $tnt->getTuple())) {
     var_dump($res);  
 }
 
+
+$count = $tnt->select( 0,1, 'x'); // ns, idx , 
+
+echo "count tuples $count\n";
+
+$i=0;
+while ( false != ($res = $tnt->getTuple())) {    
+    var_dump($res);  
+}
+
+
+$count = $tnt->select( 0,2, array('x','abc')); // ns, idx , 
+
+echo "count tuples $count\n";
+
+$i=0;
+while ( false != ($res = $tnt->getTuple())) {    
+    var_dump($res);  
+}
+
+
 echo "delete tuple\n";
 
-$tnt->delete(0,'z');
+$tnt->delete(0,1);
 
-$count = $tnt->select( 0,0, 'z'); 
+$count = $tnt->select( 0,0, 1); 
 echo "count tuples $count\n";
+
+echo "incremental tuple\n";
+
+$res = $tnt->inc(0,2,3); // ns, key=1, fieldNo = 1, tuple=107
+var_dump($res);  
+
+$count = $tnt->select( 0,0,2); // ns, idx , 
+while ( false != ($res = $tnt->getTuple())) {    
+    var_dump($res);  
+}
+ echo "incremental tuple+2\n";
+$res = $tnt->inc(0,2,3,2); // ns, key=1, fieldNo = 1, tuple=107
+var_dump($res);  
+
+$count = $tnt->select( 0,0,2); // ns, idx , 
+while ( false != ($res = $tnt->getTuple())) {    
+    var_dump($res);  
+}
+ 
+ echo "decremental tuple\n";
+$res = $tnt->inc(0,2,3,-1); // ns, key=1, fieldNo = 1, tuple=107
+var_dump($res);  
+
+$count = $tnt->select( 0,0,2); // ns, idx , 
+while ( false != ($res = $tnt->getTuple())) {    
+    var_dump($res);  
+}
+ 
