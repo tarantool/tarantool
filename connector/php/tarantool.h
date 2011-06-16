@@ -35,6 +35,8 @@ extern zend_module_entry tarantool_module_entry;
 
 #define TARANTOOL_TIMEOUT  5 // sec
 #define TARANTOOL_DEF_PORT 33013
+#define TARANTOOL_ADMIN_PORT 33015
+
 #define TARANTOOL_DEF_HOST "localhost"
 #define TARANTOOL_BUFSIZE  256 
 
@@ -71,6 +73,7 @@ PHP_METHOD( tarantool_class, getTuple);
 PHP_METHOD( tarantool_class, delete);
 PHP_METHOD( tarantool_class, update);
 PHP_METHOD( tarantool_class, inc);
+PHP_METHOD( tarantool_class, getError);
 
 
 #ifdef ZTS

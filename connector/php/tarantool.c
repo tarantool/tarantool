@@ -56,6 +56,7 @@ typedef struct _tarantool_object {
 	int countTuples;	// count tuples
 	int readedTuples;	//
 	int readed;			// readed byte
+	uint32_t errorcode;		// error code
 	php_stream * stream; 
 } tarantool_object;
 
@@ -157,6 +158,7 @@ zend_function_entry tarantool_class_functions[] = {
 	 PHP_ME(tarantool_class, delete,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, update,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, inc,		NULL, ZEND_ACC_PUBLIC)
+	 PHP_ME(tarantool_class, getError,		NULL, ZEND_ACC_PUBLIC)
 	 
 	{NULL, NULL, NULL}	
 };
@@ -223,8 +225,7 @@ static int php_tnt_connect( tarantool_object *ctx TSRMLS_DC) {
 			return 1;				
 		}
 		
-		return 0;
-		
+		return 0;		
 }
 
 static void php_tnt_tuple2data(HashTable *pht, u_char ** p TSRMLS_DC) {
@@ -283,6 +284,7 @@ PHP_METHOD(tarantool_class, __construct)
 	ctx->port = 0;
 	ctx->stream = NULL;
 	ctx->bodyLen = 0;
+	ctx->errorcode = 0;
 		
 	if (host_len > 0) 
 		ctx->host = estrdup(host);
@@ -390,6 +392,8 @@ PHP_METHOD(tarantool_class, insert )
 		RETURN_TRUE;
 	}		
 	
+	
+	ctx->errorcode = *(out_buf+HEADER_SIZE);
 	efree(out_buf);
 		
 	RETURN_FALSE;
@@ -433,6 +437,7 @@ PHP_METHOD(tarantool_class, select )
 	ctx->countTuples = 0;	
 	ctx->readedTuples = 0;	
 	ctx->readed	= 0;		
+	ctx->errorcode	= 0;		
 
 	char out_buf[TARANTOOL_BUFSIZE];
 	bzero(out_buf, TARANTOOL_BUFSIZE);
@@ -563,23 +568,26 @@ PHP_METHOD(tarantool_class, select )
 
 	ctx->bodyLen = responseHeader.len;
 	
-	SelectResponseBody response;
-	bzero(&response, sizeof(SelectResponseBody));
+	uint32_t code;
 	
-	len = php_stream_read(ctx->stream, (void *) &response, sizeof(SelectResponseBody));
-	if (len != sizeof(SelectResponseBody)) {
-			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
-			"read body error" ,0 TSRMLS_CC);
+	len = php_stream_read(ctx->stream, (void *) &code,sizeof(uint32_t));
+	ctx->readed += len;
+	if (code > 0 || len != sizeof(uint32_t)) {
+		ctx->errorcode = code;					
+		RETURN_FALSE;
+	}	
+//	
+	uint32_t tuples_count=0;	
+	len = php_stream_read(ctx->stream, (void *) &tuples_count,sizeof(uint32_t));	
+	ctx->readed += len;
+	if (len != sizeof(uint32_t)) {
+			zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C),
+			0 TSRMLS_CC,"read body error");	
+		return;	
 	}	
 
-	ctx->readed += sizeof(SelectResponseBody);
-
-	if (response.code) {
-			zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C),
-			0 TSRMLS_CC,"response code %d", response.code );	
-	}
-	
-	ctx->countTuples = response.tuples_count;
+	ctx->errorcode	= code;		
+	ctx->countTuples = tuples_count;
 	
 	RETURN_LONG(ctx->countTuples);
 
@@ -636,6 +644,7 @@ PHP_METHOD(tarantool_class, getTuple )
 	u_char * buf = emalloc(responseBody.size);
 
 	if (php_stream_read(ctx->stream, (char*) buf, responseBody.size) != responseBody.size) {
+		efree(buf);	
 		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
 			"the read tuple error" ,0 TSRMLS_CC);
 		return;				
@@ -838,7 +847,8 @@ PHP_METHOD(tarantool_class, delete)
 
 		}
 		break;	
-		default : 			
+		default :
+			efree(buf);				
 			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
 			"tuple: unsuport tuple type" ,0 TSRMLS_CC);
 			return;
@@ -863,7 +873,8 @@ PHP_METHOD(tarantool_class, delete)
 		RETURN_LONG(deleted);
 	}		
 	
-	// TODO запомнить код ошибки и вернуть ошибку getLastError()
+	
+	ctx->errorcode = *(buf+HEADER_SIZE); 
 	efree(buf);		
 	RETURN_FALSE;
 
@@ -878,11 +889,11 @@ PHP_METHOD(tarantool_class, update)
 	tarantool_object *ctx;
 	long namespace;
 
-	zval* data;
-	 
+	zval* key;
+	zval* data;	 
 
-	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "Ola", 
-			&id, tarantool_class_entry, &namespace, &data) == FAILURE) {
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "Olza", 
+			&id, tarantool_class_entry, &namespace, &key, &data) == FAILURE) {
 		return;
 	}
 		
@@ -896,7 +907,8 @@ PHP_METHOD(tarantool_class, update)
 	ctx->bodyLen = 0;		
 	ctx->countTuples = 0;	
 	ctx->readedTuples = 0;	
-	ctx->readed	= 0;		
+	ctx->readed	= 0;	
+	ctx->errorcode = 0;	
 
 	if (!ctx->stream) {
 		if (php_tnt_connect(ctx TSRMLS_CC)) {
@@ -908,33 +920,96 @@ PHP_METHOD(tarantool_class, update)
 
 // <insert_request_body> ::= <namespace_no><flags><tuple>
 // <update_request_body> ::= <namespace_no><flags><tuple><count><operation>+
-
 // <operation> ::= <field_no><op_code><op_arg>
+
+	char * out_buf = emalloc(TARANTOOL_BUFSIZE);
+	bzero(out_buf, TARANTOOL_BUFSIZE);
+
+	Header * header = (Header *) out_buf;
+	
+	header->type		= TARANTOOL_UPDATE;	
+	header->request_id	= TARANTOOL_REQUEST_ID;	
+	
+	InsertRequest * insert = (InsertRequest *) (out_buf + HEADER_SIZE);
+
+	insert->namespaceNo = namespace;	
+	insert->tuple.count = 1; 
+		
+	u_char * p = (u_char *) insert->tuple.data;
+		
+	switch (Z_TYPE_P(key)) {
+		case IS_STRING: {				
+//			*count_elements  = 1;	//!!!! <------- кол-во элементов в  кортеже
+//			p += sizeof(uint32_t);
+
+				char * strval = Z_STRVAL_P(key);
+				int str_len = Z_STRLEN_P(key);
+				u_char str_shortlen = (u_char)str_len;
+				
+				*(p++) = str_shortlen;
+				memcpy(p, strval, str_len);
+				p += str_len;
+
+//				printf("tuple: len=%d [%s]\n", str_len, strval );				
+			}
+			break;
+
+		case IS_LONG: {
+//			*count_elements  = 1;	//!!!! <------- кол-во элементов в  кортеже
+//			p += sizeof(uint32_t);
+
+			unsigned long val = Z_LVAL_P(key);
+
+		    u_char leb_size = 4; //(u_char)leb128_size( val);	
+		    *(p++) = leb_size;
+			
+			b2i * pb = (b2i*) p;
+			pb->i = (uint32_t) val;		
+//		    leb128_write( (char *)p, val);
+		    p += leb_size;	
+
+//			printf("tuple: int %d\n", val );		
+			}
+			break;
+
+		default : 			
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"unsupport key type" ,0 TSRMLS_CC);
+			return;
+	}		
+
+	const int insertLen = p-insert->tuple.data;
 
 
 	HashTable *pht = Z_ARRVAL_P(data); 
-	int num = zend_hash_num_elements(pht); 
-	
-	char * out_buf = emalloc(TARANTOOL_BUFSIZE);
-	bzero(out_buf, TARANTOOL_BUFSIZE);
-	
-	Header * header = (Header *) out_buf;
-	InsertRequest * insert = (InsertRequest *) (out_buf + HEADER_SIZE);
 
+	UpdateRequest  * updateRequest = (UpdateRequest*) p;
+	updateRequest->count = zend_hash_num_elements(pht);; 
 	
-	header->type		= TARANTOOL_INSERT;	
-	header->request_id	= TARANTOOL_REQUEST_ID;	
-	
-	insert->namespaceNo = namespace;	
-	insert->tuple.count = num; // count Tuples		
-		
-	u_char * p = (u_char *) insert->tuple.data;
-	
+	HashPosition pos;
 	zval** curr;
-    for(zend_hash_internal_pointer_reset(pht); 
-          zend_hash_get_current_data(pht, (void **) &curr) == SUCCESS; 
-          zend_hash_move_forward(pht)) { 
-        
+	
+	char *ht_key;
+	ulong index;
+	uint ht_key_len;
+
+	Operation * operation = &(updateRequest->operation);
+					
+    for(zend_hash_internal_pointer_reset_ex(pht, &pos); 
+          zend_hash_get_current_data_ex(pht, (void **) &curr, &pos) == SUCCESS; 
+          zend_hash_move_forward_ex(pht,&pos)) { 
+
+		if (HASH_KEY_IS_LONG != zend_hash_get_current_key_ex(pht, &ht_key, &ht_key_len, &index, 0, &pos)) {
+			efree(out_buf);		
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"key type error" ,0 TSRMLS_CC);			
+			return;
+		}
+
+		operation->code = TARANTOOL_OP_ASSIGN;
+		operation->fieldNo = index;	
+		p = operation->arg;
+		
 		if (Z_TYPE_PP(curr) == IS_STRING)  {
 			char * strval = Z_STRVAL_PP(curr);
 			int str_len = Z_STRLEN_PP(curr);
@@ -948,38 +1023,46 @@ PHP_METHOD(tarantool_class, update)
 		if (Z_TYPE_PP(curr) == IS_LONG)  {
 		   unsigned long val = Z_LVAL_PP(curr);		
 		   
-		   u_char leb_size = (u_char)leb128_size( val);	
-		   *(p++) = leb_size;
-		   leb128_write( (char *)p, val);
-		   p += leb_size;	
-		} 
+		    u_char leb_size = 4; 
+		    *(p++) = leb_size;			
+			b2i * pb = (b2i*) p;
+			pb->i = (uint32_t) val;		
+		    p += leb_size;	
+		}
+		
+		operation = (Operation*)p;  
     } 
 
-	
-	
-	
-	header->len = (p-insert->tuple.data) + INSERT_REQUEST_SIZE ; // 12 = 3 * sizeof(int32) :ns, flag & cardinality
-
-	
+	u_char * p2 = (u_char *) insert;
+	header->len = (uint32_t) (p-p2);
 
 	// write header
 	int len = php_stream_write(ctx->stream, out_buf , HEADER_SIZE); // 12
+	if (len!=HEADER_SIZE) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"error write header" ,0 TSRMLS_CC);
+		return;
+	}
 
-	// write tuple	
-//	p = (u_char*) delRequest;
-//	len = php_stream_write(ctx->stream, (char*)p , header->len ); 
-//
-//	bzero(buf, header->len + HEADER_SIZE);
+//	write tuple	
+	p = (u_char*) out_buf+HEADER_SIZE;
+	len = php_stream_write(ctx->stream, (char*)p , header->len ); //
+	if (len != header->len) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"error write body" ,0 TSRMLS_CC);
+		return;	
+	}	
+
+	bzero(out_buf, header->len + HEADER_SIZE);
 //	
-//	len = php_stream_read(ctx->stream, out_buf, TARANTOOL_BUFSIZE);
-//
-//	if ( *(buf+HEADER_SIZE) == '\0') {
-//		int deleted = *(buf+HEADER_SIZE + sizeof(uint32_t));
-//		efree(out_buf);
-//		RETURN_LONG(deleted);
-//	}		
+	len = php_stream_read(ctx->stream, out_buf, TARANTOOL_BUFSIZE);
+
+	if ( *(out_buf+HEADER_SIZE) == '\0') {
+		efree(out_buf);
+		RETURN_TRUE;
+	}		
 	
-	// TODO запомнить код ошибки и вернуть ошибку getLastError()
+	ctx->errorcode = *(out_buf+HEADER_SIZE); 
 	efree(out_buf);		
 	RETURN_FALSE;
 
@@ -1015,6 +1098,7 @@ PHP_METHOD(tarantool_class, inc)
 	ctx->countTuples = 0;	
 	ctx->readedTuples = 0;	
 	ctx->readed	= 0;		
+	ctx->errorcode = 0;
 
 	if (!ctx->stream) {
 		if (php_tnt_connect(ctx TSRMLS_CC)) {
@@ -1060,7 +1144,7 @@ PHP_METHOD(tarantool_class, inc)
 				memcpy(p, strval, str_len);
 				p += str_len;
 
-				printf("tuple: len=%d [%s]\n", str_len, strval );				
+//				printf("tuple: len=%d [%s]\n", str_len, strval );				
 			}
 			break;
 
@@ -1073,7 +1157,7 @@ PHP_METHOD(tarantool_class, inc)
 		    u_char leb_size = 4; //(u_char)leb128_size( val);	
 		    *(p++) = leb_size;
 			
-			b2i * pb = p;
+			b2i * pb = (b2i*) p;
 			pb->i = (uint32_t) val;		
 //		    leb128_write( (char *)p, val);
 		    p += leb_size;	
@@ -1094,8 +1178,7 @@ PHP_METHOD(tarantool_class, inc)
 	incRequest->count = 1;
 	
 	incRequest->operation.code = TARANTOOL_OP_ADD;
-	
-	
+		
 	incRequest->operation.fieldNo = fieldNo;
 
 	u_char leb_size = '\4';
@@ -1119,6 +1202,7 @@ PHP_METHOD(tarantool_class, inc)
 	// write header
 	int len = php_stream_write(ctx->stream, out_buf , HEADER_SIZE); // 12
 	if (len!=HEADER_SIZE) {
+		efree(out_buf);	
 		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
 			"error write header" ,0 TSRMLS_CC);
 		return;
@@ -1128,6 +1212,7 @@ PHP_METHOD(tarantool_class, inc)
 	p = (u_char*) out_buf+HEADER_SIZE;
 	len = php_stream_write(ctx->stream, (char*)p , header->len ); //
 	if (len != header->len) {
+		efree(out_buf);	
 		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
 			"error write body" ,0 TSRMLS_CC);
 		return;	
@@ -1142,13 +1227,75 @@ PHP_METHOD(tarantool_class, inc)
 		RETURN_TRUE;
 	}		
 	
-	// TODO запомнить код ошибки и вернуть ошибку getLastError()
+	ctx->errorcode = *(out_buf+HEADER_SIZE); 
 	efree(out_buf);		
 	RETURN_FALSE;
 
 }
 /* }}} */
 
+
+/* {{{ proto string tarantool::getError();		
+   returb tarantool error string */
+   
+PHP_METHOD(tarantool_class, getError)
+{
+	zval *id;
+	tarantool_object *ctx;
+
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "O", &id,
+		tarantool_class_entry) == FAILURE) {
+		return;
+	}
+
+	ctx = (tarantool_object *)zend_object_store_get_object(id TSRMLS_CC);
+	if (!ctx) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"the context is null" ,0 TSRMLS_CC);
+		return;	
+	}		
+	
+	switch(ctx->errorcode) {
+		case 0: { RETURN_STRING("Result Ok",1); break; }
+		case 258: {RETURN_STRING("Non master connection, but it should be",1); break; }	
+		case 514: {RETURN_STRING("Illegal parametrs",1); break; }	
+		case 770: {RETURN_STRING("Uid not from this storage range",1); break; }	
+		case 1025: {RETURN_STRING("Node is marked as read-only",1); break; }	
+		case 1281: {RETURN_STRING("Node isn't locked",1); break; }					
+		case 1537: {RETURN_STRING("Node is locked",1); break; }							
+		case 1793: {RETURN_STRING("Some memory issues",1); break; }					
+		case 0x00000802: {RETURN_STRING("Bad graph integrity",1); break; }					
+		case 0x00000a02: {RETURN_STRING("Unsupported command",1); break; }					
+		case 0x00001801: {RETURN_STRING("Can't register new user",1); break; }					
+		case 0x00001a01: {RETURN_STRING("Can't generate alert id",1); break; }					
+		case 0x00001b02: {RETURN_STRING("Can't del node",1); break; }					
+		case 0x00001c02: {RETURN_STRING("User isn't registered",1); break; }				
+		case 0x00001d02: {RETURN_STRING("Syntax error in query",1); break; }		
+		case 0x00001e02: {RETURN_STRING("Unknown field",1); break; }		
+		case 0x00001f02: {RETURN_STRING("Number value is out of range",1); break; }		
+		case 0x00002002: {RETURN_STRING("Insert already existing object",1); break; }		
+		case 0x00002202: {RETURN_STRING("Can not order result",1); break; }		
+		case 0x00002302: {RETURN_STRING("Multiple to update/delete",1); break; }		
+		case 0x00002400: {RETURN_STRING("nothing to do (not an error)",1); break; }		
+		case 0x00002502: {RETURN_STRING("id's update",1); break; }		
+		case 0x00002602: {RETURN_STRING("unsupported version of protocol",1); break; }		
+		
+		case 0x00002702: {RETURN_STRING("Unknow error",1); break; }		
+		case 0x00003102: {RETURN_STRING("Node not found",1); break; }		
+		
+		case 0x00003702: {RETURN_STRING("Node found",1); break; }		
+		case 0x00003802: {RETURN_STRING("INDEX violation",1); break; }		
+		case 0x00003902: {RETURN_STRING("No such namespace",1); break; }		
+
+		default : {
+				char * err_string;
+				int len = spprintf(&err_string, 0, "Unknow error code : %X\n", ctx->errorcode);
+				RETURN_STRINGL(err_string, len,1); 
+			}
+	}
+	
+}
+/* }}}*/
 
 static void printLine( u_char *p ) {
 	u_char b[4];
@@ -1328,9 +1475,10 @@ PHP_MSHUTDOWN_FUNCTION(tarantool)
 PHP_MINFO_FUNCTION(tarantool)
 {
 	php_info_print_table_start();
-	php_info_print_table_header(2, "tarantool support", "enabled");
+	php_info_print_table_header(2, "tarantool_box support", "enabled");
 	php_info_print_table_row(2,		"default host", TARANTOOL_DEF_HOST);
 	php_info_print_table_row(2,		"default port", TARANTOOL_DEF_PORT);
+	php_info_print_table_row(2,		"admin port",	TARANTOOL_ADMIN_PORT);
 	php_info_print_table_row(2,		"timeout in sec",TARANTOOL_TIMEOUT);
 	php_info_print_table_end();
 

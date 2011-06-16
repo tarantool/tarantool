@@ -7,11 +7,11 @@ if(!extension_loaded('tarantool')) {
 $res = true;
 //$tnt = new Tarantool( [ $host, $port ]);
 
-$tnt = new Tarantool( );
+$tnt = new Tarantool( 'tfn24');
 
-$tuple = array(1, 'z','abc', 1025 );
-$tnt->insert(0,$tuple);
-
+//$tuple = array(1, 'z','abc', 1025 );
+//$tnt->insert(0,$tuple);
+exit;
 
 $tuple = array(2, 'z','abd', 1025 );
 $tnt->insert(0,$tuple);
@@ -67,7 +67,7 @@ echo "count tuples $count\n";
 
 echo "incremental tuple\n";
 
-$res = $tnt->inc(0,2,3); // ns, key=1, fieldNo = 1, tuple=107
+$res = $tnt->inc(0,2,3); 
 var_dump($res);  
 
 $count = $tnt->select( 0,0,2); // ns, idx , 
@@ -75,7 +75,7 @@ while ( false != ($res = $tnt->getTuple())) {
     var_dump($res);  
 }
  echo "incremental tuple+2\n";
-$res = $tnt->inc(0,2,3,2); // ns, key=1, fieldNo = 1, tuple=107
+$res = $tnt->inc(0,2,3,3);
 var_dump($res);  
 
 $count = $tnt->select( 0,0,2); // ns, idx , 
@@ -83,12 +83,4 @@ while ( false != ($res = $tnt->getTuple())) {
     var_dump($res);  
 }
  
- echo "decremental tuple\n";
-$res = $tnt->inc(0,2,3,-1); // ns, key=1, fieldNo = 1, tuple=107
-var_dump($res);  
-
-$count = $tnt->select( 0,0,2); // ns, idx , 
-while ( false != ($res = $tnt->getTuple())) {    
-    var_dump($res);  
-}
  
