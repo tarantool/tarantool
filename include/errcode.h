@@ -89,8 +89,8 @@ struct errcode_record {
 
 
 /*
- * !IMPORTANT! Please see an instruction how to add !IMPORTANT!
- * !IMPORTANT! new errors at start of the file !IMPORTANT!
+ * !IMPORTANT! Please follow instructions at start of the file
+ * when adding new errors.
  */
 
 ENUM0(tnt_error_codes_enum, ERROR_CODES);
