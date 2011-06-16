@@ -42,6 +42,8 @@ for i in range(1, 5):
 	master.sql.execute("insert into t0 values ({0}, 'the tuple #{0}')".format(i),
 			   silent=False)
 
+slave.wait_lsn(5)
+
 print """
 #
 # Reconfigure slave to replicate from secondary feeder.
