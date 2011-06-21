@@ -215,6 +215,7 @@ static int php_tnt_connect( tarantool_object *ctx TSRMLS_DC) {
 											   STREAM_XPORT_CLIENT | STREAM_XPORT_CONNECT,
 											   NULL, &tv, NULL, &errstr, &err);
 	
+		efree(hostname);
 //		php_printf("stream open code=%d\n", err);
 		if (err && errstr) {
 			php_printf("stream error: %s\n", errstr);	
@@ -1257,7 +1258,8 @@ PHP_METHOD(tarantool_class, getError)
 		default : {
 				char * err_string;
 				int len = spprintf(&err_string, 0, "Unknow error code : %X\n", ctx->errorcode);
-				RETURN_STRINGL(err_string, len,1); 
+				RETVAL_STRINGL(err_string, len,1); 
+				efree(err_string);
 			}
 	}
 	
@@ -1378,16 +1380,15 @@ tarantool_dtor(void *object TSRMLS_DC)
 	if (ctx) {
 		if (ctx->stream) {
 			php_stream_close(ctx->stream); 
-			ctx->stream = NULL;
 		}	
 
 		if (ctx->host) {
-			efree(ctx->host);		
+			efree(ctx->host);					
 		}
 		
 	}
 
-	zend_object_std_dtor(&(ctx->zo) TSRMLS_CC);	 	  	   
+	zend_object_std_dtor(&ctx->zo TSRMLS_CC);	 	  	   
 
 	efree(object);
 
@@ -1395,11 +1396,8 @@ tarantool_dtor(void *object TSRMLS_DC)
 
 static zend_object_value tarantool_ctor(zend_class_entry *ce TSRMLS_DC)
 {
-
 	zend_object_value new_value;
 	tarantool_object* obj = (tarantool_object*)emalloc(sizeof(tarantool_object));
-	zend_object_std_dtor(&(obj->zo) TSRMLS_CC);
-
 	memset(obj, 0, sizeof(tarantool_object));
 
 	zend_object_std_init(&obj->zo, ce TSRMLS_CC);

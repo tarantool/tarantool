@@ -21,9 +21,8 @@ $res=0;
 $tuple = array(1, 'x','abd', 1023 );
 $res += $tnt->insert(NMSPACE, $tuple);
 
-
 $tuple = array(2, 'z','abd', 1023 );
-$res = $tnt->insert(NMSPACE,$tuple);
+$res += $tnt->insert(NMSPACE,$tuple);
 
 $tuple = array(3, 'z','abc', 1025 );
 $res += $tnt->insert(NMSPACE,$tuple);
@@ -54,10 +53,14 @@ $tuple = array('9', 66,65, 1024 );
 $res = $tnt->insert(NMSPACE,$tuple);
 if (!$res)
     echo $tnt->getError();
-echo "inserted $res tuples\n";
-
+else    
+    echo "inserted $res tuples\n";
+    
 $tuple = array(10, 66,65, 'xdf' );
 $res = $tnt->insert(NMSPACE,$tuple);
+
 if (!$res)
     echo $tnt->getError();
-echo "inserted $res tuples\n";
+else    
+    echo "inserted $res tuples\n";
+    
