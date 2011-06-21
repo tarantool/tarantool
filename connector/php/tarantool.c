@@ -1318,6 +1318,9 @@ PHP_METHOD(tarantool_class, getInfo)
 	zval *id;
 	tarantool_object *ctx;
 	size_t response_len=0;
+	char buf[TARANTOOL_SMALL_BUFSIZE];
+	bzero(buf,TARANTOOL_SMALL_BUFSIZE);
+
 
 	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "O", &id,
 		tarantool_class_entry) == FAILURE) {
@@ -1339,25 +1342,19 @@ PHP_METHOD(tarantool_class, getInfo)
 		}			
 	}
 	
-	
-	php_printf("point 1");	
 	if (php_stream_write(ctx->admin_stream, TARANTOOL_SHOW_INFO, TARANTOOL_SHOW_INFO_SIZE) != TARANTOOL_SHOW_INFO_SIZE) {
 		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
 			"Failed sending command" ,0 TSRMLS_DC);
 		return;					
 	}	
-	
-	
-	char buf[256];
-	bzero(buf,256);
-	php_printf("point 2");	
-	
-	response_len = php_stream_read(ctx->admin_stream, buf, 256);
+			
+	response_len = php_stream_read(ctx->admin_stream, buf, TARANTOOL_SMALL_BUFSIZE);
 
-	if (response_len)
-		php_printf("result: %s", buf);
-	else
-		php_printf("result: null");
+	if (response_len) {
+		RETURN_STRINGL(buf,response_len,1);
+	}
+	
+	RETURN_FALSE;
 		
 }
 /* }}}*/

@@ -39,6 +39,7 @@ extern zend_module_entry tarantool_module_entry;
 
 #define TARANTOOL_DEF_HOST "localhost"
 #define TARANTOOL_BUFSIZE  256 
+#define TARANTOOL_SMALL_BUFSIZE  256 
 
 #define TARANTOOL_INSERT  13 
 #define TARANTOOL_SELECT  17 
