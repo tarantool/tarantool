@@ -40,7 +40,7 @@
 #include <util.h>
 #include "third_party/queue.h"
 
-#include <exceptions.h>
+#include "exception.h"
 
 #define FIBER_NAME_MAXLEN 16
 

@@ -27,7 +27,7 @@
  */
 
 #include <mod/box/index.h>
-#include <exceptions.h>
+#include "exception.h"
 #include <tbuf.h>
 
 @interface tnt_BoxException: tnt_Exception {
