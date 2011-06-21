@@ -54,6 +54,8 @@ extern zend_module_entry tarantool_module_entry;
 #define TARANTOOL_OP_XOR	3
 #define TARANTOOL_OP_OR		4
 
+#define TARANTOOL_SHOW_INFO "show info\n"
+#define TARANTOOL_SHOW_INFO_SIZE sizeof(TARANTOOL_SHOW_INFO) 
 
 
 #ifdef ZTS
@@ -74,7 +76,7 @@ PHP_METHOD( tarantool_class, delete);
 PHP_METHOD( tarantool_class, update);
 PHP_METHOD( tarantool_class, inc);
 PHP_METHOD( tarantool_class, getError);
-
+PHP_METHOD( tarantool_class, getInfo);
 
 #ifdef ZTS
 #define TARANTOOL_G(v) TSRMG(tarantool_globals_id, zend_tarantool_globals *, v)

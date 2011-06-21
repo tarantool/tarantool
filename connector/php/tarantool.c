@@ -52,12 +52,14 @@ typedef struct _tarantool_object {
 	zend_object  zo;
 	char * host;		//	tarantool host
 	int port;			//  tarantool port
+	int admin_port;		//  tarantool admin port	
 	int bodyLen;		// body len from tuples header	
 	int countTuples;	// count tuples
 	int readedTuples;	//
 	int readed;			// readed byte
 	uint32_t errorcode;		// error code
 	php_stream * stream; 
+	php_stream * admin_stream; 	
 } tarantool_object;
 
 #define HEADER_SIZE sizeof(Header)
@@ -159,6 +161,7 @@ zend_function_entry tarantool_class_functions[] = {
 	 PHP_ME(tarantool_class, update,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, inc,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, getError,		NULL, ZEND_ACC_PUBLIC)
+	 PHP_ME(tarantool_class, getInfo,		NULL, ZEND_ACC_PUBLIC)
 	 
 	{NULL, NULL, NULL}	
 };
@@ -188,7 +191,6 @@ zend_module_entry tarantool_module_entry = {
 
 
 
-
 #ifdef COMPILE_DL_TARANTOOL
 ZEND_GET_MODULE(tarantool)
 #endif
@@ -206,7 +208,7 @@ static int php_tnt_connect( tarantool_object *ctx TSRMLS_DC) {
 		if (ctx->port) {
 			hostname_len = spprintf(&hostname, 0, "tcp://%s:%d", ctx->host, ctx->port);
 		} else { 
-			hostname_len = spprintf(&hostname, 0, "tcp://%s", ctx->host);
+			php_printf("port undefined\n");	
 		}
 
 		
@@ -216,7 +218,7 @@ static int php_tnt_connect( tarantool_object *ctx TSRMLS_DC) {
 											   NULL, &tv, NULL, &errstr, &err);
 	
 		efree(hostname);
-//		php_printf("stream open code=%d\n", err);
+
 		if (err && errstr) {
 			php_printf("stream error: %s\n", errstr);	
 			ctx->stream = NULL;
@@ -229,7 +231,41 @@ static int php_tnt_connect( tarantool_object *ctx TSRMLS_DC) {
 		return 0;		
 }
 
-/* {{{ proto tarantool::__construct( string string host=localhost, int port=PORT)
+static int php_tnt_admin_connect( tarantool_object *ctx TSRMLS_DC) {
+			// open stream
+		struct timeval tv;
+		tv.tv_sec = TARANTOOL_TIMEOUT;
+		tv.tv_usec = 0;
+
+		char * errstr = NULL, *hostname = NULL; 
+		int   err = 0, hostname_len;
+
+		if (ctx->admin_port) {
+			hostname_len = spprintf(&hostname, 0, "tcp://%s:%d", ctx->host, ctx->admin_port);
+		} else { 
+			php_printf("admin port undefined\n");	
+		}
+		
+		ctx->admin_stream = php_stream_xport_create( hostname, hostname_len,
+											   ENFORCE_SAFE_MODE | REPORT_ERRORS,
+											   STREAM_XPORT_CLIENT | STREAM_XPORT_CONNECT,
+											   NULL, &tv, NULL, &errstr, &err);
+	
+		efree(hostname);
+
+		if (err && errstr) {
+			php_printf("stream error: %s\n", errstr);	
+			ctx->admin_stream = NULL;
+		}		
+		
+		if (!ctx->admin_stream) {
+			return 1;				
+		}
+		
+		return 0;		
+}
+
+/* {{{ proto tarantool::__construct( string string host=localhost, int port=PORT, int admin_port=ADMIN_PORT)
    tarantool constructor */
 PHP_METHOD(tarantool_class, __construct)
 {
@@ -241,16 +277,17 @@ PHP_METHOD(tarantool_class, __construct)
 
 	char * host = NULL;
 	int host_len = 0;
-	long port=0;
+	long port=0, admin_port=0;
 			
-	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "O|sl", 
-			&id, tarantool_class_entry, &host, &host_len, &port) == FAILURE) {
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "O|sll", 
+			&id, tarantool_class_entry, &host, &host_len, &port, &admin_port) == FAILURE) {
 		return;
 	}
 		
 	ctx = (tarantool_object *)zend_object_store_get_object(id TSRMLS_CC);	
 	ctx->host = NULL;
-	ctx->port = 0;
+	ctx->port = 0;   
+	ctx->admin_port = 0;   	
 	ctx->stream = NULL;
 	ctx->bodyLen = 0;
 	ctx->errorcode = 0;
@@ -264,6 +301,12 @@ PHP_METHOD(tarantool_class, __construct)
 		ctx->port = port;
 	else
 		ctx->port = TARANTOOL_DEF_PORT;
+		
+	if (admin_port) 
+		ctx->admin_port = admin_port;
+	else
+		ctx->admin_port = TARANTOOL_ADMIN_PORT;
+		
 }
 /* }}} */
 
@@ -1266,6 +1309,59 @@ PHP_METHOD(tarantool_class, getError)
 }
 /* }}}*/
 
+
+/* {{{ proto string tarantool::getError();		
+   returb tarantool error string */
+   
+PHP_METHOD(tarantool_class, getInfo)
+{
+	zval *id;
+	tarantool_object *ctx;
+	size_t response_len=0;
+
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "O", &id,
+		tarantool_class_entry) == FAILURE) {
+		return;
+	}
+
+	ctx = (tarantool_object *)zend_object_store_get_object(id TSRMLS_CC);
+	if (!ctx) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"the context is null" ,0 TSRMLS_CC);
+		return;	
+	}		
+	
+	if (!ctx->admin_stream) {
+		if (php_tnt_admin_connect(ctx TSRMLS_CC)) {
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+				"the can't open remote host " ,0 TSRMLS_DC);
+			return;	
+		}			
+	}
+	
+	
+	php_printf("point 1");	
+	if (php_stream_write(ctx->admin_stream, TARANTOOL_SHOW_INFO, TARANTOOL_SHOW_INFO_SIZE) != TARANTOOL_SHOW_INFO_SIZE) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"Failed sending command" ,0 TSRMLS_DC);
+		return;					
+	}	
+	
+	
+	char buf[256];
+	bzero(buf,256);
+	php_printf("point 2");	
+	
+	response_len = php_stream_read(ctx->admin_stream, buf, 256);
+
+	if (response_len)
+		php_printf("result: %s", buf);
+	else
+		php_printf("result: null");
+		
+}
+/* }}}*/
+
 static void printLine( u_char *p ) {
 	u_char b[4];
 	memcpy(b, p, 4);
@@ -1380,6 +1476,10 @@ tarantool_dtor(void *object TSRMLS_DC)
 	if (ctx) {
 		if (ctx->stream) {
 			php_stream_close(ctx->stream); 
+		}	
+
+		if (ctx->admin_stream) {
+			php_stream_close(ctx->admin_stream); 
 		}	
 
 		if (ctx->host) {
