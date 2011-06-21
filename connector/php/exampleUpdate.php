@@ -1,4 +1,12 @@
 <?php
+
+define("NMSPACE", 0);
+define("PRIMARYINDEX", 0);
+
+define("FIELD_1", 1);
+define("FIELD_2", 2);
+define("FIELD_3", 3);
+
 if(!extension_loaded('tarantool')) {
 	dl('tarantool.so');
 }
@@ -8,7 +16,7 @@ $res = true;
 // constructor(host,port);
 $tnt = new Tarantool('tfn24');
 
-$tnt->select(0,0,1);
+$tnt->select(NMSPACE,PRIMARYINDEX,1);
 $tuple = $tnt->getTuple();
 var_dump($tuple);
 
@@ -23,35 +31,35 @@ var_dump($tuple);
  *  @return bool result
  */
 // increment
-$tnt->inc(0,1,3);
+$tnt->inc(NMSPACE,1,FIELD_3);
 
-$tnt->select(0,0,1);
+$tnt->select(NMSPACE,PRIMARYINDEX,1);
 $tuple = $tnt->getTuple();
 var_dump($tuple);
 
 
 // duble increment (+2)
-$tnt->inc(0,1,3,2);
+$tnt->inc(NMSPACE,1,FIELD_3,2);
 
-$tnt->select(0,0,1);
+$tnt->select(NMSPACE,PRIMARYINDEX,1);
 $tuple = $tnt->getTuple();
 var_dump($tuple);
 
 
 // decrement
-$res = $tnt->inc(0,1,3,-1);
+$res = $tnt->inc(NMSPACE,1,FIELD_3,-1);
 echo "increment tuple res=$res\n";
 
-$tnt->select(0,0,1);
+$tnt->select(NMSPACE,PRIMARYINDEX,1);
 $tuple = $tnt->getTuple();
 var_dump($tuple);
 
 // error, type inxex must be NUM 
-$res = $tnt->inc(0,1,2);
+$res = $tnt->inc(NMSPACE,1,FIELD_2);
 echo "increment tuple res=$res\n";
 if (!$res)
     echo $tnt->getError();
-$tnt->select(0,0,1);
+$tnt->select(NMSPACE,PRIMARYINDEX,1);
 $tuple = $tnt->getTuple();
 var_dump($tuple);
 
@@ -65,24 +73,24 @@ var_dump($tuple);
  * 
  *  @return bool result
  */
-$res = $tnt->update(0,1,array(2=>'y'));
+$res = $tnt->update(NMSPACE,1,array(2=>'y'));
 echo "update tuple res=$res\n";
 
-$tnt->select(0,0,1);
+$tnt->select(NMSPACE,0,1);
 $tuple = $tnt->getTuple();
 var_dump($tuple);
 
 
-$res = $tnt->update(0,1,array(1 => 'z', 2=>'abc'));
+$res = $tnt->update(NMSPACE,1,array(1 => 'z', 2=>'abc'));
 echo "update tuple res=$res\n";
 
-$tnt->select(0,0,1);
+$tnt->select(NMSPACE,0,1);
 $tuple = $tnt->getTuple();
 var_dump($tuple);
 
 
 // Error  type inxex 0 must be NUM 
-$res = $tnt->update(0,1,array(0 => 'z', 2=>'abc'));
+$res = $tnt->update(NMSPACE,1,array(0 => 'z', 2=>'abc'));
 echo "update tuple res=$res\n";
 if (!$res)
     echo $tnt->getError();

@@ -228,38 +228,6 @@ static int php_tnt_connect( tarantool_object *ctx TSRMLS_DC) {
 		return 0;		
 }
 
-static void php_tnt_tuple2data(HashTable *pht, u_char ** p TSRMLS_DC) {
-	HashPosition pos; 
-	zval **curr;
-	
-	for(zend_hash_internal_pointer_reset_ex(pht, &pos); 
-	  zend_hash_get_current_data_ex(pht, (void **) &curr, &pos) == SUCCESS; 
-	  zend_hash_move_forward_ex(pht, &pos)) { 
-	
-		if (Z_TYPE_PP(curr) == IS_STRING)  {
-			char * strval = Z_STRVAL_PP(curr);
-			int str_len = Z_STRLEN_PP(curr);
-			
-			u_char str_shortlen = (u_char)str_len;
-			
-			**(p++) = str_shortlen;
-			memcpy(*p, strval, str_len);
-			*p += str_len;
-		}
-		/*
-		if (Z_TYPE_PP(curr) == IS_LONG)  {
-		   unsigned long val = Z_LVAL_PP(curr);		
-		   
-		   u_char leb_size = (u_char)leb128_size( val);	
-		   *(p++) = leb_size;
-		   leb128_write( (char *)p, val);
-		   p += leb_size;	
-		} 
-		*/
-	} 
-
-}
-
 /* {{{ proto tarantool::__construct( string string host=localhost, int port=PORT)
    tarantool constructor */
 PHP_METHOD(tarantool_class, __construct)
@@ -707,15 +675,14 @@ PHP_METHOD(tarantool_class, getTuple )
 
 			case 4 : {
 				if ( isprint(*bb2) && isprint(*(bb2+1)) && isprint(*(bb2+2)) && isprint(*(bb2+3)) ) {
-//					printf("tuple element '%c %c %c'%c len=%d\n",*bb2,*(bb2+1),*(bb2+2),*(bb2+3), len);	
 					is_string = true;
 				} else {
-//					pb = (b2i*) p+2;
-//					value = (unsigned long) pb->i;
-					leb128_read(bb2, len, &value);
-//					printf("tuple element(int) %d len=%d\n",value, len);					
-					is_string = false;
-				}	
+
+					pb = (b2i*) bb2;
+					value = (unsigned long) pb->i;				
+//				php_printf("tuple element(int) %d len=%d\n",value, len);					
+				is_string = false;					
+				}
 				break;
 			}
 			default :  {
