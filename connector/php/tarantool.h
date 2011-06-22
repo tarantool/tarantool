@@ -38,7 +38,7 @@ extern zend_module_entry tarantool_module_entry;
 #define TARANTOOL_ADMIN_PORT 33015
 
 #define TARANTOOL_DEF_HOST "localhost"
-#define TARANTOOL_BUFSIZE  256 
+#define TARANTOOL_BUFSIZE  2048 
 #define TARANTOOL_SMALL_BUFSIZE  256 
 
 #define TARANTOOL_INSERT  13 
@@ -55,8 +55,14 @@ extern zend_module_entry tarantool_module_entry;
 #define TARANTOOL_OP_XOR	3
 #define TARANTOOL_OP_OR		4
 
-#define TARANTOOL_SHOW_INFO "show info\n"
+#define TARANTOOL_SHOW_INFO "show info\r\n"
 #define TARANTOOL_SHOW_INFO_SIZE sizeof(TARANTOOL_SHOW_INFO) 
+
+#define TARANTOOL_SHOW_STAT "show stat\r\n"
+#define TARANTOOL_SHOW_STAT_SIZE sizeof(TARANTOOL_SHOW_STAT) 
+
+#define TARANTOOL_SHOW_CONF "show configuration\n"
+#define TARANTOOL_SHOW_CONF_SIZE sizeof(TARANTOOL_SHOW_CONF) 
 
 
 #ifdef ZTS
@@ -78,7 +84,8 @@ PHP_METHOD( tarantool_class, update);
 PHP_METHOD( tarantool_class, inc);
 PHP_METHOD( tarantool_class, getError);
 PHP_METHOD( tarantool_class, getInfo);
-
+PHP_METHOD( tarantool_class, getStat);
+PHP_METHOD( tarantool_class, getConf);
 #ifdef ZTS
 #define TARANTOOL_G(v) TSRMG(tarantool_globals_id, zend_tarantool_globals *, v)
 #else

@@ -162,7 +162,8 @@ zend_function_entry tarantool_class_functions[] = {
 	 PHP_ME(tarantool_class, inc,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, getError,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, getInfo,		NULL, ZEND_ACC_PUBLIC)
-	 
+	 PHP_ME(tarantool_class, getStat,		NULL, ZEND_ACC_PUBLIC)	 
+	 PHP_ME(tarantool_class, getConf,		NULL, ZEND_ACC_PUBLIC)	 	 
 	{NULL, NULL, NULL}	
 };
 
@@ -222,6 +223,7 @@ static int php_tnt_connect( tarantool_object *ctx TSRMLS_DC) {
 		if (err && errstr) {
 			php_printf("stream error: %s\n", errstr);	
 			ctx->stream = NULL;
+			efree(errstr);
 		}		
 		
 		if (!ctx->stream) {
@@ -256,6 +258,7 @@ static int php_tnt_admin_connect( tarantool_object *ctx TSRMLS_DC) {
 		if (err && errstr) {
 			php_printf("stream error: %s\n", errstr);	
 			ctx->admin_stream = NULL;
+			efree(errstr);
 		}		
 		
 		if (!ctx->admin_stream) {
@@ -451,7 +454,7 @@ PHP_METHOD(tarantool_class, select )
 	ctx->readed	= 0;		
 	ctx->errorcode	= 0;		
 
-	char out_buf[TARANTOOL_BUFSIZE];
+	char * out_buf = emalloc(TARANTOOL_BUFSIZE);
 	bzero(out_buf, TARANTOOL_BUFSIZE);
 	
 	Header * header = (Header *) out_buf;
@@ -561,12 +564,16 @@ PHP_METHOD(tarantool_class, select )
 	if (len != HEADER_SIZE) {
 			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
 			"write header error" ,0 TSRMLS_CC);
+			efree(out_buf);
+			return;
 	}
 	
 	len = php_stream_write(ctx->stream, (void*)select , header->len ); 	
 	if (len != header->len) {
 			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
 			"write request error" ,0 TSRMLS_CC);
+			efree(out_buf);
+			return;			
 	}
 
 	Header responseHeader;
@@ -576,6 +583,8 @@ PHP_METHOD(tarantool_class, select )
 	if (len != HEADER_SIZE) {
 			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
 			"read header error" ,0 TSRMLS_CC);
+			efree(out_buf);
+			return;			
 	}	
 
 	ctx->bodyLen = responseHeader.len;
@@ -586,6 +595,7 @@ PHP_METHOD(tarantool_class, select )
 	ctx->readed += len;
 	if (code > 0 || len != sizeof(uint32_t)) {
 		ctx->errorcode = code;					
+		efree(out_buf);
 		RETURN_FALSE;
 	}	
 //	
@@ -595,11 +605,13 @@ PHP_METHOD(tarantool_class, select )
 	if (len != sizeof(uint32_t)) {
 			zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C),
 			0 TSRMLS_CC,"read body error");	
+		efree(out_buf);	
 		return;	
 	}	
 
 	ctx->errorcode	= code;		
 	ctx->countTuples = tuples_count;
+	efree(out_buf);
 	
 	RETURN_LONG(ctx->countTuples);
 
@@ -874,6 +886,13 @@ PHP_METHOD(tarantool_class, delete)
 	p = (u_char*)delRequest;
 	len = php_stream_write(ctx->stream, (char*)p , header->len ); 
 
+	if (header->len + HEADER_SIZE > TARANTOOL_BUFSIZE) {
+			efree(buf);				
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"out of memory: the tuple is very big" ,0 TSRMLS_CC);
+			return;
+	}
+	
 	bzero(buf, header->len + HEADER_SIZE);
 	
 	len = php_stream_read(ctx->stream, buf, TARANTOOL_BUFSIZE);
@@ -1310,17 +1329,13 @@ PHP_METHOD(tarantool_class, getError)
 /* }}}*/
 
 
-/* {{{ proto string tarantool::getError();		
-   returb tarantool error string */
-   
+/* {{{ proto string tarantool::getInfo();		
+   return tarantool info string */   
 PHP_METHOD(tarantool_class, getInfo)
 {
 	zval *id;
 	tarantool_object *ctx;
 	size_t response_len=0;
-	char buf[TARANTOOL_SMALL_BUFSIZE];
-	bzero(buf,TARANTOOL_SMALL_BUFSIZE);
-
 
 	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "O", &id,
 		tarantool_class_entry) == FAILURE) {
@@ -1347,13 +1362,119 @@ PHP_METHOD(tarantool_class, getInfo)
 			"Failed sending command" ,0 TSRMLS_DC);
 		return;					
 	}	
+
+	char * buf=emalloc(TARANTOOL_SMALL_BUFSIZE);
+	bzero(buf,TARANTOOL_SMALL_BUFSIZE);
 			
 	response_len = php_stream_read(ctx->admin_stream, buf, TARANTOOL_SMALL_BUFSIZE);
 
 	if (response_len) {
-		RETURN_STRINGL(buf,response_len,1);
+		RETVAL_STRINGL(buf,response_len,1);
+		efree(buf);
+		return;
 	}
 	
+	efree(buf);	
+	RETURN_FALSE;
+		
+}
+/* }}}*/
+
+/* {{{ proto string tarantool::getConf();		
+   returb tarantool info string */   
+PHP_METHOD(tarantool_class, getConf)
+{
+	zval *id;
+	tarantool_object *ctx;
+	size_t response_len=0;
+
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "O", &id,
+		tarantool_class_entry) == FAILURE) {
+		return;
+	}
+	
+	ctx = (tarantool_object *)zend_object_store_get_object(id TSRMLS_CC);
+	if (!ctx) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"the context is null" ,0 TSRMLS_CC);
+		return;	
+	}		
+	
+	if (!ctx->admin_stream) {
+		if (php_tnt_admin_connect(ctx TSRMLS_CC)) {
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+				"the can't open remote host " ,0 TSRMLS_DC);
+			return;	
+		}			
+	}
+	
+	if (php_stream_write(ctx->admin_stream, TARANTOOL_SHOW_CONF, TARANTOOL_SHOW_CONF_SIZE) != TARANTOOL_SHOW_CONF_SIZE) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"Failed sending command" ,0 TSRMLS_DC);
+		return;					
+	}	
+			
+	char * buf = emalloc(TARANTOOL_BUFSIZE);
+	response_len = php_stream_read(ctx->admin_stream, buf, TARANTOOL_BUFSIZE);
+
+	if (response_len) {
+		RETVAL_STRINGL(buf,response_len,1);
+		efree(buf);
+		return;
+	}
+	
+	efree(buf);
+	RETURN_FALSE;
+		
+}
+/* }}}*/
+
+/* {{{ proto string tarantool::getStat();		
+   returb tarantool statistic string */
+PHP_METHOD(tarantool_class, getStat)
+{
+	zval *id;
+	tarantool_object *ctx;
+	size_t response_len=0;
+
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "O", &id,
+		tarantool_class_entry) == FAILURE) {
+		return;
+	}
+
+	ctx = (tarantool_object *)zend_object_store_get_object(id TSRMLS_CC);
+	if (!ctx) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"the context is null" ,0 TSRMLS_CC);
+		return;	
+	}		
+	
+	if (!ctx->admin_stream) {
+		if (php_tnt_admin_connect(ctx TSRMLS_CC)) {
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+				"the can't open remote host " ,0 TSRMLS_DC);
+			return;	
+		}			
+	}
+	
+	if (php_stream_write(ctx->admin_stream, TARANTOOL_SHOW_STAT, TARANTOOL_SHOW_STAT_SIZE) != TARANTOOL_SHOW_STAT_SIZE) {
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"Failed sending command" ,0 TSRMLS_DC);
+		return;					
+	}	
+			
+	char * buf = emalloc(TARANTOOL_SMALL_BUFSIZE);
+	bzero(buf,TARANTOOL_SMALL_BUFSIZE);
+
+	response_len = php_stream_read(ctx->admin_stream, buf, TARANTOOL_SMALL_BUFSIZE);
+
+	if (response_len) {
+		RETVAL_STRINGL(buf,response_len,1);
+		efree(buf);
+		return;
+	}
+
+	efree(buf);	
 	RETURN_FALSE;
 		
 }
