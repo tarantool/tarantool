@@ -86,6 +86,7 @@ PHP_METHOD( tarantool_class, getError);
 PHP_METHOD( tarantool_class, getInfo);
 PHP_METHOD( tarantool_class, getStat);
 PHP_METHOD( tarantool_class, getConf);
+
 #ifdef ZTS
 #define TARANTOOL_G(v) TSRMG(tarantool_globals_id, zend_tarantool_globals *, v)
 #else
