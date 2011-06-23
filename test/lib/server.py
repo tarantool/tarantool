@@ -23,6 +23,15 @@ def wait_until_connected(port):
     except socket.error as e:
       time.sleep(0.001)
 
+def check_port(port):
+  """Check if the port we're connecting to is available"""
+  try:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(("localhost", port))
+  except socket.error as e:
+     return
+  raise RuntimeError("The server is already running on port {0}".format(port))
+
 def prepare_gdb(args):
   """Prepare server startup arguments to run under gdb."""
   if "TERM" in os.environ:
@@ -165,6 +174,7 @@ class Server(object):
       version = self.version()
       print "Starting {0} {1}.".format(os.path.basename(self.binary),
                                        version)
+    check_port(self.port)
     args = self.prepare_args()
     if self.gdb:
       args = prepare_gdb(args)
