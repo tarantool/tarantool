@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2010, 2011 Mail.RU
+ * Copyright (C) 2010, 2011 Yuriy Vostrikov
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,6 +24,7 @@
  * SUCH DAMAGE.
  */
 #include "iproto.h"
+#include "exception.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -36,64 +37,78 @@
 
 const uint32_t msg_ping = 0xff00;
 
-static struct tbuf *
-iproto_parse(struct tbuf *in)
-{
-	if (in->len < sizeof(struct iproto_header))
-		return NULL;
-	if (in->len < sizeof(struct iproto_header) + iproto(in)->len)
-		return NULL;
-
-	return tbuf_split(in, sizeof(struct iproto_header) + iproto(in)->len);
-}
+static void iproto_reply(iproto_callback callback, struct tbuf *request);
 
 void
-iproto_interact(void *data)
+iproto_interact(iproto_callback callback)
 {
-	uint32_t (*callback) (uint32_t msg, struct tbuf *requst_data) = data;
-	struct tbuf *request;
-	struct iproto_header_retcode *reply;
-	ssize_t r;
+	struct tbuf *in = fiber->rbuf;
+	ssize_t to_read = sizeof(struct iproto_header);
 
 	for (;;) {
-		if (fiber_bread(fiber->rbuf, sizeof(struct iproto_header)) <= 0)
+		if (to_read > 0 && fiber_bread(in, to_read) <= 0)
 			break;
-		while ((request = iproto_parse(fiber->rbuf)) != NULL) {
-			reply = palloc(fiber->pool, sizeof(*reply));
-			reply->msg_code = iproto(request)->msg_code;
-			reply->sync = iproto(request)->sync;
 
-			if (unlikely(reply->msg_code == msg_ping)) {
-				reply->len = 0;
-				add_iov(reply, sizeof(struct iproto_header));
-			} else {
-				add_iov(reply, sizeof(struct iproto_header_retcode));
-				/* j is last used iov in loop */
-				int j = fiber->iov_cnt;
+		ssize_t request_len = sizeof(struct iproto_header) + iproto(in)->len;
+		to_read = request_len - in->len;
 
-				/* make requst point to iproto data */
-				u32 msg_code = iproto(request)->msg_code;
-				request->len = iproto(request)->len;
-				request->data = iproto(request)->data;
-				u32 err = callback(msg_code, request);
-				reply->ret_code = tnt_errcode_val(err);
+		if (to_read > 0 && fiber_bread(in, to_read) <= 0)
+			break;
 
-				/*
-				 * retcode is uint32_t and included int struct iproto_header_retcode
-				 * but we has to count it anyway
-				 */
-				reply->len = sizeof(uint32_t);
+		struct tbuf *request = tbuf_split(in, request_len);
+		iproto_reply(callback, request);
 
-				for (; j < fiber->iov_cnt; j++)
-					reply->len += iovec(fiber->iov)[j].iov_len;
+		to_read = sizeof(struct iproto_header) - in->len;
+
+		/*
+		 * Flush output and garbage collect before reading
+		 * next header.
+		 */
+		if (to_read > 0) {
+			if (fiber_flush_output() < 0) {
+				say_warn("io_error: %s", strerror(errno));
+				break;
 			}
-		}
-		r = fiber_flush_output();
-		fiber_gc();
-
-		if (r < 0) {
-			say_warn("io_error: %s", strerror(errno));
-			break;
+			fiber_gc();
+			/* Must be reset after fiber_gc() */
+			in = fiber->rbuf;
 		}
 	}
+}
+
+/** Stack a reply to a single request to the fiber's io vector. */
+
+static void iproto_reply(iproto_callback callback, struct tbuf *request)
+{
+	struct iproto_header_retcode *reply;
+
+	reply = palloc(fiber->pool, sizeof(*reply));
+	reply->msg_code = iproto(request)->msg_code;
+	reply->sync = iproto(request)->sync;
+
+	if (unlikely(reply->msg_code == msg_ping)) {
+		reply->len = 0;
+		add_iov(reply, sizeof(struct iproto_header));
+		return;
+	}
+
+	reply->len = sizeof(uint32_t); /* ret_code */
+	add_iov(reply, sizeof(struct iproto_header_retcode));
+	size_t saved_iov_cnt = fiber->iov_cnt;
+	/* make request point to iproto data */
+	request->len = iproto(request)->len;
+	request->data = iproto(request)->data;
+
+	@try {
+		callback(reply->msg_code, request);
+		reply->ret_code = 0;
+	}
+	@catch (ClientError *e) {
+		fiber->iov->len -= (fiber->iov_cnt - saved_iov_cnt) * sizeof(struct iovec);
+		fiber->iov_cnt = saved_iov_cnt;
+		reply->ret_code = tnt_errcode_val(e->errcode);
+		add_iov_dup(e->errmsg, strlen(e->errmsg)+1);
+	}
+	for (; saved_iov_cnt < fiber->iov_cnt; saved_iov_cnt++)
+		reply->len += iovec(fiber->iov)[saved_iov_cnt].iov_len;
 }

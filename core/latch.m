@@ -21,7 +21,8 @@
  * SUCH DAMAGE.
  */
 
-#include <latch.h>
+#include "latch.h"
+#include "fiber.h"
 
 void
 tnt_latch_init(struct tnt_latch *latch)

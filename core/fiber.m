@@ -56,7 +56,7 @@
 #include <pickle.h>
 #include "diagnostics.h"
 
-@implementation tnt_FiberCancelException
+@implementation FiberCancelException
 @end
 
 static struct fiber sched;
@@ -190,7 +190,7 @@ fiber_testcancel(void)
 	if (!(fiber->flags & FIBER_CANCEL))
 		return;
 
-	tnt_raise(tnt_FiberCancelException, reason:"fiber_testcancel");
+	tnt_raise(FiberCancelException);
 }
 
 /** Change the current cancellation state of a fiber. This is not
@@ -441,7 +441,7 @@ fiber_loop(void *data __attribute__((unused)))
 		@try {
 			fiber->f(fiber->f_data);
 		}
-		@catch (tnt_FiberCancelException *e) {
+		@catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled", fiber->name);
 
 			if (fiber->waiter != NULL) {
@@ -451,11 +451,6 @@ fiber_loop(void *data __attribute__((unused)))
 			}
 
 			say_info("fiber `%s': exiting", fiber->name);
-		}
-		@catch (tnt_Exception *e) {
-			say_error("fiber `%s': exception `%s': `%s'",
-				  fiber->name, [e name], e->reason);
-			panic("fiber `%s': exiting", fiber->name);
 		}
 		@catch (id e) {
 			say_error("fiber `%s': exception `%s'", fiber->name, [e name]);
@@ -706,7 +701,7 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 }
 
 void
-add_iov_dup(void *buf, size_t len)
+add_iov_dup(const void *buf, size_t len)
 {
 	void *copy = palloc(fiber->pool, len);
 	memcpy(copy, buf, len);
@@ -1152,7 +1147,7 @@ tcp_server_handler(void *data)
 
 	fiber_io_start(EV_READ);
 	for (;;) {
-		fiber_io_yield(EV_READ);
+		fiber_io_yield();
 
 		while ((fd = accept(fiber->fd, NULL, NULL)) > 0) {
 			if (set_nonblock(fd) == -1) {

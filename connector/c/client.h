@@ -43,6 +43,7 @@ struct tnt_result
 {
 	/** Server error or 0. */
 	uint32_t errcode;
+	const char *errmsg;
 };
 
 

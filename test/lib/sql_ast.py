@@ -24,39 +24,43 @@ DELETE_REQUEST_TYPE = 20
 PING_REQUEST_TYPE = 65280
 
 ER = {
- 0x00000000: ("ERR_CODE_OK"                  , "OK")                                      ,
- 0x00000102: ("ERR_CODE_NONMASTER"           ,  "Non master connection, but it should be"),
- 0x00000202: ("ERR_CODE_ILLEGAL_PARAMS"      ,  "Illegal parameters")                     ,
- 0x00000302: ("ERR_CODE_BAD_UID"             ,  "Uid not from this storage range")        ,
- 0x00000401: ("ERR_CODE_NODE_IS_RO"          ,  "Node is marked as read-only")            ,
- 0x00000501: ("ERR_CODE_NODE_IS_NOT_LOCKED"  ,  "Node isn't locked")                      ,
- 0x00000601: ("ERR_CODE_NODE_IS_LOCKED"      ,  "Node is locked")                         ,
- 0x00000701: ("ERR_CODE_MEMORY_ISSUE"        ,  "Some memory issues")                     ,
- 0x00000802: ("ERR_CODE_BAD_INTEGRITY"       ,  "Bad graph integrity")                    ,
- 0x00000a02: ("ERR_CODE_UNSUPPORTED_COMMAND" ,  "Unsupported command")                    ,
- 0x00001801: ("ERR_CODE_CANNOT_REGISTER"     ,  "Can not register new user")              ,
- 0x00001a01: ("ERR_CODE_CANNOT_INIT_ALERT_ID",  "Can not generate alert id")              ,
- 0x00001b02: ("ERR_CODE_CANNOT_DEL"          ,  "Can\'t del node")                        ,
- 0x00001c02: ("ERR_CODE_USER_NOT_REGISTERED" ,  "User isn\'t registered")                 ,
- 0x00001d02: ("ERR_CODE_SYNTAX_ERROR"        ,  "Syntax error in query")                  ,
- 0x00001e02: ("ERR_CODE_WRONG_FIELD"         ,  "Unknown field")                          ,
- 0x00001f02: ("ERR_CODE_WRONG_NUMBER"        ,  "Number value is out of range")           ,
- 0x00002002: ("ERR_CODE_DUPLICATE"           ,  "Insert already existing object")         ,
- 0x00002202: ("ERR_CODE_UNSUPPORTED_ORDER"   ,  "Can not order result")                   ,
- 0x00002302: ("ERR_CODE_MULTIWRITE"          ,  "Multiple to update/delete")              ,
- 0x00002400: ("ERR_CODE_NOTHING"             ,  "nothing to do (not an error)")           ,
- 0x00002502: ("ERR_CODE_UPDATE_ID"           ,  "id\'s update")                           ,
- 0x00002602: ("ERR_CODE_WRONG_VERSION"       ,  "Unsupported version of protocol")        ,
- 0x00002702: ("ERR_CODE_UNKNOWN_ERROR"       ,  "")                                       ,
- 0x00003102: ("ERR_CODE_NODE_NOT_FOUND"      ,  "")                                       ,
- 0x00003702: ("ERR_CODE_NODE_FOUND"          ,  "")                                       ,
- 0x00003802: ("ERR_CODE_INDEX_VIOLATION"     ,  "")                                       ,
- 0x00003902: ("ERR_CODE_NO_SUCH_NAMESPACE"   ,  "No namespace with specified id exists")  ,
+    0: "ER_OK"                  ,
+    1: "ER_NONMASTER"           ,
+    2: "ER_ILLEGAL_PARAMS"      ,
+    3: "ER_BAD_UID"             ,
+    4: "ER_TUPLE_IS_RO"         ,
+    5: "ER_TUPLE_IS_NOT_LOCKED" ,
+    6: "ER_TUPLE_IS_LOCKED"     ,
+    7: "ER_MEMORY_ISSUE"        ,
+    8: "ER_BAD_INTEGRITY"       ,
+   10: "ER_UNSUPPORTED_COMMAND" ,
+   24: "ER_CANNOT_REGISTER"     ,
+   26: "ER_CANNOT_INIT_ALERT_ID",
+   27: "ER_CANNOT_DEL"          ,
+   28: "ER_USER_NOT_REGISTERED" ,
+   29: "ER_SYNTAX_ERROR"        ,
+   30: "ER_WRONG_FIELD"         ,
+   31: "ER_WRONG_NUMBER"        ,
+   32: "ER_DUPLICATE"           ,
+   34: "ER_UNSUPPORTED_ORDER"   ,
+   35: "ER_MULTIWRITE"          ,
+   36: "ER_NOTHING"             ,
+   37: "ER_UPDATE_ID"           ,
+   38: "ER_WRONG_VERSION"       ,
+   39: "ER_WAL_IO"              ,
+   49: "ER_TUPLE_NOT_FOUND"     ,
+   52: "ER_NAMESPACE_DISABLED"  ,
+   53: "ER_NO_SUCH_INDEX"       ,
+   54: "ER_NO_SUCH_FIELD"       ,
+   55: "ER_TUPLE_FOUND"         ,
+   56: "ER_INDEX_VIOLATION"     ,
+   57: "ER_NO_SUCH_NAMESPACE"
 }
 
-def format_error(return_code):
-  return "An error occurred: {0}, \'{1}'".format(ER[return_code][0],
-                                                 ER[return_code][1])
+
+def format_error(return_code, response):
+  return "An error occurred: {0}, \'{1}'".format(ER[return_code >> 8],
+                                                 response[4:])
 
 
 def save_varint32(value):
@@ -185,9 +189,9 @@ class StatementInsert(StatementPing):
   def unpack(self, response):
     (return_code,) = struct.unpack("<L", response[:4])
     if return_code:
-      return format_error(return_code)
-    (result_code, row_count) = struct.unpack("<LL", response)
-    return "Insert OK, {0} row affected".format(row_count)
+      return format_error(return_code, response)
+    (tuple_count,) = struct.unpack("<L", response[4:8])
+    return "Insert OK, {0} row affected".format(tuple_count)
 
 
 class StatementUpdate(StatementPing):
@@ -212,9 +216,9 @@ class StatementUpdate(StatementPing):
   def unpack(self, response):
     (return_code,) = struct.unpack("<L", response[:4])
     if return_code:
-      return format_error(return_code)
-    (result_code, row_count) = struct.unpack("<LL", response)
-    return "Update OK, {0} row affected".format(row_count)
+      return format_error(return_code, response)
+    (tuple_count,) = struct.unpack("<L", response[4:8])
+    return "Update OK, {0} row affected".format(tuple_count)
 
 class StatementDelete(StatementPing):
   reqeust_type = DELETE_REQUEST_TYPE
@@ -235,9 +239,9 @@ class StatementDelete(StatementPing):
   def unpack(self, response):
     (return_code,) = struct.unpack("<L", response[:4])
     if return_code:
-      return format_error(return_code)
-    (result_code, row_count) = struct.unpack("<LL", response)
-    return "Delete OK, {0} row affected".format(row_count)
+      return format_error(return_code, response)
+    (tuple_count,) = struct.unpack("<L", response[4:8])
+    return "Delete OK, {0} row affected".format(tuple_count)
 
 class StatementSelect(StatementPing):
   reqeust_type = SELECT_REQUEST_TYPE
@@ -274,9 +278,9 @@ class StatementSelect(StatementPing):
     return buf[:offset]
 
   def unpack(self, response):
-    if len(response) == 4:
-      (return_code,) = struct.unpack("<L", response[:4])
-      return format_error(return_code)
+    (return_code,) = struct.unpack("<L", response[:4])
+    if return_code:
+      return format_error(return_code, response)
     (tuple_count,) = struct.unpack("<L", response[4:8])
     tuples = []
     offset = 8

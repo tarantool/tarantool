@@ -29,35 +29,64 @@
 #include "exception.h"
 #include "say.h"
 
+
 @implementation tnt_Exception
-+ alloc
++ (id) alloc
 {
 	static __thread tnt_Exception *e = nil;
 
-	if (![e isKindOf:self]) {
+	if ([e isKindOf:self]) {
+		*(Class *) e = self;
+	} else {
 		[e free];
 		e = [super alloc];
 	}
-
 	return e;
 }
+@end
 
-- init:(const char *)p_file:(unsigned)p_line reason:(const char *)p_reason
+
+@implementation ClientError
+- (id) init: (uint32_t)errcode_, ...
 {
-	[super init];
-
-	file = p_file;
-	line = p_line;
-
-	reason = p_reason;
+	va_list ap;
+	va_start(ap, errcode_);
+	[self init: errcode_ args: ap];
+	va_end(ap);
 
 	return self;
 }
 
-- init:(const char *)p_file:(unsigned)p_line
-{
-	return [self init:p_file:p_line reason:"unknown"];
-}
 
+- (id) init: (uint32_t)errcode_ args: (va_list)ap
+{
+	[super init];
+	errcode = errcode_;
+	vsnprintf(errmsg, sizeof(errmsg), tnt_errcode_desc(errcode), ap);
+	return self;
+}
+@end
+
+
+@implementation LoggedError
+- (id) init: (uint32_t) errcode_, ...
+{
+	va_list ap;
+	va_start(ap, errcode_);
+	[super init: errcode_ args: ap];
+
+	say_error("%s at %s:%d, %s", [self name], file, line, errmsg);
+
+	return self;
+}
+@end
+
+
+@implementation IllegalParams
+- (id) init: (const char*) msg
+{
+	printf("IllegalParams init\n");
+	return [super init: ER_ILLEGAL_PARAMS, msg];
+}
 @end
 

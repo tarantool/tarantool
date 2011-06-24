@@ -167,7 +167,7 @@
 ; Even this type awareness is very limited: it's only used when
 ; the field participates in an index. For example, when a numeric
 ; 32-bit index is defined on a field, and a non-32-bit value
-; is supplied for that field, an ERR_CODE_BAD_PARAMS
+; is supplied for that field, an ER_BAD_PARAMS
 ; is returned.
 ;
 
@@ -297,7 +297,7 @@
 ; it can be deduced from the error code. There are only
 ; 3 completion status codes in use:
 ; 0  - success; The only possible error code with this status is
-       0, ERR_CODE_OK
+       0, ER_OK
 ; 1  - try again; An indicator of an intermittent error.
 ;      Usually is returned when two clients attempt to change
 ;      the same tuple simultaneously.
@@ -308,45 +308,45 @@
 ;
 ;  Completion status 0 (success)
 ;  -----------------------------
-;  0x00000000 -- ERR_CODE_OK
+;  0x00000000 -- ER_OK
 ;
 ;  Completion status 1 (try again)
 ;  -------------------------------
-;  0x00000401 -- ERR_CODE_NODE_IS_RO
+;  0x00000401 -- ER_TUPLE_IS_RO
 ;                The requested data is blocked from modification
 ;
-;  0x00000601 -- ERR_CODE_NODE_IS_LOCKED
+;  0x00000601 -- ER_TUPLE_IS_LOCKED
 ;                The requested data is not available
 ;
-;  0x00000701 -- ERR_CODE_MEMORY_ISSUE
+;  0x00000701 -- ER_MEMORY_ISSUE
 ;                An error occurred when allocating memory
 ;
 ;  Completion status 2 (error)
 ;  ---------------------------
 ;
-;  0x00000102  -- ERR_CODE_NONMASTER
-;                 An attempt was made to change data on a read-only port
+;  0x00000102 -- ER_NONMASTER
+;                An attempt was made to change data on a read-only port
 ;
-;  0x00000202  -- ERR_CODE_ILLEGAL_PARAMS
-;                 Malformed query
+;  0x00000202 -- ER_ILLEGAL_PARAMS
+;                Malformed query
 ;
-;  0x00000a02 -- ERR_CODE_UNSUPPORTED_COMMAND
+;  0x00000a02 -- ER_UNSUPPORTED_COMMAND
 ;                The query is not recognized
 ;
-;  0x00001e02 -- ERR_CODE_WRONG_FIELD
+;  0x00001e02 -- ER_WRONG_FIELD
 ;                An unknown field was requested
 ;
-;  0x00001f02 -- ERR_CODE_WRONG_NUMBER
+;  0x00001f02 -- ER_WRONG_NUMBER
 ;                An out-of-range numeric value was included in the query
 ;
-;  0x00002002 -- ERR_CODE_DUPLICATE
+;  0x00002002 -- ER_DUPLICATE
 ;                An attempt was made to create an object with an existing key.
 ;
-;  0x000026002 -- ERR_CODE_WRONG_VERSION
-;                 The protocol version is not supported
+;  0x00002602 -- ER_WRONG_VERSION
+;                The protocol version is not supported
 ;
-;  0x000027002 -- ERR_CODE_UNKNOWN_ERROR
-;                 Unknown error
+;  0x00002702 -- ER_WAL_IO
+;                WAL I/O error
 ;
 ; Convenience that define hexadecimal constants for <int32>
 ; return codes (completion status + code) can be found in

@@ -29,29 +29,68 @@
  * SUCH DAMAGE.
  */
 #import <objc/Object.h>
+#include <stdarg.h>
+#include "errcode.h"
 
 /** The base class for all exceptions.
  *
  * Note: implements garbage collection (see +alloc
  * implementation).
  */
-
 @interface tnt_Exception: Object {
 	@public
 		const char *file;
 		unsigned line;
-		const char *reason;
 }
 
-+ alloc;
-
-- init:(const char *)p_file:(unsigned)p_line reason:(const char*)p_reason;
-- init:(const char *)p_file:(unsigned)p_line;
++ (id) alloc;
 @end
 
-#define tnt_raise(class, message) {					\
-	say_debug("tnt_raise %s at %s:%i", #class, __FILE__, __LINE__);	\
-	@throw [[class alloc] init:__FILE__:__LINE__ message];		\
+
+/** Errors that should make it to the client.
+ */
+@interface ClientError: tnt_Exception {
+	@public
+		uint32_t errcode;
+		char errmsg[TNT_ERRMSG_MAX];
 }
+
+- (id) init: (uint32_t)errcode_, ...;
+- (id) init: (uint32_t)errcode_ args: (va_list)ap;
+@end
+
+
+/** Additionally log this error in the log file. */
+@interface LoggedError: ClientError
+- (id) init: (uint32_t)errcode, ...;
+@end
+
+
+/** A handy wrapper for ER_ILLEGAL_PARAMS, which is used very
+ * often.
+ */
+@interface IllegalParams: LoggedError
+- (id) init: (const char *)msg;
+@end
+
+
+/**
+ * A helper macro to add __FILE__ and __LINE__ information to
+ * raised exceptions.
+ *
+ * Usage:
+ *
+ * tnt_raise(tnt_Exception);
+ * tnt_raise(LoggedError, :"invalid argument %d", argno);
+ */
+#define tnt_raise(...) tnt_raise0(__VA_ARGS__)
+#define tnt_raise0(class, ...) do {					\
+	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
+	class *exception = [class alloc];				\
+	exception->file = __FILE__;					\
+	exception->line = __LINE__;					\
+	[exception init __VA_ARGS__];					\
+	@throw exception;						\
+} while (0)
 
 #endif /* TARANTOOL_EXCEPTION_H_INCLUDED */

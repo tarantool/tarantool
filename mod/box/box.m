@@ -87,26 +87,6 @@ struct box_snap_row {
 	u8 data[];
 } __attribute__((packed));
 
-@implementation tnt_BoxException
-- init:(const char *)p_file:(unsigned)p_line reason:(const char *)p_reason errcode:(u32)p_errcode
-{
-	[super init:p_file:p_line reason:p_reason];
-
-	errcode = p_errcode;
-
-	if (errcode != ERR_CODE_NODE_IS_RO)
-		say_error("tnt_BoxException: %s/`%s' at %s:%i",
-			  tnt_errcode_desc(errcode), reason, file, line);
-
-	return self;
-}
-
-- init:(const char *)p_file:(unsigned)p_line errcode:(u32)p_errcode
-{
-	return [self init:p_file:p_line reason:"unknown" errcode:p_errcode];
-}
-
-@end
 
 static inline struct box_snap_row *
 box_snap_row(const struct tbuf *t)
@@ -116,20 +96,6 @@ box_snap_row(const struct tbuf *t)
 
 static void tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple);
 
-box_hook_t *before_commit_update_hook;
-
-static void
-run_hooks(struct box_txn *txn, box_hook_t * hook)
-{
-	if (hook != NULL) {
-		for (int i = 0; hook[i] != NULL; i++) {
-			int result = (*hook[i]) (txn);
-			if (result != ERR_CODE_OK)
-				tnt_raise(tnt_BoxException,
-					  reason:"hook returned error" errcode:result);
-		}
-	}
-}
 
 void *
 next_field(void *f)
@@ -156,7 +122,7 @@ static void
 lock_tuple(struct box_txn *txn, struct box_tuple *tuple)
 {
 	if (tuple->flags & WAL_WAIT)
-		tnt_raise(tnt_BoxException, reason:"tuple is locked" errcode:ERR_CODE_NODE_IS_RO);
+		tnt_raise(ClientError, :ER_TUPLE_IS_RO);
 
 	say_debug("lock_tuple(%p)", tuple);
 	txn->lock_tuple = tuple;
@@ -215,11 +181,11 @@ tuple_print(struct tbuf *buf, uint8_t cardinality, void *f)
 static struct box_tuple *
 tuple_alloc(size_t size)
 {
-	struct box_tuple *tuple = salloc(sizeof(struct box_tuple) + size);
+	size_t total = sizeof(struct box_tuple) + size;
+	struct box_tuple *tuple = salloc(total);
 
 	if (tuple == NULL)
-		tnt_raise(tnt_BoxException,
-			  reason:"can't allocate tuple" errcode:ERR_CODE_MEMORY_ISSUE);
+		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, total, "slab allocator", "tuple");
 
 	tuple->flags = tuple->refs = 0;
 	tuple->flags |= NEW;
@@ -263,11 +229,10 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 {
 	assert(data != NULL);
 	if (cardinality == 0)
-		tnt_raise(tnt_BoxException,
-			  reason:"cardinality can't be equal to 0" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"tuple cardinality is 0");
+
 	if (data->len == 0 || data->len != valid_tuple(data, cardinality))
-		tnt_raise(tnt_BoxException,
-			  reason:"tuple encoding error" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"incorrect tuple length");
 
 	txn->tuple = tuple_alloc(data->len);
 	tuple_txn_ref(txn, txn->tuple);
@@ -280,14 +245,12 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		tuple_txn_ref(txn, txn->old_tuple);
 
 	if (txn->flags & BOX_ADD && txn->old_tuple != NULL)
-		tnt_raise(tnt_BoxException, reason:"tuple found" errcode:ERR_CODE_NODE_FOUND);
+		tnt_raise(ClientError, :ER_TUPLE_FOUND);
 
 	if (txn->flags & BOX_REPLACE && txn->old_tuple == NULL)
-		tnt_raise(tnt_BoxException,
-			  reason:"tuple not found" errcode:ERR_CODE_NODE_NOT_FOUND);
+		tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
 
 	validate_indexes(txn);
-	run_hooks(txn, before_commit_update_hook);
 
 	if (txn->old_tuple != NULL) {
 #ifndef NDEBUG
@@ -363,12 +326,10 @@ static void
 do_field_arith(u8 op, struct tbuf *field, void *arg, u32 arg_size)
 {
 	if (field->len != 4)
-		tnt_raise(tnt_BoxException,
-			  reason:"num op on field with length != 4"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"numeric operation on a field with length != 4");
+
 	if (arg_size != 4)
-		tnt_raise(tnt_BoxException,
-			  reason:"num op with arg not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"the argument of a numeric operation is not a 4-byte int");
 
 	switch (op) {
 	case 1:
@@ -407,8 +368,7 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 	length_field = read_field(&args);
 	list_field = read_field(&args);
 	if (args.len != 0)
-		tnt_raise(tnt_BoxException,
-			  reason:"do_field_splice: bad args" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"field splice: bad arguments");
 
 	offset_size = load_varint32(&offset_field);
 	if (offset_size == 0)
@@ -417,16 +377,14 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 		offset = pick_u32(offset_field, &offset_field);
 		if (offset < 0) {
 			if (field->len < -offset)
-				tnt_raise(tnt_BoxException,
-					  reason:"do_field_splice: noffset is negative"
-					  errcode:ERR_CODE_ILLEGAL_PARAMS);
+				tnt_raise(IllegalParams,
+					  :"field splice: offset is negative");
 			noffset = offset + field->len;
 		} else
 			noffset = offset;
 	} else
-		tnt_raise(tnt_BoxException,
-			  reason:"do_field_splice: bad size of offset field"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"field splice: wrong size of offset");
+
 	if (noffset > field->len)
 		noffset = field->len;
 
@@ -435,9 +393,8 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 		nlength = field->len - noffset;
 	else if (length_size == sizeof(length)) {
 		if (offset_size == 0)
-			tnt_raise(tnt_BoxException,
-				  reason:"do_field_splice: offset field is empty but length is not"
-				  errcode:ERR_CODE_ILLEGAL_PARAMS);
+			tnt_raise(IllegalParams,
+				  :"field splice: offset is empty but length is not");
 
 		length = pick_u32(length_field, &length_field);
 		if (length < 0) {
@@ -448,21 +405,17 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 		} else
 			nlength = length;
 	} else
-		tnt_raise(tnt_BoxException,
-			  reason:"do_field_splice: bad size of length field"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"field splice: wrong size of length");
+
 	if (nlength > (field->len - noffset))
 		nlength = field->len - noffset;
 
 	list_size = load_varint32(&list_field);
 	if (list_size > 0 && length_size == 0)
-		tnt_raise(tnt_BoxException,
-			  reason:"do_field_splice: length field is empty but list is not"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams,
+			  :"field splice: length field is empty but list is not");
 	if (list_size > (UINT32_MAX - (field->len - nlength)))
-		tnt_raise(tnt_BoxException,
-			  reason:"do_field_splice: list_size is too long"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"field splice: list_size is too long");
 
 	say_debug("do_field_splice: noffset = %i, nlength = %i, list_size = %u",
 		  noffset, nlength, list_size);
@@ -487,17 +440,17 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 
 	u32 key_len = read_u32(data);
 	if (key_len != 1)
-		tnt_raise(tnt_BoxException,
-			  reason:"key must be single valued" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key must be single valued");
+
 	key = read_field(data);
 	op_cnt = read_u32(data);
 
 	if (op_cnt > 128)
-		tnt_raise(tnt_BoxException, reason:"too many ops" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"too many operations for update");
 	if (op_cnt == 0)
-		tnt_raise(tnt_BoxException, reason:"no ops" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"no operations for update");
 	if (key == NULL)
-		tnt_raise(tnt_BoxException, reason:"invalid key" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"invalid key");
 
 	txn->old_tuple = txn->index->find(txn->index, key);
 	if (txn->old_tuple == NULL) {
@@ -529,17 +482,14 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 		field_no = read_u32(data);
 
 		if (field_no >= txn->old_tuple->cardinality)
-			tnt_raise(tnt_BoxException,
-				  reason:"update of field beyond tuple cardinality"
-				  errcode:ERR_CODE_ILLEGAL_PARAMS);
+			tnt_raise(ClientError, :ER_NO_SUCH_FIELD, field_no);
 
 		struct tbuf *sptr_field = fields[field_no];
 
 		op = read_u8(data);
 		if (op > 5)
-			tnt_raise(tnt_BoxException,
-				  reason:"op is not 0, 1, 2, 3, 4 or 5"
-				  errcode:ERR_CODE_ILLEGAL_PARAMS);
+			tnt_raise(IllegalParams, :"op is not 0, 1, 2, 3, 4 or 5");
+
 		arg = read_field(data);
 		arg_size = load_varint32(&arg);
 
@@ -563,8 +513,7 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 	}
 
 	if (data->len != 0)
-		tnt_raise(tnt_BoxException,
-			  reason:"can't unpack request" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"can't unpack request");
 
 	size_t bsize = 0;
 	for (int i = 0; i < txn->old_tuple->cardinality; i++)
@@ -581,11 +530,9 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 	}
 
 	validate_indexes(txn);
-	run_hooks(txn, before_commit_update_hook);
 
 	if (data->len != 0)
-		tnt_raise(tnt_BoxException,
-			  reason:"can't unpack request" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"can't unpack request");
 
 out:
 	if (!(txn->flags & BOX_QUIET)) {
@@ -620,9 +567,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 	uint32_t *found;
 	u32 count = read_u32(data);
 	if (count == 0)
-		tnt_raise(tnt_BoxException,
-			  reason:"tuple count must be greater than zero"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"tuple count must be positive");
 
 	found = palloc(fiber->pool, sizeof(*found));
 	add_iov(found, sizeof(*found));
@@ -670,9 +615,8 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 
 			u32 key_len = read_u32(data);
 			if (key_len != 1)
-				tnt_raise(tnt_BoxException,
-					  reason:"key must be single valued"
-					  errcode:ERR_CODE_ILLEGAL_PARAMS);
+				tnt_raise(IllegalParams, :"key must be single valued");
+
 			void *key = read_field(data);
 			tuple = txn->index->find(txn->index, key);
 			if (tuple == NULL || tuple->flags & GHOST)
@@ -689,8 +633,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 	}
 
 	if (data->len != 0)
-		tnt_raise(tnt_BoxException,
-			  reason:"can't unpack request" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"can't unpack request");
 }
 
 static void __attribute__((noinline))
@@ -745,47 +688,43 @@ txn_alloc(u32 flags)
 }
 
 /**
-  * Validate the request and start a transaction associated with that request.
-  * 
-  * This function does too much:
-  * - parses the request,
-  * - takes a "savepoint" of fiber->iov_cnt,
-  * - performs a "name resolution", i.e. find the namespace object
+  * Validate the request and start a transaction associated with
+  * that request:
+  *
+  * - parse the request,
+  * - perform a "name resolution", i.e. find the namespace object
   *   associated with the request.
-  * @todo: split in smaller blocks. 
   */
 
 static void
 txn_begin(struct box_txn *txn, u16 op, struct tbuf *data)
 {
-	txn->saved_iov_cnt = fiber->iov_cnt;
-
 	txn->op = op;
 	txn->req = (struct tbuf){ .data = data->data, .len = data->len };
 	txn->n = read_u32(data);
-	if (txn->n < 0 || txn->n > namespace_count - 1)
-		tnt_raise(tnt_BoxException,
-			  reason:"bad namespace number" errcode:ERR_CODE_NO_SUCH_NAMESPACE);
-	txn->index = &namespace[txn->n].index[0];
 
-	if (!namespace[txn->n].enabled) {
-		say_warn("namespace %i is not enabled", txn->n);
-		tnt_raise(tnt_BoxException,
-			  reason:"namespace is not enabled" errcode:ERR_CODE_NO_SUCH_NAMESPACE);
-	}
+	if (txn->n < 0 || txn->n > namespace_count - 1)
+		tnt_raise(ClientError, :ER_NO_SUCH_NAMESPACE, txn->n);
 
 	txn->namespace = &namespace[txn->n];
+
+	if (!txn->namespace->enabled)
+		tnt_raise(ClientError, :ER_NAMESPACE_DISABLED, txn->n);
+
+	txn->index = txn->namespace->index;
 }
 
 void
 txn_cleanup(struct box_txn *txn)
 {
 	/*
-	 * txn_cleanup maybe called twice in following scenario:
-	 * several request processed by single iproto loop run
-	 * first one successed, but the last one fails with OOM
-	 * in this case fiber perform fiber_cleanup for every registered callback
-	 * we should not not run cleanup twice.
+	 * txn_cleanup() may get called twice in the following
+	 * scenario: Several requests are processed by a single
+	 * iproto loop iteration. The first few requests are
+	 * handled successfully, but the next one fails with an
+	 * OOM. In this case, fiber performs fiber_cleanup() for
+	 * every registered callback. We should not run
+	 * txn_cleanup() twice.
 	 */
 	if (txn->op == 0)
 		return;
@@ -823,7 +762,7 @@ txn_commit(struct box_txn *txn)
 
 			i64 lsn = next_lsn(recovery_state, 0);
 			if (!wal_write(recovery_state, wal_tag, fiber->cookie, lsn, t))
-				tnt_raise(tnt_BoxException, errcode:ERR_CODE_WAL_IO);
+				tnt_raise(LoggedError, :ER_WAL_IO);
 			confirm_lsn(recovery_state, lsn);
 		}
 
@@ -847,8 +786,6 @@ txn_abort(struct box_txn *txn)
 	if (txn->op == 0)
 		return;
 
-	fiber->iov_cnt = txn->saved_iov_cnt;
-
 	if (!op_is_select(txn->op)) {
 		say_debug("box_rollback(op:%s)", messages_strs[txn->op]);
 
@@ -862,13 +799,13 @@ txn_abort(struct box_txn *txn)
 }
 
 static void
-box_dispach(struct box_txn *txn, struct tbuf *data)
+box_dispatch(struct box_txn *txn, struct tbuf *data)
 {
 	u32 cardinality;
 	void *key;
 	u32 key_len;
 
-	say_debug("box_dispach(%i)", txn->op);
+	say_debug("box_dispatch(%i)", txn->op);
 
 	switch (txn->op) {
 	case INSERT:
@@ -876,23 +813,18 @@ box_dispach(struct box_txn *txn, struct tbuf *data)
 		cardinality = read_u32(data);
 		if (namespace[txn->n].cardinality > 0
 		    && namespace[txn->n].cardinality != cardinality)
-			tnt_raise(tnt_BoxException,
-				  reason:"tuple cardinality must match namespace cardinality"
-				  errcode:ERR_CODE_ILLEGAL_PARAMS);
+			tnt_raise(IllegalParams, :"tuple cardinality must match namespace cardinality");
 		prepare_replace(txn, cardinality, data);
 		break;
 
 	case DELETE:
 		key_len = read_u32(data);
 		if (key_len != 1)
-			tnt_raise(tnt_BoxException,
-				  reason:"key must be single valued"
-				  errcode:ERR_CODE_ILLEGAL_PARAMS);
+			tnt_raise(IllegalParams, :"key must be single valued");
 
 		key = read_field(data);
 		if (data->len != 0)
-			tnt_raise(tnt_BoxException,
-				  reason:"can't unpack request" errcode:ERR_CODE_ILLEGAL_PARAMS);
+			tnt_raise(IllegalParams, :"can't unpack request");
 
 		prepare_delete(txn, key);
 		break;
@@ -902,14 +834,12 @@ box_dispach(struct box_txn *txn, struct tbuf *data)
 			u32 offset = read_u32(data);
 			u32 limit = read_u32(data);
 
-			if (i > MAX_IDX)
-				tnt_raise(tnt_BoxException,
-					  reason:"index too big" errcode:ERR_CODE_NO_SUCH_INDEX);
+			if (i > MAX_IDX ||
+			    namespace[txn->n].index[i].key_cardinality == 0) {
+
+				tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i, txn->n);
+			}
 			txn->index = &namespace[txn->n].index[i];
-			if (txn->index->key_cardinality == 0)
-				tnt_raise(tnt_BoxException,
-					  reason:"index is invalid"
-					  errcode:ERR_CODE_NO_SUCH_INDEX);
 
 			process_select(txn, limit, offset, data);
 			break;
@@ -921,8 +851,8 @@ box_dispach(struct box_txn *txn, struct tbuf *data)
 		break;
 
 	default:
-		say_error("silverbox_dispach: unsupported command = %" PRIi32 "", txn->op);
-		tnt_raise(tnt_BoxException, errcode:ERR_CODE_ILLEGAL_PARAMS);
+		say_error("box_dispatch: unsupported command = %" PRIi32 "", txn->op);
+		tnt_raise(IllegalParams, :"unsupported command code, check the error log");
 	}
 }
 
@@ -1067,8 +997,6 @@ xlog_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 static void
 custom_init(void)
 {
-	before_commit_update_hook = calloc(1, sizeof(box_hook_t));
-
 	if (cfg.namespace == NULL)
 		panic("at least one namespace must be configured");
 
@@ -1202,7 +1130,8 @@ custom_init(void)
 	}
 }
 
-u32
+
+void
 box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
 {
 	ev_tstamp start = ev_now(), stop;
@@ -1211,63 +1140,38 @@ box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
 
 	@try {
 		txn_begin(txn, op, request_data);
-		box_dispach(txn, request_data);
+		box_dispatch(txn, request_data);
 		txn_commit(txn);
-
-		return ERR_CODE_OK;
-	}
-	@catch (tnt_PickleException *e) {
-		txn_abort(txn);
-
-		say_error("tnt_PickleException: `%s' at %s:%i", e->reason, e->file, e->line);
-
-		return ERR_CODE_ILLEGAL_PARAMS;
-	}
-	@catch (tnt_BoxException *e) {
-		txn_abort(txn);
-
-		if (e->errcode != ERR_CODE_NODE_IS_RO)
-			say_error("tnt_BoxException: %s/`%s' at %s:%i",
-				  tnt_errcode_desc(e->errcode),
-				  e->reason, e->file, e->line);
-
-		return e->errcode;
 	}
 	@catch (id e) {
 		txn_abort(txn);
-
 		@throw;
 	}
 	@finally {
 		stop = ev_now();
 		if (stop - start > cfg.too_long_threshold)
-			say_warn("too long %s: %.3f sec", messages_strs[txn->op], stop - start);
+			say_warn("too long %s: %.3f sec", messages_strs[op], stop - start);
 	}
 }
 
-static u32
+static void
 box_process_ro(u32 op, struct tbuf *request_data)
 {
-	if (!op_is_select(op)) {
-		say_error("can't process %i command on RO port", op);
-
-		return ERR_CODE_NONMASTER;
-	}
+	if (!op_is_select(op))
+		tnt_raise(LoggedError, :ER_NONMASTER);
 
 	return box_process(txn_alloc(0), op, request_data);
 }
 
-static u32
+static void
 box_process_rw(u32 op, struct tbuf *request_data)
 {
-	if (!op_is_select(op) && !box_updates_allowed) {
-		say_error("can't process %i command, updates are disallowed", op);
-
-		return ERR_CODE_NONMASTER;
-	}
+	if (!op_is_select(op) && !box_updates_allowed)
+		tnt_raise(LoggedError, :ER_NONMASTER);
 
 	return box_process(txn_alloc(0), op, request_data);
 }
+
 
 static struct tbuf *
 convert_snap_row_to_wal(struct tbuf *t)
@@ -1307,8 +1211,12 @@ recover_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 
 	op = read_u16(t);
 
-	if (box_process(txn, op, t) != ERR_CODE_OK)
+	@try {
+		box_process(txn, op, t);
+	}
+	@catch (id e) {
 		return -1;
+	}
 
 	return 0;
 }
@@ -1535,12 +1443,14 @@ mod_init(void)
 			     memcached_bound_to_primary);
 	} else {
 		if (cfg.secondary_port != 0)
-			fiber_server(tcp_server, cfg.secondary_port, iproto_interact,
+			fiber_server(tcp_server, cfg.secondary_port,
+				     (fiber_server_callback) iproto_interact,
 				     box_process_ro, NULL);
 
 		if (cfg.primary_port != 0)
-			fiber_server(tcp_server, cfg.primary_port, iproto_interact, box_process_rw,
-				     box_bound_to_primary);
+			fiber_server(tcp_server, cfg.primary_port,
+				     (fiber_server_callback) iproto_interact,
+				     box_process_rw, box_bound_to_primary);
 	}
 
 	say_info("initialized");

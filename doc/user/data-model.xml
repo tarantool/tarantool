@@ -61,7 +61,7 @@
   Found 1 tuple:
   [1]
   tarantool> insert into t0 values ('hello')
-  An error occurred: ERR_CODE_ILLEGAL_PARAMS, 'Illegal parameters'
+  An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters'
   tarantool> insert into t0 values (1, 'hello')
   Insert OK, 1 row affected
   tarantool> select * from t0 where k0=1 

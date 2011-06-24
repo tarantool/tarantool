@@ -156,8 +156,8 @@ index_find_hash_by_tuple(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	if (key == NULL)
-		tnt_raise(tnt_BoxException,
-		          reason:"invalid tuple, can't find key" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key_field->fieldno);
+
 	return self->find(self, key);
 }
 
@@ -169,8 +169,7 @@ index_find_hash_num(struct index *self, void *key)
 	u32 num = *(u32 *)key;
 
 	if (key_size != 4)
-		tnt_raise(tnt_BoxException,
-		          reason:"key is not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u32");
 
 	assoc_find(int_ptr_map, self->idx.int_hash, num, ret);
 #ifdef DEBUG
@@ -187,8 +186,7 @@ index_find_hash_num64(struct index *self, void *key)
 	u64 num = *(u64 *)key;
 
 	if (key_size != 8)
-		tnt_raise(tnt_BoxException,
-		          reason:"key is not u64" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u64");
 
 	assoc_find(int64_ptr_map, self->idx.int64_hash, num, ret);
 #ifdef DEBUG
@@ -303,8 +301,7 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 	u32 num = *(u32 *)key;
 
 	if (key_size != 4)
-		tnt_raise(tnt_BoxException,
-			  reason:"key is not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u32");
 	assoc_delete(int_ptr_map, self->idx.int_hash, num);
 #ifdef DEBUG
 	say_debug("index_remove_hash_num(self:%p, key:%i)", self, num);
@@ -319,8 +316,7 @@ index_remove_hash_num64(struct index *self, struct box_tuple *tuple)
 	u64 num = *(u64 *)key;
 
 	if (key_size != 8)
-		tnt_raise(tnt_BoxException,
-			  reason:"key is not u64" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u64");
 	assoc_delete(int64_ptr_map, self->idx.int64_hash, num);
 #ifdef DEBUG
 	say_debug("index_remove_hash_num(self:%p, key:%"PRIu64")", self, num);
@@ -353,8 +349,7 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 	u32 num = *(u32 *)key;
 
 	if (key_size != 4)
-		tnt_raise(tnt_BoxException,
-			  reason:"key is not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u32");
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -378,8 +373,7 @@ index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct
 	u64 num = *(u64 *)key;
 
 	if (key_size != 8)
-		tnt_raise(tnt_BoxException,
-			  reason:"key is not u64" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u64");
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -401,9 +395,7 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 
 	if (key == NULL)
-		tnt_raise(tnt_BoxException,
-			  reason:"Supplied tuple misses a field which is part of an index"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key_field->fieldno);
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -422,9 +414,7 @@ static void
 index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	if (tuple->cardinality < self->field_cmp_order_cnt)
-		tnt_raise(tnt_BoxException,
-			  reason:"Supplied tuple misses a field which is part of an index"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->field_cmp_order_cnt);
 
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 
@@ -463,8 +453,7 @@ validate_indexes(struct box_txn *txn)
 		foreach_index(txn->n, index) {
 			for (u32 f = 0; f < index->key_cardinality; ++f) {
 				if (index->key_field[f].fieldno >= txn->tuple->cardinality)
-					tnt_raise(tnt_BoxException,
-						  reason:"tuple is too short" errcode:ERR_CODE_ILLEGAL_PARAMS);
+					tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 
 				if (index->key_field[f].type == STRING)
 					continue;
@@ -473,14 +462,10 @@ validate_indexes(struct box_txn *txn)
 				u32 len = load_varint32(&field);
 
 				if (index->key_field[f].type == NUM && len != sizeof(u32))
-					tnt_raise(tnt_BoxException,
-						  reason:"field must be NUM"
-						  errcode:ERR_CODE_ILLEGAL_PARAMS);
+					tnt_raise(IllegalParams, :"field must be NUM");
 
 				if (index->key_field[f].type == NUM64 && len != sizeof(u64))
-					tnt_raise(tnt_BoxException,
-						  reason:"field must be NUM64"
-						  errcode:ERR_CODE_ILLEGAL_PARAMS);
+					tnt_raise(IllegalParams, :"field must be NUM64");
 			}
 			if (index->type == TREE && index->unique == false)
 				/* Don't check non unique indexes */
@@ -489,9 +474,7 @@ validate_indexes(struct box_txn *txn)
 			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
 
 			if (tuple != NULL && tuple != txn->old_tuple)
-				tnt_raise(tnt_BoxException,
-					  reason:"duplicate key in a unique index"
-					  errcode:ERR_CODE_INDEX_VIOLATION);
+				tnt_raise(ClientError, :ER_INDEX_VIOLATION);
 		}
 	}
 }

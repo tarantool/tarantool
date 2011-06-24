@@ -909,29 +909,36 @@ recover_snap(struct recovery_state *r)
 		memset(&i, 0, sizeof(i));
 
 		lsn = greatest_lsn(r->snap_prefered_class);
-		if (lsn <= 0)
-			tnt_raise(tnt_Exception, reason:"can't find snapshot");
+		if (lsn <= 0) {
+			say_error("can't find snapshot");
+			return -1;
+		}
 
 		snap = open_for_read(r, r->snap_class, lsn, 0, NULL);
-		if (snap == NULL)
-			tnt_raise(tnt_Exception, reason:"can't find/open snapshot");
+		if (snap == NULL) {
+			say_error("can't find/open snapshot");
+			return -1;
+		}
 
 		iter_open(snap, &i, read_rows);
 		say_info("recover from `%s'", snap->filename);
 
 		while ((row = iter_inner(&i, (void *)1))) {
-			if (r->row_handler(r, row) < 0)
-				tnt_raise(tnt_Exception, reason:"can't apply row");
+			if (r->row_handler(r, row) < 0) {
+				say_error("can't apply row");
+				return -1;
+			}
 		}
-		if (i.error != 0)
-			tnt_raise(tnt_Exception, reason:"error during snapshot processing");
+		if (i.error != 0) {
+			say_error("failure reading snapshot");
+			return -1;
+		}
 
 		r->lsn = r->confirmed_lsn = lsn;
 
 		return 0;
 	}
-	@catch (tnt_Exception *e) {
-		say_error("tnt_Exception: `%s'", e->reason);
+	@catch (id e) {
 		say_error("failure reading snapshot");
 
 		return -1;
@@ -974,8 +981,10 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 			}
 
 			/*  after handler(r, row) returned, row may be modified, do not use it */
-			if (r->row_handler(r, row) < 0)
-				tnt_raise(tnt_Exception, reason:"can't apply row");
+			if (r->row_handler(r, row) < 0) {
+				say_error("can't apply row");
+				return -1;
+			}
 
 			if (r) {
 				next_lsn(r, lsn);
@@ -983,16 +992,17 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 			}
 		}
 
-		if (i.error != 0)
-			tnt_raise(tnt_Exception, reason:"error during xlog processing");
+		if (i.error != 0) {
+			say_error("error during xlog processing");
+			return -1;
+		}
 
 		if (i.eof)
 			return LOG_EOF;
 
 		return 1;
 	}
-	@catch (tnt_Exception *e) {
-		say_error("tnt_Exception: `%s'", e->reason);
+	@catch (id e) {
 		say_error("failure reading xlog");
 
 		return -1;

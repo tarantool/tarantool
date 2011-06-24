@@ -54,7 +54,7 @@
  * cancelled.
  */
 
-@interface tnt_FiberCancelException: tnt_Exception
+@interface FiberCancelException: tnt_Exception
 @end
 
 struct msg {
@@ -157,7 +157,7 @@ inline static void add_iov(const void *buf, size_t len)
 	add_iov_unsafe(buf, len);
 }
 
-void add_iov_dup(void *buf, size_t len);
+void add_iov_dup(const void *buf, size_t len);
 bool write_inbox(struct fiber *recipient, struct tbuf *msg);
 int inbox_size(struct fiber *recipient);
 void wait_inbox(struct fiber *recipient);
@@ -195,7 +195,10 @@ typedef enum fiber_server_type {
 	tcp_server,
 } fiber_server_type;
 
-struct fiber *fiber_server(fiber_server_type type, int port, void (*handler) (void *), void *,
+typedef void (*fiber_server_callback)(void *);
+
+struct fiber *fiber_server(fiber_server_type type, int port,
+			   fiber_server_callback callback, void *,
 			   void (*on_bind) (void *));
 
 struct child *spawn_child(const char *name,

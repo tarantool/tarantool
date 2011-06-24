@@ -1,3 +1,3 @@
 return_code: 0
-return_code: ERR_CODE_ILLEGAL_PARAMS, Illegal parameters
-return_code: ERR_CODE_NO_SUCH_INDEX, No index with the given id is defined
+return_code: ER_ILLEGAL_PARAMS, Illegal parameters, tuple count must be positive
+return_code: ER_NO_SUCH_INDEX, No index #1 is defined in namespace 0

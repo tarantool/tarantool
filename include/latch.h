@@ -22,10 +22,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <fiber.h>
-
 #include <stdbool.h>
+
+struct fiber;
 
 /*
  * Internal implementation of a container for a mutex like object

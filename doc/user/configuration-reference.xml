@@ -409,7 +409,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           store tuples, <emphasis role="strong">in
           gigabytes</emphasis>. When the limit is reached, INSERT
           or UPDATE requests begin failing with error
-          <olink targetptr="ERR_CODE_MEMORY_ISSUE"/>.
+          <olink targetptr="ER_MEMORY_ISSUE"/>.
           While the server does not go
           beyond the defined limit to allocate tuples, there is
           additional memory used to store indexes and connection
