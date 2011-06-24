@@ -31,6 +31,9 @@ class Box(TarantoolConnection):
     res = ""
     while len(res) < length:
       buf = self.socket.recv(length - len(res))
+      if not buf:
+        raise RuntimeError("Got EOF from socket, the server has "
+                           "probably crashed")
       res = res + buf
     return res
 

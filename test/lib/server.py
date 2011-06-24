@@ -150,12 +150,8 @@ class Server(object):
 
     if self.gdb == True:
         raise RuntimeError("'--gdb' and '--start-and-exit' can't be defined together")
-    pid = os.fork()
-    if pid > 0:
-      os.wait()
-    else:
-      with daemon.DaemonContext(working_directory = self.vardir):
-        os.execvp(args[0], args)
+    with daemon.DaemonContext(working_directory = self.vardir):
+      os.execvp(args[0], args)
 
   def prepare_args(self):
     return [self.binary]
@@ -188,21 +184,31 @@ class Server(object):
     wait_until_connected(self.port)
 # Set is_started flag, to nicely support cleanup during an exception.
     self.is_started = True
+    with open(self.pidfile) as f:
+      self.pid = int(f.read())
 
   def stop(self, silent=True):
     """Stop server instance. Do nothing if the server is not started,
     to properly shut down the server in case of an exception during
     start up."""
-    if self.is_started:
-      if not silent:
-        print "Stopping the server..."
-      if self.process == None:
-        self.kill_old_server()
-      self.process.terminate()
+    if not self.is_started:
+       if not silent:
+         print "The server is not started."
+       return
+    if not silent:
+      print "Stopping the server..."
+
+    if self.process == None:
+      self.kill_old_server()
+    else:
+      self.kill_server()
+
+    if self.gdb:
+      self.process.expect(pexpect.EOF, timeout = 1 << 30)
+    else:
       self.process.expect(pexpect.EOF)
-      self.is_started = False
-    elif not silent:
-      print "The server is not started."
+    self.is_started = False
+    self.pid = None
 
   def deploy(self, config=None, binary=None, vardir=None,
              mem=None, start_and_exit=None, gdb=None, valgrind=None, silent=True):
@@ -231,6 +237,14 @@ class Server(object):
                                 stdout = subprocess.PIPE,
                                 stderr = subprocess.STDOUT).stdout.read()
       print output
+
+  def kill_server(self):
+    """Kill a server which was started correctly"""
+    try:
+      os.kill(self.pid, signal.SIGTERM)
+    except OSError as e:
+      print e
+      pass
 
   def kill_old_server(self, silent=True):
     """Kill old server instance if it exists."""
