@@ -232,7 +232,7 @@ snapshot(void *ev, int events __attribute__((unused)))
 static void
 sig_int(int signal)
 {
-	say_info("SIGINT or SIGTERM recieved, terminating");
+	say_info("Exiting: %s", strsignal(signal));
 
 	if (recovery_state != NULL) {
 		struct child *writer = recovery_state->wal_writer;

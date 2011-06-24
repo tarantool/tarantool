@@ -1073,7 +1073,11 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		return c;
 	} else {
 		char child_name[sizeof(fiber->name)];
-
+		/*
+		 * Move to an own process group, to not receive
+		 * signals from the controlling tty.
+		 */
+		setpgid(0, 0);
 		salloc_destroy();
 		close_all_xcpt(2, socks[0], sayfd);
 		snprintf(child_name, sizeof(child_name), "%s/child", name);

@@ -85,6 +85,14 @@ say_logger_init(int nonblock)
 		if (pid == 0) {
 			close(pipefd[1]);
 			dup2(pipefd[0], STDIN_FILENO);
+			/*
+			 * Move to an own process group, to not
+			 * receive signals from the controlling
+			 * tty. This keeps the log open as long as
+			 * the parent is around. When the parent
+			 * dies, we get SIGPIPE and terminate.
+			 */
+			setpgid(0, 0);
 			execve(argv[0], argv, envp);
 		} else {
 			close(pipefd[0]);
