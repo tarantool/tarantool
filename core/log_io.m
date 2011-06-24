@@ -43,7 +43,6 @@
 #include <say.h>
 #include <third_party/crc32.h>
 #include <pickle.h>
-#include "diagnostics.h"
 
 const u16 snap_tag = -1;
 const u16 wal_tag = -2;
@@ -252,10 +251,6 @@ read_rows(struct log_io_iter *i)
 		eof = 1;
 		goto out;
 	}
-	if (l->class->eof_marker_size == 0 && ftello(l->f) == good_offset) {
-		eof = 1;
-		goto out;
-	}
 
       out:
 	l->rows += row_count;
@@ -407,23 +402,6 @@ find_including_file(struct log_io_class *class, i64 target_lsn)
 	return *lsn;
 }
 
-struct tbuf *
-convert_to_v11(struct tbuf *orig, u16 tag, const u64 cookie, i64 lsn)
-{
-	struct tbuf *row = tbuf_alloc(orig->pool);
-	tbuf_ensure(row, sizeof(struct row_v11));
-	row->len = sizeof(struct row_v11);
-	row_v11(row)->lsn = lsn;
-	row_v11(row)->tm = 0;
-	row_v11(row)->len = orig->len + sizeof(tag) + sizeof(cookie);
-
-	tbuf_append(row, &tag, sizeof(tag));
-	tbuf_append(row, &cookie, sizeof(cookie));
-	tbuf_append(row, orig->data, orig->len);
-	return row;
-}
-
-
 static struct tbuf *
 row_reader_v11(FILE *f, struct palloc_pool *pool)
 {
@@ -556,24 +534,14 @@ flush_log(struct log_io *l)
 static int
 write_header(struct log_io *l)
 {
-	char buf[27];
-	time_t tm;
-
 	if (fwrite(l->class->filetype, strlen(l->class->filetype), 1, l->f) != 1)
 		return -1;
 
 	if (fwrite(l->class->version, strlen(l->class->version), 1, l->f) != 1)
 		return -1;
 
-	if (strcmp(l->class->version, v11) == 0) {
-		if (fwrite("\n", 1, 1, l->f) != 1)
-			return -1;
-	} else {
-		time(&tm);
-		ctime_r(&tm, buf);
-		if (fwrite(buf, strlen(buf), 1, l->f) != 1)
-			return -1;
-	}
+	if (fwrite("\n", 1, 1, l->f) != 1)
+		return -1;
 
 	return 0;
 }
@@ -609,10 +577,11 @@ open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 ls
 	char filetype[32], version[32], buf[256];
 	struct log_io *l = NULL;
 	char *r;
+	const char *errmsg;
 
 	l = calloc(1, sizeof(*l));
 	if (l == NULL) {
-		diag_set_error(errno, strerror(errno));
+		errmsg = strerror(errno);
 		goto error;
 	}
 	l->mode = LOG_READ;
@@ -632,55 +601,47 @@ open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 ls
 
 	l->f = fopen(l->filename, "r");
 	if (l->f == NULL) {
-		diag_set_error(errno, strerror(errno));
+		errmsg = strerror(errno);
 		goto error;
 	}
 
 	r = fgets(filetype, sizeof(filetype), l->f);
 	if (r == NULL) {
-		diag_set_error(1, "header reading failed");
+		errmsg = "header reading failed";
 		goto error;
 	}
 
 	r = fgets(version, sizeof(version), l->f);
 	if (r == NULL) {
-		diag_set_error(1, "header reading failed");
+		errmsg = "header reading failed";
 		goto error;
 	}
 
 	if (strcmp(class->filetype, filetype) != 0) {
-		diag_set_error(1, "unknown filetype");
+		errmsg = "unknown filetype";
 		goto error;
 	}
 
 	if (strcmp(class->version, version) != 0) {
-		diag_set_error(1, "unknown version");
+		errmsg = "unknown version";
 		goto error;
 	}
 	l->class = class;
 
-	if (strcmp(version, v11) == 0) {
-		for (;;) {
-			r = fgets(buf, sizeof(buf), l->f);
-			if (r == NULL) {
-				diag_set_error(1, "header reading failed");
-				goto error;
-			}
-			if (strcmp(r, "\n") == 0 || strcmp(r, "\r\n") == 0)
-				break;
-		}
-	} else {
-		r = fgets(buf, sizeof(buf), l->f);	/* skip line with time */
+	for (;;) {
+		r = fgets(buf, sizeof(buf), l->f);
 		if (r == NULL) {
-			diag_set_error(1, "header reading failed");
+			errmsg = "header reading failed";
 			goto error;
 		}
+		if (strcmp(r, "\n") == 0 || strcmp(r, "\r\n") == 0)
+			break;
 	}
 
 	return l;
       error:
 	say_error("open_for_read: failed to open `%s': %s", l->filename,
-		  diag_get_last_error()->msg);
+		  errmsg);
 	if (l != NULL) {
 		if (l->f != NULL)
 			fclose(l->f);
@@ -690,16 +651,19 @@ open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 ls
 }
 
 struct log_io *
-open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 lsn, int suffix)
+open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 lsn,
+	       int suffix, int *save_errno)
 {
 	struct log_io *l = NULL;
 	int fd;
 	char *dot;
 	bool exists;
+	const char *errmsg;
 
 	l = calloc(1, sizeof(*l));
 	if (l == NULL) {
-		diag_set_error(errno, strerror(errno));
+		*save_errno = errno;
+		errmsg = strerror(errno);
 		goto error;
 	}
 	l->mode = LOG_WRITE;
@@ -721,7 +685,8 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 		exists = access(l->filename, F_OK) == 0;
 		*dot = '.';
 		if (exists) {
-			diag_set_error(EEXIST, "exists");
+			*save_errno = EEXIST;
+			errmsg = "exists";
 			goto error;
 		}
 	}
@@ -732,13 +697,15 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	 */
 	fd = open(l->filename, O_WRONLY | O_CREAT | O_EXCL | O_APPEND, 0664);
 	if (fd < 0) {
-		diag_set_error(errno, strerror(errno));
+		*save_errno = errno;
+		errmsg = strerror(errno);
 		goto error;
 	}
 
 	l->f = fdopen(fd, "a");
 	if (l->f == NULL) {
-		diag_set_error(errno, strerror(errno));
+		*save_errno = errno;
+		errmsg = strerror(errno);
 		goto error;
 	}
 
@@ -747,7 +714,7 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	return l;
       error:
 	say_error("find_log: failed to open `%s': %s", l->filename,
-		  diag_get_last_error()->msg);
+		  errmsg);
 	if (l != NULL) {
 		if (l->f != NULL)
 			fclose(l->f);
@@ -774,7 +741,7 @@ read_log(const char *filename,
 		c = snapshot_class_create(NULL);
 		h = snap_handler;
 	} else {
-		say_error("don't know what how to read `%s'", filename);
+		say_error("don't know how to read `%s'", filename);
 		return -1;
 	}
 
@@ -1051,12 +1018,11 @@ recover(struct recovery_state *r, i64 lsn)
 			say_error("can't find wal containing record with lsn:%" PRIi64, next_lsn);
 			result = -1;
 			goto out;
-		} else {
-			r->current_wal = open_for_read(r, r->wal_class, lsn, 0, NULL);
-			if (r->current_wal == NULL) {
-				result = -1;
-				goto out;
-			}
+		}
+		r->current_wal = open_for_read(r, r->wal_class, lsn, 0, NULL);
+		if (r->current_wal == NULL) {
+			result = -1;
+			goto out;
 		}
 	}
 
@@ -1188,9 +1154,12 @@ write_to_disk(void *_state, struct tbuf *t)
 
 	reply = tbuf_alloc(t->pool);
 
-	if (wal == NULL)
+	if (wal == NULL) {
+		int unused;
 		/* Open WAL with '.inprogress' suffix. */
-		wal = open_for_write(r, r->wal_class, wal_write_request(t)->lsn, -1);
+		wal = open_for_write(r, r->wal_class, wal_write_request(t)->lsn, -1,
+				     &unused);
+	}
 	else if (wal->rows == 1) {
 		/* rename wal after first successfull write to name without inprogress suffix*/
 		if (inprogress_log_rename(wal->filename) != 0) {
@@ -1412,13 +1381,13 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 	struct log_io *snap;
 	char final_filename[PATH_MAX + 1];
 	char *dot;
+	int save_errno;
 
 	memset(&i, 0, sizeof(i));
 
-	snap = open_for_write(r, r->snap_class, r->confirmed_lsn, -1);
+	snap = open_for_write(r, r->snap_class, r->confirmed_lsn, -1, &save_errno);
 	if (snap == NULL)
-		panic_status(diag_get_last_error()->code,
-			     "can't open snap for writing");
+		panic_status(save_errno, "can't open snap for writing");
 
 	iter_open(snap, &i, write_rows);
 

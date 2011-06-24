@@ -54,7 +54,6 @@
 #include <util.h>
 #include <stat.h>
 #include <pickle.h>
-#include "diagnostics.h"
 
 @implementation FiberCancelException
 @end
@@ -422,7 +421,6 @@ fiber_gc(void)
 static void
 fiber_zombificate()
 {
-	diag_clear();
 	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
 	fiber->data = NULL;
