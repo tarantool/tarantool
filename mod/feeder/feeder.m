@@ -87,7 +87,7 @@ recover_feed_slave(int sock)
 	send_row(NULL, ver);
 
 	log_io = recover_init(NULL, cfg.wal_feeder_dir,
-			      NULL, send_row, INT32_MAX, 0, 64, RECOVER_READONLY, false);
+			      send_row, INT32_MAX, 0, 64, RECOVER_READONLY, false);
 
 	recover(log_io, lsn);
 	recover_follow(log_io, 0.1);

@@ -946,22 +946,6 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	return 0;
 }
 
-struct tbuf *
-box_snap_reader(FILE *f, struct palloc_pool *pool)
-{
-	struct tbuf *row = tbuf_alloc(pool);
-	const int header_size = sizeof(*box_snap_row(row));
-
-	tbuf_reserve(row, header_size);
-	if (fread(row->data, header_size, 1, f) != 1)
-		return NULL;
-
-	tbuf_reserve(row, box_snap_row(row)->data_size);
-	if (fread(box_snap_row(row)->data, box_snap_row(row)->data_size, 1, f) != 1)
-		return NULL;
-
-	return convert_to_v11(row, snap_tag, default_cookie, 0);
-}
 
 static int
 snap_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
@@ -1379,8 +1363,7 @@ mod_init(void)
 	}
 
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
-				      box_snap_reader, recover_row,
-				      cfg.rows_per_wal, cfg.wal_fsync_delay,
+				      recover_row, cfg.rows_per_wal, cfg.wal_fsync_delay,
 				      cfg.wal_writer_inbox_size,
 				      init_storage ? RECOVER_READONLY : 0, NULL);
 
@@ -1459,7 +1442,7 @@ mod_init(void)
 int
 mod_cat(const char *filename)
 {
-	return read_log(filename, box_snap_reader, xlog_print, snap_print, NULL);
+	return read_log(filename, xlog_print, snap_print, NULL);
 }
 
 void
