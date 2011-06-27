@@ -1049,7 +1049,7 @@ recover(struct recovery_state *r, i64 lsn)
 		i64 next_lsn = r->confirmed_lsn + 1;
 		i64 lsn = find_including_file(r->wal_class, next_lsn);
 		if (lsn <= 0) {
-			say_error("can't find wal containing record with lsn:%" PRIi64, next_lsn);
+			say_error("can't find WAL containing record with lsn:%" PRIi64, next_lsn);
 			result = -1;
 			goto out;
 		}
@@ -1195,7 +1195,8 @@ write_to_disk(void *_state, struct tbuf *t)
 				     &unused);
 	}
 	else if (wal->rows == 1) {
-		/* rename wal after first successfull write to name without inprogress suffix*/
+		/* rename WAL after first successful write to name
+		 * without inprogress suffix*/
 		if (inprogress_log_rename(wal->filename) != 0) {
 			say_error("can't rename inprogress wal");
 			goto fail;

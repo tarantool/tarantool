@@ -1257,7 +1257,7 @@ box_master_or_slave(struct tarantool_cfg *conf)
 		remote_recovery_restart(conf);
 	} else {
 		if (remote_recover) {
-			say_info("shuting down the replica");
+			say_info("shutting down the replica");
 			fiber_cancel(remote_recover);
 
 			remote_recover = NULL;

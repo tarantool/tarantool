@@ -102,8 +102,8 @@ remote_read_row(i64 initial_lsn)
 				goto err;
 			}
 
-			say_crit("succefully connected to feeder");
-			say_crit("starting remote recovery from lsn:%" PRIi64, initial_lsn);
+			say_crit("successfully connected to feeder");
+			say_crit("starting replication from lsn:%" PRIi64, initial_lsn);
 			warning_said = false;
 			err = NULL;
 		}
