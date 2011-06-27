@@ -37,6 +37,7 @@
 #include <sys/uio.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "fiber.h"
 
 
 /** replicator process context struct */
@@ -269,13 +270,14 @@ acceptor_handler(void *data)
 
 	msg = tbuf_alloc(fiber->pool);
 
-	while (true) {
+	fiber_io_start(EV_READ);
+	for (;;) {
 		struct sockaddr_in addr;
 		socklen_t addrlen = sizeof(addr);
 		int client_sock = -1;
 
 		/* wait new connection request */
-		wait_for(EV_READ);
+		fiber_io_yield();
 
 		/* accept connection */
 		client_sock = accept(fiber->fd, &addr, &addrlen);
@@ -294,6 +296,7 @@ acceptor_handler(void *data)
 		tbuf_reset(msg);
 		wait_inbox(sender);
 	}
+	fiber_io_stop(EV_READ);
 }
 
 /** Replication sender fiber. */

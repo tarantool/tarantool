@@ -23,6 +23,15 @@ def wait_until_connected(port):
     except socket.error as e:
       time.sleep(0.001)
 
+def check_port(port):
+  """Check if the port we're connecting to is available"""
+  try:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(("localhost", port))
+  except socket.error as e:
+     return
+  raise RuntimeError("The server is already running on port {0}".format(port))
+
 def prepare_gdb(args):
   """Prepare server startup arguments to run under gdb."""
   if "TERM" in os.environ:
@@ -33,7 +42,7 @@ def prepare_gdb(args):
   if term not in ["xterm", "rxvt", "urxvt", "gnome-terminal", "konsole"]:
     raise RuntimeError("--gdb: unsupported terminal {0}".format(term))
 
-  args = [ term, "-e ", "gdb", "-ex", "break main", "-ex", "run" ] + args
+  args = [ term, "-e", "gdb", "-ex", "break main", "-ex", "run" ] + args
   return args
 
 def prepare_valgrind(args, valgrind_log):
@@ -141,12 +150,8 @@ class Server(object):
 
     if self.gdb == True:
         raise RuntimeError("'--gdb' and '--start-and-exit' can't be defined together")
-    pid = os.fork()
-    if pid > 0:
-      os.wait()
-    else:
-      with daemon.DaemonContext(working_directory = self.vardir):
-        os.execvp(args[0], args)
+    with daemon.DaemonContext(working_directory = self.vardir):
+      os.execvp(args[0], args)
 
   def prepare_args(self):
     return [self.binary]
@@ -165,6 +170,7 @@ class Server(object):
       version = self.version()
       print "Starting {0} {1}.".format(os.path.basename(self.binary),
                                        version)
+    check_port(self.port)
     args = self.prepare_args()
     if self.gdb:
       args = prepare_gdb(args)
@@ -178,21 +184,31 @@ class Server(object):
     wait_until_connected(self.port)
 # Set is_started flag, to nicely support cleanup during an exception.
     self.is_started = True
+    with open(self.pidfile) as f:
+      self.pid = int(f.read())
 
   def stop(self, silent=True):
     """Stop server instance. Do nothing if the server is not started,
     to properly shut down the server in case of an exception during
     start up."""
-    if self.is_started:
-      if not silent:
-        print "Stopping the server..."
-      if self.process == None:
-        self.kill_old_server()
-      self.process.terminate()
+    if not self.is_started:
+       if not silent:
+         print "The server is not started."
+       return
+    if not silent:
+      print "Stopping the server..."
+
+    if self.process == None:
+      self.kill_old_server()
+    else:
+      self.kill_server()
+
+    if self.gdb:
+      self.process.expect(pexpect.EOF, timeout = 1 << 30)
+    else:
       self.process.expect(pexpect.EOF)
-      self.is_started = False
-    elif not silent:
-      print "The server is not started."
+    self.is_started = False
+    self.pid = None
 
   def deploy(self, config=None, binary=None, vardir=None,
              mem=None, start_and_exit=None, gdb=None, valgrind=None, silent=True,
@@ -223,6 +239,14 @@ class Server(object):
                                 stdout = subprocess.PIPE,
                                 stderr = subprocess.STDOUT).stdout.read()
       print output
+
+  def kill_server(self):
+    """Kill a server which was started correctly"""
+    try:
+      os.kill(self.pid, signal.SIGTERM)
+    except OSError as e:
+      print e
+      pass
 
   def kill_old_server(self, silent=True):
     """Kill old server instance if it exists."""

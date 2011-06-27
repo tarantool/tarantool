@@ -16,96 +16,303 @@
   Unlike many other key/value servers, Tarantool uses
   different TCP ports and client/server protocols for data
   manipulation and administrative statements.
-  On start up, the server connects to three TCP ports:
+  On start up, the server can connect to up to five TCP ports:
   <itemizedlist>
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
-      DELETEs and SELECTs.
+      DELETEs and SELECTs. This port speaks the native
+      Tarantool protocol, and provides full access to the server.
       </para>
       <para>
       The default value of the port is <literal>33013</literal>,
-      as defined in <emphasis>primary_port</emphasis>
+      as defined in <olink targetptr="primary_port"/>
       configuration option.
     </para></listitem>
     <listitem><para>
       Read only port, which only accepts SELECTs, port number
       <literal>33014</literal>, as defined in
-      <emphasis>secondary_port</emphasis> configuration option.
+      <olink targetptr="secondary_port"/> configuration option.
     </para></listitem>
     <listitem><para>
       Administrative port, which defaults to <literal>33015</literal>,
-      and is defined in <emphasis>admin_port</emphasis>
+      and is defined in <olink targetptr="admin_port"/>
       configuration option.
     </para></listitem>
+    <listitem><para>Replication port (see <olink
+        targetptr="replication_port"/>), by default set to
+        <literal>33016</literal>, used to send updates to
+        replicas. Replication is optional, and if this port is not
+        set in the option file, the corresponding server process
+        is not started.
+      </para></listitem>
+    <listitem><para>Memcached port. Optional, read-write data port
+      that speaks Memcached protocol. This port is off by default.
+    </para></listitem>
   </itemizedlist>
-
-  The data protocol is binary; a complete description is
-  provided in doc/box-protocol.txt.
-
-</para>
-<para>
-  separation of ports is done in part to allow system
-  administrators to secure the read/write port or the
-  administrative port. The values of read-only, read-write and
-  administrative ports can be specified in the configuration file.
-</para>
-<para>
-  How command line client understands what port to use.
+  In absence of authentication, this approach allows system
+  administrators to restrict access to read/write or
+  administrative ports. The client, however, has to be aware of
+  the separation, and <command>tarantool</command> command line
+  client automatically selects the correct port for you
+  with help of a simple regular expression. SELECTs, UPDATEs,
+  INSERTs and DELETEs are sent to the primary port, whereas SHOW,
+  RELOAD, SAVE and others -- to the administrative port.
 </para>
 
-<!--
 <section>
+  <title>Data manipulation</title>
 
-  <title>Data console</title>
-
-  <para>The default data port is 33014. It can be set in the
-  configuration file. Data console supports asynchronous I/O.
-  Four commands are supported. For a complete protocol manual, see
-  developers guide.
+  <para>Tarantool protocol was designed with focus on asynchronous
+    I/O and easy integration with proxies. Each client
+    request starts with a simple binary header, containing three
+    fields: request type, length, and a numeric id.
   </para>
+  <para>
+    Four basic request types are supported: INSERT, UPDATE, DELETE
+    and SELECT. The mandatory length, present in the header,
+    allows to simplify client or proxy I/O.
+    The server response to a request always carries in its header
+    the same command type and request id.
+    The id makes it possible to always match request to a
+    response, even if the latter arrived out of order.
+  </para>
+  <para>Request type defines the format of the payload.
+    INSERTs and DELETEs can only be made by the primary key, so
+    an index id and key value are always present in these requests.
+    SELECTs and UPDATEs can use secondary keys. UPDATE only needs to
+    list the fields that are actually changed. With this one
+    exception, all commands operate on whole tuple(s).
+  </para>
+  <para>Unless implementing a client driver, one needn't
+    concern him or her self with the complications of the binary
+    protocol. <olink targetptr="connectors">Language-specific
+    drivers</olink> provide a friendly way to store domain
+    language data structures in Tarantool, and the command line
+    client supports a subset of the standard SQL.
+    A complete description of both, the binary protocol and
+    the supported SQL, is maintained in annotated Backus-Naur
+    form in the source tree: please see
+    <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
+    and
+    <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link> respectively.
+  </para>
+  <section>
+    <title>Memcached protocol</title>
+      <para>If full access to Tarantool functionality is not needed,
+      or there is no readily available connector for the
+      programming language in use, any existing client driver for
+      Memcached will make do as a Tarantool connector.
+      To enable Memcached protocol, turn on
+      <olink targetptr="memcached_port"/> in the option file.
+      Since Memcached has no notion of namespaces or secondary
+      indexes, this port only makes it possible to access one
+      dedicated namespace (see <olink
+      targetptr="memcached_namespace"/>) via its primary key.
+      Unless tuple expiration is enabled with <olink
+      targetptr="memcached_expire"/>, TTL part of the message is
+      stored but ignored.
+  </para>
+  </section>
+</section>
 
+<section>
+  <title>Writing stored procedures in Lua</title>
+  <para>
+    Lua.
+  </para>
 </section>
 
 
--->
 <section>
   <title>Administrative console</title>
   <para>
-    The administrative console uses a simple text protocol, so you
-    can connect to it using any <command>telnet</command> client,
-    or a tool like <command>rlwrap</command>, if access to
-    readline features is desired. Additionally, Tarantool features
-    its own Python-based client, located in directory <filename>test</filename>, <command>tarantool</command>.
-    Tarantool replies to administrative command in YAML.
+    The administrative console uses a simple text protocol.
+    All commands are case-insensitive.
+    You can connect to the administrative port using any
+    <command>telnet</command> client, or a tool like
+    <command>rlwrap</command>, if access to readline features is
+    desired. Additionally, <command>tarantool</command>, the
+    SQL-capable command line client,
+    understands all administrative statements
+    and automatically directs them to the administrative port.
+    The server response to an administrative command, even though
+    is always in plain text, can be quite complex.
+    It is encoded using YAML markup to simplify automated parsing.
   </para>
+  <para>To learn about all supported administrative commands, you
+    can type <emphasis role="tntadmin">help</emphasis> in the
+    administrative console. A reference description also follows
+    below:</para>
 
-  <para><emphasis xml:id="reload-configuration" xreflabel="RELOAD CONFIGURATION" role="tntadmin">reload
-  configuration</emphasis> Re-read the configuration file. If the
-  file contains changes to dynamic parameters, update the runtime
-  settings. If configuration syntax is incorrect, or a read-only parameter is    changed, produce an error and do nothing.</para>
-  <para><emphasis xml:id="show-configuration" xreflabel="SHOW CONFIGURATION" role="tntadmin">show configuration</emphasis> Show the current settings. Displays all
-  settings, including those that have default values and thus are
-  not necessarily present in the configuration file.</para>
+  <variablelist>
 
-  <para><emphasis xml:id="save-snapshot" xreflabel="SAVE SNAPSHOT"
-  role="tntadmin">save snaspshot</emphasis>
-  Take a snapshot of all data and store it in
-  <filename><olink targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
-    To take a snapshot, Tarantool forks and quickly munmap(2)s all
-    memory except one that stores tuples. Since all modern operating
-    systems support virtual memory copy-on-write, this effectively
-    creates a consistent snapshot of all tuples in the child
-    process, which is then written to disk tuple by tuple. Since a
-    snapshot is written
-    sequentially, you can expect a very high write performance
-    (averaging to 70MB/second on modern disks), which means an
-    average database instance gets saved in a matter of minutes.
-    Note, that as long as there are any changes to the parent
-    memory through concurrent updates, there are going to be page
-    splits, and therefore you need to have some extra free memory
-    to run this command. 15%-30% of <olink
-    targetptr="slab_alloc_arena"/> is, on average, sufficient.
-  </para>
+    <varlistentry>
+      <term xml:id="save-snapshot" xreflabel="SAVE SNAPSHOT">
+        <emphasis role="tntadmin">save snapshot</emphasis>
+      </term>
+      <listitem><para>
+        Take a snapshot of all data and store it in
+        <filename><olink
+        targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
+        To take a snapshot, Tarantool forks and quickly
+        <function>munmap(2)</function>s all memory except one that
+        stores tuples. Since all modern operating systems support
+        virtual memory copy-on-write, this effectively creates a
+        consistent snapshot of all tuples in the child process,
+        which is then written to disk tuple by tuple. Since a
+        snapshot is written sequentially, you can expect a very
+        high write performance (averaging to 70MB/second on modern
+        disks), which means an average database instance gets
+        saved in a matter of minutes.  Note, that as long as there
+        are any changes to the parent memory through concurrent
+        updates, there are going to be page splits, and therefore
+        you need to have some extra free memory to run this
+        command. 15%-30% of <olink targetptr="slab_alloc_arena"/>
+        is, on average, sufficient.
+      </para></listitem>
+    </varlistentry>
+
+
+    <varlistentry>
+      <term xml:id="reload-configuration" xreflabel="RELOAD CONFIGURATION">
+        <emphasis role="tntadmin">reload configuration</emphasis>
+      </term>
+      <listitem><para>
+        Re-read the configuration file. If the file contains
+        changes to dynamic parameters, update the runtime
+        settings. If configuration syntax is incorrect, or a
+        read-only parameter is changed, produce an error and do
+        nothing.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-configuration" xreflabel="SHOW CONFIGURATION">
+        <emphasis role="tntadmin">show configuration</emphasis>
+      </term>
+      <listitem><para>
+        Show the current settings. Displays all settings,
+        including those that have default values and thus are not
+        necessarily present in the configuration file.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-info" xreflabel="SHOW INFO">
+        <emphasis role="tntadmin">show info</emphasis>
+      </term>
+      <listitem><para>
+<programlisting>
+tarantool> show info
+---
+info:
+  version: "1.4.0-30-ge500b95"
+  uptime: 441524
+  pid: 16180
+  wal_writer_pid: 16182
+  lsn: 15481913304
+  recovery_lag: 0.000
+  recovery_last_update: 1306964594.980
+  status: primary
+</programlisting>
+      </para>
+      <para>
+        <emphasis role="strong">recovery_lag</emphasis> holds the
+        difference (in seconds) between the current time on the
+        machine (wall clock time) and the time stamp of the last
+        applied record.  In replication setup, this difference can
+        indicate the delay taking place before a change is
+        applied to a replica.
+      </para>
+      <para>
+        <emphasis role="strong">recovery_last_update</emphasis> is
+        the wall clock time of the last change recorded in the
+        write ahead log.
+      </para>
+      <para>
+        <emphasis role="strong">status</emphasis> is
+        either "primary" or "hot_standby/&lt;hostname&gt;".
+      </para>
+
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-stat" xreflabel="SHOW STAT">
+        <emphasis role="tntadmin">show stat</emphasis>
+      </term>
+      <listitem><para>
+<programlisting>
+tarantool> show stat
+---
+statistics:
+  INSERT:        { rps:  139  , total:  48207694    }
+  SELECT_LIMIT:  { rps:  0    , total:  0           }
+  SELECT:        { rps:  1246 , total:  388322317   }
+  UPDATE_FIELDS: { rps:  1874 , total:  743350520   }
+  DELETE:        { rps:  147  , total:  48902544    }
+</programlisting>
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-slab" xreflabel="SHOW SLAB">
+        <emphasis role="tntadmin">show slab</emphasis>
+      </term>
+      <listitem>
+        <para>
+          Show the statistics of the slab allocator. The slab
+          allocator is the main allocator used to store tuples.
+          This can be used to monitor the total memory use and
+          memory fragmentation.
+        </para>
+        <para>
+          <emphasis role="strong">items_used</emphasis> contains
+          the % of <olink targetptr="slab_alloc_arena"/> already
+          used to store tuples.
+        </para>
+        <para>
+          <emphasis role="strong">arena_used</emphasis> contains
+          the % of <olink targetptr="slab_alloc_arena"/> that is
+          already distributed to the slab allocator.
+        </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-palloc" xreflabel="SHOW PALLOC">
+        <emphasis role="tntadmin">show palloc</emphasis>
+      </term>
+      <listitem><para>
+        A pool allocator is used for temporary memory, when
+        serving client requests. Every fiber has an own
+        pool. Shows the current state of pools of all fibers.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="save-coredump" xreflabel="SAVE COREDUMP">
+        <emphasis role="tntadmin">SAVE COREDUMP</emphasis>
+      </term>
+      <listitem><para>
+        Fork and dump a core. Since Tarantool stores all tuples
+        in memory, it can take some time. Mainly useful for
+        debugging.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-fiber" xreflabel="SHOW FIBER">
+        <emphasis role="tntadmin">show fiber</emphasis>
+      </term>
+      <listitem><para>
+        Show all running fibers, with their stack.
+        Mainly useful for debugging.
+      </para></listitem>
+    </varlistentry>
+
+  </variablelist>
+
 </section>
 </chapter>
 

@@ -1,5 +1,5 @@
 <para xmlns="http://docbook.org/ns/docbook" version="5.0"
-      xmlns:xi="http://www.w3.org/2001/XInclude" 
+      xmlns:xi="http://www.w3.org/2001/XInclude"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xml:id="namespace">
 <bridgehead>Namespace settings explained</bridgehead>
@@ -59,11 +59,31 @@ a minimal storage configuration looks like below:
 <programlisting language="c">
 namespace[0].enabled = 1
 namespace[0].index[0].type = HASH
+namespace[0].index[0].unique = 1
 namespace[0].index[0].key_field[0].fieldno = 0
 namespace[0].index[0].key_field[0].type = NUM64
 </programlisting>
-Other namespace properties are set in the same way.
-When defining a namespace, please be aware of these restrictions:
+The parameters listed above are mandatory. Other namespace
+properties are set in the same way.
+An alternative syntax, mainly useful when defining large namespaces, exists:
+<programlisting language="c">
+namespace[0] = {
+    enabled = 1,
+    index = [
+        {
+            type = HASH,
+            key_field = [
+                {
+                    fieldno = 0,
+                    type = NUM64
+                }
+            ]
+        }
+    ]
+}
+</programlisting>
+When defining a namespace,
+please be aware of these restrictions:
 <itemizedlist>
   <listitem><simpara>at least one namespace must be
     configured,</simpara></listitem>
@@ -73,7 +93,7 @@ When defining a namespace, please be aware of these restrictions:
   <listitem><simpara>"unique" property doesn't have a default, and
     must be set explicitly,
   </simpara></listitem>
-  <listitem><simpara>namespace configuration can not be changed 
+  <listitem><simpara>namespace configuration can not be changed
     dynamically, currently you need to restart the server even to
     disable or enable a namespace,
   </simpara></listitem>

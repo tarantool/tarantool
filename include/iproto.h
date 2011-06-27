@@ -44,7 +44,6 @@ struct iproto_header_retcode {
 	uint32_t len;
 	uint32_t sync;
 	uint32_t ret_code;
-	uint8_t data[];
 } __attribute__((packed));
 
 static inline struct iproto_header *iproto(const struct tbuf *t)
@@ -52,11 +51,9 @@ static inline struct iproto_header *iproto(const struct tbuf *t)
 	return (struct iproto_header *)t->data;
 }
 
-struct iproto_interactor;
 
-struct iproto_interactor
-*iproto_interactor(uint32_t (*interact) (uint32_t msg, uint8_t *data, size_t len));
+typedef void (*iproto_callback) (uint32_t msg_code, struct tbuf *request);
 
-void iproto_interact(void *);
+void iproto_interact(iproto_callback *callback);
 
 #endif

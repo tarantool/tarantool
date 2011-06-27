@@ -201,6 +201,8 @@ void init_tarantool_cfg(tarantool_cfg *c);
 
 int fill_default_tarantool_cfg(tarantool_cfg *c);
 
+void swap_tarantool_cfg(struct tarantool_cfg *c1, struct tarantool_cfg *c2);
+
 void parse_cfg_file_tarantool_cfg(tarantool_cfg *c, FILE *fh, int check_rdonly, int *n_accepted, int *n_skipped);
 
 void parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly, int *n_accepted, int *n_skipped);

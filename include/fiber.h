@@ -40,14 +40,21 @@
 #include <util.h>
 #include "third_party/queue.h"
 
-#include <exceptions.h>
+#include "exception.h"
 
 #define FIBER_NAME_MAXLEN 32
 
 #define FIBER_READING_INBOX 0x1
-#define FIBER_RAISE	    0x2
+/** Can this fiber be cancelled? */
+#define FIBER_CANCELLABLE   0x2
+/** Indicates that a fiber has been cancelled. */
+#define FIBER_CANCEL        0x4
 
-@interface tnt_FiberException: tnt_Exception
+/** This is thrown by fiber_* API calls when the fiber is
+ * cancelled.
+ */
+
+@interface FiberCancelException: tnt_Exception
 @end
 
 struct msg {
@@ -62,6 +69,7 @@ struct ring {
 
 struct fiber {
 	ev_io io;
+	ev_async async;
 #ifdef ENABLE_BACKTRACE
 	void *last_stack_frame;
 #endif
@@ -96,6 +104,8 @@ struct fiber {
 	char peer_name[32];
 
 	u32 flags;
+
+	struct fiber *waiter;
 };
 
 SLIST_HEAD(, fiber) fibers, zombie_fibers;
@@ -118,9 +128,7 @@ extern struct fiber *fiber;
 void fiber_init(void);
 struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
 void fiber_set_name(struct fiber *fiber, const char *name);
-void wait_for(int events);
 void wait_for_child(pid_t pid);
-void unwait(int events);
 void yield(void);
 void fiber_destroy_all();
 
@@ -149,7 +157,7 @@ inline static void add_iov(const void *buf, size_t len)
 	add_iov_unsafe(buf, len);
 }
 
-void add_iov_dup(void *buf, size_t len);
+void add_iov_dup(const void *buf, size_t len);
 bool write_inbox(struct fiber *recipient, struct tbuf *msg);
 int inbox_size(struct fiber *recipient);
 void wait_inbox(struct fiber *recipient);
@@ -162,7 +170,22 @@ ssize_t fiber_flush_output(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
 void fiber_call(struct fiber *callee);
-void fiber_raise(struct fiber *callee);
+void fiber_wakeup(struct fiber *f);
+/** Cancel a fiber. A cancelled fiber will have
+ * tnt_FiberCancelException raised in it.
+ *
+ * A fiber can be cancelled only if it is
+ * FIBER_CANCELLABLE flag is set.
+ */
+void fiber_cancel(struct fiber *f);
+/** Check if the current fiber has been cancelled.  Raises
+ * tnt_FiberCancelException
+ */
+void fiber_testcancel(void);
+/** Make it possible or not possible to cancel the current
+ * fiber.
+ */
+void fiber_setcancelstate(bool enable);
 int fiber_connect(struct sockaddr_in *addr);
 void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);
@@ -170,10 +193,12 @@ int set_nonblock(int sock);
 
 typedef enum fiber_server_type {
 	tcp_server,
-	udp_server
 } fiber_server_type;
 
-struct fiber *fiber_server(fiber_server_type type, int port, void (*handler) (void *), void *,
+typedef void (*fiber_server_callback)(void *);
+
+struct fiber *fiber_server(fiber_server_type type, int port,
+			   fiber_server_callback callback, void *,
 			   void (*on_bind) (void *));
 
 /**

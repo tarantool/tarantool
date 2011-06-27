@@ -46,6 +46,7 @@
 #include <replicator.h>
 #include <fiber.h>
 #include <iproto.h>
+#include <latch.h>
 #include <log_io.h>
 #include <palloc.h>
 #include <salloc.h>
@@ -108,58 +109,72 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	return 0;
 }
 
+
 i32
 reload_cfg(struct tbuf *out)
 {
-	struct tarantool_cfg new_cfg1, new_cfg2;
-	i32 ret;
+	static struct tnt_latch *latch = NULL;
+	struct tarantool_cfg new_cfg, aux_cfg;
 
-	// Load with checking readonly params
-	if (dup_tarantool_cfg(&new_cfg1, &cfg) != 0) {
-		destroy_tarantool_cfg(&new_cfg1);
-
-		return -1;
+	if (latch == NULL) {
+		latch = palloc(eter_pool, sizeof(*latch));
+		tnt_latch_init(latch);
 	}
-	ret = load_cfg(&new_cfg1, 1);
-	if (ret == -1) {
-		tbuf_append(out, cfg_out->data, cfg_out->len);
 
-		destroy_tarantool_cfg(&new_cfg1);
-
-		return -1;
-	}
-	// Load without checking readonly params
-	if (fill_default_tarantool_cfg(&new_cfg2) != 0) {
-		destroy_tarantool_cfg(&new_cfg2);
-
-		return -1;
-	}
-	ret = load_cfg(&new_cfg2, 0);
-	if (ret == -1) {
-		tbuf_append(out, cfg_out->data, cfg_out->len);
-
-		destroy_tarantool_cfg(&new_cfg1);
-
-		return -1;
-	}
-	// Compare only readonly params
-	char *diff = cmp_tarantool_cfg(&new_cfg1, &new_cfg2, 1);
-	if (diff != NULL) {
-		destroy_tarantool_cfg(&new_cfg1);
-		destroy_tarantool_cfg(&new_cfg2);
-
-		out_warning(0, "Could not accept read only '%s' option", diff);
+	if (tnt_latch_trylock(latch) == -1) {
+		out_warning(0, "Could not reload configuration: it is being reloaded right now");
 		tbuf_append(out, cfg_out->data, cfg_out->len);
 
 		return -1;
 	}
-	destroy_tarantool_cfg(&new_cfg1);
 
-	mod_reload_config(&cfg, &new_cfg2);
+	@try {
+		init_tarantool_cfg(&new_cfg);
+		init_tarantool_cfg(&aux_cfg);
 
-	destroy_tarantool_cfg(&cfg);
+		/*
+		  Prepare a copy of the original config file
+		  for confetti, so that it can compare the new
+		  file with the old one when loading the new file.
+		  Load the new file and return an error if it
+		  contains a different value for some read-only
+		  parameter.
+		*/
+		if (dup_tarantool_cfg(&aux_cfg, &cfg) != 0 ||
+		    load_cfg(&aux_cfg, 1) != 0)
+			return -1;
+		/*
+		  Load the new configuration file, but
+		  skip the check for read only parameters.
+		  new_cfg contains only defaults and
+		  new settings.
+		*/
+		if (fill_default_tarantool_cfg(&new_cfg) != 0 ||
+		    load_cfg(&new_cfg, 0) != 0)
+			return -1;
 
-	cfg = new_cfg2;
+		/* Check that no default value has been changed. */
+		char *diff = cmp_tarantool_cfg(&aux_cfg, &new_cfg, 1);
+		if (diff != NULL) {
+			out_warning(0, "Could not accept read only '%s' option", diff);
+			return -1;
+		}
+
+		/* Now pass the config to the module, to take action. */
+		if (mod_reload_config(&cfg, &new_cfg) != 0)
+			return -1;
+		/* All OK, activate the config. */
+		swap_tarantool_cfg(&cfg, &new_cfg);
+	}
+	@finally {
+		destroy_tarantool_cfg(&aux_cfg);
+		destroy_tarantool_cfg(&new_cfg);
+
+		if (cfg_out->len != 0)
+			tbuf_append(out, cfg_out->data, cfg_out->len);
+
+		tnt_latch_unlock(latch);
+	}
 
 	return 0;
 }
@@ -224,7 +239,7 @@ snapshot(void *ev, int events __attribute__((unused)))
 static void
 sig_int(int signal)
 {
-	say_info("SIGINT or SIGTERM recieved, terminating");
+	say_info("Exiting: %s", strsignal(signal));
 
 	if (recovery_state != NULL) {
 		struct child *writer = recovery_state->wal_writer;

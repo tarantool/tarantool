@@ -123,7 +123,11 @@ Tarantool/Box 1.4.0-69-g45551dd
       </para>
     </listitem>
     <listitem>
-      <para><option>--init-storage</option></para>
+      <para>
+      <option xml:id="init-storage-option"
+            xreflabel="--init-storage">
+          --init-storage
+      </option></para>
       <para>Initialize the directory, specified in <emphasis>vardir</emphasis>
       configuration option by creating an empty snapshot file in
       it. If <filename>vardir</filename> doesn't contain at
@@ -140,7 +144,8 @@ Tarantool/Box 1.4.0-69-g45551dd
     </listitem>
 
     <listitem>
-      <para><option>--cat</option> <userinput>snapshot.file</userinput></para>
+      <para><option xml:id="cat-option" xreflabel="--cat">--cat</option>
+      <userinput>snapshot.file</userinput></para>
       <para>Print the snapshot file, pointed to by the argument,
       in a human-readable form. For each log record, log sequence
       number, time of entry, operation type and arguments are
@@ -180,7 +185,7 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
   </itemizedlist>
 </section>
 
-<section>
+<section xml:id="option-file" xreflabel="option file">
 <title>The option file</title>
   <para>
     All advanced configuration parameters must be specified in a
@@ -225,9 +230,11 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
     <filename xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_big/tarantool.cfg">test/box_big/tarantool.cfg</filename>.
   </para>
 
-  <table frame='all'>
+  <table frame='all' pgwide='1'>
     <title>Basic parameters</title>
     <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
@@ -310,7 +317,8 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
         </row>
 
         <row>
-          <entry>secondary_port</entry>
+          <entry xml:id="secondary_port"
+            xreflabel="secondary_port">secondary_port</entry>
           <entry>integer</entry>
           <entry>none</entry>
           <entry>no</entry>
@@ -320,7 +328,7 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
         </row>
 
         <row>
-          <entry>admin_port</entry>
+          <entry xml:id="admin_port" xreflabel="admin_port">admin_port</entry>
           <entry>integer</entry>
           <entry>none</entry>
           <entry>no</entry>
@@ -341,23 +349,27 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
         </row>
 
         <row>
-          <entry>custom_proc_title</entry>
+          <entry xml:id="custom_proc_title"
+                 xreflabel="custom_proc_title">
+            custom_proc_title
+          </entry>
           <entry>string</entry>
           <entry>""</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>
-            <para>Inject the given string into process title
+            <para>Inject the given string into <olink
+            targetptr="proctitle">server process title</olink>
             (what's shown in COMMAND column of <command>ps</command>
             and <command>top</command> commands). For example,
             an unmodified Tarantool/Box process group looks like:
             </para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool: box:primary pri:33013 sec:33014 adm:33015</programlisting>
+tarantool_box: primary pri:33013 sec:33014 adm:33015</programlisting>
           <para>After "sessions" custom_proc_title is injected it
           looks like:</para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
+tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           </entry>
         </row>
 
@@ -365,9 +377,11 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
     </tgroup>
   </table>
 
-  <table frame='all'>
+  <table frame='all' pgwide='1'>
     <title>Configuring the storage</title>
     <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
@@ -395,7 +409,7 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           store tuples, <emphasis role="strong">in
           gigabytes</emphasis>. When the limit is reached, INSERT
           or UPDATE requests begin failing with error
-          <olink targetptr="ERR_CODE_MEMORY_ISSUE"/>.
+          <olink targetptr="ER_MEMORY_ISSUE"/>.
           While the server does not go
           beyond the defined limit to allocate tuples, there is
           additional memory used to store indexes and connection
@@ -447,9 +461,11 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
     </tgroup>
   </table>
 
-  <table frame='all'>
+  <table frame='all' pgwide='1'>
     <title>Binary logging and snapshots</title>
     <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
@@ -522,24 +538,11 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>WAL writer is a separate process whose sole
           purpose is to write the change log to disk. Every
           incoming data change is sent to this process and
-          queued for write. This parameter sets the size
-          of the queue. However, it has no effect
-          due to <link
-          xlink:href="https://bugs.launchpad.net/tarantool/+bug/791498">Bug#791498</link>.</entry>
-        </row>
-
-        <row>
-          <entry>readahead</entry>
-          <entry>integer</entry>
-          <entry>16384</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>WAL writer network read-ahead buffer size, in
-          bytes.
-            It's not recommended to change this value until
-            <link xlink:href="https://bugs.launchpad.net/tarantool/+bug/791498">Bug#791498</link>
-            is fixed.
-            </entry>
+          queued for write. This parameter affects the size of the
+          user space buffer that WAL writer uses to queue
+          write requests. By default, up to 128 client
+          connections can have pending updates waiting on disk.
+          </entry>
         </row>
 
         <row>
@@ -564,9 +567,11 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
     </tgroup>
   </table>
 
-  <table frame='all'>
+  <table frame='all' pgwide='1'>
     <title>Replication</title>
     <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
@@ -581,7 +586,8 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
 
       <tbody>
         <row>
-          <entry>replication_port</entry>
+          <entry xml:id="replication_port"
+            xreflabel="replication_port">replication_port</entry>
           <entry>integer</entry>
           <entry>0</entry>
           <entry>no</entry>
@@ -609,7 +615,10 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         </row>
 
         <row>
-          <entry>replication_source_ipaddr</entry>
+          <entry xml:id="replication_source_ipaddr"
+                 xreflabel="replication_source_ipaddr">
+              replication_source_ipaddr
+          </entry>
           <entry>string</entry>
           <entry>0</entry>
           <entry>no</entry>
@@ -621,19 +630,67 @@ tarantool: box:primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
     </tgroup>
   </table>
 
-<!--
+  <table frame='all' pgwide='1'>
+    <title>Networking</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
 
-# delay between loop iterations
-io_collect_interval=0.0, ro
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
 
-# size of listen backlog
-backlog=1024, ro
+      <tbody>
 
--->
+        <row>
+          <entry>io_collect_interval</entry>
+          <entry>float</entry>
+          <entry>0.0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>If non-zero, a sleep given duration is
+          injected between iterations of the event loop. Can be
+          used to reduce CPU load in deployments in which the
+          number of client connections is large, but requests are
+          not so frequent (for example, each connection issuing
+          just a handful of requests per second). </entry>
+        </row>
 
-  <table frame='all'>
+        <row>
+          <entry>readahead</entry>
+          <entry>integer</entry>
+          <entry>16384</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>The size of read-ahead buffer associated with
+              a client connection.</entry>
+        </row>
+
+        <row>
+          <entry>backlog</entry>
+          <entry>integer</entry>
+          <entry>1024</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>The size of listen backlog.</entry>
+       </row>
+
+      </tbody>
+    </tgroup>
+  </table>
+
+  <table frame='all' pgwide='1'>
     <title>Logging</title>
     <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
@@ -712,9 +769,11 @@ backlog=1024, ro
     </tgroup>
   </table>
 
-  <table frame='all'>
+  <table frame='all' pgwide='1'>
     <title>Memcached protocol support</title>
     <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
@@ -730,19 +789,27 @@ backlog=1024, ro
       <tbody>
 
         <row>
-          <entry>memcached</entry>
+          <entry>memcached_port</entry>
           <entry>integer</entry>
           <entry>0</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>Turn on Memcached mode. In this mode, Tarantool
-            does not use secondary_port, and speaks memcached
-            protocol on the primary port. In particular,
-            memcached-style flags are supported, and expiration
-            time can be set on tuples. Unlike Memcached, all data
-            still goes to the binary log and to the replica, if
-            latter one is set up, which means that power outage
-            does not lead to a loss of all data.
+          <entry>
+            <anchor xml:id="memcached_port" xreflabel="memcached_port"/>
+
+          Turn on Memcached protocol support on the given
+            port. All requests on this port are directed to
+            a dedicated namespace, set in <olink
+            targetptr="memcached_namespace"/>.
+            Memcached-style flags are supported and stored
+            along with the value. The expiration time can also be
+            set and is persistent, but is ignored, unless <olink
+            targetptr="memcached_expire"/> is turned on.
+            Unlike Memcached, all data still goes to the binary
+            log and to the replica, if latter one is set up, which
+            means that power outage does not lead to loss of all
+            data. Thanks to data persistence, cache warm up time
+            is also very short.
           </entry>
         </row>
 
@@ -752,9 +819,34 @@ backlog=1024, ro
           <entry>23</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>Namespace id to store memcached data in. The
-          format of tuple is [key, metadata, value], with a hash
-          index based on the key. </entry>
+          <entry>
+            <anchor xml:id="memcached_namespace"
+            xreflabel="memcached_namespace"/>
+          Namespace id to store memcached data in. The
+          format of tuple is [key, metadata, value], with a HASH
+          index based on the key. Since the namespace format
+          is defined by Memcached data model, it must not be
+          previously configured.</entry>
+        </row>
+
+        <row>
+          <entry>memcached_expire</entry>
+          <entry>boolean</entry>
+          <entry>0</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>
+            <anchor xml:id="memcached_expire"
+            xreflabel="memcached_expire"/>
+            Turn on tuple time-to-live support in
+            <olink targetptr="memcached_namespace"/>. This
+            effectively turns Tarantool into a "persistent" implementation
+            of Memcached. Since a caching server has
+            significantly different purpose than a data server, in
+            this mode Tarantool turns off replication and does not
+            bind to <olink targetptr="primary_port"/> or <olink
+            targetptr="secondary_port"/>.
+          </entry>
         </row>
 
         <row>

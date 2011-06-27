@@ -27,18 +27,9 @@
  */
 
 #include <mod/box/index.h>
-#include <exceptions.h>
+#include "exception.h"
 #include <tbuf.h>
 
-@interface tnt_BoxException: tnt_Exception {
-	@public
-		u32 errcode;
-}
-
-
-- init:(const char *)p_file:(unsigned)p_line reason:(const char *)p_reason errcode:(u32)p_errcode;
-- init:(const char *)p_file:(unsigned)p_line errcode:(u32)p_errcode;
-@end
 
 extern bool box_updates_allowed;
 void memcached_handler(void * /* data */);
@@ -81,7 +72,6 @@ struct box_txn {
 	struct box_tuple *tuple;
 	struct box_tuple *lock_tuple;
 
-	size_t saved_iov_cnt;
 	struct tbuf req;
 
 	bool in_recover;
@@ -139,7 +129,7 @@ enum box_mode {
 ENUM(messages, MESSAGES);
 
 struct box_txn *txn_alloc(u32 flags);
-u32 box_process(struct box_txn *txn, u32 op, struct tbuf *request_data);
+void box_process(struct box_txn *txn, u32 op, struct tbuf *request_data);
 
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
 void txn_cleanup(struct box_txn *txn);

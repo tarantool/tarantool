@@ -115,7 +115,7 @@ int tnt_execute_raw(struct tnt_connection *tnt, const char *message,
 	if (send(tnt->data_port, message, len, 0) < 0)
 		return -1;
 
-	char buf[2048];
+	static char buf[2048];
 
 	if (recv(tnt->data_port, buf, 2048, 0) < 16)
 		return -1;
@@ -126,6 +126,10 @@ int tnt_execute_raw(struct tnt_connection *tnt, const char *message,
 		/* @fixme: we may want to support big-endian some
 		 * day. */
 		tnt_res->errcode = * (uint32_t*) (buf+12); /* see iproto.h */
+		if (tnt_res->errcode)
+			tnt_res->errmsg = (const char *)(buf + 16);
+		else
+			tnt_res->errmsg = "";
 	}
 	return 0;
 }

@@ -1,6 +1,6 @@
 #include <connector/c/client.h>
-#include <include/errcode.h>
 #include <stdio.h>
+#include "errcode.h"
 
 /** Server connection. Reused between tests. */
 struct tnt_connection *conn;
@@ -32,8 +32,7 @@ void test_bug702397()
 	struct tnt_result tnt_res;
 	int res = tnt_execute_raw(conn, message, sizeof message, &tnt_res);
 	printf("return_code: %s, %s\n",
-	       tnt_errcode_str(tnt_res.errcode >> 8),
-	       tnt_errcode_desc(tnt_res.errcode >> 8));
+	       tnt_errcode_str(tnt_res.errcode >> 8), tnt_res.errmsg);
 }
 
 
@@ -54,8 +53,7 @@ void test_bug702399()
 	struct tnt_result tnt_res;
 	int res = tnt_execute_raw(conn, message, sizeof message, &tnt_res);
 	printf("return_code: %s, %s\n",
-	       tnt_errcode_str(tnt_res.errcode >> 8),
-	       tnt_errcode_desc(tnt_res.errcode >> 8));
+	       tnt_errcode_str(tnt_res.errcode >> 8), tnt_res.errmsg);
 }
 
 

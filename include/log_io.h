@@ -65,6 +65,26 @@ struct log_io_class {
 	const char *dirname;
 };
 
+
+/** A "condition variable" that allows fibers to wait when a given
+ * LSN makes it to disk.
+ */
+
+struct wait_lsn {
+	struct fiber *waiter;
+	i64 lsn;
+};
+
+void
+wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn);
+
+inline static void
+wait_lsn_clear(struct wait_lsn *wait_lsn)
+{
+	wait_lsn->waiter = NULL;
+	wait_lsn->lsn = 0LL;
+}
+
 struct log_io {
 	struct log_io_class *class;
 	FILE *f;
@@ -82,7 +102,8 @@ struct recovery_state {
 	i64 lsn, confirmed_lsn;
 
 	struct log_io *current_wal;	/* the WAL we'r currently reading/writing from/to */
-	struct log_io_class **snap_class, **wal_class, *snap_prefered_class, *wal_prefered_class;
+	struct log_io_class *snap_class;
+	struct log_io_class *wal_class;
 	struct child *wal_writer;
 
 	/* row_handler will be presented by most recent format of data
@@ -94,6 +115,7 @@ struct recovery_state {
 
 	int snap_io_rate_limit;
 	u64 cookie;
+	struct wait_lsn wait_lsn;
 
 	bool finalize;
 
@@ -129,7 +151,7 @@ static inline struct row_v11 *row_v11(const struct tbuf *t)
 struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, u64 cookie, i64 lsn);
 
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
-				    row_reader snap_row_reader, row_handler row_handler,
+				    row_handler row_handler,
 				    int rows_per_file, double fsync_delay, int inbox_size,
 				    int flags, void *data);
 int recover(struct recovery_state *, i64 lsn);
@@ -141,8 +163,9 @@ void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_
 
 int confirm_lsn(struct recovery_state *r, i64 lsn);
 int64_t next_lsn(struct recovery_state *r, i64 new_lsn);
+void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
 
-int read_log(const char *filename, row_reader reader,
+int read_log(const char *filename,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);
 
 int default_remote_row_handler(struct recovery_state *r, struct tbuf *row);

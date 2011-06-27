@@ -55,9 +55,9 @@ set (recompiled_core_sources
      ${CMAKE_SOURCE_DIR}/core/replicator.m
      ${CMAKE_SOURCE_DIR}/core/fiber.m PARENT_SCOPE)
 
-set (common_sources tbuf.m palloc.m util.m diagnostics.m
+set (common_sources tbuf.m palloc.m util.m
     salloc.m pickle.m coro.m stat.m log_io.m
-    log_io_remote.m iproto.m exceptions.m errcode.c)
+    log_io_remote.m iproto.m exception.m errcode.c latch.m)
 
 if (ENABLE_TRACE)
   set (common_sources ${common_sources} trace.m)

@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_CORE_DIAGNOSTICS_H_INCLUDED
-#define TARANTOOL_CORE_DIAGNOSTICS_H_INCLUDED
+#ifndef TARANTOOL_LATCH_H_INCLUDED
+#define TARANTOOL_LATCH_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -22,37 +22,45 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
+
+struct fiber;
 
 /*
- * This is used globally in the program to pass around information
- * about execution errors. Each fiber has its own error context,
- * setting an error in one doesn't affect another.
+ * Internal implementation of a container for a mutex like object
+ * with similar interface. It's used boolean variable because of
+ * single threaded nature of tarantool. But it's rather simple to change
+ * this variable to a mutex object to maintain multi threaded approach.
  */
+struct tnt_latch {
+	bool locked;
 
-struct Error
-{
-	/** Most often contains system errno. */
-	int code;
-	/** Text description of the error. Can be NULL. */
-	const char *msg;
+	struct fiber *owner;
 };
 
 /**
- * Set the last error in the current execution context (fiber).
- * If another error was already set, it's overwritten.
+ * Initialize the given latch.
  *
- * @param code  Error code.
- * @todo: think how to distinguish errno and tarantool codes here.
- * @param message  Optional text message. Can be NULL.
+ * @param latch Latch to be initialized.
  */
-void diag_set_error(int code, const char *msg);
-
-/** Return the last error. Return NULL if no error.
+void tnt_latch_init(struct tnt_latch *latch);
+/**
+ * Destroy the given latch.
  */
-struct Error *diag_get_last_error();
-
-/** Clear the last error, if any.
+void tnt_latch_destroy(struct tnt_latch *latch);
+/**
+ * Set the latch to the locked state. If it's already locked
+ * returns -1 value immediately otherwise returns 0.
+ *
+ * @param latch Latch to be locked.
  */
-void diag_clear();
+int tnt_latch_trylock(struct tnt_latch *latch);
+/**
+ * Unlock the locked latch.
+ *
+ * @param latch Latch to be unlocked.
+ */
+void tnt_latch_unlock(struct tnt_latch *latch);
 
-#endif /* TARANTOOL_CORE_DIAGNOSTICS_H_INCLUDED */
+
+#endif /* TARANTOOL_LATCH_H_INCLUDED */

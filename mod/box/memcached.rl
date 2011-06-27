@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2010, 2011 Mail.RU
+ * Copyright (C) 2010, 2011 Yuriy Vostrikov
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -80,7 +80,7 @@ natoq(const u8 *start, const u8 *end)
 	return num;
 }
 
-static int
+static void
 store(struct box_txn *txn, void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 {
 	u32 box_flags = BOX_QUIET, cardinality = 4;
@@ -112,10 +112,10 @@ store(struct box_txn *txn, void *key, u32 exptime, u32 flags, u32 bytes, u8 *dat
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
-	return box_process(txn, INSERT, req); /* FIXME: handle RW/RO */
+	box_process(txn, INSERT, req); /* FIXME: handle RW/RO */
 }
 
-static int
+static void
 delete(struct box_txn *txn, void *key)
 {
 	u32 key_len = 1;
@@ -125,7 +125,7 @@ delete(struct box_txn *txn, void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	return box_process(txn, DELETE, req);
+	box_process(txn, DELETE, req);
 }
 
 static struct box_tuple *
@@ -241,23 +241,24 @@ memcached_dispatch(struct box_txn *txn)
 
 	say_debug("memcached_dispatch '%.*s'", MIN((int)(pe - p), 40) , p);
 
-#define STORE ({									\
-	stats.cmd_set++;								\
-	if (bytes > (1<<20)) {								\
-		add_iov("SERVER_ERROR object too large for cache\r\n", 41);		\
-	} else {									\
-		u32 ret_code;								\
-		if ((ret_code = store(txn, key, exptime, flags, bytes, data)) == 0) {	\
-			stats.total_items++;						\
-			add_iov("STORED\r\n", 8);					\
-		} else {								\
-			add_iov("SERVER_ERROR ", 13);					\
-			add_iov(tnt_errcode_desc(ret_code),			\
-				strlen(tnt_errcode_desc(ret_code)));		\
-			add_iov("\r\n", 2);						\
-		}									\
-	}										\
-})
+#define STORE									\
+do {										\
+	stats.cmd_set++;							\
+	if (bytes > (1<<20)) {							\
+		add_iov("SERVER_ERROR object too large for cache\r\n", 41);	\
+	} else {								\
+		@try {								\
+			store(txn, key, exptime, flags, bytes, data);		\
+			stats.total_items++;					\
+			add_iov("STORED\r\n", 8);				\
+		}								\
+		@catch (ClientError *e) {					\
+			add_iov("SERVER_ERROR ", 13);				\
+			add_iov(e->errmsg, strlen(e->errmsg));			\
+			add_iov("\r\n", 2);					\
+		}								\
+	}									\
+} while (0)
 
 	%%{
 		action set {
@@ -358,12 +359,16 @@ memcached_dispatch(struct box_txn *txn)
 					bytes = b->len;
 
 					stats.cmd_set++;
-					if (store(txn, key, exptime, flags, bytes, data) == 0) {
+					@try {
+						store(txn, key, exptime, flags, bytes, data);
 						stats.total_items++;
 						add_iov(b->data, b->len);
 						add_iov("\r\n", 2);
-					} else {
-						add_iov("SERVER_ERROR\r\n", 14);
+					}
+					@catch (ClientError *e) {
+						add_iov("SERVER_ERROR ", 13);
+						add_iov(e->errmsg, strlen(e->errmsg));
+						add_iov("\r\n", 2);
 					}
 				} else {
 					add_iov("CLIENT_ERROR cannot increment or decrement non-numeric value\r\n", 62);
@@ -378,13 +383,13 @@ memcached_dispatch(struct box_txn *txn)
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				add_iov("NOT_FOUND\r\n", 11);
 			} else {
-				u32 ret_code;
-				if ((ret_code = delete(txn, key)) == 0)
+				@try {
+					delete(txn, key);
 					add_iov("DELETED\r\n", 9);
-				else {
+				}
+				@catch (ClientError *e) {
 					add_iov("SERVER_ERROR ", 13);
-					add_iov(tnt_errcode_desc(ret_code),
-						strlen(tnt_errcode_desc(ret_code)));
+					add_iov(e->errmsg, strlen(e->errmsg));
 					add_iov("\r\n", 2);
 				}
 			}
@@ -692,8 +697,13 @@ memcached_expire(void *data __attribute__((unused)))
 
 		while (keys_to_delete->len > 0) {
 			struct box_txn *txn = txn_alloc(BOX_QUIET);
-			delete(txn, read_field(keys_to_delete));
-			expired_keys++;
+			@try {
+				delete(txn, read_field(keys_to_delete));
+				expired_keys++;
+			}
+			@catch (id e) {
+				/* The error is already logged. */
+			}
 		}
 		stat_collect(stat_base, MEMC_EXPIRED_KEYS, expired_keys);
 
@@ -710,5 +720,5 @@ memcached_expire(void *data __attribute__((unused)))
  * Local Variables:
  * mode: c
  * End:
- * vim: syntax=c
+ * vim: syntax=objc
  */

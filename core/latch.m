@@ -20,73 +20,47 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "diagnostics.h"
+
+#include "latch.h"
 #include "fiber.h"
-#include <errno.h>
-#include <string.h>
-#include <stdlib.h>
 
-static struct Error oom_error = { ENOMEM, "Out of memory" };
-
-/**
- * Allocate error on heap. Errors are expected to be rare and
- * small, thus we don't care much about allocation speed, and
- * memory fragmentation should be negligible.
- */
-
-static struct Error *error_create(int code, const char *msg_arg)
+void
+tnt_latch_init(struct tnt_latch *latch)
 {
-	/* Just something large enough. */
-	const int MAX_MSGLEN = 200;
-
-	if (msg_arg == NULL)
-		msg_arg = "";
-
-	size_t msglen = strlen(msg_arg);
-	char *msg;
-
-	if (msglen > MAX_MSGLEN)
-		msglen = MAX_MSGLEN;
-
-	struct Error *error = malloc(sizeof(struct Error) + msglen + 1);
-
-	if (error == NULL)
-		return &oom_error;
-
-	msg = (char *)(error + 1);
-	strncpy(msg, msg_arg, msglen);
-	msg[msglen] = '\0';
-
-	error->code = code;
-	error->msg = msg;
-
-	return error;
+	latch->locked = false;
+	latch->owner = NULL;
 }
 
-
-static void error_destroy(struct Error *error)
+void
+tnt_latch_destroy(struct tnt_latch *latch)
 {
-	if (error != &oom_error)
-		free(error);
+	assert(latch->locked == false);
+
+	latch->owner = NULL;
 }
 
-
-void diag_set_error(int code, const char *message)
+int
+tnt_latch_trylock(struct tnt_latch *latch)
 {
-	if (fiber->diagnostics)
-		diag_clear();
-	fiber->diagnostics = error_create(code, message);
+	if (latch->locked) {
+		assert(latch->owner != fiber);
+
+		return -1;
+	}
+
+	assert(latch->owner == NULL);
+
+	latch->locked = true;
+	latch->owner = fiber;
+
+	return 0;
 }
 
-
-struct Error *diag_get_last_error()
+void
+tnt_latch_unlock(struct tnt_latch *latch)
 {
-	return fiber->diagnostics;
-}
+	assert(latch->owner == fiber);
 
-
-void diag_clear()
-{
-	error_destroy(fiber->diagnostics);
-	fiber->diagnostics = NULL;
+	latch->locked = false;
+	latch->owner = NULL;
 }

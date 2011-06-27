@@ -61,7 +61,7 @@ static const char *help =
 static const char *unknown_command = "unknown command. try typing help." CRLF;
 
 
-#line 65 "core/admin.c"
+#line 65 "core/admin.m"
 static const int admin_start = 1;
 static const int admin_first_final = 108;
 static const int admin_error = 0;
@@ -119,12 +119,12 @@ admin_dispatch(void)
 	p = fiber->rbuf->data;
 
 	
-#line 123 "core/admin.c"
+#line 123 "core/admin.m"
 	{
 	cs = admin_start;
 	}
 
-#line 128 "core/admin.c"
+#line 128 "core/admin.m"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -283,7 +283,7 @@ st108:
 	if ( ++p == pe )
 		goto _test_eof108;
 case 108:
-#line 287 "core/admin.c"
+#line 287 "core/admin.m"
 	goto st0;
 tr13:
 #line 193 "core/admin.rl"
@@ -383,7 +383,7 @@ st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 387 "core/admin.c"
+#line 387 "core/admin.m"
 	if ( (*p) == 10 )
 		goto st108;
 	goto st0;
@@ -471,7 +471,7 @@ st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-#line 475 "core/admin.c"
+#line 475 "core/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr28;
 		case 13: goto tr29;
@@ -485,7 +485,7 @@ st17:
 	if ( ++p == pe )
 		goto _test_eof17;
 case 17:
-#line 489 "core/admin.c"
+#line 489 "core/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr28;
 		case 13: goto tr29;

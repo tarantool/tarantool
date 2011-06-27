@@ -119,6 +119,13 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	return 0;
 }
 
+void
+swap_tarantool_cfg(struct tarantool_cfg *c1, struct tarantool_cfg *c2) {
+	struct tarantool_cfg tmpcfg = *c1;
+	*c1 = *c2;
+	*c2 = tmpcfg;
+}
+
 static int
 acceptDefault_name__namespace(tarantool_cfg_namespace *c) {
 	c->enabled = -1;

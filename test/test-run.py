@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/env python
 """Tarantool regression test suite front-end."""
 
 __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
