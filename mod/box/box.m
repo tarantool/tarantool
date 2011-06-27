@@ -47,9 +47,12 @@
 #include <cfg/tarantool_box_cfg.h>
 #include <mod/box/index.h>
 
+static void box_process_ro(u32 op, struct tbuf *request_data);
+static void box_process_rw(u32 op, struct tbuf *request_data);
+
 const char *mod_name = "Box";
 
-bool box_updates_allowed = false;
+iproto_callback rw_callback = box_process_ro;
 static char *status = "unknown";
 
 static int stat_base;
@@ -761,9 +764,11 @@ txn_commit(struct box_txn *txn)
 			tbuf_append(t, txn->req.data, txn->req.len);
 
 			i64 lsn = next_lsn(recovery_state, 0);
-			if (!wal_write(recovery_state, wal_tag, fiber->cookie, lsn, t))
-				tnt_raise(LoggedError, :ER_WAL_IO);
+			bool res = !wal_write(recovery_state, wal_tag,
+					      fiber->cookie, lsn, t);
 			confirm_lsn(recovery_state, lsn);
+			if (res)
+				tnt_raise(LoggedError, :ER_WAL_IO);
 		}
 
 		unlock_tuples(txn);
@@ -1150,9 +1155,6 @@ box_process_ro(u32 op, struct tbuf *request_data)
 static void
 box_process_rw(u32 op, struct tbuf *request_data)
 {
-	if (!op_is_select(op) && !box_updates_allowed)
-		tnt_raise(LoggedError, :ER_NONMASTER);
-
 	return box_process(txn_alloc(0), op, request_data);
 }
 
@@ -1248,7 +1250,9 @@ static void
 box_master_or_slave(struct tarantool_cfg *conf)
 {
 	if (conf->remote_hot_standby) {
-		box_updates_allowed = false;
+		rw_callback = box_process_ro;
+
+		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 
 		remote_recovery_restart(conf);
 	} else {
@@ -1258,10 +1262,9 @@ box_master_or_slave(struct tarantool_cfg *conf)
 
 			remote_recover = NULL;
 		}
+		rw_callback = box_process_rw;
 
 		say_info("I am primary");
-
-		box_updates_allowed = true;
 
 		status = "primary";
 		title("primary");
@@ -1329,6 +1332,8 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 void
 mod_init(void)
 {
+	static iproto_callback ro_callback = box_process_ro;
+
 	stat_base = stat_register(messages_strs, messages_MAX);
 
 	namespace = palloc(eter_pool, sizeof(struct namespace) * namespace_count);
@@ -1428,12 +1433,12 @@ mod_init(void)
 		if (cfg.secondary_port != 0)
 			fiber_server(tcp_server, cfg.secondary_port,
 				     (fiber_server_callback) iproto_interact,
-				     box_process_ro, NULL);
+				     &ro_callback, NULL);
 
 		if (cfg.primary_port != 0)
 			fiber_server(tcp_server, cfg.primary_port,
 				     (fiber_server_callback) iproto_interact,
-				     box_process_rw, box_bound_to_primary);
+				     &rw_callback, box_bound_to_primary);
 	}
 
 	say_info("initialized");

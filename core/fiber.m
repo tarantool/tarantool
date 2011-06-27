@@ -442,11 +442,8 @@ fiber_loop(void *data __attribute__((unused)))
 		@catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled", fiber->name);
 
-			if (fiber->waiter != NULL) {
+			if (fiber->waiter != NULL)
 				fiber_call(fiber->waiter);
-
-				fiber->waiter = NULL;
-			}
 
 			say_info("fiber `%s': exiting", fiber->name);
 		}
