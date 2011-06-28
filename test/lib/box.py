@@ -27,42 +27,43 @@ import struct
 from tarantool_connection import TarantoolConnection
 
 class Box(TarantoolConnection):
-  def recvall(self, length):
-    res = ""
-    while len(res) < length:
-      buf = self.socket.recv(length - len(res))
-      if not buf:
-        raise RuntimeError("Got EOF from socket, the server has "
-                           "probably crashed")
-      res = res + buf
-    return res
 
-  def execute_no_reconnect(self, command, silent=True):
-    statement = sql.parse("sql", command)
-    if statement == None:
-      return "You have an error in your SQL syntax\n"
+    def recvall(self, length):
+        res = ""
+        while len(res) < length:
+            buf = self.socket.recv(length - len(res))
+            if not buf:
+                raise RuntimeError("Got EOF from socket, the server has "
+                                   "probably crashed")
+            res = res + buf
+        return res
 
-    payload = statement.pack()
-    header = struct.pack("<lll", statement.reqeust_type, len(payload), 0)
+    def execute_no_reconnect(self, command, silent=True):
+        statement = sql.parse("sql", command)
+        if statement == None:
+            return "You have an error in your SQL syntax\n"
 
-    self.socket.sendall(header)
-    if len(payload):
-      self.socket.sendall(payload)
+        payload = statement.pack()
+        header = struct.pack("<lll", statement.reqeust_type, len(payload), 0)
 
-    IPROTO_HEADER_SIZE = 12
+        self.socket.sendall(header)
+        if len(payload):
+            self.socket.sendall(payload)
 
-    header = self.recvall(IPROTO_HEADER_SIZE)
+        IPROTO_HEADER_SIZE = 12
 
-    response_len = struct.unpack("<lll", header)[1]
+        header = self.recvall(IPROTO_HEADER_SIZE)
 
-    if response_len:
-      response = self.recvall(response_len)
-    else:
-      response = None
+        response_len = struct.unpack("<lll", header)[1]
 
-    if not silent:
-      print command
-      print statement.unpack(response)
+        if response_len:
+            response = self.recvall(response_len)
+        else:
+            response = None
 
-    return statement.unpack(response) + "\n"
+        if not silent:
+            print command
+            print statement.unpack(response)
+
+        return statement.unpack(response) + "\n"
 
