@@ -53,7 +53,7 @@ static void box_process_rw(u32 op, struct tbuf *request_data);
 const char *mod_name = "Box";
 
 iproto_callback rw_callback = box_process_ro;
-static char *status = "unknown";
+static char status[64] = "unknown";
 
 static int stat_base;
 STRS(messages, MESSAGES);
@@ -1239,8 +1239,7 @@ remote_recovery_restart(struct tarantool_cfg *conf)
 					       conf->wal_feeder_port,
 					       default_remote_row_handler);
 
-	status = palloc(eter_pool, 64);
-	snprintf(status, 64, "replica/%s:%i%s", conf->wal_feeder_ipaddr,
+	snprintf(status, sizeof(status), "replica/%s:%i%s", conf->wal_feeder_ipaddr,
 		 conf->wal_feeder_port, custom_proc_title);
 	title("replica/%s:%i%s", conf->wal_feeder_ipaddr, conf->wal_feeder_port,
 	      custom_proc_title);
@@ -1264,10 +1263,10 @@ box_master_or_slave(struct tarantool_cfg *conf)
 		}
 		rw_callback = box_process_rw;
 
-		say_info("I am primary");
-
-		status = "primary";
+		snprintf(status, sizeof(status), "primary");
 		title("primary");
+
+		say_info("I am primary");
 	}
 }
 
@@ -1422,7 +1421,7 @@ mod_init(void)
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recover_follow(recovery_state, cfg.wal_dir_rescan_delay);
-		status = "hot_standby";
+		snprintf(status, sizeof(status), "hot_standby");
 		title("hot_standby");
 	}
 
@@ -1440,8 +1439,6 @@ mod_init(void)
 				     (fiber_server_callback) iproto_interact,
 				     &rw_callback, box_bound_to_primary);
 	}
-
-	say_info("initialized");
 }
 
 int
