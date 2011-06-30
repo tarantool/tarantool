@@ -61,8 +61,6 @@ static struct fiber **sp, *call_stack[64];
 static uint32_t last_used_fid;
 static struct palloc_pool *ex_pool;
 
-static uint32_t watermark = 0;
-
 struct fiber_cleanup {
 	void (*handler) (void *data);
 	void *data;
@@ -1120,7 +1118,7 @@ void
 fiber_init(void)
 {
 	SLIST_INIT(&fibers);
-	fibers_registry = kh_init(fid2fiber, &watermark);
+	fibers_registry = kh_init(fid2fiber, NULL);
 
 	ex_pool = palloc_create_pool("ex_pool");
 
