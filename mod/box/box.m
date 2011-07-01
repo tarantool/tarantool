@@ -1224,26 +1224,6 @@ title(const char *fmt, ...)
 			       cfg.primary_port, cfg.secondary_port, cfg.admin_port);
 }
 
-void
-remote_recovery_start(struct recovery_state *r, const char *ipaddr, int port)
-{
-	say_info("starting the replica");
-
-	recover_follow_remote(r, ipaddr, port);
-
-	snprintf(status, sizeof(status), "replica/%s:%i%s", ipaddr, port,
-		 custom_proc_title);
-	title("replica/%s:%i%s", ipaddr, port, custom_proc_title);
-}
-
-
-void
-remote_recovery_stop(struct recovery_state *r)
-{
-	say_info("shutting down the replica");
-	fiber_cancel(r->remote_recovery);
-	r->remote_recovery = NULL;
-}
 
 static void
 box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
@@ -1253,9 +1233,15 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 
-		remote_recovery_start(recovery_state,
+		recovery_follow_remote(recovery_state,
 				      conf->wal_feeder_ipaddr,
 				      conf->wal_feeder_port);
+
+		snprintf(status, sizeof(status), "replica/%s:%i%s",
+			 conf->wal_feeder_ipaddr, conf->wal_feeder_port,
+			 custom_proc_title);
+		title("replica/%s:%i%s", conf->wal_feeder_ipaddr,
+		      conf->wal_feeder_port, custom_proc_title);
 	} else {
 		rw_callback = box_process_rw;
 
@@ -1299,7 +1285,12 @@ mod_check_config(struct tarantool_cfg *conf)
 i32
 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
 {
-	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby) {
+	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby ||
+	    (old_conf->remote_hot_standby != 0 &&
+	     (strcmp(old_conf->wal_feeder_ipaddr,
+		     new_conf->wal_feeder_ipaddr) != 0 ||
+	      old_conf->wal_feeder_port != new_conf->wal_feeder_port))) {
+
 		if (recovery_state->finalize != true) {
 			out_warning(0, "Could not propagate %s before local recovery finished",
 				    old_conf->remote_hot_standby == true ? "slave to master" :
@@ -1307,25 +1298,11 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 
 			return -1;
 		}
-	}
-
-	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby) {
-		/* Local recovery must be finalized at this point */
-		assert(recovery_state->finalize == true);
 
 		if (recovery_state->remote_recovery)
-			remote_recovery_stop(recovery_state);
+			recovery_stop_remote(recovery_state);
 
 		box_enter_master_or_replica_mode(new_conf);
-	} else if (old_conf->remote_hot_standby > 0 &&
-		   (strcmp(old_conf->wal_feeder_ipaddr, new_conf->wal_feeder_ipaddr) != 0 ||
-		    old_conf->wal_feeder_port != new_conf->wal_feeder_port)) {
-
-		if (recovery_state->remote_recovery)
-			remote_recovery_stop(recovery_state);
-		remote_recovery_start(recovery_state,
-				      new_conf->wal_feeder_ipaddr,
-				      new_conf->wal_feeder_port);
 	}
 
 	return 0;

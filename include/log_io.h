@@ -169,7 +169,9 @@ void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
 int read_log(const char *filename,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);
 
-void recover_follow_remote(struct recovery_state *r, const char *ip_addr, int port);
+void recovery_follow_remote(struct recovery_state *r,
+			    const char *ip_addr, int port);
+void recovery_stop_remote(struct recovery_state *r);
 
 struct log_io_iter;
 void snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row);

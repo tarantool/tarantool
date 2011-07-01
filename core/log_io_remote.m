@@ -177,7 +177,8 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 }
 
 void
-recover_follow_remote(struct recovery_state *r, const char *ip_addr, int port)
+recovery_follow_remote(struct recovery_state *r,
+		       const char *ip_addr, int port)
 {
 	char *name;
 	struct fiber *f;
@@ -213,4 +214,12 @@ recover_follow_remote(struct recovery_state *r, const char *ip_addr, int port)
 	memcpy(&r->cookie, &addr, MIN(sizeof(r->cookie), sizeof(addr)));
 	fiber_call(f);
 	r->remote_recovery = f;
+}
+
+void
+recovery_stop_remote(struct recovery_state *r)
+{
+	say_info("shutting down the replica");
+	fiber_cancel(r->remote_recovery);
+	r->remote_recovery = NULL;
 }
