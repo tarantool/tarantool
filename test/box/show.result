@@ -57,11 +57,10 @@ configuration:
   rows_per_wal: "50"
   wal_fsync_delay: "0"
   wal_writer_inbox_size: "128"
-  local_hot_standby: "0"
+  hot_standby: "0"
   wal_dir_rescan_delay: "0.1"
   panic_on_snap_error: "1"
   panic_on_wal_error: "0"
-  remote_hot_standby: "0"
   replication_source_ipaddr: (null)
   replication_source_port: "0"
   namespace[0].enabled: "1"

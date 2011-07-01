@@ -58,7 +58,7 @@ for i in range(1, 10):
   beholder.sql.execute("select * from t0 where k0 = {0}".format(i),
                        silent=False)
 
-slave.wait_sync(10)
+slave.wait_lsn(10)
 
 print """
 #

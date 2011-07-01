@@ -1230,8 +1230,11 @@ static void
 remote_recovery_restart(struct tarantool_cfg *conf)
 {
 	if (remote_recover) {
+		/* Another replication fiber started, stop it */
 		say_info("shutting down the replica");
+		fiber_cancel(remote_recover);
 		fiber_call(remote_recover);
+		remote_recover = NULL;
 	}
 
 	say_info("starting the replica");
@@ -1241,16 +1244,14 @@ remote_recovery_restart(struct tarantool_cfg *conf)
 					       default_remote_row_handler);
 
 	status = palloc(eter_pool, 64);
-	snprintf(status, 64, "replica/%s:%i%s", conf->wal_feeder_ipaddr,
-		 conf->wal_feeder_port, custom_proc_title);
-	title("replica/%s:%i%s", conf->wal_feeder_ipaddr, conf->wal_feeder_port,
-	      custom_proc_title);
+	snprintf(status, 64, "replica/%s:%i%s", conf->replication_source_ipaddr, conf->replication_source_port, custom_proc_title);
+	title("replica/%s:%i%s", conf->replication_source_ipaddr, conf->replication_source_port, custom_proc_title);
 }
 
 static void
 box_master_or_slave(struct tarantool_cfg *conf)
 {
-	if (conf->remote_hot_standby) {
+	if (conf->replication_source_port) {
 		rw_callback = box_process_ro;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
@@ -1294,10 +1295,24 @@ memcached_bound_to_primary(void *data __attribute__((unused)))
 i32
 mod_check_config(struct tarantool_cfg *conf)
 {
-	if (conf->remote_hot_standby > 0 && conf->local_hot_standby > 0) {
+	bool is_replica = (bool)conf->replication_source_port;
+
+	if (is_replica) {
+		if (conf->replication_source_port < 0 || conf->replication_source_port > USHRT_MAX) {
+			out_warning(0, "invalid replication source port value: %"PRId32,
+				    conf->replication_source_port);
+		}
+
+		if (conf->replication_source_ipaddr == 0) {
+			out_warning(0, "replication source ip address not defined");
+			return -1;
+		}
+
+	}
+
+	if (is_replica && conf->hot_standby) {
 		out_warning(0, "Remote and local hot standby modes "
 			       "can't be enabled simultaneously");
-
 		return -1;
 	}
 
@@ -1307,25 +1322,22 @@ mod_check_config(struct tarantool_cfg *conf)
 i32
 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
 {
-	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby) {
-		if (recovery_state->finalize != true) {
-			out_warning(0, "Could not propagate %s before local recovery finished",
-				    old_conf->remote_hot_standby == true ? "slave to master" :
-				    "master to slave");
+	bool old_is_replica = (bool)old_conf->replication_source_port;
+	bool new_is_replica = (bool)new_conf->replication_source_port;
 
+	if (old_is_replica != new_is_replica) {
+		if (!recovery_state->finalize) {
+			out_warning(0, "Could not propagate %s before local recovery finished",
+				    old_is_replica ? "slave to master" : "master to slave");
 			return -1;
 		}
-	}
-
-	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby) {
-		/* Local recovery must be finalized at this point */
-		assert(recovery_state->finalize == true);
 
 		box_master_or_slave(new_conf);
-	} else if (old_conf->remote_hot_standby > 0 &&
-		   (strcmp(old_conf->wal_feeder_ipaddr, new_conf->wal_feeder_ipaddr) != 0 ||
-		    old_conf->wal_feeder_port != new_conf->wal_feeder_port))
+	} else if (old_is_replica > 0 &&
+		   (strcmp(old_conf->replication_source_ipaddr, new_conf->replication_source_ipaddr) != 0 ||
+		    old_conf->replication_source_port != new_conf->replication_source_port)) {
 		remote_recovery_restart(new_conf);
+	}
 
 	return 0;
 }
@@ -1355,7 +1367,7 @@ mod_init(void)
 	if (cfg.memcached != 0) {
 		if (cfg.secondary_port != 0)
 			panic("in memcached mode secondary_port must be 0");
-		if (cfg.remote_hot_standby)
+		if (cfg.replication_source_port)
 			panic("remote replication is not supported in memcached mode.");
 
 		memcached_init();
@@ -1363,9 +1375,9 @@ mod_init(void)
 
 	title("loading");
 
-	if (cfg.remote_hot_standby) {
+	if (cfg.replication_source_port) {
 		if (cfg.replication_source_ipaddr == NULL || cfg.replication_source_port == 0)
-			panic("replication_source_ipaddr & replication_source_port must be provided in remote_hot_standby mode");
+			panic("replication_source_ipaddr & replication_source_port must be provided in replication mode");
 	}
 
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
@@ -1420,7 +1432,7 @@ mod_init(void)
 
 	title("orphan");
 
-	if (cfg.local_hot_standby) {
+	if (cfg.hot_standby) {
 		say_info("starting local hot standby");
 		recover_follow(recovery_state, cfg.wal_dir_rescan_delay);
 		status = "hot_standby";

@@ -129,6 +129,17 @@ void fiber_init(void);
 struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
 void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for_child(pid_t pid);
+
+void
+fiber_io_start(int events);
+
+void
+fiber_io_yield();
+
+void
+fiber_io_stop(int events);
+
+
 void yield(void);
 void fiber_destroy_all();
 

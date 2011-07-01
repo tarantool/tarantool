@@ -2,6 +2,7 @@
 #define tarantool_cfg_CFG_H
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <sys/types.h>
 
 /*
@@ -157,10 +158,10 @@ typedef struct tarantool_cfg {
 	int32_t	wal_writer_inbox_size;
 
 	/*
-	 * Local hot standby (if enabled, the server will run in local hot standby
-	 * mode, continuously fetching WAL records from shared local directory).
+	 * Hot standby (if enabled, the server will run in hot standby
+	 * mode, continuously fetching WAL records from shared directory).
 	 */
-	int32_t	local_hot_standby;
+	int32_t	hot_standby;
 
 	/*
 	 * Delay, in seconds, between successive re-readings of wal_dir.
@@ -177,11 +178,10 @@ typedef struct tarantool_cfg {
 	int32_t	panic_on_wal_error;
 
 	/*
-	 * Remote hot standby (if enabled, the server will run in hot standby mode
+	 * Replicator mode (if enabled, the server will run in replication mode
 	 * continuously fetching WAL records from
 	 * replication_source_ipaddr:replication_source_port
 	 */
-	int32_t	remote_hot_standby;
 	char*	replication_source_ipaddr;
 	int32_t	replication_source_port;
 	tarantool_cfg_namespace**	namespace;

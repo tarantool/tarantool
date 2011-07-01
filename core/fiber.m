@@ -258,7 +258,7 @@ wait_for_child(pid_t pid)
 }
 
 
-static void
+void
 fiber_io_start(int events)
 {
 	ev_io *io = &fiber->io;
@@ -272,7 +272,7 @@ fiber_io_start(int events)
 /** @note: this is a cancellation point.
  */
 
-static void
+void
 fiber_io_yield()
 {
 	assert(ev_is_active(&fiber->io));
@@ -287,7 +287,7 @@ fiber_io_yield()
 	}
 }
 
-static void
+void
 fiber_io_stop(int events)
 {
 	ev_io *io = &fiber->io;
@@ -1092,8 +1092,9 @@ tcp_server_handler(void *data)
 		exit(EX_OSERR);
 	}
 
-	if (server->on_bind != NULL)
+	if (server->on_bind != NULL) {
 		server->on_bind(server->data);
+	}
 
 	fiber_io_start(EV_READ);
 	for (;;) {
@@ -1125,68 +1126,6 @@ tcp_server_handler(void *data)
 		if (fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
 			say_syserror("accept");
 			continue;
-		}
-		exit(EX_OSERR);
-	}
-
-	if (set_nonblock(fiber->fd) == -1)
-		exit(EX_OSERR);
-
-	memset(&sin, 0, sizeof(struct sockaddr_in));
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(server->port);
-	sin.sin_addr.s_addr = INADDR_ANY;
-
-	for (;;) {
-		if (bind(fiber->fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-			if (errno == EADDRINUSE)
-				goto sleep_and_retry;
-			say_syserror("bind");
-			exit(EX_OSERR);
-		}
-
-		say_info("bound to UDP port %i", server->port);
-		break;
-
-	      sleep_and_retry:
-		if (!warning_said) {
-			say_warn("port %i is already in use, "
-				 "will retry binding after 0.1 seconds.", server->port);
-			warning_said = true;
-		}
-		fiber_sleep(0.1);
-	}
-
-	if (server->on_bind != NULL)
-		server->on_bind(server->data);
-
-	fiber_io_start(EV_READ);
-	for (;;) {
-#define MAXUDPPACKETLEN	128
-		char buf[MAXUDPPACKETLEN];
-		struct sockaddr_in addr;
-		socklen_t addrlen;
-		ssize_t sz;
-
-		fiber_io_yield();
-
-		for (;;) {
-			addrlen = sizeof(addr);
-			sz = recvfrom(fiber->fd, buf, MAXUDPPACKETLEN, MSG_DONTWAIT,
-				      (struct sockaddr *)&addr, &addrlen);
-
-			if (sz <= 0) {
-				if (!(errno == EAGAIN || errno == EWOULDBLOCK))
-					say_syserror("recvfrom");
-				break;
-			} else {
-				if (server->handler) {
-					server->handler(data);
-				} else {
-					void (*f) (char *, int) = data;
-					f(buf, (int)sz);
-				}
-			}
 		}
 	}
 	fiber_io_stop(EV_READ);
@@ -1222,7 +1161,6 @@ create_socket(struct fiber *fiber, fiber_server_type type)
 	int sock_domain = -1;
 	int sock_type = -1;
 	int sock_protocol = -1;
-	bool is_stream_sock = false;
 	int one = 1;
 	struct linger ling = { 0, 0 };
 
@@ -1236,13 +1174,6 @@ create_socket(struct fiber *fiber, fiber_server_type type)
 		sock_domain = AF_INET;
 		sock_type = SOCK_STREAM;
 		sock_protocol = IPPROTO_TCP;
-		is_stream_sock = true;
-		break;
-	case udp_server:
-		sock_domain = AF_INET;
-		sock_type = SOCK_DGRAM;
-		sock_protocol = IPPROTO_UDP;
-		is_stream_sock = false;
 		break;
 	default:
 		say_error("invalid socket type");
@@ -1260,13 +1191,11 @@ create_socket(struct fiber *fiber, fiber_server_type type)
 		goto create_socket_fail;
 	}
 
-	if (is_stream_sock) {
-		if (setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) != 0 ||
-	    	    setsockopt(fiber->fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0 ||
-	    	    setsockopt(fiber->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling)) != 0) {
-			say_syserror("setsockopt");
-			goto create_socket_fail;
-		}
+	if (setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) != 0 ||
+	    setsockopt(fiber->fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0 ||
+	    setsockopt(fiber->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling)) != 0) {
+		say_syserror("setsockopt");
+		goto create_socket_fail;
 	}
 
 	if (set_nonblock(fiber->fd) == -1) {

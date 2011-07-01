@@ -48,6 +48,8 @@ struct replicator_process {
 	bool need_waitpid;
 	/** replicator is done */
 	bool is_done;
+	/** child process counts */
+	u32 child_count;
 };
 
 
@@ -107,10 +109,15 @@ spawner_init(int sock);
 
 /**
  * Replicator spawner process main loop.
- *
  */
 static void
 spawner_main_loop();
+
+/**
+ * Replicator spawner shutdown.
+ */
+static void
+spawner_shutdown();
 
 /**
  * Replicator's spawner process signals handler.
@@ -121,10 +128,10 @@ static void
 spawner_signals_handler(int signal);
 
 /**
- * Process finished childs.
+ * Process waitpid childs.
  */
 static void
-spawner_process_finished_childs();
+spawner_process_wait_childs();
 
 /**
  * Receive replication client socket from main process.
@@ -143,6 +150,18 @@ static int
 spawner_create_client_handler(int client_sock);
 
 /**
+ * Replicator spawner shutdown: kill childs.
+ */
+static void
+spawner_shutdown_kill_childs();
+
+/**
+ * Replicator spawner shutdown: wait childs.
+ */
+static int
+spawner_shutdown_wait_childs();
+
+/**
  * Initialize replicator's service process.
  */
 static void
@@ -153,6 +172,7 @@ client_handler_init(int client_sock);
  */
 static int
 client_handler_send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t);
+
 
 /*-----------------------------------------------------------------------------*/
 /* replicatior module                                                          */
@@ -264,21 +284,20 @@ acceptor_handler(void *data)
 	struct fiber *sender = (struct fiber *) data;
 	struct tbuf *msg;
 
-	if (fiber_serv_socket(fiber, tcp_server, cfg.replication_port, false, 0.0) != 0) {
+	if (fiber_serv_socket(fiber, tcp_server, cfg.replication_port, true, 0.1) != 0) {
 		panic("can not bind replication port");
 	}
 
 	msg = tbuf_alloc(fiber->pool);
 
-	fiber_io_start(EV_READ);
 	for (;;) {
 		struct sockaddr_in addr;
 		socklen_t addrlen = sizeof(addr);
 		int client_sock = -1;
 
 		/* wait new connection request */
+		fiber_io_start(EV_READ);
 		fiber_io_yield();
-
 		/* accept connection */
 		client_sock = accept(fiber->fd, &addr, &addrlen);
 		if (client_sock == -1) {
@@ -287,6 +306,7 @@ acceptor_handler(void *data)
 			}
 			panic_syserror("accept");
 		}
+		fiber_io_stop(EV_READ);
 		say_info("connection from %s:%d", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 
 		/* put descriptor to message and send to sender fiber */
@@ -294,9 +314,7 @@ acceptor_handler(void *data)
 		write_inbox(sender, msg);
 		/* clean-up buffer & wait while sender fiber read message */
 		tbuf_reset(msg);
-		wait_inbox(sender);
 	}
-	fiber_io_stop(EV_READ);
 }
 
 /** Replication sender fiber. */
@@ -361,11 +379,13 @@ sender_send_sock(int client_sock)
 	*((int *) CMSG_DATA(control_message)) = client_sock;
 
 	/* wait, when interprocess comm. socke will ready for write */
-	wait_for(EV_WRITE);
+	fiber_io_start(EV_WRITE);
+	fiber_io_yield();
 	/* send client socket to replicator porcess */
 	if (sendmsg(fiber->fd, &msg, 0) < 0) {
 		say_syserror("sendmsg");
 	}
+	fiber_io_stop(EV_WRITE);
 	/* close client sock in the main process */
 	close(client_sock);
 }
@@ -395,6 +415,7 @@ spawner_init(int sock)
 	replicator_process.sock = sock;
 	replicator_process.need_waitpid = false;
 	replicator_process.is_done = false;
+	replicator_process.child_count = 0;
 
 	/* init signals */
 	memset(&sa, 0, sizeof(sa));
@@ -427,7 +448,7 @@ spawner_main_loop()
 		int client_sock;
 
 		if (replicator_process.need_waitpid) {
-			spawner_process_finished_childs();
+			spawner_process_wait_childs();
 		}
 
 		if (spawner_recv_client_sock(&client_sock) != 0) {
@@ -439,7 +460,20 @@ spawner_main_loop()
 		}
 	}
 
+	spawner_shutdown();
+}
+
+/** Replicator spawner shutdown. */
+static void
+spawner_shutdown()
+{
+	say_info("shutdown");
+
+	/* kill all childs */
+	spawner_shutdown_kill_childs();
+	/* close socket */
 	close(replicator_process.sock);
+
 	exit(EXIT_SUCCESS);
 }
 
@@ -458,11 +492,11 @@ static void spawner_signals_handler(int signal)
 	}
 }
 
-/** Process finished childs. */
+/** Process waitpid childs. */
 static void
-spawner_process_finished_childs()
+spawner_process_wait_childs()
 {
-	while (true) {
+	while (replicator_process.child_count > 0) {
 		int exit_status;
 		pid_t pid;
 
@@ -477,7 +511,8 @@ spawner_process_finished_childs()
 			break;
 		}
 
-		say_debug("child finished: pid = %d, exit status = %d", pid, exit_status);
+		say_info("child finished: pid = %d, exit status = %d", pid, WEXITSTATUS(exit_status));
+		replicator_process.child_count--;
 	}
 
 	replicator_process.need_waitpid = false;
@@ -539,7 +574,95 @@ spawner_create_client_handler(int client_sock)
 	if (pid == 0) {
 		client_handler_init(client_sock);
 	} else {
+		say_info("replicator client handler spawned: pid = %d", pid);
+		replicator_process.child_count++;
 		close(client_sock);
+	}
+
+	return 0;
+}
+
+/** Replicator spawner shutdown: kill childs. */
+static void
+spawner_shutdown_kill_childs()
+{
+	int result = 0;
+
+	/* check child process count */
+	if (replicator_process.child_count == 0) {
+		return;
+	}
+
+	/* send terminate signals to childs */
+	say_info("send SIGTERM to %"PRIu32" childs", replicator_process.child_count);
+	result = kill(0, SIGTERM);
+	if (result != 0) {
+		say_syserror("kill");
+		return;
+	}
+
+	/* wait when process is down */
+	result = spawner_shutdown_wait_childs();
+	if (result != 0) {
+		return;
+	}
+
+	/* check child process count */
+	if (replicator_process.child_count == 0) {
+		say_info("all childs terminated");
+		return;
+	}
+	say_info("%"PRIu32" childs still alive", replicator_process.child_count);
+
+	/* send terminate signals to childs */
+	say_info("send SIGKILL to %"PRIu32" childs", replicator_process.child_count);
+	result = kill(0, SIGKILL);
+	if (result != 0) {
+		say_syserror("kill");
+		return;
+	}
+
+	/* wait when process is down */
+	result = spawner_shutdown_wait_childs();
+	if (result != 0) {
+		return;
+	}
+	say_info("all childs terminated");
+}
+
+/** Replicator spawner shutdown: wait childs. */
+static int
+spawner_shutdown_wait_childs()
+{
+	const u32 wait_sec = 5;
+	struct timeval tv;
+
+	say_info("wait for childs %"PRIu32" seconds", wait_sec);
+
+	tv.tv_sec = wait_sec;
+	tv.tv_usec = 0;
+
+	/* wait childs process */
+	spawner_process_wait_childs();
+	while (replicator_process.child_count > 0) {
+		int result;
+
+		/* wait EINTR or timeout */
+		result = select(0, NULL, NULL, NULL, &tv);
+		if (result < 0 && errno != EINTR) {
+			/* this is not signal */
+			say_syserror("select");
+			return - 1;
+		}
+
+		/* wait childs process */
+		spawner_process_wait_childs();
+
+		/* check timeout */
+		if (tv.tv_sec == 0 && tv.tv_usec == 0) {
+			/* timeout happen */
+			break;
+		}
 	}
 
 	return 0;
@@ -550,6 +673,7 @@ static void
 client_handler_init(int client_sock)
 {
 	char name[sizeof(fiber->name)];
+	struct sigaction sa;
 	struct recovery_state *log_io;
 	struct tbuf *ver;
 	i64 lsn;
@@ -558,10 +682,30 @@ client_handler_init(int client_sock)
 	fiber->has_peer = true;
 	fiber->fd = client_sock;
 
+	/* set replicator name */
 	memset(name, 0, sizeof(name));
 	snprintf(name, sizeof(name), "replicator%s/handler", cfg.replicator_custom_proc_title);
 	fiber_set_name(fiber, name);
 	set_proc_title("%s %s", name, fiber_peer_name(fiber));
+
+	/* init signals */
+	memset(&sa, 0, sizeof(sa));
+
+	/* ignore SIGPIPE and SIGCHLD */
+	sa.sa_handler = SIG_IGN;
+	if ((sigaction(SIGPIPE, &sa, NULL) == -1) ||
+	    (sigaction(SIGCHLD, &sa, NULL) == -1)) {
+		say_syserror("sigaction");
+	}
+
+	/* return signals SIGHUP, SIGINT and SIGTERM to default value */
+	sa.sa_handler = SIG_DFL;
+
+	if ((sigaction(SIGHUP, &sa, NULL) == -1) ||
+	    (sigaction(SIGINT, &sa, NULL) == -1) ||
+	    (sigaction(SIGTERM, &sa, NULL) == -1)) {
+		say_syserror("sigaction");
+	}
 
 	ev_default_loop(0);
 
@@ -572,13 +716,14 @@ client_handler_init(int client_sock)
 		}
 		panic("invalid lns request size: %zu", r);
 	}
+	say_info("start recover from lsn:%"PRIi64, lsn);
 
 	ver = tbuf_alloc(fiber->pool);
 	tbuf_append(ver, &default_version, sizeof(default_version));
 	client_handler_send_row(NULL, ver);
 
 	log_io = recover_init(NULL, cfg.wal_dir,
-			      NULL, client_handler_send_row, INT32_MAX, 0, 64, RECOVER_READONLY, false);
+			      client_handler_send_row, INT32_MAX, 0, 64, RECOVER_READONLY, false);
 
 	recover(log_io, lsn);
 	recover_follow(log_io, 0.1);
@@ -596,6 +741,11 @@ client_handler_send_row(struct recovery_state *r __attribute__((unused)), struct
 	while (len > 0) {
 		bytes = write(fiber->fd, data, len);
 		if (bytes < 0) {
+			if (errno == EPIPE) {
+				/* socket closed on opposite site */
+				say_info("replication socket closed on opposite side, exit");
+				exit(EXIT_SUCCESS);
+			}
 			panic_syserror("write");
 		}
 		len -= bytes;
@@ -603,7 +753,6 @@ client_handler_send_row(struct recovery_state *r __attribute__((unused)), struct
 	}
 
 	say_debug("send row: %" PRIu32 " bytes %s", t->len, tbuf_to_hex(t));
-
 	return 0;
 }
 
