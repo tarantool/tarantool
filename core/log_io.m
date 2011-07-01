@@ -71,6 +71,15 @@ struct log_io_iter {
 	int io_rate_limit;
 };
 
+
+void
+wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn)
+{
+	assert(wait_lsn->waiter == NULL);
+	wait_lsn->waiter = fiber;
+	wait_lsn->lsn = lsn;
+}
+
 int
 confirm_lsn(struct recovery_state *r, i64 lsn)
 {
@@ -82,6 +91,14 @@ confirm_lsn(struct recovery_state *r, i64 lsn)
 				 " new:%" PRIi64 " diff: %" PRIi64,
 				 r->confirmed_lsn, lsn, lsn - r->confirmed_lsn);
 		r->confirmed_lsn = lsn;
+		/* Alert the waiter, if any. There can be holes in
+		 * confirmed_lsn, in case of disk write failure,
+		 * but wal_writer never confirms LSNs out order.
+		 */
+		if (r->wait_lsn.waiter && r->confirmed_lsn >= r->wait_lsn.lsn) {
+			fiber_call(r->wait_lsn.waiter);
+		}
+
 		return 0;
 	} else {
 		say_warn("lsn double confirmed:%" PRIi64, r->confirmed_lsn);
@@ -89,6 +106,23 @@ confirm_lsn(struct recovery_state *r, i64 lsn)
 
 	return -1;
 }
+
+
+/** Wait until the given LSN makes its way to disk. */
+
+void
+recovery_wait_lsn(struct recovery_state *r, i64 lsn)
+{
+	while (lsn < r->confirmed_lsn) {
+		wait_lsn_set(&r->wait_lsn, lsn);
+		@try {
+			yield();
+		} @finally {
+			wait_lsn_clear(&r->wait_lsn);
+		}
+	}
+}
+
 
 i64
 next_lsn(struct recovery_state *r, i64 new_lsn)
@@ -1015,7 +1049,7 @@ recover(struct recovery_state *r, i64 lsn)
 		i64 next_lsn = r->confirmed_lsn + 1;
 		i64 lsn = find_including_file(r->wal_class, next_lsn);
 		if (lsn <= 0) {
-			say_error("can't find wal containing record with lsn:%" PRIi64, next_lsn);
+			say_error("can't find WAL containing record with lsn:%" PRIi64, next_lsn);
 			result = -1;
 			goto out;
 		}
@@ -1161,7 +1195,8 @@ write_to_disk(void *_state, struct tbuf *t)
 				     &unused);
 	}
 	else if (wal->rows == 1) {
-		/* rename wal after first successfull write to name without inprogress suffix*/
+		/* rename WAL after first successful write to name
+		 * without inprogress suffix*/
 		if (inprogress_log_rename(wal->filename) != 0) {
 			say_error("can't rename inprogress wal");
 			goto fail;
@@ -1282,6 +1317,7 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_class = xlog_class_create(wal_dirname);
 	r->wal_class->rows_per_file = rows_per_file;
 	r->wal_class->fsync_delay = fsync_delay;
+	wait_lsn_clear(&r->wait_lsn);
 
 	if ((flags & RECOVER_READONLY) == 0)
 		r->wal_writer = spawn_child("wal_writer", inbox_size, write_to_disk, r);

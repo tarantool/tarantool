@@ -65,6 +65,26 @@ struct log_io_class {
 	const char *dirname;
 };
 
+
+/** A "condition variable" that allows fibers to wait when a given
+ * LSN makes it to disk.
+ */
+
+struct wait_lsn {
+	struct fiber *waiter;
+	i64 lsn;
+};
+
+void
+wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn);
+
+inline static void
+wait_lsn_clear(struct wait_lsn *wait_lsn)
+{
+	wait_lsn->waiter = NULL;
+	wait_lsn->lsn = 0LL;
+}
+
 struct log_io {
 	struct log_io_class *class;
 	FILE *f;
@@ -95,6 +115,7 @@ struct recovery_state {
 
 	int snap_io_rate_limit;
 	u64 cookie;
+	struct wait_lsn wait_lsn;
 
 	bool finalize;
 
@@ -142,6 +163,7 @@ void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_
 
 int confirm_lsn(struct recovery_state *r, i64 lsn);
 int64_t next_lsn(struct recovery_state *r, i64 new_lsn);
+void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
 
 int read_log(const char *filename,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);

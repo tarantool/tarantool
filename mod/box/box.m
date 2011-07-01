@@ -47,10 +47,13 @@
 #include <cfg/tarantool_box_cfg.h>
 #include <mod/box/index.h>
 
+static void box_process_ro(u32 op, struct tbuf *request_data);
+static void box_process_rw(u32 op, struct tbuf *request_data);
+
 const char *mod_name = "Box";
 
-bool box_updates_allowed = false;
-static char *status = "unknown";
+iproto_callback rw_callback = box_process_ro;
+static char status[64] = "unknown";
 
 static int stat_base;
 STRS(messages, MESSAGES);
@@ -761,9 +764,11 @@ txn_commit(struct box_txn *txn)
 			tbuf_append(t, txn->req.data, txn->req.len);
 
 			i64 lsn = next_lsn(recovery_state, 0);
-			if (!wal_write(recovery_state, wal_tag, fiber->cookie, lsn, t))
-				tnt_raise(LoggedError, :ER_WAL_IO);
+			bool res = !wal_write(recovery_state, wal_tag,
+					      fiber->cookie, lsn, t);
 			confirm_lsn(recovery_state, lsn);
+			if (res)
+				tnt_raise(LoggedError, :ER_WAL_IO);
 		}
 
 		unlock_tuples(txn);
@@ -1150,9 +1155,6 @@ box_process_ro(u32 op, struct tbuf *request_data)
 static void
 box_process_rw(u32 op, struct tbuf *request_data)
 {
-	if (!op_is_select(op) && !box_updates_allowed)
-		tnt_raise(LoggedError, :ER_NONMASTER);
-
 	return box_process(txn_alloc(0), op, request_data);
 }
 
@@ -1237,8 +1239,7 @@ remote_recovery_restart(struct tarantool_cfg *conf)
 					       conf->wal_feeder_port,
 					       default_remote_row_handler);
 
-	status = palloc(eter_pool, 64);
-	snprintf(status, 64, "replica/%s:%i%s", conf->wal_feeder_ipaddr,
+	snprintf(status, sizeof(status), "replica/%s:%i%s", conf->wal_feeder_ipaddr,
 		 conf->wal_feeder_port, custom_proc_title);
 	title("replica/%s:%i%s", conf->wal_feeder_ipaddr, conf->wal_feeder_port,
 	      custom_proc_title);
@@ -1248,23 +1249,24 @@ static void
 box_master_or_slave(struct tarantool_cfg *conf)
 {
 	if (conf->remote_hot_standby) {
-		box_updates_allowed = false;
+		rw_callback = box_process_ro;
+
+		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 
 		remote_recovery_restart(conf);
 	} else {
 		if (remote_recover) {
-			say_info("shuting down the replica");
+			say_info("shutting down the replica");
 			fiber_cancel(remote_recover);
 
 			remote_recover = NULL;
 		}
+		rw_callback = box_process_rw;
+
+		snprintf(status, sizeof(status), "primary");
+		title("primary");
 
 		say_info("I am primary");
-
-		box_updates_allowed = true;
-
-		status = "primary";
-		title("primary");
 	}
 }
 
@@ -1329,6 +1331,8 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 void
 mod_init(void)
 {
+	static iproto_callback ro_callback = box_process_ro;
+
 	stat_base = stat_register(messages_strs, messages_MAX);
 
 	namespace = palloc(eter_pool, sizeof(struct namespace) * namespace_count);
@@ -1417,7 +1421,7 @@ mod_init(void)
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recover_follow(recovery_state, cfg.wal_dir_rescan_delay);
-		status = "hot_standby";
+		snprintf(status, sizeof(status), "hot_standby");
 		title("hot_standby");
 	}
 
@@ -1428,15 +1432,13 @@ mod_init(void)
 		if (cfg.secondary_port != 0)
 			fiber_server(tcp_server, cfg.secondary_port,
 				     (fiber_server_callback) iproto_interact,
-				     box_process_ro, NULL);
+				     &ro_callback, NULL);
 
 		if (cfg.primary_port != 0)
 			fiber_server(tcp_server, cfg.primary_port,
 				     (fiber_server_callback) iproto_interact,
-				     box_process_rw, box_bound_to_primary);
+				     &rw_callback, box_bound_to_primary);
 	}
-
-	say_info("initialized");
 }
 
 int
