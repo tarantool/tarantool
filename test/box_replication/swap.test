@@ -1,0 +1,65 @@
+# encoding: tarantool
+import os
+from lib.tarantool_box_server import TarantoolBoxServer
+
+REPEAT = 10
+ID_BEGIN = 0
+ID_STEP = 10
+
+def insert_tuples(server, begin, end, msg = "tuple"):
+    for i in range(begin, end):
+        server.sql.execute("insert into t0 values (%d, '%s %d')" % (i, msg, i), silent=False)
+
+def select_tuples(server, begin, end):
+    # the last lsn is end id + 1
+    server.wait_lsn(end + 1)
+    for i in range(begin, end):
+        server.sql.execute("select * from t0 where k0 = %d" % i, silent=False)
+
+# master server
+master = server
+
+# replica server
+replica = TarantoolBoxServer()
+replica.deploy("box_replication/cfg/replica.cfg",
+               replica.find_exe(self.args.builddir),
+               os.path.join(self.args.vardir, "replica"))
+
+id = ID_BEGIN
+for i in range(REPEAT):
+    summary = 0.0
+    print "test %d iteration" % i
+
+    # insert to master
+    insert_tuples(master, id, id + ID_STEP)
+    # select from replica
+    select_tuples(replica, id, id + ID_STEP)
+    id += ID_STEP
+
+    print "swap servers"
+    # reconfigure replica to master
+    replica.reconfigure("box_replication/cfg/replica_to_master.cfg", silent = False)
+    # reconfigure master to replica
+    master.reconfigure("box_replication/cfg/master_to_replica.cfg", silent = False)
+
+
+    # insert to master
+    insert_tuples(replica, id, id + ID_STEP)
+    # select from replica
+    select_tuples(master, id, id + ID_STEP)
+
+    print "rollback servers configuration"
+    # reconfigure replica to master
+    master.reconfigure("box_replication/cfg/master.cfg", silent = False)
+    # reconfigure master to replica
+    replica.reconfigure("box_replication/cfg/replica.cfg", silent = False)
+    id += ID_STEP
+
+
+# Cleanup.
+replica.stop()
+replica.cleanup(True)
+server.stop()
+server.deploy(self.suite_ini["config"])
+
+# vim: syntax=python

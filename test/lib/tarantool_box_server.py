@@ -1,3 +1,4 @@
+import time
 import shutil
 import subprocess
 import yaml
@@ -34,10 +35,16 @@ class TarantoolBoxServer(TarantoolServer):
                           stdout = subprocess.PIPE,
                           stderr = subprocess.PIPE)
 
+  def get_param(self, param):
+    data = self.admin.execute("show info\n", silent = True)
+    info = yaml.load(data)["info"]
+    return info[param]
+
   def wait_lsn(self, lsn):
+    try_count = 0
     while True:
-      data = self.admin.execute("show info\n", silent=True)
-      info = yaml.load(data)["info"]
-      if (int(info["lsn"]) >= lsn):
+      curr_lsn = int(self.get_param("lsn"))
+      if (curr_lsn >= lsn):
         break
+      try_count += 1
       time.sleep(0.01)
