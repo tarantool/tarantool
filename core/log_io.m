@@ -1311,6 +1311,7 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_timer.data = r;
 	r->row_handler = row_handler;
 	r->data = data;
+	r->remote_recovery = NULL;
 
 	r->snap_class = snapshot_class_create(snap_dirname);
 

@@ -176,9 +176,8 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 	return 0;
 }
 
-struct fiber *
-recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
-		      int (*handler) (struct recovery_state *r, struct tbuf *row))
+void
+recover_follow_remote(struct recovery_state *r, const char *ip_addr, int port)
 {
 	char *name;
 	struct fiber *f;
@@ -186,21 +185,23 @@ recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
 	struct sockaddr_in *addr;
 	struct remote_state *h;
 
+	assert(r->remote_recovery == NULL);
+
 	say_crit("initializing the replica, WAL feeder %s:%i", ip_addr, port);
 	name = palloc(eter_pool, 64);
 	snprintf(name, 64, "replica/%s:%i", ip_addr, port);
 
 	h = palloc(eter_pool, sizeof(*h));
 	h->r = r;
-	h->handler = handler;
+	h->handler = default_remote_row_handler;
 
 	f = fiber_create(name, -1, -1, pull_from_remote, h);
 	if (f == NULL)
-		return NULL;
+		return;
 
 	if (inet_aton(ip_addr, &server) < 0) {
 		say_syserror("inet_aton: %s", ip_addr);
-		return NULL;
+		return;
 	}
 
 	addr = palloc(eter_pool, sizeof(*addr));
@@ -211,5 +212,5 @@ recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
 	f->data = addr;
 	memcpy(&r->cookie, &addr, MIN(sizeof(r->cookie), sizeof(addr)));
 	fiber_call(f);
-	return f;
+	r->remote_recovery = f;
 }

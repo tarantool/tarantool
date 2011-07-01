@@ -61,8 +61,6 @@ STRS(messages, MESSAGES);
 const int MEMCACHED_NAMESPACE = 23;
 static char *custom_proc_title;
 
-static struct fiber *remote_recover;
-
 /* hooks */
 typedef int (*box_hook_t) (struct box_txn * txn);
 
@@ -1226,41 +1224,39 @@ title(const char *fmt, ...)
 			       cfg.primary_port, cfg.secondary_port, cfg.admin_port);
 }
 
-static void
-remote_recovery_restart(struct tarantool_cfg *conf)
+void
+remote_recovery_start(struct recovery_state *r, const char *ipaddr, int port)
 {
-	if (remote_recover) {
-		say_info("shutting down the replica");
-		fiber_call(remote_recover);
-	}
-
 	say_info("starting the replica");
-	remote_recover = recover_follow_remote(recovery_state, conf->wal_feeder_ipaddr,
-					       conf->wal_feeder_port,
-					       default_remote_row_handler);
 
-	snprintf(status, sizeof(status), "replica/%s:%i%s", conf->wal_feeder_ipaddr,
-		 conf->wal_feeder_port, custom_proc_title);
-	title("replica/%s:%i%s", conf->wal_feeder_ipaddr, conf->wal_feeder_port,
-	      custom_proc_title);
+	recover_follow_remote(r, ipaddr, port);
+
+	snprintf(status, sizeof(status), "replica/%s:%i%s", ipaddr, port,
+		 custom_proc_title);
+	title("replica/%s:%i%s", ipaddr, port, custom_proc_title);
+}
+
+
+void
+remote_recovery_stop(struct recovery_state *r)
+{
+	say_info("shutting down the replica");
+	fiber_cancel(r->remote_recovery);
+	r->remote_recovery = NULL;
 }
 
 static void
-box_master_or_slave(struct tarantool_cfg *conf)
+box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 {
 	if (conf->remote_hot_standby) {
 		rw_callback = box_process_ro;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 
-		remote_recovery_restart(conf);
+		remote_recovery_start(recovery_state,
+				      conf->wal_feeder_ipaddr,
+				      conf->wal_feeder_port);
 	} else {
-		if (remote_recover) {
-			say_info("shutting down the replica");
-			fiber_cancel(remote_recover);
-
-			remote_recover = NULL;
-		}
 		rw_callback = box_process_rw;
 
 		snprintf(status, sizeof(status), "primary");
@@ -1271,23 +1267,21 @@ box_master_or_slave(struct tarantool_cfg *conf)
 }
 
 static void
-box_bound_to_primary(void *data __attribute__((unused)))
+box_leave_local_hot_standby_mode(void *data __attribute__((unused)))
 {
 	recover_finalize(recovery_state);
 
-	box_master_or_slave(&cfg);
+	box_enter_master_or_replica_mode(&cfg);
+
+	if (cfg.memcached != 0 && cfg.remote_hot_standby == 0) {
+		struct fiber *expire = fiber_create("memecached_expire", -1,
+				       -1, memcached_expire, NULL);
+		if (expire == NULL)
+			panic("can't start the expire fiber");
+		fiber_call(expire);
+	}
 }
 
-static void
-memcached_bound_to_primary(void *data __attribute__((unused)))
-{
-	box_bound_to_primary(NULL);
-
-	struct fiber *expire = fiber_create("memecached_expire", -1, -1, memcached_expire, NULL);
-	if (expire == NULL)
-		panic("can't start the expire fiber");
-	fiber_call(expire);
-}
 
 i32
 mod_check_config(struct tarantool_cfg *conf)
@@ -1319,11 +1313,20 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 		/* Local recovery must be finalized at this point */
 		assert(recovery_state->finalize == true);
 
-		box_master_or_slave(new_conf);
+		if (recovery_state->remote_recovery)
+			remote_recovery_stop(recovery_state);
+
+		box_enter_master_or_replica_mode(new_conf);
 	} else if (old_conf->remote_hot_standby > 0 &&
 		   (strcmp(old_conf->wal_feeder_ipaddr, new_conf->wal_feeder_ipaddr) != 0 ||
-		    old_conf->wal_feeder_port != new_conf->wal_feeder_port))
-		remote_recovery_restart(new_conf);
+		    old_conf->wal_feeder_port != new_conf->wal_feeder_port)) {
+
+		if (recovery_state->remote_recovery)
+			remote_recovery_stop(recovery_state);
+		remote_recovery_start(recovery_state,
+				      new_conf->wal_feeder_ipaddr,
+				      new_conf->wal_feeder_port);
+	}
 
 	return 0;
 }
@@ -1427,7 +1430,7 @@ mod_init(void)
 
 	if (cfg.memcached != 0) {
 		fiber_server(tcp_server, cfg.primary_port, memcached_handler, NULL,
-			     memcached_bound_to_primary);
+			     box_leave_local_hot_standby_mode);
 	} else {
 		if (cfg.secondary_port != 0)
 			fiber_server(tcp_server, cfg.secondary_port,
@@ -1437,7 +1440,7 @@ mod_init(void)
 		if (cfg.primary_port != 0)
 			fiber_server(tcp_server, cfg.primary_port,
 				     (fiber_server_callback) iproto_interact,
-				     &rw_callback, box_bound_to_primary);
+				     &rw_callback, box_leave_local_hot_standby_mode);
 	}
 }
 

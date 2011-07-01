@@ -424,6 +424,7 @@ fiber_zombificate()
 	fiber->data = NULL;
 	unregister_fid(fiber);
 	fiber->fid = 0;
+	fiber->flags = 0;
 	fiber_alloc(fiber);
 
 	SLIST_INSERT_HEAD(&zombie_fibers, fiber, zombie_link);

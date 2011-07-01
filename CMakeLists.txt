@@ -211,7 +211,7 @@ endif()
 # -x option, simply use CXX flags to build Objective C files.
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fobjc-exceptions")
 
 add_subdirectory(third_party)
 add_subdirectory(cfg)
