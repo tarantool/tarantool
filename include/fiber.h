@@ -191,13 +191,9 @@ void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);
 int set_nonblock(int sock);
 
-typedef enum fiber_server_type {
-	tcp_server,
-} fiber_server_type;
-
 typedef void (*fiber_server_callback)(void *);
 
-struct fiber *fiber_server(fiber_server_type type, int port,
+struct fiber *fiber_server(int port,
 			   fiber_server_callback callback, void *,
 			   void (*on_bind) (void *));
 

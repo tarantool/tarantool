@@ -143,8 +143,15 @@ set (CMAKE_C_FLAGS
 if (${CMAKE_BUILD_TYPE} STREQUAL "None")
     set (core_cflags "-std=gnu99")
 else()
-    set (core_cflags "-std=gnu99 -Wall -Wextra -Werror")
+    set (core_cflags "-std=gnu99 -Wall -Wextra")
     set (core_cflags "${core_cflags} -Wno-sign-compare -Wno-strict-aliasing")
+endif()
+
+# Only add -Werror if it's a debug build, done by developers.
+# Community builds should not cause extra trouble.
+
+if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+    set (core_cflags "${core_cflags} -Werror")
 endif()
 
 #

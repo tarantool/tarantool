@@ -1406,16 +1406,16 @@ mod_init(void)
 	}
 
 	if (cfg.memcached != 0) {
-		fiber_server(tcp_server, cfg.primary_port, memcached_handler, NULL,
+		fiber_server(cfg.primary_port, memcached_handler, NULL,
 			     box_leave_local_hot_standby_mode);
 	} else {
 		if (cfg.secondary_port != 0)
-			fiber_server(tcp_server, cfg.secondary_port,
+			fiber_server(cfg.secondary_port,
 				     (fiber_server_callback) iproto_interact,
 				     &ro_callback, NULL);
 
 		if (cfg.primary_port != 0)
-			fiber_server(tcp_server, cfg.primary_port,
+			fiber_server(cfg.primary_port,
 				     (fiber_server_callback) iproto_interact,
 				     &rw_callback, box_leave_local_hot_standby_mode);
 	}

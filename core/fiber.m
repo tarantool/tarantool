@@ -286,7 +286,7 @@ fiber_io_yield()
 }
 
 static void
-fiber_io_stop(int events)
+fiber_io_stop(int events __attribute__((unused)))
 {
 	ev_io *io = &fiber->io;
 
@@ -1175,14 +1175,12 @@ tcp_server_handler(void *data)
 }
 
 struct fiber *
-fiber_server(fiber_server_type type, int port, void (*handler) (void *data), void *data,
+fiber_server(int port, void (*handler) (void *data), void *data,
 	     void (*on_bind) (void *data))
 {
 	char *server_name;
 	struct fiber_server *server;
 	struct fiber *s;
-
-	assert(type == tcp_server);
 
 	server_name = palloc(eter_pool, 64);
 	snprintf(server_name, 64, "%i/acceptor", port);
