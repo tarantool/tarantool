@@ -7,6 +7,9 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.m
 set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM 1)
 
 set_source_files_properties(memcached-grammar.m
+    PROPERTIES HEADER_FILE_ONLY true)
+
+set_source_files_properties(memcached.m
     PROPERTIES COMPILE_FLAGS "-Wno-uninitialized")
 
-tarantool_module("box" index.m box.m memcached-grammar.m)
+tarantool_module("box" index.m box.m memcached.m memcached-grammar.m)
