@@ -39,6 +39,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include <tnt_queue.h>
 #include <tnt_error.h>
 #include <tnt_mem.h>
 #include <tnt_opt.h>

@@ -29,8 +29,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include <third_party/queue.h>
-
+#include <tnt_queue.h>
 #include <tnt_error.h>
 #include <tnt_mem.h>
 #include <tnt_leb128.h>

@@ -30,8 +30,8 @@
 
 #include <sys/types.h>
 #include <sys/uio.h>
-#include <third_party/queue.h>
 
+#include <tnt_queue.h>
 #include <tnt_error.h>
 #include <tnt_mem.h>
 #include <tnt_buf.h>

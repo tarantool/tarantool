@@ -1,4 +1,5 @@
-add_library(client
+
+set (tnt_sources 
 	tnt_opt.c
 	tnt_buf.c
 	tnt_mem.c
@@ -14,3 +15,37 @@ add_library(client
 	tnt_select.c
 	tnt_memcache_val.c
 	tnt_memcache.c)
+
+add_library(tnt STATIC ${tnt_sources})
+
+add_library(tnt_shared SHARED ${tnt_sources})
+set_target_properties(tnt_shared PROPERTIES OUTPUT_NAME tnt)	
+
+install(FILES
+	include/libtnt.h
+	include/tnt_queue.h
+	include/tnt_error.h
+	include/tnt_mem.h
+	include/tnt_opt.h
+	include/tnt_buf.h
+	include/tnt.h
+	include/tnt_io.h
+	include/tnt_proto.h
+	include/tnt_tuple.h
+	include/tnt_insert.h
+	include/tnt_update.h
+	include/tnt_delete.h
+	include/tnt_select.h
+	include/tnt_ping.h
+	include/tnt_recv.h
+	include/tnt_memcache_val.h
+	include/tnt_memcache.h
+	DESTINATION include/libtnt)
+
+install_targets(/lib tnt)
+install_targets(/lib tnt_shared)
+
+#install(TARGETS tnt
+	#LIBRARY DESTINATION lib
+	#ARCHIVE DESTINATION lib
+#)
