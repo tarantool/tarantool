@@ -47,12 +47,18 @@ void
 replicator_reload_config(struct tarantool_cfg *config);
 
 /**
+ * Pre-fork replicator spawner process.
+ */
+void
+replicator_prefork();
+
+/**
  * Intialize tarantool's replicator module.
  *
  * @return On success, a zero is returned. On error, -1 is returned.
  */
 void
-replicator_init(void);
+replicator_init();
 
 #endif // !defined(REPLICATOR_H_INCLUDED)
 

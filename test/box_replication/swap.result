@@ -9,16 +9,6 @@ insert into t0 values (3, 'tuple 3')
 Insert OK, 1 row affected
 insert into t0 values (4, 'tuple 4')
 Insert OK, 1 row affected
-insert into t0 values (5, 'tuple 5')
-Insert OK, 1 row affected
-insert into t0 values (6, 'tuple 6')
-Insert OK, 1 row affected
-insert into t0 values (7, 'tuple 7')
-Insert OK, 1 row affected
-insert into t0 values (8, 'tuple 8')
-Insert OK, 1 row affected
-insert into t0 values (9, 'tuple 9')
-Insert OK, 1 row affected
 select * from t0 where k0 = 0
 Found 1 tuple:
 [0, 'tuple 0']
@@ -34,6 +24,16 @@ Found 1 tuple:
 select * from t0 where k0 = 4
 Found 1 tuple:
 [4, 'tuple 4']
+insert into t0 values (5, 'tuple 5')
+Insert OK, 1 row affected
+insert into t0 values (6, 'tuple 6')
+Insert OK, 1 row affected
+insert into t0 values (7, 'tuple 7')
+Insert OK, 1 row affected
+insert into t0 values (8, 'tuple 8')
+Insert OK, 1 row affected
+insert into t0 values (9, 'tuple 9')
+Insert OK, 1 row affected
 select * from t0 where k0 = 5
 Found 1 tuple:
 [5, 'tuple 5']
@@ -68,16 +68,6 @@ insert into t0 values (13, 'tuple 13')
 Insert OK, 1 row affected
 insert into t0 values (14, 'tuple 14')
 Insert OK, 1 row affected
-insert into t0 values (15, 'tuple 15')
-Insert OK, 1 row affected
-insert into t0 values (16, 'tuple 16')
-Insert OK, 1 row affected
-insert into t0 values (17, 'tuple 17')
-Insert OK, 1 row affected
-insert into t0 values (18, 'tuple 18')
-Insert OK, 1 row affected
-insert into t0 values (19, 'tuple 19')
-Insert OK, 1 row affected
 select * from t0 where k0 = 10
 Found 1 tuple:
 [10, 'tuple 10']
@@ -93,6 +83,16 @@ Found 1 tuple:
 select * from t0 where k0 = 14
 Found 1 tuple:
 [14, 'tuple 14']
+insert into t0 values (15, 'tuple 15')
+Insert OK, 1 row affected
+insert into t0 values (16, 'tuple 16')
+Insert OK, 1 row affected
+insert into t0 values (17, 'tuple 17')
+Insert OK, 1 row affected
+insert into t0 values (18, 'tuple 18')
+Insert OK, 1 row affected
+insert into t0 values (19, 'tuple 19')
+Insert OK, 1 row affected
 select * from t0 where k0 = 15
 Found 1 tuple:
 [15, 'tuple 15']
@@ -128,16 +128,6 @@ insert into t0 values (23, 'tuple 23')
 Insert OK, 1 row affected
 insert into t0 values (24, 'tuple 24')
 Insert OK, 1 row affected
-insert into t0 values (25, 'tuple 25')
-Insert OK, 1 row affected
-insert into t0 values (26, 'tuple 26')
-Insert OK, 1 row affected
-insert into t0 values (27, 'tuple 27')
-Insert OK, 1 row affected
-insert into t0 values (28, 'tuple 28')
-Insert OK, 1 row affected
-insert into t0 values (29, 'tuple 29')
-Insert OK, 1 row affected
 select * from t0 where k0 = 20
 Found 1 tuple:
 [20, 'tuple 20']
@@ -153,6 +143,16 @@ Found 1 tuple:
 select * from t0 where k0 = 24
 Found 1 tuple:
 [24, 'tuple 24']
+insert into t0 values (25, 'tuple 25')
+Insert OK, 1 row affected
+insert into t0 values (26, 'tuple 26')
+Insert OK, 1 row affected
+insert into t0 values (27, 'tuple 27')
+Insert OK, 1 row affected
+insert into t0 values (28, 'tuple 28')
+Insert OK, 1 row affected
+insert into t0 values (29, 'tuple 29')
+Insert OK, 1 row affected
 select * from t0 where k0 = 25
 Found 1 tuple:
 [25, 'tuple 25']
@@ -187,16 +187,6 @@ insert into t0 values (33, 'tuple 33')
 Insert OK, 1 row affected
 insert into t0 values (34, 'tuple 34')
 Insert OK, 1 row affected
-insert into t0 values (35, 'tuple 35')
-Insert OK, 1 row affected
-insert into t0 values (36, 'tuple 36')
-Insert OK, 1 row affected
-insert into t0 values (37, 'tuple 37')
-Insert OK, 1 row affected
-insert into t0 values (38, 'tuple 38')
-Insert OK, 1 row affected
-insert into t0 values (39, 'tuple 39')
-Insert OK, 1 row affected
 select * from t0 where k0 = 30
 Found 1 tuple:
 [30, 'tuple 30']
@@ -212,6 +202,16 @@ Found 1 tuple:
 select * from t0 where k0 = 34
 Found 1 tuple:
 [34, 'tuple 34']
+insert into t0 values (35, 'tuple 35')
+Insert OK, 1 row affected
+insert into t0 values (36, 'tuple 36')
+Insert OK, 1 row affected
+insert into t0 values (37, 'tuple 37')
+Insert OK, 1 row affected
+insert into t0 values (38, 'tuple 38')
+Insert OK, 1 row affected
+insert into t0 values (39, 'tuple 39')
+Insert OK, 1 row affected
 select * from t0 where k0 = 35
 Found 1 tuple:
 [35, 'tuple 35']
@@ -247,16 +247,6 @@ insert into t0 values (43, 'tuple 43')
 Insert OK, 1 row affected
 insert into t0 values (44, 'tuple 44')
 Insert OK, 1 row affected
-insert into t0 values (45, 'tuple 45')
-Insert OK, 1 row affected
-insert into t0 values (46, 'tuple 46')
-Insert OK, 1 row affected
-insert into t0 values (47, 'tuple 47')
-Insert OK, 1 row affected
-insert into t0 values (48, 'tuple 48')
-Insert OK, 1 row affected
-insert into t0 values (49, 'tuple 49')
-Insert OK, 1 row affected
 select * from t0 where k0 = 40
 Found 1 tuple:
 [40, 'tuple 40']
@@ -272,6 +262,16 @@ Found 1 tuple:
 select * from t0 where k0 = 44
 Found 1 tuple:
 [44, 'tuple 44']
+insert into t0 values (45, 'tuple 45')
+Insert OK, 1 row affected
+insert into t0 values (46, 'tuple 46')
+Insert OK, 1 row affected
+insert into t0 values (47, 'tuple 47')
+Insert OK, 1 row affected
+insert into t0 values (48, 'tuple 48')
+Insert OK, 1 row affected
+insert into t0 values (49, 'tuple 49')
+Insert OK, 1 row affected
 select * from t0 where k0 = 45
 Found 1 tuple:
 [45, 'tuple 45']
@@ -306,16 +306,6 @@ insert into t0 values (53, 'tuple 53')
 Insert OK, 1 row affected
 insert into t0 values (54, 'tuple 54')
 Insert OK, 1 row affected
-insert into t0 values (55, 'tuple 55')
-Insert OK, 1 row affected
-insert into t0 values (56, 'tuple 56')
-Insert OK, 1 row affected
-insert into t0 values (57, 'tuple 57')
-Insert OK, 1 row affected
-insert into t0 values (58, 'tuple 58')
-Insert OK, 1 row affected
-insert into t0 values (59, 'tuple 59')
-Insert OK, 1 row affected
 select * from t0 where k0 = 50
 Found 1 tuple:
 [50, 'tuple 50']
@@ -331,6 +321,16 @@ Found 1 tuple:
 select * from t0 where k0 = 54
 Found 1 tuple:
 [54, 'tuple 54']
+insert into t0 values (55, 'tuple 55')
+Insert OK, 1 row affected
+insert into t0 values (56, 'tuple 56')
+Insert OK, 1 row affected
+insert into t0 values (57, 'tuple 57')
+Insert OK, 1 row affected
+insert into t0 values (58, 'tuple 58')
+Insert OK, 1 row affected
+insert into t0 values (59, 'tuple 59')
+Insert OK, 1 row affected
 select * from t0 where k0 = 55
 Found 1 tuple:
 [55, 'tuple 55']
@@ -366,16 +366,6 @@ insert into t0 values (63, 'tuple 63')
 Insert OK, 1 row affected
 insert into t0 values (64, 'tuple 64')
 Insert OK, 1 row affected
-insert into t0 values (65, 'tuple 65')
-Insert OK, 1 row affected
-insert into t0 values (66, 'tuple 66')
-Insert OK, 1 row affected
-insert into t0 values (67, 'tuple 67')
-Insert OK, 1 row affected
-insert into t0 values (68, 'tuple 68')
-Insert OK, 1 row affected
-insert into t0 values (69, 'tuple 69')
-Insert OK, 1 row affected
 select * from t0 where k0 = 60
 Found 1 tuple:
 [60, 'tuple 60']
@@ -391,6 +381,16 @@ Found 1 tuple:
 select * from t0 where k0 = 64
 Found 1 tuple:
 [64, 'tuple 64']
+insert into t0 values (65, 'tuple 65')
+Insert OK, 1 row affected
+insert into t0 values (66, 'tuple 66')
+Insert OK, 1 row affected
+insert into t0 values (67, 'tuple 67')
+Insert OK, 1 row affected
+insert into t0 values (68, 'tuple 68')
+Insert OK, 1 row affected
+insert into t0 values (69, 'tuple 69')
+Insert OK, 1 row affected
 select * from t0 where k0 = 65
 Found 1 tuple:
 [65, 'tuple 65']
@@ -425,16 +425,6 @@ insert into t0 values (73, 'tuple 73')
 Insert OK, 1 row affected
 insert into t0 values (74, 'tuple 74')
 Insert OK, 1 row affected
-insert into t0 values (75, 'tuple 75')
-Insert OK, 1 row affected
-insert into t0 values (76, 'tuple 76')
-Insert OK, 1 row affected
-insert into t0 values (77, 'tuple 77')
-Insert OK, 1 row affected
-insert into t0 values (78, 'tuple 78')
-Insert OK, 1 row affected
-insert into t0 values (79, 'tuple 79')
-Insert OK, 1 row affected
 select * from t0 where k0 = 70
 Found 1 tuple:
 [70, 'tuple 70']
@@ -450,6 +440,16 @@ Found 1 tuple:
 select * from t0 where k0 = 74
 Found 1 tuple:
 [74, 'tuple 74']
+insert into t0 values (75, 'tuple 75')
+Insert OK, 1 row affected
+insert into t0 values (76, 'tuple 76')
+Insert OK, 1 row affected
+insert into t0 values (77, 'tuple 77')
+Insert OK, 1 row affected
+insert into t0 values (78, 'tuple 78')
+Insert OK, 1 row affected
+insert into t0 values (79, 'tuple 79')
+Insert OK, 1 row affected
 select * from t0 where k0 = 75
 Found 1 tuple:
 [75, 'tuple 75']
@@ -485,16 +485,6 @@ insert into t0 values (83, 'tuple 83')
 Insert OK, 1 row affected
 insert into t0 values (84, 'tuple 84')
 Insert OK, 1 row affected
-insert into t0 values (85, 'tuple 85')
-Insert OK, 1 row affected
-insert into t0 values (86, 'tuple 86')
-Insert OK, 1 row affected
-insert into t0 values (87, 'tuple 87')
-Insert OK, 1 row affected
-insert into t0 values (88, 'tuple 88')
-Insert OK, 1 row affected
-insert into t0 values (89, 'tuple 89')
-Insert OK, 1 row affected
 select * from t0 where k0 = 80
 Found 1 tuple:
 [80, 'tuple 80']
@@ -510,6 +500,16 @@ Found 1 tuple:
 select * from t0 where k0 = 84
 Found 1 tuple:
 [84, 'tuple 84']
+insert into t0 values (85, 'tuple 85')
+Insert OK, 1 row affected
+insert into t0 values (86, 'tuple 86')
+Insert OK, 1 row affected
+insert into t0 values (87, 'tuple 87')
+Insert OK, 1 row affected
+insert into t0 values (88, 'tuple 88')
+Insert OK, 1 row affected
+insert into t0 values (89, 'tuple 89')
+Insert OK, 1 row affected
 select * from t0 where k0 = 85
 Found 1 tuple:
 [85, 'tuple 85']
@@ -544,16 +544,6 @@ insert into t0 values (93, 'tuple 93')
 Insert OK, 1 row affected
 insert into t0 values (94, 'tuple 94')
 Insert OK, 1 row affected
-insert into t0 values (95, 'tuple 95')
-Insert OK, 1 row affected
-insert into t0 values (96, 'tuple 96')
-Insert OK, 1 row affected
-insert into t0 values (97, 'tuple 97')
-Insert OK, 1 row affected
-insert into t0 values (98, 'tuple 98')
-Insert OK, 1 row affected
-insert into t0 values (99, 'tuple 99')
-Insert OK, 1 row affected
 select * from t0 where k0 = 90
 Found 1 tuple:
 [90, 'tuple 90']
@@ -569,6 +559,16 @@ Found 1 tuple:
 select * from t0 where k0 = 94
 Found 1 tuple:
 [94, 'tuple 94']
+insert into t0 values (95, 'tuple 95')
+Insert OK, 1 row affected
+insert into t0 values (96, 'tuple 96')
+Insert OK, 1 row affected
+insert into t0 values (97, 'tuple 97')
+Insert OK, 1 row affected
+insert into t0 values (98, 'tuple 98')
+Insert OK, 1 row affected
+insert into t0 values (99, 'tuple 99')
+Insert OK, 1 row affected
 select * from t0 where k0 = 95
 Found 1 tuple:
 [95, 'tuple 95']
@@ -604,16 +604,6 @@ insert into t0 values (103, 'tuple 103')
 Insert OK, 1 row affected
 insert into t0 values (104, 'tuple 104')
 Insert OK, 1 row affected
-insert into t0 values (105, 'tuple 105')
-Insert OK, 1 row affected
-insert into t0 values (106, 'tuple 106')
-Insert OK, 1 row affected
-insert into t0 values (107, 'tuple 107')
-Insert OK, 1 row affected
-insert into t0 values (108, 'tuple 108')
-Insert OK, 1 row affected
-insert into t0 values (109, 'tuple 109')
-Insert OK, 1 row affected
 select * from t0 where k0 = 100
 Found 1 tuple:
 [100, 'tuple 100']
@@ -629,6 +619,16 @@ Found 1 tuple:
 select * from t0 where k0 = 104
 Found 1 tuple:
 [104, 'tuple 104']
+insert into t0 values (105, 'tuple 105')
+Insert OK, 1 row affected
+insert into t0 values (106, 'tuple 106')
+Insert OK, 1 row affected
+insert into t0 values (107, 'tuple 107')
+Insert OK, 1 row affected
+insert into t0 values (108, 'tuple 108')
+Insert OK, 1 row affected
+insert into t0 values (109, 'tuple 109')
+Insert OK, 1 row affected
 select * from t0 where k0 = 105
 Found 1 tuple:
 [105, 'tuple 105']
@@ -663,16 +663,6 @@ insert into t0 values (113, 'tuple 113')
 Insert OK, 1 row affected
 insert into t0 values (114, 'tuple 114')
 Insert OK, 1 row affected
-insert into t0 values (115, 'tuple 115')
-Insert OK, 1 row affected
-insert into t0 values (116, 'tuple 116')
-Insert OK, 1 row affected
-insert into t0 values (117, 'tuple 117')
-Insert OK, 1 row affected
-insert into t0 values (118, 'tuple 118')
-Insert OK, 1 row affected
-insert into t0 values (119, 'tuple 119')
-Insert OK, 1 row affected
 select * from t0 where k0 = 110
 Found 1 tuple:
 [110, 'tuple 110']
@@ -688,6 +678,16 @@ Found 1 tuple:
 select * from t0 where k0 = 114
 Found 1 tuple:
 [114, 'tuple 114']
+insert into t0 values (115, 'tuple 115')
+Insert OK, 1 row affected
+insert into t0 values (116, 'tuple 116')
+Insert OK, 1 row affected
+insert into t0 values (117, 'tuple 117')
+Insert OK, 1 row affected
+insert into t0 values (118, 'tuple 118')
+Insert OK, 1 row affected
+insert into t0 values (119, 'tuple 119')
+Insert OK, 1 row affected
 select * from t0 where k0 = 115
 Found 1 tuple:
 [115, 'tuple 115']
@@ -723,16 +723,6 @@ insert into t0 values (123, 'tuple 123')
 Insert OK, 1 row affected
 insert into t0 values (124, 'tuple 124')
 Insert OK, 1 row affected
-insert into t0 values (125, 'tuple 125')
-Insert OK, 1 row affected
-insert into t0 values (126, 'tuple 126')
-Insert OK, 1 row affected
-insert into t0 values (127, 'tuple 127')
-Insert OK, 1 row affected
-insert into t0 values (128, 'tuple 128')
-Insert OK, 1 row affected
-insert into t0 values (129, 'tuple 129')
-Insert OK, 1 row affected
 select * from t0 where k0 = 120
 Found 1 tuple:
 [120, 'tuple 120']
@@ -748,6 +738,16 @@ Found 1 tuple:
 select * from t0 where k0 = 124
 Found 1 tuple:
 [124, 'tuple 124']
+insert into t0 values (125, 'tuple 125')
+Insert OK, 1 row affected
+insert into t0 values (126, 'tuple 126')
+Insert OK, 1 row affected
+insert into t0 values (127, 'tuple 127')
+Insert OK, 1 row affected
+insert into t0 values (128, 'tuple 128')
+Insert OK, 1 row affected
+insert into t0 values (129, 'tuple 129')
+Insert OK, 1 row affected
 select * from t0 where k0 = 125
 Found 1 tuple:
 [125, 'tuple 125']
@@ -782,16 +782,6 @@ insert into t0 values (133, 'tuple 133')
 Insert OK, 1 row affected
 insert into t0 values (134, 'tuple 134')
 Insert OK, 1 row affected
-insert into t0 values (135, 'tuple 135')
-Insert OK, 1 row affected
-insert into t0 values (136, 'tuple 136')
-Insert OK, 1 row affected
-insert into t0 values (137, 'tuple 137')
-Insert OK, 1 row affected
-insert into t0 values (138, 'tuple 138')
-Insert OK, 1 row affected
-insert into t0 values (139, 'tuple 139')
-Insert OK, 1 row affected
 select * from t0 where k0 = 130
 Found 1 tuple:
 [130, 'tuple 130']
@@ -807,6 +797,16 @@ Found 1 tuple:
 select * from t0 where k0 = 134
 Found 1 tuple:
 [134, 'tuple 134']
+insert into t0 values (135, 'tuple 135')
+Insert OK, 1 row affected
+insert into t0 values (136, 'tuple 136')
+Insert OK, 1 row affected
+insert into t0 values (137, 'tuple 137')
+Insert OK, 1 row affected
+insert into t0 values (138, 'tuple 138')
+Insert OK, 1 row affected
+insert into t0 values (139, 'tuple 139')
+Insert OK, 1 row affected
 select * from t0 where k0 = 135
 Found 1 tuple:
 [135, 'tuple 135']
@@ -842,16 +842,6 @@ insert into t0 values (143, 'tuple 143')
 Insert OK, 1 row affected
 insert into t0 values (144, 'tuple 144')
 Insert OK, 1 row affected
-insert into t0 values (145, 'tuple 145')
-Insert OK, 1 row affected
-insert into t0 values (146, 'tuple 146')
-Insert OK, 1 row affected
-insert into t0 values (147, 'tuple 147')
-Insert OK, 1 row affected
-insert into t0 values (148, 'tuple 148')
-Insert OK, 1 row affected
-insert into t0 values (149, 'tuple 149')
-Insert OK, 1 row affected
 select * from t0 where k0 = 140
 Found 1 tuple:
 [140, 'tuple 140']
@@ -867,6 +857,16 @@ Found 1 tuple:
 select * from t0 where k0 = 144
 Found 1 tuple:
 [144, 'tuple 144']
+insert into t0 values (145, 'tuple 145')
+Insert OK, 1 row affected
+insert into t0 values (146, 'tuple 146')
+Insert OK, 1 row affected
+insert into t0 values (147, 'tuple 147')
+Insert OK, 1 row affected
+insert into t0 values (148, 'tuple 148')
+Insert OK, 1 row affected
+insert into t0 values (149, 'tuple 149')
+Insert OK, 1 row affected
 select * from t0 where k0 = 145
 Found 1 tuple:
 [145, 'tuple 145']
@@ -901,16 +901,6 @@ insert into t0 values (153, 'tuple 153')
 Insert OK, 1 row affected
 insert into t0 values (154, 'tuple 154')
 Insert OK, 1 row affected
-insert into t0 values (155, 'tuple 155')
-Insert OK, 1 row affected
-insert into t0 values (156, 'tuple 156')
-Insert OK, 1 row affected
-insert into t0 values (157, 'tuple 157')
-Insert OK, 1 row affected
-insert into t0 values (158, 'tuple 158')
-Insert OK, 1 row affected
-insert into t0 values (159, 'tuple 159')
-Insert OK, 1 row affected
 select * from t0 where k0 = 150
 Found 1 tuple:
 [150, 'tuple 150']
@@ -926,6 +916,16 @@ Found 1 tuple:
 select * from t0 where k0 = 154
 Found 1 tuple:
 [154, 'tuple 154']
+insert into t0 values (155, 'tuple 155')
+Insert OK, 1 row affected
+insert into t0 values (156, 'tuple 156')
+Insert OK, 1 row affected
+insert into t0 values (157, 'tuple 157')
+Insert OK, 1 row affected
+insert into t0 values (158, 'tuple 158')
+Insert OK, 1 row affected
+insert into t0 values (159, 'tuple 159')
+Insert OK, 1 row affected
 select * from t0 where k0 = 155
 Found 1 tuple:
 [155, 'tuple 155']
@@ -961,16 +961,6 @@ insert into t0 values (163, 'tuple 163')
 Insert OK, 1 row affected
 insert into t0 values (164, 'tuple 164')
 Insert OK, 1 row affected
-insert into t0 values (165, 'tuple 165')
-Insert OK, 1 row affected
-insert into t0 values (166, 'tuple 166')
-Insert OK, 1 row affected
-insert into t0 values (167, 'tuple 167')
-Insert OK, 1 row affected
-insert into t0 values (168, 'tuple 168')
-Insert OK, 1 row affected
-insert into t0 values (169, 'tuple 169')
-Insert OK, 1 row affected
 select * from t0 where k0 = 160
 Found 1 tuple:
 [160, 'tuple 160']
@@ -986,6 +976,16 @@ Found 1 tuple:
 select * from t0 where k0 = 164
 Found 1 tuple:
 [164, 'tuple 164']
+insert into t0 values (165, 'tuple 165')
+Insert OK, 1 row affected
+insert into t0 values (166, 'tuple 166')
+Insert OK, 1 row affected
+insert into t0 values (167, 'tuple 167')
+Insert OK, 1 row affected
+insert into t0 values (168, 'tuple 168')
+Insert OK, 1 row affected
+insert into t0 values (169, 'tuple 169')
+Insert OK, 1 row affected
 select * from t0 where k0 = 165
 Found 1 tuple:
 [165, 'tuple 165']
@@ -1020,16 +1020,6 @@ insert into t0 values (173, 'tuple 173')
 Insert OK, 1 row affected
 insert into t0 values (174, 'tuple 174')
 Insert OK, 1 row affected
-insert into t0 values (175, 'tuple 175')
-Insert OK, 1 row affected
-insert into t0 values (176, 'tuple 176')
-Insert OK, 1 row affected
-insert into t0 values (177, 'tuple 177')
-Insert OK, 1 row affected
-insert into t0 values (178, 'tuple 178')
-Insert OK, 1 row affected
-insert into t0 values (179, 'tuple 179')
-Insert OK, 1 row affected
 select * from t0 where k0 = 170
 Found 1 tuple:
 [170, 'tuple 170']
@@ -1045,6 +1035,16 @@ Found 1 tuple:
 select * from t0 where k0 = 174
 Found 1 tuple:
 [174, 'tuple 174']
+insert into t0 values (175, 'tuple 175')
+Insert OK, 1 row affected
+insert into t0 values (176, 'tuple 176')
+Insert OK, 1 row affected
+insert into t0 values (177, 'tuple 177')
+Insert OK, 1 row affected
+insert into t0 values (178, 'tuple 178')
+Insert OK, 1 row affected
+insert into t0 values (179, 'tuple 179')
+Insert OK, 1 row affected
 select * from t0 where k0 = 175
 Found 1 tuple:
 [175, 'tuple 175']
@@ -1080,16 +1080,6 @@ insert into t0 values (183, 'tuple 183')
 Insert OK, 1 row affected
 insert into t0 values (184, 'tuple 184')
 Insert OK, 1 row affected
-insert into t0 values (185, 'tuple 185')
-Insert OK, 1 row affected
-insert into t0 values (186, 'tuple 186')
-Insert OK, 1 row affected
-insert into t0 values (187, 'tuple 187')
-Insert OK, 1 row affected
-insert into t0 values (188, 'tuple 188')
-Insert OK, 1 row affected
-insert into t0 values (189, 'tuple 189')
-Insert OK, 1 row affected
 select * from t0 where k0 = 180
 Found 1 tuple:
 [180, 'tuple 180']
@@ -1105,6 +1095,16 @@ Found 1 tuple:
 select * from t0 where k0 = 184
 Found 1 tuple:
 [184, 'tuple 184']
+insert into t0 values (185, 'tuple 185')
+Insert OK, 1 row affected
+insert into t0 values (186, 'tuple 186')
+Insert OK, 1 row affected
+insert into t0 values (187, 'tuple 187')
+Insert OK, 1 row affected
+insert into t0 values (188, 'tuple 188')
+Insert OK, 1 row affected
+insert into t0 values (189, 'tuple 189')
+Insert OK, 1 row affected
 select * from t0 where k0 = 185
 Found 1 tuple:
 [185, 'tuple 185']
@@ -1139,16 +1139,6 @@ insert into t0 values (193, 'tuple 193')
 Insert OK, 1 row affected
 insert into t0 values (194, 'tuple 194')
 Insert OK, 1 row affected
-insert into t0 values (195, 'tuple 195')
-Insert OK, 1 row affected
-insert into t0 values (196, 'tuple 196')
-Insert OK, 1 row affected
-insert into t0 values (197, 'tuple 197')
-Insert OK, 1 row affected
-insert into t0 values (198, 'tuple 198')
-Insert OK, 1 row affected
-insert into t0 values (199, 'tuple 199')
-Insert OK, 1 row affected
 select * from t0 where k0 = 190
 Found 1 tuple:
 [190, 'tuple 190']
@@ -1164,6 +1154,16 @@ Found 1 tuple:
 select * from t0 where k0 = 194
 Found 1 tuple:
 [194, 'tuple 194']
+insert into t0 values (195, 'tuple 195')
+Insert OK, 1 row affected
+insert into t0 values (196, 'tuple 196')
+Insert OK, 1 row affected
+insert into t0 values (197, 'tuple 197')
+Insert OK, 1 row affected
+insert into t0 values (198, 'tuple 198')
+Insert OK, 1 row affected
+insert into t0 values (199, 'tuple 199')
+Insert OK, 1 row affected
 select * from t0 where k0 = 195
 Found 1 tuple:
 [195, 'tuple 195']

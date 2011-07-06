@@ -41,10 +41,9 @@ class TarantoolBoxServer(TarantoolServer):
     return info[param]
 
   def wait_lsn(self, lsn):
-    try_count = 0
     while True:
       curr_lsn = int(self.get_param("lsn"))
       if (curr_lsn >= lsn):
         break
-      try_count += 1
       time.sleep(0.01)
+

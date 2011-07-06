@@ -52,16 +52,11 @@ struct replicator_process {
 	u32 child_count;
 };
 
+static int replicator_socks[2];
 
 /*-----------------------------------------------------------------------------*/
 /* replication accept/sender fibers                                            */
 /*-----------------------------------------------------------------------------*/
-
-/**
- * Initialize replication fibers.
- */
-static void
-fibers_init(int sock);
 
 /**
  * Replication acceptor fiber handler.
@@ -201,13 +196,10 @@ void
 replicator_reload_config(struct tarantool_cfg *config __attribute__((unused)))
 {}
 
-/** Intialize tarantool's replicator module. */
+/** Pre-fork replicator spawner process. */
 void
-replicator_init(void)
+replicator_prefork()
 {
-	int socks[2];
-	pid_t pid = -1;
-
 	if (cfg.replication_port == 0) {
 		/* replicator not needed, leave init function */
 		return;
@@ -218,35 +210,29 @@ replicator_init(void)
 	}
 
 	/* create communication sockes between tarantool and replicator processes via UNIX sockets*/
-	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, socks) != 0) {
+	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, replicator_socks) != 0) {
 		panic_syserror("socketpair");
 	}
 
 	/* create replicator process */
-	pid = fork();
+	pid_t pid = fork();
 	if (pid == -1) {
-		panic("fork");
+		panic_syserror("fork");
 	}
 
 	if (pid != 0) {
 		/* parent process: tarantool */
-		close(socks[1]);
-		fibers_init(socks[0]);
+		close(replicator_socks[1]);
 	} else {
 		/* child process: replicator */
-		close(socks[0]);
-		spawner_init(socks[1]);
+		close(replicator_socks[0]);
+		spawner_init(replicator_socks[1]);
 	}
 }
 
-
-/*-----------------------------------------------------------------------------*/
-/* replication accept/sender fibers                                            */
-/*-----------------------------------------------------------------------------*/
-
-/** Initialize replication fibers. */
-static void
-fibers_init(int sock)
+/** Intialize tarantool's replicator module. */
+void
+replicator_init()
 {
 	char fiber_name[FIBER_NAME_MAXLEN];
 	const size_t sender_inbox_size = 16 * sizeof(int);
@@ -258,7 +244,7 @@ fibers_init(int sock)
 		panic("snprintf fail");
 	}
 
-	sender = fiber_create(fiber_name, sock, sender_inbox_size, sender_handler, NULL);
+	sender = fiber_create(fiber_name, replicator_socks[0], sender_inbox_size, sender_handler, NULL);
 	if (sender == NULL) {
 		panic("create fiber fail");
 	}
@@ -276,6 +262,11 @@ fibers_init(int sock)
 	fiber_call(acceptor);
 	fiber_call(sender);
 }
+
+
+/*-----------------------------------------------------------------------------*/
+/* replication accept/sender fibers                                            */
+/*-----------------------------------------------------------------------------*/
 
 /** Replication acceptor fiber handler. */
 static void

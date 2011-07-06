@@ -539,6 +539,9 @@ main(int argc, char **argv)
 	say_logger_init(cfg.logger_nonblock);
 	booting = false;
 
+	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
+	replicator_prefork();
+
 	ev_default_loop(EVFLAG_AUTO);
 
 	ev_signal *ev_sig;
@@ -546,7 +549,6 @@ main(int argc, char **argv)
 	ev_signal_init(ev_sig, (void *)snapshot, SIGUSR1);
 	ev_signal_start(ev_sig);
 
-	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
 	signal_init();
 
 	replicator_init();

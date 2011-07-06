@@ -38,7 +38,7 @@ for i in range(id, id + 10):
 print """
 # Select 10 tuples from replica
 """
-replica.wait_lsn(10)
+replica.wait_lsn(11)
 for i in range(id, id + 10):
     replica.sql.execute("select * from t0 where k0 = %d" % i, silent=False)
 
@@ -70,7 +70,7 @@ for i in range(id, id + 10):
 print """
 # Select 10 tuples from replica
 """
-replica.wait_lsn(20)
+replica.wait_lsn(21)
 for i in range(id, id + 10):
     replica.sql.execute("select * from t0 where k0 = %d" % i, silent=False)
 

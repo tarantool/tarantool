@@ -1,10 +1,11 @@
 # encoding: tarantool
 import os
+import time
 from lib.tarantool_box_server import TarantoolBoxServer
 
 REPEAT = 10
 ID_BEGIN = 0
-ID_STEP = 10
+ID_STEP = 5
 
 def insert_tuples(server, begin, end, msg = "tuple"):
     for i in range(begin, end):
@@ -27,8 +28,13 @@ replica.deploy("box_replication/cfg/replica.cfg",
 
 id = ID_BEGIN
 for i in range(REPEAT):
-    summary = 0.0
     print "test %d iteration" % i
+
+    # insert to master
+    insert_tuples(master, id, id + ID_STEP)
+    # select from replica
+    select_tuples(replica, id, id + ID_STEP)
+    id += ID_STEP
 
     # insert to master
     insert_tuples(master, id, id + ID_STEP)
@@ -42,18 +48,23 @@ for i in range(REPEAT):
     # reconfigure master to replica
     master.reconfigure("box_replication/cfg/master_to_replica.cfg", silent = False)
 
-
-    # insert to master
+    # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
-    # select from replica
+    # select from master
     select_tuples(master, id, id + ID_STEP)
+    id += ID_STEP
+
+    # insert to replica
+    insert_tuples(replica, id, id + ID_STEP)
+    # select from master
+    select_tuples(master, id, id + ID_STEP)
+    id += ID_STEP
 
     print "rollback servers configuration"
     # reconfigure replica to master
     master.reconfigure("box_replication/cfg/master.cfg", silent = False)
     # reconfigure master to replica
     replica.reconfigure("box_replication/cfg/replica.cfg", silent = False)
-    id += ID_STEP
 
 
 # Cleanup.
