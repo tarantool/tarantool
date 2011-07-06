@@ -1,1 +1,16 @@
-add_library(client client.c)
+add_library(client
+	tnt_opt.c
+	tnt_buf.c
+	tnt_mem.c
+	tnt_leb128.c
+	tnt_tuple.c
+	tnt.c
+	tnt_io.c
+	tnt_recv.c
+	tnt_ping.c
+	tnt_update.c
+	tnt_insert.c
+	tnt_delete.c
+	tnt_select.c
+	tnt_memcache_val.c
+	tnt_memcache.c)

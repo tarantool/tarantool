@@ -73,10 +73,10 @@ if (ENABLE_GCOV)
 endif()
 
 if (ENABLE_BACKTRACE AND HAVE_BFD)
-  set (common_libraries ${common_libraries} bfd)
+  set (common_libraries ${common_libraries} bfd dl)
   if (ENABLE_STATIC)
      include (FindZLIB)
-     set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES} iberty dl)
+     set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES} iberty)
   endif()
 endif()
 
