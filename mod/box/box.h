@@ -96,7 +96,8 @@ enum box_mode {
 #define BOX_ALLOWED_REQUEST_FLAGS	(BOX_RETURN_TUPLE | \
 					 BOX_ADD | \
 					 BOX_REPLACE | \
-					 BOX_QUIET)
+					 BOX_QUIET | \
+					 BOX_NOT_STORE)
 
 /*
     deprecated commands:
