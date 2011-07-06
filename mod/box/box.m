@@ -34,7 +34,6 @@
 #include <cfg/warning.h>
 #include <errcode.h>
 #include <fiber.h>
-#include <iproto.h>
 #include <log_io.h>
 #include <pickle.h>
 #include <salloc.h>

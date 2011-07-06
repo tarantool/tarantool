@@ -28,6 +28,7 @@
 
 #include <mod/box/index.h>
 #include "exception.h"
+#include "iproto.h"
 #include <tbuf.h>
 
 struct tarantool_cfg;
@@ -128,14 +129,12 @@ enum box_mode {
 
 ENUM(messages, MESSAGES);
 
-struct box_txn *txn_alloc(u32 flags);
-void box_process(struct box_txn *txn, u32 op, struct tbuf *request_data);
+extern iproto_callback rw_callback;
 
+/* These 3 are used to implemente memcached 'GET' */
+struct box_txn *txn_alloc(u32 flags);
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
 void txn_cleanup(struct box_txn *txn);
-
-void *next_field(void *f);
-void append_field(struct tbuf *b, void *f);
 void *tuple_field(struct box_tuple *tuple, size_t i);
 
 #endif /* TARANTOOL_BOX_H_INCLUDED */

@@ -65,7 +65,7 @@ natoq(const u8 *start, const u8 *end)
 }
 
 static void
-store(struct box_txn *txn, void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
+store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 {
 	u32 box_flags = BOX_QUIET, cardinality = 4;
 	static u64 cas = 42;
@@ -96,20 +96,26 @@ store(struct box_txn *txn, void *key, u32 exptime, u32 flags, u32 bytes, u8 *dat
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
-	box_process(txn, INSERT, req); /* FIXME: handle RW/RO */
+	/*
+	 * Use a box dispatch wrapper which handles correctly
+	 * read-only/read-write modes.
+	 */
+	rw_callback(INSERT, req);
 }
 
 static void
-delete(struct box_txn *txn, void *key)
+delete(void *key)
 {
 	u32 key_len = 1;
+	u32 box_flags = BOX_QUIET;
 	struct tbuf *req = tbuf_alloc(fiber->pool);
 
 	tbuf_append(req, &cfg.memcached_namespace, sizeof(u32));
+	tbuf_append(req, &box_flags, sizeof(box_flags));
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	box_process(txn, DELETE_1_3, req);
+	rw_callback(DELETE, req);
 }
 
 static struct box_tuple *
@@ -206,7 +212,7 @@ do {										\
 		add_iov("SERVER_ERROR object too large for cache\r\n", 41);	\
 	} else {								\
 		@try {								\
-			store(txn, key, exptime, flags, bytes, data);		\
+			store(key, exptime, flags, bytes, data);		\
 			stats.total_items++;					\
 			add_iov("STORED\r\n", 8);				\
 		}								\
@@ -223,7 +229,6 @@ do {										\
 void
 memcached_handler(void *_data __attribute__((unused)))
 {
-	struct box_txn *txn;
 	stats.total_connections++;
 	stats.curr_connections++;
 	int r, p;
@@ -237,8 +242,7 @@ memcached_handler(void *_data __attribute__((unused)))
 		}
 
 	dispatch:
-		txn = txn_alloc(BOX_QUIET);
-		p = memcached_dispatch(txn);
+		p = memcached_dispatch();
 		if (p < 0) {
 			say_debug("negative dispatch, closing connection");
 			goto exit;
@@ -400,12 +404,13 @@ memcached_expire_loop(void *data __attribute__((unused)))
 		}
 
 		while (keys_to_delete->len > 0) {
-			struct box_txn *txn = txn_alloc(BOX_QUIET);
 			@try {
-				delete(txn, read_field(keys_to_delete));
+				delete(read_field(keys_to_delete));
 				expired_keys++;
 			}
 			@catch (ClientError *e) {
+				/* expire is off when replication is on */
+				assert(e->errcode != ER_NONMASTER);
 				/* The error is already logged. */
 			}
 		}

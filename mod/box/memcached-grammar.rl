@@ -30,7 +30,7 @@
 }%%
 
 static int __attribute__((noinline))
-memcached_dispatch(struct box_txn *txn)
+memcached_dispatch()
 {
 	int cs;
 	u8 *p, *pe;
@@ -154,7 +154,7 @@ memcached_dispatch(struct box_txn *txn)
 
 					stats.cmd_set++;
 					@try {
-						store(txn, key, exptime, flags, bytes, data);
+						store(key, exptime, flags, bytes, data);
 						stats.total_items++;
 						add_iov(b->data, b->len);
 						add_iov("\r\n", 2);
@@ -178,7 +178,7 @@ memcached_dispatch(struct box_txn *txn)
 				add_iov("NOT_FOUND\r\n", 11);
 			} else {
 				@try {
-					delete(txn, key);
+					delete(key);
 					add_iov("DELETED\r\n", 9);
 				}
 				@catch (ClientError *e) {
@@ -190,6 +190,7 @@ memcached_dispatch(struct box_txn *txn)
 		}
 
 		action get {
+			struct box_txn *txn = txn_alloc(BOX_QUIET);
 			txn->op = SELECT;
 			fiber_register_cleanup((void *)txn_cleanup, txn);
 			stat_collect(stat_base, MEMC_GET, 1);
