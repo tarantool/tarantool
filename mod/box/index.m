@@ -282,7 +282,11 @@ index_find_tree(struct index *self, void *key)
 {
 	struct tree_index_member *member = (struct tree_index_member *)key;
 
-	return sptree_str_t_find(self->idx.tree, member);
+	member = sptree_str_t_find(self->idx.tree, member);
+	if (member != NULL)
+		return member->tuple;
+
+	return NULL;
 }
 
 static struct box_tuple *
