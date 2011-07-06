@@ -109,7 +109,7 @@ delete(struct box_txn *txn, void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	box_process(txn, DELETE, req);
+	box_process(txn, DELETE_1_3, req);
 }
 
 static struct box_tuple *

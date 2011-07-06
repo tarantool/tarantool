@@ -773,7 +773,7 @@ txn_commit(struct box_txn *txn)
 
 		unlock_tuples(txn);
 
-		if (txn->op == DELETE_OLD || txn->op == DELETE)
+		if (txn->op == DELETE_1_3 || txn->op == DELETE)
 			commit_delete(txn);
 		else
 			commit_replace(txn);
@@ -824,7 +824,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 
 	case DELETE:
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-	case DELETE_OLD:
+	case DELETE_1_3:
 		key_len = read_u32(data);
 		if (key_len != 1)
 			tnt_raise(IllegalParams, :"key must be single valued");
@@ -904,6 +904,8 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 		break;
 
 	case DELETE:
+		flags = read_u32(b);
+	case DELETE_1_3:
 		key_len = read_u32(b);
 		key = read_field(b);
 		if (b->len != 0)

@@ -9,7 +9,7 @@ INT_BER_MAX_LEN = 5
 IPROTO_HEADER_LEN = 3*INT_FIELD_LEN
 INSERT_REQUEST_FIXED_LEN = 2*INT_FIELD_LEN
 UPDATE_REQUEST_FIXED_LEN = 2*INT_FIELD_LEN
-DELETE_REQUEST_FIXED_LEN = INT_FIELD_LEN
+DELETE_REQUEST_FIXED_LEN = 2*INT_FIELD_LEN
 SELECT_REQUEST_FIXED_LEN = 5*INT_FIELD_LEN
 PACKET_BUF_LEN = 2048
 
@@ -20,7 +20,7 @@ UPDATE_SET_FIELD_OPCODE = 0
 INSERT_REQUEST_TYPE = 13
 SELECT_REQUEST_TYPE = 17
 UPDATE_REQUEST_TYPE = 19
-DELETE_REQUEST_TYPE = 20
+DELETE_REQUEST_TYPE = 21
 PING_REQUEST_TYPE = 65280
 
 ER = {
@@ -231,6 +231,7 @@ class StatementDelete(StatementPing):
 
     def __init__(self, table_name, where):
         self.namespace_no = table_name
+        self.flags = 0
         key_no = where[0]
         if key_no != 0:
             raise RuntimeError("DELETE can only be made by the primary key (#0)")
@@ -239,7 +240,7 @@ class StatementDelete(StatementPing):
     def pack(self):
         buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
         (buf, offset) = pack_tuple(self.value_list, buf, DELETE_REQUEST_FIXED_LEN)
-        struct.pack_into("<L", buf, 0, self.namespace_no)
+        struct.pack_into("<LL", buf, 0, self.namespace_no, self.flags)
         return buf[:offset]
 
     def unpack(self, response):

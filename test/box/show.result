@@ -5,6 +5,7 @@ statistics:
   SELECT_LIMIT:  { rps:  0    , total:  0           }
   SELECT:        { rps:  0    , total:  0           }
   UPDATE_FIELDS: { rps:  0    , total:  0           }
+  DELETE_1_3:    { rps:  0    , total:  0           }
   DELETE:        { rps:  0    , total:  0           }
 ...
 help
@@ -77,6 +78,7 @@ statistics:
   SELECT_LIMIT:  { rps:  0    , total:  0           }
   SELECT:        { rps:  0    , total:  0           }
   UPDATE_FIELDS: { rps:  0    , total:  0           }
+  DELETE_1_3:    { rps:  0    , total:  0           }
   DELETE:        { rps:  0    , total:  0           }
 ...
 save coredump
