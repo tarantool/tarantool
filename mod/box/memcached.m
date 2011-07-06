@@ -1,5 +1,3 @@
-
-#line 1 "mod/box/memcached.rl"
 /*
  * Copyright (C) 2010, 2011 Mail.RU
  * Copyright (C) 2010, 2011 Yuriy Vostrikov
@@ -42,9 +40,11 @@
 
 ENUM(memcached_stat, STAT);
 STRS(memcached_stat, STAT);
-int stat_base;
 
-struct index *memcached_index;
+static int stat_base;
+static struct fiber *memcached_expire = NULL;
+
+static struct index *memcached_index;
 
 /* memcached tuple format:
    <key, meta, data> */
@@ -275,14 +275,100 @@ exit:
 	stats.curr_connections--; /* FIXME: nonlocal exit via exception will leak this counter */
 }
 
-void
-memcached_init(void)
+
+int
+memcached_check_config(struct tarantool_cfg *conf)
 {
-	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
+	if (conf->memcached_port == 0) {
+		return 0;
+	}
+
+	if (conf->memcached_port <= 0 || conf->memcached_port >= USHRT_MAX) {
+		/* invalid namespace number */
+		out_warning(0, "invalid memcached port value: %i",
+			    conf->memcached_port);
+		return -1;
+	}
+
+	/* check memcached namespace number: it shoud be in segment [0, max_namespace] */
+	if ((conf->memcached_namespace < 0) ||
+	    (conf->memcached_namespace > BOX_NAMESPACE_MAX)) {
+		/* invalid namespace number */
+		out_warning(0, "invalid memcached namespace number: %i",
+			    conf->memcached_namespace);
+		return -1;
+	}
+
+	if (conf->memcached_expire_per_loop <= 0) {
+		/* invalid expire per loop value */
+		out_warning(0, "invalid expire per loop value: %i",
+			    conf->memcached_expire_per_loop);
+		return -1;
+	}
+
+	if (conf->memcached_expire_full_sweep <= 0) {
+		/* invalid expire full sweep value */
+		out_warning(0, "invalid expire full sweep value: %i",
+			    conf->memcached_expire_full_sweep);
+		return -1;
+	}
+
+	return 0;
 }
 
 void
-memcached_expire(void *data __attribute__((unused)))
+memcached_init(void)
+{
+	if (cfg.memcached_port == 0) {
+		return;
+	}
+
+	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
+
+	memcached_index = &namespace[cfg.memcached_namespace].index[0];
+}
+
+void
+memcached_namespace_init()
+{
+	struct namespace *memc_ns;
+	struct index *memc_index;
+
+	/* configure memcached namespace */
+	memc_ns = &namespace[cfg.memcached_namespace];
+	memc_ns->enabled = true;
+	memc_ns->cardinality = 4;
+	memc_ns->n = cfg.memcached_namespace;
+
+	/* configure memcached index */
+	memc_index = &memc_ns->index[0];
+
+	/* configure memcached index's key */
+	memc_index->key_cardinality = 1;
+
+	memc_index->key_field = salloc(sizeof(memc_index->key_field[0]));
+	memc_index->field_cmp_order = salloc(sizeof(u32));
+	memc_index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(memc_index));
+
+	if (memc_index->key_field == NULL || memc_index->field_cmp_order == NULL ||
+	    memc_index->search_pattern == NULL)
+		panic("out of memory when configuring memcached_namespace");
+
+	memc_index->key_field[0].fieldno = 0;
+	memc_index->key_field[0].type = STRING;
+
+	/* configure memcached index compare order */
+	memc_index->field_cmp_order_cnt = 1;
+	memc_index->field_cmp_order[0] = 0;
+
+	memc_index->unique = true;
+	memc_index->type = HASH;
+	memc_index->enabled = true;
+	index_init(memc_index, memc_ns, 0);
+}
+
+void
+memcached_expire_loop(void *data __attribute__((unused)))
 {
 	static khiter_t i;
 	khash_t(lstr_ptr_map) *map = memcached_index->idx.str_hash;
@@ -319,7 +405,7 @@ memcached_expire(void *data __attribute__((unused)))
 				delete(txn, read_field(keys_to_delete));
 				expired_keys++;
 			}
-			@catch (id e) {
+			@catch (ClientError *e) {
 				/* The error is already logged. */
 			}
 		}
@@ -330,13 +416,30 @@ memcached_expire(void *data __attribute__((unused)))
 		double delay = (double)cfg.memcached_expire_per_loop * cfg.memcached_expire_full_sweep / (map->size + 1);
 		if (delay > 1)
 			delay = 1;
+		fiber_setcancelstate(true);
 		fiber_sleep(delay);
+		fiber_setcancelstate(false);
 	}
 }
 
-/*
- * Local Variables:
- * mode: c
- * End:
- * vim: syntax=objc
- */
+void memcached_start_expire()
+{
+	if (cfg.memcached_port == 0 || cfg.memcached_expire == 0)
+		return;
+
+	assert(memcached_expire == NULL);
+	memcached_expire = fiber_create("memecached_expire", -1,
+					-1, memcached_expire_loop, NULL);
+	if (memcached_expire == NULL)
+		say_error("can't start the expire fiber");
+	fiber_call(memcached_expire);
+}
+
+void memcached_stop_expire()
+{
+	if (cfg.memcached_port == 0 || cfg.memcached_expire == 0)
+		return;
+	assert(memcached_expire != NULL);
+	fiber_cancel(memcached_expire);
+	memcached_expire = NULL;
+}

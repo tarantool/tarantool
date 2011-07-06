@@ -49,7 +49,16 @@ struct field {
 	};
 };
 
-enum field_data_type { NUM, NUM64, STRING };
+/*
+ * Possible field data types. Can't use STRS/ENUM macros for them,
+ * since there is a mismatch between enum name (STRING) and type
+ * name literal ("STR"). STR is already used as Objective C type.
+ */
+enum field_data_type { NUM, NUM64, STRING, field_data_type_MAX };
+extern const char *field_data_type_strs[];
+
+enum index_type { HASH, TREE, index_type_MAX };
+extern const char *index_type_strs[];
 
 struct tree_index_member {
 	struct box_tuple *tuple;
@@ -98,7 +107,7 @@ struct index {
 
 	struct tree_index_member *search_pattern;
 
-	enum { HASH, TREE } type;
+	enum index_type type;
 };
 
 #define foreach_index(n, index_var)					\
@@ -107,10 +116,8 @@ struct index {
 	     index_var++)						\
 		if (index_var->enabled)
 
-void index_hash_num(struct index *index, struct namespace *namespace, size_t estimated_rows);
-void index_hash_num64(struct index *index, struct namespace *namespace, size_t estimated_rows);
-void index_hash_str(struct index *index, struct namespace *namespace, size_t estimated_rows);
-void index_tree(struct index *index, struct namespace *namespace, size_t /* estimated_rows */);
+void
+index_init(struct index *index, struct namespace *namespace, size_t estimated_rows);
 
 struct tree_index_member * alloc_search_pattern(struct index *index, int key_cardinality, void *key);
 void index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern);

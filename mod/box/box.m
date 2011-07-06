@@ -46,6 +46,7 @@
 
 #include <cfg/tarantool_box_cfg.h>
 #include <mod/box/index.h>
+#include "memcached.h"
 
 static void box_process_ro(u32 op, struct tbuf *request_data);
 static void box_process_rw(u32 op, struct tbuf *request_data);
@@ -58,7 +59,6 @@ static char status[64] = "unknown";
 static int stat_base;
 STRS(messages, MESSAGES);
 
-const int MEMCACHED_NAMESPACE = 23;
 static char *custom_proc_title;
 
 /* hooks */
@@ -79,7 +79,6 @@ typedef int (*box_hook_t) (struct box_txn * txn);
 const int BOX_REF_THRESHOLD = 8196;
 
 struct namespace *namespace;
-const int namespace_count = 256;
 
 struct box_snap_row {
 	u32 namespace;
@@ -704,7 +703,7 @@ txn_begin(struct box_txn *txn, u16 op, struct tbuf *data)
 	txn->req = (struct tbuf){ .data = data->data, .len = data->len };
 	txn->n = read_u32(data);
 
-	if (txn->n < 0 || txn->n > namespace_count - 1)
+	if (txn->n < 0 || txn->n >= BOX_NAMESPACE_MAX)
 		tnt_raise(ClientError, :ER_NO_SUCH_NAMESPACE, txn->n);
 
 	txn->namespace = &namespace[txn->n];
@@ -837,7 +836,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 			u32 offset = read_u32(data);
 			u32 limit = read_u32(data);
 
-			if (i > MAX_IDX ||
+			if (i >= BOX_INDEX_MAX ||
 			    namespace[txn->n].index[i].key_cardinality == 0) {
 
 				tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i, txn->n);
@@ -981,142 +980,93 @@ xlog_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 	return res;
 }
 
-static void
-custom_init(void)
+void
+namespace_init(void)
 {
-	if (cfg.namespace == NULL)
-		panic("at least one namespace must be configured");
+	namespace = palloc(eter_pool, sizeof(struct namespace) * BOX_NAMESPACE_MAX);
+	for (int i = 0; i < BOX_NAMESPACE_MAX; i++) {
+		namespace[i].enabled = false;
+		for (int j = 0; j < BOX_INDEX_MAX; j++) {
+			namespace[i].index[j].key_cardinality = 0;
+		}
+	}
+	/* fill box namespaces */
+	for (int i = 0; cfg.namespace[i] != NULL; ++i) {
+		tarantool_cfg_namespace *cfg_namespace = cfg.namespace[i];
 
-	for (int i = 0; i < namespace_count; i++) {
-		if (cfg.namespace[i] == NULL)
-			break;
-
-		if (!CNF_STRUCT_DEFINED(cfg.namespace[i]))
-			namespace[i].enabled = false;
-		else
-			namespace[i].enabled = !!cfg.namespace[i]->enabled;
-
-		if (!namespace[i].enabled)
+		if (!CNF_STRUCT_DEFINED(cfg_namespace) || !cfg_namespace->enabled)
 			continue;
 
-		namespace[i].cardinality = cfg.namespace[i]->cardinality;
-		int estimated_rows = cfg.namespace[i]->estimated_rows;
+		assert(cfg.memcached_port == 0 || i != cfg.memcached_namespace);
 
-		if (cfg.namespace[i]->index == NULL)
-			panic("(namespace = %" PRIu32 ") at least one index must be defined", i);
+		namespace[i].enabled = true;
 
-		for (int j = 0; j < nelem(namespace[i].index); j++) {
+		namespace[i].cardinality = cfg_namespace->cardinality;
+		/* fill namespace indexes */
+		for (int j = 0; cfg_namespace->index[j] != NULL; ++j) {
+			typeof(cfg_namespace->index[j]) cfg_index = cfg_namespace->index[j];
 			struct index *index = &namespace[i].index[j];
 			u32 max_key_fieldno = 0;
 
+			/* clean-up index struct */
 			memset(index, 0, sizeof(*index));
 
-			if (cfg.namespace[i]->index[j] == NULL)
-				break;
+			/* calculate key cardinality and maximal field number */
+			for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
+				typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
 
-			if (cfg.namespace[i]->index[j]->key_field == NULL)
-				panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
-				      "at least one field must be defined", i, j);
-
-			for (int k = 0; cfg.namespace[i]->index[j]->key_field[k] != NULL; k++) {
-				if (cfg.namespace[i]->index[j]->key_field[k]->fieldno == -1)
+				if (cfg_key->fieldno == -1) {
+					/* last filled key reached */
 					break;
+				}
 
-				max_key_fieldno =
-					MAX(max_key_fieldno,
-					    cfg.namespace[i]->index[j]->key_field[k]->fieldno);
-
+				max_key_fieldno = MAX(max_key_fieldno, cfg_key->fieldno);
 				++index->key_cardinality;
 			}
 
-			if (index->key_cardinality == 0)
-				continue;
-
-			index->key_field = salloc(sizeof(index->key_field[0]) *
-						  index->key_cardinality);
-			if (index->key_field == NULL)
+			/* init key array */
+			index->key_field = salloc(sizeof(index->key_field[0]) * index->key_cardinality);
+			if (index->key_field == NULL) {
 				panic("can't allocate key_field for index");
+			}
 
+			/* init compare order array */
 			index->field_cmp_order_cnt = max_key_fieldno + 1;
-			index->field_cmp_order =
-				salloc(sizeof(index->field_cmp_order[0]) *
-				       index->field_cmp_order_cnt);
-			if (index->field_cmp_order == NULL)
+			index->field_cmp_order = salloc(index->field_cmp_order_cnt * sizeof(u32));
+			if (index->field_cmp_order == NULL) {
 				panic("can't allocate field_cmp_order for index");
-			memset(index->field_cmp_order, -1,
-			       sizeof(index->field_cmp_order[0]) * index->field_cmp_order_cnt);
+			}
+			memset(index->field_cmp_order, -1, index->field_cmp_order_cnt * sizeof(u32));
 
-			for (int k = 0; cfg.namespace[i]->index[j]->key_field[k] != NULL; k++) {
-				typeof(cfg.namespace[i]->index[j]->key_field[k]) cfg_key_field =
-					cfg.namespace[i]->index[j]->key_field[k];
+			/* fill fields and compare order */
+			for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
+				typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
 
-				if (cfg_key_field->fieldno == -1)
+				if (cfg_key->fieldno == -1) {
+					/* last filled key reached */
 					break;
+				}
 
-				index->key_field[k].fieldno = cfg_key_field->fieldno;
-				if (strcmp(cfg_key_field->type, "NUM") == 0)
-					index->key_field[k].type = NUM;
-				else if (strcmp(cfg_key_field->type, "NUM64") == 0)
-					index->key_field[k].type = NUM64;
-				else if (strcmp(cfg_key_field->type, "STR") == 0)
-					index->key_field[k].type = STRING;
-				else
-					panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
-					      "unknown field data type: `%s'",
-					      i, j, cfg_key_field->type);
-
-				index->field_cmp_order[index->key_field[k].fieldno] = k;
+				/* fill keys */
+				index->key_field[k].fieldno = cfg_key->fieldno;
+				index->key_field[k].type = STR2ENUM(field_data_type, cfg_key->type);
+				/* fill compare order */
+				index->field_cmp_order[cfg_key->fieldno] = k;
 			}
 
 			index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
-
-			if (cfg.namespace[i]->index[j]->unique == 0)
-				index->unique = false;
-			else if (cfg.namespace[i]->index[j]->unique == 1)
-				index->unique = true;
-			else
-				panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
-				      "unique property is undefined", i, j);
-
-			if (strcmp(cfg.namespace[i]->index[j]->type, "HASH") == 0) {
-				if (index->key_cardinality != 1)
-					panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
-					      "hash index must have a single-field key", i, j);
-
-				if (index->unique == false)
-					panic("(namespace = %" PRIu32 " index = %" PRIu32 ") "
-					      "hash index must be unique", i, j);
-
-				index->enabled = true;
-				if (index->key_field->type == NUM) {
-					index_hash_num(index, &namespace[i], estimated_rows);
-				} else if (index->key_field->type == NUM64) {
-					index_hash_num64(index, &namespace[i], estimated_rows);
-				} else {
-					index_hash_str(index, &namespace[i], estimated_rows);
-				}
-			} else if (strcmp(cfg.namespace[i]->index[j]->type, "TREE") == 0) {
-				index->enabled = false;
-				index_tree(index, &namespace[0], 0);
-			} else
-				panic("namespace = %" PRIu32 " index = %" PRIu32 ") "
-				      "unknown index type `%s'",
-				      i, j, cfg.namespace[i]->index[j]->type);
+			index->unique = cfg_index->unique;
+			index->type = STR2ENUM(index_type, cfg_index->type);
+			index_init(index, &namespace[i], cfg_namespace->estimated_rows);
 		}
-
-		if (namespace[i].index[0].key_cardinality == 0)
-			panic("(namespace = %" PRIu32 ") namespace must have at least one index",
-			      i);
-		if (namespace[i].index[0].type != HASH)
-			panic("(namespace = %" PRIu32 ") namespace first index must be HASH", i);
 
 		namespace[i].enabled = true;
 		namespace[i].n = i;
 
 		say_info("namespace %i successfully configured", i);
 	}
+	memcached_namespace_init();
 }
-
 
 void
 box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
@@ -1209,19 +1159,24 @@ static void
 title(const char *fmt, ...)
 {
 	va_list ap;
-	char buf[64];
+	char buf[128], *bufptr = buf, *bufend = buf + sizeof(buf);
 
 	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
+	bufptr += vsnprintf(bufptr, bufend - bufptr, fmt, ap);
 	va_end(ap);
 
-	if (cfg.memcached)
-		set_proc_title("%s%s memcached:%i adm:%i",
-			       buf, custom_proc_title, cfg.primary_port, cfg.admin_port);
-	else
-		set_proc_title("%s%s pri:%i sec:%i adm:%i",
-			       buf, custom_proc_title,
-			       cfg.primary_port, cfg.secondary_port, cfg.admin_port);
+	int ports[] = { cfg.primary_port, cfg.secondary_port,
+			cfg.memcached_port, cfg.admin_port };
+	int *pptr = ports;
+	char *names[] = { "pri", "sec", "memc", "adm", NULL };
+	char **nptr = names;
+
+	for (; *nptr; nptr++, pptr++)
+		if (*pptr)
+			bufptr += snprintf(bufptr, bufend - bufptr,
+					   " %s: %i", *nptr, *pptr);
+
+	set_proc_title(buf);
 }
 
 
@@ -1232,7 +1187,6 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 		rw_callback = box_process_ro;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
-
 		recovery_follow_remote(recovery_state,
 				      conf->wal_feeder_ipaddr,
 				      conf->wal_feeder_port);
@@ -1244,6 +1198,8 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 		      conf->wal_feeder_port, custom_proc_title);
 	} else {
 		rw_callback = box_process_rw;
+
+		memcached_start_expire();
 
 		snprintf(status, sizeof(status), "primary");
 		title("primary");
@@ -1258,24 +1214,170 @@ box_leave_local_hot_standby_mode(void *data __attribute__((unused)))
 	recover_finalize(recovery_state);
 
 	box_enter_master_or_replica_mode(&cfg);
-
-	if (cfg.memcached != 0 && cfg.remote_hot_standby == 0) {
-		struct fiber *expire = fiber_create("memecached_expire", -1,
-				       -1, memcached_expire, NULL);
-		if (expire == NULL)
-			panic("can't start the expire fiber");
-		fiber_call(expire);
-	}
 }
-
 
 i32
 mod_check_config(struct tarantool_cfg *conf)
 {
+	/* local & remote standby can not work together */
 	if (conf->remote_hot_standby > 0 && conf->local_hot_standby > 0) {
 		out_warning(0, "Remote and local hot standby modes "
 			       "can't be enabled simultaneously");
+		return -1;
+	}
 
+	/* in the remote_hot_standby mode wal_feeder_ipaddr and wal_feeder_port must be defiend */
+	if (conf->remote_hot_standby &&
+	    (conf->wal_feeder_ipaddr == NULL || conf->wal_feeder_port == 0)) {
+		out_warning(0, "wal_feeder_ipaddr & wal_feeder_port "
+				"must be provided in remote_hot_standby mode");
+		return -1;
+	}
+
+	/* check primary ports */
+	if (conf->primary_port != 0 &&
+	    (conf->primary_port <= 0 || conf->primary_port >= USHRT_MAX)) {
+		out_warning(0, "invalid primary port value: %i", conf->primary_port);
+		return -1;
+	}
+
+	/* check secondary port */
+	if (conf->secondary_port != 0 &&
+	    (conf->secondary_port <= 0 || conf->secondary_port >= USHRT_MAX)) {
+		out_warning(0, "invalid secondary port value: %i", conf->primary_port);
+		return -1;
+	}
+
+	/* check configured namespaces */
+	for (size_t i = 0; conf->namespace[i] != NULL; ++i) {
+		typeof(conf->namespace[i]) namespace = conf->namespace[i];
+
+		if (!CNF_STRUCT_DEFINED(namespace)) {
+			/* namespace undefined, skip it */
+			continue;
+		}
+
+		if (namespace->enabled) {
+			/* namespace disabled, skip it */
+			continue;
+		}
+
+		/* check namespace bound */
+		if (i >= BOX_NAMESPACE_MAX) {
+			/* maximum namespace is reached */
+			out_warning(0, "(namespace = %zu) "
+				    "too many namespaces (%i maximum)", i, namespace);
+			return -1;
+		}
+
+		if (conf->memcached_port && i == conf->memcached_namespace) {
+			out_warning(0, "Namespace %i is already used as "
+				    "memcached_namespace.", i);
+			return -1;
+		}
+
+		/* at least one index in namespace must be defined
+		 * */
+		if (namespace->index == NULL) {
+			out_warning(0, "(namespace = %zu) "
+				    "at least one index must be defined", i);
+			return -1;
+		}
+
+		/* check namespaces indexes */
+		for (size_t j = 0; namespace->index[j] != NULL; ++j) {
+			typeof(namespace->index[j]) index = namespace->index[j];
+			u32 index_cardinality = 0;
+			enum index_type index_type;
+
+			/* check index bound */
+			if (j >= BOX_INDEX_MAX) {
+				/* maximum index in namespace reached */
+				out_warning(0, "(namespace = %zu index = %zu) "
+					    "too many indexed (%i maximum)", i, j, BOX_INDEX_MAX);
+				return -1;
+			}
+
+			/* at least one key in index must be defined */
+			if (index->key_field == NULL) {
+				out_warning(0, "(namespace = %zu index = %zu) "
+					    "at least one field must be defined", i, j);
+				return -1;
+			}
+
+			/* check unique property */
+			if (index->unique == -1) {
+				/* unique property undefined */
+				out_warning(0, "(namespace = %zu index = %zu) "
+					    "unique property is undefined", i, j);
+			}
+
+			for (size_t k = 0; index->key_field[k] != NULL; ++k) {
+				typeof(index->key_field[k]) key = index->key_field[k];
+
+				if (key->fieldno == -1) {
+					/* last key reached */
+					break;
+				}
+
+				/* key must has valid type */
+				if (STR2ENUM(field_data_type, key->type) == field_data_type_MAX) {
+					out_warning(0, "(namespace = %zu index = %zu) "
+						    "unknown field data type: `%s'", i, j, key->type);
+					return -1;
+				}
+
+				++index_cardinality;
+			}
+
+			/* check index cardinality */
+			if (index_cardinality == 0) {
+				out_warning(0, "(namespace = %zu index = %zu) "
+					    "at least one field must be defined", i, j);
+				return -1;
+			}
+
+			index_type = STR2ENUM(index_type, index->type);
+
+			/* check index type */
+			if (index_type == index_type_MAX) {
+				out_warning(0, "(namespace = %zu index = %zu) "
+					    "unknown index type '%s'", i, j, index->type);
+				return -1;
+			}
+
+			/* first namespace index must has hash type */
+			if (j == 0 && index_type != HASH) {
+				out_warning(0, "(namespace = %zu) namespace first index must has HASH type", i);
+				return -1;
+			}
+
+			switch (index_type) {
+			case HASH:
+				/* check hash index */
+				/* hash index must has single-field key */
+				if (index_cardinality != 0) {
+					out_warning(0, "(namespace = %zu index = %zu) "
+					            "hash index must has a single-field key", i, j);
+					return -1;
+				}
+				/* hash index must be unique */
+				if (!index->unique) {
+					out_warning(0, "(namespace = %zu index = %zu) "
+					            "hash index must be unique", i, j);
+					return -1;
+				}
+				break;
+			case TREE:
+				/* extra check for tree index not needed */
+				break;
+			default:
+				assert(false);
+			}
+		}
+	}
+	/* check memcached configuration */
+	if (memcached_check_config(conf) != 0) {
 		return -1;
 	}
 
@@ -1299,6 +1401,10 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 			return -1;
 		}
 
+		if (old_conf->remote_hot_standby == 0 &&
+		    new_conf->remote_hot_standby != 0)
+			memcached_stop_expire();
+
 		if (recovery_state->remote_recovery)
 			recovery_stop_remote(recovery_state);
 
@@ -1313,15 +1419,7 @@ mod_init(void)
 {
 	static iproto_callback ro_callback = box_process_ro;
 
-	stat_base = stat_register(messages_strs, messages_MAX);
-
-	namespace = palloc(eter_pool, sizeof(struct namespace) * namespace_count);
-	for (int i = 0; i < namespace_count; i++) {
-		namespace[i].enabled = false;
-		for (int j = 0; j < MAX_IDX; j++)
-			namespace[i].index[j].key_cardinality = 0;
-	}
-
+	/* init process title */
 	if (cfg.custom_proc_title == NULL)
 		custom_proc_title = "";
 	else {
@@ -1330,22 +1428,12 @@ mod_init(void)
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
-	if (cfg.memcached != 0) {
-		if (cfg.secondary_port != 0)
-			panic("in memcached mode secondary_port must be 0");
-		if (cfg.remote_hot_standby)
-			panic("remote replication is not supported in memcached mode.");
-
-		memcached_init();
-	}
-
 	title("loading");
 
-	if (cfg.remote_hot_standby) {
-		if (cfg.wal_feeder_ipaddr == NULL || cfg.wal_feeder_port == 0)
-			panic("wal_feeder_ipaddr & wal_feeder_port must be provided in remote_hot_standby mode");
-	}
+	/* initialization namespaces */
+	namespace_init();
 
+	/* recovery initialization */
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
 				      recover_row, cfg.rows_per_wal, cfg.wal_fsync_delay,
 				      cfg.wal_writer_inbox_size,
@@ -1354,37 +1442,11 @@ mod_init(void)
 	recovery_state->snap_io_rate_limit = cfg.snap_io_rate_limit * 1024 * 1024;
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
-	/* initialize hashes _after_ starting wal writer */
-	if (cfg.memcached != 0) {
-		int n = cfg.memcached_namespace > 0 ? cfg.memcached_namespace : MEMCACHED_NAMESPACE;
+	stat_base = stat_register(messages_strs, messages_MAX);
 
-		cfg.namespace = palloc(eter_pool, (n + 1) * sizeof(cfg.namespace[0]));
-		for (u32 i = 0; i <= n; ++i) {
-			cfg.namespace[i] = palloc(eter_pool, sizeof(cfg.namespace[0][0]));
-			cfg.namespace[i]->enabled = false;
-		}
+	/* memcached initialize */
+	memcached_init();
 
-		cfg.namespace[n]->enabled = true;
-		cfg.namespace[n]->cardinality = 4;
-		cfg.namespace[n]->estimated_rows = 0;
-		cfg.namespace[n]->index = palloc(eter_pool, 2 * sizeof(cfg.namespace[n]->index[0]));
-		cfg.namespace[n]->index[0] =
-			palloc(eter_pool, sizeof(cfg.namespace[n]->index[0][0]));
-		cfg.namespace[n]->index[1] = NULL;
-		cfg.namespace[n]->index[0]->type = "HASH";
-		cfg.namespace[n]->index[0]->unique = 1;
-		cfg.namespace[n]->index[0]->key_field =
-			palloc(eter_pool, 2 * sizeof(cfg.namespace[n]->index[0]->key_field[0]));
-		cfg.namespace[n]->index[0]->key_field[0] =
-			palloc(eter_pool, sizeof(cfg.namespace[n]->index[0]->key_field[0][0]));
-		cfg.namespace[n]->index[0]->key_field[1] = NULL;
-		cfg.namespace[n]->index[0]->key_field[0]->fieldno = 0;
-		cfg.namespace[n]->index[0]->key_field[0]->type = "STR";
-
-		memcached_index = &namespace[n].index[0];
-	}
-
-	custom_init();
 
 	if (init_storage)
 		return;
@@ -1405,20 +1467,21 @@ mod_init(void)
 		title("hot_standby");
 	}
 
-	if (cfg.memcached != 0) {
-		fiber_server(cfg.primary_port, memcached_handler, NULL,
-			     box_leave_local_hot_standby_mode);
-	} else {
-		if (cfg.secondary_port != 0)
-			fiber_server(cfg.secondary_port,
-				     (fiber_server_callback) iproto_interact,
-				     &ro_callback, NULL);
+	/* run memcached server */
+	if (cfg.memcached_port != 0)
+		fiber_server(cfg.memcached_port, memcached_handler, NULL, NULL);
 
-		if (cfg.primary_port != 0)
-			fiber_server(cfg.primary_port,
-				     (fiber_server_callback) iproto_interact,
-				     &rw_callback, box_leave_local_hot_standby_mode);
-	}
+	/* run secondary server */
+	if (cfg.secondary_port != 0)
+		fiber_server(cfg.secondary_port,
+			     (fiber_server_callback) iproto_interact,
+			     &ro_callback, NULL);
+
+	/* run primary server */
+	if (cfg.primary_port != 0)
+		fiber_server(cfg.primary_port,
+			     (fiber_server_callback) iproto_interact,
+			     &rw_callback, box_leave_local_hot_standby_mode);
 }
 
 int
@@ -1435,7 +1498,7 @@ mod_snapshot(struct log_io_iter *i)
 	struct box_tuple *tuple;
 	khiter_t k;
 
-	for (uint32_t n = 0; n < namespace_count; ++n) {
+	for (uint32_t n = 0; n < BOX_NAMESPACE_MAX; ++n) {
 		if (!namespace[n].enabled)
 			continue;
 

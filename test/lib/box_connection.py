@@ -26,7 +26,7 @@ import sql
 import struct
 from tarantool_connection import TarantoolConnection
 
-class Box(TarantoolConnection):
+class BoxConnection(TarantoolConnection):
 
     def recvall(self, length):
         res = ""

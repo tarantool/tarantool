@@ -28,7 +28,7 @@ from tarantool_connection import TarantoolConnection
 
 is_admin_re = re.compile("^\s*(show|save|exec|exit|reload|help)", re.I)
 
-class TarantoolAdmin(TarantoolConnection):
+class AdminConnection(TarantoolConnection):
     def execute_no_reconnect(self, command, silent):
         self.socket.sendall(command)
 

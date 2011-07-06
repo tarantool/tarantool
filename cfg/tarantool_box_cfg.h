@@ -113,11 +113,14 @@ typedef struct tarantool_cfg {
 	 */
 	char*	custom_proc_title;
 
-	/* Memcached emulation is enabled if memcached == 1 */
-	int32_t	memcached;
+	/* Memcached protocol support is enabled if memcached_port is set */
+	int32_t	memcached_port;
 
 	/* namespace used for memcached emulation */
 	int32_t	memcached_namespace;
+
+	/* Memcached expiration is on if memcached_expire is set. */
+	int32_t	memcached_expire;
 
 	/* maximum rows to consider per expire loop iteration */
 	int32_t	memcached_expire_per_loop;
