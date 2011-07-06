@@ -581,7 +581,10 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 				return;
 
 			u32 key_len = read_u32(data);
-			void *key = read_field(data);
+			void *key = NULL;
+
+			if (key_len != 0)
+				key = read_field(data);
 
 			/* advance remaining fields of a key */
 			for (int i = 1; i < key_len; i++)
