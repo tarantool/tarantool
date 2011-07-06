@@ -163,6 +163,12 @@ static void
 client_handler_init(int client_sock);
 
 /**
+ * Receive data event to replication socket handler
+ */
+static void
+client_handler_recv(struct ev_io *w, int revents);
+
+/**
  * Send to row to client.
  */
 static int
@@ -698,8 +704,6 @@ client_handler_init(int client_sock)
 		say_syserror("sigaction");
 	}
 
-	ev_default_loop(0);
-
 	r = read(fiber->fd, &lsn, sizeof(lsn));
 	if (r != sizeof(lsn)) {
 		if (r < 0) {
@@ -713,13 +717,51 @@ client_handler_init(int client_sock)
 	tbuf_append(ver, &default_version, sizeof(default_version));
 	client_handler_send_row(NULL, ver);
 
+	/* init libev events handlers */
+	ev_default_loop(0);
+
+	/* init read events */
+	struct ev_io sock_read_ev;
+	int sock_read_fd = fiber->fd;
+	sock_read_ev.data = (void *)&sock_read_fd;
+	ev_io_init(&sock_read_ev, client_handler_recv, sock_read_fd, EV_READ);
+	ev_io_start(&sock_read_ev);
+
+	/* init reovery porcess */
 	log_io = recover_init(NULL, cfg.wal_dir,
 			      client_handler_send_row, INT32_MAX, 0, 64, RECOVER_READONLY, false);
 
 	recover(log_io, lsn);
 	recover_follow(log_io, 0.1);
+
 	ev_loop(0);
 
+	say_crit("leave loop");
+	exit(EXIT_SUCCESS);
+}
+
+/** Receive data event to replication socket handler */
+static void
+client_handler_recv(struct ev_io *w, int __attribute__((unused)) revents)
+{
+	int fd = *((int *)w->data);
+	u8 data;
+
+	int result = recv(fd, &data, sizeof(data), 0);
+	if (result < 0) {
+		if (errno == ECONNRESET) {
+			goto shutdown_handler;
+		}
+		say_syserror("recv");
+		exit(EXIT_FAILURE);
+	} else if (result == 0) {
+		/* end-of-input */
+		goto shutdown_handler;
+	}
+
+	exit(EXIT_FAILURE);
+shutdown_handler:
+	say_info("replication socket closed on opposite side, exit");
 	exit(EXIT_SUCCESS);
 }
 
@@ -734,8 +776,7 @@ client_handler_send_row(struct recovery_state *r __attribute__((unused)), struct
 		if (bytes < 0) {
 			if (errno == EPIPE) {
 				/* socket closed on opposite site */
-				say_info("replication socket closed on opposite side, exit");
-				exit(EXIT_SUCCESS);
+				goto shutdown_handler;
 			}
 			panic_syserror("write");
 		}
@@ -745,5 +786,8 @@ client_handler_send_row(struct recovery_state *r __attribute__((unused)), struct
 
 	say_debug("send row: %" PRIu32 " bytes %s", t->len, tbuf_to_hex(t));
 	return 0;
+shutdown_handler:
+	say_info("replication socket closed on opposite side, exit");
+	exit(EXIT_SUCCESS);
 }
 

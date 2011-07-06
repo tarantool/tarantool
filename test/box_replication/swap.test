@@ -3,7 +3,7 @@ import os
 import time
 from lib.tarantool_box_server import TarantoolBoxServer
 
-REPEAT = 10
+REPEAT = 20
 ID_BEGIN = 0
 ID_STEP = 5
 
