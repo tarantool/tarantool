@@ -1,0 +1,28 @@
+import time
+
+print """# Test flush_all with zero delay. """
+server.memcached.execute("set foo 0 0 6\r\nfooval", silent=False)
+server.memcached.execute("get foo", silent=False)
+server.memcached.execute("flush_all", silent=False)
+server.memcached.execute("get foo", silent=False)
+
+print """# check that flush_all doesn't blow away items that immediately get set """
+server.memcached.execute("set foo 0 0 3\r\nnew", silent=False)
+server.memcached.execute("get foo", silent=False)
+
+print """# and the other form, specifying a flush_all time... """
+expire = time.time() + 2
+print "flush_all time + 2"
+print server.memcached.execute("flush_all %d" % expire, silent=True)
+server.memcached.execute("get foo", silent=False)
+
+server.memcached.execute("set foo 0 0 3\r\n123", silent=False)
+server.memcached.execute("get foo", silent=False)
+time.sleep(2.2)
+server.memcached.execute("get foo", silent=False)
+
+# resore default suite config
+server.stop()
+server.deploy(self.suite_ini["config"])
+server.start()
+# vim: syntax=python

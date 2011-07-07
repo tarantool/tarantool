@@ -139,7 +139,6 @@ fiber_io_yield();
 void
 fiber_io_stop(int events);
 
-
 void yield(void);
 void fiber_destroy_all();
 
@@ -202,13 +201,9 @@ void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);
 int set_nonblock(int sock);
 
-typedef enum fiber_server_type {
-	tcp_server,
-} fiber_server_type;
-
 typedef void (*fiber_server_callback)(void *);
 
-struct fiber *fiber_server(fiber_server_type type, int port,
+struct fiber *fiber_server(int port,
 			   fiber_server_callback callback, void *,
 			   void (*on_bind) (void *));
 
@@ -224,7 +219,7 @@ struct fiber *fiber_server(fiber_server_type type, int port,
  * @return on success, zero is returned. on error, -1 is returned.
  */
 int
-fiber_serv_socket(struct fiber *fiber, fiber_server_type type, unsigned short port, bool retry, ev_tstamp delay);
+fiber_serv_socket(struct fiber *fiber, unsigned short port, bool retry, ev_tstamp delay);
 
 struct child *spawn_child(const char *name,
 			  int inbox_size,

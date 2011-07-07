@@ -102,8 +102,9 @@ remote_read_row(i64 initial_lsn)
 				goto err;
 			}
 
-			say_crit("succefully connected to replicator");
-			say_crit("starting remote recovery from lsn:%" PRIi64, initial_lsn);
+			say_crit("successfully connected to master");
+			say_crit("starting replication from lsn:%" PRIi64, initial_lsn);
+
 			warning_said = false;
 			err = NULL;
 		}
@@ -176,9 +177,9 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 	return 0;
 }
 
-struct fiber *
-recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
-		      int (*handler) (struct recovery_state *r, struct tbuf *row))
+void
+recovery_follow_remote(struct recovery_state *r,
+		       const char *ip_addr, int port)
 {
 	char *name;
 	struct fiber *f;
@@ -186,22 +187,23 @@ recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
 	struct sockaddr_in *addr;
 	struct remote_state *h;
 
-	say_crit("initializing the replica, WAL replicator %s:%i",
-		 ip_addr, port);
+	assert(r->remote_recovery == NULL);
+
+	say_crit("initializing the replica, WAL master %s:%i", ip_addr, port);
 	name = palloc(eter_pool, 64);
 	snprintf(name, 64, "replica/%s:%i", ip_addr, port);
 
 	h = palloc(eter_pool, sizeof(*h));
 	h->r = r;
-	h->handler = handler;
+	h->handler = default_remote_row_handler;
 
 	f = fiber_create(name, -1, -1, pull_from_remote, h);
 	if (f == NULL)
-		return NULL;
+		return;
 
 	if (inet_aton(ip_addr, &server) < 0) {
 		say_syserror("inet_aton: %s", ip_addr);
-		return NULL;
+		return;
 	}
 
 	addr = palloc(eter_pool, sizeof(*addr));
@@ -212,5 +214,13 @@ recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
 	f->data = addr;
 	memcpy(&r->cookie, &addr, MIN(sizeof(r->cookie), sizeof(addr)));
 	fiber_call(f);
-	return f;
+	r->remote_recovery = f;
+}
+
+void
+recovery_stop_remote(struct recovery_state *r)
+{
+	say_info("shutting down the replica");
+	fiber_cancel(r->remote_recovery);
+	r->remote_recovery = NULL;
 }

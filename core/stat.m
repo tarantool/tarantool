@@ -36,7 +36,7 @@
 static ev_timer timer;
 
 struct {
-	char *name;
+	const char *name;
 	i64 value[SECS + 1];
 } *stats = NULL;
 static int stats_size = 0;
@@ -44,7 +44,7 @@ static int stats_max = 0;
 static int base = 0;
 
 int
-stat_register(char **name, size_t max_idx)
+stat_register(const char **name, size_t max_idx)
 {
 	int initial_base = base;
 

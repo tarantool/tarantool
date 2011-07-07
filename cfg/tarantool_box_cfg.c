@@ -51,8 +51,9 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->secondary_port = 0;
 	c->too_long_threshold = 0;
 	c->custom_proc_title = NULL;
-	c->memcached = 0;
+	c->memcached_port = 0;
 	c->memcached_namespace = 0;
+	c->memcached_expire = 0;
 	c->memcached_expire_per_loop = 0;
 	c->memcached_expire_full_sweep = 0;
 	c->snap_io_rate_limit = 0;
@@ -99,8 +100,9 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->secondary_port = 0;
 	c->too_long_threshold = 0.5;
 	c->custom_proc_title = NULL;
-	c->memcached = 0;
+	c->memcached_port = 0;
 	c->memcached_namespace = 23;
+	c->memcached_expire = 0;
 	c->memcached_expire_per_loop = 1024;
 	c->memcached_expire_full_sweep = 3600;
 	c->snap_io_rate_limit = 0;
@@ -219,11 +221,14 @@ static NameAtom _name__too_long_threshold[] = {
 static NameAtom _name__custom_proc_title[] = {
 	{ "custom_proc_title", -1, NULL }
 };
-static NameAtom _name__memcached[] = {
-	{ "memcached", -1, NULL }
+static NameAtom _name__memcached_port[] = {
+	{ "memcached_port", -1, NULL }
 };
 static NameAtom _name__memcached_namespace[] = {
 	{ "memcached_namespace", -1, NULL }
+};
+static NameAtom _name__memcached_expire[] = {
+	{ "memcached_expire", -1, NULL }
 };
 static NameAtom _name__memcached_expire_per_loop[] = {
 	{ "memcached_expire_per_loop", -1, NULL }
@@ -620,7 +625,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramValue.stringval && c->custom_proc_title == NULL)
 			return CNF_NOMEMORY;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__memcached) ) {
+	else if ( cmpNameAtoms( opt->name, _name__memcached_port) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
@@ -630,9 +635,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->memcached != i32)
+		if (check_rdonly && c->memcached_port != i32)
 			return CNF_RDONLY;
-		c->memcached = i32;
+		c->memcached_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_namespace) ) {
 		if (opt->paramType != numberType )
@@ -647,6 +652,20 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (check_rdonly && c->memcached_namespace != i32)
 			return CNF_RDONLY;
 		c->memcached_namespace = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__memcached_expire) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->memcached_expire != i32)
+			return CNF_RDONLY;
+		c->memcached_expire = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_expire_per_loop) ) {
 		if (opt->paramType != numberType )
@@ -1100,8 +1119,9 @@ typedef enum IteratorState {
 	S_name__secondary_port,
 	S_name__too_long_threshold,
 	S_name__custom_proc_title,
-	S_name__memcached,
+	S_name__memcached_port,
 	S_name__memcached_namespace,
+	S_name__memcached_expire,
 	S_name__memcached_expire_per_loop,
 	S_name__memcached_expire_full_sweep,
 	S_name__snap_io_rate_limit,
@@ -1393,17 +1413,17 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "custom_proc_title");
-			i->state = S_name__memcached;
+			i->state = S_name__memcached_port;
 			return buf;
-		case S_name__memcached:
+		case S_name__memcached_port:
 			*v = malloc(32);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->memcached);
-			snprintf(buf, PRINTBUFLEN-1, "memcached");
+			sprintf(*v, "%"PRId32, c->memcached_port);
+			snprintf(buf, PRINTBUFLEN-1, "memcached_port");
 			i->state = S_name__memcached_namespace;
 			return buf;
 		case S_name__memcached_namespace:
@@ -1415,6 +1435,17 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->memcached_namespace);
 			snprintf(buf, PRINTBUFLEN-1, "memcached_namespace");
+			i->state = S_name__memcached_expire;
+			return buf;
+		case S_name__memcached_expire:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%"PRId32, c->memcached_expire);
+			snprintf(buf, PRINTBUFLEN-1, "memcached_expire");
 			i->state = S_name__memcached_expire_per_loop;
 			return buf;
 		case S_name__memcached_expire_per_loop:
@@ -1869,8 +1900,9 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->custom_proc_title = src->custom_proc_title == NULL ? NULL : strdup(src->custom_proc_title);
 	if (src->custom_proc_title != NULL && dst->custom_proc_title == NULL)
 		return CNF_NOMEMORY;
-	dst->memcached = src->memcached;
+	dst->memcached_port = src->memcached_port;
 	dst->memcached_namespace = src->memcached_namespace;
+	dst->memcached_expire = src->memcached_expire;
 	dst->memcached_expire_per_loop = src->memcached_expire_per_loop;
 	dst->memcached_expire_full_sweep = src->memcached_expire_full_sweep;
 	dst->snap_io_rate_limit = src->snap_io_rate_limit;
@@ -2147,13 +2179,18 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 }
-	if (c1->memcached != c2->memcached) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached");
+	if (c1->memcached_port != c2->memcached_port) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_port");
 
 		return diff;
 	}
 	if (c1->memcached_namespace != c2->memcached_namespace) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_namespace");
+
+		return diff;
+	}
+	if (c1->memcached_expire != c2->memcached_expire) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_expire");
 
 		return diff;
 	}

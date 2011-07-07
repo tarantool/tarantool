@@ -240,17 +240,19 @@ replicator_prefork()
 void
 replicator_init()
 {
-	char fiber_name[FIBER_NAME_MAXLEN];
-	const size_t sender_inbox_size = 16 * sizeof(int);
-	struct fiber *acceptor = NULL;
-	struct fiber *sender = NULL;
+	if (cfg.replication_port == 0) {
+		/* replicator not needed, leave init function */
+		return;
+	}
 
+	char fiber_name[FIBER_NAME_MAXLEN];
 	/* create sender fiber */
 	if (snprintf(fiber_name, FIBER_NAME_MAXLEN, "%i/replication sender", cfg.replication_port) < 0) {
 		panic("snprintf fail");
 	}
 
-	sender = fiber_create(fiber_name, replicator_socks[0], sender_inbox_size, sender_handler, NULL);
+	const size_t sender_inbox_size = 16 * sizeof(int);
+	struct fiber *sender = fiber_create(fiber_name, replicator_socks[0], sender_inbox_size, sender_handler, NULL);
 	if (sender == NULL) {
 		panic("create fiber fail");
 	}
@@ -260,7 +262,7 @@ replicator_init()
 		panic("snprintf fail");
 	}
 
-	acceptor = fiber_create(fiber_name, -1, -1, acceptor_handler, sender);
+	struct fiber *acceptor = fiber_create(fiber_name, -1, -1, acceptor_handler, sender);
 	if (acceptor == NULL) {
 		panic("create fiber fail");
 	}
@@ -281,7 +283,7 @@ acceptor_handler(void *data)
 	struct fiber *sender = (struct fiber *) data;
 	struct tbuf *msg;
 
-	if (fiber_serv_socket(fiber, tcp_server, cfg.replication_port, true, 0.1) != 0) {
+	if (fiber_serv_socket(fiber, cfg.replication_port, true, 0.1) != 0) {
 		panic("can not bind replication port");
 	}
 

@@ -49,8 +49,9 @@ configuration:
   secondary_port: "33014"
   too_long_threshold: "0.5"
   custom_proc_title: (null)
-  memcached: "0"
+  memcached_port: "0"
   memcached_namespace: "23"
+  memcached_expire: "0"
   memcached_expire_per_loop: "1024"
   memcached_expire_full_sweep: "3600"
   snap_io_rate_limit: "0"

@@ -22,47 +22,33 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 # SUCH DAMAGE.
 
 import socket
-import sql
-import struct
+import yaml
+import re
 from tarantool_connection import TarantoolConnection
 
-class Box(TarantoolConnection):
-  def recvall(self, length):
-    res = ""
-    while len(res) < length:
-      buf = self.socket.recv(length - len(res))
-      if not buf:
-        raise RuntimeError("Got EOF from socket, the server has "
-                           "probably crashed")
-      res = res + buf
-    return res
+is_admin_re = re.compile("^\s*(show|save|exec|exit|reload|help)", re.I)
 
-  def execute_no_reconnect(self, command, silent=True):
-    statement = sql.parse("sql", command)
-    if statement == None:
-      return "You have an error in your SQL syntax\n"
+class AdminConnection(TarantoolConnection):
+    def execute_no_reconnect(self, command, silent):
+        self.socket.sendall(command)
 
-    payload = statement.pack()
-    header = struct.pack("<lll", statement.reqeust_type, len(payload), 0)
+        bufsiz = 4096
+        res = ""
 
-    self.socket.sendall(header)
-    if len(payload):
-      self.socket.sendall(payload)
+        while True:
+            buf = self.socket.recv(bufsiz)
+            if not buf:
+                break
+            res = res + buf;
+            if (res.rfind("\r\n...\r\n") >= 0):
+                break
 
-    IPROTO_HEADER_SIZE = 12
+        # validate yaml by parsing it
+        yaml.load(res)
 
-    header = self.recvall(IPROTO_HEADER_SIZE)
+        if not silent:
+            print command.replace('\n', '')
+            print res[:-1]
 
-    response_len = struct.unpack("<lll", header)[1]
-
-    if response_len:
-      response = self.recvall(response_len)
-    else:
-      response = None
-
-    if not silent:
-      print command
-      print statement.unpack(response)
-
-    return statement.unpack(response) + "\n"
+        return res
 

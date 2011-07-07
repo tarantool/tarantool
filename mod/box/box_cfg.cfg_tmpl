@@ -20,10 +20,12 @@ too_long_threshold=0.5
 # program title.
 custom_proc_title=NULL, ro
 
-# Memcached emulation is enabled if memcached == 1
-memcached=0, ro
+# Memcached protocol support is enabled if memcached_port is set
+memcached_port=0, ro
 # namespace used for memcached emulation
 memcached_namespace=23, ro
+# Memcached expiration is on if memcached_expire is set.
+memcached_expire=0, ro
 # maximum rows to consider per expire loop iteration
 memcached_expire_per_loop=1024
 # tarantool will try to iterate over all rows within this time

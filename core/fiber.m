@@ -64,8 +64,6 @@ static struct fiber **sp, *call_stack[64];
 static uint32_t last_used_fid;
 static struct palloc_pool *ex_pool;
 
-static uint32_t watermark = 0;
-
 struct fiber_cleanup {
 	void (*handler) (void *data);
 	void *data;
@@ -288,7 +286,7 @@ fiber_io_yield()
 }
 
 void
-fiber_io_stop(int events)
+fiber_io_stop(int events __attribute__((unused)))
 {
 	ev_io *io = &fiber->io;
 
@@ -426,6 +424,7 @@ fiber_zombificate()
 	fiber->data = NULL;
 	unregister_fid(fiber);
 	fiber->fid = 0;
+	fiber->flags = 0;
 	fiber_alloc(fiber);
 
 	SLIST_INSERT_HEAD(&zombie_fibers, fiber, zombie_link);
@@ -1087,7 +1086,7 @@ tcp_server_handler(void *data)
 	int fd;
 	int one = 1;
 
-	if (fiber_serv_socket(fiber, tcp_server, server->port, true, 0.1) != 0) {
+	if (fiber_serv_socket(fiber, server->port, true, 0.1) != 0) {
 		say_error("init server socket on port %i fail", server->port);
 		exit(EX_OSERR);
 	}
@@ -1132,14 +1131,12 @@ tcp_server_handler(void *data)
 }
 
 struct fiber *
-fiber_server(fiber_server_type type, int port, void (*handler) (void *data), void *data,
+fiber_server(int port, void (*handler) (void *data), void *data,
 	     void (*on_bind) (void *data))
 {
 	char *server_name;
 	struct fiber_server *server;
 	struct fiber *s;
-
-	assert(type == tcp_server);
 
 	server_name = palloc(eter_pool, 64);
 	snprintf(server_name, 64, "%i/acceptor", port);
@@ -1156,41 +1153,26 @@ fiber_server(fiber_server_type type, int port, void (*handler) (void *data), voi
 
 /** create new fiber's socket and set standat options. */
 static int
-create_socket(struct fiber *fiber, fiber_server_type type)
+create_socket(struct fiber *fiber)
 {
-	int sock_domain = -1;
-	int sock_type = -1;
-	int sock_protocol = -1;
-	int one = 1;
-	struct linger ling = { 0, 0 };
-
 	if (fiber->fd != -1) {
 		say_error("fiber is already has socket");
-		return -1;
-	}
-
-	switch (type) {
-	case tcp_server:
-		sock_domain = AF_INET;
-		sock_type = SOCK_STREAM;
-		sock_protocol = IPPROTO_TCP;
-		break;
-	default:
-		say_error("invalid socket type");
 		goto create_socket_fail;
 	}
 
-	fiber->fd = socket(sock_domain, sock_type, sock_protocol);
+	fiber->fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (fiber->fd == -1) {
 		say_syserror("socket");
 		goto create_socket_fail;
 	}
 
+	int one = 1;
 	if (setsockopt(fiber->fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) != 0) {
 		say_syserror("setsockopt");
 		goto create_socket_fail;
 	}
 
+	struct linger ling = { 0, 0 };
 	if (setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) != 0 ||
 	    setsockopt(fiber->fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0 ||
 	    setsockopt(fiber->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling)) != 0) {
@@ -1214,22 +1196,17 @@ create_socket_fail:
 
 /** Create server socket and bind his on port. */
 int
-fiber_serv_socket(struct fiber *fiber, fiber_server_type type, unsigned short port, bool retry, ev_tstamp delay)
+fiber_serv_socket(struct fiber *fiber, unsigned short port, bool retry, ev_tstamp delay)
 {
 	const ev_tstamp min_delay = 0.001; /* minimal delay is 1 msec */
 	struct sockaddr_in sin;
 	bool warning_said = false;
-	bool is_stream_sock = false;
-
-	if (type == tcp_server) {
-		is_stream_sock = true;
-	}
 
 	if (delay < min_delay) {
 		delay = min_delay;
 	}
 
-	if (create_socket(fiber, type) != 0) {
+	if (create_socket(fiber) != 0) {
 		return -1;
 	}
 
@@ -1257,7 +1234,7 @@ fiber_serv_socket(struct fiber *fiber, fiber_server_type type, unsigned short po
 			say_syserror("bind");
 			return -1;
 		}
-		if (is_stream_sock && (listen(fiber->fd, cfg.backlog) != 0)) {
+		if (listen(fiber->fd, cfg.backlog) != 0) {
 			if (retry && (errno == EADDRINUSE)) {
 				/* retry mode, try, to bind after delay */
 				goto sleep_and_retry;
@@ -1309,7 +1286,7 @@ void
 fiber_init(void)
 {
 	SLIST_INIT(&fibers);
-	fibers_registry = kh_init(fid2fiber, &watermark);
+	fibers_registry = kh_init(fid2fiber, NULL);
 
 	ex_pool = palloc_create_pool("ex_pool");
 

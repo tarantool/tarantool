@@ -46,6 +46,26 @@
 void *__libc_stack_end;
 #endif
 
+
+/** Find a string in an array of strings.
+ *
+ * @param haystack  Array of strings. Either NULL
+ *                  pointer terminated (for arrays of
+ *                  unknown size) or of size hmax.
+ * @param needle    string to look for
+ * @param hmax      the index to use if nothing is found
+ *                  also limits the size of the array
+ * @return  string index or hmax if the string is not found.
+ */
+uint32_t
+strindex(const char **haystack, const char *needle, uint32_t hmax)
+{
+	for (int index = 0; index != hmax && haystack[index]; index++)
+		if (strcmp(haystack[index], needle) == 0)
+			return index;
+	return hmax;
+}
+
 void
 close_all_xcpt(int fdc, ...)
 {

@@ -109,6 +109,7 @@ struct recovery_state {
 	/* row_handler will be presented by most recent format of data
 	   log_io_class->reader is responsible of converting data from old format */
 	row_handler *row_handler;
+	struct fiber *remote_recovery;
 
 	ev_timer wal_timer;
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
@@ -168,9 +169,9 @@ void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
 int read_log(const char *filename,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);
 
-int default_remote_row_handler(struct recovery_state *r, struct tbuf *row);
-struct fiber *recover_follow_remote(struct recovery_state *r, char *ip_addr, int port,
-				    int (*handler) (struct recovery_state *r, struct tbuf *row));
+void recovery_follow_remote(struct recovery_state *r,
+			    const char *ip_addr, int port);
+void recovery_stop_remote(struct recovery_state *r);
 
 struct log_io_iter;
 void snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row);

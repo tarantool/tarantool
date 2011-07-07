@@ -1,0 +1,66 @@
+import time
+
+print """# expire: after 1 second"""
+
+print """# set foo"""
+server.memcached.execute("set foo 0 1 6\r\nfooval", silent=False)
+
+print """# foo shoud be exists"""
+server.memcached.execute("get foo", silent=False)
+
+time.sleep(1.5)
+print """# foo shoud expired"""
+server.memcached.execute("get foo", silent=False)
+
+
+print """# expire: time - 1 second"""
+expire = time.time() - 1
+
+print """# set foo"""
+server.memcached.execute("set foo 0 %d 6\r\nfooval" % expire, silent=True)
+
+print """# foo shoud expired"""
+server.memcached.execute("get foo", silent=False)
+
+
+print """# expire: time + 1 second"""
+expire = time.time() + 1
+
+print """# set foo"""
+server.memcached.execute("set foo 0 %d 6\r\nfooval" % expire, silent=True)
+
+print """# foo shoud be exists"""
+server.memcached.execute("get foo", silent=False)
+
+time.sleep(2.2)
+print """# foo shoud expired"""
+server.memcached.execute("get foo", silent=False)
+
+
+print """# expire: time - 20 second"""
+expire = time.time() - 20
+
+print """# set boo"""
+server.memcached.execute("set boo 0 %d 6\r\nbooval" % expire, silent=True)
+
+print """# foo shoud expired"""
+server.memcached.execute("get boo", silent=False)
+
+
+print """# expire: after 2 second"""
+
+print """# add add"""
+server.memcached.execute("add add 0 1 6\r\naddval", silent=False)
+
+print """# readd add - shoud be fail"""
+server.memcached.execute("add add 0 1 7\r\naddval1", silent=False)
+
+time.sleep(2.2)
+print """# readd add - shoud be success"""
+server.memcached.execute("add add 0 1 7\r\naddval2", silent=False)
+
+# resore default suite config
+server.stop()
+server.deploy(self.suite_ini["config"])
+server.start()
+# vim: syntax=python

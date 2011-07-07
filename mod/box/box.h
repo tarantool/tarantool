@@ -30,26 +30,24 @@
 #include "exception.h"
 #include <tbuf.h>
 
-
-extern bool box_updates_allowed;
-void memcached_handler(void * /* data */);
-
-struct namespace;
+struct tarantool_cfg;
 struct box_tuple;
 struct index;
 
-extern struct index *memcached_index;
+enum
+{
+	BOX_INDEX_MAX = 10,
+	BOX_NAMESPACE_MAX = 256,
+};
 
-#define MAX_IDX 10
 struct namespace {
 	int n;
 	bool enabled;
 	int cardinality;
-	struct index index[MAX_IDX];
+	struct index index[BOX_INDEX_MAX];
 };
 
 extern struct namespace *namespace;
-extern const int namespace_count;
 
 struct box_tuple {
 	u16 refs;
@@ -138,6 +136,4 @@ void *next_field(void *f);
 void append_field(struct tbuf *b, void *f);
 void *tuple_field(struct box_tuple *tuple, size_t i);
 
-void memcached_init(void);
-void memcached_expire(void * /* data */);
 #endif /* TARANTOOL_BOX_H_INCLUDED */
