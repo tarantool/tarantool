@@ -63,7 +63,7 @@ if (ENABLE_TRACE)
 endif()
 
 add_library(core STATIC ${common_sources})
-add_dependencies(core generate_headers)
+add_dependencies(core generate_headers libluajit)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
 set (common_libraries cfg core ev coro gopt misc objc)

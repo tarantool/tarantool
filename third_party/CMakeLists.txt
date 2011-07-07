@@ -7,3 +7,32 @@ endif()
 
 add_subdirectory(coro)
 add_subdirectory(gopt)
+
+
+set (luajit_buildoptions BUILDMODE=static)
+if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+    set (luajit_buildoptions ${luajit_buildoptions} CCOPT=-O0)
+    set (luajit_buildoptions ${luajit_buildoptions} CCDEBUG=-ggdb)
+    set (luajit_buildoptions ${luajit_buildoptions} XCFLAGS='-DLUA_USE_APICHECK -DLUA_USE_ASSERT')
+endif()
+set (luajit_buildoptions ${luajit_buildoptions} Q='')
+if (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
+    add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
+        COMMAND make clean && make -C src ${luajit_buildoptions}
+        DEPENDS ${CMAKE_SOURCE_DIR}/CMakeCache.txt
+    )
+else()
+    add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit
+        COMMAND mkdir ${PROJECT_BINARY_DIR}/third_party/luajit
+    )
+    add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
+        COMMAND cp -r ${PROJECT_SOURCE_DIR}/third_party/luajit/* .
+        COMMAND make clean && make -C src ${luajit_buildoptions}
+        DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt ${PROJECT_BINARY_DIR}/third_party/luajit
+    )
+endif()
+add_custom_target(libluajit
+    DEPENDS ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
+)
