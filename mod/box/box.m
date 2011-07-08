@@ -62,8 +62,6 @@ static char status[64] = "unknown";
 static int stat_base;
 STRS(messages, MESSAGES);
 
-static char *custom_proc_title;
-
 /* hooks */
 typedef int (*box_hook_t) (struct box_txn * txn);
 
@@ -1431,15 +1429,6 @@ void
 mod_init(void)
 {
 	static iproto_callback ro_callback = box_process_ro;
-
-	/* init process title */
-	if (cfg.custom_proc_title == NULL) {
-		custom_proc_title = "";
-	} else {
-		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
-		strcat(custom_proc_title, "@");
-		strcat(custom_proc_title, cfg.custom_proc_title);
-	}
 
 	title("loading");
 

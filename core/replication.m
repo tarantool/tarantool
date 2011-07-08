@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <replicator.h>
+#include <replication.h>
 #include <say.h>
 #include <fiber.h>
 #include TARANTOOL_CONFIG
@@ -38,19 +38,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "fiber.h"
-
-
-/** replicator process context struct */
-struct replicator_process {
-	/** communication socket. */
-	int sock;
-	/** waitpid need */
-	bool need_waitpid;
-	/** replicator is done */
-	bool is_done;
-	/** child process counts */
-	u32 child_count;
-};
 
 static int replicator_socks[2];
 
@@ -70,8 +57,7 @@ acceptor_handler(void *data);
 static void
 sender_handler(void *data);
 
-/**
- * Read sender's fiber inbox.
+/** Read sender's fiber inbox.
  *
  * @return On success, a file descriptor is returned. On error, -1 is returned.
  */
@@ -79,54 +65,56 @@ static int
 sender_read_inbox();
 
 /**
- * Send file descriptor to replicator process.
+ * Send file descriptor to replication relay spawner.
  *
  * @param fd the sending file descriptor.
  */
 static void
 sender_send_sock(int sock);
 
+/** Replication spawner process */
+static struct spawner {
+	/** communication socket. */
+	int sock;
+	/** waitpid need */
+	bool need_waitpid;
+	/** got signal */
+	bool is_done;
+	/** child process counts */
+	u32 child_count;
+} spawner;
 
-/*-----------------------------------------------------------------------------*/
-/* replicator process                                                          */
-/*-----------------------------------------------------------------------------*/
-
-/** replicator process context */
-static struct replicator_process replicator_process;
-
-/**
- * Initialize replicator spawner process.
+/** Initialize spawner process.
  *
- * @param sock the socket between tarantool and replicator.
+ * @param sock the socket between the main process and the spawner.
  */
 static void
 spawner_init(int sock);
 
 /**
- * Replicator spawner process main loop.
+ * Spawner main loop.
  */
 static void
 spawner_main_loop();
 
 /**
- * Replicator spawner shutdown.
+ * Shutdown spawner and all its children.
  */
 static void
 spawner_shutdown();
 
-/**
- * Replicator's spawner process signals handler.
+/** Replication spawner process signal handler.
  *
  * @param signal is signal number.
  */
 static void
-spawner_signals_handler(int signal);
+spawner_signal_handler(int signal);
 
 /**
- * Process waitpid childs.
+ * Process waitpid children.
  */
 static void
-spawner_process_wait_childs();
+spawner_wait_children();
 
 /**
  * Receive replication client socket from main process.
@@ -142,95 +130,82 @@ spawner_recv_client_sock(int *client_sock);
  * @return On success, a zero is returned. On error, -1 is returned.
  */
 static int
-spawner_create_client_handler(int client_sock);
+spawner_create_replication_relay(int client_sock);
 
 /**
- * Replicator spawner shutdown: kill childs.
+ * Replicator spawner shutdown: kill children.
  */
 static void
-spawner_shutdown_kill_childs();
+spawner_shutdown_kill_children();
 
 /**
- * Replicator spawner shutdown: wait childs.
+ * Replicator spawner shutdown: wait children.
  */
 static int
-spawner_shutdown_wait_childs();
+spawner_shutdown_wait_children();
 
 /**
  * Initialize replicator's service process.
  */
 static void
-client_handler_init(int client_sock);
+replication_relay_loop(int client_sock);
 
 /**
  * Receive data event to replication socket handler
  */
 static void
-client_handler_recv(struct ev_io *w, int revents);
+replication_relay_recv(struct ev_io *w, int revents);
 
 /**
  * Send to row to client.
  */
 static int
-client_handler_send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t);
+replication_relay_send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t);
 
 
 /*-----------------------------------------------------------------------------*/
-/* replicatior module                                                          */
+/* replication module                                                          */
 /*-----------------------------------------------------------------------------*/
 
-/** Check replicator module configuration. */
-u32
-replicator_check_config(struct tarantool_cfg *config)
+/** Check replication module configuration. */
+int
+replication_check_config(struct tarantool_cfg *config)
 {
-	if (config->replication_port == 0) {
-		/* port not defined or setted to zero, replicator disabled */
-		return 0;
-	}
-
 	if (config->replication_port < 0 ||
-	    config->replication_port >= 65536) {
-		say_error("replicator: invalid port: %"PRId32, config->replication_port);
+	    config->replication_port >= USHRT_MAX) {
+		say_error("invalid replication port value: %"PRId32,
+			  config->replication_port);
 		return -1;
 	}
 
 	return 0;
 }
 
-/** Reload replicator module configuration. */
+/** Pre-fork replication spawner process. */
 void
-replicator_reload_config(struct tarantool_cfg *config __attribute__((unused)))
-{}
-
-/** Pre-fork replicator spawner process. */
-void
-replicator_prefork()
+replication_prefork()
 {
 	if (cfg.replication_port == 0) {
-		/* replicator not needed, leave init function */
+		/* replication is not needed, do nothing */
 		return;
 	}
-
-	if (cfg.replicator_custom_proc_title == NULL) {
-		cfg.replicator_custom_proc_title = "";
-	}
-
-	/* create communication sockes between tarantool and replicator processes via UNIX sockets*/
-	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, replicator_socks) != 0) {
+	/*
+	 * Create UNIX sockets to communicate between the main and
+	 * spawner processes.
+         */
+	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, replicator_socks) != 0)
 		panic_syserror("socketpair");
-	}
 
-	/* create replicator process */
+	/* create spawner */
 	pid_t pid = fork();
-	if (pid == -1) {
+	if (pid == -1)
 		panic_syserror("fork");
-	}
 
 	if (pid != 0) {
 		/* parent process: tarantool */
 		close(replicator_socks[1]);
 	} else {
-		/* child process: replicator */
+		/* child process: spawner */
 		close(replicator_socks[0]);
 		spawner_init(replicator_socks[1]);
 	}
@@ -238,12 +213,10 @@ replicator_prefork()
 
 /** Intialize tarantool's replicator module. */
 void
-replicator_init()
+replication_init()
 {
-	if (cfg.replication_port == 0) {
-		/* replicator not needed, leave init function */
-		return;
-	}
+	if (cfg.replication_port == 0)
+		return;                         /* replication is not in use */
 
 	char fiber_name[FIBER_NAME_MAXLEN];
 	/* create sender fiber */
@@ -351,7 +324,7 @@ sender_read_inbox()
 	return *((int *) message->msg->data);
 }
 
-/** Send file descriptor to replicator process. */
+/** Send file descriptor to the spawner. */
 static void
 sender_send_sock(int client_sock)
 {
@@ -377,46 +350,43 @@ sender_send_sock(int client_sock)
 	control_message->cmsg_type = SCM_RIGHTS;
 	*((int *) CMSG_DATA(control_message)) = client_sock;
 
-	/* wait, when interprocess comm. socke will ready for write */
+	/* wait, when interprocess comm. socket is ready for write */
 	fiber_io_start(EV_WRITE);
 	fiber_io_yield();
-	/* send client socket to replicator porcess */
+	/* send client socket to the spawner */
 	if (sendmsg(fiber->fd, &msg, 0) < 0) {
 		say_syserror("sendmsg");
 	}
 	fiber_io_stop(EV_WRITE);
-	/* close client sock in the main process */
+	/* close client socket in the main process */
 	close(client_sock);
 }
 
 
 /*-----------------------------------------------------------------------------*/
-/* replicator process                                                          */
+/* spawner process                                                             */
 /*-----------------------------------------------------------------------------*/
 
-/** Initialize replicator spawner process. */
+/** Initialize the spawner. */
+
 static void
 spawner_init(int sock)
 {
 	char name[sizeof(fiber->name)];
 	struct sigaction sa;
 
-	if (cfg.replicator_custom_proc_title == NULL) {
-		cfg.replicator_custom_proc_title = "";
-	}
-
-	snprintf(name, sizeof(name), "replicator%s/spawner", cfg.replicator_custom_proc_title);
+	snprintf(name, sizeof(name), "replication%s/spawner", custom_proc_title);
 	fiber_set_name(fiber, name);
 	set_proc_title(name);
 
 	/* init replicator process context */
-	memset(&replicator_process, 0, sizeof(replicator_process));
-	replicator_process.sock = sock;
-	replicator_process.need_waitpid = false;
-	replicator_process.is_done = false;
-	replicator_process.child_count = 0;
+	memset(&spawner, 0, sizeof(spawner));
+	spawner.sock = sock;
+	spawner.need_waitpid = false;
+	spawner.is_done = false;
+	spawner.child_count = 0;
 
-	/* init signals */
+	/* init signal */
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = SIG_IGN;
 
@@ -426,7 +396,7 @@ spawner_init(int sock)
 	}
 
 	/* set handler for signals: SIGHUP, SIGINT, SIGTERM and SIGCHLD */
-	sa.sa_handler = spawner_signals_handler;
+	sa.sa_handler = spawner_signal_handler;
 
 	if ((sigaction(SIGHUP, &sa, NULL) == -1) ||
 	    (sigaction(SIGINT, &sa, NULL) == -1) ||
@@ -443,11 +413,11 @@ spawner_init(int sock)
 static void
 spawner_main_loop()
 {
-	while (!replicator_process.is_done) {
+	while (!spawner.is_done) {
 		int client_sock;
 
-		if (replicator_process.need_waitpid) {
-			spawner_process_wait_childs();
+		if (spawner.need_waitpid) {
+			spawner_wait_children();
 		}
 
 		if (spawner_recv_client_sock(&client_sock) != 0) {
@@ -455,7 +425,7 @@ spawner_main_loop()
 		}
 
 		if (client_sock > 0) {
-			spawner_create_client_handler(client_sock);
+			spawner_create_replication_relay(client_sock);
 		}
 	}
 
@@ -468,34 +438,34 @@ spawner_shutdown()
 {
 	say_info("shutdown");
 
-	/* kill all childs */
-	spawner_shutdown_kill_childs();
+	/* kill all children */
+	spawner_shutdown_kill_children();
 	/* close socket */
-	close(replicator_process.sock);
+	close(spawner.sock);
 
 	exit(EXIT_SUCCESS);
 }
 
-/** Replicator's spawner process signals handler. */
-static void spawner_signals_handler(int signal)
+/** Replicator's spawner process signal handler. */
+static void spawner_signal_handler(int signal)
 {
 	switch (signal) {
 	case SIGHUP:
 	case SIGINT:
 	case SIGTERM:
-		replicator_process.is_done = true;
+		spawner.is_done = true;
 		break;
 	case SIGCHLD:
-		replicator_process.need_waitpid = true;
+		spawner.need_waitpid = true;
 		break;
 	}
 }
 
-/** Process waitpid childs. */
+/** Process waitpid children. */
 static void
-spawner_process_wait_childs()
+spawner_wait_children()
 {
-	while (replicator_process.child_count > 0) {
+	while (spawner.child_count > 0) {
 		int exit_status;
 		pid_t pid;
 
@@ -511,10 +481,10 @@ spawner_process_wait_childs()
 		}
 
 		say_info("child finished: pid = %d, exit status = %d", pid, WEXITSTATUS(exit_status));
-		replicator_process.child_count--;
+		spawner.child_count--;
 	}
 
-	replicator_process.need_waitpid = false;
+	spawner.need_waitpid = false;
 }
 
 /** Receive replication client socket from main process. */
@@ -537,7 +507,7 @@ spawner_recv_client_sock(int *client_sock)
 	msg.msg_control = control_buf;
 	msg.msg_controllen = sizeof(control_buf);
 
-	if (recvmsg(replicator_process.sock, &msg, 0) < 0) {
+	if (recvmsg(spawner.sock, &msg, 0) < 0) {
 		if (errno == EINTR) {
 			*client_sock = 0;
 			return 0;
@@ -560,7 +530,7 @@ spawner_recv_client_sock(int *client_sock)
 
 /** Create replicator's client handler process. */
 static int
-spawner_create_client_handler(int client_sock)
+spawner_create_replication_relay(int client_sock)
 {
 	pid_t pid;
 
@@ -571,29 +541,29 @@ spawner_create_client_handler(int client_sock)
 	}
 
 	if (pid == 0) {
-		client_handler_init(client_sock);
+		replication_relay_loop(client_sock);
 	} else {
 		say_info("replicator client handler spawned: pid = %d", pid);
-		replicator_process.child_count++;
+		spawner.child_count++;
 		close(client_sock);
 	}
 
 	return 0;
 }
 
-/** Replicator spawner shutdown: kill childs. */
+/** Replicator spawner shutdown: kill children. */
 static void
-spawner_shutdown_kill_childs()
+spawner_shutdown_kill_children()
 {
 	int result = 0;
 
 	/* check child process count */
-	if (replicator_process.child_count == 0) {
+	if (spawner.child_count == 0) {
 		return;
 	}
 
-	/* send terminate signals to childs */
-	say_info("send SIGTERM to %"PRIu32" childs", replicator_process.child_count);
+	/* send terminate signal to children */
+	say_info("send SIGTERM to %"PRIu32" children", spawner.child_count);
 	result = kill(0, SIGTERM);
 	if (result != 0) {
 		say_syserror("kill");
@@ -601,20 +571,20 @@ spawner_shutdown_kill_childs()
 	}
 
 	/* wait when process is down */
-	result = spawner_shutdown_wait_childs();
+	result = spawner_shutdown_wait_children();
 	if (result != 0) {
 		return;
 	}
 
 	/* check child process count */
-	if (replicator_process.child_count == 0) {
-		say_info("all childs terminated");
+	if (spawner.child_count == 0) {
+		say_info("all children terminated");
 		return;
 	}
-	say_info("%"PRIu32" childs still alive", replicator_process.child_count);
+	say_info("%"PRIu32" children still alive", spawner.child_count);
 
-	/* send terminate signals to childs */
-	say_info("send SIGKILL to %"PRIu32" childs", replicator_process.child_count);
+	/* send terminate signal to children */
+	say_info("send SIGKILL to %"PRIu32" children", spawner.child_count);
 	result = kill(0, SIGKILL);
 	if (result != 0) {
 		say_syserror("kill");
@@ -622,28 +592,28 @@ spawner_shutdown_kill_childs()
 	}
 
 	/* wait when process is down */
-	result = spawner_shutdown_wait_childs();
+	result = spawner_shutdown_wait_children();
 	if (result != 0) {
 		return;
 	}
-	say_info("all childs terminated");
+	say_info("all children terminated");
 }
 
-/** Replicator spawner shutdown: wait childs. */
+/** Replicator spawner shutdown: wait children. */
 static int
-spawner_shutdown_wait_childs()
+spawner_shutdown_wait_children()
 {
 	const u32 wait_sec = 5;
 	struct timeval tv;
 
-	say_info("wait for childs %"PRIu32" seconds", wait_sec);
+	say_info("wait for children %"PRIu32" seconds", wait_sec);
 
 	tv.tv_sec = wait_sec;
 	tv.tv_usec = 0;
 
-	/* wait childs process */
-	spawner_process_wait_childs();
-	while (replicator_process.child_count > 0) {
+	/* wait children process */
+	spawner_wait_children();
+	while (spawner.child_count > 0) {
 		int result;
 
 		/* wait EINTR or timeout */
@@ -654,8 +624,8 @@ spawner_shutdown_wait_childs()
 			return - 1;
 		}
 
-		/* wait childs process */
-		spawner_process_wait_childs();
+		/* wait children process */
+		spawner_wait_children();
 
 		/* check timeout */
 		if (tv.tv_sec == 0 && tv.tv_usec == 0) {
@@ -667,9 +637,10 @@ spawner_shutdown_wait_childs()
 	return 0;
 }
 
-/** Initialize replicator's service process. */
+
+/** The main loop of replication client service process. */
 static void
-client_handler_init(int client_sock)
+replication_relay_loop(int client_sock)
 {
 	char name[sizeof(fiber->name)];
 	struct sigaction sa;
@@ -681,9 +652,9 @@ client_handler_init(int client_sock)
 	fiber->has_peer = true;
 	fiber->fd = client_sock;
 
-	/* set replicator name */
+	/* set process title and fiber name */
 	memset(name, 0, sizeof(name));
-	snprintf(name, sizeof(name), "replicator%s/handler", cfg.replicator_custom_proc_title);
+	snprintf(name, sizeof(name), "replication%s/relay", custom_proc_title);
 	fiber_set_name(fiber, name);
 	set_proc_title("%s %s", name, fiber_peer_name(fiber));
 
@@ -717,7 +688,7 @@ client_handler_init(int client_sock)
 
 	ver = tbuf_alloc(fiber->pool);
 	tbuf_append(ver, &default_version, sizeof(default_version));
-	client_handler_send_row(NULL, ver);
+	replication_relay_send_row(NULL, ver);
 
 	/* init libev events handlers */
 	ev_default_loop(0);
@@ -726,12 +697,12 @@ client_handler_init(int client_sock)
 	struct ev_io sock_read_ev;
 	int sock_read_fd = fiber->fd;
 	sock_read_ev.data = (void *)&sock_read_fd;
-	ev_io_init(&sock_read_ev, client_handler_recv, sock_read_fd, EV_READ);
+	ev_io_init(&sock_read_ev, replication_relay_recv, sock_read_fd, EV_READ);
 	ev_io_start(&sock_read_ev);
 
 	/* init reovery porcess */
 	log_io = recover_init(NULL, cfg.wal_dir,
-			      client_handler_send_row, INT32_MAX, 0, 64, RECOVER_READONLY, false);
+			      replication_relay_send_row, INT32_MAX, 0, 64, RECOVER_READONLY, false);
 
 	recover(log_io, lsn);
 	recover_follow(log_io, 0.1);
@@ -744,7 +715,7 @@ client_handler_init(int client_sock)
 
 /** Receive data event to replication socket handler */
 static void
-client_handler_recv(struct ev_io *w, int __attribute__((unused)) revents)
+replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
 {
 	int fd = *((int *)w->data);
 	u8 data;
@@ -769,7 +740,7 @@ shutdown_handler:
 
 /** Send to row to client. */
 static int
-client_handler_send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
+replication_relay_send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 {
 	u8 *data = t->data;
 	ssize_t bytes, len = t->len;

@@ -31,7 +31,6 @@ configuration:
   coredump: "0"
   admin_port: "33015"
   replication_port: "0"
-  replicator_custom_proc_title: (null)
   log_level: "4"
   slab_alloc_arena: "0.1"
   slab_alloc_minimal: "64"

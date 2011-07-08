@@ -46,6 +46,7 @@ extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern bool init_storage, booting;
 extern char *binary_filename;
+extern char *custom_proc_title;
 i32 reload_cfg(struct tbuf *out);
 int snapshot(void * /* ev */, int /* events */);
 const char *tarantool_version(void);

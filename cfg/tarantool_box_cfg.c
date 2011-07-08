@@ -33,7 +33,6 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->coredump = 0;
 	c->admin_port = 0;
 	c->replication_port = 0;
-	c->replicator_custom_proc_title = NULL;
 	c->log_level = 0;
 	c->slab_alloc_arena = 0;
 	c->slab_alloc_minimal = 0;
@@ -79,7 +78,6 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->coredump = 0;
 	c->admin_port = 0;
 	c->replication_port = 0;
-	c->replicator_custom_proc_title = NULL;
 	c->log_level = 4;
 	c->slab_alloc_arena = 1;
 	c->slab_alloc_minimal = 64;
@@ -166,9 +164,6 @@ static NameAtom _name__admin_port[] = {
 };
 static NameAtom _name__replication_port[] = {
 	{ "replication_port", -1, NULL }
-};
-static NameAtom _name__replicator_custom_proc_title[] = {
-	{ "replicator_custom_proc_title", -1, NULL }
 };
 static NameAtom _name__log_level[] = {
 	{ "log_level", -1, NULL }
@@ -407,17 +402,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (check_rdonly && c->replication_port != i32)
 			return CNF_RDONLY;
 		c->replication_port = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__replicator_custom_proc_title) ) {
-		if (opt->paramType != stringType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->replicator_custom_proc_title == NULL) || strcmp(opt->paramValue.stringval, c->replicator_custom_proc_title) != 0))
-			return CNF_RDONLY;
-		c->replicator_custom_proc_title = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->replicator_custom_proc_title == NULL)
-			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__log_level) ) {
 		if (opt->paramType != numberType )
@@ -1101,7 +1085,6 @@ typedef enum IteratorState {
 	S_name__coredump,
 	S_name__admin_port,
 	S_name__replication_port,
-	S_name__replicator_custom_proc_title,
 	S_name__log_level,
 	S_name__slab_alloc_arena,
 	S_name__slab_alloc_minimal,
@@ -1222,16 +1205,6 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->replication_port);
 			snprintf(buf, PRINTBUFLEN-1, "replication_port");
-			i->state = S_name__replicator_custom_proc_title;
-			return buf;
-		case S_name__replicator_custom_proc_title:
-			*v = (c->replicator_custom_proc_title) ? strdup(c->replicator_custom_proc_title) : NULL;
-			if (*v == NULL && c->replicator_custom_proc_title) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			snprintf(buf, PRINTBUFLEN-1, "replicator_custom_proc_title");
 			i->state = S_name__log_level;
 			return buf;
 		case S_name__log_level:
@@ -1868,9 +1841,6 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->coredump = src->coredump;
 	dst->admin_port = src->admin_port;
 	dst->replication_port = src->replication_port;
-	dst->replicator_custom_proc_title = src->replicator_custom_proc_title == NULL ? NULL : strdup(src->replicator_custom_proc_title);
-	if (src->replicator_custom_proc_title != NULL && dst->replicator_custom_proc_title == NULL)
-		return CNF_NOMEMORY;
 	dst->log_level = src->log_level;
 	dst->slab_alloc_arena = src->slab_alloc_arena;
 	dst->slab_alloc_minimal = src->slab_alloc_minimal;
@@ -1981,8 +1951,6 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 		free(c->username);
 	if (c->bind_ipaddr != NULL)
 		free(c->bind_ipaddr);
-	if (c->replicator_custom_proc_title != NULL)
-		free(c->replicator_custom_proc_title);
 	if (c->work_dir != NULL)
 		free(c->work_dir);
 	if (c->pid_file != NULL)
@@ -2083,11 +2051,6 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 	}
-	if (confetti_strcmp(c1->replicator_custom_proc_title, c2->replicator_custom_proc_title) != 0) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replicator_custom_proc_title");
-
-		return diff;
-}
 	if (!only_check_rdonly) {
 		if (c1->log_level != c2->log_level) {
 			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->log_level");

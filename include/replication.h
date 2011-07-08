@@ -1,5 +1,5 @@
-#if !defined(REPLICATOR_H_INCLUDED)
-#define REPLICATOR_H_INCLUDED
+#ifndef TARANTOOL_REPLICATION_H_INCLUDED
+#define TARANTOOL_REPLICATION_H_INCLUDED
 /*
  * Copyright (C) 2011 Mail.RU
  * Copyright (C) 2011 Yuriy Vostrikov
@@ -29,36 +29,30 @@
 #include <util.h>
 
 /**
- * Check replicator module configuration.
+ * Check replication configuration.
  *
- * @param config is tarantool checking configuration.
+ * @param config  config file to check.
  *
- * @return On success, a zero is returned. On error, -1 is returned.
+ * @return 0 on success, -1 on error
  */
-u32
-replicator_check_config(struct tarantool_cfg *config);
+int
+replication_check_config(struct tarantool_cfg *config);
 
 /**
- * Reload replicator module configuration.
+ * Pre-fork replication spawner process.
  *
- * @param config is tarantool checking configuration.
+ * @return None. Panics and exits on error.
  */
 void
-replicator_reload_config(struct tarantool_cfg *config);
+replication_prefork();
 
 /**
- * Pre-fork replicator spawner process.
- */
-void
-replicator_prefork();
-
-/**
- * Intialize tarantool's replicator module.
+ * Initialize replication module.
  *
- * @return On success, a zero is returned. On error, -1 is returned.
+ * @return None. Panics and exits on error.
  */
 void
-replicator_init();
+replication_init();
 
-#endif // !defined(REPLICATOR_H_INCLUDED)
+#endif // TARANTOOL_REPLICATION_H_INCLUDED
 

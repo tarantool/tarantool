@@ -43,7 +43,7 @@
 # include <sys/prctl.h>
 #endif
 #include <admin.h>
-#include <replicator.h>
+#include <replication.h>
 #include <fiber.h>
 #include <iproto.h>
 #include <latch.h>
@@ -63,6 +63,8 @@ static pid_t master_pid;
 const char *cfg_filename = DEFAULT_CFG_FILENAME;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
+char *custom_proc_title;
+
 struct tarantool_cfg cfg;
 struct recovery_state *recovery_state;
 
@@ -98,15 +100,10 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	if (n_accepted == 0 || n_skipped != 0)
 		return -1;
 
-	if (mod_check_config(conf) != 0) {
+	if (replication_check_config(conf) != 0)
 		return -1;
-	}
 
-	if (replicator_check_config(conf) != 0) {
-		return -1;
-	}
-
-	return 0;
+	return mod_check_config(conf);
 }
 
 
@@ -536,11 +533,20 @@ main(int argc, char **argv)
 		atexit(remove_pid);
 	}
 
+	/* init process title */
+	if (cfg.custom_proc_title == NULL) {
+		custom_proc_title = "";
+	} else {
+		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
+		strcat(custom_proc_title, "@");
+		strcat(custom_proc_title, cfg.custom_proc_title);
+	}
+
 	say_logger_init(cfg.logger_nonblock);
 	booting = false;
 
 	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
-	replicator_prefork();
+	replication_prefork();
 
 	ev_default_loop(EVFLAG_AUTO);
 
@@ -551,7 +557,7 @@ main(int argc, char **argv)
 
 	signal_init();
 
-	replicator_init();
+	replication_init();
 	mod_init();
 	admin_init();
 

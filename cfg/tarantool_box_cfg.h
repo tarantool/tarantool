@@ -2,7 +2,6 @@
 #define tarantool_cfg_CFG_H
 
 #include <stdio.h>
-#include <stdbool.h>
 #include <sys/types.h>
 
 /*
@@ -41,8 +40,8 @@ typedef struct tarantool_cfg {
 	char*	username;
 
 	/*
-	 * tarantool bind ip address
-	 * all tarantools  (INADDR_ANY defaul value)
+	 * tarantool bind ip address, applies to master
+	 * and replication ports. INADDR_ANY is the default value.
 	 */
 	char*	bind_ipaddr;
 
@@ -58,14 +57,8 @@ typedef struct tarantool_cfg {
 	 */
 	int32_t	admin_port;
 
-	/*
-	 * replication port
-	 * replicator accepts it's clients on bind_ipaddr:replication_port
-	 */
+	/* Replication clients should use this port (bind_ipaddr:replication_port). */
 	int32_t	replication_port;
-
-	/* replicator custom process title */
-	char*	replicator_custom_proc_title;
 
 	/* Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5 */
 	int32_t	log_level;
