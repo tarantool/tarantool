@@ -51,9 +51,6 @@
 static void box_process_ro(u32 op, struct tbuf *request_data);
 static void box_process_rw(u32 op, struct tbuf *request_data);
 
-static void box_process_ro(u32 op, struct tbuf *request_data);
-static void box_process_rw(u32 op, struct tbuf *request_data);
-
 const char *mod_name = "Box";
 
 iproto_callback rw_callback = box_process_ro;
@@ -1206,7 +1203,7 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 }
 
 static void
-box_leave_hot_standby_mode(void *data __attribute__((unused)))
+box_leave_local_standby_mode(void *data __attribute__((unused)))
 {
 	recover_finalize(recovery_state);
 
@@ -1478,7 +1475,7 @@ mod_init(void)
 	if (cfg.primary_port != 0)
 		fiber_server(cfg.primary_port,
 			     (fiber_server_callback) iproto_interact,
-			     &rw_callback, box_leave_hot_standby_mode);
+			     &rw_callback, box_leave_local_standby_mode);
 }
 
 int

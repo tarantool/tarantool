@@ -1239,7 +1239,7 @@ write_to_disk(void *_state, struct tbuf *t)
 		goto fail;
 	}
 
-	/* flush stdio buffer to keep replicator in sync */
+	/* flush stdio buffer to keep replication in sync */
 	if (fflush(wal->f) < 0) {
 		say_syserror("can't flush wal");
 		goto fail;

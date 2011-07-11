@@ -443,4 +443,3 @@ void memcached_stop_expire()
 	fiber_cancel(memcached_expire);
 	memcached_expire = NULL;
 }
-

@@ -86,7 +86,7 @@ remote_read_row(i64 initial_lsn)
 	for (;;) {
 		if (fiber->fd < 0) {
 			if (fiber_connect(fiber->data) < 0) {
-				err = "can't connect to replicator";
+				err = "can't connect to master";
 				goto err;
 			}
 
