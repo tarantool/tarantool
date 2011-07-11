@@ -28,28 +28,27 @@
 
 #include <mod/box/index.h>
 #include "exception.h"
+#include "iproto.h"
 #include <tbuf.h>
 
-
-extern bool box_updates_allowed;
-void memcached_handler(void * /* data */);
-
-struct namespace;
+struct tarantool_cfg;
 struct box_tuple;
 struct index;
 
-extern struct index *memcached_index;
+enum
+{
+	BOX_INDEX_MAX = 10,
+	BOX_NAMESPACE_MAX = 256,
+};
 
-#define MAX_IDX 10
 struct namespace {
 	int n;
 	bool enabled;
 	int cardinality;
-	struct index index[MAX_IDX];
+	struct index index[BOX_INDEX_MAX];
 };
 
 extern struct namespace *namespace;
-extern const int namespace_count;
 
 struct box_tuple {
 	u16 refs;
@@ -98,7 +97,8 @@ enum box_mode {
 #define BOX_ALLOWED_REQUEST_FLAGS	(BOX_RETURN_TUPLE | \
 					 BOX_ADD | \
 					 BOX_REPLACE | \
-					 BOX_QUIET)
+					 BOX_QUIET | \
+					 BOX_NOT_STORE)
 
 /*
     deprecated commands:
@@ -124,20 +124,17 @@ enum box_mode {
         _(SELECT_LIMIT, 15)			\
 	_(SELECT, 17)				\
 	_(UPDATE_FIELDS, 19)			\
-	_(DELETE, 20)
+	_(DELETE_1_3, 20)			\
+	_(DELETE, 21)
 
 ENUM(messages, MESSAGES);
 
-struct box_txn *txn_alloc(u32 flags);
-void box_process(struct box_txn *txn, u32 op, struct tbuf *request_data);
+extern iproto_callback rw_callback;
 
+/* These 3 are used to implemente memcached 'GET' */
+struct box_txn *txn_alloc(u32 flags);
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
 void txn_cleanup(struct box_txn *txn);
-
-void *next_field(void *f);
-void append_field(struct tbuf *b, void *f);
 void *tuple_field(struct box_tuple *tuple, size_t i);
 
-void memcached_init(void);
-void memcached_expire(void * /* data */);
 #endif /* TARANTOOL_BOX_H_INCLUDED */

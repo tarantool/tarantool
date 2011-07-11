@@ -32,8 +32,8 @@ import argparse
 import socket
 import sys
 import string
-from lib.tarantool_admin import TarantoolAdmin, is_admin_re
-from lib.box import Box
+from lib.admin_connection import AdminConnection, is_admin_re
+from lib.box_connection import BoxConnection
 
 class Options:
   def __init__(self):
@@ -94,8 +94,8 @@ def do_command(admin_con, data_con, line):
 def main():
   init_readline_history()
   options = Options()
-  admin_con = TarantoolAdmin(options.args.host, options.args.admin_port)
-  data_con = Box(options.args.host, options.args.port)
+  admin_con = AdminConnection(options.args.host, options.args.admin_port)
+  data_con = BoxConnection(options.args.host, options.args.port)
   try:
     admin_con.connect()
     data_con.connect()

@@ -4,7 +4,6 @@ import subprocess
 import pexpect
 import ConfigParser
 from server import Server
-from tarantool_admin import TarantoolAdmin
 
 class TarantoolConfigFile:
     """ConfigParser can't read files without sections, work it around"""

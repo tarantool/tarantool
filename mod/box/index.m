@@ -43,6 +43,9 @@
 #include <mod/box/box.h>
 #include <mod/box/index.h>
 
+const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
+const char *index_type_strs[] = { "HASH", "TREE", "\0" };
+
 const struct field ASTERISK = {
 	.len = UINT32_MAX,
 	{
@@ -282,7 +285,11 @@ index_find_tree(struct index *self, void *key)
 {
 	struct tree_index_member *member = (struct tree_index_member *)key;
 
-	return sptree_str_t_find(self->idx.tree, member);
+	member = sptree_str_t_find(self->idx.tree, member);
+	if (member != NULL)
+		return member->tuple;
+
+	return NULL;
 }
 
 static struct box_tuple *
@@ -483,7 +490,7 @@ validate_indexes(struct box_txn *txn)
 void
 build_indexes(void)
 {
-	for (u32 n = 0; n < namespace_count; ++n) {
+	for (u32 n = 0; n < BOX_NAMESPACE_MAX; ++n) {
 		u32 n_tuples, estimated_tuples;
 		struct tree_index_member *members[nelem(namespace[n].index)] = { NULL };
 
@@ -560,8 +567,7 @@ build_indexes(void)
 	}
 }
 
-
-void
+static void
 index_hash_num(struct index *index, struct namespace *namespace, size_t estimated_rows)
 {
 	index->type = HASH;
@@ -575,8 +581,7 @@ index_hash_num(struct index *index, struct namespace *namespace, size_t estimate
 		kh_resize(int_ptr_map, index->idx.int_hash, estimated_rows);
 }
 
-
-void
+static void
 index_hash_num64(struct index *index, struct namespace *namespace, size_t estimated_rows)
 {
 	index->type = HASH;
@@ -590,7 +595,7 @@ index_hash_num64(struct index *index, struct namespace *namespace, size_t estima
 		kh_resize(int64_ptr_map, index->idx.int64_hash, estimated_rows);
 }
 
-void
+static void
 index_hash_str(struct index *index, struct namespace *namespace, size_t estimated_rows)
 {
 	index->type = HASH;
@@ -604,7 +609,7 @@ index_hash_str(struct index *index, struct namespace *namespace, size_t estimate
 		kh_resize(lstr_ptr_map, index->idx.str_hash, estimated_rows);
 }
 
-void
+static void
 index_tree(struct index *index, struct namespace *namespace,
 	   size_t estimated_rows __attribute__((unused)))
 {
@@ -617,4 +622,41 @@ index_tree(struct index *index, struct namespace *namespace,
 	index->iterator_init = index_iterator_init_tree_str;
 	index->iterator_next = index_iterator_next_tree_str;
 	index->idx.tree = palloc(eter_pool, sizeof(*index->idx.tree));
+}
+
+void
+index_init(struct index *index, struct namespace *namespace, size_t estimated_rows)
+{
+	switch (index->type) {
+	case HASH:
+		/* Hash index, check key type. */
+		/* Hash index has single-field key*/
+		index->enabled = true;
+		switch (index->key_field[0].type) {
+		case NUM:
+			/* 32-bit integer hash */
+			index_hash_num(index, namespace, estimated_rows);
+			break;
+		case NUM64:
+			/* 64-bit integer hash */
+			index_hash_num64(index, namespace, estimated_rows);
+			break;
+		case STRING:
+			/* string hash */
+			index_hash_str(index, namespace, estimated_rows);
+			break;
+		default:
+			panic("unsupported field type in index");
+			break;
+		}
+		break;
+	case TREE:
+		/* tree index */
+		index->enabled = false;
+		index_tree(index, namespace, estimated_rows);
+		break;
+	default:
+		panic("unsupported index type");
+		break;
+	}
 }

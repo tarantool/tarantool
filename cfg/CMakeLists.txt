@@ -72,6 +72,6 @@ add_library(cfg prscfg.c warning.c)
 #
 add_custom_target(generate_headers
     DEPENDS ${CMAKE_SOURCE_DIR}/cfg/prscfg.h ${generated_headers})
-add_dependencies(cfg generate_headers)
+add_dependencies(cfg generate_headers libluajit)
 # Do not list this helper target among all high-level targets.
 set_target_properties(generate_headers PROPERTIES EXCLUDE_FROM_ALL TRUE)

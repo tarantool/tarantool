@@ -1,0 +1,2 @@
+server.memcached.execute("boguscommand slkdsldkfjsd", silent=False)
+# vim: syntax=python

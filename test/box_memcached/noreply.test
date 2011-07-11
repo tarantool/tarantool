@@ -1,0 +1,39 @@
+print """# Test that commands can take 'noreply' parameter. """
+server.memcached.execute("flush_all noreply", silent = False)
+server.memcached.execute("flush_all 0 noreply", silent = False)
+
+server.memcached.execute("add noreply:foo 0 0 1 noreply\r\n1", silent = False)
+server.memcached.execute("get noreply:foo", silent = False)
+
+server.memcached.execute("set noreply:foo 0 0 1 noreply\r\n2", silent = False)
+server.memcached.execute("get noreply:foo", silent = False)
+
+server.memcached.execute("replace noreply:foo 0 0 1 noreply\r\n3", silent = False)
+server.memcached.execute("get noreply:foo", silent = False)
+
+server.memcached.execute("append noreply:foo 0 0 1 noreply\r\n4", silent = False)
+server.memcached.execute("get noreply:foo", silent = False)
+
+server.memcached.execute("prepend noreply:foo 0 0 1 noreply\r\n5", silent = False)
+server.memcached.execute("get noreply:foo", silent = False)
+
+result = server.memcached.execute("gets noreply:foo", silent = False);
+unique_id = int(result.split()[4])
+
+server.memcached.execute("cas noreply:foo 0 0 1 %d noreply\r\n6" % unique_id, silent = False)
+server.memcached.execute("get noreply:foo", silent = False)
+
+server.memcached.execute("incr noreply:foo 3 noreply", silent = False)
+server.memcached.execute("get noreply:foo", silent = False)
+
+server.memcached.execute("decr noreply:foo 2 noreply", silent = False)
+server.memcached.execute("get noreply:foo", silent = False)
+
+server.memcached.execute("delete noreply:foo noreply", silent = False)
+server.memcached.execute("get noreply:foo", silent = False)
+
+# resore default suite config
+server.stop()
+server.deploy(self.suite_ini["config"])
+server.start()
+# vim: syntax=python

@@ -1,0 +1,16 @@
+blobs_list = [ "mooo\0", "mumble\0\0\0\0\r\rblarg", "\0", "\r" ]
+
+for i in range(len(blobs_list)):
+    key = "foo_%d" % i
+    blob = blobs_list[i]
+    blob_len = len(blob)
+
+    print "len is %d" % blob_len
+    server.memcached.execute("set %s 0 0 %d\r\n%s" % (key, blob_len, blob), silent=False)
+    server.memcached.execute("get %s" % key, silent=False)
+
+# resore default suite config
+server.stop()
+server.deploy(self.suite_ini["config"])
+server.start()
+# vim: syntax=python
