@@ -1,8 +1,8 @@
 set foo 0 0 6
 fooval
 STORED
-
 gets foo
+
 VALUE foo 0 6 42
 fooval
 END
@@ -11,8 +11,8 @@ success: flags (0x0) == ret_flags (0x0)
 set foo 123 0 6
 fooval
 STORED
-
 gets foo
+
 VALUE foo 123 6 43
 fooval
 END
@@ -21,8 +21,8 @@ success: flags (0x7b) == ret_flags (0x7b)
 set foo 65535 0 6
 fooval
 STORED
-
 gets foo
+
 VALUE foo 65535 6 44
 fooval
 END

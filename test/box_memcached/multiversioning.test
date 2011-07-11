@@ -10,20 +10,20 @@ memcached2 = MemcachedConnection('localhost', server.memcached_port)
 
 print """# Store big in lower case via first memcached client """
 print "set big 0 0 %d\r\n<big-value-lower-case>" % buf_size
-print memcached1.execute("set big 0 0 %d\r\n%s" % (buf_size, buf), silent = True)
+print memcached1.execute("set big 0 0 %d\r\n%s\r\n" % (buf_size, buf), silent = True)
 
 print """# send command 'get big' to firs memcached client """
-memcached1.send_commands("get big", silent = False)
+memcached1.send("get big\r\n", silent = False)
 
 print """# send command 'delete big' to second client """
-memcached2.execute("delete big")
+memcached2.execute("delete big\r\n")
 
 print """# Store big in lower case via first memcached client """
 print "set big 0 0 %d\r\n<big-value-upper-case>" % buf_size
-print memcached2.execute("set big 0 0 %d\r\n%s" % (buf_size, buf_upper), silent = True)
+print memcached2.execute("set big 0 0 %d\r\n%s\r\n" % (buf_size, buf_upper), silent = True)
 
 print """# recv reply 'get big' from firs memcached client """
-reply = memcached1.recv_reply(silent = True).split('\r\n')[1]
+reply = memcached1.recv(silent = True).split('\r\n')[1]
 if buf == reply:
     print "succes: buf == reply"
 else:

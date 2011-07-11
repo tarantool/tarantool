@@ -1,47 +1,48 @@
+# encoding: tarantool
 print """# set foo (and should get it) """
-server.memcached.execute("set foo 0 0 6\r\nfooval", silent=False)
-server.memcached.execute("get foo", silent=False)
+exec memcached "set foo 0 0 6\r\nfooval\r\n"
+exec memcached "get foo\r\n"
 
 print """# add bar (and should get it)"""
-server.memcached.execute("set bar 0 0 6\r\nbarval", silent=False)
-server.memcached.execute("get bar", silent=False)
+exec memcached "set bar 0 0 6\r\nbarval\r\n"
+exec memcached "get bar\r\n"
 
 print """# add foo (but shouldn't get new value)"""
-server.memcached.execute("add foo 0 0 5\r\nfoov2", silent=False)
-server.memcached.execute("get foo", silent=False)
+exec memcached "add foo 0 0 5\r\nfoov2\r\n"
+exec memcached "get foo\r\n"
 
 print """# replace bar (should work)"""
-server.memcached.execute("replace bar 0 0 6\r\nbarva2", silent=False);
-server.memcached.execute("get bar", silent=False)
+exec memcached "replace bar 0 0 6\r\nbarva2\r\n"
+exec memcached "get bar\r\n"
 
 print """# replace notexist (shouldn't work)"""
-server.memcached.execute("replace notexist 0 0 6\r\nbarva2", silent=False);
-server.memcached.execute("get notexist", silent=False)
+exec memcached "replace notexist 0 0 6\r\nbarva2\r\n"
+exec memcached "get notexist\r\n"
 
 print """# delete foo"""
-server.memcached.execute("delete foo", silent=False);
-server.memcached.execute("get foo", silent=False)
+exec memcached "delete foo\r\n"
+exec memcached "get foo\r\n"
 
 print """# delete foo again. not found this time."""
-server.memcached.execute("delete foo", silent=False);
-server.memcached.execute("get foo", silent=False)
+exec memcached "delete foo\r\n"
+exec memcached "get foo\r\n"
 
 print """# add moo"""
-server.memcached.execute("add moo 0 0 6\r\nmooval", silent=False);
-server.memcached.execute("get moo", silent=False);
+exec memcached "add moo 0 0 6\r\nmooval\r\n"
+exec memcached "get moo\r\n"
 
 print """# check-and-set (cas) failure case, try to set value with incorrect cas unique val"""
-server.memcached.execute("cas moo 0 0 6 0\r\nMOOVAL", silent=False);
-server.memcached.execute("get moo", silent=False);
+exec memcached "cas moo 0 0 6 0\r\nMOOVAL\r\n"
+exec memcached "get moo\r\n"
 
-result = server.memcached.execute("gets moo", silent=False);
+result = server.memcached.execute("gets moo\r\n", silent=True)
 unique_id = int(result.split()[4])
 
 print """# now test that we can store moo with the correct unique id"""
-server.memcached.execute("cas moo 0 0 6 %d\r\nMOOVAL" % unique_id, silent=False);
-server.memcached.execute("get moo", silent=False);
+server.memcached.execute("cas moo 0 0 6 %d\r\nMOOVAL\r\n" % unique_id, silent=True)
+exec memcached "get moo\r\n"
 
-server.memcached.execute("set foo 0 0 6\r\nfooval\r\ndelete foo\r\nset foo 0 0 6\r\nfooval\r\ndelete foo", silent=False);
+exec memcached "set foo 0 0 6\r\nfooval\r\ndelete foo\r\nset foo 0 0 6\r\nfooval\r\ndelete foo\r\n"
 
 len = 1024
 while len < (1024 * 1028):
@@ -49,15 +50,15 @@ while len < (1024 * 1028):
     if len > (1024 * 1024):
         print """# Ensure causing a memory overflow doesn't leave stale data."""
         print "# set small data: - should pass"
-        server.memcached.execute("set foo_%d 0 0 3\r\nMOO" % (len), silent=False)
-        server.memcached.execute("get moo", silent=False)
+        exec memcached "set foo_%d 0 0 3\r\nMOO\r\n" % (len)
+        exec memcached "get foo_%d\r\n" % (len)
         print "# set big data: - should fail"
-        print server.memcached.execute("set foo_%d 0 0 %d\r\n%s" % (len, len, val), silent=False)
-        server.memcached.execute("get moo", silent=False)
+        print "set foo_%d 0 0 %d\r\n<big-data>\r\n" % (len, len)
+        print server.memcached.execute("set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val), silent=True)
     else:
         print "# set big data: - should pass"
-        print server.memcached.execute("set foo_%d 0 0 %d\r\n%s" % (len, len, val), silent=False)
-        server.memcached.execute("get moo", silent=False)
+        print "set foo_%d 0 0 %d\r\n<big-data>\r\n" % (len, len)
+        print server.memcached.execute("set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val), silent=True)
     len += 1024 * 512
 
 # resore default suite config

@@ -1,36 +1,37 @@
+# encoding: tarantool
 print """# incr/decr big value """
-server.memcached.execute("set bug21 0 0 19\r\n9223372036854775807", silent=False)
-server.memcached.execute("incr bug21 1", silent=False)
-server.memcached.execute("incr bug21 1", silent=False)
-server.memcached.execute("decr bug21 1", silent=False)
+exec memcached "set bug21 0 0 19\r\n9223372036854775807\r\n"
+exec memcached "incr bug21 1\r\n"
+exec memcached "incr bug21 1\r\n"
+exec memcached "decr bug21 1\r\n"
 
 print """# underflow protection """
-server.memcached.execute("set num 0 0 1\r\n1", silent=False)
-server.memcached.execute("incr num 1", silent=False)
-server.memcached.execute("incr num 8", silent=False)
-server.memcached.execute("decr num 1", silent=False)
-server.memcached.execute("decr num 9", silent=False)
-server.memcached.execute("decr num 5", silent=False)
+exec memcached "set num 0 0 1\r\n1\r\n"
+exec memcached "incr num 1\r\n"
+exec memcached "incr num 8\r\n"
+exec memcached "decr num 1\r\n"
+exec memcached "decr num 9\r\n"
+exec memcached "decr num 5\r\n"
 
 print """# 32-bit value """
-server.memcached.execute("set num 0 0 10\r\n4294967296", silent=False)
-server.memcached.execute("incr num 1", silent=False)
+exec memcached "set num 0 0 10\r\n4294967296\r\n"
+exec memcached "incr num 1\r\n"
 
 print """# overflow value """
-server.memcached.execute("set num 0 0 20\r\n18446744073709551615", silent=False)
-server.memcached.execute("incr num 1", silent=False)
+exec memcached "set num 0 0 20\r\n18446744073709551615\r\n"
+exec memcached "incr num 1\r\n"
 
 print """# bogus """
-server.memcached.execute("decr bogus 1", silent=False)
-server.memcached.execute("decr incr 1", silent=False)
+exec memcached "decr bogus 1\r\n"
+exec memcached "decr incr 1\r\n"
 
 print """# bit increment """
-server.memcached.execute("set bigincr 0 0 1\r\n0", silent=False)
-server.memcached.execute("incr num 18446744073709551610", silent=False)
+exec memcached "set bigincr 0 0 1\r\n0\r\n"
+exec memcached "incr num 18446744073709551610\r\n"
 
 print """# incr text value error """
-server.memcached.execute("set text 0 0 2\r\nhi", silent=False)
-server.memcached.execute("incr text 1", silent=False)
+exec memcached "set text 0 0 2\r\nhi\r\n"
+exec memcached "incr text 1\r\n"
 
 # resore default suite config
 server.stop()

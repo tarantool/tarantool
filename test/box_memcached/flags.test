@@ -1,8 +1,9 @@
+# encoding: tarantool
 flags_list = [ 0x0, 0x7b, 0xffff ]
 
 for flags in flags_list:
-    server.memcached.execute("set foo %d 0 6\r\nfooval" % flags, silent=False)
-    result = server.memcached.execute("gets foo", silent=False);
+    exec memcached "set foo %d 0 6\r\nfooval\r\n" % flags
+    result = server.memcached.execute("gets foo\r\n", silent=False);
     ret_flags = int(result.split()[2])
     if flags == ret_flags:
         print "success: flags (0x%x) == ret_flags (0x%x)" % (flags, ret_flags)

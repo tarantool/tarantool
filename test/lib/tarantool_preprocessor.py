@@ -15,7 +15,7 @@ def tarantool_translate(readline):
         if type == tokenize.NAME and name == "exec":
             next_token = next(token_stream)
             type, name = next_token[:2]
-            if type == tokenize.NAME and name in [ "sql", "admin", "memcached"]:
+            if type == tokenize.NAME and name in [ "sql", "admin", "memcached" ]:
                 yield (tokenize.NAME, 'print') + token[2:]
                 yield (tokenize.OP, '>>') + token[2:]
                 yield next_token

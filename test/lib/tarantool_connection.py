@@ -30,6 +30,8 @@ class TarantoolConnection:
     def __init__(self, host, port):
         self.host = host
         self.port = port
+        self.separator = '\n'
+        self.separator_len = 1
         self.is_connected = False
         self.stream = cStringIO.StringIO()
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -75,18 +77,19 @@ class TarantoolConnection:
         accumulate all writes until we receive \n. When we receive it,
         we execute the command, and rewind the stream."""
 
-        newline_pos = fragment.rfind("\n")
-        while newline_pos >= 0:
-            self.stream.write(fragment[:newline_pos+1])
-            statement = self.stream.getvalue()
+        str = self.stream.getvalue() + fragment
+        separator_index = str.rfind(self.separator)
+        while separator_index >= 0:
+            statement = str[:separator_index + self.separator_len]
             sys.stdout.write(statement)
             sys.stdout.write(self.execute(statement))
-            fragment = fragment[newline_pos+1:]
-            newline_pos = fragment.rfind("\n")
-            self.stream.seek(0)
-            self.stream.truncate()
 
-        self.stream.write(fragment)
+            str = str[separator_index + len(self.separator):]
+            separator_index = str.rfind(self.separator)
+
+        self.stream.seek(0)
+        self.stream.truncate()
+        self.stream.write(str)
 
     def __enter__(self):
         self.connect()
