@@ -36,7 +36,7 @@ configuration:
   slab_alloc_factor: "2"
   work_dir: (null)
   pid_file: "box.pid"
-  logger: "tee -a tarantool.log"
+  logger: "cat - >> tarantool.log"
   logger_nonblock: "1"
   io_collect_interval: "0"
   backlog: "1024"
