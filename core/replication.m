@@ -39,38 +39,41 @@
 #include <arpa/inet.h>
 #include "fiber.h"
 
-static int replicator_socks[2];
-
-/*-----------------------------------------------------------------------------*/
-/* replication accept/sender fibers                                            */
-/*-----------------------------------------------------------------------------*/
-
-/**
- * Replication acceptor fiber handler.
+/** Replication topology
+ * ----------------------
+ *
+ * Tarantool replication consists of 3 interacting processes:
+ * master, spawner and replication relay.
+ *
+ * The spawner is created at server start, and master communicates
+ * with the spawner using a socketpair(2).
+ *
+ * The master process binds to replication_port and accepts
+ * incoming connections. We do it in the master to be able to
+ * correctly handle RELOAD CONFIGURATION, which happens in the
+ * master, and, in future, perform authentication of replication
+ * clients. Sine the master uses fibers to serve all clients,
+ * acceptor fiber is just one of the many fibers in use. Once
+ * a client socket is accepted, it is sent to the spawner process,
+ * through the master's end of the socket pair.
+ *
+ * The spawner listens on the receiving end of the socket pair and
+ * for every received socket creates a replication relay, which is
+ * then responsible for sending write ahead logs to the replica.
  */
+
+static int replication_socks[2];
+
+/** replication_port acceptor fiber */
 static void
 acceptor_handler(void *data);
 
-/**
- * Replication sender fiber.
+/** Send file descriptor to replication relay spawner.
+ *
+ * @param client_sock the file descriptor to be sent.
  */
 static void
-sender_handler(void *data);
-
-/** Read sender's fiber inbox.
- *
- * @return On success, a file descriptor is returned. On error, -1 is returned.
- */
-static int
-sender_read_inbox();
-
-/**
- * Send file descriptor to replication relay spawner.
- *
- * @param fd the sending file descriptor.
- */
-static void
-sender_send_sock(int sock);
+acceptor_send_sock(int client_sock);
 
 /** Replication spawner process */
 static struct spawner {
@@ -124,41 +127,30 @@ spawner_wait_children();
 static int
 spawner_recv_client_sock(int *client_sock);
 
-/**
- * Create replicator's client handler process.
+/** Create a replication relay.
  *
- * @return On success, a zero is returned. On error, -1 is returned.
+ * @return 0 on success, -1 on error
  */
 static int
 spawner_create_replication_relay(int client_sock);
 
-/**
- * Replicator spawner shutdown: kill children.
- */
+/** Replicator spawner shutdown: kill children. */
 static void
 spawner_shutdown_kill_children();
 
-/**
- * Replicator spawner shutdown: wait children.
- */
+/** * Replicator spawner shutdown: wait children.  */
 static int
 spawner_shutdown_wait_children();
 
-/**
- * Initialize replicator's service process.
- */
+/** Initialize replication relay process. */
 static void
 replication_relay_loop(int client_sock);
 
-/**
- * Receive data event to replication socket handler
- */
+/** * Receive data event to replication socket handler. */
 static void
 replication_relay_recv(struct ev_io *w, int revents);
 
-/**
- * Send to row to client.
- */
+/** * Send a single row to the client. */
 static int
 replication_relay_send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t);
 
@@ -193,8 +185,11 @@ replication_prefork()
 	 * Create UNIX sockets to communicate between the main and
 	 * spawner processes.
          */
-	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, replicator_socks) != 0)
+	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, replication_socks) != 0)
 		panic_syserror("socketpair");
+
+	if (set_nonblock(replication_socks[0]) == -1)
+		panic("set nonblock fail");
 
 	/* create spawner */
 	pid_t pid = fork();
@@ -203,15 +198,19 @@ replication_prefork()
 
 	if (pid != 0) {
 		/* parent process: tarantool */
-		close(replicator_socks[1]);
+		close(replication_socks[1]);
 	} else {
 		/* child process: spawner */
-		close(replicator_socks[0]);
-		spawner_init(replicator_socks[1]);
+		close(replication_socks[0]);
+		spawner_init(replication_socks[1]);
 	}
 }
 
-/** Intialize tarantool's replicator module. */
+/**
+ * Create a fiber which accepts client connections and pushes them
+ * to replication spawner.
+ */
+
 void
 replication_init()
 {
@@ -219,29 +218,17 @@ replication_init()
 		return;                         /* replication is not in use */
 
 	char fiber_name[FIBER_NAME_MAXLEN];
-	/* create sender fiber */
-	if (snprintf(fiber_name, FIBER_NAME_MAXLEN, "%i/replication sender", cfg.replication_port) < 0) {
-		panic("snprintf fail");
-	}
-
-	const size_t sender_inbox_size = 16 * sizeof(int);
-	struct fiber *sender = fiber_create(fiber_name, replicator_socks[0], sender_inbox_size, sender_handler, NULL);
-	if (sender == NULL) {
-		panic("create fiber fail");
-	}
 
 	/* create acceptor fiber */
-	if (snprintf(fiber_name, FIBER_NAME_MAXLEN, "%i/replication acceptor", cfg.replication_port) < 0) {
-		panic("snprintf fail");
-	}
+	snprintf(fiber_name, FIBER_NAME_MAXLEN, "%i/replication", cfg.replication_port);
 
-	struct fiber *acceptor = fiber_create(fiber_name, -1, -1, acceptor_handler, sender);
+	struct fiber *acceptor = fiber_create(fiber_name, -1, -1, acceptor_handler, NULL);
+
 	if (acceptor == NULL) {
 		panic("create fiber fail");
 	}
 
 	fiber_call(acceptor);
-	fiber_call(sender);
 }
 
 
@@ -251,16 +238,11 @@ replication_init()
 
 /** Replication acceptor fiber handler. */
 static void
-acceptor_handler(void *data)
+acceptor_handler(void *data __attribute__((unused)))
 {
-	struct fiber *sender = (struct fiber *) data;
-	struct tbuf *msg;
-
 	if (fiber_serv_socket(fiber, cfg.replication_port, true, 0.1) != 0) {
-		panic("can not bind replication port");
+		panic("can not bind to replication port");
 	}
-
-	msg = tbuf_alloc(fiber->pool);
 
 	for (;;) {
 		struct sockaddr_in addr;
@@ -268,7 +250,7 @@ acceptor_handler(void *data)
 		int client_sock = -1;
 
 		/* wait new connection request */
-		fiber_io_start(EV_READ);
+		fiber_io_start(fiber->fd, EV_READ);
 		fiber_io_yield();
 		/* accept connection */
 		client_sock = accept(fiber->fd, &addr, &addrlen);
@@ -278,55 +260,16 @@ acceptor_handler(void *data)
 			}
 			panic_syserror("accept");
 		}
-		fiber_io_stop(EV_READ);
+		fiber_io_stop(fiber->fd, EV_READ);
 		say_info("connection from %s:%d", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-
-		/* put descriptor to message and send to sender fiber */
-		tbuf_append(msg, &client_sock, sizeof(client_sock));
-		write_inbox(sender, msg);
-		/* clean-up buffer & wait while sender fiber read message */
-		tbuf_reset(msg);
+		acceptor_send_sock(client_sock);
 	}
 }
 
-/** Replication sender fiber. */
-static void
-sender_handler(void *data __attribute__((unused)))
-{
-	if (set_nonblock(fiber->fd) == -1) {
-		panic("set nonblock fail");
-	}
-
-	while (true) {
-		int client_sock;
-
-		client_sock = sender_read_inbox();
-		if (client_sock == -1) {
-			continue;
-		}
-
-		sender_send_sock(client_sock);
-	}
-}
-
-/** Read sender's fiber inbox. */
-static int
-sender_read_inbox()
-{
-	struct msg *message;
-
-	message = read_inbox();
-	if (message->msg->len != sizeof(int)) {
-		say_error("invalid message length %"PRId32, message->msg->len);
-		return -1;
-	}
-
-	return *((int *) message->msg->data);
-}
 
 /** Send file descriptor to the spawner. */
 static void
-sender_send_sock(int client_sock)
+acceptor_send_sock(int client_sock)
 {
 	struct msghdr msg;
 	struct iovec iov[1];
@@ -351,13 +294,13 @@ sender_send_sock(int client_sock)
 	*((int *) CMSG_DATA(control_message)) = client_sock;
 
 	/* wait, when interprocess comm. socket is ready for write */
-	fiber_io_start(EV_WRITE);
+	fiber_io_start(replication_socks[0], EV_WRITE);
 	fiber_io_yield();
 	/* send client socket to the spawner */
-	if (sendmsg(fiber->fd, &msg, 0) < 0) {
+	if (sendmsg(replication_socks[0], &msg, 0) < 0)
 		say_syserror("sendmsg");
-	}
-	fiber_io_stop(EV_WRITE);
+
+	fiber_io_stop(replication_socks[0], EV_WRITE);
 	/* close client socket in the main process */
 	close(client_sock);
 }

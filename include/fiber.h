@@ -131,13 +131,13 @@ void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for_child(pid_t pid);
 
 void
-fiber_io_start(int events);
+fiber_io_start(int fd, int events);
 
 void
 fiber_io_yield();
 
 void
-fiber_io_stop(int events);
+fiber_io_stop(int fd, int events);
 
 void yield(void);
 void fiber_destroy_all();

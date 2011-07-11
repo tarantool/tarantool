@@ -257,13 +257,13 @@ wait_for_child(pid_t pid)
 
 
 void
-fiber_io_start(int events)
+fiber_io_start(int fd, int events)
 {
 	ev_io *io = &fiber->io;
 
 	assert (!ev_is_active(io));
 
-	ev_io_set(io, fiber->fd, events);
+	ev_io_set(io, fd, events);
 	ev_io_start(io);
 }
 
@@ -286,11 +286,11 @@ fiber_io_yield()
 }
 
 void
-fiber_io_stop(int events __attribute__((unused)))
+fiber_io_stop(int fd __attribute__((unused)), int events __attribute__((unused)))
 {
 	ev_io *io = &fiber->io;
 
-	assert(ev_is_active(io) && io->fd == fiber->fd && (io->events & events));
+	assert(ev_is_active(io) && io->fd == fd && (io->events & events));
 
 	ev_io_stop(io);
 }
@@ -581,7 +581,7 @@ fiber_close(void)
 
 	/* We don't know if IO is active if there was an error. */
 	if (ev_is_active(&fiber->io))
-		fiber_io_stop(-1);
+		fiber_io_stop(fiber->fd, -1);
 
 	int r = close(fiber->fd);
 
@@ -675,7 +675,7 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 	ssize_t r;
 	tbuf_ensure(buf, MAX(cfg.readahead, at_least));
 
-	fiber_io_start(EV_READ);
+	fiber_io_start(fiber->fd, EV_READ);
 	for (;;) {
 		fiber_io_yield();
 		r = read(fiber->fd, buf->data + buf->len, buf->size - buf->len);
@@ -689,7 +689,7 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 			break;
 		}
 	}
-	fiber_io_stop(EV_READ);
+	fiber_io_stop(fiber->fd, EV_READ);
 
 	return r;
 }
@@ -713,7 +713,7 @@ fiber_flush_output(void)
 	struct iovec *iov = iovec(fiber->iov);
 	size_t iov_cnt = fiber->iov_cnt;
 
-	fiber_io_start(EV_WRITE);
+	fiber_io_start(fiber->fd, EV_WRITE);
 	while (iov_cnt > 0) {
 		fiber_io_yield();
 		bytes += r = writev(fiber->fd, iov, MIN(iov_cnt, IOV_MAX));
@@ -736,7 +736,7 @@ fiber_flush_output(void)
 			}
 		}
 	}
-	fiber_io_stop(EV_WRITE);
+	fiber_io_stop(fiber->fd, EV_WRITE);
 
 	if (r < 0) {
 		size_t rem = 0;
@@ -762,7 +762,7 @@ fiber_read(void *buf, size_t count)
 {
 	ssize_t r, done = 0;
 
-	fiber_io_start(EV_READ);
+	fiber_io_start(fiber->fd, EV_READ);
 	while (count != done) {
 
 		fiber_io_yield();
@@ -775,7 +775,7 @@ fiber_read(void *buf, size_t count)
 		}
 		done += r;
 	}
-	fiber_io_stop(EV_READ);
+	fiber_io_stop(fiber->fd, EV_READ);
 
 	return done;
 }
@@ -790,7 +790,7 @@ fiber_write(const void *buf, size_t count)
 	int r;
 	unsigned int done = 0;
 
-	fiber_io_start(EV_WRITE);
+	fiber_io_start(fiber->fd, EV_WRITE);
 
 	while (count != done) {
 		fiber_io_yield();
@@ -802,7 +802,7 @@ fiber_write(const void *buf, size_t count)
 		}
 		done += r;
 	}
-	fiber_io_stop(EV_WRITE);
+	fiber_io_stop(fiber->fd, EV_WRITE);
 
 	return done;
 }
@@ -826,9 +826,9 @@ fiber_connect(struct sockaddr_in *addr)
 		if (errno != EINPROGRESS)
 			goto error;
 
-		fiber_io_start(EV_WRITE);
+		fiber_io_start(fiber->fd, EV_WRITE);
 		fiber_io_yield();
-		fiber_io_stop(EV_WRITE);
+		fiber_io_stop(fiber->fd, EV_WRITE);
 
 		int error;
 		socklen_t error_size = sizeof(error);
@@ -1093,7 +1093,7 @@ tcp_server_handler(void *data)
 		server->on_bind(server->data);
 	}
 
-	fiber_io_start(EV_READ);
+	fiber_io_start(fiber->fd, EV_READ);
 	for (;;) {
 		fiber_io_yield();
 
@@ -1125,7 +1125,7 @@ tcp_server_handler(void *data)
 			continue;
 		}
 	}
-	fiber_io_stop(EV_READ);
+	fiber_io_stop(fiber->fd, EV_READ);
 }
 
 struct fiber *
