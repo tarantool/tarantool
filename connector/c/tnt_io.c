@@ -44,7 +44,7 @@
 #include <tnt_mem.h>
 #include <tnt_opt.h>
 #include <tnt_buf.h>
-#include <tnt.h>
+#include <tnt_main.h>
 #include <tnt_io.h>
 
 static enum tnt_error

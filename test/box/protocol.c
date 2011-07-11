@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <connector/c/include/libtnt.h>
+#include <connector/c/include/tnt.h>
 #include "util.h"
 #include "errcode.h"
 

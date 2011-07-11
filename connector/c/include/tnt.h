@@ -1,5 +1,5 @@
-#ifndef TNT_H_INCLUDED
-#define TNT_H_INCLUDED
+#ifndef LIBTNT_H_INCLUDED
+#define LIBTNT_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,124 +26,22 @@
  * SUCH DAMAGE.
  */
 
-/**
- * @mainpage
- * 
- * libtnt - Tarantool DB client library.
- *
- */
+#include <tnt_queue.h>
+#include <tnt_error.h>
+#include <tnt_mem.h>
+#include <tnt_opt.h>
+#include <tnt_buf.h>
+#include <tnt_main.h>
+#include <tnt_io.h>
+#include <tnt_proto.h>
+#include <tnt_tuple.h>
+#include <tnt_insert.h>
+#include <tnt_update.h>
+#include <tnt_delete.h>
+#include <tnt_select.h>
+#include <tnt_ping.h>
+#include <tnt_recv.h>
+#include <tnt_memcache_val.h>
+#include <tnt_memcache.h>
 
-/**
- * @defgroup Main
- * @brief Initizalization and connection
- */
-struct tnt {
-	struct tnt_opt opt;
-	int connected;
-	int fd;
-	struct tnt_buf sbuf;
-	struct tnt_buf rbuf;
-	enum tnt_error error;
-	int error_errno;
-};
-
-/**
- * @defgroup Initialization
- * @ingroup  Main
- * @{
- */
-
-/**
- * Allocates handler object 
- *
- * @returns handler pointer, or NULL on error
- */
-struct tnt *tnt_alloc(void);
-
-/**
- * Initializes handler object
- *
- * @param t handler pointer
- * @returns 0 on success, -1 on error
- */
-int tnt_init(struct tnt *t);
-
-/**
- * Frees handler object
- *
- * @param t handler pointer
- */
-void tnt_free(struct tnt *t);
-
-/**
- * Sets handler option
- *
- * @param t handler pointer
- * @param name option name
- * @returns 0 on success, -1 on error
- */
-int tnt_set(struct tnt *t, enum tnt_opt_type name, ...);
-/** @} */
-
-/**
- * @defgroup Connection
- * @ingroup  Main
- * @{
- */
-
-/**
- * Connects to server
- *
- * @param t handler pointer
- * @returns 0 on success, -1 on error
- */
-int tnt_connect(struct tnt *t);
-
-/**
- * Sends all internal buffers to server
- *
- * @param t handler pointer
- * @returns 0 on success, -1 on error
- */
-int tnt_flush(struct tnt *t);
-
-/**
- * Closes connection to server
- *
- * @param t handler pointer
- */
-void tnt_close(struct tnt *t);
-/** @} */
-
-/**
- * @defgroup Errors
- * @ingroup  Main
- * @{
- */
-
-/**
- * Obtains library error code
- *
- * @param t handler pointer
- * @returns error code
- */
-enum tnt_error tnt_error(struct tnt *t);
-
-/**
- * Returns last saved errno value for system errors (TNT_ESYSTEM)
- *
- * @param t handler pointer
- * @returns errno
- */
-int tnt_error_errno(struct tnt *t);
-
-/**
- * Returns error description
- *
- * @param t handler pointer
- * @returns error description
- */
-char *tnt_perror(struct tnt *t);
-/** @} */
-
-#endif /* TNT_H_INCLUDED */
+#endif /* LIBTNT_H_INCLUDED */
