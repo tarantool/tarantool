@@ -85,7 +85,6 @@
 @implementation IllegalParams
 - (id) init: (const char*) msg
 {
-	printf("IllegalParams init\n");
 	return [super init: ER_ILLEGAL_PARAMS, msg];
 }
 @end
