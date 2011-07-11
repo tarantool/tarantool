@@ -39,6 +39,9 @@
 #include <say.h>
 #include <pickle.h>
 
+static int
+default_remote_row_handler(struct recovery_state *r, struct tbuf *row);
+
 static u32
 row_v11_len(struct tbuf *r)
 {
@@ -131,18 +134,18 @@ remote_read_row(i64 initial_lsn)
 static void
 pull_from_remote(void *state)
 {
-	struct remote_state *h = state;
+	struct recovery_state *r = state;
 	struct tbuf *row;
 
 	for (;;) {
 		fiber_setcancelstate(true);
-		row = remote_read_row(h->r->confirmed_lsn + 1);
+		row = remote_read_row(r->confirmed_lsn + 1);
 		fiber_setcancelstate(false);
 
-		h->r->recovery_lag = ev_now() - row_v11(row)->tm;
-		h->r->recovery_last_update_tstamp = ev_now();
+		r->recovery_lag = ev_now() - row_v11(row)->tm;
+		r->recovery_last_update_tstamp = ev_now();
 
-		if (h->handler(h->r, row) < 0) {
+		if (default_remote_row_handler(r, row) < 0) {
 			fiber_close();
 			continue;
 		}
@@ -151,7 +154,7 @@ pull_from_remote(void *state)
 	}
 }
 
-int
+static int
 default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 {
 	struct tbuf *data;
@@ -187,18 +190,13 @@ recovery_follow_remote(struct recovery_state *r, const char *remote)
 	struct fiber *f;
 	struct in_addr server;
 	struct sockaddr_in *addr;
-	struct remote_state *h;
 
 	assert(r->remote_recovery == NULL);
 
 	say_crit("initializing the replica, WAL master %s", remote);
 	snprintf(name, sizeof(name), "replica/%s", remote);
 
-	h = palloc(eter_pool, sizeof(*h));
-	h->r = r;
-	h->handler = default_remote_row_handler;
-
-	f = fiber_create(name, -1, -1, pull_from_remote, h);
+	f = fiber_create(name, -1, -1, pull_from_remote, r);
 	if (f == NULL)
 		return;
 
