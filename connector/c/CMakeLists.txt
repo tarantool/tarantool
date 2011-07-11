@@ -22,13 +22,13 @@ add_library(tnt_shared SHARED ${tnt_sources})
 set_target_properties(tnt_shared PROPERTIES OUTPUT_NAME tnt)	
 
 install(FILES
-	include/libtnt.h
+	include/tnt.h
 	include/tnt_queue.h
 	include/tnt_error.h
 	include/tnt_mem.h
 	include/tnt_opt.h
 	include/tnt_buf.h
-	include/tnt.h
+	include/tnt_main.h
 	include/tnt_io.h
 	include/tnt_proto.h
 	include/tnt_tuple.h
