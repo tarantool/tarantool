@@ -58,17 +58,17 @@ memcached1 = server.memcached
 memcached2 = MemcachedConnection('localhost', server.memcached_port)
 
 print """# gets foo from memcached1 - should success """
-result = memcached1.execute("gets foo1\r\n", silent = False)
+result = memcached1.execute("gets foo1\r\n", silent = True)
 mem1_cas = int(result.split()[4])
 
 print """# gets foo from memcached2 - should success """
-result = memcached2.execute("gets foo1\r\n", silent = False)
+result = memcached2.execute("gets foo1\r\n", silent = True)
 mem2_cas = int(result.split()[4])
 
 print """# send 'cas foo1' from memcached1 """
-memcached1.send("cas foo1 0 0 6 %d\r\nbarva2\r\n" % mem1_cas, silent = False)
+memcached1.send("cas foo1 0 0 6 %d\r\nbarva2\r\n" % mem1_cas, silent = True)
 print """# send 'cas foo1' from memcached2 """
-memcached2.send("cas foo1 0 0 4 %d\r\npear\r\n" % mem2_cas, silent = False)
+memcached2.send("cas foo1 0 0 4 %d\r\npear\r\n" % mem2_cas, silent = True)
 
 print """# recv reply 'cas foo1' from memcached1 """
 result = memcached1.recv(silent = True)

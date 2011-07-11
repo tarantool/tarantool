@@ -26,22 +26,10 @@ class MemcachedCommandBuffer:
 
 class MemcachedConnection(TarantoolConnection):
 
-    def write(self, fragment):
-        """This is to support print >> admin, "command" syntax.
-        For every print statement, write is invoked twice: one to
-        write the command itself, and another to write \n. We should
-        accumulate all writes until we receive \n. When we receive it,
-        we execute the command, and rewind the stream."""
-
-        self.stream.write(fragment)
-        statement = self.stream.getvalue()
-
-        sys.stdout.write(statement)
-        if fragment != '\n':
-            # execute only commands
-            sys.stdout.write(self.execute(statement))
-        self.stream.seek(0)
-        self.stream.truncate()
+    def __init__(self, host, port):
+        TarantoolConnection.__init__(self, host, port)
+        self.separator = MEMCACHED_SEPARATOR + '\n'
+        self.separator_len = 2
 
     def execute_no_reconnect(self, commands, silent = True):
         self.send(commands, silent)
