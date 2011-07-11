@@ -45,9 +45,11 @@ wal_fsync_delay=0, ro
 # size of WAL writer request buffer
 wal_writer_inbox_size=128, ro
 
-# Hot standby (if enabled, the server will run in hot standby
-# mode, continuously fetching WAL records from shared directory).
-hot_standby=0, ro
+# Local hot standby (if enabled, the server will run in hot
+# standby mode, continuously fetching WAL records from wal_dir,
+# until it is able to bind to the primary port.
+# In local hot standby mode the server only accepts reads.
+local_hot_standby=0, ro
 # Delay, in seconds, between successive re-readings of wal_dir.
 # The re-scan is necessary to discover new WAL files or snapshots.
 wal_dir_rescan_delay=0.1, ro
@@ -59,12 +61,12 @@ wal_dir_rescan_delay=0.1, ro
 panic_on_snap_error=1, ro
 panic_on_wal_error=0, ro
 
-# Replicator mode (if enabled, the server will run in replication mode
-# continuously fetching WAL records from
-# replication_source_ipaddr:replication_source_port
-replication_source_ipaddr=NULL
-replication_source_port=0
-
+# Replication mode (if enabled, the server, once
+# bound to the primary port, will connect to
+# replication_source (ipaddr:port) and run continously
+# fetching records from it.. In replication mode the server
+# only accepts reads.
+replication_source=NULL
 
 namespace = [
   {

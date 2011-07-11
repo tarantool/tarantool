@@ -59,12 +59,11 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->rows_per_wal = 0;
 	c->wal_fsync_delay = 0;
 	c->wal_writer_inbox_size = 0;
-	c->hot_standby = 0;
+	c->local_hot_standby = 0;
 	c->wal_dir_rescan_delay = 0;
 	c->panic_on_snap_error = 0;
 	c->panic_on_wal_error = 0;
-	c->replication_source_ipaddr = NULL;
-	c->replication_source_port = 0;
+	c->replication_source = NULL;
 	c->namespace = NULL;
 }
 
@@ -107,12 +106,11 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->rows_per_wal = 500000;
 	c->wal_fsync_delay = 0;
 	c->wal_writer_inbox_size = 128;
-	c->hot_standby = 0;
+	c->local_hot_standby = 0;
 	c->wal_dir_rescan_delay = 0.1;
 	c->panic_on_snap_error = 1;
 	c->panic_on_wal_error = 0;
-	c->replication_source_ipaddr = NULL;
-	c->replication_source_port = 0;
+	c->replication_source = NULL;
 	c->namespace = NULL;
 	return 0;
 }
@@ -243,8 +241,8 @@ static NameAtom _name__wal_fsync_delay[] = {
 static NameAtom _name__wal_writer_inbox_size[] = {
 	{ "wal_writer_inbox_size", -1, NULL }
 };
-static NameAtom _name__hot_standby[] = {
-	{ "hot_standby", -1, NULL }
+static NameAtom _name__local_hot_standby[] = {
+	{ "local_hot_standby", -1, NULL }
 };
 static NameAtom _name__wal_dir_rescan_delay[] = {
 	{ "wal_dir_rescan_delay", -1, NULL }
@@ -255,11 +253,8 @@ static NameAtom _name__panic_on_snap_error[] = {
 static NameAtom _name__panic_on_wal_error[] = {
 	{ "panic_on_wal_error", -1, NULL }
 };
-static NameAtom _name__replication_source_ipaddr[] = {
-	{ "replication_source_ipaddr", -1, NULL }
-};
-static NameAtom _name__replication_source_port[] = {
-	{ "replication_source_port", -1, NULL }
+static NameAtom _name__replication_source[] = {
+	{ "replication_source", -1, NULL }
 };
 static NameAtom _name__namespace[] = {
 	{ "namespace", -1, NULL }
@@ -729,7 +724,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_RDONLY;
 		c->wal_writer_inbox_size = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__hot_standby) ) {
+	else if ( cmpNameAtoms( opt->name, _name__local_hot_standby) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
@@ -739,9 +734,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->hot_standby != i32)
+		if (check_rdonly && c->local_hot_standby != i32)
 			return CNF_RDONLY;
-		c->hot_standby = i32;
+		c->local_hot_standby = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_dir_rescan_delay) ) {
 		if (opt->paramType != numberType )
@@ -783,26 +778,14 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_RDONLY;
 		c->panic_on_wal_error = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__replication_source_ipaddr) ) {
+	else if ( cmpNameAtoms( opt->name, _name__replication_source) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		c->replication_source_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->replication_source_ipaddr == NULL)
+		c->replication_source = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->replication_source == NULL)
 			return CNF_NOMEMORY;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__replication_source_port) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		c->replication_source_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__namespace) ) {
 		if (opt->paramType != arrayType )
@@ -1111,12 +1094,11 @@ typedef enum IteratorState {
 	S_name__rows_per_wal,
 	S_name__wal_fsync_delay,
 	S_name__wal_writer_inbox_size,
-	S_name__hot_standby,
+	S_name__local_hot_standby,
 	S_name__wal_dir_rescan_delay,
 	S_name__panic_on_snap_error,
 	S_name__panic_on_wal_error,
-	S_name__replication_source_ipaddr,
-	S_name__replication_source_port,
+	S_name__replication_source,
 	S_name__namespace,
 	S_name__namespace__enabled,
 	S_name__namespace__cardinality,
@@ -1485,17 +1467,17 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->wal_writer_inbox_size);
 			snprintf(buf, PRINTBUFLEN-1, "wal_writer_inbox_size");
-			i->state = S_name__hot_standby;
+			i->state = S_name__local_hot_standby;
 			return buf;
-		case S_name__hot_standby:
+		case S_name__local_hot_standby:
 			*v = malloc(32);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->hot_standby);
-			snprintf(buf, PRINTBUFLEN-1, "hot_standby");
+			sprintf(*v, "%"PRId32, c->local_hot_standby);
+			snprintf(buf, PRINTBUFLEN-1, "local_hot_standby");
 			i->state = S_name__wal_dir_rescan_delay;
 			return buf;
 		case S_name__wal_dir_rescan_delay:
@@ -1529,27 +1511,16 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->panic_on_wal_error);
 			snprintf(buf, PRINTBUFLEN-1, "panic_on_wal_error");
-			i->state = S_name__replication_source_ipaddr;
+			i->state = S_name__replication_source;
 			return buf;
-		case S_name__replication_source_ipaddr:
-			*v = (c->replication_source_ipaddr) ? strdup(c->replication_source_ipaddr) : NULL;
-			if (*v == NULL && c->replication_source_ipaddr) {
+		case S_name__replication_source:
+			*v = (c->replication_source) ? strdup(c->replication_source) : NULL;
+			if (*v == NULL && c->replication_source) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			snprintf(buf, PRINTBUFLEN-1, "replication_source_ipaddr");
-			i->state = S_name__replication_source_port;
-			return buf;
-		case S_name__replication_source_port:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->replication_source_port);
-			snprintf(buf, PRINTBUFLEN-1, "replication_source_port");
+			snprintf(buf, PRINTBUFLEN-1, "replication_source");
 			i->state = S_name__namespace;
 			return buf;
 		case S_name__namespace:
@@ -1879,14 +1850,13 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->rows_per_wal = src->rows_per_wal;
 	dst->wal_fsync_delay = src->wal_fsync_delay;
 	dst->wal_writer_inbox_size = src->wal_writer_inbox_size;
-	dst->hot_standby = src->hot_standby;
+	dst->local_hot_standby = src->local_hot_standby;
 	dst->wal_dir_rescan_delay = src->wal_dir_rescan_delay;
 	dst->panic_on_snap_error = src->panic_on_snap_error;
 	dst->panic_on_wal_error = src->panic_on_wal_error;
-	dst->replication_source_ipaddr = src->replication_source_ipaddr == NULL ? NULL : strdup(src->replication_source_ipaddr);
-	if (src->replication_source_ipaddr != NULL && dst->replication_source_ipaddr == NULL)
+	dst->replication_source = src->replication_source == NULL ? NULL : strdup(src->replication_source);
+	if (src->replication_source != NULL && dst->replication_source == NULL)
 		return CNF_NOMEMORY;
-	dst->replication_source_port = src->replication_source_port;
 
 	dst->namespace = NULL;
 	if (src->namespace != NULL) {
@@ -1963,8 +1933,8 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 		free(c->wal_dir);
 	if (c->custom_proc_title != NULL)
 		free(c->custom_proc_title);
-	if (c->replication_source_ipaddr != NULL)
-		free(c->replication_source_ipaddr);
+	if (c->replication_source != NULL)
+		free(c->replication_source);
 
 	if (c->namespace != NULL) {
 		i->idx_name__namespace = 0;
@@ -2191,8 +2161,8 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 	}
-	if (c1->hot_standby != c2->hot_standby) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->hot_standby");
+	if (c1->local_hot_standby != c2->local_hot_standby) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->local_hot_standby");
 
 		return diff;
 	}
@@ -2212,18 +2182,11 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 		return diff;
 	}
 	if (!only_check_rdonly) {
-		if (confetti_strcmp(c1->replication_source_ipaddr, c2->replication_source_ipaddr) != 0) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_source_ipaddr");
+		if (confetti_strcmp(c1->replication_source, c2->replication_source) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_source");
 
 			return diff;
 }
-	}
-	if (!only_check_rdonly) {
-		if (c1->replication_source_port != c2->replication_source_port) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_source_port");
-
-			return diff;
-		}
 	}
 
 	i1->idx_name__namespace = 0;

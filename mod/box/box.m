@@ -1184,20 +1184,15 @@ title(const char *fmt, ...)
 static void
 box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 {
-	if (conf->replication_source_port != 0) {
+	if (conf->replication_source != NULL) {
 		rw_callback = box_process_ro;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
-		recovery_follow_remote(recovery_state,
-				       conf->replication_source_ipaddr,
-				       conf->replication_source_port);
+		recovery_follow_remote(recovery_state, conf->replication_source);
 
-		snprintf(status, sizeof(status), "replica/%s:%i%s",
-			 conf->replication_source_ipaddr,
-			 conf->replication_source_port,
-			 custom_proc_title);
-		title("replica/%s:%i%s", conf->replication_source_ipaddr,
-		      conf->replication_source_port, custom_proc_title);
+		snprintf(status, sizeof(status), "replica/%s%s",
+			 conf->replication_source, custom_proc_title);
+		title("replica/%s%s", conf->replication_source, custom_proc_title);
 	} else {
 		rw_callback = box_process_rw;
 
@@ -1222,23 +1217,25 @@ i32
 mod_check_config(struct tarantool_cfg *conf)
 {
 	/* replication & hot standby modes can not work together */
-	if (conf->replication_source_port != 0 && conf->hot_standby > 0) {
-		out_warning(0, "replication and hot standby modes "
+	if (conf->replication_source != NULL && conf->local_hot_standby > 0) {
+		out_warning(0, "replication and local hot standby modes "
 			       "can't be enabled simultaneously");
 		return -1;
 	}
 
 	/* check replication mode */
-	if (conf->replication_source_port != 0) {
+	if (conf->replication_source != NULL) {
 		/* check replication port */
-		if (conf->replication_source_port <= 0 || conf->replication_source_port >= USHRT_MAX) {
-			out_warning(0, "invalid replication_source_port value: %i", conf->replication_source_port);
+		char ip_addr[32];
+		int port;
+
+		if (sscanf(conf->replication_source, "%31[^:]:%i",
+			   ip_addr, &port) != 2) {
+			out_warning(0, "replication source IP address is not recognized");
 			return -1;
 		}
-
-		/* in the replication mode replication_source_ipaddr must be specified */
-		if (conf->replication_source_ipaddr == NULL) {
-			out_warning(0, "replication_source_ipaddr must be provided in replication mode");
+		if (port <= 0 || port >= USHRT_MAX) {
+			out_warning(0, "invalid replication source port value: %i", port);
 			return -1;
 		}
 	}
@@ -1396,13 +1393,12 @@ mod_check_config(struct tarantool_cfg *conf)
 i32
 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
 {
-	bool old_is_replica = old_conf->replication_source_port != 0;
-	bool new_is_replica = new_conf->replication_source_port != 0;
+	bool old_is_replica = old_conf->replication_source != NULL;
+	bool new_is_replica = new_conf->replication_source != NULL;
 
 	if (old_is_replica != new_is_replica ||
 	    (old_is_replica &&
-	     (strcmp(old_conf->replication_source_ipaddr, new_conf->replication_source_ipaddr) != 0 ||
-	      old_conf->replication_source_port != new_conf->replication_source_port))) {
+	     (strcmp(old_conf->replication_source, new_conf->replication_source) != 0))) {
 
 		if (recovery_state->finalize != true) {
 			out_warning(0, "Could not propagate %s before local recovery finished",
@@ -1412,8 +1408,7 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 			return -1;
 		}
 
-		if (old_conf->replication_source_port == 0 &&
-		    new_conf->replication_source_port != 0)
+		if (!old_is_replica && new_is_replica)
 			memcached_stop_expire();
 
 		if (recovery_state->remote_recovery)
@@ -1462,7 +1457,7 @@ mod_init(void)
 
 	title("orphan");
 
-	if (cfg.hot_standby) {
+	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recover_follow(recovery_state, cfg.wal_dir_rescan_delay);
 		snprintf(status, sizeof(status), "hot_standby");

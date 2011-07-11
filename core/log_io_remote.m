@@ -178,10 +178,12 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 }
 
 void
-recovery_follow_remote(struct recovery_state *r,
-		       const char *ip_addr, int port)
+recovery_follow_remote(struct recovery_state *r, const char *remote)
 {
-	char *name;
+	char name[FIBER_NAME_MAXLEN];
+	char ip_addr[32];
+	int port;
+	int rc;
 	struct fiber *f;
 	struct in_addr server;
 	struct sockaddr_in *addr;
@@ -189,9 +191,8 @@ recovery_follow_remote(struct recovery_state *r,
 
 	assert(r->remote_recovery == NULL);
 
-	say_crit("initializing the replica, WAL master %s:%i", ip_addr, port);
-	name = palloc(eter_pool, 64);
-	snprintf(name, 64, "replica/%s:%i", ip_addr, port);
+	say_crit("initializing the replica, WAL master %s", remote);
+	snprintf(name, sizeof(name), "replica/%s", remote);
 
 	h = palloc(eter_pool, sizeof(*h));
 	h->r = r;
@@ -200,6 +201,9 @@ recovery_follow_remote(struct recovery_state *r,
 	f = fiber_create(name, -1, -1, pull_from_remote, h);
 	if (f == NULL)
 		return;
+
+	rc = sscanf(remote, "%31[^:]:%i", ip_addr, &port);
+	assert(rc == 2);
 
 	if (inet_aton(ip_addr, &server) < 0) {
 		say_syserror("inet_aton: %s", ip_addr);

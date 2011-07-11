@@ -642,7 +642,7 @@ spawner_shutdown_wait_children()
 static void
 replication_relay_loop(int client_sock)
 {
-	char name[sizeof(fiber->name)];
+	char name[FIBER_NAME_MAXLEN];
 	struct sigaction sa;
 	struct recovery_state *log_io;
 	struct tbuf *ver;

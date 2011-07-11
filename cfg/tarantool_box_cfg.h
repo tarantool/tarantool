@@ -154,10 +154,12 @@ typedef struct tarantool_cfg {
 	int32_t	wal_writer_inbox_size;
 
 	/*
-	 * Hot standby (if enabled, the server will run in hot standby
-	 * mode, continuously fetching WAL records from shared directory).
+	 * Local hot standby (if enabled, the server will run in hot
+	 * standby mode, continuously fetching WAL records from wal_dir,
+	 * until it is able to bind to the primary port.
+	 * In local hot standby mode the server only accepts reads.
 	 */
-	int32_t	hot_standby;
+	int32_t	local_hot_standby;
 
 	/*
 	 * Delay, in seconds, between successive re-readings of wal_dir.
@@ -174,12 +176,13 @@ typedef struct tarantool_cfg {
 	int32_t	panic_on_wal_error;
 
 	/*
-	 * Replicator mode (if enabled, the server will run in replication mode
-	 * continuously fetching WAL records from
-	 * replication_source_ipaddr:replication_source_port
+	 * Replication mode (if enabled, the server, once
+	 * bound to the primary port, will connect to
+	 * replication_source (ipaddr:port) and run continously
+	 * fetching records from it.. In replication mode the server
+	 * only accepts reads.
 	 */
-	char*	replication_source_ipaddr;
-	int32_t	replication_source_port;
+	char*	replication_source;
 	tarantool_cfg_namespace**	namespace;
 } tarantool_cfg;
 

@@ -490,7 +490,7 @@ fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void 
 		if (tarantool_coro_create(&fiber->coro, fiber_loop, NULL) == NULL)
 			return NULL;
 
-		fiber->pool = palloc_create_pool(name);
+		fiber->pool = palloc_create_pool("");
 		fiber->inbox = palloc(eter_pool, (sizeof(*fiber->inbox) +
 						  inbox_size * sizeof(struct tbuf *)));
 		fiber->inbox->size = inbox_size;
@@ -1029,7 +1029,7 @@ struct child *
 spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, struct tbuf *),
 	    void *state)
 {
-	char *proxy_name;
+	char proxy_name[FIBER_NAME_MAXLEN];
 	int socks[2];
 	int pid;
 
@@ -1051,12 +1051,10 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		struct child *c = palloc(eter_pool, sizeof(*c));
 		c->pid = pid;
 
-		proxy_name = palloc(eter_pool, 64);
-		snprintf(proxy_name, 64, "%s/sock2inbox", name);
+		snprintf(proxy_name, sizeof(proxy_name), "%s/sock2inbox", name);
 		c->in = fiber_create(proxy_name, socks[1], inbox_size, sock2inbox, NULL);
 		fiber_call(c->in);
-		proxy_name = palloc(eter_pool, 64);
-		snprintf(proxy_name, 64, "%s/inbox2sock", name);
+		snprintf(proxy_name, sizeof(proxy_name), "%s/inbox2sock", name);
 		c->out = fiber_create(proxy_name, socks[1], inbox_size, inbox2sock, NULL);
 		c->out->flags |= FIBER_READING_INBOX;
 		return c;
@@ -1082,7 +1080,7 @@ tcp_server_handler(void *data)
 {
 	struct fiber_server *server = fiber->data;
 	struct fiber *h;
-	char name[64];
+	char name[FIBER_NAME_MAXLEN];
 	int fd;
 	int one = 1;
 
@@ -1134,12 +1132,11 @@ struct fiber *
 fiber_server(int port, void (*handler) (void *data), void *data,
 	     void (*on_bind) (void *data))
 {
-	char *server_name;
+	char server_name[FIBER_NAME_MAXLEN];
 	struct fiber_server *server;
 	struct fiber *s;
 
-	server_name = palloc(eter_pool, 64);
-	snprintf(server_name, 64, "%i/acceptor", port);
+	snprintf(server_name, sizeof(server_name), "%i/acceptor", port);
 	s = fiber_create(server_name, -1, -1, tcp_server_handler, data);
 	s->data = server = palloc(eter_pool, sizeof(struct fiber_server));
 	assert(server != NULL);
