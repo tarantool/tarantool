@@ -1,5 +1,6 @@
 import socket
 import struct
+import sys
 import re
 from tarantool_connection import TarantoolConnection
 
@@ -25,17 +26,34 @@ class MemcachedCommandBuffer:
 
 class MemcachedConnection(TarantoolConnection):
 
-    def execute_no_reconnect(self, commands, silent = True):
-        self.send_commands(commands, silent)
-        return self.recv_reply(silent)
+    def write(self, fragment):
+        """This is to support print >> admin, "command" syntax.
+        For every print statement, write is invoked twice: one to
+        write the command itself, and another to write \n. We should
+        accumulate all writes until we receive \n. When we receive it,
+        we execute the command, and rewind the stream."""
 
-    def send_commands(self, commands, silent = True):
+        self.stream.write(fragment)
+        statement = self.stream.getvalue()
+
+        sys.stdout.write(statement)
+        if fragment != '\n':
+            # execute only commands
+            sys.stdout.write(self.execute(statement))
+        self.stream.seek(0)
+        self.stream.truncate()
+
+    def execute_no_reconnect(self, commands, silent = True):
+        self.send(commands, silent)
+        return self.recv(silent)
+
+    def send(self, commands, silent = True):
         self.commands = commands
-        self.socket.sendall(commands + MEMCACHED_SEPARATOR)
+        self.socket.sendall(commands)
         if not silent:
             print self.commands
 
-    def recv_reply(self, silent = True):
+    def recv(self, silent = True):
         self.recv_buffer = ''
         self.command_buffer = MemcachedCommandBuffer(self.commands)
         self.reply = ''

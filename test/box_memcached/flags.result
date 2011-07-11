@@ -3,6 +3,7 @@ fooval
 STORED
 
 gets foo
+
 VALUE foo 0 6 42
 fooval
 END
@@ -13,6 +14,7 @@ fooval
 STORED
 
 gets foo
+
 VALUE foo 123 6 43
 fooval
 END
@@ -23,6 +25,7 @@ fooval
 STORED
 
 gets foo
+
 VALUE foo 65535 6 44
 fooval
 END

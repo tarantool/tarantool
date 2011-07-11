@@ -1,17 +1,13 @@
 cas bad blah 0 0 0
-
 CLIENT_ERROR bad command line format
 
 cas bad 0 blah 0 0
-
 CLIENT_ERROR bad command line format
 
 cas bad 0 0 blah 0
-
 CLIENT_ERROR bad command line format
 
 cas bad 0 0 0 blah
-
 CLIENT_ERROR bad command line format
 
 # gets foo (should not exist) 
@@ -36,6 +32,7 @@ EXISTS
 
 # gets foo and verify identifier exists 
 gets foo
+
 VALUE foo 0 6 42
 barval
 END
@@ -52,7 +49,6 @@ EXISTS
 
 # delete foo 
 delete foo
-
 DELETED
 
 # cas missing 
@@ -72,26 +68,30 @@ STORED
 
 # gets foo1 check 
 gets foo1
+
 VALUE foo1 0 1 44
 1
 END
 
 # gets foo2 check 
 gets foo2
+
 VALUE foo2 0 1 45
 2
 END
 
 # validate foo1 != foo2 
-success: foo1_cas (44) != foo2_cas (45)
+pass: foo1_cas != foo2_cas
 # gets foo from memcached1 - should success 
 gets foo1
+
 VALUE foo1 0 1 44
 1
 END
 
 # gets foo from memcached2 - should success 
 gets foo1
+
 VALUE foo1 0 1 44
 1
 END
@@ -99,9 +99,11 @@ END
 # send 'cas foo1' from memcached1 
 cas foo1 0 0 6 44
 barva2
+
 # send 'cas foo1' from memcached2 
 cas foo1 0 0 4 44
 pear
+
 # recv reply 'cas foo1' from memcached1 
 # recv reply 'cas foo1' from memcached2 
 race cas: pass
@@ -117,4 +119,4 @@ incr bug15 1
 
 # Validate a changed CAS. 
 # validate bug15_cas != next_bug15_cas 
-success: bug15_cas != next_bug15_cas
+pass: bug15_cas != next_bug15_cas
