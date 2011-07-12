@@ -557,9 +557,9 @@ main(int argc, char **argv)
 
 	signal_init();
 
-	replication_init();
 	mod_init();
 	admin_init();
+	replication_init();
 
 	prelease(fiber->pool);
 	say_crit("log level %i", cfg.log_level);

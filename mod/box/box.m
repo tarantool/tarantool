@@ -1164,9 +1164,10 @@ title(const char *fmt, ...)
 	va_end(ap);
 
 	int ports[] = { cfg.primary_port, cfg.secondary_port,
-			cfg.memcached_port, cfg.admin_port };
+			cfg.memcached_port, cfg.admin_port,
+			cfg.replication_port };
 	int *pptr = ports;
-	char *names[] = { "pri", "sec", "memc", "adm", NULL };
+	char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
 	char **nptr = names;
 
 	for (; *nptr; nptr++, pptr++)
@@ -1195,8 +1196,8 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 
 		memcached_start_expire();
 
-		snprintf(status, sizeof(status), "primary");
-		title("primary");
+		snprintf(status, sizeof(status), "primary%s", custom_proc_title);
+		title("primary%s", custom_proc_title);
 
 		say_info("I am primary");
 	}
@@ -1461,21 +1462,22 @@ mod_init(void)
 		title("hot_standby");
 	}
 
-	/* run memcached server */
-	if (cfg.memcached_port != 0)
-		fiber_server(cfg.memcached_port, memcached_handler, NULL, NULL);
+	/* run primary server */
+	if (cfg.primary_port != 0)
+		fiber_server("primary", cfg.primary_port,
+			     (fiber_server_callback) iproto_interact,
+			     &rw_callback, box_leave_local_standby_mode);
 
 	/* run secondary server */
 	if (cfg.secondary_port != 0)
-		fiber_server(cfg.secondary_port,
+		fiber_server("secondary", cfg.secondary_port,
 			     (fiber_server_callback) iproto_interact,
 			     &ro_callback, NULL);
 
-	/* run primary server */
-	if (cfg.primary_port != 0)
-		fiber_server(cfg.primary_port,
-			     (fiber_server_callback) iproto_interact,
-			     &rw_callback, box_leave_local_standby_mode);
+	/* run memcached server */
+	if (cfg.memcached_port != 0)
+		fiber_server("memcached", cfg.memcached_port,
+			     memcached_handler, NULL, NULL);
 }
 
 int

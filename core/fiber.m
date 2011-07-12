@@ -1069,7 +1069,7 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		close_all_xcpt(2, socks[0], sayfd);
 		snprintf(child_name, sizeof(child_name), "%s/child", name);
 		fiber_set_name(&sched, child_name);
-		set_proc_title(name);
+		set_proc_title("%s%s", name, custom_proc_title);
 		say_crit("%s initialized", name);
 		blocking_loop(socks[0], handler, state);
 	}
@@ -1129,14 +1129,14 @@ tcp_server_handler(void *data)
 }
 
 struct fiber *
-fiber_server(int port, void (*handler) (void *data), void *data,
+fiber_server(const char *name, int port, void (*handler) (void *data), void *data,
 	     void (*on_bind) (void *data))
 {
 	char server_name[FIBER_NAME_MAXLEN];
 	struct fiber_server *server;
 	struct fiber *s;
 
-	snprintf(server_name, sizeof(server_name), "%i/acceptor", port);
+	snprintf(server_name, sizeof(server_name), "%i/%s", port, name);
 	s = fiber_create(server_name, -1, -1, tcp_server_handler, data);
 	s->data = server = palloc(eter_pool, sizeof(struct fiber_server));
 	assert(server != NULL);

@@ -203,7 +203,7 @@ int set_nonblock(int sock);
 
 typedef void (*fiber_server_callback)(void *);
 
-struct fiber *fiber_server(int port,
+struct fiber *fiber_server(const char *name, int port,
 			   fiber_server_callback callback, void *,
 			   void (*on_bind) (void *));
 
