@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2010-2011 Mail.RU
+ * Copyright (C) 2010-2011 Yuriy Vostrikov
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,6 +43,7 @@
 # include <sys/prctl.h>
 #endif
 #include <admin.h>
+#include <replication.h>
 #include <fiber.h>
 #include <iproto.h>
 #include <latch.h>
@@ -62,6 +63,8 @@ static pid_t master_pid;
 const char *cfg_filename = DEFAULT_CFG_FILENAME;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
+char *custom_proc_title;
+
 struct tarantool_cfg cfg;
 struct recovery_state *recovery_state;
 
@@ -95,6 +98,9 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 		return -1;
 
 	if (n_accepted == 0 || n_skipped != 0)
+		return -1;
+
+	if (replication_check_config(conf) != 0)
 		return -1;
 
 	return mod_check_config(conf);
@@ -184,7 +190,6 @@ tarantool_uptime(void)
 	return ev_now() - start_time;
 }
 
-#ifdef STORAGE
 int
 snapshot(void *ev, int events __attribute__((unused)))
 {
@@ -227,7 +232,6 @@ snapshot(void *ev, int events __attribute__((unused)))
 
 	return 0;
 }
-#endif
 
 static void
 sig_int(int signal)
@@ -341,9 +345,7 @@ initialize_minimal()
 int
 main(int argc, char **argv)
 {
-#ifdef STORAGE
 	const char *cat_filename = NULL;
-#endif
 	const char *cfg_paramname = NULL;
 
 #ifndef HAVE_LIBC_STACK_END
@@ -376,13 +378,11 @@ main(int argc, char **argv)
 			   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
 				       gopt_longs("config"),
 				       "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
-#ifdef STORAGE
 			   gopt_option('C', GOPT_ARG, gopt_shorts(0), gopt_longs("cat"),
 				       "=FILE", "cat snapshot file to stdout in readable format and exit"),
 			   gopt_option('I', 0, gopt_shorts(0),
 				       gopt_longs("init-storage", "init_storage"),
 				       NULL, "initialize storage (an empty snapshot file) and exit"),
-#endif
 			   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
 				       NULL, "increase verbosity level in log messages"),
 			   gopt_option('B', 0, gopt_shorts('B'), gopt_longs("background"),
@@ -483,7 +483,7 @@ main(int argc, char **argv)
 				exit(EX_OSERR);
 			}
 		} else {
-			say_error("can't swith to %s: i'm not root", cfg.username);
+			say_error("can't switch to %s: i'm not root", cfg.username);
 		}
 	}
 
@@ -506,7 +506,6 @@ main(int argc, char **argv)
 #endif
 	}
 
-#ifdef STORAGE
 	if (gopt_arg(opt, 'C', &cat_filename)) {
 		initialize_minimal();
 		if (access(cat_filename, R_OK) == -1) {
@@ -525,7 +524,6 @@ main(int argc, char **argv)
 		snapshot_save(recovery_state, mod_snapshot);
 		exit(EXIT_SUCCESS);
 	}
-#endif
 
 	if (gopt(opt, 'B'))
 		daemonize(1, 1);
@@ -535,14 +533,21 @@ main(int argc, char **argv)
 		atexit(remove_pid);
 	}
 
+	/* init process title */
+	if (cfg.custom_proc_title == NULL) {
+		custom_proc_title = "";
+	} else {
+		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
+		strcat(custom_proc_title, "@");
+		strcat(custom_proc_title, cfg.custom_proc_title);
+	}
+
 	say_logger_init(cfg.logger_nonblock);
 	booting = false;
 
-#if defined(UTILITY)
-	initialize_minimal();
-	signal_init();
-	mod_init();
-#elif defined(STORAGE)
+	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
+	replication_prefork();
+
 	ev_default_loop(EVFLAG_AUTO);
 
 	ev_signal *ev_sig;
@@ -550,11 +555,12 @@ main(int argc, char **argv)
 	ev_signal_init(ev_sig, (void *)snapshot, SIGUSR1);
 	ev_signal_start(ev_sig);
 
-	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
 	signal_init();
 
 	mod_init();
 	admin_init();
+	replication_init();
+
 	prelease(fiber->pool);
 	say_crit("log level %i", cfg.log_level);
 	say_crit("entering event loop");
@@ -564,8 +570,6 @@ main(int argc, char **argv)
 	start_time = ev_now();
 	ev_loop(0);
 	say_crit("exiting loop");
-#else
-#error UTILITY or STORAGE must be defined
-#endif
+
 	return 0;
 }

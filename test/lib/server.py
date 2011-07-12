@@ -229,7 +229,7 @@ class Server(object):
         self.pid = None
 
     def deploy(self, config=None, binary=None, vardir=None,
-               mem=None, start_and_exit=None, gdb=None, valgrind=None, silent=True):
+               mem=None, start_and_exit=None, gdb=None, valgrind=None, silent=True, need_init=True):
         if config != None: self.config = config
         if binary != None: self.binary = binary
         if vardir != None: self.vardir = vardir
@@ -240,7 +240,8 @@ class Server(object):
 
         self.configure(self.config)
         self.install(self.binary, self.vardir, self.mem, silent)
-        self.init()
+        if need_init:
+            self.init()
         self.start(self.start_and_exit, self.gdb, self.valgrind, silent)
 
     def restart(self):

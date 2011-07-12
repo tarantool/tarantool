@@ -1,6 +1,10 @@
 # username to switch to
 username=NULL, ro
 
+# tarantool bind ip address, applies to master
+# and replication ports. INADDR_ANY is the default value.
+bind_ipaddr="INADDR_ANY", ro
+
 # save core on abort/assert
 # deprecated; use ulimit instead
 coredump=0, ro
@@ -8,6 +12,9 @@ coredump=0, ro
 # admin port
 # used for admin's connections
 admin_port=0, ro
+
+# Replication clients should use this port (bind_ipaddr:replication_port).
+replication_port=0, ro
 
 # Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5
 log_level=4

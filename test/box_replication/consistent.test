@@ -1,0 +1,162 @@
+# encoding: tarantool
+import os
+import time
+from lib.tarantool_box_server import TarantoolBoxServer
+
+ID_BEGIN = 0
+ID_STEP = 10
+
+def insert_tuples(server, begin, end, msg = "tuple"):
+    for i in range(begin, end):
+        server.sql.execute("insert into t0 values (%d, '%s %d')" % (i, msg, i), silent=False)
+
+def select_tuples(server, begin, end):
+    # the last lsn is end id + 1
+    server.wait_lsn(end + 1)
+    for i in range(begin, end):
+        server.sql.execute("select * from t0 where k0 = %d" % i, silent=False)
+
+# master server
+master = server
+
+# replica server
+replica = TarantoolBoxServer()
+replica.deploy("box_replication/cfg/replica.cfg",
+               replica.find_exe(self.args.builddir),
+               os.path.join(self.args.vardir, "replica"))
+
+# Id counter
+id = 0
+
+
+print "insert to master [%d, %d) entries" % (id, id + ID_STEP)
+insert_tuples(master, id, id + ID_STEP, "mater")
+
+print "select from replica [%d, %d) entries" % (id, id + ID_STEP)
+select_tuples(replica, id, id + ID_STEP)
+id += ID_STEP
+
+print "master lsn = %s" % master.get_param("lsn")
+print "replica lsn = %s" % replica.get_param("lsn")
+
+
+print """
+#
+# mater lsn > replica lsn
+#
+"""
+print """
+# reconfigure replica to master
+"""
+replica.reconfigure("box_replication/cfg/replica_to_master.cfg")
+
+print "insert to master [%d, %d) entries" % (id, id + ID_STEP)
+insert_tuples(master, id, id + ID_STEP, "mater")
+print "select from master [%d, %d) entries" % (id, id + ID_STEP)
+select_tuples(master, id, id + ID_STEP)
+
+print "insert to replica [%d, %d) entries" % (id, id + (ID_STEP / 2))
+insert_tuples(replica, id, id + (ID_STEP / 2), "replica")
+print "select from replica [%d, %d) entries" % (id, id + (ID_STEP / 2))
+select_tuples(replica, id, id + (ID_STEP / 2))
+
+print "master lsn = %s" % master.get_param("lsn")
+print "replica lsn = %s" % replica.get_param("lsn")
+
+print """
+# rollback replica
+"""
+replica.reconfigure("box_replication/cfg/replica.cfg")
+
+print "select from replica [%d, %d) entries" % (id, id + ID_STEP)
+select_tuples(replica, id, id + ID_STEP)
+id += ID_STEP
+
+print "master lsn = %s" % master.get_param("lsn")
+print "replica lsn = %s" % replica.get_param("lsn")
+
+
+print """
+#
+# master lsn == replica lsn
+#
+"""
+print """
+# reconfigure replica to master
+"""
+replica.reconfigure("box_replication/cfg/replica_to_master.cfg")
+
+print "insert to master [%d, %d) entries" % (id, id + ID_STEP)
+insert_tuples(master, id, id + ID_STEP, "mater")
+print "select from master [%d, %d) entries" % (id, id + ID_STEP)
+select_tuples(master, id, id + ID_STEP)
+
+print "insert to replica [%d, %d) entries" % (id, id + ID_STEP)
+insert_tuples(replica, id, id + ID_STEP, "replica")
+print "select from replica [%d, %d) entries" % (id, id + ID_STEP)
+select_tuples(replica, id, id + ID_STEP)
+
+print "master lsn = %s" % master.get_param("lsn")
+print "replica lsn = %s" % replica.get_param("lsn")
+
+print """
+# rollback replica
+"""
+replica.reconfigure("box_replication/cfg/replica.cfg")
+
+print "select from replica [%d, %d) entries" % (id, id + ID_STEP)
+select_tuples(replica, id, id + ID_STEP)
+id += ID_STEP
+
+print "master lsn = %s" % master.get_param("lsn")
+print "replica lsn = %s" % replica.get_param("lsn")
+
+
+print """
+#
+# mater lsn < replica lsn
+#
+"""
+print """
+#reconfigure replica to master
+"""
+replica.reconfigure("box_replication/cfg/replica_to_master.cfg")
+
+print "insert to master [%d, %d) entries" % (id, id + ID_STEP)
+insert_tuples(master, id, id + ID_STEP, "mater")
+print "select from master [%d, %d) entries" % (id, id + ID_STEP)
+select_tuples(master, id, id + ID_STEP)
+
+print "insert to replica [%d, %d) entries" % (id, id + (ID_STEP * 2))
+insert_tuples(replica, id, id + (ID_STEP * 2), "replica")
+print "select from replica [%d, %d) entries" % (id, id + (ID_STEP * 2))
+select_tuples(replica, id, id + (ID_STEP * 2))
+
+print "master lsn = %s" % master.get_param("lsn")
+print "replica lsn = %s" % replica.get_param("lsn")
+
+print """
+# rollback replica
+"""
+replica.reconfigure("box_replication/cfg/replica.cfg")
+
+print "select from replica [%d, %d) entries" % (id, id + (ID_STEP * 2))
+select_tuples(replica, id, id + (ID_STEP * 2))
+id += ID_STEP
+
+print "insert to master [%d, %d) entries" % (id, id + (ID_STEP * 2))
+insert_tuples(master, id, id + (ID_STEP * 2), "master")
+
+print "select from replica [%d, %d) entries" % (id, id + (ID_STEP * 2))
+select_tuples(replica, id, id + (ID_STEP * 2))
+
+print "master lsn = %s" % master.get_param("lsn")
+print "replica lsn = %s" % replica.get_param("lsn")
+
+# Cleanup.
+replica.stop()
+replica.cleanup(True)
+server.stop()
+server.deploy(self.suite_ini["config"])
+
+# vim: syntax=python

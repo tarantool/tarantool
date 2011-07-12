@@ -1,8 +1,8 @@
-#ifndef TARANTOOL_H_INCLUDED
-#define TARANTOOL_H_INCLUDED
+#ifndef TARANTOOL_REPLICATION_H_INCLUDED
+#define TARANTOOL_REPLICATION_H_INCLUDED
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
+ * Copyright (C) 2011 Yuriy Vostrikov
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,35 +25,34 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <tbuf.h>
+#include <tarantool.h>
 #include <util.h>
-#include <log_io.h>
 
-extern struct recovery_state *recovery_state;
-void mod_init(void);
-struct tarantool_cfg;
+/**
+ * Check replication configuration.
+ *
+ * @param config  config file to check.
+ *
+ * @return 0 on success, -1 on error
+ */
+int
+replication_check_config(struct tarantool_cfg *config);
 
-extern const char *mod_name;
-i32 mod_check_config(struct tarantool_cfg *conf);
-i32 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
-int mod_cat(const char *filename);
-void mod_snapshot(struct log_io_iter *);
-void mod_info(struct tbuf *out);
-void mod_exec(char *str, int len, struct tbuf *out);
+/**
+ * Pre-fork replication spawner process.
+ *
+ * @return None. Panics and exits on error.
+ */
+void
+replication_prefork();
 
-extern struct tarantool_cfg cfg;
-extern const char *cfg_filename;
-extern bool init_storage, booting;
-extern char *binary_filename;
-extern char *custom_proc_title;
-i32 reload_cfg(struct tbuf *out);
-int snapshot(void * /* ev */, int /* events */);
-const char *tarantool_version(void);
-void tarantool_info(struct tbuf *out);
-double tarantool_uptime(void);
+/**
+ * Initialize replication module.
+ *
+ * @return None. Panics and exits on error.
+ */
+void
+replication_init();
 
-char **init_set_proc_title(int argc, char **argv);
-void set_proc_title(const char *format, ...);
+#endif // TARANTOOL_REPLICATION_H_INCLUDED
 
-#endif /* TARANTOOL_H_INCLUDED */

@@ -124,11 +124,6 @@ struct recovery_state {
 	void *data;
 };
 
-struct remote_state {
-	struct recovery_state *r;
-	int (*handler) (struct recovery_state * r, struct tbuf *row);
-};
-
 struct wal_write_request {
 	i64 lsn;
 	u32 len;
@@ -169,8 +164,7 @@ void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
 int read_log(const char *filename,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);
 
-void recovery_follow_remote(struct recovery_state *r,
-			    const char *ip_addr, int port);
+void recovery_follow_remote(struct recovery_state *r, const char *remote);
 void recovery_stop_remote(struct recovery_state *r);
 
 struct log_io_iter;

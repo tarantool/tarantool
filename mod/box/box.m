@@ -58,8 +58,6 @@ static char status[64] = "unknown";
 static int stat_base;
 STRS(messages, MESSAGES);
 
-static char *custom_proc_title;
-
 /* hooks */
 typedef int (*box_hook_t) (struct box_txn * txn);
 
@@ -1172,9 +1170,10 @@ title(const char *fmt, ...)
 	va_end(ap);
 
 	int ports[] = { cfg.primary_port, cfg.secondary_port,
-			cfg.memcached_port, cfg.admin_port };
+			cfg.memcached_port, cfg.admin_port,
+			cfg.replication_port };
 	int *pptr = ports;
-	char *names[] = { "pri", "sec", "memc", "adm", NULL };
+	char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
 	char **nptr = names;
 
 	for (; *nptr; nptr++, pptr++)
@@ -1189,33 +1188,29 @@ title(const char *fmt, ...)
 static void
 box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 {
-	if (conf->remote_hot_standby) {
+	if (conf->replication_source != NULL) {
 		rw_callback = box_process_ro;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
-		recovery_follow_remote(recovery_state,
-				      conf->wal_feeder_ipaddr,
-				      conf->wal_feeder_port);
+		recovery_follow_remote(recovery_state, conf->replication_source);
 
-		snprintf(status, sizeof(status), "replica/%s:%i%s",
-			 conf->wal_feeder_ipaddr, conf->wal_feeder_port,
-			 custom_proc_title);
-		title("replica/%s:%i%s", conf->wal_feeder_ipaddr,
-		      conf->wal_feeder_port, custom_proc_title);
+		snprintf(status, sizeof(status), "replica/%s%s",
+			 conf->replication_source, custom_proc_title);
+		title("replica/%s%s", conf->replication_source, custom_proc_title);
 	} else {
 		rw_callback = box_process_rw;
 
 		memcached_start_expire();
 
-		snprintf(status, sizeof(status), "primary");
-		title("primary");
+		snprintf(status, sizeof(status), "primary%s", custom_proc_title);
+		title("primary%s", custom_proc_title);
 
 		say_info("I am primary");
 	}
 }
 
 static void
-box_leave_local_hot_standby_mode(void *data __attribute__((unused)))
+box_leave_local_standby_mode(void *data __attribute__((unused)))
 {
 	recover_finalize(recovery_state);
 
@@ -1225,22 +1220,31 @@ box_leave_local_hot_standby_mode(void *data __attribute__((unused)))
 i32
 mod_check_config(struct tarantool_cfg *conf)
 {
-	/* local & remote standby can not work together */
-	if (conf->remote_hot_standby > 0 && conf->local_hot_standby > 0) {
-		out_warning(0, "Remote and local hot standby modes "
+	/* replication & hot standby modes can not work together */
+	if (conf->replication_source != NULL && conf->local_hot_standby > 0) {
+		out_warning(0, "replication and local hot standby modes "
 			       "can't be enabled simultaneously");
 		return -1;
 	}
 
-	/* in the remote_hot_standby mode wal_feeder_ipaddr and wal_feeder_port must be defiend */
-	if (conf->remote_hot_standby &&
-	    (conf->wal_feeder_ipaddr == NULL || conf->wal_feeder_port == 0)) {
-		out_warning(0, "wal_feeder_ipaddr & wal_feeder_port "
-				"must be provided in remote_hot_standby mode");
-		return -1;
+	/* check replication mode */
+	if (conf->replication_source != NULL) {
+		/* check replication port */
+		char ip_addr[32];
+		int port;
+
+		if (sscanf(conf->replication_source, "%31[^:]:%i",
+			   ip_addr, &port) != 2) {
+			out_warning(0, "replication source IP address is not recognized");
+			return -1;
+		}
+		if (port <= 0 || port >= USHRT_MAX) {
+			out_warning(0, "invalid replication source port value: %i", port);
+			return -1;
+		}
 	}
 
-	/* check primary ports */
+	/* check primary port */
 	if (conf->primary_port != 0 &&
 	    (conf->primary_port <= 0 || conf->primary_port >= USHRT_MAX)) {
 		out_warning(0, "invalid primary port value: %i", conf->primary_port);
@@ -1393,22 +1397,22 @@ mod_check_config(struct tarantool_cfg *conf)
 i32
 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
 {
-	if (old_conf->remote_hot_standby != new_conf->remote_hot_standby ||
-	    (old_conf->remote_hot_standby != 0 &&
-	     (strcmp(old_conf->wal_feeder_ipaddr,
-		     new_conf->wal_feeder_ipaddr) != 0 ||
-	      old_conf->wal_feeder_port != new_conf->wal_feeder_port))) {
+	bool old_is_replica = old_conf->replication_source != NULL;
+	bool new_is_replica = new_conf->replication_source != NULL;
+
+	if (old_is_replica != new_is_replica ||
+	    (old_is_replica &&
+	     (strcmp(old_conf->replication_source, new_conf->replication_source) != 0))) {
 
 		if (recovery_state->finalize != true) {
 			out_warning(0, "Could not propagate %s before local recovery finished",
-				    old_conf->remote_hot_standby == true ? "slave to master" :
+				    old_is_replica == true ? "slave to master" :
 				    "master to slave");
 
 			return -1;
 		}
 
-		if (old_conf->remote_hot_standby == 0 &&
-		    new_conf->remote_hot_standby != 0)
+		if (!old_is_replica && new_is_replica)
 			memcached_stop_expire();
 
 		if (recovery_state->remote_recovery)
@@ -1424,15 +1428,6 @@ void
 mod_init(void)
 {
 	static iproto_callback ro_callback = box_process_ro;
-
-	/* init process title */
-	if (cfg.custom_proc_title == NULL)
-		custom_proc_title = "";
-	else {
-		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
-		strcat(custom_proc_title, "@");
-		strcat(custom_proc_title, cfg.custom_proc_title);
-	}
 
 	title("loading");
 
@@ -1473,21 +1468,22 @@ mod_init(void)
 		title("hot_standby");
 	}
 
-	/* run memcached server */
-	if (cfg.memcached_port != 0)
-		fiber_server(cfg.memcached_port, memcached_handler, NULL, NULL);
+	/* run primary server */
+	if (cfg.primary_port != 0)
+		fiber_server("primary", cfg.primary_port,
+			     (fiber_server_callback) iproto_interact,
+			     &rw_callback, box_leave_local_standby_mode);
 
 	/* run secondary server */
 	if (cfg.secondary_port != 0)
-		fiber_server(cfg.secondary_port,
+		fiber_server("secondary", cfg.secondary_port,
 			     (fiber_server_callback) iproto_interact,
 			     &ro_callback, NULL);
 
-	/* run primary server */
-	if (cfg.primary_port != 0)
-		fiber_server(cfg.primary_port,
-			     (fiber_server_callback) iproto_interact,
-			     &rw_callback, box_leave_local_hot_standby_mode);
+	/* run memcached server */
+	if (cfg.memcached_port != 0)
+		fiber_server("memcached", cfg.memcached_port,
+			     memcached_handler, NULL, NULL);
 }
 
 int

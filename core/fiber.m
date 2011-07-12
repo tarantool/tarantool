@@ -256,21 +256,21 @@ wait_for_child(pid_t pid)
 }
 
 
-static void
-fiber_io_start(int events)
+void
+fiber_io_start(int fd, int events)
 {
 	ev_io *io = &fiber->io;
 
 	assert (!ev_is_active(io));
 
-	ev_io_set(io, fiber->fd, events);
+	ev_io_set(io, fd, events);
 	ev_io_start(io);
 }
 
 /** @note: this is a cancellation point.
  */
 
-static void
+void
 fiber_io_yield()
 {
 	assert(ev_is_active(&fiber->io));
@@ -285,12 +285,12 @@ fiber_io_yield()
 	}
 }
 
-static void
-fiber_io_stop(int events __attribute__((unused)))
+void
+fiber_io_stop(int fd __attribute__((unused)), int events __attribute__((unused)))
 {
 	ev_io *io = &fiber->io;
 
-	assert(ev_is_active(io) && io->fd == fiber->fd && (io->events & events));
+	assert(ev_is_active(io) && io->fd == fd && (io->events & events));
 
 	ev_io_stop(io);
 }
@@ -490,7 +490,7 @@ fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void 
 		if (tarantool_coro_create(&fiber->coro, fiber_loop, NULL) == NULL)
 			return NULL;
 
-		fiber->pool = palloc_create_pool(name);
+		fiber->pool = palloc_create_pool("");
 		fiber->inbox = palloc(eter_pool, (sizeof(*fiber->inbox) +
 						  inbox_size * sizeof(struct tbuf *)));
 		fiber->inbox->size = inbox_size;
@@ -581,7 +581,7 @@ fiber_close(void)
 
 	/* We don't know if IO is active if there was an error. */
 	if (ev_is_active(&fiber->io))
-		fiber_io_stop(-1);
+		fiber_io_stop(fiber->fd, -1);
 
 	int r = close(fiber->fd);
 
@@ -675,7 +675,7 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 	ssize_t r;
 	tbuf_ensure(buf, MAX(cfg.readahead, at_least));
 
-	fiber_io_start(EV_READ);
+	fiber_io_start(fiber->fd, EV_READ);
 	for (;;) {
 		fiber_io_yield();
 		r = read(fiber->fd, buf->data + buf->len, buf->size - buf->len);
@@ -689,7 +689,7 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 			break;
 		}
 	}
-	fiber_io_stop(EV_READ);
+	fiber_io_stop(fiber->fd, EV_READ);
 
 	return r;
 }
@@ -713,7 +713,7 @@ fiber_flush_output(void)
 	struct iovec *iov = iovec(fiber->iov);
 	size_t iov_cnt = fiber->iov_cnt;
 
-	fiber_io_start(EV_WRITE);
+	fiber_io_start(fiber->fd, EV_WRITE);
 	while (iov_cnt > 0) {
 		fiber_io_yield();
 		bytes += r = writev(fiber->fd, iov, MIN(iov_cnt, IOV_MAX));
@@ -736,7 +736,7 @@ fiber_flush_output(void)
 			}
 		}
 	}
-	fiber_io_stop(EV_WRITE);
+	fiber_io_stop(fiber->fd, EV_WRITE);
 
 	if (r < 0) {
 		size_t rem = 0;
@@ -762,7 +762,7 @@ fiber_read(void *buf, size_t count)
 {
 	ssize_t r, done = 0;
 
-	fiber_io_start(EV_READ);
+	fiber_io_start(fiber->fd, EV_READ);
 	while (count != done) {
 
 		fiber_io_yield();
@@ -775,7 +775,7 @@ fiber_read(void *buf, size_t count)
 		}
 		done += r;
 	}
-	fiber_io_stop(EV_READ);
+	fiber_io_stop(fiber->fd, EV_READ);
 
 	return done;
 }
@@ -790,7 +790,7 @@ fiber_write(const void *buf, size_t count)
 	int r;
 	unsigned int done = 0;
 
-	fiber_io_start(EV_WRITE);
+	fiber_io_start(fiber->fd, EV_WRITE);
 
 	while (count != done) {
 		fiber_io_yield();
@@ -802,7 +802,7 @@ fiber_write(const void *buf, size_t count)
 		}
 		done += r;
 	}
-	fiber_io_stop(EV_WRITE);
+	fiber_io_stop(fiber->fd, EV_WRITE);
 
 	return done;
 }
@@ -826,9 +826,9 @@ fiber_connect(struct sockaddr_in *addr)
 		if (errno != EINPROGRESS)
 			goto error;
 
-		fiber_io_start(EV_WRITE);
+		fiber_io_start(fiber->fd, EV_WRITE);
 		fiber_io_yield();
-		fiber_io_stop(EV_WRITE);
+		fiber_io_stop(fiber->fd, EV_WRITE);
 
 		int error;
 		socklen_t error_size = sizeof(error);
@@ -1029,7 +1029,7 @@ struct child *
 spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, struct tbuf *),
 	    void *state)
 {
-	char *proxy_name;
+	char proxy_name[FIBER_NAME_MAXLEN];
 	int socks[2];
 	int pid;
 
@@ -1051,12 +1051,10 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		struct child *c = palloc(eter_pool, sizeof(*c));
 		c->pid = pid;
 
-		proxy_name = palloc(eter_pool, 64);
-		snprintf(proxy_name, 64, "%s/sock2inbox", name);
+		snprintf(proxy_name, sizeof(proxy_name), "%s/sock2inbox", name);
 		c->in = fiber_create(proxy_name, socks[1], inbox_size, sock2inbox, NULL);
 		fiber_call(c->in);
-		proxy_name = palloc(eter_pool, 64);
-		snprintf(proxy_name, 64, "%s/inbox2sock", name);
+		snprintf(proxy_name, sizeof(proxy_name), "%s/inbox2sock", name);
 		c->out = fiber_create(proxy_name, socks[1], inbox_size, inbox2sock, NULL);
 		c->out->flags |= FIBER_READING_INBOX;
 		return c;
@@ -1071,7 +1069,7 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		close_all_xcpt(2, socks[0], sayfd);
 		snprintf(child_name, sizeof(child_name), "%s/child", name);
 		fiber_set_name(&sched, child_name);
-		set_proc_title(name);
+		set_proc_title("%s%s", name, custom_proc_title);
 		say_crit("%s initialized", name);
 		blocking_loop(socks[0], handler, state);
 	}
@@ -1082,64 +1080,20 @@ tcp_server_handler(void *data)
 {
 	struct fiber_server *server = fiber->data;
 	struct fiber *h;
-	char name[64];
+	char name[FIBER_NAME_MAXLEN];
 	int fd;
-	bool warning_said = false;
 	int one = 1;
-	struct sockaddr_in sin;
-	struct linger ling = { 0, 0 };
 
-	if ((fiber->fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-		say_syserror("socket");
+	if (fiber_serv_socket(fiber, server->port, true, 0.1) != 0) {
+		say_error("init server socket on port %i fail", server->port);
 		exit(EX_OSERR);
 	}
 
-	if (setsockopt(fiber->fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) == -1 ||
-	    setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) == -1 ||
-	    setsockopt(fiber->fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1 ||
-	    setsockopt(fiber->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling)) == -1) {
-		say_syserror("setsockopt");
-		exit(EX_OSERR);
-	}
-
-	if (set_nonblock(fiber->fd) == -1)
-		exit(EX_OSERR);
-
-	memset(&sin, 0, sizeof(struct sockaddr_in));
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(server->port);
-	sin.sin_addr.s_addr = INADDR_ANY;
-
-	for (;;) {
-		if (bind(fiber->fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-			if (errno == EADDRINUSE)
-				goto sleep_and_retry;
-			say_syserror("bind");
-			exit(EX_OSERR);
-		}
-		if (listen(fiber->fd, cfg.backlog) == -1) {
-			if (errno == EADDRINUSE)
-				goto sleep_and_retry;
-			say_syserror("listen");
-			exit(EX_OSERR);
-		}
-
-		say_info("bound to TCP port %i", server->port);
-		break;
-
-	      sleep_and_retry:
-		if (!warning_said) {
-			say_warn("port %i is already in use, "
-				 "will retry binding after 0.1 seconds.", server->port);
-			warning_said = true;
-		}
-		fiber_sleep(0.1);
-	}
-
-	if (server->on_bind != NULL)
+	if (server->on_bind != NULL) {
 		server->on_bind(server->data);
+	}
 
-	fiber_io_start(EV_READ);
+	fiber_io_start(fiber->fd, EV_READ);
 	for (;;) {
 		fiber_io_yield();
 
@@ -1171,19 +1125,18 @@ tcp_server_handler(void *data)
 			continue;
 		}
 	}
-	fiber_io_stop(EV_READ);
+	fiber_io_stop(fiber->fd, EV_READ);
 }
 
 struct fiber *
-fiber_server(int port, void (*handler) (void *data), void *data,
+fiber_server(const char *name, int port, void (*handler) (void *data), void *data,
 	     void (*on_bind) (void *data))
 {
-	char *server_name;
+	char server_name[FIBER_NAME_MAXLEN];
 	struct fiber_server *server;
 	struct fiber *s;
 
-	server_name = palloc(eter_pool, 64);
-	snprintf(server_name, 64, "%i/acceptor", port);
+	snprintf(server_name, sizeof(server_name), "%i/%s", port, name);
 	s = fiber_create(server_name, -1, -1, tcp_server_handler, data);
 	s->data = server = palloc(eter_pool, sizeof(struct fiber_server));
 	assert(server != NULL);
@@ -1195,6 +1148,112 @@ fiber_server(int port, void (*handler) (void *data), void *data,
 	return s;
 }
 
+/** create new fiber's socket and set standat options. */
+static int
+create_socket(struct fiber *fiber)
+{
+	if (fiber->fd != -1) {
+		say_error("fiber is already has socket");
+		goto create_socket_fail;
+	}
+
+	fiber->fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (fiber->fd == -1) {
+		say_syserror("socket");
+		goto create_socket_fail;
+	}
+
+	int one = 1;
+	if (setsockopt(fiber->fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) != 0) {
+		say_syserror("setsockopt");
+		goto create_socket_fail;
+	}
+
+	struct linger ling = { 0, 0 };
+	if (setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) != 0 ||
+	    setsockopt(fiber->fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0 ||
+	    setsockopt(fiber->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling)) != 0) {
+		say_syserror("setsockopt");
+		goto create_socket_fail;
+	}
+
+	if (set_nonblock(fiber->fd) == -1) {
+		goto create_socket_fail;
+	}
+
+	return 0;
+
+create_socket_fail:
+
+	if (fiber->fd != -1) {
+		close(fiber->fd);
+	}
+	return -1;
+}
+
+/** Create server socket and bind his on port. */
+int
+fiber_serv_socket(struct fiber *fiber, unsigned short port, bool retry, ev_tstamp delay)
+{
+	const ev_tstamp min_delay = 0.001; /* minimal delay is 1 msec */
+	struct sockaddr_in sin;
+	bool warning_said = false;
+
+	if (delay < min_delay) {
+		delay = min_delay;
+	}
+
+	if (create_socket(fiber) != 0) {
+		return -1;
+	}
+
+	/* clean sockaddr_in struct */
+	memset(&sin, 0, sizeof(struct sockaddr_in));
+
+	/* fill sockaddr_in struct */
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(port);
+	if (strcmp(cfg.bind_ipaddr, "INADDR_ANY") == 0) {
+		sin.sin_addr.s_addr = INADDR_ANY;
+	} else {
+		if (!inet_aton(cfg.bind_ipaddr, &sin.sin_addr)) {
+			say_syserror("inet_aton");
+			return -1;
+		}
+	}
+
+	while (true) {
+		if (bind(fiber->fd, (struct sockaddr *)&sin, sizeof(sin)) != 0) {
+			if (retry && (errno == EADDRINUSE)) {
+				/* retry mode, try, to bind after delay */
+				goto sleep_and_retry;
+			}
+			say_syserror("bind");
+			return -1;
+		}
+		if (listen(fiber->fd, cfg.backlog) != 0) {
+			if (retry && (errno == EADDRINUSE)) {
+				/* retry mode, try, to bind after delay */
+				goto sleep_and_retry;
+			}
+			say_syserror("listen");
+			return -1;
+		}
+
+		say_info("bound to port %i", port);
+		break;
+
+	sleep_and_retry:
+		if (!warning_said) {
+			say_warn("port %i is already in use, "
+				 "will retry binding after %lf seconds.", port, delay);
+			warning_said = true;
+		}
+		fiber_sleep(delay);
+	}
+
+	return 0;
+}
 
 void
 fiber_info(struct tbuf *out)

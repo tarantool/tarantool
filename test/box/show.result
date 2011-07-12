@@ -28,8 +28,10 @@ show configuration
 ---
 configuration:
   username: (null)
+  bind_ipaddr: "INADDR_ANY"
   coredump: "0"
   admin_port: "33015"
+  replication_port: "0"
   log_level: "4"
   slab_alloc_arena: "0.1"
   slab_alloc_minimal: "64"
@@ -60,9 +62,7 @@ configuration:
   wal_dir_rescan_delay: "0.1"
   panic_on_snap_error: "1"
   panic_on_wal_error: "0"
-  remote_hot_standby: "0"
-  wal_feeder_ipaddr: (null)
-  wal_feeder_port: "0"
+  replication_source: (null)
   namespace[0].enabled: "1"
   namespace[0].cardinality: "-1"
   namespace[0].estimated_rows: "0"

@@ -40,6 +40,12 @@ typedef struct tarantool_cfg {
 	char*	username;
 
 	/*
+	 * tarantool bind ip address, applies to master
+	 * and replication ports. INADDR_ANY is the default value.
+	 */
+	char*	bind_ipaddr;
+
+	/*
 	 * save core on abort/assert
 	 * deprecated; use ulimit instead
 	 */
@@ -50,6 +56,9 @@ typedef struct tarantool_cfg {
 	 * used for admin's connections
 	 */
 	int32_t	admin_port;
+
+	/* Replication clients should use this port (bind_ipaddr:replication_port). */
+	int32_t	replication_port;
 
 	/* Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5 */
 	int32_t	log_level;
@@ -145,8 +154,10 @@ typedef struct tarantool_cfg {
 	int32_t	wal_writer_inbox_size;
 
 	/*
-	 * Local hot standby (if enabled, the server will run in local hot standby
-	 * mode, continuously fetching WAL records from shared local directory).
+	 * Local hot standby (if enabled, the server will run in hot
+	 * standby mode, continuously fetching WAL records from wal_dir,
+	 * until it is able to bind to the primary port.
+	 * In local hot standby mode the server only accepts reads.
 	 */
 	int32_t	local_hot_standby;
 
@@ -165,12 +176,13 @@ typedef struct tarantool_cfg {
 	int32_t	panic_on_wal_error;
 
 	/*
-	 * Remote hot standby (if enabled, the server will run in hot standby mode
-	 * continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
+	 * Replication mode (if enabled, the server, once
+	 * bound to the primary port, will connect to
+	 * replication_source (ipaddr:port) and run continously
+	 * fetching records from it.. In replication mode the server
+	 * only accepts reads.
 	 */
-	int32_t	remote_hot_standby;
-	char*	wal_feeder_ipaddr;
-	int32_t	wal_feeder_port;
+	char*	replication_source;
 	tarantool_cfg_namespace**	namespace;
 } tarantool_cfg;
 

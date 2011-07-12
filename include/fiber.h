@@ -42,7 +42,7 @@
 
 #include "exception.h"
 
-#define FIBER_NAME_MAXLEN 16
+#define FIBER_NAME_MAXLEN 32
 
 #define FIBER_READING_INBOX 0x1
 /** Can this fiber be cancelled? */
@@ -129,6 +129,16 @@ void fiber_init(void);
 struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
 void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for_child(pid_t pid);
+
+void
+fiber_io_start(int fd, int events);
+
+void
+fiber_io_yield();
+
+void
+fiber_io_stop(int fd, int events);
+
 void yield(void);
 void fiber_destroy_all();
 
@@ -193,9 +203,23 @@ int set_nonblock(int sock);
 
 typedef void (*fiber_server_callback)(void *);
 
-struct fiber *fiber_server(int port,
+struct fiber *fiber_server(const char *name, int port,
 			   fiber_server_callback callback, void *,
 			   void (*on_bind) (void *));
+
+/**
+ * Create server socket and bind his on port. cfd.bind_ipaddr param using as IP address.
+ *
+ * @param type the fiber server type (TCP or UDP)
+ * @param port the bind ip port.
+ * @param retry the retry flag, if flag up the function will be try again to bind
+ *              socket after delay.
+ * @param delay the bind socket retry delay in sec.
+ *
+ * @return on success, zero is returned. on error, -1 is returned.
+ */
+int
+fiber_serv_socket(struct fiber *fiber, unsigned short port, bool retry, ev_tstamp delay);
 
 struct child *spawn_child(const char *name,
 			  int inbox_size,

@@ -1,0 +1,181 @@
+
+# Insert 10 tuples to master
+
+insert into t0 values (1, 'the tuple 1')
+Insert OK, 1 row affected
+insert into t0 values (2, 'the tuple 2')
+Insert OK, 1 row affected
+insert into t0 values (3, 'the tuple 3')
+Insert OK, 1 row affected
+insert into t0 values (4, 'the tuple 4')
+Insert OK, 1 row affected
+insert into t0 values (5, 'the tuple 5')
+Insert OK, 1 row affected
+insert into t0 values (6, 'the tuple 6')
+Insert OK, 1 row affected
+insert into t0 values (7, 'the tuple 7')
+Insert OK, 1 row affected
+insert into t0 values (8, 'the tuple 8')
+Insert OK, 1 row affected
+insert into t0 values (9, 'the tuple 9')
+Insert OK, 1 row affected
+insert into t0 values (10, 'the tuple 10')
+Insert OK, 1 row affected
+
+# Select 10 tuples from master
+
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'the tuple 1']
+select * from t0 where k0 = 2
+Found 1 tuple:
+[2, 'the tuple 2']
+select * from t0 where k0 = 3
+Found 1 tuple:
+[3, 'the tuple 3']
+select * from t0 where k0 = 4
+Found 1 tuple:
+[4, 'the tuple 4']
+select * from t0 where k0 = 5
+Found 1 tuple:
+[5, 'the tuple 5']
+select * from t0 where k0 = 6
+Found 1 tuple:
+[6, 'the tuple 6']
+select * from t0 where k0 = 7
+Found 1 tuple:
+[7, 'the tuple 7']
+select * from t0 where k0 = 8
+Found 1 tuple:
+[8, 'the tuple 8']
+select * from t0 where k0 = 9
+Found 1 tuple:
+[9, 'the tuple 9']
+select * from t0 where k0 = 10
+Found 1 tuple:
+[10, 'the tuple 10']
+
+# Select 10 tuples from replica
+
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'the tuple 1']
+select * from t0 where k0 = 2
+Found 1 tuple:
+[2, 'the tuple 2']
+select * from t0 where k0 = 3
+Found 1 tuple:
+[3, 'the tuple 3']
+select * from t0 where k0 = 4
+Found 1 tuple:
+[4, 'the tuple 4']
+select * from t0 where k0 = 5
+Found 1 tuple:
+[5, 'the tuple 5']
+select * from t0 where k0 = 6
+Found 1 tuple:
+[6, 'the tuple 6']
+select * from t0 where k0 = 7
+Found 1 tuple:
+[7, 'the tuple 7']
+select * from t0 where k0 = 8
+Found 1 tuple:
+[8, 'the tuple 8']
+select * from t0 where k0 = 9
+Found 1 tuple:
+[9, 'the tuple 9']
+select * from t0 where k0 = 10
+Found 1 tuple:
+[10, 'the tuple 10']
+
+# Shutdown master server (now the hot_standby must be a primary server)
+
+
+# Insert 10 tuples to hot_standby
+
+insert into t0 values (11, 'the tuple 11')
+Insert OK, 1 row affected
+insert into t0 values (12, 'the tuple 12')
+Insert OK, 1 row affected
+insert into t0 values (13, 'the tuple 13')
+Insert OK, 1 row affected
+insert into t0 values (14, 'the tuple 14')
+Insert OK, 1 row affected
+insert into t0 values (15, 'the tuple 15')
+Insert OK, 1 row affected
+insert into t0 values (16, 'the tuple 16')
+Insert OK, 1 row affected
+insert into t0 values (17, 'the tuple 17')
+Insert OK, 1 row affected
+insert into t0 values (18, 'the tuple 18')
+Insert OK, 1 row affected
+insert into t0 values (19, 'the tuple 19')
+Insert OK, 1 row affected
+insert into t0 values (20, 'the tuple 20')
+Insert OK, 1 row affected
+
+# Select 10 tuples from hot_standby
+
+select * from t0 where k0 = 11
+Found 1 tuple:
+[11, 'the tuple 11']
+select * from t0 where k0 = 12
+Found 1 tuple:
+[12, 'the tuple 12']
+select * from t0 where k0 = 13
+Found 1 tuple:
+[13, 'the tuple 13']
+select * from t0 where k0 = 14
+Found 1 tuple:
+[14, 'the tuple 14']
+select * from t0 where k0 = 15
+Found 1 tuple:
+[15, 'the tuple 15']
+select * from t0 where k0 = 16
+Found 1 tuple:
+[16, 'the tuple 16']
+select * from t0 where k0 = 17
+Found 1 tuple:
+[17, 'the tuple 17']
+select * from t0 where k0 = 18
+Found 1 tuple:
+[18, 'the tuple 18']
+select * from t0 where k0 = 19
+Found 1 tuple:
+[19, 'the tuple 19']
+select * from t0 where k0 = 20
+Found 1 tuple:
+[20, 'the tuple 20']
+
+# Select 10 tuples from replica
+
+select * from t0 where k0 = 11
+Found 1 tuple:
+[11, 'the tuple 11']
+select * from t0 where k0 = 12
+Found 1 tuple:
+[12, 'the tuple 12']
+select * from t0 where k0 = 13
+Found 1 tuple:
+[13, 'the tuple 13']
+select * from t0 where k0 = 14
+Found 1 tuple:
+[14, 'the tuple 14']
+select * from t0 where k0 = 15
+Found 1 tuple:
+[15, 'the tuple 15']
+select * from t0 where k0 = 16
+Found 1 tuple:
+[16, 'the tuple 16']
+select * from t0 where k0 = 17
+Found 1 tuple:
+[17, 'the tuple 17']
+select * from t0 where k0 = 18
+Found 1 tuple:
+[18, 'the tuple 18']
+select * from t0 where k0 = 19
+Found 1 tuple:
+[19, 'the tuple 19']
+select * from t0 where k0 = 20
+Found 1 tuple:
+[20, 'the tuple 20']

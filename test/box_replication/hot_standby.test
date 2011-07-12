@@ -1,0 +1,85 @@
+import os
+import time
+from lib.tarantool_box_server import TarantoolBoxServer
+
+# master server
+master = server
+
+# hot standby server
+hot_standby = TarantoolBoxServer()
+hot_standby.deploy("box_replication/cfg/hot_standby.cfg",
+                   hot_standby.find_exe(self.args.builddir),
+                   os.path.join(self.args.vardir, "hot_standby"), need_init=False)
+
+# replica server
+replica = TarantoolBoxServer()
+replica.deploy("box_replication/cfg/replica.cfg",
+               replica.find_exe(self.args.builddir),
+               os.path.join(self.args.vardir, "replica"))
+
+# Begin tuple id
+id = 1
+
+
+print """
+# Insert 10 tuples to master
+"""
+for i in range(id, id + 10):
+    master.sql.execute("insert into t0 values (%d, 'the tuple %d')" % (i, i), silent=False)
+
+
+print """
+# Select 10 tuples from master
+"""
+for i in range(id, id + 10):
+    master.sql.execute("select * from t0 where k0 = %d" % i, silent=False)
+
+
+print """
+# Select 10 tuples from replica
+"""
+replica.wait_lsn(11)
+for i in range(id, id + 10):
+    replica.sql.execute("select * from t0 where k0 = %d" % i, silent=False)
+
+
+print """
+# Shutdown master server (now the hot_standby must be a primary server)
+"""
+server.stop()
+
+id += 10
+
+# White while hot_standby server not bind masters ports
+time.sleep(0.2)
+
+print """
+# Insert 10 tuples to hot_standby
+"""
+for i in range(id, id + 10):
+    hot_standby.sql.execute("insert into t0 values (%d, 'the tuple %d')" % (i, i), silent=False)
+
+
+print """
+# Select 10 tuples from hot_standby
+"""
+for i in range(id, id + 10):
+    hot_standby.sql.execute("select * from t0 where k0 = %d" % i, silent=False)
+
+
+print """
+# Select 10 tuples from replica
+"""
+replica.wait_lsn(21)
+for i in range(id, id + 10):
+    replica.sql.execute("select * from t0 where k0 = %d" % i, silent=False)
+
+
+# Cleanup.
+hot_standby.stop()
+hot_standby.cleanup(True)
+replica.stop()
+replica.cleanup(True)
+server.deploy(self.suite_ini["config"])
+
+# vim: syntax=python
