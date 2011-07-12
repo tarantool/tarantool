@@ -684,7 +684,7 @@ PHP_METHOD(tarantool_class, getTuple )
 	b2i b;
 	b2i * pb;
 	u_char* p = buf;
-	bool is_string = false;
+	int is_string = 0;
 	
 	for(i=0; i < responseBody.count; i++) { // 
 		b.i=0;
@@ -697,9 +697,9 @@ PHP_METHOD(tarantool_class, getTuple )
 			case 1 : {
 				if ( isprint(*bb2) ) {
 //					printf("tuple element '%s' len=%d\n",bb2, len);	
-					is_string = true;
+					is_string = 1;
 				} else {
-					is_string = false;
+					is_string = 0;
 					leb128_read(bb2, len, &value);
 //					printf("tuple element(int) %d len=%d\n",value, len);					
 				}	
@@ -708,9 +708,9 @@ PHP_METHOD(tarantool_class, getTuple )
 			case 2 : {
 				if ( isprint(*bb2) && isprint(*(bb2+1))) {
 //					printf("tuple element '%s' len=%d\n",bb2, len);	
-					is_string = true;
+					is_string = 1;
 				} else {
-					is_string = false;				
+					is_string = 0;				
 					leb128_read(bb2, len, &value);
 //					printf("tuple element(int) %d len=%d\n",value, len);
 				}						
@@ -720,9 +720,9 @@ PHP_METHOD(tarantool_class, getTuple )
 			case 3 : {
 				if ( isprint(*bb2) && isprint(*(bb2+1)) && isprint(*(bb2+2)) ) {
 //					printf("tuple element '%s' len=%d\n",bb2, len);	
-					is_string = true;
+					is_string = 1;
 				} else {
-					is_string = false;				
+					is_string = 0;				
 					leb128_read(bb2, len, &value);
 //					printf("tuple element(int) %d len=%d\n",value, len);					
 				}	
@@ -731,18 +731,18 @@ PHP_METHOD(tarantool_class, getTuple )
 
 			case 4 : {
 				if ( isprint(*bb2) && isprint(*(bb2+1)) && isprint(*(bb2+2)) && isprint(*(bb2+3)) ) {
-					is_string = true;
+					is_string = 1;
 				} else {
 
 					pb = (b2i*) bb2;
 					value = (unsigned long) pb->i;				
 //				php_printf("tuple element(int) %d len=%d\n",value, len);					
-				is_string = false;					
+					is_string = 0;					
 				}
 				break;
 			}
 			default :  {
-				is_string = true;
+				is_string = 0;
 //				printf("tuple element %s len=%d\n",bb2, len);	
 			}
 		} // end switch
