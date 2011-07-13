@@ -69,7 +69,7 @@ class Options:
         default = "tarantool> ",
         help = """Command prompt. Set to "" for no prompt. Default:
         tarantool> """)
-    
+
     self.args = parser.parse_args()
 
 def init_readline_history():
@@ -84,12 +84,12 @@ def init_readline_history():
 
 
 def do_command(admin_con, data_con, line):
-  output = None 
+  output = None
   if is_admin_re.match(line):
-    output = admin_con.execute(line + "\n")
+    output = admin_con.execute(line)
   else:
     output = data_con.execute(line)
-  return output 
+  return output
 
 def main():
   init_readline_history()

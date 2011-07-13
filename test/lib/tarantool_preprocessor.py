@@ -106,10 +106,7 @@ def token_is_operator(token):
 
 
 def token_is_identifier(token):
-    token_type = token[0]
-    if token_type == tokenize.NAME:
-        return True
-    return False
+    return token[0] == tokenize.NAME
 
 
 def token_is_separator(token):
@@ -125,7 +122,7 @@ class TarantoolStreamReader(utf_8.StreamReader):
         try:
             data = tokenize.untokenize(tarantool_translate(self.stream.readline))
             self.stream = cStringIO.StringIO(data)
-        except Exception, e :
+        except Exception:
             self.stream.seek(0)
 
 
