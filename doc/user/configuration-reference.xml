@@ -595,35 +595,23 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>Replication port. If non-zero, Tarantool listens
           on the given port for incoming connections from
           replicas. See also <olink
-          targetptr="replication_source_port"/>, which complements
+          targetptr="replication_source"/>, which complements
           this setting on the replica side.</entry>
         </row>
 
         <row>
-          <entry xml:id="replication_source_port"
-          xreflabel="replication_source_port">replication_source_port</entry>
-          <entry>integer</entry>
-          <entry>0</entry>
+          <entry xml:id="replication_source"
+          xreflabel="replication_source">replication_source</entry>
+          <entry>string</entry>
+          <entry>NULL</entry>
           <entry>no</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>Remote port of the master. If non-zero,
+          <entry>Pair ip:port describing the master. If not empty,
           replication is on, and Tarantool does not accept updates
           on <olink targetptr="primary_port"/>. This parameter is
           dynamic, that is, to enter master mode, simply set the
-          port value to 0 and issue <olink
+          value to an empty string and issue <olink
           targetptr="reload-configuration"/>.</entry>
-        </row>
-
-        <row>
-          <entry xml:id="replication_source_ipaddr"
-                 xreflabel="replication_source_ipaddr">
-              replication_source_ipaddr
-          </entry>
-          <entry>string</entry>
-          <entry>0</entry>
-          <entry>no</entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>IP address of replication master.</entry>
         </row>
 
       </tbody>
