@@ -62,7 +62,8 @@ print """
 
 exec sql "insert into t0 values (1, 'Test tuple')"
 
-info = yaml.load(admin.execute("show info\n"))["info"]
+result = exec admin silent "show info"
+info = yaml.load(result)["info"]
 
 pid = info["pid"]
 snapshot = str(info["lsn"]).zfill(20) + ".snap"

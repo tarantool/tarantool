@@ -49,7 +49,7 @@ class TarantoolBoxServer(TarantoolServer):
                               stderr = subprocess.PIPE)
 
     def get_param(self, param):
-        data = self.admin.execute("show info\n", silent = True)
+        data = self.admin.execute("show info", silent = True)
         info = yaml.load(data)["info"]
         return info[param]
 

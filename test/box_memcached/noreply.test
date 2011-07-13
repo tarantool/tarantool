@@ -1,4 +1,6 @@
 # encoding: tarantool
+import sys
+
 print """# Test that commands can take 'noreply' parameter. """
 exec memcached "flush_all noreply\r\n"
 exec memcached "flush_all 0 noreply\r\n"
@@ -18,10 +20,12 @@ exec memcached "get noreply:foo\r\n"
 exec memcached "prepend noreply:foo 0 0 1 noreply\r\n5\r\n"
 exec memcached "get noreply:foo\r\n"
 
-result = server.memcached.execute("gets noreply:foo\r\n", silent = False);
+sys.stdout.write("gets noreply:foo\r\n")
+result = exec memcached silent "gets noreply:foo\r\n"
 unique_id = int(result.split()[4])
 
-exec memcached "cas noreply:foo 0 0 1 %d noreply\r\n6\r\n" % unique_id
+sys.stdout.write("cas noreply:foo 0 0 1 <unique_id> noreply\r\n6\r\n")
+exec memcached silent "cas noreply:foo 0 0 1 %d noreply\r\n6\r\n" % unique_id
 exec memcached "get noreply:foo\r\n"
 
 exec memcached "incr noreply:foo 3 noreply\r\n"
