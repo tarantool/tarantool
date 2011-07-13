@@ -1063,6 +1063,7 @@ namespace_init(void)
 			index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 			index->unique = cfg_index->unique;
 			index->type = STR2ENUM(index_type, cfg_index->type);
+			index->n = j;
 			index_init(index, &namespace[i], cfg_namespace->estimated_rows);
 		}
 
@@ -1352,11 +1353,18 @@ mod_check_config(struct tarantool_cfg *conf)
 				return -1;
 			}
 
-			/* first namespace index must has hash type */
-			if (j == 0 && index_type != HASH) {
-				out_warning(0, "(namespace = %zu) namespace first index must has HASH type", i);
-				return -1;
+			/* first namespace index must be unique and cardinality == 1 */
+			if (j == 0) {
+				if (index->unique == false) {
+					out_warning(0, "(namespace = %zu) namespace first index must be unique", i);
+					return -1;
+				}
+				if (index_cardinality != 1) {
+					out_warning(0, "(namespace = %zu) namespace first index must be single keyed", i);
+					return -1;
+				}
 			}
+
 
 			switch (index_type) {
 			case HASH:
@@ -1496,33 +1504,50 @@ mod_cat(const char *filename)
 	return read_log(filename, xlog_print, snap_print, NULL);
 }
 
-void
-mod_snapshot(struct log_io_iter *i)
+static void
+snapshot_write_tuple(struct log_io_iter *i, unsigned n, struct box_tuple *tuple)
 {
 	struct tbuf *row;
 	struct box_snap_row header;
+
+	if (tuple->flags & GHOST)	// do not save fictive rows
+		return;
+
+	header.namespace = n;
+	header.tuple_size = tuple->cardinality;
+	header.data_size = tuple->bsize;
+
+	row = tbuf_alloc(fiber->pool);
+	tbuf_append(row, &header, sizeof(header));
+	tbuf_append(row, tuple->data, tuple->bsize);
+
+	snapshot_write_row(i, snap_tag, default_cookie, row);
+}
+
+void
+mod_snapshot(struct log_io_iter *i)
+{
 	struct box_tuple *tuple;
-	khiter_t k;
 
 	for (uint32_t n = 0; n < BOX_NAMESPACE_MAX; ++n) {
 		if (!namespace[n].enabled)
 			continue;
 
-		assoc_foreach(namespace[n].index[0].idx.int_hash, k) {
-			tuple = kh_value(namespace[n].index[0].idx.int_hash, k);
+		struct index *pk = &namespace[n].index[0];
 
-			if (tuple->flags & GHOST)	// do not save fictive rows
-				continue;
 
-			header.namespace = n;
-			header.tuple_size = tuple->cardinality;
-			header.data_size = tuple->bsize;
-
-			row = tbuf_alloc(fiber->pool);
-			tbuf_append(row, &header, sizeof(header));
-			tbuf_append(row, tuple->data, tuple->bsize);
-
-			snapshot_write_row(i, snap_tag, default_cookie, row);
+		if (pk->type == HASH) {
+			khiter_t k;
+			assoc_foreach(namespace[n].index[0].idx.hash, k) {
+				tuple = kh_value(namespace[n].index[0].idx.hash, k);
+				snapshot_write_tuple(i, n, tuple);
+			}
+		} else {
+			struct tree_index_member *empty = alloc_search_pattern(pk, 0, NULL);
+			pk->iterator_init(pk, empty);
+			while ((tuple = pk->iterator_next_nocompare(pk))) {
+				snapshot_write_tuple(i, n, tuple);
+			}
 		}
 	}
 }

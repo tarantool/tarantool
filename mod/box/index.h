@@ -72,6 +72,7 @@ struct tree_index_member {
 SPTREE_DEF(str_t, realloc);
 
 struct index {
+	unsigned n;
 	bool enabled;
 
 	bool unique;
@@ -82,6 +83,8 @@ struct index {
 	void (*replace) (struct index * index, struct box_tuple *, struct box_tuple *);
 	void (*iterator_init) (struct index *, struct tree_index_member * pattern);
 	struct box_tuple *(*iterator_next) (struct index *, struct tree_index_member * pattern);
+	struct box_tuple *(*iterator_next_nocompare) (struct index *);
+	size_t (*size)(struct index *index);
 	union {
 		khash_t(lstr_ptr_map) * str_hash;
 		khash_t(int_ptr_map) * int_hash;

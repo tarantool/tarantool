@@ -152,7 +152,11 @@ tree_index_member_compare(struct tree_index_member *member_a, struct tree_index_
 	return 0;
 }
 
-
+static size_t
+index_size_hash(struct index *self)
+{
+	return kh_size(self->idx.int_hash);
+}
 
 static struct box_tuple *
 index_find_hash_by_tuple(struct index *self, struct box_tuple *tuple)
@@ -283,12 +287,13 @@ alloc_search_pattern(struct index *index, int key_cardinality, void *key)
 static struct box_tuple *
 index_find_tree(struct index *self, void *key)
 {
-	struct tree_index_member *member = (struct tree_index_member *)key;
-
+	struct tree_index_member *member;
+	member = alloc_search_pattern(self, 1, key);
+	member->tuple = (void *)1; /* HACK: otherwise tree_index_member_compare returns -2,
+				      which is plain wrong */
 	member = sptree_str_t_find(self->idx.tree, member);
 	if (member != NULL)
 		return member->tuple;
-
 	return NULL;
 }
 
@@ -297,7 +302,10 @@ index_find_tree_by_tuple(struct index *self, struct box_tuple *tuple)
 {
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 
-	return self->find(self, member);
+	member = sptree_str_t_find(self->idx.tree, member);
+	if (member != NULL)
+		return member->tuple;
+	return NULL;
 }
 
 static void
@@ -430,6 +438,12 @@ index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct b
 	sptree_str_t_insert(self->idx.tree, member);
 }
 
+static size_t
+index_size_tree_str(struct index *self)
+{
+	return self->idx.tree->size;
+}
+
 void
 index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern)
 {
@@ -451,6 +465,18 @@ index_iterator_next_tree_str(struct index *self, struct tree_index_member *patte
 		return member->tuple;
 
 	return NULL;
+}
+
+static struct box_tuple *
+index_iterator_next_tree_str_nocompare(struct index *self)
+{
+	struct tree_index_member *member =
+		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
+
+	if (member == NULL)
+		return NULL;
+
+	return member->tuple;
 }
 
 void
@@ -497,45 +523,77 @@ build_indexes(void)
 		if (namespace[n].enabled == false)
 			continue;
 
-		n_tuples = kh_size(namespace[n].index[0].idx.hash);
+		struct index *pk = &namespace[n].index[0];
+		n_tuples = pk->size(pk);
 		estimated_tuples = n_tuples * 1.2;
 
 		say_info("build_indexes: n = %" PRIu32 ": build arrays", n);
 
-		khiter_t k;
-		u32 i = 0;
-		assoc_foreach(namespace[n].index[0].idx.hash, k) {
-			for (u32 idx = 0;; idx++) {
-				struct index *index = &namespace[n].index[idx];
-				struct tree_index_member *member;
-				struct tree_index_member *m;
+		for (u32 idx = 0;; idx++) {
+			struct index *index = &namespace[n].index[idx];
+			if (index->key_cardinality == 0)
+				break;
 
-				if (index->key_cardinality == 0)
-					break;
+			if (index->type != TREE || index == pk)
+				continue;
 
-				if (index->type != TREE)
-					continue;
-
-				member = members[idx];
-				if (member == NULL) {
-					member = malloc(estimated_tuples *
-							SIZEOF_TREE_INDEX_MEMBER(index));
-					if (member == NULL)
-						panic("build_indexes: malloc failed: %m");
-
-					members[idx] = member;
-				}
-
-				m = (struct tree_index_member *)
-					((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
-
-				tuple2tree_index_member(index,
-							kh_value(namespace[n].index[0].idx.hash,
-								 k),
-							&m);
+			if (members[idx] == NULL) {
+				members[idx] = malloc(estimated_tuples *
+						      SIZEOF_TREE_INDEX_MEMBER(index));
+				if (members[idx] == NULL)
+					panic("build_indexes: malloc failed: %m");
 			}
+		}
 
-			++i;
+		if (pk->type == HASH) {
+			khiter_t k;
+			u32 i = 0;
+			assoc_foreach(namespace[n].index[0].idx.hash, k) {
+				for (u32 idx = 0;; idx++) {
+					struct index *index = &namespace[n].index[idx];
+					struct tree_index_member *member = members[idx];
+					struct tree_index_member *m;
+
+					if (index->key_cardinality == 0)
+						break;
+
+					if (index->type != TREE || index == pk)
+						continue;
+
+					m = (struct tree_index_member *)
+						((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
+
+					tuple2tree_index_member(index,
+								kh_value(namespace[n].index[0].idx.hash,
+									 k),
+								&m);
+				}
+				++i;
+			}
+		} else {
+			struct tree_index_member *empty = alloc_search_pattern(pk, 0, NULL);
+			pk->iterator_init(pk, empty);
+			struct box_tuple *tuple;
+			u32 i = 0;
+			while ((tuple = pk->iterator_next_nocompare(pk))) {
+				for (u32 idx = 0;; idx++) {
+					struct index *index = &namespace[n].index[idx];
+					struct tree_index_member *member = members[idx];
+					struct tree_index_member *m;
+
+					if (index->key_cardinality == 0)
+						break;
+
+					if (index->type != TREE || index == pk)
+						continue;
+
+					m = (struct tree_index_member *)
+						((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
+
+					tuple2tree_index_member(index, tuple, &m);
+				}
+				++i;
+			}
 		}
 
 		say_info("build_indexes: n = %" PRIu32 ": build trees", n);
@@ -547,7 +605,7 @@ build_indexes(void)
 			if (index->key_cardinality == 0)
 				break;
 
-			if (index->type != TREE)
+			if (index->type != TREE || index == &namespace[n].index[0])
 				continue;
 
 			assert(index->enabled == false);
@@ -556,6 +614,7 @@ build_indexes(void)
 				 idx);
 
 			/* if n_tuples == 0 then estimated_tuples = 0, member == NULL, tree is empty */
+			assert(index->enabled == false);
 			sptree_str_t_init(index->idx.tree,
 					  SIZEOF_TREE_INDEX_MEMBER(index),
 					  member, n_tuples, estimated_tuples,
@@ -572,6 +631,7 @@ index_hash_num(struct index *index, struct namespace *namespace, size_t estimate
 {
 	index->type = HASH;
 	index->namespace = namespace;
+	index->size = index_size_hash;
 	index->find = index_find_hash_num;
 	index->find_by_tuple = index_find_hash_by_tuple;
 	index->remove = index_remove_hash_num;
@@ -586,6 +646,7 @@ index_hash_num64(struct index *index, struct namespace *namespace, size_t estima
 {
 	index->type = HASH;
 	index->namespace = namespace;
+	index->size = index_size_hash;
 	index->find = index_find_hash_num64;
 	index->find_by_tuple = index_find_hash_by_tuple;
 	index->remove = index_remove_hash_num64;
@@ -600,6 +661,7 @@ index_hash_str(struct index *index, struct namespace *namespace, size_t estimate
 {
 	index->type = HASH;
 	index->namespace = namespace;
+	index->size = index_size_hash;
 	index->find = index_find_hash_str;
 	index->find_by_tuple = index_find_hash_by_tuple;
 	index->remove = index_remove_hash_str;
@@ -615,12 +677,14 @@ index_tree(struct index *index, struct namespace *namespace,
 {
 	index->type = TREE;
 	index->namespace = namespace;
+	index->size = index_size_tree_str;
 	index->find = index_find_tree;
 	index->find_by_tuple = index_find_tree_by_tuple;
 	index->remove = index_remove_tree_str;
 	index->replace = index_replace_tree_str;
 	index->iterator_init = index_iterator_init_tree_str;
 	index->iterator_next = index_iterator_next_tree_str;
+	index->iterator_next_nocompare = index_iterator_next_tree_str_nocompare;
 	index->idx.tree = palloc(eter_pool, sizeof(*index->idx.tree));
 }
 
@@ -654,6 +718,13 @@ index_init(struct index *index, struct namespace *namespace, size_t estimated_ro
 		/* tree index */
 		index->enabled = false;
 		index_tree(index, namespace, estimated_rows);
+		if (index->n == 0) {/* pk */
+			sptree_str_t_init(index->idx.tree,
+					  SIZEOF_TREE_INDEX_MEMBER(index),
+					  NULL, 0, 0,
+					  (void *)tree_index_member_compare, index);
+			index->enabled = true;
+		}
 		break;
 	default:
 		panic("unsupported index type");

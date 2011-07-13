@@ -1,0 +1,29 @@
+insert into t0 values (1, 'tuple')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+insert into t0 values (2, 'tuple 2')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+insert into t0 values (3, 'tuple 3')
+Insert OK, 1 row affected
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'tuple']
+select * from t0 where k0 = 2
+Found 1 tuple:
+[2, 'tuple 2']
+select * from t0 where k0 = 3
+Found 1 tuple:
+[3, 'tuple 3']
+delete from t0 where k0 = 1
+Delete OK, 1 row affected
+delete from t0 where k0 = 2
+Delete OK, 1 row affected
+delete from t0 where k0 = 3
+Delete OK, 1 row affected
