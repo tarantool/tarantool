@@ -18,7 +18,7 @@
     <title>C</title>
     <para>
        Please see <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/c/client.h"><filename>connector/c/client.h</filename></link> in the source tree.
+       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/c/tnt.h"><filename>connector/c/tnt.h</filename></link> in the source tree.
     </para>
   </section>
 

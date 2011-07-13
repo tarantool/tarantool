@@ -23,4 +23,12 @@ install_manifest.txt
 tarantool-*.tar.gz
 doc/tnt.ent
 doc/user/tarantool_user_guide.html
-test/box/protocol
+third_party/luajit/src/luajit
+third_party/luajit/lib/vmdef.lua
+third_party/luajit/src/buildvm
+third_party/luajit/src/lj_bcdef.h
+third_party/luajit/src/lj_ffdef.h
+third_party/luajit/src/lj_folddef.h
+third_party/luajit/src/lj_libdef.h
+third_party/luajit/src/lj_recdef.h
+third_party/luajit/src/lj_vm.s
