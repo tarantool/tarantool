@@ -26,11 +26,6 @@ class MemcachedCommandBuffer:
 
 class MemcachedConnection(TarantoolConnection):
 
-    def __init__(self, host, port):
-        TarantoolConnection.__init__(self, host, port)
-        self.separator = MEMCACHED_SEPARATOR + '\n'
-        self.separator_len = 2
-
     def execute_no_reconnect(self, commands, silent = True):
         self.send(commands, silent)
         return self.recv(silent)
@@ -39,7 +34,7 @@ class MemcachedConnection(TarantoolConnection):
         self.commands = commands
         self.socket.sendall(commands)
         if not silent:
-            print self.commands
+            sys.stdout.write(self.commands)
 
     def recv(self, silent = True):
         self.recv_buffer = ''
@@ -70,7 +65,7 @@ class MemcachedConnection(TarantoolConnection):
                 self.reply_unknown(cmd)
 
         if not silent:
-            print self.reply
+            sys.stdout.write(self.reply)
 
         return self.reply
 

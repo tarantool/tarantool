@@ -24,24 +24,19 @@ barva2
 EXISTS
 # gets foo and verify identifier exists 
 gets foo
-
-VALUE foo 0 6 42
-barval
-END
-
 # cas success 
-cas foo 0 0 6 42
+cas foo 0 0 6 <unique_id>
 barva2
 STORED
 # cas failure (reusing the same key) 
-cas foo 0 0 6 42
+cas foo 0 0 6 <unique_id>
 barva2
 EXISTS
 # delete foo 
 delete foo
 DELETED
 # cas missing 
-cas foo 0 0 6 42
+cas foo 0 0 6 <unique_id>
 barva2
 NOT_FOUND
 # set foo1 
@@ -54,18 +49,14 @@ set foo2 0 0 1
 STORED
 # gets foo1 check 
 gets foo1
-
 VALUE foo1 0 1 44
 1
 END
-
 # gets foo2 check 
 gets foo2
-
 VALUE foo2 0 1 45
 2
 END
-
 # validate foo1 != foo2 
 pass: foo1_cas != foo2_cas
 # gets foo from memcached1 - should success 

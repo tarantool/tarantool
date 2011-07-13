@@ -14,7 +14,7 @@ exec memcached "get foo\r\n"
 print """# and the other form, specifying a flush_all time... """
 expire = time.time() + 2
 print "flush_all time + 2"
-print server.memcached.execute("flush_all %d\r\n" % expire, silent=True)
+print exec memcached silent "flush_all %d\r\n" % expire
 exec memcached "get foo\r\n"
 
 exec memcached "set foo 0 0 3\r\n123\r\n"

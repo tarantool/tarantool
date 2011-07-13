@@ -18,7 +18,7 @@ print """# expire: time - 1 second"""
 expire = time.time() - 1
 
 print """# set foo"""
-server.memcached.execute("set foo 0 %d 6\r\nfooval\r\n" % expire, silent=True)
+exec memcached silent "set foo 0 %d 6\r\nfooval\r\n" % expire
 
 print """# foo shoud expired"""
 exec memcached "get foo\r\n"
@@ -28,7 +28,7 @@ print """# expire: time + 1 second"""
 expire = time.time() + 1
 
 print """# set foo"""
-server.memcached.execute("set foo 0 %d 6\r\nfooval\r\n" % expire, silent=True)
+exec memcached silent "set foo 0 %d 6\r\nfooval\r\n" % expire
 
 print """# foo shoud be exists"""
 exec memcached "get foo\r\n"
@@ -42,7 +42,7 @@ print """# expire: time - 20 second"""
 expire = time.time() - 20
 
 print """# set boo"""
-server.memcached.execute("set boo 0 %d 6\r\nbooval\r\n" % expire, silent=True)
+exec memcached silent "set boo 0 %d 6\r\nbooval\r\n" % expire
 
 print """# foo shoud expired"""
 exec memcached "get boo\r\n"
