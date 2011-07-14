@@ -80,3 +80,21 @@ while( ($res = $tnt->getTuple()) != false){
     var_dump($res);
 }
 
+// multi select
+/// SELECT * FROM t0 WHERE k0 IN (1,2) 
+$count = $tnt->mselect(NMSPACE,PRIMARYINDEX, array(1,2)); // ns, idx , keys, [limit, offset]  
+print "count=$count\n";
+while ( false != ($res = $tnt->getTuple())) {    
+    var_dump($res);  
+}
+
+/// SELECT * FROM t0 WHERE k1 IN ('x','z') 
+$count = $tnt->mselect(NMSPACE,INDEX_1, array('x','z')); // ns, idx , keys, [limit, offset]
+print "count=$count\n";
+while ( false != ($res = $tnt->getTuple())) {    
+    var_dump($res);  
+}
+
+
+
+
