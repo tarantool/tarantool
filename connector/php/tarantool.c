@@ -94,6 +94,7 @@ typedef	struct {
 	Tuple tuple;
 } DeleteRequest;
 
+
 // sizeof(count) + sizeof(operation.fieldNo) + sizeof(operation.code) +1 // 10
 #define UPDATE_REQUEST_SIZE 10 
 typedef	struct {
@@ -125,13 +126,27 @@ typedef	struct {
 } SelectResponseBody;
 
 
+#define SELECT_RESPONSE_SIZE sizeof(SelectResponseTuple)
 typedef	struct {
 	uint32_t size;			// tuple size in bytes
 	uint32_t count;			// count elements in tuple	
 } SelectResponseTuple;
 
+typedef	struct {
+	uint32_t code;
+	uint32_t count;
+	char data[];
+} Response;
+
+//typedef	struct {
+//	uint32_t code;
+//	uint32_t count;
+//	char data[];
+//} UpdateResponse;
+
 
 static void printLine( u_char *p );
+static void printLine3( u_char *p );
 
 static void
 leb128_write(char * buf, unsigned long value);
@@ -408,7 +423,9 @@ PHP_METHOD(tarantool_class, insert )
 	}		
 	
 	
-	ctx->errorcode = *(out_buf+HEADER_SIZE);
+	b2i* bb = (b2i*)(out_buf+HEADER_SIZE); 
+	ctx->errorcode = bb->i;
+
 	efree(out_buf);
 		
 	RETURN_FALSE;
@@ -594,7 +611,7 @@ PHP_METHOD(tarantool_class, select )
 	len = php_stream_read(ctx->stream, (void *) &code,sizeof(uint32_t));
 	ctx->readed += len;
 	if (code > 0 || len != sizeof(uint32_t)) {
-		ctx->errorcode = code;					
+		ctx->errorcode = code;					///  need test
 		efree(out_buf);
 		RETURN_FALSE;
 	}	
@@ -904,7 +921,9 @@ PHP_METHOD(tarantool_class, delete)
 	}		
 	
 	
-	ctx->errorcode = *(buf+HEADER_SIZE); 
+	b2i* bb =(b2i*)(buf+HEADER_SIZE); 
+	ctx->errorcode = bb->i;
+
 	efree(buf);		
 	RETURN_FALSE;
 
@@ -1092,7 +1111,9 @@ PHP_METHOD(tarantool_class, update)
 		RETURN_TRUE;
 	}		
 	
-	ctx->errorcode = *(out_buf+HEADER_SIZE); 
+	b2i* bb = (b2i*) out_buf+HEADER_SIZE; 
+	ctx->errorcode = bb->i;
+
 	efree(out_buf);		
 	RETURN_FALSE;
 
@@ -1100,8 +1121,8 @@ PHP_METHOD(tarantool_class, update)
 /* }}} */
 
 
-/* {{{ proto int tarantool::inc(int namespace, mixed key, int fieldNo, [data = 1]);
-		$tnt->inc(0,'z', array(2 =>5)  );
+/* {{{ proto int tarantool::inc(int namespace, mixed key, int fieldNo, [data = 1, flag=0]);
+		$tnt->inc($NS,$key, $fieldNo , $inc=1;  );
    tarantool incremental tuple */
 PHP_METHOD(tarantool_class, inc)
 {
@@ -1110,10 +1131,10 @@ PHP_METHOD(tarantool_class, inc)
 	long namespace, fieldNo ;
 	zval* key;
 	long data = 1;
-	 
+	long flag = 0;	 
 
-	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "Olzl|l", 
-			&id, tarantool_class_entry, &namespace, &key, &fieldNo, &data) == FAILURE) {
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "Olzl|lb", 
+			&id, tarantool_class_entry, &namespace, &key, &fieldNo, &data, &flag) == FAILURE) {
 		return;
 	}
 		
@@ -1143,7 +1164,6 @@ PHP_METHOD(tarantool_class, inc)
 
 // <operation> ::= <field_no><op_code><op_arg>
 
-
 	char * out_buf = emalloc(TARANTOOL_BUFSIZE);
 	bzero(out_buf, TARANTOOL_BUFSIZE);
 
@@ -1158,7 +1178,8 @@ PHP_METHOD(tarantool_class, inc)
 
 	insert->namespaceNo = namespace;	
 	insert->tuple.count = 1; 
-		
+	insert->flag = flag; 
+			
 	u_char * p = (u_char *) insert->tuple.data;
 		
 	switch (Z_TYPE_P(key)) {
@@ -1205,10 +1226,8 @@ PHP_METHOD(tarantool_class, inc)
 	const int insertLen = p-insert->tuple.data;
 
 	UpdateRequest  * incRequest = (UpdateRequest*) p;
-	incRequest->count = 1;
-	
-	incRequest->operation.code = TARANTOOL_OP_ADD;
-		
+	incRequest->count = 1;	
+	incRequest->operation.code = TARANTOOL_OP_ADD;		
 	incRequest->operation.fieldNo = fieldNo;
 
 	u_char leb_size = '\4';
@@ -1248,18 +1267,39 @@ PHP_METHOD(tarantool_class, inc)
 		return;	
 	}	
 
+
 	bzero(out_buf, header->len + HEADER_SIZE);
 //	
 	len = php_stream_read(ctx->stream, out_buf, TARANTOOL_BUFSIZE);
-
-	if ( *(out_buf+HEADER_SIZE) == '\0') {
-		efree(out_buf);
-		RETURN_TRUE;
+	
+	if ( *(out_buf+HEADER_SIZE) != '\0') {
+		b2i* bb = (b2i*)(out_buf+HEADER_SIZE); 
+		ctx->errorcode = bb->i;
+		efree(out_buf);		
+		RETURN_FALSE;
 	}		
 	
-	ctx->errorcode = *(out_buf+HEADER_SIZE); 
-	efree(out_buf);		
-	RETURN_FALSE;
+	if( !flag)
+		RETURN_TRUE;
+	
+	Response * responseBody = (Response*) (out_buf+HEADER_SIZE);
+	SelectResponseTuple * responseTuple = (SelectResponseTuple*) responseBody->data;
+	
+	p = responseBody->data + SELECT_RESPONSE_SIZE;
+	
+	int i=0;
+	int8_t * size;
+	while (i < fieldNo) {
+		size = (int8_t*) p;
+		p += *size+1;		
+		i++;
+	}
+	
+	b2i* bb = (b2i*)(p+1);
+	
+	efree(out_buf);
+	RETURN_LONG(bb->i);
+	
 
 }
 /* }}} */
@@ -1485,6 +1525,15 @@ static void printLine( u_char *p ) {
 	memcpy(b, p, 4);
 	php_printf("%x %x %x %x\t\t", b[0], b[1], b[2], b[3]);
 }
+
+static void printLine3( u_char *p ) {
+	u_char b[12];
+	memcpy(b, p, 12);
+	php_printf("%x %x %x %x\t\t", b[0], b[1], b[2], b[3]);
+	php_printf("%x %x %x %x\t\t", b[4], b[5], b[6], b[7]);
+	php_printf("%x %x %x %x\n", b[8], b[9], b[10], b[11]);		
+}
+
 
 static void
 leb128_write(char * buf, unsigned long value)
