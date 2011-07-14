@@ -94,8 +94,8 @@ def do_command(admin_con, data_con, line):
 def main():
   init_readline_history()
   options = Options()
-  admin_con = AdminConnection(options.args.host, options.args.admin_port)
-  data_con = BoxConnection(options.args.host, options.args.port)
+  admin_con = AdminConnection(options.args.host, int(options.args.admin_port))
+  data_con = BoxConnection(options.args.host, int(options.args.port))
   try:
     admin_con.connect()
     data_con.connect()
