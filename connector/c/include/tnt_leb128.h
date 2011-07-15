@@ -26,8 +26,8 @@
  * SUCH DAMAGE.
  */
 
-int tnt_leb128_read(char *buf, int size, unsigned long *value);
-void tnt_leb128_write(char *buf, unsigned long value);
-int tnt_leb128_size(unsigned long value);
+int tnt_leb128_read(char *buf, int size, uint32_t *value);
+void tnt_leb128_write(char *buf, uint32_t value);
+int tnt_leb128_size(uint32_t value);
 
 #endif /* TNT_LEB128_H_INCLUDED */

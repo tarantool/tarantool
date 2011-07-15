@@ -102,7 +102,7 @@ tnt_tuple_pack(struct tnt_tuple *tuple, char **data, unsigned int *size)
 	if (*data == NULL)
 		return TNT_EMEMORY;
 	char *p = *data;
-	memcpy(p, &tuple->count, sizeof(tuple->count));
+	memcpy(p, &tuple->count, 4);
 	p += 4;
 
 	unsigned int i;
@@ -121,7 +121,7 @@ tnt_tuple_pack(struct tnt_tuple *tuple, char **data, unsigned int *size)
 enum tnt_error
 tnt_tuple_pack_to(struct tnt_tuple *tuple, char *dest)
 {
-	memcpy(dest, &tuple->count, sizeof(tuple->count));
+	memcpy(dest, &tuple->count, 4);
 	dest += 4;
 
 	unsigned int i;
@@ -184,7 +184,7 @@ tnt_tuples_pack(struct tnt_tuples *tuples, char **data, unsigned int *size)
 		return TNT_EMEMORY;
 
 	char *p = *data;
-	memcpy(p, &tuples->count, sizeof(tuples->count));
+	memcpy(p, &tuples->count, 4);
 	p += 4;
 
 	STAILQ_FOREACH(t, &tuples->list, next) {
@@ -208,8 +208,9 @@ tnt_tuples_unpack(struct tnt_tuples *tuples, char *data, unsigned int size)
 	}
 
 	char *p = data;
-	unsigned long i, c = *(unsigned long*)p;
-	int off	= sizeof(unsigned long);
+	uint32_t i, c = *(uint32_t*)p;
+	int off	= 4;
+	p += 4;
 
 	if (tnt_tuple_init(t, c) == -1) {
 		STAILQ_REMOVE(&tuples->list, t, tnt_tuple, next);
@@ -217,15 +218,13 @@ tnt_tuples_unpack(struct tnt_tuples *tuples, char *data, unsigned int size)
 		return TNT_EMEMORY;
 	}
 
-	p += sizeof(unsigned long);
-
 	for (i = 0 ; i < c ; i++) {
-		unsigned long s;
+		uint32_t s;
 		int r = tnt_leb128_read(p, size - off, &s);
 		if (r == -1) 
 			return TNT_EPROTO;
 		off += r, p += r;
-		if (s > (unsigned long)(size - off))
+		if (s > (uint32_t)(size - off))
 			return TNT_EPROTO;
 		enum tnt_error res = tnt_tuple_set(t, i, p, s);
 		if ( res != TNT_EOK )

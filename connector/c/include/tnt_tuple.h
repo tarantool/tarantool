@@ -33,8 +33,8 @@
 
 struct tnt_tuple_field {
 	char *data;
-	unsigned int size;
-	unsigned int size_leb;
+	uint32_t size;
+	uint32_t size_leb;
 };
 
 #define TNT_TUPLE_FIELD_SIZE(F) \
@@ -43,8 +43,8 @@ struct tnt_tuple_field {
 	((F)->data)
 
 struct tnt_tuple {
-	unsigned int count;
-	unsigned int size_enc;
+	uint32_t count;
+	uint32_t size_enc;
 	struct tnt_tuple_field *fields;
 	STAILQ_ENTRY(tnt_tuple) next;
 };
@@ -53,7 +53,7 @@ struct tnt_tuple {
 	((T)->count)
 
 struct tnt_tuples {
-	unsigned int count;
+	uint32_t count;
 	STAILQ_HEAD(,tnt_tuple) list;
 };
 

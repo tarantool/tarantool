@@ -39,7 +39,7 @@ test_recv(struct tnt *t, struct tnt_recv *rcv, char *name)
 		return -1;
 	} else {
 		if (tnt_error(t) != TNT_EOK) {
-			printf("%s: respond %s (op: %d, reqid: %lu, code: %lu, count: %lu)\n",
+			printf("%s: respond %s (op: %d, reqid: %d, code: %d, count: %d)\n",
 				name,
 				tnt_perror(t), TNT_RECV_OP(rcv),
 				TNT_RECV_ID(rcv),

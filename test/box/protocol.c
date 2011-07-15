@@ -21,7 +21,7 @@ void test_ping()
 	tnt_recv_init(&rcv);
 	tnt_recv(t, &rcv);
 
-	printf("return_code: %lu\n", TNT_RECV_CODE(&rcv)); /* =0 */
+	printf("return_code: %d\n", TNT_RECV_CODE(&rcv)); /* =0 */
 	tnt_recv_free(&rcv);
 }
 

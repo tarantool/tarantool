@@ -80,7 +80,7 @@ tnt_set(struct tnt *t, enum tnt_opt_type name, ...)
 {
 	va_list args;
 	va_start(args, name);
-	t->error = tnt_opt_set(&t->opt, name, (void*)&args);
+	t->error = tnt_opt_set(&t->opt, name, args);
 	va_end(args);
 	return (t->error == TNT_EOK) ? 0 : -1;
 }

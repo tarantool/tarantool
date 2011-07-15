@@ -33,20 +33,20 @@
 #define TNT_PROTO_TYPE_PING   (65280)
 
 struct tnt_proto_header {
-	unsigned long type;
-	unsigned long len;
-	unsigned long reqid;
+	uint32_t type;
+	uint32_t len;
+	uint32_t reqid;
 };
 
 #define TNT_PROTO_IS_OK(V) ((V) == 0x0)
 
 struct tnt_proto_header_resp {
 	struct tnt_proto_header hdr;
-	unsigned long code;
+	uint32_t code;
 };
 
 struct tnt_proto_tuple {
-	unsigned long card;
+	uint32_t card;
 	unsigned char field[];
 };
 
@@ -57,8 +57,8 @@ struct tnt_proto_tuple {
 #define TNT_PROTO_FLAG_NOT_STORE (0x10)
 
 struct tnt_proto_insert {
-	unsigned long ns;
-	unsigned long flags;
+	uint32_t ns;
+	uint32_t flags;
 	/* tuple data */
 };
 
@@ -70,29 +70,29 @@ struct tnt_proto_insert {
 #define TNT_PROTO_UPDATE_SPLICE (5)
 
 struct tnt_proto_update {
-	unsigned long ns;
-	unsigned long flags;
+	uint32_t ns;
+	uint32_t flags;
 	/* tuple data */
 	/* count */
 	/* operation */
 };
 
 struct tnt_proto_update_op {
-	unsigned long field;
+	uint32_t field;
 	unsigned char op;
 	/* op_arg */
 };
 
 struct tnt_proto_delete {
-	unsigned long ns;
+	uint32_t ns;
 	/* tuple data */
 };
 
 struct tnt_proto_select {
-	unsigned long ns;
-	unsigned long index;
-	unsigned long offset;
-	unsigned long limit;
+	uint32_t ns;
+	uint32_t index;
+	uint32_t offset;
+	uint32_t limit;
 	/* tuple data */
 };
 

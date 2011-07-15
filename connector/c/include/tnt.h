@@ -26,6 +26,9 @@
  * SUCH DAMAGE.
  */
 
+#include <stdint.h>
+#include <stdarg.h>
+
 #include <tnt_queue.h>
 #include <tnt_error.h>
 #include <tnt_mem.h>

@@ -59,10 +59,9 @@ tnt_opt_free(struct tnt_opt *opt)
 
 enum tnt_error
 tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
-	    void *pargs)
+	    va_list args)
 {
 	char *key;
-	va_list args = *(va_list*)pargs;
 	switch (name) {
 	case TNT_OPT_PROTO:
 		opt->proto = va_arg(args, enum tnt_proto);

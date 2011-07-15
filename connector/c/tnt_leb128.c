@@ -25,6 +25,7 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -32,7 +33,7 @@
 #include <tnt_leb128.h>
 
 int
-tnt_leb128_read(char *buf, int size, unsigned long *value)
+tnt_leb128_read(char *buf, int size, uint32_t *value)
 {
 	*value = 0;
 	if (size < 1)
@@ -79,7 +80,7 @@ tnt_leb128_read(char *buf, int size, unsigned long *value)
 }
 
 void
-tnt_leb128_write(char *buf, unsigned long value)
+tnt_leb128_write(char *buf, uint32_t value)
 {
 	if (value >= (1 << 7)) {
 		if (value >= (1 << 14)) {
@@ -96,7 +97,7 @@ tnt_leb128_write(char *buf, unsigned long value)
 }
 
 int
-tnt_leb128_size(unsigned long value)
+tnt_leb128_size(uint32_t value)
 {
 	if (value < (1 << 7))
 		return 1;

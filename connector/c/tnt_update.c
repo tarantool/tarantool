@@ -25,6 +25,7 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -155,9 +156,9 @@ tnt_update_splice(struct tnt_update *update, int field,
 	if (op == NULL)
 		return TNT_EMEMORY;
 
-	int offset_len = tnt_leb128_size(sizeof(offset)),
-	    length_len = tnt_leb128_size(sizeof(length)),
-	    list_len   = tnt_leb128_size(sizeof(list_size));
+	uint32_t offset_len = tnt_leb128_size(sizeof(offset)),
+	         length_len = tnt_leb128_size(sizeof(length)),
+	         list_len   = tnt_leb128_size(sizeof(list_size));
 
 	op->size = offset_len + sizeof(offset) +
 		length_len + sizeof(length) +
@@ -204,7 +205,7 @@ tnt_update_pack(struct tnt_update *update, char **data, int *size)
 		return TNT_EMEMORY;
 
 	char *p = *data;
-	memcpy(p, &update->count, sizeof(unsigned long));
+	memcpy(p, &update->count, 4);
 	p += 4;
 
 	/*  <operation> ::= <field_no><op_code><op_arg>
@@ -216,10 +217,10 @@ tnt_update_pack(struct tnt_update *update, char **data, int *size)
 	*/
 	struct tnt_update_op *op;
 	STAILQ_FOREACH(op, &update->list, next) {
-		memcpy(p, (void*)&op->field, sizeof(unsigned long));
-		p += sizeof(unsigned long);
-		memcpy(p, (void*)&op->op, sizeof(unsigned char));
-		p += sizeof(unsigned char);
+		memcpy(p, (void*)&op->field, 4);
+		p += 4;
+		memcpy(p, (void*)&op->op, 1);
+		p += 1;
 		tnt_leb128_write(p, op->size);
 		p += op->size_leb;
 		memcpy(p, op->data, op->size); 

@@ -25,6 +25,7 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -73,7 +74,7 @@ tnt_recv_fqtuple(struct tnt_recv *rcv, char *data, unsigned long size,
 	char *p = data;
 	unsigned long i, off = 0;
 	for (i = 0 ; i < count ; i++) {
-		unsigned long s = *(unsigned long*)p;
+		uint32_t s = *(uint32_t*)p;
 		if (s > (unsigned long)(size - off)) {
 			tnt_tuples_free(&rcv->tuples);
 			return TNT_EPROTO;
@@ -159,7 +160,7 @@ tnt_recv(struct tnt *t, struct tnt_recv *rcv)
 			sizeof(struct tnt_proto_header_resp), 4);
 		if (t->error != TNT_EOK)
 			return -1;
-		rcv->count = *(unsigned long*)(buffer +
+		rcv->count = *(uint32_t*)(buffer +
 			sizeof(struct tnt_proto_header_resp));
 		return 0;
 	} 
@@ -176,8 +177,8 @@ tnt_recv(struct tnt *t, struct tnt_recv *rcv)
 		return -1;
 	}
 
-	rcv->count = *(unsigned long*)(p);
-	p += sizeof(unsigned long);
+	rcv->count = *(uint32_t*)(p);
+	p += 4;
 	size -= 4;
 
 	switch (rcv->op) {

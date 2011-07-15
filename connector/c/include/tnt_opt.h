@@ -99,6 +99,6 @@ void tnt_opt_init(struct tnt_opt *opt);
 void tnt_opt_free(struct tnt_opt *opt);
 
 enum tnt_error tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
-		           void *pargs);
+		           va_list args);
 
 #endif /* TNT_OPT_H_INCLUDED */

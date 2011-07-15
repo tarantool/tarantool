@@ -44,10 +44,10 @@ enum tnt_recv_op {
 
 struct tnt_recv {
 	enum tnt_recv_op op;
-	unsigned long reqid;
-	unsigned long code;
+	uint32_t reqid;
+	uint32_t code;
 	char *error;
-	unsigned long count;
+	uint32_t count;
 	struct tnt_tuples tuples;
 };
 
