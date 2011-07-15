@@ -218,7 +218,6 @@ tnt_io_flush(struct tnt *t)
 	return TNT_EOK;
 }
 
-
 int
 tnt_io_send_raw(struct tnt *t, char *buf, int size)
 {

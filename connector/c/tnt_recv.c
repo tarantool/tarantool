@@ -95,6 +95,9 @@ tnt_recv_fqtuple(struct tnt_recv *rcv, char *data, unsigned long size,
 int
 tnt_recv(struct tnt *t, struct tnt_recv *rcv)
 {
+	if (tnt_flush(t) == -1)
+		return -1;
+
 	char buffer[sizeof(struct tnt_proto_header_resp) + 4];
 	struct tnt_proto_header_resp *hdr =
 		(struct tnt_proto_header_resp*)buffer;

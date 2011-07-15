@@ -130,7 +130,7 @@ tnt_error_errno(struct tnt *t)
 
 struct tnt_error_desc {
 	enum tnt_error type;
-	char * desc;
+	char *desc;
 };
 
 /* must be in sync with enum tnt_error */
