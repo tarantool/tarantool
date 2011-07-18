@@ -7,14 +7,16 @@ ID_BEGIN = 0
 ID_STEP = 10
 
 def insert_tuples(server, begin, end, msg = "tuple"):
+    server_sql = server.sql
     for i in range(begin, end):
-        server.sql.execute("insert into t0 values (%d, '%s %d')" % (i, msg, i), silent=False)
+        exec server_sql "insert into t0 values (%d, '%s %d')" % (i, msg, i)
 
 def select_tuples(server, begin, end):
+    server_sql = server.sql
     # the last lsn is end id + 1
     server.wait_lsn(end + 1)
     for i in range(begin, end):
-        server.sql.execute("select * from t0 where k0 = %d" % i, silent=False)
+        exec server_sql "select * from t0 where k0 = %d" % i
 
 # master server
 master = server

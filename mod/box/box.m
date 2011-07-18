@@ -657,8 +657,12 @@ prepare_delete(struct box_txn *txn, void *key)
 		tuples_affected = 1;
 	}
 
-	if (!(txn->flags & BOX_QUIET))
+	if (!(txn->flags & BOX_QUIET)) {
 		add_iov_dup(&tuples_affected, sizeof(tuples_affected));
+
+		if (txn->old_tuple && (txn->flags & BOX_RETURN_TUPLE))
+			tuple_add_iov(txn, txn->old_tuple);
+	}
 }
 
 static void

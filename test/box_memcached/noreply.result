@@ -32,12 +32,7 @@ VALUE noreply:foo 0 3
 534
 END
 gets noreply:foo
-
-VALUE noreply:foo 0 3 46
-534
-END
-
-cas noreply:foo 0 0 1 46 noreply
+cas noreply:foo 0 0 1 <unique_id> noreply
 6
 get noreply:foo
 VALUE noreply:foo 0 1

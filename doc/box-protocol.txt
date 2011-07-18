@@ -44,7 +44,7 @@
 ; - 13    -- <insert>
 ; - 17    -- <select>
 ; - 19    -- <update>
-; - 20    -- <delete>
+; - 21    -- <delete>
 ; - 65280 -- <ping>
 ; This list is sparse since a number of old commands
 ; were deprecated and removed.
@@ -270,19 +270,21 @@
 <update_response_body> ::= <insert_response_body>
 
 ;
-; <delete>, request <type> = 20
+; <delete>, request <type> = 21
 ; Similarly to updates, <delete> always uses the
 ; primary key.
 ;
 
-<delete_request_body> ::= <namespace_no><tuple>
+<delete_request_body> ::= <namespace_no><flags><tuple>
 
 ;
 ; <delete> returns the number of deleted tuples.
 ; Currently it's always either 0 or 1.
+; If BOX_RETURN_TUPLE is specified, and there is an old
+; tuple, (count > 0), DELETE returns the deleted tuple.
 ;
 
-<delete_response_body> ::= <count>
+<delete_response_body> ::= <count> | <count><fq_tuple>
 
 ;
 ; The server response, in addition to response header and body,

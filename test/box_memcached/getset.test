@@ -35,11 +35,11 @@ print """# check-and-set (cas) failure case, try to set value with incorrect cas
 exec memcached "cas moo 0 0 6 0\r\nMOOVAL\r\n"
 exec memcached "get moo\r\n"
 
-result = server.memcached.execute("gets moo\r\n", silent=True)
+result = exec memcached silent "gets moo\r\n"
 unique_id = int(result.split()[4])
 
 print """# now test that we can store moo with the correct unique id"""
-server.memcached.execute("cas moo 0 0 6 %d\r\nMOOVAL\r\n" % unique_id, silent=True)
+exec memcached silent "cas moo 0 0 6 %d\r\nMOOVAL\r\n" % unique_id
 exec memcached "get moo\r\n"
 
 exec memcached "set foo 0 0 6\r\nfooval\r\ndelete foo\r\nset foo 0 0 6\r\nfooval\r\ndelete foo\r\n"
@@ -54,11 +54,11 @@ while len < (1024 * 1028):
         exec memcached "get foo_%d\r\n" % (len)
         print "# set big data: - should fail"
         print "set foo_%d 0 0 %d\r\n<big-data>\r\n" % (len, len)
-        print server.memcached.execute("set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val), silent=True)
+        print exec memcached silent "set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val)
     else:
         print "# set big data: - should pass"
         print "set foo_%d 0 0 %d\r\n<big-data>\r\n" % (len, len)
-        print server.memcached.execute("set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val), silent=True)
+        print exec memcached silent "set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val)
     len += 1024 * 512
 
 # resore default suite config

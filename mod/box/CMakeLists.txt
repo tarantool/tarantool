@@ -6,6 +6,11 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.m
 # Do not clean memcached-grammar.m in 'make clean'.
 set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM 1)
 
+# Do not try to randomly re-generate memcached-grammar.m
+# after a fresh checkout/branch switch.
+execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
+    ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.m)
+
 set_source_files_properties(memcached-grammar.m
     PROPERTIES HEADER_FILE_ONLY true)
 

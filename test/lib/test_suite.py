@@ -100,6 +100,7 @@ class Test:
 
         diagnostics = "unknown"
         save_stdout = sys.stdout
+        builddir = self.args.builddir
         try:
             sys.stdout = FilteredStream(self.tmp_result)
             stdout_fileno = sys.stdout.stream.fileno()

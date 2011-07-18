@@ -36,7 +36,10 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/core/admin.m
     COMMAND ${RAGEL} -G2 core/admin.rl -o core/admin.m
     DEPENDS ${CMAKE_SOURCE_DIR}/core/admin.rl)
 
-add_custom_target(generate_admin_c DEPENDS ${CMAKE_SOURCE_DIR}/core/admin.m)
+add_custom_target(generate_admin_m DEPENDS ${CMAKE_SOURCE_DIR}/core/admin.m)
+# do not randomly try to re-generate admin.m after a fresh checkout
+execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
+    ${CMAKE_SOURCE_DIR}/core/admin.m)
 
 #
 # Do not clean admin.m, memcached.m or other

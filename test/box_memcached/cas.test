@@ -1,4 +1,5 @@
 # encoding: tarantool
+import sys
 from lib.memcached_connection import MemcachedConnection
 
 exec memcached "cas bad blah 0 0 0\r\n"
@@ -19,20 +20,27 @@ print """# cas fail """
 exec memcached "cas foo 0 0 6 123\r\nbarva2\r\n"
 
 print """# gets foo and verify identifier exists """
-result = server.memcached.execute("gets foo\r\n", silent=False)
-identifier = int(result.split()[4])
+sys.stdout.write("gets foo\r\n")
+result = exec memcached silent "gets foo\r\n"
+unique_id = int(result.split()[4])
 
 print """# cas success """
-exec memcached "cas foo 0 0 6 %d\r\nbarva2\r\n" % identifier
+sys.stdout.write("cas foo 0 0 6 <unique_id>\r\nbarva2\r\n")
+result = exec memcached silent "cas foo 0 0 6 %d\r\nbarva2\r\n" % unique_id
+sys.stdout.write(result)
 
 print """# cas failure (reusing the same key) """
-exec memcached "cas foo 0 0 6 %d\r\nbarva2\r\n" % identifier
+sys.stdout.write("cas foo 0 0 6 <unique_id>\r\nbarva2\r\n")
+result = exec memcached silent "cas foo 0 0 6 %d\r\nbarva2\r\n" % unique_id
+sys.stdout.write(result)
 
 print """# delete foo """
 exec memcached "delete foo\r\n"
 
 print """# cas missing """
-exec memcached "cas foo 0 0 6 %d\r\nbarva2\r\n" % identifier
+sys.stdout.write("cas foo 0 0 6 <unique_id>\r\nbarva2\r\n")
+result = exec memcached silent "cas foo 0 0 6 %d\r\nbarva2\r\n" % unique_id
+sys.stdout.write(result)
 
 print """# set foo1 """
 exec memcached "set foo1 0 0 1\r\n1\r\n"
@@ -41,11 +49,11 @@ print """# set foo2 """
 exec memcached "set foo2 0 0 1\r\n2\r\n"
 
 print """# gets foo1 check """
-result = server.memcached.execute("gets foo1\r\n", silent=False)
+result = exec memcached "gets foo1\r\n"
 foo1_cas = int(result.split()[4])
 
 print """# gets foo2 check """
-result = server.memcached.execute("gets foo2\r\n", silent=False)
+result = exec memcached "gets foo2\r\n"
 foo2_cas = int(result.split()[4])
 
 print """# validate foo1 != foo2 """
@@ -58,23 +66,23 @@ memcached1 = server.memcached
 memcached2 = MemcachedConnection('localhost', server.memcached_port)
 
 print """# gets foo from memcached1 - should success """
-result = memcached1.execute("gets foo1\r\n", silent = True)
+result = exec memcached1 silent "gets foo1\r\n"
 mem1_cas = int(result.split()[4])
 
 print """# gets foo from memcached2 - should success """
-result = memcached2.execute("gets foo1\r\n", silent = True)
+result = exec memcached2 silent "gets foo1\r\n"
 mem2_cas = int(result.split()[4])
 
 print """# send 'cas foo1' from memcached1 """
-memcached1.send("cas foo1 0 0 6 %d\r\nbarva2\r\n" % mem1_cas, silent = True)
+send memcached1 silent "cas foo1 0 0 6 %d\r\nbarva2\r\n" % mem1_cas
 print """# send 'cas foo1' from memcached2 """
-memcached2.send("cas foo1 0 0 4 %d\r\npear\r\n" % mem2_cas, silent = True)
+send memcached2 silent "cas foo1 0 0 4 %d\r\npear\r\n" % mem2_cas
 
 print """# recv reply 'cas foo1' from memcached1 """
-result = memcached1.recv(silent = True)
+result = recv memcached1 silent
 mem1_cas_result = result.split()[0]
 print """# recv reply 'cas foo1' from memcached2 """
-result = memcached2.recv(silent = True)
+result = recv memcached2 silent
 mem2_cas_result = result.split()[0]
 
 if mem1_cas_result == "STORED" and mem2_cas_result == "EXISTS":
@@ -90,13 +98,13 @@ print """# set bug15 """
 exec memcached "set bug15 0 0 1\r\n0\r\n"
 
 print """# Check out the first gets. """
-result = server.memcached.execute("gets bug15\r\n", silent=True)
+result = exec memcached silent "gets bug15\r\n"
 bug15_cas = int(result.split()[4])
 
 print """# Increment. """
 exec memcached "incr bug15 1\r\n"
 print """# Validate a changed CAS. """
-result = server.memcached.execute("gets bug15\r\n", silent=True)
+result = exec memcached silent "gets bug15\r\n"
 next_bug15_cas = int(result.split()[4])
 
 print """# validate bug15_cas != next_bug15_cas """
