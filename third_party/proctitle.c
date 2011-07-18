@@ -106,6 +106,8 @@ static size_t ps_buffer_fixed_size;	/* size of the constant prefix */
 /* save the original argv[] location here */
 static int save_argc;
 static char **save_argv;
+/* save the original environ[] here */
+static char **save_environ = NULL;
 
 /*
  * Call this early in startup to save the original argc/argv values.
@@ -124,7 +126,7 @@ init_set_proc_title(int argc, char **argv)
 	save_argv = argv;
 
 #if defined(PS_USE_CLOBBER_ARGV)
-
+	save_environ = environ;
 	/*
 	 * If we're going to overwrite the argv area, count the available space.
 	 * Also move the environment to make additional room.
@@ -243,6 +245,21 @@ init_set_proc_title(int argc, char **argv)
 #endif /*PS_USE_NONE */
 
 	return argv;
+}
+
+void
+free_proc_title(int argc, char **argv)
+{
+	int i;
+#if defined(PS_USE_CLOBBER_ARGV)
+	for (i = 0; environ[i] != NULL; i++)
+		free(environ[i]);
+	free(environ);
+	environ = save_environ;
+#endif
+	for (i = 0; i < argc; i++)
+		free(argv[i]);
+	free(argv);
 }
 
 void

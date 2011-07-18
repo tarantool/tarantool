@@ -133,8 +133,9 @@ acceptDefault_name__namespace(tarantool_cfg_namespace *c) {
 
 static int
 acceptDefault_name__namespace__index(tarantool_cfg_namespace_index *c) {
-	c->type = strdup("");
-	if (c->type == NULL) return CNF_NOMEMORY;
+	/*c->type = strdup("");*/
+	/*if (c->type == NULL) return CNF_NOMEMORY;*/
+	c->type = NULL;
 	c->unique = -1;
 	c->key_field = NULL;
 	return 0;
@@ -143,8 +144,9 @@ acceptDefault_name__namespace__index(tarantool_cfg_namespace_index *c) {
 static int
 acceptDefault_name__namespace__index__key_field(tarantool_cfg_namespace_index_key_field *c) {
 	c->fieldno = -1;
-	c->type = strdup("");
-	if (c->type == NULL) return CNF_NOMEMORY;
+	c->type = NULL;
+	/*c->type = strdup("");*/
+	/*if (c->type == NULL) return CNF_NOMEMORY;*/
 	return 0;
 }
 
@@ -862,7 +864,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
 		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+
+		ARRAYALLOC(c->namespace[opt->name->index]->index,
+			opt->name->next->index + 1,
+			_name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+
 		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
 		c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;

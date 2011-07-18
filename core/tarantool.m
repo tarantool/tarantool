@@ -64,7 +64,8 @@ const char *cfg_filename = DEFAULT_CFG_FILENAME;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
 char *custom_proc_title;
-
+char **main_argv;
+int main_argc;
 struct tarantool_cfg cfg;
 struct recovery_state *recovery_state;
 
@@ -234,21 +235,48 @@ snapshot(void *ev, int events __attribute__((unused)))
 }
 
 static void
-sig_int(int signal)
+remove_pid(void)
 {
-	say_info("Exiting: %s", strsignal(signal));
+	unlink(cfg.pid_file);
+}
 
+void
+tarantool_free(void)
+{
 	if (recovery_state != NULL) {
 		struct child *writer = recovery_state->wal_writer;
 		if (writer && writer->out && writer->out->fd > 0) {
 			close(writer->out->fd);
 			usleep(1000);
 		}
+		recover_free(recovery_state);
 	}
+
+	mod_free();
+
+	if (cfg.pid_file != NULL)
+		remove_pid();
+
+	destroy_tarantool_cfg(&cfg);
+
+	fiber_destroy_all();
+
+	salloc_destroy();
+	palloc_destroy_pool(eter_pool);
+
+	free_proc_title(main_argc, main_argv);
+}
+
+static void
+sig_int(int signal)
+{
+	say_info("Exiting: %s", strsignal(signal));
+
+	tarantool_free();
+
 #ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
-
 	if (master_pid == getpid()) {
 		kill(0, signal);
 		exit(EXIT_SUCCESS);
@@ -321,15 +349,8 @@ create_pid(void)
 }
 
 static void
-remove_pid(void)
-{
-	unlink(cfg.pid_file);
-}
-
-static void
 initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_factor)
 {
-
 	if (!salloc_init(slab_alloc_arena * (1 << 30), slab_alloc_minimal, slab_alloc_factor))
 		panic_syserror("can't initialize slab allocator");
 
@@ -367,6 +388,8 @@ main(int argc, char **argv)
 	load_symbols(argv[0]);
 #endif
 	argv = init_set_proc_title(argc, argv);
+	main_argv = argv;
+	main_argc = argc;
 
 	const void *opt_def =
 		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
@@ -530,7 +553,7 @@ main(int argc, char **argv)
 
 	if (cfg.pid_file != NULL) {
 		create_pid();
-		atexit(remove_pid);
+		//atexit(remove_pid);
 	}
 
 	/* init process title */

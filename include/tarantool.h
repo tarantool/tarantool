@@ -32,6 +32,7 @@
 
 extern struct recovery_state *recovery_state;
 void mod_init(void);
+void mod_free(void);
 struct tarantool_cfg;
 
 extern const char *mod_name;
@@ -54,6 +55,7 @@ void tarantool_info(struct tbuf *out);
 double tarantool_uptime(void);
 
 char **init_set_proc_title(int argc, char **argv);
+void free_proc_title(int argc, char **argv);
 void set_proc_title(const char *format, ...);
 
 #endif /* TARANTOOL_H_INCLUDED */

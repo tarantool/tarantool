@@ -1065,7 +1065,7 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		 * signals from the controlling tty.
 		 */
 		setpgid(0, 0);
-		salloc_destroy();
+		/* destroing salloc in tarantool_free() */
 		close_all_xcpt(2, socks[0], sayfd);
 		snprintf(child_name, sizeof(child_name), "%s/child", name);
 		fiber_set_name(&sched, child_name);

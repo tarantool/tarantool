@@ -62,7 +62,7 @@ struct log_io_class {
 	const char *filetype;
 	const char *version;
 	const char *suffix;
-	const char *dirname;
+	char *dirname;
 };
 
 
@@ -150,6 +150,7 @@ struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_d
 				    row_handler row_handler,
 				    int rows_per_file, double fsync_delay, int inbox_size,
 				    int flags, void *data);
+void recover_free(struct recovery_state *recovery);
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recover_finalize(struct recovery_state *r);

@@ -1,0 +1,74 @@
+==29482== Memcheck, a memory error detector
+==29482== Copyright (C) 2002-2010, and GNU GPL'd, by Julian Seward et al.
+==29482== Using Valgrind-3.6.1 and LibVEX; rerun with -h for copyright info
+==29482== Command: ./tarantool_box
+==29482== Parent PID: 11562
+==29482== 
+--29484-- WARNING: unhandled syscall: 340
+--29484-- You may be able to write your own handler.
+--29484-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
+--29484-- Nevertheless we consider this a bug.  Please report
+--29484-- it at http://valgrind.org/support/bug_reports.html.
+==29484== 
+==29484== HEAP SUMMARY:
+==29484==     in use at exit: 15,266 bytes in 360 blocks
+==29484==   total heap usage: 1,303,355 allocs, 188 frees, 192,206,011 bytes allocated
+==29484== 
+==29482== 
+==29482== HEAP SUMMARY:
+==29482==     in use at exit: 2,945,876 bytes in 25,307 blocks
+==29482==   total heap usage: 4,505,525 allocs, 183,307 frees, 525,965,719 bytes allocated
+==29482== 
+==29482== 640,000 bytes in 10,000 blocks are definitely lost in loss record 94 of 95
+==29482==    at 0x807FF66: salloc (salloc.m:293)
+==29482==    by 0x8056A2E: tuple_alloc (box.m:182)
+==29482==    by 0x8056EC6: prepare_replace (box.m:234)
+==29482==    by 0x805965F: box_dispatch (box.m:819)
+==29482==    by 0x805A61E: box_process (box.m:1108)
+==29482==    by 0x805A801: box_process_rw (box.m:1134)
+==29482==    by 0x808697E: iproto_reply (iproto.m:103)
+==29482==    by 0x8086817: iproto_interact (iproto.m:59)
+==29482==    by 0x8077919: fiber_loop (fiber.m:439)
+==29482==    by 0x808CEFC: coro_init (coro.c:91)
+==29482==    by 0xDEADBEEE: ???
+==29482== 
+==29482== 2,240,000 bytes in 15,000 blocks are definitely lost in loss record 95 of 95
+==29482==    at 0x807FF66: salloc (salloc.m:293)
+==29482==    by 0x8056A2E: tuple_alloc (box.m:182)
+==29482==    by 0x8058617: prepare_update_fields (box.m:518)
+==29482==    by 0x80599EB: box_dispatch (box.m:854)
+==29482==    by 0x805A61E: box_process (box.m:1108)
+==29482==    by 0x805A801: box_process_rw (box.m:1134)
+==29482==    by 0x808697E: iproto_reply (iproto.m:103)
+==29482==    by 0x8086817: iproto_interact (iproto.m:59)
+==29482==    by 0x8077919: fiber_loop (fiber.m:439)
+==29482==    by 0x808CEFC: coro_init (coro.c:91)
+==29482==    by 0xDEADBEEE: ???
+==29482== 
+==29482== LEAK SUMMARY:
+==29482==    definitely lost: 2,880,000 bytes in 25,000 blocks
+==29482==    indirectly lost: 0 bytes in 0 blocks
+==29482==      possibly lost: 0 bytes in 0 blocks
+==29482==    still reachable: 64,012 bytes in 175 blocks
+==29482==         suppressed: 1,864 bytes in 132 blocks
+==29482== Reachable blocks (those to which a pointer was found) are not shown.
+==29482== To see them, rerun with: --leak-check=full --show-reachable=yes
+==29482== 
+==29482== For counts of detected and suppressed errors, rerun with: -v
+==29482== ERROR SUMMARY: 2 errors from 2 contexts (suppressed: 34 from 17)
+==29484== 1,975 (148 direct, 1,827 indirect) bytes in 1 blocks are definitely lost in loss record 111 of 113
+==29484==    at 0x4026C28: malloc (in /usr/lib/valgrind/vgpreload_memcheck-x86-linux.so)
+==29484==    by 0x808E054: init_set_proc_title (proctitle.c:167)
+==29484==    by 0x8071401: main (tarantool.m:390)
+==29484== 
+==29484== LEAK SUMMARY:
+==29484==    definitely lost: 148 bytes in 1 blocks
+==29484==    indirectly lost: 1,827 bytes in 36 blocks
+==29484==      possibly lost: 0 bytes in 0 blocks
+==29484==    still reachable: 189,019 bytes in 203 blocks
+==29484==         suppressed: 1,864 bytes in 127 blocks
+==29484== Reachable blocks (those to which a pointer was found) are not shown.
+==29484== To see them, rerun with: --leak-check=full --show-reachable=yes
+==29484== 
+==29484== For counts of detected and suppressed errors, rerun with: -v
+==29484== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 29 from 12)

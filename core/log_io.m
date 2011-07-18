@@ -152,6 +152,14 @@ v11_class(struct log_io_class *c)
 	c->fsync_delay = 0;
 }
 
+static void
+v11_class_free(struct log_io_class *c)
+{
+	if (c->dirname)
+		free(c->dirname);
+	free(c);
+}
+
 static struct log_io_class *
 snapshot_class_create(const char *dirname)
 {
@@ -788,6 +796,8 @@ read_log(const char *filename,
 		say_error("binary log `%s' wasn't correctly closed", filename);
 
 	close_iter(&i);
+	v11_class_free(c);
+	close_log(&l);
 	return i.error;
 }
 
@@ -1324,6 +1334,16 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 		r->wal_writer = spawn_child("wal_writer", inbox_size, write_to_disk, r);
 
 	return r;
+}
+
+void
+recover_free(struct recovery_state *recovery)
+{
+	v11_class_free(recovery->snap_class);
+	v11_class_free(recovery->wal_class);
+	
+	if (recovery->current_wal)
+		close_log(&recovery->current_wal);
 }
 
 void

@@ -985,6 +985,25 @@ xlog_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 }
 
 void
+namespace_free(void)
+{
+	for (int i = 0; cfg.namespace[i] != NULL; ++i) {
+		tarantool_cfg_namespace *cfg_namespace = cfg.namespace[i];
+		if (!CNF_STRUCT_DEFINED(cfg_namespace) || !cfg_namespace->enabled)
+			continue;
+		for (int j = 0; cfg_namespace->index[j] != NULL; ++j) {
+			struct index *index = &namespace[i].index[j];
+
+			index_free(index);
+
+			sfree(index->key_field);
+			sfree(index->field_cmp_order);
+		}
+	}
+	memcached_namespace_free();
+}
+
+void
 namespace_init(void)
 {
 	namespace = palloc(eter_pool, sizeof(struct namespace) * BOX_NAMESPACE_MAX);
@@ -1422,6 +1441,12 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 	}
 
 	return 0;
+}
+
+void
+mod_free(void)
+{
+	namespace_free();
 }
 
 void

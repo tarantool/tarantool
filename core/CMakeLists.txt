@@ -67,7 +67,7 @@ add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers libluajit)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
-set (common_libraries cfg core ev coro gopt misc objc)
+set (common_libraries cfg core ev coro gopt misc objc dl)
 
 if (ENABLE_GCOV)
   set (common_libraries ${common_libraries} gcov)
@@ -77,7 +77,7 @@ if (ENABLE_BACKTRACE AND HAVE_BFD)
   set (common_libraries ${common_libraries} bfd)
   if (ENABLE_STATIC)
      include (FindZLIB)
-     set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES} iberty dl)
+     set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES} iberty)
   endif()
 endif()
 

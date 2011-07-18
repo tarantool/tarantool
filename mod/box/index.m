@@ -582,6 +582,12 @@ index_hash_num(struct index *index, struct namespace *namespace, size_t estimate
 }
 
 static void
+index_hash_num_free(struct index *index)
+{
+	kh_destroy(int_ptr_map, index->idx.int_hash);
+}
+
+static void
 index_hash_num64(struct index *index, struct namespace *namespace, size_t estimated_rows)
 {
 	index->type = HASH;
@@ -593,6 +599,12 @@ index_hash_num64(struct index *index, struct namespace *namespace, size_t estima
 	index->idx.int64_hash = kh_init(int64_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(int64_ptr_map, index->idx.int64_hash, estimated_rows);
+}
+
+static void
+index_hash_num64_free(struct index *index)
+{
+	kh_destroy(int64_ptr_map, index->idx.int64_hash);
 }
 
 static void
@@ -610,6 +622,12 @@ index_hash_str(struct index *index, struct namespace *namespace, size_t estimate
 }
 
 static void
+index_hash_str_free(struct index *index)
+{
+	kh_destroy(lstr_ptr_map, index->idx.str_hash);
+}
+
+static void
 index_tree(struct index *index, struct namespace *namespace,
 	   size_t estimated_rows __attribute__((unused)))
 {
@@ -622,6 +640,12 @@ index_tree(struct index *index, struct namespace *namespace,
 	index->iterator_init = index_iterator_init_tree_str;
 	index->iterator_next = index_iterator_next_tree_str;
 	index->idx.tree = palloc(eter_pool, sizeof(*index->idx.tree));
+}
+
+static void
+index_tree_free(struct index *index)
+{
+	palloc_destroy_pool((void*)index->idx.tree);
 }
 
 void
@@ -657,6 +681,33 @@ index_init(struct index *index, struct namespace *namespace, size_t estimated_ro
 		break;
 	default:
 		panic("unsupported index type");
+		break;
+	}
+}
+
+void
+index_free(struct index *index)
+{
+	switch (index->type) {
+	case HASH:
+		switch (index->key_field[0].type) {
+		case NUM:
+			index_hash_num_free(index);
+			break;
+		case NUM64:
+			index_hash_num64_free(index);
+			break;
+		case STRING:
+			index_hash_str_free(index);
+			break;
+		default:
+			break;
+		}
+		break;
+	case TREE:
+		index_tree_free(index);
+		break;
+	default:
 		break;
 	}
 }
