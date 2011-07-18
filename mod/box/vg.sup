@@ -127,57 +127,6 @@
    Memcheck:Leak
    fun:malloc
    fun:realloc
-   fun:kh_destroy_int_ptr_map
-   fun:index_hash_num_free
-   fun:index_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:sig_int
-   obj:/lib/libc-2.13.so
-   fun:ev_run
-   fun:ev_loop
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:kh_destroy_int_ptr_map
-   fun:index_hash_num_free
-   fun:index_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:sig_int
-   obj:/lib/libc-2.13.so
-   fun:ev_run
-   fun:ev_loop
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:kh_destroy_int_ptr_map
-   fun:index_hash_num_free
-   fun:index_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:sig_int
-   obj:/lib/libc-2.13.so
-   fun:ev_run
-   fun:ev_loop
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
    fun:tnt_xrealloc
    fun:kh_destroy_lstr_ptr_map
    fun:index_hash_str_free
@@ -239,4 +188,55 @@
    fun:box_process_rw
    fun:iproto_reply
    fun:iproto_interact
+}
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_destroy_lstr_ptr_map
+   fun:index_hash_str_free
+   fun:index_free
+   fun:namespace_free
+   fun:mod_free
+   fun:tarantool_free
+   fun:sig_int
+   obj:/lib/libc-2.13.so
+   fun:ev_run
+}
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_destroy_lstr_ptr_map
+   fun:index_hash_str_free
+   fun:index_free
+   fun:namespace_free
+   fun:mod_free
+   fun:tarantool_free
+   fun:sig_int
+   obj:/lib/libc-2.13.so
+   fun:ev_run
+}
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_destroy_lstr_ptr_map
+   fun:index_hash_str_free
+   fun:index_free
+   fun:namespace_free
+   fun:mod_free
+   fun:tarantool_free
+   fun:sig_int
+   obj:/lib/libc-2.13.so
+   fun:ev_run
 }

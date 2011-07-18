@@ -258,11 +258,9 @@ tarantool_free(void)
 		remove_pid();
 
 	destroy_tarantool_cfg(&cfg);
-
 	fiber_destroy_all();
-
-	salloc_destroy();
 	palloc_destroy_pool(eter_pool);
+	salloc_destroy();
 
 	free_proc_title(main_argc, main_argv);
 }
