@@ -386,8 +386,8 @@ main(int argc, char **argv)
 	load_symbols(argv[0]);
 #endif
 	argv = init_set_proc_title(argc, argv);
-	main_argv = argv;
 	main_argc = argc;
+	main_argv = argv;
 
 	const void *opt_def =
 		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),

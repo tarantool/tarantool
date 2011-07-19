@@ -50,7 +50,8 @@ def prepare_gdb(args):
 
 def prepare_valgrind(args, valgrind_log):
     "Prepare server startup arguments to run under valgrind."
-    args = [ "valgrind", "--log-file={0}".format(valgrind_log), "--quiet" ] + args
+    args = [ "valgrind", "--log-file={0}".format(valgrind_log),
+             "--suppressions={0}".format(valgrind_sup), "--quiet" ] + args
     return args
 
 def check_tmpfs_exists():
@@ -83,6 +84,7 @@ class Server(object):
         self.config = None
         self.vardir = None
         self.valgrind_log = "valgrind.log"
+        self.valgrind_sup = "valgrind.sup"
         self.pidfile = None
         self.port = None
         self.binary = None
