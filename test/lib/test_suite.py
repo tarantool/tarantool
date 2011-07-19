@@ -207,6 +207,7 @@ class TestSuite:
         config.read(os.path.join(suite_path, "suite.ini"))
         self.ini.update(dict(config.items("default")))
         self.ini["config"] = os.path.join(suite_path, self.ini["config"])
+        self.ini["valgrind_suppression"] = os.path.join(suite_path, self.ini["valgrind_suppression"])
         if self.ini.has_key("disabled"):
             self.ini["disabled"] = dict.fromkeys(self.ini["disabled"].split(" "))
         else:
@@ -234,7 +235,7 @@ class TestSuite:
         server.deploy(self.ini["config"],
                       server.find_exe(self.args.builddir, silent=False),
                       self.args.vardir, self.args.mem, self.args.start_and_exit, self.args.gdb,
-                      self.args.valgrind, silent=False)
+                      self.args.valgrind, self.ini["valgrind_suppression"], silent=False)
         if self.args.start_and_exit:
             print "  Start and exit requested, exiting..."
             exit(0)

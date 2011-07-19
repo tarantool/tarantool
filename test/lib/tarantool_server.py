@@ -34,7 +34,7 @@ class TarantoolServer(Server):
         Server.__init__(self, core, module)
         self.default_config_name = "tarantool.cfg"
         # append additional cleanup patterns
-        self.re_vardir_cleanup += ['*.snap', '*.xlog', '*.inprogress', '*.cfg']
+        self.re_vardir_cleanup += ['*.snap', '*.xlog', '*.inprogress', '*.cfg', '*.sup']
 
     def find_exe(self, builddir, silent=True):
         return Server.find_exe(self, "{0}/mod/{1}".format(builddir, self.module), silent)

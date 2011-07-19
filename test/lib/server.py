@@ -48,7 +48,7 @@ def prepare_gdb(args):
     args = [ term, "-e", "gdb", "-ex", "break main", "-ex", "run" ] + args
     return args
 
-def prepare_valgrind(args, valgrind_log):
+def prepare_valgrind(args, valgrind_log, valgrind_sup):
     "Prepare server startup arguments to run under valgrind."
     args = [ "valgrind", "--log-file={0}".format(valgrind_log),
              "--suppressions={0}".format(valgrind_sup), "--quiet" ] + args
@@ -84,7 +84,8 @@ class Server(object):
         self.config = None
         self.vardir = None
         self.valgrind_log = "valgrind.log"
-        self.valgrind_sup = "valgrind.sup"
+        self.valgrind_sup = None
+        self.default_suppression_name = "valgrind.sup"
         self.pidfile = None
         self.port = None
         self.binary = None
@@ -154,6 +155,7 @@ class Server(object):
                 os.makedirs(self.vardir)
 
         shutil.copy(self.config, os.path.join(self.vardir, self.default_config_name))
+        shutil.copy(self.valgrind_sup, os.path.join(self.vardir, self.default_suppression_name))
 
     def init(self):
         pass
@@ -191,7 +193,9 @@ class Server(object):
         if self.gdb:
             args = prepare_gdb(args)
         elif self.valgrind:
-            args = prepare_valgrind(args, self.valgrind_log)
+            args = prepare_valgrind(args, self.valgrind_log,
+			            os.path.abspath(os.path.join(self.vardir,
+						    self.default_suppression_name)))
 
         if self.start_and_exit:
             self._start_and_exit(args)
@@ -231,7 +235,8 @@ class Server(object):
         self.pid = None
 
     def deploy(self, config=None, binary=None, vardir=None,
-               mem=None, start_and_exit=None, gdb=None, valgrind=None, silent=True, need_init=True):
+               mem=None, start_and_exit=None, gdb=None, valgrind=None, valgrind_sup=None,
+	       silent=True, need_init=True):
         if config != None: self.config = config
         if binary != None: self.binary = binary
         if vardir != None: self.vardir = vardir
@@ -239,6 +244,7 @@ class Server(object):
         if start_and_exit != None: self.start_and_exit = start_and_exit
         if gdb != None: self.gdb = gdb
         if valgrind != None: self.valgrind = valgrind
+        if valgrind_sup != None: self.valgrind_sup = valgrind_sup
 
         self.configure(self.config)
         self.install(self.binary, self.vardir, self.mem, silent)
