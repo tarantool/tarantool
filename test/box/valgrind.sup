@@ -1,114 +1,39 @@
 
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:objc_malloc
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   fun:__objc_exec_class
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:*
-   obj:*
-}
+## obj-c
+##
 
 {
    <insert_a_suppression_name_here>
    Memcheck:Leak
    fun:malloc
    fun:objc_malloc
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   fun:__objc_exec_class
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:*
    obj:*
 }
 
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:objc_malloc
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   fun:__objc_exec_class
-   fun:__objc_gnu_init
-   obj:/home/pmwka/work/master-valgrind/tarantool/mod/box/tarantool_box
-   obj:/home/pmwka/work/master-valgrind/tarantool/mod/box/tarantool_box
-}
+## libev/libc internal stuff
+##
 
 {
    <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:objc_malloc
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   fun:__objc_exec_class
-   fun:__objc_gnu_init
-   obj:/home/pmwka/work/master-valgrind/tarantool/mod/box/tarantool_box
-   obj:/home/pmwka/work/master-valgrind/tarantool/mod/box/tarantool_box
+   Memcheck:Param
+   write(buf)
+   fun:__write_nocancel
+   fun:evpipe_write
+   fun:ev_feed_signal
+   fun:ev_sighandler
+   obj:/lib64/libc-2.5.so
+   fun:__epoll_wait_nocancel
+   fun:epoll_poll
+   fun:ev_run
+   fun:ev_loop
+   fun:main
 }
 
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:objc_malloc
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   fun:__objc_exec_class
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:*
-   obj:*
-}
+## khash free/realloc(0)
+##
 
 {
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:objc_malloc
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   fun:__objc_exec_class
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:*
-   obj:*
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:objc_malloc
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   fun:__objc_exec_class
-   fun:__objc_gnu_init
-   obj:/home/pmwka/work/master-valgrind/tarantool/mod/box/tarantool_box
-   obj:/home/pmwka/work/master-valgrind/tarantool/mod/box/tarantool_box
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:objc_malloc
-   obj:/usr/lib/libobjc.so.3.0.0
-   obj:/usr/lib/libobjc.so.3.0.0
-   fun:__objc_exec_class
-   fun:__objc_gnu_init
-   obj:/home/pmwka/work/master-valgrind/tarantool/mod/box/tarantool_box
-   obj:/home/pmwka/work/master-valgrind/tarantool/mod/box/tarantool_box
-}
-
-{
-   <insert_a_suppression_name_here>
+   <realloc with 0 byte>
    Memcheck:Leak
    fun:malloc
    fun:realloc
@@ -123,7 +48,7 @@
 }
 
 {
-   <insert_a_suppression_name_here>
+   <realloc with 0 byte>
    Memcheck:Leak
    fun:malloc
    fun:realloc
@@ -136,28 +61,11 @@
    fun:mod_free
    fun:tarantool_free
    fun:sig_int
-   obj:/lib/libc-2.13.so
+   obj:*
 }
 
 {
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:memcached_namespace_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:sig_int
-   obj:/lib/libc-2.13.so
-}
-
-{
-   <insert_a_suppression_name_here>
+   <realloc with 0 byte>
    Memcheck:Leak
    fun:malloc
    fun:realloc
@@ -174,7 +82,7 @@
 }
 
 {
-   <insert_a_suppression_name_here>
+   <realloc with 0 byte>
    Memcheck:Leak
    fun:malloc
    fun:realloc
@@ -191,7 +99,7 @@
 }
 
 {
-   <insert_a_suppression_name_here>
+   <realloc with 0 byte>
    Memcheck:Leak
    fun:malloc
    fun:realloc
@@ -203,12 +111,12 @@
    fun:mod_free
    fun:tarantool_free
    fun:sig_int
-   obj:/lib/libc-2.13.so
+   obj:*
    fun:ev_run
 }
 
 {
-   <insert_a_suppression_name_here>
+   <realloc with 0 byte>
    Memcheck:Leak
    fun:malloc
    fun:realloc
@@ -220,26 +128,212 @@
    fun:mod_free
    fun:tarantool_free
    fun:sig_int
-   obj:/lib/libc-2.13.so
-   fun:ev_run
+   obj:*
+   fun:__epoll_wait_nocancel
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_destroy_lstr_ptr_map
+   fun:index_hash_str_free
+   fun:index_free
+   fun:namespace_free
+   fun:mod_free
+   fun:tarantool_free
+   fun:sig_int
+   obj:*
+   fun:__epoll_wait_nocancel
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_destroy_lstr_ptr_map
+   fun:index_hash_str_free
+   fun:index_free
+   fun:namespace_free
+   fun:mod_free
+   fun:tarantool_free
+   fun:sig_int
+   obj:*
+   fun:__epoll_wait_nocancel
+}
+
+## box update/old-new tuple changing
+##
+
+{
+   <box>
+   Memcheck:Leak
+   fun:salloc
+   fun:tuple_alloc
+   fun:prepare_update_fields
+   fun:box_dispatch
+   fun:box_process
+   fun:box_process_rw
+   fun:iproto_reply
+   fun:iproto_interact
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
+}
+
+{
+   <box>
+   Memcheck:Leak
+   fun:salloc
+   fun:tuple_alloc
+   fun:prepare_update_fields
+   fun:box_dispatch
+   fun:box_process
+   fun:recover_row
+   fun:recover_wal
+   fun:recover_remaining_wals
+   fun:recover
+   fun:mod_init
+   fun:main
+}
+
+## backtrace
+##
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Cond
+   fun:backtrace
+   fun:fiber_info
+   fun:admin_dispatch
+   fun:admin_handler
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
 }
 
 {
    <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:sig_int
-   obj:/lib/libc-2.13.so
-   fun:ev_run
+   Memcheck:Value8
+   fun:backtrace
+   fun:fiber_info
+   fun:admin_dispatch
+   fun:admin_handler
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
 }
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Cond
+   fun:vfprintf
+   fun:vsnprintf
+   fun:snprintf
+   fun:backtrace
+   fun:fiber_info
+   fun:admin_dispatch
+   fun:admin_handler
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
+}
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Value8
+   fun:_itoa_word
+   fun:vfprintf
+   fun:vsnprintf
+   fun:snprintf
+   fun:backtrace
+   fun:fiber_info
+   fun:admin_dispatch
+   fun:admin_handler
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
+}
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Cond
+   fun:_itoa_word
+   fun:vfprintf
+   fun:vsnprintf
+   fun:snprintf
+   fun:backtrace
+   fun:fiber_info
+   fun:admin_dispatch
+   fun:admin_handler
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
+}
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Cond
+   fun:vfprintf
+   fun:vsnprintf
+   fun:snprintf
+   fun:backtrace
+   fun:fiber_info
+   fun:admin_dispatch
+   fun:admin_handler
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
+}
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Cond
+   fun:vfprintf
+   fun:vsnprintf
+   fun:snprintf
+   fun:backtrace
+   fun:fiber_info
+   fun:admin_dispatch
+   fun:admin_handler
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
+}
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Cond
+   fun:vfprintf
+   fun:vsnprintf
+   fun:snprintf
+   fun:backtrace
+   fun:fiber_info
+   fun:admin_dispatch
+   fun:admin_handler
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
+}
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Value8
+   fun:backtrace
+   fun:fiber_info
+   fun:admin_dispatch
+   fun:admin_handler
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
+}
+
+## third_party/proctitle leaks
+## 
 
 {
    <>

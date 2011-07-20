@@ -645,7 +645,7 @@ index_tree(struct index *index, struct namespace *namespace,
 static void
 index_tree_free(struct index *index)
 {
-	palloc_destroy_pool((void*)index->idx.tree);
+	(void)index;
 }
 
 void

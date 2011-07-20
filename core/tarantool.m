@@ -268,7 +268,7 @@ tarantool_free(void)
 static void
 sig_int(int signal)
 {
-	say_info("Exiting: %s", strsignal(signal));
+	//say_info("Exiting: %s", strsignal(signal));
 
 	tarantool_free();
 
@@ -559,7 +559,7 @@ main(int argc, char **argv)
 		custom_proc_title = "";
 	} else {
 		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
-		strcat(custom_proc_title, "@");
+		strcpy(custom_proc_title, "@");
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
