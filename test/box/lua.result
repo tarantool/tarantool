@@ -1,0 +1,56 @@
+lua
+---
+unknown command. try typing help.
+...
+lua 1
+---
+error: '[string "1"]:1: unexpected symbol near ''1'''
+...
+lua print('  lua says: hello')
+---
+  lua says: hello
+...
+lua for n in pairs(box) do print('  - box.', n) end
+---
+  - box.pack
+...
+lua box.pack()
+---
+error: '[string "box.pack()"]:1: bad argument #1 to ''pack'' (string expected, got no value)'
+...
+lua box.pack(1)
+---
+error: '[string "box.pack(1)"]:1: box.pack: unsupported pack format specifier ''1'''
+...
+lua box.pack('abc')
+---
+error: '[string "box.pack(''abc'')"]:1: bad argument #2 to ''pack'' (string expected, got no value)'
+...
+lua print(box.pack('a', ' - hello'))
+---
+ - hello
+...
+lua print(box.pack('Aa', ' - hello', ' world'))
+---
+ - hello world
+...
+lua print(box.pack('w', 0x30))
+---
+0
+...
+lua print(box.pack('www', 0x30, 0x30, 0x30))
+---
+000
+...
+lua print(box.pack('www', 0x3030, 0x30))
+---
+error: '[string "print(box.pack(''www'', 0x3030, 0x30))"]:1: bad argument #4 to ''pack'' (number expected, got no value)'
+...
+lua print(string.byte(box.pack('w', 212345), 1, 2))
+---
+140250
+...
+lua print(box.pack('p', 'this string is 45 characters long 1234567890 '))
+---
+-this string is 45 characters long 1234567890 
+...

@@ -60,17 +60,18 @@ set (recompiled_core_sources
 
 set (common_sources tbuf.m palloc.m util.m
     salloc.m pickle.m coro.m stat.m log_io.m
-    log_io_remote.m iproto.m exception.m errcode.c latch.m)
+    log_io_remote.m iproto.m exception.m errcode.c latch.m
+    tarantool_lua.m)
 
 if (ENABLE_TRACE)
   set (common_sources ${common_sources} trace.m)
 endif()
 
 add_library(core STATIC ${common_sources})
-add_dependencies(core generate_headers libluajit)
+add_dependencies(core generate_headers luajit)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
-set (common_libraries cfg core ev coro gopt misc objc)
+set (common_libraries cfg core ev coro gopt misc objc luajit)
 
 if (ENABLE_GCOV)
   set (common_libraries ${common_libraries} gcov)

@@ -41,6 +41,9 @@
 #include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
+#include "third_party/luajit/src/lua.h"
+#include "third_party/luajit/src/lauxlib.h"
+#include "third_party/luajit/src/lualib.h"
 
 static const char *help =
 	"available commands:" CRLF
@@ -54,14 +57,14 @@ static const char *help =
 	" - show stat" CRLF
 	" - save coredump" CRLF
 	" - save snapshot" CRLF
-	" - exec module command" CRLF
+	" - lua command" CRLF
 	" - reload configuration" CRLF;
 
 
 static const char *unknown_command = "unknown command. try typing help." CRLF;
 
 
-#line 65 "core/admin.m"
+#line 68 "core/admin.m"
 static const int admin_start = 1;
 static const int admin_first_final = 108;
 static const int admin_error = 0;
@@ -69,7 +72,7 @@ static const int admin_error = 0;
 static const int admin_en_main = 1;
 
 
-#line 64 "core/admin.rl"
+#line 67 "core/admin.rl"
 
 
 
@@ -102,7 +105,7 @@ fail(struct tbuf *out, struct tbuf *err)
 }
 
 static int
-admin_dispatch(void)
+admin_dispatch(lua_State *L)
 {
 	struct tbuf *out = tbuf_alloc(fiber->pool);
 	struct tbuf *err = tbuf_alloc(fiber->pool);
@@ -119,12 +122,12 @@ admin_dispatch(void)
 	p = fiber->rbuf->data;
 
 	
-#line 123 "core/admin.m"
+#line 126 "core/admin.m"
 	{
 	cs = admin_start;
 	}
 
-#line 128 "core/admin.m"
+#line 131 "core/admin.m"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -134,8 +137,9 @@ case 1:
 	switch( (*p) ) {
 		case 99: goto st2;
 		case 101: goto st13;
-		case 104: goto st22;
-		case 113: goto st26;
+		case 104: goto st17;
+		case 108: goto st21;
+		case 113: goto st27;
 		case 114: goto st28;
 		case 115: goto st48;
 	}
@@ -180,39 +184,40 @@ st6:
 		goto _test_eof6;
 case 6:
 	switch( (*p) ) {
-		case 10: goto tr12;
-		case 13: goto tr13;
+		case 10: goto tr13;
+		case 13: goto tr14;
 		case 97: goto st8;
 	}
 	goto st0;
-tr12:
-#line 193 "core/admin.rl"
+tr13:
+#line 197 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st108;
-tr19:
-#line 183 "core/admin.rl"
+tr20:
+#line 187 "core/admin.rl"
 	{return 0;}
 	goto st108;
-tr28:
-#line 179 "core/admin.rl"
-	{strend = p;}
-#line 137 "core/admin.rl"
-	{
-			start(out);
-			mod_exec(strstart, strend - strstart, out);
-			end(out);
-		}
-	goto st108;
-tr32:
-#line 131 "core/admin.rl"
+tr25:
+#line 134 "core/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
 			end(out);
 		}
 	goto st108;
+tr36:
+#line 182 "core/admin.rl"
+	{strend = p;}
+#line 140 "core/admin.rl"
+	{
+			strstart[strend-strstart]='\0';
+			start(out);
+			tarantool_lua(L, out, strstart);
+			end(out);
+		}
+	goto st108;
 tr43:
-#line 143 "core/admin.rl"
+#line 147 "core/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -221,11 +226,11 @@ tr43:
 		}
 	goto st108;
 tr66:
-#line 190 "core/admin.rl"
+#line 195 "core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st108;
 tr75:
-#line 150 "core/admin.rl"
+#line 154 "core/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -240,7 +245,7 @@ tr75:
 		}
 	goto st108;
 tr92:
-#line 113 "core/admin.rl"
+#line 116 "core/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -260,59 +265,60 @@ tr92:
 		}
 	goto st108;
 tr106:
-#line 185 "core/admin.rl"
+#line 190 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st108;
 tr112:
-#line 184 "core/admin.rl"
+#line 189 "core/admin.rl"
 	{start(out); mod_info(out); end(out);}
 	goto st108;
 tr117:
-#line 188 "core/admin.rl"
+#line 193 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st108;
 tr125:
-#line 187 "core/admin.rl"
+#line 192 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
 	goto st108;
 tr129:
-#line 189 "core/admin.rl"
+#line 194 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st108;
 st108:
 	if ( ++p == pe )
 		goto _test_eof108;
 case 108:
-#line 287 "core/admin.m"
+#line 292 "core/admin.m"
 	goto st0;
-tr13:
-#line 193 "core/admin.rl"
+tr14:
+#line 197 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
-tr20:
-#line 183 "core/admin.rl"
+tr21:
+#line 187 "core/admin.rl"
 	{return 0;}
 	goto st7;
-tr29:
-#line 179 "core/admin.rl"
-	{strend = p;}
-#line 137 "core/admin.rl"
-	{
-			start(out);
-			mod_exec(strstart, strend - strstart, out);
-			end(out);
-		}
-	goto st7;
-tr33:
-#line 131 "core/admin.rl"
+tr26:
+#line 134 "core/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
 			end(out);
 		}
 	goto st7;
+tr37:
+#line 182 "core/admin.rl"
+	{strend = p;}
+#line 140 "core/admin.rl"
+	{
+			strstart[strend-strstart]='\0';
+			start(out);
+			tarantool_lua(L, out, strstart);
+			end(out);
+		}
+	goto st7;
 tr44:
-#line 143 "core/admin.rl"
+#line 147 "core/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -321,11 +327,11 @@ tr44:
 		}
 	goto st7;
 tr67:
-#line 190 "core/admin.rl"
+#line 195 "core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
 tr76:
-#line 150 "core/admin.rl"
+#line 154 "core/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -340,7 +346,7 @@ tr76:
 		}
 	goto st7;
 tr93:
-#line 113 "core/admin.rl"
+#line 116 "core/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -360,30 +366,30 @@ tr93:
 		}
 	goto st7;
 tr107:
-#line 185 "core/admin.rl"
+#line 190 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st7;
 tr113:
-#line 184 "core/admin.rl"
+#line 189 "core/admin.rl"
 	{start(out); mod_info(out); end(out);}
 	goto st7;
 tr118:
-#line 188 "core/admin.rl"
+#line 193 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st7;
 tr126:
-#line 187 "core/admin.rl"
+#line 192 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
 	goto st7;
 tr130:
-#line 189 "core/admin.rl"
+#line 194 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 387 "core/admin.m"
+#line 393 "core/admin.m"
 	if ( (*p) == 10 )
 		goto st108;
 	goto st0;
@@ -392,8 +398,8 @@ st8:
 		goto _test_eof8;
 case 8:
 	switch( (*p) ) {
-		case 10: goto tr12;
-		case 13: goto tr13;
+		case 10: goto tr13;
+		case 13: goto tr14;
 		case 98: goto st9;
 	}
 	goto st0;
@@ -402,8 +408,8 @@ st9:
 		goto _test_eof9;
 case 9:
 	switch( (*p) ) {
-		case 10: goto tr12;
-		case 13: goto tr13;
+		case 10: goto tr13;
+		case 13: goto tr14;
 	}
 	goto st0;
 st10:
@@ -436,8 +442,8 @@ st13:
 		goto _test_eof13;
 case 13:
 	switch( (*p) ) {
-		case 10: goto tr19;
-		case 13: goto tr20;
+		case 10: goto tr20;
+		case 13: goto tr21;
 		case 120: goto st14;
 	}
 	goto st0;
@@ -446,11 +452,9 @@ st14:
 		goto _test_eof14;
 case 14:
 	switch( (*p) ) {
-		case 10: goto tr19;
-		case 13: goto tr20;
-		case 32: goto st15;
-		case 101: goto st18;
-		case 105: goto st20;
+		case 10: goto tr20;
+		case 13: goto tr21;
+		case 105: goto st15;
 	}
 	goto st0;
 st15:
@@ -458,83 +462,73 @@ st15:
 		goto _test_eof15;
 case 15:
 	switch( (*p) ) {
-		case 10: goto st0;
-		case 13: goto st0;
-		case 32: goto tr26;
+		case 10: goto tr20;
+		case 13: goto tr21;
+		case 116: goto st16;
 	}
-	goto tr25;
-tr25:
-#line 179 "core/admin.rl"
-	{strstart = p;}
-	goto st16;
+	goto st0;
 st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-#line 475 "core/admin.m"
 	switch( (*p) ) {
-		case 10: goto tr28;
-		case 13: goto tr29;
+		case 10: goto tr20;
+		case 13: goto tr21;
 	}
-	goto st16;
-tr26:
-#line 179 "core/admin.rl"
-	{strstart = p;}
-	goto st17;
+	goto st0;
 st17:
 	if ( ++p == pe )
 		goto _test_eof17;
 case 17:
-#line 489 "core/admin.m"
 	switch( (*p) ) {
-		case 10: goto tr28;
-		case 13: goto tr29;
-		case 32: goto tr26;
+		case 10: goto tr25;
+		case 13: goto tr26;
+		case 101: goto st18;
 	}
-	goto tr25;
+	goto st0;
 st18:
 	if ( ++p == pe )
 		goto _test_eof18;
 case 18:
 	switch( (*p) ) {
-		case 32: goto st15;
-		case 99: goto st19;
+		case 10: goto tr25;
+		case 13: goto tr26;
+		case 108: goto st19;
 	}
 	goto st0;
 st19:
 	if ( ++p == pe )
 		goto _test_eof19;
 case 19:
-	if ( (*p) == 32 )
-		goto st15;
+	switch( (*p) ) {
+		case 10: goto tr25;
+		case 13: goto tr26;
+		case 112: goto st20;
+	}
 	goto st0;
 st20:
 	if ( ++p == pe )
 		goto _test_eof20;
 case 20:
 	switch( (*p) ) {
-		case 10: goto tr19;
-		case 13: goto tr20;
-		case 116: goto st21;
+		case 10: goto tr25;
+		case 13: goto tr26;
 	}
 	goto st0;
 st21:
 	if ( ++p == pe )
 		goto _test_eof21;
 case 21:
-	switch( (*p) ) {
-		case 10: goto tr19;
-		case 13: goto tr20;
-	}
+	if ( (*p) == 117 )
+		goto st22;
 	goto st0;
 st22:
 	if ( ++p == pe )
 		goto _test_eof22;
 case 22:
 	switch( (*p) ) {
-		case 10: goto tr32;
-		case 13: goto tr33;
-		case 101: goto st23;
+		case 32: goto st23;
+		case 97: goto st26;
 	}
 	goto st0;
 st23:
@@ -542,48 +536,55 @@ st23:
 		goto _test_eof23;
 case 23:
 	switch( (*p) ) {
-		case 10: goto tr32;
-		case 13: goto tr33;
-		case 108: goto st24;
+		case 10: goto st0;
+		case 13: goto st0;
+		case 32: goto tr34;
 	}
-	goto st0;
+	goto tr33;
+tr33:
+#line 182 "core/admin.rl"
+	{strstart = p;}
+	goto st24;
 st24:
 	if ( ++p == pe )
 		goto _test_eof24;
 case 24:
+#line 553 "core/admin.m"
 	switch( (*p) ) {
-		case 10: goto tr32;
-		case 13: goto tr33;
-		case 112: goto st25;
+		case 10: goto tr36;
+		case 13: goto tr37;
 	}
-	goto st0;
+	goto st24;
+tr34:
+#line 182 "core/admin.rl"
+	{strstart = p;}
+	goto st25;
 st25:
 	if ( ++p == pe )
 		goto _test_eof25;
 case 25:
+#line 567 "core/admin.m"
 	switch( (*p) ) {
-		case 10: goto tr32;
-		case 13: goto tr33;
+		case 10: goto tr36;
+		case 13: goto tr37;
+		case 32: goto tr34;
 	}
-	goto st0;
+	goto tr33;
 st26:
 	if ( ++p == pe )
 		goto _test_eof26;
 case 26:
-	switch( (*p) ) {
-		case 10: goto tr19;
-		case 13: goto tr20;
-		case 117: goto st27;
-	}
+	if ( (*p) == 32 )
+		goto st23;
 	goto st0;
 st27:
 	if ( ++p == pe )
 		goto _test_eof27;
 case 27:
 	switch( (*p) ) {
-		case 10: goto tr19;
-		case 13: goto tr20;
-		case 105: goto st20;
+		case 10: goto tr20;
+		case 13: goto tr21;
+		case 117: goto st14;
 	}
 	goto st0;
 st28:
@@ -1449,7 +1450,7 @@ case 107:
 	_out: {}
 	}
 
-#line 199 "core/admin.rl"
+#line 203 "core/admin.rl"
 
 
 	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);
@@ -1463,14 +1464,34 @@ case 107:
 	return fiber_write(out->data, out->len);
 }
 
+static int
+lbox_adminprint(struct lua_State *L)
+{
+	int n = lua_gettop(L);
+	lua_pushstring(L, "out");
+	lua_gettable(L, LUA_REGISTRYINDEX);
+	struct tbuf *out = (struct tbuf *) lua_topointer(L, -1);
+	for (int i = 1; i <= n; i++)
+		tbuf_printf(out, "%s", lua_tostring(L, i));
+	/* Courtesy: append YAML line-end if it is not there */
+	if (out->len < 2 || tbuf_str(out)[out->len-1] != '\n')
+		tbuf_printf(out, "\r\n");
+	return 0;
+}
 
 static void
-admin_handler(void *_data __attribute__((unused)))
+admin_handler(void *data __attribute__((unused)))
 {
-	for (;;) {
-		if (admin_dispatch() <= 0)
-			return;
-		fiber_gc();
+	lua_State *L = tarantool_lua_init();
+	lua_register(L, "print", lbox_adminprint);
+	@try {
+		for (;;) {
+			if (admin_dispatch(L) <= 0)
+				return;
+			fiber_gc();
+		}
+	} @finally {
+		lua_close(L);
 	}
 }
 
@@ -1490,5 +1511,5 @@ admin_init(void)
  * Local Variables:
  * mode: c
  * End:
- * vim: syntax=c
+ * vim: syntax=objc
  */

@@ -1543,9 +1543,8 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  status: %s" CRLF, status);
 }
 
-void
-mod_exec(char *str __attribute__((unused)), int len __attribute__((unused)),
-	 struct tbuf *out)
+struct lua_State *
+mod_lua_init(struct lua_State *L)
 {
-	tbuf_printf(out, "unimplemented" CRLF);
+	return L;
 }

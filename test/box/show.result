@@ -21,7 +21,7 @@ available commands:
  - show stat
  - save coredump
  - save snapshot
- - exec module command
+ - lua command
  - reload configuration
 ...
 show configuration
@@ -93,10 +93,6 @@ ok
 ...
 delete from t0 where k0 = 1
 Delete OK, 1 row affected
-exec module command
----
-unimplemented
-...
 show info
 ---
 info:

@@ -12,7 +12,8 @@ find_program(CAT cat)
 find_program(GIT git)
 find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
-
+set(luadir ${PROJECT_BINARY_DIR}/third_party/luajit/src)
+link_directories(${luadir})
 
 include(cmake/check_objective_c_compiler.cmake)
 

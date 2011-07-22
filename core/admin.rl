@@ -39,6 +39,9 @@
 #include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
+#include "third_party/luajit/src/lua.h"
+#include "third_party/luajit/src/lauxlib.h"
+#include "third_party/luajit/src/lualib.h"
 
 static const char *help =
 	"available commands:" CRLF
@@ -52,7 +55,7 @@ static const char *help =
 	" - show stat" CRLF
 	" - save coredump" CRLF
 	" - save snapshot" CRLF
-	" - exec module command" CRLF
+	" - lua command" CRLF
 	" - reload configuration" CRLF;
 
 
@@ -93,7 +96,7 @@ fail(struct tbuf *out, struct tbuf *err)
 }
 
 static int
-admin_dispatch(void)
+admin_dispatch(lua_State *L)
 {
 	struct tbuf *out = tbuf_alloc(fiber->pool);
 	struct tbuf *err = tbuf_alloc(fiber->pool);
@@ -134,9 +137,10 @@ admin_dispatch(void)
 			end(out);
 		}
 
-		action mod_exec {
+		action lua {
+			strstart[strend-strstart]='\0';
 			start(out);
-			mod_exec(strstart, strend - strstart, out);
+			tarantool_lua(L, out, strstart);
 			end(out);
 		}
 
@@ -175,12 +179,13 @@ admin_dispatch(void)
 		save = "sa"("v"("e")?)?;
 		coredump = "co"("r"("e"("d"("u"("m"("p")?)?)?)?)?)?;
 		snapshot = "sn"("a"("p"("s"("h"("o"("t")?)?)?)?)?)?;
-		exec = "ex"("e"("c")?)?;
 		string = [^\r\n]+ >{strstart = p;}  %{strend = p;};
 		reload = "re"("l"("o"("a"("d")?)?)?)?;
+		lua = "lu"("a")?;
 
 		commands = (help			%help						|
 			    exit			%{return 0;}					|
+			    lua  " "+ string		%lua						|
 			    show " "+ info		%{start(out); mod_info(out); end(out);}		|
 			    show " "+ fiber		%{start(out); fiber_info(out); end(out);}	|
 			    show " "+ configuration 	%show_configuration				|
@@ -189,7 +194,6 @@ admin_dispatch(void)
 			    show " "+ stat		%{start(out); stat_print(out);end(out);}	|
 			    save " "+ coredump		%{coredump(60); ok(out);}			|
 			    save " "+ snapshot		%save_snapshot					|
-			    exec " "+ string		%mod_exec					|
 			    check " "+ slab		%{slab_validate(); ok(out);}			|
 			    reload " "+ configuration	%reload_configuration);
 
@@ -209,14 +213,48 @@ admin_dispatch(void)
 	return fiber_write(out->data, out->len);
 }
 
+/** We need to be able to print from Lua back to the
+ * administrative console. For that, we register this
+ * function as Lua 'print'. However, administrative
+ * console output must be YAML-compatible. If this is
+ * done automatically, the result is ugly, so we don't
+ * do it. A creator of Lua procedures has to do it
+ * herself.  Best we can do here is to add a trailing
+ * \r\n if it's forgotten.
+ */
+
+static int
+lbox_adminprint(struct lua_State *L)
+{
+	int n = lua_gettop(L);
+	lua_pushstring(L, "out");
+	lua_gettable(L, LUA_REGISTRYINDEX);
+	struct tbuf *out = (struct tbuf *) lua_topointer(L, -1);
+	for (int i = 1; i <= n; i++)
+		tbuf_printf(out, "%s", lua_tostring(L, i));
+	/* Courtesy: append YAML line-end if it is not there */
+	if (out->len < 2 || tbuf_str(out)[out->len-1] != '\n')
+		tbuf_printf(out, "\r\n");
+	return 0;
+}
 
 static void
-admin_handler(void *_data __attribute__((unused)))
+admin_handler(void *data __attribute__((unused)))
 {
-	for (;;) {
-		if (admin_dispatch() <= 0)
-			return;
-		fiber_gc();
+	/*
+	 * Create a disposable Lua interpreter state
+	 * for every new connection.
+	 */
+	lua_State *L = tarantool_lua_init();
+	lua_register(L, "print", lbox_adminprint);
+	@try {
+		for (;;) {
+			if (admin_dispatch(L) <= 0)
+				return;
+			fiber_gc();
+		}
+	} @finally {
+		lua_close(L);
 	}
 }
 
@@ -236,5 +274,5 @@ admin_init(void)
  * Local Variables:
  * mode: c
  * End:
- * vim: syntax=c
+ * vim: syntax=objc
  */

@@ -199,7 +199,7 @@
 ; boundaries: in Tarantool, tuples have variable cardinality.
 ;
 
-<fq_tuple> ::= <size><cardinality><tuple>
+<fq_tuple> ::= <size><tuple>
 
 <size> ::= <int32>
 
