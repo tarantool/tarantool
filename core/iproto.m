@@ -82,7 +82,7 @@ static void iproto_reply(iproto_callback callback, struct tbuf *request)
 {
 	struct iproto_header_retcode *reply;
 
-	reply = palloc(fiber->pool, sizeof(*reply));
+	reply = palloc(fiber->gc_pool, sizeof(*reply));
 	reply->msg_code = iproto(request)->msg_code;
 	reply->sync = iproto(request)->sync;
 

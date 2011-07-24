@@ -104,8 +104,8 @@ fail(struct tbuf *out, struct tbuf *err)
 static int
 admin_dispatch(void)
 {
-	struct tbuf *out = tbuf_alloc(fiber->pool);
-	struct tbuf *err = tbuf_alloc(fiber->pool);
+	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
+	struct tbuf *err = tbuf_alloc(fiber->gc_pool);
 	int cs;
 	char *p, *pe;
 	char *strstart, *strend;

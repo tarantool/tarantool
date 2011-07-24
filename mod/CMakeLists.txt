@@ -12,7 +12,7 @@ function(tarantool_module mod)
   add_library(lt${mod} STATIC ${recompiled_core_sources})
   set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
     "${core_cflags} -DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
-  add_dependencies(lt${mod} generate_headers generate_admin_c)
+  add_dependencies(lt${mod} generate_headers generate_admin_m)
 
   target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries})
   set_target_properties(tarantool_${mod} PROPERTIES COMPILE_FLAGS

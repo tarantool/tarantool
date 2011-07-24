@@ -23,7 +23,7 @@ enum { TNT_ERRMSG_MAX = 512 };
  */
 
 #define ERROR_CODES(_)					    \
-	/*  0 */_(ER_OK,			0, "OK") \
+	/*  0 */_(ER_OK=0,			0, "OK") \
 	/*  1 */_(ER_NONMASTER,			2, "Non master connection, but it should be") \
 	/*  2 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  3 */_(ER_BAD_UID,			2, "Uid is not from this storage range") \

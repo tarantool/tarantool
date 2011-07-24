@@ -220,7 +220,7 @@ tuple2tree_index_member(struct index *index,
 	void *tuple_data = tuple->data;
 
 	if (member_p == NULL || *member_p == NULL)
-		member = palloc(fiber->pool, SIZEOF_TREE_INDEX_MEMBER(index));
+		member = palloc(fiber->gc_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 	else
 		member = *member_p;
 

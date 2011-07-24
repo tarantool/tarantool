@@ -242,7 +242,7 @@ read_rows(struct log_io_iter *i)
 				 marker_offset - good_offset, good_offset);
 		say_debug("magic found at 0x%08" PRI_XFFT, marker_offset);
 
-		row = l->class->reader(l->f, fiber->pool);
+		row = l->class->reader(l->f, fiber->gc_pool);
 		if (row == ROW_EOF)
 			goto eof;
 
@@ -260,7 +260,7 @@ read_rows(struct log_io_iter *i)
 			goto out;
 		}
 
-		prelease_after(fiber->pool, 128 * 1024);
+		prelease_after(fiber->gc_pool, 128 * 1024);
 
 		if (++row_count % 100000 == 0)
 			say_info("%.1fM rows processed", row_count / 1000000.);
@@ -290,7 +290,7 @@ read_rows(struct log_io_iter *i)
 	l->rows += row_count;
 
 	fseeko(l->f, good_offset, SEEK_SET);	/* seek back to last known good offset */
-	prelease(fiber->pool);
+	prelease(fiber->gc_pool);
 
 	if (error)
 		i->error = error;
@@ -333,7 +333,7 @@ scan_dir(struct log_io_class *class, i64 **ret_lsn)
 
 	suffix_len = strlen(class->suffix);
 
-	lsn = palloc(fiber->pool, sizeof(i64) * size);
+	lsn = palloc(fiber->gc_pool, sizeof(i64) * size);
 	if (lsn == NULL)
 		goto out;
 
@@ -374,7 +374,7 @@ scan_dir(struct log_io_class *class, i64 **ret_lsn)
 
 		i++;
 		if (i == size) {
-			i64 *n = palloc(fiber->pool, sizeof(i64) * size * 2);
+			i64 *n = palloc(fiber->gc_pool, sizeof(i64) * size * 2);
 			if (n == NULL)
 				goto out;
 			memcpy(n, lsn, sizeof(i64) * size);
@@ -844,7 +844,7 @@ recover_snap(struct recovery_state *r)
 		if (snap != NULL)
 			close_log(&snap);
 
-		prelease(fiber->pool);
+		prelease(fiber->gc_pool);
 	}
 }
 
@@ -911,7 +911,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 			iter_inner(&i, NULL);
 
 		close_iter(&i);
-		prelease(fiber->pool);
+		prelease(fiber->gc_pool);
 	}
 }
 
@@ -1009,7 +1009,7 @@ recover_remaining_wals(struct recovery_state *r)
 		result = -1;
 	}
 
-	prelease(fiber->pool);
+	prelease(fiber->gc_pool);
 	return result;
 }
 
@@ -1065,7 +1065,7 @@ recover(struct recovery_state *r, i64 lsn)
 		panic("recover failed");
 	say_info("wals recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
       out:
-	prelease(fiber->pool);
+	prelease(fiber->gc_pool);
 	return result;
 }
 
@@ -1367,7 +1367,7 @@ write_rows(struct log_io_iter *i)
 		if (fwrite(data->data, data->len, 1, l->f) != 1)
 			panic("fwrite");
 
-		prelease_after(fiber->pool, 128 * 1024);
+		prelease_after(fiber->gc_pool, 128 * 1024);
 	}
 }
 
@@ -1378,7 +1378,7 @@ snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
 	static int bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
-	struct tbuf *wal_row = tbuf_alloc(fiber->pool);
+	struct tbuf *wal_row = tbuf_alloc(fiber->gc_pool);
 
 	tbuf_append(wal_row, &tag, sizeof(tag));
 	tbuf_append(wal_row, &cookie, sizeof(cookie));

@@ -341,10 +341,10 @@ clear_inbox(struct fiber *fiber)
 static void
 fiber_alloc(struct fiber *fiber)
 {
-	prelease(fiber->pool);
-	fiber->rbuf = tbuf_alloc(fiber->pool);
-	fiber->iov = tbuf_alloc(fiber->pool);
-	fiber->cleanup = tbuf_alloc(fiber->pool);
+	prelease(fiber->gc_pool);
+	fiber->rbuf = tbuf_alloc(fiber->gc_pool);
+	fiber->iov = tbuf_alloc(fiber->gc_pool);
+	fiber->cleanup = tbuf_alloc(fiber->gc_pool);
 
 	fiber->iov_cnt = 0;
 	clear_inbox(fiber);
@@ -379,19 +379,19 @@ fiber_gc(void)
 
 	fiber_cleanup();
 
-	if (palloc_allocated(fiber->pool) < 128 * 1024)
+	if (palloc_allocated(fiber->gc_pool) < 128 * 1024)
 		return;
 
-	tmp = fiber->pool;
-	fiber->pool = ex_pool;
+	tmp = fiber->gc_pool;
+	fiber->gc_pool = ex_pool;
 	ex_pool = tmp;
-	palloc_set_name(fiber->pool, fiber->name);
+	palloc_set_name(fiber->gc_pool, fiber->name);
 	palloc_set_name(ex_pool, "ex_pool");
 
-	fiber->rbuf = tbuf_clone(fiber->pool, fiber->rbuf);
-	fiber->cleanup = tbuf_clone(fiber->pool, fiber->cleanup);
+	fiber->rbuf = tbuf_clone(fiber->gc_pool, fiber->rbuf);
+	fiber->cleanup = tbuf_clone(fiber->gc_pool, fiber->cleanup);
 
-	struct tbuf *new_iov = tbuf_alloc(fiber->pool);
+	struct tbuf *new_iov = tbuf_alloc(fiber->gc_pool);
 	for (int i = 0; i < fiber->iov_cnt; i++) {
 		struct iovec *v;
 		size_t o = tbuf_reserve(new_iov, sizeof(*v));
@@ -403,9 +403,9 @@ fiber_gc(void)
 	for (int i = 0; i < fiber->inbox->size; i++) {
 		struct msg *ri = fiber->inbox->ring[i];
 		if (ri != NULL) {
-			fiber->inbox->ring[i] = palloc(fiber->pool, sizeof(*ri));
+			fiber->inbox->ring[i] = palloc(fiber->gc_pool, sizeof(*ri));
 			fiber->inbox->ring[i]->sender_fid = ri->sender_fid;
-			fiber->inbox->ring[i]->msg = tbuf_clone(fiber->pool, ri->msg);
+			fiber->inbox->ring[i]->msg = tbuf_clone(fiber->gc_pool, ri->msg);
 		}
 	}
 
@@ -490,7 +490,7 @@ fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void 
 		if (tarantool_coro_create(&fiber->coro, fiber_loop, NULL) == NULL)
 			return NULL;
 
-		fiber->pool = palloc_create_pool("");
+		fiber->gc_pool = palloc_create_pool("");
 		fiber->inbox = palloc(eter_pool, (sizeof(*fiber->inbox) +
 						  inbox_size * sizeof(struct tbuf *)));
 		fiber->inbox->size = inbox_size;
@@ -513,7 +513,7 @@ fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void 
 	fiber->flags = 0;
 	fiber->waiter = NULL;
 	fiber_set_name(fiber, name);
-	palloc_set_name(fiber->pool, fiber->name);
+	palloc_set_name(fiber->gc_pool, fiber->name);
 	register_fid(fiber);
 
 	return fiber;
@@ -532,7 +532,7 @@ fiber_destroy(struct fiber *f)
 	if (strcmp(f->name, "sched") == 0)
 		return;
 
-	palloc_destroy_pool(f->pool);
+	palloc_destroy_pool(f->gc_pool);
 	tarantool_coro_destroy(&f->coro);
 }
 
@@ -629,9 +629,9 @@ write_inbox(struct fiber *recipient, struct tbuf *msg)
 	if (ring_size(inbox) == inbox->size - 1)
 		return false;
 
-	inbox->ring[inbox->head] = palloc(recipient->pool, sizeof(struct msg));
+	inbox->ring[inbox->head] = palloc(recipient->gc_pool, sizeof(struct msg));
 	inbox->ring[inbox->head]->sender_fid = fiber->fid;
-	inbox->ring[inbox->head]->msg = tbuf_clone(recipient->pool, msg);
+	inbox->ring[inbox->head]->msg = tbuf_clone(recipient->gc_pool, msg);
 	inbox->head = (inbox->head + 1) % inbox->size;
 
 	if (recipient->flags & FIBER_READING_INBOX)
@@ -697,7 +697,7 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 void
 add_iov_dup(const void *buf, size_t len)
 {
-	void *copy = palloc(fiber->pool, len);
+	void *copy = palloc(fiber->gc_pool, len);
 	memcpy(copy, buf, len);
 	add_iov(copy, len);
 }
@@ -912,7 +912,7 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 	int result = EXIT_FAILURE;
 
 	for (;;) {
-		request = tbuf_alloc(fiber->pool);
+		request = tbuf_alloc(fiber->gc_pool);
 		if (read_atleast(fd, request, sizeof(u32)) < 0) {
 			result = EXIT_SUCCESS;
 			break;
@@ -929,13 +929,13 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 			break;
 		}
 
-		request_body = tbuf_alloc(fiber->pool);
+		request_body = tbuf_alloc(fiber->gc_pool);
 		tbuf_append(request_body, fiber_msg(request)->data, fiber_msg(request)->data_len);
 
 		reply_body = handler(state, request_body);
 
 		reply_size = sizeof(struct fiber_msg) + reply_body->len;
-		reply = tbuf_alloc(fiber->pool);
+		reply = tbuf_alloc(fiber->gc_pool);
 		tbuf_reserve(reply, reply_size);
 
 		fiber_msg(reply)->fid = fiber_msg(request)->fid;
@@ -952,7 +952,7 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 			break;
 		}
 
-		prelease(fiber->pool);
+		prelease(fiber->gc_pool);
 	}
 
 	handler(state, NULL);
@@ -967,11 +967,11 @@ inbox2sock(void *_data __attribute__((unused)))
 	u32 len;
 
 	for (;;) {
-		out = tbuf_alloc(fiber->pool);
+		out = tbuf_alloc(fiber->gc_pool);
 
 		do {
 			m = read_inbox();
-			msg = tbuf_alloc(fiber->pool);
+			msg = tbuf_alloc(fiber->gc_pool);
 
 			/* TODO: do not copy message twice */
 			tbuf_reserve(msg, sizeof(struct fiber_msg) + m->msg->len);
@@ -1018,7 +1018,7 @@ sock2inbox(void *_data __attribute__((unused)))
 			continue;
 		}
 
-		msg_body = tbuf_alloc(recipient->pool);
+		msg_body = tbuf_alloc(recipient->gc_pool);
 		tbuf_append(msg_body, fiber_msg(msg)->data, fiber_msg(msg)->data_len);
 		write_inbox(recipient, msg_body);
 		fiber_gc();
@@ -1290,7 +1290,7 @@ fiber_init(void)
 	memset(&sched, 0, sizeof(sched));
 	sched.fid = 1;
 	fiber_set_name(&sched, "sched");
-	sched.pool = palloc_create_pool(sched.name);
+	sched.gc_pool = palloc_create_pool(sched.name);
 
 	sp = call_stack;
 	fiber = &sched;
