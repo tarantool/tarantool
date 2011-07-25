@@ -75,7 +75,8 @@ struct fiber {
 #endif
 	int csw;
 	struct tarantool_coro coro;
-	struct palloc_pool *pool;
+	/* A garbage-collected memory pool. */
+	struct palloc_pool *gc_pool;
 	uint32_t fid;
 	int fd;
 

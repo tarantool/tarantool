@@ -44,7 +44,7 @@ memcached_dispatch()
 	int cs;
 	u8 *p, *pe;
 	u8 *fstart;
-	struct tbuf *keys = tbuf_alloc(fiber->pool);
+	struct tbuf *keys = tbuf_alloc(fiber->gc_pool);
 	void *key;
 	bool append, show_cas;
 	int incr_sign;
@@ -403,7 +403,7 @@ tr58:
 			} else {
 				value = tuple_field(tuple, 3);
 				value_len = load_varint32(&value);
-				b = tbuf_alloc(fiber->pool);
+				b = tbuf_alloc(fiber->gc_pool);
 				if (append) {
 					tbuf_append(b, value, value_len);
 					tbuf_append(b, data, bytes);
@@ -461,7 +461,7 @@ tr62:
 			} else {
 				value = tuple_field(tuple, 3);
 				value_len = load_varint32(&value);
-				b = tbuf_alloc(fiber->pool);
+				b = tbuf_alloc(fiber->gc_pool);
 				if (append) {
 					tbuf_append(b, value, value_len);
 					tbuf_append(b, data, bytes);
@@ -521,7 +521,7 @@ tr71:
 			} else {
 				value = tuple_field(tuple, 3);
 				value_len = load_varint32(&value);
-				b = tbuf_alloc(fiber->pool);
+				b = tbuf_alloc(fiber->gc_pool);
 				if (append) {
 					tbuf_append(b, value, value_len);
 					tbuf_append(b, data, bytes);
@@ -709,7 +709,7 @@ tr118:
 					exptime = m->exptime;
 					flags = m->flags;
 
-					b = tbuf_alloc(fiber->pool);
+					b = tbuf_alloc(fiber->gc_pool);
 					tbuf_printf(b, "%"PRIu64, value);
 					data = b->data;
 					bytes = b->len;
@@ -774,7 +774,7 @@ tr122:
 					exptime = m->exptime;
 					flags = m->flags;
 
-					b = tbuf_alloc(fiber->pool);
+					b = tbuf_alloc(fiber->gc_pool);
 					tbuf_printf(b, "%"PRIu64, value);
 					data = b->data;
 					bytes = b->len;
@@ -841,7 +841,7 @@ tr132:
 					exptime = m->exptime;
 					flags = m->flags;
 
-					b = tbuf_alloc(fiber->pool);
+					b = tbuf_alloc(fiber->gc_pool);
 					tbuf_printf(b, "%"PRIu64, value);
 					data = b->data;
 					bytes = b->len;
@@ -1092,7 +1092,7 @@ tr195:
 				tuple_txn_ref(txn, tuple);
 
 				if (show_cas) {
-					struct tbuf *b = tbuf_alloc(fiber->pool);
+					struct tbuf *b = tbuf_alloc(fiber->gc_pool);
 					tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (u8 *)key, m->flags, value_len, m->cas);
 					add_iov_unsafe(b->data, b->len);
 					stats.bytes_written += b->len;

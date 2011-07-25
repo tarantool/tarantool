@@ -359,7 +359,7 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 	i32 offset, length;
 	u32 noffset, nlength;	/* normalized values */
 
-	new_field = tbuf_alloc(fiber->pool);
+	new_field = tbuf_alloc(fiber->gc_pool);
 
 	offset_field = read_field(&args);
 	length_field = read_field(&args);
@@ -460,11 +460,11 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 
 	lock_tuple(txn, txn->old_tuple);
 
-	fields = palloc(fiber->pool, (txn->old_tuple->cardinality + 1) * sizeof(struct tbuf *));
+	fields = palloc(fiber->gc_pool, (txn->old_tuple->cardinality + 1) * sizeof(struct tbuf *));
 	memset(fields, 0, (txn->old_tuple->cardinality + 1) * sizeof(struct tbuf *));
 
 	for (i = 0, field = (uint8_t *)txn->old_tuple->data; i < txn->old_tuple->cardinality; i++) {
-		fields[i] = tbuf_alloc(fiber->pool);
+		fields[i] = tbuf_alloc(fiber->gc_pool);
 
 		u32 field_size = load_varint32(&field);
 		tbuf_append(fields[i], field, field_size);
@@ -566,7 +566,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 	if (count == 0)
 		tnt_raise(IllegalParams, :"tuple count must be positive");
 
-	found = palloc(fiber->pool, sizeof(*found));
+	found = palloc(fiber->gc_pool, sizeof(*found));
 	add_iov(found, sizeof(*found));
 	*found = 0;
 
@@ -685,8 +685,8 @@ op_is_select(u32 op)
 struct box_txn *
 txn_alloc(u32 flags)
 {
-	struct box_txn *txn = p0alloc(fiber->pool, sizeof(*txn));
-	txn->ref_tuples = tbuf_alloc(fiber->pool);
+	struct box_txn *txn = p0alloc(fiber->gc_pool, sizeof(*txn));
+	txn->ref_tuples = tbuf_alloc(fiber->gc_pool);
 	txn->flags = flags;
 	return txn;
 }
@@ -760,7 +760,7 @@ txn_commit(struct box_txn *txn)
 			;
 		else {
 			fiber_peer_name(fiber); /* fill the cookie */
-			struct tbuf *t = tbuf_alloc(fiber->pool);
+			struct tbuf *t = tbuf_alloc(fiber->gc_pool);
 			tbuf_append(t, &txn->op, sizeof(txn->op));
 			tbuf_append(t, txn->req.data, txn->req.len);
 
@@ -869,7 +869,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 {
 	struct row_v11 *row = row_v11(t);
 
-	struct tbuf *b = palloc(fiber->pool, sizeof(*b));
+	struct tbuf *b = palloc(fiber->gc_pool, sizeof(*b));
 	b->data = row->data;
 	b->len = row->len;
 	u16 tag, op;
@@ -964,7 +964,7 @@ snap_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 	struct box_snap_row *row;
 	struct row_v11 *raw_row = row_v11(t);
 
-	struct tbuf *b = palloc(fiber->pool, sizeof(*b));
+	struct tbuf *b = palloc(fiber->gc_pool, sizeof(*b));
 	b->data = raw_row->data;
 	b->len = raw_row->len;
 
@@ -1118,7 +1118,7 @@ box_process_rw(u32 op, struct tbuf *request_data)
 static struct tbuf *
 convert_snap_row_to_wal(struct tbuf *t)
 {
-	struct tbuf *r = tbuf_alloc(fiber->pool);
+	struct tbuf *r = tbuf_alloc(fiber->gc_pool);
 	struct box_snap_row *row = box_snap_row(t);
 	u16 op = INSERT;
 	u32 flags = 0;
@@ -1518,7 +1518,7 @@ mod_snapshot(struct log_io_iter *i)
 			header.tuple_size = tuple->cardinality;
 			header.data_size = tuple->bsize;
 
-			row = tbuf_alloc(fiber->pool);
+			row = tbuf_alloc(fiber->gc_pool);
 			tbuf_append(row, &header, sizeof(header));
 			tbuf_append(row, tuple->data, tuple->bsize);
 

@@ -71,7 +71,7 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 	static u64 cas = 42;
 	struct meta m;
 
-	struct tbuf *req = tbuf_alloc(fiber->pool);
+	struct tbuf *req = tbuf_alloc(fiber->gc_pool);
 
 	tbuf_append(req, &cfg.memcached_namespace, sizeof(u32));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
@@ -108,7 +108,7 @@ delete(void *key)
 {
 	u32 key_len = 1;
 	u32 box_flags = BOX_QUIET;
-	struct tbuf *req = tbuf_alloc(fiber->pool);
+	struct tbuf *req = tbuf_alloc(fiber->gc_pool);
 
 	tbuf_append(req, &cfg.memcached_namespace, sizeof(u32));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
@@ -164,7 +164,7 @@ static void
 print_stats()
 {
 	u64 bytes_used, items;
-	struct tbuf *out = tbuf_alloc(fiber->pool);
+	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
 	slab_stat2(&bytes_used, &items);
 
 	tbuf_printf(out, "STAT pid %"PRIu32"\r\n", (u32)getpid());
@@ -382,7 +382,7 @@ memcached_expire_loop(void *data __attribute__((unused)))
 		if (i > kh_end(map))
 			i = kh_begin(map);
 
-		struct tbuf *keys_to_delete = tbuf_alloc(fiber->pool);
+		struct tbuf *keys_to_delete = tbuf_alloc(fiber->gc_pool);
 		int expired_keys = 0;
 
 		for (int j = 0; j < cfg.memcached_expire_per_loop; j++, i++) {
