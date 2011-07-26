@@ -138,41 +138,45 @@ unlock_tuples(struct box_txn *txn)
 static void
 field_print(struct tbuf *buf, void *f)
 {
-	uint32_t size;
-
-	size = load_varint32(&f);
-
-	if (size == 2)
-		tbuf_printf(buf, "%i:", *(u16 *)f);
-
-	if (size == 4)
-		tbuf_printf(buf, "%i:", *(u32 *)f);
-
-	while (size-- > 0) {
-		if (0x20 <= *(u8 *)f && *(u8 *)f < 0x7f)
-			tbuf_printf(buf, "%c", *(u8 *)f++);
-		else
-			tbuf_printf(buf, "\\x%02X", *(u8 *)f++);
+	uint32_t size = load_varint32(&f);
+	switch (size) {
+	case 2:
+		tbuf_printf(buf, "%hu", *(u16 *)f);
+		break;
+	case 4:
+		tbuf_printf(buf, "%u", *(u32 *)f);
+		break;
+	default:
+		tbuf_printf(buf, "'");
+		while (size-- > 0) {
+			if (0x20 <= *(u8 *)f && *(u8 *)f < 0x7f)
+				tbuf_printf(buf, "%c", *(u8 *)f++);
+			else
+				tbuf_printf(buf, "\\x%02X", *(u8 *)f++);
+		}
+		tbuf_printf(buf, "'");
+		break;
 	}
-
 }
+
+/*
+ * Print a tuple in yaml-compatible mode:
+ * key: { value, value, value }
+ */
 
 static void
 tuple_print(struct tbuf *buf, uint8_t cardinality, void *f)
 {
-	tbuf_printf(buf, "<");
+	field_print(buf, f);
+	tbuf_printf(buf, ": {");
+	f = next_field(f);
 
-	for (size_t i = 0; i < cardinality; i++, f = next_field(f)) {
-		tbuf_printf(buf, "\"");
+	for (size_t i = 1; i < cardinality; i++, f = next_field(f)) {
 		field_print(buf, f);
-		tbuf_printf(buf, "\"");
-
 		if (likely(i + 1 < cardinality))
 			tbuf_printf(buf, ", ");
-
 	}
-
-	tbuf_printf(buf, ">");
+	tbuf_printf(buf, "}\r\n");
 }
 
 static struct box_tuple *
@@ -1543,8 +1547,32 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  status: %s" CRLF, status);
 }
 
-struct lua_State *
-mod_lua_init(struct lua_State *L)
+/*
+ * Convert fiber->iov to yaml and append to
+ * the given tbuf.
+ */
+void mod_convert_iov_to_yaml(struct tbuf *out)
 {
-	return L;
+	for (int i = 0; i < fiber->iov_cnt; ++i) {
+		struct iovec *iov = iovec(fiber->iov)+i;
+		switch (iov->iov_len) {
+		case 4:
+			tbuf_printf(out, " - int: %u\r\n", *(u32*)iov->iov_base);
+			break;
+		default:
+		{
+			/*
+			 * Sic, we can't access tuple->flags or
+			 * tuple->refs since they may point
+			 * to nowhere, @sa tuple_add_iov().
+			 */
+			struct box_tuple *tuple = iov->iov_base -
+				offsetof(struct box_tuple, bsize);
+			tbuf_printf(out, " - ");
+			tuple_print(out, tuple->cardinality, tuple->data);
+			break;
+		}
+		}
+	}
+
 }

@@ -168,6 +168,12 @@ inline static void add_iov(const void *buf, size_t len)
 	add_iov_unsafe(buf, len);
 }
 
+inline static void fiber_iov_reset()
+{
+	fiber->iov_cnt = 0;	/* discard anything unwritten */
+	tbuf_reset(fiber->iov);
+}
+
 void add_iov_dup(const void *buf, size_t len);
 bool write_inbox(struct fiber *recipient, struct tbuf *msg);
 int inbox_size(struct fiber *recipient);

@@ -748,8 +748,7 @@ fiber_flush_output(void)
 	} else
 		result = bytes;
 
-	fiber->iov_cnt = 0;	/* discard anything unwritten */
-	tbuf_reset(fiber->iov);
+	fiber_iov_reset();
 	return result;
 }
 

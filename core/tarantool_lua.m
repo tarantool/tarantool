@@ -35,6 +35,7 @@
 #include "third_party/luajit/src/lualib.h"
 
 #include "pickle.h"
+#include "fiber.h"
 
 /** Pack our BER integer into luaL_Buffer */
 static void
@@ -151,6 +152,7 @@ tarantool_lua(struct lua_State *L,
 	lua_pushstring(L, "out");
 	lua_pushlightuserdata(L, (void *) out);
 	lua_settable(L, LUA_REGISTRYINDEX);
+	assert(fiber->iov->len == 0 && fiber->iov_cnt == 0);
 	int r = luaL_dostring(L, str);
 	if (r) {
 		/* Make sure the output is YAMLish */
@@ -159,4 +161,8 @@ tarantool_lua(struct lua_State *L,
 				      "'", "''"));
 		lua_pop(L, lua_gettop(L));
 	}
+	else {
+		mod_convert_iov_to_yaml(out);
+	}
+	fiber_iov_reset();
 }

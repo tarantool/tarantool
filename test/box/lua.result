@@ -12,6 +12,7 @@ lua print('  lua says: hello')
 ...
 lua for n in pairs(box) do print('  - box.', n) end
 ---
+  - box.process
   - box.pack
 ...
 lua box.pack()
@@ -53,4 +54,23 @@ lua print(string.byte(box.pack('w', 212345), 1, 2))
 lua print(box.pack('p', 'this string is 45 characters long 1234567890 '))
 ---
 -this string is 45 characters long 1234567890 
+...
+lua box.process(13, box.pack('iiippp', 0, 1, 3, box.pack('i', 1), 'testing', 'lua rocks'))
+---
+ - int: 1
+ - 1: {'testing', 'lua rocks'}
+...
+lua box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, box.pack('i', 1)))
+---
+ - int: 1
+ - 1: {'testing', 'lua rocks'}
+...
+lua box.process(21, box.pack('iiip', 0, 1, 1, box.pack('i', 1)))
+---
+ - int: 1
+ - 1: {'testing', 'lua rocks'}
+...
+lua box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, box.pack('i', 1)))
+---
+ - int: 0
 ...

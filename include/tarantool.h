@@ -49,6 +49,14 @@ void mod_info(struct tbuf *out);
  * @return  L on success, 0 if out of memory
  */
 struct lua_State *mod_lua_init(struct lua_State *L);
+/*
+ * A running stored procedure can attempt to send
+ * tuples and other fields to the client.
+ * This is all cached in fiber->iov vector in the format
+ * of the binary protocol. Convert this output to YAML
+ * for the administrative console.
+ */
+void mod_convert_iov_to_yaml(struct tbuf *out);
 
 /**
  * Create an instance of Lua interpreter and load it with
