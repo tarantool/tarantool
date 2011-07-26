@@ -125,7 +125,8 @@ enum box_mode {
 	_(SELECT, 17)				\
 	_(UPDATE_FIELDS, 19)			\
 	_(DELETE_1_3, 20)			\
-	_(DELETE, 21)
+	_(DELETE, 21)				\
+	_(CALL, 22)
 
 ENUM(messages, MESSAGES);
 

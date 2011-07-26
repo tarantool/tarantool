@@ -13,4 +13,5 @@ statistics:
   UPDATE_FIELDS: { rps:  0    , total:  0           }
   DELETE_1_3:    { rps:  0    , total:  0           }
   DELETE:        { rps:  0    , total:  0           }
+  CALL:          { rps:  0    , total:  0           }
 ...

@@ -46,6 +46,7 @@
 #include <cfg/tarantool_box_cfg.h>
 #include <mod/box/index.h>
 #include "memcached.h"
+#include "box_lua.h"
 
 static void box_process_ro(u32 op, struct tbuf *request_data);
 static void box_process_rw(u32 op, struct tbuf *request_data);
@@ -695,6 +696,22 @@ txn_alloc(u32 flags)
 	return txn;
 }
 
+
+void txn_assign_n(struct box_txn *txn, struct tbuf *data)
+{
+	txn->n = read_u32(data);
+
+	if (txn->n < 0 || txn->n >= BOX_NAMESPACE_MAX)
+		tnt_raise(ClientError, :ER_NO_SUCH_NAMESPACE, txn->n);
+
+	txn->namespace = &namespace[txn->n];
+
+	if (!txn->namespace->enabled)
+		tnt_raise(ClientError, :ER_NAMESPACE_DISABLED, txn->n);
+
+	txn->index = txn->namespace->index;
+}
+
 /**
   * Validate the request and start a transaction associated with
   * that request:
@@ -709,17 +726,6 @@ txn_begin(struct box_txn *txn, u16 op, struct tbuf *data)
 {
 	txn->op = op;
 	txn->req = (struct tbuf){ .data = data->data, .len = data->len };
-	txn->n = read_u32(data);
-
-	if (txn->n < 0 || txn->n >= BOX_NAMESPACE_MAX)
-		tnt_raise(ClientError, :ER_NO_SUCH_NAMESPACE, txn->n);
-
-	txn->namespace = &namespace[txn->n];
-
-	if (!txn->namespace->enabled)
-		tnt_raise(ClientError, :ER_NAMESPACE_DISABLED, txn->n);
-
-	txn->index = txn->namespace->index;
 }
 
 void
@@ -819,6 +825,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 
 	switch (txn->op) {
 	case INSERT:
+		txn_assign_n(txn, data);
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 		cardinality = read_u32(data);
 		if (namespace[txn->n].cardinality > 0
@@ -828,8 +835,10 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		break;
 
 	case DELETE:
-		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 	case DELETE_1_3:
+		txn_assign_n(txn, data);
+		if (txn->op == DELETE)
+			txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 		key_len = read_u32(data);
 		if (key_len != 1)
 			tnt_raise(IllegalParams, :"key must be single valued");
@@ -841,25 +850,32 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		prepare_delete(txn, key);
 		break;
 
-	case SELECT:{
-			u32 i = read_u32(data);
-			u32 offset = read_u32(data);
-			u32 limit = read_u32(data);
+	case SELECT:
+	{
+		txn_assign_n(txn, data);
+		u32 i = read_u32(data);
+		u32 offset = read_u32(data);
+		u32 limit = read_u32(data);
 
-			if (i >= BOX_INDEX_MAX ||
-			    namespace[txn->n].index[i].key_cardinality == 0) {
+		if (i >= BOX_INDEX_MAX ||
+		    namespace[txn->n].index[i].key_cardinality == 0) {
 
-				tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i, txn->n);
-			}
-			txn->index = &namespace[txn->n].index[i];
-
-			process_select(txn, limit, offset, data);
-			break;
+			tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i, txn->n);
 		}
+		txn->index = &namespace[txn->n].index[i];
+
+		process_select(txn, limit, offset, data);
+		break;
+	}
 
 	case UPDATE_FIELDS:
+		txn_assign_n(txn, data);
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 		prepare_update_fields(txn, data);
+		break;
+	case CALL:
+		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
+		box_lua_call(txn, data);
 		break;
 
 	default:
@@ -1492,6 +1508,8 @@ mod_init(void)
 	if (cfg.memcached_port != 0)
 		fiber_server("memcached", cfg.memcached_port,
 			     memcached_handler, NULL, NULL);
+
+	box_lua_init();
 }
 
 int

@@ -30,6 +30,10 @@
 
 <request> ::= <header><request_body>
 
+; If <return_code> is non-zero, the rest of server
+; response is an error message.
+;
+
 <response> ::= <header><return_code>{<response_body>}
 
 ;
@@ -45,6 +49,7 @@
 ; - 17    -- <select>
 ; - 19    -- <update>
 ; - 21    -- <delete>
+; - 22    -- <call>
 ; - 65280 -- <ping>
 ; This list is sparse since a number of old commands
 ; were deprecated and removed.
@@ -83,11 +88,14 @@
 <request_body> ::= <select_request_body> |
                    <insert_request_body> |
                    <update_request_body> |
-                   <delete_request_body>
+                   <delete_request_body> |
+                   <call_request_body>
 
 ;
 ; <response_body> carries command reply
 ; It is only present if <return_code> is 0 (success).
+; <call_response_body> can be arbitrary, it purely depends
+; on what your procedure does.
 ; 
 
 <response_body> ::= <select_response_body> |
@@ -285,6 +293,27 @@
 ;
 
 <delete_response_body> ::= <count> | <count><fq_tuple>
+
+;
+; CALL request body contains <namespace_no>, <flags>, <proc_name>
+; the number of procedure args, and the arguments themselves,
+; which are passed into the procedure as Lua strings.
+;
+<call_request_body> ::= <flags><proc_name><tuple>
+
+;
+; <proc_name> is a valid Lua identifier, something like
+; 'type', or 'box.process'.
+;
+
+<proc_name> ::= <field>
+
+;
+; In case of an error, <call_response_body> always contains
+; <return_code>. If it's not 0, it is followed by an
+; error message. Otherwise, the rest of the response can
+; be arbitrary.
+<call_response_body> ::= <...>
 
 ;
 ; The server response, in addition to response header and body,

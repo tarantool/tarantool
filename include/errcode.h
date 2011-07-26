@@ -104,8 +104,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 47 */_(ER_UNUSED47,			0, "Unused47") \
 	/* 48 */_(ER_UNUSED48,			0, "Unused48") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist") \
-	/* 50 */_(ER_UNUSED50,			0, "Unused50") \
-	/* 51 */_(ER_UNUSED51,			0, "Unused51") \
+	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure %.*s is not defined") \
+	/* 51 */_(ER_PROC_LUA,			2, "Lua error: %s") \
 	/* 52 */_(ER_NAMESPACE_DISABLED,	2, "Namespace %u is disabled") \
 	/* 53 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in namespace %u") \
 	/* 54 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \

@@ -27,3 +27,6 @@ exec admin "lua box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, box.pac
 exec admin "lua box.process(21, box.pack('iiip', 0, 1, 1, box.pack('i', 1)))"
 # check delete:
 exec admin "lua box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, box.pack('i', 1)))"
+exec admin "lua box.process(22, box.pack('iii', 0, 0, 0))"
+exec sql "call box.process('abc', 'def')"
+
