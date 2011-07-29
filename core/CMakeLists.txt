@@ -71,7 +71,7 @@ add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers luajit)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
-set (common_libraries cfg core ev coro gopt misc objc luajit)
+set (common_libraries cfg core ev coro gopt misc objc luajit dl)
 
 if (ENABLE_GCOV)
   set (common_libraries ${common_libraries} gcov)
