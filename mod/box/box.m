@@ -1291,7 +1291,7 @@ mod_check_config(struct tarantool_cfg *conf)
 			continue;
 		}
 
-		if (namespace->enabled) {
+		if (!namespace->enabled) {
 			/* namespace disabled, skip it */
 			continue;
 		}
@@ -1390,7 +1390,7 @@ mod_check_config(struct tarantool_cfg *conf)
 			case HASH:
 				/* check hash index */
 				/* hash index must has single-field key */
-				if (index_cardinality != 0) {
+				if (index_cardinality != 1) {
 					out_warning(0, "(namespace = %zu index = %zu) "
 					            "hash index must has a single-field key", i, j);
 					return -1;
