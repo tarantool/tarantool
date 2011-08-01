@@ -174,6 +174,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->username == NULL) || strcmp(opt->paramValue.stringval, c->username) != 0))
 			return CNF_RDONLY;
+		 if (c->username) free(c->username);
 		c->username = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->username == NULL)
 			return CNF_NOMEMORY;
@@ -263,6 +264,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->work_dir == NULL) || strcmp(opt->paramValue.stringval, c->work_dir) != 0))
 			return CNF_RDONLY;
+		 if (c->work_dir) free(c->work_dir);
 		c->work_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->work_dir == NULL)
 			return CNF_NOMEMORY;
@@ -274,6 +276,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->pid_file == NULL) || strcmp(opt->paramValue.stringval, c->pid_file) != 0))
 			return CNF_RDONLY;
+		 if (c->pid_file) free(c->pid_file);
 		c->pid_file = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->pid_file == NULL)
 			return CNF_NOMEMORY;
@@ -285,6 +288,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->logger == NULL) || strcmp(opt->paramValue.stringval, c->logger) != 0))
 			return CNF_RDONLY;
+		 if (c->logger) free(c->logger);
 		c->logger = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->logger == NULL)
 			return CNF_NOMEMORY;
@@ -348,6 +352,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_feeder_bind_ipaddr == NULL) || strcmp(opt->paramValue.stringval, c->wal_feeder_bind_ipaddr) != 0))
 			return CNF_RDONLY;
+		 if (c->wal_feeder_bind_ipaddr) free(c->wal_feeder_bind_ipaddr);
 		c->wal_feeder_bind_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->wal_feeder_bind_ipaddr == NULL)
 			return CNF_NOMEMORY;
@@ -373,6 +378,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_feeder_dir == NULL) || strcmp(opt->paramValue.stringval, c->wal_feeder_dir) != 0))
 			return CNF_RDONLY;
+		 if (c->wal_feeder_dir) free(c->wal_feeder_dir);
 		c->wal_feeder_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->wal_feeder_dir == NULL)
 			return CNF_NOMEMORY;
@@ -384,6 +390,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->custom_proc_title == NULL) || strcmp(opt->paramValue.stringval, c->custom_proc_title) != 0))
 			return CNF_RDONLY;
+		 if (c->custom_proc_title) free(c->custom_proc_title);
 		c->custom_proc_title = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->custom_proc_title == NULL)
 			return CNF_NOMEMORY;

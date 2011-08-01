@@ -31,32 +31,20 @@
 #include <tnt_error.h>
 #include <tnt_mem.h>
 
-static void *(*_tnt_malloc)(int size) = (void *(*)(int))malloc;
 static void *(*_tnt_realloc)(void *ptr, int size) =
 	(void *(*)(void*, int))realloc;
-static void *(*_tnt_dup)(char *sz) = (void *(*)(char*))strdup;
-static void (*_tnt_free)(void *ptr) = (void (*)(void*))free;
 
 void
-tnt_mem_init(void *(*malloc_)(int size),
-	     void *(*realloc_)(void *ptr, int size),
-	     void *(*dup_)(char *sz),
-	     void (*free_)(void *ptr))
+tnt_mem_init(void *(*realloc_)(void *ptr, int size))
 {
-	if (malloc_)
-		_tnt_malloc = malloc_;
 	if (realloc_)
 		_tnt_realloc = realloc_;
-	if (dup_)
-		_tnt_dup = dup_;
-	if (free_)
-		_tnt_free = free_;
 }
 
 void*
 tnt_mem_alloc(int size)
 {
-	return _tnt_malloc(size);
+	return _tnt_realloc(NULL, size);
 }
 
 void*
@@ -68,11 +56,16 @@ tnt_mem_realloc(void *ptr, int size)
 char*
 tnt_mem_dup(char *sz)
 {
-	return _tnt_dup(sz);
+	int len = strlen(sz);
+	char *szp = tnt_mem_alloc(len + 1);
+	if (szp == NULL)
+		return NULL;
+	memcpy(szp, sz, len + 1);
+	return szp;
 }
 
 void
 tnt_mem_free(void *ptr)
 {
-	_tnt_free(ptr);
+	_tnt_realloc(ptr, 0);
 }

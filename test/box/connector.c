@@ -230,12 +230,10 @@ main(void)
 	struct tnt *t = tnt_alloc();
 	if (t == NULL)
 		return 1;
-
 	tnt_set(t, TNT_OPT_HOSTNAME, "localhost");
 	tnt_set(t, TNT_OPT_PORT, 33013); 
 	if (tnt_init(t) == -1)
 		return 1;
-
 	if (tnt_connect(t) == -1)
 		return 1;
 

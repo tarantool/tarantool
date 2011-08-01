@@ -201,8 +201,10 @@ tnt_update_pack(struct tnt_update *update, char **data, int *size)
 	/* <count><operation>+ */
 	*size = 4 + update->size_enc;
 	*data = tnt_mem_alloc(*size);
-	if (*data == NULL)
+	if (*data == NULL) {
+		*size = 0;
 		return TNT_EMEMORY;
+	}
 
 	char *p = *data;
 	memcpy(p, &update->count, 4);

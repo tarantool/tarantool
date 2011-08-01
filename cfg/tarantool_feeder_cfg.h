@@ -2,6 +2,7 @@
 #define tarantool_cfg_CFG_H
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <sys/types.h>
 
 /*

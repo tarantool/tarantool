@@ -50,8 +50,7 @@ tnt_alloc(void)
 int
 tnt_init(struct tnt *t)
 {
-	tnt_mem_init(t->opt.malloc,
-		t->opt.realloc, t->opt.dup, t->opt.free);
+	tnt_mem_init(t->opt.realloc);
 	if (tnt_buf_init(&t->sbuf, t->opt.send_buf, t->opt.send_cb,
 		t->opt.send_cbv, t->opt.send_cb_arg) == -1) {
 		t->error = TNT_EMEMORY;

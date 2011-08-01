@@ -48,13 +48,13 @@ void
 tnt_opt_free(struct tnt_opt *opt)
 {
 	if (opt->hostname)
-		free(opt->hostname);
+		tnt_mem_free(opt->hostname);
 	if (opt->auth_id)
-		free(opt->auth_id);
+		tnt_mem_free(opt->auth_id);
 	if (opt->auth_key)
-		free(opt->auth_key);
+		tnt_mem_free(opt->auth_key);
 	if (opt->auth_mech)
-		free(opt->auth_mech);
+		tnt_mem_free(opt->auth_mech);
 }
 
 enum tnt_error
@@ -69,7 +69,7 @@ tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
 	case TNT_OPT_HOSTNAME:
 		if (opt->hostname)
 			tnt_mem_free(opt->hostname);
-		opt->hostname = strdup(va_arg(args, char*));
+		opt->hostname = tnt_mem_dup(va_arg(args, char*));
 		if (opt->hostname == NULL)
 			return TNT_EMEMORY;
 		break;
@@ -112,7 +112,7 @@ tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
 	case TNT_OPT_AUTH_ID:
 		if (opt->auth_id)
 			free(opt->auth_id);
-		opt->auth_id = strdup(va_arg(args, char*));
+		opt->auth_id = tnt_mem_dup(va_arg(args, char*));
 		if (opt->auth_id == NULL)
 			return TNT_EMEMORY;
 		opt->auth_id_size = strlen(opt->auth_id);
@@ -122,8 +122,8 @@ tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
 			free(opt->auth_key);
 		key = va_arg(args, char*);
 		opt->auth_key_size = va_arg(args, int);
-		opt->auth_key = malloc(opt->auth_key_size + 1);
-		if (opt->auth_id == NULL)
+		opt->auth_key = tnt_mem_alloc(opt->auth_key_size + 1);
+		if (opt->auth_key == NULL)
 			return TNT_EMEMORY;
 		memcpy(opt->auth_key, key, opt->auth_key_size);
 		opt->auth_key[opt->auth_key_size] = 0;
@@ -131,21 +131,12 @@ tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
 	case TNT_OPT_AUTH_MECH:
 		if (opt->auth_mech)
 			free(opt->auth_mech);
-		opt->auth_mech = strdup(va_arg(args, char*));
+		opt->auth_mech = tnt_mem_dup(va_arg(args, char*));
 		if (opt->auth_mech == NULL)
 			return TNT_EMEMORY;
 		break;
-	case TNT_OPT_MALLOC:
-		opt->malloc = va_arg(args, void *(*)(int size));
-		break;
-	case TNT_OPT_REALLOC:
+	case TNT_OPT_ALLOC:
 		opt->realloc = va_arg(args, void *(*)(void *ptr, int size));
-		break;
-	case TNT_OPT_DUP:
-		opt->dup = va_arg(args, void *(*)(char *sz));
-		break;
-	case TNT_OPT_FREE:
-		opt->free = va_arg(args, void (*)(void *ptr));
 		break;
 	default:
 		return TNT_EFAIL;

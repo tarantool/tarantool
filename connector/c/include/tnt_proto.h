@@ -26,11 +26,11 @@
  * SUCH DAMAGE.
  */
 
-#define TNT_PROTO_TYPE_INSERT (13)
-#define TNT_PROTO_TYPE_SELECT (17)
-#define TNT_PROTO_TYPE_UPDATE (19)
-#define TNT_PROTO_TYPE_DELETE (20)
-#define TNT_PROTO_TYPE_PING   (65280)
+#define TNT_PROTO_TYPE_INSERT 13
+#define TNT_PROTO_TYPE_SELECT 17
+#define TNT_PROTO_TYPE_UPDATE 19
+#define TNT_PROTO_TYPE_DELETE 20
+#define TNT_PROTO_TYPE_PING   65280
 
 struct tnt_proto_header {
 	uint32_t type;
@@ -50,11 +50,11 @@ struct tnt_proto_tuple {
 	unsigned char field[];
 };
 
-#define TNT_PROTO_FLAG_RETURN    (0x01)
-#define TNT_PROTO_FLAG_ADD       (0x02)
-#define TNT_PROTO_FLAG_REPLACE   (0x04)
-#define TNT_PROTO_FLAG_BOX_QUIET (0x08)
-#define TNT_PROTO_FLAG_NOT_STORE (0x10)
+#define TNT_PROTO_FLAG_RETURN    0x01
+#define TNT_PROTO_FLAG_ADD       0x02
+#define TNT_PROTO_FLAG_REPLACE   0x04
+#define TNT_PROTO_FLAG_BOX_QUIET 0x08
+#define TNT_PROTO_FLAG_NOT_STORE 0x10
 
 struct tnt_proto_insert {
 	uint32_t ns;
@@ -62,12 +62,12 @@ struct tnt_proto_insert {
 	/* tuple data */
 };
 
-#define TNT_PROTO_UPDATE_ASSIGN (0)
-#define TNT_PROTO_UPDATE_ADD    (1)
-#define TNT_PROTO_UPDATE_AND    (2)
-#define TNT_PROTO_UPDATE_XOR    (3)
-#define TNT_PROTO_UPDATE_OR     (4)
-#define TNT_PROTO_UPDATE_SPLICE (5)
+#define TNT_PROTO_UPDATE_ASSIGN 0
+#define TNT_PROTO_UPDATE_ADD    1
+#define TNT_PROTO_UPDATE_AND    2
+#define TNT_PROTO_UPDATE_XOR    3
+#define TNT_PROTO_UPDATE_OR     4
+#define TNT_PROTO_UPDATE_SPLICE 5
 
 struct tnt_proto_update {
 	uint32_t ns;

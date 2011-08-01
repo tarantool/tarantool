@@ -150,7 +150,7 @@ tnt_tuples_free(struct tnt_tuples *tuples)
 	struct tnt_tuple *t, *tnext;
 	STAILQ_FOREACH_SAFE(t, &tuples->list, next, tnext) {
 		tnt_tuple_free(t);
-		free(t);
+		tnt_mem_free(t);
 	}
 }
 
@@ -172,7 +172,6 @@ tnt_tuples_pack(struct tnt_tuples *tuples, char **data, unsigned int *size)
 {
 	if (tuples->count == 0)
 		return TNT_EEMPTY;
-
 	*size = 4; /* count */
 
 	struct tnt_tuple *t;
@@ -191,6 +190,8 @@ tnt_tuples_pack(struct tnt_tuples *tuples, char **data, unsigned int *size)
 		enum tnt_error result = tnt_tuple_pack_to(t, p);
 		if (result != TNT_EOK) {
 			tnt_mem_free(*data);
+			*data = NULL;
+			*size = 0;
 			return result;
 		}
 		p += t->size_enc;
@@ -202,10 +203,8 @@ enum tnt_error
 tnt_tuples_unpack(struct tnt_tuples *tuples, char *data, unsigned int size)
 {
 	struct tnt_tuple *t = tnt_tuples_add(tuples);
-	if (t == NULL) {
-		tnt_tuples_free(tuples);
+	if (t == NULL)
 		return TNT_EMEMORY;
-	}
 
 	char *p = data;
 	uint32_t i, c = *(uint32_t*)p;
@@ -214,7 +213,7 @@ tnt_tuples_unpack(struct tnt_tuples *tuples, char *data, unsigned int size)
 
 	if (tnt_tuple_init(t, c) == -1) {
 		STAILQ_REMOVE(&tuples->list, t, tnt_tuple, next);
-		free(t);
+		tnt_mem_free(t);
 		return TNT_EMEMORY;
 	}
 
