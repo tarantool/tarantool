@@ -78,12 +78,9 @@ int
 tnt_delete(struct tnt *t, int reqid, int ns, char *key, int key_size)
 {
 	struct tnt_tuple k;
-	tnt_tuple_init(&k, 1);
-
-	t->error = tnt_tuple_set(&k, 0, key, key_size);
-	if (t->error != TNT_EOK)
+	tnt_tuple_init(&k);
+	if (tnt_tuple_add(&k, key, key_size) == NULL)
 		return -1;
-
 	int result = tnt_delete_tuple(t, reqid, ns, &k);
 	tnt_tuple_free(&k);
 	return result;

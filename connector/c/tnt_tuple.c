@@ -35,63 +35,64 @@
 #include <tnt_leb128.h>
 #include <tnt_tuple.h>
 
-int
-tnt_tuple_init(struct tnt_tuple *tuple, unsigned int fields)
+void
+tnt_tuple_init(struct tnt_tuple *tuple)
 {
-	tuple->fields = tnt_mem_alloc(fields *
-		sizeof(struct tnt_tuple_field));
-	if (tuple->fields == NULL)
-		return -1;
-	memset(tuple->fields, 0,
-		sizeof(struct tnt_tuple_field) * fields);
-	tuple->count = fields;
+	tuple->count    = 0;
 	tuple->size_enc = 4; /* cardinality */
-	return 0;
+	STAILQ_INIT(&tuple->list);
 }
 
 void
 tnt_tuple_free(struct tnt_tuple *tuple)
 {
+	/*
 	unsigned int i;
 	for (i = 0 ; i < tuple->count ; i++) {
 		if (tuple->fields[i].data)
 			tnt_mem_free(tuple->fields[i].data);
 	}
 	tnt_mem_free(tuple->fields);
+	*/
 }
 
-int
-tnt_tuple_set(struct tnt_tuple *tuple,
-	      unsigned int field, char *data, unsigned int size)
+struct tnt_tuple_field* 
+tnt_tuple_add(struct tnt_tuple *tuple, char *data, unsigned int size)
 {
-	if (field >= tuple->count)
-		return -1;
-	char *p = tnt_mem_alloc(size);
-	if (p == NULL)
-		return -1;
-	memcpy(p, data, size);
-
-	tuple->size_enc -= tuple->fields[field].size +
-		tuple->fields[field].size_leb;
-
-	tuple->fields[field].size = size;
-	tuple->fields[field].size_leb = tnt_leb128_size(size);
-
-	tuple->size_enc += tuple->fields[field].size +
-		tuple->fields[field].size_leb;
-
-	if (tuple->fields[field].data)
-		tnt_mem_free(tuple->fields[field].data);
-	tuple->fields[field].data = p;
-	return 0;
+	struct tnt_tuple_field *f =
+		tnt_mem_alloc(sizeof(struct tnt_tuple_field));
+	if (f == NULL)
+		return NULL;
+	f->size = size;
+	f->size_leb = tnt_leb128_size(size);
+	f->data = NULL;
+	if (data) {
+		f->data = tnt_mem_alloc(size);
+		if (f->data == NULL) {
+			tnt_mem_free(f);
+			return NULL;
+		}
+		memcpy(f->data, data, f->size);
+	}
+	tuple->count++;
+	tuple->size_enc += f->size_leb;
+	tuple->size_enc += size;
+	STAILQ_INSERT_TAIL(&tuple->list, f, next);
+	return f;
 }
 
 struct tnt_tuple_field*
 tnt_tuple_get(struct tnt_tuple *tuple, unsigned int field)
 {
+	int c = 0;
+	struct tnt_tuple_field *iter;
 	if (field >= tuple->count)
 		return NULL;
-	return &tuple->fields[field];
+	TNT_TUPLE_FOREACH(tuple, iter) {
+		if (field == c++)
+			return iter;
+	}
+	return NULL;
 }
 
 enum tnt_error
@@ -105,9 +106,8 @@ tnt_tuple_pack(struct tnt_tuple *tuple, char **data, unsigned int *size)
 	memcpy(p, &tuple->count, 4);
 	p += 4;
 
-	unsigned int i;
-	for (i = 0 ; i < tuple->count ; i++) {
-		struct tnt_tuple_field *f = &tuple->fields[i];
+	struct tnt_tuple_field *f;
+	TNT_TUPLE_FOREACH(tuple, f) {
 		tnt_leb128_write(p, f->size);
 		p += f->size_leb;
 		if (f->data) {
@@ -123,10 +123,8 @@ tnt_tuple_pack_to(struct tnt_tuple *tuple, char *dest)
 {
 	memcpy(dest, &tuple->count, 4);
 	dest += 4;
-
-	unsigned int i;
-	for (i = 0 ; i < tuple->count ; i++) {
-		struct tnt_tuple_field *f = &tuple->fields[i];
+	struct tnt_tuple_field *f;
+	TNT_TUPLE_FOREACH(tuple, f) {
 		tnt_leb128_write(dest, f->size);
 		dest += f->size_leb;
 		if (f->data) {
@@ -161,7 +159,7 @@ tnt_tuples_add(struct tnt_tuples *tuples)
 		tnt_mem_alloc(sizeof(struct tnt_tuple));
 	if (t == NULL)
 		return NULL;
-	memset(t, 0, sizeof(struct tnt_tuple));
+	tnt_tuple_init(t);
 	tuples->count++;
 	STAILQ_INSERT_TAIL(&tuples->list, t, next);
 	return t;
@@ -211,12 +209,6 @@ tnt_tuples_unpack(struct tnt_tuples *tuples, char *data, unsigned int size)
 	int off	= 4;
 	p += 4;
 
-	if (tnt_tuple_init(t, c) == -1) {
-		STAILQ_REMOVE(&tuples->list, t, tnt_tuple, next);
-		tnt_mem_free(t);
-		return TNT_EMEMORY;
-	}
-
 	for (i = 0 ; i < c ; i++) {
 		uint32_t s;
 		int r = tnt_leb128_read(p, size - off, &s);
@@ -225,11 +217,9 @@ tnt_tuples_unpack(struct tnt_tuples *tuples, char *data, unsigned int size)
 		off += r, p += r;
 		if (s > (uint32_t)(size - off))
 			return TNT_EPROTO;
-		enum tnt_error res = tnt_tuple_set(t, i, p, s);
-		if ( res != TNT_EOK )
-			return res;
+		if (tnt_tuple_add(t, p, s) == NULL)
+			return TNT_EMEMORY;
 		off += s, p+= s;
 	}
-
 	return TNT_EOK;
 }

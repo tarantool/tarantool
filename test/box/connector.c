@@ -81,9 +81,9 @@ test_insert(struct tnt *t)
 	int buf_len = sizeof(buf) - 1;
 
 	struct tnt_tuple tu;
-	tnt_tuple_init(&tu, 2);
-	tnt_tuple_set(&tu, 0, (char*)&key, key_len);
-	tnt_tuple_set(&tu, 1, buf, buf_len);
+	tnt_tuple_init(&tu);
+	tnt_tuple_add(&tu, (char*)&key, key_len);
+	tnt_tuple_add(&tu, buf, buf_len);
 	if (tnt_insert(t, 0xFAFA, 0, TNT_PROTO_FLAG_RETURN, &tu) == -1)
 		test_error(t, "insert");
 	tnt_flush(t);
@@ -166,8 +166,8 @@ test_select(struct tnt *t)
 	struct tnt_tuples tuples;
 	tnt_tuples_init(&tuples);
 	struct tnt_tuple *tu = tnt_tuples_add(&tuples);
-	tnt_tuple_init(tu, 1);
-	tnt_tuple_set(tu, 0, (char*)&key, key_len);
+	tnt_tuple_init(tu);
+	tnt_tuple_add(tu, (char*)&key, key_len);
 	if (tnt_select(t, 0x444, 0, 0, 0, 100, &tuples) == -1)
 		test_error(t, "select");
 	tnt_tuples_free(&tuples);

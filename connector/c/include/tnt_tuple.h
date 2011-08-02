@@ -35,6 +35,7 @@ struct tnt_tuple_field {
 	char *data;
 	uint32_t size;
 	uint32_t size_leb;
+	STAILQ_ENTRY(tnt_tuple_field) next;
 };
 
 #define TNT_TUPLE_FIELD_SIZE(F) \
@@ -45,12 +46,14 @@ struct tnt_tuple_field {
 struct tnt_tuple {
 	uint32_t count;
 	uint32_t size_enc;
-	struct tnt_tuple_field *fields;
+	STAILQ_HEAD(,tnt_tuple_field) list;
 	STAILQ_ENTRY(tnt_tuple) next;
 };
 
 #define TNT_TUPLE_COUNT(T) \
 	((T)->count)
+#define TNT_TUPLE_FOREACH(T, TI) \
+	STAILQ_FOREACH(TI, &(T)->list, next)
 
 struct tnt_tuples {
 	uint32_t count;
@@ -69,9 +72,8 @@ struct tnt_tuples {
  *
  * @param tuple tuple object pointer
  * @param fields number of fields
- * @returns 0 on success, -1 on error
  */
-int tnt_tuple_init(struct tnt_tuple *tuple, unsigned int fields);
+void tnt_tuple_init(struct tnt_tuple *tuple);
 
 /**
  * Frees tuple object
@@ -81,17 +83,16 @@ int tnt_tuple_init(struct tnt_tuple *tuple, unsigned int fields);
 void tnt_tuple_free(struct tnt_tuple *tuple);
 
 /**
- * Sets tuple field data
+ * Adds tuple field data
  *
  * @param tuple tuple object pointer
- * @param field field number
  * @param data data pointer
  * @param size data size
- * @returns 0 on success, -1 on error
+ * @returns tuple field on success, NULL on error
  */
-int
-tnt_tuple_set(struct tnt_tuple *tuple,
-	      unsigned int field, char *data, unsigned int size);
+
+struct tnt_tuple_field*
+tnt_tuple_add(struct tnt_tuple *tuple, char *data, unsigned int size);
 
 /**
  * Gets tuple field data
