@@ -46,14 +46,12 @@ tnt_tuple_init(struct tnt_tuple *tuple)
 void
 tnt_tuple_free(struct tnt_tuple *tuple)
 {
-	/*
-	unsigned int i;
-	for (i = 0 ; i < tuple->count ; i++) {
-		if (tuple->fields[i].data)
-			tnt_mem_free(tuple->fields[i].data);
+	struct tnt_tuple_field *f, *fnext;
+	STAILQ_FOREACH_SAFE(f, &tuple->list, next, fnext) {
+		if (f->data)
+			tnt_mem_free(f->data);
+		tnt_mem_free(f);
 	}
-	tnt_mem_free(tuple->fields);
-	*/
 }
 
 struct tnt_tuple_field* 

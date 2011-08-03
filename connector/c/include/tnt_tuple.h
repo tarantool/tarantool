@@ -103,6 +103,7 @@ tnt_tuple_add(struct tnt_tuple *tuple, char *data, unsigned int size);
  */
 struct tnt_tuple_field*
 tnt_tuple_get(struct tnt_tuple *tuple, unsigned int field);
+
 /** @} */
 
 enum tnt_error

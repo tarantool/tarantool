@@ -1,4 +1,3 @@
-
 set (tnt_sources 
 	tnt_opt.c
 	tnt_buf.c
@@ -44,8 +43,3 @@ install(FILES
 
 install_targets(/lib tnt)
 install_targets(/lib tnt_shared)
-
-#install(TARGETS tnt
-	#LIBRARY DESTINATION lib
-	#ARCHIVE DESTINATION lib
-#)
