@@ -94,28 +94,6 @@ box_snap_row(const struct tbuf *t)
 
 static void tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple);
 
-
-void *
-next_field(void *f)
-{
-	u32 size = load_varint32(&f);
-	return (u8 *)f + size;
-}
-
-void *
-tuple_field(struct box_tuple *tuple, size_t i)
-{
-	void *field = tuple->data;
-
-	if (i >= tuple->cardinality)
-		return NULL;
-
-	while (i-- > 0)
-		field = next_field(field);
-
-	return field;
-}
-
 static void
 lock_tuple(struct box_txn *txn, struct box_tuple *tuple)
 {
@@ -134,88 +112,6 @@ unlock_tuples(struct box_txn *txn)
 		txn->lock_tuple->flags &= ~WAL_WAIT;
 		txn->lock_tuple = NULL;
 	}
-}
-
-static void
-field_print(struct tbuf *buf, void *f)
-{
-	uint32_t size = load_varint32(&f);
-	switch (size) {
-	case 2:
-		tbuf_printf(buf, "%hu", *(u16 *)f);
-		break;
-	case 4:
-		tbuf_printf(buf, "%u", *(u32 *)f);
-		break;
-	default:
-		tbuf_printf(buf, "'");
-		while (size-- > 0) {
-			if (0x20 <= *(u8 *)f && *(u8 *)f < 0x7f)
-				tbuf_printf(buf, "%c", *(u8 *)f++);
-			else
-				tbuf_printf(buf, "\\x%02X", *(u8 *)f++);
-		}
-		tbuf_printf(buf, "'");
-		break;
-	}
-}
-
-/*
- * Print a tuple in yaml-compatible mode:
- * key: { value, value, value }
- */
-
-static void
-tuple_print(struct tbuf *buf, uint8_t cardinality, void *f)
-{
-	field_print(buf, f);
-	tbuf_printf(buf, ": {");
-	f = next_field(f);
-
-	for (size_t i = 1; i < cardinality; i++, f = next_field(f)) {
-		field_print(buf, f);
-		if (likely(i + 1 < cardinality))
-			tbuf_printf(buf, ", ");
-	}
-	tbuf_printf(buf, "}\r\n");
-}
-
-static struct box_tuple *
-tuple_alloc(size_t size)
-{
-	size_t total = sizeof(struct box_tuple) + size;
-	struct box_tuple *tuple = salloc(total);
-
-	if (tuple == NULL)
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, total, "slab allocator", "tuple");
-
-	tuple->flags = tuple->refs = 0;
-	tuple->flags |= NEW;
-	tuple->bsize = size;
-
-	say_debug("tuple_alloc(%zu) = %p", size, tuple);
-	return tuple;
-}
-
-static void
-tuple_free(struct box_tuple *tuple)
-{
-	say_debug("tuple_free(%p)", tuple);
-	assert(tuple->refs == 0);
-	sfree(tuple);
-}
-
-static void
-tuple_ref(struct box_tuple *tuple, int count)
-{
-	assert(tuple->refs + count >= 0);
-	tuple->refs += count;
-
-	if (tuple->refs > 0)
-		tuple->flags &= ~NEW;
-
-	if (tuple->refs == 0)
-		tuple_free(tuple);
 }
 
 void

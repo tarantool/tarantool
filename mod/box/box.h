@@ -26,13 +26,14 @@
  * SUCH DAMAGE.
  */
 
-#include <mod/box/index.h>
-#include "exception.h"
-#include "iproto.h"
+#include <exception.h>
+#include <iproto.h>
 #include <tbuf.h>
 
+#include <mod/box/index.h>
+#include <mod/box/tuple.h>
+
 struct tarantool_cfg;
-struct box_tuple;
 struct index;
 
 enum
@@ -49,14 +50,6 @@ struct namespace {
 };
 
 extern struct namespace *namespace;
-
-struct box_tuple {
-	u16 refs;
-	u16 flags;
-	u32 bsize;
-	u32 cardinality;
-	u8 data[0];
-} __attribute__((packed));
 
 struct box_txn {
 	u16 op;
@@ -77,17 +70,6 @@ struct box_txn {
 	bool write_to_wal;
 };
 
-enum tuple_flags {
-	WAL_WAIT = 0x1,
-	GHOST = 0x2,
-	NEW = 0x4,
-	SEARCH = 0x8
-};
-
-enum box_mode {
-	RO = 1,
-	RW
-};
 
 #define BOX_RETURN_TUPLE		0x01
 #define BOX_ADD				0x02
@@ -136,6 +118,5 @@ extern iproto_callback rw_callback;
 struct box_txn *txn_alloc(u32 flags);
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
 void txn_cleanup(struct box_txn *txn);
-void *tuple_field(struct box_tuple *tuple, size_t i);
 
 #endif /* TARANTOOL_BOX_H_INCLUDED */
