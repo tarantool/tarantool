@@ -113,6 +113,26 @@ tuple_field(struct box_tuple *tuple, size_t i)
 }
 
 /**
+ * Tuple length.
+ *
+ * @returns tuple length in bytes, exception will be raised if error happen.
+ */
+u32
+tuple_length(struct tbuf *buf, u32 cardinality)
+{
+	void *data = buf->data;
+	u32 len = buf->len;
+
+	for (int i = 0; i < cardinality; i++)
+		read_field(buf);
+
+	u32 r = len - buf->len;
+	buf->data = data;
+	buf->len = len;
+	return r;
+}
+
+/**
  * Print a tuple in yaml-compatible mode tp tbuf:
  * key: { value, value, value }
  */

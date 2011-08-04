@@ -25,7 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <util.h>
 #include <tbuf.h>
 
@@ -90,6 +89,14 @@ tuple_ref(struct box_tuple *tuple, int count);
  */
 void *
 tuple_field(struct box_tuple *tuple, size_t i);
+
+/**
+ * Tuple length.
+ *
+ * @returns tuple length in bytes, exception will be raised if error happen.
+ */
+u32
+tuple_length(struct tbuf *buf, u32 cardinality);
 
 /**
  * Print a tuple in yaml-compatible mode tp tbuf:
