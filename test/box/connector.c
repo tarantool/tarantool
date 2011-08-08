@@ -25,9 +25,9 @@ test_assert(char *file, int line, int expr, char *exprsz)
 static void
 test_error(struct tnt *t, char *name)
 {
-	printf("%s failed: %s", name, tnt_perror(t));
+	printf("%s failed: %s", name, tnt_strerror(t));
 	if (tnt_error(t) == TNT_ESYSTEM)
-		printf("(%s)", strerror(tnt_error_errno(t)));
+		printf("(%s)", strerror(tnt_errno(t)));
 	printf("\n");
 }
 
@@ -41,7 +41,7 @@ test_recv(struct tnt *t, struct tnt_recv *rcv, char *name)
 		if (tnt_error(t) != TNT_EOK) {
 			printf("%s: respond %s (op: %d, reqid: %d, code: %d, count: %d)\n",
 				name,
-				tnt_perror(t), TNT_RECV_OP(rcv),
+				tnt_strerror(t), TNT_RECV_OP(rcv),
 				TNT_RECV_ID(rcv),
 				TNT_RECV_CODE(rcv),
 				TNT_RECV_COUNT(rcv));
