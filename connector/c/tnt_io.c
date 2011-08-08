@@ -100,12 +100,26 @@ tnt_io_connect_do(struct tnt *t, char *host, int port)
 			FD_ZERO(&fds);
 			FD_SET(t->fd, &fds);
 
+			/** waiting for connection while handling signal events */
+			struct timeval begin, end;
 			struct timeval tmout;
-			tmout.tv_sec = t->opt.tmout_connect;
-			tmout.tv_usec = 0;
-			if (select(t->fd + 1, NULL, &fds, NULL, &tmout) == -1) {
-				t->errno_ = errno;
-				return TNT_ESYSTEM;
+			int tc = t->opt.tmout_connect;
+			gettimeofday(&begin, NULL);
+			while (1) {
+				tmout.tv_sec  = tc;
+				tmout.tv_usec = 0;
+				if (select(t->fd + 1, NULL, &fds, NULL, &tmout) == -1) {
+					if (errno == EINTR || errno == EAGAIN) {
+						gettimeofday(&end, NULL);
+						tc = end.tv_sec - begin.tv_sec;
+						if (tc <= 0)
+							break;
+						continue;
+					}
+					t->errno_ = errno;
+					return TNT_ESYSTEM;
+				}
+				break;
 			}
 			if (!FD_ISSET(t->fd, &fds))
 				return TNT_ETMOUT;
@@ -173,7 +187,6 @@ tnt_io_setopts(struct tnt *t)
 	return TNT_EOK;
 error:
 	t->errno_ = errno;
-	tnt_io_close(t);
 	return TNT_ESYSTEM;
 }
 
@@ -187,13 +200,13 @@ tnt_io_connect(struct tnt *t, char *host, int port)
 	}
 	enum tnt_error result = tnt_io_setopts(t);
 	if (result != TNT_EOK)
-		return result;
+		goto out;
 	result = tnt_io_connect_do(t, host, port);
-	if (result != TNT_EOK) {
-		tnt_io_close(t);
-		return result;
-	}
-	return TNT_EOK;
+	if (result != TNT_EOK)
+		goto out;
+out:
+	tnt_io_close(t);
+	return result;
 }
 
 void
@@ -224,10 +237,13 @@ tnt_io_send_raw(struct tnt *t, char *buf, int size)
 	int result;
 	if (t->sbuf.tx)
 		result = t->sbuf.tx(t->sbuf.buf, buf, size);
-	else
-		result = send(t->fd, buf, size, 0);
-	if (result <= 0)
-		t->errno_ = errno;
+	else {
+		do {
+			result = send(t->fd, buf, size, 0);
+		} while (result == -1 && (errno == EINTR || errno == EAGAIN));
+		if (result <= 0)
+			t->errno_ = errno;
+	}
 	return result;
 }
 
@@ -237,10 +253,13 @@ tnt_io_sendv_raw(struct tnt *t, void *iovec, int count)
 	int result;
 	if (t->sbuf.txv)
 		result = t->sbuf.txv(t->sbuf.buf, iovec, count);
-	else
-		result = writev(t->fd, iovec, count);
-	if (result <= 0)
-		t->errno_ = errno;
+	else {
+		do {
+			result = writev(t->fd, iovec, count);
+		} while (result == -1 && (errno == EINTR || errno == EAGAIN));
+		if (result <= 0)
+			t->errno_ = errno;
+	}
 	return result;
 }
 
@@ -303,10 +322,13 @@ tnt_io_recv_raw(struct tnt *t, char *buf, int size)
 	int result;
 	if (t->rbuf.tx)
 		result = t->rbuf.tx(t->rbuf.buf, buf, size);
-	else
-		result = recv(t->fd, buf, size, 0);
-	if (result <= 0)
-		t->errno_ = errno;
+	else {
+		do {
+			result = recv(t->fd, buf, size, 0);
+		} while (result == -1 && (errno == EINTR || errno == EAGAIN));
+		if (result <= 0)
+			t->errno_ = errno;
+	}
 	return result;
 }
 
@@ -344,7 +366,7 @@ tnt_io_recv(struct tnt *t, char *buf, int size)
 		}
 
 		t->rbuf.off = 0;
-		t->rbuf.top = recv(t->fd, t->rbuf.buf, t->rbuf.size, 0);
+		t->rbuf.top = tnt_io_recv_raw(t, t->rbuf.buf, t->rbuf.size);
 		if (t->rbuf.top <= 0) {
 			t->errno_ = errno;
 			return TNT_ESYSTEM;

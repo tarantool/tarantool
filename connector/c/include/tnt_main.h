@@ -109,6 +109,14 @@ void *tnt_set_allocator(void *(*alloc)(void *ptr, int size));
 int tnt_connect(struct tnt *t);
 
 /**
+ * Gets connection socket
+ *
+ * @param t handler pointer
+ * @returns connection socket
+ */
+int tnt_fd(struct tnt *t);
+
+/**
  * Sends all internal buffers to server
  *
  * @param t handler pointer

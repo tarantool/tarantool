@@ -108,6 +108,12 @@ tnt_connect(struct tnt *t)
 }
 
 int
+tnt_fd(struct tnt *t)
+{
+	return t->fd;
+}
+
+int
 tnt_flush(struct tnt *t)
 {
 	t->error = tnt_io_flush(t);
