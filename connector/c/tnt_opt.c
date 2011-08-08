@@ -135,9 +135,6 @@ tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
 		if (opt->auth_mech == NULL)
 			return TNT_EMEMORY;
 		break;
-	case TNT_OPT_ALLOC:
-		opt->realloc = va_arg(args, void *(*)(void *ptr, int size));
-		break;
 	default:
 		return TNT_EFAIL;
 	}

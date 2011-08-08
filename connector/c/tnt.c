@@ -39,7 +39,7 @@
 struct tnt*
 tnt_alloc(void)
 {
-	struct tnt *t = malloc(sizeof(struct tnt));
+	struct tnt *t = tnt_mem_alloc(sizeof(struct tnt));
 	if (t == NULL)
 		return NULL;
 	memset(t, 0, sizeof(struct tnt));
@@ -50,7 +50,6 @@ tnt_alloc(void)
 int
 tnt_init(struct tnt *t)
 {
-	tnt_mem_init(t->opt.realloc);
 	if (tnt_buf_init(&t->sbuf, t->opt.send_buf, t->opt.send_cb,
 		t->opt.send_cbv, t->opt.send_cb_arg) == -1) {
 		t->error = TNT_EMEMORY;
@@ -71,7 +70,7 @@ tnt_free(struct tnt *t)
 	tnt_buf_free(&t->sbuf);
 	tnt_buf_free(&t->rbuf);
 	tnt_opt_free(&t->opt);
-	free(t);
+	tnt_mem_free(t);
 }
 
 int
@@ -82,6 +81,12 @@ tnt_set(struct tnt *t, enum tnt_opt_type name, ...)
 	t->error = tnt_opt_set(&t->opt, name, args);
 	va_end(args);
 	return (t->error == TNT_EOK) ? 0 : -1;
+}
+
+void*
+tnt_set_allocator(void *(*alloc)(void *ptr, int size))
+{
+	return tnt_mem_init(alloc);
 }
 
 int
@@ -122,9 +127,9 @@ tnt_error(struct tnt *t)
 }
 
 int
-tnt_error_errno(struct tnt *t)
+tnt_errno(struct tnt *t)
 {
-	return t->error_errno;
+	return t->errno_;
 }
 
 struct tnt_error_desc {
@@ -136,8 +141,8 @@ struct tnt_error_desc {
 static
 struct tnt_error_desc tnt_error_list[] = 
 {
-	{ TNT_EFAIL,    "fail"                     },
 	{ TNT_EOK,      "ok"                       },
+	{ TNT_EFAIL,    "fail"                     },
 	{ TNT_EMEMORY,  "memory allocation failed" },
 	{ TNT_ESYSTEM,  "system error"             },
 	{ TNT_EBADVAL,  "bad argument"             },
@@ -153,13 +158,13 @@ struct tnt_error_desc tnt_error_list[] =
 };
 
 char*
-tnt_perror(struct tnt *t)
+tnt_strerror(struct tnt *t)
 {
 	if (t->error == TNT_ESYSTEM) {
 		static char msg[256];
 		snprintf(msg, sizeof(msg), "%s: %s",
 			tnt_error_list[TNT_ESYSTEM].desc,
-				strerror(t->error_errno));
+				strerror(t->errno_));
 		return msg;
 	}
 	return tnt_error_list[(int)t->error].desc;

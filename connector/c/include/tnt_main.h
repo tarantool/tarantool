@@ -44,7 +44,7 @@ struct tnt {
 	struct tnt_buf sbuf;
 	struct tnt_buf rbuf;
 	enum tnt_error error;
-	int error_errno;
+	int errno_;
 };
 
 /**
@@ -83,6 +83,15 @@ void tnt_free(struct tnt *t);
  * @returns 0 on success, -1 on error
  */
 int tnt_set(struct tnt *t, enum tnt_opt_type name, ...);
+
+/**
+ * Sets memory allocator
+ *
+ * @param alloc allocator function pointer 
+ * @returns previous allocator pointer
+ */
+void *tnt_set_allocator(void *(*alloc)(void *ptr, int size));
+
 /** @} */
 
 /**
@@ -135,7 +144,7 @@ enum tnt_error tnt_error(struct tnt *t);
  * @param t handler pointer
  * @returns errno
  */
-int tnt_error_errno(struct tnt *t);
+int tnt_errno(struct tnt *t);
 
 /**
  * Returns error description
@@ -143,7 +152,7 @@ int tnt_error_errno(struct tnt *t);
  * @param t handler pointer
  * @returns error description
  */
-char *tnt_perror(struct tnt *t);
+char *tnt_strerror(struct tnt *t);
 /** @} */
 
 #endif /* TNT_MAIN_H_INCLUDED */

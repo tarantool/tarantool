@@ -61,8 +61,7 @@ enum tnt_opt_type {
 	TNT_OPT_AUTH,
 	TNT_OPT_AUTH_ID,
 	TNT_OPT_AUTH_KEY,
-	TNT_OPT_AUTH_MECH,
-	TNT_OPT_ALLOC
+	TNT_OPT_AUTH_MECH
 };
 /** @} */
 
@@ -86,7 +85,6 @@ struct tnt_opt {
 	unsigned char *auth_key;
 	int auth_key_size;
 	char *auth_mech;
-	void *(*realloc)(void *ptr, int size);
 };
 
 void tnt_opt_init(struct tnt_opt *opt);

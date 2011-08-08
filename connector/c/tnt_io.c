@@ -68,7 +68,7 @@ tnt_io_nonblock(struct tnt *t, int set)
 {
 	int flags = fcntl(t->fd, F_GETFL);
 	if (flags == -1) {
-		t->error_errno = errno;
+		t->errno_ = errno;
 		return TNT_ESYSTEM;
 	}
 	if (set)
@@ -76,7 +76,7 @@ tnt_io_nonblock(struct tnt *t, int set)
 	else
 		flags &= ~O_NONBLOCK;
 	if (fcntl(t->fd, F_SETFL, flags) == -1) {
-		t->error_errno = errno;
+		t->errno_ = errno;
 		return TNT_ESYSTEM;
 	}
 	return TNT_EOK;
@@ -104,7 +104,7 @@ tnt_io_connect_do(struct tnt *t, char *host, int port)
 			tmout.tv_sec = t->opt.tmout_connect;
 			tmout.tv_usec = 0;
 			if (select(t->fd + 1, NULL, &fds, NULL, &tmout) == -1) {
-				t->error_errno = errno;
+				t->errno_ = errno;
 				return TNT_ESYSTEM;
 			}
 			if (!FD_ISSET(t->fd, &fds))
@@ -113,11 +113,11 @@ tnt_io_connect_do(struct tnt *t, char *host, int port)
 			int opt = 0;
 			socklen_t len = sizeof(opt);
 			if ((getsockopt(t->fd, SOL_SOCKET, SO_ERROR, &opt, &len) == -1) || opt) {
-				t->error_errno = (opt) ? opt: errno;
+				t->errno_ = (opt) ? opt: errno;
 				return TNT_ESYSTEM;
 			}
 		} else {
-			t->error_errno = errno;
+			t->errno_ = errno;
 			return TNT_ESYSTEM;
 		}
 	}
@@ -172,7 +172,7 @@ tnt_io_setopts(struct tnt *t)
 	}
 	return TNT_EOK;
 error:
-	t->error_errno = errno;
+	t->errno_ = errno;
 	tnt_io_close(t);
 	return TNT_ESYSTEM;
 }
@@ -182,7 +182,7 @@ tnt_io_connect(struct tnt *t, char *host, int port)
 {
 	t->fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (t->fd < 0) {
-		t->error_errno = errno;
+		t->errno_ = errno;
 		return TNT_ESYSTEM;
 	}
 	enum tnt_error result = tnt_io_setopts(t);
@@ -227,7 +227,7 @@ tnt_io_send_raw(struct tnt *t, char *buf, int size)
 	else
 		result = send(t->fd, buf, size, 0);
 	if (result <= 0)
-		t->error_errno = errno;
+		t->errno_ = errno;
 	return result;
 }
 
@@ -240,7 +240,7 @@ tnt_io_sendv_raw(struct tnt *t, void *iovec, int count)
 	else
 		result = writev(t->fd, iovec, count);
 	if (result <= 0)
-		t->error_errno = errno;
+		t->errno_ = errno;
 	return result;
 }
 
@@ -297,7 +297,6 @@ tnt_io_sendv(struct tnt *t, void *iovec, int count)
 	return TNT_EOK;
 }
 
-
 int
 tnt_io_recv_raw(struct tnt *t, char *buf, int size)
 {
@@ -307,7 +306,7 @@ tnt_io_recv_raw(struct tnt *t, char *buf, int size)
 	else
 		result = recv(t->fd, buf, size, 0);
 	if (result <= 0)
-		t->error_errno = errno;
+		t->errno_ = errno;
 	return result;
 }
 
@@ -347,7 +346,7 @@ tnt_io_recv(struct tnt *t, char *buf, int size)
 		t->rbuf.off = 0;
 		t->rbuf.top = recv(t->fd, t->rbuf.buf, t->rbuf.size, 0);
 		if (t->rbuf.top <= 0) {
-			t->error_errno = errno;
+			t->errno_ = errno;
 			return TNT_ESYSTEM;
 		}
 

@@ -25,6 +25,7 @@
  */
 
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -91,6 +92,76 @@ tnt_tuple_get(struct tnt_tuple *tuple, unsigned int field)
 			return iter;
 	}
 	return NULL;
+}
+
+int
+tnt_tuplef(struct tnt_tuple *tuple, char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	char *p = fmt;
+	while (*p) {
+		if (isspace(*p)) {
+			p++;
+			continue;
+		} else
+		if (*p != '%')
+			return -1;
+		p++;
+		switch (*p) {
+		case '*': {
+			if (*(p + 1) == 's') {
+				int len = va_arg(args, int);
+				char *s = va_arg(args, char*);
+				tnt_tuple_add(tuple, s, len);
+				p += 2;
+			} else
+				return -1;
+			break;
+		}
+		case 's': {
+			char *s = va_arg(args, char*);
+			tnt_tuple_add(tuple, s, strlen(s));
+			p++;
+			break;
+		}
+		case 'd': {
+			int i = va_arg(args, int);
+			tnt_tuple_add(tuple, (char*)&i, sizeof(int));
+			p++;
+			break;
+		}	
+		case 'u':
+			if (*(p + 1) == 'l') {
+				if (*(p + 2) == 'l') {
+					unsigned long long int ull = va_arg(args, unsigned long long);
+					tnt_tuple_add(tuple, (char*)&ull, sizeof(unsigned long long int));
+					p += 3;
+				} else {
+					unsigned long int ul = va_arg(args, unsigned long int);
+					tnt_tuple_add(tuple, (char*)&ul, sizeof(unsigned long int));
+					p += 2;
+				}
+			} else
+				return -1;
+			break;
+		case 'l':
+			if (*(p + 1) == 'l') {
+				long long int ll = va_arg(args, int);
+				tnt_tuple_add(tuple, (char*)&ll, sizeof(long long int));
+				p += 2;
+			} else {
+				long int l = va_arg(args, int);
+				tnt_tuple_add(tuple, (char*)&l, sizeof(long int));
+				p++;
+			}
+			break;
+		default:
+			return -1;
+		}
+	}
+	va_end(args);
+	return 0;
 }
 
 enum tnt_error

@@ -54,6 +54,8 @@ struct tnt_tuple {
 	((T)->count)
 #define TNT_TUPLE_FOREACH(T, TI) \
 	STAILQ_FOREACH(TI, &(T)->list, next)
+#define TNT_TUPLE_LAST(T, TI) \
+	(STAILQ_NEXT((TI), next) == NULL)
 
 struct tnt_tuples {
 	uint32_t count;
@@ -104,6 +106,16 @@ tnt_tuple_add(struct tnt_tuple *tuple, char *data, unsigned int size);
 struct tnt_tuple_field*
 tnt_tuple_get(struct tnt_tuple *tuple, unsigned int field);
 
+/**
+ * Adds formated tuple data field's
+ *
+ * @param tuple tuple object pointer
+ * @param fmt printf-alike format (%s, %*s, %d, %l, %ll, %ul, %ull are supported)
+ * @returns 0 on success, -1 on error
+ */
+int
+tnt_tuplef(struct tnt_tuple *tuple, char *fmt, ...)
+           __attribute__ ((format (printf, 2, 3)));
 /** @} */
 
 enum tnt_error
