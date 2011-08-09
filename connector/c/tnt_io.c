@@ -96,22 +96,21 @@ tnt_io_connect_do(struct tnt *t, char *host, int port)
 
 	if (connect(t->fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
 		if (errno == EINPROGRESS) {
-			fd_set fds;
-			FD_ZERO(&fds);
-			FD_SET(t->fd, &fds);
-
 			/** waiting for connection while handling signal events */
+			fd_set fds;
 			struct timeval begin, end;
 			struct timeval tmout;
 			int tc = t->opt.tmout_connect;
 			gettimeofday(&begin, NULL);
 			while (1) {
+				FD_ZERO(&fds);
+				FD_SET(t->fd, &fds);
 				tmout.tv_sec  = tc;
 				tmout.tv_usec = 0;
 				if (select(t->fd + 1, NULL, &fds, NULL, &tmout) == -1) {
 					if (errno == EINTR || errno == EAGAIN) {
 						gettimeofday(&end, NULL);
-						tc = end.tv_sec - begin.tv_sec;
+						tc = t->opt.tmout_connect - (end.tv_sec - begin.tv_sec);
 						if (tc <= 0)
 							break;
 						continue;
@@ -204,6 +203,7 @@ tnt_io_connect(struct tnt *t, char *host, int port)
 	result = tnt_io_connect_do(t, host, port);
 	if (result != TNT_EOK)
 		goto out;
+	return TNT_EOK;
 out:
 	tnt_io_close(t);
 	return result;
