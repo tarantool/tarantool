@@ -96,33 +96,59 @@ tnt_io_connect_do(struct tnt *t, char *host, int port)
 
 	if (connect(t->fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
 		if (errno == EINPROGRESS) {
-			fd_set fds;
-			FD_ZERO(&fds);
-			FD_SET(t->fd, &fds);
-
+			const int64_t micro = 1000000;
+			int64_t tmout_usec = t->opt.tmout_connect * micro;
 			/** waiting for connection while handling signal events */
-			struct timeval begin, end;
-			struct timeval tmout;
-			int tc = t->opt.tmout_connect;
-			gettimeofday(&begin, NULL);
-			while (1) {
-				tmout.tv_sec  = tc;
-				tmout.tv_usec = 0;
-				if (select(t->fd + 1, NULL, &fds, NULL, &tmout) == -1) {
-					if (errno == EINTR || errno == EAGAIN) {
-						gettimeofday(&end, NULL);
-						tc = end.tv_sec - begin.tv_sec;
-						if (tc <= 0)
-							break;
-						continue;
-					}
-					t->errno_ = errno;
-					return TNT_ESYSTEM;
-				}
-				break;
+			/* get start connect time */
+			struct timeval start_connect;
+			if (gettimeofday(&start_connect, NULL) == -1) {
+				t->errno_ = errno;
+				return TNT_ESYSTEM;
 			}
-			if (!FD_ISSET(t->fd, &fds))
-				return TNT_ETMOUT;
+
+			/* set initial timer */
+			struct timeval tmout;
+			tmout.tv_sec  = t->opt.tmout_connect;
+			tmout.tv_usec = 0;
+			while (1) {
+				fd_set fds;
+
+				FD_ZERO(&fds);
+				FD_SET(t->fd, &fds);
+
+				int result = select(t->fd + 1, NULL, &fds, NULL, &tmout);
+				if (result == -1) {
+					if (errno == EINTR || errno == EAGAIN) {
+						struct timeval curr;
+
+						/* get current time */
+						if (gettimeofday(&curr, NULL) == -1) {
+							t->errno_ = errno;
+							return TNT_ESYSTEM;
+						}
+
+						/* calculate timeout last time */
+						int64_t passd_usec = (curr.tv_sec - start_connect.tv_sec) * micro + (curr.tv_usec - start_connect.tv_usec);
+						int64_t curr_tmeout = passd_usec - tmout_usec;
+						if (curr_tmeout > 0) {
+							/* timeout */
+							return TNT_ETMOUT;
+						}
+
+						tmout.tv_sec = curr_tmeout / micro;
+						tmout.tv_usec = curr_tmeout % micro;
+					} else {
+						t->errno_ = errno;
+						return TNT_ESYSTEM;
+					}
+				} else if (result == 0) {
+					/* timeout */
+					return TNT_ETMOUT;
+				} else {
+					/* we have a event on socet */
+					break;
+				}
+			}
 
 			int opt = 0;
 			socklen_t len = sizeof(opt);
