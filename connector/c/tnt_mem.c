@@ -35,11 +35,11 @@ static void *(*_tnt_realloc)(void *ptr, size_t size) =
 	(void *(*)(void*, size_t))realloc;
 
 void*
-tnt_mem_init(void *(*realloc_)(void *ptr, size_t size))
+tnt_mem_init(tnt_allocator_t alloc)
 {
 	void *ptr = _tnt_realloc;
-	if (realloc_)
-		_tnt_realloc = realloc_;
+	if (alloc)
+		_tnt_realloc = alloc;
 	return ptr;
 }
 

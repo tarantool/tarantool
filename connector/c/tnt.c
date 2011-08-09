@@ -87,7 +87,7 @@ tnt_set(struct tnt *t, enum tnt_opt_type name, ...)
 }
 
 void*
-tnt_set_allocator(void *(*alloc)(void *ptr, size_t size))
+tnt_set_allocator(tnt_allocator_t alloc)
 {
 	return tnt_mem_init(alloc);
 }

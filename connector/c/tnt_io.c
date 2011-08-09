@@ -261,9 +261,9 @@ ssize_t
 tnt_io_send_raw(struct tnt *t, char *buf, size_t size)
 {
 	ssize_t result;
-	if (t->sbuf.tx)
+	if (t->sbuf.tx) {
 		result = t->sbuf.tx(t->sbuf.buf, buf, size);
-	else {
+	} else {
 		do {
 			result = send(t->fd, buf, size, 0);
 		} while (result == -1 && (errno == EINTR || errno == EAGAIN));
@@ -274,12 +274,12 @@ tnt_io_send_raw(struct tnt *t, char *buf, size_t size)
 }
 
 ssize_t
-tnt_io_sendv_raw(struct tnt *t, struct iovec *iov, size_t count)
+tnt_io_sendv_raw(struct tnt *t, struct iovec *iov, int count)
 {
 	ssize_t result;
-	if (t->sbuf.txv)
+	if (t->sbuf.txv) {
 		result = t->sbuf.txv(t->sbuf.buf, iov, count);
-	else {
+	} else {
 		do {
 			result = writev(t->fd, iov, count);
 		} while (result == -1 && (errno == EINTR || errno == EAGAIN));
@@ -304,12 +304,11 @@ tnt_io_send(struct tnt *t, char *buf, size_t size)
 
 /** sendv unbufferized version */
 enum tnt_error
-tnt_io_sendvu(struct tnt *t, struct iovec *iov, size_t count)
+tnt_io_sendvu(struct tnt *t, struct iovec *iov, int count)
 {
        	ssize_t r = 0;
-	ssize_t bytes = 0;
 	while (count > 0) {
-		bytes += r = tnt_io_sendv_raw(t, iov, count);
+		r = tnt_io_sendv_raw(t, iov, count);
 		if (r <= 0)
 			return TNT_ESYSTEM;
 		while (count > 0) {
@@ -328,7 +327,7 @@ tnt_io_sendvu(struct tnt *t, struct iovec *iov, size_t count)
 }
 
 inline static void
-tnt_io_sendv_put(struct tnt *t, struct iovec *iov, size_t count)
+tnt_io_sendv_put(struct tnt *t, struct iovec *iov, int count)
 {
 	size_t i;
 	for (i = 0 ; i < count ; i++) {
@@ -341,7 +340,7 @@ tnt_io_sendv_put(struct tnt *t, struct iovec *iov, size_t count)
 
 /** sendv bufferized version */
 enum tnt_error
-tnt_io_sendv(struct tnt *t, struct iovec *iov, size_t count)
+tnt_io_sendv(struct tnt *t, struct iovec *iov, int count)
 {
 	if (t->sbuf.buf == NULL)
 		return tnt_io_sendvu(t, iov, count);
@@ -370,9 +369,9 @@ ssize_t
 tnt_io_recv_raw(struct tnt *t, char *buf, size_t size)
 {
 	ssize_t result;
-	if (t->rbuf.tx)
+	if (t->rbuf.tx) {
 		result = t->rbuf.tx(t->rbuf.buf, buf, size);
-	else {
+	} else {
 		do {
 			result = recv(t->fd, buf, size, 0);
 		} while (result == -1 && (errno == EINTR || errno == EAGAIN));

@@ -31,10 +31,10 @@ void tnt_io_close(struct tnt *t);
 enum tnt_error tnt_io_flush(struct tnt *t);
 
 ssize_t tnt_io_send_raw(struct tnt *t, char *buf, size_t size);
-ssize_t tnt_io_sendv_raw(struct tnt *t, struct iovec *iov, size_t count);
+ssize_t tnt_io_sendv_raw(struct tnt *t, struct iovec *iov, int count);
 enum tnt_error tnt_io_send(struct tnt *t, char *buf, size_t size);
-enum tnt_error tnt_io_sendv(struct tnt *t, struct iovec *iov, size_t count);
-enum tnt_error tnt_io_sendvu(struct tnt *t, struct iovec *iov, size_t count);
+enum tnt_error tnt_io_sendv(struct tnt *t, struct iovec *iov, int count);
+enum tnt_error tnt_io_sendvu(struct tnt *t, struct iovec *iov, int count);
 
 ssize_t tnt_io_recv_raw(struct tnt *t, char *buf, size_t size);
 enum tnt_error tnt_io_recv(struct tnt *t, char *buf, size_t size);

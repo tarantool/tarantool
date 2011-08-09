@@ -26,20 +26,21 @@
  * SUCH DAMAGE.
  */
 
+typedef ssize_t (*tnt_buf_tx_t)(void *ptr, char *buf, size_t size);
+typedef ssize_t (*tnt_buf_txv_t)(void *ptr, struct iovec *iov, int count);
+
 struct tnt_buf {
 	char *buf;
 	size_t off;
 	size_t top;
 	size_t size;
-	ssize_t (*tx)(void *ptr, char *buf, size_t size);
-	ssize_t (*txv)(void *ptr, void *iovec, size_t count);
+	tnt_buf_tx_t tx;
+	tnt_buf_txv_t txv;
 	void *ptr;
 };
 
-int tnt_buf_init(struct tnt_buf *buf, int size,
-		 ssize_t (*tx)(void *ptr, char *buf, size_t size),
-		 ssize_t (*txv)(void *ptr, void *iovec, size_t count),
-		 void *ptr);
+int tnt_buf_init(struct tnt_buf *buf, size_t size,
+		 tnt_buf_tx_t tx, tnt_buf_txv_t txv, void *ptr);
 
 void tnt_buf_free(struct tnt_buf *buf);
 

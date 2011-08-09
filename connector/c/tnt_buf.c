@@ -28,15 +28,16 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <unistd.h>
+#include <sys/uio.h>
+
 #include <tnt_error.h>
 #include <tnt_mem.h>
 #include <tnt_buf.h>
 
 int
-tnt_buf_init(struct tnt_buf *buf, int size,
-	     int (*tx)(void *ptr, char *buf, size_t size),
-	     int (*txv)(void *ptr, void *iovec, size_t count),
-	     void *ptr)
+tnt_buf_init(struct tnt_buf *buf, size_t size,
+	     tnt_buf_tx_t tx, tnt_buf_txv_t txv, void *ptr)
 {
 	buf->tx = tx;
 	buf->txv = txv;
