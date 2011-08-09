@@ -31,11 +31,11 @@
 #include <tnt_error.h>
 #include <tnt_mem.h>
 
-static void *(*_tnt_realloc)(void *ptr, int size) =
-	(void *(*)(void*, int))realloc;
+static void *(*_tnt_realloc)(void *ptr, size_t size) =
+	(void *(*)(void*, size_t))realloc;
 
 void*
-tnt_mem_init(void *(*realloc_)(void *ptr, int size))
+tnt_mem_init(void *(*realloc_)(void *ptr, size_t size))
 {
 	void *ptr = _tnt_realloc;
 	if (realloc_)
@@ -44,13 +44,13 @@ tnt_mem_init(void *(*realloc_)(void *ptr, int size))
 }
 
 void*
-tnt_mem_alloc(int size)
+tnt_mem_alloc(size_t size)
 {
 	return _tnt_realloc(NULL, size);
 }
 
 void*
-tnt_mem_realloc(void *ptr, int size)
+tnt_mem_realloc(void *ptr, size_t size)
 {
 	return _tnt_realloc(ptr, size);
 }

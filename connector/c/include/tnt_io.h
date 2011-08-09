@@ -30,13 +30,14 @@ enum tnt_error tnt_io_connect(struct tnt *t, char *host, int port);
 void tnt_io_close(struct tnt *t);
 enum tnt_error tnt_io_flush(struct tnt *t);
 
-int tnt_io_send_raw(struct tnt *t, char *buf, int size);
-int tnt_io_sendv_raw(struct tnt *t, void *iovec, int count);
-enum tnt_error tnt_io_send(struct tnt *t, char *buf, int size);
-enum tnt_error tnt_io_sendv(struct tnt *t, void *iovec, int count);
+ssize_t tnt_io_send_raw(struct tnt *t, char *buf, size_t size);
+ssize_t tnt_io_sendv_raw(struct tnt *t, struct iovec *iov, size_t count);
+enum tnt_error tnt_io_send(struct tnt *t, char *buf, size_t size);
+enum tnt_error tnt_io_sendv(struct tnt *t, struct iovec *iov, size_t count);
+enum tnt_error tnt_io_sendvu(struct tnt *t, struct iovec *iov, size_t count);
 
-int tnt_io_recv_raw(struct tnt *t, char *buf, int size);
-enum tnt_error tnt_io_recv(struct tnt *t, char *buf, int size);
+ssize_t tnt_io_recv_raw(struct tnt *t, char *buf, size_t size);
+enum tnt_error tnt_io_recv(struct tnt *t, char *buf, size_t size);
 enum tnt_error tnt_io_recv_char(struct tnt *t, char buf[1]);
 enum tnt_error tnt_io_recv_expect(struct tnt *t, char *sz);
 

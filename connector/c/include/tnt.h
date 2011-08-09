@@ -28,6 +28,9 @@
 
 #include <stdint.h>
 #include <stdarg.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/uio.h>
 
 #include <tnt_queue.h>
 #include <tnt_error.h>

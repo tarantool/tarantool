@@ -34,8 +34,8 @@
 
 int
 tnt_buf_init(struct tnt_buf *buf, int size,
-	     int (*tx)(void *ptr, char *buf, int size),
-	     int (*txv)(void *ptr, void *iovec, int count),
+	     int (*tx)(void *ptr, char *buf, size_t size),
+	     int (*txv)(void *ptr, void *iovec, size_t count),
 	     void *ptr)
 {
 	buf->tx = tx;

@@ -31,11 +31,6 @@
  * @ingroup  Main
  * @{
  */
-enum tnt_auth {
-	TNT_AUTH_NONE,
-	TNT_AUTH_CHAP,
-	TNT_AUTH_SASL
-};
 
 enum tnt_proto {
 	TNT_PROTO_ADMIN,
@@ -57,11 +52,7 @@ enum tnt_opt_type {
 	TNT_OPT_SEND_BUF,
 	TNT_OPT_RECV_CB,
 	TNT_OPT_RECV_CB_ARG,
-	TNT_OPT_RECV_BUF,
-	TNT_OPT_AUTH,
-	TNT_OPT_AUTH_ID,
-	TNT_OPT_AUTH_KEY,
-	TNT_OPT_AUTH_MECH
+	TNT_OPT_RECV_BUF
 };
 /** @} */
 
@@ -79,12 +70,6 @@ struct tnt_opt {
 	void *recv_cb;
 	void *recv_cb_arg;
 	int recv_buf;
-	enum tnt_auth auth;
-	char *auth_id;
-	int auth_id_size;
-	unsigned char *auth_key;
-	int auth_key_size;
-	char *auth_mech;
 };
 
 void tnt_opt_init(struct tnt_opt *opt);

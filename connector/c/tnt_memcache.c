@@ -47,7 +47,7 @@ tnt_memcache_storage(struct tnt *t, char *cmd,
 		     int use_cas, unsigned long long cas)
 {
 	char buf[256];
-	int len;
+	ssize_t len;
 	if (use_cas)
 		len = snprintf(buf, sizeof(buf),
 			"%s %s %d %d %d %llu\r\n", cmd, key, flags, expire, size, cas);
@@ -63,7 +63,7 @@ tnt_memcache_storage(struct tnt *t, char *cmd,
 	v[2].iov_base = "\r\n";
 	v[2].iov_len  = 2;
 
-	int r = tnt_io_sendv_raw(t, v, 3);
+	ssize_t r = tnt_io_sendvu(t, v, 3);
 	if (r <= 0) {
 		t->error = TNT_ESYSTEM;
 		return -1;
@@ -173,7 +173,7 @@ tnt_memcache_get_tx(struct tnt *t, int cas, int count, char **keys)
 		}
 	}
 
-	int r = tnt_io_sendv_raw(t, v, vc);
+	ssize_t r = tnt_io_sendvu(t, v, vc);
 	tnt_mem_free(v);
 	if (r <= 0) {
 		t->error = TNT_ESYSTEM;
@@ -333,13 +333,13 @@ int
 tnt_memcache_delete(struct tnt *t, char *key, int time)
 {
 	char buf[256];
-	int len = snprintf(buf, sizeof(buf), "delete %s %d\r\n", key, time);
+	ssize_t len = snprintf(buf, sizeof(buf), "delete %s %d\r\n", key, time);
 
 	struct iovec v[1];
 	v[0].iov_base = buf;
 	v[0].iov_len = len;
 
-	int r = tnt_io_sendv_raw(t, v, 1);
+	ssize_t r = tnt_io_sendvu(t, v, 1);
 	if (r <= 0) {
 		t->error = TNT_ESYSTEM;
 		return -1;
@@ -370,7 +370,7 @@ tnt_memcache_unary(struct tnt *t, char *cmd,
 	v[0].iov_base = buf;
 	v[0].iov_len  = len;
 
-	int r = tnt_io_sendv_raw(t, v, 1);
+	ssize_t r = tnt_io_sendvu(t, v, 1);
 	if (r <= 0) {
 		t->error = TNT_ESYSTEM;
 		return -1;
@@ -430,13 +430,13 @@ int
 tnt_memcache_flush_all(struct tnt *t, int time)
 {
 	char buf[256];
-	int len = snprintf(buf, sizeof(buf), "flush_all %d\r\n", time);
+	ssize_t len = snprintf(buf, sizeof(buf), "flush_all %d\r\n", time);
 
 	struct iovec v[1];
 	v[0].iov_base = buf;
 	v[0].iov_len  = len;
 
-	int r = tnt_io_sendv_raw(t, v, 1);
+	ssize_t r = tnt_io_sendvu(t, v, 1);
 	if (r <= 0) {
 		t->error = TNT_ESYSTEM;
 		return -1;

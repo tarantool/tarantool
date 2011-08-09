@@ -43,17 +43,17 @@ enum tnt_update_type {
 /** @} */
 
 struct tnt_update_op {
-	char op;
-	int field;
+	uint8_t op;
+	uint32_t field;
 	char *data;
-	unsigned int size;
-	unsigned int size_leb;
+	uint32_t size;
+	uint32_t size_leb;
 	STAILQ_ENTRY(tnt_update_op) next;
 };
 
 struct tnt_update {
-	unsigned int count;
-	unsigned int size_enc;
+	uint32_t count;
+	uint32_t size_enc;
 	STAILQ_HEAD(,tnt_update_op) list;
 };
 

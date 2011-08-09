@@ -90,7 +90,7 @@ int tnt_set(struct tnt *t, enum tnt_opt_type name, ...);
  * @param alloc allocator function pointer 
  * @returns previous allocator pointer
  */
-void *tnt_set_allocator(void *(*alloc)(void *ptr, int size));
+void *tnt_set_allocator(void *(*alloc)(void *ptr, size_t size));
 
 /** @} */
 

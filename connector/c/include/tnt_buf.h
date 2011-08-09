@@ -28,17 +28,17 @@
 
 struct tnt_buf {
 	char *buf;
-	int off;
-	int top;
-	int size;
-	int (*tx)(void *ptr, char *buf, int size);
-	int (*txv)(void *ptr, void *iovec, int count);
+	size_t off;
+	size_t top;
+	size_t size;
+	ssize_t (*tx)(void *ptr, char *buf, size_t size);
+	ssize_t (*txv)(void *ptr, void *iovec, size_t count);
 	void *ptr;
 };
 
 int tnt_buf_init(struct tnt_buf *buf, int size,
-		 int (*tx)(void *ptr, char *buf, int size),
-		 int (*txv)(void *ptr, void *iovec, int count),
+		 ssize_t (*tx)(void *ptr, char *buf, size_t size),
+		 ssize_t (*txv)(void *ptr, void *iovec, size_t count),
 		 void *ptr);
 
 void tnt_buf_free(struct tnt_buf *buf);

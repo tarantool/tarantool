@@ -126,7 +126,8 @@ tnt_io_connect_do(struct tnt *t, char *host, int port)
 						}
 
 						/* calculate timeout last time */
-						int64_t passd_usec = (curr.tv_sec - start_connect.tv_sec) * micro + (curr.tv_usec - start_connect.tv_usec);
+						int64_t passd_usec = (curr.tv_sec - start_connect.tv_sec) * micro +
+							(curr.tv_usec - start_connect.tv_usec);
 						int64_t curr_tmeout = passd_usec - tmout_usec;
 						if (curr_tmeout <= 0) {
 							/* timeout */
@@ -256,10 +257,10 @@ tnt_io_flush(struct tnt *t)
 	return TNT_EOK;
 }
 
-int
-tnt_io_send_raw(struct tnt *t, char *buf, int size)
+ssize_t
+tnt_io_send_raw(struct tnt *t, char *buf, size_t size)
 {
-	int result;
+	ssize_t result;
 	if (t->sbuf.tx)
 		result = t->sbuf.tx(t->sbuf.buf, buf, size);
 	else {
@@ -272,15 +273,15 @@ tnt_io_send_raw(struct tnt *t, char *buf, int size)
 	return result;
 }
 
-int
-tnt_io_sendv_raw(struct tnt *t, void *iovec, int count)
+ssize_t
+tnt_io_sendv_raw(struct tnt *t, struct iovec *iov, size_t count)
 {
-	int result;
+	ssize_t result;
 	if (t->sbuf.txv)
-		result = t->sbuf.txv(t->sbuf.buf, iovec, count);
+		result = t->sbuf.txv(t->sbuf.buf, iov, count);
 	else {
 		do {
-			result = writev(t->fd, iovec, count);
+			result = writev(t->fd, iov, count);
 		} while (result == -1 && (errno == EINTR || errno == EAGAIN));
 		if (result <= 0)
 			t->errno_ = errno;
@@ -289,9 +290,9 @@ tnt_io_sendv_raw(struct tnt *t, void *iovec, int count)
 }
 
 enum tnt_error
-tnt_io_send(struct tnt *t, char *buf, int size)
+tnt_io_send(struct tnt *t, char *buf, size_t size)
 {
-	int r, off = 0;
+	ssize_t r, off = 0;
 	do {
 		r = tnt_io_send_raw(t, buf + off, size - off);
 		if (r <= 0)
@@ -301,34 +302,58 @@ tnt_io_send(struct tnt *t, char *buf, int size)
 	return TNT_EOK;
 }
 
-inline static void
-tnt_io_sendv_put(struct tnt *t, void *iovec, int count)
+/** sendv unbufferized version */
+enum tnt_error
+tnt_io_sendvu(struct tnt *t, struct iovec *iov, size_t count)
 {
-	int i;
+       	ssize_t r = 0;
+	ssize_t bytes = 0;
+	while (count > 0) {
+		bytes += r = tnt_io_sendv_raw(t, iov, count);
+		if (r <= 0)
+			return TNT_ESYSTEM;
+		while (count > 0) {
+			if (iov->iov_len > r) {
+				iov->iov_base += r;
+				iov->iov_len -= r;
+				break;
+			} else {
+				r -= iov->iov_len;
+				iov++;
+				count--;
+			}
+		}
+	}
+	return TNT_EOK;
+}
+
+inline static void
+tnt_io_sendv_put(struct tnt *t, struct iovec *iov, size_t count)
+{
+	size_t i;
 	for (i = 0 ; i < count ; i++) {
-		memcpy(t->sbuf.buf + t->sbuf.off,  
-			((struct iovec*)iovec)[i].iov_base,
-			((struct iovec*)iovec)[i].iov_len);
-		t->sbuf.off += ((struct iovec*)iovec)[i].iov_len;
+		memcpy(t->sbuf.buf + t->sbuf.off,
+		       iov[i].iov_base,
+		       iov[i].iov_len);
+		t->sbuf.off += iov[i].iov_len;
 	}
 }
 
+/** sendv bufferized version */
 enum tnt_error
-tnt_io_sendv(struct tnt *t, void *iovec, int count)
+tnt_io_sendv(struct tnt *t, struct iovec *iov, size_t count)
 {
-	if (t->sbuf.buf == NULL) {
-		int r = tnt_io_sendv_raw(t, iovec, count);
-		return (r > 0) ?  TNT_EOK : TNT_ESYSTEM;
-	}
+	if (t->sbuf.buf == NULL)
+		return tnt_io_sendvu(t, iov, count);
 
-	int i, size = 0;
+	size_t i, size = 0;
 	for (i = 0 ; i < count ; i++)
-		size += ((struct iovec*)iovec)[i].iov_len;
+		size += iov[i].iov_len;
 	if (size > t->sbuf.size)
 		return TNT_EBIG;
 
 	if ((t->sbuf.off + size) <= t->sbuf.size) {
-		tnt_io_sendv_put(t, iovec, count);
+		tnt_io_sendv_put(t, iov, count);
 		return TNT_EOK;
 	}
 
@@ -337,14 +362,14 @@ tnt_io_sendv(struct tnt *t, void *iovec, int count)
 		return r;
 
 	t->sbuf.off = 0;
-	tnt_io_sendv_put(t, iovec, count);
+	tnt_io_sendv_put(t, iov, count);
 	return TNT_EOK;
 }
 
-int
-tnt_io_recv_raw(struct tnt *t, char *buf, int size)
+ssize_t
+tnt_io_recv_raw(struct tnt *t, char *buf, size_t size)
 {
-	int result;
+	ssize_t result;
 	if (t->rbuf.tx)
 		result = t->rbuf.tx(t->rbuf.buf, buf, size);
 	else {
@@ -358,10 +383,10 @@ tnt_io_recv_raw(struct tnt *t, char *buf, int size)
 }
 
 inline static enum tnt_error
-tnt_io_recv_asis(struct tnt *t, char *buf, int size, int off)
+tnt_io_recv_asis(struct tnt *t, char *buf, size_t size, size_t off)
 {
 	do {
-		int r = tnt_io_recv_raw(t, buf + off, size - off);
+		ssize_t r = tnt_io_recv_raw(t, buf + off, size - off);
 		if (r <= 0)
 			return TNT_ESYSTEM;
 		off += r;
@@ -370,12 +395,12 @@ tnt_io_recv_asis(struct tnt *t, char *buf, int size, int off)
 }
 
 enum tnt_error
-tnt_io_recv(struct tnt *t, char *buf, int size)
+tnt_io_recv(struct tnt *t, char *buf, size_t size)
 {
 	if (t->rbuf.buf == NULL)
 		return tnt_io_recv_asis(t, buf, size, 0);
 
-	int lv, rv, off = 0, left = size;
+	size_t lv, rv, off = 0, left = size;
 	while (1) {
 		if ((t->rbuf.off + left) <= t->rbuf.top) {
 			memcpy(buf + off, t->rbuf.buf + t->rbuf.off, left);

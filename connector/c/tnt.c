@@ -29,6 +29,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <unistd.h>
+#include <sys/uio.h>
+
 #include <tnt_error.h>
 #include <tnt_mem.h>
 #include <tnt_opt.h>
@@ -84,7 +87,7 @@ tnt_set(struct tnt *t, enum tnt_opt_type name, ...)
 }
 
 void*
-tnt_set_allocator(void *(*alloc)(void *ptr, int size))
+tnt_set_allocator(void *(*alloc)(void *ptr, size_t size))
 {
 	return tnt_mem_init(alloc);
 }

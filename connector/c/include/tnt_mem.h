@@ -26,9 +26,9 @@
  * SUCH DAMAGE.
  */
 
-void *tnt_mem_init(void *(*realloc_)(void *ptr, int size));
-void *tnt_mem_alloc(int size);
-void *tnt_mem_realloc(void *ptr, int size);
+void *tnt_mem_init(void *(*realloc_)(void *ptr, size_t size));
+void *tnt_mem_alloc(size_t size);
+void *tnt_mem_realloc(void *ptr, size_t size);
 char *tnt_mem_dup(char *sz);
 void tnt_mem_free(void *ptr);
 
