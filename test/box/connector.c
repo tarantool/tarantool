@@ -25,10 +25,7 @@ test_assert(char *file, int line, int expr, char *exprsz)
 static void
 test_error(struct tnt *t, char *name)
 {
-	printf("%s failed: %s", name, tnt_strerror(t));
-	if (tnt_error(t) == TNT_ESYSTEM)
-		printf("(%s)", strerror(tnt_errno(t)));
-	printf("\n");
+	printf("%s failed: %s\n", name, tnt_strerror(t));
 }
 
 static int

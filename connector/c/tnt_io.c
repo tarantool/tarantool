@@ -97,31 +97,56 @@ tnt_io_connect_do(struct tnt *t, char *host, int port)
 	if (connect(t->fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
 		if (errno == EINPROGRESS) {
 			/** waiting for connection while handling signal events */
-			fd_set fds;
-			struct timeval begin, end;
+			const int64_t micro = 1000000;
+			int64_t tmout_usec = t->opt.tmout_connect * micro;
+			/* get start connect time */
+			struct timeval start_connect;
+			if (gettimeofday(&start_connect, NULL) == -1) {
+				t->errno_ = errno;
+				return TNT_ESYSTEM;
+			}
+
+			/* set initial timer */
 			struct timeval tmout;
-			int tc = t->opt.tmout_connect;
-			gettimeofday(&begin, NULL);
+			tmout.tv_sec  = t->opt.tmout_connect;
+			tmout.tv_usec = 0;
 			while (1) {
+				fd_set fds;
 				FD_ZERO(&fds);
 				FD_SET(t->fd, &fds);
-				tmout.tv_sec  = tc;
-				tmout.tv_usec = 0;
-				if (select(t->fd + 1, NULL, &fds, NULL, &tmout) == -1) {
+
+				int ret = select(t->fd + 1, NULL, &fds, NULL, &tmout);
+				if (ret == -1) {
 					if (errno == EINTR || errno == EAGAIN) {
-						gettimeofday(&end, NULL);
-						tc = t->opt.tmout_connect - (end.tv_sec - begin.tv_sec);
-						if (tc <= 0)
-							break;
-						continue;
+						/* get current time */
+						struct timeval curr;
+						if (gettimeofday(&curr, NULL) == -1) {
+							t->errno_ = errno;
+							return TNT_ESYSTEM;
+						}
+
+						/* calculate timeout last time */
+						int64_t passd_usec = (curr.tv_sec - start_connect.tv_sec) * micro + (curr.tv_usec - start_connect.tv_usec);
+						int64_t curr_tmeout = passd_usec - tmout_usec;
+						if (curr_tmeout <= 0) {
+							/* timeout */
+							return TNT_ETMOUT;
+						}
+
+						tmout.tv_sec = curr_tmeout / micro;
+						tmout.tv_usec = curr_tmeout % micro;
+					} else {
+						t->errno_ = errno;
+						return TNT_ESYSTEM;
 					}
-					t->errno_ = errno;
-					return TNT_ESYSTEM;
+				} else if (ret == 0) {
+					/* timeout */
+					return TNT_ETMOUT;
+				} else {
+					/* we have a event on socket */
+					break;
 				}
-				break;
 			}
-			if (!FD_ISSET(t->fd, &fds))
-				return TNT_ETMOUT;
 
 			int opt = 0;
 			socklen_t len = sizeof(opt);
