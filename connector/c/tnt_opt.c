@@ -53,7 +53,6 @@ enum tnt_error
 tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
 	    va_list args)
 {
-	char *key;
 	switch (name) {
 	case TNT_OPT_PROTO:
 		opt->proto = va_arg(args, enum tnt_proto);
