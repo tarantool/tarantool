@@ -38,6 +38,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <limits.h>
 
 #include <tnt_queue.h>
 #include <tnt_error.h>
@@ -46,6 +47,10 @@
 #include <tnt_buf.h>
 #include <tnt_main.h>
 #include <tnt_io.h>
+
+#if !defined(MIN)
+#	define MIN(a, b) (a) < (b) ? (a) : (b)
+#endif /* !defined(MIN) */
 
 static enum tnt_error
 tnt_io_resolve(struct sockaddr_in *addr,
@@ -304,11 +309,11 @@ tnt_io_send(struct tnt *t, char *buf, size_t size)
 
 /** sendv unbufferized version */
 enum tnt_error
-tnt_io_sendvu(struct tnt *t, struct iovec *iov, int count)
+tnt_io_sendv_direct(struct tnt *t, struct iovec *iov, int count)
 {
        	ssize_t r = 0;
 	while (count > 0) {
-		r = tnt_io_sendv_raw(t, iov, count);
+		r = tnt_io_sendv_raw(t, iov, MIN(count, IOV_MAX));
 		if (r <= 0)
 			return TNT_ESYSTEM;
 		while (count > 0) {
@@ -343,7 +348,7 @@ enum tnt_error
 tnt_io_sendv(struct tnt *t, struct iovec *iov, int count)
 {
 	if (t->sbuf.buf == NULL)
-		return tnt_io_sendvu(t, iov, count);
+		return tnt_io_sendv_direct(t, iov, count);
 
 	size_t i, size = 0;
 	for (i = 0 ; i < count ; i++)
