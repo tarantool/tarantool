@@ -43,6 +43,7 @@ void prelease_after(struct palloc_pool *pool, size_t after);
 struct palloc_pool *palloc_create_pool(const char *name);
 void palloc_destroy_pool(struct palloc_pool *);
 void palloc_free_unused(void);
+/* Set a name of this pool. Does not copy the argument name. */
 void palloc_set_name(struct palloc_pool *, const char *);
 size_t palloc_allocated(struct palloc_pool *);
 

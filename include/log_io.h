@@ -33,6 +33,7 @@
 #include <tbuf.h>
 #include <util.h>
 #include <palloc.h>
+#include <netinet/in.h> /* struct sockaddr_in */
 
 struct tbuf;
 
@@ -109,6 +110,7 @@ struct recovery_state {
 	/* row_handler will be presented by most recent format of data
 	   log_io_class->reader is responsible of converting data from old format */
 	row_handler *row_handler;
+	struct sockaddr_in remote_addr;
 	struct fiber *remote_recovery;
 
 	ev_timer wal_timer;

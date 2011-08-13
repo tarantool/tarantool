@@ -145,9 +145,9 @@ fiber_wakeup(struct fiber *f)
  * Currently cancellation can only be synchronous: this call
  * returns only when the subject fiber has terminated.
  *
- * The fiber which is cancelled, has tnt_FiberCancelException
- * raised in it. For cancellation to work, this exception type
- * should be re-raised whenever (if) it is caught.
+ * The fiber which is cancelled, has FiberCancelException raised
+ * in it. For cancellation to work, this exception type should be
+ * re-raised whenever (if) it is caught.
  */
 
 void
@@ -174,7 +174,7 @@ fiber_cancel(struct fiber *f)
 
 
 /** Test if this fiber is in a cancellable state and was indeed
- * cancelled, and raise an exception (tnt_FiberCancelException) if
+ * cancelled, and raise an exception (FiberCancelException) if
  * that's the case.
  */
 
@@ -421,7 +421,6 @@ fiber_zombificate()
 {
 	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
-	fiber->data = NULL;
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	fiber->flags = 0;
@@ -545,7 +544,7 @@ fiber_destroy_all()
 }
 
 
-char *
+const char *
 fiber_peer_name(struct fiber *fiber)
 {
 	struct sockaddr_in peer;
@@ -1058,7 +1057,7 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		c->out->flags |= FIBER_READING_INBOX;
 		return c;
 	} else {
-		char child_name[sizeof(fiber->name)];
+		char child_name[FIBER_NAME_MAXLEN];
 		/*
 		 * Move to an own process group, to not receive
 		 * signals from the controlling tty.
@@ -1077,7 +1076,7 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 static void
 tcp_server_handler(void *data)
 {
-	struct fiber_server *server = fiber->data;
+	struct fiber_server *server = (void*) data;
 	struct fiber *h;
 	char name[FIBER_NAME_MAXLEN];
 	int fd;
@@ -1109,7 +1108,7 @@ tcp_server_handler(void *data)
 			}
 
 			snprintf(name, sizeof(name), "%i/handler", server->port);
-			h = fiber_create(name, fd, -1, server->handler, data);
+			h = fiber_create(name, fd, -1, server->handler, server->data);
 			if (h == NULL) {
 				say_error("can't create handler fiber, dropping client connection");
 				close(fd);
@@ -1136,12 +1135,13 @@ fiber_server(const char *name, int port, void (*handler) (void *data), void *dat
 	struct fiber *s;
 
 	snprintf(server_name, sizeof(server_name), "%i/%s", port, name);
-	s = fiber_create(server_name, -1, -1, tcp_server_handler, data);
-	s->data = server = palloc(eter_pool, sizeof(struct fiber_server));
+	server = palloc(eter_pool, sizeof(struct fiber_server));
 	assert(server != NULL);
+	server->data = data;
 	server->port = port;
 	server->handler = handler;
 	server->on_bind = on_bind;
+	s = fiber_create(server_name, -1, -1, tcp_server_handler, server);
 
 	fiber_call(s);		/* give a handler a chance */
 	return s;

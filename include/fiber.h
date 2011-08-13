@@ -92,16 +92,14 @@ struct fiber {
 
 	struct ring *inbox;
 
+	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];
 	void (*f) (void *);
 	void *f_data;
 
-	void *data;
-	/** Information about the last error. */
-	void *diagnostics;
-
 	u64 cookie;
 	bool has_peer;
+	/* ASCIIZ name of the peer, if there is one. */
 	char peer_name[32];
 
 	u32 flags;
@@ -179,7 +177,7 @@ bool write_inbox(struct fiber *recipient, struct tbuf *msg);
 int inbox_size(struct fiber *recipient);
 void wait_inbox(struct fiber *recipient);
 
-char *fiber_peer_name(struct fiber *fiber);
+const char *fiber_peer_name(struct fiber *fiber);
 ssize_t fiber_read(void *buf, size_t count);
 ssize_t fiber_write(const void *buf, size_t count);
 int fiber_close(void);
