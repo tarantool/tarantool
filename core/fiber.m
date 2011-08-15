@@ -1296,3 +1296,10 @@ fiber_init(void)
 	fiber = &sched;
 	last_used_fid = 100;
 }
+
+void
+fiber_free(void)
+{
+	fiber_destroy_all();
+	kh_destroy(fid2fiber, fibers_registry);
+}

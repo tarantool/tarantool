@@ -270,6 +270,8 @@ acceptor_send_sock(int client_sock)
 	iov[0].iov_base = &cmd_code;
 	iov[0].iov_len = sizeof(cmd_code);
 
+	memset(&msg, 0, sizeof(msg));
+
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
 	msg.msg_iov = iov;
@@ -409,13 +411,13 @@ spawner_shutdown()
 	/* kill all children */
 	spawner_shutdown_children();
 
+	//tarantool_free();
 	exit(EXIT_SUCCESS);
 }
 
 /** Replication spawner signal handler for terminating signals. */
 static void spawner_signal_handler(int signal)
 {
-	say_info("Exiting: %s", strsignal(signal));
 	spawner.killed = signal;
 }
 
@@ -429,13 +431,11 @@ spawner_sigchld_handler(int signo __attribute__((unused)))
 		switch (pid) {
 		case -1:
 			if (errno != ECHILD)
-				say_syserror("waitpid");
+				write(sayfd, "spawner: waitpid() failed\n", 26);
 		case 0: /* no more changes in children status */
 			return;
 		default:
 			spawner.child_count--;
-			say_info("child finished: pid = %d, exit status = %d",
-				 (int) pid, WEXITSTATUS(exit_status));
 		}
 	} while (spawner.child_count > 0);
 }

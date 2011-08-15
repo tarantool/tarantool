@@ -11,14 +11,16 @@ master_sql = master.sql
 hot_standby = TarantoolBoxServer()
 hot_standby.deploy("box_replication/cfg/hot_standby.cfg",
                    hot_standby.find_exe(self.args.builddir),
-                   os.path.join(self.args.vardir, "hot_standby"), need_init=False)
+                   os.path.join(self.args.vardir, "hot_standby"), need_init=False,
+                   valgrind_sup="box_replication/valgrind.sup")
 hot_standby_sql = hot_standby.sql
 
 # replica server
 replica = TarantoolBoxServer()
 replica.deploy("box_replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
-               os.path.join(self.args.vardir, "replica"))
+               os.path.join(self.args.vardir, "replica"),
+               valgrind_sup="box_replication/valgrind.sup")
 replica_sql = replica.sql
 
 # Begin tuple id

@@ -126,6 +126,7 @@ void fiber_register_cleanup(fiber_cleanup_handler handler, void *data);
 extern struct fiber *fiber;
 
 void fiber_init(void);
+void fiber_free(void);
 struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
 void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for_child(pid_t pid);

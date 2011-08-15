@@ -53,6 +53,7 @@ int snapshot(void * /* ev */, int /* events */);
 const char *tarantool_version(void);
 void tarantool_info(struct tbuf *out);
 double tarantool_uptime(void);
+void tarantool_free(void);
 
 char **init_set_proc_title(int argc, char **argv);
 void free_proc_title(int argc, char **argv);

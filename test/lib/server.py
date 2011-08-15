@@ -51,7 +51,9 @@ def prepare_gdb(args):
 def prepare_valgrind(args, valgrind_log, valgrind_sup):
     "Prepare server startup arguments to run under valgrind."
     args = [ "valgrind", "--log-file={0}".format(valgrind_log),
-             "--suppressions={0}".format(valgrind_sup), "--quiet" ] + args
+             "--suppressions={0}".format(valgrind_sup),
+             "--gen-suppressions=all", "--show-reachable=yes",
+             "--read-var-info=yes", "--quiet" ] + args
     return args
 
 def check_tmpfs_exists():
@@ -195,7 +197,7 @@ class Server(object):
         elif self.valgrind:
             args = prepare_valgrind(args, self.valgrind_log,
 			            os.path.abspath(os.path.join(self.vardir,
-						    self.default_suppression_name)))
+				    self.default_suppression_name)))
 
         if self.start_and_exit:
             self._start_and_exit(args)

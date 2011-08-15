@@ -1459,6 +1459,7 @@ mod_init(void)
 	static iproto_callback ro_callback = box_process_ro;
 
 	title("loading");
+	atexit(mod_free);
 
 	/* initialization namespaces */
 	namespace_init();

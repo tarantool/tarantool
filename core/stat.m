@@ -132,6 +132,14 @@ stat_init(void)
 }
 
 void
+stat_free(void)
+{
+	ev_timer_stop(&timer);
+	if (stats)
+		free(stats);
+}
+
+void
 stat_cleanup(int base, size_t max_idx)
 {
 	for (int i = base; i < max_idx; i++)

@@ -1193,6 +1193,7 @@ write_to_disk(void *_state, struct tbuf *t)
 	if (t == NULL) {
 		if (wal != NULL)
 			close_log(&wal);
+		recover_free((struct recovery_state*)_state);
 		return NULL;
 	}
 
@@ -1339,9 +1340,14 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 void
 recover_free(struct recovery_state *recovery)
 {
+	struct child *writer = recovery->wal_writer;
+	if (writer && writer->out && writer->out->fd > 0) {
+		close(writer->out->fd);
+		usleep(1000);
+	}
+
 	v11_class_free(recovery->snap_class);
 	v11_class_free(recovery->wal_class);
-	
 	if (recovery->current_wal)
 		close_log(&recovery->current_wal);
 }
