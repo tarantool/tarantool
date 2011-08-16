@@ -42,6 +42,7 @@
 
 #include <mod/box/box.h>
 #include <mod/box/index.h>
+#include <mod/box/tuple.h>
 
 const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
 const char *index_type_strs[] = { "HASH", "TREE", "\0" };

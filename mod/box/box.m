@@ -44,7 +44,7 @@
 #include <util.h>
 
 #include <cfg/tarantool_box_cfg.h>
-#include <mod/box/index.h>
+#include <mod/box/tuple.h>
 #include "memcached.h"
 #include "box_lua.h"
 
@@ -129,7 +129,7 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 	if (cardinality == 0)
 		tnt_raise(IllegalParams, :"tuple cardinality is 0");
 
-	if (data->len == 0 || data->len != tuple_length(data, cardinality))
+	if (data->len == 0 || data->len != valid_tuple(data, cardinality))
 		tnt_raise(IllegalParams, :"incorrect tuple length");
 
 	txn->tuple = tuple_alloc(data->len);
@@ -815,7 +815,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	case INSERT:
 		flags = read_u32(b);
 		cardinality = read_u32(b);
-		if (b->len != tuple_length(b, cardinality))
+		if (b->len != valid_tuple(b, cardinality))
 			abort();
 		tuple_print(buf, cardinality, b->data);
 		break;

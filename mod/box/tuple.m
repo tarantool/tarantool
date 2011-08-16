@@ -1,53 +1,40 @@
 /*
- * Copyright (C) 2011 Mail.RU
- * Copyright (C) 2011 Yuriy Vostrikov
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
 #include "tuple.h"
 
 #include <pickle.h>
 #include <salloc.h>
+#include "tbuf.h"
 
 #include "exception.h"
 
-/*
- * local functions declaraion
- */
-
-/** get next field */
-static void *
-next_field(void *f);
-
-/** print field value to tbuf */
-static void
-print_field(struct tbuf *buf, void *f);
-
-
-/*
- * tuple interface definition
- */
-
-/** Allocate tuple */
+/** Allocate a tuple */
 struct box_tuple *
 tuple_alloc(size_t size)
 {
@@ -65,11 +52,10 @@ tuple_alloc(size_t size)
 }
 
 /**
- * Clean-up tuple
- *
- * @pre tuple->refs + count >= 0
+ * Free the tuple.
+ * @pre tuple->refs  == 0
  */
-void
+static void
 tuple_free(struct box_tuple *tuple)
 {
 	say_debug("tuple_free(%p)", tuple);
@@ -78,8 +64,8 @@ tuple_free(struct box_tuple *tuple)
 }
 
 /**
- * Add count to tuple's reference counter. If tuple's refs counter down to
- * zero the tuple will be destroyed.
+ * Add count to tuple's reference counter.
+ * When the counter goes down to 0, the tuple is destroyed.
  *
  * @pre tuple->refs + count >= 0
  */
@@ -93,10 +79,18 @@ tuple_ref(struct box_tuple *tuple, int count)
 		tuple_free(tuple);
 }
 
+/** Get the next field from a tuple */
+static void *
+next_field(void *f)
+{
+	u32 size = load_varint32(&f);
+	return (u8 *)f + size;
+}
+
 /**
- * Get field from tuple
+ * Get a field from tuple.
  *
- * @returns field data if field is exist or NULL
+ * @returns field data if field exists or NULL
  */
 void *
 tuple_field(struct box_tuple *tuple, size_t i)
@@ -110,58 +104,6 @@ tuple_field(struct box_tuple *tuple, size_t i)
 		field = next_field(field);
 
 	return field;
-}
-
-/**
- * Tuple length.
- *
- * @returns tuple length in bytes, exception will be raised if error happen.
- */
-u32
-tuple_length(struct tbuf *buf, u32 cardinality)
-{
-	void *data = buf->data;
-	u32 len = buf->len;
-
-	for (int i = 0; i < cardinality; i++)
-		read_field(buf);
-
-	u32 r = len - buf->len;
-	buf->data = data;
-	buf->len = len;
-	return r;
-}
-
-/**
- * Print a tuple in yaml-compatible mode tp tbuf:
- * key: { value, value, value }
- */
-void
-tuple_print(struct tbuf *buf, uint8_t cardinality, void *f)
-{
-	print_field(buf, f);
-	tbuf_printf(buf, ": {");
-	f = next_field(f);
-
-	for (size_t i = 1; i < cardinality; i++, f = next_field(f)) {
-		print_field(buf, f);
-		if (likely(i + 1 < cardinality))
-			tbuf_printf(buf, ", ");
-	}
-	tbuf_printf(buf, "}\r\n");
-}
-
-
-/*
- * local function definition
- */
-
-/** get next field from tuple */
-static void *
-next_field(void *f)
-{
-	u32 size = load_varint32(&f);
-	return (u8 *)f + size;
 }
 
 /** print field to tbuf */
@@ -189,3 +131,21 @@ print_field(struct tbuf *buf, void *f)
 	}
 }
 
+/**
+ * Print a tuple in yaml-compatible mode to tbuf:
+ * key: { value, value, value }
+ */
+void
+tuple_print(struct tbuf *buf, uint8_t cardinality, void *f)
+{
+	print_field(buf, f);
+	tbuf_printf(buf, ": {");
+	f = next_field(f);
+
+	for (size_t i = 1; i < cardinality; i++, f = next_field(f)) {
+		print_field(buf, f);
+		if (likely(i + 1 < cardinality))
+			tbuf_printf(buf, ", ");
+	}
+	tbuf_printf(buf, "}\r\n");
+}

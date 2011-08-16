@@ -189,6 +189,21 @@ read_str(struct tbuf *buf, u32 len)
 	return p;
 }
 
+u32
+valid_tuple(struct tbuf *buf, u32 cardinality)
+{
+	void *data = buf->data;
+	u32 r, len = buf->len;
+
+	for (int i = 0; i < cardinality; i++)
+		read_field(buf);
+
+	r = len - buf->len;
+	buf->data = data;
+	buf->len = len;
+	return r;
+}
+
 size_t
 varint32_sizeof(u32 value)
 {

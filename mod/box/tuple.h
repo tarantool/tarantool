@@ -1,81 +1,77 @@
-#if !defined(TARANTOOL_BOX_TUPLE_H_INCLUDED)
+#ifndef TARANTOOL_BOX_TUPLE_H_INCLUDED
 #define TARANTOOL_BOX_TUPLE_H_INCLUDED
 /*
- * Copyright (C) 2011 Mail.RU
- * Copyright (C) 2011 Yuriy Vostrikov
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
 #include <util.h>
-#include <tbuf.h>
 
-/**
- * tuple types definition
- */
+struct tbuf;
 
 /** tuple's flags */
 enum tuple_flags {
-	/** locked flag */
+	/** Waiting on WAL write to complete. */
 	WAL_WAIT = 0x1,
-	/** tuple in the ghost mode. New primari key created but not
-	    already commited to wal. */
+	/** A new primary key is created but not yet written to WAL. */
 	GHOST = 0x2,
 };
 
-/** box tuple */
+/**
+ * An atom of Tarantool/Box storage. Consists of a list of fields.
+ * The first field is always the primary key.
+ */
 struct box_tuple
 {
-	/** tuple reference cunter */
+	/** reference counter */
 	u16 refs;
-	/** flags */
+	/* see enum tuple_flags */
 	u16 flags;
-	/** tuple size */
+	/** length of the variable part of the tuple */
 	u32 bsize;
-	/** fields number in the tuple */
+	/** number of fields in the variable part. */
 	u32 cardinality;
-	/** fields */
+	/**
+	 * Fields can have variable length, and thus are packed
+	 * into a contiguous byte array. Each field is prefixed
+	 * with BER-packed field length.
+	 */
 	u8 data[0];
 } __attribute__((packed));
 
-
-/*
- * tuple interface declaraion
+/** Allocate a tuple
+ *
+ * @param size  tuple->bsize
+ * @post tuple->refs = 1
  */
-
-/** Allocate tuple */
 struct box_tuple *
 tuple_alloc(size_t size);
 
 /**
- * Clean-up tuple
- *
- * @pre tuple->refs + count >= 0
- */
-void
-tuple_free(struct box_tuple *tuple);
-
-/**
- * Add count to tuple's reference counter. If tuple's refs counter down to
- * zero the tuple will be destroyed.
+ * Change tuple reference counter. If it has reached zero, free the tuple.
  *
  * @pre tuple->refs + count >= 0
  */
@@ -83,28 +79,18 @@ void
 tuple_ref(struct box_tuple *tuple, int count);
 
 /**
- * Get field from tuple
+ * Get a field from tuple by index.
  *
- * @returns field data if field is exist or NULL
+ * @returns field data if the field exists, or NULL
  */
 void *
 tuple_field(struct box_tuple *tuple, size_t i);
 
 /**
- * Tuple length.
- *
- * @returns tuple length in bytes, exception will be raised if error happen.
- */
-u32
-tuple_length(struct tbuf *buf, u32 cardinality);
-
-/**
- * Print a tuple in yaml-compatible mode tp tbuf:
+ * Print a tuple in yaml-compatible mode to tbuf:
  * key: { value, value, value }
  */
 void
 tuple_print(struct tbuf *buf, uint8_t cardinality, void *f);
-
-
-#endif /* !defined(TARANTOOL_BOX_TUPLE_H_INCLUDED) */
+#endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

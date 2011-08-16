@@ -46,6 +46,8 @@ void *read_str(struct tbuf *buf, u32 len);
 
 u32 pick_u32(void *data, void **rest);
 
+u32 valid_tuple(struct tbuf *buf, u32 cardinality);
+
 size_t varint32_sizeof(u32);
 
 inline static u32 load_varint32(void **data)

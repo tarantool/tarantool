@@ -26,14 +26,13 @@
  * SUCH DAMAGE.
  */
 
-#include <exception.h>
-#include <iproto.h>
+#include <mod/box/index.h>
+#include "exception.h"
+#include "iproto.h"
 #include <tbuf.h>
 
-#include <mod/box/index.h>
-#include <mod/box/tuple.h>
-
 struct tarantool_cfg;
+struct box_tuple;
 struct index;
 
 enum
