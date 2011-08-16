@@ -694,11 +694,25 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 }
 
 void
-add_iov_dup(const void *buf, size_t len)
+iov_add(const void *buf, size_t len)
+{
+	iov_ensure(1);
+	iov_add_unsafe(buf, len);
+}
+
+void
+iov_dup(const void *buf, size_t len)
 {
 	void *copy = palloc(fiber->gc_pool, len);
 	memcpy(copy, buf, len);
-	add_iov(copy, len);
+	iov_add(copy, len);
+}
+
+void
+iov_reset()
+{
+	fiber->iov_cnt = 0;	/* discard anything unwritten */
+	tbuf_reset(fiber->iov);
 }
 
 /**
@@ -706,7 +720,7 @@ add_iov_dup(const void *buf, size_t len)
  */
 
 ssize_t
-fiber_flush_output(void)
+iov_flush(void)
 {
 	ssize_t result, r = 0, bytes = 0;
 	struct iovec *iov = iovec(fiber->iov);
@@ -747,7 +761,7 @@ fiber_flush_output(void)
 	} else
 		result = bytes;
 
-	fiber_iov_reset();
+	iov_reset();
 	return result;
 }
 

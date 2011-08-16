@@ -92,7 +92,7 @@ box_snap_row(const struct tbuf *t)
 	return (struct box_snap_row *)t->data;
 }
 
-static void tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple);
+static void tuple_iov_add(struct box_txn *txn, struct box_tuple *tuple);
 
 
 void *
@@ -290,10 +290,10 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 	if (!(txn->flags & BOX_QUIET)) {
 		u32 tuples_affected = 1;
 
-		add_iov_dup(&tuples_affected, sizeof(uint32_t));
+		iov_dup(&tuples_affected, sizeof(uint32_t));
 
 		if (txn->flags & BOX_RETURN_TUPLE)
-			tuple_add_iov(txn, txn->tuple);
+			tuple_iov_add(txn, txn->tuple);
 	}
 }
 
@@ -538,15 +538,15 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 
 out:
 	if (!(txn->flags & BOX_QUIET)) {
-		add_iov_dup(&tuples_affected, sizeof(uint32_t));
+		iov_dup(&tuples_affected, sizeof(uint32_t));
 
 		if (txn->flags & BOX_RETURN_TUPLE)
-			tuple_add_iov(txn, txn->tuple);
+			tuple_iov_add(txn, txn->tuple);
 	}
 }
 
 static void
-tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple)
+tuple_iov_add(struct box_txn *txn, struct box_tuple *tuple)
 {
 	size_t len;
 
@@ -556,9 +556,9 @@ tuple_add_iov(struct box_txn *txn, struct box_tuple *tuple)
 
 	if (len > BOX_REF_THRESHOLD) {
 		tuple_txn_ref(txn, tuple);
-		add_iov(&tuple->bsize, len);
+		iov_add(&tuple->bsize, len);
 	} else {
-		add_iov_dup(&tuple->bsize, len);
+		iov_dup(&tuple->bsize, len);
 	}
 }
 
@@ -572,7 +572,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 		tnt_raise(IllegalParams, :"tuple count must be positive");
 
 	found = palloc(fiber->gc_pool, sizeof(*found));
-	add_iov(found, sizeof(*found));
+	iov_add(found, sizeof(*found));
 	*found = 0;
 
 	if (txn->index->type == TREE) {
@@ -605,7 +605,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 					continue;
 				}
 
-				tuple_add_iov(txn, tuple);
+				tuple_iov_add(txn, tuple);
 
 				if (limit == ++(*found))
 					break;
@@ -632,7 +632,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 				continue;
 			}
 
-			tuple_add_iov(txn, tuple);
+			tuple_iov_add(txn, tuple);
 			(*found)++;
 		}
 	}
@@ -663,10 +663,10 @@ prepare_delete(struct box_txn *txn, void *key)
 	}
 
 	if (!(txn->flags & BOX_QUIET)) {
-		add_iov_dup(&tuples_affected, sizeof(tuples_affected));
+		iov_dup(&tuples_affected, sizeof(tuples_affected));
 
 		if (txn->old_tuple && (txn->flags & BOX_RETURN_TUPLE))
-			tuple_add_iov(txn, txn->old_tuple);
+			tuple_iov_add(txn, txn->old_tuple);
 	}
 }
 
@@ -1582,7 +1582,7 @@ void mod_convert_iov_to_yaml(struct tbuf *out)
 			/*
 			 * Sic, we can't access tuple->flags or
 			 * tuple->refs since they may point
-			 * to nowhere, @sa tuple_add_iov().
+			 * to nowhere, @sa tuple_iov_add().
 			 */
 			struct box_tuple *tuple = iov->iov_base -
 				offsetof(struct box_tuple, bsize);
