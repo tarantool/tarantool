@@ -1,8 +1,8 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+#ifndef TNT_IO_H_INCLUDED
+#define TNT_IO_H_INCLUDED
+
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +26,19 @@
  * SUCH DAMAGE.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-#include "util.h"
+enum tnt_error tnt_io_connect(struct tnt *t, char *host, int port);
+void tnt_io_close(struct tnt *t);
+enum tnt_error tnt_io_flush(struct tnt *t);
 
-struct tbuf;
+ssize_t tnt_io_send_raw(struct tnt *t, char *buf, size_t size);
+ssize_t tnt_io_sendv_raw(struct tnt *t, struct iovec *iov, int count);
+enum tnt_error tnt_io_send(struct tnt *t, char *buf, size_t size);
+enum tnt_error tnt_io_sendv(struct tnt *t, struct iovec *iov, int count);
+enum tnt_error tnt_io_sendv_direct(struct tnt *t, struct iovec *iov, int count);
 
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-size_t palloc_allocated(struct palloc_pool *);
+ssize_t tnt_io_recv_raw(struct tnt *t, char *buf, size_t size);
+enum tnt_error tnt_io_recv(struct tnt *t, char *buf, size_t size);
+enum tnt_error tnt_io_recv_char(struct tnt *t, char buf[1]);
+enum tnt_error tnt_io_recv_expect(struct tnt *t, char *sz);
 
-void palloc_stat(struct tbuf *buf);
-
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+#endif /* TNT_IO_H_INCLUDED */

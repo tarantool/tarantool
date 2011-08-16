@@ -1,8 +1,6 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +24,56 @@
  * SUCH DAMAGE.
  */
 
-#include <stddef.h>
+#include <stdlib.h>
 #include <stdint.h>
-#include "util.h"
+#include <stdio.h>
+#include <string.h>
 
-struct tbuf;
+#include <sys/types.h>
+#include <sys/uio.h>
 
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-size_t palloc_allocated(struct palloc_pool *);
+#include <tnt_queue.h>
+#include <tnt_error.h>
+#include <tnt_mem.h>
+#include <tnt_opt.h>
+#include <tnt_buf.h>
+#include <tnt_main.h>
+#include <tnt_io.h>
+#include <tnt_tuple.h>
+#include <tnt_proto.h>
+#include <tnt_leb128.h>
+#include <tnt_select.h>
 
-void palloc_stat(struct tbuf *buf);
+int
+tnt_select(struct tnt *t, int reqid, int ns, int index, int offset,
+	   int limit, struct tnt_tuples *tuples)
+{
+	char *data_enc;
+	unsigned int data_enc_size;
+	t->error = tnt_tuples_pack(tuples, &data_enc, &data_enc_size);
+	if (t->error != TNT_EOK)
+		return -1;
 
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+	struct tnt_proto_header hdr;
+	hdr.type  = TNT_PROTO_TYPE_SELECT;
+	hdr.len   = sizeof(struct tnt_proto_select) + data_enc_size;
+	hdr.reqid = reqid;
+
+	struct tnt_proto_select hdr_sel;
+	hdr_sel.ns     = ns;
+	hdr_sel.index  = index;
+	hdr_sel.offset = offset;
+	hdr_sel.limit  = limit;
+
+	struct iovec v[3];
+	v[0].iov_base = &hdr;
+	v[0].iov_len  = sizeof(struct tnt_proto_header);
+	v[1].iov_base = &hdr_sel;
+	v[1].iov_len  = sizeof(struct tnt_proto_select);
+	v[2].iov_base = data_enc;
+	v[2].iov_len  = data_enc_size;
+
+	t->error = tnt_io_sendv(t, v, 3);
+	tnt_mem_free(data_enc);
+	return (t->error == TNT_EOK) ? 0 : -1;
+}

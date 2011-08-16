@@ -1,8 +1,8 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+#ifndef TNT_MEMCACHE_VAL_H_INCLUDED
+#define TNT_MEMCACHE_VAL_H_INCLUDED
+
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +26,26 @@
  * SUCH DAMAGE.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-#include "util.h"
+struct tnt_memcache_val {
+	int flags;
+	unsigned long long cas;
+	char *key;
+	char *value;
+	unsigned int value_size;
+};
 
-struct tbuf;
+struct tnt_memcache_vals {
+	unsigned int count;
+	struct tnt_memcache_val *values;
+};
 
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-size_t palloc_allocated(struct palloc_pool *);
+#define TNT_MEMCACHE_VAL_COUNT(VS) \
+	((VS)->count)
+#define TNT_MEMCACHE_VAL_GET(VS, IDX) \
+	(&(VS)->values[IDX])
 
-void palloc_stat(struct tbuf *buf);
+void tnt_memcache_val_init(struct tnt_memcache_vals *values);
+void tnt_memcache_val_free(struct tnt_memcache_vals *values);
+int tnt_memcache_val_alloc(struct tnt_memcache_vals *values, int count);
 
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+#endif /* TNT_MEMCACHE_VAL_H_INCLUDED */

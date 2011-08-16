@@ -1,8 +1,6 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +24,40 @@
  * SUCH DAMAGE.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-#include "util.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
-struct tbuf;
+#include <unistd.h>
+#include <sys/uio.h>
 
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-size_t palloc_allocated(struct palloc_pool *);
+#include <tnt_error.h>
+#include <tnt_mem.h>
+#include <tnt_buf.h>
 
-void palloc_stat(struct tbuf *buf);
+int
+tnt_buf_init(struct tnt_buf *buf, size_t size,
+	     tnt_buf_tx_t tx, tnt_buf_txv_t txv, void *ptr)
+{
+	buf->tx = tx;
+	buf->txv = txv;
+	buf->ptr = ptr;
+	buf->size = size;
+	buf->off = 0;
+	buf->top = 0;
+	buf->buf = NULL;
+	if (size > 0) {
+		buf->buf = tnt_mem_alloc(size);
+		if (buf->buf == NULL)
+			return -1;
+		memset(buf->buf, 0, size);
+	}
+	return 0;
+}
 
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+void
+tnt_buf_free(struct tnt_buf *buf)
+{
+	if (buf->buf)
+		tnt_mem_free(buf->buf);
+}

@@ -1,8 +1,8 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+#ifndef LIBTNT_H_INCLUDED
+#define LIBTNT_H_INCLUDED
+
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +26,28 @@
  * SUCH DAMAGE.
  */
 
-#include <stddef.h>
 #include <stdint.h>
-#include "util.h"
+#include <stdarg.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/uio.h>
 
-struct tbuf;
+#include <tnt_queue.h>
+#include <tnt_error.h>
+#include <tnt_mem.h>
+#include <tnt_opt.h>
+#include <tnt_buf.h>
+#include <tnt_main.h>
+#include <tnt_io.h>
+#include <tnt_proto.h>
+#include <tnt_tuple.h>
+#include <tnt_insert.h>
+#include <tnt_update.h>
+#include <tnt_delete.h>
+#include <tnt_select.h>
+#include <tnt_ping.h>
+#include <tnt_recv.h>
+#include <tnt_memcache_val.h>
+#include <tnt_memcache.h>
 
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-size_t palloc_allocated(struct palloc_pool *);
-
-void palloc_stat(struct tbuf *buf);
-
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+#endif /* LIBTNT_H_INCLUDED */

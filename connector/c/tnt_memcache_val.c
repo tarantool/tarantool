@@ -1,8 +1,6 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +24,46 @@
  * SUCH DAMAGE.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-#include "util.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
 
-struct tbuf;
+#include <sys/types.h>
+#include <sys/uio.h>
 
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-size_t palloc_allocated(struct palloc_pool *);
+#include <tnt_error.h>
+#include <tnt_mem.h>
+#include <tnt_memcache_val.h>
 
-void palloc_stat(struct tbuf *buf);
+void
+tnt_memcache_val_init(struct tnt_memcache_vals *values)
+{
+	values->count = 0;
+	values->values = NULL;
+}
 
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+void
+tnt_memcache_val_free(struct tnt_memcache_vals *values)
+{
+	unsigned int i;
+	for (i = 0 ; i < values->count ; i++) {
+		if (values->values[i].key)
+			tnt_mem_free(values->values[i].key);
+		if (values->values[i].value)
+			tnt_mem_free(values->values[i].value);
+	}
+	if (values->values)
+		tnt_mem_free(values->values);
+}
+
+int
+tnt_memcache_val_alloc(struct tnt_memcache_vals *values, int count)
+{
+	values->values = tnt_mem_alloc(sizeof(struct tnt_memcache_val) * count);
+	if (values->values == NULL)
+		return -1;
+	memset(values->values, 0, sizeof(struct tnt_memcache_val) * count);
+	values->count = count;
+	return 0;
+}

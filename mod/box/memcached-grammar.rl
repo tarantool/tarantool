@@ -252,18 +252,18 @@ memcached_dispatch()
 				if (show_cas) {
 					struct tbuf *b = tbuf_alloc(fiber->gc_pool);
 					tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (u8 *)key, m->flags, value_len, m->cas);
-					add_iov_unsafe(b->data, b->len);
+					iov_add_unsafe(b->data, b->len);
 					stats.bytes_written += b->len;
 				} else {
-					add_iov_unsafe("VALUE ", 6);
-					add_iov_unsafe(key, key_len);
-					add_iov_unsafe(suffix, suffix_len);
+					iov_add_unsafe("VALUE ", 6);
+					iov_add_unsafe(key, key_len);
+					iov_add_unsafe(suffix, suffix_len);
 				}
-				add_iov_unsafe(value, value_len);
-				add_iov_unsafe("\r\n", 2);
+				iov_add_unsafe(value, value_len);
+				iov_add_unsafe("\r\n", 2);
 				stats.bytes_written += value_len + 2;
 			}
-			add_iov_unsafe("END\r\n", 5);
+			iov_add_unsafe("END\r\n", 5);
 			stats.bytes_written += 5;
 		}
 

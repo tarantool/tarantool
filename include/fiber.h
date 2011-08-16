@@ -92,16 +92,14 @@ struct fiber {
 
 	struct ring *inbox;
 
+	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];
 	void (*f) (void *);
 	void *f_data;
 
-	void *data;
-	/** Information about the last error. */
-	void *diagnostics;
-
 	u64 cookie;
 	bool has_peer;
+	/* ASCIIZ name of the peer, if there is one. */
 	char peer_name[32];
 
 	u32 flags;
@@ -146,7 +144,7 @@ void fiber_destroy_all();
 struct msg *read_inbox(void);
 int fiber_bread(struct tbuf *, size_t v);
 
-inline static void add_iov_unsafe(const void *buf, size_t len)
+inline static void iov_add_unsafe(const void *buf, size_t len)
 {
 	struct iovec *v;
 	assert(fiber->iov->size - fiber->iov->len >= sizeof(*v));
@@ -162,24 +160,19 @@ inline static void iov_ensure(size_t count)
 	tbuf_ensure(fiber->iov, sizeof(struct iovec) * count);
 }
 
-inline static void add_iov(const void *buf, size_t len)
-{
-	iov_ensure(1);
-	add_iov_unsafe(buf, len);
-}
+/* Add to fiber's iov vector. */
+void iov_add(const void *buf, size_t len);
+void iov_dup(const void *buf, size_t len);
+/* Reset the fiber's iov vector. */
+ssize_t iov_flush(void);
+/* Write everything in the fiber's iov vector to fiber socket. */
+void iov_reset();
 
-inline static void fiber_iov_reset()
-{
-	fiber->iov_cnt = 0;	/* discard anything unwritten */
-	tbuf_reset(fiber->iov);
-}
-
-void add_iov_dup(const void *buf, size_t len);
 bool write_inbox(struct fiber *recipient, struct tbuf *msg);
 int inbox_size(struct fiber *recipient);
 void wait_inbox(struct fiber *recipient);
 
-char *fiber_peer_name(struct fiber *fiber);
+const char *fiber_peer_name(struct fiber *fiber);
 ssize_t fiber_read(void *buf, size_t count);
 ssize_t fiber_write(const void *buf, size_t count);
 int fiber_close(void);

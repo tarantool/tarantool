@@ -164,5 +164,5 @@ tarantool_lua(struct lua_State *L,
 	else {
 		mod_convert_iov_to_yaml(out);
 	}
-	fiber_iov_reset();
+	iov_reset();
 }

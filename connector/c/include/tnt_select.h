@@ -1,8 +1,8 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+#ifndef TNT_SELECT_H_INCLUDED
+#define TNT_SELECT_H_INCLUDED
+
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +26,32 @@
  * SUCH DAMAGE.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-#include "util.h"
+/**
+ * @defgroup Select
+ * @ingroup  Operations
+ * @brief Select operation
+ *
+ * @{
+ */
 
-struct tbuf;
+/**
+ * Select operation.
+ *
+ * If bufferization is in use, then request would be placed in
+ * internal buffer for later sending. Otherwise, operation
+ * would be processed immediately.
+ *
+ * @param t handler pointer
+ * @param reqid user supplied integer value
+ * @param ns namespace number
+ * @param index index number
+ * @param offset offset
+ * @param limit offset
+ * @param tuples tuples object pointer
+ * @returns 0 on success, -1 on error
+ */
+int tnt_select(struct tnt *t, int reqid, int ns, int index, int offset,
+	       int limit, struct tnt_tuples *tuples);
+/** @} */
 
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-size_t palloc_allocated(struct palloc_pool *);
-
-void palloc_stat(struct tbuf *buf);
-
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+#endif /* TNT_SELECT_H_INCLUDED */

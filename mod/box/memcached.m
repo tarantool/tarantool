@@ -188,7 +188,7 @@ print_stats()
 	tbuf_printf(out, "STAT limit_maxbytes %"PRIu64"\r\n", (u64)(cfg.slab_alloc_arena * (1 << 30)));
 	tbuf_printf(out, "STAT threads 1\r\n");
 	tbuf_printf(out, "END\r\n");
-	add_iov(out->data, out->len);
+	iov_add(out->data, out->len);
 }
 
 static void
@@ -209,17 +209,17 @@ flush_all(void *data)
 do {										\
 	stats.cmd_set++;							\
 	if (bytes > (1<<20)) {							\
-		add_iov("SERVER_ERROR object too large for cache\r\n", 41);	\
+		iov_add("SERVER_ERROR object too large for cache\r\n", 41);	\
 	} else {								\
 		@try {								\
 			store(key, exptime, flags, bytes, data);		\
 			stats.total_items++;					\
-			add_iov("STORED\r\n", 8);				\
+			iov_add("STORED\r\n", 8);				\
 		}								\
 		@catch (ClientError *e) {					\
-			add_iov("SERVER_ERROR ", 13);				\
-			add_iov(e->errmsg, strlen(e->errmsg));			\
-			add_iov("\r\n", 2);					\
+			iov_add("SERVER_ERROR ", 13);				\
+			iov_add(e->errmsg, strlen(e->errmsg));			\
+			iov_add("\r\n", 2);					\
 		}								\
 	}									\
 } while (0)
@@ -258,7 +258,7 @@ memcached_handler(void *_data __attribute__((unused)))
 				goto dispatch;
 		}
 
-		r = fiber_flush_output();
+		r = iov_flush();
 		if (r < 0) {
 			say_debug("flush_output failed, closing connection");
 			goto exit;
@@ -273,7 +273,7 @@ memcached_handler(void *_data __attribute__((unused)))
 		}
 	}
 exit:
-        fiber_flush_output();
+        iov_flush();
 	fiber_sleep(0.01);
 	say_debug("exit");
 	stats.curr_connections--; /* FIXME: nonlocal exit via exception will leak this counter */

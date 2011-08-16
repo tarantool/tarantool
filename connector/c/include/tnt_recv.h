@@ -1,8 +1,8 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+#ifndef TNT_RECV_H_INCLUDED
+#define TNT_RECV_H_INCLUDED
+
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +26,56 @@
  * SUCH DAMAGE.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-#include "util.h"
+/**
+ * @defgroup Responce
+ * @brief Server responce
+ * @{
+ */
 
-struct tbuf;
+enum tnt_recv_op {
+	TNT_RECV_SELECT,
+	TNT_RECV_INSERT,
+	TNT_RECV_UPDATE,
+	TNT_RECV_DELETE,
+	TNT_RECV_PING
+};
 
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-size_t palloc_allocated(struct palloc_pool *);
+/** @} */
 
-void palloc_stat(struct tbuf *buf);
+struct tnt_recv {
+	enum tnt_recv_op op;
+	uint32_t reqid;
+	uint32_t code;
+	char *error;
+	uint32_t count;
+	struct tnt_tuples tuples;
+};
 
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+/** @addtogroup Responce
+ *  @{
+ */
+
+#define TNT_RECV_COUNT(R) \
+	((R)->count)
+
+#define TNT_RECV_CODE(R) \
+	((R)->code)
+
+#define TNT_RECV_ID(R) \
+	((R)->reqid)
+
+#define TNT_RECV_OP(R) \
+	((R)->op)
+
+#define TNT_RECV_FOREACH(R, N) \
+	TNT_TUPLES_FOREACH(&(R)->tuples, (N))
+
+void tnt_recv_init(struct tnt_recv *rcv);
+void tnt_recv_free(struct tnt_recv *rcv);
+
+char *tnt_recv_error(struct tnt_recv *rcv);
+int tnt_recv(struct tnt *t, struct tnt_recv *rcv);
+
+/** @} */
+
+#endif /* TNT_RECV_H_INCLUDED */

@@ -1,8 +1,8 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+#ifndef TNT_ERROR_H_INCLUDED
+#define TNT_ERROR_H_INCLUDED
+
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +26,21 @@
  * SUCH DAMAGE.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-#include "util.h"
+enum tnt_error {
+	TNT_EOK,
+	TNT_EFAIL,
+	TNT_EMEMORY,
+	TNT_ESYSTEM,
+	TNT_EBADVAL,
+	TNT_EBIG,
+	TNT_ESIZE,
+	TNT_ERESOLVE,
+	TNT_ETMOUT,
+	TNT_EPROTO,
+	TNT_EAUTH,
+	TNT_EEMPTY,
+	TNT_EERROR,
+	TNT_LAST
+};
 
-struct tbuf;
-
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-size_t palloc_allocated(struct palloc_pool *);
-
-void palloc_stat(struct tbuf *buf);
-
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+#endif /* TNT_ERROR_H_INCLUDED */

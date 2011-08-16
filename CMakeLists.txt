@@ -160,6 +160,7 @@ endif()
 #
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories("${PROJECT_SOURCE_DIR}/connector/c/include")
 include_directories("${PROJECT_BINARY_DIR}/include")
 
 #
@@ -226,6 +227,7 @@ add_subdirectory(cfg)
 add_subdirectory(connector)
 add_subdirectory(core)
 add_subdirectory(mod)
+add_subdirectory(client)
 add_subdirectory(test)
 add_subdirectory(doc EXCLUDE_FROM_ALL)
 
