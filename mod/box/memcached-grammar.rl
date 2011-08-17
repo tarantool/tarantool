@@ -64,7 +64,7 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple != NULL && !expired(tuple))
-				add_iov("NOT_STORED\r\n", 12);
+				iov_add("NOT_STORED\r\n", 12);
 			else
 				STORE;
 		}
@@ -73,7 +73,7 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
-				add_iov("NOT_STORED\r\n", 12);
+				iov_add("NOT_STORED\r\n", 12);
 			else
 				STORE;
 		}
@@ -82,9 +82,9 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
-				add_iov("NOT_FOUND\r\n", 11);
+				iov_add("NOT_FOUND\r\n", 11);
 			else if (meta(tuple)->cas != cas)
-				add_iov("EXISTS\r\n", 8);
+				iov_add("EXISTS\r\n", 8);
 			else
 				STORE;
 		}
@@ -97,7 +97,7 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST) {
-				add_iov("NOT_STORED\r\n", 12);
+				iov_add("NOT_STORED\r\n", 12);
 			} else {
 				value = tuple_field(tuple, 3);
 				value_len = load_varint32(&value);
@@ -126,7 +126,7 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
-				add_iov("NOT_FOUND\r\n", 11);
+				iov_add("NOT_FOUND\r\n", 11);
 			} else {
 				m = meta(tuple);
 				field = tuple_field(tuple, 3);
@@ -156,16 +156,16 @@ memcached_dispatch()
 					@try {
 						store(key, exptime, flags, bytes, data);
 						stats.total_items++;
-						add_iov(b->data, b->len);
-						add_iov("\r\n", 2);
+						iov_add(b->data, b->len);
+						iov_add("\r\n", 2);
 					}
 					@catch (ClientError *e) {
-						add_iov("SERVER_ERROR ", 13);
-						add_iov(e->errmsg, strlen(e->errmsg));
-						add_iov("\r\n", 2);
+						iov_add("SERVER_ERROR ", 13);
+						iov_add(e->errmsg, strlen(e->errmsg));
+						iov_add("\r\n", 2);
 					}
 				} else {
-					add_iov("CLIENT_ERROR cannot increment or decrement non-numeric value\r\n", 62);
+					iov_add("CLIENT_ERROR cannot increment or decrement non-numeric value\r\n", 62);
 				}
 			}
 
@@ -175,16 +175,16 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
-				add_iov("NOT_FOUND\r\n", 11);
+				iov_add("NOT_FOUND\r\n", 11);
 			} else {
 				@try {
 					delete(key);
-					add_iov("DELETED\r\n", 9);
+					iov_add("DELETED\r\n", 9);
 				}
 				@catch (ClientError *e) {
-					add_iov("SERVER_ERROR ", 13);
-					add_iov(e->errmsg, strlen(e->errmsg));
-					add_iov("\r\n", 2);
+					iov_add("SERVER_ERROR ", 13);
+					iov_add(e->errmsg, strlen(e->errmsg));
+					iov_add("\r\n", 2);
 				}
 			}
 		}
@@ -274,7 +274,7 @@ memcached_dispatch()
 					fiber_call(f);
 			} else
 				flush_all((void *)0);
-			add_iov("OK\r\n", 4);
+			iov_add("OK\r\n", 4);
 		}
 
 		action stats {
@@ -376,14 +376,14 @@ memcached_dispatch()
 		if (pe - p > (1 << 20)) {
 		exit:
 			say_warn("memcached proto error");
-			add_iov("ERROR\r\n", 7);
+			iov_add("ERROR\r\n", 7);
 			stats.bytes_written += 7;
 			return -1;
 		}
 		char *r;
 		if ((r = memmem(p, pe - p, "\r\n", 2)) != NULL) {
 			tbuf_peek(fiber->rbuf, r + 2 - (char *)fiber->rbuf->data);
-			add_iov("CLIENT_ERROR bad command line format\r\n", 38);
+			iov_add("CLIENT_ERROR bad command line format\r\n", 38);
 			return 1;
 		}
 		return 0;
