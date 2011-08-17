@@ -185,6 +185,7 @@ replication_prefork()
 		if (set_nonblock(master_to_spawner_sock) == -1)
 			panic("set_nonblock");
 	} else {
+		ev_default_fork();
 		/* child process: spawner */
 		close(sockpair[0]);
 		/*
@@ -411,7 +412,6 @@ spawner_shutdown()
 	/* kill all children */
 	spawner_shutdown_children();
 
-	//tarantool_free();
 	exit(EXIT_SUCCESS);
 }
 
@@ -452,6 +452,7 @@ spawner_create_replication_relay(int client_sock)
 	}
 
 	if (pid == 0) {
+		ev_default_fork();
 		close(spawner.sock);
 		replication_relay_loop(client_sock);
 	} else {

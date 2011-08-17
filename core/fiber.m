@@ -1059,6 +1059,10 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		c->out->flags |= FIBER_READING_INBOX;
 		return c;
 	} else {
+		/* it is safier to tell libev about fork, even
+		 * if child wont' use it. */
+		ev_default_fork();
+
 		char child_name[sizeof(fiber->name)];
 		/*
 		 * Move to an own process group, to not receive
