@@ -68,7 +68,8 @@ natoq(const u8 *start, const u8 *end)
 static void
 store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 {
-	u32 box_flags = BOX_QUIET, cardinality = 4;
+	u32 box_flags = 0;
+	u32 cardinality = 4;
 	static u64 cas = 42;
 	struct meta m;
 
@@ -97,6 +98,9 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
+
+	struct box_txn *txn = txn_begin();
+	txn->out = &box_out_quiet;
 	/*
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
@@ -108,13 +112,16 @@ static void
 delete(void *key)
 {
 	u32 key_len = 1;
-	u32 box_flags = BOX_QUIET;
+	u32 box_flags = 0;
 	struct tbuf *req = tbuf_alloc(fiber->gc_pool);
 
 	tbuf_append(req, &cfg.memcached_namespace, sizeof(u32));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
+
+	struct box_txn *txn = txn_begin();
+	txn->out = &box_out_quiet;
 
 	rw_callback(DELETE, req);
 }
@@ -190,6 +197,83 @@ print_stats()
 	tbuf_printf(out, "STAT threads 1\r\n");
 	tbuf_printf(out, "END\r\n");
 	iov_add(out->data, out->len);
+}
+
+void memcached_get(struct box_txn *txn, size_t keys_count, struct tbuf *keys,
+		   bool show_cas)
+{
+	txn->op = SELECT;
+	stat_collect(stat_base, MEMC_GET, 1);
+	stats.cmd_get++;
+	say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
+	iov_ensure(keys_count * 5 + 1);
+	while (keys_count-- > 0) {
+		struct box_tuple *tuple;
+		struct meta *m;
+		void *field;
+		void *value;
+		void *suffix;
+		u32 key_len;
+		u32 value_len;
+		u32 suffix_len;
+		u32 _l;
+
+		void *key = read_field(keys);
+		tuple = find(key);
+		key_len = load_varint32(&key);
+
+		if (tuple == NULL || tuple->flags & GHOST) {
+			stat_collect(stat_base, MEMC_GET_MISS, 1);
+			stats.get_misses++;
+			continue;
+		}
+
+		field = tuple->data;
+
+		/* skip key */
+		_l = load_varint32(&field);
+		field += _l;
+
+		/* metainfo */
+		_l = load_varint32(&field);
+		m = field;
+		field += _l;
+
+		/* suffix */
+		suffix_len = load_varint32(&field);
+		suffix = field;
+		field += suffix_len;
+
+		/* value */
+		value_len = load_varint32(&field);
+		value = field;
+
+		if (m->exptime > 0 && m->exptime < ev_now()) {
+			stats.get_misses++;
+			stat_collect(stat_base, MEMC_GET_MISS, 1);
+			continue;
+		}
+		stats.get_hits++;
+		stat_collect(stat_base, MEMC_GET_HIT, 1);
+
+		tuple_txn_ref(txn, tuple);
+
+		if (show_cas) {
+			struct tbuf *b = tbuf_alloc(fiber->gc_pool);
+			tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (u8 *)key, m->flags, value_len, m->cas);
+			iov_add_unsafe(b->data, b->len);
+			stats.bytes_written += b->len;
+		} else {
+			iov_add_unsafe("VALUE ", 6);
+			iov_add_unsafe(key, key_len);
+			iov_add_unsafe(suffix, suffix_len);
+		}
+		iov_add_unsafe(value, value_len);
+		iov_add_unsafe("\r\n", 2);
+		stats.bytes_written += value_len + 2;
+	}
+	iov_add_unsafe("END\r\n", 5);
+	stats.bytes_written += 5;
 }
 
 static void

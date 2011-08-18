@@ -1464,6 +1464,17 @@ case 107:
 	return fiber_write(out->data, out->len);
 }
 
+/**
+  We need to be able to print from Lua back to the
+ * administrative console. For that, we register this
+ * function as Lua 'print'. However, administrative
+ * console output must be YAML-compatible. If this is
+ * done automatically, the result is ugly, so we don't
+ * do it. A creator of Lua procedures has to do it
+ * herself.  Best we can do here is to add a trailing
+ * \r\n if it's forgotten.
+ */
+
 static int
 lbox_adminprint(struct lua_State *L)
 {
@@ -1482,6 +1493,10 @@ lbox_adminprint(struct lua_State *L)
 static void
 admin_handler(void *data __attribute__((unused)))
 {
+	/*
+	 * Create a disposable Lua interpreter state
+	 * for every new connection.
+	 */
 	lua_State *L = tarantool_lua_init();
 	lua_register(L, "print", lbox_adminprint);
 	@try {

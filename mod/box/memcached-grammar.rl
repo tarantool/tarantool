@@ -190,81 +190,19 @@ memcached_dispatch()
 		}
 
 		action get {
-			struct box_txn *txn = txn_alloc(BOX_QUIET);
-			txn->op = SELECT;
-			fiber_register_cleanup((void *)txn_cleanup, txn);
-			stat_collect(stat_base, MEMC_GET, 1);
-			stats.cmd_get++;
-			say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
-			iov_ensure(keys_count * 5 + 1);
-			while (keys_count-- > 0) {
-				struct box_tuple *tuple;
-				struct meta *m;
-				void *field;
-				void *value;
-				void *suffix;
-				u32 key_len;
-				u32 value_len;
-				u32 suffix_len;
-				u32 _l;
-
-				key = read_field(keys);
-				tuple = find(key);
-				key_len = load_varint32(&key);
-
-				if (tuple == NULL || tuple->flags & GHOST) {
-					stat_collect(stat_base, MEMC_GET_MISS, 1);
-					stats.get_misses++;
-					continue;
-				}
-
-				field = tuple->data;
-
-				/* skip key */
-				_l = load_varint32(&field);
-				field += _l;
-
-				/* metainfo */
-				_l = load_varint32(&field);
-				m = field;
-				field += _l;
-
-				/* suffix */
-				suffix_len = load_varint32(&field);
-				suffix = field;
-				field += suffix_len;
-
-				/* value */
-				value_len = load_varint32(&field);
-				value = field;
-
-				if (m->exptime > 0 && m->exptime < ev_now()) {
-					stats.get_misses++;
-					stat_collect(stat_base, MEMC_GET_MISS, 1);
-					continue;
-				} else {
-					stats.get_hits++;
-					stat_collect(stat_base, MEMC_GET_HIT, 1);
-				}
-
-				tuple_txn_ref(txn, tuple);
-
-				if (show_cas) {
-					struct tbuf *b = tbuf_alloc(fiber->gc_pool);
-					tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (u8 *)key, m->flags, value_len, m->cas);
-					iov_add_unsafe(b->data, b->len);
-					stats.bytes_written += b->len;
-				} else {
-					iov_add_unsafe("VALUE ", 6);
-					iov_add_unsafe(key, key_len);
-					iov_add_unsafe(suffix, suffix_len);
-				}
-				iov_add_unsafe(value, value_len);
-				iov_add_unsafe("\r\n", 2);
-				stats.bytes_written += value_len + 2;
+			struct box_txn *txn = txn_begin();
+			txn->flags |= BOX_GC_TXN;
+			txn->out = &box_out_quiet;
+			@try {
+				memcached_get(txn, keys_count, keys, show_cas);
+				txn_commit(txn);
+			} @catch (ClientError *e) {
+				txn_rollback(txn);
+				iov_reset();
+				iov_add("SERVER_ERROR ", 13);
+				iov_add(e->errmsg, strlen(e->errmsg));
+				iov_add("\r\n", 2);
 			}
-			iov_add_unsafe("END\r\n", 5);
-			stats.bytes_written += 5;
 		}
 
 		action flush_all {

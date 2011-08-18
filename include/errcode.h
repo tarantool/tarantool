@@ -102,7 +102,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 45 */_(ER_UNUSED45,			0, "Unused45") \
 	/* 46 */_(ER_UNUSED46,			0, "Unused46") \
 	/* 47 */_(ER_UNUSED47,			0, "Unused47") \
-	/* 48 */_(ER_UNUSED48,			0, "Unused48") \
+	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist") \
 	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure %.*s is not defined") \
 	/* 51 */_(ER_PROC_LUA,			2, "Lua error: %s") \

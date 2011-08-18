@@ -92,5 +92,12 @@ tuple_field(struct box_tuple *tuple, size_t i);
  */
 void
 tuple_print(struct tbuf *buf, uint8_t cardinality, void *f);
+
+/** Tuple length when adding to iov. */
+static inline size_t tuple_len(struct box_tuple *tuple)
+{
+	return tuple->bsize + sizeof(tuple->bsize) +
+		sizeof(tuple->cardinality);
+}
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

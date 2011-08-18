@@ -59,9 +59,6 @@ static char status[64] = "unknown";
 static int stat_base;
 STRS(messages, MESSAGES);
 
-/* hooks */
-typedef int (*box_hook_t) (struct box_txn * txn);
-
 /*
   For tuples of size below this threshold, when sending a tuple
   to the client, make a deep copy of the tuple for the duration
@@ -91,8 +88,6 @@ box_snap_row(const struct tbuf *t)
 {
 	return (struct box_snap_row *)t->data;
 }
-
-static void tuple_iov_add(struct box_txn *txn, struct box_tuple *tuple);
 
 static void
 lock_tuple(struct box_txn *txn, struct box_tuple *tuple)
@@ -165,7 +160,7 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		lock_tuple(txn, txn->tuple);
 		/*
 		 * Mark the tuple as ghost before attempting an
-		 * index replace: if it fails, txn_abort() will
+		 * index replace: if it fails, txn_rollback() will
 		 * look at the flag and remove the tuple.
 		 */
 		txn->tuple->flags |= GHOST;
@@ -183,14 +178,10 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 			index->replace(index, NULL, txn->tuple);
 	}
 
-	if (!(txn->flags & BOX_QUIET)) {
-		u32 tuples_affected = 1;
+	txn->out->dup_u32(1); /* Affected tuples */
 
-		iov_dup(&tuples_affected, sizeof(uint32_t));
-
-		if (txn->flags & BOX_RETURN_TUPLE)
-			tuple_iov_add(txn, txn->tuple);
-	}
+	if (txn->flags & BOX_RETURN_TUPLE)
+		txn->out->add_tuple(txn->tuple);
 }
 
 static void
@@ -433,29 +424,10 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 		tnt_raise(IllegalParams, :"can't unpack request");
 
 out:
-	if (!(txn->flags & BOX_QUIET)) {
-		iov_dup(&tuples_affected, sizeof(uint32_t));
+	txn->out->dup_u32(tuples_affected);
 
-		if (txn->flags & BOX_RETURN_TUPLE)
-			tuple_iov_add(txn, txn->tuple);
-	}
-}
-
-static void
-tuple_iov_add(struct box_txn *txn, struct box_tuple *tuple)
-{
-	size_t len;
-
-	len = tuple->bsize +
-		field_sizeof(struct box_tuple, bsize) +
-		field_sizeof(struct box_tuple, cardinality);
-
-	if (len > BOX_REF_THRESHOLD) {
-		tuple_txn_ref(txn, tuple);
-		iov_add(&tuple->bsize, len);
-	} else {
-		iov_dup(&tuple->bsize, len);
-	}
+	if (txn->flags & BOX_RETURN_TUPLE)
+		txn->out->add_tuple(txn->tuple);
 }
 
 static void __attribute__((noinline))
@@ -468,7 +440,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 		tnt_raise(IllegalParams, :"tuple count must be positive");
 
 	found = palloc(fiber->gc_pool, sizeof(*found));
-	iov_add(found, sizeof(*found));
+	txn->out->add_u32(found);
 	*found = 0;
 
 	if (txn->index->type == TREE) {
@@ -501,7 +473,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 					continue;
 				}
 
-				tuple_iov_add(txn, tuple);
+				txn->out->add_tuple(tuple);
 
 				if (limit == ++(*found))
 					break;
@@ -528,7 +500,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 				continue;
 			}
 
-			tuple_iov_add(txn, tuple);
+			txn->out->add_tuple(tuple);
 			(*found)++;
 		}
 	}
@@ -558,12 +530,10 @@ prepare_delete(struct box_txn *txn, void *key)
 		tuples_affected = 1;
 	}
 
-	if (!(txn->flags & BOX_QUIET)) {
-		iov_dup(&tuples_affected, sizeof(tuples_affected));
+	txn->out->dup_u32(tuples_affected);
 
-		if (txn->old_tuple && (txn->flags & BOX_RETURN_TUPLE))
-			tuple_iov_add(txn, txn->old_tuple);
-	}
+	if (txn->old_tuple && (txn->flags & BOX_RETURN_TUPLE))
+		txn->out->add_tuple(txn->old_tuple);
 }
 
 static void
@@ -583,15 +553,57 @@ op_is_select(u32 op)
 	return op == SELECT || op == SELECT_LIMIT;
 }
 
-struct box_txn *
-txn_alloc(u32 flags)
+static void
+iov_add_u32(u32 *p_u32)
 {
-	struct box_txn *txn = p0alloc(fiber->gc_pool, sizeof(*txn));
-	txn->ref_tuples = tbuf_alloc(fiber->gc_pool);
-	txn->flags = flags;
-	return txn;
+	iov_add(p_u32, sizeof(u32));
 }
 
+static void
+iov_dup_u32(u32 u32)
+{
+	iov_dup(&u32, sizeof(u32));
+}
+
+static void
+iov_add_tuple(struct box_tuple *tuple)
+{
+	size_t len = tuple_len(tuple);
+
+	if (len > BOX_REF_THRESHOLD) {
+		tuple_txn_ref(in_txn(), tuple);
+		iov_add(&tuple->bsize, len);
+	} else {
+		iov_dup(&tuple->bsize, len);
+	}
+}
+
+struct box_out box_out_iproto = {
+	iov_add_u32,
+	iov_dup_u32,
+	iov_add_tuple
+};
+
+static void box_quiet_add_u32(u32 *p_u32 __attribute__((unused))) {}
+static void box_quiet_dup_u32(u32 u32 __attribute__((unused))) {}
+static void box_quiet_add_tuple(struct box_tuple *tuple __attribute__((unused))) {}
+
+struct box_out box_out_quiet = {
+	box_quiet_add_u32,
+	box_quiet_dup_u32,
+	box_quiet_add_tuple
+};
+
+struct box_txn *
+txn_begin()
+{
+	assert(in_txn() == NULL);
+	struct box_txn *txn = p0alloc(fiber->gc_pool, sizeof(*txn));
+	txn->ref_tuples = tbuf_alloc(fiber->gc_pool);
+	assert(fiber->mod_data.txn == NULL);
+	fiber->mod_data.txn = txn;
+	return txn;
+}
 
 void txn_assign_n(struct box_txn *txn, struct tbuf *data)
 {
@@ -608,39 +620,17 @@ void txn_assign_n(struct box_txn *txn, struct tbuf *data)
 	txn->index = txn->namespace->index;
 }
 
-/**
-  * Validate the request and start a transaction associated with
-  * that request:
-  *
-  * - parse the request,
-  * - perform a "name resolution", i.e. find the namespace object
-  *   associated with the request.
-  */
-
+/** Remember op code/request in the txn. */
 static void
-txn_begin(struct box_txn *txn, u16 op, struct tbuf *data)
+txn_set_op(struct box_txn *txn, u16 op, struct tbuf *data)
 {
 	txn->op = op;
 	txn->req = (struct tbuf){ .data = data->data, .len = data->len };
 }
 
-void
+static void
 txn_cleanup(struct box_txn *txn)
 {
-	/*
-	 * txn_cleanup() may get called twice in the following
-	 * scenario: Several requests are processed by a single
-	 * iproto loop iteration. The first few requests are
-	 * handled successfully, but the next one fails with an
-	 * OOM. In this case, fiber performs fiber_cleanup() for
-	 * every registered callback. We should not run
-	 * txn_cleanup() twice.
-	 */
-	if (txn->op == 0)
-		return;
-
-	unlock_tuples(txn);
-
 	struct box_tuple **tuple = txn->ref_tuples->data;
 	int i = txn->ref_tuples->len / sizeof(struct box_txn *);
 
@@ -653,11 +643,12 @@ txn_cleanup(struct box_txn *txn)
 	memset(txn, 0, sizeof(*txn));
 }
 
-static void
+void
 txn_commit(struct box_txn *txn)
 {
-	if (txn->op == 0)
-		return;
+	assert(txn == in_txn());
+	assert(txn->op);
+	fiber->mod_data.txn = 0;
 
 	if (!op_is_select(txn->op)) {
 		say_debug("box_commit(op:%s)", messages_strs[txn->op]);
@@ -686,20 +677,22 @@ txn_commit(struct box_txn *txn)
 			commit_replace(txn);
 	}
 
-	if (txn->flags & BOX_QUIET)
-		txn_cleanup(txn);
-	else
+	if (txn->flags & BOX_GC_TXN)
 		fiber_register_cleanup((fiber_cleanup_handler)txn_cleanup, txn);
+	else
+		txn_cleanup(txn);
 }
 
-static void
-txn_abort(struct box_txn *txn)
+void
+txn_rollback(struct box_txn *txn)
 {
+	assert(txn == in_txn());
+	fiber->mod_data.txn = 0;
 	if (txn->op == 0)
 		return;
 
 	if (!op_is_select(txn->op)) {
-		say_debug("box_rollback(op:%s)", messages_strs[txn->op]);
+		say_debug("txn_rollback(op:%s)", messages_strs[txn->op]);
 
 		unlock_tuples(txn);
 
@@ -992,20 +985,27 @@ namespace_init(void)
 	memcached_namespace_init();
 }
 
-void
-box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
+static void
+box_process_rw(u32 op, struct tbuf *request_data)
 {
 	ev_tstamp start = ev_now(), stop;
 
 	stat_collect(stat_base, op, 1);
 
+	struct box_txn *txn = in_txn();
+	if (txn == NULL) {
+		txn = txn_begin();
+		txn->flags |= BOX_GC_TXN;
+		txn->out = &box_out_iproto;
+	}
+
 	@try {
-		txn_begin(txn, op, request_data);
+		txn_set_op(txn, op, request_data);
 		box_dispatch(txn, request_data);
 		txn_commit(txn);
 	}
 	@catch (id e) {
-		txn_abort(txn);
+		txn_rollback(txn);
 		@throw;
 	}
 	@finally {
@@ -1018,18 +1018,15 @@ box_process(struct box_txn *txn, u32 op, struct tbuf *request_data)
 static void
 box_process_ro(u32 op, struct tbuf *request_data)
 {
-	if (!op_is_select(op))
+	if (!op_is_select(op)) {
+		struct box_txn *txn = in_txn();
+		if (txn != NULL)
+			txn_rollback(txn);
 		tnt_raise(LoggedError, :ER_NONMASTER);
+	}
 
-	return box_process(txn_alloc(0), op, request_data);
+	return box_process_rw(op, request_data);
 }
-
-static void
-box_process_rw(u32 op, struct tbuf *request_data)
-{
-	return box_process(txn_alloc(0), op, request_data);
-}
-
 
 static struct tbuf *
 convert_snap_row_to_wal(struct tbuf *t)
@@ -1051,9 +1048,6 @@ convert_snap_row_to_wal(struct tbuf *t)
 static int
 recover_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 {
-	struct box_txn *txn = txn_alloc(BOX_QUIET | BOX_NOT_STORE);
-	u16 op;
-
 	/* drop wal header */
 	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
 		return -1;
@@ -1067,10 +1061,14 @@ recover_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 		return -1;
 	}
 
-	op = read_u16(t);
+	u16 op = read_u16(t);
+
+	struct box_txn *txn = txn_begin();
+	txn->flags |= BOX_NOT_STORE;
+	txn->out = &box_out_quiet;
 
 	@try {
-		box_process(txn, op, t);
+		box_process_rw(op, t);
 	}
 	@catch (id e) {
 		return -1;

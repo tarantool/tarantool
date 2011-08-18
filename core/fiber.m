@@ -694,21 +694,6 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 }
 
 void
-iov_add(const void *buf, size_t len)
-{
-	iov_ensure(1);
-	iov_add_unsafe(buf, len);
-}
-
-void
-iov_dup(const void *buf, size_t len)
-{
-	void *copy = palloc(fiber->gc_pool, len);
-	memcpy(copy, buf, len);
-	iov_add(copy, len);
-}
-
-void
 iov_reset()
 {
 	fiber->iov_cnt = 0;	/* discard anything unwritten */

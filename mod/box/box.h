@@ -30,6 +30,7 @@
 #include "exception.h"
 #include "iproto.h"
 #include <tbuf.h>
+#include <fiber.h>
 
 struct tarantool_cfg;
 struct box_tuple;
@@ -50,10 +51,20 @@ struct namespace {
 
 extern struct namespace *namespace;
 
+struct box_out {
+	void (*add_u32)(u32 *u32);
+	void (*dup_u32)(u32 u32);
+	void (*add_tuple)(struct box_tuple *tuple);
+};
+
+extern struct box_out box_out_quiet;
+
 struct box_txn {
 	u16 op;
 	u32 flags;
 
+	struct lua_State *L;
+	struct box_out *out;
 	struct namespace *namespace;
 	struct index *index;
 	int n;
@@ -64,21 +75,17 @@ struct box_txn {
 	struct box_tuple *lock_tuple;
 
 	struct tbuf req;
-
-	bool in_recover;
-	bool write_to_wal;
 };
 
 
 #define BOX_RETURN_TUPLE		0x01
 #define BOX_ADD				0x02
 #define BOX_REPLACE			0x04
-#define BOX_QUIET			0x08
 #define BOX_NOT_STORE			0x10
+#define BOX_GC_TXN			0x20
 #define BOX_ALLOWED_REQUEST_FLAGS	(BOX_RETURN_TUPLE | \
 					 BOX_ADD | \
 					 BOX_REPLACE | \
-					 BOX_QUIET | \
 					 BOX_NOT_STORE)
 
 /*
@@ -113,9 +120,11 @@ ENUM(messages, MESSAGES);
 
 extern iproto_callback rw_callback;
 
-/* These 3 are used to implemente memcached 'GET' */
-struct box_txn *txn_alloc(u32 flags);
+/* These are used to implement memcached 'GET' */
+static inline struct box_txn *in_txn() { return fiber->mod_data.txn; }
+struct box_txn *txn_begin();
+void txn_commit(struct box_txn *txn);
+void txn_rollback(struct box_txn *txn);
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
-void txn_cleanup(struct box_txn *txn);
 
 #endif /* TARANTOOL_BOX_H_INCLUDED */

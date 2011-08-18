@@ -41,6 +41,7 @@
 #include "third_party/queue.h"
 
 #include "exception.h"
+#include "palloc.h"
 
 #define FIBER_NAME_MAXLEN 32
 
@@ -96,6 +97,10 @@ struct fiber {
 	char name[FIBER_NAME_MAXLEN];
 	void (*f) (void *);
 	void *f_data;
+	/* Store execution context in a fiber. */
+	union {
+		struct box_txn *txn;
+	} mod_data;
 
 	u64 cookie;
 	bool has_peer;
@@ -161,8 +166,19 @@ inline static void iov_ensure(size_t count)
 }
 
 /* Add to fiber's iov vector. */
-void iov_add(const void *buf, size_t len);
-void iov_dup(const void *buf, size_t len);
+inline static void iov_add(const void *buf, size_t len)
+{
+	iov_ensure(1);
+	iov_add_unsafe(buf, len);
+}
+
+inline static void iov_dup(const void *buf, size_t len)
+{
+	void *copy = palloc(fiber->gc_pool, len);
+	memcpy(copy, buf, len);
+	iov_add(copy, len);
+}
+
 /* Reset the fiber's iov vector. */
 ssize_t iov_flush(void);
 /* Write everything in the fiber's iov vector to fiber socket. */
@@ -176,7 +192,6 @@ const char *fiber_peer_name(struct fiber *fiber);
 ssize_t fiber_read(void *buf, size_t count);
 ssize_t fiber_write(const void *buf, size_t count);
 int fiber_close(void);
-ssize_t fiber_flush_output(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
 void fiber_call(struct fiber *callee);
