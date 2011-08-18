@@ -39,7 +39,7 @@ def prepare_valgrind(args, valgrind_log, valgrind_sup):
     "Prepare server startup arguments to run under valgrind."
     args = [ "valgrind", "--log-file={0}".format(valgrind_log),
              "--suppressions={0}".format(valgrind_sup),
-             "--gen-suppressions=all", "--show-reachable=yes",
+             "--gen-suppressions=all", "--show-reachable=yes", "--leak-check=full",
              "--read-var-info=yes", "--quiet" ] + args
     return args
 
@@ -214,7 +214,8 @@ class Server(object):
 
         # kill process
         self.process.kill(signal.SIGTERM)
-        self.process.wait()
+        self.process.expect(pexpect.EOF)
+        self.process.close()
         # clean-up processs flags
         self.is_started = False
         self.process = None

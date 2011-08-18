@@ -8,7 +8,7 @@
    Memcheck:Leak
    fun:malloc
    fun:objc_malloc
-   obj:*
+   ...
 }
 
 {
@@ -16,97 +16,7 @@
    Memcheck:Leak
    fun:calloc
    fun:objc_calloc
-   fun:objc_hash_add
-   fun:__sel_register_typed_name
-   fun:sel_register_name
-   obj:*
-   obj:*
-   fun:__objc_exec_class
-   obj:*
-   obj:*
-   obj:*
-   fun:call_init
-}
-
-{
-   <obj-c internals>
-   Memcheck:Leak
-   fun:calloc
-   fun:objc_calloc
-   fun:objc_hash_new
-   fun:__objc_init_selector_tables
-   fun:__objc_exec_class
-   obj:*
-   obj:*
-   obj:*
-   fun:call_init
-   fun:_dl_init
-   obj:*
-}
-
-{
-   <obj-c internals>
-   Memcheck:Leak
-   fun:calloc
-   fun:objc_calloc
-   fun:objc_hash_new
-   fun:__objc_exec_class
-   obj:*
-   obj:*
-   obj:*
-   fun:call_init
-   fun:_dl_init
-   obj:*
-}
-
-
-{
-   <obj-c internals>
-   Memcheck:Leak
-   fun:calloc
-   fun:objc_calloc
-   fun:objc_hash_add
-   fun:__sel_register_typed_name
-   fun:__objc_exec_class
-   fun:__objc_gnu_init
-   obj:*
-   obj:*
-   obj:*
-   fun:__libc_csu_init
-   fun:(below main)
-}
-
-{
-   <obj-c internals>
-   Memcheck:Leak
-   fun:calloc
-   fun:objc_calloc
-   fun:objc_hash_add
-   fun:__sel_register_typed_name
-   fun:__objc_register_selectors_from_list
-   fun:__objc_register_selectors_from_class
-   fun:__objc_exec_class
-   obj:*
-   obj:*
-   obj:*
-   fun:call_init
-   fun:_dl_init
-}
-
-{
-   <obj-c internals>
-   Memcheck:Leak
-   fun:calloc
-   fun:objc_calloc
-   fun:objc_hash_add
-   fun:__sel_register_typed_name
-   fun:__objc_exec_class
-   obj:*
-   obj:*
-   obj:*
-   fun:call_init
-   fun:_dl_init
-   obj:*
+   ...
 }
 
 {
@@ -114,31 +24,9 @@
    Memcheck:Leak
    fun:realloc
    fun:objc_realloc
-   fun:__objc_register_instance_methods_to_class
-   fun:__objc_exec_class
-   obj:*
-   obj:*
-   obj:*
-   fun:call_init
-   fun:_dl_init
-   obj:*
+   ...
 }
 
-{
-   <obj-c internals>
-   Memcheck:Leak
-   fun:calloc
-   fun:objc_calloc
-   fun:objc_hash_add
-   fun:__sel_register_typed_name
-   fun:__objc_exec_class
-   fun:__objc_gnu_init
-   obj:*
-   obj:*
-   obj:*
-   fun:__libc_csu_init
-   fun:(below main)
-}
 
 ##
 ## third_party
