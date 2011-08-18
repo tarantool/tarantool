@@ -112,6 +112,13 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
 }
 
 
+static int
+box_lua_panic(struct lua_State *L)
+{
+	tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
+	return 0;
+}
+
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
@@ -130,9 +137,7 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 		/* Push the rest of args (a tuple) as is. */
 		lua_pushlstring(L, data->data, data->len);
 
-		int r = lua_pcall(L, 1, 0, 0);
-		if (r)
-			tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
+		lua_call(L, 1, LUA_MULTRET);
 	} @finally {
 		/*
 		 * Allow the used coro to be garbage collected.
@@ -146,6 +151,7 @@ struct lua_State *
 mod_lua_init(struct lua_State *L)
 {
 	luaL_register(L, "box", boxlib);
+	lua_atpanic(L, box_lua_panic);
 	return L;
 }
 
