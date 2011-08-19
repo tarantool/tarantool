@@ -597,7 +597,6 @@ struct box_out box_out_quiet = {
 struct box_txn *
 txn_begin()
 {
-	assert(in_txn() == NULL);
 	struct box_txn *txn = p0alloc(fiber->gc_pool, sizeof(*txn));
 	txn->ref_tuples = tbuf_alloc(fiber->gc_pool);
 	assert(fiber->mod_data.txn == NULL);
@@ -1457,34 +1456,4 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,
 		    recovery_state->recovery_last_update_tstamp);
 	tbuf_printf(out, "  status: %s" CRLF, status);
-}
-
-/*
- * Convert fiber->iov to yaml and append to
- * the given tbuf.
- */
-void mod_convert_iov_to_yaml(struct tbuf *out)
-{
-	for (int i = 0; i < fiber->iov_cnt; ++i) {
-		struct iovec *iov = iovec(fiber->iov)+i;
-		switch (iov->iov_len) {
-		case 4:
-			tbuf_printf(out, " - int: %u\r\n", *(u32*)iov->iov_base);
-			break;
-		default:
-		{
-			/*
-			 * Sic, we can't access tuple->flags or
-			 * tuple->refs since they may point
-			 * to nowhere, @sa tuple_iov_add().
-			 */
-			struct box_tuple *tuple = iov->iov_base -
-				offsetof(struct box_tuple, bsize);
-			tbuf_printf(out, " - ");
-			tuple_print(out, tuple->cardinality, tuple->data);
-			break;
-		}
-		}
-	}
-
 }

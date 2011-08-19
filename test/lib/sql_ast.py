@@ -49,6 +49,7 @@ ER = {
    37: "ER_UPDATE_ID"           ,
    38: "ER_WRONG_VERSION"       ,
    39: "ER_WAL_IO"              ,
+   48: "ER_PROC_RET"            ,
    49: "ER_TUPLE_NOT_FOUND"     ,
    50: "ER_NO_SUCH_PROC"        ,
    51: "ER_PROC_LUA"            ,

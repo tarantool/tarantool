@@ -142,7 +142,50 @@ tarantool_lua_init()
 		luaL_register(L, "box", boxlib);
 		L = mod_lua_init(L);
 	}
+	lua_settop(L, 0); /* clear possible left-overs of init */
 	return L;
+}
+
+/*
+ * lua_tostring does no use __tostring metamethod, and it has
+ * to be called if we want to print Lua userdata correctly.
+ */
+const char *tarantool_lua_tostring(struct lua_State *L, int index)
+{
+	lua_pushstring(L, "tostring");
+	lua_gettable(L, LUA_GLOBALSINDEX);
+	lua_pushvalue(L, index);
+	lua_call(L, 1, 1); /* pops both "tostring" and its argument */
+	lua_replace(L, index);
+	return lua_tostring(L, index);
+}
+
+/*
+ * Convert Lua stack to YAML and append to
+ * the given tbuf.
+ */
+void tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
+{
+	for (int i = 1; i <= lua_gettop(L); i++)
+		tbuf_printf(out, " - %s\r\n", tarantool_lua_tostring(L, i));
+}
+
+/**
+ * Attempt to append 'return ' before the chunk: if the chunk is
+ * an expression, this pushes results of the expression onto the
+ * stack. If the chunk is a statement, it won't compile. In that
+ * case try to run the original string.
+ */
+int tarantool_lua_dostring(struct lua_State *L, const char *str)
+{
+	struct tbuf *buf = tbuf_alloc(fiber->gc_pool);
+	tbuf_printf(buf, "%s%s", "return ", str);
+	int r = luaL_loadstring(L, tbuf_str(buf));
+	if (r) {
+		lua_pop(L, 1); /* pop the error message */
+		return luaL_dostring(L, str);
+	}
+	return lua_pcall(L, 0, LUA_MULTRET, 0);
 }
 
 void
@@ -152,17 +195,15 @@ tarantool_lua(struct lua_State *L,
 	lua_pushstring(L, "out");
 	lua_pushlightuserdata(L, (void *) out);
 	lua_settable(L, LUA_REGISTRYINDEX);
-	assert(fiber->iov->len == 0 && fiber->iov_cnt == 0);
-	int r = luaL_dostring(L, str);
+	int r = tarantool_lua_dostring(L, str);
 	if (r) {
 		/* Make sure the output is YAMLish */
 		tbuf_printf(out, "error: '%s'\r\n",
 			    luaL_gsub(L, lua_tostring(L, -1),
 				      "'", "''"));
-		lua_pop(L, lua_gettop(L));
 	}
 	else {
-		mod_convert_iov_to_yaml(out);
+		tarantool_lua_printstack(L, out);
 	}
-	iov_reset();
+	lua_settop(L, 0); /* clear the stack from return values. */
 }

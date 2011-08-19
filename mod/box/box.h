@@ -58,6 +58,7 @@ struct box_out {
 };
 
 extern struct box_out box_out_quiet;
+extern struct box_out box_out_iproto;
 
 struct box_txn {
 	u16 op;

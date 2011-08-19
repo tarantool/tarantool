@@ -147,5 +147,5 @@ tuple_print(struct tbuf *buf, uint8_t cardinality, void *f)
 		if (likely(i + 1 < cardinality))
 			tbuf_printf(buf, ", ");
 	}
-	tbuf_printf(buf, "}\r\n");
+	tbuf_printf(buf, "}");
 }

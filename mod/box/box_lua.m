@@ -37,6 +37,7 @@
 #include "third_party/luajit/src/lualib.h"
 
 #include "pickle.h"
+#include "tuple.h"
 
 /**
  * All box connections share the same Lua state. We use
@@ -45,22 +46,195 @@
  */
 lua_State *root_L;
 
+/*
+ * Functions, exported in box_lua.h should have prefix
+ * "box_lua_"; functions, available in Lua "box"
+ * should start with "lbox_".
+ */
+
+/** {{{ box.tuple Lua library
+ *
+ * To avoid extra copying between Lua memory and garbage-collected
+ * tuple memory, provide a Lua userdata object 'box.tuple'.  This
+ * object refers to a tuple instance in the slab allocator, and
+ * allows accessing it using Lua primitives (array subscription,
+ * iteration, etc.). When Lua object is garbage-collected,
+ * tuple reference counter in the slab allocator is decreased,
+ * allowing the tuple to be eventually garbage collected in
+ * the slab allocator.
+ */
+
+static const char *tuplelib_name = "box.tuple";
+
+static inline struct box_tuple *
+lua_checktuple(struct lua_State *L, int narg)
+{
+	return *(void **) luaL_checkudata(L, narg, tuplelib_name);
+}
+
+static inline struct box_tuple *
+lua_istuple(struct lua_State *L, int narg)
+{
+	struct box_tuple *tuple = 0;
+	lua_getmetatable(L, narg);
+	luaL_getmetatable(L, tuplelib_name);
+	if (lua_equal(L, -1, -2))
+		tuple = * (void **) lua_touserdata(L, narg);
+	lua_pop(L, 2);
+	return tuple;
+}
+
+static int
+lbox_tuple_gc(struct lua_State *L)
+{
+	struct box_tuple *tuple = lua_checktuple(L, 1);
+	tuple_ref(tuple, -1);
+	return 0;
+}
+
+static int
+lbox_tuple_len(struct lua_State *L)
+{
+	struct box_tuple *tuple = lua_checktuple(L, 1);
+	lua_pushnumber(L, tuple->cardinality);
+	return 1;
+}
+
+static int
+lbox_tuple_index(struct lua_State *L)
+{
+	struct box_tuple *tuple = lua_checktuple(L, 1);
+	int i = luaL_checkint(L, 2);
+	if (i >= tuple->cardinality)
+		luaL_error(L, "%s: index %d is out of bounds (0..%d)",
+			   tuplelib_name, i, tuple->cardinality-1);
+	void *field = tuple_field(tuple, i);
+	u32 len = load_varint32(&field);
+	lua_pushlstring(L, field, len);
+	return 1;
+}
+
+static int
+lbox_tuple_tostring(struct lua_State *L)
+{
+	struct box_tuple *tuple = lua_checktuple(L, 1);
+	/* @todo: print the tuple */
+	struct tbuf *tbuf = tbuf_alloc(fiber->gc_pool);
+	tuple_print(tbuf, tuple->cardinality, tuple->data);
+	lua_pushlstring(L, tbuf->data, tbuf->len);
+	return 1;
+}
+
+static const struct luaL_reg lbox_tuple_meta [] = {
+	{"__gc", lbox_tuple_gc},
+	{"__len", lbox_tuple_len},
+	{"__index", lbox_tuple_index},
+	{"__tostring", lbox_tuple_tostring},
+	{NULL, NULL}
+};
+
+/* }}} */
+
+/** {{{ Lua I/O: facilities to intercept box output
+ * and push into Lua stack and the opposite: append Lua types
+ * to fiber IOV.
+ */
+
+void iov_add_ret(struct lua_State *L, int index)
+{
+	int type = lua_type(L, index);
+	switch (type) {
+	case LUA_TNUMBER:
+		box_out_iproto.dup_u32((u32) lua_tointeger(L, index));
+		break;
+	case LUA_TUSERDATA:
+	{
+		struct box_tuple *tuple = lua_istuple(L, index);
+		if (tuple != NULL) {
+			box_out_iproto.add_tuple(tuple);
+			break;
+		}
+	}
+	default:
+		/*
+		 * LUA_TNONE, LUA_TNIL, LUA_TBOOLEAN, LUA_TSTRING,
+		 * LUA_TTABLE, LUA_THREAD, LUA_TFUNCTION
+		 */
+		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
+		break;
+	}
+}
+
+/** Add nargs elements on the top of Lua stack to fiber iov. */
+
+void iov_add_multret(struct lua_State *L, int nargs)
+{
+	while (nargs > 0) {
+		iov_add_ret(L, -nargs);
+		nargs--;
+	}
+}
+
+static void
+box_lua_dup_u32(u32 u32)
+{
+	lua_pushinteger(in_txn()->L, u32);
+}
+
+static void
+box_lua_add_u32(u32 *p_u32)
+{
+	box_lua_dup_u32(*p_u32); /* xxx: this can't be done properly in Lua */
+}
+
+static void
+box_lua_add_tuple(struct box_tuple *tuple)
+{
+	struct lua_State *L = in_txn()->L;
+	void **ptr = lua_newuserdata(L, sizeof(void *));
+	luaL_getmetatable(L, tuplelib_name);
+	lua_setmetatable(L, -2);
+	*ptr = tuple;
+	tuple_ref(tuple, 1);
+}
+
+static struct box_out box_out_lua = {
+	box_lua_add_u32,
+	box_lua_dup_u32,
+	box_lua_add_tuple
+};
+
+/* }}} */
+
+static inline void
+txn_enter_lua(lua_State *L)
+{
+	struct box_txn *txn = in_txn();
+	if (txn == NULL)
+		txn = txn_begin();
+	txn->out = &box_out_lua;
+	txn->L = L;
+}
+
 /**
- * The main extention provided to Lua by
- * Tarantool -- ability to call INSERT/UPDATE/SELECT/DELETE
- * from within a Lua procedure.
+ * The main extension provided to Lua by Tarantool/Box --
+ * ability to call INSERT/UPDATE/SELECT/DELETE from within
+ * a Lua procedure.
  *
  * This is a low-level API, and it expects
  * all arguments to be packed in accordance
  * with the binary protocol format (iproto
  * header excluded).
+ *
+ * Signature:
+ * box.process(op_code, request)
  */
 static int lbox_process(lua_State *L)
 {
-	u32 op = luaL_checkint(L, 1);
+	u32 op = lua_tointeger(L, 1); /* Get the first arg. */
 	struct tbuf req;
 	size_t sz;
-	req.data = (char *) luaL_checklstring(L, 2, &sz);
+	req.data = (char *) luaL_checklstring(L, 2, &sz); /* Second arg. */
 	req.size = req.len = sz;
 	if (op == CALL) {
 		/*
@@ -71,12 +245,19 @@ static int lbox_process(lua_State *L)
 		 */
 		return luaL_error(L, "box.process(CALL, ...) is not allowed");
 	}
+	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 	@try {
+		txn_enter_lua(L);
 		rw_callback(op, &req);
+		/*
+		 * @todo: when multi-statement transactions are
+		 * implemented, restore the original txn->out here.
+		 */
+		assert(in_txn() == NULL);
 	} @catch (ClientError *e) {
 		return luaL_error(L, "%d:%s", e->errcode, e->errmsg);
 	}
-	return 0; /* nothing is added to the stack */
+	return lua_gettop(L) - top;
 }
 
 static const struct luaL_reg boxlib[] = {
@@ -84,11 +265,11 @@ static const struct luaL_reg boxlib[] = {
 	{NULL, NULL}
 };
 
-
 /**
- * A helper to find a Lua stored procedure by name and put it
+ * A helper to find a Lua function by name and put it
  * on top of the stack.
  */
+static
 void box_lua_find(lua_State *L, const char *name, const char *name_end)
 {
 	int index = LUA_GLOBALSINDEX;
@@ -106,9 +287,12 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
 	}
 	lua_pushlstring(L, start, name_end - start);
 	lua_gettable(L, index);
-	if (! lua_isfunction(L, -1))
+	if (! lua_isfunction(L, -1)) {
+		/* lua_call or lua_gettable would raise a type error
+		 * for us, but our own message is more verbose. */
 		tnt_raise(ClientError, :ER_NO_SUCH_PROC,
 			  name_end - name, name);
+	}
 }
 
 
@@ -137,7 +321,10 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 		/* Push the rest of args (a tuple) as is. */
 		lua_pushlstring(L, data->data, data->len);
 
+		int top = lua_gettop(L);
 		lua_call(L, 1, LUA_MULTRET);
+		/* Send results of the called procedure to the client. */
+		iov_add_multret(L, lua_gettop(L) - top);
 	} @finally {
 		/*
 		 * Allow the used coro to be garbage collected.
@@ -150,8 +337,14 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 struct lua_State *
 mod_lua_init(struct lua_State *L)
 {
+	/* box */
 	luaL_register(L, "box", boxlib);
 	lua_atpanic(L, box_lua_panic);
+	/* box.tuple */
+	luaL_newmetatable(L, tuplelib_name);
+	lua_pushstring(L, tuplelib_name);
+	lua_setfield(L, -2, "__metatable");
+	luaL_register(L, NULL, lbox_tuple_meta);
 	return L;
 }
 
