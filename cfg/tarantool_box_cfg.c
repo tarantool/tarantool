@@ -1814,10 +1814,10 @@ int
 dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	tarantool_cfg_iterator_t iterator, *i = &iterator;
 
-	dst->username = src->username == NULL ? NULL : strdup(src->username);
+	if (dst->username) free(dst->username);dst->username = src->username == NULL ? NULL : strdup(src->username);
 	if (src->username != NULL && dst->username == NULL)
 		return CNF_NOMEMORY;
-	dst->bind_ipaddr = src->bind_ipaddr == NULL ? NULL : strdup(src->bind_ipaddr);
+	if (dst->bind_ipaddr) free(dst->bind_ipaddr);dst->bind_ipaddr = src->bind_ipaddr == NULL ? NULL : strdup(src->bind_ipaddr);
 	if (src->bind_ipaddr != NULL && dst->bind_ipaddr == NULL)
 		return CNF_NOMEMORY;
 	dst->coredump = src->coredump;
@@ -1827,29 +1827,29 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->slab_alloc_arena = src->slab_alloc_arena;
 	dst->slab_alloc_minimal = src->slab_alloc_minimal;
 	dst->slab_alloc_factor = src->slab_alloc_factor;
-	dst->work_dir = src->work_dir == NULL ? NULL : strdup(src->work_dir);
+	if (dst->work_dir) free(dst->work_dir);dst->work_dir = src->work_dir == NULL ? NULL : strdup(src->work_dir);
 	if (src->work_dir != NULL && dst->work_dir == NULL)
 		return CNF_NOMEMORY;
-	dst->pid_file = src->pid_file == NULL ? NULL : strdup(src->pid_file);
+	if (dst->pid_file) free(dst->pid_file);dst->pid_file = src->pid_file == NULL ? NULL : strdup(src->pid_file);
 	if (src->pid_file != NULL && dst->pid_file == NULL)
 		return CNF_NOMEMORY;
-	dst->logger = src->logger == NULL ? NULL : strdup(src->logger);
+	if (dst->logger) free(dst->logger);dst->logger = src->logger == NULL ? NULL : strdup(src->logger);
 	if (src->logger != NULL && dst->logger == NULL)
 		return CNF_NOMEMORY;
 	dst->logger_nonblock = src->logger_nonblock;
 	dst->io_collect_interval = src->io_collect_interval;
 	dst->backlog = src->backlog;
 	dst->readahead = src->readahead;
-	dst->snap_dir = src->snap_dir == NULL ? NULL : strdup(src->snap_dir);
+	if (dst->snap_dir) free(dst->snap_dir);dst->snap_dir = src->snap_dir == NULL ? NULL : strdup(src->snap_dir);
 	if (src->snap_dir != NULL && dst->snap_dir == NULL)
 		return CNF_NOMEMORY;
-	dst->wal_dir = src->wal_dir == NULL ? NULL : strdup(src->wal_dir);
+	if (dst->wal_dir) free(dst->wal_dir);dst->wal_dir = src->wal_dir == NULL ? NULL : strdup(src->wal_dir);
 	if (src->wal_dir != NULL && dst->wal_dir == NULL)
 		return CNF_NOMEMORY;
 	dst->primary_port = src->primary_port;
 	dst->secondary_port = src->secondary_port;
 	dst->too_long_threshold = src->too_long_threshold;
-	dst->custom_proc_title = src->custom_proc_title == NULL ? NULL : strdup(src->custom_proc_title);
+	if (dst->custom_proc_title) free(dst->custom_proc_title);dst->custom_proc_title = src->custom_proc_title == NULL ? NULL : strdup(src->custom_proc_title);
 	if (src->custom_proc_title != NULL && dst->custom_proc_title == NULL)
 		return CNF_NOMEMORY;
 	dst->memcached_port = src->memcached_port;
@@ -1865,7 +1865,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->wal_dir_rescan_delay = src->wal_dir_rescan_delay;
 	dst->panic_on_snap_error = src->panic_on_snap_error;
 	dst->panic_on_wal_error = src->panic_on_wal_error;
-	dst->replication_source = src->replication_source == NULL ? NULL : strdup(src->replication_source);
+	if (dst->replication_source) free(dst->replication_source);dst->replication_source = src->replication_source == NULL ? NULL : strdup(src->replication_source);
 	if (src->replication_source != NULL && dst->replication_source == NULL)
 		return CNF_NOMEMORY;
 
@@ -1889,7 +1889,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 				while (src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index] != NULL) {
 					ARRAYALLOC(dst->namespace[i->idx_name__namespace]->index, i->idx_name__namespace__index + 1, _name__namespace__index, 0, 0);
 
-					dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type == NULL ? NULL : strdup(src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type);
+					if (dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type) free(dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type);dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type == NULL ? NULL : strdup(src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type);
 					if (src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type != NULL && dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type == NULL)
 						return CNF_NOMEMORY;
 					dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->unique = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->unique;
@@ -1903,7 +1903,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 							ARRAYALLOC(dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field, i->idx_name__namespace__index__key_field + 1, _name__namespace__index__key_field, 0, 0);
 
 							dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->fieldno = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->fieldno;
-							dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type == NULL ? NULL : strdup(src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type);
+							if (dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) free(dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type);dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type == NULL ? NULL : strdup(src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type);
 							if (src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type != NULL && dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type == NULL)
 								return CNF_NOMEMORY;
 

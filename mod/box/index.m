@@ -646,6 +646,7 @@ static void
 index_tree_free(struct index *index)
 {
 	(void)index;
+	/* sptree_free? */
 }
 
 void
