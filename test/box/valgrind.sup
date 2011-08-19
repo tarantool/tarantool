@@ -27,30 +27,19 @@
    ...
 }
 
-
-##
-## third_party
-##
-
-
 ##
 ## libev internals
 ##
 
 {
-   <libev/libc internal stuff>
+   <uninitialized value>
    Memcheck:Param
    write(buf)
    fun:__write_nocancel
    fun:evpipe_write
    fun:ev_feed_signal
    fun:ev_sighandler
-   obj:*
-   fun:__epoll_wait_nocancel
-   fun:epoll_poll
-   fun:ev_run
-   fun:ev_loop
-   fun:main
+   ...
 }
 
 {
@@ -64,7 +53,7 @@
    fun:ev_loop_destroy
    fun:ev_default_destroy
    fun:tarantool_free
-   fun:main
+   ...
 }
 
 {
@@ -77,129 +66,77 @@
    fun:ev_loop_destroy
    fun:ev_default_destroy
    fun:tarantool_free
-   fun:main
-}
-
-{
-   <0 byte free>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:ev_realloc_emul
-   fun:ev_realloc
-   fun:epoll_destroy
-   fun:ev_loop_destroy
-   fun:ev_default_destroy
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-   fun:mod_init
-}
-
-{
-   <0 byte free>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:ev_realloc_emul
-   fun:ev_realloc
-   fun:ev_loop_destroy
-   fun:ev_default_destroy
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-   fun:mod_init
-   fun:main
-}
-
-
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:ev_realloc_emul
-   fun:ev_realloc
-   fun:epoll_destroy
-   fun:ev_loop_destroy
-   fun:ev_default_destroy
-   fun:tarantool_free
-   fun:exit
-   fun:(below main)
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:ev_realloc_emul
-   fun:ev_realloc
-   fun:ev_loop_destroy
-   fun:ev_default_destroy
-   fun:tarantool_free
-   fun:exit
-   fun:(below main)
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:ev_realloc_emul
-   fun:ev_realloc
-   fun:epoll_destroy
-   fun:ev_loop_destroy
-   fun:ev_default_destroy
-   fun:tarantool_free
-   fun:exit
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:ev_realloc_emul
-   fun:ev_realloc
-   fun:ev_loop_destroy
-   fun:ev_default_destroy
-   fun:tarantool_free
-   fun:exit
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-   fun:mod_init
-}
-
-{
-   <libev uninitialized value>
-   Memcheck:Param
-   write(buf)
-   fun:__write_nocancel
-   fun:evpipe_write
-   fun:ev_feed_signal
-   fun:ev_sighandler
-   obj:/lib64/libc-2.5.so
-   fun:__write_nocancel
-   fun:vsay
-   fun:_say
-   fun:fiber_serv_socket
-   fun:acceptor_handler
-   fun:fiber_loop
-   fun:coro_init
+   ...
 }
 
 ##
 ## realloc(ptr, 0)
 ##
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:kh_destroy_int_ptr_map
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_destroy_lstr_ptr_map
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:kh_destroy_fid2fiber
+   fun:fiber_free
+   fun:tarantool_free
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_destroy_lstr_ptr_map
+   fun:index_hash_str_free
+   fun:index_free
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_resize_lstr_ptr_map
+   fun:kh_put_lstr_ptr_map
+   fun:index_replace_hash_str
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:kh_resize_int_ptr_map
+   fun:kh_put_int_ptr_map
+   fun:index_replace_hash_num
+   ...
+}
 
 {
    <realloc with 0 byte>
@@ -216,286 +153,25 @@
    fun:main
 }
 
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:namespace_free
-   fun:mod_free
-   fun:exit
-   fun:(below main)
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:memcached_namespace_free
-   fun:namespace_free
-   fun:mod_free
-   fun:exit
-   fun:(below main)
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:namespace_free
-   fun:mod_free
-   fun:exit
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:memcached_namespace_free
-   fun:namespace_free
-   fun:mod_free
-   fun:exit
-   fun:blocking_loop
-   fun:spawn_child
-}
-
-
-
-
-
-{
-   <realloc with 0 byte>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_resize_lstr_ptr_map
-   fun:kh_put_lstr_ptr_map
-   fun:index_replace_hash_str
-   fun:prepare_replace
-   fun:box_dispatch
-   fun:box_process
-   fun:recover_row
-   fun:recover_wal
-   fun:recover_remaining_wals
-}
-
-{
-   <realloc with 0 byte>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_resize_lstr_ptr_map
-   fun:kh_put_lstr_ptr_map
-   fun:index_replace_hash_str
-   fun:prepare_replace
-   fun:box_dispatch
-   fun:box_process
-   fun:box_process_rw
-   fun:iproto_reply
-   fun:iproto_interact
-}
-
-##
-## realloc(ptr, 0) wal_writer
-##
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-}
-
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:memcached_namespace_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:memcached_namespace_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:tnt_xrealloc
-   fun:kh_destroy_lstr_ptr_map
-   fun:index_hash_str_free
-   fun:index_free
-   fun:memcached_namespace_free
-   fun:namespace_free
-   fun:mod_free
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:kh_destroy_fid2fiber
-   fun:fiber_free
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-   fun:mod_init
-   fun:main
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:kh_destroy_fid2fiber
-   fun:fiber_free
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-   fun:mod_init
-   fun:main
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:kh_destroy_fid2fiber
-   fun:fiber_free
-   fun:tarantool_free
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-   fun:mod_init
-   fun:main
-}
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:kh_destroy_fid2fiber
-   fun:fiber_free
-   fun:tarantool_free
-   fun:exit
-   fun:blocking_loop
-   fun:spawn_child
-   fun:recover_init
-   fun:mod_init
-   fun:main
-}
-
 ##
 ## backtrace
 ##
 
+## backtrace implementation is system specific and
+## produces alot of warnings.
+
 {
    <backtrace internals>
    Memcheck:Cond
    fun:backtrace
-   fun:fiber_info
-   fun:admin_dispatch
-   fun:admin_handler
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
+   ...
 }
 
 {
    <backtrace internals>
    Memcheck:Value8
    fun:backtrace
-   fun:fiber_info
-   fun:admin_dispatch
-   fun:admin_handler
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
+   ...
 }
 
 {
@@ -505,12 +181,7 @@
    fun:vsnprintf
    fun:snprintf
    fun:backtrace
-   fun:fiber_info
-   fun:admin_dispatch
-   fun:admin_handler
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
+   ...
 }
 
 {
@@ -521,12 +192,7 @@
    fun:vsnprintf
    fun:snprintf
    fun:backtrace
-   fun:fiber_info
-   fun:admin_dispatch
-   fun:admin_handler
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
+   ...
 }
 
 {
@@ -537,75 +203,14 @@
    fun:vsnprintf
    fun:snprintf
    fun:backtrace
-   fun:fiber_info
-   fun:admin_dispatch
-   fun:admin_handler
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
+   ...
 }
-
-{
-   <backtrace internals>
-   Memcheck:Cond
-   fun:vfprintf
-   fun:vsnprintf
-   fun:snprintf
-   fun:backtrace
-   fun:fiber_info
-   fun:admin_dispatch
-   fun:admin_handler
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
-}
-
-{
-   <backtrace internals>
-   Memcheck:Cond
-   fun:vfprintf
-   fun:vsnprintf
-   fun:snprintf
-   fun:backtrace
-   fun:fiber_info
-   fun:admin_dispatch
-   fun:admin_handler
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
-}
-
-{
-   <backtrace internals>
-   Memcheck:Cond
-   fun:vfprintf
-   fun:vsnprintf
-   fun:snprintf
-   fun:backtrace
-   fun:fiber_info
-   fun:admin_dispatch
-   fun:admin_handler
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
-}
-
-{
-   <backtrace internals>
-   Memcheck:Value8
-   fun:backtrace
-   fun:fiber_info
-   fun:admin_dispatch
-   fun:admin_handler
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
-}
-
 
 ##
 ## box allocations
 ## 
+
+## we can't directly free tuple allocations.
 
 {
    <box>
@@ -637,4 +242,65 @@
    fun:recover
    fun:mod_init
    fun:main
+}
+
+{
+   <box>
+   Memcheck:Leak
+   fun:salloc
+   fun:tuple_alloc
+   fun:prepare_replace
+   fun:box_dispatch
+   fun:box_process
+   fun:box_process_rw
+   fun:store
+   fun:memcached_dispatch
+   fun:memcached_handler
+   ...
+}
+
+{
+   <box>
+   Memcheck:Leak
+   fun:salloc
+   fun:tuple_alloc
+   fun:prepare_replace
+   fun:box_dispatch
+   fun:box_process
+   fun:box_process_rw
+   fun:iproto_reply
+   fun:iproto_interact
+   fun:fiber_loop
+   fun:coro_init
+   obj:*
+}
+
+## sptree
+##
+
+## third_party sptree implementation doesn't have
+## destroy function.
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:sptree_str_t_init
+   fun:build_indexes
+   ...
+}
+
+# iterator_init_set calls realloc only if iterator value not
+# initialized or have lower depth.
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:sptree_str_t_iterator_init_set
+   fun:index_iterator_init_tree_str
+   fun:process_select
+   ...
 }
