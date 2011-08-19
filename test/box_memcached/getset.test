@@ -64,5 +64,4 @@ while len < (1024 * 1028):
 # resore default suite config
 server.stop()
 server.deploy(self.suite_ini["config"])
-server.start()
 # vim: syntax=python

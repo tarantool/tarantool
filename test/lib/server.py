@@ -191,10 +191,12 @@ class Server(object):
             return
 
         self.process = pexpect.spawn(args[0], args[1:], cwd = self.vardir)
+
         # wait until the server is connected
         self.wait_until_started()
         # Set is_started flag, to nicely support cleanup during an exception.
         self.is_started = True
+
 
     def stop(self, silent=True):
         """Stop server instance. Do nothing if the server is not started,
@@ -212,10 +214,17 @@ class Server(object):
             self.kill_old_server()
             return
 
+
         # kill process
-        self.process.kill(signal.SIGTERM)
-        self.process.expect(pexpect.EOF)
+        os.kill(self.read_pidfile(), signal.SIGTERM)
+        #self.process.kill(signal.SIGTERM)
+        if self.gdb:
+            self.process.expect(pexpect.EOF, timeout = 1 << 30)
+        else:
+            self.process.expect(pexpect.EOF)
         self.process.close()
+
+        self.wait_until_stoped()
         # clean-up processs flags
         self.is_started = False
         self.process = None
@@ -283,7 +292,7 @@ class Server(object):
     def wait_until_started(self):
         """Wait until the server is started and accepting connections"""
 
-        while (self.read_pidfile() != self.process.pid):
+        while self.read_pidfile() == -1:
             time.sleep(0.001)
 
         is_connected = False
@@ -295,4 +304,22 @@ class Server(object):
                 sock.close()
             except socket.error as e:
                 time.sleep(0.001)
+
+    def wait_until_stoped(self):
+        """Wait until the server is stoped and close sockets"""
+
+        while self.read_pidfile() != -1:
+            time.sleep(0.001)
+
+        is_connected = False
+        while not is_connected:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.connect(("localhost", self.port))
+                is_connected = True
+                sock.close()
+                time.sleep(0.001)
+                continue
+            except socket.error as e:
+                break
 

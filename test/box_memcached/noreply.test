@@ -40,5 +40,4 @@ exec memcached "get noreply:foo\r\n"
 # resore default suite config
 server.stop()
 server.deploy(self.suite_ini["config"])
-server.start()
 # vim: syntax=python

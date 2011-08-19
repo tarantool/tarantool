@@ -33,7 +33,6 @@ else:
 # resore default suite config
 server.stop()
 server.deploy(self.suite_ini["config"])
-server.start()
 # check that we print clear memcached stats
 exec admin "show stat"
 # vim: syntax=python
