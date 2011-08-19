@@ -73,7 +73,7 @@ class Server(object):
         self.config = None
         self.vardir = None
         self.valgrind_log = "valgrind.log"
-        self.valgrind_sup = None
+        self.valgrind_sup = os.path.join("share/", "%s_%s.sup" % (core, module))
         self.default_suppression_name = "valgrind.sup"
         self.pidfile = None
         self.port = None
@@ -239,7 +239,6 @@ class Server(object):
         if start_and_exit != None: self.start_and_exit = start_and_exit
         if gdb != None: self.gdb = gdb
         if valgrind != None: self.valgrind = valgrind
-        if valgrind_sup != None: self.valgrind_sup = valgrind_sup
 
         self.configure(self.config)
         self.install(self.binary, self.vardir, self.mem, silent)
