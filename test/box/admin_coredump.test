@@ -1,0 +1,7 @@
+# encoding: tarantool
+# 
+import sys
+# moved to separete test becouse this test fail in the valgrind mode (coredump
+# process terminated via abort procedure).
+exec admin "save coredump"
+# vim: syntax=python

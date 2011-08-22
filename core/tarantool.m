@@ -333,7 +333,6 @@ tarantool_free(void)
 
 	fiber_free();
 	palloc_free();
-	salloc_destroy();
 
 	ev_default_destroy();
 #ifdef ENABLE_GCOV
