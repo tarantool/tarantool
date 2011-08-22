@@ -42,6 +42,7 @@
 
 #include <mod/box/box.h>
 #include <mod/box/index.h>
+#include <mod/box/tuple.h>
 
 const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
 const char *index_type_strs[] = { "HASH", "TREE", "\0" };
@@ -220,7 +221,7 @@ tuple2tree_index_member(struct index *index,
 	void *tuple_data = tuple->data;
 
 	if (member_p == NULL || *member_p == NULL)
-		member = palloc(fiber->pool, SIZEOF_TREE_INDEX_MEMBER(index));
+		member = palloc(fiber->gc_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 	else
 		member = *member_p;
 

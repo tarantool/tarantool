@@ -13,8 +13,8 @@ set big 0 0 262144
 <big-value-upper-case>
 STORED
 
-# recv reply 'get big' from firs memcached client 
-succes: buf == reply
+# recv reply 'get big' from the first memcached client 
+success: buf == reply
 show stat
 ---
 statistics:
@@ -24,6 +24,7 @@ statistics:
   UPDATE_FIELDS:     { rps:  0    , total:  0           }
   DELETE_1_3:        { rps:  0    , total:  0           }
   DELETE:            { rps:  0    , total:  0           }
+  CALL:              { rps:  0    , total:  0           }
   MEMC_GET:          { rps:  0    , total:  0           }
   MEMC_GET_MISS:     { rps:  0    , total:  0           }
   MEMC_GET_HIT:      { rps:  0    , total:  0           }

@@ -1,0 +1,32 @@
+# encoding: tarantool
+# Test Lua from admin console. Whenever producing output,
+# make sure it's a valid YAML.
+exec admin "lua"
+exec admin "lua 1"
+exec admin "lua print('  lua says: hello')"
+# What's in the box? 
+exec admin "lua for n in pairs(box) do print('  - box.', n) end"
+# Test box.pack()
+exec admin "lua box.pack()"
+exec admin "lua box.pack(1)"
+exec admin "lua box.pack('abc')"
+exec admin "lua print(box.pack('a', ' - hello'))"
+exec admin "lua print(box.pack('Aa', ' - hello', ' world'))"
+exec admin "lua print(box.pack('w', 0x30))"
+exec admin "lua print(box.pack('www', 0x30, 0x30, 0x30))"
+exec admin "lua print(box.pack('www', 0x3030, 0x30))"
+exec admin "lua print(string.byte(box.pack('w', 212345), 1, 2))"
+exec admin "lua print(box.pack('p', 'this string is 45 characters long 1234567890 '))"
+# Test the low-level box.process() call, which takes a binary packet
+# and passes it to box for execution.
+# insert:
+exec admin "lua box.process(13, box.pack('iiippp', 0, 1, 3, box.pack('i', 1), 'testing', 'lua rocks'))"
+# select:
+exec admin "lua box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, box.pack('i', 1)))"
+# delete:
+exec admin "lua box.process(21, box.pack('iiip', 0, 1, 1, box.pack('i', 1)))"
+# check delete:
+exec admin "lua box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, box.pack('i', 1)))"
+exec admin "lua box.process(22, box.pack('iii', 0, 0, 0))"
+exec sql "call box.process('abc', 'def')"
+exec sql "call box.pack('test')"

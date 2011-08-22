@@ -65,7 +65,7 @@ iproto_interact(iproto_callback *callback)
 		 * next header.
 		 */
 		if (to_read > 0) {
-			if (fiber_flush_output() < 0) {
+			if (iov_flush() < 0) {
 				say_warn("io_error: %s", strerror(errno));
 				break;
 			}
@@ -82,18 +82,18 @@ static void iproto_reply(iproto_callback callback, struct tbuf *request)
 {
 	struct iproto_header_retcode *reply;
 
-	reply = palloc(fiber->pool, sizeof(*reply));
+	reply = palloc(fiber->gc_pool, sizeof(*reply));
 	reply->msg_code = iproto(request)->msg_code;
 	reply->sync = iproto(request)->sync;
 
 	if (unlikely(reply->msg_code == msg_ping)) {
 		reply->len = 0;
-		add_iov(reply, sizeof(struct iproto_header));
+		iov_add(reply, sizeof(struct iproto_header));
 		return;
 	}
 
 	reply->len = sizeof(uint32_t); /* ret_code */
-	add_iov(reply, sizeof(struct iproto_header_retcode));
+	iov_add(reply, sizeof(struct iproto_header_retcode));
 	size_t saved_iov_cnt = fiber->iov_cnt;
 	/* make request point to iproto data */
 	request->len = iproto(request)->len;
@@ -107,7 +107,7 @@ static void iproto_reply(iproto_callback callback, struct tbuf *request)
 		fiber->iov->len -= (fiber->iov_cnt - saved_iov_cnt) * sizeof(struct iovec);
 		fiber->iov_cnt = saved_iov_cnt;
 		reply->ret_code = tnt_errcode_val(e->errcode);
-		add_iov_dup(e->errmsg, strlen(e->errmsg)+1);
+		iov_dup(e->errmsg, strlen(e->errmsg)+1);
 	}
 	for (; saved_iov_cnt < fiber->iov_cnt; saved_iov_cnt++)
 		reply->len += iovec(fiber->iov)[saved_iov_cnt].iov_len;

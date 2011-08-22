@@ -11,7 +11,6 @@ exec admin "show stat"
 exec sql "insert into t0 values (1, 'tuple')"
 exec admin "save snapshot"
 exec sql "delete from t0 where k0 = 1"
-exec admin "exec module command"
 sys.stdout.push_filter("(\d)\.\d\.\d(-\d+-\w+)?", "\\1.minor.patch-<rev>-<commit>")
 sys.stdout.push_filter("pid: \d+", "pid: <pid>")
 sys.stdout.push_filter("uptime: \d+", "uptime: <uptime>")

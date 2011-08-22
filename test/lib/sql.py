@@ -19,6 +19,7 @@ class sqlScanner(runtime.Scanner):
         ('\\s+', re.compile('\\s+')),
         ('NUM', re.compile('[+-]?[0-9]+')),
         ('ID', re.compile('[a-z_]+[0-9]+')),
+        ('PROC_ID', re.compile('[a-z_][a-z0-9_.]*')),
         ('STR', re.compile("'([^']+|\\\\.)*'")),
         ('PING', re.compile('ping')),
         ('INSERT', re.compile('insert')),
@@ -32,6 +33,7 @@ class sqlScanner(runtime.Scanner):
         ('SET', re.compile('set')),
         ('OR', re.compile('or')),
         ('LIMIT', re.compile('limit')),
+        ('CALL', re.compile('call')),
         ('END', re.compile('\\s*$')),
     ]
     def __init__(self, str,*args,**kw):
@@ -41,7 +43,7 @@ class sql(runtime.Parser):
     Context = runtime.Context
     def sql(self, _parent=None):
         _context = self.Context(_parent, self._scanner, 'sql', [])
-        _token = self._peek('INSERT', 'UPDATE', 'DELETE', 'SELECT', 'PING', context=_context)
+        _token = self._peek('INSERT', 'UPDATE', 'DELETE', 'SELECT', 'CALL', 'PING', context=_context)
         if _token == 'INSERT':
             insert = self.insert(_context)
             stmt = insert
@@ -54,6 +56,9 @@ class sql(runtime.Parser):
         elif _token == 'SELECT':
             select = self.select(_context)
             stmt = select
+        elif _token == 'CALL':
+            call = self.call(_context)
+            stmt = call
         else: # == 'PING'
             ping = self.ping(_context)
             stmt = ping
@@ -101,6 +106,13 @@ class sql(runtime.Parser):
         _context = self.Context(_parent, self._scanner, 'ping', [])
         PING = self._scan('PING', context=_context)
         return sql_ast.StatementPing()
+
+    def call(self, _parent=None):
+        _context = self.Context(_parent, self._scanner, 'call', [])
+        CALL = self._scan('CALL', context=_context)
+        PROC_ID = self._scan('PROC_ID', context=_context)
+        value_list = self.value_list(_context)
+        return sql_ast.StatementCall(PROC_ID, value_list)
 
     def predicate(self, _parent=None):
         _context = self.Context(_parent, self._scanner, 'predicate', [])

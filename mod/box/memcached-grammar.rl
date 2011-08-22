@@ -35,7 +35,7 @@ memcached_dispatch()
 	int cs;
 	u8 *p, *pe;
 	u8 *fstart;
-	struct tbuf *keys = tbuf_alloc(fiber->pool);
+	struct tbuf *keys = tbuf_alloc(fiber->gc_pool);
 	void *key;
 	bool append, show_cas;
 	int incr_sign;
@@ -64,7 +64,7 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple != NULL && !expired(tuple))
-				add_iov("NOT_STORED\r\n", 12);
+				iov_add("NOT_STORED\r\n", 12);
 			else
 				STORE;
 		}
@@ -73,7 +73,7 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
-				add_iov("NOT_STORED\r\n", 12);
+				iov_add("NOT_STORED\r\n", 12);
 			else
 				STORE;
 		}
@@ -82,9 +82,9 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
-				add_iov("NOT_FOUND\r\n", 11);
+				iov_add("NOT_FOUND\r\n", 11);
 			else if (meta(tuple)->cas != cas)
-				add_iov("EXISTS\r\n", 8);
+				iov_add("EXISTS\r\n", 8);
 			else
 				STORE;
 		}
@@ -97,11 +97,11 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST) {
-				add_iov("NOT_STORED\r\n", 12);
+				iov_add("NOT_STORED\r\n", 12);
 			} else {
 				value = tuple_field(tuple, 3);
 				value_len = load_varint32(&value);
-				b = tbuf_alloc(fiber->pool);
+				b = tbuf_alloc(fiber->gc_pool);
 				if (append) {
 					tbuf_append(b, value, value_len);
 					tbuf_append(b, data, bytes);
@@ -126,7 +126,7 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
-				add_iov("NOT_FOUND\r\n", 11);
+				iov_add("NOT_FOUND\r\n", 11);
 			} else {
 				m = meta(tuple);
 				field = tuple_field(tuple, 3);
@@ -147,7 +147,7 @@ memcached_dispatch()
 					exptime = m->exptime;
 					flags = m->flags;
 
-					b = tbuf_alloc(fiber->pool);
+					b = tbuf_alloc(fiber->gc_pool);
 					tbuf_printf(b, "%"PRIu64, value);
 					data = b->data;
 					bytes = b->len;
@@ -156,16 +156,16 @@ memcached_dispatch()
 					@try {
 						store(key, exptime, flags, bytes, data);
 						stats.total_items++;
-						add_iov(b->data, b->len);
-						add_iov("\r\n", 2);
+						iov_add(b->data, b->len);
+						iov_add("\r\n", 2);
 					}
 					@catch (ClientError *e) {
-						add_iov("SERVER_ERROR ", 13);
-						add_iov(e->errmsg, strlen(e->errmsg));
-						add_iov("\r\n", 2);
+						iov_add("SERVER_ERROR ", 13);
+						iov_add(e->errmsg, strlen(e->errmsg));
+						iov_add("\r\n", 2);
 					}
 				} else {
-					add_iov("CLIENT_ERROR cannot increment or decrement non-numeric value\r\n", 62);
+					iov_add("CLIENT_ERROR cannot increment or decrement non-numeric value\r\n", 62);
 				}
 			}
 
@@ -175,96 +175,34 @@ memcached_dispatch()
 			key = read_field(keys);
 			struct box_tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
-				add_iov("NOT_FOUND\r\n", 11);
+				iov_add("NOT_FOUND\r\n", 11);
 			} else {
 				@try {
 					delete(key);
-					add_iov("DELETED\r\n", 9);
+					iov_add("DELETED\r\n", 9);
 				}
 				@catch (ClientError *e) {
-					add_iov("SERVER_ERROR ", 13);
-					add_iov(e->errmsg, strlen(e->errmsg));
-					add_iov("\r\n", 2);
+					iov_add("SERVER_ERROR ", 13);
+					iov_add(e->errmsg, strlen(e->errmsg));
+					iov_add("\r\n", 2);
 				}
 			}
 		}
 
 		action get {
-			struct box_txn *txn = txn_alloc(BOX_QUIET);
-			txn->op = SELECT;
-			fiber_register_cleanup((void *)txn_cleanup, txn);
-			stat_collect(stat_base, MEMC_GET, 1);
-			stats.cmd_get++;
-			say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
-			iov_ensure(keys_count * 5 + 1);
-			while (keys_count-- > 0) {
-				struct box_tuple *tuple;
-				struct meta *m;
-				void *field;
-				void *value;
-				void *suffix;
-				u32 key_len;
-				u32 value_len;
-				u32 suffix_len;
-				u32 _l;
-
-				key = read_field(keys);
-				tuple = find(key);
-				key_len = load_varint32(&key);
-
-				if (tuple == NULL || tuple->flags & GHOST) {
-					stat_collect(stat_base, MEMC_GET_MISS, 1);
-					stats.get_misses++;
-					continue;
-				}
-
-				field = tuple->data;
-
-				/* skip key */
-				_l = load_varint32(&field);
-				field += _l;
-
-				/* metainfo */
-				_l = load_varint32(&field);
-				m = field;
-				field += _l;
-
-				/* suffix */
-				suffix_len = load_varint32(&field);
-				suffix = field;
-				field += suffix_len;
-
-				/* value */
-				value_len = load_varint32(&field);
-				value = field;
-
-				if (m->exptime > 0 && m->exptime < ev_now()) {
-					stats.get_misses++;
-					stat_collect(stat_base, MEMC_GET_MISS, 1);
-					continue;
-				} else {
-					stats.get_hits++;
-					stat_collect(stat_base, MEMC_GET_HIT, 1);
-				}
-
-				tuple_txn_ref(txn, tuple);
-
-				if (show_cas) {
-					struct tbuf *b = tbuf_alloc(fiber->pool);
-					tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (u8 *)key, m->flags, value_len, m->cas);
-					add_iov_unsafe(b->data, b->len);
-					stats.bytes_written += b->len;
-				} else {
-					add_iov_unsafe("VALUE ", 6);
-					add_iov_unsafe(key, key_len);
-					add_iov_unsafe(suffix, suffix_len);
-				}
-				add_iov_unsafe(value, value_len);
-				add_iov_unsafe("\r\n", 2);
-				stats.bytes_written += value_len + 2;
+			struct box_txn *txn = txn_begin();
+			txn->flags |= BOX_GC_TXN;
+			txn->out = &box_out_quiet;
+			@try {
+				memcached_get(txn, keys_count, keys, show_cas);
+				txn_commit(txn);
+			} @catch (ClientError *e) {
+				txn_rollback(txn);
+				iov_reset();
+				iov_add("SERVER_ERROR ", 13);
+				iov_add(e->errmsg, strlen(e->errmsg));
+				iov_add("\r\n", 2);
 			}
-			add_iov_unsafe("END\r\n", 5);
-			stats.bytes_written += 5;
 		}
 
 		action flush_all {
@@ -274,7 +212,7 @@ memcached_dispatch()
 					fiber_call(f);
 			} else
 				flush_all((void *)0);
-			add_iov("OK\r\n", 4);
+			iov_add("OK\r\n", 4);
 		}
 
 		action stats {
@@ -376,14 +314,14 @@ memcached_dispatch()
 		if (pe - p > (1 << 20)) {
 		exit:
 			say_warn("memcached proto error");
-			add_iov("ERROR\r\n", 7);
+			iov_add("ERROR\r\n", 7);
 			stats.bytes_written += 7;
 			return -1;
 		}
 		char *r;
 		if ((r = memmem(p, pe - p, "\r\n", 2)) != NULL) {
 			tbuf_peek(fiber->rbuf, r + 2 - (char *)fiber->rbuf->data);
-			add_iov("CLIENT_ERROR bad command line format\r\n", 38);
+			iov_add("CLIENT_ERROR bad command line format\r\n", 38);
 			return 1;
 		}
 		return 0;

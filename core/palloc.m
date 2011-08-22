@@ -68,7 +68,7 @@ struct palloc_pool {
 	struct chunk_list_head chunks;
 	 SLIST_ENTRY(palloc_pool) link;
 	size_t allocated;
-	char name[PALLOC_POOL_NAME_MAXLEN];
+	const char *name;
 };
 
 SLIST_HEAD(palloc_pool_head, palloc_pool) pools;
@@ -409,8 +409,7 @@ palloc_stat(struct tbuf *buf)
 void
 palloc_set_name(struct palloc_pool *pool, const char *name)
 {
-	assert(name != NULL);
-	snprintf(pool->name, sizeof(pool->name), "%s", name);
+	pool->name = name;
 }
 
 size_t

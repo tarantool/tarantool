@@ -5,11 +5,13 @@ config.mk
 lcov
 *.o
 *.a
+*.so
 *.d
 test/var
 test/lib/*.pyc
 test/lib/*/*.pyc
 test/box/protocol
+test/box/connector
 Makefile
 CMakeFiles
 CMakeCache.txt

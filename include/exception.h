@@ -31,6 +31,7 @@
 #import <objc/Object.h>
 #include <stdarg.h>
 #include "errcode.h"
+#include "say.h"
 
 /** The base class for all exceptions.
  *
