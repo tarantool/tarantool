@@ -372,21 +372,6 @@ memcached_namespace_init()
 }
 
 void
-memcached_namespace_free()
-{
-	struct namespace *memc_ns;
-	struct index *memc_index;
-
-	memc_ns = &namespace[cfg.memcached_namespace];
-	memc_index = &memc_ns->index[0];
-
-	index_free(memc_index);
-
-	sfree(memc_index->key_field);
-	sfree(memc_index->field_cmp_order);
-}
-
-void
 memcached_expire_loop(void *data __attribute__((unused)))
 {
 	static khiter_t i;
