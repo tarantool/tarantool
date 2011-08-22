@@ -311,7 +311,9 @@ class StatementCall(StatementSelect):
 
     def __init__(self, proc_name, value_list):
         self.proc_name = proc_name
-        self.value_list= value_list
+# the binary protocol passes everything into procedure as strings
+# convert input to strings to avoid data mangling by the protocol
+        self.value_list = map(lambda val: str(val), value_list)
 
     def pack(self):
         buf = ctypes.create_string_buffer(PACKET_BUF_LEN)

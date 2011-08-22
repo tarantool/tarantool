@@ -118,8 +118,76 @@
 <section>
   <title>Writing stored procedures in Lua</title>
   <para>
-    Lua.
+    Lua is a light-weight, multi-paradigm embeddable language.
+    Tarantool/Box supports allows user to dynamically define,
+    alter, drop using the administrative console.
+    The procedures can be invoked Lua both from the administrative
+    console and using a binary protocol, for example:
+<programlisting>
+tarantool> lua function f1() return 'hello' end
+---
+...
+tarantool> call f1()
+Found 1 tuple:
+['hello']
+</programlisting>
   </para>
+  <para>
+    There is a single global Lua interpreter state, which is
+    shared across all connections. Each connection, however, is
+    running in its own Lua <quote>thread</quote> -- a mechanism, akin to
+    Tarantool <quote>fibers</quote>.
+    Anything, prefixed with "lua " on the administrative console
+    is sent directly to the interpreter. In the binary protocol,
+    however, it is only possible to invoke Lua functions, but not
+    define or modify them.
+    A special command code designates invocation of a stored
+    program in the binary protocol. The tuple, sent as argument
+    of the command, is passed into the stored procedure, each
+    field of the tuple converted to a string parameter of the
+    procedure. As long as currently Tarantool tuples are
+    type-agnostic, Lua strings is chosen as the transport means
+    between the server and the interpreter.
+  </para>
+  <para>
+    Everything value, returned from a stored function by means of
+    <quote>return</quote> clause, is converted to Tarantool/Box tuple
+    and sent back to the client in binary form.
+  </para>
+  <para>
+    It's possible not only to invoke trivial Lua code, but call
+    into Tarantool/Box storage functionality, using <quote>box</quote>
+    Lua library.
+    The main means of communication between Lua and Tarantool
+    is <quote>box.process()</quote> function, which allows
+    to send any kind of request to the server in the binary form.
+    Function <quote>box.process()</quote> is a server-side outlet
+    for Tarantool binary protocol. Any tuple returned by the
+    server is converted to a Lua object of tupe <quote>box.tuple</quote>
+    and appended to the return list of <quote>box.process()</quote>.
+  </para>
+  <para>
+    A few wrappers are defined to simplify the most common
+    tasks:
+    <itemizedlist>
+        <listitem><para><quote>box.select(namespace, key, ...)</quote>
+        to retrieve tuples. </para></listitem>
+        <listitem><para><quote>box.replace(namespace, ...)</quote>
+        to insert and replace tuples. The tuple is constructed
+        from all the remaining arguments passed into the function.</para></listitem>
+        <listitem><para><quote>box.update(namespace, key, tuple)</quote> and <quote>box.delete(namespace, key)</quote>for updates and deletes respectively.</para></listitem>
+    </itemizedlist>
+    The Lua source code of these wrappers, as well as a more
+    extensive documentation can be found in <filename>mod/box/box.lua</filename> file in the source tree.
+  </para>
+  <section>
+  <title>Replication of stored procedures</title>
+  <para>
+    The CALL statement itself does not enter Tarantool write ahead
+    log. Instead, the actual updates and deletes, performed by
+    the procedure, generate their own log events.
+  </para>
+  </section>
 </section>
 
 

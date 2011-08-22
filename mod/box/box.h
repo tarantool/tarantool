@@ -58,7 +58,6 @@ struct box_out {
 };
 
 extern struct box_out box_out_quiet;
-extern struct box_out box_out_iproto;
 
 struct box_txn {
 	u16 op;
@@ -101,18 +100,18 @@ struct box_txn {
         _(DELETE, 8)
         _(UPDATE_FIELDS, 9)
         _(INSERT,10)
+        _(JUBOX_ALIVE, 11)
         _(SELECT_LIMIT, 12)
         _(SELECT_OLD, 14)
+        _(SELECT_LIMIT, 15)
         _(UPDATE_FIELDS_OLD, 16)
-        _(JUBOX_ALIVE, 11)
 
     DO NOT use these ids!
  */
 #define MESSAGES(_)				\
-        _(INSERT, 13)				\
-        _(SELECT_LIMIT, 15)			\
+        _(REPLACE, 13)				\
 	_(SELECT, 17)				\
-	_(UPDATE_FIELDS, 19)			\
+	_(UPDATE, 19)				\
 	_(DELETE_1_3, 20)			\
 	_(DELETE, 21)				\
 	_(CALL, 22)

@@ -1,0 +1,4 @@
+# encoding: tarantool
+exec sql "insert into t1 values ('brave', 'new', 'world')"
+exec sql "call box.select(1, 1, 'new', 'world')"
+exec sql "call box.delete(1, 'brave')"

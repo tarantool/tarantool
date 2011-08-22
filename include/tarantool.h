@@ -66,6 +66,9 @@ struct lua_State *tarantool_lua_init();
  * Created with tarantool_lua_init().
  */
 extern struct lua_State *tarantool_L;
+/* Call Lua 'tostring' built-in to print userdata nicely. */
+const char *
+tarantool_lua_tostring(struct lua_State *L, int index);
 
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;

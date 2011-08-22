@@ -26,7 +26,7 @@ Insert OK, 1 row affected
 show stat
 ---
 statistics:
-  INSERT:        { rps:  2    , total:  10          }
+  REPLACE:       { rps:  2    , total:  10          }
   SELECT_LIMIT:  { rps:  0    , total:  0           }
   SELECT:        { rps:  0    , total:  0           }
   UPDATE_FIELDS: { rps:  0    , total:  0           }
@@ -45,7 +45,7 @@ statistics:
 show stat
 ---
 statistics:
-  INSERT:        { rps:  0    , total:  0           }
+  REPLACE:       { rps:  0    , total:  0           }
   SELECT_LIMIT:  { rps:  0    , total:  0           }
   SELECT:        { rps:  0    , total:  0           }
   UPDATE_FIELDS: { rps:  0    , total:  0           }

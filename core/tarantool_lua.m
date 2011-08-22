@@ -50,6 +50,21 @@ luaL_addvarint32(luaL_Buffer *b, u32 u32)
 	luaL_addlstring(b, tbuf.data, tbuf.len);
 }
 
+/* Convert box.pack() format specifier to Tarantool
+ * binary protocol UPDATE opcode
+ */
+static char format_to_opcode(char format)
+{
+	switch (format) {
+	case '=': return 0;
+	case '+': return 1;
+	case '&': return 2;
+	case '|': return 3;
+	case '^': return 4;
+	default: return format;
+	}
+}
+
 /**
  * To use Tarantool/Box binary protocol primitives from Lua, we
  * need a way to pack Lua variables into a binary representation.
@@ -63,7 +78,7 @@ luaL_addvarint32(luaL_Buffer *b, u32 u32)
  *
  * For example, a typical SELECT packet packs in Lua like this:
  *
- * pkt = box.pack("uuuuuup", -- pack format
+ * pkt = box.pack("iiiiiip", -- pack format
  *                         0, -- namespace id
  *                         0, -- index id
  *                         0, -- offset
@@ -81,41 +96,56 @@ lbox_pack(struct lua_State *L)
 	luaL_Buffer b;
 	const char *format = luaL_checkstring(L, 1);
 	int i = 2; /* first arg comes second */
+	int nargs = lua_gettop(L);
+	u32 u32buf;
+	size_t size;
+	const char *str;
 
 	luaL_buffinit(L, &b);
 
 	while (*format) {
+		if (i > nargs)
+			luaL_error(L, "box.pack: argument count does not match the format");
 		switch (*format) {
 		/* signed and unsigned 32-bit integers */
 		case 'I':
 		case 'i':
 		{
-			u32 u32 = luaL_checkinteger(L, i);
-			luaL_addlstring(&b, (const char *)&u32, sizeof(u32));
+			u32buf = lua_tointeger(L, i);
+			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
 			break;
 		}
 		/* Perl 'pack' BER-encoded integer */
 		case 'w':
-			luaL_addvarint32(&b, luaL_checkinteger(L, i));
+			luaL_addvarint32(&b, lua_tointeger(L, i));
 			break;
 		/* A sequence of bytes */
 		case 'A':
 		case 'a':
-		{
-			size_t size;
-			const char *str = luaL_checklstring(L, i, &size);
+			str = luaL_checklstring(L, i, &size);
 			luaL_addlstring(&b, str, size);
 			break;
-		}
 		case 'P':
 		case 'p':
-		{
-			size_t size;
-			const char *str = luaL_checklstring(L, i, &size);
+			if (lua_type(L, i) == LUA_TNUMBER) {
+				u32buf= (u32) lua_tointeger(L, i);
+				str = (char *) &u32buf;
+				size = sizeof(u32);
+			} else {
+				str = luaL_checklstring(L, i, &size);
+			}
 			luaL_addvarint32(&b, size);
 			luaL_addlstring(&b, str, size);
 			break;
-		}
+		case '=': /* update tuple set foo=bar */
+		case '+': /* set field+=val */
+		case '&': /* set field&=val */
+		case '|': /* set field|=val */
+		case '^': /* set field^=val */
+			u32buf= (u32) lua_tointeger(L, i); /* field no */
+			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
+			luaL_addchar(&b, format_to_opcode(*format));
+			break;
 		default:
 			luaL_error(L, "box.pack: unsupported pack "
 				   "format specifier '%c'", *format);
@@ -138,9 +168,11 @@ static const struct luaL_reg boxlib[] = {
  * lua_tostring does no use __tostring metamethod, and it has
  * to be called if we want to print Lua userdata correctly.
  */
-static const char *
+const char *
 tarantool_lua_tostring(struct lua_State *L, int index)
 {
+	if (index < 0) /* we need an absolute index */
+		index = lua_gettop(L) + index + 1;
 	lua_getglobal(L, "tostring");
 	lua_pushvalue(L, index);
 	lua_call(L, 1, 1); /* pops both "tostring" and its argument */
@@ -251,9 +283,17 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 	int r = luaL_loadstring(L, tbuf_str(buf));
 	if (r) {
 		lua_pop(L, 1); /* pop the error message */
-		return luaL_dostring(L, str);
+		r = luaL_loadstring(L, str);
+		if (r)
+			return r;
 	}
-	return lua_pcall(L, 0, LUA_MULTRET, 0);
+	@try {
+		lua_call(L, 0, LUA_MULTRET);
+	} @catch (ClientError *e) {
+		lua_pushstring(L, e->errmsg);
+		return 1;
+	}
+	return 0;
 }
 
 void

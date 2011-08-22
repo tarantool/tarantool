@@ -63,8 +63,8 @@ parser sql:
                       {{ return disjunction }}
     rule opt_limit:   {{ return 0xffffffff }}
                       | LIMIT NUM {{ return int(NUM) }}
-    rule value_list:  '\(' expr {{ value_list = [expr] }}
-                          [("," expr {{ value_list.append(expr) }} )+]
+    rule value_list:  '\(' {{ value_list = [] }}
+                         [expr {{ value_list = [expr] }} [("," expr {{ value_list.append(expr) }} )+]]
                       '\)' {{ return value_list }}
     rule update_list: predicate {{ update_list = [predicate] }}
                       [(',' predicate {{ update_list.append(predicate) }})+]
