@@ -186,6 +186,7 @@ replication_prefork()
 			panic("set_nonblock");
 	} else {
 		ev_default_fork();
+		ev_loop(EVLOOP_NONBLOCK);
 		/* child process: spawner */
 		close(sockpair[0]);
 		/*
@@ -453,6 +454,7 @@ spawner_create_replication_relay(int client_sock)
 
 	if (pid == 0) {
 		ev_default_fork();
+		ev_loop(EVLOOP_NONBLOCK);
 		close(spawner.sock);
 		replication_relay_loop(client_sock);
 	} else {

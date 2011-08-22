@@ -1062,6 +1062,7 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		/* it is safier to tell libev about fork, even
 		 * if child wont' use it. */
 		ev_default_fork();
+		ev_loop(EVLOOP_NONBLOCK);
 
 		char child_name[sizeof(fiber->name)];
 		/*
