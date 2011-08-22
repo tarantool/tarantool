@@ -350,5 +350,5 @@ mod_lua_init(struct lua_State *L)
 
 void box_lua_init()
 {
-	root_L = tarantool_lua_init();
+	root_L = tarantool_L;
 }

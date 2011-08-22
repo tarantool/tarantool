@@ -1464,41 +1464,11 @@ case 107:
 	return fiber_write(out->data, out->len);
 }
 
-/**
-  We need to be able to print from Lua back to the
- * administrative console. For that, we register this
- * function as Lua 'print'. However, administrative
- * console output must be YAML-compatible. If this is
- * done automatically, the result is ugly, so we don't
- * do it. A creator of Lua procedures has to do it
- * herself.  Best we can do here is to add a trailing
- * \r\n if it's forgotten.
- */
-
-static int
-lbox_adminprint(struct lua_State *L)
-{
-	int n = lua_gettop(L);
-	lua_pushstring(L, "out");
-	lua_gettable(L, LUA_REGISTRYINDEX);
-	struct tbuf *out = (struct tbuf *) lua_topointer(L, -1);
-	for (int i = 1; i <= n; i++)
-		tbuf_printf(out, "%s", lua_tostring(L, i));
-	/* Courtesy: append YAML line-end if it is not there */
-	if (out->len < 2 || tbuf_str(out)[out->len-1] != '\n')
-		tbuf_printf(out, "\r\n");
-	return 0;
-}
-
 static void
 admin_handler(void *data __attribute__((unused)))
 {
-	/*
-	 * Create a disposable Lua interpreter state
-	 * for every new connection.
-	 */
-	lua_State *L = tarantool_lua_init();
-	lua_register(L, "print", lbox_adminprint);
+	lua_State *L = lua_newthread(tarantool_L);
+	int coro_index = lua_gettop(tarantool_L);
 	@try {
 		for (;;) {
 			if (admin_dispatch(L) <= 0)
@@ -1506,7 +1476,7 @@ admin_handler(void *data __attribute__((unused)))
 			fiber_gc();
 		}
 	} @finally {
-		lua_close(L);
+		lua_remove(tarantool_L, coro_index);
 	}
 }
 

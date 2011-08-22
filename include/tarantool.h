@@ -60,6 +60,13 @@ struct lua_State *mod_lua_init(struct lua_State *L);
  * @return  L on success, 0 if out of memory
  */
 struct lua_State *tarantool_lua_init();
+
+/*
+ * Single global lua_State shared by core and modules.
+ * Created with tarantool_lua_init().
+ */
+extern struct lua_State *tarantool_L;
+
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern bool init_storage, booting;

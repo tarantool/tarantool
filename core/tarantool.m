@@ -557,6 +557,7 @@ main(int argc, char **argv)
 
 	signal_init();
 
+	tarantool_L = tarantool_lua_init();
 	mod_init();
 	admin_init();
 	replication_init();
