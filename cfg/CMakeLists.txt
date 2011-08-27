@@ -30,12 +30,10 @@ macro(generate_config mod)
 # their sources when configuring the project.
 execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
     ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.h
-    ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c
-    ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.cfg)
+    ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c)
 add_custom_command(
     OUTPUT ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.h
            ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c
-           ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.cfg
     COMMAND ${ECHO} '%{' > ${mod}_tmp.cfg
     COMMAND ${ECHO} '\#include \"cfg/warning.h\"' >> ${mod}_tmp.cfg
     COMMAND ${ECHO} '\#include \"cfg/tarantool_${mod}_cfg.h\"' >> ${mod}_tmp.cfg
@@ -46,7 +44,6 @@ add_custom_command(
     COMMAND ${CONFETTI} -i ${mod}_tmp.cfg -n tarantool_cfg
             -c ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c
             -h ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.h
-            -f ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.cfg
     COMMAND ${CMAKE_COMMAND} -E remove ${mod}_tmp.cfg
     DEPENDS ${CMAKE_SOURCE_DIR}/cfg/core_cfg.cfg_tmpl
             ${CMAKE_SOURCE_DIR}/cfg/warning.h
