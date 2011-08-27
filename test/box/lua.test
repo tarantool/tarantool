@@ -1,4 +1,6 @@
 # encoding: tarantool
+import os
+import sys
 # Test Lua from admin console. Whenever producing output,
 # make sure it's a valid YAML.
 exec admin "lua"
@@ -80,3 +82,21 @@ exec admin "lua function field_x(namespace, key, field_index) return (box.select
 exec sql "call field_x(0, 'pass', 0)"
 exec sql "call field_x(0, 'pass', 1)"
 exec sql "call box.delete(0, 'pass')"
+fifo_lua = os.path.abspath("box/fifo.lua")
+# don't log the path name
+sys.stdout.push_filter("exec admin .*", "exec admin ...")
+exec admin "lua dofile('{0}')".format(fifo_lua)
+sys.stdout.pop_filter()
+exec admin "lua fifo_max"
+exec admin "lua fifo_push('test', 1)"
+exec admin "lua fifo_push('test', 2)"
+exec admin "lua fifo_push('test', 3)"
+exec admin "lua fifo_push('test', 4)"
+exec admin "lua fifo_push('test', 5)"
+exec admin "lua fifo_push('test', 6)"
+exec admin "lua fifo_push('test', 7)"
+exec admin "lua fifo_push('test', 8)"
+exec admin "lua fifo_top('test')"
+exec admin "lua box.delete(0, 'test')"
+exec admin "lua fifo_top('test')"
+exec admin "lua box.delete(0, 'test')"

@@ -157,10 +157,36 @@ lbox_pack(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_unpack(struct lua_State *L)
+{
+	const char *format = luaL_checkstring(L, 1);
+	int i = 2; /* first arg comes second */
+	int nargs = lua_gettop(L);
+	u32 u32buf;
+
+	while (*format) {
+		if (i > nargs)
+			luaL_error(L, "box.unpack: argument count does not match the format");
+		switch (*format) {
+		case 'i':
+			u32buf = * (u32 *) lua_tostring(L, i);
+			lua_pushnumber(L, u32buf);
+			break;
+		default:
+			luaL_error(L, "box.unpack: unsupported pack "
+				   "format specifier '%c'", *format);
+		} /* end switch */
+		i++;
+		format++;
+	}
+	return i-2;
+}
 /** A descriptor for box.tbuf object methods */
 
 static const struct luaL_reg boxlib[] = {
 	{"pack", lbox_pack},
+	{"unpack", lbox_unpack},
 	{NULL, NULL}
 };
 
