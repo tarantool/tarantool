@@ -7,7 +7,7 @@ bind_ipaddr="INADDR_ANY", ro
 
 # save core on abort/assert
 # deprecated; use ulimit instead
-coredump=0, ro
+coredump=false, ro
 
 # admin port
 # used for admin's connections
@@ -39,7 +39,7 @@ pid_file="tarantool.pid", ro
 logger=NULL, ro
 
 # make logging nonblocking, this potentially can lose some logging data
-logger_nonblock=1, ro
+logger_nonblock=true, ro
 
 # delay between loop iterations
 io_collect_interval=0.0, ro

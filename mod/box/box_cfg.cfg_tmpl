@@ -25,7 +25,7 @@ memcached_port=0, ro
 # namespace used for memcached emulation
 memcached_namespace=23, ro
 # Memcached expiration is on if memcached_expire is set.
-memcached_expire=0, ro
+memcached_expire=false, ro
 # maximum rows to consider per expire loop iteration
 memcached_expire_per_loop=1024
 # tarantool will try to iterate over all rows within this time
@@ -49,7 +49,7 @@ wal_writer_inbox_size=128, ro
 # standby mode, continuously fetching WAL records from wal_dir,
 # until it is able to bind to the primary port.
 # In local hot standby mode the server only accepts reads.
-local_hot_standby=0, ro
+local_hot_standby=false, ro
 # Delay, in seconds, between successive re-readings of wal_dir.
 # The re-scan is necessary to discover new WAL files or snapshots.
 wal_dir_rescan_delay=0.1, ro
@@ -58,8 +58,8 @@ wal_dir_rescan_delay=0.1, ro
 # Panic if there is an error reading a snapshot or WAL.
 # By default, panic on any snapshot reading error and ignore errors
 # when reading WALs.
-panic_on_snap_error=1, ro
-panic_on_wal_error=0, ro
+panic_on_snap_error=true, ro
+panic_on_wal_error=false, ro
 
 # Replication mode (if enabled, the server, once
 # bound to the primary port, will connect to

@@ -50,7 +50,7 @@ typedef struct tarantool_cfg {
 	 * save core on abort/assert
 	 * deprecated; use ulimit instead
 	 */
-	int32_t	coredump;
+	bool	coredump;
 
 	/*
 	 * admin port
@@ -88,7 +88,7 @@ typedef struct tarantool_cfg {
 	char*	logger;
 
 	/* make logging nonblocking, this potentially can lose some logging data */
-	int32_t	logger_nonblock;
+	bool	logger_nonblock;
 
 	/* delay between loop iterations */
 	double	io_collect_interval;
@@ -130,7 +130,7 @@ typedef struct tarantool_cfg {
 	int32_t	memcached_namespace;
 
 	/* Memcached expiration is on if memcached_expire is set. */
-	int32_t	memcached_expire;
+	bool	memcached_expire;
 
 	/* maximum rows to consider per expire loop iteration */
 	int32_t	memcached_expire_per_loop;
@@ -160,7 +160,7 @@ typedef struct tarantool_cfg {
 	 * until it is able to bind to the primary port.
 	 * In local hot standby mode the server only accepts reads.
 	 */
-	int32_t	local_hot_standby;
+	bool	local_hot_standby;
 
 	/*
 	 * Delay, in seconds, between successive re-readings of wal_dir.
@@ -173,8 +173,8 @@ typedef struct tarantool_cfg {
 	 * By default, panic on any snapshot reading error and ignore errors
 	 * when reading WALs.
 	 */
-	int32_t	panic_on_snap_error;
-	int32_t	panic_on_wal_error;
+	bool	panic_on_snap_error;
+	bool	panic_on_wal_error;
 
 	/*
 	 * Replication mode (if enabled, the server, once

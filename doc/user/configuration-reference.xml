@@ -483,7 +483,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         <row>
           <entry>panic_on_snap_error</entry>
           <entry>boolean</entry>
-          <entry>1</entry>
+          <entry>true</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>If there is an error reading the snapshot (at
@@ -493,7 +493,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         <row>
           <entry>panic_on_wal_error</entry>
           <entry>boolean</entry>
-          <entry>0</entry>
+          <entry>false</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>If there is an error reading from a write ahead
@@ -778,8 +778,8 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
 
         <row>
           <entry>memcached_port</entry>
-          <entry>integer</entry>
-          <entry>0</entry>
+          <entry>boolean</entry>
+          <entry>false</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>
@@ -820,7 +820,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         <row>
           <entry>memcached_expire</entry>
           <entry>boolean</entry>
-          <entry>0</entry>
+          <entry>false</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>

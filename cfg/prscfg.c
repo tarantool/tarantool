@@ -15,12 +15,13 @@ static prscfg_yyscan_t prscfgScannerInitBuffer(char *buffer, prscfg_yy_extra_typ
 static void prscfgScannerFinish(prscfg_yyscan_t scanner);
 static int prscfgGetLineNo(prscfg_yyscan_t yyscanner);
 
-/* A Bison parser, made by GNU Bison 2.4.3.  */
+
+/* A Bison parser, made by GNU Bison 2.4.1.  */
 
 /* Skeleton interface for Bison's Yacc-like parsers in C
    
-      Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
-   2009, 2010 Free Software Foundation, Inc.
+      Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005, 2006
+   Free Software Foundation, Inc.
    
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -76,7 +77,7 @@ static int prscfgGetLineNo(prscfg_yyscan_t yyscanner);
 typedef union YYSTYPE
 {
 
-/* Line 1685 of yacc.c  */
+/* Line 1676 of yacc.c  */
 #line 89 "prscfg.y"
 
 	char		*str;
@@ -86,8 +87,8 @@ typedef union YYSTYPE
 
 
 
-/* Line 1685 of yacc.c  */
-#line 74 "y.tab.h"
+/* Line 1676 of yacc.c  */
+#line 75 "y.tab.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -97,12 +98,13 @@ typedef union YYSTYPE
 
 
 
-/* A Bison parser, made by GNU Bison 2.4.3.  */
+
+/* A Bison parser, made by GNU Bison 2.4.1.  */
 
 /* Skeleton implementation for Bison's Yacc-like parsers in C
    
-      Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
-   2009, 2010 Free Software Foundation, Inc.
+      Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005, 2006
+   Free Software Foundation, Inc.
    
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -144,7 +146,7 @@ typedef union YYSTYPE
 #define YYBISON 1
 
 /* Bison version.  */
-#define YYBISON_VERSION "2.4.3"
+#define YYBISON_VERSION "2.4.1"
 
 /* Skeleton name.  */
 #define YYSKELETON_NAME "yacc.c"
@@ -256,7 +258,7 @@ static OptDef	*output;
 
 
 /* Line 189 of yacc.c  */
-#line 161 "y.tab.c"
+#line 162 "y.tab.c"
 
 /* Enabling traces.  */
 #ifndef YYDEBUG
@@ -315,7 +317,7 @@ typedef union YYSTYPE
 
 
 /* Line 214 of yacc.c  */
-#line 220 "y.tab.c"
+#line 221 "y.tab.c"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -327,7 +329,7 @@ typedef union YYSTYPE
 
 
 /* Line 264 of yacc.c  */
-#line 232 "y.tab.c"
+#line 233 "y.tab.c"
 
 #ifdef short
 # undef short
@@ -377,7 +379,7 @@ typedef short int yytype_int16;
 #define YYSIZE_MAXIMUM ((YYSIZE_T) -1)
 
 #ifndef YY_
-# if defined YYENABLE_NLS && YYENABLE_NLS
+# if YYENABLE_NLS
 #  if ENABLE_NLS
 #   include <libintl.h> /* INFRINGES ON USER NAME SPACE */
 #   define YY_(msgid) dgettext ("bison-runtime", msgid)
@@ -762,18 +764,9 @@ static const yytype_uint8 yystos[] =
 
 /* Like YYERROR except do call yyerror.  This remains here temporarily
    to ease the transition to the new meaning of YYERROR, for GCC.
-   Once GCC version 2 has supplanted version 1, this can go.  However,
-   YYFAIL appears to be in use.  Nevertheless, it is formally deprecated
-   in Bison 2.4.2's NEWS entry, where a plan to phase it out is
-   discussed.  */
+   Once GCC version 2 has supplanted version 1, this can go.  */
 
 #define YYFAIL		goto yyerrlab
-#if defined YYFAIL
-  /* This is here to suppress warnings from the GCC cpp's
-     -Wunused-macros.  Normally we don't worry about that warning, but
-     some users do, and we want to make it easy for users to remove
-     YYFAIL uses, which will produce warnings from Bison 2.5.  */
-#endif
 
 #define YYRECOVERING()  (!!yyerrstatus)
 
@@ -830,7 +823,7 @@ while (YYID (0))
    we won't break user code: when these are the locations we know.  */
 
 #ifndef YY_LOCATION_PRINT
-# if defined YYLTYPE_IS_TRIVIAL && YYLTYPE_IS_TRIVIAL
+# if YYLTYPE_IS_TRIVIAL
 #  define YY_LOCATION_PRINT(File, Loc)			\
      fprintf (File, "%d.%d-%d.%d",			\
 	      (Loc).first_line, (Loc).first_column,	\
@@ -1574,35 +1567,35 @@ yyreduce:
     {
         case 2:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 106 "prscfg.y"
     { output = (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 3:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 110 "prscfg.y"
     { MakeAtom((yyval.atom), (yyvsp[(1) - (1)].str)); }
     break;
 
   case 4:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 111 "prscfg.y"
     { MakeAtom((yyval.atom), (yyvsp[(1) - (1)].str)); }
     break;
 
   case 5:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 115 "prscfg.y"
     { (yyval.atom) = (yyvsp[(1) - (1)].atom); }
     break;
 
   case 6:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 116 "prscfg.y"
     { 
 			(yyval.atom) = (yyvsp[(1) - (4)].atom); 
@@ -1614,21 +1607,21 @@ yyreduce:
 
   case 7:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 125 "prscfg.y"
     { (yyval.atom) = (yyvsp[(1) - (1)].atom); }
     break;
 
   case 8:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 126 "prscfg.y"
     { MakeList((yyval.atom), (yyvsp[(1) - (3)].atom), (yyvsp[(3) - (3)].atom)); }
     break;
 
   case 9:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 130 "prscfg.y"
     { 
 			(yyval.atom) = (yyvsp[(1) - (4)].atom);
@@ -1640,140 +1633,140 @@ yyreduce:
 
   case 10:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 136 "prscfg.y"
     { MakeList((yyval.atom), (yyvsp[(1) - (3)].atom), (yyvsp[(3) - (3)].atom)); }
     break;
 
   case 11:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 140 "prscfg.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 12:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 141 "prscfg.y"
     { MakeList((yyval.node), (yyvsp[(3) - (3)].node), (yyvsp[(1) - (3)].node)); /* plainOptDef will revert the list */ }
     break;
 
   case 13:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 145 "prscfg.y"
     { SetSection((yyval.node), (yyvsp[(4) - (4)].node), (yyvsp[(2) - (4)].atom)); }
     break;
 
   case 14:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 146 "prscfg.y"
     { SetSection((yyval.node), (yyvsp[(4) - (4)].node), (yyvsp[(2) - (4)].atom)); }
     break;
 
   case 15:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 150 "prscfg.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 16:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 151 "prscfg.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 17:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 152 "prscfg.y"
     { MakeList((yyval.node), (yyvsp[(2) - (2)].node), (yyvsp[(1) - (2)].node)); }
     break;
 
   case 18:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 156 "prscfg.y"
     { MakeScalarParam((yyval.node), number, (yyvsp[(1) - (3)].atom), (yyvsp[(3) - (3)].str)); }
     break;
 
   case 19:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 157 "prscfg.y"
     { MakeScalarParam((yyval.node), string, (yyvsp[(1) - (3)].atom), (yyvsp[(3) - (3)].str)); }
     break;
 
   case 20:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 158 "prscfg.y"
     { MakeScalarParam((yyval.node), string, (yyvsp[(1) - (3)].atom), (yyvsp[(3) - (3)].str)); }
     break;
 
   case 21:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 159 "prscfg.y"
     { MakeScalarParam((yyval.node), string, (yyvsp[(1) - (3)].atom), (yyvsp[(3) - (3)].str)); }
     break;
 
   case 22:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 160 "prscfg.y"
     { MakeScalarParam((yyval.node), string, (yyvsp[(1) - (3)].atom), NULL); free((yyvsp[(3) - (3)].str)); }
     break;
 
   case 23:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 161 "prscfg.y"
     { MakeScalarParam((yyval.node), struct, (yyvsp[(1) - (6)].atom), (yyvsp[(4) - (6)].node)); SetParent( (yyval.node), (yyvsp[(4) - (6)].node) ); }
     break;
 
   case 24:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 162 "prscfg.y"
     { (yyvsp[(4) - (6)].node)->name = (yyvsp[(1) - (6)].atom); (yyval.node) = (yyvsp[(4) - (6)].node); }
     break;
 
   case 25:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 163 "prscfg.y"
     { MakeScalarParam((yyval.node), array, (yyvsp[(1) - (4)].atom), NULL); }
     break;
 
   case 26:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 164 "prscfg.y"
     { MakeScalarParam((yyval.node), struct, (yyvsp[(1) - (6)].atom), (yyvsp[(4) - (6)].node)); SetParent( (yyval.node), (yyvsp[(4) - (6)].node) ); }
     break;
 
   case 27:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 168 "prscfg.y"
     { (yyval.str)=NULL; }
     break;
 
   case 28:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 169 "prscfg.y"
     { (yyval.str)=NULL; }
     break;
 
   case 29:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 173 "prscfg.y"
     {
 			OptDef		*str;
@@ -1790,7 +1783,7 @@ yyreduce:
 
   case 30:
 
-/* Line 1464 of yacc.c  */
+/* Line 1455 of yacc.c  */
 #line 184 "prscfg.y"
     {
 			OptDef		*str;
@@ -1808,8 +1801,8 @@ yyreduce:
 
 
 
-/* Line 1464 of yacc.c  */
-#line 1714 "y.tab.c"
+/* Line 1455 of yacc.c  */
+#line 1706 "y.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2020,7 +2013,7 @@ yyreturn:
 
 
 
-/* Line 1684 of yacc.c  */
+/* Line 1675 of yacc.c  */
 #line 198 "prscfg.y"
 
 
@@ -2314,7 +2307,6 @@ typedef int flex_int32_t;
 typedef unsigned char flex_uint8_t; 
 typedef unsigned short int flex_uint16_t;
 typedef unsigned int flex_uint32_t;
-#endif /* ! C99 */
 
 /* Limits of integral types. */
 #ifndef INT8_MIN
@@ -2344,6 +2336,8 @@ typedef unsigned int flex_uint32_t;
 #ifndef UINT32_MAX
 #define UINT32_MAX             (4294967295U)
 #endif
+
+#endif /* ! C99 */
 
 #endif /* ! FLEXINT_H */
 
@@ -2418,7 +2412,15 @@ typedef void* yyscan_t;
 
 /* Size of default input buffer. */
 #ifndef YY_BUF_SIZE
+#ifdef __ia64__
+/* On IA-64, the buffer size is 16k, not 8k.
+ * Moreover, YY_BUF_SIZE is 2*YY_READ_BUF_SIZE in the general case.
+ * Ditto for the __ia64__ case accordingly.
+ */
+#define YY_BUF_SIZE 32768
+#else
 #define YY_BUF_SIZE 16384
+#endif /* __ia64__ */
 #endif
 
 /* The state buf must be large enough to hold one state per character in the main buffer.
@@ -2759,7 +2761,7 @@ static YY_BUFFER_STATE buf = NULL;
 
 
 
-#line 503 "prscfg_scan.c"
+#line 512 "prscfg_scan.c"
 
 #define INITIAL 0
 #define xQUOTED 1
@@ -2853,10 +2855,6 @@ int prscfg_yyget_lineno (yyscan_t yyscanner );
 
 void prscfg_yyset_lineno (int line_number ,yyscan_t yyscanner );
 
-int prscfg_yyget_column  (yyscan_t yyscanner );
-
-void prscfg_yyset_column (int column_no ,yyscan_t yyscanner );
-
 YYSTYPE * prscfg_yyget_lval (yyscan_t yyscanner );
 
 void prscfg_yyset_lval (YYSTYPE * yylval_param ,yyscan_t yyscanner );
@@ -2893,7 +2891,12 @@ static int input (yyscan_t yyscanner );
 
 /* Amount of stuff to slurp up with each read. */
 #ifndef YY_READ_BUF_SIZE
+#ifdef __ia64__
+/* On IA-64, the buffer size is 16k, not 8k */
+#define YY_READ_BUF_SIZE 16384
+#else
 #define YY_READ_BUF_SIZE 8192
+#endif /* __ia64__ */
 #endif
 
 /* Copy whatever the last rule matched to the standard output. */
@@ -2912,7 +2915,7 @@ static int input (yyscan_t yyscanner );
 	if ( YY_CURRENT_BUFFER_LVALUE->yy_is_interactive ) \
 		{ \
 		int c = '*'; \
-		unsigned n; \
+		size_t n; \
 		for ( n = 0; n < max_size && \
 			     (c = getc( yyin )) != EOF && c != '\n'; ++n ) \
 			buf[n] = (char) c; \
@@ -3000,7 +3003,7 @@ YY_DECL
 #line 40 "prscfg.l"
 
 
-#line 744 "prscfg_scan.c"
+#line 754 "prscfg_scan.c"
 
     yylval = yylval_param;
 
@@ -3316,7 +3319,7 @@ YY_RULE_SETUP
 #line 182 "prscfg.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1060 "prscfg_scan.c"
+#line 1070 "prscfg_scan.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -4045,8 +4048,8 @@ YY_BUFFER_STATE prscfg_yy_scan_string (yyconst char * yystr , yyscan_t yyscanner
 
 /** Setup the input buffer state to scan the given bytes. The next call to prscfg_yylex() will
  * scan from a @e copy of @a bytes.
- * @param bytes the byte buffer to scan
- * @param len the number of bytes in the buffer pointed to by @a bytes.
+ * @param yybytes the byte buffer to scan
+ * @param _yybytes_len the number of bytes in the buffer pointed to by @a bytes.
  * @param yyscanner The scanner object.
  * @return the newly allocated buffer state object.
  */
