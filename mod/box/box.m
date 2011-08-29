@@ -167,8 +167,8 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		/*
 		 * If the tuple doesn't exist, insert a GHOST
 		 * tuple in all indices in order to avoid a race
-		 * condition when another INSERT comes along:
-		 * a concurrent INSERT, UPDATE, or DELETE, returns
+		 * condition when another REPLACE comes along:
+		 * a concurrent REPLACE, UPDATE, or DELETE, returns
 		 * an error when meets a ghost tuple.
 		 *
 		 * Tuple reference counter will be incremented in
@@ -318,7 +318,7 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 }
 
 static void __attribute__((noinline))
-prepare_update_fields(struct box_txn *txn, struct tbuf *data)
+prepare_update(struct box_txn *txn, struct tbuf *data)
 {
 	struct tbuf **fields;
 	void *field;
@@ -426,7 +426,7 @@ prepare_update_fields(struct box_txn *txn, struct tbuf *data)
 out:
 	txn->out->dup_u32(tuples_affected);
 
-	if (txn->flags & BOX_RETURN_TUPLE)
+	if (txn->flags & BOX_RETURN_TUPLE && txn->tuple)
 		txn->out->add_tuple(txn->tuple);
 }
 
@@ -550,7 +550,7 @@ commit_delete(struct box_txn *txn)
 static bool
 op_is_select(u32 op)
 {
-	return op == SELECT || op == SELECT_LIMIT;
+	return op == SELECT || op == CALL;
 }
 
 static void
@@ -578,7 +578,7 @@ iov_add_tuple(struct box_tuple *tuple)
 	}
 }
 
-struct box_out box_out_iproto = {
+static struct box_out box_out_iproto = {
 	iov_add_u32,
 	iov_dup_u32,
 	iov_add_tuple
@@ -695,7 +695,7 @@ txn_rollback(struct box_txn *txn)
 
 		unlock_tuples(txn);
 
-		if (txn->op == INSERT)
+		if (txn->op == REPLACE)
 			rollback_replace(txn);
 	}
 
@@ -712,7 +712,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 	say_debug("box_dispatch(%i)", txn->op);
 
 	switch (txn->op) {
-	case INSERT:
+	case REPLACE:
 		txn_assign_n(txn, data);
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 		cardinality = read_u32(data);
@@ -756,10 +756,10 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		break;
 	}
 
-	case UPDATE_FIELDS:
+	case UPDATE:
 		txn_assign_n(txn, data);
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		prepare_update_fields(txn, data);
+		prepare_update(txn, data);
 		break;
 	case CALL:
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
@@ -804,7 +804,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 		    messages_strs[op], n);
 
 	switch (op) {
-	case INSERT:
+	case REPLACE:
 		flags = read_u32(b);
 		cardinality = read_u32(b);
 		if (b->len != valid_tuple(b, cardinality))
@@ -822,7 +822,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 		tuple_print(buf, key_len, key);
 		break;
 
-	case UPDATE_FIELDS:
+	case UPDATE:
 		flags = read_u32(b);
 		key_len = read_u32(b);
 		key = read_field(b);
@@ -1051,7 +1051,7 @@ convert_snap_row_to_wal(struct tbuf *t)
 {
 	struct tbuf *r = tbuf_alloc(fiber->gc_pool);
 	struct box_snap_row *row = box_snap_row(t);
-	u16 op = INSERT;
+	u16 op = REPLACE;
 	u32 flags = 0;
 
 	tbuf_append(r, &op, sizeof(op));
@@ -1374,6 +1374,8 @@ mod_init(void)
 	title("loading");
 	atexit(mod_free);
 
+	box_lua_init();
+
 	/* initialization namespaces */
 	namespace_init();
 
@@ -1427,8 +1429,6 @@ mod_init(void)
 	if (cfg.memcached_port != 0)
 		fiber_server("memcached", cfg.memcached_port,
 			     memcached_handler, NULL, NULL);
-
-	box_lua_init();
 }
 
 int

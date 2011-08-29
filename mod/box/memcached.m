@@ -105,7 +105,7 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
 	 */
-	rw_callback(INSERT, req);
+	rw_callback(REPLACE, req);
 }
 
 static void

@@ -15,7 +15,6 @@ if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set (tnt_cflags "${tnt_cflags} -Werror")
 endif()
 
-
 #============================================================================#
 # Build tnt projects
 #============================================================================#
@@ -44,6 +43,10 @@ set (tnt_sources
 #----------------------------------------------------------------------------#
 # Builds
 #----------------------------------------------------------------------------#
+
+# Here we manage to build static/dynamic libraries ourselves,
+# do not use the top level settings.
+string(REPLACE "-static" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 
 #
 # Static library

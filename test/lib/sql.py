@@ -166,14 +166,16 @@ class sql(runtime.Parser):
     def value_list(self, _parent=None):
         _context = self.Context(_parent, self._scanner, 'value_list', [])
         self._scan("'\\('", context=_context)
-        expr = self.expr(_context)
-        value_list = [expr]
-        if self._peek('","', "'\\)'", context=_context) == '","':
-            while 1:
-                self._scan('","', context=_context)
-                expr = self.expr(_context)
-                value_list.append(expr)
-                if self._peek('","', "'\\)'", context=_context) != '","': break
+        value_list = []
+        if self._peek("'\\)'", '","', 'NUM', 'STR', context=_context) in ['NUM', 'STR']:
+            expr = self.expr(_context)
+            value_list = [expr]
+            if self._peek('","', "'\\)'", context=_context) == '","':
+                while 1:
+                    self._scan('","', context=_context)
+                    expr = self.expr(_context)
+                    value_list.append(expr)
+                    if self._peek('","', "'\\)'", context=_context) != '","': break
         self._scan("'\\)'", context=_context)
         return value_list
 

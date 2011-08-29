@@ -39,6 +39,9 @@
 #include "pickle.h"
 #include "tuple.h"
 
+/* contents of box.lua */
+extern const char _binary_box_lua_start;
+
 /**
  * All box connections share the same Lua state. We use
  * Lua coroutines (lua_newthread()) to have multiple
@@ -143,36 +146,58 @@ static const struct luaL_reg lbox_tuple_meta [] = {
 void iov_add_ret(struct lua_State *L, int index)
 {
 	int type = lua_type(L, index);
+	struct box_tuple *tuple;
 	switch (type) {
 	case LUA_TNUMBER:
-		box_out_iproto.dup_u32((u32) lua_tointeger(L, index));
-		break;
-	case LUA_TUSERDATA:
+	case LUA_TSTRING:
 	{
-		struct box_tuple *tuple = lua_istuple(L, index);
-		if (tuple != NULL) {
-			box_out_iproto.add_tuple(tuple);
-			break;
-		}
+		size_t len;
+		const char *str = lua_tolstring(L, index, &len);
+		tuple = tuple_alloc(len + varint32_sizeof(len));
+		tuple->cardinality = 1;
+		memcpy(save_varint32(tuple->data, len), str, len);
+		break;
 	}
+	case LUA_TNIL:
+	case LUA_TBOOLEAN:
+	{
+		const char *str = tarantool_lua_tostring(L, index);
+		size_t len = strlen(str);
+		tuple = tuple_alloc(len + varint32_sizeof(len));
+		tuple->cardinality = 1;
+		memcpy(save_varint32(tuple->data, len), str, len);
+		break;
+	}
+	case LUA_TUSERDATA:
+		tuple = lua_istuple(L, index);
+		if (tuple)
+			break;
 	default:
 		/*
-		 * LUA_TNONE, LUA_TNIL, LUA_TBOOLEAN, LUA_TSTRING,
-		 * LUA_TTABLE, LUA_THREAD, LUA_TFUNCTION
+		 * LUA_TNONE, LUA_TTABLE, LUA_THREAD, LUA_TFUNCTION
 		 */
 		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
 		break;
 	}
+	tuple_txn_ref(in_txn(), tuple);
+	iov_add(&tuple->bsize, tuple_len(tuple));
 }
 
-/** Add nargs elements on the top of Lua stack to fiber iov. */
+/**
+ * Add all elements from Lua stack to fiber iov.
+ *
+ * To allow clients to understand a complex return from
+ * a procedure, we are compatible with SELECT protocol,
+ * and return the number of return values first, and
+ * then each return value as a tuple.
+ */
 
-void iov_add_multret(struct lua_State *L, int nargs)
+void iov_add_multret(struct lua_State *L)
 {
-	while (nargs > 0) {
-		iov_add_ret(L, -nargs);
-		nargs--;
-	}
+	int nargs = lua_gettop(L);
+	iov_dup(&nargs, sizeof(u32));
+	for (int i = 1; i <= nargs; ++i)
+		iov_add_ret(L, i);
 }
 
 static void
@@ -206,14 +231,15 @@ static struct box_out box_out_lua = {
 
 /* }}} */
 
-static inline void
+static inline struct box_txn *
 txn_enter_lua(lua_State *L)
 {
-	struct box_txn *txn = in_txn();
-	if (txn == NULL)
-		txn = txn_begin();
+	struct box_txn *old_txn = in_txn();
+	fiber->mod_data.txn = NULL;
+	struct box_txn *txn = fiber->mod_data.txn = txn_begin();
 	txn->out = &box_out_lua;
 	txn->L = L;
+	return old_txn;
 }
 
 /**
@@ -246,16 +272,12 @@ static int lbox_process(lua_State *L)
 		return luaL_error(L, "box.process(CALL, ...) is not allowed");
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
+
+	struct box_txn *old_txn = txn_enter_lua(L);
 	@try {
-		txn_enter_lua(L);
 		rw_callback(op, &req);
-		/*
-		 * @todo: when multi-statement transactions are
-		 * implemented, restore the original txn->out here.
-		 */
-		assert(in_txn() == NULL);
-	} @catch (ClientError *e) {
-		return luaL_error(L, "%d:%s", e->errcode, e->errmsg);
+	} @finally {
+		fiber->mod_data.txn = old_txn;
 	}
 	return lua_gettop(L) - top;
 }
@@ -293,6 +315,8 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
 		tnt_raise(ClientError, :ER_NO_SUCH_PROC,
 			  name_end - name, name);
 	}
+	if (index != LUA_GLOBALSINDEX)
+		lua_remove(L, index);
 }
 
 
@@ -317,14 +341,17 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 		u32 field_len = read_varint32(data);
 		void *field = read_str(data, field_len); /* proc name */
 		box_lua_find(L, field, field + field_len);
-		lua_checkstack(L, 1);
-		/* Push the rest of args (a tuple) as is. */
-		lua_pushlstring(L, data->data, data->len);
-
-		int top = lua_gettop(L);
-		lua_call(L, 1, LUA_MULTRET);
+		/* Push the rest of args (a tuple). */
+		u32 nargs = read_u32(data);
+		luaL_checkstack(L, nargs, "call: out of stack");
+		for (int i = 0; i < nargs; i++) {
+			field_len = read_varint32(data);
+			field = read_str(data, field_len);
+			lua_pushlstring(L, field, field_len);
+		}
+		lua_call(L, nargs, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
-		iov_add_multret(L, lua_gettop(L) - top);
+		iov_add_multret(L);
 	} @finally {
 		/*
 		 * Allow the used coro to be garbage collected.
@@ -345,6 +372,8 @@ mod_lua_init(struct lua_State *L)
 	lua_pushstring(L, tuplelib_name);
 	lua_setfield(L, -2, "__metatable");
 	luaL_register(L, NULL, lbox_tuple_meta);
+	/* Load box.lua */
+	(void) luaL_dostring(L, &_binary_box_lua_start);
 	return L;
 }
 

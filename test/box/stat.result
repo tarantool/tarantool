@@ -26,13 +26,12 @@ Insert OK, 1 row affected
 show stat
 ---
 statistics:
-  INSERT:        { rps:  2    , total:  10          }
-  SELECT_LIMIT:  { rps:  0    , total:  0           }
-  SELECT:        { rps:  0    , total:  0           }
-  UPDATE_FIELDS: { rps:  0    , total:  0           }
-  DELETE_1_3:    { rps:  0    , total:  0           }
-  DELETE:        { rps:  0    , total:  0           }
-  CALL:          { rps:  0    , total:  0           }
+  REPLACE:    { rps:  2    , total:  10          }
+  SELECT:     { rps:  0    , total:  0           }
+  UPDATE:     { rps:  0    , total:  0           }
+  DELETE_1_3: { rps:  0    , total:  0           }
+  DELETE:     { rps:  0    , total:  0           }
+  CALL:       { rps:  0    , total:  0           }
 ...
 #
 # restart server
@@ -45,13 +44,12 @@ statistics:
 show stat
 ---
 statistics:
-  INSERT:        { rps:  0    , total:  0           }
-  SELECT_LIMIT:  { rps:  0    , total:  0           }
-  SELECT:        { rps:  0    , total:  0           }
-  UPDATE_FIELDS: { rps:  0    , total:  0           }
-  DELETE_1_3:    { rps:  0    , total:  0           }
-  DELETE:        { rps:  0    , total:  0           }
-  CALL:          { rps:  0    , total:  0           }
+  REPLACE:    { rps:  0    , total:  0           }
+  SELECT:     { rps:  0    , total:  0           }
+  UPDATE:     { rps:  0    , total:  0           }
+  DELETE_1_3: { rps:  0    , total:  0           }
+  DELETE:     { rps:  0    , total:  0           }
+  CALL:       { rps:  0    , total:  0           }
 ...
 delete from t0 where k0 = 0
 Delete OK, 1 row affected
