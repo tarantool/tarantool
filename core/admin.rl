@@ -217,7 +217,7 @@ static void
 admin_handler(void *data __attribute__((unused)))
 {
 	lua_State *L = lua_newthread(tarantool_L);
-	int coro_index = lua_gettop(tarantool_L);
+	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	@try {
 		for (;;) {
 			if (admin_dispatch(L) <= 0)
@@ -225,7 +225,7 @@ admin_handler(void *data __attribute__((unused)))
 			fiber_gc();
 		}
 	} @finally {
-		lua_remove(tarantool_L, coro_index);
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 	}
 }
 

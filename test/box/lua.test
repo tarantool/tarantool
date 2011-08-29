@@ -84,7 +84,7 @@ exec sql "call field_x(0, 'pass', 1)"
 exec sql "call box.delete(0, 'pass')"
 fifo_lua = os.path.abspath("box/fifo.lua")
 # don't log the path name
-sys.stdout.push_filter("exec admin .*", "exec admin ...")
+sys.stdout.push_filter("lua dofile(.*)", "lua dofile(...)")
 exec admin "lua dofile('{0}')".format(fifo_lua)
 sys.stdout.pop_filter()
 exec admin "lua fifo_max"
