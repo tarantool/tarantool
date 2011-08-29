@@ -213,66 +213,118 @@
 ## we can't directly free tuple allocations.
 
 {
-   <box>
-   Memcheck:Leak
-   fun:salloc
-   fun:tuple_alloc
-   fun:prepare_update_fields
-   fun:box_dispatch
-   fun:box_process
-   fun:box_process_rw
-   fun:iproto_reply
-   fun:iproto_interact
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
-}
-
-{
-   <box>
-   Memcheck:Leak
-   fun:salloc
-   fun:tuple_alloc
-   fun:prepare_update_fields
-   fun:box_dispatch
-   fun:box_process
-   fun:recover_row
-   fun:recover_wal
-   fun:recover_remaining_wals
-   fun:recover
-   fun:mod_init
-   fun:main
-}
-
-{
-   <box>
+   <box replace command (insert)>
    Memcheck:Leak
    fun:salloc
    fun:tuple_alloc
    fun:prepare_replace
    fun:box_dispatch
-   fun:box_process
-   fun:box_process_rw
-   fun:store
-   fun:memcached_dispatch
-   fun:memcached_handler
+   fun:box_process*
+   ...
+}
+
+##
+## tarantool/lua suppressions
+##
+
+#----------------------------------------------------------------------------#
+# tarantool_lua function
+#----------------------------------------------------------------------------#
+
+#
+# lua_* function suppressions
+#
+
+{
+   <lua_* from luajit library suppression>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:tarantool_lua
    ...
 }
 
 {
-   <box>
-   Memcheck:Leak
-   fun:salloc
-   fun:tuple_alloc
-   fun:prepare_replace
+   <lua_* from luajit library suppression>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:tarantool_lua_dostring
+   fun:tarantool_lua
+   ...
+}
+
+{
+   <lua_* from luajit library suppression in admin console>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:tarantool_lua_tostring
+   fun:tarantool_lua_printstack_yaml
+   fun:tarantool_lua
+   ...
+}
+
+#
+# luaL_* function suppressions
+#
+
+{
+   <luaL_* from luajit library suppression in tarantool_lua>
+   Memcheck:Cond
+   ...
+   fun:luaL_*
+   fun:tarantool_lua
+   ...
+}
+
+{
+   <luaL_* from luajit library suppression in tarantool_lua>
+   Memcheck:Cond
+   ...
+   fun:luaL_*
+   fun:tarantool_lua_dostring
+   fun:tarantool_lua
+   ...
+}
+
+{
+   <luaL_* from luajit library suppression in tarantool_lua>
+   Memcheck:Cond
+   ...
+   fun:luaL_*
+   fun:tarantool_lua_tostring
+   fun:tarantool_lua_printstack_yaml
+   fun:tarantool_lua
+   ...
+}
+
+#----------------------------------------------------------------------------#
+# box_lua_call function
+#----------------------------------------------------------------------------#
+
+{
+   <lua_* frim luajit libarary suppression in box_lua_call>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:box_lua_call
    fun:box_dispatch
-   fun:box_process
-   fun:box_process_rw
-   fun:iproto_reply
-   fun:iproto_interact
-   fun:fiber_loop
-   fun:coro_init
-   obj:*
+   fun:box_process*
+   ...
+}
+
+{
+   <lua_* frim luajit libarary suppression in box_lua_call>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:iov_add_ret
+   fun:iov_add_multret
+   fun:box_lua_call
+   fun:box_dispatch
+   fun:box_process*
+   ...
 }
 
 ## sptree
