@@ -81,10 +81,6 @@ statistics:
   DELETE:     { rps:  0    , total:  0           }
   CALL:       { rps:  0    , total:  0           }
 ...
-save coredump
----
-ok
-...
 insert into t0 values (1, 'tuple')
 Insert OK, 1 row affected
 save snapshot

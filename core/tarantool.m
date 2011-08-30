@@ -64,9 +64,12 @@ const char *cfg_filename = DEFAULT_CFG_FILENAME;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
 char *custom_proc_title;
-
+char **main_argv;
+int main_argc;
+static void *main_opt = NULL;
 struct tarantool_cfg cfg;
 struct recovery_state *recovery_state;
+static ev_signal *sigs = NULL;
 
 bool init_storage, booting = true;
 
@@ -221,45 +224,34 @@ snapshot(void *ev, int events __attribute__((unused)))
 
 	fiber_set_name(fiber, "dumper");
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
-	fiber_destroy_all();
-	palloc_free_unused();
+
 	close_all_xcpt(1, sayfd);
 	snapshot_save(recovery_state, mod_snapshot);
-#ifdef ENABLE_GCOV
-	__gcov_flush();
-#endif
-	_exit(EXIT_SUCCESS);
 
+	exit(EXIT_SUCCESS);
 	return 0;
 }
 
 static void
-sig_int(int signal)
+signal_cb(void)
 {
-	say_info("Exiting: %s", strsignal(signal));
+	/* terminating main event loop */
+	ev_unloop(EV_A_ EVUNLOOP_ALL);
+}
 
-	if (recovery_state != NULL) {
-		struct child *writer = recovery_state->wal_writer;
-		if (writer && writer->out && writer->out->fd > 0) {
-			close(writer->out->fd);
-			usleep(1000);
-		}
-	}
-#ifdef ENABLE_GCOV
-	__gcov_flush();
-#endif
-
-	if (master_pid == getpid()) {
-		kill(0, signal);
-		exit(EXIT_SUCCESS);
-	} else
-		_exit(EXIT_SUCCESS);
+static void
+signal_free(void)
+{
+	if (sigs == NULL)
+		return;
+	int i;
+	for (i = 0 ; i < 4 ; i++)
+		ev_signal_stop(&sigs[i]);
 }
 
 /**
  * Adjust the process signal mask and add handlers for signals.
  */
-
 static void
 signal_init(void)
 {
@@ -269,21 +261,23 @@ signal_init(void)
 	sa.sa_handler = SIG_IGN;
 	sigemptyset(&sa.sa_mask);
 
-	if (sigaction(SIGPIPE, &sa, 0) == -1)
-		goto error;
-
-	sa.sa_handler = sig_int;
-
-	if (sigaction(SIGINT, &sa, 0) == -1 ||
-	    sigaction(SIGTERM, &sa, 0) == -1 ||
-	    sigaction(SIGHUP, &sa, 0) == -1)
-	{
-		goto error;
+	if (sigaction(SIGPIPE, &sa, 0) == -1) {
+		say_syserror("sigaction");
+		exit(EX_OSERR);
 	}
-	return;
-      error:
-	say_syserror("sigaction");
-	exit(EX_OSERR);
+
+	sigs = palloc(eter_pool, sizeof(ev_signal) * 4);
+	memset(sigs, 0, sizeof(ev_signal) * 4);
+	ev_signal_init(&sigs[0], (void*)snapshot, SIGUSR1);
+	ev_signal_start(&sigs[0]);
+	ev_signal_init(&sigs[1], (void*)signal_cb, SIGINT);
+	ev_signal_start(&sigs[1]);
+	ev_signal_init(&sigs[2], (void*)signal_cb, SIGTERM);
+	ev_signal_start(&sigs[2]);
+	ev_signal_init(&sigs[3], (void*)signal_cb, SIGHUP);
+	ev_signal_start(&sigs[3]);
+
+	atexit(signal_free);
 }
 
 static void
@@ -320,16 +314,35 @@ create_pid(void)
 	fclose(f);
 }
 
-static void
-remove_pid(void)
+void
+tarantool_free(void)
 {
-	unlink(cfg.pid_file);
+	if (recovery_state != NULL)
+		recover_free(recovery_state);
+	stat_free();
+
+	if (cfg_filename_fullpath)
+		free(cfg_filename_fullpath);
+	if (main_opt)
+		gopt_free(main_opt);
+	free_proc_title(main_argc, main_argv);
+
+	if ((cfg.pid_file != NULL) && (master_pid == getpid()))
+		unlink(cfg.pid_file);
+	destroy_tarantool_cfg(&cfg);
+
+	fiber_free();
+	palloc_free();
+
+	ev_default_destroy();
+#ifdef ENABLE_GCOV
+	__gcov_flush();
+#endif
 }
 
 static void
 initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_factor)
 {
-
 	if (!salloc_init(slab_alloc_arena * (1 << 30), slab_alloc_minimal, slab_alloc_factor))
 		panic_syserror("can't initialize slab allocator");
 
@@ -367,6 +380,8 @@ main(int argc, char **argv)
 	load_symbols(argv[0]);
 #endif
 	argv = init_set_proc_title(argc, argv);
+	main_argc = argc;
+	main_argv = argv;
 
 	const void *opt_def =
 		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
@@ -393,6 +408,7 @@ main(int argc, char **argv)
 				       NULL, "print program version and exit"));
 
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
+	main_opt = opt;
 	binary_filename = argv[0];
 
 	if (gopt(opt, 'V')) {
@@ -528,32 +544,28 @@ main(int argc, char **argv)
 	if (gopt(opt, 'B'))
 		daemonize(1, 1);
 
-	if (cfg.pid_file != NULL) {
+	if (cfg.pid_file != NULL)
 		create_pid();
-		atexit(remove_pid);
-	}
 
 	/* init process title */
 	if (cfg.custom_proc_title == NULL) {
 		custom_proc_title = "";
 	} else {
 		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
-		strcat(custom_proc_title, "@");
+		strcpy(custom_proc_title, "@");
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
 	say_logger_init(cfg.logger_nonblock);
 	booting = false;
 
-	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
-	replication_prefork();
+	/* main core cleanup routine */
+	atexit(tarantool_free);
 
 	ev_default_loop(EVFLAG_AUTO);
 
-	ev_signal *ev_sig;
-	ev_sig = palloc(eter_pool, sizeof(ev_signal));
-	ev_signal_init(ev_sig, (void *)snapshot, SIGUSR1);
-	ev_signal_start(ev_sig);
+	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
+	replication_prefork();
 
 	signal_init();
 
@@ -571,6 +583,6 @@ main(int argc, char **argv)
 	start_time = ev_now();
 	ev_loop(0);
 	say_crit("exiting loop");
-
+	/* freeing resources */
 	return 0;
 }

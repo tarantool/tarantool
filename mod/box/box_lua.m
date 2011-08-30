@@ -335,7 +335,7 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 		  struct tbuf *data)
 {
 	lua_State *L = lua_newthread(root_L);
-	int coro_index = lua_gettop(root_L);
+	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
 
 	@try {
 		u32 field_len = read_varint32(data);
@@ -357,7 +357,7 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 		 * Allow the used coro to be garbage collected.
 		 * @todo: cache and reuse it instead.
 		 */
-		lua_remove(root_L, coro_index);
+		luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
 	}
 }
 

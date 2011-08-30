@@ -119,6 +119,9 @@ struct index {
 void
 index_init(struct index *index, struct namespace *namespace, size_t estimated_rows);
 
+void
+index_free(struct index *index);
+
 struct tree_index_member * alloc_search_pattern(struct index *index, int key_cardinality, void *key);
 void index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern);
 struct box_tuple * index_iterator_next_tree_str(struct index *self, struct tree_index_member *pattern);

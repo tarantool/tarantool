@@ -185,6 +185,8 @@ replication_prefork()
 		if (set_nonblock(master_to_spawner_sock) == -1)
 			panic("set_nonblock");
 	} else {
+		ev_default_fork();
+		ev_loop(EVLOOP_NONBLOCK);
 		/* child process: spawner */
 		close(sockpair[0]);
 		/*
@@ -269,6 +271,8 @@ acceptor_send_sock(int client_sock)
 
 	iov[0].iov_base = &cmd_code;
 	iov[0].iov_len = sizeof(cmd_code);
+
+	memset(&msg, 0, sizeof(msg));
 
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
@@ -415,7 +419,6 @@ spawner_shutdown()
 /** Replication spawner signal handler for terminating signals. */
 static void spawner_signal_handler(int signal)
 {
-	say_info("Exiting: %s", strsignal(signal));
 	spawner.killed = signal;
 }
 
@@ -429,13 +432,11 @@ spawner_sigchld_handler(int signo __attribute__((unused)))
 		switch (pid) {
 		case -1:
 			if (errno != ECHILD)
-				say_syserror("waitpid");
+				write(sayfd, "spawner: waitpid() failed\n", 26);
 		case 0: /* no more changes in children status */
 			return;
 		default:
 			spawner.child_count--;
-			say_info("child finished: pid = %d, exit status = %d",
-				 (int) pid, WEXITSTATUS(exit_status));
 		}
 	} while (spawner.child_count > 0);
 }
@@ -452,6 +453,8 @@ spawner_create_replication_relay(int client_sock)
 	}
 
 	if (pid == 0) {
+		ev_default_fork();
+		ev_loop(EVLOOP_NONBLOCK);
 		close(spawner.sock);
 		replication_relay_loop(client_sock);
 	} else {

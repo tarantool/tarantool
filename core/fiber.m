@@ -1056,13 +1056,18 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		c->out->flags |= FIBER_READING_INBOX;
 		return c;
 	} else {
+		/* it is safer to tell libev about fork, even
+		 * if child wont' use it. */
+		ev_default_fork();
+		ev_loop(EVLOOP_NONBLOCK);
+
 		char child_name[FIBER_NAME_MAXLEN];
 		/*
 		 * Move to an own process group, to not receive
 		 * signals from the controlling tty.
 		 */
 		setpgid(0, 0);
-		salloc_destroy();
+		/* destroying salloc in tarantool_free() */
 		close_all_xcpt(2, socks[0], sayfd);
 		snprintf(child_name, sizeof(child_name), "%s/child", name);
 		fiber_set_name(&sched, child_name);
@@ -1293,4 +1298,11 @@ fiber_init(void)
 	sp = call_stack;
 	fiber = &sched;
 	last_used_fid = 100;
+}
+
+void
+fiber_free(void)
+{
+	fiber_destroy_all();
+	kh_destroy(fid2fiber, fibers_registry);
 }

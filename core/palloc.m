@@ -145,6 +145,20 @@ palloc_init(void)
 	return 1;
 }
 
+void
+palloc_free(void)
+{
+	struct palloc_pool *pool, *pool_next;
+	SLIST_FOREACH_SAFE(pool, &pools, link, pool_next)
+		palloc_destroy_pool(pool);
+
+	palloc_free_unused();
+
+	struct chunk_class *class, *class_next;
+	TAILQ_FOREACH_SAFE(class, &classes, link, class_next)
+		free(class);
+}
+
 static void
 poison_chunk(struct chunk *chunk)
 {

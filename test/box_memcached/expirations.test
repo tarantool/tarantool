@@ -63,5 +63,4 @@ exec memcached "add add 0 1 7\r\naddval2\r\n"
 # resore default suite config
 server.stop()
 server.deploy(self.suite_ini["config"])
-server.start()
 # vim: syntax=python

@@ -897,6 +897,25 @@ xlog_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 }
 
 void
+namespace_free(void)
+{
+	int i;
+	for (i = 0 ; i < BOX_NAMESPACE_MAX ; i++) {
+		if (!namespace[i].enabled)
+			continue;
+		int j;
+		for (j = 0 ; j < BOX_INDEX_MAX ; j++) {
+			struct index *index = &namespace[i].index[j];
+			if (index->key_cardinality == 0)
+				break;
+			index_free(index);
+			sfree(index->key_field);
+			sfree(index->field_cmp_order);
+		}
+	}
+}
+
+void
 namespace_init(void)
 {
 	namespace = palloc(eter_pool, sizeof(struct namespace) * BOX_NAMESPACE_MAX);
@@ -1342,11 +1361,18 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 }
 
 void
+mod_free(void)
+{
+	namespace_free();
+}
+
+void
 mod_init(void)
 {
 	static iproto_callback ro_callback = box_process_ro;
 
 	title("loading");
+	atexit(mod_free);
 
 	box_lua_init();
 
