@@ -420,12 +420,13 @@ tnt_io_recv(struct tnt *t, char *buf, size_t size)
 		}
 
 		t->rbuf.off = 0;
-		t->rbuf.top = tnt_io_recv_raw(t, t->rbuf.buf, t->rbuf.size);
-		if (t->rbuf.top <= 0) {
+		ssize_t top = tnt_io_recv_raw(t, t->rbuf.buf, t->rbuf.size);
+		if (top <= 0) {
 			t->errno_ = errno;
 			return TNT_ESYSTEM;
 		}
 
+		t->rbuf.top = top;
 		if (rv <= t->rbuf.top) {
 			memcpy(buf + off, t->rbuf.buf, rv);
 			t->rbuf.off = rv;
