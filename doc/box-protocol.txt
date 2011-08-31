@@ -139,7 +139,12 @@
 
 <limit> ::= <int32>
 
-; key count in the disjunctive set
+; key count in the conjunctive set. Tarantool will
+; consequently return tuples that match the first key,
+; then the second, and so on. If a tuple matches
+; more than one key, it's returned twice. <limit> 
+; thus limits the total number of returned tuples,
+; which are not necessarily distinct.
 
 <count> ::= <int32>
 
