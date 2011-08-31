@@ -292,7 +292,8 @@
 ;
 <splice_op_arg> ::= <offset><length><field>
 
-<length> ::= <int32>
+<offset> ::= <field>
+<length> ::= <field>
 
 ;
 
