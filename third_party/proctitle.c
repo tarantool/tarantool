@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #ifdef HAVE_SYS_PSTAT_H
 #include <sys/pstat.h>		/* for HP-UX */
@@ -105,6 +106,8 @@ static size_t ps_buffer_fixed_size;	/* size of the constant prefix */
 /* save the original argv[] location here */
 static int save_argc;
 static char **save_argv;
+/* save the original environ[] here */
+static char **save_environ = NULL;
 
 /*
  * Call this early in startup to save the original argc/argv values.
@@ -123,7 +126,7 @@ init_set_proc_title(int argc, char **argv)
 	save_argv = argv;
 
 #if defined(PS_USE_CLOBBER_ARGV)
-
+	save_environ = environ;
 	/*
 	 * If we're going to overwrite the argv area, count the available space.
 	 * Also move the environment to make additional room.
@@ -216,7 +219,18 @@ init_set_proc_title(int argc, char **argv)
 	 */
 	ps_buffer_fixed_size = 0;
 #else
-	snprintf(ps_buffer, ps_buffer_size, "tarantool: ");
+	{
+		char basename_buf[PATH_MAX];
+
+		/*
+		 * At least partially mimic FreeBSD, which for
+		 * ./a.out outputs:
+		 *
+		 * a.out: custom title here (a.out)
+	         */
+		snprintf(basename_buf, sizeof basename_buf, "%s", argv[0]);
+		snprintf(ps_buffer, ps_buffer_size, "%s: ", basename(basename_buf));
+	}
 
 	ps_buffer_fixed_size = strlen(ps_buffer);
 
@@ -231,6 +245,21 @@ init_set_proc_title(int argc, char **argv)
 #endif /*PS_USE_NONE */
 
 	return argv;
+}
+
+void
+free_proc_title(int argc, char **argv)
+{
+	int i;
+#if defined(PS_USE_CLOBBER_ARGV)
+	for (i = 0; environ[i] != NULL; i++)
+		free(environ[i]);
+	free(environ);
+	environ = save_environ;
+#endif
+	for (i = 0; i < argc; i++)
+		free(argv[i]);
+	free(argv);
 }
 
 void

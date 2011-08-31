@@ -29,9 +29,7 @@
 #include <fiber.h>
 #include <iproto.h>		/* for err codes */
 #include "say.h"
-
-@implementation tnt_PickleException
-@end
+#include "exception.h"
 
 /* caller must ensure that there is space in target */
 u8 *
@@ -83,7 +81,7 @@ write_varint32(struct tbuf *b, u32 value)
 	u##bits read_u##bits(struct tbuf *b)						\
 	{										\
 		if (b->len < (bits)/8)							\
-			tnt_raise(tnt_PickleException, reason:"buffer too short");	\
+			tnt_raise(IllegalParams, :"packet too short (expected "#bits" bits)");\
 		u##bits r = *(u##bits *)b->data;					\
 		b->size -= (bits)/8;							\
 		b->len -= (bits)/8;							\
@@ -103,7 +101,7 @@ read_varint32(struct tbuf *buf)
 	int len = buf->len;
 
 	if (len < 1) {
-		tnt_raise(tnt_PickleException, reason:"buffer too short");
+		tnt_raise(IllegalParams, :"packet too short (expected 1 byte)");
 	}
 	if (!(b[0] & 0x80)) {
 		buf->data += 1;
@@ -113,7 +111,7 @@ read_varint32(struct tbuf *buf)
 	}
 
 	if (len < 2)
-		tnt_raise(tnt_PickleException, reason:"buffer too short");
+		tnt_raise(IllegalParams, :"packet too short (expected 2 bytes)");
 	if (!(b[1] & 0x80)) {
 		buf->data += 2;
 		buf->size -= 2;
@@ -121,7 +119,7 @@ read_varint32(struct tbuf *buf)
 		return (b[0] & 0x7f) << 7 | (b[1] & 0x7f);
 	}
 	if (len < 3)
-		tnt_raise(tnt_PickleException, reason:"buffer too short");
+		tnt_raise(IllegalParams, :"packet too short (expected 3 bytes)");
 	if (!(b[2] & 0x80)) {
 		buf->data += 3;
 		buf->size -= 3;
@@ -130,7 +128,7 @@ read_varint32(struct tbuf *buf)
 	}
 
 	if (len < 4)
-		tnt_raise(tnt_PickleException, reason:"buffer too short");
+		tnt_raise(IllegalParams, :"packet too short (expected 4 bytes)");
 	if (!(b[3] & 0x80)) {
 		buf->data += 4;
 		buf->size -= 4;
@@ -140,7 +138,7 @@ read_varint32(struct tbuf *buf)
 	}
 
 	if (len < 5)
-		tnt_raise(tnt_PickleException, reason:"buffer too short");
+		tnt_raise(IllegalParams, :"packet too short (expected 5 bytes)");
 	if (!(b[4] & 0x80)) {
 		buf->data += 5;
 		buf->size -= 5;
@@ -149,7 +147,7 @@ read_varint32(struct tbuf *buf)
 			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
 
-	tnt_raise(tnt_PickleException, reason:"impossible happened");
+	tnt_raise(IllegalParams, :"incorrect BER format");
 	return 0;
 }
 
@@ -169,11 +167,25 @@ read_field(struct tbuf *buf)
 	u32 data_len = read_varint32(buf);
 
 	if (data_len > buf->len)
-		tnt_raise(tnt_PickleException, reason:"buffer too short");
+		tnt_raise(IllegalParams, :"packet too short (expected a field)");
 
 	buf->size -= data_len;
 	buf->len -= data_len;
 	buf->data += data_len;
+	return p;
+}
+
+void *
+read_str(struct tbuf *buf, u32 len)
+{
+	void *p = buf->data;
+
+	if (len > buf->len)
+		tnt_raise(IllegalParams, :"packet too short (expected a string)");
+
+	buf->size -= len;
+	buf->len -= len;
+	buf->data += len;
 	return p;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001-2009 Marc Alexander Lehmann <schmorp@schmorp.de>
+ * Copyright (c) 2001-2011 Marc Alexander Lehmann <schmorp@schmorp.de>
  * 
  * Redistribution and use in source and binary forms, with or without modifica-
  * tion, are permitted provided that the following conditions are met:
@@ -88,6 +88,10 @@ coro_init (void)
 
   coro_transfer (new_coro, create_coro);
 
+#if __GCC_HAVE_DWARF2_CFI_ASM && __amd64
+  asm (".cfi_undefined rip");
+#endif
+
   func ((void *)arg);
 
   /* the new coro returned. bad. just abort() for now */
@@ -112,73 +116,87 @@ trampoline (int sig)
 
 # if CORO_ASM
 
+  #if _WIN32
+    #define CORO_WIN_TIB 1
+  #endif
+
   asm (
-       ".text\n"
-       ".globl coro_transfer\n"
-       ".type coro_transfer, @function\n"
+       "\t.text\n"
+       "\t.globl coro_transfer\n"
        "coro_transfer:\n"
+       /* windows, of course, gives a shit on the amd64 ABI and uses different registers */
+       /* http://blogs.msdn.com/freik/archive/2005/03/17/398200.aspx */
        #if __amd64
-         #define NUM_SAVED 6
-         "\tpush %rbp\n"
-         "\tpush %rbx\n"
-         "\tpush %r12\n"
-         "\tpush %r13\n"
-         "\tpush %r14\n"
-         "\tpush %r15\n"
-         "\tmov  %rsp, (%rdi)\n"
-         "\tmov  (%rsi), %rsp\n"
-         "\tpop  %r15\n"
-         "\tpop  %r14\n"
-         "\tpop  %r13\n"
-         "\tpop  %r12\n"
-         "\tpop  %rbx\n"
-         "\tpop  %rbp\n"
+         #ifdef WIN32
+           /* TODO: xmm6..15 also would need to be saved. sigh. */
+           #define NUM_SAVED 8
+           "\tpushq %rsi\n"
+           "\tpushq %rdi\n"
+           "\tpushq %rbp\n"
+           "\tpushq %rbx\n"
+           "\tpushq %r12\n"
+           "\tpushq %r13\n"
+           "\tpushq %r14\n"
+           "\tpushq %r15\n"
+           #if CORO_WIN_TIB
+             "\tpushq %fs:0x0\n"
+             "\tpushq %fs:0x8\n"
+             "\tpushq %fs:0xc\n"
+           #endif
+           "\tmovq %rsp, (%rcx)\n"
+           "\tmovq (%rdx), %rsp\n"
+           #if CORO_WIN_TIB
+             "\tpopq %fs:0xc\n"
+             "\tpopq %fs:0x8\n"
+             "\tpopq %fs:0x0\n"
+           #endif
+           "\tpopq %r15\n"
+           "\tpopq %r14\n"
+           "\tpopq %r13\n"
+           "\tpopq %r12\n"
+           "\tpopq %rbx\n"
+           "\tpopq %rbp\n"
+           "\tpopq %rdi\n"
+           "\tpopq %rsi\n"
+         #else
+           #define NUM_SAVED 6
+           "\tpushq %rbp\n"
+           "\tpushq %rbx\n"
+           "\tpushq %r12\n"
+           "\tpushq %r13\n"
+           "\tpushq %r14\n"
+           "\tpushq %r15\n"
+           "\tmovq %rsp, (%rdi)\n"
+           "\tmovq (%rsi), %rsp\n"
+           "\tpopq %r15\n"
+           "\tpopq %r14\n"
+           "\tpopq %r13\n"
+           "\tpopq %r12\n"
+           "\tpopq %rbx\n"
+           "\tpopq %rbp\n"
+         #endif
        #elif __i386
          #define NUM_SAVED 4
-         "\tpush %ebp\n"
-         "\tpush %ebx\n"
-         "\tpush %esi\n"
-         "\tpush %edi\n"
-         "\tmov  %esp, (%eax)\n"
-         "\tmov  (%edx), %esp\n"
-         "\tpop  %edi\n"
-         "\tpop  %esi\n"
-         "\tpop  %ebx\n"
-         "\tpop  %ebp\n"
-       #else
-         #error unsupported architecture
-       #endif
-       "\tret\n"
-  );
-  asm (
-       ".text\n"
-       ".globl coro_save_and_longjmp\n"
-       ".type coro_save_and_longjmp, @function\n"
-       "coro_save_and_longjmp:\n"
-       #if __amd64
-         #define NUM_SAVED 6
-         "\tpush %rbp\n"
-         "\tpush %rbx\n"
-         "\tpush %r12\n"
-         "\tpush %r13\n"
-         "\tpush %r14\n"
-         "\tpush %r15\n"
-         "\tmov  %rsp, (%rdi)\n"
-         "\tmovq %rsi, %rdi\n"
-         "\tsubq $8, %rsp\n"
-         "\tmovl %edx, %esi\n"
-         "\tcall longjmp\n"
-       #elif __i386
-         #define NUM_SAVED 4
-         "\tpush %ebp\n"
-         "\tpush %ebx\n"
-         "\tpush %esi\n"
-         "\tpush %edi\n"
-         "\tmov  %esp, (%eax)\n"
-         "\tsubl  $0x28,%esp\n"
-         "\tmovl %ecx,0x4(%esp)\n"
-         "\tmovl %edx,(%esp)\n"
-         "\tcall longjmp\n"
+         "\tpushl %ebp\n"
+         "\tpushl %ebx\n"
+         "\tpushl %esi\n"
+         "\tpushl %edi\n"
+         #if CORO_WIN_TIB
+           "\tpushl %fs:0\n"
+           "\tpushl %fs:4\n"
+           "\tpushl %fs:8\n"
+         #endif
+         "\tmovl %esp, (%eax)\n"
+         "\tmovl (%edx), %esp\n"
+         #if CORO_WIN_TIB
+           "\tpopl %fs:8\n"
+           "\tpopl %fs:4\n"
+           "\tpopl %fs:0\n"
+         #endif
+         "\tpopl %edi\n"
+         "\tpopl %esi\n"
+         "\tpopl %ebx\n"
+         "\tpopl %ebp\n"
        #else
          #error unsupported architecture
        #endif
@@ -224,8 +242,8 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, long ssiz
     }
 
   /* set the new stack */
-  nstk.ss_sp    = STACK_ADJUST_PTR (sptr,ssize); /* yes, some platforms (IRIX) get this wrong. */
-  nstk.ss_size  = STACK_ADJUST_SIZE (sptr,ssize);
+  nstk.ss_sp    = STACK_ADJUST_PTR (sptr, ssize); /* yes, some platforms (IRIX) get this wrong. */
+  nstk.ss_size  = STACK_ADJUST_SIZE (sptr, ssize);
   nstk.ss_flags = 0;
 
   if (sigaltstack (&nstk, &ostk) < 0)
@@ -259,9 +277,12 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, long ssiz
 # elif CORO_LOSER
 
   coro_setjmp (ctx->env);
-  #if __CYGWIN__
+  #if __CYGWIN__ && __i386
     ctx->env[8]                        = (long)    coro_init;
     ctx->env[7]                        = (long)    ((char *)sptr + ssize)         - sizeof (long);
+  #elif __CYGWIN__ && __x86_64
+    ctx->env[7]                        = (long)    coro_init;
+    ctx->env[6]                        = (long)    ((char *)sptr + ssize)         - sizeof (long);
   #elif defined(__MINGW32__)
     ctx->env[5]                        = (long)    coro_init;
     ctx->env[4]                        = (long)    ((char *)sptr + ssize)         - sizeof (long);
@@ -270,10 +291,10 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, long ssiz
     ((_JUMP_BUFFER *)&ctx->env)->Esp   = (long)    STACK_ADJUST_PTR (sptr, ssize) - sizeof (long);
   #elif defined(_M_AMD64)
     ((_JUMP_BUFFER *)&ctx->env)->Rip   = (__int64) coro_init;
-    ((_JUMP_BUFFER *)&ctx->env)->Rsp   = (__int64) STACK_ADJUST_PTR (sptr, ssize) - sizeof (long);
+    ((_JUMP_BUFFER *)&ctx->env)->Rsp   = (__int64) STACK_ADJUST_PTR (sptr, ssize) - sizeof (__int64);
   #elif defined(_M_IA64)
     ((_JUMP_BUFFER *)&ctx->env)->StIIP = (__int64) coro_init;
-    ((_JUMP_BUFFER *)&ctx->env)->IntSp = (__int64) STACK_ADJUST_PTR (sptr, ssize) - sizeof (long);
+    ((_JUMP_BUFFER *)&ctx->env)->IntSp = (__int64) STACK_ADJUST_PTR (sptr, ssize) - sizeof (__int64);
   #else
     #error "microsoft libc or architecture not supported"
   #endif
@@ -306,12 +327,20 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, long ssiz
 # elif CORO_ASM
 
   ctx->sp = (void **)(ssize + (char *)sptr);
-  *--ctx->sp = (void *)0xdeadbeef; /* needed for alignment only */
+  *--ctx->sp = (void *)abort; /* needed for alignment only */
   *--ctx->sp = (void *)coro_init;
+
+  #if CORO_WIN_TIB
+  *--ctx->sp = 0;                    /* ExceptionList */
+  *--ctx->sp = (char *)sptr + ssize; /* StackBase */
+  *--ctx->sp = sptr;                 /* StackLimit */
+  #endif
+
   ctx->sp -= NUM_SAVED;
+  memset (ctx->sp, 0, sizeof (*ctx->sp) * NUM_SAVED);
 
 # elif CORO_UCONTEXT
-  
+
   getcontext (&(ctx->uc));
 
   ctx->uc.uc_link           =  0;
@@ -406,7 +435,15 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, long ssiz
       args.main = &nctx;
 
       pthread_attr_init (&attr);
+#if __UCLIBC__
+      /* exists, but is borked */
+      /*pthread_attr_setstacksize (&attr, (size_t)ssize);*/
+#elif __CYGWIN__
+      /* POSIX, not here */
+      pthread_attr_setstacksize (&attr, (size_t)ssize);
+#else
       pthread_attr_setstack (&attr, sptr, (size_t)ssize);
+#endif
       pthread_attr_setscope (&attr, PTHREAD_SCOPE_PROCESS);
       pthread_create (&ctx->id, &attr, coro_init, &args);
 

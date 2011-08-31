@@ -191,7 +191,7 @@ format_slab(struct slab_class *class, struct slab *slab)
 }
 
 static bool
-full_formated(struct slab *slab)
+fully_formatted(struct slab *slab)
 {
 	return slab->brk + slab->class->item_size >= (void *)slab + SLAB_SIZE;
 }
@@ -284,7 +284,7 @@ salloc(size_t size)
 		VALGRIND_MAKE_MEM_UNDEFINED(item, sizeof(void *));
 	}
 
-	if (full_formated(slab) && slab->free == NULL)
+	if (fully_formatted(slab) && slab->free == NULL)
 		TAILQ_REMOVE(&class->free_slabs, slab, class_free_link);
 
 	slab->used += class->item_size + sizeof(red_zone);
@@ -302,7 +302,7 @@ sfree(void *ptr)
 	struct slab_class *class = slab->class;
 	struct slab_item *item = ptr;
 
-	if (full_formated(slab) && slab->free == NULL)
+	if (fully_formatted(slab) && slab->free == NULL)
 		TAILQ_INSERT_TAIL(&class->free_slabs, slab, class_free_link);
 
 	assert(valid_item(slab, item));

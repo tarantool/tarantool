@@ -30,28 +30,65 @@
 #include <util.h>
 #include <log_io.h>
 
+struct lua_State;
+
 extern struct recovery_state *recovery_state;
 void mod_init(void);
+void mod_free(void);
 struct tarantool_cfg;
+
+extern const char *mod_name;
 i32 mod_check_config(struct tarantool_cfg *conf);
-void mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
+i32 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
 int mod_cat(const char *filename);
 void mod_snapshot(struct log_io_iter *);
 void mod_info(struct tbuf *out);
-void mod_exec(char *str, int len, struct tbuf *out);
+/**
+ * This is a callback used by tarantool_lua_init() to open
+ * module-specific libraries into given Lua state.
+ *
+ * @return  L on success, 0 if out of memory
+ */
+struct lua_State *mod_lua_init(struct lua_State *L);
 
-extern struct tarantool_module module;
+/**
+ * Create an instance of Lua interpreter and load it with
+ * Tarantool modules.  Creates a Lua state, imports global
+ * Tarantool modules, then calls mod_lua_init(), which performs
+ * module-specific imports. The created state can be freed as any
+ * other, with lua_close().
+ *
+ * @return  L on success, 0 if out of memory
+ */
+struct lua_State *tarantool_lua_init();
+
+/*
+ * Single global lua_State shared by core and modules.
+ * Created with tarantool_lua_init().
+ */
+extern struct lua_State *tarantool_L;
+/* Call Lua 'tostring' built-in to print userdata nicely. */
+const char *
+tarantool_lua_tostring(struct lua_State *L, int index);
+
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern bool init_storage, booting;
 extern char *binary_filename;
+extern char *custom_proc_title;
 i32 reload_cfg(struct tbuf *out);
 int snapshot(void * /* ev */, int /* events */);
 const char *tarantool_version(void);
 void tarantool_info(struct tbuf *out);
 double tarantool_uptime(void);
+void tarantool_free(void);
 
 char **init_set_proc_title(int argc, char **argv);
+void free_proc_title(int argc, char **argv);
 void set_proc_title(const char *format, ...);
+
+void
+tarantool_lua(struct lua_State *L,
+	      struct tbuf *out, const char *str);
 
 #endif /* TARANTOOL_H_INCLUDED */

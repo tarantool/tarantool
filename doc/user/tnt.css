@@ -1,0 +1,16 @@
+.tntadmin {
+  font-family: monospace;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: green;
+}
+
+.hl-keyword {
+  color: green;
+  font-weight: bold;
+}
+
+.hl-comment{
+  color: blue;
+  font-weight: bold;
+}

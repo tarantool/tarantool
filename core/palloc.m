@@ -39,6 +39,8 @@
 #include <third_party/queue.h>
 #include <tbuf.h>
 
+#define PALLOC_POOL_NAME_MAXLEN 16
+
 struct chunk {
 	uint32_t magic;
 	void *brk;
@@ -141,6 +143,20 @@ palloc_init(void)
 
 	eter_pool = palloc_create_pool("eter_pool");
 	return 1;
+}
+
+void
+palloc_free(void)
+{
+	struct palloc_pool *pool, *pool_next;
+	SLIST_FOREACH_SAFE(pool, &pools, link, pool_next)
+		palloc_destroy_pool(pool);
+
+	palloc_free_unused();
+
+	struct chunk_class *class, *class_next;
+	TAILQ_FOREACH_SAFE(class, &classes, link, class_next)
+		free(class);
 }
 
 static void
@@ -312,7 +328,7 @@ palloc_create_pool(const char *name)
 	struct palloc_pool *pool = malloc(sizeof(struct palloc_pool));
 	assert(pool != NULL);
 	memset(pool, 0, sizeof(*pool));
-	pool->name = name;
+	palloc_set_name(pool, name);
 	SLIST_INIT(&pool->chunks);
 	SLIST_INSERT_HEAD(&pools, pool, link);
 	VALGRIND_CREATE_MEMPOOL(pool, PALLOC_REDZONE, 0);
@@ -390,13 +406,10 @@ palloc_stat(struct tbuf *buf)
 	}
 }
 
-const char *
-palloc_name(struct palloc_pool *pool, const char *new_name)
+void
+palloc_set_name(struct palloc_pool *pool, const char *name)
 {
-	const char *old_name = pool->name;
-	if (new_name != NULL)
-		pool->name = new_name;
-	return old_name;
+	pool->name = name;
 }
 
 size_t

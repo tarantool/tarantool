@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<book xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude" version="5.0">
+<title>Tarantool/Box Developer Guide</title>
+<chapter>
+<title>Compiling</title>
+<section>
+<title>How to fix the compile time error about missing confetti</title>
+<para>
+  An error about missing confetti:
+<programlisting>
+Generating prscfg.h, prscfg.c...
+[ 13%] Generating prscfg.h, prscfg.c
+/bin/sh: CONFETTI-NOTFOUND: not found
+</programlisting>
+This error is caused by cmake, trying to re-create generated files
+prscfg.h, prscfg.c in <filename>cfg/</filename> directory.
+These files are under revision control and normally need not to be 
+regenerated. 
+The fix is to
+<programlisting>
+<prompt>$ </prompt>git checkout cfg/prscfg.h
+<prompt>$ </prompt>git checkout cfg/prscfg.c
+<prompt>$ </prompt>touch cfg/prscfg.[hc]
+</programlisting>
+The other alternative, if you have actually modified
+<filename>core_cfg.cfg_tmpl</filename> is to install confetti from
+<link xlink:href="http://github.com/mailru/confetti"/> and let cmake use it.
+  
+  </para>
+</section>
+</chapter>
+<!--
+     TOC:
+
+     Introduction
+       What it can basically do; 
+
+
+     Installation and Running
+       Command line options reference
+ 
+     Data console and administrative console
+       Data operations
+       Administrative console operations
+         Format of response
+
+     Setting up replication
+       Master-slave replication
+
+     Support of memcached protocol
+
+     Configuration reference
+
+     Log file messages
+
+     Connectors
+       C
+       Ruby 
+         Example
+       Perl
+
+     Frequently Asked Questions
+       Q. What's on your roadmap?
+       Q. I found a bug. What to do?
+
+
+
+     Appendixes:
+       Configuration parameters index
+       Server error codes
+       Glossary of terms
+-->
+</book>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

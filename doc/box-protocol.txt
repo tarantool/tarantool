@@ -30,6 +30,10 @@
 
 <request> ::= <header><request_body>
 
+; If <return_code> is non-zero, the rest of server
+; response is an error message.
+;
+
 <response> ::= <header><return_code>{<response_body>}
 
 ;
@@ -44,7 +48,8 @@
 ; - 13    -- <insert>
 ; - 17    -- <select>
 ; - 19    -- <update>
-; - 20    -- <delete>
+; - 21    -- <delete>
+; - 22    -- <call>
 ; - 65280 -- <ping>
 ; This list is sparse since a number of old commands
 ; were deprecated and removed.
@@ -76,18 +81,21 @@
 
 <request_id> ::= <int32>
 
-; <request_body> holds actual command data. It is 
-; only present if <return_code> is 0 (success).
+; <request_body> holds actual command data.
 ; Its format and interpretation are defined by the value of
 ; request <type>.
 
 <request_body> ::= <select_request_body> |
                    <insert_request_body> |
                    <update_request_body> |
-                   <delete_request_body>
+                   <delete_request_body> |
+                   <call_request_body>
 
 ;
 ; <response_body> carries command reply
+; It is only present if <return_code> is 0 (success).
+; <call_response_body> can be arbitrary, it purely depends
+; on what your procedure does.
 ; 
 
 <response_body> ::= <select_response_body> |
@@ -105,7 +113,6 @@
 ;
 ; Note, that <tuple> is mandatory, and tuple <count>
 ; must be non-zero.
-; To select all keys in the namespace, use
 ;
 
 <select_request_body> ::= <namespace_no><index_no>
@@ -158,7 +165,7 @@
 ; A single unit of storage, therefore, must contain all fields
 ; of all (possibly multipart) keys and zero or more fields
 ; treated as "data". To do a <select> the user only needs to
-; define fields of those key that is used for search.
+; define fields of the key used for search.
 ;
 
 <field> ::= <int32_varint><data>
@@ -168,7 +175,7 @@
 ; Even this type awareness is very limited: it's only used when
 ; the field participates in an index. For example, when a numeric
 ; 32-bit index is defined on a field, and a non-32-bit value
-; is supplied for that field, an ERR_CODE_BAD_PARAMS
+; is supplied for that field, an ER_BAD_PARAMS
 ; is returned.
 ;
 
@@ -200,7 +207,7 @@
 ; boundaries: in Tarantool, tuples have variable cardinality.
 ;
 
-<fq_tuple> ::= <size><cardinality><tuple>
+<fq_tuple> ::= <size><tuple>
 
 <size> ::= <int32>
 
@@ -237,7 +244,7 @@
 <update_request_body> ::= <namespace_no><flags><tuple><count><operation>+
 
 ;
-; Operations are optional and exist primarily to allow
+; Operations are optional and exist solely to allow
 ; updates of individual fields.
 ;
 
@@ -271,23 +278,46 @@
 <update_response_body> ::= <insert_response_body>
 
 ;
-; <delete>, request <type> = 20
+; <delete>, request <type> = 21
 ; Similarly to updates, <delete> always uses the
 ; primary key.
 ;
 
-<delete_request_body> ::= <namespace_no><tuple>
+<delete_request_body> ::= <namespace_no><flags><tuple>
 
 ;
-; Return the number of deleted tuples.
-; Currently it's always 0 or 1
+; <delete> returns the number of deleted tuples.
+; Currently it's always either 0 or 1.
+; If BOX_RETURN_TUPLE is specified, and there is an old
+; tuple, (count > 0), DELETE returns the deleted tuple.
 ;
 
-<delete_response_body> ::= <count>
+<delete_response_body> ::= <count> | <count><fq_tuple>
+
+;
+; CALL request body contains <namespace_no>, <flags>, <proc_name>
+; the number of procedure args, and the arguments themselves,
+; which are passed into the procedure as Lua strings.
+;
+<call_request_body> ::= <flags><proc_name><tuple>
+
+;
+; <proc_name> is a valid Lua identifier, something like
+; 'type', or 'box.process'.
+;
+
+<proc_name> ::= <field>
+
+;
+; In case of an error, <call_response_body> always contains
+; <return_code>. If it's not 0, it is followed by an
+; error message. Otherwise, the rest of the response can
+; be arbitrary.
+<call_response_body> ::= <...>
 
 ;
 ; The server response, in addition to response header and body,
-; contains a return code. It's a 4-byte integer, that has
+; contains a return code. It's a 4-byte integer, which has
 ; a lower 1-byte completion status part, and a higher 3-byte
 ; error code part.
 ;
@@ -295,12 +325,10 @@
 <return_code> ::= <int32>
 
 ; Currently, the completion status is complementary:
-; it can be deduced from the error code.
-;
-; Currently there are only 3 completion status codes
-; in use:
+; it can be deduced from the error code. There are only
+; 3 completion status codes in use:
 ; 0  - success; The only possible error code with this status is
-       0, ERR_CODE_OK
+       0, ER_OK
 ; 1  - try again; An indicator of an intermittent error.
 ;      Usually is returned when two clients attempt to change
 ;      the same tuple simultaneously.
@@ -311,47 +339,47 @@
 ;
 ;  Completion status 0 (success)
 ;  -----------------------------
-;  0x00000000 -- ERR_CODE_OK
+;  0x00000000 -- ER_OK
 ;
 ;  Completion status 1 (try again)
 ;  -------------------------------
-;  0x00000401 -- ERR_CODE_NODE_IS_RO
+;  0x00000401 -- ER_TUPLE_IS_RO
 ;                The requested data is blocked from modification
 ;
-;  0x00000601 -- ERR_CODE_NODE_IS_LOCKED
+;  0x00000601 -- ER_TUPLE_IS_LOCKED
 ;                The requested data is not available
 ;
-;  0x00000701 -- ERR_CODE_MEMORY_ISSUE
+;  0x00000701 -- ER_MEMORY_ISSUE
 ;                An error occurred when allocating memory
 ;
 ;  Completion status 2 (error)
 ;  ---------------------------
 ;
-;  0x00000102  -- ERR_CODE_NONMASTER
-;                 An attempt was made to change data on a read-only port
+;  0x00000102 -- ER_NONMASTER
+;                An attempt was made to change data on a read-only port
 ;
-;  0x00000202  -- ERR_CODE_ILLEGAL_PARAMS
-;                 Malformed query
+;  0x00000202 -- ER_ILLEGAL_PARAMS
+;                Malformed query
 ;
-;  0x00000a02 -- ERR_CODE_UNSUPPORTED_COMMAND
+;  0x00000a02 -- ER_UNSUPPORTED_COMMAND
 ;                The query is not recognized
 ;
-;  0x00001e02 -- ERR_CODE_WRONG_FIELD
+;  0x00001e02 -- ER_WRONG_FIELD
 ;                An unknown field was requested
 ;
-;  0x00001f02 -- ERR_CODE_WRONG_NUMBER
+;  0x00001f02 -- ER_WRONG_NUMBER
 ;                An out-of-range numeric value was included in the query
 ;
-;  0x00002002 -- ERR_CODE_DUPLICATE
+;  0x00002002 -- ER_DUPLICATE
 ;                An attempt was made to create an object with an existing key.
 ;
-;  0x000026002 -- ERR_CODE_WRONG_VERSION
-;                 The protocol version is not supported
+;  0x00002602 -- ER_WRONG_VERSION
+;                The protocol version is not supported
 ;
-;  0x000027002 -- ERR_CODE_UNKNOWN_ERROR
-;                 Unknown error
+;  0x00002702 -- ER_WAL_IO
+;                WAL I/O error
 ;
-; Convenience macros that define hexadecimal constants for <int32>
+; Convenience that define hexadecimal constants for <int32>
 ; return codes (completion status + code) can be found in
 ; include/iproto.h.
 ;

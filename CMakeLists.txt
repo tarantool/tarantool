@@ -4,18 +4,26 @@ include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
 include(CheckSymbolExists)
+include(TestBigEndian)
 find_program(ECHO echo)
+find_program(XSLTPROC xsltproc)
+find_program(XMLLINT xmllint)
 find_program(CAT cat)
 find_program(GIT git)
 find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
+find_program(LD ld)
+set(luadir ${PROJECT_BINARY_DIR}/third_party/luajit/src)
+link_directories(${luadir})
+
+include(cmake/check_objective_c_compiler.cmake)
 
 #
 # This instructs the rest of the build system what product
 # and what modules to produce.
 #
 set (TARANTOOL_PRODUCT "box")
-set (TARANTOOL_MODULES "box" "feeder")
+set (TARANTOOL_MODULES "box")
 
 #
 # Set default build type to Debug. This is to ease a developer's
@@ -47,6 +55,24 @@ endif()
 
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
+
+test_big_endian(HAVE_BYTE_ORDER_BIG_ENDIAN)
+
+#
+# We do not perform host-to-network byte order translation,
+# and simply assume the machine is little-endian.
+# We also do not bother with trying to avoid unaligned
+# word access. Refuse to compile on rare hardware such as
+# Sparc or Itanium.
+#
+if (${HAVE_BYTE_ORDER_BIG_ENDIAN} OR
+    ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "sparc" OR
+    ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "ia64" OR
+    ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^alpha")
+    message (FATAL_ERROR "Unsupported architecture -- ${CMAKE_SYSTEM_PROCESSOR}, ")
+    message (FATAL_ERROR "Tarantool currently only supports little-endian hardware")
+    message (FATAL_ERROR "with unaligned word access.")
+endif()
 
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
@@ -94,7 +120,7 @@ execute_process (COMMAND ${GIT} describe HEAD
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "4")
-set (CPACK_PACKAGE_VERSION_PATCH "0")
+set (CPACK_PACKAGE_VERSION_PATCH "2")
 if (TARANTOOL_VERSION STREQUAL "")
     set (TARANTOOL_VERSION
         "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
@@ -119,8 +145,15 @@ set (CMAKE_C_FLAGS
 if (${CMAKE_BUILD_TYPE} STREQUAL "None")
     set (core_cflags "-std=gnu99")
 else()
-    set (core_cflags "-std=gnu99 -Wall -Wextra -Werror")
+    set (core_cflags "-std=gnu99 -Wall -Wextra")
     set (core_cflags "${core_cflags} -Wno-sign-compare -Wno-strict-aliasing")
+endif()
+
+# Only add -Werror if it's a debug build, done by developers.
+# Community builds should not cause extra trouble.
+
+if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+    set (core_cflags "${core_cflags} -Werror")
 endif()
 
 #
@@ -128,6 +161,7 @@ endif()
 #
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories("${PROJECT_SOURCE_DIR}/connector/c/include")
 include_directories("${PROJECT_BINARY_DIR}/include")
 
 #
@@ -187,14 +221,16 @@ endif()
 # -x option, simply use CXX flags to build Objective C files.
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fobjc-exceptions")
 
 add_subdirectory(third_party)
 add_subdirectory(cfg)
 add_subdirectory(connector)
 add_subdirectory(core)
 add_subdirectory(mod)
+add_subdirectory(client)
 add_subdirectory(test)
+add_subdirectory(doc EXCLUDE_FROM_ALL)
 
 install (FILES README LICENSE doc/box-protocol.txt
          DESTINATION doc)
@@ -207,6 +243,10 @@ include (cmake/tarantool_cpack.cmake)
 configure_file(
     "${PROJECT_SOURCE_DIR}/include/config.h.cmake"
     "${PROJECT_BINARY_DIR}/include/config.h"
+    )
+configure_file(
+    "${PROJECT_SOURCE_DIR}/doc/tnt.ent.cmake"
+    "${PROJECT_BINARY_DIR}/doc/tnt.ent"
     )
 
 message (STATUS "")

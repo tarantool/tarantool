@@ -1,12 +1,12 @@
 #
 # libev library
 #
-add_library(ev tarantool_ev.m)
+add_library(ev tarantool_ev.c)
 
 check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
 
 if (gcc_has_wno_unused_result)
-    set_source_files_properties(tarantool_ev.m
+    set_source_files_properties(tarantool_ev.c
         PROPERTIES COMPILE_FLAGS "-Wno-unused-result")
 endif()
 
@@ -36,7 +36,10 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/core/admin.m
     COMMAND ${RAGEL} -G2 core/admin.rl -o core/admin.m
     DEPENDS ${CMAKE_SOURCE_DIR}/core/admin.rl)
 
-add_custom_target(generate_admin_c DEPENDS ${CMAKE_SOURCE_DIR}/core/admin.m)
+add_custom_target(generate_admin_m DEPENDS ${CMAKE_SOURCE_DIR}/core/admin.m)
+# do not randomly try to re-generate admin.m after a fresh checkout
+execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
+    ${CMAKE_SOURCE_DIR}/core/admin.m)
 
 #
 # Do not clean admin.m, memcached.m or other
@@ -52,31 +55,33 @@ set (recompiled_core_sources
      ${CMAKE_SOURCE_DIR}/core/tarantool.m
      ${CMAKE_SOURCE_DIR}/core/say.m
      ${CMAKE_SOURCE_DIR}/core/admin.m
+     ${CMAKE_SOURCE_DIR}/core/replication.m
      ${CMAKE_SOURCE_DIR}/core/fiber.m PARENT_SCOPE)
 
-set (common_sources tbuf.m palloc.m util.m diagnostics.m
+set (common_sources tbuf.m palloc.m util.m
     salloc.m pickle.m coro.m stat.m log_io.m
-    log_io_remote.m iproto.m exceptions.m)
+    log_io_remote.m iproto.m exception.m errcode.c latch.m
+    tarantool_lua.m)
 
 if (ENABLE_TRACE)
   set (common_sources ${common_sources} trace.m)
 endif()
 
 add_library(core STATIC ${common_sources})
-add_dependencies(core generate_headers)
+add_dependencies(core generate_headers luajit)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
-set (common_libraries cfg core ev coro gopt misc objc)
+set (common_libraries cfg core ev coro gopt misc objc luajit dl)
 
 if (ENABLE_GCOV)
   set (common_libraries ${common_libraries} gcov)
 endif()
 
 if (ENABLE_BACKTRACE AND HAVE_BFD)
-  set (common_libraries ${common_libraries} bfd)
+  set (common_libraries ${common_libraries} bfd dl)
   if (ENABLE_STATIC)
      include (FindZLIB)
-     set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES} iberty dl)
+     set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES} iberty)
   endif()
 endif()
 

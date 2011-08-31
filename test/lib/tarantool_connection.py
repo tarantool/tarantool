@@ -27,71 +27,51 @@ import cStringIO
 import errno
 
 class TarantoolConnection:
-  def __init__(self, host, port):
-    self.host = host
-    self.port = port
-    self.is_connected = False
-    self.stream = cStringIO.StringIO()
-    self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.is_connected = False
+        self.stream = cStringIO.StringIO()
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
 
-  def connect(self):
-    self.socket.connect((self.host, self.port))
-    self.is_connected = True
+    def connect(self):
+        self.socket.connect((self.host, self.port))
+        self.is_connected = True
 
-  def disconnect(self):
-    if self.is_connected:
-      self.socket.close()
-      self.is_connected = False
+    def disconnect(self):
+        if self.is_connected:
+            self.socket.close()
+            self.is_connected = False
 
-  def reconnect(self):
-    self.disconnect()
-    self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
-    self.connect()
+    def reconnect(self):
+        self.disconnect()
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
+        self.connect()
 
-  def opt_reconnect(self):
-    """ On a socket which was disconnected, recv of 0 bytes immediately
-        returns with no data. On a socket which is alive, it returns EAGAIN.
-        Make use of this property and detect whether or not the socket is
-        dead. Reconnect a dead socket, do nothing if the socket is good."""
-    try:
-      if self.socket.recv(0, socket.MSG_DONTWAIT) == '':
-        self.reconnect()
-    except socket.error as e:
-      if e.errno == errno.EAGAIN:
-        pass
-      else:
-        self.reconnect()
+    def opt_reconnect(self):
+        """ On a socket which was disconnected, recv of 0 bytes immediately
+            returns with no data. On a socket which is alive, it returns EAGAIN.
+            Make use of this property and detect whether or not the socket is
+            dead. Reconnect a dead socket, do nothing if the socket is good."""
+        try:
+            if self.socket.recv(0, socket.MSG_DONTWAIT) == '':
+                self.reconnect()
+        except socket.error as e:
+            if e.errno == errno.EAGAIN:
+                pass
+            else:
+                self.reconnect()
 
-  def execute(self, command, noprint=True):
-    self.opt_reconnect()
-    return self.execute_no_reconnect(command, noprint)
+    def execute(self, command, silent=True):
+        self.opt_reconnect()
+        return self.execute_no_reconnect(command, silent)
 
-  def write(self, fragment):
-    """This is to support print >> admin, "command" syntax.
-    For every print statement, write is invoked twice: one to
-    write the command itself, and another to write \n. We should
-    accumulate all writes until we receive \n. When we receive it,
-    we execute the command, and rewind the stream."""
+    def __enter__(self):
+        self.connect()
+        return self
 
-    newline_pos = fragment.rfind("\n")
-    while newline_pos >= 0:
-      self.stream.write(fragment[:newline_pos+1])
-      statement = self.stream.getvalue()
-      sys.stdout.write(statement)
-      sys.stdout.write(self.execute(statement))
-      fragment = fragment[newline_pos+1:]
-      newline_pos = fragment.rfind("\n")
-      self.stream.seek(0)
-      self.stream.truncate()
-
-    self.stream.write(fragment)
-
-  def __enter__(self):
-    self.connect()
-    return self
-
-  def __exit__(self, type, value, tb):
-    self.disconnect()
+    def __exit__(self, type, value, tb):
+        self.disconnect()
 

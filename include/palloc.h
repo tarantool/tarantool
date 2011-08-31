@@ -35,6 +35,7 @@ struct tbuf;
 struct palloc_pool;
 extern struct palloc_pool *eter_pool;
 int palloc_init(void);
+void palloc_free(void);
 void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
 void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
 void *palloca(struct palloc_pool *pool, size_t size, size_t align);
@@ -43,7 +44,8 @@ void prelease_after(struct palloc_pool *pool, size_t after);
 struct palloc_pool *palloc_create_pool(const char *name);
 void palloc_destroy_pool(struct palloc_pool *);
 void palloc_free_unused(void);
-const char *palloc_name(struct palloc_pool *, const char *);
+/* Set a name of this pool. Does not copy the argument name. */
+void palloc_set_name(struct palloc_pool *, const char *);
 size_t palloc_allocated(struct palloc_pool *);
 
 void palloc_stat(struct tbuf *buf);

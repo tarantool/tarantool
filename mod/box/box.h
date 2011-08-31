@@ -27,51 +27,44 @@
  */
 
 #include <mod/box/index.h>
-#include <exceptions.h>
+#include "exception.h"
+#include "iproto.h"
 #include <tbuf.h>
+#include <fiber.h>
 
-@interface tnt_BoxException: tnt_Exception {
-	@public
-		u32 errcode;
-}
-
-
-- init:(const char *)p_file:(unsigned)p_line reason:(const char *)p_reason errcode:(u32)p_errcode;
-- init:(const char *)p_file:(unsigned)p_line errcode:(u32)p_errcode;
-@end
-
-extern bool box_updates_allowed;
-void memcached_handler(void * /* data */);
-
-struct namespace;
+struct tarantool_cfg;
 struct box_tuple;
 struct index;
 
-extern struct index *memcached_index;
+enum
+{
+	BOX_INDEX_MAX = 10,
+	BOX_NAMESPACE_MAX = 256,
+};
 
-#define MAX_IDX 10
 struct namespace {
 	int n;
 	bool enabled;
 	int cardinality;
-	struct index index[MAX_IDX];
+	struct index index[BOX_INDEX_MAX];
 };
 
 extern struct namespace *namespace;
-extern const int namespace_count;
 
-struct box_tuple {
-	u16 refs;
-	u16 flags;
-	u32 bsize;
-	u32 cardinality;
-	u8 data[0];
-} __attribute__((packed));
+struct box_out {
+	void (*add_u32)(u32 *u32);
+	void (*dup_u32)(u32 u32);
+	void (*add_tuple)(struct box_tuple *tuple);
+};
+
+extern struct box_out box_out_quiet;
 
 struct box_txn {
 	u16 op;
 	u32 flags;
 
+	struct lua_State *L;
+	struct box_out *out;
 	struct namespace *namespace;
 	struct index *index;
 	int n;
@@ -81,34 +74,19 @@ struct box_txn {
 	struct box_tuple *tuple;
 	struct box_tuple *lock_tuple;
 
-	size_t saved_iov_cnt;
 	struct tbuf req;
-
-	bool in_recover;
-	bool write_to_wal;
 };
 
-enum tuple_flags {
-	WAL_WAIT = 0x1,
-	GHOST = 0x2,
-	NEW = 0x4,
-	SEARCH = 0x8
-};
-
-enum box_mode {
-	RO = 1,
-	RW
-};
 
 #define BOX_RETURN_TUPLE		0x01
 #define BOX_ADD				0x02
 #define BOX_REPLACE			0x04
-#define BOX_QUIET			0x08
 #define BOX_NOT_STORE			0x10
+#define BOX_GC_TXN			0x20
 #define BOX_ALLOWED_REQUEST_FLAGS	(BOX_RETURN_TUPLE | \
 					 BOX_ADD | \
 					 BOX_REPLACE | \
-					 BOX_QUIET)
+					 BOX_NOT_STORE)
 
 /*
     deprecated commands:
@@ -122,32 +100,31 @@ enum box_mode {
         _(DELETE, 8)
         _(UPDATE_FIELDS, 9)
         _(INSERT,10)
+        _(JUBOX_ALIVE, 11)
         _(SELECT_LIMIT, 12)
         _(SELECT_OLD, 14)
+        _(SELECT_LIMIT, 15)
         _(UPDATE_FIELDS_OLD, 16)
-        _(JUBOX_ALIVE, 11)
 
     DO NOT use these ids!
  */
 #define MESSAGES(_)				\
-        _(INSERT, 13)				\
-        _(SELECT_LIMIT, 15)			\
+        _(REPLACE, 13)				\
 	_(SELECT, 17)				\
-	_(UPDATE_FIELDS, 19)			\
-	_(DELETE, 20)
+	_(UPDATE, 19)				\
+	_(DELETE_1_3, 20)			\
+	_(DELETE, 21)				\
+	_(CALL, 22)
 
 ENUM(messages, MESSAGES);
 
-struct box_txn *txn_alloc(u32 flags);
-u32 box_process(struct box_txn *txn, u32 op, struct tbuf *request_data);
+extern iproto_callback rw_callback;
 
+/* These are used to implement memcached 'GET' */
+static inline struct box_txn *in_txn() { return fiber->mod_data.txn; }
+struct box_txn *txn_begin();
+void txn_commit(struct box_txn *txn);
+void txn_rollback(struct box_txn *txn);
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
-void txn_cleanup(struct box_txn *txn);
 
-void *next_field(void *f);
-void append_field(struct tbuf *b, void *f);
-void *tuple_field(struct box_tuple *tuple, size_t i);
-
-void memcached_init(void);
-void memcached_expire(void * /* data */);
 #endif /* TARANTOOL_BOX_H_INCLUDED */

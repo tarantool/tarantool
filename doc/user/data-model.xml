@@ -1,0 +1,122 @@
+<!DOCTYPE chapter [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
+<title>Dynamic data model</title>
+<blockquote><para>
+  This chapter describes how Tarantool stores 
+  values and what operations with data it supports.
+</para></blockquote>
+
+<para>
+  Tarantool data is organized in <emphasis>tuples</emphasis>. Tuple
+  cardinality is varying: a tuple can contain any number
+  of fields. A field can be either numeric &mdash;
+  32- or 64- bit unsigned integer, or binary
+  string &mdash; a sequence of 8-bit octets.  The first field of a
+  tuple is always assumed to be
+  the identifying (unique) key. The remaining fields make up a 
+  value, associated with the key.
+  Tuple sets are called <emphasis>namespaces<alt>perhaps, not the best name</alt></emphasis>, and there can be up to 255 namespaces defined per
+  one Tarantool instance.
+
+  Apart from the primary key, it is possible to define secondary
+  <emphasis>indexes</emphasis> on other tuple fields. A secondary index does
+  not have to be unique, and can cover several fields.
+  If a namespace has a secondary index, tuple cardinality must be
+  at least equal to the ordinal number of the field
+  participating in the index.
+</para>
+<para>
+  Currently, entire server <emphasis>schema</emphasis> must be
+  specified in the configuration file. The schema contains all
+  namespaces and indexes. A server started with a configuration
+  file that doesn't match contents of its data directory will most
+  likely crash, but may also behave in a non-defined way. 
+  It is, however, possible to stop the server,
+  add new namespaces to the schema or temporarily disable
+  existing namespaces, and then restart the server.
+</para>
+<para>
+  Schema objects, such as namespaces and indexes, are referred to
+  by a numeric id. For example, to insert a tuple, is is necessary
+  to provide id of the destination namespace; to select
+  a tuple, one must provide the identifying key, namespace id and
+  index id of the index used for lookup.
+</para>
+
+<para>
+  The configuration file shipped with the binary package defines
+  only one namespace with id <literal>0</literal>. It has no keys
+  other than the primary. The primary key numeric id is also 
+  <literal>0</literal>. Tarantool command line client
+  supports a small subset of SQL, and we'll use it to demonstrate
+  supported data manipulation commands:
+  <programlisting>
+  tarantool> insert into t0 values (1)
+  Insert OK, 1 row affected
+  tarantool> select * from t0 where k0=1
+  Found 1 tuple:
+  [1]
+  tarantool> insert into t0 values ('hello')
+  An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters'
+  tarantool> insert into t0 values (1, 'hello')
+  Insert OK, 1 row affected
+  tarantool> select * from t0 where k0=1 
+  Found 1 tuple:
+  [1, 'hello']
+  tarantool> update t0 set k1='world' where k0=1
+  Update OK, 1 row affected
+  tarantool> select * from t0 where k0=1
+  Found 1 tuple:
+  [1, 'world']
+  tarantool> delete from t0 where k0=1
+  Delete OK, 1 row affected
+  tarantool> select * from t0 where k0=1
+  No match</programlisting>
+
+  <itemizedlist>
+    <title>Please observe:</title>
+    <listitem><para>
+      Since all object identifiers are numeric, Tarantool SQL subset
+      expects identifiers that end with a number (<literal>t0</literal>,
+      <literal>k0</literal>, <literal>k1</literal>, and so on):
+      this number is used to refer to the actual namespace or
+      index.
+    </para></listitem>
+    <listitem><para>
+       All commands actually tell the server which key/value pair
+       to change. In SQL terms, that means that all DML statements
+       must be qualified with the primary key. WHERE clause
+       is, therefore, mandatory.
+    </para></listitem>
+    <listitem><para>
+       INSERT turns into REPLACE when a tuple with given
+       primary key already exists. Such replace can insert
+       a tuple of different cardinality.
+    </para></listitem>
+  </itemizedlist>
+</para>
+<para>
+  Additional examples of SQL statements can be found in <citetitle
+  xlink:href="https://github.com/mailru/tarantool/tree/master/test/box"
+  xlink:title="Tarantool regression test suite">Tarantool
+  regression test suite</citetitle>. A complete grammar of
+  supported SQL is provided in <olink targetdoc="tarantool-user-guide" targetptr="language-reference">Language reference</olink> chapter.
+</para>
+<para>
+  Since not all NoSQL operations can be expressed in SQL, to gain
+  complete access to data manipulation functionality one must use
+  a <olink targetptr="connectors">Perl, Python, Ruby or C connector</olink>. The client/server protocol
+  is open and documented: an annotated BNF can be found in the
+  source tree, file <filename
+  xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/protocol.txt</filename>.
+</para>
+
+</chapter>
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

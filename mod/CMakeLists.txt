@@ -9,16 +9,10 @@ function(tarantool_module mod)
       ${module_sources}
       ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c)
 
-  if (mod STREQUAL "feeder")
-    set (STORAGE_OR_UTILITY "UTILITY")
-  else()
-    set (STORAGE_OR_UTILITY "STORAGE")
-  endif()
-
   add_library(lt${mod} STATIC ${recompiled_core_sources})
   set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
-    "${core_cflags} -D${STORAGE_OR_UTILITY} -DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
-  add_dependencies(lt${mod} generate_headers generate_admin_c)
+    "${core_cflags} -DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
+  add_dependencies(lt${mod} generate_headers generate_admin_m)
 
   target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries})
   set_target_properties(tarantool_${mod} PROPERTIES COMPILE_FLAGS

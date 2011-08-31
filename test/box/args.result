@@ -10,7 +10,7 @@ Usage: tarantool_box [OPTIONS]
                           exit
       --init-storage      initialize storage (an empty snapshot file) and exit
   -v, --verbose           increase verbosity level in log messages
-  -D, --daemonize         redirect input/output streams to a log file and run as
+  -B, --background        redirect input/output streams to a log file and run as
                           daemon
   -h, --help              display this help and exit
   -V, --version           print program version and exit
@@ -30,13 +30,15 @@ Usage: tarantool_box [OPTIONS]
                           exit
       --init-storage      initialize storage (an empty snapshot file) and exit
   -v, --verbose           increase verbosity level in log messages
-  -D, --daemonize         redirect input/output streams to a log file and run as
+  -B, --background        redirect input/output streams to a log file and run as
                           daemon
   -h, --help              display this help and exit
   -V, --version           print program version and exit
 
 Please visit project home page at http://launchpad.net/tarantool
 to see online documentation, submit bugs or contribute a patch.
+
+tarantool_box --cfg-get=custom_proc_title
 
 tarantool_box -Z
 tarantool_box: -Z: unknown option
@@ -57,13 +59,16 @@ tarantool_box --config tarantool.cfg
 tarantool_box: the daemon is already running
 
 tarantool_box --daemonize
+tarantool_box: --daemonize: unknown option
+
+tarantool_box --background
 tarantool_box: the daemon is already running
 
 tarantool_box --version
-1.minor.patch-<rev>-<commit>
+Tarantool/Box 1.minor.patch-<rev>-<commit>
 
 tarantool_box -V
-1.minor.patch-<rev>-<commit>
+Tarantool/Box 1.minor.patch-<rev>-<commit>
 
 #
 # A test case for Bug#726778 "Gopt broke wal_dir and snap_dir: they are no

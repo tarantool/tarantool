@@ -1,0 +1,102 @@
+# encoding: tarantool
+import os
+import sys
+# Test Lua from admin console. Whenever producing output,
+# make sure it's a valid YAML.
+exec admin "lua"
+exec admin "lua 1"
+exec admin "lua print('  lua says: hello')"
+# What's in the box? 
+exec admin "lua for n in pairs(box) do print('  - box.', n) end"
+# Test box.pack()
+exec admin "lua box.pack()"
+exec admin "lua box.pack(1)"
+exec admin "lua box.pack('abc')"
+exec admin "lua print(box.pack('a', ' - hello'))"
+exec admin "lua print(box.pack('Aa', ' - hello', ' world'))"
+exec admin "lua print(box.pack('w', 0x30))"
+exec admin "lua print(box.pack('www', 0x30, 0x30, 0x30))"
+exec admin "lua print(box.pack('www', 0x3030, 0x30))"
+exec admin "lua print(string.byte(box.pack('w', 212345), 1, 2))"
+exec admin "lua print(string.sub(box.pack('p', 1684234849), 2))"
+exec admin "lua print(box.pack('p', 'this string is 45 characters long 1234567890 '))"
+# Test the low-level box.process() call, which takes a binary packet
+# and passes it to box for execution.
+# insert:
+exec admin "lua box.process(13, box.pack('iiippp', 0, 1, 3, 1, 'testing', 'lua rocks'))"
+# select:
+exec admin "lua box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, 1))"
+# delete:
+exec admin "lua box.process(21, box.pack('iiip', 0, 1, 1, 1))"
+# check delete:
+exec admin "lua box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, 1))"
+exec admin "lua box.process(22, box.pack('iii', 0, 0, 0))"
+exec sql "call box.process('abc', 'def')"
+exec sql "call box.pack('test')"
+exec sql "call box.pack('p', 'this string is 45 characters long 1234567890 ')"
+exec sql "call box.pack('p', 'ascii symbols are visible starting from code 20')"
+exec admin "lua function f1() return 'testing', 1, false, -1, 1.123, 1e123, nil end"
+exec admin "lua f1()"
+exec sql "call f1()"
+exec admin "lua f1=nil"
+exec sql "call f1()"
+exec admin "lua function f1() return f1 end"
+exec sql "call f1()"
+
+exec sql "insert into t0 values (1, 'test box delete')"
+exec sql "call box.delete(0, '\1\0\0\0')"
+exec sql "call box.delete(0, '\1\0\0\0')"
+exec sql "insert into t0 values (1, 'test box delete')"
+exec admin "lua box.delete(0, 1)"
+exec admin "lua box.delete(0, 1)"
+exec sql "insert into t0 values ('abcd', 'test box delete')"
+exec sql "call box.delete(0, '\1\0\0\0')"
+exec sql "call box.delete(0, 'abcd')"
+exec sql "call box.delete(0, 'abcd')"
+exec sql "insert into t0 values ('abcd', 'test box delete')"
+exec admin "lua box.delete(0, 'abcd')"
+exec admin "lua box.delete(0, 'abcd')"
+exec sql "call box.select(0, 0, 'abcd')"
+exec sql "insert into t0 values ('abcd', 'test box.select()')"
+exec sql "call box.select(0, 0, 'abcd')"
+exec admin "lua box.select(0, 0, 'abcd')"
+exec admin "lua box.select(0, 0)"
+exec admin "lua box.select(0, 1)"
+exec admin "lua box.select(0)"
+exec sql "call box.replace(0, 'abcd', 'hello', 'world')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.select(0, 0, 'abcd')"
+exec sql "call box.select(0, 0, 'defc')"
+exec sql "call box.replace(0, 'abcd')"
+exec sql "call box.select(0, 0, 'abcd')"
+exec sql "call box.delete(0, 'abcd')"
+exec sql "call box.delete(0, 'defc')"
+exec sql "call box.insert(0, 'test', 'old', 'abcd')"
+exec sql "call box.update(0, 'test', '=p=p', 0, 'pass', 1, 'new')"
+exec sql "call box.select(0, 0, 'pass')"
+exec sql "call box.update(0, 'miss', '+p', 2, '\1\0\0\0')"
+exec sql "call box.update(0, 'pass', '+p', 2, '\1\0\0\0')"
+exec admin "lua box.update(0, 'pass', '+p', 2, 1)"
+exec sql "call box.select(0, 0, 'pass')"
+exec admin "lua function field_x(namespace, key, field_index) return (box.select(namespace, 0, key))[field_index] end"
+exec sql "call field_x(0, 'pass', 0)"
+exec sql "call field_x(0, 'pass', 1)"
+exec sql "call box.delete(0, 'pass')"
+fifo_lua = os.path.abspath("box/fifo.lua")
+# don't log the path name
+sys.stdout.push_filter("lua dofile(.*)", "lua dofile(...)")
+exec admin "lua dofile('{0}')".format(fifo_lua)
+sys.stdout.pop_filter()
+exec admin "lua fifo_max"
+exec admin "lua fifo_push('test', 1)"
+exec admin "lua fifo_push('test', 2)"
+exec admin "lua fifo_push('test', 3)"
+exec admin "lua fifo_push('test', 4)"
+exec admin "lua fifo_push('test', 5)"
+exec admin "lua fifo_push('test', 6)"
+exec admin "lua fifo_push('test', 7)"
+exec admin "lua fifo_push('test', 8)"
+exec admin "lua fifo_top('test')"
+exec admin "lua box.delete(0, 'test')"
+exec admin "lua fifo_top('test')"
+exec admin "lua box.delete(0, 'test')"

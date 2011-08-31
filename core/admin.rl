@@ -39,6 +39,9 @@
 #include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
+#include "third_party/luajit/src/lua.h"
+#include "third_party/luajit/src/lauxlib.h"
+#include "third_party/luajit/src/lualib.h"
 
 static const char *help =
 	"available commands:" CRLF
@@ -52,11 +55,11 @@ static const char *help =
 	" - show stat" CRLF
 	" - save coredump" CRLF
 	" - save snapshot" CRLF
-	" - exec module command" CRLF
+	" - lua command" CRLF
 	" - reload configuration" CRLF;
 
 
-static const char unknown_command[] = "unknown command. try typing help." CRLF;
+static const char *unknown_command = "unknown command. try typing help." CRLF;
 
 %%{
 	machine admin;
@@ -93,10 +96,10 @@ fail(struct tbuf *out, struct tbuf *err)
 }
 
 static int
-admin_dispatch(void)
+admin_dispatch(lua_State *L)
 {
-	struct tbuf *out = tbuf_alloc(fiber->pool);
-	struct tbuf *err = tbuf_alloc(fiber->pool);
+	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
+	struct tbuf *err = tbuf_alloc(fiber->gc_pool);
 	int cs;
 	char *p, *pe;
 	char *strstart, *strend;
@@ -134,9 +137,10 @@ admin_dispatch(void)
 			end(out);
 		}
 
-		action mod_exec {
+		action lua {
+			strstart[strend-strstart]='\0';
 			start(out);
-			mod_exec(strstart, strend - strstart, out);
+			tarantool_lua(L, out, strstart);
 			end(out);
 		}
 
@@ -175,12 +179,13 @@ admin_dispatch(void)
 		save = "sa"("v"("e")?)?;
 		coredump = "co"("r"("e"("d"("u"("m"("p")?)?)?)?)?)?;
 		snapshot = "sn"("a"("p"("s"("h"("o"("t")?)?)?)?)?)?;
-		exec = "ex"("e"("c")?)?;
 		string = [^\r\n]+ >{strstart = p;}  %{strend = p;};
 		reload = "re"("l"("o"("a"("d")?)?)?)?;
+		lua = "lu"("a")?;
 
 		commands = (help			%help						|
 			    exit			%{return 0;}					|
+			    lua  " "+ string		%lua						|
 			    show " "+ info		%{start(out); mod_info(out); end(out);}		|
 			    show " "+ fiber		%{start(out); fiber_info(out); end(out);}	|
 			    show " "+ configuration 	%show_configuration				|
@@ -189,7 +194,6 @@ admin_dispatch(void)
 			    show " "+ stat		%{start(out); stat_print(out);end(out);}	|
 			    save " "+ coredump		%{coredump(60); ok(out);}			|
 			    save " "+ snapshot		%save_snapshot					|
-			    exec " "+ string		%mod_exec					|
 			    check " "+ slab		%{slab_validate(); ok(out);}			|
 			    reload " "+ configuration	%reload_configuration);
 
@@ -198,33 +202,37 @@ admin_dispatch(void)
 		write exec;
 	}%%
 
-	fiber->rbuf->len -= (void *)pe - (void *)fiber->rbuf->data;
-	fiber->rbuf->data = pe;
+	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);
 
 	if (p != pe) {
 		start(out);
-		tbuf_append(out, unknown_command, sizeof(unknown_command));
+		tbuf_append(out, unknown_command, strlen(unknown_command));
 		end(out);
 	}
 
 	return fiber_write(out->data, out->len);
 }
 
-
 static void
-admin_handler(void *_data __attribute__((unused)))
+admin_handler(void *data __attribute__((unused)))
 {
-	for (;;) {
-		if (admin_dispatch() <= 0)
-			return;
-		fiber_gc();
+	lua_State *L = lua_newthread(tarantool_L);
+	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	@try {
+		for (;;) {
+			if (admin_dispatch(L) <= 0)
+				return;
+			fiber_gc();
+		}
+	} @finally {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 	}
 }
 
 int
 admin_init(void)
 {
-	if (fiber_server(tcp_server, cfg.admin_port, admin_handler, NULL, NULL) == NULL) {
+	if (fiber_server("admin", cfg.admin_port, admin_handler, NULL, NULL) == NULL) {
 		say_syserror("can't bind to %d", cfg.admin_port);
 		return -1;
 	}
@@ -237,5 +245,5 @@ admin_init(void)
  * Local Variables:
  * mode: c
  * End:
- * vim: syntax=c
+ * vim: syntax=objc
  */

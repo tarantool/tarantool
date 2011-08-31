@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2010-2011 Mail.RU
+ * Copyright (C) 2010-2011 Yuriy Vostrikov
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,8 +43,10 @@
 # include <sys/prctl.h>
 #endif
 #include <admin.h>
+#include <replication.h>
 #include <fiber.h>
 #include <iproto.h>
+#include <latch.h>
 #include <log_io.h>
 #include <palloc.h>
 #include <salloc.h>
@@ -61,8 +63,13 @@ static pid_t master_pid;
 const char *cfg_filename = DEFAULT_CFG_FILENAME;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
+char *custom_proc_title;
+char **main_argv;
+int main_argc;
+static void *main_opt = NULL;
 struct tarantool_cfg cfg;
 struct recovery_state *recovery_state;
+static ev_signal *sigs = NULL;
 
 bool init_storage, booting = true;
 
@@ -96,61 +103,78 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	if (n_accepted == 0 || n_skipped != 0)
 		return -1;
 
+	if (replication_check_config(conf) != 0)
+		return -1;
+
 	return mod_check_config(conf);
 }
+
 
 i32
 reload_cfg(struct tbuf *out)
 {
-	struct tarantool_cfg new_cfg1, new_cfg2;
-	i32 ret;
+	static struct tnt_latch *latch = NULL;
+	struct tarantool_cfg new_cfg, aux_cfg;
 
-	// Load with checking readonly params
-	if (dup_tarantool_cfg(&new_cfg1, &cfg) != 0) {
-		destroy_tarantool_cfg(&new_cfg1);
-
-		return -1;
+	if (latch == NULL) {
+		latch = palloc(eter_pool, sizeof(*latch));
+		tnt_latch_init(latch);
 	}
-	ret = load_cfg(&new_cfg1, 1);
-	if (ret == -1) {
-		tbuf_append(out, cfg_out->data, cfg_out->len);
 
-		destroy_tarantool_cfg(&new_cfg1);
-
-		return -1;
-	}
-	// Load without checking readonly params
-	if (fill_default_tarantool_cfg(&new_cfg2) != 0) {
-		destroy_tarantool_cfg(&new_cfg2);
-
-		return -1;
-	}
-	ret = load_cfg(&new_cfg2, 0);
-	if (ret == -1) {
-		tbuf_append(out, cfg_out->data, cfg_out->len);
-
-		destroy_tarantool_cfg(&new_cfg1);
-
-		return -1;
-	}
-	// Compare only readonly params
-	char *diff = cmp_tarantool_cfg(&new_cfg1, &new_cfg2, 1);
-	if (diff != NULL) {
-		destroy_tarantool_cfg(&new_cfg1);
-		destroy_tarantool_cfg(&new_cfg2);
-
-		out_warning(0, "Could not accept read only '%s' option", diff);
+	if (tnt_latch_trylock(latch) == -1) {
+		out_warning(0, "Could not reload configuration: it is being reloaded right now");
 		tbuf_append(out, cfg_out->data, cfg_out->len);
 
 		return -1;
 	}
-	destroy_tarantool_cfg(&new_cfg1);
 
-	mod_reload_config(&cfg, &new_cfg2);
+	@try {
+		init_tarantool_cfg(&new_cfg);
+		init_tarantool_cfg(&aux_cfg);
 
-	destroy_tarantool_cfg(&cfg);
+		/*
+		  Prepare a copy of the original config file
+		  for confetti, so that it can compare the new
+		  file with the old one when loading the new file.
+		  Load the new file and return an error if it
+		  contains a different value for some read-only
+		  parameter.
+		*/
+		if (dup_tarantool_cfg(&aux_cfg, &cfg) != 0 ||
+		    load_cfg(&aux_cfg, 1) != 0)
+			return -1;
+		/*
+		  Load the new configuration file, but
+		  skip the check for read only parameters.
+		  new_cfg contains only defaults and
+		  new settings.
+		*/
+		if (fill_default_tarantool_cfg(&new_cfg) != 0 ||
+		    load_cfg(&new_cfg, 0) != 0)
+			return -1;
 
-	cfg = new_cfg2;
+		/* Check that no default value has been changed. */
+		char *diff = cmp_tarantool_cfg(&aux_cfg, &new_cfg, 1);
+		if (diff != NULL) {
+			out_warning(0, "Could not accept read only '%s' option", diff);
+			return -1;
+		}
+
+		/* Now pass the config to the module, to take action. */
+		if (mod_reload_config(&cfg, &new_cfg) != 0)
+			return -1;
+		/* All OK, activate the config. */
+		swap_tarantool_cfg(&cfg, &new_cfg);
+	}
+	@finally {
+		destroy_tarantool_cfg(&aux_cfg);
+		destroy_tarantool_cfg(&new_cfg);
+
+		if (cfg_out->len != 0)
+			tbuf_append(out, cfg_out->data, cfg_out->len);
+
+		tnt_latch_unlock(latch);
+	}
 
 	return 0;
 }
@@ -169,7 +193,6 @@ tarantool_uptime(void)
 	return ev_now() - start_time;
 }
 
-#ifdef STORAGE
 int
 snapshot(void *ev, int events __attribute__((unused)))
 {
@@ -199,48 +222,36 @@ snapshot(void *ev, int events __attribute__((unused)))
 		return WEXITSTATUS(fiber->cw.rstatus);
 	}
 
-	fiber->name = "dumper";
+	fiber_set_name(fiber, "dumper");
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
-	fiber_destroy_all();
-	palloc_free_unused();
+
 	close_all_xcpt(1, sayfd);
 	snapshot_save(recovery_state, mod_snapshot);
-#ifdef ENABLE_GCOV
-	__gcov_flush();
-#endif
-	_exit(EXIT_SUCCESS);
 
+	exit(EXIT_SUCCESS);
 	return 0;
 }
-#endif
 
 static void
-sig_int(int signal)
+signal_cb(void)
 {
-	say_info("SIGINT or SIGTERM recieved, terminating");
+	/* terminating main event loop */
+	ev_unloop(EV_A_ EVUNLOOP_ALL);
+}
 
-	if (recovery_state != NULL) {
-		struct child *writer = recovery_state->wal_writer;
-		if (writer && writer->out && writer->out->fd > 0) {
-			close(writer->out->fd);
-			usleep(1000);
-		}
-	}
-#ifdef ENABLE_GCOV
-	__gcov_flush();
-#endif
-
-	if (master_pid == getpid()) {
-		kill(0, signal);
-		exit(EXIT_SUCCESS);
-	} else
-		_exit(EXIT_SUCCESS);
+static void
+signal_free(void)
+{
+	if (sigs == NULL)
+		return;
+	int i;
+	for (i = 0 ; i < 4 ; i++)
+		ev_signal_stop(&sigs[i]);
 }
 
 /**
  * Adjust the process signal mask and add handlers for signals.
  */
-
 static void
 signal_init(void)
 {
@@ -250,21 +261,23 @@ signal_init(void)
 	sa.sa_handler = SIG_IGN;
 	sigemptyset(&sa.sa_mask);
 
-	if (sigaction(SIGPIPE, &sa, 0) == -1)
-		goto error;
-
-	sa.sa_handler = sig_int;
-
-	if (sigaction(SIGINT, &sa, 0) == -1 ||
-	    sigaction(SIGTERM, &sa, 0) == -1 ||
-	    sigaction(SIGHUP, &sa, 0) == -1)
-	{
-		goto error;
+	if (sigaction(SIGPIPE, &sa, 0) == -1) {
+		say_syserror("sigaction");
+		exit(EX_OSERR);
 	}
-	return;
-      error:
-	say_syserror("sigaction");
-	exit(EX_OSERR);
+
+	sigs = palloc(eter_pool, sizeof(ev_signal) * 4);
+	memset(sigs, 0, sizeof(ev_signal) * 4);
+	ev_signal_init(&sigs[0], (void*)snapshot, SIGUSR1);
+	ev_signal_start(&sigs[0]);
+	ev_signal_init(&sigs[1], (void*)signal_cb, SIGINT);
+	ev_signal_start(&sigs[1]);
+	ev_signal_init(&sigs[2], (void*)signal_cb, SIGTERM);
+	ev_signal_start(&sigs[2]);
+	ev_signal_init(&sigs[3], (void*)signal_cb, SIGHUP);
+	ev_signal_start(&sigs[3]);
+
+	atexit(signal_free);
 }
 
 static void
@@ -301,16 +314,35 @@ create_pid(void)
 	fclose(f);
 }
 
-static void
-remove_pid(void)
+void
+tarantool_free(void)
 {
-	unlink(cfg.pid_file);
+	if (recovery_state != NULL)
+		recover_free(recovery_state);
+	stat_free();
+
+	if (cfg_filename_fullpath)
+		free(cfg_filename_fullpath);
+	if (main_opt)
+		gopt_free(main_opt);
+	free_proc_title(main_argc, main_argv);
+
+	if ((cfg.pid_file != NULL) && (master_pid == getpid()))
+		unlink(cfg.pid_file);
+	destroy_tarantool_cfg(&cfg);
+
+	fiber_free();
+	palloc_free();
+
+	ev_default_destroy();
+#ifdef ENABLE_GCOV
+	__gcov_flush();
+#endif
 }
 
 static void
 initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_factor)
 {
-
 	if (!salloc_init(slab_alloc_arena * (1 << 30), slab_alloc_minimal, slab_alloc_factor))
 		panic_syserror("can't initialize slab allocator");
 
@@ -326,9 +358,7 @@ initialize_minimal()
 int
 main(int argc, char **argv)
 {
-#ifdef STORAGE
 	const char *cat_filename = NULL;
-#endif
 	const char *cfg_paramname = NULL;
 
 #ifndef HAVE_LIBC_STACK_END
@@ -350,6 +380,8 @@ main(int argc, char **argv)
 	load_symbols(argv[0]);
 #endif
 	argv = init_set_proc_title(argc, argv);
+	main_argc = argc;
+	main_argv = argv;
 
 	const void *opt_def =
 		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
@@ -361,16 +393,14 @@ main(int argc, char **argv)
 			   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
 				       gopt_longs("config"),
 				       "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
-#ifdef STORAGE
 			   gopt_option('C', GOPT_ARG, gopt_shorts(0), gopt_longs("cat"),
 				       "=FILE", "cat snapshot file to stdout in readable format and exit"),
 			   gopt_option('I', 0, gopt_shorts(0),
 				       gopt_longs("init-storage", "init_storage"),
 				       NULL, "initialize storage (an empty snapshot file) and exit"),
-#endif
 			   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
 				       NULL, "increase verbosity level in log messages"),
-			   gopt_option('D', 0, gopt_shorts('D'), gopt_longs("daemonize"),
+			   gopt_option('B', 0, gopt_shorts('B'), gopt_longs("background"),
 				       NULL, "redirect input/output streams to a log file and run as daemon"),
 			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
 				       NULL, "display this help and exit"),
@@ -378,10 +408,11 @@ main(int argc, char **argv)
 				       NULL, "print program version and exit"));
 
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
+	main_opt = opt;
 	binary_filename = argv[0];
 
 	if (gopt(opt, 'V')) {
-		puts(tarantool_version());
+		printf("Tarantool/%s %s\n", mod_name, tarantool_version());
 		return 0;
 	}
 
@@ -440,7 +471,7 @@ main(int argc, char **argv)
 
 		i = tarantool_cfg_iterator_init();
 		while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
-			if (strcmp(key, cfg_paramname) == 0) {
+			if (strcmp(key, cfg_paramname) == 0 && value != NULL) {
 				printf("%s\n", value);
 				free(value);
 
@@ -468,7 +499,7 @@ main(int argc, char **argv)
 				exit(EX_OSERR);
 			}
 		} else {
-			say_error("can't swith to %s: i'm not root", cfg.username);
+			say_error("can't switch to %s: i'm not root", cfg.username);
 		}
 	}
 
@@ -491,7 +522,6 @@ main(int argc, char **argv)
 #endif
 	}
 
-#ifdef STORAGE
 	if (gopt_arg(opt, 'C', &cat_filename)) {
 		initialize_minimal();
 		if (access(cat_filename, R_OK) == -1) {
@@ -510,37 +540,41 @@ main(int argc, char **argv)
 		snapshot_save(recovery_state, mod_snapshot);
 		exit(EXIT_SUCCESS);
 	}
-#endif
 
-	if (gopt(opt, 'D'))
+	if (gopt(opt, 'B'))
 		daemonize(1, 1);
 
-	if (cfg.pid_file != NULL) {
+	if (cfg.pid_file != NULL)
 		create_pid();
-		atexit(remove_pid);
+
+	/* init process title */
+	if (cfg.custom_proc_title == NULL) {
+		custom_proc_title = "";
+	} else {
+		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
+		strcpy(custom_proc_title, "@");
+		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
 	say_logger_init(cfg.logger_nonblock);
 	booting = false;
 
-#if defined(UTILITY)
-	initialize_minimal();
-	signal_init();
-	mod_init();
-#elif defined(STORAGE)
+	/* main core cleanup routine */
+	atexit(tarantool_free);
+
 	ev_default_loop(EVFLAG_AUTO);
 
-	ev_signal *ev_sig;
-	ev_sig = palloc(eter_pool, sizeof(ev_signal));
-	ev_signal_init(ev_sig, (void *)snapshot, SIGUSR1);
-	ev_signal_start(ev_sig);
-
 	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
+	replication_prefork();
+
 	signal_init();
 
+	tarantool_L = tarantool_lua_init();
 	mod_init();
 	admin_init();
-	prelease(fiber->pool);
+	replication_init();
+
+	prelease(fiber->gc_pool);
 	say_crit("log level %i", cfg.log_level);
 	say_crit("entering event loop");
 	if (cfg.io_collect_interval > 0)
@@ -549,8 +583,6 @@ main(int argc, char **argv)
 	start_time = ev_now();
 	ev_loop(0);
 	say_crit("exiting loop");
-#else
-#error UTILITY or STORAGE must be defined
-#endif
+	/* freeing resources */
 	return 0;
 }

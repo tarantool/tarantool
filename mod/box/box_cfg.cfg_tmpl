@@ -4,7 +4,7 @@
 # Snapshot directory (where snapshots get saved/read)
 snap_dir=".", ro
 
-# WAL directory (where WAL get saved/read)
+# WAL directory (where WALs get saved/read)
 wal_dir=".", ro
 
 # Primary port (where updates are accepted)
@@ -13,53 +13,60 @@ primary_port=0, ro, required
 # Secondary port (where only selects are accepted)
 secondary_port=0, ro
 
-# warn about requests which take longer to process
+# Warn about requests which take longer to process, in seconds.
 too_long_threshold=0.5
 
-# custom proc title is appended after normal
+# A custom process list (ps) title string, appended after the standard
+# program title.
 custom_proc_title=NULL, ro
 
-# Memcached emulation is enabled if memcached == 1
-memcached=0, ro
+# Memcached protocol support is enabled if memcached_port is set
+memcached_port=0, ro
 # namespace used for memcached emulation
 memcached_namespace=23, ro
+# Memcached expiration is on if memcached_expire is set.
+memcached_expire=false, ro
 # maximum rows to consider per expire loop iteration
 memcached_expire_per_loop=1024
-# tarantool will try iterate all rows within this time
+# tarantool will try to iterate over all rows within this time
 memcached_expire_full_sweep=3600
 
-
-# do not write snapshot faster then snap_io_rate_limit MBytes/sec
+# Do not write into snapshot faster than snap_io_rate_limit MB/sec
 snap_io_rate_limit=0.0, ro
 
 # Write no more rows in WAL
 rows_per_wal=500000, ro
 
-# fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay seconds ago
-# WARNING: actually, several last requsts may stall for much longer
+# fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay
+# seconds ago.
+# WARNING: actually, several last requests may stall fsync for much longer
 wal_fsync_delay=0, ro
 
-# size of WAL writer requests buffer
+# size of WAL writer request buffer
 wal_writer_inbox_size=128, ro
 
-# Local hot standby (if enabled server will run in locale hot standby mode
-# continuously fetching WAL records from shared local directory
-local_hot_standby=0, ro
-# delay in fractional seconds between successive re-readings of wal_dir
+# Local hot standby (if enabled, the server will run in hot
+# standby mode, continuously fetching WAL records from wal_dir,
+# until it is able to bind to the primary port.
+# In local hot standby mode the server only accepts reads.
+local_hot_standby=false, ro
+# Delay, in seconds, between successive re-readings of wal_dir.
+# The re-scan is necessary to discover new WAL files or snapshots.
 wal_dir_rescan_delay=0.1, ro
 
 
-# panic if where is error reading snap or wal
-# be default panic any snapshot reading error  and ignore errors then reading wals
-panic_on_snap_error=1, ro
-panic_on_wal_error=0, ro
+# Panic if there is an error reading a snapshot or WAL.
+# By default, panic on any snapshot reading error and ignore errors
+# when reading WALs.
+panic_on_snap_error=true, ro
+panic_on_wal_error=false, ro
 
-# Remote hot standby (if enabled server will run in hot standby mode
-# continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
-remote_hot_standby=0, ro
-wal_feeder_ipaddr=NULL, ro
-wal_feeder_port=0, ro
-
+# Replication mode (if enabled, the server, once
+# bound to the primary port, will connect to
+# replication_source (ipaddr:port) and run continously
+# fetching records from it.. In replication mode the server
+# only accepts reads.
+replication_source=NULL
 
 namespace = [
   {

@@ -1,0 +1,53 @@
+# incr/decr big value 
+set bug21 0 0 19
+9223372036854775807
+STORED
+incr bug21 1
+9223372036854775808
+incr bug21 1
+9223372036854775809
+decr bug21 1
+9223372036854775808
+# underflow protection 
+set num 0 0 1
+1
+STORED
+incr num 1
+2
+incr num 8
+10
+decr num 1
+9
+decr num 9
+0
+decr num 5
+0
+# 32-bit value 
+set num 0 0 10
+4294967296
+STORED
+incr num 1
+4294967297
+# overflow value 
+set num 0 0 20
+18446744073709551615
+STORED
+incr num 1
+0
+# bogus 
+decr bogus 1
+NOT_FOUND
+decr incr 1
+NOT_FOUND
+# bit increment 
+set bigincr 0 0 1
+0
+STORED
+incr num 18446744073709551610
+18446744073709551610
+# incr text value error 
+set text 0 0 2
+hi
+STORED
+incr text 1
+CLIENT_ERROR cannot increment or decrement non-numeric value

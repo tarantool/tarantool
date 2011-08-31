@@ -1,0 +1,28 @@
+# encoding: tarantool
+import time
+
+print """# Test flush_all with zero delay. """
+exec memcached "set foo 0 0 6\r\nfooval\r\n"
+exec memcached "get foo\r\n"
+exec memcached "flush_all\r\n"
+exec memcached "get foo\r\n"
+
+print """# check that flush_all doesn't blow away items that immediately get set """
+exec memcached "set foo 0 0 3\r\nnew\r\n"
+exec memcached "get foo\r\n"
+
+print """# and the other form, specifying a flush_all time... """
+expire = time.time() + 2
+print "flush_all time + 2"
+print exec memcached silent "flush_all %d\r\n" % expire
+exec memcached "get foo\r\n"
+
+exec memcached "set foo 0 0 3\r\n123\r\n"
+exec memcached "get foo\r\n"
+time.sleep(2.2)
+exec memcached "get foo\r\n"
+
+# resore default suite config
+server.stop()
+server.deploy(self.suite_ini["config"])
+# vim: syntax=python

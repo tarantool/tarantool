@@ -1,0 +1,53 @@
+# Test that commands can take 'noreply' parameter. 
+flush_all noreply
+flush_all 0 noreply
+add noreply:foo 0 0 1 noreply
+1
+get noreply:foo
+VALUE noreply:foo 0 1
+1
+END
+set noreply:foo 0 0 1 noreply
+2
+get noreply:foo
+VALUE noreply:foo 0 1
+2
+END
+replace noreply:foo 0 0 1 noreply
+3
+get noreply:foo
+VALUE noreply:foo 0 1
+3
+END
+append noreply:foo 0 0 1 noreply
+4
+get noreply:foo
+VALUE noreply:foo 0 2
+34
+END
+prepend noreply:foo 0 0 1 noreply
+5
+get noreply:foo
+VALUE noreply:foo 0 3
+534
+END
+gets noreply:foo
+cas noreply:foo 0 0 1 <unique_id> noreply
+6
+get noreply:foo
+VALUE noreply:foo 0 1
+6
+END
+incr noreply:foo 3 noreply
+get noreply:foo
+VALUE noreply:foo 0 1
+9
+END
+decr noreply:foo 2 noreply
+get noreply:foo
+VALUE noreply:foo 0 1
+7
+END
+delete noreply:foo noreply
+get noreply:foo
+END

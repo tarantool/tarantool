@@ -17,7 +17,11 @@ Caveats:
 
 COMPILATION AND INSTALL
 
-Tarantool uses CMake for configuration management.
+Tarantool is written in C and Objective C.
+To build, you will need GCC Objective C frontend or
+Apple CLang compiler.
+
+CMake is used for configuration management.
 3 standard CMake build types are supported:
  * Debug -- used by project maintainers
  * RelWithDebugInfo -- the most common release configuration,
@@ -28,6 +32,10 @@ Please follow these steps to compile Tarantool:
 
 tarantool $ cmake .
 tarantool $ make
+
+To use a different release type, say, RelWithDebugInfo, use:
+
+tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
 
 'make' will create tarantool_box executable in directory
 mod/box.
@@ -46,7 +54,7 @@ Once all pre-requisites are installed, try:
 tarantool $ cd test && ./test-run.py --start-and-exit
 
 This will create a 'var' subdirectory in directory 'test',
-populate it with necessary files used by the server, and
+populate it with necessary files, and
 start the server. To connect, you could use
 a simplistic command-line client:
 

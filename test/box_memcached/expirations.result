@@ -1,0 +1,46 @@
+# expire: after 1 second
+# set foo
+set foo 0 1 6
+fooval
+STORED
+# foo shoud be exists
+get foo
+VALUE foo 0 6
+fooval
+END
+# foo shoud expired
+get foo
+END
+# expire: time - 1 second
+# set foo
+# foo shoud expired
+get foo
+END
+# expire: time + 1 second
+# set foo
+# foo shoud be exists
+get foo
+VALUE foo 0 6
+fooval
+END
+# foo shoud expired
+get foo
+END
+# expire: time - 20 second
+# set boo
+# foo shoud expired
+get boo
+END
+# expire: after 2 second
+# add add
+add add 0 1 6
+addval
+STORED
+# readd add - shoud be fail
+add add 0 1 7
+addval1
+NOT_STORED
+# readd add - shoud be success
+add add 0 1 7
+addval2
+STORED

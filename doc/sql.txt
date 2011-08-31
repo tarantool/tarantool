@@ -1,0 +1,53 @@
+;  
+; Tarantool SQL parser is implemented entirely on the client side.
+; This BNF provides a reference of the supported subset of 
+; the standard SQL, to which all clients are strongly encouraged 
+; to stick.
+; 
+; Convention: UPPERCASE letters are used for terminals and literals.
+; Lowercase letters are used for <non-terminals>. SQL is
+; case-insensitive, so this convention is present only to imporve
+; legibility of the BNF.
+
+<sql> ::= <insert> | <update> | <delete> | <select>
+
+<insert> ::= INSERT [INTO] <ident> VALUES <value_list>
+
+<update> ::= UPDATE <ident> SET <update_list> <simple_where>
+
+<delete> ::= DELETE FROM <ident> <simple_where>
+
+; It's only possible to select all fields of a tuple (* for field list)
+<select> ::= SELECT * FROM <ident> <where> <opt_limit>
+
+<simple_where> ::= WHERE <predicate>
+
+<where> ::= WHERE <disjunction>
+
+<predicate> ::= <ident> = <constant>
+
+<disjunction> ::= <predicate> [{OR <predicate>}+]
+
+; LIMIT is optional
+<opt_limit> ::= | LIMIT NUM[, NUM]
+
+<value_list> ::= (<constant> [{, <constant>}+])
+
+<update_list> ::= <ident> = <constant> [{, <ident> = <constant>}+]
+
+<constant> ::= STR | NUM
+
+<ident> ::= ID
+
+; Only integer numbers, optionally signed, are supported
+NUM ::= [+-]?[0-9]+
+
+;  Strings must be single-quoted
+STR ::= '.*'
+
+; Identifiers must be standard SQL, but end with digits.
+; These digits are used to infer the namespace or index id.
+
+ID ::= [a-z_]+[0-9]+
+
+; vim: syntax=bnf

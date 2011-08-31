@@ -29,8 +29,8 @@
 #include <stdbool.h>
 #include <errno.h>
 
+#include <errcode.h>
 #include <fiber.h>
-#include <iproto.h>
 #include <log_io.h>
 #include <pickle.h>
 #include <salloc.h>
@@ -42,6 +42,10 @@
 
 #include <mod/box/box.h>
 #include <mod/box/index.h>
+#include <mod/box/tuple.h>
+
+const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
+const char *index_type_strs[] = { "HASH", "TREE", "\0" };
 
 const struct field ASTERISK = {
 	.len = UINT32_MAX,
@@ -156,8 +160,8 @@ index_find_hash_by_tuple(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	if (key == NULL)
-		tnt_raise(tnt_BoxException,
-		          reason:"invalid tuple, can't find key" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key_field->fieldno);
+
 	return self->find(self, key);
 }
 
@@ -169,8 +173,7 @@ index_find_hash_num(struct index *self, void *key)
 	u32 num = *(u32 *)key;
 
 	if (key_size != 4)
-		tnt_raise(tnt_BoxException,
-		          reason:"key is not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u32");
 
 	assoc_find(int_ptr_map, self->idx.int_hash, num, ret);
 #ifdef DEBUG
@@ -187,8 +190,7 @@ index_find_hash_num64(struct index *self, void *key)
 	u64 num = *(u64 *)key;
 
 	if (key_size != 8)
-		tnt_raise(tnt_BoxException,
-		          reason:"key is not u64" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u64");
 
 	assoc_find(int64_ptr_map, self->idx.int64_hash, num, ret);
 #ifdef DEBUG
@@ -219,7 +221,7 @@ tuple2tree_index_member(struct index *index,
 	void *tuple_data = tuple->data;
 
 	if (member_p == NULL || *member_p == NULL)
-		member = palloc(fiber->pool, SIZEOF_TREE_INDEX_MEMBER(index));
+		member = palloc(fiber->gc_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 	else
 		member = *member_p;
 
@@ -284,7 +286,11 @@ index_find_tree(struct index *self, void *key)
 {
 	struct tree_index_member *member = (struct tree_index_member *)key;
 
-	return sptree_str_t_find(self->idx.tree, member);
+	member = sptree_str_t_find(self->idx.tree, member);
+	if (member != NULL)
+		return member->tuple;
+
+	return NULL;
 }
 
 static struct box_tuple *
@@ -303,8 +309,7 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 	u32 num = *(u32 *)key;
 
 	if (key_size != 4)
-		tnt_raise(tnt_BoxException,
-			  reason:"key is not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u32");
 	assoc_delete(int_ptr_map, self->idx.int_hash, num);
 #ifdef DEBUG
 	say_debug("index_remove_hash_num(self:%p, key:%i)", self, num);
@@ -319,8 +324,7 @@ index_remove_hash_num64(struct index *self, struct box_tuple *tuple)
 	u64 num = *(u64 *)key;
 
 	if (key_size != 8)
-		tnt_raise(tnt_BoxException,
-			  reason:"key is not u64" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u64");
 	assoc_delete(int64_ptr_map, self->idx.int64_hash, num);
 #ifdef DEBUG
 	say_debug("index_remove_hash_num(self:%p, key:%"PRIu64")", self, num);
@@ -353,8 +357,7 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 	u32 num = *(u32 *)key;
 
 	if (key_size != 4)
-		tnt_raise(tnt_BoxException,
-			  reason:"key is not u32" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u32");
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -378,8 +381,7 @@ index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct
 	u64 num = *(u64 *)key;
 
 	if (key_size != 8)
-		tnt_raise(tnt_BoxException,
-			  reason:"key is not u64" errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(IllegalParams, :"key is not u64");
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -401,9 +403,7 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 
 	if (key == NULL)
-		tnt_raise(tnt_BoxException,
-			  reason:"Supplied tuple misses a field which is part of an index"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key_field->fieldno);
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
@@ -422,9 +422,7 @@ static void
 index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	if (tuple->cardinality < self->field_cmp_order_cnt)
-		tnt_raise(tnt_BoxException,
-			  reason:"Supplied tuple misses a field which is part of an index"
-			  errcode:ERR_CODE_ILLEGAL_PARAMS);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->field_cmp_order_cnt);
 
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 
@@ -463,8 +461,7 @@ validate_indexes(struct box_txn *txn)
 		foreach_index(txn->n, index) {
 			for (u32 f = 0; f < index->key_cardinality; ++f) {
 				if (index->key_field[f].fieldno >= txn->tuple->cardinality)
-					tnt_raise(tnt_BoxException,
-						  reason:"tuple is too short" errcode:ERR_CODE_ILLEGAL_PARAMS);
+					tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 
 				if (index->key_field[f].type == STRING)
 					continue;
@@ -473,14 +470,10 @@ validate_indexes(struct box_txn *txn)
 				u32 len = load_varint32(&field);
 
 				if (index->key_field[f].type == NUM && len != sizeof(u32))
-					tnt_raise(tnt_BoxException,
-						  reason:"field must be NUM"
-						  errcode:ERR_CODE_ILLEGAL_PARAMS);
+					tnt_raise(IllegalParams, :"field must be NUM");
 
 				if (index->key_field[f].type == NUM64 && len != sizeof(u64))
-					tnt_raise(tnt_BoxException,
-						  reason:"field must be NUM64"
-						  errcode:ERR_CODE_ILLEGAL_PARAMS);
+					tnt_raise(IllegalParams, :"field must be NUM64");
 			}
 			if (index->type == TREE && index->unique == false)
 				/* Don't check non unique indexes */
@@ -489,9 +482,7 @@ validate_indexes(struct box_txn *txn)
 			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
 
 			if (tuple != NULL && tuple != txn->old_tuple)
-				tnt_raise(tnt_BoxException,
-					  reason:"unique index violation"
-					  errcode:ERR_CODE_INDEX_VIOLATION);
+				tnt_raise(ClientError, :ER_INDEX_VIOLATION);
 		}
 	}
 }
@@ -500,7 +491,7 @@ validate_indexes(struct box_txn *txn)
 void
 build_indexes(void)
 {
-	for (u32 n = 0; n < namespace_count; ++n) {
+	for (u32 n = 0; n < BOX_NAMESPACE_MAX; ++n) {
 		u32 n_tuples, estimated_tuples;
 		struct tree_index_member *members[nelem(namespace[n].index)] = { NULL };
 
@@ -577,8 +568,7 @@ build_indexes(void)
 	}
 }
 
-
-void
+static void
 index_hash_num(struct index *index, struct namespace *namespace, size_t estimated_rows)
 {
 	index->type = HASH;
@@ -592,8 +582,13 @@ index_hash_num(struct index *index, struct namespace *namespace, size_t estimate
 		kh_resize(int_ptr_map, index->idx.int_hash, estimated_rows);
 }
 
+static void
+index_hash_num_free(struct index *index)
+{
+	kh_destroy(int_ptr_map, index->idx.int_hash);
+}
 
-void
+static void
 index_hash_num64(struct index *index, struct namespace *namespace, size_t estimated_rows)
 {
 	index->type = HASH;
@@ -607,7 +602,13 @@ index_hash_num64(struct index *index, struct namespace *namespace, size_t estima
 		kh_resize(int64_ptr_map, index->idx.int64_hash, estimated_rows);
 }
 
-void
+static void
+index_hash_num64_free(struct index *index)
+{
+	kh_destroy(int64_ptr_map, index->idx.int64_hash);
+}
+
+static void
 index_hash_str(struct index *index, struct namespace *namespace, size_t estimated_rows)
 {
 	index->type = HASH;
@@ -621,7 +622,13 @@ index_hash_str(struct index *index, struct namespace *namespace, size_t estimate
 		kh_resize(lstr_ptr_map, index->idx.str_hash, estimated_rows);
 }
 
-void
+static void
+index_hash_str_free(struct index *index)
+{
+	kh_destroy(lstr_ptr_map, index->idx.str_hash);
+}
+
+static void
 index_tree(struct index *index, struct namespace *namespace,
 	   size_t estimated_rows __attribute__((unused)))
 {
@@ -634,4 +641,75 @@ index_tree(struct index *index, struct namespace *namespace,
 	index->iterator_init = index_iterator_init_tree_str;
 	index->iterator_next = index_iterator_next_tree_str;
 	index->idx.tree = palloc(eter_pool, sizeof(*index->idx.tree));
+}
+
+static void
+index_tree_free(struct index *index)
+{
+	(void)index;
+	/* sptree_free? */
+}
+
+void
+index_init(struct index *index, struct namespace *namespace, size_t estimated_rows)
+{
+	switch (index->type) {
+	case HASH:
+		/* Hash index, check key type. */
+		/* Hash index has single-field key*/
+		index->enabled = true;
+		switch (index->key_field[0].type) {
+		case NUM:
+			/* 32-bit integer hash */
+			index_hash_num(index, namespace, estimated_rows);
+			break;
+		case NUM64:
+			/* 64-bit integer hash */
+			index_hash_num64(index, namespace, estimated_rows);
+			break;
+		case STRING:
+			/* string hash */
+			index_hash_str(index, namespace, estimated_rows);
+			break;
+		default:
+			panic("unsupported field type in index");
+			break;
+		}
+		break;
+	case TREE:
+		/* tree index */
+		index->enabled = false;
+		index_tree(index, namespace, estimated_rows);
+		break;
+	default:
+		panic("unsupported index type");
+		break;
+	}
+}
+
+void
+index_free(struct index *index)
+{
+	switch (index->type) {
+	case HASH:
+		switch (index->key_field[0].type) {
+		case NUM:
+			index_hash_num_free(index);
+			break;
+		case NUM64:
+			index_hash_num64_free(index);
+			break;
+		case STRING:
+			index_hash_str_free(index);
+			break;
+		default:
+			break;
+		}
+		break;
+	case TREE:
+		index_tree_free(index);
+		break;
+	default:
+		break;
+	}
 }

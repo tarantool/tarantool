@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<book xmlns="http://docbook.org/ns/docbook" version="5.0"
+      xmlns:xi="http://www.w3.org/2001/XInclude" 
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xml:id="tarantool-user-guide">
+<title>Tarantool/Box User Guide, version &tnt_version;</title>
+<xi:include href="preface.xml"/>
+<xi:include href="tutorial.xml"/>
+<xi:include href="data-model.xml"/>
+<xi:include href="language-reference.xml"/>
+<xi:include href="replication.xml"/>
+<xi:include href="configuration-reference.xml"/>
+<xi:include href="connectors.xml"/>
+<xi:include href="proctitle.xml"/>
+<xi:include href="errcode.xml"/>
+<!--
+<xi:include href="faq.xml"/>
+-->
+</book>
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

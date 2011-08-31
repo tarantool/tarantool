@@ -28,10 +28,6 @@
 #include <stdbool.h>
 
 #include <util.h>
-#include <exceptions.h>
-
-@interface tnt_PickleException: tnt_Exception
-@end
 
 struct tbuf;
 
@@ -46,6 +42,8 @@ u64 read_u64(struct tbuf *b);
 u32 read_varint32(struct tbuf *buf);
 void *read_field(struct tbuf *buf);
 
+void *read_str(struct tbuf *buf, u32 len);
+
 u32 pick_u32(void *data, void **rest);
 
 u32 valid_tuple(struct tbuf *buf, u32 cardinality);
@@ -54,7 +52,7 @@ size_t varint32_sizeof(u32);
 
 inline static u32 load_varint32(void **data)
 {
-	u8 *b = *data;
+	const u8 *b = *data;
 
 	if (!(b[0] & 0x80)) {
 		*data += 1;

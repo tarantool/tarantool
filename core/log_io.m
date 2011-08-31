@@ -43,29 +43,22 @@
 #include <say.h>
 #include <third_party/crc32.h>
 #include <pickle.h>
-#include "diagnostics.h"
 
 const u16 snap_tag = -1;
 const u16 wal_tag = -2;
 const u64 default_cookie = 0;
 const u32 default_version = 11;
-const u32 snap_marker_v04 = -1U;
-const u64 xlog_marker_v04 = -1ULL;
-const u64 xlog_eof_marker_v04 = 0;
 const u32 marker_v11 = 0xba0babed;
 const u32 eof_marker_v11 = 0x10adab1e;
 const char *snap_suffix = ".snap";
 const char *xlog_suffix = ".xlog";
 const char *inprogress_suffix = ".inprogress";
-const char *v04 = "0.04\n";
-const char *v03 = "0.03\n";
 const char *v11 = "0.11\n";
 const char *snap_mark = "SNAP\n";
 const char *xlog_mark = "XLOG\n";
 
 #define ROW_EOF (void *)1
 
-static struct tbuf *row_reader_v04(FILE *f, struct palloc_pool *pool);
 static struct tbuf *row_reader_v11(FILE *f, struct palloc_pool *pool);
 
 struct log_io_iter {
@@ -78,18 +71,14 @@ struct log_io_iter {
 	int io_rate_limit;
 };
 
-struct row_v04 {
-	i64 lsn;		/* this used to be tid */
-	u16 type;
-	u32 len;
-	u8 data[];
-} __packed__;
 
-static inline struct row_v04 *row_v04(const struct tbuf *t)
+void
+wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn)
 {
-	return (struct row_v04 *)t->data;
+	assert(wait_lsn->waiter == NULL);
+	wait_lsn->waiter = fiber;
+	wait_lsn->lsn = lsn;
 }
-
 
 int
 confirm_lsn(struct recovery_state *r, i64 lsn)
@@ -102,6 +91,14 @@ confirm_lsn(struct recovery_state *r, i64 lsn)
 				 " new:%" PRIi64 " diff: %" PRIi64,
 				 r->confirmed_lsn, lsn, lsn - r->confirmed_lsn);
 		r->confirmed_lsn = lsn;
+		/* Alert the waiter, if any. There can be holes in
+		 * confirmed_lsn, in case of disk write failure,
+		 * but wal_writer never confirms LSNs out order.
+		 */
+		if (r->wait_lsn.waiter && r->confirmed_lsn >= r->wait_lsn.lsn) {
+			fiber_call(r->wait_lsn.waiter);
+		}
+
 		return 0;
 	} else {
 		say_warn("lsn double confirmed:%" PRIi64, r->confirmed_lsn);
@@ -109,6 +106,23 @@ confirm_lsn(struct recovery_state *r, i64 lsn)
 
 	return -1;
 }
+
+
+/** Wait until the given LSN makes its way to disk. */
+
+void
+recovery_wait_lsn(struct recovery_state *r, i64 lsn)
+{
+	while (lsn < r->confirmed_lsn) {
+		wait_lsn_set(&r->wait_lsn, lsn);
+		@try {
+			yield();
+		} @finally {
+			wait_lsn_clear(&r->wait_lsn);
+		}
+	}
+}
+
 
 i64
 next_lsn(struct recovery_state *r, i64 new_lsn)
@@ -122,21 +136,6 @@ next_lsn(struct recovery_state *r, i64 new_lsn)
 	return r->lsn;
 }
 
-static void
-xlog04_class(struct log_io_class *c)
-{
-	c->suffix = xlog_suffix;
-	c->filetype = xlog_mark;
-	c->version = v04;
-	c->reader = row_reader_v04;
-	c->marker = xlog_marker_v04;
-	c->marker_size = sizeof(xlog_marker_v04);
-	c->eof_marker = xlog_eof_marker_v04;
-	c->eof_marker_size = sizeof(xlog_eof_marker_v04);
-
-	c->rows_per_file = 50000;	/* sane defaults */
-	c->fsync_delay = 0;
-}
 
 static void
 v11_class(struct log_io_class *c)
@@ -153,51 +152,39 @@ v11_class(struct log_io_class *c)
 	c->fsync_delay = 0;
 }
 
-static struct log_io_class **
-snap_classes(row_reader snap_row_reader, const char *dirname)
+static void
+v11_class_free(struct log_io_class *c)
 {
-	struct log_io_class **c = calloc(3, sizeof(*c));
+	if (c->dirname)
+		free(c->dirname);
+	free(c);
+}
+
+static struct log_io_class *
+snapshot_class_create(const char *dirname)
+{
+	struct log_io_class *c = calloc(1, sizeof(*c));
 	if (c == NULL)
 		panic("calloc");
 
-	c[0] = calloc(1, sizeof(**c));
-	c[1] = calloc(1, sizeof(**c));
-	if (c[0] == NULL || c[1] == NULL)
-		panic("calloc");
+	v11_class(c);
+	c->filetype = snap_mark;
+	c->suffix = snap_suffix;
 
-	c[0]->suffix = snap_suffix;
-	c[0]->filetype = snap_mark;
-	c[0]->version = v03;
-	c[0]->eof_marker_size = 0;	/* no end marker */
-	c[0]->marker = snap_marker_v04;
-	c[0]->marker_size = sizeof(snap_marker_v04);
-	c[0]->rows_per_file = 0;
-	c[0]->reader = snap_row_reader;
-
-	v11_class(c[1]);
-	c[1]->filetype = c[0]->filetype;
-	c[1]->suffix = c[0]->suffix;
-
-	c[0]->dirname = c[1]->dirname = dirname ? strdup(dirname) : NULL;
+	c->dirname = dirname ? strdup(dirname) : NULL;
 	return c;
 }
 
-static struct log_io_class **
-xlog_classes(const char *dirname)
+static struct log_io_class *
+xlog_class_create(const char *dirname)
 {
-	struct log_io_class **c = calloc(3, sizeof(*c));
+	struct log_io_class *c = calloc(1, sizeof(*c));
 	if (c == NULL)
 		panic("calloc");
 
-	c[0] = calloc(1, sizeof(**c));
-	c[1] = calloc(1, sizeof(**c));
-	if (c[0] == NULL || c[1] == NULL)
-		panic("calloc");
+	v11_class(c);
 
-	xlog04_class(c[0]);
-	v11_class(c[1]);
-
-	c[0]->dirname = c[1]->dirname = dirname ? strdup(dirname) : NULL;
+	c->dirname = dirname ? strdup(dirname) : NULL;
 	return c;
 }
 
@@ -263,7 +250,7 @@ read_rows(struct log_io_iter *i)
 				 marker_offset - good_offset, good_offset);
 		say_debug("magic found at 0x%08" PRI_XFFT, marker_offset);
 
-		row = l->class->reader(l->f, fiber->pool);
+		row = l->class->reader(l->f, fiber->gc_pool);
 		if (row == ROW_EOF)
 			goto eof;
 
@@ -281,7 +268,7 @@ read_rows(struct log_io_iter *i)
 			goto out;
 		}
 
-		prelease_after(fiber->pool, 128 * 1024);
+		prelease_after(fiber->gc_pool, 128 * 1024);
 
 		if (++row_count % 100000 == 0)
 			say_info("%.1fM rows processed", row_count / 1000000.);
@@ -306,16 +293,12 @@ read_rows(struct log_io_iter *i)
 		eof = 1;
 		goto out;
 	}
-	if (l->class->eof_marker_size == 0 && ftello(l->f) == good_offset) {
-		eof = 1;
-		goto out;
-	}
 
       out:
 	l->rows += row_count;
 
 	fseeko(l->f, good_offset, SEEK_SET);	/* seek back to last known good offset */
-	prelease(fiber->pool);
+	prelease(fiber->gc_pool);
 
 	if (error)
 		i->error = error;
@@ -358,7 +341,7 @@ scan_dir(struct log_io_class *class, i64 **ret_lsn)
 
 	suffix_len = strlen(class->suffix);
 
-	lsn = palloc(fiber->pool, sizeof(i64) * size);
+	lsn = palloc(fiber->gc_pool, sizeof(i64) * size);
 	if (lsn == NULL)
 		goto out;
 
@@ -399,7 +382,7 @@ scan_dir(struct log_io_class *class, i64 **ret_lsn)
 
 		i++;
 		if (i == size) {
-			i64 *n = palloc(fiber->pool, sizeof(i64) * size * 2);
+			i64 *n = palloc(fiber->gc_pool, sizeof(i64) * size * 2);
 			if (n == NULL)
 				goto out;
 			memcpy(n, lsn, sizeof(i64) * size);
@@ -459,70 +442,6 @@ find_including_file(struct log_io_class *class, i64 target_lsn)
 
       out:
 	return *lsn;
-}
-
-struct tbuf *
-convert_to_v11(struct tbuf *orig, u16 tag, const u64 cookie, i64 lsn)
-{
-	struct tbuf *row = tbuf_alloc(orig->pool);
-	tbuf_ensure(row, sizeof(struct row_v11));
-	row->len = sizeof(struct row_v11);
-	row_v11(row)->lsn = lsn;
-	row_v11(row)->tm = 0;
-	row_v11(row)->len = orig->len + sizeof(tag) + sizeof(cookie);
-
-	tbuf_append(row, &tag, sizeof(tag));
-	tbuf_append(row, &cookie, sizeof(cookie));
-	tbuf_append(row, orig->data, orig->len);
-	return row;
-}
-
-static struct tbuf *
-row_reader_v04(FILE *f, struct palloc_pool *pool)
-{
-	const int header_size = offsetof(struct row_v04, data);
-	struct tbuf *m = tbuf_alloc(pool);
-	u32 crc, calculated_crc;
-
-	/*
-	 * it's imposible to distinguish between EOF and bad record condition here
-	 * since bad record may have bogus length
-	 * so if record is suspicious simply return NULL to the caller
-	 */
-
-	if (fread(m->data, header_size, 1, f) != 1)
-		return ROW_EOF;
-	m->len = header_size;
-
-	/* filter out rows with definitly wrong length */
-	if (row_v04(m)->len > (1 << 20)) {
-		say_error("record too long(%" PRIi32 "), probably damaged", row_v04(m)->len);
-		return NULL;
-	}
-
-	tbuf_ensure(m, header_size + row_v04(m)->len);
-	if (fread(row_v04(m)->data, row_v04(m)->len, 1, f) != 1)
-		return ROW_EOF;
-
-	m->len += row_v04(m)->len;
-
-	if (fread(&crc, sizeof(crc), 1, f) != 1)
-		return ROW_EOF;
-
-	calculated_crc = crc32(m->data, m->len);
-	if (crc != calculated_crc) {
-		say_error("crc32 mismatch");
-		return NULL;
-	}
-
-	say_debug("read row v04 success lsn:%" PRIi64, row_v04(m)->lsn);
-
-	/* we're copying row data twice here, it's ok since this is legacy function */
-	struct tbuf *data = tbuf_alloc(pool);
-	tbuf_append(data, &row_v04(m)->type, sizeof(row_v04(m)->type));
-	tbuf_append(data, row_v04(m)->data, row_v04(m)->len);
-
-	return convert_to_v11(data, wal_tag, default_cookie, row_v04(m)->lsn);
 }
 
 static struct tbuf *
@@ -619,7 +538,7 @@ close_log(struct log_io **lptr)
 			panic("can't rename 'inprogress' WAL");
 	}
 
-	if (l->class->eof_marker_size > 0 && l->mode == LOG_WRITE) {
+	if (l->mode == LOG_WRITE) {
 		if (fwrite(&l->class->eof_marker, l->class->eof_marker_size, 1, l->f) != 1)
 			say_error("can't write eof_marker");
 	}
@@ -657,24 +576,14 @@ flush_log(struct log_io *l)
 static int
 write_header(struct log_io *l)
 {
-	char buf[27];
-	time_t tm;
-
 	if (fwrite(l->class->filetype, strlen(l->class->filetype), 1, l->f) != 1)
 		return -1;
 
 	if (fwrite(l->class->version, strlen(l->class->version), 1, l->f) != 1)
 		return -1;
 
-	if (strcmp(l->class->version, v11) == 0) {
-		if (fwrite("\n", 1, 1, l->f) != 1)
-			return -1;
-	} else {
-		time(&tm);
-		ctime_r(&tm, buf);
-		if (fwrite(buf, strlen(buf), 1, l->f) != 1)
-			return -1;
-	}
+	if (fwrite("\n", 1, 1, l->f) != 1)
+		return -1;
 
 	return 0;
 }
@@ -704,16 +613,17 @@ format_filename(char *filename, struct log_io_class *class, i64 lsn, int suffix)
 }
 
 static struct log_io *
-open_for_read(struct recovery_state *recover, struct log_io_class **class, i64 lsn, int suffix,
+open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 lsn, int suffix,
 	      const char *filename)
 {
 	char filetype[32], version[32], buf[256];
 	struct log_io *l = NULL;
 	char *r;
+	const char *errmsg;
 
 	l = calloc(1, sizeof(*l));
 	if (l == NULL) {
-		diag_set_error(errno, strerror(errno));
+		errmsg = strerror(errno);
 		goto error;
 	}
 	l->mode = LOG_READ;
@@ -723,7 +633,7 @@ open_for_read(struct recovery_state *recover, struct log_io_class **class, i64 l
 	/* when filename is not null it is forced open for debug reading */
 	if (filename == NULL) {
 		assert(lsn != 0);
-		format_filename(l->filename, *class, lsn, suffix);
+		format_filename(l->filename, class, lsn, suffix);
 	} else {
 		assert(lsn == 0);
 		strncpy(l->filename, filename, PATH_MAX);
@@ -733,61 +643,47 @@ open_for_read(struct recovery_state *recover, struct log_io_class **class, i64 l
 
 	l->f = fopen(l->filename, "r");
 	if (l->f == NULL) {
-		diag_set_error(errno, strerror(errno));
+		errmsg = strerror(errno);
 		goto error;
 	}
 
 	r = fgets(filetype, sizeof(filetype), l->f);
 	if (r == NULL) {
-		diag_set_error(1, "header reading failed");
+		errmsg = "header reading failed";
 		goto error;
 	}
 
 	r = fgets(version, sizeof(version), l->f);
 	if (r == NULL) {
-		diag_set_error(1, "header reading failed");
+		errmsg = "header reading failed";
 		goto error;
 	}
 
-	if (strcmp((*class)->filetype, filetype) != 0) {
-		diag_set_error(1, "unknown filetype");
+	if (strcmp(class->filetype, filetype) != 0) {
+		errmsg = "unknown filetype";
 		goto error;
 	}
 
-	while (*class) {
-		if (strcmp((*class)->version, version) == 0)
-			break;
-		class++;
-	}
-
-	if (*class == NULL) {
-		diag_set_error(1, "unknown version");
+	if (strcmp(class->version, version) != 0) {
+		errmsg = "unknown version";
 		goto error;
 	}
-	l->class = *class;
+	l->class = class;
 
-	if (strcmp(version, v11) == 0) {
-		for (;;) {
-			r = fgets(buf, sizeof(buf), l->f);
-			if (r == NULL) {
-				diag_set_error(1, "header reading failed");
-				goto error;
-			}
-			if (strcmp(r, "\n") == 0 || strcmp(r, "\r\n") == 0)
-				break;
-		}
-	} else {
-		r = fgets(buf, sizeof(buf), l->f);	/* skip line with time */
+	for (;;) {
+		r = fgets(buf, sizeof(buf), l->f);
 		if (r == NULL) {
-			diag_set_error(1, "header reading failed");
+			errmsg = "header reading failed";
 			goto error;
 		}
+		if (strcmp(r, "\n") == 0 || strcmp(r, "\r\n") == 0)
+			break;
 	}
 
 	return l;
       error:
 	say_error("open_for_read: failed to open `%s': %s", l->filename,
-		  diag_get_last_error()->msg);
+		  errmsg);
 	if (l != NULL) {
 		if (l->f != NULL)
 			fclose(l->f);
@@ -797,16 +693,19 @@ open_for_read(struct recovery_state *recover, struct log_io_class **class, i64 l
 }
 
 struct log_io *
-open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 lsn, int suffix)
+open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 lsn,
+	       int suffix, int *save_errno)
 {
 	struct log_io *l = NULL;
 	int fd;
 	char *dot;
 	bool exists;
+	const char *errmsg;
 
 	l = calloc(1, sizeof(*l));
 	if (l == NULL) {
-		diag_set_error(errno, strerror(errno));
+		*save_errno = errno;
+		errmsg = strerror(errno);
 		goto error;
 	}
 	l->mode = LOG_WRITE;
@@ -828,7 +727,8 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 		exists = access(l->filename, F_OK) == 0;
 		*dot = '.';
 		if (exists) {
-			diag_set_error(EEXIST, "exists");
+			*save_errno = EEXIST;
+			errmsg = "exists";
 			goto error;
 		}
 	}
@@ -839,13 +739,15 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	 */
 	fd = open(l->filename, O_WRONLY | O_CREAT | O_EXCL | O_APPEND, 0664);
 	if (fd < 0) {
-		diag_set_error(errno, strerror(errno));
+		*save_errno = errno;
+		errmsg = strerror(errno);
 		goto error;
 	}
 
 	l->f = fdopen(fd, "a");
 	if (l->f == NULL) {
-		diag_set_error(errno, strerror(errno));
+		*save_errno = errno;
+		errmsg = strerror(errno);
 		goto error;
 	}
 
@@ -854,7 +756,7 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	return l;
       error:
 	say_error("find_log: failed to open `%s': %s", l->filename,
-		  diag_get_last_error()->msg);
+		  errmsg);
 	if (l != NULL) {
 		if (l->f != NULL)
 			fclose(l->f);
@@ -865,23 +767,23 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 
 /* this little hole shouldn't be used too much */
 int
-read_log(const char *filename, row_reader reader,
+read_log(const char *filename,
 	 row_handler *xlog_handler, row_handler *snap_handler, void *state)
 {
 	struct log_io_iter i;
 	struct log_io *l;
-	struct log_io_class **c;
+	struct log_io_class *c;
 	struct tbuf *row;
 	row_handler *h;
 
 	if (strstr(filename, xlog_suffix)) {
-		c = xlog_classes(NULL);
+		c = xlog_class_create(NULL);
 		h = xlog_handler;
 	} else if (strstr(filename, snap_suffix)) {
-		c = snap_classes(reader, NULL);
+		c = snapshot_class_create(NULL);
 		h = snap_handler;
 	} else {
-		say_error("don't know what how to read `%s'", filename);
+		say_error("don't know how to read `%s'", filename);
 		return -1;
 	}
 
@@ -894,6 +796,8 @@ read_log(const char *filename, row_reader reader,
 		say_error("binary log `%s' wasn't correctly closed", filename);
 
 	close_iter(&i);
+	v11_class_free(c);
+	close_log(&l);
 	return i.error;
 }
 
@@ -908,30 +812,37 @@ recover_snap(struct recovery_state *r)
 	@try {
 		memset(&i, 0, sizeof(i));
 
-		lsn = greatest_lsn(r->snap_prefered_class);
-		if (lsn <= 0)
-			tnt_raise(tnt_Exception, reason:"can't find snapshot");
+		lsn = greatest_lsn(r->snap_class);
+		if (lsn <= 0) {
+			say_error("can't find snapshot");
+			return -1;
+		}
 
 		snap = open_for_read(r, r->snap_class, lsn, 0, NULL);
-		if (snap == NULL)
-			tnt_raise(tnt_Exception, reason:"can't find/open snapshot");
+		if (snap == NULL) {
+			say_error("can't find/open snapshot");
+			return -1;
+		}
 
 		iter_open(snap, &i, read_rows);
 		say_info("recover from `%s'", snap->filename);
 
 		while ((row = iter_inner(&i, (void *)1))) {
-			if (r->row_handler(r, row) < 0)
-				tnt_raise(tnt_Exception, reason:"can't apply row");
+			if (r->row_handler(r, row) < 0) {
+				say_error("can't apply row");
+				return -1;
+			}
 		}
-		if (i.error != 0)
-			tnt_raise(tnt_Exception, reason:"error during snapshot processing");
+		if (i.error != 0) {
+			say_error("failure reading snapshot");
+			return -1;
+		}
 
 		r->lsn = r->confirmed_lsn = lsn;
 
 		return 0;
 	}
-	@catch (tnt_Exception *e) {
-		say_error("tnt_Exception: `%s'", e->reason);
+	@catch (id e) {
 		say_error("failure reading snapshot");
 
 		return -1;
@@ -943,7 +854,7 @@ recover_snap(struct recovery_state *r)
 		if (snap != NULL)
 			close_log(&snap);
 
-		prelease(fiber->pool);
+		prelease(fiber->gc_pool);
 	}
 }
 
@@ -974,8 +885,10 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 			}
 
 			/*  after handler(r, row) returned, row may be modified, do not use it */
-			if (r->row_handler(r, row) < 0)
-				tnt_raise(tnt_Exception, reason:"can't apply row");
+			if (r->row_handler(r, row) < 0) {
+				say_error("can't apply row");
+				return -1;
+			}
 
 			if (r) {
 				next_lsn(r, lsn);
@@ -983,16 +896,17 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 			}
 		}
 
-		if (i.error != 0)
-			tnt_raise(tnt_Exception, reason:"error during xlog processing");
+		if (i.error != 0) {
+			say_error("error during xlog processing");
+			return -1;
+		}
 
 		if (i.eof)
 			return LOG_EOF;
 
 		return 1;
 	}
-	@catch (tnt_Exception *e) {
-		say_error("tnt_Exception: `%s'", e->reason);
+	@catch (id e) {
 		say_error("failure reading xlog");
 
 		return -1;
@@ -1007,7 +921,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 			iter_inner(&i, NULL);
 
 		close_iter(&i);
-		prelease(fiber->pool);
+		prelease(fiber->gc_pool);
 	}
 }
 
@@ -1023,7 +937,7 @@ recover_remaining_wals(struct recovery_state *r)
 	size_t rows_before;
 
 	current_lsn = r->confirmed_lsn + 1;
-	wal_greatest_lsn = greatest_lsn(r->wal_prefered_class);
+	wal_greatest_lsn = greatest_lsn(r->wal_class);
 
 	/* if the caller already opened WAL for us, recover from it first */
 	if (r->current_wal != NULL)
@@ -1054,7 +968,7 @@ recover_remaining_wals(struct recovery_state *r)
 			next_wal = open_for_read(r, r->wal_class, current_lsn, -1, NULL);
 			if (next_wal == NULL) {
 				char *filename =
-					format_filename(NULL, *r->wal_class, current_lsn, -1);
+					format_filename(NULL, r->wal_class, current_lsn, -1);
 
 				say_warn("unlink broken %s wal", filename);
 				if (inprogress_log_unlink(filename) != 0)
@@ -1105,7 +1019,7 @@ recover_remaining_wals(struct recovery_state *r)
 		result = -1;
 	}
 
-	prelease(fiber->pool);
+	prelease(fiber->gc_pool);
 	return result;
 }
 
@@ -1123,7 +1037,7 @@ recover(struct recovery_state *r, i64 lsn)
 	if (lsn == 0) {
 		result = recover_snap(r);
 		if (result < 0) {
-			if (greatest_lsn(r->snap_prefered_class) <= 0) {
+			if (greatest_lsn(r->snap_class) <= 0) {
 				say_crit("didn't you forget to initialize storage with --init-storage switch?");
 				_exit(1);
 			}
@@ -1143,17 +1057,16 @@ recover(struct recovery_state *r, i64 lsn)
 	 */
 	if (r->current_wal == NULL) {
 		i64 next_lsn = r->confirmed_lsn + 1;
-		i64 lsn = find_including_file(r->wal_prefered_class, next_lsn);
+		i64 lsn = find_including_file(r->wal_class, next_lsn);
 		if (lsn <= 0) {
-			say_error("can't find wal containing record with lsn:%" PRIi64, next_lsn);
+			say_error("can't find WAL containing record with lsn:%" PRIi64, next_lsn);
 			result = -1;
 			goto out;
-		} else {
-			r->current_wal = open_for_read(r, r->wal_class, lsn, 0, NULL);
-			if (r->current_wal == NULL) {
-				result = -1;
-				goto out;
-			}
+		}
+		r->current_wal = open_for_read(r, r->wal_class, lsn, 0, NULL);
+		if (r->current_wal == NULL) {
+			result = -1;
+			goto out;
 		}
 	}
 
@@ -1162,7 +1075,7 @@ recover(struct recovery_state *r, i64 lsn)
 		panic("recover failed");
 	say_info("wals recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
       out:
-	prelease(fiber->pool);
+	prelease(fiber->gc_pool);
 	return result;
 }
 
@@ -1280,16 +1193,21 @@ write_to_disk(void *_state, struct tbuf *t)
 	if (t == NULL) {
 		if (wal != NULL)
 			close_log(&wal);
+		recover_free((struct recovery_state*)_state);
 		return NULL;
 	}
 
 	reply = tbuf_alloc(t->pool);
 
-	if (wal == NULL)
+	if (wal == NULL) {
+		int unused;
 		/* Open WAL with '.inprogress' suffix. */
-		wal = open_for_write(r, r->wal_prefered_class, wal_write_request(t)->lsn, -1);
+		wal = open_for_write(r, r->wal_class, wal_write_request(t)->lsn, -1,
+				     &unused);
+	}
 	else if (wal->rows == 1) {
-		/* rename wal after first successfull write to name without inprogress suffix*/
+		/* rename WAL after first successful write to name
+		 * without inprogress suffix*/
 		if (inprogress_log_rename(wal->filename) != 0) {
 			say_error("can't rename inprogress wal");
 			goto fail;
@@ -1332,7 +1250,7 @@ write_to_disk(void *_state, struct tbuf *t)
 		goto fail;
 	}
 
-	/* flush stdio buffer to keep feeder in sync */
+	/* flush stdio buffer to keep replication in sync */
 	if (fflush(wal->f) < 0) {
 		say_syserror("can't flush wal");
 		goto fail;
@@ -1392,26 +1310,26 @@ wal_write(struct recovery_state *r, u16 tag, u64 cookie, i64 lsn, struct tbuf *r
 
 struct recovery_state *
 recover_init(const char *snap_dirname, const char *wal_dirname,
-	     row_reader snap_row_reader, row_handler row_handler,
+	     row_handler row_handler,
 	     int rows_per_file, double fsync_delay,
 	     int inbox_size, int flags, void *data)
 {
 	struct recovery_state *r = p0alloc(eter_pool, sizeof(*r));
 
 	if (rows_per_file <= 1)
-		panic("inacceptable value of 'rows_per_file'");
+		panic("unacceptable value of 'rows_per_file'");
 
 	r->wal_timer.data = r;
 	r->row_handler = row_handler;
 	r->data = data;
+	r->remote_recovery = NULL;
 
-	r->snap_class = snap_classes(snap_row_reader, snap_dirname);
-	r->snap_prefered_class = r->snap_class[1];
+	r->snap_class = snapshot_class_create(snap_dirname);
 
-	r->wal_class = xlog_classes(wal_dirname);
-	r->wal_prefered_class = r->wal_class[1];
-	r->wal_prefered_class->rows_per_file = rows_per_file;
-	r->wal_prefered_class->fsync_delay = fsync_delay;
+	r->wal_class = xlog_class_create(wal_dirname);
+	r->wal_class->rows_per_file = rows_per_file;
+	r->wal_class->fsync_delay = fsync_delay;
+	wait_lsn_clear(&r->wait_lsn);
 
 	if ((flags & RECOVER_READONLY) == 0)
 		r->wal_writer = spawn_child("wal_writer", inbox_size, write_to_disk, r);
@@ -1420,15 +1338,25 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 }
 
 void
+recover_free(struct recovery_state *recovery)
+{
+	struct child *writer = recovery->wal_writer;
+	if (writer && writer->out && writer->out->fd > 0) {
+		close(writer->out->fd);
+		usleep(1000);
+	}
+
+	v11_class_free(recovery->snap_class);
+	v11_class_free(recovery->wal_class);
+	if (recovery->current_wal)
+		close_log(&recovery->current_wal);
+}
+
+void
 recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error)
 {
-	struct log_io_class **class;
-
-	for (class = r->wal_class; *class; class++)
-		(*class)->panic_if_error = on_wal_error;
-
-	for (class = r->snap_class; *class; class++)
-		(*class)->panic_if_error = on_snap_error;
+	r->wal_class->panic_if_error = on_wal_error;
+	r->snap_class->panic_if_error = on_snap_error;
 }
 
 static void
@@ -1465,7 +1393,7 @@ write_rows(struct log_io_iter *i)
 		if (fwrite(data->data, data->len, 1, l->f) != 1)
 			panic("fwrite");
 
-		prelease_after(fiber->pool, 128 * 1024);
+		prelease_after(fiber->gc_pool, 128 * 1024);
 	}
 }
 
@@ -1476,7 +1404,7 @@ snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
 	static int bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
-	struct tbuf *wal_row = tbuf_alloc(fiber->pool);
+	struct tbuf *wal_row = tbuf_alloc(fiber->gc_pool);
 
 	tbuf_append(wal_row, &tag, sizeof(tag));
 	tbuf_append(wal_row, &cookie, sizeof(cookie));
@@ -1516,13 +1444,13 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 	struct log_io *snap;
 	char final_filename[PATH_MAX + 1];
 	char *dot;
+	int save_errno;
 
 	memset(&i, 0, sizeof(i));
 
-	snap = open_for_write(r, r->snap_prefered_class, r->confirmed_lsn, -1);
+	snap = open_for_write(r, r->snap_class, r->confirmed_lsn, -1, &save_errno);
 	if (snap == NULL)
-		panic_status(diag_get_last_error()->code,
-			     "can't open snap for writing");
+		panic_status(save_errno, "can't open snap for writing");
 
 	iter_open(snap, &i, write_rows);
 

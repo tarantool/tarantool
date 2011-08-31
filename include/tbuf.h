@@ -33,8 +33,11 @@
 #include <util.h>
 
 struct tbuf {
+	/* Used size. */
 	u32 len;
+	/* Size of the buffer. */
 	u32 size;
+	/* Allocated buffer. */
 	void *data;
 	struct palloc_pool *pool;
 };
@@ -57,11 +60,26 @@ static inline void tbuf_append(struct tbuf *b, const void *data, size_t len)
 	*(((char *)b->data) + b->len) = '\0';
 }
 
+static inline const char *tbuf_str(const struct tbuf *tbuf)
+{
+	return tbuf->data;
+}
+
 struct tbuf *tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig);
 struct tbuf *tbuf_split(struct tbuf *e, size_t at);
 size_t tbuf_reserve(struct tbuf *b, size_t count);
 void tbuf_reset(struct tbuf *b);
 void *tbuf_peek(struct tbuf *b, size_t count);
+
+/**
+ * Remove count bytes from the beginning, and adjust all sizes
+ * accordingly.
+ *
+ * @param    count   the number of bytes to forget about.
+ *
+ * @pre      0 <= count <= tbuf->len
+ */
+void tbuf_ltrim(struct tbuf *b, size_t count);
 
 void tbuf_append_field(struct tbuf *b, void *f);
 void tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)

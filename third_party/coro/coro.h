@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001-2009 Marc Alexander Lehmann <schmorp@schmorp.de>
+ * Copyright (c) 2001-2011 Marc Alexander Lehmann <schmorp@schmorp.de>
  * 
  * Redistribution and use in source and binary forms, with or without modifica-
  * tion, are permitted provided that the following conditions are met:
@@ -69,10 +69,20 @@
  * 2008-11-16 work around a freebsd pthread bug.
  * 2008-11-19 define coro_*jmp symbols for easier porting.
  * 2009-06-23 tentative win32-backend support for mingw32 (Yasuhiro Matsumoto).
+ * 2010-12-03 tentative support for uclibc (which lacks all sorts of things).
+ * 2011-05-30 set initial callee-saved-registers to zero with CORO_ASM.
+ *            use .cfi_undefined rip on linux-amd64 for better backtraces.
+ * 2011-06-08 maybe properly implement weird windows amd64 calling conventions.
+ * 2011-07-03 rely on __GCC_HAVE_DWARF2_CFI_ASM for cfi detection.
+ * 2011-08-08 cygwin trashes stacks, use pthreads with double stack on cygwin.
  */
 
 #ifndef CORO_H
 #define CORO_H
+
+#if __cplusplus
+extern "C" {
+#endif
 
 #define CORO_VERSION 2
 
@@ -199,7 +209,17 @@ void coro_destroy (coro_context *ctx);
     && !defined(CORO_SJLJ) && !defined(CORO_LINUX) \
     && !defined(CORO_IRIX) && !defined(CORO_ASM) \
     && !defined(CORO_PTHREAD)
-#error unknown or unsupported architecture
+# if defined(WINDOWS) || defined(_WIN32)
+#  define CORO_LOSER 1 /* you don't win with windoze */
+# elif defined(__linux) && (defined(__x86) || defined (__amd64))
+#  define CORO_ASM 1
+# elif defined(HAVE_UCONTEXT_H)
+#  define CORO_UCONTEXT 1
+# elif defined(HAVE_SETJMP_H) && defined(HAVE_SIGALTSTACK)
+#  define CORO_SJLJ 1
+# else
+error unknown or unsupported architecture
+# endif
 #endif
 
 /*****************************************************************************/
@@ -256,16 +276,12 @@ struct coro_context {
 
 #elif CORO_ASM
 
-# include <setjmp.h> /* for jmp_buf */
-
 struct coro_context {
   void **sp; /* must be at offset 0 */
 };
 
-void __attribute__ ((noinline, regparm(2)))
+void __attribute__ ((__noinline__, __regparm__(2)))
 coro_transfer (coro_context *prev, coro_context *next);
-void __attribute__ ((noinline, regparm(3)))
-coro_save_and_longjmp (coro_context *prev, jmp_buf jump, int value);
 
 # define coro_destroy(ctx) (void *)(ctx)
 
@@ -283,6 +299,10 @@ struct coro_context {
 void coro_transfer (coro_context *prev, coro_context *next);
 void coro_destroy (coro_context *ctx);
 
+#endif
+
+#if __cplusplus
+}
 #endif
 
 #endif

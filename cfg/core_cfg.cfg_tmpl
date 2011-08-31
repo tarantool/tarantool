@@ -1,21 +1,29 @@
 # username to switch to
 username=NULL, ro
 
+# tarantool bind ip address, applies to master
+# and replication ports. INADDR_ANY is the default value.
+bind_ipaddr="INADDR_ANY", ro
+
 # save core on abort/assert
-coredump=0, ro
+# deprecated; use ulimit instead
+coredump=false, ro
 
 # admin port
 # used for admin's connections
 admin_port=0, ro
 
+# Replication clients should use this port (bind_ipaddr:replication_port).
+replication_port=0, ro
+
 # Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5
 log_level=4
 
-# Size of slab arena in GiBs
+# Size of slab arena in GB
 slab_alloc_arena=1.0, ro
 # Size of minimal allocation unit
 slab_alloc_minimal=64, ro
-# Growth factor, each subsecuent unit size is factor * prev unit size
+# Growth factor, each subsequent unit size is factor * prev unit size
 slab_alloc_factor=2.0, ro
 
 # working directory (daemon will chdir(2) to it)
@@ -25,15 +33,15 @@ work_dir=NULL, ro
 pid_file="tarantool.pid", ro
 
 # logger command will be executed via /bin/sh -c {}
-# example: 'exec cronolog /var/log/taranul/%Y-%m/%Y-%m-%d/tarantool.log'
-# example: 'exec extra/logger.pl /var/log/taranul/tarantool.log'
+# example: 'exec cronolog /var/log/tarantool/%Y-%m/%Y-%m-%d/tarantool.log'
+# example: 'exec extra/logger.pl /var/log/tarantool/tarantool.log'
 # when logger is not configured all logging going to STDERR
 logger=NULL, ro
 
-# make logging nonblocking, this potentially can loss some logging data
-logger_nonblock=1, ro
+# make logging nonblocking, this potentially can lose some logging data
+logger_nonblock=true, ro
 
-# delay between loop iteraions
+# delay between loop iterations
 io_collect_interval=0.0, ro
 
 # size of listen backlog
