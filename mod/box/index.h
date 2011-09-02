@@ -92,7 +92,7 @@ struct index {
 	void *iterator;
 	bool iterator_empty;
 
-	struct namespace *namespace;
+	struct space *space;
 
 	struct {
 		struct {
@@ -111,13 +111,13 @@ struct index {
 };
 
 #define foreach_index(n, index_var)					\
-	for (struct index *index_var = namespace[(n)].index;		\
+	for (struct index *index_var = space[(n)].index;		\
 	     index_var->key_cardinality != 0;				\
 	     index_var++)						\
 		if (index_var->enabled)
 
 void
-index_init(struct index *index, struct namespace *namespace, size_t estimated_rows);
+index_init(struct index *index, struct space *space, size_t estimated_rows);
 
 void
 index_free(struct index *index);

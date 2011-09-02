@@ -442,7 +442,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         </row>
 
         <row>
-          <entry>namespace</entry>
+          <entry>space</entry>
           <entry>array of objects</entry>
           <entry>none</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
@@ -453,7 +453,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           entries, and each entry represents a tuple set
           served by the server. Every entry is a composite object,
           best seen as a C programming language "struct"
-          <footnote><xi:include href="namespace.xml"/></footnote>.
+          <footnote><xi:include href="space.xml"/></footnote>.
           </entry>
         </row>
 
@@ -787,8 +787,8 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
 
           Turn on Memcached protocol support on the given
             port. All requests on this port are directed to
-            a dedicated namespace, set in <olink
-            targetptr="memcached_namespace"/>.
+            a dedicated space, set in <olink
+            targetptr="memcached_space"/>.
             Memcached-style flags are supported and stored
             along with the value. The expiration time can also be
             set and is persistent, but is ignored, unless <olink
@@ -802,17 +802,17 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         </row>
 
         <row>
-          <entry>memcached_namespace</entry>
+          <entry>memcached_space</entry>
           <entry>integer</entry>
           <entry>23</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>
-            <anchor xml:id="memcached_namespace"
-            xreflabel="memcached_namespace"/>
+            <anchor xml:id="memcached_space"
+            xreflabel="memcached_space"/>
           Namespace id to store memcached data in. The
           format of tuple is [key, metadata, value], with a HASH
-          index based on the key. Since the namespace format
+          index based on the key. Since the space format
           is defined by Memcached data model, it must not be
           previously configured.</entry>
         </row>
@@ -827,7 +827,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
             <anchor xml:id="memcached_expire"
             xreflabel="memcached_expire"/>
             Turn on tuple time-to-live support in
-            <olink targetptr="memcached_namespace"/>. This
+            <olink targetptr="memcached_space"/>. This
             effectively turns Tarantool into a "persistent" implementation
             of Memcached. Since a caching server has
             significantly different purpose than a data server, in

@@ -75,7 +75,7 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 
 	struct tbuf *req = tbuf_alloc(fiber->gc_pool);
 
-	tbuf_append(req, &cfg.memcached_namespace, sizeof(u32));
+	tbuf_append(req, &cfg.memcached_space, sizeof(u32));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
 	tbuf_append(req, &cardinality, sizeof(cardinality));
 
@@ -115,7 +115,7 @@ delete(void *key)
 	u32 box_flags = 0;
 	struct tbuf *req = tbuf_alloc(fiber->gc_pool);
 
-	tbuf_append(req, &cfg.memcached_namespace, sizeof(u32));
+	tbuf_append(req, &cfg.memcached_space, sizeof(u32));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
@@ -373,18 +373,18 @@ memcached_check_config(struct tarantool_cfg *conf)
 	}
 
 	if (conf->memcached_port <= 0 || conf->memcached_port >= USHRT_MAX) {
-		/* invalid namespace number */
+		/* invalid space number */
 		out_warning(0, "invalid memcached port value: %i",
 			    conf->memcached_port);
 		return -1;
 	}
 
-	/* check memcached namespace number: it shoud be in segment [0, max_namespace] */
-	if ((conf->memcached_namespace < 0) ||
-	    (conf->memcached_namespace > BOX_NAMESPACE_MAX)) {
-		/* invalid namespace number */
-		out_warning(0, "invalid memcached namespace number: %i",
-			    conf->memcached_namespace);
+	/* check memcached space number: it shoud be in segment [0, max_space] */
+	if ((conf->memcached_space < 0) ||
+	    (conf->memcached_space > BOX_NAMESPACE_MAX)) {
+		/* invalid space number */
+		out_warning(0, "invalid memcached space number: %i",
+			    conf->memcached_space);
 		return -1;
 	}
 
@@ -414,20 +414,20 @@ memcached_init(void)
 
 	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 
-	memcached_index = &namespace[cfg.memcached_namespace].index[0];
+	memcached_index = &space[cfg.memcached_space].index[0];
 }
 
 void
-memcached_namespace_init()
+memcached_space_init()
 {
-	struct namespace *memc_ns;
+	struct space *memc_ns;
 	struct index *memc_index;
 
-	/* configure memcached namespace */
-	memc_ns = &namespace[cfg.memcached_namespace];
+	/* configure memcached space */
+	memc_ns = &space[cfg.memcached_space];
 	memc_ns->enabled = true;
 	memc_ns->cardinality = 4;
-	memc_ns->n = cfg.memcached_namespace;
+	memc_ns->n = cfg.memcached_space;
 
 	/* configure memcached index */
 	memc_index = &memc_ns->index[0];
@@ -441,7 +441,7 @@ memcached_namespace_init()
 
 	if (memc_index->key_field == NULL || memc_index->field_cmp_order == NULL ||
 	    memc_index->search_pattern == NULL)
-		panic("out of memory when configuring memcached_namespace");
+		panic("out of memory when configuring memcached_space");
 
 	memc_index->key_field[0].fieldno = 0;
 	memc_index->key_field[0].type = STRING;

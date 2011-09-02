@@ -104,10 +104,10 @@
       Memcached will make do as a Tarantool connector.
       To enable Memcached protocol, turn on
       <olink targetptr="memcached_port"/> in the option file.
-      Since Memcached has no notion of namespaces or secondary
+      Since Memcached has no notion of spaces or secondary
       indexes, this port only makes it possible to access one
-      dedicated namespace (see <olink
-      targetptr="memcached_namespace"/>) via its primary key.
+      dedicated space (see <olink
+      targetptr="memcached_space"/>) via its primary key.
       Unless tuple expiration is enabled with <olink
       targetptr="memcached_expire"/>, TTL part of the message is
       stored but ignored.
@@ -170,12 +170,12 @@ Found 1 tuple:
     A few wrappers are defined to simplify the most common
     tasks:
     <itemizedlist>
-        <listitem><para><quote>box.select(namespace, key, ...)</quote>
+        <listitem><para><quote>box.select(space, key, ...)</quote>
         to retrieve tuples. </para></listitem>
-        <listitem><para><quote>box.replace(namespace, ...)</quote>
+        <listitem><para><quote>box.replace(space, ...)</quote>
         to insert and replace tuples. The tuple is constructed
         from all the remaining arguments passed into the function.</para></listitem>
-        <listitem><para><quote>box.update(namespace, key, tuple)</quote> and <quote>box.delete(namespace, key)</quote>for updates and deletes respectively.</para></listitem>
+        <listitem><para><quote>box.update(space, key, tuple)</quote> and <quote>box.delete(space, key)</quote>for updates and deletes respectively.</para></listitem>
     </itemizedlist>
     The Lua source code of these wrappers, as well as a more
     extensive documentation can be found in <filename>mod/box/box.lua</filename> file in the source tree.

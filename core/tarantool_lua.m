@@ -80,7 +80,7 @@ static char format_to_opcode(char format)
  * For example, a typical SELECT packet packs in Lua like this:
  *
  * pkt = box.pack("iiiiiip", -- pack format
- *                         0, -- namespace id
+ *                         0, -- space id
  *                         0, -- index id
  *                         0, -- offset
  *                         2^32, -- limit
@@ -389,7 +389,7 @@ void tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 					key, quote, value, quote);
 			luaL_addstring(&b, lua_tostring(L, -1));
 			lua_pop(L, 1);
-		} else if (strncmp(key, "namespace[", 10) == 0) {
+		} else if (strncmp(key, "space[", 10) == 0) {
 			lua_pushfstring(L, "box.space%s = %s%s%s\n",
 					key+9, quote, value, quote);
 			luaL_addstring(&b, lua_tostring(L, -1));

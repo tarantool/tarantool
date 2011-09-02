@@ -42,14 +42,14 @@ enum
 	BOX_NAMESPACE_MAX = 256,
 };
 
-struct namespace {
+struct space {
 	int n;
 	bool enabled;
 	int cardinality;
 	struct index index[BOX_INDEX_MAX];
 };
 
-extern struct namespace *namespace;
+extern struct space *space;
 
 struct box_out {
 	void (*add_u32)(u32 *u32);
@@ -65,7 +65,7 @@ struct box_txn {
 
 	struct lua_State *L;
 	struct box_out *out;
-	struct namespace *namespace;
+	struct space *space;
 	struct index *index;
 	int n;
 

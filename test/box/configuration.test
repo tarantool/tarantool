@@ -8,7 +8,7 @@ print """
 """
 # stop current server
 server.stop()
-# start server from config with holes in namespaces
+# start server from config with holes in spaces
 server.deploy("box/tarantool_bug708685.cfg")
 # check connection
 exec admin "show stat"

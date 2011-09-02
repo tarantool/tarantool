@@ -22,8 +22,8 @@ custom_proc_title=NULL, ro
 
 # Memcached protocol support is enabled if memcached_port is set
 memcached_port=0, ro
-# namespace used for memcached emulation
-memcached_namespace=23, ro
+# space used for memcached emulation
+memcached_space=23, ro
 # Memcached expiration is on if memcached_expire is set.
 memcached_expire=false, ro
 # maximum rows to consider per expire loop iteration
@@ -68,7 +68,7 @@ panic_on_wal_error=false, ro
 # only accepts reads.
 replication_source=NULL
 
-namespace = [
+space = [
   {
     enabled = -1, required
     cardinality = -1

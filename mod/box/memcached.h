@@ -34,7 +34,7 @@ void
 memcached_init();
 
 void
-memcached_namespace_init();
+memcached_space_init();
 
 int
 memcached_check_config(struct tarantool_cfg *conf);

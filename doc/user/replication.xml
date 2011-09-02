@@ -51,7 +51,7 @@
   <para>
     To start replication, configure <olink
     targetptr="replication_source"/>.
-    Other parameters can also be changed, but existing namespaces and
+    Other parameters can also be changed, but existing spaces and
     their primary keys on the replica must be identical to ones on the
     master.
   </para>
@@ -87,7 +87,7 @@
     A separate monitoring script (or scripts, if decision making
     quorum is desirable) is necessary to detect a master failure.
     Such script would typically try to update a tuple in an
-    auxiliary namespace on the master, and raise alarm if a
+    auxiliary space on the master, and raise alarm if a
     network or disk error persists longer than is acceptable.
   </para>
   <para>

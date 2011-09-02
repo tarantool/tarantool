@@ -73,10 +73,10 @@ STRS(messages, MESSAGES);
 
 const int BOX_REF_THRESHOLD = 8196;
 
-struct namespace *namespace;
+struct space *space;
 
 struct box_snap_row {
-	u32 namespace;
+	u32 space;
 	u32 tuple_size;
 	u32 data_size;
 	u8 data[];
@@ -611,12 +611,12 @@ void txn_assign_n(struct box_txn *txn, struct tbuf *data)
 	if (txn->n < 0 || txn->n >= BOX_NAMESPACE_MAX)
 		tnt_raise(ClientError, :ER_NO_SUCH_NAMESPACE, txn->n);
 
-	txn->namespace = &namespace[txn->n];
+	txn->space = &space[txn->n];
 
-	if (!txn->namespace->enabled)
+	if (!txn->space->enabled)
 		tnt_raise(ClientError, :ER_NAMESPACE_DISABLED, txn->n);
 
-	txn->index = txn->namespace->index;
+	txn->index = txn->space->index;
 }
 
 /** Remember op code/request in the txn. */
@@ -716,9 +716,9 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		txn_assign_n(txn, data);
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 		cardinality = read_u32(data);
-		if (namespace[txn->n].cardinality > 0
-		    && namespace[txn->n].cardinality != cardinality)
-			tnt_raise(IllegalParams, :"tuple cardinality must match namespace cardinality");
+		if (space[txn->n].cardinality > 0
+		    && space[txn->n].cardinality != cardinality)
+			tnt_raise(IllegalParams, :"tuple cardinality must match space cardinality");
 		prepare_replace(txn, cardinality, data);
 		break;
 
@@ -746,11 +746,11 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		u32 limit = read_u32(data);
 
 		if (i >= BOX_INDEX_MAX ||
-		    namespace[txn->n].index[i].key_cardinality == 0) {
+		    space[txn->n].index[i].key_cardinality == 0) {
 
 			tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i, txn->n);
 		}
-		txn->index = &namespace[txn->n].index[i];
+		txn->index = &space[txn->n].index[i];
 
 		process_select(txn, limit, offset, data);
 		break;
@@ -882,7 +882,7 @@ snap_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 	row = box_snap_row(b);
 
 	tuple_print(out, row->tuple_size, row->data);
-	printf("n:%i %*s\n", row->namespace, (int)out->len, (char *)out->data);
+	printf("n:%i %*s\n", row->space, (int)out->len, (char *)out->data);
 	return 0;
 }
 
@@ -897,15 +897,15 @@ xlog_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 }
 
 void
-namespace_free(void)
+space_free(void)
 {
 	int i;
 	for (i = 0 ; i < BOX_NAMESPACE_MAX ; i++) {
-		if (!namespace[i].enabled)
+		if (!space[i].enabled)
 			continue;
 		int j;
 		for (j = 0 ; j < BOX_INDEX_MAX ; j++) {
-			struct index *index = &namespace[i].index[j];
+			struct index *index = &space[i].index[j];
 			if (index->key_cardinality == 0)
 				break;
 			index_free(index);
@@ -916,31 +916,31 @@ namespace_free(void)
 }
 
 void
-namespace_init(void)
+space_init(void)
 {
-	namespace = palloc(eter_pool, sizeof(struct namespace) * BOX_NAMESPACE_MAX);
+	space = palloc(eter_pool, sizeof(struct space) * BOX_NAMESPACE_MAX);
 	for (int i = 0; i < BOX_NAMESPACE_MAX; i++) {
-		namespace[i].enabled = false;
+		space[i].enabled = false;
 		for (int j = 0; j < BOX_INDEX_MAX; j++) {
-			namespace[i].index[j].key_cardinality = 0;
+			space[i].index[j].key_cardinality = 0;
 		}
 	}
-	/* fill box namespaces */
-	for (int i = 0; cfg.namespace[i] != NULL; ++i) {
-		tarantool_cfg_namespace *cfg_namespace = cfg.namespace[i];
+	/* fill box spaces */
+	for (int i = 0; cfg.space[i] != NULL; ++i) {
+		tarantool_cfg_space *cfg_space = cfg.space[i];
 
-		if (!CNF_STRUCT_DEFINED(cfg_namespace) || !cfg_namespace->enabled)
+		if (!CNF_STRUCT_DEFINED(cfg_space) || !cfg_space->enabled)
 			continue;
 
-		assert(cfg.memcached_port == 0 || i != cfg.memcached_namespace);
+		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
 
-		namespace[i].enabled = true;
+		space[i].enabled = true;
 
-		namespace[i].cardinality = cfg_namespace->cardinality;
-		/* fill namespace indexes */
-		for (int j = 0; cfg_namespace->index[j] != NULL; ++j) {
-			typeof(cfg_namespace->index[j]) cfg_index = cfg_namespace->index[j];
-			struct index *index = &namespace[i].index[j];
+		space[i].cardinality = cfg_space->cardinality;
+		/* fill space indexes */
+		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
+			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
+			struct index *index = &space[i].index[j];
 			u32 max_key_fieldno = 0;
 
 			/* clean-up index struct */
@@ -992,15 +992,15 @@ namespace_init(void)
 			index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 			index->unique = cfg_index->unique;
 			index->type = STR2ENUM(index_type, cfg_index->type);
-			index_init(index, &namespace[i], cfg_namespace->estimated_rows);
+			index_init(index, &space[i], cfg_space->estimated_rows);
 		}
 
-		namespace[i].enabled = true;
-		namespace[i].n = i;
+		space[i].enabled = true;
+		space[i].n = i;
 
-		say_info("namespace %i successfully configured", i);
+		say_info("space %i successfully configured", i);
 	}
-	memcached_namespace_init();
+	memcached_space_init();
 }
 
 static void
@@ -1055,7 +1055,7 @@ convert_snap_row_to_wal(struct tbuf *t)
 	u32 flags = 0;
 
 	tbuf_append(r, &op, sizeof(op));
-	tbuf_append(r, &row->namespace, sizeof(row->namespace));
+	tbuf_append(r, &row->space, sizeof(row->space));
 	tbuf_append(r, &flags, sizeof(flags));
 	tbuf_append(r, &row->tuple_size, sizeof(row->tuple_size));
 	tbuf_append(r, row->data, row->data_size);
@@ -1194,59 +1194,59 @@ mod_check_config(struct tarantool_cfg *conf)
 		return -1;
 	}
 
-	/* check configured namespaces */
-	for (size_t i = 0; conf->namespace[i] != NULL; ++i) {
-		typeof(conf->namespace[i]) namespace = conf->namespace[i];
+	/* check configured spaces */
+	for (size_t i = 0; conf->space[i] != NULL; ++i) {
+		typeof(conf->space[i]) space = conf->space[i];
 
-		if (!CNF_STRUCT_DEFINED(namespace)) {
-			/* namespace undefined, skip it */
+		if (!CNF_STRUCT_DEFINED(space)) {
+			/* space undefined, skip it */
 			continue;
 		}
 
-		if (!namespace->enabled) {
-			/* namespace disabled, skip it */
+		if (!space->enabled) {
+			/* space disabled, skip it */
 			continue;
 		}
 
-		/* check namespace bound */
+		/* check space bound */
 		if (i >= BOX_NAMESPACE_MAX) {
-			/* maximum namespace is reached */
-			out_warning(0, "(namespace = %zu) "
-				    "too many namespaces (%i maximum)", i, namespace);
+			/* maximum space is reached */
+			out_warning(0, "(space = %zu) "
+				    "too many spaces (%i maximum)", i, space);
 			return -1;
 		}
 
-		if (conf->memcached_port && i == conf->memcached_namespace) {
+		if (conf->memcached_port && i == conf->memcached_space) {
 			out_warning(0, "Namespace %i is already used as "
-				    "memcached_namespace.", i);
+				    "memcached_space.", i);
 			return -1;
 		}
 
-		/* at least one index in namespace must be defined
+		/* at least one index in space must be defined
 		 * */
-		if (namespace->index == NULL) {
-			out_warning(0, "(namespace = %zu) "
+		if (space->index == NULL) {
+			out_warning(0, "(space = %zu) "
 				    "at least one index must be defined", i);
 			return -1;
 		}
 
-		/* check namespaces indexes */
-		for (size_t j = 0; namespace->index[j] != NULL; ++j) {
-			typeof(namespace->index[j]) index = namespace->index[j];
+		/* check spaces indexes */
+		for (size_t j = 0; space->index[j] != NULL; ++j) {
+			typeof(space->index[j]) index = space->index[j];
 			u32 index_cardinality = 0;
 			enum index_type index_type;
 
 			/* check index bound */
 			if (j >= BOX_INDEX_MAX) {
-				/* maximum index in namespace reached */
-				out_warning(0, "(namespace = %zu index = %zu) "
+				/* maximum index in space reached */
+				out_warning(0, "(space = %zu index = %zu) "
 					    "too many indexed (%i maximum)", i, j, BOX_INDEX_MAX);
 				return -1;
 			}
 
 			/* at least one key in index must be defined */
 			if (index->key_field == NULL) {
-				out_warning(0, "(namespace = %zu index = %zu) "
+				out_warning(0, "(space = %zu index = %zu) "
 					    "at least one field must be defined", i, j);
 				return -1;
 			}
@@ -1254,7 +1254,7 @@ mod_check_config(struct tarantool_cfg *conf)
 			/* check unique property */
 			if (index->unique == -1) {
 				/* unique property undefined */
-				out_warning(0, "(namespace = %zu index = %zu) "
+				out_warning(0, "(space = %zu index = %zu) "
 					    "unique property is undefined", i, j);
 			}
 
@@ -1268,7 +1268,7 @@ mod_check_config(struct tarantool_cfg *conf)
 
 				/* key must has valid type */
 				if (STR2ENUM(field_data_type, key->type) == field_data_type_MAX) {
-					out_warning(0, "(namespace = %zu index = %zu) "
+					out_warning(0, "(space = %zu index = %zu) "
 						    "unknown field data type: `%s'", i, j, key->type);
 					return -1;
 				}
@@ -1278,7 +1278,7 @@ mod_check_config(struct tarantool_cfg *conf)
 
 			/* check index cardinality */
 			if (index_cardinality == 0) {
-				out_warning(0, "(namespace = %zu index = %zu) "
+				out_warning(0, "(space = %zu index = %zu) "
 					    "at least one field must be defined", i, j);
 				return -1;
 			}
@@ -1287,14 +1287,14 @@ mod_check_config(struct tarantool_cfg *conf)
 
 			/* check index type */
 			if (index_type == index_type_MAX) {
-				out_warning(0, "(namespace = %zu index = %zu) "
+				out_warning(0, "(space = %zu index = %zu) "
 					    "unknown index type '%s'", i, j, index->type);
 				return -1;
 			}
 
-			/* first namespace index must has hash type */
+			/* first space index must has hash type */
 			if (j == 0 && index_type != HASH) {
-				out_warning(0, "(namespace = %zu) namespace first index must has HASH type", i);
+				out_warning(0, "(space = %zu) space first index must has HASH type", i);
 				return -1;
 			}
 
@@ -1303,13 +1303,13 @@ mod_check_config(struct tarantool_cfg *conf)
 				/* check hash index */
 				/* hash index must has single-field key */
 				if (index_cardinality != 1) {
-					out_warning(0, "(namespace = %zu index = %zu) "
+					out_warning(0, "(space = %zu index = %zu) "
 					            "hash index must has a single-field key", i, j);
 					return -1;
 				}
 				/* hash index must be unique */
 				if (!index->unique) {
-					out_warning(0, "(namespace = %zu index = %zu) "
+					out_warning(0, "(space = %zu index = %zu) "
 					            "hash index must be unique", i, j);
 					return -1;
 				}
@@ -1363,7 +1363,7 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 void
 mod_free(void)
 {
-	namespace_free();
+	space_free();
 }
 
 void
@@ -1376,8 +1376,8 @@ mod_init(void)
 
 	box_lua_init();
 
-	/* initialization namespaces */
-	namespace_init();
+	/* initialization spaces */
+	space_init();
 
 	/* recovery initialization */
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
@@ -1446,16 +1446,16 @@ mod_snapshot(struct log_io_iter *i)
 	khiter_t k;
 
 	for (uint32_t n = 0; n < BOX_NAMESPACE_MAX; ++n) {
-		if (!namespace[n].enabled)
+		if (!space[n].enabled)
 			continue;
 
-		assoc_foreach(namespace[n].index[0].idx.int_hash, k) {
-			tuple = kh_value(namespace[n].index[0].idx.int_hash, k);
+		assoc_foreach(space[n].index[0].idx.int_hash, k) {
+			tuple = kh_value(space[n].index[0].idx.int_hash, k);
 
 			if (tuple->flags & GHOST)	// do not save fictive rows
 				continue;
 
-			header.namespace = n;
+			header.space = n;
 			header.tuple_size = tuple->cardinality;
 			header.data_size = tuple->bsize;
 
