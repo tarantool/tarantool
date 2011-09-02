@@ -165,6 +165,7 @@ reload_cfg(struct tbuf *out)
 			return -1;
 		/* All OK, activate the config. */
 		swap_tarantool_cfg(&cfg, &new_cfg);
+		tarantool_lua_load_cfg(tarantool_L, &cfg);
 	}
 	@finally {
 		destroy_tarantool_cfg(&aux_cfg);

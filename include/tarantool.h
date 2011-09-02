@@ -71,6 +71,10 @@ extern struct lua_State *tarantool_L;
 const char *
 tarantool_lua_tostring(struct lua_State *L, int index);
 
+/* Make a new configuration available in Lua */
+void tarantool_lua_load_cfg(struct lua_State *L,
+			    struct tarantool_cfg *cfg);
+
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern bool init_storage, booting;

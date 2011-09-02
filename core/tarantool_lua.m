@@ -36,6 +36,7 @@
 
 #include "pickle.h"
 #include "fiber.h"
+#include TARANTOOL_CONFIG
 
 struct lua_State *tarantool_L;
 
@@ -277,6 +278,7 @@ tarantool_lua_init()
 		lua_register(L, "print", lbox_print);
 		L = mod_lua_init(L);
 	}
+	tarantool_lua_load_cfg(L, &cfg);
 	lua_settop(L, 0); /* clear possible left-overs of init */
 	return L;
 }
@@ -339,4 +341,51 @@ tarantool_lua(struct lua_State *L,
 		tarantool_lua_printstack_yaml(L, out);
 	}
 	lua_settop(L, 0); /* clear the stack from return values. */
+}
+
+/**
+ * Check if the given literal is a number/boolean or string
+ * literal. A string literal needs quotes.
+ */
+static bool is_string(const char *str)
+{
+	if (strcmp(str, "true") == 0 || strcmp(str, "false") == 0)
+	    return false;
+	char *endptr;
+	(void) strtod(str, &endptr);
+	return *endptr != '\0';
+}
+
+/*
+ * Make a new configuration available in Lua.
+ * We could perhaps make Lua bindings to access the C
+ * structure in question, but for now it's easier and just
+ * as functional to convert the given configuration to a Lua
+ * table and export the table into Lua.
+ */
+void tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
+{
+	luaL_Buffer b;
+	char *key, *value;
+
+	luaL_buffinit(L, &b);
+	tarantool_cfg_iterator_t *i = tarantool_cfg_iterator_init();
+	luaL_addstring(&b, "box.cfg = {}\n");
+	while ((key = tarantool_cfg_iterator_next(i, cfg, &value)) != NULL) {
+		if (value == NULL)
+			continue;
+		if (strchr(key, '.') == NULL) {
+			char *quote = is_string(value) ? "'" : "";
+			lua_pushfstring(L, "box.cfg.%s = %s%s%s\n",
+					key, quote, value, quote);
+			luaL_addstring(&b, lua_tostring(L, -1));
+			free(value);
+			lua_pop(L, 1);
+		}
+	}
+	luaL_pushresult(&b);
+	puts(lua_tostring(L, -1));
+	if (luaL_loadstring(L, lua_tostring(L, -1)) == 0)
+		lua_pcall(L, 0, 0, 0);
+	lua_pop(L, 1);
 }
