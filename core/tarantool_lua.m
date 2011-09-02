@@ -370,21 +370,39 @@ void tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 
 	luaL_buffinit(L, &b);
 	tarantool_cfg_iterator_t *i = tarantool_cfg_iterator_init();
-	luaL_addstring(&b, "box.cfg = {}\n");
+	luaL_addstring(&b,
+"box.cfg = {}\n"
+"setmetatable(box.cfg, {})\n"
+"box.space = {}\n"
+"setmetatable(box.space, getmetatable(box.cfg))\n"
+"getmetatable(box.space).__index = function(table, index)\n"
+"  table[index] = {}\n"
+"  setmetatable(table[index], getmetatable(table))\n"
+"  return rawget(table, index)\n"
+"end\n");
 	while ((key = tarantool_cfg_iterator_next(i, cfg, &value)) != NULL) {
 		if (value == NULL)
 			continue;
+		char *quote = is_string(value) ? "'" : "";
 		if (strchr(key, '.') == NULL) {
-			char *quote = is_string(value) ? "'" : "";
 			lua_pushfstring(L, "box.cfg.%s = %s%s%s\n",
 					key, quote, value, quote);
 			luaL_addstring(&b, lua_tostring(L, -1));
-			free(value);
+			lua_pop(L, 1);
+		} else if (strncmp(key, "namespace[", 10) == 0) {
+			lua_pushfstring(L, "box.space%s = %s%s%s\n",
+					key+9, quote, value, quote);
+			luaL_addstring(&b, lua_tostring(L, -1));
 			lua_pop(L, 1);
 		}
+		free(value);
 	}
+	luaL_addstring(&b,
+"getmetatable(box.cfg).__newindex = function(table, index)\n"
+"  error('Attempt to modify a read-only table')\n"
+"end\n"
+"getmetatable(box.cfg).__index = nil\n");
 	luaL_pushresult(&b);
-	puts(lua_tostring(L, -1));
 	if (luaL_loadstring(L, lua_tostring(L, -1)) == 0)
 		lua_pcall(L, 0, 0, 0);
 	lua_pop(L, 1);
