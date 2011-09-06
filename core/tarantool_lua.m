@@ -272,13 +272,13 @@ struct lua_State *
 tarantool_lua_init()
 {
 	lua_State *L = luaL_newstate();
-	if (L) {
-		luaL_openlibs(L);
-		luaL_register(L, "box", boxlib);
-		lua_register(L, "print", lbox_print);
-		L = mod_lua_init(L);
-	}
+	if (L == NULL)
+		return L;
+	luaL_openlibs(L);
+	luaL_register(L, "box", boxlib);
+	lua_register(L, "print", lbox_print);
 	tarantool_lua_load_cfg(L, &cfg);
+	L = mod_lua_init(L);
 	lua_settop(L, 0); /* clear possible left-overs of init */
 	return L;
 }
@@ -389,9 +389,9 @@ void tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 					key, quote, value, quote);
 			luaL_addstring(&b, lua_tostring(L, -1));
 			lua_pop(L, 1);
-		} else if (strncmp(key, "space[", 10) == 0) {
-			lua_pushfstring(L, "box.space%s = %s%s%s\n",
-					key+9, quote, value, quote);
+		} else if (strncmp(key, "space", strlen("space")) == 0) {
+			lua_pushfstring(L, "box.%s = %s%s%s\n",
+					key, quote, value, quote);
 			luaL_addstring(&b, lua_tostring(L, -1));
 			lua_pop(L, 1);
 		}
