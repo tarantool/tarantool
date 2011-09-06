@@ -372,8 +372,10 @@ mod_lua_init(struct lua_State *L)
 	lua_pushstring(L, tuplelib_name);
 	lua_setfield(L, -2, "__metatable");
 	luaL_register(L, NULL, lbox_tuple_meta);
+	lua_pop(L, 2);
 	/* Load box.lua */
 	(void) luaL_dostring(L, &_binary_box_lua_start);
+	assert(lua_gettop(L) == 0);
 	return L;
 }
 

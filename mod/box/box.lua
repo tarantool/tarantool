@@ -36,7 +36,16 @@ function box.replace(namespace, ...)
                                  unpack(tuple))))
 end
 
-box.insert = box.replace
+-- insert a tuple (produces an error if a tuple already exists
+function box.insert(namespace, ...)
+    tuple = {...}
+    return select(2,
+        box.process(13, box.pack('iii'..string.rep('p', #tuple),
+                                 namespace,
+                                 3, -- flags, BOX_RETURN_TUPLE | BOX_ADD
+                                 #tuple, -- cardinality
+                                 unpack(tuple))))
+end
 
 function box.update(namespace, key, format, ...)
     ops = {...}

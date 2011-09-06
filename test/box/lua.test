@@ -72,6 +72,8 @@ exec sql "call box.select(0, 0, 'abcd')"
 exec sql "call box.delete(0, 'abcd')"
 exec sql "call box.delete(0, 'defc')"
 exec sql "call box.insert(0, 'test', 'old', 'abcd')"
+# test that insert produces a duplicate key error
+exec sql "call box.insert(0, 'test', 'old', 'abcd')"
 exec sql "call box.update(0, 'test', '=p=p', 0, 'pass', 1, 'new')"
 exec sql "call box.select(0, 0, 'pass')"
 exec sql "call box.update(0, 'miss', '+p', 2, '\1\0\0\0')"

@@ -276,6 +276,7 @@ tarantool_lua_init()
 		return L;
 	luaL_openlibs(L);
 	luaL_register(L, "box", boxlib);
+	lua_pop(L, 1);
 	lua_register(L, "print", lbox_print);
 	tarantool_lua_load_cfg(L, &cfg);
 	L = mod_lua_init(L);
