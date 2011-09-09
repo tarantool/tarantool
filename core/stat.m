@@ -30,7 +30,7 @@
 #include <tbuf.h>
 #include <say.h>
 
-#include <third_party/khash.h>
+#include <assoc.h>
 
 #define SECS 5
 static ev_timer timer;

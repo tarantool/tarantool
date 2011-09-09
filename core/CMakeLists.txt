@@ -55,6 +55,7 @@ set (recompiled_core_sources
      ${CMAKE_SOURCE_DIR}/core/tarantool.m
      ${CMAKE_SOURCE_DIR}/core/tarantool_lua.m
      ${CMAKE_SOURCE_DIR}/core/say.m
+     ${CMAKE_SOURCE_DIR}/core/assoc.m
      ${CMAKE_SOURCE_DIR}/core/admin.m
      ${CMAKE_SOURCE_DIR}/core/replication.m
      ${CMAKE_SOURCE_DIR}/core/fiber.m PARENT_SCOPE)

@@ -42,7 +42,7 @@
 #include <unistd.h>
 #include <sysexits.h>
 #include <third_party/queue.h>
-#include <third_party/khash.h>
+#include <assoc.h>
 
 #include <palloc.h>
 #include <salloc.h>
@@ -88,8 +88,7 @@ fiber_msg(const struct tbuf *buf)
 	return buf->data;
 }
 
-KHASH_MAP_INIT_INT(fid2fiber, void *, realloc);
-static khash_t(fid2fiber) *fibers_registry;
+static struct mh_i32ptr_t *fibers_registry;
 
 static void
 update_last_stack_frame(struct fiber *fiber)
@@ -305,29 +304,27 @@ ev_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 static struct fiber *
 fid2fiber(int fid)
 {
-	khiter_t k = kh_get(fid2fiber, fibers_registry, fid);
+	u32 k = mh_i32ptr_get(fibers_registry, fid);
 
-	if (k == kh_end(fibers_registry))
+	if (k == mh_end(fibers_registry))
 		return NULL;
-	if (!kh_exist(fibers_registry, k))
+	if (!mh_exist(fibers_registry, k))
 		return NULL;
-	return kh_value(fibers_registry, k);
+	return mh_value(fibers_registry, k);
 }
 
 static void
 register_fid(struct fiber *fiber)
 {
 	int ret;
-	khiter_t k = kh_put(fid2fiber, fibers_registry, fiber->fid, &ret);
-	kh_key(fibers_registry, k) = fiber->fid;
-	kh_value(fibers_registry, k) = fiber;
+	mh_i32ptr_put(fibers_registry, fiber->fid, fiber, &ret);
 }
 
 static void
 unregister_fid(struct fiber *fiber)
 {
-	khiter_t k = kh_get(fid2fiber, fibers_registry, fiber->fid);
-	kh_del(fid2fiber, fibers_registry, k);
+	u32 k = mh_i32ptr_get(fibers_registry, fiber->fid);
+	mh_i32ptr_del(fibers_registry, k);
 }
 
 static void
@@ -1286,7 +1283,7 @@ void
 fiber_init(void)
 {
 	SLIST_INIT(&fibers);
-	fibers_registry = kh_init(fid2fiber, NULL);
+	fibers_registry = mh_i32ptr_init(fid2fiber, NULL);
 
 	ex_pool = palloc_create_pool("ex_pool");
 
@@ -1304,5 +1301,5 @@ void
 fiber_free(void)
 {
 	fiber_destroy_all();
-	kh_destroy(fid2fiber, fibers_registry);
+	mh_i32ptr_destroy(fibers_registry);
 }

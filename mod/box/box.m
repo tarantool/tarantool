@@ -1443,14 +1443,21 @@ mod_snapshot(struct log_io_iter *i)
 	struct tbuf *row;
 	struct box_snap_row header;
 	struct box_tuple *tuple;
-	khiter_t k;
 
 	for (uint32_t n = 0; n < BOX_NAMESPACE_MAX; ++n) {
 		if (!space[n].enabled)
 			continue;
 
-		assoc_foreach(space[n].index[0].idx.int_hash, k) {
-			tuple = kh_value(space[n].index[0].idx.int_hash, k);
+		for (u32 k = 0; k < space[n].index[0].idx.hash->n_buckets; k++) {
+			if (!mh_exist(space[n].index[0].idx.hash, k))
+				continue;
+
+			if (space[n].index[0].key_field->type == NUM)
+				tuple = mh_value(space[n].index[0].idx.int_hash, k);
+			else if (space[n].index[0].key_field->type == NUM64)
+				tuple = mh_value(space[n].index[0].idx.int64_hash, k);
+			else
+				tuple = mh_value(space[n].index[0].idx.str_hash, k);
 
 			if (tuple->flags & GHOST)	// do not save fictive rows
 				continue;
