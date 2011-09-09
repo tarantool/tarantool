@@ -572,6 +572,7 @@ main(int argc, char **argv)
 
 	tarantool_L = tarantool_lua_init();
 	mod_init();
+	tarantool_lua_load_cfg(tarantool_L, &cfg);
 	admin_init();
 	replication_init();
 

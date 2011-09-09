@@ -1,7 +1,9 @@
 # encoding: tarantool
 #
+exec admin "lua box.cfg.too_long_threshold"
 # bad1
 server.reconfigure("box/tarantool_bad1.cfg")
+exec admin "lua box.cfg.too_long_threshold"
 # bad2
 server.reconfigure("box/tarantool_bad2.cfg")
 # bad3
@@ -12,8 +14,10 @@ server.reconfigure("box/tarantool_bad4.cfg")
 server.reconfigure("box/tarantool_bad5.cfg")
 # good
 server.reconfigure("box/tarantool_good.cfg")
+exec admin "lua box.cfg.too_long_threshold"
 # empty
 server.reconfigure("box/tarantool_empty.cfg")
+exec admin "lua box.cfg.too_long_threshold"
 
 # no config
 server.reconfigure(None)
@@ -21,6 +25,7 @@ server.reconfigure(None)
 # cleanup
 # restore default
 server.reconfigure(self.suite_ini["config"])
+exec admin "lua box.cfg.too_long_threshold"
 
 print """#
 # A test case for http://bugs.launchpad.net/bugs/712447:

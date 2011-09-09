@@ -76,6 +76,7 @@ struct index {
 
 	bool unique;
 
+	size_t (*size)(struct index *index);
 	struct box_tuple *(*find) (struct index * index, void *key);	/* only for unique lookups */
 	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
 	void (*remove) (struct index * index, struct box_tuple *);
@@ -95,15 +96,14 @@ struct index {
 	struct space *space;
 
 	struct {
-		struct {
-			u32 fieldno;
-			enum field_data_type type;
-		} *key_field;
-		u32 key_cardinality;
-
-		u32 *field_cmp_order;
-		u32 field_cmp_order_cnt;
-	};
+		u32 fieldno;
+		enum field_data_type type;
+	} *key_field;
+	u32 *field_cmp_order;
+	u32 field_cmp_order_cnt;
+	u32 key_cardinality;
+	/* relative offset of the index in the namespace */
+	u32 n;
 
 	struct tree_index_member *search_pattern;
 

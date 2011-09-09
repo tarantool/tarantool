@@ -31,7 +31,7 @@
 #include "box_lua.h"
 #include "tarantool.h"
 #include "box.h"
-/* use a full path to avoid clashes with system lua */
+/* use a full path to avoid clashes with system Lua */
 #include "third_party/luajit/src/lua.h"
 #include "third_party/luajit/src/lauxlib.h"
 #include "third_party/luajit/src/lualib.h"
@@ -138,6 +138,68 @@ static const struct luaL_reg lbox_tuple_meta [] = {
 
 /* }}} */
 
+/**
+ * {{{ Lua box.index library: access to spaces and indexes
+ */
+
+static const char *indexlib_name = "box.index";
+
+static struct index *
+lua_checkindex(struct lua_State *L, int i)
+{
+	struct index **index = luaL_checkudata(L, i, indexlib_name);
+	assert(index != NULL);
+	return *index;
+}
+
+static int
+lbox_index_new(struct lua_State *L)
+{
+	int n = luaL_checkint(L, 1); /* get space id */
+	int idx = luaL_checkint(L, 2); /* get index id in */
+	/* locate the appropriate index */
+	if (n >= BOX_NAMESPACE_MAX || !space[n].enabled ||
+	    idx >= BOX_INDEX_MAX || space[n].index[idx].key_cardinality == 0)
+		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
+	/* create a userdata object */
+	void **ptr = lua_newuserdata(L, sizeof(void *));
+	*ptr = &space[n].index[idx];
+	/* set userdata object metatable to indexlib */
+	luaL_getmetatable(L, indexlib_name);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+static int
+lbox_index_tostring(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	lua_pushfstring(L, "box.space[%d].index[%d]",
+			index->space->n, index->n);
+	return 1;
+}
+
+static int
+lbox_index_len(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	lua_pushinteger(L, index->size(index));
+	return 1;
+}
+
+static const struct luaL_reg lbox_index_meta[] = {
+	{"__tostring", lbox_index_tostring},
+	{"__len", lbox_index_len},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg indexlib [] = {
+	{"new", lbox_index_new},
+	{NULL, NULL}
+};
+
+/* }}} */
+
 /** {{{ Lua I/O: facilities to intercept box output
  * and push into Lua stack and the opposite: append Lua types
  * to fiber IOV.
@@ -191,7 +253,6 @@ void iov_add_ret(struct lua_State *L, int index)
  * and return the number of return values first, and
  * then each return value as a tuple.
  */
-
 void iov_add_multret(struct lua_State *L)
 {
 	int nargs = lua_gettop(L);
@@ -364,17 +425,24 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 struct lua_State *
 mod_lua_init(struct lua_State *L)
 {
-	/* box */
-	luaL_register(L, "box", boxlib);
 	lua_atpanic(L, box_lua_panic);
-	/* box.tuple */
+	/* box, box.tuple */
+	luaL_register(L, "box", boxlib);
 	luaL_newmetatable(L, tuplelib_name);
 	lua_pushstring(L, tuplelib_name);
 	lua_setfield(L, -2, "__metatable");
 	luaL_register(L, NULL, lbox_tuple_meta);
 	lua_pop(L, 2);
+	/* box.index */
+	luaL_newmetatable(L, indexlib_name);
+	lua_pushstring(L, indexlib_name);
+	lua_setfield(L, -2, "__metatable");
+	luaL_register(L, NULL, lbox_index_meta);
+	luaL_register(L, "box.index", indexlib);
+	lua_pop(L, 2);
 	/* Load box.lua */
-	(void) luaL_dostring(L, &_binary_box_lua_start);
+	if (luaL_dostring(L, &_binary_box_lua_start))
+		panic("Error loading box.lua: %s", lua_tostring(L, -1));
 	assert(lua_gettop(L) == 0);
 	return L;
 }
@@ -383,3 +451,7 @@ void box_lua_init()
 {
 	root_L = tarantool_L;
 }
+
+/**
+ * vim: foldmethod=marker
+ */

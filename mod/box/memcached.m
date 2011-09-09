@@ -453,6 +453,7 @@ memcached_space_init()
 	memc_index->unique = true;
 	memc_index->type = HASH;
 	memc_index->enabled = true;
+	memc_index->n = 0;
 	index_init(memc_index, memc_ns, 0);
 }
 

@@ -278,7 +278,6 @@ tarantool_lua_init()
 	luaL_register(L, "box", boxlib);
 	lua_pop(L, 1);
 	lua_register(L, "print", lbox_print);
-	tarantool_lua_load_cfg(L, &cfg);
 	L = mod_lua_init(L);
 	lua_settop(L, 0); /* clear possible left-overs of init */
 	return L;
@@ -402,7 +401,10 @@ void tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 "getmetatable(box.cfg).__newindex = function(table, index)\n"
 "  error('Attempt to modify a read-only table')\n"
 "end\n"
-"getmetatable(box.cfg).__index = nil\n");
+"getmetatable(box.cfg).__index = nil\n"
+"if type(box.on_reload_configuration) == 'function' then\n"
+"  box.on_reload_configuration()\n"
+"end\n");
 	luaL_pushresult(&b);
 	if (luaL_loadstring(L, lua_tostring(L, -1)) == 0)
 		lua_pcall(L, 0, 0, 0);

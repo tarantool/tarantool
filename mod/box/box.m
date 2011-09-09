@@ -992,6 +992,7 @@ space_init(void)
 			index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 			index->unique = cfg_index->unique;
 			index->type = STR2ENUM(index_type, cfg_index->type);
+			index->n = j;
 			index_init(index, &space[i], cfg_space->estimated_rows);
 		}
 

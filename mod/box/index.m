@@ -153,7 +153,11 @@ tree_index_member_compare(struct tree_index_member *member_a, struct tree_index_
 	return 0;
 }
 
-
+static size_t
+index_tree_size(struct index *index)
+{
+	return index->idx.tree->size;
+}
 
 static struct box_tuple *
 index_find_hash_by_tuple(struct index *self, struct box_tuple *tuple)
@@ -163,6 +167,13 @@ index_find_hash_by_tuple(struct index *self, struct box_tuple *tuple)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key_field->fieldno);
 
 	return self->find(self, key);
+}
+
+size_t
+index_hash_size(struct index *index)
+{
+	/* All kh_* structures have the same member layout */
+	return index->idx.hash->size;
 }
 
 static struct box_tuple *
@@ -573,6 +584,7 @@ index_hash_num(struct index *index, struct space *space, size_t estimated_rows)
 {
 	index->type = HASH;
 	index->space = space;
+	index->size = index_hash_size;
 	index->find = index_find_hash_num;
 	index->find_by_tuple = index_find_hash_by_tuple;
 	index->remove = index_remove_hash_num;
@@ -593,6 +605,7 @@ index_hash_num64(struct index *index, struct space *space, size_t estimated_rows
 {
 	index->type = HASH;
 	index->space = space;
+	index->size = index_hash_size;
 	index->find = index_find_hash_num64;
 	index->find_by_tuple = index_find_hash_by_tuple;
 	index->remove = index_remove_hash_num64;
@@ -613,6 +626,7 @@ index_hash_str(struct index *index, struct space *space, size_t estimated_rows)
 {
 	index->type = HASH;
 	index->space = space;
+	index->size = index_hash_size;
 	index->find = index_find_hash_str;
 	index->find_by_tuple = index_find_hash_by_tuple;
 	index->remove = index_remove_hash_str;
@@ -634,6 +648,7 @@ index_tree(struct index *index, struct space *space,
 {
 	index->type = TREE;
 	index->space = space;
+	index->size = index_tree_size;
 	index->find = index_find_tree;
 	index->find_by_tuple = index_find_tree_by_tuple;
 	index->remove = index_remove_tree_str;
