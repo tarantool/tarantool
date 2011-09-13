@@ -20,7 +20,7 @@
     necessary to enable <olink targetptr="replication_port"/> in
     the configuration file. An example configuration file can be
     found in <link
-    xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/tarantool.cfg"><filename>test/box_replication/tarantool.cfg</filename></link>. A master with enabled replication_port can accept connections
+    xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/cfg/master.cfg"><filename>test/box_replication/cfg/master.cfg</filename></link>. A master with enabled replication_port can accept connections
     from as many replicas as necessary on that port. Each replica
     has its own replication state.
   </para>
@@ -50,9 +50,8 @@
   </para>
   <para>
     To start replication, configure <olink
-    targetptr="replication_source_port"/> and <olink
-    targetptr="replication_source_ipaddr"/>.
-    Other parameters can also be changed, but existing namespaces and
+    targetptr="replication_source"/>.
+    Other parameters can also be changed, but existing spaces and
     their primary keys on the replica must be identical to ones on the
     master.
   </para>
@@ -62,7 +61,7 @@
     necessary to keep WAL files on the master host as long as
     there are replicas that haven't applied them yet.  An example
     configuration can be found in <link
-    xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/tarantool_slave.cfg"><filename>test/box_replication/tarantool_slave.cfg</filename></link>.
+    xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/cfg/slave.cfg"><filename>test/box_replication/cfg/slave.cfg</filename></link>.
   </para>
   <para>
     In absence of WALs, a replica can be "seeded" at any time
@@ -88,7 +87,7 @@
     A separate monitoring script (or scripts, if decision making
     quorum is desirable) is necessary to detect a master failure.
     Such script would typically try to update a tuple in an
-    auxiliary namespace on the master, and raise alarm if a
+    auxiliary space on the master, and raise alarm if a
     network or disk error persists longer than is acceptable.
   </para>
   <para>
@@ -107,8 +106,7 @@
           If the master is available, the easiest way to turn
           on read-only mode is to turn Tarantool into a replica of
           itself. This can be done by setting master's <olink
-          targetptr="replication_source_ipaddr"/> and <olink
-          targetptr="replication_source_port"/> to point to self.
+          targetptr="replication_source"/> to point to self.
         </para>
         <para>
           If the master is not available, best bet is to log into
@@ -131,8 +129,8 @@
       <listitem>
         <para>
           Propagate the replica to become a master. This is done
-          by setting <olink targetptr="replication_source_port"/>
-          on replica to <constant>0</constant>.
+          by setting <olink targetptr="replication_source"/>
+          on replica to an empty string.
         </para>
       </listitem>
       <listitem>

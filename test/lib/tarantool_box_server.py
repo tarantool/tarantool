@@ -1,18 +1,13 @@
+import time
 import shutil
 import subprocess
 import yaml
 import ConfigParser
 from tarantool_server import TarantoolServer, TarantoolConfigFile
-from admin_connection import AdminConnection 
+from admin_connection import AdminConnection
 from box_connection import BoxConnection
 from memcached_connection import MemcachedConnection
 import time
-
-#try:
-#    import memcache
-#    has_memcached = True
-#except ImportError:
-#    has_memcached = False
 
 class TarantoolBoxServer(TarantoolServer):
     def __new__(cls, core="tarantool", module="box"):
@@ -53,10 +48,15 @@ class TarantoolBoxServer(TarantoolServer):
                               stdout = subprocess.PIPE,
                               stderr = subprocess.PIPE)
 
+    def get_param(self, param):
+        data = self.admin.execute("show info", silent = True)
+        info = yaml.load(data)["info"]
+        return info[param]
+
     def wait_lsn(self, lsn):
         while True:
-            data = self.admin.execute("show info\n", silent=True)
-            info = yaml.load(data)["info"]
-            if (int(info["lsn"]) >= lsn):
+            curr_lsn = int(self.get_param("lsn"))
+            if (curr_lsn >= lsn):
                 break
             time.sleep(0.01)
+

@@ -22,10 +22,10 @@ custom_proc_title=NULL, ro
 
 # Memcached protocol support is enabled if memcached_port is set
 memcached_port=0, ro
-# namespace used for memcached emulation
-memcached_namespace=23, ro
+# space used for memcached emulation
+memcached_space=23, ro
 # Memcached expiration is on if memcached_expire is set.
-memcached_expire=0, ro
+memcached_expire=false, ro
 # maximum rows to consider per expire loop iteration
 memcached_expire_per_loop=1024
 # tarantool will try to iterate over all rows within this time
@@ -45,9 +45,11 @@ wal_fsync_delay=0, ro
 # size of WAL writer request buffer
 wal_writer_inbox_size=128, ro
 
-# Local hot standby (if enabled, the server will run in local hot standby
-# mode, continuously fetching WAL records from shared local directory).
-local_hot_standby=0, ro
+# Local hot standby (if enabled, the server will run in hot
+# standby mode, continuously fetching WAL records from wal_dir,
+# until it is able to bind to the primary port.
+# In local hot standby mode the server only accepts reads.
+local_hot_standby=false, ro
 # Delay, in seconds, between successive re-readings of wal_dir.
 # The re-scan is necessary to discover new WAL files or snapshots.
 wal_dir_rescan_delay=0.1, ro
@@ -56,17 +58,17 @@ wal_dir_rescan_delay=0.1, ro
 # Panic if there is an error reading a snapshot or WAL.
 # By default, panic on any snapshot reading error and ignore errors
 # when reading WALs.
-panic_on_snap_error=1, ro
-panic_on_wal_error=0, ro
+panic_on_snap_error=true, ro
+panic_on_wal_error=false, ro
 
-# Remote hot standby (if enabled, the server will run in hot standby mode
-# continuously fetching WAL records from wal_feeder_ipaddr:wal_feeder_port
-remote_hot_standby=0
-wal_feeder_ipaddr=NULL
-wal_feeder_port=0
+# Replication mode (if enabled, the server, once
+# bound to the primary port, will connect to
+# replication_source (ipaddr:port) and run continously
+# fetching records from it.. In replication mode the server
+# only accepts reads.
+replication_source=NULL
 
-
-namespace = [
+space = [
   {
     enabled = -1, required
     cardinality = -1

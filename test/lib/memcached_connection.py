@@ -1,5 +1,6 @@
 import socket
 import struct
+import sys
 import re
 from tarantool_connection import TarantoolConnection
 
@@ -26,16 +27,16 @@ class MemcachedCommandBuffer:
 class MemcachedConnection(TarantoolConnection):
 
     def execute_no_reconnect(self, commands, silent = True):
-        self.send_commands(commands, silent)
-        return self.recv_reply(silent)
+        self.send(commands, silent)
+        return self.recv(silent)
 
-    def send_commands(self, commands, silent = True):
+    def send(self, commands, silent = True):
         self.commands = commands
-        self.socket.sendall(commands + MEMCACHED_SEPARATOR)
+        self.socket.sendall(commands)
         if not silent:
-            print self.commands
+            sys.stdout.write(self.commands)
 
-    def recv_reply(self, silent = True):
+    def recv(self, silent = True):
         self.recv_buffer = ''
         self.command_buffer = MemcachedCommandBuffer(self.commands)
         self.reply = ''
@@ -64,7 +65,7 @@ class MemcachedConnection(TarantoolConnection):
                 self.reply_unknown(cmd)
 
         if not silent:
-            print self.reply
+            sys.stdout.write(self.reply)
 
         return self.reply
 

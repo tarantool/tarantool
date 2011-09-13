@@ -145,9 +145,9 @@ fiber_wakeup(struct fiber *f)
  * Currently cancellation can only be synchronous: this call
  * returns only when the subject fiber has terminated.
  *
- * The fiber which is cancelled, has tnt_FiberCancelException
- * raised in it. For cancellation to work, this exception type
- * should be re-raised whenever (if) it is caught.
+ * The fiber which is cancelled, has FiberCancelException raised
+ * in it. For cancellation to work, this exception type should be
+ * re-raised whenever (if) it is caught.
  */
 
 void
@@ -174,7 +174,7 @@ fiber_cancel(struct fiber *f)
 
 
 /** Test if this fiber is in a cancellable state and was indeed
- * cancelled, and raise an exception (tnt_FiberCancelException) if
+ * cancelled, and raise an exception (FiberCancelException) if
  * that's the case.
  */
 
@@ -256,21 +256,21 @@ wait_for_child(pid_t pid)
 }
 
 
-static void
-fiber_io_start(int events)
+void
+fiber_io_start(int fd, int events)
 {
 	ev_io *io = &fiber->io;
 
 	assert (!ev_is_active(io));
 
-	ev_io_set(io, fiber->fd, events);
+	ev_io_set(io, fd, events);
 	ev_io_start(io);
 }
 
 /** @note: this is a cancellation point.
  */
 
-static void
+void
 fiber_io_yield()
 {
 	assert(ev_is_active(&fiber->io));
@@ -285,12 +285,12 @@ fiber_io_yield()
 	}
 }
 
-static void
-fiber_io_stop(int events __attribute__((unused)))
+void
+fiber_io_stop(int fd __attribute__((unused)), int events __attribute__((unused)))
 {
 	ev_io *io = &fiber->io;
 
-	assert(ev_is_active(io) && io->fd == fiber->fd && (io->events & events));
+	assert(ev_is_active(io) && io->fd == fd && (io->events & events));
 
 	ev_io_stop(io);
 }
@@ -341,10 +341,10 @@ clear_inbox(struct fiber *fiber)
 static void
 fiber_alloc(struct fiber *fiber)
 {
-	prelease(fiber->pool);
-	fiber->rbuf = tbuf_alloc(fiber->pool);
-	fiber->iov = tbuf_alloc(fiber->pool);
-	fiber->cleanup = tbuf_alloc(fiber->pool);
+	prelease(fiber->gc_pool);
+	fiber->rbuf = tbuf_alloc(fiber->gc_pool);
+	fiber->iov = tbuf_alloc(fiber->gc_pool);
+	fiber->cleanup = tbuf_alloc(fiber->gc_pool);
 
 	fiber->iov_cnt = 0;
 	clear_inbox(fiber);
@@ -379,19 +379,19 @@ fiber_gc(void)
 
 	fiber_cleanup();
 
-	if (palloc_allocated(fiber->pool) < 128 * 1024)
+	if (palloc_allocated(fiber->gc_pool) < 128 * 1024)
 		return;
 
-	tmp = fiber->pool;
-	fiber->pool = ex_pool;
+	tmp = fiber->gc_pool;
+	fiber->gc_pool = ex_pool;
 	ex_pool = tmp;
-	palloc_set_name(fiber->pool, fiber->name);
+	palloc_set_name(fiber->gc_pool, fiber->name);
 	palloc_set_name(ex_pool, "ex_pool");
 
-	fiber->rbuf = tbuf_clone(fiber->pool, fiber->rbuf);
-	fiber->cleanup = tbuf_clone(fiber->pool, fiber->cleanup);
+	fiber->rbuf = tbuf_clone(fiber->gc_pool, fiber->rbuf);
+	fiber->cleanup = tbuf_clone(fiber->gc_pool, fiber->cleanup);
 
-	struct tbuf *new_iov = tbuf_alloc(fiber->pool);
+	struct tbuf *new_iov = tbuf_alloc(fiber->gc_pool);
 	for (int i = 0; i < fiber->iov_cnt; i++) {
 		struct iovec *v;
 		size_t o = tbuf_reserve(new_iov, sizeof(*v));
@@ -403,9 +403,9 @@ fiber_gc(void)
 	for (int i = 0; i < fiber->inbox->size; i++) {
 		struct msg *ri = fiber->inbox->ring[i];
 		if (ri != NULL) {
-			fiber->inbox->ring[i] = palloc(fiber->pool, sizeof(*ri));
+			fiber->inbox->ring[i] = palloc(fiber->gc_pool, sizeof(*ri));
 			fiber->inbox->ring[i]->sender_fid = ri->sender_fid;
-			fiber->inbox->ring[i]->msg = tbuf_clone(fiber->pool, ri->msg);
+			fiber->inbox->ring[i]->msg = tbuf_clone(fiber->gc_pool, ri->msg);
 		}
 	}
 
@@ -421,7 +421,6 @@ fiber_zombificate()
 {
 	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
-	fiber->data = NULL;
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	fiber->flags = 0;
@@ -490,7 +489,7 @@ fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void 
 		if (tarantool_coro_create(&fiber->coro, fiber_loop, NULL) == NULL)
 			return NULL;
 
-		fiber->pool = palloc_create_pool(name);
+		fiber->gc_pool = palloc_create_pool("");
 		fiber->inbox = palloc(eter_pool, (sizeof(*fiber->inbox) +
 						  inbox_size * sizeof(struct tbuf *)));
 		fiber->inbox->size = inbox_size;
@@ -513,7 +512,7 @@ fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void 
 	fiber->flags = 0;
 	fiber->waiter = NULL;
 	fiber_set_name(fiber, name);
-	palloc_set_name(fiber->pool, fiber->name);
+	palloc_set_name(fiber->gc_pool, fiber->name);
 	register_fid(fiber);
 
 	return fiber;
@@ -532,7 +531,7 @@ fiber_destroy(struct fiber *f)
 	if (strcmp(f->name, "sched") == 0)
 		return;
 
-	palloc_destroy_pool(f->pool);
+	palloc_destroy_pool(f->gc_pool);
 	tarantool_coro_destroy(&f->coro);
 }
 
@@ -545,7 +544,7 @@ fiber_destroy_all()
 }
 
 
-char *
+const char *
 fiber_peer_name(struct fiber *fiber)
 {
 	struct sockaddr_in peer;
@@ -581,7 +580,7 @@ fiber_close(void)
 
 	/* We don't know if IO is active if there was an error. */
 	if (ev_is_active(&fiber->io))
-		fiber_io_stop(-1);
+		fiber_io_stop(fiber->fd, -1);
 
 	int r = close(fiber->fd);
 
@@ -629,9 +628,9 @@ write_inbox(struct fiber *recipient, struct tbuf *msg)
 	if (ring_size(inbox) == inbox->size - 1)
 		return false;
 
-	inbox->ring[inbox->head] = palloc(recipient->pool, sizeof(struct msg));
+	inbox->ring[inbox->head] = palloc(recipient->gc_pool, sizeof(struct msg));
 	inbox->ring[inbox->head]->sender_fid = fiber->fid;
-	inbox->ring[inbox->head]->msg = tbuf_clone(recipient->pool, msg);
+	inbox->ring[inbox->head]->msg = tbuf_clone(recipient->gc_pool, msg);
 	inbox->head = (inbox->head + 1) % inbox->size;
 
 	if (recipient->flags & FIBER_READING_INBOX)
@@ -675,7 +674,7 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 	ssize_t r;
 	tbuf_ensure(buf, MAX(cfg.readahead, at_least));
 
-	fiber_io_start(EV_READ);
+	fiber_io_start(fiber->fd, EV_READ);
 	for (;;) {
 		fiber_io_yield();
 		r = read(fiber->fd, buf->data + buf->len, buf->size - buf->len);
@@ -689,17 +688,16 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 			break;
 		}
 	}
-	fiber_io_stop(EV_READ);
+	fiber_io_stop(fiber->fd, EV_READ);
 
 	return r;
 }
 
 void
-add_iov_dup(const void *buf, size_t len)
+iov_reset()
 {
-	void *copy = palloc(fiber->pool, len);
-	memcpy(copy, buf, len);
-	add_iov(copy, len);
+	fiber->iov_cnt = 0;	/* discard anything unwritten */
+	tbuf_reset(fiber->iov);
 }
 
 /**
@@ -707,13 +705,13 @@ add_iov_dup(const void *buf, size_t len)
  */
 
 ssize_t
-fiber_flush_output(void)
+iov_flush(void)
 {
 	ssize_t result, r = 0, bytes = 0;
 	struct iovec *iov = iovec(fiber->iov);
 	size_t iov_cnt = fiber->iov_cnt;
 
-	fiber_io_start(EV_WRITE);
+	fiber_io_start(fiber->fd, EV_WRITE);
 	while (iov_cnt > 0) {
 		fiber_io_yield();
 		bytes += r = writev(fiber->fd, iov, MIN(iov_cnt, IOV_MAX));
@@ -736,7 +734,7 @@ fiber_flush_output(void)
 			}
 		}
 	}
-	fiber_io_stop(EV_WRITE);
+	fiber_io_stop(fiber->fd, EV_WRITE);
 
 	if (r < 0) {
 		size_t rem = 0;
@@ -748,8 +746,7 @@ fiber_flush_output(void)
 	} else
 		result = bytes;
 
-	fiber->iov_cnt = 0;	/* discard anything unwritten */
-	tbuf_reset(fiber->iov);
+	iov_reset();
 	return result;
 }
 
@@ -762,7 +759,7 @@ fiber_read(void *buf, size_t count)
 {
 	ssize_t r, done = 0;
 
-	fiber_io_start(EV_READ);
+	fiber_io_start(fiber->fd, EV_READ);
 	while (count != done) {
 
 		fiber_io_yield();
@@ -775,7 +772,7 @@ fiber_read(void *buf, size_t count)
 		}
 		done += r;
 	}
-	fiber_io_stop(EV_READ);
+	fiber_io_stop(fiber->fd, EV_READ);
 
 	return done;
 }
@@ -790,7 +787,7 @@ fiber_write(const void *buf, size_t count)
 	int r;
 	unsigned int done = 0;
 
-	fiber_io_start(EV_WRITE);
+	fiber_io_start(fiber->fd, EV_WRITE);
 
 	while (count != done) {
 		fiber_io_yield();
@@ -802,7 +799,7 @@ fiber_write(const void *buf, size_t count)
 		}
 		done += r;
 	}
-	fiber_io_stop(EV_WRITE);
+	fiber_io_stop(fiber->fd, EV_WRITE);
 
 	return done;
 }
@@ -826,9 +823,9 @@ fiber_connect(struct sockaddr_in *addr)
 		if (errno != EINPROGRESS)
 			goto error;
 
-		fiber_io_start(EV_WRITE);
+		fiber_io_start(fiber->fd, EV_WRITE);
 		fiber_io_yield();
-		fiber_io_stop(EV_WRITE);
+		fiber_io_stop(fiber->fd, EV_WRITE);
 
 		int error;
 		socklen_t error_size = sizeof(error);
@@ -912,7 +909,7 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 	int result = EXIT_FAILURE;
 
 	for (;;) {
-		request = tbuf_alloc(fiber->pool);
+		request = tbuf_alloc(fiber->gc_pool);
 		if (read_atleast(fd, request, sizeof(u32)) < 0) {
 			result = EXIT_SUCCESS;
 			break;
@@ -929,13 +926,13 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 			break;
 		}
 
-		request_body = tbuf_alloc(fiber->pool);
+		request_body = tbuf_alloc(fiber->gc_pool);
 		tbuf_append(request_body, fiber_msg(request)->data, fiber_msg(request)->data_len);
 
 		reply_body = handler(state, request_body);
 
 		reply_size = sizeof(struct fiber_msg) + reply_body->len;
-		reply = tbuf_alloc(fiber->pool);
+		reply = tbuf_alloc(fiber->gc_pool);
 		tbuf_reserve(reply, reply_size);
 
 		fiber_msg(reply)->fid = fiber_msg(request)->fid;
@@ -952,7 +949,7 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 			break;
 		}
 
-		prelease(fiber->pool);
+		prelease(fiber->gc_pool);
 	}
 
 	handler(state, NULL);
@@ -967,11 +964,11 @@ inbox2sock(void *_data __attribute__((unused)))
 	u32 len;
 
 	for (;;) {
-		out = tbuf_alloc(fiber->pool);
+		out = tbuf_alloc(fiber->gc_pool);
 
 		do {
 			m = read_inbox();
-			msg = tbuf_alloc(fiber->pool);
+			msg = tbuf_alloc(fiber->gc_pool);
 
 			/* TODO: do not copy message twice */
 			tbuf_reserve(msg, sizeof(struct fiber_msg) + m->msg->len);
@@ -1018,7 +1015,7 @@ sock2inbox(void *_data __attribute__((unused)))
 			continue;
 		}
 
-		msg_body = tbuf_alloc(recipient->pool);
+		msg_body = tbuf_alloc(recipient->gc_pool);
 		tbuf_append(msg_body, fiber_msg(msg)->data, fiber_msg(msg)->data_len);
 		write_inbox(recipient, msg_body);
 		fiber_gc();
@@ -1029,7 +1026,7 @@ struct child *
 spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, struct tbuf *),
 	    void *state)
 {
-	char *proxy_name;
+	char proxy_name[FIBER_NAME_MAXLEN];
 	int socks[2];
 	int pid;
 
@@ -1051,27 +1048,30 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 		struct child *c = palloc(eter_pool, sizeof(*c));
 		c->pid = pid;
 
-		proxy_name = palloc(eter_pool, 64);
-		snprintf(proxy_name, 64, "%s/sock2inbox", name);
+		snprintf(proxy_name, sizeof(proxy_name), "%s/sock2inbox", name);
 		c->in = fiber_create(proxy_name, socks[1], inbox_size, sock2inbox, NULL);
 		fiber_call(c->in);
-		proxy_name = palloc(eter_pool, 64);
-		snprintf(proxy_name, 64, "%s/inbox2sock", name);
+		snprintf(proxy_name, sizeof(proxy_name), "%s/inbox2sock", name);
 		c->out = fiber_create(proxy_name, socks[1], inbox_size, inbox2sock, NULL);
 		c->out->flags |= FIBER_READING_INBOX;
 		return c;
 	} else {
-		char child_name[sizeof(fiber->name)];
+		/* it is safer to tell libev about fork, even
+		 * if child wont' use it. */
+		ev_default_fork();
+		ev_loop(EVLOOP_NONBLOCK);
+
+		char child_name[FIBER_NAME_MAXLEN];
 		/*
 		 * Move to an own process group, to not receive
 		 * signals from the controlling tty.
 		 */
 		setpgid(0, 0);
-		salloc_destroy();
+		/* destroying salloc in tarantool_free() */
 		close_all_xcpt(2, socks[0], sayfd);
 		snprintf(child_name, sizeof(child_name), "%s/child", name);
 		fiber_set_name(&sched, child_name);
-		set_proc_title(name);
+		set_proc_title("%s%s", name, custom_proc_title);
 		say_crit("%s initialized", name);
 		blocking_loop(socks[0], handler, state);
 	}
@@ -1080,66 +1080,22 @@ spawn_child(const char *name, int inbox_size, struct tbuf *(*handler) (void *, s
 static void
 tcp_server_handler(void *data)
 {
-	struct fiber_server *server = fiber->data;
+	struct fiber_server *server = (void*) data;
 	struct fiber *h;
-	char name[64];
+	char name[FIBER_NAME_MAXLEN];
 	int fd;
-	bool warning_said = false;
 	int one = 1;
-	struct sockaddr_in sin;
-	struct linger ling = { 0, 0 };
 
-	if ((fiber->fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
-		say_syserror("socket");
+	if (fiber_serv_socket(fiber, server->port, true, 0.1) != 0) {
+		say_error("init server socket on port %i fail", server->port);
 		exit(EX_OSERR);
 	}
 
-	if (setsockopt(fiber->fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) == -1 ||
-	    setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) == -1 ||
-	    setsockopt(fiber->fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) == -1 ||
-	    setsockopt(fiber->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling)) == -1) {
-		say_syserror("setsockopt");
-		exit(EX_OSERR);
-	}
-
-	if (set_nonblock(fiber->fd) == -1)
-		exit(EX_OSERR);
-
-	memset(&sin, 0, sizeof(struct sockaddr_in));
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(server->port);
-	sin.sin_addr.s_addr = INADDR_ANY;
-
-	for (;;) {
-		if (bind(fiber->fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-			if (errno == EADDRINUSE)
-				goto sleep_and_retry;
-			say_syserror("bind");
-			exit(EX_OSERR);
-		}
-		if (listen(fiber->fd, cfg.backlog) == -1) {
-			if (errno == EADDRINUSE)
-				goto sleep_and_retry;
-			say_syserror("listen");
-			exit(EX_OSERR);
-		}
-
-		say_info("bound to TCP port %i", server->port);
-		break;
-
-	      sleep_and_retry:
-		if (!warning_said) {
-			say_warn("port %i is already in use, "
-				 "will retry binding after 0.1 seconds.", server->port);
-			warning_said = true;
-		}
-		fiber_sleep(0.1);
-	}
-
-	if (server->on_bind != NULL)
+	if (server->on_bind != NULL) {
 		server->on_bind(server->data);
+	}
 
-	fiber_io_start(EV_READ);
+	fiber_io_start(fiber->fd, EV_READ);
 	for (;;) {
 		fiber_io_yield();
 
@@ -1156,7 +1112,7 @@ tcp_server_handler(void *data)
 			}
 
 			snprintf(name, sizeof(name), "%i/handler", server->port);
-			h = fiber_create(name, fd, -1, server->handler, data);
+			h = fiber_create(name, fd, -1, server->handler, server->data);
 			if (h == NULL) {
 				say_error("can't create handler fiber, dropping client connection");
 				close(fd);
@@ -1171,30 +1127,136 @@ tcp_server_handler(void *data)
 			continue;
 		}
 	}
-	fiber_io_stop(EV_READ);
+	fiber_io_stop(fiber->fd, EV_READ);
 }
 
 struct fiber *
-fiber_server(int port, void (*handler) (void *data), void *data,
+fiber_server(const char *name, int port, void (*handler) (void *data), void *data,
 	     void (*on_bind) (void *data))
 {
-	char *server_name;
+	char server_name[FIBER_NAME_MAXLEN];
 	struct fiber_server *server;
 	struct fiber *s;
 
-	server_name = palloc(eter_pool, 64);
-	snprintf(server_name, 64, "%i/acceptor", port);
-	s = fiber_create(server_name, -1, -1, tcp_server_handler, data);
-	s->data = server = palloc(eter_pool, sizeof(struct fiber_server));
+	snprintf(server_name, sizeof(server_name), "%i/%s", port, name);
+	server = palloc(eter_pool, sizeof(struct fiber_server));
 	assert(server != NULL);
+	server->data = data;
 	server->port = port;
 	server->handler = handler;
 	server->on_bind = on_bind;
+	s = fiber_create(server_name, -1, -1, tcp_server_handler, server);
 
 	fiber_call(s);		/* give a handler a chance */
 	return s;
 }
 
+/** create new fiber's socket and set standat options. */
+static int
+create_socket(struct fiber *fiber)
+{
+	if (fiber->fd != -1) {
+		say_error("fiber is already has socket");
+		goto create_socket_fail;
+	}
+
+	fiber->fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (fiber->fd == -1) {
+		say_syserror("socket");
+		goto create_socket_fail;
+	}
+
+	int one = 1;
+	if (setsockopt(fiber->fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) != 0) {
+		say_syserror("setsockopt");
+		goto create_socket_fail;
+	}
+
+	struct linger ling = { 0, 0 };
+	if (setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one)) != 0 ||
+	    setsockopt(fiber->fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0 ||
+	    setsockopt(fiber->fd, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling)) != 0) {
+		say_syserror("setsockopt");
+		goto create_socket_fail;
+	}
+
+	if (set_nonblock(fiber->fd) == -1) {
+		goto create_socket_fail;
+	}
+
+	return 0;
+
+create_socket_fail:
+
+	if (fiber->fd != -1) {
+		close(fiber->fd);
+	}
+	return -1;
+}
+
+/** Create server socket and bind his on port. */
+int
+fiber_serv_socket(struct fiber *fiber, unsigned short port, bool retry, ev_tstamp delay)
+{
+	const ev_tstamp min_delay = 0.001; /* minimal delay is 1 msec */
+	struct sockaddr_in sin;
+	bool warning_said = false;
+
+	if (delay < min_delay) {
+		delay = min_delay;
+	}
+
+	if (create_socket(fiber) != 0) {
+		return -1;
+	}
+
+	/* clean sockaddr_in struct */
+	memset(&sin, 0, sizeof(struct sockaddr_in));
+
+	/* fill sockaddr_in struct */
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(port);
+	if (strcmp(cfg.bind_ipaddr, "INADDR_ANY") == 0) {
+		sin.sin_addr.s_addr = INADDR_ANY;
+	} else {
+		if (!inet_aton(cfg.bind_ipaddr, &sin.sin_addr)) {
+			say_syserror("inet_aton");
+			return -1;
+		}
+	}
+
+	while (true) {
+		if (bind(fiber->fd, (struct sockaddr *)&sin, sizeof(sin)) != 0) {
+			if (retry && (errno == EADDRINUSE)) {
+				/* retry mode, try, to bind after delay */
+				goto sleep_and_retry;
+			}
+			say_syserror("bind");
+			return -1;
+		}
+		if (listen(fiber->fd, cfg.backlog) != 0) {
+			if (retry && (errno == EADDRINUSE)) {
+				/* retry mode, try, to bind after delay */
+				goto sleep_and_retry;
+			}
+			say_syserror("listen");
+			return -1;
+		}
+
+		say_info("bound to port %i", port);
+		break;
+
+	sleep_and_retry:
+		if (!warning_said) {
+			say_warn("port %i is already in use, "
+				 "will retry binding after %lf seconds.", port, delay);
+			warning_said = true;
+		}
+		fiber_sleep(delay);
+	}
+
+	return 0;
+}
 
 void
 fiber_info(struct tbuf *out)
@@ -1231,9 +1293,16 @@ fiber_init(void)
 	memset(&sched, 0, sizeof(sched));
 	sched.fid = 1;
 	fiber_set_name(&sched, "sched");
-	sched.pool = palloc_create_pool(sched.name);
+	sched.gc_pool = palloc_create_pool(sched.name);
 
 	sp = call_stack;
 	fiber = &sched;
 	last_used_fid = 100;
+}
+
+void
+fiber_free(void)
+{
+	fiber_destroy_all();
+	kh_destroy(fid2fiber, fibers_registry);
 }

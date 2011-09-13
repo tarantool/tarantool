@@ -1,0 +1,358 @@
+
+##
+## obj-c leaks
+##
+
+{
+   <obj-c internals>
+   Memcheck:Leak
+   fun:malloc
+   fun:objc_malloc
+   ...
+}
+
+{
+   <obj-c internals>
+   Memcheck:Leak
+   fun:calloc
+   fun:objc_calloc
+   ...
+}
+
+{
+   <obj-c internals>
+   Memcheck:Leak
+   fun:realloc
+   fun:objc_realloc
+   ...
+}
+
+##
+## libev internals
+##
+
+{
+   <uninitialized value>
+   Memcheck:Param
+   write(buf)
+   fun:__write_nocancel
+   fun:evpipe_write
+   fun:ev_feed_signal
+   fun:ev_sighandler
+   ...
+}
+
+{
+   <0 byte free>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:ev_realloc_emul
+   fun:ev_realloc
+   fun:epoll_destroy
+   fun:ev_loop_destroy
+   fun:ev_default_destroy
+   fun:tarantool_free
+   ...
+}
+
+{
+   <0 byte free>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:ev_realloc_emul
+   fun:ev_realloc
+   fun:ev_loop_destroy
+   fun:ev_default_destroy
+   fun:tarantool_free
+   ...
+}
+
+##
+## realloc(ptr, 0)
+##
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:kh_destroy_int_ptr_map
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_destroy_lstr_ptr_map
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:kh_destroy_fid2fiber
+   fun:fiber_free
+   fun:tarantool_free
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_destroy_lstr_ptr_map
+   fun:index_hash_str_free
+   fun:index_free
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:tnt_xrealloc
+   fun:kh_resize_lstr_ptr_map
+   fun:kh_put_lstr_ptr_map
+   fun:index_replace_hash_str
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:kh_resize_int_ptr_map
+   fun:kh_put_int_ptr_map
+   fun:index_replace_hash_num
+   ...
+}
+
+{
+   <realloc with 0 byte>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:kh_resize_fid2fiber
+   fun:kh_put_fid2fiber
+   fun:register_fid
+   fun:fiber_create
+   fun:spawn_child
+   fun:recover_init
+   fun:mod_init
+   fun:main
+}
+
+##
+## backtrace
+##
+
+## backtrace implementation is low-level and
+## produces alot of warnings.
+
+{
+   <backtrace internals>
+   Memcheck:Cond
+   fun:backtrace
+   ...
+}
+
+{
+   <backtrace internals>
+   Memcheck:Value8
+   fun:backtrace
+   ...
+}
+
+{
+   <backtrace internals>
+   Memcheck:Cond
+   fun:vfprintf
+   fun:vsnprintf
+   fun:snprintf
+   fun:backtrace
+   ...
+}
+
+{
+   <backtrace internals>
+   Memcheck:Value8
+   fun:_itoa_word
+   fun:vfprintf
+   fun:vsnprintf
+   fun:snprintf
+   fun:backtrace
+   ...
+}
+
+{
+   <backtrace internals>
+   Memcheck:Cond
+   fun:_itoa_word
+   fun:vfprintf
+   fun:vsnprintf
+   fun:snprintf
+   fun:backtrace
+   ...
+}
+
+##
+## box allocations
+## 
+
+## we can't directly free tuple allocations.
+
+{
+   <box replace command (insert)>
+   Memcheck:Leak
+   fun:salloc
+   fun:tuple_alloc
+   fun:prepare_replace
+   fun:box_dispatch
+   fun:box_process*
+   ...
+}
+
+##
+## tarantool/lua suppressions
+##
+
+#----------------------------------------------------------------------------#
+# tarantool_lua function
+#----------------------------------------------------------------------------#
+
+#
+# lua_* function suppressions
+#
+
+{
+   <lua_* from luajit library suppression>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:tarantool_lua
+   ...
+}
+
+{
+   <lua_* from luajit library suppression>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:tarantool_lua_dostring
+   fun:tarantool_lua
+   ...
+}
+
+{
+   <lua_* from luajit library suppression in admin console>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:tarantool_lua_tostring
+   fun:tarantool_lua_printstack_yaml
+   fun:tarantool_lua
+   ...
+}
+
+#
+# luaL_* function suppressions
+#
+
+{
+   <luaL_* from luajit library suppression in tarantool_lua>
+   Memcheck:Cond
+   ...
+   fun:luaL_*
+   fun:tarantool_lua
+   ...
+}
+
+{
+   <luaL_* from luajit library suppression in tarantool_lua>
+   Memcheck:Cond
+   ...
+   fun:luaL_*
+   fun:tarantool_lua_dostring
+   fun:tarantool_lua
+   ...
+}
+
+{
+   <luaL_* from luajit library suppression in tarantool_lua>
+   Memcheck:Cond
+   ...
+   fun:luaL_*
+   fun:tarantool_lua_tostring
+   fun:tarantool_lua_printstack_yaml
+   fun:tarantool_lua
+   ...
+}
+
+#----------------------------------------------------------------------------#
+# box_lua_call function
+#----------------------------------------------------------------------------#
+
+{
+   <lua_* frim luajit libarary suppression in box_lua_call>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:box_lua_call
+   fun:box_dispatch
+   fun:box_process*
+   ...
+}
+
+{
+   <lua_* frim luajit libarary suppression in box_lua_call>
+   Memcheck:Cond
+   ...
+   fun:lua_*
+   fun:iov_add_ret
+   fun:iov_add_multret
+   fun:box_lua_call
+   fun:box_dispatch
+   fun:box_process*
+   ...
+}
+
+## sptree
+##
+
+## third_party sptree implementation doesn't have
+## destroy function.
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:sptree_str_t_init
+   fun:build_indexes
+   ...
+}
+
+# iterator_init_set calls realloc only if iterator value not
+# initialized or have lower depth.
+
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   fun:malloc
+   fun:realloc
+   fun:sptree_str_t_iterator_init_set
+   fun:index_iterator_init_tree_str
+   fun:process_select
+   ...
+}

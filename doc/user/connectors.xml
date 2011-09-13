@@ -18,7 +18,7 @@
     <title>C</title>
     <para>
        Please see <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/c/client.h"><filename>connector/c/client.h</filename></link> in the source tree.
+       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/c/tnt.h"><filename>connector/c/tnt.h</filename></link> in the source tree.
     </para>
   </section>
 
@@ -33,7 +33,7 @@
       <simpara><emphasis role="strong">new</emphasis></simpara>
 <programlisting language="perl"><![CDATA[
      my $box = MR::SilverBox->new({
-            namespaces => [ {
+            spaces => [ {
                 indexes => [ {
                     index_name   => 'primary_id',
                     keys         => [0],
@@ -41,7 +41,7 @@
                     index_name   => 'primary_email',
                     keys         => [1],
                 }, ],
-                namespace     => 0,
+                space     => 0,
                 format        => 'l& SSLL',
                 default_index => 'primary_id',
             } ],
@@ -160,21 +160,21 @@
     </para>
     <para>
        Assume, for the sake of example, that Tarantool has the
-       following namespace configuration:
+       following space configuration:
 <programlisting language="c">
 primary_port = 33013 
 admin_port = 33015 
 log_level = 3
 slab_alloc_arena = 0.1
 
-namespace[0].enabled = 1
-namespace[0].index[0].type = "NUM"
-namespace[0].index[0].key_fields[0].fieldno = 0
+space[0].enabled = 1
+space[0].index[0].type = "NUM"
+space[0].index[0].key_fields[0].fieldno = 0
 
-namespace[0].index[1].type = "STR"
-namespace[0].index[1].key_fields[0].fieldno = 1
+space[0].index[1].type = "STR"
+space[0].index[1].key_fields[0].fieldno = 1
 </programlisting>
-        The only defined namespace will be used to store user
+        The only defined space will be used to store user
         account information, such as id, name, email, and other
         properties. User ID is used for the primary key, but
         it's also possible to find a user by name.
@@ -188,7 +188,7 @@ namespace[0].index[1].key_fields[0].fieldno = 1
 
 class UserBox < Box
   def initialize(host)
-    super(host, :namespace => 0)
+    super(host, :space => 0)
   end
 
   def insert(user)
@@ -223,7 +223,7 @@ end]]></programlisting></example>
 >> require 'userbox'
 => true
 >> b = UserBox.new 'localhost:33013'
-=> #<UserBox:0x870fd48 @namespace=1, @end_point=["localhost", 33013], @sock=#<TCPSocket:0x870f85c>
+=> #<UserBox:0x870fd48 @space=1, @end_point=["localhost", 33013], @sock=#<TCPSocket:0x870f85c>
 >> # Insert a few users
 >> b.insert :uid => 1, :email => 'pupkin@mail.ru', :name => 'Vasya', :apple_count => 1
 => 1

@@ -33,6 +33,7 @@
 #include <tbuf.h>
 #include <util.h>
 #include <palloc.h>
+#include <netinet/in.h> /* struct sockaddr_in */
 
 struct tbuf;
 
@@ -62,7 +63,7 @@ struct log_io_class {
 	const char *filetype;
 	const char *version;
 	const char *suffix;
-	const char *dirname;
+	char *dirname;
 };
 
 
@@ -109,6 +110,7 @@ struct recovery_state {
 	/* row_handler will be presented by most recent format of data
 	   log_io_class->reader is responsible of converting data from old format */
 	row_handler *row_handler;
+	struct sockaddr_in remote_addr;
 	struct fiber *remote_recovery;
 
 	ev_timer wal_timer;
@@ -122,11 +124,6 @@ struct recovery_state {
 
 	/* Points to module-specific state */
 	void *data;
-};
-
-struct remote_state {
-	struct recovery_state *r;
-	int (*handler) (struct recovery_state * r, struct tbuf *row);
 };
 
 struct wal_write_request {
@@ -155,6 +152,7 @@ struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_d
 				    row_handler row_handler,
 				    int rows_per_file, double fsync_delay, int inbox_size,
 				    int flags, void *data);
+void recover_free(struct recovery_state *recovery);
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recover_finalize(struct recovery_state *r);
@@ -169,8 +167,7 @@ void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
 int read_log(const char *filename,
 	     row_handler xlog_handler, row_handler snap_handler, void *state);
 
-void recovery_follow_remote(struct recovery_state *r,
-			    const char *ip_addr, int port);
+void recovery_follow_remote(struct recovery_state *r, const char *remote);
 void recovery_stop_remote(struct recovery_state *r);
 
 struct log_io_iter;

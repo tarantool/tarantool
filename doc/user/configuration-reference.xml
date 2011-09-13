@@ -442,7 +442,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         </row>
 
         <row>
-          <entry>namespace</entry>
+          <entry>space</entry>
           <entry>array of objects</entry>
           <entry>none</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
@@ -453,7 +453,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           entries, and each entry represents a tuple set
           served by the server. Every entry is a composite object,
           best seen as a C programming language "struct"
-          <footnote><xi:include href="namespace.xml"/></footnote>.
+          <footnote><xi:include href="space.xml"/></footnote>.
           </entry>
         </row>
 
@@ -483,7 +483,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         <row>
           <entry>panic_on_snap_error</entry>
           <entry>boolean</entry>
-          <entry>1</entry>
+          <entry>true</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>If there is an error reading the snapshot (at
@@ -493,7 +493,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         <row>
           <entry>panic_on_wal_error</entry>
           <entry>boolean</entry>
-          <entry>0</entry>
+          <entry>false</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>If there is an error reading from a write ahead
@@ -595,35 +595,23 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>Replication port. If non-zero, Tarantool listens
           on the given port for incoming connections from
           replicas. See also <olink
-          targetptr="replication_source_port"/>, which complements
+          targetptr="replication_source"/>, which complements
           this setting on the replica side.</entry>
         </row>
 
         <row>
-          <entry xml:id="replication_source_port"
-          xreflabel="replication_source_port">replication_source_port</entry>
-          <entry>integer</entry>
-          <entry>0</entry>
+          <entry xml:id="replication_source"
+          xreflabel="replication_source">replication_source</entry>
+          <entry>string</entry>
+          <entry>NULL</entry>
           <entry>no</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>Remote port of the master. If non-zero,
+          <entry>Pair ip:port describing the master. If not empty,
           replication is on, and Tarantool does not accept updates
           on <olink targetptr="primary_port"/>. This parameter is
           dynamic, that is, to enter master mode, simply set the
-          port value to 0 and issue <olink
+          value to an empty string and issue <olink
           targetptr="reload-configuration"/>.</entry>
-        </row>
-
-        <row>
-          <entry xml:id="replication_source_ipaddr"
-                 xreflabel="replication_source_ipaddr">
-              replication_source_ipaddr
-          </entry>
-          <entry>string</entry>
-          <entry>0</entry>
-          <entry>no</entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>IP address of replication master.</entry>
         </row>
 
       </tbody>
@@ -790,8 +778,8 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
 
         <row>
           <entry>memcached_port</entry>
-          <entry>integer</entry>
-          <entry>0</entry>
+          <entry>boolean</entry>
+          <entry>false</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>
@@ -799,8 +787,8 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
 
           Turn on Memcached protocol support on the given
             port. All requests on this port are directed to
-            a dedicated namespace, set in <olink
-            targetptr="memcached_namespace"/>.
+            a dedicated space, set in <olink
+            targetptr="memcached_space"/>.
             Memcached-style flags are supported and stored
             along with the value. The expiration time can also be
             set and is persistent, but is ignored, unless <olink
@@ -814,17 +802,17 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         </row>
 
         <row>
-          <entry>memcached_namespace</entry>
+          <entry>memcached_space</entry>
           <entry>integer</entry>
           <entry>23</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>
-            <anchor xml:id="memcached_namespace"
-            xreflabel="memcached_namespace"/>
+            <anchor xml:id="memcached_space"
+            xreflabel="memcached_space"/>
           Namespace id to store memcached data in. The
           format of tuple is [key, metadata, value], with a HASH
-          index based on the key. Since the namespace format
+          index based on the key. Since the space format
           is defined by Memcached data model, it must not be
           previously configured.</entry>
         </row>
@@ -832,14 +820,14 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         <row>
           <entry>memcached_expire</entry>
           <entry>boolean</entry>
-          <entry>0</entry>
+          <entry>false</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>
             <anchor xml:id="memcached_expire"
             xreflabel="memcached_expire"/>
             Turn on tuple time-to-live support in
-            <olink targetptr="memcached_namespace"/>. This
+            <olink targetptr="memcached_space"/>. This
             effectively turns Tarantool into a "persistent" implementation
             of Memcached. Since a caching server has
             significantly different purpose than a data server, in

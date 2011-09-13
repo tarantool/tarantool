@@ -25,6 +25,7 @@
  */
 #include "tarantool.h"
 #include "box.h"
+#include "mod/box/tuple.h"
 #include "fiber.h"
 #include "cfg/warning.h"
 #include "cfg/tarantool_box_cfg.h"
@@ -67,13 +68,14 @@ natoq(const u8 *start, const u8 *end)
 static void
 store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 {
-	u32 box_flags = BOX_QUIET, cardinality = 4;
+	u32 box_flags = 0;
+	u32 cardinality = 4;
 	static u64 cas = 42;
 	struct meta m;
 
-	struct tbuf *req = tbuf_alloc(fiber->pool);
+	struct tbuf *req = tbuf_alloc(fiber->gc_pool);
 
-	tbuf_append(req, &cfg.memcached_namespace, sizeof(u32));
+	tbuf_append(req, &cfg.memcached_space, sizeof(u32));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
 	tbuf_append(req, &cardinality, sizeof(cardinality));
 
@@ -96,24 +98,30 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
+
+	struct box_txn *txn = txn_begin();
+	txn->out = &box_out_quiet;
 	/*
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
 	 */
-	rw_callback(INSERT, req);
+	rw_callback(REPLACE, req);
 }
 
 static void
 delete(void *key)
 {
 	u32 key_len = 1;
-	u32 box_flags = BOX_QUIET;
-	struct tbuf *req = tbuf_alloc(fiber->pool);
+	u32 box_flags = 0;
+	struct tbuf *req = tbuf_alloc(fiber->gc_pool);
 
-	tbuf_append(req, &cfg.memcached_namespace, sizeof(u32));
+	tbuf_append(req, &cfg.memcached_space, sizeof(u32));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
+
+	struct box_txn *txn = txn_begin();
+	txn->out = &box_out_quiet;
 
 	rw_callback(DELETE, req);
 }
@@ -164,7 +172,7 @@ static void
 print_stats()
 {
 	u64 bytes_used, items;
-	struct tbuf *out = tbuf_alloc(fiber->pool);
+	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
 	slab_stat2(&bytes_used, &items);
 
 	tbuf_printf(out, "STAT pid %"PRIu32"\r\n", (u32)getpid());
@@ -188,7 +196,84 @@ print_stats()
 	tbuf_printf(out, "STAT limit_maxbytes %"PRIu64"\r\n", (u64)(cfg.slab_alloc_arena * (1 << 30)));
 	tbuf_printf(out, "STAT threads 1\r\n");
 	tbuf_printf(out, "END\r\n");
-	add_iov(out->data, out->len);
+	iov_add(out->data, out->len);
+}
+
+void memcached_get(struct box_txn *txn, size_t keys_count, struct tbuf *keys,
+		   bool show_cas)
+{
+	txn->op = SELECT;
+	stat_collect(stat_base, MEMC_GET, 1);
+	stats.cmd_get++;
+	say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
+	iov_ensure(keys_count * 5 + 1);
+	while (keys_count-- > 0) {
+		struct box_tuple *tuple;
+		struct meta *m;
+		void *field;
+		void *value;
+		void *suffix;
+		u32 key_len;
+		u32 value_len;
+		u32 suffix_len;
+		u32 _l;
+
+		void *key = read_field(keys);
+		tuple = find(key);
+		key_len = load_varint32(&key);
+
+		if (tuple == NULL || tuple->flags & GHOST) {
+			stat_collect(stat_base, MEMC_GET_MISS, 1);
+			stats.get_misses++;
+			continue;
+		}
+
+		field = tuple->data;
+
+		/* skip key */
+		_l = load_varint32(&field);
+		field += _l;
+
+		/* metainfo */
+		_l = load_varint32(&field);
+		m = field;
+		field += _l;
+
+		/* suffix */
+		suffix_len = load_varint32(&field);
+		suffix = field;
+		field += suffix_len;
+
+		/* value */
+		value_len = load_varint32(&field);
+		value = field;
+
+		if (m->exptime > 0 && m->exptime < ev_now()) {
+			stats.get_misses++;
+			stat_collect(stat_base, MEMC_GET_MISS, 1);
+			continue;
+		}
+		stats.get_hits++;
+		stat_collect(stat_base, MEMC_GET_HIT, 1);
+
+		tuple_txn_ref(txn, tuple);
+
+		if (show_cas) {
+			struct tbuf *b = tbuf_alloc(fiber->gc_pool);
+			tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (u8 *)key, m->flags, value_len, m->cas);
+			iov_add_unsafe(b->data, b->len);
+			stats.bytes_written += b->len;
+		} else {
+			iov_add_unsafe("VALUE ", 6);
+			iov_add_unsafe(key, key_len);
+			iov_add_unsafe(suffix, suffix_len);
+		}
+		iov_add_unsafe(value, value_len);
+		iov_add_unsafe("\r\n", 2);
+		stats.bytes_written += value_len + 2;
+	}
+	iov_add_unsafe("END\r\n", 5);
+	stats.bytes_written += 5;
 }
 
 static void
@@ -209,17 +294,17 @@ flush_all(void *data)
 do {										\
 	stats.cmd_set++;							\
 	if (bytes > (1<<20)) {							\
-		add_iov("SERVER_ERROR object too large for cache\r\n", 41);	\
+		iov_add("SERVER_ERROR object too large for cache\r\n", 41);	\
 	} else {								\
 		@try {								\
 			store(key, exptime, flags, bytes, data);		\
 			stats.total_items++;					\
-			add_iov("STORED\r\n", 8);				\
+			iov_add("STORED\r\n", 8);				\
 		}								\
 		@catch (ClientError *e) {					\
-			add_iov("SERVER_ERROR ", 13);				\
-			add_iov(e->errmsg, strlen(e->errmsg));			\
-			add_iov("\r\n", 2);					\
+			iov_add("SERVER_ERROR ", 13);				\
+			iov_add(e->errmsg, strlen(e->errmsg));			\
+			iov_add("\r\n", 2);					\
 		}								\
 	}									\
 } while (0)
@@ -258,7 +343,7 @@ memcached_handler(void *_data __attribute__((unused)))
 				goto dispatch;
 		}
 
-		r = fiber_flush_output();
+		r = iov_flush();
 		if (r < 0) {
 			say_debug("flush_output failed, closing connection");
 			goto exit;
@@ -273,7 +358,7 @@ memcached_handler(void *_data __attribute__((unused)))
 		}
 	}
 exit:
-        fiber_flush_output();
+        iov_flush();
 	fiber_sleep(0.01);
 	say_debug("exit");
 	stats.curr_connections--; /* FIXME: nonlocal exit via exception will leak this counter */
@@ -288,18 +373,18 @@ memcached_check_config(struct tarantool_cfg *conf)
 	}
 
 	if (conf->memcached_port <= 0 || conf->memcached_port >= USHRT_MAX) {
-		/* invalid namespace number */
+		/* invalid space number */
 		out_warning(0, "invalid memcached port value: %i",
 			    conf->memcached_port);
 		return -1;
 	}
 
-	/* check memcached namespace number: it shoud be in segment [0, max_namespace] */
-	if ((conf->memcached_namespace < 0) ||
-	    (conf->memcached_namespace > BOX_NAMESPACE_MAX)) {
-		/* invalid namespace number */
-		out_warning(0, "invalid memcached namespace number: %i",
-			    conf->memcached_namespace);
+	/* check memcached space number: it shoud be in segment [0, max_space] */
+	if ((conf->memcached_space < 0) ||
+	    (conf->memcached_space > BOX_NAMESPACE_MAX)) {
+		/* invalid space number */
+		out_warning(0, "invalid memcached space number: %i",
+			    conf->memcached_space);
 		return -1;
 	}
 
@@ -329,20 +414,20 @@ memcached_init(void)
 
 	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 
-	memcached_index = &namespace[cfg.memcached_namespace].index[0];
+	memcached_index = &space[cfg.memcached_space].index[0];
 }
 
 void
-memcached_namespace_init()
+memcached_space_init()
 {
-	struct namespace *memc_ns;
+	struct space *memc_ns;
 	struct index *memc_index;
 
-	/* configure memcached namespace */
-	memc_ns = &namespace[cfg.memcached_namespace];
+	/* configure memcached space */
+	memc_ns = &space[cfg.memcached_space];
 	memc_ns->enabled = true;
 	memc_ns->cardinality = 4;
-	memc_ns->n = cfg.memcached_namespace;
+	memc_ns->n = cfg.memcached_space;
 
 	/* configure memcached index */
 	memc_index = &memc_ns->index[0];
@@ -356,7 +441,7 @@ memcached_namespace_init()
 
 	if (memc_index->key_field == NULL || memc_index->field_cmp_order == NULL ||
 	    memc_index->search_pattern == NULL)
-		panic("out of memory when configuring memcached_namespace");
+		panic("out of memory when configuring memcached_space");
 
 	memc_index->key_field[0].fieldno = 0;
 	memc_index->key_field[0].type = STRING;
@@ -368,6 +453,7 @@ memcached_namespace_init()
 	memc_index->unique = true;
 	memc_index->type = HASH;
 	memc_index->enabled = true;
+	memc_index->n = 0;
 	index_init(memc_index, memc_ns, 0);
 }
 
@@ -382,7 +468,7 @@ memcached_expire_loop(void *data __attribute__((unused)))
 		if (i > kh_end(map))
 			i = kh_begin(map);
 
-		struct tbuf *keys_to_delete = tbuf_alloc(fiber->pool);
+		struct tbuf *keys_to_delete = tbuf_alloc(fiber->gc_pool);
 		int expired_keys = 0;
 
 		for (int j = 0; j < cfg.memcached_expire_per_loop; j++, i++) {

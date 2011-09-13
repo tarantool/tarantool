@@ -1,0 +1,8 @@
+insert into t1 values ('brave', 'new', 'world')
+Insert OK, 1 row affected
+call box.select(1, 1, 'new', 'world')
+Found 1 tuple:
+['brave', 'new', 'world']
+call box.delete(1, 'brave')
+Found 1 tuple:
+['brave', 'new', 'world']

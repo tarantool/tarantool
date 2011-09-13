@@ -23,14 +23,17 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 
 import socket
 import yaml
+import sys
 import re
 from tarantool_connection import TarantoolConnection
 
-is_admin_re = re.compile("^\s*(show|save|exec|exit|reload|help)", re.I)
+is_admin_re = re.compile("^\s*(show|save|lua|exit|reload|help)", re.I)
+
+ADMIN_SEPARATOR = '\n'
 
 class AdminConnection(TarantoolConnection):
     def execute_no_reconnect(self, command, silent):
-        self.socket.sendall(command)
+        self.socket.sendall(command + ADMIN_SEPARATOR)
 
         bufsiz = 4096
         res = ""
@@ -47,8 +50,8 @@ class AdminConnection(TarantoolConnection):
         yaml.load(res)
 
         if not silent:
-            print command.replace('\n', '')
-            print res[:-1]
+            sys.stdout.write(command + ADMIN_SEPARATOR)
+            sys.stdout.write(res)
 
         return res
 

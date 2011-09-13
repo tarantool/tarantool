@@ -14,6 +14,7 @@ parser sql:
     ignore:           '\\s+'
     token NUM:        '[+-]?[0-9]+'
     token ID:         '[a-z_]+[0-9]+' 
+    token PROC_ID:    '[a-z_][a-z0-9_.]*'
     token STR:        '\'([^\']+|\\\\.)*\''
     token PING:       'ping'
     token INSERT:     'insert'
@@ -27,12 +28,14 @@ parser sql:
     token SET:        'set'
     token OR:         'or'
     token LIMIT:      'limit'
+    token CALL:       'call'
     token END:        '\\s*$'
 
     rule sql:         (insert {{ stmt = insert }} |
                       update {{ stmt = update }} |
                       delete {{ stmt = delete }} |
                       select {{ stmt = select }} |
+                      call {{ stmt = call }} |
                       ping {{ stmt = ping }}) END {{ return stmt }}
                       
     rule insert:      INSERT [INTO] ident VALUES value_list
@@ -45,6 +48,8 @@ parser sql:
                       {{ return sql_ast.StatementSelect(ident, opt_where, opt_limit) }}
     rule ping:        PING
                       {{ return sql_ast.StatementPing() }}
+    rule call:        CALL PROC_ID value_list
+                      {{ return sql_ast.StatementCall(PROC_ID, value_list) }}
     rule predicate:   ident '=' constant
                       {{ return (ident, constant) }}
     rule opt_simple_where:   {{ return None }}
@@ -58,8 +63,8 @@ parser sql:
                       {{ return disjunction }}
     rule opt_limit:   {{ return 0xffffffff }}
                       | LIMIT NUM {{ return int(NUM) }}
-    rule value_list:  '\(' expr {{ value_list = [expr] }}
-                          [("," expr {{ value_list.append(expr) }} )+]
+    rule value_list:  '\(' {{ value_list = [] }}
+                         [expr {{ value_list = [expr] }} [("," expr {{ value_list.append(expr) }} )+]]
                       '\)' {{ return value_list }}
     rule update_list: predicate {{ update_list = [predicate] }}
                       [(',' predicate {{ update_list.append(predicate) }})+]

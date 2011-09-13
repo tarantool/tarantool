@@ -113,7 +113,7 @@ say_logger_init(int nonblock)
 void
 vsay(int level, const char *filename, int line, const char *error, const char *format, va_list ap)
 {
-	char *peer_name = fiber_peer_name(fiber);
+	const char *peer_name = fiber_peer_name(fiber);
 	size_t p = 0, len = PIPE_BUF;
 	const char *f;
 	static char buf[PIPE_BUF];

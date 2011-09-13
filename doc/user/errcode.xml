@@ -57,7 +57,7 @@ of existing codes.</para>
 
   <varlistentry>
     <term xml:id="ER_NO_SUCH_NAMESPACE" xreflabel="ER_NO_SUCH_NAMESPACE">ER_NO_SUCH_NAMESPACE</term>
-    <listitem><para>Attempt to access a namespace that is not
+    <listitem><para>Attempt to access a space that is not
     configured (doesn't exist).
     </para></listitem>
   </varlistentry>

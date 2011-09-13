@@ -11,19 +11,6 @@ import daemon
 import glob
 import ConfigParser
 
-def wait_until_connected(port):
-    """Wait until the server is started and accepting connections"""
-
-    is_connected = False
-    while not is_connected:
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect(("localhost", port))
-            is_connected = True
-            sock.close()
-        except socket.error as e:
-            time.sleep(0.001)
-
 def check_port(port):
     """Check if the port we're connecting to is available"""
 
@@ -48,9 +35,12 @@ def prepare_gdb(args):
     args = [ term, "-e", "gdb", "-ex", "break main", "-ex", "run" ] + args
     return args
 
-def prepare_valgrind(args, valgrind_log):
+def prepare_valgrind(args, valgrind_log, valgrind_sup):
     "Prepare server startup arguments to run under valgrind."
-    args = [ "valgrind", "--log-file={0}".format(valgrind_log), "--quiet" ] + args
+    args = [ "valgrind", "--log-file={0}".format(valgrind_log),
+             "--suppressions={0}".format(valgrind_sup),
+             "--gen-suppressions=all", "--show-reachable=yes", "--leak-check=full",
+             "--read-var-info=yes", "--quiet" ] + args
     return args
 
 def check_tmpfs_exists():
@@ -83,6 +73,8 @@ class Server(object):
         self.config = None
         self.vardir = None
         self.valgrind_log = "valgrind.log"
+        self.valgrind_sup = os.path.join("share/", "%s_%s.sup" % (core, module))
+        self.default_suppression_name = "valgrind.sup"
         self.pidfile = None
         self.port = None
         self.binary = None
@@ -152,6 +144,7 @@ class Server(object):
                 os.makedirs(self.vardir)
 
         shutil.copy(self.config, os.path.join(self.vardir, self.default_config_name))
+        shutil.copy(self.valgrind_sup, os.path.join(self.vardir, self.default_suppression_name))
 
     def init(self):
         pass
@@ -189,19 +182,21 @@ class Server(object):
         if self.gdb:
             args = prepare_gdb(args)
         elif self.valgrind:
-            args = prepare_valgrind(args, self.valgrind_log)
+            args = prepare_valgrind(args, self.valgrind_log,
+                                    os.path.abspath(os.path.join(self.vardir,
+                                    self.default_suppression_name)))
 
         if self.start_and_exit:
             self._start_and_exit(args)
-        else:
-            self.process = pexpect.spawn(args[0], args[1:], cwd = self.vardir)
+            return
 
-        # wait until the server is connectedk
-        wait_until_connected(self.port)
+        self.process = pexpect.spawn(args[0], args[1:], cwd = self.vardir)
+
+        # wait until the server is connected
+        self.wait_until_started()
         # Set is_started flag, to nicely support cleanup during an exception.
         self.is_started = True
-        with open(self.pidfile) as f:
-            self.pid = int(f.read())
+
 
     def stop(self, silent=True):
         """Stop server instance. Do nothing if the server is not started,
@@ -217,19 +212,26 @@ class Server(object):
 
         if self.process == None:
             self.kill_old_server()
-        else:
-            self.kill_server()
+            return
 
-        if self.gdb:
+
+        # kill process
+        os.kill(self.read_pidfile(), signal.SIGTERM)
+        #self.process.kill(signal.SIGTERM)
+        if self.gdb or self.valgrind:
             self.process.expect(pexpect.EOF, timeout = 1 << 30)
         else:
             self.process.expect(pexpect.EOF)
+        self.process.close()
 
+        self.wait_until_stoped()
+        # clean-up processs flags
         self.is_started = False
-        self.pid = None
+        self.process = None
 
     def deploy(self, config=None, binary=None, vardir=None,
-               mem=None, start_and_exit=None, gdb=None, valgrind=None, silent=True):
+               mem=None, start_and_exit=None, gdb=None, valgrind=None, valgrind_sup=None,
+               silent=True, need_init=True):
         if config != None: self.config = config
         if binary != None: self.binary = binary
         if vardir != None: self.vardir = vardir
@@ -240,7 +242,8 @@ class Server(object):
 
         self.configure(self.config)
         self.install(self.binary, self.vardir, self.mem, silent)
-        self.init()
+        if need_init:
+            self.init()
         self.start(self.start_and_exit, self.gdb, self.valgrind, silent)
 
     def restart(self):
@@ -256,22 +259,11 @@ class Server(object):
                                   stderr = subprocess.STDOUT).stdout.read()
         print output
 
-    def kill_server(self):
-        """Kill a server which was started correctly"""
-        try:
-            os.kill(self.pid, signal.SIGTERM)
-        except OSError as e:
-            print e
-            pass
-
     def kill_old_server(self, silent=True):
         """Kill old server instance if it exists."""
-        if os.access(self.pidfile, os.F_OK) == False:
+        pid = self.read_pidfile()
+        if pid == -1:
             return # Nothing to do
-
-        pid = 0
-        with open(self.pidfile) as f:
-            pid = int(f.read())
 
         if not silent:
             print "  Found old server, pid {0}, killing...".format(pid)
@@ -282,4 +274,51 @@ class Server(object):
                 time.sleep(0.001)
         except OSError:
             pass
+
+    def read_pidfile(self):
+        if os.access(self.pidfile, os.F_OK) == False:
+            # file is inaccessible (not exist or permission denied)
+            return -1
+
+        pid = -1
+        try:
+            with open(self.pidfile) as f:
+                pid = int(f.read())
+        except:
+            pass
+        return pid
+
+    def wait_until_started(self):
+        """Wait until the server is started and accepting connections"""
+
+        while self.read_pidfile() == -1:
+            time.sleep(0.001)
+
+        is_connected = False
+        while not is_connected:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.connect(("localhost", self.port))
+                is_connected = True
+                sock.close()
+            except socket.error as e:
+                time.sleep(0.001)
+
+    def wait_until_stoped(self):
+        """Wait until the server is stoped and close sockets"""
+
+        while self.read_pidfile() != -1:
+            time.sleep(0.001)
+
+        is_connected = False
+        while not is_connected:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.connect(("localhost", self.port))
+                is_connected = True
+                sock.close()
+                time.sleep(0.001)
+                continue
+            except socket.error as e:
+                break
 

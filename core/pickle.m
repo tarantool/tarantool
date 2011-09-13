@@ -175,6 +175,20 @@ read_field(struct tbuf *buf)
 	return p;
 }
 
+void *
+read_str(struct tbuf *buf, u32 len)
+{
+	void *p = buf->data;
+
+	if (len > buf->len)
+		tnt_raise(IllegalParams, :"packet too short (expected a string)");
+
+	buf->size -= len;
+	buf->len -= len;
+	buf->data += len;
+	return p;
+}
+
 u32
 valid_tuple(struct tbuf *buf, u32 cardinality)
 {

@@ -1,3 +1,7 @@
+lua box.cfg.too_long_threshold
+---
+ - 0.5
+...
 reload configuration
 ---
 fail:
@@ -8,43 +12,55 @@ fail:
  - Could not accept read only 'secondary_port' option
  - Could not accept read only 'admin_port' option
  - Could not accept read only 'rows_per_wal' option
- - Could not accept read only 'namespace[0].enabled' option
- - Could not accept read only 'namespace[0].index[0].type' option
- - Could not accept read only 'namespace[0].index[0].unique' option
- - Could not accept read only 'namespace[0].index[0].key_field[0].fieldno' option
- - Could not accept read only 'namespace[0].index[0].key_field[0].type' option
+ - Could not accept read only 'space[0].enabled' option
+ - Could not accept read only 'space[0].index[0].type' option
+ - Could not accept read only 'space[0].index[0].unique' option
+ - Could not accept read only 'space[0].index[0].key_field[0].fieldno' option
+ - Could not accept read only 'space[0].index[0].key_field[0].type' option
+...
+lua box.cfg.too_long_threshold
+---
+ - 0.5
 ...
 reload configuration
 ---
 fail:
  - Option 'primary_port' is not set (or has a default value)
- - Option 'namespace[0].enabled' is not set (or has a default value)
- - Option 'namespace[0].index[0].type' is not set (or has a default value)
- - Option 'namespace[0].index[0].key_field[0].fieldno' is not set (or has a default value)
+ - Option 'space[0].enabled' is not set (or has a default value)
+ - Option 'space[0].index[0].type' is not set (or has a default value)
+ - Option 'space[0].index[0].key_field[0].fieldno' is not set (or has a default value)
 ...
 reload configuration
 ---
 fail:
- - Option 'namespace' is not set (or has a default value)
+ - Option 'space' is not set (or has a default value)
 ...
 reload configuration
 ---
 fail:
- - Could not accept read only 'namespace[1].enabled' option
+ - Could not accept read only 'space[1].enabled' option
 ...
 reload configuration
 ---
 fail:
- - Could not accept read only 'namespace[0].index[0].key_field[1].fieldno' option
+ - Could not accept read only 'space[0].index[0].key_field[1].fieldno' option
 ...
 reload configuration
 ---
 ok
 ...
+lua box.cfg.too_long_threshold
+---
+ - 2
+...
 reload configuration
 ---
 fail:
  - gram_yyerror: syntax error, unexpected $end, expecting KEY_P or NULL_P or '[' at line 1
+...
+lua box.cfg.too_long_threshold
+---
+ - 2
 ...
 reload configuration
 ---
@@ -54,6 +70,10 @@ fail:
 reload configuration
 ---
 ok
+...
+lua box.cfg.too_long_threshold
+---
+ - 0.5
 ...
 #
 # A test case for http://bugs.launchpad.net/bugs/712447:

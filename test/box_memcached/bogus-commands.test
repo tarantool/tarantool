@@ -1,2 +1,3 @@
-server.memcached.execute("boguscommand slkdsldkfjsd", silent=False)
+# encoding: tarantool
+exec memcached "boguscommand slkdsldkfjsd\r\n"
 # vim: syntax=python

@@ -1,0 +1,2380 @@
+test 0 iteration
+insert into t0 values (0, 'tuple 0')
+Insert OK, 1 row affected
+insert into t0 values (1, 'tuple 1')
+Insert OK, 1 row affected
+insert into t0 values (2, 'tuple 2')
+Insert OK, 1 row affected
+insert into t0 values (3, 'tuple 3')
+Insert OK, 1 row affected
+insert into t0 values (4, 'tuple 4')
+Insert OK, 1 row affected
+select * from t0 where k0 = 0
+Found 1 tuple:
+[0, 'tuple 0']
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1, 'tuple 1']
+select * from t0 where k0 = 2
+Found 1 tuple:
+[2, 'tuple 2']
+select * from t0 where k0 = 3
+Found 1 tuple:
+[3, 'tuple 3']
+select * from t0 where k0 = 4
+Found 1 tuple:
+[4, 'tuple 4']
+insert into t0 values (5, 'tuple 5')
+Insert OK, 1 row affected
+insert into t0 values (6, 'tuple 6')
+Insert OK, 1 row affected
+insert into t0 values (7, 'tuple 7')
+Insert OK, 1 row affected
+insert into t0 values (8, 'tuple 8')
+Insert OK, 1 row affected
+insert into t0 values (9, 'tuple 9')
+Insert OK, 1 row affected
+select * from t0 where k0 = 5
+Found 1 tuple:
+[5, 'tuple 5']
+select * from t0 where k0 = 6
+Found 1 tuple:
+[6, 'tuple 6']
+select * from t0 where k0 = 7
+Found 1 tuple:
+[7, 'tuple 7']
+select * from t0 where k0 = 8
+Found 1 tuple:
+[8, 'tuple 8']
+select * from t0 where k0 = 9
+Found 1 tuple:
+[9, 'tuple 9']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (10, 'tuple 10')
+Insert OK, 1 row affected
+insert into t0 values (11, 'tuple 11')
+Insert OK, 1 row affected
+insert into t0 values (12, 'tuple 12')
+Insert OK, 1 row affected
+insert into t0 values (13, 'tuple 13')
+Insert OK, 1 row affected
+insert into t0 values (14, 'tuple 14')
+Insert OK, 1 row affected
+select * from t0 where k0 = 10
+Found 1 tuple:
+[10, 'tuple 10']
+select * from t0 where k0 = 11
+Found 1 tuple:
+[11, 'tuple 11']
+select * from t0 where k0 = 12
+Found 1 tuple:
+[12, 'tuple 12']
+select * from t0 where k0 = 13
+Found 1 tuple:
+[13, 'tuple 13']
+select * from t0 where k0 = 14
+Found 1 tuple:
+[14, 'tuple 14']
+insert into t0 values (15, 'tuple 15')
+Insert OK, 1 row affected
+insert into t0 values (16, 'tuple 16')
+Insert OK, 1 row affected
+insert into t0 values (17, 'tuple 17')
+Insert OK, 1 row affected
+insert into t0 values (18, 'tuple 18')
+Insert OK, 1 row affected
+insert into t0 values (19, 'tuple 19')
+Insert OK, 1 row affected
+select * from t0 where k0 = 15
+Found 1 tuple:
+[15, 'tuple 15']
+select * from t0 where k0 = 16
+Found 1 tuple:
+[16, 'tuple 16']
+select * from t0 where k0 = 17
+Found 1 tuple:
+[17, 'tuple 17']
+select * from t0 where k0 = 18
+Found 1 tuple:
+[18, 'tuple 18']
+select * from t0 where k0 = 19
+Found 1 tuple:
+[19, 'tuple 19']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 1 iteration
+insert into t0 values (20, 'tuple 20')
+Insert OK, 1 row affected
+insert into t0 values (21, 'tuple 21')
+Insert OK, 1 row affected
+insert into t0 values (22, 'tuple 22')
+Insert OK, 1 row affected
+insert into t0 values (23, 'tuple 23')
+Insert OK, 1 row affected
+insert into t0 values (24, 'tuple 24')
+Insert OK, 1 row affected
+select * from t0 where k0 = 20
+Found 1 tuple:
+[20, 'tuple 20']
+select * from t0 where k0 = 21
+Found 1 tuple:
+[21, 'tuple 21']
+select * from t0 where k0 = 22
+Found 1 tuple:
+[22, 'tuple 22']
+select * from t0 where k0 = 23
+Found 1 tuple:
+[23, 'tuple 23']
+select * from t0 where k0 = 24
+Found 1 tuple:
+[24, 'tuple 24']
+insert into t0 values (25, 'tuple 25')
+Insert OK, 1 row affected
+insert into t0 values (26, 'tuple 26')
+Insert OK, 1 row affected
+insert into t0 values (27, 'tuple 27')
+Insert OK, 1 row affected
+insert into t0 values (28, 'tuple 28')
+Insert OK, 1 row affected
+insert into t0 values (29, 'tuple 29')
+Insert OK, 1 row affected
+select * from t0 where k0 = 25
+Found 1 tuple:
+[25, 'tuple 25']
+select * from t0 where k0 = 26
+Found 1 tuple:
+[26, 'tuple 26']
+select * from t0 where k0 = 27
+Found 1 tuple:
+[27, 'tuple 27']
+select * from t0 where k0 = 28
+Found 1 tuple:
+[28, 'tuple 28']
+select * from t0 where k0 = 29
+Found 1 tuple:
+[29, 'tuple 29']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (30, 'tuple 30')
+Insert OK, 1 row affected
+insert into t0 values (31, 'tuple 31')
+Insert OK, 1 row affected
+insert into t0 values (32, 'tuple 32')
+Insert OK, 1 row affected
+insert into t0 values (33, 'tuple 33')
+Insert OK, 1 row affected
+insert into t0 values (34, 'tuple 34')
+Insert OK, 1 row affected
+select * from t0 where k0 = 30
+Found 1 tuple:
+[30, 'tuple 30']
+select * from t0 where k0 = 31
+Found 1 tuple:
+[31, 'tuple 31']
+select * from t0 where k0 = 32
+Found 1 tuple:
+[32, 'tuple 32']
+select * from t0 where k0 = 33
+Found 1 tuple:
+[33, 'tuple 33']
+select * from t0 where k0 = 34
+Found 1 tuple:
+[34, 'tuple 34']
+insert into t0 values (35, 'tuple 35')
+Insert OK, 1 row affected
+insert into t0 values (36, 'tuple 36')
+Insert OK, 1 row affected
+insert into t0 values (37, 'tuple 37')
+Insert OK, 1 row affected
+insert into t0 values (38, 'tuple 38')
+Insert OK, 1 row affected
+insert into t0 values (39, 'tuple 39')
+Insert OK, 1 row affected
+select * from t0 where k0 = 35
+Found 1 tuple:
+[35, 'tuple 35']
+select * from t0 where k0 = 36
+Found 1 tuple:
+[36, 'tuple 36']
+select * from t0 where k0 = 37
+Found 1 tuple:
+[37, 'tuple 37']
+select * from t0 where k0 = 38
+Found 1 tuple:
+[38, 'tuple 38']
+select * from t0 where k0 = 39
+Found 1 tuple:
+[39, 'tuple 39']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 2 iteration
+insert into t0 values (40, 'tuple 40')
+Insert OK, 1 row affected
+insert into t0 values (41, 'tuple 41')
+Insert OK, 1 row affected
+insert into t0 values (42, 'tuple 42')
+Insert OK, 1 row affected
+insert into t0 values (43, 'tuple 43')
+Insert OK, 1 row affected
+insert into t0 values (44, 'tuple 44')
+Insert OK, 1 row affected
+select * from t0 where k0 = 40
+Found 1 tuple:
+[40, 'tuple 40']
+select * from t0 where k0 = 41
+Found 1 tuple:
+[41, 'tuple 41']
+select * from t0 where k0 = 42
+Found 1 tuple:
+[42, 'tuple 42']
+select * from t0 where k0 = 43
+Found 1 tuple:
+[43, 'tuple 43']
+select * from t0 where k0 = 44
+Found 1 tuple:
+[44, 'tuple 44']
+insert into t0 values (45, 'tuple 45')
+Insert OK, 1 row affected
+insert into t0 values (46, 'tuple 46')
+Insert OK, 1 row affected
+insert into t0 values (47, 'tuple 47')
+Insert OK, 1 row affected
+insert into t0 values (48, 'tuple 48')
+Insert OK, 1 row affected
+insert into t0 values (49, 'tuple 49')
+Insert OK, 1 row affected
+select * from t0 where k0 = 45
+Found 1 tuple:
+[45, 'tuple 45']
+select * from t0 where k0 = 46
+Found 1 tuple:
+[46, 'tuple 46']
+select * from t0 where k0 = 47
+Found 1 tuple:
+[47, 'tuple 47']
+select * from t0 where k0 = 48
+Found 1 tuple:
+[48, 'tuple 48']
+select * from t0 where k0 = 49
+Found 1 tuple:
+[49, 'tuple 49']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (50, 'tuple 50')
+Insert OK, 1 row affected
+insert into t0 values (51, 'tuple 51')
+Insert OK, 1 row affected
+insert into t0 values (52, 'tuple 52')
+Insert OK, 1 row affected
+insert into t0 values (53, 'tuple 53')
+Insert OK, 1 row affected
+insert into t0 values (54, 'tuple 54')
+Insert OK, 1 row affected
+select * from t0 where k0 = 50
+Found 1 tuple:
+[50, 'tuple 50']
+select * from t0 where k0 = 51
+Found 1 tuple:
+[51, 'tuple 51']
+select * from t0 where k0 = 52
+Found 1 tuple:
+[52, 'tuple 52']
+select * from t0 where k0 = 53
+Found 1 tuple:
+[53, 'tuple 53']
+select * from t0 where k0 = 54
+Found 1 tuple:
+[54, 'tuple 54']
+insert into t0 values (55, 'tuple 55')
+Insert OK, 1 row affected
+insert into t0 values (56, 'tuple 56')
+Insert OK, 1 row affected
+insert into t0 values (57, 'tuple 57')
+Insert OK, 1 row affected
+insert into t0 values (58, 'tuple 58')
+Insert OK, 1 row affected
+insert into t0 values (59, 'tuple 59')
+Insert OK, 1 row affected
+select * from t0 where k0 = 55
+Found 1 tuple:
+[55, 'tuple 55']
+select * from t0 where k0 = 56
+Found 1 tuple:
+[56, 'tuple 56']
+select * from t0 where k0 = 57
+Found 1 tuple:
+[57, 'tuple 57']
+select * from t0 where k0 = 58
+Found 1 tuple:
+[58, 'tuple 58']
+select * from t0 where k0 = 59
+Found 1 tuple:
+[59, 'tuple 59']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 3 iteration
+insert into t0 values (60, 'tuple 60')
+Insert OK, 1 row affected
+insert into t0 values (61, 'tuple 61')
+Insert OK, 1 row affected
+insert into t0 values (62, 'tuple 62')
+Insert OK, 1 row affected
+insert into t0 values (63, 'tuple 63')
+Insert OK, 1 row affected
+insert into t0 values (64, 'tuple 64')
+Insert OK, 1 row affected
+select * from t0 where k0 = 60
+Found 1 tuple:
+[60, 'tuple 60']
+select * from t0 where k0 = 61
+Found 1 tuple:
+[61, 'tuple 61']
+select * from t0 where k0 = 62
+Found 1 tuple:
+[62, 'tuple 62']
+select * from t0 where k0 = 63
+Found 1 tuple:
+[63, 'tuple 63']
+select * from t0 where k0 = 64
+Found 1 tuple:
+[64, 'tuple 64']
+insert into t0 values (65, 'tuple 65')
+Insert OK, 1 row affected
+insert into t0 values (66, 'tuple 66')
+Insert OK, 1 row affected
+insert into t0 values (67, 'tuple 67')
+Insert OK, 1 row affected
+insert into t0 values (68, 'tuple 68')
+Insert OK, 1 row affected
+insert into t0 values (69, 'tuple 69')
+Insert OK, 1 row affected
+select * from t0 where k0 = 65
+Found 1 tuple:
+[65, 'tuple 65']
+select * from t0 where k0 = 66
+Found 1 tuple:
+[66, 'tuple 66']
+select * from t0 where k0 = 67
+Found 1 tuple:
+[67, 'tuple 67']
+select * from t0 where k0 = 68
+Found 1 tuple:
+[68, 'tuple 68']
+select * from t0 where k0 = 69
+Found 1 tuple:
+[69, 'tuple 69']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (70, 'tuple 70')
+Insert OK, 1 row affected
+insert into t0 values (71, 'tuple 71')
+Insert OK, 1 row affected
+insert into t0 values (72, 'tuple 72')
+Insert OK, 1 row affected
+insert into t0 values (73, 'tuple 73')
+Insert OK, 1 row affected
+insert into t0 values (74, 'tuple 74')
+Insert OK, 1 row affected
+select * from t0 where k0 = 70
+Found 1 tuple:
+[70, 'tuple 70']
+select * from t0 where k0 = 71
+Found 1 tuple:
+[71, 'tuple 71']
+select * from t0 where k0 = 72
+Found 1 tuple:
+[72, 'tuple 72']
+select * from t0 where k0 = 73
+Found 1 tuple:
+[73, 'tuple 73']
+select * from t0 where k0 = 74
+Found 1 tuple:
+[74, 'tuple 74']
+insert into t0 values (75, 'tuple 75')
+Insert OK, 1 row affected
+insert into t0 values (76, 'tuple 76')
+Insert OK, 1 row affected
+insert into t0 values (77, 'tuple 77')
+Insert OK, 1 row affected
+insert into t0 values (78, 'tuple 78')
+Insert OK, 1 row affected
+insert into t0 values (79, 'tuple 79')
+Insert OK, 1 row affected
+select * from t0 where k0 = 75
+Found 1 tuple:
+[75, 'tuple 75']
+select * from t0 where k0 = 76
+Found 1 tuple:
+[76, 'tuple 76']
+select * from t0 where k0 = 77
+Found 1 tuple:
+[77, 'tuple 77']
+select * from t0 where k0 = 78
+Found 1 tuple:
+[78, 'tuple 78']
+select * from t0 where k0 = 79
+Found 1 tuple:
+[79, 'tuple 79']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 4 iteration
+insert into t0 values (80, 'tuple 80')
+Insert OK, 1 row affected
+insert into t0 values (81, 'tuple 81')
+Insert OK, 1 row affected
+insert into t0 values (82, 'tuple 82')
+Insert OK, 1 row affected
+insert into t0 values (83, 'tuple 83')
+Insert OK, 1 row affected
+insert into t0 values (84, 'tuple 84')
+Insert OK, 1 row affected
+select * from t0 where k0 = 80
+Found 1 tuple:
+[80, 'tuple 80']
+select * from t0 where k0 = 81
+Found 1 tuple:
+[81, 'tuple 81']
+select * from t0 where k0 = 82
+Found 1 tuple:
+[82, 'tuple 82']
+select * from t0 where k0 = 83
+Found 1 tuple:
+[83, 'tuple 83']
+select * from t0 where k0 = 84
+Found 1 tuple:
+[84, 'tuple 84']
+insert into t0 values (85, 'tuple 85')
+Insert OK, 1 row affected
+insert into t0 values (86, 'tuple 86')
+Insert OK, 1 row affected
+insert into t0 values (87, 'tuple 87')
+Insert OK, 1 row affected
+insert into t0 values (88, 'tuple 88')
+Insert OK, 1 row affected
+insert into t0 values (89, 'tuple 89')
+Insert OK, 1 row affected
+select * from t0 where k0 = 85
+Found 1 tuple:
+[85, 'tuple 85']
+select * from t0 where k0 = 86
+Found 1 tuple:
+[86, 'tuple 86']
+select * from t0 where k0 = 87
+Found 1 tuple:
+[87, 'tuple 87']
+select * from t0 where k0 = 88
+Found 1 tuple:
+[88, 'tuple 88']
+select * from t0 where k0 = 89
+Found 1 tuple:
+[89, 'tuple 89']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (90, 'tuple 90')
+Insert OK, 1 row affected
+insert into t0 values (91, 'tuple 91')
+Insert OK, 1 row affected
+insert into t0 values (92, 'tuple 92')
+Insert OK, 1 row affected
+insert into t0 values (93, 'tuple 93')
+Insert OK, 1 row affected
+insert into t0 values (94, 'tuple 94')
+Insert OK, 1 row affected
+select * from t0 where k0 = 90
+Found 1 tuple:
+[90, 'tuple 90']
+select * from t0 where k0 = 91
+Found 1 tuple:
+[91, 'tuple 91']
+select * from t0 where k0 = 92
+Found 1 tuple:
+[92, 'tuple 92']
+select * from t0 where k0 = 93
+Found 1 tuple:
+[93, 'tuple 93']
+select * from t0 where k0 = 94
+Found 1 tuple:
+[94, 'tuple 94']
+insert into t0 values (95, 'tuple 95')
+Insert OK, 1 row affected
+insert into t0 values (96, 'tuple 96')
+Insert OK, 1 row affected
+insert into t0 values (97, 'tuple 97')
+Insert OK, 1 row affected
+insert into t0 values (98, 'tuple 98')
+Insert OK, 1 row affected
+insert into t0 values (99, 'tuple 99')
+Insert OK, 1 row affected
+select * from t0 where k0 = 95
+Found 1 tuple:
+[95, 'tuple 95']
+select * from t0 where k0 = 96
+Found 1 tuple:
+[96, 'tuple 96']
+select * from t0 where k0 = 97
+Found 1 tuple:
+[97, 'tuple 97']
+select * from t0 where k0 = 98
+Found 1 tuple:
+[98, 'tuple 98']
+select * from t0 where k0 = 99
+Found 1 tuple:
+[99, 'tuple 99']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 5 iteration
+insert into t0 values (100, 'tuple 100')
+Insert OK, 1 row affected
+insert into t0 values (101, 'tuple 101')
+Insert OK, 1 row affected
+insert into t0 values (102, 'tuple 102')
+Insert OK, 1 row affected
+insert into t0 values (103, 'tuple 103')
+Insert OK, 1 row affected
+insert into t0 values (104, 'tuple 104')
+Insert OK, 1 row affected
+select * from t0 where k0 = 100
+Found 1 tuple:
+[100, 'tuple 100']
+select * from t0 where k0 = 101
+Found 1 tuple:
+[101, 'tuple 101']
+select * from t0 where k0 = 102
+Found 1 tuple:
+[102, 'tuple 102']
+select * from t0 where k0 = 103
+Found 1 tuple:
+[103, 'tuple 103']
+select * from t0 where k0 = 104
+Found 1 tuple:
+[104, 'tuple 104']
+insert into t0 values (105, 'tuple 105')
+Insert OK, 1 row affected
+insert into t0 values (106, 'tuple 106')
+Insert OK, 1 row affected
+insert into t0 values (107, 'tuple 107')
+Insert OK, 1 row affected
+insert into t0 values (108, 'tuple 108')
+Insert OK, 1 row affected
+insert into t0 values (109, 'tuple 109')
+Insert OK, 1 row affected
+select * from t0 where k0 = 105
+Found 1 tuple:
+[105, 'tuple 105']
+select * from t0 where k0 = 106
+Found 1 tuple:
+[106, 'tuple 106']
+select * from t0 where k0 = 107
+Found 1 tuple:
+[107, 'tuple 107']
+select * from t0 where k0 = 108
+Found 1 tuple:
+[108, 'tuple 108']
+select * from t0 where k0 = 109
+Found 1 tuple:
+[109, 'tuple 109']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (110, 'tuple 110')
+Insert OK, 1 row affected
+insert into t0 values (111, 'tuple 111')
+Insert OK, 1 row affected
+insert into t0 values (112, 'tuple 112')
+Insert OK, 1 row affected
+insert into t0 values (113, 'tuple 113')
+Insert OK, 1 row affected
+insert into t0 values (114, 'tuple 114')
+Insert OK, 1 row affected
+select * from t0 where k0 = 110
+Found 1 tuple:
+[110, 'tuple 110']
+select * from t0 where k0 = 111
+Found 1 tuple:
+[111, 'tuple 111']
+select * from t0 where k0 = 112
+Found 1 tuple:
+[112, 'tuple 112']
+select * from t0 where k0 = 113
+Found 1 tuple:
+[113, 'tuple 113']
+select * from t0 where k0 = 114
+Found 1 tuple:
+[114, 'tuple 114']
+insert into t0 values (115, 'tuple 115')
+Insert OK, 1 row affected
+insert into t0 values (116, 'tuple 116')
+Insert OK, 1 row affected
+insert into t0 values (117, 'tuple 117')
+Insert OK, 1 row affected
+insert into t0 values (118, 'tuple 118')
+Insert OK, 1 row affected
+insert into t0 values (119, 'tuple 119')
+Insert OK, 1 row affected
+select * from t0 where k0 = 115
+Found 1 tuple:
+[115, 'tuple 115']
+select * from t0 where k0 = 116
+Found 1 tuple:
+[116, 'tuple 116']
+select * from t0 where k0 = 117
+Found 1 tuple:
+[117, 'tuple 117']
+select * from t0 where k0 = 118
+Found 1 tuple:
+[118, 'tuple 118']
+select * from t0 where k0 = 119
+Found 1 tuple:
+[119, 'tuple 119']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 6 iteration
+insert into t0 values (120, 'tuple 120')
+Insert OK, 1 row affected
+insert into t0 values (121, 'tuple 121')
+Insert OK, 1 row affected
+insert into t0 values (122, 'tuple 122')
+Insert OK, 1 row affected
+insert into t0 values (123, 'tuple 123')
+Insert OK, 1 row affected
+insert into t0 values (124, 'tuple 124')
+Insert OK, 1 row affected
+select * from t0 where k0 = 120
+Found 1 tuple:
+[120, 'tuple 120']
+select * from t0 where k0 = 121
+Found 1 tuple:
+[121, 'tuple 121']
+select * from t0 where k0 = 122
+Found 1 tuple:
+[122, 'tuple 122']
+select * from t0 where k0 = 123
+Found 1 tuple:
+[123, 'tuple 123']
+select * from t0 where k0 = 124
+Found 1 tuple:
+[124, 'tuple 124']
+insert into t0 values (125, 'tuple 125')
+Insert OK, 1 row affected
+insert into t0 values (126, 'tuple 126')
+Insert OK, 1 row affected
+insert into t0 values (127, 'tuple 127')
+Insert OK, 1 row affected
+insert into t0 values (128, 'tuple 128')
+Insert OK, 1 row affected
+insert into t0 values (129, 'tuple 129')
+Insert OK, 1 row affected
+select * from t0 where k0 = 125
+Found 1 tuple:
+[125, 'tuple 125']
+select * from t0 where k0 = 126
+Found 1 tuple:
+[126, 'tuple 126']
+select * from t0 where k0 = 127
+Found 1 tuple:
+[127, 'tuple 127']
+select * from t0 where k0 = 128
+Found 1 tuple:
+[128, 'tuple 128']
+select * from t0 where k0 = 129
+Found 1 tuple:
+[129, 'tuple 129']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (130, 'tuple 130')
+Insert OK, 1 row affected
+insert into t0 values (131, 'tuple 131')
+Insert OK, 1 row affected
+insert into t0 values (132, 'tuple 132')
+Insert OK, 1 row affected
+insert into t0 values (133, 'tuple 133')
+Insert OK, 1 row affected
+insert into t0 values (134, 'tuple 134')
+Insert OK, 1 row affected
+select * from t0 where k0 = 130
+Found 1 tuple:
+[130, 'tuple 130']
+select * from t0 where k0 = 131
+Found 1 tuple:
+[131, 'tuple 131']
+select * from t0 where k0 = 132
+Found 1 tuple:
+[132, 'tuple 132']
+select * from t0 where k0 = 133
+Found 1 tuple:
+[133, 'tuple 133']
+select * from t0 where k0 = 134
+Found 1 tuple:
+[134, 'tuple 134']
+insert into t0 values (135, 'tuple 135')
+Insert OK, 1 row affected
+insert into t0 values (136, 'tuple 136')
+Insert OK, 1 row affected
+insert into t0 values (137, 'tuple 137')
+Insert OK, 1 row affected
+insert into t0 values (138, 'tuple 138')
+Insert OK, 1 row affected
+insert into t0 values (139, 'tuple 139')
+Insert OK, 1 row affected
+select * from t0 where k0 = 135
+Found 1 tuple:
+[135, 'tuple 135']
+select * from t0 where k0 = 136
+Found 1 tuple:
+[136, 'tuple 136']
+select * from t0 where k0 = 137
+Found 1 tuple:
+[137, 'tuple 137']
+select * from t0 where k0 = 138
+Found 1 tuple:
+[138, 'tuple 138']
+select * from t0 where k0 = 139
+Found 1 tuple:
+[139, 'tuple 139']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 7 iteration
+insert into t0 values (140, 'tuple 140')
+Insert OK, 1 row affected
+insert into t0 values (141, 'tuple 141')
+Insert OK, 1 row affected
+insert into t0 values (142, 'tuple 142')
+Insert OK, 1 row affected
+insert into t0 values (143, 'tuple 143')
+Insert OK, 1 row affected
+insert into t0 values (144, 'tuple 144')
+Insert OK, 1 row affected
+select * from t0 where k0 = 140
+Found 1 tuple:
+[140, 'tuple 140']
+select * from t0 where k0 = 141
+Found 1 tuple:
+[141, 'tuple 141']
+select * from t0 where k0 = 142
+Found 1 tuple:
+[142, 'tuple 142']
+select * from t0 where k0 = 143
+Found 1 tuple:
+[143, 'tuple 143']
+select * from t0 where k0 = 144
+Found 1 tuple:
+[144, 'tuple 144']
+insert into t0 values (145, 'tuple 145')
+Insert OK, 1 row affected
+insert into t0 values (146, 'tuple 146')
+Insert OK, 1 row affected
+insert into t0 values (147, 'tuple 147')
+Insert OK, 1 row affected
+insert into t0 values (148, 'tuple 148')
+Insert OK, 1 row affected
+insert into t0 values (149, 'tuple 149')
+Insert OK, 1 row affected
+select * from t0 where k0 = 145
+Found 1 tuple:
+[145, 'tuple 145']
+select * from t0 where k0 = 146
+Found 1 tuple:
+[146, 'tuple 146']
+select * from t0 where k0 = 147
+Found 1 tuple:
+[147, 'tuple 147']
+select * from t0 where k0 = 148
+Found 1 tuple:
+[148, 'tuple 148']
+select * from t0 where k0 = 149
+Found 1 tuple:
+[149, 'tuple 149']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (150, 'tuple 150')
+Insert OK, 1 row affected
+insert into t0 values (151, 'tuple 151')
+Insert OK, 1 row affected
+insert into t0 values (152, 'tuple 152')
+Insert OK, 1 row affected
+insert into t0 values (153, 'tuple 153')
+Insert OK, 1 row affected
+insert into t0 values (154, 'tuple 154')
+Insert OK, 1 row affected
+select * from t0 where k0 = 150
+Found 1 tuple:
+[150, 'tuple 150']
+select * from t0 where k0 = 151
+Found 1 tuple:
+[151, 'tuple 151']
+select * from t0 where k0 = 152
+Found 1 tuple:
+[152, 'tuple 152']
+select * from t0 where k0 = 153
+Found 1 tuple:
+[153, 'tuple 153']
+select * from t0 where k0 = 154
+Found 1 tuple:
+[154, 'tuple 154']
+insert into t0 values (155, 'tuple 155')
+Insert OK, 1 row affected
+insert into t0 values (156, 'tuple 156')
+Insert OK, 1 row affected
+insert into t0 values (157, 'tuple 157')
+Insert OK, 1 row affected
+insert into t0 values (158, 'tuple 158')
+Insert OK, 1 row affected
+insert into t0 values (159, 'tuple 159')
+Insert OK, 1 row affected
+select * from t0 where k0 = 155
+Found 1 tuple:
+[155, 'tuple 155']
+select * from t0 where k0 = 156
+Found 1 tuple:
+[156, 'tuple 156']
+select * from t0 where k0 = 157
+Found 1 tuple:
+[157, 'tuple 157']
+select * from t0 where k0 = 158
+Found 1 tuple:
+[158, 'tuple 158']
+select * from t0 where k0 = 159
+Found 1 tuple:
+[159, 'tuple 159']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 8 iteration
+insert into t0 values (160, 'tuple 160')
+Insert OK, 1 row affected
+insert into t0 values (161, 'tuple 161')
+Insert OK, 1 row affected
+insert into t0 values (162, 'tuple 162')
+Insert OK, 1 row affected
+insert into t0 values (163, 'tuple 163')
+Insert OK, 1 row affected
+insert into t0 values (164, 'tuple 164')
+Insert OK, 1 row affected
+select * from t0 where k0 = 160
+Found 1 tuple:
+[160, 'tuple 160']
+select * from t0 where k0 = 161
+Found 1 tuple:
+[161, 'tuple 161']
+select * from t0 where k0 = 162
+Found 1 tuple:
+[162, 'tuple 162']
+select * from t0 where k0 = 163
+Found 1 tuple:
+[163, 'tuple 163']
+select * from t0 where k0 = 164
+Found 1 tuple:
+[164, 'tuple 164']
+insert into t0 values (165, 'tuple 165')
+Insert OK, 1 row affected
+insert into t0 values (166, 'tuple 166')
+Insert OK, 1 row affected
+insert into t0 values (167, 'tuple 167')
+Insert OK, 1 row affected
+insert into t0 values (168, 'tuple 168')
+Insert OK, 1 row affected
+insert into t0 values (169, 'tuple 169')
+Insert OK, 1 row affected
+select * from t0 where k0 = 165
+Found 1 tuple:
+[165, 'tuple 165']
+select * from t0 where k0 = 166
+Found 1 tuple:
+[166, 'tuple 166']
+select * from t0 where k0 = 167
+Found 1 tuple:
+[167, 'tuple 167']
+select * from t0 where k0 = 168
+Found 1 tuple:
+[168, 'tuple 168']
+select * from t0 where k0 = 169
+Found 1 tuple:
+[169, 'tuple 169']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (170, 'tuple 170')
+Insert OK, 1 row affected
+insert into t0 values (171, 'tuple 171')
+Insert OK, 1 row affected
+insert into t0 values (172, 'tuple 172')
+Insert OK, 1 row affected
+insert into t0 values (173, 'tuple 173')
+Insert OK, 1 row affected
+insert into t0 values (174, 'tuple 174')
+Insert OK, 1 row affected
+select * from t0 where k0 = 170
+Found 1 tuple:
+[170, 'tuple 170']
+select * from t0 where k0 = 171
+Found 1 tuple:
+[171, 'tuple 171']
+select * from t0 where k0 = 172
+Found 1 tuple:
+[172, 'tuple 172']
+select * from t0 where k0 = 173
+Found 1 tuple:
+[173, 'tuple 173']
+select * from t0 where k0 = 174
+Found 1 tuple:
+[174, 'tuple 174']
+insert into t0 values (175, 'tuple 175')
+Insert OK, 1 row affected
+insert into t0 values (176, 'tuple 176')
+Insert OK, 1 row affected
+insert into t0 values (177, 'tuple 177')
+Insert OK, 1 row affected
+insert into t0 values (178, 'tuple 178')
+Insert OK, 1 row affected
+insert into t0 values (179, 'tuple 179')
+Insert OK, 1 row affected
+select * from t0 where k0 = 175
+Found 1 tuple:
+[175, 'tuple 175']
+select * from t0 where k0 = 176
+Found 1 tuple:
+[176, 'tuple 176']
+select * from t0 where k0 = 177
+Found 1 tuple:
+[177, 'tuple 177']
+select * from t0 where k0 = 178
+Found 1 tuple:
+[178, 'tuple 178']
+select * from t0 where k0 = 179
+Found 1 tuple:
+[179, 'tuple 179']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 9 iteration
+insert into t0 values (180, 'tuple 180')
+Insert OK, 1 row affected
+insert into t0 values (181, 'tuple 181')
+Insert OK, 1 row affected
+insert into t0 values (182, 'tuple 182')
+Insert OK, 1 row affected
+insert into t0 values (183, 'tuple 183')
+Insert OK, 1 row affected
+insert into t0 values (184, 'tuple 184')
+Insert OK, 1 row affected
+select * from t0 where k0 = 180
+Found 1 tuple:
+[180, 'tuple 180']
+select * from t0 where k0 = 181
+Found 1 tuple:
+[181, 'tuple 181']
+select * from t0 where k0 = 182
+Found 1 tuple:
+[182, 'tuple 182']
+select * from t0 where k0 = 183
+Found 1 tuple:
+[183, 'tuple 183']
+select * from t0 where k0 = 184
+Found 1 tuple:
+[184, 'tuple 184']
+insert into t0 values (185, 'tuple 185')
+Insert OK, 1 row affected
+insert into t0 values (186, 'tuple 186')
+Insert OK, 1 row affected
+insert into t0 values (187, 'tuple 187')
+Insert OK, 1 row affected
+insert into t0 values (188, 'tuple 188')
+Insert OK, 1 row affected
+insert into t0 values (189, 'tuple 189')
+Insert OK, 1 row affected
+select * from t0 where k0 = 185
+Found 1 tuple:
+[185, 'tuple 185']
+select * from t0 where k0 = 186
+Found 1 tuple:
+[186, 'tuple 186']
+select * from t0 where k0 = 187
+Found 1 tuple:
+[187, 'tuple 187']
+select * from t0 where k0 = 188
+Found 1 tuple:
+[188, 'tuple 188']
+select * from t0 where k0 = 189
+Found 1 tuple:
+[189, 'tuple 189']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (190, 'tuple 190')
+Insert OK, 1 row affected
+insert into t0 values (191, 'tuple 191')
+Insert OK, 1 row affected
+insert into t0 values (192, 'tuple 192')
+Insert OK, 1 row affected
+insert into t0 values (193, 'tuple 193')
+Insert OK, 1 row affected
+insert into t0 values (194, 'tuple 194')
+Insert OK, 1 row affected
+select * from t0 where k0 = 190
+Found 1 tuple:
+[190, 'tuple 190']
+select * from t0 where k0 = 191
+Found 1 tuple:
+[191, 'tuple 191']
+select * from t0 where k0 = 192
+Found 1 tuple:
+[192, 'tuple 192']
+select * from t0 where k0 = 193
+Found 1 tuple:
+[193, 'tuple 193']
+select * from t0 where k0 = 194
+Found 1 tuple:
+[194, 'tuple 194']
+insert into t0 values (195, 'tuple 195')
+Insert OK, 1 row affected
+insert into t0 values (196, 'tuple 196')
+Insert OK, 1 row affected
+insert into t0 values (197, 'tuple 197')
+Insert OK, 1 row affected
+insert into t0 values (198, 'tuple 198')
+Insert OK, 1 row affected
+insert into t0 values (199, 'tuple 199')
+Insert OK, 1 row affected
+select * from t0 where k0 = 195
+Found 1 tuple:
+[195, 'tuple 195']
+select * from t0 where k0 = 196
+Found 1 tuple:
+[196, 'tuple 196']
+select * from t0 where k0 = 197
+Found 1 tuple:
+[197, 'tuple 197']
+select * from t0 where k0 = 198
+Found 1 tuple:
+[198, 'tuple 198']
+select * from t0 where k0 = 199
+Found 1 tuple:
+[199, 'tuple 199']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 10 iteration
+insert into t0 values (200, 'tuple 200')
+Insert OK, 1 row affected
+insert into t0 values (201, 'tuple 201')
+Insert OK, 1 row affected
+insert into t0 values (202, 'tuple 202')
+Insert OK, 1 row affected
+insert into t0 values (203, 'tuple 203')
+Insert OK, 1 row affected
+insert into t0 values (204, 'tuple 204')
+Insert OK, 1 row affected
+select * from t0 where k0 = 200
+Found 1 tuple:
+[200, 'tuple 200']
+select * from t0 where k0 = 201
+Found 1 tuple:
+[201, 'tuple 201']
+select * from t0 where k0 = 202
+Found 1 tuple:
+[202, 'tuple 202']
+select * from t0 where k0 = 203
+Found 1 tuple:
+[203, 'tuple 203']
+select * from t0 where k0 = 204
+Found 1 tuple:
+[204, 'tuple 204']
+insert into t0 values (205, 'tuple 205')
+Insert OK, 1 row affected
+insert into t0 values (206, 'tuple 206')
+Insert OK, 1 row affected
+insert into t0 values (207, 'tuple 207')
+Insert OK, 1 row affected
+insert into t0 values (208, 'tuple 208')
+Insert OK, 1 row affected
+insert into t0 values (209, 'tuple 209')
+Insert OK, 1 row affected
+select * from t0 where k0 = 205
+Found 1 tuple:
+[205, 'tuple 205']
+select * from t0 where k0 = 206
+Found 1 tuple:
+[206, 'tuple 206']
+select * from t0 where k0 = 207
+Found 1 tuple:
+[207, 'tuple 207']
+select * from t0 where k0 = 208
+Found 1 tuple:
+[208, 'tuple 208']
+select * from t0 where k0 = 209
+Found 1 tuple:
+[209, 'tuple 209']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (210, 'tuple 210')
+Insert OK, 1 row affected
+insert into t0 values (211, 'tuple 211')
+Insert OK, 1 row affected
+insert into t0 values (212, 'tuple 212')
+Insert OK, 1 row affected
+insert into t0 values (213, 'tuple 213')
+Insert OK, 1 row affected
+insert into t0 values (214, 'tuple 214')
+Insert OK, 1 row affected
+select * from t0 where k0 = 210
+Found 1 tuple:
+[210, 'tuple 210']
+select * from t0 where k0 = 211
+Found 1 tuple:
+[211, 'tuple 211']
+select * from t0 where k0 = 212
+Found 1 tuple:
+[212, 'tuple 212']
+select * from t0 where k0 = 213
+Found 1 tuple:
+[213, 'tuple 213']
+select * from t0 where k0 = 214
+Found 1 tuple:
+[214, 'tuple 214']
+insert into t0 values (215, 'tuple 215')
+Insert OK, 1 row affected
+insert into t0 values (216, 'tuple 216')
+Insert OK, 1 row affected
+insert into t0 values (217, 'tuple 217')
+Insert OK, 1 row affected
+insert into t0 values (218, 'tuple 218')
+Insert OK, 1 row affected
+insert into t0 values (219, 'tuple 219')
+Insert OK, 1 row affected
+select * from t0 where k0 = 215
+Found 1 tuple:
+[215, 'tuple 215']
+select * from t0 where k0 = 216
+Found 1 tuple:
+[216, 'tuple 216']
+select * from t0 where k0 = 217
+Found 1 tuple:
+[217, 'tuple 217']
+select * from t0 where k0 = 218
+Found 1 tuple:
+[218, 'tuple 218']
+select * from t0 where k0 = 219
+Found 1 tuple:
+[219, 'tuple 219']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 11 iteration
+insert into t0 values (220, 'tuple 220')
+Insert OK, 1 row affected
+insert into t0 values (221, 'tuple 221')
+Insert OK, 1 row affected
+insert into t0 values (222, 'tuple 222')
+Insert OK, 1 row affected
+insert into t0 values (223, 'tuple 223')
+Insert OK, 1 row affected
+insert into t0 values (224, 'tuple 224')
+Insert OK, 1 row affected
+select * from t0 where k0 = 220
+Found 1 tuple:
+[220, 'tuple 220']
+select * from t0 where k0 = 221
+Found 1 tuple:
+[221, 'tuple 221']
+select * from t0 where k0 = 222
+Found 1 tuple:
+[222, 'tuple 222']
+select * from t0 where k0 = 223
+Found 1 tuple:
+[223, 'tuple 223']
+select * from t0 where k0 = 224
+Found 1 tuple:
+[224, 'tuple 224']
+insert into t0 values (225, 'tuple 225')
+Insert OK, 1 row affected
+insert into t0 values (226, 'tuple 226')
+Insert OK, 1 row affected
+insert into t0 values (227, 'tuple 227')
+Insert OK, 1 row affected
+insert into t0 values (228, 'tuple 228')
+Insert OK, 1 row affected
+insert into t0 values (229, 'tuple 229')
+Insert OK, 1 row affected
+select * from t0 where k0 = 225
+Found 1 tuple:
+[225, 'tuple 225']
+select * from t0 where k0 = 226
+Found 1 tuple:
+[226, 'tuple 226']
+select * from t0 where k0 = 227
+Found 1 tuple:
+[227, 'tuple 227']
+select * from t0 where k0 = 228
+Found 1 tuple:
+[228, 'tuple 228']
+select * from t0 where k0 = 229
+Found 1 tuple:
+[229, 'tuple 229']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (230, 'tuple 230')
+Insert OK, 1 row affected
+insert into t0 values (231, 'tuple 231')
+Insert OK, 1 row affected
+insert into t0 values (232, 'tuple 232')
+Insert OK, 1 row affected
+insert into t0 values (233, 'tuple 233')
+Insert OK, 1 row affected
+insert into t0 values (234, 'tuple 234')
+Insert OK, 1 row affected
+select * from t0 where k0 = 230
+Found 1 tuple:
+[230, 'tuple 230']
+select * from t0 where k0 = 231
+Found 1 tuple:
+[231, 'tuple 231']
+select * from t0 where k0 = 232
+Found 1 tuple:
+[232, 'tuple 232']
+select * from t0 where k0 = 233
+Found 1 tuple:
+[233, 'tuple 233']
+select * from t0 where k0 = 234
+Found 1 tuple:
+[234, 'tuple 234']
+insert into t0 values (235, 'tuple 235')
+Insert OK, 1 row affected
+insert into t0 values (236, 'tuple 236')
+Insert OK, 1 row affected
+insert into t0 values (237, 'tuple 237')
+Insert OK, 1 row affected
+insert into t0 values (238, 'tuple 238')
+Insert OK, 1 row affected
+insert into t0 values (239, 'tuple 239')
+Insert OK, 1 row affected
+select * from t0 where k0 = 235
+Found 1 tuple:
+[235, 'tuple 235']
+select * from t0 where k0 = 236
+Found 1 tuple:
+[236, 'tuple 236']
+select * from t0 where k0 = 237
+Found 1 tuple:
+[237, 'tuple 237']
+select * from t0 where k0 = 238
+Found 1 tuple:
+[238, 'tuple 238']
+select * from t0 where k0 = 239
+Found 1 tuple:
+[239, 'tuple 239']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 12 iteration
+insert into t0 values (240, 'tuple 240')
+Insert OK, 1 row affected
+insert into t0 values (241, 'tuple 241')
+Insert OK, 1 row affected
+insert into t0 values (242, 'tuple 242')
+Insert OK, 1 row affected
+insert into t0 values (243, 'tuple 243')
+Insert OK, 1 row affected
+insert into t0 values (244, 'tuple 244')
+Insert OK, 1 row affected
+select * from t0 where k0 = 240
+Found 1 tuple:
+[240, 'tuple 240']
+select * from t0 where k0 = 241
+Found 1 tuple:
+[241, 'tuple 241']
+select * from t0 where k0 = 242
+Found 1 tuple:
+[242, 'tuple 242']
+select * from t0 where k0 = 243
+Found 1 tuple:
+[243, 'tuple 243']
+select * from t0 where k0 = 244
+Found 1 tuple:
+[244, 'tuple 244']
+insert into t0 values (245, 'tuple 245')
+Insert OK, 1 row affected
+insert into t0 values (246, 'tuple 246')
+Insert OK, 1 row affected
+insert into t0 values (247, 'tuple 247')
+Insert OK, 1 row affected
+insert into t0 values (248, 'tuple 248')
+Insert OK, 1 row affected
+insert into t0 values (249, 'tuple 249')
+Insert OK, 1 row affected
+select * from t0 where k0 = 245
+Found 1 tuple:
+[245, 'tuple 245']
+select * from t0 where k0 = 246
+Found 1 tuple:
+[246, 'tuple 246']
+select * from t0 where k0 = 247
+Found 1 tuple:
+[247, 'tuple 247']
+select * from t0 where k0 = 248
+Found 1 tuple:
+[248, 'tuple 248']
+select * from t0 where k0 = 249
+Found 1 tuple:
+[249, 'tuple 249']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (250, 'tuple 250')
+Insert OK, 1 row affected
+insert into t0 values (251, 'tuple 251')
+Insert OK, 1 row affected
+insert into t0 values (252, 'tuple 252')
+Insert OK, 1 row affected
+insert into t0 values (253, 'tuple 253')
+Insert OK, 1 row affected
+insert into t0 values (254, 'tuple 254')
+Insert OK, 1 row affected
+select * from t0 where k0 = 250
+Found 1 tuple:
+[250, 'tuple 250']
+select * from t0 where k0 = 251
+Found 1 tuple:
+[251, 'tuple 251']
+select * from t0 where k0 = 252
+Found 1 tuple:
+[252, 'tuple 252']
+select * from t0 where k0 = 253
+Found 1 tuple:
+[253, 'tuple 253']
+select * from t0 where k0 = 254
+Found 1 tuple:
+[254, 'tuple 254']
+insert into t0 values (255, 'tuple 255')
+Insert OK, 1 row affected
+insert into t0 values (256, 'tuple 256')
+Insert OK, 1 row affected
+insert into t0 values (257, 'tuple 257')
+Insert OK, 1 row affected
+insert into t0 values (258, 'tuple 258')
+Insert OK, 1 row affected
+insert into t0 values (259, 'tuple 259')
+Insert OK, 1 row affected
+select * from t0 where k0 = 255
+Found 1 tuple:
+[255, 'tuple 255']
+select * from t0 where k0 = 256
+Found 1 tuple:
+[256, 'tuple 256']
+select * from t0 where k0 = 257
+Found 1 tuple:
+[257, 'tuple 257']
+select * from t0 where k0 = 258
+Found 1 tuple:
+[258, 'tuple 258']
+select * from t0 where k0 = 259
+Found 1 tuple:
+[259, 'tuple 259']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 13 iteration
+insert into t0 values (260, 'tuple 260')
+Insert OK, 1 row affected
+insert into t0 values (261, 'tuple 261')
+Insert OK, 1 row affected
+insert into t0 values (262, 'tuple 262')
+Insert OK, 1 row affected
+insert into t0 values (263, 'tuple 263')
+Insert OK, 1 row affected
+insert into t0 values (264, 'tuple 264')
+Insert OK, 1 row affected
+select * from t0 where k0 = 260
+Found 1 tuple:
+[260, 'tuple 260']
+select * from t0 where k0 = 261
+Found 1 tuple:
+[261, 'tuple 261']
+select * from t0 where k0 = 262
+Found 1 tuple:
+[262, 'tuple 262']
+select * from t0 where k0 = 263
+Found 1 tuple:
+[263, 'tuple 263']
+select * from t0 where k0 = 264
+Found 1 tuple:
+[264, 'tuple 264']
+insert into t0 values (265, 'tuple 265')
+Insert OK, 1 row affected
+insert into t0 values (266, 'tuple 266')
+Insert OK, 1 row affected
+insert into t0 values (267, 'tuple 267')
+Insert OK, 1 row affected
+insert into t0 values (268, 'tuple 268')
+Insert OK, 1 row affected
+insert into t0 values (269, 'tuple 269')
+Insert OK, 1 row affected
+select * from t0 where k0 = 265
+Found 1 tuple:
+[265, 'tuple 265']
+select * from t0 where k0 = 266
+Found 1 tuple:
+[266, 'tuple 266']
+select * from t0 where k0 = 267
+Found 1 tuple:
+[267, 'tuple 267']
+select * from t0 where k0 = 268
+Found 1 tuple:
+[268, 'tuple 268']
+select * from t0 where k0 = 269
+Found 1 tuple:
+[269, 'tuple 269']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (270, 'tuple 270')
+Insert OK, 1 row affected
+insert into t0 values (271, 'tuple 271')
+Insert OK, 1 row affected
+insert into t0 values (272, 'tuple 272')
+Insert OK, 1 row affected
+insert into t0 values (273, 'tuple 273')
+Insert OK, 1 row affected
+insert into t0 values (274, 'tuple 274')
+Insert OK, 1 row affected
+select * from t0 where k0 = 270
+Found 1 tuple:
+[270, 'tuple 270']
+select * from t0 where k0 = 271
+Found 1 tuple:
+[271, 'tuple 271']
+select * from t0 where k0 = 272
+Found 1 tuple:
+[272, 'tuple 272']
+select * from t0 where k0 = 273
+Found 1 tuple:
+[273, 'tuple 273']
+select * from t0 where k0 = 274
+Found 1 tuple:
+[274, 'tuple 274']
+insert into t0 values (275, 'tuple 275')
+Insert OK, 1 row affected
+insert into t0 values (276, 'tuple 276')
+Insert OK, 1 row affected
+insert into t0 values (277, 'tuple 277')
+Insert OK, 1 row affected
+insert into t0 values (278, 'tuple 278')
+Insert OK, 1 row affected
+insert into t0 values (279, 'tuple 279')
+Insert OK, 1 row affected
+select * from t0 where k0 = 275
+Found 1 tuple:
+[275, 'tuple 275']
+select * from t0 where k0 = 276
+Found 1 tuple:
+[276, 'tuple 276']
+select * from t0 where k0 = 277
+Found 1 tuple:
+[277, 'tuple 277']
+select * from t0 where k0 = 278
+Found 1 tuple:
+[278, 'tuple 278']
+select * from t0 where k0 = 279
+Found 1 tuple:
+[279, 'tuple 279']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 14 iteration
+insert into t0 values (280, 'tuple 280')
+Insert OK, 1 row affected
+insert into t0 values (281, 'tuple 281')
+Insert OK, 1 row affected
+insert into t0 values (282, 'tuple 282')
+Insert OK, 1 row affected
+insert into t0 values (283, 'tuple 283')
+Insert OK, 1 row affected
+insert into t0 values (284, 'tuple 284')
+Insert OK, 1 row affected
+select * from t0 where k0 = 280
+Found 1 tuple:
+[280, 'tuple 280']
+select * from t0 where k0 = 281
+Found 1 tuple:
+[281, 'tuple 281']
+select * from t0 where k0 = 282
+Found 1 tuple:
+[282, 'tuple 282']
+select * from t0 where k0 = 283
+Found 1 tuple:
+[283, 'tuple 283']
+select * from t0 where k0 = 284
+Found 1 tuple:
+[284, 'tuple 284']
+insert into t0 values (285, 'tuple 285')
+Insert OK, 1 row affected
+insert into t0 values (286, 'tuple 286')
+Insert OK, 1 row affected
+insert into t0 values (287, 'tuple 287')
+Insert OK, 1 row affected
+insert into t0 values (288, 'tuple 288')
+Insert OK, 1 row affected
+insert into t0 values (289, 'tuple 289')
+Insert OK, 1 row affected
+select * from t0 where k0 = 285
+Found 1 tuple:
+[285, 'tuple 285']
+select * from t0 where k0 = 286
+Found 1 tuple:
+[286, 'tuple 286']
+select * from t0 where k0 = 287
+Found 1 tuple:
+[287, 'tuple 287']
+select * from t0 where k0 = 288
+Found 1 tuple:
+[288, 'tuple 288']
+select * from t0 where k0 = 289
+Found 1 tuple:
+[289, 'tuple 289']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (290, 'tuple 290')
+Insert OK, 1 row affected
+insert into t0 values (291, 'tuple 291')
+Insert OK, 1 row affected
+insert into t0 values (292, 'tuple 292')
+Insert OK, 1 row affected
+insert into t0 values (293, 'tuple 293')
+Insert OK, 1 row affected
+insert into t0 values (294, 'tuple 294')
+Insert OK, 1 row affected
+select * from t0 where k0 = 290
+Found 1 tuple:
+[290, 'tuple 290']
+select * from t0 where k0 = 291
+Found 1 tuple:
+[291, 'tuple 291']
+select * from t0 where k0 = 292
+Found 1 tuple:
+[292, 'tuple 292']
+select * from t0 where k0 = 293
+Found 1 tuple:
+[293, 'tuple 293']
+select * from t0 where k0 = 294
+Found 1 tuple:
+[294, 'tuple 294']
+insert into t0 values (295, 'tuple 295')
+Insert OK, 1 row affected
+insert into t0 values (296, 'tuple 296')
+Insert OK, 1 row affected
+insert into t0 values (297, 'tuple 297')
+Insert OK, 1 row affected
+insert into t0 values (298, 'tuple 298')
+Insert OK, 1 row affected
+insert into t0 values (299, 'tuple 299')
+Insert OK, 1 row affected
+select * from t0 where k0 = 295
+Found 1 tuple:
+[295, 'tuple 295']
+select * from t0 where k0 = 296
+Found 1 tuple:
+[296, 'tuple 296']
+select * from t0 where k0 = 297
+Found 1 tuple:
+[297, 'tuple 297']
+select * from t0 where k0 = 298
+Found 1 tuple:
+[298, 'tuple 298']
+select * from t0 where k0 = 299
+Found 1 tuple:
+[299, 'tuple 299']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 15 iteration
+insert into t0 values (300, 'tuple 300')
+Insert OK, 1 row affected
+insert into t0 values (301, 'tuple 301')
+Insert OK, 1 row affected
+insert into t0 values (302, 'tuple 302')
+Insert OK, 1 row affected
+insert into t0 values (303, 'tuple 303')
+Insert OK, 1 row affected
+insert into t0 values (304, 'tuple 304')
+Insert OK, 1 row affected
+select * from t0 where k0 = 300
+Found 1 tuple:
+[300, 'tuple 300']
+select * from t0 where k0 = 301
+Found 1 tuple:
+[301, 'tuple 301']
+select * from t0 where k0 = 302
+Found 1 tuple:
+[302, 'tuple 302']
+select * from t0 where k0 = 303
+Found 1 tuple:
+[303, 'tuple 303']
+select * from t0 where k0 = 304
+Found 1 tuple:
+[304, 'tuple 304']
+insert into t0 values (305, 'tuple 305')
+Insert OK, 1 row affected
+insert into t0 values (306, 'tuple 306')
+Insert OK, 1 row affected
+insert into t0 values (307, 'tuple 307')
+Insert OK, 1 row affected
+insert into t0 values (308, 'tuple 308')
+Insert OK, 1 row affected
+insert into t0 values (309, 'tuple 309')
+Insert OK, 1 row affected
+select * from t0 where k0 = 305
+Found 1 tuple:
+[305, 'tuple 305']
+select * from t0 where k0 = 306
+Found 1 tuple:
+[306, 'tuple 306']
+select * from t0 where k0 = 307
+Found 1 tuple:
+[307, 'tuple 307']
+select * from t0 where k0 = 308
+Found 1 tuple:
+[308, 'tuple 308']
+select * from t0 where k0 = 309
+Found 1 tuple:
+[309, 'tuple 309']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (310, 'tuple 310')
+Insert OK, 1 row affected
+insert into t0 values (311, 'tuple 311')
+Insert OK, 1 row affected
+insert into t0 values (312, 'tuple 312')
+Insert OK, 1 row affected
+insert into t0 values (313, 'tuple 313')
+Insert OK, 1 row affected
+insert into t0 values (314, 'tuple 314')
+Insert OK, 1 row affected
+select * from t0 where k0 = 310
+Found 1 tuple:
+[310, 'tuple 310']
+select * from t0 where k0 = 311
+Found 1 tuple:
+[311, 'tuple 311']
+select * from t0 where k0 = 312
+Found 1 tuple:
+[312, 'tuple 312']
+select * from t0 where k0 = 313
+Found 1 tuple:
+[313, 'tuple 313']
+select * from t0 where k0 = 314
+Found 1 tuple:
+[314, 'tuple 314']
+insert into t0 values (315, 'tuple 315')
+Insert OK, 1 row affected
+insert into t0 values (316, 'tuple 316')
+Insert OK, 1 row affected
+insert into t0 values (317, 'tuple 317')
+Insert OK, 1 row affected
+insert into t0 values (318, 'tuple 318')
+Insert OK, 1 row affected
+insert into t0 values (319, 'tuple 319')
+Insert OK, 1 row affected
+select * from t0 where k0 = 315
+Found 1 tuple:
+[315, 'tuple 315']
+select * from t0 where k0 = 316
+Found 1 tuple:
+[316, 'tuple 316']
+select * from t0 where k0 = 317
+Found 1 tuple:
+[317, 'tuple 317']
+select * from t0 where k0 = 318
+Found 1 tuple:
+[318, 'tuple 318']
+select * from t0 where k0 = 319
+Found 1 tuple:
+[319, 'tuple 319']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 16 iteration
+insert into t0 values (320, 'tuple 320')
+Insert OK, 1 row affected
+insert into t0 values (321, 'tuple 321')
+Insert OK, 1 row affected
+insert into t0 values (322, 'tuple 322')
+Insert OK, 1 row affected
+insert into t0 values (323, 'tuple 323')
+Insert OK, 1 row affected
+insert into t0 values (324, 'tuple 324')
+Insert OK, 1 row affected
+select * from t0 where k0 = 320
+Found 1 tuple:
+[320, 'tuple 320']
+select * from t0 where k0 = 321
+Found 1 tuple:
+[321, 'tuple 321']
+select * from t0 where k0 = 322
+Found 1 tuple:
+[322, 'tuple 322']
+select * from t0 where k0 = 323
+Found 1 tuple:
+[323, 'tuple 323']
+select * from t0 where k0 = 324
+Found 1 tuple:
+[324, 'tuple 324']
+insert into t0 values (325, 'tuple 325')
+Insert OK, 1 row affected
+insert into t0 values (326, 'tuple 326')
+Insert OK, 1 row affected
+insert into t0 values (327, 'tuple 327')
+Insert OK, 1 row affected
+insert into t0 values (328, 'tuple 328')
+Insert OK, 1 row affected
+insert into t0 values (329, 'tuple 329')
+Insert OK, 1 row affected
+select * from t0 where k0 = 325
+Found 1 tuple:
+[325, 'tuple 325']
+select * from t0 where k0 = 326
+Found 1 tuple:
+[326, 'tuple 326']
+select * from t0 where k0 = 327
+Found 1 tuple:
+[327, 'tuple 327']
+select * from t0 where k0 = 328
+Found 1 tuple:
+[328, 'tuple 328']
+select * from t0 where k0 = 329
+Found 1 tuple:
+[329, 'tuple 329']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (330, 'tuple 330')
+Insert OK, 1 row affected
+insert into t0 values (331, 'tuple 331')
+Insert OK, 1 row affected
+insert into t0 values (332, 'tuple 332')
+Insert OK, 1 row affected
+insert into t0 values (333, 'tuple 333')
+Insert OK, 1 row affected
+insert into t0 values (334, 'tuple 334')
+Insert OK, 1 row affected
+select * from t0 where k0 = 330
+Found 1 tuple:
+[330, 'tuple 330']
+select * from t0 where k0 = 331
+Found 1 tuple:
+[331, 'tuple 331']
+select * from t0 where k0 = 332
+Found 1 tuple:
+[332, 'tuple 332']
+select * from t0 where k0 = 333
+Found 1 tuple:
+[333, 'tuple 333']
+select * from t0 where k0 = 334
+Found 1 tuple:
+[334, 'tuple 334']
+insert into t0 values (335, 'tuple 335')
+Insert OK, 1 row affected
+insert into t0 values (336, 'tuple 336')
+Insert OK, 1 row affected
+insert into t0 values (337, 'tuple 337')
+Insert OK, 1 row affected
+insert into t0 values (338, 'tuple 338')
+Insert OK, 1 row affected
+insert into t0 values (339, 'tuple 339')
+Insert OK, 1 row affected
+select * from t0 where k0 = 335
+Found 1 tuple:
+[335, 'tuple 335']
+select * from t0 where k0 = 336
+Found 1 tuple:
+[336, 'tuple 336']
+select * from t0 where k0 = 337
+Found 1 tuple:
+[337, 'tuple 337']
+select * from t0 where k0 = 338
+Found 1 tuple:
+[338, 'tuple 338']
+select * from t0 where k0 = 339
+Found 1 tuple:
+[339, 'tuple 339']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 17 iteration
+insert into t0 values (340, 'tuple 340')
+Insert OK, 1 row affected
+insert into t0 values (341, 'tuple 341')
+Insert OK, 1 row affected
+insert into t0 values (342, 'tuple 342')
+Insert OK, 1 row affected
+insert into t0 values (343, 'tuple 343')
+Insert OK, 1 row affected
+insert into t0 values (344, 'tuple 344')
+Insert OK, 1 row affected
+select * from t0 where k0 = 340
+Found 1 tuple:
+[340, 'tuple 340']
+select * from t0 where k0 = 341
+Found 1 tuple:
+[341, 'tuple 341']
+select * from t0 where k0 = 342
+Found 1 tuple:
+[342, 'tuple 342']
+select * from t0 where k0 = 343
+Found 1 tuple:
+[343, 'tuple 343']
+select * from t0 where k0 = 344
+Found 1 tuple:
+[344, 'tuple 344']
+insert into t0 values (345, 'tuple 345')
+Insert OK, 1 row affected
+insert into t0 values (346, 'tuple 346')
+Insert OK, 1 row affected
+insert into t0 values (347, 'tuple 347')
+Insert OK, 1 row affected
+insert into t0 values (348, 'tuple 348')
+Insert OK, 1 row affected
+insert into t0 values (349, 'tuple 349')
+Insert OK, 1 row affected
+select * from t0 where k0 = 345
+Found 1 tuple:
+[345, 'tuple 345']
+select * from t0 where k0 = 346
+Found 1 tuple:
+[346, 'tuple 346']
+select * from t0 where k0 = 347
+Found 1 tuple:
+[347, 'tuple 347']
+select * from t0 where k0 = 348
+Found 1 tuple:
+[348, 'tuple 348']
+select * from t0 where k0 = 349
+Found 1 tuple:
+[349, 'tuple 349']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (350, 'tuple 350')
+Insert OK, 1 row affected
+insert into t0 values (351, 'tuple 351')
+Insert OK, 1 row affected
+insert into t0 values (352, 'tuple 352')
+Insert OK, 1 row affected
+insert into t0 values (353, 'tuple 353')
+Insert OK, 1 row affected
+insert into t0 values (354, 'tuple 354')
+Insert OK, 1 row affected
+select * from t0 where k0 = 350
+Found 1 tuple:
+[350, 'tuple 350']
+select * from t0 where k0 = 351
+Found 1 tuple:
+[351, 'tuple 351']
+select * from t0 where k0 = 352
+Found 1 tuple:
+[352, 'tuple 352']
+select * from t0 where k0 = 353
+Found 1 tuple:
+[353, 'tuple 353']
+select * from t0 where k0 = 354
+Found 1 tuple:
+[354, 'tuple 354']
+insert into t0 values (355, 'tuple 355')
+Insert OK, 1 row affected
+insert into t0 values (356, 'tuple 356')
+Insert OK, 1 row affected
+insert into t0 values (357, 'tuple 357')
+Insert OK, 1 row affected
+insert into t0 values (358, 'tuple 358')
+Insert OK, 1 row affected
+insert into t0 values (359, 'tuple 359')
+Insert OK, 1 row affected
+select * from t0 where k0 = 355
+Found 1 tuple:
+[355, 'tuple 355']
+select * from t0 where k0 = 356
+Found 1 tuple:
+[356, 'tuple 356']
+select * from t0 where k0 = 357
+Found 1 tuple:
+[357, 'tuple 357']
+select * from t0 where k0 = 358
+Found 1 tuple:
+[358, 'tuple 358']
+select * from t0 where k0 = 359
+Found 1 tuple:
+[359, 'tuple 359']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 18 iteration
+insert into t0 values (360, 'tuple 360')
+Insert OK, 1 row affected
+insert into t0 values (361, 'tuple 361')
+Insert OK, 1 row affected
+insert into t0 values (362, 'tuple 362')
+Insert OK, 1 row affected
+insert into t0 values (363, 'tuple 363')
+Insert OK, 1 row affected
+insert into t0 values (364, 'tuple 364')
+Insert OK, 1 row affected
+select * from t0 where k0 = 360
+Found 1 tuple:
+[360, 'tuple 360']
+select * from t0 where k0 = 361
+Found 1 tuple:
+[361, 'tuple 361']
+select * from t0 where k0 = 362
+Found 1 tuple:
+[362, 'tuple 362']
+select * from t0 where k0 = 363
+Found 1 tuple:
+[363, 'tuple 363']
+select * from t0 where k0 = 364
+Found 1 tuple:
+[364, 'tuple 364']
+insert into t0 values (365, 'tuple 365')
+Insert OK, 1 row affected
+insert into t0 values (366, 'tuple 366')
+Insert OK, 1 row affected
+insert into t0 values (367, 'tuple 367')
+Insert OK, 1 row affected
+insert into t0 values (368, 'tuple 368')
+Insert OK, 1 row affected
+insert into t0 values (369, 'tuple 369')
+Insert OK, 1 row affected
+select * from t0 where k0 = 365
+Found 1 tuple:
+[365, 'tuple 365']
+select * from t0 where k0 = 366
+Found 1 tuple:
+[366, 'tuple 366']
+select * from t0 where k0 = 367
+Found 1 tuple:
+[367, 'tuple 367']
+select * from t0 where k0 = 368
+Found 1 tuple:
+[368, 'tuple 368']
+select * from t0 where k0 = 369
+Found 1 tuple:
+[369, 'tuple 369']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (370, 'tuple 370')
+Insert OK, 1 row affected
+insert into t0 values (371, 'tuple 371')
+Insert OK, 1 row affected
+insert into t0 values (372, 'tuple 372')
+Insert OK, 1 row affected
+insert into t0 values (373, 'tuple 373')
+Insert OK, 1 row affected
+insert into t0 values (374, 'tuple 374')
+Insert OK, 1 row affected
+select * from t0 where k0 = 370
+Found 1 tuple:
+[370, 'tuple 370']
+select * from t0 where k0 = 371
+Found 1 tuple:
+[371, 'tuple 371']
+select * from t0 where k0 = 372
+Found 1 tuple:
+[372, 'tuple 372']
+select * from t0 where k0 = 373
+Found 1 tuple:
+[373, 'tuple 373']
+select * from t0 where k0 = 374
+Found 1 tuple:
+[374, 'tuple 374']
+insert into t0 values (375, 'tuple 375')
+Insert OK, 1 row affected
+insert into t0 values (376, 'tuple 376')
+Insert OK, 1 row affected
+insert into t0 values (377, 'tuple 377')
+Insert OK, 1 row affected
+insert into t0 values (378, 'tuple 378')
+Insert OK, 1 row affected
+insert into t0 values (379, 'tuple 379')
+Insert OK, 1 row affected
+select * from t0 where k0 = 375
+Found 1 tuple:
+[375, 'tuple 375']
+select * from t0 where k0 = 376
+Found 1 tuple:
+[376, 'tuple 376']
+select * from t0 where k0 = 377
+Found 1 tuple:
+[377, 'tuple 377']
+select * from t0 where k0 = 378
+Found 1 tuple:
+[378, 'tuple 378']
+select * from t0 where k0 = 379
+Found 1 tuple:
+[379, 'tuple 379']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+test 19 iteration
+insert into t0 values (380, 'tuple 380')
+Insert OK, 1 row affected
+insert into t0 values (381, 'tuple 381')
+Insert OK, 1 row affected
+insert into t0 values (382, 'tuple 382')
+Insert OK, 1 row affected
+insert into t0 values (383, 'tuple 383')
+Insert OK, 1 row affected
+insert into t0 values (384, 'tuple 384')
+Insert OK, 1 row affected
+select * from t0 where k0 = 380
+Found 1 tuple:
+[380, 'tuple 380']
+select * from t0 where k0 = 381
+Found 1 tuple:
+[381, 'tuple 381']
+select * from t0 where k0 = 382
+Found 1 tuple:
+[382, 'tuple 382']
+select * from t0 where k0 = 383
+Found 1 tuple:
+[383, 'tuple 383']
+select * from t0 where k0 = 384
+Found 1 tuple:
+[384, 'tuple 384']
+insert into t0 values (385, 'tuple 385')
+Insert OK, 1 row affected
+insert into t0 values (386, 'tuple 386')
+Insert OK, 1 row affected
+insert into t0 values (387, 'tuple 387')
+Insert OK, 1 row affected
+insert into t0 values (388, 'tuple 388')
+Insert OK, 1 row affected
+insert into t0 values (389, 'tuple 389')
+Insert OK, 1 row affected
+select * from t0 where k0 = 385
+Found 1 tuple:
+[385, 'tuple 385']
+select * from t0 where k0 = 386
+Found 1 tuple:
+[386, 'tuple 386']
+select * from t0 where k0 = 387
+Found 1 tuple:
+[387, 'tuple 387']
+select * from t0 where k0 = 388
+Found 1 tuple:
+[388, 'tuple 388']
+select * from t0 where k0 = 389
+Found 1 tuple:
+[389, 'tuple 389']
+swap servers
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...
+insert into t0 values (390, 'tuple 390')
+Insert OK, 1 row affected
+insert into t0 values (391, 'tuple 391')
+Insert OK, 1 row affected
+insert into t0 values (392, 'tuple 392')
+Insert OK, 1 row affected
+insert into t0 values (393, 'tuple 393')
+Insert OK, 1 row affected
+insert into t0 values (394, 'tuple 394')
+Insert OK, 1 row affected
+select * from t0 where k0 = 390
+Found 1 tuple:
+[390, 'tuple 390']
+select * from t0 where k0 = 391
+Found 1 tuple:
+[391, 'tuple 391']
+select * from t0 where k0 = 392
+Found 1 tuple:
+[392, 'tuple 392']
+select * from t0 where k0 = 393
+Found 1 tuple:
+[393, 'tuple 393']
+select * from t0 where k0 = 394
+Found 1 tuple:
+[394, 'tuple 394']
+insert into t0 values (395, 'tuple 395')
+Insert OK, 1 row affected
+insert into t0 values (396, 'tuple 396')
+Insert OK, 1 row affected
+insert into t0 values (397, 'tuple 397')
+Insert OK, 1 row affected
+insert into t0 values (398, 'tuple 398')
+Insert OK, 1 row affected
+insert into t0 values (399, 'tuple 399')
+Insert OK, 1 row affected
+select * from t0 where k0 = 395
+Found 1 tuple:
+[395, 'tuple 395']
+select * from t0 where k0 = 396
+Found 1 tuple:
+[396, 'tuple 396']
+select * from t0 where k0 = 397
+Found 1 tuple:
+[397, 'tuple 397']
+select * from t0 where k0 = 398
+Found 1 tuple:
+[398, 'tuple 398']
+select * from t0 where k0 = 399
+Found 1 tuple:
+[399, 'tuple 399']
+rollback servers configuration
+reload configuration
+---
+ok
+...
+reload configuration
+---
+ok
+...

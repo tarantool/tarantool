@@ -12,7 +12,9 @@ find_program(CAT cat)
 find_program(GIT git)
 find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
-
+find_program(LD ld)
+set(luadir ${PROJECT_BINARY_DIR}/third_party/luajit/src)
+link_directories(${luadir})
 
 include(cmake/check_objective_c_compiler.cmake)
 
@@ -21,7 +23,7 @@ include(cmake/check_objective_c_compiler.cmake)
 # and what modules to produce.
 #
 set (TARANTOOL_PRODUCT "box")
-set (TARANTOOL_MODULES "box" "feeder")
+set (TARANTOOL_MODULES "box")
 
 #
 # Set default build type to Debug. This is to ease a developer's
@@ -118,7 +120,7 @@ execute_process (COMMAND ${GIT} describe HEAD
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "4")
-set (CPACK_PACKAGE_VERSION_PATCH "1")
+set (CPACK_PACKAGE_VERSION_PATCH "2")
 if (TARANTOOL_VERSION STREQUAL "")
     set (TARANTOOL_VERSION
         "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
@@ -159,6 +161,7 @@ endif()
 #
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories("${PROJECT_SOURCE_DIR}/connector/c/include")
 include_directories("${PROJECT_BINARY_DIR}/include")
 
 #
@@ -225,6 +228,7 @@ add_subdirectory(cfg)
 add_subdirectory(connector)
 add_subdirectory(core)
 add_subdirectory(mod)
+add_subdirectory(client)
 add_subdirectory(test)
 add_subdirectory(doc EXCLUDE_FROM_ALL)
 

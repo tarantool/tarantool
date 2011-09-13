@@ -1,6 +1,33 @@
 #ifndef TARANTOOL_ERRCODE_H
 #define TARANTOOL_ERRCODE_H
-
+/*
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 #include <stdint.h>
 
 #include <util.h>
@@ -23,7 +50,7 @@ enum { TNT_ERRMSG_MAX = 512 };
  */
 
 #define ERROR_CODES(_)					    \
-	/*  0 */_(ER_OK,			0, "OK") \
+	/*  0 */_(ER_OK=0,			0, "OK") \
 	/*  1 */_(ER_NONMASTER,			2, "Non master connection, but it should be") \
 	/*  2 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  3 */_(ER_BAD_UID,			2, "Uid is not from this storage range") \
@@ -75,12 +102,12 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 45 */_(ER_UNUSED45,			0, "Unused45") \
 	/* 46 */_(ER_UNUSED46,			0, "Unused46") \
 	/* 47 */_(ER_UNUSED47,			0, "Unused47") \
-	/* 48 */_(ER_UNUSED48,			0, "Unused48") \
+	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist") \
-	/* 50 */_(ER_UNUSED50,			0, "Unused50") \
-	/* 51 */_(ER_UNUSED51,			0, "Unused51") \
+	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure %.*s is not defined") \
+	/* 51 */_(ER_PROC_LUA,			2, "Lua error: %s") \
 	/* 52 */_(ER_NAMESPACE_DISABLED,	2, "Namespace %u is disabled") \
-	/* 53 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in namespace %u") \
+	/* 53 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space %u") \
 	/* 54 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
 	/* 55 */_(ER_TUPLE_FOUND,		2, "Tuple already exists") \
 	/* 56 */_(ER_INDEX_VIOLATION,		2, "Duplicate key exists in a unique index") \

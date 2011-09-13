@@ -21,6 +21,7 @@ INSERT_REQUEST_TYPE = 13
 SELECT_REQUEST_TYPE = 17
 UPDATE_REQUEST_TYPE = 19
 DELETE_REQUEST_TYPE = 21
+CALL_REQUEST_TYPE = 22
 PING_REQUEST_TYPE = 65280
 
 ER = {
@@ -48,7 +49,10 @@ ER = {
    37: "ER_UPDATE_ID"           ,
    38: "ER_WRONG_VERSION"       ,
    39: "ER_WAL_IO"              ,
+   48: "ER_PROC_RET"            ,
    49: "ER_TUPLE_NOT_FOUND"     ,
+   50: "ER_NO_SUCH_PROC"        ,
+   51: "ER_PROC_LUA"            ,
    52: "ER_NAMESPACE_DISABLED"  ,
    53: "ER_NO_SUCH_INDEX"       ,
    54: "ER_NO_SUCH_FIELD"       ,
@@ -302,3 +306,20 @@ class StatementSelect(StatementPing):
         else:
             return "Found {0} tuples:\n".format(tuple_count) + "\n".join(tuples)
 
+class StatementCall(StatementSelect):
+    reqeust_type = CALL_REQUEST_TYPE
+
+    def __init__(self, proc_name, value_list):
+        self.proc_name = proc_name
+# the binary protocol passes everything into procedure as strings
+# convert input to strings to avoid data mangling by the protocol
+        self.value_list = map(lambda val: str(val), value_list)
+
+    def pack(self):
+        buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
+        offset = 0
+        struct.pack_into("<L", buf, offset, 0) # flags
+        offset += INT_FIELD_LEN
+        (buf, offset) = pack_field(self.proc_name, buf, offset)
+        (buf, offset) = pack_tuple(self.value_list, buf, offset)
+        return buf[:offset]

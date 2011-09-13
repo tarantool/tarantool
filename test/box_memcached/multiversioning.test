@@ -10,29 +10,30 @@ memcached2 = MemcachedConnection('localhost', server.memcached_port)
 
 print """# Store big in lower case via first memcached client """
 print "set big 0 0 %d\r\n<big-value-lower-case>" % buf_size
-print memcached1.execute("set big 0 0 %d\r\n%s" % (buf_size, buf), silent = True)
+print exec memcached1 silent "set big 0 0 %d\r\n%s\r\n" % (buf_size, buf)
 
 print """# send command 'get big' to firs memcached client """
-memcached1.send_commands("get big", silent = False)
+send memcached1 "get big\r\n"
 
 print """# send command 'delete big' to second client """
-memcached2.execute("delete big")
+exec memcached2 "delete big\r\n"
 
 print """# Store big in lower case via first memcached client """
 print "set big 0 0 %d\r\n<big-value-upper-case>" % buf_size
-print memcached2.execute("set big 0 0 %d\r\n%s" % (buf_size, buf_upper), silent = True)
+print exec memcached2 silent "set big 0 0 %d\r\n%s\r\n" % (buf_size, buf_upper)
 
-print """# recv reply 'get big' from firs memcached client """
-reply = memcached1.recv_reply(silent = True).split('\r\n')[1]
-if buf == reply:
-    print "succes: buf == reply"
+print """# recv reply 'get big' from the first memcached client """
+reply = recv memcached1 silent
+reply_buf = reply.split('\r\n')[1]
+if buf == reply_buf:
+    print "success: buf == reply"
 else:
     print "fail: buf != reply"
+    print len(buf), len(reply_buf)
 
 # resore default suite config
 server.stop()
 server.deploy(self.suite_ini["config"])
-server.start()
 # check that we print clear memcached stats
 exec admin "show stat"
 # vim: syntax=python

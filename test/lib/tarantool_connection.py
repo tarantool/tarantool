@@ -68,26 +68,6 @@ class TarantoolConnection:
         self.opt_reconnect()
         return self.execute_no_reconnect(command, silent)
 
-    def write(self, fragment):
-        """This is to support print >> admin, "command" syntax.
-        For every print statement, write is invoked twice: one to
-        write the command itself, and another to write \n. We should
-        accumulate all writes until we receive \n. When we receive it,
-        we execute the command, and rewind the stream."""
-
-        newline_pos = fragment.rfind("\n")
-        while newline_pos >= 0:
-            self.stream.write(fragment[:newline_pos+1])
-            statement = self.stream.getvalue()
-            sys.stdout.write(statement)
-            sys.stdout.write(self.execute(statement))
-            fragment = fragment[newline_pos+1:]
-            newline_pos = fragment.rfind("\n")
-            self.stream.seek(0)
-            self.stream.truncate()
-
-        self.stream.write(fragment)
-
     def __enter__(self):
         self.connect()
         return self

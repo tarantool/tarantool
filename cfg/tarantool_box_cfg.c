@@ -29,8 +29,10 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->__confetti_flags = 0;
 
 	c->username = NULL;
-	c->coredump = 0;
+	c->bind_ipaddr = NULL;
+	c->coredump = false;
 	c->admin_port = 0;
+	c->replication_port = 0;
 	c->log_level = 0;
 	c->slab_alloc_arena = 0;
 	c->slab_alloc_minimal = 0;
@@ -38,7 +40,7 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->work_dir = NULL;
 	c->pid_file = NULL;
 	c->logger = NULL;
-	c->logger_nonblock = 0;
+	c->logger_nonblock = false;
 	c->io_collect_interval = 0;
 	c->backlog = 0;
 	c->readahead = 0;
@@ -49,22 +51,20 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->too_long_threshold = 0;
 	c->custom_proc_title = NULL;
 	c->memcached_port = 0;
-	c->memcached_namespace = 0;
-	c->memcached_expire = 0;
+	c->memcached_space = 0;
+	c->memcached_expire = false;
 	c->memcached_expire_per_loop = 0;
 	c->memcached_expire_full_sweep = 0;
 	c->snap_io_rate_limit = 0;
 	c->rows_per_wal = 0;
 	c->wal_fsync_delay = 0;
 	c->wal_writer_inbox_size = 0;
-	c->local_hot_standby = 0;
+	c->local_hot_standby = false;
 	c->wal_dir_rescan_delay = 0;
-	c->panic_on_snap_error = 0;
-	c->panic_on_wal_error = 0;
-	c->remote_hot_standby = 0;
-	c->wal_feeder_ipaddr = NULL;
-	c->wal_feeder_port = 0;
-	c->namespace = NULL;
+	c->panic_on_snap_error = false;
+	c->panic_on_wal_error = false;
+	c->replication_source = NULL;
+	c->space = NULL;
 }
 
 int
@@ -72,8 +72,11 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->__confetti_flags = 0;
 
 	c->username = NULL;
-	c->coredump = 0;
+	c->bind_ipaddr = strdup("INADDR_ANY");
+	if (c->bind_ipaddr == NULL) return CNF_NOMEMORY;
+	c->coredump = false;
 	c->admin_port = 0;
+	c->replication_port = 0;
 	c->log_level = 4;
 	c->slab_alloc_arena = 1;
 	c->slab_alloc_minimal = 64;
@@ -82,7 +85,7 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->pid_file = strdup("tarantool.pid");
 	if (c->pid_file == NULL) return CNF_NOMEMORY;
 	c->logger = NULL;
-	c->logger_nonblock = 1;
+	c->logger_nonblock = true;
 	c->io_collect_interval = 0;
 	c->backlog = 1024;
 	c->readahead = 16320;
@@ -95,22 +98,20 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->too_long_threshold = 0.5;
 	c->custom_proc_title = NULL;
 	c->memcached_port = 0;
-	c->memcached_namespace = 23;
-	c->memcached_expire = 0;
+	c->memcached_space = 23;
+	c->memcached_expire = false;
 	c->memcached_expire_per_loop = 1024;
 	c->memcached_expire_full_sweep = 3600;
 	c->snap_io_rate_limit = 0;
 	c->rows_per_wal = 500000;
 	c->wal_fsync_delay = 0;
 	c->wal_writer_inbox_size = 128;
-	c->local_hot_standby = 0;
+	c->local_hot_standby = false;
 	c->wal_dir_rescan_delay = 0.1;
-	c->panic_on_snap_error = 1;
-	c->panic_on_wal_error = 0;
-	c->remote_hot_standby = 0;
-	c->wal_feeder_ipaddr = NULL;
-	c->wal_feeder_port = 0;
-	c->namespace = NULL;
+	c->panic_on_snap_error = true;
+	c->panic_on_wal_error = false;
+	c->replication_source = NULL;
+	c->space = NULL;
 	return 0;
 }
 
@@ -122,7 +123,7 @@ swap_tarantool_cfg(struct tarantool_cfg *c1, struct tarantool_cfg *c2) {
 }
 
 static int
-acceptDefault_name__namespace(tarantool_cfg_namespace *c) {
+acceptDefault_name__space(tarantool_cfg_space *c) {
 	c->enabled = -1;
 	c->cardinality = -1;
 	c->estimated_rows = 0;
@@ -131,7 +132,7 @@ acceptDefault_name__namespace(tarantool_cfg_namespace *c) {
 }
 
 static int
-acceptDefault_name__namespace__index(tarantool_cfg_namespace_index *c) {
+acceptDefault_name__space__index(tarantool_cfg_space_index *c) {
 	c->type = strdup("");
 	if (c->type == NULL) return CNF_NOMEMORY;
 	c->unique = -1;
@@ -140,7 +141,7 @@ acceptDefault_name__namespace__index(tarantool_cfg_namespace_index *c) {
 }
 
 static int
-acceptDefault_name__namespace__index__key_field(tarantool_cfg_namespace_index_key_field *c) {
+acceptDefault_name__space__index__key_field(tarantool_cfg_space_index_key_field *c) {
 	c->fieldno = -1;
 	c->type = strdup("");
 	if (c->type == NULL) return CNF_NOMEMORY;
@@ -150,11 +151,17 @@ acceptDefault_name__namespace__index__key_field(tarantool_cfg_namespace_index_ke
 static NameAtom _name__username[] = {
 	{ "username", -1, NULL }
 };
+static NameAtom _name__bind_ipaddr[] = {
+	{ "bind_ipaddr", -1, NULL }
+};
 static NameAtom _name__coredump[] = {
 	{ "coredump", -1, NULL }
 };
 static NameAtom _name__admin_port[] = {
 	{ "admin_port", -1, NULL }
+};
+static NameAtom _name__replication_port[] = {
+	{ "replication_port", -1, NULL }
 };
 static NameAtom _name__log_level[] = {
 	{ "log_level", -1, NULL }
@@ -210,8 +217,8 @@ static NameAtom _name__custom_proc_title[] = {
 static NameAtom _name__memcached_port[] = {
 	{ "memcached_port", -1, NULL }
 };
-static NameAtom _name__memcached_namespace[] = {
-	{ "memcached_namespace", -1, NULL }
+static NameAtom _name__memcached_space[] = {
+	{ "memcached_space", -1, NULL }
 };
 static NameAtom _name__memcached_expire[] = {
 	{ "memcached_expire", -1, NULL }
@@ -246,59 +253,53 @@ static NameAtom _name__panic_on_snap_error[] = {
 static NameAtom _name__panic_on_wal_error[] = {
 	{ "panic_on_wal_error", -1, NULL }
 };
-static NameAtom _name__remote_hot_standby[] = {
-	{ "remote_hot_standby", -1, NULL }
+static NameAtom _name__replication_source[] = {
+	{ "replication_source", -1, NULL }
 };
-static NameAtom _name__wal_feeder_ipaddr[] = {
-	{ "wal_feeder_ipaddr", -1, NULL }
+static NameAtom _name__space[] = {
+	{ "space", -1, NULL }
 };
-static NameAtom _name__wal_feeder_port[] = {
-	{ "wal_feeder_port", -1, NULL }
-};
-static NameAtom _name__namespace[] = {
-	{ "namespace", -1, NULL }
-};
-static NameAtom _name__namespace__enabled[] = {
-	{ "namespace", -1, _name__namespace__enabled + 1 },
+static NameAtom _name__space__enabled[] = {
+	{ "space", -1, _name__space__enabled + 1 },
 	{ "enabled", -1, NULL }
 };
-static NameAtom _name__namespace__cardinality[] = {
-	{ "namespace", -1, _name__namespace__cardinality + 1 },
+static NameAtom _name__space__cardinality[] = {
+	{ "space", -1, _name__space__cardinality + 1 },
 	{ "cardinality", -1, NULL }
 };
-static NameAtom _name__namespace__estimated_rows[] = {
-	{ "namespace", -1, _name__namespace__estimated_rows + 1 },
+static NameAtom _name__space__estimated_rows[] = {
+	{ "space", -1, _name__space__estimated_rows + 1 },
 	{ "estimated_rows", -1, NULL }
 };
-static NameAtom _name__namespace__index[] = {
-	{ "namespace", -1, _name__namespace__index + 1 },
+static NameAtom _name__space__index[] = {
+	{ "space", -1, _name__space__index + 1 },
 	{ "index", -1, NULL }
 };
-static NameAtom _name__namespace__index__type[] = {
-	{ "namespace", -1, _name__namespace__index__type + 1 },
-	{ "index", -1, _name__namespace__index__type + 2 },
+static NameAtom _name__space__index__type[] = {
+	{ "space", -1, _name__space__index__type + 1 },
+	{ "index", -1, _name__space__index__type + 2 },
 	{ "type", -1, NULL }
 };
-static NameAtom _name__namespace__index__unique[] = {
-	{ "namespace", -1, _name__namespace__index__unique + 1 },
-	{ "index", -1, _name__namespace__index__unique + 2 },
+static NameAtom _name__space__index__unique[] = {
+	{ "space", -1, _name__space__index__unique + 1 },
+	{ "index", -1, _name__space__index__unique + 2 },
 	{ "unique", -1, NULL }
 };
-static NameAtom _name__namespace__index__key_field[] = {
-	{ "namespace", -1, _name__namespace__index__key_field + 1 },
-	{ "index", -1, _name__namespace__index__key_field + 2 },
+static NameAtom _name__space__index__key_field[] = {
+	{ "space", -1, _name__space__index__key_field + 1 },
+	{ "index", -1, _name__space__index__key_field + 2 },
 	{ "key_field", -1, NULL }
 };
-static NameAtom _name__namespace__index__key_field__fieldno[] = {
-	{ "namespace", -1, _name__namespace__index__key_field__fieldno + 1 },
-	{ "index", -1, _name__namespace__index__key_field__fieldno + 2 },
-	{ "key_field", -1, _name__namespace__index__key_field__fieldno + 3 },
+static NameAtom _name__space__index__key_field__fieldno[] = {
+	{ "space", -1, _name__space__index__key_field__fieldno + 1 },
+	{ "index", -1, _name__space__index__key_field__fieldno + 2 },
+	{ "key_field", -1, _name__space__index__key_field__fieldno + 3 },
 	{ "fieldno", -1, NULL }
 };
-static NameAtom _name__namespace__index__key_field__type[] = {
-	{ "namespace", -1, _name__namespace__index__key_field__type + 1 },
-	{ "index", -1, _name__namespace__index__key_field__type + 2 },
-	{ "key_field", -1, _name__namespace__index__key_field__type + 3 },
+static NameAtom _name__space__index__key_field__type[] = {
+	{ "space", -1, _name__space__index__key_field__type + 1 },
+	{ "index", -1, _name__space__index__key_field__type + 2 },
+	{ "key_field", -1, _name__space__index__key_field__type + 3 },
 	{ "type", -1, NULL }
 };
 
@@ -340,23 +341,47 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->username == NULL) || strcmp(opt->paramValue.stringval, c->username) != 0))
 			return CNF_RDONLY;
+		 if (c->username) free(c->username);
 		c->username = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->username == NULL)
 			return CNF_NOMEMORY;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__coredump) ) {
-		if (opt->paramType != numberType )
+	else if ( cmpNameAtoms( opt->name, _name__bind_ipaddr) ) {
+		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->coredump != i32)
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->bind_ipaddr == NULL) || strcmp(opt->paramValue.stringval, c->bind_ipaddr) != 0))
 			return CNF_RDONLY;
-		c->coredump = i32;
+		 if (c->bind_ipaddr) free(c->bind_ipaddr);
+		c->bind_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->bind_ipaddr == NULL)
+			return CNF_NOMEMORY;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__coredump) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		bool bln;
+
+		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->coredump != bln)
+			return CNF_RDONLY;
+		c->coredump = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__admin_port) ) {
 		if (opt->paramType != numberType )
@@ -371,6 +396,20 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (check_rdonly && c->admin_port != i32)
 			return CNF_RDONLY;
 		c->admin_port = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__replication_port) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->replication_port != i32)
+			return CNF_RDONLY;
+		c->replication_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__log_level) ) {
 		if (opt->paramType != numberType )
@@ -429,6 +468,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->work_dir == NULL) || strcmp(opt->paramValue.stringval, c->work_dir) != 0))
 			return CNF_RDONLY;
+		 if (c->work_dir) free(c->work_dir);
 		c->work_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->work_dir == NULL)
 			return CNF_NOMEMORY;
@@ -440,6 +480,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->pid_file == NULL) || strcmp(opt->paramValue.stringval, c->pid_file) != 0))
 			return CNF_RDONLY;
+		 if (c->pid_file) free(c->pid_file);
 		c->pid_file = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->pid_file == NULL)
 			return CNF_NOMEMORY;
@@ -451,23 +492,35 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->logger == NULL) || strcmp(opt->paramValue.stringval, c->logger) != 0))
 			return CNF_RDONLY;
+		 if (c->logger) free(c->logger);
 		c->logger = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->logger == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__logger_nonblock) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+		bool bln;
+
+		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->logger_nonblock != i32)
+		if (check_rdonly && c->logger_nonblock != bln)
 			return CNF_RDONLY;
-		c->logger_nonblock = i32;
+		c->logger_nonblock = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__io_collect_interval) ) {
 		if (opt->paramType != numberType )
@@ -514,6 +567,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->snap_dir == NULL) || strcmp(opt->paramValue.stringval, c->snap_dir) != 0))
 			return CNF_RDONLY;
+		 if (c->snap_dir) free(c->snap_dir);
 		c->snap_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->snap_dir == NULL)
 			return CNF_NOMEMORY;
@@ -525,6 +579,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_dir == NULL) || strcmp(opt->paramValue.stringval, c->wal_dir) != 0))
 			return CNF_RDONLY;
+		 if (c->wal_dir) free(c->wal_dir);
 		c->wal_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->wal_dir == NULL)
 			return CNF_NOMEMORY;
@@ -574,6 +629,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->custom_proc_title == NULL) || strcmp(opt->paramValue.stringval, c->custom_proc_title) != 0))
 			return CNF_RDONLY;
+		 if (c->custom_proc_title) free(c->custom_proc_title);
 		c->custom_proc_title = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->custom_proc_title == NULL)
 			return CNF_NOMEMORY;
@@ -592,7 +648,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_RDONLY;
 		c->memcached_port = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__memcached_namespace) ) {
+	else if ( cmpNameAtoms( opt->name, _name__memcached_space) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
@@ -602,23 +658,34 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->memcached_namespace != i32)
+		if (check_rdonly && c->memcached_space != i32)
 			return CNF_RDONLY;
-		c->memcached_namespace = i32;
+		c->memcached_space = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_expire) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+		bool bln;
+
+		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->memcached_expire != i32)
+		if (check_rdonly && c->memcached_expire != bln)
 			return CNF_RDONLY;
-		c->memcached_expire = i32;
+		c->memcached_expire = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_expire_per_loop) ) {
 		if (opt->paramType != numberType )
@@ -699,18 +766,29 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->wal_writer_inbox_size = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__local_hot_standby) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+		bool bln;
+
+		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->local_hot_standby != i32)
+		if (check_rdonly && c->local_hot_standby != bln)
 			return CNF_RDONLY;
-		c->local_hot_standby = i32;
+		c->local_hot_standby = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_dir_rescan_delay) ) {
 		if (opt->paramType != numberType )
@@ -725,235 +803,236 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->wal_dir_rescan_delay = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__panic_on_snap_error) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+		bool bln;
+
+		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->panic_on_snap_error != i32)
+		if (check_rdonly && c->panic_on_snap_error != bln)
 			return CNF_RDONLY;
-		c->panic_on_snap_error = i32;
+		c->panic_on_snap_error = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__panic_on_wal_error) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->panic_on_wal_error != i32)
-			return CNF_RDONLY;
-		c->panic_on_wal_error = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__remote_hot_standby) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		c->remote_hot_standby = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_ipaddr) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		c->wal_feeder_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->wal_feeder_ipaddr == NULL)
+		bool bln;
+
+		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->panic_on_wal_error != bln)
+			return CNF_RDONLY;
+		c->panic_on_wal_error = bln;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__replication_source) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		 if (c->replication_source) free(c->replication_source);
+		c->replication_source = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->replication_source == NULL)
 			return CNF_NOMEMORY;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__wal_feeder_port) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		c->wal_feeder_port = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space) ) {
 		if (opt->paramType != arrayType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		ARRAYALLOC(c->space, 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__enabled) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__enabled) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->namespace[opt->name->index]->enabled != i32)
+		if (check_rdonly && c->space[opt->name->index]->enabled != i32)
 			return CNF_RDONLY;
-		c->namespace[opt->name->index]->enabled = i32;
+		c->space[opt->name->index]->enabled = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__cardinality) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__cardinality) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->namespace[opt->name->index]->cardinality != i32)
+		if (check_rdonly && c->space[opt->name->index]->cardinality != i32)
 			return CNF_RDONLY;
-		c->namespace[opt->name->index]->cardinality = i32;
+		c->space[opt->name->index]->cardinality = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__estimated_rows) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__estimated_rows) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->namespace[opt->name->index]->estimated_rows != i32)
+		if (check_rdonly && c->space[opt->name->index]->estimated_rows != i32)
 			return CNF_RDONLY;
-		c->namespace[opt->name->index]->estimated_rows = i32;
+		c->space[opt->name->index]->estimated_rows = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__index) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__index) ) {
 		if (opt->paramType != arrayType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index, 1, _name__space__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__index__type) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__index__type) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index, opt->name->next->index + 1, _name__space__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->namespace[opt->name->index]->index[opt->name->next->index]->type == NULL) || strcmp(opt->paramValue.stringval, c->namespace[opt->name->index]->index[opt->name->next->index]->type) != 0))
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->space[opt->name->index]->index[opt->name->next->index]->type == NULL) || strcmp(opt->paramValue.stringval, c->space[opt->name->index]->index[opt->name->next->index]->type) != 0))
 			return CNF_RDONLY;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->type = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->namespace[opt->name->index]->index[opt->name->next->index]->type == NULL)
+		 if (c->space[opt->name->index]->index[opt->name->next->index]->type) free(c->space[opt->name->index]->index[opt->name->next->index]->type);
+		c->space[opt->name->index]->index[opt->name->next->index]->type = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->space[opt->name->index]->index[opt->name->next->index]->type == NULL)
 			return CNF_NOMEMORY;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__index__unique) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__index__unique) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index, opt->name->next->index + 1, _name__space__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->namespace[opt->name->index]->index[opt->name->next->index]->unique != i32)
+		if (check_rdonly && c->space[opt->name->index]->index[opt->name->next->index]->unique != i32)
 			return CNF_RDONLY;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->unique = i32;
+		c->space[opt->name->index]->index[opt->name->next->index]->unique = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__index__key_field) ) {
 		if (opt->paramType != arrayType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index, opt->name->next->index + 1, _name__space__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, 1, _name__namespace__index__key_field, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index[opt->name->next->index]->key_field, 1, _name__space__index__key_field, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field__fieldno) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__index__key_field__fieldno) ) {
 		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index, opt->name->next->index + 1, _name__space__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__space__index__key_field, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->fieldno != i32)
+		if (check_rdonly && c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->fieldno != i32)
 			return CNF_RDONLY;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->fieldno = i32;
+		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->fieldno = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__namespace__index__key_field__type) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__index__key_field__type) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
-		ARRAYALLOC(c->namespace, opt->name->index + 1, _name__namespace, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index, opt->name->next->index + 1, _name__namespace__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index, opt->name->next->index + 1, _name__space__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		ARRAYALLOC(c->namespace[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__namespace__index__key_field, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
-		if (c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index[opt->name->next->index]->key_field, opt->name->next->next->index + 1, _name__space__index__key_field, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
 			check_rdonly = 0;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL) || strcmp(opt->paramValue.stringval, c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type) != 0))
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL) || strcmp(opt->paramValue.stringval, c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type) != 0))
 			return CNF_RDONLY;
-		c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->namespace[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL)
+		 if (c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type) free(c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type);
+		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL)
 			return CNF_NOMEMORY;
 	}
 	else {
@@ -1062,8 +1141,10 @@ parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly,
 typedef enum IteratorState {
 	_S_Initial = 0,
 	S_name__username,
+	S_name__bind_ipaddr,
 	S_name__coredump,
 	S_name__admin_port,
+	S_name__replication_port,
 	S_name__log_level,
 	S_name__slab_alloc_arena,
 	S_name__slab_alloc_minimal,
@@ -1082,7 +1163,7 @@ typedef enum IteratorState {
 	S_name__too_long_threshold,
 	S_name__custom_proc_title,
 	S_name__memcached_port,
-	S_name__memcached_namespace,
+	S_name__memcached_space,
 	S_name__memcached_expire,
 	S_name__memcached_expire_per_loop,
 	S_name__memcached_expire_full_sweep,
@@ -1094,27 +1175,25 @@ typedef enum IteratorState {
 	S_name__wal_dir_rescan_delay,
 	S_name__panic_on_snap_error,
 	S_name__panic_on_wal_error,
-	S_name__remote_hot_standby,
-	S_name__wal_feeder_ipaddr,
-	S_name__wal_feeder_port,
-	S_name__namespace,
-	S_name__namespace__enabled,
-	S_name__namespace__cardinality,
-	S_name__namespace__estimated_rows,
-	S_name__namespace__index,
-	S_name__namespace__index__type,
-	S_name__namespace__index__unique,
-	S_name__namespace__index__key_field,
-	S_name__namespace__index__key_field__fieldno,
-	S_name__namespace__index__key_field__type,
+	S_name__replication_source,
+	S_name__space,
+	S_name__space__enabled,
+	S_name__space__cardinality,
+	S_name__space__estimated_rows,
+	S_name__space__index,
+	S_name__space__index__type,
+	S_name__space__index__unique,
+	S_name__space__index__key_field,
+	S_name__space__index__key_field__fieldno,
+	S_name__space__index__key_field__type,
 	_S_Finished
 } IteratorState;
 
 struct tarantool_cfg_iterator_t {
 	IteratorState	state;
-	int	idx_name__namespace;
-	int	idx_name__namespace__index;
-	int	idx_name__namespace__index__key_field;
+	int	idx_name__space;
+	int	idx_name__space__index;
+	int	idx_name__space__index__key_field;
 };
 
 tarantool_cfg_iterator_t*
@@ -1142,16 +1221,26 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "username");
+			i->state = S_name__bind_ipaddr;
+			return buf;
+		case S_name__bind_ipaddr:
+			*v = (c->bind_ipaddr) ? strdup(c->bind_ipaddr) : NULL;
+			if (*v == NULL && c->bind_ipaddr) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "bind_ipaddr");
 			i->state = S_name__coredump;
 			return buf;
 		case S_name__coredump:
-			*v = malloc(32);
+			*v = malloc(8);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->coredump);
+			sprintf(*v, "%s", c->coredump ? "true" : "false");
 			snprintf(buf, PRINTBUFLEN-1, "coredump");
 			i->state = S_name__admin_port;
 			return buf;
@@ -1164,6 +1253,17 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->admin_port);
 			snprintf(buf, PRINTBUFLEN-1, "admin_port");
+			i->state = S_name__replication_port;
+			return buf;
+		case S_name__replication_port:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%"PRId32, c->replication_port);
+			snprintf(buf, PRINTBUFLEN-1, "replication_port");
 			i->state = S_name__log_level;
 			return buf;
 		case S_name__log_level:
@@ -1241,13 +1341,13 @@ again:
 			i->state = S_name__logger_nonblock;
 			return buf;
 		case S_name__logger_nonblock:
-			*v = malloc(32);
+			*v = malloc(8);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->logger_nonblock);
+			sprintf(*v, "%s", c->logger_nonblock ? "true" : "false");
 			snprintf(buf, PRINTBUFLEN-1, "logger_nonblock");
 			i->state = S_name__io_collect_interval;
 			return buf;
@@ -1356,27 +1456,27 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->memcached_port);
 			snprintf(buf, PRINTBUFLEN-1, "memcached_port");
-			i->state = S_name__memcached_namespace;
+			i->state = S_name__memcached_space;
 			return buf;
-		case S_name__memcached_namespace:
+		case S_name__memcached_space:
 			*v = malloc(32);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->memcached_namespace);
-			snprintf(buf, PRINTBUFLEN-1, "memcached_namespace");
+			sprintf(*v, "%"PRId32, c->memcached_space);
+			snprintf(buf, PRINTBUFLEN-1, "memcached_space");
 			i->state = S_name__memcached_expire;
 			return buf;
 		case S_name__memcached_expire:
-			*v = malloc(32);
+			*v = malloc(8);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->memcached_expire);
+			sprintf(*v, "%s", c->memcached_expire ? "true" : "false");
 			snprintf(buf, PRINTBUFLEN-1, "memcached_expire");
 			i->state = S_name__memcached_expire_per_loop;
 			return buf;
@@ -1447,13 +1547,13 @@ again:
 			i->state = S_name__local_hot_standby;
 			return buf;
 		case S_name__local_hot_standby:
-			*v = malloc(32);
+			*v = malloc(8);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->local_hot_standby);
+			sprintf(*v, "%s", c->local_hot_standby ? "true" : "false");
 			snprintf(buf, PRINTBUFLEN-1, "local_hot_standby");
 			i->state = S_name__wal_dir_rescan_delay;
 			return buf;
@@ -1469,174 +1569,152 @@ again:
 			i->state = S_name__panic_on_snap_error;
 			return buf;
 		case S_name__panic_on_snap_error:
-			*v = malloc(32);
+			*v = malloc(8);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->panic_on_snap_error);
+			sprintf(*v, "%s", c->panic_on_snap_error ? "true" : "false");
 			snprintf(buf, PRINTBUFLEN-1, "panic_on_snap_error");
 			i->state = S_name__panic_on_wal_error;
 			return buf;
 		case S_name__panic_on_wal_error:
-			*v = malloc(32);
+			*v = malloc(8);
 			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->panic_on_wal_error);
+			sprintf(*v, "%s", c->panic_on_wal_error ? "true" : "false");
 			snprintf(buf, PRINTBUFLEN-1, "panic_on_wal_error");
-			i->state = S_name__remote_hot_standby;
+			i->state = S_name__replication_source;
 			return buf;
-		case S_name__remote_hot_standby:
-			*v = malloc(32);
-			if (*v == NULL) {
+		case S_name__replication_source:
+			*v = (c->replication_source) ? strdup(c->replication_source) : NULL;
+			if (*v == NULL && c->replication_source) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->remote_hot_standby);
-			snprintf(buf, PRINTBUFLEN-1, "remote_hot_standby");
-			i->state = S_name__wal_feeder_ipaddr;
+			snprintf(buf, PRINTBUFLEN-1, "replication_source");
+			i->state = S_name__space;
 			return buf;
-		case S_name__wal_feeder_ipaddr:
-			*v = (c->wal_feeder_ipaddr) ? strdup(c->wal_feeder_ipaddr) : NULL;
-			if (*v == NULL && c->wal_feeder_ipaddr) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			snprintf(buf, PRINTBUFLEN-1, "wal_feeder_ipaddr");
-			i->state = S_name__wal_feeder_port;
-			return buf;
-		case S_name__wal_feeder_port:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->wal_feeder_port);
-			snprintf(buf, PRINTBUFLEN-1, "wal_feeder_port");
-			i->state = S_name__namespace;
-			return buf;
-		case S_name__namespace:
-			i->state = S_name__namespace;
-		case S_name__namespace__enabled:
-		case S_name__namespace__cardinality:
-		case S_name__namespace__estimated_rows:
-		case S_name__namespace__index:
-		case S_name__namespace__index__type:
-		case S_name__namespace__index__unique:
-		case S_name__namespace__index__key_field:
-		case S_name__namespace__index__key_field__fieldno:
-		case S_name__namespace__index__key_field__type:
-			if (c->namespace && c->namespace[i->idx_name__namespace]) {
+		case S_name__space:
+			i->state = S_name__space;
+		case S_name__space__enabled:
+		case S_name__space__cardinality:
+		case S_name__space__estimated_rows:
+		case S_name__space__index:
+		case S_name__space__index__type:
+		case S_name__space__index__unique:
+		case S_name__space__index__key_field:
+		case S_name__space__index__key_field__fieldno:
+		case S_name__space__index__key_field__type:
+			if (c->space && c->space[i->idx_name__space]) {
 				switch(i->state) {
-					case S_name__namespace:
-					case S_name__namespace__enabled:
+					case S_name__space:
+					case S_name__space__enabled:
 						*v = malloc(32);
 						if (*v == NULL) {
 							free(i);
 							out_warning(CNF_NOMEMORY, "No memory to output value");
 							return NULL;
 						}
-						sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->enabled);
-						snprintf(buf, PRINTBUFLEN-1, "namespace[%d].enabled", i->idx_name__namespace);
-						i->state = S_name__namespace__cardinality;
+						sprintf(*v, "%"PRId32, c->space[i->idx_name__space]->enabled);
+						snprintf(buf, PRINTBUFLEN-1, "space[%d].enabled", i->idx_name__space);
+						i->state = S_name__space__cardinality;
 						return buf;
-					case S_name__namespace__cardinality:
+					case S_name__space__cardinality:
 						*v = malloc(32);
 						if (*v == NULL) {
 							free(i);
 							out_warning(CNF_NOMEMORY, "No memory to output value");
 							return NULL;
 						}
-						sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->cardinality);
-						snprintf(buf, PRINTBUFLEN-1, "namespace[%d].cardinality", i->idx_name__namespace);
-						i->state = S_name__namespace__estimated_rows;
+						sprintf(*v, "%"PRId32, c->space[i->idx_name__space]->cardinality);
+						snprintf(buf, PRINTBUFLEN-1, "space[%d].cardinality", i->idx_name__space);
+						i->state = S_name__space__estimated_rows;
 						return buf;
-					case S_name__namespace__estimated_rows:
+					case S_name__space__estimated_rows:
 						*v = malloc(32);
 						if (*v == NULL) {
 							free(i);
 							out_warning(CNF_NOMEMORY, "No memory to output value");
 							return NULL;
 						}
-						sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->estimated_rows);
-						snprintf(buf, PRINTBUFLEN-1, "namespace[%d].estimated_rows", i->idx_name__namespace);
-						i->state = S_name__namespace__index;
+						sprintf(*v, "%"PRId32, c->space[i->idx_name__space]->estimated_rows);
+						snprintf(buf, PRINTBUFLEN-1, "space[%d].estimated_rows", i->idx_name__space);
+						i->state = S_name__space__index;
 						return buf;
-					case S_name__namespace__index:
-						i->state = S_name__namespace__index;
-					case S_name__namespace__index__type:
-					case S_name__namespace__index__unique:
-					case S_name__namespace__index__key_field:
-					case S_name__namespace__index__key_field__fieldno:
-					case S_name__namespace__index__key_field__type:
-						if (c->namespace[i->idx_name__namespace]->index && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]) {
+					case S_name__space__index:
+						i->state = S_name__space__index;
+					case S_name__space__index__type:
+					case S_name__space__index__unique:
+					case S_name__space__index__key_field:
+					case S_name__space__index__key_field__fieldno:
+					case S_name__space__index__key_field__type:
+						if (c->space[i->idx_name__space]->index && c->space[i->idx_name__space]->index[i->idx_name__space__index]) {
 							switch(i->state) {
-								case S_name__namespace__index:
-								case S_name__namespace__index__type:
-									*v = (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type) ? strdup(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type) : NULL;
-									if (*v == NULL && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type) {
+								case S_name__space__index:
+								case S_name__space__index__type:
+									*v = (c->space[i->idx_name__space]->index[i->idx_name__space__index]->type) ? strdup(c->space[i->idx_name__space]->index[i->idx_name__space__index]->type) : NULL;
+									if (*v == NULL && c->space[i->idx_name__space]->index[i->idx_name__space__index]->type) {
 										free(i);
 										out_warning(CNF_NOMEMORY, "No memory to output value");
 										return NULL;
 									}
-									snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].type", i->idx_name__namespace, i->idx_name__namespace__index);
-									i->state = S_name__namespace__index__unique;
+									snprintf(buf, PRINTBUFLEN-1, "space[%d].index[%d].type", i->idx_name__space, i->idx_name__space__index);
+									i->state = S_name__space__index__unique;
 									return buf;
-								case S_name__namespace__index__unique:
+								case S_name__space__index__unique:
 									*v = malloc(32);
 									if (*v == NULL) {
 										free(i);
 										out_warning(CNF_NOMEMORY, "No memory to output value");
 										return NULL;
 									}
-									sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->unique);
-									snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].unique", i->idx_name__namespace, i->idx_name__namespace__index);
-									i->state = S_name__namespace__index__key_field;
+									sprintf(*v, "%"PRId32, c->space[i->idx_name__space]->index[i->idx_name__space__index]->unique);
+									snprintf(buf, PRINTBUFLEN-1, "space[%d].index[%d].unique", i->idx_name__space, i->idx_name__space__index);
+									i->state = S_name__space__index__key_field;
 									return buf;
-								case S_name__namespace__index__key_field:
-									i->state = S_name__namespace__index__key_field;
-								case S_name__namespace__index__key_field__fieldno:
-								case S_name__namespace__index__key_field__type:
-									if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]) {
+								case S_name__space__index__key_field:
+									i->state = S_name__space__index__key_field;
+								case S_name__space__index__key_field__fieldno:
+								case S_name__space__index__key_field__type:
+									if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field && c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]) {
 										switch(i->state) {
-											case S_name__namespace__index__key_field:
-											case S_name__namespace__index__key_field__fieldno:
+											case S_name__space__index__key_field:
+											case S_name__space__index__key_field__fieldno:
 												*v = malloc(32);
 												if (*v == NULL) {
 													free(i);
 													out_warning(CNF_NOMEMORY, "No memory to output value");
 													return NULL;
 												}
-												sprintf(*v, "%"PRId32, c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->fieldno);
-												snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].key_field[%d].fieldno", i->idx_name__namespace, i->idx_name__namespace__index, i->idx_name__namespace__index__key_field);
-												i->state = S_name__namespace__index__key_field__type;
+												sprintf(*v, "%"PRId32, c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->fieldno);
+												snprintf(buf, PRINTBUFLEN-1, "space[%d].index[%d].key_field[%d].fieldno", i->idx_name__space, i->idx_name__space__index, i->idx_name__space__index__key_field);
+												i->state = S_name__space__index__key_field__type;
 												return buf;
-											case S_name__namespace__index__key_field__type:
-												*v = (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) ? strdup(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) : NULL;
-												if (*v == NULL && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type) {
+											case S_name__space__index__key_field__type:
+												*v = (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type) ? strdup(c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type) : NULL;
+												if (*v == NULL && c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type) {
 													free(i);
 													out_warning(CNF_NOMEMORY, "No memory to output value");
 													return NULL;
 												}
-												snprintf(buf, PRINTBUFLEN-1, "namespace[%d].index[%d].key_field[%d].type", i->idx_name__namespace, i->idx_name__namespace__index, i->idx_name__namespace__index__key_field);
-												i->state = S_name__namespace__index__key_field;
-												i->idx_name__namespace__index__key_field++;
+												snprintf(buf, PRINTBUFLEN-1, "space[%d].index[%d].key_field[%d].type", i->idx_name__space, i->idx_name__space__index, i->idx_name__space__index__key_field);
+												i->state = S_name__space__index__key_field;
+												i->idx_name__space__index__key_field++;
 												return buf;
 											default:
 												break;
 										}
 									}
 									else {
-										i->state = S_name__namespace__index;
-										i->idx_name__namespace__index++;
-										i->idx_name__namespace__index__key_field = 0;
+										i->state = S_name__space__index;
+										i->idx_name__space__index++;
+										i->idx_name__space__index__key_field = 0;
 										goto again;
 									}
 								default:
@@ -1644,10 +1722,10 @@ again:
 							}
 						}
 						else {
-							i->state = S_name__namespace;
-							i->idx_name__namespace++;
-							i->idx_name__namespace__index = 0;
-							i->idx_name__namespace__index__key_field = 0;
+							i->state = S_name__space;
+							i->idx_name__space++;
+							i->idx_name__space__index = 0;
+							i->idx_name__space__index__key_field = 0;
 							goto again;
 						}
 					default:
@@ -1674,87 +1752,87 @@ check_cfg_tarantool_cfg(tarantool_cfg *c) {
 		res++;
 		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__primary_port));
 	}
-	if (c->namespace == NULL) {
+	if (c->space == NULL) {
 		res++;
-		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace));
+		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__space));
 	}
-	i->idx_name__namespace = 0;
-	while (c->namespace && c->namespace[i->idx_name__namespace]) {
-		if (c->namespace[i->idx_name__namespace]->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) {
+	i->idx_name__space = 0;
+	while (c->space && c->space[i->idx_name__space]) {
+		if (c->space[i->idx_name__space]->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) {
 			(void)0;
 		} else {
-			if (c->namespace[i->idx_name__namespace]->enabled == -1) {
+			if (c->space[i->idx_name__space]->enabled == -1) {
 				res++;
-				_name__namespace__enabled->index = i->idx_name__namespace;
-				out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__enabled));
+				_name__space__enabled->index = i->idx_name__space;
+				out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__space__enabled));
 			}
-			if (c->namespace[i->idx_name__namespace]->index == NULL) {
+			if (c->space[i->idx_name__space]->index == NULL) {
 				res++;
-				_name__namespace__index->index = i->idx_name__namespace;
-				out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__index));
+				_name__space__index->index = i->idx_name__space;
+				out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__space__index));
 			}
-			i->idx_name__namespace__index = 0;
-			while (c->namespace[i->idx_name__namespace]->index && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]) {
-				if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) {
+			i->idx_name__space__index = 0;
+			while (c->space[i->idx_name__space]->index && c->space[i->idx_name__space]->index[i->idx_name__space__index]) {
+				if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) {
 					res++;
-					_name__namespace__index->next->index = i->idx_name__namespace__index;
-					_name__namespace__index->index = i->idx_name__namespace;
-					out_warning(CNF_NOTSET, "Option '%s' is not set", dumpOptDef(_name__namespace__index));
+					_name__space__index->next->index = i->idx_name__space__index;
+					_name__space__index->index = i->idx_name__space;
+					out_warning(CNF_NOTSET, "Option '%s' is not set", dumpOptDef(_name__space__index));
 				} else {
-					if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type != NULL && strcmp(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type, "") == 0) {
+					if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->type != NULL && strcmp(c->space[i->idx_name__space]->index[i->idx_name__space__index]->type, "") == 0) {
 						res++;
-						_name__namespace__index__type->next->index = i->idx_name__namespace__index;
-						_name__namespace__index__type->index = i->idx_name__namespace;
-						out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__index__type));
+						_name__space__index__type->next->index = i->idx_name__space__index;
+						_name__space__index__type->index = i->idx_name__space;
+						out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__space__index__type));
 					}
-					if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->unique == -1) {
+					if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->unique == -1) {
 						res++;
-						_name__namespace__index__unique->next->index = i->idx_name__namespace__index;
-						_name__namespace__index__unique->index = i->idx_name__namespace;
-						out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__index__unique));
+						_name__space__index__unique->next->index = i->idx_name__space__index;
+						_name__space__index__unique->index = i->idx_name__space;
+						out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__space__index__unique));
 					}
-					if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field == NULL) {
+					if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field == NULL) {
 						res++;
-						_name__namespace__index__key_field->next->index = i->idx_name__namespace__index;
-						_name__namespace__index__key_field->index = i->idx_name__namespace;
-						out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__index__key_field));
+						_name__space__index__key_field->next->index = i->idx_name__space__index;
+						_name__space__index__key_field->index = i->idx_name__space;
+						out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__space__index__key_field));
 					}
-					i->idx_name__namespace__index__key_field = 0;
-					while (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field && c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]) {
-						if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) {
+					i->idx_name__space__index__key_field = 0;
+					while (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field && c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]) {
+						if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) {
 							res++;
-							_name__namespace__index__key_field->next->next->index = i->idx_name__namespace__index__key_field;
-							_name__namespace__index__key_field->next->index = i->idx_name__namespace__index;
-							_name__namespace__index__key_field->index = i->idx_name__namespace;
-							out_warning(CNF_NOTSET, "Option '%s' is not set", dumpOptDef(_name__namespace__index__key_field));
+							_name__space__index__key_field->next->next->index = i->idx_name__space__index__key_field;
+							_name__space__index__key_field->next->index = i->idx_name__space__index;
+							_name__space__index__key_field->index = i->idx_name__space;
+							out_warning(CNF_NOTSET, "Option '%s' is not set", dumpOptDef(_name__space__index__key_field));
 						} else {
-							if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->fieldno == -1) {
+							if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->fieldno == -1) {
 								res++;
-								_name__namespace__index__key_field__fieldno->next->next->index = i->idx_name__namespace__index__key_field;
-								_name__namespace__index__key_field__fieldno->next->index = i->idx_name__namespace__index;
-								_name__namespace__index__key_field__fieldno->index = i->idx_name__namespace;
-								out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__index__key_field__fieldno));
+								_name__space__index__key_field__fieldno->next->next->index = i->idx_name__space__index__key_field;
+								_name__space__index__key_field__fieldno->next->index = i->idx_name__space__index;
+								_name__space__index__key_field__fieldno->index = i->idx_name__space;
+								out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__space__index__key_field__fieldno));
 							}
-							if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type != NULL && strcmp(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type, "") == 0) {
+							if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type != NULL && strcmp(c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type, "") == 0) {
 								res++;
-								_name__namespace__index__key_field__type->next->next->index = i->idx_name__namespace__index__key_field;
-								_name__namespace__index__key_field__type->next->index = i->idx_name__namespace__index;
-								_name__namespace__index__key_field__type->index = i->idx_name__namespace;
-								out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__namespace__index__key_field__type));
+								_name__space__index__key_field__type->next->next->index = i->idx_name__space__index__key_field;
+								_name__space__index__key_field__type->next->index = i->idx_name__space__index;
+								_name__space__index__key_field__type->index = i->idx_name__space;
+								out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__space__index__key_field__type));
 							}
 						}
 
-						i->idx_name__namespace__index__key_field++;
+						i->idx_name__space__index__key_field++;
 					}
 
 				}
 
-				i->idx_name__namespace__index++;
+				i->idx_name__space__index++;
 			}
 
 		}
 
-		i->idx_name__namespace++;
+		i->idx_name__space++;
 	}
 
 	return res;
@@ -1765,33 +1843,33 @@ cleanFlags(tarantool_cfg* c, OptDef* opt) {
 	tarantool_cfg_iterator_t iterator, *i = &iterator;
 
 
-	if (c->namespace != NULL) {
-		i->idx_name__namespace = 0;
-		while (c->namespace[i->idx_name__namespace] != NULL) {
-			c->namespace[i->idx_name__namespace]->__confetti_flags &= ~CNF_FLAG_STRUCT_NEW;
+	if (c->space != NULL) {
+		i->idx_name__space = 0;
+		while (c->space[i->idx_name__space] != NULL) {
+			c->space[i->idx_name__space]->__confetti_flags &= ~CNF_FLAG_STRUCT_NEW;
 
 
-			if (c->namespace[i->idx_name__namespace]->index != NULL) {
-				i->idx_name__namespace__index = 0;
-				while (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index] != NULL) {
-					c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NEW;
+			if (c->space[i->idx_name__space]->index != NULL) {
+				i->idx_name__space__index = 0;
+				while (c->space[i->idx_name__space]->index[i->idx_name__space__index] != NULL) {
+					c->space[i->idx_name__space]->index[i->idx_name__space__index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NEW;
 
 
-					if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field != NULL) {
-						i->idx_name__namespace__index__key_field = 0;
-						while (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field] != NULL) {
-							c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->__confetti_flags &= ~CNF_FLAG_STRUCT_NEW;
+					if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field != NULL) {
+						i->idx_name__space__index__key_field = 0;
+						while (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field] != NULL) {
+							c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->__confetti_flags &= ~CNF_FLAG_STRUCT_NEW;
 
 
-							i->idx_name__namespace__index__key_field++;
+							i->idx_name__space__index__key_field++;
 						}
 					}
 
-					i->idx_name__namespace__index++;
+					i->idx_name__space__index++;
 				}
 			}
 
-			i->idx_name__namespace++;
+			i->idx_name__space++;
 		}
 	}
 }
@@ -1802,42 +1880,46 @@ int
 dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	tarantool_cfg_iterator_t iterator, *i = &iterator;
 
-	dst->username = src->username == NULL ? NULL : strdup(src->username);
+	if (dst->username) free(dst->username);dst->username = src->username == NULL ? NULL : strdup(src->username);
 	if (src->username != NULL && dst->username == NULL)
+		return CNF_NOMEMORY;
+	if (dst->bind_ipaddr) free(dst->bind_ipaddr);dst->bind_ipaddr = src->bind_ipaddr == NULL ? NULL : strdup(src->bind_ipaddr);
+	if (src->bind_ipaddr != NULL && dst->bind_ipaddr == NULL)
 		return CNF_NOMEMORY;
 	dst->coredump = src->coredump;
 	dst->admin_port = src->admin_port;
+	dst->replication_port = src->replication_port;
 	dst->log_level = src->log_level;
 	dst->slab_alloc_arena = src->slab_alloc_arena;
 	dst->slab_alloc_minimal = src->slab_alloc_minimal;
 	dst->slab_alloc_factor = src->slab_alloc_factor;
-	dst->work_dir = src->work_dir == NULL ? NULL : strdup(src->work_dir);
+	if (dst->work_dir) free(dst->work_dir);dst->work_dir = src->work_dir == NULL ? NULL : strdup(src->work_dir);
 	if (src->work_dir != NULL && dst->work_dir == NULL)
 		return CNF_NOMEMORY;
-	dst->pid_file = src->pid_file == NULL ? NULL : strdup(src->pid_file);
+	if (dst->pid_file) free(dst->pid_file);dst->pid_file = src->pid_file == NULL ? NULL : strdup(src->pid_file);
 	if (src->pid_file != NULL && dst->pid_file == NULL)
 		return CNF_NOMEMORY;
-	dst->logger = src->logger == NULL ? NULL : strdup(src->logger);
+	if (dst->logger) free(dst->logger);dst->logger = src->logger == NULL ? NULL : strdup(src->logger);
 	if (src->logger != NULL && dst->logger == NULL)
 		return CNF_NOMEMORY;
 	dst->logger_nonblock = src->logger_nonblock;
 	dst->io_collect_interval = src->io_collect_interval;
 	dst->backlog = src->backlog;
 	dst->readahead = src->readahead;
-	dst->snap_dir = src->snap_dir == NULL ? NULL : strdup(src->snap_dir);
+	if (dst->snap_dir) free(dst->snap_dir);dst->snap_dir = src->snap_dir == NULL ? NULL : strdup(src->snap_dir);
 	if (src->snap_dir != NULL && dst->snap_dir == NULL)
 		return CNF_NOMEMORY;
-	dst->wal_dir = src->wal_dir == NULL ? NULL : strdup(src->wal_dir);
+	if (dst->wal_dir) free(dst->wal_dir);dst->wal_dir = src->wal_dir == NULL ? NULL : strdup(src->wal_dir);
 	if (src->wal_dir != NULL && dst->wal_dir == NULL)
 		return CNF_NOMEMORY;
 	dst->primary_port = src->primary_port;
 	dst->secondary_port = src->secondary_port;
 	dst->too_long_threshold = src->too_long_threshold;
-	dst->custom_proc_title = src->custom_proc_title == NULL ? NULL : strdup(src->custom_proc_title);
+	if (dst->custom_proc_title) free(dst->custom_proc_title);dst->custom_proc_title = src->custom_proc_title == NULL ? NULL : strdup(src->custom_proc_title);
 	if (src->custom_proc_title != NULL && dst->custom_proc_title == NULL)
 		return CNF_NOMEMORY;
 	dst->memcached_port = src->memcached_port;
-	dst->memcached_namespace = src->memcached_namespace;
+	dst->memcached_space = src->memcached_space;
 	dst->memcached_expire = src->memcached_expire;
 	dst->memcached_expire_per_loop = src->memcached_expire_per_loop;
 	dst->memcached_expire_full_sweep = src->memcached_expire_full_sweep;
@@ -1849,59 +1931,57 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->wal_dir_rescan_delay = src->wal_dir_rescan_delay;
 	dst->panic_on_snap_error = src->panic_on_snap_error;
 	dst->panic_on_wal_error = src->panic_on_wal_error;
-	dst->remote_hot_standby = src->remote_hot_standby;
-	dst->wal_feeder_ipaddr = src->wal_feeder_ipaddr == NULL ? NULL : strdup(src->wal_feeder_ipaddr);
-	if (src->wal_feeder_ipaddr != NULL && dst->wal_feeder_ipaddr == NULL)
+	if (dst->replication_source) free(dst->replication_source);dst->replication_source = src->replication_source == NULL ? NULL : strdup(src->replication_source);
+	if (src->replication_source != NULL && dst->replication_source == NULL)
 		return CNF_NOMEMORY;
-	dst->wal_feeder_port = src->wal_feeder_port;
 
-	dst->namespace = NULL;
-	if (src->namespace != NULL) {
-		i->idx_name__namespace = 0;
-		ARRAYALLOC(dst->namespace, 1, _name__namespace, 0, 0);
+	dst->space = NULL;
+	if (src->space != NULL) {
+		i->idx_name__space = 0;
+		ARRAYALLOC(dst->space, 1, _name__space, 0, 0);
 
-		while (src->namespace[i->idx_name__namespace] != NULL) {
-			ARRAYALLOC(dst->namespace, i->idx_name__namespace + 1, _name__namespace, 0, 0);
+		while (src->space[i->idx_name__space] != NULL) {
+			ARRAYALLOC(dst->space, i->idx_name__space + 1, _name__space, 0, 0);
 
-			dst->namespace[i->idx_name__namespace]->enabled = src->namespace[i->idx_name__namespace]->enabled;
-			dst->namespace[i->idx_name__namespace]->cardinality = src->namespace[i->idx_name__namespace]->cardinality;
-			dst->namespace[i->idx_name__namespace]->estimated_rows = src->namespace[i->idx_name__namespace]->estimated_rows;
+			dst->space[i->idx_name__space]->enabled = src->space[i->idx_name__space]->enabled;
+			dst->space[i->idx_name__space]->cardinality = src->space[i->idx_name__space]->cardinality;
+			dst->space[i->idx_name__space]->estimated_rows = src->space[i->idx_name__space]->estimated_rows;
 
-			dst->namespace[i->idx_name__namespace]->index = NULL;
-			if (src->namespace[i->idx_name__namespace]->index != NULL) {
-				i->idx_name__namespace__index = 0;
-				ARRAYALLOC(dst->namespace[i->idx_name__namespace]->index, 1, _name__namespace__index, 0, 0);
+			dst->space[i->idx_name__space]->index = NULL;
+			if (src->space[i->idx_name__space]->index != NULL) {
+				i->idx_name__space__index = 0;
+				ARRAYALLOC(dst->space[i->idx_name__space]->index, 1, _name__space__index, 0, 0);
 
-				while (src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index] != NULL) {
-					ARRAYALLOC(dst->namespace[i->idx_name__namespace]->index, i->idx_name__namespace__index + 1, _name__namespace__index, 0, 0);
+				while (src->space[i->idx_name__space]->index[i->idx_name__space__index] != NULL) {
+					ARRAYALLOC(dst->space[i->idx_name__space]->index, i->idx_name__space__index + 1, _name__space__index, 0, 0);
 
-					dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type == NULL ? NULL : strdup(src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type);
-					if (src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type != NULL && dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type == NULL)
+					if (dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type) free(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type);dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type = src->space[i->idx_name__space]->index[i->idx_name__space__index]->type == NULL ? NULL : strdup(src->space[i->idx_name__space]->index[i->idx_name__space__index]->type);
+					if (src->space[i->idx_name__space]->index[i->idx_name__space__index]->type != NULL && dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type == NULL)
 						return CNF_NOMEMORY;
-					dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->unique = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->unique;
+					dst->space[i->idx_name__space]->index[i->idx_name__space__index]->unique = src->space[i->idx_name__space]->index[i->idx_name__space__index]->unique;
 
-					dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field = NULL;
-					if (src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field != NULL) {
-						i->idx_name__namespace__index__key_field = 0;
-						ARRAYALLOC(dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field, 1, _name__namespace__index__key_field, 0, 0);
+					dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field = NULL;
+					if (src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field != NULL) {
+						i->idx_name__space__index__key_field = 0;
+						ARRAYALLOC(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field, 1, _name__space__index__key_field, 0, 0);
 
-						while (src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field] != NULL) {
-							ARRAYALLOC(dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field, i->idx_name__namespace__index__key_field + 1, _name__namespace__index__key_field, 0, 0);
+						while (src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field] != NULL) {
+							ARRAYALLOC(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field, i->idx_name__space__index__key_field + 1, _name__space__index__key_field, 0, 0);
 
-							dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->fieldno = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->fieldno;
-							dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type = src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type == NULL ? NULL : strdup(src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type);
-							if (src->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type != NULL && dst->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type == NULL)
+							dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->fieldno = src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->fieldno;
+							if (dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type) free(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type);dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type = src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type == NULL ? NULL : strdup(src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type);
+							if (src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type != NULL && dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type == NULL)
 								return CNF_NOMEMORY;
 
-							i->idx_name__namespace__index__key_field++;
+							i->idx_name__space__index__key_field++;
 						}
 					}
 
-					i->idx_name__namespace__index++;
+					i->idx_name__space__index++;
 				}
 			}
 
-			i->idx_name__namespace++;
+			i->idx_name__space++;
 		}
 	}
 
@@ -1916,6 +1996,8 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 
 	if (c->username != NULL)
 		free(c->username);
+	if (c->bind_ipaddr != NULL)
+		free(c->bind_ipaddr);
 	if (c->work_dir != NULL)
 		free(c->work_dir);
 	if (c->pid_file != NULL)
@@ -1928,47 +2010,47 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 		free(c->wal_dir);
 	if (c->custom_proc_title != NULL)
 		free(c->custom_proc_title);
-	if (c->wal_feeder_ipaddr != NULL)
-		free(c->wal_feeder_ipaddr);
+	if (c->replication_source != NULL)
+		free(c->replication_source);
 
-	if (c->namespace != NULL) {
-		i->idx_name__namespace = 0;
-		while (c->namespace[i->idx_name__namespace] != NULL) {
+	if (c->space != NULL) {
+		i->idx_name__space = 0;
+		while (c->space[i->idx_name__space] != NULL) {
 
-			if (c->namespace[i->idx_name__namespace]->index != NULL) {
-				i->idx_name__namespace__index = 0;
-				while (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index] != NULL) {
-					if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type != NULL)
-						free(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->type);
+			if (c->space[i->idx_name__space]->index != NULL) {
+				i->idx_name__space__index = 0;
+				while (c->space[i->idx_name__space]->index[i->idx_name__space__index] != NULL) {
+					if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->type != NULL)
+						free(c->space[i->idx_name__space]->index[i->idx_name__space__index]->type);
 
-					if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field != NULL) {
-						i->idx_name__namespace__index__key_field = 0;
-						while (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field] != NULL) {
-							if (c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type != NULL)
-								free(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]->type);
+					if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field != NULL) {
+						i->idx_name__space__index__key_field = 0;
+						while (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field] != NULL) {
+							if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type != NULL)
+								free(c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type);
 
-							free(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field[i->idx_name__namespace__index__key_field]);
+							free(c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]);
 
-							i->idx_name__namespace__index__key_field++;
+							i->idx_name__space__index__key_field++;
 						}
 
-						free(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]->key_field);
+						free(c->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field);
 					}
 
-					free(c->namespace[i->idx_name__namespace]->index[i->idx_name__namespace__index]);
+					free(c->space[i->idx_name__space]->index[i->idx_name__space__index]);
 
-					i->idx_name__namespace__index++;
+					i->idx_name__space__index++;
 				}
 
-				free(c->namespace[i->idx_name__namespace]->index);
+				free(c->space[i->idx_name__space]->index);
 			}
 
-			free(c->namespace[i->idx_name__namespace]);
+			free(c->space[i->idx_name__space]);
 
-			i->idx_name__namespace++;
+			i->idx_name__space++;
 		}
 
-		free(c->namespace);
+		free(c->space);
 	}
 }
 
@@ -1996,6 +2078,11 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 }
+	if (confetti_strcmp(c1->bind_ipaddr, c2->bind_ipaddr) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->bind_ipaddr");
+
+		return diff;
+}
 	if (c1->coredump != c2->coredump) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->coredump");
 
@@ -2003,6 +2090,11 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 	}
 	if (c1->admin_port != c2->admin_port) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->admin_port");
+
+		return diff;
+	}
+	if (c1->replication_port != c2->replication_port) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_port");
 
 		return diff;
 	}
@@ -2102,8 +2194,8 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 	}
-	if (c1->memcached_namespace != c2->memcached_namespace) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_namespace");
+	if (c1->memcached_space != c2->memcached_space) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_space");
 
 		return diff;
 	}
@@ -2167,97 +2259,83 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 		return diff;
 	}
 	if (!only_check_rdonly) {
-		if (c1->remote_hot_standby != c2->remote_hot_standby) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->remote_hot_standby");
-
-			return diff;
-		}
-	}
-	if (!only_check_rdonly) {
-		if (confetti_strcmp(c1->wal_feeder_ipaddr, c2->wal_feeder_ipaddr) != 0) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_ipaddr");
+		if (confetti_strcmp(c1->replication_source, c2->replication_source) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_source");
 
 			return diff;
 }
 	}
-	if (!only_check_rdonly) {
-		if (c1->wal_feeder_port != c2->wal_feeder_port) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_feeder_port");
+
+	i1->idx_name__space = 0;
+	i2->idx_name__space = 0;
+	while (c1->space != NULL && c1->space[i1->idx_name__space] != NULL && c2->space != NULL && c2->space[i2->idx_name__space] != NULL) {
+		if (c1->space[i1->idx_name__space]->enabled != c2->space[i2->idx_name__space]->enabled) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->enabled");
 
 			return diff;
 		}
-	}
-
-	i1->idx_name__namespace = 0;
-	i2->idx_name__namespace = 0;
-	while (c1->namespace != NULL && c1->namespace[i1->idx_name__namespace] != NULL && c2->namespace != NULL && c2->namespace[i2->idx_name__namespace] != NULL) {
-		if (c1->namespace[i1->idx_name__namespace]->enabled != c2->namespace[i2->idx_name__namespace]->enabled) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->enabled");
+		if (c1->space[i1->idx_name__space]->cardinality != c2->space[i2->idx_name__space]->cardinality) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->cardinality");
 
 			return diff;
 		}
-		if (c1->namespace[i1->idx_name__namespace]->cardinality != c2->namespace[i2->idx_name__namespace]->cardinality) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->cardinality");
-
-			return diff;
-		}
-		if (c1->namespace[i1->idx_name__namespace]->estimated_rows != c2->namespace[i2->idx_name__namespace]->estimated_rows) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->estimated_rows");
+		if (c1->space[i1->idx_name__space]->estimated_rows != c2->space[i2->idx_name__space]->estimated_rows) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->estimated_rows");
 
 			return diff;
 		}
 
-		i1->idx_name__namespace__index = 0;
-		i2->idx_name__namespace__index = 0;
-		while (c1->namespace[i1->idx_name__namespace]->index != NULL && c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index] != NULL && c2->namespace[i2->idx_name__namespace]->index != NULL && c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index] != NULL) {
-			if (confetti_strcmp(c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->type, c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->type) != 0) {
-				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]->type");
+		i1->idx_name__space__index = 0;
+		i2->idx_name__space__index = 0;
+		while (c1->space[i1->idx_name__space]->index != NULL && c1->space[i1->idx_name__space]->index[i1->idx_name__space__index] != NULL && c2->space[i2->idx_name__space]->index != NULL && c2->space[i2->idx_name__space]->index[i2->idx_name__space__index] != NULL) {
+			if (confetti_strcmp(c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->type, c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->type) != 0) {
+				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->index[]->type");
 
 				return diff;
 }
-			if (c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->unique != c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->unique) {
-				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]->unique");
+			if (c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->unique != c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->unique) {
+				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->index[]->unique");
 
 				return diff;
 			}
 
-			i1->idx_name__namespace__index__key_field = 0;
-			i2->idx_name__namespace__index__key_field = 0;
-			while (c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field != NULL && c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field[i1->idx_name__namespace__index__key_field] != NULL && c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field != NULL && c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field[i2->idx_name__namespace__index__key_field] != NULL) {
-				if (c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field[i1->idx_name__namespace__index__key_field]->fieldno != c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field[i2->idx_name__namespace__index__key_field]->fieldno) {
-					snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]->key_field[]->fieldno");
+			i1->idx_name__space__index__key_field = 0;
+			i2->idx_name__space__index__key_field = 0;
+			while (c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->key_field != NULL && c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->key_field[i1->idx_name__space__index__key_field] != NULL && c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->key_field != NULL && c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->key_field[i2->idx_name__space__index__key_field] != NULL) {
+				if (c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->key_field[i1->idx_name__space__index__key_field]->fieldno != c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->key_field[i2->idx_name__space__index__key_field]->fieldno) {
+					snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->index[]->key_field[]->fieldno");
 
 					return diff;
 				}
-				if (confetti_strcmp(c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field[i1->idx_name__namespace__index__key_field]->type, c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field[i2->idx_name__namespace__index__key_field]->type) != 0) {
-					snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]->key_field[]->type");
+				if (confetti_strcmp(c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->key_field[i1->idx_name__space__index__key_field]->type, c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->key_field[i2->idx_name__space__index__key_field]->type) != 0) {
+					snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->index[]->key_field[]->type");
 
 					return diff;
 }
 
-				i1->idx_name__namespace__index__key_field++;
-				i2->idx_name__namespace__index__key_field++;
+				i1->idx_name__space__index__key_field++;
+				i2->idx_name__space__index__key_field++;
 			}
-			if (!(c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field == c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field && c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field == NULL) && (c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field == NULL || c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field == NULL || c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index]->key_field[i1->idx_name__namespace__index__key_field] != NULL || c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index]->key_field[i2->idx_name__namespace__index__key_field] != NULL)) {
-				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]->key_field[]");
+			if (!(c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->key_field == c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->key_field && c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->key_field == NULL) && (c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->key_field == NULL || c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->key_field == NULL || c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->key_field[i1->idx_name__space__index__key_field] != NULL || c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->key_field[i2->idx_name__space__index__key_field] != NULL)) {
+				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->index[]->key_field[]");
 
 				return diff;
 			}
 
-			i1->idx_name__namespace__index++;
-			i2->idx_name__namespace__index++;
+			i1->idx_name__space__index++;
+			i2->idx_name__space__index++;
 		}
-		if (!(c1->namespace[i1->idx_name__namespace]->index == c2->namespace[i2->idx_name__namespace]->index && c1->namespace[i1->idx_name__namespace]->index == NULL) && (c1->namespace[i1->idx_name__namespace]->index == NULL || c2->namespace[i2->idx_name__namespace]->index == NULL || c1->namespace[i1->idx_name__namespace]->index[i1->idx_name__namespace__index] != NULL || c2->namespace[i2->idx_name__namespace]->index[i2->idx_name__namespace__index] != NULL)) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]->index[]");
+		if (!(c1->space[i1->idx_name__space]->index == c2->space[i2->idx_name__space]->index && c1->space[i1->idx_name__space]->index == NULL) && (c1->space[i1->idx_name__space]->index == NULL || c2->space[i2->idx_name__space]->index == NULL || c1->space[i1->idx_name__space]->index[i1->idx_name__space__index] != NULL || c2->space[i2->idx_name__space]->index[i2->idx_name__space__index] != NULL)) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->index[]");
 
 			return diff;
 		}
 
-		i1->idx_name__namespace++;
-		i2->idx_name__namespace++;
+		i1->idx_name__space++;
+		i2->idx_name__space++;
 	}
-	if (!(c1->namespace == c2->namespace && c1->namespace == NULL) && (c1->namespace == NULL || c2->namespace == NULL || c1->namespace[i1->idx_name__namespace] != NULL || c2->namespace[i2->idx_name__namespace] != NULL)) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->namespace[]");
+	if (!(c1->space == c2->space && c1->space == NULL) && (c1->space == NULL || c2->space == NULL || c1->space[i1->idx_name__space] != NULL || c2->space[i2->idx_name__space] != NULL)) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]");
 
 		return diff;
 	}

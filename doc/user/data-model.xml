@@ -19,37 +19,37 @@
   tuple is always assumed to be
   the identifying (unique) key. The remaining fields make up a 
   value, associated with the key.
-  Tuple sets are called <emphasis>namespaces<alt>perhaps, not the best name</alt></emphasis>, and there can be up to 255 namespaces defined per
+  Tuple sets are called <emphasis>spaces<alt>perhaps, not the best name</alt></emphasis>, and there can be up to 255 spaces defined per
   one Tarantool instance.
 
   Apart from the primary key, it is possible to define secondary
   <emphasis>indexes</emphasis> on other tuple fields. A secondary index does
   not have to be unique, and can cover several fields.
-  If a namespace has a secondary index, tuple cardinality must be
+  If a space has a secondary index, tuple cardinality must be
   at least equal to the ordinal number of the field
   participating in the index.
 </para>
 <para>
   Currently, entire server <emphasis>schema</emphasis> must be
   specified in the configuration file. The schema contains all
-  namespaces and indexes. A server started with a configuration
+  spaces and indexes. A server started with a configuration
   file that doesn't match contents of its data directory will most
   likely crash, but may also behave in a non-defined way. 
   It is, however, possible to stop the server,
-  add new namespaces to the schema or temporarily disable
-  existing namespaces, and then restart the server.
+  add new spaces to the schema or temporarily disable
+  existing spaces, and then restart the server.
 </para>
 <para>
-  Schema objects, such as namespaces and indexes, are referred to
+  Schema objects, such as spaces and indexes, are referred to
   by a numeric id. For example, to insert a tuple, is is necessary
-  to provide id of the destination namespace; to select
-  a tuple, one must provide the identifying key, namespace id and
+  to provide id of the destination space; to select
+  a tuple, one must provide the identifying key, space id and
   index id of the index used for lookup.
 </para>
 
 <para>
   The configuration file shipped with the binary package defines
-  only one namespace with id <literal>0</literal>. It has no keys
+  only one space with id <literal>0</literal>. It has no keys
   other than the primary. The primary key numeric id is also 
   <literal>0</literal>. Tarantool command line client
   supports a small subset of SQL, and we'll use it to demonstrate
@@ -83,7 +83,7 @@
       Since all object identifiers are numeric, Tarantool SQL subset
       expects identifiers that end with a number (<literal>t0</literal>,
       <literal>k0</literal>, <literal>k1</literal>, and so on):
-      this number is used to refer to the actual namespace or
+      this number is used to refer to the actual space or
       index.
     </para></listitem>
     <listitem><para>

@@ -100,6 +100,7 @@ class Test:
 
         diagnostics = "unknown"
         save_stdout = sys.stdout
+        builddir = self.args.builddir
         try:
             sys.stdout = FilteredStream(self.tmp_result)
             stdout_fileno = sys.stdout.stream.fileno()
@@ -211,6 +212,11 @@ class TestSuite:
         else:
             self.ini["disabled"] = dict()
 
+        if self.ini.has_key("valgrind_disabled"):
+            self.ini["valgrind_disabled"] = dict.fromkeys(self.ini["valgrind_disabled"].split(" "))
+        else:
+            self.ini["valgrind_disabled"] = dict()
+
         print "Collecting tests in \"" + suite_path + "\": " +\
             self.ini["description"] + "."
 
@@ -230,6 +236,10 @@ class TestSuite:
             raise RuntimeError("Unknown server: core = {0}, module = {1}".format(
                                self.ini["core"], self.ini["module"]))
 
+        if len(self.tests) == 0:
+            # noting to test, exit
+            return 0
+
         server.deploy(self.ini["config"],
                       server.find_exe(self.args.builddir, silent=False),
                       self.args.vardir, self.args.mem, self.args.start_and_exit, self.args.gdb,
@@ -241,17 +251,20 @@ class TestSuite:
         longsep = "=============================================================================="
         shortsep = "------------------------------------------------------------"
         print longsep
-        print string.ljust("TEST", 31), "RESULT"
+        print string.ljust("TEST", 48), "RESULT"
         print shortsep
         failed_tests = []
         self.ini["server"] = server
 
         for test in self.tests:
-            sys.stdout.write(string.ljust(test.name, 31))
+            sys.stdout.write(string.ljust(test.name, 48))
             # for better diagnostics in case of a long-running test
             sys.stdout.flush()
 
-            if os.path.basename(test.name) in self.ini["disabled"]:
+            test_name = os.path.basename(test.name)
+            if test_name in self.ini["disabled"]:
+                print "[ skip ]"
+            elif self.args.valgrind and test_name in self.ini["valgrind_disabled"]:
                 print "[ skip ]"
             else:
                 test.run(server)

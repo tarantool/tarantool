@@ -72,11 +72,11 @@ struct tree_index_member {
 SPTREE_DEF(str_t, realloc);
 
 struct index {
-	unsigned n;
 	bool enabled;
 
 	bool unique;
 
+	size_t (*size)(struct index *index);
 	struct box_tuple *(*find) (struct index * index, void *key);	/* only for unique lookups */
 	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
 	void (*remove) (struct index * index, struct box_tuple *);
@@ -84,7 +84,6 @@ struct index {
 	void (*iterator_init) (struct index *, struct tree_index_member * pattern);
 	struct box_tuple *(*iterator_next) (struct index *, struct tree_index_member * pattern);
 	struct box_tuple *(*iterator_next_nocompare) (struct index *);
-	size_t (*size)(struct index *index);
 	union {
 		khash_t(lstr_ptr_map) * str_hash;
 		khash_t(int_ptr_map) * int_hash;
@@ -95,18 +94,17 @@ struct index {
 	void *iterator;
 	bool iterator_empty;
 
-	struct namespace *namespace;
+	struct space *space;
 
 	struct {
-		struct {
-			u32 fieldno;
-			enum field_data_type type;
-		} *key_field;
-		u32 key_cardinality;
-
-		u32 *field_cmp_order;
-		u32 field_cmp_order_cnt;
-	};
+		u32 fieldno;
+		enum field_data_type type;
+	} *key_field;
+	u32 *field_cmp_order;
+	u32 field_cmp_order_cnt;
+	u32 key_cardinality;
+	/* relative offset of the index in the namespace */
+	u32 n;
 
 	struct tree_index_member *search_pattern;
 
@@ -114,13 +112,16 @@ struct index {
 };
 
 #define foreach_index(n, index_var)					\
-	for (struct index *index_var = namespace[(n)].index;		\
+	for (struct index *index_var = space[(n)].index;		\
 	     index_var->key_cardinality != 0;				\
 	     index_var++)						\
 		if (index_var->enabled)
 
 void
-index_init(struct index *index, struct namespace *namespace, size_t estimated_rows);
+index_init(struct index *index, struct space *space, size_t estimated_rows);
+
+void
+index_free(struct index *index);
 
 struct tree_index_member * alloc_search_pattern(struct index *index, int key_cardinality, void *key);
 void index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern);
