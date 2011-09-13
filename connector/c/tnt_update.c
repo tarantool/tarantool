@@ -158,7 +158,7 @@ tnt_update_splice(struct tnt_update *update, int field,
 
 	uint32_t offset_len = tnt_leb128_size(sizeof(offset)),
 	         length_len = tnt_leb128_size(sizeof(length)),
-	         list_len   = tnt_leb128_size(sizeof(list_size));
+	         list_len   = tnt_leb128_size(list_size);
 
 	op->size = offset_len + sizeof(offset) +
 		length_len + sizeof(length) +
