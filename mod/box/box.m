@@ -460,11 +460,9 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 			for (int i = 1; i < key_len; i++)
 				read_field(data);
 
-			struct tree_index_member *pattern =
-				alloc_search_pattern(txn->index, key_len, key);
-			txn->index->iterator_init(txn->index, pattern);
+			txn->index->iterator_init(txn->index, key_len, key);
 
-			while ((tuple = txn->index->iterator_next(txn->index, pattern)) != NULL) {
+			while ((tuple = txn->index->iterator_next(txn->index)) != NULL) {
 				if (tuple->flags & GHOST)
 					continue;
 
@@ -989,7 +987,6 @@ space_init(void)
 				index->field_cmp_order[cfg_key->fieldno] = k;
 			}
 
-			index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 			index->unique = cfg_index->unique;
 			index->type = STR2ENUM(index_type, cfg_index->type);
 			index->n = j;
@@ -1483,8 +1480,7 @@ mod_snapshot(struct log_io_iter *i)
 				snapshot_write_tuple(i, n, tuple);
 			}
 		} else {
-			struct tree_index_member *empty = alloc_search_pattern(pk, 0, NULL);
-			pk->iterator_init(pk, empty);
+			pk->iterator_init(pk, 0, NULL);
 			while ((tuple = pk->iterator_next_nocompare(pk))) {
 				snapshot_write_tuple(i, n, tuple);
 			}

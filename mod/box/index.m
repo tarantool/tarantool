@@ -264,8 +264,8 @@ tuple2tree_index_member(struct index *index,
 	return member;
 }
 
-struct tree_index_member *
-alloc_search_pattern(struct index *index, int key_cardinality, void *key)
+void
+init_search_pattern(struct index *index, int key_cardinality, void *key)
 {
 	struct tree_index_member *pattern = index->search_pattern;
 	void *key_field = key;
@@ -288,15 +288,13 @@ alloc_search_pattern(struct index *index, int key_cardinality, void *key)
 	}
 
 	pattern->tuple = NULL;
-
-	return pattern;
 }
 
 static struct box_tuple *
 index_find_tree(struct index *self, void *key)
 {
-	struct tree_index_member *member;
-	member = alloc_search_pattern(self, 1, key);
+	init_search_pattern(self, 1, key);
+	struct tree_index_member *member = self->search_pattern;
 	member->tuple = (void *)1; /* HACK: otherwise tree_index_member_compare returns -2,
 				      which is plain wrong */
 	member = sptree_str_t_find(self->idx.tree, member);
@@ -447,14 +445,15 @@ index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct b
 }
 
 void
-index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern)
+index_iterator_init_tree_str(struct index *index, int cardinality, void *key)
 {
-	sptree_str_t_iterator_init_set(self->idx.tree,
-				       (struct sptree_str_t_iterator **)&self->iterator, pattern);
+	init_search_pattern(index, cardinality, key);
+	sptree_str_t_iterator_init_set(index->idx.tree,
+				       (struct sptree_str_t_iterator **)&index->iterator, index->search_pattern);
 }
 
 struct box_tuple *
-index_iterator_next_tree_str(struct index *self, struct tree_index_member *pattern)
+index_iterator_next_tree_str(struct index *self)
 {
 	struct tree_index_member *member =
 		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
@@ -462,7 +461,7 @@ index_iterator_next_tree_str(struct index *self, struct tree_index_member *patte
 	if (member == NULL)
 		return NULL;
 
-	i32 r = tree_index_member_compare(pattern, member, self);
+	i32 r = tree_index_member_compare(self->search_pattern, member, self);
 	if (r == -2)
 		return member->tuple;
 
@@ -484,7 +483,7 @@ index_iterator_next_tree_str_nocompare(struct index *self)
 void
 validate_indexes(struct box_txn *txn)
 {
-	if (space[txn->n].index[1].key_cardinality != 0) {	/* there is more then one index */
+	if (space[txn->n].index[1].key_cardinality != 0) {	/* there is more than one index */
 		foreach_index(txn->n, index) {
 			for (u32 f = 0; f < index->key_cardinality; ++f) {
 				if (index->key_field[f].fieldno >= txn->tuple->cardinality)
@@ -573,8 +572,7 @@ build_indexes(void)
 				++i;
 			}
 		} else {
-			struct tree_index_member *empty = alloc_search_pattern(pk, 0, NULL);
-			pk->iterator_init(pk, empty);
+			pk->iterator_init(pk, 0, NULL);
 			struct box_tuple *tuple;
 			u32 i = 0;
 			while ((tuple = pk->iterator_next_nocompare(pk))) {
@@ -616,7 +614,6 @@ build_indexes(void)
 				 idx);
 
 			/* if n_tuples == 0 then estimated_tuples = 0, member == NULL, tree is empty */
-			assert(index->enabled == false);
 			sptree_str_t_init(index->idx.tree,
 					  SIZEOF_TREE_INDEX_MEMBER(index),
 					  member, n_tuples, estimated_tuples,
@@ -757,6 +754,7 @@ index_init(struct index *index, struct space *space, size_t estimated_rows)
 		panic("unsupported index type");
 		break;
 	}
+	index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 }
 
 void

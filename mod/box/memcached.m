@@ -437,10 +437,8 @@ memcached_space_init()
 
 	memc_index->key_field = salloc(sizeof(memc_index->key_field[0]));
 	memc_index->field_cmp_order = salloc(sizeof(u32));
-	memc_index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(memc_index));
 
-	if (memc_index->key_field == NULL || memc_index->field_cmp_order == NULL ||
-	    memc_index->search_pattern == NULL)
+	if (memc_index->key_field == NULL || memc_index->field_cmp_order == NULL)
 		panic("out of memory when configuring memcached_space");
 
 	memc_index->key_field[0].fieldno = 0;
