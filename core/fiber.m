@@ -665,28 +665,34 @@ read_inbox(void)
 }
 
 /**
+ * Read at least at_least bytes from a socket.
+ *
+ * @retval 0   socket is closed by the sender
+ * @reval -1   a system error
+ * @retval >0  success, size of the last read chunk is returned
+ *
  * @note: this is a cancellation point.
  */
 
-int
+ssize_t
 fiber_bread(struct tbuf *buf, size_t at_least)
 {
 	ssize_t r;
 	tbuf_ensure(buf, MAX(cfg.readahead, at_least));
+	size_t stop_at = buf->len + at_least;
 
 	fiber_io_start(fiber->fd, EV_READ);
-	for (;;) {
+
+	while (buf->len < stop_at) {
 		fiber_io_yield();
+
 		r = read(fiber->fd, buf->data + buf->len, buf->size - buf->len);
-		if (r > 0) {
-			buf->len += r;
-			if (buf->len >= at_least)
-				break;
-		} else {
-			if (r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
-				continue;
+		if (r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+			continue;
+		else if (r <= 0)
 			break;
-		}
+
+		buf->len += r;
 	}
 	fiber_io_stop(fiber->fd, EV_READ);
 

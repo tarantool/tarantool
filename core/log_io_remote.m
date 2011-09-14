@@ -42,36 +42,25 @@
 static int
 default_remote_row_handler(struct recovery_state *r, struct tbuf *row);
 
-static u32
-row_v11_len(struct tbuf *r)
-{
-	if (r->len < sizeof(struct row_v11))
-		return 0;
-
-	if (r->len < sizeof(struct row_v11) + row_v11(r)->len)
-		return 0;
-
-	return sizeof(struct row_v11) + row_v11(r)->len;
-}
-
 static struct tbuf *
 remote_row_reader_v11()
 {
-	const int header_size = sizeof(struct row_v11);
-	struct tbuf *m;
+	ssize_t to_read = sizeof(struct row_v11) - fiber->rbuf->len;
 
-	for (;;) {
-		if (row_v11_len(fiber->rbuf) != 0) {
-			m = tbuf_split(fiber->rbuf, row_v11_len(fiber->rbuf));
-			say_debug("read row bytes:%" PRIu32 " %s", m->len, tbuf_to_hex(m));
-			return m;
-		}
+	if (to_read > 0 && fiber_bread(fiber->rbuf, to_read) <= 0)
+		goto error;
 
-		if (fiber_bread(fiber->rbuf, header_size) <= 0) {
-			say_error("unexpected eof reading row header");
-			return NULL;
-		}
-	}
+	ssize_t request_len = row_v11(fiber->rbuf)->len + sizeof(struct row_v11);
+	to_read = request_len - fiber->rbuf->len;
+
+	if (to_read > 0 && fiber_bread(fiber->rbuf, to_read) <= 0)
+		goto error;
+
+	say_debug("read row bytes:%" PRI_SSZ, request_len);
+	return tbuf_split(fiber->rbuf, request_len);
+error:
+	say_error("unexpected eof reading row header");
+	return NULL;
 }
 
 static struct tbuf *

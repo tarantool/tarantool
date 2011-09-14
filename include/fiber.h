@@ -148,7 +148,7 @@ void yield(void);
 void fiber_destroy_all();
 
 struct msg *read_inbox(void);
-int fiber_bread(struct tbuf *, size_t v);
+ssize_t fiber_bread(struct tbuf *, size_t v);
 
 inline static void iov_add_unsafe(const void *buf, size_t len)
 {
