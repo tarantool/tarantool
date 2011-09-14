@@ -460,11 +460,9 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 			for (int i = 1; i < key_len; i++)
 				read_field(data);
 
-			struct tree_index_member *pattern =
-				alloc_search_pattern(txn->index, key_len, key);
-			txn->index->iterator_init(txn->index, pattern);
+			txn->index->iterator_init(txn->index, key_len, key);
 
-			while ((tuple = txn->index->iterator_next(txn->index, pattern)) != NULL) {
+			while ((tuple = txn->index->iterator_next(txn->index)) != NULL) {
 				if (tuple->flags & GHOST)
 					continue;
 
@@ -989,7 +987,6 @@ space_init(void)
 				index->field_cmp_order[cfg_key->fieldno] = k;
 			}
 
-			index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 			index->unique = cfg_index->unique;
 			index->type = STR2ENUM(index_type, cfg_index->type);
 			index->n = j;
@@ -1293,10 +1290,16 @@ mod_check_config(struct tarantool_cfg *conf)
 				return -1;
 			}
 
-			/* first space index must has hash type */
-			if (j == 0 && index_type != HASH) {
-				out_warning(0, "(space = %zu) space first index must has HASH type", i);
-				return -1;
+			/* first space index must be unique and cardinality == 1 */
+			if (j == 0) {
+				if (index->unique == false) {
+					out_warning(0, "(space = %zu) space first index must be unique", i);
+					return -1;
+				}
+				if (index_cardinality != 1) {
+					out_warning(0, "(space = %zu) space first index must be single keyed", i);
+					return -1;
+				}
 			}
 
 			switch (index_type) {
@@ -1438,33 +1441,49 @@ mod_cat(const char *filename)
 	return read_log(filename, xlog_print, snap_print, NULL);
 }
 
-void
-mod_snapshot(struct log_io_iter *i)
+static void
+snapshot_write_tuple(struct log_io_iter *i, unsigned n, struct box_tuple *tuple)
 {
 	struct tbuf *row;
 	struct box_snap_row header;
+
+	if (tuple->flags & GHOST)	// do not save fictive rows
+		return;
+
+	header.space = n;
+	header.tuple_size = tuple->cardinality;
+	header.data_size = tuple->bsize;
+
+	row = tbuf_alloc(fiber->gc_pool);
+	tbuf_append(row, &header, sizeof(header));
+	tbuf_append(row, tuple->data, tuple->bsize);
+
+	snapshot_write_row(i, snap_tag, default_cookie, row);
+}
+
+void
+mod_snapshot(struct log_io_iter *i)
+{
 	struct box_tuple *tuple;
-	khiter_t k;
 
 	for (uint32_t n = 0; n < BOX_NAMESPACE_MAX; ++n) {
 		if (!space[n].enabled)
 			continue;
 
-		assoc_foreach(space[n].index[0].idx.int_hash, k) {
-			tuple = kh_value(space[n].index[0].idx.int_hash, k);
+		struct index *pk = &space[n].index[0];
 
-			if (tuple->flags & GHOST)	// do not save fictive rows
-				continue;
 
-			header.space = n;
-			header.tuple_size = tuple->cardinality;
-			header.data_size = tuple->bsize;
-
-			row = tbuf_alloc(fiber->gc_pool);
-			tbuf_append(row, &header, sizeof(header));
-			tbuf_append(row, tuple->data, tuple->bsize);
-
-			snapshot_write_row(i, snap_tag, default_cookie, row);
+		if (pk->type == HASH) {
+			khiter_t k;
+			assoc_foreach(space[n].index[0].idx.hash, k) {
+				tuple = kh_value(space[n].index[0].idx.hash, k);
+				snapshot_write_tuple(i, n, tuple);
+			}
+		} else {
+			pk->iterator_init(pk, 0, NULL);
+			while ((tuple = pk->iterator_next_nocompare(pk))) {
+				snapshot_write_tuple(i, n, tuple);
+			}
 		}
 	}
 }

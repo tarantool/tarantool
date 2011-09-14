@@ -73,7 +73,6 @@ SPTREE_DEF(str_t, realloc);
 
 struct index {
 	bool enabled;
-
 	bool unique;
 
 	size_t (*size)(struct index *index);
@@ -81,8 +80,9 @@ struct index {
 	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
 	void (*remove) (struct index * index, struct box_tuple *);
 	void (*replace) (struct index * index, struct box_tuple *, struct box_tuple *);
-	void (*iterator_init) (struct index *, struct tree_index_member * pattern);
-	struct box_tuple *(*iterator_next) (struct index *, struct tree_index_member * pattern);
+	void (*iterator_init) (struct index *, int cardinality, void *key);
+	struct box_tuple *(*iterator_next) (struct index *);
+	struct box_tuple *(*iterator_next_nocompare) (struct index *);
 	union {
 		khash_t(lstr_ptr_map) * str_hash;
 		khash_t(int_ptr_map) * int_hash;
@@ -91,7 +91,7 @@ struct index {
 		sptree_str_t *tree;
 	} idx;
 	void *iterator;
-	bool iterator_empty;
+	struct tree_index_member *search_pattern;
 
 	struct space *space;
 
@@ -105,7 +105,6 @@ struct index {
 	/* relative offset of the index in the namespace */
 	u32 n;
 
-	struct tree_index_member *search_pattern;
 
 	enum index_type type;
 };
@@ -121,10 +120,6 @@ index_init(struct index *index, struct space *space, size_t estimated_rows);
 
 void
 index_free(struct index *index);
-
-struct tree_index_member * alloc_search_pattern(struct index *index, int key_cardinality, void *key);
-void index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern);
-struct box_tuple * index_iterator_next_tree_str(struct index *self, struct tree_index_member *pattern);
 
 struct box_txn;
 void validate_indexes(struct box_txn *txn);

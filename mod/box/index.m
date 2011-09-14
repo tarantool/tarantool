@@ -173,7 +173,7 @@ size_t
 index_hash_size(struct index *index)
 {
 	/* All kh_* structures have the same member layout */
-	return index->idx.hash->size;
+	return kh_size(index->idx.hash);
 }
 
 static struct box_tuple *
@@ -264,8 +264,8 @@ tuple2tree_index_member(struct index *index,
 	return member;
 }
 
-struct tree_index_member *
-alloc_search_pattern(struct index *index, int key_cardinality, void *key)
+void
+init_search_pattern(struct index *index, int key_cardinality, void *key)
 {
 	struct tree_index_member *pattern = index->search_pattern;
 	void *key_field = key;
@@ -288,19 +288,18 @@ alloc_search_pattern(struct index *index, int key_cardinality, void *key)
 	}
 
 	pattern->tuple = NULL;
-
-	return pattern;
 }
 
 static struct box_tuple *
 index_find_tree(struct index *self, void *key)
 {
-	struct tree_index_member *member = (struct tree_index_member *)key;
-
+	init_search_pattern(self, 1, key);
+	struct tree_index_member *member = self->search_pattern;
+	member->tuple = (void *)1; /* HACK: otherwise tree_index_member_compare returns -2,
+				      which is plain wrong */
 	member = sptree_str_t_find(self->idx.tree, member);
 	if (member != NULL)
 		return member->tuple;
-
 	return NULL;
 }
 
@@ -309,7 +308,10 @@ index_find_tree_by_tuple(struct index *self, struct box_tuple *tuple)
 {
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 
-	return self->find(self, member);
+	member = sptree_str_t_find(self->idx.tree, member);
+	if (member != NULL)
+		return member->tuple;
+	return NULL;
 }
 
 static void
@@ -443,14 +445,15 @@ index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct b
 }
 
 void
-index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern)
+index_iterator_init_tree_str(struct index *index, int cardinality, void *key)
 {
-	sptree_str_t_iterator_init_set(self->idx.tree,
-				       (struct sptree_str_t_iterator **)&self->iterator, pattern);
+	init_search_pattern(index, cardinality, key);
+	sptree_str_t_iterator_init_set(index->idx.tree,
+				       (struct sptree_str_t_iterator **)&index->iterator, index->search_pattern);
 }
 
 struct box_tuple *
-index_iterator_next_tree_str(struct index *self, struct tree_index_member *pattern)
+index_iterator_next_tree_str(struct index *self)
 {
 	struct tree_index_member *member =
 		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
@@ -458,17 +461,29 @@ index_iterator_next_tree_str(struct index *self, struct tree_index_member *patte
 	if (member == NULL)
 		return NULL;
 
-	i32 r = tree_index_member_compare(pattern, member, self);
+	i32 r = tree_index_member_compare(self->search_pattern, member, self);
 	if (r == -2)
 		return member->tuple;
 
 	return NULL;
 }
 
+static struct box_tuple *
+index_iterator_next_tree_str_nocompare(struct index *self)
+{
+	struct tree_index_member *member =
+		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
+
+	if (member == NULL)
+		return NULL;
+
+	return member->tuple;
+}
+
 void
 validate_indexes(struct box_txn *txn)
 {
-	if (space[txn->n].index[1].key_cardinality != 0) {	/* there is more then one index */
+	if (space[txn->n].index[1].key_cardinality != 0) {	/* there is more than one index */
 		foreach_index(txn->n, index) {
 			for (u32 f = 0; f < index->key_cardinality; ++f) {
 				if (index->key_field[f].fieldno >= txn->tuple->cardinality)
@@ -509,45 +524,76 @@ build_indexes(void)
 		if (space[n].enabled == false)
 			continue;
 
-		n_tuples = kh_size(space[n].index[0].idx.hash);
+		struct index *pk = &space[n].index[0];
+		n_tuples = pk->size(pk);
 		estimated_tuples = n_tuples * 1.2;
 
 		say_info("build_indexes: n = %" PRIu32 ": build arrays", n);
 
-		khiter_t k;
-		u32 i = 0;
-		assoc_foreach(space[n].index[0].idx.hash, k) {
-			for (u32 idx = 0;; idx++) {
-				struct index *index = &space[n].index[idx];
-				struct tree_index_member *member;
-				struct tree_index_member *m;
+		for (u32 idx = 0;; idx++) {
+			struct index *index = &space[n].index[idx];
+			if (index->key_cardinality == 0)
+				break;
 
-				if (index->key_cardinality == 0)
-					break;
+			if (index->type != TREE || index == pk)
+				continue;
 
-				if (index->type != TREE)
-					continue;
-
-				member = members[idx];
-				if (member == NULL) {
-					member = malloc(estimated_tuples *
-							SIZEOF_TREE_INDEX_MEMBER(index));
-					if (member == NULL)
-						panic("build_indexes: malloc failed: %m");
-
-					members[idx] = member;
-				}
-
-				m = (struct tree_index_member *)
-					((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
-
-				tuple2tree_index_member(index,
-							kh_value(space[n].index[0].idx.hash,
-								 k),
-							&m);
+			if (members[idx] == NULL) {
+				members[idx] = malloc(estimated_tuples *
+						      SIZEOF_TREE_INDEX_MEMBER(index));
+				if (members[idx] == NULL)
+					panic("build_indexes: malloc failed: %m");
 			}
+		}
 
-			++i;
+		if (pk->type == HASH) {
+			khiter_t k;
+			u32 i = 0;
+			assoc_foreach(space[n].index[0].idx.hash, k) {
+				for (u32 idx = 0;; idx++) {
+					struct index *index = &space[n].index[idx];
+					struct tree_index_member *member = members[idx];
+					struct tree_index_member *m;
+
+					if (index->key_cardinality == 0)
+						break;
+
+					if (index->type != TREE || index == pk)
+						continue;
+
+					m = (struct tree_index_member *)
+						((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
+
+					tuple2tree_index_member(index,
+								kh_value(space[n].index[0].idx.hash,
+									 k),
+								&m);
+				}
+				++i;
+			}
+		} else {
+			pk->iterator_init(pk, 0, NULL);
+			struct box_tuple *tuple;
+			u32 i = 0;
+			while ((tuple = pk->iterator_next_nocompare(pk))) {
+				for (u32 idx = 0;; idx++) {
+					struct index *index = &space[n].index[idx];
+					struct tree_index_member *member = members[idx];
+					struct tree_index_member *m;
+
+					if (index->key_cardinality == 0)
+						break;
+
+					if (index->type != TREE || index == pk)
+						continue;
+
+					m = (struct tree_index_member *)
+						((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
+
+					tuple2tree_index_member(index, tuple, &m);
+				}
+				++i;
+			}
 		}
 
 		say_info("build_indexes: n = %" PRIu32 ": build trees", n);
@@ -559,7 +605,7 @@ build_indexes(void)
 			if (index->key_cardinality == 0)
 				break;
 
-			if (index->type != TREE)
+			if (index->type != TREE || index == &space[n].index[0])
 				continue;
 
 			assert(index->enabled == false);
@@ -655,6 +701,7 @@ index_tree(struct index *index, struct space *space,
 	index->replace = index_replace_tree_str;
 	index->iterator_init = index_iterator_init_tree_str;
 	index->iterator_next = index_iterator_next_tree_str;
+	index->iterator_next_nocompare = index_iterator_next_tree_str_nocompare;
 	index->idx.tree = palloc(eter_pool, sizeof(*index->idx.tree));
 }
 
@@ -695,11 +742,19 @@ index_init(struct index *index, struct space *space, size_t estimated_rows)
 		/* tree index */
 		index->enabled = false;
 		index_tree(index, space, estimated_rows);
+		if (index->n == 0) {/* pk */
+			sptree_str_t_init(index->idx.tree,
+					  SIZEOF_TREE_INDEX_MEMBER(index),
+					  NULL, 0, 0,
+					  (void *)tree_index_member_compare, index);
+			index->enabled = true;
+		}
 		break;
 	default:
 		panic("unsupported index type");
 		break;
 	}
+	index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 }
 
 void
