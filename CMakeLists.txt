@@ -103,7 +103,7 @@ set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 #
 # Enable 'make TAGS' target.
 #
-add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m.h -e -f TAGS
+add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m -e -f TAGS
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #
