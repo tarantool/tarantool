@@ -160,7 +160,7 @@ index_tree_size(struct index *index)
 }
 
 static struct box_tuple *
-index_find_hash_by_tuple(struct index *self, struct box_tuple *tuple)
+index_hash_find_by_tuple(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	if (key == NULL)
@@ -177,7 +177,7 @@ index_hash_size(struct index *index)
 }
 
 static struct box_tuple *
-index_find_hash_num(struct index *self, void *key)
+index_hash_num_find(struct index *self, void *key)
 {
 	struct box_tuple *ret = NULL;
 	u32 key_size = load_varint32(&key);
@@ -188,13 +188,13 @@ index_find_hash_num(struct index *self, void *key)
 
 	assoc_find(int_ptr_map, self->idx.int_hash, num, ret);
 #ifdef DEBUG
-	say_debug("index_find_hash_num(self:%p, key:%i) = %p", self, num, ret);
+	say_debug("index_hash_num_find(self:%p, key:%i) = %p", self, num, ret);
 #endif
 	return ret;
 }
 
 static struct box_tuple *
-index_find_hash_num64(struct index *self, void *key)
+index_hash_num64_find(struct index *self, void *key)
 {
 	struct box_tuple *ret = NULL;
 	u32 key_size = load_varint32(&key);
@@ -205,20 +205,20 @@ index_find_hash_num64(struct index *self, void *key)
 
 	assoc_find(int64_ptr_map, self->idx.int64_hash, num, ret);
 #ifdef DEBUG
-	say_debug("index_find_hash_num(self:%p, key:%"PRIu64") = %p", self, num, ret);
+	say_debug("index_hash_num64_find(self:%p, key:%"PRIu64") = %p", self, num, ret);
 #endif
 	return ret;
 }
 
 static struct box_tuple *
-index_find_hash_str(struct index *self, void *key)
+index_hash_str_find(struct index *self, void *key)
 {
 	struct box_tuple *ret = NULL;
 
 	assoc_find(lstr_ptr_map, self->idx.str_hash, key, ret);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
-	say_debug("index_find_hash_str(self:%p, key:(%i)'%.*s') = %p", self, size, size, (u8 *)key,
+	say_debug("index_hash_str_find(self:%p, key:(%i)'%.*s') = %p", self, size, size, (u8 *)key,
 		  ret);
 #endif
 	return ret;
@@ -291,7 +291,7 @@ init_search_pattern(struct index *index, int key_cardinality, void *key)
 }
 
 static struct box_tuple *
-index_find_tree(struct index *self, void *key)
+index_tree_find(struct index *self, void *key)
 {
 	init_search_pattern(self, 1, key);
 	struct tree_index_member *member = self->search_pattern;
@@ -304,7 +304,7 @@ index_find_tree(struct index *self, void *key)
 }
 
 static struct box_tuple *
-index_find_tree_by_tuple(struct index *self, struct box_tuple *tuple)
+index_tree_find_by_tuple(struct index *self, struct box_tuple *tuple)
 {
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 
@@ -315,7 +315,7 @@ index_find_tree_by_tuple(struct index *self, struct box_tuple *tuple)
 }
 
 static void
-index_remove_hash_num(struct index *self, struct box_tuple *tuple)
+index_hash_num_remove(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	unsigned int key_size = load_varint32(&key);
@@ -325,12 +325,12 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 		tnt_raise(IllegalParams, :"key is not u32");
 	assoc_delete(int_ptr_map, self->idx.int_hash, num);
 #ifdef DEBUG
-	say_debug("index_remove_hash_num(self:%p, key:%i)", self, num);
+	say_debug("index_hash_num_remove(self:%p, key:%i)", self, num);
 #endif
 }
 
 static void
-index_remove_hash_num64(struct index *self, struct box_tuple *tuple)
+index_hash_num64_remove(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	unsigned int key_size = load_varint32(&key);
@@ -340,30 +340,30 @@ index_remove_hash_num64(struct index *self, struct box_tuple *tuple)
 		tnt_raise(IllegalParams, :"key is not u64");
 	assoc_delete(int64_ptr_map, self->idx.int64_hash, num);
 #ifdef DEBUG
-	say_debug("index_remove_hash_num(self:%p, key:%"PRIu64")", self, num);
+	say_debug("index_hash_num64_remove(self:%p, key:%"PRIu64")", self, num);
 #endif
 }
 
 static void
-index_remove_hash_str(struct index *self, struct box_tuple *tuple)
+index_hash_str_remove(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	assoc_delete(lstr_ptr_map, self->idx.str_hash, key);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
-	say_debug("index_remove_hash_str(self:%p, key:'%.*s')", self, size, (u8 *)key);
+	say_debug("index_hash_str_remove(self:%p, key:'%.*s')", self, size, (u8 *)key);
 #endif
 }
 
 static void
-index_remove_tree_str(struct index *self, struct box_tuple *tuple)
+index_tree_remove(struct index *self, struct box_tuple *tuple)
 {
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 	sptree_str_t_delete(self->idx.tree, member);
 }
 
 static void
-index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+index_hash_num_replace(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	u32 key_size = load_varint32(&key);
@@ -381,13 +381,13 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 
 	assoc_replace(int_ptr_map, self->idx.int_hash, num, tuple);
 #ifdef DEBUG
-	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%i", self, old_tuple,
+	say_debug("index_hash_num_replace(self:%p, old_tuple:%p, tuple:%p) key:%i", self, old_tuple,
 		  tuple, num);
 #endif
 }
 
 static void
-index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+index_hash_num64_replace(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	u32 key_size = load_varint32(&key);
@@ -405,13 +405,13 @@ index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct
 
 	assoc_replace(int64_ptr_map, self->idx.int64_hash, num, tuple);
 #ifdef DEBUG
-	say_debug("index_replace_hash_num(self:%p, old_tuple:%p, tuple:%p) key:%"PRIu64, self, old_tuple,
+	say_debug("index_hash_num64_replace(self:%p, old_tuple:%p, tuple:%p) key:%"PRIu64, self, old_tuple,
 		  tuple, num);
 #endif
 }
 
 static void
-index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+index_hash_str_replace(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 
@@ -426,13 +426,13 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 	assoc_replace(lstr_ptr_map, self->idx.str_hash, key, tuple);
 #ifdef DEBUG
 	u32 size = load_varint32(&key);
-	say_debug("index_replace_hash_str(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'", self,
+	say_debug("index_hash_str_replace(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'", self,
 		  old_tuple, tuple, size, (u8 *)key);
 #endif
 }
 
 static void
-index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+index_tree_replace(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	if (tuple->cardinality < self->field_cmp_order_cnt)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->field_cmp_order_cnt);
@@ -440,12 +440,12 @@ index_replace_tree_str(struct index *self, struct box_tuple *old_tuple, struct b
 	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
 
 	if (old_tuple)
-		index_remove_tree_str(self, old_tuple);
+		index_tree_remove(self, old_tuple);
 	sptree_str_t_insert(self->idx.tree, member);
 }
 
 void
-index_iterator_init_tree_str(struct index *index, int cardinality, void *key)
+index_tree_iterator_init(struct index *index, int cardinality, void *key)
 {
 	init_search_pattern(index, cardinality, key);
 	sptree_str_t_iterator_init_set(index->idx.tree,
@@ -453,7 +453,7 @@ index_iterator_init_tree_str(struct index *index, int cardinality, void *key)
 }
 
 struct box_tuple *
-index_iterator_next_tree_str(struct index *self)
+index_tree_iterator_next(struct index *self)
 {
 	struct tree_index_member *member =
 		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
@@ -469,7 +469,7 @@ index_iterator_next_tree_str(struct index *self)
 }
 
 static struct box_tuple *
-index_iterator_next_tree_str_nocompare(struct index *self)
+index_tree_iterator_next_nocompare(struct index *self)
 {
 	struct tree_index_member *member =
 		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
@@ -631,10 +631,10 @@ index_hash_num(struct index *index, struct space *space, size_t estimated_rows)
 	index->type = HASH;
 	index->space = space;
 	index->size = index_hash_size;
-	index->find = index_find_hash_num;
-	index->find_by_tuple = index_find_hash_by_tuple;
-	index->remove = index_remove_hash_num;
-	index->replace = index_replace_hash_num;
+	index->find = index_hash_num_find;
+	index->find_by_tuple = index_hash_find_by_tuple;
+	index->remove = index_hash_num_remove;
+	index->replace = index_hash_num_replace;
 	index->idx.int_hash = kh_init(int_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(int_ptr_map, index->idx.int_hash, estimated_rows);
@@ -652,10 +652,10 @@ index_hash_num64(struct index *index, struct space *space, size_t estimated_rows
 	index->type = HASH;
 	index->space = space;
 	index->size = index_hash_size;
-	index->find = index_find_hash_num64;
-	index->find_by_tuple = index_find_hash_by_tuple;
-	index->remove = index_remove_hash_num64;
-	index->replace = index_replace_hash_num64;
+	index->find = index_hash_num64_find;
+	index->find_by_tuple = index_hash_find_by_tuple;
+	index->remove = index_hash_num64_remove;
+	index->replace = index_hash_num64_replace;
 	index->idx.int64_hash = kh_init(int64_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(int64_ptr_map, index->idx.int64_hash, estimated_rows);
@@ -673,10 +673,10 @@ index_hash_str(struct index *index, struct space *space, size_t estimated_rows)
 	index->type = HASH;
 	index->space = space;
 	index->size = index_hash_size;
-	index->find = index_find_hash_str;
-	index->find_by_tuple = index_find_hash_by_tuple;
-	index->remove = index_remove_hash_str;
-	index->replace = index_replace_hash_str;
+	index->find = index_hash_str_find;
+	index->find_by_tuple = index_hash_find_by_tuple;
+	index->remove = index_hash_str_remove;
+	index->replace = index_hash_str_replace;
 	index->idx.str_hash = kh_init(lstr_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(lstr_ptr_map, index->idx.str_hash, estimated_rows);
@@ -695,13 +695,13 @@ index_tree(struct index *index, struct space *space,
 	index->type = TREE;
 	index->space = space;
 	index->size = index_tree_size;
-	index->find = index_find_tree;
-	index->find_by_tuple = index_find_tree_by_tuple;
-	index->remove = index_remove_tree_str;
-	index->replace = index_replace_tree_str;
-	index->iterator_init = index_iterator_init_tree_str;
-	index->iterator_next = index_iterator_next_tree_str;
-	index->iterator_next_nocompare = index_iterator_next_tree_str_nocompare;
+	index->find = index_tree_find;
+	index->find_by_tuple = index_tree_find_by_tuple;
+	index->remove = index_tree_remove;
+	index->replace = index_tree_replace;
+	index->iterator_init = index_tree_iterator_init;
+	index->iterator_next = index_tree_iterator_next;
+	index->iterator_next_nocompare = index_tree_iterator_next_nocompare;
 	index->idx.tree = palloc(eter_pool, sizeof(*index->idx.tree));
 }
 
