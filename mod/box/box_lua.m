@@ -174,8 +174,8 @@ static int
 lbox_index_tostring(struct lua_State *L)
 {
 	struct index *index = lua_checkindex(L, 1);
-	lua_pushfstring(L, "box.space[%d].index[%d]",
-			index->space->n, index->n);
+	lua_pushfstring(L, "index %d in space %d",
+			index->n, index->space->n);
 	return 1;
 }
 
