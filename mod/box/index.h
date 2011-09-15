@@ -60,13 +60,13 @@ extern const char *field_data_type_strs[];
 enum index_type { HASH, TREE, index_type_MAX };
 extern const char *index_type_strs[];
 
-struct tree_index_member {
+struct index_tree_el {
 	struct box_tuple *tuple;
 	struct field key[];
 };
 
-#define SIZEOF_TREE_INDEX_MEMBER(index) \
-	(sizeof(struct tree_index_member) + sizeof(struct field) * (index)->key_cardinality)
+#define INDEX_TREE_EL_SIZE(index) \
+	(sizeof(struct index_tree_el) + sizeof(struct field) * (index)->key_cardinality)
 
 #include <third_party/sptree.h>
 SPTREE_DEF(str_t, realloc);
@@ -91,7 +91,7 @@ struct index {
 		sptree_str_t *tree;
 	} idx;
 	void *iterator;
-	struct tree_index_member *search_pattern;
+	struct index_tree_el *search_pattern;
 
 	struct space *space;
 

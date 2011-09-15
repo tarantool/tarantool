@@ -54,11 +54,6 @@ const struct field ASTERISK = {
 	}
 };
 
-/* hooks */
-typedef int (*box_hook_t) (struct box_txn * txn);
-
-
-
 #define IS_ASTERISK(f) ((f)->len == ASTERISK.len && (f)->data_ptr == ASTERISK.data_ptr)
 
 /** Compare two fields of an index key.
@@ -110,7 +105,8 @@ field_compare(struct field *f1, struct field *f2, enum field_data_type type)
 
 
 /*
- * Compare index_tree_members only by fields defined in index->field_cmp_order.
+ * Compare index_tree elements only by fields defined in
+ * index->field_cmp_order.
  * Return:
  *      Common meaning:
  *              < 0  - a is smaller than b
@@ -122,13 +118,14 @@ field_compare(struct field *f1, struct field *f2, enum field_data_type type)
  *              3 - differ in pointers
  */
 static int
-tree_index_member_compare(struct tree_index_member *member_a, struct tree_index_member *member_b,
-			  struct index *index)
+index_tree_el_compare(struct index_tree_el *elem_a,
+		      struct index_tree_el *elem_b,
+		      struct index *index)
 {
 	i8 r = 0;
 
 	for (i32 i = 0, end = index->key_cardinality; i < end; ++i) {
-		r = field_compare(&member_a->key[i], &member_b->key[i], index->key_field[i].type);
+		r = field_compare(&elem_a->key[i], &elem_b->key[i], index->key_field[i].type);
 
 		if (r != 0)
 			break;
@@ -137,16 +134,16 @@ tree_index_member_compare(struct tree_index_member *member_a, struct tree_index_
 	if (r != 0)
 		return r;
 
-	if (member_a->tuple == NULL)
+	if (elem_a->tuple == NULL)
 		return -2;
 
-	if (member_b->tuple == NULL)
+	if (elem_b->tuple == NULL)
 		return 2;
 
 	if (index->unique == false) {
-		if (member_a->tuple > member_b->tuple)
+		if (elem_a->tuple > elem_b->tuple)
 			return 3;
-		else if (member_a->tuple < member_b->tuple)
+		else if (elem_a->tuple < elem_b->tuple)
 			return -3;
 	}
 
@@ -172,7 +169,7 @@ index_hash_find_by_tuple(struct index *self, struct box_tuple *tuple)
 size_t
 index_hash_size(struct index *index)
 {
-	/* All kh_* structures have the same member layout */
+	/* All kh_* structures have the same elem layout */
 	return kh_size(index->idx.hash);
 }
 
@@ -224,17 +221,17 @@ index_hash_str_find(struct index *self, void *key)
 	return ret;
 }
 
-static struct tree_index_member *
-tuple2tree_index_member(struct index *index,
-			struct box_tuple *tuple, struct tree_index_member **member_p)
+static struct index_tree_el *
+tuple2index_tree_el(struct index *index,
+		    struct box_tuple *tuple, struct index_tree_el **p_elem)
 {
-	struct tree_index_member *member;
+	struct index_tree_el *elem;
 	void *tuple_data = tuple->data;
 
-	if (member_p == NULL || *member_p == NULL)
-		member = palloc(fiber->gc_pool, SIZEOF_TREE_INDEX_MEMBER(index));
+	if (p_elem == NULL || *p_elem == NULL)
+		elem = palloc(fiber->gc_pool, INDEX_TREE_EL_SIZE(index));
 	else
-		member = *member_p;
+		elem = *p_elem;
 
 	for (i32 i = 0; i < index->field_cmp_order_cnt; ++i) {
 		struct field f;
@@ -253,21 +250,21 @@ tuple2tree_index_member(struct index *index,
 		if (index->field_cmp_order[i] == -1)
 			continue;
 
-		member->key[index->field_cmp_order[i]] = f;
+		elem->key[index->field_cmp_order[i]] = f;
 	}
 
-	member->tuple = tuple;
+	elem->tuple = tuple;
 
-	if (member_p)
-		*member_p = member;
+	if (p_elem)
+		*p_elem = elem;
 
-	return member;
+	return elem;
 }
 
 void
 init_search_pattern(struct index *index, int key_cardinality, void *key)
 {
-	struct tree_index_member *pattern = index->search_pattern;
+	struct index_tree_el *pattern = index->search_pattern;
 	void *key_field = key;
 
 	assert(key_cardinality <= index->key_cardinality);
@@ -294,23 +291,24 @@ static struct box_tuple *
 index_tree_find(struct index *self, void *key)
 {
 	init_search_pattern(self, 1, key);
-	struct tree_index_member *member = self->search_pattern;
-	member->tuple = (void *)1; /* HACK: otherwise tree_index_member_compare returns -2,
-				      which is plain wrong */
-	member = sptree_str_t_find(self->idx.tree, member);
-	if (member != NULL)
-		return member->tuple;
+	struct index_tree_el *elem = self->search_pattern;
+	/* HACK: otherwise index_tree_el_compare returns -2,
+	 * which is plain wrong. */
+	elem->tuple = (void *)1;
+	elem = sptree_str_t_find(self->idx.tree, elem);
+	if (elem != NULL)
+		return elem->tuple;
 	return NULL;
 }
 
 static struct box_tuple *
 index_tree_find_by_tuple(struct index *self, struct box_tuple *tuple)
 {
-	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
+	struct index_tree_el *elem = tuple2index_tree_el(self, tuple, NULL);
 
-	member = sptree_str_t_find(self->idx.tree, member);
-	if (member != NULL)
-		return member->tuple;
+	elem = sptree_str_t_find(self->idx.tree, elem);
+	if (elem != NULL)
+		return elem->tuple;
 	return NULL;
 }
 
@@ -358,12 +356,13 @@ index_hash_str_remove(struct index *self, struct box_tuple *tuple)
 static void
 index_tree_remove(struct index *self, struct box_tuple *tuple)
 {
-	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
-	sptree_str_t_delete(self->idx.tree, member);
+	struct index_tree_el *elem = tuple2index_tree_el(self, tuple, NULL);
+	sptree_str_t_delete(self->idx.tree, elem);
 }
 
 static void
-index_hash_num_replace(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+index_hash_num_replace(struct index *self,
+		       struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	u32 key_size = load_varint32(&key);
@@ -387,7 +386,9 @@ index_hash_num_replace(struct index *self, struct box_tuple *old_tuple, struct b
 }
 
 static void
-index_hash_num64_replace(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+index_hash_num64_replace(struct index *self,
+			 struct box_tuple *old_tuple,
+			 struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 	u32 key_size = load_varint32(&key);
@@ -411,7 +412,8 @@ index_hash_num64_replace(struct index *self, struct box_tuple *old_tuple, struct
 }
 
 static void
-index_hash_str_replace(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+index_hash_str_replace(struct index *self,
+		       struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 
@@ -432,16 +434,17 @@ index_hash_str_replace(struct index *self, struct box_tuple *old_tuple, struct b
 }
 
 static void
-index_tree_replace(struct index *self, struct box_tuple *old_tuple, struct box_tuple *tuple)
+index_tree_replace(struct index *self,
+		   struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
 	if (tuple->cardinality < self->field_cmp_order_cnt)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->field_cmp_order_cnt);
 
-	struct tree_index_member *member = tuple2tree_index_member(self, tuple, NULL);
+	struct index_tree_el *elem = tuple2index_tree_el(self, tuple, NULL);
 
 	if (old_tuple)
 		index_tree_remove(self, old_tuple);
-	sptree_str_t_insert(self->idx.tree, member);
+	sptree_str_t_insert(self->idx.tree, elem);
 }
 
 void
@@ -455,15 +458,15 @@ index_tree_iterator_init(struct index *index, int cardinality, void *key)
 struct box_tuple *
 index_tree_iterator_next(struct index *self)
 {
-	struct tree_index_member *member =
+	struct index_tree_el *elem =
 		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
 
-	if (member == NULL)
+	if (elem == NULL)
 		return NULL;
 
-	i32 r = tree_index_member_compare(self->search_pattern, member, self);
+	i32 r = index_tree_el_compare(self->search_pattern, elem, self);
 	if (r == -2)
-		return member->tuple;
+		return elem->tuple;
 
 	return NULL;
 }
@@ -471,13 +474,13 @@ index_tree_iterator_next(struct index *self)
 static struct box_tuple *
 index_tree_iterator_next_nocompare(struct index *self)
 {
-	struct tree_index_member *member =
+	struct index_tree_el *elem =
 		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
 
-	if (member == NULL)
+	if (elem == NULL)
 		return NULL;
 
-	return member->tuple;
+	return elem->tuple;
 }
 
 void
@@ -519,7 +522,7 @@ build_indexes(void)
 {
 	for (u32 n = 0; n < BOX_NAMESPACE_MAX; ++n) {
 		u32 n_tuples, estimated_tuples;
-		struct tree_index_member *members[nelem(space[n].index)] = { NULL };
+		struct index_tree_el *elems[nelem(space[n].index)] = { NULL };
 
 		if (space[n].enabled == false)
 			continue;
@@ -538,10 +541,10 @@ build_indexes(void)
 			if (index->type != TREE || index == pk)
 				continue;
 
-			if (members[idx] == NULL) {
-				members[idx] = malloc(estimated_tuples *
-						      SIZEOF_TREE_INDEX_MEMBER(index));
-				if (members[idx] == NULL)
+			if (elems[idx] == NULL) {
+				elems[idx] = malloc(estimated_tuples *
+						      INDEX_TREE_EL_SIZE(index));
+				if (elems[idx] == NULL)
 					panic("build_indexes: malloc failed: %m");
 			}
 		}
@@ -552,8 +555,8 @@ build_indexes(void)
 			assoc_foreach(space[n].index[0].idx.hash, k) {
 				for (u32 idx = 0;; idx++) {
 					struct index *index = &space[n].index[idx];
-					struct tree_index_member *member = members[idx];
-					struct tree_index_member *m;
+					struct index_tree_el *elem = elems[idx];
+					struct index_tree_el *m;
 
 					if (index->key_cardinality == 0)
 						break;
@@ -561,10 +564,10 @@ build_indexes(void)
 					if (index->type != TREE || index == pk)
 						continue;
 
-					m = (struct tree_index_member *)
-						((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
+					m = (struct index_tree_el *)
+						((char *)elem + i * INDEX_TREE_EL_SIZE(index));
 
-					tuple2tree_index_member(index,
+					tuple2index_tree_el(index,
 								kh_value(space[n].index[0].idx.hash,
 									 k),
 								&m);
@@ -578,8 +581,8 @@ build_indexes(void)
 			while ((tuple = pk->iterator_next_nocompare(pk))) {
 				for (u32 idx = 0;; idx++) {
 					struct index *index = &space[n].index[idx];
-					struct tree_index_member *member = members[idx];
-					struct tree_index_member *m;
+					struct index_tree_el *elem = elems[idx];
+					struct index_tree_el *m;
 
 					if (index->key_cardinality == 0)
 						break;
@@ -587,10 +590,10 @@ build_indexes(void)
 					if (index->type != TREE || index == pk)
 						continue;
 
-					m = (struct tree_index_member *)
-						((char *)member + i * SIZEOF_TREE_INDEX_MEMBER(index));
+					m = (struct index_tree_el *)
+						((char *)elem + i * INDEX_TREE_EL_SIZE(index));
 
-					tuple2tree_index_member(index, tuple, &m);
+					tuple2index_tree_el(index, tuple, &m);
 				}
 				++i;
 			}
@@ -600,7 +603,7 @@ build_indexes(void)
 
 		for (u32 idx = 0;; idx++) {
 			struct index *index = &space[n].index[idx];
-			struct tree_index_member *member = members[idx];
+			struct index_tree_el *elem = elems[idx];
 
 			if (index->key_cardinality == 0)
 				break;
@@ -613,11 +616,11 @@ build_indexes(void)
 			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": build tree", n,
 				 idx);
 
-			/* if n_tuples == 0 then estimated_tuples = 0, member == NULL, tree is empty */
+			/* if n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
 			sptree_str_t_init(index->idx.tree,
-					  SIZEOF_TREE_INDEX_MEMBER(index),
-					  member, n_tuples, estimated_tuples,
-					  (void *)tree_index_member_compare, index);
+					  INDEX_TREE_EL_SIZE(index),
+					  elem, n_tuples, estimated_tuples,
+					  (void *)index_tree_el_compare, index);
 			index->enabled = true;
 
 			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": end", n, idx);
@@ -626,7 +629,8 @@ build_indexes(void)
 }
 
 static void
-index_hash_num(struct index *index, struct space *space, size_t estimated_rows)
+index_hash_num(struct index *index, struct space *space,
+	       size_t estimated_rows)
 {
 	index->type = HASH;
 	index->space = space;
@@ -647,7 +651,8 @@ index_hash_num_free(struct index *index)
 }
 
 static void
-index_hash_num64(struct index *index, struct space *space, size_t estimated_rows)
+index_hash_num64(struct index *index, struct space *space,
+		 size_t estimated_rows)
 {
 	index->type = HASH;
 	index->space = space;
@@ -744,9 +749,9 @@ index_init(struct index *index, struct space *space, size_t estimated_rows)
 		index_tree(index, space, estimated_rows);
 		if (index->n == 0) {/* pk */
 			sptree_str_t_init(index->idx.tree,
-					  SIZEOF_TREE_INDEX_MEMBER(index),
+					  INDEX_TREE_EL_SIZE(index),
 					  NULL, 0, 0,
-					  (void *)tree_index_member_compare, index);
+					  (void *)index_tree_el_compare, index);
 			index->enabled = true;
 		}
 		break;
@@ -754,7 +759,7 @@ index_init(struct index *index, struct space *space, size_t estimated_rows)
 		panic("unsupported index type");
 		break;
 	}
-	index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
+	index->search_pattern = palloc(eter_pool, INDEX_TREE_EL_SIZE(index));
 }
 
 void
