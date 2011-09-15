@@ -50,4 +50,18 @@ exec sql "select * from t0 where k0='Spears'"
 exec sql "select * from t0 where k1='Anything'"
 exec sql "select * from t0 where k1='Britney'"
 exec sql "delete from t0 where k0='Spears'"
+print """#
+# Test composite keys with trees
+#"""
+exec sql "insert into t1 values ('key1', 'part1', 'part2')"
+exec sql "insert into t1 values ('key2', 'part1', 'part2_a')"
+exec sql "insert into t1 values ('key3', 'part1', 'part2_b')"
+exec sql "select * from t1 where k0='key1'"
+exec sql "select * from t1 where k0='key2'"
+exec sql "select * from t1 where k0='key3'"
+exec sql "select * from t1 where k1='part1'"
+exec sql "delete from t1 where k0='key1'"
+exec sql "delete from t1 where k0='key2'"
+exec sql "delete from t1 where k0='key3'"
+
 # vim: syntax=python

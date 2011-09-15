@@ -1,0 +1,58 @@
+insert into t2 values (1, 'tuple')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+insert into t2 values (2, 'tuple 2')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+insert into t2 values (3, 'tuple 3')
+Insert OK, 1 row affected
+select * from t2 where k0 = 1
+Found 1 tuple:
+[1, 'tuple']
+select * from t2 where k0 = 2
+Found 1 tuple:
+[2, 'tuple 2']
+select * from t2 where k0 = 3
+Found 1 tuple:
+[3, 'tuple 3']
+delete from t2 where k0 = 1
+Delete OK, 1 row affected
+delete from t2 where k0 = 2
+Delete OK, 1 row affected
+delete from t2 where k0 = 3
+Delete OK, 1 row affected
+insert into t3 values ('identifier', 'tuple')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+insert into t3 values ('second', 'tuple 2')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+insert into t3 values ('third', 'tuple 3')
+Insert OK, 1 row affected
+select * from t3 where k0 = 'identifier'
+Found 1 tuple:
+['identifier', 'tuple']
+select * from t3 where k0 = 'second'
+Found 1 tuple:
+['second', 'tuple 2']
+select * from t3 where k0 = 'third'
+Found 1 tuple:
+['third', 'tuple 3']
+delete from t3 where k0 = 'identifier'
+Delete OK, 1 row affected
+delete from t3 where k0 = 'second'
+Delete OK, 1 row affected
+delete from t3 where k0 = 'third'
+Delete OK, 1 row affected
