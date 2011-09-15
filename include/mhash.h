@@ -49,8 +49,6 @@ e * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
    SOFTWARE.
 */
 
-#import <config.h>
-
 #ifndef MH_INCREMENTAL_RESIZE
 #define MH_INCREMENTAL_RESIZE 1
 #endif
@@ -107,6 +105,7 @@ struct _mh(t) {
 
 #define mh_value(h, i)		({ (h)->p[(i)].val;	})
 #define mh_size(h)		({ (h)->size; 		})
+#define mh_begin(h)		({ 0;			})
 #define mh_end(h)		({ (h)->n_buckets;	})
 
 
@@ -122,7 +121,7 @@ void _mh(dump)(struct _mh(t) *h);
 #define get_slot(h, key) _mh(get_slot)(h, key)
 #define put_slot(h, key) _mh(put_slot)(h, key)
 
-static uint32_t
+static inline uint32_t
 _mh(get_slot)(struct _mh(t) *h, mh_key_t key)
 {
 	uint32_t inc, k, i;
@@ -143,7 +142,7 @@ _mh(get_slot)(struct _mh(t) *h, mh_key_t key)
 }
 
 #if 0
-static uint32_t
+static inline uint32_t
 _mh(put_slot)(struct _mh(t) *h, mh_key_t key)
 {
 	uint32_t inc, k, i, p = h->n_buckets;
@@ -171,7 +170,7 @@ _mh(put_slot)(struct _mh(t) *h, mh_key_t key)
 #endif
 
 /* Faster variant of above loop */
-static uint32_t
+static inline uint32_t
 _mh(put_slot)(struct _mh(t) *h, mh_key_t key)
 {
 	uint32_t inc, k, i, p = h->n_buckets;
@@ -354,14 +353,16 @@ _mh(start_resize)(struct _mh(t) *h, uint32_t buckets, uint32_t batch)
 	if (buckets < h->n_buckets)
 		buckets = h->n_buckets;
 	if (buckets < h->size * 2) {
-		for (int k = h->prime; k < __ac_HASH_PRIME_SIZE; k++)
+		for (int k = h->prime; k < __ac_HASH_PRIME_SIZE - 1; k++)
 			if (__ac_prime_list[k] > h->size) {
 				h->prime = k + 1;
 				break;
 			}
 	}
 	h->batch = batch > 0 ? batch : h->n_buckets / (256 * 1024);
-	if (h->batch < 256) /* minimum batch is 3 */
+	if (h->batch < 256)
+		/* minimum batch must be greater or equal than
+		   1 / (1 - f), where f is upper bound percent = 0.7 */
 		h->batch = 256;
 	memcpy(s, h, sizeof(*h));
 	s->resizing = 0;
