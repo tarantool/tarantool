@@ -16,7 +16,7 @@
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-e * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
@@ -114,7 +114,7 @@ struct _mh(t) * _mh(init)();
 void _mh(clear)(struct _mh(t) *h);
 void _mh(destroy)(struct _mh(t) *h);
 void _mh(resize)(struct _mh(t) *h);
-int _mh(start_resize)(struct _mh(t) *h, uint32_t buckets, uint32_t batch);
+uint32_t _mh(start_resize)(struct _mh(t) *h, uint32_t buckets, uint32_t batch);
 void __attribute__((noinline)) _mh(put_resize)(struct _mh(t) *h, mh_key_t key, mh_val_t val);
 void __attribute__((noinline)) _mh(del_resize)(struct _mh(t) *h, uint32_t x);
 void _mh(dump)(struct _mh(t) *h);
@@ -408,7 +408,7 @@ _mh(resize)(struct _mh(t) *h)
 	h->resize_cnt++;
 }
 
-int
+uint32_t
 _mh(start_resize)(struct _mh(t) *h, uint32_t buckets, uint32_t batch)
 {
 	if (h->resizing)
