@@ -520,7 +520,7 @@ validate_indexes(struct box_txn *txn)
 void
 build_indexes(void)
 {
-	for (u32 n = 0; n < BOX_NAMESPACE_MAX; ++n) {
+	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
 		u32 n_tuples, estimated_tuples;
 		struct index_tree_el *elems[nelem(space[n].index)] = { NULL };
 

@@ -1,11 +1,11 @@
 --
 --
 --
-function box.select(namespace, index, ...)
+function box.select(space, index, ...)
     key = {...}
     return select(2, -- skip the first return from select, number of tuples
         box.process(17, box.pack('iiiiii'..string.rep('p', #key),
-                                 namespace,
+                                 space,
                                  index,
                                  0, -- offset
                                  4294967295, -- limit
@@ -17,41 +17,41 @@ end
 -- delete can be done only by the primary key, whose
 -- index is always 0. It doesn't accept compound keys
 --
-function box.delete(namespace, key)
+function box.delete(space, key)
     return select(2, -- skip the first return, tuple count
-        box.process(21, box.pack('iiip', namespace,
+        box.process(21, box.pack('iiip', space,
                                  1, -- flags, BOX_RETURN_TUPLE
                                  1, -- cardinality
                                  key)))
 end
 
 -- insert or replace a tuple
-function box.replace(namespace, ...)
+function box.replace(space, ...)
     tuple = {...}
     return select(2,
         box.process(13, box.pack('iii'..string.rep('p', #tuple),
-                                 namespace,
+                                 space,
                                  1, -- flags, BOX_RETURN_TUPLE 
                                  #tuple, -- cardinality
                                  unpack(tuple))))
 end
 
 -- insert a tuple (produces an error if the tuple already exists)
-function box.insert(namespace, ...)
+function box.insert(space, ...)
     tuple = {...}
     return select(2,
         box.process(13, box.pack('iii'..string.rep('p', #tuple),
-                                 namespace,
+                                 space,
                                  3, -- flags, BOX_RETURN_TUPLE | BOX_ADD
                                  #tuple, -- cardinality
                                  unpack(tuple))))
 end
 
-function box.update(namespace, key, format, ...)
+function box.update(space, key, format, ...)
     ops = {...}
     return select(2,
         box.process(19, box.pack('iiipi'..format,
-                                  namespace,
+                                  space,
                                   1, -- flags, BOX_RETURN_TUPLE
                                   1, -- cardinality
                                   key, -- primary key

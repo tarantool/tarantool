@@ -381,7 +381,7 @@ memcached_check_config(struct tarantool_cfg *conf)
 
 	/* check memcached space number: it shoud be in segment [0, max_space] */
 	if ((conf->memcached_space < 0) ||
-	    (conf->memcached_space > BOX_NAMESPACE_MAX)) {
+	    (conf->memcached_space > BOX_SPACE_MAX)) {
 		/* invalid space number */
 		out_warning(0, "invalid memcached space number: %i",
 			    conf->memcached_space);

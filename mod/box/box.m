@@ -606,13 +606,13 @@ void txn_assign_n(struct box_txn *txn, struct tbuf *data)
 {
 	txn->n = read_u32(data);
 
-	if (txn->n < 0 || txn->n >= BOX_NAMESPACE_MAX)
-		tnt_raise(ClientError, :ER_NO_SUCH_NAMESPACE, txn->n);
+	if (txn->n < 0 || txn->n >= BOX_SPACE_MAX)
+		tnt_raise(ClientError, :ER_NO_SUCH_SPACE, txn->n);
 
 	txn->space = &space[txn->n];
 
 	if (!txn->space->enabled)
-		tnt_raise(ClientError, :ER_NAMESPACE_DISABLED, txn->n);
+		tnt_raise(ClientError, :ER_SPACE_DISABLED, txn->n);
 
 	txn->index = txn->space->index;
 }
@@ -898,7 +898,7 @@ void
 space_free(void)
 {
 	int i;
-	for (i = 0 ; i < BOX_NAMESPACE_MAX ; i++) {
+	for (i = 0 ; i < BOX_SPACE_MAX ; i++) {
 		if (!space[i].enabled)
 			continue;
 		int j;
@@ -916,8 +916,8 @@ space_free(void)
 void
 space_init(void)
 {
-	space = palloc(eter_pool, sizeof(struct space) * BOX_NAMESPACE_MAX);
-	for (int i = 0; i < BOX_NAMESPACE_MAX; i++) {
+	space = palloc(eter_pool, sizeof(struct space) * BOX_SPACE_MAX);
+	for (int i = 0; i < BOX_SPACE_MAX; i++) {
 		space[i].enabled = false;
 		for (int j = 0; j < BOX_INDEX_MAX; j++) {
 			space[i].index[j].key_cardinality = 0;
@@ -1207,7 +1207,7 @@ mod_check_config(struct tarantool_cfg *conf)
 		}
 
 		/* check space bound */
-		if (i >= BOX_NAMESPACE_MAX) {
+		if (i >= BOX_SPACE_MAX) {
 			/* maximum space is reached */
 			out_warning(0, "(space = %zu) "
 				    "too many spaces (%i maximum)", i, space);
@@ -1215,7 +1215,7 @@ mod_check_config(struct tarantool_cfg *conf)
 		}
 
 		if (conf->memcached_port && i == conf->memcached_space) {
-			out_warning(0, "Namespace %i is already used as "
+			out_warning(0, "Space %i is already used as "
 				    "memcached_space.", i);
 			return -1;
 		}
@@ -1466,7 +1466,7 @@ mod_snapshot(struct log_io_iter *i)
 {
 	struct box_tuple *tuple;
 
-	for (uint32_t n = 0; n < BOX_NAMESPACE_MAX; ++n) {
+	for (uint32_t n = 0; n < BOX_SPACE_MAX; ++n) {
 		if (!space[n].enabled)
 			continue;
 

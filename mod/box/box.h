@@ -39,7 +39,7 @@ struct index;
 enum
 {
 	BOX_INDEX_MAX = 10,
-	BOX_NAMESPACE_MAX = 256,
+	BOX_SPACE_MAX = 256,
 };
 
 struct space {

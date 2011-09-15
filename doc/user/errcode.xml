@@ -56,7 +56,7 @@ of existing codes.</para>
   </varlistentry>
 
   <varlistentry>
-    <term xml:id="ER_NO_SUCH_NAMESPACE" xreflabel="ER_NO_SUCH_NAMESPACE">ER_NO_SUCH_NAMESPACE</term>
+    <term xml:id="ER_NO_SUCH_SPACE" xreflabel="ER_NO_SUCH_SPACE">ER_NO_SUCH_SPACE</term>
     <listitem><para>Attempt to access a space that is not
     configured (doesn't exist).
     </para></listitem>

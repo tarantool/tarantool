@@ -105,7 +105,7 @@
 
 ; <select_request_body> (required <header> <type> is 17):
 ;
-; Specify which namespace to query, which index in the namespace
+; Specify which space to query, which index in the space
 ; to use, offset in the resulting tuple set (set to 0 for no offset),
 ; a limit (set to 4294967295 for no limit), and one or several
 ; keys to use in lookup. When more than one key is given, they
@@ -115,18 +115,18 @@
 ; must be non-zero.
 ;
 
-<select_request_body> ::= <namespace_no><index_no>
+<select_request_body> ::= <space_no><index_no>
                           <offset><limit><count><tuple>+
 
-; Namespace number is a non-negative integer, starting from 0.
-; All namespaces are defined in the server configuration file,
+; Space number is a non-negative integer, starting from 0.
+; All spaces are defined in the server configuration file,
 ; and then referred to by numeric id.
 
-<namespace_no> ::= <int32>
+<space_no> ::= <int32>
 
 ; Tarantool supports HASH and TREE indexes. Indexes are
-; enumerated similarly to namespaces, starting from 0.
-; Each namespace has at least index #0, which defines
+; enumerated similarly to spaces, starting from 0.
+; Each space has at least index #0, which defines
 ; the primary key.
 
 <index_no> ::= <int32>
@@ -219,10 +219,10 @@
 ;
 ; It is not possible to insert more than one tuple at a time.
 ; Thus <insert_request_body> (<header> <type> = 13) simply
-; holds one tuple, and which namespace to put it into.
+; holds one tuple, and which space to put it into.
 ;
 
-<insert_request_body> ::= <namespace_no><flags><tuple>
+<insert_request_body> ::= <space_no><flags><tuple>
 
 ; The only defined flag BOX_RETURN_TUPLE (0x01) indicates
 ; that it is required to return the inserted tuple back:
@@ -237,7 +237,7 @@
 <insert_response_body> ::= <count> | <count><fq_tuple>
 
 ; <update> request, <type> = 19 is similar to <insert>:
-; - <namespace_no>: same as in <select> or <insert>
+; - <space_no>: same as in <select> or <insert>
 ; - <flags>, <tuple>: same as in <insert>
 ; Index number for tuple lookup does not need to be provided,
 ; since only primary key updates are allowed.
@@ -246,7 +246,7 @@
 ; - <count> specifies possibly zero operation count
 ;
 
-<update_request_body> ::= <namespace_no><flags><tuple><count><operation>+
+<update_request_body> ::= <space_no><flags><tuple><count><operation>+
 
 ;
 ; Operations are optional and exist solely to allow
@@ -310,7 +310,7 @@
 ; primary key.
 ;
 
-<delete_request_body> ::= <namespace_no><flags><tuple>
+<delete_request_body> ::= <space_no><flags><tuple>
 
 ;
 ; <delete> returns the number of deleted tuples.
@@ -322,7 +322,7 @@
 <delete_response_body> ::= <count> | <count><fq_tuple>
 
 ;
-; CALL request body contains <namespace_no>, <flags>, <proc_name>
+; CALL request body contains <space_no>, <flags>, <proc_name>
 ; the number of procedure args, and the arguments themselves,
 ; which are passed into the procedure as Lua strings.
 ;

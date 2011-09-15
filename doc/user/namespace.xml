@@ -2,8 +2,8 @@
       xmlns:xi="http://www.w3.org/2001/XInclude"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xml:id="space">
-<bridgehead>Namespace settings explained</bridgehead>
-Namespace is a composite parameter, i.e. it has properties.
+<bridgehead>Space settings explained</bridgehead>
+Space is a composite parameter, i.e. it has properties.
 <programlisting language="cpp">
 /*
  * Each tuple consists of fields. Three field types are
