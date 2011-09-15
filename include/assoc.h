@@ -44,7 +44,7 @@ typedef void* ptr_t;
 #define mh_name _i64ptr
 #define mh_key_t i64
 #define mh_val_t ptr_t
-#define mh_hash(a) ({ (uint32_t)((a)>>33^(a)^(a)<<11); })
+#define mh_hash(a) ({ (mh_int_t)((a)>>33^(a)^(a)<<11); })
 #define mh_eq(a, b) ({ (a) == (b); })
 #include <mhash.h>
 

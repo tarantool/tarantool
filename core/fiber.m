@@ -304,7 +304,7 @@ ev_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 static struct fiber *
 fid2fiber(int fid)
 {
-	u32 k = mh_i32ptr_get(fibers_registry, fid);
+	mh_iter_t k = mh_i32ptr_get(fibers_registry, fid);
 
 	if (k == mh_end(fibers_registry))
 		return NULL;
@@ -323,7 +323,7 @@ register_fid(struct fiber *fiber)
 static void
 unregister_fid(struct fiber *fiber)
 {
-	u32 k = mh_i32ptr_get(fibers_registry, fiber->fid);
+	mh_iter_t k = mh_i32ptr_get(fibers_registry, fiber->fid);
 	mh_i32ptr_del(fibers_registry, k);
 }
 
