@@ -546,20 +546,21 @@ build_indexes_in_space(struct space *space)
 		}
 	}
 
-	if (pk->type == HASH) {
-		khiter_t k;
-		u32 i = 0;
-		assoc_foreach(pk->idx.hash, k) {
-			for (u32 idx = 0;; idx++) {
-				struct index *index = &space->index[idx];
-				struct index_tree_el *elem = elems[idx];
-				struct index_tree_el *m;
+	for (u32 idx = 0;; idx++) {
+		struct index *index = &space->index[idx];
+		struct index_tree_el *elem = elems[idx];
+		struct index_tree_el *m;
 
-				if (index->key_cardinality == 0)
-					break;
+		if (index->key_cardinality == 0)
+			break;
 
-				if (index->type != TREE || index == pk)
-					continue;
+		if (index->type != TREE || index == pk)
+			continue;
+
+		if (pk->type == HASH) {
+			khiter_t k;
+			u32 i = 0;
+			assoc_foreach(pk->idx.hash, k) {
 
 				m = (struct index_tree_el *)
 					((char *)elem + i * INDEX_TREE_EL_SIZE(index));
@@ -567,31 +568,20 @@ build_indexes_in_space(struct space *space)
 				tuple2index_tree_el(index,
 						    kh_value(pk->idx.hash, k),
 						    &m);
+				++i;
 			}
-			++i;
-		}
-	} else {
-		pk->iterator_init(pk, 0, NULL);
-		struct box_tuple *tuple;
-		u32 i = 0;
-		while ((tuple = pk->iterator_next_nocompare(pk))) {
-			for (u32 idx = 0;; idx++) {
-				struct index *index = &space->index[idx];
-				struct index_tree_el *elem = elems[idx];
-				struct index_tree_el *m;
-
-				if (index->key_cardinality == 0)
-					break;
-
-				if (index->type != TREE || index == pk)
-					continue;
+		} else {
+			pk->iterator_init(pk, 0, NULL);
+			struct box_tuple *tuple;
+			u32 i = 0;
+			while ((tuple = pk->iterator_next_nocompare(pk))) {
 
 				m = (struct index_tree_el *)
 					((char *)elem + i * INDEX_TREE_EL_SIZE(index));
 
 				tuple2index_tree_el(index, tuple, &m);
+				++i;
 			}
-			++i;
 		}
 	}
 	for (u32 idx = 0;; idx++) {
