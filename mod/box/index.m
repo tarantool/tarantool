@@ -518,113 +518,115 @@ validate_indexes(struct box_txn *txn)
 
 
 void
+build_indexes_in_space(struct space *space)
+{
+	struct index_tree_el *elems[nelem(space->index)] = { NULL };
+	struct index *pk = &space->index[0];
+	u32 n_tuples = pk->size(pk);
+	u32 estimated_tuples = n_tuples * 1.2;
+
+	for (u32 idx = 0;; idx++) {
+		struct index *index = &space->index[idx];
+		if (index->key_cardinality == 0)
+			break;
+
+		if (index->type != TREE || index == pk)
+			continue;
+
+		if (elems[idx] == NULL) {
+			/*
+			 * Allocate a little extra to avoid
+			 * unnecessary realloc() when more data is
+			 * inserted.
+			 */
+			size_t sz = estimated_tuples * INDEX_TREE_EL_SIZE(index);
+			elems[idx] = malloc(sz);
+			if (elems[idx] == NULL)
+				panic("malloc(): failed to allocate %"PRI_SZ" bytes", sz);
+		}
+	}
+
+	if (pk->type == HASH) {
+		khiter_t k;
+		u32 i = 0;
+		assoc_foreach(pk->idx.hash, k) {
+			for (u32 idx = 0;; idx++) {
+				struct index *index = &space->index[idx];
+				struct index_tree_el *elem = elems[idx];
+				struct index_tree_el *m;
+
+				if (index->key_cardinality == 0)
+					break;
+
+				if (index->type != TREE || index == pk)
+					continue;
+
+				m = (struct index_tree_el *)
+					((char *)elem + i * INDEX_TREE_EL_SIZE(index));
+
+				tuple2index_tree_el(index,
+						    kh_value(pk->idx.hash, k),
+						    &m);
+			}
+			++i;
+		}
+	} else {
+		pk->iterator_init(pk, 0, NULL);
+		struct box_tuple *tuple;
+		u32 i = 0;
+		while ((tuple = pk->iterator_next_nocompare(pk))) {
+			for (u32 idx = 0;; idx++) {
+				struct index *index = &space->index[idx];
+				struct index_tree_el *elem = elems[idx];
+				struct index_tree_el *m;
+
+				if (index->key_cardinality == 0)
+					break;
+
+				if (index->type != TREE || index == pk)
+					continue;
+
+				m = (struct index_tree_el *)
+					((char *)elem + i * INDEX_TREE_EL_SIZE(index));
+
+				tuple2index_tree_el(index, tuple, &m);
+			}
+			++i;
+		}
+	}
+	for (u32 idx = 0;; idx++) {
+		struct index *index = &space->index[idx];
+		struct index_tree_el *elem = elems[idx];
+
+		if (index->key_cardinality == 0)
+			break;
+
+		if (index->type != TREE || index == pk)
+			continue;
+
+		assert(index->enabled == false);
+
+		say_info("Sorting index %" PRIu32 ", space %" PRIu32 "...", idx, space->n);
+
+		/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
+		sptree_str_t_init(index->idx.tree,
+				  INDEX_TREE_EL_SIZE(index),
+				  elem, n_tuples, estimated_tuples,
+				  (void *)index_tree_el_compare, index);
+		index->enabled = true;
+
+		say_info("Space %" PRIu32 ", index = %" PRIu32 ": complete", space->n, idx);
+	}
+}
+
+void
 build_indexes(void)
 {
 	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
-		u32 n_tuples, estimated_tuples;
-		struct index_tree_el *elems[nelem(space[n].index)] = { NULL };
-
 		if (space[n].enabled == false)
 			continue;
-
-		struct index *pk = &space[n].index[0];
-		n_tuples = pk->size(pk);
-		estimated_tuples = n_tuples * 1.2;
-
-		say_info("build_indexes: n = %" PRIu32 ": build arrays", n);
-
-		for (u32 idx = 0;; idx++) {
-			struct index *index = &space[n].index[idx];
-			if (index->key_cardinality == 0)
-				break;
-
-			if (index->type != TREE || index == pk)
-				continue;
-
-			if (elems[idx] == NULL) {
-				elems[idx] = malloc(estimated_tuples *
-						      INDEX_TREE_EL_SIZE(index));
-				if (elems[idx] == NULL)
-					panic("build_indexes: malloc failed: %m");
-			}
-		}
-
-		if (pk->type == HASH) {
-			khiter_t k;
-			u32 i = 0;
-			assoc_foreach(space[n].index[0].idx.hash, k) {
-				for (u32 idx = 0;; idx++) {
-					struct index *index = &space[n].index[idx];
-					struct index_tree_el *elem = elems[idx];
-					struct index_tree_el *m;
-
-					if (index->key_cardinality == 0)
-						break;
-
-					if (index->type != TREE || index == pk)
-						continue;
-
-					m = (struct index_tree_el *)
-						((char *)elem + i * INDEX_TREE_EL_SIZE(index));
-
-					tuple2index_tree_el(index,
-								kh_value(space[n].index[0].idx.hash,
-									 k),
-								&m);
-				}
-				++i;
-			}
-		} else {
-			pk->iterator_init(pk, 0, NULL);
-			struct box_tuple *tuple;
-			u32 i = 0;
-			while ((tuple = pk->iterator_next_nocompare(pk))) {
-				for (u32 idx = 0;; idx++) {
-					struct index *index = &space[n].index[idx];
-					struct index_tree_el *elem = elems[idx];
-					struct index_tree_el *m;
-
-					if (index->key_cardinality == 0)
-						break;
-
-					if (index->type != TREE || index == pk)
-						continue;
-
-					m = (struct index_tree_el *)
-						((char *)elem + i * INDEX_TREE_EL_SIZE(index));
-
-					tuple2index_tree_el(index, tuple, &m);
-				}
-				++i;
-			}
-		}
-
-		say_info("build_indexes: n = %" PRIu32 ": build trees", n);
-
-		for (u32 idx = 0;; idx++) {
-			struct index *index = &space[n].index[idx];
-			struct index_tree_el *elem = elems[idx];
-
-			if (index->key_cardinality == 0)
-				break;
-
-			if (index->type != TREE || index == &space[n].index[0])
-				continue;
-
-			assert(index->enabled == false);
-
-			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": build tree", n,
-				 idx);
-
-			/* if n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
-			sptree_str_t_init(index->idx.tree,
-					  INDEX_TREE_EL_SIZE(index),
-					  elem, n_tuples, estimated_tuples,
-					  (void *)index_tree_el_compare, index);
-			index->enabled = true;
-
-			say_info("build_indexes: n = %" PRIu32 " idx = %" PRIu32 ": end", n, idx);
-		}
+		say_info("Building secondary keys in space %" PRIu32 "...", n);
+		build_indexes_in_space(&space[n]);
 	}
 }
 
