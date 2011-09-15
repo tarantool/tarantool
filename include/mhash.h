@@ -105,6 +105,7 @@ struct _mh(t) {
 
 #define mh_value(h, i)		({ (h)->p[(i)].val;	})
 #define mh_size(h)		({ (h)->size; 		})
+#define mh_capacity(h)		({ (h)->n_buckets;	})
 #define mh_begin(h)		({ 0;			})
 #define mh_end(h)		({ (h)->n_buckets;	})
 
@@ -167,7 +168,6 @@ _mh(put_slot)(struct _mh(t) *h, mh_key_t key)
 			i -= h->n_buckets;
 	}
 }
-#endif
 
 /* Faster variant of above loop */
 static inline uint32_t
@@ -207,7 +207,64 @@ next_slot:
 		i -= h->n_buckets;
 	goto *loop;
 }
+#endif
 
+/* clearer variant of above loop */
+static inline uint32_t
+_mh(put_slot)(struct _mh(t) *h, mh_key_t key)
+{
+	uint32_t hashed_key = mh_hash(key);
+	uint32_t itr = hashed_key % h->n_buckets;
+	uint32_t step = 1 + hashed_key % (h->n_buckets - 1);
+	uint32_t found_slot = mh_end(h);
+	/* marking loop */
+	while (true) {
+		if (mh_exist(h, itr)) {
+			/* this is slop occupied */
+			if (mh_eq(h->p[itr].key, key))
+				/* this is same element */
+				return itr;
+			/* this is another element, mark it as dirty */
+			mh_setdirty(h, itr);
+		} else {
+			/* we found not occupied element */
+			found_slot = itr;
+			break;
+		}
+		itr += step;
+		if (itr > h->n_buckets)
+			itr -= h->n_buckets;
+	}
+
+	/* we found not occupied slot, but element with same key
+	   may exist in the hash table */
+	while (true) {
+		if (mh_exist(h, itr)) {
+			/* this is slop occupied */
+			if (mh_eq(h->p[itr].key, key)) {
+				/* move found element closer to begin of sequence */
+				/* copy element */
+				mh_setexist(h, found_slot);
+				h->p[found_slot].key = h->p[itr].key;
+				h->p[found_slot].val = h->p[itr].val;
+				/* mark old as free */
+				mh_setfree(h, itr);
+				if (!mh_dirty(h, itr))
+					h->n_dirty--;
+				/* this is same element */
+				return found_slot;
+			}
+		} else {
+			/* all sequence checked, element with same key not
+			   found. */
+			if (!mh_dirty(h, itr))
+				return found_slot;
+		}
+		itr += step;
+		if (itr > h->n_buckets)
+			itr -= h->n_buckets;
+	}
+}
 
 static inline uint32_t
 _mh(get)(struct _mh(t) *h, mh_key_t key)
@@ -356,14 +413,11 @@ _mh(start_resize)(struct _mh(t) *h, uint32_t buckets, uint32_t batch)
 {
 	if (h->resizing)
 		/* resize is already started */
-		return 0;
-
-	if (buckets > __ac_prime_list[__ac_HASH_PRIME_SIZE - 1])
-		/* too big capacity required */
-		return -1;
+		return h->n_buckets;
 
 	if (buckets < h->n_buckets)
-		buckets = h->n_buckets;
+		/* hash size already greater than requested */
+		return h->n_buckets;
 
 	while (h->prime < __ac_HASH_PRIME_SIZE) {
 		if (__ac_prime_list[h->prime] >= buckets)
@@ -387,7 +441,7 @@ _mh(start_resize)(struct _mh(t) *h, uint32_t buckets, uint32_t batch)
 	s->b = calloc(s->n_buckets / 16 + 1, sizeof(unsigned));
 	_mh(resize)(h);
 
-	return 0;
+	return h->n_buckets;
 }
 
 #ifndef mh_stat
