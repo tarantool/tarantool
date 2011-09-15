@@ -88,7 +88,7 @@ struct _mh(pair) {
 struct _mh(t) {
 	struct _mh(pair) * p;
 	uint32_t *b;
-	uint32_t n_buckets, n_dirty, n_occupied, size, upper_bound;
+	uint32_t n_buckets, n_dirty, size, upper_bound;
 	uint32_t prime;
 
 	uint32_t resize_cnt;
@@ -113,7 +113,7 @@ struct _mh(t) * _mh(init)();
 void _mh(clear)(struct _mh(t) *h);
 void _mh(destroy)(struct _mh(t) *h);
 void _mh(resize)(struct _mh(t) *h);
-void _mh(start_resize)(struct _mh(t) *h, uint32_t buckets, uint32_t batch);
+int _mh(start_resize)(struct _mh(t) *h, uint32_t buckets, uint32_t batch);
 void __attribute__((noinline)) _mh(put_resize)(struct _mh(t) *h, mh_key_t key, mh_val_t val);
 void __attribute__((noinline)) _mh(del_resize)(struct _mh(t) *h, uint32_t x);
 void _mh(dump)(struct _mh(t) *h);
@@ -221,27 +221,32 @@ _mh(get)(struct _mh(t) *h, mh_key_t key)
 static inline uint32_t
 _mh(put)(struct _mh(t) *h, mh_key_t key, mh_val_t val, int * ret)
 {
+	if (h->size == h->n_buckets)
+		/* no one free elements */
+		return mh_end(h);
 #if MH_INCREMENTAL_RESIZE
-	if (mh_unlikely(h->n_occupied >= h->upper_bound || h->resizing > 0))
+	if (mh_unlikely(h->n_dirty >= h->upper_bound || h->resizing > 0))
 		_mh(put_resize)(h, key, val);
 #else
-	if (mh_unlikely(h->n_occupied >= h->upper_bound))
-		_mh(start_resize)(h, 0, -1);
+	if (mh_unlikely(h->n_dirty >= h->upper_bound))
+		_mh(start_resize)(h, h->n_buckets + 1, -1);
 #endif
 	uint32_t x = put_slot(h, key);
-	int found = !mh_exist(h, x);
+	int exist = mh_exist(h, x);
 	if (ret)
-		*ret = found;
+		*ret = !exist;
 
-	if (found) {
+	if (!exist) {
+		/* add new */
 		mh_setexist(h, x);
 		h->size++;
 		if (!mh_dirty(h, x))
-			h->n_occupied++;
+			h->n_dirty++;
 
 		h->p[x].key = key;
 		h->p[x].val = val;
 	} else {
+		/* replace old */
 		h->p[x].val = val;
 	}
 	return x;
@@ -254,7 +259,7 @@ _mh(del)(struct _mh(t) *h, uint32_t x)
 		mh_setfree(h, x);
 		h->size--;
 		if (!mh_dirty(h, x))
-			h->n_occupied--;
+			h->n_dirty--;
 #if MH_INCREMENTAL_RESIZE
 		if (mh_unlikely(h->resizing))
 			_mh(del_resize)(h, x);
@@ -271,7 +276,7 @@ _mh(put_resize)(struct _mh(t) *h, mh_key_t key, mh_val_t val)
 	if (h->resizing > 0)
 		_mh(resize)(h);
 	else
-		_mh(start_resize)(h, 0, 0);
+		_mh(start_resize)(h, h->n_buckets + 1, 0);
 	if (h->resizing)
 		_mh(put)(h->shadow, key, val, NULL);
 }
@@ -291,7 +296,8 @@ _mh(init)()
 {
 	struct _mh(t) *h = calloc(1, sizeof(*h));
 	h->shadow = calloc(1, sizeof(*h));
-	h->n_buckets = 3;
+	h->prime = 0;
+	h->n_buckets = __ac_prime_list[h->prime];
 	h->p = calloc(h->n_buckets, sizeof(struct _mh(pair)));
 	h->b = calloc(h->n_buckets / 16 + 1, sizeof(unsigned));
 	h->upper_bound = h->n_buckets * 0.7;
@@ -302,7 +308,8 @@ void
 _mh(clear)(struct _mh(t) *h)
 {
 	free(h->p);
-	h->n_buckets = 3;
+	h->prime = 0;
+	h->n_buckets = __ac_prime_list[h->prime];
 	h->p = calloc(h->n_buckets, sizeof(struct _mh(pair)));
 	h->upper_bound = h->n_buckets * 0.7;
 }
@@ -335,7 +342,7 @@ _mh(resize)(struct _mh(t) *h)
 		uint32_t n = put_slot(s, h->p[o].key);
 		s->p[n] = h->p[o];
 		mh_setexist(s, n);
-		s->n_occupied++;
+		s->n_dirty++;
 	}
 	free(h->p);
 	free(h->b);
@@ -344,48 +351,57 @@ _mh(resize)(struct _mh(t) *h)
 	h->resize_cnt++;
 }
 
-void
+int
 _mh(start_resize)(struct _mh(t) *h, uint32_t buckets, uint32_t batch)
 {
 	if (h->resizing)
-		return;
-	struct _mh(t) *s = h->shadow;
+		/* resize is already started */
+		return 0;
+
+	if (buckets > __ac_prime_list[__ac_HASH_PRIME_SIZE - 1])
+		/* too big capacity required */
+		return -1;
+
 	if (buckets < h->n_buckets)
 		buckets = h->n_buckets;
-	if (buckets < h->size * 2) {
-		for (int k = h->prime; k < __ac_HASH_PRIME_SIZE - 1; k++)
-			if (__ac_prime_list[k] > h->size) {
-				h->prime = k + 1;
-				break;
-			}
+
+	while (h->prime < __ac_HASH_PRIME_SIZE) {
+		if (__ac_prime_list[h->prime] >= buckets)
+			break;
+		h->prime += 1;
 	}
+
 	h->batch = batch > 0 ? batch : h->n_buckets / (256 * 1024);
 	if (h->batch < 256)
 		/* minimum batch must be greater or equal than
 		   1 / (1 - f), where f is upper bound percent = 0.7 */
 		h->batch = 256;
+
+	struct _mh(t) *s = h->shadow;
 	memcpy(s, h, sizeof(*h));
 	s->resizing = 0;
 	s->n_buckets = __ac_prime_list[h->prime];
 	s->upper_bound = s->n_buckets * 0.7;
-	s->n_occupied = s->n_dirty = 0;
+	s->n_dirty = 0;
 	s->p = malloc(s->n_buckets * sizeof(struct _mh(pair)));
 	s->b = calloc(s->n_buckets / 16 + 1, sizeof(unsigned));
 	_mh(resize)(h);
+
+	return 0;
 }
 
 #ifndef mh_stat
-#define mh_stat(buf, h) ({					    \
-                tbuf_printf(buf, "  n_buckets: %"PRIu32 CRLF        \
-                            "  n_occupied: %"PRIu32 CRLF            \
-                            "  size: %"PRIu32 CRLF                  \
-                            "  resize_cnt: %"PRIu32 CRLF	    \
-			    "  resizing: %"PRIu32 CRLF,		    \
-                            h->n_buckets,                           \
-                            h->n_occupied,                          \
-                            h->size,                                \
-                            h->resize_cnt,			    \
-			    h->resizing);			    \
+#define mh_stat(buf, h) ({						\
+                tbuf_printf(buf, "  n_buckets: %"PRIu32 CRLF		\
+			    "  n_dirty: %"PRIu32 CRLF			\
+			    "  size: %"PRIu32 CRLF			\
+			    "  resize_cnt: %"PRIu32 CRLF		\
+			    "  resizing: %"PRIu32 CRLF,			\
+			    h->n_buckets,				\
+			    h->n_dirty,					\
+			    h->size,					\
+			    h->resize_cnt,				\
+			    h->resizing);				\
 			})
 #endif
 
