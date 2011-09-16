@@ -60,6 +60,13 @@ exec sql "select * from t1 where k0='key1'"
 exec sql "select * from t1 where k0='key2'"
 exec sql "select * from t1 where k0='key3'"
 exec sql "select * from t1 where k1='part1'"
+# Check how build_idnexes() works
+server.stop()
+server.start()
+exec sql "select * from t1 where k0='key1'"
+exec sql "select * from t1 where k0='key2'"
+exec sql "select * from t1 where k0='key3'"
+exec sql "select * from t1 where k1='part1'"
 exec sql "delete from t1 where k0='key1'"
 exec sql "delete from t1 where k0='key2'"
 exec sql "delete from t1 where k0='key3'"
