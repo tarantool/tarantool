@@ -175,7 +175,7 @@ index_find_hash_num(struct index *self, void *key)
 	if (key_size != 4)
 		tnt_raise(IllegalParams, :"key is not u32");
 
-	mh_iter_t k = mh_i32ptr_get(self->idx.int_hash, num);
+	mh_int_t k = mh_i32ptr_get(self->idx.int_hash, num);
 	if (k != mh_end(self->idx.int_hash))
 		ret = mh_value(self->idx.int_hash, k);
 #ifdef DEBUG
@@ -194,7 +194,7 @@ index_find_hash_num64(struct index *self, void *key)
 	if (key_size != 8)
 		tnt_raise(IllegalParams, :"key is not u64");
 
-	mh_iter_t k = mh_i64ptr_get(self->idx.int64_hash, num);
+	mh_int_t k = mh_i64ptr_get(self->idx.int64_hash, num);
 	if (k != mh_end(self->idx.int64_hash))
 		ret = mh_value(self->idx.int64_hash, k);
 #ifdef DEBUG
@@ -208,7 +208,7 @@ index_find_hash_str(struct index *self, void *key)
 {
 	struct box_tuple *ret = NULL;
 
-	mh_iter_t k = mh_lstrptr_get(self->idx.str_hash, key);
+	mh_int_t k = mh_lstrptr_get(self->idx.str_hash, key);
 	if (k != mh_end(self->idx.str_hash))
 		ret = mh_value(self->idx.str_hash, k);
 #ifdef DEBUG
@@ -317,7 +317,7 @@ index_remove_hash_num(struct index *self, struct box_tuple *tuple)
 	if (key_size != 4)
 		tnt_raise(IllegalParams, :"key is not u32");
 
-	mh_iter_t k = mh_i32ptr_get(self->idx.int_hash, num);
+	mh_int_t k = mh_i32ptr_get(self->idx.int_hash, num);
 	if (k != mh_end(self->idx.int_hash))
 		mh_i32ptr_del(self->idx.int_hash, k);
 #ifdef DEBUG
@@ -335,7 +335,7 @@ index_remove_hash_num64(struct index *self, struct box_tuple *tuple)
 	if (key_size != 8)
 		tnt_raise(IllegalParams, :"key is not u64");
 
-	mh_iter_t k = mh_i64ptr_get(self->idx.int64_hash, num);
+	mh_int_t k = mh_i64ptr_get(self->idx.int64_hash, num);
 	if (k != mh_end(self->idx.int64_hash))
 		mh_i64ptr_del(self->idx.int64_hash, k);
 #ifdef DEBUG
@@ -348,7 +348,7 @@ index_remove_hash_str(struct index *self, struct box_tuple *tuple)
 {
 	void *key = tuple_field(tuple, self->key_field->fieldno);
 
-	mh_iter_t k = mh_lstrptr_get(self->idx.str_hash, key);
+	mh_int_t k = mh_lstrptr_get(self->idx.str_hash, key);
 	if (k != mh_end(self->idx.str_hash))
 		mh_lstrptr_del(self->idx.str_hash, k);
 #ifdef DEBUG
@@ -378,7 +378,7 @@ index_replace_hash_num(struct index *self, struct box_tuple *old_tuple, struct b
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
 		load_varint32(&old_key);
 		u32 old_num = *(u32 *)old_key;
-		mh_iter_t k = mh_i32ptr_get(self->idx.int_hash, old_num);
+		mh_int_t k = mh_i32ptr_get(self->idx.int_hash, old_num);
 		if (k != mh_end(self->idx.int_hash))
 			mh_i32ptr_del(self->idx.int_hash, k);
 	}
@@ -405,7 +405,7 @@ index_replace_hash_num64(struct index *self, struct box_tuple *old_tuple, struct
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
 		load_varint32(&old_key);
 		u64 old_num = *(u64 *)old_key;
-		mh_iter_t k = mh_i64ptr_get(self->idx.int64_hash, old_num);
+		mh_int_t k = mh_i64ptr_get(self->idx.int64_hash, old_num);
 		if (k != mh_end(self->idx.int64_hash))
 			mh_i64ptr_del(self->idx.int64_hash, k);
 	}
@@ -427,7 +427,7 @@ index_replace_hash_str(struct index *self, struct box_tuple *old_tuple, struct b
 
 	if (old_tuple != NULL) {
 		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
-		mh_iter_t k = mh_lstrptr_get(self->idx.str_hash, old_key);
+		mh_int_t k = mh_lstrptr_get(self->idx.str_hash, old_key);
 		if (k != mh_end(self->idx.str_hash))
 			mh_lstrptr_del(self->idx.str_hash, k);
 	}

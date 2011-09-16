@@ -66,7 +66,6 @@
 #ifndef MH_TYPEDEFS
 #define MH_TYPEDEFS
 typedef uint32_t mh_int_t;
-typedef mh_int_t mh_iter_t;
 #endif /* MH_TYPEDEFS */
 
 #ifndef __ac_HASH_PRIME_SIZE
