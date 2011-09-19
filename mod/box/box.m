@@ -1473,17 +1473,9 @@ mod_snapshot(struct log_io_iter *i)
 		struct index *pk = &space[n].index[0];
 
 
-		if (pk->type == HASH) {
-			khiter_t k;
-			assoc_foreach(space[n].index[0].idx.hash, k) {
-				tuple = kh_value(space[n].index[0].idx.hash, k);
-				snapshot_write_tuple(i, n, tuple);
-			}
-		} else {
-			pk->iterator_init(pk, 0, NULL);
-			while ((tuple = pk->iterator_next_nocompare(pk))) {
-				snapshot_write_tuple(i, n, tuple);
-			}
+		pk->iterator_init(pk, 0, NULL);
+		while ((tuple = pk->iterator_next_nocompare(pk))) {
+			snapshot_write_tuple(i, n, tuple);
 		}
 	}
 }

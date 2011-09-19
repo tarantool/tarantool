@@ -173,6 +173,25 @@ index_hash_size(struct index *index)
 	return kh_size(index->idx.hash);
 }
 
+void
+index_hash_iterator_init(struct index *index, int cardinality, void *key)
+{
+	assert(cardinality == 0 && key == NULL);
+	index->iterator.hash = kh_begin(index->idx.hash);
+}
+
+struct box_tuple *
+index_hash_iterator_next(struct index *index)
+{
+	while (index->iterator.hash != kh_end(index->idx.hash)) {
+		if (kh_exist(index->idx.hash, index->iterator.hash))
+			return kh_value(index->idx.hash,
+					index->iterator.hash++);
+		index->iterator.hash++;
+	}
+	return NULL;
+}
+
 static struct box_tuple *
 index_hash_num_find(struct index *self, void *key)
 {
@@ -446,14 +465,15 @@ index_tree_iterator_init(struct index *index, int cardinality, void *key)
 {
 	init_search_pattern(index, cardinality, key);
 	sptree_str_t_iterator_init_set(index->idx.tree,
-				       (struct sptree_str_t_iterator **)&index->iterator, index->position[POS_READ]);
+				       &index->iterator.tree,
+				       index->position[POS_READ]);
 }
 
 struct box_tuple *
 index_tree_iterator_next(struct index *self)
 {
 	struct index_tree_el *elem =
-		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
+		sptree_str_t_iterator_next(self->iterator.tree);
 
 	if (elem == NULL)
 		return NULL;
@@ -469,7 +489,7 @@ static struct box_tuple *
 index_tree_iterator_next_nocompare(struct index *self)
 {
 	struct index_tree_el *elem =
-		sptree_str_t_iterator_next((struct sptree_str_t_iterator *)self->iterator);
+		sptree_str_t_iterator_next(self->iterator.tree);
 
 	if (elem == NULL)
 		return NULL;
@@ -532,27 +552,15 @@ build_index(struct index *pk, struct index *index)
 	struct index_tree_el *m;
 	u32 i = 0;
 
-	if (pk->type == HASH) {
-		khiter_t k;
-		assoc_foreach(pk->idx.hash, k) {
+	pk->iterator_init(pk, 0, NULL);
+	struct box_tuple *tuple;
+	while ((tuple = pk->iterator_next_nocompare(pk))) {
 
-			m = (struct index_tree_el *)
-				((char *)elem + i * INDEX_TREE_EL_SIZE(index));
+		m = (struct index_tree_el *)
+			((char *)elem + i * INDEX_TREE_EL_SIZE(index));
 
-			index_tree_el_init(m, index, kh_value(pk->idx.hash, k));
-			++i;
-		}
-	} else {
-		pk->iterator_init(pk, 0, NULL);
-		struct box_tuple *tuple;
-		while ((tuple = pk->iterator_next_nocompare(pk))) {
-
-			m = (struct index_tree_el *)
-				((char *)elem + i * INDEX_TREE_EL_SIZE(index));
-
-			index_tree_el_init(m, index, tuple);
-			++i;
-		}
+		index_tree_el_init(m, index, tuple);
+		++i;
 	}
 
 	if (n_tuples)
@@ -602,6 +610,8 @@ index_hash_num(struct index *index, struct space *space,
 	index->find_by_tuple = index_hash_find_by_tuple;
 	index->remove = index_hash_num_remove;
 	index->replace = index_hash_num_replace;
+	index->iterator_init = index_hash_iterator_init;
+	index->iterator_next_nocompare = index_hash_iterator_next;
 	index->idx.int_hash = kh_init(int_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(int_ptr_map, index->idx.int_hash, estimated_rows);
@@ -624,6 +634,8 @@ index_hash_num64(struct index *index, struct space *space,
 	index->find_by_tuple = index_hash_find_by_tuple;
 	index->remove = index_hash_num64_remove;
 	index->replace = index_hash_num64_replace;
+	index->iterator_init = index_hash_iterator_init;
+	index->iterator_next_nocompare = index_hash_iterator_next;
 	index->idx.int64_hash = kh_init(int64_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(int64_ptr_map, index->idx.int64_hash, estimated_rows);
@@ -645,6 +657,8 @@ index_hash_str(struct index *index, struct space *space, size_t estimated_rows)
 	index->find_by_tuple = index_hash_find_by_tuple;
 	index->remove = index_hash_str_remove;
 	index->replace = index_hash_str_replace;
+	index->iterator_init = index_hash_iterator_init;
+	index->iterator_next_nocompare = index_hash_iterator_next;
 	index->idx.str_hash = kh_init(lstr_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(lstr_ptr_map, index->idx.str_hash, estimated_rows);

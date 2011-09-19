@@ -93,7 +93,11 @@ struct index {
 		khash_t(int_ptr_map) * hash;
 		sptree_str_t *tree;
 	} idx;
-	void *iterator;
+	/* Reusable, current iterator, to cut on the allocation. */
+	union {
+		struct sptree_str_t_iterator *tree;
+		khiter_t hash;
+	} iterator;
 	struct index_tree_el *position[POS_MAX];
 
 	struct space *space;
