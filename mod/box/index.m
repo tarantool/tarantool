@@ -221,17 +221,11 @@ index_hash_str_find(struct index *self, void *key)
 	return ret;
 }
 
-static struct index_tree_el *
-tuple2index_tree_el(struct index *index,
-		    struct box_tuple *tuple, struct index_tree_el **p_elem)
+void
+index_tree_el_init(struct index_tree_el *elem,
+		   struct index *index, struct box_tuple *tuple)
 {
-	struct index_tree_el *elem;
 	void *tuple_data = tuple->data;
-
-	if (p_elem == NULL || *p_elem == NULL)
-		elem = palloc(fiber->gc_pool, INDEX_TREE_EL_SIZE(index));
-	else
-		elem = *p_elem;
 
 	for (i32 i = 0; i < index->field_cmp_order_cnt; ++i) {
 		struct field f;
@@ -252,19 +246,13 @@ tuple2index_tree_el(struct index *index,
 
 		elem->key[index->field_cmp_order[i]] = f;
 	}
-
 	elem->tuple = tuple;
-
-	if (p_elem)
-		*p_elem = elem;
-
-	return elem;
 }
 
 void
 init_search_pattern(struct index *index, int key_cardinality, void *key)
 {
-	struct index_tree_el *pattern = index->search_pattern;
+	struct index_tree_el *pattern = index->position[POS_READ];
 	void *key_field = key;
 
 	assert(key_cardinality <= index->key_cardinality);
@@ -291,7 +279,7 @@ static struct box_tuple *
 index_tree_find(struct index *self, void *key)
 {
 	init_search_pattern(self, 1, key);
-	struct index_tree_el *elem = self->search_pattern;
+	struct index_tree_el *elem = self->position[POS_READ];
 	/* HACK: otherwise index_tree_el_compare returns -2,
 	 * which is plain wrong. */
 	elem->tuple = (void *)1;
@@ -304,7 +292,9 @@ index_tree_find(struct index *self, void *key)
 static struct box_tuple *
 index_tree_find_by_tuple(struct index *self, struct box_tuple *tuple)
 {
-	struct index_tree_el *elem = tuple2index_tree_el(self, tuple, NULL);
+	struct index_tree_el *elem = self->position[POS_WRITE];
+
+	index_tree_el_init(elem, self, tuple);
 
 	elem = sptree_str_t_find(self->idx.tree, elem);
 	if (elem != NULL)
@@ -356,7 +346,8 @@ index_hash_str_remove(struct index *self, struct box_tuple *tuple)
 static void
 index_tree_remove(struct index *self, struct box_tuple *tuple)
 {
-	struct index_tree_el *elem = tuple2index_tree_el(self, tuple, NULL);
+	struct index_tree_el *elem = self->position[POS_WRITE];
+	index_tree_el_init(elem, self, tuple);
 	sptree_str_t_delete(self->idx.tree, elem);
 }
 
@@ -440,10 +431,13 @@ index_tree_replace(struct index *self,
 	if (tuple->cardinality < self->field_cmp_order_cnt)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->field_cmp_order_cnt);
 
-	struct index_tree_el *elem = tuple2index_tree_el(self, tuple, NULL);
+	struct index_tree_el *elem = self->position[POS_WRITE];
 
-	if (old_tuple)
-		index_tree_remove(self, old_tuple);
+	if (old_tuple) {
+		index_tree_el_init(elem, self, old_tuple);
+		sptree_str_t_delete(self->idx.tree, elem);
+	}
+	index_tree_el_init(elem, self, tuple);
 	sptree_str_t_insert(self->idx.tree, elem);
 }
 
@@ -452,7 +446,7 @@ index_tree_iterator_init(struct index *index, int cardinality, void *key)
 {
 	init_search_pattern(index, cardinality, key);
 	sptree_str_t_iterator_init_set(index->idx.tree,
-				       (struct sptree_str_t_iterator **)&index->iterator, index->search_pattern);
+				       (struct sptree_str_t_iterator **)&index->iterator, index->position[POS_READ]);
 }
 
 struct box_tuple *
@@ -464,7 +458,7 @@ index_tree_iterator_next(struct index *self)
 	if (elem == NULL)
 		return NULL;
 
-	i32 r = index_tree_el_compare(self->search_pattern, elem, self);
+	i32 r = index_tree_el_compare(self->position[POS_READ], elem, self);
 	if (r == -2)
 		return elem->tuple;
 
@@ -545,9 +539,7 @@ build_index(struct index *pk, struct index *index)
 			m = (struct index_tree_el *)
 				((char *)elem + i * INDEX_TREE_EL_SIZE(index));
 
-			tuple2index_tree_el(index,
-					    kh_value(pk->idx.hash, k),
-					    &m);
+			index_tree_el_init(m, index, kh_value(pk->idx.hash, k));
 			++i;
 		}
 	} else {
@@ -558,7 +550,7 @@ build_index(struct index *pk, struct index *index)
 			m = (struct index_tree_el *)
 				((char *)elem + i * INDEX_TREE_EL_SIZE(index));
 
-			tuple2index_tree_el(index, tuple, &m);
+			index_tree_el_init(m, index, tuple);
 			++i;
 		}
 	}
@@ -730,7 +722,8 @@ index_init(struct index *index, struct space *space, size_t estimated_rows)
 		panic("unsupported index type");
 		break;
 	}
-	index->search_pattern = palloc(eter_pool, INDEX_TREE_EL_SIZE(index));
+	index->position[POS_READ] = palloc(eter_pool, INDEX_TREE_EL_SIZE(index));
+	index->position[POS_WRITE] = palloc(eter_pool, INDEX_TREE_EL_SIZE(index));
 }
 
 void

@@ -71,6 +71,9 @@ struct index_tree_el {
 #include <third_party/sptree.h>
 SPTREE_DEF(str_t, realloc);
 
+/* Indexes at preallocated search positions.  */
+enum { POS_READ = 0, POS_WRITE = 1, POS_MAX = 2 };
+
 struct index {
 	bool enabled;
 	bool unique;
@@ -91,7 +94,7 @@ struct index {
 		sptree_str_t *tree;
 	} idx;
 	void *iterator;
-	struct index_tree_el *search_pattern;
+	struct index_tree_el *position[POS_MAX];
 
 	struct space *space;
 
