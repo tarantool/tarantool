@@ -88,7 +88,7 @@ please be aware of these restrictions:
   <listitem><simpara>at least one space must be
     configured,</simpara></listitem>
   <listitem><simpara>each configured space needs at least one
-    unique index of type HASH,
+    unique index,
   </simpara></listitem>
   <listitem><simpara>"unique" property doesn't have a default, and
     must be set explicitly,
