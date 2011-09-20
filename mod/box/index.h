@@ -79,10 +79,10 @@ struct index {
 	bool unique;
 
 	size_t (*size)(struct index *index);
-	struct box_tuple *(*find) (struct index * index, void *key);	/* only for unique lookups */
+	struct box_tuple *(*find) (struct index *index, void *key); /* only for unique lookups */
 	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
-	void (*remove) (struct index * index, struct box_tuple *);
-	void (*replace) (struct index * index, struct box_tuple *, struct box_tuple *);
+	void (*remove) (struct index *index, struct box_tuple *);
+	void (*replace) (struct index *index, struct box_tuple *, struct box_tuple *);
 	void (*iterator_init) (struct index *, int cardinality, void *key);
 	struct box_tuple *(*iterator_next) (struct index *);
 	struct box_tuple *(*iterator_next_nocompare) (struct index *);
@@ -102,12 +102,24 @@ struct index {
 
 	struct space *space;
 
+	/* Description of parts of a multipart index. */
 	struct {
 		u32 fieldno;
 		enum field_data_type type;
 	} *key_field;
+	/*
+	 * An array holding field positions in key_field array.
+	 * Imagine there is index[1] = { key_field[0].fieldno=5,
+	 * key_field[1].fieldno=3 }.
+	 * key_field array will contain data from key_field[0] and
+	 * key_field[1] respectively. field_cmp_order_cnt will be 5,
+	 * and field_cmp_order array will hold offsets of
+	 * field 3 and 5 in key_field array: -1, -1, 0, -1, 1.
+	 */
 	u32 *field_cmp_order;
+	/* max fieldno in key_field array + 1 */
 	u32 field_cmp_order_cnt;
+	/* Size of key_field array */
 	u32 key_cardinality;
 	/* relative offset of the index in the namespace */
 	u32 n;
