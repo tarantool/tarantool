@@ -63,8 +63,8 @@ ER = {
 
 
 def format_error(return_code, response):
-    return "An error occurred: {0}, \'{1}'".format(ER[return_code >> 8],
-                                                   response[4:])
+    return "An error occurred: {0}, '{1}'".format(ER[return_code >> 8],
+                                                  response[4:-1])
 
 
 def save_varint32(value):

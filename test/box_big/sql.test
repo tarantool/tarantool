@@ -60,6 +60,19 @@ exec sql "select * from t1 where k0='key1'"
 exec sql "select * from t1 where k0='key2'"
 exec sql "select * from t1 where k0='key3'"
 exec sql "select * from t1 where k1='part1'"
+# check non-unique multipart keys
+exec sql "insert into t5 values ('01234567', 'part1', 'part2')"
+exec sql "insert into t5 values ('11234567', 'part1', 'part2')"
+exec sql "insert into t5 values ('21234567', 'part1', 'part2_a')"
+exec sql "insert into t5 values ('31234567', 'part1_a', 'part2')"
+exec sql "insert into t5 values ('41234567', 'part1_a', 'part2_a')"
+exec sql "select * from t5 where k0='01234567'"
+exec sql "select * from t5 where k0='11234567'"
+exec sql "select * from t5 where k0='21234567'"
+exec sql "select * from t5 where k1='part1'"
+exec sql "select * from t5 where k1='part1_a'"
+exec sql "select * from t5 where k1='part_none'"
+exec admin "lua box.space[5]:select(1, 'part1', 'part2')"
 # Check how build_idnexes() works
 server.stop()
 server.start()
@@ -70,6 +83,17 @@ exec sql "select * from t1 where k1='part1'"
 exec sql "delete from t1 where k0='key1'"
 exec sql "delete from t1 where k0='key2'"
 exec sql "delete from t1 where k0='key3'"
+exec sql "select * from t5 where k1='part1'"
+exec sql "select * from t5 where k1='part2'"
+# check incomplete keys
+exec sql "delete from t5 where k0=1"
+exec sql "delete from t5 where k0=2"
+# cleanup
+exec sql "delete from t5 where k0='01234567'"
+exec sql "delete from t5 where k0='11234567'"
+exec sql "delete from t5 where k0='21234567'"
+exec sql "delete from t5 where k0='31234567'"
+exec sql "delete from t5 where k0='41234567'"
 
 print """
 #
@@ -88,5 +112,43 @@ exec sql "insert into t4 values ('Spears')"
 exec sql "select * from t4 where k0='Spears'"
 # cleanup
 exec sql "delete from t4 where k0='Spears'"
+
+#
+# Test retrieval of duplicates via a secondary key
+#
+exec sql "insert into t4 values (1, 'duplicate one')"
+exec sql "insert into t4 values (2, 'duplicate one')"
+exec sql "insert into t4 values (3, 'duplicate one')"
+exec sql "insert into t4 values (4, 'duplicate one')"
+exec sql "insert into t4 values (5, 'duplicate one')"
+exec sql "insert into t4 values (6, 'duplicate two')"
+exec sql "insert into t4 values (7, 'duplicate two')"
+exec sql "insert into t4 values (8, 'duplicate two')"
+exec sql "insert into t4 values (9, 'duplicate two')"
+exec sql "insert into t4 values (10, 'duplicate two')"
+exec sql "insert into t4 values (11, 'duplicate three')"
+exec sql "insert into t4 values (12, 'duplicate three')"
+exec sql "insert into t4 values (13, 'duplicate three')"
+exec sql "insert into t4 values (14, 'duplicate three')"
+exec sql "insert into t4 values (15, 'duplicate three')"
+exec sql "select * from t4 where k1='duplicate one'"
+exec sql "select * from t4 where k1='duplicate two'"
+exec sql "select * from t4 where k1='duplicate three'"
+exec sql "delete from t4 where k0=1"
+exec sql "delete from t4 where k0=2"
+exec sql "delete from t4 where k0=3"
+exec sql "delete from t4 where k0=4"
+exec sql "delete from t4 where k0=5"
+exec sql "delete from t4 where k0=6"
+exec sql "delete from t4 where k0=7"
+exec sql "delete from t4 where k0=8"
+exec sql "delete from t4 where k0=9"
+exec sql "delete from t4 where k0=10"
+exec sql "delete from t4 where k0=11"
+exec sql "delete from t4 where k0=12"
+exec sql "delete from t4 where k0=13"
+exec sql "delete from t4 where k0=14"
+exec sql "delete from t4 where k0=15"
+
 
 # vim: syntax=python

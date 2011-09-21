@@ -443,54 +443,35 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 	txn->out->add_u32(found);
 	*found = 0;
 
-	if (txn->index->type == TREE) {
-		for (u32 i = 0; i < count; i++) {
+	for (u32 i = 0; i < count; i++) {
 
-			/* End the loop if reached the limit. */
-			if (limit == *found)
-				return;
+		struct index *index = txn->index;
+		/* End the loop if reached the limit. */
+		if (limit == *found)
+			return;
 
-			u32 key_len = read_u32(data);
-			void *key = NULL;
+		u32 key_cardinality = read_u32(data);
+		void *key = NULL;
 
-			if (key_len != 0)
-				key = read_field(data);
+		if (key_cardinality != 0)
+			key = read_field(data);
 
-			/* advance remaining fields of a key */
-			for (int i = 1; i < key_len; i++)
-				read_field(data);
+		/*
+		 * For TREE indexes, we allow partially specified
+		 * keys. HASH indexes are always unique and can
+		 * not have multiple parts.
+		 */
+		if (index->type == HASH && key_cardinality != 1)
+			tnt_raise(IllegalParams, :"key must be single valued");
 
-			txn->index->iterator_init(txn->index, key_len, key);
+		/* advance remaining fields of a key */
+		for (int i = 1; i < key_cardinality; i++)
+			read_field(data);
 
-			while ((tuple = txn->index->iterator_next(txn->index)) != NULL) {
-				if (tuple->flags & GHOST)
-					continue;
+		index->iterator_init(index, key_cardinality, key);
 
-				if (offset > 0) {
-					offset--;
-					continue;
-				}
-
-				txn->out->add_tuple(tuple);
-
-				if (limit == ++(*found))
-					break;
-			}
-		}
-	} else {
-		for (u32 i = 0; i < count; i++) {
-
-			/* End the loop if reached the limit. */
-			if (limit == *found)
-				return;
-
-			u32 key_len = read_u32(data);
-			if (key_len != 1)
-				tnt_raise(IllegalParams, :"key must be single valued");
-
-			void *key = read_field(data);
-			tuple = txn->index->find(txn->index, key);
-			if (tuple == NULL || tuple->flags & GHOST)
+		while ((tuple = index->iterator.next_equal(index)) != NULL) {
+			if (tuple->flags & GHOST)
 				continue;
 
 			if (offset > 0) {
@@ -499,10 +480,11 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 			}
 
 			txn->out->add_tuple(tuple);
-			(*found)++;
+
+			if (limit == ++(*found))
+				break;
 		}
 	}
-
 	if (data->len != 0)
 		tnt_raise(IllegalParams, :"can't unpack request");
 }
@@ -1472,9 +1454,8 @@ mod_snapshot(struct log_io_iter *i)
 
 		struct index *pk = &space[n].index[0];
 
-
 		pk->iterator_init(pk, 0, NULL);
-		while ((tuple = pk->iterator_next_nocompare(pk))) {
+		while ((tuple = pk->iterator.next(pk))) {
 			snapshot_write_tuple(i, n, tuple);
 		}
 	}

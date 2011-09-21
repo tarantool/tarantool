@@ -112,42 +112,31 @@ field_compare(struct field *f1, struct field *f2, enum field_data_type type)
  *              < 0  - a is smaller than b
  *              == 0 - a is equal to b
  *              > 0  - a is greater than b
- *      Custom treatment (by absolute value):
- *              1 - differ in some key field
- *              2 - one tuple is a search pattern
- *              3 - differ in pointers
  */
 static int
-index_tree_el_compare(struct index_tree_el *elem_a,
-		      struct index_tree_el *elem_b,
-		      struct index *index)
+index_tree_el_unique_cmp(struct index_tree_el *elem_a,
+			 struct index_tree_el *elem_b,
+			 struct index *index)
 {
-	i8 r = 0;
-
+	int r = 0;
 	for (i32 i = 0, end = index->key_cardinality; i < end; ++i) {
-		r = field_compare(&elem_a->key[i], &elem_b->key[i], index->key_field[i].type);
-
+		r = field_compare(&elem_a->key[i], &elem_b->key[i],
+				  index->key_field[i].type);
 		if (r != 0)
 			break;
 	}
+	return r;
+}
 
-	if (r != 0)
-		return r;
-
-	if (elem_a->tuple == NULL)
-		return -2;
-
-	if (elem_b->tuple == NULL)
-		return 2;
-
-	if (index->unique == false) {
-		if (elem_a->tuple > elem_b->tuple)
-			return 3;
-		else if (elem_a->tuple < elem_b->tuple)
-			return -3;
-	}
-
-	return 0;
+static int
+index_tree_el_cmp(struct index_tree_el *elem_a, struct index_tree_el *elem_b,
+		  struct index *index)
+{
+	int r = index_tree_el_unique_cmp(elem_a, elem_b, index);
+	if (r == 0 && elem_a->tuple && elem_b->tuple)
+		r = (elem_a->tuple < elem_b->tuple ?
+		     -1 : elem_a->tuple > elem_b->tuple);
+	return r;
 }
 
 static size_t
@@ -173,24 +162,63 @@ index_hash_size(struct index *index)
 	return kh_size(index->idx.hash);
 }
 
-void
-index_hash_iterator_init(struct index *index, int cardinality, void *key)
+static struct box_tuple *
+index_iterator_next_equal(struct index *index __attribute__((unused)))
 {
-	assert(cardinality == 0 && key == NULL);
-	index->iterator.hash = kh_begin(index->idx.hash);
+	return NULL;
+}
+
+static struct box_tuple *
+index_iterator_first_equal(struct index *index)
+{
+	index->iterator.next_equal = index_iterator_next_equal;
+	return index->iterator.next(index);
 }
 
 struct box_tuple *
 index_hash_iterator_next(struct index *index)
 {
-	while (index->iterator.hash != kh_end(index->idx.hash)) {
-		if (kh_exist(index->idx.hash, index->iterator.hash))
-			return kh_value(index->idx.hash,
-					index->iterator.hash++);
-		index->iterator.hash++;
+	struct iterator *it = &index->iterator;
+	while (it->h_iter != kh_end(index->idx.hash)) {
+		if (kh_exist(index->idx.hash, it->h_iter))
+			return kh_value(index->idx.hash, it->h_iter++);
+		it->h_iter++;
 	}
 	return NULL;
 }
+
+void
+index_hash_iterator_init(struct index *index,
+			 int cardinality, void *key)
+{
+	struct iterator *it = &index->iterator;
+	it->next = index_hash_iterator_next;
+	it->next_equal = index_iterator_first_equal;
+
+	if (cardinality == 0 && key == NULL) {
+
+		it->h_iter = kh_begin(index->idx.hash);
+	} else if (index->key_field[0].type == NUM) {
+		u32 key_size = load_varint32(&key);
+		u32 num = *(u32 *)key;
+
+		if (key_size != 4)
+			tnt_raise(IllegalParams, :"key is not u32");
+
+		it->h_iter = kh_get(int_ptr_map, index->idx.int_hash, num);
+	} else if (index->key_field[0].type == NUM64) {
+		u32 key_size = load_varint32(&key);
+		u64 num = *(u64 *)key;
+
+		if (key_size != 8)
+			tnt_raise(IllegalParams, :"key is not u64");
+
+		it->h_iter = kh_get(int64_ptr_map, index->idx.int64_hash, num);
+	} else {
+		it->h_iter = kh_get(lstr_ptr_map, index->idx.str_hash, key);
+	}
+}
+
 
 static struct box_tuple *
 index_hash_num_find(struct index *self, void *key)
@@ -260,10 +288,19 @@ index_tree_el_init(struct index_tree_el *elem,
 		} else
 			f = ASTERISK;
 
-		if (index->field_cmp_order[i] == -1)
+		u32 key_field_no = index->field_cmp_order[i];
+
+		if (key_field_no == -1)
 			continue;
 
-		elem->key[index->field_cmp_order[i]] = f;
+		if (index->key_field[key_field_no].type == NUM) {
+			if (f.len != 4)
+				tnt_raise(IllegalParams, :"key is not u32");
+		} else if (index->key_field[key_field_no].type == NUM64 && f.len != 8) {
+				tnt_raise(IllegalParams, :"key is not u64");
+		}
+
+		elem->key[key_field_no] = f;
 	}
 	elem->tuple = tuple;
 }
@@ -282,6 +319,12 @@ init_search_pattern(struct index *index, int key_cardinality, void *key)
 		u32 len;
 
 		len = pattern->key[i].len = load_varint32(&key_field);
+		if (index->key_field[i].type == NUM) {
+			if (len != 4)
+				tnt_raise(IllegalParams, :"key is not u32");
+		} else if (index->key_field[i].type == NUM64 && len != 8) {
+				tnt_raise(IllegalParams, :"key is not u64");
+		}
 		if (len <= sizeof(pattern->key[i].data)) {
 			memset(pattern->key[i].data, 0, sizeof(pattern->key[i].data));
 			memcpy(pattern->key[i].data, key_field, len);
@@ -299,9 +342,6 @@ index_tree_find(struct index *self, void *key)
 {
 	init_search_pattern(self, 1, key);
 	struct index_tree_el *elem = self->position[POS_READ];
-	/* HACK: otherwise index_tree_el_compare returns -2,
-	 * which is plain wrong. */
-	elem->tuple = (void *)1;
 	elem = sptree_str_t_find(self->idx.tree, elem);
 	if (elem != NULL)
 		return elem->tuple;
@@ -460,41 +500,43 @@ index_tree_replace(struct index *self,
 	sptree_str_t_insert(self->idx.tree, elem);
 }
 
-void
-index_tree_iterator_init(struct index *index, int cardinality, void *key)
-{
-	init_search_pattern(index, cardinality, key);
-	sptree_str_t_iterator_init_set(index->idx.tree,
-				       &index->iterator.tree,
-				       index->position[POS_READ]);
-}
-
 struct box_tuple *
-index_tree_iterator_next(struct index *self)
+index_tree_iterator_next_equal(struct index *self)
 {
+	struct iterator *it = &self->iterator;
 	struct index_tree_el *elem =
-		sptree_str_t_iterator_next(self->iterator.tree);
+		sptree_str_t_iterator_next(it->t_iter);
 
-	if (elem == NULL)
-		return NULL;
-
-	i32 r = index_tree_el_compare(self->position[POS_READ], elem, self);
-	if (r == -2)
+	if (elem != NULL && index_tree_el_unique_cmp(self->position[POS_READ],
+						     elem, self) == 0)
 		return elem->tuple;
 
 	return NULL;
 }
 
 static struct box_tuple *
-index_tree_iterator_next_nocompare(struct index *self)
+index_tree_iterator_next(struct index *self)
 {
 	struct index_tree_el *elem =
-		sptree_str_t_iterator_next(self->iterator.tree);
+		sptree_str_t_iterator_next(self->iterator.t_iter);
 
-	if (elem == NULL)
-		return NULL;
+	return elem ? elem->tuple : NULL;
+}
 
-	return elem->tuple;
+void
+index_tree_iterator_init(struct index *index,
+			 int cardinality, void *key)
+{
+	struct iterator *it = &index->iterator;
+	it->next = index_tree_iterator_next;
+	if (index->unique && cardinality == index->key_cardinality)
+		it->next_equal = index_iterator_first_equal;
+	else
+		it->next_equal = index_tree_iterator_next_equal;
+	init_search_pattern(index, cardinality, key);
+	sptree_str_t_iterator_init_set(index->idx.tree,
+				       &it->t_iter,
+				       index->position[POS_READ]);
 }
 
 void
@@ -554,7 +596,7 @@ build_index(struct index *pk, struct index *index)
 
 	pk->iterator_init(pk, 0, NULL);
 	struct box_tuple *tuple;
-	while ((tuple = pk->iterator_next_nocompare(pk))) {
+	while ((tuple = pk->iterator.next(pk))) {
 
 		m = (struct index_tree_el *)
 			((char *)elem + i * INDEX_TREE_EL_SIZE(index));
@@ -569,7 +611,8 @@ build_index(struct index *pk, struct index *index)
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
 	sptree_str_t_init(index->idx.tree, INDEX_TREE_EL_SIZE(index),
 			  elem, n_tuples, estimated_tuples,
-			  (void *)index_tree_el_compare, index);
+			  (void*) (index->unique ? index_tree_el_unique_cmp :
+			  index_tree_el_cmp), index);
 	index->enabled = true;
 }
 
@@ -611,7 +654,6 @@ index_hash_num(struct index *index, struct space *space,
 	index->remove = index_hash_num_remove;
 	index->replace = index_hash_num_replace;
 	index->iterator_init = index_hash_iterator_init;
-	index->iterator_next_nocompare = index_hash_iterator_next;
 	index->idx.int_hash = kh_init(int_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(int_ptr_map, index->idx.int_hash, estimated_rows);
@@ -635,7 +677,6 @@ index_hash_num64(struct index *index, struct space *space,
 	index->remove = index_hash_num64_remove;
 	index->replace = index_hash_num64_replace;
 	index->iterator_init = index_hash_iterator_init;
-	index->iterator_next_nocompare = index_hash_iterator_next;
 	index->idx.int64_hash = kh_init(int64_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(int64_ptr_map, index->idx.int64_hash, estimated_rows);
@@ -658,7 +699,6 @@ index_hash_str(struct index *index, struct space *space, size_t estimated_rows)
 	index->remove = index_hash_str_remove;
 	index->replace = index_hash_str_replace;
 	index->iterator_init = index_hash_iterator_init;
-	index->iterator_next_nocompare = index_hash_iterator_next;
 	index->idx.str_hash = kh_init(lstr_ptr_map, NULL);
 	if (estimated_rows > 0)
 		kh_resize(lstr_ptr_map, index->idx.str_hash, estimated_rows);
@@ -682,8 +722,6 @@ index_tree(struct index *index, struct space *space,
 	index->remove = index_tree_remove;
 	index->replace = index_tree_replace;
 	index->iterator_init = index_tree_iterator_init;
-	index->iterator_next = index_tree_iterator_next;
-	index->iterator_next_nocompare = index_tree_iterator_next_nocompare;
 	index->idx.tree = palloc(eter_pool, sizeof(*index->idx.tree));
 }
 
@@ -728,7 +766,7 @@ index_init(struct index *index, struct space *space, size_t estimated_rows)
 			sptree_str_t_init(index->idx.tree,
 					  INDEX_TREE_EL_SIZE(index),
 					  NULL, 0, 0,
-					  (void *)index_tree_el_compare, index);
+					  (void *)index_tree_el_unique_cmp, index);
 			index->enabled = true;
 		}
 		break;

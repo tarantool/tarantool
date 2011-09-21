@@ -79,13 +79,11 @@ struct index {
 	bool unique;
 
 	size_t (*size)(struct index *index);
-	struct box_tuple *(*find) (struct index *index, void *key); /* only for unique lookups */
-	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
-	void (*remove) (struct index *index, struct box_tuple *);
-	void (*replace) (struct index *index, struct box_tuple *, struct box_tuple *);
-	void (*iterator_init) (struct index *, int cardinality, void *key);
-	struct box_tuple *(*iterator_next) (struct index *);
-	struct box_tuple *(*iterator_next_nocompare) (struct index *);
+	struct box_tuple *(*find)(struct index *index, void *key); /* only for unique lookups */
+	struct box_tuple *(*find_by_tuple)(struct index * index, struct box_tuple * pattern);
+	void (*remove)(struct index *index, struct box_tuple *);
+	void (*replace)(struct index *index, struct box_tuple *, struct box_tuple *);
+	void (*iterator_init)(struct index *, int cardinality, void *key);
 	union {
 		khash_t(lstr_ptr_map) * str_hash;
 		khash_t(int_ptr_map) * int_hash;
@@ -93,11 +91,15 @@ struct index {
 		khash_t(int_ptr_map) * hash;
 		sptree_str_t *tree;
 	} idx;
-	/* Reusable, current iterator, to cut on the allocation. */
-	union {
-		struct sptree_str_t_iterator *tree;
-		khiter_t hash;
+	struct iterator {
+		union {
+			struct sptree_str_t_iterator *t_iter;
+			khiter_t h_iter;
+		};
+		struct box_tuple *(*next)(struct index *);
+		struct box_tuple *(*next_equal)(struct index *);
 	} iterator;
+	/* Reusable iteration positions, to save on memory allocation. */
 	struct index_tree_el *position[POS_MAX];
 
 	struct space *space;
