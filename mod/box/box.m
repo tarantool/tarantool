@@ -645,7 +645,6 @@ txn_commit(struct box_txn *txn)
 {
 	assert(txn == in_txn());
 	assert(txn->op);
-	fiber->mod_data.txn = 0;
 
 	if (!op_is_select(txn->op)) {
 		say_debug("box_commit(op:%s)", messages_strs[txn->op]);
@@ -673,6 +672,12 @@ txn_commit(struct box_txn *txn)
 		else
 			commit_replace(txn);
 	}
+	/*
+	 * If anything above throws, we must be able to
+	 * roll back. Thus clear mod_data.txn only when
+	 * we know for sure the commit has succeeded.
+	 */
+	fiber->mod_data.txn = 0;
 
 	if (txn->flags & BOX_GC_TXN)
 		fiber_register_cleanup((fiber_cleanup_handler)txn_cleanup, txn);
