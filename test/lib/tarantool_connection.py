@@ -26,7 +26,7 @@ import sys
 import cStringIO
 import errno
 
-class TarantoolConnection:
+class TarantoolConnection(object):
     def __init__(self, host, port):
         self.host = host
         self.port = port

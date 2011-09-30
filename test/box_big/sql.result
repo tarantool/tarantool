@@ -236,11 +236,11 @@ Found 5 tuples:
 [5, 'duplicate one']
 select * from t4 where k1='duplicate two'
 Found 5 tuples:
+[10, 'duplicate two']
 [6, 'duplicate two']
 [7, 'duplicate two']
 [8, 'duplicate two']
 [9, 'duplicate two']
-[10, 'duplicate two']
 select * from t4 where k1='duplicate three'
 Found 5 tuples:
 [11, 'duplicate three']

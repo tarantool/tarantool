@@ -299,6 +299,8 @@ class StatementSelect(StatementPing):
         while len(tuples) < tuple_count:
             (next_tuple, offset) = unpack_tuple(response, offset)
             tuples.append(next_tuple)
+        if self.sort:
+            tuples.sort()
         if tuple_count == 0:
             return "No match"
         elif tuple_count == 1:

@@ -131,9 +131,11 @@ exec sql "insert into t4 values (12, 'duplicate three')"
 exec sql "insert into t4 values (13, 'duplicate three')"
 exec sql "insert into t4 values (14, 'duplicate three')"
 exec sql "insert into t4 values (15, 'duplicate three')"
+sql.sort = True
 exec sql "select * from t4 where k1='duplicate one'"
 exec sql "select * from t4 where k1='duplicate two'"
 exec sql "select * from t4 where k1='duplicate three'"
+sql.sort = False
 exec sql "delete from t4 where k0=1"
 exec sql "delete from t4 where k0=2"
 exec sql "delete from t4 where k0=3"

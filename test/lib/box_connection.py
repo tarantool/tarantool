@@ -27,6 +27,9 @@ import struct
 from tarantool_connection import TarantoolConnection
 
 class BoxConnection(TarantoolConnection):
+    def __init__(self, host, port):
+        super(BoxConnection, self).__init__(host, port)
+        self.sort = False
 
     def recvall(self, length):
         res = ""
@@ -42,6 +45,7 @@ class BoxConnection(TarantoolConnection):
         statement = sql.parse("sql", command)
         if statement == None:
             return "You have an error in your SQL syntax\n"
+        statement.sort = self.sort
 
         payload = statement.pack()
         header = struct.pack("<lll", statement.reqeust_type, len(payload), 0)
