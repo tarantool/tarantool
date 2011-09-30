@@ -106,7 +106,6 @@ tnt_connect(struct tnt *t)
 	t->error = tnt_io_connect(t, t->opt.hostname, t->opt.port);
 	if (t->error != TNT_EOK)
 		return -1;
-	t->connected = 1;
 	return 0;
 }
 

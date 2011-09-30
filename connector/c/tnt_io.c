@@ -59,13 +59,17 @@ tnt_io_resolve(struct sockaddr_in *addr,
 	memset(addr, 0, sizeof(struct sockaddr_in));
 	addr->sin_family = AF_INET;
 	addr->sin_port = htons(port);
-	struct hostent *host = gethostbyname(hostname);
-	if (host)
+	struct addrinfo *addr_info = NULL;
+	if (getaddrinfo(hostname, NULL, NULL, &addr_info) == 0) {
 		memcpy(&addr->sin_addr,
-			(void*)(host->h_addr), host->h_length);
-	else
-		return TNT_ERESOLVE;
-	return TNT_EOK;
+		       (void*)&((struct sockaddr_in *)addr_info->ai_addr)->sin_addr,
+		       sizeof(addr->sin_addr));
+		freeaddrinfo(addr_info);
+		return TNT_EOK;
+	}
+	if (addr_info)
+		freeaddrinfo(addr_info);
+	return TNT_ERESOLVE;
 }
 
 static enum tnt_error
@@ -234,6 +238,7 @@ tnt_io_connect(struct tnt *t, char *host, int port)
 	result = tnt_io_connect_do(t, host, port);
 	if (result != TNT_EOK)
 		goto out;
+	t->connected = 1;
 	return TNT_EOK;
 out:
 	tnt_io_close(t);
@@ -243,9 +248,9 @@ out:
 void
 tnt_io_close(struct tnt *t)
 {
-	if (t->fd >= 0) {
+	if (t->fd > 0) {
 		close(t->fd);
-		t->fd = -1;
+		t->fd = 0;
 	}
 	t->connected = 0;
 }
