@@ -151,6 +151,18 @@ exec sql "delete from t4 where k0=12"
 exec sql "delete from t4 where k0=13"
 exec sql "delete from t4 where k0=14"
 exec sql "delete from t4 where k0=15"
-
+#
+# Check min() and max() functions
+#
+exec sql "insert into t4 values(1, 'Aardvark')"
+exec sql "insert into t4 values(2, 'Bilimbi')"
+exec sql "insert into t4 values(3, 'Creature')"
+exec admin "lua box.space[4].index[0].idx:min()"
+exec admin "lua box.space[4].index[0].idx:max()"
+exec admin "lua box.space[4].index[1].idx:min()"
+exec admin "lua box.space[4].index[1].idx:max()"
+exec sql "delete from t4 where k0=1"
+exec sql "delete from t4 where k0=2"
+exec sql "delete from t4 where k0=3"
 
 # vim: syntax=python

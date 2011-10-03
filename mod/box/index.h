@@ -80,6 +80,8 @@ struct index {
 
 	size_t (*size)(struct index *index);
 	struct box_tuple *(*find)(struct index *index, void *key); /* only for unique lookups */
+	struct box_tuple  *(*min)(struct index  *index);
+	struct box_tuple  *(*max)(struct index  *index);
 	struct box_tuple *(*find_by_tuple)(struct index * index, struct box_tuple * pattern);
 	void (*remove)(struct index *index, struct box_tuple *);
 	void (*replace)(struct index *index, struct box_tuple *, struct box_tuple *);

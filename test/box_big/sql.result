@@ -278,3 +278,31 @@ delete from t4 where k0=14
 Delete OK, 1 row affected
 delete from t4 where k0=15
 Delete OK, 1 row affected
+insert into t4 values(1, 'Aardvark')
+Insert OK, 1 row affected
+insert into t4 values(2, 'Bilimbi')
+Insert OK, 1 row affected
+insert into t4 values(3, 'Creature')
+Insert OK, 1 row affected
+lua box.space[4].index[0].idx:min()
+---
+error: 'Unsupported'
+...
+lua box.space[4].index[0].idx:max()
+---
+error: 'Unsupported'
+...
+lua box.space[4].index[1].idx:min()
+---
+ - 1: {'Aardvark'}
+...
+lua box.space[4].index[1].idx:max()
+---
+ - 3: {'Creature'}
+...
+delete from t4 where k0=1
+Delete OK, 1 row affected
+delete from t4 where k0=2
+Delete OK, 1 row affected
+delete from t4 where k0=3
+Delete OK, 1 row affected

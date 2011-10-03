@@ -60,7 +60,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/*  7 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
 	/*  8 */_(ER_BAD_INTEGRITY,		2, "Bad graph integrity") \
 	/*  9 */_(ER_UNUSED9,			0, "Unused9") \
-	/* 10 */_(ER_UNSUPPORTED_COMMAND,	2, "Unsupported command") \
+	/* 10 */_(ER_UNSUPPORTED,		2, "Unsupported") \
 		/* silverproxy error codes */ \
 	/* 11 */_(ER_RESERVED11,		0, "Reserved11") \
 	/* 12 */_(ER_RESERVED12,		0, "Reserved12") \

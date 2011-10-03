@@ -128,6 +128,20 @@ lbox_tuple_tostring(struct lua_State *L)
 	return 1;
 }
 
+static void
+lbox_pushtuple(struct lua_State *L, struct box_tuple *tuple)
+{
+	if (tuple) {
+		void **ptr = lua_newuserdata(L, sizeof(void *));
+		luaL_getmetatable(L, tuplelib_name);
+		lua_setmetatable(L, -2);
+		*ptr = tuple;
+		tuple_ref(tuple, 1);
+	} else {
+		lua_pushnil(L);
+	}
+}
+
 static const struct luaL_reg lbox_tuple_meta [] = {
 	{"__gc", lbox_tuple_gc},
 	{"__len", lbox_tuple_len},
@@ -187,9 +201,27 @@ lbox_index_len(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_index_min(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	lbox_pushtuple(L, index->min(index));
+	return 1;
+}
+
+static int
+lbox_index_max(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	lbox_pushtuple(L, index->max(index));
+	return 1;
+}
+
 static const struct luaL_reg lbox_index_meta[] = {
 	{"__tostring", lbox_index_tostring},
 	{"__len", lbox_index_len},
+	{"min", lbox_index_min},
+	{"max", lbox_index_max},
 	{NULL, NULL}
 };
 
@@ -277,11 +309,7 @@ static void
 box_lua_add_tuple(struct box_tuple *tuple)
 {
 	struct lua_State *L = in_txn()->L;
-	void **ptr = lua_newuserdata(L, sizeof(void *));
-	luaL_getmetatable(L, tuplelib_name);
-	lua_setmetatable(L, -2);
-	*ptr = tuple;
-	tuple_ref(tuple, 1);
+	lbox_pushtuple(L, tuple);
 }
 
 static struct box_out box_out_lua = {
@@ -435,6 +463,9 @@ mod_lua_init(struct lua_State *L)
 	lua_pop(L, 2);
 	/* box.index */
 	luaL_newmetatable(L, indexlib_name);
+	/* Make the metatable point to itself in __index. */
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
 	lua_pushstring(L, indexlib_name);
 	lua_setfield(L, -2, "__metatable");
 	luaL_register(L, NULL, lbox_index_meta);

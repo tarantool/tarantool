@@ -169,6 +169,13 @@ index_iterator_next_equal(struct index *index __attribute__((unused)))
 }
 
 static struct box_tuple *
+index_min_max_unsupported(struct index *index __attribute__((unused)))
+{
+	tnt_raise(ClientError, :ER_UNSUPPORTED);
+	return NULL;
+}
+
+static struct box_tuple *
 index_iterator_first_equal(struct index *index)
 {
 	index->iterator.next_equal = index_iterator_next_equal;
@@ -343,6 +350,24 @@ index_tree_find(struct index *self, void *key)
 	init_search_pattern(self, 1, key);
 	struct index_tree_el *elem = self->position[POS_READ];
 	elem = sptree_str_t_find(self->idx.tree, elem);
+	if (elem != NULL)
+		return elem->tuple;
+	return NULL;
+}
+
+static struct box_tuple *
+index_tree_min(struct index *index)
+{
+	struct index_tree_el *elem = sptree_str_t_first(index->idx.tree);
+	if (elem != NULL)
+		return elem->tuple;
+	return NULL;
+}
+
+static struct box_tuple *
+index_tree_max(struct index *index)
+{
+	struct index_tree_el *elem = sptree_str_t_last(index->idx.tree);
 	if (elem != NULL)
 		return elem->tuple;
 	return NULL;
@@ -650,6 +675,8 @@ index_hash_num(struct index *index, struct space *space,
 	index->space = space;
 	index->size = index_hash_size;
 	index->find = index_hash_num_find;
+	index->min = index_min_max_unsupported;
+	index->max = index_min_max_unsupported;
 	index->find_by_tuple = index_hash_find_by_tuple;
 	index->remove = index_hash_num_remove;
 	index->replace = index_hash_num_replace;
@@ -673,6 +700,8 @@ index_hash_num64(struct index *index, struct space *space,
 	index->space = space;
 	index->size = index_hash_size;
 	index->find = index_hash_num64_find;
+	index->min = index_min_max_unsupported;
+	index->max = index_min_max_unsupported;
 	index->find_by_tuple = index_hash_find_by_tuple;
 	index->remove = index_hash_num64_remove;
 	index->replace = index_hash_num64_replace;
@@ -695,6 +724,8 @@ index_hash_str(struct index *index, struct space *space, size_t estimated_rows)
 	index->space = space;
 	index->size = index_hash_size;
 	index->find = index_hash_str_find;
+	index->min = index_min_max_unsupported;
+	index->max = index_min_max_unsupported;
 	index->find_by_tuple = index_hash_find_by_tuple;
 	index->remove = index_hash_str_remove;
 	index->replace = index_hash_str_replace;
@@ -718,6 +749,8 @@ index_tree(struct index *index, struct space *space,
 	index->space = space;
 	index->size = index_tree_size;
 	index->find = index_tree_find;
+	index->min = index_tree_min;
+	index->max = index_tree_max;
 	index->find_by_tuple = index_tree_find_by_tuple;
 	index->remove = index_tree_remove;
 	index->replace = index_tree_replace;
