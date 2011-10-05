@@ -116,7 +116,7 @@ recovery_wait_lsn(struct recovery_state *r, i64 lsn)
 	while (lsn < r->confirmed_lsn) {
 		wait_lsn_set(&r->wait_lsn, lsn);
 		@try {
-			yield();
+			fiber_yield();
 		} @finally {
 			wait_lsn_clear(&r->wait_lsn);
 		}
