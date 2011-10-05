@@ -139,7 +139,7 @@ fiber_wakeup(struct fiber *f)
  * cancelled.  Such fiber we won't be ever to cancel, ever, and
  * for such fiber this call will lead to an infinite wait.
  * However, fiber_testcancel() is embedded to the rest of fiber_*
- * API (@sa yield()), which makes most of the fibers that opt in,
+ * API (@sa fiber_yield()), which makes most of the fibers that opt in,
  * cancellable.
  *
  * Currently cancellation can only be synchronous: this call
@@ -165,7 +165,7 @@ fiber_cancel(struct fiber *f)
 	f->waiter = fiber;
 
 	@try {
-		yield();
+		fiber_yield();
 	}
 	@finally {
 		f->waiter = NULL;
@@ -207,7 +207,7 @@ void fiber_setcancelstate(bool enable)
  */
 
 void
-yield(void)
+fiber_yield(void)
 {
 	struct fiber *callee = *(--sp);
 	struct fiber *caller = fiber;
@@ -231,7 +231,7 @@ fiber_sleep(ev_tstamp delay)
 	ev_timer_set(&fiber->timer, delay, 0.);
 	ev_timer_start(&fiber->timer);
 	@try {
-		yield();
+		fiber_yield();
 	}
 	@finally {
 		ev_timer_stop(&fiber->timer);
@@ -248,7 +248,7 @@ wait_for_child(pid_t pid)
 	ev_child_set(&fiber->cw, pid, 0);
 	ev_child_start(&fiber->cw);
 	@try {
-		yield();
+		fiber_yield();
 	}
 	@finally {
 		ev_child_stop(&fiber->cw);
@@ -276,7 +276,7 @@ fiber_io_yield()
 	assert(ev_is_active(&fiber->io));
 
 	@try {
-		yield();
+		fiber_yield();
 	}
 	@catch (id o)
 	{
@@ -452,7 +452,7 @@ fiber_loop(void *data __attribute__((unused)))
 
 		fiber_close();
 		fiber_zombificate();
-		yield();	/* give control back to scheduler */
+		fiber_yield();	/* give control back to scheduler */
 	}
 }
 
@@ -613,7 +613,7 @@ wait_inbox(struct fiber *recipient)
 	while (ring_size(recipient->inbox) == 0) {
 		recipient->flags |= FIBER_READING_INBOX;
 		@try {
-			yield();
+			fiber_yield();
 		}
 		@finally {
 			recipient->flags &= ~FIBER_READING_INBOX;
@@ -650,7 +650,7 @@ read_inbox(void)
 	while (ring_size(inbox) == 0) {
 		fiber->flags |= FIBER_READING_INBOX;
 		@try {
-			yield();
+			fiber_yield();
 		}
 		@finally {
 			fiber->flags &= ~FIBER_READING_INBOX;

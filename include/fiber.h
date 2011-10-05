@@ -144,7 +144,8 @@ fiber_io_yield();
 void
 fiber_io_stop(int fd, int events);
 
-void yield(void);
+void
+fiber_yield(void);
 void fiber_destroy_all();
 
 struct msg *read_inbox(void);
