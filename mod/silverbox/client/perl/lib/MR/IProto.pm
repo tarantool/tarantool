@@ -562,10 +562,10 @@ sub _server_callback {
     my ($resp_msg, $data, $error) = @$resp_args;
     eval {
         if ($error) {
-            $self->_debug("send: failed") if $self->debug >= 2;
             my $retry = defined $args->{request} ? $args->{request}->retry()
                 : ref $args->{retry} eq 'CODE' ? $args->{retry}->()
                 : $args->{retry};
+            $self->_debug("send: failed[@{[$retry, $$try+1, $self->max_request_retries]}]") if $self->debug >= 2;
             if( $retry && $$try++ < $self->max_request_retries ) {
                 $self->_send_retry($sync, $args, $$handler, $$try);
             }

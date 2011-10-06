@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Scalar::Util qw/looks_like_number/;
 use List::MoreUtils qw/each_arrayref/;
+use Time::HiRes qw/sleep/;
 
 use MR::IProto ();
 use MR::Storage::Const ();
@@ -30,7 +31,8 @@ sub new {
     $arg = { %$arg };
     $self->{name}            = $arg->{name}      || ref$class || $class;
     $self->{timeout}         = $arg->{timeout}   || 23;
-    $self->{retry    }       = $arg->{retry}     || 1;
+    $self->{retry}           = $arg->{retry}     || 1;
+    $self->{retry_delay}     = $arg->{retry_delay} || 1;
     $self->{select_retry}    = $arg->{select_retry} || 3;
     $self->{softretry}       = $arg->{softretry} || 3;
     $self->{debug}           = $arg->{'debug'}   || 0;
@@ -171,7 +173,7 @@ sub _chat {
             # retry if error is soft even in case of update e.g. ROW_LOCK
             if ($ret_code->[0] == 1 and --$soft_retry > 0) {
                 --$retry if $retry > 1;
-                sleep 1;
+                sleep $self->{retry_delay};
                 next;
             }
         } else { # timeout has caused the failure if $ret->{timeout}
@@ -182,7 +184,7 @@ sub _chat {
 
         last unless --$retry;
 
-        sleep 1;
+        sleep $self->{retry_delay};
     };
 
     $self->_raise("no success after $retry_count tries\n") if $self->{raise};
