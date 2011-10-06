@@ -78,9 +78,10 @@ lua_checktuple(struct lua_State *L, int narg)
 static inline struct box_tuple *
 lua_istuple(struct lua_State *L, int narg)
 {
-	struct box_tuple *tuple = 0;
-	lua_getmetatable(L, narg);
+	if (lua_getmetatable(L, narg) == 0)
+		return NULL;
 	luaL_getmetatable(L, tuplelib_name);
+	struct box_tuple *tuple = 0;
 	if (lua_equal(L, -1, -2))
 		tuple = * (void **) lua_touserdata(L, narg);
 	lua_pop(L, 2);
@@ -217,11 +218,133 @@ lbox_index_max(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Convert an element on Lua stack to a part of an index
+ * key.
+ *
+ * Lua type system has strings, numbers, booleans, tables,
+ * userdata objects. Tarantool indexes only support 32/64-bit
+ * integers and strings.
+ *
+ * Instead of considering each Tarantool <-> Lua type pair,
+ * here we follow the approach similar to one in lbox_pack()
+ * (see tarantool_lua.m):
+ *
+ * Lua numbers are converted to 32 or 64 bit integers,
+ * if key part is integer. In all other cases,
+ * Lua types are converted to Lua strings, and these
+ * strings are used as key parts.
+ */
+
+void append_key_part(struct lua_State *L, int i,
+		     struct tbuf *tbuf, enum field_data_type type)
+{
+	const char *str;
+	size_t size;
+	u32 v_u32;
+	u64 v_u64;
+
+	if (lua_type(L, i) == LUA_TNUMBER) {
+		if (type == NUM64) {
+			v_u64 = (u64) lua_tonumber(L, i);
+			str = (char *) &v_u64;
+			size = sizeof(u64);
+		} else {
+			v_u32 = (u32) lua_tointeger(L, i);
+			str = (char *) &v_u32;
+			size = sizeof(u32);
+		}
+	} else {
+		str = luaL_checklstring(L, i, &size);
+	}
+	write_varint32(tbuf, size);
+	tbuf_append(tbuf, str, size);
+}
+
+/**
+ * Lua iterator over a Taratnool/Box index.
+ *
+ *	(iteration_state, tuple) = index.next(index, [iteration_state])
+ *
+ * When [iteration_state] is absent or nil
+ * returns a pointer to a new iterator and
+ * to the first tuple (or nil, if the index is
+ * empty).
+ *
+ * When [iteration_state] is a userdata,
+ * i.e. we're inside an iteration loop, retrieves
+ * the next tuple from the iterator.
+ *
+ * Otherwise, [iteration_state] can be used to seed
+ * the iterator with one or several Lua scalars
+ * (numbers, strings) and start iteration from an
+ * offset.
+ *
+ * @todo/FIXME: Currently we always store iteration
+ * state within index. This limits the total
+ * amount of active iterators to 1.
+ */
+static int
+lbox_index_next(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	int argc = lua_gettop(L) - 1;
+	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
+		/*
+		 * If there is nothing or nil on top of the stack,
+		 * start iteration from the beginning.
+		 */
+		index->iterator_init(index, 0, NULL);
+	} else if (argc > 1 || !lua_islightuserdata(L, 2)) {
+		/*
+		 * We've got something different from iterator's
+		 * light userdata: must be a key
+		 * to start iteration from an offset. Seed the
+		 * iterator with this key.
+		 */
+		int cardinality;
+		void *key;
+
+		if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
+			/* Searching by tuple. */
+			struct box_tuple *tuple = lua_checktuple(L, 2);
+			key = tuple->data;
+			cardinality = tuple->cardinality;
+		} else {
+			/* Single or multi- part key. */
+			cardinality = argc;
+			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
+			for (int i = 0; i < argc; ++i)
+				append_key_part(L, i + 2, data,
+						index->key_field[i].type);
+			key = data->data;
+		}
+		/*
+		 * We allow partially specified keys for TREE
+		 * indexes. HASH indexes can only use single-part
+		 * keys.
+		*/
+		assert(cardinality != 0);
+		if (cardinality > index->key_cardinality)
+			luaL_error(L, "index.next(): key part count (%d) "
+				   "does not match index cardinality (%d)",
+				   cardinality, index->key_cardinality);
+		index->iterator_init(index, cardinality, key);
+	}
+	struct box_tuple *tuple = index->iterator.next(index);
+	if (tuple)
+		lua_pushlightuserdata(L, &index->iterator);
+	/* If tuple is NULL, pushes nil as end indicator. */
+	lbox_pushtuple(L, tuple);
+	return tuple ? 2 : 1;
+}
+
 static const struct luaL_reg lbox_index_meta[] = {
 	{"__tostring", lbox_index_tostring},
 	{"__len", lbox_index_len},
 	{"min", lbox_index_min},
 	{"max", lbox_index_max},
+	{"next", lbox_index_next},
 	{NULL, NULL}
 };
 

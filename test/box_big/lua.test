@@ -1,4 +1,15 @@
 # encoding: tarantool
 exec sql "insert into t1 values ('brave', 'new', 'world')"
+exec admin "lua box.space[1].index[1]:min()"
+exec admin "lua box.space[1].index[1]:max()"
 exec sql "call box.select(1, 1, 'new', 'world')"
 exec sql "call box.delete(1, 'brave')"
+
+#
+# Check range scan over multipart keys
+#
+exec sql "insert into t5 values ('01234567', 'new', 'world')"
+exec sql "insert into t5 values ('00000000', 'of', 'puppets')"
+exec sql "insert into t5 values ('00000001', 'of', 'might', 'and', 'magic')"
+exec sql "call box.select_range(5, 1, 2, 'of')"
+exec admin "lua box.space[5]:truncate()"

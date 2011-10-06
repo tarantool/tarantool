@@ -39,6 +39,13 @@ save snapshot
 ---
 ok
 ...
+call box.select_range(3, 0, 100, 'second')
+Found 1 tuple:
+['second', 'tuple 2']
+call box.select_range(3, 0, 100, 'identifier')
+Found 2 tuples:
+['identifier', 'tuple']
+['second', 'tuple 2']
 insert into t3 values ('third', 'tuple 3')
 Insert OK, 1 row affected
 select * from t3 where k0 = 'identifier'

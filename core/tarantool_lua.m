@@ -164,6 +164,7 @@ lbox_unpack(struct lua_State *L)
 	const char *format = luaL_checkstring(L, 1);
 	int i = 2; /* first arg comes second */
 	int nargs = lua_gettop(L);
+	size_t size;
 	u32 u32buf;
 
 	while (*format) {
@@ -171,7 +172,9 @@ lbox_unpack(struct lua_State *L)
 			luaL_error(L, "box.unpack: argument count does not match the format");
 		switch (*format) {
 		case 'i':
-			u32buf = * (u32 *) lua_tostring(L, i);
+			u32buf = * (u32 *) lua_tolstring(L, i, &size);
+			if (size != sizeof(u32))
+				luaL_error(L, "box.unpack('%c'): got %d bytes (expected: 4)", *format, (int) size);
 			lua_pushnumber(L, u32buf);
 			break;
 		default:

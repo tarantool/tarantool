@@ -75,6 +75,12 @@ No match
 select * from t0 where k1='Britney'
 Found 1 tuple:
 ['Spears', 'Britney']
+call box.select_range(0, 0, 100, 'Spears')
+Found 1 tuple:
+['Spears', 'Britney']
+call box.select_range(0, 1, 100, 'Britney')
+Found 1 tuple:
+['Spears', 'Britney']
 delete from t0 where k0='Spears'
 Delete OK, 1 row affected
 #
@@ -86,6 +92,12 @@ insert into t1 values ('key2', 'part1', 'part2_a')
 Insert OK, 1 row affected
 insert into t1 values ('key3', 'part1', 'part2_b')
 Insert OK, 1 row affected
+lua for k, v in box.space[1]:pairs() do print(v) end
+---
+830039403: {'part1', 'part2'}
+863593835: {'part1', 'part2_b'}
+846816619: {'part1', 'part2_a'}
+...
 select * from t1 where k0='key1'
 Found 1 tuple:
 [830039403, 'part1', 'part2']
@@ -100,6 +112,19 @@ Found 3 tuples:
 [830039403, 'part1', 'part2']
 [846816619, 'part1', 'part2_a']
 [863593835, 'part1', 'part2_b']
+call box.select_range(1, 1, 100, 'part1')
+Found 3 tuples:
+[830039403, 'part1', 'part2']
+[846816619, 'part1', 'part2_a']
+[863593835, 'part1', 'part2_b']
+call box.select_range(1, 0, 100, 'key2')
+Found 1 tuple:
+[846816619, 'part1', 'part2_a']
+call box.select_range(1, 1, 100, 'part1', 'part2_a')
+Found 3 tuples:
+[830039403, 'part1', 'part2']
+[846816619, 'part1', 'part2_a']
+[863593835, 'part1', 'part2_b']
 insert into t5 values ('01234567', 'part1', 'part2')
 Insert OK, 1 row affected
 insert into t5 values ('11234567', 'part1', 'part2')
@@ -110,6 +135,14 @@ insert into t5 values ('31234567', 'part1_a', 'part2')
 Insert OK, 1 row affected
 insert into t5 values ('41234567', 'part1_a', 'part2_a')
 Insert OK, 1 row affected
+lua for k, v in box.space[5]:pairs() do print(v) end
+---
+'01234567': {'part1', 'part2'}
+'11234567': {'part1', 'part2'}
+'21234567': {'part1', 'part2_a'}
+'31234567': {'part1_a', 'part2'}
+'41234567': {'part1_a', 'part2_a'}
+...
 select * from t5 where k0='01234567'
 Found 1 tuple:
 ['01234567', 'part1', 'part2']
@@ -176,6 +209,9 @@ delete from t5 where k0='31234567'
 Delete OK, 1 row affected
 delete from t5 where k0='41234567'
 Delete OK, 1 row affected
+lua for k, v in box.space[5]:pairs() do print(v) end
+---
+...
 
 #
 # A test case for: http://bugs.launchpad.net/bugs/735140
@@ -248,6 +284,24 @@ Found 5 tuples:
 [13, 'duplicate three']
 [14, 'duplicate three']
 [15, 'duplicate three']
+lua for k, v in box.space[4]:pairs() do print(v) end
+---
+10: {'duplicate two'}
+13: {'duplicate three'}
+4: {'duplicate one'}
+14: {'duplicate three'}
+3: {'duplicate one'}
+8: {'duplicate two'}
+1: {'duplicate one'}
+15: {'duplicate three'}
+2: {'duplicate one'}
+9: {'duplicate two'}
+11: {'duplicate three'}
+7: {'duplicate two'}
+6: {'duplicate two'}
+5: {'duplicate one'}
+12: {'duplicate three'}
+...
 delete from t4 where k0=1
 Delete OK, 1 row affected
 delete from t4 where k0=2
@@ -284,6 +338,12 @@ insert into t4 values(2, 'Bilimbi')
 Insert OK, 1 row affected
 insert into t4 values(3, 'Creature')
 Insert OK, 1 row affected
+lua for k, v in box.space[4]:pairs() do print(v) end
+---
+1: {'Aardvark'}
+2: {'Bilimbi'}
+3: {'Creature'}
+...
 lua box.space[4].index[0].idx:min()
 ---
 error: 'Unsupported'

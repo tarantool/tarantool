@@ -20,6 +20,8 @@ exec sql "insert into t3 values ('identifier', 'tuple')"
 exec admin "save snapshot"
 exec sql "insert into t3 values ('second', 'tuple 2')"
 exec admin "save snapshot"
+exec sql "call box.select_range(3, 0, 100, 'second')"
+exec sql "call box.select_range(3, 0, 100, 'identifier')"
 
 exec sql "insert into t3 values ('third', 'tuple 3')"
 exec sql "select * from t3 where k0 = 'identifier'"
