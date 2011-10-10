@@ -87,11 +87,10 @@ check_library_exists("" __libc_stack_end "" HAVE_LIBC_STACK_END)
 # in the top level CMakeLists.txt, to ensure a consistent
 # header file layout across the entire project.
 #
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86")
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "amd64")
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCORO_ASM")
 else()
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCORO_SJLJ")
-  set_target_properties(coro PROPERTIES COMPILE_FLAGS "-DCORO_SJLJ")
 endif()
 #
 # Perform build type specific configuration.
