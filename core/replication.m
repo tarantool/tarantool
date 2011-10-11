@@ -245,7 +245,7 @@ acceptor_handler(void *data __attribute__((unused)))
 		fiber_io_start(fiber->fd, EV_READ);
 		fiber_io_yield();
 		/* accept connection */
-		client_sock = accept(fiber->fd, &addr, &addrlen);
+		client_sock = accept(fiber->fd, (struct sockaddr*)&addr, &addrlen);
 		if (client_sock == -1) {
 			if (errno == EAGAIN && errno == EWOULDBLOCK) {
 				continue;
