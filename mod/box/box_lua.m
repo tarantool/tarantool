@@ -104,17 +104,31 @@ lbox_tuple_len(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Implementation of tuple __index metamethod.
+ *
+ * Provides operator [] access to individual fields for integer
+ * indexes, as well as searches and invokes metatable methods
+ * for strings.
+ */
 static int
 lbox_tuple_index(struct lua_State *L)
 {
 	struct box_tuple *tuple = lua_checktuple(L, 1);
-	int i = luaL_checkint(L, 2);
-	if (i >= tuple->cardinality)
-		luaL_error(L, "%s: index %d is out of bounds (0..%d)",
-			   tuplelib_name, i, tuple->cardinality-1);
-	void *field = tuple_field(tuple, i);
-	u32 len = load_varint32(&field);
-	lua_pushlstring(L, field, len);
+	/* For integer indexes, implement [] operator */
+	if (lua_isnumber(L, 2)) {
+		int i = luaL_checkint(L, 2);
+		if (i >= tuple->cardinality)
+			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
+				   tuplelib_name, i, tuple->cardinality-1);
+		void *field = tuple_field(tuple, i);
+		u32 len = load_varint32(&field);
+		lua_pushlstring(L, field, len);
+		return 1;
+	}
+	/* If we got a string, try to find a method for it. */
+	lua_getmetatable(L, 1);
+	lua_getfield(L, -1, lua_tostring(L, 2));
 	return 1;
 }
 
@@ -143,18 +157,62 @@ lbox_pushtuple(struct lua_State *L, struct box_tuple *tuple)
 	}
 }
 
+/**
+ * Sequential access to tuple fields. Since tuple is a list-like
+ * structure, iterating over tuple fields is faster
+ * than accessing fields using an index.
+ */
+static int
+lbox_tuple_next(struct lua_State *L)
+{
+	struct box_tuple *tuple = lua_checktuple(L, 1);
+	int argc = lua_gettop(L) - 1;
+	u8 *field;
+	size_t len;
+
+	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL))
+		field = tuple->data;
+	else if (argc == 1 && lua_islightuserdata(L, 2))
+		field = lua_touserdata(L, 2);
+	else
+		luaL_error(L, "tuple.next(): bad arguments");
+
+	assert(field >= tuple->data);
+	if (field < tuple->data + tuple->bsize) {
+		len = load_varint32((void **) &field);
+		lua_pushlightuserdata(L, field + len);
+		lua_pushlstring(L, (char *) field, len);
+		return 2;
+	}
+	lua_pushnil(L);
+	return  1;
+}
+
+/** Iterator over tuple fields. Adapt lbox_tuple_next
+ * to Lua iteration conventions.
+ */
+static int
+lbox_tuple_pairs(struct lua_State *L)
+{
+	lua_pushcfunction(L, lbox_tuple_next);
+	lua_pushvalue(L, -2); /* tuple */
+	lua_pushnil(L);
+	return 3;
+}
+
 static const struct luaL_reg lbox_tuple_meta [] = {
 	{"__gc", lbox_tuple_gc},
 	{"__len", lbox_tuple_len},
 	{"__index", lbox_tuple_index},
 	{"__tostring", lbox_tuple_tostring},
+	{"next", lbox_tuple_next},
+	{"pairs", lbox_tuple_pairs},
 	{NULL, NULL}
 };
 
 /* }}} */
 
-/**
- * {{{ Lua box.index library: access to spaces and indexes
+/** {{{ box.index Lua library: access to spaces and indexes
  */
 
 static const char *indexlib_name = "box.index";
@@ -573,27 +631,37 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 	}
 }
 
+/** A helper to register a single type metatable. */
+static void
+lua_register_type(struct lua_State *L, const char *type_name,
+		  const struct luaL_reg *methods)
+{
+	luaL_newmetatable(L, type_name);
+	/*
+	 * Conventionally, make the metatable point to itself
+	 * in __index. If 'methods' contain a field for __index,
+	 * this is a no-op.
+	 */
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
+	lua_pushstring(L, type_name);
+	lua_setfield(L, -2, "__metatable");
+	luaL_register(L, NULL, methods);
+	lua_pop(L, 1);
+}
+
 struct lua_State *
 mod_lua_init(struct lua_State *L)
 {
 	lua_atpanic(L, box_lua_panic);
 	/* box, box.tuple */
+	lua_register_type(L, tuplelib_name, lbox_tuple_meta);
 	luaL_register(L, "box", boxlib);
-	luaL_newmetatable(L, tuplelib_name);
-	lua_pushstring(L, tuplelib_name);
-	lua_setfield(L, -2, "__metatable");
-	luaL_register(L, NULL, lbox_tuple_meta);
-	lua_pop(L, 2);
+	lua_pop(L, 1);
 	/* box.index */
-	luaL_newmetatable(L, indexlib_name);
-	/* Make the metatable point to itself in __index. */
-	lua_pushvalue(L, -1);
-	lua_setfield(L, -2, "__index");
-	lua_pushstring(L, indexlib_name);
-	lua_setfield(L, -2, "__metatable");
-	luaL_register(L, NULL, lbox_index_meta);
+	lua_register_type(L, indexlib_name, lbox_index_meta);
 	luaL_register(L, "box.index", indexlib);
-	lua_pop(L, 2);
+	lua_pop(L, 1);
 	/* Load box.lua */
 	if (luaL_dostring(L, &_binary_box_lua_start))
 		panic("Error loading box.lua: %s", lua_tostring(L, -1));
