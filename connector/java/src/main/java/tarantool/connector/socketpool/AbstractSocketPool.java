@@ -138,7 +138,7 @@ public abstract class AbstractSocketPool implements SocketPool {
             pushToReconnect(socketWorker);
             if (stateMachine.isRunning() && disconnectCount.incrementAndGet() >= disconnectBound) {
                 stateMachine.disconnect();
-                disconnectCount.getAndSet(0);
+                disconnectCount.set(0);
                 feedReconnect();
             }
         }
