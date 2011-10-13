@@ -73,8 +73,6 @@ static ev_signal *sigs = NULL;
 
 bool init_storage, booting = true;
 
-extern int daemonize(int nochdir, int noclose);
-
 static i32
 load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 {
@@ -288,6 +286,9 @@ create_pid(void)
 	char buf[16] = { 0 };
 	pid_t pid;
 
+	if (cfg.pid_file == NULL)
+		return;
+
 	f = fopen(cfg.pid_file, "a+");
 	if (f == NULL)
 		panic_syserror("can't open pid file");
@@ -313,6 +314,36 @@ create_pid(void)
 
 	fprintf(f, "%i\n", getpid());
 	fclose(f);
+}
+
+/** Run in the background.
+ */
+static void background()
+{
+    switch (fork()) {
+    case -1:
+	    goto error;
+    case 0:                                     /* child */
+        break;
+    default:                                    /* parent */
+        exit(EXIT_SUCCESS);
+    }
+
+    if (setsid() == -1)
+	    goto error;
+
+    /*
+     * Prints to stdout on failure, so got to be done before we
+     * close it.
+     */
+    create_pid();
+
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+
+error:
+        exit(EXIT_FAILURE);
 }
 
 void
@@ -542,11 +573,18 @@ main(int argc, char **argv)
 		exit(EXIT_SUCCESS);
 	}
 
-	if (gopt(opt, 'B'))
-		daemonize(1, 1);
-
-	if (cfg.pid_file != NULL)
+	if (gopt(opt, 'B')) {
+		if (cfg.logger == NULL) {
+			say_crit("--background requires 'logger' configuration option to be set");
+			exit(EXIT_FAILURE);
+		}
+		background();
+	}
+	else {
 		create_pid();
+	}
+
+	say_logger_init(cfg.logger_nonblock);
 
 	/* init process title */
 	if (cfg.custom_proc_title == NULL) {
@@ -557,7 +595,6 @@ main(int argc, char **argv)
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
-	say_logger_init(cfg.logger_nonblock);
 	booting = false;
 
 	/* main core cleanup routine */

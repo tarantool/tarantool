@@ -224,7 +224,7 @@ class Server(object):
             self.process.expect(pexpect.EOF)
         self.process.close()
 
-        self.wait_until_stoped()
+        self.wait_until_stopped()
         # clean-up processs flags
         self.is_started = False
         self.process = None
@@ -304,8 +304,8 @@ class Server(object):
             except socket.error as e:
                 time.sleep(0.001)
 
-    def wait_until_stoped(self):
-        """Wait until the server is stoped and close sockets"""
+    def wait_until_stopped(self):
+        """Wait until the server is stoped and has closed sockets"""
 
         while self.read_pidfile() != -1:
             time.sleep(0.001)

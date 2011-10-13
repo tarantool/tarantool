@@ -15,6 +15,16 @@ server.test_option("-c")
 server.test_option("--config tarantool.cfg")
 server.test_option("--daemonize")
 server.test_option("--background")
+print """#
+# Check that --background  doesn't work if there is no logger
+# This is a test case for
+# https://bugs.launchpad.net/tarantool/+bug/750658
+# "--background neither closes nor redirects stdin/stdout/stderr"
+#"""
+cfg = os.path.join(vardir, "tarantool_bug750658.cfg")
+os.symlink(os.path.abspath("box/tarantool_bug750658.cfg"), cfg)
+server.test_option("--config=tarantool_bug750658.cfg --background")
+os.unlink(cfg)
 sys.stdout.pop_filter()
 sys.stdout.push_filter("(\d)\.\d\.\d(-\d+-\w+)?", "\\1.minor.patch-<rev>-<commit>")
 server.test_option("--version")
