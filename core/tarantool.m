@@ -316,32 +316,32 @@ create_pid(void)
 	fclose(f);
 }
 
-/** Run in the background.
- */
-static void background()
+/** Run in the background. */
+static void
+background()
 {
-    switch (fork()) {
-    case -1:
-	    goto error;
-    case 0:                                     /* child */
-        break;
-    default:                                    /* parent */
-        exit(EXIT_SUCCESS);
-    }
+	switch (fork()) {
+	case -1:
+		goto error;
+	case 0:                                     /* child */
+		break;
+	default:                                    /* parent */
+		exit(EXIT_SUCCESS);
+	}
 
-    if (setsid() == -1)
-	    goto error;
+	if (setsid() == -1)
+		goto error;
 
-    /*
-     * Prints to stdout on failure, so got to be done before we
-     * close it.
-     */
-    create_pid();
+	/*
+	 * Prints to stdout on failure, so got to be done before
+	 * we close it.
+	 */
+	create_pid();
 
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-
+	close(STDIN_FILENO);
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
+	return;
 error:
         exit(EXIT_FAILURE);
 }
