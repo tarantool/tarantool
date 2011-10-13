@@ -322,7 +322,7 @@
 <delete_response_body> ::= <count> | <count><fq_tuple>
 
 ;
-; CALL request body contains <space_no>, <flags>, <proc_name>
+; CALL request body contains <flags>, <proc_name>
 ; the number of procedure args, and the arguments themselves,
 ; which are passed into the procedure as Lua strings.
 ;
@@ -338,9 +338,9 @@
 ;
 ; In case of an error, <call_response_body> always contains
 ; <return_code>. If it's not 0, it is followed by an
-; error message. Otherwise, the rest of the response can
-; be arbitrary.
-<call_response_body> ::= <...>
+; error message. Otherwise, the response, just like in case of
+; SELECT, is a sequence of <fq_tuple>s.
+<call_response_body> ::= <count><fq_tuple>
 
 ;
 ; The server response, in addition to response header and body,
