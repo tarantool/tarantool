@@ -163,7 +163,7 @@ sub _chat {
                 return $ret;
             }
 
-            $message = $self->{errstrclass}->ErrorStr($full_code);
+            $message = $ret_code->[0] == 0 ? "ok" : $data ? sprintf "Error %08X: %s", $full_code, $$data : $self->{errstrclass}->ErrorStr($full_code);
             $self->_debug("$self->{name}: $message") if $self->{debug} >= 1;
             if ($ret_code->[0] == 2) { #fatal error
                 $self->_raise($message) if $self->{raise};
@@ -210,6 +210,27 @@ sub _validate_param {
     confess "$self->{name}: bad index `$param->{use_index}'" unless exists $ns->{index_names}->{$param->{use_index}};
     $param->{index} = $ns->{index_names}->{$param->{use_index}};
     return ($param, map { /namespace/ ? $self->{namespaces}->{$param->{namespace}} : $param->{$_} } @pnames);
+}
+
+sub Call {
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace flags raise unpack unpack_format/);
+    my ($self, $sp_name, $tuple) = @_;
+
+    my $flags = $param->{flags} || 0;
+    local $self->{raise} = $param->{raise} if defined $param->{raise};
+
+    $self->_debug("$self->{name}: CALL[$sp_name][${\join '   ', map {join' ',unpack'(H2)*',$_} @$tuple}]") if $self->{debug} >= 4;
+    confess "All fields must be defined" if grep { !defined } @$tuple;
+
+    confess "Bad `unpack_format` option" if exists $param->{unpack_format} and ref $param->{unpack_format} ne 'ARRAY';
+    my $unpack_format = join '', map { /&/ ? 'w/a*' : "x$_" } @{$param->{unpack_format}};
+    local $namespace->{unpack_format} = $unpack_format if $unpack_format; # XXX
+
+    $self->_chat (
+        msg     => 22,
+        payload => pack("L w/a* L(w/a*)*", $flags, $sp_name, scalar(@$tuple), @$tuple),
+        unpack  => $param->{unpack} || sub { $self->_unpack_select($namespace, "CALL", @_) },
+    );
 }
 
 sub Add { # store tuple if tuple identified by primary key _does_not_ exist
@@ -287,7 +308,7 @@ sub _unpack_select {
         $self->_debug("$self->{name}: [$debug_prefix]: ROW[$i]: DATA=[@{[unpack '(H2)*', $packed_tuple]}];") if $self->{debug} >= 6;
         $packed_tuple .= $appe;
         my @tuple = eval { unpack($fmt, $packed_tuple) };
-        confess "$self->{name}: [$debug_prefix]: ROW[$i]: can't unpack tuple [@{[unpack('(H2)*', $packed_tuple)]}]" if !@tuple || $@;
+        confess "$self->{name}: [$debug_prefix]: ROW[$i]: can't unpack tuple [@{[unpack('(H2)*', $packed_tuple)]}]: $@" if !@tuple || $@;
         $self->_debug("$self->{name}: [$debug_prefix]: ROW[$i]: FIELDS=[@{[map { qq{`$_'} } @tuple]}];") if $self->{debug} >= 5;
         push @res, \@tuple;
     }
