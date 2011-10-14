@@ -158,6 +158,11 @@ fiber_cancel(struct fiber *f)
 
 	f->flags |= FIBER_CANCEL;
 
+	if (f == fiber) {
+		fiber_testcancel();
+		return;
+	}
+
 	if (f->flags & FIBER_CANCELLABLE)
 		fiber_wakeup(f);
 

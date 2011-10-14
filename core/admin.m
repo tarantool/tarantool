@@ -1469,6 +1469,8 @@ admin_handler(void *data __attribute__((unused)))
 {
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	/** Allow to interrupt/kill administrative connections. */
+	fiber_setcancelstate(true);
 	@try {
 		for (;;) {
 			if (admin_dispatch(L) <= 0)

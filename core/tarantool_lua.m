@@ -40,6 +40,11 @@
 
 struct lua_State *tarantool_L;
 
+/** {{{ box Lua library: common functions
+ */
+
+const char *boxlib_name = "box";
+
 /** Pack our BER integer into luaL_Buffer */
 static void
 luaL_addvarint32(luaL_Buffer *b, u32 u32)
@@ -188,13 +193,142 @@ lbox_unpack(struct lua_State *L)
 	}
 	return i-2;
 }
-/** A descriptor for box.tbuf object methods */
+
+/** A descriptor for box methods */
 
 static const struct luaL_reg boxlib[] = {
 	{"pack", lbox_pack},
 	{"unpack", lbox_unpack},
 	{NULL, NULL}
 };
+
+/* }}} */
+
+/** {{{ box.fiber Lua library: access to Tarantool/Box fibers
+ *
+ * Each fiber can be running, suspended or dead.
+ * It can also be attached or detached.
+ * All fibers are part of the fiber registry,
+ * box.fiber. This registry can be searched either by
+ * fiber id (fid), which is numeric, or by fiber name,
+ * which is a string. If there is more than one
+ * fiber with the given name, the first fiber that
+ * matches is returned.
+ *
+ * A new fiber can also be created from Lua, with
+ * fiber.create(). The fiber
+ * is created suspended, and is thus "attached"
+ * to the creator. The creator can invoke the suspended
+ * fiber with fiber.resume(), and the invoked fiber
+ * can yield control back to the caller with fiber.yield().
+ *
+ * An active fiber, however, may choose to "detach"
+ * from the caller, and become part of the main Tarantool/Box
+ * loop. This is what all internal Tarantool/Box fibers
+ * are -- detached. To "detach" from its creator,
+ * a running fiber can use fiber.detach(). A detached
+ * fiber becomes attached to the internal "sched"
+ * fiber, and can not be attached back to its original
+ * creator.
+ *
+ * Once fiber chunk is done or calls "return",
+ * the fiber is considered dead. Its carcass is put into
+ * fiber pool, and can be reused when another fiber is
+ * created.
+ *
+ * A runaway fiber can be stopped with fiber.cancel().
+ * fiber.cancel(), however, is advisory -- it works
+ * only if the runaway fiber is calling fiber.testcancel()
+ * once in a while. Most box.* hooks, such as box.delete()
+ * or box.update(), are calling fiber.testcancel().
+ * Thus a runaway fiber can really only become cuckoo
+ * if it does a lot of computations and doesn't check
+ * whether it's been cancelled (just don't do that).
+ */
+
+static const char *fiberlib_name = "box.fiber";
+
+struct fiber *
+lbox_checkfiber(struct lua_State *L, int index)
+{
+	return *(void **) luaL_checkudata(L, index, fiberlib_name);
+}
+
+int
+lbox_fiber_id(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	lua_pushinteger(L, f->fid);
+	return 1;
+}
+
+/** Yield to the sched fiber and sleep.
+ * @param[in]  amount of time to sleep (double)
+ *
+ * Only the current fiber can be made to sleep.
+ */
+int
+lbox_fiber_sleep(struct lua_State *L)
+{
+	if (! lua_isnumber(L, 1) || lua_gettop(L) != 1)
+		luaL_error(L, "fiber.sleep(delay): bad arguments");
+	double delay = lua_tonumber(L, 1);
+	fiber_sleep(delay);
+	return 0;
+}
+
+int
+lbox_fiber_self(struct lua_State *L)
+{
+	void **ptr = lua_newuserdata(L, sizeof(void *));
+	luaL_getmetatable(L, fiberlib_name);
+	lua_setmetatable(L, -2);
+	*ptr = fiber;
+	return 1;
+}
+
+/** Running and suspended fibers can be cancelled.
+ * Zombie fibers can't.
+ */
+int
+lbox_fiber_cancel(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	if (! (f->flags & FIBER_CANCELLABLE))
+		luaL_error(L, "fiber.cancel(): subject fiber does "
+			   "not permit cancel");
+	fiber_cancel(f);
+	return 0;
+}
+
+/**
+ * Check if this current fiber has been cancelled and
+ * throw an exception if this is the case.
+ */
+
+int
+lbox_fiber_testcancel(struct lua_State *L)
+{
+	if (lua_gettop(L) != 0)
+		luaL_error(L, "fiber.testcancel(): bad arguments");
+	fiber_testcancel();
+	return 0;
+}
+
+static const struct luaL_reg lbox_fiber_meta [] = {
+	{"id", lbox_fiber_id},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg fiberlib[] = {
+	{"sleep", lbox_fiber_sleep},
+	{"self", lbox_fiber_self},
+	{"cancel", lbox_fiber_cancel},
+	{"testcancel", lbox_fiber_testcancel},
+	{NULL, NULL}
+};
+
+/* }}} */
 
 /*
  * lua_tostring does no use __tostring metamethod, and it has
@@ -273,6 +407,25 @@ lbox_print(struct lua_State *L)
 	return 0;
 }
 
+/** A helper to register a single type metatable. */
+void
+tarantool_lua_register_type(struct lua_State *L, const char *type_name,
+			    const struct luaL_Reg *methods)
+{
+	luaL_newmetatable(L, type_name);
+	/*
+	 * Conventionally, make the metatable point to itself
+	 * in __index. If 'methods' contain a field for __index,
+	 * this is a no-op.
+	 */
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
+	lua_pushstring(L, type_name);
+	lua_setfield(L, -2, "__metatable");
+	luaL_register(L, NULL, methods);
+	lua_pop(L, 1);
+}
+
 struct lua_State *
 tarantool_lua_init()
 {
@@ -280,8 +433,11 @@ tarantool_lua_init()
 	if (L == NULL)
 		return L;
 	luaL_openlibs(L);
-	luaL_register(L, "box", boxlib);
+	luaL_register(L, boxlib_name, boxlib);
 	lua_pop(L, 1);
+	luaL_register(L, fiberlib_name, fiberlib);
+	lua_pop(L, 1);
+	tarantool_lua_register_type(L, fiberlib_name, lbox_fiber_meta);
 	lua_register(L, "print", lbox_print);
 	L = mod_lua_init(L);
 	lua_settop(L, 0); /* clear possible left-overs of init */
@@ -415,3 +571,7 @@ void tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		lua_pcall(L, 0, 0, 0);
 	lua_pop(L, 1);
 }
+
+/*
+ * vim: foldmethod=marker
+ */

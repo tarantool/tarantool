@@ -631,35 +631,16 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 	}
 }
 
-/** A helper to register a single type metatable. */
-static void
-lua_register_type(struct lua_State *L, const char *type_name,
-		  const struct luaL_reg *methods)
-{
-	luaL_newmetatable(L, type_name);
-	/*
-	 * Conventionally, make the metatable point to itself
-	 * in __index. If 'methods' contain a field for __index,
-	 * this is a no-op.
-	 */
-	lua_pushvalue(L, -1);
-	lua_setfield(L, -2, "__index");
-	lua_pushstring(L, type_name);
-	lua_setfield(L, -2, "__metatable");
-	luaL_register(L, NULL, methods);
-	lua_pop(L, 1);
-}
-
 struct lua_State *
 mod_lua_init(struct lua_State *L)
 {
 	lua_atpanic(L, box_lua_panic);
 	/* box, box.tuple */
-	lua_register_type(L, tuplelib_name, lbox_tuple_meta);
+	tarantool_lua_register_type(L, tuplelib_name, lbox_tuple_meta);
 	luaL_register(L, "box", boxlib);
 	lua_pop(L, 1);
 	/* box.index */
-	lua_register_type(L, indexlib_name, lbox_index_meta);
+	tarantool_lua_register_type(L, indexlib_name, lbox_index_meta);
 	luaL_register(L, "box.index", indexlib);
 	lua_pop(L, 1);
 	/* Load box.lua */
