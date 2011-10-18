@@ -40,6 +40,34 @@
 
 struct lua_State *tarantool_L;
 
+/* Remember the output of the administrative console in the
+ * registry, to use with 'print'.
+ */
+static void
+tarantool_lua_set_out(struct lua_State *L, const struct tbuf *out)
+{
+	lua_pushthread(L);
+	if (out)
+		lua_pushlightuserdata(L, (void *) out);
+	else
+		lua_pushnil(L);
+	lua_settable(L, LUA_REGISTRYINDEX);
+}
+
+/* dup out from parent to child L. Used in fiber_create */
+
+void
+tarantool_lua_dup_out(struct lua_State *L, struct lua_State *child_L)
+{
+	lua_pushthread(L);
+	lua_gettable(L, LUA_REGISTRYINDEX);
+	struct tbuf *out = (struct tbuf *) lua_topointer(L, -1);
+	lua_pop(L, 1); /* pop 'out' */
+	if (out)
+		tarantool_lua_set_out(child_L, out);
+}
+
+
 /** {{{ box Lua library: common functions
  */
 
@@ -315,6 +343,198 @@ lbox_fiber_id(struct lua_State *L)
 	return 1;
 }
 
+static struct lua_State *
+box_lua_fiber_get_coro(struct lua_State *L, struct fiber *f)
+{
+	lua_pushlightuserdata(L, f);
+	lua_gettable(L, LUA_REGISTRYINDEX);
+	struct lua_State *child_L = lua_tothread(L, -1);
+	lua_pop(L, 1);
+	return child_L;
+}
+
+static void
+box_lua_fiber_clear_coro(struct lua_State *L, struct fiber *f)
+{
+	lua_pushlightuserdata(L, f);
+	lua_pushnil(L);
+	lua_settable(L, LUA_REGISTRYINDEX);
+}
+
+static int
+lbox_fiber_gc(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	struct lua_State *child_L = box_lua_fiber_get_coro(L, f);
+	/*
+	 * A non-NULL coro is an indicator of a 1) alive,
+	 * 2) suspended and 3) attached fiber. The coro is
+	 * an outlet to pass arguments in and out the Lua
+	 * routine being executed by the fiber (see fiber.resume()
+	 * and fiber.yield()), and as soon as the Lua routine
+	 * completes, the "plug" is shut down (see
+	 * box_lua_fiber_run()). When its routine completes,
+	 * the fiber recycles itself.
+	 * Likewise, when a fiber becomes detached, this plug is
+	 * removed, since we no longer need to pass arguments
+	 * to and from it, and 'sched' garbage collects all detached
+	 * fibers (see lbox_fiber_detach()).
+	 * We also know that the fiber is suspended, not running,
+	 * because any running and attached fiber is referenced,
+	 * if only by the fiber which called lbox_lua_resume()
+	 * on it. lbox_lua_resume() is the only entry point
+	 * to resume an attached fiber.
+	 */
+	if (child_L) {
+		assert(f != fiber && child_L != L);
+		/* Garbage collect the associated coro.
+		 * Do it first, since the cancelled fiber
+		 * can get recycled quickly.
+		 */
+		box_lua_fiber_clear_coro(L, f);
+		/*
+		 * Cancel and recycle the fiber. This
+		 * returns only after the fiber has died.
+		 */
+		fiber_cancel(f);
+	}
+	return 0;
+}
+
+
+static void
+box_lua_fiber_run(void *arg __attribute__((unused)))
+{
+	fiber_setcancelstate(true);
+	fiber_testcancel();
+	struct lua_State *L = box_lua_fiber_get_coro(tarantool_L, fiber);
+	/*
+	 * Reference the coroutine to make sure it's not garbage
+	 * collected when detached.
+	 */
+	lua_pushthread(L);
+	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	/*
+	 * Lua coroutine.resume() returns true/false for
+	 * completion status plus whatever the coroutine main
+	 * function returns. Follow this style here.
+	 */
+	@try {
+		lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
+		lua_pushboolean(L, true); /* push completion status */
+		lua_insert(L, 1); /* move 'true' to stack start */
+	} @catch (ClientError *e) {
+		/*
+		 * Note: FiberCancelException passes through this
+		 * catch and thus leaves garbage on coroutine
+		 * stack. This is OK since it is only possible to
+		 * cancel a fiber which is not scheduled, and
+		 * cancel() is synchronous.
+		 */
+		lua_settop(L, 0); /* pop any possible garbage */
+		lua_pushboolean(L, 0); /* completion status */
+		lua_pushstring(L, e->errmsg); /* error message */
+	} @finally {
+		/*
+		 * If the coroutine has detached itself, collect
+		 * its resources here.
+		 */
+		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+	}
+	/* L stack contains nothing but call results */
+}
+
+static int
+lbox_fiber_create(struct lua_State *L)
+{
+        if (lua_gettop(L) != 1 || !lua_isfunction(L, 1))
+                luaL_error(L, "fiber.create(function): bad arguments");
+	if (fiber_checkstack()) {
+		luaL_error(L, "fiber.create(function): recursion limit"
+			   " reached");
+	}
+	struct fiber *f= fiber_create("lua", -1, -1, box_lua_fiber_run, NULL);
+
+	lua_pushlightuserdata(L, f); /* associate coro with fiber */
+	struct lua_State *child_L = lua_newthread(L);
+	lua_settable(L, LUA_REGISTRYINDEX);
+	lua_xmove(L, child_L, 1); /* move the argument to the new coro */
+	lbox_pushfiber(L, f);
+	return 1;
+}
+
+static int
+lbox_fiber_resume(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	struct lua_State *child_L = box_lua_fiber_get_coro(L, f);
+	if (child_L == NULL)
+		luaL_error(L, "fiber.resume(): can't resume a "
+			   "detached fiber");
+	int nargs = lua_gettop(L) - 1;
+	if (nargs > 0)
+		lua_xmove(L, child_L, nargs);
+	/* dup 'out' for admin fibers */
+	tarantool_lua_dup_out(L, child_L);
+	fiber_call(f);
+	tarantool_lua_set_out(child_L, NULL);
+	/* Get the results */
+	nargs = lua_gettop(child_L);
+	lua_xmove(child_L, L, nargs);
+	if (f->f == 0) { /* The fiber is dead. */
+		/* Garbage collect the associated coro. */
+		box_lua_fiber_clear_coro(L, f);
+	}
+	return nargs;
+}
+
+/** Yield the current fiber.
+ *
+ * Yield control to the calling fiber -- if the fiber
+ * is attached, or to sched otherwise.
+ * If the fiber is attached, whatever arguments are passed
+ * to this call, are passed on to the calling fiber.
+ * If the fiber is detached, simply returns everything back.
+ */
+static int
+lbox_fiber_yield(struct lua_State *L)
+{
+	/*
+	 * Yield to the caller. The caller will take care of
+	 * whatever arguments are taken.
+	 */
+	fiber_yield();
+	fiber_testcancel(); /* throws an error if we were cancelled. */
+	/*
+	 * Got resumed. Return whatever the caller has passed
+	 * to us with box.fiber.resume().
+	 * As a side effect, the detached fiber which yields
+	 * to sched always gets back whatever it yields.
+	 */
+	return lua_gettop(L);
+}
+
+/**
+ * Detach the current fiber.
+ */
+static int
+lbox_fiber_detach(struct lua_State *L)
+{
+	struct lua_State *self_L = box_lua_fiber_get_coro(L, fiber);
+	if (self_L == NULL)
+		luaL_error(L, "fiber.detach(): not attached");
+	assert(self_L == L);
+	/* Clear our association with the parent. */
+	box_lua_fiber_clear_coro(L, fiber);
+	tarantool_lua_set_out(L, NULL);
+	/* Make sure we get awoken, at least once. */
+	fiber_wakeup(fiber);
+	/* Yield to the parent. */
+	fiber_yield();
+	fiber_testcancel(); /* check if we were cancelled. */
+	return 0;
+}
+
 /** Yield to the sched fiber and sleep.
  * @param[in]  amount of time to sleep (double)
  *
@@ -334,6 +554,18 @@ static int
 lbox_fiber_self(struct lua_State *L)
 {
 	lbox_pushfiber(L, fiber);
+	return 1;
+}
+
+static int
+lbox_fiber_find(struct lua_State *L)
+{
+	int fid = lua_tointeger(L, -1);
+	struct fiber *f = fiber_find(fid);
+	if (f)
+		lbox_pushfiber(L, f);
+	else
+		lua_pushnil(L);
 	return 1;
 }
 
@@ -367,14 +599,20 @@ lbox_fiber_testcancel(struct lua_State *L)
 
 static const struct luaL_reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
+	{"__gc", lbox_fiber_gc},
 	{NULL, NULL}
 };
 
 static const struct luaL_reg fiberlib[] = {
 	{"sleep", lbox_fiber_sleep},
 	{"self", lbox_fiber_self},
+	{"find", lbox_fiber_find},
 	{"cancel", lbox_fiber_cancel},
 	{"testcancel", lbox_fiber_testcancel},
+	{"create", lbox_fiber_create},
+	{"resume", lbox_fiber_resume},
+	{"yield", lbox_fiber_yield},
+	{"detach", lbox_fiber_detach},
 	{NULL, NULL}
 };
 
@@ -493,20 +731,6 @@ tarantool_lua_init()
 	L = mod_lua_init(L);
 	lua_settop(L, 0); /* clear possible left-overs of init */
 	return L;
-}
-
-/* Remember the output of the administrative console in the
- * registry, to use with 'print'.
- */
-static void
-tarantool_lua_set_out(struct lua_State *L, struct tbuf *out)
-{
-	lua_pushthread(L);
-	if (out)
-		lua_pushlightuserdata(L, (void *) out);
-	else
-		lua_pushnil(L);
-	lua_settable(L, LUA_REGISTRYINDEX);
 }
 
 /**

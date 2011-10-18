@@ -408,9 +408,8 @@ main(int argc, char **argv)
 	stat_init();
 	palloc_init();
 
-#ifdef RESOLVE_SYMBOLS
 	load_symbols(argv[0]);
-#endif
+
 	argv = init_set_proc_title(argc, argv);
 	main_argc = argc;
 	main_argv = argv;

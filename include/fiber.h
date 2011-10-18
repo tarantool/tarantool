@@ -196,8 +196,10 @@ ssize_t fiber_write(const void *buf, size_t count);
 int fiber_close(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
+bool fiber_checkstack();
 void fiber_call(struct fiber *callee);
 void fiber_wakeup(struct fiber *f);
+struct fiber *fiber_find(int fid);
 /** Cancel a fiber. A cancelled fiber will have
  * tnt_FiberCancelException raised in it.
  *
