@@ -207,29 +207,29 @@ static const struct luaL_reg boxlib[] = {
 /** {{{ box.fiber Lua library: access to Tarantool/Box fibers
  *
  * Each fiber can be running, suspended or dead.
- * It can also be attached or detached.
- * All fibers are part of the fiber registry,
- * box.fiber. This registry can be searched either by
+ * A fiber is created (box.fiber.create()) suspended.
+ * It can be started with box.fiber.resume(), yield
+ * the control back with box.fiber.yield() end
+ * with return or just by reaching the end of the
+ * function.
+ *
+ * A fiber can also be attached or detached.
+ * An attached fiber is a child of the creator,
+ * and is running only if the creator has called
+ * box.fiber.resume(). A detached fiber is a child of
+ * Tarntool/Box internal 'sched' fiber, and is gets
+ * scheduled only if there is a libev event associated
+ * with it.
+ * To detach, a running fiber must invoke box.fiber.detach().
+ * A detached fiber loses connection with its parent
+ * forever.
+ *
+ * All fibers are part of the fiber registry, box.fiber.
+ * This registry can be searched either by
  * fiber id (fid), which is numeric, or by fiber name,
  * which is a string. If there is more than one
  * fiber with the given name, the first fiber that
  * matches is returned.
- *
- * A new fiber can also be created from Lua, with
- * fiber.create(). The fiber
- * is created suspended, and is thus "attached"
- * to the creator. The creator can invoke the suspended
- * fiber with fiber.resume(), and the invoked fiber
- * can yield control back to the caller with fiber.yield().
- *
- * An active fiber, however, may choose to "detach"
- * from the caller, and become part of the main Tarantool/Box
- * loop. This is what all internal Tarantool/Box fibers
- * are -- detached. To "detach" from its creator,
- * a running fiber can use fiber.detach(). A detached
- * fiber becomes attached to the internal "sched"
- * fiber, and can not be attached back to its original
- * creator.
  *
  * Once fiber chunk is done or calls "return",
  * the fiber is considered dead. Its carcass is put into
@@ -241,20 +241,73 @@ static const struct luaL_reg boxlib[] = {
  * only if the runaway fiber is calling fiber.testcancel()
  * once in a while. Most box.* hooks, such as box.delete()
  * or box.update(), are calling fiber.testcancel().
+ *
  * Thus a runaway fiber can really only become cuckoo
  * if it does a lot of computations and doesn't check
  * whether it's been cancelled (just don't do that).
+ *
+ * The other potential problem comes from detached
+ * fibers which never get scheduled, because are subscribed
+ * or get no events. Such morphing fibers can be killed
+ * with box.fiber.cancel(), since box.fiber.cancel()
+ * sends an asynchronous wakeup event to the fiber.
  */
 
 static const char *fiberlib_name = "box.fiber";
 
-struct fiber *
+/** Push a userdata for the given fiber onto Lua stack. */
+static void
+lbox_pushfiber(struct lua_State *L, struct fiber *f)
+{
+	/*
+	 * Use 'memoize'  pattern and keep a single userdata for
+	 * the given fiber.
+	 */
+	luaL_getmetatable(L, fiberlib_name);
+	int top = lua_gettop(L);
+	lua_getfield(L, -1, "memoize");
+	if (lua_isnil(L, -1)) { /* first access - instantiate memoize */
+		lua_pop(L, 1);                  /* pop the nil */
+		lua_newtable(L);                /* create memoize table */
+		lua_newtable(L);                /* and a metatable */
+		lua_pushstring(L, "kv"); /* weak keys and values */
+		lua_setfield(L, -2, "__mode"); /* pops 'kv' */
+		lua_setmetatable(L, -2); /* pops the metatable */
+		lua_setfield(L, -2, "memoize"); /* assigns and pops memoize */
+		lua_getfield(L, -1, "memoize"); /* gets memoize back. */
+		assert(! lua_isnil(L, -1));
+	}
+	/* Find out whether the fiber is  already in the memoize table. */
+	lua_pushlightuserdata(L, f);
+	lua_gettable(L, -2);
+	if (lua_isnil(L, -1)) { /* no userdata for fiber created so far */
+		lua_pop(L, 1);                  /* pop the nil */
+		lua_pushlightuserdata(L, f);    /* push the key back */
+		/* create a new userdata */
+		void **ptr = lua_newuserdata(L, sizeof(void *));
+		*ptr = f;
+		luaL_getmetatable(L, fiberlib_name);
+		lua_setmetatable(L, -2);
+		lua_settable(L, -3);            /* memoize it */
+		lua_pushlightuserdata(L, f);
+		lua_gettable(L, -2);            /* get it back */
+	}
+	/*
+	 * Here we have a userdata on top of the stack and
+	 * possibly some garbage just under the top. Move the
+	 * result to the beginning of the stack and clear the rest.
+	 */
+	lua_replace(L, top); /* moves the current top to the old top */
+	lua_settop(L, top); /* clears everything after the old top */
+}
+
+static struct fiber *
 lbox_checkfiber(struct lua_State *L, int index)
 {
 	return *(void **) luaL_checkudata(L, index, fiberlib_name);
 }
 
-int
+static int
 lbox_fiber_id(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
@@ -267,7 +320,7 @@ lbox_fiber_id(struct lua_State *L)
  *
  * Only the current fiber can be made to sleep.
  */
-int
+static int
 lbox_fiber_sleep(struct lua_State *L)
 {
 	if (! lua_isnumber(L, 1) || lua_gettop(L) != 1)
@@ -277,20 +330,17 @@ lbox_fiber_sleep(struct lua_State *L)
 	return 0;
 }
 
-int
+static int
 lbox_fiber_self(struct lua_State *L)
 {
-	void **ptr = lua_newuserdata(L, sizeof(void *));
-	luaL_getmetatable(L, fiberlib_name);
-	lua_setmetatable(L, -2);
-	*ptr = fiber;
+	lbox_pushfiber(L, fiber);
 	return 1;
 }
 
 /** Running and suspended fibers can be cancelled.
  * Zombie fibers can't.
  */
-int
+static int
 lbox_fiber_cancel(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
@@ -306,7 +356,7 @@ lbox_fiber_cancel(struct lua_State *L)
  * throw an exception if this is the case.
  */
 
-int
+static int
 lbox_fiber_testcancel(struct lua_State *L)
 {
 	if (lua_gettop(L) != 0)
@@ -331,8 +381,9 @@ static const struct luaL_reg fiberlib[] = {
 /* }}} */
 
 /*
- * lua_tostring does no use __tostring metamethod, and it has
- * to be called if we want to print Lua userdata correctly.
+ * This function exists because lua_tostring does not use
+ * __tostring metamethod, and this metamethod has to be used
+ * if we want to print Lua userdata correctly.
  */
 const char *
 tarantool_lua_tostring(struct lua_State *L, int index)
@@ -381,10 +432,10 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
  * administrative command.
  *
  * Note: administrative console output must be YAML-compatible.
- * If this is * done automatically, the result is ugly, so we
- * don't do it. A creator of Lua procedures has to do it herself.
- * Best we can do here is to add a trailing \r\n if it's
- * forgotten.
+ * If this is done automatically, the result is ugly, so we
+ * don't do it. Creators of Lua procedures have to do it
+ * themselves. Best we can do here is to add a trailing
+ * \r\n if it's forgotten.
  */
 static int
 lbox_print(struct lua_State *L)
@@ -508,7 +559,8 @@ tarantool_lua(struct lua_State *L,
  * Check if the given literal is a number/boolean or string
  * literal. A string literal needs quotes.
  */
-static bool is_string(const char *str)
+static bool
+is_string(const char *str)
 {
 	if (strcmp(str, "true") == 0 || strcmp(str, "false") == 0)
 	    return false;
@@ -524,7 +576,8 @@ static bool is_string(const char *str)
  * as functional to convert the given configuration to a Lua
  * table and export the table into Lua.
  */
-void tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
+void
+tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 {
 	luaL_Buffer b;
 	char *key, *value;
