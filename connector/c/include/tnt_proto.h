@@ -30,6 +30,7 @@
 #define TNT_PROTO_TYPE_SELECT 17
 #define TNT_PROTO_TYPE_UPDATE 19
 #define TNT_PROTO_TYPE_DELETE 20
+#define TNT_PROTO_TYPE_CALL   22
 #define TNT_PROTO_TYPE_PING   65280
 
 struct tnt_proto_header {
@@ -93,6 +94,12 @@ struct tnt_proto_select {
 	uint32_t index;
 	uint32_t offset;
 	uint32_t limit;
+	/* tuple data */
+};
+
+struct tnt_proto_call {
+	uint32_t flags;
+	/* proc */
 	/* tuple data */
 };
 

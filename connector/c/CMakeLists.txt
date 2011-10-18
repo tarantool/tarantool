@@ -37,6 +37,7 @@ set (tnt_sources
 	tnt_insert.c
 	tnt_delete.c
 	tnt_select.c
+	tnt_call.c
 	tnt_memcache_val.c
 	tnt_memcache.c)
 

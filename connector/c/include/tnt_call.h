@@ -1,5 +1,5 @@
-#ifndef TNT_OPT_H_INCLUDED
-#define TNT_OPT_H_INCLUDED
+#ifndef TNT_CALL_H_INCLUDED
+#define TNT_CALL_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -27,59 +27,32 @@
  */
 
 /**
- * @defgroup Options
- * @ingroup  Main
+ * @defgroup Call
+ * @ingroup  Operations
+ * @brief Call operation
+ *
  * @{
  */
 
-enum tnt_proto {
-	TNT_PROTO_ADMIN,
-	TNT_PROTO_RW,
-	TNT_PROTO_RO,
-	TNT_PROTO_FEEDER
-};
-
-enum tnt_opt_type {
-	TNT_OPT_PROTO,
-	TNT_OPT_HOSTNAME,
-	TNT_OPT_PORT,
-	TNT_OPT_TMOUT_CONNECT,
-	TNT_OPT_TMOUT_RECV,
-	TNT_OPT_TMOUT_RECV_MS,
-	TNT_OPT_TMOUT_SEND,
-	TNT_OPT_TMOUT_SEND_MS,
-	TNT_OPT_SEND_CB,
-	TNT_OPT_SEND_CBV,
-	TNT_OPT_SEND_CB_ARG,
-	TNT_OPT_SEND_BUF,
-	TNT_OPT_RECV_CB,
-	TNT_OPT_RECV_CB_ARG,
-	TNT_OPT_RECV_BUF
-};
+/**
+ * Call operation.
+ *
+ * If bufferization is in use, then request would be placed in
+ * internal buffer for later sending. Otherwise, operation
+ * would be processed immediately.
+ *
+ * @param t handler pointer
+ * @param reqid user supplied integer value
+ * @param flags operation flags
+ * @param proc procedure name
+ * @param argc argument count
+ * @param argv arguments
+ * @returns 0 on success, -1 on error
+ */
+int tnt_call(struct tnt *t, int reqid, int flags, char *proc,
+	     uint32_t argc, char **argv);
+int tnt_callv(struct tnt *t, int reqid, int flags, char *proc,
+	      uint32_t argc, ...);
 /** @} */
 
-struct tnt_opt {
-	enum tnt_proto proto;
-	char *hostname;
-	int port;
-	int tmout_connect;
-	int tmout_recv;
-	int tmout_recv_ms;
-	int tmout_send;
-	int tmout_send_ms;
-	void *send_cb;
-	void *send_cbv;
-	void *send_cb_arg;
-	int send_buf;
-	void *recv_cb;
-	void *recv_cb_arg;
-	int recv_buf;
-};
-
-void tnt_opt_init(struct tnt_opt *opt);
-void tnt_opt_free(struct tnt_opt *opt);
-
-enum tnt_error tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
-		           va_list args);
-
-#endif /* TNT_OPT_H_INCLUDED */
+#endif /* TNT_CALL_H_INCLUDED */
