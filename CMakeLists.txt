@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 2.6)
+
 project(tarantool)
+
 include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
 include(CheckSymbolExists)
 include(TestBigEndian)
+
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
 find_program(XMLLINT xmllint)
@@ -13,6 +16,7 @@ find_program(GIT git)
 find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
 find_program(LD ld)
+
 set(luadir ${PROJECT_BINARY_DIR}/third_party/luajit/src)
 link_directories(${luadir})
 
@@ -24,6 +28,8 @@ include(cmake/check_objective_c_compiler.cmake)
 #
 set (TARANTOOL_PRODUCT "box")
 set (TARANTOOL_MODULES "box")
+set (TARANTOOL_CLIENTS "")
+
 
 #
 # Set default build type to Debug. This is to ease a developer's
@@ -166,6 +172,11 @@ include_directories("${PROJECT_BINARY_DIR}/include")
 #
 # Now handle all configuration options.
 #
+option(ENABLE_CLIENT "Enable building of console client" ON)
+if (ENABLE_CLIENT)
+    set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
+endif()
+
 option(ENABLE_GCOV "Enable integration with gcov, a code coverage program" ON)
 if (ENABLE_GCOV)
     check_library_exists (gcov __gcov_flush  ""  HAVE_GCOV)
@@ -256,6 +267,7 @@ message (STATUS "${TARANTOOL_MODULES}.")
 message (STATUS "Please check out CMakeCache.txt to view or modify configuration results.")
 message (STATUS "")
 message (STATUS "*** The following options are on in this configuration: ***")
+message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
 message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
 message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
 message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE}")
