@@ -142,7 +142,7 @@ static void
 test_insert_sql(struct tnt *t)
 {
 	char *e;
-	char q[] = "insert into t0 values(222, 'world')";
+	char q[] = "insert into t0 values(222, 'world', 'abc')";
 	if (tnt_query(t, q, sizeof(q) - 1, &e) == -1) {
 		printf("%s\n", e);
 		return;
@@ -244,10 +244,16 @@ test_update_sql(struct tnt *t)
 		printf("%s\n", e);
 		return;
 	}
+	/* splice */
+	char q7[] = "update t0 set k2 = splice(k2, 0, 2, 'AB') where k0 = 222";
+	if (tnt_query(t, q7, sizeof(q7) - 1, &e) == -1) {
+		printf("%s\n", e);
+		return;
+	}
 	tnt_flush(t);
 
 	int i;
-	for (i = 0 ; i < 6 ; i++) {
+	for (i = 0 ; i < 7 ; i++) {
 		struct tnt_recv rcv; 
 		tnt_recv_init(&rcv);
 		if (test_recv(t, &rcv, "update") == -1)
@@ -326,7 +332,7 @@ test_select_sql(struct tnt *t)
 		goto done;
 	struct tnt_tuple *tp;
 	TNT_RECV_FOREACH(&rcv, tp) {
-		if (!TEST_ASSERT(TNT_TUPLE_COUNT(tp) == 2))
+		if (!TEST_ASSERT(TNT_TUPLE_COUNT(tp) == 3))
 			goto done;
 		struct tnt_tuple_field *k = tnt_tuple_get(tp, 0);
 		if (!TEST_ASSERT(*((int*)TNT_TUPLE_FIELD_DATA(k)) == 222))

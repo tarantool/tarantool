@@ -318,7 +318,7 @@ tnt_sql_stmt(struct tnt_sql *sql)
 			tnt_expect(tnt_sqltkv(sql, TNT_TK_ID, &name));
 			tnt_lex_idonly(sql->l, false);
 			len += snprintf(proc + len, sizeof(proc) - len, "%.*s",
-				        TNT_TK_S(name)->size, TNT_TK_S(name)->data);
+				        (int)TNT_TK_S(name)->size, TNT_TK_S(name)->data);
 			if (!tnt_sqltry(sql, '.'))
 				break;
 			if (sql->error)

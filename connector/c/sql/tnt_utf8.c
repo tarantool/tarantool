@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <tnt.h>
 #include <connector/c/sql/tnt_utf8.h>
 
 bool
