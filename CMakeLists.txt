@@ -172,7 +172,7 @@ include_directories("${PROJECT_BINARY_DIR}/include")
 #
 # Now handle all configuration options.
 #
-option(ENABLE_CLIENT "Enable building of console client" ON)
+option(ENABLE_CLIENT "Enable building of console client" Off)
 if (ENABLE_CLIENT)
     set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
 endif()
