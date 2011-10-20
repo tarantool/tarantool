@@ -172,6 +172,7 @@ zend_function_entry tarantool_class_functions[] = {
 	 PHP_ME(tarantool_class, insert,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, select,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, mselect,		NULL, ZEND_ACC_PUBLIC)
+	 PHP_ME(tarantool_class, call,			NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, getTuple,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, delete,		NULL, ZEND_ACC_PUBLIC)
 	 PHP_ME(tarantool_class, update,		NULL, ZEND_ACC_PUBLIC)
@@ -807,6 +808,196 @@ PHP_METHOD(tarantool_class, mselect )
 }
 /* }}} */
 
+/* {{{ proto int tarantool::call(procname, tuple);
+	call a stored procedure by  name
+*/
+PHP_METHOD(tarantool_class, call)
+{
+	zval *id, * tuple;
+	tarantool_object *ctx;
+	const char *procname = NULL;
+	long procname_len = 0;
+
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS() TSRMLS_CC, getThis(), "Osz", &id,
+		tarantool_class_entry, &procname, &procname_len, &tuple) == FAILURE) {
+		return;
+	}
+
+	ctx = (tarantool_object *)zend_object_store_get_object(id TSRMLS_CC);
+	if (!ctx)
+		zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"the context is null" ,0 TSRMLS_CC);
+
+	if (!ctx->stream) {
+		if (php_tnt_connect(ctx TSRMLS_CC)) {
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+				"can't connect to remote host " ,0 TSRMLS_DC);
+			return;
+		}
+	}
+
+	ctx->bodyLen = 0;
+	ctx->countTuples = 0;
+	ctx->readedTuples = 0;
+	ctx->readed	= 0;
+	ctx->errorcode	= 0;
+
+	char *out_buf = emalloc(TARANTOOL_BUFSIZE);
+	bzero(out_buf, TARANTOOL_BUFSIZE);
+
+	Header *header = (Header *) out_buf;
+
+	header->type		= TARANTOOL_CALL;
+	header->request_id	= TARANTOOL_REQUEST_ID;
+
+	u_char *call = (char *) out_buf + HEADER_SIZE;
+	u_char *p = call;
+
+	p+= 4; /* flags */
+	*p++ = (u_char) procname_len;
+
+	memcpy(p, procname, procname_len);
+	p += procname_len;
+
+	int * count_elements = (int *)p;
+
+	switch (Z_TYPE_P(tuple)) {
+		case IS_STRING: {
+			*count_elements  = 1;
+			p += sizeof(uint32_t);
+
+			char * strval = Z_STRVAL_P(tuple);
+			int str_len = Z_STRLEN_P(tuple);
+			u_char str_shortlen = (u_char)str_len;
+
+			*(p++) = str_shortlen;
+			memcpy(p, strval, str_len);
+			p += str_len;
+		}
+		break;
+
+		case IS_LONG: {
+			*count_elements  = 1;
+			p += sizeof(uint32_t);
+
+			unsigned long val = Z_LVAL_P(tuple);
+
+			u_char leb_size = 4;
+			*(p++) = leb_size;
+			b2i * pval = (b2i*) p;
+			pval->i = (int) val;
+			p += leb_size;
+
+			}
+			break;
+
+
+		case IS_ARRAY: {
+			HashTable *pht;
+			HashPosition pos;
+			zval **curr;
+
+			*count_elements  = zend_hash_num_elements(Z_ARRVAL_P(tuple));
+			p += sizeof(uint32_t);
+
+			pht = Z_ARRVAL_P(tuple);
+			for(zend_hash_internal_pointer_reset_ex(pht, &pos);
+				  zend_hash_get_current_data_ex(pht, (void **)&curr, &pos) == SUCCESS;
+				  zend_hash_move_forward_ex(pht, &pos)) {
+
+				if (Z_TYPE_PP(curr) == IS_STRING)  {
+					char * strval = Z_STRVAL_PP(curr);
+					int str_len = Z_STRLEN_PP(curr);
+		//			printf("tuple: len=%d [%s]", str_len, strval );
+					u_char str_shortlen = (u_char)str_len;
+
+					*(p++) = str_shortlen;
+					memcpy(p, strval, str_len);
+					p += str_len;
+				}
+				if (Z_TYPE_PP(curr) == IS_LONG)  {
+					unsigned long val = Z_LVAL_PP(curr);
+
+//					u_char leb_size = (u_char)leb128_size( val);
+//					*(p++) = leb_size;
+//					leb128_write( (char *)p, val);
+					u_char leb_size = 4;
+					*(p++) = leb_size;
+					b2i * pval = (b2i*) p;
+					pval->i = (int) val;
+
+					p += leb_size;
+				}
+			}
+
+		}
+		break;
+		default :
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"tuple: unsuport tuple type" ,0 TSRMLS_CC);
+			return;
+	}
+
+	header->len = p - call;
+
+	// write header
+	int len = php_stream_write(ctx->stream, out_buf, HEADER_SIZE); // 12
+	if (len != HEADER_SIZE) {
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"write header error" ,0 TSRMLS_CC);
+			efree(out_buf);
+			return;
+	}
+
+	len = php_stream_write(ctx->stream, call, header->len );
+	if (len != header->len) {
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"write request error" ,0 TSRMLS_CC);
+			efree(out_buf);
+			return;
+	}
+
+	Header responseHeader;
+	bzero(&responseHeader, HEADER_SIZE);
+
+	len = php_stream_read(ctx->stream, (void *)&responseHeader, HEADER_SIZE);
+	if (len != HEADER_SIZE) {
+			zend_throw_exception(zend_exception_get_default(TSRMLS_C),
+			"read header error" ,0 TSRMLS_CC);
+			efree(out_buf);
+			return;
+	}
+
+	ctx->bodyLen = responseHeader.len;
+
+	uint32_t code;
+
+	len = php_stream_read(ctx->stream, (void *) &code,sizeof(uint32_t));
+	ctx->readed += len;
+	if (code > 0 || len != sizeof(uint32_t)) {
+		ctx->errorcode = code;					///  need test
+		efree(out_buf);
+		RETURN_FALSE;
+	}
+//
+	uint32_t tuples_count=0;
+	len = php_stream_read(ctx->stream, (void *) &tuples_count,sizeof(uint32_t));
+	ctx->readed += len;
+	if (len != sizeof(uint32_t)) {
+			zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C),
+			0 TSRMLS_CC,"read body error");
+		efree(out_buf);
+		return;
+	}
+
+	ctx->errorcode	= code;
+	ctx->countTuples = tuples_count;
+	efree(out_buf);
+
+	RETURN_LONG(ctx->countTuples);
+
+}
+/* }}} */
 
 
 /* {{{ proto array tarantool::getTuple()
