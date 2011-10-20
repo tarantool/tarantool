@@ -1,5 +1,5 @@
-#ifndef TNT_CALL_H_INCLUDED
-#define TNT_CALL_H_INCLUDED
+#ifndef TNT_SQL_H_INCLUDED
+#define TNT_SQL_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -27,34 +27,37 @@
  */
 
 /**
- * @defgroup Call
+ * @defgroup SQL
  * @ingroup  Operations
- * @brief Call operation
+ * @brief Server Query Language support
  *
  * @{
  */
 
 /**
- * Call operation.
+ * Server query operation.
  *
- * If bufferization is in use, then request would be placed in
- * internal buffer for later sending. Otherwise, operation
- * would be processed immediately.
+ * Parses and processes user supplied SQL query .
  *
  * @param t handler pointer
- * @param reqid user supplied integer value
- * @param flags operation flags
- * @param proc procedure name
- * @param fmt printf-alike format (%s, %*s, %d, %l, %ll, %ul, %ull are supported)
- * @param args tuple containing passing arguments 
- * @returns 0 on success, -1 on error
+ * @param q sql query string
+ * @param qsize query size
+ * @param e string error description
+ * @returns number of operations processed on success, -1 on error and
+ * string description returned (must be freed after use)
  */
-int tnt_call_tuple(struct tnt *t, int reqid, int flags, char *proc,
-		   struct tnt_tuple *args);
+int tnt_query(struct tnt *t, char *q, size_t qsize, char **e);
 
-int tnt_call(struct tnt *t, int reqid, int flags, char *proc,
-	     char *fmt, ...)
-             __attribute__ ((format(printf, 5, 6)));
+/**
+ * Server query validation.
+ *
+ * Tells if the supplied query should be processed as SQL .
+ *
+ * @param q query string
+ * @param qsize query size
+ * @returns 0 if not, 1 if yes
+ */
+int tnt_query_is(char *q, size_t qsize);
 /** @} */
 
-#endif /* TNT_CALL_H_INCLUDED */
+#endif /* TNT_SQL_H_INCLUDED */

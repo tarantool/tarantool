@@ -1,5 +1,5 @@
-#ifndef TNT_CALL_H_INCLUDED
-#define TNT_CALL_H_INCLUDED
+#ifndef TNT_LEX_H_INCLUDED
+#define TNT_LEX_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,35 +26,67 @@
  * SUCH DAMAGE.
  */
 
-/**
- * @defgroup Call
- * @ingroup  Operations
- * @brief Call operation
- *
- * @{
- */
+/* token id */
+enum {
+	TNT_TK_ERROR = -1,
+	TNT_TK_EOF = 0,
+	TNT_TK_NONE = 1000,
+	TNT_TK_NUM,
+	TNT_TK_ID,
+	TNT_TK_KEY,
+	TNT_TK_TABLE,
+	TNT_TK_PUNCT,
+	TNT_TK_STRING,
+	TNT_TK_PING,
+	TNT_TK_UPDATE,
+	TNT_TK_SET,
+	TNT_TK_WHERE,
+	TNT_TK_SPLICE,
+	TNT_TK_DELETE,
+	TNT_TK_FROM,
+	TNT_TK_INSERT,
+	TNT_TK_INTO,
+	TNT_TK_VALUES,
+	TNT_TK_SELECT,
+	TNT_TK_CALL,
+	TNT_TK_OR
+};
 
-/**
- * Call operation.
- *
- * If bufferization is in use, then request would be placed in
- * internal buffer for later sending. Otherwise, operation
- * would be processed immediately.
- *
- * @param t handler pointer
- * @param reqid user supplied integer value
- * @param flags operation flags
- * @param proc procedure name
- * @param fmt printf-alike format (%s, %*s, %d, %l, %ll, %ul, %ull are supported)
- * @param args tuple containing passing arguments 
- * @returns 0 on success, -1 on error
- */
-int tnt_call_tuple(struct tnt *t, int reqid, int flags, char *proc,
-		   struct tnt_tuple *args);
+/* token object */
+struct tnt_tk {
+	int tk;
+	union {
+		int32_t i;
+		struct tnt_utf8 s;
+	} v;
+	int line, col;
+	SLIST_ENTRY(tnt_tk) next;
+	STAILQ_ENTRY(tnt_tk) nextq;
+};
 
-int tnt_call(struct tnt *t, int reqid, int flags, char *proc,
-	     char *fmt, ...)
-             __attribute__ ((format(printf, 5, 6)));
-/** @} */
+#define TNT_TK_S(TK) (&(TK)->v.s)
+#define TNT_TK_I(TK)  ((TK)->v.i)
 
-#endif /* TNT_CALL_H_INCLUDED */
+/* lexer object */
+struct tnt_lex {
+	struct tnt_utf8 buf;
+	size_t pos;
+	size_t line, col;
+	int count;
+	SLIST_HEAD(,tnt_tk) stack;
+	int countq;
+	STAILQ_HEAD(,tnt_tk) q;
+	bool idonly;
+	char *error;
+};
+
+bool tnt_lex_init(struct tnt_lex *l, unsigned char *buf, size_t size);
+void tnt_lex_free(struct tnt_lex *l);
+
+char *tnt_lex_nameof(int tk);
+void tnt_lex_idonly(struct tnt_lex *l, bool on);
+
+void tnt_lex_push(struct tnt_lex *l, struct tnt_tk *tk);
+int tnt_lex(struct tnt_lex *l, struct tnt_tk **tk);
+
+#endif /* TNT_LEX_H_INCLUDED */

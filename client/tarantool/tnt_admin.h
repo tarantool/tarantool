@@ -1,5 +1,5 @@
-#ifndef TNT_CALL_H_INCLUDED
-#define TNT_CALL_H_INCLUDED
+#ifndef TNT_ADMIN_H_INCLUDED
+#define TNT_ADMIN_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,35 +26,14 @@
  * SUCH DAMAGE.
  */
 
-/**
- * @defgroup Call
- * @ingroup  Operations
- * @brief Call operation
- *
- * @{
- */
+struct tnt_admin {
+	int fd;
+};
 
-/**
- * Call operation.
- *
- * If bufferization is in use, then request would be placed in
- * internal buffer for later sending. Otherwise, operation
- * would be processed immediately.
- *
- * @param t handler pointer
- * @param reqid user supplied integer value
- * @param flags operation flags
- * @param proc procedure name
- * @param fmt printf-alike format (%s, %*s, %d, %l, %ll, %ul, %ull are supported)
- * @param args tuple containing passing arguments 
- * @returns 0 on success, -1 on error
- */
-int tnt_call_tuple(struct tnt *t, int reqid, int flags, char *proc,
-		   struct tnt_tuple *args);
+int tnt_admin_init(struct tnt_admin *a, char *host, int port);
+void tnt_admin_free(struct tnt_admin *a);
 
-int tnt_call(struct tnt *t, int reqid, int flags, char *proc,
-	     char *fmt, ...)
-             __attribute__ ((format(printf, 5, 6)));
-/** @} */
+int tnt_admin_query(struct tnt_admin *a, char *q);
+int tnt_admin_reply(struct tnt_admin *a, char **r, size_t *size);
 
-#endif /* TNT_CALL_H_INCLUDED */
+#endif /* TNT_ADMIN_H_INCLUDED */
