@@ -1,11 +1,15 @@
-ATTENTION!!
-This module is experimental and may be to have bugs.
+ATTENTION!
+This module is experimental and may have bugs.
 
-The PHP module for key/value database http://opensource.mail.ru/tarantool/index.eng.html
+The PHP module for key/value database Tarantool/Box,
+http://tarantool.org/
 
-This module realise the binary protocol. The protocol description is https://github.com/mailru/tarantool/wiki/Iproto.bnf
+This module implements the binary protocol.
+The protocol description is located at
+https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt
 
-the experimental tarantool_box config:
+The following Tarantool/Box configuration file was used for
+testing:
 
 space[0].enabled = 1
 space[0].index[0].type = "HASH"
