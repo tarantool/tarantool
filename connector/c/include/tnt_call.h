@@ -45,14 +45,16 @@
  * @param reqid user supplied integer value
  * @param flags operation flags
  * @param proc procedure name
- * @param argc argument count
- * @param argv arguments
+ * @param fmt printf-alike format (%s, %*s, %d, %l, %ll, %ul, %ull are supported)
+ * @param args tuple containing passing arguments 
  * @returns 0 on success, -1 on error
  */
+int tnt_call_tuple(struct tnt *t, int reqid, int flags, char *proc,
+		   struct tnt_tuple *args);
+
 int tnt_call(struct tnt *t, int reqid, int flags, char *proc,
-	     uint32_t argc, char **argv);
-int tnt_callv(struct tnt *t, int reqid, int flags, char *proc,
-	      uint32_t argc, ...);
+	     char *fmt, ...)
+             __attribute__ ((format(printf, 5, 6)));
 /** @} */
 
 #endif /* TNT_CALL_H_INCLUDED */

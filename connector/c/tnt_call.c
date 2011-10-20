@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -46,17 +47,12 @@
 #include <tnt_call.h>
 
 int
-tnt_call(struct tnt *t, int reqid, int flags, char *proc, uint32_t argc, char **argv)
+tnt_call_tuple(struct tnt *t, int reqid, int flags, char *proc,
+	       struct tnt_tuple *args)
 {
-	int i;
-	struct tnt_tuple fields;
-	tnt_tuple_init(&fields);
-	for (i = 0 ; i < argc ; i++)
-		tnt_tuple_add(&fields, argv[i], strlen(argv[i]));
-
 	char *data_enc;
 	unsigned int data_enc_size;
-	t->error = tnt_tuple_pack(&fields, &data_enc, &data_enc_size);
+	t->error = tnt_tuple_pack(args, &data_enc, &data_enc_size);
 	if (t->error != TNT_EOK)
 		return -1;
 
@@ -83,7 +79,7 @@ tnt_call(struct tnt *t, int reqid, int flags, char *proc, uint32_t argc, char **
 	v[2].iov_len  = proc_enc_size;
 	v[3].iov_base = proc;
 	v[3].iov_len  = proc_len;
-	v[4].iov_base = &argc;
+	v[4].iov_base = &TNT_TUPLE_COUNT(args);
 	v[4].iov_len  = sizeof(uint32_t);
 	/* skipping tuple cardinality */
 	v[5].iov_base = data_enc + 4;
@@ -94,21 +90,83 @@ tnt_call(struct tnt *t, int reqid, int flags, char *proc, uint32_t argc, char **
 	return (t->error == TNT_EOK) ? 0 : -1;
 }
 
-int
-tnt_callv(struct tnt *t, int reqid, int flags, char *proc, uint32_t argc, ...)
+int tnt_call(struct tnt *t, int reqid, int flags, char *proc,
+	     char *fmt, ...)
 {
-	char **argv = tnt_mem_alloc(sizeof(char*) * argc);
-	if (argv == NULL) {
-		t->error = TNT_EMEMORY;
-		return -1;
+	struct tnt_tuple args;
+	tnt_tuple_init(&args);
+
+	va_list va;
+	va_start(va, fmt);
+	char *p = fmt;
+	while (*p) {
+		if (isspace(*p)) {
+			p++;
+			continue;
+		} else
+		if (*p != '%')
+			return -1;
+		p++;
+		switch (*p) {
+		case '*': {
+			if (*(p + 1) == 's') {
+				int len = va_arg(va, int);
+				char *s = va_arg(va, char*);
+				tnt_tuple_add(&args, s, len);
+				p += 2;
+			} else {
+				goto error;
+			}
+			break;
+		}
+		case 's': {
+			char *s = va_arg(va, char*);
+			tnt_tuple_add(&args, s, strlen(s));
+			p++;
+			break;
+		}
+		case 'd': {
+			int i = va_arg(va, int);
+			tnt_tuple_add(&args, (char*)&i, sizeof(int));
+			p++;
+			break;
+		}	
+		case 'u':
+			if (*(p + 1) == 'l') {
+				if (*(p + 2) == 'l') {
+					unsigned long long int ull = va_arg(va, unsigned long long);
+					tnt_tuple_add(&args, (char*)&ull, sizeof(unsigned long long int));
+					p += 3;
+				} else {
+					unsigned long int ul = va_arg(va, unsigned long int);
+					tnt_tuple_add(&args, (char*)&ul, sizeof(unsigned long int));
+					p += 2;
+				}
+			} else {
+				goto error;
+			}
+			break;
+		case 'l':
+			if (*(p + 1) == 'l') {
+				long long int ll = va_arg(va, int);
+				tnt_tuple_add(&args, (char*)&ll, sizeof(long long int));
+				p += 2;
+			} else {
+				long int l = va_arg(va, int);
+				tnt_tuple_add(&args, (char*)&l, sizeof(long int));
+				p++;
+			}
+			break;
+		default:
+			goto error;
+		}
 	}
-	va_list args;
-	va_start(args, argc);
-	int i;
-	for (i = 0 ; i < argc ; i++)
-		argv[i] = va_arg(args, char*);
-	va_end(args);
-	int r = tnt_call(t, reqid, flags, proc, argc, argv);
-	tnt_mem_free(argv);
-	return r;
+	va_end(va);
+
+	int ret = tnt_call_tuple(t, reqid, flags, proc, &args);
+	tnt_tuple_free(&args);
+	return ret;
+error:
+	tnt_tuple_free(&args);
+	return -1;
 }

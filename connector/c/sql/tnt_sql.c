@@ -330,18 +330,8 @@ tnt_sql_stmt(struct tnt_sql *sql)
 			goto noargs;
 		if (sql->error)
 			goto error;
-		int argc = 0;
-		int argc_max = 16;
-		char **argv = tnt_mem_alloc(sizeof(char*) * argc_max);
 		while (1) {
-			if (argc == argc_max) {
-				argc_max += argc_max;
-				argv = tnt_mem_realloc(argv, sizeof(char*) * argc_max);
-			}
-			struct tnt_tk *arg;
-			tnt_expect(tnt_sqltkv(sql, TNT_TK_STRING, &arg));
-			argv[argc] = TNT_TK_S(arg)->data;
-			argc++;
+			tnt_expect(tnt_sql_kv(sql, &tu, false));
 			if (tnt_sqltry(sql, ','))
 				continue;
 			if (sql->error)
@@ -350,12 +340,10 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		}
 		tnt_expect(tnt_sqltk(sql, ')'));
 noargs:
-		if (tnt_call(sql->t, 0, 0, proc, argc, argv) == -1) {
+		if (tnt_call_tuple(sql->t, 0, 0, proc, &tu) == -1) {
 			tnt_sql_error(sql, tk, "call failed: %s", tnt_strerror(sql->t)); 
-			tnt_mem_free(argv);
 			goto error;
 		}
-		tnt_mem_free(argv);
 		sql->ops++;
 		break;
 	}

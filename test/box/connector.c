@@ -396,7 +396,7 @@ done:
 static void
 test_call(struct tnt *t)
 {
-	if (tnt_callv(t, 0, 0, "box.insert", 4, "0", "333", "abc", "bca") == -1)
+	if (tnt_call(t, 0, 0, "box.insert", "%d%d%s%s", 0, 333, "abc", "bca") == -1)
 		test_error(t, "call");
 	tnt_flush(t);
 
@@ -418,7 +418,7 @@ static void
 test_call_sql(struct tnt *t)
 {
 	char *e;
-	char q[] = "call box.insert('0', '444', 'abc', 'bca')";
+	char q[] = "call box.insert(0, 444, 'abc', 'bca')";
 	if (tnt_query(t, q, sizeof(q) - 1, &e) == -1) {
 		printf("%s\n", e);
 		return;
