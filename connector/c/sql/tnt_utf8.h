@@ -1,5 +1,5 @@
-#ifndef TNT_CALL_H_INCLUDED
-#define TNT_CALL_H_INCLUDED
+#ifndef TNT_UTF8_H_INCLUDED
+#define TNT_UTF8_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,35 +26,23 @@
  * SUCH DAMAGE.
  */
 
-/**
- * @defgroup Call
- * @ingroup  Operations
- * @brief Call operation
- *
- * @{
- */
+struct tnt_utf8 {
+	unsigned char *data;
+	size_t size;
+	size_t len;
+};
 
-/**
- * Call operation.
- *
- * If bufferization is in use, then request would be placed in
- * internal buffer for later sending. Otherwise, operation
- * would be processed immediately.
- *
- * @param t handler pointer
- * @param reqid user supplied integer value
- * @param flags operation flags
- * @param proc procedure name
- * @param fmt printf-alike format (%s, %*s, %d, %l, %ll, %ul, %ull are supported)
- * @param args tuple containing passing arguments 
- * @returns 0 on success, -1 on error
- */
-int tnt_call_tuple(struct tnt *t, int reqid, int flags, char *proc,
-		   struct tnt_tuple *args);
+#define TNT_UTF8_CHAR(U, P) ((U)->data + (P))
 
-int tnt_call(struct tnt *t, int reqid, int flags, char *proc,
-	     char *fmt, ...)
-             __attribute__ ((format(printf, 5, 6)));
-/** @} */
+bool tnt_utf8_init(struct tnt_utf8 *u, unsigned char *data, size_t size);
+void tnt_utf8_free(struct tnt_utf8 *u);
 
-#endif /* TNT_CALL_H_INCLUDED */
+ssize_t tnt_utf8_chrlen(unsigned char *data, size_t size);
+ssize_t tnt_utf8_strlen(unsigned char *data, size_t size);
+
+ssize_t tnt_utf8_sizeof(unsigned char *data, size_t size, size_t n);
+bool tnt_utf8_cmp(struct tnt_utf8 *u, struct tnt_utf8 *us);
+
+ssize_t tnt_utf8_next(struct tnt_utf8 *u, size_t off);
+
+#endif /* TNT_UTF8_H_INCLUDED */
