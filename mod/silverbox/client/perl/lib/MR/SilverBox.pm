@@ -224,7 +224,9 @@ sub Call {
 
     confess "Bad `unpack_format` option" if exists $param->{unpack_format} and ref $param->{unpack_format} ne 'ARRAY';
     my $unpack_format = join '', map { /&/ ? 'w/a*' : "x$_" } @{$param->{unpack_format}};
+
     local $namespace->{unpack_format} = $unpack_format if $unpack_format; # XXX
+    local $namespace->{append_for_unpack} = ''         if $unpack_format; # shit...
 
     $self->_chat (
         msg     => 22,
