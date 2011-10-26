@@ -101,8 +101,8 @@ endif()
 #
 # Perform build type specific configuration.
 #
-set (CMAKE_C_FLAGS_DEBUG "-ggdb -O0")
-set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2")
+set (CMAKE_C_FLAGS_DEBUG "-ggdb -O0 -fexceptions -funwind-tables")
+set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2 -fexceptions -funwind-tables")
 set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 
 #
@@ -141,7 +141,7 @@ endif()
 # The same reasoning applies to -fno-stack-protector switch.
 #
 set (CMAKE_C_FLAGS
-    "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fno-stack-protector")
+    "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fno-stack-protector -fexceptions -funwind-tables")
 #
 # Tarantool code is written in GNU C dialect.
 # Additionally, compile it with more strict flags than the rest
