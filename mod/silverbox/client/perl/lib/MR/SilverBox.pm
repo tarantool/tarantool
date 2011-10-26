@@ -192,7 +192,7 @@ sub _chat {
 
 sub _raise {
     my ($self, $msg) = @_;
-    die "$self->{name}: $msg";
+    die "$self->{name}: $msg\n";
 }
 
 sub _validate_param {
