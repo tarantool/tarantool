@@ -207,14 +207,14 @@ tnt_io_setopts(struct tnt *t)
 	if (t->opt.tmout_send) {
 		struct timeval tmout;
 		tmout.tv_sec  = t->opt.tmout_send;
-		tmout.tv_usec = 0;
+		tmout.tv_usec = t->opt.tmout_send_ms;
 		if (setsockopt(t->fd, SOL_SOCKET, SO_SNDTIMEO, &tmout, sizeof(tmout)) == -1)
 			goto error;
 	}
 	if (t->opt.tmout_recv) {
 		struct timeval tmout;
 		tmout.tv_sec  = t->opt.tmout_recv;
-		tmout.tv_usec = 0;
+		tmout.tv_usec = t->opt.tmout_recv_ms;
 		if (setsockopt(t->fd, SOL_SOCKET, SO_RCVTIMEO, &tmout, sizeof(tmout)) == -1)
 			goto error;
 	}
@@ -276,7 +276,7 @@ tnt_io_send_raw(struct tnt *t, char *buf, size_t size)
 	} else {
 		do {
 			result = send(t->fd, buf, size, 0);
-		} while (result == -1 && (errno == EINTR || errno == EAGAIN));
+		} while (result == -1 && (errno == EINTR));
 		if (result <= 0)
 			t->errno_ = errno;
 	}
@@ -292,7 +292,7 @@ tnt_io_sendv_raw(struct tnt *t, struct iovec *iov, int count)
 	} else {
 		do {
 			result = writev(t->fd, iov, count);
-		} while (result == -1 && (errno == EINTR || errno == EAGAIN));
+		} while (result == -1 && (errno == EINTR));
 		if (result <= 0)
 			t->errno_ = errno;
 	}
@@ -384,7 +384,7 @@ tnt_io_recv_raw(struct tnt *t, char *buf, size_t size)
 	} else {
 		do {
 			result = recv(t->fd, buf, size, 0);
-		} while (result == -1 && (errno == EINTR || errno == EAGAIN));
+		} while (result == -1 && (errno == EINTR));
 		if (result <= 0)
 			t->errno_ = errno;
 	}

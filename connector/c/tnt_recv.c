@@ -124,6 +124,9 @@ tnt_recv(struct tnt *t, struct tnt_recv *rcv)
 	case TNT_PROTO_TYPE_SELECT:
 		rcv->op = TNT_RECV_SELECT;
 		break;
+	case TNT_PROTO_TYPE_CALL:
+		rcv->op = TNT_RECV_CALL;
+		break;
 	default:
 		return TNT_EPROTO;
 	}
@@ -138,7 +141,6 @@ tnt_recv(struct tnt *t, struct tnt_recv *rcv)
 	/* error handling */
 	rcv->code = hdr->code;
 	if (!TNT_PROTO_IS_OK(hdr->code)) {
-		t->error = TNT_EERROR;
 		rcv->error = tnt_mem_alloc(size);
 		if (rcv->error == NULL) {
 			t->error = TNT_EMEMORY;
@@ -150,6 +152,7 @@ tnt_recv(struct tnt *t, struct tnt_recv *rcv)
 			rcv->error = NULL;
 			return -1;
 		}
+		t->error = TNT_EERROR;
 		return 0;
 	}
 
@@ -197,6 +200,7 @@ tnt_recv(struct tnt *t, struct tnt_recv *rcv)
 		/* unreach */
 		break;
 	/* <select_response_body> ::= <count><fq_tuple>* */
+	case TNT_RECV_CALL:
 	case TNT_RECV_SELECT:
 		/* fq_tuple* */
 		t->error = tnt_recv_fqtuple(rcv, p, size, rcv->count);

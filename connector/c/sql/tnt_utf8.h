@@ -1,5 +1,5 @@
-#ifndef TNT_OPT_H_INCLUDED
-#define TNT_OPT_H_INCLUDED
+#ifndef TNT_UTF8_H_INCLUDED
+#define TNT_UTF8_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,60 +26,23 @@
  * SUCH DAMAGE.
  */
 
-/**
- * @defgroup Options
- * @ingroup  Main
- * @{
- */
-
-enum tnt_proto {
-	TNT_PROTO_ADMIN,
-	TNT_PROTO_RW,
-	TNT_PROTO_RO,
-	TNT_PROTO_FEEDER
+struct tnt_utf8 {
+	unsigned char *data;
+	size_t size;
+	size_t len;
 };
 
-enum tnt_opt_type {
-	TNT_OPT_PROTO,
-	TNT_OPT_HOSTNAME,
-	TNT_OPT_PORT,
-	TNT_OPT_TMOUT_CONNECT,
-	TNT_OPT_TMOUT_RECV,
-	TNT_OPT_TMOUT_RECV_MS,
-	TNT_OPT_TMOUT_SEND,
-	TNT_OPT_TMOUT_SEND_MS,
-	TNT_OPT_SEND_CB,
-	TNT_OPT_SEND_CBV,
-	TNT_OPT_SEND_CB_ARG,
-	TNT_OPT_SEND_BUF,
-	TNT_OPT_RECV_CB,
-	TNT_OPT_RECV_CB_ARG,
-	TNT_OPT_RECV_BUF
-};
-/** @} */
+#define TNT_UTF8_CHAR(U, P) ((U)->data + (P))
 
-struct tnt_opt {
-	enum tnt_proto proto;
-	char *hostname;
-	int port;
-	int tmout_connect;
-	int tmout_recv;
-	int tmout_recv_ms;
-	int tmout_send;
-	int tmout_send_ms;
-	void *send_cb;
-	void *send_cbv;
-	void *send_cb_arg;
-	int send_buf;
-	void *recv_cb;
-	void *recv_cb_arg;
-	int recv_buf;
-};
+bool tnt_utf8_init(struct tnt_utf8 *u, unsigned char *data, size_t size);
+void tnt_utf8_free(struct tnt_utf8 *u);
 
-void tnt_opt_init(struct tnt_opt *opt);
-void tnt_opt_free(struct tnt_opt *opt);
+ssize_t tnt_utf8_chrlen(unsigned char *data, size_t size);
+ssize_t tnt_utf8_strlen(unsigned char *data, size_t size);
 
-enum tnt_error tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
-		           va_list args);
+ssize_t tnt_utf8_sizeof(unsigned char *data, size_t size, size_t n);
+bool tnt_utf8_cmp(struct tnt_utf8 *u, struct tnt_utf8 *us);
 
-#endif /* TNT_OPT_H_INCLUDED */
+ssize_t tnt_utf8_next(struct tnt_utf8 *u, size_t off);
+
+#endif /* TNT_UTF8_H_INCLUDED */

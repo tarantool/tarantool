@@ -95,6 +95,7 @@ static char format_to_opcode(char format)
 	case '&': return 2;
 	case '|': return 3;
 	case '^': return 4;
+	case ':': return 5;
 	default: return format;
 	}
 }
@@ -176,6 +177,7 @@ lbox_pack(struct lua_State *L)
 		case '&': /* set field&=val */
 		case '|': /* set field|=val */
 		case '^': /* set field^=val */
+		case ':': /* splice */
 			u32buf= (u32) lua_tointeger(L, i); /* field no */
 			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
 			luaL_addchar(&b, format_to_opcode(*format));

@@ -1,5 +1,5 @@
-#ifndef TNT_OPT_H_INCLUDED
-#define TNT_OPT_H_INCLUDED
+#ifndef TNT_SQL_H_INCLUDED
+#define TNT_SQL_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -27,59 +27,37 @@
  */
 
 /**
- * @defgroup Options
- * @ingroup  Main
+ * @defgroup SQL
+ * @ingroup  Operations
+ * @brief Server Query Language support
+ *
  * @{
  */
 
-enum tnt_proto {
-	TNT_PROTO_ADMIN,
-	TNT_PROTO_RW,
-	TNT_PROTO_RO,
-	TNT_PROTO_FEEDER
-};
+/**
+ * Server query operation.
+ *
+ * Parses and processes user supplied SQL query .
+ *
+ * @param t handler pointer
+ * @param q sql query string
+ * @param qsize query size
+ * @param e string error description
+ * @returns number of operations processed on success, -1 on error and
+ * string description returned (must be freed after use)
+ */
+int tnt_query(struct tnt *t, char *q, size_t qsize, char **e);
 
-enum tnt_opt_type {
-	TNT_OPT_PROTO,
-	TNT_OPT_HOSTNAME,
-	TNT_OPT_PORT,
-	TNT_OPT_TMOUT_CONNECT,
-	TNT_OPT_TMOUT_RECV,
-	TNT_OPT_TMOUT_RECV_MS,
-	TNT_OPT_TMOUT_SEND,
-	TNT_OPT_TMOUT_SEND_MS,
-	TNT_OPT_SEND_CB,
-	TNT_OPT_SEND_CBV,
-	TNT_OPT_SEND_CB_ARG,
-	TNT_OPT_SEND_BUF,
-	TNT_OPT_RECV_CB,
-	TNT_OPT_RECV_CB_ARG,
-	TNT_OPT_RECV_BUF
-};
+/**
+ * Server query validation.
+ *
+ * Tells if the supplied query should be processed as SQL .
+ *
+ * @param q query string
+ * @param qsize query size
+ * @returns 0 if not, 1 if yes
+ */
+int tnt_query_is(char *q, size_t qsize);
 /** @} */
 
-struct tnt_opt {
-	enum tnt_proto proto;
-	char *hostname;
-	int port;
-	int tmout_connect;
-	int tmout_recv;
-	int tmout_recv_ms;
-	int tmout_send;
-	int tmout_send_ms;
-	void *send_cb;
-	void *send_cbv;
-	void *send_cb_arg;
-	int send_buf;
-	void *recv_cb;
-	void *recv_cb_arg;
-	int recv_buf;
-};
-
-void tnt_opt_init(struct tnt_opt *opt);
-void tnt_opt_free(struct tnt_opt *opt);
-
-enum tnt_error tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
-		           va_list args);
-
-#endif /* TNT_OPT_H_INCLUDED */
+#endif /* TNT_SQL_H_INCLUDED */

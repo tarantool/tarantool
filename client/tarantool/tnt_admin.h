@@ -1,5 +1,5 @@
-#ifndef TNT_OPT_H_INCLUDED
-#define TNT_OPT_H_INCLUDED
+#ifndef TNT_ADMIN_H_INCLUDED
+#define TNT_ADMIN_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,60 +26,14 @@
  * SUCH DAMAGE.
  */
 
-/**
- * @defgroup Options
- * @ingroup  Main
- * @{
- */
-
-enum tnt_proto {
-	TNT_PROTO_ADMIN,
-	TNT_PROTO_RW,
-	TNT_PROTO_RO,
-	TNT_PROTO_FEEDER
+struct tnt_admin {
+	int fd;
 };
 
-enum tnt_opt_type {
-	TNT_OPT_PROTO,
-	TNT_OPT_HOSTNAME,
-	TNT_OPT_PORT,
-	TNT_OPT_TMOUT_CONNECT,
-	TNT_OPT_TMOUT_RECV,
-	TNT_OPT_TMOUT_RECV_MS,
-	TNT_OPT_TMOUT_SEND,
-	TNT_OPT_TMOUT_SEND_MS,
-	TNT_OPT_SEND_CB,
-	TNT_OPT_SEND_CBV,
-	TNT_OPT_SEND_CB_ARG,
-	TNT_OPT_SEND_BUF,
-	TNT_OPT_RECV_CB,
-	TNT_OPT_RECV_CB_ARG,
-	TNT_OPT_RECV_BUF
-};
-/** @} */
+int tnt_admin_init(struct tnt_admin *a, char *host, int port);
+void tnt_admin_free(struct tnt_admin *a);
 
-struct tnt_opt {
-	enum tnt_proto proto;
-	char *hostname;
-	int port;
-	int tmout_connect;
-	int tmout_recv;
-	int tmout_recv_ms;
-	int tmout_send;
-	int tmout_send_ms;
-	void *send_cb;
-	void *send_cbv;
-	void *send_cb_arg;
-	int send_buf;
-	void *recv_cb;
-	void *recv_cb_arg;
-	int recv_buf;
-};
+int tnt_admin_query(struct tnt_admin *a, char *q);
+int tnt_admin_reply(struct tnt_admin *a, char **r, size_t *size);
 
-void tnt_opt_init(struct tnt_opt *opt);
-void tnt_opt_free(struct tnt_opt *opt);
-
-enum tnt_error tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
-		           va_list args);
-
-#endif /* TNT_OPT_H_INCLUDED */
+#endif /* TNT_ADMIN_H_INCLUDED */

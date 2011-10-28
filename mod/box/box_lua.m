@@ -104,6 +104,21 @@ lbox_tuple_len(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_tuple_unpack(struct lua_State *L)
+{
+	struct box_tuple *tuple = lua_checktuple(L, 1);
+	u8 *field = tuple->data;
+
+	while (field < tuple->data + tuple->bsize) {
+		size_t len = load_varint32((void **) &field);
+		lua_pushlstring(L, (char *) field, len);
+		field += len;
+	}
+	assert(lua_gettop(L) == tuple->cardinality + 1);
+	return tuple->cardinality;
+}
+
 /**
  * Implementation of tuple __index metamethod.
  *
@@ -207,6 +222,7 @@ static const struct luaL_reg lbox_tuple_meta [] = {
 	{"__tostring", lbox_tuple_tostring},
 	{"next", lbox_tuple_next},
 	{"pairs", lbox_tuple_pairs},
+	{"unpack", lbox_tuple_unpack},
 	{NULL, NULL}
 };
 

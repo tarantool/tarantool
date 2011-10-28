@@ -1,5 +1,5 @@
-#ifndef TNT_OPT_H_INCLUDED
-#define TNT_OPT_H_INCLUDED
+#ifndef TNT_LEX_H_INCLUDED
+#define TNT_LEX_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,60 +26,67 @@
  * SUCH DAMAGE.
  */
 
-/**
- * @defgroup Options
- * @ingroup  Main
- * @{
- */
-
-enum tnt_proto {
-	TNT_PROTO_ADMIN,
-	TNT_PROTO_RW,
-	TNT_PROTO_RO,
-	TNT_PROTO_FEEDER
+/* token id */
+enum {
+	TNT_TK_ERROR = -1,
+	TNT_TK_EOF = 0,
+	TNT_TK_NONE = 1000,
+	TNT_TK_NUM,
+	TNT_TK_ID,
+	TNT_TK_KEY,
+	TNT_TK_TABLE,
+	TNT_TK_PUNCT,
+	TNT_TK_STRING,
+	TNT_TK_PING,
+	TNT_TK_UPDATE,
+	TNT_TK_SET,
+	TNT_TK_WHERE,
+	TNT_TK_SPLICE,
+	TNT_TK_DELETE,
+	TNT_TK_FROM,
+	TNT_TK_INSERT,
+	TNT_TK_INTO,
+	TNT_TK_VALUES,
+	TNT_TK_SELECT,
+	TNT_TK_CALL,
+	TNT_TK_OR
 };
 
-enum tnt_opt_type {
-	TNT_OPT_PROTO,
-	TNT_OPT_HOSTNAME,
-	TNT_OPT_PORT,
-	TNT_OPT_TMOUT_CONNECT,
-	TNT_OPT_TMOUT_RECV,
-	TNT_OPT_TMOUT_RECV_MS,
-	TNT_OPT_TMOUT_SEND,
-	TNT_OPT_TMOUT_SEND_MS,
-	TNT_OPT_SEND_CB,
-	TNT_OPT_SEND_CBV,
-	TNT_OPT_SEND_CB_ARG,
-	TNT_OPT_SEND_BUF,
-	TNT_OPT_RECV_CB,
-	TNT_OPT_RECV_CB_ARG,
-	TNT_OPT_RECV_BUF
-};
-/** @} */
-
-struct tnt_opt {
-	enum tnt_proto proto;
-	char *hostname;
-	int port;
-	int tmout_connect;
-	int tmout_recv;
-	int tmout_recv_ms;
-	int tmout_send;
-	int tmout_send_ms;
-	void *send_cb;
-	void *send_cbv;
-	void *send_cb_arg;
-	int send_buf;
-	void *recv_cb;
-	void *recv_cb_arg;
-	int recv_buf;
+/* token object */
+struct tnt_tk {
+	int tk;
+	union {
+		int32_t i;
+		struct tnt_utf8 s;
+	} v;
+	int line, col;
+	SLIST_ENTRY(tnt_tk) next;
+	STAILQ_ENTRY(tnt_tk) nextq;
 };
 
-void tnt_opt_init(struct tnt_opt *opt);
-void tnt_opt_free(struct tnt_opt *opt);
+#define TNT_TK_S(TK) (&(TK)->v.s)
+#define TNT_TK_I(TK)  ((TK)->v.i)
 
-enum tnt_error tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
-		           va_list args);
+/* lexer object */
+struct tnt_lex {
+	struct tnt_utf8 buf;
+	size_t pos;
+	size_t line, col;
+	int count;
+	SLIST_HEAD(,tnt_tk) stack;
+	int countq;
+	STAILQ_HEAD(,tnt_tk) q;
+	bool idonly;
+	char *error;
+};
 
-#endif /* TNT_OPT_H_INCLUDED */
+bool tnt_lex_init(struct tnt_lex *l, unsigned char *buf, size_t size);
+void tnt_lex_free(struct tnt_lex *l);
+
+char *tnt_lex_nameof(int tk);
+void tnt_lex_idonly(struct tnt_lex *l, bool on);
+
+void tnt_lex_push(struct tnt_lex *l, struct tnt_tk *tk);
+int tnt_lex(struct tnt_lex *l, struct tnt_tk **tk);
+
+#endif /* TNT_LEX_H_INCLUDED */

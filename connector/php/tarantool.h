@@ -45,6 +45,7 @@ extern zend_module_entry tarantool_module_entry;
 #define TARANTOOL_SELECT  17 
 #define TARANTOOL_UPDATE  19 
 #define TARANTOOL_DELETE  20 
+#define TARANTOOL_CALL    22
 #define TARANTOOL_PING	  65280
 
 #define TARANTOOL_REQUEST_ID  8 
@@ -79,6 +80,7 @@ PHP_METHOD( tarantool_class, __construct);
 PHP_METHOD( tarantool_class, insert);
 PHP_METHOD( tarantool_class, select);
 PHP_METHOD( tarantool_class, mselect);
+PHP_METHOD( tarantool_class, call);
 PHP_METHOD( tarantool_class, getTuple);
 PHP_METHOD( tarantool_class, delete);
 PHP_METHOD( tarantool_class, update);
