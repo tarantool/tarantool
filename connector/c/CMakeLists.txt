@@ -89,6 +89,7 @@ install(FILES
 	include/tnt_update.h
 	include/tnt_delete.h
 	include/tnt_select.h
+	include/tnt_call.h
 	include/tnt_ping.h
 	include/tnt_recv.h
 	include/tnt_memcache_val.h
