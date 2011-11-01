@@ -408,7 +408,9 @@ main(int argc, char **argv)
 	stat_init();
 	palloc_init();
 
+#ifdef HAVE_BFD
 	load_symbols(argv[0]);
+#endif
 
 	argv = init_set_proc_title(argc, argv);
 	main_argc = argc;
