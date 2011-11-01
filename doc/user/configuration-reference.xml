@@ -778,8 +778,8 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
 
         <row>
           <entry>memcached_port</entry>
-          <entry>boolean</entry>
-          <entry>false</entry>
+          <entry>integer</entry>
+          <entry>none</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>
