@@ -37,15 +37,15 @@ typedef void* ptr_t;
 #define mh_name _i32ptr
 #define mh_key_t i32
 #define mh_val_t ptr_t
-#define mh_hash(a) ({ (a); })
-#define mh_eq(a, b) ({ (a) == (b); })
+#define mh_hash(a) (a)
+#define mh_eq(a, b) ((a) == (b))
 #include <mhash.h>
 
 #define mh_name _i64ptr
 #define mh_key_t i64
 #define mh_val_t ptr_t
-#define mh_hash(a) ({ (mh_int_t)((a)>>33^(a)^(a)<<11); })
-#define mh_eq(a, b) ({ (a) == (b); })
+#define mh_hash(a) ((mh_int_t)((a)>>33^(a)^(a)<<11))
+#define mh_eq(a, b) ((a) == (b))
 #include <mhash.h>
 
 static inline int lstrcmp(void *a, void *b)
@@ -64,5 +64,5 @@ static inline int lstrcmp(void *a, void *b)
 #define mh_key_t ptr_t
 #define mh_val_t ptr_t
 #define mh_hash(key) ({ void *_k = (key); unsigned l = load_varint32(&_k); MurmurHash2(_k, l, 13); })
-#define mh_eq(a, b) ({ lstrcmp((a), (b)) == 0; })
+#define mh_eq(a, b) (lstrcmp((a), (b)) == 0)
 #include <mhash.h>
