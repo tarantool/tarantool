@@ -31,6 +31,7 @@
 #include <log_io.h>
 
 struct lua_State;
+struct luaL_Reg;
 
 extern struct recovery_state *recovery_state;
 void mod_init(void);
@@ -50,6 +51,10 @@ void mod_info(struct tbuf *out);
  * @return  L on success, 0 if out of memory
  */
 struct lua_State *mod_lua_init(struct lua_State *L);
+
+void
+tarantool_lua_register_type(struct lua_State *L, const char *type_name,
+			    const struct luaL_Reg *methods);
 
 /**
  * Create an instance of Lua interpreter and load it with

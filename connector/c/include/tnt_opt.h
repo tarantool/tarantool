@@ -45,7 +45,9 @@ enum tnt_opt_type {
 	TNT_OPT_PORT,
 	TNT_OPT_TMOUT_CONNECT,
 	TNT_OPT_TMOUT_RECV,
+	TNT_OPT_TMOUT_RECV_MS,
 	TNT_OPT_TMOUT_SEND,
+	TNT_OPT_TMOUT_SEND_MS,
 	TNT_OPT_SEND_CB,
 	TNT_OPT_SEND_CBV,
 	TNT_OPT_SEND_CB_ARG,
@@ -62,7 +64,9 @@ struct tnt_opt {
 	int port;
 	int tmout_connect;
 	int tmout_recv;
+	int tmout_recv_ms;
 	int tmout_send;
+	int tmout_send_ms;
 	void *send_cb;
 	void *send_cbv;
 	void *send_cb_arg;

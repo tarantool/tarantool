@@ -60,7 +60,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/*  7 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
 	/*  8 */_(ER_BAD_INTEGRITY,		2, "Bad graph integrity") \
 	/*  9 */_(ER_UNUSED9,			0, "Unused9") \
-	/* 10 */_(ER_UNSUPPORTED_COMMAND,	2, "Unsupported command") \
+	/* 10 */_(ER_UNSUPPORTED,		2, "Unsupported") \
 		/* silverproxy error codes */ \
 	/* 11 */_(ER_RESERVED11,		0, "Reserved11") \
 	/* 12 */_(ER_RESERVED12,		0, "Reserved12") \
@@ -104,14 +104,14 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 47 */_(ER_UNUSED47,			0, "Unused47") \
 	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist") \
-	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure %.*s is not defined") \
+	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure '%.*s' is not defined") \
 	/* 51 */_(ER_PROC_LUA,			2, "Lua error: %s") \
-	/* 52 */_(ER_NAMESPACE_DISABLED,	2, "Namespace %u is disabled") \
+	/* 52 */_(ER_SPACE_DISABLED,	2, "Space %u is disabled") \
 	/* 53 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space %u") \
 	/* 54 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
 	/* 55 */_(ER_TUPLE_FOUND,		2, "Tuple already exists") \
 	/* 56 */_(ER_INDEX_VIOLATION,		2, "Duplicate key exists in a unique index") \
-	/* 57 */_(ER_NO_SUCH_NAMESPACE,		2, "Namespace %u does not exists")
+	/* 57 */_(ER_NO_SUCH_SPACE,		2, "Space %u does not exists")
 
 
 /*

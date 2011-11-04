@@ -1,8 +1,29 @@
 insert into t1 values ('brave', 'new', 'world')
 Insert OK, 1 row affected
+lua box.space[1].index[1]:min()
+---
+ - 'brave': {'new', 'world'}
+...
+lua box.space[1].index[1]:max()
+---
+ - 'brave': {'new', 'world'}
+...
 call box.select(1, 1, 'new', 'world')
 Found 1 tuple:
 ['brave', 'new', 'world']
 call box.delete(1, 'brave')
 Found 1 tuple:
 ['brave', 'new', 'world']
+insert into t5 values ('01234567', 'new', 'world')
+Insert OK, 1 row affected
+insert into t5 values ('00000000', 'of', 'puppets')
+Insert OK, 1 row affected
+insert into t5 values ('00000001', 'of', 'might', 'and', 'magic')
+Insert OK, 1 row affected
+call box.select_range(5, 1, 2, 'of')
+Found 2 tuples:
+['00000001', 'of', 'might', 'and', 'magic']
+['00000000', 'of', 'puppets']
+lua box.space[5]:truncate()
+---
+...

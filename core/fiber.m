@@ -58,9 +58,11 @@
 @implementation FiberCancelException
 @end
 
+#define FIBER_CALL_STACK 16
+
 static struct fiber sched;
 struct fiber *fiber = &sched;
-static struct fiber **sp, *call_stack[64];
+static struct fiber **sp, *call_stack[FIBER_CALL_STACK];
 static uint32_t last_used_fid;
 static struct palloc_pool *ex_pool;
 
@@ -100,12 +102,19 @@ update_last_stack_frame(struct fiber *fiber)
 #endif /* ENABLE_BACKTRACE */
 }
 
+/** @retval true if check failed, false otherwise */
+bool
+fiber_checkstack()
+{
+	return sp >= call_stack + FIBER_CALL_STACK;
+}
+
 void
 fiber_call(struct fiber *callee)
 {
 	struct fiber *caller = fiber;
 
-	assert(sp - call_stack < 8);
+	assert(sp - call_stack < FIBER_CALL_STACK);
 	assert(caller);
 
 	fiber = callee;
@@ -138,7 +147,7 @@ fiber_wakeup(struct fiber *f)
  * cancelled.  Such fiber we won't be ever to cancel, ever, and
  * for such fiber this call will lead to an infinite wait.
  * However, fiber_testcancel() is embedded to the rest of fiber_*
- * API (@sa yield()), which makes most of the fibers that opt in,
+ * API (@sa fiber_yield()), which makes most of the fibers that opt in,
  * cancellable.
  *
  * Currently cancellation can only be synchronous: this call
@@ -157,20 +166,45 @@ fiber_cancel(struct fiber *f)
 
 	f->flags |= FIBER_CANCEL;
 
-	if (f->flags & FIBER_CANCELLABLE)
-		fiber_wakeup(f);
-
-	assert(f->waiter == NULL);
-	f->waiter = fiber;
-
-	@try {
-		yield();
+	if (f == fiber) {
+		fiber_testcancel();
+		return;
 	}
-	@finally {
-		f->waiter = NULL;
+	/**
+	 * In most cases the fiber is CANCELLABLE and
+	 * will notice it's been cancelled right away.
+	 * So we just invoke it here in hope it'll die
+	 * and yield to us without a full scheduler loop.
+	 */
+	fiber_call(f);
+
+	if (f->fid) {
+		/*
+		 * Syncrhonous cancel did not work: apparently
+		 * the fiber is not CANCELLABLE or for some reason
+		 * chose to yield without dying. We have no
+		 * choice but to wait asynchronously.
+		 */
+		assert(f->waiter == NULL);
+		f->waiter = fiber;
+		fiber_yield();
 	}
+	/*
+	 * Here we can't even check f->fid is 0 since
+	 * f could have already been reused. Knowing
+	 * at least that we can't get scheduled ourselves
+	 * unless asynchronously woken up is somewhat a relief.
+	 */
+
+	fiber_testcancel(); /* Check if we're ourselves cancelled. */
 }
 
+static bool
+fiber_is_cancelled()
+{
+	return (fiber->flags & FIBER_CANCELLABLE &&
+		fiber->flags & FIBER_CANCEL);
+}
 
 /** Test if this fiber is in a cancellable state and was indeed
  * cancelled, and raise an exception (FiberCancelException) if
@@ -180,14 +214,11 @@ fiber_cancel(struct fiber *f)
 void
 fiber_testcancel(void)
 {
-	if (!(fiber->flags & FIBER_CANCELLABLE))
-		return;
-
-	if (!(fiber->flags & FIBER_CANCEL))
-		return;
-
-	tnt_raise(FiberCancelException);
+	if (fiber_is_cancelled())
+		tnt_raise(FiberCancelException);
 }
+
+
 
 /** Change the current cancellation state of a fiber. This is not
  * a cancellation point.
@@ -202,11 +233,13 @@ void fiber_setcancelstate(bool enable)
 }
 
 /**
- * @note: this is a cancellation point (@sa fiber_testcancel())
+ * @note: this is not a cancellation point (@sa fiber_testcancel())
+ * but it is considered good practice to call testcancel()
+ * after each yield.
  */
 
 void
-yield(void)
+fiber_yield(void)
 {
 	struct fiber *callee = *(--sp);
 	struct fiber *caller = fiber;
@@ -216,8 +249,6 @@ yield(void)
 
 	callee->csw++;
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
-
-	fiber_testcancel();
 }
 
 /**
@@ -229,12 +260,9 @@ fiber_sleep(ev_tstamp delay)
 {
 	ev_timer_set(&fiber->timer, delay, 0.);
 	ev_timer_start(&fiber->timer);
-	@try {
-		yield();
-	}
-	@finally {
-		ev_timer_stop(&fiber->timer);
-	}
+	fiber_yield();
+	ev_timer_stop(&fiber->timer);
+	fiber_testcancel();
 }
 
 /** Wait for a forked child to complete.
@@ -246,12 +274,9 @@ wait_for_child(pid_t pid)
 {
 	ev_child_set(&fiber->cw, pid, 0);
 	ev_child_start(&fiber->cw);
-	@try {
-		yield();
-	}
-	@finally {
-		ev_child_stop(&fiber->cw);
-	}
+	fiber_yield();
+	ev_child_stop(&fiber->cw);
+	fiber_testcancel();
 }
 
 
@@ -274,13 +299,11 @@ fiber_io_yield()
 {
 	assert(ev_is_active(&fiber->io));
 
-	@try {
-		yield();
-	}
-	@catch (id o)
-	{
+	fiber_yield();
+
+	if (fiber_is_cancelled()) {
 		ev_io_stop(&fiber->io);
-		@throw;
+		fiber_testcancel();
 	}
 }
 
@@ -301,8 +324,8 @@ ev_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 	fiber_call(watcher->data);
 }
 
-static struct fiber *
-fid2fiber(int fid)
+struct fiber *
+fiber_find(int fid)
 {
 	mh_int_t k = mh_i32ptr_get(fibers_registry, fid);
 
@@ -416,6 +439,9 @@ fiber_gc(void)
 static void
 fiber_zombificate()
 {
+	if (fiber->waiter)
+		fiber_wakeup(fiber->waiter);
+	fiber->waiter = NULL;
 	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
 	unregister_fid(fiber);
@@ -436,20 +462,15 @@ fiber_loop(void *data __attribute__((unused)))
 		}
 		@catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled", fiber->name);
-
-			if (fiber->waiter != NULL)
-				fiber_call(fiber->waiter);
-
 			say_info("fiber `%s': exiting", fiber->name);
 		}
 		@catch (id e) {
 			say_error("fiber `%s': exception `%s'", fiber->name, [e name]);
 			panic("fiber `%s': exiting", fiber->name);
 		}
-
 		fiber_close();
 		fiber_zombificate();
-		yield();	/* give control back to scheduler */
+		fiber_yield();	/* give control back to scheduler */
 	}
 }
 
@@ -609,12 +630,9 @@ wait_inbox(struct fiber *recipient)
 {
 	while (ring_size(recipient->inbox) == 0) {
 		recipient->flags |= FIBER_READING_INBOX;
-		@try {
-			yield();
-		}
-		@finally {
-			recipient->flags &= ~FIBER_READING_INBOX;
-		}
+		fiber_yield();
+		recipient->flags &= ~FIBER_READING_INBOX;
+		fiber_testcancel();
 	}
 }
 
@@ -646,12 +664,9 @@ read_inbox(void)
 	struct ring *restrict inbox = fiber->inbox;
 	while (ring_size(inbox) == 0) {
 		fiber->flags |= FIBER_READING_INBOX;
-		@try {
-			yield();
-		}
-		@finally {
-			fiber->flags &= ~FIBER_READING_INBOX;
-		}
+		fiber_yield();
+		fiber->flags &= ~FIBER_READING_INBOX;
+		fiber_testcancel();
 	}
 
 	struct msg *msg = inbox->ring[inbox->tail];
@@ -662,28 +677,34 @@ read_inbox(void)
 }
 
 /**
+ * Read at least at_least bytes from a socket.
+ *
+ * @retval 0   socket is closed by the sender
+ * @reval -1   a system error
+ * @retval >0  success, size of the last read chunk is returned
+ *
  * @note: this is a cancellation point.
  */
 
-int
+ssize_t
 fiber_bread(struct tbuf *buf, size_t at_least)
 {
 	ssize_t r;
 	tbuf_ensure(buf, MAX(cfg.readahead, at_least));
+	size_t stop_at = buf->len + at_least;
 
 	fiber_io_start(fiber->fd, EV_READ);
-	for (;;) {
+
+	while (buf->len < stop_at) {
 		fiber_io_yield();
+
 		r = read(fiber->fd, buf->data + buf->len, buf->size - buf->len);
-		if (r > 0) {
-			buf->len += r;
-			if (buf->len >= at_least)
-				break;
-		} else {
-			if (r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
-				continue;
+		if (r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+			continue;
+		else if (r <= 0)
 			break;
-		}
+
+		buf->len += r;
 	}
 	fiber_io_stop(fiber->fd, EV_READ);
 
@@ -1006,7 +1027,7 @@ sock2inbox(void *_data __attribute__((unused)))
 		}
 
 		msg = tbuf_split(fiber->rbuf, len);
-		recipient = fid2fiber(fiber_msg(msg)->fid);
+		recipient = fiber_find(fiber_msg(msg)->fid);
 		if (recipient == NULL) {
 			say_error("recipient is lost");
 			continue;
@@ -1283,7 +1304,7 @@ void
 fiber_init(void)
 {
 	SLIST_INIT(&fibers);
-	fibers_registry = mh_i32ptr_init(fid2fiber, NULL);
+	fibers_registry = mh_i32ptr_init();
 
 	ex_pool = palloc_create_pool("ex_pool");
 

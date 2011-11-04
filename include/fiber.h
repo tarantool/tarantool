@@ -144,11 +144,12 @@ fiber_io_yield();
 void
 fiber_io_stop(int fd, int events);
 
-void yield(void);
+void
+fiber_yield(void);
 void fiber_destroy_all();
 
 struct msg *read_inbox(void);
-int fiber_bread(struct tbuf *, size_t v);
+ssize_t fiber_bread(struct tbuf *, size_t v);
 
 inline static void iov_add_unsafe(const void *buf, size_t len)
 {
@@ -195,8 +196,10 @@ ssize_t fiber_write(const void *buf, size_t count);
 int fiber_close(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
+bool fiber_checkstack();
 void fiber_call(struct fiber *callee);
 void fiber_wakeup(struct fiber *f);
+struct fiber *fiber_find(int fid);
 /** Cancel a fiber. A cancelled fiber will have
  * tnt_FiberCancelException raised in it.
  *

@@ -53,18 +53,18 @@ ER = {
    49: "ER_TUPLE_NOT_FOUND"     ,
    50: "ER_NO_SUCH_PROC"        ,
    51: "ER_PROC_LUA"            ,
-   52: "ER_NAMESPACE_DISABLED"  ,
+   52: "ER_SPACE_DISABLED"  ,
    53: "ER_NO_SUCH_INDEX"       ,
    54: "ER_NO_SUCH_FIELD"       ,
    55: "ER_TUPLE_FOUND"         ,
    56: "ER_INDEX_VIOLATION"     ,
-   57: "ER_NO_SUCH_NAMESPACE"
+   57: "ER_NO_SUCH_SPACE"
 }
 
 
 def format_error(return_code, response):
-    return "An error occurred: {0}, \'{1}'".format(ER[return_code >> 8],
-                                                   response[4:])
+    return "An error occurred: {0}, '{1}'".format(ER[return_code >> 8],
+                                                  response[4:-1])
 
 
 def save_varint32(value):
@@ -186,14 +186,14 @@ class StatementInsert(StatementPing):
     reqeust_type = INSERT_REQUEST_TYPE
 
     def __init__(self, table_name, value_list):
-        self.namespace_no = table_name
+        self.space_no = table_name
         self.flags = 0
         self.value_list = value_list
 
     def pack(self):
         buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
         (buf, offset) = pack_tuple(self.value_list, buf, INSERT_REQUEST_FIXED_LEN)
-        struct.pack_into("<LL", buf, 0, self.namespace_no, self.flags)
+        struct.pack_into("<LL", buf, 0, self.space_no, self.flags)
         return buf[:offset]
 
     def unpack(self, response):
@@ -208,7 +208,7 @@ class StatementUpdate(StatementPing):
     reqeust_type = UPDATE_REQUEST_TYPE
 
     def __init__(self, table_name, update_list, where):
-        self.namespace_no = table_name
+        self.space_no = table_name
         self.flags = 0
         key_no = where[0]
         if key_no != 0:
@@ -218,7 +218,7 @@ class StatementUpdate(StatementPing):
 
     def pack(self):
         buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
-        struct.pack_into("<LL", buf, 0, self.namespace_no, self.flags)
+        struct.pack_into("<LL", buf, 0, self.space_no, self.flags)
         (buf, offset) = pack_tuple(self.value_list, buf, UPDATE_REQUEST_FIXED_LEN)
         (buf, offset) = pack_operation_list(self.update_list, buf, offset)
         return buf[:offset]
@@ -234,7 +234,7 @@ class StatementDelete(StatementPing):
     reqeust_type = DELETE_REQUEST_TYPE
 
     def __init__(self, table_name, where):
-        self.namespace_no = table_name
+        self.space_no = table_name
         self.flags = 0
         key_no = where[0]
         if key_no != 0:
@@ -244,7 +244,7 @@ class StatementDelete(StatementPing):
     def pack(self):
         buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
         (buf, offset) = pack_tuple(self.value_list, buf, DELETE_REQUEST_FIXED_LEN)
-        struct.pack_into("<LL", buf, 0, self.namespace_no, self.flags)
+        struct.pack_into("<LL", buf, 0, self.space_no, self.flags)
         return buf[:offset]
 
     def unpack(self, response):
@@ -258,7 +258,7 @@ class StatementSelect(StatementPing):
     reqeust_type = SELECT_REQUEST_TYPE
 
     def __init__(self, table_name, where, limit):
-        self.namespace_no = table_name
+        self.space_no = table_name
         self.index_no = None
         self.key_list = []
         if not where:
@@ -277,7 +277,7 @@ class StatementSelect(StatementPing):
     def pack(self):
         buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
         struct.pack_into("<LLLLL", buf, 0,
-                         self.namespace_no,
+                         self.space_no,
                          self.index_no,
                          self.offset,
                          self.limit,
@@ -299,6 +299,8 @@ class StatementSelect(StatementPing):
         while len(tuples) < tuple_count:
             (next_tuple, offset) = unpack_tuple(response, offset)
             tuples.append(next_tuple)
+        if self.sort:
+            tuples.sort()
         if tuple_count == 0:
             return "No match"
         elif tuple_count == 1:

@@ -175,6 +175,32 @@ sptree_##name##_find(sptree_##name *t, void *k)    {                            
     return NULL;                                                                          \
 }                                                                                         \
                                                                                           \
+static inline void*                                                                       \
+sptree_##name##_first(sptree_##name *t)    {                                              \
+    spnode_t    node = t->root;                                                           \
+    spnode_t    first = SPNIL;                                                            \
+    while (node != SPNIL) {                                                               \
+            first = node;                                                                 \
+            node = _GET_SPNODE_LEFT(node);                                                \
+    }                                                                                     \
+    if (first != SPNIL)                                                                   \
+        return ITHELEM(t, first);                                                         \
+    return NULL;                                                                          \
+}                                                                                         \
+                                                                                          \
+static inline void*                                                                       \
+sptree_##name##_last(sptree_##name *t)    {                                               \
+    spnode_t    node = t->root;                                                           \
+    spnode_t    last = SPNIL;                                                             \
+    while (node != SPNIL) {                                                               \
+            last = node;                                                                  \
+            node = _GET_SPNODE_RIGHT(node);                                               \
+    }                                                                                     \
+    if (last != SPNIL)                                                                    \
+        return ITHELEM(t, last);                                                          \
+    return NULL;                                                                          \
+}                                                                                         \
+                                                                                          \
 static inline spnode_t                                                                    \
 sptree_##name##_size_of_subtree(sptree_##name *t, spnode_t node) {                        \
     if (node == SPNIL)                                                                    \

@@ -73,8 +73,14 @@ tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name,
 	case TNT_OPT_TMOUT_RECV:
 		opt->tmout_recv = va_arg(args, int);
 		break;
+	case TNT_OPT_TMOUT_RECV_MS:
+		opt->tmout_recv_ms = va_arg(args, int);
+		break;
 	case TNT_OPT_TMOUT_SEND:
 		opt->tmout_send = va_arg(args, int);
+		break;
+	case TNT_OPT_TMOUT_SEND_MS:
+		opt->tmout_send_ms = va_arg(args, int);
 		break;
 	case TNT_OPT_SEND_CB:
 		opt->send_cb = va_arg(args, void*);

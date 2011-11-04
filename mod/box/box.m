@@ -443,56 +443,35 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 	txn->out->add_u32(found);
 	*found = 0;
 
-	if (txn->index->type == TREE) {
-		for (u32 i = 0; i < count; i++) {
+	for (u32 i = 0; i < count; i++) {
 
-			/* End the loop if reached the limit. */
-			if (limit == *found)
-				return;
+		struct index *index = txn->index;
+		/* End the loop if reached the limit. */
+		if (limit == *found)
+			return;
 
-			u32 key_len = read_u32(data);
-			void *key = NULL;
+		u32 key_cardinality = read_u32(data);
+		void *key = NULL;
 
-			if (key_len != 0)
-				key = read_field(data);
+		if (key_cardinality != 0)
+			key = read_field(data);
 
-			/* advance remaining fields of a key */
-			for (int i = 1; i < key_len; i++)
-				read_field(data);
+		/*
+		 * For TREE indexes, we allow partially specified
+		 * keys. HASH indexes are always unique and can
+		 * not have multiple parts.
+		 */
+		if (index->type == HASH && key_cardinality != 1)
+			tnt_raise(IllegalParams, :"key must be single valued");
 
-			struct tree_index_member *pattern =
-				alloc_search_pattern(txn->index, key_len, key);
-			txn->index->iterator_init(txn->index, pattern);
+		/* advance remaining fields of a key */
+		for (int i = 1; i < key_cardinality; i++)
+			read_field(data);
 
-			while ((tuple = txn->index->iterator_next(txn->index, pattern)) != NULL) {
-				if (tuple->flags & GHOST)
-					continue;
+		index->iterator_init(index, key_cardinality, key);
 
-				if (offset > 0) {
-					offset--;
-					continue;
-				}
-
-				txn->out->add_tuple(tuple);
-
-				if (limit == ++(*found))
-					break;
-			}
-		}
-	} else {
-		for (u32 i = 0; i < count; i++) {
-
-			/* End the loop if reached the limit. */
-			if (limit == *found)
-				return;
-
-			u32 key_len = read_u32(data);
-			if (key_len != 1)
-				tnt_raise(IllegalParams, :"key must be single valued");
-
-			void *key = read_field(data);
-			tuple = txn->index->find(txn->index, key);
-			if (tuple == NULL || tuple->flags & GHOST)
+		while ((tuple = index->iterator.next_equal(index)) != NULL) {
+			if (tuple->flags & GHOST)
 				continue;
 
 			if (offset > 0) {
@@ -501,10 +480,11 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 			}
 
 			txn->out->add_tuple(tuple);
-			(*found)++;
+
+			if (limit == ++(*found))
+				break;
 		}
 	}
-
 	if (data->len != 0)
 		tnt_raise(IllegalParams, :"can't unpack request");
 }
@@ -608,13 +588,13 @@ void txn_assign_n(struct box_txn *txn, struct tbuf *data)
 {
 	txn->n = read_u32(data);
 
-	if (txn->n < 0 || txn->n >= BOX_NAMESPACE_MAX)
-		tnt_raise(ClientError, :ER_NO_SUCH_NAMESPACE, txn->n);
+	if (txn->n < 0 || txn->n >= BOX_SPACE_MAX)
+		tnt_raise(ClientError, :ER_NO_SUCH_SPACE, txn->n);
 
 	txn->space = &space[txn->n];
 
 	if (!txn->space->enabled)
-		tnt_raise(ClientError, :ER_NAMESPACE_DISABLED, txn->n);
+		tnt_raise(ClientError, :ER_SPACE_DISABLED, txn->n);
 
 	txn->index = txn->space->index;
 }
@@ -647,7 +627,6 @@ txn_commit(struct box_txn *txn)
 {
 	assert(txn == in_txn());
 	assert(txn->op);
-	fiber->mod_data.txn = 0;
 
 	if (!op_is_select(txn->op)) {
 		say_debug("box_commit(op:%s)", messages_strs[txn->op]);
@@ -675,6 +654,12 @@ txn_commit(struct box_txn *txn)
 		else
 			commit_replace(txn);
 	}
+	/*
+	 * If anything above throws, we must be able to
+	 * roll back. Thus clear mod_data.txn only when
+	 * we know for sure the commit has succeeded.
+	 */
+	fiber->mod_data.txn = 0;
 
 	if (txn->flags & BOX_GC_TXN)
 		fiber_register_cleanup((fiber_cleanup_handler)txn_cleanup, txn);
@@ -900,7 +885,7 @@ void
 space_free(void)
 {
 	int i;
-	for (i = 0 ; i < BOX_NAMESPACE_MAX ; i++) {
+	for (i = 0 ; i < BOX_SPACE_MAX ; i++) {
 		if (!space[i].enabled)
 			continue;
 		int j;
@@ -918,8 +903,8 @@ space_free(void)
 void
 space_init(void)
 {
-	space = palloc(eter_pool, sizeof(struct space) * BOX_NAMESPACE_MAX);
-	for (int i = 0; i < BOX_NAMESPACE_MAX; i++) {
+	space = palloc(eter_pool, sizeof(struct space) * BOX_SPACE_MAX);
+	for (int i = 0; i < BOX_SPACE_MAX; i++) {
 		space[i].enabled = false;
 		for (int j = 0; j < BOX_INDEX_MAX; j++) {
 			space[i].index[j].key_cardinality = 0;
@@ -989,10 +974,10 @@ space_init(void)
 				index->field_cmp_order[cfg_key->fieldno] = k;
 			}
 
-			index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(index));
 			index->unique = cfg_index->unique;
 			index->type = STR2ENUM(index_type, cfg_index->type);
-			index_init(index, &space[i], cfg_space->estimated_rows);
+			index->n = j;
+			index_init(index, &space[i]);
 		}
 
 		space[i].enabled = true;
@@ -1209,7 +1194,7 @@ mod_check_config(struct tarantool_cfg *conf)
 		}
 
 		/* check space bound */
-		if (i >= BOX_NAMESPACE_MAX) {
+		if (i >= BOX_SPACE_MAX) {
 			/* maximum space is reached */
 			out_warning(0, "(space = %zu) "
 				    "too many spaces (%i maximum)", i, space);
@@ -1217,7 +1202,7 @@ mod_check_config(struct tarantool_cfg *conf)
 		}
 
 		if (conf->memcached_port && i == conf->memcached_space) {
-			out_warning(0, "Namespace %i is already used as "
+			out_warning(0, "Space %i is already used as "
 				    "memcached_space.", i);
 			return -1;
 		}
@@ -1292,10 +1277,16 @@ mod_check_config(struct tarantool_cfg *conf)
 				return -1;
 			}
 
-			/* first space index must has hash type */
-			if (j == 0 && index_type != HASH) {
-				out_warning(0, "(space = %zu) space first index must has HASH type", i);
-				return -1;
+			/* first space index must be unique and cardinality == 1 */
+			if (j == 0) {
+				if (index->unique == false) {
+					out_warning(0, "(space = %zu) space first index must be unique", i);
+					return -1;
+				}
+				if (index_cardinality != 1) {
+					out_warning(0, "(space = %zu) space first index must be single keyed", i);
+					return -1;
+				}
 			}
 
 			switch (index_type) {
@@ -1437,40 +1428,40 @@ mod_cat(const char *filename)
 	return read_log(filename, xlog_print, snap_print, NULL);
 }
 
-void
-mod_snapshot(struct log_io_iter *i)
+static void
+snapshot_write_tuple(struct log_io_iter *i, unsigned n, struct box_tuple *tuple)
 {
 	struct tbuf *row;
 	struct box_snap_row header;
+
+	if (tuple->flags & GHOST)	// do not save fictive rows
+		return;
+
+	header.space = n;
+	header.tuple_size = tuple->cardinality;
+	header.data_size = tuple->bsize;
+
+	row = tbuf_alloc(fiber->gc_pool);
+	tbuf_append(row, &header, sizeof(header));
+	tbuf_append(row, tuple->data, tuple->bsize);
+
+	snapshot_write_row(i, snap_tag, default_cookie, row);
+}
+
+void
+mod_snapshot(struct log_io_iter *i)
+{
 	struct box_tuple *tuple;
 
-	for (uint32_t n = 0; n < BOX_NAMESPACE_MAX; ++n) {
+	for (uint32_t n = 0; n < BOX_SPACE_MAX; ++n) {
 		if (!space[n].enabled)
 			continue;
 
-		for (u32 k = 0; k < space[n].index[0].idx.hash->n_buckets; k++) {
-			if (!mh_exist(space[n].index[0].idx.hash, k))
-				continue;
+		struct index *pk = &space[n].index[0];
 
-			if (space[n].index[0].key_field->type == NUM)
-				tuple = mh_value(space[n].index[0].idx.int_hash, k);
-			else if (space[n].index[0].key_field->type == NUM64)
-				tuple = mh_value(space[n].index[0].idx.int64_hash, k);
-			else
-				tuple = mh_value(space[n].index[0].idx.str_hash, k);
-
-			if (tuple->flags & GHOST)	// do not save fictive rows
-				continue;
-
-			header.space = n;
-			header.tuple_size = tuple->cardinality;
-			header.data_size = tuple->bsize;
-
-			row = tbuf_alloc(fiber->gc_pool);
-			tbuf_append(row, &header, sizeof(header));
-			tbuf_append(row, tuple->data, tuple->bsize);
-
-			snapshot_write_row(i, snap_tag, default_cookie, row);
+		pk->iterator_init(pk, 0, NULL);
+		while ((tuple = pk->iterator.next(pk))) {
+			snapshot_write_tuple(i, n, tuple);
 		}
 	}
 }

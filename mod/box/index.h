@@ -60,52 +60,74 @@ extern const char *field_data_type_strs[];
 enum index_type { HASH, TREE, index_type_MAX };
 extern const char *index_type_strs[];
 
-struct tree_index_member {
+struct index_tree_el {
 	struct box_tuple *tuple;
 	struct field key[];
 };
 
-#define SIZEOF_TREE_INDEX_MEMBER(index) \
-	(sizeof(struct tree_index_member) + sizeof(struct field) * (index)->key_cardinality)
+#define INDEX_TREE_EL_SIZE(index) \
+	(sizeof(struct index_tree_el) + sizeof(struct field) * (index)->key_cardinality)
 
 #include <third_party/sptree.h>
 SPTREE_DEF(str_t, realloc);
 
+/* Indexes at preallocated search positions.  */
+enum { POS_READ = 0, POS_WRITE = 1, POS_MAX = 2 };
+
 struct index {
 	bool enabled;
-
 	bool unique;
 
-	struct box_tuple *(*find) (struct index * index, void *key);	/* only for unique lookups */
-	struct box_tuple *(*find_by_tuple) (struct index * index, struct box_tuple * pattern);
-	void (*remove) (struct index * index, struct box_tuple *);
-	void (*replace) (struct index * index, struct box_tuple *, struct box_tuple *);
-	void (*iterator_init) (struct index *, struct tree_index_member * pattern);
-	struct box_tuple *(*iterator_next) (struct index *, struct tree_index_member * pattern);
+	size_t (*size)(struct index *index);
+	struct box_tuple *(*find)(struct index *index, void *key); /* only for unique lookups */
+	struct box_tuple  *(*min)(struct index  *index);
+	struct box_tuple  *(*max)(struct index  *index);
+	struct box_tuple *(*find_by_tuple)(struct index * index, struct box_tuple * pattern);
+	void (*remove)(struct index *index, struct box_tuple *);
+	void (*replace)(struct index *index, struct box_tuple *, struct box_tuple *);
+	void (*iterator_init)(struct index *, int cardinality, void *key);
 	union {
-		struct mh_lstrptr_t * str_hash;
-		struct mh_i32ptr_t * int_hash;
-		struct mh_i64ptr_t * int64_hash;
-		struct mh_i32ptr_t * hash;
+		struct mh_lstrptr_t *str_hash;
+		struct mh_i32ptr_t *int_hash;
+		struct mh_i64ptr_t *int64_hash;
+		struct mh_i32ptr_t *hash;
 		sptree_str_t *tree;
 	} idx;
-	void *iterator;
-	bool iterator_empty;
+	struct iterator {
+		union {
+			struct sptree_str_t_iterator *t_iter;
+			mh_int_t h_iter;
+		};
+		struct box_tuple *(*next)(struct index *);
+		struct box_tuple *(*next_equal)(struct index *);
+	} iterator;
+	/* Reusable iteration positions, to save on memory allocation. */
+	struct index_tree_el *position[POS_MAX];
 
 	struct space *space;
 
+	/* Description of parts of a multipart index. */
 	struct {
-		struct {
-			u32 fieldno;
-			enum field_data_type type;
-		} *key_field;
-		u32 key_cardinality;
+		u32 fieldno;
+		enum field_data_type type;
+	} *key_field;
+	/*
+	 * An array holding field positions in key_field array.
+	 * Imagine there is index[1] = { key_field[0].fieldno=5,
+	 * key_field[1].fieldno=3 }.
+	 * key_field array will contain data from key_field[0] and
+	 * key_field[1] respectively. field_cmp_order_cnt will be 5,
+	 * and field_cmp_order array will hold offsets of
+	 * field 3 and 5 in key_field array: -1, -1, 0, -1, 1.
+	 */
+	u32 *field_cmp_order;
+	/* max fieldno in key_field array + 1 */
+	u32 field_cmp_order_cnt;
+	/* Size of key_field array */
+	u32 key_cardinality;
+	/* relative offset of the index in the namespace */
+	u32 n;
 
-		u32 *field_cmp_order;
-		u32 field_cmp_order_cnt;
-	};
-
-	struct tree_index_member *search_pattern;
 
 	enum index_type type;
 };
@@ -117,14 +139,10 @@ struct index {
 		if (index_var->enabled)
 
 void
-index_init(struct index *index, struct space *space, size_t estimated_rows);
+index_init(struct index *index, struct space *space);
 
 void
 index_free(struct index *index);
-
-struct tree_index_member * alloc_search_pattern(struct index *index, int key_cardinality, void *key);
-void index_iterator_init_tree_str(struct index *self, struct tree_index_member *pattern);
-struct box_tuple * index_iterator_next_tree_str(struct index *self, struct tree_index_member *pattern);
 
 struct box_txn;
 void validate_indexes(struct box_txn *txn);

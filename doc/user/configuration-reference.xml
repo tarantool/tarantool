@@ -778,8 +778,8 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
 
         <row>
           <entry>memcached_port</entry>
-          <entry>boolean</entry>
-          <entry>false</entry>
+          <entry>integer</entry>
+          <entry>none</entry>
           <entry>no</entry>
           <entry>no</entry>
           <entry>
@@ -810,7 +810,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>
             <anchor xml:id="memcached_space"
             xreflabel="memcached_space"/>
-          Namespace id to store memcached data in. The
+          Space id to store memcached data in. The
           format of tuple is [key, metadata, value], with a HASH
           index based on the key. Since the space format
           is defined by Memcached data model, it must not be

@@ -31,7 +31,7 @@
 #include "box_lua.h"
 #include "tarantool.h"
 #include "box.h"
-/* use a full path to avoid clashes with system lua */
+/* use a full path to avoid clashes with system Lua */
 #include "third_party/luajit/src/lua.h"
 #include "third_party/luajit/src/lauxlib.h"
 #include "third_party/luajit/src/lualib.h"
@@ -78,9 +78,10 @@ lua_checktuple(struct lua_State *L, int narg)
 static inline struct box_tuple *
 lua_istuple(struct lua_State *L, int narg)
 {
-	struct box_tuple *tuple = 0;
-	lua_getmetatable(L, narg);
+	if (lua_getmetatable(L, narg) == 0)
+		return NULL;
 	luaL_getmetatable(L, tuplelib_name);
+	struct box_tuple *tuple = 0;
 	if (lua_equal(L, -1, -2))
 		tuple = * (void **) lua_touserdata(L, narg);
 	lua_pop(L, 2);
@@ -104,16 +105,45 @@ lbox_tuple_len(struct lua_State *L)
 }
 
 static int
+lbox_tuple_unpack(struct lua_State *L)
+{
+	struct box_tuple *tuple = lua_checktuple(L, 1);
+	u8 *field = tuple->data;
+
+	while (field < tuple->data + tuple->bsize) {
+		size_t len = load_varint32((void **) &field);
+		lua_pushlstring(L, (char *) field, len);
+		field += len;
+	}
+	assert(lua_gettop(L) == tuple->cardinality + 1);
+	return tuple->cardinality;
+}
+
+/**
+ * Implementation of tuple __index metamethod.
+ *
+ * Provides operator [] access to individual fields for integer
+ * indexes, as well as searches and invokes metatable methods
+ * for strings.
+ */
+static int
 lbox_tuple_index(struct lua_State *L)
 {
 	struct box_tuple *tuple = lua_checktuple(L, 1);
-	int i = luaL_checkint(L, 2);
-	if (i >= tuple->cardinality)
-		luaL_error(L, "%s: index %d is out of bounds (0..%d)",
-			   tuplelib_name, i, tuple->cardinality-1);
-	void *field = tuple_field(tuple, i);
-	u32 len = load_varint32(&field);
-	lua_pushlstring(L, field, len);
+	/* For integer indexes, implement [] operator */
+	if (lua_isnumber(L, 2)) {
+		int i = luaL_checkint(L, 2);
+		if (i >= tuple->cardinality)
+			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
+				   tuplelib_name, i, tuple->cardinality-1);
+		void *field = tuple_field(tuple, i);
+		u32 len = load_varint32(&field);
+		lua_pushlstring(L, field, len);
+		return 1;
+	}
+	/* If we got a string, try to find a method for it. */
+	lua_getmetatable(L, 1);
+	lua_getfield(L, -1, lua_tostring(L, 2));
 	return 1;
 }
 
@@ -128,11 +158,272 @@ lbox_tuple_tostring(struct lua_State *L)
 	return 1;
 }
 
+static void
+lbox_pushtuple(struct lua_State *L, struct box_tuple *tuple)
+{
+	if (tuple) {
+		void **ptr = lua_newuserdata(L, sizeof(void *));
+		luaL_getmetatable(L, tuplelib_name);
+		lua_setmetatable(L, -2);
+		*ptr = tuple;
+		tuple_ref(tuple, 1);
+	} else {
+		lua_pushnil(L);
+	}
+}
+
+/**
+ * Sequential access to tuple fields. Since tuple is a list-like
+ * structure, iterating over tuple fields is faster
+ * than accessing fields using an index.
+ */
+static int
+lbox_tuple_next(struct lua_State *L)
+{
+	struct box_tuple *tuple = lua_checktuple(L, 1);
+	int argc = lua_gettop(L) - 1;
+	u8 *field;
+	size_t len;
+
+	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL))
+		field = tuple->data;
+	else if (argc == 1 && lua_islightuserdata(L, 2))
+		field = lua_touserdata(L, 2);
+	else
+		luaL_error(L, "tuple.next(): bad arguments");
+
+	assert(field >= tuple->data);
+	if (field < tuple->data + tuple->bsize) {
+		len = load_varint32((void **) &field);
+		lua_pushlightuserdata(L, field + len);
+		lua_pushlstring(L, (char *) field, len);
+		return 2;
+	}
+	lua_pushnil(L);
+	return  1;
+}
+
+/** Iterator over tuple fields. Adapt lbox_tuple_next
+ * to Lua iteration conventions.
+ */
+static int
+lbox_tuple_pairs(struct lua_State *L)
+{
+	lua_pushcfunction(L, lbox_tuple_next);
+	lua_pushvalue(L, -2); /* tuple */
+	lua_pushnil(L);
+	return 3;
+}
+
 static const struct luaL_reg lbox_tuple_meta [] = {
 	{"__gc", lbox_tuple_gc},
 	{"__len", lbox_tuple_len},
 	{"__index", lbox_tuple_index},
 	{"__tostring", lbox_tuple_tostring},
+	{"next", lbox_tuple_next},
+	{"pairs", lbox_tuple_pairs},
+	{"unpack", lbox_tuple_unpack},
+	{NULL, NULL}
+};
+
+/* }}} */
+
+/** {{{ box.index Lua library: access to spaces and indexes
+ */
+
+static const char *indexlib_name = "box.index";
+
+static struct index *
+lua_checkindex(struct lua_State *L, int i)
+{
+	struct index **index = luaL_checkudata(L, i, indexlib_name);
+	assert(index != NULL);
+	return *index;
+}
+
+static int
+lbox_index_new(struct lua_State *L)
+{
+	int n = luaL_checkint(L, 1); /* get space id */
+	int idx = luaL_checkint(L, 2); /* get index id in */
+	/* locate the appropriate index */
+	if (n >= BOX_SPACE_MAX || !space[n].enabled ||
+	    idx >= BOX_INDEX_MAX || space[n].index[idx].key_cardinality == 0)
+		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
+	/* create a userdata object */
+	void **ptr = lua_newuserdata(L, sizeof(void *));
+	*ptr = &space[n].index[idx];
+	/* set userdata object metatable to indexlib */
+	luaL_getmetatable(L, indexlib_name);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+static int
+lbox_index_tostring(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	lua_pushfstring(L, "index %d in space %d",
+			index->n, index->space->n);
+	return 1;
+}
+
+static int
+lbox_index_len(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	lua_pushinteger(L, index->size(index));
+	return 1;
+}
+
+static int
+lbox_index_min(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	lbox_pushtuple(L, index->min(index));
+	return 1;
+}
+
+static int
+lbox_index_max(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	lbox_pushtuple(L, index->max(index));
+	return 1;
+}
+
+/**
+ * Convert an element on Lua stack to a part of an index
+ * key.
+ *
+ * Lua type system has strings, numbers, booleans, tables,
+ * userdata objects. Tarantool indexes only support 32/64-bit
+ * integers and strings.
+ *
+ * Instead of considering each Tarantool <-> Lua type pair,
+ * here we follow the approach similar to one in lbox_pack()
+ * (see tarantool_lua.m):
+ *
+ * Lua numbers are converted to 32 or 64 bit integers,
+ * if key part is integer. In all other cases,
+ * Lua types are converted to Lua strings, and these
+ * strings are used as key parts.
+ */
+
+void append_key_part(struct lua_State *L, int i,
+		     struct tbuf *tbuf, enum field_data_type type)
+{
+	const char *str;
+	size_t size;
+	u32 v_u32;
+	u64 v_u64;
+
+	if (lua_type(L, i) == LUA_TNUMBER) {
+		if (type == NUM64) {
+			v_u64 = (u64) lua_tonumber(L, i);
+			str = (char *) &v_u64;
+			size = sizeof(u64);
+		} else {
+			v_u32 = (u32) lua_tointeger(L, i);
+			str = (char *) &v_u32;
+			size = sizeof(u32);
+		}
+	} else {
+		str = luaL_checklstring(L, i, &size);
+	}
+	write_varint32(tbuf, size);
+	tbuf_append(tbuf, str, size);
+}
+
+/**
+ * Lua iterator over a Taratnool/Box index.
+ *
+ *	(iteration_state, tuple) = index.next(index, [iteration_state])
+ *
+ * When [iteration_state] is absent or nil
+ * returns a pointer to a new iterator and
+ * to the first tuple (or nil, if the index is
+ * empty).
+ *
+ * When [iteration_state] is a userdata,
+ * i.e. we're inside an iteration loop, retrieves
+ * the next tuple from the iterator.
+ *
+ * Otherwise, [iteration_state] can be used to seed
+ * the iterator with one or several Lua scalars
+ * (numbers, strings) and start iteration from an
+ * offset.
+ *
+ * @todo/FIXME: Currently we always store iteration
+ * state within index. This limits the total
+ * amount of active iterators to 1.
+ */
+static int
+lbox_index_next(struct lua_State *L)
+{
+	struct index *index = lua_checkindex(L, 1);
+	int argc = lua_gettop(L) - 1;
+	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
+		/*
+		 * If there is nothing or nil on top of the stack,
+		 * start iteration from the beginning.
+		 */
+		index->iterator_init(index, 0, NULL);
+	} else if (argc > 1 || !lua_islightuserdata(L, 2)) {
+		/*
+		 * We've got something different from iterator's
+		 * light userdata: must be a key
+		 * to start iteration from an offset. Seed the
+		 * iterator with this key.
+		 */
+		int cardinality;
+		void *key;
+
+		if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
+			/* Searching by tuple. */
+			struct box_tuple *tuple = lua_checktuple(L, 2);
+			key = tuple->data;
+			cardinality = tuple->cardinality;
+		} else {
+			/* Single or multi- part key. */
+			cardinality = argc;
+			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
+			for (int i = 0; i < argc; ++i)
+				append_key_part(L, i + 2, data,
+						index->key_field[i].type);
+			key = data->data;
+		}
+		/*
+		 * We allow partially specified keys for TREE
+		 * indexes. HASH indexes can only use single-part
+		 * keys.
+		*/
+		assert(cardinality != 0);
+		if (cardinality > index->key_cardinality)
+			luaL_error(L, "index.next(): key part count (%d) "
+				   "does not match index cardinality (%d)",
+				   cardinality, index->key_cardinality);
+		index->iterator_init(index, cardinality, key);
+	}
+	struct box_tuple *tuple = index->iterator.next(index);
+	if (tuple)
+		lua_pushlightuserdata(L, &index->iterator);
+	/* If tuple is NULL, pushes nil as end indicator. */
+	lbox_pushtuple(L, tuple);
+	return tuple ? 2 : 1;
+}
+
+static const struct luaL_reg lbox_index_meta[] = {
+	{"__tostring", lbox_index_tostring},
+	{"__len", lbox_index_len},
+	{"min", lbox_index_min},
+	{"max", lbox_index_max},
+	{"next", lbox_index_next},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg indexlib [] = {
+	{"new", lbox_index_new},
 	{NULL, NULL}
 };
 
@@ -191,7 +482,6 @@ void iov_add_ret(struct lua_State *L, int index)
  * and return the number of return values first, and
  * then each return value as a tuple.
  */
-
 void iov_add_multret(struct lua_State *L)
 {
 	int nargs = lua_gettop(L);
@@ -216,11 +506,7 @@ static void
 box_lua_add_tuple(struct box_tuple *tuple)
 {
 	struct lua_State *L = in_txn()->L;
-	void **ptr = lua_newuserdata(L, sizeof(void *));
-	luaL_getmetatable(L, tuplelib_name);
-	lua_setmetatable(L, -2);
-	*ptr = tuple;
-	tuple_ref(tuple, 1);
+	lbox_pushtuple(L, tuple);
 }
 
 static struct box_out box_out_lua = {
@@ -364,17 +650,18 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 struct lua_State *
 mod_lua_init(struct lua_State *L)
 {
-	/* box */
-	luaL_register(L, "box", boxlib);
 	lua_atpanic(L, box_lua_panic);
-	/* box.tuple */
-	luaL_newmetatable(L, tuplelib_name);
-	lua_pushstring(L, tuplelib_name);
-	lua_setfield(L, -2, "__metatable");
-	luaL_register(L, NULL, lbox_tuple_meta);
-	lua_pop(L, 2);
+	/* box, box.tuple */
+	tarantool_lua_register_type(L, tuplelib_name, lbox_tuple_meta);
+	luaL_register(L, "box", boxlib);
+	lua_pop(L, 1);
+	/* box.index */
+	tarantool_lua_register_type(L, indexlib_name, lbox_index_meta);
+	luaL_register(L, "box.index", indexlib);
+	lua_pop(L, 1);
 	/* Load box.lua */
-	(void) luaL_dostring(L, &_binary_box_lua_start);
+	if (luaL_dostring(L, &_binary_box_lua_start))
+		panic("Error loading box.lua: %s", lua_tostring(L, -1));
 	assert(lua_gettop(L) == 0);
 	return L;
 }
@@ -383,3 +670,7 @@ void box_lua_init()
 {
 	root_L = tarantool_L;
 }
+
+/**
+ * vim: foldmethod=marker
+ */

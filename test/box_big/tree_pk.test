@@ -1,0 +1,34 @@
+# encoding: tarantool
+#
+# integer keys
+exec sql "insert into t2 values (1, 'tuple')"
+exec admin "save snapshot"
+exec sql "insert into t2 values (2, 'tuple 2')"
+exec admin "save snapshot"
+
+exec sql "insert into t2 values (3, 'tuple 3')"
+exec sql "select * from t2 where k0 = 1"
+exec sql "select * from t2 where k0 = 2"
+exec sql "select * from t2 where k0 = 3"
+
+# Cleanup
+exec sql "delete from t2 where k0 = 1"
+exec sql "delete from t2 where k0 = 2"
+exec sql "delete from t2 where k0 = 3"
+# string keys
+exec sql "insert into t3 values ('identifier', 'tuple')"
+exec admin "save snapshot"
+exec sql "insert into t3 values ('second', 'tuple 2')"
+exec admin "save snapshot"
+exec sql "call box.select_range(3, 0, 100, 'second')"
+exec sql "call box.select_range(3, 0, 100, 'identifier')"
+
+exec sql "insert into t3 values ('third', 'tuple 3')"
+exec sql "select * from t3 where k0 = 'identifier'"
+exec sql "select * from t3 where k0 = 'second'"
+exec sql "select * from t3 where k0 = 'third'"
+
+# Cleanup
+exec sql "delete from t3 where k0 = 'identifier'"
+exec sql "delete from t3 where k0 = 'second'"
+exec sql "delete from t3 where k0 = 'third'"

@@ -101,7 +101,7 @@
   <para>
     UNIX shell command input is prefixed with '$ ' and is 
     formatted using a fixed-width font:
-    <programlisting><prompt>$ </prompt>tarantool_box <option>--daemonize</option>
+    <programlisting><prompt>$ </prompt>tarantool_box <option>--background</option>
     </programlisting>
   </para>
   <para>

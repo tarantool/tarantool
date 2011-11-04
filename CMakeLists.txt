@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 2.6)
+
 project(tarantool)
+
 include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
 include(CheckSymbolExists)
 include(TestBigEndian)
+
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
 find_program(XMLLINT xmllint)
@@ -13,6 +16,7 @@ find_program(GIT git)
 find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
 find_program(LD ld)
+
 set(luadir ${PROJECT_BINARY_DIR}/third_party/luajit/src)
 link_directories(${luadir})
 
@@ -24,6 +28,8 @@ include(cmake/check_objective_c_compiler.cmake)
 #
 set (TARANTOOL_PRODUCT "box")
 set (TARANTOOL_MODULES "box")
+set (TARANTOOL_CLIENTS "")
+
 
 #
 # Set default build type to Debug. This is to ease a developer's
@@ -87,23 +93,22 @@ check_library_exists("" __libc_stack_end "" HAVE_LIBC_STACK_END)
 # in the top level CMakeLists.txt, to ensure a consistent
 # header file layout across the entire project.
 #
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86")
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "amd64")
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCORO_ASM")
 else()
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCORO_SJLJ")
-  set_target_properties(coro PROPERTIES COMPILE_FLAGS "-DCORO_SJLJ")
 endif()
 #
 # Perform build type specific configuration.
 #
-set (CMAKE_C_FLAGS_DEBUG "-ggdb -O0")
-set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2")
+set (CMAKE_C_FLAGS_DEBUG "-ggdb -O0 -fexceptions -funwind-tables")
+set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2 -fexceptions -funwind-tables")
 set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 
 #
 # Enable 'make TAGS' target.
 #
-add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m.h -e -f TAGS
+add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m -e -f TAGS
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #
@@ -136,7 +141,7 @@ endif()
 # The same reasoning applies to -fno-stack-protector switch.
 #
 set (CMAKE_C_FLAGS
-    "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fno-stack-protector")
+    "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -fno-stack-protector -fexceptions -funwind-tables")
 #
 # Tarantool code is written in GNU C dialect.
 # Additionally, compile it with more strict flags than the rest
@@ -167,6 +172,11 @@ include_directories("${PROJECT_BINARY_DIR}/include")
 #
 # Now handle all configuration options.
 #
+option(ENABLE_CLIENT "Enable building of console client" Off)
+if (ENABLE_CLIENT)
+    set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
+endif()
+
 option(ENABLE_GCOV "Enable integration with gcov, a code coverage program" ON)
 if (ENABLE_GCOV)
     check_library_exists (gcov __gcov_flush  ""  HAVE_GCOV)
@@ -257,6 +267,7 @@ message (STATUS "${TARANTOOL_MODULES}.")
 message (STATUS "Please check out CMakeCache.txt to view or modify configuration results.")
 message (STATUS "")
 message (STATUS "*** The following options are on in this configuration: ***")
+message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
 message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
 message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
 message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE}")

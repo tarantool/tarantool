@@ -37,6 +37,7 @@ set (tnt_sources
 	tnt_insert.c
 	tnt_delete.c
 	tnt_select.c
+	tnt_call.c
 	tnt_memcache_val.c
 	tnt_memcache.c)
 
@@ -65,6 +66,8 @@ add_library(tnt_shared SHARED ${tnt_sources})
 set_target_properties(tnt_shared PROPERTIES OUTPUT_NAME tnt)
 set_target_properties(tnt_shared PROPERTIES COMPILE_FLAGS "${tnt_cflags}")
 
+# build sql parser library
+add_subdirectory(sql)
 
 #----------------------------------------------------------------------------#
 # Install
@@ -86,6 +89,7 @@ install(FILES
 	include/tnt_update.h
 	include/tnt_delete.h
 	include/tnt_select.h
+	include/tnt_call.h
 	include/tnt_ping.h
 	include/tnt_recv.h
 	include/tnt_memcache_val.h

@@ -40,6 +40,39 @@
 
 struct lua_State *tarantool_L;
 
+/* Remember the output of the administrative console in the
+ * registry, to use with 'print'.
+ */
+static void
+tarantool_lua_set_out(struct lua_State *L, const struct tbuf *out)
+{
+	lua_pushthread(L);
+	if (out)
+		lua_pushlightuserdata(L, (void *) out);
+	else
+		lua_pushnil(L);
+	lua_settable(L, LUA_REGISTRYINDEX);
+}
+
+/* dup out from parent to child L. Used in fiber_create */
+
+void
+tarantool_lua_dup_out(struct lua_State *L, struct lua_State *child_L)
+{
+	lua_pushthread(L);
+	lua_gettable(L, LUA_REGISTRYINDEX);
+	struct tbuf *out = (struct tbuf *) lua_topointer(L, -1);
+	lua_pop(L, 1); /* pop 'out' */
+	if (out)
+		tarantool_lua_set_out(child_L, out);
+}
+
+
+/** {{{ box Lua library: common functions
+ */
+
+const char *boxlib_name = "box";
+
 /** Pack our BER integer into luaL_Buffer */
 static void
 luaL_addvarint32(luaL_Buffer *b, u32 u32)
@@ -62,6 +95,7 @@ static char format_to_opcode(char format)
 	case '&': return 2;
 	case '|': return 3;
 	case '^': return 4;
+	case ':': return 5;
 	default: return format;
 	}
 }
@@ -143,6 +177,7 @@ lbox_pack(struct lua_State *L)
 		case '&': /* set field&=val */
 		case '|': /* set field|=val */
 		case '^': /* set field^=val */
+		case ':': /* splice */
 			u32buf= (u32) lua_tointeger(L, i); /* field no */
 			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
 			luaL_addchar(&b, format_to_opcode(*format));
@@ -164,6 +199,8 @@ lbox_unpack(struct lua_State *L)
 	const char *format = luaL_checkstring(L, 1);
 	int i = 2; /* first arg comes second */
 	int nargs = lua_gettop(L);
+	size_t size;
+	const char *str;
 	u32 u32buf;
 
 	while (*format) {
@@ -171,7 +208,10 @@ lbox_unpack(struct lua_State *L)
 			luaL_error(L, "box.unpack: argument count does not match the format");
 		switch (*format) {
 		case 'i':
-			u32buf = * (u32 *) lua_tostring(L, i);
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u32))
+				luaL_error(L, "box.unpack('%c'): got %d bytes (expected: 4)", *format, (int) size);
+			u32buf = * (u32 *) str;
 			lua_pushnumber(L, u32buf);
 			break;
 		default:
@@ -183,7 +223,8 @@ lbox_unpack(struct lua_State *L)
 	}
 	return i-2;
 }
-/** A descriptor for box.tbuf object methods */
+
+/** A descriptor for box methods */
 
 static const struct luaL_reg boxlib[] = {
 	{"pack", lbox_pack},
@@ -191,9 +232,398 @@ static const struct luaL_reg boxlib[] = {
 	{NULL, NULL}
 };
 
+/* }}} */
+
+/** {{{ box.fiber Lua library: access to Tarantool/Box fibers
+ *
+ * Each fiber can be running, suspended or dead.
+ * A fiber is created (box.fiber.create()) suspended.
+ * It can be started with box.fiber.resume(), yield
+ * the control back with box.fiber.yield() end
+ * with return or just by reaching the end of the
+ * function.
+ *
+ * A fiber can also be attached or detached.
+ * An attached fiber is a child of the creator,
+ * and is running only if the creator has called
+ * box.fiber.resume(). A detached fiber is a child of
+ * Tarntool/Box internal 'sched' fiber, and is gets
+ * scheduled only if there is a libev event associated
+ * with it.
+ * To detach, a running fiber must invoke box.fiber.detach().
+ * A detached fiber loses connection with its parent
+ * forever.
+ *
+ * All fibers are part of the fiber registry, box.fiber.
+ * This registry can be searched either by
+ * fiber id (fid), which is numeric, or by fiber name,
+ * which is a string. If there is more than one
+ * fiber with the given name, the first fiber that
+ * matches is returned.
+ *
+ * Once fiber chunk is done or calls "return",
+ * the fiber is considered dead. Its carcass is put into
+ * fiber pool, and can be reused when another fiber is
+ * created.
+ *
+ * A runaway fiber can be stopped with fiber.cancel().
+ * fiber.cancel(), however, is advisory -- it works
+ * only if the runaway fiber is calling fiber.testcancel()
+ * once in a while. Most box.* hooks, such as box.delete()
+ * or box.update(), are calling fiber.testcancel().
+ *
+ * Thus a runaway fiber can really only become cuckoo
+ * if it does a lot of computations and doesn't check
+ * whether it's been cancelled (just don't do that).
+ *
+ * The other potential problem comes from detached
+ * fibers which never get scheduled, because are subscribed
+ * or get no events. Such morphing fibers can be killed
+ * with box.fiber.cancel(), since box.fiber.cancel()
+ * sends an asynchronous wakeup event to the fiber.
+ */
+
+static const char *fiberlib_name = "box.fiber";
+
+/** Push a userdata for the given fiber onto Lua stack. */
+static void
+lbox_pushfiber(struct lua_State *L, struct fiber *f)
+{
+	/*
+	 * Use 'memoize'  pattern and keep a single userdata for
+	 * the given fiber.
+	 */
+	luaL_getmetatable(L, fiberlib_name);
+	int top = lua_gettop(L);
+	lua_getfield(L, -1, "memoize");
+	if (lua_isnil(L, -1)) { /* first access - instantiate memoize */
+		lua_pop(L, 1);                  /* pop the nil */
+		lua_newtable(L);                /* create memoize table */
+		lua_newtable(L);                /* and a metatable */
+		lua_pushstring(L, "kv"); /* weak keys and values */
+		lua_setfield(L, -2, "__mode"); /* pops 'kv' */
+		lua_setmetatable(L, -2); /* pops the metatable */
+		lua_setfield(L, -2, "memoize"); /* assigns and pops memoize */
+		lua_getfield(L, -1, "memoize"); /* gets memoize back. */
+		assert(! lua_isnil(L, -1));
+	}
+	/* Find out whether the fiber is  already in the memoize table. */
+	lua_pushlightuserdata(L, f);
+	lua_gettable(L, -2);
+	if (lua_isnil(L, -1)) { /* no userdata for fiber created so far */
+		lua_pop(L, 1);                  /* pop the nil */
+		lua_pushlightuserdata(L, f);    /* push the key back */
+		/* create a new userdata */
+		void **ptr = lua_newuserdata(L, sizeof(void *));
+		*ptr = f;
+		luaL_getmetatable(L, fiberlib_name);
+		lua_setmetatable(L, -2);
+		lua_settable(L, -3);            /* memoize it */
+		lua_pushlightuserdata(L, f);
+		lua_gettable(L, -2);            /* get it back */
+	}
+	/*
+	 * Here we have a userdata on top of the stack and
+	 * possibly some garbage just under the top. Move the
+	 * result to the beginning of the stack and clear the rest.
+	 */
+	lua_replace(L, top); /* moves the current top to the old top */
+	lua_settop(L, top); /* clears everything after the old top */
+}
+
+static struct fiber *
+lbox_checkfiber(struct lua_State *L, int index)
+{
+	return *(void **) luaL_checkudata(L, index, fiberlib_name);
+}
+
+static int
+lbox_fiber_id(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	lua_pushinteger(L, f->fid);
+	return 1;
+}
+
+static struct lua_State *
+box_lua_fiber_get_coro(struct lua_State *L, struct fiber *f)
+{
+	lua_pushlightuserdata(L, f);
+	lua_gettable(L, LUA_REGISTRYINDEX);
+	struct lua_State *child_L = lua_tothread(L, -1);
+	lua_pop(L, 1);
+	return child_L;
+}
+
+static void
+box_lua_fiber_clear_coro(struct lua_State *L, struct fiber *f)
+{
+	lua_pushlightuserdata(L, f);
+	lua_pushnil(L);
+	lua_settable(L, LUA_REGISTRYINDEX);
+}
+
+static int
+lbox_fiber_gc(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	struct lua_State *child_L = box_lua_fiber_get_coro(L, f);
+	/*
+	 * A non-NULL coro is an indicator of a 1) alive,
+	 * 2) suspended and 3) attached fiber. The coro is
+	 * an outlet to pass arguments in and out the Lua
+	 * routine being executed by the fiber (see fiber.resume()
+	 * and fiber.yield()), and as soon as the Lua routine
+	 * completes, the "plug" is shut down (see
+	 * box_lua_fiber_run()). When its routine completes,
+	 * the fiber recycles itself.
+	 * Likewise, when a fiber becomes detached, this plug is
+	 * removed, since we no longer need to pass arguments
+	 * to and from it, and 'sched' garbage collects all detached
+	 * fibers (see lbox_fiber_detach()).
+	 * We also know that the fiber is suspended, not running,
+	 * because any running and attached fiber is referenced,
+	 * if only by the fiber which called lbox_lua_resume()
+	 * on it. lbox_lua_resume() is the only entry point
+	 * to resume an attached fiber.
+	 */
+	if (child_L) {
+		assert(f != fiber && child_L != L);
+		/* Garbage collect the associated coro.
+		 * Do it first, since the cancelled fiber
+		 * can get recycled quickly.
+		 */
+		box_lua_fiber_clear_coro(L, f);
+		/*
+		 * Cancel and recycle the fiber. This
+		 * returns only after the fiber has died.
+		 */
+		fiber_cancel(f);
+	}
+	return 0;
+}
+
+
+static void
+box_lua_fiber_run(void *arg __attribute__((unused)))
+{
+	fiber_setcancelstate(true);
+	fiber_testcancel();
+	struct lua_State *L = box_lua_fiber_get_coro(tarantool_L, fiber);
+	/*
+	 * Reference the coroutine to make sure it's not garbage
+	 * collected when detached.
+	 */
+	lua_pushthread(L);
+	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	/*
+	 * Lua coroutine.resume() returns true/false for
+	 * completion status plus whatever the coroutine main
+	 * function returns. Follow this style here.
+	 */
+	@try {
+		lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
+		lua_pushboolean(L, true); /* push completion status */
+		lua_insert(L, 1); /* move 'true' to stack start */
+	} @catch (ClientError *e) {
+		/*
+		 * Note: FiberCancelException passes through this
+		 * catch and thus leaves garbage on coroutine
+		 * stack. This is OK since it is only possible to
+		 * cancel a fiber which is not scheduled, and
+		 * cancel() is synchronous.
+		 */
+		lua_settop(L, 0); /* pop any possible garbage */
+		lua_pushboolean(L, 0); /* completion status */
+		lua_pushstring(L, e->errmsg); /* error message */
+	} @finally {
+		/*
+		 * If the coroutine has detached itself, collect
+		 * its resources here.
+		 */
+		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+	}
+	/* L stack contains nothing but call results */
+}
+
+static int
+lbox_fiber_create(struct lua_State *L)
+{
+        if (lua_gettop(L) != 1 || !lua_isfunction(L, 1))
+                luaL_error(L, "fiber.create(function): bad arguments");
+	if (fiber_checkstack()) {
+		luaL_error(L, "fiber.create(function): recursion limit"
+			   " reached");
+	}
+	struct fiber *f= fiber_create("lua", -1, -1, box_lua_fiber_run, NULL);
+
+	lua_pushlightuserdata(L, f); /* associate coro with fiber */
+	struct lua_State *child_L = lua_newthread(L);
+	lua_settable(L, LUA_REGISTRYINDEX);
+	lua_xmove(L, child_L, 1); /* move the argument to the new coro */
+	lbox_pushfiber(L, f);
+	return 1;
+}
+
+static int
+lbox_fiber_resume(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	struct lua_State *child_L = box_lua_fiber_get_coro(L, f);
+	if (child_L == NULL)
+		luaL_error(L, "fiber.resume(): can't resume a "
+			   "detached fiber");
+	int nargs = lua_gettop(L) - 1;
+	if (nargs > 0)
+		lua_xmove(L, child_L, nargs);
+	/* dup 'out' for admin fibers */
+	tarantool_lua_dup_out(L, child_L);
+	fiber_call(f);
+	tarantool_lua_set_out(child_L, NULL);
+	/* Get the results */
+	nargs = lua_gettop(child_L);
+	lua_xmove(child_L, L, nargs);
+	if (f->f == 0) { /* The fiber is dead. */
+		/* Garbage collect the associated coro. */
+		box_lua_fiber_clear_coro(L, f);
+	}
+	return nargs;
+}
+
+/** Yield the current fiber.
+ *
+ * Yield control to the calling fiber -- if the fiber
+ * is attached, or to sched otherwise.
+ * If the fiber is attached, whatever arguments are passed
+ * to this call, are passed on to the calling fiber.
+ * If the fiber is detached, simply returns everything back.
+ */
+static int
+lbox_fiber_yield(struct lua_State *L)
+{
+	/*
+	 * Yield to the caller. The caller will take care of
+	 * whatever arguments are taken.
+	 */
+	fiber_yield();
+	fiber_testcancel(); /* throws an error if we were cancelled. */
+	/*
+	 * Got resumed. Return whatever the caller has passed
+	 * to us with box.fiber.resume().
+	 * As a side effect, the detached fiber which yields
+	 * to sched always gets back whatever it yields.
+	 */
+	return lua_gettop(L);
+}
+
+/**
+ * Detach the current fiber.
+ */
+static int
+lbox_fiber_detach(struct lua_State *L)
+{
+	struct lua_State *self_L = box_lua_fiber_get_coro(L, fiber);
+	if (self_L == NULL)
+		luaL_error(L, "fiber.detach(): not attached");
+	assert(self_L == L);
+	/* Clear our association with the parent. */
+	box_lua_fiber_clear_coro(L, fiber);
+	tarantool_lua_set_out(L, NULL);
+	/* Make sure we get awoken, at least once. */
+	fiber_wakeup(fiber);
+	/* Yield to the parent. */
+	fiber_yield();
+	fiber_testcancel(); /* check if we were cancelled. */
+	return 0;
+}
+
+/** Yield to the sched fiber and sleep.
+ * @param[in]  amount of time to sleep (double)
+ *
+ * Only the current fiber can be made to sleep.
+ */
+static int
+lbox_fiber_sleep(struct lua_State *L)
+{
+	if (! lua_isnumber(L, 1) || lua_gettop(L) != 1)
+		luaL_error(L, "fiber.sleep(delay): bad arguments");
+	double delay = lua_tonumber(L, 1);
+	fiber_sleep(delay);
+	return 0;
+}
+
+static int
+lbox_fiber_self(struct lua_State *L)
+{
+	lbox_pushfiber(L, fiber);
+	return 1;
+}
+
+static int
+lbox_fiber_find(struct lua_State *L)
+{
+	int fid = lua_tointeger(L, -1);
+	struct fiber *f = fiber_find(fid);
+	if (f)
+		lbox_pushfiber(L, f);
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
+/** Running and suspended fibers can be cancelled.
+ * Zombie fibers can't.
+ */
+static int
+lbox_fiber_cancel(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	if (! (f->flags & FIBER_CANCELLABLE))
+		luaL_error(L, "fiber.cancel(): subject fiber does "
+			   "not permit cancel");
+	fiber_cancel(f);
+	return 0;
+}
+
+/**
+ * Check if this current fiber has been cancelled and
+ * throw an exception if this is the case.
+ */
+
+static int
+lbox_fiber_testcancel(struct lua_State *L)
+{
+	if (lua_gettop(L) != 0)
+		luaL_error(L, "fiber.testcancel(): bad arguments");
+	fiber_testcancel();
+	return 0;
+}
+
+static const struct luaL_reg lbox_fiber_meta [] = {
+	{"id", lbox_fiber_id},
+	{"__gc", lbox_fiber_gc},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg fiberlib[] = {
+	{"sleep", lbox_fiber_sleep},
+	{"self", lbox_fiber_self},
+	{"find", lbox_fiber_find},
+	{"cancel", lbox_fiber_cancel},
+	{"testcancel", lbox_fiber_testcancel},
+	{"create", lbox_fiber_create},
+	{"resume", lbox_fiber_resume},
+	{"yield", lbox_fiber_yield},
+	{"detach", lbox_fiber_detach},
+	{NULL, NULL}
+};
+
+/* }}} */
+
 /*
- * lua_tostring does no use __tostring metamethod, and it has
- * to be called if we want to print Lua userdata correctly.
+ * This function exists because lua_tostring does not use
+ * __tostring metamethod, and this metamethod has to be used
+ * if we want to print Lua userdata correctly.
  */
 const char *
 tarantool_lua_tostring(struct lua_State *L, int index)
@@ -242,10 +672,10 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
  * administrative command.
  *
  * Note: administrative console output must be YAML-compatible.
- * If this is * done automatically, the result is ugly, so we
- * don't do it. A creator of Lua procedures has to do it herself.
- * Best we can do here is to add a trailing \r\n if it's
- * forgotten.
+ * If this is done automatically, the result is ugly, so we
+ * don't do it. Creators of Lua procedures have to do it
+ * themselves. Best we can do here is to add a trailing
+ * \r\n if it's forgotten.
  */
 static int
 lbox_print(struct lua_State *L)
@@ -268,6 +698,25 @@ lbox_print(struct lua_State *L)
 	return 0;
 }
 
+/** A helper to register a single type metatable. */
+void
+tarantool_lua_register_type(struct lua_State *L, const char *type_name,
+			    const struct luaL_Reg *methods)
+{
+	luaL_newmetatable(L, type_name);
+	/*
+	 * Conventionally, make the metatable point to itself
+	 * in __index. If 'methods' contain a field for __index,
+	 * this is a no-op.
+	 */
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
+	lua_pushstring(L, type_name);
+	lua_setfield(L, -2, "__metatable");
+	luaL_register(L, NULL, methods);
+	lua_pop(L, 1);
+}
+
 struct lua_State *
 tarantool_lua_init()
 {
@@ -275,27 +724,15 @@ tarantool_lua_init()
 	if (L == NULL)
 		return L;
 	luaL_openlibs(L);
-	luaL_register(L, "box", boxlib);
+	luaL_register(L, boxlib_name, boxlib);
 	lua_pop(L, 1);
+	luaL_register(L, fiberlib_name, fiberlib);
+	lua_pop(L, 1);
+	tarantool_lua_register_type(L, fiberlib_name, lbox_fiber_meta);
 	lua_register(L, "print", lbox_print);
-	tarantool_lua_load_cfg(L, &cfg);
 	L = mod_lua_init(L);
 	lua_settop(L, 0); /* clear possible left-overs of init */
 	return L;
-}
-
-/* Remember the output of the administrative console in the
- * registry, to use with 'print'.
- */
-static void
-tarantool_lua_set_out(struct lua_State *L, struct tbuf *out)
-{
-	lua_pushthread(L);
-	if (out)
-		lua_pushlightuserdata(L, (void *) out);
-	else
-		lua_pushnil(L);
-	lua_settable(L, LUA_REGISTRYINDEX);
 }
 
 /**
@@ -348,7 +785,8 @@ tarantool_lua(struct lua_State *L,
  * Check if the given literal is a number/boolean or string
  * literal. A string literal needs quotes.
  */
-static bool is_string(const char *str)
+static bool
+is_string(const char *str)
 {
 	if (strcmp(str, "true") == 0 || strcmp(str, "false") == 0)
 	    return false;
@@ -364,7 +802,8 @@ static bool is_string(const char *str)
  * as functional to convert the given configuration to a Lua
  * table and export the table into Lua.
  */
-void tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
+void
+tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 {
 	luaL_Buffer b;
 	char *key, *value;
@@ -402,9 +841,16 @@ void tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 "getmetatable(box.cfg).__newindex = function(table, index)\n"
 "  error('Attempt to modify a read-only table')\n"
 "end\n"
-"getmetatable(box.cfg).__index = nil\n");
+"getmetatable(box.cfg).__index = nil\n"
+"if type(box.on_reload_configuration) == 'function' then\n"
+"  box.on_reload_configuration()\n"
+"end\n");
 	luaL_pushresult(&b);
 	if (luaL_loadstring(L, lua_tostring(L, -1)) == 0)
 		lua_pcall(L, 0, 0, 0);
 	lua_pop(L, 1);
 }
+
+/*
+ * vim: foldmethod=marker
+ */

@@ -381,7 +381,7 @@ memcached_check_config(struct tarantool_cfg *conf)
 
 	/* check memcached space number: it shoud be in segment [0, max_space] */
 	if ((conf->memcached_space < 0) ||
-	    (conf->memcached_space > BOX_NAMESPACE_MAX)) {
+	    (conf->memcached_space > BOX_SPACE_MAX)) {
 		/* invalid space number */
 		out_warning(0, "invalid memcached space number: %i",
 			    conf->memcached_space);
@@ -437,10 +437,8 @@ memcached_space_init()
 
 	memc_index->key_field = salloc(sizeof(memc_index->key_field[0]));
 	memc_index->field_cmp_order = salloc(sizeof(u32));
-	memc_index->search_pattern = palloc(eter_pool, SIZEOF_TREE_INDEX_MEMBER(memc_index));
 
-	if (memc_index->key_field == NULL || memc_index->field_cmp_order == NULL ||
-	    memc_index->search_pattern == NULL)
+	if (memc_index->key_field == NULL || memc_index->field_cmp_order == NULL)
 		panic("out of memory when configuring memcached_space");
 
 	memc_index->key_field[0].fieldno = 0;
@@ -453,7 +451,8 @@ memcached_space_init()
 	memc_index->unique = true;
 	memc_index->type = HASH;
 	memc_index->enabled = true;
-	index_init(memc_index, memc_ns, 0);
+	memc_index->n = 0;
+	index_init(memc_index, memc_ns);
 }
 
 void
