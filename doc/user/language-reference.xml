@@ -102,7 +102,7 @@
       or there is no readily available connector for the
       programming language in use, any existing client driver for
       Memcached will make do as a Tarantool connector.
-      To enable Memcached protocol, turn on
+      To enable text Memcached protocol, turn on
       <olink targetptr="memcached_port"/> in the option file.
       Since Memcached has no notion of spaces or secondary
       indexes, this port only makes it possible to access one
@@ -110,7 +110,10 @@
       targetptr="memcached_space"/>) via its primary key.
       Unless tuple expiration is enabled with <olink
       targetptr="memcached_expire"/>, TTL part of the message is
-      stored but ignored.
+      stored but ignored. Note, that we do not support the binary
+      protocol of Memcached. If top performance
+      is a must, Tarantool's own binary protocol should be
+      used.
   </para>
   </section>
 </section>
