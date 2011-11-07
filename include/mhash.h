@@ -131,10 +131,10 @@ void _mh(dump)(struct _mh(t) *h);
 #define put_slot(h, key) _mh(put_slot)(h, key)
 
 static inline mh_int_t
-_mh(next_slot)(mh_int_t link, mh_int_t inc, mh_int_t size)
+_mh(next_slot)(mh_int_t slot, mh_int_t inc, mh_int_t size)
 {
-	link += inc;
-	return link > size ? link - size : link;
+	slot += inc;
+	return slot >= size ? slot - size : slot;
 }
 
 static inline mh_int_t
