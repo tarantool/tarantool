@@ -17,6 +17,7 @@ CMakeFiles
 CMakeCache.txt
 cmake_install.cmake
 mod/box/tarantool_box
+client/tarantool/tarantool
 include/config.h
 CPackConfig.cmake
 CPackSourceConfig.cmake
