@@ -434,11 +434,59 @@ static const struct luaL_reg indexlib [] = {
  * to fiber IOV.
  */
 
+/* Add a Lua table to iov as if it was a tuple, with as little
+ * overhead as possible. */
+
+static void
+iov_add_lua_table(struct lua_State *L, int index)
+{
+	u32 *cardinality = palloc(fiber->gc_pool, sizeof(u32));
+	u32 *tuple_len = palloc(fiber->gc_pool, sizeof(u32));
+
+	*cardinality = 0;
+	*tuple_len = 0;
+
+	iov_add(tuple_len, sizeof(u32));
+	iov_add(cardinality, sizeof(u32));
+
+	u8 field_len_buf[5];
+	size_t field_len, field_len_len;
+	const char *field;
+
+	lua_pushnil(L);  /* first key */
+	while (lua_next(L, index) != 0) {
+		++*cardinality;
+
+		switch (lua_type(L, -1)) {
+		case LUA_TNUMBER:
+		case LUA_TSTRING:
+			field = lua_tolstring(L, -1, &field_len);
+			field_len_len =
+				save_varint32(field_len_buf,
+					      field_len) - field_len_buf;
+			iov_dup(field_len_buf, field_len_len);
+			iov_dup(field, field_len);
+			*tuple_len += field_len_len + field_len;
+			break;
+		default:
+			tnt_raise(ClientError, :ER_PROC_RET,
+				  lua_typename(L, lua_type(L, -1)));
+			break;
+		}
+		lua_pop(L, 1);
+	}
+}
+
 void iov_add_ret(struct lua_State *L, int index)
 {
 	int type = lua_type(L, index);
 	struct box_tuple *tuple;
 	switch (type) {
+	case LUA_TTABLE:
+	{
+		iov_add_lua_table(L, index);
+		return;
+	}
 	case LUA_TNUMBER:
 	case LUA_TSTRING:
 	{
@@ -482,7 +530,8 @@ void iov_add_ret(struct lua_State *L, int index)
  * and return the number of return values first, and
  * then each return value as a tuple.
  */
-void iov_add_multret(struct lua_State *L)
+void
+iov_add_multret(struct lua_State *L)
 {
 	int nargs = lua_gettop(L);
 	iov_dup(&nargs, sizeof(u32));
