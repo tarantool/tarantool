@@ -6,12 +6,11 @@ import java.net.InetAddress;
 import tarantool.connector.socketpool.AbstractSocketPool;
 
 
-public abstract class SocketWorkerInternal implements SocketWorker, Comparable<SocketWorkerInternal> {
-    //TODO: Clarify Dynamic or Static SocketWorker for best performance in Static Socket Pool
+public abstract class SocketWorkerInternal implements SocketWorker {
 
     private enum ConnectionState {
         CONNECTED,
-        DISCONNECTED;
+        DISCONNECTED
     }
 
     private long lastTimeStamp;
@@ -46,12 +45,6 @@ public abstract class SocketWorkerInternal implements SocketWorker, Comparable<S
 
     public long getLastTimeStamp() {
         return lastTimeStamp;
-    }
-
-    @Override
-    public int compareTo(SocketWorkerInternal o) {
-        long result = lastTimeStamp - o.lastTimeStamp;
-        return result == 0 ? 0 : result > 0 ? 1 : -1;
     }
 
     @Override

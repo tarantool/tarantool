@@ -2,8 +2,8 @@ package tarantool.connector.socketpool;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
-import java.util.PriorityQueue;
-import java.util.Queue;
+import java.util.Deque;
+import java.util.LinkedList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -36,7 +36,7 @@ class DynamicSocketPool extends AbstractSocketPool {
     private final int maxPoolSize;
 	private int currentUsed = 0;
 
-    private final Queue<SocketWorkerInternal> queue = new PriorityQueue<SocketWorkerInternal>();
+    private final Deque<SocketWorkerInternal> queue = new LinkedList<SocketWorkerInternal>();
 
     private final Lock lock = new ReentrantLock();
     private final Condition cond = lock.newCondition();
@@ -67,29 +67,33 @@ class DynamicSocketPool extends AbstractSocketPool {
         this.maxPoolSize = config.getMaxPoolSize();
         this.latency = config.getLatencyPeriod();
 
-        initializePool();
+
 
         startSocketPoolCleaner();
+        
+        initializePool();
     }
 
     private void initializePool() throws SocketPoolTimeOutException {
         long startTime = System.currentTimeMillis();
 
         for (int i = 0; i < minPoolSize;) {
+
+
+            if (stateMachine.isClosed()) {
+                LOG.info("Socket pool is closed, initialization aborted");
+                return; // Socket pool is closed
+            }
+
             lock.lock();
             try {
-                if (stateMachine.isClosed()) {
-                    LOG.info("Socket pool is closed, initialization aborted");
-                    return; // Socket pool is closed
-                }
-
                 if (queue.size() + currentUsed > minPoolSize) {
                     break;
                 }
 
                 try {
                     SocketWorkerInternal socketWorker = socketWorkerFactory.create();
-                    queue.add(socketWorker);
+                    queue.addFirst(socketWorker);
                     i++;
                 } catch (IOException e) {
                     LOG.warn("Can't establish socket connection because: Exception - " +
@@ -119,30 +123,32 @@ class DynamicSocketPool extends AbstractSocketPool {
             public void run() {
                 long scheduleTime = latency;
 
+
+
+                if (stateMachine.isClosed()) {
+                    LOG.info("Socket pool is closed, cleaner thread stopped");
+                    return;
+                }
+
                 lock.lock();
                 try {
-                    if (stateMachine.isClosed()) {
-                        LOG.info("Socket pool is closed, cleaner thread stopped");
-                        return;
-                    }
-
                     if (queue.size() + currentUsed <= minPoolSize) {
                         return;
                     }
 
                     long remainingTime, currentTime = System.currentTimeMillis();
                     while(!queue.isEmpty()) {
-                        SocketWorkerInternal socketWorker = queue.peek();
-                        assert socketWorker != null: "Priority queue must contain socket worker";
+                        SocketWorkerInternal socketWorker = queue.peekLast();
+                        assert socketWorker != null: "Deque must contain socket worker";
 
                         remainingTime = currentTime - socketWorker.getLastTimeStamp();
                         if (remainingTime > latency) {
-                            SocketWorkerInternal removed = queue.remove();
+                            SocketWorkerInternal removed = queue.pollLast();
                             assert removed == socketWorker: "Incorrect operation peek and remove";
 
                             socketWorker.close();
                         } else {
-                            scheduleTime = remainingTime;
+                            scheduleTime = latency - remainingTime;
                             break;
                         }
                     }
@@ -164,18 +170,20 @@ class DynamicSocketPool extends AbstractSocketPool {
     public SocketWorker borrowSocketWorker() throws InterruptedException, SocketPoolException {
         SocketWorkerInternal socketWorker;
 
+
+
+        if (stateMachine.isClosed()) {
+            throw new SocketPoolClosedException("Socket pool is closed, borrowing of socket worker was rejected");
+        }
+
+        if (stateMachine.isReconnecting()) {
+            throw new SocketPoolUnavailableException("Socket pool is reconnecting, borrowing of socket worker was rejected");
+        }
+
         lock.lock();
         try {
-            if (stateMachine.isClosed()) {
-                throw new SocketPoolClosedException("Socket pool is closed, borrowing of socket worker was rejected");
-            }
-
-            if (stateMachine.isReconnecting()) {
-                throw new SocketPoolUnavailableException("Socket pool is reconnecting, borrowing of socket worker was rejected");
-            }
-
             do {
-                socketWorker = queue.poll();
+                socketWorker = queue.pollFirst();
                 if (socketWorker == null) {
                     if (currentUsed < maxPoolSize) {
                         try {
@@ -192,7 +200,7 @@ class DynamicSocketPool extends AbstractSocketPool {
                             }
                         }
 
-                        socketWorker = queue.poll();
+                        socketWorker = queue.pollFirst();
                         assert socketWorker != null: "Incorrect state of queue";
                     }
                 }
@@ -208,19 +216,21 @@ class DynamicSocketPool extends AbstractSocketPool {
     }
 
     public void internalReturnSocketWorker(SocketWorkerInternal socketWorker) {
+
+
+        if (stateMachine.isClosed()) {
+            socketWorker.close();
+            LOG.info("Socket pool is closed, return operation skipped");
+            return;
+        }
+
         lock.lock();
         try {
-            if (stateMachine.isClosed()) {
-                socketWorker.close();
-                LOG.info("Socket pool is closed, return operation skipped");
-                return;
-            }
-
             if (currentUsed > 0) {
                 currentUsed--;
             }
 
-            queue.offer(socketWorker);
+            queue.addFirst(socketWorker);
 
             cond.signal();
         } finally {

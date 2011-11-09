@@ -8,7 +8,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -29,19 +29,22 @@ public abstract class AbstractSocketPool implements SocketPool {
     public static final long INITIALIZE_SOCKET_POOL_TIMEOUT = 20000L; // 20 sec
     public static final int DISCONNECT_BOUND = 10;
 
+    private static final long DISCONNECT_BOUND_CHECK_PERIOD = TimeUnit.SECONDS.toNanos(1);
+
     final long waitingTimeout;
     final long reconnectTimeout;
     final long initializeTimeout;
-    final int disconnectBound;
 
     final SocketFactory socketWorkerFactory;
 
-    private final AtomicInteger disconnectCount = new AtomicInteger(0);
+    private final int disconnectBound;
+    private long[] timeQueue;
+    private int timeQueueIndex = 0;
 
     private final ExecutorService reconnectExecutor;
     private final BlockingQueue<SocketWorkerInternal> reconnectQueue = new LinkedBlockingQueue<SocketWorkerInternal>();
 
-    volatile SocketPoolStateMachine stateMachine = new SocketPoolStateMachine();
+    final SocketPoolStateMachine stateMachine = new SocketPoolStateMachine();
 
     public AbstractSocketPool(String host, int port, int socketReadTimeout, long waitingTimeout,
             long reconnectTimeout, long initializeTimeout, int disconnectBound, FactoryType type) throws UnknownHostException {
@@ -76,8 +79,9 @@ public abstract class AbstractSocketPool implements SocketPool {
 
         this.waitingTimeout = waitingTimeout;
         this.reconnectTimeout = reconnectTimeout;
-        this.disconnectBound = disconnectBound;
         this.initializeTimeout = initializeTimeout;
+        this.disconnectBound = disconnectBound;
+        this.timeQueue = new long[disconnectBound];
 
         socketWorkerFactory = type.createFactory(InetAddress.getByName(host), port, socketReadTimeout, this);
 
@@ -136,10 +140,22 @@ public abstract class AbstractSocketPool implements SocketPool {
             internalReturnSocketWorker(socketWorker);
         } else {
             pushToReconnect(socketWorker);
-            if (stateMachine.isRunning() && disconnectCount.incrementAndGet() >= disconnectBound) {
-                stateMachine.disconnect();
-                disconnectCount.set(0);
-                feedReconnect();
+            if (stateMachine.isRunning()) {
+                synchronized (stateMachine) {
+                    if (!stateMachine.isRunning()) {
+                        return;
+                    }
+                    int index = timeQueueIndex++ % timeQueue.length;
+                    long lastTimePoint = timeQueue[index];
+                    timeQueue[index] = System.nanoTime();
+
+                    if (lastTimePoint > 0 && System.nanoTime() - lastTimePoint < DISCONNECT_BOUND_CHECK_PERIOD) {
+                        stateMachine.disconnect();
+                        timeQueueIndex = 0;
+                        timeQueue = new long[disconnectBound];
+                        feedReconnect();
+                    }
+                }
             }
         }
     }
