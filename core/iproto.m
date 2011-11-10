@@ -50,7 +50,7 @@ iproto_interact(iproto_callback *callback)
 			break;
 
 		ssize_t request_len = sizeof(struct iproto_header) + iproto(in)->len;
-		to_read = request_len - in->len;
+		to_read = request_len - in->size0;
 
 		if (to_read > 0 && fiber_bread(in, to_read) <= 0)
 			break;
@@ -58,7 +58,7 @@ iproto_interact(iproto_callback *callback)
 		struct tbuf *request = tbuf_split(in, request_len);
 		iproto_reply(*callback, request);
 
-		to_read = sizeof(struct iproto_header) - in->len;
+		to_read = sizeof(struct iproto_header) - in->size0;
 
 		/*
 		 * Flush output and garbage collect before reading
@@ -96,7 +96,7 @@ static void iproto_reply(iproto_callback callback, struct tbuf *request)
 	iov_add(reply, sizeof(struct iproto_header_retcode));
 	size_t saved_iov_cnt = fiber->iov_cnt;
 	/* make request point to iproto data */
-	request->len = iproto(request)->len;
+	request->size0 = iproto(request)->len;
 	request->data = iproto(request)->data;
 
 	@try {
@@ -104,7 +104,7 @@ static void iproto_reply(iproto_callback callback, struct tbuf *request)
 		reply->ret_code = 0;
 	}
 	@catch (ClientError *e) {
-		fiber->iov->len -= (fiber->iov_cnt - saved_iov_cnt) * sizeof(struct iovec);
+		fiber->iov->size0 -= (fiber->iov_cnt - saved_iov_cnt) * sizeof(struct iovec);
 		fiber->iov_cnt = saved_iov_cnt;
 		reply->ret_code = tnt_errcode_val(e->errcode);
 		iov_dup(e->errmsg, strlen(e->errmsg)+1);

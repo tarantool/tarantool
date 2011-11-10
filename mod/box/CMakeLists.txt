@@ -7,6 +7,9 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.m
 set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES box.lua.o)
 
+add_custom_target(generate_memcached_grammar_m DEPENDS
+    ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.m)
+
 # Do not try to randomly re-generate memcached-grammar.m
 # after a fresh checkout/branch switch.
 execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate

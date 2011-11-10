@@ -33,10 +33,10 @@
 #include <util.h>
 
 struct tbuf {
-	/* Used size. */
-	u32 len;
-	/* Size of the buffer. */
-	u32 size;
+	/* Used space in the buffer. */
+	u32 size0;
+	/* Total allocated buffer capacity. */
+	u32 capacity;
 	/* Allocated buffer. */
 	void *data;
 	struct palloc_pool *pool;
@@ -47,17 +47,17 @@ struct tbuf *tbuf_alloc(struct palloc_pool *pool);
 void tbuf_ensure_resize(struct tbuf *e, size_t bytes_required);
 static inline void tbuf_ensure(struct tbuf *e, size_t required)
 {
-	assert(e->len <= e->size);
-	if (unlikely(e->size - e->len < required))
+	assert(e->size0 <= e->capacity);
+	if (unlikely(e->size0 + required > e->capacity))
 		tbuf_ensure_resize(e, required);
 }
 
 static inline void tbuf_append(struct tbuf *b, const void *data, size_t len)
 {
-	tbuf_ensure(b, len + 1);
-	memcpy(b->data + b->len, data, len);
-	b->len += len;
-	*(((char *)b->data) + b->len) = '\0';
+	tbuf_ensure(b, len + 1); /* +1 for trailing '\0' */
+	memcpy(b->data + b->size0, data, len);
+	b->size0 += len;
+	*(((char *)b->data) + b->size0) = '\0';
 }
 
 static inline const char *tbuf_str(const struct tbuf *tbuf)

@@ -455,7 +455,7 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 	if (fread(m->data, sizeof(struct row_v11), 1, f) != 1)
 		return ROW_EOF;
 
-	m->len = offsetof(struct row_v11, data);
+	m->size0 = offsetof(struct row_v11, data);
 
 	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
 	header_crc = crc32c(0, m->data + offsetof(struct row_v11, lsn),
@@ -466,11 +466,11 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 		return NULL;
 	}
 
-	tbuf_ensure(m, m->len + row_v11(m)->len);
+	tbuf_ensure(m, m->size0 + row_v11(m)->len);
 	if (fread(row_v11(m)->data, row_v11(m)->len, 1, f) != 1)
 		return ROW_EOF;
 
-	m->len += row_v11(m)->len;
+	m->size0 += row_v11(m)->len;
 
 	data_crc = crc32c(0, row_v11(m)->data, row_v11(m)->len);
 	if (row_v11(m)->data_crc32c != data_crc) {
@@ -1229,7 +1229,7 @@ write_to_disk(void *_state, struct tbuf *t)
 
 	header = tbuf_alloc(t->pool);
 	tbuf_ensure(header, sizeof(struct row_v11));
-	header->len = sizeof(struct row_v11);
+	header->size0 = sizeof(struct row_v11);
 
 	row_v11(header)->lsn = wal_write_request(t)->lsn;
 	row_v11(header)->tm = ev_now();
@@ -1240,7 +1240,7 @@ write_to_disk(void *_state, struct tbuf *t)
 		crc32c(0, header->data + field_sizeof(struct row_v11, header_crc32c),
 		       sizeof(struct row_v11) - field_sizeof(struct row_v11, header_crc32c));
 
-	if (fwrite(header->data, header->len, 1, wal->f) != 1) {
+	if (fwrite(header->data, header->size0, 1, wal->f) != 1) {
 		say_syserror("can't write row header to wal");
 		goto fail;
 	}
@@ -1287,13 +1287,13 @@ wal_write(struct recovery_state *r, u16 tag, u64 cookie, i64 lsn, struct tbuf *r
 	struct msg *a;
 
 	say_debug("wal_write lsn=%" PRIi64, lsn);
-	tbuf_reserve(m, sizeof(struct wal_write_request) + sizeof(tag) + sizeof(cookie) + row->len);
-	m->len = sizeof(struct wal_write_request);
+	tbuf_reserve(m, sizeof(struct wal_write_request) + sizeof(tag) + sizeof(cookie) + row->size0);
+	m->size0 = sizeof(struct wal_write_request);
 	wal_write_request(m)->lsn = lsn;
-	wal_write_request(m)->len = row->len + sizeof(tag) + sizeof(cookie);
+	wal_write_request(m)->len = row->size0 + sizeof(tag) + sizeof(cookie);
 	tbuf_append(m, &tag, sizeof(tag));
 	tbuf_append(m, &cookie, sizeof(cookie));
-	tbuf_append(m, row->data, row->len);
+	tbuf_append(m, row->data, row->size0);
 
 	if (write_inbox(r->wal_writer->out, m) == false) {
 		say_warn("wal writer inbox is full");
@@ -1367,7 +1367,7 @@ write_rows(struct log_io_iter *i)
 
 	row = tbuf_alloc(eter_pool);
 	tbuf_ensure(row, sizeof(struct row_v11));
-	row->len = sizeof(struct row_v11);
+	row->size0 = sizeof(struct row_v11);
 
 	goto start;
 	for (;;) {
@@ -1380,17 +1380,17 @@ write_rows(struct log_io_iter *i)
 
 		row_v11(row)->lsn = 0;	/* unused */
 		row_v11(row)->tm = ev_now();
-		row_v11(row)->len = data->len;
-		row_v11(row)->data_crc32c = crc32c(0, data->data, data->len);
+		row_v11(row)->len = data->size0;
+		row_v11(row)->data_crc32c = crc32c(0, data->data, data->size0);
 		row_v11(row)->header_crc32c =
 			crc32c(0, row->data + field_sizeof(struct row_v11, header_crc32c),
 			       sizeof(struct row_v11) - field_sizeof(struct row_v11,
 								     header_crc32c));
 
-		if (fwrite(row->data, row->len, 1, l->f) != 1)
+		if (fwrite(row->data, row->size0, 1, l->f) != 1)
 			panic("fwrite");
 
-		if (fwrite(data->data, data->len, 1, l->f) != 1)
+		if (fwrite(data->data, data->size0, 1, l->f) != 1)
 			panic("fwrite");
 
 		prelease_after(fiber->gc_pool, 128 * 1024);
@@ -1408,7 +1408,7 @@ snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
 
 	tbuf_append(wal_row, &tag, sizeof(tag));
 	tbuf_append(wal_row, &cookie, sizeof(cookie));
-	tbuf_append(wal_row, row->data, row->len);
+	tbuf_append(wal_row, row->data, row->size0);
 
 	i->to = wal_row;
 	if (i->io_rate_limit > 0) {
@@ -1417,7 +1417,7 @@ snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
 			last = ev_now();
 		}
 
-		bytes += row->len + sizeof(struct row_v11);
+		bytes += row->size0 + sizeof(struct row_v11);
 
 		while (bytes >= i->io_rate_limit) {
 			flush_log(i->log);

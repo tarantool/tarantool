@@ -633,7 +633,7 @@ static int
 replication_relay_send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 {
 	u8 *data = t->data;
-	ssize_t bytes, len = t->len;
+	ssize_t bytes, len = t->size0;
 	while (len > 0) {
 		bytes = write(fiber->fd, data, len);
 		if (bytes < 0) {
@@ -647,7 +647,7 @@ replication_relay_send_row(struct recovery_state *r __attribute__((unused)), str
 		data += bytes;
 	}
 
-	say_debug("send row: %" PRIu32 " bytes %s", t->len, tbuf_to_hex(t));
+	say_debug("send row: %" PRIu32 " bytes %s", t->size0, tbuf_to_hex(t));
 	return 0;
 shutdown_handler:
 	say_info("the client has closed its replication socket, exiting");

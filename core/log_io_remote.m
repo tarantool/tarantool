@@ -45,13 +45,13 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row);
 static struct tbuf *
 remote_row_reader_v11()
 {
-	ssize_t to_read = sizeof(struct row_v11) - fiber->rbuf->len;
+	ssize_t to_read = sizeof(struct row_v11) - fiber->rbuf->size0;
 
 	if (to_read > 0 && fiber_bread(fiber->rbuf, to_read) <= 0)
 		goto error;
 
 	ssize_t request_len = row_v11(fiber->rbuf)->len + sizeof(struct row_v11);
-	to_read = request_len - fiber->rbuf->len;
+	to_read = request_len - fiber->rbuf->size0;
 
 	if (to_read > 0 && fiber_bread(fiber->rbuf, to_read) <= 0)
 		goto error;

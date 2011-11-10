@@ -383,7 +383,7 @@ void
 fiber_cleanup(void)
 {
 	struct fiber_cleanup *cleanup = fiber->cleanup->data;
-	int i = fiber->cleanup->len / sizeof(struct fiber_cleanup);
+	int i = fiber->cleanup->size0 / sizeof(struct fiber_cleanup);
 
 	while (i-- > 0) {
 		cleanup->handler(cleanup->data);
@@ -691,20 +691,20 @@ fiber_bread(struct tbuf *buf, size_t at_least)
 {
 	ssize_t r;
 	tbuf_ensure(buf, MAX(cfg.readahead, at_least));
-	size_t stop_at = buf->len + at_least;
+	size_t stop_at = buf->size0 + at_least;
 
 	fiber_io_start(fiber->fd, EV_READ);
 
-	while (buf->len < stop_at) {
+	while (buf->size0 < stop_at) {
 		fiber_io_yield();
 
-		r = read(fiber->fd, buf->data + buf->len, buf->size - buf->len);
+		r = read(fiber->fd, buf->data + buf->size0, buf->capacity - buf->size0);
 		if (r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
 			continue;
 		else if (r <= 0)
 			break;
 
-		buf->len += r;
+		buf->size0 += r;
 	}
 	fiber_io_stop(fiber->fd, EV_READ);
 
@@ -881,14 +881,14 @@ read_atleast(int fd, struct tbuf *b, size_t to_read)
 {
 	tbuf_ensure(b, to_read);
 	while (to_read > 0) {
-		int r = read(fd, b->data + b->len, to_read);
+		int r = read(fd, b->data + b->size0, to_read);
 		if (r <= 0) {
 			if (errno == EINTR)
 				continue;
 			return -1;
 		}
 		to_read -= r;
-		b->len += r;
+		b->size0 += r;
 	}
 	return 0;
 }
@@ -949,20 +949,20 @@ blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void
 
 		reply_body = handler(state, request_body);
 
-		reply_size = sizeof(struct fiber_msg) + reply_body->len;
+		reply_size = sizeof(struct fiber_msg) + reply_body->size0;
 		reply = tbuf_alloc(fiber->gc_pool);
 		tbuf_reserve(reply, reply_size);
 
 		fiber_msg(reply)->fid = fiber_msg(request)->fid;
-		fiber_msg(reply)->data_len = reply_body->len;
-		memcpy(fiber_msg(reply)->data, reply_body->data, reply_body->len);
+		fiber_msg(reply)->data_len = reply_body->size0;
+		memcpy(fiber_msg(reply)->data, reply_body->data, reply_body->size0);
 
 		reply_size = htonl(reply_size);
 		if (write_all(fd, &reply_size, sizeof(reply_size)) < 0) {
 			result = EXIT_FAILURE;
 			break;
 		}
-		if (write_all(fd, reply->data, reply->len) < 0) {
+		if (write_all(fd, reply->data, reply->size0) < 0) {
 			result = EXIT_FAILURE;
 			break;
 		}
@@ -989,17 +989,17 @@ inbox2sock(void *_data __attribute__((unused)))
 			msg = tbuf_alloc(fiber->gc_pool);
 
 			/* TODO: do not copy message twice */
-			tbuf_reserve(msg, sizeof(struct fiber_msg) + m->msg->len);
+			tbuf_reserve(msg, sizeof(struct fiber_msg) + m->msg->size0);
 			fiber_msg(msg)->fid = m->sender_fid;
-			fiber_msg(msg)->data_len = m->msg->len;
-			memcpy(fiber_msg(msg)->data, m->msg->data, m->msg->len);
-			len = htonl(msg->len);
+			fiber_msg(msg)->data_len = m->msg->size0;
+			memcpy(fiber_msg(msg)->data, m->msg->data, m->msg->size0);
+			len = htonl(msg->size0);
 
 			tbuf_append(out, &len, sizeof(len));
-			tbuf_append(out, msg->data, msg->len);
+			tbuf_append(out, msg->data, msg->size0);
 		} while (ring_size(fiber->inbox) > 0);
 
-		if (fiber_write(out->data, out->len) != out->len)
+		if (fiber_write(out->data, out->size0) != out->size0)
 			panic("child is dead");
 		fiber_gc();
 	}
@@ -1013,7 +1013,7 @@ sock2inbox(void *_data __attribute__((unused)))
 	u32 len;
 
 	for (;;) {
-		if (fiber->rbuf->len < sizeof(len)) {
+		if (fiber->rbuf->size0 < sizeof(len)) {
 			if (fiber_bread(fiber->rbuf, sizeof(len)) <= 0)
 				panic("child is dead");
 		}
@@ -1021,7 +1021,7 @@ sock2inbox(void *_data __attribute__((unused)))
 		len = read_u32(fiber->rbuf);
 
 		len = ntohl(len);
-		if (fiber->rbuf->len < len) {
+		if (fiber->rbuf->size0 < len) {
 			if (fiber_bread(fiber->rbuf, len) <= 0)
 				panic("child is dead");
 		}
