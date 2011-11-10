@@ -49,7 +49,7 @@ static void
 tbuf_assert(const struct tbuf *b)
 {
 	(void)b;		/* arg used :-) */
-	assert(b->size0 <= b->capacity);
+	assert(b->size <= b->capacity);
 }
 
 struct tbuf *
@@ -57,7 +57,7 @@ tbuf_alloc(struct palloc_pool *pool)
 {
 	const size_t initial_capacity = 128 - sizeof(struct tbuf);
 	struct tbuf *e = palloc(pool, sizeof(*e) + initial_capacity);
-	e->size0 = 0;
+	e->size = 0;
 	e->capacity = initial_capacity;
 	e->data = (char *)e + sizeof(*e);
 	e->pool = pool;
@@ -74,14 +74,14 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 	const size_t initial_capacity = MAX(e->capacity, 128 - sizeof(*e));
 	size_t new_capacity = initial_capacity * 2;
 
-	while (new_capacity < e->size0 + required)
+	while (new_capacity < e->size + required)
 		new_capacity *= 2;
 
 	void *p = palloc(e->pool, new_capacity);
 
 	poison(p, new_capacity);
-	memcpy(p, e->data, e->size0);
-	poison(e->data, e->size0);
+	memcpy(p, e->data, e->size);
+	poison(e->data, e->size);
 	e->data = p;
 	e->capacity = new_capacity;
 	tbuf_assert(e);
@@ -92,7 +92,7 @@ tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig)
 {
 	struct tbuf *clone = tbuf_alloc(pool);
 	tbuf_assert(orig);
-	tbuf_append(clone, orig->data, orig->size0);
+	tbuf_append(clone, orig->data, orig->size);
 	return clone;
 }
 
@@ -100,14 +100,14 @@ struct tbuf *
 tbuf_split(struct tbuf *orig, size_t at)
 {
 	struct tbuf *head = palloc(orig->pool, sizeof(*orig));
-	assert(at <= orig->size0);
+	assert(at <= orig->size);
 	tbuf_assert(orig);
 	head->pool = orig->pool;
 	head->data = orig->data;
-	head->size0 = head->capacity = at;
+	head->size = head->capacity = at;
 	orig->data += at;
 	orig->capacity -= at;
-	orig->size0 -= at;
+	orig->size -= at;
 	return head;
 }
 
@@ -116,9 +116,9 @@ tbuf_peek(struct tbuf *b, size_t count)
 {
 	void *p = b->data;
 	tbuf_assert(b);
-	if (count <= b->size0) {
+	if (count <= b->size) {
 		b->data += count;
-		b->size0 -= count;
+		b->size -= count;
 		b->capacity -= count;
 		return p;
 	}
@@ -131,10 +131,10 @@ void
 tbuf_ltrim(struct tbuf *b, size_t count)
 {
 	tbuf_assert(b);
-	assert(count <= b->size0);
+	assert(count <= b->size);
 
-	memmove(b->data, b->data + count, b->size0 - count);
-	b->size0 -= count;
+	memmove(b->data, b->data + count, b->size - count);
+	b->size -= count;
 }
 
 size_t
@@ -142,8 +142,8 @@ tbuf_reserve(struct tbuf *b, size_t count)
 {
 	tbuf_assert(b);
 	tbuf_ensure(b, count);
-	size_t offt = b->size0;
-	b->size0 += count;
+	size_t offt = b->size;
+	b->size += count;
 	return offt;
 }
 
@@ -151,8 +151,8 @@ void
 tbuf_reset(struct tbuf *b)
 {
 	tbuf_assert(b);
-	poison(b->data, b->size0);
-	b->size0 = 0;
+	poison(b->data, b->size);
+	b->size = 0;
 }
 
 void
@@ -168,13 +168,13 @@ void
 tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 {
 	int printed_len;
-	size_t free_len = b->capacity - b->size0;
+	size_t free_len = b->capacity - b->size;
 	va_list ap_copy;
 
 	va_copy(ap_copy, ap);
 
 	tbuf_assert(b);
-	printed_len = vsnprintf(((char *)b->data) + b->size0, free_len, format, ap);
+	printed_len = vsnprintf(((char *)b->data) + b->size, free_len, format, ap);
 
 	/*
 	 * if buffer too short, resize buffer and
@@ -182,11 +182,11 @@ tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 	 */
 	if (free_len <= printed_len) {
 		tbuf_ensure(b, printed_len + 1);
-		free_len = b->capacity - b->size0 - 1;
-		printed_len = vsnprintf(((char *)b->data) + b->size0, free_len, format, ap_copy);
+		free_len = b->capacity - b->size - 1;
+		printed_len = vsnprintf(((char *)b->data) + b->size, free_len, format, ap_copy);
 	}
 
-	b->size0 += printed_len;
+	b->size += printed_len;
 
 	va_end(ap_copy);
 }
@@ -206,7 +206,7 @@ char *
 tbuf_to_hex(const struct tbuf *x)
 {
 	const unsigned char *data = x->data;
-	size_t size = x->size0;
+	size_t size = x->size;
 	char *out = palloc(x->pool, size * 3 + 1);
 	out[size * 3] = 0;
 

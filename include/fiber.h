@@ -154,11 +154,11 @@ ssize_t fiber_bread(struct tbuf *, size_t v);
 inline static void iov_add_unsafe(const void *buf, size_t len)
 {
 	struct iovec *v;
-	assert(fiber->iov->capacity - fiber->iov->size0 >= sizeof(*v));
-	v = fiber->iov->data + fiber->iov->size0;
+	assert(fiber->iov->capacity - fiber->iov->size >= sizeof(*v));
+	v = fiber->iov->data + fiber->iov->size;
 	v->iov_base = (void *)buf;
 	v->iov_len = len;
-	fiber->iov->size0 += sizeof(*v);
+	fiber->iov->size += sizeof(*v);
 	fiber->iov_cnt++;
 }
 

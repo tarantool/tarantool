@@ -50,7 +50,7 @@ memcached_dispatch()
 	size_t keys_count = 0;
 
 	p = fiber->rbuf->data;
-	pe = fiber->rbuf->data + fiber->rbuf->size0;
+	pe = fiber->rbuf->data + fiber->rbuf->size;
 
 	say_debug("memcached_dispatch '%.*s'", MIN((int)(pe - p), 40) , p);
 
@@ -150,13 +150,13 @@ memcached_dispatch()
 					b = tbuf_alloc(fiber->gc_pool);
 					tbuf_printf(b, "%"PRIu64, value);
 					data = b->data;
-					bytes = b->size0;
+					bytes = b->size;
 
 					stats.cmd_set++;
 					@try {
 						store(key, exptime, flags, bytes, data);
 						stats.total_items++;
-						iov_add(b->data, b->size0);
+						iov_add(b->data, b->size);
 						iov_add("\r\n", 2);
 					}
 					@catch (ClientError *e) {
@@ -255,7 +255,7 @@ memcached_dispatch()
 
 		action read_data {
 			size_t parsed = p - (u8 *)fiber->rbuf->data;
-			while (fiber->rbuf->size0 - parsed < bytes + 2) {
+			while (fiber->rbuf->size - parsed < bytes + 2) {
 				if ((r = fiber_bread(fiber->rbuf, bytes + 2 - (pe - p))) <= 0) {
 					say_debug("read returned %i, closing connection", r);
 					return 0;
@@ -263,7 +263,7 @@ memcached_dispatch()
 			}
 
 			p = fiber->rbuf->data + parsed;
-			pe = fiber->rbuf->data + fiber->rbuf->size0;
+			pe = fiber->rbuf->data + fiber->rbuf->size;
 
 			data = p;
 
@@ -329,7 +329,7 @@ memcached_dispatch()
 
 	if (noreply) {
 		fiber->iov_cnt = saved_iov_cnt;
-		fiber->iov->size0 = saved_iov_cnt * sizeof(struct iovec);
+		fiber->iov->size = saved_iov_cnt * sizeof(struct iovec);
 	}
 
 	return 1;

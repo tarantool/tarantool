@@ -196,7 +196,7 @@ print_stats()
 	tbuf_printf(out, "STAT limit_maxbytes %"PRIu64"\r\n", (u64)(cfg.slab_alloc_arena * (1 << 30)));
 	tbuf_printf(out, "STAT threads 1\r\n");
 	tbuf_printf(out, "END\r\n");
-	iov_add(out->data, out->size0);
+	iov_add(out->data, out->size);
 }
 
 void memcached_get(struct box_txn *txn, size_t keys_count, struct tbuf *keys,
@@ -261,8 +261,8 @@ void memcached_get(struct box_txn *txn, size_t keys_count, struct tbuf *keys,
 		if (show_cas) {
 			struct tbuf *b = tbuf_alloc(fiber->gc_pool);
 			tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (u8 *)key, m->flags, value_len, m->cas);
-			iov_add_unsafe(b->data, b->size0);
-			stats.bytes_written += b->size0;
+			iov_add_unsafe(b->data, b->size);
+			stats.bytes_written += b->size;
 		} else {
 			iov_add_unsafe("VALUE ", 6);
 			iov_add_unsafe(key, key_len);
@@ -339,7 +339,7 @@ memcached_handler(void *_data __attribute__((unused)))
 		if (p == 1) {
 			batch_count++;
 			/* some unparsed commands remain and batch count less than 20 */
-			if (fiber->rbuf->size0 > 0 && batch_count < 20)
+			if (fiber->rbuf->size > 0 && batch_count < 20)
 				goto dispatch;
 		}
 
@@ -352,7 +352,7 @@ memcached_handler(void *_data __attribute__((unused)))
 		stats.bytes_written += r;
 		fiber_gc();
 
-		if (p == 1 && fiber->rbuf->size0 > 0) {
+		if (p == 1 && fiber->rbuf->size > 0) {
 			batch_count = 0;
 			goto dispatch;
 		}
@@ -487,7 +487,7 @@ memcached_expire_loop(void *data __attribute__((unused)))
 			tbuf_append_field(keys_to_delete, tuple->data);
 		}
 
-		while (keys_to_delete->size0 > 0) {
+		while (keys_to_delete->size > 0) {
 			@try {
 				delete(read_field(keys_to_delete));
 				expired_keys++;

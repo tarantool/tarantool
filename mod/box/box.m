@@ -124,13 +124,13 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 	if (cardinality == 0)
 		tnt_raise(IllegalParams, :"tuple cardinality is 0");
 
-	if (data->size0 == 0 || data->size0 != valid_tuple(data, cardinality))
+	if (data->size == 0 || data->size != valid_tuple(data, cardinality))
 		tnt_raise(IllegalParams, :"incorrect tuple length");
 
-	txn->tuple = tuple_alloc(data->size0);
+	txn->tuple = tuple_alloc(data->size);
 	tuple_txn_ref(txn, txn->tuple);
 	txn->tuple->cardinality = cardinality;
-	memcpy(txn->tuple->data, data->data, data->size0);
+	memcpy(txn->tuple->data, data->data, data->size);
 
 	txn->old_tuple = txn->index->find_by_tuple(txn->index, txn->tuple);
 
@@ -214,7 +214,7 @@ rollback_replace(struct box_txn *txn)
 static void
 do_field_arith(u8 op, struct tbuf *field, void *arg, u32 arg_size)
 {
-	if (field->size0 != 4)
+	if (field->size != 4)
 		tnt_raise(IllegalParams, :"numeric operation on a field with length != 4");
 
 	if (arg_size != 4)
@@ -240,7 +240,7 @@ static void
 do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 {
 	struct tbuf args = {
-		.size0 = args_data_size,
+		.size = args_data_size,
 		.capacity = args_data_size,
 		.data = args_data,
 		.pool = NULL
@@ -256,7 +256,7 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 	offset_field = read_field(&args);
 	length_field = read_field(&args);
 	list_field = read_field(&args);
-	if (args.size0 != 0)
+	if (args.size != 0)
 		tnt_raise(IllegalParams, :"field splice: bad arguments");
 
 	offset_size = load_varint32(&offset_field);
@@ -265,21 +265,21 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 	else if (offset_size == sizeof(offset)) {
 		offset = pick_u32(offset_field, &offset_field);
 		if (offset < 0) {
-			if (field->size0 < -offset)
+			if (field->size < -offset)
 				tnt_raise(IllegalParams,
 					  :"field splice: offset is negative");
-			noffset = offset + field->size0;
+			noffset = offset + field->size;
 		} else
 			noffset = offset;
 	} else
 		tnt_raise(IllegalParams, :"field splice: wrong size of offset");
 
-	if (noffset > field->size0)
-		noffset = field->size0;
+	if (noffset > field->size)
+		noffset = field->size;
 
 	length_size = load_varint32(&length_field);
 	if (length_size == 0)
-		nlength = field->size0 - noffset;
+		nlength = field->size - noffset;
 	else if (length_size == sizeof(length)) {
 		if (offset_size == 0)
 			tnt_raise(IllegalParams,
@@ -287,32 +287,32 @@ do_field_splice(struct tbuf *field, void *args_data, u32 args_data_size)
 
 		length = pick_u32(length_field, &length_field);
 		if (length < 0) {
-			if ((field->size0 - noffset) < -length)
+			if ((field->size - noffset) < -length)
 				nlength = 0;
 			else
-				nlength = length + field->size0 - noffset;
+				nlength = length + field->size - noffset;
 		} else
 			nlength = length;
 	} else
 		tnt_raise(IllegalParams, :"field splice: wrong size of length");
 
-	if (nlength > (field->size0 - noffset))
-		nlength = field->size0 - noffset;
+	if (nlength > (field->size - noffset))
+		nlength = field->size - noffset;
 
 	list_size = load_varint32(&list_field);
 	if (list_size > 0 && length_size == 0)
 		tnt_raise(IllegalParams,
 			  :"field splice: length field is empty but list is not");
-	if (list_size > (UINT32_MAX - (field->size0 - nlength)))
+	if (list_size > (UINT32_MAX - (field->size - nlength)))
 		tnt_raise(IllegalParams, :"field splice: list_size is too long");
 
 	say_debug("do_field_splice: noffset = %i, nlength = %i, list_size = %u",
 		  noffset, nlength, list_size);
 
-	new_field->size0 = 0;
+	new_field->size = 0;
 	tbuf_append(new_field, field->data, noffset);
 	tbuf_append(new_field, list_field, list_size);
-	tbuf_append(new_field, field->data + noffset + nlength, field->size0 - (noffset + nlength));
+	tbuf_append(new_field, field->data + noffset + nlength, field->size - (noffset + nlength));
 
 	*field = *new_field;
 }
@@ -384,7 +384,7 @@ prepare_update(struct box_txn *txn, struct tbuf *data)
 
 		if (op == 0) {
 			tbuf_ensure(sptr_field, arg_size);
-			sptr_field->size0 = arg_size;
+			sptr_field->size = arg_size;
 			memcpy(sptr_field->data, arg, arg_size);
 		} else {
 			switch (op) {
@@ -401,26 +401,26 @@ prepare_update(struct box_txn *txn, struct tbuf *data)
 		}
 	}
 
-	if (data->size0 != 0)
+	if (data->size != 0)
 		tnt_raise(IllegalParams, :"can't unpack request");
 
 	size_t bsize = 0;
 	for (int i = 0; i < txn->old_tuple->cardinality; i++)
-		bsize += fields[i]->size0 + varint32_sizeof(fields[i]->size0 );
+		bsize += fields[i]->size + varint32_sizeof(fields[i]->size );
 	txn->tuple = tuple_alloc(bsize);
 	tuple_txn_ref(txn, txn->tuple);
 	txn->tuple->cardinality = txn->old_tuple->cardinality;
 
 	uint8_t *p = txn->tuple->data;
 	for (int i = 0; i < txn->old_tuple->cardinality; i++) {
-		p = save_varint32(p, fields[i]->size0);
-		memcpy(p, fields[i]->data, fields[i]->size0);
-		p += fields[i]->size0;
+		p = save_varint32(p, fields[i]->size);
+		memcpy(p, fields[i]->data, fields[i]->size);
+		p += fields[i]->size;
 	}
 
 	validate_indexes(txn);
 
-	if (data->size0 != 0)
+	if (data->size != 0)
 		tnt_raise(IllegalParams, :"can't unpack request");
 
 out:
@@ -485,7 +485,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 				break;
 		}
 	}
-	if (data->size0 != 0)
+	if (data->size != 0)
 		tnt_raise(IllegalParams, :"can't unpack request");
 }
 
@@ -606,8 +606,8 @@ txn_set_op(struct box_txn *txn, u16 op, struct tbuf *data)
 	txn->op = op;
 	txn->req = (struct tbuf) {
 		.data = data->data,
-		.size0 = data->size0,
-		.capacity = data->size0,
+		.size = data->size,
+		.capacity = data->size,
 		.pool = NULL };
 }
 
@@ -615,7 +615,7 @@ static void
 txn_cleanup(struct box_txn *txn)
 {
 	struct box_tuple **tuple = txn->ref_tuples->data;
-	int i = txn->ref_tuples->size0 / sizeof(struct box_txn *);
+	int i = txn->ref_tuples->size / sizeof(struct box_txn *);
 
 	while (i-- > 0) {
 		say_debug("tuple_txn_unref(%p)", *tuple);
@@ -641,7 +641,7 @@ txn_commit(struct box_txn *txn)
 			fiber_peer_name(fiber); /* fill the cookie */
 			struct tbuf *t = tbuf_alloc(fiber->gc_pool);
 			tbuf_append(t, &txn->op, sizeof(txn->op));
-			tbuf_append(t, txn->req.data, txn->req.size0);
+			tbuf_append(t, txn->req.data, txn->req.size);
 
 			i64 lsn = next_lsn(recovery_state, 0);
 			bool res = !wal_write(recovery_state, wal_tag,
@@ -721,7 +721,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 			tnt_raise(IllegalParams, :"key must be single valued");
 
 		key = read_field(data);
-		if (data->size0 != 0)
+		if (data->size != 0)
 			tnt_raise(IllegalParams, :"can't unpack request");
 
 		prepare_delete(txn, key);
@@ -768,7 +768,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 
 	struct tbuf *b = palloc(fiber->gc_pool, sizeof(*b));
 	b->data = row->data;
-	b->size0 = row->len;
+	b->size = row->len;
 	u16 tag, op;
 	u64 cookie;
 	struct sockaddr_in *peer = (void *)&cookie;
@@ -781,7 +781,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 
 	tbuf_printf(buf, "lsn:%" PRIi64 " ", row->lsn);
 
-	say_debug("b->len:%" PRIu32, b->size0);
+	say_debug("b->len:%" PRIu32, b->size);
 
 	tag = read_u16(b);
 	cookie = read_u64(b);
@@ -796,7 +796,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	case REPLACE:
 		flags = read_u32(b);
 		cardinality = read_u32(b);
-		if (b->size0 != valid_tuple(b, cardinality))
+		if (b->size != valid_tuple(b, cardinality))
 			abort();
 		tuple_print(buf, cardinality, b->data);
 		break;
@@ -806,7 +806,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	case DELETE_1_3:
 		key_len = read_u32(b);
 		key = read_field(b);
-		if (b->size0 != 0)
+		if (b->size != 0)
 			abort();
 		tuple_print(buf, key_len, key);
 		break;
@@ -863,7 +863,7 @@ snap_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 
 	struct tbuf *b = palloc(fiber->gc_pool, sizeof(*b));
 	b->data = raw_row->data;
-	b->size0 = raw_row->len;
+	b->size = raw_row->len;
 
 	(void)read_u16(b); /* drop tag */
 	(void)read_u64(b); /* drop cookie */
@@ -871,7 +871,7 @@ snap_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 	row = box_snap_row(b);
 
 	tuple_print(out, row->tuple_size, row->data);
-	printf("n:%i %*s\n", row->space, (int) out->size0, (char *)out->data);
+	printf("n:%i %*s\n", row->space, (int) out->size, (char *)out->data);
 	return 0;
 }
 
@@ -881,7 +881,7 @@ xlog_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 	struct tbuf *out = tbuf_alloc(t->pool);
 	int res = box_xlog_sprint(out, t);
 	if (res >= 0)
-		printf("%*s\n", (int)out->size0, (char *)out->data);
+		printf("%*s\n", (int)out->size, (char *)out->data);
 	return res;
 }
 

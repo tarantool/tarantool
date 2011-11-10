@@ -154,7 +154,7 @@ lbox_tuple_tostring(struct lua_State *L)
 	/* @todo: print the tuple */
 	struct tbuf *tbuf = tbuf_alloc(fiber->gc_pool);
 	tuple_print(tbuf, tuple->cardinality, tuple->data);
-	lua_pushlstring(L, tbuf->data, tbuf->size0);
+	lua_pushlstring(L, tbuf->data, tbuf->size);
 	return 1;
 }
 
@@ -596,7 +596,7 @@ static int lbox_process(lua_State *L)
 	struct tbuf req;
 	size_t sz;
 	req.data = (char *) luaL_checklstring(L, 2, &sz); /* Second arg. */
-	req.capacity = req.size0 = sz;
+	req.capacity = req.size = sz;
 	if (op == CALL) {
 		/*
 		 * We should not be doing a CALL from within a CALL.

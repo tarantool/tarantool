@@ -55,8 +55,8 @@ save_varint32(u8 *target, u32 value)
 inline static void
 append_byte(struct tbuf *b, u8 byte)
 {
-	*((u8 *)b->data + b->size0) = byte;
-	b->size0++;
+	*((u8 *)b->data + b->size) = byte;
+	b->size++;
 }
 
 void
@@ -80,11 +80,11 @@ write_varint32(struct tbuf *b, u32 value)
 #define read_u(bits)									\
 	u##bits read_u##bits(struct tbuf *b)						\
 	{										\
-		if (b->size0 < (bits)/8)							\
+		if (b->size < (bits)/8)							\
 			tnt_raise(IllegalParams, :"packet too short (expected "#bits" bits)");\
 		u##bits r = *(u##bits *)b->data;					\
 		b->capacity -= (bits)/8;							\
-		b->size0 -= (bits)/8;							\
+		b->size -= (bits)/8;							\
 		b->data += (bits)/8;							\
 		return r;								\
 	}
@@ -98,7 +98,7 @@ u32
 read_varint32(struct tbuf *buf)
 {
 	u8 *b = buf->data;
-	int size = buf->size0;
+	int size = buf->size;
 
 	if (size < 1) {
 		tnt_raise(IllegalParams, :"packet too short (expected 1 byte)");
@@ -106,7 +106,7 @@ read_varint32(struct tbuf *buf)
 	if (!(b[0] & 0x80)) {
 		buf->data += 1;
 		buf->capacity -= 1;
-		buf->size0 -= 1;
+		buf->size -= 1;
 		return (b[0] & 0x7f);
 	}
 
@@ -115,7 +115,7 @@ read_varint32(struct tbuf *buf)
 	if (!(b[1] & 0x80)) {
 		buf->data += 2;
 		buf->capacity -= 2;
-		buf->size0 -= 2;
+		buf->size -= 2;
 		return (b[0] & 0x7f) << 7 | (b[1] & 0x7f);
 	}
 	if (size < 3)
@@ -123,7 +123,7 @@ read_varint32(struct tbuf *buf)
 	if (!(b[2] & 0x80)) {
 		buf->data += 3;
 		buf->capacity -= 3;
-		buf->size0 -= 3;
+		buf->size -= 3;
 		return (b[0] & 0x7f) << 14 | (b[1] & 0x7f) << 7 | (b[2] & 0x7f);
 	}
 
@@ -132,7 +132,7 @@ read_varint32(struct tbuf *buf)
 	if (!(b[3] & 0x80)) {
 		buf->data += 4;
 		buf->capacity -= 4;
-		buf->size0 -= 4;
+		buf->size -= 4;
 		return (b[0] & 0x7f) << 21 | (b[1] & 0x7f) << 14 |
 			(b[2] & 0x7f) << 7 | (b[3] & 0x7f);
 	}
@@ -142,7 +142,7 @@ read_varint32(struct tbuf *buf)
 	if (!(b[4] & 0x80)) {
 		buf->data += 5;
 		buf->capacity -= 5;
-		buf->size0 -= 5;
+		buf->size -= 5;
 		return (b[0] & 0x7f) << 28 | (b[1] & 0x7f) << 21 |
 			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
@@ -166,11 +166,11 @@ read_field(struct tbuf *buf)
 	void *p = buf->data;
 	u32 data_len = read_varint32(buf);
 
-	if (data_len > buf->size0)
+	if (data_len > buf->size)
 		tnt_raise(IllegalParams, :"packet too short (expected a field)");
 
 	buf->capacity -= data_len;
-	buf->size0 -= data_len;
+	buf->size -= data_len;
 	buf->data += data_len;
 	return p;
 }
@@ -180,11 +180,11 @@ read_str(struct tbuf *buf, u32 size)
 {
 	void *p = buf->data;
 
-	if (size > buf->size0)
+	if (size > buf->size)
 		tnt_raise(IllegalParams, :"packet too short (expected a string)");
 
 	buf->capacity -= size;
-	buf->size0 -= size;
+	buf->size -= size;
 	buf->data += size;
 	return p;
 }
@@ -193,14 +193,14 @@ u32
 valid_tuple(struct tbuf *buf, u32 cardinality)
 {
 	void *data = buf->data;
-	u32 r, size = buf->size0;
+	u32 r, size = buf->size;
 
 	for (int i = 0; i < cardinality; i++)
 		read_field(buf);
 
-	r = size - buf->size0;
+	r = size - buf->size;
 	buf->data = data;
-	buf->size0 = size;
+	buf->size = size;
 	return r;
 }
 

@@ -78,10 +78,10 @@ static void
 luaL_addvarint32(luaL_Buffer *b, u32 u32)
 {
 	char varint_buf[sizeof(u32)+1];
-	struct tbuf tbuf = { .size0 = 0, .capacity = sizeof(varint_buf),
+	struct tbuf tbuf = { .size = 0, .capacity = sizeof(varint_buf),
 		.data = varint_buf };
 	write_varint32(&tbuf, u32);
-	luaL_addlstring(b, tbuf.data, tbuf.size0);
+	luaL_addlstring(b, tbuf.data, tbuf.size);
 }
 
 /* Convert box.pack() format specifier to Tarantool
@@ -688,7 +688,7 @@ lbox_print(struct lua_State *L)
 	if (out) { /* Administrative console */
 		tarantool_lua_printstack(L, out);
 		/* Courtesy: append YAML's \r\n if it's not already there */
-		if (out->size0 < 2 || tbuf_str(out)[out->size0-1] != '\n')
+		if (out->size < 2 || tbuf_str(out)[out->size-1] != '\n')
 			tbuf_printf(out, "\r\n");
 	} else { /* Add a message to the server log */
 		out = tbuf_alloc(fiber->gc_pool);

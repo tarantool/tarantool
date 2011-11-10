@@ -91,7 +91,7 @@ static void
 fail(struct tbuf *out, struct tbuf *err)
 {
 	start(out);
-	tbuf_printf(out, "fail:%.*s" CRLF, err->size0, (char *)err->data);
+	tbuf_printf(out, "fail:%.*s" CRLF, err->size, (char *)err->data);
 	end(out);
 }
 
@@ -104,7 +104,7 @@ admin_dispatch(lua_State *L)
 	char *p, *pe;
 	char *strstart, *strend;
 
-	while ((pe = memchr(fiber->rbuf->data, '\n', fiber->rbuf->size0)) == NULL) {
+	while ((pe = memchr(fiber->rbuf->data, '\n', fiber->rbuf->size)) == NULL) {
 		if (fiber_bread(fiber->rbuf, 1) <= 0)
 			return 0;
 	}
@@ -210,7 +210,7 @@ admin_dispatch(lua_State *L)
 		end(out);
 	}
 
-	return fiber_write(out->data, out->size0);
+	return fiber_write(out->data, out->size);
 }
 
 static void
