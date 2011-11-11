@@ -70,13 +70,13 @@ replication_source=NULL
 
 space = [
   {
-    enabled = -1, required
+    enabled = false, required
     cardinality = -1
     estimated_rows = 0
     index = [
       {
         type = "", required
-        unique = -1, required
+        unique = false, required
         key_field = [
           {
             fieldno = -1, required

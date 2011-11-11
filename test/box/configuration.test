@@ -13,6 +13,18 @@ server.deploy("box/tarantool_bug708685.cfg")
 # check connection
 exec admin "show stat"
 
+print """
+# Bug #884768:
+#  Test representation of boolean values
+#  (https://bugs.launchpad.net/bugs/884768)
+"""
+# stop current server
+server.stop()
+# start server from config with different boolean represenation
+server.deploy("box/tarantool_bug884768.cfg")
+# check values
+exec admin "show configuration"
+
 # restore default server
 server.stop()
 server.deploy(self.suite_ini["config"])

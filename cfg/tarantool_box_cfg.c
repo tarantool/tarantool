@@ -359,13 +359,19 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__coredump) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != stringType && opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
@@ -498,13 +504,19 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__logger_nonblock) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != stringType && opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
@@ -663,13 +675,19 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->memcached_space = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_expire) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != stringType && opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
@@ -766,13 +784,19 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->wal_writer_inbox_size = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__local_hot_standby) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != stringType && opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
@@ -803,13 +827,19 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->wal_dir_rescan_delay = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__panic_on_snap_error) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != stringType && opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
@@ -828,13 +858,19 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->panic_on_snap_error = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__panic_on_wal_error) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != stringType && opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
 				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
@@ -868,7 +904,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		ARRAYALLOC(c->space, 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__enabled) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != stringType && opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
@@ -876,14 +912,31 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+		bool bln;
+
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->space[opt->name->index]->enabled != i32)
+		if (check_rdonly && c->space[opt->name->index]->enabled != bln)
 			return CNF_RDONLY;
-		c->space[opt->name->index]->enabled = i32;
+		c->space[opt->name->index]->enabled = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__cardinality) ) {
 		if (opt->paramType != numberType )
@@ -951,7 +1004,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__index__unique) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != stringType && opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
@@ -963,14 +1016,31 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+		bool bln;
+
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->space[opt->name->index]->index[opt->name->next->index]->unique != i32)
+		if (check_rdonly && c->space[opt->name->index]->index[opt->name->next->index]->unique != bln)
 			return CNF_RDONLY;
-		c->space[opt->name->index]->index[opt->name->next->index]->unique = i32;
+		c->space[opt->name->index]->index[opt->name->next->index]->unique = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__index__key_field) ) {
 		if (opt->paramType != arrayType )
@@ -1615,13 +1685,13 @@ again:
 				switch(i->state) {
 					case S_name__space:
 					case S_name__space__enabled:
-						*v = malloc(32);
+						*v = malloc(8);
 						if (*v == NULL) {
 							free(i);
 							out_warning(CNF_NOMEMORY, "No memory to output value");
 							return NULL;
 						}
-						sprintf(*v, "%"PRId32, c->space[i->idx_name__space]->enabled);
+						sprintf(*v, "%s", c->space[i->idx_name__space]->enabled ? "true" : "false");
 						snprintf(buf, PRINTBUFLEN-1, "space[%d].enabled", i->idx_name__space);
 						i->state = S_name__space__cardinality;
 						return buf;
@@ -1668,13 +1738,13 @@ again:
 									i->state = S_name__space__index__unique;
 									return buf;
 								case S_name__space__index__unique:
-									*v = malloc(32);
+									*v = malloc(8);
 									if (*v == NULL) {
 										free(i);
 										out_warning(CNF_NOMEMORY, "No memory to output value");
 										return NULL;
 									}
-									sprintf(*v, "%"PRId32, c->space[i->idx_name__space]->index[i->idx_name__space__index]->unique);
+									sprintf(*v, "%s", c->space[i->idx_name__space]->index[i->idx_name__space__index]->unique ? "true" : "false");
 									snprintf(buf, PRINTBUFLEN-1, "space[%d].index[%d].unique", i->idx_name__space, i->idx_name__space__index);
 									i->state = S_name__space__index__key_field;
 									return buf;
