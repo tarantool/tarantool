@@ -64,7 +64,7 @@
   queries using a command line client:
   <programlisting>
   <prompt>$ </prompt><command>cd <replaceable>package-name</replaceable>/bin &amp;&amp; ./tarantool</command>
-  <prompt>tarantool> </prompt> <userinput>show info</userinput>
+  <prompt>localhost> </prompt> <userinput>show info</userinput>
   <computeroutput>
   ---
   info:

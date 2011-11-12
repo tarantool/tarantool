@@ -14,6 +14,48 @@
 </para></blockquote>
 
 <section>
+    <title>Replication architecture</title>
+  <para>
+    A replica gets all updates from the master by continuously
+    fetching and applying its write ahead log (WAL).
+    Each record in the WAL represents a single Tarantool/Box
+    command, such as INSERT, UPDATE, DELETE and is assigned
+    a monotonically growing log sequence number (LSN) and a
+    timestamp. As long as all data change commands
+    are fully deterministic and operate on a single record,
+    Tarantool replication can be classified as row-based
+  </para>
+  <para>
+    A stored program invocation, unless requested explicitly,
+    does not enter the Write Ahead Log. Instead, log events
+    for actual UPDATEs and DELETEs, performed by the Lua code,
+    are written to the log. This ensures that possible
+    non-determinism of Lua does not cause replication
+    going out of sync.
+  </para>
+  <para>
+    It is still sometimes necessary to replicate stored program
+    CALLs, rather than their effects: for example, when the
+    procedure is fully deterministic and CALL representation in
+    the WAL is known to be significantly more compact. Another
+    example would be when a procedure is written to do one thing
+    on the master, and another on a replica. BOX_RPL_STMT
+    flag of the binary protocol can  be used 
+    to replicate CALLs as statements.
+  </para>
+  <para>
+    For replication to work correctly, the latest LSN
+    on the replica must match or fall behind the latest LSN
+    on the master. If the replica has its own updates,
+    this leads to it getting out of sync, since
+    updates from the master having identical LSNs are
+    not applied. Indeed, if replication is ON, Tarantool
+    does not accept updates, even on its <olink
+    targetptr="primary_port"/>.
+  </para>
+</section>
+
+<section>
   <title>Setting up the master</title>
   <para>
     To prepare the master for connections from replica, it's only
@@ -28,25 +70,10 @@
 <section>
   <title>Setting up a replica</title>
   <para>
-    Replica gets all updates from the master by simply shipping
-    the write ahead log (WAL) and applying it.
-    Each record in the WAL has a log sequence number
-    (LSN), operation type (INSERT, UPDATE, DELETE) and a
-    timestamp.
-  </para>
-  <para>
-    For replication to work correctly, the latest LSN
-    on the replica must match or fall behind the latest LSN
-    on the master. If the replica has its own updates,
-    this leads to it getting out of sync, since
-    updates from the master having identical LSNs are
-    not applied. Indeed, if replication is on, Tarantool
-    does not accept updates, even on its <olink
-    targetptr="primary_port"/>.
-  </para>
-  <para>
-    Tarantool always requires a valid snapshot file to boot from:
-    it should be prepared with <olink targetptr="init-storage-option"/> option    or copied from the master.
+    The server, master or replica, always requires a valid
+    snapshot file to boot from. For a master, it's usually
+    prepared with with <olink targetptr="init-storage-option"/> option,
+    for replicas it's usually copied from the master.
   </para>
   <para>
     To start replication, configure <olink
@@ -59,13 +86,14 @@
     Once connected to the master, the replica requests all changes
     that happened after the latest local LSN. It is therefore
     necessary to keep WAL files on the master host as long as
-    there are replicas that haven't applied them yet.  An example
+    there are replicas that haven't applied them yet. An example
     configuration can be found in <link
     xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/cfg/slave.cfg"><filename>test/box_replication/cfg/slave.cfg</filename></link>.
   </para>
   <para>
-    In absence of WALs, a replica can be "seeded" at any time
-    with a snapshot file, manually copied from the master.
+    In absence of required WALs, a replica can be "re-seeded" at
+    any time with a newer snapshot file, manually copied from the
+    master.
   </para>
   <note><simpara>
     Replication parameters are "dynamic", which allows the

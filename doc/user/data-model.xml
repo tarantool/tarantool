@@ -55,26 +55,26 @@
   supports a small subset of SQL, and we'll use it to demonstrate
   supported data manipulation commands:
   <programlisting>
-  tarantool> insert into t0 values (1)
+  localhost> insert into t0 values (1)
   Insert OK, 1 row affected
-  tarantool> select * from t0 where k0=1
+  localhost> select * from t0 where k0=1
   Found 1 tuple:
   [1]
-  tarantool> insert into t0 values ('hello')
+  localhost> insert into t0 values ('hello')
   An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters'
-  tarantool> insert into t0 values (1, 'hello')
+  localhost> insert into t0 values (1, 'hello')
   Insert OK, 1 row affected
-  tarantool> select * from t0 where k0=1 
+  localhost> select * from t0 where k0=1 
   Found 1 tuple:
   [1, 'hello']
-  tarantool> update t0 set k1='world' where k0=1
+  localhost> update t0 set k1='world' where k0=1
   Update OK, 1 row affected
-  tarantool> select * from t0 where k0=1
+  localhost> select * from t0 where k0=1
   Found 1 tuple:
   [1, 'world']
-  tarantool> delete from t0 where k0=1
+  localhost> delete from t0 where k0=1
   Delete OK, 1 row affected
-  tarantool> select * from t0 where k0=1
+  localhost> select * from t0 where k0=1
   No match</programlisting>
 
   <itemizedlist>
