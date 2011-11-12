@@ -35,6 +35,16 @@ The other alternative, if you have actually modified
   </para>
 </section>
 </chapter>
+
+To build documentation, you'll need:
+
+xsltproc
+docbook5-xml
+docbook-xsl-ns
+libsaxon-java- for saxon processing
+libxml-commons-resolver1.1-java
+libxerces2-java
+libxslthl-java
 <!--
      TOC:
 

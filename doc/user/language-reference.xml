@@ -20,7 +20,7 @@
   <itemizedlist>
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
-      DELETEs and SELECTs. This port speaks the native
+      DELETEs, SELECTs and CALLs. This port speaks the native
       Tarantool protocol, and provides full access to the server.
       </para>
       <para>
@@ -46,7 +46,7 @@
         is not started.
       </para></listitem>
     <listitem><para>Memcached port. Optional, read-write data port
-      that speaks Memcached protocol. This port is off by default.
+      that speaks Memcached text protocol. This port is off by default.
     </para></listitem>
   </itemizedlist>
   In absence of authentication, this approach allows system
@@ -55,8 +55,8 @@
   the separation, and <command>tarantool</command> command line
   client automatically selects the correct port for you
   with help of a simple regular expression. SELECTs, UPDATEs,
-  INSERTs and DELETEs are sent to the primary port, whereas SHOW,
-  RELOAD, SAVE and others -- to the administrative port.
+  INSERTs, DELETEs and CALLs are sent to the primary port, whereas
+  SHOW, RELOAD, SAVE and others -- to the administrative port.
 </para>
 
 <section>
@@ -64,15 +64,15 @@
 
   <para>Tarantool protocol was designed with focus on asynchronous
     I/O and easy integration with proxies. Each client
-    request starts with a simple binary header, containing three
+    request starts with a 12-byte binary header, containing three
     fields: request type, length, and a numeric id.
   </para>
   <para>
-    Four basic request types are supported: INSERT, UPDATE, DELETE
-    and SELECT. The mandatory length, present in the header,
-    allows to simplify client or proxy I/O.
+    Five basic request types are supported: INSERT, UPDATE,
+    DELETE, SELECT and CALL. The mandatory length, present in the
+    header, allows to simplify client or proxy I/O.
     The server response to a request always carries in its header
-    the same command type and request id.
+    the same request type and id.
     The id makes it possible to always match request to a
     response, even if the latter arrived out of order.
   </para>
@@ -122,10 +122,10 @@
   <title>Writing stored procedures in Lua</title>
   <para>
     Lua is a light-weight, multi-paradigm embeddable language.
-    Tarantool/Box supports allows user to dynamically define,
-    alter, drop using the administrative console.
-    The procedures can be invoked Lua both from the administrative
-    console and using a binary protocol, for example:
+    Tarantool/Box allows to dynamically define, invoke,
+    alter and drop Lua procedures.
+    The procedures can be invoked both from the administrative
+    console and using the  binary protocol, for example:
 <programlisting>
 tarantool> lua function f1() return 'hello' end
 ---
@@ -149,11 +149,11 @@ Found 1 tuple:
     of the command, is passed into the stored procedure, each
     field of the tuple converted to a string parameter of the
     procedure. As long as currently Tarantool tuples are
-    type-agnostic, Lua strings is chosen as the transport means
+    type-agnostic, Lua strings are chosen as the transport means
     between the server and the interpreter.
   </para>
   <para>
-    Everything value, returned from a stored function by means of
+    Every value, returned from a stored function by means of
     <quote>return</quote> clause, is converted to Tarantool/Box tuple
     and sent back to the client in binary form.
   </para>
@@ -166,7 +166,7 @@ Found 1 tuple:
     to send any kind of request to the server in the binary form.
     Function <quote>box.process()</quote> is a server-side outlet
     for Tarantool binary protocol. Any tuple returned by the
-    server is converted to a Lua object of tupe <quote>box.tuple</quote>
+    server is converted to a Lua object of type <quote>box.tuple</quote>
     and appended to the return list of <quote>box.process()</quote>.
   </para>
   <para>
@@ -186,9 +186,12 @@ Found 1 tuple:
   <section>
   <title>Replication of stored procedures</title>
   <para>
-    The CALL statement itself does not enter Tarantool write ahead
-    log. Instead, the actual updates and deletes, performed by
-    the procedure, generate their own log events.
+    The CALL statement itself does not enter Tarantool Write Ahead
+    Log. Instead, the actual updates and deletes, performed by
+    the procedure, generate their own log events. This ensures
+    that the replica never goes out of sync with the master
+    due to non-deterministic effects of Lua procedures, such
+    as involving current time, I/O, or random functions.
   </para>
   </section>
 </section>

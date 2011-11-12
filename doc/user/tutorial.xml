@@ -25,8 +25,7 @@
        <citetitle xlink:href="http://pypi.python.org/pypi/pexpect/" xlink:title="pure-Python pexpect implementation">python-pexpect</citetitle> modules,</para>
 
       <note><para>
-        Python is used to run regression tests and
-        <command>tarantool</command> command-line client.
+        Python is used to run regression tests.
         If you do not plan to run tests you may skip this step.
       </para></note>
     </listitem>
@@ -35,7 +34,10 @@
   <itemizedlist>
     <listitem><para>CMake 2.6 or newer,</para></listitem>
     <listitem><para>GCC 4.4 or newer, with gcc-objc (ObjectiveC)
-    language frontend.</para></listitem>
+    language frontend,</para></listitem>
+    <listitem><para>libreadline-dev, when compiling the
+    command line client.
+    </para></listitem>
   </itemizedlist>
 </para>
 <para>
@@ -59,7 +61,7 @@
 </para>
 <para>
   Once the server is started, you can connect to it and issue
-  queries using a command line client implemented in Python:
+  queries using a command line client:
   <programlisting>
   <prompt>$ </prompt><command>cd <replaceable>package-name</replaceable>/bin &amp;&amp; ./tarantool</command>
   <prompt>tarantool> </prompt> <userinput>show info</userinput>
@@ -82,11 +84,12 @@
   necessary: configuration and build. The easiest way to configure
   a source directory with CMake is by requesting an in-source build:
   <programlisting>
-  <prompt>$ </prompt><command>cd</command> <filename><replaceable>package-name</replaceable></filename> &amp;&amp; <command>cmake</command> .</programlisting>
+  <prompt>$ </prompt><command>cd</command> <filename><replaceable>package-name</replaceable></filename> &amp;&amp; <command>cmake</command><option> . -DENABLE_CLIENT=true</option></programlisting>
   Upon successful configuration, CMake prints the status
   of optional features:
   <programlisting>
   -- *** The following options are on in this configuration: ***
+  -- ENABLE_CLIENT: true 
   -- ENABLE_GCOV: ON
   -- ENABLE_TRACE: ON
   -- ENABLE_BACKTRACE: ON
@@ -108,14 +111,14 @@
   It will create necessary files in directory
   <filename>./test/var/</filename>, and fire off the server with
   minimal configuration.
-  The command line client is located in the same directory:
-  <programlisting><prompt>$ </prompt><command>./test/tarantool</command></programlisting>
+  The command line client is located in <filename>client/tarantool</filename>:
+  <programlisting><prompt>$ </prompt><command>./client/tarantool/tarantool</command></programlisting>
 </para>
 <sidebar>
 <para>
   Congratulations, you have the server up and running.
   Check out the remaining chapters of this manual to learn
-  more about available commands, contents of
+  about available commands, contents of
   <filename>tarantool.cfg</filename>,
   replication and high availability with Tarantool.
 </para>
