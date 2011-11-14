@@ -5,6 +5,12 @@
   color: green;
 }
 
+.lua {
+  font-family: monospace;
+  font-weight: bold;
+}
+
+
 .hl-keyword {
   color: green;
   font-weight: bold;

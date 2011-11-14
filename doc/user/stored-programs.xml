@@ -1,3 +1,7 @@
+<!DOCTYPE section [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
 <section xmlns="http://docbook.org/ns/docbook" version="5.0"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -6,8 +10,8 @@
 <blockquote>
     <para>
         Lua is a light-weight, multi-paradigm embeddable language.
-        Stored procedures in Lua can be used to implement complex
-        data manipulation patterns and data structures. A
+        Stored procedures in Lua can be used to implement
+        data manipulation patterns or data structures. A
         server-side procedure written in Lua can select and modify
         data, access configuration and perform administrative
         tasks. It is possible to dynamically define, invoke,
@@ -30,15 +34,16 @@ Found 1 tuple:
 </programlisting>
     In the language of the administrative console 
     <olink targetptr="lua-command" /> evaluates an arbitrary
-    Lua chunk. "CALL" is the SQL standard statement the command
-    line client uses to represent the CALL command of the binary
+    Lua chunk. "CALL" is the SQL standard statement used
+    to represent the CALL command of the binary
     protocol.
-    In the example above, we first define a Lua procedure
+    In the example above, a Lua procedure is first defined
     using the text protocol of the administrative port,
-    and then invoke it using the Tarantool client-side SQL
-    parser, and then the binary protocol on the <olink targetptr="primary_port" />.
+    and then invoked using the Tarantool client-side SQL
+    parser plus the binary protocol on the <olink targetptr="primary_port" />.
     Since it's possible to execute any Lua chunk in the
-    administrative console, the newly created <code language="Pascal">function f1()</code>
+    administrative console, the newly created <code
+    language="Pascal">function f1()</code>
     can be called there too:
 <programlisting>
 <computeroutput>
@@ -60,9 +65,9 @@ localhost> lua "hello".." world"
   <para>
     There is a single global Lua interpreter state, which is
     shared across all connections. Each connection, however, is
-    running in its own Lua <quote>thread</quote> -- a mechanism, akin to
-    Tarantool <quote>fibers</quote>.
-    Anything, prefixed with "lua " on the administrative console
+    running in its own Lua <emphasis>thread</emphasis> -- a mechanism, akin to
+    Tarantool <emphasis>fibers</emphasis>.
+    Anything prefixed with <code>lua </code> on the administrative console
     is sent directly to the interpreter. In the binary protocol,
     however, it is only possible to invoke Lua functions, but not
     define or modify them.
@@ -71,39 +76,132 @@ localhost> lua "hello".." world"
     of the command, is passed into the stored procedure, each
     field of the tuple converted to a string parameter of the
     procedure. As long as currently Tarantool tuples are
-    type-agnostic, Lua strings are chosen as the transport means
+    type-agnostic, Lua strings are chosen as the transport media 
     between the server and the interpreter.
   </para>
   <para>
     Every value, returned from a stored function by means of
-    <quote>return</quote> clause, is converted to Tarantool/Box tuple
+    <code>return</code> clause, is converted to Tarantool/Box tuple
     and sent back to the client in binary form.
   </para>
   <para>
+    When a function in Lua terminates with an error, it is 
+    returned to the client as <olink targetptr="ER_PROC_LUA" />
+    return code, with the original error message preserved.
+    Similarly, an error occurred inside Tarantool (observed on the
+    client as an error code), when happens during execution of a
+    Lua procedure, produces a genuine Lua exception.
+  </para>
+  <para>
     It's possible not only to invoke trivial Lua code, but call
-    into Tarantool/Box storage functionality, using <quote>box</quote>
-    Lua library.
-    The main means of communication between Lua and Tarantool
-    is <quote>box.process()</quote> function, which allows
-    to send any kind of request to the server in the binary form.
-    Function <quote>box.process()</quote> is a server-side outlet
-    for Tarantool binary protocol. Any tuple returned by the
-    server is converted to a Lua object of type <quote>box.tuple</quote>
-    and appended to the return list of <quote>box.process()</quote>.
+    into Tarantool/Box storage functionality, using
+    <code>box</code>
+    Lua library. The actual contents of the library can be
+    inspected at runtime:
+<programlisting>
+<computeroutput>
+localhost> lua for k, v in pairs(box) do print(k, ": ", type(v)) end
+---
+fiber: table
+space: table
+cfg: table
+on_reload_configuration: function
+update: function
+process: function
+delete: function
+insert: function
+select: function
+index: table
+unpack: function
+replace: function
+select_range: function
+pack: function
+...
+</computeroutput>
+</programlisting>
+    As is shown in the listing, <code>box</code> package ships:
+    <itemizedlist>
+        <listitem><para>
+            high-level functions, such as
+            <code>process(), update(), select(), select_range(), insert(),
+                replace(), delete()</code>, to manipulate
+                tuples and access spaces from Lua.
+        </para></listitem>
+        <listitem><para>
+            libraries, such as <code>cfg, space, fiber, index, tuple</code>,
+            to access server configuration, create, resume and
+            interrupt fibers, inspect content of spaces, indexes
+            and tuples.
+        </para></listitem>
+    </itemizedlist>
+  </para>
+
+<para>
+<variablelist>
+    <title>Package <code>box</code> function index</title>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.process(op, request)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                The main extension provided to Lua by
+                Tarantool/Box -- ability to call
+                INSERT/UPDATE/SELECT/DELETE from within a Lua
+                procedure.
+            </para>
+            <para>
+                This is a low-level API, and it expects
+                all arguments to be packed in accordance
+                with the binary protocol format (iproto
+                header excluded).
+                <bridgehead renderas="sect4">Parameters</bridgehead>
+                <simplelist>
+                    <member><code>op</code> &mdash; number, Tarantool/Box command code, see
+                    <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt">
+                    <filename>doc/box-protocol.txt</filename></link>,
+                    </member>
+                    <member><code>request</code> &mdash; request packed in binary
+                    format</member>
+                </simplelist>
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                This function returns zero or more tuples.
+                <bridgehead renderas="sect4">Errors</bridgehead>
+                Any server error produced by the executed command.
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+</para>
+
+  <para>
+    Some of the functionality is implemented The Lua source code of these wrappers, as well as a more
+    extensive documentation can be found in
+    <filename>mod/box/box.lua</filename> file in the source tree.
+  </para>
+  <para>
+    The main communication portal between Lua and Tarantool
+    is <code>box.process()</code> function, which directly
+    invokes the Tarantool command handler and allows
+    to send any kind of request to the server.
+    Any tuple returned by the
+    server is converted to a Lua object of type
+    <code>box.tuple</code>
+    and is appended to the return list of
+    <code>box.process()</code>.
   </para>
   <para>
     A few wrappers are defined to simplify the most common
     tasks:
     <itemizedlist>
-        <listitem><para><quote>box.select(space, key, ...)</quote>
+        <listitem><para><code>box.select(space, key, ...)</code>
         to retrieve tuples. </para></listitem>
-        <listitem><para><quote>box.replace(space, ...)</quote>
+        <listitem><para><code>box.replace(space, ...)</code>
         to insert and replace tuples. The tuple is constructed
         from all the remaining arguments passed into the function.</para></listitem>
-        <listitem><para><quote>box.update(space, key, tuple)</quote> and <quote>box.delete(space, key)</quote>for updates and deletes respectively.</para></listitem>
+        <listitem><para><code>box.update(space, key, tuple)</code> and <code>box.delete(space, key)</code>for updates and deletes respectively.</para></listitem>
     </itemizedlist>
-    The Lua source code of these wrappers, as well as a more
-    extensive documentation can be found in <filename>mod/box/box.lua</filename> file in the source tree.
   </para>
 </section>
 <!--

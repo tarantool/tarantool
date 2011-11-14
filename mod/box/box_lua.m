@@ -540,15 +540,20 @@ iov_add_multret(struct lua_State *L)
 }
 
 static void
-box_lua_dup_u32(u32 u32)
+box_lua_dup_u32(u32 u32 __attribute__((unused)))
 {
-	lua_pushinteger(in_txn()->L, u32);
+	/*
+	 * Do nothing -- the only u32 Box can give us is
+	 * tuple count, and we don't need it, since we intercept
+	 * everything into Lua stack first.
+	 * @sa iov_add_multret
+	 */
 }
 
 static void
-box_lua_add_u32(u32 *p_u32)
+box_lua_add_u32(u32 *p_u32 __attribute__((unused)))
 {
-	box_lua_dup_u32(*p_u32); /* xxx: this can't be done properly in Lua */
+	/* See the comment in box_lua_dup_u32. */
 }
 
 static void

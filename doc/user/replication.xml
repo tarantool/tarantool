@@ -20,10 +20,10 @@
     fetching and applying its write ahead log (WAL).
     Each record in the WAL represents a single Tarantool/Box
     command, such as INSERT, UPDATE, DELETE and is assigned
-    a monotonically growing log sequence number (LSN) and a
-    timestamp. As long as all data change commands
-    are fully deterministic and operate on a single record,
-    Tarantool replication can be classified as row-based
+    a monotonically growing log sequence number (LSN).
+    In essence, Tarantool replication is row-based:
+    all data change commands are fully deterministic and operate
+    on a single record.
   </para>
   <para>
     A stored program invocation, unless requested explicitly,

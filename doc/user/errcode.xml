@@ -68,6 +68,12 @@ of existing codes.</para>
     </para></listitem>
   </varlistentry>
 
+  <varlistentry>
+    <term xml:id="ER_PROC_LUA" xreflabel="ER_PROC_LUA">ER_PROC_LUA</term>
+    <listitem><para>An error inside Lua procedure.
+    </para></listitem>
+  </varlistentry>
+
 </variablelist>
 </appendix>
 

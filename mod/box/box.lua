@@ -2,16 +2,16 @@
 --
 --
 function box.select(space, index, ...)
-    key = {...}
-    return select(2, -- skip the first return from select, number of tuples
-        box.process(17, box.pack('iiiiii'..string.rep('p', #key),
+    local key = {...}
+    return box.process(17,
+                       box.pack('iiiiii'..string.rep('p', #key),
                                  space,
                                  index,
                                  0, -- offset
                                  4294967295, -- limit
                                  1, -- key count
                                  #key, -- key cardinality
-                                 unpack(key))))
+                                 unpack(key)))
 end
 
 --
@@ -28,49 +28,50 @@ end
 -- index is always 0. It doesn't accept compound keys
 --
 function box.delete(space, key)
-    return select(2, -- skip the first return, tuple count
-        box.process(21, box.pack('iiip', space,
+    return box.process(21,
+                       box.pack('iiip', space,
                                  1, -- flags, BOX_RETURN_TUPLE
                                  1, -- cardinality
-                                 key)))
+                                 key))
 end
 
 -- insert or replace a tuple
 function box.replace(space, ...)
-    tuple = {...}
-    return select(2,
-        box.process(13, box.pack('iii'..string.rep('p', #tuple),
+    local tuple = {...}
+    return box.process(13,
+                       box.pack('iii'..string.rep('p', #tuple),
                                  space,
                                  1, -- flags, BOX_RETURN_TUPLE 
                                  #tuple, -- cardinality
-                                 unpack(tuple))))
+                                 unpack(tuple)))
 end
 
 -- insert a tuple (produces an error if the tuple already exists)
 function box.insert(space, ...)
-    tuple = {...}
-    return select(2,
-        box.process(13, box.pack('iii'..string.rep('p', #tuple),
-                                 space,
-                                 3, -- flags, BOX_RETURN_TUPLE | BOX_ADD
-                                 #tuple, -- cardinality
-                                 unpack(tuple))))
+    local tuple = {...}
+    return box.process(13,
+                       box.pack('iii'..string.rep('p', #tuple),
+                                space,
+                                3, -- flags, BOX_RETURN_TUPLE  | BOX_ADD
+                                #tuple, -- cardinality
+                                unpack(tuple)))
 end
 
+-- 
 function box.update(space, key, format, ...)
-    ops = {...}
-    return select(2,
-        box.process(19, box.pack('iiipi'..format,
+    local ops = {...}
+    return box.process(19,
+                       box.pack('iiipi'..format,
                                   space,
                                   1, -- flags, BOX_RETURN_TUPLE
                                   1, -- cardinality
                                   key, -- primary key
                                   #ops/2, -- op count
-                                  ...)))
+                                  unpack(ops)))
 end
 
 function box.on_reload_configuration()
-    index_mt = {}
+    local index_mt = {}
     -- __len and __index
     index_mt.len = function(index) return #index.idx end
     index_mt.__newindex = function(table, index)
@@ -84,7 +85,7 @@ function box.on_reload_configuration()
         return index.idx.next, index.idx, nil end
     --
     index_mt.range = function(index, limit, ...)
-        range = {}
+        local range = {}
         for k, v in index.idx.next, index.idx, ... do
             if #range >= limit then
                 break
@@ -94,7 +95,7 @@ function box.on_reload_configuration()
         return unpack(range)
     end
     --
-    space_mt = {}
+    local space_mt = {}
     space_mt.len = function(space) return space.index[0]:len() end
     space_mt.__newindex = index_mt.__newindex
     space_mt.select = function(space, ...) return box.select(space.n, ...) end
@@ -104,7 +105,7 @@ function box.on_reload_configuration()
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.truncate = function(space)
         while true do
-            k, v = space.index[0].idx:next()
+            local k, v = space.index[0].idx:next()
             if v == nil then
                 break
             end

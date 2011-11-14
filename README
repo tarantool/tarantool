@@ -18,8 +18,8 @@ Caveats:
 COMPILATION AND INSTALL
 
 Tarantool is written in C and Objective C.
-To build, you will need GCC Objective C frontend or
-Apple CLang compiler.
+To build, you will need GCC Objective C frontend
+(gcc-objc package on most systems) or Apple CLang compiler.
 
 CMake is used for configuration management.
 3 standard CMake build types are supported:
@@ -27,6 +27,9 @@ CMake is used for configuration management.
  * RelWithDebugInfo -- the most common release configuration,
  also provides debugging capabilities
  * Release -- use only if the highest performance is required
+
+The only external library dependency is readline: libreadline-dev
+is required to build the command line client.
 
 Please follow these steps to compile Tarantool:
 
@@ -37,8 +40,14 @@ To use a different release type, say, RelWithDebugInfo, use:
 
 tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
 
-'make' will create tarantool_box executable in directory
-mod/box.
+Additional build options can be set similarly:
+
+tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
+
+-- builds the command line client.
+
+'make' creates tarantool_box executable in directory
+mod/box and tarantool executable in client/tarantool.
 
 There is no 'make install' goal, but no installation
 is required either.
