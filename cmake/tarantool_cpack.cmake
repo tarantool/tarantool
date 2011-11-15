@@ -1,7 +1,20 @@
 #
 # List generators
 #
-set (CPACK_GENERATOR "TGZ")
+
+if ("${CPACK_GENERATOR}" STREQUAL "RPM")
+    set (CPACK_RPM_PACKAGE_REQUIRES "git, gcc44, flex >= 2.5.35, bison, cmake")
+    set (CPACK_RPM_PACKAGE_NAME "tarantool_box")
+    set (CPACK_RPM_PACKAGE_SUMMARY "tarantool_box")
+    set (CPACK_RPM_PACKAGE_VERSION "${TARANTOOL_VERSION}")
+    set (CPACK_RPM_PACKAGE_RELEASE "8")
+    set (CPACK_RPM_PACKAGE_LICENSE "BSD")
+    set (CPACK_RPM_PACKAGE_GROUP "MAIL.RU")
+    set (CPACK_RPM_PACKAGE_DESCRIPTION "Tarantool in-memory DB storage")
+else()
+    set (CPACK_GENERATOR "TGZ")
+endif()
+
 set (CPACK_SOURCE_GENERATOR "TGZ")
 #
 # Describe the source distribution
