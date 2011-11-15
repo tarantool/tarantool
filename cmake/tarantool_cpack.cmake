@@ -3,10 +3,10 @@
 #
 
 if ("${CPACK_GENERATOR}" STREQUAL "RPM")
-    set (CPACK_RPM_PACKAGE_REQUIRES "git, gcc44, flex >= 2.5.35, bison, cmake")
     set (CPACK_RPM_PACKAGE_NAME "tarantool_box")
     set (CPACK_RPM_PACKAGE_SUMMARY "tarantool_box")
-    set (CPACK_RPM_PACKAGE_VERSION "${TARANTOOL_VERSION}")
+    execute_process (COMMAND "date" "+%Y%m%d.%H%M" OUTPUT_VARIABLE RPM_PACKAGE_VERSION)
+    set (CPACK_RPM_PACKAGE_VERSION "${RPM_PACKAGE_VERSION}")
     set (CPACK_RPM_PACKAGE_RELEASE "8")
     set (CPACK_RPM_PACKAGE_LICENSE "BSD")
     set (CPACK_RPM_PACKAGE_GROUP "MAIL.RU")
