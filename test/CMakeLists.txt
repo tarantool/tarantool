@@ -3,7 +3,7 @@ add_custom_target(test
     )
 
 tarantool_client("box/protocol" ${CMAKE_SOURCE_DIR}/test/box/protocol.c)
-tarantool_client("box/connector" ${CMAKE_SOURCE_DIR}/test/box/connector.c)
+tarantool_client("connector_c/tt" ${CMAKE_SOURCE_DIR}/test/connector_c/tt.c)
 
 install (FILES ${CMAKE_SOURCE_DIR}/test/box/tarantool.cfg
         ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap

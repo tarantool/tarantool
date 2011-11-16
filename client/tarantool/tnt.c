@@ -34,8 +34,10 @@
 #include <readline/history.h>
 
 #include <third_party/gopt/gopt.h>
-#include <connector/c/include/tnt.h>
-#include <connector/c/sql/tnt_sql.h>
+#include <connector/c/tnt/include/tnt.h>
+#include <connector/c/tntsql/include/tnt_sql.h>
+#include <connector/c/tntnet/include/tnt_net.h>
+
 #include <client/tarantool/tnt_admin.h>
 
 #define DEFAULT_HOST "localhost"
@@ -43,79 +45,91 @@
 #define DEFAULT_PORT_ADMIN 33015
 #define HISTORY_FILE ".tarantool_history"
 
-static int
-query_reply(struct tnt *t)
-{
-	int rc = -1;
-	struct tnt_recv rcv;
-	tnt_recv_init(&rcv);
-	if (tnt_recv(t, &rcv) == -1) {
-		printf("recv failed: %s\n", tnt_strerror(t));
-		goto error;
-	}
-	switch (TNT_RECV_OP(&rcv)) {
-	case TNT_RECV_PING:
-	       	printf("Ping ");
+static int query_reply_handle(struct tnt_stream *t, struct tnt_reply *r) {
+	switch (r->op) {
+	case TNT_OP_PING:
+		printf("Ping ");
 		break;
-	case TNT_RECV_INSERT:
-	       	printf("Insert ");
+	case TNT_OP_INSERT:
+		printf("Insert ");
 		break;
-	case TNT_RECV_DELETE:
-	       	printf("Delete ");
+	case TNT_OP_DELETE:
+		printf("Delete ");
 		break;
-	case TNT_RECV_UPDATE:
-	       	printf("Update ");
+	case TNT_OP_UPDATE:
+		printf("Update ");
 		break;
-	case TNT_RECV_SELECT:
-	       	printf("Select ");
+	case TNT_OP_SELECT:
+		printf("Select ");
 		break;
-	case TNT_RECV_CALL:
-	       	printf("Call ");
+	case TNT_OP_CALL:
+		printf("Call ");
 		break;
 	default:
-	       	printf("Unknown ");
+		printf("Unknown ");
 		break;
 	}
 	if (tnt_error(t) != TNT_EOK) {
 		printf("FAIL, %s (op: %d, reqid: %d, code: %d, count: %d)\n",
-			tnt_strerror(t), TNT_RECV_OP(&rcv),
-			TNT_RECV_ID(&rcv),
-			TNT_RECV_CODE(&rcv),
-			TNT_RECV_COUNT(&rcv));
-		if (tnt_error(t) == TNT_EERROR)
-			printf("error: %s\n", tnt_recv_error(&rcv));
-		goto error;
+			tnt_strerror(t),
+			r->op,
+			r->reqid,
+			r->code,
+			r->count);
+		if (r->error)
+			printf("error: %s\n", r->error);
+		return -1;
 	}
-	printf("OK, %d rows affected\n", TNT_RECV_COUNT(&rcv));
-	struct tnt_tuple *tp;
-	TNT_RECV_FOREACH(&rcv, tp) {
+	printf("OK, %d rows affected\n", r->count);
+	struct tnt_iter it;
+	tnt_iter_list(&it, TNT_REPLY_LIST(r));
+	while (tnt_next(&it)) {
 		printf("[");
-		struct tnt_tuple_field *tf;
-		TNT_TUPLE_FOREACH(tp, tf) {
-			if (!isprint(tf->data[0]) && (tf->size == 4 || tf->size == 8)) {
-				if (tf->size == 4) {
-					uint32_t i = *((uint32_t*)tf->data);
+		struct tnt_tuple *tu = TNT_ILIST_TUPLE(&it);
+		struct tnt_iter ifl;
+		tnt_iter(&ifl, tu);
+		while (tnt_next(&ifl)) {
+			if (TNT_IFIELD_IDX(&ifl) != 0)
+				printf(", ");
+			char *data = TNT_IFIELD_DATA(&ifl);
+			uint32_t size = TNT_IFIELD_SIZE(&ifl);
+			if (!isprint(data[0]) && (size == 4 || size == 8)) {
+				if (size == 4) {
+					uint32_t i = *((uint32_t*)data);
 					printf("%"PRIu32, i);
 				} else {
-					uint64_t i = *((uint64_t*)tf->data);
+					uint64_t i = *((uint64_t*)data);
 					printf("%"PRIu64, i);
 				}
 			} else {
-				printf("'%-.*s'", tf->size, tf->data);
+				printf("'%-.*s'", size, data);
 			}
-			if (!TNT_TUPLE_LAST(tp, tf))
-				printf(", ");
 		}
 		printf("]\n");
 	}
+	return 0;
+}
+
+static int
+query_reply(struct tnt_stream *t)
+{
+	int rc = -1;
+	struct tnt_iter i;
+	tnt_iter_stream(&i, t);
+	while (tnt_next(&i)) {
+		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		if (query_reply_handle(t, r) == -1)
+			goto error;
+
+	}
 	rc = 0;
 error:
-	tnt_recv_free(&rcv);
+	tnt_iter_free(&i);
 	return rc;
 }
 
 static int
-query(struct tnt *t, char *q)
+query(struct tnt_stream *t, char *q)
 {
 	char *e = NULL;
 	int ops = tnt_query(t, q, strlen(q), &e);
@@ -126,11 +140,12 @@ query(struct tnt *t, char *q)
 		}
 		return -1;
 	}
-	int rc = 0;
-	while (ops-- > 0)
-		if (query_reply(t) == -1)
-			rc = -1;
-	return rc;
+	int rc = tnt_flush(t);
+	if (rc < 0)
+		return -1;
+	if (query_reply(t) == -1)
+		return -1;
+	return 0;
 }
 
 static int
@@ -194,22 +209,22 @@ main(int argc, char *argv[])
 		admin_port = atoi(arg);
 	gopt_free(opt);
 
-	/* creating and initializing tarantool client handler */
-	struct tnt *t = tnt_alloc();
+	/* creating and initializing tarantool network stream */
+	struct tnt_stream *t = tnt_net(NULL);
 	if (t == NULL)
 		return 1;
 	tnt_set(t, TNT_OPT_HOSTNAME, host);
 	tnt_set(t, TNT_OPT_PORT, port);
 	if (tnt_init(t) == -1) {
 		printf("error: %s\n", tnt_strerror(t));
-		tnt_free(t);
+		tnt_stream_free(t);
 		return 1;
 	}
 
 	/* connecting to server */
 	if (tnt_connect(t) == -1) {
 		printf("error: %s\n", tnt_strerror(t));
-		tnt_free(t);
+		tnt_stream_free(t);
 		return 1;
 	}
 
@@ -217,7 +232,7 @@ main(int argc, char *argv[])
 	struct tnt_admin a;
 	if (tnt_admin_init(&a, host, admin_port) == -1) {
 		printf("error: admin console initialization failed\n");
-		tnt_free(t);
+		tnt_stream_free(t);
 		return 1;
 	}
 
@@ -236,7 +251,7 @@ main(int argc, char *argv[])
 					break;
 			}
 		}
-		tnt_free(t);
+		tnt_stream_free(t);
 		tnt_admin_free(&a);
 		return rc;
 	}
@@ -271,7 +286,7 @@ main(int argc, char *argv[])
 	write_history(history);
 	clear_history();
 
-	tnt_free(t);
+	tnt_stream_free(t);
 	tnt_admin_free(&a);
 	return 0;
 }
