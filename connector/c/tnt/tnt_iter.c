@@ -45,6 +45,7 @@ static struct tnt_iter *tnt_iter_tryalloc(struct tnt_iter *i) {
 		return NULL;
 	memset(i, 0, sizeof(struct tnt_iter));
 	i->alloc = 1;
+	i->status = TNT_ITER_OK;
 	return i;
 }
 
@@ -54,13 +55,17 @@ static int tnt_iter_field_next(struct tnt_iter *i) {
 		return 0;
 	/* intitializing iter to the first field */
 	if (ip->fld_ptr == NULL) {
-		if (ip->tu->size < 4)
-			return -1;
+		if (ip->tu->size < 4) {
+			i->status = TNT_ITER_FAIL;
+			return 0;
+		}
 		ip->fld_ptr = ip->tu->data + 4; /* skipping tuple cardinality */
 		ip->fld_index = 0;
 		ip->fld_esize = tnt_enc_read(ip->fld_ptr, &ip->fld_size);
-		if (ip->fld_esize == -1)
-			return -1;
+		if (ip->fld_esize == -1) {
+			i->status = TNT_ITER_FAIL;
+			return 0;
+		}
 		ip->fld_data = ip->fld_ptr + ip->fld_esize;
 		return 1;
 	}
@@ -69,8 +74,10 @@ static int tnt_iter_field_next(struct tnt_iter *i) {
 	ip->fld_index++;
 	/* reading field size */
 	ip->fld_esize = tnt_enc_read(ip->fld_ptr, &ip->fld_size);
-	if (ip->fld_esize == -1)
-		return -1;
+	if (ip->fld_esize == -1) {
+		i->status = TNT_ITER_FAIL;
+		return 0;
+	}
 	ip->fld_data = ip->fld_ptr + ip->fld_esize;
 	return 1;
 }
@@ -158,8 +165,12 @@ static int tnt_iter_stream_next(struct tnt_iter *i) {
 	struct tnt_iter_stream *is = TNT_ISTREAM(i);
 	tnt_reply_free(&is->r);
 	tnt_reply_init(&is->r);
-	is->status = is->s->reply(is->s, &is->r);
-	return (is->status == 0) ? 1 : 0;
+	int rc = is->s->reply(is->s, &is->r);
+	if (rc == -1) {
+		i->status = TNT_ITER_FAIL;
+		return 0;
+	}
+	return rc; /* 0 or 1 */
 }
 
 static void tnt_iter_stream_free(struct tnt_iter *i) {
@@ -191,7 +202,6 @@ struct tnt_iter *tnt_iter_stream(struct tnt_iter *i, struct tnt_stream *s) {
 	i->free = tnt_iter_stream_free;
 	struct tnt_iter_stream *is = TNT_ISTREAM(i);
 	is->s = s;
-	is->status = 0;
 	tnt_reply_init(&is->r);
 	return i;
 }
@@ -240,6 +250,7 @@ int tnt_next(struct tnt_iter *i) {
  * first tuple field or first tuple in a list.
 */
 void tnt_rewind(struct tnt_iter *i) {
+	i->status = TNT_ITER_OK;
 	if (i->rewind)
 		i->rewind(i);
 }

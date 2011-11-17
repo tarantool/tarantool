@@ -73,7 +73,6 @@ struct tnt_iter_list {
 struct tnt_iter_stream {
 	struct tnt_stream *s; /* stream pointer */
 	struct tnt_reply r;   /* current reply */
-	int status;           /* current reply read status */
 };
 
 /* stream iterator accessors */
@@ -81,10 +80,16 @@ struct tnt_iter_stream {
 #define TNT_ISTREAM(I)        (&(I)->data.stream)
 #define TNT_ISTREAM_REPLY(I)  &TNT_ISTREAM(I)->r
 
+enum tnt_iter_status {
+	TNT_ITER_OK,
+	TNT_ITER_FAIL
+};
+
 /* common iterator object */
 
 struct tnt_iter {
 	enum tnt_iter_type type;
+	enum tnt_iter_status status;
 	int alloc;
 	/* interface callbacks */
 	int  (*next)(struct tnt_iter *iter);
