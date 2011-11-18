@@ -4,7 +4,8 @@
 <blockquote><para>
   This chapter describes the contents
   of binary and source package download, explains how to
-  start/stop the server, connect to it with a command line client.
+  start or stop the server, and explains how to connect to it with
+  a command line client.
 </para></blockquote>
 
 <para>
@@ -41,7 +42,7 @@
   </itemizedlist>
 </para>
 <para>
-  After download, unpack the binary package, an own directory will be created:
+  After download, unpack the binary package, a new directory will be created:
   <programlisting>
   <prompt>$ </prompt><command>tar</command> <option>zxvf</option> <filename><replaceable><replaceable>package-name</replaceable></replaceable>.tar.gz</filename></programlisting>
   The binary download contains just two subdirectories:
@@ -109,8 +110,10 @@
   regression testing framework:
   <programlisting><prompt>$ </prompt><command>./test/run</command> <option>--start-and-exit</option></programlisting>
   It will create necessary files in directory
-  <filename>./test/var/</filename>, and fire off the server with
+  <filename>./test/var/</filename>, and start the server with
   minimal configuration.
+</para>
+<para>
   The command line client is located in <filename>client/tarantool</filename>:
   <programlisting><prompt>$ </prompt><command>./client/tarantool/tarantool</command></programlisting>
 </para>

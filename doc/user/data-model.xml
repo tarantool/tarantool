@@ -12,10 +12,10 @@
 
 <para>
   Tarantool data is organized in <emphasis>tuples</emphasis>. Tuple
-  cardinality is varying: a tuple can contain any number
+  length is varying: a tuple can contain any number
   of fields. A field can be either numeric &mdash;
   32- or 64- bit unsigned integer, or binary
-  string &mdash; a sequence of 8-bit octets.  The first field of a
+  string &mdash; a sequence of octets.  The first field of a
   tuple is always assumed to be
   the identifying (unique) key. The remaining fields make up a 
   value, associated with the key.
@@ -25,9 +25,9 @@
   Apart from the primary key, it is possible to define secondary
   <emphasis>indexes</emphasis> on other tuple fields. A secondary index does
   not have to be unique, and can cover several fields.
-  If a space has a secondary index, tuple cardinality must be
-  at least equal to the ordinal number of the field
-  participating in the index.
+  If a space has a secondary index, the total number of fields in
+  a tuple must be at least equal to the ordinal number of the
+  field participating in the index.
 </para>
 <para>
   Currently, entire server <emphasis>schema</emphasis> must be
@@ -41,7 +41,7 @@
 </para>
 <para>
   Schema objects, such as spaces and indexes, are referred to
-  by a numeric id. For example, to insert a tuple, is is necessary
+  by a numeric id. For example, to insert a tuple, it is necessary
   to provide id of the destination space; to select
   a tuple, one must provide the identifying key, space id and
   index id of the index used for lookup.
@@ -93,7 +93,7 @@
        is, therefore, mandatory.
     </para></listitem>
     <listitem><para>
-       INSERT turns into REPLACE when a tuple with given
+       INSERT replaces data when a tuple with given
        primary key already exists. Such replace can insert
        a tuple of different cardinality.
     </para></listitem>

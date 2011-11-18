@@ -30,7 +30,7 @@
       configuration option.
     </para></listitem>
     <listitem><para>
-      Read only port, which only accepts SELECTs, port number
+      Read only port, which only accepts SELECTs, default  port number
       <literal>33014</literal>, as defined in
       <olink targetptr="secondary_port"/> configuration option.
     </para></listitem>
@@ -56,8 +56,8 @@
   the separation, and <command>tarantool</command> command line
   client automatically selects the correct port for you
   with help of a simple regular expression. SELECTs, UPDATEs,
-  INSERTs, DELETEs and CALLs are sent to the primary port, whereas
-  SHOW, RELOAD, SAVE and others -- to the administrative port.
+  INSERTs, DELETEs and CALLs are sent to the primary port.
+  SHOW, RELOAD, SAVE and other statements are sent to the administrative port.
 </para>
 
 <section>
@@ -71,7 +71,7 @@
   <para>
     Five basic request types are supported: INSERT, UPDATE,
     DELETE, SELECT and CALL. The mandatory length, present in the
-    header, allows to simplify client or proxy I/O.
+    header, allows simplifying client or proxy I/O.
     The server response to a request always carries in its header
     the same request type and id.
     The id makes it possible to always match request to a
