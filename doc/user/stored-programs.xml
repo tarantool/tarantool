@@ -21,7 +21,7 @@
   
 <para>
     Procedures can be invoked both from the administrative
-    console and using the  binary protocol, for example:
+    console and using the binary protocol, for example:
 <programlisting>
 <computeroutput>
 localhost> lua function f1() return 'hello' end
@@ -35,7 +35,7 @@ Found 1 tuple:
     In the language of the administrative console 
     <olink targetptr="lua-command" /> evaluates an arbitrary
     Lua chunk. "CALL" is the SQL standard statement used
-    to represent the CALL command of the binary
+    to represent CALL command of the binary
     protocol.
     In the example above, a Lua procedure is first defined
     using the text protocol of the administrative port,
@@ -65,7 +65,7 @@ localhost> lua "hello".." world"
   <para>
     There is a single global Lua interpreter state, which is
     shared across all connections. Each connection, however, is
-    running in its own Lua <emphasis>thread</emphasis> -- a mechanism, akin to
+    running in its own Lua <emphasis>thread</emphasis> &mdash; a mechanism, akin to
     Tarantool <emphasis>fibers</emphasis>.
     Anything prefixed with <code>lua </code> on the administrative console
     is sent directly to the interpreter. In the binary protocol,
@@ -96,11 +96,9 @@ localhost> lua "hello".." world"
     It's possible not only to invoke trivial Lua code, but call
     into Tarantool/Box storage functionality, using
     <code>box</code>
-    Lua library. The actual contents of the library can be
+    Lua library. The contents of the library can be
     inspected at runtime:
-<programlisting>
-<computeroutput>
-localhost> lua for k, v in pairs(box) do print(k, ": ", type(v)) end
+<programlisting><computeroutput>localhost> lua for k, v in pairs(box) do print(k, ": ", type(v)) end
 ---
 fiber: table
 space: table
@@ -116,9 +114,7 @@ unpack: function
 replace: function
 select_range: function
 pack: function
-...
-</computeroutput>
-</programlisting>
+...</computeroutput></programlisting>
     As is shown in the listing, <code>box</code> package ships:
     <itemizedlist>
         <listitem><para>
@@ -136,7 +132,6 @@ pack: function
     </itemizedlist>
   </para>
 
-<para>
 <variablelist>
     <title>Package <code>box</code> function index</title>
 
@@ -147,7 +142,7 @@ pack: function
         <listitem>
             <para>
                 The main extension provided to Lua by
-                Tarantool/Box -- ability to call
+                Tarantool/Box &mdash; ability to call
                 INSERT/UPDATE/SELECT/DELETE from within a Lua
                 procedure.
             </para>
@@ -155,54 +150,395 @@ pack: function
                 This is a low-level API, and it expects
                 all arguments to be packed in accordance
                 with the binary protocol format (iproto
-                header excluded).
+                header excluded). Normally there is no need
+                to use <code>box.process()</code> directly:
+                <code>box.select(), box.update(), ...</code>
+                and other convenience wrappers
+                invoke <code>box.process()</code> with
+                correctly packed arguments.
                 <bridgehead renderas="sect4">Parameters</bridgehead>
                 <simplelist>
                     <member><code>op</code> &mdash; number, Tarantool/Box command code, see
                     <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt">
                     <filename>doc/box-protocol.txt</filename></link>,
                     </member>
-                    <member><code>request</code> &mdash; request packed in binary
-                    format</member>
+                    <member><code>request</code> &mdash; a request packed in binary format</member>
                 </simplelist>
                 <bridgehead renderas="sect4">Returns</bridgehead>
-                This function returns zero or more tuples.
+                This function returns zero or more tuples. In Lua, a
+                tuple is represented by
+                <emphasis>userdata</emphasis> object of type
+                <code>box.tuple</code>. If a Lua procedure
+                is called from the administrative console, tuples
+                are converted to YAML. When called from the binary
+                protocol, the binary format is used.
                 <bridgehead renderas="sect4">Errors</bridgehead>
                 Any server error produced by the executed command.
             </para>
         </listitem>
     </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.select(space_no, index_no, ...)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Select a tuple in the given namespace by key. A
+                wrapper around <code>box.process()</code>.
+                <bridgehead renderas="sect4">Parameters</bridgehead>
+                <simplelist>
+                    <member><code>space_no</code> &mdash; namespace id,
+                    </member>
+                    <member><code>index_no</code> &mdash; index number in the
+                        namespace,</member>
+                    <member><code>...</code> &dash; possibly compound key.
+                    </member>
+                </simplelist>
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                Returns zero or more tuples.
+                <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+localhost> call box.insert(0, 'test', 'my first tuple')
+Call OK, 1 rows affected
+['test', 'my first tuple']
+localhost> call box.select(0, 0, 'test')
+Call OK, 1 rows affected
+['test', 'my first tuple']
+localhost> lua box.insert(5, 'testtest', 'firstname', 'lastname')
+---
+ - 'testtest': {'firstname', 'lastname'}
+...
+localhost> lua box.select(5, 1, 'firstname', 'lastname')
+---
+ - 'testtest': {'firstname', 'lastname'}
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.insert(space_no, ...)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.replace(space_no, ...)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Insert a tuple into a space. Tuple fields
+                follow <code>space_no</code>. If a tuple with
+                the same primary key already exists,
+                <code>box.insert()</code> returns an error, while
+                <code>box.replace()</code> replaces the existing
+                tuple with the new one. These functions are
+                wrappers around <code>box.process()</code>
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                Returns the inserted tuple.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.delete(space_no, key)</emphasis>
+        </term>
+        <listitem><para>
+            Delete a tuple, identified by a primary key.
+            <bridgehead renderas="sect4">Returns</bridgehead>
+            Returns the deleted tuple.
+        </para></listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.select_range(space_no, index_no limit, ...)</emphasis>
+        </term>
+        <listitem><para>
+            Select a range of tuples, starting from offset
+            specified by the key.
+            Limit selection with at most <code>limit</code>
+            tuples.
+            If no key is specified, start from the first key in
+            the index.
+            </para><para>
+            For TREE indexes, this returns tuples in sorted order, 
+            and can be used to iterate over the entire space.
+            For HASH indexes, this returns at most one tuple,
+            unless <code>key</code> is nil or unspecified, in which case it
+            returns all tuples.
+        </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">box.pack(format, ...)</emphasis></term>
+        <listitem><para>
+ To use Tarantool/Box binary protocol primitives from Lua, 
+ it's necessary to pack Lua variables into a binary representation.
+ This is a helper function to do it.
+ It's prototyped aftre Perl 'pack', which takes a format and a list of
+ arguments, and returns a binary string with all arguments
+ packed according to the format.  See also doc/box-protocol.txt,
+ the binary protocol description.
+        <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+ pkt = box.pack("iiiiiip", -- pack format
+                         0, -- space id
+                         0, -- index id
+                         0, -- offset
+                         2^32, -- limit
+                         1, -- number of SELECT arguments
+                         1, -- tuple cardinality
+                         key) -- the key to use for SELECT
+</programlisting>
+        </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">box.unpack(format, ...)</emphasis></term>
+        <listitem><para>
+            Counterpart to <code>box.pack().</code>
+        </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.print(...)</emphasis>
+        </term>
+        <listitem><para>
+Redefine Lua <code>print()</code> built-in to print either to the log file
+(when Lua is used from the binary port) or back to the user (for the
+administrative console).
+</para><para>
+When printing to the log file, INFO log level is used. When printing to
+the administrative console, all output is sent directly
+to the socket.
+</para><para>
+Note: the administrative console output must be YAML-compatible.
+        </para></listitem>
+    </varlistentry>
 </variablelist>
+
+<variablelist>
+    <title>Packages <code>box.space</code>  and <code>box.index</code></title>
+    <para>These packages combine access to space and index
+    configuration, such as <code>enabled</code>, <code>cardinality</code>,
+    etc, with object-oriented access to space and index functions
+    (<code>insert(), update(), select(), ...</code>. Each space
+    entry is a container for all space indexes, which are
+    available in array box.space[].index[].</para>
+    <varlistentry>
+        <term><emphasis role="lua">
+        box.space[i].n
+        </emphasis></term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+</variablelist>
+
+<variablelist>
+    <title>Package <code>box.fiber</code></title>
+    <para>Create, run and manage existing <emphasis>fibers</emphasis>.
+    </para>
+    <para>
+A fiber is an independent execution thread, implemented
+using the mechanism of cooperative multitasking.
+Each fiber can be running, suspended or dead.
+A fiber is created (<code>box.fiber.create()</code>) suspended.
+It can be started with <code>box.fiber.resume()</code>, yield
+the control back with <code>box.fiber.yield()</code>
+end with <code>return</code> or just by reaching the end of the
+function.
+    </para>
+    <para>
+A fiber can also be attached or detached.
+An attached fiber is a child of the creator,
+and is running only if the creator has called
+<code>box.fiber.resume()</code>. A detached fiber is a child of
+Tarntool/Box internal <quote>sched</quote> fiber, and is gets
+scheduled only if there is a libev event associated
+with it.
+    </para>
+    <para>
+To detach, a running fiber must invoke box.fiber.detach().
+A detached fiber loses connection with its parent
+forever.
+    </para>
+    <para>
+All fibers are part of the fiber registry, box.fiber.
+This registry can be searched (<code>box.fiber.find()</code>)
+either by fiber id (fid), which is numeric, or by fiber name,
+which is a string. If there is more than one fiber with the given
+name, the first fiber that matches is returned.
+    </para>
+    <para>
+Once fiber chunk is done or calls <code>return</code>,
+the fiber is considered dead. Its carcass is put into
+a fiber pool, and can be reused when another fiber is
+created.
+    </para>
+    <para>
+A runaway fiber can be stopped with <code>box.fiber.cancel()</code>.
+<code>box.fiber.cancel()</code>, however, is advisory &mdash; it works
+only if the runaway fiber is calling <code>box.fiber.testcancel()</code>
+once in a while. Most <code>box.*</code> hooks, such as <code>box.delete()</code>
+or <code>box.update()</code>, are calling <code>box.fiber.testcancel()</code>.
+<code>box.select()</code> doesn't.
+    </para>
+    <para>
+A runaway fiber can really only become cuckoo
+if it does a lot of computations and doesn't check
+whether it's been cancelled. In addition
+to the advisory cancellation, configuration parameter lua_timeout
+can be used to cancel runaway Lua procedures.
+    </para>
+    <para>
+The other potential problem comes from detached
+fibers which never get scheduled, because are subscribed
+or get no events. Such morphing fibers can be killed
+with <code>box.fiber.cancel()</code> at any time,
+since <code>box.fiber.cancel()</code>
+sends an asynchronous wakeup event to the fiber,
+and when returning from <code>box.fiber.yield()</code>
+<code>box.fiber.testcancel()</code> is invoked.
+    </para>
+    <para>Like all Lua objects, dead fibers are
+    garbage collected.</para>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.id(fiber) </emphasis>
+        </term>
+        <listitem><simpara>Returns a numeric id of the fiber.</simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.self() </emphasis>
+        </term>
+        <listitem><simpara>Returns <code>box.fiber</code> userdata
+        object for the currently scheduled
+        fiber.</simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.find(id) </emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.create(function) </emphasis>
+        </term>
+        <listitem><simpara>
+		Create a fiber for the passed change.
+        Can hit a recursion limit. Is a cancellation
+        point.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.resume(fiber, ...) </emphasis>
+        </term>
+        <listitem><simpara>Resume a created
+        or suspended fiber.</simpara></listitem>
+    </varlistentry>
+        
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.yield(...) </emphasis>
+        </term>
+        <listitem><para>
+        Yield control to the calling fiber &mdash; if the fiber
+        is attached, or to sched otherwise.
+        </para>
+        <para>
+        If the fiber is attached, whatever arguments are passed
+        to this call, are passed on to the calling fiber.
+        If the fiber is detached, simply returns everything back.
+	 Yield to the caller. The caller will take care of
+	 whatever arguments are taken.
+	fiber_testcancel(); /* throws an error if we were cancelled. */
+	 * Got resumed. Return whatever the caller has passed
+	 * to us with box.fiber.resume().
+	 * As a side effect, the detached fiber which yields
+	 * to sched always gets back whatever it yields.
+        </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.detach()</emphasis>
+        </term>
+        <listitem><simpara>
+        Detach the current fiber. This is a cancellation point. This is a yield point.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.sleep(time)</emphasis>
+        </term>
+        <listitem><simpara>
+    Yield to the sched fiber and sleep.
+    @param[in]  amount of time to sleep (double)
+    Only the current fiber can be made to sleep.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.cancel(fiber)</emphasis>
+        </term>
+        <listitem><simpara>
+Running and suspended fibers can be cancelled.
+Zombie fibers can't. Returns an error if
+subject fiber does not permit cancel.
+        </simpara></listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.testcancel()</emphasis>
+        </term>
+        <listitem><simpara>
+Check if this current fiber has been cancelled and
+throw an exception if this is the case.
+        </simpara></listitem>
+    </varlistentry>
+
+</variablelist>
+
+<variablelist>
+    <title>Package <code>box.cfg</code></title>
+    <para>This package provides read-only access to 
+    all server configuration parameters.</para>
+    <varlistentry>
+        <term><emphasis role="lua">box.cfg</emphasis></term>
+        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
+localhost> lua for k, v in pairs(box.cfg) do print(k, " = ", v) end
+---
+io_collect_interval = 0
+pid_file = box.pid
+panic_on_wal_error = false
+slab_alloc_factor = 2
+slab_alloc_minimal = 64
+admin_port = 33015
+logger = cat - >> tarantool.log
+...
+</programlisting></listitem>
+    </varlistentry>
+</variablelist>
+
+<para>
+    Additional examples can be found in the open source Lua stored
+    procedures repository and in the server test suite.
 </para>
 
-  <para>
-    Some of the functionality is implemented The Lua source code of these wrappers, as well as a more
-    extensive documentation can be found in
-    <filename>mod/box/box.lua</filename> file in the source tree.
-  </para>
-  <para>
-    The main communication portal between Lua and Tarantool
-    is <code>box.process()</code> function, which directly
-    invokes the Tarantool command handler and allows
-    to send any kind of request to the server.
-    Any tuple returned by the
-    server is converted to a Lua object of type
-    <code>box.tuple</code>
-    and is appended to the return list of
-    <code>box.process()</code>.
-  </para>
-  <para>
-    A few wrappers are defined to simplify the most common
-    tasks:
-    <itemizedlist>
-        <listitem><para><code>box.select(space, key, ...)</code>
-        to retrieve tuples. </para></listitem>
-        <listitem><para><code>box.replace(space, ...)</code>
-        to insert and replace tuples. The tuple is constructed
-        from all the remaining arguments passed into the function.</para></listitem>
-        <listitem><para><code>box.update(space, key, tuple)</code> and <code>box.delete(space, key)</code>for updates and deletes respectively.</para></listitem>
-    </itemizedlist>
-  </para>
 </section>
 <!--
 vim: tw=66 syntax=docbk
