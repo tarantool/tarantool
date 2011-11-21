@@ -63,11 +63,11 @@ configuration:
   panic_on_snap_error: "true"
   panic_on_wal_error: "false"
   replication_source: (null)
-  space[0].enabled: "1"
+  space[0].enabled: "true"
   space[0].cardinality: "-1"
   space[0].estimated_rows: "0"
   space[0].index[0].type: "HASH"
-  space[0].index[0].unique: "1"
+  space[0].index[0].unique: "true"
   space[0].index[0].key_field[0].fieldno: "0"
   space[0].index[0].key_field[0].type: "NUM"
 ...
