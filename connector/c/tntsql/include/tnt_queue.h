@@ -30,8 +30,8 @@
  * $FreeBSD: src/sys/sys/queue.h,v 1.60.2.1 2005/08/16 22:41:39 phk Exp $
  */
 
-#ifndef TNT_QUEUE_H_INCLUDED
-#define TNT_QUEUE_H_INCLUDED
+#ifndef _SYS_QUEUE_H_
+#define _SYS_QUEUE_H_
 
 #include <sys/cdefs.h>
 
@@ -550,4 +550,4 @@ void	remque(void *a);
 
 #endif /* _KERNEL */
 
-#endif /* TNT_QUEUE_H_INCLUDED */
+#endif /* _SYS_QUEUE_H_ */

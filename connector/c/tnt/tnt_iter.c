@@ -170,7 +170,7 @@ static int tnt_iter_stream_next(struct tnt_iter *i) {
 		i->status = TNT_ITER_FAIL;
 		return 0;
 	}
-	return rc; /* 0 or 1 */
+	return (rc == 1 /* finish */ ) ? 0 : 1;
 }
 
 static void tnt_iter_stream_free(struct tnt_iter *i) {
