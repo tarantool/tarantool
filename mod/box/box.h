@@ -34,7 +34,6 @@
 
 struct tarantool_cfg;
 struct box_tuple;
-struct index;
 
 enum
 {
@@ -46,7 +45,7 @@ struct space {
 	int n;
 	bool enabled;
 	int cardinality;
-	struct index index[BOX_INDEX_MAX];
+	Index *index[BOX_INDEX_MAX];
 };
 
 extern struct space *space;
@@ -66,7 +65,7 @@ struct box_txn {
 	struct lua_State *L;
 	struct box_out *out;
 	struct space *space;
-	struct index *index;
+	Index *index;
 	int n;
 
 	struct tbuf *ref_tuples;

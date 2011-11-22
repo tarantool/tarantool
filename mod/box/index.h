@@ -25,6 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#import <objc/Object.h>
 #include <assoc.h>
 
 /**
@@ -74,18 +75,21 @@ SPTREE_DEF(str_t, realloc);
 /* Indexes at preallocated search positions.  */
 enum { POS_READ = 0, POS_WRITE = 1, POS_MAX = 2 };
 
-struct index {
+@class Index;
+
+@interface Index : Object {
+	@public
 	bool enabled;
 	bool unique;
 
-	size_t (*size)(struct index *index);
-	struct box_tuple *(*find)(struct index *index, void *key); /* only for unique lookups */
-	struct box_tuple  *(*min)(struct index  *index);
-	struct box_tuple  *(*max)(struct index  *index);
-	struct box_tuple *(*find_by_tuple)(struct index * index, struct box_tuple * pattern);
-	void (*remove)(struct index *index, struct box_tuple *);
-	void (*replace)(struct index *index, struct box_tuple *, struct box_tuple *);
-	void (*iterator_init)(struct index *, int cardinality, void *key);
+	size_t (*size)(Index *index);
+	struct box_tuple *(*find)(Index *index, void *key); /* only for unique lookups */
+	struct box_tuple *(*min)(Index *index);
+	struct box_tuple *(*max)(Index *index);
+	struct box_tuple *(*find_by_tuple)(Index * index, struct box_tuple * pattern);
+	void (*remove)(Index *index, struct box_tuple *);
+	void (*replace)(Index *index, struct box_tuple *, struct box_tuple *);
+	void (*iterator_init)(Index *, int cardinality, void *key);
 	union {
 		struct mh_lstrptr_t *str_hash;
 		struct mh_i32ptr_t *int_hash;
@@ -98,8 +102,8 @@ struct index {
 			struct sptree_str_t_iterator *t_iter;
 			mh_int_t h_iter;
 		};
-		struct box_tuple *(*next)(struct index *);
-		struct box_tuple *(*next_equal)(struct index *);
+		struct box_tuple *(*next)(Index *);
+		struct box_tuple *(*next_equal)(Index *);
 	} iterator;
 	/* Reusable iteration positions, to save on memory allocation. */
 	struct index_tree_el *position[POS_MAX];
@@ -132,17 +136,24 @@ struct index {
 	enum index_type type;
 };
 
+/**
+ * Initialize index instance.
+ *
+ * @param space    space the index belongs to
+ */
+- (void) init: (struct space *) space_arg;
+/**
+ * Destroy and free index instance.
+ */
+- (void) free;
+@end
+
 #define foreach_index(n, index_var)					\
-	for (struct index *index_var = space[(n)].index;		\
-	     index_var->key_cardinality != 0;				\
-	     index_var++)						\
-		if (index_var->enabled)
-
-void
-index_init(struct index *index, struct space *space);
-
-void
-index_free(struct index *index);
+	Index *index_var;						\
+	for (Index **index_ptr = space[(n)].index;			\
+	     (**index_ptr).key_cardinality != 0;			\
+	     index_ptr++)						\
+		if ((index_var = *index_ptr)->enabled)
 
 struct box_txn;
 void validate_indexes(struct box_txn *txn);

@@ -233,10 +233,10 @@ static const struct luaL_reg lbox_tuple_meta [] = {
 
 static const char *indexlib_name = "box.index";
 
-static struct index *
+static Index *
 lua_checkindex(struct lua_State *L, int i)
 {
-	struct index **index = luaL_checkudata(L, i, indexlib_name);
+	Index **index = luaL_checkudata(L, i, indexlib_name);
 	assert(index != NULL);
 	return *index;
 }
@@ -248,11 +248,11 @@ lbox_index_new(struct lua_State *L)
 	int idx = luaL_checkint(L, 2); /* get index id in */
 	/* locate the appropriate index */
 	if (n >= BOX_SPACE_MAX || !space[n].enabled ||
-	    idx >= BOX_INDEX_MAX || space[n].index[idx].key_cardinality == 0)
+	    idx >= BOX_INDEX_MAX || space[n].index[idx]->key_cardinality == 0)
 		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
 	/* create a userdata object */
 	void **ptr = lua_newuserdata(L, sizeof(void *));
-	*ptr = &space[n].index[idx];
+	*ptr = space[n].index[idx];
 	/* set userdata object metatable to indexlib */
 	luaL_getmetatable(L, indexlib_name);
 	lua_setmetatable(L, -2);
@@ -262,7 +262,7 @@ lbox_index_new(struct lua_State *L)
 static int
 lbox_index_tostring(struct lua_State *L)
 {
-	struct index *index = lua_checkindex(L, 1);
+	Index *index = lua_checkindex(L, 1);
 	lua_pushfstring(L, "index %d in space %d",
 			index->n, index->space->n);
 	return 1;
@@ -271,7 +271,7 @@ lbox_index_tostring(struct lua_State *L)
 static int
 lbox_index_len(struct lua_State *L)
 {
-	struct index *index = lua_checkindex(L, 1);
+	Index *index = lua_checkindex(L, 1);
 	lua_pushinteger(L, index->size(index));
 	return 1;
 }
@@ -279,7 +279,7 @@ lbox_index_len(struct lua_State *L)
 static int
 lbox_index_min(struct lua_State *L)
 {
-	struct index *index = lua_checkindex(L, 1);
+	Index *index = lua_checkindex(L, 1);
 	lbox_pushtuple(L, index->min(index));
 	return 1;
 }
@@ -287,7 +287,7 @@ lbox_index_min(struct lua_State *L)
 static int
 lbox_index_max(struct lua_State *L)
 {
-	struct index *index = lua_checkindex(L, 1);
+	Index *index = lua_checkindex(L, 1);
 	lbox_pushtuple(L, index->max(index));
 	return 1;
 }
@@ -361,7 +361,7 @@ void append_key_part(struct lua_State *L, int i,
 static int
 lbox_index_next(struct lua_State *L)
 {
-	struct index *index = lua_checkindex(L, 1);
+	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
 	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
 		/*

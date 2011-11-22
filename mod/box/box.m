@@ -445,7 +445,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 
 	for (u32 i = 0; i < count; i++) {
 
-		struct index *index = txn->index;
+		Index *index = txn->index;
 		/* End the loop if reached the limit. */
 		if (limit == *found)
 			return;
@@ -596,7 +596,7 @@ void txn_assign_n(struct box_txn *txn, struct tbuf *data)
 	if (!txn->space->enabled)
 		tnt_raise(ClientError, :ER_SPACE_DISABLED, txn->n);
 
-	txn->index = txn->space->index;
+	txn->index = txn->space->index[0];
 }
 
 /** Remember op code/request in the txn. */
@@ -734,12 +734,9 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		u32 offset = read_u32(data);
 		u32 limit = read_u32(data);
 
-		if (i >= BOX_INDEX_MAX ||
-		    space[txn->n].index[i].key_cardinality == 0) {
-
+		if (i >= BOX_INDEX_MAX || space[txn->n].index[i]->key_cardinality == 0)
 			tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i, txn->n);
-		}
-		txn->index = &space[txn->n].index[i];
+		txn->index = space[txn->n].index[i];
 
 		process_select(txn, limit, offset, data);
 		break;
@@ -894,10 +891,10 @@ space_free(void)
 			continue;
 		int j;
 		for (j = 0 ; j < BOX_INDEX_MAX ; j++) {
-			struct index *index = &space[i].index[j];
+			Index *index = space[i].index[j];
 			if (index->key_cardinality == 0)
 				break;
-			index_free(index);
+			[index free];
 			sfree(index->key_field);
 			sfree(index->field_cmp_order);
 		}
@@ -911,7 +908,8 @@ space_init(void)
 	for (int i = 0; i < BOX_SPACE_MAX; i++) {
 		space[i].enabled = false;
 		for (int j = 0; j < BOX_INDEX_MAX; j++) {
-			space[i].index[j].key_cardinality = 0;
+			space[i].index[j] = [[Index alloc] init];
+			space[i].index[j]->key_cardinality = 0;
 		}
 	}
 	/* fill box spaces */
@@ -929,11 +927,8 @@ space_init(void)
 		/* fill space indexes */
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
-			struct index *index = &space[i].index[j];
+			Index *index = space[i].index[j];
 			u32 max_key_fieldno = 0;
-
-			/* clean-up index struct */
-			memset(index, 0, sizeof(*index));
 
 			/* calculate key cardinality and maximal field number */
 			for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
@@ -981,12 +976,11 @@ space_init(void)
 			index->unique = cfg_index->unique;
 			index->type = STR2ENUM(index_type, cfg_index->type);
 			index->n = j;
-			index_init(index, &space[i]);
+			[index init: &space[i]];
 		}
 
 		space[i].enabled = true;
 		space[i].n = i;
-
 		say_info("space %i successfully configured", i);
 	}
 	memcached_space_init();
@@ -1461,7 +1455,7 @@ mod_snapshot(struct log_io_iter *i)
 		if (!space[n].enabled)
 			continue;
 
-		struct index *pk = &space[n].index[0];
+		Index *pk = space[n].index[0];
 
 		pk->iterator_init(pk, 0, NULL);
 		while ((tuple = pk->iterator.next(pk))) {

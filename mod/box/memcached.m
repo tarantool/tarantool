@@ -45,7 +45,7 @@ STRS(memcached_stat, STAT);
 static int stat_base;
 static struct fiber *memcached_expire = NULL;
 
-static struct index *memcached_index;
+static Index *memcached_index;
 
 /* memcached tuple format:
    <key, meta, data> */
@@ -414,14 +414,14 @@ memcached_init(void)
 
 	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 
-	memcached_index = &space[cfg.memcached_space].index[0];
+	memcached_index = space[cfg.memcached_space].index[0];
 }
 
 void
 memcached_space_init()
 {
 	struct space *memc_ns;
-	struct index *memc_index;
+	Index *memc_index;
 
 	/* configure memcached space */
 	memc_ns = &space[cfg.memcached_space];
@@ -430,7 +430,7 @@ memcached_space_init()
 	memc_ns->n = cfg.memcached_space;
 
 	/* configure memcached index */
-	memc_index = &memc_ns->index[0];
+	memc_index = memc_ns->index[0];
 
 	/* configure memcached index's key */
 	memc_index->key_cardinality = 1;
@@ -452,7 +452,7 @@ memcached_space_init()
 	memc_index->type = HASH;
 	memc_index->enabled = true;
 	memc_index->n = 0;
-	index_init(memc_index, memc_ns);
+	[memc_index init: memc_ns];
 }
 
 void
