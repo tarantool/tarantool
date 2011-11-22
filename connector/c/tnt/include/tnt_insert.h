@@ -26,7 +26,8 @@
  * SUCH DAMAGE.
  */
 
-ssize_t tnt_insert(struct tnt_stream *s,
-		   uint32_t ns, uint32_t flags, struct tnt_tuple *kv);
+ssize_t
+tnt_insert(struct tnt_stream *s,
+	   uint32_t ns, uint32_t flags, struct tnt_tuple *kv);
 
 #endif /* TNT_INSERT_H_INCLUDED */

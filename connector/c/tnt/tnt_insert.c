@@ -51,8 +51,9 @@ struct tnt_header_insert {
  * 
  * returns number of bytes written, or -1 on error.
 */
-int
-tnt_insert(struct tnt_stream *s, uint32_t ns, uint32_t flags, struct tnt_tuple *kv)
+ssize_t
+tnt_insert(struct tnt_stream *s, uint32_t ns, uint32_t flags,
+	   struct tnt_tuple *kv)
 {
 	/* filling major header */
 	struct tnt_header hdr;
