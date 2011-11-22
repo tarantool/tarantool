@@ -41,7 +41,6 @@
 #include <errno.h>
 #include <limits.h>
 
-#include <connector/c/include/tnt.h>
 #include <client/tarantool/tnt_admin.h>
 
 int

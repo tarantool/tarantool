@@ -1,7 +1,0 @@
-import subprocess
-import sys
-
-p = subprocess.Popen([ "box/connector" ], stdout=subprocess.PIPE)
-p.wait()
-for line in p.stdout.readlines():
-      sys.stdout.write(line)

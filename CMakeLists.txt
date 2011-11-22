@@ -166,8 +166,10 @@ endif()
 #
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/include")
-include_directories("${PROJECT_SOURCE_DIR}/connector/c/include")
 include_directories("${PROJECT_BINARY_DIR}/include")
+include_directories("${PROJECT_SOURCE_DIR}/connector/c/tnt/include")
+include_directories("${PROJECT_SOURCE_DIR}/connector/c/tntsql/include")
+include_directories("${PROJECT_SOURCE_DIR}/connector/c/tntnet/include")
 
 #
 # Now handle all configuration options.

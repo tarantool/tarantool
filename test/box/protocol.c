@@ -1,10 +1,16 @@
+
+#include <stdlib.h>
 #include <stdio.h>
-#include <connector/c/include/tnt.h>
+#include <inttypes.h>
+
+#include <connector/c/tnt/include/tnt.h>
+#include <connector/c/tntnet/include/tnt_net.h>
+#include <connector/c/tntnet/include/tnt_io.h>
 #include "util.h"
 #include "errcode.h"
 
 /** Client handler. Reused between tests. */
-struct tnt *t;
+struct tnt_stream *t;
 
 /** Test the ping command. */
 void test_ping()
@@ -15,14 +21,15 @@ void test_ping()
 		0x0, 0x0, 0x0, 0x0,    0x1, 0x0, 0x0, 0x0,
 		0x4, 0x1, 0x0, 0x0, 0x0 };
 
-	tnt_io_send_raw(t, (char*)message, sizeof(message));
+	tnt_io_send_raw(TNT_SNET_CAST(t), (char*)message, sizeof(message), 1);
+	t->wrcnt++;
 
-	struct tnt_recv rcv;
-	tnt_recv_init(&rcv);
-	tnt_recv(t, &rcv);
-
-	printf("return_code: %d\n", TNT_RECV_CODE(&rcv)); /* =0 */
-	tnt_recv_free(&rcv);
+	struct tnt_iter i;
+	tnt_iter_stream(&i, t);
+	tnt_next(&i);
+	struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+	printf("return_code: %"PRIu32"\n", r->code); /* =0 */
+	tnt_iter_free(&i);
 }
 
 /** A test case for Bug#702397
@@ -37,20 +44,16 @@ void test_bug702397()
 		0x0, 0x0, 0x0, 0x0,     0x0, 0x0, 0x0, 0x0,     0x0, 0x0, 0x0, 0x0,
 		0xff, 0xff, 0xff, 0xff, 0x0, 0x0, 0x0, 0x0 };
 
-	tnt_io_send_raw(t, (char*)message, sizeof(message));
+	tnt_io_send_raw(TNT_SNET_CAST(t), (char*)message, sizeof(message), 1);
+	t->wrcnt++;
 
-	struct tnt_recv rcv;
-	tnt_recv_init(&rcv);
-	tnt_recv(t, &rcv);
-
-	/*
+	struct tnt_iter i;
+	tnt_iter_stream(&i, t);
+	tnt_next(&i);
+	struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
 	printf("return_code: %s, %s\n",
-	       tnt_errcode_str(tnt_res.errcode >> 8), tnt_res.errmsg);
-	       */
-	printf("return_code: %s, %s\n",
-	       tnt_errcode_str(TNT_RECV_CODE(&rcv) >> 8),
-		       tnt_recv_error(&rcv));
-	tnt_recv_free(&rcv);
+	       tnt_errcode_str(r->code >> 8), r->error);
+	tnt_iter_free(&i);
 }
 
 /** A test case for Bug#702399
@@ -68,34 +71,27 @@ void test_bug702399()
 		0x1, 0x0, 0x0, 0x0,     0x1, 0x0, 0x0, 0x0,
 		0x4,    0x1, 0x0, 0x0, 0x0 };
 
-	tnt_io_send_raw(t, (char*)message, sizeof(message));
+	tnt_io_send_raw(TNT_SNET_CAST(t), (char*)message, sizeof(message), 1);
+	t->wrcnt++;
 
-	/*
-	int res = tnt_execute_raw(conn, message, sizeof message, &tnt_res);
+	struct tnt_iter i;
+	tnt_iter_stream(&i, t);
+	tnt_next(&i);
+	struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
 	printf("return_code: %s, %s\n",
-	       tnt_errcode_str(tnt_res.errcode >> 8), tnt_res.errmsg);
-	       */
-	struct tnt_recv rcv;
-	tnt_recv_init(&rcv);
-	tnt_recv(t, &rcv);
-
-	printf("return_code: %s, %s\n",
-	       tnt_errcode_str(TNT_RECV_CODE(&rcv) >> 8),
-		       tnt_recv_error(&rcv));
-	tnt_recv_free(&rcv);
+	       tnt_errcode_str(r->code >> 8), r->error);
+	tnt_iter_free(&i);
 }
 
 int main()
 {
-	t = tnt_alloc();
+	t = tnt_net(NULL);
 	if (t == NULL)
 		return 1;
-
 	tnt_set(t, TNT_OPT_HOSTNAME, "localhost");
-	tnt_set(t, TNT_OPT_PORT, 33013); 
+	tnt_set(t, TNT_OPT_PORT, 33013);
 	if (tnt_init(t) == -1)
 		return 1;
-
 	if (tnt_connect(t) == -1)
 		return 1;
 
@@ -103,6 +99,6 @@ int main()
 	test_bug702397();
 	test_bug702399();
 
-	tnt_free(t);
+	tnt_stream_free(t);
 	return 0;
 }

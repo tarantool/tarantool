@@ -25,7 +25,7 @@ endif()
 
 set (cli "tarantool")
 set (cli_sources tnt.c tnt_admin.c)
-set (cli_libs tntsql tnt gopt ${cli_deps})
+set (cli_libs tntnet tntsql tnt gopt ${cli_deps})
 
 add_executable(${cli} ${cli_sources} ${CMAKE_SOURCE_DIR}/core/errcode.c)
 set_target_properties(${cli} PROPERTIES COMPILE_FLAGS "${core_cflags}")
