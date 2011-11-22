@@ -547,7 +547,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
 
         <row>
         <entry>wal_fsync_delay</entry>
-        <entry>integer</entry>
+        <entry>float</entry>
         <entry>0</entry>
         <entry>no</entry>
         <entry>no</entry>
@@ -853,7 +853,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
 
         <row>
           <entry>memcached_expire_full_sweep</entry>
-          <entry>integer</entry>
+          <entry>float</entry>
           <entry>3600</entry>
           <entry>no</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
