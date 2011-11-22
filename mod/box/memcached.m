@@ -423,6 +423,10 @@ memcached_space_init()
 	struct space *memc_ns;
 	struct index *memc_index;
 
+        if (cfg.memcached_port == 0) {
+                return;
+        }
+
 	/* configure memcached space */
 	memc_ns = &space[cfg.memcached_space];
 	memc_ns->enabled = true;
