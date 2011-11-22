@@ -104,7 +104,7 @@ tnt_utf8_chrlen(unsigned char *data, size_t size)
 ssize_t
 tnt_utf8_strlen(unsigned char *data, size_t size)
 {
-	register size_t i;
+	register size_t i = 0;
 	register ssize_t c = 0, r = 0;
 	while (i < size) {
 		r =tnt_utf8_chrlen(data + i, size - i);
