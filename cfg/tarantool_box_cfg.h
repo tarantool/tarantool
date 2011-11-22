@@ -140,7 +140,7 @@ typedef struct tarantool_cfg {
 	int32_t	memcached_expire_per_loop;
 
 	/* tarantool will try to iterate over all rows within this time */
-	int32_t	memcached_expire_full_sweep;
+	double	memcached_expire_full_sweep;
 
 	/* Do not write into snapshot faster than snap_io_rate_limit MB/sec */
 	double	snap_io_rate_limit;
@@ -153,7 +153,7 @@ typedef struct tarantool_cfg {
 	 * seconds ago.
 	 * WARNING: actually, several last requests may stall fsync for much longer
 	 */
-	int32_t	wal_fsync_delay;
+	double	wal_fsync_delay;
 
 	/* size of WAL writer request buffer */
 	int32_t	wal_writer_inbox_size;

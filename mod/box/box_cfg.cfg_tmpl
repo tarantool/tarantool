@@ -29,7 +29,7 @@ memcached_expire=false, ro
 # maximum rows to consider per expire loop iteration
 memcached_expire_per_loop=1024
 # tarantool will try to iterate over all rows within this time
-memcached_expire_full_sweep=3600
+memcached_expire_full_sweep=3600.0
 
 # Do not write into snapshot faster than snap_io_rate_limit MB/sec
 snap_io_rate_limit=0.0, ro
@@ -40,7 +40,7 @@ rows_per_wal=500000, ro
 # fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay
 # seconds ago.
 # WARNING: actually, several last requests may stall fsync for much longer
-wal_fsync_delay=0, ro
+wal_fsync_delay=0.0, ro
 
 # size of WAL writer request buffer
 wal_writer_inbox_size=128, ro

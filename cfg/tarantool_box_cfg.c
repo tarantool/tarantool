@@ -722,12 +722,10 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+		double dbl = strtod(opt->paramValue.numberval, NULL);
+		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		c->memcached_expire_full_sweep = i32;
+		c->memcached_expire_full_sweep = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
 		if (opt->paramType != numberType )
@@ -760,14 +758,12 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+		double dbl = strtod(opt->paramValue.numberval, NULL);
+		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->wal_fsync_delay != i32)
+		if (check_rdonly && c->wal_fsync_delay != dbl)
 			return CNF_RDONLY;
-		c->wal_fsync_delay = i32;
+		c->wal_fsync_delay = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_writer_inbox_size) ) {
 		if (opt->paramType != numberType )
@@ -1568,7 +1564,7 @@ again:
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->memcached_expire_full_sweep);
+			sprintf(*v, "%g", c->memcached_expire_full_sweep);
 			snprintf(buf, PRINTBUFLEN-1, "memcached_expire_full_sweep");
 			i->state = S_name__snap_io_rate_limit;
 			return buf;
@@ -1601,7 +1597,7 @@ again:
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			sprintf(*v, "%"PRId32, c->wal_fsync_delay);
+			sprintf(*v, "%g", c->wal_fsync_delay);
 			snprintf(buf, PRINTBUFLEN-1, "wal_fsync_delay");
 			i->state = S_name__wal_writer_inbox_size;
 			return buf;
