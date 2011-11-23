@@ -27,11 +27,15 @@
  */
 
 struct tnt_admin {
+	char *host;
+	int port;
 	int fd;
 };
 
 int tnt_admin_init(struct tnt_admin *a, char *host, int port);
 void tnt_admin_free(struct tnt_admin *a);
+
+int tnt_admin_reconnect(struct tnt_admin *a);
 
 int tnt_admin_query(struct tnt_admin *a, char *q);
 int tnt_admin_reply(struct tnt_admin *a, char **r, size_t *size);

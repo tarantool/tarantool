@@ -120,8 +120,8 @@ int tnt_reply_from(struct tnt_reply *r, tnt_replyf_t rcv, void *ptr) {
 		return -1;
 	size -= 4;
 
-	/* count only (insert, update, delete) */
-	if (r->op != TNT_OP_SELECT && size == 0)
+	/* count only */
+	if (size == 0)
 		return 0;
 
 	/* allocating and reading data */

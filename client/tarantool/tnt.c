@@ -30,6 +30,9 @@
 #include <ctype.h>
 #include <inttypes.h>
 
+#include <signal.h>
+#include <errno.h>
+
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -105,6 +108,8 @@ static int query_reply_handle(struct tnt_stream *t, struct tnt_reply *r) {
 				printf("'%-.*s'", size, data);
 			}
 		}
+		if (ifl.status == TNT_ITER_FAIL)
+			printf("<parsing error>");
 		printf("]\n");
 	}
 	return 0;
@@ -122,7 +127,7 @@ query_reply(struct tnt_stream *t)
 			goto error;
 
 	}
-	rc = 0;
+	rc = (i.status == TNT_ITER_FAIL) ? -1 : 0;
 error:
 	tnt_iter_free(&i);
 	return rc;
@@ -141,8 +146,10 @@ query(struct tnt_stream *t, char *q)
 		return -1;
 	}
 	int rc = tnt_flush(t);
-	if (rc < 0)
+	if (rc < 0) {
+		printf("error: %s\n", tnt_strerror(t));
 		return -1;
+	}
 	if (query_reply(t) == -1)
 		return -1;
 	return 0;
@@ -167,6 +174,98 @@ query_admin(struct tnt_admin *a, char *q, int reply)
 		printf("%s", rep);
 		free(rep);
 	}
+	return 0;
+}
+
+static int
+run_cmdline(struct tnt_stream *t, struct tnt_admin *a, int argc, char **argv) 
+{
+	int i, rc = 0;
+	for (i = 1 ; i < argc ; i++) {
+		if (tnt_query_is(argv[i], strlen(argv[i]))) {
+			if (query(t, argv[i]) == -1)
+				rc = 1;
+		} else {
+			int reply = strcmp(argv[i], "exit") && strcmp(argv[i], "quit");
+			if (query_admin(a, argv[i], reply) == -1)
+				rc = 1;
+			if (!reply)
+				break;
+		}
+	}
+	return rc;
+}
+
+static int reconnect_do(struct tnt_stream *t, struct tnt_admin *a) {
+	if (tnt_connect(t) == -1) {
+		printf("reconnect: %s\n", tnt_strerror(t));
+		return 0;
+	}
+	if (tnt_admin_reconnect(a) == -1) {
+		printf("reconnect: admin console connection failed\n");
+		return 0;
+	}
+	printf("reconnected\n");
+	return 1;
+}
+
+static int
+run_interactive(struct tnt_stream *t, struct tnt_admin *a, char *host) 
+{
+	/* ignoring SIGPIPE */
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sigemptyset(&sa.sa_mask);
+	sa.sa_handler = SIG_IGN;
+	if (sigaction(SIGPIPE, &sa, NULL) == -1) {
+		printf("signal initialization failed\n");
+		return 1;
+	}
+
+	char *home = getenv("HOME");
+	char history[1024];
+	snprintf(history, sizeof(history), "%s/%s", home, HISTORY_FILE);
+	read_history(history);
+
+	char prompt[128];
+	snprintf(prompt, sizeof(prompt), "%s> ", host);
+
+	/* interactive mode */
+	int reconnect = 0;
+	char *cmd;
+	while ((cmd = readline(prompt))) {
+		if (reconnect) {
+reconnect: 		if (reconnect_do(t, a))
+				reconnect = 0;
+			else
+				continue;
+		}
+		if (!cmd[0])
+			continue;
+		if (tnt_query_is(cmd, strlen(cmd))) {
+			if (query(t, cmd) == -1) {
+				/* broken pipe or recv() == 0 */
+				int e = tnt_errno(t) == EPIPE || tnt_errno(t) == 0;
+				if (tnt_error(t) == TNT_ESYSTEM && e)
+					reconnect = 1;
+			}
+		} else {
+			int reply = strcmp(cmd, "exit") && strcmp(cmd, "quit");
+			if (query_admin(a, cmd, reply) == -1)
+				reconnect = 1;
+			if (!reply) {
+				free(cmd);
+				break;
+			}
+		}
+		add_history(cmd);
+		free(cmd);
+		if (reconnect)
+			goto reconnect;
+	}
+
+	write_history(history);
+	clear_history();
 	return 0;
 }
 
@@ -215,6 +314,9 @@ main(int argc, char *argv[])
 		return 1;
 	tnt_set(t, TNT_OPT_HOSTNAME, host);
 	tnt_set(t, TNT_OPT_PORT, port);
+	tnt_set(t, TNT_OPT_SEND_BUF, 0);
+	tnt_set(t, TNT_OPT_RECV_BUF, 0);
+
 	if (tnt_init(t) == -1) {
 		printf("error: %s\n", tnt_strerror(t));
 		tnt_stream_free(t);
@@ -236,57 +338,13 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	/* command line mode */
-	if (argc >= 2) {
-		int i, rc = 0;
-		for (i = 1 ; i < argc ; i++) {
-			if (tnt_query_is(argv[i], strlen(argv[i]))) {
-				if (query(t, argv[i]) == -1)
-					rc = 1;
-			} else {
-				int reply = strcmp(argv[i], "exit") && strcmp(argv[i], "quit");
-				if (query_admin(&a, argv[i], reply) == -1)
-					rc = 1;
-				if (!reply)
-					break;
-			}
-		}
-		tnt_stream_free(t);
-		tnt_admin_free(&a);
-		return rc;
-	}
-
-	/* interactive mode */
-	char *home = getenv("HOME");
-	char history[1024];
-	snprintf(history, sizeof(history), "%s/%s", home, HISTORY_FILE);
-	read_history(history);
-
-	char prompt[128];
-	snprintf(prompt, sizeof(prompt), "%s> ", host);
-
-	char *cmd;
-	while ((cmd = readline(prompt))) {
-		if (!cmd[0])
-			continue;
-		if (tnt_query_is(cmd, strlen(cmd)))
-			query(t, cmd);
-		else {
-			int reply = strcmp(cmd, "exit") && strcmp(cmd, "quit");
-			query_admin(&a, cmd, reply);
-			if (!reply) {
-				free(cmd);
-				break;
-			}
-		}
-		add_history(cmd);
-		free(cmd);
-	}
-
-	write_history(history);
-	clear_history();
-
+	/* main */
+	int rc = 0;
+	if (argc >= 2) 
+		rc = run_cmdline(t, &a, argc, argv);
+	else
+		rc = run_interactive(t, &a, host);
 	tnt_stream_free(t);
 	tnt_admin_free(&a);
-	return 0;
+	return rc;
 }

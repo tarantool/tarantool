@@ -43,8 +43,8 @@
 
 #include <client/tarantool/tnt_admin.h>
 
-int
-tnt_admin_init(struct tnt_admin *a, char *host, int port)
+static int
+tnt_admin_connect(struct tnt_admin *a)
 {
 	a->fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (a->fd < 0)
@@ -55,9 +55,9 @@ tnt_admin_init(struct tnt_admin *a, char *host, int port)
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
-	struct hostent *he = gethostbyname(host);
-	if (host)
+	addr.sin_port = htons(a->port);
+	struct hostent *he = gethostbyname(a->host);
+	if (he)
 		memcpy(&addr.sin_addr, (void*)(he->h_addr), he->h_length);
 	else 
 		goto error;
@@ -69,11 +69,27 @@ error:
 	return -1;
 }
 
+int
+tnt_admin_init(struct tnt_admin *a, char *host, int port)
+{
+	a->host = host;
+	a->port = port;
+	return tnt_admin_connect(a);
+}
+
+int
+tnt_admin_reconnect(struct tnt_admin *a)
+{
+	tnt_admin_free(a);
+	return tnt_admin_connect(a);
+}
+
 void
 tnt_admin_free(struct tnt_admin *a)
 {
-	if (a->fd)
+	if (a->fd > 0)
 		close(a->fd);
+	a->fd = -1;
 }
 
 static int
