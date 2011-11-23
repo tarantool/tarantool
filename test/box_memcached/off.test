@@ -2,6 +2,7 @@
 #
 
 import os
+import sys
 
 print """
 # Bug #855616:
@@ -18,7 +19,9 @@ exec admin "show configuration"
 # stop current server
 server.stop()
 # start server with memcached space conflict
+sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
 server.test_option("-c " + os.path.join(os.getcwd(), "box_memcached/tarantool_memcached_bad.cfg"))
+sys.stdout.pop_filter()
 
 # restore default server
 server.stop()
