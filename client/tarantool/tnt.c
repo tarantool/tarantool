@@ -235,14 +235,12 @@ run_interactive(struct tnt_stream *t, struct tnt_admin *a, char *host)
 	char *cmd;
 	while ((cmd = readline(prompt))) {
 		if (!cmd[0])
-			continue;
+			goto next;
 		if (reconnect) {
 reconnect: 		if (reconnect_do(t, a))
 				reconnect = 0;
-			else {
-				free(cmd);
-				continue;
-			}
+			else 
+				goto next;
 		}
 		if (tnt_query_is(cmd, strlen(cmd))) {
 			if (query(t, cmd) == -1) {
@@ -263,6 +261,7 @@ reconnect: 		if (reconnect_do(t, a))
 		add_history(cmd);
 		if (reconnect)
 			goto reconnect;
+next:
 		free(cmd);
 	}
 
