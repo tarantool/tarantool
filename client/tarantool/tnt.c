@@ -234,14 +234,16 @@ run_interactive(struct tnt_stream *t, struct tnt_admin *a, char *host)
 	int reconnect = 0;
 	char *cmd;
 	while ((cmd = readline(prompt))) {
+		if (!cmd[0])
+			continue;
 		if (reconnect) {
 reconnect: 		if (reconnect_do(t, a))
 				reconnect = 0;
-			else
+			else {
+				free(cmd);
 				continue;
+			}
 		}
-		if (!cmd[0])
-			continue;
 		if (tnt_query_is(cmd, strlen(cmd))) {
 			if (query(t, cmd) == -1) {
 				/* broken pipe or recv() == 0 */
@@ -259,9 +261,9 @@ reconnect: 		if (reconnect_do(t, a))
 			}
 		}
 		add_history(cmd);
-		free(cmd);
 		if (reconnect)
 			goto reconnect;
+		free(cmd);
 	}
 
 	write_history(history);
