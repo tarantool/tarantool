@@ -60,7 +60,8 @@
 
 static pid_t master_pid;
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
-const char *cfg_filename = DEFAULT_CFG_FILENAME;
+#define DEFAULT_CFG INSTALL_PREFIX "/etc/" DEFAULT_CFG_FILENAME
+const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
 char *custom_proc_title;
@@ -460,8 +461,18 @@ main(int argc, char **argv)
 		return 0;
 	}
 
-	/* If config filename given in command line it will override the default */
 	gopt_arg(opt, 'c', &cfg_filename);
+	/* if config is not specified trying ./tarantool.cfg then /etc/tarantool.cfg */
+	if (cfg_filename == NULL) {
+		if (access(DEFAULT_CFG_FILENAME, F_OK) == 0)
+			cfg_filename = DEFAULT_CFG_FILENAME;
+		else
+		if (access(DEFAULT_CFG, F_OK) == 0)
+			cfg_filename = DEFAULT_CFG;
+		else
+			panic("can't load config " "%s or %s", DEFAULT_CFG_FILENAME, DEFAULT_CFG);
+	}
+
 	cfg.log_level += gopt(opt, 'v');
 
 	if (argc != 1) {
