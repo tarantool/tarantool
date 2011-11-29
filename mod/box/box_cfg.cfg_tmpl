@@ -86,4 +86,4 @@ space = [
       }, ro, required
     ], required
   }, ro
-], ro, required
+], ro

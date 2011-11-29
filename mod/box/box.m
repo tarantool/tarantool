@@ -904,17 +904,14 @@ space_free(void)
 	}
 }
 
-void
-space_init(void)
+static void
+space_config(void)
 {
-	space = palloc(eter_pool, sizeof(struct space) * BOX_SPACE_MAX);
-	for (int i = 0; i < BOX_SPACE_MAX; i++) {
-		space[i].enabled = false;
-		for (int j = 0; j < BOX_INDEX_MAX; j++) {
-			space[i].index[j] = [[Index alloc] init];
-			space[i].index[j]->key_cardinality = 0;
-		}
+	/* exit if no spaces are configured */
+	if (cfg.space == NULL) {
+		return;
 	}
+
 	/* fill box spaces */
 	for (int i = 0; cfg.space[i] != NULL; ++i) {
 		tarantool_cfg_space *cfg_space = cfg.space[i];
@@ -986,6 +983,25 @@ space_init(void)
 		space[i].n = i;
 		say_info("space %i successfully configured", i);
 	}
+}
+
+void
+space_init(void)
+{
+ 	/* allocate and initialize space memory */
+	space = palloc(eter_pool, sizeof(struct space) * BOX_SPACE_MAX);
+	for (int i = 0; i < BOX_SPACE_MAX; i++) {
+		space[i].enabled = false;
+		for (int j = 0; j < BOX_INDEX_MAX; j++) {
+			space[i].index[j] = [[Index alloc] init];
+			space[i].index[j]->key_cardinality = 0;
+		}
+	}
+
+	/* configure regular spaces */
+	space_config();
+
+	/* configure memcached space */
 	memcached_space_init();
 }
 
@@ -1139,48 +1155,14 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	box_enter_master_or_replica_mode(&cfg);
 }
 
-i32
-mod_check_config(struct tarantool_cfg *conf)
+static i32
+check_spaces(struct tarantool_cfg *conf)
 {
-	/* replication & hot standby modes can not work together */
-	if (conf->replication_source != NULL && conf->local_hot_standby > 0) {
-		out_warning(0, "replication and local hot standby modes "
-			       "can't be enabled simultaneously");
-		return -1;
+	/* exit if no spaces are configured */
+	if (conf->space == NULL) {
+		return 0;
 	}
 
-	/* check replication mode */
-	if (conf->replication_source != NULL) {
-		/* check replication port */
-		char ip_addr[32];
-		int port;
-
-		if (sscanf(conf->replication_source, "%31[^:]:%i",
-			   ip_addr, &port) != 2) {
-			out_warning(0, "replication source IP address is not recognized");
-			return -1;
-		}
-		if (port <= 0 || port >= USHRT_MAX) {
-			out_warning(0, "invalid replication source port value: %i", port);
-			return -1;
-		}
-	}
-
-	/* check primary port */
-	if (conf->primary_port != 0 &&
-	    (conf->primary_port <= 0 || conf->primary_port >= USHRT_MAX)) {
-		out_warning(0, "invalid primary port value: %i", conf->primary_port);
-		return -1;
-	}
-
-	/* check secondary port */
-	if (conf->secondary_port != 0 &&
-	    (conf->secondary_port <= 0 || conf->secondary_port >= USHRT_MAX)) {
-		out_warning(0, "invalid secondary port value: %i", conf->primary_port);
-		return -1;
-	}
-
-	/* check configured spaces */
 	for (size_t i = 0; conf->space[i] != NULL; ++i) {
 		typeof(conf->space[i]) space = conf->space[i];
 
@@ -1314,6 +1296,62 @@ mod_check_config(struct tarantool_cfg *conf)
 			}
 		}
 	}
+
+	return 0;
+}
+
+i32
+mod_check_config(struct tarantool_cfg *conf)
+{
+	/* replication & hot standby modes can not work together */
+	if (conf->replication_source != NULL && conf->local_hot_standby > 0) {
+		out_warning(0, "replication and local hot standby modes "
+			       "can't be enabled simultaneously");
+		return -1;
+	}
+
+	/* check replication mode */
+	if (conf->replication_source != NULL) {
+		/* check replication port */
+		char ip_addr[32];
+		int port;
+
+		if (sscanf(conf->replication_source, "%31[^:]:%i",
+			   ip_addr, &port) != 2) {
+			out_warning(0, "replication source IP address is not recognized");
+			return -1;
+		}
+		if (port <= 0 || port >= USHRT_MAX) {
+			out_warning(0, "invalid replication source port value: %i", port);
+			return -1;
+		}
+	}
+
+	/* check primary port */
+	if (conf->primary_port != 0 &&
+	    (conf->primary_port <= 0 || conf->primary_port >= USHRT_MAX)) {
+		out_warning(0, "invalid primary port value: %i", conf->primary_port);
+		return -1;
+	}
+
+	/* check secondary port */
+	if (conf->secondary_port != 0 &&
+	    (conf->secondary_port <= 0 || conf->secondary_port >= USHRT_MAX)) {
+		out_warning(0, "invalid secondary port value: %i", conf->primary_port);
+		return -1;
+	}
+
+	/* check if at least one space is defined */
+	if (conf->space == NULL && conf->memcached_port == 0) {
+		out_warning(0, "at least one space or memcached port must be defined");
+		return -1;
+	}
+
+	/* check configured spaces */
+	if (check_spaces(conf) != 0) {
+		return -1;
+	}
+
 	/* check memcached configuration */
 	if (memcached_check_config(conf) != 0) {
 		return -1;

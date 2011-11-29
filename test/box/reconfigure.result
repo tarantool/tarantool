@@ -33,7 +33,7 @@ fail:
 reload configuration
 ---
 fail:
- - Option 'space' is not set (or has a default value)
+ - at least one space or memcached port must be defined
 ...
 reload configuration
 ---
