@@ -466,8 +466,7 @@ main(int argc, char **argv)
 	if (cfg_filename == NULL) {
 		if (access(DEFAULT_CFG_FILENAME, F_OK) == 0)
 			cfg_filename = DEFAULT_CFG_FILENAME;
-		else
-		if (access(DEFAULT_CFG, F_OK) == 0)
+		else if (access(DEFAULT_CFG, F_OK) == 0)
 			cfg_filename = DEFAULT_CFG;
 		else
 			panic("can't load config " "%s or %s", DEFAULT_CFG_FILENAME, DEFAULT_CFG);
