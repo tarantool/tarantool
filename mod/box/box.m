@@ -48,6 +48,9 @@
 #include "memcached.h"
 #include "box_lua.h"
 
+extern const char *cfg_filename;
+extern char *cfg_filename_fullpath;
+
 static void box_process_ro(u32 op, struct tbuf *request_data);
 static void box_process_rw(u32 op, struct tbuf *request_data);
 
@@ -1478,4 +1481,8 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,
 		    recovery_state->recovery_last_update_tstamp);
 	tbuf_printf(out, "  status: %s" CRLF, status);
+	const char *path = cfg_filename_fullpath;
+	if (cfg_filename_fullpath == NULL)
+		path = cfg_filename;
+	tbuf_printf(out, "  config: \"%s\"" CRLF, path);
 }
