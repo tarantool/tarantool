@@ -95,6 +95,17 @@ fail(struct tbuf *out, struct tbuf *err)
 	end(out);
 }
 
+static void
+tarantool_info(struct tbuf *out)
+{
+	tbuf_printf(out, "info:" CRLF);
+	mod_info(out);
+	const char *path = cfg_filename_fullpath;
+	if (path == NULL)
+		path = cfg_filename;
+	tbuf_printf(out, "  config: \"%s\"" CRLF, path);
+}
+
 static int
 admin_dispatch(lua_State *L)
 {
@@ -186,7 +197,7 @@ admin_dispatch(lua_State *L)
 		commands = (help			%help						|
 			    exit			%{return 0;}					|
 			    lua  " "+ string		%lua						|
-			    show " "+ info		%{start(out); mod_info(out); end(out);}		|
+			    show " "+ info		%{start(out); tarantool_info(out); end(out);}		|
 			    show " "+ fiber		%{start(out); fiber_info(out); end(out);}	|
 			    show " "+ configuration 	%show_configuration				|
 			    show " "+ slab		%{start(out); slab_stat(out); end(out);}	|

@@ -82,13 +82,13 @@ void tarantool_lua_load_cfg(struct lua_State *L,
 
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
+extern char *cfg_filename_fullpath;
 extern bool init_storage, booting;
 extern char *binary_filename;
 extern char *custom_proc_title;
 i32 reload_cfg(struct tbuf *out);
 int snapshot(void * /* ev */, int /* events */);
 const char *tarantool_version(void);
-void tarantool_info(struct tbuf *out);
 double tarantool_uptime(void);
 void tarantool_free(void);
 

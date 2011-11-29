@@ -100,4 +100,5 @@ info:
   recovery_lag: 0.000
   recovery_last_update: 0.000
   status: primary
+  config: "tarantool.cfg"
 ...
