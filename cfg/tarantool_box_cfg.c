@@ -1818,10 +1818,6 @@ check_cfg_tarantool_cfg(tarantool_cfg *c) {
 		res++;
 		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__primary_port));
 	}
-	if (c->space == NULL) {
-		res++;
-		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__space));
-	}
 	i->idx_name__space = 0;
 	while (c->space && c->space[i->idx_name__space]) {
 		if (c->space[i->idx_name__space]->__confetti_flags & CNF_FLAG_STRUCT_NOTSET) {
