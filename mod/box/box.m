@@ -73,7 +73,7 @@ STRS(messages, MESSAGES);
 
 const int BOX_REF_THRESHOLD = 8196;
 
-struct space *space;
+struct space *space = NULL;
 
 struct box_snap_row {
 	u32 space;
@@ -734,7 +734,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		u32 offset = read_u32(data);
 		u32 limit = read_u32(data);
 
-		if (i >= BOX_INDEX_MAX || space[txn->n].index[i]->key.part_count == 0)
+		if (i >= BOX_INDEX_MAX || space[txn->n].index[i] == nil)
 			tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i, txn->n);
 		txn->index = space[txn->n].index[i];
 
@@ -892,11 +892,9 @@ space_free(void)
 		int j;
 		for (j = 0 ; j < BOX_INDEX_MAX ; j++) {
 			Index *index = space[i].index[j];
-			if (index->key.part_count == 0)
+			if (index == 0)
 				break;
 			[index free];
-			sfree(index->key.parts);
-			sfree(index->key.cmp_order);
 		}
 	}
 }
@@ -974,7 +972,7 @@ space_config(void)
 		/* fill space indexes */
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
-			Index *index = space[i].index[j];
+			Index *index = [[Index alloc] init];
 			struct key key;
 			key_config(&key, cfg_index);
 			index->key = key;
@@ -982,6 +980,7 @@ space_config(void)
 			index->type = STR2ENUM(index_type, cfg_index->type);
 			index->n = j;
 			[index init: &space[i]];
+			space[i].index[j] = index;
 		}
 
 		space[i].enabled = true;
@@ -993,15 +992,10 @@ space_config(void)
 void
 space_init(void)
 {
- 	/* allocate and initialize space memory */
+	/* Allocate and initialize space memory. */
 	space = palloc(eter_pool, sizeof(struct space) * BOX_SPACE_MAX);
-	for (int i = 0; i < BOX_SPACE_MAX; i++) {
-		space[i].enabled = false;
-		for (int j = 0; j < BOX_INDEX_MAX; j++) {
-			space[i].index[j] = [[Index alloc] init];
-			space[i].index[j]->key.part_count = 0;
-		}
-	}
+	memset(space, 0, sizeof(struct space) * BOX_SPACE_MAX);
+
 
 	/* configure regular spaces */
 	space_config();

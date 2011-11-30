@@ -128,7 +128,8 @@ struct symbol {
 	void *end;
 };
 struct symbol *addr2symbol(void *addr);
-void load_symbols(const char *name);
+void symbols_load(const char *name);
+void symbols_free();
 #endif /* HAVE_BFD */
 
 #ifdef NDEBUG

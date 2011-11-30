@@ -589,7 +589,7 @@ index_tree_iterator_init(Index *index,
 void
 validate_indexes(struct box_txn *txn)
 {
-	if (space[txn->n].index[1]->key.part_count != 0) {	/* there is more than one index */
+	if (space[txn->n].index[1] != nil) {	/* there is more than one index */
 		foreach_index(txn->n, index) {
 			for (u32 f = 0; f < index->key.part_count; ++f) {
 				if (index->key.parts[f].fieldno >= txn->tuple->cardinality)
@@ -670,13 +670,13 @@ build_indexes(void)
 		if (space[n].enabled == false)
 			continue;
 		/* A shortcut to avoid unnecessary log messages. */
-		if (space[n].index[1]->key.part_count == 0)
+		if (space[n].index[1] == nil)
 			continue; /* no secondary keys */
 		say_info("Building secondary keys in space %" PRIu32 "...", n);
 		Index *pk = space[n].index[0];
 		for (u32 idx = 1;; idx++) {
 			Index *index = space[n].index[idx];
-			if (index->key.part_count == 0)
+			if (index == nil)
 				break;
 
 			if (index->type != TREE)
@@ -849,6 +849,8 @@ index_tree_free(Index *index)
 	default:
 		break;
 	}
+	sfree(key.parts);
+	sfree(key.cmp_order);
 
 	[super free];
 }

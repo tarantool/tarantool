@@ -108,8 +108,8 @@ struct key {
 
 @class Index;
 
-@interface Index : Object {
-	@public
+@interface Index: Object {
+ @public
 	bool enabled;
 	bool unique;
 
@@ -165,8 +165,7 @@ struct key {
 #define foreach_index(n, index_var)					\
 	Index *index_var;						\
 	for (Index **index_ptr = space[(n)].index;			\
-	     (**index_ptr).key.part_count != 0;				\
-	     index_ptr++)						\
+	     *index_ptr != nil; index_ptr++)				\
 		if ((index_var = *index_ptr)->enabled)
 
 struct box_txn;

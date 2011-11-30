@@ -371,6 +371,9 @@ tarantool_free(void)
 #ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
+#ifdef HAVE_BFD
+	symbols_free();
+#endif
 }
 
 static void
@@ -410,7 +413,7 @@ main(int argc, char **argv)
 	palloc_init();
 
 #ifdef HAVE_BFD
-	load_symbols(argv[0]);
+	symbols_load(argv[0]);
 #endif
 
 	argv = init_set_proc_title(argc, argv);

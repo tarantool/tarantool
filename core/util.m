@@ -233,7 +233,7 @@ compare_symbol(const void *_a, const void *_b)
 }
 
 void
-load_symbols(const char *name)
+symbols_load(const char *name)
 {
 	long storage_needed;
 	asymbol **symbol_table = NULL;
@@ -299,6 +299,7 @@ load_symbols(const char *name)
 			j++;
 		}
 	}
+	bfd_close(h);
 
 	qsort(symbols, symbol_count, sizeof(struct symbol), compare_symbol);
 
@@ -311,6 +312,13 @@ out:
 
 	if (symbol_table)
 		free(symbol_table);
+}
+
+void symbols_free()
+{
+	for (struct symbol *s = symbols; s < symbols + symbol_count; s++)
+		free((void *) s->name);
+	free(symbols);
 }
 
 struct symbol *

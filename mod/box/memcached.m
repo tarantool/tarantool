@@ -420,22 +420,20 @@ memcached_init(void)
 void
 memcached_space_init()
 {
-	struct space *memc_ns;
-	Index *memc_index;
-
-        if (cfg.memcached_port == 0) {
+        if (cfg.memcached_port == 0)
                 return;
-        }
 
-	/* configure memcached space */
-	memc_ns = &space[cfg.memcached_space];
-	memc_ns->enabled = true;
-	memc_ns->cardinality = 4;
-	memc_ns->n = cfg.memcached_space;
+	/* Configure memcached space. */
+	struct space *memc_s = &space[cfg.memcached_space];
+	memc_s->enabled = true;
+	memc_s->cardinality = 4;
+	memc_s->n = cfg.memcached_space;
+
+	/* Configure memcached index. */
+	Index *memc_index = memc_s->index[0] = [[Index alloc] init];
 
 	struct key key;
-
-	/* configure memcached index's key */
+	/* Configure memcached index key. */
 	key.part_count = 1;
 
 	key.parts = salloc(sizeof(struct key_part));
@@ -447,19 +445,15 @@ memcached_space_init()
 	key.parts[0].fieldno = 0;
 	key.parts[0].type = STRING;
 
-	/* configure memcached index compare order */
 	key.max_fieldno = 1;
 	key.cmp_order[0] = 0;
-
-	/* configure memcached index */
-	memc_index = memc_ns->index[0];
 
 	memc_index->key = key;
 	memc_index->unique = true;
 	memc_index->type = HASH;
 	memc_index->enabled = true;
 	memc_index->n = 0;
-	[memc_index init: memc_ns];
+	[memc_index init: memc_s];
 }
 
 void

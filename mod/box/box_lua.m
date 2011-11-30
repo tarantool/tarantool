@@ -248,7 +248,7 @@ lbox_index_new(struct lua_State *L)
 	int idx = luaL_checkint(L, 2); /* get index id in */
 	/* locate the appropriate index */
 	if (n >= BOX_SPACE_MAX || !space[n].enabled ||
-	    idx >= BOX_INDEX_MAX || space[n].index[idx]->key.part_count == 0)
+	    idx >= BOX_INDEX_MAX || space[n].index[idx] == nil)
 		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
 	/* create a userdata object */
 	void **ptr = lua_newuserdata(L, sizeof(void *));
