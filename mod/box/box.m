@@ -148,8 +148,8 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 	if (txn->old_tuple != NULL) {
 #ifndef NDEBUG
 		void *ka, *kb;
-		ka = tuple_field(txn->tuple, txn->index->key_field->fieldno);
-		kb = tuple_field(txn->old_tuple, txn->index->key_field->fieldno);
+		ka = tuple_field(txn->tuple, txn->index->key.parts[0].fieldno);
+		kb = tuple_field(txn->old_tuple, txn->index->key.parts[0].fieldno);
 		int kal, kab;
 		kal = load_varint32(&ka);
 		kab = load_varint32(&kb);
@@ -734,7 +734,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		u32 offset = read_u32(data);
 		u32 limit = read_u32(data);
 
-		if (i >= BOX_INDEX_MAX || space[txn->n].index[i]->key_cardinality == 0)
+		if (i >= BOX_INDEX_MAX || space[txn->n].index[i]->key.part_count == 0)
 			tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i, txn->n);
 		txn->index = space[txn->n].index[i];
 
@@ -892,12 +892,62 @@ space_free(void)
 		int j;
 		for (j = 0 ; j < BOX_INDEX_MAX ; j++) {
 			Index *index = space[i].index[j];
-			if (index->key_cardinality == 0)
+			if (index->key.part_count == 0)
 				break;
 			[index free];
-			sfree(index->key_field);
-			sfree(index->field_cmp_order);
+			sfree(index->key.parts);
+			sfree(index->key.cmp_order);
 		}
+	}
+}
+
+static void
+key_config(struct key *key, struct tarantool_cfg_space_index *cfg_index)
+{
+	key->max_fieldno = 0;
+	key->part_count = 0;
+
+	/* calculate key cardinality and maximal field number */
+	for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
+		typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
+
+		if (cfg_key->fieldno == -1) {
+			/* last filled key reached */
+			break;
+		}
+
+		key->max_fieldno = MAX(key->max_fieldno, cfg_key->fieldno);
+		key->part_count++;
+	}
+
+	/* init key array */
+	key->parts = salloc(sizeof(struct key_part) * key->part_count);
+	if (key->parts == NULL) {
+		panic("can't allocate key parts array for index");
+	}
+
+	/* init compare order array */
+	key->max_fieldno++;
+	key->cmp_order = salloc(key->max_fieldno * sizeof(u32));
+	if (key->cmp_order == NULL) {
+		panic("can't allocate key cmp_order array for index");
+	}
+	memset(key->cmp_order, -1, key->max_fieldno * sizeof(u32));
+
+	/* fill fields and compare order */
+	for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
+		typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
+
+		if (cfg_key->fieldno == -1) {
+			/* last filled key reached */
+			break;
+		}
+
+		/* fill keys */
+		key->parts[k].fieldno = cfg_key->fieldno;
+		key->parts[k].type = STR2ENUM(field_data_type, cfg_key->type);
+		/* fill compare order */
+		key->cmp_order[cfg_key->fieldno] = k;
 	}
 }
 
@@ -925,51 +975,9 @@ space_config(void)
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
 			Index *index = space[i].index[j];
-			u32 max_key_fieldno = 0;
-
-			/* calculate key cardinality and maximal field number */
-			for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
-				typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
-
-				if (cfg_key->fieldno == -1) {
-					/* last filled key reached */
-					break;
-				}
-
-				max_key_fieldno = MAX(max_key_fieldno, cfg_key->fieldno);
-				++index->key_cardinality;
-			}
-
-			/* init key array */
-			index->key_field = salloc(sizeof(index->key_field[0]) * index->key_cardinality);
-			if (index->key_field == NULL) {
-				panic("can't allocate key_field for index");
-			}
-
-			/* init compare order array */
-			index->field_cmp_order_cnt = max_key_fieldno + 1;
-			index->field_cmp_order = salloc(index->field_cmp_order_cnt * sizeof(u32));
-			if (index->field_cmp_order == NULL) {
-				panic("can't allocate field_cmp_order for index");
-			}
-			memset(index->field_cmp_order, -1, index->field_cmp_order_cnt * sizeof(u32));
-
-			/* fill fields and compare order */
-			for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
-				typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
-
-				if (cfg_key->fieldno == -1) {
-					/* last filled key reached */
-					break;
-				}
-
-				/* fill keys */
-				index->key_field[k].fieldno = cfg_key->fieldno;
-				index->key_field[k].type = STR2ENUM(field_data_type, cfg_key->type);
-				/* fill compare order */
-				index->field_cmp_order[cfg_key->fieldno] = k;
-			}
-
+			struct key key;
+			key_config(&key, cfg_index);
+			index->key = key;
 			index->unique = cfg_index->unique;
 			index->type = STR2ENUM(index_type, cfg_index->type);
 			index->n = j;
@@ -991,7 +999,7 @@ space_init(void)
 		space[i].enabled = false;
 		for (int j = 0; j < BOX_INDEX_MAX; j++) {
 			space[i].index[j] = [[Index alloc] init];
-			space[i].index[j]->key_cardinality = 0;
+			space[i].index[j]->key.part_count = 0;
 		}
 	}
 

@@ -119,9 +119,9 @@ index_tree_el_unique_cmp(struct index_tree_el *elem_a,
 			 Index *index)
 {
 	int r = 0;
-	for (i32 i = 0, end = index->key_cardinality; i < end; ++i) {
+	for (i32 i = 0, end = index->key.part_count; i < end; ++i) {
 		r = field_compare(&elem_a->key[i], &elem_b->key[i],
-				  index->key_field[i].type);
+				  index->key.parts[i].type);
 		if (r != 0)
 			break;
 	}
@@ -148,9 +148,9 @@ index_tree_size(Index *index)
 static struct box_tuple *
 index_hash_find_by_tuple(Index *self, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_field->fieldno);
+	void *key = tuple_field(tuple, self->key.parts[0].fieldno);
 	if (key == NULL)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key_field->fieldno);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key.parts[0].fieldno);
 
 	return self->find(self, key);
 }
@@ -205,7 +205,7 @@ index_hash_iterator_init(Index *index,
 	if (cardinality == 0 && key == NULL) {
 
 		it->h_iter = mh_begin(index->idx.hash);
-	} else if (index->key_field[0].type == NUM) {
+	} else if (index->key.parts[0].type == NUM) {
 		u32 key_size = load_varint32(&key);
 		u32 num = *(u32 *)key;
 
@@ -213,7 +213,7 @@ index_hash_iterator_init(Index *index,
 			tnt_raise(IllegalParams, :"key is not u32");
 
 		it->h_iter = mh_i32ptr_get(index->idx.int_hash, num);
-	} else if (index->key_field[0].type == NUM64) {
+	} else if (index->key.parts[0].type == NUM64) {
 		u32 key_size = load_varint32(&key);
 		u64 num = *(u64 *)key;
 
@@ -287,7 +287,7 @@ index_tree_el_init(struct index_tree_el *elem,
 {
 	void *tuple_data = tuple->data;
 
-	for (i32 i = 0; i < index->field_cmp_order_cnt; ++i) {
+	for (i32 i = 0; i < index->key.max_fieldno; ++i) {
 		struct field f;
 
 		if (i < tuple->cardinality) {
@@ -301,15 +301,15 @@ index_tree_el_init(struct index_tree_el *elem,
 		} else
 			f = ASTERISK;
 
-		u32 key_field_no = index->field_cmp_order[i];
+		u32 key_field_no = index->key.cmp_order[i];
 
 		if (key_field_no == -1)
 			continue;
 
-		if (index->key_field[key_field_no].type == NUM) {
+		if (index->key.parts[key_field_no].type == NUM) {
 			if (f.len != 4)
 				tnt_raise(IllegalParams, :"key is not u32");
-		} else if (index->key_field[key_field_no].type == NUM64 && f.len != 8) {
+		} else if (index->key.parts[key_field_no].type == NUM64 && f.len != 8) {
 				tnt_raise(IllegalParams, :"key is not u64");
 		}
 
@@ -324,18 +324,18 @@ init_search_pattern(Index *index, int key_cardinality, void *key)
 	struct index_tree_el *pattern = index->position[POS_READ];
 	void *key_field = key;
 
-	assert(key_cardinality <= index->key_cardinality);
+	assert(key_cardinality <= index->key.part_count);
 
-	for (i32 i = 0; i < index->key_cardinality; ++i)
+	for (i32 i = 0; i < index->key.part_count; ++i)
 		pattern->key[i] = ASTERISK;
 	for (int i = 0; i < key_cardinality; i++) {
 		u32 len;
 
 		len = pattern->key[i].len = load_varint32(&key_field);
-		if (index->key_field[i].type == NUM) {
+		if (index->key.parts[i].type == NUM) {
 			if (len != 4)
 				tnt_raise(IllegalParams, :"key is not u32");
-		} else if (index->key_field[i].type == NUM64 && len != 8) {
+		} else if (index->key.parts[i].type == NUM64 && len != 8) {
 				tnt_raise(IllegalParams, :"key is not u64");
 		}
 		if (len <= sizeof(pattern->key[i].data)) {
@@ -395,7 +395,7 @@ index_tree_find_by_tuple(Index *self, struct box_tuple *tuple)
 static void
 index_hash_num_remove(Index *self, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_field->fieldno);
+	void *key = tuple_field(tuple, self->key.parts[0].fieldno);
 	unsigned int key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
@@ -413,7 +413,7 @@ index_hash_num_remove(Index *self, struct box_tuple *tuple)
 static void
 index_hash_num64_remove(Index *self, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_field->fieldno);
+	void *key = tuple_field(tuple, self->key.parts[0].fieldno);
 	unsigned int key_size = load_varint32(&key);
 	u64 num = *(u64 *)key;
 
@@ -431,7 +431,7 @@ index_hash_num64_remove(Index *self, struct box_tuple *tuple)
 static void
 index_hash_str_remove(Index *self, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_field->fieldno);
+	void *key = tuple_field(tuple, self->key.parts[0].fieldno);
 
 	mh_int_t k = mh_lstrptr_get(self->idx.str_hash, key);
 	if (k != mh_end(self->idx.str_hash))
@@ -454,7 +454,7 @@ static void
 index_hash_num_replace(Index *self,
 		       struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_field->fieldno);
+	void *key = tuple_field(tuple, self->key.parts[0].fieldno);
 	u32 key_size = load_varint32(&key);
 	u32 num = *(u32 *)key;
 
@@ -462,7 +462,7 @@ index_hash_num_replace(Index *self,
 		tnt_raise(IllegalParams, :"key is not u32");
 
 	if (old_tuple != NULL) {
-		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
+		void *old_key = tuple_field(old_tuple, self->key.parts[0].fieldno);
 		load_varint32(&old_key);
 		u32 old_num = *(u32 *)old_key;
 		mh_int_t k = mh_i32ptr_get(self->idx.int_hash, old_num);
@@ -483,7 +483,7 @@ index_hash_num64_replace(Index *self,
 			 struct box_tuple *old_tuple,
 			 struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_field->fieldno);
+	void *key = tuple_field(tuple, self->key.parts[0].fieldno);
 	u32 key_size = load_varint32(&key);
 	u64 num = *(u64 *)key;
 
@@ -491,7 +491,7 @@ index_hash_num64_replace(Index *self,
 		tnt_raise(IllegalParams, :"key is not u64");
 
 	if (old_tuple != NULL) {
-		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
+		void *old_key = tuple_field(old_tuple, self->key.parts[0].fieldno);
 		load_varint32(&old_key);
 		u64 old_num = *(u64 *)old_key;
 		mh_int_t k = mh_i64ptr_get(self->idx.int64_hash, old_num);
@@ -510,13 +510,13 @@ static void
 index_hash_str_replace(Index *self,
 		       struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
-	void *key = tuple_field(tuple, self->key_field->fieldno);
+	void *key = tuple_field(tuple, self->key.parts[0].fieldno);
 
 	if (key == NULL)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key_field->fieldno);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key.parts[0].fieldno);
 
 	if (old_tuple != NULL) {
-		void *old_key = tuple_field(old_tuple, self->key_field->fieldno);
+		void *old_key = tuple_field(old_tuple, self->key.parts[0].fieldno);
 		mh_int_t k = mh_lstrptr_get(self->idx.str_hash, old_key);
 		if (k != mh_end(self->idx.str_hash))
 			mh_lstrptr_del(self->idx.str_hash, k);
@@ -534,8 +534,8 @@ static void
 index_tree_replace(Index *self,
 		   struct box_tuple *old_tuple, struct box_tuple *tuple)
 {
-	if (tuple->cardinality < self->field_cmp_order_cnt)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->field_cmp_order_cnt);
+	if (tuple->cardinality < self->key.max_fieldno)
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, self->key.max_fieldno);
 
 	struct index_tree_el *elem = self->position[POS_WRITE];
 
@@ -576,7 +576,7 @@ index_tree_iterator_init(Index *index,
 {
 	struct iterator *it = &index->iterator;
 	it->next = index_tree_iterator_next;
-	if (index->unique && cardinality == index->key_cardinality)
+	if (index->unique && cardinality == index->key.part_count)
 		it->next_equal = index_iterator_first_equal;
 	else
 		it->next_equal = index_tree_iterator_next_equal;
@@ -589,22 +589,22 @@ index_tree_iterator_init(Index *index,
 void
 validate_indexes(struct box_txn *txn)
 {
-	if (space[txn->n].index[1]->key_cardinality != 0) {	/* there is more than one index */
+	if (space[txn->n].index[1]->key.part_count != 0) {	/* there is more than one index */
 		foreach_index(txn->n, index) {
-			for (u32 f = 0; f < index->key_cardinality; ++f) {
-				if (index->key_field[f].fieldno >= txn->tuple->cardinality)
+			for (u32 f = 0; f < index->key.part_count; ++f) {
+				if (index->key.parts[f].fieldno >= txn->tuple->cardinality)
 					tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 
-				if (index->key_field[f].type == STRING)
+				if (index->key.parts[f].type == STRING)
 					continue;
 
-				void *field = tuple_field(txn->tuple, index->key_field[f].fieldno);
+				void *field = tuple_field(txn->tuple, index->key.parts[f].fieldno);
 				u32 len = load_varint32(&field);
 
-				if (index->key_field[f].type == NUM && len != sizeof(u32))
+				if (index->key.parts[f].type == NUM && len != sizeof(u32))
 					tnt_raise(IllegalParams, :"field must be NUM");
 
-				if (index->key_field[f].type == NUM64 && len != sizeof(u64))
+				if (index->key.parts[f].type == NUM64 && len != sizeof(u64))
 					tnt_raise(IllegalParams, :"field must be NUM64");
 			}
 			if (index->type == TREE && index->unique == false)
@@ -670,13 +670,13 @@ build_indexes(void)
 		if (space[n].enabled == false)
 			continue;
 		/* A shortcut to avoid unnecessary log messages. */
-		if (space[n].index[1]->key_cardinality == 0)
+		if (space[n].index[1]->key.part_count == 0)
 			continue; /* no secondary keys */
 		say_info("Building secondary keys in space %" PRIu32 "...", n);
 		Index *pk = space[n].index[0];
 		for (u32 idx = 1;; idx++) {
 			Index *index = space[n].index[idx];
-			if (index->key_cardinality == 0)
+			if (index->key.part_count == 0)
 				break;
 
 			if (index->type != TREE)
@@ -787,7 +787,7 @@ index_tree_free(Index *index)
 		/* Hash index, check key type. */
 		/* Hash index has single-field key*/
 		enabled = true;
-		switch (key_field[0].type) {
+		switch (key.parts[0].type) {
 		case NUM:
 			/* 32-bit integer hash */
 			index_hash_num(self, space);
@@ -829,7 +829,7 @@ index_tree_free(Index *index)
 {
 	switch (type) {
 	case HASH:
-		switch (key_field[0].type) {
+		switch (key.parts[0].type) {
 		case NUM:
 			index_hash_num_free(self);
 			break;

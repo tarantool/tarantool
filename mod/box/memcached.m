@@ -433,25 +433,28 @@ memcached_space_init()
 	memc_ns->cardinality = 4;
 	memc_ns->n = cfg.memcached_space;
 
+	struct key key;
+
+	/* configure memcached index's key */
+	key.part_count = 1;
+
+	key.parts = salloc(sizeof(struct key_part));
+	key.cmp_order = salloc(sizeof(u32));
+
+	if (key.parts == NULL || key.cmp_order == NULL)
+		panic("out of memory when configuring memcached_space");
+
+	key.parts[0].fieldno = 0;
+	key.parts[0].type = STRING;
+
+	/* configure memcached index compare order */
+	key.max_fieldno = 1;
+	key.cmp_order[0] = 0;
+
 	/* configure memcached index */
 	memc_index = memc_ns->index[0];
 
-	/* configure memcached index's key */
-	memc_index->key_cardinality = 1;
-
-	memc_index->key_field = salloc(sizeof(memc_index->key_field[0]));
-	memc_index->field_cmp_order = salloc(sizeof(u32));
-
-	if (memc_index->key_field == NULL || memc_index->field_cmp_order == NULL)
-		panic("out of memory when configuring memcached_space");
-
-	memc_index->key_field[0].fieldno = 0;
-	memc_index->key_field[0].type = STRING;
-
-	/* configure memcached index compare order */
-	memc_index->field_cmp_order_cnt = 1;
-	memc_index->field_cmp_order[0] = 0;
-
+	memc_index->key = key;
 	memc_index->unique = true;
 	memc_index->type = HASH;
 	memc_index->enabled = true;
