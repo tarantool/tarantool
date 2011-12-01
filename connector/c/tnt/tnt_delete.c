@@ -57,7 +57,7 @@ tnt_delete(struct tnt_stream *s, uint32_t ns, uint32_t flags, struct tnt_tuple *
 	struct tnt_header hdr;
 	hdr.type  = TNT_OP_DELETE;
 	hdr.len = sizeof(struct tnt_header_delete) + k->size;
-	hdr.reqid = 0;
+	hdr.reqid = s->reqid;
 	/* filling delete header */
 	struct tnt_header_delete hdr_del;
 	hdr_del.ns = ns;

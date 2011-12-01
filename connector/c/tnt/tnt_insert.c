@@ -59,7 +59,7 @@ tnt_insert(struct tnt_stream *s, uint32_t ns, uint32_t flags,
 	struct tnt_header hdr;
 	hdr.type  = TNT_OP_INSERT;
 	hdr.len = sizeof(struct tnt_header_insert) + kv->size;
-	hdr.reqid = 0;
+	hdr.reqid = s->reqid;
 	/* filling insert header */
 	struct tnt_header_insert hdr_insert;
 	hdr_insert.ns = ns;

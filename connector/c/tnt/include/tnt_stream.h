@@ -40,8 +40,10 @@ struct tnt_stream {
 	void (*free)(struct tnt_stream *s);
 	void *data;
 	uint32_t wrcnt; /* count of write operations */
+	uint32_t reqid;
 };
 
+uint32_t tnt_stream_reqid(struct tnt_stream *s, uint32_t reqid);
 void tnt_stream_free(struct tnt_stream *s);
 
 #endif /* TNT_STREAM_H_INCLUDED */

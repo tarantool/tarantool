@@ -176,7 +176,7 @@ tnt_update(struct tnt_stream *s, uint32_t ns, uint32_t flags,
 	hdr.type = TNT_OP_UPDATE;
 	hdr.len = sizeof(struct tnt_header_update) +
 		  k->size + 4 + TNT_SBUF_SIZE(ops);
-	hdr.reqid = 0;
+	hdr.reqid = s->reqid;
 	/* filling update header */
 	struct tnt_header_update hdr_update;
 	hdr_update.ns = ns;

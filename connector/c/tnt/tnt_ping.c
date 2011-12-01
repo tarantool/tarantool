@@ -50,7 +50,7 @@ tnt_ping(struct tnt_stream *s)
 	struct tnt_header hdr;
 	hdr.type = TNT_OP_PING;
 	hdr.len = 0;
-	hdr.reqid = 0;
+	hdr.reqid = s->reqid;
 	/* writing data to stream */
 	struct iovec v[1];
 	v[0].iov_base = &hdr;

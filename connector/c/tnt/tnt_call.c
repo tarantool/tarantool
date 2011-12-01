@@ -65,7 +65,7 @@ tnt_call(struct tnt_stream *s, uint32_t flags, char *proc,
 	hdr.type = TNT_OP_CALL;
 	hdr.len = sizeof(struct tnt_header_call) +
 		  proc_enc_size + proc_len + args->size;
-	hdr.reqid = 0;
+	hdr.reqid = s->reqid;
 	/* filling call header */
 	struct tnt_header_call hdr_call;
 	hdr_call.flags = flags;

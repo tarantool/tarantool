@@ -34,11 +34,30 @@
 #include <tnt_stream.h>
 
 /*
+ * tnt_stream_reqid()
+ *
+ * set reqid value
+ *
+ * s     - stream pointer
+ * reqid - new reqid value
+ *
+ * returns old reqid value
+ *
+*/
+uint32_t
+tnt_stream_reqid(struct tnt_stream *s, uint32_t reqid)
+{
+	uint32_t old = s->reqid;
+	s->reqid = reqid;
+	return old;
+}
+
+/*
  * tnt_stream_free()
  *
  * free stream object.
  *
- * i - stream pointer
+ * s - stream pointer
  *
 */
 void tnt_stream_free(struct tnt_stream *s) {
@@ -47,3 +66,4 @@ void tnt_stream_free(struct tnt_stream *s) {
 	if (s->alloc)
 		tnt_mem_free(s);
 }
+

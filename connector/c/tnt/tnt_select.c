@@ -75,7 +75,7 @@ tnt_select(struct tnt_stream *s,
 	struct tnt_header hdr;
 	hdr.type = TNT_OP_SELECT;
 	hdr.len = sizeof(struct tnt_header_select) + 4 + size;
-	hdr.reqid = 0;
+	hdr.reqid = s->reqid;
 	/* filling select header */
 	struct tnt_header_select hdr_sel;
 	hdr_sel.ns = ns;
