@@ -67,7 +67,7 @@ struct index_tree_el {
 };
 
 #define INDEX_TREE_EL_SIZE(index) \
-	(sizeof(struct index_tree_el) + sizeof(struct field) * (index)->key_cardinality)
+	(sizeof(struct index_tree_el) + sizeof(struct field) * (index)->key.part_count)
 
 #include <third_party/sptree.h>
 SPTREE_DEF(str_t, realloc);
@@ -75,10 +75,41 @@ SPTREE_DEF(str_t, realloc);
 /* Indexes at preallocated search positions.  */
 enum { POS_READ = 0, POS_WRITE = 1, POS_MAX = 2 };
 
+/** Descriptor of a single part in a multipart key. */
+
+struct key_part {
+	u32 fieldno;
+	enum field_data_type type;
+};
+
+/* Descriptor of a multipart key. */
+
+struct key {
+	/* Description of parts of a multipart index. */
+	struct key_part *parts;
+	/*
+	 * An array holding field positions in 'parts' array.
+	 * Imagine there is index[1] = { key_field[0].fieldno=5,
+	 * key_field[1].fieldno=3 }.
+	 * 'parts' array for such index contains data from
+	 * key_field[0] and key_field[1] respectively.
+	 * max_fieldno is 5, and cmp_order array holds offsets of
+	 * field 3 and 5 in 'parts' array: -1, -1, 0, -1, 1.
+	 */
+	u32 *cmp_order;
+	/* The size of the 'parts' array. */
+	u32 part_count;
+	/*
+	 * The size of 'cmp_order' array (= max fieldno in 'parts'
+	 * array).
+	 */
+	u32 max_fieldno;
+};
+
 @class Index;
 
-@interface Index : Object {
-	@public
+@interface Index: Object {
+ @public
 	bool enabled;
 	bool unique;
 
@@ -110,28 +141,11 @@ enum { POS_READ = 0, POS_WRITE = 1, POS_MAX = 2 };
 
 	struct space *space;
 
-	/* Description of parts of a multipart index. */
-	struct {
-		u32 fieldno;
-		enum field_data_type type;
-	} *key_field;
-	/*
-	 * An array holding field positions in key_field array.
-	 * Imagine there is index[1] = { key_field[0].fieldno=5,
-	 * key_field[1].fieldno=3 }.
-	 * key_field array will contain data from key_field[0] and
-	 * key_field[1] respectively. field_cmp_order_cnt will be 5,
-	 * and field_cmp_order array will hold offsets of
-	 * field 3 and 5 in key_field array: -1, -1, 0, -1, 1.
-	 */
-	u32 *field_cmp_order;
-	/* max fieldno in key_field array + 1 */
-	u32 field_cmp_order_cnt;
-	/* Size of key_field array */
-	u32 key_cardinality;
+	/* Description of a possibly multipart key. */
+	struct key key;
+
 	/* relative offset of the index in the namespace */
 	u32 n;
-
 
 	enum index_type type;
 };
@@ -151,8 +165,7 @@ enum { POS_READ = 0, POS_WRITE = 1, POS_MAX = 2 };
 #define foreach_index(n, index_var)					\
 	Index *index_var;						\
 	for (Index **index_ptr = space[(n)].index;			\
-	     (**index_ptr).key_cardinality != 0;			\
-	     index_ptr++)						\
+	     *index_ptr != nil; index_ptr++)				\
 		if ((index_var = *index_ptr)->enabled)
 
 struct box_txn;

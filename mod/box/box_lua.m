@@ -248,7 +248,7 @@ lbox_index_new(struct lua_State *L)
 	int idx = luaL_checkint(L, 2); /* get index id in */
 	/* locate the appropriate index */
 	if (n >= BOX_SPACE_MAX || !space[n].enabled ||
-	    idx >= BOX_INDEX_MAX || space[n].index[idx]->key_cardinality == 0)
+	    idx >= BOX_INDEX_MAX || space[n].index[idx] == nil)
 		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
 	/* create a userdata object */
 	void **ptr = lua_newuserdata(L, sizeof(void *));
@@ -390,7 +390,7 @@ lbox_index_next(struct lua_State *L)
 			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
 			for (int i = 0; i < argc; ++i)
 				append_key_part(L, i + 2, data,
-						index->key_field[i].type);
+						index->key.parts[i].type);
 			key = data->data;
 		}
 		/*
@@ -399,10 +399,10 @@ lbox_index_next(struct lua_State *L)
 		 * keys.
 		*/
 		assert(cardinality != 0);
-		if (cardinality > index->key_cardinality)
+		if (cardinality > index->key.part_count)
 			luaL_error(L, "index.next(): key part count (%d) "
 				   "does not match index cardinality (%d)",
-				   cardinality, index->key_cardinality);
+				   cardinality, index->key.part_count);
 		index->iterator_init(index, cardinality, key);
 	}
 	struct box_tuple *tuple = index->iterator.next(index);

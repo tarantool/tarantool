@@ -297,7 +297,8 @@ salloc(size_t size)
 void
 sfree(void *ptr)
 {
-	assert(ptr != NULL);
+	if (ptr == NULL)
+		return;
 	struct slab *slab = slab_header(ptr);
 	struct slab_class *class = slab->class;
 	struct slab_item *item = ptr;
