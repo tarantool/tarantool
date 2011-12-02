@@ -287,6 +287,7 @@ static void tt_tnt_net_ping(struct tt_test *test) {
 
 /* insert */
 static void tt_tnt_net_insert(struct tt_test *test) {
+	tnt_stream_reqid(&net, 777);
 	struct tnt_tuple kv1;
 	tnt_tuple_init(&kv1);
 	tnt_tuple(&kv1, "%d%s", 123, "foo");
@@ -302,6 +303,7 @@ static void tt_tnt_net_insert(struct tt_test *test) {
 	tnt_iter_stream(&i, &net);
 	while (tnt_next(&i)) {
 		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		TT_ASSERT(r->reqid == 777);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_INSERT);
 		TT_ASSERT(r->count == 1);

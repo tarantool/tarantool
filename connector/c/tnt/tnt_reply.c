@@ -147,8 +147,8 @@ int tnt_reply_from(struct tnt_reply *r, tnt_replyf_t rcv, void *ptr) {
 		if (t == NULL)
 			goto rollback;
 		tnt_list_at(&r->tuples, t);
-		p += tsize;
-		total += (4 + tsize);
+		p += tsize + 4;
+		total += (4 + 4 + tsize); /* length + cardinality + tuple size */
 	}
 	free(buf);
 	return 0;
