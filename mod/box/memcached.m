@@ -32,6 +32,7 @@
 #include "say.h"
 #include "stat.h"
 #include "salloc.h"
+#include "pickle.h"
 
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
@@ -129,7 +130,7 @@ delete(void *key)
 static struct box_tuple *
 find(void *key)
 {
-	return memcached_index->find(memcached_index, key);
+	return [memcached_index find: key];
 }
 
 static struct meta *
@@ -282,10 +283,12 @@ flush_all(void *data)
 	uintptr_t delay = (uintptr_t)data;
 	fiber_sleep(delay - ev_now());
 	struct box_tuple *tuple;
-	memcached_index->iterator_init(memcached_index, 0, NULL);
-	while ((tuple = memcached_index->iterator.next(memcached_index))) {
+	struct iterator *it = [memcached_index allocIterator];
+	[memcached_index initIterator: it];
+	while ((tuple = it->next(it))) {
 	       meta(tuple)->exptime = 1;
 	}
+	sfree(it);
 }
 
 #define STORE									\
@@ -427,9 +430,6 @@ memcached_space_init()
 	memc_s->cardinality = 4;
 	memc_s->n = cfg.memcached_space;
 
-	/* Configure memcached index. */
-	Index *memc_index = memc_s->index[0] = [[Index alloc] init];
-
 	struct key key;
 	/* Configure memcached index key. */
 	key.part_count = 1;
@@ -446,12 +446,9 @@ memcached_space_init()
 	key.max_fieldno = 1;
 	key.cmp_order[0] = 0;
 
-	memc_index->key = key;
-	memc_index->unique = true;
-	memc_index->type = HASH;
-	memc_index->enabled = true;
-	memc_index->n = 0;
-	[memc_index init: memc_s];
+	/* Configure memcached index. */
+	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :&key];
+	[memc_index init: &key :memc_s];
 }
 
 /** Delete a bunch of expired keys. */
@@ -476,7 +473,7 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 
 	double delay = ((double) cfg.memcached_expire_per_loop *
 			cfg.memcached_expire_full_sweep /
-			(memcached_index->size(memcached_index) + 1));
+			([memcached_index size] + 1));
 	if (delay > 1)
 		delay = 1;
 	fiber_setcancelstate(true);
@@ -490,15 +487,17 @@ memcached_expire_loop(void *data __attribute__((unused)))
 	struct box_tuple *tuple = NULL;
 
 	say_info("memcached expire fiber started");
-	for (;;) {
+	struct iterator *it = [memcached_index allocIterator];
+	@try {
+restart:
 		if (tuple == NULL)
-			memcached_index->iterator_init(memcached_index, 0, NULL);
+			[memcached_index initIterator: it];
 
 		struct tbuf *keys_to_delete = tbuf_alloc(fiber->gc_pool);
 
 		for (int j = 0; j < cfg.memcached_expire_per_loop; j++) {
 
-			tuple = memcached_index->iterator.next(memcached_index);
+			tuple = it->next(it);
 
 			if (tuple == NULL)
 				break;
@@ -511,6 +510,9 @@ memcached_expire_loop(void *data __attribute__((unused)))
 		}
 		memcached_delete_expired_keys(keys_to_delete);
 		fiber_gc();
+		goto restart;
+	} @finally {
+		sfree(it);
 	}
 }
 

@@ -26,29 +26,12 @@
  * SUCH DAMAGE.
  */
 #import <objc/Object.h>
-#include <assoc.h>
+#include <stdbool.h>
+#include <util.h>
 
-/**
- * A field reference used for TREE indexes. Either stores a copy
- * of the corresponding field in the tuple or points to that field
- * in the tuple (depending on field length).
- */
-
-struct field {
-	/** Field data length. */
-	u32 len;
-	/** Actual field data. For small fields we store the value
-	 * of the field (u32, u64, strings up to 8 bytes), for
-	 * longer fields, we store a pointer to field data in the
-	 * tuple in the primary index.
-	 */
-	union {
-		u32 u32;
-		u64 u64;
-		u8 data[sizeof(u64)];
-		void *data_ptr;
-	};
-};
+struct box_tuple;
+struct space;
+struct index;
 
 /*
  * Possible field data types. Can't use STRS/ENUM macros for them,
@@ -61,29 +44,13 @@ extern const char *field_data_type_strs[];
 enum index_type { HASH, TREE, index_type_MAX };
 extern const char *index_type_strs[];
 
-struct index_tree_el {
-	struct box_tuple *tuple;
-	struct field key[];
-};
-
-#define INDEX_TREE_EL_SIZE(index) \
-	(sizeof(struct index_tree_el) + sizeof(struct field) * (index)->key.part_count)
-
-#include <third_party/sptree.h>
-SPTREE_DEF(str_t, realloc);
-
-/* Indexes at preallocated search positions.  */
-enum { POS_READ = 0, POS_WRITE = 1, POS_MAX = 2 };
-
 /** Descriptor of a single part in a multipart key. */
-
 struct key_part {
 	u32 fieldno;
 	enum field_data_type type;
 };
 
 /* Descriptor of a multipart key. */
-
 struct key {
 	/* Description of parts of a multipart index. */
 	struct key_part *parts;
@@ -113,32 +80,6 @@ struct key {
 	bool enabled;
 	bool unique;
 
-	size_t (*size)(Index *index);
-	struct box_tuple *(*find)(Index *index, void *key); /* only for unique lookups */
-	struct box_tuple *(*min)(Index *index);
-	struct box_tuple *(*max)(Index *index);
-	struct box_tuple *(*find_by_tuple)(Index * index, struct box_tuple * pattern);
-	void (*remove)(Index *index, struct box_tuple *);
-	void (*replace)(Index *index, struct box_tuple *, struct box_tuple *);
-	void (*iterator_init)(Index *, int cardinality, void *key);
-	union {
-		struct mh_lstrptr_t *str_hash;
-		struct mh_i32ptr_t *int_hash;
-		struct mh_i64ptr_t *int64_hash;
-		struct mh_i32ptr_t *hash;
-		sptree_str_t *tree;
-	} idx;
-	struct iterator {
-		union {
-			struct sptree_str_t_iterator *t_iter;
-			mh_int_t h_iter;
-		};
-		struct box_tuple *(*next)(Index *);
-		struct box_tuple *(*next_equal)(Index *);
-	} iterator;
-	/* Reusable iteration positions, to save on memory allocation. */
-	struct index_tree_el *position[POS_MAX];
-
 	struct space *space;
 
 	/* Description of a possibly multipart key. */
@@ -148,19 +89,49 @@ struct key {
 	u32 n;
 
 	enum index_type type;
+
+	/*
+	 * Pre-allocated iterator to speed up the main case of
+	 * box_process(). Should not be used elsewhere.
+	 */
+	struct iterator *position;
 };
 
++ (Index *) alloc: (enum index_type) type :(struct key *) key;
 /**
  * Initialize index instance.
  *
  * @param space    space the index belongs to
+ * @param key      key part description
  */
-- (void) init: (struct space *) space_arg;
-/**
- * Destroy and free index instance.
- */
+- (void) init: (struct key *) key :(struct space *) space_arg;
+/** Destroy and free index instance. */
 - (void) free;
+/**
+ * Finish index construction.
+ */
+- (void) enable;
+- (size_t) size;
+- (struct box_tuple *) min;
+- (struct box_tuple *) max;
+- (struct box_tuple *) find: (void *) key; /* only for unique lookups */
+- (struct box_tuple *) findBy: (struct box_tuple *) pattern;
+- (void) remove: (struct box_tuple *) tuple;
+- (void) replace: (struct box_tuple *) old :(struct box_tuple *) new;
+/**
+ * Create a structure to represent an iterator. Must be
+ * initialized separately.
+ */
+- (struct iterator *) allocIterator;
+- (void) initIterator: (struct iterator *) iterator;
+- (void) initIterator: (struct iterator *) iterator :(void *) key
+			:(int) part_count;
 @end
+
+struct iterator {
+	struct box_tuple *(*next)(struct iterator *);
+	struct box_tuple *(*next_equal)(struct iterator *);
+};
 
 #define foreach_index(n, index_var)					\
 	Index *index_var;						\
@@ -168,8 +139,6 @@ struct key {
 	     *index_ptr != nil; index_ptr++)				\
 		if ((index_var = *index_ptr)->enabled)
 
-struct box_txn;
-void validate_indexes(struct box_txn *txn);
 void build_indexes(void);
 
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */

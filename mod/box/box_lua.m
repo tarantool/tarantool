@@ -272,7 +272,7 @@ static int
 lbox_index_len(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	lua_pushinteger(L, index->size(index));
+	lua_pushinteger(L, [index size]);
 	return 1;
 }
 
@@ -280,7 +280,7 @@ static int
 lbox_index_min(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	lbox_pushtuple(L, index->min(index));
+	lbox_pushtuple(L, [index min]);
 	return 1;
 }
 
@@ -288,7 +288,7 @@ static int
 lbox_index_max(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	lbox_pushtuple(L, index->max(index));
+	lbox_pushtuple(L, [index max]);
 	return 1;
 }
 
@@ -368,7 +368,7 @@ lbox_index_next(struct lua_State *L)
 		 * If there is nothing or nil on top of the stack,
 		 * start iteration from the beginning.
 		 */
-		index->iterator_init(index, 0, NULL);
+		[index initIterator: index->position];
 	} else if (argc > 1 || !lua_islightuserdata(L, 2)) {
 		/*
 		 * We've got something different from iterator's
@@ -403,11 +403,11 @@ lbox_index_next(struct lua_State *L)
 			luaL_error(L, "index.next(): key part count (%d) "
 				   "does not match index cardinality (%d)",
 				   cardinality, index->key.part_count);
-		index->iterator_init(index, cardinality, key);
+		[index initIterator: index->position :key :cardinality];
 	}
-	struct box_tuple *tuple = index->iterator.next(index);
+	struct box_tuple *tuple = index->position->next(index->position);
 	if (tuple)
-		lua_pushlightuserdata(L, &index->iterator);
+		lua_pushlightuserdata(L, index->position);
 	/* If tuple is NULL, pushes nil as end indicator. */
 	lbox_pushtuple(L, tuple);
 	return tuple ? 2 : 1;

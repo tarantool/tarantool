@@ -23,7 +23,27 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "index.h"
+#include "say.h"
+#include "tuple.h"
+#include "pickle.h"
+#include "exception.h"
+#include "box.h"
 
+const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
+const char *index_type_strs[] = { "HASH", "TREE", "\0" };
+
+#if 0
+
+			index->key = key;
+			index->unique = cfg_index->unique;
+			index->type = STR2ENUM(index_type, cfg_index->type);
+			index->n = j;
+	memc_index->key = key;
+	memc_index->unique = true;
+	memc_index->type = HASH;
+	memc_index->enabled = true;
+	memc_index->n = 0;
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -44,100 +64,9 @@
 #include <mod/box/index.h>
 #include <mod/box/tuple.h>
 
-const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
-const char *index_type_strs[] = { "HASH", "TREE", "\0" };
-
-const struct field ASTERISK = {
-	.len = UINT32_MAX,
-	{
-		.data_ptr = NULL,
-	}
-};
-
-#define IS_ASTERISK(f) ((f)->len == ASTERISK.len && (f)->data_ptr == ASTERISK.data_ptr)
-
-/** Compare two fields of an index key.
- *
- * @retval 0  two fields are equal
- * @retval -1 f2 is less than f1
- * @retval 1 f2 is greater than f1
- */
-
-static i8
-field_compare(struct field *f1, struct field *f2, enum field_data_type type)
-{
-	if (IS_ASTERISK(f1) || IS_ASTERISK(f2))
-		return 0;
-
-	if (type == NUM) {
-		assert(f1->len == f2->len);
-		assert(f1->len == sizeof(f1->u32));
-
-		return f1->u32 >f2->u32 ? 1 : f1->u32 == f2->u32 ? 0 : -1;
-	} else if (type == NUM64) {
-		assert(f1->len == f2->len);
-		assert(f1->len == sizeof(f1->u64));
-
-		return f1->u64 >f2->u64 ? 1 : f1->u64 == f2->u64 ? 0 : -1;
-	} else if (type == STRING) {
-		i32 cmp;
-		void *f1_data, *f2_data;
-
-		f1_data = f1->len <= sizeof(f1->data) ? f1->data : f1->data_ptr;
-		f2_data = f2->len <= sizeof(f2->data) ? f2->data : f2->data_ptr;
-
-		cmp = memcmp(f1_data, f2_data, MIN(f1->len, f2->len));
-
-		if (cmp > 0)
-			return 1;
-		else if (cmp < 0)
-			return -1;
-		else if (f1->len == f2->len)
-			return 0;
-		else if (f1->len > f2->len)
-			return 1;
-		else
-			return -1;
-	}
-
-	panic("impossible happened");
-}
 
 
-/*
- * Compare index_tree elements only by fields defined in
- * index->field_cmp_order.
- * Return:
- *      Common meaning:
- *              < 0  - a is smaller than b
- *              == 0 - a is equal to b
- *              > 0  - a is greater than b
- */
-static int
-index_tree_el_unique_cmp(struct index_tree_el *elem_a,
-			 struct index_tree_el *elem_b,
-			 Index *index)
-{
-	int r = 0;
-	for (i32 i = 0, end = index->key.part_count; i < end; ++i) {
-		r = field_compare(&elem_a->key[i], &elem_b->key[i],
-				  index->key.parts[i].type);
-		if (r != 0)
-			break;
-	}
-	return r;
-}
 
-static int
-index_tree_el_cmp(struct index_tree_el *elem_a, struct index_tree_el *elem_b,
-		  Index *index)
-{
-	int r = index_tree_el_unique_cmp(elem_a, elem_b, index);
-	if (r == 0 && elem_a->tuple && elem_b->tuple)
-		r = (elem_a->tuple < elem_b->tuple ?
-		     -1 : elem_a->tuple > elem_b->tuple);
-	return r;
-}
 
 static size_t
 index_tree_size(Index *index)
@@ -279,43 +208,6 @@ index_hash_str_find(Index *self, void *key)
 		  ret);
 #endif
 	return ret;
-}
-
-void
-index_tree_el_init(struct index_tree_el *elem,
-		   Index *index, struct box_tuple *tuple)
-{
-	void *tuple_data = tuple->data;
-
-	for (i32 i = 0; i < index->key.max_fieldno; ++i) {
-		struct field f;
-
-		if (i < tuple->cardinality) {
-			f.len = load_varint32(&tuple_data);
-			if (f.len <= sizeof(f.data)) {
-				memset(f.data, 0, sizeof(f.data));
-				memcpy(f.data, tuple_data, f.len);
-			} else
-				f.data_ptr = tuple_data;
-			tuple_data += f.len;
-		} else
-			f = ASTERISK;
-
-		u32 key_field_no = index->key.cmp_order[i];
-
-		if (key_field_no == -1)
-			continue;
-
-		if (index->key.parts[key_field_no].type == NUM) {
-			if (f.len != 4)
-				tnt_raise(IllegalParams, :"key is not u32");
-		} else if (index->key.parts[key_field_no].type == NUM64 && f.len != 8) {
-				tnt_raise(IllegalParams, :"key is not u64");
-		}
-
-		elem->key[key_field_no] = f;
-	}
-	elem->tuple = tuple;
 }
 
 void
@@ -586,108 +478,8 @@ index_tree_iterator_init(Index *index,
 				       index->position[POS_READ]);
 }
 
-void
-validate_indexes(struct box_txn *txn)
-{
-	if (space[txn->n].index[1] != nil) {	/* there is more than one index */
-		foreach_index(txn->n, index) {
-			for (u32 f = 0; f < index->key.part_count; ++f) {
-				if (index->key.parts[f].fieldno >= txn->tuple->cardinality)
-					tnt_raise(IllegalParams, :"tuple must have all indexed fields");
-
-				if (index->key.parts[f].type == STRING)
-					continue;
-
-				void *field = tuple_field(txn->tuple, index->key.parts[f].fieldno);
-				u32 len = load_varint32(&field);
-
-				if (index->key.parts[f].type == NUM && len != sizeof(u32))
-					tnt_raise(IllegalParams, :"field must be NUM");
-
-				if (index->key.parts[f].type == NUM64 && len != sizeof(u64))
-					tnt_raise(IllegalParams, :"field must be NUM64");
-			}
-			if (index->type == TREE && index->unique == false)
-				/* Don't check non unique indexes */
-				continue;
-
-			struct box_tuple *tuple = index->find_by_tuple(index, txn->tuple);
-
-			if (tuple != NULL && tuple != txn->old_tuple)
-				tnt_raise(ClientError, :ER_INDEX_VIOLATION);
-		}
-	}
-}
 
 
-void
-build_index(Index *pk, Index *index)
-{
-	u32 n_tuples = pk->size(pk);
-	u32 estimated_tuples = n_tuples * 1.2;
-
-	struct index_tree_el *elem = NULL;
-	if (n_tuples) {
-		/*
-		 * Allocate a little extra to avoid
-		 * unnecessary realloc() when more data is
-		 * inserted.
-		*/
-		size_t sz = estimated_tuples * INDEX_TREE_EL_SIZE(index);
-		elem = malloc(sz);
-		if (elem == NULL)
-			panic("malloc(): failed to allocate %"PRI_SZ" bytes", sz);
-	}
-	struct index_tree_el *m;
-	u32 i = 0;
-
-	pk->iterator_init(pk, 0, NULL);
-	struct box_tuple *tuple;
-	while ((tuple = pk->iterator.next(pk))) {
-
-		m = (struct index_tree_el *)
-			((char *)elem + i * INDEX_TREE_EL_SIZE(index));
-
-		index_tree_el_init(m, index, tuple);
-		++i;
-	}
-
-	if (n_tuples)
-		say_info("Sorting %"PRIu32 " keys in index %" PRIu32 "...", n_tuples, index->n);
-
-	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
-	sptree_str_t_init(index->idx.tree, INDEX_TREE_EL_SIZE(index),
-			  elem, n_tuples, estimated_tuples,
-			  (void*) (index->unique ? index_tree_el_unique_cmp :
-			  index_tree_el_cmp), index);
-	index->enabled = true;
-}
-
-void
-build_indexes(void)
-{
-	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
-		if (space[n].enabled == false)
-			continue;
-		/* A shortcut to avoid unnecessary log messages. */
-		if (space[n].index[1] == nil)
-			continue; /* no secondary keys */
-		say_info("Building secondary keys in space %" PRIu32 "...", n);
-		Index *pk = space[n].index[0];
-		for (u32 idx = 1;; idx++) {
-			Index *index = space[n].index[idx];
-			if (index == nil)
-				break;
-
-			if (index->type != TREE)
-				continue;
-			assert(index->enabled == false);
-
-			build_index(pk, index);
-		}
-		say_info("Space %"PRIu32": done", n);
-	}
-}
 
 static void
 index_hash_num(Index *index, struct space *space)
@@ -857,3 +649,287 @@ index_tree_free(Index *index)
 
 @end
 
+#endif
+
+/* {{{ HashIndex -- base class for all hashes. ********************/
+
+@interface HashIndex: Index
+@end
+
+@implementation HashIndex
+@end
+
+/* }}} */
+
+/* {{{ Hash32Index ************************************************/
+
+@interface Hash32Index: HashIndex
+@end
+
+@implementation Hash32Index
+@end
+
+/* }}} */
+
+/* {{{ Hash64Index ************************************************/
+
+@interface Hash64Index: HashIndex
+@end
+
+@implementation Hash64Index
+@end
+
+/* }}} */
+
+/* {{{ HashStrIndex ***********************************************/
+
+@interface HashStrIndex: HashIndex
+@end
+
+@implementation HashStrIndex
+@end
+
+/* }}} */
+
+/* {{{ TreeIndex and auxiliary structures. ************************/
+/**
+ * A field reference used for TREE indexes. Either stores a copy
+ * of the corresponding field in the tuple or points to that field
+ * in the tuple (depending on field length).
+ */
+struct field {
+	/** Field data length. */
+	u32 len;
+	/** Actual field data. For small fields we store the value
+	 * of the field (u32, u64, strings up to 8 bytes), for
+	 * longer fields, we store a pointer to field data in the
+	 * tuple in the primary index.
+	 */
+	union {
+		u32 u32;
+		u64 u64;
+		u8 data[sizeof(u64)];
+		void *data_ptr;
+	};
+};
+
+const struct field ASTERISK = {
+	.len = UINT32_MAX,
+	{
+		.data_ptr = NULL,
+	}
+};
+
+#define IS_ASTERISK(f) ((f)->len == ASTERISK.len && (f)->data_ptr == ASTERISK.data_ptr)
+
+/** Compare two fields of an index key.
+ *
+ * @retval 0  two fields are equal
+ * @retval -1 f2 is less than f1
+ * @retval 1 f2 is greater than f1
+ */
+static i8
+field_compare(struct field *f1, struct field *f2, enum field_data_type type)
+{
+	if (IS_ASTERISK(f1) || IS_ASTERISK(f2))
+		return 0;
+
+	if (type == NUM) {
+		assert(f1->len == f2->len);
+		assert(f1->len == sizeof(f1->u32));
+
+		return f1->u32 >f2->u32 ? 1 : f1->u32 == f2->u32 ? 0 : -1;
+	} else if (type == NUM64) {
+		assert(f1->len == f2->len);
+		assert(f1->len == sizeof(f1->u64));
+
+		return f1->u64 >f2->u64 ? 1 : f1->u64 == f2->u64 ? 0 : -1;
+	} else if (type == STRING) {
+		i32 cmp;
+		void *f1_data, *f2_data;
+
+		f1_data = f1->len <= sizeof(f1->data) ? f1->data : f1->data_ptr;
+		f2_data = f2->len <= sizeof(f2->data) ? f2->data : f2->data_ptr;
+
+		cmp = memcmp(f1_data, f2_data, MIN(f1->len, f2->len));
+
+		if (cmp > 0)
+			return 1;
+		else if (cmp < 0)
+			return -1;
+		else if (f1->len == f2->len)
+			return 0;
+		else if (f1->len > f2->len)
+			return 1;
+		else
+			return -1;
+	}
+	panic("impossible happened");
+}
+
+struct index_tree_el {
+	struct box_tuple *tuple;
+	struct field key[];
+};
+
+#define INDEX_TREE_EL_SIZE(key) \
+	(sizeof(struct index_tree_el) + sizeof(struct field) * (key)->part_count)
+
+void
+index_tree_el_init(struct index_tree_el *elem,
+		   struct key *key, struct box_tuple *tuple)
+{
+	void *tuple_data = tuple->data;
+
+	for (i32 i = 0; i < key->max_fieldno; ++i) {
+		struct field f;
+
+		if (i < tuple->cardinality) {
+			f.len = load_varint32(&tuple_data);
+			if (f.len <= sizeof(f.data)) {
+				memset(f.data, 0, sizeof(f.data));
+				memcpy(f.data, tuple_data, f.len);
+			} else
+				f.data_ptr = tuple_data;
+			tuple_data += f.len;
+		} else
+			f = ASTERISK;
+
+		u32 key_field_no = key->cmp_order[i];
+
+		if (key_field_no == -1)
+			continue;
+
+		if (key->parts[key_field_no].type == NUM) {
+			if (f.len != 4)
+				tnt_raise(IllegalParams, :"key is not u32");
+		} else if (key->parts[key_field_no].type == NUM64 && f.len != 8) {
+				tnt_raise(IllegalParams, :"key is not u64");
+		}
+
+		elem->key[key_field_no] = f;
+	}
+	elem->tuple = tuple;
+}
+
+/*
+ * Compare index_tree elements only by fields defined in
+ * index->field_cmp_order.
+ * Return:
+ *      Common meaning:
+ *              < 0  - a is smaller than b
+ *              == 0 - a is equal to b
+ *              > 0  - a is greater than b
+ */
+static int
+index_tree_el_unique_cmp(struct index_tree_el *elem_a,
+			 struct index_tree_el *elem_b,
+			 struct key *key)
+{
+	int r = 0;
+	for (i32 i = 0, end = key->part_count; i < end; ++i) {
+		r = field_compare(&elem_a->key[i], &elem_b->key[i],
+				  key->parts[i].type);
+		if (r != 0)
+			break;
+	}
+	return r;
+}
+
+static int
+index_tree_el_cmp(struct index_tree_el *elem_a, struct index_tree_el *elem_b,
+		  struct key *key)
+{
+	int r = index_tree_el_unique_cmp(elem_a, elem_b, key);
+	if (r == 0 && elem_a->tuple && elem_b->tuple)
+		r = (elem_a->tuple < elem_b->tuple ?
+		     -1 : elem_a->tuple > elem_b->tuple);
+	return r;
+}
+
+#include <third_party/sptree.h>
+SPTREE_DEF(str_t, realloc);
+
+@interface TreeIndex: Index {
+	sptree_str_t *tree;
+};
+- (void) build: (Index *) pk;
+@end
+
+@implementation TreeIndex
+
+- (void) build: (Index *) pk
+{
+	u32 n_tuples = [pk size];
+	u32 estimated_tuples = n_tuples * 1.2;
+
+	assert(enabled == false);
+
+	struct index_tree_el *elem = NULL;
+	if (n_tuples) {
+		/*
+		 * Allocate a little extra to avoid
+		 * unnecessary realloc() when more data is
+		 * inserted.
+		*/
+		size_t sz = estimated_tuples * INDEX_TREE_EL_SIZE(&key);
+		elem = malloc(sz);
+		if (elem == NULL)
+			panic("malloc(): failed to allocate %"PRI_SZ" bytes", sz);
+	}
+	struct index_tree_el *m;
+	u32 i = 0;
+
+	struct iterator *it = pk->position;
+	[pk initIterator: it];
+	struct box_tuple *tuple;
+	while ((tuple = it->next(it))) {
+
+		m = (struct index_tree_el *)
+			((char *)elem + i * INDEX_TREE_EL_SIZE(&key));
+
+		index_tree_el_init(m, &key, tuple);
+		++i;
+	}
+
+	if (n_tuples)
+		say_info("Sorting %"PRIu32 " keys in index %" PRIu32 "...", n_tuples, self->n);
+
+	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
+	sptree_str_t_init(tree, INDEX_TREE_EL_SIZE(&key),
+			  elem, n_tuples, estimated_tuples,
+			  (void *) (unique ? index_tree_el_unique_cmp :
+			  index_tree_el_cmp), &key);
+	enabled = true;
+}
+@end
+
+/* }}} */
+
+void
+build_indexes(void)
+{
+	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
+		if (space[n].enabled == false)
+			continue;
+		/* A shortcut to avoid unnecessary log messages. */
+		if (space[n].index[1] == nil)
+			continue; /* no secondary keys */
+		say_info("Building secondary keys in space %" PRIu32 "...", n);
+		Index *pk = space[n].index[0];
+		for (u32 idx = 1;; idx++) {
+			Index *index = space[n].index[idx];
+			if (index == nil)
+				break;
+
+			if (index->type != TREE)
+				continue;
+			[(TreeIndex*) index build: pk];
+		}
+		say_info("Space %"PRIu32": done", n);
+	}
+}
+
+/**
+ * vim: foldmethod=marker
+ */

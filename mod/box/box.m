@@ -117,6 +117,42 @@ tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
 	tuple_ref(tuple, +1);
 }
 
+void
+validate_indexes(struct box_txn *txn)
+{
+	if (space[txn->n].index[1] == nil)
+		return;
+
+	/* There is more than one index. */
+	foreach_index(txn->n, index) {
+		/* XXX: skip the first index here! */
+		for (u32 f = 0; f < index->key.part_count; ++f) {
+			if (index->key.parts[f].fieldno >= txn->tuple->cardinality)
+				tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+
+			if (index->key.parts[f].type == STRING)
+				continue;
+
+			void *field = tuple_field(txn->tuple, index->key.parts[f].fieldno);
+			u32 len = load_varint32(&field);
+
+			if (index->key.parts[f].type == NUM && len != sizeof(u32))
+				tnt_raise(IllegalParams, :"field must be NUM");
+
+			if (index->key.parts[f].type == NUM64 && len != sizeof(u64))
+				tnt_raise(IllegalParams, :"field must be NUM64");
+		}
+		if (index->type == TREE && index->unique == false)
+			/* Don't check non unique indexes */
+			continue;
+
+		struct box_tuple *tuple = [index findBy: txn->tuple];
+
+		if (tuple != NULL && tuple != txn->old_tuple)
+			tnt_raise(ClientError, :ER_INDEX_VIOLATION);
+	}
+}
+
 static void __attribute__((noinline))
 prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 {
@@ -132,7 +168,7 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 	txn->tuple->cardinality = cardinality;
 	memcpy(txn->tuple->data, data->data, data->size);
 
-	txn->old_tuple = txn->index->find_by_tuple(txn->index, txn->tuple);
+	txn->old_tuple = [txn->index findBy: txn->tuple];
 
 	if (txn->old_tuple != NULL)
 		tuple_txn_ref(txn, txn->old_tuple);
@@ -175,7 +211,7 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		 * txn_commit().
 		 */
 		foreach_index(txn->n, index)
-			index->replace(index, NULL, txn->tuple);
+			[index replace: NULL :txn->tuple];
 	}
 
 	txn->out->dup_u32(1); /* Affected tuples */
@@ -189,7 +225,7 @@ commit_replace(struct box_txn *txn)
 {
 	if (txn->old_tuple != NULL) {
 		foreach_index(txn->n, index)
-			index->replace(index, txn->old_tuple, txn->tuple);
+			[index replace: txn->old_tuple :txn->tuple];
 
 		tuple_ref(txn->old_tuple, -1);
 	}
@@ -207,7 +243,7 @@ rollback_replace(struct box_txn *txn)
 
 	if (txn->tuple && txn->tuple->flags & GHOST) {
 		foreach_index(txn->n, index)
-			index->remove(index, txn->tuple);
+			[index remove: txn->tuple];
 	}
 }
 
@@ -341,7 +377,7 @@ prepare_update(struct box_txn *txn, struct tbuf *data)
 	if (key == NULL)
 		tnt_raise(IllegalParams, :"invalid key");
 
-	txn->old_tuple = txn->index->find(txn->index, key);
+	txn->old_tuple = [txn->index find: key];
 	if (txn->old_tuple == NULL) {
 		txn->flags |= BOX_NOT_STORE;
 
@@ -468,9 +504,10 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 		for (int i = 1; i < key_cardinality; i++)
 			read_field(data);
 
-		index->iterator_init(index, key_cardinality, key);
+		struct iterator *it = index->position;
+		[index initIterator: it :key :key_cardinality];
 
-		while ((tuple = index->iterator.next_equal(index)) != NULL) {
+		while ((tuple = it->next_equal(it)) != NULL) {
 			if (tuple->flags & GHOST)
 				continue;
 
@@ -494,7 +531,7 @@ prepare_delete(struct box_txn *txn, void *key)
 {
 	u32 tuples_affected = 0;
 
-	txn->old_tuple = txn->index->find(txn->index, key);
+	txn->old_tuple = [txn->index find: key];
 
 	if (txn->old_tuple == NULL)
 		/*
@@ -523,7 +560,7 @@ commit_delete(struct box_txn *txn)
 		return;
 
 	foreach_index(txn->n, index)
-		index->remove(index, txn->old_tuple);
+		[index remove: txn->old_tuple];
 	tuple_ref(txn->old_tuple, -1);
 }
 
@@ -892,7 +929,7 @@ space_free(void)
 		int j;
 		for (j = 0 ; j < BOX_INDEX_MAX ; j++) {
 			Index *index = space[i].index[j];
-			if (index == 0)
+			if (index == nil)
 				break;
 			[index free];
 		}
@@ -972,14 +1009,11 @@ space_config(void)
 		/* fill space indexes */
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
-			Index *index = [[Index alloc] init];
 			struct key key;
 			key_config(&key, cfg_index);
-			index->key = key;
-			index->unique = cfg_index->unique;
-			index->type = STR2ENUM(index_type, cfg_index->type);
-			index->n = j;
-			[index init: &space[i]];
+			enum index_type type = STR2ENUM(index_type, cfg_index->type);
+			Index *index = [Index alloc: type :&key];
+			[index init: &key :&space[i]];
 			space[i].index[j] = index;
 		}
 
@@ -1497,8 +1531,9 @@ mod_snapshot(struct log_io_iter *i)
 
 		Index *pk = space[n].index[0];
 
-		pk->iterator_init(pk, 0, NULL);
-		while ((tuple = pk->iterator.next(pk))) {
+		struct iterator *it = pk->position;
+		[pk initIterator: it];
+		while ((tuple = it->next(it))) {
 			snapshot_write_tuple(i, n, tuple);
 		}
 	}
