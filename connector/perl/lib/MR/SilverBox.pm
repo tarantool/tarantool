@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Scalar::Util qw/looks_like_number/;
 use List::MoreUtils qw/each_arrayref/;
+use Time::HiRes qw/sleep/;
 
 use MR::IProto ();
 use MR::Storage::Const ();
@@ -30,7 +31,8 @@ sub new {
     $arg = { %$arg };
     $self->{name}            = $arg->{name}      || ref$class || $class;
     $self->{timeout}         = $arg->{timeout}   || 23;
-    $self->{retry    }       = $arg->{retry}     || 1;
+    $self->{retry}           = $arg->{retry}     || 1;
+    $self->{retry_delay}     = $arg->{retry_delay} || 1;
     $self->{select_retry}    = $arg->{select_retry} || 3;
     $self->{softretry}       = $arg->{softretry} || 3;
     $self->{debug}           = $arg->{'debug'}   || 0;
@@ -161,7 +163,7 @@ sub _chat {
                 return $ret;
             }
 
-            $message = $self->{errstrclass}->ErrorStr($full_code);
+            $message = $ret_code->[0] == 0 ? "ok" : $data ? sprintf "Error %08X: %s", $full_code, $$data : $self->{errstrclass}->ErrorStr($full_code);
             $self->_debug("$self->{name}: $message") if $self->{debug} >= 1;
             if ($ret_code->[0] == 2) { #fatal error
                 $self->_raise($message) if $self->{raise};
@@ -171,7 +173,7 @@ sub _chat {
             # retry if error is soft even in case of update e.g. ROW_LOCK
             if ($ret_code->[0] == 1 and --$soft_retry > 0) {
                 --$retry if $retry > 1;
-                sleep 1;
+                sleep $self->{retry_delay};
                 next;
             }
         } else { # timeout has caused the failure if $ret->{timeout}
@@ -182,7 +184,7 @@ sub _chat {
 
         last unless --$retry;
 
-        sleep 1;
+        sleep $self->{retry_delay};
     };
 
     $self->_raise("no success after $retry_count tries\n") if $self->{raise};
@@ -190,12 +192,12 @@ sub _chat {
 
 sub _raise {
     my ($self, $msg) = @_;
-    die "$self->{name}: $msg";
+    die "$self->{name}: $msg\n";
 }
 
 sub _validate_param {
     my ($self, $args, @pnames) = @_;
-    my $param = ref $args->[-1] eq 'HASH' ? {%{pop @$args}}: {};
+    my $param = ref $args->[-1] eq 'HASH' ? {%{pop @$args}} : {};
 
     foreach my $pname (keys %$param) {
         confess "$self->{name}: unknown param $pname\n" if 0 == grep { $_ eq $pname } @pnames;
@@ -208,6 +210,29 @@ sub _validate_param {
     confess "$self->{name}: bad index `$param->{use_index}'" unless exists $ns->{index_names}->{$param->{use_index}};
     $param->{index} = $ns->{index_names}->{$param->{use_index}};
     return ($param, map { /namespace/ ? $self->{namespaces}->{$param->{namespace}} : $param->{$_} } @pnames);
+}
+
+sub Call {
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace flags raise unpack unpack_format/);
+    my ($self, $sp_name, $tuple) = @_;
+
+    my $flags = $param->{flags} || 0;
+    local $self->{raise} = $param->{raise} if defined $param->{raise};
+
+    $self->_debug("$self->{name}: CALL[$sp_name][${\join '   ', map {join' ',unpack'(H2)*',$_} @$tuple}]") if $self->{debug} >= 4;
+    confess "All fields must be defined" if grep { !defined } @$tuple;
+
+    confess "Bad `unpack_format` option" if exists $param->{unpack_format} and ref $param->{unpack_format} ne 'ARRAY';
+    my $unpack_format = join '', map { /&/ ? 'w/a*' : "x$_" } @{$param->{unpack_format}};
+
+    local $namespace->{unpack_format} = $unpack_format if $unpack_format; # XXX
+    local $namespace->{append_for_unpack} = ''         if $unpack_format; # shit...
+
+    $self->_chat (
+        msg     => 22,
+        payload => pack("L w/a* L(w/a*)*", $flags, $sp_name, scalar(@$tuple), @$tuple),
+        unpack  => $param->{unpack} || sub { $self->_unpack_select($namespace, "CALL", @_) },
+    );
 }
 
 sub Add { # store tuple if tuple identified by primary key _does_not_ exist
@@ -269,7 +294,6 @@ sub Insert {
 
 sub _unpack_select {
     my ($self, $ns, $debug_prefix) = @_;
-    local *@;
     $debug_prefix ||= "SELECT";
     confess __LINE__."$self->{name}: [$debug_prefix]: Bad response" if length $_[3] < 4;
     my $result_count = unpack('L', substr($_[3], 0, 4, ''));
@@ -286,7 +310,7 @@ sub _unpack_select {
         $self->_debug("$self->{name}: [$debug_prefix]: ROW[$i]: DATA=[@{[unpack '(H2)*', $packed_tuple]}];") if $self->{debug} >= 6;
         $packed_tuple .= $appe;
         my @tuple = eval { unpack($fmt, $packed_tuple) };
-        confess "$self->{name}: [$debug_prefix]: ROW[$i]: can't unpack tuple [@{[unpack('(H2)*', $packed_tuple)]}]" if !@tuple || $@;
+        confess "$self->{name}: [$debug_prefix]: ROW[$i]: can't unpack tuple [@{[unpack('(H2)*', $packed_tuple)]}]: $@" if !@tuple || $@;
         $self->_debug("$self->{name}: [$debug_prefix]: ROW[$i]: FIELDS=[@{[map { qq{`$_'} } @tuple]}];") if $self->{debug} >= 5;
         push @res, \@tuple;
     }
