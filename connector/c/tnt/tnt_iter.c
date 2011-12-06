@@ -51,8 +51,6 @@ static struct tnt_iter *tnt_iter_tryalloc(struct tnt_iter *i) {
 
 static int tnt_iter_field_next(struct tnt_iter *i) {
 	struct tnt_iter_field *ip = TNT_IFIELD(i);
-	if (ip->tu->cardinality == (ip->fld_index + 1))
-		return 0;
 	/* intitializing iter to the first field */
 	if (ip->fld_ptr == NULL) {
 		if (ip->tu->size < 4) {
@@ -68,7 +66,9 @@ static int tnt_iter_field_next(struct tnt_iter *i) {
 		}
 		ip->fld_data = ip->fld_ptr + ip->fld_esize;
 		return 1;
-	}
+	} else
+	if (ip->tu->cardinality == (ip->fld_index + 1)) /* checking end */
+		return 0;
 	/* skipping to the next field */
 	ip->fld_ptr += ip->fld_esize + ip->fld_size;
 	ip->fld_index++;

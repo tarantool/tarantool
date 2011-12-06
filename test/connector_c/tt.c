@@ -210,6 +210,21 @@ static void tt_tnt_iter1(struct tt_test *test) {
 	tnt_tuple_free(t);
 }
 
+/* iterator tuple single field */
+static void tt_tnt_iter11(struct tt_test *test) {
+	struct tnt_tuple *t = tnt_tuple(NULL, "%s", "foo");
+	TT_ASSERT(t->cardinality == 1);
+	struct tnt_iter i;
+	tnt_iter(&i, t);
+	TT_ASSERT(tnt_next(&i) == 1);
+	TT_ASSERT(TNT_IFIELD_IDX(&i) == 0);
+	TT_ASSERT(TNT_IFIELD_SIZE(&i) == 3);
+	TT_ASSERT(memcmp(TNT_IFIELD_DATA(&i), "foo", 3) == 0);
+	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_iter_free(&i);
+	tnt_tuple_free(t);
+}
+
 /* iterator tuple field */
 static void tt_tnt_iter2(struct tt_test *test) {
 	struct tnt_tuple *t = tnt_tuple(NULL, "%s%d%s", "foo", 123, "bar");
@@ -733,7 +748,8 @@ main(int argc, char * argv[])
 	tt_test(&t, "list", tt_tnt_list);
 	tt_test(&t, "stream buffer", tt_tnt_sbuf);
 	tt_test(&t, "iterator tuple", tt_tnt_iter1);
-	tt_test(&t, "iterator tuple field", tt_tnt_iter2);
+	tt_test(&t, "iterator tuple (single field)", tt_tnt_iter11);
+	tt_test(&t, "iterator tuple (tnt_field)", tt_tnt_iter2);
 	tt_test(&t, "iterator list", tt_tnt_iter3);
 	/* common operations */
 	tt_test(&t, "connect", tt_tnt_net_connect);
