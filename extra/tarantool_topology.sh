@@ -43,7 +43,7 @@ else
         num=$1
 fi
 
-# validating instance number 
+# validating instance number
 #
 isnum=0
 if [ $num -eq $num 2> /dev/null ]; then

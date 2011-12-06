@@ -1,8 +1,8 @@
 #!/bin/sh
 
-echo "creating user and group"
+echo "Creating a user and a group"
 groupadd tarantool
 useradd -r -g tarantool tarantool
 
-echo "making single instance setup"
+echo "Performing a single instance setup"
 /usr/local/bin/tarantool_topology.sh -y 1
