@@ -7,7 +7,7 @@ BINARY="/usr/local/bin/${NAME}"
 INST=$(basename $0 .sh)
 CONF="/usr/local/etc/${INST}.cfg"
 LOGDIR="/var/${INST}/logs"
-CRONOLOG="/usr/sbin/cronolog"
+WRAP_PIDFILE="/var/${INST}/wrapper.pid"
 
 exec <&-
 
@@ -18,7 +18,6 @@ report()
 
 runtarantool()
 {
-
         ulimit -n 40960
         ${BINARY} ${OPTIONS} --config ${CONF} 2>&1 </dev/null &
         wait
