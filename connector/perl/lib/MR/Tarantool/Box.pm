@@ -244,7 +244,8 @@ sub new {
     $self->{iprotoclass}     = $arg->{iprotoclass} || $class->IPROTOCLASS;
     $self->{_last_error}     = 0;
 
-    $arg->{spaces} = $arg->{namespaces} = [@{ $arg->{spaces} ||= $arg->{namespaces} }];
+    $arg->{spaces} = $arg->{namespaces} = [@{ $arg->{spaces} ||= $arg->{namespaces} || confess "no spaces given" }];
+    confess "no spaces given" unless @{$arg->{spaces}};
     my %namespaces;
     for my $ns (@{$arg->{spaces}}) {
         $ns = { %$ns };
