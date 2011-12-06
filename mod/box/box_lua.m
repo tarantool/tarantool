@@ -390,7 +390,7 @@ lbox_index_next(struct lua_State *L)
 			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
 			for (int i = 0; i < argc; ++i)
 				append_key_part(L, i + 2, data,
-						index->key.parts[i].type);
+						index->key_def.parts[i].type);
 			key = data->data;
 		}
 		/*
@@ -399,10 +399,10 @@ lbox_index_next(struct lua_State *L)
 		 * keys.
 		*/
 		assert(cardinality != 0);
-		if (cardinality > index->key.part_count)
+		if (cardinality > index->key_def.part_count)
 			luaL_error(L, "index.next(): key part count (%d) "
 				   "does not match index cardinality (%d)",
-				   cardinality, index->key.part_count);
+				   cardinality, index->key_def.part_count);
 		[index initIterator: index->position :key :cardinality];
 	}
 	struct box_tuple *tuple = index->position->next(index->position);
