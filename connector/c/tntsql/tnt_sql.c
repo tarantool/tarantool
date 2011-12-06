@@ -244,11 +244,13 @@ tnt_sql_stmt(struct tnt_sql *sql)
 	tnt_list_init(&tuples);
 	tnt_buf(&update);
 
+	int flags = 0;
 	struct tnt_tk *tk = NULL, *tn = NULL;
 	bool rc = false;
 	switch (tnt_lex(sql->l, &tk)) {
-	/* INSERT [INTO] TABLE VALUES ( list ) */
+	/* <INSERT|REPLACE> [INTO] TABLE VALUES ( list ) */
 	case TNT_TK_INSERT:
+	case TNT_TK_REPLACE:
 		tnt_sqltry(sql, TNT_TK_INTO);
 		if (sql->error)
 			goto error;
@@ -263,8 +265,11 @@ tnt_sql_stmt(struct tnt_sql *sql)
 				goto error;
 			break;
 		}
+		flags = TNT_FLAG_ADD;
+		if (tk->tk == TNT_TK_REPLACE)
+			flags = TNT_FLAG_REPLACE;
 		tnt_expect(tnt_sqltk(sql, ')'));
-		if (tnt_insert(sql->s, TNT_TK_I(tn), 0, &tu) == -1) {
+		if (tnt_insert(sql->s, TNT_TK_I(tn), flags, &tu) == -1) {
 			tnt_sql_error(sql, tk, "insert failed");
 			goto error;
 		}
@@ -361,7 +366,7 @@ noargs:
 		return tnt_sql_error(sql, tk, "%s", sql->l->error);
 	default:
 		return tnt_sql_error(sql, tk,
-			"insert, update, delete, select, call, ping are expected");
+			"insert, replace, update, delete, select, call, ping are expected");
 	}
 	rc = true;
 error:
@@ -450,11 +455,12 @@ tnt_query_is(char *q, size_t qsize)
 	case TNT_TK_EOF:
 		break;
 	default:
-		if (tk->tk == TNT_TK_PING ||
-		    tk->tk == TNT_TK_INSERT ||
-		    tk->tk == TNT_TK_UPDATE ||
-		    tk->tk == TNT_TK_SELECT ||
-		    tk->tk == TNT_TK_DELETE ||
+		if (tk->tk == TNT_TK_PING    ||
+		    tk->tk == TNT_TK_INSERT  ||
+		    tk->tk == TNT_TK_REPLACE ||
+		    tk->tk == TNT_TK_UPDATE  ||
+		    tk->tk == TNT_TK_SELECT  ||
+		    tk->tk == TNT_TK_DELETE  ||
 		    tk->tk == TNT_TK_CALL)
 			rc = 1;
 		break;
