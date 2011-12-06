@@ -242,33 +242,3 @@
    fun:box_process*
    ...
 }
-
-## sptree
-##
-
-## third_party sptree implementation doesn't have
-## destroy function.
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:sptree_str_t_init
-   fun:build_indexes
-   ...
-}
-
-# iterator_init_set calls realloc only if iterator value not
-# initialized or have lower depth.
-
-{
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:sptree_str_t_iterator_init_set
-   fun:index_iterator_init_tree_str
-   fun:process_select
-   ...
-}

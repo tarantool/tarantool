@@ -100,7 +100,7 @@ iterator_first_equal(struct iterator *it)
 {
 	sfree(key_def.parts);
 	sfree(key_def.cmp_order);
-	sfree(position);
+	position->free(position);
 	[super free];
 }
 
@@ -211,6 +211,13 @@ hash_iterator_next(struct iterator *iterator)
 	return NULL;
 }
 
+void
+hash_iterator_free(struct iterator *iterator)
+{
+	assert(iterator->next = hash_iterator_next);
+	sfree(iterator);
+}
+
 
 @implementation HashIndex
 - (void) free
@@ -241,10 +248,11 @@ hash_iterator_next(struct iterator *iterator)
 
 - (struct iterator *) allocIterator
 {
-	struct hash_iterator *it = salloc(sizeof(hash_iterator));
+	struct hash_iterator *it = salloc(sizeof(struct hash_iterator));
 	if (it) {
 		memset(it, 0, sizeof(struct hash_iterator));
 		it->base.next = hash_iterator_next;
+		it->base.free = hash_iterator_free;
 	}
 	return (struct iterator *) it;
 }
@@ -798,7 +806,6 @@ struct tree_iterator {
 	struct iterator base;
 	struct sptree_str_t_iterator *t_iter;
 	struct tree_el *pattern;
-	sptree_str_t *tree;
 	struct key_def *key_def;
 };
 
@@ -818,6 +825,17 @@ tree_iterator_next(struct iterator *iterator)
 	struct tree_el *elem = sptree_str_t_iterator_next(it->t_iter);
 
 	return elem ? elem->tuple : NULL;
+}
+
+void
+tree_iterator_free(struct iterator *iterator)
+{
+	assert(iterator->next == tree_iterator_next);
+	struct tree_iterator *it = tree_iterator(iterator);
+
+	if (it->t_iter)
+		sptree_str_t_iterator_free(it->t_iter);
+	sfree(it);
 }
 
 static struct box_tuple *
@@ -843,6 +861,7 @@ tree_iterator_next_equal(struct iterator *iterator)
 - (void) free
 {
 	sfree(pattern);
+	sptree_str_t_destroy(tree);
 	sfree(tree);
 	[super free];
 }
@@ -923,10 +942,14 @@ tree_iterator_next_equal(struct iterator *iterator)
 {
 	struct tree_iterator *it = salloc(sizeof(struct tree_iterator) +
 					  TREE_EL_SIZE(&key_def));
-	it->pattern = (struct tree_el *) (it + 1);
-	it->base.next = tree_iterator_next;
-	it->key_def = &key_def;
-	it->tree = tree;
+	if (it) {
+		memset(it, 0, sizeof(struct tree_iterator));
+		it->base.next = tree_iterator_next;
+		it->base.free = tree_iterator_free;
+		it->pattern = (struct tree_el *) (it + 1);
+		it->key_def = &key_def;
+		it->t_iter = NULL;
+	}
 	return (struct iterator *) it;
 }
 

@@ -159,6 +159,13 @@ sptree_##name##_init(sptree_##name *t, size_t elemsize, void *m,                
     }                                                                                     \
 }                                                                                         \
                                                                                           \
+static inline void                                                                        \
+sptree_##name##_destroy(sptree_##name *t) {                                               \
+        if (t == NULL)    return;                                                         \
+	free(t->members);			                                          \
+	free(t->lrpointers);			                                          \
+}                                                                                         \
+                                                                                          \
 static inline void*                                                                       \
 sptree_##name##_find(sptree_##name *t, void *k)    {                                      \
     spnode_t    node = t->root;                                                           \

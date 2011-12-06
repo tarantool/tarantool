@@ -127,6 +127,7 @@ struct key_def {
 struct iterator {
 	struct box_tuple *(*next)(struct iterator *);
 	struct box_tuple *(*next_equal)(struct iterator *);
+	void (*free)(struct iterator *);
 };
 
 #define foreach_index(n, index_var)					\

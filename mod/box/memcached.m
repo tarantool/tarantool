@@ -288,7 +288,7 @@ flush_all(void *data)
 	while ((tuple = it->next(it))) {
 	       meta(tuple)->exptime = 1;
 	}
-	sfree(it);
+	it->free(it);
 }
 
 #define STORE									\
@@ -513,7 +513,7 @@ restart:
 		fiber_gc();
 		goto restart;
 	} @finally {
-		sfree(it);
+		it->free(it);
 	}
 }
 
