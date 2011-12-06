@@ -1,4 +1,48 @@
-package MR::SilverBox;
+package MR::Tarantool::Box;
+
+=pod
+
+=head1 NAME
+
+A driver for an efficient Tarantool/Box NoSQL in-memory storage.
+
+=head1 SYNOPSIS
+
+    my $box = MR::Tarantool::Box->new({
+        servers => "127.0.0.1:33013",
+        name    => "My Box",              # primarily used for debug purposes
+        spaces => [ {
+            indexes => [ {
+                index_name   => 'idx1',
+                keys         => [0],
+            }, {
+                index_name   => 'idx2',
+                keys         => [1],
+            }, ],
+            space         => 1,           # space id, as set in Tarantool/Box config
+            name          => "primary",   # self-descriptive space-id
+            format        => "QqLlSsCc&", # pack()-compatible, Qq must be supported by perl itself, & stands for byte-string.
+            default_index => 'idx1',
+        }, {
+            #...
+        } ],
+        default_space => "primary",
+
+        timeout   => 1,
+        retry     => 3,
+        debug     => 9,                   # output to STDERR some debugging info
+        raise     => 0,                   # dont raise an exception in case of error
+    });
+
+    $box->Insert(1,2,3,4,5,6,7,8,"asdf") or die $box->ErrorStr;
+    $box->Insert(1,2,3,4,5,6,7,8,"asdf",{space => "primary"}) or die $box->ErrorStr;
+
+    my $tuples = $box->Select(1);
+    my $tuples = $box->Select(1,{space => "primary", use_index => "idx1"});
+
+=head1 DESCRIPTION
+
+=cut
 
 use strict;
 use warnings;
@@ -7,7 +51,6 @@ use List::MoreUtils qw/each_arrayref/;
 use Time::HiRes qw/sleep/;
 
 use MR::IProto ();
-use MR::Storage::Const ();
 
 use constant {
     WANT_RESULT       => 1,
@@ -17,12 +60,168 @@ use constant {
 
 
 sub IPROTOCLASS () { 'MR::IProto' }
-sub ERRSTRCLASS () { 'MR::Storage::Const::Errors::SilverBox' }
 
-use vars qw/$VERSION/;
-$VERSION = 0;
+use vars qw/$VERSION %ERRORS/;
+$VERSION = 1.4.3;
 
 BEGIN { *confess = \&MR::IProto::confess }
+
+%ERRORS = (
+    0x00000000  => q{OK},
+    0x00000100  => q{Non master connection, but it should be},
+    0x00000200  => q{Illegal parametrs},
+    0x00000300  => q{Uid not from this storage range},
+    0x00000400  => q{Tuple is marked as read-only},
+    0x00000500  => q{Tuple isn't locked},
+    0x00000600  => q{Tuple is locked},
+    0x00000700  => q{Failed to allocate memory},
+    0x00000800  => q{Bad integrity},
+    0x00000a00  => q{Unsupported command},
+
+    0x00000b00  => q{Can't do select},
+
+    0x00001800  => q{Can't register new user},
+    0x00001a00  => q{Can't generate alert id},
+    0x00001b00  => q{Can't del node},
+
+    0x00001c00  => q{User isn't registered},
+    0x00001d00  => q{Syntax error in query},
+    0x00001e00  => q{Unknown field},
+    0x00001f00  => q{Number value is out of range},
+    0x00002000  => q{Insert already existing object},
+    0x00002200  => q{Can not order result},
+    0x00002300  => q{Multiple update/delete forbidden},
+    0x00002400  => q{Nothing affected},
+    0x00002500  => q{Primary key update forbidden},
+    0x00002600  => q{Incorrect protocol version},
+    0x00002700  => q{WAL failed},
+    0x00003000  => q{Procedure return type is not supported in the binary protocol},
+    0x00003100  => q{Tuple doesn't exist},
+    0x00003200  => q{Procedure is not defined},
+    0x00003300  => q{Lua error},
+    0x00003400  => q{Space is disabled},
+    0x00003500  => q{No such index in space},
+    0x00003600  => q{Field was not found in the tuple},
+    0x00003700  => q{Tuple already exists},
+    0x00003800  => q{Duplicate key exists in a unique index},
+    0x00003900  => q{Space does not exists},
+);
+
+
+
+=pod
+
+=head3 new
+
+    my $box = $class->new(\%args);
+
+%args:
+
+=over
+
+=item B<spaces> => [ \%space, ... ]
+
+%space:
+
+=over
+
+=item B<space> => $space_id_uint32
+
+Space id as set in Tarantool/Box config.
+
+=item B<name> => $space_name_string
+
+Self-descriptive space id, which will be mapped into C<space>.
+
+=item B<format> => $format_string
+
+C<pack()>-compatible tuple format string, allowed formats: C<QqLlSsCc&>,
+where C<&> stands for bytestring. C<Qq> usable only if perl supports
+int64 itself. Tuples' fields are packed/unpacked according to this C<format>.
+
+=item B<indexes> => [ \%index, ... ]
+
+%index:
+
+=over
+
+=item B<id> => $index_id_uint32
+
+Index id as set in Tarantool/Box config within current C<space>.
+If not set, order position in C<indexes> is theated as C<id>.
+
+=item B<name> => $index_name_string
+
+Self-descriptive index id, which will be mapped into C<index_id>.
+
+=item B<keys> => [ $field_no_uint32, ... ]
+
+Properly ordered arrayref of fields' numbers which are indexed.
+
+=back
+
+=item B<default_index> => $default_index_name_string_or_id_uint32
+
+Index C<id> or C<name> to be used by default for the current C<space>.
+Must be set if there are more than one C<\%index>es.
+
+=back
+
+=item B<default_space> => $default_space_name_string_or_id_uint32
+
+Space C<space> or C<name> to be used by default. Must be set if there are
+more than one C<\%space>s.
+
+=item B<timeout> => $timeout_fractional_seconds_float || 23
+
+A common timeout for network operations.
+
+=item B<select_timeout> => $select_timeout_fractional_seconds_float || 2
+
+Select queries timeout for network operations. See L<select_retry>.
+
+=item B<retry> => $retry_int || 1
+
+A common retries number for network operations.
+
+=item B<select_retry> => $select_retry_int || 3
+
+Select queries retries number for network operations.
+
+Sometimes we need short timeout for select's and long timeout for B<critical> update's,
+because in case of timeout we B<don't know if the update has succeeded>. For the same
+reason we B<can't retry> update operation.
+
+So increasing C<timeout> and setting C<< retry => 1 >> for updates lowers possibility of
+such situations (but, of course, does not exclude them at all), and guarantees that
+we dont do the same more then once.
+
+=item B<soft_retry> => $soft_retry_int || 3
+
+A common retries number for Tarantool/Box B<temporary errors> (these marked by 1 in the
+lowest byte of C<error_code>). In that case we B<know for sure> that the B<request was
+declined> by Tarantool/Box for some reason (a tuple was locked for another update, for
+example), and we B<can> try it again.
+
+This is also limited by C<retry>/C<select_retry>
+(depending on query type).
+
+=item B<raise> => $raise_bool || 1
+
+Should we raise an exceptions? If so, exceptions are raised when no more retries left and
+all tries failed (with timeout, fatal, or temporary error).
+
+=item B<debug> => $debug_level_int || 0
+
+Debug level, 0 - print nothing, 9 - print everything
+
+=item B<name> => $name
+
+A string used for self-description. Mainly used for debugging purposes.
+
+=back
+
+=cut
 
 sub new {
     my ($class, $arg) = @_;
@@ -34,7 +233,7 @@ sub new {
     $self->{retry}           = $arg->{retry}     || 1;
     $self->{retry_delay}     = $arg->{retry_delay} || 1;
     $self->{select_retry}    = $arg->{select_retry} || 3;
-    $self->{softretry}       = $arg->{softretry} || 3;
+    $self->{softretry}       = $arg->{soft_retry} || $arg->{softretry} || 3;
     $self->{debug}           = $arg->{'debug'}   || 0;
     $self->{ipdebug}         = $arg->{'ipdebug'} || 0;
     $self->{raise}           = 1;
@@ -43,16 +242,16 @@ sub new {
     $self->{default_raw}     = exists $arg->{default_raw} ? $arg->{default_raw} : !$self->{hashify};
     $self->{select_timeout}  = $arg->{select_timeout} || $self->{timeout};
     $self->{iprotoclass}     = $arg->{iprotoclass} || $class->IPROTOCLASS;
-    $self->{errstrclass}     = $arg->{errstrclass} || $class->ERRSTRCLASS;
     $self->{_last_error}     = 0;
 
-    $arg->{namespaces} = [@{ $arg->{namespaces} }];
+    $arg->{spaces} = $arg->{namespaces} = [@{ $arg->{spaces} ||= $arg->{namespaces} }];
     my %namespaces;
-    for my $ns (@{$arg->{namespaces}}) {
+    for my $ns (@{$arg->{spaces}}) {
         $ns = { %$ns };
-        my $namespace = $ns->{namespace};
-        confess "ns[?] `namespace' not set" unless defined $namespace;
-        confess "ns[$namespace] already defined" if $namespaces{$namespace} || $ns->{name}&&$namespaces{$ns->{name}};
+        my $namespace = defined $ns->{space} ? $ns->{space} : $ns->{namespace};
+        $ns->{space} = $ns->{namespace} = $namespace;
+        confess "ns[?] `space' not set" unless defined $namespace;
+        confess "ns[$namespace] already defined" if $namespaces{$namespace} or $ns->{name}&&$namespaces{$ns->{name}};
         confess "ns[$namespace] no indexes defined" unless $ns->{indexes} && @{$ns->{indexes}};
         $namespaces{$namespace} = $ns;
         $namespaces{$ns->{name}} = $ns if $ns->{name};
@@ -87,12 +286,14 @@ sub new {
         }
     }
     $self->{namespaces} = \%namespaces;
-    if (values %namespaces > 1) {
-        confess "default_namespace not given" unless defined $arg->{default_namespace};
-        confess "default_namespace $arg->{default_namespace} does not exist" unless $namespaces{$arg->{default_namespace}};
+    if (@{$arg->{spaces}} > 1) {
+        $arg->{default_namespace} = $arg->{default_space} if defined $arg->{default_space};
+        confess "default_space not given" unless defined $arg->{default_namespace};
+        confess "default_space $arg->{default_namespace} does not exist" unless $namespaces{$arg->{default_namespace}};
         $self->{default_namespace} = $arg->{default_namespace};
     } else {
-        $self->{default_namespace} = $arg->{default_namespace} || $arg->{namespaces}->[0]->{namespace};
+        $self->{default_namespace} = $arg->{default_space} || $arg->{default_namespace} || $arg->{spaces}->[0]->{space};
+        confess "default_space $self->{default_namespace} does not exist" unless $namespaces{$self->{default_namespace}};
     }
     bless $self, $class;
     $self->_connect($arg->{'servers'});
@@ -117,10 +318,24 @@ sub _connect {
     });
 }
 
+=pod
+
+=head3 Error
+
+Last error code, or 'fail' for some network reason, oftenly a timeout.
+
+    $box->Insert(@tuple) or die sprintf "Error %X", $box->Error; # die "Error 202"
+
+=head3 ErrorStr
+
+Last error code and description in a single string.
+
+    $box->Insert(@tuple) or die $box->ErrorStr;                  # die "Error 00000202: Illegal Parameters"
+
+=cut
+
 sub ErrorStr {
-    my ($self, $code) = @_;
-    return $self->{_last_error_msg} if $self->{_last_error} eq 'fail';
-    return $self->{errstrclass}->ErrorStr($code || $self->{_last_error});
+    return $_[0]->{_last_error_msg};
 }
 
 sub Error {
@@ -134,10 +349,10 @@ sub _chat {
     $param{unpack} = sub {
         my $data = $_[0];
         confess __LINE__."$self->{name}: [common]: Bad response" if length $data < 4;
-        my ($full_code, @err_code) = unpack('LX[L]CCCC', substr($data, 0, 4, ''));
+        my ($full_code, @err_code) = unpack('LX[L]CSC', substr($data, 0, 4, ''));
         # $err_code[0] = severity: 0 -> ok, 1 -> transient, 2 -> permanent;
         # $err_code[1] = description;
-        # $err_code[3] = da box project;
+        # $err_code[2] = da box project;
         return (\@err_code, \$data, $full_code);
     };
 
@@ -158,12 +373,12 @@ sub _chat {
             my ($ret_code, $data, $full_code) = @{$ret->{ok}};
             $self->{_last_error} = $full_code;
             if ($ret_code->[0] == 0) {
-                my $ret = $orig_unpack->($$data,$ret_code->[3]);
+                my $ret = $orig_unpack->($$data,$ret_code->[2]);
                 confess __LINE__."$self->{name}: [common]: Bad response (more data left)" if length $$data > 0;
                 return $ret;
             }
 
-            $message = $ret_code->[0] == 0 ? "ok" : $data ? sprintf "Error %08X: %s", $full_code, $$data : $self->{errstrclass}->ErrorStr($full_code);
+            $self->{_last_error_msg} = $message = $ret_code->[0] == 0 ? "ok" : sprintf "Error %08X: %s", $full_code, $$data || $ERRORS{$full_code & 0xFFFFFF00} || 'Unknown error';
             $self->_debug("$self->{name}: $message") if $self->{debug} >= 1;
             if ($ret_code->[0] == 2) { #fatal error
                 $self->_raise($message) if $self->{raise};
@@ -197,29 +412,62 @@ sub _raise {
 
 sub _validate_param {
     my ($self, $args, @pnames) = @_;
-    my $param = ref $args->[-1] eq 'HASH' ? {%{pop @$args}} : {};
+    my $param = $args && @$args && ref $args->[-1] eq 'HASH' ? {%{pop @$args}} : {};
 
+    my %pnames = map { $_ => 1 } @pnames;
+    $pnames{space} = 1;
+    $pnames{namespace} = 1;
     foreach my $pname (keys %$param) {
-        confess "$self->{name}: unknown param $pname\n" if 0 == grep { $_ eq $pname } @pnames;
+        confess "$self->{name}: unknown param $pname\n" unless exists $pnames{$pname};
     }
 
+    $param->{namespace} = $param->{space} if exists $param->{space} and defined $param->{space};
     $param->{namespace} = $self->{default_namespace} unless defined $param->{namespace};
-    confess "$self->{name}: bad namespace `$param->{namespace}'" unless exists $self->{namespaces}->{$param->{namespace}};
+    confess "$self->{name}: bad space `$param->{namespace}'" unless exists $self->{namespaces}->{$param->{namespace}};
     my $ns = $self->{namespaces}->{$param->{namespace}};
     $param->{use_index} = $ns->{default_index} unless defined $param->{use_index};
     confess "$self->{name}: bad index `$param->{use_index}'" unless exists $ns->{index_names}->{$param->{use_index}};
     $param->{index} = $ns->{index_names}->{$param->{use_index}};
-    return ($param, map { /namespace/ ? $self->{namespaces}->{$param->{namespace}} : $param->{$_} } @pnames);
+    return ($param, $self->{namespaces}->{$param->{namespace}}, map { $param->{$_} } @pnames);
 }
 
+=pod
+
+=head3 Call
+
+Call a stored procedure. Returns an arrayref of the result tuple(s) upon success.
+
+    my $results = $box->Call('stored_procedure_name', \@procedure_params, \%options) or die $box->ErrorStr; # Call failed
+    my $result_tuple = @$results && $results->[0] or warn "Call succeeded, but returned nothing";
+
+=over
+
+=item B<@procedure_params>
+
+An array of bytestrings to be passed as is to the procecedure.
+
+=item B<%options>
+
+=over
+
+=item B<unpack_format>
+
+Format to unpack the result tuple, the same as C<format> option for C<new()>
+
+=back
+
+=back
+
+=cut
+
 sub Call {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace flags raise unpack unpack_format/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/flags raise unpack unpack_format/);
     my ($self, $sp_name, $tuple) = @_;
 
     my $flags = $param->{flags} || 0;
     local $self->{raise} = $param->{raise} if defined $param->{raise};
 
-    $self->_debug("$self->{name}: CALL[$sp_name][${\join '   ', map {join' ',unpack'(H2)*',$_} @$tuple}]") if $self->{debug} >= 4;
+    $self->_debug("$self->{name}: CALL($sp_name)[${\join '   ', map {join' ',unpack'(H2)*',$_} @$tuple}]") if $self->{debug} >= 4;
     confess "All fields must be defined" if grep { !defined } @$tuple;
 
     confess "Bad `unpack_format` option" if exists $param->{unpack_format} and ref $param->{unpack_format} ne 'ARRAY';
@@ -229,11 +477,63 @@ sub Call {
     local $namespace->{append_for_unpack} = ''         if $unpack_format; # shit...
 
     $self->_chat (
-        msg     => 22,
-        payload => pack("L w/a* L(w/a*)*", $flags, $sp_name, scalar(@$tuple), @$tuple),
-        unpack  => $param->{unpack} || sub { $self->_unpack_select($namespace, "CALL", @_) },
+        msg      => 22,
+        payload  => pack("L w/a* L(w/a*)*", $flags, $sp_name, scalar(@$tuple), @$tuple),
+        unpack   => $param->{unpack} || sub { $self->_unpack_select($namespace, "CALL", @_) },
+        callback => $param->{callback},
     );
 }
+
+=pod
+
+=head3 Add, Set, Replace
+
+    $box->Add(@tuple) or die $box->ErrorStr;
+    $box->Set(@tuple, { space => "main" });
+    $box->Replace(@tuple, { space => "secondary" });
+
+Insert a C<< @tuple >> into the storage into C<$options{space}> or C<default_space> space.
+All of them return C<true> upon success.
+
+All of them have the same parameters:
+
+=over
+
+=item B<@tuple>
+
+A tuple to insert. All fields must be defined. All fields will be C<pack()>ed according to C<format> (see L<new>)
+
+=item B<%options>
+
+=over
+
+=item B<space> => $space_id_uint32_or_name_string
+
+Specify storage space to work on.
+
+=back
+
+=back
+
+The difference between them is the behaviour concerning tuple with the same primary key:
+
+=over
+
+=item *
+
+B<Add> will fail if a duplicate-key tuple B<exists> 
+
+=item *
+
+B<Replace> will fail if a duplicate-key tuple B<does not exists> 
+
+=item *
+
+B<Set> will B<overwrite> a duplicate-key tuple 
+
+=back
+
+=cut
 
 sub Add { # store tuple if tuple identified by primary key _does_not_ exist
     my $param = @_ && ref $_[-1] eq 'HASH' ? pop : {};
@@ -254,10 +554,10 @@ sub Replace { # store tuple if tuple identified by primary key _does_ exist
 }
 
 sub Insert {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace _flags action/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/_flags action/);
     my ($self, @tuple) = @_;
 
-    $self->_debug("$self->{name}: INSERT(@{[map {qq{`$_'}} @tuple]})") if $self->{debug} >= 3;
+    $self->_debug("$self->{name}: INSERT(NS:$namespace->{namespace},TUPLE:[@{[map {qq{`$_'}} @tuple]}])") if $self->{debug} >= 3;
 
     my $flags = $param->{_flags} || 0;
     $param->{action} ||= 'set';
@@ -286,9 +586,10 @@ sub Insert {
     $self->_debug("$self->{name}: INSERT[${\join '   ', map {join' ',unpack'(H2)*',$_} @tuple}]") if $self->{debug} >= 4;
 
     $self->_chat (
-        msg => 13,
-        payload => pack("LLL (w/a*)*", $namespace->{namespace}, $flags, scalar(@tuple), @tuple),
-        unpack => sub { $self->_unpack_affected($flags, $namespace, @_) }
+        msg      => 13,
+        payload  => pack("LLL (w/a*)*", $namespace->{namespace}, $flags, scalar(@tuple), @tuple),
+        unpack   => sub { $self->_unpack_affected($flags, $namespace, @_) },
+        callback => $param->{callback},
     );
 }
 
@@ -333,7 +634,7 @@ sub _unpack_select_multi {
 sub _unpack_affected {
     my ($self, $flags, $ns) = @_;
 
-    ($flags & WANT_RESULT) ? $self->_unpack_select($ns, "AFFECTED", $_[3])->[0] : unpack('L', substr($_[3],0,4,''));
+    ($flags & WANT_RESULT) ? $self->_unpack_select($ns, "AFFECTED", $_[3])->[0] : unpack('L', substr($_[3],0,4,''))||'0E0';
 }
 
 sub NPRM () { 3 }
@@ -397,15 +698,90 @@ sub _PostSelect {
     }
 }
 
-my @select_param_ok = qw/namespace use_index raw want next_rows limit offset raise hashify timeout format hash_by/;
+=pod
+
+=head3 Select
+
+Select tuple(s) from storage
+
+    my $tuple  = $box->Select($key)             or $box->Error && die $box->ErrorStr;
+    my $tuple  = $box->Select($key, \%options)   or $box->Error && die $box->ErrorStr;
+    
+    my @tuples = $box->Select(@keys)            or $box->Error && die $box->ErrorStr;
+    my @tuples = $box->Select(@keys, \%options)  or $box->Error && die $box->ErrorStr;
+    
+    my $tuples = $box->Select(\@keys)           or die $box->ErrorStr;
+    my $tuples = $box->Select(\@keys, \%options) or die $box->ErrorStr;
+
+=over
+
+=item B<$key>, B<@keys>, B<\@keys>
+
+Specify keys to select. All keys must be defined.
+
+=over
+
+=item *
+
+In scalar context, you can select one C<$key>, and the resulting tuple will be returned.
+Check C<< $box->Error >> to see if there was an error or there is just no such key
+in the storage
+
+=item *
+
+In list context, you can select several C<@keys>, and the resulting tuples will be returned.
+Check C<< $box->Error >> to see if there was an error or there is just no such keys
+in the storage
+
+=item *
+
+If you select C<< \@keys >> then C<< \@tuples >> will be returned upon success. @tuples will
+be empty if there are no such keys, and false will be returned in case of error.
+
+=back
+
+=item B<%options>
+
+=over
+
+=item B<space> => $space_id_uint32_or_name_string
+
+Specify storage (by id or name) space to select from.
+
+=item B<use_index> => $index_id_uint32_or_name_string
+
+Specify index (by id or name) to use.
+
+=item B<hashify> => $coderef
+
+Override C<hashify> option (see L<new>).
+
+=item B<raw> => $bool
+
+Don't C<hashify>.
+
+=item B<hash_by> => $by
+
+Return a hashref of the resultset. If you C<hashify> the result set,
+then C<$by> must be a field name of the hash you return,
+else it must be a number of field of the tuple.
+False will be returned in case of error.
+
+=back
+
+=back
+
+=cut
+
+my @select_param_ok = qw/use_index raw want next_rows limit offset raise hashify timeout format hash_by/;
 sub Select {
     confess q/Select isnt callable in void context/ unless defined wantarray;
     my ($param, $namespace) = $_[0]->_validate_param(\@_, @select_param_ok);
     my ($self, @keys) = @_;
     local $self->{raise} = $param->{raise} if defined $param->{raise};
-    @keys = @{$keys[0]} if ref $keys[0] eq 'ARRAY' and 1 == @{$param->{index}->{keys}} || ref $keys[0]->[0] eq 'ARRAY';
+    @keys = @{$keys[0]} if @keys && ref $keys[0] eq 'ARRAY' and 1 == @{$param->{index}->{keys}} || (@keys && ref $keys[0]->[0] eq 'ARRAY');
 
-    $self->_debug("$self->{name}: SELECT($namespace->{namespace}/$param->{use_index})[@{[map{ref$_?qq{[@$_]}:$_}@keys]}]") if $self->{debug} >= 3;
+    $self->_debug("$self->{name}: SELECT(NS:$namespace->{namespace},IDX:$param->{use_index})[@{[map{ref$_?qq{[@$_]}:$_}@keys]}]") if $self->{debug} >= 3;
 
     my ($msg,$payload);
     if(exists $param->{next_rows}) {
@@ -428,6 +804,7 @@ sub Select {
             unpack   => sub { $self->_unpack_select($namespace, "SELECT", @_) },
             retry    => $self->{select_retry},
             timeout  => $param->{timeout} || $self->{select_timeout},
+            callback => $param->{callback},
         ) or return;
     }
 
@@ -484,7 +861,8 @@ sub SelectUnion {
         payload  => pack("L (a*)*", scalar(@reqs), map { $_->{payload} } @reqs),
         unpack   => sub { $self->_unpack_select_multi([map { $_->{namespace} } @reqs], "SMULTI", @_) },
         retry    => $self->{select_retry},
-        timeout  => $param->{timeout} || $self->{select_timeout},
+        timeout  => $param->{select_timeout} || $self->{timeout},
+        callback => $param->{callback},
     ) or return;
     confess __LINE__."$self->{name}: something wrong" if @$r != @reqs;
     my $ea = each_arrayref $r, \@reqs;
@@ -494,19 +872,56 @@ sub SelectUnion {
     return $r;
 }
 
+=pod
+
+=head3 Delete
+
+Delete tuple from storage. Return false upon error.
+
+    my $n_deleted = $box->Delete($key) or die $box->ErrorStr;
+    my $n_deleted = $box->Delete($key, \%options) or die $box->ErrorStr;
+    warn "Nothing was deleted" unless int $n_deleted;
+    
+    my $deleted_tuple_set = $box->Delete($key, { want_deleted_tuples => 1 }) or die $box->ErrorStr;
+    warn "Nothing was deleted" unless @$deleted_tuple_set;
+
+=over
+
+=item B<%options>
+
+=over
+
+=item B<space> => $space_id_uint32_or_name_string
+
+Specify storage space (by id or name) to work on.
+
+=item B<want_deleted_tuples> => $bool
+
+if C<$bool> then return arrayref of deleted tuple(s).
+
+=back
+
+=back
+
+=cut
+
 sub Delete {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/want_deleted_tuples/);
     my ($self, $key) = @_;
 
-    $self->_debug("$self->{name}: DELETE($key)") if $self->{debug} >= 3;
+    my $flags = 0;
+    $flags |= WANT_RESULT if $param->{want_deleted_tuple};
+
+    $self->_debug("$self->{name}: DELETE(NS:$namespace->{namespace},KEY:$key,F:$flags)") if $self->{debug} >= 3;
 
     confess "$self->{name}\->Delete: for now key cardinality of 1 is only allowed" unless 1 == @{$param->{index}->{keys}};
     $self->_pack_keys($namespace, $param->{index}, $key);
 
-    $self->_chat (
-        msg => 20,
-        payload => pack("L a*", $namespace->{namespace}, $key),
-        unpack  => sub { $self->_unpack_affected(0, $namespace, @_) }
+    $self->_chat(
+        msg      => $flags ? 21 : 20,
+        payload  => $flags ? pack("L L a*", $namespace->{namespace}, $flags, $key) : pack("L a*", $namespace->{namespace}, $key),
+        unpack   => sub { $self->_unpack_affected($flags, $namespace, @_) },
+        callback => $param->{callback},
     );
 }
 
@@ -564,11 +979,80 @@ BEGIN {
     }
 }
 
+=pod
+
+=head3 Update
+
+Update tuple in storage. Return false upon error.
+
+    my $n_updated = $box->UpdateMulti($key, @op) or die $box->ErrorStr;
+    my $n_updated = $box->UpdateMulti($key, @op, \%options) or die $box->ErrorStr;
+    warn "Nothing was updated" unless int $n_deleted;
+    
+    my $updated_tuple_set = $box->UpdateMulti($key, @op, { want_result => 1 }) or die $box->ErrorStr;
+    warn "Nothing was updated" unless @$updated_tuple_set;
+
+=over
+
+=item B<@op> = ([ $field_num => $op => $value ], ...)
+
+=over
+
+=item B<$field_num>
+
+Field-to-update number.
+
+=item B<$op>
+
+=over
+
+=item B<set>
+
+Set C<< $field_num >> field to C<< $value >>
+
+=item B<add>, B<and>, B<xor>, B<or>
+
+Apply an arithmetic operation to C<< $field_num >> with argument C<< $value >>
+Currently arithmetic operations are supported only for int32 (4-byte length) fields (and C<$value>s too)
+
+=item B<splice>, B<substr>
+
+Apply a perl-like L<splice> operation to C<< $field_num >>. B<$value> = [$OFFSET, $LENGTH, $REPLACE_WITH].
+substr is just an alias.
+
+=item B<append>, B<prepend>
+
+Append or prepend C<< $field_num >> with C<$value> string.
+
+=item B<cutbeg>, B<cutend>
+
+Cut C<< $value >> bytes from beginning or end of C<< $field_num >>.
+
+=back 
+
+=back
+
+=item B<%options>
+
+=over
+
+=item B<space> => $space_id_uint32_or_name_string
+
+Specify storage space (by id or name) to work on.
+
+=item B<want_result> => $bool
+
+if C<$bool> then return arrayref of deleted tuple(s).
+
+=back
+
+=cut
+
 sub UpdateMulti {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/namespace want_result _flags raw/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/want_result _flags/);
     my ($self, $key, @op) = @_;
 
-    $self->_debug("$self->{name}: UPDATEMULTI($namespace->{namespace}=$key)[@{[map{qq{[@$_]}}@op]}]") if $self->{debug} >= 3;
+    $self->_debug("$self->{name}: UPDATEMULTI(NS:$namespace->{namespace},KEY:$key)[@{[map{qq{[@$_]}}@op]}]") if $self->{debug} >= 3;
 
     confess "$self->{name}\->UpdateMulti: for now key cardinality of 1 is only allowed" unless 1 == @{$param->{index}->{keys}};
     confess "$self->{name}: too many op" if scalar @op > 128;
@@ -617,7 +1101,8 @@ sub UpdateMulti {
     $self->_chat(
         msg      => 19,
         payload  => pack("LL a* L (a*)*" , $namespace->{namespace}, $flags, $key, scalar(@op), @op),
-        unpack   => sub { $self->_unpack_affected($flags, $namespace, @_) }
+        unpack   => sub { $self->_unpack_affected($flags, $namespace, @_) },
+        callback => $param->{callback},
     );
 }
 

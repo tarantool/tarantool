@@ -1,8 +1,8 @@
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    NAME          => "MR::SilverBox",
-    VERSION_FROM  => "lib/MR/SilverBox.pm",
+    NAME          => "MR::Tarantool",
+    VERSION_FROM  => "lib/MR/Tarantool/Box.pm",
     MAKEFILE      => 'Makefile',
     PREREQ_PM     => {
         'Scalar::Util'      => 0,
