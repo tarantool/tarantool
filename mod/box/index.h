@@ -71,40 +71,36 @@ struct key {
 	 * array).
 	 */
 	u32 max_fieldno;
+	bool is_unique;
 };
 
 @class Index;
 
 @interface Index: Object {
  @public
-	bool enabled;
-	bool unique;
-
 	struct space *space;
-
-	/* Description of a possibly multipart key. */
-	struct key key;
-
-	/* relative offset of the index in the namespace */
-	u32 n;
-
-	enum index_type type;
-
 	/*
 	 * Pre-allocated iterator to speed up the main case of
 	 * box_process(). Should not be used elsewhere.
 	 */
 	struct iterator *position;
+	/* Description of a possibly multipart key. */
+	struct key key;
+	enum index_type type;
+	bool enabled;
+	/* Relative offset of the index in its namespace. */
+	u32 n;
 };
 
-+ (Index *) alloc: (enum index_type) type :(struct key *) key;
++ (Index *) alloc: (enum index_type) type_arg :(struct key *) key_arg;
 /**
  * Initialize index instance.
  *
  * @param space    space the index belongs to
  * @param key      key part description
  */
-- (void) init: (struct key *) key :(struct space *) space_arg;
+- (id) init: (enum index_type) type_arg :(struct key *) key_arg
+	:(struct space *) space_arg :(u32) n_arg;
 /** Destroy and free index instance. */
 - (void) free;
 /**
@@ -114,17 +110,17 @@ struct key {
 - (size_t) size;
 - (struct box_tuple *) min;
 - (struct box_tuple *) max;
-- (struct box_tuple *) find: (void *) key; /* only for unique lookups */
-- (struct box_tuple *) findBy: (struct box_tuple *) pattern;
+- (struct box_tuple *) find: (void *) key_arg; /* only for unique lookups */
+- (struct box_tuple *) findBy: (struct box_tuple *) tuple;
 - (void) remove: (struct box_tuple *) tuple;
-- (void) replace: (struct box_tuple *) old :(struct box_tuple *) new;
+- (void) replace: (struct box_tuple *) old_tuple :(struct box_tuple *) new_tuple;
 /**
  * Create a structure to represent an iterator. Must be
  * initialized separately.
  */
 - (struct iterator *) allocIterator;
 - (void) initIterator: (struct iterator *) iterator;
-- (void) initIterator: (struct iterator *) iterator :(void *) key
+- (void) initIterator: (struct iterator *) iterator :(void *) key_arg
 			:(int) part_count;
 @end
 

@@ -433,6 +433,7 @@ memcached_space_init()
 	struct key key;
 	/* Configure memcached index key. */
 	key.part_count = 1;
+	key.is_unique = true;
 
 	key.parts = salloc(sizeof(struct key_part));
 	key.cmp_order = salloc(sizeof(u32));
@@ -448,7 +449,7 @@ memcached_space_init()
 
 	/* Configure memcached index. */
 	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :&key];
-	[memc_index init: &key :memc_s];
+	[memc_index init: HASH :&key :memc_s :0];
 }
 
 /** Delete a bunch of expired keys. */

@@ -142,7 +142,7 @@ validate_indexes(struct box_txn *txn)
 			if (index->key.parts[f].type == NUM64 && len != sizeof(u64))
 				tnt_raise(IllegalParams, :"field must be NUM64");
 		}
-		if (index->type == TREE && index->unique == false)
+		if (index->type == TREE && index->key.is_unique == false)
 			/* Don't check non unique indexes */
 			continue;
 
@@ -937,7 +937,7 @@ space_free(void)
 }
 
 static void
-key_config(struct key *key, struct tarantool_cfg_space_index *cfg_index)
+key_init(struct key *key, struct tarantool_cfg_space_index *cfg_index)
 {
 	key->max_fieldno = 0;
 	key->part_count = 0;
@@ -984,6 +984,7 @@ key_config(struct key *key, struct tarantool_cfg_space_index *cfg_index)
 		/* fill compare order */
 		key->cmp_order[cfg_key->fieldno] = k;
 	}
+	key->is_unique = cfg_index->unique;
 }
 
 static void
@@ -1009,11 +1010,11 @@ space_config(void)
 		/* fill space indexes */
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
-			struct key key;
-			key_config(&key, cfg_index);
+			struct key info;
+			key_init(&info, cfg_index);
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
-			Index *index = [Index alloc: type :&key];
-			[index init: &key :&space[i]];
+			Index *index = [Index alloc: type :&info];
+			[index init: type :&info :space + i :j];
 			space[i].index[j] = index;
 		}
 
