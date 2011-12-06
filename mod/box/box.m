@@ -126,27 +126,27 @@ validate_indexes(struct box_txn *txn)
 	/* There is more than one index. */
 	foreach_index(txn->n, index) {
 		/* XXX: skip the first index here! */
-		for (u32 f = 0; f < index->key.part_count; ++f) {
-			if (index->key.parts[f].fieldno >= txn->tuple->cardinality)
+		for (u32 f = 0; f < index->key_def.part_count; ++f) {
+			if (index->key_def.parts[f].fieldno >= txn->tuple->cardinality)
 				tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 
-			if (index->key.parts[f].type == STRING)
+			if (index->key_def.parts[f].type == STRING)
 				continue;
 
-			void *field = tuple_field(txn->tuple, index->key.parts[f].fieldno);
+			void *field = tuple_field(txn->tuple, index->key_def.parts[f].fieldno);
 			u32 len = load_varint32(&field);
 
-			if (index->key.parts[f].type == NUM && len != sizeof(u32))
+			if (index->key_def.parts[f].type == NUM && len != sizeof(u32))
 				tnt_raise(IllegalParams, :"field must be NUM");
 
-			if (index->key.parts[f].type == NUM64 && len != sizeof(u64))
+			if (index->key_def.parts[f].type == NUM64 && len != sizeof(u64))
 				tnt_raise(IllegalParams, :"field must be NUM64");
 		}
-		if (index->type == TREE && index->key.is_unique == false)
+		if (index->type == TREE && index->key_def.is_unique == false)
 			/* Don't check non unique indexes */
 			continue;
 
-		struct box_tuple *tuple = [index findBy: txn->tuple];
+		struct box_tuple *tuple = [index findByTuple: txn->tuple];
 
 		if (tuple != NULL && tuple != txn->old_tuple)
 			tnt_raise(ClientError, :ER_INDEX_VIOLATION);
@@ -168,7 +168,7 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 	txn->tuple->cardinality = cardinality;
 	memcpy(txn->tuple->data, data->data, data->size);
 
-	txn->old_tuple = [txn->index findBy: txn->tuple];
+	txn->old_tuple = [txn->index findByTuple: txn->tuple];
 
 	if (txn->old_tuple != NULL)
 		tuple_txn_ref(txn, txn->old_tuple);
@@ -184,8 +184,8 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 	if (txn->old_tuple != NULL) {
 #ifndef NDEBUG
 		void *ka, *kb;
-		ka = tuple_field(txn->tuple, txn->index->key.parts[0].fieldno);
-		kb = tuple_field(txn->old_tuple, txn->index->key.parts[0].fieldno);
+		ka = tuple_field(txn->tuple, txn->index->key_def.parts[0].fieldno);
+		kb = tuple_field(txn->old_tuple, txn->index->key_def.parts[0].fieldno);
 		int kal, kab;
 		kal = load_varint32(&ka);
 		kab = load_varint32(&kb);
@@ -937,12 +937,12 @@ space_free(void)
 }
 
 static void
-key_init(struct key *key, struct tarantool_cfg_space_index *cfg_index)
+key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 {
-	key->max_fieldno = 0;
-	key->part_count = 0;
+	def->max_fieldno = 0;
+	def->part_count = 0;
 
-	/* calculate key cardinality and maximal field number */
+	/* Calculate key cardinality and maximal field number. */
 	for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
 		typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
 
@@ -951,23 +951,23 @@ key_init(struct key *key, struct tarantool_cfg_space_index *cfg_index)
 			break;
 		}
 
-		key->max_fieldno = MAX(key->max_fieldno, cfg_key->fieldno);
-		key->part_count++;
+		def->max_fieldno = MAX(def->max_fieldno, cfg_key->fieldno);
+		def->part_count++;
 	}
 
-	/* init key array */
-	key->parts = salloc(sizeof(struct key_part) * key->part_count);
-	if (key->parts == NULL) {
-		panic("can't allocate key parts array for index");
+	/* init def array */
+	def->parts = salloc(sizeof(struct key_part) * def->part_count);
+	if (def->parts == NULL) {
+		panic("can't allocate def parts array for index");
 	}
 
 	/* init compare order array */
-	key->max_fieldno++;
-	key->cmp_order = salloc(key->max_fieldno * sizeof(u32));
-	if (key->cmp_order == NULL) {
-		panic("can't allocate key cmp_order array for index");
+	def->max_fieldno++;
+	def->cmp_order = salloc(def->max_fieldno * sizeof(u32));
+	if (def->cmp_order == NULL) {
+		panic("can't allocate def cmp_order array for index");
 	}
-	memset(key->cmp_order, -1, key->max_fieldno * sizeof(u32));
+	memset(def->cmp_order, -1, def->max_fieldno * sizeof(u32));
 
 	/* fill fields and compare order */
 	for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
@@ -979,12 +979,12 @@ key_init(struct key *key, struct tarantool_cfg_space_index *cfg_index)
 		}
 
 		/* fill keys */
-		key->parts[k].fieldno = cfg_key->fieldno;
-		key->parts[k].type = STR2ENUM(field_data_type, cfg_key->type);
+		def->parts[k].fieldno = cfg_key->fieldno;
+		def->parts[k].type = STR2ENUM(field_data_type, cfg_key->type);
 		/* fill compare order */
-		key->cmp_order[cfg_key->fieldno] = k;
+		def->cmp_order[cfg_key->fieldno] = k;
 	}
-	key->is_unique = cfg_index->unique;
+	def->is_unique = cfg_index->unique;
 }
 
 static void
@@ -1010,11 +1010,11 @@ space_config(void)
 		/* fill space indexes */
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
-			struct key info;
-			key_init(&info, cfg_index);
+			struct key_def key_def;
+			key_init(&key_def, cfg_index);
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
-			Index *index = [Index alloc: type :&info];
-			[index init: type :&info :space + i :j];
+			Index *index = [Index alloc: type :&key_def];
+			[index init: type :&key_def:space + i :j];
 			space[i].index[j] = index;
 		}
 
