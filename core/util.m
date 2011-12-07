@@ -219,7 +219,7 @@ assert_fail(const char *assertion, const char *file, unsigned int line, const ch
 
 #ifdef HAVE_BFD
 static struct symbol *symbols;
-static size_t symbol_count;
+static ssize_t symbol_count;
 
 int
 compare_symbol(const void *_a, const void *_b)
@@ -321,29 +321,31 @@ void symbols_free()
 	free(symbols);
 }
 
+/**
+ * Sic: this assumes stack direction is from lowest to
+ * highest.
+ */
 struct symbol *
 addr2symbol(void *addr)
 {
-	int low = 0, high = symbol_count, middle = -1;
-	struct symbol *ret, key = {.addr = addr};
+	struct symbol key = {.addr = addr, .name = NULL, .end = NULL};
+	struct symbol *low = symbols;
+	struct symbol *high = symbols + symbol_count;
 
-	while(low < high) {
-		middle = low + ((high - low) >> 1);
-		int diff = compare_symbol(symbols + middle, &key);
+	while (low + 1 < high) { /* there are at least two to choose from. */
+		struct symbol *middle = low + ((high - low) >> 1);
 
-		if (diff < 0) {
-			low = middle + 1;
-		} else if (diff > 0) {
+		int diff = compare_symbol(&key, middle);
+		if (diff < 0) { /* key < middle. */
 			high = middle;
-		} else {
-			ret = symbols + middle;
-			goto out;
+		} else {/* key >= middle */
+			low = middle;
+			if (diff == 0)
+				break;
 		}
 	}
-	ret = symbols + high - 1;
-out:
-	if (middle != -1 && ret->addr <= key.addr && key.addr <= ret->end)
-		return ret;
+	if (low->addr <= key.addr && low->end >= key.addr)
+		return low;
 	return NULL;
 }
 
