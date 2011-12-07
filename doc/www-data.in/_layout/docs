@@ -1,6 +1,2 @@
 {% extends "base" %}
 {% set title = "Tarantool Docs" %}
-
-{% block epilogue %}
-  {{ home_page_docs | langselect }}
-{% endblock epilogue %}

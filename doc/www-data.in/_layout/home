@@ -7,29 +7,35 @@
       <div class="lwrap">
 
         <div id="blurb" class="span_8">
-          <div class="lwrap">
-           <img src="logo.png" alt="Tarantool" width="170" height="170"/>
-          </div>
-	  <span id="text">
-            <h1>Tarantool<h1>
-	    <h2>High performance in-memory key-value storage</h2>
-	  </span>
+
+          <img id="logo" src="logo.png" alt="Tarantool Logo" />
+
+          {{ blurb | langselect }}
+
           <div class="clear"></div>
+
+	  <div id="download" class="front_block">
+            <p>
+	      <a id="current" href="{{ current_download | e }}">Download</a>
+	      <a href="{{ more_downloads | e }}">[ More Downloads ]</a>
+	    </p>
+          </div>
+
         </div>
 
         <div id="blocks">
 
           <div id="docs" class="span_4">
-	    <div class='front_block'>
-	      {{ home_page_docs | langselect }}
+            <div class='front_block'>
+              {{ home_page_docs | langselect }}
             </div>
-	  </div>
+          </div>
 
           <div id="join" class="span_4">
-	    <div class='front_block'>
-	      {{ home_page_community | langselect }}
+            <div class='front_block'>
+              {{ home_page_community | langselect }}
             </div>
-	  </div>
+          </div>
 
           <div class="clear"></div>
 
@@ -38,16 +44,9 @@
       </div>
 
       <div class="span_4">
-
-        <div id="download" class="front_block">
-  	  <p><a id="current" href="http:/tarantool.org/dist">Download</a><p>
-          <p><a href="http:/tarantool.org/dist">[ More Downloads ]</a></p>
+        <div id="news" class='front_block'>
+          {{ home_page_news | langselect }}
         </div>
-
-	<div id="news" class='front_block'>
-	  {{ home_page_news | langselect }}
-        </div>
-
       </div>
 
       <div class="clear"></div>

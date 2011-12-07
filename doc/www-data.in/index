@@ -1,3 +1,13 @@
+{% text blurb en %}
+
+# Tarantool
+## high performance in-memory key-value storage
+
+{% text blurb ru %}
+
+# Tarantool
+## high performance in-memory key-value storage
+
 {% text home_page_news en %}
 
 Stay Informed
