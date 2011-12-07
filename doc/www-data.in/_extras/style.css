@@ -1,0 +1,405 @@
+/* This stylesheet heavily borrows from http://necolas.github.com/normalize.css */
+
+/* =============================================================================
+   Base
+   ========================================================================== */
+
+/*
+ * 1. Corrects text resizing oddly in IE6/7 when body font-size is set using em units
+ *    http://clagnut.com/blog/348/#c790
+ * 2. Keeps page centred in all browsers regardless of content height
+ * 3. Prevents iOS text size adjust after orientation change, without disabling user zoom
+ *    www.456bereastreet.com/archive/201012/controlling_text_size_in_safari_for_ios_without_disabling_user_zoom/
+ */
+
+html {
+    font-size: 100%; /* 1 */
+    overflow-y: scroll; /* 2 */
+    -webkit-text-size-adjust: 100%; /* 3 */
+    -ms-text-size-adjust: 100%; /* 3 */
+}
+
+/*
+ * Addresses margins handled incorrectly in IE6/7
+ */
+
+body {
+    margin: 0;
+}
+
+/* =============================================================================
+   Links
+   ========================================================================== */
+
+/*
+ * Addresses outline displayed oddly in Chrome
+ */
+
+a:focus {
+    outline: thin dotted;
+}
+
+/*
+ * Improves readability when focused and also mouse hovered in all browsers
+ * people.opera.com/patrickl/experiments/keyboard/test
+ */
+
+a:hover, a:active {
+    outline: 0;
+}
+
+
+/* =============================================================================
+   Typography
+   ========================================================================== */
+
+/*
+ * Neutralise smaller font-size in 'section' and 'article' in FF4+, Chrome, S5
+ */
+
+h1 {
+    font-size: 2em;
+}
+
+/*
+ * Addresses style set to 'bolder' in FF3+, S4/5, Chrome
+ */
+
+b, strong { 
+    font-weight: bold;
+}
+
+blockquote {
+    margin: 1em 40px;
+}
+
+/*
+ * Corrects font family set oddly in IE6, S4/5, Chrome
+ * en.wikipedia.org/wiki/User:Davidgothberg/Test59
+ */
+
+pre, code, kbd, samp {
+    font-family: monospace, serif;
+    _font-family: 'courier new', monospace;
+    font-size: 1em;
+}
+
+/*
+ * Improves readability of pre-formatted text in all browsers
+ */
+
+pre {
+    white-space: pre;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/*
+ * 1. Addresses CSS quotes not supported in IE6/7
+ * 2. Addresses quote property not supported in S4
+ */
+
+/* 1 */
+
+q {
+    quotes: none;
+}
+
+/* 2 */
+
+q:before,
+q:after {
+    content: '';
+    content: none;
+}
+
+/*
+ * XXX
+ */
+
+small {
+    font-size: 75%;
+}
+
+/*
+ * Prevents sub and sup affecting line-height in all browsers
+ * gist.github.com/413930
+ */
+
+sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+}
+
+sup {
+    top: -0.5em;
+}
+
+sub {
+    bottom: -0.25em;
+}
+
+
+/* =============================================================================
+   Lists
+   ========================================================================== */
+
+ul, ol {
+    margin-left: 0;
+    padding: 0 0 0 40px;
+}
+
+dd {
+    margin: 0 0 0 40px;
+}
+
+
+/* =============================================================================
+   Embedded content
+   ========================================================================== */
+
+/*
+ * 1. Removes border when inside 'a' element in IE6/7/8/9, FF3
+ * 2. Improves image quality when scaled in IE7
+ *    code.flickr.com/blog/2008/11/12/on-ui-quality-the-little-things-client-side-image-resizing/
+ */
+
+img {
+    border: 0; /* 1 */
+    -ms-interpolation-mode: bicubic; /* 2 */
+}
+
+
+/* =============================================================================
+   Tables
+   ========================================================================== */
+
+/* 
+ * Remove most spacing between table cells
+ */
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+
+/* =============================================================================
+   Layout
+   ========================================================================== */
+
+/*
+ * Top-level page sections:
+ * body > #wrapper > #header #content #footer
+ */
+
+#wrapper, #header, #footer, #content {
+    width: 970px;
+    margin: 0 auto;
+    padding: 0;
+    overflow: hidden;
+}
+
+#footer {
+    clear: both;
+}
+
+#footer p, #header p {
+    margin: 0 10px;
+}
+
+/*
+ * http://sonspring.com/journal/clearing-floats 
+ */
+
+.clear {
+  clear: both;
+  display: block;
+  visibility: hidden;
+  width: 0;
+  height: 0;
+}
+
+/* =============================================================================
+   Grid
+   ========================================================================== */
+
+.grid {
+    width: 960px;
+    overflow: hidden;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 10px 0 0;
+    clear: both;
+}
+
+.lwrap {
+    float: left;
+}
+
+.rwrap {
+    float: right;
+}
+
+.span_1, .span_2, .span_3, .span_4, .span_5, .span_6,
+.span_7, .span_8, .span_9, .span_10, .span_11, .span_12 {
+    float: left;
+    dsiplay: inline; /* IE workaround */
+    margin-left: 10px;
+}
+
+.span_1 { width: 70px; }
+.span_2 { width: 150px; }
+.span_3 { width: 230px; }
+.span_4 { width: 310px; }
+.span_5 { width: 390px; }
+.span_6 { width: 470px; }
+.span_7 { width: 550px; }
+.span_8 { width: 630px; }
+.span_9 { width: 710px; }
+.span_10 { width: 790px; }
+.span_11 { width: 870px; }
+.span_12 { width: 950px; }
+
+.lpad_1 { padding-left: 80px; }
+.lpad_2 { padding-left: 160px; }
+.lpad_3 { padding-left: 240px; }
+.lpad_4 { padding-left: 320px; }
+.lpad_5 { padding-left: 400px; }
+.lpad_6 { padding-left: 480px; }
+.lpad_7 { padding-left: 560px; }
+.lpad_8 { padding-left: 640px; }
+.lpad_9 { padding-left: 720px; }
+.lpad_10 { padding-left: 800px; }
+.lpad_11 { padding-left: 880px; }
+
+.rpad_1 { padding-right: 80px; }
+.rpad_2 { padding-right: 160px; }
+.rpad_3 { padding-right: 240px; }
+.rpad_4 { padding-right: 320px; }
+.rpad_5 { padding-right: 400px; }
+.rpad_6 { padding-right: 480px; }
+.rpad_7 { padding-right: 560px; }
+.rpad_8 { padding-right: 640px; }
+.rpad_9 { padding-right: 720px; }
+.rpad_10 { padding-right: 800px; }
+.rpad_11 { padding-right: 880px; }
+
+
+/* =============================================================================
+   Custom styles
+   ========================================================================== */
+
+body {
+    color: #333;
+    background-color: #eee;
+    font-size: 80%;
+    font-family: Helvetica, Arial, sans-serif;
+    line-height: 1.4;
+}
+
+#header, #footer, #content {
+    background-color: #fff;
+}
+
+#footer img {
+    vertical-align: middle;
+}
+
+#logo {
+	width: 150px;
+	height: 30px;
+	float: left;
+	display: block;
+	background: url(tarantool.png) no-repeat;
+	margin: 3px 30px 0 30px;
+}
+
+#content {
+    
+}
+
+#blurb {
+    margin-top: 9px;
+    background: #ddf;
+}
+
+/*
+#blocks {
+    background: yellow;
+}
+*/
+
+.front_block {
+    border: 1px dotted black;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding: 0 10px;
+    background: #eee;
+}
+
+#download p {
+    text-align: center;
+}
+
+#download #current {
+    font-size: 150%;
+    border: 2px outset grey;
+    padding: 4px 10px;
+    background: #e50;
+}
+
+#download #current a {
+    text-decoration: none;
+}
+#download #current a:visited {
+    text-decoration: none;
+}
+
+/* =============================================================================
+   Navigation
+   ========================================================================== */
+
+#nav {
+	width: 740px;
+	float: right;
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+	border-radius: 3px;
+	background: url('bg_header.png') repeat-x scroll 50% 0 white;
+}
+
+#nav ul, #nav ol {
+    list-style: none outside none;
+    margin: 0 15px;
+    padding: 0;
+}
+
+#nav ul li {
+    display: inline-block;
+}
+
+#nav ul li a {
+    -moz-border-radius: 10px;
+    -webkit-border-radius: 10px;
+    border-radius: 10px;
+    color: #eee;
+    text-decoration: none;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 32px;
+    padding: 3px 12px;
+    margin: 0 10px;
+}
+
+#nav ul li.current a {
+    background-color: rgba(0,0,0,0.5) !important;
+}
+
+#nav ul li a:HOVER {
+    background-color: rgba(0,0,0,0.25)
+}

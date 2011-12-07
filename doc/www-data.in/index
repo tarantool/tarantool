@@ -1,0 +1,69 @@
+{% text home_page_news en %}
+
+Stay Informed
+=============
+
+### What's new
+
+2011-10-07: <a href="http://tarantool.org/dist/tarantool-1.4.3-3-g45804c6-src.tar.gz">Tarantool 1.4.3</a>, stable version of 1.4 branch.
+
+2011-08-25: Tarantool 1.4.2, featuring Lua stored prcoedures, is out.
+
+2011-06-05: <a href="http://tarantool.org/tarantool_user_guide.html">Tarantool User Guide</a> is published.
+
+2011-05-14: <a href="http://launchpad.net/tarantool/1.3/1.3.5/+download/tarantool-1.3.5-src.tar.gz">tarantool-1.3.5</a> (stable) is out.
+
+{% text home_page_news ru %}
+
+Информация
+==========
+
+### Новости
+
+2011-10-07: <a href="http://tarantool.org/dist/tarantool-1.4.3-3-g45804c6-src.tar.gz">Tarantool 1.4.3</a>, stable version of 1.4 branch.
+
+2011-08-25: Tarantool 1.4.2, featuring Lua stored prcoedures, is out.
+
+2011-06-05: <a href="http://tarantool.org/tarantool_user_guide.html">Tarantool User Guide</a> is published.
+
+2011-05-14: <a href="http://launchpad.net/tarantool/1.3/1.3.5/+download/tarantool-1.3.5-src.tar.gz">tarantool-1.3.5</a> (stable) is out.
+
+{% text home_page_docs en %}
+
+[Learn It](docs.html)
+=====================
+
+- [About](about.html)
+- [Documentation](http://tarantool.org/tarantool_user_guide.html)
+- [Wiki](http://github.com/mailru/tarantool/wiki)
+
+{% text home_page_docs ru %}
+
+[Описание](docs.ru.html)
+========================
+
+- [Обзор](about.ru.html)
+- [Документвция](http://tarantool.org/tarantool_user_guide.html)
+- [Wiki](http://github.com/mailru/tarantool/wiki)
+
+{% text home_page_community en %}
+
+Get Involved
+============
+
+- [Bugs](http://bugs.launchpad.net/tarantool)
+- XXX
+- YYY
+
+{% text home_page_community ru %}
+
+Участие
+=======
+
+- [Bugs](http://bugs.launchpad.net/tarantool)
+- XXX
+- YYY
+
+{% page home en %}
+
+{% page home ru %}

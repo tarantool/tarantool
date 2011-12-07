@@ -1,0 +1,15 @@
+{% text sidebar en %}
+
+* [Home](index.html)
+* [Docs](docs.html) 
+	* [About](about.html)
+* [Community]
+* [Downloads]
+
+{% text sidebar ru %}
+
+* [Home](index.ru.html)
+* [Docs](docs.ru.html) 
+	* [About](about.ru.html)
+* [Community]
+* [Downloads]

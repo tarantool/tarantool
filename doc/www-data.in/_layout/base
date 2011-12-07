@@ -1,0 +1,43 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>{{ title }}</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<link rel="shortcut icon" href="favicon.ico" />
+<link rel="stylesheet" type="text/css" href="style.css" />
+{% include "script" ignore missing %}
+</head>
+<body id="tarantool">
+<div id="wrapper">
+
+  <div id="header">
+    {% block header %}
+    <p class='lwrap'><a id="home_link" href="index.html">Home</a></p>
+    <p class='rwrap'><a id="lang_link" href="{{ pagename + lang_ext | langselect | e }}">{{ lang_tag | langselect | e }}</a></p>
+    {% endblock header %}
+  </div>
+
+  <div id="content">
+    {% block content %}
+    <div class="grid">
+      <div id="main" class="span_8">
+	{% block prologue %}{% endblock %}
+	{{ content }}
+	{% block epilogue %}{% endblock %}
+      </div>
+      <div id="sidebar" class="span_4">
+	{{ sidebar | langselect }}
+      </div>
+    </div>
+    {% endblock content %}
+  </div>
+
+  <div id="footer">
+    {% block footer %}
+    <p>Sponsored by <a href="http://api.mail.ru"><img src="mail-logo.png" alt="Mail.Ru" /></a></p>
+    {% endblock footer %}
+  </div>
+
+</div>
+</body>
+</html>
