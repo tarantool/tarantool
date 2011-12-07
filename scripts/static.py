@@ -28,6 +28,7 @@ class Config(object):
         self.layout_dir = '_layout'
         self.extras_dir = '_extras'
         self.output_dir = 'www'
+        self.abs_output_path = None
         self.config = {}
 
     def __getitem__(self, key):
@@ -47,7 +48,13 @@ class Config(object):
         return os.path.join(self.source_path, self.extras_dir)
     @property
     def output_path(self):
+        if self.abs_output_path:
+            return self.abs_output_path
         return os.path.join(self.source_path, self.output_dir)
+
+    @output_path.setter
+    def output_path(self, value):
+        self.abs_output_path = value
 
     def check(self, key, config):
         if config and key in config:
@@ -102,14 +109,15 @@ class Config(object):
         root = self.corpus_path
         walker = os.walk(root)
         for curdir, subdirs, files in walker:
-            path = os.path.join(root, curdir)
-            self.load_ignore_file(path, ignore_list)
+            self.load_ignore_file(curdir, ignore_list)
             for s in subdirs[:]:
-                if self.check_ignore_dir(path, s, ignore_list):
+                if self.check_ignore_dir(curdir, s, ignore_list):
                     subdirs.remove(s)
             for f in files:
-                if not self.check_ignore_file(path, f, ignore_list):
-                    list.append(os.path.normpath(os.path.join(curdir, f)))
+                if not self.check_ignore_file(curdir, f, ignore_list):
+                    dir = curdir.replace(root, '')
+                    list.append(os.path.normpath(os.path.join(dir, f)))
+        print list
         return list
 
 
@@ -123,7 +131,7 @@ class Scanner(object):
     BODY = re.compile(r'.*?(?=\s*^\s*%s)' % re.escape(HEAD_OPEN), re.M | re.S)
 
     def __init__(self, name, config):
-        f = open(os.path.join(config.corpus_path, name))
+        f = open(os.path.join(config.source_path, name))
         self.data = f.read()
         f.close()
         self.name = name
