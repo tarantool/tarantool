@@ -1,0 +1,8 @@
+
+languages:
+  en: { source-encoding: 'utf-8', output-encoding: 'utf-8', suffix: '.html' }
+  ru: { source-encoding: 'utf-8', output-encoding: 'utf-8', suffix: '.ru.html' }
+
+# aux table to implement language switch in header
+lang_tag: { en: 'Русский', ru: 'English' }
+lang_ext: { en: '.ru.html', ru: '.html' }
