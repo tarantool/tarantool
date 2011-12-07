@@ -337,7 +337,8 @@ a:visited { color: #3f3f3f; }
 
 #blurb {
     margin-top: 9px;
-    background: #6361f2;
+    color: #ffffff;
+    background-color: #00468c;
 }
 
 #blurb h1 {
@@ -357,24 +358,26 @@ a:visited { color: #3f3f3f; }
     padding: 0 10px;
 }
 
-#download p {
+#download {
     border-top: 1px dotted black;
     padding-top: 10px;
     text-align: center;
+}
+
+#download a {
+    color: #ffffff;
+    text-decoration: none;
+}
+#download a:visited {
+    color: #cfcfcf;
+    text-decoration: none;
 }
 
 #download #current {
     font-size: 150%;
     border: 2px outset grey;
     padding: 4px 10px;
-    background: #ff6817;
-}
-
-#download a {
-    text-decoration: none;
-}
-#download a:visited {
-    text-decoration: none;
+    background-color: #ffaa00;
 }
 
 /* =============================================================================
