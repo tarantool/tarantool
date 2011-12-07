@@ -117,7 +117,7 @@ class Config(object):
                 if not self.check_ignore_file(curdir, f, ignore_list):
                     dir = curdir.replace(root, '')
                     list.append(os.path.normpath(os.path.join(dir, f)))
-        print list
+        #print list
         return list
 
 
@@ -213,7 +213,7 @@ class BaseHandler(object):
 class PageHandler(BaseHandler):
 
     def __init__(self, config):
-	super(PageHandler, self).__init__(config)
+        super(PageHandler, self).__init__(config)
         self.environ = make_environ(config.layout_path)
 
     def write(self, name, data):
