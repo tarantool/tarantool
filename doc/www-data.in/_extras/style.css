@@ -380,6 +380,16 @@ a:visited { color: #3f3f3f; }
     background-color: #ffaa00;
 }
 
+#content_cap {
+    color: #ffffff;
+    background-color: #00468c;
+}
+
+#content_cap #logo {
+    width: 65px;
+    height: 65px;
+}
+
 /* =============================================================================
    Navigation
    ========================================================================== */

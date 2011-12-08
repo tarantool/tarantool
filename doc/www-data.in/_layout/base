@@ -20,13 +20,19 @@
   <div id="content">
     {% block content %}
     <div class="grid">
+      <div id="sidebar" class="span_4">
+<!--
+	<div id="content_cap">
+          <img id="logo" src="logo.png" alt="Tarantool Logo" />
+	</div>
+-->
+	<div class="clear"></div>
+        {{ sidebar | langselect }}
+      </div>
       <div id="main" class="span_8">
         {% block prologue %}{% endblock %}
         {{ content }}
         {% block epilogue %}{% endblock %}
-      </div>
-      <div id="sidebar" class="span_4">
-        {{ sidebar | langselect }}
       </div>
     </div>
     {% endblock content %}
