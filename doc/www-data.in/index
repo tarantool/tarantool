@@ -1,12 +1,12 @@
 {% text blurb en %}
 
 # Tarantool
-## high performance in-memory key-value storage
+## high performance in-memory key-value store
 
 {% text blurb ru %}
 
 # Tarantool
-## high performance in-memory key-value storage
+## high performance in-memory key-value store
 
 {% text home_page_news en %}
 
@@ -61,18 +61,18 @@ Stay Informed
 Get Involved
 ============
 
+- [Code Repo](https://github.com/mailru/tarantool)
 - [Bugs](http://bugs.launchpad.net/tarantool)
-- XXX
-- YYY
+- IRC: #tarantool on irc.freenode.net
 
 {% text home_page_community ru %}
 
 Участие
 =======
 
+- [Code Repo](https://github.com/mailru/tarantool)
 - [Bugs](http://bugs.launchpad.net/tarantool)
-- XXX
-- YYY
+- IRC: #tarantool on irc.freenode.net
 
 {% page home en %}
 

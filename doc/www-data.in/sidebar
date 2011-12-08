@@ -3,13 +3,22 @@
 * [Home](index.html)
 * [Docs](docs.html) 
 	* [About](about.html)
-* [Community]
-* [Downloads]
+	* [User Guide](http://tarantool.org/tarantool_user_guide.html)
+	* [Wiki](https://github.com/mailru/tarantool/wiki)
+* [Downloads](http://tarantool.org/dist/)
+* Community
+	* [Code Repo](https://github.com/mailru/tarantool)
+	* [Bugs](https://bugs.launchpad.net/tarantool)
 
 {% text sidebar ru %}
 
 * [Home](index.ru.html)
 * [Docs](docs.ru.html) 
 	* [About](about.ru.html)
-* [Community]
-* [Downloads]
+*	* [User Guide](http://tarantool.org/tarantool_user_guide.html)
+	* [Wiki](https://github.com/mailru/tarantool/wiki)
+* [Downloads](http://tarantool.org/dist/)
+* Community
+	* [Code Repo](https://github.com/mailru/tarantool)
+	* [Bugs](https://bugs.launchpad.net/tarantool)
+
