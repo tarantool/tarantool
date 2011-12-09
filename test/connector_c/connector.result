@@ -13,6 +13,7 @@
 > select                        [OK]
 > delete                        [OK]
 > call                          [OK]
+> reply                         [OK]
 > lex ws                        [OK]
 > lex integer                   [OK]
 > lex string                    [OK]

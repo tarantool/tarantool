@@ -26,6 +26,10 @@
  * SUCH DAMAGE.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdarg.h>
 
@@ -43,5 +47,9 @@
 #include <tnt_delete.h>
 #include <tnt_call.h>
 #include <tnt_select.h>
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* TNT_H_INCLUDED */
