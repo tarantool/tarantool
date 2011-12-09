@@ -527,12 +527,15 @@ sptree_##name##_iterator_init_set(sptree_##name *t, sptree_##name##_iterator **i
     spnode_t node;                                                                        \
     int      lastLevelEq = -1, cmp;                                                       \
                                                                                           \
-    if ((*i) == NULL || t->max_depth > (*i)->max_depth)					  \
+    if ((*i) == NULL || t->max_depth > (*i)->max_depth)                                   \
         *i = realloc(*i, sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 1));            \
                                                                                           \
     (*i)->t = t;                                                                          \
     (*i)->level = -1;                                                                     \
-    if (t->root == SPNIL) return;                                                         \
+    if (t->root == SPNIL) {                                                               \
+            (*i)->max_depth = 0; /* valgrind points out it's used in the check above ^.*/ \
+            return;                                                                       \
+    }                                                                                     \
                                                                                           \
     (*i)->max_depth = t->max_depth;                                                       \
     (*i)->stack[0] = t->root;                                                             \
