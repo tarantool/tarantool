@@ -735,6 +735,12 @@ tarantool_lua_init()
 	return L;
 }
 
+void
+tarantool_lua_close(struct lua_State *L)
+{
+	lua_close(L); /* collects garbage, invoking userdata gc */
+}
+
 /**
  * Attempt to append 'return ' before the chunk: if the chunk is
  * an expression, this pushes results of the expression onto the

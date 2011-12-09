@@ -66,6 +66,7 @@ tarantool_lua_register_type(struct lua_State *L, const char *type_name,
  * @return  L on success, 0 if out of memory
  */
 struct lua_State *tarantool_lua_init();
+void tarantool_lua_close(struct lua_State *L);
 
 /*
  * Single global lua_State shared by core and modules.

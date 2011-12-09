@@ -120,7 +120,7 @@ struct key_def {
  */
 - (struct iterator *) allocIterator;
 - (void) initIterator: (struct iterator *) iterator;
-- (void) initIterator: (struct iterator *) iterator :(void *) key_arg
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count;
 @end
 

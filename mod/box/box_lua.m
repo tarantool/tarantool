@@ -255,8 +255,7 @@ lbox_pushiterator(struct lua_State *L, struct iterator *it)
 static int
 lbox_iterator_gc(struct lua_State *L)
 {
-	struct iterator *it = lua_checkiterator(L, 1);
-	printf("hello\n");
+	struct iterator *it = lua_checkiterator(L, -1);
 	it->free(it);
 	return 0;
 }
@@ -400,12 +399,11 @@ lbox_index_next(struct lua_State *L)
 		it = [index allocIterator];
 		[index initIterator: it];
 		lbox_pushiterator(L, it);
-	} else if (argc > 1 || !lua_isuserdata(L, 2)) {
+	} else if (argc > 1 || lua_type(L, 2) != LUA_TUSERDATA) {
 		/*
 		 * We've got something different from iterator's
-		 * light userdata: must be a key
-		 * to start iteration from an offset. Seed the
-		 * iterator with this key.
+		 * userdata: must be a key to start iteration from
+		 * an offset. Seed the iterator with this key.
 		 */
 		int cardinality;
 		void *key;
@@ -438,7 +436,7 @@ lbox_index_next(struct lua_State *L)
 		[index initIterator: it :key :cardinality];
 		lbox_pushiterator(L, it);
 	} else { /* 1 item on the stack and it's a userdata. */
-		it = lua_checkiterator(L, -1);
+		it = lua_checkiterator(L, 2);
 	}
 	struct box_tuple *tuple = it->next(it);
 	/* If tuple is NULL, pushes nil as end indicator. */

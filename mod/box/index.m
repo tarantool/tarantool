@@ -591,7 +591,7 @@ hash_iterator_free(struct iterator *iterator)
 	it->hash = (struct mh_i32ptr_t *) str_hash;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(void *) field
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
 	assert(iterator->next = hash_iterator_next);
@@ -600,7 +600,7 @@ hash_iterator_free(struct iterator *iterator)
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	it->base.next_equal = iterator_first_equal;
-	it->h_pos = mh_lstrptr_get(str_hash, field);
+	it->h_pos = mh_lstrptr_get(str_hash, key);
 	it->hash = (struct mh_i32ptr_t *) str_hash;
 }
 @end
@@ -948,14 +948,13 @@ tree_iterator_next_equal(struct iterator *iterator)
 		it->base.free = tree_iterator_free;
 		it->pattern = (struct tree_el *) (it + 1);
 		it->key_def = &key_def;
-		it->t_iter = NULL;
 	}
 	return (struct iterator *) it;
 }
 
-- (void) initIterator: (struct iterator *) iterator
+- (void) initIterator: (struct iterator *) it
 {
-	[self initIterator: iterator :NULL :0];
+	[self initIterator: it :NULL :0];
 }
 
 - (void) initIterator: (struct iterator *) iterator :(void *) key

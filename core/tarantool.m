@@ -374,6 +374,7 @@ tarantool_free(void)
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
+	tarantool_lua_close(tarantool_L);
 }
 
 static void
