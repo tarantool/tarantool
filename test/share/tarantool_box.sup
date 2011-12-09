@@ -242,3 +242,23 @@
    fun:box_process*
    ...
 }
+
+# third_party/luajit/src/lj.supp -- add as recommended in
+# http://lua-users.org/lists/lua-l/2011-08/msg00736.html
+
+# Valgrind suppression file for LuaJIT 2.x.
+{
+   Optimized string compare
+   Memcheck:Addr4
+   fun:lj_str_cmp
+}
+{
+   Optimized string compare
+   Memcheck:Addr4
+   fun:lj_str_new
+}
+{
+   Optimized string compare
+   Memcheck:Cond
+   fun:lj_str_new
+}
