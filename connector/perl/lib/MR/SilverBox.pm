@@ -6,6 +6,8 @@ use base qw/MR::Tarantool::Box/;
 
 =head1 NAME
 
+MR::SilverBox
+
 A backward-compatiblity module. Is it obsolete and is unsupported. Do not use.
 
 =head1 SEE ALSO

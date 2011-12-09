@@ -11,4 +11,4 @@ lib/MR/IProto/Message.pm
 lib/MR/IProto/Request.pm
 lib/MR/IProto/Response.pm
 lib/MR/SilverBox.pm
-lib/MR/Storage/Const.pm
+lib/MR/Tarantool/Box.pm

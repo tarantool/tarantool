@@ -10,8 +10,10 @@ use lib "$Bin";
 #use TBox ();
 use Carp qw/confess/;
 
-use Test::More tests => 218;
+use Test::More tests => 234;
 use Test::Exception;
+
+use List::MoreUtils qw/zip/;
 
 local $SIG{__DIE__} = \&confess;
 
@@ -517,6 +519,46 @@ foreach my $r (@res) {
 	ok sub { return $r != $tuples->[-1] && $r != $tuples->[-2] };
 }
 
+
+my $flds = [qw/ f1 f2 f3 f4 /];
+sub def_param_flds {
+    my $format = 'l&&&';
+    return { servers => $server,
+             spaces => [ {
+                 indexes => [ {
+                     index_name   => 'id',
+                     keys         => [0],
+                 } ],
+                 space         => 27,
+                 format        => $format,
+                 default_index => 'id',
+                 fields        => $flds,
+             } ],
+             debug => 0,
+         }
+}
+
+$box = $CLASS->new(def_param_flds);
+ok $box->isa($CLASS), 'connect';
+
+do {
+    my $tuples = [ @$tuples[0..2] ];
+    foreach my $tuple (@$tuples) {
+        cleanup $tuple->[0];
+    }
+
+    foreach my $tuple (@$tuples) {
+        is_deeply [$box->Insert(@$tuple, {want_inserted_tuple => 1})], [{zip @$flds, @$tuple}], "flds/insert \'$tuple->[0]\'";
+    }
+
+    is_deeply [$box->Select([[$tuples->[0]->[0]]])], [{zip @$flds, @{$tuples->[0]}}], 'select by primary_num1 index';
+    is_deeply [$box->UpdateMulti($tuples->[0]->[0],[ $flds->[3] => set => $tuples->[0]->[3] ],{want_updated_tuple => 1})], [{zip @$flds, @{$tuples->[0]}}], 'update1';
+    ok         $box->UpdateMulti($tuples->[0]->[0],[ $flds->[3] => set => $tuples->[0]->[3] ]), 'update2';
+    is_deeply [$box->UpdateMulti($tuples->[0]->[0],[ 3          => set => $tuples->[0]->[3] ],{want_updated_tuple => 1})], [{zip @$flds, @{$tuples->[0]}}], 'update3';
+    ok         $box->UpdateMulti($tuples->[0]->[0],[ 3          => set => $tuples->[0]->[3] ]), 'update4';
+
+    is_deeply [$box->Delete($tuples->[0]->[0],{want_deleted_tuple => 1})], [{zip @$flds, @{$tuples->[0]}}], 'update3';
+};
 
 
 
