@@ -36,6 +36,7 @@
 
 #include "pickle.h"
 #include "fiber.h"
+#include <ctype.h>
 #include TARANTOOL_CONFIG
 
 struct lua_State *tarantool_L;
@@ -796,6 +797,8 @@ is_string(const char *str)
 {
 	if (strcmp(str, "true") == 0 || strcmp(str, "false") == 0)
 	    return false;
+	if (! isdigit(*str))
+	    return true;
 	char *endptr;
 	(void) strtod(str, &endptr);
 	return *endptr != '\0';
