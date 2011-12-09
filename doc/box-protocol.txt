@@ -13,7 +13,7 @@
 ;
 ; int8 - a single 8-bit byte (i.e. an octet)
 ;
-; int32 - a 32-bit integer in big-endian format (Intel x86)
+; int32 - a 32-bit integer in little-endian format (Intel x86)
 ;
 ; int32_varint - a 1 to 5 byte representation of an integer
 ;
