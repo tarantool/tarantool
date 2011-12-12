@@ -27,8 +27,7 @@ Or without it:
         servers => 'xxx.xxx.xxx.xxx:xxxx,xxx.xxx.xxx.xxx:xxxx',
     );
 
-Messages can be prepared and processed using objects (recomended,
-but requires some more CPU):
+Messages can be prepared and processed using objects (requires some more CPU):
 
     my $request = MyProject::Message::MyOperation::Request->new(
         arg1 => 1,
@@ -39,7 +38,7 @@ but requires some more CPU):
     # Of course, both message classes (request and reply) must
     # be implemented by user.
 
-Or without them (not recommended because of unclean architecture):
+Or without them:
 
     my $response = $client->send({
         msg    => x,
@@ -230,6 +229,7 @@ sub send {
     }
     else {
         die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
+        local $SIG{__DIE__} = do { my $old = $SIG{__DIE__}; sub { local $! = 0; $old->(@_); } } if ref $SIG{__DIE__};
         my %servers;
         my ($data, $error, $errno);
         $self->_send_now($message, sub {
@@ -281,6 +281,7 @@ sub send_bulk {
     }
     else {
         die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
+        local $SIG{__DIE__} = do { my $old = $SIG{__DIE__}; sub { local $! = 0; $old->(@_); } } if ref $SIG{__DIE__};
         my %servers;
         foreach my $message ( @$messages ) {
             $self->_send_now($message, sub {
@@ -455,6 +456,11 @@ Message have no reply.
 Is retry is allowed. Values of attributes L</max_request_retries> and
 L</retry_delay> is used if retry is allowed.
 
+=item is_retry
+
+Callback used to determine if server asks for retry. Unpacked data is passed
+to it as a first argument.
+
 =back
 
 =cut
@@ -559,9 +565,11 @@ sub _send_retry {
 sub _server_callback {
     my ($self, $req_args, $resp_args) = @_;
     my ($handler, $args, $callback, $sync, $try) = @$req_args;
-    my ($resp_msg, $data, $error) = @$resp_args;
+    my ($resp_msg, $data, $error, $errno) = @$resp_args;
     eval {
         if ($error) {
+            $! = $errno;
+            $@ = $error;
             my $retry = defined $args->{request} ? $args->{request}->retry()
                 : ref $args->{retry} eq 'CODE' ? $args->{retry}->()
                 : $args->{retry};
@@ -571,7 +579,7 @@ sub _server_callback {
             }
             else {
                 undef $$handler;
-                $self->_report_error($args->{request}, $callback, $error, $sync);
+                $self->_report_error($args->{request}, $callback, $error, $sync, $errno);
             }
         }
         else {
@@ -622,16 +630,18 @@ sub _recv_now {
 }
 
 sub _report_error {
-    my ($self, $request, $callback, $error, $sync) = @_;
+    my ($self, $request, $callback, $error, $sync, $errno) = @_;
     my $errobj = defined $request && ref $request ne 'HASH'
         ? MR::IProto::Error->new(
             request => $request,
             error   => $error,
-            errno   => 0+$!,
+            errno   => defined $errno ? 0 + $errno : 0,
         )
         : undef;
     $self->_finish_and_start() unless $sync;
-    $callback->($errobj, $error);
+    $! = $errno;
+    $@ = $error;
+    $callback->($errobj, $error, $errno);
     return;
 }
 
