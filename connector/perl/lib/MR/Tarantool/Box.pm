@@ -12,14 +12,14 @@ A driver for an efficient Tarantool/Box NoSQL in-memory storage.
 
     my $box = MR::Tarantool::Box->new({
         servers => "127.0.0.1:33013",
-        name    => "My Box",              # primarily used for debug purposes
+        name    => "My Box",              # mostly used for debug purposes
         spaces => [ {
             indexes => [ {
                 index_name   => 'idx1',
                 keys         => [0],
             }, {
                 index_name   => 'idx2',
-                keys         => [1],
+                keys         => [1,2],
             }, ],
             space         => 1,           # space id, as set in Tarantool/Box config
             name          => "primary",   # self-descriptive space-id
@@ -37,13 +37,29 @@ A driver for an efficient Tarantool/Box NoSQL in-memory storage.
         raise     => 0,                   # dont raise an exception in case of error
     });
 
-    $box->Insert(1,2,3,4,5,6,7,8,"asdf") or die $box->ErrorStr;
-    $box->Insert(1,2,3,4,5,6,7,8,"asdf",{space => "primary"}) or die $box->ErrorStr;
+    my $bool  = $box->Insert(1, 2,3, 4,5,6,7,8,"asdf")                            or die $box->ErrorStr;
+    my $bool  = $box->Insert(2, 2,4, 4,5,6,7,8,"asdf",{space => "primary"})       or die $box->ErrorStr;
+    my $tuple = $box->Insert(3, 3,3, 4,5,6,7,8,"asdf",{want_inserted_tuple => 1}) or die $box->ErrorStr;
 
-    my $tuples = $box->Select(1);
-    my $tuples = $box->Select(1,{space => "primary", use_index => "idx1"});
+    # Select by single-field key
+    my $tuple  = $box->Select(1);                                                 # scalar context - scalar result: $tuple
+    my @tuples = $box->Select(1,2,3);                                             # list   context - list   result: ($tuple, $tuple, ...)
+    my $tuples = $box->Select([1,2,3],{space => "primary", use_index => "idx1"}); #                arrayref result: [$tuple, $tuple, ...]
+
+    # Select by multi-field key
+    my $tuples = $box->Select([[2,3]],{use_index => "idx2"}); # by full key
+    my $tuples = $box->Select([[2]]  ,{use_index => "idx2"}); # by partial key
+
+    my $bool  = $box->UpdateMulti(1,[ f4 => add => 3 ]);
+    my $bool  = $box->UpdateMulti(2,[ f4 => add => 3 ],{space => "primary"});
+    my $tuple = $box->UpdateMulti(3,[ f4 => add => 3 ],{want_updated_tuple => 1});
+
+    my $bool  = $box->Delete(1);
+    my $tuple = $box->Delete(2, {want_deleted_tuple => 1});
 
 =head1 DESCRIPTION
+
+=head2 METHODS
 
 =cut
 
@@ -514,11 +530,11 @@ sub Call {
 
 =pod
 
-=head3 Add, Set, Replace
+=head3 Add, Insert, Replace
 
-    $box->Add(@tuple) or die $box->ErrorStr;
-    $box->Set(@tuple, { space => "main" });
-    $box->Replace(@tuple, { space => "secondary" });
+    $box->Add(@tuple) or die $box->ErrorStr;         # only store a new tuple
+    $box->Replace(@tuple, { space => "secondary" }); # only store an existing tuple
+    $box->Insert(@tuple, { space => "main" });       # store anyway
 
 Insert a C<< @tuple >> into the storage into C<$options{space}> or C<default_space> space.
 All of them return C<true> upon success.
@@ -557,7 +573,7 @@ B<Replace> will succeed if and only if a duplicate-key tuple B<exists>
 
 =item *
 
-B<Set> will suddeed B<anyway>. Duplicate-key tuple will be B<overwritten>
+B<Insert> will succeed B<anyway>. Duplicate-key tuple will be B<overwritten>
 
 =back
 
@@ -1047,7 +1063,7 @@ Apply several update operations to a tuple.
     
     my $n_updated = $box->UpdateMulti($key, @op) or die $box->ErrorStr;
     my $n_updated = $box->UpdateMulti($key, @op, \%options) or die $box->ErrorStr;
-    warn "Nothing was updated" unless int $n_deleted;
+    warn "Nothing was updated" unless int $n_updated;
     
     my $updated_tuple_set = $box->UpdateMulti($key, @op, { want_result => 1 }) or die $box->ErrorStr;
     warn "Nothing was updated" unless @$updated_tuple_set;
@@ -1082,7 +1098,7 @@ Currently arithmetic operations are supported only for int32 (4-byte length) fie
 
 =item B<splice>, B<substr>
 
-Apply a perl-like L<perlfunc/splice> operation to C<< $field >>. B<$value> = [$OFFSET, $LENGTH, $REPLACE_WITH].
+Apply a perl-like L<splice|perlfunc/splice> operation to C<< $field >>. B<$value> = [$OFFSET, $LENGTH, $REPLACE_WITH].
 substr is just an alias.
 
 =item B<append>, B<prepend>

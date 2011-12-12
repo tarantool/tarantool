@@ -13,7 +13,7 @@ use FindBin qw($Bin);
 use lib "$Bin";
 use Carp qw/confess/;
 
-use Test::More tests => 234;
+use Test::More tests => 233;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
@@ -522,27 +522,35 @@ foreach my $r (@res) {
 	ok sub { return $r != $tuples->[-1] && $r != $tuples->[-2] };
 }
 
+my $flds;
+BEGIN{ $flds = [qw/ f1 f2 f3 f4 /] }
+    {
+        package TestBox;
+        use MR::Tarantool::Box::Singleton;
+        use base 'MR::Tarantool::Box::Singleton';
 
-my $flds = [qw/ f1 f2 f3 f4 /];
-sub def_param_flds {
-    my $format = 'l&&&';
-    return { servers => $server,
-             spaces => [ {
-                 indexes => [ {
-                     index_name   => 'id',
-                     keys         => [0],
-                 } ],
-                 space         => 27,
-                 format        => $format,
-                 default_index => 'id',
-                 fields        => $flds,
-             } ],
-             debug => 0,
-         }
-}
+        BEGIN {
+            __PACKAGE__->mkfields(@$flds);
+        }
 
-$box = $CLASS->new(def_param_flds);
-ok $box->isa($CLASS), 'connect';
+        sub SERVER   { $server }
+        sub REPLICAS { '' }
+
+        sub SPACES   {[{
+            space         => 27,
+            indexes       => [ {
+                index_name   => 'primary_id',
+                keys         => [TUPLE_f1],
+            } ],
+            format        => 'l&&&',
+            default_index => 'primary_id',
+        }]}
+
+    }
+
+$box = 'TestBox';
+#$box = $CLASS->new(def_param_flds);
+#ok $box->isa($CLASS), 'connect';
 
 do {
     my $tuples = [ @$tuples[0..2] ];
