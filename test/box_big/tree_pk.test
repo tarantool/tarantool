@@ -32,3 +32,31 @@ exec sql "select * from t3 where k0 = 'third'"
 exec sql "delete from t3 where k0 = 'identifier'"
 exec sql "delete from t3 where k0 = 'second'"
 exec sql "delete from t3 where k0 = 'third'"
+lua = """
+function box.crossjoin(space0, space1, limit)
+  space0 = tonumber(space0)
+  space1 = tonumber(space1)
+  limit = tonumber(limit)
+  local result = {}
+  for k0, v0 in box.space[space0]:pairs() do
+    for k1, v1 in box.space[space1]:pairs() do
+      if limit <= 0 then
+        return unpack(result)
+      end
+      newtuple = {v0:unpack()}
+      for _, v in v1:pairs() do table.insert(newtuple, v) end
+      table.insert(result, newtuple)
+      limit = limit - 1
+    end
+  end
+  return unpack(result)
+end"""
+exec sql "insert into t2 values (1, 'tuple')"
+exec sql "insert into t3 values (1, 'tuple')"
+exec sql "insert into t3 values (2, 'tuple')"
+exec admin "lua " + lua.replace('\n', ' ')
+exec sql "call box.crossjoin(3, 3, 0)"
+exec sql "call box.crossjoin(3, 3, 5)"
+exec sql "call box.crossjoin(3, 3, 10000)"
+exec sql "call box.crossjoin(3, 2, 10000)"
+exec admin "lua box.space[3]:truncate()"

@@ -202,4 +202,35 @@ exec sql "call f1()"
 exec sql "call f2()"
 exec sql "call f1('jason')"
 exec sql "call f1('jason', 1, 'test', 2, 'stewart')"
-
+lua = """
+function box.crossjoin(space0, space1, limit)
+  space0 = tonumber(space0)
+  space1 = tonumber(space1)
+  limit = tonumber(limit)
+  local result = {}
+  for k0, v0 in box.space[space0]:pairs() do
+    for k1, v1 in box.space[space1]:pairs() do
+      if limit <= 0 then
+        return unpack(result)
+      end
+      newtuple = {v0:unpack()}
+      for _, v in v1:pairs() do table.insert(newtuple, v) end
+      table.insert(result, newtuple)
+      limit = limit - 1
+    end
+  end
+  return unpack(result)
+end"""
+exec admin "lua " + lua.replace('\n', ' ')
+exec admin "lua box.crossjoin(0, 0, 0)"
+exec admin "lua box.crossjoin(0, 0, 10000)"
+exec admin "lua box.space[0]:insert(1)"
+exec sql "call box.crossjoin('0', '0', '10000')"
+exec admin "lua box.space[0]:insert(2)"
+exec sql "call box.crossjoin('0', '0', '10000')"
+exec admin "lua box.space[0]:insert(3, 'hello')"
+exec sql "call box.crossjoin('0', '0', '10000')"
+exec admin "lua box.space[0]:insert(4, 'world')"
+exec admin "lua box.space[0]:insert(5, 'hello world')"
+exec sql "call box.crossjoin('0', '0', '10000')"
+exec admin "lua box.space[0]:truncate()"

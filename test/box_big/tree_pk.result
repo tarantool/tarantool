@@ -63,3 +63,33 @@ delete from t3 where k0 = 'second'
 Delete OK, 1 row affected
 delete from t3 where k0 = 'third'
 Delete OK, 1 row affected
+insert into t2 values (1, 'tuple')
+Insert OK, 1 row affected
+insert into t3 values (1, 'tuple')
+Insert OK, 1 row affected
+insert into t3 values (2, 'tuple')
+Insert OK, 1 row affected
+lua  function box.crossjoin(space0, space1, limit)   space0 = tonumber(space0)   space1 = tonumber(space1)   limit = tonumber(limit)   local result = {}   for k0, v0 in box.space[space0]:pairs() do     for k1, v1 in box.space[space1]:pairs() do       if limit <= 0 then         return unpack(result)       end       newtuple = {v0:unpack()}       for _, v in v1:pairs() do table.insert(newtuple, v) end       table.insert(result, newtuple)       limit = limit - 1     end   end   return unpack(result) end
+---
+...
+call box.crossjoin(3, 3, 0)
+No match
+call box.crossjoin(3, 3, 5)
+Found 4 tuples:
+[1, 'tuple', 1, 'tuple']
+[1, 'tuple', 2, 'tuple']
+[2, 'tuple', 1, 'tuple']
+[2, 'tuple', 2, 'tuple']
+call box.crossjoin(3, 3, 10000)
+Found 4 tuples:
+[1, 'tuple', 1, 'tuple']
+[1, 'tuple', 2, 'tuple']
+[2, 'tuple', 1, 'tuple']
+[2, 'tuple', 2, 'tuple']
+call box.crossjoin(3, 2, 10000)
+Found 2 tuples:
+[1, 'tuple', 1, 'tuple']
+[2, 'tuple', 1, 'tuple']
+lua box.space[3]:truncate()
+---
+...
