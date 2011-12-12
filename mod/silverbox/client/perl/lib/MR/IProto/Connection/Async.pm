@@ -192,10 +192,11 @@ sub _build__handle {
         },
         on_error   => sub {
             my ($handle, $fatal, $message) = @_;
+            my $errno = $!;
             $server->_debug(($fatal ? 'fatal ' : '') . 'error: ' . $message);
             my @callbacks;
             foreach my $sync ( keys %{$self->_callbacks} ) {
-                $server->_recv_finished($sync, undef, undef, $message);
+                $server->_recv_finished($sync, undef, undef, $message, $errno);
                 $self->_in_progress( $self->_in_progress - 1 );
                 push @callbacks, $self->_callbacks->{$sync};
             }
@@ -206,7 +207,7 @@ sub _build__handle {
             $server->_debug('closing socket') if $server->debug >= 1;
             $handle->destroy();
             $self->_try_to_send();
-            $_->(undef, undef, $message) foreach @callbacks;
+            $_->(undef, undef, $message, $errno) foreach @callbacks;
             return;
         },
         on_timeout => sub {

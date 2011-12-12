@@ -206,6 +206,7 @@ sub _set_timeout {
 
 sub _handle_error {
     my ($self, $sync, $callback, $error) = @_;
+    my $errno = $!;
     if (!$error) {
         $error = 'Unknown error';
     } elsif ($error =~ /^(.+?) at \S+ line \d+/s) {
@@ -220,12 +221,12 @@ sub _handle_error {
     $server->active(0);
     my $sent = $self->_sent;
     my @sent = splice @$sent, 0, scalar @$sent;
-    $server->_recv_finished($sync, undef, undef, $error);
-    $callback->(undef, undef, $error);
+    $server->_recv_finished($sync, undef, undef, $error, $errno);
+    $callback->(undef, undef, $error, $errno);
     foreach my $args (@sent) {
         my ($sync, $callback) = @$args;
-        $server->_recv_finished($sync, undef, undef, $error);
-        $callback->(undef, undef, $error);
+        $server->_recv_finished($sync, undef, undef, $error, $errno);
+        $callback->(undef, undef, $error, $errno);
     }
     return
 }
