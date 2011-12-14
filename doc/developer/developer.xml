@@ -76,6 +76,9 @@ to build the user guide.
 vim CMakeLists.txt # edit CPACK_PACKAGE_VERSION_PATCH
 git push --tags
 </programlisting>
+Update the Web site in doc/www-data.
+</para>
+<para>
 Go to launchpad and move all "Fix committed" bugs to "Fix released".
 </para>
 <para>
