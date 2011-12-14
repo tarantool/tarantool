@@ -5,4 +5,7 @@ add_custom_target(dev-html ALL
         ${CMAKE_SOURCE_DIR}/doc/user/tnt-html.xsl
         developer.xml)
 
+add_custom_target(dev-check ALL
+	COMMAND jing http://docbook.org/xml/5.0/rng/docbookxi.rng developer.xml
+    )
 

@@ -7,10 +7,24 @@
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xmlns:xi="http://www.w3.org/2001/XInclude" version="5.0">
 <title>Tarantool/Box Developer Guide</title>
+<preface>
+  <title>What documentation there is</title>
+  <para>
+    Tarantool documentation consists of:
+    <itemizedlist>
+    <listitem><para>a user guide</para></listitem>
+    <listitem><para>a developer guide (you're reading it)</para></listitem>
+    <listitem><para>protocol description box-protocol.txt</para></listitem>
+    <listitem><para>coding style guides for Lua, Objective C, C, Python (for
+    other connectors, we use conventions of the connector programming
+    language community)</para></listitem>
+  </itemizedlist>
+  </para>
+</preface>
 <chapter>
 <title>Compiling</title>
 <section>
-<title>How to fix the compile time error about missing confetti</title>
+<title>How to fix a compile time error about missing confetti</title>
 <para>
   An error about missing confetti:
 <programlisting>
@@ -34,58 +48,37 @@ The other alternative, if you have actually modified
   
   </para>
 </section>
+
+<section>
+<title>How to build the XML manual</title>
+<para>
+To build XML manual, you'll need:
+<itemizedlist>
+
+<listitem><para>xsltproc</para></listitem>
+<listitem><para>docbook5-xml</para></listitem>
+<listitem><para>docbook-xsl-ns</para></listitem>
+<listitem><para>libsaxon-java- for saxon processing</para></listitem>
+<listitem><para>libxml-commons-resolver1.1-java</para></listitem>
+<listitem><para>libxerces2-java</para></listitem>
+<listitem><para>libxslthl-java</para></listitem>
+</itemizedlist>
+Once all pre-requisites are met, <computeroutput>make html</computeroutput>
+to build the user guide.
+</para>
+</section>
 </chapter>
-
-To build documentation, you'll need:
-
-xsltproc
-docbook5-xml
-docbook-xsl-ns
-libsaxon-java- for saxon processing
-libxml-commons-resolver1.1-java
-libxerces2-java
-libxslthl-java
-<!--
-     TOC:
-
-     Introduction
-       What it can basically do; 
-
-
-     Installation and Running
-       Command line options reference
- 
-     Data console and administrative console
-       Data operations
-       Administrative console operations
-         Format of response
-
-     Setting up replication
-       Master-slave replication
-
-     Support of memcached protocol
-
-     Configuration reference
-
-     Log file messages
-
-     Connectors
-       C
-       Ruby 
-         Example
-       Perl
-
-     Frequently Asked Questions
-       Q. What's on your roadmap?
-       Q. I found a bug. What to do?
-
-
-
-     Appendixes:
-       Configuration parameters index
-       Server error codes
-       Glossary of terms
--->
+<chapter>
+<title>Release management</title>
+  <section><title>How to make a minor release</title>
+  <para>
+  <programlisting>git tag -a 1.4.4 -m "Next minor in 1.4 series"
+vim CMakeLists.txt # edit CMAKE_VERSION_*
+git push --tags
+</programlisting>
+  </para>
+  </section>
+</chapter>
 </book>
 
 <!--
