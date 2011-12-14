@@ -85,7 +85,40 @@ or blueprints on Launchpad. If anything significant is there,
 which is not mentioned, something went wrong in release planning
 and the release should be held up until this is cleared.
   </para>
+<para>
+Click 'Release milestone'. Create a milestone for the next minor 
+release. Alert the driver to target bugs and blueprints 
+to the new milestone.
+</para>
+<para>
+Upload the milestone from http://tarantool.org/dist to Launchpad. Use the .src.tar.gz build.
+</para>
+<para>
+</para>
   </section>
+</chapter>
+<chapter>
+<title>Developer guidelines</title>
+<section>
+<title>How to work on a bug</title>
+<para>Any defect, even minor, if it changes the user-visible
+server behavior, needs a bug report. Report a bug at
+bugs.launchpad.net/tarantool.
+
+When reporting a bug, try to come up with a test case right away. 
+Set the current maintenance milestone for the bug fix, and specify the series.
+Assign the bug to yourself. Put the status to 'In progress'
+Once the patch is ready, put the bug the bug to 'In review' and solicit a review for the fix.
+
+Once there is a positive code review, push the patch 
+and set the status to 'Fix committed'
+
+Patches for bugs should contain a reference to the respective
+Launchpad bug page or at least bug id. Each patch should have a
+test, unless coming up with one is difficult in the current
+framework, in which case QA should be alerted.
+</para>
+</section>
 </chapter>
 </book>
 
