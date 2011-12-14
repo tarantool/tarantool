@@ -229,7 +229,8 @@ sub send {
     }
     else {
         die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
-        local $SIG{__DIE__} = do { my $old = $SIG{__DIE__}; sub { local $! = 0; $old->(@_); } } if ref $SIG{__DIE__};
+        my $olddie = ref $SIG{__DIE__} eq 'CODE' ? $SIG{__DIE__} : ref $SIG{__DIE__} eq 'GLOB' ? *{$SIG{__DIE__}}{CODE} : undef;
+        local $SIG{__DIE__} = sub { local $! = 0; $olddie->(@_); } if $olddie;
         my %servers;
         my ($data, $error, $errno);
         $self->_send_now($message, sub {
@@ -281,7 +282,8 @@ sub send_bulk {
     }
     else {
         die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
-        local $SIG{__DIE__} = do { my $old = $SIG{__DIE__}; sub { local $! = 0; $old->(@_); } } if ref $SIG{__DIE__};
+        my $olddie = ref $SIG{__DIE__} eq 'CODE' ? $SIG{__DIE__} : ref $SIG{__DIE__} eq 'GLOB' ? *{$SIG{__DIE__}}{CODE} : undef;
+        local $SIG{__DIE__} = sub { local $! = 0; $olddie->(@_); } if $olddie;
         my %servers;
         foreach my $message ( @$messages ) {
             $self->_send_now($message, sub {
