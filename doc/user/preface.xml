@@ -68,6 +68,14 @@
   </para>
 
   <para>
+    The key feature of Tarantool is <emphasis role="strong">support
+    for stored procedures</emphasis>, which
+    can access and modify data atomically. With stored procedures,
+    it's possible to turn Tarantool into a highly
+    flexible and extremely fast social web application server.
+  </para>
+
+  <para>
     <emphasis role="strong">The software is production-ready</emphasis>.
     Tarantool has been developed and is actively used at
     <citetitle xlink:href="http://api.mail.ru">Mail.Ru</citetitle>,
