@@ -28,5 +28,6 @@
 > sql insert                    [OK]
 > sql update                    [OK]
 > sql select                    [OK]
+> sql select limit              [OK]
 > sql delete                    [OK]
 > sql call                      [OK]

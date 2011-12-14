@@ -73,14 +73,11 @@ static int query_reply_handle(struct tnt_stream *t, struct tnt_reply *r) {
 		break;
 	}
 	if (tnt_error(t) != TNT_EOK) {
-		printf("FAIL, %s (op: %d, reqid: %d, code: %d, count: %d)\n",
-			tnt_strerror(t),
-			r->op,
-			r->reqid,
-			r->code,
-			r->count);
-		if (r->error)
-			printf("error: %s\n", r->error);
+		printf("FAIL, %s\n", tnt_strerror(t));
+		return -1;
+	} else if (r->code != 0) {
+		printf("FAIL, %s (code: %d)\n",
+		       ((r->error) ? r->error : ""), r->code);
 		return -1;
 	}
 	printf("OK, %d rows affected\n", r->count);
