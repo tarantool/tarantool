@@ -214,6 +214,7 @@
 
 <fq_tuple> ::= <size><tuple>
 
+; length of the variable part of the tuple (all tuple fields)
 <size> ::= <int32>
 
 ;
