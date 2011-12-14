@@ -115,12 +115,14 @@ tnt_sqltryv(struct tnt_sql *sql, int tk, struct tnt_tk **tkp) {
 /* key-value parsing for tuple operation. */
 
 static bool
-tnt_sql_kv(struct tnt_sql *sql, struct tnt_tuple *tu, bool key)
+tnt_sql_keyval(struct tnt_sql *sql, struct tnt_tuple *tu, bool key, struct tnt_tk **kt)
 {
 	/* key */
 	struct tnt_tk *k = NULL;
 	if (key && (!tnt_sqltkv(sql, TNT_TK_KEY, &k) || !tnt_sqltk(sql, '=')))
 		return false;
+	if (kt)
+		*kt = k;
 	/* value */
 	struct tnt_tk *v = NULL;
 	if (tnt_lex(sql->l, &v) == TNT_TK_ERROR)
@@ -132,6 +134,27 @@ tnt_sql_kv(struct tnt_sql *sql, struct tnt_tuple *tu, bool key)
 		tnt_tuple_add(tu, (char*)&TNT_TK_I(v), 4);
 	else
 		tnt_tuple_add(tu, (char*)TNT_TK_S(v)->data, TNT_TK_S(v)->size);
+	return true;
+}
+
+static bool
+tnt_sql_kv(struct tnt_sql *sql, struct tnt_tuple *tu, bool key) {
+	return tnt_sql_keyval(sql, tu, key, NULL);
+}
+
+static bool
+tnt_sql_kv_select(struct tnt_sql *sql, struct tnt_tuple *tu, int32_t *index)
+{
+	struct tnt_tk *key = NULL;
+	bool rc = tnt_sql_keyval(sql, tu, true, &key);
+	if (rc == false)
+		return false;
+	if (*index == -1)
+		*index = TNT_TK_I(key);
+	else
+	if (*index != TNT_TK_I(key))
+		return tnt_sql_error(sql, key,
+				     "select key values must refer to the same index");
 	return true;
 }
 
@@ -294,27 +317,37 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		}
 		sql->ops++;
 		break;
-	/* SELECT * FROM TABLE WHERE predicate OR predicate... */
-	case TNT_TK_SELECT:
+	/* SELECT * FROM TABLE WHERE predicate OR predicate... LIMIT NUM */
+	case TNT_TK_SELECT: {
 		tnt_expect(tnt_sqltk(sql, '*'));
 		tnt_expect(tnt_sqltk(sql, TNT_TK_FROM));
 		tnt_expect(tnt_sqltkv(sql, TNT_TK_TABLE, &tn));
 		tnt_expect(tnt_sqltk(sql, TNT_TK_WHERE));
+		int32_t index = -1;
 		while (1) {
 			struct tnt_tuple *tup = tnt_list_at(&tuples, NULL);
-			tnt_expect(tnt_sql_kv(sql, tup, true));
+			tnt_expect(tnt_sql_kv_select(sql, tup, &index));
 			if (tnt_sqltry(sql, TNT_TK_OR))
 				continue;
 			if (sql->error)
 				goto error;
 			break;
 		}
-		if (tnt_select(sql->s, TNT_TK_I(tn), 0, 0, 1000, &tuples) == -1) {
+		uint32_t limit = UINT32_MAX;
+		if (tnt_sqltry(sql, TNT_TK_LIMIT)) {
+			struct tnt_tk *ltk;
+			tnt_expect(tnt_sqltkv(sql, TNT_TK_NUM, &ltk));
+			limit = TNT_TK_I(ltk);
+		} else
+		if (sql->error)
+			goto error;
+		if (tnt_select(sql->s, TNT_TK_I(tn), index, 0, limit, &tuples) == -1) {
 			tnt_sql_error(sql, tk, "select failed");
 			goto error;
 		}
 		sql->ops++;
 		break;
+	}
 	/* CALL NAME[{.NAME}+](STRING [{,STRING}+]) */
 	case TNT_TK_CALL: {
 		char proc[512];

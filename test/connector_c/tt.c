@@ -753,18 +753,17 @@ static void tt_tnt_sql_update(struct tt_test *test) {
 
 /* sql select */
 static void tt_tnt_sql_select(struct tt_test *test) {
-	struct tnt_list *search =
-		tnt_list(NULL, tnt_tuple(NULL, "%d", 222), NULL);
-	TT_ASSERT(tnt_select(&net, 0, 0, 0, 1, search) > 0);
+	char *e = NULL;
+	char q[] = "select * from t0 where k0 = 222 or k0 = 222";
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
 	TT_ASSERT(tnt_flush(&net) > 0);
-	tnt_list_free(search);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
 	while (tnt_next(&i)) {
 		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_SELECT);
-		TT_ASSERT(r->count == 1);
+		TT_ASSERT(r->count == 2);
 		struct tnt_iter il;
 		tnt_iter_list(&il, TNT_REPLY_LIST(r));
 		TT_ASSERT(tnt_next(&il) == 1);
@@ -788,6 +787,24 @@ static void tt_tnt_sql_select(struct tt_test *test) {
 		tnt_iter_free(&ifl);
 		tnt_iter_free(&il);
 	}
+	tnt_iter_free(&i);
+}
+
+/* sql select limit */
+static void tt_tnt_sql_select_limit(struct tt_test *test) {
+	char *e = NULL;
+	char q[] = "select * from t0 where k0 = 222 limit 0";
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_flush(&net) > 0);
+	struct tnt_iter i;
+	tnt_iter_stream(&i, &net);
+	while (tnt_next(&i)) {
+		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		TT_ASSERT(r->code == 0);
+		TT_ASSERT(r->op == TNT_OP_SELECT);
+		TT_ASSERT(r->count == 0);
+	}
+	tnt_iter_free(&i);
 }
 
 /* sql delete */
@@ -866,6 +883,7 @@ main(int argc, char * argv[])
 	tt_test(&t, "sql insert", tt_tnt_sql_insert);
 	tt_test(&t, "sql update", tt_tnt_sql_update);
 	tt_test(&t, "sql select", tt_tnt_sql_select);
+	tt_test(&t, "sql select limit", tt_tnt_sql_select_limit);
 	tt_test(&t, "sql delete", tt_tnt_sql_delete);
 	tt_test(&t, "sql call", tt_tnt_sql_call);
 
