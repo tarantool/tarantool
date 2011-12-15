@@ -1,2 +1,0 @@
-# encoding: tarantool
-exec admin "show configuration"

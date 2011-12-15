@@ -11,7 +11,7 @@ server.stop()
 # start server from config with holes in spaces
 server.deploy("box/tarantool_bug708685.cfg")
 # check connection
-exec admin "show stat"
+exec admin "show configuration"
 
 print """
 # Bug #884768:
