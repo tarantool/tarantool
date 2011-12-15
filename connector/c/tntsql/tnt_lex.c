@@ -159,7 +159,7 @@ tnt_lex_nameof(int tk)
 {
 	/* system tokens */
 	switch (tk) {
-	case TNT_TK_EOF: return "EOF";
+	case TNT_TK_EOF: return "End-Of-Statement";
 	case TNT_TK_ERROR: return "ERROR";
 	case TNT_TK_NUM: return "NUM";
 	case TNT_TK_STRING: return "STRING";

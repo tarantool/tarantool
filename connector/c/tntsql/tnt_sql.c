@@ -41,7 +41,6 @@
 struct tnt_sql {
 	struct tnt_stream *s;
 	struct tnt_lex *l;
-	int ops;
 	char *error;
 };
 
@@ -246,6 +245,7 @@ tnt_sql_stmt_update(struct tnt_sql *sql, struct tnt_tuple *tu, struct tnt_stream
 	tnt_expect(tnt_sqltk(sql, TNT_TK_WHERE));
 	/* predicate */
 	tnt_expect(tnt_sql_kv(sql, tu, true));
+	tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
 	if (tnt_update(sql->s, TNT_TK_I(tn), 0, tu, u) == -1) {
 		tnt_sql_error(sql, tn, "update failed");
 		goto error;
@@ -292,17 +292,16 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		if (tk->tk == TNT_TK_REPLACE)
 			flags = TNT_FLAG_REPLACE;
 		tnt_expect(tnt_sqltk(sql, ')'));
+		tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
 		if (tnt_insert(sql->s, TNT_TK_I(tn), flags, &tu) == -1) {
 			tnt_sql_error(sql, tk, "insert failed");
 			goto error;
 		}
-		sql->ops++;
 		break;
 	/* UPDATE TABLE SET operations WHERE predicate */
 	case TNT_TK_UPDATE:
 		if (!tnt_sql_stmt_update(sql, &tu, &update))
 			goto error;
-		sql->ops++;
 		break;
 	/* DELETE FROM TABLE WHERE predicate */
 	case TNT_TK_DELETE:
@@ -311,11 +310,11 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		tnt_expect(tnt_sqltk(sql, TNT_TK_WHERE));
 		/* predicate */
 		tnt_expect(tnt_sql_kv(sql, &tu, true));
+		tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
 		if (tnt_delete(sql->s, TNT_TK_I(tn), 0, &tu) == -1) {
 			tnt_sql_error(sql, tk, "delete failed"); 
 			goto error;
 		}
-		sql->ops++;
 		break;
 	/* SELECT * FROM TABLE WHERE predicate OR predicate... LIMIT NUM */
 	case TNT_TK_SELECT: {
@@ -341,11 +340,11 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		} else
 		if (sql->error)
 			goto error;
+		tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
 		if (tnt_select(sql->s, TNT_TK_I(tn), index, 0, limit, &tuples) == -1) {
 			tnt_sql_error(sql, tk, "select failed");
 			goto error;
 		}
-		sql->ops++;
 		break;
 	}
 	/* CALL NAME[{.NAME}+](STRING [{,STRING}+]) */
@@ -380,20 +379,22 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		}
 		tnt_expect(tnt_sqltk(sql, ')'));
 noargs:
+		tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
 		if (tnt_call(sql->s, 0, proc, &tu) == -1) {
 			tnt_sql_error(sql, tk, "call failed"); 
 			goto error;
 		}
-		sql->ops++;
 		break;
 	}
 	/* PING */
 	case TNT_TK_PING:
+		tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
 		if (tnt_ping(sql->s) == -1) {
 			tnt_sql_error(sql, tk, "ping failed"); 
 			goto error;
 		}
-		sql->ops++;
+		break;
+	case TNT_TK_EOF:
 		break;
 	case TNT_TK_ERROR:
 		return tnt_sql_error(sql, tk, "%s", sql->l->error);
@@ -414,24 +415,7 @@ error:
 /* primary sql grammar parsing function. */
 
 static bool tnt_sql(struct tnt_sql *sql) {
-	struct tnt_tk *tk;
-	while (1) {
-		switch (tnt_lex(sql->l, &tk)) {
-		case TNT_TK_ERROR:
-			return tnt_sql_error(sql, NULL, "%s", sql->l->error);
-		case TNT_TK_EOF:
-			return true;
-		default:
-			tnt_lex_push(sql->l, tk);
-			if (!tnt_sql_stmt(sql))
-				return false;
-			if (tnt_sqltry(sql, ';'))
-				continue;
-			if (sql->error)
-				return false;
-			break;
-		}
-	}
+	return tnt_sql_stmt(sql);
 }
 
 /*
@@ -444,7 +428,7 @@ static bool tnt_sql(struct tnt_sql *sql) {
  * qsize - query size
  * e     - error description string
  * 
- * returns number of operations processed on succes, or -1 on error
+ * returns 0 on success, or -1 on error
  * and string description returned (must be freed after use).
 */
 int
@@ -453,7 +437,7 @@ tnt_query(struct tnt_stream *s, char *q, size_t qsize, char **e)
 	struct tnt_lex l;
 	if (!tnt_lex_init(&l, (unsigned char*)q, qsize))
 		return -1;
-	struct tnt_sql sql = { s, &l, 0, NULL};
+	struct tnt_sql sql = { s, &l, NULL };
 	bool ret = tnt_sql(&sql);
 	if (e) {
 		*e = sql.error;
@@ -462,7 +446,7 @@ tnt_query(struct tnt_stream *s, char *q, size_t qsize, char **e)
 			tnt_mem_free(sql.error);
 	}
 	tnt_lex_free(&l);
-	return (ret) ? sql.ops : -1;
+	return (ret) ? 0 : -1;
 }
 
 /*
