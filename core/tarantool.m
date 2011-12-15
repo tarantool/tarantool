@@ -468,7 +468,7 @@ main(int argc, char **argv)
 	if (gopt_arg(opt, 'C', &cat_filename)) {
 		initialize_minimal();
 		if (access(cat_filename, R_OK) == -1) {
-			panic("access(\"%s\")", cat_filename);
+			panic("access(\"%s\"): %s", cat_filename, strerror(errno));
 			exit(EX_OSFILE);
 		}
 		return mod_cat(cat_filename);
