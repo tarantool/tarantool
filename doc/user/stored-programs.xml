@@ -9,7 +9,8 @@
   <title>Writing stored procedures in Lua</title>
 <blockquote>
     <para>
-        Lua is a light-weight, multi-paradigm embeddable language.
+        <link xlink:href="http://www.lua.org">Lua</link>
+        is a light-weight, multi-paradigm, embeddable language.
         Stored procedures in Lua can be used to implement
         data manipulation patterns or data structures. A
         server-side procedure written in Lua can select and modify
@@ -18,13 +19,10 @@
         alter and drop Lua procedures.
     </para>
 </blockquote>
-  
 <para>
     Procedures can be invoked both from the administrative
     console and using the binary protocol, for example:
-<programlisting>
-<computeroutput>
-localhost> lua function f1() return 'hello' end
+<programlisting><computeroutput>localhost> lua function f1() return 'hello' end
 ---
 ...
 localhost> call f1()
@@ -34,7 +32,7 @@ Found 1 tuple:
 </programlisting>
     In the language of the administrative console 
     <olink targetptr="lua-command" /> evaluates an arbitrary
-    Lua chunk. "CALL" is the SQL standard statement used
+    Lua chunk. CALL is the SQL standard statement used
     to represent CALL command of the binary
     protocol.
     In the example above, a Lua procedure is first defined
@@ -45,9 +43,7 @@ Found 1 tuple:
     administrative console, the newly created <code
     language="Pascal">function f1()</code>
     can be called there too:
-<programlisting>
-<computeroutput>
-localhost> lua f1()
+<programlisting><computeroutput>localhost> lua f1()
 ---
  - hello
 ...
@@ -59,18 +55,25 @@ localhost> lua "hello".." world"
 ---
  - hello world
 ...
-</computeroutput>
-</programlisting>
+</computeroutput></programlisting>
   </para>
   <para>
-    There is a single global Lua interpreter state, which is
-    shared across all connections. Each connection, however, is
-    running in its own Lua <emphasis>thread</emphasis> &mdash; a mechanism, akin to
-    Tarantool <emphasis>fibers</emphasis>.
-    Anything prefixed with <code>lua </code> on the administrative console
-    is sent directly to the interpreter. In the binary protocol,
-    however, it is only possible to invoke Lua functions, but not
-    define or modify them.
+    There is a single global instance of Lua interpreter, which is
+    shared across all connections. Anything prefixed with
+    <code>lua </code> on the administrative console is sent
+    directly to this interpreter. This way it's possible to define
+    and drop stored procedures at run time, without having to
+    restart the server: any change of the interpreter state is
+    immediately available to all client connections.
+  </para>
+  <para>
+    Each connection, however, is running in its own Lua
+    <emphasis>coroutine</emphasis> &mdash; a mechanism, akin to
+    Tarantool <emphasis>fibers</emphasis>. A coroutine has its
+    own execution stack and a Lua <emphasis>closure</emphasis> 
+    &mdash; set of local variables and definitions.
+  </para>
+  <para>
     A special command code designates invocation of a stored
     program in the binary protocol. The tuple, sent as argument
     of the command, is passed into the stored procedure, each
@@ -78,11 +81,23 @@ localhost> lua "hello".." world"
     procedure. As long as currently Tarantool tuples are
     type-agnostic, Lua strings are chosen as the transport media 
     between the server and the interpreter.
+    In the binary protocol, it is only possible to <emphasis
+    role="strong">invoke</emphasis> Lua functions, but not
+    <emphasis role ="strong">define</emphasis> or <emphasis
+    role="strong">modify</emphasis> them.
+    </para>
+    <para>In addition to conventional method invocation,
+    Lua provides object-oriented syntax. Access to the latter is also
+    only available on the administrative console.
   </para>
   <para>
     Every value, returned from a stored function by means of
     <code>return</code> clause, is converted to Tarantool/Box tuple
-    and sent back to the client in binary form.
+    and sent back to the client in binary form. Tuples are
+    returned as such; an atom, such as a string or an integer, is
+    converted to a tuple that has only one field. In case of
+    <emphasis>Lua table</emphasis>, the resulting tuple contains
+    only table values, but not keys.
   </para>
   <para>
     When a function in Lua terminates with an error, it is 
