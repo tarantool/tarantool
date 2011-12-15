@@ -687,7 +687,7 @@ static void tt_tnt_lex_badstr2(struct tt_test *test) {
 static void tt_tnt_sql_ping(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "PING";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -703,7 +703,7 @@ static void tt_tnt_sql_ping(struct tt_test *test) {
 static void tt_tnt_sql_insert(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "insert into t0 values (222, 'baz')";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -720,25 +720,25 @@ static void tt_tnt_sql_insert(struct tt_test *test) {
 static void tt_tnt_sql_update(struct tt_test *test) {
 	char *e;
 	char q1[] = "update t0 set k0 = 7 where k0 = 222";
-	TT_ASSERT(tnt_query(&net, q1, sizeof(q1) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q1, sizeof(q1) - 1, &e) == 0);
 	/* 7 + 1 = 8 */
 	char q2[] = "update t0 set k0 = k0 + 1 where k0 = 7";
-	TT_ASSERT(tnt_query(&net, q2, sizeof(q2) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q2, sizeof(q2) - 1, &e) == 0);
 	/* 8 | 2 = 10 */
 	char q3[] = "update t0 set k0 = k0 | 2 where k0 = 8";
-	TT_ASSERT(tnt_query(&net, q3, sizeof(q3) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q3, sizeof(q3) - 1, &e) == 0);
 	/* 10 & 2 = 2 */
 	char q4[] = "update t0 set k0 = k0 & 2 where k0 = 10";
-	TT_ASSERT(tnt_query(&net, q4, sizeof(q4) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q4, sizeof(q4) - 1, &e) == 0);
 	/* 2 ^ 123 = 121 */
 	char q5[] = "update t0 set k0 = k0 ^ 123 where k0 = 2";
-	TT_ASSERT(tnt_query(&net, q5, sizeof(q5) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q5, sizeof(q5) - 1, &e) == 0);
 	/* assign */
 	char q6[] = "update t0 set k0 = 222, k1 = 'hello world' where k0 = 121";
-	TT_ASSERT(tnt_query(&net, q6, sizeof(q6) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q6, sizeof(q6) - 1, &e) == 0);
 	/* splice */
 	char q7[] = "update t0 set k1 = splice(k1, 0, 2, 'AB') where k0 = 222";
-	TT_ASSERT(tnt_query(&net, q7, sizeof(q7) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q7, sizeof(q7) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -755,7 +755,7 @@ static void tt_tnt_sql_update(struct tt_test *test) {
 static void tt_tnt_sql_select(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "select * from t0 where k0 = 222 or k0 = 222";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -794,7 +794,7 @@ static void tt_tnt_sql_select(struct tt_test *test) {
 static void tt_tnt_sql_select_limit(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "select * from t0 where k0 = 222 limit 0";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -811,7 +811,7 @@ static void tt_tnt_sql_select_limit(struct tt_test *test) {
 static void tt_tnt_sql_delete(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "delete from t0 where k0 = 222";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -828,7 +828,7 @@ static void tt_tnt_sql_delete(struct tt_test *test) {
 static void tt_tnt_sql_call(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "call box.insert(0, 454, 'abc', 'cba')";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
