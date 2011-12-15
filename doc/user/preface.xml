@@ -104,7 +104,7 @@
     This manual is written in <citetitle
     xlink:href="http://www.docbook.org/tdg5/en/html/docbook.html">DocBook
     5</citetitle> XML markup language and is using the standard <citetitle
-    xlink:href="http://docbook.sourceforge.net/release/xsl/current/doc/">DocbBook
+    xlink:href="http://docbook.sourceforge.net/release/xsl/current/doc/">DocBook
     XSL</citetitle> formatting conventions:</para>
   <para>
     UNIX shell command input is prefixed with '$ ' and is 

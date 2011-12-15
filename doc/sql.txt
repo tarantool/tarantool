@@ -9,9 +9,11 @@
 ; case-insensitive, so this convention is present only to imporve
 ; legibility of the BNF.
 
-<sql> ::= <insert> | <update> | <delete> | <select>
+<sql> ::= <insert> | <replace> | <update> | <delete> | <select>
 
 <insert> ::= INSERT [INTO] <ident> VALUES <value_list>
+
+<insert> ::= REPLACE [INTO] <ident> VALUES <value_list>
 
 <update> ::= UPDATE <ident> SET <update_list> <simple_where>
 

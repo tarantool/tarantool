@@ -193,6 +193,7 @@
 <int32_varint> ::= <int8>+
 ;
 ; SELECT may return zero, one or several tuples.
+; CALL response is identical to one for SELECT.
 ; <select_response_body> starts with the number of found
 ; tuples:
 ;
@@ -341,7 +342,7 @@
 ; <return_code>. If it's not 0, it is followed by an
 ; error message. Otherwise, the response, just like in case of
 ; SELECT, is a sequence of <fq_tuple>s.
-<call_response_body> ::= <count><fq_tuple>
+<call_response_body> ::= <select_response_body>
 
 ;
 ; The server response, in addition to response header and body,

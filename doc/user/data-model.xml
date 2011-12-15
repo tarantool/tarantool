@@ -62,8 +62,8 @@
   [1]
   localhost> insert into t0 values ('hello')
   An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters'
-  localhost> insert into t0 values (1, 'hello')
-  Insert OK, 1 row affected
+  localhost> replace into t0 values (1, 'hello')
+  Replace OK, 1 row affected
   localhost> select * from t0 where k0=1 
   Found 1 tuple:
   [1, 'hello']
@@ -93,9 +93,9 @@
        is, therefore, mandatory.
     </para></listitem>
     <listitem><para>
-       INSERT replaces data when a tuple with given
-       primary key already exists. Such replace can insert
-       a tuple of different cardinality.
+       REPLACE replaces data when a
+       tuple with given primary key already exists. Such replace
+       can insert a tuple of different cardinality.
     </para></listitem>
   </itemizedlist>
 </para>

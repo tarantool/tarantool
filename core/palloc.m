@@ -366,19 +366,7 @@ palloc_stat(struct tbuf *buf)
 	int chunks[class_count];
 
 	tbuf_printf(buf, "palloc statistic:" CRLF);
-	tbuf_printf(buf, "  classes:" CRLF);
-	TAILQ_FOREACH(class, &classes, link) {
-		int free_chunks = 0;
-		SLIST_FOREACH(chunk, &class->chunks, free_link)
-		    free_chunks++;
-
-		tbuf_printf(buf,
-			    "    - { size: %"PRIu32
-			    ", free_chunks: %- 6i, busy_chunks: %- 6i }" CRLF, class->allocated_size,
-			    free_chunks, class->chunks_count - free_chunks);
-	}
 	tbuf_printf(buf, "  pools:" CRLF);
-
 	SLIST_FOREACH(pool, &pools, link) {
 		for (int i = 0; i < class_count; i++)
 			chunks[i] = 0;
@@ -392,18 +380,39 @@ palloc_stat(struct tbuf *buf)
 			SLIST_FOREACH(chunk, &pool->chunks, busy_link)
 			    chunks[chunk->class->i]++;
 
-			int indent = 0;
 			TAILQ_FOREACH(class, &classes, link) {
 				if (chunks[class->i] == 0)
 					continue;
 				tbuf_printf(buf, "        - { size: %"PRIu32", used: %i }" CRLF,
 					    class->allocated_size, chunks[class->i]);
-
-				if (indent == 0)
-					indent = 19;
 			}
 		}
 	}
+	tbuf_printf(buf, "  classes:" CRLF);
+	TAILQ_FOREACH(class, &classes, link) {
+		int free_chunks = 0;
+		SLIST_FOREACH(chunk, &class->chunks, free_link)
+			free_chunks++;
+
+		tbuf_printf(buf,
+			    "    - { size: %"PRIu32
+			    ", free_chunks: %- 6i, busy_chunks: %- 6i }" CRLF, class->allocated_size,
+			    free_chunks, class->chunks_count - free_chunks);
+	}
+	u64 palloc_total = 0;
+	u64 palloc_used = 0;
+	SLIST_FOREACH(pool, &pools, link) {
+		SLIST_FOREACH(chunk, &pool->chunks, busy_link) {
+			palloc_total += chunk->size;
+			palloc_used += chunk->size - chunk->free;
+		}
+		SLIST_FOREACH(chunk, &pool->chunks, free_link)
+			palloc_total += chunk->size;
+	}
+	tbuf_printf(buf, "  total:" CRLF);
+	tbuf_printf(buf, "    - { occupied: %"PRIu64", used: %"PRIu64" }"CRLF,
+		    palloc_total, palloc_used);
+
 }
 
 void
