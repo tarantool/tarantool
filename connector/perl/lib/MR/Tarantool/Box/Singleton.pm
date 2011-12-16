@@ -248,13 +248,16 @@ sub declare_stored_procedure {
     confess "bad `method_name` $method" unless $method =~ m/^[a-zA-Z]\w*$/;
     my $fn = "${class}::${method}";
     confess "Method $method id already defined in class $class" if defined &{$fn};
-    *$fn = sub {
-        my $p0 = @_ && ref $_[-1] eq 'HASH' ? pop : {};
-        my $param = { %$options, %$p0 };
-        my ($class, %params) = @_;
-        my $res = $class->Call($name, $pack->([@params{@params}]), $param) or return;
-        return $res unless $unpack;
-        return $unpack->($res);
+    do {
+        no strict 'refs';
+        *$fn = sub {
+            my $p0 = @_ && ref $_[-1] eq 'HASH' ? pop : {};
+            my $param = { %$options, %$p0 };
+            my ($class, %params) = @_;
+            my $res = $class->Call($name, $pack->([@params{@params}]), $param) or return;
+            return $res unless $unpack;
+            return $unpack->($res);
+        }
     };
     return $method;
 }

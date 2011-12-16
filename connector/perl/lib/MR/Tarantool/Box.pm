@@ -605,6 +605,7 @@ sub Insert {
 
     $param->{want_result} = $param->{want_inserted_tuple} if !defined $param->{want_result};
 
+
     my $flags = $param->{_flags} || 0;
     $flags |= WANT_RESULT if $param->{want_result};
 
@@ -618,6 +619,7 @@ sub Insert {
     }
     my $chkkey = $namespace->{check_keys};
     my $fmt = $namespace->{field_format};
+    confess "Wrong fields number in tuple" if @tuple != @$fmt;
     for (0..$#tuple) {
         confess "$self->{name}: ref in tuple $_=`$tuple[$_]'" if ref $tuple[$_];
         no warnings 'uninitialized';
