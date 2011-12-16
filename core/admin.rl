@@ -39,6 +39,7 @@
 #include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
+#include <errinj.h>
 #include "third_party/luajit/src/lua.h"
 #include "third_party/luajit/src/lauxlib.h"
 #include "third_party/luajit/src/lualib.h"
@@ -58,6 +59,9 @@ static const char *help =
 	" - lua command" CRLF
 	" - reload configuration" CRLF;
 
+static const char *help_debug =
+	" - show injections" CRLF
+	" - set injection <name> <state>" CRLF;
 
 static const char *unknown_command = "unknown command. try typing help." CRLF;
 
@@ -114,6 +118,7 @@ admin_dispatch(lua_State *L)
 	int cs;
 	char *p, *pe;
 	char *strstart, *strend;
+	bool state;
 
 	while ((pe = memchr(fiber->rbuf->data, '\n', fiber->rbuf->size)) == NULL) {
 		if (fiber_bread(fiber->rbuf, 1) <= 0)
@@ -142,9 +147,18 @@ admin_dispatch(lua_State *L)
 			end(out);
 		}
 
+		action show_injections {
+			start(out);
+			errinj_info(out);
+			end(out);
+		}
+
 		action help {
 			start(out);
 			tbuf_append(out, help, strlen(help));
+#ifndef NDEBUG
+			tbuf_append(out, help_debug, strlen(help_debug));
+#endif
 			end(out);
 		}
 
@@ -175,6 +189,17 @@ admin_dispatch(lua_State *L)
 			}
 		}
 
+		action set_injection {
+			strstart[strend-strstart] = '\0';
+			bool ret = errinj_set(strstart, state);
+			if (ret) {
+				ok(out);
+			} else {
+				tbuf_printf(err, "can't find error injection '%s'", strstart);
+				fail(out, err);
+			}
+		}
+
 		eol = "\n" | "\r\n";
 		show = "sh"("o"("w")?)?;
 		info = "in"("f"("o")?)?;
@@ -185,6 +210,7 @@ admin_dispatch(lua_State *L)
 		mod = "mo"("d")?;
 		palloc = "pa"("l"("l"("o"("c")?)?)?)?;
 		stat = "st"("a"("t")?)?;
+
 		help = "h"("e"("l"("p")?)?)?;
 		exit = "e"("x"("i"("t")?)?)? | "q"("u"("i"("t")?)?)?;
 		save = "sa"("v"("e")?)?;
@@ -194,15 +220,26 @@ admin_dispatch(lua_State *L)
 		reload = "re"("l"("o"("a"("d")?)?)?)?;
 		lua = "lu"("a")?;
 
+		set = "se"("t")?;
+		injection = "in"("j"("e"("c"("t"("i"("o"("n")?)?)?)?)?)?)?;
+		injections = injection"s";
+		namech = alnum | punct;
+		name = namech+ >{ strstart = p; }  %{ strend = p; };
+		state_on = "on" %{ state = true; };
+		state_off = "of"("f")? %{ state = false; };
+		state = state_on | state_off;
+
 		commands = (help			%help						|
 			    exit			%{return 0;}					|
 			    lua  " "+ string		%lua						|
-			    show " "+ info		%{start(out); tarantool_info(out); end(out);}		|
+			    show " "+ info		%{start(out); tarantool_info(out); end(out);}	|
 			    show " "+ fiber		%{start(out); fiber_info(out); end(out);}	|
 			    show " "+ configuration 	%show_configuration				|
 			    show " "+ slab		%{start(out); slab_stat(out); end(out);}	|
 			    show " "+ palloc		%{start(out); palloc_stat(out); end(out);}	|
 			    show " "+ stat		%{start(out); stat_print(out);end(out);}	|
+			    show " "+ injections	%show_injections                                |
+			    set " "+ injection " "+ name " "+ state	%set_injection                  |
 			    save " "+ coredump		%{coredump(60); ok(out);}			|
 			    save " "+ snapshot		%save_snapshot					|
 			    check " "+ slab		%{slab_validate(); ok(out);}			|

@@ -42,6 +42,7 @@
 #include <tarantool.h>
 #include <tbuf.h>
 #include <util.h>
+#include <errinj.h>
 
 #include <cfg/tarantool_box_cfg.h>
 #include <mod/box/tuple.h>

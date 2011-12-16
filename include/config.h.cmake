@@ -52,6 +52,7 @@
 #cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
 
 #define INSTALL_PREFIX "@CMAKE_INSTALL_PREFIX@"
+#define BUILD_TYPE "@CMAKE_BUILD_TYPE@"
 /*
  * vim: syntax=c
  */

@@ -1,8 +1,7 @@
-#ifndef TARANTOOL_ADMIN_H_INCLUDED
-#define TARANTOOL_ADMIN_H_INCLUDED
+#ifndef TARANTOOL_ERRINJ_H_INCLUDED
+#define TARANTOOL_ERRINJ_H_INCLUDED
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,6 +25,32 @@
  * SUCH DAMAGE.
  */
 
-int admin_init(void);
+#include "exception.h"
+#include "third_party/queue.h"
 
-#endif /* TARANTOOL_ADMIN_H_INCLUDED */
+struct errinj {
+	char *name;
+	bool state;
+	TAILQ_ENTRY(errinj) next;
+};
+
+TAILQ_HEAD(, errinj) errinjs;
+
+void errinj_init(void);
+void errinj_free(void);
+struct errinj *errinj_add(char *name);
+bool errinj_state(char *name);
+void errinj_info(struct tbuf *out);
+bool errinj_set(char *name, bool state);
+
+#ifdef NDEBUG
+	#define ERROR_INJECT(NAME)
+#else
+	#define ERROR_INJECT(NAME) \
+		do { \
+			if (errinj_state(NAME) == true) \
+				tnt_raise(ErrorInjection, :NAME); \
+		} while (0)
+#endif
+
+#endif /* TATRANTOOL_ERRINJ_H_INCLUDED */
