@@ -25,7 +25,7 @@ A driver for an efficient Tarantool/Box NoSQL in-memory storage.
             name          => "primary",   # self-descriptive space-id
             format        => "QqLlSsCc&", # pack()-compatible, Qq must be supported by perl itself, & stands for byte-string.
             default_index => 'idx1',
-            hashify       => [qw/ id f2 field3 f4 f5 f6 f7 f8 misc_string /], # turn each tuple into hash, field names according to format
+            fields        => [qw/ id f2 field3 f4 f5 f6 f7 f8 misc_string /], # turn each tuple into hash, field names according to format
         }, {
             #...
         } ],
@@ -276,10 +276,12 @@ sub new {
     $self->{ipdebug}         = $arg->{'ipdebug'} || 0;
     $self->{raise}           = 1;
     $self->{raise}           = $arg->{raise} if exists $arg->{raise};
-    $self->{hashify}         = $arg->{'hashify'} if exists $arg->{'hashify'};
     $self->{select_timeout}  = $arg->{select_timeout} || $self->{timeout};
     $self->{iprotoclass}     = $arg->{iprotoclass} || $class->IPROTOCLASS;
     $self->{_last_error}     = 0;
+
+    $self->{hashify}         = $arg->{'hashify'} if exists $arg->{'hashify'};
+    $self->{default_raw}     = $arg->{default_raw};
 
     $arg->{spaces} = $arg->{namespaces} = [@{ $arg->{spaces} ||= $arg->{namespaces} || confess "no spaces given" }];
     confess "no spaces given" unless @{$arg->{spaces}};
@@ -468,11 +470,18 @@ sub _validate_param {
     $param->{namespace} = $param->{space} if exists $param->{space} and defined $param->{space};
     $param->{namespace} = $self->{default_namespace} unless defined $param->{namespace};
     confess "$self->{name}: bad space `$param->{namespace}'" unless exists $self->{namespaces}->{$param->{namespace}};
+
     my $ns = $self->{namespaces}->{$param->{namespace}};
     $param->{use_index} = $ns->{default_index} unless defined $param->{use_index};
     confess "$self->{name}: bad index `$param->{use_index}'" unless exists $ns->{index_names}->{$param->{use_index}};
     $param->{index} = $ns->{index_names}->{$param->{use_index}};
-    return ($param, $self->{namespaces}->{$param->{namespace}}, map { $param->{$_} } @pnames);
+
+    if(exists $pnames{raw}) {
+        $param->{raw} = $ns->{default_raw}   unless defined $param->{raw};
+        $param->{raw} = $self->{default_raw} unless defined $param->{raw};
+    }
+
+    return ($param, $ns, map { $param->{$_} } @pnames);
 }
 
 =pod

@@ -315,7 +315,6 @@ sub MR_TARANTOOL_BOX_CLASS () { 'MR::Tarantool::Box' }
 sub SPACES          () { die }
 sub DEFAULT_SPACE   () { undef }
 
-
 sub _new_instance {
     my ($class) = @_;
     my ($config) = $class->can('_config') ? $class->_config : {};
@@ -385,7 +384,7 @@ C<< true >>, no matter whether any query succeeds or not.
 
 BEGIN {
 
-    foreach my $method (qw/Insert UpdateMulti Delete Add Set Insert Replace/) {
+    foreach my $method (qw/Insert UpdateMulti Delete Add Set Insert Replace Bit Num AndXorAdd Update/) {
         no strict 'refs';
         *$method = sub {
             use strict;
