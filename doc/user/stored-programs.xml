@@ -30,7 +30,7 @@ Found 1 tuple:
 ['hello']
 </computeroutput>
 </programlisting>
-    In the language of the administrative console 
+    In the language of the administrative console
     <olink targetptr="lua-command" /> evaluates an arbitrary
     Lua chunk. CALL is the SQL standard statement used
     to represent CALL command of the binary
@@ -61,34 +61,73 @@ localhost> lua "hello".." world"
     There is a single global instance of Lua interpreter, which is
     shared across all connections. Anything prefixed with
     <code>lua </code> on the administrative console is sent
-    directly to this interpreter. This way it's possible to define
-    and drop stored procedures at run time, without having to
-    restart the server: any change of the interpreter state is
-    immediately available to all client connections.
+    directly to this interpreter. Any change of the interpreter
+    state is immediately available to all client connections.
   </para>
   <para>
     Each connection, however, is running in its own Lua
     <emphasis>coroutine</emphasis> &mdash; a mechanism, akin to
     Tarantool <emphasis>fibers</emphasis>. A coroutine has its
-    own execution stack and a Lua <emphasis>closure</emphasis> 
+    own execution stack and a Lua <emphasis>closure</emphasis>
     &mdash; set of local variables and definitions.
   </para>
   <para>
-    A special command code designates invocation of a stored
-    program in the binary protocol. The tuple, sent as argument
-    of the command, is passed into the stored procedure, each
-    field of the tuple converted to a string parameter of the
-    procedure. As long as currently Tarantool tuples are
-    type-agnostic, Lua strings are chosen as the transport media 
-    between the server and the interpreter.
-    In the binary protocol, it is only possible to <emphasis
-    role="strong">invoke</emphasis> Lua functions, but not
-    <emphasis role ="strong">define</emphasis> or <emphasis
-    role="strong">modify</emphasis> them.
+    In the binary protocol, it's only possible to <emphasis
+    role="strong">invoke</emphasis> existing
+    procedures, but not <emphasis role="strong">define</emphasis>
+    or <emphasis role="strong">alter</emphasis> them.
+    CALL request packet contains CALL command code (22), the name
+    of the procedure to be called, and a tuple for procedure
+    arguments. Currently, Tarantool tuples are type-agnostic,
+    thus each field of the tuple makes a string parameter
+    of the procedure. For example:
+<programlisting><computeroutput>kostja@atlas:~$ cat arg.lua
+function f1(a)
+    local s = a
+    if type(a) == 'string' then
+        s = ''
+        for i=1, #a, 1 do
+            s = s..string.format('0x%x ', string.byte(a, i))
+        end
+    end
+    return type(a), s
+end
+kostja@atlas:~$ tarantool
+localhost> lua dofile('arg.lua')
+---
+...
+localhost> lua f1('1234')
+---
+ - string
+ - 0x31 0x32 0x33 0x34
+...
+localhost> call f1('1234')
+Call OK, 2 rows affected
+['string']
+['0x31 0x32 0x33 0x34 ']
+localhost> lua f1(1234)
+---
+ - number
+ - 1234
+...
+localhost> call f1(1234)
+Call OK, 2 rows affected
+['string']
+['0xd2 0x4 0x0 0x0 ']</computeroutput></programlisting>
+    In the above example, the way the procedure receives its
+    argument is identical in two protocols, when the argument is a
+    string. A number, however, is cast by the binary protocol
+    to a 4-byte blob.
     </para>
     <para>In addition to conventional method invocation,
     Lua provides object-oriented syntax. Access to the latter is also
-    only available on the administrative console.
+    only available on the administrative console:
+<programlisting><computeroutput>localhost> lua box.space[0]:truncate()
+---
+...
+localhost> call box.space[0]:truncate()
+error: 1:15 expected '('
+</computeroutput></programlisting>
   </para>
   <para>
     Every value, returned from a stored function by means of
@@ -100,12 +139,25 @@ localhost> lua "hello".." world"
     only table values, but not keys.
   </para>
   <para>
-    When a function in Lua terminates with an error, it is 
+    When a function in Lua terminates with an error, it is
     returned to the client as <olink targetptr="ER_PROC_LUA" />
     return code, with the original error message preserved.
     Similarly, an error occurred inside Tarantool (observed on the
     client as an error code), when happens during execution of a
-    Lua procedure, produces a genuine Lua exception.
+    Lua procedure, produces a genuine Lua error.
+<programlisting><computeroutput>localhost> lua function f1() error("oops") end
+---
+...
+localhost> call f1()
+Call ERROR, Lua error: [string "function f1() error("oops") end"]:1: oops (ER_PROC_LUA)
+localhost> call box.insert('99', 1, 'test'
+Call ERROR, Space 99 is disabled (ER_SPACE_DISABLED)
+localhost> lua pcall(box.insert, 99, 1, 'test')
+---
+ - false
+ - C++ exception
+...
+</computeroutput></programlisting>
   </para>
   <para>
     It's possible not only to invoke trivial Lua code, but call
@@ -141,7 +193,7 @@ pack: function
         <listitem><para>
             libraries, such as <code>cfg, space, fiber, index, tuple</code>,
             to access server configuration, create, resume and
-            interrupt fibers, inspect content of spaces, indexes
+            interrupt fibers, inspect contents of spaces, indexes
             and tuples.
         </para></listitem>
     </itemizedlist>
@@ -280,7 +332,7 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
             If no key is specified, start from the first key in
             the index.
             </para><para>
-            For TREE indexes, this returns tuples in sorted order, 
+            For TREE indexes, this returns tuples in sorted order,
             and can be used to iterate over the entire space.
             For HASH indexes, this returns at most one tuple,
             unless <code>key</code> is nil or unspecified, in which case it
@@ -291,7 +343,7 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
     <varlistentry>
         <term><emphasis role="lua">box.pack(format, ...)</emphasis></term>
         <listitem><para>
- To use Tarantool/Box binary protocol primitives from Lua, 
+ To use Tarantool/Box binary protocol primitives from Lua,
  it's necessary to pack Lua variables into a binary representation.
  This is a helper function to do it.
  It's prototyped aftre Perl 'pack', which takes a format and a list of
@@ -462,7 +514,7 @@ and when returning from <code>box.fiber.yield()</code>
         <listitem><simpara>Resume a created
         or suspended fiber.</simpara></listitem>
     </varlistentry>
-        
+
     <varlistentry>
         <term>
             <emphasis role="lua">box.fiber.yield(...) </emphasis>
@@ -515,7 +567,7 @@ Zombie fibers can't. Returns an error if
 subject fiber does not permit cancel.
         </simpara></listitem>
     </varlistentry>
-    
+
     <varlistentry>
         <term>
             <emphasis role="lua">box.fiber.testcancel()</emphasis>
@@ -530,7 +582,7 @@ throw an exception if this is the case.
 
 <variablelist>
     <title>Package <code>box.cfg</code></title>
-    <para>This package provides read-only access to 
+    <para>This package provides read-only access to
     all server configuration parameters.</para>
     <varlistentry>
         <term><emphasis role="lua">box.cfg</emphasis></term>
