@@ -425,6 +425,23 @@ static void tt_tnt_net_call(struct tt_test *test) {
 	tnt_iter_free(&i);
 }
 
+/* call (no args) */
+static void tt_tnt_net_call_na(struct tt_test *test) {
+	struct tnt_tuple args;
+	tnt_tuple_init(&args);
+	TT_ASSERT(tnt_call(&net, 0, "box.insert", &args) > 0);
+	TT_ASSERT(tnt_flush(&net) > 0);
+	tnt_tuple_free(&args);
+	struct tnt_iter i;
+	tnt_iter_stream(&i, &net);
+	while (tnt_next(&i)) {
+		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		TT_ASSERT(r->code != 0);
+		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple cardinality is 0") == 0);
+	}
+	tnt_iter_free(&i);
+}
+
 /* reply */
 static void tt_tnt_net_reply(struct tt_test *test) {
 	struct tnt_tuple kv1, kv2;
@@ -866,6 +883,7 @@ main(int argc, char * argv[])
 	tt_test(&t, "select", tt_tnt_net_select);
 	tt_test(&t, "delete", tt_tnt_net_delete);
 	tt_test(&t, "call", tt_tnt_net_call);
+	tt_test(&t, "call (no args)", tt_tnt_net_call_na);
 	tt_test(&t, "reply", tt_tnt_net_reply);
 	/* sql lexer */
 	tt_test(&t, "lex ws", tt_tnt_lex_ws);
