@@ -251,10 +251,10 @@ tnt_io_send_raw(struct tnt_stream_net *s, char *buf, size_t size, int all)
 	do {
 		ssize_t r;
 		if (s->sbuf.tx) {
-			r = s->sbuf.tx(s->sbuf.buf, buf, size);
+			r = s->sbuf.tx(s->sbuf.buf, buf + off, size - off);
 		} else {
 			do {
-				r = send(s->fd, buf, size, 0);
+				r = send(s->fd, buf + off, size - off, 0);
 			} while (r == -1 && (errno == EINTR));
 		}
 		if (r <= 0) {
@@ -368,10 +368,10 @@ tnt_io_recv_raw(struct tnt_stream_net *s, char *buf, size_t size, int all)
 	do {
 		ssize_t r;
 		if (s->rbuf.tx) {
-			r = s->rbuf.tx(s->rbuf.buf, buf, size);
+			r = s->rbuf.tx(s->rbuf.buf, buf + off, size - off);
 		} else {
 			do {
-				r = recv(s->fd, buf, size, 0);
+				r = recv(s->fd, buf + off, size - off, 0);
 			} while (r == -1 && (errno == EINTR));
 		}
 		if (r <= 0) {
