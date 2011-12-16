@@ -155,7 +155,7 @@ Call ERROR, Space 99 is disabled (ER_SPACE_DISABLED)
 localhost> lua pcall(box.insert, 99, 1, 'test')
 ---
  - false
- - C++ exception
+ - Space 99 is disabled
 ...
 </computeroutput></programlisting>
   </para>

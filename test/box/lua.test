@@ -234,3 +234,11 @@ exec admin "lua box.space[0]:insert(4, 'world')"
 exec admin "lua box.space[0]:insert(5, 'hello world')"
 exec sql "call box.crossjoin('0', '0', '10000')"
 exec admin "lua box.space[0]:truncate()"
+print """
+# A test case for Bug#901674
+# No way to inspect exceptions from Box in Lua
+"""
+exec admin "lua pcall(box.insert, 99, 1, 'test')"
+exec admin "lua pcall(box.insert, 0, 1, 'hello')"
+exec admin "lua pcall(box.insert, 0, 1, 'hello')"
+exec admin "lua box.space[0]:truncate()"
