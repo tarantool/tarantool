@@ -465,6 +465,15 @@ main(int argc, char **argv)
 		return 0;
 	}
 
+	if (gopt_arg(opt, 'C', &cat_filename)) {
+		initialize_minimal();
+		if (access(cat_filename, R_OK) == -1) {
+			panic("access(\"%s\"): %s", cat_filename, strerror(errno));
+			exit(EX_OSFILE);
+		}
+		return mod_cat(cat_filename);
+	}
+
 	gopt_arg(opt, 'c', &cfg_filename);
 	/* if config is not specified trying ./tarantool.cfg then /etc/tarantool.cfg */
 	if (cfg_filename == NULL) {
@@ -567,15 +576,6 @@ main(int argc, char **argv)
 			exit(EX_OSERR);
 		}
 #endif
-	}
-
-	if (gopt_arg(opt, 'C', &cat_filename)) {
-		initialize_minimal();
-		if (access(cat_filename, R_OK) == -1) {
-			say_syserror("access(\"%s\")", cat_filename);
-			exit(EX_OSFILE);
-		}
-		return mod_cat(cat_filename);
 	}
 
 	if (gopt(opt, 'I')) {
