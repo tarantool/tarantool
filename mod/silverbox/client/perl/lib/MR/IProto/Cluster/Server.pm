@@ -12,6 +12,8 @@ This class is used to implement all communication with one server.
 
 use Mouse;
 use Mouse::Util::TypeConstraints;
+use POSIX::AtFork;
+use Scalar::Util;
 use MR::IProto::Connection::Async;
 use MR::IProto::Connection::Sync;
 use MR::IProto::Message;
@@ -164,6 +166,12 @@ has sync => (
     lazy_build => 1,
 );
 
+has _at_fork_child => (
+    is  => 'ro',
+    isa => 'CodeRef',
+    lazy_build => 1,
+);
+
 =back
 
 =head1 PROTECTED METHODS
@@ -171,6 +179,18 @@ has sync => (
 =over
 
 =cut
+
+sub BUILD {
+    my ($self) = @_;
+    POSIX::AtFork->add_to_child($self->_at_fork_child);
+    return;
+}
+
+sub DEMOLISH {
+    my ($self) = @_;
+    POSIX::AtFork->delete_from_child($self->_at_fork_child);
+    return;
+}
 
 sub _build_async {
     my ($self) = @_;
@@ -189,6 +209,15 @@ sub _build_debug_cb {
         chomp $msg;
         warn "MR::IProto: $msg\n";
         return;
+    };
+}
+
+sub _build__at_fork_child {
+    my ($self) = @_;
+    Scalar::Util::weaken($self);
+    return sub {
+        $self->clear_async();
+        $self->clear_sync();
     };
 }
 
