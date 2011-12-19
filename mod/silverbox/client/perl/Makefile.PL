@@ -11,7 +11,6 @@ WriteMakefile(
         'List::MoreUtils'   => 0,
         'Mouse'             => 0,
         'MRO::Compat'       => 0,
-        'POSIX::AtFork'     => 0,
         'String::CRC32'     => 0,
         'Time::HiRes'       => 0,
         'Exporter'          => 0,

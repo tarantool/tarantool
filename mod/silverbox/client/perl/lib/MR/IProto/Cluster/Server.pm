@@ -12,7 +12,6 @@ This class is used to implement all communication with one server.
 
 use Mouse;
 use Mouse::Util::TypeConstraints;
-use POSIX::AtFork;
 use Scalar::Util;
 use MR::IProto::Connection::Async;
 use MR::IProto::Connection::Sync;
@@ -166,13 +165,28 @@ has sync => (
     lazy_build => 1,
 );
 
-has _at_fork_child => (
-    is  => 'ro',
-    isa => 'CodeRef',
-    lazy_build => 1,
-);
+my %servers;
 
 =back
+
+=head1 PUBLIC METHODS
+
+=over
+
+=item disconnect_all
+
+Class method used to disconnect all iproto-connections. Very useful in case of fork().
+
+=cut
+
+sub disconnect_all {
+    my ($class) = @_;
+    foreach my $server (values %servers) {
+        $server->clear_async();
+        $server->clear_sync();
+    }
+    return;
+}
 
 =head1 PROTECTED METHODS
 
@@ -182,13 +196,14 @@ has _at_fork_child => (
 
 sub BUILD {
     my ($self) = @_;
-    POSIX::AtFork->add_to_child($self->_at_fork_child);
+    $servers{Scalar::Util::refaddr($self)} = $self;
+    Scalar::Util::weaken($servers{Scalar::Util::refaddr($self)});
     return;
 }
 
 sub DEMOLISH {
     my ($self) = @_;
-    POSIX::AtFork->delete_from_child($self->_at_fork_child);
+    delete $servers{Scalar::Util::refaddr($self)};
     return;
 }
 
@@ -209,15 +224,6 @@ sub _build_debug_cb {
         chomp $msg;
         warn "MR::IProto: $msg\n";
         return;
-    };
-}
-
-sub _build__at_fork_child {
-    my ($self) = @_;
-    Scalar::Util::weaken($self);
-    return sub {
-        $self->clear_async();
-        $self->clear_sync();
     };
 }
 
