@@ -87,7 +87,7 @@ freedom to the galaxy....
 
 ---------- test begin ----------
 test call: call undefined function (expected error exception)
-catched exception: call failed: 12802
+catched exception: call failed: 12802(0x00003202): Procedure 'fafagaga' is not defined
 ----------- test end -----------
 
 ===DONE===

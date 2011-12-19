@@ -125,8 +125,12 @@ struct tnt_call_request {
 struct tnt_response {
 	/* return code */
 	int32_t return_code;
-	/* count */
-	int32_t count;
+	union {
+		/* count */
+		int32_t count;
+		/* error message */
+		char return_msg[0];
+	};
 } __attribute__((packed));
 
 
@@ -585,7 +589,10 @@ PHP_METHOD(tarantool_class, select)
 	if (response->return_code) {
 		/* error happen, throw exceprion */
 		zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
-								"select failed: %"PRIi32, response->return_code);
+								"select failed: %"PRIi32"(0x%08"PRIx32"): %s",
+								response->return_code,
+								response->return_code,
+								response->return_msg);
 		return;
 	}
 
@@ -703,7 +710,10 @@ PHP_METHOD(tarantool_class, insert)
 	if (response->return_code) {
 		/* error happen, throw exceprion */
 		zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
-								"insert failed: %"PRIi32, response->return_code);
+								"insert failed: %"PRIi32"(0x%08"PRIx32"): %s",
+								response->return_code,
+								response->return_code,
+								response->return_msg);
 		return;
 	}
 	
@@ -947,7 +957,10 @@ PHP_METHOD(tarantool_class, update_fields)
 	if (response->return_code) {
 		/* error happen, throw exceprion */
 		zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
-								"update fields failed: %"PRIi32, response->return_code);
+								"update fields failed: %"PRIi32"(0x%08"PRIx32"): %s",
+								response->return_code,
+								response->return_code,
+								response->return_msg);
 		return;
 	}
 	
@@ -1059,7 +1072,10 @@ PHP_METHOD(tarantool_class, delete)
 	if (response->return_code) {
 		/* error happen, throw exceprion */
 		zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
-								"delete failed: %"PRIi32, response->return_code);
+								"delete failed: %"PRIi32"(0x%08"PRIx32"): %s",
+								response->return_code,
+								response->return_code,
+								response->return_msg);
 		return;
 	}
 	
@@ -1174,7 +1190,10 @@ PHP_METHOD(tarantool_class, call)
 	if (response->return_code) {
 		/* error happen, throw exceprion */
 		zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
-								"call failed: %"PRIi32, response->return_code);
+								"call failed: %"PRIi32"(0x%08"PRIx32"): %s",
+								response->return_code,
+								response->return_code,
+								response->return_msg);
 		return;
 	}
 

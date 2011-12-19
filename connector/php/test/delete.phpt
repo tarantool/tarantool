@@ -54,7 +54,7 @@ catched exception: unsupported field type
 
 ---------- test begin ----------
 test delete: invalid key (expected error exception)
-catched exception: delete failed: 514
+catched exception: delete failed: 514(0x00000202): Illegal parameters, key must be single valued
 ----------- test end -----------
 
 ---------- test begin ----------

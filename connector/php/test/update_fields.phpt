@@ -57,7 +57,7 @@ test_clean($tarantool, 0);
 --EXPECT--
 ---------- test begin ----------
 test update fields: do update w/o operations (expected error exception)
-catched exception: update fields failed: 514
+catched exception: update fields failed: 514(0x00000202): Illegal parameters, no operations for update
 ----------- test end -----------
 
 ---------- test begin ----------

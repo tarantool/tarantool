@@ -160,9 +160,9 @@ function test_delete($tarantool, $space_no, $key, $flags) {
     }
 }
 
-function test_call($tarantool, $proc, $key, $flags) {
+function test_call($tarantool, $proc, $tuple_args, $flags) {
     try {
-        $result = $tarantool->call($proc, $key, $flags);
+        $result = $tarantool->call($proc, $tuple_args, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
         $tuples_list = $result["tuples_list"];
