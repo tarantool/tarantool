@@ -190,6 +190,7 @@ recovery_follow_remote(struct recovery_state *r, const char *remote)
 
 	rc = sscanf(remote, "%31[^:]:%i", ip_addr, &port);
 	assert(rc == 2);
+	(void)rc;
 
 	if (inet_aton(ip_addr, &server) < 0) {
 		say_syserror("inet_aton: %s", ip_addr);

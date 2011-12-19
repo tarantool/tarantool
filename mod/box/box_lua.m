@@ -183,7 +183,7 @@ lbox_tuple_next(struct lua_State *L)
 {
 	struct box_tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
-	u8 *field;
+	u8 *field = NULL;
 	size_t len;
 
 	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL))
@@ -193,6 +193,7 @@ lbox_tuple_next(struct lua_State *L)
 	else
 		luaL_error(L, "tuple.next(): bad arguments");
 
+	(void)field;
 	assert(field >= tuple->data);
 	if (field < tuple->data + tuple->bsize) {
 		len = load_varint32((void **) &field);
