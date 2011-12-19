@@ -689,7 +689,7 @@ read_inbox(void)
 ssize_t
 fiber_bread(struct tbuf *buf, size_t at_least)
 {
-	ssize_t r;
+	ssize_t r = 0;
 	tbuf_ensure(buf, MAX(cfg.readahead, at_least));
 	size_t stop_at = buf->size + at_least;
 
