@@ -83,7 +83,7 @@ function test_clean($tarantool, $space_no) {
     } catch (Exception $e) {
         echo "clean-up failed: ", $e->getMessage(), "\n";
         throw $e;
-    } 
+    }
 }
 
 function test_select($tarantool, $space_no, $index_no, $key) {
@@ -124,9 +124,9 @@ function test_insert($tarantool, $space_no, $tuple, $flags) {
     }
 }
 
-function test_update_fields($tarantool, $space_no, $tuple, $ops, $flags) {
+function test_update_fields($tarantool, $space_no, $key, $ops, $flags) {
     try {
-        $result = $tarantool->update_fields($space_no, $tuple, $ops, $flags);
+        $result = $tarantool->update_fields($space_no, $key, $ops, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
         if ($flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
@@ -142,9 +142,9 @@ function test_update_fields($tarantool, $space_no, $tuple, $ops, $flags) {
     }
 }
 
-function test_delete($tarantool, $space_no, $tuple, $flags) {
+function test_delete($tarantool, $space_no, $key, $flags) {
     try {
-        $result = $tarantool->delete($space_no, $tuple, $flags);
+        $result = $tarantool->delete($space_no, $key, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
         if ($flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
@@ -152,7 +152,7 @@ function test_delete($tarantool, $space_no, $tuple, $flags) {
             echo "  id     = ", $result["tuple"][0], "\n";
             echo "  series = ", $result["tuple"][1], "\n";
             echo "  year   = ", $result["tuple"][2], "\n";
-            echo "  name   = ", $result["tuple"][3], "...\n";
+            echo "  name   = ", $result["tuple"][3], "\n";
             echo "  crawl  = ", $result["tuple"][4], "\n";
         }
     } catch (Exception $e) {
@@ -160,9 +160,9 @@ function test_delete($tarantool, $space_no, $tuple, $flags) {
     }
 }
 
-function test_call($tarantool, $proc, $tuple, $flags) {
+function test_call($tarantool, $proc, $key, $flags) {
     try {
-        $result = $tarantool->call($proc, $tuple, $flags);
+        $result = $tarantool->call($proc, $key, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
         $tuples_list = $result["tuples_list"];
@@ -172,7 +172,7 @@ function test_call($tarantool, $proc, $tuple, $flags) {
             echo "  id     = ", $tuples_list[$i][0], "\n";
             echo "  series = ", $tuples_list[$i][1], "\n";
             echo "  year   = ", $tuples_list[$i][2], "\n";
-            echo "  name   = ", $tuples_list[$i][3], "...\n";
+            echo "  name   = ", $tuples_list[$i][3], "\n";
             echo "  crawl  = ", $tuples_list[$i][4], "\n";
         }
     } catch (Exception $e) {
