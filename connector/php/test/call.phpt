@@ -34,7 +34,7 @@ tuple[0]:
   id     = 2
   series = Star Wars
   year   = 1983
-  name   = Return of the Jedi...
+  name   = Return of the Jedi
   crawl  = Luke Skywalker has returned
 to his home planet of
 Tatooine in an attempt
@@ -65,7 +65,7 @@ tuple[0]:
   id     = 0
   series = Star Wars
   year   = 1977 year
-  name   = A New Hope...
+  name   = A New Hope
   crawl  = A long time ago, in a galaxy far, far away...
 It is a period of civil war. Rebel
 spaceships, striking from a hidden
@@ -87,7 +87,7 @@ freedom to the galaxy....
 
 ---------- test begin ----------
 test call: call undefined function (expected error exception)
-catched exception: call failed: 12802
+catched exception: call failed: 12802(0x00003202): Procedure 'fafagaga' is not defined
 ----------- test end -----------
 
 ===DONE===

@@ -54,7 +54,7 @@ catched exception: unsupported field type
 
 ---------- test begin ----------
 test delete: invalid key (expected error exception)
-catched exception: delete failed: 514
+catched exception: delete failed: 514(0x00000202): Illegal parameters, key must be single valued
 ----------- test end -----------
 
 ---------- test begin ----------
@@ -65,7 +65,7 @@ tuple:
   id     = 0
   series = Star Wars
   year   = 1977
-  name   = A New Hope...
+  name   = A New Hope
   crawl  = A long time ago, in a galaxy far, far away...
 It is a period of civil war. Rebel
 spaceships, striking from a hidden
@@ -93,7 +93,7 @@ tuple:
   id     = 1
   series = Star Wars
   year   = 1980
-  name   = The Empire Strikes Back...
+  name   = The Empire Strikes Back
   crawl  = It is a dark time for the
 Rebellion. Although the Death
 Star has been destroyed.

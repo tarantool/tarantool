@@ -100,12 +100,12 @@ count = 1
 
 ---------- test begin ----------
 test insert: add existed tuple (expected error exception)
-catched exception: insert failed: 14082
+catched exception: insert failed: 14082(0x00003702): Tuple already exists
 ----------- test end -----------
 
 ---------- test begin ----------
 test insert: replace not existed tuple (expected error exception)
-catched exception: insert failed: 12546
+catched exception: insert failed: 12546(0x00003102): Tuple doesn't exist
 ----------- test end -----------
 
 ---------- test begin ----------

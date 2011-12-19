@@ -57,19 +57,16 @@ test_clean($tarantool, 0);
 --EXPECT--
 ---------- test begin ----------
 test update fields: do update w/o operations (expected error exception)
-ops count = 0
-catched exception: update fields failed: 514
+catched exception: update fields failed: 514(0x00000202): Illegal parameters, no operations for update
 ----------- test end -----------
 
 ---------- test begin ----------
 test update fields: invalid operation list (expected error exception)
-ops count = 1
 catched exception: invalid operations list
 ----------- test end -----------
 
 ---------- test begin ----------
 test update fields: do update arith operation
-ops count = 5
 result:
 count = 1
 tuple:
