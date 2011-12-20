@@ -93,6 +93,19 @@ echo "sa_merge('1', 'key_1', 'key_2')\n";
 test_call($tarantool, "box.sa_merge", array("1", "key_1", "key_2"), 0);
 echo "----------- test end -----------\n\n";
 
+echo "---------- test begin ----------\n";
+echo "test call: sa_delete from key_1\n";
+echo "sa_delete('1', 'key_1', '42')\n";
+test_call($tarantool, "box.sa_delete", array("1", "key_1", "42"), 0);
+echo "sa_delete('1', 'key_1', '16')\n";
+test_call($tarantool, "box.sa_delete", array("1", "key_1", "16"), 0);
+echo "sa_delete('1', 'key_1', '10')\n";
+test_call($tarantool, "box.sa_delete", array("1", "key_1", "10"), 0);
+echo "sa_delete('1', 'key_1', '15')\n";
+test_call($tarantool, "box.sa_delete", array("1", "key_1", "15"), 0);
+echo "----------- test end -----------\n\n";
+
+
 test_clean($tarantool, 0);
 ?>
 ===DONE===
@@ -692,12 +705,10 @@ array(2) {
       string(5) "key_2"
     }
     [1]=>
-    array(3) {
+    array(2) {
       [0]=>
-      string(3) "166"
-      [1]=>
       string(2) "10"
-      [2]=>
+      [1]=>
       string(1) "8"
     }
   }
@@ -717,7 +728,7 @@ array(2) {
     [1]=>
     array(1) {
       [0]=>
-      string(3) "166"
+      string(2) "10"
     }
   }
 }
@@ -754,6 +765,90 @@ array(2) {
       string(2) "10"
       [9]=>
       string(1) "8"
+    }
+  }
+}
+----------- test end -----------
+
+---------- test begin ----------
+test call: sa_delete from key_1
+sa_delete('1', 'key_1', '42')
+result:
+array(2) {
+  ["count"]=>
+  int(2)
+  ["tuples_list"]=>
+  array(2) {
+    [0]=>
+    array(1) {
+      [0]=>
+      string(5) "key_1"
+    }
+    [1]=>
+    array(3) {
+      [0]=>
+      string(2) "16"
+      [1]=>
+      string(2) "15"
+      [2]=>
+      string(2) "10"
+    }
+  }
+}
+sa_delete('1', 'key_1', '16')
+result:
+array(2) {
+  ["count"]=>
+  int(2)
+  ["tuples_list"]=>
+  array(2) {
+    [0]=>
+    array(1) {
+      [0]=>
+      string(5) "key_1"
+    }
+    [1]=>
+    array(2) {
+      [0]=>
+      string(2) "15"
+      [1]=>
+      string(2) "10"
+    }
+  }
+}
+sa_delete('1', 'key_1', '10')
+result:
+array(2) {
+  ["count"]=>
+  int(2)
+  ["tuples_list"]=>
+  array(2) {
+    [0]=>
+    array(1) {
+      [0]=>
+      string(5) "key_1"
+    }
+    [1]=>
+    array(1) {
+      [0]=>
+      string(2) "15"
+    }
+  }
+}
+sa_delete('1', 'key_1', '15')
+result:
+array(2) {
+  ["count"]=>
+  int(2)
+  ["tuples_list"]=>
+  array(2) {
+    [0]=>
+    array(1) {
+      [0]=>
+      string(5) "key_1"
+    }
+    [1]=>
+    array(0) {
     }
   }
 }

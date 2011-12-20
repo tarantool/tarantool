@@ -55,24 +55,24 @@ end
 local function afind_ge(a, x)
     if #a == 0 then
 	return 1
+    elseif a[1] < x then
+	return 1
+    elseif a[#a] > x then
+	return #a + 1
     end
-    
-    local first, last  = 1, #a
+
+    local first, last = 1, #a + 1
     local mid
-    repeat
+    while first < last do
 	mid = floor(first + (last - first) / 2)
-	if x > a[mid] then
+	if x >= a[mid] then
 	    last = mid
 	else
 	    first = mid + 1
 	end
-    until first >= last
+    end
 
---[[    if a[mid] > x then
-	mid = mid + 1
-end ]]--
-
-    return mid
+    return last
 end
 
 local function ains(a, key)
@@ -93,6 +93,8 @@ end
 local function adel(a, key)
     key = tonumber(key)
     local i = afind_ge(a, key)
+    print("key = ", key)
+    print("i   = ", i)
     if a[i] == key then
 	table.remove(a, i)
     end
@@ -112,7 +114,6 @@ local function store(space, key, a)
     return key, a
 end
 
-
 function box.sa_insert(space, key, value)
     local a = get(space, key)
     ains(a, value)
@@ -122,6 +123,9 @@ end
 
 function box.sa_delete(space, key, ...)
     local a = get(space, key)
+    for i = 1, #a do
+	print("a[", i, "] = ", a[i])
+    end
     for i, d in pairs({...}) do
 	adel(a, d)
     end
