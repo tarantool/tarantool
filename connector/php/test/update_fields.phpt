@@ -51,9 +51,9 @@ test_update_fields($tarantool, 0, 0,
                        ), TARANTOOL_FLAGS_RETURN_TUPLE);
 echo "----------- test end -----------\n\n";
 
-
 test_clean($tarantool, 0);
 ?>
+===DONE===
 --EXPECT--
 ---------- test begin ----------
 test update fields: do update w/o operations (expected error exception)
@@ -90,4 +90,7 @@ Princess Leia races home aboard her
 starship, custodian of the stolen plans
 that can save her people and restore
 freedom to the galaxy....
+  uuid   = -1091633151
 ----------- test end -----------
+
+===DONE===
