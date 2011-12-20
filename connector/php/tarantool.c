@@ -230,9 +230,13 @@ io_buf_clean(struct io_buf *buf);
 static bool
 io_buf_read_struct(struct io_buf *buf, void **ptr, size_t n);
 
-/* read integer from buffer */
+/* read 32-bit integer from buffer */
 static bool
-io_buf_read_int(struct io_buf *buf, int32_t *val);
+io_buf_read_int32(struct io_buf *buf, int32_t *val);
+
+/* read 64-bit integer from buffer */
+static bool
+io_buf_read_int64(struct io_buf *buf, int64_t *val);
 
 /* read var integer from buffer */
 static bool
@@ -1396,13 +1400,24 @@ io_buf_read_struct(struct io_buf *buf, void **ptr, size_t n)
 }
 
 static bool
-io_buf_read_int(struct io_buf *buf, int32_t *val)
+io_buf_read_int32(struct io_buf *buf, int32_t *val)
 {
 	size_t last = buf->size - buf->readed;
 	if (last < sizeof(int32_t))
 		return false;
 	*val = *(int32_t *)(buf->value + buf->readed);
 	buf->readed += sizeof(int32_t);
+	return true;
+}
+
+static bool
+io_buf_read_int64(struct io_buf *buf, int64_t *val)
+{
+	size_t last = buf->size - buf->readed;
+	if (last < sizeof(int64_t))
+		return false;
+	*val = *(int64_t *)(buf->value + buf->readed);
+	buf->readed += sizeof(int64_t);
 	return true;
 }
 
@@ -1482,13 +1497,19 @@ io_buf_read_field(struct io_buf *buf, zval *tuple)
 		return false;
 
 	int32_t i32_val;
+	int64_t i64_val;
 	char *str_val;
 	switch (field_length) {
 	case sizeof(int32_t):
-		if (!io_buf_read_int(buf, &i32_val))
+		if (!io_buf_read_int32(buf, &i32_val))
 			return false;
 		add_next_index_long(tuple, i32_val);
 		break;
+	case sizeof(int64_t):
+		if (!io_buf_read_int64(buf, &i64_val))
+			return false;
+		add_next_index_long(tuple, i32_val);
+		break;		
 	default:
 		if (!io_buf_read_str(buf, &str_val, field_length))
 			return false;
@@ -1507,11 +1528,11 @@ io_buf_read_tuple(struct io_buf *buf, zval **tuple)
 	}
 
 	int32_t size;
-	if (!io_buf_read_int(buf, &size))
+	if (!io_buf_read_int32(buf, &size))
 		return false;
 
 	int32_t cardinality;
-	if (!io_buf_read_int(buf, &cardinality))
+	if (!io_buf_read_int32(buf, &cardinality))
 		return false;
 
 	while (cardinality > 0) {
