@@ -18,19 +18,21 @@ end
 
 local function a_to_s(a)
     local bytes = {}
+    local shift = {}
     for i = 1, #a do
+	val = a[i]
 	for c = 0, 7 do
-	    table.insert(bytes, bit.band(a[i], 0xff))
-	    a[i] = bit.rshift(a[i], 8)
+	    table.insert(bytes, bit.band(val, 0xff))
+	    val = bit.rshift(val, 8)
 	end
     end
     return string.char(unpack(bytes))
 end
 
-local limit = 500
+local max_limit = 500
 local function amerge(a, b)
     local r = {}
-    local n = limit
+    local n = max_limit
     while #a > 0 and #b > 0 and n > 0 do
 	if a[1] > b[1] then
 	    table.insert(r, table.remove(a, 1))
@@ -66,9 +68,9 @@ local function afind_ge(a, x)
 	end
     until first >= last
 
-    if a[mid] >= x then
+--[[    if a[mid] > x then
 	mid = mid + 1
-    end
+end ]]--
 
     return mid
 end
@@ -83,7 +85,7 @@ local function ains(a, key)
 	table.insert(a, i, key)
     end
     
-    while #a > limit do
+    while #a > max_limit do
 	table.remove(a)
     end
 end
@@ -106,7 +108,8 @@ local function get(space, key)
 end
 
 local function store(space, key, a)
-    return box.replace(space, key, a_to_s(a))
+    box.replace(space, key, a_to_s(a))
+    return key, a
 end
 
 
@@ -129,19 +132,23 @@ function box.sa_select(space, key, from, limit)
     local a = get(space, key)
 
     if from ~= nil then
-	from = afind_ge(a, tonumber(from))
+	from = tonumber(from)
+	index = afind_ge(a, from)
+	if a[index] == from then
+	    index = index + 1
+	end
     else
-	from = 1
+	index = 1
     end
     
     if limit ~= nil then
 	limit = tonumber(limit)
     else
-	limit = 0
+	limit = max_limit
     end
 
     local r = {}
-    for i = from, #a do
+    for i = index, #a do
 	if a[i] == nil then
 	    break
 	end
