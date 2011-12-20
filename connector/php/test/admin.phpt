@@ -23,11 +23,6 @@ echo $tarantool->admin("lua box.select(0, 1, 'test_id1')");
 echo "----------- test end -----------\n\n";
 
 echo "---------- test begin ----------\n";
-echo "myselect\n";
-echo $tarantool->admin("lua myselect(0, 1, 'test_id1')");
-echo "----------- test end -----------\n\n";
-
-echo "---------- test begin ----------\n";
 echo "delete\n";
 for ($i = 0; $i < 10; ++$i)
     echo $tarantool->admin("lua box.delete(0, $i)");
@@ -68,21 +63,6 @@ insert
 
 ---------- test begin ----------
 select
- - 0: {'test_id1', 'test field #0'}
- - 1: {'test_id1', 'test field #1'}
- - 2: {'test_id1', 'test field #2'}
- - 3: {'test_id1', 'test field #3'}
- - 4: {'test_id1', 'test field #4'}
- - 5: {'test_id1', 'test field #5'}
- - 6: {'test_id1', 'test field #6'}
- - 7: {'test_id1', 'test field #7'}
- - 8: {'test_id1', 'test field #8'}
- - 9: {'test_id1', 'test field #9'}
------------ test end -----------
-
----------- test begin ----------
-myselect
-select in space: 0 index: 1 by key test_id1
  - 0: {'test_id1', 'test field #0'}
  - 1: {'test_id1', 'test field #1'}
  - 2: {'test_id1', 'test field #2'}

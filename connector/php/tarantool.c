@@ -266,9 +266,13 @@ io_buf_write_struct(struct io_buf *buf, size_t n);
 static bool
 io_buf_write_byte(struct io_buf *buf, int8_t value);
 
-/* write int32 to I/O buffer */
+/* write 32-bit integer to I/O buffer */
 static bool
 io_buf_write_int32(struct io_buf *buf, int32_t value);
+
+/* write 64-bit integer to I/O buffer */
+static bool
+io_buf_write_int64(struct io_buf *buf, int64_t value);
 
 /* write varint to I/O buffer */
 static bool
@@ -278,13 +282,21 @@ io_buf_write_varint(struct io_buf *buf, int32_t value);
 static bool
 io_buf_write_str(struct io_buf *buf, uint8_t *str, size_t len);
 
+/* write 32-bit integer as tuple's field to I/O buffer */
+static bool
+io_buf_write_field_int32(struct io_buf *buf, uint32_t value);
+
+/* write 64-bit integer as tuple's field to I/O buffer */
+static bool
+io_buf_write_field_int64(struct io_buf *buf, uint64_t value);
+
+/* write string tuple's field to I/O buffer */
+static bool
+io_buf_write_field_str(struct io_buf *buf, uint8_t *val, size_t len);
+
 /* write tuple to I/O buffer */
 static bool
 io_buf_write_tuple_int(struct io_buf *buf, zval *tuple);
-
-/* write tuple's field to I/O buffer */
-static bool
-io_buf_write_field(struct io_buf *buf, uint8_t *val, size_t len);
 
 /* write tuple (string) to I/O buffer */
 static bool
@@ -860,11 +872,11 @@ PHP_METHOD(tarantool_class, update_fields)
 			}
 			if (Z_TYPE_PP(assing_arg) == IS_LONG) {
 				/* write as interger */
-				if (!io_buf_write_field(tnt->io_buf, (uint8_t *) &Z_LVAL_PP(assing_arg), sizeof(int32_t)))
+				if (!io_buf_write_field_str(tnt->io_buf, (uint8_t *) &Z_LVAL_PP(assing_arg), sizeof(int32_t)))
 					return;
 			} else {
 				/* write as string */
-				if (!io_buf_write_field(tnt->io_buf, (uint8_t *) Z_STRVAL_PP(assing_arg), Z_STRLEN_PP(assing_arg)))
+				if (!io_buf_write_field_str(tnt->io_buf, (uint8_t *) Z_STRVAL_PP(assing_arg), Z_STRLEN_PP(assing_arg)))
 					return;
 			}
 			break;
@@ -878,7 +890,7 @@ PHP_METHOD(tarantool_class, update_fields)
 				return;
 			}
 			/* write arith arg */
-			if (!io_buf_write_field(tnt->io_buf, (uint8_t *) &arith_arg, sizeof(int32_t)))
+			if (!io_buf_write_field_str(tnt->io_buf, (uint8_t *) &arith_arg, sizeof(int32_t)))
 				return;
 			break;
 		case TARANTOOL_OP_SPLICE:
@@ -911,17 +923,17 @@ PHP_METHOD(tarantool_class, update_fields)
 			io_buf_clean(tnt->splice_field);
 
 			/* write offset to separate buffer */
-			if (!io_buf_write_field(tnt->splice_field, (uint8_t *) &splice_offset, sizeof(int32_t)))
+			if (!io_buf_write_field_str(tnt->splice_field, (uint8_t *) &splice_offset, sizeof(int32_t)))
 				return;
 			/* write length to separate buffer */
-			if (!io_buf_write_field(tnt->splice_field, (uint8_t *) &splice_length, sizeof(int32_t)))
+			if (!io_buf_write_field_str(tnt->splice_field, (uint8_t *) &splice_length, sizeof(int32_t)))
 				return;
 			/* write list to separate buffer */
-			if (!io_buf_write_field(tnt->splice_field, (uint8_t *) splice_list, splice_list_len))
+			if (!io_buf_write_field_str(tnt->splice_field, (uint8_t *) splice_list, splice_list_len))
 				return;
 
 			/* write splice args as alone field */
-			if (!io_buf_write_field(tnt->io_buf, tnt->splice_field->value, tnt->splice_field->size))
+			if (!io_buf_write_field_str(tnt->io_buf, tnt->splice_field->value, tnt->splice_field->size))
 				return;
 
 			break;
@@ -1158,7 +1170,7 @@ PHP_METHOD(tarantool_class, call)
 	/* flags */
 	request->flags = flags;
 	/* proc name */
-	if (!io_buf_write_field(tnt->io_buf, proc_name, proc_name_len))
+	if (!io_buf_write_field_str(tnt->io_buf, proc_name, proc_name_len))
 		return;
 	/* tuple */
 	if (!io_buf_write_tuple(tnt->io_buf, tuple))
@@ -1575,6 +1587,16 @@ io_buf_write_int32(struct io_buf *buf, int32_t value)
 }
 
 static bool
+io_buf_write_int64(struct io_buf *buf, int64_t value)
+{
+	if (!io_buf_reserve(buf, buf->size + sizeof(int64_t)))
+		return false;
+	*(int64_t *)(buf->value + buf->size) = value;
+	buf->size += sizeof(int64_t);
+	return true;
+}
+
+static bool
 io_buf_write_varint(struct io_buf *buf, int32_t value)
 {
 	if (!io_buf_reserve(buf, buf->size + 5))
@@ -1609,10 +1631,36 @@ io_buf_write_str(struct io_buf *buf, uint8_t *str, size_t len)
 }
 
 static bool
-io_buf_write_field(struct io_buf *buf, uint8_t *field_value, size_t field_length)
+io_buf_write_field_int32(struct io_buf *buf, uint32_t value)
 {
+	/* write field length (4 bytes) */
+	if (!io_buf_write_varint(buf, sizeof(int32_t)))
+		return false;
+	/* write field value */
+	if (!io_buf_write_int32(buf, value))
+		return false;
+	return true;
+}
+
+static bool
+io_buf_write_field_int64(struct io_buf *buf, uint64_t value)
+{
+	/* write field length (8 bytes) */
+	if (!io_buf_write_varint(buf, sizeof(int64_t)))
+		return false;
+	/* write field value */
+	if (!io_buf_write_int64(buf, value))
+		return false;
+	return true;
+}
+
+static bool
+io_buf_write_field_str(struct io_buf *buf, uint8_t *field_value, size_t field_length)
+{
+	/* write field length (string length) */
 	if (!io_buf_write_varint(buf, (int32_t)field_length))
 		return false;
+	/* write field value (string) */
 	if (!io_buf_write_str(buf, field_value, field_length))
 		return false;
 	return true;
@@ -1627,8 +1675,13 @@ io_buf_write_tuple_int(struct io_buf *buf, zval *tuple)
 	if (!io_buf_write_int32(buf, 1))
 		return false;
 	/* write field */
-	if (!io_buf_write_field(buf, (uint8_t *)&long_value, sizeof(int32_t)))
-		return false;
+	if ((unsigned long)long_value <= 0xffffffffllu) {
+		if (!io_buf_write_field_int32(buf, (uint32_t)long_value))
+			return false;
+	} else {
+		if (!io_buf_write_field_int64(buf, (uint64_t)long_value))
+			return false;
+	}
 
 	return true;
 }
@@ -1643,7 +1696,7 @@ io_buf_write_tuple_str(struct io_buf *buf, zval *tuple)
 	if (!io_buf_write_int32(buf, 1))
 		return false;
 	/* write field */
-	if (!io_buf_write_field(buf, str_value, str_length))
+	if (!io_buf_write_field_str(buf, str_value, str_length))
 		return false;
 
 	return true;
@@ -1670,12 +1723,12 @@ io_buf_write_tuple_array(struct io_buf *buf, zval *tuple)
 			/* string field */
 			str_value = Z_STRVAL_PP(field);
 			str_length = Z_STRLEN_PP(field);
-			io_buf_write_field(buf, str_value, str_length);
+			io_buf_write_field_str(buf, str_value, str_length);
 			break;
 		case IS_LONG:
 			/* integer field */
 			long_value = Z_LVAL_PP(field);
-			io_buf_write_field(buf, (uint8_t *)&long_value, sizeof(int32_t));
+			io_buf_write_field_str(buf, (uint8_t *)&long_value, sizeof(int32_t));
 			break;
 		default:
 			zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
@@ -1690,12 +1743,16 @@ io_buf_write_tuple_array(struct io_buf *buf, zval *tuple)
 static bool
 io_buf_write_tuple(struct io_buf *buf, zval *tuple)
 {
+	/* write tuple by type */
 	switch (Z_TYPE_P(tuple)) {
 	case IS_LONG:
+		/* write integer as tuple */
 		return io_buf_write_tuple_int(buf, tuple);
 	case IS_STRING:
+		/* write string as tuple */
 		return io_buf_write_tuple_str(buf, tuple);
 	case IS_ARRAY:
+		/* write array as tuple */
 		return io_buf_write_tuple_array(buf, tuple);
 	default:
 		zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
