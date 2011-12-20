@@ -4,9 +4,7 @@ package MR::Tarantool::Box;
 
 =head1 NAME
 
-MR::Tarantool::Box
-
-A driver for an efficient Tarantool/Box NoSQL in-memory storage.
+MR::Tarantool::Box - A driver for an efficient Tarantool/Box NoSQL in-memory storage.
 
 =head1 SYNOPSIS
 
@@ -81,7 +79,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 1.4.3;
+$VERSION = 0.0.7;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -1257,6 +1255,10 @@ sub Num {
     push @op, [$field_num => num_add => $arg{num_add}]; # if $arg{num_add};
     $self->UpdateMulti($key, @op, $param);
 }
+
+=head1 LICENCE AND COPYRIGHT
+
+This is free software; you can redistribute it and/or modify it under the same terms as the Perl 5 programming language system itself.
 
 =head1 SEE ALSO
 

@@ -4,9 +4,8 @@ package MR::Tarantool::Box::Singleton;
 
 =head1 NAME
 
-MR::Tarantool::Box::Singleton
+MR::Tarantool::Box::Singleton - A singleton wrapper for L<MR::Tarantool::Box>.
 
-A singleton wrapper for L<MR::Tarantool::Box>.
 Provides connection-persistence and replica fallback.
 Please read L<"MR::Tarantool::Box manual"|MR::Tarantool::Box> first.
 
@@ -384,7 +383,7 @@ C<< true >>, no matter whether any query succeeds or not.
 
 BEGIN {
 
-    foreach my $method (qw/Insert UpdateMulti Delete Add Set Insert Replace Bit Num AndXorAdd Update/) {
+    foreach my $method (qw/Insert UpdateMulti Delete Add Set Replace Bit Num AndXorAdd Update/) {
         no strict 'refs';
         *$method = sub {
             use strict;
@@ -468,6 +467,10 @@ sub ErrorStr {
 }
 
 =pod
+
+=head1 LICENCE AND COPYRIGHT
+
+This is free software; you can redistribute it and/or modify it under the same terms as the Perl 5 programming language system itself.
 
 =head1 SEE ALSO
 

@@ -14,5 +14,6 @@ WriteMakefile(
         'String::CRC32'     => 0,
         'Time::HiRes'       => 0,
         'Exporter'          => 0,
+        'Class::Singleton'  => 0,
     },
 );
