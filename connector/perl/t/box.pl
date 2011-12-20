@@ -1,3 +1,7 @@
+#!/usr/bin/perl
+
+# Tarantool/Box config below
+
 use strict;
 use warnings;
 BEGIN {
@@ -7,21 +11,22 @@ BEGIN {
 }
 use FindBin qw($Bin);
 use lib "$Bin";
-use TBox ();
 use Carp qw/confess/;
 
-use Test::More tests => 218;
+use Test::More tests => 233;
 use Test::Exception;
+
+use List::MoreUtils qw/zip/;
 
 local $SIG{__DIE__} = \&confess;
 
 our $CLASS;
-BEGIN { $CLASS = $ENV{BOXCLASS} || 'MR::SilverBox'; eval "require $CLASS" or die $@; }
+BEGIN { $CLASS = $ENV{BOXCLASS} || 'MR::Tarantool::Box'; eval "require $CLASS" or die $@; }
 
-use constant ILL_PARAM         => qr/$CLASS: Error 00000202/;
-use constant TUPLE_NOT_EXISTS  => qr/$CLASS: Error 00003102/;
-use constant TUPLE_EXISTS      => qr/$CLASS: Error 00003702/;
-use constant INDEX_VIOLATION   => qr/$CLASS: Error 00003802/;
+use constant ILL_PARAM         => qr/Error 00000202/;
+use constant TUPLE_NOT_EXISTS  => qr/Error 00003102/;
+use constant TUPLE_EXISTS      => qr/Error 00003702/;
+use constant INDEX_VIOLATION   => qr/Error 00003802/;
 
 use constant TOO_BIG_FIELD => qr/too big field/;
 
@@ -30,6 +35,7 @@ my $server = (shift || $ENV{BOX}) or die;
 
 sub cleanup ($) {
     my ($id) = @_;
+    die unless defined $id;
     ok defined $box->Delete($id), 'delete of possible existing record';
     ok $box->Delete($id) == 0, 'delete of non existing record';
 }
@@ -49,17 +55,20 @@ sub def_param  {
                  namespace     => 0,
                  format        => $format,
                  default_index => 'primary_id',
-             } ]}
+                 name          => 'main',
+             } ],
+             default_space => "main",
+         }
 }
 
 $box = $CLASS->new(def_param('l&SSLL&'));
 ok $box->isa($CLASS), 'connect';
 cleanup 13;
 
-ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '777'), 'insert';
+ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '777',{space => 'main'}), 'insert';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '777'], 'select/insert';
 
-ok $box->Insert(13, q/some_email@test.mail.ru/, 2, 2, 3, 4, '666'), 'replace';
+ok $box->Insert(13, q/some_email@test.mail.ru/, 2, 2, 3, 4, '666',{namespace => 'main'}), 'replace';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 2, 3, 4, '666'], 'select/replace';
 
 ok $box->Update(13, 3 => 1) == 1, 'update of some field';
@@ -88,7 +97,7 @@ cleanup 13;
 ok $box->Insert(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'insert';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/insert';
 
-throws_ok sub { $box->UpdateMulti(13, [6 => splice => [-10]]) }, qr/Illegal parametrs/, "splice/bad_params_1";
+throws_ok sub { $box->UpdateMulti(13, [6 => splice => [-10]]) }, ILL_PARAM, "splice/bad_params_1";
 
 ok $box->UpdateMulti(13, [6 => splice => [100]]), "splice/big_offset";
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select';
@@ -409,8 +418,8 @@ sub def_param1 {
              } ]}
 }
 
-$box = MR::SilverBox->new(def_param1);
-ok $box->isa('MR::SilverBox'), 'connect';
+$box = $CLASS->new(def_param1);
+ok $box->isa($CLASS), 'connect';
 
 my @tuple1 = (13, 'mail.ru', 123);
 cleanup $tuple1[0];
@@ -435,7 +444,7 @@ is_deeply [$box->Select([[$tuple2[1], $tuple2[2]]], { use_index => 'secondary_co
 sub def_param_bad {
     my $format = 'l&&';
     return { servers => $server,
-             namespaces => [ {
+             spaces => [ {
                  indexes => [ {
                      index_name   => 'primary_num1',
                      keys         => [0],
@@ -452,12 +461,12 @@ sub def_param_bad {
              } ]}
 }
 
-$box = MR::SilverBox->new(def_param_bad);
-ok $box->isa('MR::SilverBox'), 'connect';
+$box = $CLASS->new(def_param_bad);
+ok $box->isa($CLASS), 'connect';
 
 my @tuple_bad = (13, 'mail.ru', '123');
 cleanup $tuple_bad[0];
-throws_ok sub { $box->Insert(@tuple_bad) }, qr/Illegal parametrs/, "index_constains/bad_field_type";
+throws_ok sub { $box->Insert(@tuple_bad) }, ILL_PARAM, "index_constains/bad_field_type";
 
 
 ## Check unique tree index
@@ -466,9 +475,9 @@ sub def_param_unique {
     return { servers => $server,
              namespaces => [ {
                  indexes => [ {
-		     index_name   => 'id',
-		     keys         => [0],
-		 }, {
+                     index_name   => 'id',
+                     keys         => [0],
+                 }, {
                      index_name   => 'email',
                      keys         => [1],
                  }, {
@@ -478,17 +487,17 @@ sub def_param_unique {
                      index_name   => 'lastname',
                      keys         => [3],
                  } , {
-		     index_name   => 'fullname',
-		     keys         => [2, 3]
-		 } ],
-                 namespace     => 27,
+                     index_name   => 'fullname',
+                     keys         => [2, 3]
+                 } ],
+                 space     => 27,
                  format        => $format,
                  default_index => 'id',
              } ]}
 }
 
-$box = MR::SilverBox->new(def_param_unique);
-ok $box->isa('MR::SilverBox'), 'connect';
+$box = $CLASS->new(def_param_unique);
+ok $box->isa($CLASS), 'connect';
 
 my $tuples = [ [1, 'rtokarev@corp.mail.ru', 'Roman', 'Tokarev'],
 	       [2, 'vostrikov@corp.mail.ru', 'Yuri', 'Vostrikov'],
@@ -502,7 +511,7 @@ foreach my $tuple (@$tuples) {
 
 foreach my $tuple (@$tuples) {
 	if ($tuple == $tuples->[-1] || $tuple == $tuples->[-2]) {
-		throws_ok sub { $box->Insert(@$tuple) }, qr/Index violation/, "unique_tree_index/insert \'$tuple->[0]\'";
+		throws_ok sub { $box->Insert(@$tuple) }, INDEX_VIOLATION, "unique_tree_index/insert \'$tuple->[0]\'";
 	} else {
 		ok $box->Insert(@$tuple), "unique_tree_index/insert \'$tuple->[0]\'";
 	}
@@ -513,6 +522,54 @@ foreach my $r (@res) {
 	ok sub { return $r != $tuples->[-1] && $r != $tuples->[-2] };
 }
 
+my $flds;
+BEGIN{ $flds = [qw/ f1 f2 f3 f4 /] }
+    {
+        package TestBox;
+        use MR::Tarantool::Box::Singleton;
+        use base 'MR::Tarantool::Box::Singleton';
+
+        BEGIN {
+            __PACKAGE__->mkfields(@$flds);
+        }
+
+        sub SERVER   { $server }
+        sub REPLICAS { '' }
+
+        sub SPACES   {[{
+            space         => 27,
+            indexes       => [ {
+                index_name   => 'primary_id',
+                keys         => [TUPLE_f1],
+            } ],
+            format        => 'l&&&',
+            default_index => 'primary_id',
+        }]}
+
+    }
+
+$box = 'TestBox';
+#$box = $CLASS->new(def_param_flds);
+#ok $box->isa($CLASS), 'connect';
+
+do {
+    my $tuples = [ @$tuples[0..2] ];
+    foreach my $tuple (@$tuples) {
+        cleanup $tuple->[0];
+    }
+
+    foreach my $tuple (@$tuples) {
+        is_deeply [$box->Insert(@$tuple, {want_inserted_tuple => 1})], [{zip @$flds, @$tuple}], "flds/insert \'$tuple->[0]\'";
+    }
+
+    is_deeply [$box->Select([[$tuples->[0]->[0]]])], [{zip @$flds, @{$tuples->[0]}}], 'select by primary_num1 index';
+    is_deeply [$box->UpdateMulti($tuples->[0]->[0],[ $flds->[3] => set => $tuples->[0]->[3] ],{want_updated_tuple => 1})], [{zip @$flds, @{$tuples->[0]}}], 'update1';
+    ok         $box->UpdateMulti($tuples->[0]->[0],[ $flds->[3] => set => $tuples->[0]->[3] ]), 'update2';
+    is_deeply [$box->UpdateMulti($tuples->[0]->[0],[ 3          => set => $tuples->[0]->[3] ],{want_updated_tuple => 1})], [{zip @$flds, @{$tuples->[0]}}], 'update3';
+    ok         $box->UpdateMulti($tuples->[0]->[0],[ 3          => set => $tuples->[0]->[3] ]), 'update4';
+
+    is_deeply [$box->Delete($tuples->[0]->[0],{want_deleted_tuple => 1})], [{zip @$flds, @{$tuples->[0]}}], 'update3';
+};
 
 
 
@@ -521,19 +578,21 @@ foreach my $r (@res) {
 sub def_param_u64 {
     my $format = '&&&&';
     return { servers => $server,
-             namespaces => [ {
+             spaces => [ {
                  indexes => [ {
-		     index_name   => 'id',
-		     keys         => [0],
-		 } ],
-                 namespace     => 20,
+                     index_name   => 'id',
+                     keys         => [0],
+                 } ],
+                 space         => 20,
                  format        => $format,
                  default_index => 'id',
-             } ]}
+             } ],
+             debug => 0,
+         }
 }
 
-$box = MR::SilverBox->new(def_param_u64);
-ok $box->isa('MR::SilverBox'), 'connect';
+$box = $CLASS->new(def_param_u64);
+ok $box->isa($CLASS), 'connect';
 
 $_->[0] = pack('ll', $_->[0], 0) foreach @$tuples;
 
@@ -546,3 +605,68 @@ foreach my $tuple (@$tuples) {
 }
 
 is_deeply($tuples, [$box->Select([map $_->[0], @$tuples])]);
+
+
+__END__
+
+space[0].enabled = 1
+space[0].index[0].type = "HASH"
+space[0].index[0].unique = 1
+space[0].index[0].key_field[0].fieldno = 0
+space[0].index[0].key_field[0].type = "NUM"
+space[0].index[1].type = "HASH"
+space[0].index[1].unique = 1
+space[0].index[1].key_field[0].fieldno = 1
+space[0].index[1].key_field[0].type = "STR"
+
+space[20].enabled = 1
+space[20].index[0].type = "HASH"
+space[20].index[0].unique = 1
+space[20].index[0].key_field[0].fieldno = 0
+space[20].index[0].key_field[0].type = "NUM64"
+
+
+space[26].enabled = 1
+space[26].index[0].type = "HASH"
+space[26].index[0].unique = 1
+space[26].index[0].key_field[0].fieldno = 0
+space[26].index[0].key_field[0].type = "NUM"
+space[26].index[1].type = "TREE"
+space[26].index[1].unique = 0
+space[26].index[1].key_field[0].fieldno = 1
+space[26].index[1].key_field[0].type = "STR"
+space[26].index[2].type = "TREE"
+space[26].index[2].unique = 0
+space[26].index[2].key_field[0].fieldno = 1
+space[26].index[2].key_field[0].type = "STR"
+space[26].index[2].key_field[1].fieldno = 2
+space[26].index[2].key_field[1].type = "NUM"
+
+
+
+space[27].enabled = 1
+space[27].index[0].type = "HASH"
+space[27].index[0].unique = 1
+space[27].index[0].key_field[0].fieldno = 0
+space[27].index[0].key_field[0].type = "NUM"
+space[27].index[1].type = "HASH"
+space[27].index[1].unique = 1
+space[27].index[1].key_field[0].fieldno = 1
+space[27].index[1].key_field[0].type = "STR"
+
+space[27].index[2].type = "TREE"
+space[27].index[2].unique = 1
+space[27].index[2].key_field[0].fieldno = 2
+space[27].index[2].key_field[0].type = "STR"
+
+space[27].index[2].type = "TREE"
+space[27].index[2].unique = 1
+space[27].index[2].key_field[0].fieldno = 3
+space[27].index[2].key_field[0].type = "STR"
+
+space[27].index[3].type = "TREE"
+space[27].index[3].unique = 1
+space[27].index[3].key_field[0].fieldno = 2
+space[27].index[3].key_field[0].type = "STR"
+space[27].index[3].key_field[1].fieldno = 3
+space[27].index[3].key_field[1].type = "STR"
