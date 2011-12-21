@@ -4,6 +4,8 @@ Build-Depends: cdbs, debhelper (>= 8), gobjc, cmake, libreadline-dev
 Section: database
 Standards-Version: 3.9.2
 Homepage: http://tarantool.org/
+VCS-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/tarantool.git;a=summary
+VCS-Git: git+ssh://git.debian.org/git/collab-maint/tarantool.git
 
 Package: tarantool-common
 Architecture: all
