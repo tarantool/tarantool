@@ -6,6 +6,6 @@ add_subdirectory(box)
 add_subdirectory(connector_c)
 
 install (FILES ${CMAKE_SOURCE_DIR}/test/box/tarantool.cfg
-        DESTINATION bin)
+        DESTINATION etc)
 install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
-        DESTINATION bin)
+        DESTINATION var/lib/tarantool)

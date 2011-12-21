@@ -246,7 +246,7 @@ add_subdirectory(doc EXCLUDE_FROM_ALL)
 add_subdirectory(extra)
 
 install (FILES README LICENSE doc/box-protocol.txt
-         DESTINATION doc)
+         DESTINATION share/doc/tarantool)
 
 include (cmake/tarantool_cpack.cmake)
 #
