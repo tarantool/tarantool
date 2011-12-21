@@ -1,0 +1,87 @@
+#! /bin/sh
+# /etc/init.d/tarantool
+### BEGIN INIT INFO
+# Provides:          tarantool
+# Required-Start:    $remote_fs
+# Required-Stop:     $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Tarantool init script
+# Description:       This file should be used to construct scripts to be
+#                    placed in /etc/init.d.
+### END INIT INFO
+
+# Author: Dmitry E. Oboukhov <unera@debian.org>
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+CONF_DIR=/etc/tarantool/instances.enabled
+SCRIPTNAME=/etc/init.d/tarantool
+DAEMON=/usr/bin/tarantool_box
+INSTANCES=`find $CONF_DIR -xtype f -name '*.cfg'`
+INSTSCRIPT=/usr/lib/tarantool/init_instance.sh
+
+# Exit if the package is not installed
+[ -x "$DAEMON" ] || exit 0
+
+. /lib/init/vars.sh
+
+if test -z "$INSTANCES"; then
+    echo "tarantool: There are no instances in $CONF_DIR"
+    exit 0
+fi
+
+
+#
+# Function that starts the daemon/service
+#
+do_start() {
+    echo "tarantool: Staring instances"
+    for inst in $INSTANCES; do
+        $INSTSCRIPT $inst start
+    done
+    return 0
+}
+
+#
+# Function that stops the daemon/service
+#
+do_stop() {
+    echo "tarantool: Stopping instances"
+    for inst in $INSTANCES; do
+        $INSTSCRIPT $inst stop
+    done
+    return 0
+}
+
+#
+# Function that sends a SIGHUP to the daemon/service
+#
+do_reload() {
+    do_stop
+    do_start
+}
+
+case "$1" in
+    start)
+        do_start
+    ;;
+
+    stop)
+        do_stop
+    ;;
+
+    status)
+    ;;
+
+    restart|force-reload)
+        do_stop
+        do_start
+    ;;
+    
+    *)
+	echo "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
+	exit 3
+    ;;
+esac
+
+:
