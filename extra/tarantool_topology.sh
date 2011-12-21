@@ -32,14 +32,14 @@ toolchain_check() {
 }
 
 usage() {
-        echo "Tarantool DB topology setup script"
-        echo
-        echo "usage: tarantool_topology.sh [-y] <servers>"
-        exit 0
+	echo "Tarantool DB topology setup script"
+	echo
+	echo "usage: tarantool_topology.sh [-y] <servers>"
+	exit 0
 }
 
 backup_instance() {
-        id=$1
+	id=$1
 	workdir="${prefix_var}/tarantool$id"
 	workdir_new="${prefix_var}/tarantool${id}_${ts}"
 	config="${prefix}/etc/tarantool$id.cfg"
@@ -71,7 +71,7 @@ deploy_instance() {
 	workdir="${prefix_var}/tarantool$id"
 	config="${prefix}/etc/tarantool$id.cfg"
 
-        log "> deploying instance $id"
+	log "> deploying instance $id"
 
 	# setting up work environment
 	mkdir $workdir
@@ -98,52 +98,52 @@ deploy_instance() {
 
 deploy() {
 	to=`expr $topology_count - 1`
-        for instance in `seq 0 $to`; do
-                deploy_instance $instance
-        done
+	for instance in `seq 0 $to`; do
+		deploy_instance $instance
+	done
 }
 
 update() {
-        log "updating topology config"
-        echo $topology_count > $topology_cfg
+	log "updating topology config"
+	echo $topology_count > $topology_cfg
 }
 
 toolchain_check "date" "expr"
 
 if [ -f $topology_cfg ]; then
-        topology_exists=1
-        topology_count=`cat $topology_cfg`
-        # dont' change topology if it said so in configuration file
-        if [ $topology_count -eq 0 ]; then
-                log "skipping topology setup"
-                exit 0
-        fi
+	topology_exists=1
+	topology_count=`cat $topology_cfg`
+	# dont' change topology if it said so in configuration file
+	if [ $topology_count -eq 0 ]; then
+		log "skipping topology setup"
+		exit 0
+	fi
 fi
 
 # processing command line arguments
 #
 num=0
 if [ $# -eq 2 ]; then
-        if [ "$1" != "-y" ]; then
-                usage
-        fi
-        prompt=0
-        num=$2
+	if [ "$1" != "-y" ]; then
+		usage
+	fi
+	prompt=0
+	num=$2
 else
-        if [ $# -ne 1 ]; then
-                usage
-        fi
-        num=$1
+	if [ $# -ne 1 ]; then
+		usage
+	fi
+	num=$1
 fi
 
 # validating instance number
 #
 isnum=0
 if [ $num -eq $num 2> /dev/null ]; then
-        isnum=1
+	isnum=1
 fi
 if [ $isnum -eq 0 ] || [ $num -eq 0 2> /dev/null ]; then
-        error "bad instance number"
+	error "bad instance number"
 fi
 
 # time-stamp
@@ -158,20 +158,20 @@ if [ $prompt -eq 1 ]; then
 	fi
 	log "Are you sure? [n/y]"
 	read answer
-        case "$answer" in
-                [Yy]) ;;
-                *)
+	case "$answer" in
+		[Yy]) ;;
+		*)
 			log "aborting"
 			exit 0
-                        ;;
-        esac
+			;;
+	esac
 fi
 
 # stop on error
 set -e
 
 if [ $topology_exists -eq 1 ]; then
-        backup
+	backup
 fi
 
 # updating instances count
