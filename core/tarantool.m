@@ -382,6 +382,9 @@ static void
 initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_factor)
 {
 	errinj_init();
+#ifndef NDEBUG
+	errinj_add("errinj-testing");
+#endif
 	if (!salloc_init(slab_alloc_arena * (1 << 30), slab_alloc_minimal, slab_alloc_factor))
 		panic_syserror("can't initialize slab allocator");
 	fiber_init();

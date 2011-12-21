@@ -23,6 +23,8 @@ available commands:
  - save snapshot
  - lua command
  - reload configuration
+ - show injections
+ - set injection <name> <state>
 ...
 show configuration
 ---

@@ -1,0 +1,22 @@
+show injections
+---
+error injections:
+  - name: errinj-testing
+    state: off
+...
+set injection some-injection on
+---
+fail:can't find error injection 'some-injection'
+...
+select * from t0 where k0 = 222444
+No match
+set injection errinj-testing on
+---
+ok
+...
+select * from t0 where k0 = 222444
+An error occurred: ER_INJECTION, 'Error injection 'errinj-testing''
+set injection errinj-testing off
+---
+ok
+...
