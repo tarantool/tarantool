@@ -12,14 +12,15 @@ topology_cfg="${prefix}/etc/tarantool_topology.cfg"
 topology_exists=0
 topology_count=0
 prompt=1
+name=`basename $0`
 
 error() {
-	echo "error: $*" 1>&2
+	echo "$name error: $*" 1>&2
 	exit 1
 }
 
 log() {
-	echo "> $*"
+	echo "$name > $*"
 }
 
 toolchain_check() {
@@ -71,11 +72,10 @@ deploy_instance() {
 	workdir="${prefix_var}/tarantool$id"
 	config="${prefix}/etc/tarantool$id.cfg"
 
-	log "> deploying instance $id"
+	log "deploying instance $id"
 
 	# setting up work environment
-	mkdir $workdir
-	mkdir $workdir/logs
+	mkdir -p $workdir/logs
 
 	chown tarantool:tarantool -R $workdir
 
@@ -108,18 +108,6 @@ update() {
 	echo $topology_count > $topology_cfg
 }
 
-toolchain_check "date" "expr"
-
-if [ -f $topology_cfg ]; then
-	topology_exists=1
-	topology_count=`cat $topology_cfg`
-	# dont' change topology if it said so in configuration file
-	if [ $topology_count -eq 0 ]; then
-		log "skipping topology setup"
-		exit 0
-	fi
-fi
-
 # processing command line arguments
 #
 num=0
@@ -138,15 +126,22 @@ fi
 
 # validating instance number
 #
-isnum=0
-if [ $num -eq $num 2> /dev/null ]; then
-	isnum=1
-fi
-if [ $isnum -eq 0 ] || [ $num -eq 0 2> /dev/null ]; then
-	error "bad instance number"
+[ $num -eq $num -o $num -le 0 ] 2>/dev/null || error "bad instance number"
+
+if [ -f $topology_cfg ]; then
+	topology_exists=1
+	topology_count=`cat $topology_cfg`
+	# dont' change topology if it said so in configuration file
+	if [ $topology_count -eq 0 ]; then
+		log "skipping topology setup"
+		exit 0
+	fi
 fi
 
+toolchain_check "date" "expr"
+
 # time-stamp
+#
 ts=`/bin/date +"%Y%m%d-%H%M%S"`
 
 # asking permission to continue
@@ -168,6 +163,7 @@ if [ $prompt -eq 1 ]; then
 fi
 
 # stop on error
+#
 set -e
 
 if [ $topology_exists -eq 1 ]; then
@@ -175,6 +171,7 @@ if [ $topology_exists -eq 1 ]; then
 fi
 
 # updating instances count
+#
 topology_count=$num
 
 deploy
