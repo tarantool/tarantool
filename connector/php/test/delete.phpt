@@ -38,6 +38,11 @@ echo "test delete: delete key (tuple doesn't return)\n";
 test_delete($tarantool, 0, 2, 0);
 echo "----------- test end -----------\n\n";
 
+echo "---------- test begin ----------\n";
+echo "test delete: delete not existing tuple w/ return tuple flag\n";
+test_delete($tarantool, 0, 5, TARANTOOL_FLAGS_RETURN_TUPLE);
+echo "----------- test end -----------\n\n";
+
 test_clean($tarantool, 0);
 ?>
 ===DONE===
@@ -122,6 +127,12 @@ into the far reaches of space....
 test delete: delete key (tuple doesn't return)
 result:
 count = 1
+----------- test end -----------
+
+---------- test begin ----------
+test delete: delete not existing tuple w/ return tuple flag
+result:
+count = 0
 ----------- test end -----------
 
 ===DONE===
