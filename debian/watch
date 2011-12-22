@@ -1,0 +1,3 @@
+version=3
+	https://github.com/mailru/tarantool/tags \
+		.*/tarball/(\d+(?:\.\d+)+)
