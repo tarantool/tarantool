@@ -115,7 +115,7 @@ function test_insert($tarantool, $space_no, $tuple, $flags) {
         $result = $tarantool->insert($space_no, $tuple, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
-        if ($flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+        if (array_key_exists("tuple", $result)) {
             echo "tuple:", "\n";
             echo "  id     = ", $result["tuple"][0], "\n";
             echo "  series = ", $result["tuple"][1], "\n";
@@ -134,7 +134,7 @@ function test_update_fields($tarantool, $space_no, $key, $ops, $flags) {
         $result = $tarantool->update_fields($space_no, $key, $ops, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
-        if ($flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+        if (array_key_exists("tuple", $result)) {
             echo "tuple:", "\n";
             echo "  id     = ", $result["tuple"][0], "\n";
             echo "  series = ", $result["tuple"][1], "\n";
@@ -153,7 +153,7 @@ function test_delete($tarantool, $space_no, $key, $flags) {
         $result = $tarantool->delete($space_no, $key, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
-        if ($flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+        if (array_key_exists("tuple", $result)) {
             echo "tuple:", "\n";
             echo "  id     = ", $result["tuple"][0], "\n";
             echo "  series = ", $result["tuple"][1], "\n";

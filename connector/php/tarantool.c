@@ -994,7 +994,7 @@ PHP_METHOD(tarantool_class, update_fields)
 	add_assoc_long(return_value, "count", response->count);	
 
 	/* check "return tuple" flag */
-	if (flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+	if ((response->count > 0) && (flags & TARANTOOL_FLAGS_RETURN_TUPLE)) {
 		/* ok, the responce should contain inserted tuple */
 		if (!io_buf_read_tuple(tnt->io_buf, &tuple)) {
 			zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
@@ -1109,7 +1109,7 @@ PHP_METHOD(tarantool_class, delete)
 	add_assoc_long(return_value, "count", response->count);
 
 	/* check "return tuple" flag */
-	if (flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+	if ((response->count) > 0 && (flags & TARANTOOL_FLAGS_RETURN_TUPLE)) {
 		/* ok, the responce should contain inserted tuple */
 		if (!io_buf_read_tuple(tnt->io_buf, &tuple)) {
 			zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
