@@ -58,7 +58,7 @@ set_target_properties(tnt PROPERTIES COMPILE_FLAGS "${tnt_cflags}")
 # Shared library
 #
 
-project(tnt)
+project(tnt_shared)
 add_library(tnt_shared SHARED ${tnt_sources})
 set_target_properties(tnt_shared PROPERTIES OUTPUT_NAME tnt)
 set_target_properties(tnt_shared PROPERTIES COMPILE_FLAGS "${tnt_cflags}")
