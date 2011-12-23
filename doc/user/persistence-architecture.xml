@@ -1,0 +1,85 @@
+<!DOCTYPE section [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<section xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink">
+<title>Data persistence</title>
+<para>
+To maintain data persistence, Tarantool writes each data change
+request (INSERT, UPDATE, DELETE) into a write ahead log. WAL
+files have extension <filename>.xlog</filename> and are stored in <olink
+targetptr="wal_dir"/>. A new WAL file is created for every <olink
+targetptr="rows_per_wal"/> records.  Each INSERT, UPDATE or DELETE
+gets assigned a continuously growing 64-bit log sequence number. The name of the log file is based on the log sequence
+number of the first record this file contains.
+</para>
+
+<para>Apart from a log sequence number and the data change request
+(its format is the same as in the binary protocol and is described
+in <link
+xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>),
+each WAL record contains a checksum and a UNIX time stamp.
+</para>
+
+<para>
+Tarantool proceeds requests atomically: a change is either
+accepted and recorded in the WAL, or is rejected wholesale.
+Let's clarify how this happens, using REPLACE command as an
+example:
+<orderedlist>
+    <listitem><para>
+    The server tries to locate an old tuple identified by
+    the same primary key. If found, the tuple is remembered for
+    later.
+    </para></listitem>
+    <listitem><para>
+    The new tuple is <emphasis>validated</emphasis>. If it
+    violates any of the unique key constraints, misses
+    any of indexed fields, or an indexed field type does not
+    match index type, the change is aborted.
+    </para></listitem>
+    <listitem><para>
+    The new tuple is marked 'invisible' and is added to 
+    the primary and secondary indexes.
+    </para></listitem>
+    <listitem><para>
+    A message is sent to a separate <quote>wal_writer</quote>
+    process requesting that the change is recorded in the WAL.
+    The fiber associate with the current connection is scheduled
+    off CPU until an acknowledgment is received from the WAL
+    writer.
+    </para></listitem>
+    <listitem><para>
+    Upon success, 'invisible' flag is cleared
+    and the old tuple is deleted. A response is sent to the
+    client. Upon failure, the new tuple is removed and <olink
+    targetptr="ER_WAL_IO"/> error is sent to the client.
+    </para></listitem>
+</orderedlist>
+</para>
+
+<para>
+Communication between master and WAL writer processes is asynchronous.
+It is implemented using 'inbox' paradigm, similar to 
+process inboxes in Erlang, from which it was derived.
+Asynchronous but reliable message passing between processes
+allows Tarantool to continue handling requests regardless of disk
+throughput. SELECT performance, provided SELECTs are run in their
+own connections, is unaffected by disk load.
+</para>
+
+<para>
+The size of each process' inbox is fixed. In particular,
+the WAL writer inbox can hold only <olink targetptr="wal_writer_inbox_size"/>
+messages. This can pose a practical problem when thousands of
+connections perform updates &mdash; the WAL writer inbox can become full.
+Once this happens, the server aborts any update for which
+sending a WAL message has failed with <olink targetptr="ER_WAL_IO"/>
+error.
+</para>
+</section>
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

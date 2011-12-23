@@ -120,8 +120,8 @@ Call OK, 2 rows affected
     to a 4-byte blob.
     </para>
     <para>In addition to conventional method invocation,
-    Lua provides object-oriented syntax. Access to the latter is also
-    only available on the administrative console:
+    Lua provides object-oriented syntax. Access to the latter is
+    available on the administrative console only:
 <programlisting><computeroutput>localhost> lua box.space[0]:truncate()
 ---
 ...
@@ -131,7 +131,7 @@ error: 1:15 expected '('
   </para>
   <para>
     Every value, returned from a stored function by means of
-    <code>return</code> clause, is converted to Tarantool/Box tuple
+    <code>return</code> clause, is converted to a Tarantool/Box tuple
     and sent back to the client in binary form. Tuples are
     returned as such; an atom, such as a string or an integer, is
     converted to a tuple that has only one field. In case of
@@ -144,13 +144,13 @@ error: 1:15 expected '('
     return code, with the original error message preserved.
     Similarly, an error occurred inside Tarantool (observed on the
     client as an error code), when happens during execution of a
-    Lua procedure, produces a genuine Lua error.
+    Lua procedure, produces a genuine Lua error:
 <programlisting><computeroutput>localhost> lua function f1() error("oops") end
 ---
 ...
 localhost> call f1()
 Call ERROR, Lua error: [string "function f1() error("oops") end"]:1: oops (ER_PROC_LUA)
-localhost> call box.insert('99', 1, 'test'
+localhost> call box.insert('99', 1, 'test')
 Call ERROR, Space 99 is disabled (ER_SPACE_DISABLED)
 localhost> lua pcall(box.insert, 99, 1, 'test')
 ---

@@ -501,7 +501,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         </row>
 
         <row>
-          <entry>rows_per_wal</entry>
+          <entry xml:id="rows_per_wal" xreflabel="rows_per_wal">rows_per_wal</entry>
           <entry>integer</entry>
           <entry>500000</entry>
           <entry>no</entry>
@@ -530,7 +530,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         </row>
 
         <row>
-          <entry>wal_writer_inbox_size</entry>
+          <entry xml:id="wal_writer_inbox_size" xreflabel="wal_writer_inbox_size">wal_writer_inbox_size</entry>
           <entry>integer</entry>
           <entry>128</entry>
           <entry>no</entry>
