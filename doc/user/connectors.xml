@@ -12,7 +12,7 @@
   C, Perl, Ruby, PHP and Python.
 </para></blockquote>
 
-<para>All connectors are located in srcdir/connector directory. Apart from the native Tarantool client driver, you can always use a <emphasis role="strong">Memcached</emphasis> driver of your choice, after enabling Memcached protocol in the configuration file.</para>
+<para>Apart from the native Tarantool client driver, you can always use a <emphasis role="strong">Memcached</emphasis> driver of your choice, after enabling Memcached protocol in the configuration file.</para>
 
   <section>
     <title>C</title>
@@ -25,7 +25,7 @@
   <section>
     <title>Perl</title>
     <para>
-       The perl client is located in <link
+       The Perl client is located in <link
        xlink:href="https://github.com/mailru/tarantool/blob/master/connector/perl/lib/"><filename>connector/perl/lib/</filename></link>.
     <orderedlist>
 
@@ -140,14 +140,16 @@
   <section>
     <title>PHP</title>
     <para>
-       @tba
+       Please see <link
+       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/php"><filename>connector/php</filename></link> in the source tree.
     </para>
   </section>
 
   <section>
     <title>Python</title>
     <para>
-       @tba
+       Please see <link
+       xlink:href="https://github.com/mailru/tarantool-python"><filename>http://github.com/mailru/tarantool-python</filename></link>.
     </para>
   </section>
 
@@ -156,105 +158,8 @@
     <para>
        You need <emphasis role="strong">Ruby 1.9</emphasis> or later
        to use this connector. Connector sources are located in <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/ruby/box.rb"><filename>connector/ruby/box.rb</filename></link>.
+       xlink:href="https://github.com/mailru/tarantool-ruby"><filename>http://github.com/mailru/tarantool-ruby</filename></link>.
     </para>
-    <para>
-       Assume, for the sake of example, that Tarantool has the
-       following space configuration:
-<programlisting language="c">
-primary_port = 33013 
-admin_port = 33015 
-log_level = 3
-slab_alloc_arena = 0.1
-
-space[0].enabled = 1
-space[0].index[0].type = "NUM"
-space[0].index[0].key_fields[0].fieldno = 0
-
-space[0].index[1].type = "STR"
-space[0].index[1].key_fields[0].fieldno = 1
-</programlisting>
-        The only defined space will be used to store user
-        account information, such as id, name, email, and other
-        properties. User ID is used for the primary key, but
-        it's also possible to find a user by name.
-   </para>
-   <para>In Ruby, a helper class is defined to present
-     Tarantool to the rest of the application as a typical object
-     container. 
-<example>
-<title>userbox.rb</title>
-<programlisting language="ruby"><![CDATA[require 'box'
-
-class UserBox < Box
-  def initialize(host)
-    super(host, :space => 0)
-  end
-
-  def insert(user)
-    case user
-    when Hash then super [user[:uid], user[:email], user[:name], user[:apple_count]]
-    when Array then super user
-    else fail "don't know what to do with #{user.class}"
-    end
-  end
-
-  def update_fields(key, *ops)
-    mapping = {:uid => 0, :email => 1, :name => 2, :apple_count => 3}
-    ops.map do |op|
-      op[0] = mapping[op[0]] if op.is_a? Array
-    end
-
-    super key, *ops
-  end
-
-  def unpack_tuple!(data)
-    tuple = super data
-    { :uid => tuple[0].unpack(?L)[0],
-      :email => tuple[1],
-      :name => tuple[2],
-      :apple_count => tuple[3].unpack(?L)[0]
-    }
-  end
-end]]></programlisting></example>
-     Here's how this helper class can be used:
-<programlisting><prompt>kostja@shmita:~$ </prompt><command>irb</command>
-<![CDATA[>> # Connect to the server
->> require 'userbox'
-=> true
->> b = UserBox.new 'localhost:33013'
-=> #<UserBox:0x870fd48 @space=1, @end_point=["localhost", 33013], @sock=#<TCPSocket:0x870f85c>
->> # Insert a few users
->> b.insert :uid => 1, :email => 'pupkin@mail.ru', :name => 'Vasya', :apple_count => 1
-=> 1
->> b.insert :uid => 2, :email => 'masha@mail.ru', :name => 'Masha', :apple_count => 0
-=> 1
->> b.insert :uid => 3, :email => 'petya@mail.ru', :name => 'Petya', :apple_count => 3
-=> 1
->> # Perform selects
->> b.select 1
-=> [{:uid=>1, :email=>"pupkin@mail.ru", :name=>"Vasya", :apple_count=>1}]
->> b.select 1,2,3
-=> [{:uid=>1, :email=>"pupkin@mail.ru", :name=>"Vasya", :apple_count=>1}, {:uid=>2, :email=>"masha@mail.ru", :name=>"Masha", :apple_count=>0}, {:uid=>3, :email=>"petya@mail.ru", :name=>"Petya", :apple_count=>3}]
->> # It's possible to retrieve records by email using second index
->> b.select 'pupkin@mail.ru', 'petya@mail.ru', :index => 1
-=> [{:uid=>1, :email=>"pupkin@mail.ru", :name=>"Vasya", :apple_count=>1}, {:uid=>3, :email=>"petya@mail.ru", :name=>"Petya", :apple_count=>3}]
-Delete
->> b.delete 2
-=> 1
->> # Update values
->> b.update_fields 1, [:apple_count, :add, 2 ]
-=> 1
->> b.select 1
-=> [{:uid=>1, :email=>"pupkin@mail.ru", :name=>"Vasya", :apple_count=>3}]
->> # It's possible to do several updates in a single atomic command
->> b.update_fields 3, [:apple_count, :add, 10], [:name, :set, "foobar"]
-=> 1
->> b.select 3
-=> [{:uid=>3, :email=>"petya@mail.ru", :name=>"foobar", :apple_count=>13}]
-]]>
-</programlisting>
-   </para>
   </section>
 
 </chapter>
