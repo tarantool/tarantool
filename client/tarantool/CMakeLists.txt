@@ -13,6 +13,7 @@ endif()
 set (cli_deps readline history)
 
 # trying to resolve readline dependencies
+#
 find_library(WITH_NCURSES_LIB NAMES "ncurses")
 if (WITH_NCURSES_LIB)
 	set(cli_deps ${cli_deps} ncurses)
