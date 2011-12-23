@@ -448,7 +448,7 @@ memcached_space_init()
 	key_def.cmp_order[0] = 0;
 
 	/* Configure memcached index. */
-	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :&key_def];
+	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :&key_def :space];
 	[memc_index init: HASH :&key_def :memc_s :0];
 }
 

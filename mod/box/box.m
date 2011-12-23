@@ -987,6 +987,55 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 	def->is_unique = cfg_index->unique;
 }
 
+/**
+ * Extract all available field info from keys
+ *
+ * @param space		space to extract field info for
+ * @param key_count	the number of keys
+ * @param key_defs	key description array
+ */
+static void
+extract_field_types(struct space *space, int key_count, struct key_def *key_defs)
+{
+	int i, field_count;
+
+	/* find max max field no */
+	field_count = 0;
+	for (i = 0; i < key_count; i++) {
+		field_count = MAX(field_count, key_defs[i].max_fieldno);
+	}
+
+	/* alloc & init field type info */
+	space->field_count = field_count;
+	space->field_types = salloc(field_count * sizeof(int));
+	for (i = 0; i < field_count; i++) {
+		space->field_types[i] = UNKNOWN;
+	}
+
+	/* extract field type info */
+	for (i = 0; i < key_count; i++) {
+		struct key_def *def = &key_defs[i];
+		for (int pi = 0; pi < def->part_count; pi++) {
+			struct key_part *part = &def->parts[pi];
+			assert(part->fieldno < field_count);
+			space->field_types[part->fieldno] = part->type;
+		}
+	}
+
+	/* validate field type info */
+	for (i = 0; i < key_count; i++) {
+		struct key_def *def = &key_defs[i];
+		for (int pi = 0; pi < def->part_count; pi++) {
+			struct key_part *part = &def->parts[pi];
+			if (space->field_types[part->fieldno] != part->type
+			    && space->field_types[part->fieldno] != UNKNOWN) {
+				space->field_types[part->fieldno] = UNKNOWN;
+				say_warn("conflicting field types");
+			}
+		}
+	}
+}
+
 static void
 space_config(void)
 {
@@ -1005,21 +1054,38 @@ space_config(void)
 		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
 
 		space[i].enabled = true;
-
+		space[i].n = i;
 		space[i].cardinality = cfg_space->cardinality;
+
+		/* count keys */
+		int key_count = 0;
+		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
+			++key_count;
+		}
+
+		/* collect key/field info */
+		struct key_def *key_defs = malloc(key_count * sizeof(struct key_def));
+		if (key_defs == NULL) {
+			panic("can't allocate key def array");
+		}
+		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
+			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
+			key_init(&key_defs[j], cfg_index);
+		}
+		extract_field_types(&space[i], key_count, key_defs);
+
 		/* fill space indexes */
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
-			struct key_def key_def;
-			key_init(&key_def, cfg_index);
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
-			Index *index = [Index alloc: type :&key_def];
-			[index init: type :&key_def:space + i :j];
+			Index *index = [Index alloc: type :&key_defs[j] :&space[i]];
+			[index init: type :&key_defs[j] :&space[i] :j];
 			space[i].index[j] = index;
 		}
 
-		space[i].enabled = true;
-		space[i].n = i;
+		/* free temp data */
+		free(key_defs);
+
 		say_info("space %i successfully configured", i);
 	}
 }

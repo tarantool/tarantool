@@ -46,6 +46,10 @@ struct space {
 	bool enabled;
 	int cardinality;
 	Index *index[BOX_INDEX_MAX];
+
+	/* inferred data */
+	int field_count;
+	int *field_types;
 };
 
 extern struct space *space;

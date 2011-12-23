@@ -24,6 +24,7 @@
  * SUCH DAMAGE.
  */
 #include "index.h"
+#include "tree.h"
 #include "say.h"
 #include "tuple.h"
 #include "pickle.h"
@@ -41,7 +42,7 @@ iterator_next_equal(struct iterator *it __attribute__((unused)))
 	return NULL;
 }
 
-static struct box_tuple *
+struct box_tuple *
 iterator_first_equal(struct iterator *it)
 {
 	it->next_equal = iterator_next_equal;
@@ -58,6 +59,7 @@ iterator_first_equal(struct iterator *it)
 @class TreeIndex;
 
 + (Index *) alloc: (enum index_type) type :(struct key_def *) key_def
+	:(struct space *) space;
 {
 	switch (type) {
 	case HASH:
@@ -76,7 +78,7 @@ iterator_first_equal(struct iterator *it)
 		}
 		break;
 	case TREE:
-		return [TreeIndex alloc];
+		return [TreeIndex alloc: key_def :space];
 	default:
 		break;
 	}
@@ -607,6 +609,7 @@ hash_iterator_free(struct iterator *iterator)
 
 /* }}} */
 
+#if 0
 /* {{{ TreeIndex and auxiliary structures. ************************/
 /**
  * A field reference used for TREE indexes. Either stores a copy
@@ -1020,6 +1023,7 @@ tree_iterator_next_equal(struct iterator *iterator)
 @end
 
 /* }}} */
+#endif
 
 void
 build_indexes(void)

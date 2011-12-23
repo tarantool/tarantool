@@ -38,7 +38,7 @@ struct index;
  * since there is a mismatch between enum name (STRING) and type
  * name literal ("STR"). STR is already used as Objective C type.
  */
-enum field_data_type { NUM, NUM64, STRING, field_data_type_MAX };
+enum field_data_type { UNKNOWN = -1, NUM = 0, NUM64, STRING, field_data_type_MAX };
 extern const char *field_data_type_strs[];
 
 enum index_type { HASH, TREE, index_type_MAX };
@@ -92,7 +92,8 @@ struct key_def {
 	u32 n;
 };
 
-+ (Index *) alloc: (enum index_type) type_arg :(struct key_def *) key_def_arg;
++ (Index *) alloc: (enum index_type) type :(struct key_def *) key_def
+	:(struct space *) space;
 /**
  * Initialize index instance.
  *
@@ -129,6 +130,8 @@ struct iterator {
 	struct box_tuple *(*next_equal)(struct iterator *);
 	void (*free)(struct iterator *);
 };
+
+struct box_tuple * iterator_first_equal(struct iterator *it);
 
 #define foreach_index(n, index_var)					\
 	Index *index_var;						\

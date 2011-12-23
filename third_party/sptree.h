@@ -64,6 +64,7 @@ typedef struct sptree_node_pointers {
 #define    _SET_SPNODE_RIGHT(n, v)     SET_SPNODE_RIGHT( t->lrpointers + (n), (v) )
 
 #define    ITHELEM(t, i)               ( (t)->members + (t)->elemsize * (i) )
+#define    ELEMIDX(t, e)               ( ((e) - (t)->members) / (t)->elemsize )
 
 /*
  * makes definition of tree with methods, name should
@@ -72,7 +73,9 @@ typedef struct sptree_node_pointers {
  * Methods:
  *   void sptree_NAME_init(sptree_NAME *tree, size_t elemsize, void *array, 
  *                         spnode_t array_len, spnode_t array_size, 
- *                         int (*compar)(const void *, const void *, void *), void *arg)
+ *                         int (*compare)(const void *key, const void *elem, void *arg),
+ *                         int (*elemcompare)(const void *e1, const void *e2, void *arg),
+ *                         void *arg)
  *   void* sptree_NAME_find(sptree_NAME *tree, void *key)
  *   void sptree_NAME_insert(sptree_NAME *tree, void *value)
  *   void sptree_NAME_delete(sptree_NAME *tree, void *value)
@@ -92,7 +95,8 @@ typedef struct sptree_##name {                                                  
     spnode_t                nmember;                                                      \
     spnode_t                ntotal;                                                       \
                                                                                           \
-    int                     (*compare)(const void *, const void *, void *);               \
+    int                     (*compare)(const void *key, const void *elem, void *);        \
+    int                     (*elemcompare)(const void *e1, const void *e2, void *);       \
     void*                   arg;                                                          \
     size_t                  elemsize;                                                     \
                                                                                           \
@@ -127,12 +131,15 @@ sptree_##name##_mktree(sptree_##name *t, spnode_t depth,                        
 static inline void                                                                        \
 sptree_##name##_init(sptree_##name *t, size_t elemsize, void *m,                          \
                     spnode_t nm, spnode_t nt,                                             \
-                    int (*compare)(const void *, const void *, void *), void *arg) {      \
+                    int (*compare)(const void *, const void *, void *),                   \
+                    int (*elemcompare)(const void *, const void *, void *),               \
+                    void *arg) {                                                          \
     memset(t, 0, sizeof(*t));                                                             \
     t->members = m;                                                                       \
     t->max_size = t->size = t->nmember = nm;                                              \
     t->ntotal = (nt==0) ? nm : nt;                                                        \
-    t->compare = compare;                                                                 \
+    t->compare = compare != NULL ? compare : elemcompare;                                 \
+    t->elemcompare = elemcompare != NULL ? elemcompare : compare;			  \
     t->arg = arg;                                                                         \
     t->elemsize = elemsize;                                                               \
     t->garbage_head = t->root = SPNIL;                                                    \
@@ -153,7 +160,7 @@ sptree_##name##_init(sptree_##name *t, size_t elemsize, void *m,                
         _SET_SPNODE_RIGHT(0, SPNIL);                                                      \
         _SET_SPNODE_LEFT(0, SPNIL);                                                       \
     } else if (t->nmember > 1)    {                                                       \
-        qsort_arg(t->members, t->nmember, elemsize, t->compare, t->arg);                  \
+        qsort_arg(t->members, t->nmember, elemsize, t->elemcompare, t->arg);              \
         /* create tree */                                                                 \
         t->root = sptree_##name##_mktree(t, 1, 0, t->nmember);                            \
     }                                                                                     \
@@ -239,6 +246,19 @@ sptree_##name##_get_place(sptree_##name *t) {                                   
     return node;                                                                          \
 }                                                                                         \
                                                                                           \
+static inline void*                                                                       \
+sptree_##name##_reserve_node(sptree_##name *t) {                                          \
+    spnode_t    node = sptree_##name##_get_place(t);                                      \
+    return ITHELEM(t, node);                                                              \
+}                                                                                         \
+                                                                                          \
+static inline void                                                                        \
+sptree_##name##_release_node(sptree_##name *t, void *elem) {				  \
+    spnode_t    node = ELEMIDX(t, elem);					          \
+    _SET_SPNODE_LEFT(node, t->garbage_head);                                              \
+    t->garbage_head = node;                                                               \
+}                                                                                         \
+                                                                                          \
 static inline spnode_t                                                                    \
 sptree_##name##_flatten_tree(sptree_##name *t, spnode_t root, spnode_t head){             \
     spnode_t    node;                                                                     \
@@ -299,7 +319,7 @@ sptree_##name##_insert(sptree_##name *t, void *v) {                             
         spnode_t    parent = t->root;                                                     \
                                                                                           \
         for(;;)    {                                                                      \
-            int r = t->compare(v, ITHELEM(t, parent), t->arg);                            \
+            int r = t->elemcompare(v, ITHELEM(t, parent), t->arg);                        \
             if (r==0) {                                                                   \
                 memcpy(ITHELEM(t, parent), v, t->elemsize);                               \
                 return;                                                                   \
@@ -370,7 +390,7 @@ sptree_##name##_delete(sptree_##name *t, void *k) {                             
     spnode_t    parent = SPNIL;                                                           \
     int            lr = 0;                                                                \
     while(node != SPNIL) {                                                                \
-        int r = t->compare(k, ITHELEM(t, node), t->arg);                                  \
+        int r = t->elemcompare(k, ITHELEM(t, node), t->arg);                              \
         if (r > 0) {                                                                      \
             parent = node;                                                                \
             node = _GET_SPNODE_RIGHT(node);                                               \
