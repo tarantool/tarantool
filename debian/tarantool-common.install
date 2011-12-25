@@ -1,2 +1,2 @@
 debian/etc/example.cfg /etc/tarantool/instances.available/
-debian/scripts/init_instance.sh /usr/lib/tarantool/
+debian/scripts/tarantool_instance /usr/sbin

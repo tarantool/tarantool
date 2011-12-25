@@ -18,7 +18,7 @@ CONF_DIR=/etc/tarantool/instances.enabled
 SCRIPTNAME=/etc/init.d/tarantool
 DAEMON=/usr/bin/tarantool_box
 INSTANCES=`find $CONF_DIR -xtype f -name '*.cfg'`
-INSTSCRIPT=/usr/lib/tarantool/init_instance.sh
+INSTSCRIPT=/usr/sbin/tarantool_instance
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0

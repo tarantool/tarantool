@@ -10,6 +10,9 @@ PID_DIR=/var/run/tarantool
 LOG_DIR=/var/log/tarantool
 BOX=/usr/bin/tarantool_box
 SSD=start-stop-daemon
+CFG_DIR=/etc/tarantool/instances.enabled
+
+chdir $CFG_DIR
 
 usage="Usage: sh $0 /path/to/config.file start|stop"
 
@@ -26,6 +29,11 @@ fi
 if ! test -r "$CFG"; then
     echo File $CFG not found
     exit 10
+fi
+
+if ! test -x $BOX; then
+    echo "$BOX can't be started"
+    exit 15
 fi
 
 
