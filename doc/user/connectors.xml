@@ -25,7 +25,7 @@
   <section>
     <title>Perl</title>
     <para>
-       <link xlink:href="http://search.cpan.org/search?query=Tarantool&mode=all">MR::Tarantool::Box</link>
+       Please refer to CPAN module <link xlink:href="http://search.cpan.org/search?query=Tarantool&mode=all">MR::Tarantool::Box</link>.
     </para>
   </section>
 
