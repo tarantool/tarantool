@@ -438,10 +438,7 @@ PHP_MINFO_FUNCTION(tarantool)
 {
 	php_info_print_table_start();
 	php_info_print_table_header(2, "Tarantool/Box support", "enabled");
-	php_info_print_table_row(2, "default host", TARANTOOL_DEFAULT_HOST);
-	php_info_print_table_row(2, "default primary port", TARANTOOL_DEFAULT_PORT);
-	php_info_print_table_row(2, "default read-only port", TARANTOOL_DEFAULT_RO_PORT);
-	php_info_print_table_row(2, "default admin port", TARANTOOL_DEFAULT_ADMIN_PORT);
+	php_info_print_table_row(2, "Extension version", TARANTOOL_EXTENSION_VERSION);
 	php_info_print_table_end();
 }
 
