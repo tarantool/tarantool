@@ -87,6 +87,14 @@ Increases verbosity level in log messages.
 Redirects input/output streams to a log file and runs as
 daemon.
 
+=item -l LOGGER, --logger=LOGGER
+
+Defines logger process (like the same config option).
+
+=item -p PIDFILE, --pid_file=PIDFILE
+
+Defines pid_file (like the same config option).
+
 =item -h, --help
 
 Displays helpscreen and exits.

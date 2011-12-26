@@ -10,7 +10,7 @@ VCS-Git: git+ssh://git.debian.org/git/collab-maint/tarantool.git
 Package: tarantool-common
 Architecture: all
 Priority: optional
-Depends: ${misc:Depends}, cronolog, adduser
+Depends: ${misc:Depends}, adduser
 Description: high performance key/value storage server
  Tarantool is an open-source NoSQL database, developed by Mail.ru.
  Its key properties include:

@@ -43,6 +43,11 @@ install/tarantool::
 	pod2man -c 'high performance key/value storage server' \
 	    debian/tarantool_box.pod > build-area/tarantool_box.1
 
+install/tarantool-common::
+	pod2man -c 'tarantool instances control' \
+	    debian/tarantool_instance.pod > build-area/tarantool_instance.1
+	install -m0755 extra/logger.pl \
+	    debian/tarantool-common/usr/lib/tarantool/logger
 
 install/tarantool-client::
 	pod2man -c 'readline SQL-client for tarantool.' \

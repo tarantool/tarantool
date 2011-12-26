@@ -26,14 +26,27 @@ if ! echo $ACTION|grep -q '^\(start\|stop\)$'; then
     exit 5
 fi
 
+
 if ! test -r "$CFG"; then
-    echo File $CFG not found
-    exit 10
+    if echo $CFG|grep -q '\.cfg$'; then
+        echo File $CFG not found
+        exit 10
+    else
+        if ! test -r "$CFG.cfg"; then
+            echo "Instance config '$CFG' not found"
+            exit 15
+        fi
+        CFG="$CFG.cfg"
+    fi
 fi
 
+CFG=`perl -MFile::Spec -e "print File::Spec->rel2abs('$CFG')"`
+
+echo $CFGABS
+
 if ! test -x $BOX; then
-    echo "$BOX can't be started"
-    exit 15
+    echo "$BOX not found or can't be started"
+    exit 20
 fi
 
 
@@ -43,6 +56,7 @@ PID=$PID_DIR/$NAME.pid
 SCFG=$CONFIG_DIR/$NAME
 RUNDIR=$SNAPSHOT_DIR/$NAME
 LOG=$LOG_DIR/$NAME.log
+LOGGER="exec /usr/lib/tarantool/logger $LOG"
 SOCKETS=`grep \
     '^[[:space:]]*file_descriptors[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
     | tail -n 1 \
@@ -59,22 +73,21 @@ fi
 ulimit -c unlimited
 
 comment_str="#### - commented by init script"
-sed "s/^[[:space:]]*logger.*/# & $comment_str/" $CFG \
-    | sed "s/^[[:space:]]*file_descriptors.*/# & $comment_str/" \
-    | sed "s/^[[:space:]]*pid_file.*/# & $comment_str/" > $SCFG
+sed "s/^[[:space:]]*file_descriptors.*/# & $comment_str/" $CFG > $SCFG
 
 $BOX -c $SCFG -v --check-config
 
-echo "pid_file = $PID"              >> $SCFG
-echo "logger   = \"cat >> $LOG\""   >> $SCFG
+
+# echo "pid_file = $PID"              >> $SCFG
+# echo "logger   = \"cat >> $LOG\""   >> $SCFG
 
 if [ ! -d $RUNDIR ]; then
     install -d -otarantool -gtarantool -m0750 $RUNDIR
     cd $RUNDIR
-    if ! $SSD --start $SSDARGS $BOX -- --init-storage -v -c $SCFG;
+    if ! $SSD --start $SSDARGS $BOX -- --init-storage -v -c $SCFG -p $PID;
     then
         rm -fr $RUNDIR
-        exit 15
+        exit 25
     fi
 fi
 
@@ -84,8 +97,7 @@ else
     echo -n "\tStopping '$NAME' ... "
 fi
 
-if $SSD --$ACTION $SSDARGS $BOX -- -B -v -c $SCFG >/dev/null 2>&1;
-then
+if $SSD --$ACTION $SSDARGS $BOX -- -B -v -c $SCFG -p $PID -l "$LOGGER"; then
     echo "ok"
 else
     ret=$?
