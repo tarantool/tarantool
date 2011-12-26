@@ -10,7 +10,7 @@
 <title>Tarantool/Box User Guide, version &tnt_version;</title>
 <xi:include href="preface.xml"/>
 <xi:include href="tutorial.xml"/>
-<xi:include href="data-model.xml"/>
+<xi:include href="data-and-persistence.xml"/>
 <xi:include href="language-reference.xml"/>
 <xi:include href="replication.xml"/>
 <xi:include href="configuration-reference.xml"/>

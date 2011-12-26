@@ -79,7 +79,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.8;
+$VERSION = 0.0.10;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -605,7 +605,7 @@ sub Replace { # store tuple if tuple identified by primary key _does_ exist
 }
 
 sub Insert {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/want_result want_inserted_tuple _flags action/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/want_result want_inserted_tuple _flags action raw/);
     my ($self, @tuple) = @_;
 
     $self->_debug("$self->{name}: INSERT(NS:$namespace->{namespace},TUPLE:[@{[map {qq{`$_'}} @tuple]}])") if $self->{debug} >= 3;
@@ -982,7 +982,7 @@ if C<$bool> then return deleted tuple.
 =cut
 
 sub Delete {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/want_deleted_tuple want_result/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/want_deleted_tuple want_result raw/);
     my ($self, $key) = @_;
 
     $param->{want_result} = $param->{want_deleted_tuple} if !defined $param->{want_result};
@@ -1139,7 +1139,7 @@ if C<$bool> then return updated tuple.
 =cut
 
 sub UpdateMulti {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/want_updated_tuple want_result _flags/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/want_updated_tuple want_result _flags raw/);
     my ($self, $key, @op) = @_;
 
     $self->_debug("$self->{name}: UPDATEMULTI(NS:$namespace->{namespace},KEY:$key)[@{[map{qq{[@$_]}}@op]}]") if $self->{debug} >= 3;

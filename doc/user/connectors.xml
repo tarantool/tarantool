@@ -12,7 +12,7 @@
   C, Perl, Ruby, PHP and Python.
 </para></blockquote>
 
-<para>All connectors are located in srcdir/connector directory. Apart from the native Tarantool client driver, you can always use a <emphasis role="strong">Memcached</emphasis> driver of your choice, after enabling Memcached protocol in the configuration file.</para>
+<para>Apart from the native Tarantool client driver, you can always use a <emphasis role="strong">Memcached</emphasis> driver of your choice, after enabling Memcached protocol in the configuration file.</para>
 
   <section>
     <title>C</title>
@@ -25,129 +25,23 @@
   <section>
     <title>Perl</title>
     <para>
-       The perl client is located in <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/perl/lib/"><filename>connector/perl/lib/</filename></link>.
-    <orderedlist>
-
-    <listitem>
-      <simpara><emphasis role="strong">new</emphasis></simpara>
-<programlisting language="perl"><![CDATA[
-     my $box = MR::SilverBox->new({
-            spaces => [ {
-                indexes => [ {
-                    index_name   => 'primary_id',
-                    keys         => [0],
-                }, {
-                    index_name   => 'primary_email',
-                    keys         => [1],
-                }, ],
-                space     => 0,
-                format        => 'l& SSLL',
-                default_index => 'primary_id',
-            } ],
-        },
-        servers      => $server})
-]]></programlisting>
-    </listitem>
-
-    <listitem>
-      <simpara><emphasis role="strong">Insert</emphasis></simpara>
-<programlisting language="perl">
-    $box->Insert(@tuple);
-</programlisting>
-    </listitem>
-
-    <listitem>
-      <simpara><emphasis role="strong">Select</emphasis></simpara>
-<programlisting language="perl"><![CDATA[
-    [\%tuple1, \%tuple2, ...] = $box->Select(@id);
-    \%tuple = $box->Select($id);
-    [\@tuple1, \@tuple2, ...] = $box->Select(@id, {raw => 1});
-    \@tuple = $box->Select($id, {raw => 1});
-    $box->Select($email, {use_index => 1});
-]]></programlisting>
-    </listitem>
-
-    <listitem>
-      <simpara><emphasis role="strong">Update</emphasis>
-      accepts parameters in the last argument just like Select:</simpara>
-<programlisting language="perl"><![CDATA[
-    $key = 1; # key, ID of user by default
-    $field_num = 2; # posititon in tuple, starts from 0, must be >= 1
-    $value = pack('L', 123);  # integer values must be packed
-    $box->Update($key, $field_num, $value);
-]]></programlisting>
-    </listitem>
-
-    <listitem>
-      <simpara><emphasis role="strong">Delete</emphasis></simpara>
-<programlisting language="perl"><![CDATA[
-    $box->Delete($key);
-]]></programlisting>
-    </listitem>
-
-    <listitem>
-      <simpara><emphasis role="strong">AndXorAdd</emphasis>
-      transforms the tuple field at position <quote>$field_num</quote>
-      according to formula <quote>field= ((field &amp; $and_mask) ^ $xor_mask) + $add_value</quote>.
-      </simpara>
-<programlisting language="perl"><![CDATA[
-    $box->AndXorAdd($key, $field_num, $and_mask, $xor_mask, $add_value);
-]]></programlisting>
-    </listitem>
-
-    <listitem>
-      <simpara><emphasis role="strong">Bit</emphasis>
-      performs a bitwise operation on field at position
-      <quote>$field_num</quote>. Unused arguments can be omitted.
-      Note: <quote>set</quote> has a higher precedence than
-      <quote>bit_set</quote> and <quote>bit_clear</quote>.
-      </simpara>
-<programlisting language="perl"><![CDATA[
-     $box->Bit($key, $field_num, bit_clear => $clear_mask, bit_set => $set_mask, set => $set_value);
-     $box->Bit($key, $field_num, bit_set => $set_mask);
-]]></programlisting>
-    </listitem>
-
-    <listitem>
-      <simpara><emphasis role="strong">Num</emphasis>
-      performs a numeric update operation on field at position
-      <quote>$field_num</quote>. Unused arguments can be omitted.
-      Note: again, <quote>set</quote> has a higher precedence than
-      <quote>num_add</quote> and <quote>num_sub</quote>.
-      </simpara>
-<programlisting language="perl"><![CDATA[
-     $box->Num($key, $field_num, set => $set_value, num_add => $add_value, num_sub => $sub_value);
-]]></programlisting>
-    </listitem>
-
-    <listitem>
-      <simpara><emphasis role="strong">Flag</emphasis>
-      sets or clears flags on a tuple, the calling convention 
-      is the same as for <quote>Bit</quote> and <quote>Num</quote>
-      operations.
-      </simpara>
-<programlisting language="perl"><![CDATA[
-     $box->Flags(bit_set => $set_mask, bit_clear => $clear_mask);
-]]></programlisting>
-    </listitem>
-
-    </orderedlist>
-
+       Please refer to CPAN module <link xlink:href="http://search.cpan.org/search?query=Tarantool&mode=all">MR::Tarantool::Box</link>.
     </para>
   </section>
 
   <section>
     <title>PHP</title>
     <para>
-       @tba
+       Please see <link
+       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/php"><filename>connector/php</filename></link> in the source tree.
     </para>
   </section>
 
   <section>
     <title>Python</title>
     <para>
-       @tba
+       Please see <link
+       xlink:href="https://github.com/mailru/tarantool-python"><filename>http://github.com/mailru/tarantool-python</filename></link>.
     </para>
   </section>
 
@@ -156,105 +50,8 @@
     <para>
        You need <emphasis role="strong">Ruby 1.9</emphasis> or later
        to use this connector. Connector sources are located in <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/ruby/box.rb"><filename>connector/ruby/box.rb</filename></link>.
+       xlink:href="https://github.com/mailru/tarantool-ruby"><filename>http://github.com/mailru/tarantool-ruby</filename></link>.
     </para>
-    <para>
-       Assume, for the sake of example, that Tarantool has the
-       following space configuration:
-<programlisting language="c">
-primary_port = 33013 
-admin_port = 33015 
-log_level = 3
-slab_alloc_arena = 0.1
-
-space[0].enabled = 1
-space[0].index[0].type = "NUM"
-space[0].index[0].key_fields[0].fieldno = 0
-
-space[0].index[1].type = "STR"
-space[0].index[1].key_fields[0].fieldno = 1
-</programlisting>
-        The only defined space will be used to store user
-        account information, such as id, name, email, and other
-        properties. User ID is used for the primary key, but
-        it's also possible to find a user by name.
-   </para>
-   <para>In Ruby, a helper class is defined to present
-     Tarantool to the rest of the application as a typical object
-     container. 
-<example>
-<title>userbox.rb</title>
-<programlisting language="ruby"><![CDATA[require 'box'
-
-class UserBox < Box
-  def initialize(host)
-    super(host, :space => 0)
-  end
-
-  def insert(user)
-    case user
-    when Hash then super [user[:uid], user[:email], user[:name], user[:apple_count]]
-    when Array then super user
-    else fail "don't know what to do with #{user.class}"
-    end
-  end
-
-  def update_fields(key, *ops)
-    mapping = {:uid => 0, :email => 1, :name => 2, :apple_count => 3}
-    ops.map do |op|
-      op[0] = mapping[op[0]] if op.is_a? Array
-    end
-
-    super key, *ops
-  end
-
-  def unpack_tuple!(data)
-    tuple = super data
-    { :uid => tuple[0].unpack(?L)[0],
-      :email => tuple[1],
-      :name => tuple[2],
-      :apple_count => tuple[3].unpack(?L)[0]
-    }
-  end
-end]]></programlisting></example>
-     Here's how this helper class can be used:
-<programlisting><prompt>kostja@shmita:~$ </prompt><command>irb</command>
-<![CDATA[>> # Connect to the server
->> require 'userbox'
-=> true
->> b = UserBox.new 'localhost:33013'
-=> #<UserBox:0x870fd48 @space=1, @end_point=["localhost", 33013], @sock=#<TCPSocket:0x870f85c>
->> # Insert a few users
->> b.insert :uid => 1, :email => 'pupkin@mail.ru', :name => 'Vasya', :apple_count => 1
-=> 1
->> b.insert :uid => 2, :email => 'masha@mail.ru', :name => 'Masha', :apple_count => 0
-=> 1
->> b.insert :uid => 3, :email => 'petya@mail.ru', :name => 'Petya', :apple_count => 3
-=> 1
->> # Perform selects
->> b.select 1
-=> [{:uid=>1, :email=>"pupkin@mail.ru", :name=>"Vasya", :apple_count=>1}]
->> b.select 1,2,3
-=> [{:uid=>1, :email=>"pupkin@mail.ru", :name=>"Vasya", :apple_count=>1}, {:uid=>2, :email=>"masha@mail.ru", :name=>"Masha", :apple_count=>0}, {:uid=>3, :email=>"petya@mail.ru", :name=>"Petya", :apple_count=>3}]
->> # It's possible to retrieve records by email using second index
->> b.select 'pupkin@mail.ru', 'petya@mail.ru', :index => 1
-=> [{:uid=>1, :email=>"pupkin@mail.ru", :name=>"Vasya", :apple_count=>1}, {:uid=>3, :email=>"petya@mail.ru", :name=>"Petya", :apple_count=>3}]
-Delete
->> b.delete 2
-=> 1
->> # Update values
->> b.update_fields 1, [:apple_count, :add, 2 ]
-=> 1
->> b.select 1
-=> [{:uid=>1, :email=>"pupkin@mail.ru", :name=>"Vasya", :apple_count=>3}]
->> # It's possible to do several updates in a single atomic command
->> b.update_fields 3, [:apple_count, :add, 10], [:name, :set, "foobar"]
-=> 1
->> b.select 3
-=> [{:uid=>3, :email=>"petya@mail.ru", :name=>"foobar", :apple_count=>13}]
-]]>
-</programlisting>
-   </para>
   </section>
 
 </chapter>

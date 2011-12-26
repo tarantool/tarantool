@@ -1,1 +1,2 @@
-A toy implementation of ruby client library for IProto/Box binary protocol
+Tarantool Ruby driver can be found at
+https://github.com/mailru/tarantool-ruby

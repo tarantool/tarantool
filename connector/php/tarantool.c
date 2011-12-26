@@ -438,10 +438,7 @@ PHP_MINFO_FUNCTION(tarantool)
 {
 	php_info_print_table_start();
 	php_info_print_table_header(2, "Tarantool/Box support", "enabled");
-	php_info_print_table_row(2, "default host", TARANTOOL_DEFAULT_HOST);
-	php_info_print_table_row(2, "default primary port", TARANTOOL_DEFAULT_PORT);
-	php_info_print_table_row(2, "default read-only port", TARANTOOL_DEFAULT_RO_PORT);
-	php_info_print_table_row(2, "default admin port", TARANTOOL_DEFAULT_ADMIN_PORT);
+	php_info_print_table_row(2, "Extension version", TARANTOOL_EXTENSION_VERSION);
 	php_info_print_table_end();
 }
 
@@ -994,7 +991,7 @@ PHP_METHOD(tarantool_class, update_fields)
 	add_assoc_long(return_value, "count", response->count);	
 
 	/* check "return tuple" flag */
-	if (flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+	if ((response->count > 0) && (flags & TARANTOOL_FLAGS_RETURN_TUPLE)) {
 		/* ok, the responce should contain inserted tuple */
 		if (!io_buf_read_tuple(tnt->io_buf, &tuple)) {
 			zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
@@ -1109,7 +1106,7 @@ PHP_METHOD(tarantool_class, delete)
 	add_assoc_long(return_value, "count", response->count);
 
 	/* check "return tuple" flag */
-	if (flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+	if ((response->count) > 0 && (flags & TARANTOOL_FLAGS_RETURN_TUPLE)) {
 		/* ok, the responce should contain inserted tuple */
 		if (!io_buf_read_tuple(tnt->io_buf, &tuple)) {
 			zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,

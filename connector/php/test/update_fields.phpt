@@ -51,6 +51,19 @@ test_update_fields($tarantool, 0, 0,
                        ), TARANTOOL_FLAGS_RETURN_TUPLE);
 echo "----------- test end -----------\n\n";
 
+echo "---------- test begin ----------\n";
+echo "test update fields: delete not existing tuple w/ return tuple flag\n";
+test_update_fields($tarantool, 0, 0,
+                   array(
+                       array(
+                           "field" => 2,
+                           "op" => TARANTOOL_OP_ADD,
+                           "arg" => 30,
+                           ),
+                       ),
+                   TARANTOOL_FLAGS_RETURN_TUPLE);
+echo "----------- test end -----------\n\n";
+
 test_clean($tarantool, 0);
 ?>
 ===DONE===
@@ -91,6 +104,12 @@ starship, custodian of the stolen plans
 that can save her people and restore
 freedom to the galaxy....
   uuid   = -1091633151
+----------- test end -----------
+
+---------- test begin ----------
+test update fields: delete not existing tuple w/ return tuple flag
+result:
+count = 0
 ----------- test end -----------
 
 ===DONE===
