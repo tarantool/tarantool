@@ -31,7 +31,7 @@ log() {
 
 usage() {
 	echo "Tarantool DB expand script"
-	echo "usage: tarantool_expand.sh <options> <instances>"
+	echo "usage: tarantool_expand.sh [options] <instances>"
 	echo
 	echo "  --prefix <path>       installation path ($prefix)"
 	echo "  --prefix_etc <path>   installation etc path ($prefix_etc)"
