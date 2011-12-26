@@ -14,7 +14,11 @@ deploy_current=0
 deploy_count=0
 
 prompt_name=`basename $0`
-prompt=1
+
+act_prompt=1
+act_status=0
+act_debug=0
+act_dry=0
 
 error() {
 	echo "$prompt_name error: $*" 1>&2
@@ -27,8 +31,19 @@ log() {
 
 usage() {
 	echo "Tarantool DB expand script"
+	echo "usage: tarantool_expand.sh <options> <instances>"
 	echo
-	echo "usage: tarantool_expand.sh [-y] <servers>"
+	echo "  --prefix <path>       installation path ($prefix)"
+	echo "  --prefix_etc <path>   installation etc path ($prefix_etc)"
+	echo "  --prefix_var <path>   installation var path ($prefix_var)"
+	echo
+	echo "  --status              display deployment status"
+	echo "  --dry                 don't create anything, show commands"
+	echo
+	echo "  --debug               show commands"
+	echo "  --yes                 don't prompt"
+	echo "  --help                display this usage"
+	echo
 	exit 0
 }
 
@@ -36,16 +51,16 @@ rollback_instance() {
 	id=$1
 	workdir="${prefix_var}/tarantool$id"
 	config="${prefix}/etc/tarantool$id.cfg"
-
+	rm -rf $workdir
+	rm -f $config
 	rm -f "${prefix}/bin/tarantool$id.sh"
 	rm -f "${prefix_etc}/init.d/tarantool$id"
-	rm -f $config
-	rm -rf $work_dir
 }
 
 rollback() {
-	log "rollbacking changes"
-	for instance in `seq $deploy_current $deploy_count`; do
+	log ">>>> rollbacking changes"
+	start=`expr $deploy_current + 1`
+	for instance in `seq $start $deploy_count`; do
 		rollback_instance $instance
 	done
 	exit 1
@@ -53,11 +68,12 @@ rollback() {
 
 try() {
 	cmd="$*"
-	log $cmd
-	eval $cmd
-	if [ $? -gt 0 ]; then
-#		log "failed: $cmd"
-		rollback
+	[ $act_debug -gt 0 ] && log $cmd
+	if [ $act_dry -eq 0 ]; then 
+		eval $cmd
+		if [ $? -gt 0 ]; then
+			rollback
+		fi
 	fi
 }
 
@@ -66,21 +82,19 @@ deploy_instance() {
 	workdir="${prefix_var}/tarantool$id"
 	config="${prefix}/etc/tarantool$id.cfg"
 
-	log "-- deploying instance $id"
+	log ">>>> deploying instance $id"
 
 	# setting up work environment
 	try "mkdir -p $workdir/logs"
-	try "chown tarantool:tarantool -R $workdir"
-
 	# setting up startup snapshot
 	try "cp \"${prefix}/share/tarantool/00000000000000000001.snap\" $workdir"
+	try "chown tarantool:tarantool -R $workdir"
 
 	# setting up configuration file
 	try "cp \"${prefix}/etc/tarantool.cfg\" $config"
-
 	try "echo \"work_dir = \"$workdir\"\" >> $config"
 	try "echo \"username = \"tarantool\"\" >> $config"
-	try "echo \"logger = \"cat - >> logs/tarantool.log\"\" >> $config"
+	try "echo \"logger = \"cat - \>\> logs/tarantool.log\"\" >> $config"
 
 	# setting up wrapper
 	try "ln -s \"${prefix}/bin/tarantool_multi.sh\" \"${prefix}/bin/tarantool$id.sh\""
@@ -90,43 +104,59 @@ deploy_instance() {
 }
 
 deploy() {
-	for instance in `seq $deploy_current $deploy_count`; do
+	start=`expr $deploy_current + 1`
+	for instance in `seq $start $deploy_count`; do
 		deploy_instance $instance
 	done
 }
 
-update() {
-	log "-- updating deploy config"
-	try "echo $deploy_current > $deploy_cfg"
+commit() {
+	log ">>>> updating deploy config"
+	try "echo $deploy_count > $deploy_cfg"
 }
 
 # processing command line arguments
-if [ $# -eq 2 ]; then
-	if [ "$1" != "-y" ]; then
-		usage
-	fi
-	prompt=0
-	deploy_count=$2
-else
-	if [ $# -ne 1 ]; then
-		usage
-	fi
-	deploy_count=$1
+if [ $# -eq 0 ]; then
+	usage
 fi
+while [ $# -ge 1 ]; do
+	case $1 in
+		--yes) act_prompt=0 ; shift 1 ;;
+		--prefix) prefix=$2 ; shift 2 ;;
+		--prefix_var) prefix_var=$2 ; shift 2 ;;
+		--prefix_etc) prefix_etc=$2 ; shift 2 ;;
+		--dry) act_dry=1 ; act_debug=1 ; shift 1;;
+		--debug) act_debug=1; shift 1;;
+		--status) act_status=1 ; shift 1 ;;
+		--help) usage ; shift 1 ;;
+		*) deploy_count=$1 ; shift 1 ; break ;;
+	esac
+done
 
-# validating instance number
-[ $deploy_count -eq $deploy_count -o $deploy_count -le 0 ] 2>/dev/null || \
-	error "bad instance number"
-
+# checking deployment configuration file
 if [ -f $deploy_cfg ]; then
 	deploy_exists=1
 	deploy_current=`cat $deploy_cfg`
 	# dont' change deploy if it said so in configuration file
 	if [ $deploy_current -eq 0 ]; then
-		log "skipping deploy setup"
+		log "skipping deploy setup (cancel by config)"
 		exit 0
 	fi
 fi
+
+# displaying status
+if [ $act_status -ne 0 ]; then 
+	if [ $deploy_exists -eq 0 ]; then
+		log "no tarantool instances found."
+	else
+		log "$deploy_current tarantool instances deployed"
+	fi
+	exit 0
+fi
+
+# validating instance number
+[ $deploy_count -eq $deploy_count ] 2>/dev/null && [ $deploy_count -gt 0 ] || \
+	error "bad instance number"
 
 if [ $deploy_count -le $deploy_current ]; then
 	error "expand only is supported (required instances number $deploy_count" \
@@ -134,8 +164,9 @@ if [ $deploy_count -le $deploy_current ]; then
 fi
 
 # asking permission to continue
-if [ $prompt -eq 1 ]; then
-	log "About to deploy $deploy_current - $deploy_count tarantool instances."
+if [ $act_prompt -eq 1 ]; then
+	[ $act_dry -ne 0 ] && log "(dry mode)"
+	log "About to extend tarantool instances from $deploy_current to $deploy_count."
 	log "Run? [n/y]"
 	read answer
 	case "$answer" in
@@ -148,6 +179,6 @@ if [ $prompt -eq 1 ]; then
 fi
 
 deploy
-update
+commit
 
 log "done"
