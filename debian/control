@@ -1,6 +1,12 @@
 Source: tarantool
 Maintainer: Dmitry E. Oboukhov <unera@debian.org>
-Build-Depends: cdbs, debhelper (>= 8), gobjc, cmake, libreadline-dev
+Build-Depends: cdbs, debhelper (>= 8),
+ gobjc,
+ cmake,
+ libreadline-dev,
+ python-yaml,
+ python-daemon,
+ python-pexpect
 Section: database
 Standards-Version: 3.9.2
 Homepage: http://tarantool.org/
