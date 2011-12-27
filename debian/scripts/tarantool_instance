@@ -1,0 +1,113 @@
+#!/bin/sh
+
+set -e
+
+CFG=$1
+ACTION=$2
+CONFIG_DIR=/var/lib/tarantool/started
+SNAPSHOT_DIR=/var/lib/tarantool/snapshot
+PID_DIR=/var/run/tarantool
+LOG_DIR=/var/log/tarantool
+BOX=/usr/bin/tarantool_box
+SSD=start-stop-daemon
+CFG_DIR=/etc/tarantool/instances.enabled
+
+chdir $CFG_DIR
+
+usage="Usage: sh $0 /path/to/config.file start|stop"
+
+if test -z "$CFG"; then
+    echo $usage
+    exit 5
+fi
+
+if ! echo $ACTION|grep -q '^\(start\|stop\)$'; then
+    echo $usage
+    exit 5
+fi
+
+
+if ! test -r "$CFG"; then
+    if echo $CFG|grep -q '\.cfg$'; then
+        echo File $CFG not found
+        exit 10
+    else
+        if ! test -r "$CFG.cfg"; then
+            echo "Instance config '$CFG' not found"
+            exit 15
+        fi
+        CFG="$CFG.cfg"
+    fi
+fi
+
+CFG=`perl -MFile::Spec -e "print File::Spec->rel2abs('$CFG')"`
+
+echo $CFGABS
+
+if ! test -x $BOX; then
+    echo "$BOX not found or can't be started"
+    exit 20
+fi
+
+
+NAME=`basename $CFG .cfg`
+
+PID=$PID_DIR/$NAME.pid
+SCFG=$CONFIG_DIR/$NAME
+RUNDIR=$SNAPSHOT_DIR/$NAME
+LOG=$LOG_DIR/$NAME.log
+LOGGER="exec /usr/lib/tarantool/logger $LOG"
+SOCKETS=`grep \
+    '^[[:space:]]*file_descriptors[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
+    | tail -n 1 \
+    | sed 's/[^[:digit:]]//g'
+`
+
+SSDARGS_NO_PID="--quiet --chdir $RUNDIR --chuid tarantool --exec"
+SSDARGS="--pidfile $PID $SSDARGS_NO_PID"
+
+if [ $SOCKETS -gt 1024  -a $SOCKETS -lt 65000 ]; then
+    ulimit -n $SOCKETS
+fi
+
+ulimit -c unlimited
+
+comment_str="#### - commented by init script"
+sed "s/^[[:space:]]*file_descriptors.*/# & $comment_str/" $CFG > $SCFG
+
+$BOX -c $SCFG -v --check-config
+
+
+# echo "pid_file = $PID"              >> $SCFG
+# echo "logger   = \"cat >> $LOG\""   >> $SCFG
+
+if [ ! -d $RUNDIR ]; then
+    install -d -otarantool -gtarantool -m0750 $RUNDIR
+    cd $RUNDIR
+    if ! $SSD --start $SSDARGS $BOX -- --init-storage -v -c $SCFG -p $PID;
+    then
+        rm -fr $RUNDIR
+        exit 25
+    fi
+fi
+
+if [ $ACTION = 'start' ]; then
+    echo -n "\tStarting '$NAME' ... "
+else
+    echo -n "\tStopping '$NAME' ... "
+fi
+
+if $SSD --$ACTION $SSDARGS $BOX -- -B -v -c $SCFG -p $PID -l "$LOGGER"; then
+    echo "ok"
+else
+    ret=$?
+    if [ $ret -eq 1 ]; then
+        if [ $ACTION = 'start' ]; then
+            echo "already started"
+        else
+            echo "already stoppped"
+        fi
+    else
+        echo "failed"
+    fi
+fi

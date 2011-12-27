@@ -44,6 +44,7 @@ enum say_level {
 extern int sayfd;
 
 void say_logger_init(int nonblock);
+void say_logger_reinit(void);
 void vsay(int level, const char *filename, int line, const char *error,
 	  const char *format, va_list ap)
     __attribute__ ((format(FORMAT_PRINTF, 5, 0)));
@@ -62,5 +63,7 @@ void _say(int level, const char *filename, int line, const char *error,
 #define say_warn(...)			say(S_WARN, NULL, __VA_ARGS__)
 #define say_info(...)			say(S_INFO, NULL, __VA_ARGS__)
 #define say_debug(...)			say(S_DEBUG, NULL, __VA_ARGS__)
+
+
 
 #endif /* TARANTOOL_SAY_H_INCLUDED */

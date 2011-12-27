@@ -49,7 +49,7 @@ set_target_properties(tntnet PROPERTIES COMPILE_FLAGS "${tntnet_cflags}")
 # Shared library
 #
 
-project(tntnet)
+project(tntnet_shared)
 add_library(tntnet_shared SHARED ${tntnet_sources})
 set_target_properties(tntnet_shared PROPERTIES OUTPUT_NAME tntnet)
 set_target_properties(tntnet_shared PROPERTIES COMPILE_FLAGS "${tntnet_cflags}")

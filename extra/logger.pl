@@ -7,13 +7,14 @@ my $reopen;
 $SIG{HUP} = sub { $reopen = 1 };
 
 my $fh;
-while (<>) {
+while (<STDIN>) {
     if ($reopen or not $fh) {
         undef $fh;
         undef $reopen;
-        open $fh, ">>$log" or next;
-        select $fh;
-        $| = 1;
+        if (open $fh, ">>", $log) {
+            select $fh;
+            $| = 1;
+        }
     }
 
     print;

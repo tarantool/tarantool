@@ -1,0 +1,5 @@
+tarantool (1.4.4-1) unstable; urgency=low
+
+  * Init debian release, closes: #652911.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 18 Dec 2011 11:35:37 +0400

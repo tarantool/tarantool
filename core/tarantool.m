@@ -60,7 +60,7 @@
 
 static pid_t master_pid;
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
-#define DEFAULT_CFG INSTALL_PREFIX "/etc/" DEFAULT_CFG_FILENAME
+#define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
 const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
@@ -71,6 +71,8 @@ static void *main_opt = NULL;
 struct tarantool_cfg cfg;
 struct recovery_state *recovery_state;
 static ev_signal *sigs = NULL;
+const char *cmd_line_logger = NULL;
+const char *cmd_line_pidfile = NULL;
 
 bool init_storage, booting = true;
 
@@ -94,6 +96,19 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	}
 
 	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly, &n_accepted, &n_skipped);
+
+	/* command-line option override config */
+	if (cmd_line_logger) {
+		free(conf->logger);
+		conf->logger = strdup(cmd_line_logger);
+	}
+
+	/* command-line option override config */
+	if (cmd_line_pidfile) {
+		free(conf->pid_file);
+		conf->pid_file = strdup(cmd_line_pidfile);
+	}
+
 	fclose(f);
 
 	if (check_cfg_tarantool_cfg(conf) != 0)
@@ -244,8 +259,9 @@ signal_free(void)
 {
 	if (sigs == NULL)
 		return;
+
 	int i;
-	for (i = 0 ; i < 4 ; i++)
+	for (i = 0 ; i < 5 ; i++)
 		ev_signal_stop(&sigs[i]);
 }
 
@@ -266,8 +282,8 @@ signal_init(void)
 		exit(EX_OSERR);
 	}
 
-	sigs = palloc(eter_pool, sizeof(ev_signal) * 4);
-	memset(sigs, 0, sizeof(ev_signal) * 4);
+	sigs = palloc(eter_pool, sizeof(ev_signal) * 5);
+	memset(sigs, 0, sizeof(ev_signal) * 5);
 	ev_signal_init(&sigs[0], (void*)snapshot, SIGUSR1);
 	ev_signal_start(&sigs[0]);
 	ev_signal_init(&sigs[1], (void*)signal_cb, SIGINT);
@@ -276,6 +292,8 @@ signal_init(void)
 	ev_signal_start(&sigs[2]);
 	ev_signal_init(&sigs[3], (void*)signal_cb, SIGHUP);
 	ev_signal_start(&sigs[3]);
+	ev_signal_init(&sigs[4], (void*)say_logger_reinit, SIGUSR2);
+	ev_signal_start(&sigs[4]);
 
 	atexit(signal_free);
 }
@@ -440,10 +458,23 @@ main(int argc, char **argv)
 				       NULL, "increase verbosity level in log messages"),
 			   gopt_option('B', 0, gopt_shorts('B'), gopt_longs("background"),
 				       NULL, "redirect input/output streams to a log file and run as daemon"),
+			   gopt_option('l', GOPT_ARG, gopt_shorts('l'),
+					gopt_longs("logger"),
+                                        "=LOGGER",
+                                        "defines logger process (like the same "
+                                        "config option)"
+			   ),
+			   gopt_option('p', GOPT_ARG, gopt_shorts('p'),
+                                        gopt_longs("pid_file"),
+                                        "=PIDFILE",
+                                        "defines pid_file (like the same "
+                                        "config option)"
+			   ),
 			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
 				       NULL, "display this help and exit"),
 			   gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
-				       NULL, "print program version and exit"));
+				       NULL, "print program version and exit")
+		);
 
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 	main_opt = opt;
@@ -473,6 +504,9 @@ main(int argc, char **argv)
 		}
 		return mod_cat(cat_filename);
 	}
+
+	gopt_arg(opt, 'p', &cmd_line_pidfile);
+	gopt_arg(opt, 'l', &cmd_line_logger);
 
 	gopt_arg(opt, 'c', &cfg_filename);
 	/* if config is not specified trying ./tarantool.cfg then /etc/tarantool.cfg */
@@ -588,6 +622,8 @@ main(int argc, char **argv)
 		exit(EXIT_SUCCESS);
 	}
 
+	say_logger_init(cfg.logger_nonblock);
+
 	if (gopt(opt, 'B')) {
 		if (cfg.logger == NULL) {
 			say_crit("--background requires 'logger' configuration option to be set");
@@ -599,7 +635,6 @@ main(int argc, char **argv)
 		create_pid();
 	}
 
-	say_logger_init(cfg.logger_nonblock);
 
 	/* init process title */
 	if (cfg.custom_proc_title == NULL) {

@@ -40,6 +40,8 @@
 #include "tarantool.h"
 
 int sayfd = STDERR_FILENO;
+static pid_t logger_pid;
+
 
 static char
 level_to_char(int level)
@@ -59,6 +61,19 @@ level_to_char(int level)
 		return 'D';
 	default:
 		return '_';
+	}
+}
+
+void say_logger_reinit(void) {
+	say_info("Logger reload signal was received");
+	if (!logger_pid) {
+		say_info("Logger isn't started. Signal was skipped");
+		return;
+	}
+	if (kill(logger_pid, SIGHUP) == 0) {
+		say_info("SIGHUP was sent to logger");
+	} else {
+		say_syserror("kill -HUP <LoggerPID(%d)>", logger_pid);
 	}
 }
 
@@ -94,12 +109,15 @@ say_logger_init(int nonblock)
 			 */
 			setpgid(0, 0);
 			execve(argv[0], argv, envp);
-		} else {
-			close(pipefd[0]);
-			dup2(pipefd[1], STDERR_FILENO);
-			dup2(pipefd[1], STDOUT_FILENO);
-			sayfd = pipefd[1];
+			say_syserror("Can't start logger: %s", cfg.logger);
+			_exit(-1);
 		}
+		close(pipefd[0]);
+		dup2(pipefd[1], STDERR_FILENO);
+		dup2(pipefd[1], STDOUT_FILENO);
+		sayfd = pipefd[1];
+
+		logger_pid = pid;
 	} else {
 		sayfd = STDERR_FILENO;
 	}
