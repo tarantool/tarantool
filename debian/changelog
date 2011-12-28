@@ -1,3 +1,9 @@
+tarantool (1.4.4+20111228-2) unstable; urgency=low
+
+  * Specify architectures.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 28 Dec 2011 22:40:28 +0400
+
 tarantool (1.4.4+20111228-1) unstable; urgency=low
 
   * Fix build system for kFreeBSD.
