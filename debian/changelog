@@ -1,3 +1,9 @@
+tarantool (1.4.4+20111228-3) unstable; urgency=low
+
+  * kFreeBSD: uses glibc, amd64 is x86 architecture.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 28 Dec 2011 23:38:12 +0400
+
 tarantool (1.4.4+20111228-2) unstable; urgency=low
 
   * Specify architectures.
