@@ -1,3 +1,9 @@
+tarantool (1.4.4+20111228-1) unstable; urgency=low
+
+  * Fix build system for kFreeBSD.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 28 Dec 2011 21:36:33 +0400
+
 tarantool (1.4.4-1) unstable; urgency=low
 
   * Init debian release, closes: #652911.

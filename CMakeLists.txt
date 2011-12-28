@@ -53,7 +53,8 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 # On 32-bit systems, support files larger than 2GB
 # (see man page for feature_test_macros).
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64")
-elseif (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD"
+	 or ${CMAKE_SYSTEM_NAME} STREQUAL "kFreeBSD")
     set(TARGET_OS_FREEBSD 1)
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
