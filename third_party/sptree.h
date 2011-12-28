@@ -246,19 +246,6 @@ sptree_##name##_get_place(sptree_##name *t) {                                   
     return node;                                                                          \
 }                                                                                         \
                                                                                           \
-static inline void*                                                                       \
-sptree_##name##_reserve_node(sptree_##name *t) {                                          \
-    spnode_t    node = sptree_##name##_get_place(t);                                      \
-    return ITHELEM(t, node);                                                              \
-}                                                                                         \
-                                                                                          \
-static inline void                                                                        \
-sptree_##name##_release_node(sptree_##name *t, void *elem) {				  \
-    spnode_t    node = ELEMIDX(t, elem);					          \
-    _SET_SPNODE_LEFT(node, t->garbage_head);                                              \
-    t->garbage_head = node;                                                               \
-}                                                                                         \
-                                                                                          \
 static inline spnode_t                                                                    \
 sptree_##name##_flatten_tree(sptree_##name *t, spnode_t root, spnode_t head){             \
     spnode_t    node;                                                                     \

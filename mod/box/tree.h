@@ -42,10 +42,11 @@ SPTREE_DEF(index, realloc);
 - (void) build: (Index *) pk;
 
 /* to be defined in subclasses */
-- (int) node_size;
+- (size_t) node_size;
 - (void) fold: (void *) node :(struct box_tuple *) tuple;
 - (struct box_tuple *) unfold: (const void *) node;
 - (int) compare: (const void *) node_a :(const void *) node_b;
+- (int) key_compare: (const void *) key :(const void *) node;
 
 @end
 
