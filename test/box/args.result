@@ -12,6 +12,8 @@ Usage: tarantool_box [OPTIONS]
   -v, --verbose           increase verbosity level in log messages
   -B, --background        redirect input/output streams to a log file and run as
                           daemon
+  -l, --logger=LOGGER     defines logger process (like the same config option)
+  -p, --pid_file=PIDFILE  defines pid_file (like the same config option)
   -h, --help              display this help and exit
   -V, --version           print program version and exit
 
@@ -32,6 +34,8 @@ Usage: tarantool_box [OPTIONS]
   -v, --verbose           increase verbosity level in log messages
   -B, --background        redirect input/output streams to a log file and run as
                           daemon
+  -l, --logger=LOGGER     defines logger process (like the same config option)
+  -p, --pid_file=PIDFILE  defines pid_file (like the same config option)
   -h, --help              display this help and exit
   -V, --version           print program version and exit
 
