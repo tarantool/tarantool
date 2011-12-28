@@ -1,3 +1,9 @@
+tarantool (1.4.4+20111228-4) unstable; urgency=low
+
+  * Fix test box/args.test.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 00:01:03 +0400
+
 tarantool (1.4.4+20111228-3) unstable; urgency=low
 
   * kFreeBSD: uses glibc, amd64 is x86 architecture.
