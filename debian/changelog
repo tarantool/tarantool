@@ -1,3 +1,9 @@
+tarantool (1.4.4+20111229-2) unstable; urgency=low
+
+  * Try to patch build-system for Debian kFreeBSD.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 12:37:25 +0400
+
 tarantool (1.4.4+20111229-1) unstable; urgency=low
 
   * Fix test box/args.test.

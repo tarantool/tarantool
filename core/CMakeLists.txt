@@ -77,6 +77,10 @@ if (TARGET_OS_LINUX)
   set (common_libraries ${common_libraries} dl)
 endif()
 
+if (TARGET_OS_DEBIAN_FREEBSD)
+  set (common_libraries ${common_libraries} dl)
+endif()
+
 if (ENABLE_GCOV)
   set (common_libraries ${common_libraries} gcov)
 endif()
