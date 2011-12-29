@@ -1,8 +1,10 @@
 tarantool (1.4.4+20111229+2-2) unstable; urgency=low
 
   * use cd instead chdir, closes: 653611;
-  * use spaces instead '\t' symbol, closes: 653607.
-  thanks to Norbert Kiesel <nkiesel@tbdnetworks.com> for both bugreports.
+  * use spaces instead '\t' symbol, closes: 653607;
+  * use readlink instead perl command, closes: 653613.
+  thanks to Norbert Kiesel <nkiesel@tbdnetworks.com> for all bugreports.
+  * add libmr-tarantool-perl to 'suggests' section of debian/control.
 
  -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 23:21:06 +0400
 

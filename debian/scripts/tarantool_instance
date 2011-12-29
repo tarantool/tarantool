@@ -40,9 +40,7 @@ if ! test -r "$CFG"; then
     fi
 fi
 
-CFG=`perl -MFile::Spec -e "print File::Spec->rel2abs('$CFG')"`
-
-echo $CFGABS
+CFG=`readlink -f "$CFG"`
 
 if ! test -x $BOX; then
     echo "$BOX not found or can't be started"
