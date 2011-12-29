@@ -12,7 +12,7 @@ BOX=/usr/bin/tarantool_box
 SSD=start-stop-daemon
 CFG_DIR=/etc/tarantool/instances.enabled
 
-chdir $CFG_DIR
+cd $CFG_DIR
 
 usage="Usage: sh $0 /path/to/config.file start|stop"
 
@@ -92,9 +92,9 @@ if [ ! -d $RUNDIR ]; then
 fi
 
 if [ $ACTION = 'start' ]; then
-    echo -n "\tStarting '$NAME' ... "
+    echo -n "    Starting '$NAME' ... "
 else
-    echo -n "\tStopping '$NAME' ... "
+    echo -n "    Stopping '$NAME' ... "
 fi
 
 if $SSD --$ACTION $SSDARGS $BOX -- -B -v -c $SCFG -p $PID -l "$LOGGER"; then
