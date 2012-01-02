@@ -229,11 +229,11 @@ pack: function
                     <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt">
                     <filename>doc/box-protocol.txt</filename></link>,
                     </member>
-                    <member><code>request</code> &mdash; a request packed in binary format</member>
+                    <member><code>request</code> &mdash; a request packed in binary format.</member>
                 </simplelist>
                 <bridgehead renderas="sect4">Returns</bridgehead>
                 This function returns zero or more tuples. In Lua, a
-                tuple is represented by
+                tuple is represented by a
                 <emphasis>userdata</emphasis> object of type
                 <code>box.tuple</code>. If a Lua procedure
                 is called from the administrative console, tuples
@@ -386,6 +386,18 @@ to the socket.
 </para><para>
 Note: the administrative console output must be YAML-compatible.
         </para></listitem>
+    </varlistentry>
+</variablelist>
+
+<variablelist>
+    <title>Package <code xml:id="box.tuple" xreflabel="box.tuple">box.tuple</code></title>
+    <para>The package contains no functions, but stands for
+    <code>box.tuple</code> userdata type. It is possible to access individual
+    tuple fields using an index, or iterate over all fields in a
+    tuple. Tuples are immutable.</para>
+    <varlistentry>
+        <term><emphasis role="lua"> </emphasis></term>
+        <listitem><simpara></simpara></listitem>
     </varlistentry>
 </variablelist>
 
