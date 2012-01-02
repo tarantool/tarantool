@@ -44,7 +44,7 @@ install/tarantool-client-dbg::
 install/tarantool::
 	pod2man -c 'high performance key/value storage server' \
 	    debian/tarantool_box.pod > build-area/tarantool_box.1
-	make -C build-area test || /bin/true
+	make -C build-area test-force || /bin/true
 
 install/tarantool-common::
 	pod2man -c 'tarantool instances control' \

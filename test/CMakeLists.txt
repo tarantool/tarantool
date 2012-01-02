@@ -1,6 +1,9 @@
 add_custom_target(test
     COMMAND python ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --vardir=${PROJECT_BINARY_DIR}/test/var)
 
+add_custom_target(test-force
+    COMMAND python ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --force --vardir=${PROJECT_BINARY_DIR}/test/var)
+
 add_subdirectory(box)
 add_subdirectory(connector_c)
 
