@@ -139,7 +139,7 @@ error: 1:15 expected '('
     values, but not keys.
   </para>
   <para>
-    When a function in Lua terminates with an error, the error 
+    When a function in Lua terminates with an error, the error
     is sent to the client as <olink targetptr="ER_PROC_LUA" />
     return code, with the original error message preserved.
     Similarly, an error occurred inside Tarantool (observed on the
@@ -456,7 +456,7 @@ localhost> lua box.select_range(4, 1, 2, '1')
                 </member>
             </simplelist>
         <bridgehead renderas="sect4">Errors</bridgehead>
-        Unknown format specifier. 
+        Unknown format specifier.
         <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 localhost> lua box.insert(0, 0, 'hello world')
@@ -576,7 +576,7 @@ qkl
     etc, with object-oriented access to space and index functions
     (<code>insert(), update(), select(), ...</code>. Each space
     entry is a container for all space indexes, which are
-    available in array box.space[].index[].</para>
+    available in box.space[].index[] array.</para>
     <varlistentry>
         <term><emphasis role="lua">
         box.space[i].n
@@ -595,33 +595,32 @@ using the mechanism of cooperative multitasking.
 Each fiber can be running, suspended or dead.
 A fiber is created (<code>box.fiber.create()</code>) suspended.
 It can be started with <code>box.fiber.resume()</code>, yield
-the control back with <code>box.fiber.yield()</code>
+control back to the caller with <code>box.fiber.yield()</code>
 end with <code>return</code> or just by reaching the end of the
-function.
+fiber function.
     </para>
     <para>
 A fiber can also be attached or detached.
 An attached fiber is a child of the creator,
 and is running only if the creator has called
 <code>box.fiber.resume()</code>. A detached fiber is a child of
-Tarntool/Box internal <quote>sched</quote> fiber, and is gets
+Tarntool internal <quote>sched</quote> fiber, and gets
 scheduled only if there is a libev event associated
 with it.
     </para>
     <para>
-To detach, a running fiber must invoke box.fiber.detach().
-A detached fiber loses connection with its parent
-forever.
+To detach, a running fiber must invoke <code>box.fiber.detach()</code>.
+A detached fiber loses connection with its parent forever.
     </para>
     <para>
-All fibers are part of the fiber registry, box.fiber.
+All fibers are part of the fiber registry, <code>box.fiber</code>.
 This registry can be searched (<code>box.fiber.find()</code>)
 either by fiber id (fid), which is numeric, or by fiber name,
 which is a string. If there is more than one fiber with the given
 name, the first fiber that matches is returned.
     </para>
     <para>
-Once fiber chunk is done or calls <code>return</code>,
+Once fiber function is done or calls <code>return</code>,
 the fiber is considered dead. Its carcass is put into
 a fiber pool, and can be reused when another fiber is
 created.
@@ -637,8 +636,8 @@ or <code>box.update()</code>, are calling <code>box.fiber.testcancel()</code>.
     <para>
 A runaway fiber can really only become cuckoo
 if it does a lot of computations and doesn't check
-whether it's been cancelled. In addition
-to the advisory cancellation, configuration parameter lua_timeout
+whether it's been canceled. In addition
+to the advisory cancellation, configuration parameter <code>lua_timeout</code>
 can be used to cancel runaway Lua procedures.
     </para>
     <para>
@@ -665,8 +664,7 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.self() </emphasis>
         </term>
         <listitem><simpara>Returns <code>box.fiber</code> userdata
-        object for the currently scheduled
-        fiber.</simpara></listitem>
+        object for the currently scheduled fiber.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -706,14 +704,8 @@ and when returning from <code>box.fiber.yield()</code>
         <para>
         If the fiber is attached, whatever arguments are passed
         to this call, are passed on to the calling fiber.
-        If the fiber is detached, simply returns everything back.
-	 Yield to the caller. The caller will take care of
-	 whatever arguments are taken.
-	fiber_testcancel(); /* throws an error if we were cancelled. */
-	 * Got resumed. Return whatever the caller has passed
-	 * to us with box.fiber.resume().
-	 * As a side effect, the detached fiber which yields
-	 * to sched always gets back whatever it yields.
+        If the fiber is detached, <code>box.fiber.yield()</code>
+        returns back everything passed into it.
         </para></listitem>
     </varlistentry>
 
@@ -742,7 +734,7 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.cancel(fiber)</emphasis>
         </term>
         <listitem><simpara>
-Running and suspended fibers can be cancelled.
+Running and suspended fibers can be canceled.
 Zombie fibers can't. Returns an error if
 subject fiber does not permit cancel.
         </simpara></listitem>
@@ -753,7 +745,7 @@ subject fiber does not permit cancel.
             <emphasis role="lua">box.fiber.testcancel()</emphasis>
         </term>
         <listitem><simpara>
-Check if this current fiber has been cancelled and
+Check if this current fiber has been canceled and
 throw an exception if this is the case.
         </simpara></listitem>
     </varlistentry>
@@ -786,7 +778,67 @@ logger = cat - >> tarantool.log
     procedures repository and in the server test suite.
 </para>
 
+<section>
+<title>Limitation of stored programs</title>
+
+<para>
+    There are two limitations in stored program support one should
+    be aware of: execution atomicity and lack of typing.
+</para>
+<bridgehead renderas="sect4">Cooperative multitasking environment</bridgehead>
+<para>
+    Tarantool core is built around cooperative multi-tasking
+    paradigm: unless a running fiber deliberately yields control
+    to some other fiber, it is not preempted.
+    <quote>Yield points</quote> are built into all
+    calls from Tarantool core into the operating system.
+    Any system call which can block is performed in
+    asynchronous manner, and the fiber waiting
+    on the system call is preempted with a fiber ready to
+    run. This model makes all programmatic locks unnecessary:
+    cooperative multitasking ensures that there is no concurrency
+    around a resource, no race conditions and no memory
+    consistency issues.
+</para>
+<para>
+    When requests are small, e.g. simple UPDATE, INSERT, DELETE,
+    SELECT, fiber scheduling is fair: it takes only a little time
+    to process the request, schedule a disk write, and yield to
+    a fiber serving the next client.
+</para>
+<para>
+    A stored procedure, however, can perform complex computations,
+    or be written in such a way that control is not given away for a
+    long time. This can lead to unfair scheduling, when a single
+    client throttles the rest of the system, or to apparent stalls
+    in request processing.
+    Avoiding this situation is responsibility of the stored procedure
+    author. Most of <code>box</code> calls, such as
+    <code>box.insert()</code>, <code>box.update()</code>,
+    <code>box.delete()</code> are yield points; <code>box.select()</code>
+    and <code>box.select_range()</code>, however, are not.
+</para>
+<para>
+    It should also be noted, that in absence of transactions,
+    any yield in a stored procedure is a potential change in the
+    database state. Effectively, it's only possible
+    to have CAS (compare-and-swap) -like atomic stored
+    procedures: select and then modify a record.
+
+    Multiple data change requests always run through a built-in
+    yield point.
+</para>
+<bridgehead renderas="sect4">Lack of field types</bridgehead>
+<para>
+   When invoking a stored procedure from the binary protocol,
+   it's not possible to convey types of arguments. Tuples are
+   type-agnostic. The conventional workaround is to use
+   strings to pass all (textual and numeric) data.
+</para>
+
 </section>
+</section>
+
 <!--
 vim: tw=66 syntax=docbk
 vim: spell spelllang=en_us
