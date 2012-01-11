@@ -247,6 +247,8 @@ fold_sparse_parts(struct key_def *key_def, struct box_tuple *tuple, union sparse
 {
 	u8 *part_data = tuple->data;
 
+	memset(parts, 0, sizeof(parts[0]) * key_def->part_count);
+
 	for (int field = 0; field < key_def->max_fieldno; ++field) {
 		assert(field < tuple->cardinality);
 
@@ -283,15 +285,19 @@ fold_key_parts(struct key_def *key_def, struct key_data *key_data)
 	u8 *part_data = key_data->data;
 	union sparse_part* parts = key_data->parts;
 
+	memset(parts, 0, sizeof(parts[0]) * key_data->part_count);
+
 	for (int part = 0; part < key_data->part_count; ++part) {
 		u8 *data = part_data;
 		u32 len = load_varint32((void**) &data);
 
 		if (key_def->parts[part].type == NUM) {
-			assert(len == sizeof parts[part].num32);
+			if (len != sizeof parts[part].num32)
+				tnt_raise(IllegalParams, :"key is not u32");
 			memcpy(&parts[part].num32, data, len);
 		} else if (key_def->parts[part].type == NUM64) {
-			assert(len == sizeof parts[part].num64);
+			if (len != sizeof parts[part].num64)
+				tnt_raise(IllegalParams, :"key is not u64");
 			memcpy(&parts[part].num64, data, len);
 		} else if (len <= sizeof(parts[part].str.data)) {
 			parts[part].str.length = len;
@@ -368,13 +374,13 @@ sparse_part_compare(
 	const u8 *data_b, union sparse_part part_b)
 {
 	if (type == NUM) {
-		u64 an = part_a.num32;
-		u64 bn = part_b.num32;
-		return (int) (((i64)an - (i64)bn) >> 32);
+		u32 an = part_a.num32;
+		u32 bn = part_b.num32;
+		return (an < bn ? -1 : (an > bn));
 	} else if (type == NUM64) {
 		u64 an = part_a.num64;
 		u64 bn = part_b.num64;
-		return an == bn ? 0 : an > bn ? 1 : -1;
+		return (an < bn ? -1 : (an > bn));
 	} else {
 		int cmp;
 		const u8 *ad, *bd;
@@ -397,7 +403,7 @@ sparse_part_compare(
 
 		cmp = memcmp(ad, bd, MIN(al, bl));
 		if (cmp == 0) {
-			cmp = (int) ((((i64)(u64)al) - ((i64)(u64)bl)) >> 32);
+			cmp = (al < bl ? -1 : (al > bl));
 		}
 
 		return cmp;
@@ -460,17 +466,17 @@ dense_part_compare(
 		assert(al == sizeof an && bl == sizeof bn);
 		memcpy(&an, ad, sizeof an);
 		memcpy(&bn, bd, sizeof bn);
-		return (int) (((i64)(u64)an - (i64)(u64)bn) >> 32);
+		return (an < bn ? -1 : (an > bn));
 	} else if (type == NUM64) {
 		u64 an, bn;
 		assert(al == sizeof an && bl == sizeof bn);
 		memcpy(&an, ad, sizeof an);
 		memcpy(&bn, bd, sizeof bn);
-		return an == bn ? 0 : an > bn ? 1 : -1;
+		return (an < bn ? -1 : (an > bn));
 	} else {
 		int cmp = memcmp(ad, bd, MIN(al, bl));
 		if (cmp == 0) {
-			cmp = (int) ((((i64)(u64)al) - ((i64)(u64)bl)) >> 32);
+			cmp = (al < bl ? -1 : (al > bl));
 		}
 		return cmp;
 	}
@@ -529,13 +535,13 @@ dense_key_part_compare(
 		an = part_a.num32;
 		assert(bl == sizeof bn);
 		memcpy(&bn, bd, sizeof bn);
-		return (int) (((i64)(u64)an - (i64)(u64)bn) >> 32);
+		return (an < bn ? -1 : (an > bn));
 	} else if (type == NUM64) {
 		u64 an, bn;
 		an = part_a.num64;
 		assert(bl == sizeof bn);
 		memcpy(&bn, bd, sizeof bn);
-		return an == bn ? 0 : an > bn ? 1 : -1;
+		return (an < bn ? -1 : (an > bn));
 	} else {
 		int cmp;
 		const u8 *ad;
@@ -550,7 +556,7 @@ dense_key_part_compare(
 
 		cmp = memcmp(ad, bd, MIN(al, bl));
 		if (cmp == 0) {
-			cmp = (int) ((((i64)(u64)al) - ((i64)(u64)bl)) >> 32);
+			cmp = (al < bl ? -1 : (al > bl));
 		}
 
 		return cmp;
@@ -608,10 +614,10 @@ node_compare_with_dups(const void *node_a, const void *node_b, void *arg)
 		struct box_tuple *tuple_a = [index unfold: node_a];
 		struct box_tuple *tuple_b = [index unfold: node_b];
 		if (tuple_a != NULL && tuple_b != NULL) {
-			return (tuple_a - tuple_b);
+			r = (tuple_a < tuple_b ? -1 : (tuple_a > tuple_b));
 		}
 	}
-	return 0;
+	return r;
 }
 
 /**
@@ -770,14 +776,9 @@ tree_iterator_free(struct iterator *iterator)
 
 - (void) remove: (struct box_tuple *) tuple
 {
-	struct key_data *key_data
-		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->cardinality));
-
-	key_data->data = tuple->data;
-	key_data->part_count = tuple->cardinality;
-	fold_sparse_parts(&key_def, tuple, key_data->parts);
-
-	sptree_index_delete(&tree, key_data);
+	void *node = alloca([self node_size]);
+	[self fold: node :tuple];
+	sptree_index_delete(&tree, node);
 }
 
 - (void) replace: (struct box_tuple *) old_tuple
@@ -786,11 +787,11 @@ tree_iterator_free(struct iterator *iterator)
 	if (new_tuple->cardinality < key_def.max_fieldno)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, key_def.max_fieldno);
 
-	if (old_tuple) {
-		[self remove: old_tuple];
-	}
-
 	void *node = alloca([self node_size]);
+	if (old_tuple) {
+		[self fold: node :old_tuple];
+		sptree_index_delete(&tree, node);
+	}
 	[self fold: node :new_tuple];
 	sptree_index_insert(&tree, node);
 }
@@ -1051,14 +1052,18 @@ tree_iterator_free(struct iterator *iterator)
 {
 	const struct num32_node *node_xa = node_a;
 	const struct num32_node *node_xb = node_b;
-	return ((i64) (u64) node_xa->value - (i64) (u64) node_xb->value) >> 32;
+	u32 an = node_xa->value;
+	u32 bn = node_xb->value;
+	return (an < bn ? -1 : (an > bn));
 }
 
 - (int) key_compare: (const void *) key :(const void *) node
 {
 	const struct key_data *key_data = key;
 	const struct num32_node *node_x = node;
-	return ((i64) (u64) key_data->parts[0].num32 - (i64) (u64) node_x->value) >> 32;
+	u32 an = key_data->parts[0].num32;
+	u32 bn = node_x->value;
+	return (an < bn ? -1 : (an > bn));
 }
 
 @end
