@@ -128,25 +128,20 @@ struct fixed_node {
 };
 
 /**
- * Key data with possibly partially specified number of key parts.
+ * Representation of data for key search. The data corresponds to some
+ * struct key_def. The part_count field from struct key_data may be less
+ * than or equal to the part_count field from the struct key_def. Thus
+ * the search data may be partially specified.
+ *
+ * For simplicity sake the key search data uses sparse_part internally
+ * regardless of the target kind of tree because there is little benefit
+ * of having the most compact representation of transient search data.
  */
 struct key_data
 {
 	u8 *data;
 	int part_count;
 	union sparse_part parts[];
-};
-
-#define SIZEOF_KEY_DATA(key_def) \
-	(sizeof(struct key_data) + SIZEOF_SPARSE_PARTS((key_def)->part_count))
-
-/**
- * Collection of offsets to data of key parts
- */
-struct data_offset
-{
-	int part_count;
-	u32 *parts; 
 };
 
 /* }}} */
@@ -365,7 +360,7 @@ fold_num32_value(struct key_def *key_def, struct box_tuple *tuple)
 }
 
 /**
- * Compare a key part of sparse nodes
+ * Compare a part for two keys
  */
 static int
 sparse_part_compare(
@@ -411,7 +406,7 @@ sparse_part_compare(
 }
 
 /**
- * Compare the keys of sparse nodes
+ * Compare a key for two sparse nodes
  */
 static int
 sparse_node_compare(
@@ -431,6 +426,9 @@ sparse_node_compare(
 	return 0;
 }
 
+/**
+ * Compare a key for a key search data and a sparse node 
+ */
 static int
 sparse_key_node_compare(
 	struct key_def *key_def, const struct key_data *key_data,
@@ -449,7 +447,7 @@ sparse_key_node_compare(
 }
 
 /**
- * Compare a key part of dense nodes
+ * Compare a part for two dense keys
  */
 static int
 dense_part_compare(
@@ -483,7 +481,7 @@ dense_part_compare(
 }
 
 /**
- * Compare the keys of dense nodes
+ * Compare a key for two dense nodes
  */
 static int
 dense_node_compare(
@@ -522,6 +520,9 @@ dense_node_compare(
 	return 0;
 }
 
+/**
+ * Compare a part for a key search data and a dense key
+ */
 static int
 dense_key_part_compare(
 	enum field_data_type type,
@@ -563,6 +564,9 @@ dense_key_part_compare(
 	}
 }
 
+/*
+ * Compare a key for a key search data and a dense node 
+ */
 static int
 dense_key_node_compare(
 	struct key_def *key_def, const struct key_data *key_data,

@@ -51,5 +51,3 @@ SPTREE_DEF(index, realloc);
 @end
 
 #endif /* TARANTOOL_BOX_TREE_H_INCLUDED */
-
-
