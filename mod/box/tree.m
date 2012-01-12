@@ -420,7 +420,7 @@ sparse_part_compare(
 
 		cmp = memcmp(ad, bd, MIN(al, bl));
 		if (cmp == 0) {
-			cmp = (al < bl ? -1 : (al > bl));
+			cmp = (int) al - (int) bl;
 		}
 
 		return cmp;
@@ -496,7 +496,7 @@ dense_part_compare(
 	} else {
 		int cmp = memcmp(ad, bd, MIN(al, bl));
 		if (cmp == 0) {
-			cmp = (al < bl ? -1 : (al > bl));
+			cmp = (int) al - (int) bl;
 		}
 		return cmp;
 	}
@@ -579,7 +579,7 @@ dense_key_part_compare(
 
 		cmp = memcmp(ad, bd, MIN(al, bl));
 		if (cmp == 0) {
-			cmp = (al < bl ? -1 : (al > bl));
+			cmp = (int) al - (int) bl;
 		}
 
 		return cmp;
