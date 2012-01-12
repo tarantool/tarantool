@@ -29,6 +29,24 @@
 #include <salloc.h>
 #include <pickle.h>
 
+/**
+ * Unsigned 32-bit int comparison.
+ */
+static inline int
+u32_cmp(u32 a, u32 b)
+{
+	return a < b ? -1 : (a > b);
+}
+
+/**
+ * Unsigned 64-bit int comparison.
+ */
+static inline int
+u64_cmp(u64 a, u64 b)
+{
+	return a < b ? -1 : (a > b);
+}
+
 /* {{{ Tree internal data types. **********************************/
 
 /**
@@ -391,13 +409,9 @@ sparse_part_compare(
 	const u8 *data_b, union sparse_part part_b)
 {
 	if (type == NUM) {
-		u32 an = part_a.num32;
-		u32 bn = part_b.num32;
-		return (an < bn ? -1 : (an > bn));
+		return u32_cmp(part_a.num32, part_b.num32);
 	} else if (type == NUM64) {
-		u64 an = part_a.num64;
-		u64 bn = part_b.num64;
-		return (an < bn ? -1 : (an > bn));
+		return u64_cmp(part_a.num64, part_b.num64);
 	} else {
 		int cmp;
 		const u8 *ad, *bd;
@@ -486,13 +500,13 @@ dense_part_compare(
 		assert(al == sizeof an && bl == sizeof bn);
 		memcpy(&an, ad, sizeof an);
 		memcpy(&bn, bd, sizeof bn);
-		return (an < bn ? -1 : (an > bn));
+		return u32_cmp(an, bn);
 	} else if (type == NUM64) {
 		u64 an, bn;
 		assert(al == sizeof an && bl == sizeof bn);
 		memcpy(&an, ad, sizeof an);
 		memcpy(&bn, bd, sizeof bn);
-		return (an < bn ? -1 : (an > bn));
+		return u64_cmp(an, bn);
 	} else {
 		int cmp = memcmp(ad, bd, MIN(al, bl));
 		if (cmp == 0) {
@@ -558,13 +572,13 @@ dense_key_part_compare(
 		an = part_a.num32;
 		assert(bl == sizeof bn);
 		memcpy(&bn, bd, sizeof bn);
-		return (an < bn ? -1 : (an > bn));
+		return u32_cmp(an, bn);
 	} else if (type == NUM64) {
 		u64 an, bn;
 		an = part_a.num64;
 		assert(bl == sizeof bn);
 		memcpy(&bn, bd, sizeof bn);
-		return (an < bn ? -1 : (an > bn));
+		return u64_cmp(an, bn);
 	} else {
 		int cmp;
 		const u8 *ad;
@@ -1078,18 +1092,14 @@ tree_iterator_free(struct iterator *iterator)
 {
 	const struct num32_node *node_xa = node_a;
 	const struct num32_node *node_xb = node_b;
-	u32 an = node_xa->value;
-	u32 bn = node_xb->value;
-	return (an < bn ? -1 : (an > bn));
+	return u32_cmp(node_xa->value, node_xb->value);
 }
 
 - (int) key_compare: (const void *) key :(const void *) node
 {
 	const struct key_data *key_data = key;
 	const struct num32_node *node_x = node;
-	u32 an = key_data->parts[0].num32;
-	u32 bn = node_x->value;
-	return (an < bn ? -1 : (an > bn));
+	return u32_cmp(key_data->parts[0].num32, node_x->value);
 }
 
 @end
