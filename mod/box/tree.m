@@ -52,34 +52,38 @@ u64_cmp(u64 a, u64 b)
 /**
  * Tree types
  *
- * There are four specialized forms of tree indexes optimized for different
+ * There are four specialized kinds of tree indexes optimized for different
  * combinations of index fields.
  *
  * In the most general case tuples consist of variable length fields and the
  * index uses a sparsely distributed subset of these fields. So to determine
  * the field location in the tuple it is required to scan all the preceding
- * fields. We use the SPARSE tree index structure to avoid such scans on each
- * access. It pre-computes and stores the field offsets (or the field values)
- * on the per-tuple basis in the sparse_part_t array.
+ * fields. To avoid such scans on each access to a tree node we use the SPARSE
+ * tree index structure. It pre-computes on the per-tuple basis the required
+ * field offsets (or immediate field values for NUMs) and stores them in the
+ * corresponding tree node.
  *
- * In case index fields form a dense sequence it is possible to find
+ * In case the index fields form a dense sequence it is possible to find
  * each successive field location based on the previous field location. So it
- * is only required to store the offset of the first field of the index per
- * each tuple. In this case we use the DENSE tree index structure.
+ * is only required to find the offset of the first index field in the tuple
+ * and store it in the tree node. In this case we use the DENSE tree index
+ * structure.
  *
  * In case the index consists of only one small field it is cheaper to
- * store the field value directly in the index rather than store the offset
- * to the value. In this case we use the NUM32 tree index structure.
+ * store the field value immediately in the node rather than store the field
+ * offset. In this case we use the NUM32 tree index structure.
  *
- * In case the first field offset in a dense sequence is constant there
- * is no need to store any extra data in the tree. This happens if the first
- * index field is also the first tuple field or all the preceding fields are
- * fixed (that is NUMs). In this case we use the FIXED tree structure.
+ * In case the first field offset in a dense sequence is constant there is no
+ * need to store any extra data in the node. For instance, the first index
+ * field may be the first field in the tuple so the offset is always zero or
+ * all the preceding fields may be fixed-size NUMs so the offset is a non-zero
+ * constant. In this case we use the FIXED tree structure.
  *
- * Note that currently we do not know types of the fields that are not used
- * in any index. So we cannot actually determine if the fields preceding to
- * the index are fixed length. Therefore we may miss the opportunity to use
- * this optimization in some cases.
+ * Note that there may be fields with unknown types. In particular, if a field
+ * is not used by any index then it doesn't have to be typed. So in many cases
+ * we cannot actually determine if the fields preceding to the index are fixed
+ * size or not. Therefore we may miss the opportunity to use this optimization
+ * in such cases.
  */
 enum tree_type { TREE_SPARSE, TREE_DENSE, TREE_NUM32, TREE_FIXED };
 
