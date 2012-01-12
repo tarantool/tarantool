@@ -189,24 +189,46 @@ find_tree_type(struct space *space, struct key_def *key_def)
 {
 	int dense = 1;
 	int fixed = 1;
-	int first = 1;
+
+#if DENSE_CAN_HAVE_FIXED_GAPS
 	int skip = 0;
 
 	for (int field = 0; field < key_def->max_fieldno; ++field) {
 		int part = key_def->cmp_order[field];
 		if (part != -1) {
 			if (find_fixed_offset(space, field, skip) < 0) {
-				if (first) {
+				if (skip == 0) {
 					fixed = 0;
 				} else {
 					dense = 0;
 					break;
 				}
 			}
-			first = 0;
-			skip = field;
+			skip = field + 1;
 		}
 	}
+#else
+	int field = 0;
+
+	/* Scan for the first tuple field used by the index */
+	for (; field < key_def->max_fieldno; ++field) {
+		int part = key_def->cmp_order[field];
+		if (part != -1) {
+			if (find_fixed_offset(space, field, 0) < 0) {
+				fixed = 0;
+			}
+			break;
+		}
+	}
+	/* Check that there are no gaps after the first field */
+	for (; field < key_def->max_fieldno; ++field) {
+		int part = key_def->cmp_order[field];
+		if (part == -1) {
+			dense = 0;
+			break;
+		}
+	}
+#endif
 
 	if (!dense) {
 		return TREE_SPARSE;
