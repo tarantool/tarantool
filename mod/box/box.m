@@ -1030,7 +1030,8 @@ extract_field_types(struct space *space, int key_count, struct key_def *key_defs
 			if (space->field_types[part->fieldno] != part->type
 			    && space->field_types[part->fieldno] != UNKNOWN) {
 				space->field_types[part->fieldno] = UNKNOWN;
-				say_warn("conflicting field types");
+				say_warn("type conflict in space %d for field %d",
+					 space->n, part->fieldno);
 			}
 		}
 	}
