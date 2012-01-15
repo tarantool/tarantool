@@ -65,9 +65,9 @@ localhost> lua "hello".." world"
     state is immediately available to all client connections.
   </para>
   <para>
-    Each connection, however, is running in its own Lua
+    Each connection, however, is using its own Lua
     <emphasis>coroutine</emphasis> &mdash; a mechanism, akin to
-    Tarantool <emphasis>fibers</emphasis>. A coroutine has its
+    Tarantool <emphasis>fibers</emphasis>. A coroutine has an
     own execution stack and a Lua <emphasis>closure</emphasis>
     &mdash; set of local variables and definitions.
   </para>
@@ -77,10 +77,10 @@ localhost> lua "hello".." world"
     procedures, but not <emphasis role="strong">define</emphasis>
     or <emphasis role="strong">alter</emphasis> them.
     CALL request packet contains CALL command code (22), the name
-    of the procedure to be called, and a tuple for procedure
+    of a procedure to be called, and a tuple for procedure
     arguments. Currently, Tarantool tuples are type-agnostic,
-    thus each field of the tuple makes a string parameter
-    of the procedure. For example:
+    thus each field of the tuple is passed into the procedure
+    as an argument of type <quote>string</quote>. For example:
 <programlisting><computeroutput>kostja@atlas:~$ cat arg.lua
 function f1(a)
     local s = a
@@ -116,8 +116,9 @@ Call OK, 2 rows affected
 ['0xd2 0x4 0x0 0x0 ']</computeroutput></programlisting>
     In the above example, the way the procedure receives its
     argument is identical in two protocols, when the argument is a
-    string. A number, however, is cast by the binary protocol
-    to a 4-byte blob.
+    string. A numeric field, however, when submitted via the
+    binary protocol, is seen by the procedure as 
+    a 4-byte blob, not as a Lua <quote>number</quote> type.
     </para>
     <para>In addition to conventional method invocation,
     Lua provides object-oriented syntax. Access to the latter is
@@ -132,7 +133,7 @@ error: 1:15 expected '('
   <para>
     Every value, returned from a stored function by means of
     <code>return</code> clause, is converted to a Tarantool/Box tuple.
-    Tuples are returned as such, in binary form; an atom, such as
+    Tuples are returned as such, in binary form; a Lua scalar, such as
     a string or an integer, is converted to a tuple with only
     one field. When the returned value is a <emphasis>Lua
     table</emphasis>, the resulting tuple contains only table
@@ -207,16 +208,16 @@ pack: function
         </term>
         <listitem>
             <para>
-                The main extension provided to Lua by
-                Tarantool/Box &mdash; ability to call
-                INSERT/UPDATE/SELECT/DELETE from within a Lua
-                procedure.
+                Process a request passed in as a binary string.
+                This is an entry point into the server request
+                processor. It allows to insert, update,
+                select and delete tuples from within a Lua procedure.
             </para>
             <para>
                 This is a low-level API, and it expects
                 all arguments to be packed in accordance
-                with the binary protocol format (iproto
-                header excluded). Normally there is no need
+                with the binary protocol (iproto
+                header excluded). Normally, there is no need
                 to use <code>box.process()</code> directly:
                 <code>box.select(), box.update()</code>
                 and other convenience wrappers
@@ -229,15 +230,17 @@ pack: function
                     <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt">
                     <filename>doc/box-protocol.txt</filename></link>.
                     </member>
-                    <member><code>request</code> &mdash; a request packed in binary format.</member>
+                    <member><code>request</code> &mdash; command
+                    arguments packed in binary format.</member>
                 </simplelist>
                 <bridgehead renderas="sect4">Returns</bridgehead>
                 This function returns zero or more tuples. In Lua, a
                 tuple is represented by a
                 <emphasis>userdata</emphasis> object of type
-                <code>box.tuple</code>. If a Lua procedure
-                is called from the administrative console, tuples
-                are converted to YAML. When called from the binary
+                <code xlink:href="#box.tuple">box.tuple</code>. If
+                a Lua procedure is called from the administrative
+                console, returned tuples are printed out in YAML
+                format.  When called from the binary
                 protocol, the binary format is used.
                 <bridgehead renderas="sect4">Errors</bridgehead>
                 Any server error produced by the executed
@@ -252,15 +255,16 @@ pack: function
         </term>
         <listitem>
             <para>
-                Select a tuple in the given namespace by key. A
+                Select a tuple in the given space. A
                 wrapper around <code>box.process()</code>.
                 <bridgehead renderas="sect4">Parameters</bridgehead>
                 <simplelist>
-                    <member><code>space_no</code> &mdash; namespace id,
+                    <member><code>space_no</code> &mdash; space id,
                     </member>
                     <member><code>index_no</code> &mdash; index number in the
-                        namespace,</member>
-                    <member><code>...</code>&mdash; possibly compound key.
+                        space,</member>
+                    <member><code>...</code>&mdash; index key,
+                    possibly compound.
                     </member>
                 </simplelist>
                 <bridgehead renderas="sect4">Returns</bridgehead>
@@ -321,13 +325,56 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
         </term>
         <listitem>
             <para>
-                Update a tuple identified by <code>key</code>. Update
-                arguments follow, described by <code>format</code>.
-                Both format and arguments are passed to
-                <code>box.pack()</code>, and the result then sent
-                on to <code>box.process()</code>.
+                Update a tuple identified by a primary
+                <code>key</code>. Update arguments follow,
+                described by <code>format</code>.
+                The Format and arguments are passed to
+                <code>box.pack()</code>, and the result is then sent
+                to <code>box.process()</code>.
+                A correct <code>format</code> is a sequence of
+                pairs: update operation, operation arguments. A
+                single character of format describes either an
+                operation which needs to take place or operation
+                argument. A format specifier also works as a
+                placeholder for the number of field, which needs
+                to be updated, or argument value.
+                For example: 
+                <simplelist>
+                    <member><code>+p=p</code> &mdash; add a value
+                    to one field and assign another,
+                    </member>
+                    <member><code>:p</code> &mdash; splice a
+                    field: start at offset, cut length bytes, and add a
+                    string.</member>
+                </simplelist>
+                Possible format specifiers are: <quote>+</quote>
+                for addition, <quote>-</quote> for subtraction,
+                <quote>&amp;</quote> for bitwise AND,
+                <quote>|</quote> for bitwise OR, <quote>^</quote>
+                for bitwise exclusive OR (XOR), <quote>:</quote>
+                for string splice and <quote>p</quote> for
+                operation argument.
                 <bridgehead renderas="sect4">Returns</bridgehead>
                 Returns the updated tuple.
+                <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+localhost> lua box.insert(0, 0, 'hello world')
+---
+ - 0: {'hello world'}
+...
+localhost> lua box.update(0, 0, '+p', 1, 1) -- add value 1 to field #1
+---
+error: 'Illegal parameters, numeric operation on a field with length != 4'
+...
+localhost> lua box.update(0, 0, '=p', 1, 1) -- assign field #1 to value 1
+---
+ - 0: {1}
+...
+localhost> lua box.update(0, 0, '+p', 1, 1)
+---
+ - 0: {2}
+...
+</programlisting>
             </para>
         </listitem>
     </varlistentry>
