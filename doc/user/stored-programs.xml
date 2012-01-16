@@ -201,7 +201,7 @@ pack: function
   </para>
 
 <variablelist>
-    <title>Package <code>box</code> function index</title>
+    <title>Package <code xml:id="box" xreflabel="box">box</code> function index</title>
     <varlistentry>
         <term>
             <emphasis role="lua">box.process(op, request)</emphasis>
@@ -617,57 +617,178 @@ qkl
 </variablelist>
 
 <variablelist>
-    <title>Packages <code>box.space</code></title>
-    <para>These packages combine access to space and index
-    configuration, such as <code>enabled</code>, <code>cardinality</code>,
-    etc, with object-oriented access to space and index functions
-    (<code>insert(), update(), select(), ...</code>. Each space
-    entry is a container for all space indexes, which are
-    available in box.space[].index[] array.</para>
+    <title>Package <code>box.space</code></title>
+    <para>This package is a container of all
+    configured spaces. A space object provides access to space
+    attributes, such as id, whether or not a space is
+    enabled, space cardinality, estimated number of rows. It also
+    contains object-oriented versions of <code>box</code>
+    functions. For example, instead of <code>box.insert(0, ...)</code>
+    one can write <code>box.space[0]:insert(...)</code>.
+    Package source code is available in file <filename
+    xlink:href="https://github.com/mailru/tarantool/blob/master/mod/box/box.lua">mod/box/box.lua</filename></para>
+    <para>A list of all <code>space</code> members follows.</para>
     <varlistentry>
-        <term><emphasis role="lua">
-        box.space[i].n
-        </emphasis></term>
+        <term><emphasis role="lua">space.n</emphasis></term>
+        <listitem><simpara>Ordinal space number, <code>box.space[i].n == i</code></simpara></listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">space.enabled</emphasis></term>
+        <listitem><simpara>
+            Whether or not this space is enabled in the
+            configuration file.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space.cardinality</emphasis>
+        </term>
+        <listitem><simpara>
+            A limit on tuple cardinality for tuples in this space.
+            This limit can be set in the configuration file. Value 0
+            stands for <quote>unlimited</quote>.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space.index[]</emphasis>
+        </term>
+        <listitem><simpara>
+            A container for all defined indexes. An index is a Lua object
+            of type <code xlink:href="#box.index">box.index</code> which
+            allows to search tuples and iterate over them in predefined order.
+        </simpara></listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:select(index_no, ...)</emphasis>
+        </term>
         <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:insert(...)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:replace(...)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:delete(key)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:update(key, format, ...)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:insert(...)</emphasis>
+        </term>
+        <listitem><simpara>
+            Object-oriented forms of respective <code
+            xlink:href="#box">box</code> methods.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:len()</emphasis>
+        </term>
+        <listitem><simpara>
+            Returns number of tuples in the space.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:truncate()</emphasis>
+        </term>
+        <listitem><simpara>
+            Deletes all tuples.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:pairs()</emphasis>
+        </term>
+        <listitem><simpara>
+            A helper function to iterate over all space tuples,
+            Lua style.
+        </simpara>
+                <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+localhost> lua for k,v in box.space[0]:pairs() do print(v) end
+---
+1: {'hello'}
+2: {'my     '}
+3: {'Lua    '}
+4: {'world'}
+...
+</programlisting>
+        </listitem>
     </varlistentry>
 </variablelist>
 
 <variablelist>
-    <title>Packages <code>box.space</code></title>
-    <para>This package combines access to space configurable
-    attributes, such as whether or not a space is enabled, space
-    cardinality, estimated number of rows with object-oriented
-    access to <code>box</code> functions. For example, instead of
-    <code>box.insert(0, ...)</code> one can write
-    <code>box.space[0]:insert(...)</code>. Similar object-oriented
-    wrappers exist for other <code>box</code> functions:
-    </para>
-    
+    <title>Package <code xml:id="box.index"
+xreflabel="box.index">box.index</code></title>
+    <para>This package implements methods of type <code>box.index</code>.</para>
     <varlistentry>
-        <term>
-            <emphasis role="lua">n</emphasis>
-            ordinal space number
-        </term>
-        <listitem><simpara></simpara></listitem>
+        <term><emphasis role="lua">index.n</emphasis></term>
+        <listitem><simpara>Ordinal index number in the space, <code>space.index[i].n == i</code>.</simpara></listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">index.enabled</emphasis></term>
+        <listitem><simpara>
+            Whether or not this index is enabled in the
+            configuration file.
+        </simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">enabled</emphasis>
-            whether or not this space is enabled in the
-            configuration file
+            <emphasis role="lua">index.type</emphasis>
         </term>
-        <listitem><simpara></simpara></listitem>
+        <listitem><simpara>
+            A string for index type, either 'TREE' or 'HASH'.
+        </simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">cardinality</emphasis>
-            a limit on tuple cardinality for tuples in this space
+            <emphasis role="lua">index.idx</emphasis>
         </term>
-        <listitem><simpara></simpara></listitem>
+        <listitem><simpara>
+            The underlying userdata which does all the magic.
+        </simpara></listitem>
     </varlistentry>
 
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:pairs()</emphasis>
+        </term>
+        <listitem><simpara>
+            A helper function to iterate over all tuples in index order.
+        </simpara>
+        </listitem>
+    </varlistentry>
 </variablelist>
 
 <variablelist>
