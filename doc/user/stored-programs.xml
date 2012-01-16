@@ -578,8 +578,8 @@ Note: the administrative console output must be YAML-compatible.
     <title>Package <code xml:id="box.tuple" xreflabel="box.tuple">box.tuple</code></title>
     <para>The package contains no functions, but stands for
     <code>box.tuple</code> userdata type. It is possible to access individual
-    tuple fields using an index, or iterate over all fields in a
-    tuple. Tuples are immutable.</para>
+    tuple fields using an index, iterate over all fields in a
+    tuple or convert a tuple to a Lua table. Tuples are immutable.</para>
     <varlistentry>
         <term><emphasis role="lua"> </emphasis></term>
         <listitem><para>
@@ -609,6 +609,15 @@ cde
 efg
 ghq
 qkl
+...
+localhost> lua t:unpack()
+---
+ - 
+ - abc
+ - cde
+ - efg
+ - ghq
+ - qkl
 ...
 </programlisting>
 
@@ -751,14 +760,9 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
 xreflabel="box.index">box.index</code></title>
     <para>This package implements methods of type <code>box.index</code>.</para>
     <varlistentry>
-        <term><emphasis role="lua">index.n</emphasis></term>
-        <listitem><simpara>Ordinal index number in the space, <code>space.index[i].n == i</code>.</simpara></listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua">index.enabled</emphasis></term>
+        <term><emphasis role="lua">index.unique</emphasis></term>
         <listitem><simpara>
-            Whether or not this index is enabled in the
-            configuration file.
+            Boolean, true if the index is unique.
         </simpara></listitem>
     </varlistentry>
 
@@ -768,6 +772,15 @@ xreflabel="box.index">box.index</code></title>
         </term>
         <listitem><simpara>
             A string for index type, either 'TREE' or 'HASH'.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index.key_field[]</emphasis>
+        </term>
+        <listitem><simpara>
+            An array describing index key fields.
         </simpara></listitem>
     </varlistentry>
 
@@ -789,6 +802,40 @@ xreflabel="box.index">box.index</code></title>
         </simpara>
         </listitem>
     </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:min()</emphasis>
+        </term>
+        <listitem><simpara>
+            The smallest value in the index. Available only for
+            indexes of type 'TREE'.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:max()</emphasis>
+        </term>
+        <listitem><simpara>
+            The biggest value in the index. Available only for
+            indexes of type 'TREE'.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:next()</emphasis>
+        </term>
+        <listitem><simpara>
+            This function can be used for positioned iteration, or
+            resuming iteration from a given key.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
 </variablelist>
 
 <variablelist>
