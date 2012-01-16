@@ -79,7 +79,8 @@ class Test:
         self.result = name.replace(".test", ".result")
         self.tmp_result = os.path.join(self.args.vardir,
                                        os.path.basename(self.result))
-        self.reject = name.replace(".test", ".reject")
+	self.reject = "{0}/test/{1}".format(self.args.builddir,
+			                    name.replace(".test", ".reject"))
         self.is_executed = False
         self.is_executed_ok = None
         self.is_equal_result = None
