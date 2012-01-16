@@ -33,7 +33,7 @@ tarball: clean
 
 clean::
 	find -type f -name \*.pyc -delete
-	rm -f test/box/admin.reject
+	find test -name \*.reject -delete
 
 install/tarantool-dbg::
 	rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg
