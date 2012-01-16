@@ -1,3 +1,9 @@
+tarantool (1.4.4+20120116-2) unstable; urgency=low
+
+  * Add rt into Debian/kFreeBSD likdepends.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 16 Jan 2012 16:54:17 +0400
+
 tarantool (1.4.4+20120116-1) unstable; urgency=low
 
   * New git snapshot.
