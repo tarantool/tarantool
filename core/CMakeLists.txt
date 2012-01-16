@@ -61,7 +61,7 @@ set (recompiled_core_sources
      ${CMAKE_SOURCE_DIR}/core/fiber.m PARENT_SCOPE)
 
 set (common_sources tbuf.m palloc.m util.m
-    salloc.m pickle.m coro.m stat.m log_io.m
+    salloc.m pickle.m coro.m stat.m log_io.m cpu_feature.m
     log_io_remote.m iproto.m exception.m errcode.c latch.m)
 
 if (ENABLE_TRACE)
