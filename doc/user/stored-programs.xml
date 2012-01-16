@@ -384,7 +384,7 @@ localhost> lua box.update(0, 0, '+p', 1, 1)
             <emphasis role="lua">box.delete(space_no, key)</emphasis>
         </term>
         <listitem><para>
-            Delete a tuple, identified by a primary key.
+            Delete a tuple identified by a primary key.
             <bridgehead renderas="sect4">Returns</bridgehead>
             Returns the deleted tuple.
                 <bridgehead renderas="sect4">Example</bridgehead>
@@ -394,7 +394,7 @@ Call OK, 1 rows affected
 ['test', 'my first tuple']
 localhost> call box.delete(0, 'test')
 Call OK, 0 rows affected
-localhost call box.delete(0, 'tes')
+localhost> call box.delete(0, 'tes')
 Call ERROR, Illegal parameters, key is not u32 (ER_ILLEGAL_PARAMS)
 </programlisting>
         </para></listitem>
@@ -561,7 +561,7 @@ localhost> lua box.unpack('i', tuple[0])
             <emphasis role="lua">box.print(...)</emphasis>
         </term>
         <listitem><para>
-Redefine Lua <code>print()</code> built-in to print either to the log file
+Redefines Lua <code>print()</code> built-in to print either to the log file
 (when Lua is used from the binary port) or back to the user (for the
 administrative console).
 </para><para>
@@ -617,7 +617,7 @@ qkl
 </variablelist>
 
 <variablelist>
-    <title>Packages <code>box.space</code>  and <code>box.index</code></title>
+    <title>Packages <code>box.space</code></title>
     <para>These packages combine access to space and index
     configuration, such as <code>enabled</code>, <code>cardinality</code>,
     etc, with object-oriented access to space and index functions
@@ -630,6 +630,44 @@ qkl
         </emphasis></term>
         <listitem><simpara></simpara></listitem>
     </varlistentry>
+</variablelist>
+
+<variablelist>
+    <title>Packages <code>box.space</code></title>
+    <para>This package combines access to space configurable
+    attributes, such as whether or not a space is enabled, space
+    cardinality, estimated number of rows with object-oriented
+    access to <code>box</code> functions. For example, instead of
+    <code>box.insert(0, ...)</code> one can write
+    <code>box.space[0]:insert(...)</code>. Similar object-oriented
+    wrappers exist for other <code>box</code> functions:
+    </para>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua">n</emphasis>
+            ordinal space number
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">enabled</emphasis>
+            whether or not this space is enabled in the
+            configuration file
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">cardinality</emphasis>
+            a limit on tuple cardinality for tuples in this space
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
 </variablelist>
 
 <variablelist>
