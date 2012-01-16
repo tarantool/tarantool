@@ -33,7 +33,7 @@ tarball: clean
 
 clean::
 	find -type f -name \*.pyc -delete
-	find test -name \*.reject -delete
+#	find test -name \*.reject -delete
 
 install/tarantool-dbg::
 	rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg
@@ -44,7 +44,7 @@ install/tarantool-client-dbg::
 install/tarantool::
 	pod2man -c 'high performance key/value storage server' \
 	    debian/tarantool_box.pod > build-area/tarantool_box.1
-	make -C build-area test-force || /bin/true
+#         make -C build-area test-force || /bin/true
 
 install/tarantool-common::
 	pod2man -c 'tarantool instances control' \

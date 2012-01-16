@@ -7,7 +7,14 @@ add_custom_target(test-force
 add_subdirectory(box)
 add_subdirectory(connector_c)
 
-install (FILES ${CMAKE_SOURCE_DIR}/test/box/tarantool.cfg
-        DESTINATION "${CMAKE_SYSCONF_DIR}")
-install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
-        DESTINATION "${CMAKE_LOCALSTATE_DIR}/lib/tarantool")
+if ("${CPACK_GENERATOR}" STREQUAL "RPM")
+	install (FILES ${CMAKE_SOURCE_DIR}/test/box/tarantool.cfg
+		 DESTINATION etc)
+	install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
+		 DESTINATION share/tarantool)
+else()
+	install (FILES ${CMAKE_SOURCE_DIR}/test/box/tarantool.cfg
+		DESTINATION bin)
+	install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
+		DESTINATION bin)
+endif()

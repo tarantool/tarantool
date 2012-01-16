@@ -1,3 +1,10 @@
+tarantool (1.4.4+20120117-1) unstable; urgency=low
+
+  * Merge my changes with upstream.
+  * Disable tests after building process.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 16 Jan 2012 22:35:44 +0400
+
 tarantool (1.4.4+20120116-2) unstable; urgency=low
 
   * Add rt into Debian/kFreeBSD likdepends.

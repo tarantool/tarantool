@@ -2,7 +2,7 @@
 
 #  /etc/rc.d/init.d/tarantool_box
 #
-# chkconfig: 2345 99 99 
+# chkconfig: 2345 99 99
 # description: tarantool_box
 # processname: tarantool_box
 
@@ -15,10 +15,10 @@ export WRAP_PIDFILE="/var/${INST}/wrapper.pid"
 export OPTIONS=""
 
 # We must not run immediate!
-if [ "${INST}" == "tarantool_box" ]
+if [ "${INST}" == "tarantool" ]
 then
         echo_failure
-        echo 
+        echo
         exit
 fi
 
@@ -32,7 +32,7 @@ start() {
         else
                 echo_failure
         fi
-        echo 
+        echo
         return ${RETVAL}
 }
 
@@ -75,4 +75,3 @@ case "$1" in
 esac
 
 exit ${RETVAL}
-
