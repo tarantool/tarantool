@@ -1,3 +1,9 @@
+tarantool (1.4.4+20120116-1) unstable; urgency=low
+
+  * New git snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 16 Jan 2012 11:36:19 +0400
+
 tarantool (1.4.4+20111229+2-2) unstable; urgency=low
 
   * use cd instead chdir, closes: 653611;
