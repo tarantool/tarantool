@@ -328,8 +328,8 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
                 Update a tuple identified by a primary
                 <code>key</code>. Update arguments follow,
                 described by <code>format</code>.
-                The Format and arguments are passed to
-                <code>box.pack()</code>, and the result is then sent
+                The format and arguments are passed to
+                <code>box.pack()</code> and the result is sent
                 to <code>box.process()</code>.
                 A correct <code>format</code> is a sequence of
                 pairs: update operation, operation arguments. A
@@ -626,8 +626,8 @@ localhost> lua t:unpack()
 </variablelist>
 
 <variablelist>
-    <title>Package <code>box.space</code></title>
-    <para>This package is a container of all
+    <title>Package <code xml:id="box.space" xreflabel="box.space">box.space</code></title>
+    <para>This package is a container for all
     configured spaces. A space object provides access to space
     attributes, such as id, whether or not a space is
     enabled, space cardinality, estimated number of rows. It also
@@ -673,6 +673,13 @@ localhost> lua t:unpack()
     <varlistentry>
         <term>
             <emphasis role="lua">space:select(index_no, ...)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:select_range(index_no, limit, key, ...)</emphasis>
         </term>
         <listitem><simpara></simpara></listitem>
     </varlistentry>
@@ -758,7 +765,13 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
 <variablelist>
     <title>Package <code xml:id="box.index"
 xreflabel="box.index">box.index</code></title>
-    <para>This package implements methods of type <code>box.index</code>.</para>
+    <para>
+        This package implements methods of type <code>box.index</code>.
+        Indexes are contained in <code
+        xlink:href="#box.space">box.space[i].index[]</code> array
+        within each space object. They provide an API for
+        ordered iteration over tuples.
+    </para>
     <varlistentry>
         <term><emphasis role="lua">index.unique</emphasis></term>
         <listitem><simpara>
@@ -795,10 +808,19 @@ xreflabel="box.index">box.index</code></title>
 
     <varlistentry>
         <term>
+            <emphasis role="lua">space:select_range(limit, key)</emphasis>
+        </term>
+        <listitem><simpara>Select a range of tuples, limited by
+        <code>limit</code>, starting from <code>key</code>.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
             <emphasis role="lua">index:pairs()</emphasis>
         </term>
         <listitem><simpara>
-            A helper function to iterate over all tuples in index order.
+            A helper function to iterate over all tuples in the index.
         </simpara>
         </listitem>
     </varlistentry>
@@ -827,12 +849,86 @@ xreflabel="box.index">box.index</code></title>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">index:next()</emphasis>
+            <emphasis role="lua">index:pairs()</emphasis>
+        </term>
+        <listitem><simpara>
+            A helper function to iterate over all tuples in an
+            index.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:next(iteration_state, key)</emphasis>
         </term>
         <listitem><simpara>
             This function can be used for positioned iteration, or
-            resuming iteration from a given key.
+            resuming iteration from a given key. It follows the
+            <link xlink:href='http://pgl.yoyo.org/luai/i/next'>Lua
+            iteration pattern</link> and returns a pair
+            <code>&gt;iteration_state, tuple&lt;</code>.
+            When called with no arguments, it starts iteration
+            from the beginning. If called with userdata
+            <code>iteration_state</code>, it returns a tuple
+            corresponding to iterator position, plus a new
+            <code>iteration_state</code>. When called with a key,
+            it positions the iterator on the key, and returns the
+            respective tuple and <code>iteration_state</code>.
         </simpara>
+        <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+localhost> insert into t0 values (1, 'Russia')
+Insert OK, 1 rows affected
+localhost> insert into t0 values (2, 'Serbia')
+Insert OK, 1 rows affected
+localhost> insert into t0 values (3, 'Bulgaria')
+Insert OK, 1 rows affected
+localhost> lua i = box.space[0].index[0]
+---
+...
+localhost> lua k,v=i:next()
+---
+...
+localhost> lua print(v)
+--
+1: {'Russia'}
+...
+localhost> lua k,v=i:next(k)
+---
+...
+localhost> lua print(v)
+---
+2: {'Serbia'}
+...
+localhost> lua k,v=i:next(k)
+---
+...
+localhost> lua print(v)
+---
+3: {'Bulgaria'}
+...
+localhost> lua k,v=i:next(k)
+---
+...
+localhost> lua print(v)
+---
+nil
+...
+localhost> lua k,v=i:next(2)
+---
+...
+localhost> lua print(v)
+---
+2: {'Serbia'}
+...
+localhost> lua for k,v in i.next, i, nil do print(v) end
+---
+1: {'Russia'}
+2: {'Serbia'}
+3: {'Bulgaria'}
+...
+</programlisting>
         </listitem>
     </varlistentry>
 
@@ -1027,8 +1123,9 @@ logger = cat - >> tarantool.log
 </variablelist>
 
 <para>
-    Additional examples can be found in the open source Lua stored
-    procedures repository and in the server test suite.
+    Additional examples can be found in the open source <link
+    xlink:href="https://github.com/mailru/tntlua">Lua stored
+    procedures repository</link> and in the server test suite.
 </para>
 
 <section>
@@ -1046,7 +1143,7 @@ logger = cat - >> tarantool.log
     <quote>Yield points</quote> are built into all
     calls from Tarantool core into the operating system.
     Any system call which can block is performed in
-    asynchronous manner, and the fiber waiting
+    asynchronous manner and the fiber waiting
     on the system call is preempted with a fiber ready to
     run. This model makes all programmatic locks unnecessary:
     cooperative multitasking ensures that there is no concurrency
