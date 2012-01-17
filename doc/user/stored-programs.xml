@@ -936,16 +936,17 @@ localhost> lua for k,v in i.next, i, nil do print(v) end
 
 <variablelist>
     <title>Package <code>box.fiber</code></title>
-    <para>Create, run and manage existing <emphasis>fibers</emphasis>.
+    <para>Functions in this package allow to create, run and
+    manage existing <emphasis>fibers</emphasis>.
     </para>
     <para>
-A fiber is an independent execution thread, implemented
-using the mechanism of cooperative multitasking.
+A fiber is an independent execution thread implemented
+using a mechanism of cooperative multitasking.
 Each fiber can be running, suspended or dead.
 A fiber is created (<code>box.fiber.create()</code>) suspended.
 It can be started with <code>box.fiber.resume()</code>, yield
 control back to the caller with <code>box.fiber.yield()</code>
-end with <code>return</code> or just by reaching the end of the
+end with <code>return</code> or just by reaching the end of
 fiber function.
     </para>
     <para>
@@ -953,7 +954,7 @@ A fiber can also be attached or detached.
 An attached fiber is a child of the creator,
 and is running only if the creator has called
 <code>box.fiber.resume()</code>. A detached fiber is a child of
-Tarntool internal <quote>sched</quote> fiber, and gets
+Tarantool internal <quote>sched</quote> fiber, and gets
 scheduled only if there is a libev event associated
 with it.
     </para>
@@ -983,7 +984,7 @@ or <code>box.update()</code>, are calling <code>box.fiber.testcancel()</code>.
 <code>box.select()</code> doesn't.
     </para>
     <para>
-A runaway fiber can really only become cuckoo
+In practice, a runaway fiber can only become unresponsive
 if it does a lot of computations and doesn't check
 whether it's been canceled. In addition
 to the advisory cancellation, configuration parameter <code>lua_timeout</code>
@@ -991,13 +992,12 @@ can be used to cancel runaway Lua procedures.
     </para>
     <para>
 The other potential problem comes from detached
-fibers which never get scheduled, because are subscribed
-or get no events. Such morphing fibers can be killed
-with <code>box.fiber.cancel()</code> at any time,
+fibers which never get scheduled, because are not subscribed
+to any events, or no relevant events occur. Such morphing fibers
+can be killed with <code>box.fiber.cancel()</code> at any time,
 since <code>box.fiber.cancel()</code>
 sends an asynchronous wakeup event to the fiber,
-and when returning from <code>box.fiber.yield()</code>
-<code>box.fiber.testcancel()</code> is invoked.
+and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs.
     </para>
     <para>Like all Lua objects, dead fibers are
     garbage collected.</para>
@@ -1005,14 +1005,14 @@ and when returning from <code>box.fiber.yield()</code>
         <term>
             <emphasis role="lua">box.fiber.id(fiber) </emphasis>
         </term>
-        <listitem><simpara>Returns a numeric id of the fiber.</simpara></listitem>
+        <listitem><simpara>Return a numeric id of the fiber.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua">box.fiber.self() </emphasis>
         </term>
-        <listitem><simpara>Returns <code>box.fiber</code> userdata
+        <listitem><simpara>Return <code>box.fiber</code> userdata
         object for the currently scheduled fiber.</simpara></listitem>
     </varlistentry>
 
@@ -1020,7 +1020,7 @@ and when returning from <code>box.fiber.yield()</code>
         <term>
             <emphasis role="lua">box.fiber.find(id) </emphasis>
         </term>
-        <listitem><simpara></simpara></listitem>
+        <listitem><simpara>Locate a fiber userdata object by id.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1028,10 +1028,11 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.create(function) </emphasis>
         </term>
         <listitem><simpara>
-		Create a fiber for the passed change.
-        Can hit a recursion limit. Is a cancellation
-        point.
-        </simpara></listitem>
+		Create a fiber for <code>function</code>.
+        </simpara>
+        <bridgehead renderas="sect4">Errors</bridgehead>
+        <simpara>Can hit a recursion limit.</simpara>
+        </listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1047,7 +1048,7 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.yield(...) </emphasis>
         </term>
         <listitem><para>
-        Yield control to the calling fiber &mdash; if the fiber
+        Yield control to the calling fiber, if the fiber
         is attached, or to sched otherwise.
         </para>
         <para>
@@ -1072,8 +1073,7 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.sleep(time)</emphasis>
         </term>
         <listitem><simpara>
-    Yield to the sched fiber and sleep.
-    @param[in]  amount of time to sleep (double)
+    Yield to the sched fiber and sleep <code>time</code> seconds.
     Only the current fiber can be made to sleep.
         </simpara></listitem>
     </varlistentry>
@@ -1083,9 +1083,9 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.cancel(fiber)</emphasis>
         </term>
         <listitem><simpara>
-Running and suspended fibers can be canceled.
-Zombie fibers can't. Returns an error if
-subject fiber does not permit cancel.
+        Cancel a <code>fiber</code>.
+        Running and suspended fibers can be canceled.
+        Returns an error if the subject fiber does not permit cancel.
         </simpara></listitem>
     </varlistentry>
 
@@ -1094,8 +1094,8 @@ subject fiber does not permit cancel.
             <emphasis role="lua">box.fiber.testcancel()</emphasis>
         </term>
         <listitem><simpara>
-Check if this current fiber has been canceled and
-throw an exception if this is the case.
+            Check if the current fiber has been canceled and
+            throw an exception if this is the case.
         </simpara></listitem>
     </varlistentry>
 
@@ -1141,7 +1141,7 @@ logger = cat - >> tarantool.log
     paradigm: unless a running fiber deliberately yields control
     to some other fiber, it is not preempted.
     <quote>Yield points</quote> are built into all
-    calls from Tarantool core into the operating system.
+    calls from Tarantool core to the operating system.
     Any system call which can block is performed in
     asynchronous manner and the fiber waiting
     on the system call is preempted with a fiber ready to
@@ -1173,7 +1173,7 @@ logger = cat - >> tarantool.log
     any yield in a stored procedure is a potential change in the
     database state. Effectively, it's only possible
     to have CAS (compare-and-swap) -like atomic stored
-    procedures: select and then modify a record.
+    procedures: i.e. procedures which select and then modify a record.
 
     Multiple data change requests always run through a built-in
     yield point.
