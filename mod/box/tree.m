@@ -29,6 +29,8 @@
 #include <salloc.h>
 #include <pickle.h>
 
+/* {{{ Utilities. *************************************************/
+
 /**
  * Unsigned 32-bit int comparison.
  */
@@ -46,6 +48,8 @@ u64_cmp(u64 a, u64 b)
 {
 	return a < b ? -1 : (a > b);
 }
+
+/* }}} */
 
 /* {{{ Tree internal data types. **********************************/
 
@@ -258,7 +262,7 @@ find_tree_type(struct space *space, struct key_def *key_def)
 		return TREE_FIXED;
 	} else if (key_def->part_count == 1 && key_def->parts[0].type == NUM) {
 		return TREE_NUM32;
-	} else{
+	} else {
 		return TREE_DENSE;
 	}
 }
@@ -297,10 +301,14 @@ fold_sparse_parts(struct key_def *key_def, struct box_tuple *tuple, union sparse
 		int part = key_def->cmp_order[field];
 		if (part != -1) {
 			if (key_def->parts[part].type == NUM) {
-				assert(len == sizeof parts[part].num32);
+				if (len != sizeof parts[part].num32) {
+					tnt_raise(IllegalParams, :"key is not u32");
+				}
 				memcpy(&parts[part].num32, data, len);
 			} else if (key_def->parts[part].type == NUM64) {
-				assert(len == sizeof parts[part].num64);
+				if (len != sizeof parts[part].num64) {
+					tnt_raise(IllegalParams, :"key is not u64");
+				}
 				memcpy(&parts[part].num64, data, len);
 			} else if (len <= sizeof(parts[part].str.data)) {
 				parts[part].str.length = len;
