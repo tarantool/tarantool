@@ -60,7 +60,7 @@
 
 static pid_t master_pid;
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
-#define DEFAULT_CFG INSTALL_PREFIX "/etc/" DEFAULT_CFG_FILENAME
+#define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
 const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
