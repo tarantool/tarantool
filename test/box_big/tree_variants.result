@@ -1,0 +1,79 @@
+insert into t6 values (0, '00000000', '00000100', 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000 )
+Insert OK, 1 row affected
+insert into t6 values (1, '00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001 )
+Insert OK, 1 row affected
+insert into t6 values (2, '00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002 )
+Insert OK, 1 row affected
+insert into t6 values (3, '00000003', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003 )
+Insert OK, 1 row affected
+insert into t6 values (4, '00000004', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004 )
+Insert OK, 1 row affected
+insert into t6 values (5, '00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005 )
+Insert OK, 1 row affected
+insert into t6 values (6, '00000006', '00000400', 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006 )
+Insert OK, 1 row affected
+insert into t6 values (7, '00000007', '00000400', 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007 )
+Insert OK, 1 row affected
+insert into t6 values (8, '00000008', '00000400', 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008 )
+Insert OK, 1 row affected
+insert into t6 values (9, '00000009', '00000400', 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009 )
+Insert OK, 1 row affected
+select * from t6 where k0 = 1
+Found 1 tuple:
+[1, '00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001]
+select * from t6 where k1 = '00000002'
+Found 1 tuple:
+[2, '00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002]
+select * from t6 where k2 = '00000300'
+Found 3 tuples:
+[3, '00000003', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003]
+[4, '00000004', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004]
+[5, '00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005]
+lua box.space[6]:select(3, 'Joe', 'Sixpack')
+---
+ - 0: {'00000000', '00000100', 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
+ - 1: {'00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001}
+ - 2: {'00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
+ - 3: {'00000003', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
+ - 4: {'00000004', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
+ - 5: {'00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+...
+lua box.space[6]:select(3, 'John')
+---
+ - 6: {'00000006', '00000400', 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+ - 7: {'00000007', '00000400', 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+ - 8: {'00000008', '00000400', 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+ - 9: {'00000009', '00000400', 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+...
+lua box.space[6]:select(4, 'A Pipe')
+---
+ - 6: {'00000006', '00000400', 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+...
+lua box.space[6]:select(4, 'Miller Genuine Draft', 'Drinks')
+---
+ - 5: {'00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+...
+select * from t6 where k5 = 2007
+Found 1 tuple:
+[7, '00000007', '00000400', 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007]
+lua box.space[6]:select(6, 'Miller Genuine Draft', 'Drinks')
+---
+ - 5: {'00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+...
+delete from t6 where k0 = 6
+Delete OK, 1 row affected
+delete from t6 where k0 = 7
+Delete OK, 1 row affected
+delete from t6 where k0 = 8
+Delete OK, 1 row affected
+delete from t6 where k0 = 9
+Delete OK, 1 row affected
+lua for k,v in box.space[6]:pairs() do print(v) end
+---
+0: {'00000000', '00000100', 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
+1: {'00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001}
+2: {'00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
+3: {'00000003', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
+4: {'00000004', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
+5: {'00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+...
