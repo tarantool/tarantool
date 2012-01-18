@@ -208,6 +208,21 @@ find_fixed_offset(struct space *space, int fieldno, int skip)
 }
 
 /**
+ * Find the first index field.
+ */
+static u32
+find_first_field(struct key_def *key_def)
+{
+	for (int field = 0; field < key_def->max_fieldno; ++field) {
+		int part = key_def->cmp_order[field];
+		if (part != -1) {
+			return field;
+		}
+	}
+	panic("index field not found");
+}
+
+/**
  * Find the appropriate tree type for a given key.
  */
 static enum tree_type
@@ -234,18 +249,12 @@ find_tree_type(struct space *space, struct key_def *key_def)
 		}
 	}
 #else
-	int field = 0;
-
 	/* Scan for the first tuple field used by the index */
-	for (; field < key_def->max_fieldno; ++field) {
-		int part = key_def->cmp_order[field];
-		if (part != -1) {
-			if (find_fixed_offset(space, field, 0) < 0) {
-				fixed = 0;
-			}
-			break;
-		}
+	int field = find_first_field(key_def);
+	if (find_fixed_offset(space, field, 0) < 0) {
+		fixed = 0;
 	}
+
 	/* Check that there are no gaps after the first field */
 	for (; field < key_def->max_fieldno; ++field) {
 		int part = key_def->cmp_order[field];
@@ -265,21 +274,6 @@ find_tree_type(struct space *space, struct key_def *key_def)
 	} else {
 		return TREE_DENSE;
 	}
-}
-
-/**
- * Find first index field for a dense/fixed node
- */
-static u32
-find_first_field(struct key_def *key_def)
-{
-	for (int field = 0; field < key_def->max_fieldno; ++field) {
-		int part = key_def->cmp_order[field];
-		if (part != -1) {
-			return field;
-		}
-	}
-	panic("index field not found");
 }
 
 /**
