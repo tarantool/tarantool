@@ -231,24 +231,6 @@ find_tree_type(struct space *space, struct key_def *key_def)
 	int dense = 1;
 	int fixed = 1;
 
-#if DENSE_CAN_HAVE_FIXED_GAPS
-	int skip = 0;
-
-	for (int field = 0; field < key_def->max_fieldno; ++field) {
-		int part = key_def->cmp_order[field];
-		if (part != -1) {
-			if (find_fixed_offset(space, field, skip) < 0) {
-				if (skip == 0) {
-					fixed = 0;
-				} else {
-					dense = 0;
-					break;
-				}
-			}
-			skip = field + 1;
-		}
-	}
-#else
 	/* Scan for the first tuple field used by the index */
 	int field = find_first_field(key_def);
 	if (find_fixed_offset(space, field, 0) < 0) {
@@ -263,8 +245,8 @@ find_tree_type(struct space *space, struct key_def *key_def)
 			break;
 		}
 	}
-#endif
 
+	/* Return the appropriate type */
 	if (!dense) {
 		return TREE_SPARSE;
 	} else if (fixed) {
