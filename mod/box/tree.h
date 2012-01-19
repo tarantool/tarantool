@@ -34,7 +34,10 @@
  */
 SPTREE_DEF(index, realloc);
 
+typedef int (*tree_cmp_t)(const void *, const void *, void *);
+
 @interface TreeIndex: Index {
+	@public
 	sptree_index tree;
 };
 
@@ -43,6 +46,9 @@ SPTREE_DEF(index, realloc);
 
 /* to be defined in subclasses */
 - (size_t) node_size;
+- (tree_cmp_t) node_cmp;
+- (tree_cmp_t) dup_node_cmp;
+- (tree_cmp_t) key_node_cmp;
 - (void) fold: (void *) node :(struct box_tuple *) tuple;
 - (struct box_tuple *) unfold: (const void *) node;
 - (int) compare: (const void *) node_a :(const void *) node_b;
