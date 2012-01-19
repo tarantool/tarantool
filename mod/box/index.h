@@ -131,7 +131,7 @@ struct iterator {
 	void (*free)(struct iterator *);
 };
 
-struct box_tuple * iterator_first_equal(struct iterator *it);
+struct box_tuple *iterator_first_equal(struct iterator *it);
 
 #define foreach_index(n, index_var)					\
 	Index *index_var;						\
