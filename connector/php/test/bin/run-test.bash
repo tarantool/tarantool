@@ -37,6 +37,8 @@ TARANTOOL_BOX_PID="$TEST_RUNNER_VAR_DIR/tarantool_box.pid"
 # initialize suite
 function init_suite()
 {
+	mkdir -p $TEST_RUNNER_VAR_DIR
+
 	# check TARANTOOL_HOME variable
 	if [ ! -z $TARANTOOL_HOME ]; then
 		# Use user-defined path
@@ -68,10 +70,10 @@ function init_suite()
 	fi
 	ln -s ../../modules/tarantool.so $TEST_RUNNER_LIB_DIR
 
-	if [ -f ../$TEST_RUNNER_VAR_DIR/init.lua ]; then
-		rm ../$TEST_RUNNER_VAR_DIR/init.lua
+	if [ -f $TEST_RUNNER_VAR_DIR/init.lua ]; then
+		rm $TEST_RUNNER_VAR_DIR/init.lua
 	fi
-	ln -s ../$TEST_RUNNER_LIB_DIR/lua/test.lua $TEST_RUNNER_VAR_DIR/init.lua
+	ln -s ../$TEST_RUNNER_LIB_DIR/lua/sorted_array.lua $TEST_RUNNER_VAR_DIR/init.lua
 
 	return $SUCCESS
 }

@@ -34,6 +34,9 @@ void
 memcached_init();
 
 void
+memcached_free();
+
+void
 memcached_space_init();
 
 int

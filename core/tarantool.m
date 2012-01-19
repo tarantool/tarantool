@@ -60,7 +60,7 @@
 
 static pid_t master_pid;
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
-#define DEFAULT_CFG INSTALL_PREFIX "/etc/" DEFAULT_CFG_FILENAME
+#define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
 const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
@@ -374,7 +374,8 @@ tarantool_free(void)
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
-	tarantool_lua_close(tarantool_L);
+	if (tarantool_L)
+		tarantool_lua_close(tarantool_L);
 }
 
 static void
@@ -463,6 +464,15 @@ main(int argc, char **argv)
 		puts("Please visit project home page at http://launchpad.net/tarantool");
 		puts("to see online documentation, submit bugs or contribute a patch.");
 		return 0;
+	}
+
+	if (gopt_arg(opt, 'C', &cat_filename)) {
+		initialize_minimal();
+		if (access(cat_filename, R_OK) == -1) {
+			panic("access(\"%s\"): %s", cat_filename, strerror(errno));
+			exit(EX_OSFILE);
+		}
+		return mod_cat(cat_filename);
 	}
 
 	gopt_arg(opt, 'c', &cfg_filename);
@@ -567,15 +577,6 @@ main(int argc, char **argv)
 			exit(EX_OSERR);
 		}
 #endif
-	}
-
-	if (gopt_arg(opt, 'C', &cat_filename)) {
-		initialize_minimal();
-		if (access(cat_filename, R_OK) == -1) {
-			say_syserror("access(\"%s\")", cat_filename);
-			exit(EX_OSFILE);
-		}
-		return mod_cat(cat_filename);
 	}
 
 	if (gopt(opt, 'I')) {

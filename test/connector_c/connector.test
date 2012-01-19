@@ -1,7 +1,9 @@
 import subprocess
 import sys
+import os
 
-p = subprocess.Popen([ "connector_c/tt" ], stdout=subprocess.PIPE)
+p = subprocess.Popen([ os.path.join(builddir, "test/connector_c/tt") ],
+                     stdout=subprocess.PIPE)
 p.wait()
 for line in p.stdout.readlines():
       sys.stdout.write(line)

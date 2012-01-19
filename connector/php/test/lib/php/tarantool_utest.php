@@ -17,7 +17,8 @@ $sw4 = array(0, "Star Wars", 1977, "A New Hope",
              "Princess Leia races home aboard her\n" .
              "starship, custodian of the stolen plans\n" .
              "that can save her people and restore\n" .
-             "freedom to the galaxy....");
+             "freedom to the galaxy....",
+             0xf10dbeef0001);
 
 $sw5 = array(1, "Star Wars", 1980, "The Empire Strikes Back",
              "It is a dark time for the\n" . 
@@ -39,7 +40,8 @@ $sw5 = array(1, "Star Wars", 1980, "The Empire Strikes Back",
              "obsessed with finding young\n" .
              "Skywalker, has dispatched\n" .
              "thousands of remote probes\n" .
-             "into the far reaches of space....");
+             "into the far reaches of space....",
+             0xf10dbeef0002);
 
 $sw6 = array(2, "Star Wars", 1983, "Return of the Jedi",
              "Luke Skywalker has returned\n" .
@@ -61,7 +63,8 @@ $sw6 = array(2, "Star Wars", 1983, "Return of the Jedi",
              "weapon will spell certain\n" .
              "doom for the small band of\n" .
              "rebels struggling to restore\n" .
-             "freedom to the galaxy...");
+             "freedom to the galaxy...",
+             0xf10dbeef0003);
 
 function test_init($tarantool, $space_no) {
     try {
@@ -100,6 +103,7 @@ function test_select($tarantool, $space_no, $index_no, $key) {
             echo "  year   = ", $tuples_list[$i][2], "\n";
             echo "  name   = ", $tuples_list[$i][3], "\n";
             echo "  crawl  = ", $tuples_list[$i][4], "\n";
+            echo "  uuid   = ", $tuples_list[$i][5], "\n";
         }
     } catch (Exception $e) {
         echo "catched exception: ", $e->getMessage(), "\n";
@@ -111,13 +115,14 @@ function test_insert($tarantool, $space_no, $tuple, $flags) {
         $result = $tarantool->insert($space_no, $tuple, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
-        if ($flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+        if (array_key_exists("tuple", $result)) {
             echo "tuple:", "\n";
             echo "  id     = ", $result["tuple"][0], "\n";
             echo "  series = ", $result["tuple"][1], "\n";
             echo "  year   = ", $result["tuple"][2], "\n";
             echo "  name   = ", $result["tuple"][3], "\n";
             echo "  crawl  = ", $result["tuple"][4], "\n";
+            echo "  uuid   = ", $result["tuple"][5], "\n";
         }
     } catch (Exception $e) {
         echo "catched exception: ", $e->getMessage(), "\n";
@@ -129,13 +134,14 @@ function test_update_fields($tarantool, $space_no, $key, $ops, $flags) {
         $result = $tarantool->update_fields($space_no, $key, $ops, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
-        if ($flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+        if (array_key_exists("tuple", $result)) {
             echo "tuple:", "\n";
             echo "  id     = ", $result["tuple"][0], "\n";
             echo "  series = ", $result["tuple"][1], "\n";
             echo "  year   = ", $result["tuple"][2], "\n";
             echo "  name   = ", $result["tuple"][3], "\n";
             echo "  crawl  = ", $result["tuple"][4], "\n";
+            echo "  uuid   = ", $result["tuple"][5], "\n";
         }
     } catch (Exception $e) {
         echo "catched exception: ", $e->getMessage(), "\n";
@@ -147,13 +153,14 @@ function test_delete($tarantool, $space_no, $key, $flags) {
         $result = $tarantool->delete($space_no, $key, $flags);
         echo "result:\n";
         echo "count = ", $result["count"], "\n";
-        if ($flags & TARANTOOL_FLAGS_RETURN_TUPLE) {
+        if (array_key_exists("tuple", $result)) {
             echo "tuple:", "\n";
             echo "  id     = ", $result["tuple"][0], "\n";
             echo "  series = ", $result["tuple"][1], "\n";
             echo "  year   = ", $result["tuple"][2], "\n";
             echo "  name   = ", $result["tuple"][3], "\n";
             echo "  crawl  = ", $result["tuple"][4], "\n";
+            echo "  uuid   = ", $result["tuple"][5], "\n";
         }
     } catch (Exception $e) {
         echo "catched exception: ", $e->getMessage(), "\n";
@@ -164,17 +171,7 @@ function test_call($tarantool, $proc, $tuple_args, $flags) {
     try {
         $result = $tarantool->call($proc, $tuple_args, $flags);
         echo "result:\n";
-        echo "count = ", $result["count"], "\n";
-        $tuples_list = $result["tuples_list"];
-        sort($tuples_list);
-        for ($i = 0; $i < $result["count"]; $i++) {
-            echo "tuple[", $i, "]:", "\n";
-            echo "  id     = ", $tuples_list[$i][0], "\n";
-            echo "  series = ", $tuples_list[$i][1], "\n";
-            echo "  year   = ", $tuples_list[$i][2], "\n";
-            echo "  name   = ", $tuples_list[$i][3], "\n";
-            echo "  crawl  = ", $tuples_list[$i][4], "\n";
-        }
+        var_dump($result);
     } catch (Exception $e) {
         echo "catched exception: ", $e->getMessage(), "\n";
     }

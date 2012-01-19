@@ -13,6 +13,7 @@ endif()
 set (cli_deps readline history)
 
 # trying to resolve readline dependencies
+#
 find_library(WITH_NCURSES_LIB NAMES "ncurses")
 if (WITH_NCURSES_LIB)
 	set(cli_deps ${cli_deps} ncurses)
@@ -31,4 +32,4 @@ add_executable(${cli} ${cli_sources} ${CMAKE_SOURCE_DIR}/core/errcode.c)
 set_target_properties(${cli} PROPERTIES COMPILE_FLAGS "${core_cflags}")
 target_link_libraries (${cli} ${cli_libs})
 
-install (PROGRAMS ${cli} DESTINATION bin)
+install (TARGETS ${cli} DESTINATION bin)

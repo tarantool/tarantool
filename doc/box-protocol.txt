@@ -1,4 +1,4 @@
-; Mail.RU IPROTO protocol, Tarantool/Box subset.
+Tarantool/Box IPROTO protocol.
 ;
 ; The latest version of this document can be found in
 ; tarantool source tree, doc/box-protocol.txt
@@ -21,8 +21,8 @@
 ; integer (BER stands for Basic Encoding Rules, but in reality it
 ; has little to do with ASN.1 standard). 
 ; See http://en.wikipedia.org/wiki/LEB128
-; for encoding description, or core/pickle.c for implementation
-; in tarantool.
+; for encoding description, or core/pickle.m for implementation
+; in Tarantool.
 
 ; All requests and responses utilize the same basic structure:
 
@@ -276,7 +276,7 @@
 ; on strings:
 ; 5 - implementation of Perl 'splice' command
 
-<op_code> ::= <int8> # 0 | 1 | 2 | 3
+<op_code> ::= <int8> # 0 | 1 | 2 | 3 | 4 | 5
 
 ;
 ; It's an error to specify an argument of a type that
@@ -353,7 +353,7 @@
 
 <return_code> ::= <int32>
 
-; Currently, the completion status is complementary:
+; The completion status is complementary:
 ; it can be deduced from the error code. There are only
 ; 3 completion status codes in use:
 ; 0  - success; The only possible error code with this status is
@@ -408,8 +408,8 @@
 ;  0x00002702 -- ER_WAL_IO
 ;                WAL I/O error
 ;
-; Convenience that define hexadecimal constants for <int32>
-; return codes (completion status + code) can be found in
-; include/iproto.h.
+; Convenience macros which define hexadecimal constants for
+; <int32> return codes (completion status + code) can be found
+; in include/iproto.h.
 ;
 ; vim: syntax=bnf

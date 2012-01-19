@@ -51,7 +51,7 @@
  */
 #cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
 
-#define INSTALL_PREFIX "@CMAKE_INSTALL_PREFIX@"
+#define SYSCONF_DIR "@CMAKE_SYSCONF_DIR@"
 /*
  * vim: syntax=c
  */

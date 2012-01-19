@@ -172,6 +172,16 @@ include_directories("${PROJECT_SOURCE_DIR}/connector/c/tntsql/include")
 include_directories("${PROJECT_SOURCE_DIR}/connector/c/tntnet/include")
 
 #
+# Specify prefixes
+#
+if (NOT DEFINED CMAKE_SYSCONF_DIR)
+    set (CMAKE_SYSCONF_DIR "${CMAKE_INSTALL_PREFIX}/etc")
+endif()
+if (NOT DEFINED CMAKE_LOCALSTATE_DIR)
+    set (CMAKE_LOCALSTATE_DIR "${CMAKE_INSTALL_PREFIX}/var")
+endif()
+
+#
 # Now handle all configuration options.
 #
 option(ENABLE_CLIENT "Enable building of console client" Off)
@@ -246,7 +256,7 @@ add_subdirectory(doc EXCLUDE_FROM_ALL)
 add_subdirectory(extra)
 
 install (FILES README LICENSE doc/box-protocol.txt
-         DESTINATION doc)
+         DESTINATION share/doc/tarantool)
 
 include (cmake/tarantool_cpack.cmake)
 #

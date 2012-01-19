@@ -139,6 +139,17 @@
    ...
 }
 
+{
+   <box upadte command>
+   Memcheck:Leak
+   fun:salloc
+   fun:tuple_alloc
+   fun:prepare_update
+   fun:box_dispatch
+   fun:box_process*
+   ...
+}
+
 ##
 ## tarantool/lua suppressions
 ##

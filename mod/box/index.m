@@ -365,6 +365,7 @@ hash_iterator_free(struct iterator *iterator)
 {
 	struct hash_iterator *it = hash_iterator(iterator);
 
+	(void) part_count;
 	assert(part_count == 1);
 	assert(iterator->next = hash_iterator_next);
 
@@ -486,6 +487,7 @@ hash_iterator_free(struct iterator *iterator)
 {
 	assert(iterator->next = hash_iterator_next);
 	assert(part_count == 1);
+	(void) part_count;
 
 	struct hash_iterator *it = hash_iterator(iterator);
 
@@ -598,6 +600,7 @@ hash_iterator_free(struct iterator *iterator)
 {
 	assert(iterator->next = hash_iterator_next);
 	assert(part_count== 1);
+	(void) part_count;
 
 	struct hash_iterator *it = hash_iterator(iterator);
 

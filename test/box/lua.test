@@ -242,3 +242,8 @@ exec admin "lua pcall(box.insert, 99, 1, 'test')"
 exec admin "lua pcall(box.insert, 0, 1, 'hello')"
 exec admin "lua pcall(box.insert, 0, 1, 'hello')"
 exec admin "lua box.space[0]:truncate()"
+print """
+# A test case for Bug#908094
+# Lua provides access to os.execute()
+"""
+exec admin "lua os.execute('ls')"

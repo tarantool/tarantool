@@ -1498,6 +1498,7 @@ void
 mod_free(void)
 {
 	space_free();
+	memcached_free();
 }
 
 void

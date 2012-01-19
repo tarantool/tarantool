@@ -47,6 +47,7 @@ static int stat_base;
 static struct fiber *memcached_expire = NULL;
 
 static Index *memcached_index;
+static struct iterator *memcached_it;
 
 /* memcached tuple format:
    <key, meta, data> */
@@ -419,6 +420,13 @@ memcached_init(void)
 }
 
 void
+memcached_free()
+{
+	if (memcached_it)
+		memcached_it->free(memcached_it);
+}
+
+void
 memcached_space_init()
 {
         if (cfg.memcached_port == 0)
@@ -488,17 +496,17 @@ memcached_expire_loop(void *data __attribute__((unused)))
 	struct box_tuple *tuple = NULL;
 
 	say_info("memcached expire fiber started");
-	struct iterator *it = [memcached_index allocIterator];
+	memcached_it = [memcached_index allocIterator];
 	@try {
 restart:
 		if (tuple == NULL)
-			[memcached_index initIterator: it];
+			[memcached_index initIterator: memcached_it];
 
 		struct tbuf *keys_to_delete = tbuf_alloc(fiber->gc_pool);
 
 		for (int j = 0; j < cfg.memcached_expire_per_loop; j++) {
 
-			tuple = it->next(it);
+			tuple = memcached_it->next(memcached_it);
 
 			if (tuple == NULL)
 				break;
@@ -513,7 +521,8 @@ restart:
 		fiber_gc();
 		goto restart;
 	} @finally {
-		it->free(it);
+		memcached_it->free(memcached_it);
+		memcached_it = NULL;
 	}
 }
 
@@ -523,7 +532,7 @@ void memcached_start_expire()
 		return;
 
 	assert(memcached_expire == NULL);
-	memcached_expire = fiber_create("memecached_expire", -1,
+	memcached_expire = fiber_create("memcached_expire", -1,
 					-1, memcached_expire_loop, NULL);
 	if (memcached_expire == NULL)
 		say_error("can't start the expire fiber");
