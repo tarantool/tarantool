@@ -926,6 +926,7 @@ space_free(void)
 	for (i = 0 ; i < BOX_SPACE_MAX ; i++) {
 		if (!space[i].enabled)
 			continue;
+
 		int j;
 		for (j = 0 ; j < BOX_INDEX_MAX ; j++) {
 			Index *index = space[i].index[j];
@@ -933,6 +934,8 @@ space_free(void)
 				break;
 			[index free];
 		}
+
+		sfree(space[i].field_types);
 	}
 }
 
