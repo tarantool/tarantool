@@ -42,14 +42,26 @@ enum
 };
 
 struct space {
-	int n;
-	bool enabled;
-	int cardinality;
 	Index *index[BOX_INDEX_MAX];
+	int n;
+	int cardinality;
 
-	/* inferred data */
+	/**
+	 * Inferred data: max field no which participates in an
+	 * index. Each tuple in this space must have, therefore, at
+	 * least indexed_field_count fields.
+	 */
 	int field_count;
-	int *field_types;
+	/**
+	 * Field types of indexed fields. This is an array of size
+	 * indexed_field_count. If there are gaps, i.e. fields
+	 * which do not participate in an index and for which we
+	 * thus can't infer field type, respective array member
+	 * has value UNKNOWN. XXX: right now UNKNOWN is also
+	 * set for fields which types in two indexes contradict.
+	 */
+	enum field_data_type *field_types;
+	bool enabled;
 };
 
 extern struct space *space;
