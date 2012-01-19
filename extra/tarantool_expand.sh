@@ -1,17 +1,33 @@
 #!/bin/sh
 
 #
-# Tarantool DB expand script
+# Copyright (C) 2012 Mail.RU
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
 #
 
-prefix="/usr/local"
-prefix_var="/var"
-prefix_etc="/etc"
-
-deploy_cfg="${prefix}/etc/tarantool_deploy.cfg"
-deploy_exists=0
-deploy_current=0
-deploy_count=0
+#
+# Tarantool DB expand script
+#
 
 prompt_name=`basename $0`
 
@@ -19,6 +35,7 @@ act_prompt=1
 act_status=0
 act_debug=0
 act_dry=0
+instance_current=0
 
 error() {
 	echo "$prompt_name error: $*" 1>&2
@@ -33,9 +50,9 @@ usage() {
 	echo "Tarantool DB expand script"
 	echo "usage: tarantool_expand.sh [options] <instances>"
 	echo
-	echo "  --prefix <path>       installation path ($prefix)"
-	echo "  --prefix_etc <path>   installation etc path ($prefix_etc)"
-	echo "  --prefix_var <path>   installation var path ($prefix_var)"
+	echo "  --prefix <path>       installation path (/usr/local)"
+	echo "  --prefix_etc <path>   installation etc path (/etc)"
+	echo "  --prefix_var <path>   installation var path (/var)"
 	echo
 	echo "  --status              display deployment status"
 	echo "  --dry                 don't create anything, show commands"
@@ -44,7 +61,7 @@ usage() {
 	echo "  --yes                 don't prompt"
 	echo "  --help                display this usage"
 	echo
-	exit 0
+	exit $1
 }
 
 rollback_instance() {
@@ -58,9 +75,9 @@ rollback_instance() {
 }
 
 rollback() {
-	log ">>>> rollbacking changes"
+	log ">>>> rolling back changes"
 	start=`expr $deploy_current + 1`
-	for instance in `seq $start $deploy_count`; do
+	for instance in `seq $start $instance_current`; do
 		rollback_instance $instance
 	done
 	exit 1
@@ -86,6 +103,7 @@ deploy_instance() {
 
 	# setting up work environment
 	try "mkdir -p $workdir/logs"
+
 	# setting up startup snapshot
 	try "cp \"${prefix}/share/tarantool/00000000000000000001.snap\" $workdir"
 	try "chown tarantool:tarantool -R $workdir"
@@ -106,6 +124,7 @@ deploy_instance() {
 deploy() {
 	start=`expr $deploy_current + 1`
 	for instance in `seq $start $deploy_count`; do
+		instance_current=$instance
 		deploy_instance $instance
 	done
 }
@@ -117,21 +136,31 @@ commit() {
 
 # processing command line arguments
 if [ $# -eq 0 ]; then
-	usage
+	usage 1
 fi
+
+deploy_count=0
 while [ $# -ge 1 ]; do
 	case $1 in
 		--yes) act_prompt=0 ; shift 1 ;;
 		--prefix) prefix=$2 ; shift 2 ;;
 		--prefix_var) prefix_var=$2 ; shift 2 ;;
 		--prefix_etc) prefix_etc=$2 ; shift 2 ;;
-		--dry) act_dry=1 ; act_debug=1 ; shift 1;;
-		--debug) act_debug=1; shift 1;;
+		--dry) act_dry=1 ; act_debug=1 ; shift 1 ;;
+		--debug) act_debug=1; shift 1 ;;
 		--status) act_status=1 ; shift 1 ;;
-		--help) usage ; shift 1 ;;
+		--help) usage 0 ; shift 1 ;;
 		*) deploy_count=$1 ; shift 1 ; break ;;
 	esac
 done
+
+set ${prefix:="/usr/local"}
+set ${prefix_var:="/var"}
+set ${prefix_etc:="/etc"}
+
+deploy_cfg="${prefix}/etc/tarantool_deploy.cfg"
+deploy_exists=0
+deploy_current=0
 
 # checking deployment configuration file
 if [ -f $deploy_cfg ]; then
@@ -167,7 +196,7 @@ fi
 if [ $act_prompt -eq 1 ]; then
 	[ $act_dry -ne 0 ] && log "(dry mode)"
 	log "About to extend tarantool instances from $deploy_current to $deploy_count."
-	log "Run? [n/y]"
+	log "Continue? [n/y]"
 	read answer
 	case "$answer" in
 		[Yy]) ;;
@@ -182,3 +211,6 @@ deploy
 commit
 
 log "done"
+
+# __EOF__
+
