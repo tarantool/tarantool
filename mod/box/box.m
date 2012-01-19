@@ -672,6 +672,7 @@ txn_commit(struct box_txn *txn)
 	if (!op_is_select(txn->op)) {
 		say_debug("box_commit(op:%s)", messages_strs[txn->op]);
 
+#if 0
 		if (txn->flags & BOX_NOT_STORE)
 			;
 		else {
@@ -680,13 +681,18 @@ txn_commit(struct box_txn *txn)
 			tbuf_append(t, &txn->op, sizeof(txn->op));
 			tbuf_append(t, txn->req.data, txn->req.size);
 
+#endif
 			i64 lsn = next_lsn(recovery_state, 0);
+#if 0
 			bool res = !wal_write(recovery_state, wal_tag,
 					      fiber->cookie, lsn, t);
+#endif
 			confirm_lsn(recovery_state, lsn);
+#if 0
 			if (res)
 				tnt_raise(LoggedError, :ER_WAL_IO);
 		}
+#endif
 
 		unlock_tuples(txn);
 
