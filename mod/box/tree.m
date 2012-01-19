@@ -815,7 +815,7 @@ tree_iterator_free(struct iterator *iterator)
 
 - (void) initIterator: (struct iterator *) iterator
 {
-	[ self initIterator: iterator :NULL :0 ];
+	[self initIterator: iterator :NULL :0];
 }
 
 - (void) initIterator: (struct iterator *) iterator
