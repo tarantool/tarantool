@@ -64,7 +64,7 @@ usage() {
 	exit $1
 }
 
-is_numeric() {
+is_num_positive() {
 	num=$1
 	[ $num -eq $num ] 2>/dev/null && [ $num -ge 0 ] 2>/dev/null || \
 		return 1
@@ -174,7 +174,7 @@ if [ -f $deploy_cfg ]; then
 	deploy_current=`cat $deploy_cfg`
 	[ $? -eq 0 ] || error "failed to read deploy config"
 	# validating instance number
-	is_numeric $deploy_current
+	is_num_positive $deploy_current
 	[ $? -eq 0 ] || error "bad deploy config instance number"
 	# dont' change deploy if it said so in configuration file
 	if [ $deploy_current -eq 0 ]; then
@@ -194,7 +194,7 @@ if [ $act_status -ne 0 ]; then
 fi
 
 # validating instance number
-is_numeric $deploy_count
+is_num_positive $deploy_count
 [ $? -eq 0 ] && [ $deploy_count -gt 0 ] || error "bad instance number"
 
 if [ $deploy_count -le $deploy_current ]; then
