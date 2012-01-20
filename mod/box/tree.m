@@ -53,7 +53,7 @@ u64_cmp(u64 a, u64 b)
  * Tuple addrress comparison.
  */
 static inline int
-ta_compare(struct box_tuple *tuple_a, struct box_tuple *tuple_b)
+ta_cmp(struct box_tuple *tuple_a, struct box_tuple *tuple_b)
 {
 	if (!tuple_a)
 		return 0;
@@ -964,7 +964,7 @@ sparse_dup_node_cmp(const void *node_a, const void *node_b, void *arg)
 	if (r == 0) {
 		const struct sparse_node *node_xa = node_a;
 		const struct sparse_node *node_xb = node_b;
-		r = ta_compare(node_xa->tuple, node_xb->tuple);
+		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
 }
@@ -1046,7 +1046,7 @@ dense_dup_node_cmp(const void *node_a, const void *node_b, void *arg)
 	if (r == 0) {
 		const struct dense_node *node_xa = node_a;
 		const struct dense_node *node_xb = node_b;
-		r = ta_compare(node_xa->tuple, node_xb->tuple);
+		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
 }
@@ -1128,7 +1128,7 @@ num32_dup_node_cmp(const void * node_a, const void * node_b, void *arg)
 	if (r == 0) {
 		const struct num32_node *node_xa = node_a;
 		const struct num32_node *node_xb = node_b;
-		r = ta_compare(node_xa->tuple, node_xb->tuple);
+		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
 }
@@ -1209,7 +1209,7 @@ fixed_dup_node_cmp(const void *node_a, const void *node_b, void *arg)
 	if (r == 0) {
 		const struct fixed_node *node_xa = node_a;
 		const struct fixed_node *node_xb = node_b;
-		r = ta_compare(node_xa->tuple, node_xb->tuple);
+		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
 }
