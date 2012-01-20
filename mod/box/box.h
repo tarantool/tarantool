@@ -62,7 +62,7 @@ struct space {
 	/**
 	 * Inferred data: max field no which participates in an
 	 * index. Each tuple in this space must have, therefore, at
-	 * least indexed_field_count fields.
+	 * least field_count fields.
 	 */
 	int field_count;
 
