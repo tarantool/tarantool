@@ -58,9 +58,10 @@ iterator_first_equal(struct iterator *it)
 @class HashStrIndex;
 @class TreeIndex;
 
-+ (Index *) alloc: (enum index_type) type :(struct key_def *) key_def
-	:(struct space *) space;
++ (Index *) alloc: (enum index_type) type :(struct space *) space
+	:(u32) n_arg;
 {
+	struct key_def *key_def = &space->key_defs[n_arg];
 	switch (type) {
 	case HASH:
 		/* Hash index, check key type.
@@ -78,18 +79,18 @@ iterator_first_equal(struct iterator *it)
 		}
 		break;
 	case TREE:
-		return [TreeIndex alloc: key_def :space];
+		return [TreeIndex alloc: space :n_arg];
 	default:
 		break;
 	}
 	panic("unsupported index type");
 }
 
-- (id) init: (enum index_type) type_arg :(struct key_def *) key_def_arg
-	:(struct space *) space_arg :(u32) n_arg;
+- (id) init: (enum index_type) type_arg :(struct space *) space_arg
+	:(u32) n_arg;
 {
 	self = [super init];
-	key_def = *key_def_arg;
+	key_def = &space_arg->key_defs[n_arg];
 	type = type_arg;
 	n = n_arg;
 	space = space_arg;
@@ -100,8 +101,6 @@ iterator_first_equal(struct iterator *it)
 
 - (void) free
 {
-	sfree(key_def.parts);
-	sfree(key_def.cmp_order);
 	position->free(position);
 	[super free];
 }
@@ -242,9 +241,10 @@ hash_iterator_free(struct iterator *iterator)
 - (struct box_tuple *) findByTuple: (struct box_tuple *) tuple
 {
 	/* Hash index currently is always single-part. */
-	void *field = tuple_field(tuple, key_def.parts[0].fieldno);
+	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
 	if (field == NULL)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, key_def.parts[0].fieldno);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
+			  key_def->parts[0].fieldno);
 	return [self find: field];
 }
 
@@ -307,7 +307,7 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) remove: (struct box_tuple *) tuple
 {
-	void *field = tuple_field(tuple, key_def.parts[0].fieldno);
+	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
 	unsigned int field_size = load_varint32(&field);
 	u32 num = *(u32 *)field;
 
@@ -325,7 +325,7 @@ hash_iterator_free(struct iterator *iterator)
 - (void) replace: (struct box_tuple *) old_tuple
 	:(struct box_tuple *) new_tuple
 {
-	void *field = tuple_field(new_tuple, key_def.parts[0].fieldno);
+	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
 	u32 field_size = load_varint32(&field);
 	u32 num = *(u32 *)field;
 
@@ -333,7 +333,8 @@ hash_iterator_free(struct iterator *iterator)
 		tnt_raise(IllegalParams, :"key is not u32");
 
 	if (old_tuple != NULL) {
-		void *old_field = tuple_field(old_tuple, key_def.parts[0].fieldno);
+		void *old_field = tuple_field(old_tuple,
+					      key_def->parts[0].fieldno);
 		load_varint32(&old_field);
 		u32 old_num = *(u32 *)old_field;
 		mh_int_t k = mh_i32ptr_get(int_hash, old_num);
@@ -428,7 +429,7 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) remove: (struct box_tuple *) tuple
 {
-	void *field = tuple_field(tuple, key_def.parts[0].fieldno);
+	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
 	unsigned int field_size = load_varint32(&field);
 	u64 num = *(u64 *)field;
 
@@ -446,7 +447,7 @@ hash_iterator_free(struct iterator *iterator)
 - (void) replace: (struct box_tuple *) old_tuple
 	:(struct box_tuple *) new_tuple
 {
-	void *field = tuple_field(new_tuple, key_def.parts[0].fieldno);
+	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
 	u32 field_size = load_varint32(&field);
 	u64 num = *(u64 *)field;
 
@@ -455,7 +456,7 @@ hash_iterator_free(struct iterator *iterator)
 
 	if (old_tuple != NULL) {
 		void *old_field = tuple_field(old_tuple,
-					      key_def.parts[0].fieldno);
+					      key_def->parts[0].fieldno);
 		load_varint32(&old_field);
 		u64 old_num = *(u64 *)old_field;
 		mh_int_t k = mh_i64ptr_get(int64_hash, old_num);
@@ -547,7 +548,7 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) remove: (struct box_tuple *) tuple
 {
-	void *field = tuple_field(tuple, key_def.parts[0].fieldno);
+	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
 
 	mh_int_t k = mh_lstrptr_get(str_hash, field);
 	if (k != mh_end(str_hash))
@@ -562,15 +563,15 @@ hash_iterator_free(struct iterator *iterator)
 - (void) replace: (struct box_tuple *) old_tuple
 	:(struct box_tuple *) new_tuple
 {
-	void *field = tuple_field(new_tuple, key_def.parts[0].fieldno);
+	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
 
 	if (field == NULL)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
-			  key_def.parts[0].fieldno);
+			  key_def->parts[0].fieldno);
 
 	if (old_tuple != NULL) {
 		void *old_field = tuple_field(old_tuple,
-					      key_def.parts[0].fieldno);
+					      key_def->parts[0].fieldno);
 		mh_int_t k = mh_lstrptr_get(str_hash, old_field);
 		if (k != mh_end(str_hash))
 			mh_lstrptr_del(str_hash, k);

@@ -438,26 +438,32 @@ memcached_space_init()
 	memc_s->cardinality = 4;
 	memc_s->n = cfg.memcached_space;
 
-	struct key_def key_def;
-	/* Configure memcached index key. */
-	key_def.part_count = 1;
-	key_def.is_unique = true;
+	memc_s->key_count = 1;
+	memc_s->key_defs = malloc(sizeof(struct key_def));
 
-	key_def.parts = salloc(sizeof(struct key_part));
-	key_def.cmp_order = salloc(sizeof(u32));
-
-	if (key_def.parts == NULL || key_def.cmp_order == NULL)
+	if (memc_s->key_defs == NULL)
 		panic("out of memory when configuring memcached_space");
 
-	key_def.parts[0].fieldno = 0;
-	key_def.parts[0].type = STRING;
+	struct key_def *key_def = memc_s->key_defs;
+	/* Configure memcached index key. */
+	key_def->part_count = 1;
+	key_def->is_unique = true;
 
-	key_def.max_fieldno = 1;
-	key_def.cmp_order[0] = 0;
+	key_def->parts = malloc(sizeof(struct key_part));
+	key_def->cmp_order = malloc(sizeof(u32));
+
+	if (key_def->parts == NULL || key_def->cmp_order == NULL)
+		panic("out of memory when configuring memcached_space");
+
+	key_def->parts[0].fieldno = 0;
+	key_def->parts[0].type = STRING;
+
+	key_def->max_fieldno = 1;
+	key_def->cmp_order[0] = 0;
 
 	/* Configure memcached index. */
-	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :&key_def :space];
-	[memc_index init: HASH :&key_def :memc_s :0];
+	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :memc_s :0];
+	[memc_index init: HASH :memc_s :0];
 }
 
 /** Delete a bunch of expired keys. */

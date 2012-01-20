@@ -43,15 +43,13 @@ enum
 
 struct space {
 	Index *index[BOX_INDEX_MAX];
+	/** Size of index array */
+	int key_count;
 	int n;
 	int cardinality;
 
-	/**
-	 * Inferred data: max field no which participates in an
-	 * index. Each tuple in this space must have, therefore, at
-	 * least indexed_field_count fields.
-	 */
-	int field_count;
+	/** Index metadata. */
+	struct key_def *key_defs;
 	/**
 	 * Field types of indexed fields. This is an array of size
 	 * indexed_field_count. If there are gaps, i.e. fields
@@ -61,6 +59,13 @@ struct space {
 	 * set for fields which types in two indexes contradict.
 	 */
 	enum field_data_type *field_types;
+	/**
+	 * Inferred data: max field no which participates in an
+	 * index. Each tuple in this space must have, therefore, at
+	 * least indexed_field_count fields.
+	 */
+	int field_count;
+
 	bool enabled;
 };
 

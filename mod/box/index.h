@@ -85,23 +85,23 @@ struct key_def {
 	 */
 	struct iterator *position;
 	/* Description of a possibly multipart key. */
-	struct key_def key_def;
+	struct key_def *key_def;
 	enum index_type type;
 	bool enabled;
 	/* Relative offset of the index in its namespace. */
 	u32 n;
 };
 
-+ (Index *) alloc: (enum index_type) type :(struct key_def *) key_def
-	:(struct space *) space;
++ (Index *) alloc: (enum index_type) type :(struct space *) space
+	:(u32) n_arg;
 /**
  * Initialize index instance.
  *
  * @param space    space the index belongs to
  * @param key      key part description
  */
-- (id) init: (enum index_type) type_arg :(struct key_def *) key_def_arg
-	:(struct space *) space_arg :(u32) n_arg;
+- (id) init: (enum index_type) type_arg :(struct space *) space_arg
+	:(u32) n_arg;
 /** Destroy and free index instance. */
 - (void) free;
 /**
