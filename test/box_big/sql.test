@@ -76,10 +76,12 @@ exec admin "lua for k, v in box.space[5]:pairs() do print(v) end"
 exec sql "select * from t5 where k0='01234567'"
 exec sql "select * from t5 where k0='11234567'"
 exec sql "select * from t5 where k0='21234567'"
+sql.sort = True
 exec sql "select * from t5 where k1='part1'"
 exec sql "select * from t5 where k1='part1_a'"
 exec sql "select * from t5 where k1='part_none'"
 exec admin "lua box.space[5]:select(1, 'part1', 'part2')"
+sql.sort = False 
 # Check how build_idnexes() works
 server.stop()
 server.start()

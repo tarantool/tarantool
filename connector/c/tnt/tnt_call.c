@@ -65,6 +65,8 @@ tnt_call(struct tnt_stream *s, uint32_t flags, char *proc,
 	hdr.type = TNT_OP_CALL;
 	hdr.len = sizeof(struct tnt_header_call) +
 		  proc_enc_size + proc_len + args->size;
+	if (args->size == 0)
+		hdr.len += 4;
 	hdr.reqid = s->reqid;
 	/* filling call header */
 	struct tnt_header_call hdr_call;
@@ -79,7 +81,13 @@ tnt_call(struct tnt_stream *s, uint32_t flags, char *proc,
 	v[2].iov_len  = proc_enc_size;
 	v[3].iov_base = proc;
 	v[3].iov_len  = proc_len;
-	v[4].iov_base = args->data;
-	v[4].iov_len  = args->size;
+	if (args->size == 0) {
+		uint32_t argc = 0;
+		v[4].iov_base = &argc;
+		v[4].iov_len  = 4;
+	} else {
+		v[4].iov_base = args->data;
+		v[4].iov_len  = args->size;
+	}
 	return s->writev(s, v, 5);
 }

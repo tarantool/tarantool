@@ -48,7 +48,7 @@ set_target_properties(tntsql PROPERTIES COMPILE_FLAGS "${tntsql_cflags}")
 # Shared library
 #
 
-project(tntsql)
+project(tntsql_shared)
 add_library(tntsql_shared SHARED ${tntsql_sources})
 set_target_properties(tntsql_shared PROPERTIES OUTPUT_NAME tntsql)
 set_target_properties(tntsql_shared PROPERTIES COMPILE_FLAGS "${tntsql_cflags}")

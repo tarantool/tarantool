@@ -1,4 +1,4 @@
-; Mail.RU IPROTO protocol, Tarantool/Box subset.
+Tarantool/Box IPROTO protocol.
 ;
 ; The latest version of this document can be found in
 ; tarantool source tree, doc/box-protocol.txt
@@ -13,7 +13,7 @@
 ;
 ; int8 - a single 8-bit byte (i.e. an octet)
 ;
-; int32 - a 32-bit integer in big-endian format (Intel x86)
+; int32 - a 32-bit integer in little-endian format (Intel x86)
 ;
 ; int32_varint - a 1 to 5 byte representation of an integer
 ;
@@ -21,8 +21,8 @@
 ; integer (BER stands for Basic Encoding Rules, but in reality it
 ; has little to do with ASN.1 standard). 
 ; See http://en.wikipedia.org/wiki/LEB128
-; for encoding description, or core/pickle.c for implementation
-; in tarantool.
+; for encoding description, or core/pickle.m for implementation
+; in Tarantool.
 
 ; All requests and responses utilize the same basic structure:
 
@@ -193,6 +193,7 @@
 <int32_varint> ::= <int8>+
 ;
 ; SELECT may return zero, one or several tuples.
+; CALL response is identical to one for SELECT.
 ; <select_response_body> starts with the number of found
 ; tuples:
 ;
@@ -214,6 +215,7 @@
 
 <fq_tuple> ::= <size><tuple>
 
+; length of the variable part of the tuple (all tuple fields)
 <size> ::= <int32>
 
 ;
@@ -274,7 +276,7 @@
 ; on strings:
 ; 5 - implementation of Perl 'splice' command
 
-<op_code> ::= <int8> # 0 | 1 | 2 | 3
+<op_code> ::= <int8> # 0 | 1 | 2 | 3 | 4 | 5
 
 ;
 ; It's an error to specify an argument of a type that
@@ -340,7 +342,7 @@
 ; <return_code>. If it's not 0, it is followed by an
 ; error message. Otherwise, the response, just like in case of
 ; SELECT, is a sequence of <fq_tuple>s.
-<call_response_body> ::= <count><fq_tuple>
+<call_response_body> ::= <select_response_body>
 
 ;
 ; The server response, in addition to response header and body,
@@ -351,7 +353,7 @@
 
 <return_code> ::= <int32>
 
-; Currently, the completion status is complementary:
+; The completion status is complementary:
 ; it can be deduced from the error code. There are only
 ; 3 completion status codes in use:
 ; 0  - success; The only possible error code with this status is
@@ -406,8 +408,8 @@
 ;  0x00002702 -- ER_WAL_IO
 ;                WAL I/O error
 ;
-; Convenience that define hexadecimal constants for <int32>
-; return codes (completion status + code) can be found in
-; include/iproto.h.
+; Convenience macros which define hexadecimal constants for
+; <int32> return codes (completion status + code) can be found
+; in include/iproto.h.
 ;
 ; vim: syntax=bnf

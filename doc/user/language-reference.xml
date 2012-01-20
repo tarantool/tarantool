@@ -164,8 +164,26 @@
         updates, there are going to be page splits, and therefore
         you need to have some extra free memory to run this
         command. 15%-30% of <olink targetptr="slab_alloc_arena"/>
-        is, on average, sufficient.
-      </para></listitem>
+        is, on average, sufficient. This statement waits until a
+        snapshot is taken and returns operation result. For
+        example:
+<programlisting>localhost> show info
+---
+info:
+  version: "1.4.4"
+  lsn: 843301
+...
+localhost> save snapshot
+---
+ok
+...
+localhost> save snapshot
+---
+fail: can't save snapshot, errno 17 (File exists)
+...
+</programlisting>
+      </para>
+      </listitem>
     </varlistentry>
 
 
@@ -202,7 +220,7 @@
 localhost> show info
 ---
 info:
-  version: "1.4.0-30-ge500b95"
+  version: "1.4.4"
   uptime: 441524
   pid: 16180
   wal_writer_pid: 16182
@@ -224,11 +242,12 @@ info:
       <para>
         <emphasis role="strong">recovery_last_update</emphasis> is
         the wall clock time of the last change recorded in the
-        write ahead log.
+        write ahead log. To convert it to human-readable time,
+        you can use <command>date -d@<replaceable>1306964594.980</replaceable></command>.
       </para>
       <para>
         <emphasis role="strong">status</emphasis> is
-        either "primary" or "hot_standby/&lt;hostname&gt;".
+        either "primary" or "replica/&lt;hostname&gt;".
       </para>
 
       </listitem>

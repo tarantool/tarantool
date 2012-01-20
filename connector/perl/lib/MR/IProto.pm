@@ -1,727 +1,661 @@
 package MR::IProto;
 
-use strict;
+=head1 NAME
 
-use Socket qw(PF_INET SOCK_STREAM SOL_SOCKET SO_SNDTIMEO SO_RCVTIMEO SO_KEEPALIVE TCP_NODELAY);
-use String::CRC32 qw(crc32);
-use Time::HiRes qw/time sleep/;
-use Fcntl;
+MR::IProto - iproto network protocol client
 
-use vars qw($VERSION $PROTO_TCP %sockets);
-$VERSION = 0;
+=head1 SYNOPSIS
 
-use overload '""' => sub { "$_[0]->{name}\[$_[0]->{_last_server}]" };
+IProto client can be created with full control of
+its behaviour:
 
-BEGIN {
-    if (eval {require 5.8.3}) {
-        require bytes;
-        import bytes;
-        require warnings;
-        import warnings;
+    my $client = MR::IProto->new(
+        cluster => MR::IProto::Cluster->new(
+            servers => [
+                MR::IProto::Cluster::Server->new(
+                    host => 'xxx.xxx.xxx.xxx',
+                    port => xxxx,
+                ),
+                ...
+            ],
+        ),
+    );
+
+Or without it:
+
+    my $client = MR::IProto->new(
+        servers => 'xxx.xxx.xxx.xxx:xxxx,xxx.xxx.xxx.xxx:xxxx',
+    );
+
+Messages can be prepared and processed using objects (requires some more CPU):
+
+    my $request = MyProject::Message::MyOperation::Request->new(
+        arg1 => 1,
+        arg2 => 2,
+    );
+    my $response = $client->send($request);
+    # $response isa My::Project::Message::MyOperation::Response.
+    # Of course, both message classes (request and reply) must
+    # be implemented by user.
+
+Or without them:
+
+    my $response = $client->send({
+        msg    => x,
+        data   => [...],
+        pack   => 'xxx',
+        unpack => sub {
+            my ($data) = @_;
+            return (...);
+        },
+    });
+
+Messages can be sent synchronously:
+
+    my $response = $client->send($response);
+    # exception is raised if error is occured
+    # besides $@ you can check $! to identify reason of error
+
+Or asynchronously:
+
+    use AnyEvent;
+    my $callback = sub {
+        my ($reply, $error) = @_;
+        # on error $error is defined and $! can be set
+        return;
+    };
+    $client->send($request, $callback);
+    # callback is called when reply is received or error is occured
+
+=head1 DESCRIPTION
+
+This client is used to communicate with cluster of balanced servers using
+iproto network protocol.
+
+To use it nicely you should to implement two subclasses of
+L<MR::IProto::Message> for each message type, one for request message
+and another for reply.
+This classes must be named as C<prefix::*::suffix>, where I<prefix>
+must be passed to constructor of L<MR::IProto> as value of L</prefix>
+attribute and I<suffix> is either C<Request> or C<Response>.
+This classes must be loaded before first message through client object
+will be sent.
+
+To send messages asyncronously you should to implement event loop by self.
+L<AnyEvent> is recomended.
+
+=cut
+
+use Mouse;
+use Errno;
+use MRO::Compat;
+use Scalar::Util qw(weaken);
+use Time::HiRes;
+use MR::IProto::Cluster;
+use MR::IProto::Error;
+
+with 'MR::IProto::Role::Debuggable';
+
+=head1 ATTRIBUTES
+
+=over
+
+=item prefix
+
+Prefix of the class name in which hierarchy subclasses of L<MR::IProto::Message>
+are located. Used to find reply message classes.
+
+=cut
+
+has prefix => (
+    is  => 'ro',
+    isa => 'Str',
+    default => sub { ref shift },
+);
+
+=item cluster
+
+Instance of L<MR::IProto::Cluster>. Contains all servers between which
+requests can be balanced.
+Also can be specified in I<servers> parameter of constructor as a list of
+C<host:port> pairs separated by comma.
+
+=cut
+
+has cluster => (
+    is  => 'ro',
+    isa => 'MR::IProto::Cluster',
+    required => 1,
+    coerce   => 1,
+    handles  => [qw( timeout )],
+);
+
+=item max_parallel
+
+Max amount of simultaneous request to all servers.
+
+=cut
+
+has max_parallel => (
+    is  => 'ro',
+    isa => 'Int',
+    default => 1000,
+);
+
+=item max_request_retries
+
+Max amount of request retries which must be sent to different servers
+before error is returned.
+
+=cut
+
+has max_request_retries => (
+    is  => 'ro',
+    isa => 'Int',
+    default => 2,
+);
+
+=item retry_delay
+
+Delay between request retries.
+
+=cut
+
+has retry_delay => (
+    is  => 'ro',
+    isa => 'Num',
+    default => 0,
+);
+
+=back
+
+=cut
+
+has _reply_class => (
+    is  => 'ro',
+    isa => 'HashRef[ClassName]',
+    lazy_build => 1,
+);
+
+has _queue => (
+    is  => 'ro',
+    isa => 'ArrayRef',
+    lazy_build => 1,
+);
+
+has _in_progress => (
+    is  => 'rw',
+    isa => 'Int',
+    default => 0,
+);
+
+=head1 PUBLIC METHODS
+
+=over
+
+=item new( [ %args | \%args ] )
+
+Constructor.
+See L</ATTRIBUTES> and L</BUILDARGS> for more information about allowed arguments.
+
+=item send( [ $message | \%args ], $callback? )
+
+Send C<$message> to server and receive reply.
+
+If C<$callback> is passed then request is done asyncronously and reply is passed
+to callback as first argument.
+Method B<must> be called in void context to prevent possible errors.
+Only client errors can be raised in async mode. All communication errors are
+passed to callback as second argument. Additional information can be extracted
+from C<$!> variable.
+
+In sync mode (when C<$callback> argument is skipped) all errors are raised
+and C<$!> is also set. Response is returned from method, so method B<must>
+be called in scalar context.
+
+Request C<$message> can be instance of L<MR::IProto::Message> subclass.
+In this case reply will be also subclass of L<MR::IProto::Message>.
+Or it can be passed as C<\%args> hash reference with keys described
+in L</_send>.
+
+=cut
+
+sub send {
+    my ($self, $message, $callback) = @_;
+    if($callback) {
+        die "Method must be called in void context if you want to use async" if defined wantarray;
+        $self->_send($message, $callback);
+        return;
+    }
+    else {
+        die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
+        my $olddie = ref $SIG{__DIE__} eq 'CODE' ? $SIG{__DIE__} : ref $SIG{__DIE__} eq 'GLOB' ? *{$SIG{__DIE__}}{CODE} : undef;
+        local $SIG{__DIE__} = sub { local $! = 0; $olddie->(@_); } if $olddie;
+        my %servers;
+        my ($data, $error, $errno);
+        $self->_send_now($message, sub {
+            ($data, $error) = @_;
+            $errno = $!;
+            return;
+        }, \%servers);
+        $self->_recv_now(\%servers);
+        $! = $errno;
+        die $error if $error;
+        return $data;
     }
 }
 
-$PROTO_TCP = 0;
-%sockets = ();
+=item send_bulk( \@messages, $callback? )
 
-sub DEFAULT_RETRY_DELAY         () { 0 }
-sub DEFAULT_MAX_REQUEST_RETRIES () { 2 }
-sub DEFAULT_TIMEOUT             () { 2 }
+Send all of messages in C<\@messages> and return result (sync-mode) or
+call callback (async-mode) after all replies was received.
+Result is returned as array reference, which values can be instances of
+L<MR::IProto::Response> or L<MR::IProto::Error> if request was passed
+as object, or hash with keys C<data> and C<error> if message was passed
+as C<\%args>.
+Replies in result can be returned in order different then order of requests.
 
-sub RR                          () { 1 }
-sub HASH                        () { 2 }
-sub KETAMA                      () { 3 }
+See L</_send> for more information about message data. Either
+C<$message> or C<\%args> allowed as content of C<\@messages>.
 
-sub confess { die @_ };
+=cut
 
-sub DisconnectAll {
-    close $_ foreach (values %sockets);
-    %sockets = ();
-}
-
-sub new {
-    my ($class, $args) = @_;
-    my $self = {};
-    bless $self, $class;
-
-    $self->{debug}                = $args->{debug} || 0;
-    $self->{balance}              = $args->{balance} && $args->{balance} eq 'hash-crc32' ? HASH() : RR();
-    $self->{balance}              = KETAMA() if $args->{balance} && $args->{balance} eq 'ketama';
-    $self->{rotateservers}        = 1 unless $args->{norotateservers};
-    $self->{max_request_retries}  = $args->{max_request_retries} || DEFAULT_MAX_REQUEST_RETRIES();
-    $self->{retry_delay}          = $args->{retry_delay} || DEFAULT_RETRY_DELAY();
-    $self->{dump_no_ints}         = 1 if $args->{dump_no_ints};
-    $self->{tcp_nodelay}          = 1 if $args->{tcp_nodelay};
-    $self->{tcp_keepalive}        = $args->{tcp_keepalive} || 0;
-    $self->{param}                = $args->{param};
-    $self->{_last_server}         = '';
-
-    $self->{name} = $args->{name} or ($self->{name}) = caller;
-
-    my $servers = $args->{servers} || confess("${class}->new: no servers given");
-    _parse_servers $self 'servers', $servers;
-
-    if ($self->{balance} == RR()) {
-        $self->{aviable_servers} = [@{$self->{servers}}]; #make copy
-        $servers = $args->{broadcast_servers} || ''; # confess("${class}->new: no broadcast servers given");
-        _parse_servers $self 'broadcast_servers', $servers;
-    } elsif ($self->{balance} == KETAMA()) {
-        $self->{'ketama'} = [];
-        for my $s (@{$self->{'servers'}}) {
-            $s->{'ok'} = 1;
-            for my $i (0..10) {
-               push @{$self->{'ketama'}}, [crc32($s->{'repr'}.$i), $s];
-            }
+sub send_bulk {
+    my ($self, $messages, $callback) = @_;
+    my @result;
+    if($callback) {
+        die "Method must be called in void context if you want to use async" if defined wantarray;
+        my $cv = AnyEvent->condvar();
+        $cv->begin( sub { $callback->(\@result) } );
+        foreach my $message ( @$messages ) {
+            $cv->begin();
+            $self->_send($message, sub {
+                my ($data, $error) = @_;
+                push @result, blessed($data) ? $data
+                    : { data => $data, error => $error };
+                $cv->end();
+                return;
+            });
         }
-        @{$self->{'ketama'}} = sort {$a->[0] cmp $b->[0]} @{$self->{'ketama'}};
+        $cv->end();
+        return;
     }
-
-    my $timeout = exists $args->{timeout} ? $args->{timeout} : DEFAULT_TIMEOUT();
-    SetTimeout $self $timeout;
-
-    confess "${class}: no servers given" unless @{$self->{servers}};
-    return $self;
-}
-
-sub GetParam {
-    return $_[0]->{param};
+    else {
+        die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
+        my $olddie = ref $SIG{__DIE__} eq 'CODE' ? $SIG{__DIE__} : ref $SIG{__DIE__} eq 'GLOB' ? *{$SIG{__DIE__}}{CODE} : undef;
+        local $SIG{__DIE__} = sub { local $! = 0; $olddie->(@_); } if $olddie;
+        my %servers;
+        foreach my $message ( @$messages ) {
+            $self->_send_now($message, sub {
+                my ($data, $error) = @_;
+                push @result, blessed($data) ? $data
+                    : { data => $data, error => $error };
+                return;
+            }, \%servers);
+        }
+        $self->_recv_now(\%servers);
+        return \@result;
+    }
 }
 
 sub Chat {
-    my ($self, %message) = @_;
-
-    confess "wrong msg id" unless exists($message{msg});
-    confess "wrong msg body" unless exists($message{payload}) or exists($message{data});
-    confess "wrong msg reply" unless $message{no_reply} or exists($message{unpack});
-
-    my $retries = $self->{max_request_retries};
-
-    for (my $try = 1; $try <= $retries; $try++) {
-        sleep $self->{retry_delay} if $try > 1 && $self->{retry_delay};
-        $self->{debug} >= 2 && _debug $self "chat msg=$message{msg} $try of $retries total";
-        my $ret = $self->Chat1(%message);
-
-        if ($ret->{ok}) {
-            return (wantarray ? @{$ret->{ok}} : $ret->{ok}->[0]);
-        }
-    }
-    return undef;
+    my $self = shift;
+    my $message = @_ == 1 ? shift : { @_ };
+    $message->{retry} = 1 if ref $message eq 'HASH';
+    my $data;
+    eval { $data = $self->send($message); 1 } or return;
+    return wantarray ? @$data : $data->[0];
 }
 
 sub Chat1 {
-    my ($self, %message) = @_;
-
-    confess "wrong msg id" unless exists($message{msg});
-    confess "wrong msg body" unless exists($message{payload}) or exists($message{data});
-    confess "wrong msg reply" unless $message{no_reply} or exists($message{unpack});
-
-    my $server = _select_server $self $message{key};
-    unless($server) {
-        $self->{_error} ||= 'Could not find a valid server';
-        return;
-    }
-
-    my ($ret) = _chat $self $server, \%message;
-
-    if ($ret->{fail} && $self->{rotateservers}) {
-        $self->{debug} >= 2 && _debug $self "chat: failed";
-    	_mark_server_bad $self;
-    }
-
-    return $ret;
-}
-
-# private methods
-# order of method declaration is important, see perlobj
-
-sub _parse_servers {
-    my ($self, $key, $line) = @_;
-    my @servers;
-    my $weighted = $self->{balance} == HASH();
-    foreach my $server (split(/,/, $line)) {
-        if ($weighted) {
-            my ($host, $port, $weight) = split /:/, $server;
-            $weight ||= 1;
-            push @servers, { host => $host, port => $port, ok => 1, repr => "$host:$port" } for (1..$weight);
-        } else {
-            my ($host, $port) = $server =~ /(.+):(\d+)/;
-            push @servers, { host => $host, port => $port, repr => "$host:$port" };
-        }
-    }
-    $self->{$key} = \@servers;
-}
-
-sub _chat {
-    my ($self, $server, $message) = @_;
-    _a_init $self $server, $message
-        and _a_send $self
-        and !$message->{no_reply}
-        and _a_recv $self;
-    return _a_close $self;
-}
-
-sub _a_init {
-    my ($self, $server, $message, $async) = @_;
-
-    _a_clear $self;
-    $self->{_server} = $server;
-    $self->{_message} = $message;
-    $self->{_async} = !!$async;
-
-    my $payload = $message->{payload} || do { no warnings 'uninitialized'; pack($message->{pack} || 'L*', @{$message->{data}}) };
-    $self->{_sync} = exists $message->{sync} ? $message->{sync} : int(rand 0xffffffff);
-    my $header = pack('LLL', $message->{msg}, length($payload), $self->{_sync});
-    $self->{_write_buf} = $header . $payload;
-    $self->{debug} >= 5 && _debug_dump $self '_pack_request: header ', $header;
-    $self->{debug} >= 5 && _debug_dump $self '_pack_request: payload ', $payload;
-
-    $self->{_start_time} = time;
-    $self->{_connecting} = 1;
-    $self->{sock} = $sockets{$server->{repr}} || _connect $self $server, \$self->{_error}, $async;
-    _set_blocking($self->{sock},!$async) if $self->{sock};
-    return $self->{sock};
-}
-
-sub _a_send {
-    my ($self) = @_;
-
-    $self->{_connecting} = 0;
-    $self->{_timedout} = 0;
-    while(length $self->{_write_buf}) {
-        local $! = 0;
-        my $res = syswrite($self->{sock}, $self->{_write_buf});
-        if(defined $res && $res == 0) {
-            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
-            $self->{_error} .= "Server unexpectedly closed connection (${\length $self->{_write_buf}} bytes unwritten)";
-            return;
-        }
-        if(!defined $res) {
-            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
-            $self->{_timedout} = !!$!{EAGAIN};
-            $self->{_error} .= $! unless $self->{_async} && $!{EAGAIN};
-            return;
-        }
-        substr $self->{_write_buf}, 0, $res, '';
-    }
-
-    die "We should never get here" if length $self->{_write_buf};
-
-    delete $self->{_write_buf};
-    $self->{_read_header} = 1;
-    $self->{_to_read} = 12;
-
-    return 1;
-}
-
-sub _a_recv {
-    my ($self) = @_;
-    $self->{_connecting} = 0;
-    $self->{_timedout} = 0;
-    while(1) {
-        local $! = 0;
-        my $res;
-        while($self->{_to_read} and $res = sysread($self->{sock}, my $buffer, $self->{_to_read} ) ) {
-            $self->{_to_read} -= $res;
-            $self->{_buf} .= $buffer;
-            $self->{debug} >= 6 && _debug_dump $self '_a_recv: ', $buffer;
-        }
-        if(defined $res && $res == 0 && $self->{_to_read}) {
-            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
-            $self->{_error} .= "Server unexpectedly closed connection ($self->{_to_read} bytes unread)";
-            return;
-        }
-        if(!defined $res) {
-            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
-            $self->{_timedout} = !!$!{EAGAIN};
-            $self->{_error} .= $! unless $self->{_async} && $!{EAGAIN};
-            return;
-        }
-
-        last unless $self->{_read_header};
-        if($self->{_read_header} && length $self->{_buf} >= 12) {
-            my ($response_msg, $to_read, $response_sync) = unpack('L3', substr($self->{_buf},0,12,''));
-            unless ($response_msg == $self->{_message}->{msg} and $response_sync == $self->{_sync}) {
-                $self->{_error} .= "unexpected reply msg($response_msg != $self->{_message}->{msg}) or sync($response_sync != $self->{_sync})";
-                return;
-            }
-            $self->{_read_header} = 0;
-            $self->{_to_read} = $to_read - length $self->{_buf};
-        }
-    }
-
-    die "We should never get here" if $self->{_to_read};
-    return 1;
-}
-
-sub _a_close {
-    my ($self, $error) = @_;
-    $error = '' unless defined $error;
-    $self->{_timedout} ||= $error eq 'timeout';
-    $self->{_error} ||= $error;
-    my $ret;
-    if ($self->{_error} || $self->{_timedout}) {
-        _close_sock $self $self->{_server}; # something went wrong, close socket just in case
-        $self->{_error} = "Timeout ($self->{_error})" if $self->{_timedout};
-        $self->{debug} >= 1 && _debug $self "failed with: $self->{_error}";
-        $ret = { fail => $self->{_error}, timeout => $self->{_timedout} };
-    } else {
-        $self->{debug} >= 5 && _debug_dump $self '_unpack_body: ', $self->{_buf};
-        $ret = { ok => [ $self->{_message}->{no_reply} ? (0) : $self->{_message}->{unpack}->($self->{_buf}) ] };
-    }
-    _a_clear $self;
-    return $ret;
-}
-
-sub _a_is_reading {
-    my ($self) = @_;
-    return $self->{_to_read} && $self->{sock};
-}
-
-sub _a_is_writing {
-    my ($self) = @_;
-    return exists $self->{_write_buf} && $self->{sock};
-}
-
-sub _a_is_connecting {
-    my ($self) = @_;
-    return $self->{_connecting} && $self->{sock};
-}
-
-sub _a_clear {
-    my ($self) = @_;
-    $self->{_buf} = $self->{_error} = '';
-    $self->{_to_read} = undef;
-    $self->{_data} = undef;
-    $self->{_server} = undef;
-    $self->{_message} = undef;
-    $self->{_sync} = undef;
-    $self->{_read_header} = undef;
-    $self->{_to_read} = undef;
-    $self->{_timedout} = undef;
-    $self->{_connecting} = undef;
-    delete $self->{_write_buf};
-}
-
-sub _n_servers {
-    return scalar @{$_[0]->{servers}};
-}
-
-sub _select_server {
-    my ($self, $key) = @_;
-    my $n = @{$self->{servers}};
-    while($n--) {
-        if ($self->{balance} == RR()) {
-            $self->{current_server} ||= $self->_balance_rr;
-        } elsif ($self->{balance} == KETAMA()) {
-            $self->{current_server} = $self->_balance_ketama($key);
-        } else {
-            $self->{current_server} = $self->_balance_hash($key);
-        }
-        last unless $self->{current_server};
-        last if $self->{current_server};
-    }
-    if($self->{current_server}) {
-        $self->{_last_server} = $self->{current_server}->{repr};
-    }
-    return $self->{current_server};
-}
-
-sub _mark_server_bad {
-    my ($self, $remove_last_server) = @_;
-    if ($self->{balance} == HASH()) {
-        delete($self->{current_server}->{ok});
-    }
-    delete($self->{current_server});
-    $self->{_last_server} = '' if $remove_last_server;
-}
-
-sub _balance_rr {
-    my ($self) = @_;
-    if (scalar(@{$self->{servers}}) == 1) {
-        return $self->{servers}->[0];
-    } else {
-        $self->{aviable_servers} = [@{$self->{servers}}] if (scalar(@{$self->{aviable_servers}}) == 0);
-        return splice(@{$self->{aviable_servers}}, int(rand(@{$self->{aviable_servers}})), 1);
-    }
-}
-
-sub _balance_hash {
-    my ($self, $key) = @_;
-    my ($hash_, $hash, $server);
-
-    $hash = $hash_ = crc32($key) >> 16;
-    for (0..19) {
-        $server = $self->{servers}->[$hash % @{$self->{servers}}];
-        return $server if $server->{ok};
-        $hash += crc32($_, $hash_) >> 16;
-    }
-
-    return $self->{servers}->[rand @{$self->{servers}}]; #last resort
-}
-
-sub _balance_ketama {
-    my ($self, $key) = @_;
-
-    my $idx = crc32($key);
-
-    for my $a (@{$self->{'ketama'}}) {
-       next unless ($a);
-       return $a->[1] if ($a->[0] >= $idx);
-    }
-
-    return $self->{'ketama'}->[0]->[1];
-}
-
-sub _set_sock_timeout ($$) { # not a class method!
-    my ($sock, $tv) = @_;
-    return (
-        setsockopt $sock, SOL_SOCKET, SO_SNDTIMEO, $tv
-         and setsockopt $sock, SOL_SOCKET, SO_RCVTIMEO, $tv
-    );
-}
-
-sub _set_blocking ($$) {
-    my ($sock, $blocking) = @_;
-    my $flags = 0;
-    fcntl($sock, F_GETFL, $flags) or die $!;
-    if($blocking) {
-        $flags &= ~O_NONBLOCK;
-    } else {
-        $flags |=  O_NONBLOCK;
-    }
-    fcntl($sock, F_SETFL, $flags) or die $!;
-}
-
-sub _connect {
-    my ($self, $server, $err, $async) = @_;
-
-    $self->{_timedout} = 0;
-    $self->{debug} >= 4 && _debug $self "connecting";
-
-    my $sock = "$server->{host}:$server->{port}";
-    my $proto = $PROTO_TCP ||= getprotobyname('tcp');
-    do {
-        no strict 'refs';
-        socket($sock, PF_INET, SOCK_STREAM, $proto);
-    };
-
-    if ($async) {
-        _set_blocking($sock,0);
-    } else {
-        _set_sock_timeout $sock, $self->{timeout_timeval};
-    }
-
-    my $sin = Socket::sockaddr_in($server->{'port'}, Socket::inet_aton($server->{'host'}));
-    while(1) {
-        local $! = 0;
-        unless(connect($sock, $sin)) {
-            $self->{debug} <= 0 || _debug $self "$!" and next if $!{EINTR};
-            $self->{_timedout} = !!$!{EINPROGRESS};
-            if (!$async || !$!{EINPROGRESS}) {
-                $$err .= "cannot connect: $!";
-                close $sock;
-                return undef;
-            }
-        }
-        last;
-    }
-
-    if($self->{tcp_nodelay}) {
-        setsockopt($sock, $PROTO_TCP, TCP_NODELAY, 1);
-    }
-
-    if($self->{tcp_keepalive}) {
-        setsockopt($sock, SOL_SOCKET, SO_KEEPALIVE, 1);
-    }
-
-    $self->{debug} >= 2 && _debug $self "connected";
-    return $sockets{$server->{repr}} = $sock;
+    my $self = shift;
+    my $message = @_ == 1 ? shift : { @_ };
+    my $data;
+    return eval { $data = $self->send($message); 1 } ? { ok => $data }
+        : { fail => $@ =~ /^(.*?) at \S+ line \d+/s ? $1 : $@, timeout => $! == Errno::ETIMEDOUT };
 }
 
 sub SetTimeout {
     my ($self, $timeout) = @_;
-    $self->{timeout} = $timeout;
-
-    my $sec  = int $timeout; # seconds
-    my $usec = int( ($timeout - $sec) * 1_000_000 ); # micro-seconds
-    $self->{timeout_timeval} = pack "L!L!", $sec, $usec; # struct timeval;
-
-    _set_sock_timeout $sockets{$_}, $self->{timeout_timeval}
-        for
-            grep {exists $sockets{$_}}
-                map {$_->{repr}}
-                    @{ $self->{servers} };
+    $self->timeout($timeout);
+    return;
 }
 
-sub _close_sock {
-    my ($self, $server) = @_;
+=back
 
-    if ($sockets{$server->{repr}}) {
-        $self->{debug} >= 2 && _debug $self 'closing socket';
-        close $sockets{$server->{repr}};
-        delete $sockets{$server->{repr}};
+=head1 PROTECTED METHODS
+
+=over
+
+=item BUILDARGS( [ %args | \%args ] )
+
+For compatibility with previous version of client and simplicity
+some additional arguments to constructor is allowed:
+
+=over
+
+=item servers
+
+C<host:port> pairs separated by comma used to create
+L<MR::IProto::Cluster::Server> objects.
+
+=item timeout, tcp_nodelay, tcp_keepalive, dump_no_ints
+
+Are passed directly to constructor of L<MR::IProto::Cluster::Server>.
+
+=item balance
+
+Is passed directly to constructor of L<MR::IProto::Cluster>.
+
+=back
+
+See L<Mouse::Manual::Construction/BUILDARGS> for more information.
+
+=cut
+
+my %servers;
+around BUILDARGS => sub {
+    my $orig = shift;
+    my $class = shift;
+    my %args = @_ == 1 ? %{shift()} : @_;
+    $args{prefix} = $args{name} if exists $args{name};
+    if( $args{servers} ) {
+        my $cluster_class = $args{cluster_class} || 'MR::IProto::Cluster';
+        my $server_class = $args{server_class} || 'MR::IProto::Cluster::Server';
+        my %srvargs;
+        $srvargs{debug} = $args{debug} if exists $args{debug};
+        $srvargs{timeout} = delete $args{timeout} if exists $args{timeout};
+        $srvargs{tcp_nodelay} = delete $args{tcp_nodelay} if exists $args{tcp_nodelay};
+        $srvargs{tcp_keepalive} = delete $args{tcp_keepalive} if exists $args{tcp_keepalive};
+        $srvargs{dump_no_ints} = delete $args{dump_no_ints} if exists $args{dump_no_ints};
+        my %clusterargs;
+        $clusterargs{balance} = delete $args{balance} if exists $args{balance};
+        $clusterargs{servers} = [
+            map {
+                my ($host, $port, $weight) = split /:/, $_;
+                $args{no_pool} ? my $server : $servers{"$host:$port"} ||= $server_class->new(
+                    %srvargs,
+                    host => $host,
+                    port => $port,
+                    defined $weight ? ( weight => $weight ) : (),
+                );
+            } split /,/, delete $args{servers}
+        ];
+        $args{cluster} = $cluster_class->new(%clusterargs);
     }
-}
+    return $class->$orig(%args);
+};
 
-sub _debug {
-    my ($self, $msg)= @_;
-    my $server = $self->{current_server} && $self->{current_server}->{repr} || $self->{_last_server} || '';
-    my $sock = $self->{sock} || 'none';
-    $server &&= "$server($sock) ";
-
-    warn("$self->{name}: $server$msg\n");
-    1;
-}
-
-sub _debug_dump {
-    my ($self, $msg, $datum) = @_;
-    my $server = $self->{current_server} && $self->{current_server}->{repr};
-    my $sock = $self->{sock} || 'none';
-    $server &&= "$server($sock) ";
-
-    unless($self->{dump_no_ints}) {
-        $msg .= join(' ', unpack('L*', $datum));
-        $msg .= ' > ';
-    }
-    $msg .= join(' ', map { sprintf "%02x", $_ } unpack("C*", $datum));
-    warn("$self->{name}: $server$msg\n");
-}
-
-package MR::IProto::Async;
-use Time::HiRes qw/time/;
-use List::Util qw/min shuffle/;
-
-sub DEFAULT_TIMEOUT()           { 10 }
-sub DEFAULT_TIMEOUT_SINGLE()    {  4 }
-sub DEFAULT_TIMEOUT_CONNECT()   {  1 }
-sub DEFAULT_RETRY()             {  3 }
-sub IPROTO_CLASS()              { 'MR::IProto' }
-
-use overload '""' => sub { $_[0]->{name}.'[async]' };
-
-BEGIN { *confess = \&MR::IProto::confess }
-
-sub new {
-    my ($class, %opt) = @_;
-    ($opt{name}) = caller unless $opt{name};
-    my $self = bless {
-        name                        => $opt{name},
-        iproto_class                => $opt{iproto_class}         || $class->IPROTO_CLASS,
-        timeout                     => $opt{timeout}              || $class->DEFAULT_TIMEOUT(),          # over-all-requests timeout
-        timeout_single              => $opt{timeout_single}       || $class->DEFAULT_TIMEOUT_SINGLE(),   # per-request timeout
-        timeout_connect             => $opt{timeout_connect}      || $class->DEFAULT_TIMEOUT_CONNECT(),  # timeout to do connect()
-        max_request_retries         => $opt{max_request_retries}  || $class->DEFAULT_RETRY(),
-        debug                       => $opt{debug}                || 0,
-        servers                     => [ ],
-        requests                    => [ @{$opt{requests}||[]} ],
-        nreqs                       => $opt{requests} ? scalar(@{$opt{requests}}) : 0,
-        servers_used                => {},
-        nserver                     => 0,
-        working                     => {},
-    }, $class;
-
-    _parse_servers $self 'servers', $opt{servers};
-    confess "no servers given" unless @{$self->{servers}};
-    @{$self->{servers}} = shuffle @{$self->{servers}};
-
-    return $self;
-}
-
-sub Request { # MR::IProto::Chat()-compatible
-    my ($self, %message) = @_;
-
-    confess "wrong msg id" unless exists($message{msg});
-    confess "wrong msg body" unless exists($message{payload}) or exists($message{data});
-    confess "wrong msg reply" unless $message{no_reply} or exists($message{unpack});
-
-    push @{$self->{requests}}, \%message;
-}
-
-sub Results {
+sub _build_debug_cb {
     my ($self) = @_;
-
-    my (@done);
-    my $timeout_single = $self->{timeout_single};
-    my $timeout_connect = $self->{timeout_connect};
-    my $nreqs = @{$self->{requests}};
-
-    unless ($nreqs) {
-        warn "No requests; return nothing;\n";
+    my $prefix = $self->prefix;
+    return sub {
+        my ($msg) = @_;
+        chomp $msg;
+        warn sprintf "%s: %s\n", $prefix, $msg;
         return;
+    };
+}
+
+sub _build__callbacks {
+    my ($self) = @_;
+    return {};
+}
+
+sub _build__reply_class {
+    my ($self) = @_;
+    my $re = sprintf '^%s::', $self->prefix;
+    my %reply = map { $_->msg => $_ }
+        grep $_->can('msg'),
+        grep /$re/,
+        # MR::IProto::Response->meta->subclasses();
+        @{ mro::get_isarev('MR::IProto::Response') };
+    return \%reply;
+}
+
+sub _build__queue {
+    my ($self) = @_;
+    return [];
+}
+
+=item _send( [ $message | \%args ], $callback? )
+
+Pure asyncronious internal implementation of send.
+
+C<$message> is an instance of L<MR::IProto::Message>.
+If C<\%args> hash reference is passed instead of C<$message> then it can
+contain following keys:
+
+=over
+
+=item msg
+
+Message code.
+
+=item key
+
+Depending on this value balancing between servers is implemented.
+
+=item data
+
+Message data. Already packed or unpacked. Unpacked data must be passed as
+array reference and additional parameter I<pack> must be passed.
+
+=item pack
+
+First argument of L<pack|perlfunc/pack> function.
+
+=item unpack
+
+Code reference which is used to unpack reply.
+
+=item no_reply
+
+Message have no reply.
+
+=item retry
+
+Is retry is allowed. Values of attributes L</max_request_retries> and
+L</retry_delay> is used if retry is allowed.
+
+=item is_retry
+
+Callback used to determine if server asks for retry. Unpacked data is passed
+to it as a first argument.
+
+=back
+
+=cut
+
+sub _send {
+    my ($self, $message, $callback) = @_;
+    if( $self->_in_progress < $self->max_parallel ) {
+        $self->_in_progress( $self->_in_progress + 1 );
+        eval { $self->_send_now($message, $callback); 1 }
+            or $self->_report_error($message, $callback, $@);
+    }
+    else {
+        push @{$self->_queue}, [ $message, $callback ];
+    }
+    return;
+}
+
+sub _finish_and_start {
+    my ($self) = @_;
+    if( my $task = shift @{$self->_queue} ) {
+        eval { $self->_send_now(@$task); 1 }
+            or $self->_report_error(@$task, $@);
+    }
+    else {
+        $self->_in_progress( $self->_in_progress - 1 );
+    }
+    return;
+}
+
+sub _send_now {
+    my ($self, $message, $callback, $sync) = @_;
+    my $args;
+    # MR::IProto::Message OO-API
+    if( ref $message ne 'HASH' ) {
+        my $msg = $message->msg;
+        my $response_class = $self->_reply_class->{$msg};
+        die sprintf "Cannot find response class for message code %d\n", $msg unless $response_class;
+        $args = {
+            request        => $message,
+            msg            => $msg,
+            key            => $message->key,
+            body           => $message->data,
+            response_class => $response_class,
+            no_reply       => $response_class->isa('MR::IProto::NoResponse'),
+        };
+    }
+    # Old-style compatible API
+    else {
+        die "unpack or no_reply must be specified" unless $message->{unpack} || $message->{no_reply};
+        $args = $message;
+        $args->{body} = exists $args->{payload} ? delete $args->{payload}
+            : ref $message->{data} ? pack delete $message->{pack} || 'L*', @{ delete $message->{data} }
+            : delete $message->{data};
     }
 
-    my $t0 = time;
-
-    my $err = 'timeout';
-    my $working = $self->{working};
-    confess "we have something what we should not" if %$working;
-
-    while(scalar@{$self->{requests}}) {
-        int _init_req $self $self->{requests}->[0], $working
-            or last;
-        shift @{$self->{requests}};
-    }
-
-    unless (%$working) {
-        warn "Connection error; return nothing;\n";
+    my $try = 1;
+    weaken($self);
+    my $handler;
+    $handler = sub {
+        $self->_server_callback(
+            [\$handler, $args, $callback, $sync, \$try],
+            [@_],
+        );
         return;
+    };
+    $self->_send_try($sync, $args, $handler, $try);
+    return;
+}
+
+sub _send_try {
+    my ($self, $sync, $args, $handler, $try) = @_;
+    my $xsync = $sync ? 'sync' : 'async';
+    $self->_debug(sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $self->max_request_retries ) if $self->debug >= 2;
+    my $server = $self->cluster->server( $args->{key} );
+    my $connection = $server->$xsync();
+    $connection->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
+    $sync->{$connection} ||= $connection if $sync;
+    return;
+}
+
+sub _send_retry {
+    my ($self, @in) = @_;
+    my ($sync) = @in;
+    if( $sync ) {
+        Time::HiRes::sleep($self->retry_delay);
+        $self->_send_try(@in);
     }
+    else {
+        my $timer;
+        $timer = AnyEvent->timer(
+            after => $self->retry_delay,
+            cb    => sub {
+                undef $timer;
+                $self->_send_try(@in);
+                return;
+            },
+        );
+    }
+    return;
+}
 
-    my $deadline = $self->{timeout} + time;
-
-    MAINLOOP:
-    while((my $timeout = $deadline - time) > 0 && %$working) {
-        my ($r,$w) = ('','');
-        vec($r, $_, 1) = 1 for grep {  $working->{$_}->{_conn}->_a_is_reading } keys %$working;
-        vec($w, $_, 1) = 1 for grep { !$working->{$_}->{_conn}->_a_is_reading } keys %$working;
-        my $t1 = time;
-        $timeout = min $timeout, map { ($_->{_conn}->_a_is_connecting() ? $timeout_connect : $timeout_single) - ($t1 - $_->{_conn}->{_start_time}) } values %$working;
-        my $found = select($r, $w, undef, $timeout);
-
-        my $time = time;
-        for my $fd (keys %$working) {
-            my $req = $working->{$fd};
-            my $conn = $req->{_conn};
-
-            my $restart = 0;
-            if(vec($w, $fd, 1) && ($conn->_a_is_writing || $conn->_a_is_connecting)) {
-                $restart = 1 if !$conn->_a_send && !$conn->{_timedout};
-            } elsif(vec($r, $fd, 1) && $conn->_a_is_reading) {
-                if($conn->_a_recv) {
-                    delete $working->{$fd};
-                    _server_free $self $req->{_server};
-                    push @done, $req;
-                    if(@{$self->{requests}}) {
-                        _init_req $self shift@{$self->{requests}}, $working or _die $self "shit1";
-                    }
-                } elsif(!$conn->{_timedout}) {
-                    $restart = 2;
-                }
-            } else {
-                if($conn->{_start_time} + ($conn->_a_is_connecting() ? $timeout_connect : $timeout_single) < $time) {
-                    $restart = -1;
-                }
+sub _server_callback {
+    my ($self, $req_args, $resp_args) = @_;
+    my ($handler, $args, $callback, $sync, $try) = @$req_args;
+    my ($resp_msg, $data, $error, $errno) = @$resp_args;
+    eval {
+        if ($error) {
+            $! = $errno;
+            $@ = $error;
+            my $retry = defined $args->{request} ? $args->{request}->retry()
+                : ref $args->{retry} eq 'CODE' ? $args->{retry}->()
+                : $args->{retry};
+            $self->_debug("send: failed[@{[$retry, $$try+1, $self->max_request_retries]}]") if $self->debug >= 2;
+            if( $retry && $$try++ < $self->max_request_retries ) {
+                $self->_send_retry($sync, $args, $$handler, $$try);
             }
-
-            next unless $restart;
-
-            delete $working->{$fd};
-            $conn->_a_close($restart < 0 ? 'timeout' : 'shit happened!');
-            my $oldserver = $req->{_server};
-            my $res = _init_req $self $req, $working;
-            if( !$res ) {
-                $err = 'one of requests has failed, aborting';
-                last MAINLOOP;
-            } elsif (! int $res ) {
-                push @{$self->{requests}}, $req;
+            else {
+                undef $$handler;
+                $self->_report_error($args->{request}, $callback, $error, $sync, $errno);
             }
-            _server_free $self $oldserver;
         }
+        else {
+            my $ok = eval {
+                die "Request and reply message code is different: $resp_msg != $args->{msg}\n"
+                    unless $args->{no_reply} || $resp_msg == $args->{msg};
+                if( defined $args->{request} ) {
+                    $data = $args->{response_class}->new( data => $data, request => $args->{request} );
+                }
+                else {
+                    $data = $args->{no_reply} ? [ 0 ] : [ ref $args->{unpack} eq 'CODE' ? $args->{unpack}->($data) : unpack $args->{unpack}, $data ];
+                }
+                1;
+            };
+            if($ok) {
+                if( defined $args->{request} && $data->retry && $$try++ < $self->max_request_retries ) {
+                    $self->_send_retry($sync, $args, $$handler, $$try);
+                }
+                elsif( defined $args->{is_retry} && $args->{is_retry}->($data) && $$try++ < $self->max_request_retries ) {
+                    $self->_send_retry($sync, $args, $$handler, $$try);
+                }
+                else {
+                    undef $$handler;
+                    $self->_finish_and_start() unless $sync;
+                    $callback->($data);
+                }
+            }
+            else {
+                undef $$handler;
+                $self->_report_error($args->{request}, $callback, $@, $sync);
+            }
+        }
+        1;
+    } or do {
+        undef $$handler;
+        $self->_debug("unhandled fatal error: $@");
+    };
+    return;
+}
+
+sub _recv_now {
+    my ($self, $servers) = @_;
+    while(my @servers = values %$servers) {
+        %$servers = ();
+        $_->recv_all() foreach @servers;
     }
-
-    my $t9 = time;
-    warn sprintf "$self->{name}: fetched %d requests for %.4f sec (%d/%d done)\n", $self->{nreqs}, $t9-$t0, scalar@done, $nreqs;
-
-    if(%$working) {
-        warn "$self->{name}: ${\scalar values %$working} requests not fetched\n";
-        $_->{_conn}->_a_close($err) for values %$working;
-        # warn "return nothing\n";
-        # return;
-    }
-
-    for my $req (@done) {
-        my $result = $req->{_conn}->_a_close;
-        # warn "ret nothing\n" and return unless $result->{ok};
-        $req = $result->{ok};
-    }
-
-    return grep { $_ } @done;
+    return;
 }
 
-sub _init_req {
-    my ($self, $req) = @_;
-
-    $req->{_try} ||= 0;
-    return if $req->{_try} >= $self->{max_request_retries};
-
-    $req->{_conn} = undef;
-    $req->{_server} = undef;
-
-    my $server = _select_server $self or return '0E0';
-    my $conn = $self->{iproto_class}->new({
-        servers => $server->{repr},
-        debug   => $self->{debug},
-    });
-    $conn->_select_server; # fiction
-
-    my $sock = $conn->_a_init($server, $req, 'async') or do{ $conn->_a_close; warn "can't init connection: $server->{repr}"; return '0E0'; };
-    my $fd = fileno $sock or do{ $conn->_a_close; _die $self "connection has no FD", $server->{repr}; };
-
-    my $working = $self->{working};
-    _die $self "FD $fd already exists in workers", $server->{repr} if exists $working->{$fd};
-    $working->{ $fd } = $req;
-    _server_use $self $server;
-
-    $req->{_conn} = $conn;
-    $req->{_server} = $server;
-    ++$req->{_try};
-    ++$self->{nreqs};
-
-    return $conn && 1;
+sub _report_error {
+    my ($self, $request, $callback, $error, $sync, $errno) = @_;
+    my $errobj = defined $request && ref $request ne 'HASH'
+        ? MR::IProto::Error->new(
+            request => $request,
+            error   => $error,
+            errno   => defined $errno ? 0 + $errno : 0,
+        )
+        : undef;
+    $self->_finish_and_start() unless $sync;
+    $! = $errno;
+    $@ = $error;
+    $callback->($errobj, $error, $errno);
+    return;
 }
 
-sub _select_server {
-    my ($self, $disable_servers) = @_;
-    $disable_servers ||= {};
+=back
 
-    my $servers = $self->{servers};
-    my $servers_used = $self->{servers_used};
-    my $nserver = $self->{nserver};
+=head1 SEE ALSO
 
-    my $i = 1;
-    while($i <= @$servers) {
-        my $repr = $servers->[($i+$nserver)%@$servers]->{repr};
-        next if $servers_used->{$repr};
-        next if $disable_servers->{$repr};
-        last;
-    } continue {
-        ++$i;
-    }
+L<MR::IProto::Cluster>, L<MR::IProto::Cluster::Server>, L<MR::IProto::Message>.
 
-    return if $i > @$servers;
+=cut
 
-    $self->{nserver} = $nserver = ($i+$nserver)%@$servers;
-    return $servers->[$nserver];
-}
-
-sub _server_use {
-    my ($self,$server) = @_;
-    _die $self "want to use used server:$server->{repr}:" if $self->{servers_used}->{$server->{repr}};
-    ++ $self->{servers_used}->{$server->{repr}};
-}
-
-sub _server_free {
-    my ($self,$server) = @_;
-    _die $self "want to free free server:$server->{repr}:" unless $self->{servers_used}->{$server->{repr}};
-    $self->{servers_used}->{$server->{repr}} = 0;
-}
-
-sub _parse_servers {
-    my ($self, $key, $line) = @_;
-
-    my @servers;
-    foreach my $server (split(/,/, $line)) {
-        my ($host, $port) = $server =~ /(.+):(\d+)/ or confess "bad server: $server!";
-        push @servers, { host => $host, port => $port, repr => "$host:$port" }
-    }
-
-    $self->{$key} = \@servers;
-}
-
-sub _die {
-    my ($self, @e) = @_;
-    die "$self->{name}: ".join('; ', @e);
-}
+no Mouse;
+__PACKAGE__->meta->make_immutable();
 
 1;
-

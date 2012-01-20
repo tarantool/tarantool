@@ -16,79 +16,165 @@
   | Copyright (c) 2011                                                   |
   +----------------------------------------------------------------------+
 */
-
-/* $Id: header 252479 2008-02-07 19:39:50Z iliaa $ */
-
 #ifndef PHP_TARANTOOL_H
 #define PHP_TARANTOOL_H
-
-extern zend_module_entry tarantool_module_entry;
-#define phpext_tarantool_ptr &tarantool_module_entry
-
-#ifdef PHP_WIN32
-#	define PHP_TARANTOOL_API __declspec(dllexport)
-#elif defined(__GNUC__) && __GNUC__ >= 4
-#	define PHP_TARANTOOL_API __attribute__ ((visibility("default")))
-#else
-#	define PHP_TARANTOOL_API
-#endif
-
-#define TARANTOOL_TIMEOUT  5 // sec
-#define TARANTOOL_DEF_PORT 33013
-#define TARANTOOL_ADMIN_PORT 33015
-
-#define TARANTOOL_DEF_HOST "localhost"
-#define TARANTOOL_BUFSIZE  2048 
-#define TARANTOOL_SMALL_BUFSIZE  256 
-
-#define TARANTOOL_INSERT  13 
-#define TARANTOOL_SELECT  17 
-#define TARANTOOL_UPDATE  19 
-#define TARANTOOL_DELETE  20 
-#define TARANTOOL_CALL    22
-#define TARANTOOL_PING	  65280
-
-#define TARANTOOL_REQUEST_ID  8 
-
-#define TARANTOOL_OP_ASSIGN 0 
-#define TARANTOOL_OP_ADD	1 
-#define TARANTOOL_OP_AND	2
-#define TARANTOOL_OP_XOR	3
-#define TARANTOOL_OP_OR		4
-
-#define TARANTOOL_SHOW_INFO "show info\r\n"
-#define TARANTOOL_SHOW_INFO_SIZE sizeof(TARANTOOL_SHOW_INFO) 
-
-#define TARANTOOL_SHOW_STAT "show stat\r\n"
-#define TARANTOOL_SHOW_STAT_SIZE sizeof(TARANTOOL_SHOW_STAT) 
-
-#define TARANTOOL_SHOW_CONF "show configuration\n"
-#define TARANTOOL_SHOW_CONF_SIZE sizeof(TARANTOOL_SHOW_CONF) 
-
 
 #ifdef ZTS
 #include "TSRM.h"
 #endif
 
+
+/*============================================================================*
+ * Constants
+ *============================================================================*/
+
+#define TARANTOOL_EXTENSION_VERSION "1.0"
+
+
+/*----------------------------------------------------------------------------*
+ * tbuf constants
+ *----------------------------------------------------------------------------*/
+
+enum {
+	/* tbuf minimal capacity */
+	IO_BUF_CAPACITY_MIN = 128,
+	/* tbuf factor */
+	IO_BUF_CAPACITY_FACTOR = 2,
+};
+
+
+/*----------------------------------------------------------------------------*
+ * Connections constants
+ *----------------------------------------------------------------------------*/
+
+enum {
+	/* timeout: seconds */
+	TARANTOOL_TIMEOUT_SEC = 5,
+	/* timeout: microseconds */
+	TARANTOOL_TIMEOUT_USEC = 0,
+	/* tarantool default primary port */
+	TARANTOOL_DEFAULT_PORT = 33013,
+	/* tarantool default readonly port */
+	TARANTOOL_DEFAULT_RO_PORT = 33014,
+	/* tarantool default adnim port */
+	TARANTOOL_DEFAULT_ADMIN_PORT = 33015,
+};
+
+#define TARANTOOL_DEFAULT_HOST "localhost"
+
+
+/*----------------------------------------------------------------------------*
+ * Commands constants
+ *----------------------------------------------------------------------------*/
+
+/* tarantool/box flags */
+enum {
+	/* return resulting tuples */
+	TARANTOOL_FLAGS_RETURN_TUPLE = 0x01,
+	/* insert is add operation: errro will be raised if tuple exists */
+	TARANTOOL_FLAGS_ADD = 0x02,
+	/* insert is replace operation: errro will be raised if tuple doesn't exist */
+	TARANTOOL_FLAGS_REPLACE = 0x04,
+	/* doesn't write command to WAL */
+	TARANTOOL_FLAGS_NOT_STORE = 0x10,
+};
+
+/* tarantool command codes */
+enum {
+	/* insert/replace command code */
+	TARANTOOL_COMMAND_INSERT = 13,
+	/* select command code */
+	TARANTOOL_COMMAND_SELECT = 17,
+	/* update fields command code */
+	TARANTOOL_COMMAND_UPDATE = 19,
+	/* delete command code */
+	TARANTOOL_COMMAND_DELETE = 21,
+	/* call lua function command code */
+	TARANTOOL_COMMAND_CALL = 22,
+	/* pid command code */
+	TARANTOOL_COMMAND_PING = 65280,
+};
+
+/* update fields operation codes */
+enum {
+	/* update fields: assing field value operation code */
+	TARANTOOL_OP_ASSIGN = 0,
+	/* update fields: add operation code */
+	TARANTOOL_OP_ADD = 1,
+	/* update fields: and operation code */
+	TARANTOOL_OP_AND = 2,
+	/* update fields: xor operation code */
+	TARANTOOL_OP_XOR = 3,
+	/* update fields: or operation code */
+	TARANTOOL_OP_OR	= 4,
+	/* update fields: splice operation code */
+	TARANTOOL_OP_SPLICE = 5,
+};
+
+
+/*----------------------------------------------------------------------------*
+ * Amdin commands
+ *----------------------------------------------------------------------------*/
+
+/* admin protocol separator */
+#define ADMIN_SEPARATOR "\r\n"
+/* admin command begin token */
+#define ADMIN_TOKEN_BEGIN "---"ADMIN_SEPARATOR
+/* admin command end token */
+#define ADMIN_TOKEN_END "..."ADMIN_SEPARATOR
+
+/* show information admin command */
+#define ADMIN_COMMAND_SHOW_INFO "show info"
+/* show statistic admin command */
+#define ADMIN_COMMAND_SHOW_STAT "show stat"
+/* show configuration admin command */
+#define ADMIN_COMMAND_SHOW_CONF "show configuration"
+
+
+/*============================================================================*
+ * Interaface decalaration
+ *============================================================================*/
+
+
+/*----------------------------------------------------------------------------*
+ * Tarantool module interface
+ *----------------------------------------------------------------------------*/
+
+/* initialize module function */
 PHP_MINIT_FUNCTION(tarantool);
+
+/* shutdown module function */
 PHP_MSHUTDOWN_FUNCTION(tarantool);
 
+/* show information about this module */
 PHP_MINFO_FUNCTION(tarantool);
 
-PHP_METHOD( tarantool_class, __construct);
 
-PHP_METHOD( tarantool_class, insert);
-PHP_METHOD( tarantool_class, select);
-PHP_METHOD( tarantool_class, mselect);
-PHP_METHOD( tarantool_class, call);
-PHP_METHOD( tarantool_class, getTuple);
-PHP_METHOD( tarantool_class, delete);
-PHP_METHOD( tarantool_class, update);
-PHP_METHOD( tarantool_class, inc);
-PHP_METHOD( tarantool_class, getError);
-PHP_METHOD( tarantool_class, getInfo);
-PHP_METHOD( tarantool_class, getStat);
-PHP_METHOD( tarantool_class, getConf);
+/*----------------------------------------------------------------------------*
+ * Tarantool class interface
+ *----------------------------------------------------------------------------*/
+
+/* class constructor */
+PHP_METHOD(tarantool_class, __construct);
+
+/* do select operation */
+PHP_METHOD(tarantool_class, select);
+
+/* do insert operation */
+PHP_METHOD(tarantool_class, insert);
+
+/* do update fields operation */
+PHP_METHOD(tarantool_class, update_fields);
+
+/* do delete operation */
+PHP_METHOD(tarantool_class, delete);
+
+/* call lua funtion operation */
+PHP_METHOD(tarantool_class, call);
+
+/* do admin command */
+PHP_METHOD(tarantool_class, admin);
+
 
 #ifdef ZTS
 #define TARANTOOL_G(v) TSRMG(tarantool_globals_id, zend_tarantool_globals *, v)
@@ -96,8 +182,7 @@ PHP_METHOD( tarantool_class, getConf);
 #define TARANTOOL_G(v) (tarantool_globals.v)
 #endif
 
-#endif	
-/* PHP_TARANTOOL_H */
+#endif /* PHP_TARANTOOL_H */
 
 /*
  * Local variables:

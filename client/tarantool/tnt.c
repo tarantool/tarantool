@@ -36,6 +36,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#include <errcode.h>
 #include <third_party/gopt/gopt.h>
 #include <connector/c/tnt/include/tnt.h>
 #include <connector/c/tntsql/include/tnt_sql.h>
@@ -73,14 +74,11 @@ static int query_reply_handle(struct tnt_stream *t, struct tnt_reply *r) {
 		break;
 	}
 	if (tnt_error(t) != TNT_EOK) {
-		printf("FAIL, %s (op: %d, reqid: %d, code: %d, count: %d)\n",
-			tnt_strerror(t),
-			r->op,
-			r->reqid,
-			r->code,
-			r->count);
-		if (r->error)
-			printf("error: %s\n", r->error);
+		printf("ERROR, %s\n", tnt_strerror(t));
+		return -1;
+	} else if (r->code != 0) {
+		printf("ERROR, %s (%s)\n",
+		       ((r->error) ? r->error : ""), tnt_errcode_str(r->code >> 8));
 		return -1;
 	}
 	printf("OK, %d rows affected\n", r->count);
@@ -137,15 +135,15 @@ static int
 query(struct tnt_stream *t, char *q)
 {
 	char *e = NULL;
-	int ops = tnt_query(t, q, strlen(q), &e);
-	if (ops == -1) {
+	int rc = tnt_query(t, q, strlen(q), &e);
+	if (rc == -1) {
 		if (e) {
 			printf("error: %s", e);
 			free(e);
 		}
 		return -1;
 	}
-	int rc = tnt_flush(t);
+	rc = tnt_flush(t);
 	if (rc < 0) {
 		printf("error: %s\n", tnt_strerror(t));
 		return -1;

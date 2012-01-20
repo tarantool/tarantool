@@ -1,15 +1,10 @@
-<!DOCTYPE chapter [
+<!DOCTYPE section [
 <!ENTITY % tnt SYSTEM "../tnt.ent">
 %tnt;
 ]>
-<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+<section xmlns="http://docbook.org/ns/docbook" version="5.0"
          xmlns:xlink="http://www.w3.org/1999/xlink">
 <title>Dynamic data model</title>
-<blockquote><para>
-  This chapter describes how Tarantool stores 
-  values and what operations with data it supports.
-</para></blockquote>
-
 <para>
   Tarantool data is organized in <emphasis>tuples</emphasis>. Tuple
   length is varying: a tuple can contain any number
@@ -62,8 +57,8 @@
   [1]
   localhost> insert into t0 values ('hello')
   An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters'
-  localhost> insert into t0 values (1, 'hello')
-  Insert OK, 1 row affected
+  localhost> replace into t0 values (1, 'hello')
+  Replace OK, 1 row affected
   localhost> select * from t0 where k0=1 
   Found 1 tuple:
   [1, 'hello']
@@ -93,9 +88,9 @@
        is, therefore, mandatory.
     </para></listitem>
     <listitem><para>
-       INSERT replaces data when a tuple with given
-       primary key already exists. Such replace can insert
-       a tuple of different cardinality.
+       REPLACE replaces data when a
+       tuple with given primary key already exists. Such replace
+       can insert a tuple of different cardinality.
     </para></listitem>
   </itemizedlist>
 </para>
@@ -115,7 +110,7 @@
   xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/protocol.txt</filename>.
 </para>
 
-</chapter>
+</section>
 <!--
 vim: tw=66 syntax=docbk
 vim: spell spelllang=en_us

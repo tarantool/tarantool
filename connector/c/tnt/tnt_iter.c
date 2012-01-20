@@ -196,7 +196,7 @@ struct tnt_iter *tnt_iter_stream(struct tnt_iter *i, struct tnt_stream *s) {
 	i = tnt_iter_tryalloc(i);
 	if (i == NULL)
 		return NULL;
-	i->type = TNT_ITER_LIST;
+	i->type = TNT_ITER_STREAM;
 	i->next = tnt_iter_stream_next;
 	i->rewind = NULL;
 	i->free = tnt_iter_stream_free;

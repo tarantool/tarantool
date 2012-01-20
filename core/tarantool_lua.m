@@ -36,6 +36,7 @@
 
 #include "pickle.h"
 #include "fiber.h"
+#include <ctype.h>
 #include TARANTOOL_CONFIG
 
 struct lua_State *tarantool_L;
@@ -434,7 +435,7 @@ box_lua_fiber_run(void *arg __attribute__((unused)))
 		 * cancel() is synchronous.
 		 */
 		lua_settop(L, 0); /* pop any possible garbage */
-		lua_pushboolean(L, 0); /* completion status */
+		lua_pushboolean(L, false); /* completion status */
 		lua_pushstring(L, e->errmsg); /* error message */
 	} @finally {
 		/*
@@ -698,6 +699,37 @@ lbox_print(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Redefine lua 'pcall' built-in to correctly handle exceptions,
+ * produced by 'box' C functions.
+ *
+ * See Lua documentation on 'pcall' for additional information.
+ */
+
+static int
+lbox_pcall(struct lua_State *L)
+{
+	/*
+	 * Lua pcall() returns true/false for completion status
+	 * plus whatever the called function returns.
+	 */
+	@try {
+		lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
+		lua_pushboolean(L, true); /* push completion status */
+		lua_insert(L, 1); /* move 'true' to stack start */
+	} @catch (ClientError *e) {
+		/*
+		 * Note: FiberCancelException passes through this
+		 * catch and thus leaves garbage on coroutine
+		 * stack.
+		 */
+		lua_settop(L, 0); /* pop any possible garbage */
+		lua_pushboolean(L, false); /* completion status */
+		lua_pushstring(L, e->errmsg); /* error message */
+	}
+	return lua_gettop(L);
+}
+
 /** A helper to register a single type metatable. */
 void
 tarantool_lua_register_type(struct lua_State *L, const char *type_name,
@@ -730,9 +762,16 @@ tarantool_lua_init()
 	lua_pop(L, 1);
 	tarantool_lua_register_type(L, fiberlib_name, lbox_fiber_meta);
 	lua_register(L, "print", lbox_print);
+	lua_register(L, "pcall", lbox_pcall);
 	L = mod_lua_init(L);
 	lua_settop(L, 0); /* clear possible left-overs of init */
 	return L;
+}
+
+void
+tarantool_lua_close(struct lua_State *L)
+{
+	lua_close(L); /* collects garbage, invoking userdata gc */
 }
 
 /**
@@ -790,6 +829,8 @@ is_string(const char *str)
 {
 	if (strcmp(str, "true") == 0 || strcmp(str, "false") == 0)
 	    return false;
+	if (! isdigit(*str))
+	    return true;
 	char *endptr;
 	(void) strtod(str, &endptr);
 	return *endptr != '\0';

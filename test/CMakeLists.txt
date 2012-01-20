@@ -1,9 +1,8 @@
 add_custom_target(test
-    COMMAND python ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --vardir=${PROJECT_BINARY_DIR}/test/var
-    )
+    COMMAND python ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --vardir=${PROJECT_BINARY_DIR}/test/var)
 
-tarantool_client("box/protocol" ${CMAKE_SOURCE_DIR}/test/box/protocol.c)
-tarantool_client("connector_c/tt" ${CMAKE_SOURCE_DIR}/test/connector_c/tt.c)
+add_subdirectory(box)
+add_subdirectory(connector_c)
 
 if ("${CPACK_GENERATOR}" STREQUAL "RPM")
 	install (FILES ${CMAKE_SOURCE_DIR}/test/box/tarantool.cfg
@@ -12,7 +11,7 @@ if ("${CPACK_GENERATOR}" STREQUAL "RPM")
 		 DESTINATION share/tarantool)
 else()
 	install (FILES ${CMAKE_SOURCE_DIR}/test/box/tarantool.cfg
-		DESTINATION bin)
+		DESTINATION "${CMAKE_SYSCONF_DIR}")
 	install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
-		DESTINATION bin)
+		DESTINATION "${CMAKE_LOCALSTATE_DIR}/lib/tarantool")
 endif()

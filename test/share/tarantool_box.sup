@@ -139,6 +139,17 @@
    ...
 }
 
+{
+   <box upadte command>
+   Memcheck:Leak
+   fun:salloc
+   fun:tuple_alloc
+   fun:prepare_update
+   fun:box_dispatch
+   fun:box_process*
+   ...
+}
+
 ##
 ## tarantool/lua suppressions
 ##
@@ -243,32 +254,22 @@
    ...
 }
 
-## sptree
-##
+# third_party/luajit/src/lj.supp -- add as recommended in
+# http://lua-users.org/lists/lua-l/2011-08/msg00736.html
 
-## third_party sptree implementation doesn't have
-## destroy function.
-
+# Valgrind suppression file for LuaJIT 2.x.
 {
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:sptree_str_t_init
-   fun:build_indexes
-   ...
+   Optimized string compare
+   Memcheck:Addr4
+   fun:lj_str_cmp
 }
-
-# iterator_init_set calls realloc only if iterator value not
-# initialized or have lower depth.
-
 {
-   <insert_a_suppression_name_here>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:sptree_str_t_iterator_init_set
-   fun:index_iterator_init_tree_str
-   fun:process_select
-   ...
+   Optimized string compare
+   Memcheck:Addr4
+   fun:lj_str_new
+}
+{
+   Optimized string compare
+   Memcheck:Cond
+   fun:lj_str_new
 }

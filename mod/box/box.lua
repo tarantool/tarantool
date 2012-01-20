@@ -20,7 +20,7 @@ end
 -- starts from the key.
 --
 function box.select_range(sno, ino, limit, ...)
-    return box.space[tonumber(sno)].index[tonumber(ino)]:range(tonumber(limit), ...)
+    return box.space[tonumber(sno)].index[tonumber(ino)]:select_range(tonumber(limit), ...)
 end
 
 --
@@ -57,7 +57,7 @@ function box.insert(space, ...)
                                 unpack(tuple)))
 end
 
--- 
+--
 function box.update(space, key, format, ...)
     local ops = {...}
     return box.process(19,
@@ -84,7 +84,10 @@ function box.on_reload_configuration()
     index_mt.pairs = function(index)
         return index.idx.next, index.idx, nil end
     --
-    index_mt.range = function(index, limit, ...)
+    index_mt.next = function(index, ...)
+        return index.idx:next(...) end
+    --
+    index_mt.select_range = function(index, limit, ...)
         local range = {}
         for k, v in index.idx.next, index.idx, ... do
             if #range >= limit then
@@ -99,6 +102,9 @@ function box.on_reload_configuration()
     space_mt.len = function(space) return space.index[0]:len() end
     space_mt.__newindex = index_mt.__newindex
     space_mt.select = function(space, ...) return box.select(space.n, ...) end
+    space_mt.select_range = function(space, ino, limit, ...)
+        return space.index[ino]:select_range(limit, ...)
+    end
     space_mt.insert = function(space, ...) return box.insert(space.n, ...) end
     space_mt.update = function(space, ...) return box.update(space.n, ...) end
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
@@ -128,3 +134,11 @@ if initfile ~= nil then
     io.close(initfile)
     dofile("init.lua")
 end
+-- security: nullify some of the most serious os.* holes
+--
+os.execute = nil
+os.exit = nil
+os.rename = nil
+os.tmpname = nil
+os.remove = nil
+require = nil

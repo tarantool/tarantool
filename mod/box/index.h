@@ -51,7 +51,7 @@ struct key_part {
 };
 
 /* Descriptor of a multipart key. */
-struct key {
+struct key_def {
 	/* Description of parts of a multipart index. */
 	struct key_part *parts;
 	/*
@@ -85,21 +85,21 @@ struct key {
 	 */
 	struct iterator *position;
 	/* Description of a possibly multipart key. */
-	struct key key;
+	struct key_def key_def;
 	enum index_type type;
 	bool enabled;
 	/* Relative offset of the index in its namespace. */
 	u32 n;
 };
 
-+ (Index *) alloc: (enum index_type) type_arg :(struct key *) key_arg;
++ (Index *) alloc: (enum index_type) type_arg :(struct key_def *) key_def_arg;
 /**
  * Initialize index instance.
  *
  * @param space    space the index belongs to
  * @param key      key part description
  */
-- (id) init: (enum index_type) type_arg :(struct key *) key_arg
+- (id) init: (enum index_type) type_arg :(struct key_def *) key_def_arg
 	:(struct space *) space_arg :(u32) n_arg;
 /** Destroy and free index instance. */
 - (void) free;
@@ -111,7 +111,7 @@ struct key {
 - (struct box_tuple *) min;
 - (struct box_tuple *) max;
 - (struct box_tuple *) find: (void *) key_arg; /* only for unique lookups */
-- (struct box_tuple *) findBy: (struct box_tuple *) tuple;
+- (struct box_tuple *) findByTuple: (struct box_tuple *) tuple;
 - (void) remove: (struct box_tuple *) tuple;
 - (void) replace: (struct box_tuple *) old_tuple :(struct box_tuple *) new_tuple;
 /**
@@ -120,13 +120,14 @@ struct key {
  */
 - (struct iterator *) allocIterator;
 - (void) initIterator: (struct iterator *) iterator;
-- (void) initIterator: (struct iterator *) iterator :(void *) key_arg
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count;
 @end
 
 struct iterator {
 	struct box_tuple *(*next)(struct iterator *);
 	struct box_tuple *(*next_equal)(struct iterator *);
+	void (*free)(struct iterator *);
 };
 
 #define foreach_index(n, index_var)					\

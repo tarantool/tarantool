@@ -38,6 +38,7 @@
 
 #include "pickle.h"
 #include "tuple.h"
+#include "salloc.h"
 
 /* contents of box.lua */
 extern const char _binary_box_lua_start;
@@ -182,7 +183,7 @@ lbox_tuple_next(struct lua_State *L)
 {
 	struct box_tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
-	u8 *field;
+	u8 *field = NULL;
 	size_t len;
 
 	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL))
@@ -192,6 +193,7 @@ lbox_tuple_next(struct lua_State *L)
 	else
 		luaL_error(L, "tuple.next(): bad arguments");
 
+	(void)field;
 	assert(field >= tuple->data);
 	if (field < tuple->data + tuple->bsize) {
 		len = load_varint32((void **) &field);
@@ -232,6 +234,32 @@ static const struct luaL_reg lbox_tuple_meta [] = {
  */
 
 static const char *indexlib_name = "box.index";
+static const char *iteratorlib_name = "box.index.iterator";
+
+static struct iterator *
+lua_checkiterator(struct lua_State *L, int i)
+{
+	struct iterator **it = luaL_checkudata(L, i, iteratorlib_name);
+	assert(it != NULL);
+	return *it;
+}
+
+static void
+lbox_pushiterator(struct lua_State *L, struct iterator *it)
+{
+	void **ptr = lua_newuserdata(L, sizeof(void *));
+	luaL_getmetatable(L, iteratorlib_name);
+	lua_setmetatable(L, -2);
+	*ptr = it;
+}
+
+static int
+lbox_iterator_gc(struct lua_State *L)
+{
+	struct iterator *it = lua_checkiterator(L, -1);
+	it->free(it);
+	return 0;
+}
 
 static Index *
 lua_checkindex(struct lua_State *L, int i)
@@ -363,18 +391,20 @@ lbox_index_next(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
+	struct iterator *it = NULL;
 	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
 		/*
 		 * If there is nothing or nil on top of the stack,
 		 * start iteration from the beginning.
 		 */
-		[index initIterator: index->position];
-	} else if (argc > 1 || !lua_islightuserdata(L, 2)) {
+		it = [index allocIterator];
+		[index initIterator: it];
+		lbox_pushiterator(L, it);
+	} else if (argc > 1 || lua_type(L, 2) != LUA_TUSERDATA) {
 		/*
 		 * We've got something different from iterator's
-		 * light userdata: must be a key
-		 * to start iteration from an offset. Seed the
-		 * iterator with this key.
+		 * userdata: must be a key to start iteration from
+		 * an offset. Seed the iterator with this key.
 		 */
 		int cardinality;
 		void *key;
@@ -390,7 +420,7 @@ lbox_index_next(struct lua_State *L)
 			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
 			for (int i = 0; i < argc; ++i)
 				append_key_part(L, i + 2, data,
-						index->key.parts[i].type);
+						index->key_def.parts[i].type);
 			key = data->data;
 		}
 		/*
@@ -399,15 +429,17 @@ lbox_index_next(struct lua_State *L)
 		 * keys.
 		*/
 		assert(cardinality != 0);
-		if (cardinality > index->key.part_count)
+		if (cardinality > index->key_def.part_count)
 			luaL_error(L, "index.next(): key part count (%d) "
 				   "does not match index cardinality (%d)",
-				   cardinality, index->key.part_count);
-		[index initIterator: index->position :key :cardinality];
+				   cardinality, index->key_def.part_count);
+		it = [index allocIterator];
+		[index initIterator: it :key :cardinality];
+		lbox_pushiterator(L, it);
+	} else { /* 1 item on the stack and it's a userdata. */
+		it = lua_checkiterator(L, 2);
 	}
-	struct box_tuple *tuple = index->position->next(index->position);
-	if (tuple)
-		lua_pushlightuserdata(L, index->position);
+	struct box_tuple *tuple = it->next(it);
 	/* If tuple is NULL, pushes nil as end indicator. */
 	lbox_pushtuple(L, tuple);
 	return tuple ? 2 : 1;
@@ -424,6 +456,11 @@ static const struct luaL_reg lbox_index_meta[] = {
 
 static const struct luaL_reg indexlib [] = {
 	{"new", lbox_index_new},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg lbox_iterator_meta[] = {
+	{"__gc", lbox_iterator_gc},
 	{NULL, NULL}
 };
 
@@ -713,6 +750,7 @@ mod_lua_init(struct lua_State *L)
 	tarantool_lua_register_type(L, indexlib_name, lbox_index_meta);
 	luaL_register(L, "box.index", indexlib);
 	lua_pop(L, 1);
+	tarantool_lua_register_type(L, iteratorlib_name, lbox_iterator_meta);
 	/* Load box.lua */
 	if (luaL_dostring(L, &_binary_box_lua_start))
 		panic("Error loading box.lua: %s", lua_tostring(L, -1));

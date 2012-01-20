@@ -1,0 +1,259 @@
+
+Bourne Shell Coding Conventions
+--------------------------------
+
+Original version by Mike Shapiro and OpenSolaris Shell Project.
+This document describes the shell coding style used for all the ON shell
+script changes integrated into Solaris.
+
+All new shell code should conform to this coding standard, which is intended
+to match our existing C coding standard.
+
+When in doubt, think "what would be the C-Style equivalent?"
+
+Basic Format
+------------
+
+Similar to cstyle, the basic format is that all lines are indented by TABs,
+and continuation lines (which in the shell end with "\") are indented by
+an equivalent number of TABs and then an additional four spaces, e.g.
+
+cp foo bar
+cp some_realllllllllllllllly_realllllllllllllly_long_path \
+   to_another_really_long_path
+
+If, For, and While
+------------------
+
+To match cstyle, the sh token equivalent to the C "{" should appear on
+the same line, separated by a ";", as in:
+
+if [ $x = hello ]; then
+ echo $x
+fi
+
+for i in 1 2 3; do
+  echo $i
+done
+
+while [ $# -gt 0 ]; do
+  echo $1
+ shift
+done
+
+Test Built-in
+-------------
+
+DO NOT use the test built-in. Sorry, executive decision. In our Bourne shell,
+the test built-in is the same as the "[" built-in (if you don't believe me,
+try "type test" or refer to usr/src/cmd/sh/msg.c). So please do not write:
+
+if test $# -gt 0; then
+
+instead use:
+
+if [ $# -gt 0 ]; then
+
+Single-line if-statements
+-------------------------
+
+It is permissible to use && and || to construct shorthand for an "if"
+statement in the case where the if statement has a single consequent line:
+
+[ $# -eq 0 ] && exit 0
+
+instead of the longer:
+
+if [ $# -eq 0 ]; then
+  exit 0
+fi
+
+DO NOT combine && with { }, as in:
+
+[ $# -eq 0 ] && {
+ do something
+ do something else
+}
+
+Use a complete "if-then-fi" construct for this instead.
+
+Infinite Loops
+--------------
+
+The proper way to write an infinite loop in the Bourne shell is to use
+the ":" built-in, which evaluates to true (exit status 0).
+This is better than using "true", because that is *not* a built-in in the
+Bourne shell and thus runs /bin/true.
+
+while :; do
+ echo infinite loop
+done
+
+Exit Status and If/While Statements
+-----------------------------------
+
+Recall that "if" and "while" operate on the exit status of the statement
+to be executed. In the shell, zero (0) means true and non-zero means false.
+The exit status of the last command which was executed is available in
+the $? variable. When using "if" and "while", it is typically not necessary
+to use $? explicitly, as in:
+
+grep foo /etc/passwd >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  echo found
+fi
+
+Instead, you can more concisely write:
+
+if grep foo /etc/passwd >/dev/null 2>&1; then
+  echo found
+fi
+
+Or, when appropriate:
+grep foo /etc/passwd >/dev/null 2>&1 && echo found
+
+DO NOT attempt to make pseudo-booleans by setting variables to "true"
+and "false" and then running the variable as a command instead of using a
+comparison test. This is non-idiomatic and confusing to many long-time
+shell programmers.
+
+Use:
+
+good=true
+if [[ $good = "true" ]] ; then
+
+Not:
+
+good=false
+if $good ; then
+
+Variable References
+-------------------
+
+Variable references begin with $ and *may* have their name enclosed in {}'s.
+We prefer to only see the {}'s when required.
+Do not spuriously enclose all your variable names in braces, like this:
+foo=${bar}
+
+This is kind of like writing all your C variable assignments like this:
+foo = (bar);
+
+It compiles, but it looks stupid.
+
+Braces are required around variable names in two specific cases:
+
+(1) when you are forming the string concatenation of your variable with
+another string:
+
+[ $install = yes ] && root="/a/" || root="/"
+hosts=${root}etc/inet/hosts
+
+and (2) when you are using one of the various substitution/assignment operators:
+
+echo ${BASEDIR:-/a}
+
+Variable Naming
+---------------
+
+We prefer that you adopt a shell variable naming scheme where capitalization
+provides additional meaning (as in our C style): use CAPITAL letters for
+variables that are exported into the environment, or are equivalent to C
+constants or #defines. Use lowercase letters for other variable names:
+BASEDIR=/a; export BASEDIR
+argc=$#
+
+This helps your reader immediately understand the implication of modifying a
+given variable (i.e. whether it will be inherited by child processes).
+
+Quoting
+-------
+
+Quick review of the quoting basics:
+
+Single quotes ('') mean quote but do not expand variable or backquote
+substitutions.  
+Double quotes ("") mean quote but allow expansion.  
+Backquotes (``) mean execute the command and substitute its standard output
+(note: stderr is unchanged and may "leak" through unless properly redirected)
+
+Use whatever quotes are appropriate for your situation, but please do not
+unnecessarily quote everything (also see 7 above).
+
+For example, references to variables controlled by your script do not have to
+be quoted unless you are expecting your variable to expand to multiple tokens,
+or to the empty string.
+
+However, any variable which contains values from outside the script, such as
+user input or filenames, should be quoted to avoid errors from special
+characters, including whitespace
+
+Testing for (Non-)Empty Strings
+-------------------------------
+
+DO NOT test for (non-)/empty strings by comparing to "" or ''. ALWAYS use the
+test operators -n (non-zero-length string) and -z (zero-length string):
+
+if [ -z "$foo" ]; then
+   echo 'you forgot to set $foo'
+fi
+
+if [ -n "$BASEDIR" ]; then
+   echo "\$BASEDIR is set to $BASEDIR"
+fi
+
+Commenting
+----------
+
+Shell comments are preceded by the '#' character. Place single-line comments
+in the right-hand margin. Use an extra '#' above and below the comment in the
+case of multi-line comments:
+cp foo bar # Copy foo to bar
+
+#
+# Modify the permissions on bar.  We need to set them to root/sys
+# in order to match the package prototype.
+#
+chown root bar
+chgrp sys bar
+
+Pathnames
+---------
+
+It is always a good idea to be careful about $PATH settings and pathnames when
+writing shell scripts. This allows them to function correctly even when the
+user invoking your script has some strange $PATH set in their environment.
+
+There are two acceptable ways to do this:
+
+(1) make *all* command references in your script use explicit pathnames:
+/usr/bin/chown root bar
+/usr/bin/chgrp sys bar
+
+or (2) explicitly reset $PATH in your script:
+PATH=/usr/bin; export PATH
+
+chown root bar
+chgrp sys bar
+
+DO NOT use a mixture of (1) and (2) in the same script.
+Pick one method and use it consistently.
+
+Command arguments
+-----------------
+
+When passing user input to commands, if the first operand of a command is a
+variable, use -- for any command that accepts this to flag the end of
+arguments to avoid problems if the variable expands to a value startingwith -. 
+
+Interpreter Magic
+-----------------
+
+The proper interpreter magic for a shell script should be simply #!/bin/sh.
+
+End of file
+-----------
+
+Following 2 lines should be placed at the end of file:
+
+# __EOF__
+<empty line>

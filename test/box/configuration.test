@@ -11,7 +11,7 @@ server.stop()
 # start server from config with holes in spaces
 server.deploy("box/tarantool_bug708685.cfg")
 # check connection
-exec admin "show stat"
+exec admin "show configuration"
 
 print """
 # Bug #884768:
@@ -24,6 +24,18 @@ server.stop()
 server.deploy("box/tarantool_bug884768.cfg")
 # check values
 exec admin "show configuration"
+
+print """
+# Bug #876541:
+#  Test floating point values (wal_fsync_delay) with fractional part
+#  (https://bugs.launchpad.net/bugs/876541)
+"""
+# stop current server
+server.stop()
+# start server from config with different boolean represenation
+server.deploy("box/tarantool_bug876541.cfg")
+# check values
+exec admin "lua box.cfg.wal_fsync_delay"
 
 # restore default server
 server.stop()

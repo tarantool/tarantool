@@ -179,8 +179,10 @@ rollback:
  *
  * returns zero on fully read reply, or NULL on error.
 */
-static ssize_t tnt_reply_cb(size_t *off, char *buf, ssize_t size) {
-	memcpy(buf, buf + *off, size);
+static ssize_t tnt_reply_cb(void *ptr[2], char *buf, ssize_t size) {
+	char *src = ptr[0];
+	ssize_t *off = ptr[1];
+	memcpy(buf, src + *off, size);
 	*off += size;
 	return size;
 }
@@ -195,13 +197,14 @@ int tnt_reply(struct tnt_reply *r, char *buf, size_t size, size_t *off) {
 		return 1;
 	}
 	struct tnt_header *hdr = (struct tnt_header*)buf;
-	if (size < hdr->len) {
+	if (size < sizeof(struct tnt_header) + hdr->len) {
 		if (off)
-			*off = hdr->len - size;
+			*off = (sizeof(struct tnt_header) + hdr->len) - size;
 		return 1;
 	}
 	size_t offv = 0;
-	int rc = tnt_reply_from(r, (tnt_replyf_t)tnt_reply_cb, &offv);
+	void *ptr[2] = { buf, &offv };
+	int rc = tnt_reply_from(r, (tnt_replyf_t)tnt_reply_cb, ptr);
 	if (off)
 		*off = offv;
 	return rc;

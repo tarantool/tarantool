@@ -68,6 +68,14 @@
   </para>
 
   <para>
+    The key feature of Tarantool is <emphasis role="strong">support
+    for stored procedures</emphasis>, which
+    can access and modify data atomically. With stored procedures,
+    it's possible to turn Tarantool into a highly
+    flexible and extremely fast social web application server.
+  </para>
+
+  <para>
     <emphasis role="strong">The software is production-ready</emphasis>.
     Tarantool has been developed and is actively used at
     <citetitle xlink:href="http://api.mail.ru">Mail.Ru</citetitle>,
@@ -96,7 +104,7 @@
     This manual is written in <citetitle
     xlink:href="http://www.docbook.org/tdg5/en/html/docbook.html">DocBook
     5</citetitle> XML markup language and is using the standard <citetitle
-    xlink:href="http://docbook.sourceforge.net/release/xsl/current/doc/">DocbBook
+    xlink:href="http://docbook.sourceforge.net/release/xsl/current/doc/">DocBook
     XSL</citetitle> formatting conventions:</para>
   <para>
     UNIX shell command input is prefixed with '$ ' and is 

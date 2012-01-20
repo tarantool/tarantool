@@ -57,14 +57,14 @@ iterator_first_equal(struct iterator *it)
 @class HashStrIndex;
 @class TreeIndex;
 
-+ (Index *) alloc: (enum index_type) type :(struct key *) key
++ (Index *) alloc: (enum index_type) type :(struct key_def *) key_def
 {
 	switch (type) {
 	case HASH:
 		/* Hash index, check key type.
 		 * Hash indes always has a single-field key.
 		 */
-		switch (key->parts[0].type) {
+		switch (key_def->parts[0].type) {
 		case NUM:
 			return [Hash32Index alloc]; /* 32-bit integer hash */
 		case NUM64:
@@ -83,11 +83,11 @@ iterator_first_equal(struct iterator *it)
 	panic("unsupported index type");
 }
 
-- (id) init: (enum index_type) type_arg :(struct key *) key_arg
+- (id) init: (enum index_type) type_arg :(struct key_def *) key_def_arg
 	:(struct space *) space_arg :(u32) n_arg;
 {
 	self = [super init];
-	key = *key_arg;
+	key_def = *key_def_arg;
 	type = type_arg;
 	n = n_arg;
 	space = space_arg;
@@ -98,9 +98,9 @@ iterator_first_equal(struct iterator *it)
 
 - (void) free
 {
-	sfree(key.parts);
-	sfree(key.cmp_order);
-	sfree(position);
+	sfree(key_def.parts);
+	sfree(key_def.cmp_order);
+	position->free(position);
 	[super free];
 }
 
@@ -127,14 +127,14 @@ iterator_first_equal(struct iterator *it)
 	return NULL;
 }
 
-- (struct box_tuple *) find: (void *) key_arg
+- (struct box_tuple *) find: (void *) key
 {
-	(void) key_arg;
+	(void) key;
 	[self subclassResponsibility: _cmd];
 	return NULL;
 }
 
-- (struct box_tuple *) findBy: (struct box_tuple *) pattern
+- (struct box_tuple *) findByTuple: (struct box_tuple *) pattern
 {
 	(void) pattern;
 	[self subclassResponsibility: _cmd];
@@ -167,12 +167,12 @@ iterator_first_equal(struct iterator *it)
 	[self subclassResponsibility: _cmd];
 }
 
-- (void) initIterator: (struct iterator *) iterator :(void *) key_arg
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
 	(void) iterator;
 	(void) part_count;
-	(void) key_arg;
+	(void) key;
 	[self subclassResponsibility: _cmd];
 }
 @end
@@ -211,6 +211,13 @@ hash_iterator_next(struct iterator *iterator)
 	return NULL;
 }
 
+void
+hash_iterator_free(struct iterator *iterator)
+{
+	assert(iterator->next = hash_iterator_next);
+	sfree(iterator);
+}
+
 
 @implementation HashIndex
 - (void) free
@@ -230,21 +237,22 @@ hash_iterator_next(struct iterator *iterator)
 	return NULL;
 }
 
-- (struct box_tuple *) findBy: (struct box_tuple *) tuple
+- (struct box_tuple *) findByTuple: (struct box_tuple *) tuple
 {
 	/* Hash index currently is always single-part. */
-	void *field = tuple_field(tuple, key.parts[0].fieldno);
+	void *field = tuple_field(tuple, key_def.parts[0].fieldno);
 	if (field == NULL)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, key.parts[0].fieldno);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, key_def.parts[0].fieldno);
 	return [self find: field];
 }
 
 - (struct iterator *) allocIterator
 {
-	struct hash_iterator *it = salloc(sizeof(hash_iterator));
+	struct hash_iterator *it = salloc(sizeof(struct hash_iterator));
 	if (it) {
 		memset(it, 0, sizeof(struct hash_iterator));
 		it->base.next = hash_iterator_next;
+		it->base.free = hash_iterator_free;
 	}
 	return (struct iterator *) it;
 }
@@ -290,14 +298,14 @@ hash_iterator_next(struct iterator *iterator)
 	if (k != mh_end(int_hash))
 		ret = mh_value(int_hash, k);
 #ifdef DEBUG
-	say_debug("index_hash_num_find(self:%p, key:%i) = %p", self, num, ret);
+	say_debug("Hash32Index find(self:%p, key:%i) = %p", self, num, ret);
 #endif
 	return ret;
 }
 
 - (void) remove: (struct box_tuple *) tuple
 {
-	void *field = tuple_field(tuple, self->key.parts[0].fieldno);
+	void *field = tuple_field(tuple, key_def.parts[0].fieldno);
 	unsigned int field_size = load_varint32(&field);
 	u32 num = *(u32 *)field;
 
@@ -308,14 +316,14 @@ hash_iterator_next(struct iterator *iterator)
 	if (k != mh_end(int_hash))
 		mh_i32ptr_del(int_hash, k);
 #ifdef DEBUG
-	say_debug("index_hash_num_remove(self:%p, key:%i)", self, num);
+	say_debug("Hash32Index remove(self:%p, key:%i)", self, num);
 #endif
 }
 
 - (void) replace: (struct box_tuple *) old_tuple
 	:(struct box_tuple *) new_tuple
 {
-	void *field = tuple_field(new_tuple, key.parts[0].fieldno);
+	void *field = tuple_field(new_tuple, key_def.parts[0].fieldno);
 	u32 field_size = load_varint32(&field);
 	u32 num = *(u32 *)field;
 
@@ -323,7 +331,7 @@ hash_iterator_next(struct iterator *iterator)
 		tnt_raise(IllegalParams, :"key is not u32");
 
 	if (old_tuple != NULL) {
-		void *old_field = tuple_field(old_tuple, key.parts[0].fieldno);
+		void *old_field = tuple_field(old_tuple, key_def.parts[0].fieldno);
 		load_varint32(&old_field);
 		u32 old_num = *(u32 *)old_field;
 		mh_int_t k = mh_i32ptr_get(int_hash, old_num);
@@ -334,7 +342,7 @@ hash_iterator_next(struct iterator *iterator)
 	mh_i32ptr_put(int_hash, num, new_tuple, NULL);
 
 #ifdef DEBUG
-	say_debug("index_hash_num_replace(self:%p, old_tuple:%p, new_tuple:%p) key:%i",
+	say_debug("Hash32Index replace(self:%p, old_tuple:%p, new_tuple:%p) key:%i",
 		  self, old_tuple, new_tuple, num);
 #endif
 }
@@ -350,16 +358,17 @@ hash_iterator_next(struct iterator *iterator)
 	it->hash = int_hash;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(void *) key_arg
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
 	struct hash_iterator *it = hash_iterator(iterator);
 
+	(void) part_count;
 	assert(part_count == 1);
 	assert(iterator->next = hash_iterator_next);
 
-	u32 field_size = load_varint32(&key_arg);
-	u32 num = *(u32 *)key_arg;
+	u32 field_size = load_varint32(&key);
+	u32 num = *(u32 *)key;
 
 	if (field_size != 4)
 		tnt_raise(IllegalParams, :"key is not u32");
@@ -410,14 +419,14 @@ hash_iterator_next(struct iterator *iterator)
 	if (k != mh_end(int64_hash))
 		ret = mh_value(int64_hash, k);
 #ifdef DEBUG
-	say_debug("index_hash_num64_find(self:%p, key:%"PRIu64") = %p", self, num, ret);
+	say_debug("Hash64Index find(self:%p, key:%"PRIu64") = %p", self, num, ret);
 #endif
 	return ret;
 }
 
 - (void) remove: (struct box_tuple *) tuple
 {
-	void *field = tuple_field(tuple, key.parts[0].fieldno);
+	void *field = tuple_field(tuple, key_def.parts[0].fieldno);
 	unsigned int field_size = load_varint32(&field);
 	u64 num = *(u64 *)field;
 
@@ -428,14 +437,14 @@ hash_iterator_next(struct iterator *iterator)
 	if (k != mh_end(int64_hash))
 		mh_i64ptr_del(int64_hash, k);
 #ifdef DEBUG
-	say_debug("index_hash_num64_remove(self:%p, key:%"PRIu64")", self, num);
+	say_debug("Hash64Index remove(self:%p, key:%"PRIu64")", self, num);
 #endif
 }
 
 - (void) replace: (struct box_tuple *) old_tuple
 	:(struct box_tuple *) new_tuple
 {
-	void *field = tuple_field(new_tuple, key.parts[0].fieldno);
+	void *field = tuple_field(new_tuple, key_def.parts[0].fieldno);
 	u32 field_size = load_varint32(&field);
 	u64 num = *(u64 *)field;
 
@@ -443,7 +452,8 @@ hash_iterator_next(struct iterator *iterator)
 		tnt_raise(IllegalParams, :"key is not u64");
 
 	if (old_tuple != NULL) {
-		void *old_field = tuple_field(old_tuple, key.parts[0].fieldno);
+		void *old_field = tuple_field(old_tuple,
+					      key_def.parts[0].fieldno);
 		load_varint32(&old_field);
 		u64 old_num = *(u64 *)old_field;
 		mh_int_t k = mh_i64ptr_get(int64_hash, old_num);
@@ -453,7 +463,7 @@ hash_iterator_next(struct iterator *iterator)
 
 	mh_i64ptr_put(int64_hash, num, new_tuple, NULL);
 #ifdef DEBUG
-	say_debug("index_hash_num64_replace(self:%p, old_tuple:%p, tuple:%p) key:%"PRIu64,
+	say_debug("Hash64Index replace(self:%p, old_tuple:%p, tuple:%p) key:%"PRIu64,
 		  self, old_tuple, new_tuple, num);
 #endif
 }
@@ -475,6 +485,7 @@ hash_iterator_next(struct iterator *iterator)
 {
 	assert(iterator->next = hash_iterator_next);
 	assert(part_count == 1);
+	(void) part_count;
 
 	struct hash_iterator *it = hash_iterator(iterator);
 
@@ -526,7 +537,7 @@ hash_iterator_next(struct iterator *iterator)
 		ret = mh_value(str_hash, k);
 #ifdef DEBUG
 	u32 field_size = load_varint32(&field);
-	say_debug("index_hash_str_find(self:%p, key:(%i)'%.*s') = %p",
+	say_debug("HashStrIndex find(self:%p, key:(%i)'%.*s') = %p",
 		  self, field_size, field_size, (u8 *)field, ret);
 #endif
 	return ret;
@@ -534,14 +545,14 @@ hash_iterator_next(struct iterator *iterator)
 
 - (void) remove: (struct box_tuple *) tuple
 {
-	void *field = tuple_field(tuple, key.parts[0].fieldno);
+	void *field = tuple_field(tuple, key_def.parts[0].fieldno);
 
 	mh_int_t k = mh_lstrptr_get(str_hash, field);
 	if (k != mh_end(str_hash))
 		mh_lstrptr_del(str_hash, k);
 #ifdef DEBUG
 	u32 field_size = load_varint32(&field);
-	say_debug("index_hash_str_remove(self:%p, key:'%.*s')",
+	say_debug("HashStrIndex remove(self:%p, key:'%.*s')",
 		  self, field_size, (u8 *)field);
 #endif
 }
@@ -549,13 +560,15 @@ hash_iterator_next(struct iterator *iterator)
 - (void) replace: (struct box_tuple *) old_tuple
 	:(struct box_tuple *) new_tuple
 {
-	void *field = tuple_field(new_tuple, key.parts[0].fieldno);
+	void *field = tuple_field(new_tuple, key_def.parts[0].fieldno);
 
 	if (field == NULL)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, key.parts[0].fieldno);
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
+			  key_def.parts[0].fieldno);
 
 	if (old_tuple != NULL) {
-		void *old_field = tuple_field(old_tuple, key.parts[0].fieldno);
+		void *old_field = tuple_field(old_tuple,
+					      key_def.parts[0].fieldno);
 		mh_int_t k = mh_lstrptr_get(str_hash, old_field);
 		if (k != mh_end(str_hash))
 			mh_lstrptr_del(str_hash, k);
@@ -564,7 +577,7 @@ hash_iterator_next(struct iterator *iterator)
 	mh_lstrptr_put(str_hash, field, new_tuple, NULL);
 #ifdef DEBUG
 	u32 field_size = load_varint32(&field);
-	say_debug("index_hash_str_replace(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'",
+	say_debug("HashStrIndex replace(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'",
 		  self, old_tuple, new_tuple, field_size, (u8 *)field);
 #endif
 }
@@ -580,16 +593,17 @@ hash_iterator_next(struct iterator *iterator)
 	it->hash = (struct mh_i32ptr_t *) str_hash;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(void *) field
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
 	assert(iterator->next = hash_iterator_next);
 	assert(part_count== 1);
+	(void) part_count;
 
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	it->base.next_equal = iterator_first_equal;
-	it->h_pos = mh_lstrptr_get(str_hash, field);
+	it->h_pos = mh_lstrptr_get(str_hash, key);
 	it->hash = (struct mh_i32ptr_t *) str_hash;
 }
 @end
@@ -672,21 +686,21 @@ field_compare(struct field *f1, struct field *f2, enum field_data_type type)
 	panic("impossible happened");
 }
 
-struct index_tree_el {
+struct tree_el {
 	struct box_tuple *tuple;
 	struct field key[];
 };
 
-#define INDEX_TREE_EL_SIZE(key) \
-	(sizeof(struct index_tree_el) + sizeof(struct field) * (key)->part_count)
+#define TREE_EL_SIZE(key) \
+	(sizeof(struct tree_el) + sizeof(struct field) * (key)->part_count)
 
 void
-index_tree_el_init(struct index_tree_el *elem,
-		   struct key *key, struct box_tuple *tuple)
+tree_el_init(struct tree_el *elem,
+		   struct key_def *key_def, struct box_tuple *tuple)
 {
 	void *tuple_data = tuple->data;
 
-	for (i32 i = 0; i < key->max_fieldno; ++i) {
+	for (i32 i = 0; i < key_def->max_fieldno; ++i) {
 		struct field f;
 
 		if (i < tuple->cardinality) {
@@ -700,48 +714,48 @@ index_tree_el_init(struct index_tree_el *elem,
 		} else
 			f = ASTERISK;
 
-		u32 key_field_no = key->cmp_order[i];
+		u32 fieldno = key_def->cmp_order[i];
 
-		if (key_field_no == -1)
+		if (fieldno == -1)
 			continue;
 
-		if (key->parts[key_field_no].type == NUM) {
+		if (key_def->parts[fieldno].type == NUM) {
 			if (f.len != 4)
 				tnt_raise(IllegalParams, :"key is not u32");
-		} else if (key->parts[key_field_no].type == NUM64 && f.len != 8) {
+		} else if (key_def->parts[fieldno].type == NUM64 && f.len != 8) {
 				tnt_raise(IllegalParams, :"key is not u64");
 		}
 
-		elem->key[key_field_no] = f;
+		elem->key[fieldno] = f;
 	}
 	elem->tuple = tuple;
 }
 
 void
-init_search_pattern(struct index_tree_el *pattern,
-		    struct key *key, int part_count, void *key_field)
+init_search_pattern(struct tree_el *pattern,
+		    struct key_def *key_def, int part_count, void *key)
 {
-	assert(part_count <= key->part_count);
+	assert(part_count <= key_def->part_count);
 
-	for (i32 i = 0; i < key->part_count; ++i)
+	for (i32 i = 0; i < key_def->part_count; ++i)
 		pattern->key[i] = ASTERISK;
 	for (int i = 0; i < part_count; i++) {
 		u32 len;
 
-		len = pattern->key[i].len = load_varint32(&key_field);
-		if (key->parts[i].type == NUM) {
+		len = pattern->key[i].len = load_varint32(&key);
+		if (key_def->parts[i].type == NUM) {
 			if (len != 4)
 				tnt_raise(IllegalParams, :"key is not u32");
-		} else if (key->parts[i].type == NUM64 && len != 8) {
+		} else if (key_def->parts[i].type == NUM64 && len != 8) {
 				tnt_raise(IllegalParams, :"key is not u64");
 		}
 		if (len <= sizeof(pattern->key[i].data)) {
 			memset(pattern->key[i].data, 0, sizeof(pattern->key[i].data));
-			memcpy(pattern->key[i].data, key_field, len);
+			memcpy(pattern->key[i].data, key, len);
 		} else
-			pattern->key[i].data_ptr = key_field;
+			pattern->key[i].data_ptr = key;
 
-		key_field += len;
+		key += len;
 	}
 
 	pattern->tuple = NULL;
@@ -756,14 +770,14 @@ init_search_pattern(struct index_tree_el *pattern,
  *              > 0  - a is greater than b
  */
 static int
-index_tree_el_unique_cmp(struct index_tree_el *elem_a,
-			 struct index_tree_el *elem_b,
-			 struct key *key)
+tree_el_unique_cmp(struct tree_el *elem_a,
+			 struct tree_el *elem_b,
+			 struct key_def *key_def)
 {
 	int r = 0;
-	for (i32 i = 0, end = key->part_count; i < end; ++i) {
+	for (i32 i = 0, end = key_def->part_count; i < end; ++i) {
 		r = field_compare(&elem_a->key[i], &elem_b->key[i],
-				  key->parts[i].type);
+				  key_def->parts[i].type);
 		if (r != 0)
 			break;
 	}
@@ -771,10 +785,10 @@ index_tree_el_unique_cmp(struct index_tree_el *elem_a,
 }
 
 static int
-index_tree_el_cmp(struct index_tree_el *elem_a, struct index_tree_el *elem_b,
-		  struct key *key)
+tree_el_cmp(struct tree_el *elem_a, struct tree_el *elem_b,
+		  struct key_def *key_def)
 {
-	int r = index_tree_el_unique_cmp(elem_a, elem_b, key);
+	int r = tree_el_unique_cmp(elem_a, elem_b, key_def);
 	if (r == 0 && elem_a->tuple && elem_b->tuple)
 		r = (elem_a->tuple < elem_b->tuple ?
 		     -1 : elem_a->tuple > elem_b->tuple);
@@ -786,7 +800,7 @@ SPTREE_DEF(str_t, realloc);
 
 @interface TreeIndex: Index {
 	sptree_str_t *tree;
-	struct index_tree_el *pattern;
+	struct tree_el *pattern;
 };
 - (void) build: (Index *) pk;
 @end
@@ -794,9 +808,8 @@ SPTREE_DEF(str_t, realloc);
 struct tree_iterator {
 	struct iterator base;
 	struct sptree_str_t_iterator *t_iter;
-	struct index_tree_el *pattern;
-	sptree_str_t *tree;
-	struct key *key;
+	struct tree_el *pattern;
+	struct key_def *key_def;
 };
 
 static inline struct tree_iterator *
@@ -812,9 +825,20 @@ tree_iterator_next(struct iterator *iterator)
 
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	struct index_tree_el *elem = sptree_str_t_iterator_next(it->t_iter);
+	struct tree_el *elem = sptree_str_t_iterator_next(it->t_iter);
 
 	return elem ? elem->tuple : NULL;
+}
+
+void
+tree_iterator_free(struct iterator *iterator)
+{
+	assert(iterator->next == tree_iterator_next);
+	struct tree_iterator *it = tree_iterator(iterator);
+
+	if (it->t_iter)
+		sptree_str_t_iterator_free(it->t_iter);
+	sfree(it);
 }
 
 static struct box_tuple *
@@ -824,11 +848,13 @@ tree_iterator_next_equal(struct iterator *iterator)
 
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	struct index_tree_el *elem =
+	struct tree_el *elem =
 		sptree_str_t_iterator_next(it->t_iter);
 
-	if (elem != NULL && index_tree_el_unique_cmp(it->pattern, elem, it->key) == 0)
+	if (elem != NULL &&
+	    tree_el_unique_cmp(it->pattern, elem, it->key_def) == 0) {
 		return elem->tuple;
+	}
 
 	return NULL;
 }
@@ -838,6 +864,7 @@ tree_iterator_next_equal(struct iterator *iterator)
 - (void) free
 {
 	sfree(pattern);
+	sptree_str_t_destroy(tree);
 	sfree(tree);
 	[super free];
 }
@@ -845,14 +872,14 @@ tree_iterator_next_equal(struct iterator *iterator)
 - (void) enable
 {
 	enabled = false;
-	pattern = salloc(INDEX_TREE_EL_SIZE(&key));
+	pattern = salloc(TREE_EL_SIZE(&key_def));
 	tree = salloc(sizeof(*tree));
 	memset(tree, 0, sizeof(*tree));
 	if (n == 0) {/* pk */
 		sptree_str_t_init(tree,
-				  INDEX_TREE_EL_SIZE(&key),
+				  TREE_EL_SIZE(&key_def),
 				  NULL, 0, 0,
-				  (void *)index_tree_el_unique_cmp, &key);
+				  (void *)tree_el_unique_cmp, &key_def);
 		enabled = true;
 	}
 }
@@ -864,84 +891,88 @@ tree_iterator_next_equal(struct iterator *iterator)
 
 - (struct box_tuple *) min
 {
-	struct index_tree_el *elem = sptree_str_t_first(tree);
+	struct tree_el *elem = sptree_str_t_first(tree);
 
 	return elem ? elem->tuple : NULL;
 }
 
 - (struct box_tuple *) max
 {
-	struct index_tree_el *elem = sptree_str_t_last(tree);
+	struct tree_el *elem = sptree_str_t_last(tree);
 
 	return elem ? elem->tuple : NULL;
 }
 
-- (struct box_tuple *) find: (void *) key_arg
+- (struct box_tuple *) find: (void *) key
 {
-	init_search_pattern(pattern, &key, 1, key_arg);
-	struct index_tree_el *elem = sptree_str_t_find(tree, pattern);
+	init_search_pattern(pattern, &key_def, 1, key);
+	struct tree_el *elem = sptree_str_t_find(tree, pattern);
 
 	return elem ? elem->tuple : NULL;
 }
 
-- (struct box_tuple *) findBy: (struct box_tuple *) tuple
+- (struct box_tuple *) findByTuple: (struct box_tuple *) tuple
 {
-	index_tree_el_init(pattern, &key, tuple);
+	tree_el_init(pattern, &key_def, tuple);
 
-	struct index_tree_el *elem = sptree_str_t_find(tree, pattern);
+	struct tree_el *elem = sptree_str_t_find(tree, pattern);
 
 	return elem ? elem->tuple : NULL;
 }
 
 - (void) remove: (struct box_tuple *) tuple
 {
-	index_tree_el_init(pattern, &key, tuple);
+	tree_el_init(pattern, &key_def, tuple);
 	sptree_str_t_delete(tree, pattern);
 }
 
 - (void) replace: (struct box_tuple *) old_tuple
 	:(struct box_tuple *) new_tuple
 {
-	if (new_tuple->cardinality < key.max_fieldno)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, key.max_fieldno);
+	if (new_tuple->cardinality < key_def.max_fieldno)
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
+			  key_def.max_fieldno);
 
 	if (old_tuple) {
-		index_tree_el_init(pattern, &key, old_tuple);
+		tree_el_init(pattern, &key_def, old_tuple);
 		sptree_str_t_delete(tree, pattern);
 	}
-	index_tree_el_init(pattern, &key, new_tuple);
+	tree_el_init(pattern, &key_def, new_tuple);
 	sptree_str_t_insert(tree, pattern);
 }
 
 - (struct iterator *) allocIterator
 {
 	struct tree_iterator *it = salloc(sizeof(struct tree_iterator) +
-					  INDEX_TREE_EL_SIZE(&key));
-	it->pattern = (struct index_tree_el *) (it + 1);
-	it->base.next = tree_iterator_next;
-	it->key = &key;
-	it->tree = tree;
+					  TREE_EL_SIZE(&key_def));
+	if (it) {
+		memset(it, 0, sizeof(struct tree_iterator));
+		it->base.next = tree_iterator_next;
+		it->base.free = tree_iterator_free;
+		it->pattern = (struct tree_el *) (it + 1);
+		it->key_def = &key_def;
+	}
 	return (struct iterator *) it;
 }
 
-- (void) initIterator: (struct iterator *) iterator
+- (void) initIterator: (struct iterator *) it
 {
-	[self initIterator: iterator :NULL :0];
+	[self initIterator: it :NULL :0];
 }
 
-- (void) initIterator: (struct iterator *) iterator :(void *) key_arg
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
 	assert(iterator->next == tree_iterator_next);
 
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	if (key.is_unique && part_count == key.part_count)
+	if (key_def.is_unique && part_count == key_def.part_count)
 		it->base.next_equal = iterator_first_equal;
 	else
 		it->base.next_equal = tree_iterator_next_equal;
 
-	init_search_pattern(it->pattern, &key, part_count, key_arg);
+	init_search_pattern(it->pattern, &key_def, part_count, key);
 	sptree_str_t_iterator_init_set(tree, &it->t_iter, it->pattern);
 }
 
@@ -952,19 +983,19 @@ tree_iterator_next_equal(struct iterator *iterator)
 
 	assert(enabled == false);
 
-	struct index_tree_el *elem = NULL;
+	struct tree_el *elem = NULL;
 	if (n_tuples) {
 		/*
 		 * Allocate a little extra to avoid
 		 * unnecessary realloc() when more data is
 		 * inserted.
 		*/
-		size_t sz = estimated_tuples * INDEX_TREE_EL_SIZE(&key);
+		size_t sz = estimated_tuples * TREE_EL_SIZE(&key_def);
 		elem = malloc(sz);
 		if (elem == NULL)
 			panic("malloc(): failed to allocate %"PRI_SZ" bytes", sz);
 	}
-	struct index_tree_el *m;
+	struct tree_el *m;
 	u32 i = 0;
 
 	struct iterator *it = pk->position;
@@ -972,10 +1003,10 @@ tree_iterator_next_equal(struct iterator *iterator)
 	struct box_tuple *tuple;
 	while ((tuple = it->next(it))) {
 
-		m = (struct index_tree_el *)
-			((char *)elem + i * INDEX_TREE_EL_SIZE(&key));
+		m = (struct tree_el *)
+			((char *)elem + i * TREE_EL_SIZE(&key_def));
 
-		index_tree_el_init(m, &key, tuple);
+		tree_el_init(m, &key_def, tuple);
 		++i;
 	}
 
@@ -983,10 +1014,10 @@ tree_iterator_next_equal(struct iterator *iterator)
 		say_info("Sorting %"PRIu32 " keys in index %" PRIu32 "...", n_tuples, self->n);
 
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
-	sptree_str_t_init(tree, INDEX_TREE_EL_SIZE(&key),
+	sptree_str_t_init(tree, TREE_EL_SIZE(&key_def),
 			  elem, n_tuples, estimated_tuples,
-			  (void *) (key.is_unique ? index_tree_el_unique_cmp :
-			  index_tree_el_cmp), &key);
+			  (void *) (key_def.is_unique ?  tree_el_unique_cmp
+				    : tree_el_cmp), &key_def);
 	enabled = true;
 }
 @end

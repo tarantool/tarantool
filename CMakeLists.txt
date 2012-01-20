@@ -125,7 +125,7 @@ execute_process (COMMAND ${GIT} describe HEAD
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "4")
-set (CPACK_PACKAGE_VERSION_PATCH "3")
+set (CPACK_PACKAGE_VERSION_PATCH "4")
 if (TARANTOOL_VERSION STREQUAL "")
     set (TARANTOOL_VERSION
         "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
@@ -170,6 +170,16 @@ include_directories("${PROJECT_BINARY_DIR}/include")
 include_directories("${PROJECT_SOURCE_DIR}/connector/c/tnt/include")
 include_directories("${PROJECT_SOURCE_DIR}/connector/c/tntsql/include")
 include_directories("${PROJECT_SOURCE_DIR}/connector/c/tntnet/include")
+
+#
+# Specify prefixes
+#
+if (NOT DEFINED CMAKE_SYSCONF_DIR)
+    set (CMAKE_SYSCONF_DIR "${CMAKE_INSTALL_PREFIX}/etc")
+endif()
+if (NOT DEFINED CMAKE_LOCALSTATE_DIR)
+    set (CMAKE_LOCALSTATE_DIR "${CMAKE_INSTALL_PREFIX}/var")
+endif()
 
 #
 # Now handle all configuration options.
@@ -246,7 +256,7 @@ add_subdirectory(doc EXCLUDE_FROM_ALL)
 add_subdirectory(extra)
 
 install (FILES README LICENSE doc/box-protocol.txt
-         DESTINATION doc)
+         DESTINATION share/doc/tarantool)
 
 include (cmake/tarantool_cpack.cmake)
 #

@@ -154,8 +154,8 @@ Found 1 tuple:
 ['21234567', 'part1', 'part2_a']
 select * from t5 where k1='part1'
 Found 3 tuples:
-['11234567', 'part1', 'part2']
 ['01234567', 'part1', 'part2']
+['11234567', 'part1', 'part2']
 ['21234567', 'part1', 'part2_a']
 select * from t5 where k1='part1_a'
 Found 2 tuples:
@@ -165,8 +165,8 @@ select * from t5 where k1='part_none'
 No match
 lua box.space[5]:select(1, 'part1', 'part2')
 ---
- - '11234567': {'part1', 'part2'}
  - '01234567': {'part1', 'part2'}
+ - '11234567': {'part1', 'part2'}
 ...
 select * from t1 where k0='key1'
 Found 1 tuple:

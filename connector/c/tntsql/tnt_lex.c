@@ -136,20 +136,22 @@ static struct {
 	int tk;
 } tnt_keywords[] =
 {
-	{  "PING",   4, TNT_TK_PING },
-	{  "UPDATE", 6, TNT_TK_UPDATE },
-	{  "SET",    3, TNT_TK_SET },
-	{  "WHERE",  5, TNT_TK_WHERE },
-	{  "SPLICE", 6, TNT_TK_SPLICE },
-	{  "DELETE", 6, TNT_TK_DELETE },
-	{  "FROM",   4, TNT_TK_FROM },
-	{  "INSERT", 6, TNT_TK_INSERT },
-	{  "INTO",   4, TNT_TK_INTO },
-	{  "VALUES", 6, TNT_TK_VALUES },
-	{  "SELECT", 6, TNT_TK_SELECT },
-	{  "OR",     2, TNT_TK_OR },
-	{  "CALL",   4, TNT_TK_CALL },
-	{  NULL,     0, TNT_TK_NONE }
+	{  "PING",    4, TNT_TK_PING },
+	{  "UPDATE",  6, TNT_TK_UPDATE },
+	{  "SET",     3, TNT_TK_SET },
+	{  "WHERE",   5, TNT_TK_WHERE },
+	{  "SPLICE",  6, TNT_TK_SPLICE },
+	{  "DELETE",  6, TNT_TK_DELETE },
+	{  "FROM",    4, TNT_TK_FROM },
+	{  "INSERT",  6, TNT_TK_INSERT },
+	{  "REPLACE", 7, TNT_TK_REPLACE },
+	{  "INTO",    4, TNT_TK_INTO },
+	{  "VALUES",  6, TNT_TK_VALUES },
+	{  "SELECT",  6, TNT_TK_SELECT },
+	{  "OR",      2, TNT_TK_OR },
+	{  "LIMIT",   5, TNT_TK_LIMIT },
+	{  "CALL",    4, TNT_TK_CALL },
+	{  NULL,      0, TNT_TK_NONE }
 };
 
 char*
@@ -157,7 +159,7 @@ tnt_lex_nameof(int tk)
 {
 	/* system tokens */
 	switch (tk) {
-	case TNT_TK_EOF: return "EOF";
+	case TNT_TK_EOF: return "End-Of-Statement";
 	case TNT_TK_ERROR: return "ERROR";
 	case TNT_TK_NUM: return "NUM";
 	case TNT_TK_STRING: return "STRING";

@@ -32,6 +32,7 @@
 
 #include <tnt.h>
 #include <tnt_net.h>
+#include <tnt_io.h>
 #include <tnt_queue.h>
 #include <tnt_utf8.h>
 #include <tnt_lex.h>
@@ -424,6 +425,112 @@ static void tt_tnt_net_call(struct tt_test *test) {
 	tnt_iter_free(&i);
 }
 
+/* call (no args) */
+static void tt_tnt_net_call_na(struct tt_test *test) {
+	struct tnt_tuple args;
+	tnt_tuple_init(&args);
+	TT_ASSERT(tnt_call(&net, 0, "box.insert", &args) > 0);
+	TT_ASSERT(tnt_flush(&net) > 0);
+	tnt_tuple_free(&args);
+	struct tnt_iter i;
+	tnt_iter_stream(&i, &net);
+	while (tnt_next(&i)) {
+		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		TT_ASSERT(r->code != 0);
+		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple cardinality is 0") == 0);
+	}
+	tnt_iter_free(&i);
+}
+
+/* reply */
+static void tt_tnt_net_reply(struct tt_test *test) {
+	struct tnt_tuple kv1, kv2;
+	tnt_tuple_init(&kv1);
+	tnt_tuple(&kv1, "%d%s", 587, "foo");
+	TT_ASSERT(tnt_insert(&net, 0, TNT_FLAG_RETURN, &kv1) > 0);
+	tnt_tuple_free(&kv1);
+	tnt_tuple_init(&kv2);
+	tnt_tuple(&kv2, "%d%s", 785, "bar");
+	TT_ASSERT(tnt_insert(&net, 0, TNT_FLAG_RETURN, &kv2) > 0);
+	tnt_tuple_free(&kv2);
+	TT_ASSERT(tnt_flush(&net) > 0);
+
+	struct tnt_stream_net *s = TNT_SNET_CAST(&net);
+	int current = 0;
+	size_t off = 0;
+	ssize_t size = 0;
+	char buffer[512];
+
+	while (current != 2) {
+		struct tnt_reply r;
+		tnt_reply_init(&r);
+		int rc = tnt_reply(&r, buffer, size, &off);
+		TT_ASSERT(rc != -1);
+		if (rc == 1) {
+			ssize_t res = tnt_io_recv_raw(s, buffer + size, off, 1);
+			TT_ASSERT(res > 0);
+			size += off;
+			continue;
+		}
+		TT_ASSERT(rc == 0);
+		TT_ASSERT(r.code == 0);
+		TT_ASSERT(r.op == TNT_OP_INSERT);
+		TT_ASSERT(r.count == 1);
+		if (current == 0) {
+			struct tnt_iter il;
+			tnt_iter_list(&il, TNT_REPLY_LIST(&r));
+			TT_ASSERT(tnt_next(&il) == 1);
+			struct tnt_tuple *tp = TNT_ILIST_TUPLE(&il);
+			TT_ASSERT(tp->cardinality == 2);
+			TT_ASSERT(tp->alloc == 1);
+			TT_ASSERT(tp->data != NULL);
+			TT_ASSERT(tp->size != 0);
+			struct tnt_iter ifl;
+			tnt_iter(&ifl, tp);
+			TT_ASSERT(tnt_next(&ifl) == 1);
+			TT_ASSERT(TNT_IFIELD_IDX(&ifl) == 0);
+			TT_ASSERT(TNT_IFIELD_SIZE(&ifl) == 4);
+			TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(&ifl) == 587);
+			TT_ASSERT(tnt_next(&ifl) == 1);
+			TT_ASSERT(TNT_IFIELD_IDX(&ifl) == 1);
+			TT_ASSERT(TNT_IFIELD_SIZE(&ifl) == 3);
+			TT_ASSERT(memcmp(TNT_IFIELD_DATA(&ifl), "foo", 3) == 0);
+			TT_ASSERT(tnt_next(&ifl) == 0);
+			tnt_iter_free(&ifl);
+			tnt_iter_free(&il);
+			off = 0;
+			size = 0;
+		} else
+		if (current == 1) {
+			struct tnt_iter il;
+			tnt_iter_list(&il, TNT_REPLY_LIST(&r));
+			TT_ASSERT(tnt_next(&il) == 1);
+			struct tnt_tuple *tp = TNT_ILIST_TUPLE(&il);
+			TT_ASSERT(tp->cardinality == 2);
+			TT_ASSERT(tp->alloc == 1);
+			TT_ASSERT(tp->data != NULL);
+			TT_ASSERT(tp->size != 0);
+			struct tnt_iter ifl;
+			tnt_iter(&ifl, tp);
+			TT_ASSERT(tnt_next(&ifl) == 1);
+			TT_ASSERT(TNT_IFIELD_IDX(&ifl) == 0);
+			TT_ASSERT(TNT_IFIELD_SIZE(&ifl) == 4);
+			TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(&ifl) == 785);
+			TT_ASSERT(tnt_next(&ifl) == 1);
+			TT_ASSERT(TNT_IFIELD_IDX(&ifl) == 1);
+			TT_ASSERT(TNT_IFIELD_SIZE(&ifl) == 3);
+			TT_ASSERT(memcmp(TNT_IFIELD_DATA(&ifl), "bar", 3) == 0);
+			TT_ASSERT(tnt_next(&ifl) == 0);
+			tnt_iter_free(&ifl);
+			tnt_iter_free(&il);
+		}
+		tnt_reply_free(&r);
+		current++;
+	}
+
+	net.wrcnt -= 2;
+}
+
 /* lex ws */
 static void tt_tnt_lex_ws(struct tt_test *test) {
 	unsigned char sz[] = " 	# abcde fghjk ## hh\n   # zzz\n";
@@ -597,7 +704,7 @@ static void tt_tnt_lex_badstr2(struct tt_test *test) {
 static void tt_tnt_sql_ping(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "PING";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -613,7 +720,7 @@ static void tt_tnt_sql_ping(struct tt_test *test) {
 static void tt_tnt_sql_insert(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "insert into t0 values (222, 'baz')";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -630,25 +737,25 @@ static void tt_tnt_sql_insert(struct tt_test *test) {
 static void tt_tnt_sql_update(struct tt_test *test) {
 	char *e;
 	char q1[] = "update t0 set k0 = 7 where k0 = 222";
-	TT_ASSERT(tnt_query(&net, q1, sizeof(q1) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q1, sizeof(q1) - 1, &e) == 0);
 	/* 7 + 1 = 8 */
 	char q2[] = "update t0 set k0 = k0 + 1 where k0 = 7";
-	TT_ASSERT(tnt_query(&net, q2, sizeof(q2) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q2, sizeof(q2) - 1, &e) == 0);
 	/* 8 | 2 = 10 */
 	char q3[] = "update t0 set k0 = k0 | 2 where k0 = 8";
-	TT_ASSERT(tnt_query(&net, q3, sizeof(q3) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q3, sizeof(q3) - 1, &e) == 0);
 	/* 10 & 2 = 2 */
 	char q4[] = "update t0 set k0 = k0 & 2 where k0 = 10";
-	TT_ASSERT(tnt_query(&net, q4, sizeof(q4) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q4, sizeof(q4) - 1, &e) == 0);
 	/* 2 ^ 123 = 121 */
 	char q5[] = "update t0 set k0 = k0 ^ 123 where k0 = 2";
-	TT_ASSERT(tnt_query(&net, q5, sizeof(q5) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q5, sizeof(q5) - 1, &e) == 0);
 	/* assign */
 	char q6[] = "update t0 set k0 = 222, k1 = 'hello world' where k0 = 121";
-	TT_ASSERT(tnt_query(&net, q6, sizeof(q6) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q6, sizeof(q6) - 1, &e) == 0);
 	/* splice */
 	char q7[] = "update t0 set k1 = splice(k1, 0, 2, 'AB') where k0 = 222";
-	TT_ASSERT(tnt_query(&net, q7, sizeof(q7) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q7, sizeof(q7) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -663,18 +770,17 @@ static void tt_tnt_sql_update(struct tt_test *test) {
 
 /* sql select */
 static void tt_tnt_sql_select(struct tt_test *test) {
-	struct tnt_list *search =
-		tnt_list(NULL, tnt_tuple(NULL, "%d", 222), NULL);
-	TT_ASSERT(tnt_select(&net, 0, 0, 0, 1, search) > 0);
+	char *e = NULL;
+	char q[] = "select * from t0 where k0 = 222 or k0 = 222";
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
-	tnt_list_free(search);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
 	while (tnt_next(&i)) {
 		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_SELECT);
-		TT_ASSERT(r->count == 1);
+		TT_ASSERT(r->count == 2);
 		struct tnt_iter il;
 		tnt_iter_list(&il, TNT_REPLY_LIST(r));
 		TT_ASSERT(tnt_next(&il) == 1);
@@ -698,13 +804,31 @@ static void tt_tnt_sql_select(struct tt_test *test) {
 		tnt_iter_free(&ifl);
 		tnt_iter_free(&il);
 	}
+	tnt_iter_free(&i);
+}
+
+/* sql select limit */
+static void tt_tnt_sql_select_limit(struct tt_test *test) {
+	char *e = NULL;
+	char q[] = "select * from t0 where k0 = 222 limit 0";
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
+	TT_ASSERT(tnt_flush(&net) > 0);
+	struct tnt_iter i;
+	tnt_iter_stream(&i, &net);
+	while (tnt_next(&i)) {
+		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		TT_ASSERT(r->code == 0);
+		TT_ASSERT(r->op == TNT_OP_SELECT);
+		TT_ASSERT(r->count == 0);
+	}
+	tnt_iter_free(&i);
 }
 
 /* sql delete */
 static void tt_tnt_sql_delete(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "delete from t0 where k0 = 222";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -721,7 +845,7 @@ static void tt_tnt_sql_delete(struct tt_test *test) {
 static void tt_tnt_sql_call(struct tt_test *test) {
 	char *e = NULL;
 	char q[] = "call box.insert(0, 454, 'abc', 'cba')";
-	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) != -1);
+	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
 	tnt_iter_stream(&i, &net);
@@ -759,6 +883,8 @@ main(int argc, char * argv[])
 	tt_test(&t, "select", tt_tnt_net_select);
 	tt_test(&t, "delete", tt_tnt_net_delete);
 	tt_test(&t, "call", tt_tnt_net_call);
+	tt_test(&t, "call (no args)", tt_tnt_net_call_na);
+	tt_test(&t, "reply", tt_tnt_net_reply);
 	/* sql lexer */
 	tt_test(&t, "lex ws", tt_tnt_lex_ws);
 	tt_test(&t, "lex integer", tt_tnt_lex_int);
@@ -775,6 +901,7 @@ main(int argc, char * argv[])
 	tt_test(&t, "sql insert", tt_tnt_sql_insert);
 	tt_test(&t, "sql update", tt_tnt_sql_update);
 	tt_test(&t, "sql select", tt_tnt_sql_select);
+	tt_test(&t, "sql select limit", tt_tnt_sql_select_limit);
 	tt_test(&t, "sql delete", tt_tnt_sql_delete);
 	tt_test(&t, "sql call", tt_tnt_sql_call);
 

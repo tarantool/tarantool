@@ -1687,7 +1687,7 @@ again:
 							out_warning(CNF_NOMEMORY, "No memory to output value");
 							return NULL;
 						}
-						sprintf(*v, "%s", c->space[i->idx_name__space]->enabled ? "true" : "false");
+						sprintf(*v, "%s", c->space[i->idx_name__space]->enabled == -1 ? "false" : c->space[i->idx_name__space]->enabled ? "true" : "false");
 						snprintf(buf, PRINTBUFLEN-1, "space[%d].enabled", i->idx_name__space);
 						i->state = S_name__space__cardinality;
 						return buf;
@@ -1740,7 +1740,7 @@ again:
 										out_warning(CNF_NOMEMORY, "No memory to output value");
 										return NULL;
 									}
-									sprintf(*v, "%s", c->space[i->idx_name__space]->index[i->idx_name__space__index]->unique ? "true" : "false");
+									sprintf(*v, "%s", c->space[i->idx_name__space]->index[i->idx_name__space__index]->unique == -1 ? "false" : c->space[i->idx_name__space]->index[i->idx_name__space__index]->unique ? "true" : "false");
 									snprintf(buf, PRINTBUFLEN-1, "space[%d].index[%d].unique", i->idx_name__space, i->idx_name__space__index);
 									i->state = S_name__space__index__key_field;
 									return buf;
