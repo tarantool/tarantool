@@ -141,31 +141,40 @@ tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
 static void
 validate_indexes(struct box_txn *txn)
 {
-	int n = index_count(&space[txn->n]);
-	if (n <= 1)
+	struct space *sp = &space[txn->n];
+	int n = index_count(sp);
+
+	/* Only secondary indexes are validated here. So check to see
+	   if there are any.*/
+	if (n <= 1) {
 		return;
+	}
 
-	for (int i = 1; i < n; i++) {
-		Index *index = space[txn->n].index[i];
+	/* Check to see if the tuple has a sufficient number of fields. */
+	if (txn->tuple->cardinality < sp->field_count)
+		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 
-		for (u32 f = 0; f < index->key_def->part_count; ++f) {
-			if (index->key_def->parts[f].fieldno >= txn->tuple->cardinality)
-				tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+	/* Sweep through the tuple and check the field sizes. */
+	u8 *data = txn->tuple->data;
+	for (int f = 0; f < sp->field_count; ++f) {
+		/* Get the size of the current field and advance. */
+		u32 len = load_varint32((void **) &data);
+		data += len;
 
-			if (index->key_def->parts[f].type == STRING)
-				continue;
-
-			void *field = tuple_field(txn->tuple, index->key_def->parts[f].fieldno);
-			u32 len = load_varint32(&field);
-
-			if (index->key_def->parts[f].type == NUM && len != sizeof(u32))
+		/* Check fixed size fields (NUM and NUM64) and skip undefined
+		   size fields (STRING and UNKNOWN). */
+		if (sp->field_types[f] == NUM) {
+			if (len != sizeof(u32))
 				tnt_raise(IllegalParams, :"field must be NUM");
-
-			if (index->key_def->parts[f].type == NUM64 && len != sizeof(u64))
+		} else if (sp->field_types[f] == NUM64) {
+			if (len != sizeof(u64))
 				tnt_raise(IllegalParams, :"field must be NUM64");
 		}
+	}
 
-		/* Check key uniqueness */
+	/* Check key uniqueness */
+	for (int i = 1; i < n; ++i) {
+		Index *index = space[txn->n].index[i];
 		if (index->key_def->is_unique) {
 			struct box_tuple *tuple = [index findByTuple: txn->tuple];
 			if (tuple != NULL && tuple != txn->old_tuple)
@@ -1062,19 +1071,16 @@ space_init_field_types(struct space *space)
 		}
 	}
 
+#ifndef NDEBUG
 	/* validate field type info */
 	for (i = 0; i < key_count; i++) {
 		struct key_def *def = &key_defs[i];
 		for (int pi = 0; pi < def->part_count; pi++) {
 			struct key_part *part = &def->parts[pi];
-			if (space->field_types[part->fieldno] != part->type
-			    && space->field_types[part->fieldno] != UNKNOWN) {
-				space->field_types[part->fieldno] = UNKNOWN;
-				say_warn("type conflict in space %d for field %d",
-					 space_n(space), part->fieldno);
-			}
+			assert(space->field_types[part->fieldno] == part->type);
 		}
 	}
+#endif
 }
 
 static void
@@ -1361,6 +1367,8 @@ check_spaces(struct tarantool_cfg *conf)
 			return -1;
 		}
 
+		int max_key_fieldno = -1;
+
 		/* check spaces indexes */
 		for (size_t j = 0; space->index[j] != NULL; ++j) {
 			typeof(space->index[j]) index = space->index[j];
@@ -1402,6 +1410,10 @@ check_spaces(struct tarantool_cfg *conf)
 					out_warning(0, "(space = %zu index = %zu) "
 						    "unknown field data type: `%s'", i, j, key->type);
 					return -1;
+				}
+
+				if (max_key_fieldno < key->fieldno) {
+					max_key_fieldno = key->fieldno;
 				}
 
 				++index_cardinality;
@@ -1456,6 +1468,34 @@ check_spaces(struct tarantool_cfg *conf)
 				break;
 			default:
 				assert(false);
+			}
+		}
+
+		/* Check for index field type conflicts */
+		if (max_key_fieldno >= 0) {
+			char *types = alloca(max_key_fieldno + 1);
+			memset(types, UNKNOWN, max_key_fieldno + 1);
+			for (size_t j = 0; space->index[j] != NULL; ++j) {
+				typeof(space->index[j]) index = space->index[j];
+				for (size_t k = 0; index->key_field[k] != NULL; ++k) {
+					typeof(index->key_field[k]) key = index->key_field[k];
+					int f = key->fieldno;
+					if (f == -1) {
+						break;
+					}
+					enum field_data_type t = STR2ENUM(field_data_type, key->type);
+					assert(t != field_data_type_MAX);
+					if (types[f] != t) {
+						if (types[f] == UNKNOWN) {
+							types[f] = t;
+						} else {
+							out_warning(0, "(space = %zu fieldno = %zu) "
+								    "index field type mismatch", i, f);
+							return -1;
+						}
+					}
+				}
+
 			}
 		}
 	}
@@ -1602,7 +1642,7 @@ mod_init(void)
 	/* build secondary indexes */
 	build_indexes();
 
-	/* enable secondary indexes while now */
+	/* enable secondary indexes now */
 	secondary_indexes_enabled = true;
 
 	title("orphan");

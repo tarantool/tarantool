@@ -1,5 +1,9 @@
 # encoding: tarantool
 #
+
+import os
+import sys
+
 print """
 # Bug #708685:
 #  Addition of required configuration file options broke backward
@@ -36,6 +40,16 @@ server.stop()
 server.deploy("box/tarantool_bug876541.cfg")
 # check values
 exec admin "lua box.cfg.wal_fsync_delay"
+
+print """
+#  Test field type conflict in keys
+"""
+# stop current server
+server.stop()
+# start server with memcached space conflict
+sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
+server.test_option("-c " + os.path.join(os.getcwd(), "box/tarantool_bad_type.cfg"))
+sys.stdout.pop_filter()
 
 # restore default server
 server.stop()

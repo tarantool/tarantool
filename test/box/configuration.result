@@ -185,3 +185,10 @@ lua box.cfg.wal_fsync_delay
 ---
  - 0.01
 ...
+
+#  Test field type conflict in keys
+
+tarantool_box -c tarantool_bad_type.cfg
+tarantool_box: can't load config:
+ - (space = 0 fieldno = 0) index field type mismatch
+
