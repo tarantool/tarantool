@@ -41,7 +41,7 @@ typedef int (*tree_cmp_t)(const void *, const void *, void *);
 	sptree_index tree;
 };
 
-+ (Index *) alloc: (struct space *) space :(u32) n_arg;
++ (Index *) alloc: (struct key_def *) key_def :(struct space *) space;
 - (void) build: (Index *) pk;
 
 /** To be defined in subclasses. */

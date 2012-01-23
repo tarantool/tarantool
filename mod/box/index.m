@@ -58,10 +58,10 @@ iterator_first_equal(struct iterator *it)
 @class HashStrIndex;
 @class TreeIndex;
 
-+ (Index *) alloc: (enum index_type) type :(struct space *) space
-	:(u32) n_arg;
++ (Index *) alloc: (enum index_type) type
+	 :(struct key_def *) key_def
+	 :(struct space *) space
 {
-	struct key_def *key_def = &space->key_defs[n_arg];
 	switch (type) {
 	case HASH:
 		/* Hash index, check key type.
@@ -79,20 +79,17 @@ iterator_first_equal(struct iterator *it)
 		}
 		break;
 	case TREE:
-		return [TreeIndex alloc: space :n_arg];
+		return [TreeIndex alloc: key_def :space];
 	default:
 		break;
 	}
 	panic("unsupported index type");
 }
 
-- (id) init: (enum index_type) type_arg :(struct space *) space_arg
-	:(u32) n_arg;
+- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
 	self = [super init];
-	key_def = &space_arg->key_defs[n_arg];
-	type = type_arg;
-	n = n_arg;
+	key_def = key_def_arg;
 	space = space_arg;
 	position = [self allocIterator];
 	[self enable];
@@ -278,7 +275,6 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) enable
 {
-	enabled = true;
 	int_hash = mh_i32ptr_init();
 }
 
@@ -364,17 +360,17 @@ hash_iterator_free(struct iterator *iterator)
 - (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
+	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	(void) part_count;
-	assert(part_count == 1);
-	assert(iterator->next = hash_iterator_next);
+	if (part_count != 1)
+		tnt_raise(IllegalParams, :"key must be single valued");
 
 	u32 field_size = load_varint32(&key);
-	u32 num = *(u32 *)key;
-
 	if (field_size != 4)
 		tnt_raise(IllegalParams, :"key is not u32");
+
+	u32 num = *(u32 *)key;
 
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_i32ptr_get(int_hash, num);
@@ -400,7 +396,6 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) enable
 {
-	enabled = true;
 	int64_hash = mh_i64ptr_init();
 }
 
@@ -487,16 +482,16 @@ hash_iterator_free(struct iterator *iterator)
 			:(int) part_count
 {
 	assert(iterator->next = hash_iterator_next);
-	assert(part_count == 1);
-	(void) part_count;
-
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	u32 field_size = load_varint32(&field);
-	u64 num = *(u64 *)field;
+	if (part_count != 1)
+		tnt_raise(IllegalParams, :"key must be single valued");
 
+	u32 field_size = load_varint32(&field);
 	if (field_size != 8)
 		tnt_raise(IllegalParams, :"key is not u64");
+
+	u64 num = *(u64 *)field;
 
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_i64ptr_get(int64_hash, num);
@@ -522,7 +517,6 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) enable
 {
-	enabled = true;
 	str_hash = mh_lstrptr_init();
 }
 
@@ -600,10 +594,10 @@ hash_iterator_free(struct iterator *iterator)
 			:(int) part_count
 {
 	assert(iterator->next = hash_iterator_next);
-	assert(part_count== 1);
-	(void) part_count;
-
 	struct hash_iterator *it = hash_iterator(iterator);
+
+	if (part_count != 1)
+		tnt_raise(IllegalParams, :"key must be single valued");
 
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_lstrptr_get(str_hash, key);
@@ -612,30 +606,6 @@ hash_iterator_free(struct iterator *iterator)
 @end
 
 /* }}} */
-
-void
-build_indexes(void)
-{
-	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
-		if (space[n].enabled == false)
-			continue;
-		/* A shortcut to avoid unnecessary log messages. */
-		if (space[n].index[1] == nil)
-			continue; /* no secondary keys */
-		say_info("Building secondary keys in space %" PRIu32 "...", n);
-		Index *pk = space[n].index[0];
-		for (u32 idx = 1;; idx++) {
-			Index *index = space[n].index[idx];
-			if (index == nil)
-				break;
-
-			if (index->type != TREE)
-				continue;
-			[(TreeIndex*) index build: pk];
-		}
-		say_info("Space %"PRIu32": done", n);
-	}
-}
 
 /**
  * vim: foldmethod=marker
