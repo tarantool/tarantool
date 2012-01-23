@@ -1876,6 +1876,9 @@ io_buf_send_yaml(php_stream *stream, struct io_buf *buf)
 		return false;
 	}
 
+	/* flush request */
+	php_stream_flush(stream);
+
 	return true;
 }
 
@@ -1918,6 +1921,9 @@ io_buf_send_iproto(php_stream *stream, int32_t type, int32_t request_id, struct 
 								"send requset failed");
 		return false;
 	}
+
+	/* flush request */
+	php_stream_flush(stream);
 
 	return true;
 }
