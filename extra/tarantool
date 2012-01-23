@@ -2,7 +2,7 @@
 
 #  /etc/rc.d/init.d/tarantool_box
 #
-# chkconfig: 2345 99 99 
+# chkconfig: 2345 99 99
 # description: tarantool_box
 # processname: tarantool_box
 
@@ -14,11 +14,17 @@ export PIDFILE="/var/${INST}/pid"
 export WRAP_PIDFILE="/var/${INST}/wrapper.pid"
 export OPTIONS=""
 
-# We must not run immediate!
-if [ "${INST}" == "tarantool_box" ]
+# This script is normally invoked via a symlink.
+# An own symlink is created for each instance.
+# E.g., in case of 4 instances, there are symlinks
+# tarantool0, tarantool1, tarantool2, tarantool3.
+# If, for some reason, this script is invoked not via
+# a symlink, do nothing.
+#
+if [ "${INST}" == "tarantool" ]
 then
         echo_failure
-        echo 
+        echo
         exit
 fi
 
@@ -32,7 +38,7 @@ start() {
         else
                 echo_failure
         fi
-        echo 
+        echo
         return ${RETVAL}
 }
 
@@ -75,4 +81,3 @@ case "$1" in
 esac
 
 exit ${RETVAL}
-
