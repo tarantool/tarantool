@@ -23,11 +23,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <netdb.h>
 #include <inttypes.h>
 
 #include <php.h>
 #include <php_ini.h>
+#include <php_network.h>
 #include <ext/standard/info.h>
 #include <zend_exceptions.h>
 
@@ -2014,11 +2016,31 @@ establish_connection(char *host, int port)
 	if (error_code && error_msg) {
 		zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
 								"establist connection fail: %s", error_msg);
-		efree(error_msg);
-		return NULL;
+		goto process_error;
+	}
+
+	/* set socket flag 'TCP_NODELAY' */
+	int socketd = ((php_netstream_data_t*)stream->abstract)->socket;
+	flags = 1;
+	int result = setsockopt(socketd, IPPROTO_TCP, TCP_NODELAY, (char *) &flags, sizeof(int));
+	if (result != 0) {
+		char error_buf[64];
+		zend_throw_exception_ex(zend_exception_get_default(TSRMLS_C), 0 TSRMLS_DC,
+								"establist connection fail: setsockopt %s", strerror_r(errno, error_buf, sizeof(error_buf)));
+		goto process_error;
 	}
 
 	return stream;
+
+process_error:
+
+	if (error_msg)
+		efree(error_msg);
+
+	if (stream)
+		php_stream_close(stream);
+
+	return NULL;
 }
 
 static bool
