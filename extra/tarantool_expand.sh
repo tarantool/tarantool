@@ -26,7 +26,7 @@
 #
 
 #
-# Tarantool DB expand script
+# Tarantool instance expansion script
 #
 
 prompt_name=`basename $0`
@@ -47,7 +47,7 @@ log() {
 }
 
 usage() {
-	echo "Tarantool DB expand script"
+	echo "Tarantool expansion script: add more Tarantool instances."
 	echo "usage: tarantool_expand.sh [options] <instances>"
 	echo
 	echo "  --prefix <path>       installation path (/usr/local)"
@@ -92,7 +92,7 @@ rollback() {
 try() {
 	cmd="$*"
 	[ $act_debug -gt 0 ] && log $cmd
-	if [ $act_dry -eq 0 ]; then 
+	if [ $act_dry -eq 0 ]; then
 		eval $cmd
 		if [ $? -gt 0 ]; then
 			rollback
@@ -122,7 +122,7 @@ deploy_instance() {
 
 	# setting up wrapper
 	try "ln -s \"${prefix}/bin/tarantool_multi.sh\" \"${prefix}/bin/tarantool$id.sh\""
-	
+
 	# setting up startup script
 	try "ln -s \"${prefix_etc}/init.d/tarantool\" \"${prefix_etc}/init.d/tarantool$id\""
 }
@@ -184,7 +184,7 @@ if [ -f $deploy_cfg ]; then
 fi
 
 # displaying status
-if [ $act_status -ne 0 ]; then 
+if [ $act_status -ne 0 ]; then
 	if [ $deploy_exists -eq 0 ]; then
 		log "no tarantool instances found."
 	else
@@ -199,7 +199,7 @@ is_num_positive $deploy_count
 
 if [ $deploy_count -le $deploy_current ]; then
 	error "expand only is supported (required instances number $deploy_count" \
-	      "is lower/equal than deployed $deploy_current)" 
+	      "is lower/equal than deployed $deploy_current)"
 fi
 
 # asking permission to continue

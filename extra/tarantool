@@ -14,7 +14,13 @@ export PIDFILE="/var/${INST}/pid"
 export WRAP_PIDFILE="/var/${INST}/wrapper.pid"
 export OPTIONS=""
 
-# We must not run immediate!
+# This script is normally invoked via a symlink.
+# An own symlink is created for each instance.
+# E.g., in case of 4 instances, there are symlinks
+# tarantool0, tarantool1, tarantool2, tarantool3.
+# If, for some reason, this script is invoked not via
+# a symlink, do nothing.
+#
 if [ "${INST}" == "tarantool" ]
 then
         echo_failure
