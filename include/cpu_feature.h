@@ -27,22 +27,31 @@
 
 #include <sys/types.h>
 
-/* CPU feature capabilities to use with cpu_has (feature) */
+/* CPU feature capabilities to use with cpu_has (feature). */
 enum {
 	cpuf_ht = 0, cpuf_sse4_1, cpuf_sse4_2, cpuf_hypervisor
 };
 
-/*	return 1=feature is available, 0=unavailable, -EINVAL = unsupported CPU,
-	-ERANGE = invalid feature
-*/
+/* Check whether CPU has a certain feature.
+ *
+ * @param	feature		indetifier (see above) of the target feature
+ *
+ * @return	1 if feature is available, 0 if unavailable,
+ *		-EINVAL if unsupported CPU, -ERANGE if invalid feature
+ */
 int cpu_has (unsigned int feature);
 
 
-/* hardware-calculate CRC32 for the given data buffer
- * NB: 	requires 1 == cpu_has (cpuf_sse4_2),
- * 		CALLING IT W/O CHECKING for sse4_2 CAN CAUSE SIGABRT
+/* Hardware-calculate CRC32 for the given data buffer.
+ *
+ * @param	crc 		initial CRC
+ * @param	buf			data buffer
+ * @param	len			buffer length
+ *
+ * @pre 	1 == cpu_has (cpuf_sse4_2)
+ * @return	CRC32 value
  */
-u_int32_t crc32c_hw(u_int32_t crc, unsigned char const *p, size_t len);
+u_int32_t crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len);
 
 
 #endif /* TARANTOOL_CPU_FEATURES_H */

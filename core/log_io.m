@@ -43,6 +43,7 @@
 #include <say.h>
 #include <third_party/crc32.h>
 #include <pickle.h>
+#include <cpu_feature.h>
 
 const u16 snap_tag = -1;
 const u16 wal_tag = -2;
@@ -60,6 +61,11 @@ const char *xlog_mark = "XLOG\n";
 #define ROW_EOF (void *)1
 
 static struct tbuf *row_reader_v11(FILE *f, struct palloc_pool *pool);
+
+/* Will be set to either HW or SW CRC32 calculation routine depending on CPU
+   capabilities. */
+static u_int32_t (*calc_crc32c)(u_int32_t crc, const unsigned char *buf,
+				unsigned int len) = NULL;
 
 struct log_io_iter {
 	struct tarantool_coro coro;
@@ -1235,9 +1241,9 @@ write_to_disk(void *_state, struct tbuf *t)
 	row_v11(header)->tm = ev_now();
 	row_v11(header)->len = wal_write_request(t)->len;
 	row_v11(header)->data_crc32c =
-		crc32c(0, wal_write_request(t)->data, wal_write_request(t)->len);
+		calc_crc32c(0, wal_write_request(t)->data, wal_write_request(t)->len);
 	row_v11(header)->header_crc32c =
-		crc32c(0, header->data + field_sizeof(struct row_v11, header_crc32c),
+		calc_crc32c(0, header->data + field_sizeof(struct row_v11, header_crc32c),
 		       sizeof(struct row_v11) - field_sizeof(struct row_v11, header_crc32c));
 
 	if (fwrite(header->data, header->size, 1, wal->f) != 1) {
@@ -1330,6 +1336,8 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_class->rows_per_file = rows_per_file;
 	r->wal_class->fsync_delay = fsync_delay;
 	wait_lsn_clear(&r->wait_lsn);
+
+	calc_crc32c = cpu_has (cpuf_sse4_2) ? &crc32c_hw : &crc32c;
 
 	if ((flags & RECOVER_READONLY) == 0)
 		r->wal_writer = spawn_child("wal_writer", inbox_size, write_to_disk, r);
