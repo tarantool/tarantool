@@ -292,7 +292,7 @@ lbox_index_tostring(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	lua_pushfstring(L, "index %d in space %d",
-			index->n, index->space->n);
+			index_n(index), space_n(index->space));
 	return 1;
 }
 

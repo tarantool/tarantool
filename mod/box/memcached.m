@@ -436,7 +436,6 @@ memcached_space_init()
 	struct space *memc_s = &space[cfg.memcached_space];
 	memc_s->enabled = true;
 	memc_s->cardinality = 4;
-	memc_s->n = cfg.memcached_space;
 
 	memc_s->key_count = 1;
 	memc_s->key_defs = malloc(sizeof(struct key_def));
@@ -462,8 +461,8 @@ memcached_space_init()
 	key_def->cmp_order[0] = 0;
 
 	/* Configure memcached index. */
-	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :memc_s :0];
-	[memc_index init: HASH :memc_s :0];
+	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :key_def :memc_s];
+	[memc_index init: key_def :memc_s];
 }
 
 /** Delete a bunch of expired keys. */

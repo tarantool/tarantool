@@ -47,6 +47,7 @@
 #include <mod/box/tuple.h>
 #include "memcached.h"
 #include "box_lua.h"
+#include "tree.h"
 
 static void box_process_ro(u32 op, struct tbuf *request_data);
 static void box_process_rw(u32 op, struct tbuf *request_data);
@@ -75,6 +76,11 @@ const int BOX_REF_THRESHOLD = 8196;
 
 struct space *space = NULL;
 
+/* Secondary indexes are built in bulk after all data is
+   recovered. This flag indicates that the indexes are
+   already built and ready for use. */
+static bool secondary_indexes_enabled = false;
+
 struct box_snap_row {
 	u32 space;
 	u32 tuple_size;
@@ -82,6 +88,21 @@ struct box_snap_row {
 	u8 data[];
 } __attribute__((packed));
 
+
+static inline int
+index_count(struct space *sp)
+{
+	if (!secondary_indexes_enabled) {
+		/* If the secondary indexes are not enabled yet
+		   then we can use only the primary key if any.
+		   So return 1 of there is at least one key which
+		   must be primary and return 0 otherwise. */
+		return sp->key_count >= 1;
+	} else {
+		/* Return the actual number of indexes. */
+		return sp->key_count;
+	}
+}
 
 static inline struct box_snap_row *
 box_snap_row(const struct tbuf *t)
@@ -117,15 +138,16 @@ tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
 	tuple_ref(tuple, +1);
 }
 
-void
+static void
 validate_indexes(struct box_txn *txn)
 {
-	if (space[txn->n].index[1] == nil)
+	int n = index_count(&space[txn->n]);
+	if (n <= 1)
 		return;
 
-	/* There is more than one index. */
-	foreach_index(txn->n, index) {
-		/* XXX: skip the first index here! */
+	for (int i = 1; i < n; i++) {
+		Index *index = space[txn->n].index[i];
+
 		for (u32 f = 0; f < index->key_def->part_count; ++f) {
 			if (index->key_def->parts[f].fieldno >= txn->tuple->cardinality)
 				tnt_raise(IllegalParams, :"tuple must have all indexed fields");
@@ -142,14 +164,13 @@ validate_indexes(struct box_txn *txn)
 			if (index->key_def->parts[f].type == NUM64 && len != sizeof(u64))
 				tnt_raise(IllegalParams, :"field must be NUM64");
 		}
-		if (index->type == TREE && index->key_def->is_unique == false)
-			/* Don't check non unique indexes */
-			continue;
 
-		struct box_tuple *tuple = [index findByTuple: txn->tuple];
-
-		if (tuple != NULL && tuple != txn->old_tuple)
-			tnt_raise(ClientError, :ER_INDEX_VIOLATION);
+		/* Check key uniqueness */
+		if (index->key_def->is_unique) {
+			struct box_tuple *tuple = [index findByTuple: txn->tuple];
+			if (tuple != NULL && tuple != txn->old_tuple)
+				tnt_raise(ClientError, :ER_INDEX_VIOLATION);
+		}
 	}
 }
 
@@ -210,8 +231,11 @@ prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 		 * Tuple reference counter will be incremented in
 		 * txn_commit().
 		 */
-		foreach_index(txn->n, index)
+		int n = index_count(&space[txn->n]);
+		for (int i = 0; i < n; i++) {
+			Index *index = space[txn->n].index[i];
 			[index replace: NULL :txn->tuple];
+		}
 	}
 
 	txn->out->dup_u32(1); /* Affected tuples */
@@ -224,8 +248,11 @@ static void
 commit_replace(struct box_txn *txn)
 {
 	if (txn->old_tuple != NULL) {
-		foreach_index(txn->n, index)
+		int n = index_count(&space[txn->n]);
+		for (int i = 0; i < n; i++) {
+			Index *index = space[txn->n].index[i];
 			[index replace: txn->old_tuple :txn->tuple];
+		}
 
 		tuple_ref(txn->old_tuple, -1);
 	}
@@ -242,8 +269,11 @@ rollback_replace(struct box_txn *txn)
 	say_debug("rollback_replace: txn->tuple:%p", txn->tuple);
 
 	if (txn->tuple && txn->tuple->flags & GHOST) {
-		foreach_index(txn->n, index)
+		int n = index_count(&space[txn->n]);
+		for (int i = 0; i < n; i++) {
+			Index *index = space[txn->n].index[i];
 			[index remove: txn->tuple];
+		}
 	}
 }
 
@@ -487,22 +517,15 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 			return;
 
 		u32 key_cardinality = read_u32(data);
-		void *key = NULL;
 
-		if (key_cardinality != 0)
+		void *key = NULL;
+		if (key_cardinality) {
 			key = read_field(data);
 
-		/*
-		 * For TREE indexes, we allow partially specified
-		 * keys. HASH indexes are always unique and can
-		 * not have multiple parts.
-		 */
-		if (index->type == HASH && key_cardinality != 1)
-			tnt_raise(IllegalParams, :"key must be single valued");
-
-		/* advance remaining fields of a key */
-		for (int i = 1; i < key_cardinality; i++)
-			read_field(data);
+			/* advance remaining fields of a key */
+			for (int i = 1; i < key_cardinality; i++)
+				read_field(data);
+		}
 
 		struct iterator *it = index->position;
 		[index initIterator: it :key :key_cardinality];
@@ -559,8 +582,12 @@ commit_delete(struct box_txn *txn)
 	if (txn->old_tuple == NULL)
 		return;
 
-	foreach_index(txn->n, index)
+	int n = index_count(&space[txn->n]);
+	for (int i = 0; i < n; i++) {
+		Index *index = space[txn->n].index[i];
 		[index remove: txn->old_tuple];
+	}
+
 	tuple_ref(txn->old_tuple, -1);
 }
 
@@ -771,7 +798,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		u32 offset = read_u32(data);
 		u32 limit = read_u32(data);
 
-		if (i >= BOX_INDEX_MAX || space[txn->n].index[i] == nil)
+		if (i >= space[txn->n].key_count)
 			tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i, txn->n);
 		txn->index = space[txn->n].index[i];
 
@@ -927,7 +954,7 @@ key_free(struct key_def *key_def)
 	free(key_def->cmp_order);
 }
 
-void
+static void
 space_free(void)
 {
 	int i;
@@ -936,10 +963,8 @@ space_free(void)
 			continue;
 
 		int j;
-		for (j = 0 ; j < BOX_INDEX_MAX ; j++) {
+		for (j = 0 ; j < space[i].key_count; j++) {
 			Index *index = space[i].index[j];
-			if (index == nil)
-				break;
 			[index free];
 			key_free(&space[i].key_defs[j]);
 		}
@@ -1046,7 +1071,7 @@ space_init_field_types(struct space *space)
 			    && space->field_types[part->fieldno] != UNKNOWN) {
 				space->field_types[part->fieldno] = UNKNOWN;
 				say_warn("type conflict in space %d for field %d",
-					 space->n, part->fieldno);
+					 space_n(space), part->fieldno);
 			}
 		}
 	}
@@ -1070,7 +1095,6 @@ space_config(void)
 		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
 
 		space[i].enabled = true;
-		space[i].n = i;
 		space[i].cardinality = cfg_space->cardinality;
 
 		/*
@@ -1098,27 +1122,50 @@ space_config(void)
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
-			Index *index = [Index alloc: type :&space[i] :j];
-			[index init: type :&space[i] :j];
+			struct key_def *key_def = &space[i].key_defs[j];
+			Index *index = [Index alloc: type :key_def :&space[i]];
+			[index init: key_def :&space[i]];
 			space[i].index[j] = index;
 		}
 		say_info("space %i successfully configured", i);
 	}
 }
 
-void
+static void
 space_init(void)
 {
 	/* Allocate and initialize space memory. */
 	space = palloc(eter_pool, sizeof(struct space) * BOX_SPACE_MAX);
 	memset(space, 0, sizeof(struct space) * BOX_SPACE_MAX);
 
-
 	/* configure regular spaces */
 	space_config();
 
 	/* configure memcached space */
 	memcached_space_init();
+}
+
+static void
+build_indexes(void)
+{
+	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
+		if (space[n].enabled == false)
+			continue;
+		if (space[n].key_count <= 1)
+			continue; /* no secondary keys */
+
+		say_info("Building secondary keys in space %" PRIu32 "...", n);
+
+		Index *pk = space[n].index[0];
+		for (int i = 1; i < space[n].key_count; i++) {
+			Index *index = space[n].index[i];
+			if ([index isKindOf: [TreeIndex class]]) {
+				[(TreeIndex *) index build: pk];
+			}
+		}
+
+		say_info("Space %"PRIu32": done", n);
+	}
 }
 
 static void
@@ -1521,6 +1568,9 @@ mod_init(void)
 	title("loading");
 	atexit(mod_free);
 
+	/* disable secondary indexes while loading */
+	secondary_indexes_enabled = false;
+
 	box_lua_init();
 
 	/* initialization spaces */
@@ -1549,7 +1599,11 @@ mod_init(void)
 
 	title("building indexes");
 
+	/* build secondary indexes */
 	build_indexes();
+
+	/* enable secondary indexes while now */
+	secondary_indexes_enabled = true;
 
 	title("orphan");
 

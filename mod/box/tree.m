@@ -695,9 +695,9 @@ tree_iterator_free(struct iterator *iterator)
 @class Num32TreeIndex;
 @class FixedTreeIndex;
 
-+ (Index *) alloc: (struct space *) space :(u32) n_arg
++ (Index *) alloc: (struct key_def *) key_def :(struct space *) space
 {
-	enum tree_type type = find_tree_type(space, &space->key_defs[n_arg]);
+	enum tree_type type = find_tree_type(space, key_def);
 	switch (type) {
 	case TREE_SPARSE:
 		return [SparseTreeIndex alloc];
@@ -719,14 +719,12 @@ tree_iterator_free(struct iterator *iterator)
 
 - (void) enable
 {
-	enabled = false;
 	memset(&tree, 0, sizeof tree);
-	if (n == 0) /* pk */ {
+	if (index_is_primary(self)) {
 		sptree_index_init(&tree,
 				  [self node_size], NULL, 0, 0,
 				  [self key_node_cmp], [self node_cmp],
 				  self);
-		enabled = true;
 	}
 }
 
@@ -839,8 +837,6 @@ tree_iterator_free(struct iterator *iterator)
 	u32 estimated_tuples = n_tuples * 1.2;
 	int node_size = [self node_size];
 
-	assert(enabled == false);
-
 	void *nodes = NULL;
 	if (n_tuples) {
 		/*
@@ -865,7 +861,8 @@ tree_iterator_free(struct iterator *iterator)
 	}
 
 	if (n_tuples) {
-		say_info("Sorting %"PRIu32 " keys in index %" PRIu32 "...", n_tuples, self->n);
+		say_info("Sorting %"PRIu32 " keys in index %" PRIu32 "...", n_tuples,
+			 index_n(self));
 	}
 
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
@@ -874,9 +871,6 @@ tree_iterator_free(struct iterator *iterator)
 			  [self key_node_cmp],
 			  key_def->is_unique ? [self node_cmp] : [self dup_node_cmp],
 			  self);
-
-	/* Done with it */
-	enabled = true;
 }
 
 - (size_t) node_size

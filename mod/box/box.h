@@ -43,26 +43,35 @@ enum
 
 struct space {
 	Index *index[BOX_INDEX_MAX];
-	/** Size of index array */
-	int key_count;
-	int n;
 	int cardinality;
 
-	/** Index metadata. */
+	/**
+	 * The number of indexes in the space.
+	 *
+	 * It is equal to the number of non-nil members of the index
+	 * array and defines the key_defs array size as well.
+	 */
+	int key_count;
+
+	/**
+	 * The descriptors for all indexes that belong to the space.
+	 */
 	struct key_def *key_defs;
+
 	/**
 	 * Field types of indexed fields. This is an array of size
-	 * indexed_field_count. If there are gaps, i.e. fields
-	 * which do not participate in an index and for which we
-	 * thus can't infer field type, respective array member
-	 * has value UNKNOWN. XXX: right now UNKNOWN is also
-	 * set for fields which types in two indexes contradict.
+	 * field_count. If there are gaps, i.e. fields that do not
+	 * participate in any index and thus we cannot infer their
+	 * type, then respective array members have value UNKNOWN.
+	 * XXX: right now UNKNOWN is also set for fields which types
+	 * in two indexes contradict each other.
 	 */
 	enum field_data_type *field_types;
+
 	/**
-	 * Inferred data: max field no which participates in an
-	 * index. Each tuple in this space must have, therefore, at
-	 * least field_count fields.
+	 * Max field no which participates in any of the space indexes.
+	 * Each tuple in this space must have, therefore, at least
+	 * field_count fields.
 	 */
 	int field_count;
 
@@ -139,6 +148,45 @@ struct box_txn {
 ENUM(messages, MESSAGES);
 
 extern iproto_callback rw_callback;
+
+/**
+ * Get space ordinal number.
+ */
+static inline int
+space_n(struct space *sp)
+{
+	if (sp < space || sp >= (space + BOX_SPACE_MAX)) {
+		panic("Invalid space pointer");
+	}
+	return sp - space;
+}
+
+/**
+ * Get key_def ordinal number.
+ */
+static inline int
+key_def_n(struct space *sp, struct key_def *kp)
+{
+	if (kp < sp->key_defs || kp >= (sp->key_defs + sp->key_count)) {
+		panic("Invalid key_def pointer");
+	}
+	return kp - sp->key_defs;
+}
+
+/**
+ * Get index ordinal number.
+ */
+static inline int
+index_n(Index *index)
+{
+	return key_def_n(index->space, index->key_def);
+}
+
+static inline bool
+index_is_primary(Index *index)
+{
+	return index_n(index) == 0;
+}
 
 /* These are used to implement memcached 'GET' */
 static inline struct box_txn *in_txn() { return fiber->mod_data.txn; }
