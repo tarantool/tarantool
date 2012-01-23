@@ -155,9 +155,7 @@ extern iproto_callback rw_callback;
 static inline int
 space_n(struct space *sp)
 {
-	if (sp < space || sp >= (space + BOX_SPACE_MAX)) {
-		panic("Invalid space pointer");
-	}
+	assert(sp >= space && sp < (space + BOX_SPACE_MAX));
 	return sp - space;
 }
 
@@ -167,9 +165,7 @@ space_n(struct space *sp)
 static inline int
 key_def_n(struct space *sp, struct key_def *kp)
 {
-	if (kp < sp->key_defs || kp >= (sp->key_defs + sp->key_count)) {
-		panic("Invalid key_def pointer");
-	}
+	assert(kp >= sp->key_defs && kp < (sp->key_defs + sp->key_count));
 	return kp - sp->key_defs;
 }
 

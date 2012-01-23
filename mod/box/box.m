@@ -94,10 +94,10 @@ index_count(struct space *sp)
 {
 	if (!secondary_indexes_enabled) {
 		/* If the secondary indexes are not enabled yet
-		   then we can use only the primary key if any.
-		   So return 1 of there is at least one key which
-		   must be primary and return 0 otherwise. */
-		return sp->key_count >= 1;
+		   then we can use only the primary index. So
+		   return 1 if there is at least one index (which
+		   must be primary) and return 0 otherwise. */
+		return sp->key_count > 0;
 	} else {
 		/* Return the actual number of indexes. */
 		return sp->key_count;
