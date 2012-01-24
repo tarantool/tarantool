@@ -26,7 +26,6 @@
  */
 
 #include "exception.h"
-#include "third_party/queue.h"
 
 bool errinj_state(char *name);
 void errinj_info(struct tbuf *out);
