@@ -393,6 +393,12 @@ initialize_minimal()
 	initialize(0.1, 4, 2);
 }
 
+inline static void
+march_init ()
+{
+	march_setup_crc32 ();
+}
+
 int
 main(int argc, char **argv)
 {
@@ -413,6 +419,7 @@ main(int argc, char **argv)
 	master_pid = getpid();
 	stat_init();
 	palloc_init();
+	march_init ();
 
 #ifdef HAVE_BFD
 	symbols_load(argv[0]);

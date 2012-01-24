@@ -28,6 +28,8 @@
 
 #include "cpu_feature.h"
 
+#if defined (__i386__) || defined (__x86_64__)
+
 enum { eAX=0, eBX, eCX, eDX };
 
 static const struct cpuid_feature {
@@ -47,8 +49,6 @@ static const size_t LEN_cpu_mask = sizeof(cpu_mask) / sizeof (cpu_mask[0]);
 	#define REX_PRE "0x48, "
 #elif defined (__i386__)
 	#define REX_PRE
-#else
-	#error "Only x86 and x86_64 architectures supported"
 #endif
 
 
@@ -96,13 +96,6 @@ crc32c_hw_intel(u_int32_t crc, unsigned char const *buf, size_t len)
 	}
 
 	return crc;
-}
-
-
-u_int32_t
-crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
-{
-	return crc32c_hw_intel (crc, (unsigned char const*)buf, len);
 }
 
 
@@ -206,6 +199,34 @@ cpu_has (unsigned int feature)
 
 	return (reg[cpu_mask[feature].ri] & cpu_mask[feature].bitmask) ? 1 : 0;
 }
+
+
+u_int32_t
+crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
+{
+	return crc32c_hw_intel (crc, (unsigned char const*)buf, len);
+}
+
+#else /* other (yet unsupported architectures) */
+
+int
+cpu_has (unsigned int feature)
+{
+	(void)feature;
+	return EINVAL;
+}
+
+u_int32_t
+crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
+{
+	(void)crc; (void)buf, (void)len;
+	assert (false);
+	return 0;
+}
+
+
+#endif /* defined (__i386__) || defined (__x86_64__) */
+
 
 
 /* __EOF__ */

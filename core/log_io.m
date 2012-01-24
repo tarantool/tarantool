@@ -72,17 +72,17 @@ struct log_io_iter {
 	int io_rate_limit;
 };
 
-typedef u_int32_t (*crc32_func_t)(u_int32_t crc, const unsigned char *buf,
-		unsigned int len);
+static u_int32_t (*calc_crc32c)(u_int32_t crc, const unsigned char *buf,
+		unsigned int len) = NULL;
 
-static crc32_func_t
-pick_crc32_func ()
+void
+march_setup_crc32 ()
 {
-	static crc32_func_t impl = NULL;
-	if (!impl)
-		impl = cpu_has (cpuf_sse4_2) ? &crc32c_hw : &crc32c;
-
-	return impl;
+#if defined (__i386__) || defined (__x86_64__)
+	calc_crc32c = cpu_has (cpuf_sse4_2) ? &crc32c_hw : &crc32c;
+#else
+	calc_crc32c = &crc32c;
+#endif
 }
 
 
@@ -462,7 +462,6 @@ static struct tbuf *
 row_reader_v11(FILE *f, struct palloc_pool *pool)
 {
 	struct tbuf *m = tbuf_alloc(pool);
-	crc32_func_t calc_crc32c = pick_crc32_func ();
 
 	u32 header_crc, data_crc;
 
@@ -1200,7 +1199,6 @@ write_to_disk(void *_state, struct tbuf *t)
 	struct tbuf *reply, *header;
 	struct recovery_state *r = _state;
 	u32 result = 0;
-	crc32_func_t calc_crc32c = pick_crc32_func ();
 
 	/* we're not running inside ev_loop, so update ev_now manually */
 	ev_now_update();
@@ -1380,7 +1378,6 @@ write_rows(struct log_io_iter *i)
 {
 	struct log_io *l = i->log;
 	struct tbuf *row, *data;
-	crc32_func_t calc_crc32c = pick_crc32_func ();
 
 	row = tbuf_alloc(eter_pool);
 	tbuf_ensure(row, sizeof(struct row_v11));

@@ -28,9 +28,12 @@
 #include <sys/types.h>
 
 /* CPU feature capabilities to use with cpu_has (feature). */
+
+#if defined (__i386__) || defined (__x86_64__)
 enum {
 	cpuf_ht = 0, cpuf_sse4_1, cpuf_sse4_2, cpuf_hypervisor
 };
+#endif
 
 /* Check whether CPU has a certain feature.
  *
