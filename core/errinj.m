@@ -49,13 +49,15 @@ struct errinj errinjs[errinj_enum_MAX] = {
  * @return error injection handle state on success, false on error.
  */
 bool
-errinj_state(int id)
+errinj_get(int id)
 {
 	assert(id >= 0 && id < errinj_enum_MAX);
 	return errinjs[id].state;
 }
 
-static struct errinj *errinj_match(char *name) {
+static struct errinj *
+errinj_lookup(char *name)
+{
 	int i; 
 	for (i = 0 ; i < errinj_enum_MAX ; i++) {
 		if (strcmp(errinjs[i].name, name) == 0)
@@ -72,9 +74,9 @@ static struct errinj *errinj_match(char *name) {
  * @return error injection handle state on success, false on error.
  */
 bool
-errinj_state_byname(char *name)
+errinj_get_byname(char *name)
 {
-	struct errinj *ei = errinj_match(name);
+	struct errinj *ei = errinj_lookup(name);
 	if (ei == NULL)
 		return false;
 	return ei->state;
@@ -105,7 +107,7 @@ errinj_set(int id, bool state)
 bool
 errinj_set_byname(char *name, bool state)
 {
-	struct errinj *ei = errinj_match(name);
+	struct errinj *ei = errinj_lookup(name);
 	if (ei == NULL)
 		return false;
 	ei->state = state;

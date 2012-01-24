@@ -42,8 +42,8 @@ struct errinj {
 ENUM0(errinj_enum, ERRINJ_LIST);
 extern struct errinj errinjs[];
 
-bool errinj_state(int id);
-bool errinj_state_byname(char *name);
+bool errinj_get(int id);
+bool errinj_get_byname(char *name);
 
 void errinj_set(int id, bool state);
 bool errinj_set_byname(char *name, bool state);
@@ -56,14 +56,8 @@ void errinj_info(struct tbuf *out);
 #else
 	#define ERROR_INJECT(ID) \
 		do { \
-			if (errinj_state(ID) == true) \
+			if (errinj_get(ID) == true) \
 				tnt_raise(ErrorInjection, :#ID); \
-		} while (0)
-
-	#define ERROR_INJECT_BYNAME(NAME) \
-		do { \
-			if (errinj_state_byname(NAME) == true) \
-				tnt_raise(ErrorInjection, :NAME); \
 		} while (0)
 #endif
 
