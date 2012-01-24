@@ -28,17 +28,6 @@
 #include "exception.h"
 #include "third_party/queue.h"
 
-struct errinj {
-	char *name;
-	bool state;
-	TAILQ_ENTRY(errinj) next;
-};
-
-TAILQ_HEAD(, errinj) errinjs;
-
-void errinj_init(void);
-void errinj_free(void);
-struct errinj *errinj_add(char *name);
 bool errinj_state(char *name);
 void errinj_info(struct tbuf *out);
 bool errinj_set(char *name, bool state);

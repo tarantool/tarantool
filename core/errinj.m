@@ -35,34 +35,30 @@
 #include "tbuf.h"
 #include "errinj.h"
 
-/**
- * Initialize error injection list.
- */
-void
-errinj_init(void)
-{
-	TAILQ_INIT(&errinjs);
-}
+struct errinj {
+	char *name;
+	bool state;
+};
 
 /**
- * Free error injection list.
+ * error injection list.
  */
-void
-errinj_free(void)
+static struct errinj errinjs[] =
 {
-	struct errinj *inj, *injn;
-	TAILQ_FOREACH_SAFE(inj, &errinjs, next, injn) {
-		free(inj->name);
-	}
-}
+#ifndef NDEBUG
+	{ "errinj-testing", false },
+#endif
+	{ NULL, false }
+};
 
 static struct errinj*
 errinj_match(char *name)
 {
-	struct errinj *inj;
-	TAILQ_FOREACH(inj, &errinjs, next)
-		if (strcmp(inj->name, name) == 0)
-			return inj;
+	int i;
+	for (i = 0 ; errinjs[i].name ; i++) {
+		if (strcmp(errinjs[i].name, name) == 0)
+			return &errinjs[i];
+	}
 	return NULL;
 }
 
@@ -80,30 +76,6 @@ errinj_state(char *name)
 	if (inj == NULL)
 		return false;
 	return inj->state;
-}
-
-/**
- * Add new error injection handle.
- *
- * @param name error injection name.
- *
- * @return error injection structure pointer on success, NULL on error.
- */
-struct errinj*
-errinj_add(char *name)
-{
-	assert(errinj_match(name) == NULL);
-	struct errinj *inj = malloc(sizeof(struct errinj));
-	if (inj == NULL) 
-		return NULL;
-	inj->name = strdup(name);
-	if (inj->name == NULL) {
-		free(inj);
-		return NULL;
-	}
-	inj->state = false;
-	TAILQ_INSERT_TAIL(&errinjs, inj, next);
-	return inj;
 }
 
 /**
@@ -133,8 +105,9 @@ void
 errinj_info(struct tbuf *out)
 {
 	tbuf_printf(out, "error injections:" CRLF);
-	struct errinj *inj;
-	TAILQ_FOREACH(inj, &errinjs, next) {
+	int i;
+	for (i = 0 ; errinjs[i].name ; i++) {
+		struct errinj *inj = &errinjs[i];
 		tbuf_printf(out, "  - name: %s" CRLF, inj->name);
 		tbuf_printf(out, "    state: %s" CRLF,
 			    (inj->state) ? "on" : "off");
