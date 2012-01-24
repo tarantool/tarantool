@@ -62,11 +62,6 @@ const char *xlog_mark = "XLOG\n";
 
 static struct tbuf *row_reader_v11(FILE *f, struct palloc_pool *pool);
 
-/* Will be set to either HW or SW CRC32 calculation routine depending on CPU
-   capabilities. */
-static u_int32_t (*calc_crc32c)(u_int32_t crc, const unsigned char *buf,
-				unsigned int len) = NULL;
-
 struct log_io_iter {
 	struct tarantool_coro coro;
 	struct log_io *log;
@@ -76,6 +71,19 @@ struct log_io_iter {
 	bool eof;
 	int io_rate_limit;
 };
+
+typedef u_int32_t (*crc32_func_t)(u_int32_t crc, const unsigned char *buf,
+		unsigned int len);
+
+static crc32_func_t
+pick_crc32_func ()
+{
+	static crc32_func_t impl = NULL;
+	if (!impl)
+		impl = cpu_has (cpuf_sse4_2) ? &crc32c_hw : &crc32c;
+
+	return impl;
+}
 
 
 void
@@ -454,6 +462,7 @@ static struct tbuf *
 row_reader_v11(FILE *f, struct palloc_pool *pool)
 {
 	struct tbuf *m = tbuf_alloc(pool);
+	crc32_func_t calc_crc32c = pick_crc32_func ();
 
 	u32 header_crc, data_crc;
 
@@ -1191,6 +1200,7 @@ write_to_disk(void *_state, struct tbuf *t)
 	struct tbuf *reply, *header;
 	struct recovery_state *r = _state;
 	u32 result = 0;
+	crc32_func_t calc_crc32c = pick_crc32_func ();
 
 	/* we're not running inside ev_loop, so update ev_now manually */
 	ev_now_update();
@@ -1337,8 +1347,6 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_class->fsync_delay = fsync_delay;
 	wait_lsn_clear(&r->wait_lsn);
 
-	calc_crc32c = cpu_has (cpuf_sse4_2) ? &crc32c_hw : &crc32c;
-
 	if ((flags & RECOVER_READONLY) == 0)
 		r->wal_writer = spawn_child("wal_writer", inbox_size, write_to_disk, r);
 
@@ -1372,6 +1380,7 @@ write_rows(struct log_io_iter *i)
 {
 	struct log_io *l = i->log;
 	struct tbuf *row, *data;
+	crc32_func_t calc_crc32c = pick_crc32_func ();
 
 	row = tbuf_alloc(eter_pool);
 	tbuf_ensure(row, sizeof(struct row_v11));
