@@ -158,6 +158,8 @@ admin_dispatch(lua_State *L)
 			tbuf_append(out, help, strlen(help));
 #ifndef NDEBUG
 			tbuf_append(out, help_debug, strlen(help_debug));
+#else
+			(void)help_debug; /* making compiler happy */
 #endif
 			end(out);
 		}
@@ -191,7 +193,7 @@ admin_dispatch(lua_State *L)
 
 		action set_injection {
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set(strstart, state);
+			bool ret = errinj_set_byname(strstart, state);
 			if (ret) {
 				ok(out);
 			} else {

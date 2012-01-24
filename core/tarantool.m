@@ -54,7 +54,6 @@
 #include <stat.h>
 #include TARANTOOL_CONFIG
 #include <util.h>
-#include <errinj.h>
 #include <third_party/gopt/gopt.h>
 #include <cfg/warning.h>
 

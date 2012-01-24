@@ -206,11 +206,11 @@ case 6:
 	}
 	goto st0;
 tr13:
-#line 245 "core/admin.rl"
+#line 247 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st135;
 tr20:
-#line 233 "core/admin.rl"
+#line 235 "core/admin.rl"
 	{return 0;}
 	goto st135;
 tr25:
@@ -220,14 +220,16 @@ tr25:
 			tbuf_append(out, help, strlen(help));
 #ifndef NDEBUG
 			tbuf_append(out, help_debug, strlen(help_debug));
+#else
+			(void)help_debug; /* making compiler happy */
 #endif
 			end(out);
 		}
 	goto st135;
 tr36:
-#line 219 "core/admin.rl"
+#line 221 "core/admin.rl"
 	{strend = p;}
-#line 165 "core/admin.rl"
+#line 167 "core/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
@@ -236,7 +238,7 @@ tr36:
 		}
 	goto st135;
 tr43:
-#line 172 "core/admin.rl"
+#line 174 "core/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -245,11 +247,11 @@ tr43:
 		}
 	goto st135;
 tr67:
-#line 243 "core/admin.rl"
+#line 245 "core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st135;
 tr76:
-#line 179 "core/admin.rl"
+#line 181 "core/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -264,12 +266,12 @@ tr76:
 		}
 	goto st135;
 tr98:
-#line 229 "core/admin.rl"
+#line 231 "core/admin.rl"
 	{ state = false; }
-#line 192 "core/admin.rl"
+#line 194 "core/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set(strstart, state);
+			bool ret = errinj_set_byname(strstart, state);
 			if (ret) {
 				ok(out);
 			} else {
@@ -279,12 +281,12 @@ tr98:
 		}
 	goto st135;
 tr101:
-#line 228 "core/admin.rl"
+#line 230 "core/admin.rl"
 	{ state = true; }
-#line 192 "core/admin.rl"
+#line 194 "core/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set(strstart, state);
+			bool ret = errinj_set_byname(strstart, state);
 			if (ret) {
 				ok(out);
 			} else {
@@ -314,11 +316,11 @@ tr117:
 		}
 	goto st135;
 tr131:
-#line 236 "core/admin.rl"
+#line 238 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st135;
 tr137:
-#line 235 "core/admin.rl"
+#line 237 "core/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st135;
 tr146:
@@ -330,29 +332,29 @@ tr146:
 		}
 	goto st135;
 tr152:
-#line 239 "core/admin.rl"
+#line 241 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st135;
 tr160:
-#line 238 "core/admin.rl"
+#line 240 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
 	goto st135;
 tr164:
-#line 240 "core/admin.rl"
+#line 242 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st135;
 st135:
 	if ( ++p == pe )
 		goto _test_eof135;
 case 135:
-#line 349 "core/admin.m"
+#line 351 "core/admin.m"
 	goto st0;
 tr14:
-#line 245 "core/admin.rl"
+#line 247 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
 tr21:
-#line 233 "core/admin.rl"
+#line 235 "core/admin.rl"
 	{return 0;}
 	goto st7;
 tr26:
@@ -362,14 +364,16 @@ tr26:
 			tbuf_append(out, help, strlen(help));
 #ifndef NDEBUG
 			tbuf_append(out, help_debug, strlen(help_debug));
+#else
+			(void)help_debug; /* making compiler happy */
 #endif
 			end(out);
 		}
 	goto st7;
 tr37:
-#line 219 "core/admin.rl"
+#line 221 "core/admin.rl"
 	{strend = p;}
-#line 165 "core/admin.rl"
+#line 167 "core/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
@@ -378,7 +382,7 @@ tr37:
 		}
 	goto st7;
 tr44:
-#line 172 "core/admin.rl"
+#line 174 "core/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -387,11 +391,11 @@ tr44:
 		}
 	goto st7;
 tr68:
-#line 243 "core/admin.rl"
+#line 245 "core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
 tr77:
-#line 179 "core/admin.rl"
+#line 181 "core/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -406,12 +410,12 @@ tr77:
 		}
 	goto st7;
 tr99:
-#line 229 "core/admin.rl"
+#line 231 "core/admin.rl"
 	{ state = false; }
-#line 192 "core/admin.rl"
+#line 194 "core/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set(strstart, state);
+			bool ret = errinj_set_byname(strstart, state);
 			if (ret) {
 				ok(out);
 			} else {
@@ -421,12 +425,12 @@ tr99:
 		}
 	goto st7;
 tr102:
-#line 228 "core/admin.rl"
+#line 230 "core/admin.rl"
 	{ state = true; }
-#line 192 "core/admin.rl"
+#line 194 "core/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set(strstart, state);
+			bool ret = errinj_set_byname(strstart, state);
 			if (ret) {
 				ok(out);
 			} else {
@@ -456,11 +460,11 @@ tr118:
 		}
 	goto st7;
 tr132:
-#line 236 "core/admin.rl"
+#line 238 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st7;
 tr138:
-#line 235 "core/admin.rl"
+#line 237 "core/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st7;
 tr147:
@@ -472,22 +476,22 @@ tr147:
 		}
 	goto st7;
 tr153:
-#line 239 "core/admin.rl"
+#line 241 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st7;
 tr161:
-#line 238 "core/admin.rl"
+#line 240 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
 	goto st7;
 tr165:
-#line 240 "core/admin.rl"
+#line 242 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 491 "core/admin.m"
+#line 495 "core/admin.m"
 	if ( (*p) == 10 )
 		goto st135;
 	goto st0;
@@ -640,28 +644,28 @@ case 23:
 	}
 	goto tr33;
 tr33:
-#line 219 "core/admin.rl"
+#line 221 "core/admin.rl"
 	{strstart = p;}
 	goto st24;
 st24:
 	if ( ++p == pe )
 		goto _test_eof24;
 case 24:
-#line 651 "core/admin.m"
+#line 655 "core/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
 	}
 	goto st24;
 tr34:
-#line 219 "core/admin.rl"
+#line 221 "core/admin.rl"
 	{strstart = p;}
 	goto st25;
 st25:
 	if ( ++p == pe )
 		goto _test_eof25;
 case 25:
-#line 665 "core/admin.m"
+#line 669 "core/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
@@ -1111,28 +1115,28 @@ case 73:
 		goto tr91;
 	goto st0;
 tr91:
-#line 227 "core/admin.rl"
+#line 229 "core/admin.rl"
 	{ strstart = p; }
 	goto st74;
 st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 1122 "core/admin.m"
+#line 1126 "core/admin.m"
 	if ( (*p) == 32 )
 		goto tr92;
 	if ( 33 <= (*p) && (*p) <= 126 )
 		goto st74;
 	goto st0;
 tr92:
-#line 227 "core/admin.rl"
+#line 229 "core/admin.rl"
 	{ strend = p; }
 	goto st75;
 st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 1136 "core/admin.m"
+#line 1140 "core/admin.m"
 	switch( (*p) ) {
 		case 32: goto st75;
 		case 111: goto st76;
@@ -1824,7 +1828,7 @@ case 134:
 	_out: {}
 	}
 
-#line 251 "core/admin.rl"
+#line 253 "core/admin.rl"
 
 
 	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);

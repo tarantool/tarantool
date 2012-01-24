@@ -35,27 +35,29 @@
 #include "tbuf.h"
 #include "errinj.h"
 
-struct errinj {
-	char *name;
-	bool state;
+#define ERRINJ_MEMBER(n, s) { .name = #n, .state = s },
+
+struct errinj errinjs[errinj_enum_MAX] = {
+	ERRINJ_LIST(ERRINJ_MEMBER)
 };
 
 /**
- * error injection list.
+ * Get state of the error injection handle by id.
+ *
+ * @param id error injection id.
+ *
+ * @return error injection handle state on success, false on error.
  */
-static struct errinj errinjs[] =
+bool
+errinj_state(int id)
 {
-#ifndef NDEBUG
-	{ "errinj-testing", false },
-#endif
-	{ NULL, false }
-};
+	assert(id >= 0 && id < errinj_enum_MAX);
+	return errinjs[id].state;
+}
 
-static struct errinj*
-errinj_match(char *name)
-{
-	int i;
-	for (i = 0 ; errinjs[i].name ; i++) {
+static struct errinj *errinj_match(char *name) {
+	int i; 
+	for (i = 0 ; i < errinj_enum_MAX ; i++) {
 		if (strcmp(errinjs[i].name, name) == 0)
 			return &errinjs[i];
 	}
@@ -63,23 +65,37 @@ errinj_match(char *name)
 }
 
 /**
- * Get state of the error injection handle.
+ * Get state of the error injection handle by name.
  *
  * @param name error injection name.
  *
  * @return error injection handle state on success, false on error.
  */
 bool
-errinj_state(char *name)
+errinj_state_byname(char *name)
 {
-	struct errinj *inj = errinj_match(name);
-	if (inj == NULL)
+	struct errinj *ei = errinj_match(name);
+	if (ei == NULL)
 		return false;
-	return inj->state;
+	return ei->state;
 }
 
 /**
- * Set state of the error injection handle.
+ * Set state of the error injection handle by id.
+ *
+ * @param id error injection id.
+ * @param state error injection handle state.
+ *
+ */
+void
+errinj_set(int id, bool state)
+{
+	assert(id >= 0 && id < errinj_enum_MAX);
+	errinjs[id].state = state;
+}
+
+/**
+ * Set state of the error injection handle by name.
  *
  * @param name error injection name.
  * @param state error injection handle state.
@@ -87,12 +103,12 @@ errinj_state(char *name)
  * @return true on success, false on error.
  */
 bool
-errinj_set(char *name, bool state)
+errinj_set_byname(char *name, bool state)
 {
-	struct errinj *inj = errinj_match(name);
-	if (inj == NULL)
+	struct errinj *ei = errinj_match(name);
+	if (ei == NULL)
 		return false;
-	inj->state = state;
+	ei->state = state;
 	return true;
 }
 
@@ -106,7 +122,7 @@ errinj_info(struct tbuf *out)
 {
 	tbuf_printf(out, "error injections:" CRLF);
 	int i;
-	for (i = 0 ; errinjs[i].name ; i++) {
+	for (i = 0 ; i < errinj_enum_MAX ; i++) {
 		struct errinj *inj = &errinjs[i];
 		tbuf_printf(out, "  - name: %s" CRLF, inj->name);
 		tbuf_printf(out, "    state: %s" CRLF,
