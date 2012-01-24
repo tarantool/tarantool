@@ -52,7 +52,6 @@ void errinj_info(struct tbuf *out);
 
 #ifdef NDEBUG
 	#define ERROR_INJECT(ID)
-	#define ERROR_INJECT_BYNAME(ID)
 #else
 	#define ERROR_INJECT(ID) \
 		do { \
