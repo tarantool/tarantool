@@ -251,6 +251,18 @@ fiber_yield(void)
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }
 
+bool
+fiber_is_caller(struct fiber *f)
+{
+	/* 'unwinding' fiber's stack */
+	for (struct fiber **sp_ptr = sp; sp_ptr > call_stack; --sp_ptr) {
+		if (f == *sp_ptr)
+			return true;
+	}
+	return false;
+}
+
+
 /**
  * @note: this is a cancellation point (@sa fiber_testcancel())
  */

@@ -518,6 +518,33 @@ lbox_fiber_yield(struct lua_State *L)
 }
 
 /**
+ * Get fiber status
+ */
+static int
+lbox_fiber_status(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	if (f->fid == 0) {
+		/* this fiber is dead */
+		lua_pushstring(L, "dead");
+		return 1;
+	}
+
+	if (f == fiber) {
+		lua_pushstring(L, "running");
+		return 1;
+	}
+
+	if (fiber_is_caller(f)) {
+		lua_pushstring(L, "normal");
+		return 1;
+	}
+
+	lua_pushstring(L, "suspended");
+	return 1;
+}
+
+/**
  * Detach the current fiber.
  */
 static int
@@ -615,6 +642,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"create", lbox_fiber_create},
 	{"resume", lbox_fiber_resume},
 	{"yield", lbox_fiber_yield},
+	{"status", lbox_fiber_status},
 	{"detach", lbox_fiber_detach},
 	{NULL, NULL}
 };

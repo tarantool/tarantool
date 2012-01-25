@@ -247,3 +247,28 @@ print """
 # Lua provides access to os.execute()
 """
 exec admin "lua os.execute('ls')"
+
+
+print """
+#
+# box.fiber test (create, resume, yield, status)
+#
+"""
+
+box_fiber_lua = os.path.abspath("box/box_fiber.lua")
+# don't log the path name
+sys.stdout.push_filter("lua dofile(.*)", "lua dofile(...)")
+exec admin "lua dofile('{0}')".format(box_fiber_lua)
+sys.stdout.pop_filter()
+
+print """
+# test box.fiber.status functions: invalid arguments
+"""
+exec admin "lua box.fiber.status(1)"
+exec admin "lua box.fiber.status('fafa-gaga')"
+exec admin "lua box.fiber.status(nil)"
+
+print """
+# run fiber's test
+"""
+exec admin "lua box_fiber_run_test()"
