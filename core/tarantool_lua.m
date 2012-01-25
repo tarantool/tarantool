@@ -531,15 +531,18 @@ lbox_fiber_status(struct lua_State *L)
 	}
 
 	if (f == fiber) {
+		/* the fiber is current running fiber */
 		lua_pushstring(L, "running");
 		return 1;
 	}
 
 	if (fiber_is_caller(f)) {
+		/* the fiber is current fiber caller */
 		lua_pushstring(L, "normal");
 		return 1;
 	}
 
+	/* the fiber is sleeping */
 	lua_pushstring(L, "suspended");
 	return 1;
 }
