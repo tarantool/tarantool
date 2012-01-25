@@ -51,13 +51,13 @@ bool errinj_set_byname(char *name, bool state);
 void errinj_info(struct tbuf *out);
 
 #ifdef NDEBUG
-	#define ERROR_INJECT(ID)
+#  define ERROR_INJECT(ID)
 #else
-	#define ERROR_INJECT(ID) \
-		do { \
-			if (errinj_get(ID) == true) \
-				tnt_raise(ErrorInjection, :#ID); \
-		} while (0)
+#  define ERROR_INJECT(ID) \
+	do { \
+		if (errinj_get(ID) == true) \
+			tnt_raise(ErrorInjection, :#ID); \
+	} while (0)
 #endif
 
 #endif /* TATRANTOOL_ERRINJ_H_INCLUDED */
