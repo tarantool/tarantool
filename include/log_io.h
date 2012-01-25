@@ -146,7 +146,7 @@ static inline struct row_v11 *row_v11(const struct tbuf *t)
 	return (struct row_v11 *)t->data;
 }
 
-void march_setup_crc32 ();
+void mach_setup_crc32 ();
 
 struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, u64 cookie, i64 lsn);
 

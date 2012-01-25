@@ -76,7 +76,7 @@ static u_int32_t (*calc_crc32c)(u_int32_t crc, const unsigned char *buf,
 		unsigned int len) = NULL;
 
 void
-march_setup_crc32 ()
+mach_setup_crc32 ()
 {
 #if defined (__i386__) || defined (__x86_64__)
 	calc_crc32c = cpu_has (cpuf_sse4_2) ? &crc32c_hw : &crc32c;
