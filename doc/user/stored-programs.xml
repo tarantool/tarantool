@@ -817,16 +817,6 @@ xreflabel="box.index">box.index</code></title>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">index:pairs()</emphasis>
-        </term>
-        <listitem><simpara>
-            A helper function to iterate over all tuples in the index.
-        </simpara>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
             <emphasis role="lua">index:min()</emphasis>
         </term>
         <listitem><simpara>
@@ -867,7 +857,7 @@ xreflabel="box.index">box.index</code></title>
             resuming iteration from a given key. It follows the
             <link xlink:href='http://pgl.yoyo.org/luai/i/next'>Lua
             iteration pattern</link> and returns a pair
-            <code>&gt;iteration_state, tuple&lt;</code>.
+            <code>&lt;iteration_state, tuple&gt;</code>.
             When called with no arguments, it starts iteration
             from the beginning. If called with userdata
             <code>iteration_state</code>, it returns a tuple
