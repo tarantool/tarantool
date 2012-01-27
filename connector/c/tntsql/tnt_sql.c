@@ -31,10 +31,10 @@
 #include <string.h>
 #include <ctype.h>
 
-#include <libtnt/tnt.h>
-#include <libtnt/tnt_queue.h>
-#include <libtnt/tnt_utf8.h>
-#include <libtnt/tnt_lex.h>
+#include <connector/c/include/libtnt/tnt.h>
+#include <connector/c/include/libtnt/tnt_queue.h>
+#include <connector/c/include/libtnt/tnt_utf8.h>
+#include <connector/c/include/libtnt/tnt_lex.h>
 
 /* sql parsing context. */
 
