@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    purge)
+        rm -fr  \
+            /var/log/tarantool \
+            /var/run/tarantool \
+            /var/lib/tarantool
+    ;;
+esac
+
+#DEBHELPER#
+

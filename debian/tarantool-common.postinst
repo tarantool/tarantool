@@ -16,13 +16,12 @@ case "$1" in
                 --no-create-home \
                 --disabled-login \
                     tarantool
-
-            install -d -o$SYSUSER -gadm -m2750 /var/log/$SYSUSER
-            install -d -o$SYSUSER -g$SYSUSER -m750 /var/run/$SYSUSER
-            install -d -o$SYSUSER -g$SYSUSER -m750 /var/run/$SYSUSER
-            install -d -o$SYSUSER -g$SYSUSER -m750 /var/lib/tarantool/started
-            install -d -o$SYSUSER -g$SYSUSER -m750 /var/lib/tarantool/snapshot
         fi
+
+        install -d -o$SYSUSER -gadm -m2750 /var/log/tarantool
+        install -d -o$SYSUSER -g$SYSUSER -m750 /var/run/tarantool
+        install -d -o$SYSUSER -g$SYSUSER -m750 /var/lib/tarantool/started
+        install -d -o$SYSUSER -g$SYSUSER -m750 /var/lib/tarantool/snapshot
     ;;
 esac
 
