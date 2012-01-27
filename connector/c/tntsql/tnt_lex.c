@@ -33,11 +33,10 @@
 #include <ctype.h>
 #include <errno.h>
 
-#include <tnt.h>
-
-#include <tnt_utf8.h>
-#include <tnt_queue.h>
-#include <tnt_lex.h>
+#include <libtnt/tnt.h>
+#include <libtnt/tnt_utf8.h>
+#include <libtnt/tnt_queue.h>
+#include <libtnt/tnt_lex.h>
 
 bool tnt_lex_init(struct tnt_lex *l, unsigned char *buf, size_t size)
 {

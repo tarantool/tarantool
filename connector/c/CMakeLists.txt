@@ -1,3 +1,4 @@
 add_subdirectory(tnt)
 add_subdirectory(tntsql)
 add_subdirectory(tntnet)
+add_subdirectory(include)

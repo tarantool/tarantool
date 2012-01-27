@@ -28,11 +28,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_proto.h>
-#include <tnt_tuple.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
-#include <tnt_ping.h>
+#include <libtnt/tnt_proto.h>
+#include <libtnt/tnt_tuple.h>
+#include <libtnt/tnt_reply.h>
+#include <libtnt/tnt_stream.h>
+#include <libtnt/tnt_ping.h>
 
 /*
  * tnt_ping()

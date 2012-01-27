@@ -38,9 +38,10 @@
 
 #include <errcode.h>
 #include <third_party/gopt/gopt.h>
-#include <connector/c/tnt/include/tnt.h>
-#include <connector/c/tntsql/include/tnt_sql.h>
-#include <connector/c/tntnet/include/tnt_net.h>
+
+#include <libtnt/tnt.h>
+#include <libtnt/tnt_sql.h>
+#include <libtnt/tnt_net.h>
 
 #include <client/tarantool/tnt_admin.h>
 

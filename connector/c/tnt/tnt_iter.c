@@ -28,12 +28,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_mem.h>
-#include <tnt_enc.h>
-#include <tnt_tuple.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
-#include <tnt_iter.h>
+#include <libtnt/tnt_mem.h>
+#include <libtnt/tnt_enc.h>
+#include <libtnt/tnt_tuple.h>
+#include <libtnt/tnt_reply.h>
+#include <libtnt/tnt_stream.h>
+#include <libtnt/tnt_iter.h>
 
 static struct tnt_iter *tnt_iter_tryalloc(struct tnt_iter *i) {
 	if (i) {

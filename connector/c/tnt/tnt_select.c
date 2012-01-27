@@ -28,13 +28,13 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_mem.h>
-#include <tnt_proto.h>
-#include <tnt_tuple.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
-#include <tnt_iter.h>
-#include <tnt_select.h>
+#include <libtnt/tnt_mem.h>
+#include <libtnt/tnt_proto.h>
+#include <libtnt/tnt_tuple.h>
+#include <libtnt/tnt_reply.h>
+#include <libtnt/tnt_stream.h>
+#include <libtnt/tnt_iter.h>
+#include <libtnt/tnt_select.h>
 
 struct tnt_header_select {
 	uint32_t ns;

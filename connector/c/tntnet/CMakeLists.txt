@@ -58,14 +58,6 @@ set_target_properties(tntnet_shared PROPERTIES COMPILE_FLAGS "${tntnet_cflags}")
 # Install
 #----------------------------------------------------------------------------#
 
-# headers
-install(FILES
-	include/tnt_opt.h
-	include/tnt_iob.h
-	include/tnt_io.h
-	include/tnt_net.h
-	DESTINATION include/libtnt)
-
 # install static library
 install_targets(/lib tntnet)
 # install shared library

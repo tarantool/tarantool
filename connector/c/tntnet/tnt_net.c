@@ -29,9 +29,9 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include <tnt.h>
-#include <tnt_net.h>
-#include <tnt_io.h>
+#include <libtnt/tnt.h>
+#include <libtnt/tnt_net.h>
+#include <libtnt/tnt_io.h>
 
 static struct tnt_stream *tnt_net_tryalloc(struct tnt_stream *s) {
 	if (s) {

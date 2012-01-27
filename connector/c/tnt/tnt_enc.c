@@ -28,7 +28,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_enc.h>
+#include <libtnt/tnt_enc.h>
 
 int
 tnt_enc_read(char *buf, uint32_t *value)

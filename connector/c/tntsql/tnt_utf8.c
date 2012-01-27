@@ -30,8 +30,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <tnt.h>
-#include <tnt_utf8.h>
+#include <libtnt/tnt.h>
+#include <libtnt/tnt_utf8.h>
 
 bool
 tnt_utf8_init(struct tnt_utf8 *u, unsigned char *data, size_t size)

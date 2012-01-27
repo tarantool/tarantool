@@ -28,7 +28,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <tnt_mem.h>
+#include <libtnt/tnt_mem.h>
 
 static void *(*_tnt_realloc)(void *ptr, size_t size) =
 	(void *(*)(void*, size_t))realloc;
