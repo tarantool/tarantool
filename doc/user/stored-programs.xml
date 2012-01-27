@@ -328,8 +328,8 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
                 Update a tuple identified by a primary
                 <code>key</code>. Update arguments follow,
                 described by <code>format</code>.
-                The Format and arguments are passed to
-                <code>box.pack()</code>, and the result is then sent
+                The format and arguments are passed to
+                <code>box.pack()</code> and the result is sent
                 to <code>box.process()</code>.
                 A correct <code>format</code> is a sequence of
                 pairs: update operation, operation arguments. A
@@ -578,8 +578,8 @@ Note: the administrative console output must be YAML-compatible.
     <title>Package <code xml:id="box.tuple" xreflabel="box.tuple">box.tuple</code></title>
     <para>The package contains no functions, but stands for
     <code>box.tuple</code> userdata type. It is possible to access individual
-    tuple fields using an index, or iterate over all fields in a
-    tuple. Tuples are immutable.</para>
+    tuple fields using an index, iterate over all fields in a
+    tuple or convert a tuple to a Lua table. Tuples are immutable.</para>
     <varlistentry>
         <term><emphasis role="lua"> </emphasis></term>
         <listitem><para>
@@ -610,6 +610,15 @@ efg
 ghq
 qkl
 ...
+localhost> lua t:unpack()
+---
+ - 
+ - abc
+ - cde
+ - efg
+ - ghq
+ - qkl
+...
 </programlisting>
 
         </para></listitem>
@@ -617,8 +626,8 @@ qkl
 </variablelist>
 
 <variablelist>
-    <title>Package <code>box.space</code></title>
-    <para>This package is a container of all
+    <title>Package <code xml:id="box.space" xreflabel="box.space">box.space</code></title>
+    <para>This package is a container for all
     configured spaces. A space object provides access to space
     attributes, such as id, whether or not a space is
     enabled, space cardinality, estimated number of rows. It also
@@ -664,6 +673,13 @@ qkl
     <varlistentry>
         <term>
             <emphasis role="lua">space:select(index_no, ...)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:select_range(index_no, limit, key, ...)</emphasis>
         </term>
         <listitem><simpara></simpara></listitem>
     </varlistentry>
@@ -749,16 +765,17 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
 <variablelist>
     <title>Package <code xml:id="box.index"
 xreflabel="box.index">box.index</code></title>
-    <para>This package implements methods of type <code>box.index</code>.</para>
+    <para>
+        This package implements methods of type <code>box.index</code>.
+        Indexes are contained in <code
+        xlink:href="#box.space">box.space[i].index[]</code> array
+        within each space object. They provide an API for
+        ordered iteration over tuples.
+    </para>
     <varlistentry>
-        <term><emphasis role="lua">index.n</emphasis></term>
-        <listitem><simpara>Ordinal index number in the space, <code>space.index[i].n == i</code>.</simpara></listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua">index.enabled</emphasis></term>
+        <term><emphasis role="lua">index.unique</emphasis></term>
         <listitem><simpara>
-            Whether or not this index is enabled in the
-            configuration file.
+            Boolean, true if the index is unique.
         </simpara></listitem>
     </varlistentry>
 
@@ -773,6 +790,15 @@ xreflabel="box.index">box.index</code></title>
 
     <varlistentry>
         <term>
+            <emphasis role="lua">index.key_field[]</emphasis>
+        </term>
+        <listitem><simpara>
+            An array describing index key fields.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
             <emphasis role="lua">index.idx</emphasis>
         </term>
         <listitem><simpara>
@@ -782,27 +808,135 @@ xreflabel="box.index">box.index</code></title>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">index:pairs()</emphasis>
+            <emphasis role="lua">space:select_range(limit, key)</emphasis>
+        </term>
+        <listitem><simpara>Select a range of tuples, limited by
+        <code>limit</code>, starting from <code>key</code>.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:min()</emphasis>
         </term>
         <listitem><simpara>
-            A helper function to iterate over all tuples in index order.
+            The smallest value in the index. Available only for
+            indexes of type 'TREE'.
         </simpara>
         </listitem>
     </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:max()</emphasis>
+        </term>
+        <listitem><simpara>
+            The biggest value in the index. Available only for
+            indexes of type 'TREE'.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:pairs()</emphasis>
+        </term>
+        <listitem><simpara>
+            A helper function to iterate over all tuples in an
+            index.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:next(iteration_state, key)</emphasis>
+        </term>
+        <listitem><simpara>
+            This function can be used for positioned iteration, or
+            resuming iteration from a given key. It follows the
+            <link xlink:href='http://pgl.yoyo.org/luai/i/next'>Lua
+            iteration pattern</link> and returns a pair
+            <code>&lt;iteration_state, tuple&gt;</code>.
+            When called with no arguments, it starts iteration
+            from the beginning. If called with userdata
+            <code>iteration_state</code>, it returns a tuple
+            corresponding to iterator position, plus a new
+            <code>iteration_state</code>. When called with a key,
+            it positions the iterator on the key, and returns the
+            respective tuple and <code>iteration_state</code>.
+        </simpara>
+        <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+localhost> insert into t0 values (1, 'Russia')
+Insert OK, 1 rows affected
+localhost> insert into t0 values (2, 'Serbia')
+Insert OK, 1 rows affected
+localhost> insert into t0 values (3, 'Bulgaria')
+Insert OK, 1 rows affected
+localhost> lua i = box.space[0].index[0]
+---
+...
+localhost> lua k,v=i:next()
+---
+...
+localhost> lua print(v)
+--
+1: {'Russia'}
+...
+localhost> lua k,v=i:next(k)
+---
+...
+localhost> lua print(v)
+---
+2: {'Serbia'}
+...
+localhost> lua k,v=i:next(k)
+---
+...
+localhost> lua print(v)
+---
+3: {'Bulgaria'}
+...
+localhost> lua k,v=i:next(k)
+---
+...
+localhost> lua print(v)
+---
+nil
+...
+localhost> lua k,v=i:next(2)
+---
+...
+localhost> lua print(v)
+---
+2: {'Serbia'}
+...
+localhost> lua for k,v in i.next, i, nil do print(v) end
+---
+1: {'Russia'}
+2: {'Serbia'}
+3: {'Bulgaria'}
+...
+</programlisting>
+        </listitem>
+    </varlistentry>
+
 </variablelist>
 
 <variablelist>
     <title>Package <code>box.fiber</code></title>
-    <para>Create, run and manage existing <emphasis>fibers</emphasis>.
+    <para>Functions in this package allow to create, run and
+    manage existing <emphasis>fibers</emphasis>.
     </para>
     <para>
-A fiber is an independent execution thread, implemented
-using the mechanism of cooperative multitasking.
+A fiber is an independent execution thread implemented
+using a mechanism of cooperative multitasking.
 Each fiber can be running, suspended or dead.
 A fiber is created (<code>box.fiber.create()</code>) suspended.
 It can be started with <code>box.fiber.resume()</code>, yield
 control back to the caller with <code>box.fiber.yield()</code>
-end with <code>return</code> or just by reaching the end of the
+end with <code>return</code> or just by reaching the end of
 fiber function.
     </para>
     <para>
@@ -810,7 +944,7 @@ A fiber can also be attached or detached.
 An attached fiber is a child of the creator,
 and is running only if the creator has called
 <code>box.fiber.resume()</code>. A detached fiber is a child of
-Tarntool internal <quote>sched</quote> fiber, and gets
+Tarantool internal <quote>sched</quote> fiber, and gets
 scheduled only if there is a libev event associated
 with it.
     </para>
@@ -840,7 +974,7 @@ or <code>box.update()</code>, are calling <code>box.fiber.testcancel()</code>.
 <code>box.select()</code> doesn't.
     </para>
     <para>
-A runaway fiber can really only become cuckoo
+In practice, a runaway fiber can only become unresponsive
 if it does a lot of computations and doesn't check
 whether it's been canceled. In addition
 to the advisory cancellation, configuration parameter <code>lua_timeout</code>
@@ -848,13 +982,12 @@ can be used to cancel runaway Lua procedures.
     </para>
     <para>
 The other potential problem comes from detached
-fibers which never get scheduled, because are subscribed
-or get no events. Such morphing fibers can be killed
-with <code>box.fiber.cancel()</code> at any time,
+fibers which never get scheduled, because are not subscribed
+to any events, or no relevant events occur. Such morphing fibers
+can be killed with <code>box.fiber.cancel()</code> at any time,
 since <code>box.fiber.cancel()</code>
 sends an asynchronous wakeup event to the fiber,
-and when returning from <code>box.fiber.yield()</code>
-<code>box.fiber.testcancel()</code> is invoked.
+and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs.
     </para>
     <para>Like all Lua objects, dead fibers are
     garbage collected.</para>
@@ -862,14 +995,14 @@ and when returning from <code>box.fiber.yield()</code>
         <term>
             <emphasis role="lua">box.fiber.id(fiber) </emphasis>
         </term>
-        <listitem><simpara>Returns a numeric id of the fiber.</simpara></listitem>
+        <listitem><simpara>Return a numeric id of the fiber.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua">box.fiber.self() </emphasis>
         </term>
-        <listitem><simpara>Returns <code>box.fiber</code> userdata
+        <listitem><simpara>Return <code>box.fiber</code> userdata
         object for the currently scheduled fiber.</simpara></listitem>
     </varlistentry>
 
@@ -877,7 +1010,7 @@ and when returning from <code>box.fiber.yield()</code>
         <term>
             <emphasis role="lua">box.fiber.find(id) </emphasis>
         </term>
-        <listitem><simpara></simpara></listitem>
+        <listitem><simpara>Locate a fiber userdata object by id.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -885,10 +1018,11 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.create(function) </emphasis>
         </term>
         <listitem><simpara>
-		Create a fiber for the passed change.
-        Can hit a recursion limit. Is a cancellation
-        point.
-        </simpara></listitem>
+		Create a fiber for <code>function</code>.
+        </simpara>
+        <bridgehead renderas="sect4">Errors</bridgehead>
+        <simpara>Can hit a recursion limit.</simpara>
+        </listitem>
     </varlistentry>
 
     <varlistentry>
@@ -904,7 +1038,7 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.yield(...) </emphasis>
         </term>
         <listitem><para>
-        Yield control to the calling fiber &mdash; if the fiber
+        Yield control to the calling fiber, if the fiber
         is attached, or to sched otherwise.
         </para>
         <para>
@@ -929,8 +1063,7 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.sleep(time)</emphasis>
         </term>
         <listitem><simpara>
-    Yield to the sched fiber and sleep.
-    @param[in]  amount of time to sleep (double)
+    Yield to the sched fiber and sleep <code>time</code> seconds.
     Only the current fiber can be made to sleep.
         </simpara></listitem>
     </varlistentry>
@@ -940,9 +1073,9 @@ and when returning from <code>box.fiber.yield()</code>
             <emphasis role="lua">box.fiber.cancel(fiber)</emphasis>
         </term>
         <listitem><simpara>
-Running and suspended fibers can be canceled.
-Zombie fibers can't. Returns an error if
-subject fiber does not permit cancel.
+        Cancel a <code>fiber</code>.
+        Running and suspended fibers can be canceled.
+        Returns an error if the subject fiber does not permit cancel.
         </simpara></listitem>
     </varlistentry>
 
@@ -951,8 +1084,8 @@ subject fiber does not permit cancel.
             <emphasis role="lua">box.fiber.testcancel()</emphasis>
         </term>
         <listitem><simpara>
-Check if this current fiber has been canceled and
-throw an exception if this is the case.
+            Check if the current fiber has been canceled and
+            throw an exception if this is the case.
         </simpara></listitem>
     </varlistentry>
 
@@ -980,8 +1113,9 @@ logger = cat - >> tarantool.log
 </variablelist>
 
 <para>
-    Additional examples can be found in the open source Lua stored
-    procedures repository and in the server test suite.
+    Additional examples can be found in the open source <link
+    xlink:href="https://github.com/mailru/tntlua">Lua stored
+    procedures repository</link> and in the server test suite.
 </para>
 
 <section>
@@ -997,9 +1131,9 @@ logger = cat - >> tarantool.log
     paradigm: unless a running fiber deliberately yields control
     to some other fiber, it is not preempted.
     <quote>Yield points</quote> are built into all
-    calls from Tarantool core into the operating system.
+    calls from Tarantool core to the operating system.
     Any system call which can block is performed in
-    asynchronous manner, and the fiber waiting
+    asynchronous manner and the fiber waiting
     on the system call is preempted with a fiber ready to
     run. This model makes all programmatic locks unnecessary:
     cooperative multitasking ensures that there is no concurrency
@@ -1029,7 +1163,7 @@ logger = cat - >> tarantool.log
     any yield in a stored procedure is a potential change in the
     database state. Effectively, it's only possible
     to have CAS (compare-and-swap) -like atomic stored
-    procedures: select and then modify a record.
+    procedures: i.e. procedures which select and then modify a record.
 
     Multiple data change requests always run through a built-in
     yield point.

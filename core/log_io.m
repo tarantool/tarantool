@@ -43,6 +43,7 @@
 #include <say.h>
 #include <third_party/crc32.h>
 #include <pickle.h>
+#include <cpu_feature.h>
 
 const u16 snap_tag = -1;
 const u16 wal_tag = -2;
@@ -70,6 +71,19 @@ struct log_io_iter {
 	bool eof;
 	int io_rate_limit;
 };
+
+static u_int32_t (*calc_crc32c)(u_int32_t crc, const unsigned char *buf,
+		unsigned int len) = NULL;
+
+void
+mach_setup_crc32 ()
+{
+#if defined (__i386__) || defined (__x86_64__)
+	calc_crc32c = cpu_has (cpuf_sse4_2) ? &crc32c_hw : &crc32c;
+#else
+	calc_crc32c = &crc32c;
+#endif
+}
 
 
 void
@@ -458,7 +472,7 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 	m->size = offsetof(struct row_v11, data);
 
 	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
-	header_crc = crc32c(0, m->data + offsetof(struct row_v11, lsn),
+	header_crc = calc_crc32c(0, m->data + offsetof(struct row_v11, lsn),
 			    sizeof(struct row_v11) - offsetof(struct row_v11, lsn));
 
 	if (row_v11(m)->header_crc32c != header_crc) {
@@ -472,7 +486,7 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 
 	m->size += row_v11(m)->len;
 
-	data_crc = crc32c(0, row_v11(m)->data, row_v11(m)->len);
+	data_crc = calc_crc32c(0, row_v11(m)->data, row_v11(m)->len);
 	if (row_v11(m)->data_crc32c != data_crc) {
 		say_error("data crc32c mismatch");
 		return NULL;
@@ -1235,9 +1249,9 @@ write_to_disk(void *_state, struct tbuf *t)
 	row_v11(header)->tm = ev_now();
 	row_v11(header)->len = wal_write_request(t)->len;
 	row_v11(header)->data_crc32c =
-		crc32c(0, wal_write_request(t)->data, wal_write_request(t)->len);
+		calc_crc32c(0, wal_write_request(t)->data, wal_write_request(t)->len);
 	row_v11(header)->header_crc32c =
-		crc32c(0, header->data + field_sizeof(struct row_v11, header_crc32c),
+		calc_crc32c(0, header->data + field_sizeof(struct row_v11, header_crc32c),
 		       sizeof(struct row_v11) - field_sizeof(struct row_v11, header_crc32c));
 
 	if (fwrite(header->data, header->size, 1, wal->f) != 1) {
@@ -1381,9 +1395,9 @@ write_rows(struct log_io_iter *i)
 		row_v11(row)->lsn = 0;	/* unused */
 		row_v11(row)->tm = ev_now();
 		row_v11(row)->len = data->size;
-		row_v11(row)->data_crc32c = crc32c(0, data->data, data->size);
+		row_v11(row)->data_crc32c = calc_crc32c(0, data->data, data->size);
 		row_v11(row)->header_crc32c =
-			crc32c(0, row->data + field_sizeof(struct row_v11, header_crc32c),
+			calc_crc32c(0, row->data + field_sizeof(struct row_v11, header_crc32c),
 			       sizeof(struct row_v11) - field_sizeof(struct row_v11,
 								     header_crc32c));
 

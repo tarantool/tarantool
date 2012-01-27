@@ -47,6 +47,7 @@ static int stat_base;
 static struct fiber *memcached_expire = NULL;
 
 static Index *memcached_index;
+static struct iterator *memcached_it;
 
 /* memcached tuple format:
    <key, meta, data> */
@@ -419,6 +420,13 @@ memcached_init(void)
 }
 
 void
+memcached_free()
+{
+	if (memcached_it)
+		memcached_it->free(memcached_it);
+}
+
+void
 memcached_space_init()
 {
         if (cfg.memcached_port == 0)
@@ -428,28 +436,33 @@ memcached_space_init()
 	struct space *memc_s = &space[cfg.memcached_space];
 	memc_s->enabled = true;
 	memc_s->cardinality = 4;
-	memc_s->n = cfg.memcached_space;
 
-	struct key_def key_def;
-	/* Configure memcached index key. */
-	key_def.part_count = 1;
-	key_def.is_unique = true;
+	memc_s->key_count = 1;
+	memc_s->key_defs = malloc(sizeof(struct key_def));
 
-	key_def.parts = salloc(sizeof(struct key_part));
-	key_def.cmp_order = salloc(sizeof(u32));
-
-	if (key_def.parts == NULL || key_def.cmp_order == NULL)
+	if (memc_s->key_defs == NULL)
 		panic("out of memory when configuring memcached_space");
 
-	key_def.parts[0].fieldno = 0;
-	key_def.parts[0].type = STRING;
+	struct key_def *key_def = memc_s->key_defs;
+	/* Configure memcached index key. */
+	key_def->part_count = 1;
+	key_def->is_unique = true;
 
-	key_def.max_fieldno = 1;
-	key_def.cmp_order[0] = 0;
+	key_def->parts = malloc(sizeof(struct key_part));
+	key_def->cmp_order = malloc(sizeof(u32));
+
+	if (key_def->parts == NULL || key_def->cmp_order == NULL)
+		panic("out of memory when configuring memcached_space");
+
+	key_def->parts[0].fieldno = 0;
+	key_def->parts[0].type = STRING;
+
+	key_def->max_fieldno = 1;
+	key_def->cmp_order[0] = 0;
 
 	/* Configure memcached index. */
-	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :&key_def];
-	[memc_index init: HASH :&key_def :memc_s :0];
+	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :key_def :memc_s];
+	[memc_index init: key_def :memc_s];
 }
 
 /** Delete a bunch of expired keys. */
@@ -488,17 +501,17 @@ memcached_expire_loop(void *data __attribute__((unused)))
 	struct box_tuple *tuple = NULL;
 
 	say_info("memcached expire fiber started");
-	struct iterator *it = [memcached_index allocIterator];
+	memcached_it = [memcached_index allocIterator];
 	@try {
 restart:
 		if (tuple == NULL)
-			[memcached_index initIterator: it];
+			[memcached_index initIterator: memcached_it];
 
 		struct tbuf *keys_to_delete = tbuf_alloc(fiber->gc_pool);
 
 		for (int j = 0; j < cfg.memcached_expire_per_loop; j++) {
 
-			tuple = it->next(it);
+			tuple = memcached_it->next(memcached_it);
 
 			if (tuple == NULL)
 				break;
@@ -513,7 +526,8 @@ restart:
 		fiber_gc();
 		goto restart;
 	} @finally {
-		it->free(it);
+		memcached_it->free(memcached_it);
+		memcached_it = NULL;
 	}
 }
 
@@ -523,7 +537,7 @@ void memcached_start_expire()
 		return;
 
 	assert(memcached_expire == NULL);
-	memcached_expire = fiber_create("memecached_expire", -1,
+	memcached_expire = fiber_create("memcached_expire", -1,
 					-1, memcached_expire_loop, NULL);
 	if (memcached_expire == NULL)
 		say_error("can't start the expire fiber");

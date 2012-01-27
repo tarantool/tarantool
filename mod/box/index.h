@@ -38,7 +38,7 @@ struct index;
  * since there is a mismatch between enum name (STRING) and type
  * name literal ("STR"). STR is already used as Objective C type.
  */
-enum field_data_type { NUM, NUM64, STRING, field_data_type_MAX };
+enum field_data_type { UNKNOWN = -1, NUM = 0, NUM64, STRING, field_data_type_MAX };
 extern const char *field_data_type_strs[];
 
 enum index_type { HASH, TREE, index_type_MAX };
@@ -78,29 +78,33 @@ struct key_def {
 
 @interface Index: Object {
  @public
+	/* Index owner space */
 	struct space *space;
+	/* Description of a possibly multipart key. */
+	struct key_def *key_def;
 	/*
 	 * Pre-allocated iterator to speed up the main case of
 	 * box_process(). Should not be used elsewhere.
 	 */
 	struct iterator *position;
-	/* Description of a possibly multipart key. */
-	struct key_def key_def;
-	enum index_type type;
-	bool enabled;
-	/* Relative offset of the index in its namespace. */
-	u32 n;
 };
 
-+ (Index *) alloc: (enum index_type) type_arg :(struct key_def *) key_def_arg;
+/**
+ * Allocate index instance.
+ *
+ * @param type     index type
+ * @param key_def  key part description
+ * @param space    space the index belongs to
+ */
++ (Index *) alloc: (enum index_type) type :(struct key_def *) key_def
+	:(struct space *) space;
 /**
  * Initialize index instance.
  *
+ * @param key_def  key part description
  * @param space    space the index belongs to
- * @param key      key part description
  */
-- (id) init: (enum index_type) type_arg :(struct key_def *) key_def_arg
-	:(struct space *) space_arg :(u32) n_arg;
+- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg;
 /** Destroy and free index instance. */
 - (void) free;
 /**
@@ -130,12 +134,6 @@ struct iterator {
 	void (*free)(struct iterator *);
 };
 
-#define foreach_index(n, index_var)					\
-	Index *index_var;						\
-	for (Index **index_ptr = space[(n)].index;			\
-	     *index_ptr != nil; index_ptr++)				\
-		if ((index_var = *index_ptr)->enabled)
-
-void build_indexes(void);
+struct box_tuple *iterator_first_equal(struct iterator *it);
 
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */

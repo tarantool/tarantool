@@ -146,6 +146,8 @@ static inline struct row_v11 *row_v11(const struct tbuf *t)
 	return (struct row_v11 *)t->data;
 }
 
+void mach_setup_crc32 ();
+
 struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, u64 cookie, i64 lsn);
 
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,

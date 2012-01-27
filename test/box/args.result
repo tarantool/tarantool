@@ -98,3 +98,10 @@ tarantool_box: creating `snapshots/00000000000000000001.snap.inprogress'
 tarantool_box: saving snapshot `snapshots/00000000000000000001.snap'
 tarantool_box: done
 
+#
+# A test case for Bug#897162, cat command should
+# not require a configuration file.
+
+tarantool_box --config=nonexists.cfg --cat=nonexists.xlog
+tarantool_box: access("nonexists.xlog"): No such file or directory
+

@@ -292,7 +292,7 @@ lbox_index_tostring(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	lua_pushfstring(L, "index %d in space %d",
-			index->n, index->space->n);
+			index_n(index), space_n(index->space));
 	return 1;
 }
 
@@ -420,7 +420,7 @@ lbox_index_next(struct lua_State *L)
 			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
 			for (int i = 0; i < argc; ++i)
 				append_key_part(L, i + 2, data,
-						index->key_def.parts[i].type);
+						index->key_def->parts[i].type);
 			key = data->data;
 		}
 		/*
@@ -429,10 +429,10 @@ lbox_index_next(struct lua_State *L)
 		 * keys.
 		*/
 		assert(cardinality != 0);
-		if (cardinality > index->key_def.part_count)
+		if (cardinality > index->key_def->part_count)
 			luaL_error(L, "index.next(): key part count (%d) "
 				   "does not match index cardinality (%d)",
-				   cardinality, index->key_def.part_count);
+				   cardinality, index->key_def->part_count);
 		it = [index allocIterator];
 		[index initIterator: it :key :cardinality];
 		lbox_pushiterator(L, it);

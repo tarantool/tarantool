@@ -1,7 +1,7 @@
-#ifndef TARANTOOL_CPU_FEATURES_H
-#define TARANTOOL_CPU_FEATURES_H
+#ifndef TARANTOOL_BOX_TREE_H_INCLUDED
+#define TARANTOOL_BOX_TREE_H_INCLUDED
 /*
- * Copyright (C) 2010 Mail.RU
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,39 +25,35 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include "index.h"
 
-/* CPU feature capabilities to use with cpu_has (feature). */
+#include <third_party/sptree.h>
 
-#if defined (__i386__) || defined (__x86_64__)
-enum {
-	cpuf_ht = 0, cpuf_sse4_1, cpuf_sse4_2, cpuf_hypervisor
+/**
+ * Instantiate sptree definitions
+ */
+SPTREE_DEF(index, realloc);
+
+typedef int (*tree_cmp_t)(const void *, const void *, void *);
+
+@interface TreeIndex: Index {
+	@public
+	sptree_index tree;
 };
-#endif
 
-/* Check whether CPU has a certain feature.
- *
- * @param	feature		indetifier (see above) of the target feature
- *
- * @return	1 if feature is available, 0 if unavailable,
- *		-EINVAL if unsupported CPU, -ERANGE if invalid feature
- */
-int cpu_has (unsigned int feature);
++ (Index *) alloc: (struct key_def *) key_def :(struct space *) space;
+- (void) build: (Index *) pk;
 
+/** To be defined in subclasses. */
+- (size_t) node_size;
+- (tree_cmp_t) node_cmp;
+- (tree_cmp_t) dup_node_cmp;
+- (tree_cmp_t) key_node_cmp;
+- (void) fold: (void *) node :(struct box_tuple *) tuple;
+- (struct box_tuple *) unfold: (const void *) node;
+- (int) compare: (const void *) node_a :(const void *) node_b;
+- (int) key_compare: (const void *) key :(const void *) node;
 
-/* Hardware-calculate CRC32 for the given data buffer.
- *
- * @param	crc 		initial CRC
- * @param	buf			data buffer
- * @param	len			buffer length
- *
- * @pre 	1 == cpu_has (cpuf_sse4_2)
- * @return	CRC32 value
- */
-u_int32_t crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len);
+@end
 
-
-#endif /* TARANTOOL_CPU_FEATURES_H */
-
-/* __EOF__ */
-
+#endif /* TARANTOOL_BOX_TREE_H_INCLUDED */

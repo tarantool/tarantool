@@ -411,6 +411,12 @@ initialize_minimal()
 	initialize(0.1, 4, 2);
 }
 
+inline static void
+mach_init ()
+{
+	mach_setup_crc32 ();
+}
+
 int
 main(int argc, char **argv)
 {
@@ -431,6 +437,7 @@ main(int argc, char **argv)
 	master_pid = getpid();
 	stat_init();
 	palloc_init();
+	mach_init ();
 
 #ifdef HAVE_BFD
 	symbols_load(argv[0]);

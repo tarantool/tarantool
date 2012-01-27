@@ -56,5 +56,13 @@ sys.stdout.pop_filter()
 os.unlink(cfg)
 shutil.rmtree(os.path.join(vardir, "bug726778"))
 
+print """#
+# A test case for Bug#897162, cat command should
+# not require a configuration file.
+"""
+sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
+server.test_option("--config=nonexists.cfg --cat=nonexists.xlog")
+sys.stdout.pop_filter()
+
 # Args filter cleanup
 # vim: syntax=python

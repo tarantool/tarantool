@@ -14,7 +14,7 @@ if ("${CPACK_GENERATOR}" STREQUAL "RPM")
 		 DESTINATION share/tarantool)
 else()
 	install (FILES ${CMAKE_SOURCE_DIR}/test/box/tarantool.cfg
-		DESTINATION bin)
+		DESTINATION "${CMAKE_SYSCONF_DIR}")
 	install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
-		DESTINATION bin)
+		DESTINATION "${CMAKE_LOCALSTATE_DIR}/lib/tarantool")
 endif()
