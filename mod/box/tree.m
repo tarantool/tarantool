@@ -820,10 +820,7 @@ tree_iterator_free(struct iterator *iterator)
 	assert(iterator->next == tree_iterator_next);
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	if (key_def->is_unique && part_count == key_def->part_count)
-		it->base.next_equal = iterator_first_equal;
-	else
-		it->base.next_equal = tree_iterator_next_equal;
+	it->base.next_equal = tree_iterator_next_equal;
 
 	it->key_data.data = key;
 	it->key_data.part_count = part_count;
