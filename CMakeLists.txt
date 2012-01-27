@@ -6,6 +6,7 @@ include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
 include(CheckSymbolExists)
+include(CheckCXXSourceRuns)
 include(TestBigEndian)
 
 find_program(ECHO echo)
@@ -17,10 +18,8 @@ find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
 find_program(LD ld)
 
-set(luadir ${PROJECT_BINARY_DIR}/third_party/luajit/src)
-link_directories(${luadir})
-
 include(cmake/check_objective_c_compiler.cmake)
+include(cmake/luajit.cmake)
 
 #
 # This instructs the rest of the build system what product
@@ -29,7 +28,6 @@ include(cmake/check_objective_c_compiler.cmake)
 set (TARANTOOL_PRODUCT "box")
 set (TARANTOOL_MODULES "box")
 set (TARANTOOL_CLIENTS "")
-
 
 #
 # Set default build type to Debug. This is to ease a developer's
@@ -184,6 +182,9 @@ endif()
 #
 # Now handle all configuration options.
 #
+
+# luajit options are defined in cmake/luajit.cmake
+
 option(ENABLE_CLIENT "Enable building of console client" Off)
 if (ENABLE_CLIENT)
     set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
@@ -280,6 +281,7 @@ message (STATUS "${TARANTOOL_MODULES}.")
 message (STATUS "Please check out CMakeCache.txt to view or modify configuration results.")
 message (STATUS "")
 message (STATUS "*** The following options are on in this configuration: ***")
+message (STATUS "ENABLE_LUAJIT: ${ENABLE_LUAJIT}")
 message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
 message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
 message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")

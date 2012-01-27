@@ -72,7 +72,9 @@ add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers luajit)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
-set (common_libraries cfg core ev coro gopt misc objc luajit)
+set (common_libraries cfg core ev coro gopt misc objc)
+set (common_libraries ${common_libraries} ${LUAJIT_LIB})
+
 if (TARGET_OS_LINUX)
   set (common_libraries ${common_libraries} dl)
 endif()

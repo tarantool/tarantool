@@ -50,8 +50,16 @@
  * Defined if this is a big-endian system.
  */
 #cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
-
+/*
+ * predefined /etc directory prefix.
+ */
 #define SYSCONF_DIR "@CMAKE_SYSCONF_DIR@"
+/*
+ * path to luajit headers.
+ */
+#define LUAJIT_LUA_H     "@LUAJIT_INCLUDE@/lua.h"
+#define LUAJIT_LUALIB_H  "@LUAJIT_INCLUDE@/lualib.h"
+#define LUAJIT_LAUXLIB_H "@LUAJIT_INCLUDE@/lauxlib.h"
 /*
  * vim: syntax=c
  */

@@ -39,9 +39,10 @@
 #include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
-#include "third_party/luajit/src/lua.h"
-#include "third_party/luajit/src/lauxlib.h"
-#include "third_party/luajit/src/lualib.h"
+
+#include LUAJIT_LUA_H
+#include LUAJIT_LAUXLIB_H
+#include LUAJIT_LUALIB_H
 
 static const char *help =
 	"available commands:" CRLF
@@ -57,7 +58,6 @@ static const char *help =
 	" - save snapshot" CRLF
 	" - lua command" CRLF
 	" - reload configuration" CRLF;
-
 
 static const char *unknown_command = "unknown command. try typing help." CRLF;
 

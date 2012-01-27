@@ -29,10 +29,10 @@
  * SUCH DAMAGE.
  */
 #include "tarantool.h"
-/* use a full path to avoid clashes with system lua */
-#include "third_party/luajit/src/lua.h"
-#include "third_party/luajit/src/lauxlib.h"
-#include "third_party/luajit/src/lualib.h"
+
+#include LUAJIT_LUA_H
+#include LUAJIT_LAUXLIB_H
+#include LUAJIT_LUALIB_H
 
 #include "pickle.h"
 #include "fiber.h"
