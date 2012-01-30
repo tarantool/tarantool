@@ -79,7 +79,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.11;
+$VERSION = 0.0.12;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -833,6 +833,12 @@ Specify storage (by id or name) space to select from.
 =item B<use_index> => $index_id_uint32_or_name_string
 
 Specify index (by id or name) to use.
+
+=item B<limit> => $limit_uint32
+
+Max tuples to select. It is set to C<< scalar @keys >> by default.
+To select all tuples (for example, using non-unique index), you
+should supply a big number here.
 
 =item B<raw> => $bool
 
