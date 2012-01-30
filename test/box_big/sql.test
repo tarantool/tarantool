@@ -14,7 +14,9 @@ exec sql "insert into t0 values ('Kytes', 'Tomas')"
 exec sql "insert into t0 values ('Stiles', 'Tomas')"
 exec sql "insert into t0 values ('Wales', 'Tomas')"
 exec sql "insert into t0 values ('Callaghan', 'Tomas')"
+sql.sort = True
 exec sql "select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5"
+sql.sort = False
 
 print """#
 # A test case for Bug#729879

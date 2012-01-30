@@ -22,10 +22,10 @@ Insert OK, 1 row affected
 select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5
 Found 5 tuples:
 ['Doe', 'Richard']
-['Woe', 'Richard']
-['Roe', 'Richard']
-['Major', 'Tomas']
 ['Kytes', 'Tomas']
+['Major', 'Tomas']
+['Roe', 'Richard']
+['Woe', 'Richard']
 #
 # A test case for Bug#729879
 # "Zero limit is treated the same as no limit"
