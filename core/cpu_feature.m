@@ -121,8 +121,10 @@ toggle_x86_flags(long mask, long* orig, long* toggled)
 	);
 #endif
 
-	if (orig)	*orig = forig;
-	if (toggled) 	*toggled = fres;
+	if (orig)
+		*orig = forig;
+	if (toggled)
+		*toggled = fres;
 	return;
 }
 
@@ -160,7 +162,7 @@ can_cpuid()
 
 /* Retrieve CPUID data using info as the EAX key. */
 static void
-get_cpuid (long info, long* eax, long* ebx, long* ecx, long *edx)
+get_cpuid(long info, long* eax, long* ebx, long* ecx, long *edx)
 {
 	*eax = info;
 
@@ -185,7 +187,7 @@ get_cpuid (long info, long* eax, long* ebx, long* ecx, long *edx)
 
 /* Check whether CPU has a certain feature. */
 int
-cpu_has (unsigned int feature)
+cpu_has(unsigned int feature)
 {
 	long info = 1, reg[4] = {0,0,0,0};
 
@@ -210,7 +212,7 @@ crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
 #else /* other (yet unsupported architectures) */
 
 int
-cpu_has (unsigned int feature)
+cpu_has(unsigned int feature)
 {
 	(void)feature;
 	return EINVAL;
