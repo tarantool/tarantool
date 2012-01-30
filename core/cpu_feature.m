@@ -101,7 +101,7 @@ crc32c_hw_intel(u_int32_t crc, unsigned char const *buf, size_t len)
 
 /* Toggle x86 flag-register bits, as per mask. */
 static void
-toggle_x86_flags (long mask, long* orig, long* toggled)
+toggle_x86_flags(long mask, long* orig, long* toggled)
 {
 	long forig = 0, fres = 0;
 
@@ -121,7 +121,7 @@ toggle_x86_flags (long mask, long* orig, long* toggled)
 	);
 #endif
 
-	if (orig) 		*orig = forig;
+	if (orig)	*orig = forig;
 	if (toggled) 	*toggled = fres;
 	return;
 }
@@ -129,27 +129,27 @@ toggle_x86_flags (long mask, long* orig, long* toggled)
 
 /* Is CPUID instruction available ? */
 static int
-can_cpuid ()
+can_cpuid()
 {
 	long of = -1, tf = -1;
 
 	/* x86 flag register masks */
 	enum {
 		cpuf_AC = (1 << 18), 	/* bit 18 */
-		cpuf_ID = (1 << 21)		/* bit 21 */
+		cpuf_ID = (1 << 21)	/* bit 21 */
 	};
 
 
 	/* Check if AC (alignment) flag could be toggled:
 		if not - it's i386, thus no CPUID.
 	*/
-	toggle_x86_flags (cpuf_AC, &of, &tf);
+	toggle_x86_flags(cpuf_AC, &of, &tf);
 	if ((of & cpuf_AC) == (tf & cpuf_AC)) {
 		return 0;
 	}
 
 	/* Next try toggling CPUID (ID) flag. */
-	toggle_x86_flags (cpuf_ID, &of, &tf);
+	toggle_x86_flags(cpuf_ID, &of, &tf);
 	if ((of & cpuf_ID) == (tf & cpuf_ID)) {
 		return 0;
 	}
@@ -189,13 +189,13 @@ cpu_has (unsigned int feature)
 {
 	long info = 1, reg[4] = {0,0,0,0};
 
-	if (!can_cpuid ())
+	if (!can_cpuid())
 		return -EINVAL;
 
 	if (feature > LEN_cpu_mask)
 		return -ERANGE;
 
-	get_cpuid (info, &reg[eAX], &reg[eBX], &reg[eCX], &reg[eDX]);
+	get_cpuid(info, &reg[eAX], &reg[eBX], &reg[eCX], &reg[eDX]);
 
 	return (reg[cpu_mask[feature].ri] & cpu_mask[feature].bitmask) ? 1 : 0;
 }
@@ -220,13 +220,12 @@ u_int32_t
 crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
 {
 	(void)crc; (void)buf, (void)len;
-	assert (false);
+	assert(false);
 	return 0;
 }
 
 
 #endif /* defined (__i386__) || defined (__x86_64__) */
-
 
 
 /* __EOF__ */
