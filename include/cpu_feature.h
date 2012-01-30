@@ -42,7 +42,7 @@ enum {
  * @return	1 if feature is available, 0 if unavailable,
  *		-EINVAL if unsupported CPU, -ERANGE if invalid feature
  */
-int cpu_has (unsigned int feature);
+int cpu_has(unsigned int feature);
 
 
 /* Hardware-calculate CRC32 for the given data buffer.
