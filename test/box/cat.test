@@ -15,11 +15,9 @@ print """
 snapshot = os.path.join(vardir, "00000000000000000500.snap")
 os.symlink(os.path.abspath("box/00000000000000000500.snap"), snapshot)
 server.test_option("--cat=00000000000000000500.snap")
-server.restart()
 
 # print "# Restore the default server..."
 os.unlink(snapshot)
-server.stop()
 
 # __EOF__
 
