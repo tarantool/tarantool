@@ -116,7 +116,7 @@ tnt_buf_reply(struct tnt_stream *s, struct tnt_reply *r) {
 	if (sb->size == sb->rdoff)
 		return 1;
 	size_t off = 0;
-	int rc = tnt_reply(r, s->data + sb->rdoff, sb->size - sb->rdoff, &off);
+	int rc = tnt_reply(r, sb->data + sb->rdoff, sb->size - sb->rdoff, &off);
 	if (rc == 0)
 		sb->rdoff += off;
 	return rc;
