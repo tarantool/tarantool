@@ -24,8 +24,11 @@ exec sql "insert into t0 values (1, 'I am a new tuple')"
 exec sql "select * from t0 where k0 = 1"
 exec sql "update t0 set k1 = 'I am the newest tuple' where k0=1"
 exec sql "select * from t0 where k0 = 1"
-# this is illegal, can't change tuple dimension with update
-exec sql "update t0 set k1 = 'Huh', k2 = 'Oh-ho-ho' where k0=1"
+# this is correct, can append field to tuple
+exec sql "update t0 set k1 = 'Huh', k2 = 'I am a new field! I was added via append' where k0=1"
+exec sql "select * from t0 where k0 = 1"
+# this is illegal
+exec sql "update t0 set k1 = 'Huh', k1000 = 'invalid field' where k0=1"
 exec sql "select * from t0 where k0 = 1"
 exec sql "insert into t0 values (1, 'I am a new tuple', 'stub')"
 exec sql "update t0 set k1 = 'Huh', k2 = 'Oh-ho-ho' where k0=1"

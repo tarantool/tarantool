@@ -39,6 +39,8 @@ enum
 {
 	BOX_INDEX_MAX = 10,
 	BOX_SPACE_MAX = 256,
+	/** A limit on how many operations a single UPDATE can have. */
+	BOX_UPDATE_OP_CNT_MAX = 128,
 };
 
 struct space {
@@ -146,6 +148,20 @@ struct box_txn {
 	_(CALL, 22)
 
 ENUM(messages, MESSAGES);
+
+/** UPDATE operation codes. */
+#define UPDATE_OP_CODES(_)			\
+	_(UPDATE_OP_SET, 0)			\
+	_(UPDATE_OP_ADD, 1)			\
+	_(UPDATE_OP_AND, 2)			\
+	_(UPDATE_OP_XOR, 3)			\
+	_(UPDATE_OP_OR, 4)			\
+	_(UPDATE_OP_SPLICE, 5)			\
+	_(UPDATE_OP_DELETE, 6)			\
+	_(UPDATE_OP_NONE, 7)			\
+	_(UPDATE_OP_MAX, 8)			\
+
+ENUM(update_op_codes, UPDATE_OP_CODES);
 
 extern iproto_callback rw_callback;
 

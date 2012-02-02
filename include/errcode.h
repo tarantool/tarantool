@@ -94,11 +94,11 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 38 */_(ER_WRONG_VERSION,		2, "Unsupported version of protocol") \
 		/* end of silversearch error codes */					\
 	/* 39 */_(ER_WAL_IO,			2, "Failed to write to disk") \
-	/* 40 */_(ER_UNUSED40,			0, "Unused40") \
-	/* 41 */_(ER_UNUSED41,			0, "Unused41") \
-	/* 42 */_(ER_UNUSED42,			0, "Unused42") \
-	/* 43 */_(ER_UNUSED43,			0, "Unused43") \
-	/* 44 */_(ER_UNUSED44,			0, "Unused44") \
+	/* 40 */_(ER_FIELD_TYPE,		2, "Field type does not match one required by operation: expected a %s") \
+	/* 41 */_(ER_TYPE_MISMATCH,		2, "Argument type in operation does not match field type: expected a %s") \
+	/* 42 */_(ER_SPLICE,			2, "Field SPLICE error: %s") \
+	/* 43 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
+	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
 	/* 45 */_(ER_UNUSED45,			0, "Unused45") \
 	/* 46 */_(ER_UNUSED46,			0, "Unused46") \
 	/* 47 */_(ER_UNUSED47,			0, "Unused47") \

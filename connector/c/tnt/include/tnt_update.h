@@ -32,6 +32,7 @@
 #define TNT_UPDATE_XOR    3
 #define TNT_UPDATE_OR     4
 #define TNT_UPDATE_SPLICE 5
+#define TNT_UPDATE_DELETE 6
 
 ssize_t
 tnt_update_arith(struct tnt_stream *s, uint32_t field,
@@ -45,6 +46,9 @@ ssize_t
 tnt_update_splice(struct tnt_stream *s, uint32_t field,
 		  uint32_t offset,
 		  uint32_t length, char *data, size_t size);
+
+ssize_t
+tnt_update_delete(struct tnt_stream *s, uint32_t field);
 
 ssize_t
 tnt_update(struct tnt_stream *s, uint32_t ns, uint32_t flags,
