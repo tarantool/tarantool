@@ -175,10 +175,10 @@ include_directories("${PROJECT_SOURCE_DIR}/connector/c/tntnet/include")
 # Specify prefixes
 #
 if (NOT DEFINED CMAKE_SYSCONF_DIR)
-    set (CMAKE_SYSCONF_DIR "${CMAKE_INSTALL_PREFIX}/etc")
+    set (CMAKE_SYSCONF_DIR "etc")
 endif()
 if (NOT DEFINED CMAKE_LOCALSTATE_DIR)
-    set (CMAKE_LOCALSTATE_DIR "${CMAKE_INSTALL_PREFIX}/var")
+    set (CMAKE_LOCALSTATE_DIR "var")
 endif()
 
 #
