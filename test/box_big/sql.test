@@ -58,6 +58,8 @@ print """#
 # Test composite keys with trees
 #"""
 exec sql "insert into t1 values ('key1', 'part1', 'part2')"
+# Test a duplicate insert on unique index that once resulted in a crash (bug #926080)
+exec sql "insert into t1 values ('key1', 'part1', 'part2')"
 exec sql "insert into t1 values ('key2', 'part1', 'part2_a')"
 exec sql "insert into t1 values ('key3', 'part1', 'part2_b')"
 exec admin "lua for k, v in box.space[1]:pairs() do print(v) end"

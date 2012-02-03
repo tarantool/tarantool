@@ -88,6 +88,8 @@ Delete OK, 1 row affected
 #
 insert into t1 values ('key1', 'part1', 'part2')
 Insert OK, 1 row affected
+insert into t1 values ('key1', 'part1', 'part2')
+Insert OK, 1 row affected
 insert into t1 values ('key2', 'part1', 'part2_a')
 Insert OK, 1 row affected
 insert into t1 values ('key3', 'part1', 'part2_b')
