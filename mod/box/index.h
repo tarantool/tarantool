@@ -134,6 +134,4 @@ struct iterator {
 	void (*free)(struct iterator *);
 };
 
-struct box_tuple *iterator_first_equal(struct iterator *it);
-
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */
