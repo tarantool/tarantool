@@ -28,11 +28,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_proto.h>
-#include <tnt_tuple.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
-#include <tnt_insert.h>
+#include <connector/c/include/libtnt/tnt_proto.h>
+#include <connector/c/include/libtnt/tnt_tuple.h>
+#include <connector/c/include/libtnt/tnt_reply.h>
+#include <connector/c/include/libtnt/tnt_stream.h>
+#include <connector/c/include/libtnt/tnt_insert.h>
 
 struct tnt_header_insert {
 	uint32_t ns;

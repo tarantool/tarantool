@@ -28,14 +28,14 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_mem.h>
-#include <tnt_proto.h>
-#include <tnt_enc.h>
-#include <tnt_tuple.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
-#include <tnt_buf.h>
-#include <tnt_update.h>
+#include <libtnt/tnt_mem.h>
+#include <libtnt/tnt_proto.h>
+#include <libtnt/tnt_enc.h>
+#include <libtnt/tnt_tuple.h>
+#include <libtnt/tnt_reply.h>
+#include <libtnt/tnt_stream.h>
+#include <libtnt/tnt_buf.h>
+#include <libtnt/tnt_update.h>
 
 static ssize_t
 tnt_update_op(struct tnt_stream *s,

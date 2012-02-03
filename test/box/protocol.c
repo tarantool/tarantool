@@ -3,11 +3,12 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#include <connector/c/tnt/include/tnt.h>
-#include <connector/c/tntnet/include/tnt_net.h>
-#include <connector/c/tntnet/include/tnt_io.h>
 #include "util.h"
 #include "errcode.h"
+
+#include <libtnt/tnt.h>
+#include <libtnt/tnt_net.h>
+#include <libtnt/tnt_io.h>
 
 /** Client handler. Reused between tests. */
 struct tnt_stream *t;
