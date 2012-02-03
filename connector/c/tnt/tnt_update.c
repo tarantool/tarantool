@@ -32,6 +32,7 @@
 #include <tnt_proto.h>
 #include <tnt_enc.h>
 #include <tnt_tuple.h>
+#include <tnt_request.h>
 #include <tnt_reply.h>
 #include <tnt_stream.h>
 #include <tnt_buf.h>
@@ -147,11 +148,6 @@ tnt_update_splice(struct tnt_stream *s, uint32_t field,
 	tnt_mem_free(buf);
 	return rc;
 }
-
-struct tnt_header_update {
-	uint32_t ns;
-	uint32_t flags;
-};
 
 /*
  * tnt_update()

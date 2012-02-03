@@ -31,13 +31,10 @@
 #include <tnt_proto.h>
 #include <tnt_enc.h>
 #include <tnt_tuple.h>
+#include <tnt_request.h>
 #include <tnt_reply.h>
 #include <tnt_stream.h>
 #include <tnt_call.h>
-
-struct tnt_header_call {
-	uint32_t flags;
-};
 
 /*
  * tnt_call()

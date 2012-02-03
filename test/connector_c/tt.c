@@ -276,6 +276,178 @@ static void tt_tnt_iter3(struct tt_test *test) {
 	tnt_list_free(l);
 }
 
+/* marshal insert */
+static void tt_tnt_marshal_insert(struct tt_test *test) {
+	struct tnt_stream s;
+	tnt_buf(&s);
+	struct tnt_tuple t;
+	tnt_tuple_init(&t);
+	tnt_tuple(&t, "%s%d", "foo", 123);
+	tnt_insert(&s, 0, 0, &t);
+	tnt_insert(&s, 0, 0, &t);
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+	TT_ASSERT(tnt_next(&i) == 1);
+	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+	TT_ASSERT(r->type == TNT_REQUEST_INSERT);
+	struct tnt_iter *f = tnt_field(NULL, &r->r.insert.t, 0);
+	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+	TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
+	TT_ASSERT(tnt_field(f, NULL, 1) != NULL);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 4);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 1);
+	TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 123);
+	TT_ASSERT(tnt_next(&i) == 1);
+	r = TNT_IREQUEST_PTR(&i);
+	TT_ASSERT(r->type == TNT_REQUEST_INSERT);
+	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+	TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
+	TT_ASSERT(tnt_field(f, NULL, 1) != NULL);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 4);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 1);
+	TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 123);
+	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+}
+
+/* marshal delete */
+static void tt_tnt_marshal_delete(struct tt_test *test) {
+	struct tnt_stream s;
+	tnt_buf(&s);
+	struct tnt_tuple t;
+	tnt_tuple_init(&t);
+	tnt_tuple(&t, "%s", "foo");
+	tnt_delete(&s, 0, 0, &t);
+	tnt_delete(&s, 0, 0, &t);
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+	TT_ASSERT(tnt_next(&i) == 1);
+	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+	TT_ASSERT(r->type == TNT_REQUEST_DELETE);
+	struct tnt_iter *f = tnt_field(NULL, &r->r.delete.t, 0);
+	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+	TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
+	TT_ASSERT(tnt_next(&i) == 1);
+	r = TNT_IREQUEST_PTR(&i);
+	TT_ASSERT(r->type == TNT_REQUEST_DELETE);
+	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+	TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
+	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+}
+
+/* marshal call */
+static void tt_tnt_marshal_call(struct tt_test *test) {
+	struct tnt_stream s;
+	tnt_buf(&s);
+	struct tnt_tuple t;
+	tnt_tuple_init(&t);
+	tnt_tuple(&t, "%s%d", "foo", 123);
+	tnt_call(&s, 0, "box.select", &t);
+	tnt_call(&s, 0, "box.select", &t);
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+	TT_ASSERT(tnt_next(&i) == 1);
+	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+	TT_ASSERT(r->type == TNT_REQUEST_CALL);
+	TT_ASSERT(strcmp(r->r.call.proc, "box.select") == 0);
+	struct tnt_iter *f = tnt_field(NULL, &r->r.call.t, 0);
+	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+	TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
+	TT_ASSERT(tnt_field(f, NULL, 1) != NULL);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 4);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 1);
+	TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 123);
+	TT_ASSERT(tnt_next(&i) == 1);
+	r = TNT_IREQUEST_PTR(&i);
+	TT_ASSERT(r->type == TNT_REQUEST_CALL);
+	TT_ASSERT(strcmp(r->r.call.proc, "box.select") == 0);
+	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+	TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
+	TT_ASSERT(tnt_field(f, NULL, 1) != NULL);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 4);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 1);
+	TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 123);
+	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+}
+
+/* marshal select */
+static void tt_tnt_marshal_select(struct tt_test *test) {
+	struct tnt_stream s;
+	tnt_buf(&s);
+	struct tnt_list list;
+	tnt_list_init(&list);
+	tnt_list(&list, tnt_tuple(NULL, "%s", "foo"),
+			tnt_tuple(NULL, "%s%d", "bar", 444),
+			tnt_tuple(NULL, "%s%d%d", "baz", 1, 2),
+			NULL);
+	tnt_select(&s, 0, 0, 0, 1, &list);
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+	TT_ASSERT(tnt_next(&i) == 1);
+	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+	TT_ASSERT(r->type == TNT_REQUEST_SELECT);
+	struct tnt_iter il;
+	tnt_iter_list(&il, &r->r.select.l);
+	TT_ASSERT(tnt_next(&il) == 1);
+		struct tnt_tuple *t = TNT_ILIST_TUPLE(&il);
+		struct tnt_iter *f = tnt_field(NULL, t, 0);
+		TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+		TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+		TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+		TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
+		tnt_iter_free(f);
+	TT_ASSERT(tnt_next(&il) == 1);
+		t = TNT_ILIST_TUPLE(&il);
+		f = tnt_field(NULL, t, 0);
+		TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+		TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+		TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+		TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "bar", 3) == 0);
+		TT_ASSERT(tnt_field(f, NULL, 1) != NULL);
+		TT_ASSERT(TNT_IFIELD_SIZE(f) == 4);
+		TT_ASSERT(TNT_IFIELD_IDX(f) == 1);
+		TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 444);
+		tnt_iter_free(f);
+	TT_ASSERT(tnt_next(&il) == 1);
+		t = TNT_ILIST_TUPLE(&il);
+		f = tnt_field(NULL, t, 0);
+		TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+		TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+		TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+		TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "baz", 3) == 0);
+		TT_ASSERT(tnt_field(f, NULL, 1) != NULL);
+		TT_ASSERT(TNT_IFIELD_SIZE(f) == 4);
+		TT_ASSERT(TNT_IFIELD_IDX(f) == 1);
+		TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 1);
+		TT_ASSERT(tnt_field(f, NULL, 2) != NULL);
+		TT_ASSERT(TNT_IFIELD_SIZE(f) == 4);
+		TT_ASSERT(TNT_IFIELD_IDX(f) == 2);
+		TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 2);
+		tnt_iter_free(f);
+	TT_ASSERT(tnt_next(&il) == 0);
+	tnt_iter_free(&i);
+	tnt_iter_free(&il);
+	tnt_list_free(&list);
+	tnt_stream_free(&s);
+}
+
 static struct tnt_stream net;
 
 /* network connection */
@@ -292,9 +464,9 @@ static void tt_tnt_net_ping(struct tt_test *test) {
 	TT_ASSERT(tnt_ping(&net) > 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_PING);
 	}
@@ -316,9 +488,9 @@ static void tt_tnt_net_insert(struct tt_test *test) {
 	tnt_tuple_free(&kv1);
 	tnt_tuple_free(&kv2);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->reqid == 777);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_INSERT);
@@ -339,9 +511,9 @@ static void tt_tnt_net_update(struct tt_test *test) {
 	tnt_stream_free(&ops);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_UPDATE);
 		TT_ASSERT(r->count == 1);
@@ -356,9 +528,9 @@ static void tt_tnt_net_select(struct tt_test *test) {
 	TT_ASSERT(tnt_flush(&net) > 0);
 	tnt_list_free(search);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_SELECT);
 		TT_ASSERT(r->count == 1);
@@ -396,9 +568,9 @@ static void tt_tnt_net_delete(struct tt_test *test) {
 	TT_ASSERT(tnt_flush(&net) > 0);
 	tnt_tuple_free(&k);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_DELETE);
 		TT_ASSERT(r->count == 1);
@@ -415,9 +587,9 @@ static void tt_tnt_net_call(struct tt_test *test) {
 	TT_ASSERT(tnt_flush(&net) > 0);
 	tnt_tuple_free(&args);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_CALL);
 		TT_ASSERT(r->count == 1);
@@ -433,9 +605,9 @@ static void tt_tnt_net_call_na(struct tt_test *test) {
 	TT_ASSERT(tnt_flush(&net) > 0);
 	tnt_tuple_free(&args);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code != 0);
 		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple cardinality is 0") == 0);
 	}
@@ -707,9 +879,9 @@ static void tt_tnt_sql_ping(struct tt_test *test) {
 	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_PING);
 	}
@@ -723,9 +895,9 @@ static void tt_tnt_sql_insert(struct tt_test *test) {
 	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_INSERT);
 		TT_ASSERT(r->count == 1);
@@ -758,9 +930,9 @@ static void tt_tnt_sql_update(struct tt_test *test) {
 	TT_ASSERT(tnt_query(&net, q7, sizeof(q7) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_UPDATE);
 		TT_ASSERT(r->count == 1);
@@ -775,9 +947,9 @@ static void tt_tnt_sql_select(struct tt_test *test) {
 	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_SELECT);
 		TT_ASSERT(r->count == 2);
@@ -814,9 +986,9 @@ static void tt_tnt_sql_select_limit(struct tt_test *test) {
 	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_SELECT);
 		TT_ASSERT(r->count == 0);
@@ -831,9 +1003,9 @@ static void tt_tnt_sql_delete(struct tt_test *test) {
 	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_DELETE);
 		TT_ASSERT(r->count == 1);
@@ -848,9 +1020,9 @@ static void tt_tnt_sql_call(struct tt_test *test) {
 	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
-	tnt_iter_stream(&i, &net);
+	tnt_iter_reply(&i, &net);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code == 0);
 		TT_ASSERT(r->op == TNT_OP_CALL);
 		TT_ASSERT(r->count == 1);
@@ -875,6 +1047,11 @@ main(int argc, char * argv[])
 	tt_test(&t, "iterator tuple (single field)", tt_tnt_iter11);
 	tt_test(&t, "iterator tuple (tnt_field)", tt_tnt_iter2);
 	tt_test(&t, "iterator list", tt_tnt_iter3);
+	/* marshaling */
+	tt_test(&t, "marshaling insert", tt_tnt_marshal_insert);
+	tt_test(&t, "marshaling delete", tt_tnt_marshal_delete);
+	tt_test(&t, "marshaling call", tt_tnt_marshal_call);
+	tt_test(&t, "marshaling select", tt_tnt_marshal_select);
 	/* common operations */
 	tt_test(&t, "connect", tt_tnt_net_connect);
 	tt_test(&t, "ping", tt_tnt_net_ping);

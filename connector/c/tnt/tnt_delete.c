@@ -30,13 +30,10 @@
 
 #include <tnt_proto.h>
 #include <tnt_tuple.h>
+#include <tnt_request.h>
 #include <tnt_reply.h>
 #include <tnt_stream.h>
 #include <tnt_delete.h>
-
-struct tnt_header_delete {
-	uint32_t ns;
-};
 
 /*
  * tnt_delete()

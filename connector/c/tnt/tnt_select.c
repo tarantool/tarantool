@@ -31,17 +31,11 @@
 #include <tnt_mem.h>
 #include <tnt_proto.h>
 #include <tnt_tuple.h>
+#include <tnt_request.h>
 #include <tnt_reply.h>
 #include <tnt_stream.h>
 #include <tnt_iter.h>
 #include <tnt_select.h>
-
-struct tnt_header_select {
-	uint32_t ns;
-	uint32_t index;
-	uint32_t offset;
-	uint32_t limit;
-};
 
 /*
  * tnt_select()

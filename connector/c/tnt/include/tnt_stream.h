@@ -36,7 +36,8 @@ struct tnt_stream {
 	ssize_t (*write)(struct tnt_stream *s, char *buf, size_t size);
 	ssize_t (*writev)(struct tnt_stream *s, struct iovec *iov, int count);
 	ssize_t (*read)(struct tnt_stream *s, char *buf, size_t size);
-	int (*reply)(struct tnt_stream *s, struct tnt_reply *r);
+	int (*read_reply)(struct tnt_stream *s, struct tnt_reply *r);
+	int (*read_request)(struct tnt_stream *s, struct tnt_request *r);
 	void (*free)(struct tnt_stream *s);
 	void *data;
 	uint32_t wrcnt; /* count of write operations */

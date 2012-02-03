@@ -30,6 +30,7 @@
 
 #include <tnt_proto.h>
 #include <tnt_tuple.h>
+#include <tnt_request.h>
 #include <tnt_reply.h>
 #include <tnt_stream.h>
 #include <tnt_ping.h>

@@ -68,7 +68,7 @@ void tnt_reply_free(struct tnt_reply *r) {
  * 
  * returns zero on fully read reply, or -1 on error.
 */
-int tnt_reply_from(struct tnt_reply *r, tnt_replyf_t rcv, void *ptr) {
+int tnt_reply_from(struct tnt_reply *r, tnt_reply_t rcv, void *ptr) {
 	/* reading iproto header */
 	struct tnt_header hdr;
 	if (rcv(ptr, (char*)&hdr, sizeof(struct tnt_header)) == -1)
@@ -204,7 +204,7 @@ int tnt_reply(struct tnt_reply *r, char *buf, size_t size, size_t *off) {
 	}
 	size_t offv = 0;
 	void *ptr[2] = { buf, &offv };
-	int rc = tnt_reply_from(r, (tnt_replyf_t)tnt_reply_cb, ptr);
+	int rc = tnt_reply_from(r, (tnt_reply_t)tnt_reply_cb, ptr);
 	if (off)
 		*off = offv;
 	return rc;
