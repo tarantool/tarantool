@@ -193,12 +193,11 @@ admin_dispatch(lua_State *L)
 
 		action set_injection {
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set_byname(strstart, state);
-			if (ret) {
-				ok(out);
-			} else {
+			if (errinj_set_byname(strstart, state)) {
 				tbuf_printf(err, "can't find error injection '%s'", strstart);
 				fail(out, err);
+			} else {
+				ok(out);
 			}
 		}
 

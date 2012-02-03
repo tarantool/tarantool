@@ -1,5 +1,5 @@
 # encoding: tarantool
-# 
+#
 import sys
 # clear statistics:
 server.stop()

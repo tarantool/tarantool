@@ -43,10 +43,9 @@ ENUM0(errinj_enum, ERRINJ_LIST);
 extern struct errinj errinjs[];
 
 bool errinj_get(int id);
-bool errinj_get_byname(char *name);
 
 void errinj_set(int id, bool state);
-bool errinj_set_byname(char *name, bool state);
+int errinj_set_byname(char *name, bool state);
 
 void errinj_info(struct tbuf *out);
 

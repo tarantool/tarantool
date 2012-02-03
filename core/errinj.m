@@ -41,10 +41,10 @@ struct errinj errinjs[errinj_enum_MAX] = {
 	ERRINJ_LIST(ERRINJ_MEMBER)
 };
 
-static struct errinj*
+static struct errinj *
 errinj_lookup(char *name)
 {
-	int i; 
+	int i;
 	for (i = 0 ; i < errinj_enum_MAX ; i++) {
 		if (strcmp(errinjs[i].name, name) == 0)
 			return &errinjs[i];
@@ -57,29 +57,13 @@ errinj_lookup(char *name)
  *
  * @param id error injection id.
  *
- * @return error injection handle state on success, false on error.
+ * @return error injection handle state.
  */
 bool
 errinj_get(int id)
 {
 	assert(id >= 0 && id < errinj_enum_MAX);
 	return errinjs[id].state;
-}
-
-/**
- * Get state of the error injection handle by name.
- *
- * @param name error injection name.
- *
- * @return error injection handle state on success, false on error.
- */
-bool
-errinj_get_byname(char *name)
-{
-	struct errinj *ei = errinj_lookup(name);
-	if (ei == NULL)
-		return false;
-	return ei->state;
 }
 
 /**
@@ -102,16 +86,16 @@ errinj_set(int id, bool state)
  * @param name error injection name.
  * @param state error injection handle state.
  *
- * @return true on success, false on error.
+ * @return 0 on success, -1 if injection was not found.
  */
-bool
+int
 errinj_set_byname(char *name, bool state)
 {
 	struct errinj *ei = errinj_lookup(name);
 	if (ei == NULL)
-		return false;
+		return -1;
 	ei->state = state;
-	return true;
+	return 0;
 }
 
 /**

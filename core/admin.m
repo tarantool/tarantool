@@ -206,11 +206,11 @@ case 6:
 	}
 	goto st0;
 tr13:
-#line 247 "core/admin.rl"
+#line 246 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st135;
 tr20:
-#line 235 "core/admin.rl"
+#line 234 "core/admin.rl"
 	{return 0;}
 	goto st135;
 tr25:
@@ -227,7 +227,7 @@ tr25:
 		}
 	goto st135;
 tr36:
-#line 221 "core/admin.rl"
+#line 220 "core/admin.rl"
 	{strend = p;}
 #line 167 "core/admin.rl"
 	{
@@ -247,7 +247,7 @@ tr43:
 		}
 	goto st135;
 tr67:
-#line 245 "core/admin.rl"
+#line 244 "core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st135;
 tr76:
@@ -266,32 +266,30 @@ tr76:
 		}
 	goto st135;
 tr98:
-#line 231 "core/admin.rl"
+#line 230 "core/admin.rl"
 	{ state = false; }
 #line 194 "core/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set_byname(strstart, state);
-			if (ret) {
-				ok(out);
-			} else {
+			if (errinj_set_byname(strstart, state)) {
 				tbuf_printf(err, "can't find error injection '%s'", strstart);
 				fail(out, err);
+			} else {
+				ok(out);
 			}
 		}
 	goto st135;
 tr101:
-#line 230 "core/admin.rl"
+#line 229 "core/admin.rl"
 	{ state = true; }
 #line 194 "core/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set_byname(strstart, state);
-			if (ret) {
-				ok(out);
-			} else {
+			if (errinj_set_byname(strstart, state)) {
 				tbuf_printf(err, "can't find error injection '%s'", strstart);
 				fail(out, err);
+			} else {
+				ok(out);
 			}
 		}
 	goto st135;
@@ -316,11 +314,11 @@ tr117:
 		}
 	goto st135;
 tr131:
-#line 238 "core/admin.rl"
+#line 237 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st135;
 tr137:
-#line 237 "core/admin.rl"
+#line 236 "core/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st135;
 tr146:
@@ -332,29 +330,29 @@ tr146:
 		}
 	goto st135;
 tr152:
-#line 241 "core/admin.rl"
+#line 240 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st135;
 tr160:
-#line 240 "core/admin.rl"
+#line 239 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
 	goto st135;
 tr164:
-#line 242 "core/admin.rl"
+#line 241 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st135;
 st135:
 	if ( ++p == pe )
 		goto _test_eof135;
 case 135:
-#line 351 "core/admin.m"
+#line 349 "core/admin.m"
 	goto st0;
 tr14:
-#line 247 "core/admin.rl"
+#line 246 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
 tr21:
-#line 235 "core/admin.rl"
+#line 234 "core/admin.rl"
 	{return 0;}
 	goto st7;
 tr26:
@@ -371,7 +369,7 @@ tr26:
 		}
 	goto st7;
 tr37:
-#line 221 "core/admin.rl"
+#line 220 "core/admin.rl"
 	{strend = p;}
 #line 167 "core/admin.rl"
 	{
@@ -391,7 +389,7 @@ tr44:
 		}
 	goto st7;
 tr68:
-#line 245 "core/admin.rl"
+#line 244 "core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
 tr77:
@@ -410,32 +408,30 @@ tr77:
 		}
 	goto st7;
 tr99:
-#line 231 "core/admin.rl"
+#line 230 "core/admin.rl"
 	{ state = false; }
 #line 194 "core/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set_byname(strstart, state);
-			if (ret) {
-				ok(out);
-			} else {
+			if (errinj_set_byname(strstart, state)) {
 				tbuf_printf(err, "can't find error injection '%s'", strstart);
 				fail(out, err);
+			} else {
+				ok(out);
 			}
 		}
 	goto st7;
 tr102:
-#line 230 "core/admin.rl"
+#line 229 "core/admin.rl"
 	{ state = true; }
 #line 194 "core/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
-			bool ret = errinj_set_byname(strstart, state);
-			if (ret) {
-				ok(out);
-			} else {
+			if (errinj_set_byname(strstart, state)) {
 				tbuf_printf(err, "can't find error injection '%s'", strstart);
 				fail(out, err);
+			} else {
+				ok(out);
 			}
 		}
 	goto st7;
@@ -460,11 +456,11 @@ tr118:
 		}
 	goto st7;
 tr132:
-#line 238 "core/admin.rl"
+#line 237 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st7;
 tr138:
-#line 237 "core/admin.rl"
+#line 236 "core/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st7;
 tr147:
@@ -476,22 +472,22 @@ tr147:
 		}
 	goto st7;
 tr153:
-#line 241 "core/admin.rl"
+#line 240 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st7;
 tr161:
-#line 240 "core/admin.rl"
+#line 239 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
 	goto st7;
 tr165:
-#line 242 "core/admin.rl"
+#line 241 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 495 "core/admin.m"
+#line 491 "core/admin.m"
 	if ( (*p) == 10 )
 		goto st135;
 	goto st0;
@@ -644,28 +640,28 @@ case 23:
 	}
 	goto tr33;
 tr33:
-#line 221 "core/admin.rl"
+#line 220 "core/admin.rl"
 	{strstart = p;}
 	goto st24;
 st24:
 	if ( ++p == pe )
 		goto _test_eof24;
 case 24:
-#line 655 "core/admin.m"
+#line 651 "core/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
 	}
 	goto st24;
 tr34:
-#line 221 "core/admin.rl"
+#line 220 "core/admin.rl"
 	{strstart = p;}
 	goto st25;
 st25:
 	if ( ++p == pe )
 		goto _test_eof25;
 case 25:
-#line 669 "core/admin.m"
+#line 665 "core/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
@@ -1115,28 +1111,28 @@ case 73:
 		goto tr91;
 	goto st0;
 tr91:
-#line 229 "core/admin.rl"
+#line 228 "core/admin.rl"
 	{ strstart = p; }
 	goto st74;
 st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 1126 "core/admin.m"
+#line 1122 "core/admin.m"
 	if ( (*p) == 32 )
 		goto tr92;
 	if ( 33 <= (*p) && (*p) <= 126 )
 		goto st74;
 	goto st0;
 tr92:
-#line 229 "core/admin.rl"
+#line 228 "core/admin.rl"
 	{ strend = p; }
 	goto st75;
 st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 1140 "core/admin.m"
+#line 1136 "core/admin.m"
 	switch( (*p) ) {
 		case 32: goto st75;
 		case 111: goto st76;
@@ -1828,7 +1824,7 @@ case 134:
 	_out: {}
 	}
 
-#line 253 "core/admin.rl"
+#line 252 "core/admin.rl"
 
 
 	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);
