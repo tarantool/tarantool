@@ -276,6 +276,24 @@ static void tt_tnt_iter3(struct tt_test *test) {
 	tnt_list_free(l);
 }
 
+/* marshal ping */
+static void tt_tnt_marshal_ping(struct tt_test *test) {
+	struct tnt_stream s;
+	tnt_buf(&s);
+	tnt_ping(&s);
+	tnt_ping(&s);
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+	TT_ASSERT(tnt_next(&i) == 1);
+	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+	TT_ASSERT(r->type == TNT_REQUEST_PING);
+	TT_ASSERT(tnt_next(&i) == 1);
+	TT_ASSERT(r->type == TNT_REQUEST_PING);
+	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+}
+
 /* marshal insert */
 static void tt_tnt_marshal_insert(struct tt_test *test) {
 	struct tnt_stream s;
@@ -311,6 +329,7 @@ static void tt_tnt_marshal_insert(struct tt_test *test) {
 	TT_ASSERT(TNT_IFIELD_IDX(f) == 1);
 	TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 123);
 	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_tuple_free(&t);
 	tnt_iter_free(&i);
 	tnt_stream_free(&s);
 }
@@ -342,6 +361,7 @@ static void tt_tnt_marshal_delete(struct tt_test *test) {
 	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
 	TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
 	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_tuple_free(&t);
 	tnt_iter_free(&i);
 	tnt_stream_free(&s);
 }
@@ -383,6 +403,7 @@ static void tt_tnt_marshal_call(struct tt_test *test) {
 	TT_ASSERT(TNT_IFIELD_IDX(f) == 1);
 	TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 123);
 	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_tuple_free(&t);
 	tnt_iter_free(&i);
 	tnt_stream_free(&s);
 }
@@ -446,6 +467,43 @@ static void tt_tnt_marshal_select(struct tt_test *test) {
 	tnt_iter_free(&il);
 	tnt_list_free(&list);
 	tnt_stream_free(&s);
+}
+
+/* marshal update */
+static void tt_tnt_marshal_update(struct tt_test *test) {
+	struct tnt_stream s, ops;
+	tnt_buf(&s);
+	tnt_buf(&ops);
+	struct tnt_tuple t;
+	tnt_tuple_init(&t);
+	tnt_tuple(&t, "%s", "foo");
+	tnt_update_assign(&ops, 444, "FOO", 3);
+	tnt_update_arith(&ops, 2, TNT_UPDATE_ADD, 7);
+	TT_ASSERT(tnt_update(&s, 0, 0, &t, &ops) > 0);
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+	TT_ASSERT(tnt_next(&i) == 1);
+	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+	TT_ASSERT(r->type == TNT_REQUEST_UPDATE);
+	TT_ASSERT(r->r.update.opc == 2);
+	struct tnt_iter *f = tnt_field(NULL, &r->r.update.t, 0);
+	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
+	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
+	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
+	TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
+	TT_ASSERT(r->r.update.opv[0].op == TNT_UPDATE_ASSIGN);
+	TT_ASSERT(r->r.update.opv[0].field == 444);
+	TT_ASSERT(r->r.update.opv[0].size == 3);
+	TT_ASSERT(memcmp(r->r.update.opv[0].data, "FOO", 3) == 0);
+	TT_ASSERT(r->r.update.opv[1].op == TNT_UPDATE_ADD);
+	TT_ASSERT(r->r.update.opv[1].field == 2);
+	TT_ASSERT(r->r.update.opv[1].size == 4);
+	TT_ASSERT(*(uint32_t*)r->r.update.opv[1].data == 7);
+	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_tuple_free(&t);
+	tnt_stream_free(&s);
+	tnt_stream_free(&ops);
+	tnt_iter_free(&i);
 }
 
 static struct tnt_stream net;
@@ -1048,10 +1106,12 @@ main(int argc, char * argv[])
 	tt_test(&t, "iterator tuple (tnt_field)", tt_tnt_iter2);
 	tt_test(&t, "iterator list", tt_tnt_iter3);
 	/* marshaling */
+	tt_test(&t, "marshaling ping", tt_tnt_marshal_ping);
 	tt_test(&t, "marshaling insert", tt_tnt_marshal_insert);
 	tt_test(&t, "marshaling delete", tt_tnt_marshal_delete);
 	tt_test(&t, "marshaling call", tt_tnt_marshal_call);
 	tt_test(&t, "marshaling select", tt_tnt_marshal_select);
+	tt_test(&t, "marshaling update", tt_tnt_marshal_update);
 	/* common operations */
 	tt_test(&t, "connect", tt_tnt_net_connect);
 	tt_test(&t, "ping", tt_tnt_net_ping);

@@ -23,6 +23,22 @@ struct tnt_request_delete {
 	struct tnt_tuple t;
 };
 
+struct tnt_request_update_op {
+	uint8_t op;
+	uint32_t field;
+	char size_enc[5];
+	uint32_t size_enc_len;
+	uint32_t size;
+	char *data;
+};
+
+struct tnt_request_update {
+	struct tnt_header_update h;
+	struct tnt_tuple t;
+	uint32_t opc;
+	struct tnt_request_update_op *opv;
+};
+
 struct tnt_request_call {
 	struct tnt_header_call h;
 	char proc_enc[5];
@@ -45,6 +61,7 @@ struct tnt_request {
 		struct tnt_request_delete delete;
 		struct tnt_request_call call;
 		struct tnt_request_select select;
+		struct tnt_request_update update;
 	} r;
 };
 

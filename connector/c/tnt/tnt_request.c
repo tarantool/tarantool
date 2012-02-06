@@ -34,12 +34,26 @@
 #include <tnt_proto.h>
 #include <tnt_request.h>
 
+/*
+ * tnt_request_init()
+ *
+ * initialize request object;
+ *
+ * r - reply pointer
+*/
 void
 tnt_request_init(struct tnt_request *r)
 {
 	memset(r, 0, sizeof(struct tnt_request));
 }
 
+/*
+ * tnt_request_free()
+ *
+ * free request object;
+ *
+ * r - request object pointer
+*/
 void
 tnt_request_free(struct tnt_request *r)
 {
@@ -51,14 +65,27 @@ tnt_request_free(struct tnt_request *r)
 		tnt_tuple_free(&r->r.delete.t);
 		break;
 	case TNT_REQUEST_CALL:
-		if (r->r.call.proc)
+		if (r->r.call.proc) {
 			tnt_mem_free(r->r.call.proc);
+			r->r.call.proc = NULL;
+		}
 		tnt_tuple_free(&r->r.call.t);
 		break;
 	case TNT_REQUEST_SELECT:
 		tnt_list_free(&r->r.select.l);
 		break;
 	case TNT_REQUEST_UPDATE:
+		tnt_tuple_free(&r->r.update.t);
+		if (r->r.update.opv) {
+			uint32_t i;
+			for (i = 0 ; i < r->r.update.opc ; i++) {
+				struct tnt_request_update_op *op = &r->r.update.opv[i];
+				if (op->data)
+					tnt_mem_free(op->data);
+			}
+			tnt_mem_free(r->r.update.opv);
+			r->r.update.opv = NULL;
+		}
 		break;
 	case TNT_REQUEST_PING:
 	case TNT_REQUEST_NONE:
@@ -76,14 +103,14 @@ tnt_request_insert(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	if (buf == NULL)
 		return -1;
 	if (rcv(ptr, buf, size) == -1) {
-		free(buf);
+		tnt_mem_free(buf);
 		return -1;
 	}
 	if (tnt_tuple_set(&r->r.insert.t, buf, size) == NULL) {
-		free(buf);
+		tnt_mem_free(buf);
 		return -1;
 	}
-	free(buf);
+	tnt_mem_free(buf);
 	r->type = TNT_REQUEST_INSERT;
 	return 0;
 }
@@ -98,14 +125,14 @@ tnt_request_delete(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	if (buf == NULL)
 		return -1;
 	if (rcv(ptr, buf, size) == -1) {
-		free(buf);
+		tnt_mem_free(buf);
 		return -1;
 	}
 	if (tnt_tuple_set(&r->r.delete.t, buf, size) == NULL) {
-		free(buf);
+		tnt_mem_free(buf);
 		return -1;
 	}
-	free(buf);
+	tnt_mem_free(buf);
 	r->type = TNT_REQUEST_DELETE;
 	return 0;
 }
@@ -125,15 +152,14 @@ tnt_request_call(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	if (esize == -1 || esize >= 5)
 		goto error;
 	memcpy(r->r.call.proc_enc, buf, esize);
-
+	/* function name */
 	r->r.call.proc_enc_len = esize;
 	r->r.call.proc = tnt_mem_alloc(r->r.call.proc_len + 1);
 	if (r->r.call.proc == NULL)
 		goto error;
-
 	memcpy(r->r.call.proc, buf + esize, r->r.call.proc_len);
 	r->r.call.proc[r->r.call.proc_len] = 0;
-
+	/* function arguments */
 	size -= esize + r->r.call.proc_len;
 	if (tnt_tuple_set(&r->r.call.t, buf + esize + r->r.call.proc_len, size) == NULL) {
 		tnt_mem_free(r->r.call.proc);
@@ -144,6 +170,7 @@ tnt_request_call(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	r->type = TNT_REQUEST_CALL;
 	return 0;
 error:
+	tnt_tuple_free(&r->r.call.t);
 	if (buf)
 		tnt_mem_free(buf);
 	return -1;
@@ -160,10 +187,10 @@ tnt_request_select(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 		goto error;
 	if (rcv(ptr, buf, size) == -1)
 		goto error;
-
+	/* count of tuples */
 	uint32_t i, count = *(uint32_t*)buf;
 	uint32_t off = 4;
-
+	/* processing tuples */
 	tnt_list_init(&r->r.select.l);
 	for (i = 0 ; i < count ; i++) {
 		/* calculating tuple size */
@@ -186,12 +213,99 @@ tnt_request_select(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	tnt_mem_free(buf);
 	return 0;
 error:
+	tnt_list_free(&r->r.select.l);
 	if (buf)
 		tnt_mem_free(buf);
-	tnt_list_free(&r->r.select.l);
 	return -1;
 }
 
+static int
+tnt_request_update(struct tnt_request *r, tnt_request_t rcv, void *ptr)
+{
+	if (rcv(ptr, (char*)&r->r.update, sizeof(struct tnt_header_update)) == -1)
+		return -1;
+	r->r.update.opc = 0;
+	r->r.update.opv = NULL;
+	uint32_t size = r->h.len - sizeof(struct tnt_header_update);
+	char *buf = tnt_mem_alloc(size);
+	if (buf == NULL)
+		goto error;
+	if (rcv(ptr, buf, size) == -1)
+		goto error;
+	/* calculating key tuple size */
+	uint32_t i, cardinality = *(uint32_t*)(buf);
+	uint32_t ks = 4;
+	for (i = 0 ; i < cardinality ; i++) {
+		uint32_t fld_size = 0;
+		int fld_esize = tnt_enc_read(buf + ks, &fld_size);
+		if (fld_esize == -1)
+			goto error;
+		ks += fld_esize + fld_size;
+	}
+	/* initializing tuple */
+	if (tnt_tuple_set(&r->r.update.t, buf, ks) == NULL)
+		goto error;
+	/* ops */
+	r->r.update.opc = *(uint32_t*)(buf + ks);
+	uint32_t opvsz = sizeof(struct tnt_request_update_op) * r->r.update.opc;
+	r->r.update.opv = tnt_mem_alloc(opvsz);
+	if (r->r.update.opv == NULL)
+		goto error;
+	memset(r->r.update.opv, 0, sizeof(opvsz));
+	uint32_t off = ks + 4;
+	/* data */
+	for (i = 0 ; i < r->r.update.opc ; i++) {
+		struct tnt_request_update_op *op = &r->r.update.opv[i];
+		/* field */
+		op->field = *(uint32_t*)(buf + off);
+		off += 4;
+		/* operation */
+		op->op = *(uint8_t*)(buf + off);
+		off += 1;
+		/* enc_size */
+		int esize = tnt_enc_read(buf + off, &op->size);
+		if (esize == -1 || esize >= 5)
+			goto error;
+		op->size_enc_len = esize;
+		memcpy(op->size_enc, buf + off, op->size_enc_len);
+		off += op->size_enc_len;
+		/* data */
+		op->data = tnt_mem_alloc(op->size);
+		if (op->data == NULL)
+			goto error;
+		memcpy(op->data, buf + off, op->size);
+		off += op->size;
+	}
+	r->type = TNT_REQUEST_UPDATE;
+	tnt_mem_free(buf);
+	return 0;
+error:
+	tnt_tuple_free(&r->r.update.t);
+	if (r->r.update.opv) {
+		for (i = 0 ; i < r->r.update.opc ; i++) {
+			struct tnt_request_update_op *op = &r->r.update.opv[i];
+			if (op->data)
+				tnt_mem_free(op->data);
+		}
+		tnt_mem_free(r->r.update.opv);
+		r->r.update.opv = NULL;
+	}
+	if (buf)
+		tnt_mem_free(buf);
+	return -1;
+}
+
+/*
+ * tnt_request_from()
+ *
+ * process iproto request with supplied recv function;
+ *
+ * r   - request object pointer
+ * rcv - supplied recv function
+ * ptr - recv function argument
+ * 
+ * returns zero on fully read reply, or -1 on error.
+*/
 int
 tnt_request_from(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 {
@@ -202,12 +316,36 @@ tnt_request_from(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	case TNT_OP_DELETE: return tnt_request_delete(r, rcv, ptr);
 	case TNT_OP_CALL:   return tnt_request_call(r, rcv, ptr);
 	case TNT_OP_SELECT: return tnt_request_select(r, rcv, ptr);
-	case TNT_OP_PING:   return 0;
-	default: return -1;
+	case TNT_OP_UPDATE: return tnt_request_update(r, rcv, ptr);
+	case TNT_OP_PING:
+		r->type = TNT_REQUEST_PING;
+		return 0;
+	default:
+		return -1;
 	}
 	return 0;
 }
 
+/*
+ * tnt_request()
+ *
+ * process buffer as iproto request (deserilization);
+ *
+ * r    - request object pointer
+ * buf  - buffer data pointer
+ * size - buffer data size
+ * off  - returned offset, maybe NULL
+ * 
+ * if request is fully read, then zero is returned and offset set to the
+ * end of reply data in buffer.
+ *
+ * if request is not complete, then 1 is returned and offset set to the
+ * size needed to read.
+ *
+ * if there were error while parsing reply, -1 is returned.
+ *
+ * returns zero on fully read reply, or NULL on error.
+*/
 static ssize_t tnt_request_cb(void *ptr[2], char *buf, ssize_t size) {
 	char *src = ptr[0];
 	ssize_t *off = ptr[1];
@@ -216,7 +354,8 @@ static ssize_t tnt_request_cb(void *ptr[2], char *buf, ssize_t size) {
 	return size;
 }
 
-int tnt_request(struct tnt_request *r, char *buf, size_t size, size_t *off) {
+int
+tnt_request(struct tnt_request *r, char *buf, size_t size, size_t *off) {
 	if (size < (sizeof(struct tnt_header))) {
 		if (off)
 			*off = sizeof(struct tnt_header) - size;
