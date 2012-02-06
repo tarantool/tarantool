@@ -714,6 +714,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 	/*
 	 * 3. Initialize and optimize the operations.
 	 */
+	cmd->new_tuple_len = 0;
 	assert(cmd->op < cmd->op_end); /* Ensured by parse_update_cmd(). */
 	cmd->field = palloc(fiber->gc_pool, (cmd->op_end - cmd->op) *
 			    sizeof(struct update_field));
