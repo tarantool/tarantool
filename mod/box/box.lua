@@ -123,9 +123,11 @@ function box.on_reload_configuration()
     for i, space in pairs(box.space) do
         rawset(space, 'n', i)
         setmetatable(space, space_mt)
-        for j, index in pairs(space.index) do
-            rawset(index, 'idx', box.index.new(i, j))
-            setmetatable(index, index_mt)
+        if type(space.index) == 'table' and space.enabled then
+            for j, index in pairs(space.index) do
+                rawset(index, 'idx', box.index.new(i, j))
+                setmetatable(index, index_mt)
+            end
         end
     end
 end
