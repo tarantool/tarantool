@@ -1,6 +1,9 @@
 #ifndef TNT_REQUEST_H_INCLUDED
 #define TNT_REQUEST_H_INCLUDED
 
+#include <sys/types.h>
+#include <sys/uio.h>
+
 typedef ssize_t (*tnt_request_t)(void *ptr, char *dst, ssize_t size);
 
 enum tnt_request_type {
@@ -35,8 +38,10 @@ struct tnt_request_update_op {
 struct tnt_request_update {
 	struct tnt_header_update h;
 	struct tnt_tuple t;
-	uint32_t opc;
+	char *ops;
+	uint32_t ops_size;
 	struct tnt_request_update_op *opv;
+	uint32_t opc;
 };
 
 struct tnt_request_call {
@@ -63,6 +68,8 @@ struct tnt_request {
 		struct tnt_request_select select;
 		struct tnt_request_update update;
 	} r;
+	int vc;
+	struct iovec *v;
 };
 
 void tnt_request_init(struct tnt_request *r);
