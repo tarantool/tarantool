@@ -37,6 +37,7 @@ extern "C" {
 #include <libtnt/tnt_proto.h>
 #include <libtnt/tnt_enc.h>
 #include <libtnt/tnt_tuple.h>
+#include <libtnt/tnt_request.h>
 #include <libtnt/tnt_reply.h>
 #include <libtnt/tnt_stream.h>
 #include <libtnt/tnt_iter.h>

@@ -30,6 +30,8 @@
 
 #include <connector/c/include/libtnt/tnt_mem.h>
 #include <connector/c/include/libtnt/tnt_tuple.h>
+#include <connector/c/include/libtnt/tnt_proto.h>
+#include <connector/c/include/libtnt/tnt_request.h>
 #include <connector/c/include/libtnt/tnt_reply.h>
 #include <connector/c/include/libtnt/tnt_stream.h>
 #include <connector/c/include/libtnt/tnt_buf.h>
@@ -117,7 +119,6 @@ tnt_buf_reply(struct tnt_stream *s, struct tnt_reply *r) {
 		return 1;
 	size_t off = 0;
 	int rc = tnt_reply(r, sb->data + sb->rdoff, sb->size - sb->rdoff, &off);
-<<<<<<< HEAD
 	if (rc == 0)
 		sb->rdoff += off;
 	return rc;
@@ -132,8 +133,6 @@ tnt_buf_request(struct tnt_stream *s, struct tnt_request *r) {
 		return 1;
 	size_t off = 0;
 	int rc = tnt_request(r, sb->data + sb->rdoff, sb->size - sb->rdoff, &off);
-=======
->>>>>>> 149d2c857f6787b577aaee6f9bd3e946d48b07ae
 	if (rc == 0)
 		sb->rdoff += off;
 	return rc;

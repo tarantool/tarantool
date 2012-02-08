@@ -28,14 +28,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <libtnt/tnt_mem.h>
-#include <libtnt/tnt_proto.h>
-#include <libtnt/tnt_enc.h>
-#include <libtnt/tnt_tuple.h>
-#include <libtnt/tnt_reply.h>
-#include <libtnt/tnt_stream.h>
-#include <libtnt/tnt_buf.h>
-#include <libtnt/tnt_update.h>
+#include <connector/c/include/libtnt/tnt_mem.h>
+#include <connector/c/include/libtnt/tnt_proto.h>
+#include <connector/c/include/libtnt/tnt_enc.h>
+#include <connector/c/include/libtnt/tnt_tuple.h>
+#include <connector/c/include/libtnt/tnt_request.h>
+#include <connector/c/include/libtnt/tnt_reply.h>
+#include <connector/c/include/libtnt/tnt_stream.h>
+#include <connector/c/include/libtnt/tnt_buf.h>
+#include <connector/c/include/libtnt/tnt_update.h>
 
 static ssize_t
 tnt_update_op(struct tnt_stream *s,
@@ -152,8 +153,6 @@ tnt_update_splice(struct tnt_stream *s, uint32_t field,
 	return rc;
 }
 
-<<<<<<< HEAD
-=======
 /*
  * tnt_update_delete()
  *
@@ -170,12 +169,6 @@ tnt_update_delete(struct tnt_stream *s, uint32_t field)
 	return tnt_update_op(s, field, TNT_UPDATE_DELETE, NULL, 0);
 }
 
-struct tnt_header_update {
-	uint32_t ns;
-	uint32_t flags;
-};
-
->>>>>>> 149d2c857f6787b577aaee6f9bd3e946d48b07ae
 /*
  * tnt_update()
  *

@@ -28,11 +28,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_mem.h>
-#include <tnt_enc.h>
-#include <tnt_tuple.h>
-#include <tnt_proto.h>
-#include <tnt_request.h>
+#include <connector/c/include/libtnt/tnt_mem.h>
+#include <connector/c/include/libtnt/tnt_enc.h>
+#include <connector/c/include/libtnt/tnt_tuple.h>
+#include <connector/c/include/libtnt/tnt_proto.h>
+#include <connector/c/include/libtnt/tnt_request.h>
 
 /*
  * tnt_request_init()
