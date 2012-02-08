@@ -471,7 +471,8 @@ sparse_key_node_compare(struct key_def *key_def,
 			struct box_tuple *tuple,
 			const union sparse_part* parts)
 {
-	for (int part = 0; part < key_data->part_count; ++part) {
+	int part_count = MIN(key_def->part_count, key_data->part_count);
+	for (int part = 0; part < part_count; ++part) {
 		int r = sparse_part_compare(key_def->parts[part].type,
 					    key_data->data,
 					    key_data->parts[part],
@@ -616,7 +617,8 @@ dense_key_node_compare(struct key_def *key_def,
 	}
 
 	/* compare key parts */
-	for (int part = 0; part < key_data->part_count; ++part) {
+	int part_count = MIN(key_def->part_count, key_data->part_count);
+	for (int part = 0; part < part_count; ++part) {
 		int field = key_def->parts[part].fieldno;
 		int r = dense_key_part_compare(key_def->parts[part].type,
 					       key_data->data,
@@ -820,10 +822,7 @@ tree_iterator_free(struct iterator *iterator)
 	assert(iterator->next == tree_iterator_next);
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	if (key_def->is_unique && part_count == key_def->part_count)
-		it->base.next_equal = iterator_first_equal;
-	else
-		it->base.next_equal = tree_iterator_next_equal;
+	it->base.next_equal = tree_iterator_next_equal;
 
 	it->key_data.data = key;
 	it->key_data.part_count = part_count;

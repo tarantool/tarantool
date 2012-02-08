@@ -60,3 +60,9 @@ exec sql "call box.crossjoin(3, 3, 5)"
 exec sql "call box.crossjoin(3, 3, 10000)"
 exec sql "call box.crossjoin(3, 2, 10000)"
 exec admin "lua box.space[3]:truncate()"
+
+# Bug #922520 - select missing keys
+exec sql "insert into t2 values (200, 'select me!')"
+exec sql "select * from t2 where k0 = 200"
+exec sql "select * from t2 where k0 = 199"
+exec sql "select * from t2 where k0 = 201"

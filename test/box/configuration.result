@@ -186,6 +186,18 @@ lua box.cfg.wal_fsync_delay
  - 0.01
 ...
 
+# Bug#928413 Lua malfunction on certain configuration
+#  (https://bugs.launchpad.net/bugs/928413)
+
+lua box.cfg.wal_fsync_delay
+---
+ - 0.1
+...
+lua box.space[0].enabled
+---
+ - true
+...
+
 #  Test field type conflict in keys
 
 tarantool_box -c tarantool_bad_type.cfg

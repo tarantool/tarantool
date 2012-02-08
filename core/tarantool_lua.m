@@ -94,8 +94,8 @@ static char format_to_opcode(char format)
 	case '=': return 0;
 	case '+': return 1;
 	case '&': return 2;
-	case '|': return 3;
-	case '^': return 4;
+	case '^': return 3;
+	case '|': return 4;
 	case ':': return 5;
 	default: return format;
 	}
@@ -868,13 +868,11 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		if (strchr(key, '.') == NULL) {
 			lua_pushfstring(L, "box.cfg.%s = %s%s%s\n",
 					key, quote, value, quote);
-			luaL_addstring(&b, lua_tostring(L, -1));
-			lua_pop(L, 1);
+			luaL_addvalue(&b);
 		} else if (strncmp(key, "space", strlen("space")) == 0) {
 			lua_pushfstring(L, "box.%s = %s%s%s\n",
 					key, quote, value, quote);
-			luaL_addstring(&b, lua_tostring(L, -1));
-			lua_pop(L, 1);
+			luaL_addvalue(&b);
 		}
 		free(value);
 	}
@@ -887,8 +885,10 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 "  box.on_reload_configuration()\n"
 "end\n");
 	luaL_pushresult(&b);
-	if (luaL_loadstring(L, lua_tostring(L, -1)) == 0)
-		lua_pcall(L, 0, 0, 0);
+	if (luaL_loadstring(L, lua_tostring(L, -1)) != 0 ||
+	    lua_pcall(L, 0, 0, 0) != 0) {
+		panic("%s", lua_tostring(L, -1));
+	}
 	lua_pop(L, 1);
 }
 

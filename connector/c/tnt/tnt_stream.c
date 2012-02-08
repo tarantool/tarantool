@@ -28,12 +28,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_mem.h>
-#include <tnt_proto.h>
-#include <tnt_tuple.h>
-#include <tnt_request.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
+#include <connector/c/include/libtnt/tnt_mem.h>
+#include <connector/c/include/libtnt/tnt_tuple.h>
+#include <connector/c/include/libtnt/tnt_reply.h>
+#include <connector/c/include/libtnt/tnt_stream.h>
 
 /*
  * tnt_stream_reqid()

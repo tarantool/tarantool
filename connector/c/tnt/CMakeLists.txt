@@ -22,7 +22,6 @@ endif()
 #
 # source files
 #
-
 set (tnt_sources
 	tnt_mem.c
 	tnt_enc.c
@@ -67,25 +66,6 @@ set_target_properties(tnt_shared PROPERTIES COMPILE_FLAGS "${tnt_cflags}")
 #----------------------------------------------------------------------------#
 # Install
 #----------------------------------------------------------------------------#
-
-# headers
-install(FILES
-	include/tnt.h
-	include/tnt_proto.h
-	include/tnt_mem.h
-	include/tnt_enc.h
-	include/tnt_tuple.h
-	include/tnt_iter.h
-	include/tnt_stream.h
-	include/tnt_buf.h
-	include/tnt_ping.h
-	include/tnt_insert.h
-	include/tnt_update.h
-	include/tnt_delete.h
-	include/tnt_select.h
-	include/tnt_call.h
-	include/tnt_reply.h
-	DESTINATION include/libtnt)
 
 # install static library
 install_targets(/lib tnt)

@@ -1,5 +1,5 @@
-#ifndef TNT_H_INCLUDED
-#define TNT_H_INCLUDED
+#ifndef TNT_UPDATE_H_INCLUDED
+#define TNT_UPDATE_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,31 +26,33 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#define TNT_UPDATE_ASSIGN 0
+#define TNT_UPDATE_ADD    1
+#define TNT_UPDATE_AND    2
+#define TNT_UPDATE_XOR    3
+#define TNT_UPDATE_OR     4
+#define TNT_UPDATE_SPLICE 5
+#define TNT_UPDATE_DELETE 6
 
-#include <stdint.h>
-#include <stdarg.h>
+ssize_t
+tnt_update_arith(struct tnt_stream *s, uint32_t field,
+		 uint8_t op, uint32_t value);
 
-#include <tnt_mem.h>
-#include <tnt_proto.h>
-#include <tnt_enc.h>
-#include <tnt_tuple.h>
-#include <tnt_request.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
-#include <tnt_iter.h>
-#include <tnt_buf.h>
-#include <tnt_ping.h>
-#include <tnt_insert.h>
-#include <tnt_update.h>
-#include <tnt_delete.h>
-#include <tnt_call.h>
-#include <tnt_select.h>
+ssize_t
+tnt_update_assign(struct tnt_stream *s, uint32_t field,
+		  char *data, uint32_t size);
 
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
+ssize_t
+tnt_update_splice(struct tnt_stream *s, uint32_t field,
+		  uint32_t offset,
+		  uint32_t length, char *data, size_t size);
 
-#endif /* TNT_H_INCLUDED */
+ssize_t
+tnt_update_delete(struct tnt_stream *s, uint32_t field);
+
+ssize_t
+tnt_update(struct tnt_stream *s, uint32_t ns, uint32_t flags,
+	   struct tnt_tuple *k,
+	   struct tnt_stream *ops);
+
+#endif /* TNT_UPDATE_H_INCLUDED */

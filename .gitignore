@@ -37,4 +37,5 @@ third_party/luajit/src/lj_libdef.h
 third_party/luajit/src/lj_recdef.h
 third_party/luajit/src/lj_vm.s
 test/connector_c/tt
+test/connector_c/update
 *.reject

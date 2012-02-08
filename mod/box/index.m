@@ -42,7 +42,7 @@ iterator_next_equal(struct iterator *it __attribute__((unused)))
 	return NULL;
 }
 
-struct box_tuple *
+static struct box_tuple *
 iterator_first_equal(struct iterator *it)
 {
 	it->next_equal = iterator_next_equal;

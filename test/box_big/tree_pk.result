@@ -93,3 +93,12 @@ Found 2 tuples:
 lua box.space[3]:truncate()
 ---
 ...
+insert into t2 values (200, 'select me!')
+Insert OK, 1 row affected
+select * from t2 where k0 = 200
+Found 1 tuple:
+[200, 'select me!']
+select * from t2 where k0 = 199
+No match
+select * from t2 where k0 = 201
+No match
