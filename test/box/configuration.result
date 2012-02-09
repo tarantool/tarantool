@@ -197,6 +197,10 @@ lua box.space[0].enabled
 ---
  - true
 ...
+reload configuration
+---
+ok
+...
 
 #  Test field type conflict in keys
 

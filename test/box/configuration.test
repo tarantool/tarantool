@@ -36,7 +36,6 @@ print """
 """
 # stop current server
 server.stop()
-# start server from config with different boolean represenation
 server.deploy("box/tarantool_bug876541.cfg")
 # check values
 exec admin "lua box.cfg.wal_fsync_delay"
@@ -47,11 +46,11 @@ print """
 """
 # stop current server
 server.stop()
-# start server from config with different boolean represenation
 server.deploy("box/tarantool_bug928413.cfg")
 # check values
 exec admin "lua box.cfg.wal_fsync_delay"
 exec admin "lua box.space[0].enabled"
+exec admin "reload configuration"
 
 print """
 #  Test field type conflict in keys

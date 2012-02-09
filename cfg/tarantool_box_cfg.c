@@ -2005,6 +2005,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 		while (src->space[i->idx_name__space] != NULL) {
 			ARRAYALLOC(dst->space, i->idx_name__space + 1, _name__space, 0, 0);
 
+			dst->space[i->idx_name__space]->__confetti_flags = src->space[i->idx_name__space]->__confetti_flags;
 			dst->space[i->idx_name__space]->enabled = src->space[i->idx_name__space]->enabled;
 			dst->space[i->idx_name__space]->cardinality = src->space[i->idx_name__space]->cardinality;
 			dst->space[i->idx_name__space]->estimated_rows = src->space[i->idx_name__space]->estimated_rows;
@@ -2017,6 +2018,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 				while (src->space[i->idx_name__space]->index[i->idx_name__space__index] != NULL) {
 					ARRAYALLOC(dst->space[i->idx_name__space]->index, i->idx_name__space__index + 1, _name__space__index, 0, 0);
 
+					dst->space[i->idx_name__space]->index[i->idx_name__space__index]->__confetti_flags = src->space[i->idx_name__space]->index[i->idx_name__space__index]->__confetti_flags;
 					if (dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type) free(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type);dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type = src->space[i->idx_name__space]->index[i->idx_name__space__index]->type == NULL ? NULL : strdup(src->space[i->idx_name__space]->index[i->idx_name__space__index]->type);
 					if (src->space[i->idx_name__space]->index[i->idx_name__space__index]->type != NULL && dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type == NULL)
 						return CNF_NOMEMORY;
@@ -2030,6 +2032,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 						while (src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field] != NULL) {
 							ARRAYALLOC(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field, i->idx_name__space__index__key_field + 1, _name__space__index__key_field, 0, 0);
 
+							dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->__confetti_flags = src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->__confetti_flags;
 							dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->fieldno = src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->fieldno;
 							if (dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type) free(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type);dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type = src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type == NULL ? NULL : strdup(src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type);
 							if (src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type != NULL && dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type == NULL)
