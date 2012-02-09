@@ -84,7 +84,7 @@ sql.sort = True
 exec sql "select * from t5 where k1='part1'"
 exec sql "select * from t5 where k1='part1_a'"
 exec sql "select * from t5 where k1='part_none'"
-exec admin "lua box.space[5]:select(1, 'part1', 'part2')"
+exec sql "call box.select('5', '1', 'part1', 'part2')"
 sql.sort = False 
 # Check how build_idnexes() works
 server.stop()
