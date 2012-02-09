@@ -165,11 +165,10 @@ Found 2 tuples:
 ['41234567', 'part1_a', 'part2_a']
 select * from t5 where k1='part_none'
 No match
-lua box.space[5]:select(1, 'part1', 'part2')
----
- - '01234567': {'part1', 'part2'}
- - '11234567': {'part1', 'part2'}
-...
+call box.select('5', '1', 'part1', 'part2')
+Found 2 tuples:
+['01234567', 'part1', 'part2']
+['11234567', 'part1', 'part2']
 select * from t1 where k0='key1'
 Found 1 tuple:
 [830039403, 'part1', 'part2']
