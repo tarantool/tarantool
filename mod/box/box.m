@@ -898,6 +898,12 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 
 		void *key = NULL;
 		if (key_cardinality) {
+			if (key_cardinality > index->key_def->part_count) {
+				tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+					  key_cardinality,
+					  index->key_def->part_count);
+			}
+
 			key = read_field(data);
 
 			/* advance remaining fields of a key */

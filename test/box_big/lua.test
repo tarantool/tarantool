@@ -3,6 +3,12 @@ exec sql "insert into t1 values ('brave', 'new', 'world')"
 exec admin "lua box.space[1].index[1]:min()"
 exec admin "lua box.space[1].index[1]:max()"
 exec sql "call box.select(1, 1, 'new', 'world')"
+print """#
+# A test case for Bug #904208
+# "assert failed, when key cardinality is greater than index cardinality"
+# https://bugs.launchpad.net/tarantool/+bug/904208
+#"""
+exec sql "call box.select(1, 1, 'new', 'world', 'order')"
 exec sql "call box.delete(1, 'brave')"
 
 #
