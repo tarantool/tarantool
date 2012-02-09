@@ -111,6 +111,7 @@ struct key_def {
  * Finish index construction.
  */
 - (void) enable;
+- (void) build: (Index *) pk;
 - (size_t) size;
 - (struct box_tuple *) min;
 - (struct box_tuple *) max;

@@ -47,7 +47,6 @@
 #include <mod/box/tuple.h>
 #include "memcached.h"
 #include "box_lua.h"
-#include "tree.h"
 
 static void box_process_ro(u32 op, struct tbuf *request_data);
 static void box_process_rw(u32 op, struct tbuf *request_data);
@@ -1534,9 +1533,7 @@ build_indexes(void)
 		Index *pk = space[n].index[0];
 		for (int i = 1; i < space[n].key_count; i++) {
 			Index *index = space[n].index[i];
-			if ([index isKindOf: [TreeIndex class]]) {
-				[(TreeIndex *) index build: pk];
-			}
+			[index build: pk];
 		}
 
 		say_info("Space %"PRIu32": done", n);

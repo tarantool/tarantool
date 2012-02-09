@@ -169,6 +169,32 @@ call box.select('5', '1', 'part1', 'part2')
 Found 2 tuples:
 ['01234567', 'part1', 'part2']
 ['11234567', 'part1', 'part2']
+insert into t7 values (1, 'hello')
+Insert OK, 1 row affected
+insert into t7 values (2, 'brave')
+Insert OK, 1 row affected
+insert into t7 values (3, 'new')
+Insert OK, 1 row affected
+insert into t7 values (4, 'world')
+Insert OK, 1 row affected
+#
+# Bug#929654 - secondary hash index is not built with build_indexes()
+#
+select * from t7 where k1='hello'
+Found 1 tuple:
+[1, 'hello']
+select * from t7 where k1='brave'
+Found 1 tuple:
+[2, 'brave']
+select * from t7 where k1='new'
+Found 1 tuple:
+[3, 'new']
+select * from t7 where k1='world'
+Found 1 tuple:
+[4, 'world']
+lua box.space[7]:truncate()
+---
+...
 select * from t1 where k0='key1'
 Found 1 tuple:
 [830039403, 'part1', 'part2']

@@ -107,6 +107,13 @@ iterator_first_equal(struct iterator *it)
 	[self subclassResponsibility: _cmd];
 }
 
+- (void) build: (Index *) pk
+{
+	(void) pk;
+	[self subclassResponsibility: _cmd];
+}
+
+
 - (size_t) size
 {
 	[self subclassResponsibility: _cmd];
@@ -180,6 +187,7 @@ iterator_first_equal(struct iterator *it)
 /* {{{ HashIndex -- base class for all hashes. ********************/
 
 @interface HashIndex: Index
+	- (void) reserve: (u32) n_tuples;
 @end
 
 struct hash_iterator {
@@ -218,6 +226,33 @@ hash_iterator_free(struct iterator *iterator)
 
 
 @implementation HashIndex
+
+- (void) reserve: (u32) n_tuples
+{
+	(void) n_tuples;
+	[self subclassResponsibility: _cmd];
+}
+
+- (void) build: (Index *) pk
+{
+	u32 n_tuples = [pk size];
+
+	if (n_tuples == 0)
+		return;
+
+	[self reserve: n_tuples];
+
+	say_info("Adding %"PRIu32 " keys to HASH index %"
+		 PRIu32 "...", n_tuples, index_n(self));
+
+	struct iterator *it = pk->position;
+	struct box_tuple *tuple;
+	[pk initIterator: it];
+
+	while ((tuple = it->next(it)))
+	      [self replace: NULL :tuple];
+}
+
 - (void) free
 {
 	[super free];
@@ -267,6 +302,12 @@ hash_iterator_free(struct iterator *iterator)
 @end
 
 @implementation Hash32Index
+
+- (void) reserve: (u32) n_tuples
+{
+	mh_i32ptr_reserve(int_hash, n_tuples);
+}
+
 - (void) free
 {
 	mh_i32ptr_destroy(int_hash);
@@ -388,6 +429,11 @@ hash_iterator_free(struct iterator *iterator)
 @end
 
 @implementation Hash64Index
+- (void) reserve: (u32) n_tuples
+{
+	mh_i64ptr_reserve(int64_hash, n_tuples);
+}
+
 - (void) free
 {
 	mh_i64ptr_destroy(int64_hash);
@@ -509,6 +555,11 @@ hash_iterator_free(struct iterator *iterator)
 @end
 
 @implementation HashStrIndex
+- (void) reserve: (u32) n_tuples
+{
+	mh_lstrptr_reserve(str_hash, n_tuples);
+}
+
 - (void) free
 {
 	mh_lstrptr_destroy(str_hash);

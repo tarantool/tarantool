@@ -86,9 +86,21 @@ exec sql "select * from t5 where k1='part1_a'"
 exec sql "select * from t5 where k1='part_none'"
 exec sql "call box.select('5', '1', 'part1', 'part2')"
 sql.sort = False 
+exec sql "insert into t7 values (1, 'hello')"
+exec sql "insert into t7 values (2, 'brave')"
+exec sql "insert into t7 values (3, 'new')"
+exec sql "insert into t7 values (4, 'world')"
 # Check how build_idnexes() works
 server.stop()
 server.start()
+print """#
+# Bug#929654 - secondary hash index is not built with build_indexes()
+#"""
+exec sql "select * from t7 where k1='hello'"
+exec sql "select * from t7 where k1='brave'"
+exec sql "select * from t7 where k1='new'"
+exec sql "select * from t7 where k1='world'"
+exec admin "lua box.space[7]:truncate()"
 exec sql "select * from t1 where k0='key1'"
 exec sql "select * from t1 where k0='key2'"
 exec sql "select * from t1 where k0='key3'"

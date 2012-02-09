@@ -42,7 +42,6 @@ typedef int (*tree_cmp_t)(const void *, const void *, void *);
 };
 
 + (Index *) alloc: (struct key_def *) key_def :(struct space *) space;
-- (void) build: (Index *) pk;
 
 /** To be defined in subclasses. */
 - (size_t) node_size;
