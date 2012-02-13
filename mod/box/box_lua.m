@@ -381,10 +381,6 @@ void append_key_part(struct lua_State *L, int i,
  * the iterator with one or several Lua scalars
  * (numbers, strings) and start iteration from an
  * offset.
- *
- * @todo/FIXME: Currently we always store iteration
- * state within index. This limits the total
- * amount of active iterators to 1.
  */
 static int
 lbox_index_next(struct lua_State *L)
