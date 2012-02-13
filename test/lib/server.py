@@ -266,7 +266,7 @@ class Server(object):
 
     def test_debug(self):
         output = self.test_option_get(False, "-V")
-	if re.search("<Debug>", output):
+	if re.search("-Debug", output):
            return True
         return False
 

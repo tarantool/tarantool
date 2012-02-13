@@ -28,7 +28,7 @@ os.unlink(cfg)
 sys.stdout.pop_filter()
 sys.stdout.push_filter("(\d)\.\d\.\d(-\d+-\w+)?", "\\1.minor.patch-<rev>-<commit>")
 sys.stdout.push_filter("Target: .*", "Target: platform <build>")
-sys.stdout.push_filter("Build with: .*", "Build with: flags")
+sys.stdout.push_filter("Build options: .*", "Build options: flags")
 sys.stdout.push_filter("CFLAGS: .*", "CFLAGS: flags")
 
 server.test_option("--version")

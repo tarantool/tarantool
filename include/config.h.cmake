@@ -55,7 +55,7 @@
 #define BUILD_TYPE "@CMAKE_BUILD_TYPE@"
 #define BUILD_INFO "@TARANTOOL_BUILD@"
 #define BUILD_CFLAGS "@CMAKE_C_FLAGS@ @core_cflags@"
-#define BUILD_WITH "cmake . @TARANTOOL_OPTIONS@"
+#define BUILD_OPTIONS "cmake . @TARANTOOL_OPTIONS@"
 /*
  * vim: syntax=c
  */

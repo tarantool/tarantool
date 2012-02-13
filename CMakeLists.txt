@@ -247,7 +247,7 @@ set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_STATIC=${ENABLE_STATIC} -DE
 set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_TRACE=${ENABLE_TRACE} -DENABLE_BACKTRACE=${ENABLE_BACKTRACE}")
 set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_CLIENT=${ENABLE_CLIENT}")
 
-set(TARANTOOL_BUILD "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR} <${CMAKE_BUILD_TYPE}>")
+set(TARANTOOL_BUILD "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_BUILD_TYPE}")
 
 #
 # Output compile-time defines into config.h. Do it at the end
@@ -263,7 +263,7 @@ configure_file(
     )
 
 message (STATUS "")
-message (STATUS "Tarantool configuration:")
+message (STATUS "Tarantool configuration is complete:")
 message (STATUS "")
 message (STATUS "VERSION: ${TARANTOOL_VERSION}")
 message (STATUS "BUILD: ${TARANTOOL_BUILD}")
@@ -276,6 +276,6 @@ message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
 message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE} (symbol resolve: ${HAVE_BFD})")
 message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
 message (STATUS "")
-message (STATUS "(Please check out CMakeCache.txt to view or modify configuration results)")
+message (STATUS "To view or modify configuration results, check out CMakeCache.txt.")
 message (STATUS "")
 

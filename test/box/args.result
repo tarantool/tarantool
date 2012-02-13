@@ -76,13 +76,13 @@ tarantool_box: --background requires 'logger' configuration option to be set
 tarantool_box --version
 Tarantool/Box 1.minor.patch-<rev>-<commit>
 Target: platform <build>
-Build with: flags
+Build options: flags
 CFLAGS: flags
 
 tarantool_box -V
 Tarantool/Box 1.minor.patch-<rev>-<commit>
 Target: platform <build>
-Build with: flags
+Build options: flags
 CFLAGS: flags
 
 #
