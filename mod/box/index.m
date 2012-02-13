@@ -402,6 +402,8 @@ hash_iterator_free(struct iterator *iterator)
 			:(int) part_count
 {
 	assert(iterator->next = hash_iterator_next);
+	(void) part_count; /* Silence gcc warning in release mode. */
+
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (part_count != 1)
@@ -527,6 +529,7 @@ hash_iterator_free(struct iterator *iterator)
 - (void) initIterator: (struct iterator *) iterator :(void *) field
 			:(int) part_count
 {
+	(void) part_count; /* Silence gcc warning in release mode. */
 	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
@@ -644,6 +647,7 @@ hash_iterator_free(struct iterator *iterator)
 - (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
+	(void) part_count; /* Silence gcc warning in release mode. */
 	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 

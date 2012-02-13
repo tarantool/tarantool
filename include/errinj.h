@@ -1,8 +1,7 @@
-#ifndef TARANTOOL_ADMIN_H_INCLUDED
-#define TARANTOOL_ADMIN_H_INCLUDED
+#ifndef TARANTOOL_ERRINJ_H_INCLUDED
+#define TARANTOOL_ERRINJ_H_INCLUDED
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,6 +25,38 @@
  * SUCH DAMAGE.
  */
 
-int admin_init(void);
+#include "exception.h"
+#include "util.h"
 
-#endif /* TARANTOOL_ADMIN_H_INCLUDED */
+struct errinj {
+	char *name;
+	bool state;
+};
+
+/**
+ * list of error injection handles.
+ */
+#define ERRINJ_LIST(_) \
+	_(ERRINJ_TESTING, false)
+
+ENUM0(errinj_enum, ERRINJ_LIST);
+extern struct errinj errinjs[];
+
+bool errinj_get(int id);
+
+void errinj_set(int id, bool state);
+int errinj_set_byname(char *name, bool state);
+
+void errinj_info(struct tbuf *out);
+
+#ifdef NDEBUG
+#  define ERROR_INJECT(ID)
+#else
+#  define ERROR_INJECT(ID) \
+	do { \
+		if (errinj_get(ID) == true) \
+			tnt_raise(ErrorInjection, :#ID); \
+	} while (0)
+#endif
+
+#endif /* TATRANTOOL_ERRINJ_H_INCLUDED */

@@ -27,7 +27,7 @@ import sys
 import re
 from tarantool_connection import TarantoolConnection
 
-is_admin_re = re.compile("^\s*(show|save|lua|exit|reload|help)", re.I)
+is_admin_re = re.compile("^\s*(show|set|save|lua|exit|reload|help)", re.I)
 
 ADMIN_SEPARATOR = '\n'
 

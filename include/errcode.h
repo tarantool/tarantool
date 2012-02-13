@@ -59,7 +59,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/*  6 */_(ER_TUPLE_IS_LOCKED,		1, "Tuple is locked") \
 	/*  7 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
 	/*  8 */_(ER_BAD_INTEGRITY,		2, "Bad graph integrity") \
-	/*  9 */_(ER_UNUSED9,			0, "Unused9") \
+	/*  9 */_(ER_INJECTION,			2, "Error injection '%s'") \
 	/* 10 */_(ER_UNSUPPORTED,		2, "Unsupported") \
 		/* silverproxy error codes */ \
 	/* 11 */_(ER_RESERVED11,		0, "Reserved11") \

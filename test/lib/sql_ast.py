@@ -34,6 +34,7 @@ ER = {
     6: "ER_TUPLE_IS_LOCKED"     ,
     7: "ER_MEMORY_ISSUE"        ,
     8: "ER_BAD_INTEGRITY"       ,
+    9: "ER_INJECTION"           ,
    10: "ER_UNSUPPORTED_COMMAND" ,
    24: "ER_CANNOT_REGISTER"     ,
    26: "ER_CANNOT_INIT_ALERT_ID",
