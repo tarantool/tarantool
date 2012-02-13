@@ -57,11 +57,9 @@ static const char *help =
 	" - save coredump" CRLF
 	" - save snapshot" CRLF
 	" - lua command" CRLF
-	" - reload configuration" CRLF;
-
-static const char *help_debug =
-	" - show injections" CRLF
-	" - set injection <name> <state>" CRLF;
+	" - reload configuration" CRLF
+	" - show injections (debug mode only)" CRLF
+	" - set injection <name> <state> (debug mode only)" CRLF;
 
 static const char *unknown_command = "unknown command. try typing help." CRLF;
 
@@ -156,11 +154,6 @@ admin_dispatch(lua_State *L)
 		action help {
 			start(out);
 			tbuf_append(out, help, strlen(help));
-#ifndef NDEBUG
-			tbuf_append(out, help_debug, strlen(help_debug));
-#else
-			(void)help_debug; /* making compiler happy */
-#endif
 			end(out);
 		}
 

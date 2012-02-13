@@ -27,9 +27,13 @@ server.test_option("--config=tarantool_bug750658.cfg --background")
 os.unlink(cfg)
 sys.stdout.pop_filter()
 sys.stdout.push_filter("(\d)\.\d\.\d(-\d+-\w+)?", "\\1.minor.patch-<rev>-<commit>")
+sys.stdout.push_filter("Target: .*", "Target: platform <build>")
+sys.stdout.push_filter("Build with: .*", "Build with: flags")
+sys.stdout.push_filter("CFLAGS: .*", "CFLAGS: flags")
+
 server.test_option("--version")
 server.test_option("-V          ")
-sys.stdout.pop_filter()
+sys.stdout.clear_all_filters()
 
 print """#
 # A test case for Bug#726778 "Gopt broke wal_dir and snap_dir: they are no

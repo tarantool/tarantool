@@ -449,6 +449,9 @@ main(int argc, char **argv)
 
 	if (gopt(opt, 'V')) {
 		printf("Tarantool/%s %s\n", mod_name, tarantool_version());
+		printf("Target: %s\n", BUILD_INFO);
+		printf("Build with: %s\n", BUILD_WITH);
+		printf("CFLAGS:%s\n", BUILD_CFLAGS);
 		return 0;
 	}
 

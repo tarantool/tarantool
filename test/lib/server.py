@@ -10,6 +10,7 @@ import time
 import daemon
 import glob
 import ConfigParser
+import re
 
 def check_port(port):
     """Check if the port we're connecting to is available"""
@@ -165,6 +166,7 @@ class Server(object):
         if start_and_exit != None: self.start_and_exit = start_and_exit
         if gdb != None: self.gdb = gdb
         if valgrind != None: self.valgrind = valgrind
+	self.debug = self.test_debug()
 
         if self.is_started:
             if not silent:
@@ -214,7 +216,6 @@ class Server(object):
             self.kill_old_server()
             return
 
-
         # kill process
         os.kill(self.read_pidfile(), signal.SIGTERM)
         #self.process.kill(signal.SIGTERM)
@@ -250,14 +251,24 @@ class Server(object):
         self.stop(silent=True)
         self.start(silent=True)
 
-    def test_option(self, option_list_str):
+    def test_option_get(self, show, option_list_str):
         args = [self.binary] + option_list_str.split()
-        print " ".join([os.path.basename(self.binary)] + args[1:])
+	if show:
+           print " ".join([os.path.basename(self.binary)] + args[1:])
         output = subprocess.Popen(args,
                                   cwd = self.vardir,
                                   stdout = subprocess.PIPE,
                                   stderr = subprocess.STDOUT).stdout.read()
-        print output
+        return output
+
+    def test_option(self, option_list_str):
+        print self.test_option_get(True, option_list_str)
+
+    def test_debug(self):
+        output = self.test_option_get(False, "-V")
+	if re.search("<Debug>", output):
+           return True
+        return False
 
     def kill_old_server(self, silent=True):
         """Kill old server instance if it exists."""
