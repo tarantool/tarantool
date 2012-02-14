@@ -251,10 +251,14 @@ fiber_yield(void)
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }
 
+/**
+ * Return true if the current fiber is a callee of fiber f,
+ * false otherwise.
+ */
 bool
 fiber_is_caller(struct fiber *f)
 {
-	/* 'unwinding' fiber's stack */
+	/* 'Unwinding' the fiber stack. */
 	for (struct fiber **sp_ptr = sp; sp_ptr > call_stack; --sp_ptr) {
 		if (f == *sp_ptr)
 			return true;

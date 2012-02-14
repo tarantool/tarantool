@@ -518,32 +518,36 @@ lbox_fiber_yield(struct lua_State *L)
 }
 
 /**
- * Get fiber status
+ * Get fiber status.
+ * This follows the rules of Lua coroutine.status() function:
+ * Returns the status of fibier, as a string:
+ * - "running", if the fiber is running (that is, it called status);
+ * - "suspended", if the fiber is suspended in a call to yield(),
+ *    or if it has not started running yet;
+ * - "normal" if the fiber is active but not running (that is,
+ *   it has resumed another fiber);
+ * - "dead" if the fiber has finished its body function, or if it
+ *   has stopped with an error.
  */
 static int
 lbox_fiber_status(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
+	const char *status;
 	if (f->fid == 0) {
-		/* this fiber is dead */
-		lua_pushstring(L, "dead");
-		return 1;
+		/* This fiber is dead. */
+		status = "dead";
+	} else if (f == fiber) {
+		/* The fiber is the current running fiber. */
+		status = "running";
+	} else if (fiber_is_caller(f)) {
+		/* The fiber is current fiber's caller. */
+		status = "normal";
+	} else {
+		/* None of the above: must be suspended. */
+		status = "suspended";
 	}
-
-	if (f == fiber) {
-		/* the fiber is current running fiber */
-		lua_pushstring(L, "running");
-		return 1;
-	}
-
-	if (fiber_is_caller(f)) {
-		/* the fiber is current fiber caller */
-		lua_pushstring(L, "normal");
-		return 1;
-	}
-
-	/* the fiber is sleeping */
-	lua_pushstring(L, "suspended");
+	lua_pushstring(L, status);
 	return 1;
 }
 
