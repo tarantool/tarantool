@@ -59,6 +59,7 @@ static char status[64] = "unknown";
 
 static int stat_base;
 STRS(messages, MESSAGES);
+STRS(update_op_codes, UPDATE_OP_CODES);
 
 /*
   For tuples of size below this threshold, when sending a tuple
@@ -405,11 +406,31 @@ update_op_cmp(const void *op1_ptr, const void *op2_ptr)
 	const struct update_op *op1 = op1_ptr;
 	const struct update_op *op2 = op2_ptr;
 
-	if (op1->field_no < op2->field_no)
+	i32 op1_field_no = op1->field_no;
+	i32 op2_field_no = op2->field_no;
+
+	/* compare by field number */
+	if (op1_field_no < op2_field_no)
 		return -1;
-	if (op1->field_no > op2->field_no)
+	if (op1_field_no > op2_field_no)
 		return 1;
 
+	if (op1->opcode == UPDATE_OP_INSERT_BEFORE)
+		op1_field_no -= 1;
+	else if (op1->opcode == UPDATE_OP_INSERT_AFTER)
+		op1_field_no += 1;
+
+	if (op2->opcode == UPDATE_OP_INSERT_BEFORE)
+		op2_field_no -= 1;
+	else if (op2->opcode == UPDATE_OP_INSERT_AFTER)
+		op2_field_no += 1;
+
+	if (op1_field_no < op2_field_no)
+		return -1;
+	if (op1_field_no > op2_field_no)
+		return 1;
+
+	/* field number the same, sorting it by  */
 	if (op1->arg.set.value < op2->arg.set.value)
 		return -1;
 	if (op1->arg.set.value > op2->arg.set.value)
@@ -456,6 +477,13 @@ do_update_op_splice(struct op_splice_arg *arg, void *in, void *out)
 	memcpy(out, arg->paste, arg->paste_length); /* copy the paste */
 	out += arg->paste_length;
 	memcpy(out, in + arg->tail_offset, arg->tail_length); /* copy tail */
+}
+
+static void
+do_update_op_insert(struct op_set_arg *arg, void *in __attribute__((unused)),
+		 void *out)
+{
+	memcpy(out, arg->value, arg->length);
 }
 
 static void
@@ -565,6 +593,14 @@ init_update_op_delete(struct update_cmd *cmd,
 }
 
 static void
+init_update_op_insert(struct update_cmd *cmd __attribute__((unused)),
+		      struct update_field *field __attribute__((unused)),
+		      struct update_op *op)
+{
+	op->new_field_len = op->arg.set.length;
+}
+
+static void
 init_update_op_none(struct update_cmd *cmd __attribute__((unused)),
 		    struct update_field *field, struct update_op *op)
 {
@@ -587,6 +623,8 @@ static struct update_op_meta update_op_meta[UPDATE_OP_MAX + 1] = {
 	{ init_update_op_arith, (do_op_func) do_update_op_or, true },
 	{ init_update_op_splice, (do_op_func) do_update_op_splice, false },
 	{ init_update_op_delete, (do_op_func) NULL, true },
+	{ init_update_op_insert, (do_op_func) do_update_op_insert, true },
+	{ init_update_op_insert, (do_op_func) do_update_op_insert, true },
 	{ init_update_op_none, (do_op_func) do_update_op_none, false },
 	{ init_update_op_error, (do_op_func) NULL, true }
 };
@@ -641,36 +679,13 @@ parse_update_cmd(struct tbuf *data)
 	return cmd;
 }
 
-/**
- * Skip fields unaffected by UPDATE.
- * @return   length of skipped data
- */
-static u32
-skip_fields(u32 field_count, void **data)
-{
-	void *begin = *data;
-	while (field_count-- > 0) {
-		u32 len = load_varint32(data);
-		*data += len;
-	}
-	return *data - begin;
-}
-
 static void
 update_field_init(struct update_cmd *cmd, struct update_field *field,
 		  struct update_op *op, void **old_data, int old_field_count)
 {
 	field->first = op;
-	if (op->field_no < old_field_count) {
-		/*
-		 * Find out the new field length and
-		 * shift the data pointer.
-		 */
-		field->new_len = load_varint32(old_data);
-		field->old = *old_data;
-		*old_data += field->new_len;
-		field->old_end = *old_data;
-	} else {
+
+	if (op->field_no >= old_field_count) {
 		field->new_len = 0;
 		field->old = ""; /* Beyond old fields. */
 		field->old_end = field->old;
@@ -679,8 +694,49 @@ update_field_init(struct update_cmd *cmd, struct update_field *field,
 		 * always have an op on the first field.
 		 */
 		assert(op->field_no > 0 && op > cmd->op);
+		return;
 	}
+
+	if (op->opcode == UPDATE_OP_INSERT_BEFORE ||
+	    op->opcode == UPDATE_OP_INSERT_AFTER) {
+		/* insert operaion always creates a new field */
+		field->new_len = 0;
+		field->old = "";
+		field->old_end = *old_data;
+		return;
+	}
+
+	/*
+	 * Find out the new field length and
+	 * shift the data pointer.
+	 */
+	field->new_len = load_varint32(old_data);
+	field->old = *old_data;
+	*old_data += field->new_len;
+	field->old_end = *old_data;
 }
+
+/**
+ * Skip fields unaffected by UPDATE.
+ * @return   length of skipped data
+ */
+static void
+update_field_skip_fields(struct update_field *field, i32 skip_count, void **data)
+{
+	if (skip_count < 0)
+		skip_count = 0;
+
+	field->tail_field_count = skip_count;
+
+	void *begin = *data;
+	while (skip_count-- > 0) {
+		u32 len = load_varint32(data);
+		*data += len;
+	}
+
+	field->tail_len = *data - begin;
+}
+
 
 /**
  * We found a tuple to do the update on. Prepare and optimize
@@ -695,10 +751,12 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 	 */
 	qsort(cmd->op, cmd->op_end - cmd->op, sizeof(struct update_op),
 	      update_op_cmp);
+
 	/*
 	 * 2. Take care of the old tuple head.
 	 */
-	if (cmd->op->field_no != 0) {
+	if (cmd->op->field_no != 0 ||
+	    cmd->op->opcode == UPDATE_OP_INSERT_AFTER) {
 		/*
 		 * We need to copy part of the old tuple to the
 		 * new one.
@@ -711,6 +769,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 		cmd->op->meta = &update_op_meta[UPDATE_OP_NONE];
 		cmd->op->field_no = 0;
 	}
+
 	/*
 	 * 3. Initialize and optimize the operations.
 	 */
@@ -725,53 +784,88 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 
 	update_field_init(cmd, field, op, &old_data, old_field_count);
 	do {
+		struct update_op *op_prev = op - 1;
+		struct update_op *op_next = op + 1;
+
 		/*
 		 * Various checks for added fields:
-		 * 1) we can not do anything with a new field unless a
-		 *   previous field exists.
-		 * 2) we can not do any op except SET on a field
-		 *   which does not exist.
 		 */
-		if (op->field_no >= old_field_count &&
-		    /* check case 1. */
-		    (op->field_no > MAX(old_field_count,
-					op[-1].field_no + 1) ||
-		     /* check case 2. */
-		     (op->opcode != UPDATE_OP_SET &&
-		      op[-1].field_no != op->field_no))) {
+		if (op->field_no >= old_field_count) {
+			/*
+			 * We can not do anything with a new field unless a
+			 * previous field exists.
+			 */
+			int prev_field_no = MAX(old_field_count,
+						op_prev->field_no + 1);
+			if (op->field_no > prev_field_no)
+				tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
+					  op->field_no);
 
-			tnt_raise(ClientError, :ER_NO_SUCH_FIELD, op->field_no);
+			/*
+			 * We can not do any op except SET on a field
+			 * which does not exist.
+			 */
+			if (op->opcode != UPDATE_OP_SET &&
+			    op_prev->field_no != op->field_no)
+				tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
+					  op->field_no);
 		}
 		op->meta->init_op(cmd, field, op);
 		field->new_len = op->new_field_len;
 
-		if (op + 1 >= cmd->op_end || op[1].field_no != op->field_no) {
-			/* Last op on this field. */
-			int skip_to = old_field_count;
-			if (op + 1 < cmd->op_end && op[1].field_no < old_field_count)
-				skip_to = op[1].field_no;
-			if (skip_to > op->field_no + 1) {
-				/* Jumping over a gap. */
-				field->tail_field_count = skip_to - op->field_no - 1;
-				field->tail_len =
-					skip_fields(field->tail_field_count,
-						    &old_data);
-			} else {
-				field->tail_len = 0;
-				field->tail_field_count = 0;
-			}
-			field->end = op + 1;
-			if (field->first < field->end) { /* Field is not deleted. */
-				cmd->new_tuple_len += varint32_sizeof(field->new_len);
-				cmd->new_tuple_len += field->new_len;
-			}
-			cmd->new_tuple_len += field->tail_len;
-			field++; /** Move to the next field. */
-			if (op + 1 < cmd->op_end) {
-				update_field_init(cmd, field, op + 1,
-						  &old_data, old_field_count);
-			}
+		bool next_field = false;
+		int skip_count;
+		if (op_next >= cmd->op_end) {
+			/* copy whole tail: from last opearation to */
+			skip_count = old_field_count - op->field_no - 1;
+
+			if (op->opcode == UPDATE_OP_INSERT_BEFORE)
+				/* we should copy field which before
+				   inserting a new field */
+				skip_count += 1;
+
+			next_field = true;
+		} else if (op->field_no < op_next->field_no ||
+			   op->opcode == UPDATE_OP_INSERT_BEFORE ||
+			   op_next->opcode == UPDATE_OP_INSERT_AFTER) {
+			/* skip field in the middle of current operation and
+			   next */
+			skip_count = MIN(op_next->field_no, old_field_count)
+				- op->field_no - 1;
+
+			if (op->opcode == UPDATE_OP_INSERT_BEFORE)
+				/* we should copy field which before inserting
+				   a new field */
+				skip_count += 1;
+			if (op_next->opcode == UPDATE_OP_INSERT_AFTER)
+				/* we should copy field whitch after inserting
+				   a new field */
+				skip_count += 1;
+
+			next_field = true;
 		}
+
+		if (!next_field)
+			continue;
+
+		/* Jumping over a gap. */
+		update_field_skip_fields(field, skip_count, &old_data);
+
+		field->end = op_next;
+		if (field->first < field->end) {
+			/* Field is not deleted. */
+			cmd->new_tuple_len += varint32_sizeof(field->new_len);
+			cmd->new_tuple_len += field->new_len;
+		}
+		cmd->new_tuple_len += field->tail_len;
+
+		/* Move to the next field. */
+		field++;
+		if (op_next < cmd->op_end) {
+			update_field_init(cmd, field, op_next,  &old_data,
+					  old_field_count);
+		}
+
 	} while (++op < cmd->op_end);
 
 	cmd->field_end = field;
@@ -815,7 +909,7 @@ do_update(struct box_txn *txn, struct update_cmd *cmd)
 				 * conditions above got us here, simply
 				 * palloc a *new* buffer of sufficient
 				 * size.
-			         */
+				 */
 				new_field = palloc(fiber->gc_pool,
 						   op->new_field_len);
 			}

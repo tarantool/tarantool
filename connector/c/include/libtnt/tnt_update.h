@@ -26,13 +26,17 @@
  * SUCH DAMAGE.
  */
 
-#define TNT_UPDATE_ASSIGN 0
-#define TNT_UPDATE_ADD    1
-#define TNT_UPDATE_AND    2
-#define TNT_UPDATE_XOR    3
-#define TNT_UPDATE_OR     4
-#define TNT_UPDATE_SPLICE 5
-#define TNT_UPDATE_DELETE 6
+enum {
+	TNT_UPDATE_ASSIGN = 0,
+	TNT_UPDATE_ADD,
+	TNT_UPDATE_AND,
+	TNT_UPDATE_XOR,
+	TNT_UPDATE_OR,
+	TNT_UPDATE_SPLICE,
+	TNT_UPDATE_DELETE,
+	TNT_UPDATE_INSERT_BEFORE,
+	TNT_UPDATE_INSERT_AFTER,
+};
 
 ssize_t
 tnt_update_arith(struct tnt_stream *s, uint32_t field,
@@ -49,6 +53,14 @@ tnt_update_splice(struct tnt_stream *s, uint32_t field,
 
 ssize_t
 tnt_update_delete(struct tnt_stream *s, uint32_t field);
+
+ssize_t
+tnt_update_insert_before(struct tnt_stream *s, uint32_t field,
+			 char *data, uint32_t size);
+
+ssize_t
+tnt_update_insert_after(struct tnt_stream *s, uint32_t field,
+			char *data, uint32_t size);
 
 ssize_t
 tnt_update(struct tnt_stream *s, uint32_t ns, uint32_t flags,

@@ -195,3 +195,39 @@ update fields: respond ok (op: 19, reqid: 0, code: 13826, count: 0)
 select: respond ok (op: 17, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 9 (0x00000009), 10 (0x0000000a), 'fourth', 'fifth', 'eighth', 'ninth')
 <<< test delete field done
+>>> test insert field
+# insert tuple
+insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
+(9 (0x00000009), 'eleven')
+# insert new field before primary key
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(7 (0x00000007), 9 (0x00000009), 'eleven')
+# insert a new field after primary key
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 'eleven')
+# insert a new field before last field
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven')
+# insert a new field after last field
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven', 15 (0x0000000f))
+# double insert before
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven', 13 (0x0000000d), 14 (0x0000000e), 15 (0x0000000f))
+# insert before and after
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven', 12 (0x0000000c), 13 (0x0000000d), 14 (0x0000000e), 15 (0x0000000f), 16 (0x00000010))
+# multi insert
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 11 (0x0000000b), 12 (0x0000000c), 13 (0x0000000d), 14 (0x0000000e), 15 (0x0000000f), 16 (0x00000010), 20 (0x00000014), 21 (0x00000015), 22 (0x00000016))
+# insert second tuple
+insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
+(0 (0x00000000), 'one', 15 (0x0000000f))
+# multi insert
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(0 (0x00000000), 1 (0x00000001), 2 (0x00000002), 3 (0x00000003), 4 (0x00000004), 5 (0x00000005), 6 (0x00000006), 7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 11 (0x0000000b), 12 (0x0000000c), 13 (0x0000000d), 14 (0x0000000e), 15 (0x0000000f))
+# insert before invalid field number
+update fields: respond ok (op: 19, reqid: 0, code: 13826, count: 0)
+# insert after invalid field number
+update fields: respond ok (op: 19, reqid: 0, code: 13826, count: 0)
+<<< insert field test done

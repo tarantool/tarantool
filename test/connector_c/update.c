@@ -96,6 +96,21 @@ update_splice_str(struct tnt_stream *stream, i32 field, i32 offset, i32 length, 
 void
 update_delete_field(struct tnt_stream *stream, i32 field);
 
+/** add update fields operation: insert before int32 */
+void
+update_insert_before_i32(struct tnt_stream *stream, i32 field, i32 value);
+
+/** add update fields operation: insert before string */
+void
+update_insert_before_str(struct tnt_stream *stream, i32 field, char *str);
+
+/** add update fields operation: insert before int32 */
+void
+update_insert_after_i32(struct tnt_stream *stream, i32 field, i32 value);
+
+/** add update fields operation: insert before string */
+void
+update_insert_after_str(struct tnt_stream *stream, i32 field, char *str);
 
 /** receive reply from server */
 void
@@ -166,13 +181,16 @@ test_set_and_splice();
 void
 test_delete_field();
 
+/** update fields test case: insert field operations test */
+void
+test_insert_field();
 
 /*==========================================================================
  * function definition
  *==========================================================================*/
 
 int
-main(void)
+main()
 {
 	/* initialize suite */
 	test_suite_setup();
@@ -185,6 +203,7 @@ main(void)
 	test_splice();
 	test_set_and_splice();
 	test_delete_field();
+	test_insert_field();
 	/* clean-up suite */
 	test_suite_tear_down();
 	return EXIT_SUCCESS;
@@ -245,13 +264,15 @@ update_set_str(struct tnt_stream *stream, i32 field, char *str)
 {
 	int result = tnt_update_assign(stream, field, str, strlen(str));
 	if (result < 0)
-		fail_tnt_error("tnt_update_delete_field", result);
+		fail_tnt_error("tnt_update_assign", result);
 }
 
 void
-update_splice_str(struct tnt_stream *stream, i32 field, i32 offset, i32 length, char *list)
+update_splice_str(struct tnt_stream *stream, i32 field, i32 offset, i32 length,
+		  char *list)
 {
-	int result = tnt_update_splice(stream, field, offset, length, list, strlen(list));
+	int result = tnt_update_splice(stream, field, offset, length, list,
+				       strlen(list));
 	if (result < 0)
 		fail_tnt_error("tnt_update_splice", result);
 }
@@ -262,6 +283,40 @@ update_delete_field(struct tnt_stream *stream, i32 field)
 	int result = tnt_update_delete(stream, field);
 	if (result < 0)
 		fail_tnt_error("tnt_update_delete", result);
+}
+
+void
+update_insert_before_i32(struct tnt_stream *stream, i32 field, i32 value)
+{
+	int result = tnt_update_insert_before(stream, field, (char *)&value,
+					      sizeof(value));
+	if (result < 0)
+		fail_tnt_error("tnt_update_insert_before", result);
+}
+
+void
+update_insert_before_str(struct tnt_stream *stream, i32 field, char *str)
+{
+	int result = tnt_update_insert_before(stream, field, str, strlen(str));
+	if (result < 0)
+		fail_tnt_error("tnt_update_insert_before", result);
+}
+
+void
+update_insert_after_i32(struct tnt_stream *stream, i32 field, i32 value)
+{
+	int result = tnt_update_insert_after(stream, field, (char *)&value,
+					      sizeof(value));
+	if (result < 0)
+		fail_tnt_error("tnt_update_insert_after", result);
+}
+
+void
+update_insert_after_str(struct tnt_stream *stream, i32 field, char *str)
+{
+	int result = tnt_update_insert_after(stream, field, str, strlen(str));
+	if (result < 0)
+		fail_tnt_error("tnt_update_insert_after", result);
 }
 
 void
@@ -687,7 +742,6 @@ test_set_and_splice()
 	printf("<<< test set and splice done\n");
 }
 
-/** update fields test case: delete field operations test */
 void
 test_delete_field()
 {
@@ -791,4 +845,113 @@ test_delete_field()
 	select_tuple(1);
 
 	printf("<<< test delete field done\n");
+}
+
+void
+test_insert_field()
+{
+	printf(">>> test insert field\n");
+
+	printf("# insert tuple\n");
+	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s", 9, "eleven");
+	insert_tuple(tuple);
+	tnt_tuple_free(tuple);
+
+	struct tnt_stream *stream = tnt_buf(NULL);
+	printf("# insert new field before primary key\n");
+	update_insert_before_i32(stream, 0, 7);
+	update(9, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# insert a new field after primary key\n");
+	update_insert_after_i32(stream, 0, 8);
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# insert a new field before last field\n");
+	update_insert_before_i32(stream, 3, 10);
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# insert a new field after last field\n");
+	update_insert_after_i32(stream, 4, 15);
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# double insert before\n");
+	update_insert_before_i32(stream, 5, 13);
+	update_insert_before_i32(stream, 5, 14);
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# insert before and after\n");
+	update_insert_before_i32(stream, 5, 12);
+	update_insert_after_i32(stream, 7, 16);
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# multi insert\n");
+	update_set_i32(stream, 4, 1);
+	update_insert_after_i32(stream, 9, 20);
+	tnt_update_arith(stream, 4, TNT_UPDATE_ADD, 5);
+	update_insert_after_i32(stream, 9, 21);
+	tnt_update_arith(stream, 4, TNT_UPDATE_ADD, 5);
+	update_set_i32(stream, 10, -3);
+	tnt_update_arith(stream, 10, TNT_UPDATE_ADD, 5);
+	tnt_update_arith(stream, 10, TNT_UPDATE_ADD, 5);
+	tnt_update_arith(stream, 10, TNT_UPDATE_ADD, 5);
+	tnt_update_arith(stream, 10, TNT_UPDATE_ADD, 5);
+	tnt_update_arith(stream, 10, TNT_UPDATE_ADD, 5);
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	printf("# insert second tuple\n");
+	tuple = tnt_tuple(NULL, "%d%s%d", 0, "one", 15);
+	insert_tuple(tuple);
+	tnt_tuple_free(tuple);
+
+	stream = tnt_buf(NULL);
+	printf("# multi insert\n");
+	update_insert_after_i32(stream, 1, 11);
+	update_insert_after_i32(stream, 1, 12);
+	update_set_i32(stream, 1, -11);
+	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
+	update_insert_before_i32(stream, 1, 1);
+	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 2);
+	update_insert_before_i32(stream, 1, 2);
+	update_insert_before_i32(stream, 1, 3);
+	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 3);
+	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 4);
+	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 5);
+	update_insert_before_i32(stream, 1, 4);
+	update_insert_before_i32(stream, 1, 5);
+	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 6);
+	update_insert_before_i32(stream, 1, 6);
+	update_insert_after_i32(stream, 1, 13);
+	update_insert_before_i32(stream, 1, 7);
+	update_insert_before_i32(stream, 1, 8);
+	update_insert_before_i32(stream, 1, 9);
+	update_insert_after_i32(stream, 1, 14);
+	update(0, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# insert before invalid field number\n");
+	update_insert_before_str(stream, 100000, "ooppps!");
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# insert after invalid field number\n");
+	update_insert_after_str(stream, 100000, "ooppps!");
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	printf("<<< insert field test done\n");
 }
