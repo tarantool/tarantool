@@ -49,6 +49,6 @@ endmacro()
 # building shipped luajit only if there is no
 # usable system one (see cmake/luajit.cmake) or by demand.
 #
-if (ENABLE_LUAJIT)
+if (ENABLE_BUNDLED_LUAJIT)
     luajit_build()
 endif()

@@ -30,9 +30,9 @@
  */
 #include "tarantool.h"
 
-#include LUAJIT_LUA_H
-#include LUAJIT_LAUXLIB_H
-#include LUAJIT_LUALIB_H
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 #include "pickle.h"
 #include "fiber.h"

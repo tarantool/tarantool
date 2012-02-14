@@ -42,9 +42,9 @@
 #include <tbuf.h>
 #include <util.h>
 
-#include LUAJIT_LUA_H
-#include LUAJIT_LAUXLIB_H
-#include LUAJIT_LUALIB_H
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 static const char *help =
 	"available commands:" CRLF

@@ -55,12 +55,6 @@
  */
 #define SYSCONF_DIR "@CMAKE_SYSCONF_DIR@"
 /*
- * path to luajit headers.
- */
-#define LUAJIT_LUA_H     "@LUAJIT_INCLUDE@/lua.h"
-#define LUAJIT_LUALIB_H  "@LUAJIT_INCLUDE@/lualib.h"
-#define LUAJIT_LAUXLIB_H "@LUAJIT_INCLUDE@/lauxlib.h"
-/*
  * vim: syntax=c
  */
 #endif /* TARANTOOL_CONFIG_H_INCLUDED */

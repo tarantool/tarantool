@@ -183,7 +183,7 @@ endif()
 # Now handle all configuration options.
 #
 
-# luajit options are defined in cmake/luajit.cmake
+# LuaJIT options are defined in cmake/luajit.cmake
 
 option(ENABLE_CLIENT "Enable building of console client" Off)
 if (ENABLE_CLIENT)
@@ -281,7 +281,7 @@ message (STATUS "${TARANTOOL_MODULES}.")
 message (STATUS "Please check out CMakeCache.txt to view or modify configuration results.")
 message (STATUS "")
 message (STATUS "*** The following options are on in this configuration: ***")
-message (STATUS "ENABLE_LUAJIT: ${ENABLE_LUAJIT}")
+message (STATUS "ENABLE_BUNDLED_LUAJIT: ${ENABLE_BUNDLED_LUAJIT}")
 message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
 message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
 message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
