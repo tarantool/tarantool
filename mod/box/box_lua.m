@@ -31,10 +31,10 @@
 #include "box_lua.h"
 #include "tarantool.h"
 #include "box.h"
-/* use a full path to avoid clashes with system Lua */
-#include "third_party/luajit/src/lua.h"
-#include "third_party/luajit/src/lauxlib.h"
-#include "third_party/luajit/src/lualib.h"
+
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 #include "pickle.h"
 #include "tuple.h"

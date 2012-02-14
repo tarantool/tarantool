@@ -50,7 +50,9 @@
  * Defined if this is a big-endian system.
  */
 #cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
-
+/*
+ * predefined /etc directory prefix.
+ */
 #define SYSCONF_DIR "@CMAKE_SYSCONF_DIR@"
 #define INSTALL_PREFIX "@CMAKE_INSTALL_PREFIX@"
 #define BUILD_TYPE "@CMAKE_BUILD_TYPE@"

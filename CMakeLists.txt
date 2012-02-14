@@ -6,6 +6,7 @@ include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
 include(CheckSymbolExists)
+include(CheckCXXSourceRuns)
 include(TestBigEndian)
 
 find_program(ECHO echo)
@@ -17,10 +18,8 @@ find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
 find_program(LD ld)
 
-set(luadir ${PROJECT_BINARY_DIR}/third_party/luajit/src)
-link_directories(${luadir})
-
 include(cmake/check_objective_c_compiler.cmake)
+include(cmake/luajit.cmake)
 
 #
 # This instructs the rest of the build system what product
@@ -180,6 +179,9 @@ endif()
 #
 # Now handle all configuration options.
 #
+
+# LuaJIT options are defined in cmake/luajit.cmake
+
 option(ENABLE_CLIENT "Enable building of console client" Off)
 if (ENABLE_CLIENT)
     set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
@@ -283,7 +285,7 @@ message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
 message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
 message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE} (symbol resolve: ${HAVE_BFD})")
 message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
+message (STATUS "ENABLE_BUNDLED_LUAJIT: ${ENABLE_BUNDLED_LUAJIT}")
 message (STATUS "")
 message (STATUS "To view or modify configuration results, check out CMakeCache.txt.")
 message (STATUS "")
-
