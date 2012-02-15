@@ -90,7 +90,8 @@ update_set_str(struct tnt_stream *stream, i32 field, char *str);
 
 /** add update fields operation: splice string */
 void
-update_splice_str(struct tnt_stream *stream, i32 field, i32 offset, i32 length, char *list);
+update_splice_str(struct tnt_stream *stream, i32 field, i32 offset, i32 length,
+		  char *list);
 
 /** add update fields operation: delete field */
 void
@@ -166,6 +167,10 @@ test_set_and_splice();
 void
 test_delete_field();
 
+/** update fields test case: boundary arguments values test */
+void
+test_boundary_args();
+
 
 /*==========================================================================
  * function definition
@@ -185,6 +190,7 @@ main(void)
 	test_splice();
 	test_set_and_splice();
 	test_delete_field();
+	test_boundary_args();
 	/* clean-up suite */
 	test_suite_tear_down();
 	return EXIT_SUCCESS;
@@ -410,6 +416,13 @@ test_simple_set()
 	update_set_str(stream, 1, "value?");
 	update_set_str(stream, 1, "very very very very very long field value?");
 	update_set_str(stream, 1, "field's new value");
+	update(1, stream);
+	tnt_stream_free(stream);
+
+	/* test set primary key */
+	stream = tnt_buf(NULL);
+	printf("# test set primary key\n");
+	update_set_i32(stream, 0, 2);
 	update(1, stream);
 	tnt_stream_free(stream);
 
@@ -684,6 +697,14 @@ test_set_and_splice()
 	update(1, stream);
 	tnt_stream_free(stream);
 
+	/* test splice to long and set to short */
+	stream = tnt_buf(NULL);
+	printf("# test splice to long and set to short\n");
+	update_splice_str(stream, 3, -5, 5, long_string);
+	update_set_str(stream, 2, "short name");	
+	update(1, stream);
+	tnt_stream_free(stream);
+
 	printf("<<< test set and splice done\n");
 }
 
@@ -791,4 +812,37 @@ test_delete_field()
 	select_tuple(1);
 
 	printf("<<< test delete field done\n");
+}
+
+void
+test_boundary_args()
+{
+	const int max_update_op_cnt = 128;
+	printf(">>> test boundaty argumets values\n");
+
+	/* insert tuple */
+	printf("# insert tuple\n");
+	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%d", 0, 1);
+	insert_tuple(tuple);
+	tnt_tuple_free(tuple);
+
+	/* test simple delete fields */
+	struct tnt_stream *stream = tnt_buf(NULL);
+	printf("# test: try to do update w/o operations\n");
+	update(0, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# test: update w/ maximal allowed opearions count\n");
+	for (int i = 0; i < max_update_op_cnt; ++i)
+		tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
+	update(0, stream);
+	tnt_stream_free(stream);
+
+	stream = tnt_buf(NULL);
+	printf("# test: update w/ grater than maximal allowed opearions count\n");
+	for (int i = 0; i < max_update_op_cnt + 1; ++i)
+		tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
+	update(0, stream);
+	tnt_stream_free(stream);
 }
