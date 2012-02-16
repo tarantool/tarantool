@@ -73,16 +73,15 @@ ulimit -c unlimited
 comment_str="#### - commented by init script"
 sed "s/^[[:space:]]*file_descriptors.*/# & $comment_str/" $CFG > $SCFG
 
+echo "pid_file = $PID"            >> $SCFG
+echo "logger   = \"cat >> $LOG\"" >> $SCFG
+
 $BOX -c $SCFG -v --check-config
-
-
-# echo "pid_file = $PID"              >> $SCFG
-# echo "logger   = \"cat >> $LOG\""   >> $SCFG
 
 if [ ! -d $RUNDIR ]; then
     install -d -otarantool -gtarantool -m0750 $RUNDIR
     cd $RUNDIR
-    if ! $SSD --start $SSDARGS $BOX -- --init-storage -v -c $SCFG -p $PID;
+    if ! $SSD --start $SSDARGS $BOX -- --init-storage -v -c $SCFG;
     then
         rm -fr $RUNDIR
         exit 25
@@ -95,7 +94,7 @@ else
     echo -n "    Stopping '$NAME' ... "
 fi
 
-if $SSD --$ACTION $SSDARGS $BOX -- -B -v -c $SCFG -p $PID -l "$LOGGER"; then
+if $SSD --$ACTION $SSDARGS $BOX -- -B -v -c $SCFG; then
     echo "ok"
 else
     ret=$?

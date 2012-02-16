@@ -95,6 +95,7 @@ info:
   version: "1.minor.patch-<rev>-<commit>"
   uptime: <uptime>
   pid: <pid>
+  logger_pid: <pid>
   wal_writer_pid: <pid>
   lsn: 3
   recovery_lag: 0.000

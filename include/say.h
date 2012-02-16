@@ -44,7 +44,6 @@ enum say_level {
 extern int sayfd;
 
 void say_logger_init(int nonblock);
-void say_logger_reinit(void);
 void vsay(int level, const char *filename, int line, const char *error,
 	  const char *format, va_list ap)
     __attribute__ ((format(FORMAT_PRINTF, 5, 0)));

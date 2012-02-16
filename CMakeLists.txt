@@ -16,6 +16,7 @@ find_program(GIT git)
 find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
 find_program(LD ld)
+find_program(POD2MAN pod2man)
 
 set(luadir ${PROJECT_BINARY_DIR}/third_party/luajit/src)
 link_directories(${luadir})
@@ -184,10 +185,13 @@ include_directories("${PROJECT_SOURCE_DIR}/connector/c/tntnet/include")
 # Specify prefixes
 #
 if (NOT DEFINED CMAKE_SYSCONF_DIR)
-    set (CMAKE_SYSCONF_DIR "${CMAKE_INSTALL_PREFIX}/etc")
+    set (CMAKE_SYSCONF_DIR "etc")
 endif()
 if (NOT DEFINED CMAKE_LOCALSTATE_DIR)
-    set (CMAKE_LOCALSTATE_DIR "${CMAKE_INSTALL_PREFIX}/var")
+    set (CMAKE_LOCALSTATE_DIR "var")
+endif()
+if (NOT DEFINED CMAKE_MAN_DIR)
+    set (CMAKE_MAN_DIR "man")
 endif()
 
 #
@@ -261,7 +265,7 @@ add_subdirectory(core)
 add_subdirectory(mod)
 add_subdirectory(client)
 add_subdirectory(test)
-add_subdirectory(doc EXCLUDE_FROM_ALL)
+add_subdirectory(doc)
 add_subdirectory(extra)
 
 install (FILES README LICENSE doc/box-protocol.txt
