@@ -43,27 +43,9 @@
 }
 
 {
-   <0 byte free>
+   <ev loop destroy>
    Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:ev_realloc_emul
-   fun:ev_realloc
-   fun:epoll_destroy
-   fun:ev_loop_destroy
-   fun:ev_default_destroy
-   fun:tarantool_free
    ...
-}
-
-{
-   <0 byte free>
-   Memcheck:Leak
-   fun:malloc
-   fun:realloc
-   fun:ev_realloc_emul
-   fun:ev_realloc
-   fun:ev_loop_destroy
    fun:ev_default_destroy
    fun:tarantool_free
    ...
