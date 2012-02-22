@@ -29,7 +29,7 @@ The latest build can be found below.
   <tr width=60%>
     <td colspan=1>Source tarball</td>
     <td colspan=3 align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@.src.tar.gz">tarantool-@TARANTOOL_VERSION@.src.tar.gz</a>
+        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-src.tar.gz">tarantool-@TARANTOOL_VERSION@-src.tar.gz</a>
     </td>
   </tr>
 
