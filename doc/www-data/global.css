@@ -1,72 +1,244 @@
-body {
-	color: #333;
-	font-family: Helvetica, Arial, sans-serif;
-	font-size: 13px;
-	line-height: 1;
-	padding: 0;
-	margin: 0;
+/* This stylesheet heavily borrows from http://necolas.github.com/normalize.css */
+
+/* =============================================================================
+   Base
+   ========================================================================== */
+
+/*
+ * 1. Corrects text resizing oddly in IE6/7 when body font-size is set using em units
+ *    http://clagnut.com/blog/348/#c790
+ * 2. Keeps page centred in all browsers regardless of content height
+ * 3. Prevents iOS text size adjust after orientation change, without disabling user zoom
+ *    www.456bereastreet.com/archive/201012/controlling_text_size_in_safari_for_ios_without_disabling_user_zoom/
+ */
+
+html {
+    font-size: 100%; /* 1 */
+    overflow-y: scroll; /* 2 */
+    -webkit-text-size-adjust: 100%; /* 3 */
+    -ms-text-size-adjust: 100%; /* 3 */
 }
+
+/*
+ * Addresses margins handled incorrectly in IE6/7
+ */
+
+body {
+    margin: 0;
+}
+
+/* =============================================================================
+   Links
+   ========================================================================== */
+
+/*
+ * Addresses outline displayed oddly in Chrome
+ */
+
+a:focus {
+    outline: thin dotted;
+}
+
+/*
+ * Improves readability when focused and also mouse hovered in all browsers
+ * people.opera.com/patrickl/experiments/keyboard/test
+ */
+
+a:hover, a:active {
+    outline: 0;
+}
+
+
+/* =============================================================================
+   Typography
+   ========================================================================== */
+
+/*
+ * Neutralise smaller font-size in 'section' and 'article' in FF4+, Chrome, S5
+ */
+
+h1 {
+    font-size: 1.5em;
+}
+
+/*
+ * Addresses style set to 'bolder' in FF3+, S4/5, Chrome
+ */
+
+b, strong { 
+    font-weight: bold;
+}
+
+blockquote {
+    margin: 1em 40px;
+}
+
+/*
+ * Corrects font family set oddly in IE6, S4/5, Chrome
+ * en.wikipedia.org/wiki/User:Davidgothberg/Test59
+ */
+
+pre, code, kbd, samp {
+    font-family: monospace, serif;
+    _font-family: 'courier new', monospace;
+    font-size: 1em;
+}
+
+/*
+ * Improves readability of pre-formatted text in all browsers
+ */
+
+pre {
+    white-space: pre;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/*
+ * 1. Addresses CSS quotes not supported in IE6/7
+ * 2. Addresses quote property not supported in S4
+ */
+
+/* 1 */
+
+q {
+    quotes: none;
+}
+
+/* 2 */
+
+q:before,
+q:after {
+    content: '';
+    content: none;
+}
+
+/*
+ * XXX
+ */
+
+small {
+    font-size: 75%;
+}
+
+/*
+ * Prevents sub and sup affecting line-height in all browsers
+ * gist.github.com/413930
+ */
+
+sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+}
+
+sup {
+    top: -0.5em;
+}
+
+sub {
+    bottom: -0.25em;
+}
+
+
+/* =============================================================================
+   Lists
+   ========================================================================== */
+
+ul, ol {
+    margin-left: 0;
+    padding: 0 0 0 40px;
+}
+
+dd {
+    margin: 0 0 0 40px;
+}
+
+
+/* =============================================================================
+   Embedded content
+   ========================================================================== */
+
+/*
+ * 1. Removes border when inside 'a' element in IE6/7/8/9, FF3
+ * 2. Improves image quality when scaled in IE7
+ *    code.flickr.com/blog/2008/11/12/on-ui-quality-the-little-things-client-side-image-resizing/
+ */
+
+img {
+    border: 0; /* 1 */
+    -ms-interpolation-mode: bicubic; /* 2 */
+}
+
+
+/* =============================================================================
+   Tables
+   ========================================================================== */
+
+/* 
+ * Remove most spacing between table cells
+ */
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+
+/* ===========================================================================
+   Layout
+   ======================================================================== */
+
+/*
+ * Top-level page sections:
+ * body > #wrapper > #header #content #footer
+ */
+
+#wrapper {
+    width: 970px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+#header, #footer, #content {
+    width: 970px;
+    margin: 0 auto;
+    padding: 0;
+    overflow: hidden;
+}
+
 
 #header {
-	margin: 20px auto 10px auto;
-	width: 960px;
-	overflow: hidden;
+   margin-bottom: 5px;
+}
+ 
+#footer p, #header p {
+    margin: 0 10px;
 }
 
-#header #nav {
-	width: 740px;
-	float: right;
-	-moz-border-radius: 3px;
-	-webkit-border-radius: 3px;
-	border-radius: 3px;
-	background: url('bg_header.png') repeat-x scroll 50% 0 white;
+/*
+ * http://sonspring.com/journal/clearing-floats 
+ */
+
+.clear {
+  clear: both;
+  display: block;
+  visibility: hidden;
+  width: 0;
+  height: 0;
 }
 
-#header #nav ul {
-	list-style: none outside none;
-	margin: 0 15px;
-	padding: 0;
-}
+/* ==========================================================================
+   Grid
+   ======================================================================== */
 
-#header #nav ul li {
-	float: left;
-}
-
-#header #nav ul li a {
-	-moz-border-radius: 10px;
-	-webkit-border-radius: 10px;
-	border-radius: 10px;
-	color: #eee;
-	text-decoration: none;
-	text-shadow: 0 1px 1px rgba(0,0,0,0.5);
-	text-transform: uppercase;
-	font-size: 11px;
-	font-weight: bold;
-	line-height: 32px;
-	padding: 3px 12px;
-	margin: 0 15px;
-}
-
-#header #nav ul li.current a {
-	background-color: rgba(0,0,0,0.5) !important;
-}
-
-#header #nav ul li a:HOVER {
-	background-color: rgba(0,0,0,0.25)
-}
-
-#header #logo {
-	width: 150px;
-	height: 30px;
-	float: left;
-	display: block;
-	background: url(tarantool.png) no-repeat;
-	margin: 3px 30px 0 30px;
-	
-}
-
-#main {
-	overflow: hidden;
+.grid {
+    width: 940px;
+    overflow: hidden;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 10px 0 0;
 	-moz-border-radius: 3px;
 	-webkit-border-radius: 3px;
 	border-radius: 3px;
@@ -74,35 +246,216 @@ body {
 	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-
-	width: 960px;
-
-	margin: 0 auto;
+    clear: both;
 }
 
-.mBox { margin: 0 20px 10px 20px; display: inline; float: left; }
-.w600 { width: 600px; }
-.w280 { width: 280px; }
-#tarantool p {
-	margin: 10px 0;
-	line-height: 18px;
-}
-#main li {
-	margin: 10px 0;
-	line-height: 14px;
+.lwrap {
+    float: left;
 }
 
-#tarantool h1 { margin: 10px 0; font-size: 28px; font-family: HelveticaNeue-Light,"Helvetica Neue Light",Helvetica,Arial,sans-serif; color: #000; font-weight: normal; }
-#tarantool h1 a { color: black; text-decoration: none; }
+.rwrap {
+    float: right;
+}
 
-#tarantool h2 { margin: 10px 0; font-size: 24px; font-family: HelveticaNeue-Light,"Helvetica Neue Light",Helvetica,Arial,sans-serif; color: #000; font-weight: normal; }
-#tarantool h2 a { color: black; text-decoration: none; }
+.span_1, .span_2, .span_3, .span_4, .span_5, .span_6,
+.span_7, .span_8, .span_9, .span_10, .span_11, .span_12 {
+    float: left;
+    dsiplay: inline; /* IE workaround */
+    margin-left: 10px;
+}
 
-#tarantool h3 { margin: 10px 0; font-size: 20px; font-family: HelveticaNeue-Light,"Helvetica Neue Light",Helvetica,Arial,sans-serif; color: #000; font-weight: normal; }
-#tarantool h3 a { color: black; text-decoration: none; }
+.span_1 { width: 70px; }
+.span_2 { width: 150px; }
+.span_3 { width: 230px; }
+.span_4 { width: 303px; }
+.span_5 { width: 390px; }
+.span_6 { width: 470px; }
+.span_7 { width: 550px; }
+.span_8 { width: 630px; }
+.span_9 { width: 710px; }
+.span_10 { width: 790px; }
+.span_11 { width: 870px; }
+.span_12 { width: 950px; }
 
-#tarantool h4 { margin: 10px 0; font-size: 16px; font-family: HelveticaNeue-Light,"Helvetica Neue Light",Helvetica,Arial,sans-serif; color: #000; font-weight: normal; }
-#tarantool h4 a { color: black; text-decoration: none; }
+.lpad_1 { padding-left: 80px; }
+.lpad_2 { padding-left: 160px; }
+.lpad_3 { padding-left: 240px; }
+.lpad_4 { padding-left: 320px; }
+.lpad_5 { padding-left: 400px; }
+.lpad_6 { padding-left: 480px; }
+.lpad_7 { padding-left: 560px; }
+.lpad_8 { padding-left: 640px; }
+.lpad_9 { padding-left: 720px; }
+.lpad_10 { padding-left: 800px; }
+.lpad_11 { padding-left: 880px; }
 
-.mt20 { margin-top: 20px !important; }
-#tarantool a { color: #369;}
+.rpad_1 { padding-right: 80px; }
+.rpad_2 { padding-right: 160px; }
+.rpad_3 { padding-right: 240px; }
+.rpad_4 { padding-right: 320px; }
+.rpad_5 { padding-right: 400px; }
+.rpad_6 { padding-right: 480px; }
+.rpad_7 { padding-right: 560px; }
+.rpad_8 { padding-right: 640px; }
+.rpad_9 { padding-right: 720px; }
+.rpad_10 { padding-right: 800px; }
+.rpad_11 { padding-right: 880px; }
+
+
+/* =============================================================================
+   Custom styles
+   ========================================================================== */
+
+html, body, #wrapper {
+    height: 100%;
+}
+
+body {
+    background-color: #eee;
+    font-size: 80%;
+    font-family: Verdana, Arial, Helvetica, sans-serif;
+    line-height: 1.5;
+}
+
+#wrapper, #header, #content, #footer {
+    background-color: #fff;
+}
+
+#content {
+    padding-bottom: 5px;
+}
+
+a { color: #201e9e; }
+a:visited { color: #3f3f3f; }
+
+#footer img {
+    vertical-align: middle;
+}
+
+#logo {
+    width: 120px;
+    height: 120px;
+    float: left;
+}
+
+#blurb {
+    margin-bottom: 8px;
+    color: #ffffff;
+/*    background-color: #00468c; */
+    background: url('bg_header.png') repeat-x scroll 50% 0 white;
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+	border-radius: 3px;
+	
+	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+#blurb h1 {
+    font-size: 1.5em;
+    line-height: 1;
+}
+
+#blurb h2 {
+    font-size: 1.2em;
+    font-weight: normal;
+    font-style: italic;
+    line-height: 1;
+    width: 80%;
+}
+
+.front_block {
+    /*border: 1px dotted black;*/
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding: 0 10px;
+}
+
+.news_block {
+    /*border: 1px dotted black;*/
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-left: 230px;
+    margin-right: auto;
+    padding: 0 10px;
+}
+
+#download a {
+    color: #ffffff;
+    text-decoration: none;
+}
+#download a:visited {
+    color: #eee;
+    text-decoration: none;
+}
+
+#current_download {
+    font-size: 110%;
+    font-weight: bold;
+    padding: 4px 5px;
+    background-color: #ffaa00;
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+	border-radius: 3px;
+	
+	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+#content_cap {
+    color: #ffffff;
+    background-color: #00468c;
+}
+
+#content_cap #logo {
+    width: 65px;
+    height: 65px;
+}
+
+/* ===========================================================================
+   Navigation
+   ======================================================================= */
+
+#nav {
+    width: 740px;
+    float: right;
+    -moz-border-radius: 3px;
+    -webkit-border-radius: 3px;
+    border-radius: 3px;
+    background: url('bg_header.png') repeat-x scroll 50% 0 white;
+}
+
+#nav ul, #nav ol {
+    list-style: none outside none;
+    margin: 0 15px;
+    padding: 0;
+}
+
+#nav ul li {
+    display: inline-block;
+}
+
+#nav ul li a {
+    -moz-border-radius: 10px;
+    -webkit-border-radius: 10px;
+    border-radius: 10px;
+    color: #eee;
+    text-decoration: none;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 32px;
+    padding: 3px 12px;
+    margin: 0 10px;
+}
+
+#nav ul li.current_download a {
+    background-color: rgba(0,0,0,0.5) !important;
+}
+
+#nav ul li a:HOVER {
+    background-color: rgba(0,0,0,0.25)
+}
