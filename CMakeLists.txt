@@ -262,6 +262,10 @@ configure_file(
     "${PROJECT_BINARY_DIR}/doc/tnt.ent"
     )
 
+configure_file(
+    "${PROJECT_SOURCE_DIR}/doc/www-data.in/download.cmake"
+    "${PROJECT_BINARY_DIR}/doc/www-data.in/download"
+    )
 message (STATUS "")
 message (STATUS "Successfully configured Tarantool infrastructure on ")
 message (STATUS "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}, build type '${CMAKE_BUILD_TYPE}'. ")

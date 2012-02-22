@@ -4,12 +4,12 @@
 <title>{{ title }}</title>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link rel="shortcut icon" href="favicon.ico" />
-<link rel="stylesheet" type="text/css" href="style.css" />
+<link rel="stylesheet" type="text/css" href="global.css" />
 {% include "script" ignore missing %}
 </head>
 <body id="tarantool">
-<div id="wrapper">
 
+<div id="wrapper">
   <div id="header">
     {% block header %}
     <p class='lwrap'><a id="home_link" href="index{{ languages[pagelang].suffix | e }}">{{ home_tag | langselect | e }}</a></p>
@@ -20,21 +20,16 @@
   <div id="content">
     {% block content %}
     <div class="grid">
-      <div id="sidebar" class="span_4">
-<!--
-	<div id="content_cap">
-          <img id="logo" src="logo.png" alt="Tarantool Logo" />
-	</div>
--->
-	<div class="clear"></div>
-        {{ sidebar | langselect }}
+      <div id="sidebar" class="span_3">
+          <div class="clear"></div>
+            {{ sidebar | langselect }}
+          </div>
+          <div id="main" class="span_8">
+            {% block prologue %}{% endblock %}
+            {{ content }}
+            {% block epilogue %}{% endblock %}
+          </div>
       </div>
-      <div id="main" class="span_8">
-        {% block prologue %}{% endblock %}
-        {{ content }}
-        {% block epilogue %}{% endblock %}
-      </div>
-    </div>
     {% endblock content %}
   </div>
 

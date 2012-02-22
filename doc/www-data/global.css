@@ -58,7 +58,7 @@ a:hover, a:active {
  */
 
 h1 {
-    font-size: 2em;
+    font-size: 1.5em;
 }
 
 /*
@@ -186,9 +186,9 @@ table {
 }
 
 
-/* =============================================================================
+/* ===========================================================================
    Layout
-   ========================================================================== */
+   ======================================================================== */
 
 /*
  * Top-level page sections:
@@ -208,15 +208,11 @@ table {
     overflow: hidden;
 }
 
+
 #header {
-    border-bottom: 1px dotted #3f3f3f;
+   margin-bottom: 5px;
 }
-
-#footer {
-    border-top: 1px dotted #3f3f3f;
-    clear: both;
-}
-
+ 
 #footer p, #header p {
     margin: 0 10px;
 }
@@ -233,16 +229,23 @@ table {
   height: 0;
 }
 
-/* =============================================================================
+/* ==========================================================================
    Grid
-   ========================================================================== */
+   ======================================================================== */
 
 .grid {
-    width: 960px;
+    width: 940px;
     overflow: hidden;
     margin-left: auto;
     margin-right: auto;
     padding: 0 10px 0 0;
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+	border-radius: 3px;
+	
+	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     clear: both;
 }
 
@@ -264,7 +267,7 @@ table {
 .span_1 { width: 70px; }
 .span_2 { width: 150px; }
 .span_3 { width: 230px; }
-.span_4 { width: 310px; }
+.span_4 { width: 303px; }
 .span_5 { width: 390px; }
 .span_6 { width: 470px; }
 .span_7 { width: 550px; }
@@ -319,7 +322,7 @@ body {
 }
 
 #content {
-    padding-bottom: 20px;
+    padding-bottom: 5px;
 }
 
 a { color: #201e9e; }
@@ -330,25 +333,36 @@ a:visited { color: #3f3f3f; }
 }
 
 #logo {
-    width: 170px;
-    height: 170px;
+    width: 120px;
+    height: 120px;
     float: left;
 }
 
 #blurb {
-    margin-top: 9px;
+    margin-bottom: 8px;
     color: #ffffff;
-    background-color: #00468c;
+/*    background-color: #00468c; */
+    background: url('bg_header.png') repeat-x scroll 50% 0 white;
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+	border-radius: 3px;
+	
+	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 #blurb h1 {
-    font-size: 3em;
+    font-size: 1.5em;
     line-height: 1;
 }
 
 #blurb h2 {
-    font-size: 1.5em;
+    font-size: 1.2em;
+    font-weight: normal;
+    font-style: italic;
     line-height: 1;
+    width: 80%;
 }
 
 .front_block {
@@ -358,10 +372,13 @@ a:visited { color: #3f3f3f; }
     padding: 0 10px;
 }
 
-#download {
-    border-top: 1px dotted black;
-    padding-top: 10px;
-    text-align: center;
+.news_block {
+    /*border: 1px dotted black;*/
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-left: 230px;
+    margin-right: auto;
+    padding: 0 10px;
 }
 
 #download a {
@@ -369,15 +386,22 @@ a:visited { color: #3f3f3f; }
     text-decoration: none;
 }
 #download a:visited {
-    color: #cfcfcf;
+    color: #eee;
     text-decoration: none;
 }
 
-#download #current {
-    font-size: 150%;
-    border: 2px outset grey;
-    padding: 4px 10px;
+#current_download {
+    font-size: 110%;
+    font-weight: bold;
+    padding: 4px 5px;
     background-color: #ffaa00;
+	-moz-border-radius: 3px;
+	-webkit-border-radius: 3px;
+	border-radius: 3px;
+	
+	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 #content_cap {
@@ -390,9 +414,9 @@ a:visited { color: #3f3f3f; }
     height: 65px;
 }
 
-/* =============================================================================
+/* ===========================================================================
    Navigation
-   ========================================================================== */
+   ======================================================================= */
 
 #nav {
     width: 740px;
@@ -428,7 +452,7 @@ a:visited { color: #3f3f3f; }
     margin: 0 10px;
 }
 
-#nav ul li.current a {
+#nav ul li.current_download a {
     background-color: rgba(0,0,0,0.5) !important;
 }
 

@@ -1,0 +1,67 @@
+{% page faq en %}
+
+## Frequently Asked Questions
+
+**Q. Why Tarantool?**
+
+A. Tarantool is a result of long trial and error process within Mail.Ru. It's an nth generation of a family of custom in-memory data servers, developed for various web applications. Besides, when Tarantool development started (2008) there were no stable and sufficiently functional open source alternative.
+
+**Q. What's the key advantage of Tarantool?**
+
+A. Tarantool provides a fairly rich core feature set (HASH and TREE indexes, secondary indexes, composite indexes,
+asynchronous replication, hot standby, data durability) along with support for Lua stored procedures.
+These two properties allow to code fast, atomic and reliable in-memory data servers which handle non-trivial application-specific logic. The win over traditional SQL servers is in performance: low-overhead, lock-free architecture allows to serve
+an order of magnitude more RPS on comparable hardware. The win over NoSQL alternatives is in flexibility: Lua allows to flexibly process data stored in compact, not normalized format.
+
+**Q. What are your development plans?**
+
+A. Performance. Better support for transactions. Advanced replication and clustering features.
+
+**Q. Who is developing Tarantool?**
+
+A. There is a small engineering team employed by Mail.ru -- check out our commit logs on github. The development is fully open, and Python and PHP drivers are written by Konstantin Cherkasoff and Alexander Kalendarev from community.
+
+**Q. How serious is Mail.Ru about Tarantool?**
+
+A. Tarantool is an open source project, distributed under BSD license, and as such does not depend on any one sponsor. However, it is currently and integral part of Mail.Ru backbone, and because of that, gets a lot of support from Mail.ru.
+
+**Q. Why is Tarantool primary port number 33013?**
+
+A. It's a prime number which is easy to remember, because 3313, 3301, 313, 13 and 3 are also prime numbers.
+
+**Q. My arena_used/items_used in SHOW SLAB output is >> 1. What does it mean and what should I do?**
+
+A. A ratio of arena_used to items_used >> 1 indicates that there shore/fragmentation accumulated by the slab allocator. Imagine there are a lot of small tuples stored in the system initially, and later on each tuple becomes bigger and doesn't fit into its old slab size. The old slabs are never relinquished by the allocator. Currently this can be solved only by a server restart.
+
+{% page faq ru %}
+
+**Q. Why Tarantool?**
+
+A. Tarantool is a result of long trial and error process within Mail.Ru. It's an nth generation of a family of custom in-memory data servers, developed for various web applications. Besides, when Tarantool development started (2008) there were no stable and sufficiently functional open source alternative.
+
+**Q. What's the key advantage of Tarantool?**
+
+A. Tarantool provides a fairly rich core feature set (HASH and TREE indexes, secondary indexes, composite indexes,
+asynchronous replication, hot standby, data durability) along with support for Lua stored procedures.
+These two properties allow to code fast, atomic and reliable in-memory data servers which handle non-trivial application-specific logic. The win over traditional SQL servers is in performance: low-overhead, lock-free architecture allows to serve
+an order of magnitude more RPS on comparable hardware. The win over NoSQL alternatives is in flexibility: Lua allows to flexibly process data stored in compact, not normalized format.
+
+**Q. What are your development plans?**
+
+A. Performance. Better support for transactions. Advanced replication and clustering features.
+
+**Q. Who is developing Tarantool?**
+
+A. There is a small engineering team employed by Mail.ru -- check out our commit logs on github. The development is fully open, and Python and PHP drivers are written by Konstantin Cherkasoff and Alexander Kalendarev from community.
+
+**Q. How serious is Mail.Ru about Tarantool?**
+
+A. Tarantool is an open source project, distributed under BSD license, and as such does not depend on any one sponsor. However, it is currently and integral part of Mail.Ru backbone, and because of that, gets a lot of support from Mail.ru.
+
+**Q. Why is Tarantool primary port number 33013?**
+
+A. It's a prime number which is easy to remember, because 3313, 3301, 313, 13 and 3 are also prime numbers.
+
+**Q. My arena_used/items_used in SHOW SLAB output is >> 1. What does it mean and what should I do?**
+
+A. A ratio of arena_used to items_used >> 1 indicates that there shore/fragmentation accumulated by the slab allocator. Imagine there are a lot of small tuples stored in the system initially, and later on each tuple becomes bigger and doesn't fit into its old slab size. The old slabs are never relinquished by the allocator. Currently this can be solved only by a server restart.

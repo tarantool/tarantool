@@ -1,19 +1,19 @@
 {% text blurb en %}
 
-# Tarantool
-## high performance in-memory key-value store
+# Tarantool/Box - an efficient in-memory data store
+##Tarantool is an extensible, persistent, transactional database, designed to store the most volatile and highly accessible web data.
 
 {% text blurb ru %}
 
-# Tarantool
-## high performance in-memory key-value store
+# Tarantool/Box - NoSQL СУБД для высокой нагрузки
+## Tarantool - расширяемая, транзакционная СУБД для хранения наиболее запрашиваемых и часто меняющихся данных.
 
 {% text home_page_news en %}
 
-Stay Informed
-=============
+What's new
+==========
 
-### What's new
+2012-02-18: <a href="http://tarantool.org">http://tarantool.org</a> gets a new look! 
 
 2011-10-07: <a href="http://tarantool.org/dist/tarantool-1.4.3-3-g45804c6-src.tar.gz">Tarantool 1.4.3</a>, stable version of 1.4 branch.
 
@@ -25,10 +25,10 @@ Stay Informed
 
 {% text home_page_news ru %}
 
-Информация
-==========
+Новости
+=======
 
-### Новости
+2012-02-18: Новый дизайн <a href="http://tarantool.org">http://tarantool.org</a>
 
 2011-10-07: <a href="http://tarantool.org/dist/tarantool-1.4.3-3-g45804c6-src.tar.gz">Tarantool 1.4.3</a>, stable version of 1.4 branch.
 
@@ -38,34 +38,57 @@ Stay Informed
 
 2011-05-14: <a href="http://launchpad.net/tarantool/1.3/1.3.5/+download/tarantool-1.3.5-src.tar.gz">tarantool-1.3.5</a> (stable) is out.
 
-{% text home_page_docs en %}
+{% text home_page_learn en %}
 
-[Learn It](docs.html)
+Learn more
 =====================
 
-- [About](about.html)
-- [Documentation](http://tarantool.org/tarantool_user_guide.html)
-- [Wiki](http://github.com/mailru/tarantool/wiki)
+- [Introduction](intro.html)
+- [Frequently Aasked Questions](faq.html)
+- [A benchmark](benchmark.html)
 
-{% text home_page_docs ru %}
+{% text home_page_learn ru %}
 
-[Описание](docs.ru.html)
+Узнать больше
 ========================
 
 - [Обзор](about.ru.html)
-- [Документвция](http://tarantool.org/tarantool_user_guide.html)
+- статья на habrahabr
 - [Wiki](http://github.com/mailru/tarantool/wiki)
 
-{% text home_page_community en %}
+{% text home_page_use en %}
+
+Use Tarantool
+============
+- <p id="download"><a id="current_download" href="download.html">Download Tarantool</a></p>
+- [Read the User Guide](tarantool_user_guide.html)
+- [Browse a stored procedures archive](http://github.com/mailru/tntlua)
+- [Join the mailing list](http://groups.google.com/group/tarantool/subscribe)
+- [Report a bug](https://bugs.launchpad.net/tarantool/+filebug)
+- [View features and milestones](https://launchpad.net/tarantool)
+
+{% text home_page_use ru %}
+
+Использовать Tarantool
+======================
+
+- [Исходный код](https://github.com/mailru/tarantool)
+- [База дефектов](http://bugs.launchpad.net/tarantool)
+- [Документация](tarantool_user_guide.html)
+- IRC: #tarantool on irc.freenode.net
+
+{% text home_page_join en %}
 
 Get Involved
 ============
 
-- [Code Repo](https://github.com/mailru/tarantool)
-- [Bugs](http://bugs.launchpad.net/tarantool)
-- IRC: #tarantool on irc.freenode.net
+- [Browse Git source](https://github.com/mailru/tarantool)
+- [Read the developer guide](tarantool_developer_guide.html)
+- [IRC chat with developers](http://webchat.freenode.net/?channels=tarantool)
+- [Developer list archives](https://lists.launchpad.net/tarantool-developers/)
+- [Help improve our Wiki](http://github.com/mailru/tarantool/wiki)
 
-{% text home_page_community ru %}
+{% text home_page_join ru %}
 
 Участие
 =======

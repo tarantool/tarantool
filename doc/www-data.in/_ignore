@@ -1,2 +1,7 @@
 README
 *.py *.pyc
+CMakeLists.txt
+CMakeFiles
+cmake_install.cmake
+download.cmake
+Makefile

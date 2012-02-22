@@ -34,17 +34,25 @@ The other alternative, if you have actually modified
   
   </para>
 </section>
+
+<section>
+<title>How to build the user guide from DocBook .xml files</title>
+
+    <para>
+        To build documentation, you'll need:
+
+        <itemizedlist>
+            <listitem>xsltproc</listitem>
+            <listitem>docbook5-xml</listitem>
+            <listitem>docbook-xsl-ns</listitem>
+            <listitem>libsaxon-java- for saxon processing</listitem>
+            <listitem>libxml-commons-resolver1.1-java</listitem>
+            <listitem>libxerces2-java</listitem>
+            <listitem>libxslthl-java</listitem>
+        </itemizedlist>
+    </para>
+</section>
 </chapter>
-
-To build documentation, you'll need:
-
-xsltproc
-docbook5-xml
-docbook-xsl-ns
-libsaxon-java- for saxon processing
-libxml-commons-resolver1.1-java
-libxerces2-java
-libxslthl-java
 <!--
      TOC:
 

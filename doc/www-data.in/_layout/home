@@ -1,50 +1,50 @@
 {% extends "base" %}
-{% set title = "Tarantool" %}
+{% set title = "Tarantool/Box -- an efficient in-memory data store" %}
 
     {% block content %}
+    <div id="blurb" class="span_12">
+
+      <img id="logo" src="logo.png" alt="Tarantool/Box Logo" />
+
+      {{ blurb | langselect }}
+
+      <div class="clear"></div>
+
+    </div>
+
     <div class="grid">
 
       <div class="lwrap">
-
-        <div id="blurb" class="span_8">
-
-          <img id="logo" src="logo.png" alt="Tarantool Logo" />
-
-          {{ blurb | langselect }}
-
-          <div class="clear"></div>
-
-	  <p id="download" class="front_block">
-	    <a id="current" href="{{ current_download | e }}">Download</a>
-	    <a href="{{ more_downloads | e }}">[ More Downloads ]</a>
-          </p>
-
-        </div>
 
         <div id="blocks">
 
           <div id="docs" class="span_4">
             <div class='front_block'>
-              {{ home_page_docs | langselect }}
+              {{ home_page_learn | langselect }}
+            </div>
+          </div>
+
+          <div id="use" class="span_4">
+            <div class='front_block'>
+              {{ home_page_use | langselect }}
             </div>
           </div>
 
           <div id="join" class="span_4">
             <div class='front_block'>
-              {{ home_page_community | langselect }}
+              {{ home_page_join | langselect }}
             </div>
           </div>
 
           <div class="clear"></div>
 
         </div>
-
-      </div>
-
-      <div class="span_4">
-        <div id="news" class='front_block'>
+      <div class="span_9">
+        <div id="news" class='news_block'>
           {{ home_page_news | langselect }}
         </div>
+      </div>
+
       </div>
 
       <div class="clear"></div>

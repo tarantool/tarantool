@@ -1,2 +1,2 @@
 {% extends "base" %}
-{% set title = "Tarantool Docs" %}
+{% set title = "Tarantool/Box documentation" %}

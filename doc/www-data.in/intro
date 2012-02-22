@@ -1,6 +1,10 @@
-{% page docs en %}
+{% page intro en %}
 
-Tarantool/Box, or simply Tarantool, is a high performance key/value storage server.  The code is available for free under the terms of <em><a href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD license</a></em>. Supported platforms are GNU/Linux and FreeBSD.
+## What is Tarantool?
+
+Tarantool/Box, or simply Tarantool, is a high performance key/value storage server. The code is available for free under the terms of <em><a href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD license</a></em>. Supported platforms are GNU/Linux and FreeBSD.
+
+## An overview of the architecture
 
 The server <span class="strong"><strong>maintains all its data in random-access memory</strong></span>, and therefore can handle read requests blazingly fast.  At the same time, a copy of the data is kept on non-volatile storage (a disk drive), and inserts and updates are performed atomically.
 
@@ -8,15 +12,28 @@ To ensure atomicity, consistency and crash-safety of the persistent copy, a writ
 
 If update and delete rate is high, a constantly growing write-ahead log file (or files) can pose a disk space problem, and significantly increase time necessary to restart from disk. A simple solution is employed: the server <span class="strong"><strong>can be requested to save a concise snapshot</strong></span> of its current data. The underlying operating system's <span class="quote">&#8220;<span class="quote">copy-on-write</span>&#8221;</span> feature is employed to take the snapshot in a quick, resource-savvy and non-blocking manner. The <span class="quote">&#8220;<span class="quote">copy-on-write</span>&#8221;</span> technique guarantees that snapshotting has minimal impact on server performance.
 
-Tarantool supports replication. Replicas may run locally or on a remote host. Tarantool replication is asynchronous and does not block writes to the master. When or if the master becomes unavailable, the replica can be switched to assume the role of the master.
-
 <span class="strong"><strong>Tarantool is lock-free</strong></span>. Instead of the underlying operating system's concurrency primitives, Tarantool uses cooperative multitasking environment to simultaneously operate on thousands of connections. While this approach limits server scalability to a single CPU core, in practice it removes competition for the memory bus and sets the scalability limit to the top of memory and network throughput. CPU utilization of a typical highly-loaded Tarantool server is under 10%.
 
-<span class="strong"><strong>The software is production-ready</strong></span>. Tarantool has been developed and is actively used at <em><a href="http://api.mail.ru">Mail.Ru</a></em> one of the leading Russian web content providers. At Mail.Ru, the sowtware serves the <span class="quote">&#8220;<span class="quote">hottest</span>&#8221;</span> data, such as online users and their sessions, online application properties, the map between users and their serving shards.
+## Main features
+
+A key feature of Tarantool is support for stored procedures, which can
+access and modify data atomically. Procedures can be created, modified,
+dropped at runtime. With stored procedures, it's possible to
+turn Tarantool into a highly flexible and extremely fast social web
+application server.
+
+Tarantool supports replication. Replicas may run locally or on a remote host. Tarantool replication is asynchronous and does not block writes to the master. When or if the master becomes unavailable, the replica can be switched to assume the role of the master.
+
+## How stable is the software?
+
+<span class="strong"><strong>The software is
+production-ready</strong></span>. Tarantool has been developed and is
+actively used at <em><a href="http://api.mail.ru">Mail.Ru</a></em> one of
+the leading Russian web content providers, since 2008. At Mail.Ru, the sowtware serves the <span class="quote">&#8220;<span class="quote">hottest</span>&#8221;</span> data, such as online users and their sessions, online application properties, the map between users and their serving shards.
 
 To conclude, Tarantool/Box is ideal for highly volatile and/or highly accessed Web data. With Tarantool, performance overhead on serving data is minimal: a single server can easily deal with tens or even hundreds of thousands of requests per second. Snapshots can be made when Web user activity is at its lowest, for example at night, and thus add little or no restraint on the top throughput of the system.  If the master becomes unavailable, a replica can assume the role of the master with minimal downtime.
 
-{% page docs ru %}
+{% page intro ru %}
 
 <b>Tarantool</b> &mdash; однопоточный TCP сервер, реализующий кооперативную многозадачность. Разрабатывается с учетом работы под высокими нагрузками (десятки тысяч RPS). Можно выделить две логические составляющие: ядро и модули. В настоящее время подключение модулей производится на этапе компиляции. На уровне ядра реализуется базовый функционал (общение по сети, работа с бинарными логами, репликация по сети, быстрое переключение на резервный сервер и т.п.). В модулях реализуется бизнес логика конкретного приложения с использованием API ядра.
 

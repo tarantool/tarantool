@@ -3,11 +3,25 @@
 Documentation
 =============
 
-blah blah blah
+- [Tarnatool/Box User Guide](http://tarantool.org/tarantool_user_guide.html)
+- [Tarnatool/Box Developer guide](http://tarantool.org/tarantool_user_guide.html)
+
+## Where to get more help
+
+- [discussion list](http://groups.google.com/group/tarantool)
+- [developer list](http://lists.launchpad.net/tarantool-developers)
 
 {% page docs ru %}
 
 Документация
 ============
 
-ля ля тополя
+Пользовательская документация на данный момент
+доступна только на английском языке.
+
+## Другие источники:
+
+* русскоязычный список рассылки
+* стенография доклада на Форуме Технологий Mail.Ru
+* статьи на habrahabr.ru
+

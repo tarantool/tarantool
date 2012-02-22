@@ -26,7 +26,6 @@ class Config(object):
         self.ignore_file = '_ignore'
         self.corpus_dir = '.'
         self.layout_dir = '_layout'
-        self.extras_dir = '_extras'
         self.output_dir = 'www'
         self.abs_output_path = None
         self.config = {}
@@ -43,9 +42,6 @@ class Config(object):
     @property
     def layout_path(self):
         return os.path.join(self.source_path, self.layout_dir)
-    @property
-    def extras_path(self):
-        return os.path.join(self.source_path, self.extras_dir)
     @property
     def output_path(self):
         if self.abs_output_path:
@@ -68,7 +64,6 @@ class Config(object):
         config = yaml.load(f)
         f.close()
         self.check('layout_dir', config)
-        self.check('extras_dir', config)
         self.check('output_dir', config)
         self.config = config
         #print config
@@ -217,7 +212,7 @@ class PageHandler(BaseHandler):
         self.environ = make_environ(config.layout_path)
 
     def write(self, name, data):
-        print 'write %s' % name
+        print 'Writing %s' % name
         f = open(os.path.join(self.config.output_path, name), 'w')
         f.write(data)
         f.close
@@ -233,7 +228,7 @@ class PageHandler(BaseHandler):
         else:
             langdesc = default_lang
         text = unicode(text, langdesc['source-encoding'])
-        text = markdown.markdown(text)
+        text = markdown.markdown(text, ['tables'])
         filename = name + langdesc['suffix']
         template = self.environ.get_template(layout, globals=self.config.config)
         page = template.render(
@@ -309,22 +304,11 @@ def load_entries(config):
     entries = []
     corpus = config.get_corpus()
     for name in corpus:
-        print 'load content file "%s"' % name
         scanner = Scanner(name, config)
         for entry in iter(scanner):
             entries.append(entry)
+        print 'Loaded content file "%s"' % name
     return entries
-
-def copy_extras(config):
-    names = os.listdir(config.extras_path)
-    for name in names:
-        srcname = os.path.join(config.extras_path, name)
-        dstname = os.path.join(config.output_path, name)
-        print 'copy %s' % srcname
-        if os.path.isdir(srcname):
-            shutil.copytree(srcname, dstname)
-        else:
-            shutil.copy2(srcname, dstname)
 
 def main():
     config = Config()
@@ -333,7 +317,6 @@ def main():
     renderer = Renderer(config)
     entries = load_entries(config)
     renderer.render(entries)
-    copy_extras(config)
 
 if __name__ == '__main__':
     main()

@@ -27,7 +27,6 @@ tarantool-*.tar.gz
 doc/tnt.ent
 doc/user/tarantool_user_guide.html
 doc/developer/tarantool_developer_guide.html
-doc/www-data/*
 third_party/luajit/src/luajit
 third_party/luajit/lib/vmdef.lua
 third_party/luajit/src/buildvm
@@ -39,3 +38,6 @@ third_party/luajit/src/lj_recdef.h
 third_party/luajit/src/lj_vm.s
 test/connector_c/tt
 *.reject
+doc/www-data/*.html
+doc/www-data/*.ru.html
+doc/www-data.in/download
