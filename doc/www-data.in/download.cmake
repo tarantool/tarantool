@@ -1,13 +1,5 @@
 {% page download en %}
 
-### What's in the package
-
-Each binary package includes the server binary, *tarantool_box*,
-the command line client, *tarantool*, instance management
-script, *tarantool.sh*, a script to add more instances,
-*tarantool_expand.sh*, and, last but not least, man pages and the user
-guide.
-
 ### How to choose the right version for download 
 
 Tarantool/Box uses a 3-digit versioning scheme
@@ -44,6 +36,7 @@ The latest build can be found below.
   <th colspan=3>Linux</th>
 
 <!-- Debian -->
+<!--
 
   <tr>
     <td>
@@ -70,10 +63,10 @@ The latest build can be found below.
 
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x864_64-debug.deb">64-bit</a>
+        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64-debug.deb">64-bit</a>
     </td>
   </tr>
-
+-->
 <!-- RPM -->
 
   <tr>
@@ -86,7 +79,8 @@ The latest build can be found below.
     </td>
 
     <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686.rpm">64-bit</a>
+        <a
+        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64.rpm">64-bit</a>
     </td>
   </tr>
 
@@ -101,7 +95,7 @@ The latest build can be found below.
 
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x864_64-debug.rpm">64-bit</a>
+        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64-debug.rpm">64-bit</a>
     </td>
   </tr>
 
@@ -153,6 +147,7 @@ href="http://tarantool.org/dist">here</a>.
 - Perl driver, [CPAN home](http://search.cpan.org/~yuran/MR-Tarantool/)
 - [Ruby driver](https://github.com/mailru/tarantool-ruby)
 - Python driver, [hosted at pypi.python.org](http://pypi.python.org/pypi/tarantool)
+
 {% page download ru %}
 
 <!-- vim: syntax=html
