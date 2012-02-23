@@ -6,6 +6,13 @@
 
 A. Tarantool is a result of long trial and error process within Mail.Ru. It's an nth generation of a family of custom in-memory data servers, developed for various web applications. Besides, when Tarantool development started (2008) there were no stable and sufficiently functional open source alternative.
 
+** Q. Why Lua?**
+
+Lua is a ligthweight, fast, extensible multi-paradigm language. Lua also
+happens to be very easy to embed. Lua coroutines relate very closely to
+Tarantool fibers, and Lua architecture works well with Tarantool internals. 
+Lua is first, but, hopefully, not last stored program language for Tarantool.
+
 **Q. What's the key advantage of Tarantool?**
 
 A. Tarantool provides a fairly rich core feature set (HASH and TREE indexes, secondary indexes, composite indexes,
@@ -38,6 +45,13 @@ A. A ratio of arena_used to items_used >> 1 indicates that there shore/fragmenta
 **Q. Why Tarantool?**
 
 A. Tarantool is a result of long trial and error process within Mail.Ru. It's an nth generation of a family of custom in-memory data servers, developed for various web applications. Besides, when Tarantool development started (2008) there were no stable and sufficiently functional open source alternative.
+
+** Q. Why Lua?**
+
+Lua is a ligthweight, fast, extensible multi-paradigm language. Lua also
+happens to be very easy to embed. Lua coroutines relate very closely to
+Tarantool fibers, and Lua architecture works well with Tarantool internals. 
+Lua is first but not last stored program language for Tarantool.
 
 **Q. What's the key advantage of Tarantool?**
 

@@ -17,11 +17,11 @@ Documentation
 ============
 
 Пользовательская документация на данный момент
-доступна только на английском языке.
+доступна [только на английском языке](tarantool_user_guide.html).
 
 ## Другие источники:
 
-* русскоязычный список рассылки
-* стенография доклада на Форуме Технологий Mail.Ru
-* статьи на habrahabr.ru
-
+- [русскоязычный список рассылки](http://groups.google.com/group/tarantool-ru)
+- [стенография доклада на Форуме Технологий Mail.Ru](http://habrahabr.ru/company/mailru/blog/136288/)
+- [статья на habrahabr.ru](http://habrahabr.ru/blogs/nosql/133435/)
+- [Все материалы habrahabr.ru с меткой tarantool](http://habrahabr.ru/tag/tarantool/)

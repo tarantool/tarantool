@@ -52,9 +52,9 @@ Learn more
 Узнать больше
 ========================
 
-- [Обзор](about.ru.html)
-- статья на habrahabr
-- [Wiki](http://github.com/mailru/tarantool/wiki)
+- [Обзор](intro.ru.html)
+- [Часто задаваемые вопросы](faq.ru.html)
+- [Доклад на TechForum.Mail.Ru](http://habrahabr.ru/company/mailru/blog/136288/)
 
 {% text home_page_use en %}
 
@@ -72,10 +72,11 @@ Use Tarantool
 Использовать Tarantool
 ======================
 
-- [Исходный код](https://github.com/mailru/tarantool)
-- [База дефектов](http://bugs.launchpad.net/tarantool)
-- [Документация](tarantool_user_guide.html)
-- IRC: #tarantool on irc.freenode.net
+- <p id="download"><a id="current_download" href="download.ru.html">Скачать Tarantool</a></p>
+- [Руководство пользователя](tarantool_user_guide.html)
+- [Архив процедур на Lua](http://github.com/mailru/tntlua)
+- [Список рассылки](http://groups.google.com/group/tarantool-ru)
+- [Сообщить об ошибке](https://bugs.launchpad.net/tarantool/+filebug)
 
 {% text home_page_join en %}
 
@@ -90,12 +91,14 @@ Get Involved
 
 {% text home_page_join ru %}
 
-Участие
-=======
+Участвовать в проекте 
+=====================
 
-- [Code Repo](https://github.com/mailru/tarantool)
-- [Bugs](http://bugs.launchpad.net/tarantool)
-- IRC: #tarantool on irc.freenode.net
+- [Исходный код](https://github.com/mailru/tarantool)
+- [Руководство разработчика](tarantool_developer_guide.html)
+- [IRC чат](http://webchat.freenode.net/?channels=tarantool)
+- [Список рассылки](https://lists.launchpad.net/tarantool-developers/)
+- [Пополнить Вики](http://github.com/mailru/tarantool/wiki)
 
 {% page home en %}
 
