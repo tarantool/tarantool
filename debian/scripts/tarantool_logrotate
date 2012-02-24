@@ -18,7 +18,7 @@ logger_notify() {
 	  | tail -n 1 \
 	  | sed 's/[^[:digit:]]//g'
 	`
-	LOGGER_PID=`${CLI} p $PORT_PRIMARY -m $PORT_ADMIN "show info" \
+	LOGGER_PID=`${CLI} -p $PORT_PRIMARY -m $PORT_ADMIN "show info" \
 	  | grep 'logger_pid:' \
 	  | sed 's/[^[:digit:]]//g'
 	`
