@@ -47,5 +47,7 @@ install/tarantool::
 install/tarantool-common::
 	pod2man -c 'tarantool instances control' \
 	    debian/tarantool_instance.pod > build-area/tarantool_instance.1
+	pod2man -c 'tarantool log rotation' \
+	    debian/tarantool_logrotate.pod > build-area/tarantool_logrotate.1
 	install -m0755 extra/logger.pl \
 	    debian/tarantool-common/usr/lib/tarantool/logger

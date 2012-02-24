@@ -7,10 +7,6 @@
     delaycompress
     create 0640 tarantool adm
     postrotate
-        if test -d /var/run/tarantool; then
-            if [ `ls /var/run/tarantool | wc -l` -gt 0 ]; then
-                kill -USR2 `cat /var/run/tarantool/*.pid`
-            fi
-        fi
+        /usr/sbin/tarantool_rotate
     endscript
 }

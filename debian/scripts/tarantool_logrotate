@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+CLI="/usr/bin/tarantool"
+CONFIG_DIR="/var/lib/tarantool/started"
+PID_DIR="/var/run/tarantool"
+
+logger_notify() {
+	CFG=$1
+	PORT_PRIMARY=`grep \
+	  '^[[:space:]]*primary_port[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
+	  | tail -n 1 \
+	  | sed 's/[^[:digit:]]//g'
+	`
+	PORT_ADMIN=`grep \
+	  '^[[:space:]]*admin_port[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
+	  | tail -n 1 \
+	  | sed 's/[^[:digit:]]//g'
+	`
+	LOGGER_PID=`${CLI} p $PORT_PRIMARY -m $PORT_ADMIN "show info" \
+	  | grep 'logger_pid:' \
+	  | sed 's/[^[:digit:]]//g'
+	`
+	kill -USR2 $LOGGER_PID
+}
+
+if test -d ${PID_DIR}; then
+	for file in `ls -1 $PID_DIR`; do
+		INSTANCE=`basename $file .pid`
+		logger_notify "$CONFIG_DIR/$INSTANCE.cfg"
+	done
+fi
