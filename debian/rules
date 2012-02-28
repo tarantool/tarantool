@@ -16,8 +16,8 @@ DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
     -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_SYSCONF_DIR=/etc/tarantool \
-    -DCMAKE_LOCALSTATE_DIR=/var
-#     -DENABLE_STATIC=ON
+    -DCMAKE_LOCALSTATE_DIR=/var \
+    -DENABLE_STATIC=ON
 #    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
 #    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
 
@@ -37,9 +37,6 @@ clean::
 
 install/tarantool-dbg::
 	rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg
-
-install/tarantool-client-dbg::
-	rm -fr debian/tarantool-client-dbg/usr/share/doc/tarantool-client-dbg
 
 install/tarantool::
 #         make -C build-area test-force || /bin/true

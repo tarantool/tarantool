@@ -47,7 +47,6 @@ if ! test -x $BOX; then
     exit 20
 fi
 
-
 NAME=`basename $CFG .cfg`
 
 PID=$PID_DIR/$NAME.pid
@@ -73,8 +72,8 @@ ulimit -c unlimited
 comment_str="#### - commented by init script"
 sed "s/^[[:space:]]*file_descriptors.*/# & $comment_str/" $CFG > $SCFG
 
-echo "pid_file = $PID"            >> $SCFG
-echo "logger   = \"cat >> $LOG\"" >> $SCFG
+echo "pid_file = $PID"        >> $SCFG
+echo "logger   = \"$LOGGER\"" >> $SCFG
 
 $BOX -c $SCFG -v --check-config
 
