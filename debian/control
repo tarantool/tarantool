@@ -71,7 +71,7 @@ Description: high performance key/value storage server
  This package provides debug symbols for all tarantool packages.
 
 Package: tarantool-connector-c
-Architecture: all
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}
 Description: high performance key/value storage server
