@@ -100,7 +100,7 @@ endif()
 # Perform build type specific configuration.
 #
 set (CMAKE_C_FLAGS_DEBUG "-ggdb -O0 -fexceptions -funwind-tables")
-set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2 -fexceptions -funwind-tables")
+set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2 -fexceptions -funwind-tables -DNDEBUG -DNVALGRIND")
 set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 
 #
@@ -156,6 +156,9 @@ endif()
 
 if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set (core_cflags "${core_cflags} -Werror")
+else()
+# Remove VALGRIND code and assertions in *any* type of release build.
+    set (core_cflags "${core_cflags} -DNDEBUG -DNVALGRIND")
 endif()
 
 #
