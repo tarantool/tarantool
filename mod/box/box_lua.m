@@ -31,10 +31,10 @@
 #include "box_lua.h"
 #include "tarantool.h"
 #include "box.h"
-/* use a full path to avoid clashes with system Lua */
-#include "third_party/luajit/src/lua.h"
-#include "third_party/luajit/src/lauxlib.h"
-#include "third_party/luajit/src/lualib.h"
+
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 #include "pickle.h"
 #include "tuple.h"
@@ -381,10 +381,6 @@ void append_key_part(struct lua_State *L, int i,
  * the iterator with one or several Lua scalars
  * (numbers, strings) and start iteration from an
  * offset.
- *
- * @todo/FIXME: Currently we always store iteration
- * state within index. This limits the total
- * amount of active iterators to 1.
  */
 static int
 lbox_index_next(struct lua_State *L)

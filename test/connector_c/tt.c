@@ -30,13 +30,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <tnt.h>
-#include <tnt_net.h>
-#include <tnt_io.h>
-#include <tnt_queue.h>
-#include <tnt_utf8.h>
-#include <tnt_lex.h>
-#include <tnt_sql.h>
+#include <connector/c/include/libtnt/tnt.h>
+#include <connector/c/include/libtnt/tnt_net.h>
+#include <connector/c/include/libtnt/tnt_io.h>
+#include <connector/c/include/libtnt/tnt_queue.h>
+#include <connector/c/include/libtnt/tnt_utf8.h>
+#include <connector/c/include/libtnt/tnt_lex.h>
+#include <connector/c/include/libtnt/tnt_sql.h>
 
 struct tt_test;
 

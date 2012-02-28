@@ -59,7 +59,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/*  6 */_(ER_TUPLE_IS_LOCKED,		1, "Tuple is locked") \
 	/*  7 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
 	/*  8 */_(ER_BAD_INTEGRITY,		2, "Bad graph integrity") \
-	/*  9 */_(ER_UNUSED9,			0, "Unused9") \
+	/*  9 */_(ER_INJECTION,			2, "Error injection '%s'") \
 	/* 10 */_(ER_UNSUPPORTED,		2, "Unsupported") \
 		/* silverproxy error codes */ \
 	/* 11 */_(ER_RESERVED11,		0, "Reserved11") \
@@ -94,14 +94,14 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 38 */_(ER_WRONG_VERSION,		2, "Unsupported version of protocol") \
 		/* end of silversearch error codes */					\
 	/* 39 */_(ER_WAL_IO,			2, "Failed to write to disk") \
-	/* 40 */_(ER_UNUSED40,			0, "Unused40") \
-	/* 41 */_(ER_UNUSED41,			0, "Unused41") \
-	/* 42 */_(ER_UNUSED42,			0, "Unused42") \
-	/* 43 */_(ER_UNUSED43,			0, "Unused43") \
-	/* 44 */_(ER_UNUSED44,			0, "Unused44") \
+	/* 40 */_(ER_FIELD_TYPE,		2, "Field type does not match one required by operation: expected a %s") \
+	/* 41 */_(ER_TYPE_MISMATCH,		2, "Argument type in operation does not match field type: expected a %s") \
+	/* 42 */_(ER_SPLICE,			2, "Field SPLICE error: %s") \
+	/* 43 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
+	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
 	/* 45 */_(ER_UNUSED45,			0, "Unused45") \
 	/* 46 */_(ER_UNUSED46,			0, "Unused46") \
-	/* 47 */_(ER_UNUSED47,			0, "Unused47") \
+	/* 47 */_(ER_KEY_CARDINALITY,		2, "Key cardinality %d is greater than index cardinality %d") \
 	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist") \
 	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure '%.*s' is not defined") \

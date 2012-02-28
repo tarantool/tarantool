@@ -28,11 +28,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_mem.h>
-#include <tnt_tuple.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
-#include <tnt_buf.h>
+#include <connector/c/include/libtnt/tnt_mem.h>
+#include <connector/c/include/libtnt/tnt_tuple.h>
+#include <connector/c/include/libtnt/tnt_reply.h>
+#include <connector/c/include/libtnt/tnt_stream.h>
+#include <connector/c/include/libtnt/tnt_buf.h>
 
 static struct tnt_stream *tnt_buf_tryalloc(struct tnt_stream *s) {
 	if (s) {
@@ -116,7 +116,7 @@ tnt_buf_reply(struct tnt_stream *s, struct tnt_reply *r) {
 	if (sb->size == sb->rdoff)
 		return 1;
 	size_t off = 0;
-	int rc = tnt_reply(r, s->data + sb->rdoff, sb->size - sb->rdoff, &off);
+	int rc = tnt_reply(r, sb->data + sb->rdoff, sb->size - sb->rdoff, &off);
 	if (rc == 0)
 		sb->rdoff += off;
 	return rc;

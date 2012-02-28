@@ -41,9 +41,11 @@
 #include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
-#include "third_party/luajit/src/lua.h"
-#include "third_party/luajit/src/lauxlib.h"
-#include "third_party/luajit/src/lualib.h"
+#include <errinj.h>
+
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 static const char *help =
 	"available commands:" CRLF
@@ -58,21 +60,22 @@ static const char *help =
 	" - save coredump" CRLF
 	" - save snapshot" CRLF
 	" - lua command" CRLF
-	" - reload configuration" CRLF;
-
+	" - reload configuration" CRLF
+	" - show injections (debug mode only)" CRLF
+	" - set injection <name> <state> (debug mode only)" CRLF;
 
 static const char *unknown_command = "unknown command. try typing help." CRLF;
 
 
-#line 68 "core/admin.m"
+#line 71 "core/admin.m"
 static const int admin_start = 1;
-static const int admin_first_final = 108;
+static const int admin_first_final = 135;
 static const int admin_error = 0;
 
 static const int admin_en_main = 1;
 
 
-#line 67 "core/admin.rl"
+#line 70 "core/admin.rl"
 
 
 
@@ -123,6 +126,7 @@ admin_dispatch(lua_State *L)
 	int cs;
 	char *p, *pe;
 	char *strstart, *strend;
+	bool state;
 
 	while ((pe = memchr(fiber->rbuf->data, '\n', fiber->rbuf->size)) == NULL) {
 		if (fiber_bread(fiber->rbuf, 1) <= 0)
@@ -133,12 +137,12 @@ admin_dispatch(lua_State *L)
 	p = fiber->rbuf->data;
 
 	
-#line 137 "core/admin.m"
+#line 141 "core/admin.m"
 	{
 	cs = admin_start;
 	}
 
-#line 142 "core/admin.m"
+#line 146 "core/admin.m"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -201,47 +205,47 @@ case 6:
 	}
 	goto st0;
 tr13:
-#line 208 "core/admin.rl"
+#line 240 "core/admin.rl"
 	{slab_validate(); ok(out);}
-	goto st108;
+	goto st135;
 tr20:
-#line 198 "core/admin.rl"
+#line 228 "core/admin.rl"
 	{return 0;}
-	goto st108;
+	goto st135;
 tr25:
-#line 145 "core/admin.rl"
+#line 155 "core/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
 			end(out);
 		}
-	goto st108;
+	goto st135;
 tr36:
-#line 193 "core/admin.rl"
+#line 214 "core/admin.rl"
 	{strend = p;}
-#line 151 "core/admin.rl"
+#line 161 "core/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
 			tarantool_lua(L, out, strstart);
 			end(out);
 		}
-	goto st108;
+	goto st135;
 tr43:
-#line 158 "core/admin.rl"
+#line 168 "core/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
 			else
 				ok(out);
 		}
-	goto st108;
-tr66:
-#line 206 "core/admin.rl"
+	goto st135;
+tr67:
+#line 238 "core/admin.rl"
 	{coredump(60); ok(out);}
-	goto st108;
-tr75:
-#line 165 "core/admin.rl"
+	goto st135;
+tr76:
+#line 175 "core/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -254,9 +258,37 @@ tr75:
 				fail(out, err);
 			}
 		}
-	goto st108;
-tr92:
-#line 127 "core/admin.rl"
+	goto st135;
+tr98:
+#line 224 "core/admin.rl"
+	{ state = false; }
+#line 188 "core/admin.rl"
+	{
+			strstart[strend-strstart] = '\0';
+			if (errinj_set_byname(strstart, state)) {
+				tbuf_printf(err, "can't find error injection '%s'", strstart);
+				fail(out, err);
+			} else {
+				ok(out);
+			}
+		}
+	goto st135;
+tr101:
+#line 223 "core/admin.rl"
+	{ state = true; }
+#line 188 "core/admin.rl"
+	{
+			strstart[strend-strstart] = '\0';
+			if (errinj_set_byname(strstart, state)) {
+				tbuf_printf(err, "can't find error injection '%s'", strstart);
+				fail(out, err);
+			} else {
+				ok(out);
+			}
+		}
+	goto st135;
+tr117:
+#line 131 "core/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -274,43 +306,51 @@ tr92:
 			}
 			end(out);
 		}
-	goto st108;
-tr106:
-#line 201 "core/admin.rl"
+	goto st135;
+tr131:
+#line 231 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
-	goto st108;
-tr112:
-#line 200 "core/admin.rl"
+	goto st135;
+tr137:
+#line 230 "core/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
-	goto st108;
-tr117:
-#line 204 "core/admin.rl"
+	goto st135;
+tr146:
+#line 149 "core/admin.rl"
+	{
+			start(out);
+			errinj_info(out);
+			end(out);
+		}
+	goto st135;
+tr152:
+#line 234 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
-	goto st108;
-tr125:
-#line 203 "core/admin.rl"
+	goto st135;
+tr160:
+#line 233 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
-	goto st108;
-tr129:
-#line 205 "core/admin.rl"
+	goto st135;
+tr164:
+#line 235 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
-	goto st108;
-st108:
+	goto st135;
+st135:
 	if ( ++p == pe )
-		goto _test_eof108;
-case 108:
-#line 303 "core/admin.m"
+		goto _test_eof135;
+case 135:
+#line 343 "core/admin.m"
 	goto st0;
 tr14:
-#line 208 "core/admin.rl"
+#line 240 "core/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
 tr21:
-#line 198 "core/admin.rl"
+#line 228 "core/admin.rl"
 	{return 0;}
 	goto st7;
 tr26:
-#line 145 "core/admin.rl"
+#line 155 "core/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
@@ -318,9 +358,9 @@ tr26:
 		}
 	goto st7;
 tr37:
-#line 193 "core/admin.rl"
+#line 214 "core/admin.rl"
 	{strend = p;}
-#line 151 "core/admin.rl"
+#line 161 "core/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
@@ -329,7 +369,7 @@ tr37:
 		}
 	goto st7;
 tr44:
-#line 158 "core/admin.rl"
+#line 168 "core/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -337,12 +377,12 @@ tr44:
 				ok(out);
 		}
 	goto st7;
-tr67:
-#line 206 "core/admin.rl"
+tr68:
+#line 238 "core/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
-tr76:
-#line 165 "core/admin.rl"
+tr77:
+#line 175 "core/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -356,8 +396,36 @@ tr76:
 			}
 		}
 	goto st7;
-tr93:
-#line 127 "core/admin.rl"
+tr99:
+#line 224 "core/admin.rl"
+	{ state = false; }
+#line 188 "core/admin.rl"
+	{
+			strstart[strend-strstart] = '\0';
+			if (errinj_set_byname(strstart, state)) {
+				tbuf_printf(err, "can't find error injection '%s'", strstart);
+				fail(out, err);
+			} else {
+				ok(out);
+			}
+		}
+	goto st7;
+tr102:
+#line 223 "core/admin.rl"
+	{ state = true; }
+#line 188 "core/admin.rl"
+	{
+			strstart[strend-strstart] = '\0';
+			if (errinj_set_byname(strstart, state)) {
+				tbuf_printf(err, "can't find error injection '%s'", strstart);
+				fail(out, err);
+			} else {
+				ok(out);
+			}
+		}
+	goto st7;
+tr118:
+#line 131 "core/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -376,33 +444,41 @@ tr93:
 			end(out);
 		}
 	goto st7;
-tr107:
-#line 201 "core/admin.rl"
+tr132:
+#line 231 "core/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st7;
-tr113:
-#line 200 "core/admin.rl"
+tr138:
+#line 230 "core/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st7;
-tr118:
-#line 204 "core/admin.rl"
+tr147:
+#line 149 "core/admin.rl"
+	{
+			start(out);
+			errinj_info(out);
+			end(out);
+		}
+	goto st7;
+tr153:
+#line 234 "core/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st7;
-tr126:
-#line 203 "core/admin.rl"
+tr161:
+#line 233 "core/admin.rl"
 	{start(out); slab_stat(out); end(out);}
 	goto st7;
-tr130:
-#line 205 "core/admin.rl"
+tr165:
+#line 235 "core/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 404 "core/admin.m"
+#line 480 "core/admin.m"
 	if ( (*p) == 10 )
-		goto st108;
+		goto st135;
 	goto st0;
 st8:
 	if ( ++p == pe )
@@ -553,28 +629,28 @@ case 23:
 	}
 	goto tr33;
 tr33:
-#line 193 "core/admin.rl"
+#line 214 "core/admin.rl"
 	{strstart = p;}
 	goto st24;
 st24:
 	if ( ++p == pe )
 		goto _test_eof24;
 case 24:
-#line 564 "core/admin.m"
+#line 640 "core/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
 	}
 	goto st24;
 tr34:
-#line 193 "core/admin.rl"
+#line 214 "core/admin.rl"
 	{strstart = p;}
 	goto st25;
 st25:
 	if ( ++p == pe )
 		goto _test_eof25;
 case 25:
-#line 578 "core/admin.m"
+#line 654 "core/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
@@ -789,7 +865,8 @@ st48:
 case 48:
 	switch( (*p) ) {
 		case 97: goto st49;
-		case 104: goto st69;
+		case 101: goto st69;
+		case 104: goto st88;
 	}
 	goto st0;
 st49:
@@ -823,8 +900,8 @@ st52:
 		goto _test_eof52;
 case 52:
 	switch( (*p) ) {
-		case 10: goto tr66;
-		case 13: goto tr67;
+		case 10: goto tr67;
+		case 13: goto tr68;
 		case 114: goto st53;
 	}
 	goto st0;
@@ -833,8 +910,8 @@ st53:
 		goto _test_eof53;
 case 53:
 	switch( (*p) ) {
-		case 10: goto tr66;
-		case 13: goto tr67;
+		case 10: goto tr67;
+		case 13: goto tr68;
 		case 101: goto st54;
 	}
 	goto st0;
@@ -843,8 +920,8 @@ st54:
 		goto _test_eof54;
 case 54:
 	switch( (*p) ) {
-		case 10: goto tr66;
-		case 13: goto tr67;
+		case 10: goto tr67;
+		case 13: goto tr68;
 		case 100: goto st55;
 	}
 	goto st0;
@@ -853,8 +930,8 @@ st55:
 		goto _test_eof55;
 case 55:
 	switch( (*p) ) {
-		case 10: goto tr66;
-		case 13: goto tr67;
+		case 10: goto tr67;
+		case 13: goto tr68;
 		case 117: goto st56;
 	}
 	goto st0;
@@ -863,8 +940,8 @@ st56:
 		goto _test_eof56;
 case 56:
 	switch( (*p) ) {
-		case 10: goto tr66;
-		case 13: goto tr67;
+		case 10: goto tr67;
+		case 13: goto tr68;
 		case 109: goto st57;
 	}
 	goto st0;
@@ -873,8 +950,8 @@ st57:
 		goto _test_eof57;
 case 57:
 	switch( (*p) ) {
-		case 10: goto tr66;
-		case 13: goto tr67;
+		case 10: goto tr67;
+		case 13: goto tr68;
 		case 112: goto st58;
 	}
 	goto st0;
@@ -883,8 +960,8 @@ st58:
 		goto _test_eof58;
 case 58:
 	switch( (*p) ) {
-		case 10: goto tr66;
-		case 13: goto tr67;
+		case 10: goto tr67;
+		case 13: goto tr68;
 	}
 	goto st0;
 st59:
@@ -899,8 +976,8 @@ st60:
 		goto _test_eof60;
 case 60:
 	switch( (*p) ) {
-		case 10: goto tr75;
-		case 13: goto tr76;
+		case 10: goto tr76;
+		case 13: goto tr77;
 		case 97: goto st61;
 	}
 	goto st0;
@@ -909,8 +986,8 @@ st61:
 		goto _test_eof61;
 case 61:
 	switch( (*p) ) {
-		case 10: goto tr75;
-		case 13: goto tr76;
+		case 10: goto tr76;
+		case 13: goto tr77;
 		case 112: goto st62;
 	}
 	goto st0;
@@ -919,8 +996,8 @@ st62:
 		goto _test_eof62;
 case 62:
 	switch( (*p) ) {
-		case 10: goto tr75;
-		case 13: goto tr76;
+		case 10: goto tr76;
+		case 13: goto tr77;
 		case 115: goto st63;
 	}
 	goto st0;
@@ -929,8 +1006,8 @@ st63:
 		goto _test_eof63;
 case 63:
 	switch( (*p) ) {
-		case 10: goto tr75;
-		case 13: goto tr76;
+		case 10: goto tr76;
+		case 13: goto tr77;
 		case 104: goto st64;
 	}
 	goto st0;
@@ -939,8 +1016,8 @@ st64:
 		goto _test_eof64;
 case 64:
 	switch( (*p) ) {
-		case 10: goto tr75;
-		case 13: goto tr76;
+		case 10: goto tr76;
+		case 13: goto tr77;
 		case 111: goto st65;
 	}
 	goto st0;
@@ -949,8 +1026,8 @@ st65:
 		goto _test_eof65;
 case 65:
 	switch( (*p) ) {
-		case 10: goto tr75;
-		case 13: goto tr76;
+		case 10: goto tr76;
+		case 13: goto tr77;
 		case 116: goto st66;
 	}
 	goto st0;
@@ -959,8 +1036,8 @@ st66:
 		goto _test_eof66;
 case 66:
 	switch( (*p) ) {
-		case 10: goto tr75;
-		case 13: goto tr76;
+		case 10: goto tr76;
+		case 13: goto tr77;
 	}
 	goto st0;
 st67:
@@ -985,7 +1062,7 @@ st69:
 case 69:
 	switch( (*p) ) {
 		case 32: goto st70;
-		case 111: goto st106;
+		case 116: goto st87;
 	}
 	goto st0;
 st70:
@@ -994,18 +1071,14 @@ st70:
 case 70:
 	switch( (*p) ) {
 		case 32: goto st70;
-		case 99: goto st71;
-		case 102: goto st84;
-		case 105: goto st89;
-		case 112: goto st93;
-		case 115: goto st99;
+		case 105: goto st71;
 	}
 	goto st0;
 st71:
 	if ( ++p == pe )
 		goto _test_eof71;
 case 71:
-	if ( (*p) == 111 )
+	if ( (*p) == 110 )
 		goto st72;
 	goto st0;
 st72:
@@ -1013,39 +1086,45 @@ st72:
 		goto _test_eof72;
 case 72:
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 110: goto st73;
+		case 32: goto st73;
+		case 106: goto st80;
 	}
 	goto st0;
 st73:
 	if ( ++p == pe )
 		goto _test_eof73;
 case 73:
-	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 102: goto st74;
-	}
+	if ( (*p) == 32 )
+		goto st73;
+	if ( 33 <= (*p) && (*p) <= 126 )
+		goto tr91;
 	goto st0;
+tr91:
+#line 222 "core/admin.rl"
+	{ strstart = p; }
+	goto st74;
 st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 105: goto st75;
-	}
+#line 1111 "core/admin.m"
+	if ( (*p) == 32 )
+		goto tr92;
+	if ( 33 <= (*p) && (*p) <= 126 )
+		goto st74;
 	goto st0;
+tr92:
+#line 222 "core/admin.rl"
+	{ strend = p; }
+	goto st75;
 st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
+#line 1125 "core/admin.m"
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 103: goto st76;
+		case 32: goto st75;
+		case 111: goto st76;
 	}
 	goto st0;
 st76:
@@ -1053,9 +1132,8 @@ st76:
 		goto _test_eof76;
 case 76:
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 117: goto st77;
+		case 102: goto st77;
+		case 110: goto st79;
 	}
 	goto st0;
 st77:
@@ -1063,9 +1141,9 @@ st77:
 		goto _test_eof77;
 case 77:
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 114: goto st78;
+		case 10: goto tr98;
+		case 13: goto tr99;
+		case 102: goto st78;
 	}
 	goto st0;
 st78:
@@ -1073,9 +1151,8 @@ st78:
 		goto _test_eof78;
 case 78:
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 97: goto st79;
+		case 10: goto tr98;
+		case 13: goto tr99;
 	}
 	goto st0;
 st79:
@@ -1083,9 +1160,8 @@ st79:
 		goto _test_eof79;
 case 79:
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 116: goto st80;
+		case 10: goto tr101;
+		case 13: goto tr102;
 	}
 	goto st0;
 st80:
@@ -1093,9 +1169,8 @@ st80:
 		goto _test_eof80;
 case 80:
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 105: goto st81;
+		case 32: goto st73;
+		case 101: goto st81;
 	}
 	goto st0;
 st81:
@@ -1103,9 +1178,8 @@ st81:
 		goto _test_eof81;
 case 81:
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 111: goto st82;
+		case 32: goto st73;
+		case 99: goto st82;
 	}
 	goto st0;
 st82:
@@ -1113,9 +1187,8 @@ st82:
 		goto _test_eof82;
 case 82:
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
-		case 110: goto st83;
+		case 32: goto st73;
+		case 116: goto st83;
 	}
 	goto st0;
 st83:
@@ -1123,81 +1196,79 @@ st83:
 		goto _test_eof83;
 case 83:
 	switch( (*p) ) {
-		case 10: goto tr92;
-		case 13: goto tr93;
+		case 32: goto st73;
+		case 105: goto st84;
 	}
 	goto st0;
 st84:
 	if ( ++p == pe )
 		goto _test_eof84;
 case 84:
-	if ( (*p) == 105 )
-		goto st85;
+	switch( (*p) ) {
+		case 32: goto st73;
+		case 111: goto st85;
+	}
 	goto st0;
 st85:
 	if ( ++p == pe )
 		goto _test_eof85;
 case 85:
 	switch( (*p) ) {
-		case 10: goto tr106;
-		case 13: goto tr107;
-		case 98: goto st86;
+		case 32: goto st73;
+		case 110: goto st86;
 	}
 	goto st0;
 st86:
 	if ( ++p == pe )
 		goto _test_eof86;
 case 86:
-	switch( (*p) ) {
-		case 10: goto tr106;
-		case 13: goto tr107;
-		case 101: goto st87;
-	}
+	if ( (*p) == 32 )
+		goto st73;
 	goto st0;
 st87:
 	if ( ++p == pe )
 		goto _test_eof87;
 case 87:
-	switch( (*p) ) {
-		case 10: goto tr106;
-		case 13: goto tr107;
-		case 114: goto st88;
-	}
+	if ( (*p) == 32 )
+		goto st70;
 	goto st0;
 st88:
 	if ( ++p == pe )
 		goto _test_eof88;
 case 88:
 	switch( (*p) ) {
-		case 10: goto tr106;
-		case 13: goto tr107;
+		case 32: goto st89;
+		case 111: goto st133;
 	}
 	goto st0;
 st89:
 	if ( ++p == pe )
 		goto _test_eof89;
 case 89:
-	if ( (*p) == 110 )
-		goto st90;
+	switch( (*p) ) {
+		case 32: goto st89;
+		case 99: goto st90;
+		case 102: goto st103;
+		case 105: goto st108;
+		case 112: goto st120;
+		case 115: goto st126;
+	}
 	goto st0;
 st90:
 	if ( ++p == pe )
 		goto _test_eof90;
 case 90:
-	switch( (*p) ) {
-		case 10: goto tr112;
-		case 13: goto tr113;
-		case 102: goto st91;
-	}
+	if ( (*p) == 111 )
+		goto st91;
 	goto st0;
 st91:
 	if ( ++p == pe )
 		goto _test_eof91;
 case 91:
 	switch( (*p) ) {
-		case 10: goto tr112;
-		case 13: goto tr113;
-		case 111: goto st92;
+		case 10: goto tr117;
+		case 13: goto tr118;
+		case 110: goto st92;
 	}
 	goto st0;
 st92:
@@ -1205,16 +1276,20 @@ st92:
 		goto _test_eof92;
 case 92:
 	switch( (*p) ) {
-		case 10: goto tr112;
-		case 13: goto tr113;
+		case 10: goto tr117;
+		case 13: goto tr118;
+		case 102: goto st93;
 	}
 	goto st0;
 st93:
 	if ( ++p == pe )
 		goto _test_eof93;
 case 93:
-	if ( (*p) == 97 )
-		goto st94;
+	switch( (*p) ) {
+		case 10: goto tr117;
+		case 13: goto tr118;
+		case 105: goto st94;
+	}
 	goto st0;
 st94:
 	if ( ++p == pe )
@@ -1223,7 +1298,7 @@ case 94:
 	switch( (*p) ) {
 		case 10: goto tr117;
 		case 13: goto tr118;
-		case 108: goto st95;
+		case 103: goto st95;
 	}
 	goto st0;
 st95:
@@ -1233,7 +1308,7 @@ case 95:
 	switch( (*p) ) {
 		case 10: goto tr117;
 		case 13: goto tr118;
-		case 108: goto st96;
+		case 117: goto st96;
 	}
 	goto st0;
 st96:
@@ -1243,7 +1318,7 @@ case 96:
 	switch( (*p) ) {
 		case 10: goto tr117;
 		case 13: goto tr118;
-		case 111: goto st97;
+		case 114: goto st97;
 	}
 	goto st0;
 st97:
@@ -1253,7 +1328,7 @@ case 97:
 	switch( (*p) ) {
 		case 10: goto tr117;
 		case 13: goto tr118;
-		case 99: goto st98;
+		case 97: goto st98;
 	}
 	goto st0;
 st98:
@@ -1263,6 +1338,7 @@ case 98:
 	switch( (*p) ) {
 		case 10: goto tr117;
 		case 13: goto tr118;
+		case 116: goto st99;
 	}
 	goto st0;
 st99:
@@ -1270,8 +1346,9 @@ st99:
 		goto _test_eof99;
 case 99:
 	switch( (*p) ) {
-		case 108: goto st100;
-		case 116: goto st103;
+		case 10: goto tr117;
+		case 13: goto tr118;
+		case 105: goto st100;
 	}
 	goto st0;
 st100:
@@ -1279,9 +1356,9 @@ st100:
 		goto _test_eof100;
 case 100:
 	switch( (*p) ) {
-		case 10: goto tr125;
-		case 13: goto tr126;
-		case 97: goto st101;
+		case 10: goto tr117;
+		case 13: goto tr118;
+		case 111: goto st101;
 	}
 	goto st0;
 st101:
@@ -1289,9 +1366,9 @@ st101:
 		goto _test_eof101;
 case 101:
 	switch( (*p) ) {
-		case 10: goto tr125;
-		case 13: goto tr126;
-		case 98: goto st102;
+		case 10: goto tr117;
+		case 13: goto tr118;
+		case 110: goto st102;
 	}
 	goto st0;
 st102:
@@ -1299,28 +1376,25 @@ st102:
 		goto _test_eof102;
 case 102:
 	switch( (*p) ) {
-		case 10: goto tr125;
-		case 13: goto tr126;
+		case 10: goto tr117;
+		case 13: goto tr118;
 	}
 	goto st0;
 st103:
 	if ( ++p == pe )
 		goto _test_eof103;
 case 103:
-	switch( (*p) ) {
-		case 10: goto tr129;
-		case 13: goto tr130;
-		case 97: goto st104;
-	}
+	if ( (*p) == 105 )
+		goto st104;
 	goto st0;
 st104:
 	if ( ++p == pe )
 		goto _test_eof104;
 case 104:
 	switch( (*p) ) {
-		case 10: goto tr129;
-		case 13: goto tr130;
-		case 116: goto st105;
+		case 10: goto tr131;
+		case 13: goto tr132;
+		case 98: goto st105;
 	}
 	goto st0;
 st105:
@@ -1328,8 +1402,9 @@ st105:
 		goto _test_eof105;
 case 105:
 	switch( (*p) ) {
-		case 10: goto tr129;
-		case 13: goto tr130;
+		case 10: goto tr131;
+		case 13: goto tr132;
+		case 101: goto st106;
 	}
 	goto st0;
 st106:
@@ -1337,16 +1412,266 @@ st106:
 		goto _test_eof106;
 case 106:
 	switch( (*p) ) {
-		case 32: goto st70;
-		case 119: goto st107;
+		case 10: goto tr131;
+		case 13: goto tr132;
+		case 114: goto st107;
 	}
 	goto st0;
 st107:
 	if ( ++p == pe )
 		goto _test_eof107;
 case 107:
+	switch( (*p) ) {
+		case 10: goto tr131;
+		case 13: goto tr132;
+	}
+	goto st0;
+st108:
+	if ( ++p == pe )
+		goto _test_eof108;
+case 108:
+	if ( (*p) == 110 )
+		goto st109;
+	goto st0;
+st109:
+	if ( ++p == pe )
+		goto _test_eof109;
+case 109:
+	switch( (*p) ) {
+		case 10: goto tr137;
+		case 13: goto tr138;
+		case 102: goto st110;
+		case 106: goto st112;
+		case 115: goto st115;
+	}
+	goto st0;
+st110:
+	if ( ++p == pe )
+		goto _test_eof110;
+case 110:
+	switch( (*p) ) {
+		case 10: goto tr137;
+		case 13: goto tr138;
+		case 111: goto st111;
+	}
+	goto st0;
+st111:
+	if ( ++p == pe )
+		goto _test_eof111;
+case 111:
+	switch( (*p) ) {
+		case 10: goto tr137;
+		case 13: goto tr138;
+	}
+	goto st0;
+st112:
+	if ( ++p == pe )
+		goto _test_eof112;
+case 112:
+	switch( (*p) ) {
+		case 101: goto st113;
+		case 115: goto st115;
+	}
+	goto st0;
+st113:
+	if ( ++p == pe )
+		goto _test_eof113;
+case 113:
+	switch( (*p) ) {
+		case 99: goto st114;
+		case 115: goto st115;
+	}
+	goto st0;
+st114:
+	if ( ++p == pe )
+		goto _test_eof114;
+case 114:
+	switch( (*p) ) {
+		case 115: goto st115;
+		case 116: goto st116;
+	}
+	goto st0;
+st115:
+	if ( ++p == pe )
+		goto _test_eof115;
+case 115:
+	switch( (*p) ) {
+		case 10: goto tr146;
+		case 13: goto tr147;
+	}
+	goto st0;
+st116:
+	if ( ++p == pe )
+		goto _test_eof116;
+case 116:
+	switch( (*p) ) {
+		case 105: goto st117;
+		case 115: goto st115;
+	}
+	goto st0;
+st117:
+	if ( ++p == pe )
+		goto _test_eof117;
+case 117:
+	switch( (*p) ) {
+		case 111: goto st118;
+		case 115: goto st115;
+	}
+	goto st0;
+st118:
+	if ( ++p == pe )
+		goto _test_eof118;
+case 118:
+	switch( (*p) ) {
+		case 110: goto st119;
+		case 115: goto st115;
+	}
+	goto st0;
+st119:
+	if ( ++p == pe )
+		goto _test_eof119;
+case 119:
+	if ( (*p) == 115 )
+		goto st115;
+	goto st0;
+st120:
+	if ( ++p == pe )
+		goto _test_eof120;
+case 120:
+	if ( (*p) == 97 )
+		goto st121;
+	goto st0;
+st121:
+	if ( ++p == pe )
+		goto _test_eof121;
+case 121:
+	switch( (*p) ) {
+		case 10: goto tr152;
+		case 13: goto tr153;
+		case 108: goto st122;
+	}
+	goto st0;
+st122:
+	if ( ++p == pe )
+		goto _test_eof122;
+case 122:
+	switch( (*p) ) {
+		case 10: goto tr152;
+		case 13: goto tr153;
+		case 108: goto st123;
+	}
+	goto st0;
+st123:
+	if ( ++p == pe )
+		goto _test_eof123;
+case 123:
+	switch( (*p) ) {
+		case 10: goto tr152;
+		case 13: goto tr153;
+		case 111: goto st124;
+	}
+	goto st0;
+st124:
+	if ( ++p == pe )
+		goto _test_eof124;
+case 124:
+	switch( (*p) ) {
+		case 10: goto tr152;
+		case 13: goto tr153;
+		case 99: goto st125;
+	}
+	goto st0;
+st125:
+	if ( ++p == pe )
+		goto _test_eof125;
+case 125:
+	switch( (*p) ) {
+		case 10: goto tr152;
+		case 13: goto tr153;
+	}
+	goto st0;
+st126:
+	if ( ++p == pe )
+		goto _test_eof126;
+case 126:
+	switch( (*p) ) {
+		case 108: goto st127;
+		case 116: goto st130;
+	}
+	goto st0;
+st127:
+	if ( ++p == pe )
+		goto _test_eof127;
+case 127:
+	switch( (*p) ) {
+		case 10: goto tr160;
+		case 13: goto tr161;
+		case 97: goto st128;
+	}
+	goto st0;
+st128:
+	if ( ++p == pe )
+		goto _test_eof128;
+case 128:
+	switch( (*p) ) {
+		case 10: goto tr160;
+		case 13: goto tr161;
+		case 98: goto st129;
+	}
+	goto st0;
+st129:
+	if ( ++p == pe )
+		goto _test_eof129;
+case 129:
+	switch( (*p) ) {
+		case 10: goto tr160;
+		case 13: goto tr161;
+	}
+	goto st0;
+st130:
+	if ( ++p == pe )
+		goto _test_eof130;
+case 130:
+	switch( (*p) ) {
+		case 10: goto tr164;
+		case 13: goto tr165;
+		case 97: goto st131;
+	}
+	goto st0;
+st131:
+	if ( ++p == pe )
+		goto _test_eof131;
+case 131:
+	switch( (*p) ) {
+		case 10: goto tr164;
+		case 13: goto tr165;
+		case 116: goto st132;
+	}
+	goto st0;
+st132:
+	if ( ++p == pe )
+		goto _test_eof132;
+case 132:
+	switch( (*p) ) {
+		case 10: goto tr164;
+		case 13: goto tr165;
+	}
+	goto st0;
+st133:
+	if ( ++p == pe )
+		goto _test_eof133;
+case 133:
+	switch( (*p) ) {
+		case 32: goto st89;
+		case 119: goto st134;
+	}
+	goto st0;
+st134:
+	if ( ++p == pe )
+		goto _test_eof134;
+case 134:
 	if ( (*p) == 32 )
-		goto st70;
+		goto st89;
 	goto st0;
 	}
 	_test_eof2: cs = 2; goto _test_eof; 
@@ -1354,7 +1679,7 @@ case 107:
 	_test_eof4: cs = 4; goto _test_eof; 
 	_test_eof5: cs = 5; goto _test_eof; 
 	_test_eof6: cs = 6; goto _test_eof; 
-	_test_eof108: cs = 108; goto _test_eof; 
+	_test_eof135: cs = 135; goto _test_eof; 
 	_test_eof7: cs = 7; goto _test_eof; 
 	_test_eof8: cs = 8; goto _test_eof; 
 	_test_eof9: cs = 9; goto _test_eof; 
@@ -1456,12 +1781,39 @@ case 107:
 	_test_eof105: cs = 105; goto _test_eof; 
 	_test_eof106: cs = 106; goto _test_eof; 
 	_test_eof107: cs = 107; goto _test_eof; 
+	_test_eof108: cs = 108; goto _test_eof; 
+	_test_eof109: cs = 109; goto _test_eof; 
+	_test_eof110: cs = 110; goto _test_eof; 
+	_test_eof111: cs = 111; goto _test_eof; 
+	_test_eof112: cs = 112; goto _test_eof; 
+	_test_eof113: cs = 113; goto _test_eof; 
+	_test_eof114: cs = 114; goto _test_eof; 
+	_test_eof115: cs = 115; goto _test_eof; 
+	_test_eof116: cs = 116; goto _test_eof; 
+	_test_eof117: cs = 117; goto _test_eof; 
+	_test_eof118: cs = 118; goto _test_eof; 
+	_test_eof119: cs = 119; goto _test_eof; 
+	_test_eof120: cs = 120; goto _test_eof; 
+	_test_eof121: cs = 121; goto _test_eof; 
+	_test_eof122: cs = 122; goto _test_eof; 
+	_test_eof123: cs = 123; goto _test_eof; 
+	_test_eof124: cs = 124; goto _test_eof; 
+	_test_eof125: cs = 125; goto _test_eof; 
+	_test_eof126: cs = 126; goto _test_eof; 
+	_test_eof127: cs = 127; goto _test_eof; 
+	_test_eof128: cs = 128; goto _test_eof; 
+	_test_eof129: cs = 129; goto _test_eof; 
+	_test_eof130: cs = 130; goto _test_eof; 
+	_test_eof131: cs = 131; goto _test_eof; 
+	_test_eof132: cs = 132; goto _test_eof; 
+	_test_eof133: cs = 133; goto _test_eof; 
+	_test_eof134: cs = 134; goto _test_eof; 
 
 	_test_eof: {}
 	_out: {}
 	}
 
-#line 214 "core/admin.rl"
+#line 246 "core/admin.rl"
 
 
 	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);

@@ -89,3 +89,9 @@
 }
 @end
 
+@implementation ErrorInjection
+- (id) init: (const char*) msg
+{
+	return [super init: ER_INJECTION, msg];
+}
+@end

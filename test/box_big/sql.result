@@ -22,10 +22,10 @@ Insert OK, 1 row affected
 select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5
 Found 5 tuples:
 ['Doe', 'Richard']
+['Kytes', 'Tomas']
+['Major', 'Tomas']
 ['Roe', 'Richard']
 ['Woe', 'Richard']
-['Major', 'Tomas']
-['Kytes', 'Tomas']
 #
 # A test case for Bug#729879
 # "Zero limit is treated the same as no limit"
@@ -86,6 +86,8 @@ Delete OK, 1 row affected
 #
 # Test composite keys with trees
 #
+insert into t1 values ('key1', 'part1', 'part2')
+Insert OK, 1 row affected
 insert into t1 values ('key1', 'part1', 'part2')
 Insert OK, 1 row affected
 insert into t1 values ('key2', 'part1', 'part2_a')
@@ -163,10 +165,35 @@ Found 2 tuples:
 ['41234567', 'part1_a', 'part2_a']
 select * from t5 where k1='part_none'
 No match
-lua box.space[5]:select(1, 'part1', 'part2')
+call box.select('5', '1', 'part1', 'part2')
+Found 2 tuples:
+['01234567', 'part1', 'part2']
+['11234567', 'part1', 'part2']
+insert into t7 values (1, 'hello')
+Insert OK, 1 row affected
+insert into t7 values (2, 'brave')
+Insert OK, 1 row affected
+insert into t7 values (3, 'new')
+Insert OK, 1 row affected
+insert into t7 values (4, 'world')
+Insert OK, 1 row affected
+#
+# Bug#929654 - secondary hash index is not built with build_indexes()
+#
+select * from t7 where k1='hello'
+Found 1 tuple:
+[1, 'hello']
+select * from t7 where k1='brave'
+Found 1 tuple:
+[2, 'brave']
+select * from t7 where k1='new'
+Found 1 tuple:
+[3, 'new']
+select * from t7 where k1='world'
+Found 1 tuple:
+[4, 'world']
+lua box.space[7]:truncate()
 ---
- - '01234567': {'part1', 'part2'}
- - '11234567': {'part1', 'part2'}
 ...
 select * from t1 where k0='key1'
 Found 1 tuple:

@@ -14,7 +14,9 @@ exec sql "insert into t0 values ('Kytes', 'Tomas')"
 exec sql "insert into t0 values ('Stiles', 'Tomas')"
 exec sql "insert into t0 values ('Wales', 'Tomas')"
 exec sql "insert into t0 values ('Callaghan', 'Tomas')"
+sql.sort = True
 exec sql "select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5"
+sql.sort = False
 
 print """#
 # A test case for Bug#729879
@@ -56,6 +58,8 @@ print """#
 # Test composite keys with trees
 #"""
 exec sql "insert into t1 values ('key1', 'part1', 'part2')"
+# Test a duplicate insert on unique index that once resulted in a crash (bug #926080)
+exec sql "insert into t1 values ('key1', 'part1', 'part2')"
 exec sql "insert into t1 values ('key2', 'part1', 'part2_a')"
 exec sql "insert into t1 values ('key3', 'part1', 'part2_b')"
 exec admin "lua for k, v in box.space[1]:pairs() do print(v) end"
@@ -80,11 +84,23 @@ sql.sort = True
 exec sql "select * from t5 where k1='part1'"
 exec sql "select * from t5 where k1='part1_a'"
 exec sql "select * from t5 where k1='part_none'"
-exec admin "lua box.space[5]:select(1, 'part1', 'part2')"
+exec sql "call box.select('5', '1', 'part1', 'part2')"
 sql.sort = False 
+exec sql "insert into t7 values (1, 'hello')"
+exec sql "insert into t7 values (2, 'brave')"
+exec sql "insert into t7 values (3, 'new')"
+exec sql "insert into t7 values (4, 'world')"
 # Check how build_idnexes() works
 server.stop()
 server.start()
+print """#
+# Bug#929654 - secondary hash index is not built with build_indexes()
+#"""
+exec sql "select * from t7 where k1='hello'"
+exec sql "select * from t7 where k1='brave'"
+exec sql "select * from t7 where k1='new'"
+exec sql "select * from t7 where k1='world'"
+exec admin "lua box.space[7]:truncate()"
 exec sql "select * from t1 where k0='key1'"
 exec sql "select * from t1 where k0='key2'"
 exec sql "select * from t1 where k0='key3'"

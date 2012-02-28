@@ -1,6 +1,5 @@
-#ifndef TNT_NET_H_INCLUDED
-#define TNT_NET_H_INCLUDED
-
+#ifndef TARANTOOL_ERRINJ_H_INCLUDED
+#define TARANTOOL_ERRINJ_H_INCLUDED
 /*
  * Copyright (C) 2011 Mail.RU
  *
@@ -26,52 +25,38 @@
  * SUCH DAMAGE.
  */
 
-#include <stdint.h>
-#include <stdarg.h>
+#include "exception.h"
+#include "util.h"
 
-#include <sys/types.h>
-#include <sys/time.h>
-
-#include <tnt_opt.h>
-#include <tnt_iob.h>
-
-enum tnt_error {
-	TNT_EOK,
-	TNT_EFAIL,
-	TNT_EMEMORY,
-	TNT_ESYSTEM,
-	TNT_EBIG,
-	TNT_ESIZE,
-	TNT_ERESOLVE,
-	TNT_ETMOUT,
-	TNT_EBADVAL,
-	TNT_LAST
+struct errinj {
+	char *name;
+	bool state;
 };
 
-struct tnt_stream_net {
-	struct tnt_opt opt;
-	int connected;
-	int fd;
-	struct tnt_iob sbuf;
-	struct tnt_iob rbuf;
-	enum tnt_error error;
-	int errno_;
-};
+/**
+ * list of error injection handles.
+ */
+#define ERRINJ_LIST(_) \
+	_(ERRINJ_TESTING, false)
 
-#define TNT_SNET_CAST(S) ((struct tnt_stream_net*)(S)->data)
+ENUM0(errinj_enum, ERRINJ_LIST);
+extern struct errinj errinjs[];
 
-struct tnt_stream *tnt_net(struct tnt_stream *s);
-int tnt_set(struct tnt_stream *s, int opt, ...);
-int tnt_init(struct tnt_stream *s);
+bool errinj_get(int id);
 
-int tnt_connect(struct tnt_stream *s);
-void tnt_close(struct tnt_stream *s);
+void errinj_set(int id, bool state);
+int errinj_set_byname(char *name, bool state);
 
-ssize_t tnt_flush(struct tnt_stream *s);
-int tnt_fd(struct tnt_stream *s);
+void errinj_info(struct tbuf *out);
 
-enum tnt_error tnt_error(struct tnt_stream *s);
-char *tnt_strerror(struct tnt_stream *s);
-int tnt_errno(struct tnt_stream *s);
+#ifdef NDEBUG
+#  define ERROR_INJECT(ID)
+#else
+#  define ERROR_INJECT(ID) \
+	do { \
+		if (errinj_get(ID) == true) \
+			tnt_raise(ErrorInjection, :#ID); \
+	} while (0)
+#endif
 
-#endif /* TNT_NET_H_INCLUDED */
+#endif /* TATRANTOOL_ERRINJ_H_INCLUDED */

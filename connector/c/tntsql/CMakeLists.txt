@@ -57,9 +57,6 @@ set_target_properties(tntsql_shared PROPERTIES COMPILE_FLAGS "${tntsql_cflags}")
 # Install
 #----------------------------------------------------------------------------#
 
-# headers
-install(FILES include/tnt_sql.h DESTINATION include/libtnt)
-
 # install static library
 install_targets(/lib tntsql)
 # install shared library

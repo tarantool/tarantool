@@ -29,10 +29,10 @@
  * SUCH DAMAGE.
  */
 #include "tarantool.h"
-/* use a full path to avoid clashes with system lua */
-#include "third_party/luajit/src/lua.h"
-#include "third_party/luajit/src/lauxlib.h"
-#include "third_party/luajit/src/lualib.h"
+
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 #include "pickle.h"
 #include "fiber.h"
@@ -94,8 +94,8 @@ static char format_to_opcode(char format)
 	case '=': return 0;
 	case '+': return 1;
 	case '&': return 2;
-	case '|': return 3;
-	case '^': return 4;
+	case '^': return 3;
+	case '|': return 4;
 	case ':': return 5;
 	default: return format;
 	}
@@ -518,6 +518,40 @@ lbox_fiber_yield(struct lua_State *L)
 }
 
 /**
+ * Get fiber status.
+ * This follows the rules of Lua coroutine.status() function:
+ * Returns the status of fibier, as a string:
+ * - "running", if the fiber is running (that is, it called status);
+ * - "suspended", if the fiber is suspended in a call to yield(),
+ *    or if it has not started running yet;
+ * - "normal" if the fiber is active but not running (that is,
+ *   it has resumed another fiber);
+ * - "dead" if the fiber has finished its body function, or if it
+ *   has stopped with an error.
+ */
+static int
+lbox_fiber_status(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	const char *status;
+	if (f->fid == 0) {
+		/* This fiber is dead. */
+		status = "dead";
+	} else if (f == fiber) {
+		/* The fiber is the current running fiber. */
+		status = "running";
+	} else if (fiber_is_caller(f)) {
+		/* The fiber is current fiber's caller. */
+		status = "normal";
+	} else {
+		/* None of the above: must be suspended. */
+		status = "suspended";
+	}
+	lua_pushstring(L, status);
+	return 1;
+}
+
+/**
  * Detach the current fiber.
  */
 static int
@@ -615,6 +649,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"create", lbox_fiber_create},
 	{"resume", lbox_fiber_resume},
 	{"yield", lbox_fiber_yield},
+	{"status", lbox_fiber_status},
 	{"detach", lbox_fiber_detach},
 	{NULL, NULL}
 };
@@ -868,13 +903,11 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		if (strchr(key, '.') == NULL) {
 			lua_pushfstring(L, "box.cfg.%s = %s%s%s\n",
 					key, quote, value, quote);
-			luaL_addstring(&b, lua_tostring(L, -1));
-			lua_pop(L, 1);
+			luaL_addvalue(&b);
 		} else if (strncmp(key, "space", strlen("space")) == 0) {
 			lua_pushfstring(L, "box.%s = %s%s%s\n",
 					key, quote, value, quote);
-			luaL_addstring(&b, lua_tostring(L, -1));
-			lua_pop(L, 1);
+			luaL_addvalue(&b);
 		}
 		free(value);
 	}
@@ -887,8 +920,10 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 "  box.on_reload_configuration()\n"
 "end\n");
 	luaL_pushresult(&b);
-	if (luaL_loadstring(L, lua_tostring(L, -1)) == 0)
-		lua_pcall(L, 0, 0, 0);
+	if (luaL_loadstring(L, lua_tostring(L, -1)) != 0 ||
+	    lua_pcall(L, 0, 0, 0) != 0) {
+		panic("%s", lua_tostring(L, -1));
+	}
 	lua_pop(L, 1);
 }
 

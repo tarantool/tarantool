@@ -1,5 +1,5 @@
-#ifndef TNT_H_INCLUDED
-#define TNT_H_INCLUDED
+#ifndef TNT_NET_H_INCLUDED
+#define TNT_NET_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,30 +26,52 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
 #include <stdarg.h>
 
-#include <tnt_mem.h>
-#include <tnt_proto.h>
-#include <tnt_enc.h>
-#include <tnt_tuple.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
-#include <tnt_iter.h>
-#include <tnt_buf.h>
-#include <tnt_ping.h>
-#include <tnt_insert.h>
-#include <tnt_update.h>
-#include <tnt_delete.h>
-#include <tnt_call.h>
-#include <tnt_select.h>
+#include <sys/types.h>
+#include <sys/time.h>
 
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
+#include <libtnt/tnt_opt.h>
+#include <libtnt/tnt_iob.h>
 
-#endif /* TNT_H_INCLUDED */
+enum tnt_error {
+	TNT_EOK,
+	TNT_EFAIL,
+	TNT_EMEMORY,
+	TNT_ESYSTEM,
+	TNT_EBIG,
+	TNT_ESIZE,
+	TNT_ERESOLVE,
+	TNT_ETMOUT,
+	TNT_EBADVAL,
+	TNT_LAST
+};
+
+struct tnt_stream_net {
+	struct tnt_opt opt;
+	int connected;
+	int fd;
+	struct tnt_iob sbuf;
+	struct tnt_iob rbuf;
+	enum tnt_error error;
+	int errno_;
+};
+
+#define TNT_SNET_CAST(S) ((struct tnt_stream_net*)(S)->data)
+
+struct tnt_stream *tnt_net(struct tnt_stream *s);
+int tnt_set(struct tnt_stream *s, int opt, ...);
+int tnt_init(struct tnt_stream *s);
+
+int tnt_connect(struct tnt_stream *s);
+void tnt_close(struct tnt_stream *s);
+
+ssize_t tnt_flush(struct tnt_stream *s);
+int tnt_fd(struct tnt_stream *s);
+
+enum tnt_error tnt_error(struct tnt_stream *s);
+char *tnt_strerror(struct tnt_stream *s);
+int tnt_errno(struct tnt_stream *s);
+
+#endif /* TNT_NET_H_INCLUDED */

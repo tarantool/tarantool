@@ -148,6 +148,9 @@ void
 fiber_yield(void);
 void fiber_destroy_all();
 
+bool
+fiber_is_caller(struct fiber *f);
+
 struct msg *read_inbox(void);
 ssize_t fiber_bread(struct tbuf *, size_t v);
 

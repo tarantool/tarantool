@@ -28,14 +28,14 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tnt_mem.h>
-#include <tnt_proto.h>
-#include <tnt_enc.h>
-#include <tnt_tuple.h>
-#include <tnt_reply.h>
-#include <tnt_stream.h>
-#include <tnt_buf.h>
-#include <tnt_update.h>
+#include <libtnt/tnt_mem.h>
+#include <libtnt/tnt_proto.h>
+#include <libtnt/tnt_enc.h>
+#include <libtnt/tnt_tuple.h>
+#include <libtnt/tnt_reply.h>
+#include <libtnt/tnt_stream.h>
+#include <libtnt/tnt_buf.h>
+#include <libtnt/tnt_update.h>
 
 static ssize_t
 tnt_update_op(struct tnt_stream *s,
@@ -46,6 +46,7 @@ tnt_update_op(struct tnt_stream *s,
 	char enc[5];
 	tnt_enc_write(enc, size);
 	struct iovec iov[4];
+	int iovc = 3;
 	/* field */
 	iov[0].iov_base = &field;
 	iov[0].iov_len = 4;
@@ -56,9 +57,12 @@ tnt_update_op(struct tnt_stream *s,
 	iov[2].iov_base = enc;
 	iov[2].iov_len = encs;
 	/* data */
-	iov[3].iov_base = data;
-	iov[3].iov_len = size;
-	return s->writev(s, iov, 4);
+	if (data) {
+		iov[3].iov_base = data;
+		iov[3].iov_len = size;
+		iovc++;
+	}
+	return s->writev(s, iov, iovc);
 }
 
 /*
@@ -146,6 +150,22 @@ tnt_update_splice(struct tnt_stream *s, uint32_t field,
 	ssize_t rc = tnt_update_op(s, field, TNT_UPDATE_SPLICE, buf, sz);
 	tnt_mem_free(buf);
 	return rc;
+}
+
+/*
+ * tnt_update_delete()
+ *
+ * write update delete operation to buffer stream;
+ *
+ * s      - stream buffer pointer
+ * field  - field number
+ *
+ * returns number of bytes written, or -1 on error.
+*/
+ssize_t
+tnt_update_delete(struct tnt_stream *s, uint32_t field)
+{
+	return tnt_update_op(s, field, TNT_UPDATE_DELETE, NULL, 0);
 }
 
 struct tnt_header_update {

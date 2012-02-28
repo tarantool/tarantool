@@ -41,9 +41,9 @@
 #include <errno.h>
 #include <limits.h>
 
-#include <tnt.h>
-#include <tnt_net.h>
-#include <tnt_io.h>
+#include <connector/c/include/libtnt/tnt.h>
+#include <connector/c/include/libtnt/tnt_net.h>
+#include <connector/c/include/libtnt/tnt_io.h>
 
 #if !defined(MIN)
 #	define MIN(a, b) (a) < (b) ? (a) : (b)

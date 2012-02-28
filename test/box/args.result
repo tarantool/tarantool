@@ -75,9 +75,15 @@ tarantool_box: --background requires 'logger' configuration option to be set
 
 tarantool_box --version
 Tarantool/Box 1.minor.patch-<rev>-<commit>
+Target: platform <build>
+Build options: flags
+CFLAGS: flags
 
 tarantool_box -V
 Tarantool/Box 1.minor.patch-<rev>-<commit>
+Target: platform <build>
+Build options: flags
+CFLAGS: flags
 
 #
 # A test case for Bug#726778 "Gopt broke wal_dir and snap_dir: they are no

@@ -218,6 +218,11 @@ class TestSuite:
         else:
             self.ini["valgrind_disabled"] = dict()
 
+        if self.ini.has_key("release_disabled"):
+            self.ini["release_disabled"] = dict.fromkeys(self.ini["release_disabled"].split(" "))
+        else:
+            self.ini["release_disabled"] = dict()
+
         print "Collecting tests in \"" + suite_path + "\": " +\
             self.ini["description"] + "."
 
@@ -264,6 +269,8 @@ class TestSuite:
 
             test_name = os.path.basename(test.name)
             if test_name in self.ini["disabled"]:
+                print "[ skip ]"
+            elif not server.debug and test_name in self.ini["release_disabled"]:
                 print "[ skip ]"
             elif self.args.valgrind and test_name in self.ini["valgrind_disabled"]:
                 print "[ skip ]"

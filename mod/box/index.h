@@ -111,6 +111,7 @@ struct key_def {
  * Finish index construction.
  */
 - (void) enable;
+- (void) build: (Index *) pk;
 - (size_t) size;
 - (struct box_tuple *) min;
 - (struct box_tuple *) max;
@@ -133,7 +134,5 @@ struct iterator {
 	struct box_tuple *(*next_equal)(struct iterator *);
 	void (*free)(struct iterator *);
 };
-
-struct box_tuple *iterator_first_equal(struct iterator *it);
 
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */

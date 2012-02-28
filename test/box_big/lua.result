@@ -11,9 +11,55 @@ lua box.space[1].index[1]:max()
 call box.select(1, 1, 'new', 'world')
 Found 1 tuple:
 ['brave', 'new', 'world']
+#
+# A test case for Bug #904208
+# "assert failed, when key cardinality is greater than index cardinality"
+# https://bugs.launchpad.net/tarantool/+bug/904208
+#
+call box.select(1, 1, 'new', 'world', 'order')
+An error occurred: ER_KEY_CARDINALITY, 'Key cardinality 3 is greater than index cardinality 2'
 call box.delete(1, 'brave')
 Found 1 tuple:
 ['brave', 'new', 'world']
+#
+# A test case for Bug #902091
+# "Positioned iteration over a multipart index doesn't work"
+# https://bugs.launchpad.net/tarantool/+bug/902091
+#
+insert into t1 values ('item 1', 'alabama', 'song')
+Insert OK, 1 row affected
+insert into t1 values ('item 2', 'california', 'dreaming')
+Insert OK, 1 row affected
+insert into t1 values ('item 3', 'california', 'uber alles')
+Insert OK, 1 row affected
+insert into t1 values ('item 4', 'georgia', 'on my mind')
+Insert OK, 1 row affected
+lua iter, tuple = box.space[1].index[1]:next('california')
+---
+...
+lua tuple
+---
+ - 'item 2': {'california', 'dreaming'}
+...
+lua iter, tuple = box.space[1].index[1]:next(iter)
+---
+...
+lua tuple
+---
+ - 'item 3': {'california', 'uber alles'}
+...
+call box.delete(1, 'item 1')
+Found 1 tuple:
+['item 1', 'alabama', 1735290739]
+call box.delete(1, 'item 2')
+Found 1 tuple:
+['item 2', 'california', 'dreaming']
+call box.delete(1, 'item 3')
+Found 1 tuple:
+['item 3', 'california', 'uber alles']
+call box.delete(1, 'item 4')
+Found 1 tuple:
+['item 4', 'georgia', 'on my mind']
 insert into t5 values ('01234567', 'new', 'world')
 Insert OK, 1 row affected
 insert into t5 values ('00000000', 'of', 'puppets')
