@@ -69,3 +69,21 @@ Description: high performance key/value storage server
   * stored procedures in Lua are supported
  .
  This package provides debug symbols for all tarantool packages.
+
+Package: tarantool-connector-c
+Architecture: all
+Priority: optional
+Depends: ${shlibs:Depends}
+Description: high performance key/value storage server
+ Tarantool is an open-source NoSQL database, developed by Mail.ru.
+ Its key properties include:
+ .
+  * all data is maintained in RAM
+  * data persistence is implemented using Write Ahead Log and snapshotting
+  * supports asynchronous replication and hot standby
+  * uses coroutines and asynchronous I/O to implement high-performance
+    lock-free access to data
+  * available on Linux and FreeBSD
+  * stored procedures in Lua are supported
+ .
+ This package provides tarantool C client libraries.
