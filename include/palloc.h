@@ -40,6 +40,7 @@ void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
 void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
 void *palloca(struct palloc_pool *pool, size_t size, size_t align);
 void prelease(struct palloc_pool *pool);
+void ptruncate(struct palloc_pool *pool, size_t sz);
 void prelease_after(struct palloc_pool *pool, size_t after);
 struct palloc_pool *palloc_create_pool(const char *name);
 void palloc_destroy_pool(struct palloc_pool *);

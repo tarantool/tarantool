@@ -646,11 +646,13 @@ static int lbox_process(lua_State *L)
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
+	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	struct box_txn *old_txn = txn_enter_lua(L);
 	@try {
 		rw_callback(op, &req);
 	} @finally {
 		fiber->mod_data.txn = old_txn;
+		ptruncate(fiber->gc_pool, allocated_size);
 	}
 	return lua_gettop(L) - top;
 }
