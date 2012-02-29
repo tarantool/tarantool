@@ -11,9 +11,6 @@ exec sql "insert into t0 values ('Roe', 'Richard')"
 exec sql "insert into t0 values ('Woe', 'Richard')"
 exec sql "insert into t0 values ('Major', 'Tomas')"
 exec sql "insert into t0 values ('Kytes', 'Tomas')"
-exec sql "insert into t0 values ('Stiles', 'Tomas')"
-exec sql "insert into t0 values ('Wales', 'Tomas')"
-exec sql "insert into t0 values ('Callaghan', 'Tomas')"
 sql.sort = True
 exec sql "select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5"
 sql.sort = False
@@ -31,9 +28,6 @@ exec sql "delete from t0 where k0='Roe'"
 exec sql "delete from t0 where k0='Woe'"
 exec sql "delete from t0 where k0='Major'"
 exec sql "delete from t0 where k0='Kytes'"
-exec sql "delete from t0 where k0='Stiles'"
-exec sql "delete from t0 where k0='Wales'"
-exec sql "delete from t0 where k0='Callaghan'"
 
 print """#
 # A test case for Bug#730593
@@ -161,7 +155,6 @@ sql.sort = True
 exec sql "select * from t4 where k1='duplicate one'"
 exec sql "select * from t4 where k1='duplicate two'"
 exec sql "select * from t4 where k1='duplicate three'"
-exec admin "lua for k, v in box.space[4]:pairs() do print(v) end"
 sql.sort = False
 exec sql "delete from t4 where k0=1"
 exec sql "delete from t4 where k0=2"
