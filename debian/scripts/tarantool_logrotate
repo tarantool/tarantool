@@ -31,7 +31,7 @@ logger_notify() {
 	  | sed 's/[^[:digit:]]//g'
 	`
 	[ $? -eq 0 ] || error "failed to get logger pid"
-	kill -USR2 $LOGGER_PID
+	kill -HUP $LOGGER_PID
 }
 
 if ! echo $1|grep -q '^\(start\)$'; then
