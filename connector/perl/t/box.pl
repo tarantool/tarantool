@@ -160,19 +160,19 @@ ok $box->Replace(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'repl
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/replace';
 
 
+do {
+    my $continuation = $box->Select(13,{ return_fh => 1 });
+    ok $continuation, "select/continuation";
 
-my $continuation = $box->Select(13,{ return_fh => 1 });
-ok $continuation, "select/continuation";
+    my $rin = '';
+    vec($rin,$continuation->{fh}->fileno,1) = 1;
+    my $ein = $rin;
+    ok 0 <= select($rin,undef,$ein,2), "select/continuation/select";
 
-my $rin = '';
-vec($rin,$continuation->{fh}->fileno,1) = 1;
-my $ein = $rin;
-ok 0 <= select($rin,undef,$ein,2), "select/continuation/select";
-
-my $res = $continuation->{continue}->();
-use Data::Dumper;
-is_deeply $res, [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], "select/continuation/result";
-
+    my $res = $continuation->{continue}->();
+    use Data::Dumper;
+    is_deeply $res, [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], "select/continuation/result";
+};
 
 SKIP:{
     skip "AnyEvent not found", 60 unless eval { require AnyEvent; 1 };

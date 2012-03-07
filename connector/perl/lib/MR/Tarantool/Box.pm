@@ -79,7 +79,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.12;
+$VERSION = 0.0.13;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -889,9 +889,7 @@ Specify index (by id or name) to use.
 
 =item B<limit> => $limit_uint32
 
-Max tuples to select. It is set to C<< scalar @keys >> by default.
-To select all tuples (for example, using non-unique index), you
-should supply a big number here.
+Max tuples to select. It is set to C<< MAX_INT32 >> by default.
 
 =item B<raw> => $bool
 
@@ -903,10 +901,6 @@ Return a hashref of the resultset. If you C<hashify> the result set,
 then C<$by> must be a field name of the hash you return,
 otherwise it must be a number of field of the tuple.
 C<False> will be returned in case of error.
-
-=item B<callback> => $code
-
-Async request using AnyEvent.
 
 =back
 
@@ -1357,6 +1351,51 @@ sub Num {
     push @op, [$field_num => num_add => $arg{num_add}]; # if $arg{num_add};
     $self->UpdateMulti($key, @op, $param);
 }
+
+=head2 AnyEvent
+
+C<< Insert, UpdateMulti, Select, Delete, Call >> methods can be given the following options:
+
+=over
+
+=item B<callback> => sub { my ($data, $error) = @_; }
+
+Async request using AnyEvent.
+C<< $data >> is unpacked and processed according to request options data.
+C<< $error >> contains a message string in case of error.
+
+=back
+
+=head2 "Continuations"
+
+C<< Select >> methods can be given the following options:
+
+=over
+
+=item <return_fh> => 1
+
+The request does only send operation on network, and returns
+C<< { fh => $IO::Handle, continue => $code } >>. C<< $code >> reads data from network,
+unpacks, processes according to options and returns it.
+
+You should handle timeouts manually (using select() call for example).
+Usage example:
+
+    my $continuation = $box->Select(13,{ return_fh => 1 });
+    ok $continuation, "select/continuation";
+    
+    my $rin = '';
+    vec($rin,$continuation->{fh}->fileno,1) = 1;
+    my $ein = $rin;
+    ok 0 <= select($rin,undef,$ein,2), "select/continuation/select";
+    
+    my $res = $continuation->{continue}->();
+    use Data::Dumper;
+    is_deeply $res, [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], "select/continuation/result";
+
+=back
+
+
 
 =head1 LICENCE AND COPYRIGHT
 
