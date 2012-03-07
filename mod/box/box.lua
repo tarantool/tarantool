@@ -1,3 +1,20 @@
+
+--
+--
+--
+function box.select_limit(space, index, offset, limit, ...)
+    local key = {...}
+    return box.process(17,
+                       box.pack('iiiiii'..string.rep('p', #key),
+                                 space,
+                                 index,
+                                 offset,
+                                 limit,
+                                 1, -- key count
+                                 #key, -- key cardinality
+                                 unpack(key)))
+end
+
 --
 --
 --
@@ -104,6 +121,9 @@ function box.on_reload_configuration()
     space_mt.select = function(space, ...) return box.select(space.n, ...) end
     space_mt.select_range = function(space, ino, limit, ...)
         return space.index[ino]:select_range(limit, ...)
+    end
+    space_mt.select_limit = function(space, ino, offset, limit, ...)
+	return box.select_limit(space.n, ino, offset, limit, ...)
     end
     space_mt.insert = function(space, ...) return box.insert(space.n, ...) end
     space_mt.update = function(space, ...) return box.update(space.n, ...) end
