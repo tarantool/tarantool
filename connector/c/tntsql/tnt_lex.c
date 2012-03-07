@@ -148,6 +148,7 @@ static struct {
 	{  "VALUES",  6, TNT_TK_VALUES },
 	{  "SELECT",  6, TNT_TK_SELECT },
 	{  "OR",      2, TNT_TK_OR },
+	{  "AND",     3, TNT_TK_AND },
 	{  "LIMIT",   5, TNT_TK_LIMIT },
 	{  "CALL",    4, TNT_TK_CALL },
 	{  NULL,      0, TNT_TK_NONE }

@@ -325,7 +325,14 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		int32_t index = -1;
 		while (1) {
 			struct tnt_tuple *tup = tnt_list_at(&tuples, NULL);
-			tnt_expect(tnt_sql_kv_select(sql, tup, &index));
+			while (1) {
+				tnt_expect(tnt_sql_kv_select(sql, tup, &index));
+				if (tnt_sqltry(sql, TNT_TK_AND))
+					continue;
+				if (sql->error)
+					goto error;
+				break;
+			}
 			if (tnt_sqltry(sql, TNT_TK_OR))
 				continue;
 			if (sql->error)
