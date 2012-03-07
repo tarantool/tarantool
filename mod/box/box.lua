@@ -123,7 +123,7 @@ function box.on_reload_configuration()
         return space.index[ino]:select_range(limit, ...)
     end
     space_mt.select_limit = function(space, ino, offset, limit, ...)
-	return box.select_limit(space.n, ino, offset, limit, ...)
+        return box.select_limit(space.n, ino, offset, limit, ...)
     end
     space_mt.insert = function(space, ...) return box.insert(space.n, ...) end
     space_mt.update = function(space, ...) return box.update(space.n, ...) end
