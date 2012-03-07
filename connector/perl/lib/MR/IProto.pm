@@ -226,22 +226,32 @@ sub send {
         die "Method must be called in void context if you want to use async" if defined wantarray;
         $self->_send($message, $callback);
         return;
-    }
-    else {
+    } else {
         die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
         my $olddie = ref $SIG{__DIE__} eq 'CODE' ? $SIG{__DIE__} : ref $SIG{__DIE__} eq 'GLOB' ? *{$SIG{__DIE__}}{CODE} : undef;
         local $SIG{__DIE__} = sub { local $! = 0; $olddie->(@_); } if $olddie;
         my %servers;
         my ($data, $error, $errno);
-        $self->_send_now($message, sub {
+        my $fh = $self->_send_now($message, sub {
             ($data, $error) = @_;
             $errno = $!;
             return;
         }, \%servers);
-        $self->_recv_now(\%servers);
-        $! = $errno;
-        die $error if $error;
-        return $data;
+
+        my $cont = sub {
+            $self->_recv_now(\%servers, max => $message->{continue}?1:0);
+            $! = $errno;
+            return $message->{continue}->($data, $error, $errno) if $message->{continue};
+            die $error if $error;
+            return $data;
+        };
+
+        return {
+            fh       => $fh,
+            continue => $cont,
+        } if $message->{continue};
+
+        return &$cont();
     }
 }
 
@@ -528,8 +538,7 @@ sub _send_now {
         );
         return;
     };
-    $self->_send_try($sync, $args, $handler, $try);
-    return;
+    return $self->_send_try($sync, $args, $handler, $try);
 }
 
 sub _send_try {
@@ -540,7 +549,7 @@ sub _send_try {
     my $connection = $server->$xsync();
     $connection->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
     $sync->{$connection} ||= $connection if $sync;
-    return;
+    return $connection->fh;
 }
 
 sub _send_retry {
@@ -623,10 +632,10 @@ sub _server_callback {
 }
 
 sub _recv_now {
-    my ($self, $servers) = @_;
+    my ($self, $servers, %opts) = @_;
     while(my @servers = values %$servers) {
         %$servers = ();
-        $_->recv_all() foreach @servers;
+        $_->recv_all(%opts) foreach @servers;
     }
     return;
 }

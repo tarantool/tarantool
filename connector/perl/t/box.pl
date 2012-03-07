@@ -13,7 +13,7 @@ use FindBin qw($Bin);
 use lib "$Bin";
 use Carp qw/confess/;
 
-use Test::More tests => 233;
+use Test::More tests => 296;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
@@ -32,6 +32,10 @@ use constant TOO_BIG_FIELD => qr/too big field/;
 
 my $box;
 my $server = (shift || $ENV{BOX}) or die;
+my %opts = (
+    debug => $ENV{DEBUG}||0,
+    ipdebug => $ENV{IPDEBUG}||0,
+);
 
 sub cleanup ($) {
     my ($id) = @_;
@@ -58,6 +62,7 @@ sub def_param  {
                  name          => 'main',
              } ],
              default_space => "main",
+             %opts,
          }
 }
 
@@ -153,6 +158,109 @@ is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 5, 5, 5, 5, '
 
 ok $box->Replace(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'replace';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/replace';
+
+
+
+my $continuation = $box->Select(13,{ return_fh => 1 });
+ok $continuation, "select/continuation";
+
+my $rin = '';
+vec($rin,$continuation->{fh}->fileno,1) = 1;
+my $ein = $rin;
+ok 0 <= select($rin,undef,$ein,2), "select/continuation/select";
+
+my $res = $continuation->{continue}->();
+use Data::Dumper;
+is_deeply $res, [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], "select/continuation/result";
+
+
+SKIP:{
+    skip "AnyEvent not found", 60 unless eval { require AnyEvent; 1 };
+
+    my $tt =     [ [1, 'rtokarev@corp.mail.ru',     11, 111, 1111, 11111, "1111111111111"],
+                   [2, 'vostrikov@corp.mail.ru',    22, 222, 2222, 22222, "2222222222222"],
+                   [3, 'aleinikov@corp.mail.ru',    33, 333, 3333, 33333, "3333333333333"],
+                   [4, 'roman.s.tokarev@gmail.com', 44, 444, 4444, 44444, "4444444444444"],
+                   [5, 'vostrIIIkov@corp.mail.ru',  55, 555, 5555, 55555, "5555555555555"] ];
+
+    foreach my $tuple (@$tt) {
+        cleanup $tuple->[0];
+    }
+
+    AnyEvent->now_update;
+    my $cv = AnyEvent->condvar;
+    foreach my $tuple (@$tt) {
+        $cv->begin;
+        ok $box->Insert(@$tuple, {callback => sub { ok $_[0], "async/insert$tuple->[0]/result"; $cv->end; }}), "async/insert$tuple->[0]";
+    }
+    $cv->recv;
+
+
+    AnyEvent->now_update;
+    $cv = AnyEvent->condvar;
+    $cv->begin;
+    ok $box->Select(1,2,3,{callback => sub {
+                                  my ($res) = @_;
+                                  $cv->end;
+                                  is_deeply $res, [@$tt[0,1,2]], "async/select1/result";
+                           }}), "async/select1";
+
+    $cv->begin;
+    ok $box->Select(4,5,{ callback => sub {
+                                  my ($res) = @_;
+                                  $cv->end;
+                                  is_deeply $res, [@$tt[3,4]], "async/select2/result";
+                           }}), "async/select2";
+
+    $cv->recv;
+
+
+    AnyEvent->now_update;
+    $cv = AnyEvent->condvar;
+    foreach my $tuple (@$tt) {
+        $tuple->[4] += 10000;
+        $cv->begin;
+        ok $box->UpdateMulti($tuple->[0], [ 4 => add => 10000 ], {callback => sub { ok $_[0], "async/update1-$tuple->[0]/result"; $cv->end; }}), "async/update1-$tuple->[0]";
+    }
+    $cv->begin;
+    ok $box->Select((map{$_->[0]}@$tt),{ callback => sub {
+                                  my ($res) = @_;
+                                  $cv->end;
+                                  is_deeply $res, $tt, "async/update1-select/result";
+                           }}), "async/update1-select";
+    $cv->recv;
+
+    AnyEvent->now_update;
+    $cv = AnyEvent->condvar;
+    foreach my $tuple (@$tt) {
+        $tuple->[4] += 10000;
+        $cv->begin;
+        ok $box->UpdateMulti($tuple->[0], [ 4 => add => 10000 ], {want_result => 1, callback => sub { is_deeply $_[0], $tuple, "async/update2-$tuple->[0]/result"; $cv->end; }}), "async/update2-$tuple->[0]";
+    }
+    $cv->begin;
+    ok $box->Select((map{$_->[0]}@$tt),{ callback => sub {
+                                  my ($res) = @_;
+                                  $cv->end;
+                                  is_deeply $res, $tt, "async/update2-select/result";
+                           }}), "async/update2-select";
+    $cv->recv;
+
+    AnyEvent->now_update;
+    $cv = AnyEvent->condvar;
+    foreach my $tuple (@$tt) {
+        $cv->begin;
+        ok $box->Delete($tuple->[0], {want_result => 1, callback => sub { is_deeply $_[0], $tuple, "async/delete-$tuple->[0]/result"; $cv->end; }}), "async/delete-$tuple->[0]";
+    }
+    $cv->begin;
+    ok $box->Select((map{$_->[0]}@$tt),{ callback => sub {
+                                  my ($res) = @_;
+                                  $cv->end;
+                                  is_deeply $res, [], "async/delete-select/result";
+                           }}), "async/delete-select";
+    $cv->recv;
+}
+
+
 
 
 
@@ -415,7 +523,9 @@ sub def_param1 {
                  namespace     => 26,
                  format        => $format,
                  default_index => 'primary_num1',
-             } ]}
+             } ],
+             %opts,
+         }
 }
 
 $box = $CLASS->new(def_param1);
@@ -458,7 +568,9 @@ sub def_param_bad {
                  namespace     => 26,
                  format        => $format,
                  default_index => 'primary_num1',
-             } ]}
+             } ],
+             %opts,
+         }
 }
 
 $box = $CLASS->new(def_param_bad);
@@ -493,7 +605,9 @@ sub def_param_unique {
                  space     => 27,
                  format        => $format,
                  default_index => 'id',
-             } ]}
+             } ],
+             %opts,
+         }
 }
 
 $box = $CLASS->new(def_param_unique);
@@ -587,7 +701,7 @@ sub def_param_u64 {
                  format        => $format,
                  default_index => 'id',
              } ],
-             debug => 0,
+             %opts,
          }
 }
 

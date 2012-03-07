@@ -19,6 +19,7 @@ use Scalar::Util qw(weaken);
 has _handle => (
     is  => 'ro',
     isa => 'AnyEvent::Handle',
+    predicate => '_has_handle',
     lazy_build => 1,
 );
 
@@ -68,6 +69,8 @@ Enqueue message send.
 For list of arguments see L</_send>.
 
 =cut
+
+sub fh { return $_[0]->_has_handle && $_[0]->_handle }
 
 sub send {
     my $self = shift;
