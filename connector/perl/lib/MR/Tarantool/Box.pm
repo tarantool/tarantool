@@ -79,7 +79,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.13;
+$VERSION = 0.0.14;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -368,6 +368,8 @@ sub _connect {
         name          => $self->{name},
         debug         => $self->{'ipdebug'},
         dump_no_ints  => 1,
+        max_request_retries => 1,
+        retry_delay   => $self->{retry_delay},
     });
 }
 
@@ -418,6 +420,8 @@ sub _chat {
     my $return_fh = delete $param{return_fh};
     my $_cb = $callback || $return_fh;
 
+    die "Can't use raise and callback together" if $callback && $self->{raise};
+
     my $is_retry = sub {
         my ($data) = @_;
         $retry_count++;
@@ -442,7 +446,7 @@ sub _chat {
             my ($ret_code, $data, $full_code) = @$data;
 
             $self->{_last_error} = $full_code;
-            $self->{_last_error_msg} = $message = $ret_code->[0] == 0 ? "ok" : sprintf "Error %08X: %s", $full_code, $$data || $ERRORS{$full_code & 0xFFFFFF00} || 'Unknown error';
+            $self->{_last_error_msg} = $message = $ret_code->[0] == 0 ? "" : sprintf "Error %08X: %s", $full_code, $$data || $ERRORS{$full_code & 0xFFFFFF00} || 'Unknown error';
             $self->_debug("$self->{name}: $message") if $ret_code->[0] != 0 && $self->{debug} >= 1;
 
             if ($ret_code->[0] == 0) {
@@ -470,7 +474,7 @@ sub _chat {
     if ($callback) {
         $self->{_last_error} = 0x77777777;
         $self->{server}->SetTimeout($timeout);
-        return 1 if eval { $self->{server}->send({%param, is_retry => $is_retry}, $process); 1 };
+        return 1 if eval { $self->{server}->send({%param, is_retry => $is_retry, max_request_retries => $retry}, $process); 1 };
         return 0;
     }
 
@@ -939,7 +943,7 @@ sub Select {
     my $cb = sub {
         my ($r) = (@_);
 
-        $self->_PostSelect($r, $param, $namespace);
+        $self->_PostSelect($r, $param, $namespace) if $r;
 
         if ($r && defined(my $p = $param->{hash_by})) {
             my %h;
@@ -961,10 +965,12 @@ sub Select {
             return $param->{callback}->($r);
         }
 
+        return unless $r;
+
         return $r if $param->{hash_by};
         return $r if $param->{want} eq 'arrayref';
         $wantarray = wantarray if $param->{return_fh};
-        
+
         if ($wantarray) {
             return @{$r};
         } else {
@@ -978,7 +984,7 @@ sub Select {
             msg      => $msg,
             payload  => $payload,
             unpack   => sub { $self->_unpack_select($namespace, "SELECT", @_) },
-            retry    => $self->{select_retry},
+            retry    => $param->{return_fh} ? 1 : $self->{select_retry},
             timeout  => $param->{timeout} || $self->{select_timeout},
             callback => $param->{callback} ? $cb : 0,
             return_fh=> $param->{return_fh} ? $cb : 0,
@@ -1301,7 +1307,7 @@ sub UpdateMulti {
         unpack   => sub { $self->_unpack_affected($flags, $namespace, @_) },
         callback => $param->{callback} && $cb,
     ) or return;
-    
+
     return 1 if $param->{callback};
     return $cb->($r);
 }
@@ -1360,9 +1366,10 @@ C<< Insert, UpdateMulti, Select, Delete, Call >> methods can be given the follow
 
 =item B<callback> => sub { my ($data, $error) = @_; }
 
-Async request using AnyEvent.
-C<< $data >> is unpacked and processed according to request options data.
+Do an async request using AnyEvent.
+C<< $data >> contains unpacked and processed according to request options data.
 C<< $error >> contains a message string in case of error.
+Set up C<< raise => 0 >> to use this option.
 
 =back
 
@@ -1372,23 +1379,23 @@ C<< Select >> methods can be given the following options:
 
 =over
 
-=item <return_fh> => 1
+=item B<return_fh> => 1
 
 The request does only send operation on network, and returns
-C<< { fh => $IO::Handle, continue => $code } >>. C<< $code >> reads data from network,
-unpacks, processes according to options and returns it.
+C<< { fh => $IO_Handle, continue => $code } >> or false if send operation failed.
+C<< $code >> reads data from network, unpacks, processes according to options and returns it.
 
-You should handle timeouts manually (using select() call for example).
+You should handle timeouts and retries manually (using select() call for example).
 Usage example:
 
     my $continuation = $box->Select(13,{ return_fh => 1 });
     ok $continuation, "select/continuation";
-    
+
     my $rin = '';
     vec($rin,$continuation->{fh}->fileno,1) = 1;
     my $ein = $rin;
     ok 0 <= select($rin,undef,$ein,2), "select/continuation/select";
-    
+
     my $res = $continuation->{continue}->();
     use Data::Dumper;
     is_deeply $res, [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], "select/continuation/result";

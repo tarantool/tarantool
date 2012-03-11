@@ -29,6 +29,12 @@ coerce 'MR::IProto::Cluster::Server'
         );
     };
 
+has prefix => (
+    is  => 'ro',
+    isa => 'Str',
+    default => 'MR::IProto',
+);
+
 =head1 ATTRIBUTES
 
 =over
@@ -184,10 +190,11 @@ sub _build_sync {
 
 sub _build_debug_cb {
     my ($self) = @_;
+    my $prefix = $self->prefix;
     return sub {
         my ($msg) = @_;
         chomp $msg;
-        warn "MR::IProto: $msg\n";
+        warn "$prefix: $msg\n";
         return;
     };
 }

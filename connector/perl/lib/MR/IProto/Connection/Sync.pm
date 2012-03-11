@@ -98,7 +98,7 @@ sub send {
     else {
         $self->_handle_error($sync, $callback, $@);
     }
-    return;
+    return $ok;
 }
 
 sub recv_all {

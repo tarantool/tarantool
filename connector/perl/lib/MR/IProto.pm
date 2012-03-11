@@ -238,6 +238,8 @@ sub send {
             return;
         }, \%servers);
 
+        return if $message->{continue} && !$fh;
+
         my $cont = sub {
             $self->_recv_now(\%servers, max => $message->{continue}?1:0);
             $! = $errno;
@@ -378,6 +380,7 @@ around BUILDARGS => sub {
         $srvargs{tcp_nodelay} = delete $args{tcp_nodelay} if exists $args{tcp_nodelay};
         $srvargs{tcp_keepalive} = delete $args{tcp_keepalive} if exists $args{tcp_keepalive};
         $srvargs{dump_no_ints} = delete $args{dump_no_ints} if exists $args{dump_no_ints};
+        $srvargs{prefix} = $args{prefix};
         my %clusterargs;
         $clusterargs{balance} = delete $args{balance} if exists $args{balance};
         $clusterargs{servers} = [
@@ -544,10 +547,11 @@ sub _send_now {
 sub _send_try {
     my ($self, $sync, $args, $handler, $try) = @_;
     my $xsync = $sync ? 'sync' : 'async';
-    $self->_debug(sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $self->max_request_retries ) if $self->debug >= 2;
+    $args->{max_request_retries} ||= $self->max_request_retries;
+    $self->_debug(sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $args->{max_request_retries} ) if $self->debug >= 2;
     my $server = $self->cluster->server( $args->{key} );
     my $connection = $server->$xsync();
-    $connection->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
+    return unless $connection->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
     $sync->{$connection} ||= $connection if $sync;
     return $connection->fh;
 }
@@ -584,8 +588,8 @@ sub _server_callback {
             my $retry = defined $args->{request} ? $args->{request}->retry()
                 : ref $args->{retry} eq 'CODE' ? $args->{retry}->()
                 : $args->{retry};
-            $self->_debug("send: failed[@{[$retry, $$try+1, $self->max_request_retries]}]") if $self->debug >= 2;
-            if( $retry && $$try++ < $self->max_request_retries ) {
+            $self->_debug("send: failed[@{[$retry, $$try+1, $args->{max_request_retries}]}]") if $self->debug >= 2;
+            if( $retry && $$try++ < $args->{max_request_retries} ) {
                 $self->_send_retry($sync, $args, $$handler, $$try);
             }
             else {
@@ -606,10 +610,10 @@ sub _server_callback {
                 1;
             };
             if($ok) {
-                if( defined $args->{request} && $data->retry && $$try++ < $self->max_request_retries ) {
+                if( defined $args->{request} && $data->retry && $$try++ < $args->{max_request_retries} ) {
                     $self->_send_retry($sync, $args, $$handler, $$try);
                 }
-                elsif( defined $args->{is_retry} && $args->{is_retry}->($data) && $$try++ < $self->max_request_retries ) {
+                elsif( defined $args->{is_retry} && $args->{is_retry}->($data) && $$try++ < $args->{max_request_retries} ) {
                     $self->_send_retry($sync, $args, $$handler, $$try);
                 }
                 else {
