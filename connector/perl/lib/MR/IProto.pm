@@ -380,7 +380,7 @@ around BUILDARGS => sub {
         $srvargs{tcp_nodelay} = delete $args{tcp_nodelay} if exists $args{tcp_nodelay};
         $srvargs{tcp_keepalive} = delete $args{tcp_keepalive} if exists $args{tcp_keepalive};
         $srvargs{dump_no_ints} = delete $args{dump_no_ints} if exists $args{dump_no_ints};
-        $srvargs{prefix} = $args{name};
+        $srvargs{prefix} = $args{name} if exists $args{name} and defined $args{name};
         my %clusterargs;
         $clusterargs{balance} = delete $args{balance} if exists $args{balance};
         $clusterargs{servers} = [
