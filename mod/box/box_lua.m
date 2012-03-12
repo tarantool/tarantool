@@ -36,6 +36,11 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
+#include "lj_obj.h"
+#include "lj_ctype.h"
+#include "lj_cdata.h"
+#include "lj_cconv.h"
+
 #include "pickle.h"
 #include "tuple.h"
 #include "salloc.h"
@@ -501,6 +506,19 @@ iov_add_lua_table(struct lua_State *L, int index)
 			iov_dup(field, field_len);
 			*tuple_len += field_len_len + field_len;
 			break;
+
+		case LUA_TCDATA:
+			field = tarantool_lua_tostring(L, -1);
+			field_len = strlen(field);
+			if (field_len)
+				field_len -= 3; /* chopping of ULL prefix */
+			field_len_len =
+				save_varint32(field_len_buf,
+					      field_len) - field_len_buf;
+			iov_dup(field_len_buf, field_len_len);
+			iov_dup(field, field_len);
+			*tuple_len += field_len_len + field_len;
+			break;
 		default:
 			tnt_raise(ClientError, :ER_PROC_RET,
 				  lua_typename(L, lua_type(L, -1)));
@@ -532,9 +550,12 @@ void iov_add_ret(struct lua_State *L, int index)
 	}
 	case LUA_TNIL:
 	case LUA_TBOOLEAN:
+	case LUA_TCDATA:
 	{
 		const char *str = tarantool_lua_tostring(L, index);
 		size_t len = strlen(str);
+		if (type == LUA_TCDATA && len)
+			len -= 3; /* chopping of ULL prefix */
 		tuple = tuple_alloc(len + varint32_sizeof(len));
 		tuple->cardinality = 1;
 		memcpy(save_varint32(tuple->data, len), str, len);

@@ -34,6 +34,11 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
+#include "lj_obj.h"
+#include "lj_ctype.h"
+#include "lj_cdata.h"
+#include "lj_cconv.h"
+
 #include "pickle.h"
 #include "fiber.h"
 #include <ctype.h>
@@ -151,6 +156,18 @@ lbox_pack(struct lua_State *L)
 			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
 			break;
 		}
+		case 'L':
+		case 'l':
+		{
+			if (lua_type(L, i) != LUA_TCDATA)
+				luaL_error(L, "box.pack('%c'): expected to be cdata (i64)", *format);
+			GCcdata *cd = cdataV(L->base + (i - 1));
+			if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64)
+				luaL_error(L, "box.pack('%c'): unsupported cdata type", *format);
+			char *p = (char*)cdataptr(cd);
+			luaL_addlstring(&b, p, sizeof(u64));
+			break;
+		}
 		/* Perl 'pack' BER-encoded integer */
 		case 'w':
 			luaL_addvarint32(&b, lua_tointeger(L, i));
@@ -167,6 +184,13 @@ lbox_pack(struct lua_State *L)
 				u32buf= (u32) lua_tointeger(L, i);
 				str = (char *) &u32buf;
 				size = sizeof(u32);
+			} else
+			if (lua_type(L, i) == LUA_TCDATA) {
+				GCcdata *cd = cdataV(L->base + (i - 1));
+				if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64)
+					luaL_error(L, "box.pack('%c'): unsupported cdata type", *format);
+				str = (char*)cdataptr(cd);
+				size = sizeof(u64);
 			} else {
 				str = luaL_checklstring(L, i, &size);
 			}
@@ -215,6 +239,25 @@ lbox_unpack(struct lua_State *L)
 			u32buf = * (u32 *) str;
 			lua_pushnumber(L, u32buf);
 			break;
+		case 'l':
+		{
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u64))
+				luaL_error(L, "box.unpack('%c'): got %d bytes (expected: 8)", *format, (int) size);
+			TValue *o = L->base+1;
+			CTState *cts = ctype_cts(L);
+			CType *ct = ctype_raw(cts, CTID_UINT64);
+			CTSize sz;
+			lj_ctype_info(cts, CTID_UINT64, &sz);
+			GCcdata *cd = lj_cdata_new(cts, CTID_UINT64, 8);
+			setcdataV(L, o-1, cd);
+			lj_cconv_ct_init(cts, ct, sz, cdataptr(cd), o, 0);
+			L->top = o;
+			uint64_t *up = (uint64_t*)cdataptr(cd);
+			*up = *(u64*)str;
+			lj_gc_check(L);
+			break;
+		}
 		default:
 			luaL_error(L, "box.unpack: unsupported pack "
 				   "format specifier '%c'", *format);
