@@ -513,16 +513,14 @@ init_update_op_arith(struct update_cmd *cmd __attribute__((unused)),
 
 	switch (field->new_len) {
 	case sizeof(i32):
-		/* 32-bit opearion */
+		/* 32-bit operation */
 
 		/* Check the operand type. */
 		if (op->arg.set.length != sizeof(i32))
 			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
 				  "32-bit int");
 
-		arg->val_size = op->arg.set.length;
 		arg->i32_val = *(i32 *)op->arg.set.value;
-		op->new_field_len = sizeof(i32);
 		break;
 	case sizeof(i64):
 		/* 64-bit operation */
@@ -540,13 +538,12 @@ init_update_op_arith(struct update_cmd *cmd __attribute__((unused)),
 			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
 				  "32-bit or 64-bit int");
 		}
-		arg->val_size = sizeof(i64);
-		op->new_field_len = sizeof(i64);
 		break;
 	default:
 		tnt_raise(ClientError, :ER_FIELD_TYPE,
 			  "32-bit or 64-bit int");
 	}
+	arg->val_size = op->new_field_len = field->new_len;
 }
 
 static void
