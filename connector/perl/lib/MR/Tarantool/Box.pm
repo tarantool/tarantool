@@ -79,7 +79,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.14;
+$VERSION = 0.0.15;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -331,6 +331,7 @@ sub new {
             $ns->{default_index} ||= 0;
             $ns->{primary_key_index} ||= 0;
         }
+        $ns->{fields} ||= $arg->{default_fields};
         if($ns->{fields}) {
             confess "space[$namespace] fields must be ARRAYREF" unless ref $ns->{fields} eq 'ARRAY';
             confess "space[$namespace] fields number must match format" if @{$ns->{fields}} != @f;
