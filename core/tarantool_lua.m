@@ -244,7 +244,7 @@ lbox_unpack(struct lua_State *L)
 			str = lua_tolstring(L, i, &size);
 			if (str == NULL || size != sizeof(u64))
 				luaL_error(L, "box.unpack('%c'): got %d bytes (expected: 8)", *format, (int) size);
-			TValue *o = L->base+1;
+			TValue *o = L->base + i;
 			CTState *cts = ctype_cts(L);
 			CType *ct = ctype_raw(cts, CTID_UINT64);
 			CTSize sz;
@@ -255,7 +255,6 @@ lbox_unpack(struct lua_State *L)
 			L->top = o;
 			uint64_t *up = (uint64_t*)cdataptr(cd);
 			*up = *(u64*)str;
-			lj_gc_check(L);
 			break;
 		}
 		default:
