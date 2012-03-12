@@ -244,16 +244,27 @@ acceptor_handler(void *data __attribute__((unused)))
 		/* wait new connection request */
 		fiber_io_start(fiber->fd, EV_READ);
 		fiber_io_yield();
+
 		/* accept connection */
-		client_sock = accept(fiber->fd, (struct sockaddr*)&addr, &addrlen);
+		client_sock = accept(fiber->fd, (struct sockaddr*)&addr,
+				     &addrlen);
 		if (client_sock == -1) {
 			if (errno == EAGAIN && errno == EWOULDBLOCK) {
 				continue;
 			}
 			panic_syserror("accept");
 		}
+
+		/* up SO_KEEPALIVE flag */
+		int keepalive = 1;
+		if (setsockopt(client_sock, SOL_SOCKET, SO_KEEPALIVE,
+			       &keepalive, sizeof(int)) < 0)
+			/* just print error, it's not critical error */
+			say_syserror("setsockopt()");
+
 		fiber_io_stop(fiber->fd, EV_READ);
-		say_info("connection from %s:%d", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+		say_info("connection from %s:%d", inet_ntoa(addr.sin_addr),
+			 ntohs(addr.sin_port));
 		acceptor_send_sock(client_sock);
 	}
 }
