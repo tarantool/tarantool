@@ -68,7 +68,7 @@ tnt_update_op(struct tnt_stream *s,
 /*
  * tnt_update_arith()
  *
- * write arithmetic update operation to buffer stream;
+ * write 32-bit arithmetic update operation to buffer stream;
  *
  * s     - stream buffer pointer
  * field - field number
@@ -80,6 +80,44 @@ tnt_update_op(struct tnt_stream *s,
 ssize_t
 tnt_update_arith(struct tnt_stream *s, uint32_t field,
 		 uint8_t op, uint32_t value)
+{
+	return tnt_update_op(s, field, op, (char*)&value, sizeof(value));
+}
+
+/*
+ * tnt_update_arith_i32()
+ *
+ * write 32-bit arithmetic update operation to buffer stream;
+ *
+ * s     - stream buffer pointer
+ * field - field number
+ * op    - update operation type
+ * value - update operation value
+ * 
+ * returns number of bytes written, or -1 on error.
+*/
+ssize_t
+tnt_update_arith_i32(struct tnt_stream *s, uint32_t field,
+		     uint8_t op, uint32_t value)
+{
+	return tnt_update_op(s, field, op, (char*)&value, sizeof(value));
+}
+
+/*
+ * tnt_update_arith_i64()
+ *
+ * write 64-bit arithmetic update operation to buffer stream;
+ *
+ * s     - stream buffer pointer
+ * field - field number
+ * op    - update operation type
+ * value - update operation value
+ * 
+ * returns number of bytes written, or -1 on error.
+*/
+ssize_t
+tnt_update_arith_i64(struct tnt_stream *s, uint32_t field,
+		     uint8_t op, uint64_t value)
 {
 	return tnt_update_op(s, field, op, (char*)&value, sizeof(value));
 }
