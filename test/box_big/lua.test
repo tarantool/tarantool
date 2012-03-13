@@ -17,7 +17,7 @@ print """#
 # https://bugs.launchpad.net/tarantool/+bug/902091
 #"""
 exec sql "insert into t1 values ('item 1', 'alabama', 'song')"
-exec sql "insert into t1 values ('item 2', 'california', 'dreaming')"
+exec sql "insert into t1 values ('item 2', 'california', 'dreaming ')"
 exec sql "insert into t1 values ('item 3', 'california', 'uber alles')"
 exec sql "insert into t1 values ('item 4', 'georgia', 'on my mind')"
 exec admin "lua iter, tuple = box.space[1].index[1]:next('california')"

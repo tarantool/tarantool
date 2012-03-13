@@ -194,8 +194,8 @@ lbox_pack(struct lua_State *L)
 		case 'L':
 		case 'l':
 		{
-			u64 v = lua_tointeger64(L, i);
-			luaL_addlstring(&b, (char *) &v, sizeof(u64));
+			u64buf = lua_tointeger64(L, i);
+			luaL_addlstring(&b, (char *) &u64buf, sizeof(u64));
 			break;
 		}
 		/* Perl 'pack' BER-encoded integer */
@@ -766,8 +766,14 @@ static void
 tarantool_lua_printstack_yaml(struct lua_State *L, struct tbuf *out)
 {
 	int top = lua_gettop(L);
-	for (int i = 1; i <= top; i++)
-		tbuf_printf(out, " - %s\r\n", tarantool_lua_tostring(L, i));
+	for (int i = 1; i <= top; i++) {
+		if (lua_type(L, i) == LUA_TCDATA) {
+			const char *sz = tarantool_lua_tostring(L, i);
+			int len = strlen(sz);
+			tbuf_printf(out, " - %-.*s\r\n", len - 3, sz);
+		} else
+			tbuf_printf(out, " - %s\r\n", tarantool_lua_tostring(L, i));
+	}
 }
 
 /*
@@ -778,8 +784,14 @@ static void
 tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
 {
 	int top = lua_gettop(L);
-	for (int i = 1; i <= top; i++)
-		tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
+	for (int i = 1; i <= top; i++) {
+		if (lua_type(L, i) == LUA_TCDATA) {
+			const char *sz = tarantool_lua_tostring(L, i);
+			int len = strlen(sz);
+			tbuf_printf(out, "%-.*s\r\n", len - 3, sz);
+		} else
+			tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
+	}
 }
 
 /**

@@ -28,7 +28,7 @@ Found 1 tuple:
 #
 insert into t1 values ('item 1', 'alabama', 'song')
 Insert OK, 1 row affected
-insert into t1 values ('item 2', 'california', 'dreaming')
+insert into t1 values ('item 2', 'california', 'dreaming ')
 Insert OK, 1 row affected
 insert into t1 values ('item 3', 'california', 'uber alles')
 Insert OK, 1 row affected
@@ -39,7 +39,7 @@ lua iter, tuple = box.space[1].index[1]:next('california')
 ...
 lua tuple
 ---
- - 'item 2': {'california', 'dreaming'}
+ - 'item 2': {'california', 'dreaming '}
 ...
 lua iter, tuple = box.space[1].index[1]:next(iter)
 ---
@@ -53,7 +53,7 @@ Found 1 tuple:
 ['item 1', 'alabama', 1735290739]
 call box.delete(1, 'item 2')
 Found 1 tuple:
-['item 2', 'california', 'dreaming']
+['item 2', 'california', 'dreaming ']
 call box.delete(1, 'item 3')
 Found 1 tuple:
 ['item 3', 'california', 'uber alles']

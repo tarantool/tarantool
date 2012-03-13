@@ -276,3 +276,10 @@ print """
 # run fiber's test
 """
 exec admin "lua box_fiber_run_test()"
+# Testing 64bit
+exec admin "lua tonumber64(123)"
+exec admin "lua tonumber64('123')"
+exec admin "lua type(tonumber64('123')) == 'cdata'"
+exec admin "lua tonumber64('9223372036854775807') == tonumber64('9223372036854775807')"
+exec admin "lua tonumber64('9223372036854775807') - tonumber64('9223372036854775800')"
+exec admin "lua string.byte(box.pack('p', tonumber64(123)))"
