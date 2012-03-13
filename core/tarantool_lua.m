@@ -218,6 +218,29 @@ lbox_pack(struct lua_State *L)
 	return 1;
 }
 
+static GCcdata*
+luaL_pushcdata(struct lua_State *L, int idx, CTypeID id, int bits)
+{
+	TValue *o = L->base + (idx - 1);
+	CTState *cts = ctype_cts(L);
+	CType *ct = ctype_raw(cts, id);
+	CTSize sz;
+	lj_ctype_info(cts, id, &sz);
+	GCcdata *cd = lj_cdata_new(cts, id, bits);
+	setcdataV(L, o - 1, cd);
+	lj_cconv_ct_init(cts, ct, sz, cdataptr(cd), o, 0);
+	L->top = o;
+	return cd;
+}
+
+static int
+luaL_pushnumber64(struct lua_State *L, int idx, uint64_t val)
+{
+	GCcdata *cd = luaL_pushcdata(L, idx, CTID_UINT64, 8);
+	*(uint64_t*)cdataptr(cd) = val;
+	return 1;
+}
+
 static int
 lbox_unpack(struct lua_State *L)
 {
@@ -244,17 +267,9 @@ lbox_unpack(struct lua_State *L)
 			str = lua_tolstring(L, i, &size);
 			if (str == NULL || size != sizeof(u64))
 				luaL_error(L, "box.unpack('%c'): got %d bytes (expected: 8)", *format, (int) size);
-			TValue *o = L->base + i;
-			CTState *cts = ctype_cts(L);
-			CType *ct = ctype_raw(cts, CTID_UINT64);
-			CTSize sz;
-			lj_ctype_info(cts, CTID_UINT64, &sz);
-			GCcdata *cd = lj_cdata_new(cts, CTID_UINT64, 8);
-			setcdataV(L, o-1, cd);
-			lj_cconv_ct_init(cts, ct, sz, cdataptr(cd), o, 0);
-			L->top = o;
-			uint64_t *up = (uint64_t*)cdataptr(cd);
-			*up = *(u64*)str;
+			GCcdata *cd = luaL_pushcdata(L, i + 1, CTID_UINT64, 8);
+			uint64_t *u64buf = (uint64_t*)cdataptr(cd);
+			*u64buf = *(u64*)str;
 			break;
 		}
 		default:
@@ -807,6 +822,23 @@ lbox_pcall(struct lua_State *L)
 	return lua_gettop(L);
 }
 
+/*
+ * Convert lua string to lua cdata 64bit number.
+ */
+static int
+lbox_tonumber64(struct lua_State *L)
+{
+	const char *arg = luaL_checkstring(L, -1);
+	char *arge;
+	int64_t v = strtoll(arg, &arge, 10);
+	if ((errno == ERANGE && (v == LONG_MAX || v == LONG_MIN)) ||
+	    (errno != 0 && v == 0))
+		luaL_error(L, "tonumber64: ", strerror(errno));
+	if (arge == arg)
+		luaL_error(L, "tonumber64: bad argument");
+	return luaL_pushnumber64(L, 0, v);
+}
+
 /** A helper to register a single type metatable. */
 void
 tarantool_lua_register_type(struct lua_State *L, const char *type_name,
@@ -840,6 +872,7 @@ tarantool_lua_init()
 	tarantool_lua_register_type(L, fiberlib_name, lbox_fiber_meta);
 	lua_register(L, "print", lbox_print);
 	lua_register(L, "pcall", lbox_pcall);
+	lua_register(L, "tonumber64", lbox_tonumber64);
 	L = mod_lua_init(L);
 	lua_settop(L, 0); /* clear possible left-overs of init */
 	return L;
