@@ -45,6 +45,15 @@ See L<MR::IProto::Connection/send> for more information.
 
 sub fh { return $_[0]->_has_socket && $_[0]->_socket }
 
+sub Close {
+    my ($self, $reason) = @_;
+    my $sent = $self->_sent;
+    while (my $args = shift @$sent) {
+        my ($sync, $callback) = @$args;
+        $self->_handle_error($sync, $callback, $reason);
+    }
+}
+
 sub send {
     my ($self, $msg, $payload, $callback, $no_reply, $sync) = @_;
     my $server = $self->server;

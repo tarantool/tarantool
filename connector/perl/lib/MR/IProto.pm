@@ -232,13 +232,13 @@ sub send {
         local $SIG{__DIE__} = sub { local $! = 0; $olddie->(@_); } if $olddie;
         my %servers;
         my ($data, $error, $errno);
-        my $fh = $self->_send_now($message, sub {
+        my $conn = $self->_send_now($message, sub {
             ($data, $error) = @_;
             $errno = $!;
             return;
         }, \%servers);
 
-        return if $message->{continue} && !$fh;
+        return if $message->{continue} && !$conn;
 
         my $cont = sub {
             $self->_recv_now(\%servers, max => $message->{continue}?1:0);
@@ -249,8 +249,9 @@ sub send {
         };
 
         return {
-            fh       => $fh,
-            continue => $cont,
+            fh          => $conn->fh,
+            connection  => $conn,
+            continue    => $cont,
         } if $message->{continue};
 
         return &$cont();
@@ -553,7 +554,7 @@ sub _send_try {
     my $connection = $server->$xsync();
     return unless $connection->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
     $sync->{$connection} ||= $connection if $sync;
-    return $connection->fh;
+    return $connection;
 }
 
 sub _send_retry {

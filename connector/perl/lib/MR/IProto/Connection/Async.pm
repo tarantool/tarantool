@@ -269,6 +269,8 @@ around _choose_sync => sub {
     die "Can't choose sync value after 50 iterations";
 };
 
+sub Close { die "This is not what should be done" }
+
 =back
 
 =head1 SEE ALSO
