@@ -90,6 +90,40 @@ luaL_addvarint32(luaL_Buffer *b, u32 u32)
 	luaL_addlstring(b, tbuf.data, tbuf.size);
 }
 
+static uint64_t
+lua_tointeger64(struct lua_State *L, int idx)
+{
+	uint64_t result = 0;
+	switch (lua_type(L, idx)) {
+	case LUA_TNUMBER:
+		result = lua_tointeger(L, idx);
+		break;
+	case LUA_TSTRING: {
+		const char *arg = luaL_checkstring(L, idx);
+		char *arge;
+		result = strtoll(arg, &arge, 10);
+		if ((errno == ERANGE && (result == LONG_MAX || result == LONG_MIN)) ||
+		    (errno != 0 && result == 0))
+			luaL_error(L, "lua_tointeger64: ", strerror(errno));
+		if (arge == arg)
+			luaL_error(L, "lua_tointeger64: bad argument");
+		break;
+	}
+	case LUA_TCDATA: {
+		if (lua_type(L, idx) != LUA_TCDATA)
+			luaL_error(L, "lua_tointeger64: cdata expected");
+		GCcdata *cd = cdataV(L->base + (idx - 1));
+		if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64)
+			luaL_error(L, "lua_tointeger64: unsupported cdata type");
+		result = *(uint64_t*)cdataptr(cd);
+		break;
+	}
+	default:
+		luaL_error(L, "lua_tointeger64: unsupported type");
+	}
+	return result;
+}
+
 /* Convert box.pack() format specifier to Tarantool
  * binary protocol UPDATE opcode
  */
@@ -139,6 +173,7 @@ lbox_pack(struct lua_State *L)
 	int i = 2; /* first arg comes second */
 	int nargs = lua_gettop(L);
 	u32 u32buf;
+	u64 u64buf;
 	size_t size;
 	const char *str;
 
@@ -159,13 +194,8 @@ lbox_pack(struct lua_State *L)
 		case 'L':
 		case 'l':
 		{
-			if (lua_type(L, i) != LUA_TCDATA)
-				luaL_error(L, "box.pack('%c'): expected to be cdata (i64)", *format);
-			GCcdata *cd = cdataV(L->base + (i - 1));
-			if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64)
-				luaL_error(L, "box.pack('%c'): unsupported cdata type", *format);
-			char *p = (char*)cdataptr(cd);
-			luaL_addlstring(&b, p, sizeof(u64));
+			u64 v = lua_tointeger64(L, i);
+			luaL_addlstring(&b, (char *) &v, sizeof(u64));
 			break;
 		}
 		/* Perl 'pack' BER-encoded integer */
@@ -181,15 +211,13 @@ lbox_pack(struct lua_State *L)
 		case 'P':
 		case 'p':
 			if (lua_type(L, i) == LUA_TNUMBER) {
-				u32buf= (u32) lua_tointeger(L, i);
+				u32buf = (u32) lua_tointeger(L, i);
 				str = (char *) &u32buf;
 				size = sizeof(u32);
 			} else
 			if (lua_type(L, i) == LUA_TCDATA) {
-				GCcdata *cd = cdataV(L->base + (i - 1));
-				if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64)
-					luaL_error(L, "box.pack('%c'): unsupported cdata type", *format);
-				str = (char*)cdataptr(cd);
+				u64buf = lua_tointeger64(L, i);
+				str = (char *) &u64buf;
 				size = sizeof(u64);
 			} else {
 				str = luaL_checklstring(L, i, &size);
@@ -219,9 +247,9 @@ lbox_pack(struct lua_State *L)
 }
 
 static GCcdata*
-luaL_pushcdata(struct lua_State *L, int idx, CTypeID id, int bits)
+luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
 {
-	TValue *o = L->base + (idx - 1);
+	TValue *o = L->base + 1;
 	CTState *cts = ctype_cts(L);
 	CType *ct = ctype_raw(cts, id);
 	CTSize sz;
@@ -234,9 +262,9 @@ luaL_pushcdata(struct lua_State *L, int idx, CTypeID id, int bits)
 }
 
 static int
-luaL_pushnumber64(struct lua_State *L, int idx, uint64_t val)
+luaL_pushnumber64(struct lua_State *L, uint64_t val)
 {
-	GCcdata *cd = luaL_pushcdata(L, idx, CTID_UINT64, 8);
+	GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
 	*(uint64_t*)cdataptr(cd) = val;
 	return 1;
 }
@@ -267,7 +295,7 @@ lbox_unpack(struct lua_State *L)
 			str = lua_tolstring(L, i, &size);
 			if (str == NULL || size != sizeof(u64))
 				luaL_error(L, "box.unpack('%c'): got %d bytes (expected: 8)", *format, (int) size);
-			GCcdata *cd = luaL_pushcdata(L, i + 1, CTID_UINT64, 8);
+			GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
 			uint64_t *u64buf = (uint64_t*)cdataptr(cd);
 			*u64buf = *(u64*)str;
 			break;
@@ -823,20 +851,13 @@ lbox_pcall(struct lua_State *L)
 }
 
 /*
- * Convert lua string to lua cdata 64bit number.
+ * Convert lua number or string to lua cdata 64bit number.
  */
 static int
 lbox_tonumber64(struct lua_State *L)
 {
-	const char *arg = luaL_checkstring(L, -1);
-	char *arge;
-	int64_t v = strtoll(arg, &arge, 10);
-	if ((errno == ERANGE && (v == LONG_MAX || v == LONG_MIN)) ||
-	    (errno != 0 && v == 0))
-		luaL_error(L, "tonumber64: ", strerror(errno));
-	if (arge == arg)
-		luaL_error(L, "tonumber64: bad argument");
-	return luaL_pushnumber64(L, 0, v);
+	uint64_t result = lua_tointeger64(L, -1);
+	return luaL_pushnumber64(L, result);
 }
 
 /** A helper to register a single type metatable. */
