@@ -101,11 +101,9 @@ lua_tointeger64(struct lua_State *L, int idx)
 	case LUA_TSTRING: {
 		const char *arg = luaL_checkstring(L, idx);
 		char *arge;
-		result = strtoll(arg, &arge, 10);
-		if ((errno == ERANGE && (result == LONG_MAX || result == LONG_MIN)) ||
-		    (errno != 0 && result == 0))
-			luaL_error(L, "lua_tointeger64: ", strerror(errno));
-		if (arge == arg)
+		errno = 0;
+		result = strtoull(arg, &arge, 10);
+		if (errno != 0 || arge == arg)
 			luaL_error(L, "lua_tointeger64: bad argument");
 		break;
 	}
@@ -249,12 +247,12 @@ lbox_pack(struct lua_State *L)
 static GCcdata*
 luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
 {
-	TValue *o = L->base + 1;
 	CTState *cts = ctype_cts(L);
 	CType *ct = ctype_raw(cts, id);
 	CTSize sz;
 	lj_ctype_info(cts, id, &sz);
 	GCcdata *cd = lj_cdata_new(cts, id, bits);
+	TValue *o = L->base + 1;
 	setcdataV(L, o - 1, cd);
 	lj_cconv_ct_init(cts, ct, sz, cdataptr(cd), o, 0);
 	L->top = o;

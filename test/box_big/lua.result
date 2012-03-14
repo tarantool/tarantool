@@ -73,3 +73,25 @@ Found 2 tuples:
 lua box.space[5]:truncate()
 ---
 ...
+lua box.insert('8', tonumber64('18446744073709551615'), 'magic')
+---
+ - 18446744073709551615: {'magic'}
+...
+lua tu = box.select('8', '0', tonumber64('18446744073709551615'))
+---
+...
+lua num = box.unpack('l', tu[0])
+---
+...
+lua print(num)
+---
+18446744073709551615
+...
+lua type(num) == 'cdata'
+---
+ - true
+...
+lua num == tonumber64('18446744073709551615')
+---
+ - true
+...
