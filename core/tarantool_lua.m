@@ -38,6 +38,7 @@
 #include "lj_ctype.h"
 #include "lj_cdata.h"
 #include "lj_cconv.h"
+#include "lj_state.h"
 
 #include "pickle.h"
 #include "fiber.h"
@@ -252,10 +253,10 @@ luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
 	CTSize sz;
 	lj_ctype_info(cts, id, &sz);
 	GCcdata *cd = lj_cdata_new(cts, id, bits);
-	TValue *o = L->base + 1;
-	setcdataV(L, o - 1, cd);
+	TValue *o = L->top;
+	setcdataV(L, o, cd);
 	lj_cconv_ct_init(cts, ct, sz, cdataptr(cd), o, 0);
-	L->top = o;
+	incr_top(L);
 	return cd;
 }
 
