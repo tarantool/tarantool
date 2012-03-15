@@ -497,7 +497,31 @@ iov_add_lua_table(struct lua_State *L, int index)
 
 		switch (lua_type(L, -1)) {
 		case LUA_TNUMBER:
+		{
+			u32 field_num = lua_tonumber(L, -1);
+			field_len = sizeof(u32);
+			field_len_len =
+				save_varint32(field_len_buf,
+					      field_len) - field_len_buf;
+			iov_dup(field_len_buf, field_len_len);
+			iov_dup(&field_num, field_len);
+			*tuple_len += field_len_len + field_len;
+			break;
+		}
+		case LUA_TCDATA:
+		{
+			u64 field_num = tarantool_lua_tointeger64(L, -1);
+			field_len = sizeof(u64);
+			field_len_len =
+				save_varint32(field_len_buf,
+					      field_len) - field_len_buf;
+			iov_dup(field_len_buf, field_len_len);
+			iov_dup(&field_num, field_len);
+			*tuple_len += field_len_len + field_len;
+			break;
+		}
 		case LUA_TSTRING:
+		{
 			field = lua_tolstring(L, -1, &field_len);
 			field_len_len =
 				save_varint32(field_len_buf,
@@ -506,19 +530,7 @@ iov_add_lua_table(struct lua_State *L, int index)
 			iov_dup(field, field_len);
 			*tuple_len += field_len_len + field_len;
 			break;
-
-		case LUA_TCDATA:
-			field = tarantool_lua_tostring(L, -1);
-			field_len = strlen(field);
-			if (field_len)
-				field_len -= 3; /* chopping of ULL prefix */
-			field_len_len =
-				save_varint32(field_len_buf,
-					      field_len) - field_len_buf;
-			iov_dup(field_len_buf, field_len_len);
-			iov_dup(field, field_len);
-			*tuple_len += field_len_len + field_len;
-			break;
+		}
 		default:
 			tnt_raise(ClientError, :ER_PROC_RET,
 				  lua_typename(L, lua_type(L, -1)));
@@ -539,6 +551,23 @@ void iov_add_ret(struct lua_State *L, int index)
 		return;
 	}
 	case LUA_TNUMBER:
+	{
+		size_t len = sizeof(u32);
+		u32 num = lua_tointeger(L, index);
+		tuple = tuple_alloc(len + varint32_sizeof(len));
+		tuple->cardinality = 1;
+		memcpy(save_varint32(tuple->data, len), &num, len);
+                break;
+	}
+	case LUA_TCDATA:
+	{
+		u64 num = tarantool_lua_tointeger64(L, index);
+		size_t len = sizeof(u64);
+		tuple = tuple_alloc(len + varint32_sizeof(len));
+		tuple->cardinality = 1;
+		memcpy(save_varint32(tuple->data, len), &num, len);
+		break;
+	}
 	case LUA_TSTRING:
 	{
 		size_t len;
@@ -550,21 +579,20 @@ void iov_add_ret(struct lua_State *L, int index)
 	}
 	case LUA_TNIL:
 	case LUA_TBOOLEAN:
-	case LUA_TCDATA:
 	{
 		const char *str = tarantool_lua_tostring(L, index);
 		size_t len = strlen(str);
-		if (type == LUA_TCDATA && len)
-			len -= 3; /* chopping of ULL prefix */
 		tuple = tuple_alloc(len + varint32_sizeof(len));
 		tuple->cardinality = 1;
 		memcpy(save_varint32(tuple->data, len), str, len);
 		break;
 	}
 	case LUA_TUSERDATA:
+	{
 		tuple = lua_istuple(L, index);
 		if (tuple)
 			break;
+	}
 	default:
 		/*
 		 * LUA_TNONE, LUA_TTABLE, LUA_THREAD, LUA_TFUNCTION

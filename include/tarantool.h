@@ -77,6 +77,10 @@ extern struct lua_State *tarantool_L;
 const char *
 tarantool_lua_tostring(struct lua_State *L, int index);
 
+/* Convert Lua string, number or cdata (u64) to 64bit value */
+uint64_t
+tarantool_lua_tointeger64(struct lua_State *L, int idx);
+
 /* Make a new configuration available in Lua */
 void tarantool_lua_load_cfg(struct lua_State *L,
 			    struct tarantool_cfg *cfg);
