@@ -67,6 +67,14 @@ Or asynchronously:
     $client->send($request, $callback);
     # callback is called when reply is received or error is occured
 
+It is recommended to disconnect all connections in child after fork() to
+prevent possible conflicts:
+
+    my $pid = fork();
+    if ($pid == 0) {
+        MR::IProto->disconnect_all();
+    }
+
 =head1 DESCRIPTION
 
 This client is used to communicate with cluster of balanced servers using
@@ -331,6 +339,18 @@ sub Chat1 {
 sub SetTimeout {
     my ($self, $timeout) = @_;
     $self->timeout($timeout);
+    return;
+}
+
+=item disconnect_all
+
+Class method used to disconnect all iproto-connections. Very useful in case of fork().
+
+=cut
+
+sub disconnect_all {
+    my ($class) = @_;
+    MR::IProto::Cluster::Server->disconnect_all();
     return;
 }
 

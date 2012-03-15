@@ -12,6 +12,7 @@ This class is used to implement all communication with one server.
 
 use Mouse;
 use Mouse::Util::TypeConstraints;
+use Scalar::Util;
 use MR::IProto::Connection::Async;
 use MR::IProto::Connection::Sync;
 use MR::IProto::Message;
@@ -170,13 +171,47 @@ has sync => (
     lazy_build => 1,
 );
 
+my %servers;
+
 =back
+
+=head1 PUBLIC METHODS
+
+=over
+
+=item disconnect_all
+
+Class method used to disconnect all iproto-connections. Very useful in case of fork().
+
+=cut
+
+sub disconnect_all {
+    my ($class) = @_;
+    foreach my $server (values %servers) {
+        $server->clear_async();
+        $server->clear_sync();
+    }
+    return;
+}
 
 =head1 PROTECTED METHODS
 
 =over
 
 =cut
+
+sub BUILD {
+    my ($self) = @_;
+    $servers{Scalar::Util::refaddr($self)} = $self;
+    Scalar::Util::weaken($servers{Scalar::Util::refaddr($self)});
+    return;
+}
+
+sub DEMOLISH {
+    my ($self) = @_;
+    delete $servers{Scalar::Util::refaddr($self)};
+    return;
+}
 
 sub _build_async {
     my ($self) = @_;
