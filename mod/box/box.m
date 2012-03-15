@@ -320,7 +320,11 @@ struct op_set_arg {
 
 /** Argument of ADD, AND, XOR, OR operations. */
 struct op_arith_arg {
-	i32 i32_val;
+	u32 val_size;
+	union {
+		i32 i32_val;
+		i64 i64_val;
+	};
 };
 
 /** Argument of SPLICE. */
@@ -427,25 +431,53 @@ do_update_op_set(struct op_set_arg *arg, void *in __attribute__((unused)),
 static void
 do_update_op_add(struct op_arith_arg *arg, void *in, void *out)
 {
-	*(i32 *)out = *(i32 *)in + arg->i32_val;
+	switch (arg->val_size) {
+	case sizeof(i32):
+		*(i32 *)out = *(i32 *)in + arg->i32_val;
+		break;
+	case sizeof(i64):
+		*(i64 *)out = *(i64 *)in + arg->i64_val;
+		break;
+	}
 }
 
 static void
 do_update_op_and(struct op_arith_arg *arg, void *in, void *out)
 {
-	*(i32 *)out = *(i32 *)in & arg->i32_val;
+	switch (arg->val_size) {
+	case sizeof(i32):
+		*(i32 *)out = *(i32 *)in & arg->i32_val;
+		break;
+	case sizeof(i64):
+		*(i64 *)out = *(i64 *)in & arg->i64_val;
+		break;
+	}
 }
 
 static void
 do_update_op_xor(struct op_arith_arg *arg, void *in, void *out)
 {
-	*(i32 *)out = *(i32 *)in ^ arg->i32_val;
+	switch (arg->val_size) {
+	case sizeof(i32):
+		*(i32 *)out = *(i32 *)in ^ arg->i32_val;
+		break;
+	case sizeof(i64):
+		*(i64 *)out = *(i64 *)in ^ arg->i64_val;
+		break;
+	}
 }
 
 static void
 do_update_op_or(struct op_arith_arg *arg, void *in, void *out)
 {
-	*(i32 *)out = *(i32 *)in | arg->i32_val;
+	switch (arg->val_size) {
+	case sizeof(i32):
+		*(i32 *)out = *(i32 *)in | arg->i32_val;
+		break;
+	case sizeof(i64):
+		*(i64 *)out = *(i64 *)in | arg->i64_val;
+		break;
+	}
 }
 
 static void
@@ -477,15 +509,41 @@ static void
 init_update_op_arith(struct update_cmd *cmd __attribute__((unused)),
 		     struct update_field *field, struct update_op *op)
 {
-	/* Check the argument. */
-	if (field->new_len != sizeof(i32))
-		tnt_raise(ClientError, :ER_FIELD_TYPE, "32-bit int");
+	struct op_arith_arg *arg = &op->arg.arith;
 
-	if (op->arg.set.length != sizeof(i32))
-		tnt_raise(ClientError, :ER_TYPE_MISMATCH, "32-bit int");
-	/* Parse the operands. */
-	op->arg.arith.i32_val = *(i32 *)op->arg.set.value;
-	op->new_field_len = sizeof(i32);
+	switch (field->new_len) {
+	case sizeof(i32):
+		/* 32-bit operation */
+
+		/* Check the operand type. */
+		if (op->arg.set.length != sizeof(i32))
+			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
+				  "32-bit int");
+
+		arg->i32_val = *(i32 *)op->arg.set.value;
+		break;
+	case sizeof(i64):
+		/* 64-bit operation */
+		switch (op->arg.set.length) {
+		case sizeof(i32):
+			/* 32-bit operand */
+			/* cast 32-bit operand to 64-bit */
+			arg->i64_val = *(i32 *)op->arg.set.value;
+			break;
+		case sizeof(i64):
+			/* 64-bit operand */
+			arg->i64_val = *(i64 *)op->arg.set.value;
+			break;
+		default:
+			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
+				  "32-bit or 64-bit int");
+		}
+		break;
+	default:
+		tnt_raise(ClientError, :ER_FIELD_TYPE,
+			  "32-bit or 64-bit int");
+	}
+	arg->val_size = op->new_field_len = field->new_len;
 }
 
 static void

@@ -147,9 +147,13 @@ test_long_set();
 void
 test_append();
 
-/** update fields test case: simple arithmetics operations test */
+/** update fields test case: 32-bit arithmetics operations test */
 void
-test_simple_arith();
+test_arith_i32();
+
+/** update fields test case: 64-bit arithmetics operations test */
+void
+test_arith_i64();
 
 /** update fields test case: multi arithmetics operations test */
 void
@@ -185,7 +189,8 @@ main(void)
 	test_simple_set();
 	test_long_set();
 	test_append();
-	test_simple_arith();
+	test_arith_i32();
+	test_arith_i64();
 	test_multi_arith();
 	test_splice();
 	test_set_and_splice();
@@ -501,8 +506,8 @@ test_append()
 	printf("# test append and change field\n");
 	update_set_str(stream, 9, long_string);
 	update_splice_str(stream, 9, 1, 544, "ac");
-	tnt_update_arith(stream, 9, TNT_UPDATE_XOR, 0x3ffffff);
-	tnt_update_arith(stream, 9, TNT_UPDATE_ADD, 1024);
+	tnt_update_arith_i32(stream, 9, TNT_UPDATE_XOR, 0x3ffffff);
+	tnt_update_arith_i32(stream, 9, TNT_UPDATE_ADD, 1024);
 	update(1, stream);
 	tnt_stream_free(stream);
 
@@ -517,9 +522,9 @@ test_append()
 }
 
 void
-test_simple_arith()
+test_arith_i32()
 {
-	printf(">>> test simple arith\n");
+	printf(">>> test 32-bit int arith\n");
 
 	/* insert tuple */
 	printf("# insert tuple\n");
@@ -529,50 +534,117 @@ test_simple_arith()
 
 	/* test simple add */
 	struct tnt_stream *stream = tnt_buf(NULL);
-	printf("# test simple add\n");
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 16);
+	printf("# test add\n");
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 16);
 	update(1, stream);
 	tnt_stream_free(stream);
 
 	/* test overflow add */
 	stream = tnt_buf(NULL);
 	printf("# test overflow add\n");
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, INT_MAX);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, INT32_MAX);
 	update(1, stream);
 	tnt_stream_free(stream);
 
 	/* test overflow add */
 	stream = tnt_buf(NULL);
 	printf("# test underflow add\n");
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, INT_MIN);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, INT32_MIN);
 	update(1, stream);
 	tnt_stream_free(stream);
 
 	/* test or */
 	stream = tnt_buf(NULL);
-	printf("# test simple or\n");
-	tnt_update_arith(stream, 2, TNT_UPDATE_OR, 0xbacf);
-	tnt_update_arith(stream, 3, TNT_UPDATE_OR, 0xfabc);
+	printf("# test or\n");
+	tnt_update_arith_i32(stream, 2, TNT_UPDATE_OR, 0xbacfbacf);
+	tnt_update_arith_i32(stream, 3, TNT_UPDATE_OR, 0xfabcfabc);
 	update(1, stream);
 	tnt_stream_free(stream);
 
 	/* test xor */
 	stream = tnt_buf(NULL);
-	printf("# test simple xor\n");
-	tnt_update_arith(stream, 2, TNT_UPDATE_XOR, 0xffff);
-	tnt_update_arith(stream, 3, TNT_UPDATE_XOR, 0xffff);
+	printf("# test xor\n");
+	tnt_update_arith_i32(stream, 2, TNT_UPDATE_XOR, 0xffffffff);
+	tnt_update_arith_i32(stream, 3, TNT_UPDATE_XOR, 0xffffffff);
 	update(1, stream);
 	tnt_stream_free(stream);
 
 	/* test and */
 	stream = tnt_buf(NULL);
-	printf("# test simple and\n");
-	tnt_update_arith(stream, 2, TNT_UPDATE_AND, 0xf0f0);
-	tnt_update_arith(stream, 3, TNT_UPDATE_AND, 0x0f0f);
+	printf("# test and\n");
+	tnt_update_arith_i32(stream, 2, TNT_UPDATE_AND, 0xf0f0f0f0);
+	tnt_update_arith_i32(stream, 3, TNT_UPDATE_AND, 0x0f0f0f0f);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< test simple arith done\n");
+	printf("<<< test 32-bit arith done\n");
+}
+
+/** update fields test case: 64-bit arithmetics operations test */
+void
+test_arith_i64()
+{
+	printf(">>> test 64-bit int arith\n");
+
+	/* insert tuple */
+	printf("# insert tuple\n");
+	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%ll%ll%ll", 1, 2, 0, 0, 0);
+	insert_tuple(tuple);
+	tnt_tuple_free(tuple);
+
+	/* test simple add */
+	struct tnt_stream *stream = tnt_buf(NULL);
+	printf("# test add\n");
+	tnt_update_arith_i64(stream, 1, TNT_UPDATE_ADD, 16);
+	update(1, stream);
+	tnt_stream_free(stream);
+
+	/* test overflow add */
+	stream = tnt_buf(NULL);
+	printf("# test overflow add\n");
+	tnt_update_arith_i64(stream, 1, TNT_UPDATE_ADD, INT64_MAX);
+	update(1, stream);
+	tnt_stream_free(stream);
+
+	/* test overflow add */
+	stream = tnt_buf(NULL);
+	printf("# test underflow add\n");
+	tnt_update_arith_i64(stream, 1, TNT_UPDATE_ADD, INT64_MIN);
+	update(1, stream);
+	tnt_stream_free(stream);
+
+	/* test or */
+	stream = tnt_buf(NULL);
+	printf("# test or\n");
+	tnt_update_arith_i64(stream, 2, TNT_UPDATE_OR, 0xbacfbacfbacfbacf);
+	tnt_update_arith_i64(stream, 3, TNT_UPDATE_OR, 0xfabcfabcfabcfabc);
+	update(1, stream);
+	tnt_stream_free(stream);
+
+	/* test xor */
+	stream = tnt_buf(NULL);
+	printf("# test xor\n");
+	tnt_update_arith_i64(stream, 2, TNT_UPDATE_XOR, 0xffffffffffffffff);
+	tnt_update_arith_i64(stream, 3, TNT_UPDATE_XOR, 0xffffffffffffffff);
+	update(1, stream);
+	tnt_stream_free(stream);
+
+	/* test and */
+	stream = tnt_buf(NULL);
+	printf("# test and\n");
+	tnt_update_arith_i64(stream, 2, TNT_UPDATE_AND, 0xf0f0f0f0f0f0f0f0);
+	tnt_update_arith_i64(stream, 3, TNT_UPDATE_AND, 0x0f0f0f0f0f0f0f0f);
+	update(1, stream);
+	tnt_stream_free(stream);
+
+	/* test cast 32-bit operand to 64-bit */
+	stream = tnt_buf(NULL);
+	printf("# test casting 32-bit operand to 64-bit\n");
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 16);
+	update(1, stream);
+	tnt_stream_free(stream);
+
+	printf("<<< test 64-bit arith done\n");
 }
 
 void
@@ -591,9 +663,9 @@ test_multi_arith()
 	printf("# test simple and\n");
 	update_set_i32(stream, 2, 0);
 	update_set_str(stream, 1, "first field new value");
-	tnt_update_arith(stream, 2, TNT_UPDATE_XOR, 0xF00F);
+	tnt_update_arith_i32(stream, 2, TNT_UPDATE_XOR, 0xF00F);
 	update_set_str(stream, 3, "third field new value");
-	tnt_update_arith(stream, 2, TNT_UPDATE_OR, 0xF00F);
+	tnt_update_arith_i32(stream, 2, TNT_UPDATE_OR, 0xF00F);
 	update(1, stream);
 	tnt_stream_free(stream);
 
@@ -677,7 +749,10 @@ test_set_and_splice()
 
 	/* insert tuple */
 	printf("# insert tuple\n");
-	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%s%s", 1, "first", "hi, this is a test string!", "third");
+	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%s%s", 1,
+					    "first",
+					    "hi, this is a test string!",
+					    "third");
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
@@ -716,8 +791,11 @@ test_delete_field()
 
 	/* insert tuple */
 	printf("# insert tuple\n");
-	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%s%s%d%d%d%d%d%d%d%d%d%d", 1,
-			                    "first", "hi, this is a test string!", "third",
+	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%s%s%d%d%d%d%d%d%d%d%d%d",
+					    1,
+			                    "first",
+					    "hi, this is a test string!",
+					    "third",
 					    1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
@@ -733,14 +811,14 @@ test_delete_field()
 	stream = tnt_buf(NULL);
 	printf("# test useless operations with delete fields\n");
 	update_set_i32(stream, 1, 0);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
 	update_delete_field(stream, 1);
 	update(1, stream);
 	tnt_stream_free(stream);
@@ -765,12 +843,12 @@ test_delete_field()
 	printf("# test multi delete fields\n");
 	update_delete_field(stream, 1);
 	update_set_i32(stream, 1, 3);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
-	tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
+	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
 	update(1, stream);
 	tnt_stream_free(stream);
 
@@ -835,14 +913,14 @@ test_boundary_args()
 	stream = tnt_buf(NULL);
 	printf("# test: update w/ maximal allowed opearions count\n");
 	for (int i = 0; i < max_update_op_cnt; ++i)
-		tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
+		tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
 	update(0, stream);
 	tnt_stream_free(stream);
 
 	stream = tnt_buf(NULL);
 	printf("# test: update w/ grater than maximal allowed opearions count\n");
 	for (int i = 0; i < max_update_op_cnt + 1; ++i)
-		tnt_update_arith(stream, 1, TNT_UPDATE_ADD, 1);
+		tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
 	update(0, stream);
 	tnt_stream_free(stream);
 }

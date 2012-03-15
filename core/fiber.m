@@ -852,6 +852,13 @@ fiber_connect(struct sockaddr_in *addr)
 	if (set_nonblock(fiber->fd) < 0)
 		goto error;
 
+	/* set SO_KEEPALIVE flag */
+	int keepalive = 1;
+	if (setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE,
+		       &keepalive, sizeof(int)) != 0)
+		/* just print error, it's not critical error */
+		say_syserror("setsockopt()");
+
 	if (connect(fiber->fd, (struct sockaddr *)addr, sizeof(*addr)) < 0) {
 
 		if (errno != EINPROGRESS)
