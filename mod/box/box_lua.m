@@ -557,7 +557,7 @@ void iov_add_ret(struct lua_State *L, int index)
 		tuple = tuple_alloc(len + varint32_sizeof(len));
 		tuple->cardinality = 1;
 		memcpy(save_varint32(tuple->data, len), &num, len);
-                break;
+		break;
 	}
 	case LUA_TCDATA:
 	{
