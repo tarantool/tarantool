@@ -20,6 +20,7 @@ use Socket qw( TCP_NODELAY SO_KEEPALIVE SO_SNDTIMEO SO_RCVTIMEO );
 has _socket => (
     is  => 'ro',
     isa => 'IO::Socket::INET',
+    predicate => '_has_socket',
     lazy_build => 1,
 );
 
@@ -32,11 +33,26 @@ has _sent => (
 
 =over
 
+=item fh
+
+Returns socket.
+
 =item send
 
 See L<MR::IProto::Connection/send> for more information.
 
 =cut
+
+sub fh { return $_[0]->_has_socket && $_[0]->_socket }
+
+sub Close {
+    my ($self, $reason) = @_;
+    my $sent = $self->_sent;
+    while (my $args = shift @$sent) {
+        my ($sync, $callback) = @$args;
+        $self->_handle_error($sync, $callback, $reason);
+    }
+}
 
 sub send {
     my ($self, $msg, $payload, $callback, $no_reply, $sync) = @_;
@@ -91,15 +107,16 @@ sub send {
     else {
         $self->_handle_error($sync, $callback, $@);
     }
-    return;
+    return $ok;
 }
 
 sub recv_all {
-    my ($self) = @_;
+    my ($self, %opts) = @_;
     my $server = $self->server;
     my $sent = $self->_sent;
     my $dump_resp = $server->debug >= 6;
-    while (my $args = shift @$sent) {
+    my $n = $opts{max} || @$sent;
+    while ($n-- and my $args = shift @$sent) {
         my ($sync, $callback) = @$args;
         my ($resp_msg, $resp_payload);
         my $ok = eval {

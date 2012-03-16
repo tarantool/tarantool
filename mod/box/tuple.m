@@ -118,6 +118,9 @@ print_field(struct tbuf *buf, void *f)
 	case 4:
 		tbuf_printf(buf, "%u", *(u32 *)f);
 		break;
+	case 8:
+		tbuf_printf(buf, "%"PRIu64, *(u64 *)f);
+		break;
 	default:
 		tbuf_printf(buf, "'");
 		while (size-- > 0) {
