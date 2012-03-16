@@ -79,7 +79,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.17;
+$VERSION = 0.0.18;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -968,7 +968,7 @@ sub Select {
 
         return unless $r;
 
-        return $r if $param->{hash_by};
+        return $r if defined $param->{hash_by};
         return $r if $param->{want} eq 'arrayref';
         $wantarray = wantarray if $param->{return_fh};
 

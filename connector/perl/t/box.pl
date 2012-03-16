@@ -13,7 +13,7 @@ use FindBin qw($Bin);
 use lib "$Bin";
 use Carp qw/confess/;
 
-use Test::More tests => 337;
+use Test::More tests => 339;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
@@ -161,6 +161,10 @@ is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 5, 5, 5, 5, '
 
 ok $box->Replace(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'replace';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/replace';
+
+
+is_deeply [$box->Select([13], {raise => 0, hash_by => 0, raw => 1})], [{13 => [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789']}], 'select/rawhash1';
+is_deeply [$box->Select([13,14], {raise => 0, hash_by => 0, raw => 1})], [{13 => [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 14 => [14, 'some1email@test.mail.ru', 1, 2, 3, 4, '123456789']}], 'select/rawhash2';
 
 
 do {
