@@ -1,0 +1,227 @@
+insert into t9 values ('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
+Insert OK, 1 row affected
+insert into t9 values ('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')
+Insert OK, 1 row affected
+insert into t9 values ('Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.')
+Insert OK, 1 row affected
+insert into t9 values ('Jules', 'Vincent', 1, 'Then what do they call it?')
+Insert OK, 1 row affected
+insert into t9 values ('Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.')
+Insert OK, 1 row affected
+insert into t9 values ('Jules', 'Vincent', 2, 'A `Royale` with cheese!')
+Insert OK, 1 row affected
+insert into t9 values ('Vincent', 'Jules', 3, 'That`s right.')
+Insert OK, 1 row affected
+insert into t9 values ('Jules', 'Vincent', 3, 'What do they call a Big Mac?')
+Insert OK, 1 row affected
+insert into t9 values ('Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`')
+Insert OK, 1 row affected
+insert into t9 values ('Jules', 'Vincent', 4, '`Le Big Mac!`')
+Insert OK, 1 row affected
+insert into t9 values ('Vincent', 'Jules', 5, 'Ha, ha, ha.')
+Insert OK, 1 row affected
+insert into t9 values ('Jules', 'Vincent', 5, 'What do they call a `Whopper`?')
+Insert OK, 1 row affected
+insert into t9 values ('Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.')
+Insert OK, 1 row affected
+insert into t9 values ('The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.')
+Insert OK, 1 row affected
+insert into t9 values ('Vincent', 'The Wolf!', 0, 'A please would be nice.')
+Insert OK, 1 row affected
+insert into t9 values ('The Wolf!', 'Vincent', 1, 'Come again?')
+Insert OK, 1 row affected
+insert into t9 values ('Vincent', 'The Wolf!', 1, 'I said a please would be nice.')
+Insert OK, 1 row affected
+insert into t9 values ('The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.')
+Insert OK, 1 row affected
+insert into t9 values ('The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.')
+Insert OK, 1 row affected
+insert into t9 values ('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.')
+Insert OK, 1 row affected
+lua box.select(9, 0, 'Vincent', 'Jules', 0)
+---
+ - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
+...
+lua box.select(9, 0, 'Jules', 'Vincent', 0)
+---
+ - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
+...
+lua box.select(9, 0, 'Vincent', 'Jules', 1)
+---
+ - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
+...
+lua box.select(9, 0, 'Jules', 'Vincent', 1)
+---
+ - 'Jules': {'Vincent', 1, 'Then what do they call it?'}
+...
+lua box.select(9, 0, 'Vincent', 'Jules', 2)
+---
+ - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
+...
+lua box.select(9, 0, 'Jules', 'Vincent', 2)
+---
+ - 'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
+...
+lua box.select(9, 0, 'Vincent', 'Jules', 3)
+---
+ - 'Vincent': {'Jules', 3, 'That`s right.'}
+...
+lua box.select(9, 0, 'Jules', 'Vincent', 3)
+---
+ - 'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
+...
+lua box.select(9, 0, 'Vincent', 'Jules', 4)
+---
+ - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
+...
+lua box.select(9, 0, 'Jules', 'Vincent', 4)
+---
+ - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
+...
+lua box.select(9, 0, 'Vincent', 'Jules', 5)
+---
+ - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
+...
+lua box.select(9, 0, 'Jules', 'Vincent', 5)
+---
+ - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
+...
+lua box.select(9, 0, 'Vincent', 'Jules', 6)
+---
+ - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+...
+lua box.select(9, 0, 'The Wolf!', 'Vincent', 0)
+---
+ - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+...
+lua box.select(9, 0, 'Vincent', 'The Wolf!', 0)
+---
+ - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+...
+lua box.select(9, 0, 'The Wolf!', 'Vincent', 1)
+---
+ - 'The Wolf!': {'Vincent', 1, 'Come again?'}
+...
+lua box.select(9, 0, 'Vincent', 'The Wolf!', 1)
+---
+ - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+...
+lua box.select(9, 0, 'The Wolf!', 'Vincent', 2)
+---
+ - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+...
+lua box.select(9, 0, 'The Wolf!', 'Vincent', 3)
+---
+ - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+...
+lua box.select(9, 0, 'Vincent', 'The Wolf!', 2)
+---
+ - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+lua box.select(9, 0, 'Vincent', 'Jules')
+---
+ - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
+ - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
+ - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
+ - 'Vincent': {'Jules', 3, 'That`s right.'}
+ - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
+ - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
+ - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+...
+lua box.select(9, 0, 'Jules', 'Vincent')
+---
+ - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
+ - 'Jules': {'Vincent', 1, 'Then what do they call it?'}
+ - 'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
+ - 'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
+ - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
+ - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
+...
+lua box.select(9, 0, 'Vincent', 'The Wolf!')
+---
+ - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+ - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+ - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+lua box.select(9, 0, 'The Wolf!', 'Vincent')
+---
+ - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+ - 'The Wolf!': {'Vincent', 1, 'Come again?'}
+ - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+ - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+...
+lua box.select(9, 0, 'Vincent')
+---
+ - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
+ - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
+ - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
+ - 'Vincent': {'Jules', 3, 'That`s right.'}
+ - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
+ - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
+ - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+ - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+ - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+ - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+lua box.delete(9, 'The Wolf!', 'Vincent', 0)
+---
+ - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+...
+lua box.delete(9, 'The Wolf!', 'Vincent', 3)
+---
+ - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+...
+lua box.delete(9, 'Vincent', 'The Wolf!', 0)
+---
+ - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+...
+lua box.select(9, 0, 'Vincent', 'The Wolf!')
+---
+ - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+ - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+lua box.select(9, 0, 'The Wolf!', 'Vincent')
+---
+ - 'The Wolf!': {'Vincent', 1, 'Come again?'}
+ - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+...
+lua box.delete(9, 'Vincent', 'The Wolf!', 3)
+---
+...
+lua box.delete(9, 'Vincent', 'The Wolf!')
+---
+error: 'Ambiguous specification of the key (may affect multiple values)'
+...
+lua box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')
+---
+error: 'Key cardinality 4 is greater than index cardinality 3'
+...
+lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'The Wolf!', 'Vincent', 1)
+---
+ - 'The Wolf!': {'Vincent', 1, '<ooops>'}
+...
+lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'Vincent', 'The Wolf!', 1)
+---
+ - 'Vincent': {'The Wolf!', 1, '<ooops>'}
+...
+lua box.select(9, 0, 'Vincent', 'The Wolf!')
+---
+ - 'Vincent': {'The Wolf!', 1, '<ooops>'}
+ - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+lua box.select(9, 0, 'The Wolf!', 'Vincent')
+---
+ - 'The Wolf!': {'Vincent', 1, '<ooops>'}
+ - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+...
+lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'Vincent', 'The Wolf!', 3)
+---
+...
+lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'Vincent', 'The Wolf!')
+---
+error: 'Ambiguous specification of the key (may affect multiple values)'
+...
+lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'The Wolf!', 'Vincent', 1, 'Come again?')
+---
+error: 'Key cardinality 4 is greater than index cardinality 3'
+...

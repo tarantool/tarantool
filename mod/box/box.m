@@ -655,19 +655,25 @@ static struct update_op_meta update_op_meta[UPDATE_OP_MAX + 1] = {
  * tuple may not exist.
  */
 static struct update_cmd *
-parse_update_cmd(struct tbuf *data)
+parse_update_cmd(struct box_txn *txn, struct tbuf *data)
 {
 	struct update_cmd *cmd = palloc(fiber->gc_pool,
 					sizeof(struct update_cmd));
 	/* key cardinality */
 	cmd->key_cardinality = read_u32(data);
-	if (cmd->key_cardinality > 1)
-		tnt_raise(IllegalParams, :"key must be single valued");
-	if (cmd->key_cardinality == 0)
-		tnt_raise(IllegalParams, :"key is not defined");
+	if (cmd->key_cardinality > txn->index->key_def->part_count)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  cmd->key_cardinality,
+			  txn->index->key_def->part_count);
+
+	if (cmd->key_cardinality < txn->index->key_def->part_count)
+		tnt_raise(ClientError, :ER_AMBIGUOUS_KEY_SPECIFIED);
 
 	/* key */
 	cmd->key = read_field(data);
+	for (int i = 1; i < cmd->key_cardinality; i++)
+		read_field(data);
+
 	/* number of operations */
 	u32 op_cnt = read_u32(data);
 	if (op_cnt > BOX_UPDATE_OP_CNT_MAX)
@@ -902,10 +908,10 @@ prepare_update(struct box_txn *txn, struct tbuf *data)
 	u32 tuples_affected = 1;
 
 	/* Parse UPDATE request. */
-	struct update_cmd *cmd = parse_update_cmd(data);
+	struct update_cmd *cmd = parse_update_cmd(txn, data);
 
 	/* Try to find the tuple. */
-	txn->old_tuple = [txn->index find: cmd->key];
+	txn->old_tuple = [txn->index find :cmd->key :cmd->key_cardinality];
 	if (txn->old_tuple == NULL) {
 		/* Not found. For simplicity, skip the logging. */
 		txn->flags |= BOX_NOT_STORE;
@@ -992,11 +998,25 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 }
 
 static void __attribute__((noinline))
-prepare_delete(struct box_txn *txn, void *key)
+prepare_delete(struct box_txn *txn, struct tbuf *data)
 {
 	u32 tuples_affected = 0;
 
-	txn->old_tuple = [txn->index find: key];
+	/* check key cardinality */
+	u32 key_cardinality = read_u32(data);
+	if (key_cardinality > txn->index->key_def->part_count)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality, txn->index->key_def->part_count);
+	if (key_cardinality < txn->index->key_def->part_count)
+		tnt_raise(ClientError, :ER_AMBIGUOUS_KEY_SPECIFIED);
+
+	/* read key */
+	void *key = read_field(data);
+	/* advance remaining fields of a key */
+	for (int i = 1; i < key_cardinality; i++)
+		read_field(data);
+
+	txn->old_tuple = [txn->index find :key :key_cardinality];
 
 	if (txn->old_tuple == NULL)
 		/*
@@ -1201,8 +1221,6 @@ static void
 box_dispatch(struct box_txn *txn, struct tbuf *data)
 {
 	u32 cardinality;
-	void *key;
-	u32 key_len;
 
 	say_debug("box_dispatch(%i)", txn->op);
 
@@ -1222,15 +1240,8 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		txn_assign_n(txn, data);
 		if (txn->op == DELETE)
 			txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		key_len = read_u32(data);
-		if (key_len != 1)
-			tnt_raise(IllegalParams, :"key must be single valued");
 
-		key = read_field(data);
-		if (data->size != 0)
-			tnt_raise(IllegalParams, :"can't unpack request");
-
-		prepare_delete(txn, key);
+		prepare_delete(txn, data);
 		break;
 
 	case SELECT:
@@ -1871,10 +1882,6 @@ check_spaces(struct tarantool_cfg *conf)
 			if (j == 0) {
 				if (index->unique == false) {
 					out_warning(0, "(space = %zu) space first index must be unique", i);
-					return -1;
-				}
-				if (index_cardinality != 1) {
-					out_warning(0, "(space = %zu) space first index must be single keyed", i);
 					return -1;
 				}
 			}

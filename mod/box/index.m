@@ -132,9 +132,10 @@ iterator_first_equal(struct iterator *it)
 	return NULL;
 }
 
-- (struct box_tuple *) find: (void *) key
+- (struct box_tuple *) find: (void *) key_arg :(u32) key_cardinality_arg
 {
-	(void) key;
+	(void) key_arg;
+	(void) key_cardinality_arg;
 	[self subclassResponsibility: _cmd];
 	return NULL;
 }
@@ -277,7 +278,7 @@ hash_iterator_free(struct iterator *iterator)
 	if (field == NULL)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 			  key_def->parts[0].fieldno);
-	return [self find: field];
+	return [self find :field :1];
 }
 
 - (struct iterator *) allocIterator
@@ -324,15 +325,18 @@ hash_iterator_free(struct iterator *iterator)
 	return mh_size(int_hash);
 }
 
-- (struct box_tuple *) find: (void *) field
+- (struct box_tuple *) find: (void *) key_arg :(u32) key_cardinality_arg
 {
+	u32 key_size = load_varint32(&key_arg);
+
+	if (key_cardinality_arg != 1)
+		tnt_raise(IllegalParams, :"key isn't single-part");
+
+	if (key_size != 4)
+		tnt_raise(IllegalParams, :"key isn't u32");
+
 	struct box_tuple *ret = NULL;
-	u32 field_size = load_varint32(&field);
-	u32 num = *(u32 *)field;
-
-	if (field_size != 4)
-		tnt_raise(IllegalParams, :"key is not u32");
-
+	u32 num = *(u32 *)key_arg;
 	mh_int_t k = mh_i32ptr_get(int_hash, num);
 	if (k != mh_end(int_hash))
 		ret = mh_value(int_hash, k);
@@ -452,15 +456,18 @@ hash_iterator_free(struct iterator *iterator)
 	return mh_size(int64_hash);
 }
 
-- (struct box_tuple *) find: (void *) field
+- (struct box_tuple *) find: (void *) key_arg :(u32) key_cardinality_arg
 {
+	u32 key_size = load_varint32(&key_arg);
+
+	if (key_cardinality_arg != 1)
+		tnt_raise(IllegalParams, :"key isn't single-part");
+
+	if (key_size != 8)
+		tnt_raise(IllegalParams, :"key isn't u64");
+
 	struct box_tuple *ret = NULL;
-	u32 field_size = load_varint32(&field);
-	u64 num = *(u64 *)field;
-
-	if (field_size != 8)
-		tnt_raise(IllegalParams, :"key is not u64");
-
+	u64 num = *(u64 *)key_arg;
 	mh_int_t k = mh_i64ptr_get(int64_hash, num);
 	if (k != mh_end(int64_hash))
 		ret = mh_value(int64_hash, k);
@@ -579,11 +586,13 @@ hash_iterator_free(struct iterator *iterator)
 	return mh_size(str_hash);
 }
 
-- (struct box_tuple *) find: (void *) field
+- (struct box_tuple *) find: (void *) key_arg :(u32) key_cardinality_arg
 {
-	struct box_tuple *ret = NULL;
-	mh_int_t k = mh_lstrptr_get(str_hash, field);
+	if (key_cardinality_arg != 1)
+		tnt_raise(IllegalParams, :"key isn't single-part");
 
+	struct box_tuple *ret = NULL;
+	mh_int_t k = mh_lstrptr_get(str_hash, key_arg);
 	if (k != mh_end(str_hash))
 		ret = mh_value(str_hash, k);
 #ifdef DEBUG

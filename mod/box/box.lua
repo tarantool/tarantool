@@ -1,3 +1,18 @@
+-- This function create new table with constants members. The runntime errro
+-- will be rised if attempting to change table members.
+local function finalize_table(table)
+    return setmetatable ({}, {
+			     __index = table,
+			     __newindex = function(table_arg,
+						   name_arg,
+						   value_arg)
+				 error("attempting to change constant " ..
+				       tostring(name_arg) ..
+				       " to "
+				       .. tostring(value_arg), 2)
+			     end
+			     })
+end
 
 --
 --
@@ -44,12 +59,13 @@ end
 -- delete can be done only by the primary key, whose
 -- index is always 0. It doesn't accept compound keys
 --
-function box.delete(space, key)
+function box.delete(space, ...)
+    local key = {...}
     return box.process(21,
-                       box.pack('iiip', space,
+                       box.pack('iii'..string.rep('p', #key), space,
                                  1, -- flags, BOX_RETURN_TUPLE
-                                 1, -- cardinality
-                                 key))
+                                 #key, -- key cardinality
+                                 unpack(key)))
 end
 
 -- insert or replace a tuple
@@ -74,17 +90,76 @@ function box.insert(space, ...)
                                 unpack(tuple)))
 end
 
---
-function box.update(space, key, format, ...)
-    local ops = {...}
-    return box.process(19,
-                       box.pack('iiipi'..format,
-                                  space,
-                                  1, -- flags, BOX_RETURN_TUPLE
-                                  1, -- cardinality
-                                  key, -- primary key
-                                  #ops/2, -- op count
-                                  unpack(ops)))
+--- UPDATE opearations
+box.update_ops = finalize_table(
+    {
+        -- assign value to field
+        ASSIGN = 0,
+        -- add value to field's value
+        ARITH_ADD = 1,
+        -- apply binary AND to field's value
+        ARITH_AND = 2,
+        -- apply binary XOR to field's value
+        ARITH_XOR = 3,
+        -- apply binary OR to field's value
+        ARITH_OR = 4,
+        -- do splice operation
+        SPLICE = 5,
+        -- delete field
+        DELETE = 6,
+    })
+
+-- UPDATE command
+function box.update(space, ops_list, ...)
+    local key = {...}
+
+    local format = ''
+    local args_list = {}
+
+    -- fill UPDATE command's header
+    format = format .. 'ii'
+    table.insert(args_list, space) -- space number
+    table.insert(args_list, 1) -- flags, BOX_RETURN_TUPLE
+
+    -- fill UPDATE command's key
+    format = format .. 'i'
+    table.insert(args_list, #key) -- key cardinality
+    for itr, val in ipairs(key) do
+        format = format .. 'p'
+        table.insert(args_list, val) -- key field
+    end
+
+    -- fill UPDATE command's operations
+    format = format .. "i"
+    table.insert(args_list, #ops_list)
+    for itr, op in ipairs(ops_list) do
+        local ops_operands = nil
+        if op.op == box.update_ops.ASSIGN or
+            op.op == box.update_ops.ARITH_ADD or
+            op.op == box.update_ops.ARITH_ADD or
+            op.op == box.update_ops.ARITH_AND or
+            op.op == box.update_ops.ARITH_XOR or
+            op.op == box.update_ops.ARITH_OR then
+            -- single operand operation
+            ops_operands = op.value
+        elseif op.op == box.update_ops.SPLICE then
+            -- SPLICE operands
+            ops_operands = box.pack('ppp', op.offset, op.length, op.list)
+        elseif op.op == box.update_ops.DELETE then
+            -- actualy delete doesn't have arguments, but we shold put empry
+            -- args
+            ops_operands = box.pack('p', '')
+        else
+            return error("invalid UPDATE operation")
+        end
+
+        format = format .. "ibp"
+        table.insert(args_list, op.field)
+        table.insert(args_list, op.op)
+        table.insert(args_list, ops_operands)
+    end
+
+    return box.process(19, box.pack(format, unpack(args_list)))
 end
 
 function box.on_reload_configuration()
@@ -126,7 +201,9 @@ function box.on_reload_configuration()
         return box.select_limit(space.n, ino, offset, limit, ...)
     end
     space_mt.insert = function(space, ...) return box.insert(space.n, ...) end
-    space_mt.update = function(space, ...) return box.update(space.n, ...) end
+    space_mt.update = function(space, ops_list, ...)
+        return box.update(space.n, ops_list,...)
+    end
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.truncate = function(space)

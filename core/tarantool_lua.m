@@ -123,22 +123,6 @@ lua_tointeger64(struct lua_State *L, int idx)
 	return result;
 }
 
-/* Convert box.pack() format specifier to Tarantool
- * binary protocol UPDATE opcode
- */
-static char format_to_opcode(char format)
-{
-	switch (format) {
-	case '=': return 0;
-	case '+': return 1;
-	case '&': return 2;
-	case '^': return 3;
-	case '|': return 4;
-	case ':': return 5;
-	default: return format;
-	}
-}
-
 /**
  * To use Tarantool/Box binary protocol primitives from Lua, we
  * need a way to pack Lua variables into a binary representation.
@@ -182,6 +166,14 @@ lbox_pack(struct lua_State *L)
 		if (i > nargs)
 			luaL_error(L, "box.pack: argument count does not match the format");
 		switch (*format) {
+		case 'B':
+		case 'b':
+			/* signed and unsigned 8-bit integers */
+			u32buf = lua_tointeger(L, i);
+			if (u32buf > 0xff)
+				luaL_error(L, "box.pack: argument too big for 8-bit integer");
+			luaL_addchar(&b, (char) u32buf);
+			break;
 		/* signed and unsigned 32-bit integers */
 		case 'I':
 		case 'i':
@@ -223,16 +215,6 @@ lbox_pack(struct lua_State *L)
 			}
 			luaL_addvarint32(&b, size);
 			luaL_addlstring(&b, str, size);
-			break;
-		case '=': /* update tuple set foo=bar */
-		case '+': /* set field+=val */
-		case '&': /* set field&=val */
-		case '|': /* set field|=val */
-		case '^': /* set field^=val */
-		case ':': /* splice */
-			u32buf= (u32) lua_tointeger(L, i); /* field no */
-			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
-			luaL_addchar(&b, format_to_opcode(*format));
 			break;
 		default:
 			luaL_error(L, "box.pack: unsupported pack "

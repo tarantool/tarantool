@@ -99,7 +99,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 42 */_(ER_SPLICE,			2, "Field SPLICE error: %s") \
 	/* 43 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
 	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
-	/* 45 */_(ER_UNUSED45,			0, "Unused45") \
+	/* 45 */_(ER_AMBIGUOUS_KEY_SPECIFIED,	0, "Ambiguous specification of the key (may affect multiple values)") \
 	/* 46 */_(ER_UNUSED46,			0, "Unused46") \
 	/* 47 */_(ER_KEY_CARDINALITY,		2, "Key cardinality %d is greater than index cardinality %d") \
 	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \

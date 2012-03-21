@@ -115,7 +115,7 @@ struct key_def {
 - (size_t) size;
 - (struct box_tuple *) min;
 - (struct box_tuple *) max;
-- (struct box_tuple *) find: (void *) key_arg; /* only for unique lookups */
+- (struct box_tuple *) find: (void *) key_arg :(u32) key_cardinality_arg;
 - (struct box_tuple *) findByTuple: (struct box_tuple *) tuple;
 - (void) remove: (struct box_tuple *) tuple;
 - (void) replace: (struct box_tuple *) old_tuple :(struct box_tuple *) new_tuple;
