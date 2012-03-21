@@ -26,7 +26,12 @@ has _socket => (
 
 has _sent => (
     is  => 'ro',
-    default => sub { [] },
+    default => sub { {} },
+);
+
+has last_sync => (
+    is   => 'rw',
+    isa  => 'Int',
 );
 
 =head1 PUBLIC METHODS
@@ -47,11 +52,7 @@ sub fh { return $_[0]->_has_socket && $_[0]->_socket }
 
 sub Close {
     my ($self, $reason) = @_;
-    my $sent = $self->_sent;
-    while (my $args = shift @$sent) {
-        my ($sync, $callback) = @$args;
-        $self->_handle_error($sync, $callback, $reason);
-    }
+    $self->_handle_error(undef, undef, $reason);
 }
 
 sub send {
@@ -59,11 +60,15 @@ sub send {
     my $server = $self->server;
     my $sent = $self->_sent;
     my $ok = eval {
-        $sync = $self->_choose_sync() unless defined $sync;
+        if(defined $sync) {
+            die "Sync $sync already sent" if exists $sent->{$sync};
+        } else {
+            1 while exists $sent->{$sync = $self->_choose_sync()};
+        }
         $server->_send_started($sync, $msg, $payload);
 
         my $socket = $self->_socket;
-        unless (@$sent) {
+        unless (%$sent) {
             vec((my $rin = ''), fileno($socket), 1) = 1;
             if (select((my $rout = $rin), undef, undef, 0) > 0) {
                 if (sysread($socket, my $buf, 1)) {
@@ -96,12 +101,13 @@ sub send {
         }
         1;
     };
+    $self->last_sync($sync);
     if($ok) {
         if ($no_reply) {
             $callback->(undef, undef);
             $server->_recv_finished($sync, undef, undef);
         } else {
-            push @$sent, [$sync, $callback];
+            $sent->{$sync} = $callback;
         }
     }
     else {
@@ -115,10 +121,11 @@ sub recv_all {
     my $server = $self->server;
     my $sent = $self->_sent;
     my $dump_resp = $server->debug >= 6;
-    my $n = $opts{max} || @$sent;
-    while ($n-- and my $args = shift @$sent) {
-        my ($sync, $callback) = @$args;
+    my @sync = keys %$sent;
+    my $n = $opts{max} || @sync;
+    while ($n-- and %$sent) {
         my ($resp_msg, $resp_payload);
+        my ($sync,$callback);
         my $ok = eval {
             my $socket = $self->_socket;
             my $resp_header;
@@ -138,8 +145,9 @@ sub recv_all {
                 }
             }
             $server->_debug_dump('recv header: ', $resp_header) if $dump_resp;
-            ($resp_msg, my $resp_length, my $resp_sync) = $self->_unpack_header($resp_header);
-            die "Request and reply sync is different: $resp_sync != $sync" unless $resp_sync == $sync;
+            ($resp_msg, my $resp_length, $sync) = $self->_unpack_header($resp_header);
+            $callback = delete $sent->{$sync} or die "Reply sync $sync not found";
+            #die "Request and reply sync is different: $resp_sync != $sync" unless $resp_sync == $sync;
 
             $to_read = $resp_length;
             while( $to_read ) {
@@ -161,10 +169,11 @@ sub recv_all {
         };
         if($ok) {
             $server->_recv_finished($sync, $resp_msg, $resp_payload);
+            die "No Callback" unless $callback;
             $callback->($resp_msg, $resp_payload);
         }
         else {
-            $self->_handle_error($sync, $callback, $@);
+            $self->_handle_error(undef, undef, $@);
         }
     }
     return;
@@ -236,14 +245,15 @@ sub _handle_error {
         $self->_clear_socket();
     }
     $server->active(0);
-    my $sent = $self->_sent;
-    my @sent = splice @$sent, 0, scalar @$sent;
-    $server->_recv_finished($sync, undef, undef, $error, $errno);
-    $callback->(undef, undef, $error, $errno);
-    foreach my $args (@sent) {
-        my ($sync, $callback) = @$args;
+    if($sync && $callback) {
         $server->_recv_finished($sync, undef, undef, $error, $errno);
         $callback->(undef, undef, $error, $errno);
+    }
+    my $sent = $self->_sent;
+    foreach my $sync (keys %$sent) {
+        $server->_recv_finished($sync, undef, undef, $error, $errno);
+        $sent->{$sync}->(undef, undef, $error, $errno);
+        delete $sent->{$sync};
     }
     return
 }

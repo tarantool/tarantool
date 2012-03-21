@@ -230,6 +230,7 @@ has $_ => (
     is        => 'ro',
     isa       => 'CodeRef',
     predicate => "_has_$_",
+    required  => 1,
 ) for qw/onok onerror onretry/;
 
 has $_ => (
@@ -358,7 +359,8 @@ sub close {
 
 sub DEMOLISH {
     my ($self) = @_;
-    Carp::cluck "$$ FORGOTTEN $self" if $self->is_pending;
+    warn "$$ FORGOTTEN $self" if $self->is_pending;
+    #Carp::cluck "$$ FORGOTTEN $self" if $self->is_pending;
 }
 
 no Mouse;

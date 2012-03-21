@@ -79,7 +79,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.18;
+$VERSION = 0.0.19;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -964,6 +964,10 @@ sub Select {
 
         if ($param->{callback}) {
             return $param->{callback}->($r);
+        }
+
+        if ($param->{return_fh} && ref $param->{return_fh} eq 'CODE') {
+            return $param->{return_fh}->($r);
         }
 
         return unless $r;

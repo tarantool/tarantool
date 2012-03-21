@@ -251,7 +251,7 @@ sub send {
         my $cont = sub {
             $self->_recv_now(\%servers, max => $message->{continue}?1:0);
             $! = $errno;
-            return $message->{continue}->($data, $error, $errno) if $message->{continue};
+            return $message->{continue}->($data, $error, $errno) if ref $message->{continue} eq 'CODE';
             die $error if $error;
             return $data;
         };
