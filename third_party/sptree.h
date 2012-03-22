@@ -47,16 +47,16 @@ typedef struct sptree_node_pointers {
 } sptree_node_pointers;
 
 #define GET_SPNODE_LEFT(snp)        ( (snp)->left ) 
-#define SET_SPNODE_LEFT(snp, v)        (snp)->left = (v) 
-#define GET_SPNODE_RIGHT(snp)        ( (snp)->right )
+#define SET_SPNODE_LEFT(snp, v)     (snp)->left = (v) 
+#define GET_SPNODE_RIGHT(snp)       ( (snp)->right )
 #define SET_SPNODE_RIGHT(snp, v)    (snp)->right = (v)
 
 #endif /* SPTREE_NODE_SELF */
 
 #ifndef alpha
-#define    alpha    ((double)0.75)
+#define    alpha                       ((double)0.75)
 #endif
-#define    COUNTALPHA(size)     floor(log((double)(size))/log((double)1.0/alpha))
+#define    COUNTALPHA(size)            floor(log((double)(size))/log((double)1.0/alpha))
 
 #define    _GET_SPNODE_LEFT(n)         GET_SPNODE_LEFT( t->lrpointers + (n) )
 #define    _SET_SPNODE_LEFT(n, v)      SET_SPNODE_LEFT( t->lrpointers + (n), (v) )
@@ -94,7 +94,7 @@ typedef struct sptree_node_pointers {
  *   void sptree_NAME_iterator_free(sptree_NAME_iterator *i)
  *
  *   void* sptree_NAME_iterator_next(sptree_NAME_iterator *i)
- *   void* sptree_NAME_iterator_prev(sptree_NAME_iterator *i)
+ *   void* sptree_NAME_iterator_reverse_next(sptree_NAME_iterator *i)
  */
 
 #define SPTREE_DEF(name, realloc)                                                         \
@@ -736,7 +736,7 @@ sptree_##name##_iterator_next(sptree_##name##_iterator *i) {                    
 }                                                                                         \
                                                                                           \
 static inline void*                                                                       \
-sptree_##name##_iterator_prev(sptree_##name##_iterator *i) {                              \
+sptree_##name##_iterator_reverse_next(sptree_##name##_iterator *i) {                      \
     sptree_##name *t;                                                                     \
     spnode_t node, returnNode = SPNIL;                                                    \
                                                                                           \

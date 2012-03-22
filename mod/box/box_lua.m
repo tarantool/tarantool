@@ -372,6 +372,7 @@ void append_key_part(struct lua_State *L, int i,
  * Lua iterator over a Taratnool/Box index.
  *
  *	(iteration_state, tuple) = index.next(index, [iteration_state])
+ *	(iteration_state, tuple) = index.prev(index, [iteration_state])
  *
  * When [iteration_state] is absent or nil
  * returns a pointer to a new iterator and
@@ -388,7 +389,7 @@ void append_key_part(struct lua_State *L, int i,
  * offset.
  */
 static int
-lbox_index_next(struct lua_State *L)
+lbox_index_move(struct lua_State *L, enum iterator_type type)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
@@ -396,10 +397,11 @@ lbox_index_next(struct lua_State *L)
 	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
 		/*
 		 * If there is nothing or nil on top of the stack,
-		 * start iteration from the beginning.
+		 * start iteration from the beginning (ITER_FORWARD) or
+		 * end (ITER_REVERSE).
 		 */
 		it = [index allocIterator];
-		[index initIterator: it];
+		[index initIterator: it :type];
 		lbox_pushiterator(L, it);
 	} else if (argc > 1 || lua_type(L, 2) != LUA_TUSERDATA) {
 		/*
@@ -435,7 +437,7 @@ lbox_index_next(struct lua_State *L)
 				   "does not match index cardinality (%d)",
 				   cardinality, index->key_def->part_count);
 		it = [index allocIterator];
-		[index initIterator: it :key :cardinality];
+		[index initIterator: it :type :key :cardinality];
 		lbox_pushiterator(L, it);
 	} else { /* 1 item on the stack and it's a userdata. */
 		it = lua_checkiterator(L, 2);
@@ -446,12 +448,25 @@ lbox_index_next(struct lua_State *L)
 	return tuple ? 2 : 1;
 }
 
+static int
+lbox_index_next(struct lua_State *L)
+{
+	return lbox_index_move(L, ITER_FORWARD);
+}
+
+static int
+lbox_index_prev(struct lua_State *L)
+{
+	return lbox_index_move(L, ITER_REVERSE);
+}
+
 static const struct luaL_reg lbox_index_meta[] = {
 	{"__tostring", lbox_index_tostring},
 	{"__len", lbox_index_len},
 	{"min", lbox_index_min},
 	{"max", lbox_index_max},
 	{"next", lbox_index_next},
+	{"prev", lbox_index_prev},
 	{NULL, NULL}
 };
 
@@ -506,7 +521,6 @@ iov_add_lua_table(struct lua_State *L, int index)
 			iov_dup(field, field_len);
 			*tuple_len += field_len_len + field_len;
 			break;
-
 		case LUA_TCDATA:
 			field = tarantool_lua_tostring(L, -1);
 			field_len = strlen(field);

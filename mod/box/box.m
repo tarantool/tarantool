@@ -970,7 +970,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 		}
 
 		struct iterator *it = index->position;
-		[index initIterator: it :key :key_cardinality];
+		[index initIterator: it :ITER_FORWARD :key :key_cardinality];
 
 		while ((tuple = it->next_equal(it)) != NULL) {
 			if (tuple->flags & GHOST)
@@ -2142,7 +2142,7 @@ mod_snapshot(struct log_io_iter *i)
 		Index *pk = space[n].index[0];
 
 		struct iterator *it = pk->position;
-		[pk initIterator: it];
+		[pk initIterator: it :ITER_FORWARD];
 		while ((tuple = it->next(it))) {
 			snapshot_write_tuple(i, n, tuple);
 		}
