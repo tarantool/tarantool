@@ -293,6 +293,9 @@ rollback_replace(struct box_txn *txn)
  * Supported operations are: SET, ADD, bitwise AND, XOR and OR,
  * SPLICE and DELETE.
  *
+ * The typical case is when the operation count is much less
+ * than field count in a tuple.
+ *
  * To ensure minimal use of intermediate memory, UPDATE is
  * performed in a streaming fashion: all operations in the request
  * are sorted by field number. The resulting tuple length is
@@ -612,11 +615,19 @@ static void
 init_update_op_delete(struct update_cmd *cmd,
 		      struct update_field *field, struct update_op *op)
 {
-	/* Either this is the last op on this field  or next op is SET. */
-	if (op + 1 < cmd->op_end && op[1].field_no == op->field_no &&
-	    op[1].opcode != UPDATE_OP_SET && op[1].opcode != UPDATE_OP_DELETE)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, op->field_no);
-
+	/*
+	 * Either DELETE is the last op on a field or next op
+	 * on this field is SET.
+	 */
+	if (op + 1 < cmd->op_end) {
+		struct update_op *next_op = op + 1;
+		if (next_op->field_no == op->field_no &&
+		    next_op->opcode != UPDATE_OP_SET &&
+		    next_op->opcode != UPDATE_OP_DELETE) {
+			tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
+				  op->field_no);
+		}
+	}
 	/* Skip all ops on this field, including this one. */
 	field->first = op + 1;
 	op->new_field_len = 0;
