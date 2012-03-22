@@ -842,8 +842,6 @@ tree_iterator_free(struct iterator *iterator)
                         :(void *) key
 			:(int) part_count
 {
-	//assert(iterator->next == tree_iterator_next);
-
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	it->base.type = type;
@@ -855,8 +853,7 @@ tree_iterator_free(struct iterator *iterator)
 		it->base.next = tree_iterator_next;
 		it->base.next_equal = tree_iterator_next_equal;
 		sptree_index_iterator_init_set(&tree, &it->iter, &it->key_data);
-	} else
-	if (type == ITER_REVERSE) {
+	} else if (type == ITER_REVERSE) {
 		it->base.next = tree_iterator_reverse_next;
 		it->base.next_equal = tree_iterator_reverse_next_equal;
 		sptree_index_iterator_reverse_init_set(&tree, &it->iter, &it->key_data);
