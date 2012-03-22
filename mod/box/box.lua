@@ -41,6 +41,15 @@ function box.select_range(sno, ino, limit, ...)
 end
 
 --
+-- Select a range of tuples in a given namespace via a given
+-- index in reverse order. If key is NULL, starts from the end, otherwise
+-- starts from the key.
+--
+function box.select_reverse_range(sno, ino, limit, ...)
+    return box.space[tonumber(sno)].index[tonumber(ino)]:select_reverse_range(tonumber(limit), ...)
+end
+
+--
 -- delete can be done only by the primary key, whose
 -- index is always 0. It doesn't accept compound keys
 --
@@ -116,6 +125,16 @@ function box.on_reload_configuration()
         end
         return unpack(range)
     end
+    index_mt.select_reverse_range = function(index, limit, ...)
+        local range = {}
+        for k, v in index.idx.prev, index.idx, ... do
+            if #range >= limit then
+                break
+            end
+            table.insert(range, v)
+        end
+        return unpack(range)
+    end
     --
     local space_mt = {}
     space_mt.len = function(space) return space.index[0]:len() end
@@ -123,6 +142,9 @@ function box.on_reload_configuration()
     space_mt.select = function(space, ...) return box.select(space.n, ...) end
     space_mt.select_range = function(space, ino, limit, ...)
         return space.index[ino]:select_range(limit, ...)
+    end
+    space_mt.select_reverse_range = function(space, ino, limit, ...)
+        return space.index[ino]:select_reverse_range(limit, ...)
     end
     space_mt.select_limit = function(space, ino, offset, limit, ...)
         return box.select_limit(space.n, ino, offset, limit, ...)
