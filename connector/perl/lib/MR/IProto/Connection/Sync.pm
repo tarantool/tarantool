@@ -21,6 +21,7 @@ has _socket => (
     is  => 'ro',
     isa => 'IO::Socket::INET',
     predicate => '_has_socket',
+    clearer   => '_clear_socket',
     lazy_build => 1,
 );
 
@@ -32,6 +33,12 @@ has _sent => (
 has last_sync => (
     is   => 'rw',
     isa  => 'Int',
+);
+
+has last_error => (
+    is      => 'rw',
+    isa     => 'Str',
+    default => '',
 );
 
 =head1 PUBLIC METHODS
@@ -101,6 +108,7 @@ sub send {
         }
         1;
     };
+    my $err = $@;
     $self->last_sync($sync);
     if($ok) {
         if ($no_reply) {
@@ -111,7 +119,7 @@ sub send {
         }
     }
     else {
-        $self->_handle_error($sync, $callback, $@);
+        $self->_handle_error($sync, $callback, $err);
     }
     return $ok;
 }
@@ -238,6 +246,7 @@ sub _handle_error {
     } elsif ($error =~ /^(.+?) at \S+ line \d+/s) {
         $error = $1;
     }
+    $self->last_error($error);
     my $server = $self->server;
     $server->_debug("error: $error");
     if($self->_has_socket()) {
@@ -245,17 +254,18 @@ sub _handle_error {
         $self->_clear_socket();
     }
     $server->active(0);
+    my $sent = $self->_sent;
     if($sync && $callback) {
         $server->_recv_finished($sync, undef, undef, $error, $errno);
         $callback->(undef, undef, $error, $errno);
+        delete $sent->{$sync};
     }
-    my $sent = $self->_sent;
     foreach my $sync (keys %$sent) {
         $server->_recv_finished($sync, undef, undef, $error, $errno);
         $sent->{$sync}->(undef, undef, $error, $errno);
-        delete $sent->{$sync};
     }
-    return
+    undef %$sent;
+    return;
 }
 
 =head1 SEE ALSO
