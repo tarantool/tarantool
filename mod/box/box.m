@@ -784,8 +784,8 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 
 	update_field_init(cmd, field, op, &old_data, old_field_count);
 	do {
-		struct update_op *op_prev = op - 1;
-		struct update_op *op_next = op + 1;
+		struct update_op *prev_op = op - 1;
+		struct update_op *next_op = op + 1;
 
 		/*
 		 * Various checks for added fields:
@@ -796,7 +796,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 			 * previous field exists.
 			 */
 			int prev_field_no = MAX(old_field_count,
-						op_prev->field_no + 1);
+						prev_op->field_no + 1);
 			if (op->field_no > prev_field_no)
 				tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 					  op->field_no);
@@ -806,7 +806,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 			 * which does not exist.
 			 */
 			if (op->opcode != UPDATE_OP_SET &&
-			    op_prev->field_no != op->field_no)
+			    prev_op->field_no != op->field_no)
 				tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 					  op->field_no);
 		}
@@ -815,7 +815,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 
 		bool next_field = false;
 		int skip_count;
-		if (op_next >= cmd->op_end) {
+		if (next_op >= cmd->op_end) {
 			/* copy whole tail: from last opearation to */
 			skip_count = old_field_count - op->field_no - 1;
 
@@ -825,19 +825,19 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 				skip_count += 1;
 
 			next_field = true;
-		} else if (op->field_no < op_next->field_no ||
+		} else if (op->field_no < next_op->field_no ||
 			   op->opcode == UPDATE_OP_INSERT_BEFORE ||
-			   op_next->opcode == UPDATE_OP_INSERT_AFTER) {
+			   next_op->opcode == UPDATE_OP_INSERT_AFTER) {
 			/* skip field in the middle of current operation and
 			   next */
-			skip_count = MIN(op_next->field_no, old_field_count)
+			skip_count = MIN(next_op->field_no, old_field_count)
 				- op->field_no - 1;
 
 			if (op->opcode == UPDATE_OP_INSERT_BEFORE)
 				/* we should copy field which before inserting
 				   a new field */
 				skip_count += 1;
-			if (op_next->opcode == UPDATE_OP_INSERT_AFTER)
+			if (next_op->opcode == UPDATE_OP_INSERT_AFTER)
 				/* we should copy field whitch after inserting
 				   a new field */
 				skip_count += 1;
@@ -851,7 +851,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 		/* Jumping over a gap. */
 		update_field_skip_fields(field, skip_count, &old_data);
 
-		field->end = op_next;
+		field->end = next_op;
 		if (field->first < field->end) {
 			/* Field is not deleted. */
 			cmd->new_tuple_len += varint32_sizeof(field->new_len);
@@ -861,8 +861,8 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 
 		/* Move to the next field. */
 		field++;
-		if (op_next < cmd->op_end) {
-			update_field_init(cmd, field, op_next,  &old_data,
+		if (next_op < cmd->op_end) {
+			update_field_init(cmd, field, next_op,  &old_data,
 					  old_field_count);
 		}
 
