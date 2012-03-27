@@ -844,6 +844,9 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 	} while (++op < cmd->op_end);
 
 	cmd->field_end = field;
+
+	if (cmd->new_tuple_len == 0)
+		tnt_raise(ClientError, :ER_TUPLE_IS_EMPTY);
 }
 
 static void
