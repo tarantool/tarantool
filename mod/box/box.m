@@ -426,7 +426,8 @@ update_op_cmp(const void *op1_ptr, const void *op2_ptr)
 	if (op1_field_no > op2_field_no)
 		return 1;
 
-	/* field number the same, sorting it by  */
+	/* field number the same, sorting it by operation address (it's required
+	   to save original sequence operations under same field) */
 	if (op1->arg.set.value < op2->arg.set.value)
 		return -1;
 	if (op1->arg.set.value > op2->arg.set.value)
@@ -795,11 +796,12 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 					  op->field_no);
 
 			/*
-			 * We can not do any op except SET on a field
+			 * We can not do any op except SET or INSERT (before) on a field
 			 * which does not exist.
 			 */
-			if (op->opcode != UPDATE_OP_SET &&
-			    prev_op->field_no != op->field_no)
+			if (prev_op->field_no != op->field_no &&
+			    (op->opcode != UPDATE_OP_SET &&
+			     op->opcode != UPDATE_OP_INSERT))
 				tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 					  op->field_no);
 		}

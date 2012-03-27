@@ -845,15 +845,26 @@ test_insert_field()
 	update(7, stream);
 	tnt_stream_free(stream);
 
-	printf("# double insert before\n");
+	printf("# double insert before set\n");
 	stream = tnt_buf(NULL);
 	update_set_i32(stream, 5, 14);
+	update_insert_i32(stream, 5, 12);
+	update_insert_i32(stream, 5, 13);
 	update(7, stream);
 	tnt_stream_free(stream);
 
+	printf("# insert before next to last field\n");
 	stream = tnt_buf(NULL);
-	update_insert_i32(stream, 5, 12);
-	update_insert_i32(stream, 5, 13);
+	update_insert_i32(stream, 8, 15);
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	printf("# insert before next to last field\n");
+	stream = tnt_buf(NULL);
+	update_set_i32(stream, 9, 17);
+	update_insert_i32(stream, 9, 16);
+	update_set_i32(stream, 10, 19);
+	update_insert_i32(stream, 10, 18);
 	update(7, stream);
 	tnt_stream_free(stream);
 

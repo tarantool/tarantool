@@ -205,11 +205,12 @@ update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 # insert a new field before last field
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven')
-# double insert before
-update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven', 14 (0x0000000e))
+# double insert before set
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven', 12 (0x0000000c), 13 (0x0000000d), 14 (0x0000000e))
+# insert before next to last field
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven', 12 (0x0000000c), 13 (0x0000000d), 14 (0x0000000e), 15 (0x0000000f))
 # insert second tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (0 (0x00000000), 'one', 11 (0x0000000b))
