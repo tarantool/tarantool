@@ -415,15 +415,11 @@ update_op_cmp(const void *op1_ptr, const void *op2_ptr)
 	if (op1_field_no > op2_field_no)
 		return 1;
 
-	if (op1->opcode == UPDATE_OP_INSERT_BEFORE)
+	if (op1->opcode == UPDATE_OP_INSERT)
 		op1_field_no -= 1;
-	else if (op1->opcode == UPDATE_OP_INSERT_AFTER)
-		op1_field_no += 1;
 
-	if (op2->opcode == UPDATE_OP_INSERT_BEFORE)
+	if (op2->opcode == UPDATE_OP_INSERT)
 		op2_field_no -= 1;
-	else if (op2->opcode == UPDATE_OP_INSERT_AFTER)
-		op2_field_no += 1;
 
 	if (op1_field_no < op2_field_no)
 		return -1;
@@ -624,7 +620,6 @@ static struct update_op_meta update_op_meta[UPDATE_OP_MAX + 1] = {
 	{ init_update_op_splice, (do_op_func) do_update_op_splice, false },
 	{ init_update_op_delete, (do_op_func) NULL, true },
 	{ init_update_op_insert, (do_op_func) do_update_op_insert, true },
-	{ init_update_op_insert, (do_op_func) do_update_op_insert, true },
 	{ init_update_op_none, (do_op_func) do_update_op_none, false },
 	{ init_update_op_error, (do_op_func) NULL, true }
 };
@@ -697,8 +692,7 @@ update_field_init(struct update_cmd *cmd, struct update_field *field,
 		return;
 	}
 
-	if (op->opcode == UPDATE_OP_INSERT_BEFORE ||
-	    op->opcode == UPDATE_OP_INSERT_AFTER) {
+	if (op->opcode == UPDATE_OP_INSERT) {
 		/* insert operaion always creates a new field */
 		field->new_len = 0;
 		field->old = "";
@@ -755,8 +749,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 	/*
 	 * 2. Take care of the old tuple head.
 	 */
-	if (cmd->op->field_no != 0 ||
-	    cmd->op->opcode == UPDATE_OP_INSERT_AFTER) {
+	if (cmd->op->field_no != 0) {
 		/*
 		 * We need to copy part of the old tuple to the
 		 * new one.
@@ -819,26 +812,21 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 			/* copy whole tail: from last opearation to */
 			skip_count = old_field_count - op->field_no - 1;
 
-			if (op->opcode == UPDATE_OP_INSERT_BEFORE)
+			if (op->opcode == UPDATE_OP_INSERT)
 				/* we should copy field which before
 				   inserting a new field */
 				skip_count += 1;
 
 			next_field = true;
 		} else if (op->field_no < next_op->field_no ||
-			   op->opcode == UPDATE_OP_INSERT_BEFORE ||
-			   next_op->opcode == UPDATE_OP_INSERT_AFTER) {
+			   op->opcode == UPDATE_OP_INSERT) {
 			/* skip field in the middle of current operation and
 			   next */
 			skip_count = MIN(next_op->field_no, old_field_count)
 				- op->field_no - 1;
 
-			if (op->opcode == UPDATE_OP_INSERT_BEFORE)
+			if (op->opcode == UPDATE_OP_INSERT)
 				/* we should copy field which before inserting
-				   a new field */
-				skip_count += 1;
-			if (next_op->opcode == UPDATE_OP_INSERT_AFTER)
-				/* we should copy field whitch after inserting
 				   a new field */
 				skip_count += 1;
 

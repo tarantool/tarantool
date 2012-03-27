@@ -169,17 +169,10 @@ tnt_update_delete(struct tnt_stream *s, uint32_t field)
 }
 
 ssize_t
-tnt_update_insert_before(struct tnt_stream *s, uint32_t field,
+tnt_update_insert(struct tnt_stream *s, uint32_t field,
 			 char *data, uint32_t size)
 {
-	return tnt_update_op(s, field, TNT_UPDATE_INSERT_BEFORE, data, size);
-}
-
-ssize_t
-tnt_update_insert_after(struct tnt_stream *s, uint32_t field,
-			char *data, uint32_t size)
-{
-	return tnt_update_op(s, field, TNT_UPDATE_INSERT_AFTER, data, size);
+	return tnt_update_op(s, field, TNT_UPDATE_INSERT, data, size);
 }
 
 

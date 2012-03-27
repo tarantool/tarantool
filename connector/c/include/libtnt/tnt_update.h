@@ -34,8 +34,7 @@ enum {
 	TNT_UPDATE_OR,
 	TNT_UPDATE_SPLICE,
 	TNT_UPDATE_DELETE,
-	TNT_UPDATE_INSERT_BEFORE,
-	TNT_UPDATE_INSERT_AFTER,
+	TNT_UPDATE_INSERT,
 };
 
 ssize_t
@@ -55,12 +54,8 @@ ssize_t
 tnt_update_delete(struct tnt_stream *s, uint32_t field);
 
 ssize_t
-tnt_update_insert_before(struct tnt_stream *s, uint32_t field,
-			 char *data, uint32_t size);
-
-ssize_t
-tnt_update_insert_after(struct tnt_stream *s, uint32_t field,
-			char *data, uint32_t size);
+tnt_update_insert(struct tnt_stream *s, uint32_t field,
+		  char *data, uint32_t size);
 
 ssize_t
 tnt_update(struct tnt_stream *s, uint32_t ns, uint32_t flags,
