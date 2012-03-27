@@ -860,7 +860,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 			 */
 			int prev_field_no = MAX(old_field_count,
 						prev_op->field_no + 1);
-			if (op->field_no > prev_field_no)
+		if (op->field_no > prev_field_no)
 				tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 					  op->field_no);
 
@@ -877,19 +877,19 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 		op->meta->init_op(cmd, field, op);
 		field->new_len = op->new_field_len;
 
-		bool next_field = false;
 		int skip_count;
 		if (next_op >= cmd->op_end) {
 			/* copy whole tail: from last opearation to */
 			skip_count = old_field_count - op->field_no - 1;
-			next_field = true;
 		} else if (op->field_no < next_op->field_no ||
 			   op->opcode == UPDATE_OP_INSERT) {
 			/* skip field in the middle of current operation and
 			   next */
 			skip_count = MIN(next_op->field_no, old_field_count)
 				- op->field_no - 1;
-			next_field = true;
+		} else {
+			/* continue, we have more operaions for same field */
+			continue;
 		}
 
 		if (op->opcode == UPDATE_OP_INSERT)
@@ -897,9 +897,6 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 			   this field doesn't "real" opearions, so to
 			   don't miss this field we should copy it */
 			skip_count += 1;
-
-		if (!next_field)
-			continue;
 
 		/* Jumping over a gap. */
 		update_field_skip_fields(field, skip_count, &old_data);
