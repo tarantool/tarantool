@@ -882,12 +882,6 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 		if (next_op >= cmd->op_end) {
 			/* copy whole tail: from last opearation to */
 			skip_count = old_field_count - op->field_no - 1;
-
-			if (op->opcode == UPDATE_OP_INSERT)
-				/* we should copy field which before
-				   inserting a new field */
-				skip_count += 1;
-
 			next_field = true;
 		} else if (op->field_no < next_op->field_no ||
 			   op->opcode == UPDATE_OP_INSERT) {
@@ -895,14 +889,14 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 			   next */
 			skip_count = MIN(next_op->field_no, old_field_count)
 				- op->field_no - 1;
-
-			if (op->opcode == UPDATE_OP_INSERT)
-				/* we should copy field which before inserting
-				   a new field */
-				skip_count += 1;
-
 			next_field = true;
 		}
+
+		if (op->opcode == UPDATE_OP_INSERT)
+			/* This is last operation under this field, but
+			   this field doesn't "real" opearions, so to
+			   don't miss this field we should copy it */
+			skip_count += 1;
 
 		if (!next_field)
 			continue;
