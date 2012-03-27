@@ -59,7 +59,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/*  6 */_(ER_TUPLE_IS_LOCKED,		1, "Tuple is locked") \
 	/*  7 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
 	/*  8 */_(ER_BAD_INTEGRITY,		2, "Bad graph integrity") \
-	/*  9 */_(ER_UNUSED9,			0, "Unused9") \
+	/*  9 */_(ER_INJECTION,			2, "Error injection '%s'") \
 	/* 10 */_(ER_UNSUPPORTED,		2, "Unsupported") \
 		/* silverproxy error codes */ \
 	/* 11 */_(ER_RESERVED11,		0, "Reserved11") \
@@ -77,7 +77,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 23 */_(ER_RESERVED23,		0, "Reserved23") \
 		/* end of silverproxy error codes */ \
 	/* 24 */_(ER_CANNOT_REGISTER,		1, "Can't register new user") \
-	/* 25 */_(ER_UNUSED25,			0, "Unused25") \
+	/* 25 */_(ER_TUPLE_IS_EMPTY,		0, "UPDATE error: the new tuple has no fields") \
 	/* 26 */_(ER_CANNOT_INIT_ALERT_ID,	1, "Can't generate alert id") \
 	/* 27 */_(ER_CANNOT_DEL,		2, "Can't del node") \
 	/* 28 */_(ER_USER_NOT_REGISTERED,	2, "User isn't registered") \
@@ -101,7 +101,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
 	/* 45 */_(ER_UNUSED45,			0, "Unused45") \
 	/* 46 */_(ER_UNUSED46,			0, "Unused46") \
-	/* 47 */_(ER_UNUSED47,			0, "Unused47") \
+	/* 47 */_(ER_KEY_CARDINALITY,		2, "Key cardinality %d is greater than index cardinality %d") \
 	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist") \
 	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure '%.*s' is not defined") \

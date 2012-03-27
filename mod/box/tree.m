@@ -323,7 +323,8 @@ fold_with_key_parts(struct key_def *key_def, struct key_data *key_data)
 
 	memset(parts, 0, sizeof(parts[0]) * key_data->part_count);
 
-	for (int part = 0; part < key_data->part_count; ++part) {
+	int part_count = MIN(key_def->part_count, key_data->part_count);
+	for (int part = 0; part < part_count; ++part) {
 		u8 *data = part_data;
 		u32 len = load_varint32((void**) &data);
 

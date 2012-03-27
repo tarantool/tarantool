@@ -56,6 +56,12 @@ of existing codes.</para>
   </varlistentry>
 
   <varlistentry>
+    <term xml:id="ER_KEY_CARDINALITY" xreflabel="ER_KEY_CARDINALITY">ER_KEY_CARDINALITY</term>
+    <listitem><para>Key cardinality is greater than index cardinality
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
     <term xml:id="ER_NO_SUCH_SPACE" xreflabel="ER_NO_SUCH_SPACE">ER_NO_SUCH_SPACE</term>
     <listitem><para>Attempt to access a space that is not
     configured (doesn't exist).

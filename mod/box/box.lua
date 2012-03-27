@@ -1,3 +1,20 @@
+
+--
+--
+--
+function box.select_limit(space, index, offset, limit, ...)
+    local key = {...}
+    return box.process(17,
+                       box.pack('iiiiii'..string.rep('p', #key),
+                                 space,
+                                 index,
+                                 offset,
+                                 limit,
+                                 1, -- key count
+                                 #key, -- key cardinality
+                                 unpack(key)))
+end
+
 --
 --
 --
@@ -105,6 +122,9 @@ function box.on_reload_configuration()
     space_mt.select_range = function(space, ino, limit, ...)
         return space.index[ino]:select_range(limit, ...)
     end
+    space_mt.select_limit = function(space, ino, offset, limit, ...)
+        return box.select_limit(space.n, ino, offset, limit, ...)
+    end
     space_mt.insert = function(space, ...) return box.insert(space.n, ...) end
     space_mt.update = function(space, ...) return box.update(space.n, ...) end
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
@@ -136,6 +156,8 @@ if initfile ~= nil then
     io.close(initfile)
     dofile("init.lua")
 end
+-- 64bit operations support, etc.
+ffi = require("ffi")
 -- security: nullify some of the most serious os.* holes
 --
 os.execute = nil

@@ -252,6 +252,22 @@ fiber_yield(void)
 }
 
 /**
+ * Return true if the current fiber is a callee of fiber f,
+ * false otherwise.
+ */
+bool
+fiber_is_caller(struct fiber *f)
+{
+	/* 'Unwinding' the fiber stack. */
+	for (struct fiber **sp_ptr = sp; sp_ptr > call_stack; --sp_ptr) {
+		if (f == *sp_ptr)
+			return true;
+	}
+	return false;
+}
+
+
+/**
  * @note: this is a cancellation point (@sa fiber_testcancel())
  */
 
@@ -835,6 +851,13 @@ fiber_connect(struct sockaddr_in *addr)
 
 	if (set_nonblock(fiber->fd) < 0)
 		goto error;
+
+	/* set SO_KEEPALIVE flag */
+	int keepalive = 1;
+	if (setsockopt(fiber->fd, SOL_SOCKET, SO_KEEPALIVE,
+		       &keepalive, sizeof(int)) != 0)
+		/* just print error, it's not critical error */
+		say_syserror("setsockopt()");
 
 	if (connect(fiber->fd, (struct sockaddr *)addr, sizeof(*addr)) < 0) {
 

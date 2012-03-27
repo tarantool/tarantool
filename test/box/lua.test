@@ -147,6 +147,7 @@ exec admin "lua box.fiber.sleep(0.01)"
 exec admin "lua box.fiber.sleep(0.0001)"
 exec admin "lua box.fiber.sleep('hello')"
 exec admin "lua box.fiber.sleep(box, 0.001)"
+exec admin "lua box.fiber.cancel(box.fiber.self())"
 exec admin "lua f = box.fiber.self()"
 exec admin "lua old_id = f:id()"
 exec admin "lua box.fiber.cancel(f)"
@@ -237,6 +238,7 @@ exec admin "lua box.space[0]:insert(4, 'world')"
 exec admin "lua box.space[0]:insert(5, 'hello world')"
 exec sql "call box.crossjoin('0', '0', '10000')"
 exec admin "lua box.space[0]:truncate()"
+exec admin "lua box.crossjoin = nil"
 print """
 # A test case for Bug#901674
 # No way to inspect exceptions from Box in Lua
@@ -250,3 +252,48 @@ print """
 # Lua provides access to os.execute()
 """
 exec admin "lua os.execute('ls')"
+
+
+print """
+#
+# box.fiber test (create, resume, yield, status)
+#
+"""
+
+box_fiber_lua = os.path.abspath("box/box_fiber.lua")
+# don't log the path name
+sys.stdout.push_filter("lua dofile(.*)", "lua dofile(...)")
+exec admin "lua dofile('{0}')".format(box_fiber_lua)
+sys.stdout.pop_filter()
+
+print """
+# test box.fiber.status functions: invalid arguments
+"""
+exec admin "lua box.fiber.status(1)"
+exec admin "lua box.fiber.status('fafa-gaga')"
+exec admin "lua box.fiber.status(nil)"
+
+print """
+# run fiber's test
+"""
+exec admin "lua box_fiber_run_test()"
+# Testing 64bit
+exec admin "lua tonumber64(123)"
+exec admin "lua tonumber64('123')"
+exec admin "lua type(tonumber64('123')) == 'cdata'"
+exec admin "lua tonumber64('9223372036854775807') == tonumber64('9223372036854775807')"
+exec admin "lua tonumber64('9223372036854775807') - tonumber64('9223372036854775800')"
+exec admin "lua tonumber64('18446744073709551615') == tonumber64('18446744073709551615')"
+exec admin "lua tonumber64('18446744073709551615') + 1"
+exec admin "lua tonumber64(-1)"
+exec admin "lua tonumber64('184467440737095516155')"
+exec admin "lua string.byte(box.pack('p', tonumber64(123)))"
+# test delete field
+exec admin "lua box.space[0]:truncate()"
+exec sql "call box.insert(0, 'tes1', 'tes2', 'tes3', 'tes4', 'tes5')"
+exec sql "call box.update(0, 'tes1', '#p', 0, '')"
+exec sql "call box.update(0, 'tes2', '#p', 0, '')"
+exec sql "call box.update(0, 'tes3', '#p', 0, '')"
+exec sql "call box.update(0, 'tes4', '#p', 0, '')"
+exec admin "lua box.update(0, 'tes5', '#p', 0, '')"
+exec admin "lua box.space[0]:truncate()"

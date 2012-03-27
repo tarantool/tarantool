@@ -29,10 +29,16 @@
  * SUCH DAMAGE.
  */
 #include "tarantool.h"
-/* use a full path to avoid clashes with system lua */
-#include "third_party/luajit/src/lua.h"
-#include "third_party/luajit/src/lauxlib.h"
-#include "third_party/luajit/src/lualib.h"
+
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+
+#include "lj_obj.h"
+#include "lj_ctype.h"
+#include "lj_cdata.h"
+#include "lj_cconv.h"
+#include "lj_state.h"
 
 #include "pickle.h"
 #include "fiber.h"
@@ -85,6 +91,38 @@ luaL_addvarint32(luaL_Buffer *b, u32 u32)
 	luaL_addlstring(b, tbuf.data, tbuf.size);
 }
 
+static uint64_t
+lua_tointeger64(struct lua_State *L, int idx)
+{
+	uint64_t result = 0;
+	switch (lua_type(L, idx)) {
+	case LUA_TNUMBER:
+		result = lua_tointeger(L, idx);
+		break;
+	case LUA_TSTRING: {
+		const char *arg = luaL_checkstring(L, idx);
+		char *arge;
+		errno = 0;
+		result = strtoull(arg, &arge, 10);
+		if (errno != 0 || arge == arg)
+			luaL_error(L, "lua_tointeger64: bad argument");
+		break;
+	}
+	case LUA_TCDATA: {
+		if (lua_type(L, idx) != LUA_TCDATA)
+			luaL_error(L, "lua_tointeger64: cdata expected");
+		GCcdata *cd = cdataV(L->base + (idx - 1));
+		if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64)
+			luaL_error(L, "lua_tointeger64: unsupported cdata type");
+		result = *(uint64_t*)cdataptr(cd);
+		break;
+	}
+	default:
+		luaL_error(L, "lua_tointeger64: unsupported type");
+	}
+	return result;
+}
+
 /* Convert box.pack() format specifier to Tarantool
  * binary protocol UPDATE opcode
  */
@@ -97,6 +135,7 @@ static char format_to_opcode(char format)
 	case '^': return 3;
 	case '|': return 4;
 	case ':': return 5;
+	case '#': return 6;
 	default: return format;
 	}
 }
@@ -134,6 +173,7 @@ lbox_pack(struct lua_State *L)
 	int i = 2; /* first arg comes second */
 	int nargs = lua_gettop(L);
 	u32 u32buf;
+	u64 u64buf;
 	size_t size;
 	const char *str;
 
@@ -151,6 +191,13 @@ lbox_pack(struct lua_State *L)
 			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
 			break;
 		}
+		case 'L':
+		case 'l':
+		{
+			u64buf = lua_tointeger64(L, i);
+			luaL_addlstring(&b, (char *) &u64buf, sizeof(u64));
+			break;
+		}
 		/* Perl 'pack' BER-encoded integer */
 		case 'w':
 			luaL_addvarint32(&b, lua_tointeger(L, i));
@@ -164,9 +211,14 @@ lbox_pack(struct lua_State *L)
 		case 'P':
 		case 'p':
 			if (lua_type(L, i) == LUA_TNUMBER) {
-				u32buf= (u32) lua_tointeger(L, i);
+				u32buf = (u32) lua_tointeger(L, i);
 				str = (char *) &u32buf;
 				size = sizeof(u32);
+			} else
+			if (lua_type(L, i) == LUA_TCDATA) {
+				u64buf = lua_tointeger64(L, i);
+				str = (char *) &u64buf;
+				size = sizeof(u64);
 			} else {
 				str = luaL_checklstring(L, i, &size);
 			}
@@ -179,6 +231,7 @@ lbox_pack(struct lua_State *L)
 		case '|': /* set field|=val */
 		case '^': /* set field^=val */
 		case ':': /* splice */
+		case '#': /* splice */
 			u32buf= (u32) lua_tointeger(L, i); /* field no */
 			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
 			luaL_addchar(&b, format_to_opcode(*format));
@@ -191,6 +244,29 @@ lbox_pack(struct lua_State *L)
 		format++;
 	}
 	luaL_pushresult(&b);
+	return 1;
+}
+
+static GCcdata*
+luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
+{
+	CTState *cts = ctype_cts(L);
+	CType *ct = ctype_raw(cts, id);
+	CTSize sz;
+	lj_ctype_info(cts, id, &sz);
+	GCcdata *cd = lj_cdata_new(cts, id, bits);
+	TValue *o = L->top;
+	setcdataV(L, o, cd);
+	lj_cconv_ct_init(cts, ct, sz, cdataptr(cd), o, 0);
+	incr_top(L);
+	return cd;
+}
+
+static int
+luaL_pushnumber64(struct lua_State *L, uint64_t val)
+{
+	GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
+	*(uint64_t*)cdataptr(cd) = val;
 	return 1;
 }
 
@@ -215,6 +291,16 @@ lbox_unpack(struct lua_State *L)
 			u32buf = * (u32 *) str;
 			lua_pushnumber(L, u32buf);
 			break;
+		case 'l':
+		{
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u64))
+				luaL_error(L, "box.unpack('%c'): got %d bytes (expected: 8)", *format, (int) size);
+			GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
+			uint64_t *u64buf = (uint64_t*)cdataptr(cd);
+			*u64buf = *(u64*)str;
+			break;
+		}
 		default:
 			luaL_error(L, "box.unpack: unsupported pack "
 				   "format specifier '%c'", *format);
@@ -518,6 +604,40 @@ lbox_fiber_yield(struct lua_State *L)
 }
 
 /**
+ * Get fiber status.
+ * This follows the rules of Lua coroutine.status() function:
+ * Returns the status of fibier, as a string:
+ * - "running", if the fiber is running (that is, it called status);
+ * - "suspended", if the fiber is suspended in a call to yield(),
+ *    or if it has not started running yet;
+ * - "normal" if the fiber is active but not running (that is,
+ *   it has resumed another fiber);
+ * - "dead" if the fiber has finished its body function, or if it
+ *   has stopped with an error.
+ */
+static int
+lbox_fiber_status(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	const char *status;
+	if (f->fid == 0) {
+		/* This fiber is dead. */
+		status = "dead";
+	} else if (f == fiber) {
+		/* The fiber is the current running fiber. */
+		status = "running";
+	} else if (fiber_is_caller(f)) {
+		/* The fiber is current fiber's caller. */
+		status = "normal";
+	} else {
+		/* None of the above: must be suspended. */
+		status = "suspended";
+	}
+	lua_pushstring(L, status);
+	return 1;
+}
+
+/**
  * Detach the current fiber.
  */
 static int
@@ -615,6 +735,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"create", lbox_fiber_create},
 	{"resume", lbox_fiber_resume},
 	{"yield", lbox_fiber_yield},
+	{"status", lbox_fiber_status},
 	{"detach", lbox_fiber_detach},
 	{NULL, NULL}
 };
@@ -646,8 +767,14 @@ static void
 tarantool_lua_printstack_yaml(struct lua_State *L, struct tbuf *out)
 {
 	int top = lua_gettop(L);
-	for (int i = 1; i <= top; i++)
-		tbuf_printf(out, " - %s\r\n", tarantool_lua_tostring(L, i));
+	for (int i = 1; i <= top; i++) {
+		if (lua_type(L, i) == LUA_TCDATA) {
+			const char *sz = tarantool_lua_tostring(L, i);
+			int len = strlen(sz);
+			tbuf_printf(out, " - %-.*s\r\n", len - 3, sz);
+		} else
+			tbuf_printf(out, " - %s\r\n", tarantool_lua_tostring(L, i));
+	}
 }
 
 /*
@@ -658,8 +785,14 @@ static void
 tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
 {
 	int top = lua_gettop(L);
-	for (int i = 1; i <= top; i++)
-		tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
+	for (int i = 1; i <= top; i++) {
+		if (lua_type(L, i) == LUA_TCDATA) {
+			const char *sz = tarantool_lua_tostring(L, i);
+			int len = strlen(sz);
+			tbuf_printf(out, "%-.*s\r\n", len - 3, sz);
+		} else
+			tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
+	}
 }
 
 /**
@@ -730,6 +863,16 @@ lbox_pcall(struct lua_State *L)
 	return lua_gettop(L);
 }
 
+/*
+ * Convert lua number or string to lua cdata 64bit number.
+ */
+static int
+lbox_tonumber64(struct lua_State *L)
+{
+	uint64_t result = lua_tointeger64(L, -1);
+	return luaL_pushnumber64(L, result);
+}
+
 /** A helper to register a single type metatable. */
 void
 tarantool_lua_register_type(struct lua_State *L, const char *type_name,
@@ -763,6 +906,7 @@ tarantool_lua_init()
 	tarantool_lua_register_type(L, fiberlib_name, lbox_fiber_meta);
 	lua_register(L, "print", lbox_print);
 	lua_register(L, "pcall", lbox_pcall);
+	lua_register(L, "tonumber64", lbox_tonumber64);
 	L = mod_lua_init(L);
 	lua_settop(L, 0); /* clear possible left-overs of init */
 	return L;

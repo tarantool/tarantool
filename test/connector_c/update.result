@@ -8,6 +8,9 @@ update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 # set field
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'field's new value', '', 1130450022 (0x43614c66))
+# test set primary key
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(2 (0x00000002), 'field's new value', '', 1130450022 (0x43614c66))
 <<< test simple set done
 >>> test long set
 # insert tuple
@@ -81,11 +84,11 @@ freedom to the galaxy....', 765239998 (0x2d9ca2be))
 # test set to not an exist field
 update fields: respond ok (op: 19, reqid: 0, code: 13826, count: 0)
 <<< test append done
->>> test simple arith
+>>> test 32-bit int arith
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 2 (0x00000002), 0 (0x00000000), 0 (0x00000000))
-# test simple add
+# test add
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 18 (0x00000012), 0 (0x00000000), 0 (0x00000000))
 # test overflow add
@@ -94,16 +97,42 @@ update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 # test underflow add
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 17 (0x00000011), 0 (0x00000000), 0 (0x00000000))
-# test simple or
+# test or
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(1 (0x00000001), 17 (0x00000011), 47823 (0x0000bacf), 64188 (0x0000fabc))
-# test simple xor
+(1 (0x00000001), 17 (0x00000011), -1160791345 (0xbacfbacf), -88278340 (0xfabcfabc))
+# test xor
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(1 (0x00000001), 17 (0x00000011), 17712 (0x00004530), 1347 (0x00000543))
-# test simple and
+(1 (0x00000001), 17 (0x00000011), 1160791344 (0x45304530), 88278339 (0x05430543))
+# test and
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(1 (0x00000001), 17 (0x00000011), 16432 (0x00004030), 1283 (0x00000503))
-<<< test simple arith done
+(1 (0x00000001), 17 (0x00000011), 1076903984 (0x40304030), 84083971 (0x05030503))
+<<< test 32-bit arith done
+>>> test 64-bit int arith
+# insert tuple
+insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
+(1 (0x00000001), 2 (0x0000000000000002), 0 (0x0000000000000000), 0 (0x0000000000000000))
+# test add
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(1 (0x00000001), 18 (0x0000000000000012), 0 (0x0000000000000000), 0 (0x0000000000000000))
+# test overflow add
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(1 (0x00000001), -9223372036854775791 (0x8000000000000011), 0 (0x0000000000000000), 0 (0x0000000000000000))
+# test underflow add
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(1 (0x00000001), 17 (0x0000000000000011), 0 (0x0000000000000000), 0 (0x0000000000000000))
+# test or
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(1 (0x00000001), 17 (0x0000000000000011), -4985560861120677169 (0xbacfbacfbacfbacf), -379152579038479684 (0xfabcfabcfabcfabc))
+# test xor
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(1 (0x00000001), 17 (0x0000000000000011), 4985560861120677168 (0x4530453045304530), 379152579038479683 (0x0543054305430543))
+# test and
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(1 (0x00000001), 17 (0x0000000000000011), 4625267393289011248 (0x4030403040304030), 361137905646896387 (0x0503050305030503))
+# test casting 32-bit operand to 64-bit
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(1 (0x00000001), 33 (0x0000000000000021), 4625267393289011248 (0x4030403040304030), 361137905646896387 (0x0503050305030503))
+<<< test 64-bit arith done
 >>> test multi splice
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
@@ -165,6 +194,23 @@ Princess Leia races home aboard her
 starship, custodian of the stolen plans
 that can save her people and restore
 freedom to the galaxy....', 'third')
+# test splice to long and set to short
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(1 (0x00000001), 'first', 'short name', 'A long time ago, in a galaxy far, far away...
+It is a period of civil war. Rebel
+spaceships, striking from a hidden
+base, have won their first victory
+against the evil Galactic Empire.
+During the battle, Rebel spies managed
+to steal secret plans to the Empire's
+ultimate weapon, the Death Star, an
+armored space station with enough
+power to destroy an entire planet.
+Pursued by the Empire's sinister agents,
+Princess Leia races home aboard her
+starship, custodian of the stolen plans
+that can save her people and restore
+freedom to the galaxy....')
 <<< test set and splice done
 >>> test delete field
 # insert tuple
@@ -223,3 +269,14 @@ update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 # insert before invalid field number
 update fields: respond ok (op: 19, reqid: 0, code: 13826, count: 0)
 <<< insert field test done
+>>> test boundaty argumets values
+# insert tuple
+insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
+(0 (0x00000000), 1 (0x00000001))
+# test: try to do update w/o operations
+update fields: respond ok (op: 19, reqid: 0, code: 514, count: 0)
+# test: update w/ maximal allowed opearions count
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
+(0 (0x00000000), 129 (0x00000081))
+# test: update w/ grater than maximal allowed opearions count
+update fields: respond ok (op: 19, reqid: 0, code: 514, count: 0)

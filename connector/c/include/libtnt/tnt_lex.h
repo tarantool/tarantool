@@ -52,7 +52,8 @@ enum {
 	TNT_TK_SELECT,
 	TNT_TK_LIMIT,
 	TNT_TK_CALL,
-	TNT_TK_OR
+	TNT_TK_OR,
+	TNT_TK_AND
 };
 
 /* token object */

@@ -1,0 +1,15 @@
+# encoding: tarantool
+#
+import sys
+# clear statistics:
+server.stop()
+server.deploy()
+
+exec admin "show injections"
+exec admin "set injection some-injection on"
+exec sql "select * from t0 where k0 = 222444"
+exec admin "set injection ERRINJ_TESTING on"
+exec sql "select * from t0 where k0 = 222444"
+exec admin "set injection ERRINJ_TESTING off"
+
+# vim: syntax=python

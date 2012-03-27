@@ -74,6 +74,10 @@
 - (id) init: (const char *)msg;
 @end
 
+/** ER_INJECTION wrapper. */
+@interface ErrorInjection: LoggedError
+- (id) init: (const char *)msg;
+@end
 
 /**
  * A helper macro to add __FILE__ and __LINE__ information to

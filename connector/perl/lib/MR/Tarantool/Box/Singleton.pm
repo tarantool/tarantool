@@ -322,17 +322,12 @@ sub _new_instance {
     $config->{servers}                     ||= $class->SERVER;
 
     $config->{param}->{name}               ||= $class;
-
-    $config->{param}->{spaces}             ||= my $sp = $class->SPACES;
-    $config->{param}->{default_space}      ||= my $defsp = @$sp == 1 ? 0 : $class->DEFAULT_SPACE;
-
-    $sp->[$defsp]->{fields} ||= [ $class->FIELDS ] if $class->can('FIELDS');
+    $config->{param}->{spaces}             ||= $class->SPACES;
+    $config->{param}->{default_fields}     ||= [ $class->FIELDS ] if $class->can('FIELDS');
 
     $config->{param}->{raise}                = $class->RAISE unless defined $config->{param}->{raise};
-
     $config->{param}->{timeout}            ||= $class->TIMEOUT;
     $config->{param}->{select_timeout}     ||= $class->SELECT_TIMEOUT;
-
     $config->{param}->{debug}              ||= $class->DEBUG;
     $config->{param}->{ipdebug}            ||= $class->IPDEBUG;
 
@@ -341,16 +336,18 @@ sub _new_instance {
     $config->{param}->{softretry}          ||= $class->SOFT_RETRY;
     $config->{param}->{retry_delay}        ||= $class->RETRY_DELAY;
 
-    $config->{param}->{fields}             ||= [ $class->FIELDS ];
-
     my $replicas = delete $config->{replicas} || $class->REPLICAS || [];
     $replicas = [ split /,/, $replicas ] unless ref $replicas eq 'ARRAY';
+
+    $class->CheckConfig($config);
 
     return bless {
         box      => $class->MR_TARANTOOL_BOX_CLASS->new({ servers => $config->{servers}, %{$config->{param}} }),
         replicas => [ map { $class->MR_TARANTOOL_BOX_CLASS->new({ servers => $_, %{$config->{param}} }) } shuffle @$replicas ],
     }, $class;
 }
+
+sub CheckConfig {}
 
 =pod
 

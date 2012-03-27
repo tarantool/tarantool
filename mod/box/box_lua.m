@@ -31,10 +31,15 @@
 #include "box_lua.h"
 #include "tarantool.h"
 #include "box.h"
-/* use a full path to avoid clashes with system Lua */
-#include "third_party/luajit/src/lua.h"
-#include "third_party/luajit/src/lauxlib.h"
-#include "third_party/luajit/src/lualib.h"
+
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+
+#include "lj_obj.h"
+#include "lj_ctype.h"
+#include "lj_cdata.h"
+#include "lj_cconv.h"
 
 #include "pickle.h"
 #include "tuple.h"
@@ -381,10 +386,6 @@ void append_key_part(struct lua_State *L, int i,
  * the iterator with one or several Lua scalars
  * (numbers, strings) and start iteration from an
  * offset.
- *
- * @todo/FIXME: Currently we always store iteration
- * state within index. This limits the total
- * amount of active iterators to 1.
  */
 static int
 lbox_index_next(struct lua_State *L)
@@ -505,6 +506,19 @@ iov_add_lua_table(struct lua_State *L, int index)
 			iov_dup(field, field_len);
 			*tuple_len += field_len_len + field_len;
 			break;
+
+		case LUA_TCDATA:
+			field = tarantool_lua_tostring(L, -1);
+			field_len = strlen(field);
+			if (field_len)
+				field_len -= 3; /* chopping of ULL prefix */
+			field_len_len =
+				save_varint32(field_len_buf,
+					      field_len) - field_len_buf;
+			iov_dup(field_len_buf, field_len_len);
+			iov_dup(field, field_len);
+			*tuple_len += field_len_len + field_len;
+			break;
 		default:
 			tnt_raise(ClientError, :ER_PROC_RET,
 				  lua_typename(L, lua_type(L, -1)));
@@ -536,9 +550,12 @@ void iov_add_ret(struct lua_State *L, int index)
 	}
 	case LUA_TNIL:
 	case LUA_TBOOLEAN:
+	case LUA_TCDATA:
 	{
 		const char *str = tarantool_lua_tostring(L, index);
 		size_t len = strlen(str);
+		if (type == LUA_TCDATA && len)
+			len -= 3; /* chopping of ULL prefix */
 		tuple = tuple_alloc(len + varint32_sizeof(len));
 		tuple->cardinality = 1;
 		memcpy(save_varint32(tuple->data, len), str, len);
@@ -650,11 +667,13 @@ static int lbox_process(lua_State *L)
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
+	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	struct box_txn *old_txn = txn_enter_lua(L);
 	@try {
 		rw_callback(op, &req);
 	} @finally {
 		fiber->mod_data.txn = old_txn;
+		ptruncate(fiber->gc_pool, allocated_size);
 	}
 	return lua_gettop(L) - top;
 }

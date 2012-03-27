@@ -42,12 +42,12 @@
 #include <tarantool.h>
 #include <tbuf.h>
 #include <util.h>
+#include <errinj.h>
 
 #include <cfg/tarantool_box_cfg.h>
 #include <mod/box/tuple.h>
 #include "memcached.h"
 #include "box_lua.h"
-#include "tree.h"
 
 static void box_process_ro(u32 op, struct tbuf *request_data);
 static void box_process_rw(u32 op, struct tbuf *request_data);
@@ -294,6 +294,9 @@ rollback_replace(struct box_txn *txn)
  * Supported operations are: SET, ADD, bitwise AND, XOR and OR,
  * SPLICE and DELETE.
  *
+ * The typical case is when the operation count is much less
+ * than field count in a tuple.
+ *
  * To ensure minimal use of intermediate memory, UPDATE is
  * performed in a streaming fashion: all operations in the request
  * are sorted by field number. The resulting tuple length is
@@ -321,7 +324,11 @@ struct op_set_arg {
 
 /** Argument of ADD, AND, XOR, OR operations. */
 struct op_arith_arg {
-	i32 i32_val;
+	u32 val_size;
+	union {
+		i32 i32_val;
+		i64 i64_val;
+	};
 };
 
 /** Argument of SPLICE. */
@@ -445,25 +452,53 @@ do_update_op_set(struct op_set_arg *arg, void *in __attribute__((unused)),
 static void
 do_update_op_add(struct op_arith_arg *arg, void *in, void *out)
 {
-	*(i32 *)out = *(i32 *)in + arg->i32_val;
+	switch (arg->val_size) {
+	case sizeof(i32):
+		*(i32 *)out = *(i32 *)in + arg->i32_val;
+		break;
+	case sizeof(i64):
+		*(i64 *)out = *(i64 *)in + arg->i64_val;
+		break;
+	}
 }
 
 static void
 do_update_op_and(struct op_arith_arg *arg, void *in, void *out)
 {
-	*(i32 *)out = *(i32 *)in & arg->i32_val;
+	switch (arg->val_size) {
+	case sizeof(i32):
+		*(i32 *)out = *(i32 *)in & arg->i32_val;
+		break;
+	case sizeof(i64):
+		*(i64 *)out = *(i64 *)in & arg->i64_val;
+		break;
+	}
 }
 
 static void
 do_update_op_xor(struct op_arith_arg *arg, void *in, void *out)
 {
-	*(i32 *)out = *(i32 *)in ^ arg->i32_val;
+	switch (arg->val_size) {
+	case sizeof(i32):
+		*(i32 *)out = *(i32 *)in ^ arg->i32_val;
+		break;
+	case sizeof(i64):
+		*(i64 *)out = *(i64 *)in ^ arg->i64_val;
+		break;
+	}
 }
 
 static void
 do_update_op_or(struct op_arith_arg *arg, void *in, void *out)
 {
-	*(i32 *)out = *(i32 *)in | arg->i32_val;
+	switch (arg->val_size) {
+	case sizeof(i32):
+		*(i32 *)out = *(i32 *)in | arg->i32_val;
+		break;
+	case sizeof(i64):
+		*(i64 *)out = *(i64 *)in | arg->i64_val;
+		break;
+	}
 }
 
 static void
@@ -502,15 +537,41 @@ static void
 init_update_op_arith(struct update_cmd *cmd __attribute__((unused)),
 		     struct update_field *field, struct update_op *op)
 {
-	/* Check the argument. */
-	if (field->new_len != sizeof(i32))
-		tnt_raise(ClientError, :ER_FIELD_TYPE, "32-bit int");
+	struct op_arith_arg *arg = &op->arg.arith;
 
-	if (op->arg.set.length != sizeof(i32))
-		tnt_raise(ClientError, :ER_TYPE_MISMATCH, "32-bit int");
-	/* Parse the operands. */
-	op->arg.arith.i32_val = *(i32 *)op->arg.set.value;
-	op->new_field_len = sizeof(i32);
+	switch (field->new_len) {
+	case sizeof(i32):
+		/* 32-bit operation */
+
+		/* Check the operand type. */
+		if (op->arg.set.length != sizeof(i32))
+			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
+				  "32-bit int");
+
+		arg->i32_val = *(i32 *)op->arg.set.value;
+		break;
+	case sizeof(i64):
+		/* 64-bit operation */
+		switch (op->arg.set.length) {
+		case sizeof(i32):
+			/* 32-bit operand */
+			/* cast 32-bit operand to 64-bit */
+			arg->i64_val = *(i32 *)op->arg.set.value;
+			break;
+		case sizeof(i64):
+			/* 64-bit operand */
+			arg->i64_val = *(i64 *)op->arg.set.value;
+			break;
+		default:
+			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
+				  "32-bit or 64-bit int");
+		}
+		break;
+	default:
+		tnt_raise(ClientError, :ER_FIELD_TYPE,
+			  "32-bit or 64-bit int");
+	}
+	arg->val_size = op->new_field_len = field->new_len;
 }
 
 static void
@@ -579,11 +640,19 @@ static void
 init_update_op_delete(struct update_cmd *cmd,
 		      struct update_field *field, struct update_op *op)
 {
-	/* Either this is the last op on this field  or next op is SET. */
-	if (op + 1 < cmd->op_end && op[1].field_no == op->field_no &&
-	    op[1].opcode != UPDATE_OP_SET && op[1].opcode != UPDATE_OP_DELETE)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, op->field_no);
-
+	/*
+	 * Either DELETE is the last op on a field or next op
+	 * on this field is SET.
+	 */
+	if (op + 1 < cmd->op_end) {
+		struct update_op *next_op = op + 1;
+		if (next_op->field_no == op->field_no &&
+		    next_op->opcode != UPDATE_OP_SET &&
+		    next_op->opcode != UPDATE_OP_DELETE) {
+			tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
+				  op->field_no);
+		}
+	}
 	/* Skip all ops on this field, including this one. */
 	field->first = op + 1;
 	op->new_field_len = 0;
@@ -859,6 +928,9 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 	} while (++op < cmd->op_end);
 
 	cmd->field_end = field;
+
+	if (cmd->new_tuple_len == 0)
+		tnt_raise(ClientError, :ER_TUPLE_IS_EMPTY);
 }
 
 static void
@@ -982,6 +1054,12 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 
 		void *key = NULL;
 		if (key_cardinality) {
+			if (key_cardinality > index->key_def->part_count) {
+				tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+					  key_cardinality,
+					  index->key_def->part_count);
+			}
+
 			key = read_field(data);
 
 			/* advance remaining fields of a key */
@@ -1255,6 +1333,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 
 	case SELECT:
 	{
+		ERROR_INJECT(ERRINJ_TESTING);
 		txn_assign_n(txn, data);
 		u32 i = read_u32(data);
 		u32 offset = read_u32(data);
@@ -1618,9 +1697,7 @@ build_indexes(void)
 		Index *pk = space[n].index[0];
 		for (int i = 1; i < space[n].key_count; i++) {
 			Index *index = space[n].index[i];
-			if ([index isKindOf: [TreeIndex class]]) {
-				[(TreeIndex *) index build: pk];
-			}
+			[index build: pk];
 		}
 
 		say_info("Space %"PRIu32": done", n);

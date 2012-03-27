@@ -269,7 +269,7 @@ palloc(struct palloc_pool *restrict pool, size_t size)
 		ptr = palloc_slow_path(pool, rz_size);
 
 	assert(poisoned(ptr + PALLOC_REDZONE, size) == NULL);
-	VALGRIND_MEMPOOL_ALLOC(pool, ptr + PALLOC_REDZONE, size);
+	VALGRIND_MAKE_MEM_DEFINED(ptr + PALLOC_REDZONE, size);
 
 	return ptr + PALLOC_REDZONE;
 }
@@ -293,25 +293,65 @@ palloca(struct palloc_pool *pool, size_t size, size_t align)
 	return (void *)TYPEALIGN(align, (uintptr_t)ptr);
 }
 
+
+static inline void
+chunk_free(struct chunk *chunk)
+{
+	if (chunk->size <= palloc_greatest_size()) {
+		chunk->free = chunk->size - sizeof(struct chunk);
+		chunk->brk = (void *)chunk + sizeof(struct chunk);
+		SLIST_INSERT_HEAD(&chunk->class->chunks, chunk, free_link);
+		poison_chunk(chunk);
+	} else {
+		free(chunk);
+	}
+}
+
+/**
+ * Release all memory down to new_size; new_size has to be previously
+ * obtained by calling palloc_allocated().
+ */
+void
+ptruncate(struct palloc_pool *pool, size_t new_size)
+{
+	assert(new_size <= pool->allocated);
+
+	ssize_t cut_size = pool->allocated - new_size;
+	struct chunk *chunk = SLIST_FIRST(&pool->chunks);
+
+	for (chunk = SLIST_FIRST(&pool->chunks); chunk;
+	     chunk = SLIST_FIRST(&pool->chunks)) {
+
+		size_t chunk_used = (chunk->size - chunk->free -
+				     sizeof(struct chunk));
+		if (chunk_used > cut_size) {
+			/* This is the last chunk to trim. */
+			chunk->brk -= cut_size;
+			chunk->free += cut_size;
+			VALGRIND_MAKE_MEM_NOACCESS(chunk->brk, cut_size);
+			cut_size = 0;
+			break;
+		}
+		cut_size -= chunk_used;
+		/* Remove the entire chunk. */
+		SLIST_REMOVE_HEAD(&pool->chunks, busy_link);
+		chunk_free(chunk);
+	}
+	assert(cut_size == 0);
+	pool->allocated = new_size;
+}
+
 void
 prelease(struct palloc_pool *pool)
 {
 	struct chunk *chunk, *next_chunk;
 
-	for (chunk = SLIST_FIRST(&pool->chunks); chunk != NULL; chunk = next_chunk) {
+	for (chunk = SLIST_FIRST(&pool->chunks); chunk; chunk = next_chunk) {
 		next_chunk = SLIST_NEXT(chunk, busy_link);
-		if (chunk->size <= palloc_greatest_size()) {
-			chunk->free = chunk->size - sizeof(struct chunk);
-			chunk->brk = (void *)chunk + sizeof(struct chunk);
-			SLIST_INSERT_HEAD(&chunk->class->chunks, chunk, free_link);
-			poison_chunk(chunk);
-		} else {
-			free(chunk);
-		}
+		chunk_free(chunk);
 	}
 
 	SLIST_INIT(&pool->chunks);
-	VALGRIND_MEMPOOL_TRIM(pool, NULL, 0);
 	pool->allocated = 0;
 }
 
@@ -331,7 +371,6 @@ palloc_create_pool(const char *name)
 	palloc_set_name(pool, name);
 	SLIST_INIT(&pool->chunks);
 	SLIST_INSERT_HEAD(&pools, pool, link);
-	VALGRIND_CREATE_MEMPOOL(pool, PALLOC_REDZONE, 0);
 	return pool;
 }
 
@@ -340,7 +379,6 @@ palloc_destroy_pool(struct palloc_pool *pool)
 {
 	SLIST_REMOVE(&pools, pool, palloc_pool, link);
 	prelease(pool);
-	VALGRIND_DESTROY_MEMPOOL(pool);
 	free(pool);
 }
 

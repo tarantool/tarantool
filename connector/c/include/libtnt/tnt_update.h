@@ -42,6 +42,14 @@ tnt_update_arith(struct tnt_stream *s, uint32_t field,
 		 uint8_t op, uint32_t value);
 
 ssize_t
+tnt_update_arith_i32(struct tnt_stream *s, uint32_t field,
+		     uint8_t op, uint32_t value);
+
+ssize_t
+tnt_update_arith_i64(struct tnt_stream *s, uint32_t field,
+		     uint8_t op, uint64_t value);
+
+ssize_t
 tnt_update_assign(struct tnt_stream *s, uint32_t field,
 		  char *data, uint32_t size);
 
