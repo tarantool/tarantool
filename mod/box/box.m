@@ -379,29 +379,19 @@ struct update_op {
  * A descriptor of one changed field.
  */
 struct update_field {
-	/**
-	 * Pointer to first operation on this field.
-	 */
+	/** Pointer to the first operation on this field. */
 	struct update_op *first;
-	/**
-	 * points after last operation on
-	 * this field.
-	 */
+	/** Points after the last operation on this field. */
 	struct update_op *end;
-	/**
-	 * points at start of field *data* in old
-	 * tuple.
-	 */
+	/** Points at start of field *data* in the old tuple. */
 	void *old;
-	/** final length of the new field. */
+	/** The final length of the new field. */
 	u32 new_len;
-	/**
-	 *  (end of the old field).
-	 */
+	/** End of the old field. */
 	void *tail;
-	/** copy old data after this field */
+	/** Copy old data after this field. */
 	u32 tail_len;
-	/** how many fields we're copying. */
+	/** How many fields we're copying. */
 	int tail_field_count;
 };
 
@@ -428,40 +418,34 @@ update_op_cmp(const void *op1_ptr, const void *op2_ptr)
 	const struct update_op *op1 = op1_ptr;
 	const struct update_op *op2 = op2_ptr;
 
-	/* compare operations by field number */
+	/* Compare operations by field number. */
 	i32 result = (i32) op1->field_no - (i32) op2->field_no;
 	if (result)
 		return result;
-
 	/*
-	 * INSERT operations should create a new field before field_no, so that
-	 * the operations don't affect this field. Therefore insert field
-	 * should be follow before another operations under this field.
+	 * INSERT operations create a new field
+	 * at index field_no, shifting other fields to the right.
+	 * Operations on field_no are done on the field
+	 * in the old tuple and do not affect the inserted
+	 * field. Therefore, field insertion should be
+	 * done first, followed by all other operations
+	 * on the given field_no.
 	 */
-	if ((op1->opcode == UPDATE_OP_INSERT) ^
-	    (op2->opcode == UPDATE_OP_INSERT)) {
-		/* Only one operation is INSERT */
-		if (op1->opcode == UPDATE_OP_INSERT)
-			/* op1 is INSERT, so it should be first */
-			return -1;
-		else
-			/* op2 is INSERT, so it should be first */
-			return 1;
-	}
-
+	result = (op2->opcode == UPDATE_OP_INSERT) -
+		(op1->opcode == UPDATE_OP_INSERT);
+	if (result)
+		return result;
 	/*
-	 * In this case probably two cases:
-	 *   1) both operations is INSERT;
-	 *   2) both operations isn't INSERT.
-	 * 
-	 * We should save original sequence operations under same field, so
-	 * sorting it by operation address.
+	 * We end up here in two cases:
+	 *   1) both operations are INSERTs,
+	 *   2) both operations are not INSERTs.
+	 *
+	 * Preserve the original order of operations on the same
+	 * field. To do it, order them by their address in the
+	 * UPDATE request.
 	 */
-	if (op1->arg.set.value < op2->arg.set.value)
-		return -1;
-	if (op1->arg.set.value > op2->arg.set.value)
-		return 1;
-	return 0;
+	result = op1->arg.set.value - op2->arg.set.value;
+	return result;
 }
 
 static void
@@ -774,17 +758,16 @@ update_field_init(struct update_field *field, struct update_op *op,
 
 	if (op->field_no >= old_field_count ||
 	    op->opcode == UPDATE_OP_INSERT) {
-		/* insert operaion always creates a new field */
+		/* Insert operation always creates a new field. */
 		field->new_len = 0;
 		field->old = ""; /* Beyond old fields. */
 		/*
 		 * Old tuple must have at least one field and we
 		 * always have an op on the first field.
 		 */
-		assert(op->field_no > 0);
+		assert(op->field_no > 0 || op->opcode == UPDATE_OP_INSERT);
 		return;
 	}
-
 	/*
 	 * Find out the new field length and
 	 * shift the data pointer.
@@ -802,8 +785,10 @@ static void
 update_field_skip_fields(struct update_field *field, i32 skip_count,
 			 void **data)
 {
-	if (skip_count < 0)
+	if (skip_count < 0) {
+		/* Happens when there are fields added by SET. */
 		skip_count = 0;
+	}
 
 	field->tail_field_count = skip_count;
 
@@ -875,12 +860,11 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 			 */
 			int prev_field_no = MAX(old_field_count,
 						prev_op->field_no + 1);
-		if (op->field_no > prev_field_no)
+			if (op->field_no > prev_field_no)
 				tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 					  op->field_no);
-
 			/*
-			 * We can not do any op except SET or INSERT (before)
+			 * We can not do any op except SET or INSERT
 			 * on a field which does not exist.
 			 */
 			if (prev_op->field_no != op->field_no &&
@@ -891,28 +875,36 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 		}
 		op->meta->init_op(cmd, field, op);
 		field->new_len = op->new_field_len;
-
+		/*
+		 * Find out how many fields to copy to the
+		 * new tuple intact once this op is done.
+		 */
 		int skip_count;
 		if (next_op >= cmd->op_end) {
-			/* copy whole tail: from last opearation to */
+			/* This is the last op in the request. */
 			skip_count = old_field_count - op->field_no - 1;
 		} else if (op->field_no < next_op->field_no ||
 			   op->opcode == UPDATE_OP_INSERT) {
-			/* skip field in the middle of current operation and
-			   next */
-			skip_count = MIN(next_op->field_no, old_field_count)
-				- op->field_no - 1;
+			/*
+			 * This is the last op on this field. UPDATE_OP_INSERT
+			 * creates a new field, so it falls
+			 * into this category. Find out length of
+			 * the gap between the op->field_no and
+			 * next and copy the gap.
+			 */
+			skip_count = MIN(next_op->field_no, old_field_count) -
+				     op->field_no - 1;
 		} else {
-			/* continue, we have more operaions for same field */
+			/* Continue, we have more operations on this field */
 			continue;
 		}
-
-		if (op->opcode == UPDATE_OP_INSERT)
-			/* This is last operation under this field, but
-			   this field doesn't "real" opearions, so to
-			   don't miss this field we should copy it */
-			skip_count += 1;
-
+		if (op->opcode == UPDATE_OP_INSERT) {
+			/*
+			 * We're adding a new field, take this
+			 * into account.
+			 */
+			skip_count++;
+		}
 		/* Jumping over a gap. */
 		update_field_skip_fields(field, skip_count, &old_data);
 
