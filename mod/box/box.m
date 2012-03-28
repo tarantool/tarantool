@@ -379,15 +379,30 @@ struct update_op {
  * A descriptor of one changed field.
  */
 struct update_field {
-	struct update_op *first; /** first operation on this field */
-	struct update_op *end;   /** points after last operation on
-				     this field. */
-	void *old;	         /** points at start of field *data* in old
-				     tuple. */
-	void *old_end;		 /** end of the old field. */
-	u32 new_len;             /** final length of the new field. */
-	u32 tail_len;		 /** copy old data after this field */
-	int tail_field_count;    /** how many fields we're copying. */
+	/**
+	 * Pointer to first operation on this field.
+	 */
+	struct update_op *first;
+	/**
+	 * points after last operation on
+	 * this field.
+	 */
+	struct update_op *end;
+	/**
+	 * points at start of field *data* in old
+	 * tuple.
+	 */
+	void *old;
+	/** final length of the new field. */
+	u32 new_len;
+	/**
+	 *  (end of the old field).
+	 */
+	void *tail;
+	/** copy old data after this field */
+	u32 tail_len;
+	/** how many fields we're copying. */
+	int tail_field_count;
 };
 
 /** UPDATE command context. */
@@ -413,28 +428,35 @@ update_op_cmp(const void *op1_ptr, const void *op2_ptr)
 	const struct update_op *op1 = op1_ptr;
 	const struct update_op *op2 = op2_ptr;
 
-	i32 op1_field_no = op1->field_no;
-	i32 op2_field_no = op2->field_no;
+	/* compare operations by field number */
+	i32 result = (i32) op1->field_no - (i32) op2->field_no;
+	if (result)
+		return result;
 
-	/* compare by field number */
-	if (op1_field_no < op2_field_no)
-		return -1;
-	if (op1_field_no > op2_field_no)
-		return 1;
+	/*
+	 * INSERT operations should create a new field before field_no, so that
+	 * the operations don't affect this field. Therefore insert field
+	 * should be follow before another operations under this field.
+	 */
+	if ((op1->opcode == UPDATE_OP_INSERT) ^
+	    (op2->opcode == UPDATE_OP_INSERT)) {
+		/* Only one operation is INSERT */
+		if (op1->opcode == UPDATE_OP_INSERT)
+			/* op1 is INSERT, so it should be first */
+			return -1;
+		else
+			/* op2 is INSERT, so it should be first */
+			return 1;
+	}
 
-	if (op1->opcode == UPDATE_OP_INSERT)
-		op1_field_no -= 1;
-
-	if (op2->opcode == UPDATE_OP_INSERT)
-		op2_field_no -= 1;
-
-	if (op1_field_no < op2_field_no)
-		return -1;
-	if (op1_field_no > op2_field_no)
-		return 1;
-
-	/* field number the same, sorting it by operation address (it's required
-	   to save original sequence operations under same field) */
+	/*
+	 * In this case probably two cases:
+	 *   1) both operations is INSERT;
+	 *   2) both operations isn't INSERT.
+	 * 
+	 * We should save original sequence operations under same field, so
+	 * sorting it by operation address.
+	 */
 	if (op1->arg.set.value < op2->arg.set.value)
 		return -1;
 	if (op1->arg.set.value > op2->arg.set.value)
@@ -745,28 +767,21 @@ parse_update_cmd(struct tbuf *data)
 }
 
 static void
-update_field_init(struct update_cmd *cmd, struct update_field *field,
-		  struct update_op *op, void **old_data, int old_field_count)
+update_field_init(struct update_field *field, struct update_op *op,
+		  void **old_data, int old_field_count)
 {
 	field->first = op;
 
-	if (op->field_no >= old_field_count) {
+	if (op->field_no >= old_field_count ||
+	    op->opcode == UPDATE_OP_INSERT) {
+		/* insert operaion always creates a new field */
 		field->new_len = 0;
 		field->old = ""; /* Beyond old fields. */
-		field->old_end = field->old;
 		/*
 		 * Old tuple must have at least one field and we
 		 * always have an op on the first field.
 		 */
-		assert(op->field_no > 0 && op > cmd->op);
-		return;
-	}
-
-	if (op->opcode == UPDATE_OP_INSERT) {
-		/* insert operaion always creates a new field */
-		field->new_len = 0;
-		field->old = "";
-		field->old_end = *old_data;
+		assert(op->field_no > 0);
 		return;
 	}
 
@@ -777,7 +792,6 @@ update_field_init(struct update_cmd *cmd, struct update_field *field,
 	field->new_len = load_varint32(old_data);
 	field->old = *old_data;
 	*old_data += field->new_len;
-	field->old_end = *old_data;
 }
 
 /**
@@ -785,20 +799,21 @@ update_field_init(struct update_cmd *cmd, struct update_field *field,
  * @return   length of skipped data
  */
 static void
-update_field_skip_fields(struct update_field *field, i32 skip_count, void **data)
+update_field_skip_fields(struct update_field *field, i32 skip_count,
+			 void **data)
 {
 	if (skip_count < 0)
 		skip_count = 0;
 
 	field->tail_field_count = skip_count;
 
-	void *begin = *data;
+	field->tail = *data;
 	while (skip_count-- > 0) {
 		u32 len = load_varint32(data);
 		*data += len;
 	}
 
-	field->tail_len = *data - begin;
+	field->tail_len = *data - field->tail;
 }
 
 
@@ -845,7 +860,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 	void *old_data = txn->old_tuple->data;
 	int old_field_count = txn->old_tuple->cardinality;
 
-	update_field_init(cmd, field, op, &old_data, old_field_count);
+	update_field_init(field, op, &old_data, old_field_count);
 	do {
 		struct update_op *prev_op = op - 1;
 		struct update_op *next_op = op + 1;
@@ -865,8 +880,8 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 					  op->field_no);
 
 			/*
-			 * We can not do any op except SET or INSERT (before) on a field
-			 * which does not exist.
+			 * We can not do any op except SET or INSERT (before)
+			 * on a field which does not exist.
 			 */
 			if (prev_op->field_no != op->field_no &&
 			    (op->opcode != UPDATE_OP_SET &&
@@ -912,7 +927,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 		/* Move to the next field. */
 		field++;
 		if (next_op < cmd->op_end) {
-			update_field_init(cmd, field, next_op,  &old_data,
+			update_field_init(field, next_op,  &old_data,
 					  old_field_count);
 		}
 
@@ -951,7 +966,8 @@ do_update(struct box_txn *txn, struct update_cmd *cmd)
 			 *   (can happen when a big SET is then
 			 *   shrunk by a SPLICE).
 			 */
-			if ((old_field == new_field && !op->meta->works_in_place) ||
+			if ((old_field == new_field &&
+			     !op->meta->works_in_place) ||
 			    /*
 			     * Sic: this predicate must function even if
 			     * new_field != new_data.
@@ -978,7 +994,7 @@ do_update(struct box_txn *txn, struct update_cmd *cmd)
 			memcpy(new_data, new_field, field->new_len);
 		new_data += field->new_len;
 		if (field->tail_field_count) {
-			memcpy(new_data, field->old_end, field->tail_len);
+			memcpy(new_data, field->tail, field->tail_len);
 			new_data += field->tail_len;
 			txn->tuple->cardinality += field->tail_field_count;
 		}
