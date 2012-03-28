@@ -82,10 +82,7 @@ typedef struct sptree_node_pointers {
  *   void* sptree_NAME_find(sptree_NAME *tree, void *key)
  *
  *   spnode_t sptree_NAME_walk(sptree_NAME *t, void* array, spnode_t limit, spnode_t offset)
- *   spnode_t sptree_NAME_walk_reverse(sptree_NAME *t, void* array, spnode_t limit, spnode_t offset)
- *
- *   sptree_NAME_walk_cb(sptree_NAME *t, int (*cb)(void* cb_arg, void* elem), void *cb_arg)
- *   sptree_NAME_walk_reverse_cb(sptree_NAME *t, int (*cb)(void* cb_arg, void* elem), void *cb_arg)
+ *   void sptree_NAME_walk_cb(sptree_NAME *t, int (*cb)(void* cb_arg, void* elem), void *cb_arg)
  *
  *   sptree_NAME_iterator* sptree_NAME_iterator_init(sptree_NAME *t) 
  *   void sptree_NAME_iterator_init_set(sptree_NAME *t, sptree_NAME_iterator **iterator, void *start)
@@ -507,70 +504,6 @@ sptree_##name##_walk_cb(sptree_##name *t, int (*cb)(void*, void*), void *cb_arg 
             level++;                                                                      \
             stack[level] = node;                                                          \
             node = _GET_SPNODE_LEFT( stack[level] );                                      \
-        }                                                                                 \
-    }                                                                                     \
-}                                                                                         \
-                                                                                          \
-static inline spnode_t                                                                    \
-sptree_##name##_walk_reverse(sptree_##name *t, void* array, spnode_t limit,               \
-                             spnode_t offset) {                                           \
-    int         level = 0;                                                                \
-    spnode_t    count= 0,                                                                 \
-                node,                                                                     \
-                stack[ t->max_depth + 1 ];                                                \
-                                                                                          \
-    if (t->root == SPNIL) return 0;                                                       \
-    stack[0] = t->root;                                                                   \
-                                                                                          \
-    while( (node = _GET_SPNODE_RIGHT( stack[level] )) != SPNIL ) {                        \
-        level++;                                                                          \
-        stack[level] = node;                                                              \
-    }                                                                                     \
-                                                                                          \
-    while( count < offset + limit && level >= 0 ) {                                       \
-                                                                                          \
-        if (count >= offset)                                                              \
-             memcpy(array + (count-offset) * t->elemsize,                                 \
-                    ITHELEM(t, stack[level]), t->elemsize);                               \
-        count++;                                                                          \
-                                                                                          \
-        node = _GET_SPNODE_LEFT( stack[level] );                                          \
-        level--;                                                                          \
-        while( node != SPNIL ) {                                                          \
-            level++;                                                                      \
-            stack[level] = node;                                                          \
-            node = _GET_SPNODE_RIGHT( stack[level] );                                     \
-        }                                                                                 \
-    }                                                                                     \
-                                                                                          \
-    return (count > offset) ? count - offset : 0;                                         \
-}                                                                                         \
-                                                                                          \
-static inline void                                                                        \
-sptree_##name##_walk_reverse_cb(sptree_##name *t, int (*cb)(void*, void*),                \
-                                void *cb_arg ) {                                          \
-    int         level = 0;                                                                \
-    spnode_t    node,                                                                     \
-                stack[ t->max_depth + 1 ];                                                \
-                                                                                          \
-    if (t->root == SPNIL) return;                                                         \
-    stack[0] = t->root;                                                                   \
-                                                                                          \
-    while( (node = _GET_SPNODE_RIGHT( stack[level] )) != SPNIL ) {                        \
-        level++;                                                                          \
-        stack[level] = node;                                                              \
-    }                                                                                     \
-                                                                                          \
-    while( level >= 0 ) {                                                                 \
-        if ( cb(cb_arg, ITHELEM(t, stack[level])) == 0 )                                  \
-             return;                                                                      \
-                                                                                          \
-        node = _GET_SPNODE_LEFT( stack[level] );                                          \
-        level--;                                                                          \
-        while( node != SPNIL ) {                                                          \
-            level++;                                                                      \
-            stack[level] = node;                                                          \
-            node = _GET_SPNODE_RIGHT( stack[level] );                                     \
         }                                                                                 \
     }                                                                                     \
 }                                                                                         \
