@@ -250,7 +250,7 @@ hash_iterator_free(struct iterator *iterator)
 
 	struct iterator *it = pk->position;
 	struct box_tuple *tuple;
-	[pk initIterator: it: ITER_FORWARD];
+	[pk initIterator: it :ITER_FORWARD];
 
 	while ((tuple = it->next(it)))
 	      [self replace: NULL :tuple];
@@ -398,7 +398,6 @@ hash_iterator_free(struct iterator *iterator)
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	it->base.type = type;
 	it->base.next_equal = 0; /* Should not be used. */
 	it->h_pos = mh_begin(int_hash);
 	it->hash = int_hash;
@@ -425,7 +424,6 @@ hash_iterator_free(struct iterator *iterator)
 
 	u32 num = *(u32 *)key;
 
-	it->base.type = type;
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_i32ptr_get(int_hash, num);
 	it->hash = int_hash;
@@ -533,7 +531,6 @@ hash_iterator_free(struct iterator *iterator)
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	it->base.type = type;
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
 	it->h_pos = mh_begin(int64_hash);
 	it->hash = (struct mh_i32ptr_t *) int64_hash;
@@ -559,7 +556,6 @@ hash_iterator_free(struct iterator *iterator)
 
 	u64 num = *(u64 *)field;
 
-	it->base.type = type;
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_i64ptr_get(int64_hash, num);
 	it->hash = (struct mh_i32ptr_t *) int64_hash;
@@ -659,7 +655,6 @@ hash_iterator_free(struct iterator *iterator)
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	it->base.type = type;
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
 	it->h_pos = mh_begin(str_hash);
 	it->hash = (struct mh_i32ptr_t *) str_hash;
@@ -679,7 +674,6 @@ hash_iterator_free(struct iterator *iterator)
 	if (part_count != 1)
 		tnt_raise(IllegalParams, :"key must be single valued");
 
-	it->base.type = type;
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_lstrptr_get(str_hash, key);
 	it->hash = (struct mh_i32ptr_t *) str_hash;

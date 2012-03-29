@@ -133,7 +133,6 @@ struct key_def {
 @end
 
 struct iterator {
-	enum iterator_type type;
 	struct box_tuple *(*next)(struct iterator *);
 	struct box_tuple *(*next_equal)(struct iterator *);
 	void (*free)(struct iterator *);

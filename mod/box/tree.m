@@ -844,7 +844,6 @@ tree_iterator_free(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	it->base.type = type;
 	it->key_data.data = key;
 	it->key_data.part_count = part_count;
 	fold_with_key_parts(key_def, &it->key_data);
