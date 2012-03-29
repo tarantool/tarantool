@@ -126,8 +126,8 @@ struct key_def {
  * initialized separately.
  */
 - (struct iterator *) allocIterator;
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type;
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type;
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 			:(void *) key
 			:(int) part_count;
 @end

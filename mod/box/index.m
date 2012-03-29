@@ -166,14 +166,14 @@ iterator_first_equal(struct iterator *it)
 	return NULL;
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
 	(void) iterator;
 	(void) type;
 	[self subclassResponsibility: _cmd];
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
                         :(void *) key
 			:(int) part_count
 {
@@ -390,7 +390,7 @@ hash_iterator_free(struct iterator *iterator)
 #endif
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
 	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
@@ -403,7 +403,7 @@ hash_iterator_free(struct iterator *iterator)
 	it->hash = int_hash;
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
                         :(void *) key
 			:(int) part_count
 {
@@ -523,7 +523,7 @@ hash_iterator_free(struct iterator *iterator)
 #endif
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
 	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
@@ -536,7 +536,7 @@ hash_iterator_free(struct iterator *iterator)
 	it->hash = (struct mh_i32ptr_t *) int64_hash;
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
                         :(void *) field
 			:(int) part_count
 {
@@ -647,7 +647,7 @@ hash_iterator_free(struct iterator *iterator)
 #endif
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
 	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
@@ -660,7 +660,7 @@ hash_iterator_free(struct iterator *iterator)
 	it->hash = (struct mh_i32ptr_t *) str_hash;
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
                         :(void *) key
 			:(int) part_count
 {

@@ -833,12 +833,12 @@ tree_iterator_free(struct iterator *iterator)
 	return (struct iterator *) it;
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
 	[self initIterator: iterator :type :NULL :0];
 }
 
-- (void) initIterator: (struct iterator *) iterator: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
                         :(void *) key
 			:(int) part_count
 {
