@@ -449,7 +449,7 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 }
 
 /**
- * Lua forward and reverse index iterator functions.
+ * Lua forward index iterator function.
  * See lbox_index_move comment for a functional
  * description.
  */
@@ -459,6 +459,11 @@ lbox_index_next(struct lua_State *L)
 	return lbox_index_move(L, ITER_FORWARD);
 }
 
+/**
+ * Lua reverse index iterator function.
+ * See lbox_index_move comment for a functional
+ * description.
+ */
 static int
 lbox_index_prev(struct lua_State *L)
 {
