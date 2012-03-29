@@ -419,7 +419,7 @@ update_op_cmp(const void *op1_ptr, const void *op2_ptr)
 	const struct update_op *op2 = op2_ptr;
 
 	/* Compare operations by field number. */
-	i32 result = (i32) op1->field_no - (i32) op2->field_no;
+	int result = (int) op1->field_no - (int) op2->field_no;
 	if (result)
 		return result;
 	/*
@@ -443,9 +443,14 @@ update_op_cmp(const void *op1_ptr, const void *op2_ptr)
 	 * Preserve the original order of operations on the same
 	 * field. To do it, order them by their address in the
 	 * UPDATE request.
+	 *
+	 * The expression below should work even if sizeof(ptrdiff_t)
+	 * is greater than sizeof(int) because we presume that both
+	 * value addresses belong to the same UPDATE command buffer
+	 * and therefore their difference must be small enough to fit
+	 * into an int comfortably.
 	 */
-	result = op1->arg.set.value - op2->arg.set.value;
-	return result;
+	return (int) (op1->arg.set.value - op2->arg.set.value);
 }
 
 static void
