@@ -703,6 +703,7 @@ tree_iterator_reverse_next_equal(struct iterator *iterator)
 static void
 tree_iterator_free(struct iterator *iterator)
 {
+	assert(iterator->free == tree_iterator_free);
 	struct tree_iterator *it = tree_iterator(iterator);
 	if (it->iter)
 		sptree_index_iterator_free(it->iter);
