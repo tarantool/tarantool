@@ -842,6 +842,7 @@ tree_iterator_free(struct iterator *iterator)
                         :(void *) key
 			:(int) part_count
 {
+	assert(iterator->free == tree_iterator_free);
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	it->key_data.data = key;

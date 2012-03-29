@@ -208,8 +208,7 @@ hash_iterator(struct iterator *it)
 struct box_tuple *
 hash_iterator_next(struct iterator *iterator)
 {
-	assert(iterator->next = hash_iterator_next);
-
+	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	while (it->h_pos != mh_end(it->hash)) {
@@ -223,7 +222,7 @@ hash_iterator_next(struct iterator *iterator)
 void
 hash_iterator_free(struct iterator *iterator)
 {
-	assert(iterator->next = hash_iterator_next);
+	assert(iterator->next == hash_iterator_next);
 	sfree(iterator);
 }
 
@@ -392,7 +391,7 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
-	assert(iterator->next = hash_iterator_next);
+	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (type == ITER_REVERSE)
@@ -407,9 +406,8 @@ hash_iterator_free(struct iterator *iterator)
                         :(void *) key
 			:(int) part_count
 {
-	assert(iterator->next = hash_iterator_next);
 	(void) part_count; /* Silence gcc warning in release mode. */
-
+	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (type == ITER_REVERSE)
@@ -525,7 +523,7 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
-	assert(iterator->next = hash_iterator_next);
+	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (type == ITER_REVERSE)
@@ -541,7 +539,7 @@ hash_iterator_free(struct iterator *iterator)
 			:(int) part_count
 {
 	(void) part_count; /* Silence gcc warning in release mode. */
-	assert(iterator->next = hash_iterator_next);
+	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (type == ITER_REVERSE)
@@ -649,7 +647,7 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
-	assert(iterator->next = hash_iterator_next);
+	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (type == ITER_REVERSE)
@@ -665,7 +663,7 @@ hash_iterator_free(struct iterator *iterator)
 			:(int) part_count
 {
 	(void) part_count; /* Silence gcc warning in release mode. */
-	assert(iterator->next = hash_iterator_next);
+	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (type == ITER_REVERSE)
