@@ -529,9 +529,11 @@ dense_node_compare(struct key_def *key_def, u32 first_field,
 	assert(first_field + part_count <= tuple_a->cardinality);
 	assert(first_field + part_count <= tuple_b->cardinality);
 
-	/* find field offsets */
-	u32 off_a[part_count];
-	u32 off_b[part_count];
+	/* Allocate space for offsets. */
+	u32 *off_a = alloca(2 * part_count * sizeof(u32));
+	u32 *off_b = off_a + part_count;
+
+	/* Find field offsets. */
 	off_a[0] = offset_a;
 	off_b[0] = offset_b;
 	if (part_count > 1) {
@@ -547,7 +549,7 @@ dense_node_compare(struct key_def *key_def, u32 first_field,
 		}
 	}
 
-	/* compare key parts */
+	/* Compare key parts. */
 	for (int part = 0; part < part_count; ++part) {
 		int field = key_def->parts[part].fieldno;
 		int r = dense_part_compare(key_def->parts[part].type,
@@ -616,8 +618,10 @@ dense_key_node_compare(struct key_def *key_def,
 	int part_count = key_def->part_count;
 	assert(first_field + part_count <= tuple->cardinality);
 
-	/* find field offsets */
-	u32 off[part_count];
+	/* Allocate space for offsets. */
+	u32 *off = alloca(part_count * sizeof(u32));
+
+	/* Find field offsets. */
 	off[0] = offset;
 	if (part_count > 1) {
 		u8 *data = tuple->data + offset;
@@ -628,7 +632,7 @@ dense_key_node_compare(struct key_def *key_def,
 		}
 	}
 
-	/* compare key parts */
+	/* Compare key parts. */
 	if (part_count > key_data->part_count)
 		part_count = key_data->part_count;
 	for (int part = 0; part < part_count; ++part) {
