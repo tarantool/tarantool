@@ -43,6 +43,19 @@
 #endif
 
 /*
+ * Defined if O_DSYNC mode exists for open(2).
+ */
+#cmakedefine HAVE_O_DSYNC 1
+#if defined(HAVE_O_DSYNC)
+    #define WAL_SYNC_FLAG O_DSYNC
+#else
+    #define WAL_SYNC_FLAG O_SYNC
+#endif
+/*
+ * Defined if fdatasync(2) call is present.
+ */
+#cmakedefine HAVE_FDATASYNC 1
+/*
  * Set if this is a GNU system and libc has __libc_stack_end.
  */
 #cmakedefine HAVE_LIBC_STACK_END 1

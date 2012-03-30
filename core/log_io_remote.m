@@ -149,6 +149,7 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 	struct tbuf *data;
 	i64 lsn = row_v11(row)->lsn;
 	u16 tag;
+	u16 op;
 
 	/* save row data since wal_row_handler may clobber it */
 	data = tbuf_alloc(row->pool);
@@ -159,8 +160,9 @@ default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
 
 	tag = read_u16(data);
 	(void)read_u64(data); /* drop the cookie */
+	op = read_u16(data);
 
-	if (wal_write(r, tag, r->cookie, lsn, data) == false)
+	if (wal_write(r, tag, op, r->cookie, lsn, data))
 		panic("replication failure: can't write row to WAL");
 
 	next_lsn(r, lsn);

@@ -1247,13 +1247,10 @@ txn_commit(struct box_txn *txn)
 			;
 		else {
 			fiber_peer_name(fiber); /* fill the cookie */
-			struct tbuf *t = tbuf_alloc(fiber->gc_pool);
-			tbuf_append(t, &txn->op, sizeof(txn->op));
-			tbuf_append(t, txn->req.data, txn->req.size);
 
 			i64 lsn = next_lsn(recovery_state, 0);
-			bool res = !wal_write(recovery_state, wal_tag,
-					      fiber->cookie, lsn, t);
+			int res = wal_write(recovery_state, wal_tag, txn->op,
+					    fiber->cookie, lsn, &txn->req);
 			confirm_lsn(recovery_state, lsn);
 			if (res)
 				tnt_raise(LoggedError, :ER_WAL_IO);
@@ -2152,8 +2149,8 @@ mod_init(void)
 
 	/* recovery initialization */
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
-				      recover_row, cfg.rows_per_wal, cfg.wal_fsync_delay,
-				      cfg.wal_writer_inbox_size,
+				      recover_row, cfg.rows_per_wal, cfg.wal_mode,
+				      cfg.wal_fsync_delay, cfg.wal_writer_inbox_size,
 				      init_storage ? RECOVER_READONLY : 0, NULL);
 
 	recovery_state->snap_io_rate_limit = cfg.snap_io_rate_limit * 1024 * 1024;
