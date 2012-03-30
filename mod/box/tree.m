@@ -923,22 +923,6 @@ tree_iterator_free(struct iterator *iterator)
 	return NULL;
 }
 
-- (int) compare: (const void *) node_a :(const void *) node_b
-{
-	(void) node_a;
-	(void) node_b;
-	[self subclassResponsibility: _cmd];
-	return 0;
-}
-
-- (int) key_compare: (const void *) key :(const void *) node
-{
-	(void) key;
-	(void) node;
-	[self subclassResponsibility: _cmd];
-	return 0;
-}
-
 @end
 
 /* }}} */
