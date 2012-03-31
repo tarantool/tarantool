@@ -2150,7 +2150,7 @@ mod_init(void)
 	/* recovery initialization */
 	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
 				      recover_row, cfg.rows_per_wal, cfg.wal_mode,
-				      cfg.wal_fsync_delay, cfg.wal_writer_inbox_size,
+				      cfg.wal_fsync_delay,
 				      init_storage ? RECOVER_READONLY : 0, NULL);
 
 	recovery_state->snap_io_rate_limit = cfg.snap_io_rate_limit * 1024 * 1024;
@@ -2254,8 +2254,6 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  version: \"%s\"" CRLF, tarantool_version());
 	tbuf_printf(out, "  uptime: %i" CRLF, (int)tarantool_uptime());
 	tbuf_printf(out, "  pid: %i" CRLF, getpid());
-	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 CRLF,
-		    (i64) recovery_state->wal_writer->pid);
 	tbuf_printf(out, "  lsn: %" PRIi64 CRLF, recovery_state->confirmed_lsn);
 	tbuf_printf(out, "  recovery_lag: %.3f" CRLF, recovery_state->recovery_lag);
 	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,

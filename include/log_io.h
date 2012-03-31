@@ -102,6 +102,8 @@ struct log_io {
 	bool is_inprogress;
 };
 
+struct wal_writer;
+
 struct recovery_state {
 	i64 lsn, confirmed_lsn;
 
@@ -109,6 +111,7 @@ struct recovery_state {
 	struct log_io_class *snap_class;
 	struct log_io_class *wal_class;
 	struct child *wal_writer;
+	struct wal_writer *writer;
 
 	/* row_handler will be presented by most recent format of data
 	   log_io_class->reader is responsible of converting data from old format */
@@ -130,11 +133,24 @@ struct recovery_state {
 };
 
 struct wal_write_request {
+	/* Auxiliary. */
+	u64 out_lsn;
+	struct fiber *fiber;
+	/** Header. */
+	u32 marker;
+	u32 header_crc32c;
 	i64 lsn;
+	double tm;
 	u32 len;
+	u32 data_crc32c;
+	/* Data. */
+	u16 tag;
+	u64 cookie;
+	u16 op;
 	u8 data[];
 } __attribute__((packed));
 
+/* @todo: merge with wal_write_request. */
 struct row_v11 {
 	u32 header_crc32c;
 	i64 lsn;
@@ -144,19 +160,18 @@ struct row_v11 {
 	u8 data[];
 } __attribute__((packed));
 
+
 static inline struct row_v11 *row_v11(const struct tbuf *t)
 {
 	return (struct row_v11 *)t->data;
 }
-
-void mach_setup_crc32 ();
 
 struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, u64 cookie, i64 lsn);
 
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
 				    row_handler row_handler,
 				    int rows_per_file, const char *wal_mode,
-				    double fsync_delay, int inbox_size,
+				    double fsync_delay,
 				    int flags, void *data);
 void recovery_update_mode(struct recovery_state *r,
 			  const char *wal_mode, double fsync_delay);

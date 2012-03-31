@@ -610,7 +610,7 @@ replication_relay_loop(int client_sock)
 	/* init reovery porcess */
 	log_io = recover_init(NULL, cfg.wal_dir,
 			      replication_relay_send_row,
-			      INT32_MAX, "fsync_delay", 0, 64,
+			      INT32_MAX, "fsync_delay", 0,
 			      RECOVER_READONLY, false);
 
 	recover(log_io, lsn);
