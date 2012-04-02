@@ -1316,9 +1316,9 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 	if (req == NULL) {
 		if (wal != NULL)
 			log_io_close(&wal);
+#if 0
 		if (wal_to_close != NULL)
 			log_io_close(&wal_to_close);
-#if 0
 		recover_free((struct recovery_state*)_state);
 #endif
 		return 0;
@@ -1505,12 +1505,8 @@ recovery_update_mode(struct recovery_state *r, const char *mode,
 void
 recover_free(struct recovery_state *recovery)
 {
-	struct child *writer = recovery->wal_writer;
-	if (writer && writer->out && writer->out->fd > 0) {
-		close(writer->out->fd);
+	if (recovery->writer)
 		wal_writer_stop(recovery);
-		usleep(1000);
-	}
 
 	v11_class_free(recovery->snap_class);
 	v11_class_free(recovery->wal_class);

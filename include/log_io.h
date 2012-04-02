@@ -110,7 +110,6 @@ struct recovery_state {
 	struct log_io *current_wal;	/* the WAL we'r currently reading/writing from/to */
 	struct log_io_class *snap_class;
 	struct log_io_class *wal_class;
-	struct child *wal_writer;
 	struct wal_writer *writer;
 
 	/* row_handler will be presented by most recent format of data
