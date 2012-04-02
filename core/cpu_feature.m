@@ -25,6 +25,7 @@
 
 #include <sys/types.h>
 #include <errno.h>
+#include <stdlib.h>
 
 #include "cpu_feature.h"
 
@@ -186,16 +187,13 @@ get_cpuid(long info, long* eax, long* ebx, long* ecx, long *edx)
 
 
 /* Check whether CPU has a certain feature. */
-int
+bool
 cpu_has(unsigned int feature)
 {
 	long info = 1, reg[4] = {0,0,0,0};
 
-	if (!can_cpuid())
-		return -EINVAL;
-
-	if (feature > LEN_cpu_mask)
-		return -ERANGE;
+	if (!can_cpuid() || feature > LEN_cpu_mask)
+		return false;
 
 	get_cpuid(info, &reg[eAX], &reg[eBX], &reg[eCX], &reg[eDX]);
 
@@ -211,24 +209,20 @@ crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
 
 #else /* other (yet unsupported architectures) */
 
-int
+bool
 cpu_has(unsigned int feature)
 {
 	(void)feature;
-	return EINVAL;
+	return false;
 }
 
 u_int32_t
 crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
 {
 	(void)crc; (void)buf, (void)len;
-	assert(false);
+	abort();
 	return 0;
 }
 
-
 #endif /* defined (__i386__) || defined (__x86_64__) */
-
-
-/* __EOF__ */
 
