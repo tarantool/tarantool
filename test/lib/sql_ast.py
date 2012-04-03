@@ -50,6 +50,12 @@ ER = {
    37: "ER_UPDATE_ID"           ,
    38: "ER_WRONG_VERSION"       ,
    39: "ER_WAL_IO"              ,
+   41: "ER_TYPE_MISMATCH",
+   42: "ER_SPLICE",
+   43: "ER_TUPLE_IS_TOO_LONG",
+   44: "ER_UNKNOWN_UPDATE_OP",
+   45: "ER_AMBIGUOUS_KEY_SPECIFIED",
+   46: "ER_UNUSED46",
    47: "ER_KEY_CARDINALITY"	,
    48: "ER_PROC_RET"            ,
    49: "ER_TUPLE_NOT_FOUND"     ,
@@ -60,7 +66,8 @@ ER = {
    54: "ER_NO_SUCH_FIELD"       ,
    55: "ER_TUPLE_FOUND"         ,
    56: "ER_INDEX_VIOLATION"     ,
-   57: "ER_NO_SUCH_SPACE"
+   57: "ER_NO_SUCH_SPACE",
+   58: "ER_KEY_TYPE_MISMATCH",
 }
 
 

@@ -1,0 +1,268 @@
+# encoding: tarantool
+#
+server.stop()
+server.deploy("box_big/hash.cfg")
+
+print """
+#=============================================================================#
+# 32-bit hash tests
+#=============================================================================#
+"""
+
+print """
+#-----------------------------------------------------------------------------#
+# 32-bit hash insert fields tests
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# Insert valid fieds
+"""
+exec admin "lua box.space[0]:insert(0, 'value1 v1.0', 'value2 v1.0')"
+exec admin "lua box.space[0]:insert(1, 'value1 v1.0', 'value2 v1.0')"
+exec admin "lua box.space[0]:insert(2, 'value1 v1.0', 'value2 v1.0')"
+exec admin "lua box.space[0]:insert(3, 'value1 v1.0', 'value2 v1.0')"
+
+print """
+# Insert invalid fields
+"""
+exec admin "lua box.space[0]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')"
+
+
+print """
+#-----------------------------------------------------------------------------#
+# 32-bit hash replace fields tests
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# Replace valid fieds
+"""
+exec admin "lua box.space[0]:replace(3, 'value1 v1.31', 'value2 1.12')"
+exec admin "lua box.space[0]:replace(1, 'value1 v1.32', 'value2 1.72')"
+exec admin "lua box.space[0]:replace(2, 'value1 v1.43', 'value2 1.92')"
+
+print """
+# Replace invalid fields
+"""
+exec admin "lua box.space[0]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')"
+
+
+print """
+#-----------------------------------------------------------------------------#
+# 32-bit hash select fields test
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# select by valid keys
+"""
+exec admin "lua box.space[0]:select(0, 0)"
+exec admin "lua box.space[0]:select(0, 1)"
+exec admin "lua box.space[0]:select(0, 2)"
+exec admin "lua box.space[0]:select(0, 3)"
+exec admin "lua box.space[0]:select(0, 4)"
+exec admin "lua box.space[0]:select(0, 5)"
+
+print """
+# select by invalid keys
+"""
+exec admin "lua box.space[0]:select(0, 'invalid key')"
+exec admin "lua box.space[0]:select(0, 1, 2)"
+
+
+print """
+#-----------------------------------------------------------------------------#
+# 32-bit hash delete fields test
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# delete by valid keys
+"""
+exec admin "lua box.space[0]:delete(0)"
+exec admin "lua box.space[0]:delete(1)"
+exec admin "lua box.space[0]:delete(2)"
+exec admin "lua box.space[0]:delete(3)"
+exec admin "lua box.space[0]:delete(4)"
+exec admin "lua box.space[0]:delete(5)"
+
+print """
+# delete by invalid keys
+"""
+exec admin "lua box.space[0]:delete('invalid key')"
+exec admin "lua box.space[0]:delete(1, 2)"
+
+
+print """
+#=============================================================================#
+# 64-bit hash tests
+#=============================================================================#
+"""
+
+print """
+#-----------------------------------------------------------------------------#
+# 64-bit hash inset fields tests
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# Insert valid fieds
+"""
+exec admin "lua box.space[1]:insert('00000000', 'value1 v1.0', 'value2 v1.0')"
+exec admin "lua box.space[1]:insert('00000001', 'value1 v1.0', 'value2 v1.0')"
+exec admin "lua box.space[1]:insert('00000002', 'value1 v1.0', 'value2 v1.0')"
+exec admin "lua box.space[1]:insert('00000003', 'value1 v1.0', 'value2 v1.0')"
+
+print """
+# Insert invalid fields
+"""
+exec admin "lua box.space[1]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')"
+
+
+print """
+#-----------------------------------------------------------------------------#
+# 64-bit hash replace fields tests
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# Replace valid fieds
+"""
+exec admin "lua box.space[1]:replace('00000003', 'value1 v1.31', 'value2 1.12')"
+exec admin "lua box.space[1]:replace('00000001', 'value1 v1.32', 'value2 1.72')"
+exec admin "lua box.space[1]:replace('00000002', 'value1 v1.43', 'value2 1.92')"
+
+print """
+# Replace invalid fields
+"""
+exec admin "lua box.space[0]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')"
+
+
+print """
+#-----------------------------------------------------------------------------#
+# 64-bit hash select fields test
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# select by valid keys
+"""
+exec admin "lua box.space[1]:select(0, '00000000')"
+exec admin "lua box.space[1]:select(0, '00000001')"
+exec admin "lua box.space[1]:select(0, '00000002')"
+exec admin "lua box.space[1]:select(0, '00000003')"
+exec admin "lua box.space[1]:select(0, '00000004')"
+exec admin "lua box.space[1]:select(0, '00000005')"
+
+print """
+# select by invalid keys
+"""
+exec admin "lua box.space[1]:select(0, 'invalid key')"
+exec admin "lua box.space[1]:select(0, '00000001', '00000002')"
+
+
+print """
+#-----------------------------------------------------------------------------#
+# 64-bit hash delete fields test
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# delete by valid keys
+"""
+exec admin "lua box.space[1]:delete('00000000')"
+exec admin "lua box.space[1]:delete('00000001')"
+exec admin "lua box.space[1]:delete('00000002')"
+exec admin "lua box.space[1]:delete('00000003')"
+exec admin "lua box.space[1]:delete('00000004')"
+exec admin "lua box.space[1]:delete('00000005')"
+
+print """
+# delete by invalid keys
+"""
+exec admin "lua box.space[1]:delete('invalid key')"
+exec admin "lua box.space[1]:delete('00000001', '00000002')"
+
+
+print """
+#=============================================================================#
+# String hash tests
+#=============================================================================#
+"""
+
+print """
+#-----------------------------------------------------------------------------#
+# String hash inset fields tests
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# Insert valid fieds
+"""
+exec admin "lua box.space[2]:insert('key 0', 'value1 v1.0', 'value2 v1.0')"
+exec admin "lua box.space[2]:insert('key 1', 'value1 v1.0', 'value2 v1.0')"
+exec admin "lua box.space[2]:insert('key 2', 'value1 v1.0', 'value2 v1.0')"
+exec admin "lua box.space[2]:insert('key 3', 'value1 v1.0', 'value2 v1.0')"
+
+
+print """
+#-----------------------------------------------------------------------------#
+# String hash replace fields tests
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# Replace valid fieds
+"""
+exec admin "lua box.space[2]:replace('key 3', 'value1 v1.31', 'value2 1.12')"
+exec admin "lua box.space[2]:replace('key 1', 'value1 v1.32', 'value2 1.72')"
+exec admin "lua box.space[2]:replace('key 2', 'value1 v1.43', 'value2 1.92')"
+
+
+print """
+#-----------------------------------------------------------------------------#
+# String hash select fields test
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# select by valid keys
+"""
+exec admin "lua box.space[2]:select(0, 'key 0')"
+exec admin "lua box.space[2]:select(0, 'key 1')"
+exec admin "lua box.space[2]:select(0, 'key 2')"
+exec admin "lua box.space[2]:select(0, 'key 3')"
+exec admin "lua box.space[2]:select(0, 'key 4')"
+exec admin "lua box.space[2]:select(0, 'key 5')"
+
+print """
+# select by invalid keys
+"""
+exec admin "lua box.space[2]:select(0, 'key 1', 'key 2')"
+
+
+print """
+#-----------------------------------------------------------------------------#
+# String hash delete fields test
+#-----------------------------------------------------------------------------#
+"""
+
+print """
+# delete by valid keys
+"""
+exec admin "lua box.space[2]:delete('key 0')"
+exec admin "lua box.space[2]:delete('key 1')"
+exec admin "lua box.space[2]:delete('key 2')"
+exec admin "lua box.space[2]:delete('key 3')"
+exec admin "lua box.space[2]:delete('key 4')"
+exec admin "lua box.space[2]:delete('key 5')"
+print """
+# delete by invalid keys
+"""
+exec admin "lua box.space[2]:delete('key 1', 'key 2')"
+
+
+# clean-up
+server.stop()
+server.deploy(self.suite_ini["config"])

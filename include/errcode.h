@@ -100,7 +100,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 43 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
 	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
 	/* 45 */_(ER_AMBIGUOUS_KEY_SPECIFIED,	0, "Ambiguous specification of the key (may affect multiple values)") \
-	/* 46 */_(ER_UNUSED46,			0, "Unused46") \
+	/* 46 */_(ER_SINGLE_KEY_NEEDED,		0, "Key must be single valued") \
 	/* 47 */_(ER_KEY_CARDINALITY,		2, "Key cardinality %d is greater than index cardinality %d") \
 	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist") \
@@ -111,7 +111,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 54 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
 	/* 55 */_(ER_TUPLE_FOUND,		2, "Tuple already exists") \
 	/* 56 */_(ER_INDEX_VIOLATION,		2, "Duplicate key exists in a unique index") \
-	/* 57 */_(ER_NO_SUCH_SPACE,		2, "Space %u does not exists")
+	/* 57 */_(ER_NO_SUCH_SPACE,		2, "Space %u does not exists") \
+	/* 57 */_(ER_KEY_TYPE_MISMATCH,		2, "Key field isn't %s")
 
 
 /*

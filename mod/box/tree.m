@@ -748,13 +748,20 @@ tree_iterator_free(struct iterator *iterator)
 	return [self unfold: node];
 }
 
-- (struct box_tuple *) find: (void *) key_arg : (u32) key_cardinality_arg
+- (struct box_tuple *) find: (void *) key : (u32) key_cardinality
 {
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(1));
 
-	key_data->data = key_arg;
-	key_data->part_count = key_cardinality_arg;
+	if (key_cardinality > key_def->part_count)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality, key_def->part_count);
+
+	if (key_cardinality < key_def->part_count)
+		tnt_raise(ClientError, :ER_AMBIGUOUS_KEY_SPECIFIED);
+
+	key_data->data = key;
+	key_data->part_count = key_cardinality;
 	fold_with_key_parts(key_def, key_data);
 
 	void *node = sptree_index_find(&tree, key_data);
@@ -818,15 +825,21 @@ tree_iterator_free(struct iterator *iterator)
 
 - (void) initIterator: (struct iterator *) iterator
 		     : (void *) key
-		     : (int) part_count
+		     : (u32) key_cardinality
 {
 	assert(iterator->next == tree_iterator_next);
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	it->base.next_equal = tree_iterator_next_equal;
 
+	if (key_cardinality > key_def->part_count) {
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality,
+			  key_def->part_count);
+	}
+
 	it->key_data.data = key;
-	it->key_data.part_count = part_count;
+	it->key_data.part_count = key_cardinality;
 	fold_with_key_parts(key_def, &it->key_data);
 	sptree_index_iterator_init_set(&tree, &it->iter, &it->key_data);
 }
