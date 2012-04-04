@@ -70,7 +70,6 @@ char **main_argv;
 int main_argc;
 static void *main_opt = NULL;
 struct tarantool_cfg cfg;
-struct recovery_state *recovery_state;
 static ev_signal *sigs = NULL;
 
 bool init_storage, booting = true;
@@ -155,7 +154,7 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 		say_debug("%s: wal_fsync_delay [%f] -> [%f]",
 			__func__, old_conf->wal_fsync_delay, new_delay);
 
-	recovery_update_mode(recovery_state, new_conf->wal_mode, new_delay);
+	recovery_update_mode(new_conf->wal_mode, new_delay);
 
 	return 0;
 }
@@ -405,8 +404,7 @@ error:
 void
 tarantool_free(void)
 {
-	if (recovery_state != NULL)
-		recover_free(recovery_state);
+	recovery_free();
 	stat_free();
 
 	if (cfg_filename_fullpath)
