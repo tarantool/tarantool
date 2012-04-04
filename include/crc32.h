@@ -28,10 +28,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <sys/types.h>
 #include <util.h>
 
-typedef u32 (*crc32_func)(u32 crc, const unsigned char *buf,
-			  unsigned int len);
+typedef u_int32_t (*crc32_func)(u_int32_t crc, const unsigned char *buf, unsigned int len);
 
 /*
  * Pointer to an architecture-specific implementation of

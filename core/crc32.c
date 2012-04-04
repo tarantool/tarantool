@@ -38,10 +38,6 @@ crc32_func crc32_calc = NULL;
 void
 crc32_init()
 {
-#if defined (__i386__) || defined (__x86_64__)
-	crc32_calc = cpu_has(cpuf_sse4_2) ? &crc32c_hw : &crc32c;
-#else
-	crc32_calc = &crc32c;
-#endif
+	crc32_calc = sse42_enabled_cpu() ? &crc32c_hw : &crc32c;
 }
 

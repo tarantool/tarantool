@@ -28,21 +28,13 @@
 #include <sys/types.h>
 #include <stdbool.h>
 
-/* CPU feature capabilities to use with cpu_has (feature). */
-
-#if defined (__i386__) || defined (__x86_64__)
-enum {
-	cpuf_ht = 0, cpuf_sse4_1, cpuf_sse4_2, cpuf_hypervisor
-};
-#endif
-
-/* Check whether CPU has a certain feature.
+/* Check whether CPU supports SSE 4.2 (needed to compute CRC32 in hardware).
  *
  * @param	feature		indetifier (see above) of the target feature
  *
  * @return	true if feature is available, false if unavailable.
  */
-bool cpu_has(unsigned int feature);
+bool sse42_enabled_cpu();
 
 
 /* Hardware-calculate CRC32 for the given data buffer.
