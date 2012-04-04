@@ -2148,10 +2148,10 @@ mod_init(void)
 	space_init();
 
 	/* recovery initialization */
-	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
-				      recover_row, cfg.rows_per_wal, cfg.wal_mode,
-				      cfg.wal_fsync_delay,
-				      init_storage ? RECOVER_READONLY : 0, NULL);
+	recovery_init(cfg.snap_dir, cfg.wal_dir,
+		      recover_row, cfg.rows_per_wal, cfg.wal_mode,
+		      cfg.wal_fsync_delay,
+		      init_storage ? RECOVER_READONLY : 0, NULL);
 
 	recovery_state->snap_io_rate_limit = cfg.snap_io_rate_limit * 1024 * 1024;
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);

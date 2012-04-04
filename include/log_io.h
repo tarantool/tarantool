@@ -34,6 +34,7 @@
 #include <util.h>
 #include <palloc.h>
 #include <netinet/in.h> /* struct sockaddr_in */
+#include <third_party/queue.h>
 
 struct tbuf;
 
@@ -131,7 +132,10 @@ struct recovery_state {
 	void *data;
 };
 
+struct recovery_state *recovery_state;
+
 struct wal_write_request {
+	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
 	/* Auxiliary. */
 	u64 out_lsn;
 	struct fiber *fiber;
@@ -167,14 +171,13 @@ static inline struct row_v11 *row_v11(const struct tbuf *t)
 
 struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, u64 cookie, i64 lsn);
 
-struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
-				    row_handler row_handler,
-				    int rows_per_file, const char *wal_mode,
-				    double fsync_delay,
-				    int flags, void *data);
-void recovery_update_mode(struct recovery_state *r,
-			  const char *wal_mode, double fsync_delay);
-void recover_free(struct recovery_state *recovery);
+void recovery_init(const char *snap_dirname, const char *xlog_dirname,
+		   row_handler row_handler,
+		   int rows_per_file, const char *wal_mode,
+		   double fsync_delay,
+		   int flags, void *data);
+void recovery_update_mode(const char *wal_mode, double fsync_delay);
+void recovery_free();
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recover_finalize(struct recovery_state *r);

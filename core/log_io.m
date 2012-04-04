@@ -45,7 +45,6 @@
 #include <crc32.h>
 #include <tarantool_pthread.h>
 
-
 const u16 snap_tag = -1;
 const u16 wal_tag = -2;
 const u64 default_cookie = 0;
@@ -60,18 +59,22 @@ const char snap_mark[] = "SNAP\n";
 const char xlog_mark[] = "XLOG\n";
 static const int HEADER_SIZE_MAX = sizeof(v11) + sizeof(snap_mark) + 2;
 
+struct recovery_state *recovery_state;
+
 #define ROW_EOF (void *)1
 
 /* Context of the WAL writer thread. */
 
 struct wal_writer
 {
-	struct wal_write_request *input;
+	STAILQ_HEAD(wal_fifo, wal_write_request) input;
 	pthread_t thread;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	bool is_shutdown;
 };
+
+static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
 
 static struct wal_writer wal_writer;
 
@@ -1196,6 +1199,17 @@ recover_finalize(struct recovery_state *r)
 	}
 }
 
+static void
+wal_writer_child()
+{
+	recovery_state->writer = NULL;
+}
+
+static void
+wal_writer_init_once()
+{
+	pthread_atfork(NULL, NULL, wal_writer_child);
+}
 
 static void
 wal_writer_init(struct wal_writer *writer)
@@ -1223,7 +1237,9 @@ wal_writer_init(struct wal_writer *writer)
 	tt_pthread_cond_init(&writer->cond, &clock_monotonic);
 	tt_pthread_condattr_destroy(&clock_monotonic);
 
-	writer->input = NULL;
+	STAILQ_INIT(&writer->input);
+
+	tt_pthread_once(&wal_writer_once, wal_writer_init_once);
 }
 
 static void
@@ -1287,14 +1303,14 @@ wal_writer_stop(struct recovery_state *state)
 	return -1;
 }
 
-struct wal_write_request *
+struct wal_fifo
 wal_writer_pop(struct wal_writer *writer, bool wait)
 {
-	struct wal_write_request *input;
+	struct wal_fifo input;
 	do {
 		input = writer->input;
-		writer->input = NULL;
-		if (input != NULL || wait == false)
+		STAILQ_INIT(&writer->input);
+		if (STAILQ_EMPTY(&input) == false || wait == false)
 			break;
 		tt_pthread_cond_wait(&writer->cond, &writer->mutex);
 	} while (writer->is_shutdown == false);
@@ -1397,20 +1413,20 @@ wal_writer_thread(void *worker_args)
 {
 	struct recovery_state *r = worker_args;
 	struct wal_writer *writer = r->writer;
-	struct wal_write_request *output = NULL;
+	struct wal_fifo output = STAILQ_HEAD_INITIALIZER(output);
 	struct wal_write_request *req;
 
 	tt_pthread_mutex_lock(&writer->mutex);
 	while (writer->is_shutdown == false) {
-		struct wal_write_request *input =
-			wal_writer_pop(writer, output == NULL);
+		struct wal_fifo input =
+			wal_writer_pop(writer, STAILQ_EMPTY(&output));
 		pthread_mutex_unlock(&writer->mutex);
 		/*
 		 * Check the old list of fibers to wakeup *here*
 		 * since we needed a membar for its out_lsn's to
 		 * sync up.
 		 */
-		if ((req = output)) {
+		STAILQ_FOREACH(req, &output, wal_fifo_entry) {
 			/*
 			 * @todo:
 			 * Even though wal_write() is not
@@ -1419,7 +1435,7 @@ wal_writer_thread(void *worker_args)
 			 * */
 			fiber_wakeup(req->fiber);
 		}
-		if ((req = input)) {
+		STAILQ_FOREACH(req, &input, wal_fifo_entry) {
 			(void) write_to_disk(r, req);
 		}
 		output = input;
@@ -1451,9 +1467,9 @@ wal_write(struct recovery_state *r, u16 tag, u16 op, u64 cookie,
 
 	tt_pthread_mutex_lock(&writer->mutex);
 
-	bool was_empty = writer->input == NULL;
+	bool was_empty = STAILQ_EMPTY(&writer->input);
 
-	writer->input = req;
+	STAILQ_INSERT_TAIL(&writer->input, req, wal_fifo_entry);
 
 	if (was_empty)
 		tt_pthread_cond_signal(&writer->cond);
@@ -1465,12 +1481,14 @@ wal_write(struct recovery_state *r, u16 tag, u16 op, u64 cookie,
 	return req->out_lsn == 0 ? -1 : 0;
 }
 
-struct recovery_state *
-recover_init(const char *snap_dirname, const char *wal_dirname,
+void
+recovery_init(const char *snap_dirname, const char *wal_dirname,
 	     row_handler row_handler, int rows_per_file,
 	     const char *wal_mode, double fsync_delay, int flags, void *data)
 {
-	struct recovery_state *r = p0alloc(eter_pool, sizeof(*r));
+	assert(recovery_state == NULL);
+	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
+	struct recovery_state *r = recovery_state;
 
 	if (rows_per_file <= 1)
 		panic("unacceptable value of 'rows_per_file'");
@@ -1490,21 +1508,22 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 
 	if ((flags & RECOVER_READONLY) == 0)
 		wal_writer_start(r);
-
-	return r;
 }
 
 void
-recovery_update_mode(struct recovery_state *r, const char *mode,
-		     double fsync_delay)
+recovery_update_mode(const char *mode, double fsync_delay)
 {
+	struct recovery_state *r = recovery_state;
 	(void) mode;
 	r->wal_class->fsync_delay = fsync_delay;
 }
 
 void
-recover_free(struct recovery_state *recovery)
+recovery_free()
 {
+	struct recovery_state *recovery = recovery_state;
+	if (recovery == NULL)
+		return;
 	if (recovery->writer)
 		wal_writer_stop(recovery);
 
@@ -1512,6 +1531,8 @@ recover_free(struct recovery_state *recovery)
 	v11_class_free(recovery->wal_class);
 	if (recovery->current_wal)
 		log_io_close(&recovery->current_wal);
+
+	recovery_state = NULL;
 }
 
 void

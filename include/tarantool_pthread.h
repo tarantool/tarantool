@@ -154,4 +154,10 @@
 		tt_pthread_error(e);		\
 })
 
+#define tt_pthread_once(control, function)	\
+({	int e = pthread_once(control, function);\
+	tt_pthread_error(e);			\
+})
+
+
 #endif /* TARANTOOL_PTHREAD_H_INCLUDED */
