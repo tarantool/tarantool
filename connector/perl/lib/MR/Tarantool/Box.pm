@@ -79,7 +79,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.18;
+$VERSION = 0.0.21;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -286,6 +286,7 @@ sub new {
 
     $self->{hashify}         = $arg->{'hashify'} if exists $arg->{'hashify'};
     $self->{default_raw}     = $arg->{default_raw};
+    $self->{default_raw}     = 1 if !defined$self->{default_raw} and defined $self->{hashify} and !$self->{hashify};
 
     $arg->{spaces} = $arg->{namespaces} = [@{ $arg->{spaces} ||= $arg->{namespaces} || confess "no spaces given" }];
     confess "no spaces given" unless @{$arg->{spaces}};
@@ -338,6 +339,7 @@ sub new {
             m/^[A-Za-z]/ or confess "space[$namespace] fields names must begin with [A-Za-z]: bad name $_" for @{$ns->{fields}};
             $ns->{fields_hash} = { map { $ns->{fields}->[$_] => $_ } 0..$#{$ns->{fields}} };
         }
+        $ns->{default_raw} = 1 if !defined$ns->{default_raw} and defined $ns->{hashify} and !$ns->{hashify};
     }
     $self->{namespaces} = \%namespaces;
     if (@{$arg->{spaces}} > 1) {
@@ -964,6 +966,10 @@ sub Select {
 
         if ($param->{callback}) {
             return $param->{callback}->($r);
+        }
+
+        if ($param->{return_fh} && ref $param->{return_fh} eq 'CODE') {
+            return $param->{return_fh}->($r);
         }
 
         return unless $r;

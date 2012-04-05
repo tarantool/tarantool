@@ -1,6 +1,6 @@
--- This function create new table with constants members. The runntime errro
--- will be rised if attempting to change table members.
-local function finalize_table(table)
+-- This function create new table with constants members. The run-time error
+-- will be raised if attempting to change table members.
+local function create_const_table(table)
     return setmetatable ({}, {
 			     __index = table,
 			     __newindex = function(table_arg,
@@ -13,6 +13,16 @@ local function finalize_table(table)
 			     end
 			     })
 end
+
+--- box flags
+box.flags = create_const_table(
+    {
+        BOX_RETURN_TUPLE = 0x01,
+        BOX_ADD = 0x02,
+        BOX_REPLACE = 0x04,
+        BOX_NOT_STORE = 0x10,
+        BOX_GC_TXN = 0x20
+    })
 
 --
 --
@@ -63,7 +73,7 @@ function box.delete(space, ...)
     local key = {...}
     return box.process(21,
                        box.pack('iii'..string.rep('p', #key), space,
-                                 1, -- flags, BOX_RETURN_TUPLE
+                                 box.flags.BOX_RETURN_TUPLE,  -- flags
                                  #key, -- key cardinality
                                  unpack(key)))
 end
@@ -74,7 +84,7 @@ function box.replace(space, ...)
     return box.process(13,
                        box.pack('iii'..string.rep('p', #tuple),
                                  space,
-                                 1, -- flags, BOX_RETURN_TUPLE 
+                                 box.flags.BOX_RETURN_TUPLE,  -- flags
                                  #tuple, -- cardinality
                                  unpack(tuple)))
 end
@@ -85,13 +95,15 @@ function box.insert(space, ...)
     return box.process(13,
                        box.pack('iii'..string.rep('p', #tuple),
                                 space,
-                                3, -- flags, BOX_RETURN_TUPLE  | BOX_ADD
+                                bit.bor(box.flags.BOX_RETURN_TUPLE,
+                                        box.flags.BOX_ADD),  -- flags
                                 #tuple, -- cardinality
                                 unpack(tuple)))
 end
 
---- UPDATE opearations
-box.update_ops = finalize_table(
+box.upd = {}
+--- UPDATE operations codes
+box.upd.opcodes = create_const_table(
     {
         -- assign value to field
         ASSIGN = 0,
@@ -107,21 +119,64 @@ box.update_ops = finalize_table(
         SPLICE = 5,
         -- delete field
         DELETE = 6,
+        -- insert field
+        INSERT = 7,
     })
 
--- UPDATE command
-function box.update(space, ops_list, ...)
+-- create ASSIGN operation for UPDATE command
+function box.upd.assign(field, value)
+    return { opcode = box.upd.opcodes.ASSIGN, field = field, value = value }
+end
+
+-- create ADD operation for UPDATE command
+function box.upd.arith_add(field, value)
+    return { opcode = box.upd.opcodes.ARITH_ADD, field = field, value = value }
+end
+
+-- create AND operation for UPDATE command
+function box.upd.arith_and(field, value)
+    return { opcode = box.upd.opcodes.ARITH_AND, field = field, value = value }
+end
+
+-- create XOR operation for UPDATE command
+function box.upd.arith_xor(field, value)
+    return { opcode = box.upd.opcodes.ARITH_XOR, field = field, value = value }
+end
+
+-- create OR operation for UPDATE command
+function box.upd.arith_or(field, value)
+    return { opcode = box.upd.opcodes.ARITH_OR, field = field, value = value }
+end
+
+-- create SPLICE operation for UPDATE command
+function box.upd.splice(field, offset, length, list)
+    return { opcode = box.upd.opcodes.SPLICE, field = field, offset = offset,
+             length = length, list = list }
+end
+
+-- create DELETE operation for UPDATE command
+function box.upd.delete(field)
+    return { opcode = box.upd.opcodes.DELETE, field = field }
+end
+
+-- create INSERT operation for UPDATE command
+function box.upd.insert(field, value)
+    return { opcode = box.upd.opcodes.INSERT, field = field, value = value }
+end
+
+-- execute UPDATE command by operation list
+function box.update_ol(space, ops_list, ...)
     local key = {...}
 
     local format = ''
     local args_list = {}
 
-    -- fill UPDATE command's header
+    -- fill UPDATE command header
     format = format .. 'ii'
     table.insert(args_list, space) -- space number
-    table.insert(args_list, 1) -- flags, BOX_RETURN_TUPLE
+    table.insert(args_list, box.flags.BOX_RETURN_TUPLE) -- flags
 
-    -- fill UPDATE command's key
+    -- fill UPDATE command key
     format = format .. 'i'
     table.insert(args_list, #key) -- key cardinality
     for itr, val in ipairs(key) do
@@ -129,25 +184,26 @@ function box.update(space, ops_list, ...)
         table.insert(args_list, val) -- key field
     end
 
-    -- fill UPDATE command's operations
+    -- fill UPDATE command operations
     format = format .. "i"
     table.insert(args_list, #ops_list)
     for itr, op in ipairs(ops_list) do
         local ops_operands = nil
-        if op.op == box.update_ops.ASSIGN or
-            op.op == box.update_ops.ARITH_ADD or
-            op.op == box.update_ops.ARITH_ADD or
-            op.op == box.update_ops.ARITH_AND or
-            op.op == box.update_ops.ARITH_XOR or
-            op.op == box.update_ops.ARITH_OR then
+        if op.opcode == box.upd.opcodes.ASSIGN or
+            op.opcode == box.upd.opcodes.ARITH_ADD or
+            op.opcode == box.upd.opcodes.ARITH_ADD or
+            op.opcode == box.upd.opcodes.ARITH_AND or
+            op.opcode == box.upd.opcodes.ARITH_XOR or
+            op.opcode == box.upd.opcodes.ARITH_OR or
+            op.opcode == box.upd.opcodes.INSERT then
             -- single operand operation
             ops_operands = op.value
-        elseif op.op == box.update_ops.SPLICE then
+        elseif op.opcode == box.upd.opcodes.SPLICE then
             -- SPLICE operands
             ops_operands = box.pack('ppp', op.offset, op.length, op.list)
-        elseif op.op == box.update_ops.DELETE then
-            -- actualy delete doesn't have arguments, but we shold put empry
-            -- args
+        elseif op.opcode == box.upd.opcodes.DELETE then
+            -- actually delete doesn't have arguments, but we shold put empty
+            -- arguments
             ops_operands = box.pack('p', '')
         else
             return error("invalid UPDATE operation")
@@ -155,10 +211,45 @@ function box.update(space, ops_list, ...)
 
         format = format .. "ibp"
         table.insert(args_list, op.field)
-        table.insert(args_list, op.op)
+        table.insert(args_list, op.opcode)
         table.insert(args_list, ops_operands)
     end
 
+    return box.process(19, box.pack(format, unpack(args_list)))
+end
+
+-- UPDATE command
+function box.update_ml(space, ops, ...)
+    local key = {...}
+
+    local format = ''
+    local args_list = {}
+    
+    -- fill UPDATE command header
+    format = format .. 'ii'
+    table.insert(args_list, space) -- space number
+    table.insert(args_list, box.flags.BOX_RETURN_TUPLE) -- flags
+
+    -- fill UPDATE command key
+    format = format .. 'i'
+    table.insert(args_list, #key) -- key cardinality
+    for itr, val in ipairs(key) do
+        format = format .. 'p'
+        table.insert(args_list, val) -- key field
+    end
+
+    -- fill UPDATE command operations
+    -- fill format: operations count and operations
+    format = format .. "i" .. ops[1]
+    table.remove(ops, 1)
+    -- operations count
+    table.insert(args_list, #ops/2)
+    -- operations
+    for itr, op in ipairs(ops) do
+        table.insert(args_list, op)
+    end
+
+    --print("format = '", format, "'")
     return box.process(19, box.pack(format, unpack(args_list)))
 end
 
@@ -201,8 +292,11 @@ function box.on_reload_configuration()
         return box.select_limit(space.n, ino, offset, limit, ...)
     end
     space_mt.insert = function(space, ...) return box.insert(space.n, ...) end
-    space_mt.update = function(space, ops_list, ...)
-        return box.update(space.n, ops_list,...)
+    space_mt.update_ol = function(space, ops_list, ...)
+        return box.update_ol(space.n, ops_list,...)
+    end
+    space_mt.update_ml = function(space, ops, ...)
+        return box.update_ml(space.n, ops,...)
     end
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end

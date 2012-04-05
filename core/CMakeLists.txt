@@ -61,7 +61,7 @@ set (recompiled_core_sources
      ${CMAKE_SOURCE_DIR}/core/fiber.m PARENT_SCOPE)
 
 set (common_sources tbuf.m palloc.m util.m
-    salloc.m pickle.m coro.m stat.m log_io.m cpu_feature.m
+    salloc.m pickle.m coro.m stat.m log_io.m cpu_feature.m crc32.c
     log_io_remote.m iproto.m exception.m errcode.c errinj.m latch.m)
 
 if (ENABLE_TRACE)
@@ -72,7 +72,7 @@ add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers luajit)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
-set (common_libraries cfg core ev coro gopt misc objc)
+set (common_libraries cfg core ev coro gopt misc objc pthread rt)
 set (common_libraries ${common_libraries} ${LUAJIT_LIB})
 
 if (TARGET_OS_LINUX)

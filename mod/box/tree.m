@@ -525,24 +525,32 @@ dense_node_compare(struct key_def *key_def, u32 first_field,
 		   struct box_tuple *tuple_a, u32 offset_a,
 		   struct box_tuple *tuple_b, u32 offset_b)
 {
-	/* find field offsets */
-	u32 off_a[key_def->part_count];
-	u32 off_b[key_def->part_count];
-	u8 *ad = tuple_a->data + offset_a;
-	u8 *bd = tuple_b->data + offset_b;
-	for (int i = 0; i < key_def->part_count; ++i) {
-		assert(first_field + i < tuple_a->cardinality);
-		assert(first_field + i < tuple_b->cardinality);
-		off_a[i] = ad - tuple_a->data;
-		off_b[i] = bd - tuple_b->data;
-		u32 al = load_varint32((void**) &ad);
-		u32 bl = load_varint32((void**) &bd);
-		ad += al;
-		bd += bl;
+	int part_count = key_def->part_count;
+	assert(first_field + part_count <= tuple_a->cardinality);
+	assert(first_field + part_count <= tuple_b->cardinality);
+
+	/* Allocate space for offsets. */
+	u32 *off_a = alloca(2 * part_count * sizeof(u32));
+	u32 *off_b = off_a + part_count;
+
+	/* Find field offsets. */
+	off_a[0] = offset_a;
+	off_b[0] = offset_b;
+	if (part_count > 1) {
+		u8 *ad = tuple_a->data + offset_a;
+		u8 *bd = tuple_b->data + offset_b;
+		for (int i = 1; i < part_count; ++i) {
+			u32 al = load_varint32((void**) &ad);
+			u32 bl = load_varint32((void**) &bd);
+			ad += al;
+			bd += bl;
+			off_a[i] = ad - tuple_a->data;
+			off_b[i] = bd - tuple_b->data;
+		}
 	}
 
-	/* compare key parts */
-	for (int part = 0; part < key_def->part_count; ++part) {
+	/* Compare key parts. */
+	for (int part = 0; part < part_count; ++part) {
 		int field = key_def->parts[part].fieldno;
 		int r = dense_part_compare(key_def->parts[part].type,
 					   tuple_a->data,
@@ -607,18 +615,26 @@ dense_key_node_compare(struct key_def *key_def,
 		       const struct key_data *key_data,
 		       u32 first_field, struct box_tuple *tuple, u32 offset)
 {
-	/* find field offsets */
-	u32 off[key_def->part_count];
-	u8 *data = tuple->data + offset;
-	for (int i = 0; i < key_def->part_count; ++i) {
-		assert(first_field + i < tuple->cardinality);
-		off[i] = data - tuple->data;
-		u32 len = load_varint32((void**) &data);
-		data += len;
+	int part_count = key_def->part_count;
+	assert(first_field + part_count <= tuple->cardinality);
+
+	/* Allocate space for offsets. */
+	u32 *off = alloca(part_count * sizeof(u32));
+
+	/* Find field offsets. */
+	off[0] = offset;
+	if (part_count > 1) {
+		u8 *data = tuple->data + offset;
+		for (int i = 1; i < part_count; ++i) {
+			u32 len = load_varint32((void**) &data);
+			data += len;
+			off[i] = data - tuple->data;
+		}
 	}
 
-	/* compare key parts */
-	int part_count = MIN(key_def->part_count, key_data->part_count);
+	/* Compare key parts. */
+	if (part_count > key_data->part_count)
+		part_count = key_data->part_count;
 	for (int part = 0; part < part_count; ++part) {
 		int field = key_def->parts[part].fieldno;
 		int r = dense_key_part_compare(key_def->parts[part].type,
@@ -922,22 +938,6 @@ tree_iterator_free(struct iterator *iterator)
 	(void) node;
 	[self subclassResponsibility: _cmd];
 	return NULL;
-}
-
-- (int) compare: (const void *) node_a :(const void *) node_b
-{
-	(void) node_a;
-	(void) node_b;
-	[self subclassResponsibility: _cmd];
-	return 0;
-}
-
-- (int) key_compare: (const void *) key :(const void *) node
-{
-	(void) key;
-	(void) node;
-	[self subclassResponsibility: _cmd];
-	return 0;
 }
 
 @end

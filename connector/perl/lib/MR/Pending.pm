@@ -111,15 +111,19 @@ sub wait {
     my ($self) = @_;
     my $pending = $self->_pending;
 
-    my $rin = '';
-    vec($rin, $_->fileno, 1) = 1 for grep { $_->is_pending } values %$pending;
-    my $ein = $rin;
+    my $in = '';
+    vec($in, $_->fileno, 1) = 1 for grep { $_->is_pending } values %$pending;
 
-    my $n = CORE::select($rin, undef, $ein, $self->itertime);
-    $self->_waitresult([$rin,$ein]);
-    if ($n < 0) {
-        warn $self->name.": select() failed: $!";
-        return undef;
+    my $n;
+    while(1) {
+        my $ein = my $rin = $in;
+        $n = CORE::select($rin, undef, $ein, $self->itertime);
+        $self->_waitresult([$rin,$ein]);
+        if ($n < 0) {
+            next if $!{EINTR};
+            warn $self->name.": select() failed: $!";
+            return undef;
+        }
     }
 
     if ($n == 0) {
@@ -145,12 +149,12 @@ sub recv {
                     $self->runcatch($pend->onok, ($pend->id, $list, $pend, $self));
                 }
             } else {
-                $pend->close("error while receiving");
+                $pend->close("error while receiving (".$pend->last_error.")");
             }
         } elsif (vec($ein, $fileno, 1)) {
-            $pend->close("connection reset");
+            $pend->close("connection reset (".$pend->last_error.")");
         } elsif ($pend->is_timeout) {
-            $pend->close("timeout");
+            $pend->close("timeout (".$pend->last_error.")");
         }
     }
 
@@ -230,6 +234,7 @@ has $_ => (
     is        => 'ro',
     isa       => 'CodeRef',
     predicate => "_has_$_",
+    required  => 1,
 ) for qw/onok onerror onretry/;
 
 has $_ => (
@@ -261,6 +266,7 @@ has _connection => (
     isa      => 'Maybe[MR::IProto::Connection::Sync]',
     clearer  => '_clear__connection',
     predicate=> '_has__connection',
+    handles  => [qw/last_error/],
 );
 
 has fileno => (
@@ -344,8 +350,6 @@ sub continue {
             }
             return \@list;
         }
-    } else {
-        warn $@;
     }
     return 0;
 }
@@ -358,7 +362,8 @@ sub close {
 
 sub DEMOLISH {
     my ($self) = @_;
-    Carp::cluck "$$ FORGOTTEN $self" if $self->is_pending;
+    warn "$$ FORGOTTEN $self" if $self->is_pending;
+    #Carp::cluck "$$ FORGOTTEN $self" if $self->is_pending;
 }
 
 no Mouse;

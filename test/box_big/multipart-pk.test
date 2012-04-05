@@ -93,8 +93,8 @@ exec admin "lua box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')"
 #
 # Update test
 #
-exec admin "lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'The Wolf!', 'Vincent', 1)"
-exec admin "lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'Vincent', 'The Wolf!', 1)"
+exec admin "lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'The Wolf!', 'Vincent', 1)"
+exec admin "lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'Vincent', 'The Wolf!', 1)"
 
 # Checking Vincent's last messages
 exec admin "lua box.select(9, 0, 'Vincent', 'The Wolf!')"
@@ -102,8 +102,8 @@ exec admin "lua box.select(9, 0, 'Vincent', 'The Wolf!')"
 exec admin "lua box.select(9, 0, 'The Wolf!', 'Vincent')"
 
 # try to update nonexistent message
-exec admin "lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'Vincent', 'The Wolf!', 3)"
+exec admin "lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'Vincent', 'The Wolf!', 3)"
 # try to update patrial defined key
-exec admin "lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'Vincent', 'The Wolf!')"
+exec admin "lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'Vincent', 'The Wolf!')"
 # try to delete by invalid key
-exec admin "lua box.update(9, {{op = box.update_ops.ASSIGN, field = 3, value = '<ooops>'}}, 'The Wolf!', 'Vincent', 1, 'Come again?')"
+exec admin "lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'The Wolf!', 'Vincent', 1, 'Come again?')"

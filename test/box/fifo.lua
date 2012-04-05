@@ -22,26 +22,7 @@ function fifo_push(name, val)
     elseif bottom == top then
         bottom = bottom + 1
     end
-
-    return box.update(0,
-                      {
-                          {
-                              op = box.update_ops.ASSIGN,
-                              field = 1,
-                              value = top
-                          },
-                          {
-                              op = box.update_ops.ASSIGN,
-                              field = 2,
-                              value = bottom
-                          },
-                          {
-                              op = box.update_ops.ASSIGN,
-                              field = top,
-                              value = val
-                          },
-                      },
-                      name)
+    return box.update_ml(0, {'=p=p=p', 1, top, 2, bottom, top, val}, name)
 end
 function fifo_top(name)
     fifo = find_or_create_fifo(name)

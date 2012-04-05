@@ -123,6 +123,24 @@ lua_tointeger64(struct lua_State *L, int idx)
 	return result;
 }
 
+/* Convert box.pack() format specifier to Tarantool
+ * binary protocol UPDATE opcode
+ */
+static char format_to_opcode(char format)
+{
+	switch (format) {
+	case '=': return 0;
+	case '+': return 1;
+	case '&': return 2;
+	case '^': return 3;
+	case '|': return 4;
+	case ':': return 5;
+	case '#': return 6;
+	case '!': return 7;
+	default: return format;
+	}
+}
+
 /**
  * To use Tarantool/Box binary protocol primitives from Lua, we
  * need a way to pack Lua variables into a binary representation.
@@ -215,6 +233,18 @@ lbox_pack(struct lua_State *L)
 			}
 			luaL_addvarint32(&b, size);
 			luaL_addlstring(&b, str, size);
+			break;
+		case '=': /* update tuple set foo=bar */
+		case '+': /* set field+=val */
+		case '&': /* set field&=val */
+		case '|': /* set field|=val */
+		case '^': /* set field^=val */
+		case ':': /* splice */
+		case '#': /* delete field */
+		case '!': /* insert field */
+			u32buf= (u32) lua_tointeger(L, i); /* field no */
+			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
+			luaL_addchar(&b, format_to_opcode(*format));
 			break;
 		default:
 			luaL_error(L, "box.pack: unsupported pack "

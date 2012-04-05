@@ -57,9 +57,12 @@ struct log_io_class {
 	u64 marker, eof_marker;
 	size_t marker_size, eof_marker_size;
 	size_t rows_per_file;
+	/* wal_fsync_delay value for the log class. */
 	double fsync_delay;
 	bool panic_if_error;
 
+	/* Additional flags to apply at open(2) to write. */
+	int  open_wflags;
 	const char *filetype;
 	const char *version;
 	const char *suffix;
@@ -152,13 +155,17 @@ struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, u64 cookie, i64 lsn);
 
 struct recovery_state *recover_init(const char *snap_dirname, const char *xlog_dirname,
 				    row_handler row_handler,
-				    int rows_per_file, double fsync_delay, int inbox_size,
+				    int rows_per_file, const char *wal_mode,
+				    double fsync_delay, int inbox_size,
 				    int flags, void *data);
+void recovery_update_mode(struct recovery_state *r,
+			  const char *wal_mode, double fsync_delay);
 void recover_free(struct recovery_state *recovery);
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recover_finalize(struct recovery_state *r);
-bool wal_write(struct recovery_state *r, u16 tag, u64 cookie, i64 lsn, struct tbuf *data);
+int wal_write(struct recovery_state *r, u16 tag, u16 op,
+	      u64 cookie, i64 lsn, struct tbuf *data);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 
