@@ -249,7 +249,6 @@ function box.update_ml(space, ops, ...)
         table.insert(args_list, op)
     end
 
-    --print("format = '", format, "'")
     return box.process(19, box.pack(format, unpack(args_list)))
 end
 
