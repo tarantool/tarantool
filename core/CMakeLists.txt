@@ -48,6 +48,9 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
 #
 set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM 1)
 
+set_source_files_properties(cpu_feature.m
+    PROPERTIES COMPILE_FLAGS "-msse3 -msse4")
+
 #
 # Used by modules.
 #
