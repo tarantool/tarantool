@@ -677,6 +677,16 @@ tree_iterator_next(struct iterator *iterator)
 }
 
 static struct box_tuple *
+tree_iterator_reverse_next(struct iterator *iterator)
+{
+	assert(iterator->next == tree_iterator_reverse_next);
+	struct tree_iterator *it = tree_iterator(iterator);
+
+	void *node = sptree_index_iterator_reverse_next(it->iter);
+	return [it->index unfold: node];
+}
+
+static struct box_tuple *
 tree_iterator_next_equal(struct iterator *iterator)
 {
 	assert(iterator->next == tree_iterator_next);
@@ -691,12 +701,26 @@ tree_iterator_next_equal(struct iterator *iterator)
 	return NULL;
 }
 
+static struct box_tuple *
+tree_iterator_reverse_next_equal(struct iterator *iterator)
+{
+	assert(iterator->next == tree_iterator_reverse_next);
+	struct tree_iterator *it = tree_iterator(iterator);
+
+	void *node = sptree_index_iterator_reverse_next(it->iter);
+	if (node != NULL
+	    && it->index->tree.compare(&it->key_data, node, it->index) == 0) {
+		return [it->index unfold: node];
+	}
+
+	return NULL;
+}
+
 static void
 tree_iterator_free(struct iterator *iterator)
 {
-	assert(iterator->next == tree_iterator_next);
+	assert(iterator->free == tree_iterator_free);
 	struct tree_iterator *it = tree_iterator(iterator);
-
 	if (it->iter)
 		sptree_index_iterator_free(it->iter);
 
@@ -821,30 +845,36 @@ tree_iterator_free(struct iterator *iterator)
 	if (it) {
 		memset(it, 0, sizeof(struct tree_iterator));
 		it->index = self;
-		it->base.next = tree_iterator_next;
 		it->base.free = tree_iterator_free;
 	}
 	return (struct iterator *) it;
 }
 
-- (void) initIterator: (struct iterator *) iterator
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
-	[self initIterator: iterator :NULL :0];
+	[self initIterator: iterator :type :NULL :0];
 }
 
-- (void) initIterator: (struct iterator *) iterator
-		     : (void *) key
-		     : (int) part_count
+- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+                        :(void *) key
+			:(int) part_count
 {
-	assert(iterator->next == tree_iterator_next);
+	assert(iterator->free == tree_iterator_free);
 	struct tree_iterator *it = tree_iterator(iterator);
-
-	it->base.next_equal = tree_iterator_next_equal;
 
 	it->key_data.data = key;
 	it->key_data.part_count = part_count;
 	fold_with_key_parts(key_def, &it->key_data);
-	sptree_index_iterator_init_set(&tree, &it->iter, &it->key_data);
+
+	if (type == ITER_FORWARD) {
+		it->base.next = tree_iterator_next;
+		it->base.next_equal = tree_iterator_next_equal;
+		sptree_index_iterator_init_set(&tree, &it->iter, &it->key_data);
+	} else if (type == ITER_REVERSE) {
+		it->base.next = tree_iterator_reverse_next;
+		it->base.next_equal = tree_iterator_reverse_next_equal;
+		sptree_index_iterator_reverse_init_set(&tree, &it->iter, &it->key_data);
+	}
 }
 
 - (void) build: (Index *) pk
@@ -868,7 +898,7 @@ tree_iterator_free(struct iterator *iterator)
 	}
 
 	struct iterator *it = pk->position;
-	[pk initIterator: it];
+	[pk initIterator: it :ITER_FORWARD];
 
 	struct box_tuple *tuple;
 	for (u32 i = 0; (tuple = it->next(it)) != NULL; ++i) {
