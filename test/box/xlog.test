@@ -44,7 +44,7 @@ if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000004.xlog.inprogress has been successfully renamed"
 
 print """
-# An inprogress xlog fle with one record must be renamed during recovery.
+# An inprogress xlog file with one record must be renamed during recovery.
 """
 
 wal_inprogress = os.path.join(vardir, "00000000000000000005.xlog.inprogress")

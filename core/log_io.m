@@ -41,9 +41,9 @@
 
 #include <fiber.h>
 #include <say.h>
-#include <third_party/crc32.h>
 #include <pickle.h>
-#include <cpu_feature.h>
+#include <crc32.h>
+#include <tarantool_pthread.h>
 
 const u16 snap_tag = -1;
 const u16 wal_tag = -2;
@@ -51,14 +51,32 @@ const u64 default_cookie = 0;
 const u32 default_version = 11;
 const u32 marker_v11 = 0xba0babed;
 const u32 eof_marker_v11 = 0x10adab1e;
-const char *snap_suffix = ".snap";
-const char *xlog_suffix = ".xlog";
-const char *inprogress_suffix = ".inprogress";
-const char *v11 = "0.11\n";
-const char *snap_mark = "SNAP\n";
-const char *xlog_mark = "XLOG\n";
+const char snap_suffix[] = ".snap";
+const char xlog_suffix[] = ".xlog";
+const char inprogress_suffix[] = ".inprogress";
+const char v11[] = "0.11\n";
+const char snap_mark[] = "SNAP\n";
+const char xlog_mark[] = "XLOG\n";
+static const int HEADER_SIZE_MAX = sizeof(v11) + sizeof(snap_mark) + 2;
+
+struct recovery_state *recovery_state;
 
 #define ROW_EOF (void *)1
+
+/* Context of the WAL writer thread. */
+
+struct wal_writer
+{
+	STAILQ_HEAD(wal_fifo, wal_write_request) input;
+	pthread_t thread;
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+	bool is_shutdown;
+};
+
+static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
+
+static struct wal_writer wal_writer;
 
 static struct tbuf *row_reader_v11(FILE *f, struct palloc_pool *pool);
 
@@ -71,19 +89,6 @@ struct log_io_iter {
 	bool eof;
 	int io_rate_limit;
 };
-
-static u_int32_t (*calc_crc32c)(u_int32_t crc, const unsigned char *buf,
-		unsigned int len) = NULL;
-
-void
-mach_setup_crc32()
-{
-#if defined (__i386__) || defined (__x86_64__)
-	calc_crc32c = cpu_has(cpuf_sse4_2) ? &crc32c_hw : &crc32c;
-#else
-	calc_crc32c = &crc32c;
-#endif
-}
 
 
 void
@@ -224,6 +229,13 @@ close_iter(struct log_io_iter *i)
 	tarantool_coro_destroy(&i->coro);
 }
 
+/**
+ * Read logfile contents using designated format, panic if
+ * the log is corrupted/unreadable.
+ *
+ * @param i	iterator object, encapsulating log specifics.
+ *
+ */
 static void
 read_rows(struct log_io_iter *i)
 {
@@ -286,8 +298,8 @@ read_rows(struct log_io_iter *i)
 
 		if (++row_count % 100000 == 0)
 			say_info("%.1fM rows processed", row_count / 1000000.);
-	}
-      eof:
+	} /* for loop */
+eof:
 	/*
 	 * then only two cases of fully read file:
 	 * 1. eof_marker_size > 0 and it is the last record in file
@@ -308,7 +320,7 @@ read_rows(struct log_io_iter *i)
 		goto out;
 	}
 
-      out:
+out:
 	l->rows += row_count;
 
 	fseeko(l->f, good_offset, SEEK_SET);	/* seek back to last known good offset */
@@ -472,8 +484,8 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 	m->size = offsetof(struct row_v11, data);
 
 	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
-	header_crc = calc_crc32c(0, m->data + offsetof(struct row_v11, lsn),
-			    sizeof(struct row_v11) - offsetof(struct row_v11, lsn));
+	header_crc = crc32_calc(0, m->data + offsetof(struct row_v11, lsn),
+				sizeof(struct row_v11) - offsetof(struct row_v11, lsn));
 
 	if (row_v11(m)->header_crc32c != header_crc) {
 		say_error("header crc32c mismatch");
@@ -486,7 +498,7 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 
 	m->size += row_v11(m)->len;
 
-	data_crc = calc_crc32c(0, row_v11(m)->data, row_v11(m)->len);
+	data_crc = crc32_calc(0, row_v11(m)->data, row_v11(m)->len);
 	if (row_v11(m)->data_crc32c != data_crc) {
 		say_error("data crc32c mismatch");
 		return NULL;
@@ -497,7 +509,7 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 }
 
 static int
-inprogress_log_rename(char *filename)
+log_io_inprogress_rename(char *filename)
 {
 	char *new_filename;
 	char *suffix = strrchr(filename, '.');
@@ -541,14 +553,14 @@ inprogress_log_unlink(char *filename)
 }
 
 int
-close_log(struct log_io **lptr)
+log_io_close(struct log_io **lptr)
 {
 	struct log_io *l = *lptr;
 	int r;
 
 	if (l->rows == 1 && l->mode == LOG_WRITE) {
 		/* Rename WAL before finalize. */
-		if (inprogress_log_rename(l->filename) != 0)
+		if (log_io_inprogress_rename(l->filename) != 0)
 			panic("can't rename 'inprogress' WAL");
 	}
 
@@ -568,38 +580,29 @@ close_log(struct log_io **lptr)
 }
 
 static int
-flush_log(struct log_io *l)
+log_io_flush(struct log_io *l)
 {
 	if (fflush(l->f) < 0)
 		return -1;
 
-#ifdef TARGET_OS_LINUX
-	if (fdatasync(fileno(l->f)) < 0) {
-		say_syserror("fdatasync");
-		return -1;
-	}
-#else
 	if (fsync(fileno(l->f)) < 0) {
 		say_syserror("fsync");
 		return -1;
 	}
-#endif
 	return 0;
 }
 
 static int
 write_header(struct log_io *l)
 {
-	if (fwrite(l->class->filetype, strlen(l->class->filetype), 1, l->f) != 1)
-		return -1;
+	char header[HEADER_SIZE_MAX];
 
-	if (fwrite(l->class->version, strlen(l->class->version), 1, l->f) != 1)
-		return -1;
+	int n = snprintf(header, HEADER_SIZE_MAX, "%s%s\n",
+			 l->class->filetype, l->class->version);
 
-	if (fwrite("\n", 1, 1, l->f) != 1)
-		return -1;
+	assert(n < HEADER_SIZE_MAX);
 
-	return 0;
+	return fwrite(header, n, 1, l->f);
 }
 
 static char *
@@ -626,19 +629,61 @@ format_filename(char *filename, struct log_io_class *class, i64 lsn, int suffix)
 	return filename;
 }
 
-static struct log_io *
-open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 lsn, int suffix,
-	      const char *filename)
+/**
+ * Verify that file is of the given class (format).
+ *
+ * @param l		log_io object, denoting the file to check.
+ * @param class		class to check against.
+ * @param[out] errmsg   set if error
+ *
+ * @return 0 if success, -1 on error.
+ */
+static int
+log_io_verify_meta(struct log_io *l, struct log_io_class *class,
+		   const char **errmsg)
 {
 	char filetype[32], version[32], buf[256];
-	struct log_io *l = NULL;
-	char *r;
+
+	FILE *stream = l->f;
+
+	if (fgets(filetype, sizeof(filetype), stream) == NULL ||
+	    fgets(version, sizeof(version), stream) == NULL) {
+		*errmsg = "failed to read log file header";
+		goto error;
+	}
+	if (strcmp(class->filetype, filetype) != 0) {
+		*errmsg = "unknown filetype";
+		goto error;
+	}
+
+	if (strcmp(class->version, version) != 0) {
+		*errmsg = "unknown version";
+		goto error;
+	}
+	for (;;) {
+		if (fgets(buf, sizeof(buf), stream) == NULL) {
+			*errmsg = "failed to read log file header";
+			goto error;
+		}
+		if (strcmp(buf, "\n") == 0 || strcmp(buf, "\r\n") == 0)
+			break;
+	}
+	return 0;
+error:
+	return -1;
+}
+
+
+static struct log_io *
+log_io_open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 lsn, int suffix,
+		     const char *filename)
+{
 	const char *errmsg;
 
-	l = calloc(1, sizeof(*l));
+	struct log_io *l = calloc(1, sizeof(*l));
 	if (l == NULL) {
-		errmsg = strerror(errno);
-		goto error;
+		say_syserror("calloc");
+		return NULL;
 	}
 	l->mode = LOG_READ;
 	l->stat.data = recover;
@@ -653,7 +698,7 @@ open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 ls
 		strncpy(l->filename, filename, PATH_MAX);
 	}
 
-	say_debug("find_log for reading `%s'", l->filename);
+	say_debug("%s: opening %s'", __func__, l->filename);
 
 	l->f = fopen(l->filename, "r");
 	if (l->f == NULL) {
@@ -661,54 +706,23 @@ open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 ls
 		goto error;
 	}
 
-	r = fgets(filetype, sizeof(filetype), l->f);
-	if (r == NULL) {
-		errmsg = "header reading failed";
+	if (log_io_verify_meta(l, class, &errmsg) != 0)
 		goto error;
-	}
-
-	r = fgets(version, sizeof(version), l->f);
-	if (r == NULL) {
-		errmsg = "header reading failed";
-		goto error;
-	}
-
-	if (strcmp(class->filetype, filetype) != 0) {
-		errmsg = "unknown filetype";
-		goto error;
-	}
-
-	if (strcmp(class->version, version) != 0) {
-		errmsg = "unknown version";
-		goto error;
-	}
 	l->class = class;
 
-	for (;;) {
-		r = fgets(buf, sizeof(buf), l->f);
-		if (r == NULL) {
-			errmsg = "header reading failed";
-			goto error;
-		}
-		if (strcmp(r, "\n") == 0 || strcmp(r, "\r\n") == 0)
-			break;
-	}
-
 	return l;
-      error:
-	say_error("open_for_read: failed to open `%s': %s", l->filename,
-		  errmsg);
-	if (l != NULL) {
-		if (l->f != NULL)
-			fclose(l->f);
-		free(l);
-	}
+error:
+	say_error("%s: failed to open %s: %s", __func__,
+		  l->filename, errmsg);
+	if (l->f != NULL)
+		fclose(l->f);
+	free(l);
 	return NULL;
 }
 
 struct log_io *
-open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 lsn,
-	       int suffix, int *save_errno)
+log_io_open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 lsn,
+		      int suffix, int *save_errno)
 {
 	struct log_io *l = NULL;
 	int fd;
@@ -719,8 +733,8 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	l = calloc(1, sizeof(*l));
 	if (l == NULL) {
 		*save_errno = errno;
-		errmsg = strerror(errno);
-		goto error;
+		say_syserror("calloc");
+		return NULL;
 	}
 	l->mode = LOG_WRITE;
 	l->class = class;
@@ -729,7 +743,7 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	assert(lsn > 0);
 
 	format_filename(l->filename, class, lsn, suffix);
-	say_debug("find_log for writing `%s'", l->filename);
+	say_debug("%s: opening %s'", __func__, l->filename);
 
 	if (suffix == -1) {
 		/*
@@ -751,14 +765,15 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	 * Open the <lsn>.<suffix>.inprogress file. If it
 	 * exists, open will fail.
 	 */
-	fd = open(l->filename, O_WRONLY | O_CREAT | O_EXCL | O_APPEND, 0664);
+	fd = open(l->filename,
+		  O_WRONLY | O_CREAT | O_EXCL | l->class->open_wflags, 0664);
 	if (fd < 0) {
 		*save_errno = errno;
 		errmsg = strerror(errno);
 		goto error;
 	}
 
-	l->f = fdopen(fd, "a");
+	l->f = fdopen(fd, "w");
 	if (l->f == NULL) {
 		*save_errno = errno;
 		errmsg = strerror(errno);
@@ -768,14 +783,13 @@ open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 l
 	say_info("creating `%s'", l->filename);
 	write_header(l);
 	return l;
-      error:
-	say_error("find_log: failed to open `%s': %s", l->filename,
+
+error:
+	say_error("%s: failed to open `%s': %s", __func__, l->filename,
 		  errmsg);
-	if (l != NULL) {
-		if (l->f != NULL)
-			fclose(l->f);
-		free(l);
-	}
+	if (l->f != NULL)
+		fclose(l->f);
+	free(l);
 	return NULL;
 }
 
@@ -801,7 +815,7 @@ read_log(const char *filename,
 		return -1;
 	}
 
-	l = open_for_read(NULL, c, 0, 0, filename);
+	l = log_io_open_for_read(NULL, c, 0, 0, filename);
 	iter_open(l, &i, read_rows);
 	while ((row = iter_inner(&i, (void *)1)))
 		h(state, row);
@@ -811,7 +825,7 @@ read_log(const char *filename,
 
 	close_iter(&i);
 	v11_class_free(c);
-	close_log(&l);
+	log_io_close(&l);
 	return i.error;
 }
 
@@ -832,7 +846,7 @@ recover_snap(struct recovery_state *r)
 			return -1;
 		}
 
-		snap = open_for_read(r, r->snap_class, lsn, 0, NULL);
+		snap = log_io_open_for_read(r, r->snap_class, lsn, 0, NULL);
 		if (snap == NULL) {
 			say_error("can't find/open snapshot");
 			return -1;
@@ -866,7 +880,7 @@ recover_snap(struct recovery_state *r)
 			close_iter(&i);
 
 		if (snap != NULL)
-			close_log(&snap);
+			log_io_close(&snap);
 
 		prelease(fiber->gc_pool);
 	}
@@ -967,19 +981,19 @@ recover_remaining_wals(struct recovery_state *r)
 			} else {
 				say_warn("wal `%s' wasn't correctly closed",
 					 r->current_wal->filename);
-				close_log(&r->current_wal);
+				log_io_close(&r->current_wal);
 			}
 		}
 
 		current_lsn = r->confirmed_lsn + 1;	/* TODO: find better way looking for next xlog */
-		next_wal = open_for_read(r, r->wal_class, current_lsn, 0, NULL);
+		next_wal = log_io_open_for_read(r, r->wal_class, current_lsn, 0, NULL);
 
 		/*
 		 * When doing final recovery, and dealing with the
 		 * last file, try opening .<suffix>.inprogress.
 		 */
 		if (next_wal == NULL && r->finalize && current_lsn == wal_greatest_lsn) {
-			next_wal = open_for_read(r, r->wal_class, current_lsn, -1, NULL);
+			next_wal = log_io_open_for_read(r, r->wal_class, current_lsn, -1, NULL);
 			if (next_wal == NULL) {
 				char *filename =
 					format_filename(NULL, r->wal_class, current_lsn, -1);
@@ -1020,7 +1034,7 @@ recover_remaining_wals(struct recovery_state *r)
 		if (result == LOG_EOF) {
 			say_info("done `%s' confirmed_lsn:%" PRIi64, r->current_wal->filename,
 				 r->confirmed_lsn);
-			close_log(&r->current_wal);
+			log_io_close(&r->current_wal);
 		}
 	}
 
@@ -1077,7 +1091,7 @@ recover(struct recovery_state *r, i64 lsn)
 			result = -1;
 			goto out;
 		}
-		r->current_wal = open_for_read(r, r->wal_class, lsn, 0, NULL);
+		r->current_wal = log_io_open_for_read(r, r->wal_class, lsn, 0, NULL);
 		if (r->current_wal == NULL) {
 			result = -1;
 			goto out;
@@ -1123,7 +1137,7 @@ recover_follow_file(ev_stat *w, int revents __attribute__((unused)))
 	if (result == LOG_EOF) {
 		say_info("done `%s' confirmed_lsn:%" PRIi64, r->current_wal->filename,
 			 r->confirmed_lsn);
-		close_log(&r->current_wal);
+		log_io_close(&r->current_wal);
 		recover_follow_dir((ev_timer *)w, 0);
 	}
 }
@@ -1176,91 +1190,191 @@ recover_finalize(struct recovery_state *r)
 		} else if (r->current_wal->rows == 1) {
 			/* Rename inprogress wal with one row */
 			say_warn("rename unfinished %s wal", r->current_wal->filename);
-			if (inprogress_log_rename(r->current_wal->filename) != 0)
+			if (log_io_inprogress_rename(r->current_wal->filename) != 0)
 				panic("can't rename 'inprogress' wal");
 		} else
 			panic("too many rows in inprogress WAL `%s'", r->current_wal->filename);
 
-		close_log(&r->current_wal);
+		log_io_close(&r->current_wal);
 	}
 }
 
-static struct wal_write_request *
-wal_write_request(const struct tbuf *t)
+static void
+wal_writer_child()
 {
-	return t->data;
+	recovery_state->writer = NULL;
 }
 
-static struct tbuf *
-write_to_disk(void *_state, struct tbuf *t)
+static void
+wal_writer_init_once()
+{
+	pthread_atfork(NULL, NULL, wal_writer_child);
+}
+
+static void
+wal_writer_init(struct wal_writer *writer)
+{
+	/* I. Initialize the state. */
+	pthread_mutexattr_t errorcheck;
+
+	tt_pthread_mutexattr_init(&errorcheck);
+
+#ifndef NDEBUG
+	tt_pthread_mutexattr_settype(&errorcheck, PTHREAD_MUTEX_ERRORCHECK);
+#endif
+	/* Initialize queue lock mutex. */
+	tt_pthread_mutex_init(&writer->mutex, &errorcheck);
+	tt_pthread_mutexattr_destroy(&errorcheck);
+
+	pthread_condattr_t clock_monotonic;
+	tt_pthread_condattr_init(&clock_monotonic);
+
+	/* CLOCK_REALTIME is default for pthread timeouts, yet
+	 * we'd want to use a faster CLOCK_MONOTONIC.
+	 */
+	tt_pthread_condattr_setclock(&clock_monotonic, CLOCK_MONOTONIC);
+
+	tt_pthread_cond_init(&writer->cond, &clock_monotonic);
+	tt_pthread_condattr_destroy(&clock_monotonic);
+
+	STAILQ_INIT(&writer->input);
+
+	tt_pthread_once(&wal_writer_once, wal_writer_init_once);
+}
+
+static void
+wal_writer_destroy(struct wal_writer *writer)
+{
+	tt_pthread_mutex_destroy(&writer->mutex);
+	tt_pthread_cond_destroy(&writer->cond);
+}
+
+/** WAL writer thread routine. */
+static void *wal_writer_thread(void *worker_args);
+
+/**
+ * Initialize WAL writer, start the thread.
+ *
+ * @param state			WAL writer meta-data.
+ *
+ * @return 0 success, -1 on error. On success, recovery->writer
+ *         points to a newly created WAL writer.
+ */
+static int
+wal_writer_start(struct recovery_state *state)
+{
+	assert(state->writer == NULL);
+	assert(wal_writer.is_shutdown == false);
+
+	/* I. Initialize the state. */
+	wal_writer_init(&wal_writer);
+	state->writer = &wal_writer;
+
+	/* II. Start the thread. */
+
+	if (pthread_create(&wal_writer.thread, NULL, wal_writer_thread,
+			   state)) {
+		wal_writer_destroy(&wal_writer);
+		state->writer = NULL;
+		return -1;
+	}
+	return 0;
+}
+
+static int
+wal_writer_stop(struct recovery_state *state)
+{
+	struct wal_writer *writer = state->writer;
+
+	state->writer = NULL;
+
+	/* Stop the worker thread. */
+
+	tt_pthread_mutex_lock(&writer->mutex);
+	writer->is_shutdown= true;
+	tt_pthread_cond_signal(&writer->cond);
+	tt_pthread_mutex_unlock(&writer->mutex);
+
+	if (pthread_join(writer->thread, NULL) == 0) {
+		wal_writer_destroy(writer);
+		return 0;
+	}
+	say_syserror("WAL writer: thread join failed");
+	return -1;
+}
+
+struct wal_fifo
+wal_writer_pop(struct wal_writer *writer, bool wait)
+{
+	struct wal_fifo input;
+	do {
+		input = writer->input;
+		STAILQ_INIT(&writer->input);
+		if (STAILQ_EMPTY(&input) == false || wait == false)
+			break;
+		tt_pthread_cond_wait(&writer->cond, &writer->mutex);
+	} while (writer->is_shutdown == false);
+	return input;
+}
+
+static int
+write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 {
 	static struct log_io *wal = NULL, *wal_to_close = NULL;
 	static ev_tstamp last_flush = 0;
-	struct tbuf *reply, *header;
-	struct recovery_state *r = _state;
-	u32 result = 0;
 
+#if 0
 	/* we're not running inside ev_loop, so update ev_now manually */
 	ev_now_update();
+#endif
 
 	/* caller requested termination */
-	if (t == NULL) {
+	if (req == NULL) {
 		if (wal != NULL)
-			close_log(&wal);
+			log_io_close(&wal);
+#if 0
+		if (wal_to_close != NULL)
+			log_io_close(&wal_to_close);
 		recover_free((struct recovery_state*)_state);
-		return NULL;
+#endif
+		return 0;
 	}
-
-	reply = tbuf_alloc(t->pool);
 
 	if (wal == NULL) {
 		int unused;
 		/* Open WAL with '.inprogress' suffix. */
-		wal = open_for_write(r, r->wal_class, wal_write_request(t)->lsn, -1,
-				     &unused);
+		wal = log_io_open_for_write(r, r->wal_class, req->lsn, -1,
+					    &unused);
 	}
 	else if (wal->rows == 1) {
 		/* rename WAL after first successful write to name
 		 * without inprogress suffix*/
-		if (inprogress_log_rename(wal->filename) != 0) {
+		if (log_io_inprogress_rename(wal->filename) != 0) {
 			say_error("can't rename inprogress wal");
 			goto fail;
 		}
 	}
 
 	if (wal_to_close != NULL) {
-		if (close_log(&wal_to_close) != 0)
+		if (log_io_close(&wal_to_close) != 0)
 			goto fail;
 	}
 	if (wal == NULL) {
 		say_syserror("can't open wal");
 		goto fail;
 	}
-	if (fwrite(&wal->class->marker, wal->class->marker_size, 1, wal->f) != 1) {
-		say_syserror("can't write marker to wal");
-		goto fail;
-	}
-
-	header = tbuf_alloc(t->pool);
-	tbuf_ensure(header, sizeof(struct row_v11));
-	header->size = sizeof(struct row_v11);
-
-	row_v11(header)->lsn = wal_write_request(t)->lsn;
-	row_v11(header)->tm = ev_now();
-	row_v11(header)->len = wal_write_request(t)->len;
-	row_v11(header)->data_crc32c =
-		calc_crc32c(0, wal_write_request(t)->data, wal_write_request(t)->len);
-	row_v11(header)->header_crc32c =
-		calc_crc32c(0, header->data + field_sizeof(struct row_v11, header_crc32c),
-		       sizeof(struct row_v11) - field_sizeof(struct row_v11, header_crc32c));
-
-	if (fwrite(header->data, header->size, 1, wal->f) != 1) {
+	req->marker = marker_v11;
+	req->tm = ev_now();
+	req->data_crc32c = crc32_calc(0, (u8 *) &req->tag, req->len);
+	/* Header size. */
+	size_t sz = (sizeof(req->lsn) + sizeof(req->tm) + sizeof(req->len) +
+		     sizeof(req->data_crc32c));
+	req->header_crc32c = crc32_calc(0, (u8 *) &req->lsn, sz);
+	/* Total size. */
+	sz += sizeof(req->marker) + sizeof(req->header_crc32c) + req->len;
+	/* Write the request. */
+	if (fwrite(&req->marker, sz, 1, wal->f) != 1) {
 		say_syserror("can't write row header to wal");
-		goto fail;
-	}
-
-	if (fwrite(wal_write_request(t)->data, wal_write_request(t)->len, 1, wal->f) != 1) {
-		say_syserror("can't write row data to wal");
 		goto fail;
 	}
 
@@ -1270,8 +1384,9 @@ write_to_disk(void *_state, struct tbuf *t)
 		goto fail;
 	}
 
-	if (wal->class->fsync_delay > 0 && ev_now() - last_flush >= wal->class->fsync_delay) {
-		if (flush_log(wal) < 0) {
+	if (wal->class->fsync_delay > 0 &&
+	    ev_now() - last_flush >= wal->class->fsync_delay) {
+		if (log_io_flush(wal) < 0) {
 			say_syserror("can't flush wal");
 			goto fail;
 		}
@@ -1280,55 +1395,100 @@ write_to_disk(void *_state, struct tbuf *t)
 
 	wal->rows++;
 	if (wal->class->rows_per_file <= wal->rows ||
-	    (wal_write_request(t)->lsn + 1) % wal->class->rows_per_file == 0) {
+	    (req->lsn + 1) % wal->class->rows_per_file == 0) {
 		wal_to_close = wal;
 		wal = NULL;
 	}
 
-	tbuf_append(reply, &result, sizeof(result));
-	return reply;
+	req->out_lsn = req->lsn;
+	return 0;
 
-      fail:
-	result = 1;
-	tbuf_append(reply, &result, sizeof(result));
-	return reply;
+fail:
+	req->out_lsn = 0;
+	return -1;
 }
 
-bool
-wal_write(struct recovery_state *r, u16 tag, u64 cookie, i64 lsn, struct tbuf *row)
+static void *
+wal_writer_thread(void *worker_args)
 {
-	struct tbuf *m = tbuf_alloc(row->pool);
-	struct msg *a;
+	struct recovery_state *r = worker_args;
+	struct wal_writer *writer = r->writer;
+	struct wal_fifo output = STAILQ_HEAD_INITIALIZER(output);
+	struct wal_write_request *req;
 
-	say_debug("wal_write lsn=%" PRIi64, lsn);
-	tbuf_reserve(m, sizeof(struct wal_write_request) + sizeof(tag) + sizeof(cookie) + row->size);
-	m->size = sizeof(struct wal_write_request);
-	wal_write_request(m)->lsn = lsn;
-	wal_write_request(m)->len = row->size + sizeof(tag) + sizeof(cookie);
-	tbuf_append(m, &tag, sizeof(tag));
-	tbuf_append(m, &cookie, sizeof(cookie));
-	tbuf_append(m, row->data, row->size);
-
-	if (write_inbox(r->wal_writer->out, m) == false) {
-		say_warn("wal writer inbox is full");
-		return false;
+	tt_pthread_mutex_lock(&writer->mutex);
+	while (writer->is_shutdown == false) {
+		struct wal_fifo input =
+			wal_writer_pop(writer, STAILQ_EMPTY(&output));
+		pthread_mutex_unlock(&writer->mutex);
+		/*
+		 * Check the old list of fibers to wakeup *here*
+		 * since we needed a membar for its out_lsn's to
+		 * sync up.
+		 */
+		STAILQ_FOREACH(req, &output, wal_fifo_entry) {
+			/*
+			 * @todo:
+			 * Even though wal_write() is not
+			 * a cancellation point, check the fiber
+			 * wasn't cancelled and recycled.
+			 * */
+			fiber_wakeup(req->fiber);
+		}
+		STAILQ_FOREACH(req, &input, wal_fifo_entry) {
+			(void) write_to_disk(r, req);
+		}
+		output = input;
+		tt_pthread_mutex_lock(&writer->mutex);
 	}
-	a = read_inbox();
-
-	u32 reply = read_u32(a->msg);
-	say_debug("wal_write reply=%" PRIu32, reply);
-	if (reply != 0)
-		say_warn("wal writer returned error status");
-	return reply == 0;
+	tt_pthread_mutex_unlock(&writer->mutex);
+	write_to_disk(r, NULL);
+	return NULL;
 }
 
-struct recovery_state *
-recover_init(const char *snap_dirname, const char *wal_dirname,
-	     row_handler row_handler,
-	     int rows_per_file, double fsync_delay,
-	     int inbox_size, int flags, void *data)
+int
+wal_write(struct recovery_state *r, u16 tag, u16 op, u64 cookie,
+	  i64 lsn, struct tbuf *row)
 {
-	struct recovery_state *r = p0alloc(eter_pool, sizeof(*r));
+	say_debug("wal_write lsn=%" PRIi64, lsn);
+	struct wal_writer *writer = r->writer;
+
+	struct wal_write_request *req =
+		palloc(fiber->gc_pool, sizeof(struct wal_write_request)
+		       + row->size);
+
+	req->fiber = fiber;
+	req->lsn = lsn;
+	req->tag = tag;
+	req->cookie = cookie;
+	req->op = op;
+	req->len = sizeof(tag) + sizeof(cookie) + sizeof(op) + row->size;
+	memcpy(&req->data, row->data, row->size);
+
+	tt_pthread_mutex_lock(&writer->mutex);
+
+	bool was_empty = STAILQ_EMPTY(&writer->input);
+
+	STAILQ_INSERT_TAIL(&writer->input, req, wal_fifo_entry);
+
+	if (was_empty)
+		tt_pthread_cond_signal(&writer->cond);
+
+	tt_pthread_mutex_unlock(&writer->mutex);
+
+	fiber_yield();
+
+	return req->out_lsn == 0 ? -1 : 0;
+}
+
+void
+recovery_init(const char *snap_dirname, const char *wal_dirname,
+	     row_handler row_handler, int rows_per_file,
+	     const char *wal_mode, double fsync_delay, int flags, void *data)
+{
+	assert(recovery_state == NULL);
+	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
+	struct recovery_state *r = recovery_state;
 
 	if (rows_per_file <= 1)
 		panic("unacceptable value of 'rows_per_file'");
@@ -1343,27 +1503,36 @@ recover_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_class = xlog_class_create(wal_dirname);
 	r->wal_class->rows_per_file = rows_per_file;
 	r->wal_class->fsync_delay = fsync_delay;
+	r->wal_class->open_wflags = strcasecmp(wal_mode, "fsync") ? 0 : WAL_SYNC_FLAG;
 	wait_lsn_clear(&r->wait_lsn);
 
 	if ((flags & RECOVER_READONLY) == 0)
-		r->wal_writer = spawn_child("wal_writer", inbox_size, write_to_disk, r);
-
-	return r;
+		wal_writer_start(r);
 }
 
 void
-recover_free(struct recovery_state *recovery)
+recovery_update_mode(const char *mode, double fsync_delay)
 {
-	struct child *writer = recovery->wal_writer;
-	if (writer && writer->out && writer->out->fd > 0) {
-		close(writer->out->fd);
-		usleep(1000);
-	}
+	struct recovery_state *r = recovery_state;
+	(void) mode;
+	r->wal_class->fsync_delay = fsync_delay;
+}
+
+void
+recovery_free()
+{
+	struct recovery_state *recovery = recovery_state;
+	if (recovery == NULL)
+		return;
+	if (recovery->writer)
+		wal_writer_stop(recovery);
 
 	v11_class_free(recovery->snap_class);
 	v11_class_free(recovery->wal_class);
 	if (recovery->current_wal)
-		close_log(&recovery->current_wal);
+		log_io_close(&recovery->current_wal);
+
+	recovery_state = NULL;
 }
 
 void
@@ -1393,12 +1562,13 @@ write_rows(struct log_io_iter *i)
 			panic("fwrite");
 
 		row_v11(row)->lsn = 0;	/* unused */
+		/* @todo: check if we can safely use ev_now() here. */
 		row_v11(row)->tm = ev_now();
 		row_v11(row)->len = data->size;
-		row_v11(row)->data_crc32c = calc_crc32c(0, data->data, data->size);
+		row_v11(row)->data_crc32c = crc32_calc(0, data->data, data->size);
 		row_v11(row)->header_crc32c =
-			calc_crc32c(0, row->data + field_sizeof(struct row_v11, header_crc32c),
-			       sizeof(struct row_v11) - field_sizeof(struct row_v11,
+			crc32_calc(0, row->data + field_sizeof(struct row_v11, header_crc32c),
+				   sizeof(struct row_v11) - field_sizeof(struct row_v11,
 								     header_crc32c));
 
 		if (fwrite(row->data, row->size, 1, l->f) != 1)
@@ -1434,7 +1604,7 @@ snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
 		bytes += row->size + sizeof(struct row_v11);
 
 		while (bytes >= i->io_rate_limit) {
-			flush_log(i->log);
+			log_io_flush(i->log);
 
 			ev_now_update();
 			elapsed = ev_now() - last;
@@ -1462,7 +1632,7 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 
 	memset(&i, 0, sizeof(i));
 
-	snap = open_for_write(r, r->snap_class, r->confirmed_lsn, -1, &save_errno);
+	snap = log_io_open_for_write(r, r->snap_class, r->confirmed_lsn, -1, &save_errno);
 	if (snap == NULL)
 		panic_status(save_errno, "can't open snap for writing");
 
@@ -1492,7 +1662,7 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 	if (unlink(snap->filename) == -1)
 		say_syserror("can't unlink 'inprogress' snapshot");
 
-	close_log(&snap);
+	log_io_close(&snap);
 
 	say_info("done");
 }
