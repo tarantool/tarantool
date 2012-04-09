@@ -1358,6 +1358,7 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 {
 	static struct log_io *wal = NULL, *wal_to_close = NULL;
 	static ev_tstamp last_flush = 0;
+	bool is_bulk_end = req == NULL || STAILQ_NEXT(req, wal_fifo_entry) == NULL;
 
 #if 0
 	/* we're not running inside ev_loop, so update ev_now manually */
@@ -1415,7 +1416,7 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 	}
 
 	/* flush stdio buffer to keep replication in sync */
-	if (fflush(wal->f) < 0) {
+	if (is_bulk_end && fflush(wal->f) < 0) {
 		say_syserror("can't flush wal");
 		goto fail;
 	}
