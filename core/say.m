@@ -116,7 +116,7 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 	const char *peer_name = fiber_peer_name(fiber);
 	size_t p = 0, len = PIPE_BUF;
 	const char *f;
-	static char buf[PIPE_BUF];
+	static __thread char buf[PIPE_BUF];
 
 	if (booting) {
 		fprintf(stderr, "%s: ", binary_filename);
