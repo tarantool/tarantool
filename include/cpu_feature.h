@@ -26,15 +26,23 @@
  */
 
 #include <sys/types.h>
-#include <stdbool.h>
 
-/* Check whether CPU supports SSE 4.2 (needed to compute CRC32 in hardware).
+/* CPU feature capabilities to use with cpu_has (feature). */
+
+#if defined (__i386__) || defined (__x86_64__)
+enum {
+	cpuf_ht = 0, cpuf_sse4_1, cpuf_sse4_2, cpuf_hypervisor
+};
+#endif
+
+/* Check whether CPU has a certain feature.
  *
  * @param	feature		indetifier (see above) of the target feature
  *
- * @return	true if feature is available, false if unavailable.
+ * @return	1 if feature is available, 0 if unavailable,
+ *		-EINVAL if unsupported CPU, -ERANGE if invalid feature
  */
-bool sse42_enabled_cpu();
+int cpu_has(unsigned int feature);
 
 
 /* Hardware-calculate CRC32 for the given data buffer.
@@ -43,11 +51,13 @@ bool sse42_enabled_cpu();
  * @param	buf			data buffer
  * @param	len			buffer length
  *
- * @pre 	true == cpu_has (cpuf_sse4_2)
+ * @pre 	1 == cpu_has (cpuf_sse4_2)
  * @return	CRC32 value
  */
 u_int32_t crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len);
 
 
 #endif /* TARANTOOL_CPU_FEATURES_H */
+
+/* __EOF__ */
 

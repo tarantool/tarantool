@@ -25,55 +25,210 @@
 
 #include <sys/types.h>
 #include <errno.h>
-#include <stdlib.h>
-
-#if !defined (__x86_64__) && !defined (__i386__)
-	#error "Only x86 and x86_64 architectures supported"
-#endif
-
-#ifndef __GNUC__
-	#error This module uses GCC intrinsic header(s) and should be compiled using gcc.
-#endif
-
-/* GCC intrinsic headers */
-#include <cpuid.h>
-#include <smmintrin.h>
 
 #include "cpu_feature.h"
 
+#if defined (__i386__) || defined (__x86_64__)
 
-u_int32_t
-crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
-{
-#define SCALE_F	sizeof(unsigned long)
-	size_t nwords = len / SCALE_F, nbytes = len % SCALE_F;
-	unsigned long *pword;
-	unsigned char *pbyte;
+enum { eAX=0, eBX, eCX, eDX };
 
-	for (pword = (unsigned long *)buf; nwords--; ++pword)
+static const struct cpuid_feature {
+	unsigned int 	ri;
+	u_int32_t	bitmask;
+} cpu_mask[] = {
+	{eDX, (1 << 28)},	/* HT 		*/
+	{eCX, (1 << 19)},	/* SSE 4.1 	*/
+	{eCX, (1 << 20)},	/* SSE 4.2 	*/
+	{eCX, (1 << 31)}	/* HYPERV	*/
+};
+static const size_t LEN_cpu_mask = sizeof(cpu_mask) / sizeof (cpu_mask[0]);
+
+#define SCALE_F		sizeof(unsigned long)
+
 #if defined (__x86_64__)
-		crc = (u_int32_t)_mm_crc32_u64((u_int64_t)crc, *pword);
+	#define REX_PRE "0x48, "
 #elif defined (__i386__)
-		crc = _mm_crc32_u32(crc, *pword);
+	#define REX_PRE
 #endif
 
-	if (nbytes)
-		for (pbyte = (unsigned char*)pword; nbytes--; ++pbyte)
-			crc = _mm_crc32_u8(crc, *pbyte);
+
+/* Hw-calculate CRC32 per byte (for the unaligned portion of data buffer). */
+/* NOTE: the function below was adopted from Linux 2.6 kernel source tree,
+   licensed under GPL. */
+static u_int32_t
+crc32c_hw_byte(u_int32_t crc, unsigned char const *data, size_t length)
+{
+	while (length--) {
+		__asm__ __volatile__(
+			".byte 0xf2, 0xf, 0x38, 0xf0, 0xf1"
+			:"=S"(crc)
+			:"0"(crc), "c"(*data)
+		);
+		data++;
+	}
 
 	return crc;
 }
 
 
-bool
-sse42_enabled_cpu()
+/* Hw-calculate CRC32 for the given data buffer.  */
+/* NOTE: the function below was adopted from Linux 2.6 kernel source tree,
+   licensed under GPL. */
+static u_int32_t
+crc32c_hw_intel(u_int32_t crc, unsigned char const *buf, size_t len)
 {
-	unsigned int ax, bx, cx, dx;
+	unsigned int iquotient = len / SCALE_F;
+	unsigned int iremainder = len % SCALE_F;
+	unsigned long *ptmp = (unsigned long *)buf;
 
-	if (__get_cpuid(1 /* level */, &ax, &bx, &cx, &dx) == 0)
-		return 0; /* not supported */
+	while (iquotient--) {
+		__asm__ __volatile__(
+			".byte 0xf2, " REX_PRE "0xf, 0x38, 0xf1, 0xf1;"
+			:"=S"(crc)
+			:"0"(crc), "c"(*ptmp)
+		);
+		ptmp++;
+	}
 
-	return (cx & (1 << 20)) != 0;
+	if (iremainder) {
+		crc = crc32c_hw_byte(crc, (unsigned char *)ptmp,
+				 			iremainder);
+	}
+
+	return crc;
 }
 
+
+/* Toggle x86 flag-register bits, as per mask. */
+static void
+toggle_x86_flags(long mask, long* orig, long* toggled)
+{
+	long forig = 0, fres = 0;
+
+#if defined (__i386__)
+	asm (
+		"pushfl; popl %%eax; movl %%eax, %0; xorl %2, %%eax; "
+		"pushl %%eax; popfl; pushfl; popl %%eax; pushl %0; popfl "
+		: "=r" (forig), "=a" (fres)
+		: "m" (mask)
+	);
+#elif __x86_64__
+	asm (
+		"pushfq; popq %%rax; movq %%rax, %0; xorq %2, %%rax; "
+		"pushq %%rax; popfq; pushfq; popq %%rax; pushq %0; popfq "
+		: "=r" (forig), "=a" (fres)
+		: "m" (mask)
+	);
+#endif
+
+	if (orig)
+		*orig = forig;
+	if (toggled)
+		*toggled = fres;
+	return;
+}
+
+
+/* Is CPUID instruction available ? */
+static int
+can_cpuid()
+{
+	long of = -1, tf = -1;
+
+	/* x86 flag register masks */
+	enum {
+		cpuf_AC = (1 << 18), 	/* bit 18 */
+		cpuf_ID = (1 << 21)	/* bit 21 */
+	};
+
+
+	/* Check if AC (alignment) flag could be toggled:
+		if not - it's i386, thus no CPUID.
+	*/
+	toggle_x86_flags(cpuf_AC, &of, &tf);
+	if ((of & cpuf_AC) == (tf & cpuf_AC)) {
+		return 0;
+	}
+
+	/* Next try toggling CPUID (ID) flag. */
+	toggle_x86_flags(cpuf_ID, &of, &tf);
+	if ((of & cpuf_ID) == (tf & cpuf_ID)) {
+		return 0;
+	}
+
+	return 1;
+}
+
+
+/* Retrieve CPUID data using info as the EAX key. */
+static void
+get_cpuid(long info, long* eax, long* ebx, long* ecx, long *edx)
+{
+	*eax = info;
+
+#if defined (__i386__)
+	asm __volatile__ (
+		"movl %%ebx, %%edi; " 	/* must save ebx for 32-bit PIC code */
+		"cpuid; "
+		"movl %%ebx, %%esi; "
+		"movl %%edi, %%ebx; "
+		: "+a" (*eax), "=S" (*ebx), "=c" (*ecx), "=d" (*edx)
+		:
+		: "%edi"
+	);
+#elif defined (__x86_64__)
+	asm __volatile__ (
+		"cpuid; "
+		: "+a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+	);
+#endif
+}
+
+
+/* Check whether CPU has a certain feature. */
+int
+cpu_has(unsigned int feature)
+{
+	long info = 1, reg[4] = {0,0,0,0};
+
+	if (!can_cpuid())
+		return -EINVAL;
+
+	if (feature > LEN_cpu_mask)
+		return -ERANGE;
+
+	get_cpuid(info, &reg[eAX], &reg[eBX], &reg[eCX], &reg[eDX]);
+
+	return (reg[cpu_mask[feature].ri] & cpu_mask[feature].bitmask) ? 1 : 0;
+}
+
+
+u_int32_t
+crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
+{
+	return crc32c_hw_intel (crc, (unsigned char const*)buf, len);
+}
+
+#else /* other (yet unsupported architectures) */
+
+int
+cpu_has(unsigned int feature)
+{
+	(void)feature;
+	return EINVAL;
+}
+
+u_int32_t
+crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
+{
+	(void)crc; (void)buf, (void)len;
+	assert(false);
+	return 0;
+}
+
+
+#endif /* defined (__i386__) || defined (__x86_64__) */
+
+
+/* __EOF__ */
 

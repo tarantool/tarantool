@@ -45,14 +45,6 @@ typedef struct tarantool_cfg {
 	char*	username;
 
 	/*
-	 * Local hot standby (if enabled, the server will run in hot
-	 * standby mode, continuously fetching WAL records from wal_dir,
-	 * until it is able to bind to the primary port.
-	 * In local hot standby mode the server only accepts reads.
-	 */
-	confetti_bool_t	local_hot_standby;
-
-	/*
 	 * tarantool bind ip address, applies to master
 	 * and replication ports. INADDR_ANY is the default value.
 	 */
@@ -88,12 +80,6 @@ typedef struct tarantool_cfg {
 	/* working directory (daemon will chdir(2) to it) */
 	char*	work_dir;
 
-	/* Snapshot directory (where snapshots get saved/read) */
-	char*	snap_dir;
-
-	/* WAL directory (where WALs get saved/read) */
-	char*	wal_dir;
-
 	/* name of pid file */
 	char*	pid_file;
 
@@ -117,53 +103,16 @@ typedef struct tarantool_cfg {
 	/* network io readahead */
 	int32_t	readahead;
 
-	/* Do not write into snapshot faster than snap_io_rate_limit MB/sec */
-	double	snap_io_rate_limit;
-
-	/* Write no more rows in WAL */
-	int32_t	rows_per_wal;
-
-	/*
-	 * Size of the WAL writer request queue: how many outstanding
-	 * requests for write to disk it can have.
-	 * Rule of thumb is to set this to the average connection count.
-	 */
-	int32_t	wal_writer_inbox_size;
-
-	/*
-	 * Defines fiber/data synchronization fsync(2) policy:
-	 * "write":          fibers wait for their data to be written to the log.
-	 * "fsync":          fibers wait for their data, fsync(2) follows each write(2)
-	 * "fsync_delay":    fibers wait for their data, fsync every N=wal_fsync_delay seconds,
-	 * N=0.0 means no fsync (equivalent to wal_mode = "write");
-	 */
-	char*	wal_mode;
-
-	/*
-	 * Fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay
-	 * seconds ago.
-	 * WARNING: actually, several last requests may stall fsync for much longer
-	 */
-	double	wal_fsync_delay;
-
-	/*
-	 * Delay, in seconds, between successive re-readings of wal_dir.
-	 * The re-scan is necessary to discover new WAL files or snapshots.
-	 */
-	double	wal_dir_rescan_delay;
-
-	/*
-	 * Panic if there is an error reading a snapshot or WAL.
-	 * By default, panic on any snapshot reading error and ignore errors
-	 * when reading WALs.
-	 */
-	confetti_bool_t	panic_on_snap_error;
-	confetti_bool_t	panic_on_wal_error;
-
 	/*
 	 * # BOX
-	 * Primary port (where updates are accepted)
+	 * Snapshot directory (where snapshots get saved/read)
 	 */
+	char*	snap_dir;
+
+	/* WAL directory (where WALs get saved/read) */
+	char*	wal_dir;
+
+	/* Primary port (where updates are accepted) */
 	int32_t	primary_port;
 
 	/* Secondary port (where only selects are accepted) */
@@ -192,6 +141,44 @@ typedef struct tarantool_cfg {
 
 	/* tarantool will try to iterate over all rows within this time */
 	double	memcached_expire_full_sweep;
+
+	/* Do not write into snapshot faster than snap_io_rate_limit MB/sec */
+	double	snap_io_rate_limit;
+
+	/* Write no more rows in WAL */
+	int32_t	rows_per_wal;
+
+	/*
+	 * fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay
+	 * seconds ago.
+	 * WARNING: actually, several last requests may stall fsync for much longer
+	 */
+	double	wal_fsync_delay;
+
+	/* size of WAL writer request buffer */
+	int32_t	wal_writer_inbox_size;
+
+	/*
+	 * Local hot standby (if enabled, the server will run in hot
+	 * standby mode, continuously fetching WAL records from wal_dir,
+	 * until it is able to bind to the primary port.
+	 * In local hot standby mode the server only accepts reads.
+	 */
+	confetti_bool_t	local_hot_standby;
+
+	/*
+	 * Delay, in seconds, between successive re-readings of wal_dir.
+	 * The re-scan is necessary to discover new WAL files or snapshots.
+	 */
+	double	wal_dir_rescan_delay;
+
+	/*
+	 * Panic if there is an error reading a snapshot or WAL.
+	 * By default, panic on any snapshot reading error and ignore errors
+	 * when reading WALs.
+	 */
+	confetti_bool_t	panic_on_snap_error;
+	confetti_bool_t	panic_on_wal_error;
 
 	/*
 	 * Replication mode (if enabled, the server, once

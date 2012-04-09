@@ -44,8 +44,6 @@ extern const char *field_data_type_strs[];
 enum index_type { HASH, TREE, index_type_MAX };
 extern const char *index_type_strs[];
 
-enum iterator_type { ITER_FORWARD, ITER_REVERSE };
-
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
 	u32 fieldno;
@@ -126,9 +124,8 @@ struct key_def {
  * initialized separately.
  */
 - (struct iterator *) allocIterator;
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type;
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-			:(void *) key
+- (void) initIterator: (struct iterator *) iterator;
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count;
 @end
 

@@ -189,7 +189,7 @@ typedef union YYSTYPE
 #include <limits.h>
 #include <sys/types.h>
 
-static int prscfg_yyerror(prscfg_yyscan_t yyscanner, const char *msg);
+static int prscfg_yyerror(prscfg_yyscan_t yyscanner, char *msg);
 extern int prscfg_yylex (YYSTYPE * yylval_param, prscfg_yyscan_t yyscanner);
 static NameAtom* prependName(NameAtom *prep, NameAtom *name);
 static void freeName(NameAtom *atom);
@@ -2018,7 +2018,7 @@ yyreturn:
 
 
 static int
-prscfg_yyerror(prscfg_yyscan_t yyscanner, const char *msg) {
+prscfg_yyerror(prscfg_yyscan_t yyscanner, char *msg) {
 	out_warning(CNF_SYNTAXERROR, "gram_yyerror: %s at line %d", msg, prscfgGetLineNo(yyscanner));
 	return 0;
 }

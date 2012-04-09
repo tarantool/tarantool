@@ -59,7 +59,6 @@ static char status[64] = "unknown";
 
 static int stat_base;
 STRS(messages, MESSAGES);
-STRS(update_op_codes, UPDATE_OP_CODES);
 
 /*
   For tuples of size below this threshold, when sending a tuple
@@ -294,9 +293,6 @@ rollback_replace(struct box_txn *txn)
  * Supported operations are: SET, ADD, bitwise AND, XOR and OR,
  * SPLICE and DELETE.
  *
- * The typical case is when the operation count is much less
- * than field count in a tuple.
- *
  * To ensure minimal use of intermediate memory, UPDATE is
  * performed in a streaming fashion: all operations in the request
  * are sorted by field number. The resulting tuple length is
@@ -379,20 +375,15 @@ struct update_op {
  * A descriptor of one changed field.
  */
 struct update_field {
-	/** Pointer to the first operation on this field. */
-	struct update_op *first;
-	/** Points after the last operation on this field. */
-	struct update_op *end;
-	/** Points at start of field *data* in the old tuple. */
-	void *old;
-	/** The final length of the new field. */
-	u32 new_len;
-	/** End of the old field. */
-	void *tail;
-	/** Copy old data after this field. */
-	u32 tail_len;
-	/** How many fields we're copying. */
-	int tail_field_count;
+	struct update_op *first; /** first operation on this field */
+	struct update_op *end;   /** points after last operation on
+				     this field. */
+	void *old;	         /** points at start of field *data* in old
+				     tuple. */
+	void *old_end;		 /** end of the old field. */
+	u32 new_len;             /** final length of the new field. */
+	u32 tail_len;		 /** copy old data after this field */
+	int tail_field_count;    /** how many fields we're copying. */
 };
 
 /** UPDATE command context. */
@@ -418,39 +409,16 @@ update_op_cmp(const void *op1_ptr, const void *op2_ptr)
 	const struct update_op *op1 = op1_ptr;
 	const struct update_op *op2 = op2_ptr;
 
-	/* Compare operations by field number. */
-	int result = (int) op1->field_no - (int) op2->field_no;
-	if (result)
-		return result;
-	/*
-	 * INSERT operations create a new field
-	 * at index field_no, shifting other fields to the right.
-	 * Operations on field_no are done on the field
-	 * in the old tuple and do not affect the inserted
-	 * field. Therefore, field insertion should be
-	 * done first, followed by all other operations
-	 * on the given field_no.
-	 */
-	result = (op2->opcode == UPDATE_OP_INSERT) -
-		(op1->opcode == UPDATE_OP_INSERT);
-	if (result)
-		return result;
-	/*
-	 * We end up here in two cases:
-	 *   1) both operations are INSERTs,
-	 *   2) both operations are not INSERTs.
-	 *
-	 * Preserve the original order of operations on the same
-	 * field. To do it, order them by their address in the
-	 * UPDATE request.
-	 *
-	 * The expression below should work even if sizeof(ptrdiff_t)
-	 * is greater than sizeof(int) because we presume that both
-	 * value addresses belong to the same UPDATE command buffer
-	 * and therefore their difference must be small enough to fit
-	 * into an int comfortably.
-	 */
-	return (int) (op1->arg.set.value - op2->arg.set.value);
+	if (op1->field_no < op2->field_no)
+		return -1;
+	if (op1->field_no > op2->field_no)
+		return 1;
+
+	if (op1->arg.set.value < op2->arg.set.value)
+		return -1;
+	if (op1->arg.set.value > op2->arg.set.value)
+		return 1;
+	return 0;
 }
 
 static void
@@ -520,13 +488,6 @@ do_update_op_splice(struct op_splice_arg *arg, void *in, void *out)
 	memcpy(out, arg->paste, arg->paste_length); /* copy the paste */
 	out += arg->paste_length;
 	memcpy(out, in + arg->tail_offset, arg->tail_length); /* copy tail */
-}
-
-static void
-do_update_op_insert(struct op_set_arg *arg, void *in __attribute__((unused)),
-		 void *out)
-{
-	memcpy(out, arg->value, arg->length);
 }
 
 static void
@@ -651,30 +612,14 @@ static void
 init_update_op_delete(struct update_cmd *cmd,
 		      struct update_field *field, struct update_op *op)
 {
-	/*
-	 * Either DELETE is the last op on a field or next op
-	 * on this field is SET.
-	 */
-	if (op + 1 < cmd->op_end) {
-		struct update_op *next_op = op + 1;
-		if (next_op->field_no == op->field_no &&
-		    next_op->opcode != UPDATE_OP_SET &&
-		    next_op->opcode != UPDATE_OP_DELETE) {
-			tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
-				  op->field_no);
-		}
-	}
+	/* Either this is the last op on this field  or next op is SET. */
+	if (op + 1 < cmd->op_end && op[1].field_no == op->field_no &&
+	    op[1].opcode != UPDATE_OP_SET && op[1].opcode != UPDATE_OP_DELETE)
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, op->field_no);
+
 	/* Skip all ops on this field, including this one. */
 	field->first = op + 1;
 	op->new_field_len = 0;
-}
-
-static void
-init_update_op_insert(struct update_cmd *cmd __attribute__((unused)),
-		      struct update_field *field __attribute__((unused)),
-		      struct update_op *op)
-{
-	op->new_field_len = op->arg.set.length;
 }
 
 static void
@@ -700,7 +645,6 @@ static struct update_op_meta update_op_meta[UPDATE_OP_MAX + 1] = {
 	{ init_update_op_arith, (do_op_func) do_update_op_or, true },
 	{ init_update_op_splice, (do_op_func) do_update_op_splice, false },
 	{ init_update_op_delete, (do_op_func) NULL, true },
-	{ init_update_op_insert, (do_op_func) do_update_op_insert, true },
 	{ init_update_op_none, (do_op_func) do_update_op_none, false },
 	{ init_update_op_error, (do_op_func) NULL, true }
 };
@@ -755,57 +699,46 @@ parse_update_cmd(struct tbuf *data)
 	return cmd;
 }
 
-static void
-update_field_init(struct update_field *field, struct update_op *op,
-		  void **old_data, int old_field_count)
-{
-	field->first = op;
-
-	if (op->field_no >= old_field_count ||
-	    op->opcode == UPDATE_OP_INSERT) {
-		/* Insert operation always creates a new field. */
-		field->new_len = 0;
-		field->old = ""; /* Beyond old fields. */
-		/*
-		 * Old tuple must have at least one field and we
-		 * always have an op on the first field.
-		 */
-		assert(op->field_no > 0 || op->opcode == UPDATE_OP_INSERT);
-		return;
-	}
-	/*
-	 * Find out the new field length and
-	 * shift the data pointer.
-	 */
-	field->new_len = load_varint32(old_data);
-	field->old = *old_data;
-	*old_data += field->new_len;
-}
-
 /**
  * Skip fields unaffected by UPDATE.
  * @return   length of skipped data
  */
-static void
-update_field_skip_fields(struct update_field *field, i32 skip_count,
-			 void **data)
+static u32
+skip_fields(u32 field_count, void **data)
 {
-	if (skip_count < 0) {
-		/* Happens when there are fields added by SET. */
-		skip_count = 0;
-	}
-
-	field->tail_field_count = skip_count;
-
-	field->tail = *data;
-	while (skip_count-- > 0) {
+	void *begin = *data;
+	while (field_count-- > 0) {
 		u32 len = load_varint32(data);
 		*data += len;
 	}
-
-	field->tail_len = *data - field->tail;
+	return *data - begin;
 }
 
+static void
+update_field_init(struct update_cmd *cmd, struct update_field *field,
+		  struct update_op *op, void **old_data, int old_field_count)
+{
+	field->first = op;
+	if (op->field_no < old_field_count) {
+		/*
+		 * Find out the new field length and
+		 * shift the data pointer.
+		 */
+		field->new_len = load_varint32(old_data);
+		field->old = *old_data;
+		*old_data += field->new_len;
+		field->old_end = *old_data;
+	} else {
+		field->new_len = 0;
+		field->old = ""; /* Beyond old fields. */
+		field->old_end = field->old;
+		/*
+		 * Old tuple must have at least one field and we
+		 * always have an op on the first field.
+		 */
+		assert(op->field_no > 0 && op > cmd->op);
+	}
+}
 
 /**
  * We found a tuple to do the update on. Prepare and optimize
@@ -820,7 +753,6 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 	 */
 	qsort(cmd->op, cmd->op_end - cmd->op, sizeof(struct update_op),
 	      update_op_cmp);
-
 	/*
 	 * 2. Take care of the old tuple head.
 	 */
@@ -837,7 +769,6 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 		cmd->op->meta = &update_op_meta[UPDATE_OP_NONE];
 		cmd->op->field_no = 0;
 	}
-
 	/*
 	 * 3. Initialize and optimize the operations.
 	 */
@@ -850,90 +781,58 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 	void *old_data = txn->old_tuple->data;
 	int old_field_count = txn->old_tuple->cardinality;
 
-	update_field_init(field, op, &old_data, old_field_count);
+	update_field_init(cmd, field, op, &old_data, old_field_count);
 	do {
-		struct update_op *prev_op = op - 1;
-		struct update_op *next_op = op + 1;
-
 		/*
 		 * Various checks for added fields:
+		 * 1) we can not do anything with a new field unless a
+		 *   previous field exists.
+		 * 2) we can not do any op except SET on a field
+		 *   which does not exist.
 		 */
-		if (op->field_no >= old_field_count) {
-			/*
-			 * We can not do anything with a new field unless a
-			 * previous field exists.
-			 */
-			int prev_field_no = MAX(old_field_count,
-						prev_op->field_no + 1);
-			if (op->field_no > prev_field_no)
-				tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
-					  op->field_no);
-			/*
-			 * We can not do any op except SET or INSERT
-			 * on a field which does not exist.
-			 */
-			if (prev_op->field_no != op->field_no &&
-			    (op->opcode != UPDATE_OP_SET &&
-			     op->opcode != UPDATE_OP_INSERT))
-				tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
-					  op->field_no);
+		if (op->field_no >= old_field_count &&
+		    /* check case 1. */
+		    (op->field_no > MAX(old_field_count,
+					op[-1].field_no + 1) ||
+		     /* check case 2. */
+		     (op->opcode != UPDATE_OP_SET &&
+		      op[-1].field_no != op->field_no))) {
+
+			tnt_raise(ClientError, :ER_NO_SUCH_FIELD, op->field_no);
 		}
 		op->meta->init_op(cmd, field, op);
 		field->new_len = op->new_field_len;
-		/*
-		 * Find out how many fields to copy to the
-		 * new tuple intact once this op is done.
-		 */
-		int skip_count;
-		if (next_op >= cmd->op_end) {
-			/* This is the last op in the request. */
-			skip_count = old_field_count - op->field_no - 1;
-		} else if (op->field_no < next_op->field_no ||
-			   op->opcode == UPDATE_OP_INSERT) {
-			/*
-			 * This is the last op on this field. UPDATE_OP_INSERT
-			 * creates a new field, so it falls
-			 * into this category. Find out length of
-			 * the gap between the op->field_no and
-			 * next and copy the gap.
-			 */
-			skip_count = MIN(next_op->field_no, old_field_count) -
-				     op->field_no - 1;
-		} else {
-			/* Continue, we have more operations on this field */
-			continue;
-		}
-		if (op->opcode == UPDATE_OP_INSERT) {
-			/*
-			 * We're adding a new field, take this
-			 * into account.
-			 */
-			skip_count++;
-		}
-		/* Jumping over a gap. */
-		update_field_skip_fields(field, skip_count, &old_data);
 
-		field->end = next_op;
-		if (field->first < field->end) {
-			/* Field is not deleted. */
-			cmd->new_tuple_len += varint32_sizeof(field->new_len);
-			cmd->new_tuple_len += field->new_len;
+		if (op + 1 >= cmd->op_end || op[1].field_no != op->field_no) {
+			/* Last op on this field. */
+			int skip_to = old_field_count;
+			if (op + 1 < cmd->op_end && op[1].field_no < old_field_count)
+				skip_to = op[1].field_no;
+			if (skip_to > op->field_no + 1) {
+				/* Jumping over a gap. */
+				field->tail_field_count = skip_to - op->field_no - 1;
+				field->tail_len =
+					skip_fields(field->tail_field_count,
+						    &old_data);
+			} else {
+				field->tail_len = 0;
+				field->tail_field_count = 0;
+			}
+			field->end = op + 1;
+			if (field->first < field->end) { /* Field is not deleted. */
+				cmd->new_tuple_len += varint32_sizeof(field->new_len);
+				cmd->new_tuple_len += field->new_len;
+			}
+			cmd->new_tuple_len += field->tail_len;
+			field++; /** Move to the next field. */
+			if (op + 1 < cmd->op_end) {
+				update_field_init(cmd, field, op + 1,
+						  &old_data, old_field_count);
+			}
 		}
-		cmd->new_tuple_len += field->tail_len;
-
-		/* Move to the next field. */
-		field++;
-		if (next_op < cmd->op_end) {
-			update_field_init(field, next_op,  &old_data,
-					  old_field_count);
-		}
-
 	} while (++op < cmd->op_end);
 
 	cmd->field_end = field;
-
-	if (cmd->new_tuple_len == 0)
-		tnt_raise(ClientError, :ER_TUPLE_IS_EMPTY);
 }
 
 static void
@@ -963,8 +862,7 @@ do_update(struct box_txn *txn, struct update_cmd *cmd)
 			 *   (can happen when a big SET is then
 			 *   shrunk by a SPLICE).
 			 */
-			if ((old_field == new_field &&
-			     !op->meta->works_in_place) ||
+			if ((old_field == new_field && !op->meta->works_in_place) ||
 			    /*
 			     * Sic: this predicate must function even if
 			     * new_field != new_data.
@@ -975,7 +873,7 @@ do_update(struct box_txn *txn, struct update_cmd *cmd)
 				 * conditions above got us here, simply
 				 * palloc a *new* buffer of sufficient
 				 * size.
-				 */
+			         */
 				new_field = palloc(fiber->gc_pool,
 						   op->new_field_len);
 			}
@@ -991,7 +889,7 @@ do_update(struct box_txn *txn, struct update_cmd *cmd)
 			memcpy(new_data, new_field, field->new_len);
 		new_data += field->new_len;
 		if (field->tail_field_count) {
-			memcpy(new_data, field->tail, field->tail_len);
+			memcpy(new_data, field->old_end, field->tail_len);
 			new_data += field->tail_len;
 			txn->tuple->cardinality += field->tail_field_count;
 		}
@@ -1072,7 +970,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 		}
 
 		struct iterator *it = index->position;
-		[index initIterator: it :ITER_FORWARD :key :key_cardinality];
+		[index initIterator: it :key :key_cardinality];
 
 		while ((tuple = it->next_equal(it)) != NULL) {
 			if (tuple->flags & GHOST)
@@ -1247,10 +1145,13 @@ txn_commit(struct box_txn *txn)
 			;
 		else {
 			fiber_peer_name(fiber); /* fill the cookie */
+			struct tbuf *t = tbuf_alloc(fiber->gc_pool);
+			tbuf_append(t, &txn->op, sizeof(txn->op));
+			tbuf_append(t, txn->req.data, txn->req.size);
 
 			i64 lsn = next_lsn(recovery_state, 0);
-			int res = wal_write(recovery_state, wal_tag, txn->op,
-					    fiber->cookie, lsn, &txn->req);
+			bool res = !wal_write(recovery_state, wal_tag,
+					      fiber->cookie, lsn, t);
 			confirm_lsn(recovery_state, lsn);
 			if (res)
 				tnt_raise(LoggedError, :ER_WAL_IO);
@@ -2148,10 +2049,10 @@ mod_init(void)
 	space_init();
 
 	/* recovery initialization */
-	recovery_init(cfg.snap_dir, cfg.wal_dir,
-		      recover_row, cfg.rows_per_wal, cfg.wal_mode,
-		      cfg.wal_fsync_delay,
-		      init_storage ? RECOVER_READONLY : 0, NULL);
+	recovery_state = recover_init(cfg.snap_dir, cfg.wal_dir,
+				      recover_row, cfg.rows_per_wal, cfg.wal_fsync_delay,
+				      cfg.wal_writer_inbox_size,
+				      init_storage ? RECOVER_READONLY : 0, NULL);
 
 	recovery_state->snap_io_rate_limit = cfg.snap_io_rate_limit * 1024 * 1024;
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
@@ -2241,7 +2142,7 @@ mod_snapshot(struct log_io_iter *i)
 		Index *pk = space[n].index[0];
 
 		struct iterator *it = pk->position;
-		[pk initIterator: it :ITER_FORWARD];
+		[pk initIterator: it];
 		while ((tuple = it->next(it))) {
 			snapshot_write_tuple(i, n, tuple);
 		}
@@ -2254,6 +2155,8 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  version: \"%s\"" CRLF, tarantool_version());
 	tbuf_printf(out, "  uptime: %i" CRLF, (int)tarantool_uptime());
 	tbuf_printf(out, "  pid: %i" CRLF, getpid());
+	tbuf_printf(out, "  wal_writer_pid: %" PRIi64 CRLF,
+		    (i64) recovery_state->wal_writer->pid);
 	tbuf_printf(out, "  lsn: %" PRIi64 CRLF, recovery_state->confirmed_lsn);
 	tbuf_printf(out, "  recovery_lag: %.3f" CRLF, recovery_state->recovery_lag);
 	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,

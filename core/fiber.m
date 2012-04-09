@@ -135,6 +135,7 @@ fiber_call(struct fiber *callee)
 void
 fiber_wakeup(struct fiber *f)
 {
+	ev_async_start(&f->async);
 	ev_async_send(&f->async);
 }
 
@@ -530,7 +531,6 @@ fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void 
 		fiber_alloc(fiber);
 		ev_init(&fiber->io, (void *)ev_schedule);
 		ev_async_init(&fiber->async, (void *)ev_schedule);
-		ev_async_start(&fiber->async);
 		ev_init(&fiber->timer, (void *)ev_schedule);
 		ev_init(&fiber->cw, (void *)ev_schedule);
 		fiber->io.data = fiber->async.data = fiber->timer.data = fiber->cw.data = fiber;
@@ -565,7 +565,6 @@ fiber_destroy(struct fiber *f)
 	if (strcmp(f->name, "sched") == 0)
 		return;
 
-	ev_async_stop(&f->async);
 	palloc_destroy_pool(f->gc_pool);
 	tarantool_coro_destroy(&f->coro);
 }

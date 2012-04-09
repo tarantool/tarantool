@@ -48,7 +48,6 @@
 #include <iproto.h>
 #include <latch.h>
 #include <log_io.h>
-#include <crc32.h>
 #include <palloc.h>
 #include <salloc.h>
 #include <say.h>
@@ -70,21 +69,10 @@ char **main_argv;
 int main_argc;
 static void *main_opt = NULL;
 struct tarantool_cfg cfg;
+struct recovery_state *recovery_state;
 static ev_signal *sigs = NULL;
 
 bool init_storage, booting = true;
-
-static int
-core_check_config(struct tarantool_cfg *conf)
-{
-	/* Check that the mode is a supported one. */
-	if (strcmp(conf->wal_mode, "fsync") != 0 &&
-	    strcmp(conf->wal_mode, "fsync_delay") != 0) {
-		out_warning(0, "wal_mode is not one of 'fsync', 'fsync_delay'");
-		return -1;
-	}
-	return 0;
-}
 
 static i32
 load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
@@ -114,50 +102,12 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	if (n_accepted == 0 || n_skipped != 0)
 		return -1;
 
-	if (core_check_config(conf) != 0)
-		return -1;
-
 	if (replication_check_config(conf) != 0)
 		return -1;
 
 	return mod_check_config(conf);
 }
 
-static int
-core_reload_config(const struct tarantool_cfg *old_conf,
-		   const struct tarantool_cfg *new_conf)
-{
-	if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode) == 0 &&
-	    old_conf->wal_fsync_delay == new_conf->wal_fsync_delay)
-		return 0;
-
-	double new_delay = new_conf->wal_fsync_delay;
-
-	/* Mode has changed: */
-	if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode)) {
-		if (strcasecmp(old_conf->wal_mode, "fsync") == 0 ||
-		    strcasecmp(new_conf->wal_mode, "fsync") == 0) {
-			out_warning(0, "wal_mode cannot switch to/from fsync");
-			return -1;
-		}
-		say_debug("%s: wal_mode [%s] -> [%s]",
-			__func__, old_conf->wal_mode, new_conf->wal_mode);
-	}
-
-	/*
-	 * Unless wal_mode=fsync_delay, wal_fsync_delay is irrelevant and must be 0.
-	 */
-	if (strcasecmp(new_conf->wal_mode, "fsync_delay") != 0)
-		new_delay = 0.0;
-
-	if (old_conf->wal_fsync_delay != new_delay)
-		say_debug("%s: wal_fsync_delay [%f] -> [%f]",
-			__func__, old_conf->wal_fsync_delay, new_delay);
-
-	recovery_update_mode(new_conf->wal_mode, new_delay);
-
-	return 0;
-}
 
 i32
 reload_cfg(struct tbuf *out)
@@ -208,10 +158,6 @@ reload_cfg(struct tbuf *out)
 			out_warning(0, "Could not accept read only '%s' option", diff);
 			return -1;
 		}
-
-		/* Process wal-writer-related changes. */
-		if (core_reload_config(&cfg, &new_cfg) != 0)
-			return -1;
 
 		/* Now pass the config to the module, to take action. */
 		if (mod_reload_config(&cfg, &new_cfg) != 0)
@@ -404,7 +350,8 @@ error:
 void
 tarantool_free(void)
 {
-	recovery_free();
+	if (recovery_state != NULL)
+		recover_free(recovery_state);
 	stat_free();
 
 	if (cfg_filename_fullpath)
@@ -444,6 +391,12 @@ initialize_minimal()
 	initialize(0.1, 4, 2);
 }
 
+inline static void
+mach_init()
+{
+	mach_setup_crc32();
+}
+
 int
 main(int argc, char **argv)
 {
@@ -462,9 +415,9 @@ main(int argc, char **argv)
 #endif
 
 	master_pid = getpid();
-	crc32_init();
 	stat_init();
 	palloc_init();
+	mach_init();
 
 #ifdef HAVE_BFD
 	symbols_load(argv[0]);

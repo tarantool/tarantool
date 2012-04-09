@@ -166,19 +166,16 @@ iterator_first_equal(struct iterator *it)
 	return NULL;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator
 {
 	(void) iterator;
-	(void) type;
 	[self subclassResponsibility: _cmd];
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
 	(void) iterator;
-	(void) type;
 	(void) part_count;
 	(void) key;
 	[self subclassResponsibility: _cmd];
@@ -208,7 +205,8 @@ hash_iterator(struct iterator *it)
 struct box_tuple *
 hash_iterator_next(struct iterator *iterator)
 {
-	assert(iterator->next == hash_iterator_next);
+	assert(iterator->next = hash_iterator_next);
+
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	while (it->h_pos != mh_end(it->hash)) {
@@ -222,7 +220,7 @@ hash_iterator_next(struct iterator *iterator)
 void
 hash_iterator_free(struct iterator *iterator)
 {
-	assert(iterator->next == hash_iterator_next);
+	assert(iterator->next = hash_iterator_next);
 	sfree(iterator);
 }
 
@@ -249,7 +247,7 @@ hash_iterator_free(struct iterator *iterator)
 
 	struct iterator *it = pk->position;
 	struct box_tuple *tuple;
-	[pk initIterator: it :ITER_FORWARD];
+	[pk initIterator: it];
 
 	while ((tuple = it->next(it)))
 	      [self replace: NULL :tuple];
@@ -389,29 +387,24 @@ hash_iterator_free(struct iterator *iterator)
 #endif
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator
 {
-	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
+	assert(iterator->next = hash_iterator_next);
 
 	it->base.next_equal = 0; /* Should not be used. */
 	it->h_pos = mh_begin(int_hash);
 	it->hash = int_hash;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
+	assert(iterator->next = hash_iterator_next);
 	(void) part_count; /* Silence gcc warning in release mode. */
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
 
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
+	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (part_count != 1)
 		tnt_raise(IllegalParams, :"key must be single valued");
@@ -521,29 +514,24 @@ hash_iterator_free(struct iterator *iterator)
 #endif
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator
 {
-	assert(iterator->next == hash_iterator_next);
+	assert(iterator->next = hash_iterator_next);
+
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
 	it->h_pos = mh_begin(int64_hash);
 	it->hash = (struct mh_i32ptr_t *) int64_hash;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) field
+- (void) initIterator: (struct iterator *) iterator :(void *) field
 			:(int) part_count
 {
 	(void) part_count; /* Silence gcc warning in release mode. */
-	assert(iterator->next == hash_iterator_next);
+	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
-
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	if (part_count != 1)
 		tnt_raise(IllegalParams, :"key must be single valued");
@@ -645,29 +633,23 @@ hash_iterator_free(struct iterator *iterator)
 #endif
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator
 {
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	assert(iterator->next = hash_iterator_next);
 
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
+	struct hash_iterator *it = hash_iterator(iterator);
 
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
 	it->h_pos = mh_begin(str_hash);
 	it->hash = (struct mh_i32ptr_t *) str_hash;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key
+- (void) initIterator: (struct iterator *) iterator :(void *) key
 			:(int) part_count
 {
 	(void) part_count; /* Silence gcc warning in release mode. */
-	assert(iterator->next == hash_iterator_next);
+	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
-
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	if (part_count != 1)
 		tnt_raise(IllegalParams, :"key must be single valued");

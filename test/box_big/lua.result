@@ -70,10 +70,6 @@ call box.select_range(5, 1, 2, 'of')
 Found 2 tuples:
 ['00000001', 'of', 'might', 'and', 'magic']
 ['00000000', 'of', 'puppets']
-call box.select_reverse_range(5, 1, 2, 'of')
-Found 2 tuples:
-['00000000', 'of', 'puppets']
-['00000001', 'of', 'might', 'and', 'magic']
 lua box.space[5]:truncate()
 ---
 ...
@@ -113,77 +109,4 @@ lua num1 == tonumber64('18446744073709551615')
 lua num2 == tonumber64('18446744073709551615')
 ---
  - true
-...
-lua box.insert('9', 0, 0)
----
- - 0: {0}
-...
-lua box.insert('9', 1, 0)
----
- - 1: {0}
-...
-lua box.insert('9', 2, 0)
----
- - 2: {0}
-...
-lua box.insert('9', 3, 0)
----
- - 3: {0}
-...
-lua box.insert('9', 4, 0)
----
- - 4: {0}
-...
-lua box.insert('9', 5, 0)
----
- - 5: {0}
-...
-lua box.insert('9', 6, 0)
----
- - 6: {0}
-...
-lua box.insert('9', 7, 0)
----
- - 7: {0}
-...
-lua box.insert('9', 8, 0)
----
- - 8: {0}
-...
-lua box.insert('9', 9, 0)
----
- - 9: {0}
-...
-lua box.select_range(9, 1, 10)
----
- - 0: {0}
- - 1: {0}
- - 2: {0}
- - 3: {0}
- - 4: {0}
- - 5: {0}
- - 6: {0}
- - 7: {0}
- - 8: {0}
- - 9: {0}
-...
-lua box.select_reverse_range(9, 1, 10)
----
- - 9: {0}
- - 8: {0}
- - 7: {0}
- - 6: {0}
- - 5: {0}
- - 4: {0}
- - 3: {0}
- - 2: {0}
- - 1: {0}
- - 0: {0}
-...
-lua box.select_reverse_range(9, 1, 4)
----
- - 9: {0}
- - 8: {0}
- - 7: {0}
- - 6: {0}
 ...

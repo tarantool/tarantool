@@ -119,7 +119,7 @@ elseif (NOT ENABLE_BUNDLED_LUAJIT)
     # building of LuaJIT bundled with the server source.
     luajit_try_system()
 else()
-    luajit_use_bundled()
+    luajit_set_default()
 endif()
 
 unset (LUAJIT_RUNS)

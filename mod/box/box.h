@@ -158,9 +158,8 @@ ENUM(messages, MESSAGES);
 	_(UPDATE_OP_OR, 4)			\
 	_(UPDATE_OP_SPLICE, 5)			\
 	_(UPDATE_OP_DELETE, 6)			\
-	_(UPDATE_OP_INSERT, 7)			\
-	_(UPDATE_OP_NONE, 8)			\
-	_(UPDATE_OP_MAX, 9)			\
+	_(UPDATE_OP_NONE, 7)			\
+	_(UPDATE_OP_MAX, 8)			\
 
 ENUM(update_op_codes, UPDATE_OP_CODES);
 

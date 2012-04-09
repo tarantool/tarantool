@@ -36,7 +36,6 @@ exec sql "insert into t5 values ('01234567', 'new', 'world')"
 exec sql "insert into t5 values ('00000000', 'of', 'puppets')"
 exec sql "insert into t5 values ('00000001', 'of', 'might', 'and', 'magic')"
 exec sql "call box.select_range(5, 1, 2, 'of')"
-exec sql "call box.select_reverse_range(5, 1, 2, 'of')"
 exec admin "lua box.space[5]:truncate()"
 
 #
@@ -52,20 +51,3 @@ exec admin "lua num,num1,num2 = box.unpack('lll', tu[0], tu[0], tu[0])"
 exec admin "lua num == tonumber64('18446744073709551615')"
 exec admin "lua num1 == tonumber64('18446744073709551615')"
 exec admin "lua num2 == tonumber64('18446744073709551615')"
-
-#
-# Lua select_reverse_range
-#
-exec admin "lua box.insert('9', 0, 0)"
-exec admin "lua box.insert('9', 1, 0)"
-exec admin "lua box.insert('9', 2, 0)"
-exec admin "lua box.insert('9', 3, 0)"
-exec admin "lua box.insert('9', 4, 0)"
-exec admin "lua box.insert('9', 5, 0)"
-exec admin "lua box.insert('9', 6, 0)"
-exec admin "lua box.insert('9', 7, 0)"
-exec admin "lua box.insert('9', 8, 0)"
-exec admin "lua box.insert('9', 9, 0)"
-exec admin "lua box.select_range(9, 1, 10)"
-exec admin "lua box.select_reverse_range(9, 1, 10)"
-exec admin "lua box.select_reverse_range(9, 1, 4)"

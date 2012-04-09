@@ -13,7 +13,7 @@ use FindBin qw($Bin);
 use lib "$Bin";
 use Carp qw/confess/;
 
-use Test::More tests => 339;
+use Test::More tests => 233;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
@@ -28,17 +28,10 @@ use constant TUPLE_NOT_EXISTS  => qr/Error 00003102/;
 use constant TUPLE_EXISTS      => qr/Error 00003702/;
 use constant INDEX_VIOLATION   => qr/Error 00003802/;
 
-use constant NO_SUCCESS        => qr/no success after/;
-
 use constant TOO_BIG_FIELD => qr/too big field/;
 
-our $box;
-our $server = (shift || $ENV{BOX}) or die;
-our %opts = (
-    debug => $ENV{DEBUG}||0,
-    ipdebug => $ENV{IPDEBUG}||0,
-    raise => 1,
-);
+my $box;
+my $server = (shift || $ENV{BOX}) or die;
 
 sub cleanup ($) {
     my ($id) = @_;
@@ -65,7 +58,6 @@ sub def_param  {
                  name          => 'main',
              } ],
              default_space => "main",
-             %opts,
          }
 }
 
@@ -162,367 +154,6 @@ is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 5, 5, 5, 5, '
 ok $box->Replace(13, q/some_email@test.mail.ru/, 1, 2, 3, 4, '123456789'), 'replace';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 'select/replace';
 
-
-is_deeply [$box->Select([13], {raise => 0, hash_by => 0, raw => 1})], [{13 => [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789']}], 'select/rawhash1';
-is_deeply [$box->Select([13,14], {raise => 0, hash_by => 0, raw => 1})], [{13 => [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], 14 => [14, 'some1email@test.mail.ru', 1, 2, 3, 4, '123456789']}], 'select/rawhash2';
-
-
-do {
-    my $continuation = $box->Select(13,{ return_fh => 1 });
-    ok $continuation, "select/continuation";
-
-    my $rin = '';
-    vec($rin,$continuation->{fh}->fileno,1) = 1;
-    my $ein = $rin;
-    ok 0 <= select($rin,undef,$ein,2), "select/continuation/select";
-
-    my $res = $continuation->{continue}->();
-    use Data::Dumper;
-    is_deeply $res, [13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789'], "select/continuation/result";
-};
-
-our $ANYEVENT = 1 && eval { require AnyEvent; 1 };
-SKIP:{
-    skip "AnyEvent not found", 60 unless $ANYEVENT;
-
-    local $opts{raise} = 0;
-    $box = $CLASS->new(def_param('l&SSLL&'));
-
-    my $tt =     [ [1, 'rtokarev@corp.mail.ru',     11, 111, 1111, 11111, "1111111111111"],
-                   [2, 'vostrikov@corp.mail.ru',    22, 222, 2222, 22222, "2222222222222"],
-                   [3, 'aleinikov@corp.mail.ru',    33, 333, 3333, 33333, "3333333333333"],
-                   [4, 'roman.s.tokarev@gmail.com', 44, 444, 4444, 44444, "4444444444444"],
-                   [5, 'vostrIIIkov@corp.mail.ru',  55, 555, 5555, 55555, "5555555555555"] ];
-
-    foreach my $tuple (@$tt) {
-        cleanup $tuple->[0];
-    }
-
-    AnyEvent->now_update;
-    my $cv = AnyEvent->condvar;
-    foreach my $tuple (@$tt) {
-        $cv->begin;
-        ok $box->Insert(@$tuple, {callback => sub { ok $_[0], "async/insert$tuple->[0]/result"; $cv->end; }}), "async/insert$tuple->[0]";
-    }
-    $cv->recv;
-
-
-    AnyEvent->now_update;
-    $cv = AnyEvent->condvar;
-    $cv->begin;
-    ok $box->Select(1,2,3,{callback => sub {
-                                  my ($res) = @_;
-                                  $cv->end;
-                                  is_deeply $res, [@$tt[0,1,2]], "async/select1/result";
-                           }}), "async/select1";
-
-    $cv->begin;
-    ok $box->Select(4,5,{ callback => sub {
-                                  my ($res) = @_;
-                                  $cv->end;
-                                  is_deeply $res, [@$tt[3,4]], "async/select2/result";
-                           }}), "async/select2";
-
-    $cv->recv;
-
-
-    AnyEvent->now_update;
-    $cv = AnyEvent->condvar;
-    foreach my $tuple (@$tt) {
-        $tuple->[4] += 10000;
-        $cv->begin;
-        ok $box->UpdateMulti($tuple->[0], [ 4 => add => 10000 ], {callback => sub { ok $_[0], "async/update1-$tuple->[0]/result"; $cv->end; }}), "async/update1-$tuple->[0]";
-    }
-    $cv->begin;
-    ok $box->Select((map{$_->[0]}@$tt),{ callback => sub {
-                                  my ($res) = @_;
-                                  $cv->end;
-                                  is_deeply $res, $tt, "async/update1-select/result";
-                           }}), "async/update1-select";
-    $cv->recv;
-
-    AnyEvent->now_update;
-    $cv = AnyEvent->condvar;
-    foreach my $tuple (@$tt) {
-        $tuple->[4] += 10000;
-        $cv->begin;
-        ok $box->UpdateMulti($tuple->[0], [ 4 => add => 10000 ], {want_result => 1, callback => sub { is_deeply $_[0], $tuple, "async/update2-$tuple->[0]/result"; $cv->end; }}), "async/update2-$tuple->[0]";
-    }
-    $cv->begin;
-    ok $box->Select((map{$_->[0]}@$tt),{ callback => sub {
-                                  my ($res) = @_;
-                                  $cv->end;
-                                  is_deeply $res, $tt, "async/update2-select/result";
-                           }}), "async/update2-select";
-    $cv->recv;
-
-    AnyEvent->now_update;
-    $cv = AnyEvent->condvar;
-    foreach my $tuple (@$tt) {
-        $cv->begin;
-        ok $box->Delete($tuple->[0], {want_result => 1, callback => sub { is_deeply $_[0], $tuple, "async/delete-$tuple->[0]/result"; $cv->end; }}), "async/delete-$tuple->[0]";
-    }
-    $cv->begin;
-    ok $box->Select((map{$_->[0]}@$tt),{ callback => sub {
-                                  my ($res) = @_;
-                                  $cv->end;
-                                  is_deeply $res, [], "async/delete-select/result";
-                           }}), "async/delete-select";
-    $cv->recv;
-}
-
-sub countwarn {
-    my ($qr, $counter) = @_;
-    return sub {
-        ++$$counter if $_[0] =~ $qr;
-        warn @_;
-    };
-};
-
-do {
-    local $server = "127.0.0.1:1111";
-    local $opts{raise} = 0;
-    my $try = 3;
-
-    my $counter = 0;
-    local $SIG{__WARN__} = countwarn(qr/refused/i, \$counter);
-
-    my $box = $CLASS->new(def_param('l&SSLL&'));
-
-    throws_ok sub{my$x=$box->Select(13,{ want => "arrayref", raise => 1 })}, NO_SUCCESS, "reject/select/raise/sync";
-    ok $counter == $try, "reject/select/raise/sync/counter";
-    $counter = 0;
-
-    ok !$box->Select(13,{ want => "arrayref", raise => 0 }), "reject/select/noraise/sync";
-    ok $counter == $try, "reject/select/noraise/sync/counter";
-    $counter = 0;
-
-    my $continuation = $box->Select(13,{ return_fh => 1, raise => 0 });
-    ok !$continuation, "reject/select/continuation";
-    ok $counter == 1, "reject/select/continuation/counter";
-    $counter = 0;
-
-
-  SKIP:{
-        skip "AnyEvent not found", 5 unless $ANYEVENT;
-
-        AnyEvent->now_update;
-        my $cv = AnyEvent->condvar;
-        $cv->begin;
-        ok $box->Select(4,5,{ callback => sub {
-                                  my ($res) = @_;
-                                  $cv->end;
-                                  ok !$res, "reject/select/async/noraise/cb";
-                                  ok $box->Error, "reject/select/async/noraise/cb/error";
-                                  ok $box->ErrorStr, "reject/select/async/noraise/cb/errorstr";
-                              }}), "reject/select/async/noraise";
-
-        $cv->recv;
-        ok $counter == $try, "reject/select/async/noraise/counter";
-        $counter = 0;
-    }
-};
-
-do {
-    my $pid;
-    local $SIG{INT} = $SIG{TERM} = sub { kill 'TERM', $pid };
-
-    $pid = fork();
-    die unless defined $pid;
-    unless($pid) {
-        $0 = "$0 <SERVER>";
-        my $stop = 0;
-        my $h;
-        my $l = IO::Socket::INET->new(
-            LocalAddr => '127.0.0.1',
-            LocalPort => 1111,
-            Proto => 'tcp',
-            Listen => 10,
-            Blocking => 1,
-            ReuseAddr => 1,
-        ) or die $!;
-        $SIG{INT} = $SIG{TERM} = sub { ++$stop; close $l; close $h; exit; };
-        while(!$stop) {
-            $h = $l->accept;
-            my $data;
-            while($h->read($data,1024) > 0) { 0; }
-            close $h;
-        }
-        exit;
-    }
-
-
-    local $server = "127.0.0.1:1111";
-    local $opts{raise} = 0;
-    local $opts{timeout} = 0.1;
-    local $opts{select_timeout} = 0.1;
-
-    my $try = 3;
-
-    my $counter = 0;
-    local $SIG{__WARN__} = countwarn(qr/timed? ?out/i, \$counter);
-
-    my $box = $CLASS->new(def_param('l&SSLL&'));
-
-    sleep 1;
-
-    throws_ok sub{my$x=$box->Select(13,{ want => "arrayref", raise => 1 })}, NO_SUCCESS, "timeout1/select/raise/sync";
-    ok $counter == $try, "timeout1/select/raise/sync/counter";
-    $counter = 0;
-
-    ok !$box->Select(13,{ want => "arrayref", raise => 0 }), "timeout1/select/noraise/sync";
-    ok $counter == $try, "/counter";
-    $counter = 0;
-
-    my $continuation = $box->Select(13,{ return_fh => 1, raise => 0 });
-    ok $continuation, "timeout1/select/continuation";
-    ok !$continuation->{continue}->(), "timeout1/select/continuation/result";
-    ok $counter == 1, "timeout1/select/continuation/counter";
-    $counter = 0;
-
-
-  SKIP:{
-        skip "AnyEvent not found", 5 unless $ANYEVENT;
-
-        AnyEvent->now_update;
-        my $cv = AnyEvent->condvar;
-        $cv->begin;
-        ok $box->Select(4,5,{ callback => sub {
-                                  my ($res) = @_;
-                                  $cv->end;
-                                  ok !$res, "timeout1/select/async/noraise/cb";
-                                  ok $box->Error, "timeout1/select/async/noraise/cb/error";
-                                  ok $box->ErrorStr, "timeout1/select/async/noraise/cb/errorstr";
-                              }}), "timeout1/select/async/noraise";
-
-        $cv->recv;
-        ok $counter == $try, "timeout1/select/async/noraise/counter";
-        $counter = 0;
-    }
-
-    kill 'TERM', $pid;
-};
-
-do {
-    my $pid;
-    local $SIG{INT} = $SIG{TERM} = sub { kill 'TERM', $pid };
-
-    $pid = fork();
-    die unless defined $pid;
-    unless($pid) {
-        $0 = "$0 <SERVER>";
-        my $stop = 0;
-        my $h;
-        my @ok = (0,0,1,0,0,1,1,0,0,1);
-        my $l = IO::Socket::INET->new(
-            LocalAddr => '127.0.0.1',
-            LocalPort => 1111,
-            Proto => 'tcp',
-            Listen => 10,
-            Blocking => 1,
-            ReuseAddr => 1,
-        ) or die $!;
-        my ($host, $port) = split /:/, $server;
-        my $box = IO::Socket::INET->new(
-            PeerAddr => $host,
-            PeerPort => $port,
-            Proto => 'tcp',
-            Blocking => 1,
-        ) or die;
-        $SIG{INT} = $SIG{TERM} = sub { ++$stop; close $l; close $h; close $box; exit; };
-
-        while(!$stop) {
-            $h = $l->accept;
-            $h->blocking(1);
-            my $data = '';
-            if (shift @ok) {
-                while(!$stop) {
-                    $h->blocking(0);
-                    $h->read($data,1024,length$data);
-                    if(length$data) {
-                        $h->blocking(1);
-                        $h->read($data,12-length$data,length$data) while length $data < 12;
-                        my ($len) = unpack 'x4L', $data;
-                        $h->read($data,12+$len-length$data,length$data) while length $data < 12+$len;
-                        $box->write($data);
-
-                        $data = '';
-                        $box->read($data,12-length$data, length$data) while length $data < 12;
-                        ($len) = unpack 'x4L', $data;
-                        $box->read($data,12+$len-length$data,length$data) while length $data < 12+$len;
-                        $h->write($data);
-                        close $h;
-                        last;
-                    }
-                    sleep 0.1;
-                }
-            } else {
-                while($h->read($data,1024) > 0) { 0; }
-            }
-            close $h;
-        }
-        close $l;
-        close $box;
-        exit;
-    }
-
-
-    local $server = "127.0.0.1:1111";
-    local $opts{raise} = 0;
-    local $opts{timeout} = 0.1;
-    local $opts{select_timeout} = 0.1;
-
-    my $try = 2;
-
-    my $counter = 0;
-    local $SIG{__WARN__} = countwarn(qr/timed? ?out/i, \$counter);
-
-    my $box = $CLASS->new(def_param('l&SSLL&'));
-
-    sleep 1;
-
-    is_deeply $box->Select(13,{ want => "arrayref", raise => 1 }), [[13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789']], "timeout2/select/raise/sync";
-    ok !$box->Error, "timeout2/select/raise/sync/error";
-    ok !$box->ErrorStr, "timeout2/select/raise/sync/errorstr";
-    ok $counter == $try, "timeout2/select/raise/sync/counter";
-    $counter = 0;
-
-    is_deeply $box->Select(13,{ want => "arrayref", raise => 0 }), [[13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789']], "timeout2/select/noraise/sync";
-    ok !$box->Error, "timeout2/select/noraise/sync/error";
-    ok !$box->ErrorStr, "timeout2/select/noraise/sync/errorstr";
-    ok $counter == $try, "timeout2/select/noraise/sync/counter";
-    $counter = 0;
-
-    my $continuation = $box->Select(13,{ return_fh => 1, raise => 0, want => 'arrayref' });
-    ok $continuation, "timeout2/select/continuation";
-    is_deeply $continuation->{continue}->(), [[13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789']], "timeout2/select/continuation/result";
-    ok !$box->Error, "timeout2/select/continuation/error";
-    ok !$box->ErrorStr, "timeout2/select/continuation/errorstr";
-    ok $counter == 0, "timeout2/select/continuation/counter";
-    $counter = 0;
-
-
-  SKIP:{
-        skip "AnyEvent not found", 5 unless $ANYEVENT;
-
-        AnyEvent->now_update;
-        my $cv = AnyEvent->condvar;
-        $cv->begin;
-        ok $box->Select(13,{ callback => sub {
-                                  my ($res) = @_;
-                                  $cv->end;
-                                  is_deeply $res, [[13, 'some_email@test.mail.ru', 1, 2, 3, 4, '123456789']], "timeout2/select/async/noraise/cb";
-                                  ok !$box->Error, "timeout2/select/async/noraise/cb/error";
-                                  ok !$box->ErrorStr, "timeout2/select/async/noraise/cb/errorstr";
-                              }}), "timeout2/select/async/noraise";
-
-        $cv->recv;
-        ok $counter == $try, "timeout2/select/async/noraise/counter";
-        $counter = 0;
-    }
-
-    kill 'TERM', $pid;
-};
 
 
 $box = $CLASS->new(def_param);
@@ -784,9 +415,7 @@ sub def_param1 {
                  namespace     => 26,
                  format        => $format,
                  default_index => 'primary_num1',
-             } ],
-             %opts,
-         }
+             } ]}
 }
 
 $box = $CLASS->new(def_param1);
@@ -829,9 +458,7 @@ sub def_param_bad {
                  namespace     => 26,
                  format        => $format,
                  default_index => 'primary_num1',
-             } ],
-             %opts,
-         }
+             } ]}
 }
 
 $box = $CLASS->new(def_param_bad);
@@ -866,9 +493,7 @@ sub def_param_unique {
                  space     => 27,
                  format        => $format,
                  default_index => 'id',
-             } ],
-             %opts,
-         }
+             } ]}
 }
 
 $box = $CLASS->new(def_param_unique);
@@ -962,7 +587,7 @@ sub def_param_u64 {
                  format        => $format,
                  default_index => 'id',
              } ],
-             %opts,
+             debug => 0,
          }
 }
 

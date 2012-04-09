@@ -77,7 +77,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 23 */_(ER_RESERVED23,		0, "Reserved23") \
 		/* end of silverproxy error codes */ \
 	/* 24 */_(ER_CANNOT_REGISTER,		1, "Can't register new user") \
-	/* 25 */_(ER_TUPLE_IS_EMPTY,		0, "UPDATE error: the new tuple has no fields") \
+	/* 25 */_(ER_UNUSED25,			0, "Unused25") \
 	/* 26 */_(ER_CANNOT_INIT_ALERT_ID,	1, "Can't generate alert id") \
 	/* 27 */_(ER_CANNOT_DEL,		2, "Can't del node") \
 	/* 28 */_(ER_USER_NOT_REGISTERED,	2, "User isn't registered") \

@@ -1,12 +1,6 @@
 # username to switch to
 username=NULL, ro
 
-# Local hot standby (if enabled, the server will run in hot
-# standby mode, continuously fetching WAL records from wal_dir,
-# until it is able to bind to the primary port.
-# In local hot standby mode the server only accepts reads.
-local_hot_standby=false, ro
-
 # tarantool bind ip address, applies to master
 # and replication ports. INADDR_ANY is the default value.
 bind_ipaddr="INADDR_ANY", ro
@@ -35,12 +29,6 @@ slab_alloc_factor=2.0, ro
 # working directory (daemon will chdir(2) to it)
 work_dir=NULL, ro
 
-# Snapshot directory (where snapshots get saved/read)
-snap_dir=".", ro
-
-# WAL directory (where WALs get saved/read)
-wal_dir=".", ro
-
 # name of pid file
 pid_file="tarantool.pid", ro
 
@@ -61,36 +49,3 @@ backlog=1024, ro
 
 # network io readahead
 readahead=16320
-
-# Do not write into snapshot faster than snap_io_rate_limit MB/sec
-snap_io_rate_limit=0.0, ro
-
-# Write no more rows in WAL
-rows_per_wal=500000, ro
-
-# Size of the WAL writer request queue: how many outstanding
-# requests for write to disk it can have.
-# Rule of thumb is to set this to the average connection count.
-wal_writer_inbox_size=16384, ro
-
-# Defines fiber/data synchronization fsync(2) policy:
-#   "write":          fibers wait for their data to be written to the log.
-#   "fsync":          fibers wait for their data, fsync(2) follows each write(2)
-#   "fsync_delay":    fibers wait for their data, fsync every N=wal_fsync_delay seconds,
-#                     N=0.0 means no fsync (equivalent to wal_mode = "write");
-wal_mode="fsync_delay"
-
-# Fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay
-# seconds ago.
-# WARNING: actually, several last requests may stall fsync for much longer
-wal_fsync_delay=0.0
-
-# Delay, in seconds, between successive re-readings of wal_dir.
-# The re-scan is necessary to discover new WAL files or snapshots.
-wal_dir_rescan_delay=0.1, ro
-
-# Panic if there is an error reading a snapshot or WAL.
-# By default, panic on any snapshot reading error and ignore errors
-# when reading WALs.
-panic_on_snap_error=true, ro
-panic_on_wal_error=false, ro

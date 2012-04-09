@@ -127,11 +127,11 @@ insert into t5 values ('41234567', 'part1_a', 'part2_a')
 Insert OK, 1 row affected
 lua for k, v in box.space[5]:pairs() do print(v) end
 ---
-3978425819141910832: {'part1', 'part2'}
-3978425819141910833: {'part1', 'part2'}
-3978425819141910834: {'part1', 'part2_a'}
-3978425819141910835: {'part1_a', 'part2'}
-3978425819141910836: {'part1_a', 'part2_a'}
+'01234567': {'part1', 'part2'}
+'11234567': {'part1', 'part2'}
+'21234567': {'part1', 'part2_a'}
+'31234567': {'part1_a', 'part2'}
+'41234567': {'part1_a', 'part2_a'}
 ...
 select * from t5 where k0='01234567'
 Found 1 tuple:
@@ -337,8 +337,8 @@ insert into t4 values(3, 'Creature')
 Insert OK, 1 row affected
 lua for k, v in box.space[4]:pairs() do print(v) end
 ---
-3: {7310034287886430787}
-1: {7742357870522556737}
+3: {'Creature'}
+1: {'Aardvark'}
 2: {'Bilimbi'}
 ...
 lua box.space[4].index[0].idx:min()
@@ -351,11 +351,11 @@ error: 'Unsupported'
 ...
 lua box.space[4].index[1].idx:min()
 ---
- - 1: {7742357870522556737}
+ - 1: {'Aardvark'}
 ...
 lua box.space[4].index[1].idx:max()
 ---
- - 3: {7310034287886430787}
+ - 3: {'Creature'}
 ...
 delete from t4 where k0=1
 Delete OK, 1 row affected

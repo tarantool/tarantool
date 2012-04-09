@@ -285,7 +285,7 @@ flush_all(void *data)
 	fiber_sleep(delay - ev_now());
 	struct box_tuple *tuple;
 	struct iterator *it = [memcached_index allocIterator];
-	[memcached_index initIterator: it :ITER_FORWARD];
+	[memcached_index initIterator: it];
 	while ((tuple = it->next(it))) {
 	       meta(tuple)->exptime = 1;
 	}
@@ -505,7 +505,7 @@ memcached_expire_loop(void *data __attribute__((unused)))
 	@try {
 restart:
 		if (tuple == NULL)
-			[memcached_index initIterator: memcached_it :ITER_FORWARD];
+			[memcached_index initIterator: memcached_it];
 
 		struct tbuf *keys_to_delete = tbuf_alloc(fiber->gc_pool);
 

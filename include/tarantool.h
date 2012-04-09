@@ -33,6 +33,7 @@
 struct lua_State;
 struct luaL_Reg;
 
+extern struct recovery_state *recovery_state;
 void mod_init(void);
 void mod_free(void);
 struct tarantool_cfg;

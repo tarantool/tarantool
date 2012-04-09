@@ -67,14 +67,6 @@ Or asynchronously:
     $client->send($request, $callback);
     # callback is called when reply is received or error is occured
 
-It is recommended to disconnect all connections in child after fork() to
-prevent possible conflicts:
-
-    my $pid = fork();
-    if ($pid == 0) {
-        MR::IProto->disconnect_all();
-    }
-
 =head1 DESCRIPTION
 
 This client is used to communicate with cluster of balanced servers using
@@ -234,35 +226,22 @@ sub send {
         die "Method must be called in void context if you want to use async" if defined wantarray;
         $self->_send($message, $callback);
         return;
-    } else {
+    }
+    else {
         die "Method must be called in scalar context if you want to use sync" unless defined wantarray;
         my $olddie = ref $SIG{__DIE__} eq 'CODE' ? $SIG{__DIE__} : ref $SIG{__DIE__} eq 'GLOB' ? *{$SIG{__DIE__}}{CODE} : undef;
         local $SIG{__DIE__} = sub { local $! = 0; $olddie->(@_); } if $olddie;
         my %servers;
         my ($data, $error, $errno);
-        my $conn = $self->_send_now($message, sub {
+        $self->_send_now($message, sub {
             ($data, $error) = @_;
             $errno = $!;
             return;
         }, \%servers);
-
-        return if $message->{continue} && !$conn;
-
-        my $cont = sub {
-            $self->_recv_now(\%servers, max => $message->{continue}?1:0);
-            $! = $errno;
-            return $message->{continue}->($data, $error, $errno) if ref $message->{continue} eq 'CODE';
-            die $error if $error;
-            return $data;
-        };
-
-        return {
-            fh          => $conn->fh,
-            connection  => $conn,
-            continue    => $cont,
-        } if $message->{continue};
-
-        return &$cont();
+        $self->_recv_now(\%servers);
+        $! = $errno;
+        die $error if $error;
+        return $data;
     }
 }
 
@@ -342,18 +321,6 @@ sub SetTimeout {
     return;
 }
 
-=item disconnect_all
-
-Class method used to disconnect all iproto-connections. Very useful in case of fork().
-
-=cut
-
-sub disconnect_all {
-    my ($class) = @_;
-    MR::IProto::Cluster::Server->disconnect_all();
-    return;
-}
-
 =back
 
 =head1 PROTECTED METHODS
@@ -401,7 +368,6 @@ around BUILDARGS => sub {
         $srvargs{tcp_nodelay} = delete $args{tcp_nodelay} if exists $args{tcp_nodelay};
         $srvargs{tcp_keepalive} = delete $args{tcp_keepalive} if exists $args{tcp_keepalive};
         $srvargs{dump_no_ints} = delete $args{dump_no_ints} if exists $args{dump_no_ints};
-        $srvargs{prefix} = $args{name} if exists $args{name} and defined $args{name};
         my %clusterargs;
         $clusterargs{balance} = delete $args{balance} if exists $args{balance};
         $clusterargs{servers} = [
@@ -562,19 +528,19 @@ sub _send_now {
         );
         return;
     };
-    return $self->_send_try($sync, $args, $handler, $try);
+    $self->_send_try($sync, $args, $handler, $try);
+    return;
 }
 
 sub _send_try {
     my ($self, $sync, $args, $handler, $try) = @_;
     my $xsync = $sync ? 'sync' : 'async';
-    $args->{max_request_retries} ||= $self->max_request_retries;
-    $self->_debug(sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $args->{max_request_retries} ) if $self->debug >= 2;
+    $self->_debug(sprintf "send msg=%d try %d of %d total", $args->{msg}, $try, $self->max_request_retries ) if $self->debug >= 2;
     my $server = $self->cluster->server( $args->{key} );
     my $connection = $server->$xsync();
-    return unless $connection->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
+    $connection->send($args->{msg}, $args->{body}, $handler, $args->{no_reply}, $args->{sync});
     $sync->{$connection} ||= $connection if $sync;
-    return $connection;
+    return;
 }
 
 sub _send_retry {
@@ -609,8 +575,8 @@ sub _server_callback {
             my $retry = defined $args->{request} ? $args->{request}->retry()
                 : ref $args->{retry} eq 'CODE' ? $args->{retry}->()
                 : $args->{retry};
-            $self->_debug("send: failed[@{[$retry, $$try+1, $args->{max_request_retries}]}]") if $self->debug >= 2;
-            if( $retry && $$try++ < $args->{max_request_retries} ) {
+            $self->_debug("send: failed[@{[$retry, $$try+1, $self->max_request_retries]}]") if $self->debug >= 2;
+            if( $retry && $$try++ < $self->max_request_retries ) {
                 $self->_send_retry($sync, $args, $$handler, $$try);
             }
             else {
@@ -631,10 +597,10 @@ sub _server_callback {
                 1;
             };
             if($ok) {
-                if( defined $args->{request} && $data->retry && $$try++ < $args->{max_request_retries} ) {
+                if( defined $args->{request} && $data->retry && $$try++ < $self->max_request_retries ) {
                     $self->_send_retry($sync, $args, $$handler, $$try);
                 }
-                elsif( defined $args->{is_retry} && $args->{is_retry}->($data) && $$try++ < $args->{max_request_retries} ) {
+                elsif( defined $args->{is_retry} && $args->{is_retry}->($data) && $$try++ < $self->max_request_retries ) {
                     $self->_send_retry($sync, $args, $$handler, $$try);
                 }
                 else {
@@ -657,10 +623,10 @@ sub _server_callback {
 }
 
 sub _recv_now {
-    my ($self, $servers, %opts) = @_;
+    my ($self, $servers) = @_;
     while(my @servers = values %$servers) {
         %$servers = ();
-        $_->recv_all(%opts) foreach @servers;
+        $_->recv_all() foreach @servers;
     }
     return;
 }

@@ -39,25 +39,6 @@ const uint32_t msg_ping = 0xff00;
 
 static void iproto_reply(iproto_callback callback, struct tbuf *request);
 
-inline static int
-iproto_flush(struct tbuf **in, ssize_t to_read)
-{
-	/*
-	 * Flush output and garbage collect before reading
-	 * next header.
-	 */
-	if (to_read > 0) {
-		if (iov_flush() < 0) {
-			say_warn("io_error: %s", strerror(errno));
-			return -1;
-		}
-		fiber_gc();
-		/* Must be reset after fiber_gc() */
-		*in = fiber->rbuf;
-	}
-	return 0;
-}
-
 void
 iproto_interact(iproto_callback *callback)
 {
@@ -71,8 +52,6 @@ iproto_interact(iproto_callback *callback)
 		ssize_t request_len = sizeof(struct iproto_header) + iproto(in)->len;
 		to_read = request_len - in->size;
 
-		if (iproto_flush(&in, to_read) == -1)
-			break;
 		if (to_read > 0 && fiber_bread(in, to_read) <= 0)
 			break;
 
@@ -80,8 +59,20 @@ iproto_interact(iproto_callback *callback)
 		iproto_reply(*callback, request);
 
 		to_read = sizeof(struct iproto_header) - in->size;
-		if (iproto_flush(&in, to_read) == -1)
-			break;
+
+		/*
+		 * Flush output and garbage collect before reading
+		 * next header.
+		 */
+		if (to_read > 0) {
+			if (iov_flush() < 0) {
+				say_warn("io_error: %s", strerror(errno));
+				break;
+			}
+			fiber_gc();
+			/* Must be reset after fiber_gc() */
+			in = fiber->rbuf;
+		}
 	}
 }
 

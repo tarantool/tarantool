@@ -58,7 +58,7 @@ sub _unpack_header {
 
 sub _choose_sync {
     my ($self) = @_;
-    return 1 + int rand 0xfffffffe;
+    return int(rand 0xffffffff);
 }
 
 no Mouse;

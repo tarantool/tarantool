@@ -16,7 +16,7 @@ Insert OK, 1 row affected
 Stopping the server...
 00000000000000000004.xlog.inprogress has been successfully renamed
 
-# An inprogress xlog file with one record must be renamed during recovery.
+# An inprogress xlog fle with one record must be renamed during recovery.
 
 00000000000000000005.xlog.inprogress hash been successfully renamed
 

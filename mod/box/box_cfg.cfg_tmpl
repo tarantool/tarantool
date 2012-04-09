@@ -1,6 +1,12 @@
 
 ## BOX
 
+# Snapshot directory (where snapshots get saved/read)
+snap_dir=".", ro
+
+# WAL directory (where WALs get saved/read)
+wal_dir=".", ro
+
 # Primary port (where updates are accepted)
 primary_port=0, ro, required
 
@@ -24,6 +30,36 @@ memcached_expire=false, ro
 memcached_expire_per_loop=1024
 # tarantool will try to iterate over all rows within this time
 memcached_expire_full_sweep=3600.0
+
+# Do not write into snapshot faster than snap_io_rate_limit MB/sec
+snap_io_rate_limit=0.0, ro
+
+# Write no more rows in WAL
+rows_per_wal=500000, ro
+
+# fsync WAL delay, only issue fsync if last fsync was wal_fsync_delay
+# seconds ago.
+# WARNING: actually, several last requests may stall fsync for much longer
+wal_fsync_delay=0.0, ro
+
+# size of WAL writer request buffer
+wal_writer_inbox_size=128, ro
+
+# Local hot standby (if enabled, the server will run in hot
+# standby mode, continuously fetching WAL records from wal_dir,
+# until it is able to bind to the primary port.
+# In local hot standby mode the server only accepts reads.
+local_hot_standby=false, ro
+# Delay, in seconds, between successive re-readings of wal_dir.
+# The re-scan is necessary to discover new WAL files or snapshots.
+wal_dir_rescan_delay=0.1, ro
+
+
+# Panic if there is an error reading a snapshot or WAL.
+# By default, panic on any snapshot reading error and ignore errors
+# when reading WALs.
+panic_on_snap_error=true, ro
+panic_on_wal_error=false, ro
 
 # Replication mode (if enabled, the server, once
 # bound to the primary port, will connect to
