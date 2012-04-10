@@ -42,3 +42,5 @@ test/connector_c/update
 doc/www-data/*.html
 doc/www-data/*.ru.html
 doc/www-data.in/download
+doc/man/tarantool.1
+doc/man/tarantool_box.1
