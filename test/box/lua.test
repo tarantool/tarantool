@@ -289,7 +289,7 @@ exec admin "lua tonumber64(-1)"
 exec admin "lua tonumber64('184467440737095516155')"
 exec admin "lua string.byte(box.pack('p', tonumber64(123)))"
 
-# Test for Bug #955226 
-# Lua Numbers are passed back wrongly as strings 
+# Test for Bug #955226
+# Lua Numbers are passed back wrongly as strings
 exec admin "lua function foo() return 1, 2, '1', '2' end"
 exec sql "call foo()"
