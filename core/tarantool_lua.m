@@ -91,8 +91,8 @@ luaL_addvarint32(luaL_Buffer *b, u32 u32)
 	luaL_addlstring(b, tbuf.data, tbuf.size);
 }
 
-static uint64_t
-lua_tointeger64(struct lua_State *L, int idx)
+uint64_t
+tarantool_lua_tointeger64(struct lua_State *L, int idx)
 {
 	uint64_t result = 0;
 	switch (lua_type(L, idx)) {
@@ -195,7 +195,7 @@ lbox_pack(struct lua_State *L)
 		case 'L':
 		case 'l':
 		{
-			u64buf = lua_tointeger64(L, i);
+			u64buf = tarantool_lua_tointeger64(L, i);
 			luaL_addlstring(&b, (char *) &u64buf, sizeof(u64));
 			break;
 		}
@@ -217,7 +217,7 @@ lbox_pack(struct lua_State *L)
 				size = sizeof(u32);
 			} else
 			if (lua_type(L, i) == LUA_TCDATA) {
-				u64buf = lua_tointeger64(L, i);
+				u64buf = tarantool_lua_tointeger64(L, i);
 				str = (char *) &u64buf;
 				size = sizeof(u64);
 			} else {
@@ -871,7 +871,7 @@ lbox_pcall(struct lua_State *L)
 static int
 lbox_tonumber64(struct lua_State *L)
 {
-	uint64_t result = lua_tointeger64(L, -1);
+	uint64_t result = tarantool_lua_tointeger64(L, -1);
 	return luaL_pushnumber64(L, result);
 }
 

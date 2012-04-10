@@ -329,16 +329,16 @@ delete from t4 where k0=14
 Delete OK, 1 row affected
 delete from t4 where k0=15
 Delete OK, 1 row affected
-insert into t4 values(1, 'Aardvark')
+insert into t4 values(1, 'Aardvark ')
 Insert OK, 1 row affected
 insert into t4 values(2, 'Bilimbi')
 Insert OK, 1 row affected
-insert into t4 values(3, 'Creature')
+insert into t4 values(3, 'Creature ')
 Insert OK, 1 row affected
 lua for k, v in box.space[4]:pairs() do print(v) end
 ---
-3: {7310034287886430787}
-1: {7742357870522556737}
+3: {'Creature '}
+1: {'Aardvark '}
 2: {'Bilimbi'}
 ...
 lua box.space[4].index[0].idx:min()
@@ -351,11 +351,11 @@ error: 'Unsupported'
 ...
 lua box.space[4].index[1].idx:min()
 ---
- - 1: {7742357870522556737}
+ - 1: {'Aardvark '}
 ...
 lua box.space[4].index[1].idx:max()
 ---
- - 3: {7310034287886430787}
+ - 3: {'Creature '}
 ...
 delete from t4 where k0=1
 Delete OK, 1 row affected

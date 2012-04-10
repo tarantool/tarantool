@@ -313,3 +313,10 @@ exec admin "lua box.insert(0, 1, 'tuple')"
 exec admin "lua box.update(0, 1, '=p!p#p', 1, 'set tuple', 1, 'inerted tuple', 1, '')"
 exec admin "lua box.update(0, 1, '!p!p', 0, 3, 0, 2)"
 exec admin "lua box.space[0]:truncate()"
+print """
+# Test for Bug #955226
+# Lua Numbers are passed back wrongly as strings
+#
+"""
+exec admin "lua function foo() return 1, 2, '1', '2' end"
+exec sql "call foo()"
