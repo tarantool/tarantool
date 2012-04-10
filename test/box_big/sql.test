@@ -170,9 +170,9 @@ exec sql "delete from t4 where k0=15"
 #
 # Check min() and max() functions
 #
-exec sql "insert into t4 values(1, 'Aardvark')"
+exec sql "insert into t4 values(1, 'Aardvark ')"
 exec sql "insert into t4 values(2, 'Bilimbi')"
-exec sql "insert into t4 values(3, 'Creature')"
+exec sql "insert into t4 values(3, 'Creature ')"
 exec admin "lua for k, v in box.space[4]:pairs() do print(v) end"
 exec admin "lua box.space[4].index[0].idx:min()"
 exec admin "lua box.space[4].index[0].idx:max()"
