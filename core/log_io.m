@@ -1318,8 +1318,6 @@ wal_writer_stop(struct recovery_state *state)
 {
 	struct wal_writer *writer = state->writer;
 
-	state->writer = NULL;
-
 	/* Stop the worker thread. */
 
 	tt_pthread_mutex_lock(&writer->mutex);
@@ -1332,6 +1330,8 @@ wal_writer_stop(struct recovery_state *state)
 
 	ev_async_stop(&writer->async);
 	wal_writer_destroy(writer);
+
+	state->writer = NULL;
 	return 0;
 error:
 	/* We can't recover from this in any reasonable way. */
