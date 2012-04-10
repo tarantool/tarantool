@@ -106,8 +106,8 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	}
 
 	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly, &n_accepted, &n_skipped);
-	fclose(f);
 
+	fclose(f);
 	if (check_cfg_tarantool_cfg(conf) != 0)
 		return -1;
 
@@ -298,6 +298,7 @@ signal_free(void)
 {
 	if (sigs == NULL)
 		return;
+
 	int i;
 	for (i = 0 ; i < 4 ; i++)
 		ev_signal_stop(&sigs[i]);
@@ -496,7 +497,8 @@ main(int argc, char **argv)
 			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
 				       NULL, "display this help and exit"),
 			   gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
-				       NULL, "print program version and exit"));
+				       NULL, "print program version and exit")
+		);
 
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 	main_opt = opt;

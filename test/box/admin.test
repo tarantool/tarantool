@@ -13,6 +13,7 @@ exec admin "save snapshot"
 exec sql "delete from t0 where k0 = 1"
 sys.stdout.push_filter("(\d)\.\d\.\d(-\d+-\w+)?", "\\1.minor.patch-<rev>-<commit>")
 sys.stdout.push_filter("pid: \d+", "pid: <pid>")
+sys.stdout.push_filter("logger_pid: \d+", "pid: <pid>")
 sys.stdout.push_filter("uptime: \d+", "uptime: <uptime>")
 sys.stdout.push_filter("uptime: \d+", "uptime: <uptime>")
 sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")

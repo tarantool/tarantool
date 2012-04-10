@@ -63,4 +63,6 @@ void _say(int level, const char *filename, int line, const char *error,
 #define say_info(...)			say(S_INFO, NULL, __VA_ARGS__)
 #define say_debug(...)			say(S_DEBUG, NULL, __VA_ARGS__)
 
+
+
 #endif /* TARANTOOL_SAY_H_INCLUDED */

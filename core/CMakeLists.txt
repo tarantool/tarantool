@@ -22,7 +22,7 @@ endif()
 #
 # libev uses ceil and floor from the standard math library
 #
-target_link_libraries(ev m)
+target_link_libraries(ev m rt)
 
 #
 # Build admin.m from admin.rl, but only if admin.rl was changed.
@@ -79,6 +79,10 @@ set (common_libraries cfg core ev coro gopt misc objc pthread rt)
 set (common_libraries ${common_libraries} ${LUAJIT_LIB})
 
 if (TARGET_OS_LINUX)
+  set (common_libraries ${common_libraries} dl)
+endif()
+
+if (TARGET_OS_DEBIAN_FREEBSD)
   set (common_libraries ${common_libraries} dl)
 endif()
 

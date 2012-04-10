@@ -40,6 +40,7 @@
 #include "tarantool.h"
 
 int sayfd = STDERR_FILENO;
+pid_t logger_pid;
 
 static char
 level_to_char(int level)
@@ -94,12 +95,15 @@ say_logger_init(int nonblock)
 			 */
 			setpgid(0, 0);
 			execve(argv[0], argv, envp);
-		} else {
-			close(pipefd[0]);
-			dup2(pipefd[1], STDERR_FILENO);
-			dup2(pipefd[1], STDOUT_FILENO);
-			sayfd = pipefd[1];
+			say_syserror("Can't start logger: %s", cfg.logger);
+			_exit(EXIT_FAILURE);
 		}
+		close(pipefd[0]);
+		dup2(pipefd[1], STDERR_FILENO);
+		dup2(pipefd[1], STDOUT_FILENO);
+		sayfd = pipefd[1];
+
+		logger_pid = pid;
 	} else {
 		sayfd = STDERR_FILENO;
 	}

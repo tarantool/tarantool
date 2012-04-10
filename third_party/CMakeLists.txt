@@ -1,8 +1,10 @@
 add_library (misc STATIC crc32.c proctitle.c qsort_arg.c)
 
-if (TARGET_OS_FREEBSD)
-  set_source_files_properties(proctitle.c PROPERTIES
-       COMPILE_FLAGS "-DHAVE_SETPROCTITLE")
+if (NOT TARGET_OS_DEBIAN_FREEBSD) 
+	if (TARGET_OS_FREEBSD)
+	  set_source_files_properties(proctitle.c PROPERTIES
+	       COMPILE_FLAGS "-DHAVE_SETPROCTITLE")
+	endif()
 endif()
 
 add_subdirectory(coro)

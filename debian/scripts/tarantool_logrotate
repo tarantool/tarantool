@@ -1,0 +1,48 @@
+#!/bin/sh
+
+set -e
+
+CLI="/usr/bin/tarantool"
+CONFIG_DIR="/var/lib/tarantool/started"
+PID_DIR="/var/run/tarantool"
+PROMPT=`basename $0`
+
+error() {
+	echo "$PROMPT error: $*" 1>&2
+	exit 1
+}
+
+logger_notify() {
+	CFG=$1
+	PORT_PRIMARY=`grep \
+	  '^[[:space:]]*primary_port[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
+	  | tail -n 1 \
+	  | sed 's/[^[:digit:]]//g'
+	`
+	[ $? -eq 0 ] || error "failed to get primary port"
+	PORT_ADMIN=`grep \
+	  '^[[:space:]]*admin_port[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
+	  | tail -n 1 \
+	  | sed 's/[^[:digit:]]//g'
+	`
+	[ $? -eq 0 ] || error "failed to get admin port"
+	LOGGER_PID=`${CLI} -p $PORT_PRIMARY -m $PORT_ADMIN "show info" \
+	  | grep 'logger_pid:' \
+	  | sed 's/[^[:digit:]]//g'
+	`
+	[ $? -eq 0 ] || error "failed to get logger pid"
+	kill -HUP $LOGGER_PID
+}
+
+if ! echo $1|grep -q '^\(start\)$'; then
+	echo "Tarantool log rotation script"
+	echo "Usage: $0 <start>"
+    exit 5
+fi
+
+if test -d ${PID_DIR}; then
+	for file in `ls -1 $PID_DIR`; do
+		INSTANCE=`basename $file .pid`
+		logger_notify "$CONFIG_DIR/$INSTANCE"
+	done
+fi

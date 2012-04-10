@@ -49,6 +49,8 @@
 #include "memcached.h"
 #include "box_lua.h"
 
+extern pid_t logger_pid;
+
 static void box_process_ro(u32 op, struct tbuf *request_data);
 static void box_process_rw(u32 op, struct tbuf *request_data);
 
@@ -2254,6 +2256,7 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  version: \"%s\"" CRLF, tarantool_version());
 	tbuf_printf(out, "  uptime: %i" CRLF, (int)tarantool_uptime());
 	tbuf_printf(out, "  pid: %i" CRLF, getpid());
+	tbuf_printf(out, "  logger_pid: %i" CRLF, logger_pid);
 	tbuf_printf(out, "  lsn: %" PRIi64 CRLF, recovery_state->confirmed_lsn);
 	tbuf_printf(out, "  recovery_lag: %.3f" CRLF, recovery_state->recovery_lag);
 	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,

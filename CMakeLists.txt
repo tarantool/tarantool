@@ -18,6 +18,7 @@ find_program(GIT git)
 find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
 find_program(LD ld)
+find_program(POD2MAN pod2man)
 
 include(cmake/check_objective_c_compiler.cmake)
 include(cmake/luajit.cmake)
@@ -46,6 +47,15 @@ endif()
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(TARGET_OS_LINUX 1)
 #
+# Enable GNU glibc extentions.
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_GNU_SOURCE")
+#
+# On 32-bit systems, support files larger than 2GB
+# (see man page for feature_test_macros).
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64")
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "kFreeBSD")
+    set(TARGET_OS_FREEBSD 1)
+    set(TARGET_OS_DEBIAN_FREEBSD 1)
 # Enable GNU glibc extentions.
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_GNU_SOURCE")
 #
@@ -183,6 +193,9 @@ endif()
 if (NOT DEFINED CMAKE_LOCALSTATE_DIR)
     set (CMAKE_LOCALSTATE_DIR "var")
 endif()
+if (NOT DEFINED CMAKE_MAN_DIR)
+    set (CMAKE_MAN_DIR "man")
+endif()
 
 #
 # Now handle all configuration options.
@@ -216,7 +229,7 @@ addresses are printed." ${CMAKE_COMPILER_IS_GNUCC})
 set (HAVE_BFD False)
 if (ENABLE_BACKTRACE)
     if (NOT ${CMAKE_COMPILER_IS_GNUCC} OR
-        NOT (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86"))
+        NOT (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86|amd64"))
         # We only know this option to work with gcc
         # on x86 architecture.
         message (FATAL_ERROR "ENABLE_BACKTRACE option is set but the system is not x86 based (${CMAKE_SYSTEM_PROCESSOR}) or the compiler is not GNU GCC (${CMAKE_C_COMPILER}).")
@@ -250,7 +263,7 @@ add_subdirectory(core)
 add_subdirectory(mod)
 add_subdirectory(client)
 add_subdirectory(test)
-add_subdirectory(doc EXCLUDE_FROM_ALL)
+add_subdirectory(doc)
 add_subdirectory(extra)
 
 install (FILES README LICENSE doc/box-protocol.txt
