@@ -33,7 +33,10 @@
 
 #ifndef __GNUC__
 	#error This module uses GCC intrinsic header(s) and should be compiled using gcc.
+#elif ((__GNUC__ * 10000) + (__GNUC_MINOR__ * 100)) < 40400
+	#error This module should be compiled with GCC 4.4 and higher
 #endif
+
 
 /* GCC intrinsic headers */
 #include <cpuid.h>
