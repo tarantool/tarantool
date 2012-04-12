@@ -40,6 +40,14 @@ if(NOT CMAKE_BUILD_TYPE)
         FORCE)
 endif()
 
+execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
+                OUTPUT_VARIABLE GCC_VERSION)
+if (GCC_VERSION VERSION_GREATER 4.4 OR GCC_VERSION VERSION_EQUAL 4.4)
+        message(STATUS "GCC Version >= 4.4")
+else()
+    message (FATAL_ERROR "GCC version should be >= 4.4")
+endif()
+
 #
 # Perform operating-system specific configuration.
 #

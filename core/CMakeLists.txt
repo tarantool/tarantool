@@ -7,14 +7,6 @@ check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
 check_c_compiler_flag ("-msse4" gcc_has_sse4)
 check_include_file("cpuid.h" gcc_has_cpuid)
 
-execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
-                OUTPUT_VARIABLE GCC_VERSION)
-if (GCC_VERSION VERSION_GREATER 4.4 OR GCC_VERSION VERSION_EQUAL 4.4)
-        message(STATUS "GCC Version >= 4.4")
-else()
-    message (FATAL_ERROR "GCC version should be >= 4.4")
-endif()
-
 if (NOT gcc_has_sse4)
     message (FATAL_ERROR "GCC must support SSE4 instructions (-msse4).")
 endif()
