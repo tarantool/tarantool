@@ -31,10 +31,6 @@
 	#error "Only x86 and x86_64 architectures supported"
 #endif
 
-#ifndef __GNUC__
-	#error This module uses GCC intrinsic header(s) and should be compiled using gcc.
-#endif
-
 /* GCC intrinsic headers */
 #include <cpuid.h>
 #include <smmintrin.h>

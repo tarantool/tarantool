@@ -4,6 +4,16 @@
 add_library(ev tarantool_ev.c)
 
 check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
+check_c_compiler_flag ("-msse4" gcc_has_sse4)
+check_include_file("cpuid.h" gcc_has_cpuid)
+
+if (NOT gcc_has_sse4)
+    message (FATAL_ERROR "GCC must support SSE4 instructions (-msse4).")
+endif()
+
+if (NOT gcc_has_cpuid)
+    message (FATAL_ERROR "GCC is missing cpuid.h")
+endif()
 
 if (gcc_has_wno_unused_result)
     set_source_files_properties(tarantool_ev.c
