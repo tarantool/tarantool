@@ -76,8 +76,8 @@ Delete OK, 1 row affected
 #
 insert into t1 values ('key1', 'part1', 'part2')
 Insert OK, 1 row affected
-insert into t1 values ('key1', 'part1', 'part2')
-Insert OK, 1 row affected
+replace into t1 values ('key1', 'part1', 'part2')
+Replace OK, 1 row affected
 insert into t1 values ('key2', 'part1', 'part2_a')
 Insert OK, 1 row affected
 insert into t1 values ('key3', 'part1', 'part2_b')
@@ -241,7 +241,7 @@ Found 1 tuple:
 select * from t4 where k1='Britney'
 Found 1 tuple:
 ['Spears', 'Britney']
-insert into t4 values ('Spears')
+replace into t4 values ('Spears')
 An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
 select * from t4 where k0='Spears'
 Found 1 tuple:

@@ -53,8 +53,8 @@ An error occurred: ER_NO_SUCH_FIELD, 'Field 1000 was not found in the tuple'
 select * from t0 where k0 = 1
 Found 1 tuple:
 [1, 'Huh', 'I am a new field! I was added via append']
-insert into t0 values (1, 'I am a new tuple', 'stub')
-Insert OK, 1 row affected
+replace into t0 values (1, 'I am a new tuple', 'stub')
+Replace OK, 1 row affected
 update t0 set k1 = 'Huh', k2 = 'Oh-ho-ho' where k0=1
 Update OK, 1 row affected
 select * from t0 where k0 = 1

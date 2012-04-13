@@ -23,6 +23,7 @@ class sqlScanner(runtime.Scanner):
         ('STR', re.compile("'([^']+|\\\\.)*'")),
         ('PING', re.compile('ping')),
         ('INSERT', re.compile('insert')),
+        ('REPLACE', re.compile('replace')),
         ('UPDATE', re.compile('update')),
         ('DELETE', re.compile('delete')),
         ('SELECT', re.compile('select')),
@@ -43,10 +44,13 @@ class sql(runtime.Parser):
     Context = runtime.Context
     def sql(self, _parent=None):
         _context = self.Context(_parent, self._scanner, 'sql', [])
-        _token = self._peek('INSERT', 'UPDATE', 'DELETE', 'SELECT', 'CALL', 'PING', context=_context)
+        _token = self._peek('INSERT', 'REPLACE', 'UPDATE', 'DELETE', 'SELECT', 'CALL', 'PING', context=_context)
         if _token == 'INSERT':
             insert = self.insert(_context)
             stmt = insert
+        elif _token == 'REPLACE':
+            replace = self.replace(_context)
+            stmt = replace
         elif _token == 'UPDATE':
             update = self.update(_context)
             stmt = update
@@ -74,6 +78,16 @@ class sql(runtime.Parser):
         VALUES = self._scan('VALUES', context=_context)
         value_list = self.value_list(_context)
         return sql_ast.StatementInsert(ident, value_list)
+
+    def replace(self, _parent=None):
+        _context = self.Context(_parent, self._scanner, 'replace', [])
+        REPLACE = self._scan('REPLACE', context=_context)
+        if self._peek('INTO', 'ID', context=_context) == 'INTO':
+            INTO = self._scan('INTO', context=_context)
+        ident = self.ident(_context)
+        VALUES = self._scan('VALUES', context=_context)
+        value_list = self.value_list(_context)
+        return sql_ast.StatementReplace(ident, value_list)
 
     def update(self, _parent=None):
         _context = self.Context(_parent, self._scanner, 'update', [])

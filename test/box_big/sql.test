@@ -53,7 +53,7 @@ print """#
 #"""
 exec sql "insert into t1 values ('key1', 'part1', 'part2')"
 # Test a duplicate insert on unique index that once resulted in a crash (bug #926080)
-exec sql "insert into t1 values ('key1', 'part1', 'part2')"
+exec sql "replace into t1 values ('key1', 'part1', 'part2')"
 exec sql "insert into t1 values ('key2', 'part1', 'part2_a')"
 exec sql "insert into t1 values ('key3', 'part1', 'part2_b')"
 exec admin "lua for k, v in box.space[1]:pairs() do print(v) end"
@@ -125,7 +125,7 @@ exec sql "insert into t4 values ('Spears', 'Britney')"
 exec sql "select * from t4 where k0='Spears'"
 exec sql "select * from t4 where k1='Britney'"
 # try to insert the incoplete tuple
-exec sql "insert into t4 values ('Spears')"
+exec sql "replace into t4 values ('Spears')"
 # check that nothing has been updated
 exec sql "select * from t4 where k0='Spears'"
 # cleanup
