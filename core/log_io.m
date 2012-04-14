@@ -795,7 +795,10 @@ error:
 	return NULL;
 }
 
-/* this little hole shouldn't be used too much */
+/**
+ * Read the WAL and invoke a callback on every record (used for --cat
+ * command line option).
+ */
 int
 read_log(const char *filename,
 	 row_handler *xlog_handler, row_handler *snap_handler, void *state)
@@ -1201,18 +1204,41 @@ recover_finalize(struct recovery_state *r)
 	}
 }
 
+/**
+ * A pthread_atfork() callback for the child.  We fork
+ * to save a snapshot, and in the child the writer
+ * thread is not necessary and not present.  Make sure
+ * that atexit() handlers do not try to stop the
+ * non-existent thread.
+ */
 static void
 wal_writer_child()
 {
 	recovery_state->writer = NULL;
 }
 
+/**
+ * Today a WAL writer is started once at start of the
+ * server.  Nevertheless, use pthread_once() to make
+ * sure we can start/stop the writer many times.
+ */
 static void
 wal_writer_init_once()
 {
 	pthread_atfork(NULL, NULL, wal_writer_child);
 }
 
+/**
+ * A watcher callback which is invoked whenever there
+ * are requests in wal_writer->output. This callback is
+ * associated with an internal WAL writer watcher and is
+ * invoked in the front-end main event loop.
+ *
+ * ev_async, under the hood, is a simple pipe. The WAL
+ * writer thread writes to that pipe whenever it's done
+ * handling a pack of requests (look for ev_async_send()
+ * call in the writer thread loop).
+ */
 static void
 wal_writer_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 {
@@ -1236,6 +1262,11 @@ wal_writer_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 	}
 }
 
+/**
+ * Initialize WAL writer context. Even though it's a singleton,
+ * encapsulate the details just in case we may use
+ * more writers in the future.
+ */
 static void
 wal_writer_init(struct wal_writer *writer)
 {
@@ -1271,6 +1302,7 @@ wal_writer_init(struct wal_writer *writer)
 	tt_pthread_once(&wal_writer_once, wal_writer_init_once);
 }
 
+/** Destroy a WAL writer structure. */
 static void
 wal_writer_destroy(struct wal_writer *writer)
 {
@@ -1314,6 +1346,7 @@ wal_writer_start(struct recovery_state *state)
 	return 0;
 }
 
+/** Stop and destroy the writer thread (at shutdown). */
 static int
 wal_writer_stop(struct recovery_state *state)
 {
@@ -1340,6 +1373,11 @@ error:
 	return -1;
 }
 
+/**
+ * Pop a bulk of requests to write to disk to process.
+ * Block on the condition only if we have no other work to
+ * do. Loop in case of a spurious wakeup.
+ */
 struct wal_fifo
 wal_writer_pop(struct wal_writer *writer, bool input_was_empty)
 {
@@ -1354,6 +1392,9 @@ wal_writer_pop(struct wal_writer *writer, bool input_was_empty)
 	return input;
 }
 
+/**
+ * Write a single request to disk.
+ */
 static int
 write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 {
@@ -1446,6 +1487,7 @@ fail:
 	return -1;
 }
 
+/** WAL writer thread main loop.  */
 static void *
 wal_writer_thread(void *worker_args)
 {
@@ -1474,13 +1516,21 @@ wal_writer_thread(void *worker_args)
 		STAILQ_CONCAT(&writer->output, &input);
 	}
 	tt_pthread_mutex_unlock(&writer->mutex);
-
+	/*
+	 * Handle the case when a shutdown request came before
+	 * we were able to awake all fibers waiting on the
+	 * previous pack.
+	 */
 	if (input_was_empty == false)
 		ev_async_send(&writer->async);
 	write_to_disk(r, NULL);
 	return NULL;
 }
 
+/**
+ * WAL writer main entry point: queue a single request
+ * to be written to disk and wait until this task is completed.
+ */
 int
 wal_write(struct recovery_state *r, u16 tag, u16 op, u64 cookie,
 	  i64 lsn, struct tbuf *row)
@@ -1554,6 +1604,12 @@ recovery_update_mode(const char *mode, double fsync_delay)
 {
 	struct recovery_state *r = recovery_state;
 	(void) mode;
+	/* No mutex lock: let's not bother with whether
+	 * or not a WAL writer thread is present, and
+	 * if it's present, the delay will be propagated
+	 * to it whenever there is a next lock/unlock of
+	 * wal_writer->mutex.
+	 */
 	r->wal_class->fsync_delay = fsync_delay;
 }
 
