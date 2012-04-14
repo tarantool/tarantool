@@ -44,6 +44,7 @@
 #include <pickle.h>
 #include <crc32.h>
 #include <tarantool_pthread.h>
+#include "errinj.h"
 
 const u16 snap_tag = -1;
 const u16 wal_tag = -2;
@@ -1485,6 +1486,8 @@ wal_write(struct recovery_state *r, u16 tag, u16 op, u64 cookie,
 	  i64 lsn, struct tbuf *row)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
+	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
+
 	struct wal_writer *writer = r->writer;
 
 	struct wal_write_request *req =

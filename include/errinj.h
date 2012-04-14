@@ -37,7 +37,8 @@ struct errinj {
  * list of error injection handles.
  */
 #define ERRINJ_LIST(_) \
-	_(ERRINJ_TESTING, false)
+	_(ERRINJ_TESTING, false) \
+	_(ERRINJ_WAL_IO, false)
 
 ENUM0(errinj_enum, ERRINJ_LIST);
 extern struct errinj errinjs[];
@@ -50,13 +51,18 @@ int errinj_set_byname(char *name, bool state);
 void errinj_info(struct tbuf *out);
 
 #ifdef NDEBUG
-#  define ERROR_INJECT(ID)
+#  define ERROR_INJECT(ID, CODE)
 #else
-#  define ERROR_INJECT(ID) \
+#  define ERROR_INJECT(ID, CODE) \
 	do { \
 		if (errinj_get(ID) == true) \
-			tnt_raise(ErrorInjection, :#ID); \
+			CODE; \
 	} while (0)
 #endif
+
+#define ERROR_INJECT_EXCEPTION(ID) \
+	ERROR_INJECT(ID, tnt_raise(ErrorInjection, :#ID))
+
+#define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
 
 #endif /* TATRANTOOL_ERRINJ_H_INCLUDED */

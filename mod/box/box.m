@@ -1336,7 +1336,7 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 
 	case SELECT:
 	{
-		ERROR_INJECT(ERRINJ_TESTING);
+		ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 		txn_assign_n(txn, data);
 		u32 i = read_u32(data);
 		u32 offset = read_u32(data);
