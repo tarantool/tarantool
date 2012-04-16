@@ -208,6 +208,7 @@ class TestSuite:
         config.read(os.path.join(suite_path, "suite.ini"))
         self.ini.update(dict(config.items("default")))
         self.ini["config"] = os.path.join(suite_path, self.ini["config"])
+        self.ini["init_lua"] = os.path.join(suite_path, self.ini["init_lua"])
         if self.ini.has_key("disabled"):
             self.ini["disabled"] = dict.fromkeys(self.ini["disabled"].split(" "))
         else:
@@ -246,7 +247,7 @@ class TestSuite:
             # noting to test, exit
             return 0
 
-        server.deploy(self.ini["config"],
+        server.deploy(self.ini["config"], self.ini["init_lua"],
                       server.find_exe(self.args.builddir, silent=False),
                       self.args.vardir, self.args.mem, self.args.start_and_exit, self.args.gdb,
                       self.args.valgrind, silent=False)

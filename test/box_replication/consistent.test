@@ -24,6 +24,7 @@ master = server
 # replica server
 replica = TarantoolBoxServer()
 replica.deploy("box_replication/cfg/replica.cfg",
+               self.suite_ini["init_lua"],
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"),
                valgrind_sup="box/valgrind.sup")

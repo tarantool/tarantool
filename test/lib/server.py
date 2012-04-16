@@ -71,10 +71,12 @@ class Server(object):
         self.re_vardir_cleanup = ['*.core.*', 'core']
         self.process = None
         self.default_config_name = None
+        self.default_init_lua_name = None
         self.config = None
         self.vardir = None
         self.valgrind_log = "valgrind.log"
         self.valgrind_sup = os.path.join("share/", "%s_%s.sup" % (core, module))
+        self.init_lua = None
         self.default_suppression_name = "valgrind.sup"
         self.pidfile = None
         self.port = None
@@ -144,8 +146,12 @@ class Server(object):
             else:
                 os.makedirs(self.vardir)
 
-        shutil.copy(self.config, os.path.join(self.vardir, self.default_config_name))
-        shutil.copy(self.valgrind_sup, os.path.join(self.vardir, self.default_suppression_name))
+        shutil.copy(self.config, os.path.join(self.vardir,
+                                              self.default_config_name))
+        shutil.copy(self.init_lua, os.path.join(self.vardir,
+                                              self.default_init_lua_name))
+        shutil.copy(self.valgrind_sup,
+                    os.path.join(self.vardir, self.default_suppression_name))
 
     def init(self):
         pass
@@ -230,10 +236,11 @@ class Server(object):
         self.is_started = False
         self.process = None
 
-    def deploy(self, config=None, binary=None, vardir=None,
-               mem=None, start_and_exit=None, gdb=None, valgrind=None, valgrind_sup=None,
-               silent=True, need_init=True):
+    def deploy(self, config=None, init_lua = None, binary=None, vardir=None,
+               mem=None, start_and_exit=None, gdb=None, valgrind=None,
+               valgrind_sup=None, silent=True, need_init=True):
         if config != None: self.config = config
+        if init_lua != None: self.init_lua = init_lua
         if binary != None: self.binary = binary
         if vardir != None: self.vardir = vardir
         if mem != None: self.mem = mem
@@ -242,6 +249,7 @@ class Server(object):
         if valgrind != None: self.valgrind = valgrind
 
         self.configure(self.config)
+        self.init_lua = os.path.abspath(self.init_lua)
         self.install(self.binary, self.vardir, self.mem, silent)
         if need_init:
             self.init()
