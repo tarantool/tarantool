@@ -45,6 +45,9 @@
 #include <ctype.h>
 #include TARANTOOL_CONFIG
 
+/** tarantool start-up file */
+#define TARANTOOL_LUA_STARTUP "init.lua"
+
 struct lua_State *tarantool_L;
 
 /* Remember the output of the administrative console in the
@@ -947,6 +950,23 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 	return 0;
 }
 
+static int
+tarantool_lua_dofile(struct lua_State *L, const char *filename)
+{
+	if (luaL_loadfile(L, filename) != 0) {
+		return 1;
+	}
+
+	@try {
+		lua_call(L, 0, LUA_MULTRET);
+	} @catch (ClientError *e) {
+		lua_pushstring(L, e->errmsg);
+		return 1;
+	}
+
+	return 0;
+}
+
 void
 tarantool_lua(struct lua_State *L,
 	      struct tbuf *out, const char *str)
@@ -1036,6 +1056,23 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		panic("%s", lua_tostring(L, -1));
 	}
 	lua_pop(L, 1);
+}
+
+void tarantool_lua_load_startup(struct lua_State *L)
+{
+	struct stat st;
+	/* checking that Lua start-up file exist. */
+	if (stat(TARANTOOL_LUA_STARTUP, &st)) {
+		/*
+		 * File doesn't exist. It's OK, tarantool may not have
+		 * start-up file.
+		 */
+		return;
+	}
+
+	/* execute start-up file */
+	if (tarantool_lua_dofile(L, TARANTOOL_LUA_STARTUP))
+		panic("start-up: %s", lua_tostring(L, -1));
 }
 
 /*

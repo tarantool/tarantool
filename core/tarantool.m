@@ -686,6 +686,9 @@ main(int argc, char **argv)
 	admin_init();
 	replication_init();
 
+	/* execute start-up Lua file */
+	tarantool_lua_load_startup(tarantool_L);
+
 	prelease(fiber->gc_pool);
 	say_crit("log level %i", cfg.log_level);
 	say_crit("entering event loop");

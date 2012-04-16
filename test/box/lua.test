@@ -320,3 +320,32 @@ print """
 """
 exec admin "lua function foo() return 1, 2, '1', '2' end"
 exec sql "call foo()"
+
+
+print """
+#
+# Lua start-up script 'init.lua' test
+#
+"""
+
+print """
+# Load testing start-up script
+"""
+server.stop()
+server.deploy(self.suite_ini["config"], "box/test_init.lua")
+
+print """
+# Test asscess to box configuration
+"""
+exec admin "lua print_config()"
+
+print """
+# Test bug #977898
+"""
+exec admin "lua box.select(0, 0, 1)"
+
+print """
+# clean-up after tests
+"""
+server.stop()
+server.deploy(self.suite_ini["config"], self.suite_ini["init_lua"])
