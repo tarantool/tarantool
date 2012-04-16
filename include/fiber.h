@@ -58,16 +58,6 @@
 @interface FiberCancelException: tnt_Exception
 @end
 
-struct msg {
-	uint32_t sender_fid;
-	struct tbuf *msg;
-};
-
-struct ring {
-	size_t size, head, tail;
-	struct msg *ring[];
-};
-
 struct fiber {
 	ev_io io;
 	ev_async async;
@@ -90,8 +80,6 @@ struct fiber {
 	struct tbuf *cleanup;
 
 	SLIST_ENTRY(fiber) link, zombie_link;
-
-	struct ring *inbox;
 
 	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];
@@ -131,7 +119,7 @@ extern struct fiber *fiber;
 
 void fiber_init(void);
 void fiber_free(void);
-struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
+struct fiber *fiber_create(const char *name, int fd, void (*f) (void *), void *);
 void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for_child(pid_t pid);
 
@@ -151,7 +139,6 @@ void fiber_destroy_all();
 bool
 fiber_is_caller(struct fiber *f);
 
-struct msg *read_inbox(void);
 ssize_t fiber_bread(struct tbuf *, size_t v);
 
 inline static void iov_add_unsafe(const void *buf, size_t len)
@@ -188,10 +175,6 @@ inline static void iov_dup(const void *buf, size_t len)
 ssize_t iov_flush(void);
 /* Write everything in the fiber's iov vector to fiber socket. */
 void iov_reset();
-
-bool write_inbox(struct fiber *recipient, struct tbuf *msg);
-int inbox_size(struct fiber *recipient);
-void wait_inbox(struct fiber *recipient);
 
 const char *fiber_peer_name(struct fiber *fiber);
 ssize_t fiber_read(void *buf, size_t count);

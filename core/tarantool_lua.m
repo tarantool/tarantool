@@ -544,7 +544,7 @@ lbox_fiber_create(struct lua_State *L)
 		luaL_error(L, "fiber.create(function): recursion limit"
 			   " reached");
 	}
-	struct fiber *f= fiber_create("lua", -1, -1, box_lua_fiber_run, NULL);
+	struct fiber *f= fiber_create("lua", -1, box_lua_fiber_run, NULL);
 
 	lua_pushlightuserdata(L, f); /* associate coro with fiber */
 	struct lua_State *child_L = lua_newthread(L);

@@ -214,7 +214,7 @@ replication_init()
 	/* create acceptor fiber */
 	snprintf(fiber_name, FIBER_NAME_MAXLEN, "%i/replication", cfg.replication_port);
 
-	struct fiber *acceptor = fiber_create(fiber_name, -1, -1, acceptor_handler, NULL);
+	struct fiber *acceptor = fiber_create(fiber_name, -1, acceptor_handler, NULL);
 
 	if (acceptor == NULL) {
 		panic("create fiber fail");

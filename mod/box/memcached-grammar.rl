@@ -207,7 +207,7 @@ memcached_dispatch()
 
 		action flush_all {
 			if (flush_delay > 0) {
-				struct fiber *f = fiber_create("flush_all", -1, -1, flush_all, (void *)flush_delay);
+				struct fiber *f = fiber_create("flush_all", -1, flush_all, (void *)flush_delay);
 				if (f)
 					fiber_call(f);
 			} else

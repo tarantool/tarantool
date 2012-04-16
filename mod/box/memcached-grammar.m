@@ -969,7 +969,7 @@ tr169:
 #line 208 "mod/box/memcached-grammar.rl"
 	{
 			if (flush_delay > 0) {
-				struct fiber *f = fiber_create("flush_all", -1, -1, flush_all, (void *)flush_delay);
+				struct fiber *f = fiber_create("flush_all", -1, flush_all, (void *)flush_delay);
 				if (f)
 					fiber_call(f);
 			} else
@@ -991,7 +991,7 @@ tr174:
 #line 208 "mod/box/memcached-grammar.rl"
 	{
 			if (flush_delay > 0) {
-				struct fiber *f = fiber_create("flush_all", -1, -1, flush_all, (void *)flush_delay);
+				struct fiber *f = fiber_create("flush_all", -1, flush_all, (void *)flush_delay);
 				if (f)
 					fiber_call(f);
 			} else
@@ -1013,7 +1013,7 @@ tr185:
 #line 208 "mod/box/memcached-grammar.rl"
 	{
 			if (flush_delay > 0) {
-				struct fiber *f = fiber_create("flush_all", -1, -1, flush_all, (void *)flush_delay);
+				struct fiber *f = fiber_create("flush_all", -1, flush_all, (void *)flush_delay);
 				if (f)
 					fiber_call(f);
 			} else

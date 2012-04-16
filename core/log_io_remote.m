@@ -186,7 +186,7 @@ recovery_follow_remote(struct recovery_state *r, const char *remote)
 	say_crit("initializing the replica, WAL master %s", remote);
 	snprintf(name, sizeof(name), "replica/%s", remote);
 
-	f = fiber_create(name, -1, -1, pull_from_remote, r);
+	f = fiber_create(name, -1, pull_from_remote, r);
 	if (f == NULL)
 		return;
 
