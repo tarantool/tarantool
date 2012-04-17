@@ -345,6 +345,11 @@ print """
 exec admin "lua box.select(0, 0, 1)"
 
 print """
+# Test insert from init.lua
+"""
+exec admin "lua box.select(0, 0, 2)"
+
+print """
 # clean-up after tests
 """
 server.stop()

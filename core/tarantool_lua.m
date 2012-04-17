@@ -1058,8 +1058,13 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 	lua_pop(L, 1);
 }
 
-void tarantool_lua_load_startup(struct lua_State *L)
+/**
+ * Load start-up file routine
+ */
+static void
+load_startup(void *L_ptr)
 {
+	struct lua_State *L = (struct lua_State *) L_ptr;
 	struct stat st;
 	/* checking that Lua start-up file exist. */
 	if (stat(TARANTOOL_LUA_STARTUP, &st)) {
@@ -1073,6 +1078,13 @@ void tarantool_lua_load_startup(struct lua_State *L)
 	/* execute start-up file */
 	if (tarantool_lua_dofile(L, TARANTOOL_LUA_STARTUP))
 		panic("start-up: %s", lua_tostring(L, -1));
+}
+
+void tarantool_lua_load_startup(struct lua_State *L)
+{
+	struct fiber *startup_loader = fiber_create("lua start-up", -1, 0,
+						    load_startup, L);
+	fiber_call(startup_loader);
 }
 
 /*

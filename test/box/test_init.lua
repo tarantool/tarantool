@@ -31,3 +31,9 @@ end
 
 fiber = box.fiber.create(do_insert)
 box.fiber.resume(fiber)
+
+--
+-- Test insert from start-up script
+--
+
+box.insert(0, 2, 4, 8, 16)
