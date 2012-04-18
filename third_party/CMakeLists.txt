@@ -21,10 +21,10 @@ macro (luajit_build)
     if (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
-            COMMAND make clean
-            COMMAND make -C src -t buildvm_x86.h buildvm_arm.h
+            COMMAND $(MAKE) clean
+            COMMAND $(MAKE) -C src -t buildvm_x86.h buildvm_arm.h
                             buildvm_x64.h buildvm_x64win.h
-            COMMAND make -C src ${luajit_buildoptions}
+            COMMAND $(MAKE) -C src ${luajit_buildoptions}
             DEPENDS ${CMAKE_SOURCE_DIR}/CMakeCache.txt
         )
     else()
@@ -34,10 +34,10 @@ macro (luajit_build)
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND cp -r ${PROJECT_SOURCE_DIR}/third_party/luajit/* .
-            COMMAND make clean
-            COMMAND make -C src -t buildvm_x86.h buildvm_arm.h
+            COMMAND $(MAKE) clean
+            COMMAND $(MAKE) -C src -t buildvm_x86.h buildvm_arm.h
                             buildvm_x64.h buildvm_x64win.h
-            COMMAND make -C src ${luajit_buildoptions}
+            COMMAND $(MAKE) -C src ${luajit_buildoptions}
             DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt ${PROJECT_BINARY_DIR}/third_party/luajit
         )
     endif()
