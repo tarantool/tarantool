@@ -2,7 +2,7 @@
 
 /usr/bin/env python <<__EOB__
 import sys
-if sys.hexversion < 0x02070000 or sys.hexversion >= 0x03000000:
+if sys.hexversion < 0x02060000 or sys.hexversion >= 0x03000000:
     sys.stderr.write("ERROR: test harness must use python >= 2.6 but not 3.x\n")
     sys.exit(1)
 else:
