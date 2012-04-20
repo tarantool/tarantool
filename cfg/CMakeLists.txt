@@ -67,11 +67,6 @@ add_library(cfg prscfg.c warning.c)
 # when tmp.cfg is corrupted by two paralled targets.
 # See http://www.cmake.org/Bug/view.php?id=10082 for details.
 #
-#add_custom_target(generate_headers
-#    DEPENDS ${CMAKE_SOURCE_DIR}/cfg/prscfg.h ${generated_headers})
 add_custom_target(generate_config
     DEPENDS ${CMAKE_SOURCE_DIR}/cfg/prscfg.h ${generated_headers})
-# add_dependencies(cfg generate_headers libluajit)
 add_dependencies(cfg libluajit)
-# Do not list this helper target among all high-level targets.
-# set_target_properties(generate_headers PROPERTIES EXCLUDE_FROM_ALL TRUE)
