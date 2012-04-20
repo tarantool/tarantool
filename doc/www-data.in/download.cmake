@@ -36,19 +36,17 @@ The latest build can be found below.
   <th colspan=3>Linux</th>
 
 <!-- Debian -->
-<!--
-
   <tr>
     <td>
         Debian software package (<b>.deb</b>)
     </td>
 
     <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686.deb">32-bit</a>
+        <a href="http://tarantool.org/dist/debian/binary-i386/tarantool_@TARANTOOL_VERSION@_i386.deb">32-bit</a>
     </td>
 
     <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686.deb">64-bit</a>
+        <a href="http://tarantool.org/dist/debian/binary-amd64/tarantool_@TARANTOOL_VERSION@_amd64.deb">64-bit</a>
     </td>
   </tr>
 
@@ -57,16 +55,14 @@ The latest build can be found below.
         Debian software package (<b>.deb</b>), with debug info 
     </td>
     <td align=center>
-        <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686-debug.deb">32-bit</a>
+        <a href="http://tarantool.org/dist/debian/binary-i386/tarantool-dbg_@TARANTOOL_VERSION@_i386.deb">32-bit</a>
     </td>
 
     <td align=center>
-        <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64-debug.deb">64-bit</a>
+        <a href="http://tarantool.org/dist/debian/binary-amd64/tarantool-dbg_@TARANTOOL_VERSION@_amd64.deb">64-bit</a>
     </td>
   </tr>
--->
+
 <!-- RPM -->
 
   <tr>
