@@ -78,18 +78,6 @@ struct fiber_server {
 	void (*on_bind) (void *data);
 };
 
-struct fiber_msg {
-	u32 fid;
-	u32 data_len;
-	u8 data[];
-};
-
-static inline struct fiber_msg *
-fiber_msg(const struct tbuf *buf)
-{
-	return buf->data;
-}
-
 static struct mh_i32ptr_t *fibers_registry;
 
 static void
@@ -808,104 +796,6 @@ set_nonblock(int sock)
 	if ((flags = fcntl(sock, F_GETFL, 0)) < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0)
 		return -1;
 	return sock;
-}
-
-static int
-read_atleast(int fd, struct tbuf *b, size_t to_read)
-{
-	tbuf_ensure(b, to_read);
-	while (to_read > 0) {
-		int r = read(fd, b->data + b->size, to_read);
-		if (r <= 0) {
-			if (errno == EINTR)
-				continue;
-			return -1;
-		}
-		to_read -= r;
-		b->size += r;
-	}
-	return 0;
-}
-
-/** Write all data to a socket.
- *
- * This function is equivalent to 'write', except it would ensure
- * that all data is written to the file unless a non-ignorable
- * error occurs.
- *
- * @retval 0  Success
- *
- * @reval  1  An error occurred (not EINTR).
- */
-static int
-write_all(int fd, void *data, size_t len)
-{
-	while (len > 0) {
-		ssize_t r = write(fd, data, len);
-		if (r < 0) {
-			if (errno == EINTR)
-				continue;
-			return -1;
-		}
-		data += r;
-		len -= r;
-	}
-	return 0;
-}
-
-void __attribute__ ((noreturn))
-blocking_loop(int fd, struct tbuf *(*handler) (void *state, struct tbuf *), void *state)
-{
-	struct tbuf *request, *request_body, *reply, *reply_body;
-	u32 *request_size, reply_size;
-	int result = EXIT_FAILURE;
-
-	for (;;) {
-		request = tbuf_alloc(fiber->gc_pool);
-		if (read_atleast(fd, request, sizeof(u32)) < 0) {
-			result = EXIT_SUCCESS;
-			break;
-		}
-
-		if ((request_size = tbuf_peek(request, sizeof(u32))) == NULL) {
-			result = EXIT_SUCCESS;
-			break;
-		}
-		*request_size = ntohl(*request_size);
-
-		if (read_atleast(fd, request, *request_size) < 0) {
-			result = EXIT_SUCCESS;
-			break;
-		}
-
-		request_body = tbuf_alloc(fiber->gc_pool);
-		tbuf_append(request_body, fiber_msg(request)->data, fiber_msg(request)->data_len);
-
-		reply_body = handler(state, request_body);
-
-		reply_size = sizeof(struct fiber_msg) + reply_body->size;
-		reply = tbuf_alloc(fiber->gc_pool);
-		tbuf_reserve(reply, reply_size);
-
-		fiber_msg(reply)->fid = fiber_msg(request)->fid;
-		fiber_msg(reply)->data_len = reply_body->size;
-		memcpy(fiber_msg(reply)->data, reply_body->data, reply_body->size);
-
-		reply_size = htonl(reply_size);
-		if (write_all(fd, &reply_size, sizeof(reply_size)) < 0) {
-			result = EXIT_FAILURE;
-			break;
-		}
-		if (write_all(fd, reply->data, reply->size) < 0) {
-			result = EXIT_FAILURE;
-			break;
-		}
-
-		prelease(fiber->gc_pool);
-	}
-
-	handler(state, NULL);
-	exit(result);
 }
 
 static void
