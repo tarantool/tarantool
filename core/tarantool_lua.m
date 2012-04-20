@@ -978,7 +978,8 @@ is_string(const char *str)
 	if (! isdigit(*str))
 	    return true;
 	char *endptr;
-	(void) strtod(str, &endptr);
+	double r = strtod(str, &endptr);
+	(void) r;  /* -Wunused-result warning suppression */
 	return *endptr != '\0';
 }
 

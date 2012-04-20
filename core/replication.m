@@ -437,13 +437,18 @@ static void spawner_signal_handler(int signal)
 static void
 spawner_sigchld_handler(int signo __attribute__((unused)))
 {
+	static const char waitpid_failed[] = "spawner: waitpid() failed\n";
 	do {
 		int exit_status;
 		pid_t pid = waitpid(-1, &exit_status, WNOHANG);
 		switch (pid) {
 		case -1:
-			if (errno != ECHILD)
-				write(sayfd, "spawner: waitpid() failed\n", 26);
+			if (errno != ECHILD) {
+				int r = write(sayfd, waitpid_failed,
+					      sizeof(waitpid_failed) - 1);
+				(void) r; /* -Wunused-result warning suppression */
+			}
+			return;
 		case 0: /* no more changes in children status */
 			return;
 		default:
