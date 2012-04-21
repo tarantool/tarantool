@@ -102,30 +102,30 @@ select * from t2 where k0 = 199
 No match
 select * from t2 where k0 = 201
 No match
-insert into t10 values ('abcd')
+insert into t15 values ('abcd')
 Insert OK, 1 row affected
-insert into t10 values ('abcda')
+insert into t15 values ('abcda')
 Insert OK, 1 row affected
-insert into t10 values ('abcda_')
+insert into t15 values ('abcda_')
 Insert OK, 1 row affected
-insert into t10 values ('abcdb')
+insert into t15 values ('abcdb')
 Insert OK, 1 row affected
-insert into t10 values ('abcdb_')
+insert into t15 values ('abcdb_')
 Insert OK, 1 row affected
-insert into t10 values ('abcdb__')
+insert into t15 values ('abcdb__')
 Insert OK, 1 row affected
-insert into t10 values ('abcdb___')
+insert into t15 values ('abcdb___')
 Insert OK, 1 row affected
-insert into t10 values ('abcdc')
+insert into t15 values ('abcdc')
 Insert OK, 1 row affected
-insert into t10 values ('abcdc_')
+insert into t15 values ('abcdc_')
 Insert OK, 1 row affected
-lua box.space[10].index[0]:select_range(3, 'abcdb')
+lua box.space[15].index[0]:select_range(3, 'abcdb')
 ---
  - 'abcdb': {}
  - 'abcdb_': {}
  - 'abcdb__': {}
 ...
-lua box.space[10]:truncate()
+lua box.space[15]:truncate()
 ---
 ...

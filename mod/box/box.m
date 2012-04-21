@@ -186,6 +186,22 @@ validate_indexes(struct box_txn *txn)
 	}
 }
 
+static void
+read_key(struct tbuf *data, void **key_ptr, u32 *key_cardinality_ptr)
+{
+	void *key = NULL;
+	u32 key_cardinality = read_u32(data);
+	if (key_cardinality) {
+		key = read_field(data);
+		/* advance remaining fields of a key */
+		for (int i = 1; i < key_cardinality; i++)
+			read_field(data);
+	}
+
+	*key_ptr = key;
+	*key_cardinality_ptr = key_cardinality;
+}
+
 static void __attribute__((noinline))
 prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
 {
@@ -558,7 +574,7 @@ init_update_op_arith(struct update_cmd *cmd __attribute__((unused)),
 
 		/* Check the operand type. */
 		if (op->arg.set.length != sizeof(i32))
-			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
+			tnt_raise(ClientError, :ER_ARG_TYPE,
 				  "32-bit int");
 
 		arg->i32_val = *(i32 *)op->arg.set.value;
@@ -576,7 +592,7 @@ init_update_op_arith(struct update_cmd *cmd __attribute__((unused)),
 			arg->i64_val = *(i64 *)op->arg.set.value;
 			break;
 		default:
-			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
+			tnt_raise(ClientError, :ER_ARG_TYPE,
 				  "32-bit or 64-bit int");
 		}
 		break;
@@ -717,15 +733,8 @@ parse_update_cmd(struct tbuf *data)
 {
 	struct update_cmd *cmd = palloc(fiber->gc_pool,
 					sizeof(struct update_cmd));
-	/* key cardinality */
-	cmd->key_cardinality = read_u32(data);
-	if (cmd->key_cardinality > 1)
-		tnt_raise(IllegalParams, :"key must be single valued");
-	if (cmd->key_cardinality == 0)
-		tnt_raise(IllegalParams, :"key is not defined");
 
-	/* key */
-	cmd->key = read_field(data);
+	read_key(data, &cmd->key, &cmd->key_cardinality);
 	/* number of operations */
 	u32 op_cnt = read_u32(data);
 	if (op_cnt > BOX_UPDATE_OP_CNT_MAX)
@@ -1009,7 +1018,7 @@ prepare_update(struct box_txn *txn, struct tbuf *data)
 	struct update_cmd *cmd = parse_update_cmd(data);
 
 	/* Try to find the tuple. */
-	txn->old_tuple = [txn->index find: cmd->key];
+	txn->old_tuple = [txn->index find :cmd->key :cmd->key_cardinality];
 	if (txn->old_tuple == NULL) {
 		/* Not found. For simplicity, skip the logging. */
 		txn->flags |= BOX_NOT_STORE;
@@ -1056,22 +1065,10 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 		if (limit == *found)
 			return;
 
-		u32 key_cardinality = read_u32(data);
-
-		void *key = NULL;
-		if (key_cardinality) {
-			if (key_cardinality > index->key_def->part_count) {
-				tnt_raise(ClientError, :ER_KEY_CARDINALITY,
-					  key_cardinality,
-					  index->key_def->part_count);
-			}
-
-			key = read_field(data);
-
-			/* advance remaining fields of a key */
-			for (int i = 1; i < key_cardinality; i++)
-				read_field(data);
-		}
+		/* read key */
+		u32 key_cardinality;
+		void *key;
+		read_key(data, &key, &key_cardinality);
 
 		struct iterator *it = index->position;
 		[index initIterator: it :ITER_FORWARD :key :key_cardinality];
@@ -1096,20 +1093,25 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 }
 
 static void __attribute__((noinline))
-prepare_delete(struct box_txn *txn, void *key)
+prepare_delete(struct box_txn *txn, struct tbuf *data)
 {
 	u32 tuples_affected = 0;
 
-	txn->old_tuple = [txn->index find: key];
+	/* read key */
+	u32 key_cardinality;
+	void *key;
+	read_key(data, &key, &key_cardinality);
+	/* try to find tuple in primary index */
+	txn->old_tuple = [txn->index find :key :key_cardinality];
 
-	if (txn->old_tuple == NULL)
+	if (txn->old_tuple == NULL) {
 		/*
 		 * There is no subject tuple we could write to WAL, which means,
 		 * to do a write, we would have to allocate one. Too complicated,
 		 * for now, just do no logging for DELETEs that do nothing.
 		 */
 		txn->flags |= BOX_NOT_STORE;
-	else {
+	} else {
 		tuple_txn_ref(txn, txn->old_tuple);
 		lock_tuple(txn, txn->old_tuple);
 
@@ -1302,8 +1304,6 @@ static void
 box_dispatch(struct box_txn *txn, struct tbuf *data)
 {
 	u32 cardinality;
-	void *key;
-	u32 key_len;
 
 	say_debug("box_dispatch(%i)", txn->op);
 
@@ -1323,15 +1323,8 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 		txn_assign_n(txn, data);
 		if (txn->op == DELETE)
 			txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		key_len = read_u32(data);
-		if (key_len != 1)
-			tnt_raise(IllegalParams, :"key must be single valued");
 
-		key = read_field(data);
-		if (data->size != 0)
-			tnt_raise(IllegalParams, :"can't unpack request");
-
-		prepare_delete(txn, key);
+		prepare_delete(txn, data);
 		break;
 
 	case SELECT:
@@ -1972,10 +1965,6 @@ check_spaces(struct tarantool_cfg *conf)
 			if (j == 0) {
 				if (index->unique == false) {
 					out_warning(0, "(space = %zu) space first index must be unique", i);
-					return -1;
-				}
-				if (index_cardinality != 1) {
-					out_warning(0, "(space = %zu) space first index must be single keyed", i);
 					return -1;
 				}
 			}

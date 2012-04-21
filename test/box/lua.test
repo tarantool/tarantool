@@ -320,3 +320,55 @@ print """
 """
 exec admin "lua function foo() return 1, 2, '1', '2' end"
 exec sql "call foo()"
+
+
+print """
+#
+# test box.update_ol function test
+#
+"""
+
+print """
+# test update's assign opearations
+"""
+exec admin "lua box.replace(0, 1, 'field string value')"
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.assign(1, 'new field stirng value'))"
+exec admin "lua table.insert(ops_list, box.upd.assign(2, 42))"
+exec admin "lua table.insert(ops_list, box.upd.assign(3, 0xdeadbeef))"
+exec admin "lua box.update_ol(0, ops_list, 1)"
+
+print """
+# test update's arith opearations
+"""
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.arith_add(2, 16))"
+exec admin "lua table.insert(ops_list, box.upd.arith_and(3, 0xffff0000))"
+exec admin "lua table.insert(ops_list, box.upd.arith_or(3, 0x0000a0a0))"
+exec admin "lua table.insert(ops_list, box.upd.arith_xor(3, 0xffff00aa))"
+exec admin "lua box.update_ol(0, ops_list, 1)"
+
+print """
+# test update splice operation
+"""
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.splice(1, 0, 3, 'the newest'))"
+exec admin "lua box.update_ol(0, ops_list, 1)"
+
+print """
+# test update delete operations
+"""
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.delete(3))"
+exec admin "lua table.insert(ops_list, box.upd.delete(2))"
+exec admin "lua box.update_ol(0, ops_list, 1)"
+
+print """
+# test update insert operations
+"""
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.insert(1, 1))"
+exec admin "lua table.insert(ops_list, box.upd.insert(1, 2))"
+exec admin "lua table.insert(ops_list, box.upd.insert(1, 3))"
+exec admin "lua table.insert(ops_list, box.upd.insert(1, 4))"
+exec admin "lua box.update_ol(0, ops_list, 1)"

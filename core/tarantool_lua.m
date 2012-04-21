@@ -184,6 +184,14 @@ lbox_pack(struct lua_State *L)
 		if (i > nargs)
 			luaL_error(L, "box.pack: argument count does not match the format");
 		switch (*format) {
+		case 'B':
+		case 'b':
+			/* signed and unsigned 8-bit integers */
+			u32buf = lua_tointeger(L, i);
+			if (u32buf > 0xff)
+				luaL_error(L, "box.pack: argument too big for 8-bit integer");
+			luaL_addchar(&b, (char) u32buf);
+			break;
 		/* signed and unsigned 32-bit integers */
 		case 'I':
 		case 'i':

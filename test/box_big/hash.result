@@ -1,0 +1,422 @@
+
+#=============================================================================#
+# 32-bit hash tests
+#=============================================================================#
+
+
+#-----------------------------------------------------------------------------#
+# 32-bit hash insert fields tests
+#-----------------------------------------------------------------------------#
+
+
+# Insert valid fieds
+
+lua box.space[10]:insert(0, 'value1 v1.0', 'value2 v1.0')
+---
+ - 0: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[10]:insert(1, 'value1 v1.0', 'value2 v1.0')
+---
+ - 1: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[10]:insert(2, 'value1 v1.0', 'value2 v1.0')
+---
+ - 2: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[10]:insert(3, 'value1 v1.0', 'value2 v1.0')
+---
+ - 3: {'value1 v1.0', 'value2 v1.0'}
+...
+
+# Insert invalid fields
+
+lua box.space[10]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
+---
+error: 'Supplied key field type does not match index type: expected u32'
+...
+
+#-----------------------------------------------------------------------------#
+# 32-bit hash replace fields tests
+#-----------------------------------------------------------------------------#
+
+
+# Replace valid fieds
+
+lua box.space[10]:replace(3, 'value1 v1.31', 'value2 1.12')
+---
+ - 3: {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[10]:replace(1, 'value1 v1.32', 'value2 1.72')
+---
+ - 1: {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[10]:replace(2, 'value1 v1.43', 'value2 1.92')
+---
+ - 2: {'value1 v1.43', 'value2 1.92'}
+...
+
+# Replace invalid fields
+
+lua box.space[10]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
+---
+error: 'Supplied key field type does not match index type: expected u32'
+...
+
+#-----------------------------------------------------------------------------#
+# 32-bit hash select fields test
+#-----------------------------------------------------------------------------#
+
+
+# select by valid keys
+
+lua box.space[10]:select(0, 0)
+---
+ - 0: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[10]:select(0, 1)
+---
+ - 1: {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[10]:select(0, 2)
+---
+ - 2: {'value1 v1.43', 'value2 1.92'}
+...
+lua box.space[10]:select(0, 3)
+---
+ - 3: {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[10]:select(0, 4)
+---
+...
+lua box.space[10]:select(0, 5)
+---
+...
+
+# select by invalid keys
+
+lua box.space[10]:select(0, 'invalid key')
+---
+error: 'Supplied key field type does not match index type: expected u32'
+...
+lua box.space[10]:select(0, 1, 2)
+---
+error: 'Key cardinality 2 is greater than index cardinality 1'
+...
+
+#-----------------------------------------------------------------------------#
+# 32-bit hash delete fields test
+#-----------------------------------------------------------------------------#
+
+
+# delete by valid keys
+
+lua box.space[10]:delete(0)
+---
+ - 0: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[10]:delete(1)
+---
+ - 1: {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[10]:delete(2)
+---
+ - 2: {'value1 v1.43', 'value2 1.92'}
+...
+lua box.space[10]:delete(3)
+---
+ - 3: {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[10]:delete(4)
+---
+...
+lua box.space[10]:delete(5)
+---
+...
+
+# delete by invalid keys
+
+lua box.space[10]:delete('invalid key')
+---
+error: 'Supplied key field type does not match index type: expected u32'
+...
+lua box.space[10]:delete(1, 2)
+---
+error: 'Key cardinality 2 is greater than index cardinality 1'
+...
+
+#=============================================================================#
+# 64-bit hash tests
+#=============================================================================#
+
+
+#-----------------------------------------------------------------------------#
+# 64-bit hash inset fields tests
+#-----------------------------------------------------------------------------#
+
+
+# Insert valid fieds
+
+lua box.space[11]:insert('00000000', 'value1 v1.0', 'value2 v1.0')
+---
+ - 3472328296227680304: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:insert('00000001', 'value1 v1.0', 'value2 v1.0')
+---
+ - 3544385890265608240: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:insert('00000002', 'value1 v1.0', 'value2 v1.0')
+---
+ - 3616443484303536176: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:insert('00000003', 'value1 v1.0', 'value2 v1.0')
+---
+ - 3688501078341464112: {'value1 v1.0', 'value2 v1.0'}
+...
+
+# Insert invalid fields
+
+lua box.space[11]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
+---
+error: 'Supplied key field type does not match index type: expected u64'
+...
+
+#-----------------------------------------------------------------------------#
+# 64-bit hash replace fields tests
+#-----------------------------------------------------------------------------#
+
+
+# Replace valid fieds
+
+lua box.space[11]:replace('00000003', 'value1 v1.31', 'value2 1.12')
+---
+ - 3688501078341464112: {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[11]:replace('00000001', 'value1 v1.32', 'value2 1.72')
+---
+ - 3544385890265608240: {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[11]:replace('00000002', 'value1 v1.43', 'value2 1.92')
+---
+ - 3616443484303536176: {'value1 v1.43', 'value2 1.92'}
+...
+
+# Replace invalid fields
+
+lua box.space[10]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
+---
+error: 'Supplied key field type does not match index type: expected u32'
+...
+
+#-----------------------------------------------------------------------------#
+# 64-bit hash select fields test
+#-----------------------------------------------------------------------------#
+
+
+# select by valid keys
+
+lua box.space[11]:select(0, '00000000')
+---
+ - 3472328296227680304: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:select(0, '00000001')
+---
+ - 3544385890265608240: {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[11]:select(0, '00000002')
+---
+ - 3616443484303536176: {'value1 v1.43', 'value2 1.92'}
+...
+lua box.space[11]:select(0, '00000003')
+---
+ - 3688501078341464112: {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[11]:select(0, '00000004')
+---
+...
+lua box.space[11]:select(0, '00000005')
+---
+...
+
+# select by invalid keys
+
+lua box.space[11]:select(0, 'invalid key')
+---
+error: 'Supplied key field type does not match index type: expected u64'
+...
+lua box.space[11]:select(0, '00000001', '00000002')
+---
+error: 'Key cardinality 2 is greater than index cardinality 1'
+...
+
+#-----------------------------------------------------------------------------#
+# 64-bit hash delete fields test
+#-----------------------------------------------------------------------------#
+
+
+# delete by valid keys
+
+lua box.space[11]:delete('00000000')
+---
+ - 3472328296227680304: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:delete('00000001')
+---
+ - 3544385890265608240: {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[11]:delete('00000002')
+---
+ - 3616443484303536176: {'value1 v1.43', 'value2 1.92'}
+...
+lua box.space[11]:delete('00000003')
+---
+ - 3688501078341464112: {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[11]:delete('00000004')
+---
+...
+lua box.space[11]:delete('00000005')
+---
+...
+
+# delete by invalid keys
+
+lua box.space[11]:delete('invalid key')
+---
+error: 'Supplied key field type does not match index type: expected u64'
+...
+lua box.space[11]:delete('00000001', '00000002')
+---
+error: 'Key cardinality 2 is greater than index cardinality 1'
+...
+
+#=============================================================================#
+# String hash tests
+#=============================================================================#
+
+
+#-----------------------------------------------------------------------------#
+# String hash inset fields tests
+#-----------------------------------------------------------------------------#
+
+
+# Insert valid fieds
+
+lua box.space[12]:insert('key 0', 'value1 v1.0', 'value2 v1.0')
+---
+ - 'key 0': {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[12]:insert('key 1', 'value1 v1.0', 'value2 v1.0')
+---
+ - 'key 1': {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[12]:insert('key 2', 'value1 v1.0', 'value2 v1.0')
+---
+ - 'key 2': {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[12]:insert('key 3', 'value1 v1.0', 'value2 v1.0')
+---
+ - 'key 3': {'value1 v1.0', 'value2 v1.0'}
+...
+
+#-----------------------------------------------------------------------------#
+# String hash replace fields tests
+#-----------------------------------------------------------------------------#
+
+
+# Replace valid fieds
+
+lua box.space[12]:replace('key 3', 'value1 v1.31', 'value2 1.12')
+---
+ - 'key 3': {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[12]:replace('key 1', 'value1 v1.32', 'value2 1.72')
+---
+ - 'key 1': {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[12]:replace('key 2', 'value1 v1.43', 'value2 1.92')
+---
+ - 'key 2': {'value1 v1.43', 'value2 1.92'}
+...
+
+#-----------------------------------------------------------------------------#
+# String hash select fields test
+#-----------------------------------------------------------------------------#
+
+
+# select by valid keys
+
+lua box.space[12]:select(0, 'key 0')
+---
+ - 'key 0': {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[12]:select(0, 'key 1')
+---
+ - 'key 1': {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[12]:select(0, 'key 2')
+---
+ - 'key 2': {'value1 v1.43', 'value2 1.92'}
+...
+lua box.space[12]:select(0, 'key 3')
+---
+ - 'key 3': {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[12]:select(0, 'key 4')
+---
+...
+lua box.space[12]:select(0, 'key 5')
+---
+...
+
+# select by invalid keys
+
+lua box.space[12]:select(0, 'key 1', 'key 2')
+---
+error: 'Key cardinality 2 is greater than index cardinality 1'
+...
+
+#-----------------------------------------------------------------------------#
+# String hash delete fields test
+#-----------------------------------------------------------------------------#
+
+
+# delete by valid keys
+
+lua box.space[12]:delete('key 0')
+---
+ - 'key 0': {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[12]:delete('key 1')
+---
+ - 'key 1': {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[12]:delete('key 2')
+---
+ - 'key 2': {'value1 v1.43', 'value2 1.92'}
+...
+lua box.space[12]:delete('key 3')
+---
+ - 'key 3': {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[12]:delete('key 4')
+---
+...
+lua box.space[12]:delete('key 5')
+---
+...
+
+# delete by invalid keys
+
+lua box.space[12]:delete('key 1', 'key 2')
+---
+error: 'Key cardinality 2 is greater than index cardinality 1'
+...
+lua box.space[10]:truncate()
+---
+...
+lua box.space[11]:truncate()
+---
+...
+lua box.space[12]:truncate()
+---
+...

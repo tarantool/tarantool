@@ -48,7 +48,7 @@ enum iterator_type { ITER_FORWARD, ITER_REVERSE };
 
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
-	u32 fieldno;
+	int fieldno;
 	enum field_data_type type;
 };
 
@@ -67,12 +67,12 @@ struct key_def {
 	 */
 	u32 *cmp_order;
 	/* The size of the 'parts' array. */
-	u32 part_count;
+	int part_count;
 	/*
 	 * The size of 'cmp_order' array (= max fieldno in 'parts'
 	 * array).
 	 */
-	u32 max_fieldno;
+	int max_fieldno;
 	bool is_unique;
 };
 
@@ -117,7 +117,7 @@ struct key_def {
 - (size_t) size;
 - (struct box_tuple *) min;
 - (struct box_tuple *) max;
-- (struct box_tuple *) find: (void *) key_arg; /* only for unique lookups */
+- (struct box_tuple *) find: (void *) key :(int) key_cardinality;
 - (struct box_tuple *) findByTuple: (struct box_tuple *) tuple;
 - (void) remove: (struct box_tuple *) tuple;
 - (void) replace: (struct box_tuple *) old_tuple :(struct box_tuple *) new_tuple;

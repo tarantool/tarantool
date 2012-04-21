@@ -131,7 +131,7 @@ delete(void *key)
 static struct box_tuple *
 find(void *key)
 {
-	return [memcached_index find: key];
+	return [memcached_index find :key :1];
 }
 
 static struct meta *

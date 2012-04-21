@@ -65,7 +65,7 @@ iterator_first_equal(struct iterator *it)
 	switch (type) {
 	case HASH:
 		/* Hash index, check key type.
-		 * Hash indes always has a single-field key.
+		 * Hash index always has a single-field key.
 		 */
 		switch (key_def->parts[0].type) {
 		case NUM:
@@ -132,9 +132,10 @@ iterator_first_equal(struct iterator *it)
 	return NULL;
 }
 
-- (struct box_tuple *) find: (void *) key
+- (struct box_tuple *) find: (void *) key :(int) key_cardinality
 {
 	(void) key;
+	(void) key_cardinality;
 	[self subclassResponsibility: _cmd];
 	return NULL;
 }
@@ -175,12 +176,12 @@ iterator_first_equal(struct iterator *it)
 
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
                         :(void *) key
-			:(int) part_count
+			:(int) key_cardinality
 {
 	(void) iterator;
 	(void) type;
-	(void) part_count;
 	(void) key;
+	(void) key_cardinality;
 	[self subclassResponsibility: _cmd];
 }
 @end
@@ -190,7 +191,7 @@ iterator_first_equal(struct iterator *it)
 /* {{{ HashIndex -- base class for all hashes. ********************/
 
 @interface HashIndex: Index
-	- (void) reserve: (u32) n_tuples;
+- (void) reserve: (u32) n_tuples;
 @end
 
 struct hash_iterator {
@@ -199,7 +200,7 @@ struct hash_iterator {
 	mh_int_t h_pos;
 };
 
-static inline struct hash_iterator *
+static struct hash_iterator *
 hash_iterator(struct iterator *it)
 {
 	return (struct hash_iterator *) it;
@@ -279,7 +280,7 @@ hash_iterator_free(struct iterator *iterator)
 	if (field == NULL)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 			  key_def->parts[0].fieldno);
-	return [self find: field];
+	return [self find :field :1];
 }
 
 - (struct iterator *) allocIterator
@@ -297,6 +298,25 @@ hash_iterator_free(struct iterator *iterator)
 /* }}} */
 
 /* {{{ Hash32Index ************************************************/
+
+static u32
+int32_key_to_value(void *key, int key_cardinality)
+{
+	if (key_cardinality > 1)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality, 1);
+
+	if (key_cardinality < 1)
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  key_cardinality, 1);
+
+	u32 key_size = load_varint32(&key);
+	if (key_size != 4)
+		tnt_raise(ClientError, :ER_KEY_FIELD_TYPE, "u32");
+
+	return *((u32 *) key);
+}
+
 
 @interface Hash32Index: HashIndex {
 	 struct mh_i32ptr_t *int_hash;
@@ -326,15 +346,10 @@ hash_iterator_free(struct iterator *iterator)
 	return mh_size(int_hash);
 }
 
-- (struct box_tuple *) find: (void *) field
+- (struct box_tuple *) find: (void *) key :(int) key_cardinality
 {
 	struct box_tuple *ret = NULL;
-	u32 field_size = load_varint32(&field);
-	u32 num = *(u32 *)field;
-
-	if (field_size != 4)
-		tnt_raise(IllegalParams, :"key is not u32");
-
+	u32 num = int32_key_to_value(key, key_cardinality);
 	mh_int_t k = mh_i32ptr_get(int_hash, num);
 	if (k != mh_end(int_hash))
 		ret = mh_value(int_hash, k);
@@ -347,12 +362,7 @@ hash_iterator_free(struct iterator *iterator)
 - (void) remove: (struct box_tuple *) tuple
 {
 	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
-	unsigned int field_size = load_varint32(&field);
-	u32 num = *(u32 *)field;
-
-	if (field_size != 4)
-		tnt_raise(IllegalParams, :"key is not u32");
-
+	u32 num = int32_key_to_value(field, 1);
 	mh_int_t k = mh_i32ptr_get(int_hash, num);
 	if (k != mh_end(int_hash))
 		mh_i32ptr_del(int_hash, k);
@@ -365,11 +375,7 @@ hash_iterator_free(struct iterator *iterator)
 	:(struct box_tuple *) new_tuple
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
-	u32 field_size = load_varint32(&field);
-	u32 num = *(u32 *)field;
-
-	if (field_size != 4)
-		tnt_raise(IllegalParams, :"key is not u32");
+	u32 num = int32_key_to_value(field, 1);
 
 	if (old_tuple != NULL) {
 		void *old_field = tuple_field(old_tuple,
@@ -404,24 +410,15 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
                         :(void *) key
-			:(int) part_count
+			:(int) key_cardinality
 {
-	(void) part_count; /* Silence gcc warning in release mode. */
 	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	if (part_count != 1)
-		tnt_raise(IllegalParams, :"key must be single valued");
-
-	u32 field_size = load_varint32(&key);
-	if (field_size != 4)
-		tnt_raise(IllegalParams, :"key is not u32");
-
-	u32 num = *(u32 *)key;
-
+	u32 num = int32_key_to_value(key, key_cardinality);
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_i32ptr_get(int_hash, num);
 	it->hash = int_hash;
@@ -431,6 +428,24 @@ hash_iterator_free(struct iterator *iterator)
 /* }}} */
 
 /* {{{ Hash64Index ************************************************/
+
+static u64
+int64_key_to_value(void *key, int key_cardinality)
+{
+	if (key_cardinality > 1)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality, 1);
+
+	if (key_cardinality < 1)
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  key_cardinality, 1);
+
+	u32 key_size = load_varint32(&key);
+	if (key_size != 8)
+		tnt_raise(ClientError, :ER_KEY_FIELD_TYPE, "u64");
+
+	return *((u64 *) key);
+}
 
 @interface Hash64Index: HashIndex {
 	struct mh_i64ptr_t *int64_hash;
@@ -459,15 +474,10 @@ hash_iterator_free(struct iterator *iterator)
 	return mh_size(int64_hash);
 }
 
-- (struct box_tuple *) find: (void *) field
+- (struct box_tuple *) find: (void *) key :(int) key_cardinality
 {
 	struct box_tuple *ret = NULL;
-	u32 field_size = load_varint32(&field);
-	u64 num = *(u64 *)field;
-
-	if (field_size != 8)
-		tnt_raise(IllegalParams, :"key is not u64");
-
+	u64 num = int64_key_to_value(key, key_cardinality);
 	mh_int_t k = mh_i64ptr_get(int64_hash, num);
 	if (k != mh_end(int64_hash))
 		ret = mh_value(int64_hash, k);
@@ -480,11 +490,7 @@ hash_iterator_free(struct iterator *iterator)
 - (void) remove: (struct box_tuple *) tuple
 {
 	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
-	unsigned int field_size = load_varint32(&field);
-	u64 num = *(u64 *)field;
-
-	if (field_size != 8)
-		tnt_raise(IllegalParams, :"key is not u64");
+	u64 num = int64_key_to_value(field, 1);
 
 	mh_int_t k = mh_i64ptr_get(int64_hash, num);
 	if (k != mh_end(int64_hash))
@@ -498,11 +504,7 @@ hash_iterator_free(struct iterator *iterator)
 	:(struct box_tuple *) new_tuple
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
-	u32 field_size = load_varint32(&field);
-	u64 num = *(u64 *)field;
-
-	if (field_size != 8)
-		tnt_raise(IllegalParams, :"key is not u64");
+	u64 num = int64_key_to_value(field, 1);
 
 	if (old_tuple != NULL) {
 		void *old_field = tuple_field(old_tuple,
@@ -535,24 +537,16 @@ hash_iterator_free(struct iterator *iterator)
 }
 
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) field
-			:(int) part_count
+                        :(void *) key
+			:(int) key_cardinality
 {
-	(void) part_count; /* Silence gcc warning in release mode. */
 	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	if (part_count != 1)
-		tnt_raise(IllegalParams, :"key must be single valued");
-
-	u32 field_size = load_varint32(&field);
-	if (field_size != 8)
-		tnt_raise(IllegalParams, :"key is not u64");
-
-	u64 num = *(u64 *)field;
+	u64 num = int64_key_to_value(key, key_cardinality);
 
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_i64ptr_get(int64_hash, num);
@@ -563,6 +557,18 @@ hash_iterator_free(struct iterator *iterator)
 /* }}} */
 
 /* {{{ HashStrIndex ***********************************************/
+
+static char *
+str_key_to_value(void *key, int key_cardinality)
+{
+	if (key_cardinality > 1)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality, 1);
+	if (key_cardinality < 1)
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  key_cardinality, 1);
+	return key;
+}
 
 @interface HashStrIndex: HashIndex {
 	 struct mh_lstrptr_t *str_hash;
@@ -591,17 +597,17 @@ hash_iterator_free(struct iterator *iterator)
 	return mh_size(str_hash);
 }
 
-- (struct box_tuple *) find: (void *) field
+- (struct box_tuple *) find: (void *) key :(int) key_cardinality
 {
 	struct box_tuple *ret = NULL;
-	mh_int_t k = mh_lstrptr_get(str_hash, field);
-
+	void *lstr = str_key_to_value(key, key_cardinality);
+	mh_int_t k = mh_lstrptr_get(str_hash, lstr);
 	if (k != mh_end(str_hash))
 		ret = mh_value(str_hash, k);
 #ifdef DEBUG
-	u32 field_size = load_varint32(&field);
+	u32 key_size = load_varint32(&key);
 	say_debug("HashStrIndex find(self:%p, key:(%i)'%.*s') = %p",
-		  self, field_size, field_size, (u8 *)field, ret);
+		  self, key_size, key_size, (u8 *)key, ret);
 #endif
 	return ret;
 }
@@ -660,20 +666,17 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
                         :(void *) key
-			:(int) part_count
+			:(int) key_cardinality
 {
-	(void) part_count; /* Silence gcc warning in release mode. */
 	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	if (part_count != 1)
-		tnt_raise(IllegalParams, :"key must be single valued");
-
+	void *lstr = str_key_to_value(key, key_cardinality);
 	it->base.next_equal = iterator_first_equal;
-	it->h_pos = mh_lstrptr_get(str_hash, key);
+	it->h_pos = mh_lstrptr_get(str_hash, lstr);
 	it->hash = (struct mh_i32ptr_t *) str_hash;
 }
 @end
