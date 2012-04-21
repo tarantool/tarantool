@@ -28,32 +28,32 @@ box.flags = create_const_table(
 --
 --
 function box.select_limit(space, index, offset, limit, ...)
-    local key = {...}
+    local cardinality = select('#', ...)
     return box.process(17,
-                       box.pack('iiiiii'..string.rep('p', #key),
+                       box.pack('iiiiii'..string.rep('p', cardinality),
                                  space,
                                  index,
                                  offset,
                                  limit,
                                  1, -- key count
-                                 #key, -- key cardinality
-                                 unpack(key)))
+                                 cardinality, -- key cardinality
+                                 ...))
 end
 
 --
 --
 --
 function box.select(space, index, ...)
-    local key = {...}
+    local cardinality = select('#', ...)
     return box.process(17,
-                       box.pack('iiiiii'..string.rep('p', #key),
+                       box.pack('iiiiii'..string.rep('p', cardinality),
                                  space,
                                  index,
                                  0, -- offset
                                  4294967295, -- limit
                                  1, -- key count
-                                 #key, -- key cardinality
-                                 unpack(key)))
+                                 cardinality, -- key cardinality
+                                 ...))
 end
 
 --
@@ -70,35 +70,49 @@ end
 -- index is always 0. It doesn't accept compound keys
 --
 function box.delete(space, ...)
-    local key = {...}
+    local cardinality = select('#', ...)
     return box.process(21,
-                       box.pack('iii'..string.rep('p', #key), space,
+                       box.pack('iii'..string.rep('p', cardinality),
+                                 space,
                                  box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 #key, -- key cardinality
-                                 unpack(key)))
+                                 cardinality, -- key cardinality
+                                 ...))
 end
 
 -- insert or replace a tuple
 function box.replace(space, ...)
-    local tuple = {...}
+    local cardinality = select('#', ...)
     return box.process(13,
-                       box.pack('iii'..string.rep('p', #tuple),
+                       box.pack('iii'..string.rep('p', cardinality),
                                  space,
                                  box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 #tuple, -- cardinality
-                                 unpack(tuple)))
+                                 cardinality, -- cardinality
+                                 ...))
 end
 
 -- insert a tuple (produces an error if the tuple already exists)
 function box.insert(space, ...)
-    local tuple = {...}
+    local cardinality = select('#', ...)
     return box.process(13,
-                       box.pack('iii'..string.rep('p', #tuple),
+                       box.pack('iii'..string.rep('p', cardinality),
                                 space,
                                 bit.bor(box.flags.BOX_RETURN_TUPLE,
                                         box.flags.BOX_ADD),  -- flags
-                                #tuple, -- cardinality
-                                unpack(tuple)))
+                                cardinality, -- cardinality
+                                ...))
+end
+
+--
+function box.update(space, key, format, ...)
+    local op_count = select('#', ...)/2
+    return box.process(19,
+                       box.pack('iiipi'..format,
+                                  space,
+                                  1, -- flags, BOX_RETURN_TUPLE
+                                  1, -- cardinality
+                                  key, -- primary key
+                                  op_count, -- op count
+                                  ...))
 end
 
 box.upd = {}
@@ -218,40 +232,6 @@ function box.update_ol(space, ops_list, ...)
     return box.process(19, box.pack(format, unpack(args_list)))
 end
 
--- UPDATE command
-function box.update_ml(space, ops, ...)
-    local key = {...}
-
-    local format = ''
-    local args_list = {}
-    
-    -- fill UPDATE command header
-    format = format .. 'ii'
-    table.insert(args_list, space) -- space number
-    table.insert(args_list, box.flags.BOX_RETURN_TUPLE) -- flags
-
-    -- fill UPDATE command key
-    format = format .. 'i'
-    table.insert(args_list, #key) -- key cardinality
-    for itr, val in ipairs(key) do
-        format = format .. 'p'
-        table.insert(args_list, val) -- key field
-    end
-
-    -- fill UPDATE command operations
-    -- fill format: operations count and operations
-    format = format .. "i" .. ops[1]
-    table.remove(ops, 1)
-    -- operations count
-    table.insert(args_list, #ops/2)
-    -- operations
-    for itr, op in ipairs(ops) do
-        table.insert(args_list, op)
-    end
-
-    return box.process(19, box.pack(format, unpack(args_list)))
-end
-
 function box.on_reload_configuration()
     local index_mt = {}
     -- __len and __index
@@ -291,11 +271,9 @@ function box.on_reload_configuration()
         return box.select_limit(space.n, ino, offset, limit, ...)
     end
     space_mt.insert = function(space, ...) return box.insert(space.n, ...) end
+    space_mt.update = function(space, ...) return box.update(space.n, ...) end
     space_mt.update_ol = function(space, ops_list, ...)
         return box.update_ol(space.n, ops_list,...)
-    end
-    space_mt.update_ml = function(space, ops, ...)
-        return box.update_ml(space.n, ops,...)
     end
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end

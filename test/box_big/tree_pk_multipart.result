@@ -190,7 +190,7 @@ lua box.delete(9, 'Vincent', 'The Wolf!', 3)
 ...
 lua box.delete(9, 'Vincent', 'The Wolf!')
 ---
-error: 'Ambiguous specification of the key (may affect multiple values)'
+error: 'Partial key in an exact match (key field count: 2, expected: 3)'
 ...
 lua box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')
 ---
@@ -219,7 +219,7 @@ lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'Vincent', 'The Wolf!', 3
 ...
 lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'Vincent', 'The Wolf!')
 ---
-error: 'Ambiguous specification of the key (may affect multiple values)'
+error: 'Partial key in an exact match (key field count: 2, expected: 3)'
 ...
 lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'The Wolf!', 'Vincent', 1, 'Come again?')
 ---

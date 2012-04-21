@@ -51,14 +51,14 @@ enum { TNT_ERRMSG_MAX = 512 };
 
 #define ERROR_CODES(_)					    \
 	/*  0 */_(ER_OK=0,			0, "OK") \
-	/*  1 */_(ER_NONMASTER,			2, "Non master connection, but it should be") \
+	/*  1 */_(ER_NONMASTER,			2, "Attempt to modify data via a secondary port connection or on a replication slave") \
 	/*  2 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
-	/*  3 */_(ER_BAD_UID,			2, "Uid is not from this storage range") \
+	/*  3 */_(ER_UNUSED3,			2, "Unused3") \
 	/*  4 */_(ER_TUPLE_IS_RO,		1, "Tuple is marked as read-only") \
-	/*  5 */_(ER_TUPLE_IS_NOT_LOCKED,	1, "Tuple isn't locked") \
-	/*  6 */_(ER_TUPLE_IS_LOCKED,		1, "Tuple is locked") \
+	/*  5 */_(ER_UNUSED5,			2, "Unused5") \
+	/*  6 */_(ER_UNUSED6,			2, "Unused6") \
 	/*  7 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
-	/*  8 */_(ER_BAD_INTEGRITY,		2, "Bad graph integrity") \
+	/*  8 */_(ER_UNUSED8,			2, "Unused8") \
 	/*  9 */_(ER_INJECTION,			2, "Error injection '%s'") \
 	/* 10 */_(ER_UNSUPPORTED,		2, "Unsupported") \
 		/* silverproxy error codes */ \
@@ -76,43 +76,40 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 22 */_(ER_RESERVED22,		0, "Reserved22") \
 	/* 23 */_(ER_RESERVED23,		0, "Reserved23") \
 		/* end of silverproxy error codes */ \
-	/* 24 */_(ER_CANNOT_REGISTER,		1, "Can't register new user") \
-	/* 25 */_(ER_TUPLE_IS_EMPTY,		0, "UPDATE error: the new tuple has no fields") \
-	/* 26 */_(ER_CANNOT_INIT_ALERT_ID,	1, "Can't generate alert id") \
-	/* 27 */_(ER_CANNOT_DEL,		2, "Can't del node") \
-	/* 28 */_(ER_USER_NOT_REGISTERED,	2, "User isn't registered") \
-		/* silversearch error codes */ \
-	/* 29 */_(ER_SYNTAX_ERROR,		2, "Syntax error in query") \
-	/* 30 */_(ER_WRONG_FIELD,		2, "Unknown field") \
-	/* 31 */_(ER_WRONG_NUMBER,		2, "Number value is out of range") \
-	/* 32 */_(ER_DUPLICATE,			2, "Insert already existing object") \
-	/* 33 */_(ER_UNUSED32,			0, "Unused33") \
-	/* 34 */_(ER_UNSUPPORTED_ORDER,		2, "Can not order result") \
-	/* 35 */_(ER_MULTIWRITE,		2, "Multiple to update/delete") \
-	/* 36 */_(ER_NOTHING,			0, "Nothing to do (not an error)") \
-	/* 37 */_(ER_UPDATE_ID,			2, "Id's update") \
-	/* 38 */_(ER_WRONG_VERSION,		2, "Unsupported version of protocol") \
-		/* end of silversearch error codes */					\
+	/* 24 */_(ER_UNUSED24,			2, "Unused24") \
+	/* 25 */_(ER_TUPLE_IS_EMPTY,		2, "UPDATE error: the new tuple has no fields") \
+	/* 26 */_(ER_UNUSED26,			2, "Unused26") \
+	/* 27 */_(ER_UNUSED27,			2, "Unused27") \
+	/* 28 */_(ER_UNUSED28,			2, "Unused28") \
+	/* 29 */_(ER_UNUSED29,			2, "Unused29") \
+	/* 30 */_(ER_UNUSED30,			2, "Unused30") \
+	/* 31 */_(ER_UNUSED31,			2, "Unused31") \
+	/* 32 */_(ER_UNUSED32,			2, "Unused32") \
+	/* 33 */_(ER_UNUSED33,			2, "Unused33") \
+	/* 34 */_(ER_UNUSED34,			2, "Unused34") \
+	/* 35 */_(ER_UNUSED35,			2, "Unused35") \
+	/* 36 */_(ER_UNUSED36,			2, "Unused36") \
+	/* 37 */_(ER_UNUSED37,			2, "Unused37") \
+	/* 38 */_(ER_KEY_FIELD_TYPE,		2, "Supplied key field type does not match index type: expected %s") \
 	/* 39 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 40 */_(ER_FIELD_TYPE,		2, "Field type does not match one required by operation: expected a %s") \
-	/* 41 */_(ER_TYPE_MISMATCH,		2, "Argument type in operation does not match field type: expected a %s") \
+	/* 41 */_(ER_ARG_TYPE,			2, "Argument type in operation does not match field type: expected a %s") \
 	/* 42 */_(ER_SPLICE,			2, "Field SPLICE error: %s") \
 	/* 43 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
 	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
-	/* 45 */_(ER_AMBIGUOUS_KEY_SPECIFIED,	0, "Ambiguous specification of the key (may affect multiple values)") \
-	/* 46 */_(ER_SINGLE_KEY_NEEDED,		0, "Key must be single valued") \
+	/* 45 */_(ER_EXACT_MATCH,		2, "Partial key in an exact match (key field count: %d, expected: %d)") \
+	/* 46 */_(ER_UNUSED46,			2, "Unused46") \
 	/* 47 */_(ER_KEY_CARDINALITY,		2, "Key cardinality %d is greater than index cardinality %d") \
 	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist") \
 	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure '%.*s' is not defined") \
 	/* 51 */_(ER_PROC_LUA,			2, "Lua error: %s") \
-	/* 52 */_(ER_SPACE_DISABLED,	2, "Space %u is disabled") \
+	/* 52 */_(ER_SPACE_DISABLED,		2, "Space %u is disabled") \
 	/* 53 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space %u") \
 	/* 54 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
 	/* 55 */_(ER_TUPLE_FOUND,		2, "Tuple already exists") \
 	/* 56 */_(ER_INDEX_VIOLATION,		2, "Duplicate key exists in a unique index") \
-	/* 57 */_(ER_NO_SUCH_SPACE,		2, "Space %u does not exists") \
-	/* 57 */_(ER_KEY_TYPE_MISMATCH,		2, "Key field isn't %s")
+	/* 57 */_(ER_NO_SUCH_SPACE,		2, "Space %u does not exist")
 
 
 /*

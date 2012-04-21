@@ -774,7 +774,8 @@ tree_iterator_free(struct iterator *iterator)
 			  key_cardinality, key_def->part_count);
 
 	if (key_cardinality < key_def->part_count)
-		tnt_raise(ClientError, :ER_AMBIGUOUS_KEY_SPECIFIED);
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  key_cardinality, key_def->part_count);
 
 	key_data->data = key;
 	key_data->part_count = key_cardinality;

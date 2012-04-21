@@ -572,7 +572,7 @@ init_update_op_arith(struct update_cmd *cmd __attribute__((unused)),
 
 		/* Check the operand type. */
 		if (op->arg.set.length != sizeof(i32))
-			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
+			tnt_raise(ClientError, :ER_ARG_TYPE,
 				  "32-bit int");
 
 		arg->i32_val = *(i32 *)op->arg.set.value;
@@ -590,7 +590,7 @@ init_update_op_arith(struct update_cmd *cmd __attribute__((unused)),
 			arg->i64_val = *(i64 *)op->arg.set.value;
 			break;
 		default:
-			tnt_raise(ClientError, :ER_TYPE_MISMATCH,
+			tnt_raise(ClientError, :ER_ARG_TYPE,
 				  "32-bit or 64-bit int");
 		}
 		break;

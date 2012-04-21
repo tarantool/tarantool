@@ -2,7 +2,7 @@
 #
 
 #
-# Inset test
+# Insert test
 #
 
 exec sql "insert into t9 values ('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')"

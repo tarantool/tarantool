@@ -197,7 +197,7 @@ struct hash_iterator {
 	mh_int_t h_pos;
 };
 
-static inline struct hash_iterator *
+static struct hash_iterator *
 hash_iterator(struct iterator *it)
 {
 	return (struct hash_iterator *) it;
@@ -298,11 +298,28 @@ hash_iterator_free(struct iterator *iterator)
 
 /* {{{ Hash32Index ************************************************/
 
+static u32
+int32_key_to_value(void *key, u32 key_cardinality)
+{
+	if (key_cardinality > 1)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality, 1);
+
+	if (key_cardinality < 1)
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  key_cardinality, 1);
+
+	u32 key_size = load_varint32(&key);
+	if (key_size != 4)
+		tnt_raise(ClientError, :ER_KEY_FIELD_TYPE, "u32");
+
+	return *((u32 *) key);
+}
+
+
 @interface Hash32Index: HashIndex {
 	 struct mh_i32ptr_t *int_hash;
 };
-
-- (u32) keyValue :(void *) key :(u32) key_cardinality;
 @end
 
 @implementation Hash32Index
@@ -331,7 +348,7 @@ hash_iterator_free(struct iterator *iterator)
 - (struct box_tuple *) find: (void *) key :(u32) key_cardinality
 {
 	struct box_tuple *ret = NULL;
-	u32 num = [self keyValue :key :key_cardinality];
+	u32 num = int32_key_to_value(key, key_cardinality);
 	mh_int_t k = mh_i32ptr_get(int_hash, num);
 	if (k != mh_end(int_hash))
 		ret = mh_value(int_hash, k);
@@ -344,7 +361,7 @@ hash_iterator_free(struct iterator *iterator)
 - (void) remove: (struct box_tuple *) tuple
 {
 	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
-	u32 num = [self keyValue :field :1];
+	u32 num = int32_key_to_value(field, 1);
 	mh_int_t k = mh_i32ptr_get(int_hash, num);
 	if (k != mh_end(int_hash))
 		mh_i32ptr_del(int_hash, k);
@@ -357,7 +374,7 @@ hash_iterator_free(struct iterator *iterator)
 	:(struct box_tuple *) new_tuple
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
-	u32 num = [self keyValue :field :1];
+	u32 num = int32_key_to_value(field, 1);
 
 	if (old_tuple != NULL) {
 		void *old_field = tuple_field(old_tuple,
@@ -394,34 +411,38 @@ hash_iterator_free(struct iterator *iterator)
 	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	u32 num = [self keyValue :key :key_cardinality];
+	u32 num = int32_key_to_value(key, key_cardinality);
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_i32ptr_get(int_hash, num);
 	it->hash = int_hash;
 }
-
-- (u32) keyValue :(void *) key :(u32) key_cardinality
-{
-	if (key_cardinality != 1)
-		tnt_raise(ClientError, :ER_SINGLE_KEY_NEEDED);
-
-	u32 key_size = load_varint32(&key);
-	if (key_size != 4)
-		tnt_raise(ClientError, :ER_KEY_TYPE_MISMATCH, "u32");
-
-	return *((u32 *) key);
-}
-
 @end
 
 /* }}} */
 
 /* {{{ Hash64Index ************************************************/
 
+static u64
+int64_key_to_value(void *key, u32 key_cardinality)
+{
+	if (key_cardinality > 1)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality, 1);
+
+	if (key_cardinality < 1)
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  key_cardinality, 1);
+
+	u32 key_size = load_varint32(&key);
+	if (key_size != 8)
+		tnt_raise(ClientError, :ER_KEY_FIELD_TYPE, "u64");
+
+	return *((u64 *) key);
+}
+
 @interface Hash64Index: HashIndex {
 	struct mh_i64ptr_t *int64_hash;
 };
-- (u64) keyValue :(void *) key :(u32) key_cardinality;
 @end
 
 @implementation Hash64Index
@@ -449,7 +470,7 @@ hash_iterator_free(struct iterator *iterator)
 - (struct box_tuple *) find: (void *) key :(u32) key_cardinality
 {
 	struct box_tuple *ret = NULL;
-	u64 num = [self keyValue :key :key_cardinality];
+	u64 num = int64_key_to_value(key, key_cardinality);
 	mh_int_t k = mh_i64ptr_get(int64_hash, num);
 	if (k != mh_end(int64_hash))
 		ret = mh_value(int64_hash, k);
@@ -462,7 +483,7 @@ hash_iterator_free(struct iterator *iterator)
 - (void) remove: (struct box_tuple *) tuple
 {
 	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
-	u64 num = [self keyValue :field :1];
+	u64 num = int64_key_to_value(field, 1);
 
 	mh_int_t k = mh_i64ptr_get(int64_hash, num);
 	if (k != mh_end(int64_hash))
@@ -476,7 +497,7 @@ hash_iterator_free(struct iterator *iterator)
 	:(struct box_tuple *) new_tuple
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
-	u64 num = [self keyValue :field :1];
+	u64 num = int64_key_to_value(field, 1);
 
 	if (old_tuple != NULL) {
 		void *old_field = tuple_field(old_tuple,
@@ -513,34 +534,34 @@ hash_iterator_free(struct iterator *iterator)
 	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	u64 num = [self keyValue :key :key_cardinality];
+	u64 num = int64_key_to_value(key, key_cardinality);
 
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_i64ptr_get(int64_hash, num);
 	it->hash = (struct mh_i32ptr_t *) int64_hash;
 }
 
-- (u64) keyValue :(void *) key :(u32) key_cardinality
-{
-	if (key_cardinality != 1)
-		tnt_raise(ClientError, :ER_SINGLE_KEY_NEEDED);
-
-	u32 key_size = load_varint32(&key);
-	if (key_size != 8)
-		tnt_raise(ClientError, :ER_KEY_TYPE_MISMATCH, "u64");
-
-	return *((u64 *) key);
-}
 @end
 
 /* }}} */
 
 /* {{{ HashStrIndex ***********************************************/
 
+static char *
+str_key_to_value(void *key, u32 key_cardinality)
+{
+	if (key_cardinality > 1)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality, 1);
+	if (key_cardinality < 1)
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  key_cardinality, 1);
+	return key;
+}
+
 @interface HashStrIndex: HashIndex {
 	 struct mh_lstrptr_t *str_hash;
 };
-- (void *) keyValue :(void *) key :(u32) key_cardinality;
 @end
 
 @implementation HashStrIndex
@@ -568,7 +589,7 @@ hash_iterator_free(struct iterator *iterator)
 - (struct box_tuple *) find: (void *) key :(u32) key_cardinality
 {
 	struct box_tuple *ret = NULL;
-	void *lstr = [self keyValue :key :key_cardinality];
+	void *lstr = str_key_to_value(key, key_cardinality);
 	mh_int_t k = mh_lstrptr_get(str_hash, lstr);
 	if (k != mh_end(str_hash))
 		ret = mh_value(str_hash, k);
@@ -598,7 +619,7 @@ hash_iterator_free(struct iterator *iterator)
 	:(struct box_tuple *) new_tuple
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
-	void *lstr = [self keyValue :field :1];
+	void *lstr = str_key_to_value(field, 1);
 
 	if (old_tuple != NULL) {
 		void *old_field = tuple_field(old_tuple,
@@ -633,17 +654,10 @@ hash_iterator_free(struct iterator *iterator)
 	assert(iterator->next = hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	void *lstr = [self keyValue :key :key_cardinality];
+	void *lstr = str_key_to_value(key, key_cardinality);
 	it->base.next_equal = iterator_first_equal;
 	it->h_pos = mh_lstrptr_get(str_hash, lstr);
 	it->hash = (struct mh_i32ptr_t *) str_hash;
-}
-
-- (void *) keyValue :(void *) key :(u32) key_cardinality
-{
-	if (key_cardinality != 1)
-		tnt_raise(ClientError, :ER_SINGLE_KEY_NEEDED);
-	return key;
 }
 @end
 
