@@ -216,13 +216,15 @@ if (ENABLE_CLIENT)
     set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
 endif()
 
-option(ENABLE_GCOV "Enable integration with gcov, a code coverage program" ON)
+option(ENABLE_GCOV "Enable integration with gcov, a code coverage program" OFF)
 if (ENABLE_GCOV)
     check_library_exists (gcov __gcov_flush  ""  HAVE_GCOV)
     if (NOT HAVE_GCOV)
         message (FATAL_ERROR
                  "ENABLE_GCOV option requested but gcov library is not found")
     endif()
+    set (GCOV_C_FLAGS "-fprofile-arcs -ftest-coverage")
+    set (GCOV_LDFLAGS "-fprofile-arcs -ftest-coverage")
 endif()
 
 option(ENABLE_TRACE "Enable debug trace of tarantool_box execution to

@@ -103,6 +103,8 @@ if (TARGET_OS_DEBIAN_FREEBSD)
 endif()
 
 if (ENABLE_GCOV)
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${GCOV_C_FLAGS}")
+  set (LDFLAGS "${LDFLAGS} ${GCOV_LDFLAGS}")
   set (common_libraries ${common_libraries} gcov)
 endif()
 
