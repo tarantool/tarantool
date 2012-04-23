@@ -17,14 +17,13 @@ add_custom_command(
             -H ${CMAKE_SOURCE_DIR}/cfg/prscfg.h
             -p ${CMAKE_SOURCE_DIR}/cfg/prscfg.c
     COMMAND ${CMAKE_COMMAND} -E remove tmp.cfg
-    DEPENDS ${CMAKE_SOURCE_DIR}/cfg/core_cfg.cfg_tmpl
-            ${CMAKE_SOURCE_DIR}/cfg/warning.h)
+    DEPENDS tmp.cfg ${CMAKE_SOURCE_DIR}/cfg/warning.h)
 
 #
 # Optionally rebuild the configuration file parsing code from
 # templates.
 #
-macro(generate_config mod)
+macro(generate_mod_config mod)
 # Gracefully handle out-of-source builds with missing 
 # 'confetti'. Make sure that generated files are older than
 # their sources when configuring the project.
@@ -52,7 +51,7 @@ add_custom_command(
 endmacro()
 
 foreach (mod ${TARANTOOL_MODULES})
-  generate_config(${mod})
+  generate_mod_config(${mod})
   set (generated_headers ${generated_headers} 
        ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.h)
 endforeach()
@@ -67,6 +66,8 @@ add_library(cfg prscfg.c warning.c)
 # when tmp.cfg is corrupted by two paralled targets.
 # See http://www.cmake.org/Bug/view.php?id=10082 for details.
 #
-add_custom_target(generate_config
-    DEPENDS ${CMAKE_SOURCE_DIR}/cfg/prscfg.h ${generated_headers})
+add_custom_target(config
+    DEPENDS ${CMAKE_SOURCE_DIR}/cfg/prscfg.h ${generated_headers} tmp.cfg)
+
+
 add_dependencies(cfg libluajit)
