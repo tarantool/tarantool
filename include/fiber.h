@@ -102,11 +102,6 @@ struct fiber {
 
 SLIST_HEAD(, fiber) fibers, zombie_fibers;
 
-struct child {
-	pid_t pid;
-	struct fiber *in, *out;
-};
-
 static inline struct iovec *iovec(const struct tbuf *t)
 {
 	return (struct iovec *)t->data;
@@ -225,9 +220,5 @@ struct fiber *fiber_server(const char *name, int port,
  */
 int
 fiber_serv_socket(struct fiber *fiber, unsigned short port, bool retry, ev_tstamp delay);
-
-struct child *spawn_child(const char *name,
-			  int inbox_size,
-			  struct tbuf *(*handler) (void *, struct tbuf *), void *state);
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */
