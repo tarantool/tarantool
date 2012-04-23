@@ -38,7 +38,7 @@ The latest build can be found below.
 <!-- Debian -->
   <tr>
     <td>
-        Debian software package (<b>.deb</b>)
+        Debian (<b>.deb</b>)
     </td>
 
     <td align=center>
@@ -52,7 +52,7 @@ The latest build can be found below.
 
   <tr>
     <td>
-        Debian software package (<b>.deb</b>), with debug info 
+        Debian (<b>.deb</b>), with debug info 
     </td>
     <td align=center>
         <a href="http://tarantool.org/dist/debian/binary-i386/tarantool-dbg_@TARANTOOL_VERSION@_i386.deb">32-bit</a>
@@ -60,6 +60,13 @@ The latest build can be found below.
 
     <td align=center>
         <a href="http://tarantool.org/dist/debian/binary-amd64/tarantool-dbg_@TARANTOOL_VERSION@_amd64.deb">64-bit</a>
+    </td>
+  </tr>
+
+  <tr>
+    <td>&nbsp</td>
+    <td align=center colspan=2>
+        <a href="http://tarantool.org/dist/debian/binary-i386/tarantool-common_@TARANTOOL_VERSION@_all.deb">common</a>
     </td>
   </tr>
 
