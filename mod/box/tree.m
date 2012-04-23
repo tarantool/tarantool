@@ -585,7 +585,8 @@ dense_node_compare(struct key_def *key_def, u32 first_field,
  * Compare a part for two dense keys with parts in linear order.
  */
 static int
-linear_node_compare(struct key_def *key_def, u32 first_field,
+linear_node_compare(struct key_def *key_def,
+		    u32 first_field  __attribute__((unused)),
 		    struct box_tuple *tuple_a, u32 offset_a,
 		    struct box_tuple *tuple_b, u32 offset_b)
 {
@@ -701,7 +702,8 @@ dense_key_node_compare(struct key_def *key_def,
 static int
 linear_key_node_compare(struct key_def *key_def,
 			const struct key_data *key_data,
-			u32 first_field, struct box_tuple *tuple, u32 offset)
+			u32 first_field __attribute__((unused)),
+			struct box_tuple *tuple, u32 offset)
 {
 	int part_count = key_def->part_count;
 	assert(first_field + part_count <= tuple->cardinality);
