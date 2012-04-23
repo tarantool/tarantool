@@ -18,27 +18,6 @@ static Reg ra_hintalloc(ASMState *as, IRRef ref, Reg hint, RegSet allow)
   return r;
 }
 
-/* Similar to ra_left, except we override any hints. */
-static void ra_leftov(ASMState *as, Reg dest, IRRef lref)
-{
-  IRIns *ir = IR(lref);
-  Reg left = ir->r;
-  if (ra_noreg(left)) {
-    ra_sethint(ir->r, dest);  /* Propagate register hint. */
-    left = ra_allocref(as, lref, RSET_GPR);
-  }
-  ra_noweak(as, left);
-  if (dest != left) {
-    /* Use register renaming if dest is the PHI reg. */
-    if (irt_isphi(ir->t) && as->phireg[dest] == lref) {
-      ra_modified(as, left);
-      ra_rename(as, left, dest);
-    } else {
-      emit_movrr(as, ir, dest, left);
-    }
-  }
-}
-
 /* Allocate a scratch register pair. */
 static Reg ra_scratchpair(ASMState *as, RegSet allow)
 {
@@ -67,52 +46,6 @@ static Reg ra_scratchpair(ASMState *as, RegSet allow)
   ra_modified(as, r+1);
   RA_DBGX((as, "scratchpair    $r $r", r, r+1));
   return r;
-}
-
-/* Force a RID_RET/RID_RETHI destination register pair (marked as free). */
-static void ra_destpair(ASMState *as, IRIns *ir)
-{
-  Reg destlo = ir->r, desthi = (ir+1)->r;
-  /* First spill unrelated refs blocking the destination registers. */
-  if (!rset_test(as->freeset, RID_RET) &&
-      destlo != RID_RET && desthi != RID_RET)
-    ra_restore(as, regcost_ref(as->cost[RID_RET]));
-  if (!rset_test(as->freeset, RID_RETHI) &&
-      destlo != RID_RETHI && desthi != RID_RETHI)
-    ra_restore(as, regcost_ref(as->cost[RID_RETHI]));
-  /* Next free the destination registers (if any). */
-  if (ra_hasreg(destlo)) {
-    ra_free(as, destlo);
-    ra_modified(as, destlo);
-  } else {
-    destlo = RID_RET;
-  }
-  if (ra_hasreg(desthi)) {
-    ra_free(as, desthi);
-    ra_modified(as, desthi);
-  } else {
-    desthi = RID_RETHI;
-  }
-  /* Check for conflicts and shuffle the registers as needed. */
-  if (destlo == RID_RETHI) {
-    if (desthi == RID_RET) {
-      emit_movrr(as, ir, RID_RETHI, RID_TMP);
-      emit_movrr(as, ir, RID_RET, RID_RETHI);
-      emit_movrr(as, ir, RID_TMP, RID_RET);
-    } else {
-      emit_movrr(as, ir, RID_RETHI, RID_RET);
-      if (desthi != RID_RETHI) emit_movrr(as, ir, desthi, RID_RETHI);
-    }
-  } else if (desthi == RID_RET) {
-    emit_movrr(as, ir, RID_RET, RID_RETHI);
-    if (destlo != RID_RET) emit_movrr(as, ir, destlo, RID_RET);
-  } else {
-    if (desthi != RID_RETHI) emit_movrr(as, ir, desthi, RID_RETHI);
-    if (destlo != RID_RET) emit_movrr(as, ir, destlo, RID_RET);
-  }
-  /* Restore spill slots (if any). */
-  if (ra_hasspill((ir+1)->s)) ra_save(as, ir+1, RID_RETHI);
-  if (ra_hasspill(ir->s)) ra_save(as, ir, RID_RET);
 }
 
 /* -- Guard handling ------------------------------------------------------ */
@@ -186,7 +119,7 @@ static int32_t asm_fuseabase(ASMState *as, IRRef ref)
 {
   IRIns *ir = IR(ref);
   if (ir->o == IR_TNEW && ir->op1 <= LJ_MAX_COLOSIZE &&
-      noconflict(as, ref, IR_NEWREF))
+      !neverfuse(as) && noconflict(as, ref, IR_NEWREF))
     return (int32_t)sizeof(GCtab);
   return 0;
 }
@@ -398,13 +331,17 @@ static void asm_callx(ASMState *as, IRIns *ir)
 {
   IRRef args[CCI_NARGS_MAX];
   CCallInfo ci;
+  IRRef func;
+  IRIns *irf;
   ci.flags = asm_callx_flags(as, ir);
   asm_collectargs(as, ir, &ci, args);
   asm_setupresult(as, ir, &ci);
-  if (irref_isk(ir->op2)) {  /* Call to constant address. */
-    ci.func = (ASMFunction)(void *)(IR(ir->op2)->i);
+  func = ir->op2; irf = IR(func);
+  if (irf->o == IR_CARG) { func = irf->op1; irf = IR(func); }
+  if (irref_isk(func)) {  /* Call to constant address. */
+    ci.func = (ASMFunction)(void *)(irf->i);
   } else {  /* Need a non-argument register for indirect calls. */
-    Reg freg = ra_alloc1(as, ir->op2, RSET_RANGE(RID_R4, RID_R12+1));
+    Reg freg = ra_alloc1(as, func, RSET_RANGE(RID_R4, RID_R12+1));
     emit_m(as, ARMI_BLXr, freg);
     ci.func = (ASMFunction)(void *)0;
   }
@@ -583,7 +520,7 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
   int destused = ra_used(ir);
   Reg dest = ra_dest(as, ir, allow);
   Reg tab = ra_alloc1(as, ir->op1, rset_clear(allow, dest));
-  Reg key = 0, keyhi = 0, keynumhi = RID_NONE, tmp = RID_LR;
+  Reg key = 0, keyhi = 0, keynumhi = RID_NONE, tmp = RID_TMP;
   IRRef refkey = ir->op2;
   IRIns *irkey = IR(refkey);
   IRType1 kt = irkey->t;
@@ -737,7 +674,7 @@ static void asm_hrefk(ASMState *as, IRIns *ir)
 	     (int32_t)ir_knum(irkey)->u32.hi, allow);
     emit_opk(as, ARMI_CMP, 0, key,
 	     (int32_t)ir_knum(irkey)->u32.lo, allow);
-  } if (ra_hasreg(key)) {
+  } else if (ra_hasreg(key)) {
     emit_n(as, ARMF_CC(ARMI_CMN, CC_EQ)|ARMI_K12|-irt_toitype(irkey->t), type);
     emit_opk(as, ARMI_CMP, 0, key, irkey->i, allow);
   } else {
@@ -914,7 +851,7 @@ static void asm_ahuvload(ASMState *as, IRIns *ir)
     rset_clear(allow, dest);
   }
   idx = asm_fuseahuref(as, ir->op1, &ofs, allow);
-  if (!hiop) {
+  if (!hiop || type == RID_NONE) {
     rset_clear(allow, idx);
     if (ofs < 256 && ra_hasreg(dest) && (dest & 1) == 0 &&
 	rset_test((as->freeset & allow), dest+1)) {
@@ -999,12 +936,18 @@ static void asm_cnew(ASMState *as, IRIns *ir)
   const CCallInfo *ci = &lj_ir_callinfo[IRCALL_lj_mem_newgco];
   IRRef args[2];
   RegSet allow = (RSET_GPR & ~RSET_SCRATCH);
+  RegSet drop = RSET_SCRATCH;
   lua_assert(sz != CTSIZE_INVALID);
 
   args[0] = ASMREF_L;     /* lua_State *L */
   args[1] = ASMREF_TMP1;  /* MSize size   */
   as->gcsteps++;
-  asm_setupresult(as, ir, ci);  /* GCcdata * */
+
+  if (ra_hasreg(ir->r))
+    rset_clear(drop, ir->r);  /* Dest reg handled below. */
+  ra_evictset(as, drop);
+  if (ra_used(ir))
+    ra_destreg(as, ir, RID_RET);  /* GCcdata * */
 
   /* Initialize immutable cdata object. */
   if (ir->o == IR_CNEWI) {
@@ -1280,7 +1223,7 @@ static void asm_fpmin_max(ASMState *as, IRIns *ir, int cc)
   ra_evictset(as, drop);
   ra_destpair(as, ir);
   emit_dm(as, ARMF_CC(ARMI_MOV, cc), RID_RETHI, RID_R3);
-  emit_dm(as, ARMF_CC(ARMI_MOV, cc), RID_RET, RID_R2);
+  emit_dm(as, ARMF_CC(ARMI_MOV, cc), RID_RETLO, RID_R2);
   emit_call(as, (void *)ci->func);
   for (r = RID_R0; r <= RID_R3; r++)
     ra_leftov(as, r, args[r-RID_R0]);
@@ -1427,42 +1370,28 @@ static void asm_hiop(ASMState *as, IRIns *ir)
       asm_fpcomp(as, ir-1);
     return;
   } else if ((ir-1)->o == IR_MIN || (ir-1)->o == IR_MAX) {
-    if (uselo || usehi || !(as->flags & JIT_F_OPT_DCE)) {
-      as->curins--;  /* Always skip the loword min/max. */
+    as->curins--;  /* Always skip the loword min/max. */
+    if (uselo || usehi)
       asm_fpmin_max(as, ir-1, (ir-1)->o == IR_MIN ? CC_HI : CC_LO);
-    }
     return;
   }
-  if (!usehi && (as->flags & JIT_F_OPT_DCE))
-    return;  /* Skip unused hiword op for all remaining ops. */
+  if (!usehi) return;  /* Skip unused hiword op for all remaining ops. */
   switch ((ir-1)->o) {
 #if LJ_HASFFI
   case IR_ADD:
-    if (uselo) {
-      as->curins--;
-      asm_intop(as, ir, ARMI_ADC);
-      asm_intop(as, ir-1, ARMI_ADD|ARMI_S);
-    } else {
-      asm_intop(as, ir, ARMI_ADD);
-    }
+    as->curins--;
+    asm_intop(as, ir, ARMI_ADC);
+    asm_intop(as, ir-1, ARMI_ADD|ARMI_S);
     break;
   case IR_SUB:
-    if (uselo) {
-      as->curins--;
-      asm_intop(as, ir, ARMI_SBC);
-      asm_intop(as, ir-1, ARMI_SUB|ARMI_S);
-    } else {
-      asm_intop(as, ir, ARMI_SUB);
-    }
+    as->curins--;
+    asm_intop(as, ir, ARMI_SBC);
+    asm_intop(as, ir-1, ARMI_SUB|ARMI_S);
     break;
   case IR_NEG:
-    if (uselo) {
-      as->curins--;
-      asm_intneg(as, ir, ARMI_RSC);
-      asm_intneg(as, ir-1, ARMI_RSB|ARMI_S);
-    } else {
-      asm_intneg(as, ir, ARMI_RSB);
-    }
+    as->curins--;
+    asm_intneg(as, ir, ARMI_RSC);
+    asm_intneg(as, ir-1, ARMI_RSB|ARMI_S);
     break;
 #endif
   case IR_SLOAD: case IR_ALOAD: case IR_HLOAD: case IR_ULOAD: case IR_VLOAD:
@@ -1474,7 +1403,7 @@ static void asm_hiop(ASMState *as, IRIns *ir)
   case IR_CALLS:
   case IR_CALLXS:
     if (!uselo)
-      ra_allocref(as, ir->op1, RID2RSET(RID_RET));  /* Mark lo op as used. */
+      ra_allocref(as, ir->op1, RID2RSET(RID_RETLO));  /* Mark lo op as used. */
     break;
   case IR_ASTORE: case IR_HSTORE: case IR_USTORE:
   case IR_TOSTR: case IR_CNEWI:
@@ -1493,9 +1422,9 @@ static void asm_stack_check(ASMState *as, BCReg topslot,
   Reg pbase;
   uint32_t k;
   if (irp) {
-    exitno = as->T->nsnap;  /* Highest exit + 1 indicates stack check. */
-    if (ra_hasreg(irp->r)) {
+    if (!ra_hasspill(irp->s)) {
       pbase = irp->r;
+      lua_assert(ra_hasreg(pbase));
     } else if (allow) {
       pbase = rset_pickbot(allow);
     } else {
@@ -1514,14 +1443,11 @@ static void asm_stack_check(ASMState *as, BCReg topslot,
 	   (int32_t)offsetof(lua_State, maxstack));
   if (irp) {  /* Must not spill arbitrary registers in head of side trace. */
     int32_t i = i32ptr(&J2G(as->J)->jit_L);
-    if (ra_noreg(irp->r)) {
-      lua_assert(ra_hasspill(irp->s));
-      emit_lso(as, ARMI_LDR, RID_RET, RID_SP, sps_scale(irp->s));
-    }
+    if (ra_hasspill(irp->s))
+      emit_lso(as, ARMI_LDR, pbase, RID_SP, sps_scale(irp->s));
     emit_lso(as, ARMI_LDR, RID_TMP, RID_TMP, (i & 4095));
-    if (ra_noreg(irp->r)) {
+    if (ra_hasspill(irp->s) && !allow)
       emit_lso(as, ARMI_STR, RID_RET, RID_SP, 0);  /* Save temp. register. */
-    }
     emit_loadi(as, RID_TMP, (i & ~4095));
   } else {
     emit_getgl(as, RID_TMP, jit_L);
@@ -1532,8 +1458,8 @@ static void asm_stack_check(ASMState *as, BCReg topslot,
 static void asm_stack_restore(ASMState *as, SnapShot *snap)
 {
   SnapEntry *map = &as->T->snapmap[snap->mapofs];
+  SnapEntry *flinks = &as->T->snapmap[snap_nextofs(as->T, snap)-1];
   MSize n, nent = snap->nent;
-  SnapEntry *flinks = map + nent + snap->depth;
   /* Store the value of all modified slots to the Lua stack. */
   for (n = 0; n < nent; n++) {
     SnapEntry sn = map[n];
@@ -1681,8 +1607,7 @@ static void asm_tail_fixup(ASMState *as, TraceNo lnk)
     p[-2] = (ARMI_ADD^k) | ARMF_D(RID_SP) | ARMF_N(RID_SP);
   }
   /* Patch exit branch. */
-  target = lnk == TRACE_INTERP ? (MCode *)lj_vm_exit_interp :
-				 traceref(as->J, lnk)->mcode;
+  target = lnk ? traceref(as->J, lnk)->mcode : (MCode *)lj_vm_exit_interp;
   p[-1] = ARMI_B|(((target-p)-1)&0x00ffffffu);
 }
 
@@ -1816,7 +1741,7 @@ static Reg asm_setup_call_slots(ASMState *as, IRIns *ir, const CCallInfo *ci)
   int nslots = 0, ngpr = REGARG_NUMGPR;
   asm_collectargs(as, ir, ci, args);
   for (i = 0; i < nargs; i++)
-    if (!LJ_SOFTFP && irt_isfp(IR(args[i])->t)) {
+    if (!LJ_SOFTFP && args[i] && irt_isnum(IR(args[i])->t)) {
       ngpr &= ~1;
       if (ngpr > 0) ngpr -= 2; else nslots += 2;
     } else {
@@ -1854,7 +1779,7 @@ void lj_asm_patchexit(jit_State *J, GCtrace *T, ExitNo exitno, MCode *target)
     }
   }
   lua_assert(cstart != NULL);
-  asm_cache_flush(cstart, cend);
+  lj_mcode_sync(cstart, cend);
   lj_mcode_patch(J, mcarea, 1);
 }
 

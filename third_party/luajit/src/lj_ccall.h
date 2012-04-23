@@ -7,6 +7,7 @@
 #define _LJ_CCALL_H
 
 #include "lj_obj.h"
+#include "lj_ctype.h"
 
 #if LJ_HASFFI
 
@@ -53,9 +54,21 @@ typedef intptr_t GPRArg;
 #define CCALL_NARG_FPR		0
 #define CCALL_NRET_GPR		2	/* For softfp double. */
 #define CCALL_NRET_FPR		0
-#define CCALL_SPS_FREE		0	/* NYI */
+#define CCALL_SPS_FREE		0
 
 typedef intptr_t GPRArg;
+
+#elif LJ_TARGET_PPC
+
+#define CCALL_NARG_GPR		8
+#define CCALL_NARG_FPR		8
+#define CCALL_NRET_GPR		4	/* For complex double. */
+#define CCALL_NRET_FPR		1
+#define CCALL_SPS_EXTRA		4
+#define CCALL_SPS_FREE		0
+
+typedef intptr_t GPRArg;
+typedef double FPRArg;
 
 #elif LJ_TARGET_PPCSPE
 
@@ -68,7 +81,7 @@ typedef intptr_t GPRArg;
 typedef intptr_t GPRArg;
 
 #else
-#error "missing calling convention definitions for this architecture"
+#error "Missing calling convention definitions for this architecture"
 #endif
 
 #ifndef CCALL_SPS_EXTRA
@@ -86,6 +99,10 @@ typedef intptr_t GPRArg;
 #define CCALL_NUM_FPR \
   (CCALL_NARG_FPR > CCALL_NRET_FPR ? CCALL_NARG_FPR : CCALL_NRET_FPR)
 
+/* Check against constants in lj_ctype.h. */
+LJ_STATIC_ASSERT(CCALL_NUM_GPR <= CCALL_MAX_GPR);
+LJ_STATIC_ASSERT(CCALL_NUM_FPR <= CCALL_MAX_FPR);
+
 #define CCALL_MAXSTACK		32
 
 /* -- C call state -------------------------------------------------------- */
@@ -100,8 +117,13 @@ typedef struct CCallState {
   uint8_t nfpr;			/* Number of arguments in FPRs. */
 #elif LJ_TARGET_X86
   uint8_t resx87;		/* Result on x87 stack: 1:float, 2:double. */
+#elif LJ_TARGET_PPC
+  uint8_t nfpr;			/* Number of arguments in FPRs. */
 #endif
 #if CCALL_NUM_FPR
+#if LJ_32
+  int32_t align1;
+#endif
   FPRArg fpr[CCALL_NUM_FPR];	/* Arguments/results in FPRs. */
 #endif
   GPRArg gpr[CCALL_NUM_GPR];	/* Arguments/results in GPRs. */
@@ -112,6 +134,8 @@ typedef struct CCallState {
 
 /* Really belongs to lj_vm.h. */
 LJ_ASMF void LJ_FASTCALL lj_vm_ffi_call(CCallState *cc);
+
+LJ_FUNC CTypeID lj_ccall_ctid_vararg(CTState *cts, cTValue *o);
 LJ_FUNC int lj_ccall_func(lua_State *L, GCcdata *cd);
 
 #endif

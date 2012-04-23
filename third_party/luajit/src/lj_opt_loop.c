@@ -104,7 +104,7 @@
 static void loop_emit_phi(jit_State *J, IRRef1 *subst, IRRef1 *phi, IRRef nphi,
 			  SnapNo onsnap)
 {
-  int pass2 = 0;
+  int passx = 0;
   IRRef i, nslots;
   IRRef invar = J->chain[IR_LOOP];
   /* Pass #1: mark redundant and potentially redundant PHIs. */
@@ -116,16 +116,28 @@ static void loop_emit_phi(jit_State *J, IRRef1 *subst, IRRef1 *phi, IRRef nphi,
     } else if (!(IR(rref)->op1 == lref || IR(rref)->op2 == lref)) {
       /* Quick check for simple recurrences failed, need pass2. */
       irt_setmark(IR(lref)->t);
-      pass2 = 1;
+      passx = 1;
     }
   }
   /* Pass #2: traverse variant part and clear marks of non-redundant PHIs. */
-  if (pass2) {
+  if (passx) {
     SnapNo s;
     for (i = J->cur.nins-1; i > invar; i--) {
       IRIns *ir = IR(i);
-      if (!irref_isk(ir->op1)) irt_clearmark(IR(ir->op1)->t);
       if (!irref_isk(ir->op2)) irt_clearmark(IR(ir->op2)->t);
+      if (!irref_isk(ir->op1)) {
+	irt_clearmark(IR(ir->op1)->t);
+	if (ir->op1 < invar &&
+	    ir->o >= IR_CALLN && ir->o <= IR_CARG) {  /* ORDER IR */
+	  ir = IR(ir->op1);
+	  while (ir->o == IR_CARG) {
+	    if (!irref_isk(ir->op2)) irt_clearmark(IR(ir->op2)->t);
+	    if (irref_isk(ir->op1)) break;
+	    ir = IR(ir->op1);
+	    irt_clearmark(ir->t);
+	  }
+	}
+      }
     }
     for (s = J->cur.nsnap-1; s >= onsnap; s--) {
       SnapShot *snap = &J->cur.snap[s];
@@ -155,7 +167,27 @@ static void loop_emit_phi(jit_State *J, IRRef1 *subst, IRRef1 *phi, IRRef nphi,
 	break;
     }
   }
-  /* Pass #4: emit PHI instructions or eliminate PHIs. */
+  /* Pass #4: propagate non-redundant PHIs. */
+  while (passx) {
+    passx = 0;
+    for (i = 0; i < nphi; i++) {
+      IRRef lref = phi[i];
+      IRIns *ir = IR(lref);
+      if (!irt_ismarked(ir->t)) {  /* Propagate only from unmarked PHIs. */
+	IRRef rref = subst[lref];
+	if (lref == rref) {  /* Mark redundant PHI. */
+	  irt_setmark(ir->t);
+	} else {
+	  IRIns *irr = IR(rref);
+	  if (irt_ismarked(irr->t)) {  /* Right ref points to other PHI? */
+	    irt_clearmark(irr->t);  /* Mark that PHI as non-redundant. */
+	    passx = 1;  /* Retry. */
+	  }
+	}
+      }
+    }
+  }
+  /* Pass #5: emit PHI instructions or eliminate PHIs. */
   for (i = 0; i < nphi; i++) {
     IRRef lref = phi[i];
     IRIns *ir = IR(lref);
@@ -178,7 +210,8 @@ static void loop_subst_snap(jit_State *J, SnapShot *osnap,
 			    SnapEntry *loopmap, IRRef1 *subst)
 {
   SnapEntry *nmap, *omap = &J->cur.snapmap[osnap->mapofs];
-  MSize nmapofs, depth;
+  SnapEntry *nextmap = &J->cur.snapmap[snap_nextofs(&J->cur, osnap)];
+  MSize nmapofs;
   MSize on, ln, nn, onent = osnap->nent;
   BCReg nslots = osnap->nslots;
   SnapShot *snap = &J->cur.snap[J->cur.nsnap];
@@ -190,12 +223,11 @@ static void loop_subst_snap(jit_State *J, SnapShot *osnap,
     nmapofs = snap->mapofs;
   }
   J->guardemit.irt = 0;
-  depth = osnap->depth;
   /* Setup new snapshot. */
   snap->mapofs = (uint16_t)nmapofs;
   snap->ref = (IRRef1)J->cur.nins;
-  snap->depth = (uint8_t)depth;
   snap->nslots = nslots;
+  snap->topslot = osnap->topslot;
   snap->count = 0;
   nmap = &J->cur.snapmap[nmapofs];
   /* Substitute snapshot slots. */
@@ -216,11 +248,11 @@ static void loop_subst_snap(jit_State *J, SnapShot *osnap,
   while (snap_slot(loopmap[ln]) < nslots)  /* Copy remaining loop slots. */
     nmap[nn++] = loopmap[ln++];
   snap->nent = (uint8_t)nn;
-  J->cur.nsnapmap = (uint16_t)(nmapofs + nn + 1 + depth);
   omap += onent;
   nmap += nn;
-  for (nn = 0; nn <= depth; nn++)  /* Copy PC + frame links. */
-    nmap[nn] = omap[nn];
+  while (omap < nextmap)  /* Copy PC + frame links. */
+    *nmap++ = *omap++;
+  J->cur.nsnapmap = (uint16_t)(nmap - J->cur.snapmap);
 }
 
 /* Unroll loop. */
@@ -300,13 +332,24 @@ static void loop_unroll(jit_State *J)
 	}
 	/* Check all loop-carried dependencies for type instability. */
 	if (!irt_sametype(t, irr->t)) {
-	  if (irt_isnum(t) && irt_isinteger(irr->t))  /* Fix int->num. */
-	    subst[ins] = tref_ref(emitir(IRTN(IR_CONV), ref, IRCONV_NUM_INT));
+	  if (irt_isinteger(t) && irt_isinteger(irr->t))
+	    continue;
+	  else if (irt_isnum(t) && irt_isinteger(irr->t))  /* Fix int->num. */
+	    ref = tref_ref(emitir(IRTN(IR_CONV), ref, IRCONV_NUM_INT));
 	  else if (irt_isnum(irr->t) && irt_isinteger(t))  /* Fix num->int. */
-	    subst[ins] = tref_ref(emitir(IRTGI(IR_CONV), ref,
-					 IRCONV_INT_NUM|IRCONV_CHECK));
-	  else if (!(irt_isinteger(t) && irt_isinteger(irr->t)))
+	    ref = tref_ref(emitir(IRTGI(IR_CONV), ref,
+				  IRCONV_INT_NUM|IRCONV_CHECK));
+	  else
 	    lj_trace_err(J, LJ_TRERR_TYPEINS);
+	  subst[ins] = (IRRef1)ref;
+	  /* May need a PHI for the CONV, too. */
+	  irr = IR(ref);
+	  if (ref < invar && !irref_isk(ref) && !irt_isphi(irr->t)) {
+	    irt_setphi(irr->t);
+	    if (nphi >= LJ_MAX_PHI)
+	      lj_trace_err(J, LJ_TRERR_PHIOV);
+	    phi[nphi++] = (IRRef1)ref;
+	  }
 	}
       }
     }
@@ -320,13 +363,13 @@ static void loop_unroll(jit_State *J)
 }
 
 /* Undo any partial changes made by the loop optimization. */
-static void loop_undo(jit_State *J, IRRef ins, SnapNo nsnap)
+static void loop_undo(jit_State *J, IRRef ins, SnapNo nsnap, MSize nsnapmap)
 {
   ptrdiff_t i;
   SnapShot *snap = &J->cur.snap[nsnap-1];
   SnapEntry *map = J->cur.snapmap;
   map[snap->mapofs + snap->nent] = map[J->cur.snap[0].nent];  /* Restore PC. */
-  J->cur.nsnapmap = (uint16_t)(snap->mapofs + snap->nent + 1 + snap->depth);
+  J->cur.nsnapmap = (uint16_t)nsnapmap;
   J->cur.nsnap = nsnap;
   J->guardemit.irt = 0;
   lj_ir_rollback(J, ins);
@@ -355,6 +398,7 @@ int lj_opt_loop(jit_State *J)
 {
   IRRef nins = J->cur.nins;
   SnapNo nsnap = J->cur.nsnap;
+  MSize nsnapmap = J->cur.nsnapmap;
   int errcode = lj_vm_cpcall(J->L, NULL, J, cploop_opt);
   if (LJ_UNLIKELY(errcode)) {
     lua_State *L = J->L;
@@ -367,7 +411,7 @@ int lj_opt_loop(jit_State *J)
 	if (--J->instunroll < 0)  /* But do not unroll forever. */
 	  break;
 	L->top--;  /* Remove error object. */
-	loop_undo(J, nins, nsnap);
+	loop_undo(J, nins, nsnap, nsnapmap);
 	return 1;  /* Loop optimization failed, continue recording. */
       default:
 	break;

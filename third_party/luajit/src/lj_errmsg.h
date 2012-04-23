@@ -160,6 +160,8 @@ ERRDEF(FFI_BADMEMBER,	LUA_QS " has no member named " LUA_QS)
 ERRDEF(FFI_BADIDX,	LUA_QS " cannot be indexed")
 ERRDEF(FFI_WRCONST,	"attempt to write to constant location")
 ERRDEF(FFI_NODECL,	"missing declaration for symbol " LUA_QS)
+ERRDEF(FFI_BADCBACK,	"bad callback")
+ERRDEF(FFI_CBACKOV,	"too many callbacks")
 ERRDEF(FFI_NYIPACKBIT,	"NYI: packed bit fields")
 ERRDEF(FFI_NYICALL,	"NYI: cannot call this C function (yet)")
 #endif
