@@ -17,7 +17,8 @@ add_custom_command(
             -H ${CMAKE_SOURCE_DIR}/cfg/prscfg.h
             -p ${CMAKE_SOURCE_DIR}/cfg/prscfg.c
     COMMAND ${CMAKE_COMMAND} -E remove tmp.cfg
-    DEPENDS tmp.cfg ${CMAKE_SOURCE_DIR}/cfg/warning.h)
+    DEPENDS ${CMAKE_SOURCE_DIR}/cfg/warning.h)
+# ${CMAKE_SOURCE_DIR}/cfg/core_cfg.cfg_tmpl
 
 #
 # Optionally rebuild the configuration file parsing code from
@@ -67,7 +68,7 @@ add_library(cfg prscfg.c warning.c)
 # See http://www.cmake.org/Bug/view.php?id=10082 for details.
 #
 add_custom_target(config
-    DEPENDS ${CMAKE_SOURCE_DIR}/cfg/prscfg.h ${generated_headers} tmp.cfg)
+    DEPENDS ${CMAKE_SOURCE_DIR}/cfg/prscfg.h ${generated_headers})
 
 
 add_dependencies(cfg libluajit)
