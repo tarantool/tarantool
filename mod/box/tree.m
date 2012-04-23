@@ -866,7 +866,8 @@ tree_iterator_free(struct iterator *iterator)
 - (struct box_tuple *) find: (void *) key : (int) key_cardinality
 {
 	struct key_data *key_data
-		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(1));
+		= alloca(sizeof(struct key_data) +
+			 _SIZEOF_SPARSE_PARTS(key_cardinality));
 
 	if (key_cardinality > key_def->part_count)
 		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
