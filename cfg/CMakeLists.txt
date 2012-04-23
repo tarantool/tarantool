@@ -18,7 +18,6 @@ add_custom_command(
             -p ${CMAKE_SOURCE_DIR}/cfg/prscfg.c
     COMMAND ${CMAKE_COMMAND} -E remove tmp.cfg
     DEPENDS ${CMAKE_SOURCE_DIR}/cfg/warning.h)
-# ${CMAKE_SOURCE_DIR}/cfg/core_cfg.cfg_tmpl
 
 #
 # Optionally rebuild the configuration file parsing code from
