@@ -4,7 +4,7 @@
 
 **Q. Why Tarantool?**
 
-A. Tarantool is a result of a long trial and error process within Mail.Ru. It's an Nth generation of a family of custom in-memory data servers, developed for various web applications. Besides, when Tarantool development started (2008) there were no stable and sufficiently functional open source alternative.
+A. Tarantool is a result of a long trial and error process within Mail.Ru. It's the Nth generation of a family of custom in-memory data servers, developed for various web applications. Besides, when Tarantool development started (2008) there were no stable and sufficiently functional open source alternative.
 
 ** Q. Why Lua?**
 
