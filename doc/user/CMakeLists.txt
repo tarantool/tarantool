@@ -11,7 +11,7 @@ set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt"
 # jing http://docbook.org/xml/5.0/rng/docbookxi.rng file.xml
 #
 if (NOT XMLLINT STREQUAL "XMLLINT-NOTFOUND")
-    add_custom_target(check ALL
+    add_custom_target(doc-check ALL
         COMMAND ${XMLLINT} --xinclude --noout --relaxng http://docbook.org/xml/5.0/rng/docbookxi.rng user.xml)
 endif()
 
@@ -36,8 +36,13 @@ if (NOT XSLTPROC STREQUAL "XSLTPROC-NOTFOUND" AND
     NOT LYNX STREQUAL "LYNX-NOTFOUND")
     add_custom_target(doc-autogen ALL
         DEPENDS ${PATH_USERGUIDE_HTML} ${PATH_USERGUIDE_TXT})
-    install (FILES ${PATH_USERGUIDE_HTML}
-        ${PATH_USERGUIDE_TXT} DESTINATION share/doc/tarantool)
+    if ("${CPACK_GENERATOR}" STREQUAL "RPM")
+        install (FILES ${PATH_USERGUIDE_HTML}
+            ${PATH_USERGUIDE_TXT} DESTINATION /usr/local/doc/tarantool)
+    else()
+        install (FILES ${PATH_USERGUIDE_HTML}
+            ${PATH_USERGUIDE_TXT} DESTINATION share/doc/tarantool)
+    endif()
 endif()
 
 add_custom_target(pdf

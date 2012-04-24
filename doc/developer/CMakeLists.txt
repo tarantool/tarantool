@@ -3,7 +3,7 @@ set(PATH_DEVGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www-data/tarantool_developer_g
 set(PATH_DEVGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/developer/tarantool_developer_guide.txt")
 
 if (NOT JING STREQUAL "JING-NOTFOUND")
-    add_custom_target(dev-check ALL
+    add_custom_target(doc-check-dev ALL
         COMMAND ${JING} http://docbook.org/xml/5.0/rng/docbookxi.rng developer.xml)
 endif()
 
@@ -25,6 +25,11 @@ if (NOT XSLTPROC STREQUAL "XSLTPROC-NOTFOUND" AND
     NOT LYNX STREQUAL "LYNX-NOTFOUND")
     add_custom_target(doc-autogen-dev ALL
         DEPENDS ${PATH_DEVGUIDE_HTML} ${PATH_DEVGUIDE_TXT})
-    install (FILES ${PATH_DEVGUIDE_HTML}
-        ${PATH_DEVGUIDE_TXT} DESTINATION share/doc/tarantool)
+    if ("${CPACK_GENERATOR}" STREQUAL "RPM")
+        install (FILES ${PATH_DEVGUIDE_HTML}
+            ${PATH_DEVGUIDE_TXT} DESTINATION /usr/local/doc/tarantool)
+    else()
+        install (FILES ${PATH_DEVGUIDE_HTML}
+            ${PATH_DEVGUIDE_TXT} DESTINATION share/doc/tarantool)
+    endif()
 endif()
