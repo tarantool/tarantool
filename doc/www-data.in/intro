@@ -29,7 +29,7 @@ Tarantool supports replication. Replicas may run locally or on a remote host. Ta
 <span class="strong"><strong>The software is
 production-ready</strong></span>. Tarantool has been developed and is
 actively used at <em><a href="http://api.mail.ru">Mail.Ru</a></em> one of
-the leading Russian web content providers, since 2008. At Mail.Ru, the sowtware serves the <span class="quote">&#8220;<span class="quote">hottest</span>&#8221;</span> data, such as online users and their sessions, online application properties, the map between users and their serving shards.
+the leading Russian web content providers, since 2008. At Mail.Ru, the software serves the <span class="quote">&#8220;<span class="quote">hottest</span>&#8221;</span> data, such as online users and their sessions, online application properties, the map between users and their serving shards.
 
 To conclude, Tarantool/Box is ideal for highly volatile and/or highly accessed Web data. With Tarantool, performance overhead on serving data is minimal: a single server can easily deal with tens or even hundreds of thousands of requests per second. Snapshots can be made when Web user activity is at its lowest, for example at night, and thus add little or no restraint on the top throughput of the system.  If the master becomes unavailable, a replica can assume the role of the master with minimal downtime.
 

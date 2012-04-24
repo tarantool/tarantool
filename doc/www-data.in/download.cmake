@@ -21,7 +21,6 @@ packages contain asserts and are compiled without optimization.
 To simplify problem analysis and avoid various bugs induced 
 by compilation parameters and environment, it is recommended
 that production systems use the builds provided on this site.
-
 The latest build can be found below.
 
 <table border=1 title="Download the latest build, @TARANTOOL_VERSION@" width=100%> 
@@ -142,8 +141,7 @@ The latest build can be found below.
 
 ### All downloads
 
-An archive of old releases can be found at <a
-href="http://tarantool.org/dist">here</a>.
+An archive of old releases can be found <a href="http://tarantool.org/dist">here</a>.
 
 ### Connectors
 
