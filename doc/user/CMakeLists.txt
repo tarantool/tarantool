@@ -12,7 +12,8 @@ set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt"
 #
 if (NOT XMLLINT STREQUAL "XMLLINT-NOTFOUND")
     add_custom_target(doc-check ALL
-        COMMAND ${XMLLINT} --xinclude --noout --relaxng http://docbook.org/xml/5.0/rng/docbookxi.rng user.xml)
+        COMMAND ${XMLLINT} --xinclude --noout --relaxng http://docbook.org/xml/5.0/rng/docbookxi.rng
+            ${CMAKE_SOURCE_DIR}/doc/user/user.xml)
 endif()
 
 #
@@ -22,8 +23,8 @@ add_custom_command(OUTPUT ${PATH_USERGUIDE_HTML}
     COMMAND ${XSLTPROC} --nonet
         --stringparam collect.xref.targets "all"
         --xinclude -o ${PATH_USERGUIDE_HTML}
-        tnt-html.xsl
-        user.xml)
+        ${CMAKE_SOURCE_DIR}/doc/user/tnt-html.xsl
+        ${CMAKE_SOURCE_DIR}/doc/user/user.xml)
 
 add_custom_command(OUTPUT ${PATH_USERGUIDE_TXT}
     DEPENDS ${PATH_USERGUIDE_HTML}
@@ -49,16 +50,16 @@ add_custom_target(pdf
     COMMAND ${XSLTPROC} --nonet
         --stringparam collect.xref.targets "all"
         --xinclude -o tarantool_user_guide.fo
-        tnt-fo.xsl
-        user.xml
+        ${CMAKE_SOURCE_DIR}/doc/user/tnt-fo.xsl
+        ${CMAKE_SOURCE_DIR}/doc/user/user.xml
     COMMAND fop tarantool_user_guide.fo tarantool_user_guide.pdf)
 
 add_custom_target(relink
     COMMAND ${XSLTPROC} --nonet
         --stringparam collect.xref.targets "only"
         --xinclude -o ${PATH_USERGUIDE_HTML}
-        tnt-html.xsl
-        user.xml)
+        ${CMAKE_SOURCE_DIR}/doc/user/tnt-html.xsl
+        ${CMAKE_SOURCE_DIR}/doc/user/user.xml)
 
 #
 # Java saxon-based documentation generation (misc)

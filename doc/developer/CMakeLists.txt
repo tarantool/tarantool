@@ -4,7 +4,8 @@ set(PATH_DEVGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/developer/tarantool_developer_g
 
 if (NOT JING STREQUAL "JING-NOTFOUND")
     add_custom_target(doc-check-dev ALL
-        COMMAND ${JING} http://docbook.org/xml/5.0/rng/docbookxi.rng developer.xml)
+        COMMAND ${JING} http://docbook.org/xml/5.0/rng/docbookxi.rng
+            ${CMAKE_SOURCE_DIR}/doc/developer/developer.xml)
 endif()
 
 add_custom_command(OUTPUT ${PATH_DEVGUIDE_HTML}
@@ -12,7 +13,7 @@ add_custom_command(OUTPUT ${PATH_DEVGUIDE_HTML}
         --stringparam collect.xref.targets "all"
         --xinclude -o ${PATH_DEVGUIDE_HTML}
         ${CMAKE_SOURCE_DIR}/doc/user/tnt-html.xsl
-        developer.xml)
+        ${CMAKE_SOURCE_DIR}/doc/developer/developer.xml)
 
 add_custom_command(OUTPUT ${PATH_DEVGUIDE_TXT}
     DEPENDS ${PATH_DEVGUIDE_HTML}
