@@ -1,11 +1,30 @@
-add_custom_target(dev-html ALL
+
+set(PATH_DEVGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www-data/tarantool_developer_guide.html")
+set(PATH_DEVGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/developer/tarantool_developer_guide.txt")
+
+if (NOT JING STREQUAL "JING-NOTFOUND")
+    add_custom_target(dev-check ALL
+        COMMAND ${JING} http://docbook.org/xml/5.0/rng/docbookxi.rng developer.xml)
+endif()
+
+add_custom_command(OUTPUT ${PATH_DEVGUIDE_HTML}
     COMMAND ${XSLTPROC} --nonet
         --stringparam collect.xref.targets "all"
-        --xinclude -o ${PROJECT_BINARY_DIR}/doc/www-data/tarantool_developer_guide.html
+        --xinclude -o ${PATH_DEVGUIDE_HTML}
         ${CMAKE_SOURCE_DIR}/doc/user/tnt-html.xsl
         developer.xml)
 
-add_custom_target(dev-check ALL
-	COMMAND jing http://docbook.org/xml/5.0/rng/docbookxi.rng developer.xml
-    )
+add_custom_command(OUTPUT ${PATH_DEVGUIDE_TXT}
+    DEPENDS ${PATH_DEVGUIDE_HTML}
+    COMMAND ${LYNX} -dump ${PATH_DEVGUIDE_HTML} > ${PATH_DEVGUIDE_TXT})
 
+add_custom_target(dev-html DEPENDS ${PATH_DEVGUIDE_HTML})
+add_custom_target(dev-txt  DEPENDS ${PATH_DEVGUIDE_TXT})
+
+if (NOT XSLTPROC STREQUAL "XSLTPROC-NOTFOUND" AND
+    NOT LYNX STREQUAL "LYNX-NOTFOUND")
+    add_custom_target(doc-autogen-dev ALL
+        DEPENDS ${PATH_DEVGUIDE_HTML} ${PATH_DEVGUIDE_TXT})
+    install (FILES ${PATH_DEVGUIDE_HTML}
+        ${PATH_DEVGUIDE_TXT} DESTINATION share/doc/tarantool)
+endif()
