@@ -5,3 +5,4 @@ CMakeFiles
 cmake_install.cmake
 download.cmake
 Makefile
+.*.swp
