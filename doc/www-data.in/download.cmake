@@ -4,9 +4,9 @@
 
 Tarantool/Box uses a 3-digit versioning scheme
 &lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;.
-Major digits change rarely. A minor version increase
-indicates an incompatibile change. Minor version change happens
-when the source tree receives a few important bugfixes.
+Major digits change rarely. A minor version increase indicates one
+or few incompatibile changes. Patch verison counter is increased
+whenever the source tree receives a few important bugfixes.
 
 The version string may also contain a git revision id, to ease
 identification of the unqiue commit used to generate the build.
