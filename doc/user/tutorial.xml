@@ -69,14 +69,16 @@
   <computeroutput>
   ---
   info:
-    version: "1.4.0-17-g50c60ae"
+    version: "1.4.5"
     uptime: 548
     pid: 3459
-    wal_writer_pid: 3461
+    logger_pid: 3461
     lsn: 1
     recovery_lag: 0.000
     recovery_last_update: 0.000
-    status: primary</computeroutput></programlisting>
+    status: primary
+    config: "/home/kostja/tarantool/etc/tarantool.cfg"
+    </computeroutput></programlisting>
 </para>
 <para>
   <bridgehead renderas="sect2">Compiling from source</bridgehead>

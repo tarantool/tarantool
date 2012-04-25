@@ -220,15 +220,15 @@ fail: can't save snapshot, errno 17 (File exists)
 localhost> show info
 ---
 info:
-  version: "1.4.4"
+  version: "1.4.5-128-ga91962c"
   uptime: 441524
-  pid: 16180
-  wal_writer_pid: 16182
+  pid: 12315
+  logger_pid: 12316
   lsn: 15481913304
   recovery_lag: 0.000
   recovery_last_update: 1306964594.980
   status: primary
-  config: /usr/local/etc/tarantool.cfg
+  config: "/usr/local/etc/tarantool.cfg"
 </programlisting>
       </para>
       <para>
