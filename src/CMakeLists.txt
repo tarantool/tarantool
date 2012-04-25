@@ -41,15 +41,15 @@ target_link_libraries(ev m rt)
 # require engineers who do not modify .rl files to have Ragel
 # installed.
 #
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/core/admin.m
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/admin.m
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMAND ${RAGEL} -G2 core/admin.rl -o core/admin.m
-    DEPENDS ${CMAKE_SOURCE_DIR}/core/admin.rl)
+    COMMAND ${RAGEL} -G2 src/admin.rl -o src/admin.m
+    DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.rl)
 
-add_custom_target(generate_admin_m DEPENDS ${CMAKE_SOURCE_DIR}/core/admin.m)
+add_custom_target(generate_admin_m DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.m)
 # do not randomly try to re-generate admin.m after a fresh checkout
 execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
-    ${CMAKE_SOURCE_DIR}/core/admin.m)
+    ${CMAKE_SOURCE_DIR}/src/admin.m)
 
 #
 # Do not clean admin.m, memcached.m or other
@@ -64,14 +64,14 @@ set_source_files_properties(cpu_feature.m
 #
 # Used by modules.
 #
-set (recompiled_core_sources
-     ${CMAKE_SOURCE_DIR}/core/tarantool.m
-     ${CMAKE_SOURCE_DIR}/core/tarantool_lua.m
-     ${CMAKE_SOURCE_DIR}/core/say.m
-     ${CMAKE_SOURCE_DIR}/core/assoc.m
-     ${CMAKE_SOURCE_DIR}/core/admin.m
-     ${CMAKE_SOURCE_DIR}/core/replication.m
-     ${CMAKE_SOURCE_DIR}/core/fiber.m PARENT_SCOPE)
+set (recompiled_sources
+     ${CMAKE_SOURCE_DIR}/src/tarantool.m
+     ${CMAKE_SOURCE_DIR}/src/tarantool_lua.m
+     ${CMAKE_SOURCE_DIR}/src/say.m
+     ${CMAKE_SOURCE_DIR}/src/assoc.m
+     ${CMAKE_SOURCE_DIR}/src/admin.m
+     ${CMAKE_SOURCE_DIR}/src/replication.m
+     ${CMAKE_SOURCE_DIR}/src/fiber.m PARENT_SCOPE)
 
 set (common_sources tbuf.m palloc.m util.m
     salloc.m pickle.m coro.m stat.m log_io.m cpu_feature.m crc32.c

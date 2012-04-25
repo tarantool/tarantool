@@ -9,7 +9,7 @@ function(tarantool_module mod)
       ${module_sources}
       ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c)
 
-  add_library(lt${mod} STATIC ${recompiled_core_sources})
+  add_library(lt${mod} STATIC ${recompiled_sources})
   set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
     "${core_cflags} ${GCOV_C_FLAGS} -DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
   add_dependencies(lt${mod} generate_headers generate_admin_m)
