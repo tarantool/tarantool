@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-
+#
+# This script is used to build www.tarantool.org
+#
 import os
 import re
 import sys
