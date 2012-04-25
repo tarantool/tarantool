@@ -276,18 +276,26 @@ static GCtrace *jit_checktrace(lua_State *L)
   return NULL;
 }
 
+/* Names of link types. ORDER LJ_TRLINK */
+static const char *const jit_trlinkname[] = {
+  "none", "root", "loop", "tail-recursion", "up-recursion", "down-recursion",
+  "interpreter", "return"
+};
+
 /* local info = jit.util.traceinfo(tr) */
 LJLIB_CF(jit_util_traceinfo)
 {
   GCtrace *T = jit_checktrace(L);
   if (T) {
     GCtab *t;
-    lua_createtable(L, 0, 4);  /* Increment hash size if fields are added. */
+    lua_createtable(L, 0, 8);  /* Increment hash size if fields are added. */
     t = tabV(L->top-1);
     setintfield(L, t, "nins", (int32_t)T->nins - REF_BIAS - 1);
     setintfield(L, t, "nk", REF_BIAS - (int32_t)T->nk);
     setintfield(L, t, "link", T->link);
     setintfield(L, t, "nexit", T->nsnap);
+    setstrV(L, L->top++, lj_str_newz(L, jit_trlinkname[T->linktype]));
+    lua_setfield(L, -2, "linktype");
     /* There are many more fields. Add them only when needed. */
     return 1;
   }
@@ -369,15 +377,27 @@ LJLIB_CF(jit_util_tracemc)
   return 0;
 }
 
-/* local addr = jit.util.traceexitstub(idx) */
+/* local addr = jit.util.traceexitstub([tr,] exitno) */
 LJLIB_CF(jit_util_traceexitstub)
 {
+#ifdef EXITSTUBS_PER_GROUP
   ExitNo exitno = (ExitNo)lj_lib_checkint(L, 1);
   jit_State *J = L2J(L);
   if (exitno < EXITSTUBS_PER_GROUP*LJ_MAX_EXITSTUBGR) {
     setintptrV(L->top-1, (intptr_t)(void *)exitstub_addr(J, exitno));
     return 1;
   }
+#else
+  if (L->top > L->base+1) {  /* Don't throw for one-argument variant. */
+    GCtrace *T = jit_checktrace(L);
+    ExitNo exitno = (ExitNo)lj_lib_checkint(L, 2);
+    ExitNo maxexit = T->root ? T->nsnap+1 : T->nsnap;
+    if (T && T->mcode != NULL && exitno < maxexit) {
+      setintptrV(L->top-1, (intptr_t)(void *)exitstub_trace_addr(T, exitno));
+      return 1;
+    }
+  }
+#endif
   return 0;
 }
 
@@ -569,6 +589,7 @@ static uint32_t jit_cpudetect(lua_State *L)
 #endif
 #endif
 #elif LJ_TARGET_ARM
+#if LJ_HASJIT
   /* Compile-time ARM CPU detection. */
 #if __ARM_ARCH_7__ || __ARM_ARCH_7A__ || __ARM_ARCH_7R__
   flags |= JIT_F_ARMV6|JIT_F_ARMV6T2|JIT_F_ARMV7;
@@ -590,7 +611,8 @@ static uint32_t jit_cpudetect(lua_State *L)
     }
   }
 #endif
-#elif LJ_TARGET_PPC
+#endif
+#elif LJ_TARGET_PPC || LJ_TARGET_PPCSPE
   /* Nothing to do. */
 #else
 #error "Missing CPU detection for this architecture"

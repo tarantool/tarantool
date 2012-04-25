@@ -232,6 +232,7 @@ static int32_t kfold_intop(int32_t k1, int32_t k2, IROp op)
   case IR_SUB: k1 -= k2; break;
   case IR_MUL: k1 *= k2; break;
   case IR_MOD: k1 = lj_vm_modi(k1, k2); break;
+  case IR_NEG: k1 = -k1; break;
   case IR_BAND: k1 &= k2; break;
   case IR_BOR: k1 |= k2; break;
   case IR_BXOR: k1 ^= k2; break;
@@ -251,6 +252,7 @@ LJFOLD(ADD KINT KINT)
 LJFOLD(SUB KINT KINT)
 LJFOLD(MUL KINT KINT)
 LJFOLD(MOD KINT KINT)
+LJFOLD(NEG KINT KINT)
 LJFOLD(BAND KINT KINT)
 LJFOLD(BOR KINT KINT)
 LJFOLD(BXOR KINT KINT)
@@ -929,11 +931,11 @@ LJFOLDF(simplify_conv_int_i64)
   return NEXTFOLD;
 }
 
-LJFOLD(CONV CONV IRCONV_NUM_FLOAT)  /* _NUM */
+LJFOLD(CONV CONV IRCONV_FLOAT_NUM)  /* _FLOAT */
 LJFOLDF(simplify_conv_flt_num)
 {
   PHIBARRIER(fleft);
-  if ((fleft->op2 & IRCONV_SRCMASK) == IRT_NUM)
+  if ((fleft->op2 & IRCONV_SRCMASK) == IRT_FLOAT)
     return fleft->op1;
   return NEXTFOLD;
 }
@@ -965,6 +967,7 @@ LJFOLDF(simplify_floor_conv)
 
 /* Strength reduction of widening. */
 LJFOLD(CONV any IRCONV_I64_INT)
+LJFOLD(CONV any IRCONV_U64_INT)
 LJFOLDF(simplify_conv_sext)
 {
   IRRef ref = fins->op1;
@@ -1399,6 +1402,36 @@ LJFOLDF(simplify_shift2_ki)
   return NEXTFOLD;
 }
 
+LJFOLD(BSHL BAND KINT)
+LJFOLD(BSHR BAND KINT)
+LJFOLD(BROL BAND KINT)
+LJFOLD(BROR BAND KINT)
+LJFOLDF(simplify_shiftk_andk)
+{
+  IRIns *irk = IR(fleft->op2);
+  PHIBARRIER(fleft);
+  if (irk->o == IR_KINT) {  /* (i & k1) o k2 ==> (i o k2) & (k1 o k2) */
+    int32_t k = kfold_intop(irk->i, fright->i, (IROp)fins->o);
+    fins->op1 = fleft->op1;
+    fins->op1 = (IRRef1)lj_opt_fold(J);
+    fins->op2 = (IRRef1)lj_ir_kint(J, k);
+    fins->ot = IRTI(IR_BAND);
+    return RETRYFOLD;
+  }
+  return NEXTFOLD;
+}
+
+LJFOLD(BAND BSHL KINT)
+LJFOLD(BAND BSHR KINT)
+LJFOLDF(simplify_andk_shiftk)
+{
+  IRIns *irk = IR(fleft->op2);
+  if (irk->o == IR_KINT &&
+      kfold_intop(-1, irk->i, (IROp)fleft->o) == fright->i)
+    return LEFTFOLD;  /* (i o k1) & k2 ==> i, if (-1 o k1) == k2 */
+  return NEXTFOLD;
+}
+
 /* -- Reassociation ------------------------------------------------------- */
 
 LJFOLD(ADD ADD KINT)
@@ -1450,7 +1483,6 @@ LJFOLD(BAND BAND any)
 LJFOLD(BOR BOR any)
 LJFOLDF(reassoc_dup)
 {
-  PHIBARRIER(fleft);
   if (fins->op2 == fleft->op1 || fins->op2 == fleft->op2)
     return LEFTFOLD;  /* (a o b) o a ==> a o b; (a o b) o b ==> a o b */
   return NEXTFOLD;

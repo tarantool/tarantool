@@ -114,9 +114,12 @@
 |.if not X64		// x86 stack layout.
 |
 |.define CFRAME_SPACE,	aword*7			// Delta for esp (see <--).
-|.macro saveregs
-|  push ebp; push edi; push esi; push ebx
+|.macro saveregs_
+|  push edi; push esi; push ebx
 |  sub esp, CFRAME_SPACE
+|.endmacro
+|.macro saveregs
+|  push ebp; saveregs_
 |.endmacro
 |.macro restoreregs
 |  add esp, CFRAME_SPACE
@@ -166,9 +169,12 @@
 |.elif X64WIN		// x64/Windows stack layout
 |
 |.define CFRAME_SPACE,	aword*5			// Delta for rsp (see <--).
-|.macro saveregs
-|  push rbp; push rdi; push rsi; push rbx
+|.macro saveregs_
+|  push rdi; push rsi; push rbx
 |  sub rsp, CFRAME_SPACE
+|.endmacro
+|.macro saveregs
+|  push rbp; saveregs_
 |.endmacro
 |.macro restoreregs
 |  add rsp, CFRAME_SPACE
@@ -206,9 +212,12 @@
 |.else			// x64/POSIX stack layout
 |
 |.define CFRAME_SPACE,	aword*5			// Delta for rsp (see <--).
-|.macro saveregs
-|  push rbp; push rbx; push r15; push r14
+|.macro saveregs_
+|  push rbx; push r15; push r14
 |  sub rsp, CFRAME_SPACE
+|.endmacro
+|.macro saveregs
+|  push rbp; saveregs_
 |.endmacro
 |.macro restoreregs
 |  add rsp, CFRAME_SPACE
@@ -333,16 +342,16 @@
 |  mov reg, PC
 |  shr reg, 1
 |  and reg, HOTCOUNT_PCMASK
-|  sub word [DISPATCH+reg+GG_DISP2HOT], 1
-|  jz ->vm_hotloop
+|  sub word [DISPATCH+reg+GG_DISP2HOT], HOTCOUNT_LOOP
+|  jb ->vm_hotloop
 |.endmacro
 |
 |.macro hotcall, reg
 |  mov reg, PC
 |  shr reg, 1
 |  and reg, HOTCOUNT_PCMASK
-|  sub word [DISPATCH+reg+GG_DISP2HOT], 1
-|  jz ->vm_hotcall
+|  sub word [DISPATCH+reg+GG_DISP2HOT], HOTCOUNT_CALL
+|  jb ->vm_hotcall
 |.endmacro
 |
 |// Set current VM state.
@@ -760,14 +769,18 @@ static void build_subroutines(BuildCtx *ctx, int cmov, int sse)
   |  mov PC, [RB-12]			// Restore PC from [cont|PC].
   |.if X64
   |  movsxd RAa, dword [RB-16]		// May be negative on WIN64 with debug.
-  |  test RA, RA
-  |  jz >1
+#if LJ_HASFFI
+  |  cmp RA, 1
+  |  jbe >1
+#endif
   |  lea KBASEa, qword [=>0]
   |  add RAa, KBASEa
   |.else
   |  mov RA, dword [RB-16]
-  |  test RA, RA
-  |  jz >1
+#if LJ_HASFFI
+  |  cmp RA, 1
+  |  jbe >1
+#endif
   |.endif
   |  mov LFUNC:KBASE, [BASE-8]
   |  mov KBASE, LFUNC:KBASE->pc
@@ -775,11 +788,15 @@ static void build_subroutines(BuildCtx *ctx, int cmov, int sse)
   |  // BASE = base, RC = result, RB = meta base
   |  jmp RAa				// Jump to continuation.
   |
-  |1:  // Tail call from C function.
+#if LJ_HASFFI
+  |1:
+  |  je ->cont_ffi_callback		// cont = 1: return from FFI callback.
+  |  // cont = 0: Tail call from C function.
   |  sub RB, BASE
   |  shr RB, 3
   |  lea RD, [RB-1]
   |  jmp ->vm_call_tail
+#endif
   |
   |->cont_cat:				// BASE = base, RC = result, RB = mbase
   |  movzx RA, PC_RB
@@ -3687,10 +3704,118 @@ static void build_subroutines(BuildCtx *ctx, int cmov, int sse)
   |.endif
   |
   |//-----------------------------------------------------------------------
+  |//-- Assertions ---------------------------------------------------------
+  |//-----------------------------------------------------------------------
+  |
+  |->assert_bad_for_arg_type:
+#ifdef LUA_USE_ASSERT
+  |  int3
+#endif
+  |  int3
+  |
+  |//-----------------------------------------------------------------------
   |//-- FFI helper functions -----------------------------------------------
   |//-----------------------------------------------------------------------
   |
-  |->vm_ffi_call@4:
+  |// Handler for callback functions. Callback slot number in ah/al.
+  |->vm_ffi_callback:
+#if LJ_HASFFI
+  |.type CTSTATE, CTState, PC
+  |.if not X64
+  |  sub esp, 16			// Leave room for SAVE_ERRF etc.
+  |.endif
+  |  saveregs_	// ebp/rbp already saved. ebp now holds global_State *.
+  |  lea DISPATCH, [ebp+GG_G2DISP]
+  |  mov CTSTATE, GL:ebp->ctype_state
+  |  movzx eax, ax
+  |  mov CTSTATE->cb.slot, eax
+  |.if X64
+  |  mov CTSTATE->cb.gpr[0], CARG1
+  |  mov CTSTATE->cb.gpr[1], CARG2
+  |  mov CTSTATE->cb.gpr[2], CARG3
+  |  mov CTSTATE->cb.gpr[3], CARG4
+  |  movsd qword CTSTATE->cb.fpr[0], xmm0
+  |  movsd qword CTSTATE->cb.fpr[1], xmm1
+  |  movsd qword CTSTATE->cb.fpr[2], xmm2
+  |  movsd qword CTSTATE->cb.fpr[3], xmm3
+  |.if X64WIN
+  |  lea rax, [rsp+CFRAME_SIZE+4*8]
+  |.else
+  |  lea rax, [rsp+CFRAME_SIZE]
+  |  mov CTSTATE->cb.gpr[4], CARG5
+  |  mov CTSTATE->cb.gpr[5], CARG6
+  |  movsd qword CTSTATE->cb.fpr[4], xmm4
+  |  movsd qword CTSTATE->cb.fpr[5], xmm5
+  |  movsd qword CTSTATE->cb.fpr[6], xmm6
+  |  movsd qword CTSTATE->cb.fpr[7], xmm7
+  |.endif
+  |  mov CTSTATE->cb.stack, rax
+  |  mov CARG2, rsp
+  |.else
+  |  lea eax, [esp+CFRAME_SIZE+16]
+  |  mov CTSTATE->cb.gpr[0], FCARG1
+  |  mov CTSTATE->cb.gpr[1], FCARG2
+  |  mov CTSTATE->cb.stack, eax
+  |  mov FCARG1, [esp+CFRAME_SIZE+12]	// Move around misplaced retaddr/ebp.
+  |  mov FCARG2, [esp+CFRAME_SIZE+8]
+  |  mov SAVE_RET, FCARG1
+  |  mov SAVE_R4, FCARG2
+  |  mov FCARG2, esp
+  |.endif
+  |  mov SAVE_PC, CTSTATE		// Any value outside of bytecode is ok.
+  |  mov FCARG1, CTSTATE
+  |  call extern lj_ccallback_enter@8	// (CTState *cts, void *cf)
+  |  // lua_State * returned in eax (RD).
+  |  set_vmstate INTERP
+  |  mov BASE, L:RD->base
+  |  mov RD, L:RD->top
+  |  sub RD, BASE
+  |  mov LFUNC:RB, [BASE-8]
+  |  shr RD, 3
+  |  add RD, 1
+  |  ins_callt
+#endif
+  |
+  |->cont_ffi_callback:			// Return from FFI callback.
+#if LJ_HASFFI
+  |  mov L:RA, SAVE_L
+  |  mov CTSTATE, [DISPATCH+DISPATCH_GL(ctype_state)]
+  |  mov aword CTSTATE->L, L:RAa
+  |  mov L:RA->base, BASE
+  |  mov L:RA->top, RB
+  |  mov FCARG1, CTSTATE
+  |  mov FCARG2, RC
+  |  call extern lj_ccallback_leave@8	// (CTState *cts, TValue *o)
+  |.if X64
+  |  mov rax, CTSTATE->cb.gpr[0]
+  |  movsd xmm0, qword CTSTATE->cb.fpr[0]
+  |  jmp ->vm_leave_unw
+  |.else
+  |  mov L:RB, SAVE_L
+  |  mov eax, CTSTATE->cb.gpr[0]
+  |  mov edx, CTSTATE->cb.gpr[1]
+  |  cmp dword CTSTATE->cb.gpr[2], 1
+  |  jb >7
+  |  je >6
+  |  fld qword CTSTATE->cb.fpr[0].d
+  |  jmp >7
+  |6:
+  |  fld dword CTSTATE->cb.fpr[0].f
+  |7:
+  |  mov ecx, L:RB->top
+  |  movzx ecx, word [ecx+6]		// Get stack adjustment and copy up.
+  |  mov SAVE_L, ecx			// Must be one slot above SAVE_RET
+  |  restoreregs
+  |  pop ecx				// Move return addr from SAVE_RET.
+  |  add esp, [esp]			// Adjust stack.
+  |  add esp, 16
+  |  push ecx
+  |  ret
+  |.endif
+#endif
+  |
+  |->vm_ffi_call@4:			// Call C function via FFI.
+  |  // Caveat: needs special frame unwinding, see below.
 #if LJ_HASFFI
   |.if X64
   |  .type CCSTATE, CCallState, rbx
@@ -3786,16 +3911,7 @@ static void build_subroutines(BuildCtx *ctx, int cmov, int sse)
   |  mov ebx, [ebp-4]; leave; ret
   |.endif
 #endif
-  |
-  |//-----------------------------------------------------------------------
-  |//-- Assertions ---------------------------------------------------------
-  |//-----------------------------------------------------------------------
-  |
-  |->assert_bad_for_arg_type:
-#ifdef LUA_USE_ASSERT
-  |  int3
-#endif
-  |  int3
+  |// Note: vm_ffi_call must be the last function in this object file!
   |
   |//-----------------------------------------------------------------------
 }
@@ -4022,6 +4138,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop, int cmov, int sse)
       |  je <1				// Same GCobjs or pvalues?
       |  cmp RB, LJ_TISTABUD
       |  ja <2				// Different objects and not table/ud?
+      |.if X64
+      |  cmp RB, LJ_TUDATA		// And not 64 bit lightuserdata.
+      |  jb <2
+      |.endif
       |
       |  // Different tables or userdatas. Need to check __eq metamethod.
       |  // Field metatable must be at same offset for GCtab and GCudata!
@@ -5997,6 +6117,7 @@ static int build_backend(BuildCtx *ctx)
 /* Emit pseudo frame-info for all assembler functions. */
 static void emit_asm_debug(BuildCtx *ctx)
 {
+  int fcofs = (int)((uint8_t *)ctx->glob[GLOB_vm_ffi_call] - ctx->code);
 #if LJ_64
 #define SZPTR	"8"
 #define BSZPTR	"3"
@@ -6030,22 +6151,49 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.long .LEFDE0-.LASFDE0\n"
 	".LASFDE0:\n"
 	"\t.long .Lframe0\n"
-	"\t.long .Lbegin\n"
-	"\t.long %d\n"
-	"\t.byte 0xe\n\t.uleb128 %d\n"		/* def_cfa_offset */
 #if LJ_64
+	"\t.quad .Lbegin\n"
+	"\t.quad %d\n"
+	"\t.byte 0xe\n\t.uleb128 %d\n"		/* def_cfa_offset */
 	"\t.byte 0x86\n\t.uleb128 0x2\n"	/* offset rbp */
 	"\t.byte 0x83\n\t.uleb128 0x3\n"	/* offset rbx */
 	"\t.byte 0x8f\n\t.uleb128 0x4\n"	/* offset r15 */
 	"\t.byte 0x8e\n\t.uleb128 0x5\n"	/* offset r14 */
 #else
+	"\t.long .Lbegin\n"
+	"\t.long %d\n"
+	"\t.byte 0xe\n\t.uleb128 %d\n"		/* def_cfa_offset */
 	"\t.byte 0x85\n\t.uleb128 0x2\n"	/* offset ebp */
 	"\t.byte 0x87\n\t.uleb128 0x3\n"	/* offset edi */
 	"\t.byte 0x86\n\t.uleb128 0x4\n"	/* offset esi */
 	"\t.byte 0x83\n\t.uleb128 0x5\n"	/* offset ebx */
 #endif
 	"\t.align " SZPTR "\n"
-	".LEFDE0:\n\n", (int)ctx->codesz, CFRAME_SIZE);
+	".LEFDE0:\n\n", fcofs, CFRAME_SIZE);
+#if LJ_HASFFI
+    fprintf(ctx->fp,
+	".LSFDE1:\n"
+	"\t.long .LEFDE1-.LASFDE1\n"
+	".LASFDE1:\n"
+	"\t.long .Lframe0\n"
+#if LJ_64
+	"\t.quad lj_vm_ffi_call\n"
+	"\t.quad %d\n"
+	"\t.byte 0xe\n\t.uleb128 16\n"		/* def_cfa_offset */
+	"\t.byte 0x86\n\t.uleb128 0x2\n"	/* offset rbp */
+	"\t.byte 0xd\n\t.uleb128 0x6\n"		/* def_cfa_register rbp */
+	"\t.byte 0x83\n\t.uleb128 0x3\n"	/* offset rbx */
+#else
+	"\t.long lj_vm_ffi_call\n"
+	"\t.long %d\n"
+	"\t.byte 0xe\n\t.uleb128 8\n"		/* def_cfa_offset */
+	"\t.byte 0x85\n\t.uleb128 0x2\n"	/* offset ebp */
+	"\t.byte 0xd\n\t.uleb128 0x5\n"		/* def_cfa_register ebp */
+	"\t.byte 0x83\n\t.uleb128 0x3\n"	/* offset ebx */
+#endif
+	"\t.align " SZPTR "\n"
+	".LEFDE1:\n\n", (int)ctx->codesz - fcofs);
+#endif
 #if (defined(__sun__) && defined(__svr4__)) || defined(__solaris_)
     fprintf(ctx->fp, "\t.section .eh_frame,\"aw\",@progbits\n");
 #else
@@ -6070,10 +6218,10 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.align " SZPTR "\n"
 	".LECIE1:\n\n");
     fprintf(ctx->fp,
-	".LSFDE1:\n"
-	"\t.long .LEFDE1-.LASFDE1\n"
-	".LASFDE1:\n"
-	"\t.long .LASFDE1-.Lframe1\n"
+	".LSFDE2:\n"
+	"\t.long .LEFDE2-.LASFDE2\n"
+	".LASFDE2:\n"
+	"\t.long .LASFDE2-.Lframe1\n"
 	"\t.long .Lbegin-.\n"
 	"\t.long %d\n"
 	"\t.uleb128 0\n"			/* augmentation length */
@@ -6090,7 +6238,46 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.byte 0x83\n\t.uleb128 0x5\n"	/* offset ebx */
 #endif
 	"\t.align " SZPTR "\n"
-	".LEFDE1:\n\n", (int)ctx->codesz, CFRAME_SIZE);
+	".LEFDE2:\n\n", fcofs, CFRAME_SIZE);
+#if LJ_HASFFI
+    fprintf(ctx->fp,
+	".Lframe2:\n"
+	"\t.long .LECIE2-.LSCIE2\n"
+	".LSCIE2:\n"
+	"\t.long 0\n"
+	"\t.byte 0x1\n"
+	"\t.string \"zR\"\n"
+	"\t.uleb128 0x1\n"
+	"\t.sleb128 -" SZPTR "\n"
+	"\t.byte " REG_RA "\n"
+	"\t.uleb128 1\n"			/* augmentation length */
+	"\t.byte 0x1b\n"			/* pcrel|sdata4 */
+	"\t.byte 0xc\n\t.uleb128 " REG_SP "\n\t.uleb128 " SZPTR "\n"
+	"\t.byte 0x80+" REG_RA "\n\t.uleb128 0x1\n"
+	"\t.align " SZPTR "\n"
+	".LECIE2:\n\n");
+    fprintf(ctx->fp,
+	".LSFDE3:\n"
+	"\t.long .LEFDE3-.LASFDE3\n"
+	".LASFDE3:\n"
+	"\t.long .LASFDE3-.Lframe2\n"
+	"\t.long lj_vm_ffi_call-.\n"
+	"\t.long %d\n"
+	"\t.uleb128 0\n"			/* augmentation length */
+#if LJ_64
+	"\t.byte 0xe\n\t.uleb128 16\n"		/* def_cfa_offset */
+	"\t.byte 0x86\n\t.uleb128 0x2\n"	/* offset rbp */
+	"\t.byte 0xd\n\t.uleb128 0x6\n"		/* def_cfa_register rbp */
+	"\t.byte 0x83\n\t.uleb128 0x3\n"	/* offset rbx */
+#else
+	"\t.byte 0xe\n\t.uleb128 8\n"		/* def_cfa_offset */
+	"\t.byte 0x85\n\t.uleb128 0x2\n"	/* offset ebp */
+	"\t.byte 0xd\n\t.uleb128 0x5\n"		/* def_cfa_register ebp */
+	"\t.byte 0x83\n\t.uleb128 0x3\n"	/* offset ebx */
+#endif
+	"\t.align " SZPTR "\n"
+	".LEFDE3:\n\n", (int)ctx->codesz - fcofs);
+#endif
     break;
   case BUILD_coffasm:
     fprintf(ctx->fp, "\t.section .eh_frame,\"dr\"\n");
@@ -6141,6 +6328,9 @@ static void emit_asm_debug(BuildCtx *ctx)
   ** Or a linker. Or a plastic case. But I digress.
   */
   case BUILD_machasm: {
+#if LJ_HASFFI
+    int fcsize = 0;
+#endif
     int i;
     fprintf(ctx->fp, "\t.section __TEXT,__eh_frame,coalesced,no_toc+strip_static_syms+live_support\n");
     fprintf(ctx->fp,
@@ -6172,6 +6362,9 @@ static void emit_asm_debug(BuildCtx *ctx)
       const char *name = ctx->sym[i].name;
       int32_t size = ctx->sym[i+1].ofs - ctx->sym[i].ofs;
       if (size == 0) continue;
+#if LJ_HASFFI
+      if (!strcmp(name, "_lj_vm_ffi_call")) { fcsize = size; continue; }
+#endif
       fprintf(ctx->fp,
 	  "%s.eh:\n"
 	  "LSFDE%d:\n"
@@ -6181,23 +6374,72 @@ static void emit_asm_debug(BuildCtx *ctx)
 	  "\t.long LASFDE%d-EH_frame1\n"
 	  "\t.long %s-.\n"
 	  "\t.long %d\n"
-	  "\t.byte 0\n"			/* augmentation length */
+	  "\t.byte 0\n"				/* augmentation length */
 	  "\t.byte 0xe\n\t.byte %d\n"		/* def_cfa_offset */
 #if LJ_64
-	  "\t.byte 0x86\n\t.byte 0x2\n"	/* offset rbp */
-	  "\t.byte 0x83\n\t.byte 0x3\n"	/* offset rbx */
-	  "\t.byte 0x8f\n\t.byte 0x4\n"	/* offset r15 */
-	  "\t.byte 0x8e\n\t.byte 0x5\n"	/* offset r14 */
+	  "\t.byte 0x86\n\t.byte 0x2\n"		/* offset rbp */
+	  "\t.byte 0x83\n\t.byte 0x3\n"		/* offset rbx */
+	  "\t.byte 0x8f\n\t.byte 0x4\n"		/* offset r15 */
+	  "\t.byte 0x8e\n\t.byte 0x5\n"		/* offset r14 */
 #else
-	  "\t.byte 0x84\n\t.byte 0x2\n"	/* offset ebp (4 for MACH-O)*/
-	  "\t.byte 0x87\n\t.byte 0x3\n"	/* offset edi */
-	  "\t.byte 0x86\n\t.byte 0x4\n"	/* offset esi */
-	  "\t.byte 0x83\n\t.byte 0x5\n"	/* offset ebx */
+	  "\t.byte 0x84\n\t.byte 0x2\n"		/* offset ebp (4 for MACH-O)*/
+	  "\t.byte 0x87\n\t.byte 0x3\n"		/* offset edi */
+	  "\t.byte 0x86\n\t.byte 0x4\n"		/* offset esi */
+	  "\t.byte 0x83\n\t.byte 0x5\n"		/* offset ebx */
 #endif
 	  "\t.align " BSZPTR "\n"
 	  "LEFDE%d:\n\n",
 	  name, i, i, i, i, i, i, i, name, size, CFRAME_SIZE, i);
     }
+#if LJ_HASFFI
+    if (fcsize) {
+      fprintf(ctx->fp,
+	  "EH_frame2:\n"
+	  "\t.set L$set$y,LECIEY-LSCIEY\n"
+	  "\t.long L$set$y\n"
+	  "LSCIEY:\n"
+	  "\t.long 0\n"
+	  "\t.byte 0x1\n"
+	  "\t.ascii \"zR\\0\"\n"
+	  "\t.byte 0x1\n"
+	  "\t.byte 128-" SZPTR "\n"
+	  "\t.byte " REG_RA "\n"
+	  "\t.byte 1\n"				/* augmentation length */
+#if LJ_64
+	  "\t.byte 0x1b\n"			/* pcrel|sdata4 */
+	  "\t.byte 0xc\n\t.byte " REG_SP "\n\t.byte " SZPTR "\n"
+#else
+	  "\t.byte 0x1b\n"			/* pcrel|sdata4 */
+	  "\t.byte 0xc\n\t.byte 0x5\n\t.byte 0x4\n"  /* esp=5 on 32 bit MACH. */
+#endif
+	  "\t.byte 0x80+" REG_RA "\n\t.byte 0x1\n"
+	  "\t.align " BSZPTR "\n"
+	  "LECIEY:\n\n");
+      fprintf(ctx->fp,
+	  "_lj_vm_ffi_call.eh:\n"
+	  "LSFDEY:\n"
+	  "\t.set L$set$yy,LEFDEY-LASFDEY\n"
+	  "\t.long L$set$yy\n"
+	  "LASFDEY:\n"
+	  "\t.long LASFDEY-EH_frame2\n"
+	  "\t.long _lj_vm_ffi_call-.\n"
+	  "\t.long %d\n"
+	  "\t.byte 0\n"				/* augmentation length */
+#if LJ_64
+	  "\t.byte 0xe\n\t.byte 16\n"		/* def_cfa_offset */
+	  "\t.byte 0x86\n\t.byte 0x2\n"		/* offset rbp */
+	  "\t.byte 0xd\n\t.uleb128 0x6\n"	/* def_cfa_register rbp */
+	  "\t.byte 0x83\n\t.byte 0x3\n"		/* offset rbx */
+#else
+	  "\t.byte 0xe\n\t.byte 8\n"		/* def_cfa_offset */
+	  "\t.byte 0x84\n\t.byte 0x2\n"		/* offset ebp (4 for MACH-O)*/
+	  "\t.byte 0xd\n\t.uleb128 0x4\n"	/* def_cfa_register ebp */
+	  "\t.byte 0x83\n\t.byte 0x3\n"		/* offset ebx */
+#endif
+	  "\t.align " BSZPTR "\n"
+	  "LEFDEY:\n\n", fcsize);
+    }
+#endif
 #if LJ_64
     fprintf(ctx->fp, "\t.subsections_via_symbols\n");
 #else

@@ -183,6 +183,7 @@ IRFPMDEF(FPMENUM)
 #define IRFLDEF(_) \
   _(STR_LEN,	offsetof(GCstr, len)) \
   _(FUNC_ENV,	offsetof(GCfunc, l.env)) \
+  _(FUNC_PC,	offsetof(GCfunc, l.pc)) \
   _(TAB_META,	offsetof(GCtab, metatable)) \
   _(TAB_ARRAY,	offsetof(GCtab, array)) \
   _(TAB_NODE,	offsetof(GCtab, node)) \
@@ -195,7 +196,7 @@ IRFPMDEF(FPMENUM)
   _(CDATA_TYPEID, offsetof(GCcdata, typeid)) \
   _(CDATA_PTR,	sizeof(GCcdata)) \
   _(CDATA_INT64, sizeof(GCcdata)) \
-  _(CDATA_INT64HI, sizeof(GCcdata) + 4)
+  _(CDATA_INT64_4, sizeof(GCcdata) + 4)
 
 typedef enum {
 #define FLENUM(name, ofs)	IRFL_##name,
@@ -354,6 +355,7 @@ typedef struct IRType1 { uint8_t irt; } IRType1;
 #endif
 
 #define irt_is64(t)		((IRT_IS64 >> irt_type(t)) & 1)
+#define irt_is64orfp(t)		(((IRT_IS64|(1u<<IRT_FLOAT))>>irt_type(t)) & 1)
 
 static LJ_AINLINE IRType itype2irt(const TValue *tv)
 {

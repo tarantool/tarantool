@@ -28,6 +28,7 @@ enum {
 
   /* Calling conventions. */
   RID_RET = RID_R0,
+  RID_RETLO = RID_R0,
   RID_RETHI = RID_R1,
   RID_FPRET = RID_R0,
 
@@ -116,6 +117,8 @@ typedef struct {
 
 /* PC after instruction that caused an exit. Used to find the trace number. */
 #define EXITSTATE_PCREG		RID_PC
+/* Highest exit + 1 indicates stack check. */
+#define EXITSTATE_CHECKEXIT	1
 
 #define EXITSTUB_SPACING        4
 #define EXITSTUBS_PER_GROUP     32
@@ -136,6 +139,7 @@ typedef enum ARMIns {
   ARMI_S = 0x000100000,
   ARMI_K12 = 0x02000000,
   ARMI_KNEG = 0x00200000,
+  ARMI_LS_W = 0x00200000,
   ARMI_LS_U = 0x00800000,
   ARMI_LS_P = 0x01000000,
   ARMI_LS_R = 0x02000000,
@@ -173,6 +177,7 @@ typedef enum ARMIns {
   ARMI_STRB = 0xe4400000,
   ARMI_STRH = 0xe00000b0,
   ARMI_STRD = 0xe00000f0,
+  ARMI_PUSH = 0xe92d0000,
 
   ARMI_B = 0xea000000,
   ARMI_BL = 0xeb000000,

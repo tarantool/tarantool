@@ -6,6 +6,7 @@
 #define lj_vmmath_c
 #define LUA_CORE
 
+#include <errno.h>
 #include <math.h>
 
 #include "lj_obj.h"
@@ -25,21 +26,21 @@ LJ_FUNCA double lj_vm_tanh(double x) { return tanh(x); }
 
 #if LJ_HASJIT
 
-#if defined(__ANDROID__) || defined(__symbian__)
+#ifdef LUAJIT_NO_LOG2
 double lj_vm_log2(double a)
 {
   return log(a) * 1.4426950408889634074;
 }
 #endif
 
-#if defined(__symbian__)
+#ifdef LUAJIT_NO_EXP2
 double lj_vm_exp2(double a)
 {
   return exp(a * 0.6931471805599453);
 }
 #endif
 
-#if !LJ_TARGET_ARM
+#if !(LJ_TARGET_ARM || LJ_TARGET_PPC)
 int32_t LJ_FASTCALL lj_vm_modi(int32_t a, int32_t b)
 {
   uint32_t y, ua, ub;
@@ -81,7 +82,7 @@ double lj_vm_powi(double x, int32_t k)
   else if (k == 1)
     return x;
   else if (k == 0)
-    return 1;
+    return 1.0;
   else
     return 1.0 / lj_vm_powui(x, (uint32_t)-k);
 }
@@ -105,6 +106,13 @@ double lj_vm_foldfpm(double x, int fpm)
   default: lua_assert(0);
   }
   return 0;
+}
+#endif
+
+#if LJ_HASFFI
+int lj_vm_errno(void)
+{
+  return errno;
 }
 #endif
 

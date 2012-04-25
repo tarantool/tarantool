@@ -113,6 +113,9 @@ static void *err_unwind(lua_State *L, void *stopcf, int errcode)
       frame = frame_prevl(frame);
       break;
     case FRAME_C:  /* C frame. */
+#if LJ_HASFFI
+    unwind_c:
+#endif
 #if LJ_UNWIND_EXT
       if (errcode) {
 	L->cframe = cframe_prev(cf);
@@ -145,6 +148,10 @@ static void *err_unwind(lua_State *L, void *stopcf, int errcode)
       }
       return cf;
     case FRAME_CONT:  /* Continuation frame. */
+#if LJ_HASFFI
+      if ((frame-1)->u32.lo == LJ_CONT_FFI_CALLBACK)
+	goto unwind_c;
+#endif
     case FRAME_VARG:  /* Vararg frame. */
       frame = frame_prevd(frame);
       break;
@@ -178,7 +185,7 @@ static void *err_unwind(lua_State *L, void *stopcf, int errcode)
 
 /* -- External frame unwinding -------------------------------------------- */
 
-#if defined(__GNUC__) && !defined(__symbian__)
+#if defined(__GNUC__) && !defined(LUAJIT_NO_UNWIND)
 
 #ifdef __clang__
 /* http://llvm.org/bugs/show_bug.cgi?id=8703 */
@@ -190,13 +197,13 @@ static void *err_unwind(lua_State *L, void *stopcf, int errcode)
 #if !LJ_TARGET_ARM
 
 #define LJ_UEXCLASS		0x4c55414a49543200ULL	/* LUAJIT2\0 */
-#define LJ_UEXCLASS_MAKE(c)	(LJ_UEXCLASS | (_Unwind_Exception_Class)(c))
+#define LJ_UEXCLASS_MAKE(c)	(LJ_UEXCLASS | (uint64_t)(c))
 #define LJ_UEXCLASS_CHECK(cl)	(((cl) ^ LJ_UEXCLASS) <= 0xff)
 #define LJ_UEXCLASS_ERRCODE(cl)	((int)((cl) & 0xff))
 
 /* DWARF2 personality handler referenced from interpreter .eh_frame. */
 LJ_FUNCA int lj_err_unwind_dwarf(int version, _Unwind_Action actions,
-  _Unwind_Exception_Class uexclass, struct _Unwind_Exception *uex,
+  uint64_t uexclass, struct _Unwind_Exception *uex,
   struct _Unwind_Context *ctx)
 {
   void *cf;
@@ -227,11 +234,13 @@ LJ_FUNCA int lj_err_unwind_dwarf(int version, _Unwind_Action actions,
     }
 #if LJ_UNWIND_EXT
     cf = err_unwind(L, cf, errcode);
-    if (cf) {
+    if ((actions & _UA_FORCE_UNWIND)) {
+      return _URC_CONTINUE_UNWIND;
+    } else if (cf) {
       _Unwind_SetGR(ctx, LJ_TARGET_EHRETREG, errcode);
-      _Unwind_SetIP(ctx, (_Unwind_Ptr)(cframe_unwind_ff(cf) ?
-				       lj_vm_unwind_ff_eh :
-				       lj_vm_unwind_c_eh));
+      _Unwind_SetIP(ctx, (uintptr_t)(cframe_unwind_ff(cf) ?
+				     lj_vm_unwind_ff_eh :
+				     lj_vm_unwind_c_eh));
       return _URC_INSTALL_CONTEXT;
     }
 #if LJ_TARGET_X86ORX64
@@ -240,7 +249,7 @@ LJ_FUNCA int lj_err_unwind_dwarf(int version, _Unwind_Action actions,
       ** Real fix: http://gcc.gnu.org/viewcvs/trunk/gcc/unwind-dw2.c?r1=121165&r2=124837&pathrev=153877&diff_format=h
       */
       _Unwind_SetGR(ctx, LJ_TARGET_EHRETREG, errcode);
-      _Unwind_SetIP(ctx, (_Unwind_Ptr)lj_vm_unwind_rethrow);
+      _Unwind_SetIP(ctx, (uintptr_t)lj_vm_unwind_rethrow);
       return _URC_INSTALL_CONTEXT;
     }
 #endif
@@ -255,8 +264,12 @@ LJ_FUNCA int lj_err_unwind_dwarf(int version, _Unwind_Action actions,
 }
 
 #if LJ_UNWIND_EXT
-/* NYI: this is not thread-safe. */
+#if LJ_TARGET_OSX
+/* Sorry, no thread safety for OSX. Complain to Apple, not me. */
 static struct _Unwind_Exception static_uex;
+#else
+static __thread struct _Unwind_Exception static_uex;
+#endif
 
 /* Raise DWARF2 exception. */
 static void err_raise_ext(int errcode)
@@ -280,7 +293,7 @@ LJ_FUNCA _Unwind_Reason_Code lj_err_unwind_arm(_Unwind_State state,
     setstrV(L, L->top++, lj_err_str(L, LJ_ERR_ERRCPP));
     return _URC_HANDLER_FOUND;
   }
-  if ((state & _US_ACTION_MASK) == _US_UNWIND_FRAME_STARTING) {
+  if ((state&(_US_ACTION_MASK|_US_FORCE_UNWIND)) == _US_UNWIND_FRAME_STARTING) {
     _Unwind_DeleteException(ucb);
     _Unwind_SetGR(ctx, 15, (_Unwind_Word)(void *)lj_err_throw);
     _Unwind_SetGR(ctx, 0, (_Unwind_Word)L);
@@ -458,6 +471,10 @@ static ptrdiff_t finderrfunc(lua_State *L)
       cf = cframe_prev(cf);
       /* fallthrough */
     case FRAME_CONT:
+#if LJ_HASFFI
+      if ((frame-1)->u32.lo == LJ_CONT_FFI_CALLBACK)
+	cf = cframe_prev(cf);
+#endif
     case FRAME_VARG:
       frame = frame_prevd(frame);
       break;
@@ -585,15 +602,23 @@ LJ_NOINLINE void lj_err_callermsg(lua_State *L, const char *msg)
   if (frame_islua(frame)) {
     pframe = frame_prevl(frame);
   } else if (frame_iscont(frame)) {
-    pframe = frame_prevd(frame);
 #if LJ_HASFFI
-    /* Remove frame for FFI metamethods. */
-    if (frame_func(frame)->c.ffid >= FF_ffi_meta___index &&
-	frame_func(frame)->c.ffid <= FF_ffi_meta___tostring) {
-      L->base = pframe+1;
-      L->top = frame;
-    }
+    if ((frame-1)->u32.lo == LJ_CONT_FFI_CALLBACK) {
+      pframe = frame;
+      frame = NULL;
+    } else
 #endif
+    {
+      pframe = frame_prevd(frame);
+#if LJ_HASFFI
+      /* Remove frame for FFI metamethods. */
+      if (frame_func(frame)->c.ffid >= FF_ffi_meta___index &&
+	  frame_func(frame)->c.ffid <= FF_ffi_meta___tostring) {
+	L->base = pframe+1;
+	L->top = frame;
+      }
+#endif
+    }
   }
   lj_debug_addloc(L, msg, pframe, frame);
   lj_err_run(L);

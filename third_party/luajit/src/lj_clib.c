@@ -27,7 +27,7 @@
 #if defined(RTLD_DEFAULT)
 #define CLIB_DEFHANDLE	RTLD_DEFAULT
 #elif LJ_TARGET_OSX || LJ_TARGET_BSD
-#define CLIB_DEFHANDLE	((void *)-2)
+#define CLIB_DEFHANDLE	((void *)(intptr_t)-2)
 #else
 #define CLIB_DEFHANDLE	NULL
 #endif
@@ -60,25 +60,39 @@ static const char *clib_extname(lua_State *L, const char *name)
   return name;
 }
 
+/* Check for a recognized ld script line. */
+static const char *clib_check_lds(lua_State *L, const char *buf)
+{
+  char *p, *e;
+  if ((!strncmp(buf, "GROUP", 5) || !strncmp(buf, "INPUT", 5)) &&
+      (p = strchr(buf, '('))) {
+    while (*++p == ' ') ;
+    for (e = p; *e && *e != ' ' && *e != ')'; e++) ;
+    return strdata(lj_str_new(L, p, e-p));
+  }
+  return NULL;
+}
+
 /* Quick and dirty solution to resolve shared library name from ld script. */
 static const char *clib_resolve_lds(lua_State *L, const char *name)
 {
   FILE *fp = fopen(name, "r");
+  const char *p = NULL;
   if (fp) {
-    char *p, *e, buf[256];
-    if (fgets(buf, sizeof(buf), fp) && !strncmp(buf, "/* GNU ld script", 16)) {
-      while (fgets(buf, sizeof(buf), fp)) {
-	if (!strncmp(buf, "GROUP", 5) && (p = strchr(buf, '('))) {
-	  while (*++p == ' ') ;
-	  for (e = p; *e && *e != ' ' && *e != ')'; e++) ;
-	  fclose(fp);
-	  return strdata(lj_str_new(L, p, e-p));
+    char buf[256];
+    if (fgets(buf, sizeof(buf), fp)) {
+      if (!strncmp(buf, "/* GNU ld script", 16)) {  /* ld script magic? */
+	while (fgets(buf, sizeof(buf), fp)) {  /* Check all lines. */
+	  p = clib_check_lds(L, buf);
+	  if (p) break;
 	}
+      } else {  /* Otherwise check only the first line. */
+	p = clib_check_lds(L, buf);
       }
     }
     fclose(fp);
   }
-  return NULL;
+  return p;
 }
 
 static void *clib_loadlib(lua_State *L, const char *name, int global)
@@ -120,6 +134,7 @@ static void *clib_getsym(CLibrary *cl, const char *name)
 
 #ifndef GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
 #define GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS	4
+#define GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT	2
 BOOL WINAPI GetModuleHandleExA(DWORD, LPCSTR, HMODULE*);
 #endif
 
@@ -169,8 +184,10 @@ static const char *clib_extname(lua_State *L, const char *name)
 
 static void *clib_loadlib(lua_State *L, const char *name, int global)
 {
+  DWORD oldwerr = GetLastError();
   void *h = (void *)LoadLibraryA(clib_extname(L, name));
   if (!h) clib_error(L, "cannot load module " LUA_QS ": %s", name);
+  SetLastError(oldwerr);
   UNUSED(global);
   return h;
 }
@@ -194,19 +211,20 @@ static void clib_unloadlib(CLibrary *cl)
 static void *clib_getsym(CLibrary *cl, const char *name)
 {
   void *p = NULL;
+  DWORD oldwerr = GetLastError();
   if (cl->handle == CLIB_DEFHANDLE) {  /* Search default libraries. */
     MSize i;
     for (i = 0; i < CLIB_HANDLE_MAX; i++) {
       HINSTANCE h = (HINSTANCE)clib_def_handle[i];
       if (!(void *)h) {  /* Resolve default library handles (once). */
 	switch (i) {
-	case CLIB_HANDLE_EXE: GetModuleHandleExA(0, NULL, &h); break;
+	case CLIB_HANDLE_EXE: GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, NULL, &h); break;
 	case CLIB_HANDLE_DLL:
-	  GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+	  GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
 			     (const char *)clib_def_handle, &h);
 	  break;
 	case CLIB_HANDLE_CRT:
-	  GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+	  GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
 			     (const char *)&_fmode, &h);
 	  break;
 	case CLIB_HANDLE_KERNEL32: h = LoadLibraryA("kernel32.dll"); break;
@@ -222,6 +240,7 @@ static void *clib_getsym(CLibrary *cl, const char *name)
   } else {
     p = (void *)GetProcAddress((HINSTANCE)cl->handle, name);
   }
+  SetLastError(oldwerr);
   return p;
 }
 
