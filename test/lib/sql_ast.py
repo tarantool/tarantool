@@ -210,7 +210,7 @@ class StatementInsert(StatementPing):
 
     def __init__(self, table_name, value_list):
         self.space_no = table_name
-        self.flags = 0
+        self.flags = 0x02 # ADD
         self.value_list = value_list
 
     def pack(self):
@@ -226,6 +226,26 @@ class StatementInsert(StatementPing):
         (tuple_count,) = struct.unpack("<L", response[4:8])
         return "Insert OK, {0} row affected".format(tuple_count)
 
+class StatementReplace(StatementPing):
+    reqeust_type = INSERT_REQUEST_TYPE
+
+    def __init__(self, table_name, value_list):
+        self.space_no = table_name
+        self.flags = 0x04 # REPLACE
+        self.value_list = value_list
+
+    def pack(self):
+        buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
+        (buf, offset) = pack_tuple(self.value_list, buf, INSERT_REQUEST_FIXED_LEN)
+        struct.pack_into("<LL", buf, 0, self.space_no, self.flags)
+        return buf[:offset]
+
+    def unpack(self, response):
+        (return_code,) = struct.unpack("<L", response[:4])
+        if return_code:
+            return format_error(return_code, response)
+        (tuple_count,) = struct.unpack("<L", response[4:8])
+        return "Replace OK, {0} row affected".format(tuple_count)
 
 class StatementUpdate(StatementPing):
     reqeust_type = UPDATE_REQUEST_TYPE

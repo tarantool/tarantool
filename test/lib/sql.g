@@ -18,6 +18,7 @@ parser sql:
     token STR:        '\'([^\']+|\\\\.)*\''
     token PING:       'ping'
     token INSERT:     'insert'
+    token REPLACE:    'replace'
     token UPDATE:     'update'
     token DELETE:     'delete'
     token SELECT:     'select'
@@ -32,6 +33,7 @@ parser sql:
     token END:        '\\s*$'
 
     rule sql:         (insert {{ stmt = insert }} |
+                      replace {{ stmt = replace }} |
                       update {{ stmt = update }} |
                       delete {{ stmt = delete }} |
                       select {{ stmt = select }} |
@@ -40,6 +42,8 @@ parser sql:
                       
     rule insert:      INSERT [INTO] ident VALUES value_list
                       {{ return sql_ast.StatementInsert(ident, value_list) }}
+    rule replace:     REPLACE [INTO] ident VALUES value_list
+                      {{ return sql_ast.StatementReplace(ident, value_list) }}
     rule update:      UPDATE ident SET update_list opt_simple_where
                       {{ return sql_ast.StatementUpdate(ident, update_list, opt_simple_where) }}
     rule delete:      DELETE FROM ident opt_simple_where
