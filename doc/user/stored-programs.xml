@@ -381,7 +381,7 @@ localhost> lua box.update(0, 0, '+p', 1, 1)
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.delete(space_no, key)</emphasis>
+            <emphasis role="lua">box.delete(space_no, ...)</emphasis>
         </term>
         <listitem><para>
             Delete a tuple identified by a primary key.
