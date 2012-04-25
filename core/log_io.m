@@ -1433,7 +1433,14 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 			goto fail;
 		}
 	}
-
+	/*
+	 * Close the file *after* we write the first record
+	 * into the new WAL, since this is when replication
+	 * relays get an inotify alarm (when we close the file),
+	 * and try to reopen the next WAL. In other words,
+	 * make sure that replication realys try to open the
+	 * next WAL only when it exists.
+	 */
 	if (wal_to_close != NULL) {
 		if (log_io_close(&wal_to_close) != 0)
 			goto fail;
