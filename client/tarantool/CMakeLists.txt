@@ -3,25 +3,25 @@ project(tnt_cli)
 
 # checking for readline library
 #
-find_library(WITH_READLINE_LIB NAMES "readline")
-find_library(WITH_READLINE_HISTORY_LIB NAMES "history")
+find_library(READLINE_LIB NAMES "readline")
+find_library(READLINE_HISTORY_LIB NAMES "history")
 
-if (NOT WITH_READLINE_LIB OR NOT WITH_READLINE_HISTORY_LIB)
+if (NOT READLINE_LIB OR NOT READLINE_HISTORY_LIB)
     message(FATAL_ERROR "readline library not found.")
 endif()
 
-set (cli_deps readline history)
+set (cli_deps ${READLINE_LIB} ${READLINE_HISTORY_LIB})
 
 # trying to resolve readline dependencies
 #
-find_library(WITH_NCURSES_LIB NAMES "ncurses")
-if (WITH_NCURSES_LIB)
-	set(cli_deps ${cli_deps} ncurses)
-endif()
-
-find_library(WITH_TERMCAP_LIB NAMES "termcap")
-if (WITH_TERMCAP_LIB)
-	set(cli_deps ${cli_deps} termcap)
+find_library(NCURSES_LIB NAMES "ncurses")
+if (NCURSES_LIB)
+    set(cli_deps ${cli_deps} ${NCURSES_LIB})
+else()
+    find_library(TERMCAP_LIB NAMES "termcap")
+    if (TERMCAP_LIB)
+        set(cli_deps ${cli_deps} ${TERMCAP_LIB})
+    endif()
 endif()
 
 set (cli "tarantool")

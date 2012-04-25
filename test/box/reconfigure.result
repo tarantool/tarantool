@@ -111,9 +111,6 @@ reload configuration
 ---
 ok
 ...
-delete from t0 where k0 = 1
-Delete OK, 1 row affected
-delete from t0 where k0 = 2
-Delete OK, 1 row affected
-delete from t0 where k0 = 3
-Delete OK, 1 row affected
+lua box.space[0]:truncate()
+---
+...

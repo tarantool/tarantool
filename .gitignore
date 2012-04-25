@@ -7,6 +7,7 @@ lcov
 *.a
 *.so
 *.d
+*.dylib
 test/var
 test/lib/*.pyc
 test/lib/*/*.pyc

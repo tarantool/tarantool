@@ -51,3 +51,6 @@ set injection ERRINJ_WAL_IO off
 ---
 ok
 ...
+lua box.space[0]:truncate()
+---
+...

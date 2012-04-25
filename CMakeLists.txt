@@ -74,6 +74,8 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "kFreeBSD")
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
     set(TARGET_OS_FREEBSD 1)
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+    set(TARGET_OS_DARWIN 1)
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
 endif()
@@ -267,6 +269,11 @@ endif()
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fobjc-exceptions")
+
+# Use GNU Objective C runtime on Mac OS X
+if (TARGET_OS_DARWIN)
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fgnu-runtime")
+endif()
 
 add_subdirectory(third_party)
 add_subdirectory(cfg)

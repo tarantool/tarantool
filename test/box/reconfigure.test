@@ -42,8 +42,6 @@ exec sql "insert into t0 values (3, 'tuple 3')"
 exec admin "save snapshot"
 # Cleanup
 server.reconfigure(self.suite_ini["config"])
-exec sql "delete from t0 where k0 = 1"
-exec sql "delete from t0 where k0 = 2"
-exec sql "delete from t0 where k0 = 3"
+exec admin "lua box.space[0]:truncate()"
 
 # vim: syntax=python

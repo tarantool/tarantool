@@ -13,6 +13,8 @@
 #cmakedefine TARGET_OS_LINUX 1
 /*  Defined if building for FreeBSD */
 #cmakedefine TARGET_OS_FREEBSD 1
+/*  Defined if building for Darwin */
+#cmakedefine TARGET_OS_DARWIN 1
 /*
  * Defined if gcov instrumentation should be enabled.
  */
