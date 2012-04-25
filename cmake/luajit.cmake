@@ -103,7 +103,7 @@ endmacro()
 #
 # LuaJIT options.
 #
-option(ENABLE_BUNDLED_LUAJIT "Enable building of the bundled LuaJIT" OFF)
+option(ENABLE_BUNDLED_LUAJIT "Enable building of the bundled LuaJIT" ON)
 option(LUAJIT_PREFIX "Build with LuaJIT at the given path" "")
 
 if (LUAJIT_PREFIX AND ENABLE_BUNDLED_LUAJIT)
