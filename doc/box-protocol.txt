@@ -243,8 +243,6 @@ Tarantool/Box IPROTO protocol.
 ; - <flags>, <tuple>: same as in <insert>
 ; Index number for tuple lookup does not need to be provided,
 ; since only primary key updates are allowed.
-; Moreover, <tuple> cardinality is always 1, since currently
-; primary keys are always single-dimensioned.
 ; - <count> specifies possibly zero operation count
 ;
 
