@@ -530,22 +530,6 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         </row>
 
         <row>
-          <entry xml:id="wal_writer_inbox_size" xreflabel="wal_writer_inbox_size">wal_writer_inbox_size</entry>
-          <entry>integer</entry>
-          <entry>128</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>WAL writer is a separate process whose sole
-          purpose is to write the change log to disk. Every
-          incoming data change is sent to this process and
-          queued for write. This parameter affects the size of the
-          user space buffer that WAL writer uses to queue
-          write requests. By default, up to 128 client
-          connections can have pending updates waiting on disk.
-          </entry>
-        </row>
-
-        <row>
         <entry>wal_fsync_delay</entry>
         <entry>float</entry>
         <entry>0</entry>

@@ -45,7 +45,7 @@ example:
     </para></listitem>
     <listitem><para>
     A message is sent to a separate <quote>wal_writer</quote>
-    process requesting that the change is recorded in the WAL.
+    thread requesting that the change is recorded in the WAL.
     The fiber associate with the current connection is scheduled
     off CPU until an acknowledgment is received from the WAL
     writer.
@@ -60,24 +60,15 @@ example:
 </para>
 
 <para>
-Communication between master and WAL writer processes is asynchronous.
-It is implemented using 'inbox' paradigm, similar to 
-process inboxes in Erlang, from which it was derived.
-Asynchronous but reliable message passing between processes
-allows Tarantool to continue handling requests regardless of disk
-throughput. SELECT performance, provided SELECTs are run in their
-own connections, is unaffected by disk load.
+Communication between master and WAL writer threads is asynchronous.
+It is implemented using an asynchronous FIFO queue.
+Asynchronous but reliable message passing between the master
+and WAL writer threads allows Tarantool to continue handling
+requests regardless of disk throughput. SELECT performance,
+provided SELECTs are run in their own connections, is unaffected
+by disk load.
 </para>
 
-<para>
-The size of each process' inbox is fixed. In particular,
-the WAL writer inbox can hold only <olink targetptr="wal_writer_inbox_size"/>
-messages. This can pose a practical problem when thousands of
-connections perform updates &mdash; the WAL writer inbox can become full.
-Once this happens, the server aborts any update for which
-sending a WAL message has failed with <olink targetptr="ER_WAL_IO"/>
-error.
-</para>
 </section>
 <!--
 vim: tw=66 syntax=docbk

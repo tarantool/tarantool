@@ -68,9 +68,8 @@ snap_io_rate_limit=0.0, ro
 # Write no more rows in WAL
 rows_per_wal=500000, ro
 
-# Size of the WAL writer request queue: how many outstanding
-# requests for write to disk it can have.
-# Rule of thumb is to set this to the average connection count.
+# OBSOLETE
+# Starting from 1.4.5, this variable has no effect.
 wal_writer_inbox_size=16384, ro
 
 # Defines fiber/data synchronization fsync(2) policy:
