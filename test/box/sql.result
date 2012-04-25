@@ -96,6 +96,9 @@ select * from t65537 where k0 = 0
 An error occurred: ER_NO_SUCH_SPACE, 'Space 65537 does not exist'
 select * from t4294967295 where k0 = 0
 An error occurred: ER_NO_SUCH_SPACE, 'Space 4294967295 does not exist'
+lua box.space[0]:truncate()
+---
+...
 #
 # A test case for: http://bugs.launchpad.net/bugs/716683
 # Admin console should not stall on unknown command.
