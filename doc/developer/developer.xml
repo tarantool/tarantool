@@ -106,20 +106,36 @@ Upload the milestone from http://tarantool.org/dist to Launchpad. Use the .src.t
 <title>How to work on a bug</title>
 <para>Any defect, even minor, if it changes the user-visible
 server behavior, needs a bug report. Report a bug at
-bugs.launchpad.net/tarantool.
+http://bugs.launchpad.net/tarantool.
 
 When reporting a bug, try to come up with a test case right away. 
-Set the current maintenance milestone for the bug fix, and specify the series.
-Assign the bug to yourself. Put the status to 'In progress'
-Once the patch is ready, put the bug the bug to 'In review' and solicit a review for the fix.
-
+Set the current maintenance milestone for the bug fix, and specify
+the series. Assign the bug to yourself. Put the status to 'In
+progress' Once the patch is ready, put the bug the bug to 'In
+review' and solicit a review for the fix.
+</para>
+<para>
 Once there is a positive code review, push the patch 
 and set the status to 'Fix committed'
-
+</para>
+<para>
 Patches for bugs should contain a reference to the respective
 Launchpad bug page or at least bug id. Each patch should have a
 test, unless coming up with one is difficult in the current
 framework, in which case QA should be alerted.
+</para>
+<para>
+There are two things you need to do when your patch makes it
+into the master:
+<itemizedlist>
+    <listitem><para>
+        put the bug to 'fix committed',
+    </para></listitem>
+    <listitem><para>
+        delete the remote branch.
+    </para></listitem>
+</itemizedlist>
+
 </para>
 </section>
 </chapter>
