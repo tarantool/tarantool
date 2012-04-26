@@ -372,3 +372,5 @@ exec admin "lua table.insert(ops_list, box.upd.insert(1, 2))"
 exec admin "lua table.insert(ops_list, box.upd.insert(1, 3))"
 exec admin "lua table.insert(ops_list, box.upd.insert(1, 4))"
 exec admin "lua box.update_ol(0, ops_list, 1)"
+
+exec admin "lua box.space[0]:truncate()"
