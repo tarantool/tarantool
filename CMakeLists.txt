@@ -86,6 +86,8 @@ check_include_file(sys/time.h HAVE_SYS_TIME_H)
 
 check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
 check_function_exists(fdatasync HAVE_FDATASYNC)
+check_function_exists(memmem HAVE_MEMMEM)
+check_function_exists(memrchr HAVE_MEMRCHR)
 
 test_big_endian(HAVE_BYTE_ORDER_BIG_ENDIAN)
 

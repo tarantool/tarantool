@@ -43,7 +43,6 @@
  */
 #define MAP_ANONYMOUS MAP_ANON
 #endif
-
 /*
  * Defined if O_DSYNC mode exists for open(2).
  */
@@ -57,6 +56,14 @@
  * Defined if fdatasync(2) call is present.
  */
 #cmakedefine HAVE_FDATASYNC 1
+/*
+ * Defined if this platform has GNU specific memmem().
+ */
+#cmakedefine HAVE_MEMMEM 1
+/*
+ * Defined if this platform has GNU specific memrchr().
+ */
+#cmakedefine HAVE_MEMRCHR 1
 /*
  * Set if this is a GNU system and libc has __libc_stack_end.
  */
