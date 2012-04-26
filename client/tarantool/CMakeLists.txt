@@ -28,7 +28,7 @@ set (cli "tarantool")
 set (cli_sources tnt.c tnt_admin.c)
 set (cli_libs tntnet tntsql tnt gopt ${cli_deps})
 
-add_executable(${cli} ${cli_sources} ${CMAKE_SOURCE_DIR}/core/errcode.c)
+add_executable(${cli} ${cli_sources} ${CMAKE_SOURCE_DIR}/src/errcode.c)
 set_target_properties(${cli} PROPERTIES COMPILE_FLAGS "${core_cflags}")
 target_link_libraries (${cli} ${cli_libs})
 
