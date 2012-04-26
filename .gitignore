@@ -27,7 +27,9 @@ install_manifest.txt
 tarantool-*.tar.gz
 doc/tnt.ent
 doc/user/tarantool_user_guide.html
+doc/user/tarantool_user_guide.txt
 doc/developer/tarantool_developer_guide.html
+doc/developer/tarantool_developer_guide.txt
 third_party/luajit/src/luajit
 third_party/luajit/lib/vmdef.lua
 third_party/luajit/src/buildvm
