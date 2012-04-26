@@ -328,8 +328,6 @@ if initfile ~= nil then
     io.close(initfile)
     dofile("init.lua")
 end
--- 64bit operations support, etc.
-ffi = require("ffi")
 -- security: nullify some of the most serious os.* holes
 --
 os.execute = nil

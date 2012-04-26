@@ -902,6 +902,15 @@ tarantool_lua_register_type(struct lua_State *L, const char *type_name,
 	lua_pop(L, 1);
 }
 
+/** A helper to preload a lua modules. */
+static int
+tarantool_lua_require(lua_State *L, char *name)
+{
+	lua_getglobal(L, "require");
+	lua_pushstring(L, name);
+	return lua_pcall(L, 1, 0, 0);
+}
+
 struct lua_State *
 tarantool_lua_init()
 {
@@ -909,6 +918,8 @@ tarantool_lua_init()
 	if (L == NULL)
 		return L;
 	luaL_openlibs(L);
+	if (tarantool_lua_require(L, "ffi") != 0)
+		panic("%s", lua_tostring(L, -1));
 	luaL_register(L, boxlib_name, boxlib);
 	lua_pop(L, 1);
 	luaL_register(L, fiberlib_name, fiberlib);
