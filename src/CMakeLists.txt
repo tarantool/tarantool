@@ -85,7 +85,7 @@ add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers luajit)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
-set (common_libraries cfg core ev coro gopt misc objc rt)
+set (common_libraries cfg core ev coro gopt misc objc)
 
 set (THREAD_LIB pthread)
 if (ENABLE_STATIC)
