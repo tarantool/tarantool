@@ -3,7 +3,7 @@
 #
 if ("${CPACK_GENERATOR}" STREQUAL "RPM")
         # chmod +x 655
-	install (FILES tarantool DESTINATION /etc/init.d
+	install (FILES tarantool_box DESTINATION /etc/rc.d/init.d
 		 PERMISSIONS
 		 OWNER_READ OWNER_WRITE
 		 GROUP_READ GROUP_EXECUTE

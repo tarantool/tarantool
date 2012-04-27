@@ -21,7 +21,7 @@ export OPTIONS=""
 # If, for some reason, this script is invoked not via
 # a symlink, do nothing.
 #
-if [ "${INST}" == "tarantool" ]
+if [ "${INST}" == "tarantool_box" ]
 then
         echo_failure
         echo

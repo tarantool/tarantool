@@ -76,8 +76,8 @@ rollback_instance() {
 	config="${prefix}/etc/tarantool$id.cfg"
 	rm -rf $workdir
 	rm -f $config
-	rm -f "${prefix}/bin/tarantool$id.sh"
-	rm -f "${prefix_etc}/init.d/tarantool$id"
+	rm -f "${prefix}/bin/tarantool_box$id.sh"
+	rm -f "${prefix_etc}/init.d/tarantool_box$id"
 }
 
 rollback() {
@@ -121,10 +121,10 @@ deploy_instance() {
 	try "echo \"logger = \"cat - \>\> logs/tarantool.log\"\" >> $config"
 
 	# setting up wrapper
-	try "ln -s \"${prefix}/bin/tarantool_multi.sh\" \"${prefix}/bin/tarantool$id.sh\""
+	try "ln -s \"${prefix}/bin/tarantool_multi.sh\" \"${prefix}/bin/tarantool_box$id.sh\""
 
 	# setting up startup script
-	try "ln -s \"${prefix_etc}/init.d/tarantool\" \"${prefix_etc}/init.d/tarantool$id\""
+	try "ln -s \"${prefix_etc}/init.d/tarantool_box\" \"${prefix_etc}/init.d/tarantool_box$id\""
 }
 
 deploy() {
