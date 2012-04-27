@@ -263,13 +263,13 @@ hash_iterator_free(struct iterator *iterator)
 
 - (struct box_tuple *) min
 {
-	tnt_raise(ClientError, :ER_UNSUPPORTED);
+	tnt_raise(ClientError, :ER_UNSUPPORTED, "Hash index", "min()");
 	return NULL;
 }
 
 - (struct box_tuple *) max
 {
-	tnt_raise(ClientError, :ER_UNSUPPORTED);
+	tnt_raise(ClientError, :ER_UNSUPPORTED, "Hash index", "max()");
 	return NULL;
 }
 
