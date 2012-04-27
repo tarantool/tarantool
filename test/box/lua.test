@@ -332,7 +332,7 @@ print """
 # Load testing start-up script
 """
 server.stop()
-server.deploy(self.suite_ini["config"], "box/test_init.lua")
+server.deploy(init_lua="box/test_init.lua")
 
 print """
 # Test asscess to box configuration
@@ -353,4 +353,4 @@ print """
 # clean-up after tests
 """
 server.stop()
-server.deploy(self.suite_ini["config"], self.suite_ini["init_lua"])
+server.deploy(init_lua=None)

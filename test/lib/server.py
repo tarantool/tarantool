@@ -148,10 +148,15 @@ class Server(object):
 
         shutil.copy(self.config, os.path.join(self.vardir,
                                               self.default_config_name))
-        shutil.copy(self.init_lua, os.path.join(self.vardir,
-                                              self.default_init_lua_name))
         shutil.copy(self.valgrind_sup,
                     os.path.join(self.vardir, self.default_suppression_name))
+
+        var_init_lua = os.path.join(self.vardir, self.default_init_lua_name)
+        if self.init_lua != None:
+            shutil.copy(self.init_lua, var_init_lua)
+        elif os.path.exists(var_init_lua):
+            # We must delete old init.lua if it exists
+            os.remove(var_init_lua)
 
     def init(self):
         pass
@@ -236,11 +241,10 @@ class Server(object):
         self.is_started = False
         self.process = None
 
-    def deploy(self, config=None, init_lua = None, binary=None, vardir=None,
+    def deploy(self, config=None, binary=None, vardir=None,
                mem=None, start_and_exit=None, gdb=None, valgrind=None,
-               valgrind_sup=None, silent=True, need_init=True):
+               valgrind_sup=None, init_lua=None, silent=True, need_init=True):
         if config != None: self.config = config
-        if init_lua != None: self.init_lua = init_lua
         if binary != None: self.binary = binary
         if vardir != None: self.vardir = vardir
         if mem != None: self.mem = mem
@@ -248,8 +252,12 @@ class Server(object):
         if gdb != None: self.gdb = gdb
         if valgrind != None: self.valgrind = valgrind
 
+        if init_lua != None:
+            self.init_lua = os.path.abspath(init_lua)
+        else:
+            self.init_lua = None;
+
         self.configure(self.config)
-        self.init_lua = os.path.abspath(self.init_lua)
         self.install(self.binary, self.vardir, self.mem, silent)
         if need_init:
             self.init()

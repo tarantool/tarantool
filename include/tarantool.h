@@ -89,7 +89,7 @@ void tarantool_lua_load_cfg(struct lua_State *L,
  *
  * @param L is Lua State
  */
-void tarantool_lua_load_startup(struct lua_State *L);
+void tarantool_lua_load_init_script(struct lua_State *L);
 
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
