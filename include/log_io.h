@@ -177,6 +177,7 @@ void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   double fsync_delay,
 		   int flags, void *data);
 void recovery_update_mode(const char *wal_mode, double fsync_delay);
+void recovery_update_io_rate_limit(double new_limit);
 void recovery_free();
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
