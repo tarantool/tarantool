@@ -374,3 +374,9 @@ exec admin "lua table.insert(ops_list, box.upd.insert(1, 4))"
 exec admin "lua box.update_ol(0, ops_list, 1)"
 
 exec admin "lua box.space[0]:truncate()"
+
+print """
+# test that ffi extension is inaccessible
+"""
+
+exec admin "lua ffi"
