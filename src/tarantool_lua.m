@@ -902,6 +902,12 @@ tarantool_lua_register_type(struct lua_State *L, const char *type_name,
 	lua_pop(L, 1);
 }
 
+/**
+ * Remember the LuaJIT FFI extension reference index
+ * to protect it from being garbage collected.
+ */
+static int ffi_ref = 0;
+
 struct lua_State *
 tarantool_lua_init()
 {
@@ -914,6 +920,8 @@ tarantool_lua_init()
 	lua_pushstring(L, "ffi");
 	if (lua_pcall(L, 1, 0, 0) != 0)
 		panic("%s", lua_tostring(L, -1));
+	lua_getglobal(L, "ffi");
+	ffi_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	lua_pushnil(L);
 	lua_setglobal(L, "ffi");
 	luaL_register(L, boxlib_name, boxlib);
@@ -932,6 +940,7 @@ tarantool_lua_init()
 void
 tarantool_lua_close(struct lua_State *L)
 {
+	luaL_unref(L, LUA_REGISTRYINDEX, ffi_ref);
 	lua_close(L); /* collects garbage, invoking userdata gc */
 }
 
