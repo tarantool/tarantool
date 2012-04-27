@@ -1282,16 +1282,7 @@ wal_writer_init(struct wal_writer *writer)
 	tt_pthread_mutex_init(&writer->mutex, &errorcheck);
 	tt_pthread_mutexattr_destroy(&errorcheck);
 
-	pthread_condattr_t clock_monotonic;
-	tt_pthread_condattr_init(&clock_monotonic);
-
-	/* CLOCK_REALTIME is default for pthread timeouts, yet
-	 * we'd want to use a faster CLOCK_MONOTONIC.
-	 */
-	tt_pthread_condattr_setclock(&clock_monotonic, CLOCK_MONOTONIC);
-
-	tt_pthread_cond_init(&writer->cond, &clock_monotonic);
-	tt_pthread_condattr_destroy(&clock_monotonic);
+	tt_pthread_cond_init(&writer->cond, NULL);
 
 	STAILQ_INIT(&writer->input);
 	STAILQ_INIT(&writer->output);

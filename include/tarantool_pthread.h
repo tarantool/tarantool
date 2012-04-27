@@ -118,16 +118,6 @@
 	tt_pthread_error(e);			\
 })
 
-#define tt_pthread_condattr_getclock(attr, clock_id)\
-({	int e = pthread_condattr_getclock(attr, clock_id);\
-	tt_pthread_error(e);			\
-})
-
-#define tt_pthread_condattr_setclock(attr, clock_id)\
-({	int e = pthread_condattr_setclock(attr, clock_id);\
-	tt_pthread_error(e);			\
-})
-
 #define tt_pthread_cond_init(cond, attr)	\
 ({	int e = pthread_cond_init(cond, attr);	\
 	tt_pthread_error(e);			\
