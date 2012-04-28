@@ -76,6 +76,9 @@ struct wal_writer
 	bool is_shutdown;
 };
 
+static int
+wal_writer_start(struct recovery_state *state);
+
 static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
 
 static struct wal_writer wal_writer;
@@ -1220,6 +1223,9 @@ recover_finalize(struct recovery_state *r)
 
 		log_io_close(&r->current_wal);
 	}
+
+	if ((r->flags & RECOVER_READONLY) == 0)
+		wal_writer_start(r);
 }
 
 /**
@@ -1605,9 +1611,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_fsync_delay = wal_fsync_delay;
 	r->wal_class->open_wflags = strcasecmp(wal_mode, "fsync") ? 0 : WAL_SYNC_FLAG;
 	wait_lsn_clear(&r->wait_lsn);
-
-	if ((flags & RECOVER_READONLY) == 0)
-		wal_writer_start(r);
+	r->flags = flags;
 }
 
 void

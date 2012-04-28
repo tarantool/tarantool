@@ -127,6 +127,7 @@ struct recovery_state {
 
 	int snap_io_rate_limit;
 	int rows_per_wal;
+	int flags;
 	double wal_fsync_delay;
 	u64 cookie;
 	struct wait_lsn wait_lsn;
