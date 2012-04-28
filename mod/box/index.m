@@ -224,7 +224,7 @@ void
 hash_iterator_free(struct iterator *iterator)
 {
 	assert(iterator->next == hash_iterator_next);
-	sfree(iterator);
+	free(iterator);
 }
 
 
@@ -285,7 +285,7 @@ hash_iterator_free(struct iterator *iterator)
 
 - (struct iterator *) allocIterator
 {
-	struct hash_iterator *it = salloc(sizeof(struct hash_iterator));
+	struct hash_iterator *it = malloc(sizeof(struct hash_iterator));
 	if (it) {
 		memset(it, 0, sizeof(struct hash_iterator));
 		it->base.next = hash_iterator_next;

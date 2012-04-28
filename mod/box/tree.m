@@ -26,7 +26,6 @@
 #include "tree.h"
 #include "box.h"
 #include "tuple.h"
-#include <salloc.h>
 #include <pickle.h>
 
 /* {{{ Utilities. *************************************************/
@@ -801,7 +800,7 @@ tree_iterator_free(struct iterator *iterator)
 	if (it->iter)
 		sptree_index_iterator_free(it->iter);
 
-	sfree(it);
+	free(it);
 }
 
 /* }}} */
@@ -926,7 +925,7 @@ tree_iterator_free(struct iterator *iterator)
 - (struct iterator *) allocIterator
 {
 	struct tree_iterator *it
-		= salloc(sizeof(struct tree_iterator) + SIZEOF_SPARSE_PARTS(key_def));
+		= malloc(sizeof(struct tree_iterator) + SIZEOF_SPARSE_PARTS(key_def));
 
 	if (it) {
 		memset(it, 0, sizeof(struct tree_iterator));
