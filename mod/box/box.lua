@@ -323,13 +323,8 @@ function box.on_reload_configuration()
         end
     end
 end
-local initfile = io.open("init.lua")
-if initfile ~= nil then
-    io.close(initfile)
-    dofile("init.lua")
-end
+
 -- security: nullify some of the most serious os.* holes
---
 os.execute = nil
 os.exit = nil
 os.rename = nil

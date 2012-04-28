@@ -72,8 +72,8 @@ is_num_positive() {
 
 rollback_instance() {
 	id=$1
-	workdir="${prefix_var}/tarantool$id"
-	config="${prefix}/etc/tarantool$id.cfg"
+	workdir="${prefix_var}/tarantool_box$id"
+	config="${prefix}/etc/tarantool_box$id.cfg"
 	rm -rf $workdir
 	rm -f $config
 	rm -f "${prefix}/bin/tarantool_box$id.sh"
@@ -91,9 +91,9 @@ rollback() {
 
 try() {
 	cmd="$*"
-	[ $act_debug -gt 0 ] && log $cmd
+	[ $act_debug -gt 0 ] && log "$cmd"
 	if [ $act_dry -eq 0 ]; then
-		eval $cmd
+		eval "$cmd"
 		if [ $? -gt 0 ]; then
 			rollback
 		fi
@@ -102,8 +102,8 @@ try() {
 
 deploy_instance() {
 	id=$1
-	workdir="${prefix_var}/tarantool$id"
-	config="${prefix}/etc/tarantool$id.cfg"
+	workdir="${prefix_var}/tarantool_box$id"
+	config="${prefix}/etc/tarantool_box$id.cfg"
 
 	log ">>>> deploying instance $id"
 
@@ -116,9 +116,9 @@ deploy_instance() {
 
 	# setting up configuration file
 	try "cp \"${prefix}/etc/tarantool.cfg\" $config"
-	try "echo \"work_dir = \"$workdir\"\" >> $config"
-	try "echo \"username = \"tarantool\"\" >> $config"
-	try "echo \"logger = \"cat - \>\> logs/tarantool.log\"\" >> $config"
+	try 'echo work_dir = \"$workdir\" >> $config'
+	try 'echo username = \"tarantool\" >> $config'
+	try 'echo logger = \"cat - \>\> logs/tarantool.log\" >> $config'
 
 	# setting up wrapper
 	try "ln -s \"${prefix}/bin/tarantool_multi.sh\" \"${prefix}/bin/tarantool_box$id.sh\""
