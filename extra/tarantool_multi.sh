@@ -5,10 +5,9 @@ export PATH=$PATH:/usr/local/bin
 NAME="tarantool_box"
 BINARY="/usr/local/bin/${NAME}"
 INST=$(basename $0 .sh)
-ENV=`echo ${INST} | sed -e 's/tarantool_box/tarantool/'`
-CONF="/usr/local/etc/${ENV}.cfg"
-LOGDIR="/var/${ENV}/logs"
-WRAP_PIDFILE="/var/${ENV}/wrapper.pid"
+CONF="/usr/local/etc/${INST}.cfg"
+LOGDIR="/var/${INST}/logs"
+WRAP_PIDFILE="/var/${INST}/wrapper.pid"
 
 exec <&-
 

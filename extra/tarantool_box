@@ -10,9 +10,8 @@
 
 RETVAL=0
 INST="$(basename $0)"
-ENV=`echo ${INST} | sed -e 's/tarantool_box/tarantool/'`
-export PIDFILE="/var/${ENV}/box.pid"
-export WRAP_PIDFILE="/var/${ENV}/wrapper.pid"
+export PIDFILE="/var/${INST}/box.pid"
+export WRAP_PIDFILE="/var/${INST}/wrapper.pid"
 export OPTIONS=""
 
 # This script is normally invoked via a symlink.
@@ -31,7 +30,7 @@ fi
 
 start() {
         echo -n $"Starting ${INST}: "
-        /usr/local/bin/${INST}.sh ${OPTIONS} >> /var/${ENV}/logs/init.log 2>&1
+        /usr/local/bin/${INST}.sh ${OPTIONS} >> /var/${INST}/logs/init.log 2>&1
         RETVAL=${?}
         if [ ${RETVAL} -eq 0 ]
         then

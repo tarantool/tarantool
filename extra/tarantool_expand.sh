@@ -72,8 +72,8 @@ is_num_positive() {
 
 rollback_instance() {
 	id=$1
-	workdir="${prefix_var}/tarantool$id"
-	config="${prefix}/etc/tarantool$id.cfg"
+	workdir="${prefix_var}/tarantool_box$id"
+	config="${prefix}/etc/tarantool_box$id.cfg"
 	rm -rf $workdir
 	rm -f $config
 	rm -f "${prefix}/bin/tarantool_box$id.sh"
@@ -102,8 +102,8 @@ try() {
 
 deploy_instance() {
 	id=$1
-	workdir="${prefix_var}/tarantool$id"
-	config="${prefix}/etc/tarantool$id.cfg"
+	workdir="${prefix_var}/tarantool_box$id"
+	config="${prefix}/etc/tarantool_box$id.cfg"
 
 	log ">>>> deploying instance $id"
 
