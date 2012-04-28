@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_ERRCODE_H
-#define TARANTOOL_ERRCODE_H
+#ifndef TARANTOOL_ERRCODE_H_INCLUDED
+#define TARANTOOL_ERRCODE_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -145,4 +145,4 @@ static inline const char *tnt_errcode_desc(uint32_t errcode)
 }
 
 
-#endif /* TARANTOOL_ERRCODE_H */
+#endif /* TARANTOOL_ERRCODE_H_INCLUDED */
