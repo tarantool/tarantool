@@ -519,7 +519,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>float</entry>
           <entry>0.0</entry>
           <entry>no</entry>
-          <entry>no</entry>
+          <entry>yes</entry>
           <entry>Reduce the throttling effect of <olink
           targetptr="save-snapshot"/> on the INSERT/UPDATE/DELETE
           performance by setting a limit on
@@ -534,7 +534,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
         <entry>float</entry>
         <entry>0</entry>
         <entry>no</entry>
-        <entry>no</entry>
+        <entry>yes</entry>
         <entry>Do not flush the write ahead log to disk more often
           than once in wal_fsync_delay seconds. By default the
           delay is zero,
@@ -626,7 +626,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>float</entry>
           <entry>0.0</entry>
           <entry>no</entry>
-          <entry>no</entry>
+          <entry>yes</entry>
           <entry>If non-zero, a sleep given duration is
           injected between iterations of the event loop. Can be
           used to reduce CPU load in deployments in which the

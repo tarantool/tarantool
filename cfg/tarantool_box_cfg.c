@@ -603,8 +603,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		double dbl = strtod(opt->paramValue.numberval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->io_collect_interval != dbl)
-			return CNF_RDONLY;
 		c->io_collect_interval = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
@@ -641,8 +639,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		double dbl = strtod(opt->paramValue.numberval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->snap_io_rate_limit != dbl)
-			return CNF_RDONLY;
 		c->snap_io_rate_limit = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__rows_per_wal) ) {
@@ -2250,10 +2246,12 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 	}
-	if (c1->io_collect_interval != c2->io_collect_interval) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->io_collect_interval");
+	if (!only_check_rdonly) {
+		if (c1->io_collect_interval != c2->io_collect_interval) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->io_collect_interval");
 
-		return diff;
+			return diff;
+		}
 	}
 	if (c1->backlog != c2->backlog) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->backlog");
@@ -2267,10 +2265,12 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 			return diff;
 		}
 	}
-	if (c1->snap_io_rate_limit != c2->snap_io_rate_limit) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->snap_io_rate_limit");
+	if (!only_check_rdonly) {
+		if (c1->snap_io_rate_limit != c2->snap_io_rate_limit) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->snap_io_rate_limit");
 
-		return diff;
+			return diff;
+		}
 	}
 	if (c1->rows_per_wal != c2->rows_per_wal) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->rows_per_wal");
