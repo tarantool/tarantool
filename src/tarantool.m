@@ -279,6 +279,10 @@ snapshot(void *ev, int events __attribute__((unused)))
 	fiber_set_name(fiber, "dumper");
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
 
+	/*
+	 * Safety: make sure we don't double-write
+	 * parent stdio buffers at exit().
+	 */
 	close_all_xcpt(1, sayfd);
 	snapshot_save(recovery_state, mod_snapshot);
 

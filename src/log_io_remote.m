@@ -40,7 +40,7 @@
 #include <pickle.h>
 
 static int
-default_remote_row_handler(struct recovery_state *r, struct tbuf *row);
+remote_apply_row(struct recovery_state *r, struct tbuf *row);
 
 static struct tbuf *
 remote_row_reader_v11()
@@ -134,7 +134,7 @@ pull_from_remote(void *state)
 		r->recovery_lag = ev_now() - row_v11(row)->tm;
 		r->recovery_last_update_tstamp = ev_now();
 
-		if (default_remote_row_handler(r, row) < 0) {
+		if (remote_apply_row(r, row) < 0) {
 			fiber_close();
 			continue;
 		}
@@ -144,7 +144,7 @@ pull_from_remote(void *state)
 }
 
 static int
-default_remote_row_handler(struct recovery_state *r, struct tbuf *row)
+remote_apply_row(struct recovery_state *r, struct tbuf *row)
 {
 	struct tbuf *data;
 	i64 lsn = row_v11(row)->lsn;
