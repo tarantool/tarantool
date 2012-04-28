@@ -36,7 +36,6 @@
 #include <fiber.h>
 #include <log_io.h>
 #include <pickle.h>
-#include <salloc.h>
 #include <say.h>
 #include <stat.h>
 #include <tarantool.h>

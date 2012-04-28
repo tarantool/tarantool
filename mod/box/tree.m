@@ -924,6 +924,7 @@ tree_iterator_free(struct iterator *iterator)
 
 - (struct iterator *) allocIterator
 {
+	assert(key_def->part_count);
 	struct tree_iterator *it
 		= malloc(sizeof(struct tree_iterator) + SIZEOF_SPARSE_PARTS(key_def));
 
@@ -946,6 +947,10 @@ tree_iterator_free(struct iterator *iterator)
 {
 	assert(iterator->free == tree_iterator_free);
 	struct tree_iterator *it = tree_iterator(iterator);
+
+	if (key_cardinality > key_def->part_count)
+		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+			  key_cardinality, key_def->part_count);
 
 	it->key_data.data = key;
 	it->key_data.part_count = key_cardinality;

@@ -43,7 +43,6 @@
 
 #include "pickle.h"
 #include "tuple.h"
-#include "salloc.h"
 
 /* contents of box.lua */
 extern const char _binary_box_lua_start;

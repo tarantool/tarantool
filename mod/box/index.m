@@ -30,7 +30,6 @@
 #include "pickle.h"
 #include "exception.h"
 #include "box.h"
-#include "salloc.h"
 #include "assoc.h"
 
 const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
