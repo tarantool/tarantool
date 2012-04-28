@@ -15,6 +15,8 @@ server.reconfigure("box/tarantool_bad5.cfg")
 # good
 server.reconfigure("box/tarantool_good.cfg")
 exec admin "lua box.cfg.too_long_threshold"
+exec admin "lua box.cfg.snap_io_rate_limit"
+exec admin "lua box.cfg.io_collect_interval"
 # empty
 server.reconfigure("box/tarantool_empty.cfg")
 exec admin "lua box.cfg.too_long_threshold"

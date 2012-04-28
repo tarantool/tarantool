@@ -156,11 +156,9 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 
 	recovery_update_mode(new_conf->wal_mode, new_delay);
 
-	if (old_conf->snap_io_rate_limit != new_conf->snap_io_rate_limit)
-		recovery_update_io_rate_limit(new_conf->snap_io_rate_limit);
+	recovery_update_io_rate_limit(new_conf->snap_io_rate_limit);
 
-	if (old_conf->io_collect_interval != new_conf->io_collect_interval)
-		ev_set_io_collect_interval(new_conf->io_collect_interval);
+	ev_set_io_collect_interval(new_conf->io_collect_interval);
 
 	return 0;
 }
