@@ -953,18 +953,9 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 static int
 tarantool_lua_dofile(struct lua_State *L, const char *filename)
 {
-	if (luaL_loadfile(L, filename) != 0) {
-		return 1;
-	}
-
-	@try {
-		lua_call(L, 0, LUA_MULTRET);
-	} @catch (ClientError *e) {
-		lua_pushstring(L, e->errmsg);
-		return 1;
-	}
-
-	return 0;
+	lua_getglobal(L, "dofile");
+	lua_pushstring(L, filename);
+	return lua_pcall(L, 1, 1, 0);
 }
 
 void
@@ -1077,7 +1068,7 @@ load_init_script(void *L_ptr)
 
 	/* execute start-up file */
 	if (tarantool_lua_dofile(L, TARANTOOL_LUA_INIT_SCRIPT))
-		panic("start-up: %s", lua_tostring(L, -1));
+		panic("%s", lua_tostring(L, -1));
 }
 
 void tarantool_lua_load_init_script(struct lua_State *L)
