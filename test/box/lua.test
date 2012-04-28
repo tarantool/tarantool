@@ -375,8 +375,45 @@ exec admin "lua box.update_ol(0, ops_list, 1)"
 
 exec admin "lua box.space[0]:truncate()"
 
+
 print """
+#
 # test that ffi extension is inaccessible
+#
 """
 
 exec admin "lua ffi"
+
+
+print """
+#
+# Lua init lua script test
+#
+"""
+
+print """
+# Load testing init lua script
+"""
+server.stop()
+server.deploy(init_lua="box/test_init.lua")
+
+print """
+# Test asscess to box configuration
+"""
+exec admin "lua print_config()"
+
+print """
+# Test bug #977898
+"""
+exec admin "lua box.select(0, 0, 1)"
+
+print """
+# Test insert from init.lua
+"""
+exec admin "lua box.select(0, 0, 2)"
+
+print """
+# clean-up after tests
+"""
+server.stop()
+server.deploy(init_lua=None)

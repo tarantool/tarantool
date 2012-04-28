@@ -84,6 +84,13 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx);
 void tarantool_lua_load_cfg(struct lua_State *L,
 			    struct tarantool_cfg *cfg);
 
+/**
+ * Load and execute start-up file
+ *
+ * @param L is Lua State
+ */
+void tarantool_lua_load_init_script(struct lua_State *L);
+
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern char *cfg_filename_fullpath;
