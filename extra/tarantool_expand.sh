@@ -91,9 +91,9 @@ rollback() {
 
 try() {
 	cmd="$*"
-	[ $act_debug -gt 0 ] && log $cmd
+	[ $act_debug -gt 0 ] && log "$cmd"
 	if [ $act_dry -eq 0 ]; then
-		eval $cmd
+		eval "$cmd"
 		if [ $? -gt 0 ]; then
 			rollback
 		fi
@@ -116,9 +116,9 @@ deploy_instance() {
 
 	# setting up configuration file
 	try "cp \"${prefix}/etc/tarantool.cfg\" $config"
-	try "echo \"work_dir = \"$workdir\"\" >> $config"
-	try "echo \"username = \"tarantool\"\" >> $config"
-	try "echo \"logger = \"cat - \>\> logs/tarantool.log\"\" >> $config"
+	try 'echo work_dir = \"$workdir\" >> $config'
+	try 'echo username = \"tarantool\" >> $config'
+	try 'echo logger = \"cat - \>\> logs/tarantool.log\" >> $config'
 
 	# setting up wrapper
 	try "ln -s \"${prefix}/bin/tarantool_multi.sh\" \"${prefix}/bin/tarantool_box$id.sh\""
