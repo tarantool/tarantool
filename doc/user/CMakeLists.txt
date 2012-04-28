@@ -1,4 +1,16 @@
 
+if (XMLLINT STREQUAL "XMLLINT-NOTFOUND")
+    message (FATAL_ERROR "xmllint is missing")
+endif()
+
+if (XSLTPROC STREQUAL "XSLTPROC-NOTFOUND")
+    message (FATAL_ERROR "xsltproc is missing")
+endif()
+
+if (LYNX STREQUAL "LYNX-NOTFOUND")
+    message (FATAL_ERROR "lynx is missing")
+endif()
+
 set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www-data/tarantool_user_guide.html")
 set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt")
 
@@ -10,11 +22,9 @@ set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt"
 # since its diagnostics output is significantly more readable:
 # jing http://docbook.org/xml/5.0/rng/docbookxi.rng file.xml
 #
-if (NOT XMLLINT STREQUAL "XMLLINT-NOTFOUND")
-    add_custom_target(doc-check ALL
-        COMMAND ${XMLLINT} --xinclude --noout --relaxng http://docbook.org/xml/5.0/rng/docbookxi.rng
+add_custom_target(doc-check ALL
+    COMMAND ${XMLLINT} --xinclude --noout --relaxng http://docbook.org/xml/5.0/rng/docbookxi.rng
             ${CMAKE_SOURCE_DIR}/doc/user/user.xml)
-endif()
 
 #
 # xsltproc-based documentation generation (default)
@@ -33,17 +43,15 @@ add_custom_command(OUTPUT ${PATH_USERGUIDE_TXT}
 add_custom_target(html DEPENDS ${PATH_USERGUIDE_HTML})
 add_custom_target(txt  DEPENDS ${PATH_USERGUIDE_TXT})
 
-if (NOT XSLTPROC STREQUAL "XSLTPROC-NOTFOUND" AND
-    NOT LYNX STREQUAL "LYNX-NOTFOUND")
-    add_custom_target(doc-autogen ALL
-        DEPENDS ${PATH_USERGUIDE_HTML} ${PATH_USERGUIDE_TXT})
-    if ("${CPACK_GENERATOR}" STREQUAL "RPM")
-        install (FILES ${PATH_USERGUIDE_HTML}
-            ${PATH_USERGUIDE_TXT} DESTINATION /usr/local/doc/tarantool)
-    else()
-        install (FILES ${PATH_USERGUIDE_HTML}
-            ${PATH_USERGUIDE_TXT} DESTINATION share/doc/tarantool)
-    endif()
+add_custom_target(doc-autogen ALL
+    DEPENDS ${PATH_USERGUIDE_HTML} ${PATH_USERGUIDE_TXT})
+
+if ("${CPACK_GENERATOR}" STREQUAL "RPM")
+    install (FILES ${PATH_USERGUIDE_HTML}
+                   ${PATH_USERGUIDE_TXT} DESTINATION /usr/local/doc/tarantool)
+else()
+    install (FILES ${PATH_USERGUIDE_HTML}
+                   ${PATH_USERGUIDE_TXT} DESTINATION share/doc/tarantool)
 endif()
 
 add_custom_target(pdf
