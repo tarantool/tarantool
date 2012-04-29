@@ -318,7 +318,7 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) checkKeyParts: (int) parts :(bool) partial_key_allowed
 {
-	/* Hash indexes never allows partial keys. */
+	/* Hash indexes never allow partial keys. */
 	(void) partial_key_allowed;
 	[super checkKeyParts: parts :false];
 }
