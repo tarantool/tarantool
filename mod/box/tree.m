@@ -864,22 +864,14 @@ tree_iterator_free(struct iterator *iterator)
 	return [self unfold: node];
 }
 
-- (struct box_tuple *) find: (void *) key : (int) key_cardinality
+- (struct box_tuple *) findUnsafe: (void *) key : (int) parts
 {
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) +
-			 _SIZEOF_SPARSE_PARTS(key_cardinality));
-
-	if (key_cardinality > key_def->part_count)
-		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
-			  key_cardinality, key_def->part_count);
-
-	if (key_cardinality < key_def->part_count)
-		tnt_raise(ClientError, :ER_EXACT_MATCH,
-			  key_cardinality, key_def->part_count);
+			 _SIZEOF_SPARSE_PARTS(parts));
 
 	key_data->data = key;
-	key_data->part_count = key_cardinality;
+	key_data->part_count = parts;
 	fold_with_key_parts(key_def, key_data);
 
 	void *node = sptree_index_find(&tree, key_data);
@@ -938,22 +930,17 @@ tree_iterator_free(struct iterator *iterator)
 
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
-	[self initIterator: iterator :type :NULL :0];
+	[self initIteratorUnsafe: iterator :type :NULL :0];
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key
-			:(int) key_cardinality
+- (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
+                        :(void *) key :(int) parts
 {
 	assert(iterator->free == tree_iterator_free);
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	if (key_cardinality > key_def->part_count)
-		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
-			  key_cardinality, key_def->part_count);
-
 	it->key_data.data = key;
-	it->key_data.part_count = key_cardinality;
+	it->key_data.part_count = parts;
 	fold_with_key_parts(key_def, &it->key_data);
 
 	if (type == ITER_FORWARD) {
