@@ -42,6 +42,8 @@ third_party/luajit/src/lj_vm.s
 test/connector_c/tt
 test/connector_c/update
 *.reject
+extra/txt2c
+mod/box/box.lua.c
 doc/www-data/*.html
 doc/www-data/*.ru.html
 doc/www-data.in/download

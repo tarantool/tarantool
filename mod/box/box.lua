@@ -1,5 +1,6 @@
--- This function create new table with constants members. The run-time error
--- will be raised if attempting to change table members.
+-- This function creates a new table with constant members.
+-- A run-time error will be raised on attempt to change
+-- table members.
 local function create_const_table(table)
     return setmetatable ({}, {
 			     __index = table,

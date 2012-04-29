@@ -282,11 +282,11 @@ add_subdirectory(third_party)
 add_subdirectory(cfg)
 add_subdirectory(connector)
 add_subdirectory(src)
+add_subdirectory(extra)
 add_subdirectory(mod)
 add_subdirectory(client)
 add_subdirectory(test)
 add_subdirectory(doc)
-add_subdirectory(extra)
 
 install (FILES README LICENSE doc/box-protocol.txt
          DESTINATION share/doc/tarantool)

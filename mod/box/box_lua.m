@@ -45,7 +45,7 @@
 #include "tuple.h"
 
 /* contents of box.lua */
-extern const char _binary_box_lua_start;
+extern const char box_lua[];
 
 /**
  * All box connections share the same Lua state. We use
@@ -823,7 +823,7 @@ mod_lua_init(struct lua_State *L)
 	lua_pop(L, 1);
 	tarantool_lua_register_type(L, iteratorlib_name, lbox_iterator_meta);
 	/* Load box.lua */
-	if (luaL_dostring(L, &_binary_box_lua_start))
+	if (luaL_dostring(L, box_lua))
 		panic("Error loading box.lua: %s", lua_tostring(L, -1));
 	assert(lua_gettop(L) == 0);
 	return L;
