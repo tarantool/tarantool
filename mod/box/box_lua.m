@@ -110,6 +110,52 @@ lbox_tuple_len(struct lua_State *L)
 }
 
 static int
+lbox_tuple_slice(struct lua_State *L)
+{
+	struct box_tuple *tuple = lua_checktuple(L, 1);
+	int argc = lua_gettop(L) - 1;
+	int start, end;
+
+	/*
+	 * Prepare the range. The second argument is optional.
+	 * If the end is beyond tuple size, adjust it.
+	 * If no arguments, or start > end, return an error.
+	 */
+	if (argc == 0 || argc > 2)
+		luaL_error(L, "tuple.slice(): bad arguments");
+	start = lua_tointeger(L, 2);
+	if (start < 0)
+		start += tuple->cardinality;
+	if (argc == 2) {
+		end = lua_tointeger(L, 3);
+		if (end < 0)
+			end += tuple->cardinality;
+		else if (end > tuple->cardinality)
+			end = tuple->cardinality;
+	} else {
+		end = tuple->cardinality;
+	}
+	if (end <= start)
+		luaL_error(L, "tuple.slice(): start must be less than end");
+
+	u8 *field = tuple->data;
+	int fieldno = 0;
+	int stop = end - 1;
+
+	while (field < tuple->data + tuple->bsize) {
+		size_t len = load_varint32((void **) &field);
+		if (fieldno >= start) {
+			lua_pushlstring(L, (char *) field, len);
+			if (fieldno == stop)
+				break;
+		}
+		field += len;
+		fieldno += 1;
+	}
+	return end - start;
+}
+
+static int
 lbox_tuple_unpack(struct lua_State *L)
 {
 	struct box_tuple *tuple = lua_checktuple(L, 1);
@@ -228,6 +274,7 @@ static const struct luaL_reg lbox_tuple_meta [] = {
 	{"__tostring", lbox_tuple_tostring},
 	{"next", lbox_tuple_next},
 	{"pairs", lbox_tuple_pairs},
+	{"slice", lbox_tuple_slice},
 	{"unpack", lbox_tuple_unpack},
 	{NULL, NULL}
 };
@@ -305,6 +352,14 @@ lbox_index_len(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	lua_pushinteger(L, [index size]);
+	return 1;
+}
+
+static int
+lbox_index_part_count(struct lua_State *L)
+{
+	Index *index = lua_checkindex(L, 1);
+	lua_pushinteger(L, index->key_def->part_count);
 	return 1;
 }
 
@@ -472,6 +527,7 @@ lbox_index_prev(struct lua_State *L)
 static const struct luaL_reg lbox_index_meta[] = {
 	{"__tostring", lbox_index_tostring},
 	{"__len", lbox_index_len},
+	{"part_count", lbox_index_part_count},
 	{"min", lbox_index_min},
 	{"max", lbox_index_max},
 	{"next", lbox_index_next},

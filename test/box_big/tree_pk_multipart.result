@@ -225,3 +225,14 @@ lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'The Wolf!', 'Vincent', 1
 ---
 error: 'Key cardinality 4 is greater than index cardinality 3'
 ...
+lua box.space[9]:len()
+---
+ - 17
+...
+lua box.space[9]:truncate()
+---
+...
+lua box.space[9]:len()
+---
+ - 0
+...

@@ -303,12 +303,12 @@ function box.on_reload_configuration()
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.truncate = function(space)
-        while true do
-            local k, v = space.index[0].idx:next()
-            if v == nil then
-                break
+        local pk = space.index[0].idx
+        local part_count = pk:part_count()
+        while #pk > 0 do
+            for k, v in pk.next, pk, nil do
+                space:delete(v:slice(0, part_count))
             end
-            space:delete(v[0])
         end
     end
     space_mt.pairs = function(space) return space.index[0]:pairs() end

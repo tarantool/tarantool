@@ -590,8 +590,9 @@ Note: the administrative console output must be YAML-compatible.
     <title>Package <code xml:id="box.tuple" xreflabel="box.tuple">box.tuple</code></title>
     <para>The package contains no functions, but stands for
     <code>box.tuple</code> userdata type. It is possible to access individual
-    tuple fields using an index, iterate over all fields in a
-    tuple or convert a tuple to a Lua table. Tuples are immutable.</para>
+    tuple fields using an index, select a range of fields, iterate
+    over all fields in a tuple or convert a tuple to a Lua table.
+    Tuples are immutable.</para>
     <varlistentry>
         <term><emphasis role="lua"> </emphasis></term>
         <listitem><para>
@@ -630,6 +631,22 @@ localhost> lua t:unpack()
  - efg
  - ghq
  - qkl
+...
+localhost> lua t:slice(1, 2)
+---
+ - abc
+...
+localhost> lua t:slice(1, 3)
+---
+ - abc
+ - cde
+...
+localhost> lua t:slice(1, -1)
+---
+ - abc
+ - cde
+ - efg
+ - ghq
 ...
 </programlisting>
 
