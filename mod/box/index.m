@@ -131,16 +131,16 @@ iterator_first_equal(struct iterator *it)
 	return NULL;
 }
 
-- (struct box_tuple *) findByKey: (void *) key :(int) parts
+- (struct box_tuple *) findByKey: (void *) key :(int) part_count
 {
-	[self checkKeyParts: parts :false];
-	return [self findUnsafe: key :parts];
+	[self checkKeyParts: part_count :false];
+	return [self findUnsafe: key :part_count];
 }
 
-- (struct box_tuple *) findUnsafe: (void *) key :(int) parts
+- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count
 {
 	(void) key;
-	(void) parts;
+	(void) part_count;
 	[self subclassResponsibility: _cmd];
 	return NULL;
 }
@@ -180,30 +180,30 @@ iterator_first_equal(struct iterator *it)
 }
 
 - (void) initIteratorByKey: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) parts
+                        :(void *) key :(int) part_count
 {
-	[self checkKeyParts: parts :true];
-	[self initIteratorUnsafe: iterator :type :key :parts];
+	[self checkKeyParts: part_count :true];
+	[self initIteratorUnsafe: iterator :type :key :part_count];
 }
 
 - (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) parts
+                        :(void *) key :(int) part_count
 {
 	(void) iterator;
 	(void) type;
 	(void) key;
-	(void) parts;
+	(void) part_count;
 	[self subclassResponsibility: _cmd];
 }
 
-- (void) checkKeyParts: (int) parts :(bool) partial_key_allowed
+- (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed
 {
-	if (parts > key_def->part_count)
+	if (part_count > key_def->part_count)
 		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
-			  parts, key_def->part_count);
-	if (!partial_key_allowed && parts < key_def->part_count)
+			  part_count, key_def->part_count);
+	if (!partial_key_allowed && part_count < key_def->part_count)
 		tnt_raise(ClientError, :ER_EXACT_MATCH,
-			  parts, key_def->part_count);
+			  part_count, key_def->part_count);
 }
 
 @end
@@ -316,11 +316,11 @@ hash_iterator_free(struct iterator *iterator)
 	return (struct iterator *) it;
 }
 
-- (void) checkKeyParts: (int) parts :(bool) partial_key_allowed
+- (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed
 {
 	/* Hash indexes never allow partial keys. */
 	(void) partial_key_allowed;
-	[super checkKeyParts: parts :false];
+	[super checkKeyParts: part_count :false];
 }
 
 @end
@@ -367,9 +367,9 @@ int32_key_to_value(void *key)
 	return mh_size(int_hash);
 }
 
-- (struct box_tuple *) findUnsafe: (void *) key :(int) parts
+- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count
 {
-	(void) parts;
+	(void) part_count;
 
 	struct box_tuple *ret = NULL;
 	u32 num = int32_key_to_value(key);
@@ -432,9 +432,9 @@ int32_key_to_value(void *key)
 }
 
 - (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) parts
+                        :(void *) key :(int) part_count
 {
-	(void) parts;
+	(void) part_count;
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
@@ -488,9 +488,9 @@ int64_key_to_value(void *key)
 	return mh_size(int64_hash);
 }
 
-- (struct box_tuple *) findUnsafe: (void *) key :(int) parts
+- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count
 {
-	(void) parts;
+	(void) part_count;
 
 	struct box_tuple *ret = NULL;
 	u64 num = int64_key_to_value(key);
@@ -553,9 +553,9 @@ int64_key_to_value(void *key)
 }
 
 - (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) parts
+                        :(void *) key :(int) part_count
 {
-	(void) parts;
+	(void) part_count;
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
@@ -601,9 +601,9 @@ int64_key_to_value(void *key)
 	return mh_size(str_hash);
 }
 
-- (struct box_tuple *) findUnsafe: (void *) key :(int) parts
+- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count
 {
-	(void) parts;
+	(void) part_count;
 	struct box_tuple *ret = NULL;
 	mh_int_t k = mh_lstrptr_get(str_hash, key);
 	if (k != mh_end(str_hash))
@@ -670,9 +670,9 @@ int64_key_to_value(void *key)
 
 - (void) initIteratorUnsafe: (struct iterator *) iterator
 			:(enum iterator_type) type
-                        :(void *) key :(int) parts
+                        :(void *) key :(int) part_count
 {
-	(void) parts;
+	(void) part_count;
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 

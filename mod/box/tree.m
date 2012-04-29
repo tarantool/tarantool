@@ -864,14 +864,14 @@ tree_iterator_free(struct iterator *iterator)
 	return [self unfold: node];
 }
 
-- (struct box_tuple *) findUnsafe: (void *) key : (int) parts
+- (struct box_tuple *) findUnsafe: (void *) key : (int) part_count
 {
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) +
-			 _SIZEOF_SPARSE_PARTS(parts));
+			 _SIZEOF_SPARSE_PARTS(part_count));
 
 	key_data->data = key;
-	key_data->part_count = parts;
+	key_data->part_count = part_count;
 	fold_with_key_parts(key_def, key_data);
 
 	void *node = sptree_index_find(&tree, key_data);
@@ -934,13 +934,13 @@ tree_iterator_free(struct iterator *iterator)
 }
 
 - (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) parts
+                        :(void *) key :(int) part_count
 {
 	assert(iterator->free == tree_iterator_free);
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	it->key_data.data = key;
-	it->key_data.part_count = parts;
+	it->key_data.part_count = part_count;
 	fold_with_key_parts(key_def, &it->key_data);
 
 	if (type == ITER_FORWARD) {

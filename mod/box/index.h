@@ -130,18 +130,18 @@ struct key_def {
 			:(enum iterator_type) type;
 - (void) initIteratorByKey: (struct iterator *) iterator
 			:(enum iterator_type) type
-			:(void *) key :(int) parts;
+			:(void *) key :(int) part_count;
 /**
  * Check key cardinality.
  */
-- (void) checkKeyParts: (int) parts :(bool) partial_key_allowed;
+- (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed;
 /**
  * Unsafe search methods that do not check key cardinality.
  */
 - (struct box_tuple *) findUnsafe: (void *) key :(int) key_cardinality;
 - (void) initIteratorUnsafe: (struct iterator *) iterator
 			:(enum iterator_type) type
-			:(void *) key :(int) parts;
+			:(void *) key :(int) part_count;
 @end
 
 struct iterator {
