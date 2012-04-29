@@ -117,7 +117,7 @@ struct key_def {
 - (size_t) size;
 - (struct box_tuple *) min;
 - (struct box_tuple *) max;
-- (struct box_tuple *) findByKey: (void *) key :(int) parts;
+- (struct box_tuple *) findByKey: (void *) key :(int) part_count;
 - (struct box_tuple *) findByTuple: (struct box_tuple *) tuple;
 - (void) remove: (struct box_tuple *) tuple;
 - (void) replace: (struct box_tuple *) old_tuple :(struct box_tuple *) new_tuple;
@@ -138,7 +138,7 @@ struct key_def {
 /**
  * Unsafe search methods that do not check key cardinality.
  */
-- (struct box_tuple *) findUnsafe: (void *) key :(int) key_cardinality;
+- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count;
 - (void) initIteratorUnsafe: (struct iterator *) iterator
 			:(enum iterator_type) type
 			:(void *) key :(int) part_count;
