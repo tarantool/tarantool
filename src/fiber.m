@@ -1023,6 +1023,9 @@ fiber_init(void)
 void
 fiber_free(void)
 {
-	fiber_destroy_all();
-	mh_i32ptr_destroy(fibers_registry);
+	/* Only clean up if initialized. */
+	if (fibers_registry) {
+		fiber_destroy_all();
+		mh_i32ptr_destroy(fibers_registry);
+	}
 }
