@@ -1631,7 +1631,7 @@ recovery_update_mode(const char *mode, double fsync_delay)
 void
 recovery_update_io_rate_limit(double new_limit)
 {
-	recovery_state->snap_io_rate_limit = new_limit;
+	recovery_state->snap_io_rate_limit = new_limit * 1024 * 1024;
 }
 
 void
