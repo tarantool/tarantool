@@ -1,3 +1,9 @@
+tarantool (1.4.5+20120427-1) unstable; urgency=low
+
+  * New upstream snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 27 Apr 2012 11:59:49 +0400
+
 tarantool (1.4.4+20120127-1) unstable; urgency=low
 
   * Merge with upstream.
