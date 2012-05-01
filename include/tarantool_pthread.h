@@ -154,5 +154,17 @@
 	tt_pthread_error(e);			\
 })
 
+/** Make sure the created thread blocks all signals,
+ * they are handled in the main thread.
+ */
+#define tt_pthread_create(thread, attr, run, arg)	\
+({	sigset_t set, oldset;				\
+	sigfillset(&set);				\
+	pthread_sigmask(SIG_BLOCK, &set, &oldset);	\
+	int e = pthread_create(thread, attr, run, arg);	\
+	pthread_sigmask(SIG_SETMASK, &oldset, NULL);	\
+	tt_pthread_error(e);				\
+})
+
 
 #endif /* TARANTOOL_PTHREAD_H_INCLUDED */

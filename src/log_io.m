@@ -1357,8 +1357,8 @@ wal_writer_start(struct recovery_state *state)
 
 	/* II. Start the thread. */
 
-	if (pthread_create(&wal_writer.thread, NULL, wal_writer_thread,
-			   state)) {
+	if (tt_pthread_create(&wal_writer.thread, NULL, wal_writer_thread,
+			      state)) {
 		wal_writer_destroy(&wal_writer);
 		state->writer = NULL;
 		return -1;
