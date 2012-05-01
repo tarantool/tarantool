@@ -124,9 +124,8 @@ typedef struct tarantool_cfg {
 	int32_t	rows_per_wal;
 
 	/*
-	 * Size of the WAL writer request queue: how many outstanding
-	 * requests for write to disk it can have.
-	 * Rule of thumb is to set this to the average connection count.
+	 * OBSOLETE
+	 * Starting from 1.4.5, this variable has no effect.
 	 */
 	int32_t	wal_writer_inbox_size;
 

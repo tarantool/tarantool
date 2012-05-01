@@ -57,6 +57,7 @@
 #include <util.h>
 #include <third_party/gopt/gopt.h>
 #include <cfg/warning.h>
+#include "tarantool_pthread.h"
 
 
 static pid_t master_pid;
@@ -155,6 +156,10 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 			__func__, old_conf->wal_fsync_delay, new_delay);
 
 	recovery_update_mode(new_conf->wal_mode, new_delay);
+
+	recovery_update_io_rate_limit(new_conf->snap_io_rate_limit);
+
+	ev_set_io_collect_interval(new_conf->io_collect_interval);
 
 	return 0;
 }
@@ -273,12 +278,17 @@ snapshot(void *ev, int events __attribute__((unused)))
 		 */
 		wait_for_child(p);
 		assert(p == fiber->cw.rpid);
-		return WEXITSTATUS(fiber->cw.rstatus);
+		return (WIFSIGNALED(fiber->cw.rstatus) ? EINTR :
+			WEXITSTATUS(fiber->cw.rstatus));
 	}
 
 	fiber_set_name(fiber, "dumper");
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
 
+	/*
+	 * Safety: make sure we don't double-write
+	 * parent stdio buffers at exit().
+	 */
 	close_all_xcpt(1, sayfd);
 	snapshot_save(recovery_state, mod_snapshot);
 
@@ -303,6 +313,31 @@ signal_free(void)
 	for (i = 0 ; i < 4 ; i++)
 		ev_signal_stop(&sigs[i]);
 }
+
+/** Make sure the child has a default signal disposition. */
+static void
+signal_reset()
+{
+	struct sigaction sa;
+
+	/* Reset all signals to their defaults. */
+	memset(&sa, 0, sizeof(sa));
+	sigemptyset(&sa.sa_mask);
+	sa.sa_handler = SIG_DFL;
+
+	if (sigaction(SIGUSR1, &sa, NULL) == -1 ||
+	    sigaction(SIGINT, &sa, NULL) == -1 ||
+	    sigaction(SIGTERM, &sa, NULL) == -1 ||
+	    sigaction(SIGHUP, &sa, NULL) == -1)
+		say_syserror("sigaction");
+
+	/* Unblock any signals blocked by libev. */
+	sigset_t sigset;
+	sigfillset(&sigset);
+	if (sigprocmask(SIG_UNBLOCK, &sigset, NULL) == -1)
+		say_syserror("sigprocmask");
+}
+
 
 /**
  * Adjust the process signal mask and add handlers for signals.
@@ -333,6 +368,7 @@ signal_init(void)
 	ev_signal_start(&sigs[3]);
 
 	atexit(signal_free);
+	tt_pthread_atfork(NULL, NULL, signal_reset);
 }
 
 static void
@@ -685,6 +721,14 @@ main(int argc, char **argv)
 	tarantool_lua_load_cfg(tarantool_L, &cfg);
 	admin_init();
 	replication_init();
+
+	/*
+	 * Load user init script.
+	 * The script should have access to Tarantool Lua API (box.cfg,
+	 * box.fiber, etc...) that is why script must run only after the server
+	 * was fully initialized.
+	 */
+	tarantool_lua_load_init_script(tarantool_L);
 
 	prelease(fiber->gc_pool);
 	say_crit("log level %i", cfg.log_level);

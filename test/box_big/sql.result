@@ -343,11 +343,11 @@ lua for k, v in box.space[4]:pairs() do print(v) end
 ...
 lua box.space[4].index[0].idx:min()
 ---
-error: 'Unsupported'
+error: 'Hash index does not support min()'
 ...
 lua box.space[4].index[0].idx:max()
 ---
-error: 'Unsupported'
+error: 'Hash index does not support max()'
 ...
 lua box.space[4].index[1].idx:min()
 ---

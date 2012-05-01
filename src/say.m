@@ -168,10 +168,12 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 void
 _say(int level, const char *filename, int line, const char *error, const char *format, ...)
 {
+	int errsv = errno; /* Preserve the errno. */
         if (cfg.log_level < level)
 		return;
 	va_list ap;
 	va_start(ap, format);
 	vsay(level, filename, line, error, format, ap);
 	va_end(ap);
+	errno = errsv; /* Preserve the errno. */
 }

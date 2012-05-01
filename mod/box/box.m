@@ -36,7 +36,6 @@
 #include <fiber.h>
 #include <log_io.h>
 #include <pickle.h>
-#include <salloc.h>
 #include <say.h>
 #include <stat.h>
 #include <tarantool.h>
@@ -2144,7 +2143,7 @@ mod_init(void)
 		      cfg.wal_fsync_delay,
 		      init_storage ? RECOVER_READONLY : 0, NULL);
 
-	recovery_state->snap_io_rate_limit = cfg.snap_io_rate_limit * 1024 * 1024;
+	recovery_update_io_rate_limit(cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
 	stat_base = stat_register(messages_strs, messages_MAX);

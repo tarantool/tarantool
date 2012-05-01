@@ -45,6 +45,9 @@
 #include <ctype.h>
 #include TARANTOOL_CONFIG
 
+/** tarantool start-up file */
+#define TARANTOOL_LUA_INIT_SCRIPT "init.lua"
+
 struct lua_State *tarantool_L;
 
 /* Remember the output of the administrative console in the
@@ -902,6 +905,12 @@ tarantool_lua_register_type(struct lua_State *L, const char *type_name,
 	lua_pop(L, 1);
 }
 
+/**
+ * Remember the LuaJIT FFI extension reference index
+ * to protect it from being garbage collected.
+ */
+static int ffi_ref = 0;
+
 struct lua_State *
 tarantool_lua_init()
 {
@@ -909,6 +918,15 @@ tarantool_lua_init()
 	if (L == NULL)
 		return L;
 	luaL_openlibs(L);
+	/* Loading 'ffi' extension and making it inaccessible */
+	lua_getglobal(L, "require");
+	lua_pushstring(L, "ffi");
+	if (lua_pcall(L, 1, 0, 0) != 0)
+		panic("%s", lua_tostring(L, -1));
+	lua_getglobal(L, "ffi");
+	ffi_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_pushnil(L);
+	lua_setglobal(L, "ffi");
 	luaL_register(L, boxlib_name, boxlib);
 	lua_pop(L, 1);
 	luaL_register(L, fiberlib_name, fiberlib);
@@ -925,6 +943,7 @@ tarantool_lua_init()
 void
 tarantool_lua_close(struct lua_State *L)
 {
+	luaL_unref(L, LUA_REGISTRYINDEX, ffi_ref);
 	lua_close(L); /* collects garbage, invoking userdata gc */
 }
 
@@ -953,6 +972,14 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 		return 1;
 	}
 	return 0;
+}
+
+static int
+tarantool_lua_dofile(struct lua_State *L, const char *filename)
+{
+	lua_getglobal(L, "dofile");
+	lua_pushstring(L, filename);
+	return lua_pcall(L, 1, 1, 0);
 }
 
 void
@@ -1045,6 +1072,41 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		panic("%s", lua_tostring(L, -1));
 	}
 	lua_pop(L, 1);
+}
+
+/**
+ * Load start-up file routine
+ */
+static void
+load_init_script(void *L_ptr)
+{
+	struct lua_State *L = (struct lua_State *) L_ptr;
+	struct stat st;
+	/* checking that Lua start-up file exist. */
+	if (stat(TARANTOOL_LUA_INIT_SCRIPT, &st)) {
+		/*
+		 * File doesn't exist. It's OK, tarantool may not have
+		 * start-up file.
+		 */
+		return;
+	}
+
+	/* execute start-up file */
+	if (tarantool_lua_dofile(L, TARANTOOL_LUA_INIT_SCRIPT))
+		panic("%s", lua_tostring(L, -1));
+}
+
+void tarantool_lua_load_init_script(struct lua_State *L)
+{
+	/*
+	 * init script can call box.fiber.yield (including implicitly via
+	 * box.insert, box.update, etc...) but yield which called in sched
+	 * fiber will crash the server. That why, to avoid the problem, we must
+	 * run init script in to separate fiber.
+	 */
+	struct fiber *loader = fiber_create(TARANTOOL_LUA_INIT_SCRIPT, -1,
+					    load_init_script, L);
+	fiber_call(loader);
 }
 
 /*

@@ -374,3 +374,66 @@ exec admin "lua table.insert(ops_list, box.upd.insert(1, 4))"
 exec admin "lua box.update_ol(0, ops_list, 1)"
 
 exec admin "lua box.space[0]:truncate()"
+
+
+print """
+#
+# test that ffi extension is inaccessible
+#
+"""
+
+exec admin "lua ffi"
+
+
+print """
+#
+# Lua init lua script test
+#
+"""
+
+print """
+# Load testing init lua script
+"""
+server.stop()
+server.deploy(init_lua="box/test_init.lua")
+
+print """
+# Test asscess to box configuration
+"""
+exec admin "lua print_config()"
+
+print """
+# Test bug #977898
+"""
+exec admin "lua box.select(0, 0, 1)"
+
+print """
+# Test insert from init.lua
+"""
+exec admin "lua box.select(0, 0, 2)"
+
+print """
+# clean-up after tests
+"""
+server.stop()
+server.deploy(init_lua=None)
+print """
+# Test box.tuple:slice()
+"""
+exec admin "lua t=box.space[0]:insert(0, '1', '2', '3', '4', '5', '6', '7')"
+exec admin "lua t:slice(0)"
+exec admin "lua t:slice(-1)"
+exec admin "lua t:slice(1)"
+exec admin "lua t:slice(-1, -1)"
+exec admin "lua t:slice(-1, 1)"
+exec admin "lua t:slice(1, -1)"
+exec admin "lua t:slice(1, 3)"
+exec admin "lua t:slice(7)"
+exec admin "lua t:slice(9)"
+exec admin "lua t:slice(9, -1)"
+exec admin "lua t:slice(6, -1)"
+exec admin "lua t:slice(9, 10)"
+exec admin "lua t:slice(500, 700)"
+exec admin "lua box.space[0]:truncate()"
+
+

@@ -107,3 +107,6 @@ exec admin "lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'Vincent', 'T
 exec admin "lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'Vincent', 'The Wolf!')"
 # try to delete by invalid key
 exec admin "lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'The Wolf!', 'Vincent', 1, 'Come again?')"
+exec admin "lua box.space[9]:len()"
+exec admin "lua box.space[9]:truncate()"
+exec admin "lua box.space[9]:len()"

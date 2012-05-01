@@ -5,7 +5,7 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.m
     DEPENDS ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.rl)
 # Do not clean memcached-grammar.m in 'make clean'.
 set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
-set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES box.lua.o)
+set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES tmp.c box.lua.c)
 
 add_custom_target(generate_memcached_grammar_m DEPENDS
     ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.m)
@@ -15,12 +15,18 @@ add_custom_target(generate_memcached_grammar_m DEPENDS
 execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
     ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.m)
 
-add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/box.lua.o
-    COMMAND cd ${CMAKE_SOURCE_DIR}/mod/box && ${LD} -r -b binary box.lua -o ${CMAKE_CURRENT_BINARY_DIR}/box.lua.o
-    DEPENDS box.lua)
+ADD_CUSTOM_COMMAND(OUTPUT ${CMAKE_BINARY_DIR}/mod/box/box.lua.c
+    COMMAND ${ECHO} 'const char box_lua[] =' > tmp.c
+    COMMAND ${CMAKE_BINARY_DIR}/extra/txt2c
+        ${CMAKE_SOURCE_DIR}/mod/box/box.lua >> tmp.c
+    COMMAND ${ECHO} '\;' >> tmp.c
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different tmp.c
+        ${CMAKE_BINARY_DIR}/mod/box/box.lua.c
+    COMMAND ${CMAKE_COMMAND} -E remove tmp.c
+    DEPENDS ${CMAKE_SOURCE_DIR}/mod/box/box.lua)
 
-set_source_files_properties(box.lua.o
-    PROPERTIES EXTERNAL_OBJECT true)
+add_custom_target(generate_box_lua_c
+    DEPENDS ${CMAKE_BINARY_DIR}/mod/box/box.lua.c)
 
 set_source_files_properties(memcached-grammar.m
     PROPERTIES HEADER_FILE_ONLY true)
@@ -28,6 +34,5 @@ set_source_files_properties(memcached-grammar.m
 set_source_files_properties(memcached.m
     PROPERTIES COMPILE_FLAGS "-Wno-uninitialized")
 
-tarantool_module("box" tuple.m index.m tree.m box.m box_lua.m
-    memcached.m memcached-grammar.m
-    box.lua.o)
+tarantool_module("box" tuple.m index.m tree.m box.m box.lua.c box_lua.m
+    memcached.m memcached-grammar.m)

@@ -53,6 +53,14 @@ lua box.cfg.too_long_threshold
 ---
  - 2
 ...
+lua box.cfg.snap_io_rate_limit
+---
+ - 10
+...
+lua box.cfg.io_collect_interval
+---
+ - 0.01
+...
 reload configuration
 ---
 fail:

@@ -1,7 +1,7 @@
 /*
  * loop member variable declarations
  *
- * Copyright (c) 2007,2008,2009,2010,2011 Marc Alexander Lehmann <libev@schmorp.de>
+ * Copyright (c) 2007,2008,2009,2010,2011,2012 Marc Alexander Lehmann <libev@schmorp.de>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modifica-
@@ -51,7 +51,7 @@ VARx(int, activecnt) /* total number of active events ("refcount") */
 VARx(EV_ATOMIC_T, loop_done)  /* signal by ev_break */
 
 VARx(int, backend_fd)
-VARx(ev_tstamp, backend_fudge) /* assumed typical timer resolution */
+VARx(ev_tstamp, backend_mintime) /* assumed typical timer resolution */
 VAR (backend_modify, void (*backend_modify)(EV_P_ int fd, int oev, int nev))
 VAR (backend_poll  , void (*backend_poll)(EV_P_ ev_tstamp timeout))
 
@@ -73,6 +73,8 @@ VARx(int, evfd)
 #endif
 VAR (evpipe, int evpipe [2])
 VARx(ev_io, pipe_w)
+VARx(EV_ATOMIC_T, pipe_write_wanted)
+VARx(EV_ATOMIC_T, pipe_write_skipped)
 
 #if !defined(_WIN32) || EV_GENWRAP
 VARx(pid_t, curpid)
@@ -108,6 +110,7 @@ VARx(int, epoll_epermmax)
 #endif
 
 #if EV_USE_KQUEUE || EV_GENWRAP
+VARx(pid_t, kqueue_fd_pid)
 VARx(struct kevent *, kqueue_changes)
 VARx(int, kqueue_changemax)
 VARx(int, kqueue_changecnt)
@@ -180,7 +183,6 @@ VAR (fs_hash, ANFS fs_hash [EV_INOTIFY_HASHSIZE])
 #endif
 
 VARx(EV_ATOMIC_T, sig_pending)
-VARx(int, nosigmask)
 #if EV_USE_SIGNALFD || EV_GENWRAP
 VARx(int, sigfd)
 VARx(ev_io, sigfd_w)
@@ -194,8 +196,8 @@ VARx(unsigned int, loop_count) /* total number of loop iterations/blocks */
 VARx(unsigned int, loop_depth) /* #ev_run enters - #ev_run leaves */
 
 VARx(void *, userdata)
-VAR (release_cb, void (*release_cb)(EV_P))
-VAR (acquire_cb, void (*acquire_cb)(EV_P))
+VAR (release_cb, void (*release_cb)(EV_P) EV_THROW)
+VAR (acquire_cb, void (*acquire_cb)(EV_P) EV_THROW)
 VAR (invoke_cb , void (*invoke_cb) (EV_P))
 #endif
 

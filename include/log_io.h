@@ -57,9 +57,6 @@ struct log_io_class {
 	row_reader *reader;
 	u64 marker, eof_marker;
 	size_t marker_size, eof_marker_size;
-	size_t rows_per_file;
-	/* wal_fsync_delay value for the log class. */
-	double fsync_delay;
 	bool panic_if_error;
 
 	/* Additional flags to apply at open(2) to write. */
@@ -107,8 +104,14 @@ struct wal_writer;
 
 struct recovery_state {
 	i64 lsn, confirmed_lsn;
-
-	struct log_io *current_wal;	/* the WAL we'r currently reading/writing from/to */
+	/* The WAL we're currently reading/writing from/to. */
+	struct log_io *current_wal;
+	/*
+	 * When opening the next WAL, we want to first open
+	 * a new file before closing the previous one. Thus
+	 * we save the old WAL here.
+	 */
+	struct log_io *previous_wal;
 	struct log_io_class *snap_class;
 	struct log_io_class *wal_class;
 	struct wal_writer *writer;
@@ -123,6 +126,9 @@ struct recovery_state {
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
 
 	int snap_io_rate_limit;
+	int rows_per_wal;
+	int flags;
+	double wal_fsync_delay;
 	u64 cookie;
 	struct wait_lsn wait_lsn;
 
@@ -173,10 +179,11 @@ struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, u64 cookie, i64 lsn);
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler,
-		   int rows_per_file, const char *wal_mode,
-		   double fsync_delay,
+		   int rows_per_wal, const char *wal_mode,
+		   double wal_fsync_delay,
 		   int flags, void *data);
 void recovery_update_mode(const char *wal_mode, double fsync_delay);
+void recovery_update_io_rate_limit(double new_limit);
 void recovery_free();
 int recover(struct recovery_state *, i64 lsn);
 void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);

@@ -214,10 +214,11 @@ endif()
 #
 # Now handle all configuration options.
 #
+option(ENABLE_DOC "Enable building of documentation" OFF)
 
 # LuaJIT options are defined in cmake/luajit.cmake
 
-option(ENABLE_CLIENT "Enable building of console client" Off)
+option(ENABLE_CLIENT "Enable building of console client" OFF)
 if (ENABLE_CLIENT)
     set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
 endif()
@@ -281,11 +282,11 @@ add_subdirectory(third_party)
 add_subdirectory(cfg)
 add_subdirectory(connector)
 add_subdirectory(src)
+add_subdirectory(extra)
 add_subdirectory(mod)
 add_subdirectory(client)
 add_subdirectory(test)
 add_subdirectory(doc)
-add_subdirectory(extra)
 
 install (FILES README LICENSE doc/box-protocol.txt
          DESTINATION share/doc/tarantool)
@@ -332,6 +333,7 @@ message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
 message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE} (symbol resolve: ${HAVE_BFD})")
 message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
 message (STATUS "ENABLE_BUNDLED_LUAJIT: ${ENABLE_BUNDLED_LUAJIT}")
+message (STATUS "ENABLE_DOC: ${ENABLE_DOC}")
 message (STATUS "")
 message (STATUS "To view or modify configuration results, check out CMakeCache.txt.")
 message (STATUS "")

@@ -54,7 +54,7 @@ logger=NULL, ro
 logger_nonblock=true, ro
 
 # delay between loop iterations
-io_collect_interval=0.0, ro
+io_collect_interval=0.0
 
 # size of listen backlog
 backlog=1024, ro
@@ -63,7 +63,7 @@ backlog=1024, ro
 readahead=16320
 
 # Do not write into snapshot faster than snap_io_rate_limit MB/sec
-snap_io_rate_limit=0.0, ro
+snap_io_rate_limit=0.0
 
 # Write no more rows in WAL
 rows_per_wal=500000, ro

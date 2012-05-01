@@ -10,7 +10,7 @@
 
 RETVAL=0
 INST="$(basename $0)"
-export PIDFILE="/var/${INST}/pid"
+export PIDFILE="/var/${INST}/box.pid"
 export WRAP_PIDFILE="/var/${INST}/wrapper.pid"
 export OPTIONS=""
 
@@ -21,7 +21,7 @@ export OPTIONS=""
 # If, for some reason, this script is invoked not via
 # a symlink, do nothing.
 #
-if [ "${INST}" == "tarantool" ]
+if [ "${INST}" == "tarantool_box" ]
 then
         echo_failure
         echo
@@ -76,7 +76,7 @@ case "$1" in
                 restart
                 ;;
         *)
-                echo $"Usage: $0 {start|stop}"
+                echo $"Usage: $0 {start|stop|restart}"
                 RETVAL=1
 esac
 

@@ -17,8 +17,7 @@ Found 1 tuple:
 # https://bugs.launchpad.net/tarantool/+bug/904208
 #
 call box.select(1, 1, 'new', 'world', 'order')
-Found 1 tuple:
-['brave', 'new', 'world']
+An error occurred: ER_KEY_CARDINALITY, 'Key cardinality 3 is greater than index cardinality 2'
 call box.delete(1, 'brave')
 Found 1 tuple:
 ['brave', 'new', 'world']

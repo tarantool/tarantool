@@ -1,5 +1,6 @@
--- This function create new table with constants members. The run-time error
--- will be raised if attempting to change table members.
+-- This function creates a new table with constant members.
+-- A run-time error will be raised on attempt to change
+-- table members.
 local function create_const_table(table)
     return setmetatable ({}, {
 			     __index = table,
@@ -302,12 +303,12 @@ function box.on_reload_configuration()
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.truncate = function(space)
-        while true do
-            local k, v = space.index[0].idx:next()
-            if v == nil then
-                break
+        local pk = space.index[0].idx
+        local part_count = pk:part_count()
+        while #pk > 0 do
+            for k, v in pk.next, pk, nil do
+                space:delete(v:slice(0, part_count))
             end
-            space:delete(v[0])
         end
     end
     space_mt.pairs = function(space) return space.index[0]:pairs() end
@@ -323,15 +324,8 @@ function box.on_reload_configuration()
         end
     end
 end
-local initfile = io.open("init.lua")
-if initfile ~= nil then
-    io.close(initfile)
-    dofile("init.lua")
-end
--- 64bit operations support, etc.
-ffi = require("ffi")
+
 -- security: nullify some of the most serious os.* holes
---
 os.execute = nil
 os.exit = nil
 os.rename = nil

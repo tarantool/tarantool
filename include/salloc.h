@@ -34,7 +34,7 @@ struct tbuf;
 
 bool salloc_init(size_t size, size_t minimal, double factor);
 void salloc_destroy(void);
-void *salloc(size_t size);
+void *salloc(size_t size, const char *what);
 void sfree(void *ptr);
 void slab_validate();
 void slab_stat(struct tbuf *buf);

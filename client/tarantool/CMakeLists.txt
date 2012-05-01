@@ -1,5 +1,6 @@
 
 project(tnt_cli)
+include(FindCurses)
 
 # checking for readline library
 #
@@ -12,17 +13,19 @@ endif()
 
 set (cli_deps ${READLINE_LIB} ${READLINE_HISTORY_LIB})
 
+if (CURSES_FOUND)
+    set(cli_deps ${cli_deps} ${CURSES_LIBRARIES})
+else()
+    message(FATAL_ERROR "curses library not found.")
+endif()
+find_library(TERMCAP_LIBRARY NAMES "termcap")
+if (TERMCAP_LIBRARY)
+    set(cli_deps ${cli_deps} ${TERMCAP_LIBRARY})
+else()
+    message(FATAL_ERROR "termcap library not found.")
+endif()
 # trying to resolve readline dependencies
 #
-find_library(NCURSES_LIB NAMES "ncurses")
-if (NCURSES_LIB)
-    set(cli_deps ${cli_deps} ${NCURSES_LIB})
-else()
-    find_library(TERMCAP_LIB NAMES "termcap")
-    if (TERMCAP_LIB)
-        set(cli_deps ${cli_deps} ${TERMCAP_LIB})
-    endif()
-endif()
 
 set (cli "tarantool")
 set (cli_sources tnt.c tnt_admin.c)
