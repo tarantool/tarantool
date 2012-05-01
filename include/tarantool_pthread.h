@@ -149,5 +149,10 @@
 	tt_pthread_error(e);			\
 })
 
+#define tt_pthread_atfork(prepare, parent, child)\
+({	int e = pthread_atfork(prepare, parent, child);\
+	tt_pthread_error(e);			\
+})
+
 
 #endif /* TARANTOOL_PTHREAD_H_INCLUDED */

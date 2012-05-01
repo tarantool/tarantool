@@ -1254,7 +1254,7 @@ wal_writer_child()
 static void
 wal_writer_init_once()
 {
-	pthread_atfork(NULL, NULL, wal_writer_child);
+	tt_pthread_atfork(NULL, NULL, wal_writer_child);
 }
 
 /**
