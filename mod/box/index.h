@@ -117,7 +117,7 @@ struct key_def {
 - (size_t) size;
 - (struct box_tuple *) min;
 - (struct box_tuple *) max;
-- (struct box_tuple *) find: (void *) key :(int) key_cardinality;
+- (struct box_tuple *) findByKey: (void *) key :(int) part_count;
 - (struct box_tuple *) findByTuple: (struct box_tuple *) tuple;
 - (void) remove: (struct box_tuple *) tuple;
 - (void) replace: (struct box_tuple *) old_tuple :(struct box_tuple *) new_tuple;
@@ -126,10 +126,22 @@ struct key_def {
  * initialized separately.
  */
 - (struct iterator *) allocIterator;
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type;
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-			:(void *) key
-			:(int) part_count;
+- (void) initIterator: (struct iterator *) iterator
+			:(enum iterator_type) type;
+- (void) initIteratorByKey: (struct iterator *) iterator
+			:(enum iterator_type) type
+			:(void *) key :(int) part_count;
+/**
+ * Check key cardinality.
+ */
+- (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed;
+/**
+ * Unsafe search methods that do not check key cardinality.
+ */
+- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count;
+- (void) initIteratorUnsafe: (struct iterator *) iterator
+			:(enum iterator_type) type
+			:(void *) key :(int) part_count;
 @end
 
 struct iterator {

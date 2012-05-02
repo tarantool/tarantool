@@ -31,8 +31,8 @@
 #include <unistd.h>
 #include <sys/uio.h>
 
-#include <connector/c/include/libtnt/tnt.h>
-#include <connector/c/include/libtnt/tnt_iob.h>
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_iob.h>
 
 int
 tnt_iob_init(struct tnt_iob *iob, size_t size,

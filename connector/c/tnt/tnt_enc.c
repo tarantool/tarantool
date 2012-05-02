@@ -28,7 +28,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <connector/c/include/libtnt/tnt_enc.h>
+#include <connector/c/include/tarantool/tnt_enc.h>
 
 int
 tnt_enc_read(char *buf, uint32_t *value)

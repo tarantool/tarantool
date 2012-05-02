@@ -32,8 +32,8 @@
 #include <sys/types.h>
 #include <sys/time.h>
 
-#include <connector/c/include/libtnt/tnt.h>
-#include <connector/c/include/libtnt/tnt_net.h>
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_net.h>
 
 void
 tnt_opt_init(struct tnt_opt *opt)

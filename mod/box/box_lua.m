@@ -491,7 +491,7 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 				   "does not match index cardinality (%d)",
 				   cardinality, index->key_def->part_count);
 		it = [index allocIterator];
-		[index initIterator: it :type :key :cardinality];
+		[index initIteratorByKey: it :type :key :cardinality];
 		lbox_pushiterator(L, it);
 	} else { /* 1 item on the stack and it's a userdata. */
 		it = lua_checkiterator(L, 2);
