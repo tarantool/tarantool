@@ -405,6 +405,9 @@ exec admin "lua print_config()"
 print """
 # Test bug #977898
 """
+# Run a couple of dummy selects to avoid race conditions under valgrind
+exec admin "lua box.select(0, 0, 4)"
+exec admin "lua box.select(0, 0, 5)"
 exec admin "lua box.select(0, 0, 1)"
 
 print """
