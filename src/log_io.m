@@ -1228,6 +1228,10 @@ recover_finalize(struct recovery_state *r)
 		wal_writer_start(r);
 }
 
+/* {{{ WAL writer - maintain a Write Ahead Log for every change
+ * in the data state.
+ */
+
 /**
  * A pthread_atfork() callback for a child process. Today we only
  * fork the master process to save a snapshot, and in the child
@@ -1336,6 +1340,10 @@ static void *wal_writer_thread(void *worker_args);
 /**
  * Initialize WAL writer, start the thread.
  *
+ * @pre   The server has completed recovery from a snapshot
+ *        and/or existing WALs. All WALs opened in read-only
+ *        mode are closed.
+ *
  * @param state			WAL writer meta-data.
  *
  * @return 0 success, -1 on error. On success, recovery->writer
@@ -1398,7 +1406,7 @@ error:
  * Block on the condition only if we have no other work to
  * do. Loop in case of a spurious wakeup.
  */
-struct wal_fifo
+static struct wal_fifo
 wal_writer_pop(struct wal_writer *writer, bool input_was_empty)
 {
 	struct wal_fifo input;
@@ -1585,6 +1593,8 @@ wal_write(struct recovery_state *r, u16 tag, u16 op, u64 cookie,
 
 	return req->out_lsn == 0 ? -1 : 0;
 }
+
+/* }}} */
 
 void
 recovery_init(const char *snap_dirname, const char *wal_dirname,
@@ -1788,3 +1798,7 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 
 	say_info("done");
 }
+
+/*
+ * vim: foldmethod=marker
+ */
