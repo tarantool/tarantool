@@ -33,20 +33,20 @@ extern "C" {
 #include <stdint.h>
 #include <stdarg.h>
 
-#include <libtnt/tnt_mem.h>
-#include <libtnt/tnt_proto.h>
-#include <libtnt/tnt_enc.h>
-#include <libtnt/tnt_tuple.h>
-#include <libtnt/tnt_reply.h>
-#include <libtnt/tnt_stream.h>
-#include <libtnt/tnt_iter.h>
-#include <libtnt/tnt_buf.h>
-#include <libtnt/tnt_ping.h>
-#include <libtnt/tnt_insert.h>
-#include <libtnt/tnt_update.h>
-#include <libtnt/tnt_delete.h>
-#include <libtnt/tnt_call.h>
-#include <libtnt/tnt_select.h>
+#include <tarantool/tnt_mem.h>
+#include <tarantool/tnt_proto.h>
+#include <tarantool/tnt_enc.h>
+#include <tarantool/tnt_tuple.h>
+#include <tarantool/tnt_reply.h>
+#include <tarantool/tnt_stream.h>
+#include <tarantool/tnt_iter.h>
+#include <tarantool/tnt_buf.h>
+#include <tarantool/tnt_ping.h>
+#include <tarantool/tnt_insert.h>
+#include <tarantool/tnt_update.h>
+#include <tarantool/tnt_delete.h>
+#include <tarantool/tnt_call.h>
+#include <tarantool/tnt_select.h>
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -48,19 +48,21 @@ string(REPLACE "-static" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 #
 # Static library
 #
-
 project(tnt)
 add_library(tnt STATIC ${tnt_sources})
 set_target_properties(tnt PROPERTIES COMPILE_FLAGS "${tnt_cflags}")
+set_target_properties(tnt PROPERTIES VERSION ${LIBTNT_VERSION} SOVERSION ${LIBTNT_SOVERSION})
+set_target_properties(tnt PROPERTIES OUTPUT_NAME "tarantool")
 
 #
 # Shared library
 #
-
 project(tnt_shared)
 add_library(tnt_shared SHARED ${tnt_sources})
 set_target_properties(tnt_shared PROPERTIES OUTPUT_NAME tnt)
 set_target_properties(tnt_shared PROPERTIES COMPILE_FLAGS "${tnt_cflags}")
+set_target_properties(tnt_shared PROPERTIES VERSION ${LIBTNT_VERSION} SOVERSION ${LIBTNT_SOVERSION})
+set_target_properties(tnt_shared PROPERTIES OUTPUT_NAME "tarantool")
 
 #----------------------------------------------------------------------------#
 # Install

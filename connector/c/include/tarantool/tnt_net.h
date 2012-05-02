@@ -32,8 +32,8 @@
 #include <sys/types.h>
 #include <sys/time.h>
 
-#include <libtnt/tnt_opt.h>
-#include <libtnt/tnt_iob.h>
+#include <tarantool/tnt_opt.h>
+#include <tarantool/tnt_iob.h>
 
 enum tnt_error {
 	TNT_EOK,

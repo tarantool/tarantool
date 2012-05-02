@@ -28,12 +28,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <connector/c/include/libtnt/tnt_proto.h>
-#include <connector/c/include/libtnt/tnt_enc.h>
-#include <connector/c/include/libtnt/tnt_tuple.h>
-#include <connector/c/include/libtnt/tnt_reply.h>
-#include <connector/c/include/libtnt/tnt_stream.h>
-#include <connector/c/include/libtnt/tnt_call.h>
+#include <connector/c/include/tarantool/tnt_proto.h>
+#include <connector/c/include/tarantool/tnt_enc.h>
+#include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_reply.h>
+#include <connector/c/include/tarantool/tnt_stream.h>
+#include <connector/c/include/tarantool/tnt_call.h>
 
 struct tnt_header_call {
 	uint32_t flags;
