@@ -1017,7 +1017,7 @@ prepare_update(struct box_txn *txn, struct tbuf *data)
 	struct update_cmd *cmd = parse_update_cmd(data);
 
 	/* Try to find the tuple. */
-	txn->old_tuple = [txn->index find :cmd->key :cmd->key_cardinality];
+	txn->old_tuple = [txn->index findByKey :cmd->key :cmd->key_cardinality];
 	if (txn->old_tuple == NULL) {
 		/* Not found. For simplicity, skip the logging. */
 		txn->flags |= BOX_NOT_STORE;
@@ -1070,7 +1070,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 		read_key(data, &key, &key_cardinality);
 
 		struct iterator *it = index->position;
-		[index initIterator: it :ITER_FORWARD :key :key_cardinality];
+		[index initIteratorByKey: it :ITER_FORWARD :key :key_cardinality];
 
 		while ((tuple = it->next_equal(it)) != NULL) {
 			if (tuple->flags & GHOST)
@@ -1101,7 +1101,7 @@ prepare_delete(struct box_txn *txn, struct tbuf *data)
 	void *key;
 	read_key(data, &key, &key_cardinality);
 	/* try to find tuple in primary index */
-	txn->old_tuple = [txn->index find :key :key_cardinality];
+	txn->old_tuple = [txn->index findByKey :key :key_cardinality];
 
 	if (txn->old_tuple == NULL) {
 		/*
