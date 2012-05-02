@@ -34,7 +34,7 @@ example:
     for later use.
     </para></listitem>
     <listitem><para>
-    The new tuple gets <emphasis>validated</emphasis>. If it
+    The new tuple is then <emphasis>validated</emphasis>. If it
     violates a unique-key constraint, misses
     an indexed field, or an index-field type does not
     match the type of the index, the change is aborted.
