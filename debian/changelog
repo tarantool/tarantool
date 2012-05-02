@@ -1,8 +1,12 @@
-tarantool (1.4.5+20120427-1) unstable; urgency=low
+tarantool (1.4.5+20120502-1) unstable; urgency=low
 
   * New upstream snapshot.
+  * Add Priority for sources.
+  * Drop tarantool-connector-c (we wait for rename tarantool libraries).
+  * Add libtarantool* packages that weren't be packaged earlier: upstream
+    renamed them, now we have no conflicts with the other debian packages.
 
- -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 27 Apr 2012 11:59:49 +0400
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 02 May 2012 18:19:48 +0400
 
 tarantool (1.4.4+20120127-1) unstable; urgency=low
 

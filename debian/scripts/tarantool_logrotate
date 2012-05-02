@@ -30,8 +30,12 @@ logger_notify() {
 	  | grep 'logger_pid:' \
 	  | sed 's/[^[:digit:]]//g'
 	`
-	[ $? -eq 0 ] || error "failed to get logger pid"
-	kill -HUP $LOGGER_PID
+
+	if test ! -z $LOGGER_PID; then
+	    kill -HUP $LOGGER_PID
+	else
+	    error "failed to get logger pid"
+	fi
 }
 
 if ! echo $1|grep -q '^\(start\)$'; then
