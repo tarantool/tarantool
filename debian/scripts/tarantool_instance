@@ -82,6 +82,7 @@ sed "s/^[[:space:]]*file_descriptors.*/# & $comment_str/" $CFG > $SCFG
 echo "pid_file = $PID"        >> $SCFG
 echo "logger   = \"$LOGGER\"" >> $SCFG
 grep '^[[:space:]]*admin_port[[:space:]]*=' $CFG |tail -n 1 >> $SCFG
+grep '^[[:space:]]*primary_port[[:space:]]*=' $CFG |tail -n 1 >> $SCFG
 
 $BOX -c $SCFG -v --check-config
 
