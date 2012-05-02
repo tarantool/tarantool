@@ -69,7 +69,7 @@ Description: high performance key/value storage server
   * available on Linux and FreeBSD
   * stored procedures in Lua are supported
  .
- This package provides debug symbols for all tarantool packages (debug symbols).
+ This package provides debug symbols for tarantool.
 
 Package: tarantool-client
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
