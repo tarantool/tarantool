@@ -7,7 +7,7 @@
 <title>Data persistence</title>
 <para>
 To maintain data persistence, Tarantool writes each data change
-request (INSERT, UPDATE, DELETE) into a write ahead log. WAL
+request (INSERT, UPDATE, DELETE) into a write-ahead log. WAL
 files have extension <filename>.xlog</filename> and are stored in <olink
 targetptr="wal_dir"/>. A new WAL file is created for every <olink
 targetptr="rows_per_wal"/> records.  Each INSERT, UPDATE or DELETE
@@ -23,36 +23,35 @@ each WAL record contains a checksum and a UNIX time stamp.
 </para>
 
 <para>
-Tarantool proceeds requests atomically: a change is either
-accepted and recorded in the WAL, or is rejected wholesale.
+Tarantool processes requests atomically: a change is either
+accepted and recorded in the WAL, or discarded completely.
 Let's clarify how this happens, using REPLACE command as an
 example:
 <orderedlist>
     <listitem><para>
-    The server tries to locate an old tuple identified by
-    the same primary key. If found, the tuple is remembered for
-    later.
+    The server attempts to locate the original tuple by
+    primary key. If found, a reference to the tuple is retained
+    for later use.
     </para></listitem>
     <listitem><para>
-    The new tuple is <emphasis>validated</emphasis>. If it
-    violates any of the unique key constraints, misses
-    any of indexed fields, or an indexed field type does not
-    match index type, the change is aborted.
+    The new tuple is then <emphasis>validated</emphasis>. If it
+    violates a unique-key constraint, misses
+    an indexed field, or an index-field type does not
+    match the type of the index, the change is aborted.
     </para></listitem>
     <listitem><para>
-    The new tuple is marked 'invisible' and is added to 
+    The new tuple is marked 'invisible' and is added to
     the primary and secondary indexes.
     </para></listitem>
     <listitem><para>
-    A message is sent to a separate <quote>wal_writer</quote>
-    thread requesting that the change is recorded in the WAL.
-    The fiber associate with the current connection is scheduled
-    off CPU until an acknowledgment is received from the WAL
-    writer.
+    A message is sent to <quote>wal_writer</quote>, running in a
+    separate thread, requesting that the change be recorded in the WAL.
+    The fiber associated with the current connection is suspended
+    until an acknowledgment from the WAL writer.
     </para></listitem>
     <listitem><para>
-    Upon success, 'invisible' flag is cleared
-    and the old tuple is deleted. A response is sent to the
+    Upon success, the 'invisible' flag is cleared
+    and the original tuple is deleted. A response is sent to the
     client. Upon failure, the new tuple is removed and <olink
     targetptr="ER_WAL_IO"/> error is sent to the client.
     </para></listitem>
@@ -60,13 +59,12 @@ example:
 </para>
 
 <para>
-Communication between master and WAL writer threads is asynchronous.
-It is implemented using an asynchronous FIFO queue.
-Asynchronous but reliable message passing between the master
-and WAL writer threads allows Tarantool to continue handling
-requests regardless of disk throughput. SELECT performance,
-provided SELECTs are run in their own connections, is unaffected
-by disk load.
+The master and the WAL writer threads communicate using asynchronous (yet reliable)
+messaging; the master theread, not being blocked on
+WAL tasks, continues to handle requests quickly
+even at hight volumes of disk I/O. For instance, SELECT performance,
+provided SELECTs are run in their own connections, remains
+unaffected by disk load.
 </para>
 
 <para>
