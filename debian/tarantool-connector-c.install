@@ -1,9 +1,0 @@
-build-area/connector/c/tnt/libtnt.so /usr/lib
-build-area/connector/c/tntnet/libtntnet.so /usr/lib
-build-area/connector/c/tntsql/libtntsql.so /usr/lib
-
-build-area/connector/c/tnt/libtnt.a /usr/lib
-build-area/connector/c/tntnet/libtntnet.a /usr/lib
-build-area/connector/c/tntsql/libtntsql.a /usr/lib
-
-connector/c/include/libtnt /usr/include
