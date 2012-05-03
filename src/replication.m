@@ -616,7 +616,7 @@ replication_relay_loop(int client_sock)
 	/* Initialize the recovery process */
 	recovery_init(NULL, cfg.wal_dir, replication_relay_send_row,
 		      INT32_MAX, "fsync_delay", 0,
-		      RECOVER_READONLY, false);
+		      RECOVER_READONLY);
 
 	recover(recovery_state, lsn);
 	recovery_follow_local(recovery_state, 0.1);

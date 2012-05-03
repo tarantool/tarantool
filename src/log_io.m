@@ -1670,8 +1670,7 @@ wal_write(struct recovery_state *r, u16 tag, u16 op, u64 cookie,
 void
 recovery_init(const char *snap_dirname, const char *wal_dirname,
 	      row_handler row_handler, int rows_per_wal,
-	      const char *wal_mode, double wal_fsync_delay,
-	      int flags, void *data)
+	      const char *wal_mode, double wal_fsync_delay, int flags)
 {
 	assert(recovery_state == NULL);
 	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
@@ -1682,7 +1681,6 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 
 	r->wal_timer.data = r;
 	r->row_handler = row_handler;
-	r->data = data;
 	r->remote_recovery = NULL;
 
 	r->snap_class = snapshot_class_create(snap_dirname);
