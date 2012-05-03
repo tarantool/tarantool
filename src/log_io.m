@@ -806,19 +806,22 @@ error:
 	return NULL;
 }
 
+/**
+ * In case of error, writes a message to the server log
+ * and sets errno.
+ */
 struct log_io *
-log_io_open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 lsn,
-		      int suffix, int *save_errno)
+log_io_open_for_write(struct recovery_state *recover,
+		      struct log_io_class *class, i64 lsn, int suffix)
 {
 	struct log_io *l = NULL;
 	int fd;
 	char *dot;
 	bool exists;
-	const char *errmsg;
+	int save_errno;
 
 	l = calloc(1, sizeof(*l));
 	if (l == NULL) {
-		*save_errno = errno;
 		say_syserror("calloc");
 		return NULL;
 	}
@@ -841,8 +844,7 @@ log_io_open_for_write(struct recovery_state *recover, struct log_io_class *class
 		exists = access(l->filename, F_OK) == 0;
 		*dot = '.';
 		if (exists) {
-			*save_errno = EEXIST;
-			errmsg = "exists";
+			errno = EEXIST;
 			goto error;
 		}
 	}
@@ -853,29 +855,24 @@ log_io_open_for_write(struct recovery_state *recover, struct log_io_class *class
 	 */
 	fd = open(l->filename,
 		  O_WRONLY | O_CREAT | O_EXCL | l->class->open_wflags, 0664);
-	if (fd < 0) {
-		*save_errno = errno;
-		errmsg = strerror(errno);
+	if (fd < 0)
 		goto error;
-	}
 
 	l->f = fdopen(fd, "w");
-	if (l->f == NULL) {
-		*save_errno = errno;
-		errmsg = strerror(errno);
+	if (l->f == NULL)
 		goto error;
-	}
 
 	say_info("creating `%s'", l->filename);
 	write_header(l);
 	return l;
 
 error:
-	say_error("%s: failed to open `%s': %s", __func__, l->filename,
-		  errmsg);
+	save_errno = errno; /* Preserve over fclose()/free() */
+	say_syserror("%s: failed to open `%s'", __func__, l->filename);
 	if (l->f != NULL)
 		fclose(l->f);
 	free(l);
+	errno = save_errno;
 	return NULL;
 }
 
@@ -1042,8 +1039,11 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 	}
 }
 
-/*
- * this function will not close r->current_wal if recovery was successful
+/** Find out if there are new .xlog files since the current
+ * LSN, and read them all up.
+ *
+ * This function will not close r->current_wal if
+ * recovery was successful.
  */
 static int
 recover_remaining_wals(struct recovery_state *r)
@@ -1501,11 +1501,9 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 	bool is_bulk_end = STAILQ_NEXT(req, wal_fifo_entry) == NULL;
 
 	if (r->current_wal == NULL) {
-		int unused;
 		/* Open WAL with '.inprogress' suffix. */
 		r->current_wal =
-			log_io_open_for_write(r, r->wal_class, req->lsn, -1,
-					      &unused);
+			log_io_open_for_write(r, r->wal_class, req->lsn, -1);
 	}
 	else if (r->current_wal->rows == 1) {
 		/* rename WAL after first successful write to name
@@ -1829,13 +1827,12 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 	struct log_io *snap;
 	char final_filename[PATH_MAX + 1];
 	char *dot;
-	int save_errno;
 
 	memset(&i, 0, sizeof(i));
 
-	snap = log_io_open_for_write(r, r->snap_class, r->confirmed_lsn, -1, &save_errno);
+	snap = log_io_open_for_write(r, r->snap_class, r->confirmed_lsn, -1);
 	if (snap == NULL)
-		panic_status(save_errno, "can't open snap for writing");
+		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
 
 	iter_open(snap, &i, write_rows);
 
