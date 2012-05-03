@@ -16,6 +16,10 @@ cd $CFG_DIR
 
 usage="Usage: sh $0 /path/to/config.file start|stop"
 
+if ! test -x $BOX; then
+    exit 0
+fi
+
 if test -z "$CFG"; then
     echo $usage
     exit 5
@@ -57,8 +61,11 @@ LOGGER="exec /usr/lib/tarantool/logger $LOG"
 SOCKETS=`grep \
     '^[[:space:]]*file_descriptors[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
     | tail -n 1 \
-    | sed 's/[^[:digit:]]//g'
-`
+    | sed 's/[^[:digit:]]//g'`
+
+if ! test -x $PID_DIR; then
+    install -otarantool -gtarantool -d -m0750 $PID_DIR
+fi
 
 SSDARGS_NO_PID="--quiet --chdir $RUNDIR --chuid tarantool --exec"
 SSDARGS="--pidfile $PID $SSDARGS_NO_PID"
@@ -74,6 +81,8 @@ sed "s/^[[:space:]]*file_descriptors.*/# & $comment_str/" $CFG > $SCFG
 
 echo "pid_file = $PID"        >> $SCFG
 echo "logger   = \"$LOGGER\"" >> $SCFG
+grep '^[[:space:]]*admin_port[[:space:]]*=' $CFG |tail -n 1 >> $SCFG
+grep '^[[:space:]]*primary_port[[:space:]]*=' $CFG |tail -n 1 >> $SCFG
 
 $BOX -c $SCFG -v --check-config
 

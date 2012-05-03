@@ -16,8 +16,8 @@ DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
     -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_SYSCONF_DIR=/etc/tarantool \
-    -DCMAKE_LOCALSTATE_DIR=/var \
-    -DENABLE_STATIC=ON
+    -DCMAKE_LOCALSTATE_DIR=/var
+#     -DENABLE_STATIC=ON
 #    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
 #    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
 
@@ -41,13 +41,12 @@ install/tarantool-dbg::
 install/tarantool::
 #         make -C build-area test-force || /bin/true
 
-install/tarantool-connector-c::
-#
 
 install/tarantool-common::
 	pod2man -c 'tarantool instances control' \
 	    debian/tarantool_instance.pod > build-area/tarantool_instance.1
 	pod2man -c 'tarantool log rotation' \
-	    debian/tarantool_logrotate.pod > build-area/tarantool_logrotate.1
+	    debian/scripts/tarantool_logrotate \
+	    	 > build-area/tarantool_logrotate.1
 	install -m0755 extra/logger.pl \
 	    debian/tarantool-common/usr/lib/tarantool/logger

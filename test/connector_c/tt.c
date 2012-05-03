@@ -30,13 +30,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <connector/c/include/libtnt/tnt.h>
-#include <connector/c/include/libtnt/tnt_net.h>
-#include <connector/c/include/libtnt/tnt_io.h>
-#include <connector/c/include/libtnt/tnt_queue.h>
-#include <connector/c/include/libtnt/tnt_utf8.h>
-#include <connector/c/include/libtnt/tnt_lex.h>
-#include <connector/c/include/libtnt/tnt_sql.h>
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_net.h>
+#include <connector/c/include/tarantool/tnt_io.h>
+#include <connector/c/include/tarantool/tnt_queue.h>
+#include <connector/c/include/tarantool/tnt_utf8.h>
+#include <connector/c/include/tarantool/tnt_lex.h>
+#include <connector/c/include/tarantool/tnt_sql.h>
 
 struct tt_test;
 
@@ -437,7 +437,7 @@ static void tt_tnt_net_call_na(struct tt_test *test) {
 	while (tnt_next(&i)) {
 		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
 		TT_ASSERT(r->code != 0);
-		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple cardinality is 0") == 0);
+		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple field count is 0") == 0);
 	}
 	tnt_iter_free(&i);
 }

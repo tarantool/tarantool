@@ -30,9 +30,9 @@
 #include <string.h>
 #include <limits.h>
 
-#include <connector/c/include/libtnt/tnt.h>
-#include <connector/c/include/libtnt/tnt_net.h>
-#include <connector/c/include/libtnt/tnt_io.h>
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_net.h>
+#include <connector/c/include/tarantool/tnt_io.h>
 
 #include <util.h>
 #include <errcode.h>

@@ -1,4 +1,5 @@
 Source: tarantool
+Priority: optional
 Maintainer: Dmitry E. Oboukhov <unera@debian.org>
 Build-Depends: cdbs, debhelper (>= 8),
  gobjc,
@@ -6,7 +7,8 @@ Build-Depends: cdbs, debhelper (>= 8),
  libreadline-dev,
  python-yaml,
  python-daemon,
- python-pexpect
+ python-pexpect,
+ libncurses5-dev
 Section: database
 Standards-Version: 3.9.2
 Homepage: http://tarantool.org/
@@ -68,12 +70,13 @@ Description: high performance key/value storage server
   * available on Linux and FreeBSD
   * stored procedures in Lua are supported
  .
- This package provides debug symbols for all tarantool packages.
+ This package provides debug symbols for tarantool.
 
-Package: tarantool-connector-c
+Package: tarantool-client
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
-Depends: ${shlibs:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: libmr-tarantool-perl
 Description: high performance key/value storage server
  Tarantool is an open-source NoSQL database, developed by Mail.ru.
  Its key properties include:
@@ -86,4 +89,161 @@ Description: high performance key/value storage server
   * available on Linux and FreeBSD
   * stored procedures in Lua are supported
  .
- This package provides tarantool C client libraries.
+ This package provides readline client for tarantool.
+
+Package: tarantool-client-dbg
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: extra
+Section: debug
+Depends: ${shlibs:Depends}, ${misc:Depends},
+     tarantool-client (= ${binary:Version})
+Description: high performance key/value storage server
+ Tarantool is an open-source NoSQL database, developed by Mail.ru.
+ Its key properties include:
+ .
+  * all data is maintained in RAM
+  * data persistence is implemented using Write Ahead Log and snapshotting
+  * supports asynchronous replication and hot standby
+  * uses coroutines and asynchronous I/O to implement high-performance
+    lock-free access to data
+  * available on Linux and FreeBSD
+  * stored procedures in Lua are supported
+ .
+ This package provides readline client for tarantool (debug symbols).
+
+Package: libtarantool1
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: optional
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: high performance key/value storage server
+ Tarantool is an open-source NoSQL database, developed by Mail.ru.
+ Its key properties include:
+ .
+  * all data is maintained in RAM
+  * data persistence is implemented using Write Ahead Log and snapshotting
+  * supports asynchronous replication and hot standby
+  * uses coroutines and asynchronous I/O to implement high-performance
+    lock-free access to data
+  * available on Linux and FreeBSD
+  * stored procedures in Lua are supported
+ .
+ This package provides c-connector library for tarantool.
+
+Package: libtarantool1-dbg
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: extra
+Section: debug
+Depends: ${shlibs:Depends}, ${misc:Depends},
+     libtarantool1 (= ${binary:Version})
+Description: high performance key/value storage server
+ Tarantool is an open-source NoSQL database, developed by Mail.ru.
+ Its key properties include:
+ .
+  * all data is maintained in RAM
+  * data persistence is implemented using Write Ahead Log and snapshotting
+  * supports asynchronous replication and hot standby
+  * uses coroutines and asynchronous I/O to implement high-performance
+    lock-free access to data
+  * available on Linux and FreeBSD
+  * stored procedures in Lua are supported
+ .
+ This package provides debug symbols for libtarantool1.
+
+Package: libtarantool-dev
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: optional
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ libtarantool1 (= ${binary:Version}),
+ libtarantoolsql1 (= ${binary:Version}),
+ libtarantoolnet1 (= ${binary:Version})
+Description: high performance key/value storage server
+ Tarantool is an open-source NoSQL database, developed by Mail.ru.
+ Its key properties include:
+ .
+  * all data is maintained in RAM
+  * data persistence is implemented using Write Ahead Log and snapshotting
+  * supports asynchronous replication and hot standby
+  * uses coroutines and asynchronous I/O to implement high-performance
+    lock-free access to data
+  * available on Linux and FreeBSD
+  * stored procedures in Lua are supported
+ .
+ This package provides headers for libtarantool* libraries.
+
+Package: libtarantoolnet1
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: optional
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: high performance key/value storage server
+ Tarantool is an open-source NoSQL database, developed by Mail.ru.
+ Its key properties include:
+ .
+  * all data is maintained in RAM
+  * data persistence is implemented using Write Ahead Log and snapshotting
+  * supports asynchronous replication and hot standby
+  * uses coroutines and asynchronous I/O to implement high-performance
+    lock-free access to data
+  * available on Linux and FreeBSD
+  * stored procedures in Lua are supported
+ .
+ This package provides c-connector library for tarantool (network).
+
+Package: libtarantoolnet1-dbg
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: extra
+Section: debug
+Depends: ${shlibs:Depends}, ${misc:Depends},
+     libtarantoolnet1 (= ${binary:Version})
+Description: high performance key/value storage server
+ Tarantool is an open-source NoSQL database, developed by Mail.ru.
+ Its key properties include:
+ .
+  * all data is maintained in RAM
+  * data persistence is implemented using Write Ahead Log and snapshotting
+  * supports asynchronous replication and hot standby
+  * uses coroutines and asynchronous I/O to implement high-performance
+    lock-free access to data
+  * available on Linux and FreeBSD
+  * stored procedures in Lua are supported
+ .
+ This package provides debug symbols for libtarantoolnet1.
+
+Package: libtarantoolsql1
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: optional
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: high performance key/value storage server
+ Tarantool is an open-source NoSQL database, developed by Mail.ru.
+ Its key properties include:
+ .
+  * all data is maintained in RAM
+  * data persistence is implemented using Write Ahead Log and snapshotting
+  * supports asynchronous replication and hot standby
+  * uses coroutines and asynchronous I/O to implement high-performance
+    lock-free access to data
+  * available on Linux and FreeBSD
+  * stored procedures in Lua are supported
+ .
+ This package provides SQL-parser for tarantool.
+
+Package: libtarantoolsql1-dbg
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: extra
+Section: debug
+Depends: ${shlibs:Depends}, ${misc:Depends},
+     libtarantoolsql1 (= ${binary:Version})
+Description: high performance key/value storage server
+ Tarantool is an open-source NoSQL database, developed by Mail.ru.
+ Its key properties include:
+ .
+  * all data is maintained in RAM
+  * data persistence is implemented using Write Ahead Log and snapshotting
+  * supports asynchronous replication and hot standby
+  * uses coroutines and asynchronous I/O to implement high-performance
+    lock-free access to data
+  * available on Linux and FreeBSD
+  * stored procedures in Lua are supported
+ .
+ This package provides debug symbols for libtarantoolsql1.
+

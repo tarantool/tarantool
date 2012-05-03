@@ -7,6 +7,6 @@
     delaycompress
     create 0640 tarantool adm
     postrotate
-        /usr/sbin/tarantool_logrotate start
+        /usr/lib/tarantool/tarantool_logrotate
     endscript
 }
