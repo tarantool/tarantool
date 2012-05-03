@@ -105,7 +105,7 @@ static int
 lbox_tuple_len(struct lua_State *L)
 {
 	struct box_tuple *tuple = lua_checktuple(L, 1);
-	lua_pushnumber(L, tuple->cardinality);
+	lua_pushnumber(L, tuple->field_count);
 	return 1;
 }
 
@@ -125,15 +125,15 @@ lbox_tuple_slice(struct lua_State *L)
 		luaL_error(L, "tuple.slice(): bad arguments");
 	start = lua_tointeger(L, 2);
 	if (start < 0)
-		start += tuple->cardinality;
+		start += tuple->field_count;
 	if (argc == 2) {
 		end = lua_tointeger(L, 3);
 		if (end < 0)
-			end += tuple->cardinality;
-		else if (end > tuple->cardinality)
-			end = tuple->cardinality;
+			end += tuple->field_count;
+		else if (end > tuple->field_count)
+			end = tuple->field_count;
 	} else {
-		end = tuple->cardinality;
+		end = tuple->field_count;
 	}
 	if (end <= start)
 		luaL_error(L, "tuple.slice(): start must be less than end");
@@ -166,8 +166,8 @@ lbox_tuple_unpack(struct lua_State *L)
 		lua_pushlstring(L, (char *) field, len);
 		field += len;
 	}
-	assert(lua_gettop(L) == tuple->cardinality + 1);
-	return tuple->cardinality;
+	assert(lua_gettop(L) == tuple->field_count + 1);
+	return tuple->field_count;
 }
 
 /**
@@ -184,9 +184,9 @@ lbox_tuple_index(struct lua_State *L)
 	/* For integer indexes, implement [] operator */
 	if (lua_isnumber(L, 2)) {
 		int i = luaL_checkint(L, 2);
-		if (i >= tuple->cardinality)
+		if (i >= tuple->field_count)
 			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
-				   tuplelib_name, i, tuple->cardinality-1);
+				   tuplelib_name, i, tuple->field_count-1);
 		void *field = tuple_field(tuple, i);
 		u32 len = load_varint32(&field);
 		lua_pushlstring(L, field, len);
@@ -204,7 +204,7 @@ lbox_tuple_tostring(struct lua_State *L)
 	struct box_tuple *tuple = lua_checktuple(L, 1);
 	/* @todo: print the tuple */
 	struct tbuf *tbuf = tbuf_alloc(fiber->gc_pool);
-	tuple_print(tbuf, tuple->cardinality, tuple->data);
+	tuple_print(tbuf, tuple->field_count, tuple->data);
 	lua_pushlstring(L, tbuf->data, tbuf->size);
 	return 1;
 }
@@ -463,17 +463,17 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 		 * userdata: must be a key to start iteration from
 		 * an offset. Seed the iterator with this key.
 		 */
-		int cardinality;
+		int field_count;
 		void *key;
 
 		if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 			/* Searching by tuple. */
 			struct box_tuple *tuple = lua_checktuple(L, 2);
 			key = tuple->data;
-			cardinality = tuple->cardinality;
+			field_count = tuple->field_count;
 		} else {
 			/* Single or multi- part key. */
-			cardinality = argc;
+			field_count = argc;
 			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
 			for (int i = 0; i < argc; ++i)
 				append_key_part(L, i + 2, data,
@@ -485,13 +485,13 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 		 * indexes. HASH indexes can only use single-part
 		 * keys.
 		*/
-		assert(cardinality != 0);
-		if (cardinality > index->key_def->part_count)
+		assert(field_count != 0);
+		if (field_count > index->key_def->part_count)
 			luaL_error(L, "index.next(): key part count (%d) "
-				   "does not match index cardinality (%d)",
-				   cardinality, index->key_def->part_count);
+				   "does not match index field count (%d)",
+				   field_count, index->key_def->part_count);
 		it = [index allocIterator];
-		[index initIteratorByKey: it :type :key :cardinality];
+		[index initIteratorByKey: it :type :key :field_count];
 		lbox_pushiterator(L, it);
 	} else { /* 1 item on the stack and it's a userdata. */
 		it = lua_checkiterator(L, 2);
@@ -558,14 +558,14 @@ static const struct luaL_reg lbox_iterator_meta[] = {
 static void
 iov_add_lua_table(struct lua_State *L, int index)
 {
-	u32 *cardinality = palloc(fiber->gc_pool, sizeof(u32));
+	u32 *field_count = palloc(fiber->gc_pool, sizeof(u32));
 	u32 *tuple_len = palloc(fiber->gc_pool, sizeof(u32));
 
-	*cardinality = 0;
+	*field_count = 0;
 	*tuple_len = 0;
 
 	iov_add(tuple_len, sizeof(u32));
-	iov_add(cardinality, sizeof(u32));
+	iov_add(field_count, sizeof(u32));
 
 	u8 field_len_buf[5];
 	size_t field_len, field_len_len;
@@ -573,7 +573,7 @@ iov_add_lua_table(struct lua_State *L, int index)
 
 	lua_pushnil(L);  /* first key */
 	while (lua_next(L, index) != 0) {
-		++*cardinality;
+		++*field_count;
 
 		switch (lua_type(L, -1)) {
 		case LUA_TNUMBER:
@@ -635,7 +635,7 @@ void iov_add_ret(struct lua_State *L, int index)
 		size_t len = sizeof(u32);
 		u32 num = lua_tointeger(L, index);
 		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->cardinality = 1;
+		tuple->field_count = 1;
 		memcpy(save_varint32(tuple->data, len), &num, len);
 		break;
 	}
@@ -644,7 +644,7 @@ void iov_add_ret(struct lua_State *L, int index)
 		u64 num = tarantool_lua_tointeger64(L, index);
 		size_t len = sizeof(u64);
 		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->cardinality = 1;
+		tuple->field_count = 1;
 		memcpy(save_varint32(tuple->data, len), &num, len);
 		break;
 	}
@@ -653,7 +653,7 @@ void iov_add_ret(struct lua_State *L, int index)
 		size_t len;
 		const char *str = lua_tolstring(L, index, &len);
 		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->cardinality = 1;
+		tuple->field_count = 1;
 		memcpy(save_varint32(tuple->data, len), str, len);
 		break;
 	}
@@ -663,7 +663,7 @@ void iov_add_ret(struct lua_State *L, int index)
 		const char *str = tarantool_lua_tostring(L, index);
 		size_t len = strlen(str);
 		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->cardinality = 1;
+		tuple->field_count = 1;
 		memcpy(save_varint32(tuple->data, len), str, len);
 		break;
 	}

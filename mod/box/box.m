@@ -153,12 +153,12 @@ validate_indexes(struct box_txn *txn)
 	}
 
 	/* Check to see if the tuple has a sufficient number of fields. */
-	if (txn->tuple->cardinality < sp->field_count)
+	if (txn->tuple->field_count < sp->max_fieldno)
 		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 
 	/* Sweep through the tuple and check the field sizes. */
 	u8 *data = txn->tuple->data;
-	for (int f = 0; f < sp->field_count; ++f) {
+	for (int f = 0; f < sp->max_fieldno; ++f) {
 		/* Get the size of the current field and advance. */
 		u32 len = load_varint32((void **) &data);
 		data += len;
@@ -186,34 +186,34 @@ validate_indexes(struct box_txn *txn)
 }
 
 static void
-read_key(struct tbuf *data, void **key_ptr, u32 *key_cardinality_ptr)
+read_key(struct tbuf *data, void **key_ptr, u32 *key_part_count_ptr)
 {
 	void *key = NULL;
-	u32 key_cardinality = read_u32(data);
-	if (key_cardinality) {
+	u32 key_part_count = read_u32(data);
+	if (key_part_count) {
 		key = read_field(data);
 		/* advance remaining fields of a key */
-		for (int i = 1; i < key_cardinality; i++)
+		for (int i = 1; i < key_part_count; i++)
 			read_field(data);
 	}
 
 	*key_ptr = key;
-	*key_cardinality_ptr = key_cardinality;
+	*key_part_count_ptr = key_part_count;
 }
 
 static void __attribute__((noinline))
-prepare_replace(struct box_txn *txn, size_t cardinality, struct tbuf *data)
+prepare_replace(struct box_txn *txn, size_t field_count, struct tbuf *data)
 {
 	assert(data != NULL);
-	if (cardinality == 0)
-		tnt_raise(IllegalParams, :"tuple cardinality is 0");
+	if (field_count == 0)
+		tnt_raise(IllegalParams, :"tuple field count is 0");
 
-	if (data->size == 0 || data->size != valid_tuple(data, cardinality))
+	if (data->size == 0 || data->size != valid_tuple(data, field_count))
 		tnt_raise(IllegalParams, :"incorrect tuple length");
 
 	txn->tuple = tuple_alloc(data->size);
 	tuple_txn_ref(txn, txn->tuple);
-	txn->tuple->cardinality = cardinality;
+	txn->tuple->field_count = field_count;
 	memcpy(txn->tuple->data, data->data, data->size);
 
 	txn->old_tuple = [txn->index findByTuple: txn->tuple];
@@ -416,8 +416,8 @@ struct update_field {
 struct update_cmd {
 	/** Search key */
 	void *key;
-	/** Search key cardinality */
-	u32 key_cardinality;
+	/** Search key part count. */
+	u32 key_part_count;
 	/** Operations. */
 	struct update_op *op;
 	struct update_op *op_end;
@@ -733,7 +733,7 @@ parse_update_cmd(struct tbuf *data)
 	struct update_cmd *cmd = palloc(fiber->gc_pool,
 					sizeof(struct update_cmd));
 
-	read_key(data, &cmd->key, &cmd->key_cardinality);
+	read_key(data, &cmd->key, &cmd->key_part_count);
 	/* number of operations */
 	u32 op_cnt = read_u32(data);
 	if (op_cnt > BOX_UPDATE_OP_CNT_MAX)
@@ -858,7 +858,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 	struct update_op *op = cmd->op;
 	struct update_field *field = cmd->field;
 	void *old_data = txn->old_tuple->data;
-	int old_field_count = txn->old_tuple->cardinality;
+	int old_field_count = txn->old_tuple->field_count;
 
 	update_field_init(field, op, &old_data, old_field_count);
 	do {
@@ -952,12 +952,12 @@ do_update(struct box_txn *txn, struct update_cmd *cmd)
 	void *new_data = txn->tuple->data;
 	void *new_data_end = new_data + txn->tuple->bsize;
 	struct update_field *field;
-	txn->tuple->cardinality = 0;
+	txn->tuple->field_count = 0;
 
 	for (field = cmd->field; field < cmd->field_end; field++) {
 		if (field->first < field->end) { /* -> field is not deleted. */
 			new_data = save_varint32(new_data, field->new_len);
-			txn->tuple->cardinality++;
+			txn->tuple->field_count++;
 		}
 		void *new_field = new_data;
 		void *old_field = field->old;
@@ -1003,7 +1003,7 @@ do_update(struct box_txn *txn, struct update_cmd *cmd)
 		if (field->tail_field_count) {
 			memcpy(new_data, field->tail, field->tail_len);
 			new_data += field->tail_len;
-			txn->tuple->cardinality += field->tail_field_count;
+			txn->tuple->field_count += field->tail_field_count;
 		}
 	}
 }
@@ -1017,7 +1017,7 @@ prepare_update(struct box_txn *txn, struct tbuf *data)
 	struct update_cmd *cmd = parse_update_cmd(data);
 
 	/* Try to find the tuple. */
-	txn->old_tuple = [txn->index findByKey :cmd->key :cmd->key_cardinality];
+	txn->old_tuple = [txn->index findByKey :cmd->key :cmd->key_part_count];
 	if (txn->old_tuple == NULL) {
 		/* Not found. For simplicity, skip the logging. */
 		txn->flags |= BOX_NOT_STORE;
@@ -1065,12 +1065,12 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 			return;
 
 		/* read key */
-		u32 key_cardinality;
+		u32 key_part_count;
 		void *key;
-		read_key(data, &key, &key_cardinality);
+		read_key(data, &key, &key_part_count);
 
 		struct iterator *it = index->position;
-		[index initIteratorByKey: it :ITER_FORWARD :key :key_cardinality];
+		[index initIteratorByKey: it :ITER_FORWARD :key :key_part_count];
 
 		while ((tuple = it->next_equal(it)) != NULL) {
 			if (tuple->flags & GHOST)
@@ -1097,11 +1097,11 @@ prepare_delete(struct box_txn *txn, struct tbuf *data)
 	u32 tuples_affected = 0;
 
 	/* read key */
-	u32 key_cardinality;
+	u32 key_part_count;
 	void *key;
-	read_key(data, &key, &key_cardinality);
+	read_key(data, &key, &key_part_count);
 	/* try to find tuple in primary index */
-	txn->old_tuple = [txn->index findByKey :key :key_cardinality];
+	txn->old_tuple = [txn->index findByKey :key :key_part_count];
 
 	if (txn->old_tuple == NULL) {
 		/*
@@ -1302,7 +1302,7 @@ txn_rollback(struct box_txn *txn)
 static void
 box_dispatch(struct box_txn *txn, struct tbuf *data)
 {
-	u32 cardinality;
+	u32 field_count;
 
 	say_debug("box_dispatch(%i)", txn->op);
 
@@ -1310,11 +1310,11 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 	case REPLACE:
 		txn_assign_n(txn, data);
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		cardinality = read_u32(data);
-		if (space[txn->n].cardinality > 0
-		    && space[txn->n].cardinality != cardinality)
-			tnt_raise(IllegalParams, :"tuple cardinality must match space cardinality");
-		prepare_replace(txn, cardinality, data);
+		field_count = read_u32(data);
+		if (space[txn->n].arity > 0
+		    && space[txn->n].arity != field_count)
+			tnt_raise(IllegalParams, :"tuple field count must match space cardinality");
+		prepare_replace(txn, field_count, data);
 		break;
 
 	case DELETE:
@@ -1372,7 +1372,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 
 	u32 n, key_len;
 	void *key;
-	u32 cardinality, field_no;
+	u32 field_count, field_no;
 	u32 flags;
 	u32 op_cnt;
 
@@ -1392,10 +1392,10 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	switch (op) {
 	case REPLACE:
 		flags = read_u32(b);
-		cardinality = read_u32(b);
-		if (b->size != valid_tuple(b, cardinality))
+		field_count = read_u32(b);
+		if (b->size != valid_tuple(b, field_count))
 			abort();
-		tuple_print(buf, cardinality, b->data);
+		tuple_print(buf, field_count, b->data);
 		break;
 
 	case DELETE:
@@ -1516,7 +1516,7 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 	def->max_fieldno = 0;
 	def->part_count = 0;
 
-	/* Calculate key cardinality and maximal field number. */
+	/* Calculate key part count and maximal field number. */
 	for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {
 		typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
 
@@ -1571,20 +1571,20 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 static void
 space_init_field_types(struct space *space)
 {
-	int i, field_count;
+	int i, max_fieldno;
 	int key_count = space->key_count;
 	struct key_def *key_defs = space->key_defs;
 
 	/* find max max field no */
-	field_count = 0;
+	max_fieldno = 0;
 	for (i = 0; i < key_count; i++) {
-		field_count = MAX(field_count, key_defs[i].max_fieldno);
+		max_fieldno= MAX(max_fieldno, key_defs[i].max_fieldno);
 	}
 
 	/* alloc & init field type info */
-	space->field_count = field_count;
-	space->field_types = malloc(field_count * sizeof(enum field_data_type));
-	for (i = 0; i < field_count; i++) {
+	space->max_fieldno = max_fieldno;
+	space->field_types = malloc(max_fieldno * sizeof(enum field_data_type));
+	for (i = 0; i < max_fieldno; i++) {
 		space->field_types[i] = UNKNOWN;
 	}
 
@@ -1593,7 +1593,7 @@ space_init_field_types(struct space *space)
 		struct key_def *def = &key_defs[i];
 		for (int pi = 0; pi < def->part_count; pi++) {
 			struct key_part *part = &def->parts[pi];
-			assert(part->fieldno < field_count);
+			assert(part->fieldno < max_fieldno);
 			space->field_types[part->fieldno] = part->type;
 		}
 	}
@@ -1628,7 +1628,7 @@ space_config(void)
 		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
 
 		space[i].enabled = true;
-		space[i].cardinality = cfg_space->cardinality;
+		space[i].arity = cfg_space->cardinality;
 
 		/*
 		 * Collect key/field info. We need aggregate
@@ -1897,7 +1897,7 @@ check_spaces(struct tarantool_cfg *conf)
 		/* check spaces indexes */
 		for (size_t j = 0; space->index[j] != NULL; ++j) {
 			typeof(space->index[j]) index = space->index[j];
-			u32 index_cardinality = 0;
+			u32 key_part_count = 0;
 			enum index_type index_type;
 
 			/* check index bound */
@@ -1941,11 +1941,11 @@ check_spaces(struct tarantool_cfg *conf)
 					max_key_fieldno = key->fieldno;
 				}
 
-				++index_cardinality;
+				++key_part_count;
 			}
 
-			/* check index cardinality */
-			if (index_cardinality == 0) {
+			/* Check key part count. */
+			if (key_part_count == 0) {
 				out_warning(0, "(space = %zu index = %zu) "
 					    "at least one field must be defined", i, j);
 				return -1;
@@ -1960,19 +1960,17 @@ check_spaces(struct tarantool_cfg *conf)
 				return -1;
 			}
 
-			/* first space index must be unique and cardinality == 1 */
-			if (j == 0) {
-				if (index->unique == false) {
-					out_warning(0, "(space = %zu) space first index must be unique", i);
-					return -1;
-				}
+			/* First index must be unique. */
+			if (j == 0 && index->unique == false) {
+				out_warning(0, "(space = %zu) space first index must be unique", i);
+				return -1;
 			}
 
 			switch (index_type) {
 			case HASH:
 				/* check hash index */
 				/* hash index must has single-field key */
-				if (index_cardinality != 1) {
+				if (key_part_count != 1) {
 					out_warning(0, "(space = %zu index = %zu) "
 					            "hash index must has a single-field key", i, j);
 					return -1;
@@ -2209,7 +2207,7 @@ snapshot_write_tuple(struct log_io_iter *i, unsigned n, struct box_tuple *tuple)
 		return;
 
 	header.space = n;
-	header.tuple_size = tuple->cardinality;
+	header.tuple_size = tuple->field_count;
 	header.data_size = tuple->bsize;
 
 	row = tbuf_alloc(fiber->gc_pool);

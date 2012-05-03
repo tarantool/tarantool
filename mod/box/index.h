@@ -132,11 +132,11 @@ struct key_def {
 			:(enum iterator_type) type
 			:(void *) key :(int) part_count;
 /**
- * Check key cardinality.
+ * Check key part count.
  */
 - (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed;
 /**
- * Unsafe search methods that do not check key cardinality.
+ * Unsafe search methods that do not check key part count.
  */
 - (struct box_tuple *) findUnsafe: (void *) key :(int) part_count;
 - (void) initIteratorUnsafe: (struct iterator *) iterator

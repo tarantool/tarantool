@@ -437,7 +437,7 @@ static void tt_tnt_net_call_na(struct tt_test *test) {
 	while (tnt_next(&i)) {
 		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
 		TT_ASSERT(r->code != 0);
-		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple cardinality is 0") == 0);
+		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple field count is 0") == 0);
 	}
 	tnt_iter_free(&i);
 }

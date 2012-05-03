@@ -29,15 +29,15 @@ box.flags = create_const_table(
 --
 --
 function box.select_limit(space, index, offset, limit, ...)
-    local cardinality = select('#', ...)
+    local part_count = select('#', ...)
     return box.process(17,
-                       box.pack('iiiiii'..string.rep('p', cardinality),
+                       box.pack('iiiiii'..string.rep('p', part_count),
                                  space,
                                  index,
                                  offset,
                                  limit,
                                  1, -- key count
-                                 cardinality, -- key cardinality
+                                 part_count, -- key part count
                                  ...))
 end
 
@@ -45,15 +45,15 @@ end
 --
 --
 function box.select(space, index, ...)
-    local cardinality = select('#', ...)
+    local part_count = select('#', ...)
     return box.process(17,
-                       box.pack('iiiiii'..string.rep('p', cardinality),
+                       box.pack('iiiiii'..string.rep('p', part_count),
                                  space,
                                  index,
                                  0, -- offset
                                  4294967295, -- limit
                                  1, -- key count
-                                 cardinality, -- key cardinality
+                                 part_count, -- key part count
                                  ...))
 end
 
@@ -80,35 +80,35 @@ end
 -- index is always 0. It doesn't accept compound keys
 --
 function box.delete(space, ...)
-    local cardinality = select('#', ...)
+    local part_count = select('#', ...)
     return box.process(21,
-                       box.pack('iii'..string.rep('p', cardinality),
+                       box.pack('iii'..string.rep('p', part_count),
                                  space,
                                  box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 cardinality, -- key cardinality
+                                 part_count, -- key part count
                                  ...))
 end
 
 -- insert or replace a tuple
 function box.replace(space, ...)
-    local cardinality = select('#', ...)
+    local part_count = select('#', ...)
     return box.process(13,
-                       box.pack('iii'..string.rep('p', cardinality),
+                       box.pack('iii'..string.rep('p', part_count),
                                  space,
                                  box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 cardinality, -- cardinality
+                                 part_count, -- key part count
                                  ...))
 end
 
 -- insert a tuple (produces an error if the tuple already exists)
 function box.insert(space, ...)
-    local cardinality = select('#', ...)
+    local part_count = select('#', ...)
     return box.process(13,
-                       box.pack('iii'..string.rep('p', cardinality),
+                       box.pack('iii'..string.rep('p', part_count),
                                 space,
                                 bit.bor(box.flags.BOX_RETURN_TUPLE,
                                         box.flags.BOX_ADD),  -- flags
-                                cardinality, -- cardinality
+                                part_count, -- key part count
                                 ...))
 end
 
@@ -119,7 +119,7 @@ function box.update(space, key, format, ...)
                        box.pack('iiipi'..format,
                                   space,
                                   1, -- flags, BOX_RETURN_TUPLE
-                                  1, -- cardinality
+                                  1, -- primary key part count
                                   key, -- primary key
                                   op_count, -- op count
                                   ...))
@@ -202,7 +202,7 @@ function box.update_ol(space, ops_list, ...)
 
     -- fill UPDATE command key
     format = format .. 'i'
-    table.insert(args_list, #key) -- key cardinality
+    table.insert(args_list, #key) -- key part count
     for itr, val in ipairs(key) do
         format = format .. 'p'
         table.insert(args_list, val) -- key field

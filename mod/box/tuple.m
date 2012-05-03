@@ -94,7 +94,7 @@ tuple_field(struct box_tuple *tuple, size_t i)
 {
 	void *field = tuple->data;
 
-	if (i >= tuple->cardinality)
+	if (i >= tuple->field_count)
 		return NULL;
 
 	while (i-- > 0)
@@ -136,15 +136,15 @@ print_field(struct tbuf *buf, void *f)
  * key: { value, value, value }
  */
 void
-tuple_print(struct tbuf *buf, uint8_t cardinality, void *f)
+tuple_print(struct tbuf *buf, uint8_t field_count, void *f)
 {
 	print_field(buf, f);
 	tbuf_printf(buf, ": {");
 	f = next_field(f);
 
-	for (size_t i = 1; i < cardinality; i++, f = next_field(f)) {
+	for (size_t i = 1; i < field_count; i++, f = next_field(f)) {
 		print_field(buf, f);
-		if (likely(i + 1 < cardinality))
+		if (likely(i + 1 < field_count))
 			tbuf_printf(buf, ", ");
 	}
 	tbuf_printf(buf, "}");
