@@ -42,6 +42,7 @@ configuration:
   work_dir: (null)
   snap_dir: "."
   wal_dir: "."
+  script_dir: "."
   pid_file: "box.pid"
   logger: "cat - >> tarantool.log"
   logger_nonblock: "true"

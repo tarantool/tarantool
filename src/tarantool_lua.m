@@ -48,6 +48,7 @@
 /** tarantool start-up file */
 #define TARANTOOL_LUA_INIT_SCRIPT "init.lua"
 
+struct tarantool_cfg cfg;
 struct lua_State *tarantool_L;
 
 /* Remember the output of the administrative console in the
@@ -1082,8 +1083,16 @@ load_init_script(void *L_ptr)
 {
 	struct lua_State *L = (struct lua_State *) L_ptr;
 	struct stat st;
+
+	char path[PATH_MAX];
+	snprintf(path, sizeof(path), "%s/%s",
+			 ((cfg.script_dir) ? cfg.script_dir : "."),
+			 TARANTOOL_LUA_INIT_SCRIPT);
+
+	say_info("trying to load %s", path);
+
 	/* checking that Lua start-up file exist. */
-	if (stat(TARANTOOL_LUA_INIT_SCRIPT, &st)) {
+	if (stat(path, &st)) {
 		/*
 		 * File doesn't exist. It's OK, tarantool may not have
 		 * start-up file.
@@ -1092,7 +1101,7 @@ load_init_script(void *L_ptr)
 	}
 
 	/* execute start-up file */
-	if (tarantool_lua_dofile(L, TARANTOOL_LUA_INIT_SCRIPT))
+	if (tarantool_lua_dofile(L, path))
 		panic("%s", lua_tostring(L, -1));
 }
 
