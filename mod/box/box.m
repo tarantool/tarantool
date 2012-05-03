@@ -1844,7 +1844,7 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 static void
 box_leave_local_standby_mode(void *data __attribute__((unused)))
 {
-	recover_finalize(recovery_state);
+	recovery_finalize(recovery_state);
 
 	box_enter_master_or_replica_mode(&cfg);
 }
@@ -2168,7 +2168,7 @@ mod_init(void)
 
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
-		recover_follow(recovery_state, cfg.wal_dir_rescan_delay);
+		recovery_follow_local(recovery_state, cfg.wal_dir_rescan_delay);
 		snprintf(status, sizeof(status), "hot_standby");
 		title("hot_standby");
 	}
