@@ -71,7 +71,7 @@ static void
 store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 {
 	u32 box_flags = 0;
-	u32 cardinality = 4;
+	u32 field_count = 4;
 	static u64 cas = 42;
 	struct meta m;
 
@@ -79,7 +79,7 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 
 	tbuf_append(req, &cfg.memcached_space, sizeof(u32));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
-	tbuf_append(req, &cardinality, sizeof(cardinality));
+	tbuf_append(req, &field_count, sizeof(field_count));
 
 	tbuf_append_field(req, key);
 
@@ -435,7 +435,7 @@ memcached_space_init()
 	/* Configure memcached space. */
 	struct space *memc_s = &space[cfg.memcached_space];
 	memc_s->enabled = true;
-	memc_s->cardinality = 4;
+	memc_s->arity = 4;
 
 	memc_s->key_count = 1;
 	memc_s->key_defs = malloc(sizeof(struct key_def));

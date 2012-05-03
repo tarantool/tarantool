@@ -53,7 +53,7 @@ struct box_tuple
 	/** length of the variable part of the tuple */
 	u32 bsize;
 	/** number of fields in the variable part. */
-	u32 cardinality;
+	u32 field_count;
 	/**
 	 * Fields can have variable length, and thus are packed
 	 * into a contiguous byte array. Each field is prefixed
@@ -91,13 +91,13 @@ tuple_field(struct box_tuple *tuple, size_t i);
  * key: { value, value, value }
  */
 void
-tuple_print(struct tbuf *buf, uint8_t cardinality, void *f);
+tuple_print(struct tbuf *buf, uint8_t field_count, void *f);
 
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct box_tuple *tuple)
 {
 	return tuple->bsize + sizeof(tuple->bsize) +
-		sizeof(tuple->cardinality);
+		sizeof(tuple->field_count);
 }
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

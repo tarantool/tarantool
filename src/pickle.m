@@ -190,12 +190,12 @@ read_str(struct tbuf *buf, u32 size)
 }
 
 u32
-valid_tuple(struct tbuf *buf, u32 cardinality)
+valid_tuple(struct tbuf *buf, u32 field_count)
 {
 	void *data = buf->data;
 	u32 r, size = buf->size;
 
-	for (int i = 0; i < cardinality; i++)
+	for (int i = 0; i < field_count; i++)
 		read_field(buf);
 
 	r = size - buf->size;

@@ -45,7 +45,12 @@ enum
 
 struct space {
 	Index *index[BOX_INDEX_MAX];
-	int cardinality;
+	/** If not set (is 0), any tuple in the
+	 * space can have any number of fields (but
+	 * @sa max_fieldno). If set, Each tuple
+	 * must have exactly this many fields.
+	 */
+	int arity;
 
 	/**
 	 * The number of indexes in the space.
@@ -75,7 +80,7 @@ struct space {
 	 * Each tuple in this space must have, therefore, at least
 	 * field_count fields.
 	 */
-	int field_count;
+	int max_fieldno;
 
 	bool enabled;
 };

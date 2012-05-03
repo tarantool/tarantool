@@ -197,7 +197,7 @@ find_fixed_offset(struct space *space, int fieldno, int skip)
 
 	while (i < fieldno) {
 		/* if the field is unknown give up on it */
-		if (i >= space->field_count || space->field_types[i] == UNKNOWN) {
+		if (i >= space->max_fieldno || space->field_types[i] == UNKNOWN) {
 			return -1;
 		}
 
@@ -300,7 +300,7 @@ fold_with_sparse_parts(struct key_def *key_def, struct box_tuple *tuple, union s
 	memset(parts, 0, sizeof(parts[0]) * key_def->part_count);
 
 	for (int field = 0; field < key_def->max_fieldno; ++field) {
-		assert(field < tuple->cardinality);
+		assert(field < tuple->field_count);
 
 		u8 *data = part_data;
 		u32 len = load_varint32((void**) &data);
@@ -375,7 +375,7 @@ fold_with_dense_offset(struct key_def *key_def, struct box_tuple *tuple)
 	u8 *tuple_data = tuple->data;
 
 	for (int field = 0; field < key_def->max_fieldno; ++field) {
-		assert(field < tuple->cardinality);
+		assert(field < tuple->field_count);
 
 		u8 *data = tuple_data;
 		u32 len = load_varint32((void**) &data);
@@ -400,7 +400,7 @@ fold_with_num32_value(struct key_def *key_def, struct box_tuple *tuple)
 	u8 *tuple_data = tuple->data;
 
 	for (int field = 0; field < key_def->max_fieldno; ++field) {
-		assert(field < tuple->cardinality);
+		assert(field < tuple->field_count);
 
 		u8 *data = tuple_data;
 		u32 len = load_varint32((void**) &data);
@@ -541,8 +541,8 @@ dense_node_compare(struct key_def *key_def, u32 first_field,
 		   struct box_tuple *tuple_b, u32 offset_b)
 {
 	int part_count = key_def->part_count;
-	assert(first_field + part_count <= tuple_a->cardinality);
-	assert(first_field + part_count <= tuple_b->cardinality);
+	assert(first_field + part_count <= tuple_a->field_count);
+	assert(first_field + part_count <= tuple_b->field_count);
 
 	/* Allocate space for offsets. */
 	u32 *off_a = alloca(2 * part_count * sizeof(u32));
@@ -590,8 +590,8 @@ linear_node_compare(struct key_def *key_def,
 		    struct box_tuple *tuple_b, u32 offset_b)
 {
 	int part_count = key_def->part_count;
-	assert(first_field + part_count <= tuple_a->cardinality);
-	assert(first_field + part_count <= tuple_b->cardinality);
+	assert(first_field + part_count <= tuple_a->field_count);
+	assert(first_field + part_count <= tuple_b->field_count);
 
 	/* Compare key parts. */
 	u8 *ad = tuple_a->data + offset_a;
@@ -660,7 +660,7 @@ dense_key_node_compare(struct key_def *key_def,
 		       u32 first_field, struct box_tuple *tuple, u32 offset)
 {
 	int part_count = key_def->part_count;
-	assert(first_field + part_count <= tuple->cardinality);
+	assert(first_field + part_count <= tuple->field_count);
 
 	/* Allocate space for offsets. */
 	u32 *off = alloca(part_count * sizeof(u32));
@@ -705,7 +705,7 @@ linear_key_node_compare(struct key_def *key_def,
 			struct box_tuple *tuple, u32 offset)
 {
 	int part_count = key_def->part_count;
-	assert(first_field + part_count <= tuple->cardinality);
+	assert(first_field + part_count <= tuple->field_count);
 
 	/* Compare key parts. */
 	if (part_count > key_data->part_count)
@@ -881,10 +881,10 @@ tree_iterator_free(struct iterator *iterator)
 - (struct box_tuple *) findByTuple: (struct box_tuple *) tuple
 {
 	struct key_data *key_data
-		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->cardinality));
+		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
 
 	key_data->data = tuple->data;
-	key_data->part_count = tuple->cardinality;
+	key_data->part_count = tuple->field_count;
 	fold_with_sparse_parts(key_def, tuple, key_data->parts);
 
 	void *node = sptree_index_find(&tree, key_data);
@@ -901,7 +901,7 @@ tree_iterator_free(struct iterator *iterator)
 - (void) replace: (struct box_tuple *) old_tuple
 		: (struct box_tuple *) new_tuple
 {
-	if (new_tuple->cardinality < key_def->max_fieldno)
+	if (new_tuple->field_count < key_def->max_fieldno)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 			  key_def->max_fieldno);
 
