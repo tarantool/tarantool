@@ -30,9 +30,9 @@
 #include <string.h>
 #include <ctype.h>
 
-#include <libtnt/tnt_mem.h>
-#include <libtnt/tnt_enc.h>
-#include <libtnt/tnt_tuple.h>
+#include <tarantool/tnt_mem.h>
+#include <tarantool/tnt_enc.h>
+#include <tarantool/tnt_tuple.h>
 
 /*
  * tnt_tuple_init()

@@ -1,3 +1,13 @@
+tarantool (1.4.5+20120502-1) unstable; urgency=low
+
+  * New upstream snapshot.
+  * Add Priority for sources.
+  * Add libtarantool* packages that weren't be packaged earlier: upstream
+    renamed them, now we have no conflicts with the other debian packages.
+  * Add libncurses5-dev into Build-Depends.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 03 May 2012 00:08:38 +0400
+
 tarantool (1.4.4+20120127-1) unstable; urgency=low
 
   * Merge with upstream.

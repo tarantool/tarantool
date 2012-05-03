@@ -1,48 +1,88 @@
-#!/bin/sh
+#!/usr/bin/perl
 
-set -e
+use warnings;
+use strict;
 
-CLI="/usr/bin/tarantool"
-CONFIG_DIR="/var/lib/tarantool/started"
-PID_DIR="/var/run/tarantool"
-PROMPT=`basename $0`
+use constant CONFIG_DIR => '/var/lib/tarantool/started';
+use constant PID_DIR    => '/var/run/tarantool';
+use File::Spec::Functions 'catfile';
+use File::Basename 'basename', 'dirname';
+use IO::Socket::INET;
 
-error() {
-	echo "$PROMPT error: $*" 1>&2
-	exit 1
+exit 0 unless -x PID_DIR;
+exit 0 unless -x CONFIG_DIR;
+
+for (glob catfile PID_DIR, '*.pid') {
+    my $cfg = catfile CONFIG_DIR, basename $_, '.pid';
+
+    unless(-r $cfg) {
+        warn "Config file '$cfg' is not found\n";
+        next;
+    }
+
+    my $admin_port;
+
+    if (open my $fh, '<', $cfg) {
+        my @cfg = <$fh>;
+        ($admin_port) = grep /^\s*admin_port\s*=\s*\d+\s*$/, reverse @cfg;
+    } else {
+        warn "$!\n";
+        next;
+    }
+
+    unless($admin_port) {
+        warn "admin_port is not found in $cfg\n";
+        next;
+    }
+
+    $admin_port =~ s/\D+//g;
+
+    my $socket = IO::Socket::INET->new(PeerAddr => "localhost:$admin_port");
+    unless($socket) {
+        warn "Can't connect to localhost:$admin_port: $!";
+        next;
+    }
+
+
+
+    my $logger_pid;
+    local $SIG{ALRM} = sub { die "alarm\n" };
+    alarm 3;
+
+    eval {
+        print $socket "show info\n";
+        while(<$socket>) {
+            next unless /^\s*logger_pid:\s*(\d+)\s*$/;
+            $logger_pid = $1;
+            last;
+        }
+    };
+
+    alarm 0;
+
+    unless($logger_pid) {
+        warn "Can't define logger_pid\n";
+        next;
+    }
+
+    unless(kill 'HUP' => $logger_pid) {
+        warn "Can't send HUP to pid=$logger_pid: $!";
+        next;
+    }
 }
 
-logger_notify() {
-	CFG=$1
-	PORT_PRIMARY=`grep \
-	  '^[[:space:]]*primary_port[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
-	  | tail -n 1 \
-	  | sed 's/[^[:digit:]]//g'
-	`
-	[ $? -eq 0 ] || error "failed to get primary port"
-	PORT_ADMIN=`grep \
-	  '^[[:space:]]*admin_port[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
-	  | tail -n 1 \
-	  | sed 's/[^[:digit:]]//g'
-	`
-	[ $? -eq 0 ] || error "failed to get admin port"
-	LOGGER_PID=`${CLI} -p $PORT_PRIMARY -m $PORT_ADMIN "show info" \
-	  | grep 'logger_pid:' \
-	  | sed 's/[^[:digit:]]//g'
-	`
-	[ $? -eq 0 ] || error "failed to get logger pid"
-	kill -HUP $LOGGER_PID
-}
+=head1 NAME
 
-if ! echo $1|grep -q '^\(start\)$'; then
-	echo "Tarantool log rotation script"
-	echo "Usage: $0 <start>"
-    exit 5
-fi
+/usr/lib/tarantool/tarantool_logrotate - utility to rotate
+tarantool instances logs
 
-if test -d ${PID_DIR}; then
-	for file in `ls -1 $PID_DIR`; do
-		INSTANCE=`basename $file .pid`
-		logger_notify "$CONFIG_DIR/$INSTANCE"
-	done
-fi
+
+=head1 SINOPSYS
+
+    tarantool_logrotate
+
+=head1 DESCRIPTION
+
+The utility tries to connect to each running tarantool instance to get
+logger pid file, then it sends B<SIGHUP> to logger which initiates
+log rotataion procedure.
