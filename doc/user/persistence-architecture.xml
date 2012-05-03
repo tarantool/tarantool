@@ -69,6 +69,44 @@ provided SELECTs are run in their own connections, is unaffected
 by disk load.
 </para>
 
+<para>
+WAL writer ensures data consistency and synchronization
+between requesting fibers, WAL writer and disk by
+employing one the following modes of operation (designated by
+<emphasis>wal_mode</emphasis> and
+<emphasis>wal_fsync_delay</emphasis> configuration keys):
+<orderedlist>
+    <listitem><para><emphasis>write</emphasis>: fibers wait for their
+    data to be written to the log (no fsync(2));</para></listitem>
+    <listitem><para><emphasis>fsync</emphasis>: fibers wait for their
+    data, fsync(2) follows each write(2);</para></listitem>
+    <listitem><para><emphasis>fsync_delay</emphasis>: fibers wait for their
+    data, fsync every N=<emphasis>wal_fsync_delay</emphasis>
+    seconds (N=0.0 means no fsync(2) - equivalent to
+    <emphasis>wal_mode = "write"</emphasis>);</para></listitem>
+</orderedlist>
+</para>
+
+<!--
+<para>
+WAL writer ensures data consistency and synchronization
+between requesting fibers, WAL writer and disk by
+employing one the following modes of operation (designated by
+<emphasis>wal_mode</emphasis> and
+<emphasis>wal_fsync_delay</emphasis> configuration keys):
+<orderedlist>
+    <listitem><emphasis>write</emphasis>: fibers wait for their
+    data to be written to the log (no fsync(2));</listitem>
+    <listitem><emphasis>fsync</emphasis>: fibers wait for their
+    data, fsync(2) follows each write(2);</listitem>
+    <listitem><emphasis>fsync_delay</emphasis>: fibers wait for their
+    data, fsync every N=<emphasis>wal_fsync_delay</emphasis>
+    seconds (N=0.0 means no fsync(2) - equivalent to
+    <emphasis>wal_mode = "write"</emphasis>);</listitem>
+</orderedlist>
+</para>
+-->
+
 </section>
 <!--
 vim: tw=66 syntax=docbk

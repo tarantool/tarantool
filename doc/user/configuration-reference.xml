@@ -259,7 +259,7 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
         </row>
 
         <row>
-          <entry>work_dir</entry>
+          <entry xml:id="work_dir" xreflabel="work_dir">work_dir</entry>
           <entry>string</entry>
           <entry>""</entry>
           <entry>no</entry>

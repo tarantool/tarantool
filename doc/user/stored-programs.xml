@@ -20,7 +20,7 @@
     </para>
 </blockquote>
 <para>
-    Procedures can be invoked both from the administrative
+    Procedures can be invoked from the administrative
     console and using the binary protocol, for example:
 <programlisting><computeroutput>localhost> lua function f1() return 'hello' end
 ---
@@ -57,6 +57,43 @@ localhost> lua "hello".." world"
 ...
 </computeroutput></programlisting>
   </para>
+  <para>
+    Lua procedures could also be called at the time of initialization
+    using a dedicated <emphasis>init.lua</emphasis> script,
+    located in <olink targetptr="work_dir" />.
+
+    An example of such a script is given below:
+    <programlisting>
+    <![CDATA[
+-- Importing expirationd module
+dofile("expirationd.lua")
+
+function is_expired(args, tuple)
+   if tuple == nil then
+       return true
+   end
+
+   if #tuple <= args.field_no then
+       return true
+   end
+
+   field = tuple[args.field_no]
+   if field == nil or #field ~= 4 then
+       return true
+   end
+
+   local current_time = os.time()
+   local tuple_ts = box.unpack("i", field)
+   return current_time >= tuple_ts + args.ttl
+end
+
+-- Run task
+expirationd.run_task("exprd space 0", 0, is_expired, nil,
+                    { field_no = 1, ttl = 30 * 60 })
+]]>
+    </programlisting>
+  </para>
+
   <para>
     There is a single global instance of Lua interpreter, which is
     shared across all connections. Anything prefixed with
