@@ -547,6 +547,22 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           recovery.</entry>
         </row>
 
+        <row>
+            <entry xml:id="wal_mode" xreflabel="wal_mode">wal_mode</entry>
+            <entry>string</entry>
+            <entry>"fsync_delay"</entry>
+            <entry>no</entry>
+            <entry>yes</entry>
+            <entry>Specify fiber-WAL-disk synchronization mode as:
+                <emphasis>write:</emphasis> fibers wait for their data to
+                be written to WAL (no fsync(2)); <emphasis>fsync</emphasis>:
+                fibers wait for their data, fsync(2) follows each write(2);
+                <emphasis>fsync_delay</emphasis>: fibers wait for their
+                data, fsync(2) is called every N=<emphasis>wal_fsync_delay</emphasis>
+                seconds (N=0.0 means no fsync(2) - equivalent to
+                <emphasis>wal_mode = "write"</emphasis>);</entry>
+        </row>
+
       </tbody>
     </tgroup>
   </table>
