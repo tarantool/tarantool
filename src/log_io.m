@@ -915,6 +915,12 @@ read_log(const char *filename,
 	return i.error;
 }
 
+/**
+ * Read a snapshot and call row_handler for every snapshot row.
+ *
+ * @retval 0 success
+ * @retval -1 failure
+ */
 static int
 recover_snap(struct recovery_state *r)
 {
@@ -1127,7 +1133,7 @@ recover_current_wal:
 		}
 
 		if (result == LOG_EOF) {
-			say_info("done `%s' confirmed_lsn:%" PRIi64,
+			say_info("done `%s' confirmed_lsn: %" PRIi64,
 				 r->current_wal->filename,
 				 r->confirmed_lsn);
 			log_io_close(&r->current_wal);
@@ -1147,60 +1153,59 @@ recover_current_wal:
 	return result;
 }
 
-int
+void
 recover(struct recovery_state *r, i64 lsn)
 {
-	int result = -1;
-
+	/* * current_wal isn't open during initial recover. */
+	assert(r->current_wal == NULL);
 	/*
-	 * if caller set confirmed_lsn to non zero value, snapshot recovery
-	 * will be skipped, but wal reading still happens
+	 * If the caller sets confirmed_lsn to a non-zero value,
+	 * snapshot recovery is skipped and we proceed directly to
+	 * finding the WAL with the respective LSN and continue
+	 * recovery from this WAL.  @fixme: this is a gotcha, due
+	 * to whihc a replica is unable to read data from a master
+	 * if the replica has no snapshot or the master has no WAL
+	 * with the requested LSN.
 	 */
-
 	say_info("recovery start");
 	if (lsn == 0) {
-		result = recover_snap(r);
-		if (result < 0) {
+		if (recover_snap(r) != 0) {
 			if (greatest_lsn(r->snap_class) <= 0) {
 				say_crit("didn't you forget to initialize storage with --init-storage switch?");
 				_exit(1);
 			}
 			panic("snapshot recovery failed");
 		}
-		say_info("snapshot recovered, confirmed lsn:%" PRIi64, r->confirmed_lsn);
+		say_info("snapshot recovered, confirmed lsn: %"
+			 PRIi64, r->confirmed_lsn);
 	} else {
 		/*
-		 * note, that recovery start with lsn _NEXT_ to confirmed one
+		 * Note that recovery starts with lsn _NEXT_ to
+		 * the confirmed one.
 		 */
 		r->lsn = r->confirmed_lsn = lsn - 1;
 	}
-
-	/*
-	 * just after snapshot recovery current_wal isn't known
-	 * so find wal which contains record with next lsn
-	 */
-	if (r->current_wal == NULL) {
-		i64 next_lsn = r->confirmed_lsn + 1;
-		i64 lsn = find_including_file(r->wal_class, next_lsn);
-		if (lsn <= 0) {
-			say_error("can't find WAL containing record with lsn:%" PRIi64, next_lsn);
-			result = -1;
-			goto out;
+	i64 next_lsn = r->confirmed_lsn + 1;
+	i64 wal_lsn = find_including_file(r->wal_class, next_lsn);
+	if (wal_lsn <= 0) {
+		if (lsn != 0) {
+			/*
+			 * Recovery for replication relay, did not
+			 * find the requested LSN.
+			 */
+			say_error("can't find WAL containing record with lsn: %" PRIi64, next_lsn);
 		}
-		r->current_wal = log_io_open_for_read(r, r->wal_class, lsn, 0, NULL);
-		if (r->current_wal == NULL) {
-			result = -1;
-			goto out;
-		}
+		/* No WALs to recover from. */
+		goto out;
 	}
-
-	result = recover_remaining_wals(r);
-	if (result < 0)
+	r->current_wal = log_io_open_for_read(r, r->wal_class, wal_lsn, 0, NULL);
+	if (r->current_wal == NULL)
+		goto out;
+	if (recover_remaining_wals(r) < 0)
 		panic("recover failed");
-	say_info("wals recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
-      out:
+	say_info("WALs recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
+out:
 	prelease(fiber->gc_pool);
-	return result;
 }
 
 static void recovery_follow_file(ev_stat *w, int revents __attribute__((unused)));
@@ -1231,7 +1236,7 @@ recovery_follow_file(ev_stat *w, int revents __attribute__((unused)))
 	if (result < 0)
 		panic("recover failed");
 	if (result == LOG_EOF) {
-		say_info("done `%s' confirmed_lsn:%" PRIi64,
+		say_info("done `%s' confirmed_lsn: %" PRIi64,
 			 r->current_wal->filename,
 			 r->confirmed_lsn);
 		log_io_close(&r->current_wal);
