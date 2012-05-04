@@ -349,8 +349,8 @@ slab_stat(struct tbuf *t)
 			    (int)slab_classes[i].item_size, slabs, items, used, free);
 
 	}
-	tbuf_printf(t, "  items_used: %.2f" CRLF, (double)total_used / arena.size * 100);
-	tbuf_printf(t, "  arena_used: %.2f" CRLF, (double)arena.used / arena.size * 100);
+	tbuf_printf(t, "  items_used: %.2f%%" CRLF, (double)total_used / arena.size * 100);
+	tbuf_printf(t, "  arena_used: %.2f%%" CRLF, (double)arena.used / arena.size * 100);
 }
 
 void
