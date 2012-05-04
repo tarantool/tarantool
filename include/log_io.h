@@ -133,9 +133,6 @@ struct recovery_state {
 	struct wait_lsn wait_lsn;
 
 	bool finalize;
-
-	/* Points to module-specific state */
-	void *data;
 };
 
 struct recovery_state *recovery_state;
@@ -175,19 +172,17 @@ static inline struct row_v11 *row_v11(const struct tbuf *t)
 	return (struct row_v11 *)t->data;
 }
 
-struct tbuf *convert_to_v11(struct tbuf *orig, u16 tag, u64 cookie, i64 lsn);
-
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler,
 		   int rows_per_wal, const char *wal_mode,
 		   double wal_fsync_delay,
-		   int flags, void *data);
+		   int flags);
 void recovery_update_mode(const char *wal_mode, double fsync_delay);
 void recovery_update_io_rate_limit(double new_limit);
 void recovery_free();
 int recover(struct recovery_state *, i64 lsn);
-void recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
-void recover_finalize(struct recovery_state *r);
+void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
+void recovery_finalize(struct recovery_state *r);
 int wal_write(struct recovery_state *r, u16 tag, u16 op,
 	      u64 cookie, i64 lsn, struct tbuf *data);
 

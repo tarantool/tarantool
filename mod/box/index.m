@@ -199,7 +199,7 @@ iterator_first_equal(struct iterator *it)
 - (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed
 {
 	if (part_count > key_def->part_count)
-		tnt_raise(ClientError, :ER_KEY_CARDINALITY,
+		tnt_raise(ClientError, :ER_KEY_PART_COUNT,
 			  part_count, key_def->part_count);
 	if (!partial_key_allowed && part_count < key_def->part_count)
 		tnt_raise(ClientError, :ER_EXACT_MATCH,

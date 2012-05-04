@@ -1844,7 +1844,7 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 static void
 box_leave_local_standby_mode(void *data __attribute__((unused)))
 {
-	recover_finalize(recovery_state);
+	recovery_finalize(recovery_state);
 
 	box_enter_master_or_replica_mode(&cfg);
 }
@@ -2139,7 +2139,7 @@ mod_init(void)
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
 		      recover_row, cfg.rows_per_wal, cfg.wal_mode,
 		      cfg.wal_fsync_delay,
-		      init_storage ? RECOVER_READONLY : 0, NULL);
+		      init_storage ? RECOVER_READONLY : 0);
 
 	recovery_update_io_rate_limit(cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
@@ -2168,7 +2168,7 @@ mod_init(void)
 
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
-		recover_follow(recovery_state, cfg.wal_dir_rescan_delay);
+		recovery_follow_local(recovery_state, cfg.wal_dir_rescan_delay);
 		snprintf(status, sizeof(status), "hot_standby");
 		title("hot_standby");
 	}

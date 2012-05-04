@@ -45,6 +45,67 @@
 #include <crc32.h>
 #include <tarantool_pthread.h>
 #include "errinj.h"
+/*
+ * Recovery subsystem
+ * ------------------
+ *
+ * A facade of the recovery subsystem is struct recovery_state,
+ * which is a singleton.
+ *
+ * Depending on the configuration, start-up parameters, the
+ * actual task being performed, the recovery can be
+ * in a different state.
+ *
+ * The main factors influencing recovery state are:
+ * - temporal: whether or not the instance is just booting
+ *   from a snapshot, is in 'local hot standby mode', or
+ *   is already accepting requests
+ * - topological: whether or not it is a master instance
+ *   or a replica
+ * - task based: whether it's a master process,
+ *   snapshot saving process or a replication relay.
+ *
+ * Depending on the above factors, recovery can be in two main
+ * operation modes: "read mode", recovering in-memory state
+ * from existing data, and "write mode", i.e. recording on
+ * disk changes of the in-memory state.
+ *
+ * Let's enumerate all possible distinct states of recovery:
+ *
+ * Read mode
+ * ---------
+ * IR - initial recovery, initiated right after server start:
+ * reading data from the snapshot and existing WALs
+ * and restoring the in-memory state
+ * IRR - initial replication relay mode, reading data from
+ * existing WALs (xlogs) and sending it to the client.
+ *
+ * HS - standby mode, entered once all existing WALs are read:
+ * following the WAL directory for all changes done by the master
+ * and updating the in-memory state
+ * RR - replication relay, following the WAL directory for all
+ * changes done by the master and sending them to the
+ * replica
+ *
+ * Write mode
+ * ----------
+ * M - master mode, recording in-memory state changes in the WAL
+ * R - replica mode, receiving changes from the master and
+ * recording them in the WAL
+ * S - snapshot mode, writing entire in-memory state to a compact
+ * snapshot file.
+ *
+ * The following state transitions are possible/supported:
+ *
+ * recovery_init() -> IR | IRR # recover()
+ * IR -> HS         # recovery_follow_local()
+ * IRR -> RR        # recovery_follow_local()
+ * HS -> M          # recovery_finalize()
+ * M -> R           # recovery_follow_remote()
+ * R -> M           # recovery_stop_remote()
+ * M -> S           # snapshot()
+ * R -> S           # snapshot()
+ */
 
 const u16 snap_tag = -1;
 const u16 wal_tag = -2;
@@ -698,7 +759,9 @@ error:
 
 
 static struct log_io *
-log_io_open_for_read(struct recovery_state *recover, struct log_io_class *class, i64 lsn, int suffix,
+log_io_open_for_read(struct recovery_state *recover,
+		     struct log_io_class *class,
+		     i64 lsn, int suffix,
 		     const char *filename)
 {
 	const char *errmsg;
@@ -721,7 +784,7 @@ log_io_open_for_read(struct recovery_state *recover, struct log_io_class *class,
 		strncpy(l->filename, filename, PATH_MAX);
 	}
 
-	say_debug("%s: opening %s'", __func__, l->filename);
+	say_debug("%s: opening %s", __func__, l->filename);
 
 	l->f = fopen(l->filename, "r");
 	if (l->f == NULL) {
@@ -743,19 +806,22 @@ error:
 	return NULL;
 }
 
+/**
+ * In case of error, writes a message to the server log
+ * and sets errno.
+ */
 struct log_io *
-log_io_open_for_write(struct recovery_state *recover, struct log_io_class *class, i64 lsn,
-		      int suffix, int *save_errno)
+log_io_open_for_write(struct recovery_state *recover,
+		      struct log_io_class *class, i64 lsn, int suffix)
 {
 	struct log_io *l = NULL;
 	int fd;
 	char *dot;
 	bool exists;
-	const char *errmsg;
+	int save_errno;
 
 	l = calloc(1, sizeof(*l));
 	if (l == NULL) {
-		*save_errno = errno;
 		say_syserror("calloc");
 		return NULL;
 	}
@@ -778,8 +844,7 @@ log_io_open_for_write(struct recovery_state *recover, struct log_io_class *class
 		exists = access(l->filename, F_OK) == 0;
 		*dot = '.';
 		if (exists) {
-			*save_errno = EEXIST;
-			errmsg = "exists";
+			errno = EEXIST;
 			goto error;
 		}
 	}
@@ -790,29 +855,24 @@ log_io_open_for_write(struct recovery_state *recover, struct log_io_class *class
 	 */
 	fd = open(l->filename,
 		  O_WRONLY | O_CREAT | O_EXCL | l->class->open_wflags, 0664);
-	if (fd < 0) {
-		*save_errno = errno;
-		errmsg = strerror(errno);
+	if (fd < 0)
 		goto error;
-	}
 
 	l->f = fdopen(fd, "w");
-	if (l->f == NULL) {
-		*save_errno = errno;
-		errmsg = strerror(errno);
+	if (l->f == NULL)
 		goto error;
-	}
 
 	say_info("creating `%s'", l->filename);
 	write_header(l);
 	return l;
 
 error:
-	say_error("%s: failed to open `%s': %s", __func__, l->filename,
-		  errmsg);
+	save_errno = errno; /* Preserve over fclose()/free() */
+	say_syserror("%s: failed to open `%s'", __func__, l->filename);
 	if (l->f != NULL)
 		fclose(l->f);
 	free(l);
+	errno = save_errno;
 	return NULL;
 }
 
@@ -979,8 +1039,11 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 	}
 }
 
-/*
- * this function will not close r->current_wal if recovery was successful
+/** Find out if there are new .xlog files since the current
+ * LSN, and read them all up.
+ *
+ * This function will not close r->current_wal if
+ * recovery was successful.
  */
 static int
 recover_remaining_wals(struct recovery_state *r)
@@ -998,7 +1061,10 @@ recover_remaining_wals(struct recovery_state *r)
 		goto recover_current_wal;
 
 	while (r->confirmed_lsn < wal_greatest_lsn) {
-		/* if newer WAL appeared in directory before current_wal was fully read try reread last */
+		/*
+		 * If a newer WAL appeared in the directory before
+		 * current_wal was fully read, try re-reading
+		 * one last time. */
 		if (r->current_wal != NULL) {
 			if (r->current_wal->retry++ < 3) {
 				say_warn("try reread `%s' despite newer WAL exists",
@@ -1011,9 +1077,10 @@ recover_remaining_wals(struct recovery_state *r)
 			}
 		}
 
-		current_lsn = r->confirmed_lsn + 1;	/* TODO: find better way looking for next xlog */
-		next_wal = log_io_open_for_read(r, r->wal_class, current_lsn, 0, NULL);
-
+		/* TODO: find a better way of finding the next xlog */
+		current_lsn = r->confirmed_lsn + 1;
+		next_wal = log_io_open_for_read(r, r->wal_class, current_lsn,
+						0, NULL);
 		/*
 		 * When doing final recovery, and dealing with the
 		 * last file, try opening .<suffix>.inprogress.
@@ -1035,30 +1102,33 @@ recover_remaining_wals(struct recovery_state *r)
 			break;
 		}
 
-
 		assert(r->current_wal == NULL);
 		r->current_wal = next_wal;
 		say_info("recover from `%s'", r->current_wal->filename);
 
-	      recover_current_wal:
+recover_current_wal:
 		rows_before = r->current_wal->rows;
 		result = recover_wal(r, r->current_wal);
 		if (result < 0) {
-			say_error("failure reading from %s", r->current_wal->filename);
+			say_error("failure reading from %s",
+				  r->current_wal->filename);
 			break;
 		}
 
-		if (r->current_wal->rows > 0 && r->current_wal->rows != rows_before)
+		if (r->current_wal->rows > 0 &&
+		    r->current_wal->rows != rows_before) {
 			r->current_wal->retry = 0;
-
-		/* rows == 0 could possible indicate to an empty WAL */
+		}
+		/* rows == 0 could indicate an empty WAL */
 		if (r->current_wal->rows == 0) {
-			say_error("read zero records from %s", r->current_wal->filename);
+			say_error("read zero records from %s",
+				  r->current_wal->filename);
 			break;
 		}
 
 		if (result == LOG_EOF) {
-			say_info("done `%s' confirmed_lsn:%" PRIi64, r->current_wal->filename,
+			say_info("done `%s' confirmed_lsn:%" PRIi64,
+				 r->current_wal->filename,
 				 r->confirmed_lsn);
 			log_io_close(&r->current_wal);
 		}
@@ -1133,10 +1203,10 @@ recover(struct recovery_state *r, i64 lsn)
 	return result;
 }
 
-static void recover_follow_file(ev_stat *w, int revents __attribute__((unused)));
+static void recovery_follow_file(ev_stat *w, int revents __attribute__((unused)));
 
 static void
-recover_follow_dir(ev_timer *w, int revents __attribute__((unused)))
+recovery_follow_dir(ev_timer *w, int revents __attribute__((unused)))
 {
 	struct recovery_state *r = w->data;
 	struct log_io *wal = r->current_wal;
@@ -1147,13 +1217,13 @@ recover_follow_dir(ev_timer *w, int revents __attribute__((unused)))
 	/* recover_remaining_wals found new wal */
 	if (r->current_wal != NULL && wal != r->current_wal) {
 		ev_stat *stat = &r->current_wal->stat;
-		ev_stat_init(stat, recover_follow_file, r->current_wal->filename, 0.);
+		ev_stat_init(stat, recovery_follow_file, r->current_wal->filename, 0.);
 		ev_stat_start(stat);
 	}
 }
 
 static void
-recover_follow_file(ev_stat *w, int revents __attribute__((unused)))
+recovery_follow_file(ev_stat *w, int revents __attribute__((unused)))
 {
 	struct recovery_state *r = w->data;
 	int result;
@@ -1161,28 +1231,29 @@ recover_follow_file(ev_stat *w, int revents __attribute__((unused)))
 	if (result < 0)
 		panic("recover failed");
 	if (result == LOG_EOF) {
-		say_info("done `%s' confirmed_lsn:%" PRIi64, r->current_wal->filename,
+		say_info("done `%s' confirmed_lsn:%" PRIi64,
+			 r->current_wal->filename,
 			 r->confirmed_lsn);
 		log_io_close(&r->current_wal);
-		recover_follow_dir((ev_timer *)w, 0);
+		recovery_follow_dir((ev_timer *)w, 0);
 	}
 }
 
 void
-recover_follow(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay)
+recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay)
 {
-	ev_timer_init(&r->wal_timer, recover_follow_dir,
+	ev_timer_init(&r->wal_timer, recovery_follow_dir,
 		      wal_dir_rescan_delay, wal_dir_rescan_delay);
 	ev_timer_start(&r->wal_timer);
 	if (r->current_wal != NULL) {
 		ev_stat *stat = &r->current_wal->stat;
-		ev_stat_init(stat, recover_follow_file, r->current_wal->filename, 0.);
+		ev_stat_init(stat, recovery_follow_file, r->current_wal->filename, 0.);
 		ev_stat_start(stat);
 	}
 }
 
 void
-recover_finalize(struct recovery_state *r)
+recovery_finalize(struct recovery_state *r)
 {
 	int result;
 
@@ -1430,11 +1501,9 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 	bool is_bulk_end = STAILQ_NEXT(req, wal_fifo_entry) == NULL;
 
 	if (r->current_wal == NULL) {
-		int unused;
 		/* Open WAL with '.inprogress' suffix. */
 		r->current_wal =
-			log_io_open_for_write(r, r->wal_class, req->lsn, -1,
-					      &unused);
+			log_io_open_for_write(r, r->wal_class, req->lsn, -1);
 	}
 	else if (r->current_wal->rows == 1) {
 		/* rename WAL after first successful write to name
@@ -1599,8 +1668,7 @@ wal_write(struct recovery_state *r, u16 tag, u16 op, u64 cookie,
 void
 recovery_init(const char *snap_dirname, const char *wal_dirname,
 	      row_handler row_handler, int rows_per_wal,
-	      const char *wal_mode, double wal_fsync_delay,
-	      int flags, void *data)
+	      const char *wal_mode, double wal_fsync_delay, int flags)
 {
 	assert(recovery_state == NULL);
 	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
@@ -1611,7 +1679,6 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 
 	r->wal_timer.data = r;
 	r->row_handler = row_handler;
-	r->data = data;
 	r->remote_recovery = NULL;
 
 	r->snap_class = snapshot_class_create(snap_dirname);
@@ -1760,13 +1827,12 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 	struct log_io *snap;
 	char final_filename[PATH_MAX + 1];
 	char *dot;
-	int save_errno;
 
 	memset(&i, 0, sizeof(i));
 
-	snap = log_io_open_for_write(r, r->snap_class, r->confirmed_lsn, -1, &save_errno);
+	snap = log_io_open_for_write(r, r->snap_class, r->confirmed_lsn, -1);
 	if (snap == NULL)
-		panic_status(save_errno, "can't open snap for writing");
+		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
 
 	iter_open(snap, &i, write_rows);
 

@@ -49,3 +49,9 @@ doc/www-data/*.ru.html
 doc/www-data.in/download
 doc/man/tarantool.1
 doc/man/tarantool_box.1
+connector/c/tnt/libtarantool.so.1
+connector/c/tnt/libtarantool.so.1.1
+connector/c/tntnet/libtarantoolnet.so.1
+connector/c/tntnet/libtarantoolnet.so.1.1
+connector/c/tntsql/libtarantoolsql.so.1
+connector/c/tntsql/libtarantoolsql.so.1.1

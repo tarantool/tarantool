@@ -41,8 +41,8 @@ struct space_t
   /* A space can be quickly disabled and re-enabled at run time. */
   bool enabled;
   /*
-   * A limit on tuple cardinality can be set, to prevent too large tuples
-   * from coming in.
+   * If given, each tuple in the space must have exactly
+   * this many fields.
    */
   unsigned int cardinality;
   /* Only used for HASH indexes, to preallocate memory. */

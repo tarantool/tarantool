@@ -100,7 +100,7 @@ error: 'Supplied key field type does not match index type: expected u32'
 ...
 lua box.space[10]:select(0, 1, 2)
 ---
-error: 'Key cardinality 2 is greater than index cardinality 1'
+error: 'Key part count 2 is greater than index part count 1'
 ...
 
 #-----------------------------------------------------------------------------#
@@ -141,7 +141,7 @@ error: 'Supplied key field type does not match index type: expected u32'
 ...
 lua box.space[10]:delete(1, 2)
 ---
-error: 'Key cardinality 2 is greater than index cardinality 1'
+error: 'Key part count 2 is greater than index part count 1'
 ...
 
 #=============================================================================#
@@ -245,7 +245,7 @@ error: 'Supplied key field type does not match index type: expected u64'
 ...
 lua box.space[11]:select(0, '00000001', '00000002')
 ---
-error: 'Key cardinality 2 is greater than index cardinality 1'
+error: 'Key part count 2 is greater than index part count 1'
 ...
 
 #-----------------------------------------------------------------------------#
@@ -286,7 +286,7 @@ error: 'Supplied key field type does not match index type: expected u64'
 ...
 lua box.space[11]:delete('00000001', '00000002')
 ---
-error: 'Key cardinality 2 is greater than index cardinality 1'
+error: 'Key part count 2 is greater than index part count 1'
 ...
 
 #=============================================================================#
@@ -372,7 +372,7 @@ lua box.space[12]:select(0, 'key 5')
 
 lua box.space[12]:select(0, 'key 1', 'key 2')
 ---
-error: 'Key cardinality 2 is greater than index cardinality 1'
+error: 'Key part count 2 is greater than index part count 1'
 ...
 
 #-----------------------------------------------------------------------------#
@@ -409,7 +409,7 @@ lua box.space[12]:delete('key 5')
 
 lua box.space[12]:delete('key 1', 'key 2')
 ---
-error: 'Key cardinality 2 is greater than index cardinality 1'
+error: 'Key part count 2 is greater than index part count 1'
 ...
 lua box.space[10]:truncate()
 ---
