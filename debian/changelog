@@ -1,3 +1,9 @@
+tarantool (1.4.5+20120503-2) unstable; urgency=low
+
+  * Add librt to linklist (fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 04 May 2012 09:27:04 +0400
+
 tarantool (1.4.5+20120503-1) unstable; urgency=low
 
   * New upstream snapshot.
