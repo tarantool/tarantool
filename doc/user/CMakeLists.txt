@@ -63,11 +63,10 @@ add_custom_target(pdf
     COMMAND fop tarantool_user_guide.fo tarantool_user_guide.pdf)
 
 add_custom_target(relink
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMAND ${XSLTPROC} --nonet
         --stringparam collect.xref.targets "only"
-        --xinclude -o ${PATH_USERGUIDE_HTML}
-        ${CMAKE_SOURCE_DIR}/doc/user/tnt-html.xsl
-        ${CMAKE_SOURCE_DIR}/doc/user/user.xml)
+        --xinclude tnt-html.xsl user.xml)
 
 #
 # Java saxon-based documentation generation (misc)

@@ -74,7 +74,7 @@
     header, allows simplifying client or proxy I/O.
     The server response to a request always carries in its header
     the same request type and id.
-    The id makes it possible to always match request to a
+    The id makes it possible to always match a request to a
     response, even if the latter arrived out of order.
   </para>
   <para>Request type defines the format of the payload.
@@ -85,11 +85,11 @@
     exception, all commands operate on whole tuple(s).
   </para>
   <para>Unless implementing a client driver, one needn't
-    concern him or her self with the complications of the binary
+    concern oneself with the complications of the binary
     protocol. <olink targetptr="connectors">Language-specific
     drivers</olink> provide a friendly way to store domain
     language data structures in Tarantool, and the command line
-    client supports a subset of the standard SQL.
+    client supports a subset of standard SQL.
     A complete description of both, the binary protocol and
     the supported SQL, is maintained in annotated Backus-Naur
     form in the source tree: please see
@@ -132,7 +132,7 @@
     understands all administrative statements
     and automatically directs them to the administrative port.
     The server response to an administrative command, even though
-    is always in plain text, can be quite complex.
+    it is always in plain text, can be quite complex.
     It is encoded using YAML markup to simplify automated parsing.
   </para>
   <para>To learn about all supported administrative commands, you
@@ -151,8 +151,8 @@
         <filename><olink
         targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
         To take a snapshot, Tarantool forks and quickly
-        <function>munmap(2)</function>s all memory except one that
-        stores tuples. Since all modern operating systems support
+        <function>munmap(2)</function>s all memory except memory
+        where tuples are stored. Since all modern operating systems support
         virtual memory copy-on-write, this effectively creates a
         consistent snapshot of all tuples in the child process,
         which is then written to disk tuple by tuple. Since a
@@ -170,7 +170,7 @@
 <programlisting>localhost> show info
 ---
 info:
-  version: "1.4.4"
+  version: "1.4.6"
   lsn: 843301
 ...
 localhost> save snapshot
@@ -258,6 +258,8 @@ info:
         <emphasis role="tntadmin">show stat</emphasis>
       </term>
       <listitem><para>
+      Show the average number of requests per second, and the total number of requests since startup,
+      broken down by request type: INSERT or SELECT or UPDATE or DELETE."
 <programlisting>
 localhost> show stat
 ---
@@ -301,7 +303,7 @@ statistics:
       </term>
       <listitem><para>
         A pool allocator is used for temporary memory, when
-        serving client requests. Every fiber has an own
+        serving client requests. Every fiber has its own
         pool. Shows the current state of pools of all fibers.
       </para></listitem>
     </varlistentry>
@@ -334,7 +336,7 @@ statistics:
       <listitem><para>
         Execute a chunk of Lua code. This can be used to define,
         invoke, debug and drop <olink
-        targetptr="stored-programs">stored programs</olink>,
+        targetptr="stored-procedures">stored procedures</olink>,
         inspect server environment, perform automated
         administrative tasks.
       </para></listitem>
@@ -344,7 +346,7 @@ statistics:
 
 </section>
 
-<xi:include href="stored-programs.xml" />
+<xi:include href="stored-procedures.xml" />
 
 </chapter>
 
