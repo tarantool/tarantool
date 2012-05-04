@@ -720,7 +720,7 @@ localhost> lua t:slice(1, -1)
             <emphasis role="lua">space.cardinality</emphasis>
         </term>
         <listitem><simpara>
-            A limit on tuple cardinality for tuples in this space.
+            A limit on tuple field count for tuples in this space.
             This limit can be set in the configuration file. Value 0
             stands for <quote>unlimited</quote>.
         </simpara></listitem>

@@ -194,7 +194,7 @@ error: 'Partial key in an exact match (key field count: 2, expected: 3)'
 ...
 lua box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')
 ---
-error: 'Key cardinality 4 is greater than index cardinality 3'
+error: 'Key part count 4 is greater than index part count 3'
 ...
 lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'The Wolf!', 'Vincent', 1)
 ---
@@ -223,7 +223,7 @@ error: 'Partial key in an exact match (key field count: 2, expected: 3)'
 ...
 lua box.update_ol(9, { box.upd.assign(3, '<ooops>') }, 'The Wolf!', 'Vincent', 1, 'Come again?')
 ---
-error: 'Key cardinality 4 is greater than index cardinality 3'
+error: 'Key part count 4 is greater than index part count 3'
 ...
 lua box.space[9]:len()
 ---
