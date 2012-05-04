@@ -3,6 +3,7 @@
 
 import os
 import sys
+import shutil
 
 print """
 # Bug #708685:
@@ -65,4 +66,14 @@ sys.stdout.pop_filter()
 # restore default server
 server.stop()
 server.deploy(self.suite_ini["config"])
+
+script_dir_path = os.path.join(vardir, "script_dir")
+os.mkdir(script_dir_path)
+open(os.path.join(script_dir_path, "init.lua"), "w+").close()
+
+server.stop()
+server.deploy("box/tarantool_scriptdir.cfg")
+
+shutil.rmtree(script_dir_path, True)
+
 # vim: syntax=python
