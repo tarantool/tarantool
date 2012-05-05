@@ -523,7 +523,7 @@ localhost> lua box.select_range(4, 1, 2, '1')
             <emphasis role="lua">box.select_reverse_range(space_no, index_no, limit, key, ...)</emphasis>
         </term>
         <listitem><para>
-            Select a reverse range of tuples, starting from offset
+            Select a reverse range of tuples, starting from the offset
             specified by <code>key</code>. The key can be
             multipart.
             Limit selection with at most <code>limit</code>
@@ -533,9 +533,9 @@ localhost> lua box.select_range(4, 1, 2, '1')
             </para>
             <para>
             For TREE indexes, this returns tuples in sorted order.
-            HASH indexes reverse iteration is not supported.
+	    Reverse iteration for HASH indexes is not supported.
             If <code>key</code> is <code>nil</code> or unspecified,
-            the selection starts from end of the index.
+            the selection starts from the end of the index.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost> show configuration
 ---
