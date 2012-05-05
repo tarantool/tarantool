@@ -2,17 +2,13 @@
 -- A run-time error will be raised on attempt to change
 -- table members.
 local function create_const_table(table)
-    return setmetatable ({}, {
-			     __index = table,
-			     __newindex = function(table_arg,
-						   name_arg,
-						   value_arg)
-				 error("attempting to change constant " ..
-				       tostring(name_arg) ..
-				       " to "
-				       .. tostring(value_arg), 2)
-			     end
-			     })
+    local function newindex(table, name, value)
+        error("Attempt to change constant "..tostring(name)..
+              " to "..tostring(value))
+    end
+    return setmetatable({}, { __index = table,
+                              __newindex = newindex,
+                              __metatable = false })
 end
 
 --- box flags
@@ -115,14 +111,19 @@ end
 --
 function box.update(space, key, format, ...)
     local op_count = select('#', ...)/2
-    return box.process(19,
-                       box.pack('iiipi'..format,
-                                  space,
-                                  1, -- flags, BOX_RETURN_TUPLE
-                                  1, -- primary key part count
-                                  key, -- primary key
-                                  op_count, -- op count
-                                  ...))
+    if type(key) == 'table' then
+        part_count = #key
+        return box.process(19,
+                    box.pack('iii'..string.rep('p', part_count),
+                        space, box.flags.BOX_RETURN_TUPLE, part_count,
+                        unpack(key))..
+                    box.pack('i'..format, op_count, ...))
+    else
+        return box.process(19,
+                    box.pack('iiipi'..format,
+                        space, box.flags.BOX_RETURN_TUPLE, 1,
+                        key, op_count, ...))
+    end
 end
 
 box.upd = {}
@@ -332,3 +333,5 @@ os.rename = nil
 os.tmpname = nil
 os.remove = nil
 require = nil
+
+-- vim: set et ts=4 sts

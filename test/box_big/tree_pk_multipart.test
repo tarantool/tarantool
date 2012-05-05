@@ -78,6 +78,8 @@ exec admin "lua box.delete(9, 'The Wolf!', 'Vincent', 0)"
 exec admin "lua box.delete(9, 'The Wolf!', 'Vincent', 3)"
 exec admin "lua box.delete(9, 'Vincent', 'The Wolf!', 0)"
 
+exec admin "lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')"
+exec admin "lua box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')"
 # Checking Vincent's last messages
 exec admin "lua box.select(9, 0, 'Vincent', 'The Wolf!')"
 # Checking The Wolf's last messages

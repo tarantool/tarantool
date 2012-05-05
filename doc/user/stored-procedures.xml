@@ -363,7 +363,8 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
         <listitem>
             <para>
                 Update a tuple identified by a primary
-                <code>key</code>. Update arguments follow,
+                <code>key</code>. If a key is multipart,
+                it is passed in as a Lua table. Update arguments follow,
                 described by <code>format</code>.
                 The format and arguments are passed to
                 <code>box.pack()</code> and the result is sent
