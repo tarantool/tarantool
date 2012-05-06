@@ -175,6 +175,14 @@ lua box.delete(9, 'Vincent', 'The Wolf!', 0)
 ---
  - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
 ...
+lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')
+---
+ - 'Updated': {'The Wolf!', 1, 'I said a please would be nice.', 'New'}
+...
+lua box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
+---
+ - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+...
 lua box.select(9, 0, 'Vincent', 'The Wolf!')
 ---
  - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
