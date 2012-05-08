@@ -91,16 +91,16 @@ struct log_io {
 	struct log_io_class *class;
 	FILE *f;
 
-	ev_stat stat;
 	enum log_mode mode;
 	size_t rows;
-	size_t retry;
+	int retry;
 	char filename[PATH_MAX + 1];
 
 	bool is_inprogress;
 };
 
 struct wal_writer;
+struct wal_watcher;
 
 struct recovery_state {
 	i64 lsn, confirmed_lsn;
@@ -115,14 +115,14 @@ struct recovery_state {
 	struct log_io_class *snap_class;
 	struct log_io_class *wal_class;
 	struct wal_writer *writer;
+	struct wal_watcher *watcher;
+	struct fiber *remote_recovery;
 
 	/* row_handler will be presented by most recent format of data
 	   log_io_class->reader is responsible of converting data from old format */
 	row_handler *row_handler;
 	struct sockaddr_in remote_addr;
-	struct fiber *remote_recovery;
 
-	ev_timer wal_timer;
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
 
 	int snap_io_rate_limit;
