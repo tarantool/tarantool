@@ -700,7 +700,7 @@ write_header(struct log_io *l)
 
 	assert(n < HEADER_SIZE_MAX);
 
-	return fwrite(header, n, 1, l->f);
+	return fwrite(header, n, 1, l->f) == 1 ? 0 : -1;
 }
 
 static char *
@@ -732,17 +732,15 @@ format_filename(char *filename, struct log_io_class *class, i64 lsn, enum suffix
  * Verify that file is of the given class (format).
  *
  * @param l		log_io object, denoting the file to check.
- * @param class		class to check against.
  * @param[out] errmsg   set if error
  *
  * @return 0 if success, -1 on error.
  */
 static int
-log_io_verify_meta(struct log_io *l, struct log_io_class *class,
-		   const char **errmsg)
+log_io_verify_meta(struct log_io *l, const char **errmsg)
 {
 	char filetype[32], version[32], buf[256];
-
+	struct log_io_class *class = l->class;
 	FILE *stream = l->f;
 
 	if (fgets(filetype, sizeof(filetype), stream) == NULL ||
@@ -772,52 +770,58 @@ error:
 	return -1;
 }
 
-
 static struct log_io *
-log_io_open_for_read(struct log_io_class *class,
-		     i64 lsn, const char *filename,
-		     enum suffix suffix)
+log_io_open(struct log_io_class *class, enum log_mode mode,
+	      const char *filename, enum suffix suffix, FILE *file)
 {
+	struct log_io *l = NULL;
+	int save_errno;
 	const char *errmsg;
-
-	struct log_io *l = calloc(1, sizeof(*l));
-	if (l == NULL) {
-		say_syserror("calloc");
-		return NULL;
-	}
-	l->mode = LOG_READ;
-	l->is_inprogress = suffix == INPROGRESS;
-
-	/* when filename is not null it is forced open for debug reading */
-	if (filename == NULL) {
-		assert(lsn != 0);
-		format_filename(l->filename, class, lsn, suffix);
-	} else {
-		assert(lsn == 0);
-		assert(suffix == NONE);
-		strncpy(l->filename, filename, PATH_MAX);
-	}
-
-	say_debug("%s: opening %s", __func__, l->filename);
-
-	l->f = fopen(l->filename, "r");
-	if (l->f == NULL) {
+	/*
+	 * Check fopen() result the caller first thing, to
+	 * preserve the errno.
+	 */
+	if (file == NULL) {
 		errmsg = strerror(errno);
 		goto error;
 	}
-
-	if (log_io_verify_meta(l, class, &errmsg) != 0)
+	l = calloc(1, sizeof(*l));
+	if (l == NULL) {
+		errmsg = strerror(errno);
 		goto error;
+	}
+	l->f = file;
+	strncpy(l->filename, filename, PATH_MAX);
+	l->mode = mode;
 	l->class = class;
-
+	l->is_inprogress = suffix == INPROGRESS;
+	if (mode == LOG_READ) {
+		if (log_io_verify_meta(l, &errmsg) != 0)
+			goto error;
+	} else { /* LOG_WRITE */
+		if (write_header(l) != 0)
+			goto error;
+	}
 	return l;
 error:
-	say_error("%s: failed to open %s: %s", __func__,
-		  l->filename, errmsg);
-	if (l->f != NULL)
-		fclose(l->f);
-	free(l);
+	save_errno = errno;
+	say_error("%s: failed to open %s: %s", __func__, filename, errmsg);
+	if (file)
+		fclose(file);
+	if (l)
+		free(l);
+	errno = save_errno;
 	return NULL;
+}
+
+static struct log_io *
+log_io_open_for_read(struct log_io_class *class, i64 lsn, enum suffix suffix)
+{
+	assert(lsn != 0);
+
+	const char *filename = format_filename(NULL, class, lsn, suffix);
+	FILE *f = fopen(filename, "r");
+	return log_io_open(class, LOG_READ, filename, suffix, f);
 }
 
 /**
@@ -827,64 +831,35 @@ error:
 static struct log_io *
 log_io_open_for_write(struct log_io_class *class, i64 lsn, enum suffix suffix)
 {
-	struct log_io *l = NULL;
-	int fd;
-	char *dot;
-	bool exists;
-	int save_errno;
+	char *filename;
 
-	l = calloc(1, sizeof(*l));
-	if (l == NULL) {
-		say_syserror("calloc");
-		return NULL;
-	}
-	l->mode = LOG_WRITE;
-	l->class = class;
-
-	assert(lsn > 0);
-
-	format_filename(l->filename, class, lsn, suffix);
-	say_debug("%s: opening %s'", __func__, l->filename);
+	assert(lsn != 0);
 
 	if (suffix == INPROGRESS) {
 		/*
 		 * Check whether a file with this name already exists.
 		 * We don't overwrite existing files.
 		 */
-		dot = strrchr(l->filename, '.');
-		*dot = '\0';
-		exists = access(l->filename, F_OK) == 0;
-		*dot = '.';
-		if (exists) {
+		filename = format_filename(NULL, class, lsn, NONE);
+		if (access(filename, F_OK) == 0) {
 			errno = EEXIST;
 			goto error;
 		}
 	}
-
+	filename = format_filename(NULL, class, lsn, suffix);
 	/*
-	 * Open the <lsn>.<suffix>.inprogress file. If it
-	 * exists, open will fail.
+	 * Open the <lsn>.<suffix>.inprogress file. If it exists,
+	 * open will fail.
 	 */
-	fd = open(l->filename,
-		  O_WRONLY | O_CREAT | O_EXCL | l->class->open_wflags, 0664);
+	int fd = open(filename,
+		      O_WRONLY | O_CREAT | O_EXCL | class->open_wflags, 0664);
 	if (fd < 0)
 		goto error;
-
-	l->f = fdopen(fd, "w");
-	if (l->f == NULL)
-		goto error;
-
-	say_info("creating `%s'", l->filename);
-	write_header(l);
-	return l;
-
+	say_info("creating `%s'", filename);
+	FILE *f = fdopen(fd, "w");
+	return log_io_open(class, LOG_WRITE, filename, suffix, f);
 error:
-	save_errno = errno; /* Preserve over fclose()/free() */
-	say_syserror("%s: failed to open `%s'", __func__, l->filename);
-	if (l->f != NULL)
-		fclose(l->f);
-	free(l);
-	errno = save_errno;
+	say_syserror("%s: failed to open `%s'", __func__, filename);
 	return NULL;
 }
 
@@ -913,7 +888,8 @@ read_log(const char *filename,
 		return -1;
 	}
 
-	l = log_io_open_for_read(c, 0, filename, NONE);
+	FILE *f = fopen(filename, "r");
+	l = log_io_open(c, LOG_READ, filename, NONE, f);
 	iter_open(l, &i, read_rows);
 	while ((row = iter_inner(&i, (void *)1)))
 		h(state, row);
@@ -950,7 +926,7 @@ recover_snap(struct recovery_state *r)
 			return -1;
 		}
 
-		snap = log_io_open_for_read(r->snap_class, lsn, NULL, NONE);
+		snap = log_io_open_for_read(r->snap_class, lsn, NONE);
 		if (snap == NULL) {
 			say_error("can't find/open snapshot");
 			return -1;
@@ -1086,7 +1062,7 @@ recover_remaining_wals(struct recovery_state *r)
 		if (r->current_wal != NULL) {
 			if (r->current_wal->retry++ < 3) {
 				say_warn("`%s' has no EOF marker, yet a newer WAL file exists:"
-					 "trying to read (attempt %d)",
+					 " trying to read one more time (attempt #%d)",
 					 r->current_wal->filename, r->current_wal->retry);
 				goto recover_current_wal;
 			} else {
@@ -1098,14 +1074,13 @@ recover_remaining_wals(struct recovery_state *r)
 
 		/* TODO: find a better way of finding the next xlog */
 		current_lsn = r->confirmed_lsn + 1;
-		next_wal = log_io_open_for_read(r->wal_class, current_lsn,
-						NULL, NONE);
+		next_wal = log_io_open_for_read(r->wal_class, current_lsn, NONE);
 		/*
 		 * When doing final recovery, and dealing with the
 		 * last file, try opening .<ext>.inprogress.
 		 */
 		if (next_wal == NULL && r->finalize && current_lsn == wal_greatest_lsn) {
-			next_wal = log_io_open_for_read(r->wal_class, current_lsn, NULL, INPROGRESS);
+			next_wal = log_io_open_for_read(r->wal_class, current_lsn, INPROGRESS);
 			if (next_wal == NULL) {
 				char *filename =
 					format_filename(NULL, r->wal_class, current_lsn, INPROGRESS);
@@ -1211,7 +1186,7 @@ recover(struct recovery_state *r, i64 lsn)
 		/* No WALs to recover from. */
 		goto out;
 	}
-	r->current_wal = log_io_open_for_read(r->wal_class, wal_lsn, NULL, NONE);
+	r->current_wal = log_io_open_for_read(r->wal_class, wal_lsn, NONE);
 	if (r->current_wal == NULL)
 		goto out;
 	if (recover_remaining_wals(r) < 0)
