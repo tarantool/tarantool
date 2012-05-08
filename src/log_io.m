@@ -1062,7 +1062,7 @@ recover_remaining_wals(struct recovery_state *r)
 		if (r->current_wal != NULL) {
 			if (r->current_wal->retry++ < 3) {
 				say_warn("`%s' has no EOF marker, yet a newer WAL file exists:"
-					 " trying to read one more time (attempt #%d)",
+					 " trying to re-read (attempt #%d)",
 					 r->current_wal->filename, r->current_wal->retry);
 				goto recover_current_wal;
 			} else {
@@ -1074,28 +1074,46 @@ recover_remaining_wals(struct recovery_state *r)
 
 		/* TODO: find a better way of finding the next xlog */
 		current_lsn = r->confirmed_lsn + 1;
-		next_wal = log_io_open_for_read(r->wal_class, current_lsn, NONE);
+		/*
+		 * For the last WAL, first try to open .inprogress
+		 * file: if it doesn't exist, we can safely try an
+		 * .xlog, with no risk of a concurrent
+		 * log_io_inprogress_rename().
+		 */
+		FILE *f = NULL;
+		char *filename;
+		enum suffix suffix = INPROGRESS;
+		if (current_lsn == wal_greatest_lsn) {
+			/* Last WAL present at the time of rescan. */
+			filename = format_filename(NULL, r->wal_class,
+						   current_lsn, suffix);
+			f = fopen(filename, "r");
+		}
+		if (f == NULL) {
+			suffix = NONE;
+			filename = format_filename(NULL, r->wal_class,
+						   current_lsn, suffix);
+			f = fopen(filename, "r");
+		}
+		next_wal = log_io_open(r->wal_class, LOG_READ, filename, suffix, f);
 		/*
 		 * When doing final recovery, and dealing with the
 		 * last file, try opening .<ext>.inprogress.
 		 */
-		if (next_wal == NULL && r->finalize && current_lsn == wal_greatest_lsn) {
-			next_wal = log_io_open_for_read(r->wal_class, current_lsn, INPROGRESS);
-			if (next_wal == NULL) {
-				char *filename =
-					format_filename(NULL, r->wal_class, current_lsn, INPROGRESS);
-
-				say_warn("unlink broken %s wal", filename);
-				if (inprogress_log_unlink(filename) != 0)
-					panic("can't unlink 'inprogres' wal");
-			}
-		}
-
 		if (next_wal == NULL) {
+			if (r->finalize && suffix == INPROGRESS) {
+				/*
+				 * There is an .inprogress file, but
+				 * we failed to open it. Try to
+				 * delete it.
+				 */
+				say_warn("unlink broken %s WAL", filename);
+				if (inprogress_log_unlink(filename) != 0)
+					panic("can't unlink 'inprogres' WAL");
+			}
 			result = 0;
 			break;
 		}
-
 		assert(r->current_wal == NULL);
 		r->current_wal = next_wal;
 		say_info("recover from `%s'", r->current_wal->filename);
@@ -1296,7 +1314,7 @@ recovery_finalize(struct recovery_state *r)
 		panic("unable to successfully finalize recovery");
 
 	if (r->current_wal != NULL && result != LOG_EOF) {
-		say_warn("wal `%s' wasn't correctly closed", r->current_wal->filename);
+		say_warn("WAL `%s' wasn't correctly closed", r->current_wal->filename);
 
 		if (!r->current_wal->is_inprogress) {
 			if (r->current_wal->rows == 0)
@@ -1305,14 +1323,14 @@ recovery_finalize(struct recovery_state *r)
 				      r->current_wal->filename);
 		} else if (r->current_wal->rows == 0) {
 			/* Unlink empty inprogress WAL */
-			say_warn("unlink broken %s wal", r->current_wal->filename);
+			say_warn("unlink broken %s WAL", r->current_wal->filename);
 			if (inprogress_log_unlink(r->current_wal->filename) != 0)
-				panic("can't unlink 'inprogress' wal");
+				panic("can't unlink 'inprogress' WAL");
 		} else if (r->current_wal->rows == 1) {
 			/* Rename inprogress wal with one row */
-			say_warn("rename unfinished %s wal", r->current_wal->filename);
+			say_warn("rename unfinished %s WAL", r->current_wal->filename);
 			if (log_io_inprogress_rename(r->current_wal->filename) != 0)
-				panic("can't rename 'inprogress' wal");
+				panic("can't rename 'inprogress' WAL");
 		} else
 			panic("too many rows in inprogress WAL `%s'", r->current_wal->filename);
 
