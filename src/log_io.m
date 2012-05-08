@@ -113,8 +113,8 @@ const u64 default_cookie = 0;
 const u32 default_version = 11;
 const u32 marker_v11 = 0xba0babed;
 const u32 eof_marker_v11 = 0x10adab1e;
-const char snap_suffix[] = ".snap";
-const char xlog_suffix[] = ".xlog";
+const char snap_ext[] = ".snap";
+const char xlog_ext[] = ".xlog";
 const char inprogress_suffix[] = ".inprogress";
 const char v11[] = "0.11\n";
 const char snap_mark[] = "SNAP\n";
@@ -122,6 +122,8 @@ const char xlog_mark[] = "XLOG\n";
 static const int HEADER_SIZE_MAX = sizeof(v11) + sizeof(snap_mark) + 2;
 
 struct recovery_state *recovery_state;
+
+enum suffix { NONE, INPROGRESS, ANY };
 
 #define ROW_EOF (void *)1
 
@@ -246,7 +248,7 @@ next_lsn(struct recovery_state *r, i64 new_lsn)
 static void
 v11_class(struct log_io_class *c)
 {
-	c->suffix = xlog_suffix;
+	c->filename_ext = xlog_ext;
 	c->filetype = xlog_mark;
 	c->version = v11;
 	c->reader = row_reader_v11;
@@ -273,7 +275,7 @@ snapshot_class_create(const char *dirname)
 
 	v11_class(c);
 	c->filetype = snap_mark;
-	c->suffix = snap_suffix;
+	c->filename_ext = snap_ext;
 
 	c->dirname = dirname ? strdup(dirname) : NULL;
 	return c;
@@ -439,48 +441,41 @@ cmp_i64(const void *_a, const void *_b)
 static ssize_t
 scan_dir(struct log_io_class *class, i64 **ret_lsn)
 {
-	DIR *dh = NULL;
-	struct dirent *dent;
-	i64 *lsn;
-	size_t suffix_len, i = 0, size = 1024;
-	char *parse_suffix;
 	ssize_t result = -1;
+	size_t i = 0, size = 1024;
+	ssize_t ext_len = strlen(class->filename_ext);
+	i64 *lsn = palloc(fiber->gc_pool, sizeof(i64) * size);
+	DIR *dh = opendir(class->dirname);
 
-	dh = opendir(class->dirname);
-	if (dh == NULL)
-		goto out;
-
-	suffix_len = strlen(class->suffix);
-
-	lsn = palloc(fiber->gc_pool, sizeof(i64) * size);
-	if (lsn == NULL)
+	if (lsn == NULL || dh == NULL)
 		goto out;
 
 	errno = 0;
+	struct dirent *dent;
 	while ((dent = readdir(dh)) != NULL) {
-		char *suffix = strrchr(dent->d_name, '.');
 
-		if (suffix == NULL)
+		char *ext = strchr(dent->d_name, '.');
+		if (ext == NULL)
 			continue;
 
-		char *sub_suffix = memrchr(dent->d_name, '.', suffix - dent->d_name);
-
+		const char *suffix = strchr(ext + 1, '.');
 		/*
-		 * A valid suffix is either .xlog or
-		 * .xlog.inprogress, given class->suffix ==
+		 * A valid ending is either .xlog or
+		 * .xlog.inprogress, given class->filename_ext ==
 		 * 'xlog'.
 		 */
-		bool valid_suffix;
-		valid_suffix = (strcmp(suffix, class->suffix) == 0 ||
-				(sub_suffix != NULL &&
-				 strcmp(suffix, inprogress_suffix) == 0 &&
-				 strncmp(sub_suffix, class->suffix, suffix_len) == 0));
-
-		if (!valid_suffix)
+		bool ext_is_ok;
+		if (suffix == NULL)
+			ext_is_ok = strcmp(ext, class->filename_ext) == 0;
+		else
+			ext_is_ok = (strncmp(ext, class->filename_ext,
+					     ext_len) == 0 &&
+				     strcmp(suffix, inprogress_suffix) == 0);
+		if (!ext_is_ok)
 			continue;
 
-		lsn[i] = strtoll(dent->d_name, &parse_suffix, 10);
-		if (strncmp(parse_suffix, class->suffix, suffix_len) != 0) {
+		lsn[i] = strtoll(dent->d_name, &ext, 10);
+		if (strncmp(ext, class->filename_ext, ext_len) != 0) {
 			/* d_name doesn't parse entirely, ignore it */
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
@@ -506,7 +501,7 @@ scan_dir(struct log_io_class *class, i64 **ret_lsn)
 
 	*ret_lsn = lsn;
 	result = i;
-      out:
+out:
 	if (errno != 0)
 		say_syserror("error reading directory `%s'", class->dirname);
 
@@ -709,25 +704,26 @@ write_header(struct log_io *l)
 }
 
 static char *
-format_filename(char *filename, struct log_io_class *class, i64 lsn, int suffix)
+format_filename(char *filename, struct log_io_class *class, i64 lsn, enum suffix suffix)
 {
-	static char buf[PATH_MAX + 1];
+	static __thread char buf[PATH_MAX + 1];
 
 	if (filename == NULL)
 		filename = buf;
 
 	switch (suffix) {
-	case 0:
+	case NONE:
 		snprintf(filename, PATH_MAX, "%s/%020" PRIi64 "%s",
-			 class->dirname, lsn, class->suffix);
+			 class->dirname, lsn, class->filename_ext);
 		break;
-	case -1:
+	case INPROGRESS:
 		snprintf(filename, PATH_MAX, "%s/%020" PRIi64 "%s%s",
-			 class->dirname, lsn, class->suffix, inprogress_suffix);
+			 class->dirname, lsn, class->filename_ext, inprogress_suffix);
 		break;
 	default:
 		/* not reached */
 		assert(0);
+		filename[0] = '\0';
 	}
 	return filename;
 }
@@ -779,8 +775,8 @@ error:
 
 static struct log_io *
 log_io_open_for_read(struct log_io_class *class,
-		     i64 lsn, int suffix,
-		     const char *filename)
+		     i64 lsn, const char *filename,
+		     enum suffix suffix)
 {
 	const char *errmsg;
 
@@ -790,7 +786,7 @@ log_io_open_for_read(struct log_io_class *class,
 		return NULL;
 	}
 	l->mode = LOG_READ;
-	l->is_inprogress = suffix == -1 ? true : false;
+	l->is_inprogress = suffix == INPROGRESS;
 
 	/* when filename is not null it is forced open for debug reading */
 	if (filename == NULL) {
@@ -798,6 +794,7 @@ log_io_open_for_read(struct log_io_class *class,
 		format_filename(l->filename, class, lsn, suffix);
 	} else {
 		assert(lsn == 0);
+		assert(suffix == NONE);
 		strncpy(l->filename, filename, PATH_MAX);
 	}
 
@@ -827,8 +824,8 @@ error:
  * In case of error, writes a message to the server log
  * and sets errno.
  */
-struct log_io *
-log_io_open_for_write(struct log_io_class *class, i64 lsn, int suffix)
+static struct log_io *
+log_io_open_for_write(struct log_io_class *class, i64 lsn, enum suffix suffix)
 {
 	struct log_io *l = NULL;
 	int fd;
@@ -849,7 +846,7 @@ log_io_open_for_write(struct log_io_class *class, i64 lsn, int suffix)
 	format_filename(l->filename, class, lsn, suffix);
 	say_debug("%s: opening %s'", __func__, l->filename);
 
-	if (suffix == -1) {
+	if (suffix == INPROGRESS) {
 		/*
 		 * Check whether a file with this name already exists.
 		 * We don't overwrite existing files.
@@ -905,10 +902,10 @@ read_log(const char *filename,
 	struct tbuf *row;
 	row_handler *h;
 
-	if (strstr(filename, xlog_suffix)) {
+	if (strstr(filename, xlog_ext)) {
 		c = xlog_class_create(NULL);
 		h = xlog_handler;
-	} else if (strstr(filename, snap_suffix)) {
+	} else if (strstr(filename, snap_ext)) {
 		c = snapshot_class_create(NULL);
 		h = snap_handler;
 	} else {
@@ -916,7 +913,7 @@ read_log(const char *filename,
 		return -1;
 	}
 
-	l = log_io_open_for_read(c, 0, 0, filename);
+	l = log_io_open_for_read(c, 0, filename, NONE);
 	iter_open(l, &i, read_rows);
 	while ((row = iter_inner(&i, (void *)1)))
 		h(state, row);
@@ -953,7 +950,7 @@ recover_snap(struct recovery_state *r)
 			return -1;
 		}
 
-		snap = log_io_open_for_read(r->snap_class, lsn, 0, NULL);
+		snap = log_io_open_for_read(r->snap_class, lsn, NULL, NONE);
 		if (snap == NULL) {
 			say_error("can't find/open snapshot");
 			return -1;
@@ -1102,16 +1099,16 @@ recover_remaining_wals(struct recovery_state *r)
 		/* TODO: find a better way of finding the next xlog */
 		current_lsn = r->confirmed_lsn + 1;
 		next_wal = log_io_open_for_read(r->wal_class, current_lsn,
-						0, NULL);
+						NULL, NONE);
 		/*
 		 * When doing final recovery, and dealing with the
-		 * last file, try opening .<suffix>.inprogress.
+		 * last file, try opening .<ext>.inprogress.
 		 */
 		if (next_wal == NULL && r->finalize && current_lsn == wal_greatest_lsn) {
-			next_wal = log_io_open_for_read(r->wal_class, current_lsn, -1, NULL);
+			next_wal = log_io_open_for_read(r->wal_class, current_lsn, NULL, INPROGRESS);
 			if (next_wal == NULL) {
 				char *filename =
-					format_filename(NULL, r->wal_class, current_lsn, -1);
+					format_filename(NULL, r->wal_class, current_lsn, INPROGRESS);
 
 				say_warn("unlink broken %s wal", filename);
 				if (inprogress_log_unlink(filename) != 0)
@@ -1214,7 +1211,7 @@ recover(struct recovery_state *r, i64 lsn)
 		/* No WALs to recover from. */
 		goto out;
 	}
-	r->current_wal = log_io_open_for_read(r->wal_class, wal_lsn, 0, NULL);
+	r->current_wal = log_io_open_for_read(r->wal_class, wal_lsn, NULL, NONE);
 	if (r->current_wal == NULL)
 		goto out;
 	if (recover_remaining_wals(r) < 0)
@@ -1552,11 +1549,13 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 	if (r->current_wal == NULL) {
 		/* Open WAL with '.inprogress' suffix. */
 		r->current_wal =
-			log_io_open_for_write(r->wal_class, req->lsn, -1);
+			log_io_open_for_write(r->wal_class, req->lsn, INPROGRESS);
 	}
 	else if (r->current_wal->rows == 1) {
-		/* rename WAL after first successful write to name
-		 * without inprogress suffix*/
+		/*
+		 * Rename WAL after the first successful write
+		 * to a name  without inprogress suffix.
+		 */
 		if (log_io_inprogress_rename(r->current_wal->filename) != 0) {
 			say_error("can't rename inprogress WAL");
 			goto fail;
@@ -1882,7 +1881,7 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 
 	memset(&i, 0, sizeof(i));
 
-	snap = log_io_open_for_write(r->snap_class, r->confirmed_lsn, -1);
+	snap = log_io_open_for_write(r->snap_class, r->confirmed_lsn, INPROGRESS);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
 

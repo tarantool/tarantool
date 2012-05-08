@@ -63,7 +63,7 @@ struct log_io_class {
 	int  open_wflags;
 	const char *filetype;
 	const char *version;
-	const char *suffix;
+	const char *filename_ext;
 	char *dirname;
 };
 
