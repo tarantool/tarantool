@@ -48,7 +48,6 @@
 /** tarantool start-up file */
 #define TARANTOOL_LUA_INIT_SCRIPT "init.lua"
 
-struct tarantool_cfg cfg;
 struct lua_State *tarantool_L;
 
 /* Remember the output of the administrative console in the
@@ -1082,36 +1081,32 @@ static void
 load_init_script(void *L_ptr)
 {
 	struct lua_State *L = (struct lua_State *) L_ptr;
-	struct stat st;
 
-	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "%s/%s",
-			 ((cfg.script_dir) ? cfg.script_dir : "."),
-			 TARANTOOL_LUA_INIT_SCRIPT);
+	char path[PATH_MAX + 1];
+	snprintf(path, PATH_MAX, "%s/%s",
+		 cfg.script_dir, TARANTOOL_LUA_INIT_SCRIPT);
 
-	say_info("trying to load %s", path);
 
-	/* checking that Lua start-up file exist. */
-	if (stat(path, &st)) {
-		/*
-		 * File doesn't exist. It's OK, tarantool may not have
-		 * start-up file.
-		 */
-		return;
+	if (access(path, F_OK) == 0) {
+		say_info("loading %s", path);
+		/* Execute the init file. */
+		if (tarantool_lua_dofile(L, path))
+			panic("%s", lua_tostring(L, -1));
 	}
-
-	/* execute start-up file */
-	if (tarantool_lua_dofile(L, path))
-		panic("%s", lua_tostring(L, -1));
+	/*
+	 * The file doesn't exist. It's OK, tarantool may
+	 * have no init file.
+	 */
 }
 
 void tarantool_lua_load_init_script(struct lua_State *L)
 {
 	/*
 	 * init script can call box.fiber.yield (including implicitly via
-	 * box.insert, box.update, etc...) but yield which called in sched
-	 * fiber will crash the server. That why, to avoid the problem, we must
-	 * run init script in to separate fiber.
+	 * box.insert, box.update, etc...) but box.fiber.yield() today,
+	 * when called from 'sched' fiber crashes the server.
+	 * To work this problem around we must run init script in
+	 * a separate fiber.
 	 */
 	struct fiber *loader = fiber_create(TARANTOOL_LUA_INIT_SCRIPT, -1,
 					    load_init_script, L);
