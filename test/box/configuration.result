@@ -20,6 +20,7 @@ configuration:
   work_dir: (null)
   snap_dir: "."
   wal_dir: "."
+  script_dir: "."
   pid_file: "box.pid"
   logger: "cat - >> tarantool.log"
   logger_nonblock: "true"
@@ -83,6 +84,7 @@ configuration:
   work_dir: (null)
   snap_dir: "."
   wal_dir: "."
+  script_dir: "."
   pid_file: "box.pid"
   logger: "cat - >> tarantool.log"
   logger_nonblock: "true"
@@ -210,3 +212,40 @@ tarantool_box -c tarantool_bad_type.cfg
 tarantool_box: can't load config:
  - (space = 0 fieldno = 0) index field type mismatch
 
+lua print_config()
+---
+io_collect_interval = 0
+pid_file = box.pid
+slab_alloc_minimal = 64
+primary_port = 33013
+log_level = 4
+logger_nonblock = true
+memcached_expire_per_loop = 1024
+snap_dir = .
+coredump = false
+panic_on_snap_error = true
+memcached_expire_full_sweep = 3600
+replication_port = 0
+wal_fsync_delay = 0
+too_long_threshold = 0.5
+slab_alloc_factor = 2
+admin_port = 33015
+logger = cat - >> tarantool.log
+snap_io_rate_limit = 0
+wal_writer_inbox_size = 16384
+memcached_expire = false
+backlog = 1024
+memcached_space = 23
+memcached_port = 0
+rows_per_wal = 50
+wal_mode = fsync_delay
+local_hot_standby = false
+secondary_port = 33014
+panic_on_wal_error = false
+script_dir = script_dir
+wal_dir = .
+bind_ipaddr = INADDR_ANY
+readahead = 16320
+slab_alloc_arena = 0.1
+wal_dir_rescan_delay = 0.1
+...

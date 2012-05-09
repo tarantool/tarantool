@@ -94,6 +94,9 @@ typedef struct tarantool_cfg {
 	/* WAL directory (where WALs get saved/read) */
 	char*	wal_dir;
 
+	/* script directory (where init.lua is expected to be) */
+	char*	script_dir;
+
 	/* name of pid file */
 	char*	pid_file;
 

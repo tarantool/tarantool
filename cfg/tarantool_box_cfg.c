@@ -41,6 +41,7 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->work_dir = NULL;
 	c->snap_dir = NULL;
 	c->wal_dir = NULL;
+	c->script_dir = NULL;
 	c->pid_file = NULL;
 	c->logger = NULL;
 	c->logger_nonblock = false;
@@ -88,6 +89,8 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	if (c->snap_dir == NULL) return CNF_NOMEMORY;
 	c->wal_dir = strdup(".");
 	if (c->wal_dir == NULL) return CNF_NOMEMORY;
+	c->script_dir = strdup(".");
+	if (c->script_dir == NULL) return CNF_NOMEMORY;
 	c->pid_file = strdup("tarantool.pid");
 	if (c->pid_file == NULL) return CNF_NOMEMORY;
 	c->logger = NULL;
@@ -189,6 +192,9 @@ static NameAtom _name__snap_dir[] = {
 };
 static NameAtom _name__wal_dir[] = {
 	{ "wal_dir", -1, NULL }
+};
+static NameAtom _name__script_dir[] = {
+	{ "script_dir", -1, NULL }
 };
 static NameAtom _name__pid_file[] = {
 	{ "pid_file", -1, NULL }
@@ -538,6 +544,18 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		 if (c->wal_dir) free(c->wal_dir);
 		c->wal_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->wal_dir == NULL)
+			return CNF_NOMEMORY;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__script_dir) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->script_dir == NULL) || strcmp(opt->paramValue.stringval, c->script_dir) != 0))
+			return CNF_RDONLY;
+		 if (c->script_dir) free(c->script_dir);
+		c->script_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->script_dir == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__pid_file) ) {
@@ -1229,6 +1247,7 @@ typedef enum IteratorState {
 	S_name__work_dir,
 	S_name__snap_dir,
 	S_name__wal_dir,
+	S_name__script_dir,
 	S_name__pid_file,
 	S_name__logger,
 	S_name__logger_nonblock,
@@ -1426,6 +1445,16 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "wal_dir");
+			i->state = S_name__script_dir;
+			return buf;
+		case S_name__script_dir:
+			*v = (c->script_dir) ? strdup(c->script_dir) : NULL;
+			if (*v == NULL && c->script_dir) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "script_dir");
 			i->state = S_name__pid_file;
 			return buf;
 		case S_name__pid_file:
@@ -1986,6 +2015,9 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	if (dst->wal_dir) free(dst->wal_dir);dst->wal_dir = src->wal_dir == NULL ? NULL : strdup(src->wal_dir);
 	if (src->wal_dir != NULL && dst->wal_dir == NULL)
 		return CNF_NOMEMORY;
+	if (dst->script_dir) free(dst->script_dir);dst->script_dir = src->script_dir == NULL ? NULL : strdup(src->script_dir);
+	if (src->script_dir != NULL && dst->script_dir == NULL)
+		return CNF_NOMEMORY;
 	if (dst->pid_file) free(dst->pid_file);dst->pid_file = src->pid_file == NULL ? NULL : strdup(src->pid_file);
 	if (src->pid_file != NULL && dst->pid_file == NULL)
 		return CNF_NOMEMORY;
@@ -2093,6 +2125,8 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 		free(c->snap_dir);
 	if (c->wal_dir != NULL)
 		free(c->wal_dir);
+	if (c->script_dir != NULL)
+		free(c->script_dir);
 	if (c->pid_file != NULL)
 		free(c->pid_file);
 	if (c->logger != NULL)
@@ -2228,6 +2262,11 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 }
 	if (confetti_strcmp(c1->wal_dir, c2->wal_dir) != 0) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_dir");
+
+		return diff;
+}
+	if (confetti_strcmp(c1->script_dir, c2->script_dir) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->script_dir");
 
 		return diff;
 }
