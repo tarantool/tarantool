@@ -520,6 +520,71 @@ localhost> lua box.select_range(4, 1, 2, '1')
         </para></listitem>
     </varlistentry>
     <varlistentry>
+        <term>
+            <emphasis role="lua">box.select_reverse_range(space_no, index_no, limit, key, ...)</emphasis>
+        </term>
+        <listitem><para>
+            Select a reverse range of tuples, starting from the offset
+            specified by <code>key</code>. The key can be
+            multipart.
+            Limit selection with at most <code>limit</code>
+            tuples.
+            If no key is specified, start from the last key in
+            the index.
+            </para>
+            <para>
+            For TREE indexes, this returns tuples in sorted order.
+	    Reverse iteration for HASH indexes is not supported.
+            If <code>key</code> is <code>nil</code> or unspecified,
+            the selection starts from the end of the index.
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>localhost> show configuration
+---
+...
+  space[4].cardinality: "-1"
+  space[4].estimated_rows: "0"
+  space[4].index[0].type: "HASH"
+  space[4].index[0].unique: "true"
+  space[4].index[0].key_field[0].fieldno: "0"
+  space[4].index[0].key_field[0].type: "STR"
+  space[4].index[1].type: "TREE"
+  space[4].index[1].unique: "false"
+  space[4].index[1].key_field[0].fieldno: "1"
+  space[4].index[1].key_field[0].type: "STR"
+...
+localhost> insert into t4 values ('0', '0')
+Insert OK, 1 rows affected
+localhost> insert into t4 values ('1', '1')
+Insert OK, 1 rows affected
+localhost> insert into t4 values ('2', '2')
+Insert OK, 1 rows affected
+localhost> insert into t4 values ('3', '3')
+Insert OK, 1 rows affected
+localhost> lua box.select_reverse_range(4, 0, 10)
+---
+ error: 'Illegal parameters, hash iterator is forward only
+...
+localhost> lua box.select_reverse_range(4, 1, 10)
+---
+ - '3': {'3'}
+ - '2': {'2'}
+ - '1': {'1'}
+ - '0': {'0'}
+...
+localhost> lua box.select_reverse_range(4, 1, 2)
+---
+ - '3': {'3'}
+ - '2': {'2'}
+...
+localhost> lua box.select_reverse_range(4, 1, 2, '1')
+---
+ - '1': {'1'}
+ - '0': {'0'}
+...
+</programlisting>
+        </para></listitem>
+    </varlistentry>
+    <varlistentry>
         <term><emphasis role="lua">box.pack(format, ...)</emphasis></term>
         <listitem><para>
             To use Tarantool binary protocol primitives from Lua,
@@ -753,6 +818,13 @@ localhost> lua t:slice(1, -1)
 
     <varlistentry>
         <term>
+            <emphasis role="lua">space:select_reverse_range(index_no, limit, key, ...)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
             <emphasis role="lua">space:insert(...)</emphasis>
         </term>
         <listitem><simpara></simpara></listitem>
@@ -878,6 +950,15 @@ xreflabel="box.index">box.index</code></title>
             <emphasis role="lua">space:select_range(limit, key)</emphasis>
         </term>
         <listitem><simpara>Select a range of tuples, limited by
+        <code>limit</code>, starting from <code>key</code>.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:select_reverse_range(limit, key)</emphasis>
+        </term>
+        <listitem><simpara>Select a reverse range of tuples, limited by
         <code>limit</code>, starting from <code>key</code>.
         </simpara></listitem>
     </varlistentry>
