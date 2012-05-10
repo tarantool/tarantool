@@ -1,3 +1,10 @@
+tarantool (1.4.5+20120510-1) unstable; urgency=low
+
+  * New git snapshot (it provides script_dir option).
+  * Add binutils-dev to B-D list (for debugging crashes, #672327).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 10 May 2012 10:23:28 +0400
+
 tarantool (1.4.5+20120503-2) unstable; urgency=low
 
   * Add librt to linklist (fix FTBFS with Debian/kFreeBSD).
