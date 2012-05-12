@@ -43,6 +43,7 @@
 
 #include "pickle.h"
 #include "tuple.h"
+#include "space.h"
 
 /* contents of box.lua */
 extern const char box_lua[];

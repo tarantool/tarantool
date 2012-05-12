@@ -25,8 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <mod/box/index.h>
 #include "exception.h"
 #include "iproto.h"
 #include <tbuf.h>
@@ -35,57 +33,10 @@
 struct tarantool_cfg;
 struct box_tuple;
 
-enum
-{
-	BOX_INDEX_MAX = 10,
-	BOX_SPACE_MAX = 256,
+enum {
 	/** A limit on how many operations a single UPDATE can have. */
 	BOX_UPDATE_OP_CNT_MAX = 128,
 };
-
-struct space {
-	Index *index[BOX_INDEX_MAX];
-	/** If not set (is 0), any tuple in the
-	 * space can have any number of fields (but
-	 * @sa max_fieldno). If set, Each tuple
-	 * must have exactly this many fields.
-	 */
-	int arity;
-
-	/**
-	 * The number of indexes in the space.
-	 *
-	 * It is equal to the number of non-nil members of the index
-	 * array and defines the key_defs array size as well.
-	 */
-	int key_count;
-
-	/**
-	 * The descriptors for all indexes that belong to the space.
-	 */
-	struct key_def *key_defs;
-
-	/**
-	 * Field types of indexed fields. This is an array of size
-	 * field_count. If there are gaps, i.e. fields that do not
-	 * participate in any index and thus we cannot infer their
-	 * type, then respective array members have value UNKNOWN.
-	 * XXX: right now UNKNOWN is also set for fields which types
-	 * in two indexes contradict each other.
-	 */
-	enum field_data_type *field_types;
-
-	/**
-	 * Max field no which participates in any of the space indexes.
-	 * Each tuple in this space must have, therefore, at least
-	 * field_count fields.
-	 */
-	int max_fieldno;
-
-	bool enabled;
-};
-
-extern struct space *space;
 
 struct box_out {
 	void (*add_u32)(u32 *u32);
@@ -94,6 +45,8 @@ struct box_out {
 };
 
 extern struct box_out box_out_quiet;
+@class Index;
+struct space;
 
 struct box_txn {
 	u16 op;
@@ -170,41 +123,6 @@ ENUM(messages, MESSAGES);
 ENUM(update_op_codes, UPDATE_OP_CODES);
 
 extern iproto_callback rw_callback;
-
-/**
- * Get space ordinal number.
- */
-static inline int
-space_n(struct space *sp)
-{
-	assert(sp >= space && sp < (space + BOX_SPACE_MAX));
-	return sp - space;
-}
-
-/**
- * Get key_def ordinal number.
- */
-static inline int
-key_def_n(struct space *sp, struct key_def *kp)
-{
-	assert(kp >= sp->key_defs && kp < (sp->key_defs + sp->key_count));
-	return kp - sp->key_defs;
-}
-
-/**
- * Get index ordinal number.
- */
-static inline int
-index_n(Index *index)
-{
-	return key_def_n(index->space, index->key_def);
-}
-
-static inline bool
-index_is_primary(Index *index)
-{
-	return index_n(index) == 0;
-}
 
 /* These are used to implement memcached 'GET' */
 static inline struct box_txn *in_txn() { return fiber->mod_data.txn; }

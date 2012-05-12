@@ -29,7 +29,7 @@
 #include "tuple.h"
 #include "pickle.h"
 #include "exception.h"
-#include "box.h"
+#include "space.h"
 #include "assoc.h"
 
 const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};

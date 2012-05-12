@@ -24,8 +24,9 @@
  */
 
 #include "tree.h"
-#include "box.h"
 #include "tuple.h"
+#include "space.h"
+#include "exception.h"
 #include <pickle.h>
 
 /* {{{ Utilities. *************************************************/

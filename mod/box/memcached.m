@@ -33,6 +33,7 @@
 #include "stat.h"
 #include "salloc.h"
 #include "pickle.h"
+#include "space.h"
 
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
