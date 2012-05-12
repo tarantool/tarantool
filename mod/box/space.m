@@ -33,6 +33,8 @@
 #include <tarantool.h>
 #include <exception.h>
 
+struct space *space = NULL;
+
 bool secondary_indexes_enabled = false;
 /** Free a key definition. */
 static void

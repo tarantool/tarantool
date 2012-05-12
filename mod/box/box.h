@@ -56,11 +56,10 @@ struct box_txn {
 	struct box_out *out;
 	struct space *space;
 	Index *index;
-	int n;
 
 	struct tbuf *ref_tuples;
 	struct box_tuple *old_tuple;
-	struct box_tuple *tuple;
+	struct box_tuple *new_tuple;
 	struct box_tuple *lock_tuple;
 
 	struct tbuf req;
