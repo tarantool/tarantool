@@ -571,8 +571,14 @@ sub Call {
     $self->_debug("$self->{name}: CALL($sp_name)[${\join '   ', map {join' ',unpack'(H2)*',$_} @$tuple}]") if $self->{debug} >= 4;
     confess "All fields must be defined" if grep { !defined } @$tuple;
 
-    confess "Bad `unpack_format` option" if exists $param->{unpack_format} and ref $param->{unpack_format} ne 'ARRAY';
-    my $unpack_format = join '', map { /&/ ? 'w/a*' : "x$_" } @{$param->{unpack_format}};
+    confess "Required `unpack_format` option wasn't defined"
+        unless exists $param->{unpack_format} and $param->{unpack_format};
+
+    my $unpack_format = $param->{unpack_format};
+    $unpack_format = [ split /\s*/, $unpack_format ]
+        unless 'ARRAY' eq ref $unpack_format;
+
+    $unpack_format = join '', map { /&/ ? 'w/a*' : "x$_" } @$unpack_format;
 
     local $namespace->{unpack_format} = $unpack_format if $unpack_format; # XXX
     local $namespace->{append_for_unpack} = ''         if $unpack_format; # shit...
