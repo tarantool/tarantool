@@ -32,6 +32,8 @@
 #include <cfg/warning.h>
 #include <tarantool.h>
 #include <exception.h>
+#include "tuple.h"
+#include <pickle.h>
 
 struct space *space = NULL;
 
@@ -52,6 +54,51 @@ space_replace(struct space *sp, struct box_tuple *old_tuple,
 	for (int i = 0; i < n; i++) {
 		Index *index = sp->index[i];
 		[index replace: old_tuple :new_tuple];
+	}
+}
+
+void
+space_validate(struct space *sp, struct box_tuple *old_tuple,
+	       struct box_tuple *new_tuple)
+{
+	int n = index_count(sp);
+
+	/* Only secondary indexes are validated here. So check to see
+	   if there are any.*/
+	if (n <= 1) {
+		return;
+	}
+
+	/* Check to see if the tuple has a sufficient number of fields. */
+	if (new_tuple->field_count < sp->max_fieldno)
+		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+
+	/* Sweep through the tuple and check the field sizes. */
+	u8 *data = new_tuple->data;
+	for (int f = 0; f < sp->max_fieldno; ++f) {
+		/* Get the size of the current field and advance. */
+		u32 len = load_varint32((void **) &data);
+		data += len;
+
+		/* Check fixed size fields (NUM and NUM64) and skip undefined
+		   size fields (STRING and UNKNOWN). */
+		if (sp->field_types[f] == NUM) {
+			if (len != sizeof(u32))
+				tnt_raise(IllegalParams, :"field must be NUM");
+		} else if (sp->field_types[f] == NUM64) {
+			if (len != sizeof(u64))
+				tnt_raise(IllegalParams, :"field must be NUM64");
+		}
+	}
+
+	/* Check key uniqueness */
+	for (int i = 1; i < n; ++i) {
+		Index *index = sp->index[i];
+		if (index->key_def->is_unique) {
+			struct box_tuple *tuple = [index findByTuple: new_tuple];
+			if (tuple != NULL && tuple != old_tuple)
+				tnt_raise(ClientError, :ER_INDEX_VIOLATION);
+		}
 	}
 }
 

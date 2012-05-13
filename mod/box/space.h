@@ -89,6 +89,8 @@ space_n(struct space *sp)
 	return sp - space;
 }
 
+void space_validate(struct space *sp, struct box_tuple *old_tuple,
+		    struct box_tuple *new_tuple);
 void space_replace(struct space *sp, struct box_tuple *old_tuple,
 		   struct box_tuple *new_tuple);
 void space_remove(struct space *sp, struct box_tuple *tuple);
