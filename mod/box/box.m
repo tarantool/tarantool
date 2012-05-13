@@ -238,11 +238,7 @@ prepare_replace(struct box_txn *txn, size_t field_count, struct tbuf *data)
 		 * Tuple reference counter will be incremented in
 		 * txn_commit().
 		 */
-		int n = index_count(txn->space);
-		for (int i = 0; i < n; i++) {
-			Index *index = txn->space->index[i];
-			[index replace: NULL :txn->new_tuple];
-		}
+		space_replace(txn->space, NULL, txn->new_tuple);
 	}
 
 	txn->out->dup_u32(1); /* Affected tuples */
@@ -255,12 +251,7 @@ static void
 commit_replace(struct box_txn *txn)
 {
 	if (txn->old_tuple != NULL) {
-		int n = index_count(txn->space);
-		for (int i = 0; i < n; i++) {
-			Index *index = txn->space->index[i];
-			[index replace: txn->old_tuple :txn->new_tuple];
-		}
-
+		space_replace(txn->space, txn->old_tuple, txn->new_tuple);
 		tuple_ref(txn->old_tuple, -1);
 	}
 
@@ -275,13 +266,8 @@ rollback_replace(struct box_txn *txn)
 {
 	say_debug("rollback_replace: txn->new_tuple:%p", txn->new_tuple);
 
-	if (txn->new_tuple && txn->new_tuple->flags & GHOST) {
-		int n = index_count(txn->space);
-		for (int i = 0; i < n; i++) {
-			Index *index = txn->space->index[i];
-			[index remove: txn->new_tuple];
-		}
-	}
+	if (txn->new_tuple && txn->new_tuple->flags & GHOST)
+		space_remove(txn->space, txn->new_tuple);
 }
 
 /** {{{ UPDATE request implementation.
@@ -1085,9 +1071,10 @@ prepare_delete(struct box_txn *txn, struct tbuf *data)
 
 	if (txn->old_tuple == NULL) {
 		/*
-		 * There is no subject tuple we could write to WAL, which means,
-		 * to do a write, we would have to allocate one. Too complicated,
-		 * for now, just do no logging for DELETEs that do nothing.
+		 * There is no subject tuple we could write to
+		 * WAL, which means, to do a write, we would have
+		 * to allocate one. Too complicated, for now, just
+		 * do no logging for DELETEs that do nothing.
 		 */
 		txn->flags |= BOX_NOT_STORE;
 	} else {
@@ -1106,16 +1093,10 @@ prepare_delete(struct box_txn *txn, struct tbuf *data)
 static void
 commit_delete(struct box_txn *txn)
 {
-	if (txn->old_tuple == NULL)
-		return;
-
-	int n = index_count(txn->space);
-	for (int i = 0; i < n; i++) {
-		Index *index = txn->space->index[i];
-		[index remove: txn->old_tuple];
+	if (txn->old_tuple) {
+		space_remove(txn->space, txn->old_tuple);
+		tuple_ref(txn->old_tuple, -1);
 	}
-
-	tuple_ref(txn->old_tuple, -1);
 }
 
 static bool

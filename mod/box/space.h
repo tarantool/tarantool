@@ -89,6 +89,10 @@ space_n(struct space *sp)
 	return sp - space;
 }
 
+void space_replace(struct space *sp, struct box_tuple *old_tuple,
+		   struct box_tuple *new_tuple);
+void space_remove(struct space *sp, struct box_tuple *tuple);
+
 /** Get key_def ordinal number. */
 static inline int
 key_def_n(struct space *sp, struct key_def *kp)

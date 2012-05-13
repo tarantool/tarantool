@@ -45,6 +45,27 @@ key_free(struct key_def *key_def)
 }
 
 void
+space_replace(struct space *sp, struct box_tuple *old_tuple,
+	      struct box_tuple *new_tuple)
+{
+	int n = index_count(sp);
+	for (int i = 0; i < n; i++) {
+		Index *index = sp->index[i];
+		[index replace: old_tuple :new_tuple];
+	}
+}
+
+void
+space_remove(struct space *sp, struct box_tuple *tuple)
+{
+	int n = index_count(sp);
+	for (int i = 0; i < n; i++) {
+		Index *index = sp->index[i];
+		[index remove: tuple];
+	}
+}
+
+void
 space_free(void)
 {
 	int i;
