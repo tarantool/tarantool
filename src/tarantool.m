@@ -404,7 +404,8 @@ create_pid(void)
 			panic_syserror("ftruncate(`%s')", cfg.pid_file);
 	}
 
-	fprintf(f, "%i\n", getpid());
+	master_pid = getpid();
+	fprintf(f, "%i\n", master_pid);
 	fclose(f);
 }
 
@@ -498,7 +499,6 @@ main(int argc, char **argv)
 	__libc_stack_end = (void*) &argv;
 #endif
 
-	master_pid = getpid();
 	crc32_init();
 	stat_init();
 	palloc_init();
