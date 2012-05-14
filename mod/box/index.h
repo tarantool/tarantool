@@ -76,8 +76,6 @@ struct key_def {
 	bool is_unique;
 };
 
-@class Index;
-
 @interface Index: Object {
  @public
 	/* Index owner space */

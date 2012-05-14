@@ -48,7 +48,7 @@ struct box_txn {
 	u32 flags;
 
 	struct lua_State *L;
-	struct  port *port;
+	struct port *port;
 	struct space *space;
 	Index *index;
 
