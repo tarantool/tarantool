@@ -451,6 +451,7 @@ tarantool_free(void)
 		gopt_free(main_opt);
 	free_proc_title(main_argc, main_argv);
 
+	/* unlink pidfile but not in replication process. */
 	if ((cfg.pid_file != NULL) && (master_pid == getpid()))
 		unlink(cfg.pid_file);
 	destroy_tarantool_cfg(&cfg);
