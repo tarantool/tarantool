@@ -300,6 +300,8 @@ space_init(void)
 void
 build_indexes(void)
 {
+	assert(secondary_indexes_enabled == false);
+
 	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
 		if (space[n].enabled == false)
 			continue;
@@ -316,6 +318,8 @@ build_indexes(void)
 
 		say_info("Space %"PRIu32": done", n);
 	}
+	/* enable secondary indexes now */
+	secondary_indexes_enabled = true;
 }
 
 i32

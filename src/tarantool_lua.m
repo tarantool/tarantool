@@ -28,7 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tarantool.h"
+#include <tarantool_lua.h>
+#include <tarantool.h>
 
 #include "lua.h"
 #include "lauxlib.h"

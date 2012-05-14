@@ -58,6 +58,7 @@
 #include <third_party/gopt/gopt.h>
 #include <cfg/warning.h>
 #include "tarantool_pthread.h"
+#include "tarantool_lua.h"
 
 
 static pid_t master_pid;
