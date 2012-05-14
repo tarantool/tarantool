@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "request.h"
+#include "txn.h"
 #include "tuple.h"
 #include "index.h"
 #include "space.h"
@@ -35,38 +36,9 @@
 #include <errinj.h>
 #include <tbuf.h>
 #include <pickle.h>
-#include <log_io.h>
 
 STRS(requests, REQUESTS);
 STRS(update_op_codes, UPDATE_OP_CODES);
-
-static void
-lock_tuple(struct box_txn *txn, struct box_tuple *tuple)
-{
-	if (tuple->flags & WAL_WAIT)
-		tnt_raise(ClientError, :ER_TUPLE_IS_RO);
-
-	say_debug("lock_tuple(%p)", tuple);
-	txn->lock_tuple = tuple;
-	tuple->flags |= WAL_WAIT;
-}
-
-static void
-unlock_tuples(struct box_txn *txn)
-{
-	if (txn->lock_tuple) {
-		txn->lock_tuple->flags &= ~WAL_WAIT;
-		txn->lock_tuple = NULL;
-	}
-}
-
-void
-tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
-{
-	say_debug("tuple_txn_ref(%p)", tuple);
-	tbuf_append(txn->ref_tuples, &tuple, sizeof(struct box_tuple *));
-	tuple_ref(tuple, +1);
-}
 
 static void
 read_key(struct tbuf *data, void **key_ptr, u32 *key_part_count_ptr)
@@ -149,29 +121,6 @@ prepare_replace(struct box_txn *txn, size_t field_count, struct tbuf *data)
 
 	if (txn->flags & BOX_RETURN_TUPLE)
 		txn->port->add_tuple(txn->new_tuple);
-}
-
-static void
-commit_replace(struct box_txn *txn)
-{
-	if (txn->old_tuple != NULL) {
-		space_replace(txn->space, txn->old_tuple, txn->new_tuple);
-		tuple_ref(txn->old_tuple, -1);
-	}
-
-	if (txn->new_tuple != NULL) {
-		txn->new_tuple->flags &= ~GHOST;
-		tuple_ref(txn->new_tuple, +1);
-	}
-}
-
-static void
-rollback_replace(struct box_txn *txn)
-{
-	say_debug("rollback_replace: txn->new_tuple:%p", txn->new_tuple);
-
-	if (txn->new_tuple && txn->new_tuple->flags & GHOST)
-		space_remove(txn->space, txn->new_tuple);
 }
 
 /** {{{ UPDATE request implementation.
@@ -994,25 +943,6 @@ prepare_delete(struct box_txn *txn, struct tbuf *data)
 		txn->port->add_tuple(txn->old_tuple);
 }
 
-static void
-commit_delete(struct box_txn *txn)
-{
-	if (txn->old_tuple) {
-		space_remove(txn->space, txn->old_tuple);
-		tuple_ref(txn->old_tuple, -1);
-	}
-}
-
-struct box_txn *
-txn_begin()
-{
-	struct box_txn *txn = p0alloc(fiber->gc_pool, sizeof(*txn));
-	txn->ref_tuples = tbuf_alloc(fiber->gc_pool);
-	assert(fiber->mod_data.txn == NULL);
-	fiber->mod_data.txn = txn;
-	return txn;
-}
-
 void txn_assign_n(struct box_txn *txn, struct tbuf *data)
 {
 	int space_no = read_u32(data);
@@ -1038,83 +968,6 @@ txn_set_op(struct box_txn *txn, u16 op, struct tbuf *data)
 		.size = data->size,
 		.capacity = data->size,
 		.pool = NULL };
-}
-
-static void
-txn_cleanup(struct box_txn *txn)
-{
-	struct box_tuple **tuple = txn->ref_tuples->data;
-	int i = txn->ref_tuples->size / sizeof(struct box_txn *);
-
-	while (i-- > 0) {
-		say_debug("tuple_txn_unref(%p)", *tuple);
-		tuple_ref(*tuple++, -1);
-	}
-
-	/* mark txn as clean */
-	memset(txn, 0, sizeof(*txn));
-}
-
-void
-txn_commit(struct box_txn *txn)
-{
-	assert(txn == in_txn());
-	assert(txn->op);
-
-	if (!op_is_select(txn->op)) {
-		say_debug("box_commit(op:%s)", requests_strs[txn->op]);
-
-		if (txn->flags & BOX_NOT_STORE)
-			;
-		else {
-			fiber_peer_name(fiber); /* fill the cookie */
-
-			i64 lsn = next_lsn(recovery_state, 0);
-			int res = wal_write(recovery_state, wal_tag, txn->op,
-					    fiber->cookie, lsn, &txn->req);
-			confirm_lsn(recovery_state, lsn);
-			if (res)
-				tnt_raise(LoggedError, :ER_WAL_IO);
-		}
-
-		unlock_tuples(txn);
-
-		if (txn->op == DELETE_1_3 || txn->op == DELETE)
-			commit_delete(txn);
-		else
-			commit_replace(txn);
-	}
-	/*
-	 * If anything above throws, we must be able to
-	 * roll back. Thus clear mod_data.txn only when
-	 * we know for sure the commit has succeeded.
-	 */
-	fiber->mod_data.txn = 0;
-
-	if (txn->flags & BOX_GC_TXN)
-		fiber_register_cleanup((fiber_cleanup_handler)txn_cleanup, txn);
-	else
-		txn_cleanup(txn);
-}
-
-void
-txn_rollback(struct box_txn *txn)
-{
-	assert(txn == in_txn());
-	fiber->mod_data.txn = 0;
-	if (txn->op == 0)
-		return;
-
-	if (!op_is_select(txn->op)) {
-		say_debug("txn_rollback(op:%s)", requests_strs[txn->op]);
-
-		unlock_tuples(txn);
-
-		if (txn->op == REPLACE)
-			rollback_replace(txn);
-	}
-
-	txn_cleanup(txn);
 }
 
 void

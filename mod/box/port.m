@@ -30,8 +30,8 @@
 #include <pickle.h>
 #include <tarantool_lua.h>
 #include "request.h"
+#include "txn.h"
 #include "tuple.h"
-#include "fiber.h"
 #include "box_lua.h"
 #include "lua.h"
 #include "lauxlib.h"

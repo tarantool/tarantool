@@ -41,6 +41,7 @@
 #include "space.h"
 #include "port.h"
 #include "request.h"
+#include "txn.h"
 
 static void box_process_ro(u32 op, struct tbuf *request_data);
 static void box_process_rw(u32 op, struct tbuf *request_data);
