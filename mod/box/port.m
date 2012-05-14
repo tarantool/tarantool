@@ -73,7 +73,7 @@ iov_add_tuple(struct box_tuple *tuple)
 	size_t len = tuple_len(tuple);
 
 	if (len > BOX_REF_THRESHOLD) {
-		tuple_txn_ref(in_txn(), tuple);
+		txn_ref_tuple(in_txn(), tuple);
 		iov_add(&tuple->bsize, len);
 	} else {
 		iov_dup(&tuple->bsize, len);
@@ -208,7 +208,7 @@ void iov_add_ret(struct lua_State *L, int index)
 		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
 		break;
 	}
-	tuple_txn_ref(in_txn(), tuple);
+	txn_ref_tuple(in_txn(), tuple);
 	iov_add(&tuple->bsize, tuple_len(tuple));
 }
 

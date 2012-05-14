@@ -39,7 +39,7 @@ struct lua_State;
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void box_lua_call(struct box_txn *txn, struct tbuf *req);
+void do_call(struct box_txn *txn, struct tbuf *req);
 /**
  * Create an instance of Lua interpreter in box.
  */

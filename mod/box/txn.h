@@ -44,6 +44,6 @@ static inline struct box_txn *in_txn() { return fiber->mod_data.txn; }
 struct box_txn *txn_begin();
 void txn_commit(struct box_txn *txn);
 void txn_rollback(struct box_txn *txn);
-void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
-void lock_tuple(struct box_txn *txn, struct box_tuple *tuple);
+void txn_ref_tuple(struct box_txn *txn, struct box_tuple *tuple);
+void txn_lock_tuple(struct box_txn *txn, struct box_tuple *tuple);
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

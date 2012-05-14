@@ -44,7 +44,7 @@ struct port;
 struct space;
 
 struct box_txn {
-	u16 op;
+	u16 type;
 	u32 flags;
 
 	struct lua_State *L;
@@ -118,16 +118,13 @@ ENUM(update_op_codes, UPDATE_OP_CODES);
 
 extern iproto_callback rw_callback;
 
-/* These are used to implement memcached 'GET' */
-void txn_set_op(struct box_txn *txn, u16 op, struct tbuf *data);
-
-void box_dispatch(struct box_txn *txn, struct tbuf *data);
+void request_set_type(struct box_txn *req, u16 type, struct tbuf *data);
+void request_dispatch(struct box_txn *txn, struct tbuf *data);
 
 static inline bool
-op_is_select(u32 op)
+request_is_select(u32 type)
 {
-	return op == SELECT || op == CALL;
+	return type == SELECT || type == CALL;
 }
-
 
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

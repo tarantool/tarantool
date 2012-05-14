@@ -207,7 +207,7 @@ print_stats()
 void memcached_get(struct box_txn *txn, size_t keys_count, struct tbuf *keys,
 		   bool show_cas)
 {
-	txn->op = SELECT;
+	txn->type = SELECT;
 	stat_collect(stat_base, MEMC_GET, 1);
 	stats.cmd_get++;
 	say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
@@ -261,7 +261,7 @@ void memcached_get(struct box_txn *txn, size_t keys_count, struct tbuf *keys,
 		stats.get_hits++;
 		stat_collect(stat_base, MEMC_GET_HIT, 1);
 
-		tuple_txn_ref(txn, tuple);
+		txn_ref_tuple(txn, tuple);
 
 		if (show_cas) {
 			struct tbuf *b = tbuf_alloc(fiber->gc_pool);

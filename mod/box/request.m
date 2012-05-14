@@ -57,7 +57,7 @@ read_key(struct tbuf *data, void **key_ptr, u32 *key_part_count_ptr)
 }
 
 static void __attribute__((noinline))
-prepare_replace(struct box_txn *txn, size_t field_count, struct tbuf *data)
+do_replace(struct box_txn *txn, size_t field_count, struct tbuf *data)
 {
 	assert(data != NULL);
 	if (field_count == 0)
@@ -67,14 +67,14 @@ prepare_replace(struct box_txn *txn, size_t field_count, struct tbuf *data)
 		tnt_raise(IllegalParams, :"incorrect tuple length");
 
 	txn->new_tuple = tuple_alloc(data->size);
-	tuple_txn_ref(txn, txn->new_tuple);
+	txn_ref_tuple(txn, txn->new_tuple);
 	txn->new_tuple->field_count = field_count;
 	memcpy(txn->new_tuple->data, data->data, data->size);
 
 	txn->old_tuple = [txn->index findByTuple: txn->new_tuple];
 
 	if (txn->old_tuple != NULL)
-		tuple_txn_ref(txn, txn->old_tuple);
+		txn_ref_tuple(txn, txn->old_tuple);
 
 	if (txn->flags & BOX_ADD && txn->old_tuple != NULL)
 		tnt_raise(ClientError, :ER_TUPLE_FOUND);
@@ -95,9 +95,9 @@ prepare_replace(struct box_txn *txn, size_t field_count, struct tbuf *data)
 		kab = load_varint32(&kb);
 		assert(kal == kab && memcmp(ka, kb, kal) == 0);
 #endif
-		lock_tuple(txn, txn->old_tuple);
+		txn_lock_tuple(txn, txn->old_tuple);
 	} else {
-		lock_tuple(txn, txn->new_tuple);
+		txn_lock_tuple(txn, txn->new_tuple);
 		/*
 		 * Mark the tuple as ghost before attempting an
 		 * index replace: if it fails, txn_rollback() will
@@ -148,7 +148,7 @@ prepare_replace(struct box_txn *txn, size_t field_count, struct tbuf *data)
  * SET(4, "aaaaaa"), SPLICE(4, 0, 5, 0, ""), resulting in
  * zero increase of total tuple length, but requiring an
  * intermediate buffer to store SET results. Please
- * read the source of do_update() to see how these
+ * read the source of do_update_ops() to see how these
  * complications  are worked around.
  */
 
@@ -766,7 +766,7 @@ init_update_operations(struct box_txn *txn, struct update_cmd *cmd)
 }
 
 static void
-do_update(struct box_txn *txn, struct update_cmd *cmd)
+do_update_ops(struct box_txn *txn, struct update_cmd *cmd)
 {
 	void *new_data = txn->new_tuple->data;
 	void *new_data_end = new_data + txn->new_tuple->bsize;
@@ -828,7 +828,7 @@ do_update(struct box_txn *txn, struct update_cmd *cmd)
 }
 
 static void __attribute__((noinline))
-prepare_update(struct box_txn *txn, struct tbuf *data)
+do_update(struct box_txn *txn, struct tbuf *data)
 {
 	u32 tuples_affected = 1;
 
@@ -849,9 +849,9 @@ prepare_update(struct box_txn *txn, struct tbuf *data)
 	init_update_operations(txn, cmd);
 	/* allocate new tuple */
 	txn->new_tuple = tuple_alloc(cmd->new_tuple_len);
-	tuple_txn_ref(txn, txn->new_tuple);
-	do_update(txn, cmd);
-	lock_tuple(txn, txn->old_tuple);
+	txn_ref_tuple(txn, txn->new_tuple);
+	do_update_ops(txn, cmd);
+	txn_lock_tuple(txn, txn->old_tuple);
 	space_validate(txn->space, txn->old_tuple, txn->new_tuple);
 
 out:
@@ -864,7 +864,7 @@ out:
 /** }}} */
 
 static void __attribute__((noinline))
-process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
+do_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 {
 	struct box_tuple *tuple;
 	uint32_t *found;
@@ -911,7 +911,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 }
 
 static void __attribute__((noinline))
-prepare_delete(struct box_txn *txn, struct tbuf *data)
+do_delete(struct box_txn *txn, struct tbuf *data)
 {
 	u32 tuples_affected = 0;
 
@@ -931,8 +931,8 @@ prepare_delete(struct box_txn *txn, struct tbuf *data)
 		 */
 		txn->flags |= BOX_NOT_STORE;
 	} else {
-		tuple_txn_ref(txn, txn->old_tuple);
-		lock_tuple(txn, txn->old_tuple);
+		txn_ref_tuple(txn, txn->old_tuple);
+		txn_lock_tuple(txn, txn->old_tuple);
 
 		tuples_affected = 1;
 	}
@@ -943,7 +943,8 @@ prepare_delete(struct box_txn *txn, struct tbuf *data)
 		txn->port->add_tuple(txn->old_tuple);
 }
 
-void txn_assign_n(struct box_txn *txn, struct tbuf *data)
+static void
+request_set_space(struct box_txn *txn, struct tbuf *data)
 {
 	int space_no = read_u32(data);
 
@@ -960,10 +961,10 @@ void txn_assign_n(struct box_txn *txn, struct tbuf *data)
 
 /** Remember op code/request in the txn. */
 void
-txn_set_op(struct box_txn *txn, u16 op, struct tbuf *data)
+request_set_type(struct box_txn *req, u16 type, struct tbuf *data)
 {
-	txn->op = op;
-	txn->req = (struct tbuf) {
+	req->type = type;
+	req->req = (struct tbuf) {
 		.data = data->data,
 		.size = data->size,
 		.capacity = data->size,
@@ -971,35 +972,35 @@ txn_set_op(struct box_txn *txn, u16 op, struct tbuf *data)
 }
 
 void
-box_dispatch(struct box_txn *txn, struct tbuf *data)
+request_dispatch(struct box_txn *txn, struct tbuf *data)
 {
 	u32 field_count;
 
-	say_debug("box_dispatch(%i)", txn->op);
+	say_debug("request_dispatch(%i)", txn->type);
 
-	switch (txn->op) {
+	switch (txn->type) {
 	case REPLACE:
-		txn_assign_n(txn, data);
+		request_set_space(txn, data);
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 		field_count = read_u32(data);
 		if (txn->space->arity > 0 && txn->space->arity != field_count)
 			tnt_raise(IllegalParams, :"tuple field count must match space cardinality");
-		prepare_replace(txn, field_count, data);
+		do_replace(txn, field_count, data);
 		break;
 
 	case DELETE:
 	case DELETE_1_3:
-		txn_assign_n(txn, data);
-		if (txn->op == DELETE)
+		request_set_space(txn, data);
+		if (txn->type == DELETE)
 			txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 
-		prepare_delete(txn, data);
+		do_delete(txn, data);
 		break;
 
 	case SELECT:
 	{
 		ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
-		txn_assign_n(txn, data);
+		request_set_space(txn, data);
 		u32 i = read_u32(data);
 		u32 offset = read_u32(data);
 		u32 limit = read_u32(data);
@@ -1009,22 +1010,22 @@ box_dispatch(struct box_txn *txn, struct tbuf *data)
 				  space_n(txn->space));
 		txn->index = txn->space->index[i];
 
-		process_select(txn, limit, offset, data);
+		do_select(txn, limit, offset, data);
 		break;
 	}
 
 	case UPDATE:
-		txn_assign_n(txn, data);
+		request_set_space(txn, data);
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		prepare_update(txn, data);
+		do_update(txn, data);
 		break;
 	case CALL:
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		box_lua_call(txn, data);
+		do_call(txn, data);
 		break;
 
 	default:
-		say_error("box_dispatch: unsupported command = %" PRIi32 "", txn->op);
+		say_error("request_dispatch: unsupported request = %" PRIi32 "", txn->type);
 		tnt_raise(IllegalParams, :"unsupported command code, check the error log");
 	}
 }

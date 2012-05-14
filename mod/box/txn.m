@@ -33,12 +33,12 @@
 #include <log_io.h>
 
 void
-lock_tuple(struct box_txn *txn, struct box_tuple *tuple)
+txn_lock_tuple(struct box_txn *txn, struct box_tuple *tuple)
 {
 	if (tuple->flags & WAL_WAIT)
 		tnt_raise(ClientError, :ER_TUPLE_IS_RO);
 
-	say_debug("lock_tuple(%p)", tuple);
+	say_debug("txn_lock_tuple(%p)", tuple);
 	txn->lock_tuple = tuple;
 	tuple->flags |= WAL_WAIT;
 }
@@ -53,9 +53,9 @@ unlock_tuples(struct box_txn *txn)
 }
 
 void
-tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple)
+txn_ref_tuple(struct box_txn *txn, struct box_tuple *tuple)
 {
-	say_debug("tuple_txn_ref(%p)", tuple);
+	say_debug("txn_ref_tuple(%p)", tuple);
 	tbuf_append(txn->ref_tuples, &tuple, sizeof(struct box_tuple *));
 	tuple_ref(tuple, +1);
 }
@@ -121,10 +121,10 @@ void
 txn_commit(struct box_txn *txn)
 {
 	assert(txn == in_txn());
-	assert(txn->op);
+	assert(txn->type);
 
-	if (!op_is_select(txn->op)) {
-		say_debug("box_commit(op:%s)", requests_strs[txn->op]);
+	if (!request_is_select(txn->type)) {
+		say_debug("box_commit(op:%s)", requests_strs[txn->type]);
 
 		if (txn->flags & BOX_NOT_STORE)
 			;
@@ -132,7 +132,8 @@ txn_commit(struct box_txn *txn)
 			fiber_peer_name(fiber); /* fill the cookie */
 
 			i64 lsn = next_lsn(recovery_state, 0);
-			int res = wal_write(recovery_state, wal_tag, txn->op,
+			int res = wal_write(recovery_state, wal_tag,
+					    txn->type,
 					    fiber->cookie, lsn, &txn->req);
 			confirm_lsn(recovery_state, lsn);
 			if (res)
@@ -141,7 +142,7 @@ txn_commit(struct box_txn *txn)
 
 		unlock_tuples(txn);
 
-		if (txn->op == DELETE_1_3 || txn->op == DELETE)
+		if (txn->type == DELETE_1_3 || txn->type == DELETE)
 			commit_delete(txn);
 		else
 			commit_replace(txn);
@@ -164,15 +165,16 @@ txn_rollback(struct box_txn *txn)
 {
 	assert(txn == in_txn());
 	fiber->mod_data.txn = 0;
-	if (txn->op == 0)
+	if (txn->type == 0)
 		return;
 
-	if (!op_is_select(txn->op)) {
-		say_debug("txn_rollback(op:%s)", requests_strs[txn->op]);
+	if (!request_is_select(txn->type)) {
+		say_debug("txn_rollback(request type: %s)",
+			  requests_strs[txn->type]);
 
 		unlock_tuples(txn);
 
-		if (txn->op == REPLACE)
+		if (txn->type == REPLACE)
 			rollback_replace(txn);
 	}
 	txn_cleanup(txn);

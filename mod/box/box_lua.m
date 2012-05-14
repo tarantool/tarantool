@@ -696,7 +696,7 @@ box_lua_panic(struct lua_State *L)
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void box_lua_call(struct box_txn *txn, struct tbuf *data)
+void do_call(struct box_txn *txn, struct tbuf *data)
 {
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);

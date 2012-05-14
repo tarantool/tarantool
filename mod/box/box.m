@@ -82,8 +82,8 @@ box_process_rw(u32 op, struct tbuf *request_data)
 	}
 
 	@try {
-		txn_set_op(txn, op, request_data);
-		box_dispatch(txn, request_data);
+		request_set_type(txn, op, request_data);
+		request_dispatch(txn, request_data);
 		txn_commit(txn);
 	}
 	@catch (id e) {
@@ -101,7 +101,7 @@ box_process_rw(u32 op, struct tbuf *request_data)
 static void
 box_process_ro(u32 op, struct tbuf *request_data)
 {
-	if (!op_is_select(op)) {
+	if (!request_is_select(op)) {
 		struct box_txn *txn = in_txn();
 		if (txn != NULL)
 			txn_rollback(txn);
