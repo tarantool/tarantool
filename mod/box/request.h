@@ -1,46 +1,46 @@
-#ifndef TARANTOOL_BOX_H_INCLUDED
-#define TARANTOOL_BOX_H_INCLUDED
+#ifndef TARANTOOL_BOX_REQUEST_H_INCLUDED
+#define TARANTOOL_BOX_REQUEST_H_INCLUDED
 /*
- * Copyright (C) 2010 Mail.RU
- * Copyright (C) 2010 Yuriy Vostrikov
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
  *
- * THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "exception.h"
-#include "iproto.h"
+#include <util.h>
 #include <tbuf.h>
+#include <iproto.h>
 #include <fiber.h>
-
-struct tarantool_cfg;
-struct box_tuple;
 
 enum {
 	/** A limit on how many operations a single UPDATE can have. */
 	BOX_UPDATE_OP_CNT_MAX = 128,
 };
-struct port;
-
-
 @class Index;
+struct tarantool_cfg;
+struct box_tuple;
+struct port;
 struct space;
 
 struct box_txn {
@@ -60,7 +60,6 @@ struct box_txn {
 	struct tbuf req;
 };
 
-
 #define BOX_RETURN_TUPLE		0x01
 #define BOX_ADD				0x02
 #define BOX_REPLACE			0x04
@@ -71,8 +70,8 @@ struct box_txn {
 					 BOX_REPLACE | \
 					 BOX_NOT_STORE)
 
-/*
-    deprecated commands:
+/**
+    deprecated request ids:
         _(INSERT, 1)
         _(DELETE, 2)
         _(SET_FIELD, 3)
@@ -91,7 +90,7 @@ struct box_txn {
 
     DO NOT use these ids!
  */
-#define MESSAGES(_)				\
+#define REQUESTS(_)				\
         _(REPLACE, 13)				\
 	_(SELECT, 17)				\
 	_(UPDATE, 19)				\
@@ -99,7 +98,8 @@ struct box_txn {
 	_(DELETE, 21)				\
 	_(CALL, 22)
 
-ENUM(messages, MESSAGES);
+ENUM(requests, REQUESTS);
+extern const char *requests_strs[];
 
 /** UPDATE operation codes. */
 #define UPDATE_OP_CODES(_)			\
@@ -124,5 +124,15 @@ struct box_txn *txn_begin();
 void txn_commit(struct box_txn *txn);
 void txn_rollback(struct box_txn *txn);
 void tuple_txn_ref(struct box_txn *txn, struct box_tuple *tuple);
+void txn_set_op(struct box_txn *txn, u16 op, struct tbuf *data);
 
-#endif /* TARANTOOL_BOX_H_INCLUDED */
+void box_dispatch(struct box_txn *txn, struct tbuf *data);
+
+static inline bool
+op_is_select(u32 op)
+{
+	return op == SELECT || op == CALL;
+}
+
+
+#endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

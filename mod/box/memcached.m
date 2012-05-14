@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  */
 #include "tarantool.h"
-#include "box.h"
+#include "request.h"
 #include "mod/box/tuple.h"
 #include "fiber.h"
 #include "cfg/warning.h"

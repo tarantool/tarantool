@@ -30,7 +30,7 @@
  */
 #include "box_lua.h"
 #include <tarantool_lua.h>
-#include "box.h"
+#include "request.h"
 
 #include "lua.h"
 #include "lauxlib.h"

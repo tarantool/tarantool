@@ -27,10 +27,11 @@
  * SUCH DAMAGE.
  */
 #include "port.h"
-#include "box.h"
 #include <pickle.h>
 #include <tarantool_lua.h>
+#include "request.h"
 #include "tuple.h"
+#include "fiber.h"
 #include "box_lua.h"
 #include "lua.h"
 #include "lauxlib.h"
