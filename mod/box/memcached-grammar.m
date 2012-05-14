@@ -1034,7 +1034,7 @@ tr195:
 	{
 			struct box_txn *txn = txn_begin();
 			txn->flags |= BOX_GC_TXN;
-			txn->out = &box_out_quiet;
+			txn->port = &port_null;
 			@try {
 				memcached_get(txn, keys_count, keys, show_cas);
 				txn_commit(txn);

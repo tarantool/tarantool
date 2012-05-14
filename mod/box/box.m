@@ -48,6 +48,7 @@
 #include "memcached.h"
 #include "box_lua.h"
 #include "space.h"
+#include "port.h"
 
 extern pid_t logger_pid;
 
@@ -62,20 +63,6 @@ static char status[64] = "unknown";
 static int stat_base;
 STRS(messages, MESSAGES);
 STRS(update_op_codes, UPDATE_OP_CODES);
-
-/*
-  For tuples of size below this threshold, when sending a tuple
-  to the client, make a deep copy of the tuple for the duration
-  of sending rather than increment a reference counter.
-  This is necessary to avoid excessive page splits when taking
-  a snapshot: many small tuples can be accessed by clients
-  immediately after the snapshot process has forked off,
-  thus incrementing tuple ref count, and causing the OS to
-  create a copy of the memory page for the forked
-  child.
-*/
-
-const int BOX_REF_THRESHOLD = 8196;
 
 struct box_snap_row {
 	u32 space;
@@ -196,10 +183,10 @@ prepare_replace(struct box_txn *txn, size_t field_count, struct tbuf *data)
 		space_replace(txn->space, NULL, txn->new_tuple);
 	}
 
-	txn->out->dup_u32(1); /* Affected tuples */
+	txn->port->dup_u32(1); /* Affected tuples */
 
 	if (txn->flags & BOX_RETURN_TUPLE)
-		txn->out->add_tuple(txn->new_tuple);
+		txn->port->add_tuple(txn->new_tuple);
 }
 
 static void
@@ -957,10 +944,10 @@ prepare_update(struct box_txn *txn, struct tbuf *data)
 	space_validate(txn->space, txn->old_tuple, txn->new_tuple);
 
 out:
-	txn->out->dup_u32(tuples_affected);
+	txn->port->dup_u32(tuples_affected);
 
 	if (txn->flags & BOX_RETURN_TUPLE && txn->new_tuple)
-		txn->out->add_tuple(txn->new_tuple);
+		txn->port->add_tuple(txn->new_tuple);
 }
 
 /** }}} */
@@ -975,7 +962,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 		tnt_raise(IllegalParams, :"tuple count must be positive");
 
 	found = palloc(fiber->gc_pool, sizeof(*found));
-	txn->out->add_u32(found);
+	txn->port->add_u32(found);
 	*found = 0;
 
 	for (u32 i = 0; i < count; i++) {
@@ -1002,7 +989,7 @@ process_select(struct box_txn *txn, u32 limit, u32 offset, struct tbuf *data)
 				continue;
 			}
 
-			txn->out->add_tuple(tuple);
+			txn->port->add_tuple(tuple);
 
 			if (limit == ++(*found))
 				break;
@@ -1039,10 +1026,10 @@ prepare_delete(struct box_txn *txn, struct tbuf *data)
 		tuples_affected = 1;
 	}
 
-	txn->out->dup_u32(tuples_affected);
+	txn->port->dup_u32(tuples_affected);
 
 	if (txn->old_tuple && (txn->flags & BOX_RETURN_TUPLE))
-		txn->out->add_tuple(txn->old_tuple);
+		txn->port->add_tuple(txn->old_tuple);
 }
 
 static void
@@ -1059,47 +1046,6 @@ op_is_select(u32 op)
 {
 	return op == SELECT || op == CALL;
 }
-
-static void
-iov_add_u32(u32 *p_u32)
-{
-	iov_add(p_u32, sizeof(u32));
-}
-
-static void
-iov_dup_u32(u32 u32)
-{
-	iov_dup(&u32, sizeof(u32));
-}
-
-static void
-iov_add_tuple(struct box_tuple *tuple)
-{
-	size_t len = tuple_len(tuple);
-
-	if (len > BOX_REF_THRESHOLD) {
-		tuple_txn_ref(in_txn(), tuple);
-		iov_add(&tuple->bsize, len);
-	} else {
-		iov_dup(&tuple->bsize, len);
-	}
-}
-
-static struct box_out box_out_iproto = {
-	iov_add_u32,
-	iov_dup_u32,
-	iov_add_tuple
-};
-
-static void box_quiet_add_u32(u32 *p_u32 __attribute__((unused))) {}
-static void box_quiet_dup_u32(u32 u32 __attribute__((unused))) {}
-static void box_quiet_add_tuple(struct box_tuple *tuple __attribute__((unused))) {}
-
-struct box_out box_out_quiet = {
-	box_quiet_add_u32,
-	box_quiet_dup_u32,
-	box_quiet_add_tuple
-};
 
 struct box_txn *
 txn_begin()
@@ -1409,7 +1355,7 @@ box_process_rw(u32 op, struct tbuf *request_data)
 	if (txn == NULL) {
 		txn = txn_begin();
 		txn->flags |= BOX_GC_TXN;
-		txn->out = &box_out_iproto;
+		txn->port = &port_iproto;
 	}
 
 	@try {
@@ -1478,7 +1424,7 @@ recover_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 
 	struct box_txn *txn = txn_begin();
 	txn->flags |= BOX_NOT_STORE;
-	txn->out = &box_out_quiet;
+	txn->port = &port_null;
 
 	@try {
 		box_process_rw(op, t);
@@ -1688,9 +1634,6 @@ mod_init(void)
 
 	/* build secondary indexes */
 	build_indexes();
-
-	/* enable secondary indexes now */
-	secondary_indexes_enabled = true;
 
 	title("orphan");
 

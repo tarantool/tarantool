@@ -34,6 +34,7 @@
 #include "salloc.h"
 #include "pickle.h"
 #include "space.h"
+#include "port.h"
 
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
@@ -103,7 +104,7 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
 
 	struct box_txn *txn = txn_begin();
-	txn->out = &box_out_quiet;
+	txn->port = &port_null;
 	/*
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
@@ -124,7 +125,7 @@ delete(void *key)
 	tbuf_append_field(req, key);
 
 	struct box_txn *txn = txn_begin();
-	txn->out = &box_out_quiet;
+	txn->port = &port_null;
 
 	rw_callback(DELETE, req);
 }

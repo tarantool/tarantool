@@ -37,14 +37,9 @@ enum {
 	/** A limit on how many operations a single UPDATE can have. */
 	BOX_UPDATE_OP_CNT_MAX = 128,
 };
+struct port;
 
-struct box_out {
-	void (*add_u32)(u32 *u32);
-	void (*dup_u32)(u32 u32);
-	void (*add_tuple)(struct box_tuple *tuple);
-};
 
-extern struct box_out box_out_quiet;
 @class Index;
 struct space;
 
@@ -53,7 +48,7 @@ struct box_txn {
 	u32 flags;
 
 	struct lua_State *L;
-	struct box_out *out;
+	struct port *port;
 	struct space *space;
 	Index *index;
 

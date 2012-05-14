@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_SPACE_H_INCLUDED
-#define TARANTOOL_SPACE_H_INCLUDED
+#ifndef TARANTOOL_BOX_SPACE_H_INCLUDED
+#define TARANTOOL_BOX_SPACE_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -145,4 +145,4 @@ i32 check_spaces(struct tarantool_cfg *conf);
 /* Build secondary keys. */
 void build_indexes(void);
 
-#endif /* TARANTOOL_SPACE_H_INCLUDED */
+#endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */
