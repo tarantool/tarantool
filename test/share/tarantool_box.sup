@@ -115,8 +115,8 @@
    Memcheck:Leak
    fun:salloc
    fun:tuple_alloc
-   fun:prepare_replace
-   fun:box_dispatch
+   fun:do_replace
+   fun:request_dispatch
    fun:box_process*
    ...
 }
@@ -126,8 +126,8 @@
    Memcheck:Leak
    fun:salloc
    fun:tuple_alloc
-   fun:prepare_update
-   fun:box_dispatch
+   fun:do_update
+   fun:request_dispatch
    fun:box_process*
    ...
 }

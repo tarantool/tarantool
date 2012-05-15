@@ -62,7 +62,7 @@ memcached_dispatch()
 
 		action add {
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple != NULL && !expired(tuple))
 				iov_add("NOT_STORED\r\n", 12);
 			else
@@ -71,7 +71,7 @@ memcached_dispatch()
 
 		action replace {
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				iov_add("NOT_STORED\r\n", 12);
 			else
@@ -80,7 +80,7 @@ memcached_dispatch()
 
 		action cas {
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				iov_add("NOT_FOUND\r\n", 11);
 			else if (meta(tuple)->cas != cas)
@@ -95,7 +95,7 @@ memcached_dispatch()
 			u32 value_len;
 
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST) {
 				iov_add("NOT_STORED\r\n", 12);
 			} else {
@@ -124,7 +124,7 @@ memcached_dispatch()
 			u64 value;
 
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				iov_add("NOT_FOUND\r\n", 11);
 			} else {
@@ -173,7 +173,7 @@ memcached_dispatch()
 
 		action delete {
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				iov_add("NOT_FOUND\r\n", 11);
 			} else {
@@ -190,7 +190,7 @@ memcached_dispatch()
 		}
 
 		action get {
-			struct box_txn *txn = txn_begin();
+			struct txn *txn = txn_begin();
 			txn->flags |= BOX_GC_TXN;
 			txn->port = &port_null;
 			@try {
