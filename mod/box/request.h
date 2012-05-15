@@ -40,25 +40,7 @@ enum {
 @class Index;
 struct tarantool_cfg;
 struct tuple;
-struct port;
-struct space;
-
-struct txn {
-	u16 type;
-	u32 flags;
-
-	struct lua_State *L;
-	struct port *port;
-	struct space *space;
-	Index *index;
-
-	struct tbuf *ref_tuples;
-	struct tuple *old_tuple;
-	struct tuple *new_tuple;
-	struct tuple *lock_tuple;
-
-	struct tbuf req;
-};
+struct txn;
 
 #define BOX_RETURN_TUPLE		0x01
 #define BOX_ADD				0x02

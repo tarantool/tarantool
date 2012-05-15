@@ -29,8 +29,26 @@
  * SUCH DAMAGE.
  */
 #include <fiber.h>
-struct txn;
 struct tuple;
+@class Index;
+
+struct txn {
+	u16 type;
+	u32 flags;
+
+	struct lua_State *L;
+	struct port *port;
+	struct space *space;
+	Index *index;
+
+	struct tbuf *ref_tuples;
+	struct tuple *old_tuple;
+	struct tuple *new_tuple;
+	struct tuple *lock_tuple;
+
+	struct tbuf req;
+};
+
 
 /** tuple's flags */
 enum tuple_flags {
