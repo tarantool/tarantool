@@ -572,13 +572,15 @@ sub Call {
     confess "All fields must be defined" if grep { !defined } @$tuple;
 
     confess "Required `unpack_format` option wasn't defined"
-        unless exists $param->{unpack_format} and $param->{unpack_format};
+        unless exists $param->{unpack} or exists $param->{unpack_format} and $param->{unpack_format};
 
     my $unpack_format = $param->{unpack_format};
-    $unpack_format = [ split /\s*/, $unpack_format ]
-        unless 'ARRAY' eq ref $unpack_format;
+    if($unpack_format) {
+        $unpack_format = [ split /\s*/, $unpack_format ]
+            unless 'ARRAY' eq ref $unpack_format;
 
-    $unpack_format = join '', map { /&/ ? 'w/a*' : "x$_" } @$unpack_format;
+        $unpack_format = join '', map { /&/ ? 'w/a*' : "x$_" } @$unpack_format;
+    }
 
     local $namespace->{unpack_format} = $unpack_format if $unpack_format; # XXX
     local $namespace->{append_for_unpack} = ''         if $unpack_format; # shit...
