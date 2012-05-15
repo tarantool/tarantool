@@ -74,7 +74,7 @@ box_process_rw(u32 op, struct tbuf *request_data)
 
 	stat_collect(stat_base, op, 1);
 
-	struct box_txn *txn = in_txn();
+	struct txn *txn = in_txn();
 	if (txn == NULL) {
 		txn = txn_begin();
 		txn->flags |= BOX_GC_TXN;
@@ -102,7 +102,7 @@ static void
 box_process_ro(u32 op, struct tbuf *request_data)
 {
 	if (!request_is_select(op)) {
-		struct box_txn *txn = in_txn();
+		struct txn *txn = in_txn();
 		if (txn != NULL)
 			txn_rollback(txn);
 		tnt_raise(LoggedError, :ER_NONMASTER);
@@ -272,7 +272,7 @@ recover_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 
 	u16 op = read_u16(t);
 
-	struct box_txn *txn = txn_begin();
+	struct txn *txn = txn_begin();
 	txn->flags |= BOX_NOT_STORE;
 	txn->port = &port_null;
 
@@ -519,7 +519,7 @@ mod_cat(const char *filename)
 }
 
 static void
-snapshot_write_tuple(struct log_io_iter *i, unsigned n, struct box_tuple *tuple)
+snapshot_write_tuple(struct log_io_iter *i, unsigned n, struct tuple *tuple)
 {
 	struct tbuf *row;
 	struct box_snap_row header;
@@ -541,7 +541,7 @@ snapshot_write_tuple(struct log_io_iter *i, unsigned n, struct box_tuple *tuple)
 void
 mod_snapshot(struct log_io_iter *i)
 {
-	struct box_tuple *tuple;
+	struct tuple *tuple;
 
 	for (uint32_t n = 0; n < BOX_SPACE_MAX; ++n) {
 		if (!space[n].enabled)

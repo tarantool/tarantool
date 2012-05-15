@@ -48,8 +48,8 @@ typedef int (*tree_cmp_t)(const void *, const void *, void *);
 - (tree_cmp_t) node_cmp;
 - (tree_cmp_t) dup_node_cmp;
 - (tree_cmp_t) key_node_cmp;
-- (void) fold: (void *) node :(struct box_tuple *) tuple;
-- (struct box_tuple *) unfold: (const void *) node;
+- (void) fold: (void *) node :(struct tuple *) tuple;
+- (struct tuple *) unfold: (const void *) node;
 
 @end
 

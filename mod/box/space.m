@@ -47,8 +47,8 @@ key_free(struct key_def *key_def)
 }
 
 void
-space_replace(struct space *sp, struct box_tuple *old_tuple,
-	      struct box_tuple *new_tuple)
+space_replace(struct space *sp, struct tuple *old_tuple,
+	      struct tuple *new_tuple)
 {
 	int n = index_count(sp);
 	for (int i = 0; i < n; i++) {
@@ -58,8 +58,8 @@ space_replace(struct space *sp, struct box_tuple *old_tuple,
 }
 
 void
-space_validate(struct space *sp, struct box_tuple *old_tuple,
-	       struct box_tuple *new_tuple)
+space_validate(struct space *sp, struct tuple *old_tuple,
+	       struct tuple *new_tuple)
 {
 	int n = index_count(sp);
 
@@ -95,7 +95,7 @@ space_validate(struct space *sp, struct box_tuple *old_tuple,
 	for (int i = 1; i < n; ++i) {
 		Index *index = sp->index[i];
 		if (index->key_def->is_unique) {
-			struct box_tuple *tuple = [index findByTuple: new_tuple];
+			struct tuple *tuple = [index findByTuple: new_tuple];
 			if (tuple != NULL && tuple != old_tuple)
 				tnt_raise(ClientError, :ER_INDEX_VIOLATION);
 		}
@@ -103,7 +103,7 @@ space_validate(struct space *sp, struct box_tuple *old_tuple,
 }
 
 void
-space_remove(struct space *sp, struct box_tuple *tuple)
+space_remove(struct space *sp, struct tuple *tuple)
 {
 	int n = index_count(sp);
 	for (int i = 0; i < n; i++) {

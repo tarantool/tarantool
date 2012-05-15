@@ -35,13 +35,13 @@
 const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
 const char *index_type_strs[] = { "HASH", "TREE", "\0" };
 
-static struct box_tuple *
+static struct tuple *
 iterator_next_equal(struct iterator *it __attribute__((unused)))
 {
 	return NULL;
 }
 
-static struct box_tuple *
+static struct tuple *
 iterator_first_equal(struct iterator *it)
 {
 	it->next_equal = iterator_next_equal;
@@ -119,25 +119,25 @@ iterator_first_equal(struct iterator *it)
 	return 0;
 }
 
-- (struct box_tuple *) min
+- (struct tuple *) min
 {
 	[self subclassResponsibility: _cmd];
 	return NULL;
 }
 
-- (struct box_tuple *) max
+- (struct tuple *) max
 {
 	[self subclassResponsibility: _cmd];
 	return NULL;
 }
 
-- (struct box_tuple *) findByKey: (void *) key :(int) part_count
+- (struct tuple *) findByKey: (void *) key :(int) part_count
 {
 	[self checkKeyParts: part_count :false];
 	return [self findUnsafe: key :part_count];
 }
 
-- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count
+- (struct tuple *) findUnsafe: (void *) key :(int) part_count
 {
 	(void) key;
 	(void) part_count;
@@ -145,21 +145,21 @@ iterator_first_equal(struct iterator *it)
 	return NULL;
 }
 
-- (struct box_tuple *) findByTuple: (struct box_tuple *) pattern
+- (struct tuple *) findByTuple: (struct tuple *) pattern
 {
 	(void) pattern;
 	[self subclassResponsibility: _cmd];
 	return NULL;
 }
 
-- (void) remove: (struct box_tuple *) tuple
+- (void) remove: (struct tuple *) tuple
 {
 	(void) tuple;
 	[self subclassResponsibility: _cmd];
 }
 
-- (void) replace: (struct box_tuple *) old_tuple
-	:(struct box_tuple *) new_tuple
+- (void) replace: (struct tuple *) old_tuple
+	:(struct tuple *) new_tuple
 {
 	(void) old_tuple;
 	(void) new_tuple;
@@ -228,7 +228,7 @@ hash_iterator(struct iterator *it)
 	return (struct hash_iterator *) it;
 }
 
-struct box_tuple *
+struct tuple *
 hash_iterator_next(struct iterator *iterator)
 {
 	assert(iterator->next == hash_iterator_next);
@@ -271,7 +271,7 @@ hash_iterator_free(struct iterator *iterator)
 		 PRIu32 "...", n_tuples, index_n(self));
 
 	struct iterator *it = pk->position;
-	struct box_tuple *tuple;
+	struct tuple *tuple;
 	[pk initIterator: it :ITER_FORWARD];
 
 	while ((tuple = it->next(it)))
@@ -283,19 +283,19 @@ hash_iterator_free(struct iterator *iterator)
 	[super free];
 }
 
-- (struct box_tuple *) min
+- (struct tuple *) min
 {
 	tnt_raise(ClientError, :ER_UNSUPPORTED, "Hash index", "min()");
 	return NULL;
 }
 
-- (struct box_tuple *) max
+- (struct tuple *) max
 {
 	tnt_raise(ClientError, :ER_UNSUPPORTED, "Hash index", "max()");
 	return NULL;
 }
 
-- (struct box_tuple *) findByTuple: (struct box_tuple *) tuple
+- (struct tuple *) findByTuple: (struct tuple *) tuple
 {
 	/* Hash index currently is always single-part. */
 	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
@@ -367,11 +367,11 @@ int32_key_to_value(void *key)
 	return mh_size(int_hash);
 }
 
-- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count
+- (struct tuple *) findUnsafe: (void *) key :(int) part_count
 {
 	(void) part_count;
 
-	struct box_tuple *ret = NULL;
+	struct tuple *ret = NULL;
 	u32 num = int32_key_to_value(key);
 	mh_int_t k = mh_i32ptr_get(int_hash, num);
 	if (k != mh_end(int_hash))
@@ -382,7 +382,7 @@ int32_key_to_value(void *key)
 	return ret;
 }
 
-- (void) remove: (struct box_tuple *) tuple
+- (void) remove: (struct tuple *) tuple
 {
 	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
 	u32 num = int32_key_to_value(field);
@@ -394,8 +394,8 @@ int32_key_to_value(void *key)
 #endif
 }
 
-- (void) replace: (struct box_tuple *) old_tuple
-	:(struct box_tuple *) new_tuple
+- (void) replace: (struct tuple *) old_tuple
+	:(struct tuple *) new_tuple
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
 	u32 num = int32_key_to_value(field);
@@ -488,11 +488,11 @@ int64_key_to_value(void *key)
 	return mh_size(int64_hash);
 }
 
-- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count
+- (struct tuple *) findUnsafe: (void *) key :(int) part_count
 {
 	(void) part_count;
 
-	struct box_tuple *ret = NULL;
+	struct tuple *ret = NULL;
 	u64 num = int64_key_to_value(key);
 	mh_int_t k = mh_i64ptr_get(int64_hash, num);
 	if (k != mh_end(int64_hash))
@@ -503,7 +503,7 @@ int64_key_to_value(void *key)
 	return ret;
 }
 
-- (void) remove: (struct box_tuple *) tuple
+- (void) remove: (struct tuple *) tuple
 {
 	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
 	u64 num = int64_key_to_value(field);
@@ -516,8 +516,8 @@ int64_key_to_value(void *key)
 #endif
 }
 
-- (void) replace: (struct box_tuple *) old_tuple
-	:(struct box_tuple *) new_tuple
+- (void) replace: (struct tuple *) old_tuple
+	:(struct tuple *) new_tuple
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
 	u64 num = int64_key_to_value(field);
@@ -601,10 +601,10 @@ int64_key_to_value(void *key)
 	return mh_size(str_hash);
 }
 
-- (struct box_tuple *) findUnsafe: (void *) key :(int) part_count
+- (struct tuple *) findUnsafe: (void *) key :(int) part_count
 {
 	(void) part_count;
-	struct box_tuple *ret = NULL;
+	struct tuple *ret = NULL;
 	mh_int_t k = mh_lstrptr_get(str_hash, key);
 	if (k != mh_end(str_hash))
 		ret = mh_value(str_hash, k);
@@ -616,7 +616,7 @@ int64_key_to_value(void *key)
 	return ret;
 }
 
-- (void) remove: (struct box_tuple *) tuple
+- (void) remove: (struct tuple *) tuple
 {
 	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
 
@@ -630,8 +630,8 @@ int64_key_to_value(void *key)
 #endif
 }
 
-- (void) replace: (struct box_tuple *) old_tuple
-	:(struct box_tuple *) new_tuple
+- (void) replace: (struct tuple *) old_tuple
+	:(struct tuple *) new_tuple
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
 

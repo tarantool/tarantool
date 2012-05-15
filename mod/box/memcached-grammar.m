@@ -269,7 +269,7 @@ tr26:
 #line 63 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple != NULL && !expired(tuple))
 				iov_add("NOT_STORED\r\n", 12);
 			else
@@ -309,7 +309,7 @@ tr30:
 #line 63 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple != NULL && !expired(tuple))
 				iov_add("NOT_STORED\r\n", 12);
 			else
@@ -351,7 +351,7 @@ tr39:
 #line 63 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple != NULL && !expired(tuple))
 				iov_add("NOT_STORED\r\n", 12);
 			else
@@ -397,7 +397,7 @@ tr58:
 			u32 value_len;
 
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST) {
 				iov_add("NOT_STORED\r\n", 12);
 			} else {
@@ -455,7 +455,7 @@ tr62:
 			u32 value_len;
 
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST) {
 				iov_add("NOT_STORED\r\n", 12);
 			} else {
@@ -515,7 +515,7 @@ tr71:
 			u32 value_len;
 
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST) {
 				iov_add("NOT_STORED\r\n", 12);
 			} else {
@@ -571,7 +571,7 @@ tr91:
 #line 81 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				iov_add("NOT_FOUND\r\n", 11);
 			else if (meta(tuple)->cas != cas)
@@ -613,7 +613,7 @@ tr95:
 #line 81 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				iov_add("NOT_FOUND\r\n", 11);
 			else if (meta(tuple)->cas != cas)
@@ -657,7 +657,7 @@ tr105:
 #line 81 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				iov_add("NOT_FOUND\r\n", 11);
 			else if (meta(tuple)->cas != cas)
@@ -686,7 +686,7 @@ tr118:
 			u64 value;
 
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				iov_add("NOT_FOUND\r\n", 11);
 			} else {
@@ -751,7 +751,7 @@ tr122:
 			u64 value;
 
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				iov_add("NOT_FOUND\r\n", 11);
 			} else {
@@ -818,7 +818,7 @@ tr132:
 			u64 value;
 
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				iov_add("NOT_FOUND\r\n", 11);
 			} else {
@@ -877,7 +877,7 @@ tr141:
 #line 174 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				iov_add("NOT_FOUND\r\n", 11);
 			} else {
@@ -911,7 +911,7 @@ tr146:
 #line 174 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				iov_add("NOT_FOUND\r\n", 11);
 			} else {
@@ -941,7 +941,7 @@ tr157:
 #line 174 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
 				iov_add("NOT_FOUND\r\n", 11);
 			} else {
@@ -1032,7 +1032,7 @@ tr195:
 		}
 #line 192 "mod/box/memcached-grammar.rl"
 	{
-			struct box_txn *txn = txn_begin();
+			struct txn *txn = txn_begin();
 			txn->flags |= BOX_GC_TXN;
 			txn->port = &port_null;
 			@try {
@@ -1096,7 +1096,7 @@ tr233:
 #line 72 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				iov_add("NOT_STORED\r\n", 12);
 			else
@@ -1136,7 +1136,7 @@ tr237:
 #line 72 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				iov_add("NOT_STORED\r\n", 12);
 			else
@@ -1178,7 +1178,7 @@ tr246:
 #line 72 "mod/box/memcached-grammar.rl"
 	{
 			key = read_field(keys);
-			struct box_tuple *tuple = find(key);
+			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				iov_add("NOT_STORED\r\n", 12);
 			else

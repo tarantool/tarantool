@@ -39,11 +39,11 @@ enum {
 };
 @class Index;
 struct tarantool_cfg;
-struct box_tuple;
+struct tuple;
 struct port;
 struct space;
 
-struct box_txn {
+struct txn {
 	u16 type;
 	u32 flags;
 
@@ -53,9 +53,9 @@ struct box_txn {
 	Index *index;
 
 	struct tbuf *ref_tuples;
-	struct box_tuple *old_tuple;
-	struct box_tuple *new_tuple;
-	struct box_tuple *lock_tuple;
+	struct tuple *old_tuple;
+	struct tuple *new_tuple;
+	struct tuple *lock_tuple;
 
 	struct tbuf req;
 };
@@ -118,8 +118,8 @@ ENUM(update_op_codes, UPDATE_OP_CODES);
 
 extern iproto_callback rw_callback;
 
-void request_set_type(struct box_txn *req, u16 type, struct tbuf *data);
-void request_dispatch(struct box_txn *txn, struct tbuf *data);
+void request_set_type(struct txn *req, u16 type, struct tbuf *data);
+void request_dispatch(struct txn *txn, struct tbuf *data);
 
 static inline bool
 request_is_select(u32 type)

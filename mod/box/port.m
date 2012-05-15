@@ -68,7 +68,7 @@ iov_dup_u32(u32 u32)
 }
 
 static void
-iov_add_tuple(struct box_tuple *tuple)
+iov_add_tuple(struct tuple *tuple)
 {
 	size_t len = tuple_len(tuple);
 
@@ -151,7 +151,7 @@ iov_add_lua_table(struct lua_State *L, int index)
 void iov_add_ret(struct lua_State *L, int index)
 {
 	int type = lua_type(L, index);
-	struct box_tuple *tuple;
+	struct tuple *tuple;
 	switch (type) {
 	case LUA_TTABLE:
 	{
@@ -238,7 +238,7 @@ struct port port_iproto = {
 
 static void port_null_add_u32(u32 *p_u32 __attribute__((unused))) {}
 static void port_null_dup_u32(u32 u32 __attribute__((unused))) {}
-static void port_null_add_tuple(struct box_tuple *tuple __attribute__((unused))) {}
+static void port_null_add_tuple(struct tuple *tuple __attribute__((unused))) {}
 static void port_null_add_lua_multret(struct lua_State *L __attribute__((unused))) {}
 
 struct port port_null = {

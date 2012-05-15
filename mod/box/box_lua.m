@@ -72,19 +72,19 @@ lua_State *root_L;
 
 static const char *tuplelib_name = "box.tuple";
 
-static inline struct box_tuple *
+static inline struct tuple *
 lua_checktuple(struct lua_State *L, int narg)
 {
 	return *(void **) luaL_checkudata(L, narg, tuplelib_name);
 }
 
-struct box_tuple *
+struct tuple *
 lua_istuple(struct lua_State *L, int narg)
 {
 	if (lua_getmetatable(L, narg) == 0)
 		return NULL;
 	luaL_getmetatable(L, tuplelib_name);
-	struct box_tuple *tuple = 0;
+	struct tuple *tuple = 0;
 	if (lua_equal(L, -1, -2))
 		tuple = * (void **) lua_touserdata(L, narg);
 	lua_pop(L, 2);
@@ -94,7 +94,7 @@ lua_istuple(struct lua_State *L, int narg)
 static int
 lbox_tuple_gc(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	tuple_ref(tuple, -1);
 	return 0;
 }
@@ -102,7 +102,7 @@ lbox_tuple_gc(struct lua_State *L)
 static int
 lbox_tuple_len(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	lua_pushnumber(L, tuple->field_count);
 	return 1;
 }
@@ -110,7 +110,7 @@ lbox_tuple_len(struct lua_State *L)
 static int
 lbox_tuple_slice(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	int start, end;
 
@@ -156,7 +156,7 @@ lbox_tuple_slice(struct lua_State *L)
 static int
 lbox_tuple_unpack(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	u8 *field = tuple->data;
 
 	while (field < tuple->data + tuple->bsize) {
@@ -178,7 +178,7 @@ lbox_tuple_unpack(struct lua_State *L)
 static int
 lbox_tuple_index(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	/* For integer indexes, implement [] operator */
 	if (lua_isnumber(L, 2)) {
 		int i = luaL_checkint(L, 2);
@@ -199,7 +199,7 @@ lbox_tuple_index(struct lua_State *L)
 static int
 lbox_tuple_tostring(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	/* @todo: print the tuple */
 	struct tbuf *tbuf = tbuf_alloc(fiber->gc_pool);
 	tuple_print(tbuf, tuple->field_count, tuple->data);
@@ -208,7 +208,7 @@ lbox_tuple_tostring(struct lua_State *L)
 }
 
 static void
-lbox_pushtuple(struct lua_State *L, struct box_tuple *tuple)
+lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
 	if (tuple) {
 		void **ptr = lua_newuserdata(L, sizeof(void *));
@@ -229,7 +229,7 @@ lbox_pushtuple(struct lua_State *L, struct box_tuple *tuple)
 static int
 lbox_tuple_next(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	u8 *field = NULL;
 	size_t len;
@@ -466,7 +466,7 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 
 		if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 			/* Searching by tuple. */
-			struct box_tuple *tuple = lua_checktuple(L, 2);
+			struct tuple *tuple = lua_checktuple(L, 2);
 			key = tuple->data;
 			field_count = tuple->field_count;
 		} else {
@@ -494,7 +494,7 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 	} else { /* 1 item on the stack and it's a userdata. */
 		it = lua_checkiterator(L, 2);
 	}
-	struct box_tuple *tuple = it->next(it);
+	struct tuple *tuple = it->next(it);
 	/* If tuple is NULL, pushes nil as end indicator. */
 	lbox_pushtuple(L, tuple);
 	return tuple ? 2 : 1;
@@ -567,7 +567,7 @@ port_lua_add_u32(u32 *p_u32 __attribute__((unused)))
 }
 
 static void
-port_lua_add_tuple(struct box_tuple *tuple)
+port_lua_add_tuple(struct tuple *tuple)
 {
 	struct lua_State *L = in_txn()->L;
 	lbox_pushtuple(L, tuple);
@@ -594,12 +594,12 @@ static struct port port_lua = {
 
 /* }}} */
 
-static inline struct box_txn *
+static inline struct txn *
 txn_enter_lua(lua_State *L)
 {
-	struct box_txn *old_txn = in_txn();
+	struct txn *old_txn = in_txn();
 	fiber->mod_data.txn = NULL;
-	struct box_txn *txn = fiber->mod_data.txn = txn_begin();
+	struct txn *txn = fiber->mod_data.txn = txn_begin();
 	txn->port = &port_lua;
 	txn->L = L;
 	return old_txn;
@@ -637,7 +637,7 @@ static int lbox_process(lua_State *L)
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
-	struct box_txn *old_txn = txn_enter_lua(L);
+	struct txn *old_txn = txn_enter_lua(L);
 	@try {
 		rw_callback(op, &req);
 	} @finally {
@@ -696,7 +696,7 @@ box_lua_panic(struct lua_State *L)
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void do_call(struct box_txn *txn, struct tbuf *data)
+void do_call(struct txn *txn, struct tbuf *data)
 {
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);

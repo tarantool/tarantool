@@ -31,19 +31,19 @@
  * SUCH DAMAGE.
  */
 struct tbuf;
-struct box_txn;
-struct box_tuple;
+struct txn;
+struct tuple;
 struct lua_State;
 
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void do_call(struct box_txn *txn, struct tbuf *req);
+void do_call(struct txn *txn, struct tbuf *req);
 /**
  * Create an instance of Lua interpreter in box.
  */
 void box_lua_init();
 
-struct box_tuple *lua_istuple(struct lua_State *L, int narg);
+struct tuple *lua_istuple(struct lua_State *L, int narg);
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_H */
