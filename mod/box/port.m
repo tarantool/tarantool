@@ -54,6 +54,18 @@
 */
 const int BOX_REF_THRESHOLD = 8196;
 
+static void
+port_unref(void *tuple)
+{
+	tuple_ref((struct tuple *) tuple, -1);
+}
+
+void
+port_ref(struct tuple *tuple)
+{
+	tuple_ref(tuple, 1);
+	fiber_register_cleanup(port_unref, tuple);
+}
 
 static void
 iov_add_u32(u32 *p_u32)
@@ -73,7 +85,7 @@ iov_add_tuple(struct tuple *tuple)
 	size_t len = tuple_len(tuple);
 
 	if (len > BOX_REF_THRESHOLD) {
-		txn_ref_tuple(in_txn(), tuple);
+		port_ref(tuple);
 		iov_add(&tuple->bsize, len);
 	} else {
 		iov_dup(&tuple->bsize, len);
@@ -208,7 +220,7 @@ void iov_add_ret(struct lua_State *L, int index)
 		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
 		break;
 	}
-	txn_ref_tuple(in_txn(), tuple);
+	port_ref(tuple);
 	iov_add(&tuple->bsize, tuple_len(tuple));
 }
 

@@ -18,7 +18,6 @@ box.flags = create_const_table(
         BOX_ADD = 0x02,
         BOX_REPLACE = 0x04,
         BOX_NOT_STORE = 0x10,
-        BOX_GC_TXN = 0x20
     })
 
 --

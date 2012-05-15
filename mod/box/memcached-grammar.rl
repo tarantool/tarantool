@@ -191,7 +191,6 @@ memcached_dispatch()
 
 		action get {
 			struct txn *txn = txn_begin();
-			txn->flags |= BOX_GC_TXN;
 			txn->port = &port_null;
 			@try {
 				memcached_get(txn, keys_count, keys, show_cas);
@@ -202,6 +201,9 @@ memcached_dispatch()
 				iov_add("SERVER_ERROR ", 13);
 				iov_add(e->errmsg, strlen(e->errmsg));
 				iov_add("\r\n", 2);
+			} @catch (id e) {
+				txn_rollback(txn);
+				@throw;
 			}
 		}
 

@@ -261,7 +261,7 @@ void memcached_get(struct txn *txn, size_t keys_count, struct tbuf *keys,
 		stats.get_hits++;
 		stat_collect(stat_base, MEMC_GET_HIT, 1);
 
-		txn_ref_tuple(txn, tuple);
+		port_ref(tuple);
 
 		if (show_cas) {
 			struct tbuf *b = tbuf_alloc(fiber->gc_pool);

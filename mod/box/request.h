@@ -46,7 +46,6 @@ struct txn;
 #define BOX_ADD				0x02
 #define BOX_REPLACE			0x04
 #define BOX_NOT_STORE			0x10
-#define BOX_GC_TXN			0x20
 #define BOX_ALLOWED_REQUEST_FLAGS	(BOX_RETURN_TUPLE | \
 					 BOX_ADD | \
 					 BOX_REPLACE | \

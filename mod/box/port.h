@@ -40,6 +40,8 @@ struct port {
 	void (*add_lua_multret)(struct lua_State *L);
 };
 
+void port_ref(struct tuple *tuple);
+
 extern struct port port_null;
 extern struct port port_iproto;
 

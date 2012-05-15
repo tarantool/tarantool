@@ -77,7 +77,6 @@ box_process_rw(u32 op, struct tbuf *request_data)
 	struct txn *txn = in_txn();
 	if (txn == NULL) {
 		txn = txn_begin();
-		txn->flags |= BOX_GC_TXN;
 		txn->port = &port_iproto;
 	}
 

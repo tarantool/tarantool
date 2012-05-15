@@ -67,14 +67,10 @@ do_replace(struct txn *txn, size_t field_count, struct tbuf *data)
 		tnt_raise(IllegalParams, :"incorrect tuple length");
 
 	txn->new_tuple = tuple_alloc(data->size);
-	txn_ref_tuple(txn, txn->new_tuple);
 	txn->new_tuple->field_count = field_count;
 	memcpy(txn->new_tuple->data, data->data, data->size);
 
 	txn->old_tuple = [txn->index findByTuple: txn->new_tuple];
-
-	if (txn->old_tuple != NULL)
-		txn_ref_tuple(txn, txn->old_tuple);
 
 	if (txn->flags & BOX_ADD && txn->old_tuple != NULL)
 		tnt_raise(ClientError, :ER_TUPLE_FOUND);
@@ -849,7 +845,6 @@ do_update(struct txn *txn, struct tbuf *data)
 	init_update_operations(txn, cmd);
 	/* allocate new tuple */
 	txn->new_tuple = tuple_alloc(cmd->new_tuple_len);
-	txn_ref_tuple(txn, txn->new_tuple);
 	do_update_ops(txn, cmd);
 	txn_lock_tuple(txn, txn->old_tuple);
 	space_validate(txn->space, txn->old_tuple, txn->new_tuple);
@@ -931,7 +926,6 @@ do_delete(struct txn *txn, struct tbuf *data)
 		 */
 		txn->flags |= BOX_NOT_STORE;
 	} else {
-		txn_ref_tuple(txn, txn->old_tuple);
 		txn_lock_tuple(txn, txn->old_tuple);
 
 		tuples_affected = 1;

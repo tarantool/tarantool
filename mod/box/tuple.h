@@ -91,5 +91,7 @@ static inline size_t tuple_len(struct tuple *tuple)
 	return tuple->bsize + sizeof(tuple->bsize) +
 		sizeof(tuple->field_count);
 }
+
+void tuple_free(struct tuple *tuple);
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

@@ -41,7 +41,6 @@ struct txn {
 	struct space *space;
 	Index *index;
 
-	struct tbuf *ref_tuples;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
 	struct tuple *lock_tuple;
@@ -62,6 +61,5 @@ static inline struct txn *in_txn() { return fiber->mod_data.txn; }
 struct txn *txn_begin();
 void txn_commit(struct txn *txn);
 void txn_rollback(struct txn *txn);
-void txn_ref_tuple(struct txn *txn, struct tuple *tuple);
 void txn_lock_tuple(struct txn *txn, struct tuple *tuple);
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

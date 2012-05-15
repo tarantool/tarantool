@@ -30,6 +30,12 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#ifndef NDEBUG
+#define TRASH(ptr) memset(ptr, '#', sizeof(*ptr))
+#else
+#define TRASH(ptr)
+#endif
+
 #ifndef MAX
 # define MAX(a, b) ((a) > (b) ? (a) : (b))
 # define MIN(a, b) ((a) < (b) ? (a) : (b))

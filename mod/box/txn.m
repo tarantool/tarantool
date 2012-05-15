@@ -52,14 +52,6 @@ unlock_tuples(struct txn *txn)
 	}
 }
 
-void
-txn_ref_tuple(struct txn *txn, struct tuple *tuple)
-{
-	say_debug("txn_ref_tuple(%p)", tuple);
-	tbuf_append(txn->ref_tuples, &tuple, sizeof(struct tuple *));
-	tuple_ref(tuple, +1);
-}
-
 static void
 commit_replace(struct txn *txn)
 {
@@ -96,25 +88,9 @@ struct txn *
 txn_begin()
 {
 	struct txn *txn = p0alloc(fiber->gc_pool, sizeof(*txn));
-	txn->ref_tuples = tbuf_alloc(fiber->gc_pool);
 	assert(fiber->mod_data.txn == NULL);
 	fiber->mod_data.txn = txn;
 	return txn;
-}
-
-static void
-txn_cleanup(struct txn *txn)
-{
-	struct tuple **tuple = txn->ref_tuples->data;
-	int i = txn->ref_tuples->size / sizeof(struct txn *);
-
-	while (i-- > 0) {
-		say_debug("tuple_txn_unref(%p)", *tuple);
-		tuple_ref(*tuple++, -1);
-	}
-
-	/* mark txn as clean */
-	memset(txn, 0, sizeof(*txn));
 }
 
 void
@@ -153,11 +129,7 @@ txn_commit(struct txn *txn)
 	 * we know for sure the commit has succeeded.
 	 */
 	fiber->mod_data.txn = 0;
-
-	if (txn->flags & BOX_GC_TXN)
-		fiber_register_cleanup((fiber_cleanup_handler)txn_cleanup, txn);
-	else
-		txn_cleanup(txn);
+	TRASH(txn);
 }
 
 void
@@ -176,7 +148,10 @@ txn_rollback(struct txn *txn)
 
 		if (txn->type == REPLACE)
 			rollback_replace(txn);
+
+		if (txn->new_tuple)
+			tuple_free(txn->new_tuple);
 	}
-	txn_cleanup(txn);
+	TRASH(txn);
 }
 
