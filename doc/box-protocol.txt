@@ -226,8 +226,14 @@ Tarantool/Box IPROTO protocol.
 
 <insert_request_body> ::= <space_no><flags><tuple>
 
-; The only defined flag BOX_RETURN_TUPLE (0x01) indicates
+; Flag BOX_RETURN_TUPLE (0x01) indicates
 ; that it is required to return the inserted tuple back:
+; Flag BOX_ADD (0x02) requests that no tuple with the same primary
+; key exists in the space. I.e. it turns INSERT into INSERT,
+; without this flag INSERT behaves like REPLACE: replaces
+; an existing tuple if it is found.
+; Flag BOX_REPLACE (0x04) requests that a tuple with the same
+; primary key is present in the space.
 
 <flags> ::= <int32>
 

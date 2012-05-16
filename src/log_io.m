@@ -113,8 +113,8 @@ const u64 default_cookie = 0;
 const u32 default_version = 11;
 const u32 marker_v11 = 0xba0babed;
 const u32 eof_marker_v11 = 0x10adab1e;
-const char snap_suffix[] = ".snap";
-const char xlog_suffix[] = ".xlog";
+const char snap_ext[] = ".snap";
+const char xlog_ext[] = ".xlog";
 const char inprogress_suffix[] = ".inprogress";
 const char v11[] = "0.11\n";
 const char snap_mark[] = "SNAP\n";
@@ -122,6 +122,8 @@ const char xlog_mark[] = "XLOG\n";
 static const int HEADER_SIZE_MAX = sizeof(v11) + sizeof(snap_mark) + 2;
 
 struct recovery_state *recovery_state;
+
+enum suffix { NONE, INPROGRESS, ANY };
 
 #define ROW_EOF (void *)1
 
@@ -145,6 +147,28 @@ static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
 static struct wal_writer wal_writer;
 
 static struct tbuf *row_reader_v11(FILE *f, struct palloc_pool *pool);
+
+/**
+ * This is used in local hot standby or replication
+ * relay mode: look for changes in the wal_dir and apply them
+ * locally or send to the replica.
+ */
+struct wal_watcher {
+	/**
+	 * Rescan the WAL directory in search for new WAL files
+	 * every wal_dir_rescan_delay seconds.
+	 */
+	ev_timer dir_timer;
+	/**
+	 * When the latest WAL does not contain a EOF marker,
+	 * re-read its tail on every change in file metadata.
+	 */
+	ev_stat stat;
+	/** Path to the file being watched with 'stat'. */
+	char filename[PATH_MAX+1];
+};
+
+static struct wal_watcher wal_watcher;
 
 struct log_io_iter {
 	struct tarantool_coro coro;
@@ -194,7 +218,6 @@ confirm_lsn(struct recovery_state *r, i64 lsn)
 
 
 /** Wait until the given LSN makes its way to disk. */
-
 void
 recovery_wait_lsn(struct recovery_state *r, i64 lsn)
 {
@@ -225,7 +248,7 @@ next_lsn(struct recovery_state *r, i64 new_lsn)
 static void
 v11_class(struct log_io_class *c)
 {
-	c->suffix = xlog_suffix;
+	c->filename_ext = xlog_ext;
 	c->filetype = xlog_mark;
 	c->version = v11;
 	c->reader = row_reader_v11;
@@ -252,7 +275,7 @@ snapshot_class_create(const char *dirname)
 
 	v11_class(c);
 	c->filetype = snap_mark;
-	c->suffix = snap_suffix;
+	c->filename_ext = snap_ext;
 
 	c->dirname = dirname ? strdup(dirname) : NULL;
 	return c;
@@ -418,48 +441,41 @@ cmp_i64(const void *_a, const void *_b)
 static ssize_t
 scan_dir(struct log_io_class *class, i64 **ret_lsn)
 {
-	DIR *dh = NULL;
-	struct dirent *dent;
-	i64 *lsn;
-	size_t suffix_len, i = 0, size = 1024;
-	char *parse_suffix;
 	ssize_t result = -1;
+	size_t i = 0, size = 1024;
+	ssize_t ext_len = strlen(class->filename_ext);
+	i64 *lsn = palloc(fiber->gc_pool, sizeof(i64) * size);
+	DIR *dh = opendir(class->dirname);
 
-	dh = opendir(class->dirname);
-	if (dh == NULL)
-		goto out;
-
-	suffix_len = strlen(class->suffix);
-
-	lsn = palloc(fiber->gc_pool, sizeof(i64) * size);
-	if (lsn == NULL)
+	if (lsn == NULL || dh == NULL)
 		goto out;
 
 	errno = 0;
+	struct dirent *dent;
 	while ((dent = readdir(dh)) != NULL) {
-		char *suffix = strrchr(dent->d_name, '.');
 
-		if (suffix == NULL)
+		char *ext = strchr(dent->d_name, '.');
+		if (ext == NULL)
 			continue;
 
-		char *sub_suffix = memrchr(dent->d_name, '.', suffix - dent->d_name);
-
+		const char *suffix = strchr(ext + 1, '.');
 		/*
-		 * A valid suffix is either .xlog or
-		 * .xlog.inprogress, given class->suffix ==
+		 * A valid ending is either .xlog or
+		 * .xlog.inprogress, given class->filename_ext ==
 		 * 'xlog'.
 		 */
-		bool valid_suffix;
-		valid_suffix = (strcmp(suffix, class->suffix) == 0 ||
-				(sub_suffix != NULL &&
-				 strcmp(suffix, inprogress_suffix) == 0 &&
-				 strncmp(sub_suffix, class->suffix, suffix_len) == 0));
-
-		if (!valid_suffix)
+		bool ext_is_ok;
+		if (suffix == NULL)
+			ext_is_ok = strcmp(ext, class->filename_ext) == 0;
+		else
+			ext_is_ok = (strncmp(ext, class->filename_ext,
+					     ext_len) == 0 &&
+				     strcmp(suffix, inprogress_suffix) == 0);
+		if (!ext_is_ok)
 			continue;
 
-		lsn[i] = strtoll(dent->d_name, &parse_suffix, 10);
-		if (strncmp(parse_suffix, class->suffix, suffix_len) != 0) {
+		lsn[i] = strtoll(dent->d_name, &ext, 10);
+		if (strncmp(ext, class->filename_ext, ext_len) != 0) {
 			/* d_name doesn't parse entirely, ignore it */
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
@@ -485,7 +501,7 @@ scan_dir(struct log_io_class *class, i64 **ret_lsn)
 
 	*ret_lsn = lsn;
 	result = i;
-      out:
+out:
 	if (errno != 0)
 		say_syserror("error reading directory `%s'", class->dirname);
 
@@ -633,8 +649,6 @@ log_io_close(struct log_io **lptr)
 			say_error("can't write eof_marker");
 	}
 
-	if (ev_is_active(&l->stat))
-		ev_stat_stop(&l->stat);
 	r = fclose(l->f);
 	if (r < 0)
 		say_error("can't close");
@@ -686,29 +700,30 @@ write_header(struct log_io *l)
 
 	assert(n < HEADER_SIZE_MAX);
 
-	return fwrite(header, n, 1, l->f);
+	return fwrite(header, n, 1, l->f) == 1 ? 0 : -1;
 }
 
 static char *
-format_filename(char *filename, struct log_io_class *class, i64 lsn, int suffix)
+format_filename(char *filename, struct log_io_class *class, i64 lsn, enum suffix suffix)
 {
-	static char buf[PATH_MAX + 1];
+	static __thread char buf[PATH_MAX + 1];
 
 	if (filename == NULL)
 		filename = buf;
 
 	switch (suffix) {
-	case 0:
+	case NONE:
 		snprintf(filename, PATH_MAX, "%s/%020" PRIi64 "%s",
-			 class->dirname, lsn, class->suffix);
+			 class->dirname, lsn, class->filename_ext);
 		break;
-	case -1:
+	case INPROGRESS:
 		snprintf(filename, PATH_MAX, "%s/%020" PRIi64 "%s%s",
-			 class->dirname, lsn, class->suffix, inprogress_suffix);
+			 class->dirname, lsn, class->filename_ext, inprogress_suffix);
 		break;
 	default:
 		/* not reached */
 		assert(0);
+		filename[0] = '\0';
 	}
 	return filename;
 }
@@ -717,17 +732,15 @@ format_filename(char *filename, struct log_io_class *class, i64 lsn, int suffix)
  * Verify that file is of the given class (format).
  *
  * @param l		log_io object, denoting the file to check.
- * @param class		class to check against.
  * @param[out] errmsg   set if error
  *
  * @return 0 if success, -1 on error.
  */
 static int
-log_io_verify_meta(struct log_io *l, struct log_io_class *class,
-		   const char **errmsg)
+log_io_verify_meta(struct log_io *l, const char **errmsg)
 {
 	char filetype[32], version[32], buf[256];
-
+	struct log_io_class *class = l->class;
 	FILE *stream = l->f;
 
 	if (fgets(filetype, sizeof(filetype), stream) == NULL ||
@@ -757,122 +770,96 @@ error:
 	return -1;
 }
 
-
 static struct log_io *
-log_io_open_for_read(struct recovery_state *recover,
-		     struct log_io_class *class,
-		     i64 lsn, int suffix,
-		     const char *filename)
+log_io_open(struct log_io_class *class, enum log_mode mode,
+	      const char *filename, enum suffix suffix, FILE *file)
 {
+	struct log_io *l = NULL;
+	int save_errno;
 	const char *errmsg;
-
-	struct log_io *l = calloc(1, sizeof(*l));
-	if (l == NULL) {
-		say_syserror("calloc");
-		return NULL;
-	}
-	l->mode = LOG_READ;
-	l->stat.data = recover;
-	l->is_inprogress = suffix == -1 ? true : false;
-
-	/* when filename is not null it is forced open for debug reading */
-	if (filename == NULL) {
-		assert(lsn != 0);
-		format_filename(l->filename, class, lsn, suffix);
-	} else {
-		assert(lsn == 0);
-		strncpy(l->filename, filename, PATH_MAX);
-	}
-
-	say_debug("%s: opening %s", __func__, l->filename);
-
-	l->f = fopen(l->filename, "r");
-	if (l->f == NULL) {
+	/*
+	 * Check fopen() result the caller first thing, to
+	 * preserve the errno.
+	 */
+	if (file == NULL) {
 		errmsg = strerror(errno);
 		goto error;
 	}
-
-	if (log_io_verify_meta(l, class, &errmsg) != 0)
+	l = calloc(1, sizeof(*l));
+	if (l == NULL) {
+		errmsg = strerror(errno);
 		goto error;
+	}
+	l->f = file;
+	strncpy(l->filename, filename, PATH_MAX);
+	l->mode = mode;
 	l->class = class;
-
+	l->is_inprogress = suffix == INPROGRESS;
+	if (mode == LOG_READ) {
+		if (log_io_verify_meta(l, &errmsg) != 0)
+			goto error;
+	} else { /* LOG_WRITE */
+		if (write_header(l) != 0)
+			goto error;
+	}
 	return l;
 error:
-	say_error("%s: failed to open %s: %s", __func__,
-		  l->filename, errmsg);
-	if (l->f != NULL)
-		fclose(l->f);
-	free(l);
+	save_errno = errno;
+	say_error("%s: failed to open %s: %s", __func__, filename, errmsg);
+	if (file)
+		fclose(file);
+	if (l)
+		free(l);
+	errno = save_errno;
 	return NULL;
+}
+
+static struct log_io *
+log_io_open_for_read(struct log_io_class *class, i64 lsn, enum suffix suffix)
+{
+	assert(lsn != 0);
+
+	const char *filename = format_filename(NULL, class, lsn, suffix);
+	FILE *f = fopen(filename, "r");
+	return log_io_open(class, LOG_READ, filename, suffix, f);
 }
 
 /**
  * In case of error, writes a message to the server log
  * and sets errno.
  */
-struct log_io *
-log_io_open_for_write(struct recovery_state *recover,
-		      struct log_io_class *class, i64 lsn, int suffix)
+static struct log_io *
+log_io_open_for_write(struct log_io_class *class, i64 lsn, enum suffix suffix)
 {
-	struct log_io *l = NULL;
-	int fd;
-	char *dot;
-	bool exists;
-	int save_errno;
+	char *filename;
 
-	l = calloc(1, sizeof(*l));
-	if (l == NULL) {
-		say_syserror("calloc");
-		return NULL;
-	}
-	l->mode = LOG_WRITE;
-	l->class = class;
-	l->stat.data = recover;
+	assert(lsn != 0);
 
-	assert(lsn > 0);
-
-	format_filename(l->filename, class, lsn, suffix);
-	say_debug("%s: opening %s'", __func__, l->filename);
-
-	if (suffix == -1) {
+	if (suffix == INPROGRESS) {
 		/*
 		 * Check whether a file with this name already exists.
 		 * We don't overwrite existing files.
 		 */
-		dot = strrchr(l->filename, '.');
-		*dot = '\0';
-		exists = access(l->filename, F_OK) == 0;
-		*dot = '.';
-		if (exists) {
+		filename = format_filename(NULL, class, lsn, NONE);
+		if (access(filename, F_OK) == 0) {
 			errno = EEXIST;
 			goto error;
 		}
 	}
-
+	filename = format_filename(NULL, class, lsn, suffix);
 	/*
-	 * Open the <lsn>.<suffix>.inprogress file. If it
-	 * exists, open will fail.
+	 * Open the <lsn>.<suffix>.inprogress file. If it exists,
+	 * open will fail.
 	 */
-	fd = open(l->filename,
-		  O_WRONLY | O_CREAT | O_EXCL | l->class->open_wflags, 0664);
+	int fd = open(filename,
+		      O_WRONLY | O_CREAT | O_EXCL | class->open_wflags, 0664);
 	if (fd < 0)
 		goto error;
-
-	l->f = fdopen(fd, "w");
-	if (l->f == NULL)
-		goto error;
-
-	say_info("creating `%s'", l->filename);
-	write_header(l);
-	return l;
-
+	say_info("creating `%s'", filename);
+	FILE *f = fdopen(fd, "w");
+	return log_io_open(class, LOG_WRITE, filename, suffix, f);
 error:
-	save_errno = errno; /* Preserve over fclose()/free() */
-	say_syserror("%s: failed to open `%s'", __func__, l->filename);
-	if (l->f != NULL)
-		fclose(l->f);
-	free(l);
-	errno = save_errno;
+	say_syserror("%s: failed to open `%s'", __func__, filename);
 	return NULL;
 }
 
@@ -890,10 +877,10 @@ read_log(const char *filename,
 	struct tbuf *row;
 	row_handler *h;
 
-	if (strstr(filename, xlog_suffix)) {
+	if (strstr(filename, xlog_ext)) {
 		c = xlog_class_create(NULL);
 		h = xlog_handler;
-	} else if (strstr(filename, snap_suffix)) {
+	} else if (strstr(filename, snap_ext)) {
 		c = snapshot_class_create(NULL);
 		h = snap_handler;
 	} else {
@@ -901,7 +888,8 @@ read_log(const char *filename,
 		return -1;
 	}
 
-	l = log_io_open_for_read(NULL, c, 0, 0, filename);
+	FILE *f = fopen(filename, "r");
+	l = log_io_open(c, LOG_READ, filename, NONE, f);
 	iter_open(l, &i, read_rows);
 	while ((row = iter_inner(&i, (void *)1)))
 		h(state, row);
@@ -915,6 +903,12 @@ read_log(const char *filename,
 	return i.error;
 }
 
+/**
+ * Read a snapshot and call row_handler for every snapshot row.
+ *
+ * @retval 0 success
+ * @retval -1 failure
+ */
 static int
 recover_snap(struct recovery_state *r)
 {
@@ -932,7 +926,7 @@ recover_snap(struct recovery_state *r)
 			return -1;
 		}
 
-		snap = log_io_open_for_read(r, r->snap_class, lsn, 0, NULL);
+		snap = log_io_open_for_read(r->snap_class, lsn, NONE);
 		if (snap == NULL) {
 			say_error("can't find/open snapshot");
 			return -1;
@@ -1067,11 +1061,12 @@ recover_remaining_wals(struct recovery_state *r)
 		 * one last time. */
 		if (r->current_wal != NULL) {
 			if (r->current_wal->retry++ < 3) {
-				say_warn("try reread `%s' despite newer WAL exists",
-					 r->current_wal->filename);
+				say_warn("`%s' has no EOF marker, yet a newer WAL file exists:"
+					 " trying to re-read (attempt #%d)",
+					 r->current_wal->filename, r->current_wal->retry);
 				goto recover_current_wal;
 			} else {
-				say_warn("wal `%s' wasn't correctly closed",
+				say_warn("WAL `%s' wasn't correctly closed",
 					 r->current_wal->filename);
 				log_io_close(&r->current_wal);
 			}
@@ -1079,29 +1074,46 @@ recover_remaining_wals(struct recovery_state *r)
 
 		/* TODO: find a better way of finding the next xlog */
 		current_lsn = r->confirmed_lsn + 1;
-		next_wal = log_io_open_for_read(r, r->wal_class, current_lsn,
-						0, NULL);
+		/*
+		 * For the last WAL, first try to open .inprogress
+		 * file: if it doesn't exist, we can safely try an
+		 * .xlog, with no risk of a concurrent
+		 * log_io_inprogress_rename().
+		 */
+		FILE *f = NULL;
+		char *filename;
+		enum suffix suffix = INPROGRESS;
+		if (current_lsn == wal_greatest_lsn) {
+			/* Last WAL present at the time of rescan. */
+			filename = format_filename(NULL, r->wal_class,
+						   current_lsn, suffix);
+			f = fopen(filename, "r");
+		}
+		if (f == NULL) {
+			suffix = NONE;
+			filename = format_filename(NULL, r->wal_class,
+						   current_lsn, suffix);
+			f = fopen(filename, "r");
+		}
+		next_wal = log_io_open(r->wal_class, LOG_READ, filename, suffix, f);
 		/*
 		 * When doing final recovery, and dealing with the
-		 * last file, try opening .<suffix>.inprogress.
+		 * last file, try opening .<ext>.inprogress.
 		 */
-		if (next_wal == NULL && r->finalize && current_lsn == wal_greatest_lsn) {
-			next_wal = log_io_open_for_read(r, r->wal_class, current_lsn, -1, NULL);
-			if (next_wal == NULL) {
-				char *filename =
-					format_filename(NULL, r->wal_class, current_lsn, -1);
-
-				say_warn("unlink broken %s wal", filename);
-				if (inprogress_log_unlink(filename) != 0)
-					panic("can't unlink 'inprogres' wal");
-			}
-		}
-
 		if (next_wal == NULL) {
+			if (r->finalize && suffix == INPROGRESS) {
+				/*
+				 * There is an .inprogress file, but
+				 * we failed to open it. Try to
+				 * delete it.
+				 */
+				say_warn("unlink broken %s WAL", filename);
+				if (inprogress_log_unlink(filename) != 0)
+					panic("can't unlink 'inprogres' WAL");
+			}
 			result = 0;
 			break;
 		}
-
 		assert(r->current_wal == NULL);
 		r->current_wal = next_wal;
 		say_info("recover from `%s'", r->current_wal->filename);
@@ -1127,7 +1139,7 @@ recover_current_wal:
 		}
 
 		if (result == LOG_EOF) {
-			say_info("done `%s' confirmed_lsn:%" PRIi64,
+			say_info("done `%s' confirmed_lsn: %" PRIi64,
 				 r->current_wal->filename,
 				 r->confirmed_lsn);
 			log_io_close(&r->current_wal);
@@ -1136,7 +1148,7 @@ recover_current_wal:
 
 	/*
 	 * It's not a fatal error when last WAL is empty, but if
-	 * we lost some logs it is a fatal error.
+	 * we lose some logs it is a fatal error.
 	 */
 	if (wal_greatest_lsn > r->confirmed_lsn + 1) {
 		say_error("not all WALs have been successfully read");
@@ -1147,109 +1159,144 @@ recover_current_wal:
 	return result;
 }
 
-int
+void
 recover(struct recovery_state *r, i64 lsn)
 {
-	int result = -1;
-
+	/* * current_wal isn't open during initial recover. */
+	assert(r->current_wal == NULL);
 	/*
-	 * if caller set confirmed_lsn to non zero value, snapshot recovery
-	 * will be skipped, but wal reading still happens
+	 * If the caller sets confirmed_lsn to a non-zero value,
+	 * snapshot recovery is skipped and we proceed directly to
+	 * finding the WAL with the respective LSN and continue
+	 * recovery from this WAL.  @fixme: this is a gotcha, due
+	 * to whihc a replica is unable to read data from a master
+	 * if the replica has no snapshot or the master has no WAL
+	 * with the requested LSN.
 	 */
-
 	say_info("recovery start");
 	if (lsn == 0) {
-		result = recover_snap(r);
-		if (result < 0) {
+		if (recover_snap(r) != 0) {
 			if (greatest_lsn(r->snap_class) <= 0) {
 				say_crit("didn't you forget to initialize storage with --init-storage switch?");
 				_exit(1);
 			}
 			panic("snapshot recovery failed");
 		}
-		say_info("snapshot recovered, confirmed lsn:%" PRIi64, r->confirmed_lsn);
+		say_info("snapshot recovered, confirmed lsn: %"
+			 PRIi64, r->confirmed_lsn);
 	} else {
 		/*
-		 * note, that recovery start with lsn _NEXT_ to confirmed one
+		 * Note that recovery starts with lsn _NEXT_ to
+		 * the confirmed one.
 		 */
 		r->lsn = r->confirmed_lsn = lsn - 1;
 	}
-
-	/*
-	 * just after snapshot recovery current_wal isn't known
-	 * so find wal which contains record with next lsn
-	 */
-	if (r->current_wal == NULL) {
-		i64 next_lsn = r->confirmed_lsn + 1;
-		i64 lsn = find_including_file(r->wal_class, next_lsn);
-		if (lsn <= 0) {
-			say_error("can't find WAL containing record with lsn:%" PRIi64, next_lsn);
-			result = -1;
-			goto out;
+	i64 next_lsn = r->confirmed_lsn + 1;
+	i64 wal_lsn = find_including_file(r->wal_class, next_lsn);
+	if (wal_lsn <= 0) {
+		if (lsn != 0) {
+			/*
+			 * Recovery for replication relay, did not
+			 * find the requested LSN.
+			 */
+			say_error("can't find WAL containing record with lsn: %" PRIi64, next_lsn);
 		}
-		r->current_wal = log_io_open_for_read(r, r->wal_class, lsn, 0, NULL);
-		if (r->current_wal == NULL) {
-			result = -1;
-			goto out;
-		}
+		/* No WALs to recover from. */
+		goto out;
 	}
-
-	result = recover_remaining_wals(r);
-	if (result < 0)
+	r->current_wal = log_io_open_for_read(r->wal_class, wal_lsn, NONE);
+	if (r->current_wal == NULL)
+		goto out;
+	if (recover_remaining_wals(r) < 0)
 		panic("recover failed");
-	say_info("wals recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
-      out:
+	say_info("WALs recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
+out:
 	prelease(fiber->gc_pool);
-	return result;
 }
 
-static void recovery_follow_file(ev_stat *w, int revents __attribute__((unused)));
+static void recovery_rescan_file(ev_stat *w, int revents __attribute__((unused)));
 
 static void
-recovery_follow_dir(ev_timer *w, int revents __attribute__((unused)))
+recovery_watch_file(struct wal_watcher *watcher, struct log_io *wal)
+{
+	strncpy(watcher->filename, wal->filename, PATH_MAX);
+	ev_stat_init(&watcher->stat, recovery_rescan_file, watcher->filename, 0.);
+	ev_stat_start(&watcher->stat);
+}
+
+static void
+recovery_stop_file(struct wal_watcher *watcher)
+{
+	ev_stat_stop(&watcher->stat);
+}
+
+static void
+recovery_rescan_dir(ev_timer *w, int revents __attribute__((unused)))
 {
 	struct recovery_state *r = w->data;
-	struct log_io *wal = r->current_wal;
+	struct wal_watcher *watcher = r->watcher;
+	struct log_io *save_current_wal = r->current_wal;
+
 	int result = recover_remaining_wals(r);
 	if (result < 0)
 		panic("recover failed: %i", result);
-
-	/* recover_remaining_wals found new wal */
-	if (r->current_wal != NULL && wal != r->current_wal) {
-		ev_stat *stat = &r->current_wal->stat;
-		ev_stat_init(stat, recovery_follow_file, r->current_wal->filename, 0.);
-		ev_stat_start(stat);
+	if (save_current_wal != r->current_wal) {
+		if (save_current_wal != NULL)
+			recovery_stop_file(watcher);
+		if (r->current_wal != NULL)
+			recovery_watch_file(watcher, r->current_wal);
 	}
 }
 
 static void
-recovery_follow_file(ev_stat *w, int revents __attribute__((unused)))
+recovery_rescan_file(ev_stat *w, int revents __attribute__((unused)))
 {
 	struct recovery_state *r = w->data;
-	int result;
-	result = recover_wal(r, r->current_wal);
+	struct wal_watcher *watcher = r->watcher;
+	int result = recover_wal(r, r->current_wal);
 	if (result < 0)
 		panic("recover failed");
 	if (result == LOG_EOF) {
-		say_info("done `%s' confirmed_lsn:%" PRIi64,
+		say_info("done `%s' confirmed_lsn: %" PRIi64,
 			 r->current_wal->filename,
 			 r->confirmed_lsn);
 		log_io_close(&r->current_wal);
-		recovery_follow_dir((ev_timer *)w, 0);
+		recovery_stop_file(watcher);
+		/* Don't wait for wal_dir_rescan_delay. */
+		recovery_rescan_dir(&watcher->dir_timer, 0);
 	}
 }
 
 void
 recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay)
 {
-	ev_timer_init(&r->wal_timer, recovery_follow_dir,
+	assert(r->watcher == NULL);
+	assert(r->writer == NULL);
+
+	struct wal_watcher  *watcher = r->watcher= &wal_watcher;
+
+	ev_timer_init(&watcher->dir_timer, recovery_rescan_dir,
 		      wal_dir_rescan_delay, wal_dir_rescan_delay);
-	ev_timer_start(&r->wal_timer);
-	if (r->current_wal != NULL) {
-		ev_stat *stat = &r->current_wal->stat;
-		ev_stat_init(stat, recovery_follow_file, r->current_wal->filename, 0.);
-		ev_stat_start(stat);
-	}
+	watcher->dir_timer.data = watcher->stat.data = r;
+	ev_timer_start(&watcher->dir_timer);
+	/*
+	 * recover() leaves the current wal open if it has no
+	 * EOF marker.
+	 */
+	if (r->current_wal != NULL)
+		recovery_watch_file(watcher, r->current_wal);
+}
+
+static void
+recovery_stop_local(struct recovery_state *r)
+{
+	struct wal_watcher *watcher = r->watcher;
+	assert(ev_is_active(&watcher->dir_timer));
+	ev_timer_stop(&watcher->dir_timer);
+	if (ev_is_active(&watcher->stat))
+		ev_stat_stop(&watcher->stat);
+
+	r->watcher = NULL;
 }
 
 void
@@ -1257,22 +1304,17 @@ recovery_finalize(struct recovery_state *r)
 {
 	int result;
 
+	if (r->watcher)
+		recovery_stop_local(r);
+
 	r->finalize = true;
-
-	if (ev_is_active(&r->wal_timer))
-		ev_timer_stop(&r->wal_timer);
-
-	if (r->current_wal != NULL) {
-		if (ev_is_active(&r->current_wal->stat))
-			ev_stat_stop(&r->current_wal->stat);
-	}
 
 	result = recover_remaining_wals(r);
 	if (result < 0)
 		panic("unable to successfully finalize recovery");
 
 	if (r->current_wal != NULL && result != LOG_EOF) {
-		say_warn("wal `%s' wasn't correctly closed", r->current_wal->filename);
+		say_warn("WAL `%s' wasn't correctly closed", r->current_wal->filename);
 
 		if (!r->current_wal->is_inprogress) {
 			if (r->current_wal->rows == 0)
@@ -1281,14 +1323,14 @@ recovery_finalize(struct recovery_state *r)
 				      r->current_wal->filename);
 		} else if (r->current_wal->rows == 0) {
 			/* Unlink empty inprogress WAL */
-			say_warn("unlink broken %s wal", r->current_wal->filename);
+			say_warn("unlink broken %s WAL", r->current_wal->filename);
 			if (inprogress_log_unlink(r->current_wal->filename) != 0)
-				panic("can't unlink 'inprogress' wal");
+				panic("can't unlink 'inprogress' WAL");
 		} else if (r->current_wal->rows == 1) {
 			/* Rename inprogress wal with one row */
-			say_warn("rename unfinished %s wal", r->current_wal->filename);
+			say_warn("rename unfinished %s WAL", r->current_wal->filename);
 			if (log_io_inprogress_rename(r->current_wal->filename) != 0)
-				panic("can't rename 'inprogress' wal");
+				panic("can't rename 'inprogress' WAL");
 		} else
 			panic("too many rows in inprogress WAL `%s'", r->current_wal->filename);
 
@@ -1421,35 +1463,35 @@ static void *wal_writer_thread(void *worker_args);
  *         points to a newly created WAL writer.
  */
 static int
-wal_writer_start(struct recovery_state *state)
+wal_writer_start(struct recovery_state *r)
 {
-	assert(state->writer == NULL);
+	assert(r->writer == NULL);
+	assert(r->watcher == NULL);
 	assert(wal_writer.is_shutdown == false);
 	assert(STAILQ_EMPTY(&wal_writer.input));
 	assert(STAILQ_EMPTY(&wal_writer.output));
 
 	/* I. Initialize the state. */
 	wal_writer_init(&wal_writer);
-	state->writer = &wal_writer;
+	r->writer = &wal_writer;
 
 	ev_async_start(&wal_writer.async);
 
 	/* II. Start the thread. */
 
-	if (tt_pthread_create(&wal_writer.thread, NULL, wal_writer_thread,
-			      state)) {
+	if (tt_pthread_create(&wal_writer.thread, NULL, wal_writer_thread, r)) {
 		wal_writer_destroy(&wal_writer);
-		state->writer = NULL;
+		r->writer = NULL;
 		return -1;
 	}
 	return 0;
 }
 
 /** Stop and destroy the writer thread (at shutdown). */
-static int
-wal_writer_stop(struct recovery_state *state)
+void
+wal_writer_stop(struct recovery_state *r)
 {
-	struct wal_writer *writer = state->writer;
+	struct wal_writer *writer = r->writer;
 
 	/* Stop the worker thread. */
 
@@ -1458,18 +1500,15 @@ wal_writer_stop(struct recovery_state *state)
 	tt_pthread_cond_signal(&writer->cond);
 	tt_pthread_mutex_unlock(&writer->mutex);
 
-	if (pthread_join(writer->thread, NULL) != 0)
-		goto error;
+	if (pthread_join(writer->thread, NULL) != 0) {
+		/* We can't recover from this in any reasonable way. */
+		panic_syserror("WAL writer: thread join failed");
+	}
 
 	ev_async_stop(&writer->async);
 	wal_writer_destroy(writer);
 
-	state->writer = NULL;
-	return 0;
-error:
-	/* We can't recover from this in any reasonable way. */
-	panic_syserror("WAL writer: thread join failed");
-	return -1;
+	r->writer = NULL;
 }
 
 /**
@@ -1503,11 +1542,13 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 	if (r->current_wal == NULL) {
 		/* Open WAL with '.inprogress' suffix. */
 		r->current_wal =
-			log_io_open_for_write(r, r->wal_class, req->lsn, -1);
+			log_io_open_for_write(r->wal_class, req->lsn, INPROGRESS);
 	}
 	else if (r->current_wal->rows == 1) {
-		/* rename WAL after first successful write to name
-		 * without inprogress suffix*/
+		/*
+		 * Rename WAL after the first successful write
+		 * to a name  without inprogress suffix.
+		 */
 		if (log_io_inprogress_rename(r->current_wal->filename) != 0) {
 			say_error("can't rename inprogress WAL");
 			goto fail;
@@ -1677,7 +1718,6 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	if (rows_per_wal <= 1)
 		panic("unacceptable value of 'rows_per_wal'");
 
-	r->wal_timer.data = r;
 	r->row_handler = row_handler;
 	r->remote_recovery = NULL;
 
@@ -1714,22 +1754,26 @@ recovery_update_io_rate_limit(double new_limit)
 void
 recovery_free()
 {
-	struct recovery_state *recovery = recovery_state;
-	if (recovery == NULL)
+	struct recovery_state *r = recovery_state;
+	if (r == NULL)
 		return;
-	if (recovery->writer)
-		wal_writer_stop(recovery);
 
-	v11_class_free(recovery->snap_class);
-	v11_class_free(recovery->wal_class);
-	if (recovery->current_wal) {
+	if (r->watcher)
+		recovery_stop_local(r);
+
+	if (r->writer)
+		wal_writer_stop(r);
+
+	v11_class_free(r->snap_class);
+	v11_class_free(r->wal_class);
+	if (r->current_wal) {
 		/*
 		 * Possible if shutting down a replication
 		 * relay or if error during startup.
 		 */
-		log_io_close(&recovery->current_wal);
+		log_io_close(&r->current_wal);
 	}
-	assert(recovery->previous_wal == NULL);
+	assert(r->previous_wal == NULL);
 
 	recovery_state = NULL;
 }
@@ -1830,7 +1874,7 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 
 	memset(&i, 0, sizeof(i));
 
-	snap = log_io_open_for_write(r, r->snap_class, r->confirmed_lsn, -1);
+	snap = log_io_open_for_write(r->snap_class, r->confirmed_lsn, INPROGRESS);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
 

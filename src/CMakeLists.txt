@@ -22,7 +22,7 @@ endif()
 #
 # libev uses ceil and floor from the standard math library
 #
-target_link_libraries(ev m)
+target_link_libraries(ev m rt)
 
 #
 # Build admin.m from admin.rl, but only if admin.rl was changed.

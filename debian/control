@@ -8,7 +8,8 @@ Build-Depends: cdbs, debhelper (>= 8),
  python-yaml,
  python-daemon,
  python-pexpect,
- libncurses5-dev
+ libncurses5-dev,
+ binutils-dev
 Section: database
 Standards-Version: 3.9.2
 Homepage: http://tarantool.org/

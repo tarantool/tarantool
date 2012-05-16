@@ -597,7 +597,7 @@ replication_relay_loop(int client_sock)
 		}
 		panic("invalid LSN request size: %zu", r);
 	}
-	say_info("starting recovery from lsn:%"PRIi64, lsn);
+	say_info("starting replication from lsn: %"PRIi64, lsn);
 
 	ver = tbuf_alloc(fiber->gc_pool);
 	tbuf_append(ver, &default_version, sizeof(default_version));

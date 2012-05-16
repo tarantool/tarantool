@@ -1,8 +1,6 @@
-#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_H
-#define INCLUDES_TARANTOOL_MOD_BOX_LUA_H
+#ifndef INCLUDES_TARANTOOL_BOX_PORT_H
+#define INCLUDES_TARANTOOL_BOX_PORT_H
 /*
- * Copyright (C) 2011 Yuriy Vostrikov
- * Copyright (C) 2011 Konstantin Osipov
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
  * conditions are met:
@@ -30,20 +28,21 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-struct tbuf;
-struct txn;
+#include <util.h>
+
 struct tuple;
 struct lua_State;
 
-/**
- * Invoke a Lua stored procedure from the binary protocol
- * (implementation of 'CALL' command code).
- */
-void do_call(struct txn *txn, struct tbuf *req);
-/**
- * Create an instance of Lua interpreter in box.
- */
-void box_lua_init();
+struct port {
+	void (*add_u32)(u32 *u32);
+	void (*dup_u32)(u32 u32);
+	void (*add_tuple)(struct tuple *tuple);
+	void (*add_lua_multret)(struct lua_State *L);
+};
 
-struct tuple *lua_istuple(struct lua_State *L, int narg);
-#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_H */
+void port_ref(struct tuple *tuple);
+
+extern struct port port_null;
+extern struct port port_iproto;
+
+#endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

@@ -87,7 +87,7 @@ struct fiber {
 	void *f_data;
 	/* Store execution context in a fiber. */
 	union {
-		struct box_txn *txn;
+		struct txn *txn;
 	} mod_data;
 
 	u64 cookie;

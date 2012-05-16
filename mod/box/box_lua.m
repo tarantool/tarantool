@@ -29,20 +29,18 @@
  * SUCH DAMAGE.
  */
 #include "box_lua.h"
-#include "tarantool.h"
-#include "box.h"
+#include <tarantool_lua.h>
+#include "request.h"
+#include "txn.h"
 
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
 
-#include "lj_obj.h"
-#include "lj_ctype.h"
-#include "lj_cdata.h"
-#include "lj_cconv.h"
-
 #include "pickle.h"
 #include "tuple.h"
+#include "space.h"
+#include "port.h"
 
 /* contents of box.lua */
 extern const char box_lua[];
@@ -74,19 +72,19 @@ lua_State *root_L;
 
 static const char *tuplelib_name = "box.tuple";
 
-static inline struct box_tuple *
+static inline struct tuple *
 lua_checktuple(struct lua_State *L, int narg)
 {
 	return *(void **) luaL_checkudata(L, narg, tuplelib_name);
 }
 
-static inline struct box_tuple *
+struct tuple *
 lua_istuple(struct lua_State *L, int narg)
 {
 	if (lua_getmetatable(L, narg) == 0)
 		return NULL;
 	luaL_getmetatable(L, tuplelib_name);
-	struct box_tuple *tuple = 0;
+	struct tuple *tuple = 0;
 	if (lua_equal(L, -1, -2))
 		tuple = * (void **) lua_touserdata(L, narg);
 	lua_pop(L, 2);
@@ -96,7 +94,7 @@ lua_istuple(struct lua_State *L, int narg)
 static int
 lbox_tuple_gc(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	tuple_ref(tuple, -1);
 	return 0;
 }
@@ -104,7 +102,7 @@ lbox_tuple_gc(struct lua_State *L)
 static int
 lbox_tuple_len(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	lua_pushnumber(L, tuple->field_count);
 	return 1;
 }
@@ -112,7 +110,7 @@ lbox_tuple_len(struct lua_State *L)
 static int
 lbox_tuple_slice(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	int start, end;
 
@@ -158,7 +156,7 @@ lbox_tuple_slice(struct lua_State *L)
 static int
 lbox_tuple_unpack(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	u8 *field = tuple->data;
 
 	while (field < tuple->data + tuple->bsize) {
@@ -180,7 +178,7 @@ lbox_tuple_unpack(struct lua_State *L)
 static int
 lbox_tuple_index(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	/* For integer indexes, implement [] operator */
 	if (lua_isnumber(L, 2)) {
 		int i = luaL_checkint(L, 2);
@@ -201,7 +199,7 @@ lbox_tuple_index(struct lua_State *L)
 static int
 lbox_tuple_tostring(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	/* @todo: print the tuple */
 	struct tbuf *tbuf = tbuf_alloc(fiber->gc_pool);
 	tuple_print(tbuf, tuple->field_count, tuple->data);
@@ -210,7 +208,7 @@ lbox_tuple_tostring(struct lua_State *L)
 }
 
 static void
-lbox_pushtuple(struct lua_State *L, struct box_tuple *tuple)
+lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
 	if (tuple) {
 		void **ptr = lua_newuserdata(L, sizeof(void *));
@@ -231,7 +229,7 @@ lbox_pushtuple(struct lua_State *L, struct box_tuple *tuple)
 static int
 lbox_tuple_next(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	u8 *field = NULL;
 	size_t len;
@@ -468,7 +466,7 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 
 		if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 			/* Searching by tuple. */
-			struct box_tuple *tuple = lua_checktuple(L, 2);
+			struct tuple *tuple = lua_checktuple(L, 2);
 			key = tuple->data;
 			field_count = tuple->field_count;
 		} else {
@@ -496,7 +494,7 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 	} else { /* 1 item on the stack and it's a userdata. */
 		it = lua_checkiterator(L, 2);
 	}
-	struct box_tuple *tuple = it->next(it);
+	struct tuple *tuple = it->next(it);
 	/* If tuple is NULL, pushes nil as end indicator. */
 	lbox_pushtuple(L, tuple);
 	return tuple ? 2 : 1;
@@ -548,161 +546,11 @@ static const struct luaL_reg lbox_iterator_meta[] = {
 /* }}} */
 
 /** {{{ Lua I/O: facilities to intercept box output
- * and push into Lua stack and the opposite: append Lua types
- * to fiber IOV.
+ * and push into Lua stack.
  */
 
-/* Add a Lua table to iov as if it was a tuple, with as little
- * overhead as possible. */
-
 static void
-iov_add_lua_table(struct lua_State *L, int index)
-{
-	u32 *field_count = palloc(fiber->gc_pool, sizeof(u32));
-	u32 *tuple_len = palloc(fiber->gc_pool, sizeof(u32));
-
-	*field_count = 0;
-	*tuple_len = 0;
-
-	iov_add(tuple_len, sizeof(u32));
-	iov_add(field_count, sizeof(u32));
-
-	u8 field_len_buf[5];
-	size_t field_len, field_len_len;
-	const char *field;
-
-	lua_pushnil(L);  /* first key */
-	while (lua_next(L, index) != 0) {
-		++*field_count;
-
-		switch (lua_type(L, -1)) {
-		case LUA_TNUMBER:
-		{
-			u32 field_num = lua_tonumber(L, -1);
-			field_len = sizeof(u32);
-			field_len_len =
-				save_varint32(field_len_buf,
-					      field_len) - field_len_buf;
-			iov_dup(field_len_buf, field_len_len);
-			iov_dup(&field_num, field_len);
-			*tuple_len += field_len_len + field_len;
-			break;
-		}
-		case LUA_TCDATA:
-		{
-			u64 field_num = tarantool_lua_tointeger64(L, -1);
-			field_len = sizeof(u64);
-			field_len_len =
-				save_varint32(field_len_buf,
-					      field_len) - field_len_buf;
-			iov_dup(field_len_buf, field_len_len);
-			iov_dup(&field_num, field_len);
-			*tuple_len += field_len_len + field_len;
-			break;
-		}
-		case LUA_TSTRING:
-		{
-			field = lua_tolstring(L, -1, &field_len);
-			field_len_len =
-				save_varint32(field_len_buf,
-					      field_len) - field_len_buf;
-			iov_dup(field_len_buf, field_len_len);
-			iov_dup(field, field_len);
-			*tuple_len += field_len_len + field_len;
-			break;
-		}
-		default:
-			tnt_raise(ClientError, :ER_PROC_RET,
-				  lua_typename(L, lua_type(L, -1)));
-			break;
-		}
-		lua_pop(L, 1);
-	}
-}
-
-void iov_add_ret(struct lua_State *L, int index)
-{
-	int type = lua_type(L, index);
-	struct box_tuple *tuple;
-	switch (type) {
-	case LUA_TTABLE:
-	{
-		iov_add_lua_table(L, index);
-		return;
-	}
-	case LUA_TNUMBER:
-	{
-		size_t len = sizeof(u32);
-		u32 num = lua_tointeger(L, index);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->field_count = 1;
-		memcpy(save_varint32(tuple->data, len), &num, len);
-		break;
-	}
-	case LUA_TCDATA:
-	{
-		u64 num = tarantool_lua_tointeger64(L, index);
-		size_t len = sizeof(u64);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->field_count = 1;
-		memcpy(save_varint32(tuple->data, len), &num, len);
-		break;
-	}
-	case LUA_TSTRING:
-	{
-		size_t len;
-		const char *str = lua_tolstring(L, index, &len);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->field_count = 1;
-		memcpy(save_varint32(tuple->data, len), str, len);
-		break;
-	}
-	case LUA_TNIL:
-	case LUA_TBOOLEAN:
-	{
-		const char *str = tarantool_lua_tostring(L, index);
-		size_t len = strlen(str);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->field_count = 1;
-		memcpy(save_varint32(tuple->data, len), str, len);
-		break;
-	}
-	case LUA_TUSERDATA:
-	{
-		tuple = lua_istuple(L, index);
-		if (tuple)
-			break;
-	}
-	default:
-		/*
-		 * LUA_TNONE, LUA_TTABLE, LUA_THREAD, LUA_TFUNCTION
-		 */
-		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
-		break;
-	}
-	tuple_txn_ref(in_txn(), tuple);
-	iov_add(&tuple->bsize, tuple_len(tuple));
-}
-
-/**
- * Add all elements from Lua stack to fiber iov.
- *
- * To allow clients to understand a complex return from
- * a procedure, we are compatible with SELECT protocol,
- * and return the number of return values first, and
- * then each return value as a tuple.
- */
-void
-iov_add_multret(struct lua_State *L)
-{
-	int nargs = lua_gettop(L);
-	iov_dup(&nargs, sizeof(u32));
-	for (int i = 1; i <= nargs; ++i)
-		iov_add_ret(L, i);
-}
-
-static void
-box_lua_dup_u32(u32 u32 __attribute__((unused)))
+port_lua_dup_u32(u32 u32 __attribute__((unused)))
 {
 	/*
 	 * Do nothing -- the only u32 Box can give us is
@@ -713,33 +561,46 @@ box_lua_dup_u32(u32 u32 __attribute__((unused)))
 }
 
 static void
-box_lua_add_u32(u32 *p_u32 __attribute__((unused)))
+port_lua_add_u32(u32 *p_u32 __attribute__((unused)))
 {
-	/* See the comment in box_lua_dup_u32. */
+	/* See the comment in port_lua_dup_u32. */
 }
 
 static void
-box_lua_add_tuple(struct box_tuple *tuple)
+port_lua_add_tuple(struct tuple *tuple)
 {
 	struct lua_State *L = in_txn()->L;
 	lbox_pushtuple(L, tuple);
 }
 
-static struct box_out box_out_lua = {
-	box_lua_add_u32,
-	box_lua_dup_u32,
-	box_lua_add_tuple
+static void
+port_lua_add_lua_multret(struct lua_State *L)
+{
+	/*
+	 * We cannot issue a CALL request from within a CALL
+	 * request. Instead users should call Lua procedures
+	 * directly.
+	 */
+	assert(false);
+	(void) L;
+}
+
+static struct port port_lua = {
+	port_lua_add_u32,
+	port_lua_dup_u32,
+	port_lua_add_tuple,
+	port_lua_add_lua_multret
 };
 
 /* }}} */
 
-static inline struct box_txn *
+static inline struct txn *
 txn_enter_lua(lua_State *L)
 {
-	struct box_txn *old_txn = in_txn();
+	struct txn *old_txn = in_txn();
 	fiber->mod_data.txn = NULL;
-	struct box_txn *txn = fiber->mod_data.txn = txn_begin();
-	txn->out = &box_out_lua;
+	struct txn *txn = fiber->mod_data.txn = txn_begin();
+	txn->port = &port_lua;
 	txn->L = L;
 	return old_txn;
 }
@@ -776,7 +637,7 @@ static int lbox_process(lua_State *L)
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
-	struct box_txn *old_txn = txn_enter_lua(L);
+	struct txn *old_txn = txn_enter_lua(L);
 	@try {
 		rw_callback(op, &req);
 	} @finally {
@@ -835,8 +696,7 @@ box_lua_panic(struct lua_State *L)
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void box_lua_call(struct box_txn *txn __attribute__((unused)),
-		  struct tbuf *data)
+void do_call(struct txn *txn, struct tbuf *data)
 {
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
@@ -855,7 +715,7 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 		}
 		lua_call(L, nargs, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
-		iov_add_multret(L);
+		txn->port->add_lua_multret(L);
 	} @finally {
 		/*
 		 * Allow the used coro to be garbage collected.

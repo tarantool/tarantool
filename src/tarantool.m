@@ -58,6 +58,7 @@
 #include <third_party/gopt/gopt.h>
 #include <cfg/warning.h>
 #include "tarantool_pthread.h"
+#include "tarantool_lua.h"
 
 
 static pid_t master_pid;
@@ -404,7 +405,8 @@ create_pid(void)
 			panic_syserror("ftruncate(`%s')", cfg.pid_file);
 	}
 
-	fprintf(f, "%i\n", getpid());
+	master_pid = getpid();
+	fprintf(f, "%i\n", master_pid);
 	fclose(f);
 }
 
@@ -450,6 +452,7 @@ tarantool_free(void)
 		gopt_free(main_opt);
 	free_proc_title(main_argc, main_argv);
 
+	/* unlink pidfile but not in replication process. */
 	if ((cfg.pid_file != NULL) && (master_pid == getpid()))
 		unlink(cfg.pid_file);
 	destroy_tarantool_cfg(&cfg);
@@ -498,7 +501,6 @@ main(int argc, char **argv)
 	__libc_stack_end = (void*) &argv;
 #endif
 
-	master_pid = getpid();
 	crc32_init();
 	stat_init();
 	palloc_init();

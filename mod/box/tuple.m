@@ -35,11 +35,11 @@
 #include "exception.h"
 
 /** Allocate a tuple */
-struct box_tuple *
+struct tuple *
 tuple_alloc(size_t size)
 {
-	size_t total = sizeof(struct box_tuple) + size;
-	struct box_tuple *tuple = salloc(total, "tuple");
+	size_t total = sizeof(struct tuple) + size;
+	struct tuple *tuple = salloc(total, "tuple");
 
 	tuple->flags = tuple->refs = 0;
 	tuple->bsize = size;
@@ -52,8 +52,8 @@ tuple_alloc(size_t size)
  * Free the tuple.
  * @pre tuple->refs  == 0
  */
-static void
-tuple_free(struct box_tuple *tuple)
+void
+tuple_free(struct tuple *tuple)
 {
 	say_debug("tuple_free(%p)", tuple);
 	assert(tuple->refs == 0);
@@ -67,7 +67,7 @@ tuple_free(struct box_tuple *tuple)
  * @pre tuple->refs + count >= 0
  */
 void
-tuple_ref(struct box_tuple *tuple, int count)
+tuple_ref(struct tuple *tuple, int count)
 {
 	assert(tuple->refs + count >= 0);
 	tuple->refs += count;
@@ -90,7 +90,7 @@ next_field(void *f)
  * @returns field data if field exists or NULL
  */
 void *
-tuple_field(struct box_tuple *tuple, size_t i)
+tuple_field(struct tuple *tuple, size_t i)
 {
 	void *field = tuple->data;
 

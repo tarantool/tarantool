@@ -1,8 +1,6 @@
-#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_H
-#define INCLUDES_TARANTOOL_MOD_BOX_LUA_H
+#ifndef TARANTOOL_BOX_TXN_H_INCLUDED
+#define TARANTOOL_BOX_TXN_H_INCLUDED
 /*
- * Copyright (C) 2011 Yuriy Vostrikov
- * Copyright (C) 2011 Konstantin Osipov
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
  * conditions are met:
@@ -30,20 +28,38 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-struct tbuf;
-struct txn;
+#include <fiber.h>
 struct tuple;
-struct lua_State;
+@class Index;
 
-/**
- * Invoke a Lua stored procedure from the binary protocol
- * (implementation of 'CALL' command code).
- */
-void do_call(struct txn *txn, struct tbuf *req);
-/**
- * Create an instance of Lua interpreter in box.
- */
-void box_lua_init();
+struct txn {
+	u16 type;
+	u32 flags;
 
-struct tuple *lua_istuple(struct lua_State *L, int narg);
-#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_H */
+	struct lua_State *L;
+	struct port *port;
+	struct space *space;
+	Index *index;
+
+	struct tuple *old_tuple;
+	struct tuple *new_tuple;
+	struct tuple *lock_tuple;
+
+	struct tbuf req;
+};
+
+
+/** tuple's flags */
+enum tuple_flags {
+	/** Waiting on WAL write to complete. */
+	WAL_WAIT = 0x1,
+	/** A new primary key is created but not yet written to WAL. */
+	GHOST = 0x2,
+};
+
+static inline struct txn *in_txn() { return fiber->mod_data.txn; }
+struct txn *txn_begin();
+void txn_commit(struct txn *txn);
+void txn_rollback(struct txn *txn);
+void txn_lock_tuple(struct txn *txn, struct tuple *tuple);
+#endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

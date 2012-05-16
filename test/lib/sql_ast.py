@@ -72,7 +72,7 @@ ER = {
    44: "ER_UNKNOWN_UPDATE_OP"   ,
    45: "ER_EXACT_MATCH"         ,
    46: "ER_UNUSED46"            ,
-   47: "ER_KEY_CARDINALITY"     ,
+   47: "ER_KEY_PART_COUNT"      ,
    48: "ER_PROC_RET"            ,
    49: "ER_TUPLE_NOT_FOUND"     ,
    50: "ER_NO_SUCH_PROC"        ,

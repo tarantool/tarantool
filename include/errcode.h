@@ -99,7 +99,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
 	/* 45 */_(ER_EXACT_MATCH,		2, "Partial key in an exact match (key field count: %d, expected: %d)") \
 	/* 46 */_(ER_UNUSED46,			2, "Unused46") \
-	/* 47 */_(ER_KEY_CARDINALITY,		2, "Key cardinality %d is greater than index cardinality %d") \
+	/* 47 */_(ER_KEY_PART_COUNT,		2, "Key part count %d is greater than index part count %d") \
 	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist") \
 	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure '%.*s' is not defined") \

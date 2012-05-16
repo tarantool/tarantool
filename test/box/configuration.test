@@ -3,6 +3,7 @@
 
 import os
 import sys
+import shutil
 
 print """
 # Bug #708685:
@@ -62,7 +63,19 @@ sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
 server.test_option("-c " + os.path.join(os.getcwd(), "box/tarantool_bad_type.cfg"))
 sys.stdout.pop_filter()
 
+
+script_dir_path = os.path.join(vardir, "script_dir")
+os.mkdir(script_dir_path)
+shutil.copy("box/test_init.lua", os.path.join(script_dir_path, "init.lua"))
+
+server.stop()
+server.deploy("box/tarantool_scriptdir.cfg")
+exec admin "lua print_config()"
+
+
 # restore default server
 server.stop()
+shutil.rmtree(script_dir_path, True)
 server.deploy(self.suite_ini["config"])
+
 # vim: syntax=python

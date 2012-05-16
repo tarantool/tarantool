@@ -24,8 +24,9 @@
  * SUCH DAMAGE.
  */
 #include "tarantool.h"
-#include "box.h"
-#include "mod/box/tuple.h"
+#include "request.h"
+#include "txn.h"
+#include "tuple.h"
 #include "fiber.h"
 #include "cfg/warning.h"
 #include "cfg/tarantool_box_cfg.h"
@@ -33,6 +34,8 @@
 #include "stat.h"
 #include "salloc.h"
 #include "pickle.h"
+#include "space.h"
+#include "port.h"
 
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
@@ -101,8 +104,8 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
 		  key_len, key_len, (u8 *)key, exptime, flags, cas);
 
-	struct box_txn *txn = txn_begin();
-	txn->out = &box_out_quiet;
+	struct txn *txn = txn_begin();
+	txn->port = &port_null;
 	/*
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
@@ -122,27 +125,27 @@ delete(void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	struct box_txn *txn = txn_begin();
-	txn->out = &box_out_quiet;
+	struct txn *txn = txn_begin();
+	txn->port = &port_null;
 
 	rw_callback(DELETE, req);
 }
 
-static struct box_tuple *
+static struct tuple *
 find(void *key)
 {
 	return [memcached_index findByKey :key :1];
 }
 
 static struct meta *
-meta(struct box_tuple *tuple)
+meta(struct tuple *tuple)
 {
 	void *field = tuple_field(tuple, 1);
 	return field + 1;
 }
 
 static bool
-expired(struct box_tuple *tuple)
+expired(struct tuple *tuple)
 {
 	struct meta *m = meta(tuple);
 	return m->exptime == 0 ? 0 : m->exptime < ev_now();
@@ -201,16 +204,16 @@ print_stats()
 	iov_add(out->data, out->size);
 }
 
-void memcached_get(struct box_txn *txn, size_t keys_count, struct tbuf *keys,
+void memcached_get(struct txn *txn, size_t keys_count, struct tbuf *keys,
 		   bool show_cas)
 {
-	txn->op = SELECT;
+	txn->type = SELECT;
 	stat_collect(stat_base, MEMC_GET, 1);
 	stats.cmd_get++;
 	say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
 	iov_ensure(keys_count * 5 + 1);
 	while (keys_count-- > 0) {
-		struct box_tuple *tuple;
+		struct tuple *tuple;
 		struct meta *m;
 		void *field;
 		void *value;
@@ -258,7 +261,7 @@ void memcached_get(struct box_txn *txn, size_t keys_count, struct tbuf *keys,
 		stats.get_hits++;
 		stat_collect(stat_base, MEMC_GET_HIT, 1);
 
-		tuple_txn_ref(txn, tuple);
+		port_ref(tuple);
 
 		if (show_cas) {
 			struct tbuf *b = tbuf_alloc(fiber->gc_pool);
@@ -283,7 +286,7 @@ flush_all(void *data)
 {
 	uintptr_t delay = (uintptr_t)data;
 	fiber_sleep(delay - ev_now());
-	struct box_tuple *tuple;
+	struct tuple *tuple;
 	struct iterator *it = [memcached_index allocIterator];
 	[memcached_index initIterator: it :ITER_FORWARD];
 	while ((tuple = it->next(it))) {
@@ -498,7 +501,7 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 void
 memcached_expire_loop(void *data __attribute__((unused)))
 {
-	struct box_tuple *tuple = NULL;
+	struct tuple *tuple = NULL;
 
 	say_info("memcached expire fiber started");
 	memcached_it = [memcached_index allocIterator];

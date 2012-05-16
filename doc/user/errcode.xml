@@ -56,8 +56,8 @@ of existing codes.</para>
   </varlistentry>
 
   <varlistentry>
-    <term xml:id="ER_KEY_CARDINALITY" xreflabel="ER_KEY_CARDINALITY">ER_KEY_CARDINALITY</term>
-    <listitem><para>Key cardinality is greater than index cardinality
+    <term xml:id="ER_KEY_PART_COUNT" xreflabel="ER_KEY_PART_COUNT">ER_KEY_PART_COUNT</term>
+    <listitem><para>Key part count is greater than index part count
     </para></listitem>
   </varlistentry>
 

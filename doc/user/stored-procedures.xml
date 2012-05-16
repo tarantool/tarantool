@@ -5,7 +5,7 @@
 <section xmlns="http://docbook.org/ns/docbook" version="5.0"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       xmlns:xlink="http://www.w3.org/1999/xlink"
-      xml:id="stored-programs">
+      xml:id="stored-procedures">
   <title>Writing stored procedures in Lua</title>
 <blockquote>
     <para>
@@ -33,7 +33,7 @@ Found 1 tuple:
     In the language of the administrative console
     <olink targetptr="lua-command" /> evaluates an arbitrary
     Lua chunk. CALL is the SQL standard statement used
-    to represent CALL command of the binary
+    to invoke the CALL command of the binary
     protocol.
     In the example above, a Lua procedure is first defined
     using the text protocol of the administrative port,
@@ -95,7 +95,7 @@ expirationd.run_task("exprd space 0", 0, is_expired, nil,
   </para>
 
   <para>
-    There is a single global instance of Lua interpreter, which is
+    There is a single global instance of the Lua interpreter, which is
     shared across all connections. Anything prefixed with
     <code>lua </code> on the administrative console is sent
     directly to this interpreter. Any change of the interpreter
@@ -103,7 +103,7 @@ expirationd.run_task("exprd space 0", 0, is_expired, nil,
   </para>
   <para>
     Each connection, however, is using its own Lua
-    <emphasis>coroutine</emphasis> &mdash; a mechanism, akin to
+    <emphasis>coroutine</emphasis> &mdash; a mechanism akin to
     Tarantool <emphasis>fibers</emphasis>. A coroutine has an
     own execution stack and a Lua <emphasis>closure</emphasis>
     &mdash; set of local variables and definitions.
@@ -180,7 +180,7 @@ error: 1:15 expected '('
     When a function in Lua terminates with an error, the error
     is sent to the client as <olink targetptr="ER_PROC_LUA" />
     return code, with the original error message preserved.
-    Similarly, an error occurred inside Tarantool (observed on the
+    Similarly, an error which has occurred inside Tarantool (observed on the
     client as an error code), when happens during execution of a
     Lua procedure, produces a genuine Lua error:
 <programlisting><computeroutput>localhost> lua function f1() error("oops") end
@@ -247,7 +247,7 @@ pack: function
             <para>
                 Process a request passed in as a binary string.
                 This is an entry point into the server request
-                processor. It allows to insert, update,
+                processor. It can be used to insert, update,
                 select and delete tuples from within a Lua procedure.
             </para>
             <para>
@@ -363,7 +363,8 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
         <listitem>
             <para>
                 Update a tuple identified by a primary
-                <code>key</code>. Update arguments follow,
+                <code>key</code>. If a key is multipart,
+                it is passed in as a Lua table. Update arguments follow,
                 described by <code>format</code>.
                 The format and arguments are passed to
                 <code>box.pack()</code> and the result is sent
@@ -373,8 +374,8 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
                 single character of format describes either an
                 operation which needs to take place or operation
                 argument. A format specifier also works as a
-                placeholder for the number of field, which needs
-                to be updated, or argument value.
+                placeholder for the number of a field, which needs
+                to be updated, or for an argument value.
                 For example: 
                 <simplelist>
                     <member><code>+p=p</code> &mdash; add a value
@@ -419,7 +420,7 @@ localhost> lua box.update(0, 2, '!p', 1, 'Bienvenue tout le monde!')
 ---
  - 2: {'Bienvenue tout le monde!', 'Hello world!'}
 ...
-localhost> lua box.update(0, 2, '#p', 2, 'Biennvenue tout le monde!')
+localhost> lua box.update(0, 2, '#p', 2, 'Bienvenue tout le monde!')
 ---
  - 2: {'Bienvenue tout le monde!'}
 ...
@@ -467,7 +468,7 @@ Call ERROR, Illegal parameters, key is not u32 (ER_ILLEGAL_PARAMS)
             can change significantly if data is inserted or deleted
             between two calls to <code>box.select_range()</code>.
             If <code>key</code> is <code>nil</code> or unspecified,
-            the selection starts from start of the index.
+            the selection starts from the start of the index.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost> show configuration
 ---
@@ -519,6 +520,71 @@ localhost> lua box.select_range(4, 1, 2, '1')
         </para></listitem>
     </varlistentry>
     <varlistentry>
+        <term>
+            <emphasis role="lua">box.select_reverse_range(space_no, index_no, limit, key, ...)</emphasis>
+        </term>
+        <listitem><para>
+            Select a reverse range of tuples, starting from the offset
+            specified by <code>key</code>. The key can be
+            multipart.
+            Limit selection with at most <code>limit</code>
+            tuples.
+            If no key is specified, start from the last key in
+            the index.
+            </para>
+            <para>
+            For TREE indexes, this returns tuples in sorted order.
+	    Reverse iteration for HASH indexes is not supported.
+            If <code>key</code> is <code>nil</code> or unspecified,
+            the selection starts from the end of the index.
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>localhost> show configuration
+---
+...
+  space[4].cardinality: "-1"
+  space[4].estimated_rows: "0"
+  space[4].index[0].type: "HASH"
+  space[4].index[0].unique: "true"
+  space[4].index[0].key_field[0].fieldno: "0"
+  space[4].index[0].key_field[0].type: "STR"
+  space[4].index[1].type: "TREE"
+  space[4].index[1].unique: "false"
+  space[4].index[1].key_field[0].fieldno: "1"
+  space[4].index[1].key_field[0].type: "STR"
+...
+localhost> insert into t4 values ('0', '0')
+Insert OK, 1 rows affected
+localhost> insert into t4 values ('1', '1')
+Insert OK, 1 rows affected
+localhost> insert into t4 values ('2', '2')
+Insert OK, 1 rows affected
+localhost> insert into t4 values ('3', '3')
+Insert OK, 1 rows affected
+localhost> lua box.select_reverse_range(4, 0, 10)
+---
+ error: 'Illegal parameters, hash iterator is forward only
+...
+localhost> lua box.select_reverse_range(4, 1, 10)
+---
+ - '3': {'3'}
+ - '2': {'2'}
+ - '1': {'1'}
+ - '0': {'0'}
+...
+localhost> lua box.select_reverse_range(4, 1, 2)
+---
+ - '3': {'3'}
+ - '2': {'2'}
+...
+localhost> lua box.select_reverse_range(4, 1, 2, '1')
+---
+ - '1': {'1'}
+ - '0': {'0'}
+...
+</programlisting>
+        </para></listitem>
+    </varlistentry>
+    <varlistentry>
         <term><emphasis role="lua">box.pack(format, ...)</emphasis></term>
         <listitem><para>
             To use Tarantool binary protocol primitives from Lua,
@@ -535,8 +601,8 @@ localhost> lua box.select_range(4, 1, 2, '1')
                 string, low byte first,
                 </member>
                 <member><code>p</code> &mdash; stores the length
-                of the argument as a 4-byte int, low byte first,
-                followed by the argument itself: a 4-byte int, low
+                of the argument as a 4-byte integer, low byte first,
+                followed by the argument itself: a 4-byte integer, low
                 byte first, for integers, or a binary blob for
                 anything else,
                 </member>
@@ -720,7 +786,7 @@ localhost> lua t:slice(1, -1)
             <emphasis role="lua">space.cardinality</emphasis>
         </term>
         <listitem><simpara>
-            A limit on tuple cardinality for tuples in this space.
+            A limit on tuple field count for tuples in this space.
             This limit can be set in the configuration file. Value 0
             stands for <quote>unlimited</quote>.
         </simpara></listitem>
@@ -732,8 +798,8 @@ localhost> lua t:slice(1, -1)
         </term>
         <listitem><simpara>
             A container for all defined indexes. An index is a Lua object
-            of type <code xlink:href="#box.index">box.index</code> which
-            allows to search tuples and iterate over them in predefined order.
+            of type <code xlink:href="#box.index">box.index</code> with
+            methods to search tuples and iterate over them in predefined order.
         </simpara></listitem>
     </varlistentry>
     <varlistentry>
@@ -746,6 +812,13 @@ localhost> lua t:slice(1, -1)
     <varlistentry>
         <term>
             <emphasis role="lua">space:select_range(index_no, limit, key, ...)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">space:select_reverse_range(index_no, limit, key, ...)</emphasis>
         </term>
         <listitem><simpara></simpara></listitem>
     </varlistentry>
@@ -883,6 +956,15 @@ xreflabel="box.index">box.index</code></title>
 
     <varlistentry>
         <term>
+            <emphasis role="lua">space:select_reverse_range(limit, key)</emphasis>
+        </term>
+        <listitem><simpara>Select a reverse range of tuples, limited by
+        <code>limit</code>, starting from <code>key</code>.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
             <emphasis role="lua">index:min()</emphasis>
         </term>
         <listitem><simpara>
@@ -992,18 +1074,21 @@ localhost> lua for k,v in i.next, i, nil do print(v) end
 
 <variablelist>
     <title>Package <code>box.fiber</code></title>
-    <para>Functions in this package allow to create, run and
+    <para>Functions in this package allow you to create, run and
     manage existing <emphasis>fibers</emphasis>.
     </para>
     <para>
 A fiber is an independent execution thread implemented
 using a mechanism of cooperative multitasking.
-Each fiber can be running, suspended or dead.
-A fiber is created (<code>box.fiber.create()</code>) suspended.
-It can be started with <code>box.fiber.resume()</code>, yield
-control back to the caller with <code>box.fiber.yield()</code>
-end with <code>return</code> or just by reaching the end of
-fiber function.
+
+A fiber has three possible states: running, suspended or dead.
+When a fiber is created with <code>box.fiber.create()</code>,
+it is suspended.
+When a fiber is started with <code>box.fiber.resume()</code>, it is running.
+When a fiber's control is yielded back to the caller with
+<code>box.fiber.yield()</code>, it is suspended.
+When a fiber ends (due to <code>return</code> or by reaching the
+end of the fiber function), it is dead.
     </para>
     <para>
 A fiber can also be attached or detached.
@@ -1048,15 +1133,17 @@ can be used to cancel runaway Lua procedures.
     </para>
     <para>
 The other potential problem comes from detached
-fibers which never get scheduled, because are not subscribed
-to any events, or no relevant events occur. Such morphing fibers
+fibers which never get scheduled, because they are not subscribed
+to any events, or because no relevant events occur. Such morphing fibers
 can be killed with <code>box.fiber.cancel()</code> at any time,
 since <code>box.fiber.cancel()</code>
 sends an asynchronous wakeup event to the fiber,
 and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs.
     </para>
     <para>Like all Lua objects, dead fibers are
-    garbage collected.</para>
+    garbage collected: the garbage collector frees pool allocator
+    memory owned by the fiber, resets all fiber data, and returns
+    the fiber to the fiber pool.</para>
     <varlistentry>
         <term>
             <emphasis role="lua">box.fiber.id(fiber) </emphasis>
@@ -1185,10 +1272,10 @@ logger = cat - >> tarantool.log
 </para>
 
 <section>
-<title>Limitation of stored programs</title>
+<title>Limitation of stored procedures</title>
 
 <para>
-    There are two limitations in stored program support one should
+    There are two limitations in stored procedures support one should
     be aware of: execution atomicity and lack of typing.
 </para>
 <bridgehead renderas="sect4">Cooperative multitasking environment</bridgehead>
