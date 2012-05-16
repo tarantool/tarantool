@@ -642,6 +642,10 @@ static int lbox_process(lua_State *L)
 		rw_callback(op, &req);
 	} @finally {
 		fiber->mod_data.txn = old_txn;
+		/*
+		 * This only works as long as port_lua doesn't
+		 * use fiber->cleanup and fiber->gc_pool.
+		 */
 		ptruncate(fiber->gc_pool, allocated_size);
 	}
 	return lua_gettop(L) - top;

@@ -28,9 +28,8 @@
  */
 #include "port.h"
 #include <pickle.h>
+#include <fiber.h>
 #include <tarantool_lua.h>
-#include "request.h"
-#include "txn.h"
 #include "tuple.h"
 #include "box_lua.h"
 #include "lua.h"
