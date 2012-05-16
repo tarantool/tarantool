@@ -28,8 +28,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <fiber.h>
+#include <tbuf.h>
 struct tuple;
+struct space;
+struct lua_State;
+@class Port;
 @class Index;
 
 struct txn {
@@ -37,7 +40,6 @@ struct txn {
 	u32 flags;
 
 	struct lua_State *L;
-	struct port *port;
 	struct space *space;
 	Index *index;
 
@@ -57,7 +59,6 @@ enum tuple_flags {
 	GHOST = 0x2,
 };
 
-static inline struct txn *in_txn() { return fiber->mod_data.txn; }
 struct txn *txn_begin();
 void txn_commit(struct txn *txn);
 void txn_rollback(struct txn *txn);

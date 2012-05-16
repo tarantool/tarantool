@@ -190,20 +190,13 @@ memcached_dispatch()
 		}
 
 		action get {
-			struct txn *txn = txn_begin();
-			txn->port = &port_null;
 			@try {
-				memcached_get(txn, keys_count, keys, show_cas);
-				txn_commit(txn);
+				memcached_get(keys_count, keys, show_cas);
 			} @catch (ClientError *e) {
-				txn_rollback(txn);
 				iov_reset();
 				iov_add("SERVER_ERROR ", 13);
 				iov_add(e->errmsg, strlen(e->errmsg));
 				iov_add("\r\n", 2);
-			} @catch (id e) {
-				txn_rollback(txn);
-				@throw;
 			}
 		}
 

@@ -54,37 +54,62 @@
 const int BOX_REF_THRESHOLD = 8196;
 
 static void
-port_unref(void *tuple)
+tuple_unref(void *tuple)
 {
 	tuple_ref((struct tuple *) tuple, -1);
 }
 
 void
-port_ref(struct tuple *tuple)
+fiber_ref_tuple(struct tuple *tuple)
 {
 	tuple_ref(tuple, 1);
-	fiber_register_cleanup(port_unref, tuple);
+	fiber_register_cleanup(tuple_unref, tuple);
 }
 
-static void
-iov_add_u32(u32 *p_u32)
+@implementation Port
+- (void) addU32: (u32 *) p_u32
+{
+	[self subclassResponsibility: _cmd];
+	(void) p_u32;
+}
+- (void) dupU32: (u32) u32
+{
+	[self subclassResponsibility: _cmd];
+	(void) u32;
+}
+- (void) addTuple: (struct tuple *) tuple
+{
+	[self subclassResponsibility: _cmd];
+	(void) tuple;
+}
+- (void) addLuaMultret: (struct lua_State *) L
+{
+	[self subclassResponsibility: _cmd];
+	(void) L;
+}
+@end
+
+@interface PortIproto: Port
+@end
+
+@implementation PortIproto
+
+- (void) addU32: (u32 *) p_u32
 {
 	iov_add(p_u32, sizeof(u32));
 }
 
-static void
-iov_dup_u32(u32 u32)
+- (void) dupU32: (u32) u32
 {
 	iov_dup(&u32, sizeof(u32));
 }
 
-static void
-iov_add_tuple(struct tuple *tuple)
+- (void) addTuple: (struct tuple *) tuple
 {
 	size_t len = tuple_len(tuple);
 
 	if (len > BOX_REF_THRESHOLD) {
-		port_ref(tuple);
+		fiber_ref_tuple(tuple);
 		iov_add(&tuple->bsize, len);
 	} else {
 		iov_dup(&tuple->bsize, len);
@@ -219,7 +244,7 @@ void iov_add_ret(struct lua_State *L, int index)
 		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
 		break;
 	}
-	port_ref(tuple);
+	fiber_ref_tuple(tuple);
 	iov_add(&tuple->bsize, tuple_len(tuple));
 }
 
@@ -231,31 +256,38 @@ void iov_add_ret(struct lua_State *L, int index)
  * and return the number of return values first, and
  * then each return value as a tuple.
  */
-void
-iov_add_multret(struct lua_State *L)
+- (void) addLuaMultret: (struct lua_State *) L
 {
 	int nargs = lua_gettop(L);
 	iov_dup(&nargs, sizeof(u32));
 	for (int i = 1; i <= nargs; ++i)
 		iov_add_ret(L, i);
 }
+@end
 
-struct port port_iproto = {
-	iov_add_u32,
-	iov_dup_u32,
-	iov_add_tuple,
-	iov_add_multret
-};
 
-static void port_null_add_u32(u32 *p_u32 __attribute__((unused))) {}
-static void port_null_dup_u32(u32 u32 __attribute__((unused))) {}
-static void port_null_add_tuple(struct tuple *tuple __attribute__((unused))) {}
-static void port_null_add_lua_multret(struct lua_State *L __attribute__((unused))) {}
+@implementation PortNull
+- (void) addU32: (u32 *) p_u32                  { (void) p_u32; }
+- (void) dupU32: (u32) u32	                { (void) u32; }
+- (void) addTuple: (struct tuple *) tuple       { (void) tuple; }
+- (void) addLuaMultret: (struct lua_State *) L  { (void) L; }
+@end
 
-struct port port_null = {
-	port_null_add_u32,
-	port_null_dup_u32,
-	port_null_add_tuple,
-	port_null_add_lua_multret
-};
+Port *port_null;
+Port *port_iproto;
 
+void
+port_init()
+{
+	port_iproto = [[PortIproto alloc] init];
+	port_null = [[PortNull alloc] init];
+}
+
+void
+port_free()
+{
+	if (port_iproto)
+		[port_iproto free];
+	if (port_null)
+		[port_null free];
+}

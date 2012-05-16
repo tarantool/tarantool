@@ -29,7 +29,10 @@
  * SUCH DAMAGE.
  */
 #include "box_lua.h"
+#include <objc/runtime.h>
 #include <tarantool_lua.h>
+#include <fiber.h>
+#include "box.h"
 #include "request.h"
 #include "txn.h"
 
@@ -41,6 +44,7 @@
 #include "tuple.h"
 #include "space.h"
 #include "port.h"
+
 
 /* contents of box.lua */
 extern const char box_lua[];
@@ -549,61 +553,43 @@ static const struct luaL_reg lbox_iterator_meta[] = {
  * and push into Lua stack.
  */
 
-static void
-port_lua_dup_u32(u32 u32 __attribute__((unused)))
+/*
+ * For addU32/dupU32 do nothing -- the only u32 Box can give
+ * us is tuple count, and we don't need it, since we intercept
+ * everything into Lua stack first.
+ * @sa iov_add_multret
+ */
+@interface PortLua: PortNull {
+	struct lua_State *L;
+}
++ (PortLua *) alloc;
+- (id) init: (struct lua_State *) L;
+@end
+
+@implementation PortLua
++ (PortLua *) alloc
 {
-	/*
-	 * Do nothing -- the only u32 Box can give us is
-	 * tuple count, and we don't need it, since we intercept
-	 * everything into Lua stack first.
-	 * @sa iov_add_multret
-	 */
+	size_t sz = class_getInstanceSize(self);
+	id new = palloc(fiber->gc_pool, sz);
+	object_setClass(new, self);
+	return new;
 }
 
-static void
-port_lua_add_u32(u32 *p_u32 __attribute__((unused)))
+- (id) init: (struct lua_State *) L_
 {
-	/* See the comment in port_lua_dup_u32. */
+	if ((self = [super init]))
+		L = L_;
+	return self;
 }
 
-static void
-port_lua_add_tuple(struct tuple *tuple)
+- (void) addTuple: (struct tuple *) tuple
 {
-	struct lua_State *L = in_txn()->L;
 	lbox_pushtuple(L, tuple);
 }
 
-static void
-port_lua_add_lua_multret(struct lua_State *L)
-{
-	/*
-	 * We cannot issue a CALL request from within a CALL
-	 * request. Instead users should call Lua procedures
-	 * directly.
-	 */
-	assert(false);
-	(void) L;
-}
-
-static struct port port_lua = {
-	port_lua_add_u32,
-	port_lua_dup_u32,
-	port_lua_add_tuple,
-	port_lua_add_lua_multret
-};
+@end
 
 /* }}} */
-
-static inline struct txn *
-txn_enter_lua(lua_State *L)
-{
-	struct txn *old_txn = in_txn();
-	fiber->mod_data.txn = NULL;
-	struct txn *txn = fiber->mod_data.txn = txn_begin();
-	txn->port = &port_lua;
-	txn->L = L;
-	return old_txn;
-}
 
 /**
  * The main extension provided to Lua by Tarantool/Box --
@@ -636,12 +622,12 @@ static int lbox_process(lua_State *L)
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
+	struct txn *txn = txn_begin();
+	Port *port_lua = [[PortLua alloc] init: L];
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
-	struct txn *old_txn = txn_enter_lua(L);
 	@try {
-		rw_callback(op, &req);
+		box_process(txn, port_lua, op, &req);
 	} @finally {
-		fiber->mod_data.txn = old_txn;
 		/*
 		 * This only works as long as port_lua doesn't
 		 * use fiber->cleanup and fiber->gc_pool.
@@ -700,7 +686,7 @@ box_lua_panic(struct lua_State *L)
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void do_call(struct txn *txn, struct tbuf *data)
+void do_call(struct txn *txn __attribute__((unused)), Port *port, struct tbuf *data)
 {
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
@@ -719,7 +705,7 @@ void do_call(struct txn *txn, struct tbuf *data)
 		}
 		lua_call(L, nargs, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
-		txn->port->add_lua_multret(L);
+		[port addLuaMultret: L];
 	} @finally {
 		/*
 		 * Allow the used coro to be garbage collected.

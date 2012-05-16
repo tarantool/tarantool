@@ -38,6 +38,7 @@ enum {
 	BOX_UPDATE_OP_CNT_MAX = 128,
 };
 @class Index;
+@class Port;
 struct tarantool_cfg;
 struct tuple;
 struct txn;
@@ -97,10 +98,8 @@ extern const char *requests_strs[];
 
 ENUM(update_op_codes, UPDATE_OP_CODES);
 
-extern iproto_callback rw_callback;
-
 void request_set_type(struct txn *req, u16 type, struct tbuf *data);
-void request_dispatch(struct txn *txn, struct tbuf *data);
+void request_dispatch(struct txn *txn, Port *port, struct tbuf *data);
 
 static inline bool
 request_is_select(u32 type)

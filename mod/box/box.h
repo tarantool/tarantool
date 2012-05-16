@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_PORT_H
-#define INCLUDES_TARANTOOL_BOX_PORT_H
+#ifndef INCLUDES_TARANTOOL_BOX_H
+#define INCLUDES_TARANTOOL_BOX_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,38 +29,12 @@
  * SUCH DAMAGE.
  */
 #include <util.h>
-#include <objc/Object.h>
+@class Port;
+struct txn;
+struct tbuf;
 
-struct tuple;
-struct lua_State;
+typedef void (*box_process_func)(struct txn *,
+				 Port *, u32, struct tbuf *);
+extern box_process_func box_process;
 
-@interface Port: Object
-- (void) addU32: (u32 *) u32;
-- (void) dupU32: (u32) u32;
-- (void) addTuple: (struct tuple *) tuple;
-- (void) addLuaMultret: (struct lua_State *) L;
-@end
-
-@interface PortNull: Port
-@end
-
-/**
- * A hack to keep tuples alive until iov_flush(fiber->iovec).
- * Is internal to port_iproto implementation, but is also
- * used in memcached.m, which doesn't uses fiber->iovec
- * bypassing port_iproto a public declaration here.
- */
-void fiber_ref_tuple(struct tuple *tuple);
-
-/** These do not have state currently, thus a single
- * instance is sufficient.
- */
-Port *port_null;
-Port *port_iproto;
-
-/** Init the subsystem. */
-void port_init();
-/** Stop the susbystem. */
-void port_free();
-
-#endif /* INCLUDES_TARANTOOL_BOX_PORT_H */
+#endif /* INCLUDES_TARANTOOL_BOX_H */

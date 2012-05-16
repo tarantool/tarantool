@@ -31,6 +31,7 @@
 #include "tuple.h"
 #include "space.h"
 #include <log_io.h>
+#include <fiber.h>
 
 void
 txn_lock_tuple(struct txn *txn, struct tuple *tuple)
@@ -88,15 +89,12 @@ struct txn *
 txn_begin()
 {
 	struct txn *txn = p0alloc(fiber->gc_pool, sizeof(*txn));
-	assert(fiber->mod_data.txn == NULL);
-	fiber->mod_data.txn = txn;
 	return txn;
 }
 
 void
 txn_commit(struct txn *txn)
 {
-	assert(txn == in_txn());
 	assert(txn->type);
 
 	if (!request_is_select(txn->type)) {
@@ -128,15 +126,12 @@ txn_commit(struct txn *txn)
 	 * roll back. Thus clear mod_data.txn only when
 	 * we know for sure the commit has succeeded.
 	 */
-	fiber->mod_data.txn = 0;
 	TRASH(txn);
 }
 
 void
 txn_rollback(struct txn *txn)
 {
-	assert(txn == in_txn());
-	fiber->mod_data.txn = 0;
 	if (txn->type == 0)
 		return;
 

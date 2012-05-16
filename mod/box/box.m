@@ -23,6 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "box.h"
 #include <arpa/inet.h>
 
 #include <cfg/warning.h>
@@ -43,9 +44,12 @@
 #include "request.h"
 #include "txn.h"
 
-static void box_process_ro(u32 op, struct tbuf *request_data);
-static void box_process_rw(u32 op, struct tbuf *request_data);
-iproto_callback rw_callback = box_process_ro;
+static void box_process_ro(struct txn *txn, Port *port,
+			   u32 op, struct tbuf *request_data);
+static void box_process_rw(struct txn *txn, Port *port,
+			   u32 op, struct tbuf *request_data);
+box_process_func box_process = box_process_ro;
+
 extern pid_t logger_pid;
 
 const char *mod_name = "Box";
@@ -67,22 +71,18 @@ box_snap_row(const struct tbuf *t)
 {
 	return (struct box_snap_row *)t->data;
 }
+
 static void
-box_process_rw(u32 op, struct tbuf *request_data)
+box_process_rw(struct txn *txn, Port *port,
+	       u32 op, struct tbuf *request_data)
 {
 	ev_tstamp start = ev_now(), stop;
 
 	stat_collect(stat_base, op, 1);
 
-	struct txn *txn = in_txn();
-	if (txn == NULL) {
-		txn = txn_begin();
-		txn->port = &port_iproto;
-	}
-
 	@try {
 		request_set_type(txn, op, request_data);
-		request_dispatch(txn, request_data);
+		request_dispatch(txn, port, request_data);
 		txn_commit(txn);
 	}
 	@catch (id e) {
@@ -98,19 +98,27 @@ box_process_rw(u32 op, struct tbuf *request_data)
 }
 
 static void
-box_process_ro(u32 op, struct tbuf *request_data)
+box_process_ro(struct txn *txn, Port *port,
+	       u32 op, struct tbuf *request_data)
 {
 	if (!request_is_select(op)) {
-		struct txn *txn = in_txn();
-		if (txn != NULL)
-			txn_rollback(txn);
+		txn_rollback(txn);
 		tnt_raise(LoggedError, :ER_NONMASTER);
 	}
-
-	return box_process_rw(op, request_data);
+	return box_process_rw(txn, port, op, request_data);
 }
 
+static void
+iproto_primary_port_handler(u32 op, struct tbuf *request_data)
+{
+	box_process(txn_begin(), port_iproto, op, request_data);
+}
 
+static void
+iproto_secondary_port_handler(u32 op, struct tbuf *request_data)
+{
+	box_process_ro(txn_begin(), port_iproto, op, request_data);
+}
 
 static int
 box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
@@ -273,10 +281,9 @@ recover_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 
 	struct txn *txn = txn_begin();
 	txn->flags |= BOX_NOT_STORE;
-	txn->port = &port_null;
 
 	@try {
-		box_process_rw(op, t);
+		box_process_rw(txn, port_null, op, t);
 	}
 	@catch (id e) {
 		return -1;
@@ -315,7 +322,7 @@ static void
 box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 {
 	if (conf->replication_source != NULL) {
-		rw_callback = box_process_ro;
+		box_process = box_process_ro;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 		recovery_follow_remote(recovery_state, conf->replication_source);
@@ -324,7 +331,7 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 			 conf->replication_source, custom_proc_title);
 		title("replica/%s%s", conf->replication_source, custom_proc_title);
 	} else {
-		rw_callback = box_process_rw;
+		box_process = box_process_rw;
 
 		memcached_start_expire();
 
@@ -438,19 +445,16 @@ mod_free(void)
 {
 	space_free();
 	memcached_free();
+	port_free();
 }
 
 void
 mod_init(void)
 {
-	static iproto_callback ro_callback = box_process_ro;
-
 	title("loading");
 	atexit(mod_free);
 
-	/* disable secondary indexes while loading */
-	secondary_indexes_enabled = false;
-
+	port_init();
 	box_lua_init();
 
 	/* initialization spaces */
@@ -497,13 +501,14 @@ mod_init(void)
 	if (cfg.primary_port != 0)
 		fiber_server("primary", cfg.primary_port,
 			     (fiber_server_callback) iproto_interact,
-			     &rw_callback, box_leave_local_standby_mode);
+			     iproto_primary_port_handler,
+			     box_leave_local_standby_mode);
 
 	/* run secondary server */
 	if (cfg.secondary_port != 0)
 		fiber_server("secondary", cfg.secondary_port,
 			     (fiber_server_callback) iproto_interact,
-			     &ro_callback, NULL);
+			     iproto_secondary_port_handler, NULL);
 
 	/* run memcached server */
 	if (cfg.memcached_port != 0)

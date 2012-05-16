@@ -34,12 +34,13 @@ struct tbuf;
 struct txn;
 struct tuple;
 struct lua_State;
+@class Port;
 
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void do_call(struct txn *txn, struct tbuf *req);
+void do_call(struct txn *txn, Port *port, struct tbuf *req);
 /**
  * Create an instance of Lua interpreter in box.
  */

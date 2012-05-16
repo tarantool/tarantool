@@ -85,11 +85,6 @@ struct fiber {
 	char name[FIBER_NAME_MAXLEN];
 	void (*f) (void *);
 	void *f_data;
-	/* Store execution context in a fiber. */
-	union {
-		struct txn *txn;
-	} mod_data;
-
 	u64 cookie;
 	bool has_peer;
 	/* ASCIIZ name of the peer, if there is one. */

@@ -59,7 +59,7 @@ iproto_flush(struct tbuf **in, ssize_t to_read)
 }
 
 void
-iproto_interact(iproto_callback *callback)
+iproto_interact(iproto_callback callback)
 {
 	struct tbuf *in = fiber->rbuf;
 	ssize_t to_read = sizeof(struct iproto_header);
@@ -77,7 +77,7 @@ iproto_interact(iproto_callback *callback)
 			break;
 
 		struct tbuf *request = tbuf_split(in, request_len);
-		iproto_reply(*callback, request);
+		iproto_reply(callback, request);
 
 		to_read = sizeof(struct iproto_header) - in->size;
 		if (iproto_flush(&in, to_read) == -1)

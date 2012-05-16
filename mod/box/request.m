@@ -36,6 +36,7 @@
 #include <errinj.h>
 #include <tbuf.h>
 #include <pickle.h>
+#include <fiber.h>
 
 STRS(requests, REQUESTS);
 STRS(update_op_codes, UPDATE_OP_CODES);
@@ -57,7 +58,7 @@ read_key(struct tbuf *data, void **key_ptr, u32 *key_part_count_ptr)
 }
 
 static void __attribute__((noinline))
-do_replace(struct txn *txn, size_t field_count, struct tbuf *data)
+do_replace(struct txn *txn, Port *port, size_t field_count, struct tbuf *data)
 {
 	assert(data != NULL);
 	if (field_count == 0)
@@ -113,10 +114,10 @@ do_replace(struct txn *txn, size_t field_count, struct tbuf *data)
 		space_replace(txn->space, NULL, txn->new_tuple);
 	}
 
-	txn->port->dup_u32(1); /* Affected tuples */
+	[port dupU32: 1]; /* Affected tuples */
 
 	if (txn->flags & BOX_RETURN_TUPLE)
-		txn->port->add_tuple(txn->new_tuple);
+		[port addTuple: txn->new_tuple];
 }
 
 /** {{{ UPDATE request implementation.
@@ -824,7 +825,7 @@ do_update_ops(struct txn *txn, struct update_cmd *cmd)
 }
 
 static void __attribute__((noinline))
-do_update(struct txn *txn, struct tbuf *data)
+do_update(struct txn *txn, Port *port, struct tbuf *data)
 {
 	u32 tuples_affected = 1;
 
@@ -850,16 +851,16 @@ do_update(struct txn *txn, struct tbuf *data)
 	space_validate(txn->space, txn->old_tuple, txn->new_tuple);
 
 out:
-	txn->port->dup_u32(tuples_affected);
+	[port dupU32: tuples_affected];
 
 	if (txn->flags & BOX_RETURN_TUPLE && txn->new_tuple)
-		txn->port->add_tuple(txn->new_tuple);
+		[port addTuple: txn->new_tuple];
 }
 
 /** }}} */
 
 static void __attribute__((noinline))
-do_select(struct txn *txn, u32 limit, u32 offset, struct tbuf *data)
+do_select(struct txn *txn, Port *port, u32 limit, u32 offset, struct tbuf *data)
 {
 	struct tuple *tuple;
 	uint32_t *found;
@@ -868,7 +869,7 @@ do_select(struct txn *txn, u32 limit, u32 offset, struct tbuf *data)
 		tnt_raise(IllegalParams, :"tuple count must be positive");
 
 	found = palloc(fiber->gc_pool, sizeof(*found));
-	txn->port->add_u32(found);
+	[port addU32: found];
 	*found = 0;
 
 	for (u32 i = 0; i < count; i++) {
@@ -895,7 +896,7 @@ do_select(struct txn *txn, u32 limit, u32 offset, struct tbuf *data)
 				continue;
 			}
 
-			txn->port->add_tuple(tuple);
+			[port addTuple: tuple];
 
 			if (limit == ++(*found))
 				break;
@@ -906,7 +907,7 @@ do_select(struct txn *txn, u32 limit, u32 offset, struct tbuf *data)
 }
 
 static void __attribute__((noinline))
-do_delete(struct txn *txn, struct tbuf *data)
+do_delete(struct txn *txn, Port *port, struct tbuf *data)
 {
 	u32 tuples_affected = 0;
 
@@ -931,10 +932,10 @@ do_delete(struct txn *txn, struct tbuf *data)
 		tuples_affected = 1;
 	}
 
-	txn->port->dup_u32(tuples_affected);
+	[port dupU32: tuples_affected];
 
 	if (txn->old_tuple && (txn->flags & BOX_RETURN_TUPLE))
-		txn->port->add_tuple(txn->old_tuple);
+		[port addTuple: txn->old_tuple];
 }
 
 static void
@@ -966,7 +967,7 @@ request_set_type(struct txn *req, u16 type, struct tbuf *data)
 }
 
 void
-request_dispatch(struct txn *txn, struct tbuf *data)
+request_dispatch(struct txn *txn, Port *port, struct tbuf *data)
 {
 	u32 field_count;
 
@@ -979,7 +980,7 @@ request_dispatch(struct txn *txn, struct tbuf *data)
 		field_count = read_u32(data);
 		if (txn->space->arity > 0 && txn->space->arity != field_count)
 			tnt_raise(IllegalParams, :"tuple field count must match space cardinality");
-		do_replace(txn, field_count, data);
+		do_replace(txn, port, field_count, data);
 		break;
 
 	case DELETE:
@@ -988,7 +989,7 @@ request_dispatch(struct txn *txn, struct tbuf *data)
 		if (txn->type == DELETE)
 			txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 
-		do_delete(txn, data);
+		do_delete(txn, port, data);
 		break;
 
 	case SELECT:
@@ -1004,18 +1005,18 @@ request_dispatch(struct txn *txn, struct tbuf *data)
 				  space_n(txn->space));
 		txn->index = txn->space->index[i];
 
-		do_select(txn, limit, offset, data);
+		do_select(txn, port, limit, offset, data);
 		break;
 	}
 
 	case UPDATE:
 		request_set_space(txn, data);
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		do_update(txn, data);
+		do_update(txn, port, data);
 		break;
 	case CALL:
 		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		do_call(txn, data);
+		do_call(txn, port, data);
 		break;
 
 	default:
