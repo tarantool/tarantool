@@ -1,0 +1,46 @@
+Target OS: CentOS 5.8 (Final)
+
+1. Install EPEL repository:
+-------------
+http://fedoraproject.org/wiki/EPEL/FAQ#How_can_I_install_the_packages_from_the_EPEL_software_repository.3F
+
+sudo rpm -iv ./epel-release-5-4.noarch.rpm
+
+2. Install build-required packages:
+-------------
+
+sudo yum install gcc gcc-c++ gcc-objc cmake git readline-devel ncurses-devel binutuls-devel
+
+3. Download & build tarantool source code:
+-------------
+
+git clone git://github.com/mailru/tarantool.git
+
+cd tarantool
+cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true && make
+
+4. Install test-required packages and modules for Python 2.6
+-------------
+
+sudo yum install python26 python26-PyYAML python26-argparse
+
+wget http://pypi.python.org/packages/source/p/pexpect-u/pexpect-u-2.5.1.tar.gz#md5=7c916a9f42d636ec6aec39f7cdd96eb5
+tar -xzvf pexpect-u-2.5.1.tar.gz
+sudo python26 setup.py install
+
+wget http://pypi.python.org/packages/source/d/daemon/daemon-1.0.tar.gz#md5=b0bebffc51965a66ec4a4bc1006fa90b
+tar -xzvf daemon-1.0.tar.gz
+sudo python26 setup.py install
+
+5. Set up python 2.6 to run tarantool tests
+-------------
+
+mkdir ~/build/bin && ln -s /usr/bin/python26 ~/build/bin/python
+
+6. Run tarantool test suite
+-------------
+
+cd ~/build/tarantool/test
+PATH=~/build/bin:$PATH ./run
+
+-- EOF
