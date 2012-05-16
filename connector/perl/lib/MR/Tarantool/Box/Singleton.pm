@@ -95,16 +95,19 @@ if I<< fields >> were not set explicitly for that space.
 
 =cut
 
-sub mkfields {
-    my($class, @fields) = @_;
+sub _mkfields {
+    my($class, $f, $F, @fields) = @_;
     no strict 'refs';
-    confess "Fields are already defined for $class" if @{"${class}::fields"};
-    @{"${class}::fields"} = @fields;
-    %{"${class}::fields"} = map { $fields[$_] => $_ } 0..$#fields;
-    eval qq{ sub ${class}::TUPLE_$fields[$_] () { $_ } } for 0..$#fields;
-    eval qq{ sub ${class}::FIELDS      () {   \@${class}::fields } };
-    eval qq{ sub ${class}::FIELDS_HASH () { \\\%${class}::fields } };
+    confess "$f are already defined for $class" if @{"${class}::${f}"};
+    @{"${class}::${f}"} = @fields;
+    %{"${class}::${f}"} = map { $fields[$_] => $_ } 0..$#fields;
+    eval qq{ sub ${class}::${F}TUPLE_$fields[$_] () { $_ } } for 0..$#fields;
+    eval qq{ sub ${class}::${F}FIELDS      () {   \@${class}::${f} } };
+    eval qq{ sub ${class}::${F}FIELDS_HASH () { \\\%${class}::${f} } };
 }
+
+sub mkfields     { $_[0]->_mkfields('fields',      '',      @_[1..$#_]) }
+sub mklongfields { $_[0]->_mkfields('long_fields', 'LONG_', @_[1..$#_]) }
 
 =pod
 
@@ -118,7 +121,7 @@ sub mkfields {
         options          => { default => options },                    # MR::Tarantool::Box->Call \%options
         params           => [ qw{ P1 P2 P3 Param4 }],                  # names
     
-        unpack_format    => [qw/ & L S C /],
+        unpack_format    => "&LSC(L$)*",
     
         params_format    => [qw{ C S L a* }],
         params_default   => [ 1, 2, undef, 'the_default' ],            # undef's are mandatory params
@@ -174,7 +177,7 @@ its parameter mandatory.
 
 C<< pack() >>-compatible format to pack input parameters. Must match C<params>.
 
-=item B<unpack_format> => \@format
+=item B<unpack_format> => $format
 
 C<< pack() >>-compatible format to unpack procedure output.
 
@@ -236,17 +239,22 @@ sub declare_stored_procedure {
             confess "`unpack` method $fn is not provided by class ${class}" unless $class->can($fn);
             $unpack = sub { $class->$fn(@_) };
         }
-        $options->{unpack_format} = [ "a*" ];
+        if ($opts{unpack_raw}) {
+            $options->{unpack} = $unpack;
+            undef $unpack;
+        }
+        $options->{unpack_format} = '&*';
     } else {
-        confess "no `unpack` nor `unpack_format` given; it must be an arrayref" if !exists $opts{unpack_format} or ref $opts{unpack_format} ne 'ARRAY';
+        confess "no `unpack` nor `unpack_format` given" if !exists $opts{unpack_format};
         my $f = $opts{unpack_format};
+        $f = join '', @$f if ref $f;
         $options->{unpack_format} = $f;
     }
 
     my $method = $opts{method_name} or confess "`method_name` not given";
     confess "bad `method_name` $method" unless $method =~ m/^[a-zA-Z]\w*$/;
     my $fn = "${class}::${method}";
-    confess "Method $method id already defined in class $class" if defined &{$fn};
+    confess "Method $method is already defined in class $class" if defined &{$fn};
     do {
         no strict 'refs';
         *$fn = sub {
@@ -323,7 +331,8 @@ sub _new_instance {
 
     $config->{param}->{name}               ||= $class;
     $config->{param}->{spaces}             ||= $class->SPACES;
-    $config->{param}->{default_fields}     ||= [ $class->FIELDS ] if $class->can('FIELDS');
+    $config->{param}->{default_fields}     ||= [ $class->FIELDS ]      if $class->can('FIELDS');
+    $config->{param}->{default_long_fields}||= [ $class->LONG_FIELDS ] if $class->can('LONG_FIELDS');
 
     $config->{param}->{raise}                = $class->RAISE unless defined $config->{param}->{raise};
     $config->{param}->{timeout}            ||= $class->TIMEOUT;
