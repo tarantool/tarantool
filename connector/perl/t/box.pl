@@ -13,7 +13,7 @@ use FindBin qw($Bin);
 use lib "$Bin";
 use Carp qw/confess/;
 
-use Test::More tests => 339;
+use Test::More tests => 360;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
@@ -898,7 +898,9 @@ foreach my $r (@res) {
 }
 
 my $flds;
-BEGIN{ $flds = [qw/ f1 f2 f3 f4 /] }
+my $lflds;
+BEGIN{ $flds = [qw/ f1 f2 f3 f4 LL /] }
+BEGIN{ $lflds = [qw/ l1 l2 l3 /] }
     {
         package TestBox;
         use MR::Tarantool::Box::Singleton;
@@ -906,6 +908,7 @@ BEGIN{ $flds = [qw/ f1 f2 f3 f4 /] }
 
         BEGIN {
             __PACKAGE__->mkfields(@$flds);
+            __PACKAGE__->mklongfields(@$lflds);
         }
 
         sub SERVER   { $server }
@@ -917,7 +920,7 @@ BEGIN{ $flds = [qw/ f1 f2 f3 f4 /] }
                 index_name   => 'primary_id',
                 keys         => [TUPLE_f1],
             } ],
-            format        => 'l&&&',
+            format        => 'l&$&(&$&)*',
             default_index => 'primary_id',
         }]}
 
@@ -926,24 +929,52 @@ BEGIN{ $flds = [qw/ f1 f2 f3 f4 /] }
 $box = 'TestBox';
 #$box = $CLASS->new(def_param_flds);
 #ok $box->isa($CLASS), 'connect';
-
 do {
-    my $tuples = [ @$tuples[0..2] ];
+    my $tuples = [
+        [1, "asdasdasd1", "qqq\xD0\x8Eqqq1", "ww\xD0\x8Eww1", "la\xD0\x8Elalala11", "la\xD0\x8Elala11", "lala11"],
+        [2, "asdasdasd2", "qqq\xD0\x8Eqqq2", "ww\xD0\x8Eww2", "la\xD0\x8Elalala21", "la\xD0\x8Elala21", "lala21", "lalalala22", "lalala22", "lala22", "lalalala23", "lalala23", "lala23"],
+        [3, "asdasdasd3", "qqq\xD0\x8Eqqq3", "ww\xD0\x8Eww3", "la\xD0\x8Elalala31", "la\xD0\x8Elala31", "lala31", "lalalala32", "lalala32", "lala32"],
+        [4, "asdasdasd4", "qqq\xD0\x8Eqqq4", "ww\xD0\x8Eww4", "la\xD0\x8Elalala41", "la\xD0\x8Elala41", "lala41", "lalalala42", "lalala42", "lala42", "lalalala43", "lalala43", "lala43"],
+        [5, "asdasdasd5", "qqq\xD0\x8Eqqq5", "ww\xD0\x8Eww5", "la\xD0\x8Elalala51", "la\xD0\x8Elala51", "lala51"],
+    ];
+
+    my $check = [];
+    for my $tuple (@$tuples) {
+        my $i = 0;
+        Encode::_utf8_on($tuple->[2+$i*3]), ++$i while @$tuple > 1+$i*3;
+
+        my $t = { zip @{[@$flds[0..($#$flds-1)]]}, @{[@$tuple[0..($#$flds-1)]]} };
+        my $l = $t->{$flds->[-1]} = [];
+
+        $i = 1;
+        push(@$l, { zip @$lflds, @{[@$tuple[(1+$i*3)..(1+$i*3+2)]]} }), ++$i while @$tuple > 1+$i*3;
+
+        push @$check, $t;
+    }
+
     foreach my $tuple (@$tuples) {
         cleanup $tuple->[0];
     }
 
-    foreach my $tuple (@$tuples) {
-        is_deeply [$box->Insert(@$tuple, {want_inserted_tuple => 1})], [{zip @$flds, @$tuple}], "flds/insert \'$tuple->[0]\'";
+    foreach my $i (0..$#$tuples) {
+        is_deeply [$box->Insert(@{$tuples->[$i]}, {want_inserted_tuple => 1})], [$check->[$i]], "flds/insert \'$tuples->[$i]->[0]\'";
     }
 
-    is_deeply [$box->Select([[$tuples->[0]->[0]]])], [{zip @$flds, @{$tuples->[0]}}], 'select by primary_num1 index';
-    is_deeply [$box->UpdateMulti($tuples->[0]->[0],[ $flds->[3] => set => $tuples->[0]->[3] ],{want_updated_tuple => 1})], [{zip @$flds, @{$tuples->[0]}}], 'update1';
-    ok         $box->UpdateMulti($tuples->[0]->[0],[ $flds->[3] => set => $tuples->[0]->[3] ]), 'update2';
-    is_deeply [$box->UpdateMulti($tuples->[0]->[0],[ 3          => set => $tuples->[0]->[3] ],{want_updated_tuple => 1})], [{zip @$flds, @{$tuples->[0]}}], 'update3';
-    ok         $box->UpdateMulti($tuples->[0]->[0],[ 3          => set => $tuples->[0]->[3] ]), 'update4';
+    is_deeply [$box->Select([[$tuples->[0]->[0]]])], [$check->[0]], 'select by primary_num1 index';
 
-    is_deeply [$box->Delete($tuples->[0]->[0],{want_deleted_tuple => 1})], [{zip @$flds, @{$tuples->[0]}}], 'update3';
+    my $res;
+    is_deeply [$res=$box->Select([map {$_->[0]} @$tuples],{want=>'arrayref'})], [$check], 'select all';
+    # print $res->[0]->{f3}, "\n";
+    # print $check->[0]->{f3}, "\n";
+    ok $res->[$_]->{f3}            eq $check->[$_]->{f3}, "utf8chk"                for 0..$#$tuples;
+    ok $res->[$_]->{LL}->[0]->{l2} eq $check->[$_]->{LL}->[0]->{l2}, "utf8chklong" for 0..$#$tuples;
+
+    is_deeply [$box->UpdateMulti($tuples->[2]->[0],[ $flds->[3] => set => $tuples->[2]->[3] ],{want_updated_tuple => 1})], [$check->[2]], 'update1';
+    ok         $box->UpdateMulti($tuples->[2]->[0],[ $flds->[3] => set => $tuples->[2]->[3] ]), 'update2';
+    is_deeply [$box->UpdateMulti($tuples->[2]->[0],[ 3          => set => $tuples->[2]->[3] ],{want_updated_tuple => 1})], [$check->[2]], 'update3';
+    ok         $box->UpdateMulti($tuples->[2]->[0],[ 3          => set => $tuples->[2]->[3] ]), 'update4';
+
+    is_deeply [$box->Delete($tuples->[$_]->[0],{want_deleted_tuple => 1})], [$check->[$_]], "delete$_" for 0..$#$tuples;
 };
 
 
