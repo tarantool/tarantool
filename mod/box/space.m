@@ -35,7 +35,7 @@
 #include "tuple.h"
 #include <pickle.h>
 
-struct space *space = NULL;
+struct space *spaces = NULL;
 
 bool secondary_indexes_enabled = false;
 /** Free a key definition. */
@@ -117,18 +117,18 @@ space_free(void)
 {
 	int i;
 	for (i = 0 ; i < BOX_SPACE_MAX ; i++) {
-		if (!space[i].enabled)
+		if (!spaces[i].enabled)
 			continue;
 
 		int j;
-		for (j = 0 ; j < space[i].key_count; j++) {
-			Index *index = space[i].index[j];
+		for (j = 0 ; j < spaces[i].key_count; j++) {
+			Index *index = spaces[i].index[j];
 			[index free];
-			key_free(&space[i].key_defs[j]);
+			key_free(&spaces[i].key_defs[j]);
 		}
 
-		free(space[i].key_defs);
-		free(space[i].field_types);
+		free(spaces[i].key_defs);
+		free(spaces[i].field_types);
 	}
 }
 
@@ -249,38 +249,38 @@ space_config()
 
 		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
 
-		space[i].enabled = true;
-		space[i].arity = cfg_space->cardinality;
+		spaces[i].enabled = true;
+		spaces[i].arity = cfg_space->cardinality;
 
 		/*
 		 * Collect key/field info. We need aggregate
 		 * information on all keys before we can create
 		 * indexes.
 		 */
-		space[i].key_count = 0;
+		spaces[i].key_count = 0;
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
-			++space[i].key_count;
+			++spaces[i].key_count;
 		}
 
-		space[i].key_defs = malloc(space[i].key_count *
+		spaces[i].key_defs = malloc(spaces[i].key_count *
 					    sizeof(struct key_def));
-		if (space[i].key_defs == NULL) {
+		if (spaces[i].key_defs == NULL) {
 			panic("can't allocate key def array");
 		}
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
-			key_init(&space[i].key_defs[j], cfg_index);
+			key_init(&spaces[i].key_defs[j], cfg_index);
 		}
-		space_init_field_types(&space[i]);
+		space_init_field_types(&spaces[i]);
 
 		/* fill space indexes */
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
-			struct key_def *key_def = &space[i].key_defs[j];
-			Index *index = [Index alloc: type :key_def :&space[i]];
-			[index init: key_def :&space[i]];
-			space[i].index[j] = index;
+			struct key_def *key_def = &spaces[i].key_defs[j];
+			Index *index = [Index alloc: type :key_def :&spaces[i]];
+			[index init: key_def :&spaces[i]];
+			spaces[i].index[j] = index;
 		}
 		say_info("space %i successfully configured", i);
 	}
@@ -290,8 +290,7 @@ void
 space_init(void)
 {
 	/* Allocate and initialize space memory. */
-	space = palloc(eter_pool, sizeof(struct space) * BOX_SPACE_MAX);
-	memset(space, 0, sizeof(struct space) * BOX_SPACE_MAX);
+	spaces = p0alloc(eter_pool, sizeof(struct space) * BOX_SPACE_MAX);
 
 	/* configure regular spaces */
 	space_config();
@@ -303,16 +302,16 @@ build_indexes(void)
 	assert(secondary_indexes_enabled == false);
 
 	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
-		if (space[n].enabled == false)
+		if (spaces[n].enabled == false)
 			continue;
-		if (space[n].key_count <= 1)
+		if (spaces[n].key_count <= 1)
 			continue; /* no secondary keys */
 
 		say_info("Building secondary keys in space %" PRIu32 "...", n);
 
-		Index *pk = space[n].index[0];
-		for (int i = 1; i < space[n].key_count; i++) {
-			Index *index = space[n].index[i];
+		Index *pk = spaces[n].index[0];
+		for (int i = 1; i < spaces[n].key_count; i++) {
+			Index *index = spaces[n].index[i];
 			[index build: pk];
 		}
 

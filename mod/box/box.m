@@ -548,10 +548,10 @@ mod_snapshot(struct log_io_iter *i)
 	struct tuple *tuple;
 
 	for (uint32_t n = 0; n < BOX_SPACE_MAX; ++n) {
-		if (!space[n].enabled)
+		if (!spaces[n].enabled)
 			continue;
 
-		Index *pk = space[n].index[0];
+		Index *pk = spaces[n].index[0];
 
 		struct iterator *it = pk->position;
 		[pk initIterator: it :ITER_FORWARD];

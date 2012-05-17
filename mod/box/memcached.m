@@ -413,7 +413,7 @@ memcached_init(void)
 
 	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 
-	memcached_index = space[cfg.memcached_space].index[0];
+	memcached_index = spaces[cfg.memcached_space].index[0];
 }
 
 void
@@ -430,7 +430,7 @@ memcached_space_init()
                 return;
 
 	/* Configure memcached space. */
-	struct space *memc_s = &space[cfg.memcached_space];
+	struct space *memc_s = &spaces[cfg.memcached_space];
 	memc_s->enabled = true;
 	memc_s->arity = 4;
 

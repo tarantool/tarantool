@@ -946,7 +946,7 @@ request_set_space(struct txn *txn, struct tbuf *data)
 	if (space_no < 0 || space_no >= BOX_SPACE_MAX)
 		tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
 
-	txn->space = &space[space_no];
+	txn->space = &spaces[space_no];
 
 	if (!txn->space->enabled)
 		tnt_raise(ClientError, :ER_SPACE_DISABLED, space_no);

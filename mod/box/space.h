@@ -79,14 +79,14 @@ struct space {
 	bool enabled;
 };
 
-extern struct space *space;
+extern struct space *spaces;
 
 /** Get space ordinal number. */
 static inline int
 space_n(struct space *sp)
 {
-	assert(sp >= space && sp < (space + BOX_SPACE_MAX));
-	return sp - space;
+	assert(sp >= spaces && sp < (spaces + BOX_SPACE_MAX));
+	return sp - spaces;
 }
 
 void space_validate(struct space *sp, struct tuple *old_tuple,

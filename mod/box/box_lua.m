@@ -328,12 +328,12 @@ lbox_index_new(struct lua_State *L)
 	int n = luaL_checkint(L, 1); /* get space id */
 	int idx = luaL_checkint(L, 2); /* get index id in */
 	/* locate the appropriate index */
-	if (n >= BOX_SPACE_MAX || !space[n].enabled ||
-	    idx >= BOX_INDEX_MAX || space[n].index[idx] == nil)
+	if (n >= BOX_SPACE_MAX || !spaces[n].enabled ||
+	    idx >= BOX_INDEX_MAX || spaces[n].index[idx] == nil)
 		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
 	/* create a userdata object */
 	void **ptr = lua_newuserdata(L, sizeof(void *));
-	*ptr = space[n].index[idx];
+	*ptr = spaces[n].index[idx];
 	/* set userdata object metatable to indexlib */
 	luaL_getmetatable(L, indexlib_name);
 	lua_setmetatable(L, -2);
