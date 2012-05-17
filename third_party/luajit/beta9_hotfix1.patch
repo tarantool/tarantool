@@ -1,0 +1,54 @@
+Fix parsing of hex literals with exponents.
+Fix bytecode dump for certain number constants.
+
+--- a/src/lj_lex.c
++++ b/src/lj_lex.c
+@@ -137,14 +137,17 @@ static int lex_number64(LexState *ls, TValue *tv)
+ /* Parse a number literal. */
+ static void lex_number(LexState *ls, TValue *tv)
+ {
+-  int c;
++  int c, xp = 'E';
+   lua_assert(lj_char_isdigit(ls->current));
+-  do {
++  if ((c = ls->current) == '0') {
++    save_and_next(ls);
++    if ((ls->current & ~0x20) == 'X') xp = 'P';
++  }
++  while (lj_char_isident(ls->current) || ls->current == '.' ||
++	 ((ls->current == '-' || ls->current == '+') && (c & ~0x20) == xp)) {
+     c = ls->current;
+     save_and_next(ls);
+-  } while (lj_char_isident(ls->current) || ls->current == '.' ||
+-	   ((ls->current == '-' || ls->current == '+') &&
+-	    ((c & ~0x20) == 'E' || (c & ~0x20) == 'P')));
++  }
+ #if LJ_HASFFI
+   c &= ~0x20;
+   if ((c == 'I' || c == 'L' || c == 'U') && !ctype_ctsG(G(ls->L)))
+--- a/src/lj_bcwrite.c
++++ b/src/lj_bcwrite.c
+@@ -219,13 +219,19 @@ static void bcwrite_knum(BCWriteCtx *ctx, GCproto *pt)
+ 	k = lj_num2int(num);
+ 	if (num == (lua_Number)k) {  /* -0 is never a constant. */
+ 	save_int:
+-	  bcwrite_uleb128(ctx, 2*(uint32_t)k);
+-	  if (k < 0) ctx->sb.buf[ctx->sb.n-1] |= 0x10;
++	  bcwrite_uleb128(ctx, 2*(uint32_t)k | ((uint32_t)k & 0x80000000u));
++	  if (k < 0) {
++	    char *p = &ctx->sb.buf[ctx->sb.n-1];
++	    *p = (*p & 7) | ((k>>27) & 0x18);
++	  }
+ 	  continue;
+ 	}
+       }
+-      bcwrite_uleb128(ctx, 1+2*o->u32.lo);
+-      if (o->u32.lo >= 0x80000000u) ctx->sb.buf[ctx->sb.n-1] |= 0x10;
++      bcwrite_uleb128(ctx, 1+(2*o->u32.lo | (o->u32.lo & 0x80000000u)));
++      if (o->u32.lo >= 0x80000000u) {
++	char *p = &ctx->sb.buf[ctx->sb.n-1];
++	*p = (*p & 7) | ((o->u32.lo>>27) & 0x18);
++      }
+       bcwrite_uleb128(ctx, o->u32.hi);
+     }
+   }
