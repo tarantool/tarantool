@@ -28,7 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "mod/box/index.h"
+#include "index.h"
+#include <exception.h>
 
 struct tarantool_cfg;
 
@@ -144,5 +145,27 @@ void space_free(void);
 i32 check_spaces(struct tarantool_cfg *conf);
 /* Build secondary keys. */
 void build_indexes(void);
+
+static inline struct space *
+space_find(u32 space_no)
+{
+	if (space_no >= BOX_SPACE_MAX)
+		tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
+
+	struct space *sp = &spaces[space_no];
+
+	if (!sp->enabled)
+		tnt_raise(ClientError, :ER_SPACE_DISABLED, space_no);
+	return sp;
+}
+
+static inline Index *
+index_find(struct space *sp, u32 index_no)
+{
+	if (index_no >= sp->key_count)
+		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, index_no,
+			  space_n(sp));
+	return sp->index[index_no];
+}
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */

@@ -563,7 +563,7 @@ static const struct luaL_reg lbox_iterator_meta[] = {
 	struct lua_State *L;
 }
 + (PortLua *) alloc;
-- (id) init: (struct lua_State *) L;
+- (id) init: (struct lua_State *) L_arg;
 @end
 
 @implementation PortLua
@@ -575,10 +575,10 @@ static const struct luaL_reg lbox_iterator_meta[] = {
 	return new;
 }
 
-- (id) init: (struct lua_State *) L_
+- (id) init: (struct lua_State *) L_arg
 {
 	if ((self = [super init]))
-		L = L_;
+		L = L_arg;
 	return self;
 }
 
@@ -682,15 +682,18 @@ box_lua_panic(struct lua_State *L)
 	return 0;
 }
 
+@implementation Call
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void do_call(struct txn *txn __attribute__((unused)), Port *port, struct tbuf *data)
+- (void) execute: (struct txn *) txn : (Port *)port
 {
+	(void) txn;
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
-
+	/* Request flags: not used. */
+	(void) (read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS);
 	@try {
 		u32 field_len = read_varint32(data);
 		void *field = read_str(data, field_len); /* proc name */
@@ -714,6 +717,7 @@ void do_call(struct txn *txn __attribute__((unused)), Port *port, struct tbuf *d
 		luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
 	}
 }
+@end
 
 struct lua_State *
 mod_lua_init(struct lua_State *L)

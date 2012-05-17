@@ -31,27 +31,25 @@
 #include <tbuf.h>
 struct tuple;
 struct space;
-struct lua_State;
-@class Port;
-@class Index;
+
+enum txn_flags {
+	BOX_NOT_STORE = 0x1
+};
 
 struct txn {
-	u16 type;
-	u32 flags;
+	u32 txn_flags;
 
-	struct lua_State *L;
+	/* Undo info. */
 	struct space *space;
-	Index *index;
-
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
-	struct tuple *lock_tuple;
 
+	/* Redo info: binary packet */
+	u16 op;
 	struct tbuf req;
 };
 
-
-/** tuple's flags */
+/** Tuple flags used for locking. */
 enum tuple_flags {
 	/** Waiting on WAL write to complete. */
 	WAL_WAIT = 0x1,
@@ -62,5 +60,7 @@ enum tuple_flags {
 struct txn *txn_begin();
 void txn_commit(struct txn *txn);
 void txn_rollback(struct txn *txn);
-void txn_lock_tuple(struct txn *txn, struct tuple *tuple);
+void txn_add_redo(struct txn *txn, u16 op, struct tbuf *data);
+void txn_add_undo(struct txn *txn, struct space *space,
+		  struct tuple *old_tuple, struct tuple *new_tuple);
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

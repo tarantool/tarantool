@@ -115,20 +115,19 @@
    Memcheck:Leak
    fun:salloc
    fun:tuple_alloc
-   fun:do_replace
-   fun:request_dispatch
-   fun:box_process*
+   fun:_i_Replace__execute__
+   fun:box_process_rw
    ...
 }
 
+
 {
-   <box upadte command>
+   <box update command>
    Memcheck:Leak
    fun:salloc
    fun:tuple_alloc
-   fun:do_update
-   fun:request_dispatch
-   fun:box_process*
+   fun:_i_Update__execute__
+   fun:box_process_rw
    ...
 }
 
@@ -205,34 +204,6 @@
    fun:tarantool_lua_tostring
    fun:tarantool_lua_printstack_yaml
    fun:tarantool_lua
-   ...
-}
-
-#----------------------------------------------------------------------------#
-# box_lua_call function
-#----------------------------------------------------------------------------#
-
-{
-   <lua_* frim luajit libarary suppression in box_lua_call>
-   Memcheck:Cond
-   ...
-   fun:lua_*
-   fun:box_lua_call
-   fun:box_dispatch
-   fun:box_process*
-   ...
-}
-
-{
-   <lua_* frim luajit libarary suppression in box_lua_call>
-   Memcheck:Cond
-   ...
-   fun:lua_*
-   fun:iov_add_ret
-   fun:iov_add_multret
-   fun:box_lua_call
-   fun:box_dispatch
-   fun:box_process*
    ...
 }
 

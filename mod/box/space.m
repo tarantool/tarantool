@@ -73,6 +73,9 @@ space_validate(struct space *sp, struct tuple *old_tuple,
 	if (new_tuple->field_count < sp->max_fieldno)
 		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 
+	if (sp->arity > 0 && sp->arity != new_tuple->field_count)
+		tnt_raise(IllegalParams, :"tuple field count must match space cardinality");
+
 	/* Sweep through the tuple and check the field sizes. */
 	u8 *data = new_tuple->data;
 	for (int f = 0; f < sp->max_fieldno; ++f) {

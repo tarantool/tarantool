@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "request.h"
+#include <objc/runtime.h>
 #include "txn.h"
 #include "tuple.h"
 #include "index.h"
@@ -57,10 +58,37 @@ read_key(struct tbuf *data, void **key_ptr, u32 *key_part_count_ptr)
 	*key_part_count_ptr = key_part_count;
 }
 
-static void __attribute__((noinline))
-do_replace(struct txn *txn, Port *port, size_t field_count, struct tbuf *data)
+static struct space *
+read_space(struct tbuf *data)
 {
-	assert(data != NULL);
+	u32 space_no = read_u32(data);
+	return space_find(space_no);
+}
+
+static void
+port_send_tuple(u32 flags, Port *port, struct tuple *tuple)
+{
+	if (tuple) {
+		[port dupU32: 1]; /* affected tuples */
+		if (flags & BOX_RETURN_TUPLE)
+			[port addTuple: tuple];
+	} else {
+		[port dupU32: 0]; /* affected tuples. */
+	}
+}
+
+@interface Replace: Request
+- (void) execute: (struct txn *) txn :(Port *) port;
+@end
+
+@implementation Replace
+- (void) execute: (struct txn *) txn :(Port *) port
+{
+	txn_add_redo(txn, type, data);
+	struct space *sp = read_space(data);
+	u32 flags = read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
+	size_t field_count = read_u32(data);
+
 	if (field_count == 0)
 		tnt_raise(IllegalParams, :"tuple field count is 0");
 
@@ -71,54 +99,42 @@ do_replace(struct txn *txn, Port *port, size_t field_count, struct tbuf *data)
 	txn->new_tuple->field_count = field_count;
 	memcpy(txn->new_tuple->data, data->data, data->size);
 
-	txn->old_tuple = [txn->index findByTuple: txn->new_tuple];
+	struct tuple *old_tuple = [sp->index[0] findByTuple: txn->new_tuple];
 
-	if (txn->flags & BOX_ADD && txn->old_tuple != NULL)
+	if (flags & BOX_ADD && old_tuple != NULL)
 		tnt_raise(ClientError, :ER_TUPLE_FOUND);
 
-	if (txn->flags & BOX_REPLACE && txn->old_tuple == NULL)
+	if (flags & BOX_REPLACE && old_tuple == NULL)
 		tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
 
-	space_validate(txn->space, txn->old_tuple, txn->new_tuple);
+	space_validate(sp, old_tuple, txn->new_tuple);
 
-	if (txn->old_tuple != NULL) {
+	/** XXX: bug! This must be in space_validate(),
+	 * not here. Update can also replace a tuple,
+	 * and it can modify the primary key. We do not
+	 * take a gap lock for the tuple inserted by UPDATE.
+	 */
 #ifndef NDEBUG
+	if (old_tuple != NULL) {
+		Index *index = sp->index[0];
 		void *ka, *kb;
 		ka = tuple_field(txn->new_tuple,
-				 txn->index->key_def->parts[0].fieldno);
-		kb = tuple_field(txn->old_tuple, txn->index->key_def->parts[0].fieldno);
+				 index->key_def->parts[0].fieldno);
+		kb = tuple_field(old_tuple, index->key_def->parts[0].fieldno);
 		int kal, kab;
 		kal = load_varint32(&ka);
 		kab = load_varint32(&kb);
 		assert(kal == kab && memcmp(ka, kb, kal) == 0);
-#endif
-		txn_lock_tuple(txn, txn->old_tuple);
-	} else {
-		txn_lock_tuple(txn, txn->new_tuple);
-		/*
-		 * Mark the tuple as ghost before attempting an
-		 * index replace: if it fails, txn_rollback() will
-		 * look at the flag and remove the tuple.
-		 */
-		txn->new_tuple->flags |= GHOST;
-		/*
-		 * If the tuple doesn't exist, insert a GHOST
-		 * tuple in all indices in order to avoid a race
-		 * condition when another REPLACE comes along:
-		 * a concurrent REPLACE, UPDATE, or DELETE, returns
-		 * an error when meets a ghost tuple.
-		 *
-		 * Tuple reference counter will be incremented in
-		 * txn_commit().
-		 */
-		space_replace(txn->space, NULL, txn->new_tuple);
 	}
+#endif
+	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
 
 	[port dupU32: 1]; /* Affected tuples */
 
-	if (txn->flags & BOX_RETURN_TUPLE)
+	if (flags & BOX_RETURN_TUPLE)
 		[port addTuple: txn->new_tuple];
 }
+@end
 
 /** {{{ UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations,
@@ -148,6 +164,10 @@ do_replace(struct txn *txn, Port *port, size_t field_count, struct tbuf *data)
  * read the source of do_update_ops() to see how these
  * complications  are worked around.
  */
+
+@interface Update: Request
+- (void) execute: (struct txn *) txn :(Port *) port;
+@end
 
 /** Argument of SET operation. */
 struct op_set_arg {
@@ -638,7 +658,7 @@ update_field_skip_fields(struct update_field *field, i32 skip_count,
  * the operations.
  */
 static void
-init_update_operations(struct txn *txn, struct update_cmd *cmd)
+init_update_operations(struct update_cmd *cmd, struct tuple *old_tuple)
 {
 	/*
 	 * 1. Sort operations by field number and order within the
@@ -673,8 +693,8 @@ init_update_operations(struct txn *txn, struct update_cmd *cmd)
 			    sizeof(struct update_field));
 	struct update_op *op = cmd->op;
 	struct update_field *field = cmd->field;
-	void *old_data = txn->old_tuple->data;
-	int old_field_count = txn->old_tuple->field_count;
+	void *old_data = old_tuple->data;
+	int old_field_count = old_tuple->field_count;
 
 	update_field_init(field, op, &old_data, old_field_count);
 	do {
@@ -763,17 +783,17 @@ init_update_operations(struct txn *txn, struct update_cmd *cmd)
 }
 
 static void
-do_update_ops(struct txn *txn, struct update_cmd *cmd)
+do_update_ops(struct update_cmd *cmd, struct tuple *new_tuple)
 {
-	void *new_data = txn->new_tuple->data;
-	void *new_data_end = new_data + txn->new_tuple->bsize;
+	void *new_data = new_tuple->data;
+	void *new_data_end = new_data + new_tuple->bsize;
 	struct update_field *field;
-	txn->new_tuple->field_count = 0;
+	new_tuple->field_count = 0;
 
 	for (field = cmd->field; field < cmd->field_end; field++) {
 		if (field->first < field->end) { /* -> field is not deleted. */
 			new_data = save_varint32(new_data, field->new_len);
-			txn->new_tuple->field_count++;
+			new_tuple->field_count++;
 		}
 		void *new_field = new_data;
 		void *old_field = field->old;
@@ -819,62 +839,63 @@ do_update_ops(struct txn *txn, struct update_cmd *cmd)
 		if (field->tail_field_count) {
 			memcpy(new_data, field->tail, field->tail_len);
 			new_data += field->tail_len;
-			txn->new_tuple->field_count += field->tail_field_count;
+			new_tuple->field_count += field->tail_field_count;
 		}
 	}
 }
 
-static void __attribute__((noinline))
-do_update(struct txn *txn, Port *port, struct tbuf *data)
+@implementation Update
+- (void) execute: (struct txn *) txn :(Port *) port
 {
-	u32 tuples_affected = 1;
-
+	txn_add_redo(txn, type, data);
+	struct space *sp = read_space(data);
+	u32 flags = read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 	/* Parse UPDATE request. */
 	struct update_cmd *cmd = parse_update_cmd(data);
 
 	/* Try to find the tuple. */
-	txn->old_tuple = [txn->index findByKey :cmd->key :cmd->key_part_count];
-	if (txn->old_tuple == NULL) {
-		/* Not found. For simplicity, skip the logging. */
-		txn->flags |= BOX_NOT_STORE;
-
-		tuples_affected = 0;
-
-		goto out;
+	struct tuple *old_tuple =
+		[sp->index[0] findByKey :cmd->key :cmd->key_part_count];
+	if (old_tuple != NULL) {
+		init_update_operations(cmd, old_tuple);
+		/* allocate new tuple */
+		txn->new_tuple = tuple_alloc(cmd->new_tuple_len);
+		do_update_ops(cmd, txn->new_tuple);
+		space_validate(sp, old_tuple, txn->new_tuple);
 	}
+	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
 
-	init_update_operations(txn, cmd);
-	/* allocate new tuple */
-	txn->new_tuple = tuple_alloc(cmd->new_tuple_len);
-	do_update_ops(txn, cmd);
-	txn_lock_tuple(txn, txn->old_tuple);
-	space_validate(txn->space, txn->old_tuple, txn->new_tuple);
-
-out:
-	[port dupU32: tuples_affected];
-
-	if (txn->flags & BOX_RETURN_TUPLE && txn->new_tuple)
-		[port addTuple: txn->new_tuple];
+	port_send_tuple(flags, port, txn->new_tuple);
 }
+@end
 
 /** }}} */
 
-static void __attribute__((noinline))
-do_select(struct txn *txn, Port *port, u32 limit, u32 offset, struct tbuf *data)
+@interface Select: Request
+- (void) execute: (struct txn *) txn :(Port *) port;
+@end
+
+@implementation Select
+- (void) execute: (struct txn *) txn :(Port *) port
 {
-	struct tuple *tuple;
-	uint32_t *found;
+	(void) txn; /* Not used. */
+	struct space *sp = read_space(data);
+	u32 index_no = read_u32(data);
+	Index *index = index_find(sp, index_no);
+	u32 offset = read_u32(data);
+	u32 limit = read_u32(data);
 	u32 count = read_u32(data);
 	if (count == 0)
 		tnt_raise(IllegalParams, :"tuple count must be positive");
 
-	found = palloc(fiber->gc_pool, sizeof(*found));
-	[port addU32: found];
+	uint32_t *found = palloc(fiber->gc_pool, sizeof(*found));
 	*found = 0;
+	[port addU32: found];
+
+	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
 	for (u32 i = 0; i < count; i++) {
 
-		Index *index = txn->index;
 		/* End the loop if reached the limit. */
 		if (limit == *found)
 			return;
@@ -887,6 +908,7 @@ do_select(struct txn *txn, Port *port, u32 limit, u32 offset, struct tbuf *data)
 		struct iterator *it = index->position;
 		[index initIteratorByKey: it :ITER_FORWARD :key :key_part_count];
 
+		struct tuple *tuple;
 		while ((tuple = it->next_equal(it)) != NULL) {
 			if (tuple->flags & GHOST)
 				continue;
@@ -905,125 +927,85 @@ do_select(struct txn *txn, Port *port, u32 limit, u32 offset, struct tbuf *data)
 	if (data->size != 0)
 		tnt_raise(IllegalParams, :"can't unpack request");
 }
+@end
 
-static void __attribute__((noinline))
-do_delete(struct txn *txn, Port *port, struct tbuf *data)
+@interface Delete: Request
+- (void) execute: (struct txn *) txn :(Port *) port;
+@end
+
+@implementation Delete
+- (void) execute: (struct txn *) txn :(Port *) port
 {
-	u32 tuples_affected = 0;
-
+	txn_add_redo(txn, type, data);
+	u32 flags = 0;
+	struct space *sp = read_space(data);
+	if (type == DELETE)
+		flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 	/* read key */
 	u32 key_part_count;
 	void *key;
 	read_key(data, &key, &key_part_count);
 	/* try to find tuple in primary index */
-	txn->old_tuple = [txn->index findByKey :key :key_part_count];
+	struct tuple *old_tuple = [sp->index[0] findByKey :key :key_part_count];
 
-	if (txn->old_tuple == NULL) {
-		/*
-		 * There is no subject tuple we could write to
-		 * WAL, which means, to do a write, we would have
-		 * to allocate one. Too complicated, for now, just
-		 * do no logging for DELETEs that do nothing.
-		 */
-		txn->flags |= BOX_NOT_STORE;
-	} else {
-		txn_lock_tuple(txn, txn->old_tuple);
+	txn_add_undo(txn, sp, old_tuple, NULL);
 
-		tuples_affected = 1;
-	}
+	port_send_tuple(flags, port, old_tuple);
+}
+@end
 
-	[port dupU32: tuples_affected];
-
-	if (txn->old_tuple && (txn->flags & BOX_RETURN_TUPLE))
-		[port addTuple: txn->old_tuple];
+@implementation Request
++ (Request *) alloc
+{
+	size_t sz = class_getInstanceSize(self);
+	id new = palloc(fiber->gc_pool, sz);
+	object_setClass(new, self);
+	return new;
 }
 
-static void
-request_set_space(struct txn *txn, struct tbuf *data)
++ (Request *) build: (u32) type_arg
 {
-	int space_no = read_u32(data);
-
-	if (space_no < 0 || space_no >= BOX_SPACE_MAX)
-		tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
-
-	txn->space = &spaces[space_no];
-
-	if (!txn->space->enabled)
-		tnt_raise(ClientError, :ER_SPACE_DISABLED, space_no);
-
-	txn->index = txn->space->index[0];
-}
-
-/** Remember op code/request in the txn. */
-void
-request_set_type(struct txn *req, u16 type, struct tbuf *data)
-{
-	req->type = type;
-	req->req = (struct tbuf) {
-		.data = data->data,
-		.size = data->size,
-		.capacity = data->size,
-		.pool = NULL };
-}
-
-void
-request_dispatch(struct txn *txn, Port *port, struct tbuf *data)
-{
-	u32 field_count;
-
-	say_debug("request_dispatch(%i)", txn->type);
-
-	switch (txn->type) {
+	Request *new = nil;
+	switch (type_arg) {
 	case REPLACE:
-		request_set_space(txn, data);
-		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		field_count = read_u32(data);
-		if (txn->space->arity > 0 && txn->space->arity != field_count)
-			tnt_raise(IllegalParams, :"tuple field count must match space cardinality");
-		do_replace(txn, port, field_count, data);
-		break;
-
-	case DELETE:
-	case DELETE_1_3:
-		request_set_space(txn, data);
-		if (txn->type == DELETE)
-			txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-
-		do_delete(txn, port, data);
-		break;
-
+		new = [Replace alloc]; break;
 	case SELECT:
-	{
-		ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
-		request_set_space(txn, data);
-		u32 i = read_u32(data);
-		u32 offset = read_u32(data);
-		u32 limit = read_u32(data);
-
-		if (i >= txn->space->key_count)
-			tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, i,
-				  space_n(txn->space));
-		txn->index = txn->space->index[i];
-
-		do_select(txn, port, limit, offset, data);
-		break;
-	}
-
+		new = [Select alloc]; break;
 	case UPDATE:
-		request_set_space(txn, data);
-		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		do_update(txn, port, data);
-		break;
+		new = [Update alloc]; break;
+	case DELETE_1_3:
+	case DELETE:
+		new = [Delete alloc]; break;
 	case CALL:
-		txn->flags |= read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
-		do_call(txn, port, data);
-		break;
-
+		new = [Call alloc]; break;
 	default:
-		say_error("request_dispatch: unsupported request = %" PRIi32 "", txn->type);
-		tnt_raise(IllegalParams, :"unsupported command code, check the error log");
+		say_error("Unsupported request = %" PRIi32 "", type_arg);
+		tnt_raise(IllegalParams, :"unsupported command code, "
+			  "check the error log");
+		break;
 	}
+	new->type = type_arg;
+	return new;
 }
+
+- (id) init: (struct tbuf *) data_arg
+{
+	assert(type);
+	self = [super init];
+	if (self == nil)
+		return self;
+
+	data = data_arg;
+	return self;
+}
+
+- (void) execute: (struct txn *) txn :(Port *) port
+{
+	(void) txn;
+	(void) port;
+	[self subclassResponsibility: _cmd];
+}
+@end
 
 /**
  * vim: foldmethod=marker

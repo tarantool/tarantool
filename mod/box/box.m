@@ -74,15 +74,15 @@ box_snap_row(const struct tbuf *t)
 
 static void
 box_process_rw(struct txn *txn, Port *port,
-	       u32 op, struct tbuf *request_data)
+	       u32 op, struct tbuf *data)
 {
 	ev_tstamp start = ev_now(), stop;
 
 	stat_collect(stat_base, op, 1);
 
 	@try {
-		request_set_type(txn, op, request_data);
-		request_dispatch(txn, port, request_data);
+		Request *request = [[Request build: op] init: data];
+		[request execute: txn :port];
 		txn_commit(txn);
 	}
 	@catch (id e) {
@@ -280,7 +280,7 @@ recover_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 	u16 op = read_u16(t);
 
 	struct txn *txn = txn_begin();
-	txn->flags |= BOX_NOT_STORE;
+	txn->txn_flags |= BOX_NOT_STORE;
 
 	@try {
 		box_process_rw(txn, port_null, op, t);

@@ -30,17 +30,17 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-struct tbuf;
-struct txn;
-struct tuple;
+#include "request.h"
 struct lua_State;
-@class Port;
 
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void do_call(struct txn *txn, Port *port, struct tbuf *req);
+@interface Call: Request
+- (void) execute: (struct txn *) txn :(Port *) port;
+@end
+
 /**
  * Create an instance of Lua interpreter in box.
  */
