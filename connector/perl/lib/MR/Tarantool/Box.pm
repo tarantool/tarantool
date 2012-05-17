@@ -19,9 +19,10 @@ MR::Tarantool::Box - A driver for an efficient Tarantool/Box NoSQL in-memory sto
                 index_name   => 'idx2',
                 keys         => [1,2],
             }, ],
-            space         => 1,           # space id, as set in Tarantool/Box config
-            name          => "primary",   # self-descriptive space-id
-            format        => "QqLlSsCc&", # pack()-compatible, Qq must be supported by perl itself, & stands for byte-string.
+            space         => 1,               # space id, as set in Tarantool/Box config
+            name          => "primary",       # self-descriptive space-id
+            format        => "QqLlSsCc&$",    # pack()-compatible, Qq must be supported by perl itself,
+                                              # & stands for byte-string, $ stands for utf8 string.
             default_index => 'idx1',
             fields        => [qw/ id f2 field3 f4 f5 f6 f7 f8 misc_string /], # turn each tuple into hash, field names according to format
         }, {
@@ -66,6 +67,7 @@ use warnings;
 use Scalar::Util qw/looks_like_number/;
 use List::MoreUtils qw/each_arrayref zip/;
 use Time::HiRes qw/sleep/;
+use Encode;
 
 use MR::IProto ();
 
@@ -79,7 +81,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.21;
+$VERSION = 0.0.22;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -152,9 +154,10 @@ Self-descriptive space id, which will be mapped into C<space>.
 
 =item B<format> => $format_string
 
-C<pack()>-compatible tuple format string, allowed formats: C<QqLlSsCc&>,
-where C<&> stands for bytestring. C<Qq> usable only if perl supports
+C<pack()>-compatible tuple format string, allowed formats: C<QqLlSsC(c&$)*>,
+where C<&> stands for bytestring, C<$> stands for L</utf8> string. C<Qq> usable only if perl supports
 int64 itself. Tuples' fields are packed/unpacked according to this C<format>.
+C<< * >> at the end of C<format> enables L</LongTuple>.
 
 =item B<hashify> => B<$coderef>
 
@@ -170,6 +173,15 @@ It receives C<space> id and resultset as arguments. No return value needed.
 
 Specify an arrayref of fields names according to C<format> to turn each
 tuple into a good-looking hash. Names must begin with C<< [A-Za-z] >>.
+If L</LongTuple> enabled, last field will be used to fold tailing fields.
+
+=item B<long_fields> => B<$arrayref>
+
+Specify an arrayref of fields names according to C<< (xxx)* >> to turn
+tailing fields into a good-looking array of hashes.
+Names must begin with C<< [A-Za-z] >>.
+Works with L</LongTuple> enabled only.
+
 
 =item B<indexes> => [ \%index, ... ]
 
@@ -264,6 +276,31 @@ A string used for self-description. Mainly used for debugging purposes.
 
 =cut
 
+sub _make_unpack_format {
+    my ($ns,$prefix) = @_;
+    $ns->{format} =~ s/\s+//g;
+    confess "${prefix} bad format `$ns->{format}'" unless $ns->{format} =~ m/^[\$\&lLsScCqQ]*(?:\([\$\&lLsScCqQ]+\)\*|\*)?$/;
+    $ns->{long_tuple} = 1 if $ns->{format} =~ s/\*$//;
+    $ns->{long_format} = '';
+    my @f_long;
+    if ($ns->{long_tuple}) {
+        $ns->{format} =~ s/(  \( [^\)]* \)  | . )$//x;
+        $ns->{long_format} = $1;
+        $ns->{long_format} =~ s/[()]*//g;
+        @f_long = split //, $ns->{long_format};
+        $ns->{long_byfield_unpack_format} = [ map { m/[\&\$]/ ? 'w/a*' : "x$_" } @f_long ];
+        $ns->{long_field_format}          = [ map { m/[\&\$]/ ? 'a*'   : $_    } @f_long ];
+        $ns->{long_utf8_fields} = [ grep { $f_long[$_] eq '$' } 0..$#f_long ];
+    }
+    my @f = split //, $ns->{format};
+    $ns->{byfield_unpack_format} = [ map { m/[\&\$]/ ? 'w/a*' : "x$_" } @f ];
+    $ns->{field_format}          = [ map { m/[\&\$]/ ? 'a*'   : $_    } @f ];
+    $ns->{unpack_format}  = join('', @{$ns->{byfield_unpack_format}});
+    $ns->{unpack_format} .= '('.join('', @{$ns->{long_byfield_unpack_format}}).')*' if $ns->{long_tuple};
+    $ns->{string_keys} = { map { $_ =>  1 } grep { $f[$_] =~ m/[\&\$]/ } 0..$#f };
+    $ns->{utf8_fields} = { map { $_ => $_ } grep { $f[$_] eq '$' } 0..$#f };
+}
+
 sub new {
     my ($class, $arg) = @_;
     my $self;
@@ -300,15 +337,12 @@ sub new {
         confess "space[$namespace] no indexes defined" unless $ns->{indexes} && @{$ns->{indexes}};
         $namespaces{$namespace} = $ns;
         $namespaces{$ns->{name}} = $ns if $ns->{name};
-        confess "space[$namespace] bad format `$ns->{format}'" if $ns->{format} =~ m/[^&lLsScCqQ ]/;
-        $ns->{format} =~ s/\s+//g;
-        my @f = split //, $ns->{format};
-        $ns->{byfield_unpack_format} = [ map { /&/ ? 'w/a*' : "x$_" } @f ];
-        $ns->{field_format}  = [         map { /&/ ? 'a*'   : $_    } @f ];
-        $ns->{unpack_format}  = join('', @{$ns->{byfield_unpack_format}});
+
+        _make_unpack_format($ns,"space[$namespace]");
+
         $ns->{append_for_unpack} = '' unless defined $ns->{append_for_unpack};
         $ns->{check_keys} = {};
-        $ns->{string_keys} = { map { $_ => 1 } grep { $f[$_] eq '&' } 0..$#f };
+
         my $inames = $ns->{index_names} = {};
         my $i = -1;
         for my $index (@{$ns->{indexes}}) {
@@ -319,7 +353,7 @@ sub new {
             confess "space[$namespace]index[$index_name($i)] already defined" if $inames->{$index_name} || $inames->{$i};
             $index->{id} = $i unless defined $index->{id};
             $inames->{$i} = $inames->{$index_name} = $index;
-            int $_ == $_ and $_ >= 0 and $_ < @f or confess "space[$namespace]index[$index_name] bad key `$_'" for @{$ns->{keys}};
+            int $_ == $_ and $_ >= 0 and $_ < @{$ns->{field_format}} or confess "space[$namespace]index[$index_name] bad key `$_'" for @{$ns->{keys}};
             $ns->{check_keys}->{$_} = int !! $ns->{string_keys}->{$_} for @{$index->{keys}};
             $index->{string_keys} ||= $ns->{string_keys};
         }
@@ -332,12 +366,18 @@ sub new {
             $ns->{default_index} ||= 0;
             $ns->{primary_key_index} ||= 0;
         }
-        $ns->{fields} ||= $arg->{default_fields};
+        $ns->{fields}      ||= $arg->{default_fields};
+        $ns->{long_fields} ||= $arg->{default_long_fields};
         if($ns->{fields}) {
             confess "space[$namespace] fields must be ARRAYREF" unless ref $ns->{fields} eq 'ARRAY';
-            confess "space[$namespace] fields number must match format" if @{$ns->{fields}} != @f;
+            confess "space[$namespace] fields number must match format" if @{$ns->{fields}} != int(!!$ns->{long_tuple})+@{$ns->{field_format}};
             m/^[A-Za-z]/ or confess "space[$namespace] fields names must begin with [A-Za-z]: bad name $_" for @{$ns->{fields}};
             $ns->{fields_hash} = { map { $ns->{fields}->[$_] => $_ } 0..$#{$ns->{fields}} };
+        }
+        if($ns->{long_fields}) {
+            confess "space[$namespace] long_fields must be ARRAYREF" unless ref $ns->{long_fields} eq 'ARRAY';
+            confess "space[$namespace] long_fields number must match format" if @{$ns->{long_fields}} != @{$ns->{long_field_format}};
+            m/^[A-Za-z]/ or confess "space[$namespace] long_fields names must begin with [A-Za-z]: bad name $_" for @{$ns->{long_fields}};
         }
         $ns->{default_raw} = 1 if !defined$ns->{default_raw} and defined $ns->{hashify} and !$ns->{hashify};
     }
@@ -571,11 +611,25 @@ sub Call {
     $self->_debug("$self->{name}: CALL($sp_name)[${\join '   ', map {join' ',unpack'(H2)*',$_} @$tuple}]") if $self->{debug} >= 4;
     confess "All fields must be defined" if grep { !defined } @$tuple;
 
-    confess "Bad `unpack_format` option" if exists $param->{unpack_format} and ref $param->{unpack_format} ne 'ARRAY';
-    my $unpack_format = join '', map { /&/ ? 'w/a*' : "x$_" } @{$param->{unpack_format}};
+    confess "Required `unpack_format` option wasn't defined"
+        unless exists $param->{unpack} or exists $param->{unpack_format} and $param->{unpack_format};
+
+    my $unpack_format = $param->{unpack_format};
+    if($unpack_format) {
+        $unpack_format = join '', @$unpack_format if ref $unpack_format;
+        my $f = { format => $unpack_format };
+        _make_unpack_format($f, "CALL");
+        $unpack_format = $f->{unpack_format};
+    }
 
     local $namespace->{unpack_format} = $unpack_format if $unpack_format; # XXX
     local $namespace->{append_for_unpack} = ''         if $unpack_format; # shit...
+
+    $tuple = [ map {
+        my $x = $_;
+        Encode::_utf8_off($x) if Encode::is_utf8($x,0);
+        $x;
+    } @$tuple ];
 
     $self->_chat (
         msg      => 22,
@@ -662,7 +716,6 @@ sub Insert {
 
     $param->{want_result} = $param->{want_inserted_tuple} if !defined $param->{want_result};
 
-
     my $flags = $param->{_flags} || 0;
     $flags |= WANT_RESULT if $param->{want_result};
 
@@ -676,10 +729,13 @@ sub Insert {
     }
     my $chkkey = $namespace->{check_keys};
     my $fmt = $namespace->{field_format};
-    confess "Wrong fields number in tuple" if @tuple != @$fmt;
+    my $long_fmt = $namespace->{long_field_format};
+    my $chk_divisor = $namespace->{long_tuple} ? @$long_fmt : @$fmt;
+    confess "Wrong fields number in tuple" if 0 != (@tuple - @$fmt) % $chk_divisor;
     for (0..$#tuple) {
         confess "$self->{name}: ref in tuple $_=`$tuple[$_]'" if ref $tuple[$_];
         no warnings 'uninitialized';
+        Encode::_utf8_off($_) if Encode::is_utf8($_,0);
         if(exists $chkkey->{$_}) {
             if($chkkey->{$_}) {
                 confess "$self->{name}: undefined key $_" unless defined $tuple[$_];
@@ -687,7 +743,7 @@ sub Insert {
                 confess "$self->{name}: not numeric key $_=`$tuple[$_]'" unless looks_like_number($tuple[$_]) && int($tuple[$_]) == $tuple[$_];
             }
         }
-        $tuple[$_] = pack($fmt->[$_], $tuple[$_]);
+        $tuple[$_] = pack($_ < @$fmt ? $fmt->[$_] : $long_fmt->[$_ % @$long_fmt], $tuple[$_]);
     }
 
     $self->_debug("$self->{name}: INSERT[${\join '   ', map {join' ',unpack'(H2)*',$_} @tuple}]") if $self->{debug} >= 4;
@@ -771,6 +827,7 @@ sub _pack_keys {
         $strkey = $strkey->{$keys->[0]};
         foreach (@_[NPRM..$#_]) {
             ($_) = @$_ if ref $_ eq 'ARRAY';
+            Encode::_utf8_off($_) if Encode::is_utf8($_,0);
             unless ($strkey) {
                 confess "$self->{name}: not numeric key [$_]" unless looks_like_number($_) && int($_) == $_;
                 $_ = pack($fmt, $_);
@@ -784,6 +841,7 @@ sub _pack_keys {
                 unless ($strkey->{$keys->[$i]}) {
                     confess "$self->{name}: not numeric key [$i][$k->[$i]]" unless looks_like_number($k->[$i]) && int($k->[$i]) == $k->[$i];
                 }
+                Encode::_utf8_off($k->[$i]) if Encode::is_utf8($k->[$i],0);
                 $k->[$i] = pack($fmt->[$keys->[$i]], $k->[$i]);
             }
             $k = pack('L(w/a*)*', scalar(@$k), @$k);
@@ -796,7 +854,8 @@ sub _PackSelect {
     return '' unless @keys;
     $self->_pack_keys($namespace, $param->{index}, @keys);
     my $format = "";
-    if ($param->{format}) {
+    if ($param->{format}) { #broken
+        confess "broken" if $namespace->{long_tuple};
         my $f = $namespace->{byfield_unpack_format};
         $param->{unpack_format} = join '', map { $f->[$_->{field}] } @{$param->{format}};
         $format = pack 'l*', scalar @{$param->{format}}, map {
@@ -815,11 +874,39 @@ sub _PackSelect {
 sub _PostSelect {
     my ($self, $r, $param, $namespace) = @_;
     if(!$param->{raw}) {
+        my @utf8_fields = values %{$namespace->{utf8_fields}};
+        my $long_utf8_fields = $namespace->{long_utf8_fields};
+        if(@utf8_fields or $long_utf8_fields && @$long_utf8_fields) {
+            my $long_tuple = $namespace->{long_tuple};
+            for my $row (@$r) {
+                Encode::_utf8_on($row->[$_]) for @utf8_fields;
+                if ($long_tuple && @$long_utf8_fields) {
+                    my $i = @{$namespace->{field_format}};
+                    my $n = int( (@$row-$i-1) / @$long_utf8_fields );
+                    Encode::_utf8_on($row->[$_]) for map do{ $a=$_; map $a+$i+@$long_utf8_fields*$_, 0..$n }, @$long_utf8_fields;
+                }
+            }
+        }
+
         my $hashify = $param->{hashify} || $namespace->{hashify} || $self->{hashify};
-        if($hashify) {
+        if ($hashify) {
             $hashify->($namespace->{namespace}, $r);
         } elsif( $namespace->{fields} ) {
-            $_ = { zip @{$namespace->{fields}}, @$_ } for @$r;
+            my @f = @{$namespace->{fields}};
+            my @f_long;
+            my $last;
+            if ($namespace->{long_tuple}) {
+                $last = pop @f;
+                @f_long = @{$namespace->{long_fields}} if $namespace->{long_fields};
+            }
+            for my $row (@$r) {
+                my $h = { zip @{$namespace->{fields}}, @{[splice(@$row,0,0+@f)]} };
+                if($last) {
+                    $row = [ map +{ zip @f_long, @{[splice(@$row,0,0+@f_long)]} }, 0..((@$row-1)/@f_long) ] if @f_long;
+                    $h->{$last} = $row;
+                }
+                $row = $h;
+            }
         }
     }
 }
@@ -900,7 +987,7 @@ Max tuples to select. It is set to C<< MAX_INT32 >> by default.
 
 =item B<raw> => $bool
 
-Don't C<hashify> (see L</new>).
+Don't C<hashify> (see L</new>), disable L</utf8> processing.
 
 =item B<hash_by> => $by
 
@@ -1409,6 +1496,52 @@ Usage example:
 
 =back
 
+=head2 LongTuple
+
+If C<format> given to L</new>, or C<unpack_format> given to L</Call> ends with a star (C<< * >>)
+I<long tuple> is enabled. Last field or group of fields of C<format> represent variable-length
+tail of the tuple. C<long_fields> option given to L</new> will fold the tail into array of hashes.
+
+    $box->Insert(1,"2",3);
+    $box->Insert(3,"2",3,4,5);
+    $box->Insert(5,"2",3,4,5,6,7);
+
+If we set up
+
+    format => "L&CL*",
+    fields => [qw/ a b c d /], # d is the folding field here
+    # no long_fields - no folding into hash
+
+we'll get:
+
+    $result = $box->Select([1,2,3,4,5]);
+    $result = [
+        { a => 1, b => "2", c => 3, d => [] },
+        { a => 3, b => "2", c => 3, d => [4,5] },
+        { a => 5, b => "2", c => 3, d => [4,5,6,7] },
+    ];
+
+And if we set up
+
+    format => "L&C(LL)*",
+    fields => [qw/ a b c d /], # d is the folding field here
+    long_fields => [qw/ d1 d2 /],
+
+we'll get:
+
+    $result = [
+        { a => 1, b => "2", c => 3, d => [] },
+        { a => 3, b => "2", c => 3, d => [{d1=>4, d2=>5}] },
+        { a => 5, b => "2", c => 3, d => [{d1=>4, d2=>5}, {d1=>6, d2=>7}] },
+    ];
+
+
+=head2 utf8
+
+Utf8 strings are supported very simply. When pushing any data to tarantool (with any query, read or write),
+the utf8 flag is set off, so all data is pushed as bytestring. When reading response, for fields marked
+a dollar sign C<< $ >> (see L</new>) (including such in L</LongTuple> tail) utf8 flag is set on.
+That's all. Validity is on your own.
 
 
 =head1 LICENCE AND COPYRIGHT
