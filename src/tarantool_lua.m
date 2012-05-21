@@ -1114,6 +1114,25 @@ void tarantool_lua_load_init_script(struct lua_State *L)
 	fiber_call(loader);
 }
 
+void
+tarantool_lua_security_nullify(struct lua_State *L)
+{
+	/*
+	 * Nullify some functions by security reasons:
+	 * 1. some so.* functions (like os.execute, os.exit, etc..)
+	 * 2. require function (because it can provide access to ffi)
+	 */
+	int result = tarantool_lua_dostring(L,
+					    "os.execute = nil\n"
+					    "os.exit = nil\n"
+					    "os.rename = nil\n"
+					    "os.tmpname = nil\n"
+					    "os.remove = nil\n"
+					    "require = nil\n");
+	if (result)
+		panic("can't nullify unsafe (in security mind) functions");
+}
+
 /*
  * vim: foldmethod=marker
  */

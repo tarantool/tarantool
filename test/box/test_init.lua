@@ -1,4 +1,5 @@
 -- testing start-up script
+floor = require("math").floor
 
 --
 -- Access to box.cfg from start-up script

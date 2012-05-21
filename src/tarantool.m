@@ -731,6 +731,10 @@ main(int argc, char **argv)
 	 * was fully initialized.
 	 */
 	tarantool_lua_load_init_script(tarantool_L);
+	/*
+	 * Nullify some functions by security reasons.
+	 */
+	tarantool_lua_security_nullify(tarantool_L);
 
 	prelease(fiber->gc_pool);
 	say_crit("log level %i", cfg.log_level);

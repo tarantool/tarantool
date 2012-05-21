@@ -416,6 +416,13 @@ exec admin "lua box.select(0, 0, 2)"
 exec admin "lua box.select(0, 0, 4)"
 
 print """
+# Test bug #1002272
+"""
+exec admin "lua floor(0.5)"
+exec admin "lua floor(0.9)"
+exec admin "lua floor(1.1)"
+
+print """
 # clean-up after tests
 """
 server.stop()
