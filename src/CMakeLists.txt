@@ -4,16 +4,6 @@
 add_library(ev tarantool_ev.c)
 
 check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
-check_c_compiler_flag ("-msse4" gcc_has_sse4)
-check_include_file("cpuid.h" gcc_has_cpuid)
-
-if (NOT gcc_has_sse4)
-    message (FATAL_ERROR "GCC must support SSE4 instructions (-msse4).")
-endif()
-
-if (NOT gcc_has_cpuid)
-    message (FATAL_ERROR "GCC is missing cpuid.h")
-endif()
 
 if (gcc_has_wno_unused_result)
     set_source_files_properties(tarantool_ev.c
@@ -57,9 +47,6 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
 # revision control.
 #
 set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM 1)
-
-set_source_files_properties(cpu_feature.m
-    PROPERTIES COMPILE_FLAGS "-msse3 -msse4")
 
 #
 # Used by modules.
@@ -109,10 +96,10 @@ if (ENABLE_GCOV)
 endif()
 
 if (ENABLE_BACKTRACE AND HAVE_BFD)
-  set (common_libraries ${common_libraries} bfd)
+  set (common_libraries ${common_libraries} bfd iberty)
   if (ENABLE_STATIC)
      include (FindZLIB)
-     set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES} iberty)
+     set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES})
   endif()
 endif()
 
