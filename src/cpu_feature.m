@@ -23,6 +23,7 @@
  * SUCH DAMAGE.
  */
 
+#include <config.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -31,7 +32,11 @@
 	#error "Only x86 and x86_64 architectures supported"
 #endif
 
+#ifdef HAVE_CPUID_H
+#include <cpuid.h>
+#else
 #include <third_party/compat/sys/cpuid.h>
+#endif
 #include "cpu_feature.h"
 
 #define SCALE_F		sizeof(unsigned long)

@@ -83,6 +83,8 @@ endif()
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
 check_include_file(sys/time.h HAVE_SYS_TIME_H)
+check_include_file(unwind.h HAVE_UNWIND_H)
+check_include_file(cpuid.h HAVE_CPUID_H)
 
 check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
 check_function_exists(fdatasync HAVE_FDATASYNC)
