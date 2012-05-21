@@ -210,6 +210,33 @@ tnt_tuple(struct tnt_tuple *t, char *fmt, ...)
 }
 
 /*
+ * tnt_tuple_validate()
+ *
+ * check if supplied buffer is a valid tuple;
+ *
+ * buf  - iproto tuple buffer representation
+ * size - buffer size
+ *
+ * returns 0, or -1 on error.
+*/
+static int tnt_tuple_validate(char *buf, size_t size) {
+	if (size < sizeof(uint32_t))
+		return -1;
+	size_t fld_off = sizeof(uint32_t);
+	uint32_t cardinality = *(uint32_t*)buf;
+	while (cardinality-- != 0) {
+		uint32_t fld_size;
+		int fld_esize = tnt_enc_read(buf + fld_off, &fld_size);
+		if (fld_esize == -1)
+			return -1;
+		fld_off += fld_esize + fld_size;
+		if (fld_off > size)
+			return -1;
+	}
+	return 0;
+}
+
+/*
  * tnt_tuple_set()
  *
  * set tuple from data;
@@ -224,14 +251,14 @@ tnt_tuple(struct tnt_tuple *t, char *fmt, ...)
  * returns tuple pointer, or NULL on error.
 */
 struct tnt_tuple *tnt_tuple_set(struct tnt_tuple *t, char *buf, size_t size) {
+	if (tnt_tuple_validate(buf, size) == -1)
+		return NULL;
 	int allocated = t == NULL;
 	if (t == NULL) {
 		t = tnt_tuple_add(NULL, NULL, 0);
 		if (t == NULL)
 			return NULL;
 	}
-	if (size < sizeof(uint32_t))
-		goto error;
 	t->cardinality = *(uint32_t*)buf;
 	t->size = size;
 	t->data = tnt_mem_alloc(size);

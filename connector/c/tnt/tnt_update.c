@@ -158,7 +158,7 @@ tnt_update_assign(struct tnt_stream *s, uint32_t field,
 ssize_t
 tnt_update_splice(struct tnt_stream *s, uint32_t field,
 		  uint32_t offset,
-		  uint32_t length, char *data, size_t size)
+		  int32_t length, char *data, size_t size)
 {
 	/* calculating splice data sizes */
 	uint32_t offset_len = tnt_enc_size(sizeof(offset)),
@@ -212,7 +212,6 @@ tnt_update_insert(struct tnt_stream *s, uint32_t field,
 {
 	return tnt_update_op(s, field, TNT_UPDATE_INSERT, data, size);
 }
-
 
 struct tnt_header_update {
 	uint32_t ns;
