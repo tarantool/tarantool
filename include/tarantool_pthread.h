@@ -39,7 +39,7 @@
  *
  * Still give the user an opportunity to manually
  * check for error, by returning the pthread_* 
- * function status up.
+ * function status.
  */
 
 #define tt_pthread_error(e)			\
