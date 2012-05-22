@@ -1175,6 +1175,33 @@ load_init_script(void *L_ptr)
 	 */
 }
 
+/**
+ * Unset functions in the Lua state which can be used to
+ * execute external programs or otherwise introduce a breach
+ * in security.
+ *
+ * @param L is a Lua State.
+ */
+static void
+tarantool_lua_sandbox(struct lua_State *L)
+{
+	/*
+	 * Unset some functions for security reasons:
+	 * 1. Some os.* functions (like os.execute, os.exit, etc..)
+	 * 2. require(), since it can be used to provide access to ffi
+	 * or anything else we unset in 1.
+	 */
+	int result = tarantool_lua_dostring(L,
+					    "os.execute = nil\n"
+					    "os.exit = nil\n"
+					    "os.rename = nil\n"
+					    "os.tmpname = nil\n"
+					    "os.remove = nil\n"
+					    "require = nil\n");
+	if (result)
+		panic("%s", lua_tostring(L, -1));
+}
+
 void
 tarantool_lua_load_init_script(struct lua_State *L)
 {
@@ -1188,6 +1215,11 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	struct fiber *loader = fiber_create(TARANTOOL_LUA_INIT_SCRIPT, -1,
 					    load_init_script, L);
 	fiber_call(loader);
+	/* Outside the startup file require() or ffi are not
+	 * allowed.
+	*/
+	tarantool_lua_sandbox(tarantool_L);
+
 }
 
 /*

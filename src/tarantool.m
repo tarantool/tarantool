@@ -725,10 +725,10 @@ main(int argc, char **argv)
 	replication_init();
 
 	/*
-	 * Load user init script.
-	 * The script should have access to Tarantool Lua API (box.cfg,
-	 * box.fiber, etc...) that is why script must run only after the server
-	 * was fully initialized.
+	 * Load user init script.  The script should have access
+	 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that
+	 * is why script must run only after the server was fully
+	 * initialized.
 	 */
 	tarantool_lua_load_init_script(tarantool_L);
 

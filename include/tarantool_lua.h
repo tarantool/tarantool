@@ -93,7 +93,7 @@ tarantool_lua_load_cfg(struct lua_State *L,
 /**
  * Load and execute start-up file
  *
- * @param L is Lua State
+ * @param L is a Lua State.
  */
 void
 tarantool_lua_load_init_script(struct lua_State *L);
