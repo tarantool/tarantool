@@ -725,16 +725,12 @@ main(int argc, char **argv)
 	replication_init();
 
 	/*
-	 * Load user init script.
-	 * The script should have access to Tarantool Lua API (box.cfg,
-	 * box.fiber, etc...) that is why script must run only after the server
-	 * was fully initialized.
+	 * Load user init script.  The script should have access
+	 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that
+	 * is why script must run only after the server was fully
+	 * initialized.
 	 */
 	tarantool_lua_load_init_script(tarantool_L);
-	/*
-	 * Nullify some functions by security reasons.
-	 */
-	tarantool_lua_security_nullify(tarantool_L);
 
 	prelease(fiber->gc_pool);
 	say_crit("log level %i", cfg.log_level);

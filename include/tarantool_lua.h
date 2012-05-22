@@ -82,14 +82,6 @@ void tarantool_lua_load_cfg(struct lua_State *L,
  */
 void tarantool_lua_load_init_script(struct lua_State *L);
 
-/**
- * Nullify some functions by security reasons in the Lua sate.
- *
- * @param L is a Lua State.
- */
-void
-tarantool_lua_security_nullify(struct lua_State *L);
-
 void
 tarantool_lua(struct lua_State *L,
 	      struct tbuf *out, const char *str);
