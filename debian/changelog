@@ -1,3 +1,9 @@
+tarantool (1.4.5+20120522-1) unstable; urgency=low
+
+  * New git snapshot: upstream upgraded libtarantool.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 22 May 2012 22:55:07 +0400
+
 tarantool (1.4.5+20120510-1) unstable; urgency=low
 
   * New git snapshot (it provides script_dir option).
