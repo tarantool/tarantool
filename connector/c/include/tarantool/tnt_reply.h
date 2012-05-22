@@ -37,6 +37,7 @@ struct tnt_reply {
 	uint32_t count;
 };
 
+#define TNT_REPLY_ERR(R)  ((R)->code >> 8)
 #define TNT_REPLY_LIST(R) (&(R)->tuples)
 
 void tnt_reply_init(struct tnt_reply *r);
