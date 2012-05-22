@@ -29,10 +29,17 @@
  * SUCH DAMAGE.
  */
 #include <inttypes.h>
+
 struct lua_State;
 struct luaL_Reg;
 struct tarantool_cfg;
 struct tbuf;
+
+/*
+ * Single global lua_State shared by core and modules.
+ * Created with tarantool_lua_init().
+ */
+extern struct lua_State *tarantool_L;
 
 /**
  * This is a callback used by tarantool_lua_init() to open
@@ -40,7 +47,8 @@ struct tbuf;
  *
  * @return  L on success, 0 if out of memory
  */
-struct lua_State *mod_lua_init(struct lua_State *L);
+struct lua_State *
+mod_lua_init(struct lua_State *L);
 
 void
 tarantool_lua_register_type(struct lua_State *L, const char *type_name,
@@ -55,33 +63,43 @@ tarantool_lua_register_type(struct lua_State *L, const char *type_name,
  *
  * @return  L on success, 0 if out of memory
  */
-struct lua_State *tarantool_lua_init();
-void tarantool_lua_close(struct lua_State *L);
+struct lua_State *
+tarantool_lua_init();
 
-/*
- * Single global lua_State shared by core and modules.
- * Created with tarantool_lua_init().
+void
+tarantool_lua_close(struct lua_State *L);
+
+/**
+ * This function exists because lua_tostring does not use
+ * __tostring metamethod, and this metamethod has to be used
+ * if we want to print Lua userdata correctly.
  */
-extern struct lua_State *tarantool_L;
-/* Call Lua 'tostring' built-in to print userdata nicely. */
 const char *
 tarantool_lua_tostring(struct lua_State *L, int index);
 
-/* Convert Lua string, number or cdata (u64) to 64bit value */
+/**
+ * Convert Lua string, number or cdata (u64) to 64bit value
+ */
 uint64_t
 tarantool_lua_tointeger64(struct lua_State *L, int idx);
 
-/* Make a new configuration available in Lua */
-void tarantool_lua_load_cfg(struct lua_State *L,
-			    struct tarantool_cfg *cfg);
+/**
+ * Make a new configuration available in Lua
+ */
+void
+tarantool_lua_load_cfg(struct lua_State *L,
+		       struct tarantool_cfg *cfg);
 
 /**
  * Load and execute start-up file
  *
  * @param L is Lua State
  */
-void tarantool_lua_load_init_script(struct lua_State *L);
+void
+tarantool_lua_load_init_script(struct lua_State *L);
+
 void
 tarantool_lua(struct lua_State *L,
 	      struct tbuf *out, const char *str);
+
 #endif /* INCLUDES_TARANTOOL_LUA_H */
