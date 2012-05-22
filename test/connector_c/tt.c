@@ -201,6 +201,7 @@ static void tt_tnt_tuple_set(struct tt_test *test) {
 	tnt_enc_write(buf + off, 64);
 	off += esize + 64;
 	struct tnt_tuple t;
+	tnt_tuple_init(&t);
 	TT_ASSERT(tnt_tuple_set(&t, buf, 70) == NULL);
 	TT_ASSERT(tnt_tuple_set(&t, buf, sizeof(buf)) != NULL);
 	tnt_tuple_free(&t);
