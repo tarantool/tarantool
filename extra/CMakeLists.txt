@@ -15,7 +15,7 @@ if ("${CPACK_GENERATOR}" STREQUAL "RPM")
                  GROUP_READ GROUP_EXECUTE
                  WORLD_READ WORLD_EXECUTE)
         # chmod +x 755
-        install (FILES tarantool_expand.sh DESTINATION bin
+        install (FILES tarantool_deploy.sh DESTINATION bin
                  PERMISSIONS
                  OWNER_READ OWNER_WRITE OWNER_EXECUTE
 		 GROUP_READ GROUP_EXECUTE

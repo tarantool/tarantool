@@ -5,4 +5,4 @@ groupadd tarantool
 useradd -r -g tarantool tarantool
 
 echo "Performing a single instance setup"
-/usr/local/bin/tarantool_expand.sh --yes 1
+/usr/local/bin/tarantool_deploy.sh --yes 1.1
