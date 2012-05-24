@@ -63,6 +63,10 @@ SOCKETS=`grep \
     | tail -n 1 \
     | sed 's/[^[:digit:]]//g'`
 
+if test -z $SOCKETS; then
+    SOCKETS=1023
+fi
+
 if ! test -x $PID_DIR; then
     install -otarantool -gtarantool -d -m0750 $PID_DIR
 fi

@@ -38,7 +38,7 @@ Package: tarantool
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, tarantool-common
-Suggests: libmr-tarantool-perl
+Suggests: libmr-tarantool-perl, libdr-tarantool-perl
 Description: high performance key/value storage server
  Tarantool is an open-source NoSQL database, developed by Mail.ru.
  Its key properties include:
