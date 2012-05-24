@@ -214,7 +214,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 
 
 static int
-snap_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
+snap_print(struct tbuf *t)
 {
 	struct tbuf *out = tbuf_alloc(t->pool);
 	struct box_snap_row *row;
@@ -235,7 +235,7 @@ snap_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
 }
 
 static int
-xlog_print(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
+xlog_print(struct tbuf *t)
 {
 	struct tbuf *out = tbuf_alloc(t->pool);
 	int res = box_xlog_sprint(out, t);
@@ -262,7 +262,7 @@ convert_snap_row_to_wal(struct tbuf *t)
 }
 
 static int
-recover_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
+recover_row(struct tbuf *t)
 {
 	/* drop wal header */
 	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
@@ -519,7 +519,7 @@ mod_init(void)
 int
 mod_cat(const char *filename)
 {
-	return read_log(filename, xlog_print, snap_print, NULL);
+	return read_log(filename, xlog_print, snap_print);
 }
 
 static void

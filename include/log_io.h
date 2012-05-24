@@ -45,7 +45,7 @@ extern const u64 default_cookie;
 extern const u32 default_version;
 
 struct recovery_state;
-typedef int (row_handler) (struct recovery_state *, struct tbuf *);
+typedef int (row_handler)(struct tbuf *);
 typedef struct tbuf *(row_reader) (FILE *f, struct palloc_pool *pool);
 
 enum log_mode {
@@ -193,7 +193,7 @@ int64_t next_lsn(struct recovery_state *r, i64 new_lsn);
 void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
 
 int read_log(const char *filename,
-	     row_handler xlog_handler, row_handler snap_handler, void *state);
+	     row_handler xlog_handler, row_handler snap_handler);
 
 void recovery_follow_remote(struct recovery_state *r, const char *remote);
 void recovery_stop_remote(struct recovery_state *r);

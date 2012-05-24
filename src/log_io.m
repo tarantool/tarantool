@@ -123,7 +123,7 @@ static const int HEADER_SIZE_MAX = sizeof(v11) + sizeof(snap_mark) + 2;
 
 struct recovery_state *recovery_state;
 
-enum suffix { NONE, INPROGRESS, ANY };
+enum suffix { NONE, INPROGRESS };
 
 #define ROW_EOF (void *)1
 
@@ -251,7 +251,6 @@ v11_class(struct log_io_class *c)
 	c->filename_ext = xlog_ext;
 	c->filetype = xlog_mark;
 	c->version = v11;
-	c->reader = row_reader_v11;
 	c->marker = marker_v11;
 	c->marker_size = sizeof(marker_v11);
 	c->eof_marker = eof_marker_v11;
@@ -363,7 +362,7 @@ read_rows(struct log_io_iter *i)
 				 marker_offset - good_offset, good_offset);
 		say_debug("magic found at 0x%08" PRI_XFFT, marker_offset);
 
-		row = l->class->reader(l->f, fiber->gc_pool);
+		row = row_reader_v11(l->f, fiber->gc_pool);
 		if (row == ROW_EOF)
 			goto eof;
 
@@ -869,7 +868,7 @@ error:
  */
 int
 read_log(const char *filename,
-	 row_handler *xlog_handler, row_handler *snap_handler, void *state)
+	 row_handler *xlog_handler, row_handler *snap_handler)
 {
 	struct log_io_iter i;
 	struct log_io *l;
@@ -892,7 +891,7 @@ read_log(const char *filename,
 	l = log_io_open(c, LOG_READ, filename, NONE, f);
 	iter_open(l, &i, read_rows);
 	while ((row = iter_inner(&i, (void *)1)))
-		h(state, row);
+		h(row);
 
 	if (i.error != 0)
 		say_error("binary log `%s' wasn't correctly closed", filename);
@@ -936,7 +935,7 @@ recover_snap(struct recovery_state *r)
 		say_info("recover from `%s'", snap->filename);
 
 		while ((row = iter_inner(&i, (void *)1))) {
-			if (r->row_handler(r, row) < 0) {
+			if (r->row_handler(row) < 0) {
 				say_error("can't apply row");
 				return -1;
 			}
@@ -987,21 +986,19 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 		while ((row = iter_inner(&i, (void *)1))) {
 			i64 lsn = row_v11(row)->lsn;
-			if (r && lsn <= r->confirmed_lsn) {
+			if (lsn <= r->confirmed_lsn) {
 				say_debug("skipping too young row");
 				continue;
 			}
 
 			/*  after handler(r, row) returned, row may be modified, do not use it */
-			if (r->row_handler(r, row) < 0) {
+			if (r->row_handler(row) < 0) {
 				say_error("can't apply row");
 				return -1;
 			}
 
-			if (r) {
-				next_lsn(r, lsn);
-				confirm_lsn(r, lsn);
-			}
+			next_lsn(r, lsn);
+			confirm_lsn(r, lsn);
 		}
 
 		if (i.error != 0) {
@@ -1587,14 +1584,20 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 
 	/* Flush stdio buffer to keep replication in sync. */
 	if (is_bulk_end && fflush(wal->f) < 0) {
-		say_syserror("can't flush WAL");
+		say_syserror("%s: fflush() failed", wal->filename);
 		goto fail;
 	}
 
 	if (r->wal_fsync_delay > 0 &&
 	    ev_now() - last_flush >= r->wal_fsync_delay) {
 		if (log_io_flush(wal) < 0) {
-			say_syserror("can't flush WAL");
+			say_syserror("%s: fsync() failed", wal->filename);
+			/*
+			 * XXX: we don't really know how many
+			 * records were not written to disk:
+			 * probably way more than the current
+			 * one.
+			 */
 			goto fail;
 		}
 		last_flush = ev_now();
