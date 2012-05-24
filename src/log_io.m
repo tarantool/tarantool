@@ -398,7 +398,7 @@ eof:
 			say_error("can't read eof marker");
 		} else if (memcmp(&magic, &l->class->eof_marker, l->class->eof_marker_size) != 0) {
 			say_error("eof marker is corrupt: %llu",
-				  (unsigned long long), magic);
+				  (unsigned long long) magic);
 		}
 		else {
 			i->good_offset = ftello(l->f);
