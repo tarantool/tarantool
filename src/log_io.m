@@ -298,6 +298,7 @@ struct log_io_cursor
 	struct log_io *log;
 	int row_count;
 	off_t good_offset;
+	bool eof_read;
 };
 
 void
@@ -306,6 +307,7 @@ log_io_cursor_open(struct log_io_cursor *i, struct log_io *l)
 	i->log = l;
 	i->row_count = 0;
 	i->good_offset = ftello(l->f);
+	i->eof_read  = false;
 }
 
 void
@@ -317,8 +319,9 @@ log_io_cursor_close(struct log_io_cursor *i)
 	 * Since we don't close log_io
 	 * we must rewind log_io to last known
 	 * good position if there was an error.
+	 * Seek back to last known good offset.
 	 */
-	fseeko(l->f, i->good_offset, SEEK_SET);	/* seek back to last known good offset */
+	fseeko(l->f, i->good_offset, SEEK_SET);
 	prelease(fiber->gc_pool);
 }
 
@@ -337,6 +340,8 @@ log_io_cursor_next(struct log_io_cursor *i)
 	u64 magic;
 	off_t marker_offset = 0;
 	const u64 marker_mask = (u64)-1 >> ((sizeof(u64) - l->class->marker_size) * 8);
+
+	assert(i->eof_read == false);
 
 	say_debug("log_io_cursor_next: marker:0x%016" PRIX64 "/%" PRI_SZ,
 		  l->class->marker, l->class->marker_size);
@@ -402,9 +407,10 @@ eof:
 		}
 		else {
 			i->good_offset = ftello(l->f);
+			i->eof_read = true;
 		}
 	}
-	/* EOF */
+	/* No more rows. */
 	return NULL;
 }
 
@@ -877,21 +883,15 @@ read_log(const char *filename,
 	FILE *f = fopen(filename, "r");
 	struct log_io *l = log_io_open(c, LOG_READ, filename, NONE, f);
 	struct log_io_cursor i;
-	@try {
-		log_io_cursor_open(&i, l);
-		struct tbuf *row;
-		while ((row = log_io_cursor_next(&i)))
-			h(row);
-	}
-	@catch (id e) {
-		say_error("binary log `%s' wasn't correctly closed", filename);
-		return -1;
-	}
-	@finally {
-		log_io_cursor_close(&i);
-		log_io_close(&l);
-		v11_class_free(c);
-	}
+
+	log_io_cursor_open(&i, l);
+	struct tbuf *row;
+	while ((row = log_io_cursor_next(&i)))
+		h(row);
+
+	log_io_cursor_close(&i);
+	log_io_close(&l);
+	v11_class_free(c);
 	return 0;
 }
 
@@ -904,6 +904,7 @@ read_log(const char *filename,
 static int
 recover_snap(struct recovery_state *r)
 {
+	int res = -1;
 	struct log_io *snap;
 	i64 lsn;
 
@@ -919,80 +920,62 @@ recover_snap(struct recovery_state *r)
 	}
 	say_info("recover from `%s'", snap->filename);
 	struct log_io_cursor i;
-	@try {
-		log_io_cursor_open(&i, snap);
 
-		struct tbuf *row;
-		while ((row = log_io_cursor_next(&i))) {
-			if (r->row_handler(row) < 0) {
-				say_error("can't apply row");
-				return -1;
-			}
+	log_io_cursor_open(&i, snap);
+
+	struct tbuf *row;
+	while ((row = log_io_cursor_next(&i))) {
+		if (r->row_handler(row) < 0) {
+			say_error("can't apply row");
+			goto end;
 		}
-		r->lsn = r->confirmed_lsn = lsn;
-
-		return 0;
 	}
-	@catch (id e) {
-		say_error("failure reading snapshot");
-
-		return -1;
-	}
-	@finally {
-		log_io_cursor_close(&i);
-		log_io_close(&snap);
-	}
+	r->lsn = r->confirmed_lsn = lsn;
+	res = 0;
+end:
+	log_io_cursor_close(&i);
+	log_io_close(&snap);
+	return res;
 }
-
-/*
- * return value:
- * -1: error
- * 0: eof
- * 1: ok, maybe read something
- */
 
 #define LOG_EOF 0
 
+/**
+ * @retval -1 error
+ * @retval 0 EOF
+ * @retval 1 ok, maybe read something
+ */
 static int
 recover_wal(struct recovery_state *r, struct log_io *l)
 {
+	int res = -1;
 	struct log_io_cursor i;
 
-	@try {
-		log_io_cursor_open(&i, l);
+	log_io_cursor_open(&i, l);
 
-		struct tbuf *row = NULL;
-		while ((row = log_io_cursor_next(&i))) {
-			i64 lsn = row_v11(row)->lsn;
-			if (lsn <= r->confirmed_lsn) {
-				say_debug("skipping too young row");
-				continue;
-			}
-
-			/*  after handler(r, row) returned, row may be modified, do not use it */
-			if (r->row_handler(row) < 0) {
-				say_error("can't apply row");
-				return -1;
-			}
-
-			next_lsn(r, lsn);
-			confirm_lsn(r, lsn);
+	struct tbuf *row = NULL;
+	while ((row = log_io_cursor_next(&i))) {
+		i64 lsn = row_v11(row)->lsn;
+		if (lsn <= r->confirmed_lsn) {
+			say_debug("skipping too young row");
+			continue;
 		}
-	}
-	@catch (id e) {
-		say_error("failure reading xlog");
-
-		return -1;
-	}
-	@finally {
 		/*
-		 * Since we don't close log_io
-		 * we must rewind log_io to last known
-		 * good position if where was an error.
+		 * After handler(row) returned, row may be
+		 * modified, do not use it.
 		 */
-		log_io_cursor_close(&i);
+		if (r->row_handler(row) < 0) {
+			say_error("can't apply row");
+			goto end;
+		}
+		next_lsn(r, lsn);
+		confirm_lsn(r, lsn);
 	}
-	return LOG_EOF;
+	res = i.eof_read ? LOG_EOF : 1;
+end:
+	log_io_cursor_close(&i);
+	/* Sic: we don't close the log here. */
+	return res;
 }
 
 /** Find out if there are new .xlog files since the current
