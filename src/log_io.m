@@ -123,7 +123,7 @@ static const int HEADER_SIZE_MAX = sizeof(v11) + sizeof(snap_mark) + 2;
 
 struct recovery_state *recovery_state;
 
-enum suffix { NONE, INPROGRESS, ANY };
+enum suffix { NONE, INPROGRESS };
 
 #define ROW_EOF (void *)1
 
@@ -251,7 +251,6 @@ v11_class(struct log_io_class *c)
 	c->filename_ext = xlog_ext;
 	c->filetype = xlog_mark;
 	c->version = v11;
-	c->reader = row_reader_v11;
 	c->marker = marker_v11;
 	c->marker_size = sizeof(marker_v11);
 	c->eof_marker = eof_marker_v11;
@@ -294,27 +293,35 @@ xlog_class_create(const char *dirname)
 	return c;
 }
 
-static void *
-iter_inner(struct log_io_iter *i, void *data)
+struct log_io_cursor
 {
-	i->to = data;
-	coro_transfer(&fiber->coro.ctx, &i->coro.ctx);
-	return i->from;
+	struct log_io *log;
+	int row_count;
+	off_t good_offset;
+};
+
+void
+log_io_cursor_open(struct log_io_cursor *i, struct log_io *l)
+{
+	i->log = l;
+	i->row_count = 0;
+	i->good_offset = ftello(l->f);
 }
 
-static void *
-iter_outer(struct log_io_iter *i, void *data)
+void
+log_io_cursor_close(struct log_io_cursor *i)
 {
-	i->from = data;
-	coro_transfer(&i->coro.ctx, &fiber->coro.ctx);
-	return i->to;
+	struct log_io *l = i->log;
+	l->rows += i->row_count;
+	/*
+	 * Since we don't close log_io
+	 * we must rewind log_io to last known
+	 * good position if there was an error.
+	 */
+	fseeko(l->f, i->good_offset, SEEK_SET);	/* seek back to last known good offset */
+	prelease(fiber->gc_pool);
 }
 
-static void
-close_iter(struct log_io_iter *i)
-{
-	tarantool_coro_destroy(&i->coro);
-}
 
 /**
  * Read logfile contents using designated format, panic if
@@ -323,102 +330,82 @@ close_iter(struct log_io_iter *i)
  * @param i	iterator object, encapsulating log specifics.
  *
  */
-static void
-read_rows(struct log_io_iter *i)
+static struct tbuf *
+log_io_cursor_next(struct log_io_cursor *i)
 {
 	struct log_io *l = i->log;
-	struct tbuf *row;
 	u64 magic;
-	off_t marker_offset = 0, good_offset;
+	off_t marker_offset = 0;
 	const u64 marker_mask = (u64)-1 >> ((sizeof(u64) - l->class->marker_size) * 8);
-	int row_count = 0;
-	int error = 0;
-	int eof = 0;
 
-	say_debug("read_rows: marker:0x%016" PRIX64 "/%" PRI_SZ,
+	say_debug("log_io_cursor_next: marker:0x%016" PRIX64 "/%" PRI_SZ,
 		  l->class->marker, l->class->marker_size);
 
-	good_offset = ftello(l->f);
-      restart:
+	/*
+	 * Don't let gc pool grow too much. Yet to
+	 * it before reading the next row, to make
+	 * sure it's not freed along here.
+	 */
+	prelease_after(fiber->gc_pool, 128 * 1024);
+
+restart:
 	if (marker_offset > 0)
 		fseeko(l->f, marker_offset + 1, SEEK_SET);
 
-	for (;;) {
-		say_debug("read_rows: loop start offt 0x%08" PRI_XFFT, ftello(l->f));
-		if (fread(&magic, l->class->marker_size, 1, l->f) != 1)
+	if (fread(&magic, l->class->marker_size, 1, l->f) != 1)
+		goto eof;
+
+	while ((magic & marker_mask) != l->class->marker) {
+		int c = fgetc(l->f);
+		if (c == EOF) {
+			say_debug("eof while looking for magic");
 			goto eof;
-
-		while ((magic & marker_mask) != l->class->marker) {
-			int c = fgetc(l->f);
-			if (c == EOF) {
-				say_debug("eof while looking for magic");
-				goto eof;
-			}
-			magic >>= 8;
-			magic |= (((u64)c & 0xff) << ((l->class->marker_size - 1) * 8));
 		}
-		marker_offset = ftello(l->f) - l->class->marker_size;
-		if (good_offset != marker_offset)
-			say_warn("skipped %" PRI_OFFT " bytes after 0x%08" PRI_XFFT " offset",
-				 marker_offset - good_offset, good_offset);
-		say_debug("magic found at 0x%08" PRI_XFFT, marker_offset);
+		magic >>= 8;
+		magic |= (((u64)c & 0xff) << ((l->class->marker_size - 1) * 8));
+	}
+	marker_offset = ftello(l->f) - l->class->marker_size;
+	if (i->good_offset != marker_offset)
+		say_warn("skipped %" PRI_OFFT " bytes after 0x%08" PRI_XFFT " offset",
+			 marker_offset - i->good_offset, i->good_offset);
+	say_debug("magic found at 0x%08" PRI_XFFT, marker_offset);
 
-		row = l->class->reader(l->f, fiber->gc_pool);
-		if (row == ROW_EOF)
-			goto eof;
+	struct tbuf *row = row_reader_v11(l->f, fiber->gc_pool);
+	if (row == ROW_EOF)
+		goto eof;
 
-		if (row == NULL) {
-			if (l->class->panic_if_error)
-				panic("failed to read row");
-			say_warn("failed to read row");
-			goto restart;
-		}
+	if (row == NULL) {
+		if (l->class->panic_if_error)
+			panic("failed to read row");
+		say_warn("failed to read row");
+		goto restart;
+	}
 
-		good_offset = ftello(l->f);
+	i->good_offset = ftello(l->f);
 
-		if (!iter_outer(i, row)) {
-			error = -1;
-			goto out;
-		}
-
-		prelease_after(fiber->gc_pool, 128 * 1024);
-
-		if (++row_count % 100000 == 0)
-			say_info("%.1fM rows processed", row_count / 1000000.);
-	} /* for loop */
+	if (++i->row_count % 100000 == 0)
+		say_info("%.1fM rows processed", i->row_count / 1000000.);
+	return row;
 eof:
 	/*
-	 * then only two cases of fully read file:
+	 * The only two cases of fully read file:
 	 * 1. eof_marker_size > 0 and it is the last record in file
 	 * 2. eof_marker_size == 0 and there is no unread data in file
 	 */
-	if (l->class->eof_marker_size > 0 &&
-	    ftello(l->f) == good_offset + l->class->eof_marker_size) {
-		fseeko(l->f, good_offset, SEEK_SET);
+	if (ftello(l->f) == i->good_offset + l->class->eof_marker_size) {
+		fseeko(l->f, i->good_offset, SEEK_SET);
 		if (fread(&magic, l->class->eof_marker_size, 1, l->f) != 1) {
 			say_error("can't read eof marker");
-			goto out;
+		} else if (memcmp(&magic, &l->class->eof_marker, l->class->eof_marker_size) != 0) {
+			say_error("eof marker is corrupt: %llu",
+				  (unsigned long long) magic);
 		}
-		if (memcmp(&magic, &l->class->eof_marker, l->class->eof_marker_size) != 0)
-			goto out;
-
-		good_offset = ftello(l->f);
-		eof = 1;
-		goto out;
+		else {
+			i->good_offset = ftello(l->f);
+		}
 	}
-
-out:
-	l->rows += row_count;
-
-	fseeko(l->f, good_offset, SEEK_SET);	/* seek back to last known good offset */
-	prelease(fiber->gc_pool);
-
-	if (error)
-		i->error = error;
-	if (eof)
-		i->eof = eof;
-
-	iter_outer(i, NULL);
+	/* EOF */
+	return NULL;
 }
 
 static void
@@ -866,15 +853,14 @@ error:
 /**
  * Read the WAL and invoke a callback on every record (used for --cat
  * command line option).
+ * @retval 0  success
+ * @retval -1 error
  */
 int
 read_log(const char *filename,
-	 row_handler *xlog_handler, row_handler *snap_handler, void *state)
+	 row_handler *xlog_handler, row_handler *snap_handler)
 {
-	struct log_io_iter i;
-	struct log_io *l;
 	struct log_io_class *c;
-	struct tbuf *row;
 	row_handler *h;
 
 	if (strstr(filename, xlog_ext)) {
@@ -889,18 +875,24 @@ read_log(const char *filename,
 	}
 
 	FILE *f = fopen(filename, "r");
-	l = log_io_open(c, LOG_READ, filename, NONE, f);
-	iter_open(l, &i, read_rows);
-	while ((row = iter_inner(&i, (void *)1)))
-		h(state, row);
-
-	if (i.error != 0)
+	struct log_io *l = log_io_open(c, LOG_READ, filename, NONE, f);
+	struct log_io_cursor i;
+	@try {
+		log_io_cursor_open(&i, l);
+		struct tbuf *row;
+		while ((row = log_io_cursor_next(&i)))
+			h(row);
+	}
+	@catch (id e) {
 		say_error("binary log `%s' wasn't correctly closed", filename);
-
-	close_iter(&i);
-	v11_class_free(c);
-	log_io_close(&l);
-	return i.error;
+		return -1;
+	}
+	@finally {
+		log_io_cursor_close(&i);
+		log_io_close(&l);
+		v11_class_free(c);
+	}
+	return 0;
 }
 
 /**
@@ -912,40 +904,31 @@ read_log(const char *filename,
 static int
 recover_snap(struct recovery_state *r)
 {
-	struct log_io_iter i;
-	struct log_io *snap = NULL;
-	struct tbuf *row;
+	struct log_io *snap;
 	i64 lsn;
 
+	lsn = greatest_lsn(r->snap_class);
+	if (lsn <= 0) {
+		say_error("can't find snapshot");
+		return -1;
+	}
+	snap = log_io_open_for_read(r->snap_class, lsn, NONE);
+	if (snap == NULL) {
+		say_error("can't find/open snapshot");
+		return -1;
+	}
+	say_info("recover from `%s'", snap->filename);
+	struct log_io_cursor i;
 	@try {
-		memset(&i, 0, sizeof(i));
+		log_io_cursor_open(&i, snap);
 
-		lsn = greatest_lsn(r->snap_class);
-		if (lsn <= 0) {
-			say_error("can't find snapshot");
-			return -1;
-		}
-
-		snap = log_io_open_for_read(r->snap_class, lsn, NONE);
-		if (snap == NULL) {
-			say_error("can't find/open snapshot");
-			return -1;
-		}
-
-		iter_open(snap, &i, read_rows);
-		say_info("recover from `%s'", snap->filename);
-
-		while ((row = iter_inner(&i, (void *)1))) {
-			if (r->row_handler(r, row) < 0) {
+		struct tbuf *row;
+		while ((row = log_io_cursor_next(&i))) {
+			if (r->row_handler(row) < 0) {
 				say_error("can't apply row");
 				return -1;
 			}
 		}
-		if (i.error != 0) {
-			say_error("failure reading snapshot");
-			return -1;
-		}
-
 		r->lsn = r->confirmed_lsn = lsn;
 
 		return 0;
@@ -956,13 +939,8 @@ recover_snap(struct recovery_state *r)
 		return -1;
 	}
 	@finally {
-		if (i.log != NULL)
-			close_iter(&i);
-
-		if (snap != NULL)
-			log_io_close(&snap);
-
-		prelease(fiber->gc_pool);
+		log_io_cursor_close(&i);
+		log_io_close(&snap);
 	}
 }
 
@@ -978,41 +956,28 @@ recover_snap(struct recovery_state *r)
 static int
 recover_wal(struct recovery_state *r, struct log_io *l)
 {
-	struct log_io_iter i;
-	struct tbuf *row = NULL;
+	struct log_io_cursor i;
 
 	@try {
-		memset(&i, 0, sizeof(i));
-		iter_open(l, &i, read_rows);
+		log_io_cursor_open(&i, l);
 
-		while ((row = iter_inner(&i, (void *)1))) {
+		struct tbuf *row = NULL;
+		while ((row = log_io_cursor_next(&i))) {
 			i64 lsn = row_v11(row)->lsn;
-			if (r && lsn <= r->confirmed_lsn) {
+			if (lsn <= r->confirmed_lsn) {
 				say_debug("skipping too young row");
 				continue;
 			}
 
 			/*  after handler(r, row) returned, row may be modified, do not use it */
-			if (r->row_handler(r, row) < 0) {
+			if (r->row_handler(row) < 0) {
 				say_error("can't apply row");
 				return -1;
 			}
 
-			if (r) {
-				next_lsn(r, lsn);
-				confirm_lsn(r, lsn);
-			}
+			next_lsn(r, lsn);
+			confirm_lsn(r, lsn);
 		}
-
-		if (i.error != 0) {
-			say_error("error during xlog processing");
-			return -1;
-		}
-
-		if (i.eof)
-			return LOG_EOF;
-
-		return 1;
 	}
 	@catch (id e) {
 		say_error("failure reading xlog");
@@ -1021,16 +986,13 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 	}
 	@finally {
 		/*
-		 * since we don't close log_io
+		 * Since we don't close log_io
 		 * we must rewind log_io to last known
-		 * good position if where was error
+		 * good position if where was an error.
 		 */
-		if (row)
-			iter_inner(&i, NULL);
-
-		close_iter(&i);
-		prelease(fiber->gc_pool);
+		log_io_cursor_close(&i);
 	}
+	return LOG_EOF;
 }
 
 /** Find out if there are new .xlog files since the current
@@ -1587,14 +1549,20 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 
 	/* Flush stdio buffer to keep replication in sync. */
 	if (is_bulk_end && fflush(wal->f) < 0) {
-		say_syserror("can't flush WAL");
+		say_syserror("%s: fflush() failed", wal->filename);
 		goto fail;
 	}
 
 	if (r->wal_fsync_delay > 0 &&
 	    ev_now() - last_flush >= r->wal_fsync_delay) {
 		if (log_io_flush(wal) < 0) {
-			say_syserror("can't flush WAL");
+			say_syserror("%s: fsync() failed", wal->filename);
+			/*
+			 * XXX: we don't really know how many
+			 * records were not written to disk:
+			 * probably way more than the current
+			 * one.
+			 */
 			goto fail;
 		}
 		last_flush = ev_now();

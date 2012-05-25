@@ -29,7 +29,7 @@
 #define TNT_OP_INSERT      13
 #define TNT_OP_SELECT      17
 #define TNT_OP_UPDATE      19
-#define TNT_OP_DELETE      20
+#define TNT_OP_DELETE      21
 #define TNT_OP_CALL        22
 #define TNT_OP_PING        65280
 

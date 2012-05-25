@@ -136,7 +136,7 @@ replication_relay_recv(struct ev_io *w, int revents);
 
 /** Send a single row to the client. */
 static int
-replication_relay_send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t);
+replication_relay_send_row(struct tbuf *t);
 
 
 /*
@@ -601,7 +601,7 @@ replication_relay_loop(int client_sock)
 
 	ver = tbuf_alloc(fiber->gc_pool);
 	tbuf_append(ver, &default_version, sizeof(default_version));
-	replication_relay_send_row(NULL, ver);
+	replication_relay_send_row(ver);
 
 	/* init libev events handlers */
 	ev_default_loop(0);
@@ -648,7 +648,7 @@ replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
 
 /** Send to row to client. */
 static int
-replication_relay_send_row(struct recovery_state *r __attribute__((unused)), struct tbuf *t)
+replication_relay_send_row(struct tbuf *t)
 {
 	u8 *data = t->data;
 	ssize_t bytes, len = t->size;

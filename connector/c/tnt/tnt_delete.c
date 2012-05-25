@@ -36,6 +36,7 @@
 
 struct tnt_header_delete {
 	uint32_t ns;
+	uint32_t flags;
 };
 
 /*
@@ -61,7 +62,7 @@ tnt_delete(struct tnt_stream *s, uint32_t ns, uint32_t flags, struct tnt_tuple *
 	/* filling delete header */
 	struct tnt_header_delete hdr_del;
 	hdr_del.ns = ns;
-	(void)flags;
+	hdr_del.flags = flags;
 	/* writing data to stream */
 	struct iovec v[3];
 	v[0].iov_base = &hdr;

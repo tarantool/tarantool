@@ -188,6 +188,25 @@ static void tt_tnt_sbuf(struct tt_test *test) {
 	tnt_stream_free(&s);
 }
 
+/* tuple set */
+static void tt_tnt_tuple_set(struct tt_test *test) {
+	char buf[75];
+	*((uint32_t*)buf) = 2; /* cardinality */
+	/* 4 + 1 + 5 + 1 + 64 = 75 */
+	uint32_t off = sizeof(uint32_t);
+	int esize = tnt_enc_size(5);
+	tnt_enc_write(buf + off, 5);
+	off += esize + 5;
+	esize = tnt_enc_size(64);
+	tnt_enc_write(buf + off, 64);
+	off += esize + 64;
+	struct tnt_tuple t;
+	tnt_tuple_init(&t);
+	TT_ASSERT(tnt_tuple_set(&t, buf, 70) == NULL);
+	TT_ASSERT(tnt_tuple_set(&t, buf, sizeof(buf)) != NULL);
+	tnt_tuple_free(&t);
+}
+
 /* iterator tuple */
 static void tt_tnt_iter1(struct tt_test *test) {
 	struct tnt_tuple *t = tnt_tuple(NULL, "%s%d%s", "foo", 123, "bar");
@@ -871,6 +890,7 @@ main(int argc, char * argv[])
 	tt_test(&t, "tuple2", tt_tnt_tuple2);
 	tt_test(&t, "list", tt_tnt_list);
 	tt_test(&t, "stream buffer", tt_tnt_sbuf);
+	tt_test(&t, "tuple set", tt_tnt_tuple_set);
 	tt_test(&t, "iterator tuple", tt_tnt_iter1);
 	tt_test(&t, "iterator tuple (single field)", tt_tnt_iter11);
 	tt_test(&t, "iterator tuple (tnt_field)", tt_tnt_iter2);

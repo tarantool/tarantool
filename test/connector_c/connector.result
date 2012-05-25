@@ -2,6 +2,7 @@
 > tuple2                        [OK]
 > list                          [OK]
 > stream buffer                 [OK]
+> tuple set                     [OK]
 > iterator tuple                [OK]
 > iterator tuple (single field) [OK]
 > iterator tuple (tnt_field)    [OK]
