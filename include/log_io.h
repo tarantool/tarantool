@@ -53,10 +53,12 @@ enum log_mode {
 	LOG_WRITE
 };
 
+typedef u32 log_magic_t;
+
 struct log_io_class {
 	row_reader *reader;
-	u64 marker, eof_marker;
-	size_t marker_size, eof_marker_size;
+	log_magic_t marker;
+	log_magic_t eof_marker;
 	bool panic_if_error;
 
 	/* Additional flags to apply at open(2) to write. */
@@ -143,7 +145,7 @@ struct wal_write_request {
 	u64 out_lsn;
 	struct fiber *fiber;
 	/** Header. */
-	u32 marker;
+	log_magic_t marker;
 	u32 header_crc32c;
 	i64 lsn;
 	double tm;

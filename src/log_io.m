@@ -111,8 +111,8 @@ const u16 snap_tag = -1;
 const u16 wal_tag = -2;
 const u64 default_cookie = 0;
 const u32 default_version = 11;
-const u32 marker_v11 = 0xba0babed;
-const u32 eof_marker_v11 = 0x10adab1e;
+const log_magic_t marker_v11 = 0xba0babed;
+const log_magic_t eof_marker_v11 = 0x10adab1e;
 const char snap_ext[] = ".snap";
 const char xlog_ext[] = ".xlog";
 const char inprogress_suffix[] = ".inprogress";
@@ -252,9 +252,7 @@ v11_class(struct log_io_class *c)
 	c->filetype = xlog_mark;
 	c->version = v11;
 	c->marker = marker_v11;
-	c->marker_size = sizeof(marker_v11);
 	c->eof_marker = eof_marker_v11;
-	c->eof_marker_size = sizeof(eof_marker_v11);
 }
 
 static void
@@ -337,14 +335,13 @@ static struct tbuf *
 log_io_cursor_next(struct log_io_cursor *i)
 {
 	struct log_io *l = i->log;
-	u64 magic;
+	log_magic_t magic;
 	off_t marker_offset = 0;
-	const u64 marker_mask = (u64)-1 >> ((sizeof(u64) - l->class->marker_size) * 8);
 
 	assert(i->eof_read == false);
 
-	say_debug("log_io_cursor_next: marker:0x%016" PRIX64 "/%" PRI_SZ,
-		  l->class->marker, l->class->marker_size);
+	say_debug("log_io_cursor_next: marker:0x%016" PRIX32 "/%" PRI_SZ,
+		  l->class->marker, sizeof(l->class->marker));
 
 	/*
 	 * Don't let gc pool grow too much. Yet to
@@ -357,19 +354,19 @@ restart:
 	if (marker_offset > 0)
 		fseeko(l->f, marker_offset + 1, SEEK_SET);
 
-	if (fread(&magic, l->class->marker_size, 1, l->f) != 1)
+	if (fread(&magic, sizeof(magic), 1, l->f) != 1)
 		goto eof;
 
-	while ((magic & marker_mask) != l->class->marker) {
+	while (magic != l->class->marker) {
 		int c = fgetc(l->f);
 		if (c == EOF) {
 			say_debug("eof while looking for magic");
 			goto eof;
 		}
-		magic >>= 8;
-		magic |= (((u64)c & 0xff) << ((l->class->marker_size - 1) * 8));
+		magic = magic >> 8 |
+			((log_magic_t) c & 0xff) << (sizeof(magic)*8 - 8);
 	}
-	marker_offset = ftello(l->f) - l->class->marker_size;
+	marker_offset = ftello(l->f) - sizeof(l->class->marker);
 	if (i->good_offset != marker_offset)
 		say_warn("skipped %" PRI_OFFT " bytes after 0x%08" PRI_XFFT " offset",
 			 marker_offset - i->good_offset, i->good_offset);
@@ -387,23 +384,26 @@ restart:
 	}
 
 	i->good_offset = ftello(l->f);
+	i->row_count++;
 
-	if (++i->row_count % 100000 == 0)
+	if (i->row_count % 100000 == 0)
 		say_info("%.1fM rows processed", i->row_count / 1000000.);
+
 	return row;
 eof:
 	/*
 	 * The only two cases of fully read file:
-	 * 1. eof_marker_size > 0 and it is the last record in file
-	 * 2. eof_marker_size == 0 and there is no unread data in file
+	 * 1. sizeof(eof_marker) > 0 and it is the last record in file
+	 * 2. sizeof(eof_marker) == 0 and there is no unread data in file
 	 */
-	if (ftello(l->f) == i->good_offset + l->class->eof_marker_size) {
+	if (ftello(l->f) == i->good_offset + sizeof(l->class->eof_marker)) {
 		fseeko(l->f, i->good_offset, SEEK_SET);
-		if (fread(&magic, l->class->eof_marker_size, 1, l->f) != 1) {
+		if (fread(&magic, sizeof(magic), 1, l->f) != 1) {
 			say_error("can't read eof marker");
-		} else if (memcmp(&magic, &l->class->eof_marker, l->class->eof_marker_size) != 0) {
-			say_error("eof marker is corrupt: %llu",
-				  (unsigned long long) magic);
+		}
+		else if (magic != l->class->eof_marker) {
+			say_error("eof marker is corrupt: %lu",
+				  (unsigned long) magic);
 		}
 		else {
 			i->good_offset = ftello(l->f);
@@ -638,7 +638,8 @@ log_io_close(struct log_io **lptr)
 	}
 
 	if (l->mode == LOG_WRITE) {
-		if (fwrite(&l->class->eof_marker, l->class->eof_marker_size, 1, l->f) != 1)
+		if (fwrite(&l->class->eof_marker,
+			   sizeof(log_magic_t), 1, l->f) != 1)
 			say_error("can't write eof_marker");
 	}
 
@@ -1752,7 +1753,7 @@ write_rows(struct log_io_iter *i)
 	      start:
 		data = i->to;
 
-		if (fwrite(&l->class->marker, l->class->marker_size, 1, l->f) != 1)
+		if (fwrite(&l->class->marker, sizeof(l->class->marker), 1, l->f) != 1)
 			panic("fwrite");
 
 		row_v11(row)->lsn = 0;	/* unused */
