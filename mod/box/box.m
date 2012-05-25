@@ -527,27 +527,23 @@ mod_cat(const char *filename)
 }
 
 static void
-snapshot_write_tuple(struct log_io_iter *i, unsigned n, struct tuple *tuple)
+snapshot_write_tuple(struct log_io *l, unsigned n, struct tuple *tuple)
 {
-	struct tbuf *row;
-	struct box_snap_row header;
-
 	if (tuple->flags & GHOST)	// do not save fictive rows
 		return;
 
+	struct box_snap_row header;
 	header.space = n;
 	header.tuple_size = tuple->field_count;
 	header.data_size = tuple->bsize;
 
-	row = tbuf_alloc(fiber->gc_pool);
-	tbuf_append(row, &header, sizeof(header));
-	tbuf_append(row, tuple->data, tuple->bsize);
-
-	snapshot_write_row(i, snap_tag, default_cookie, row);
+	snapshot_write_row(l, snap_tag, default_cookie,
+			   (void *) &header, sizeof(header),
+			   tuple->data, tuple->bsize);
 }
 
 void
-mod_snapshot(struct log_io_iter *i)
+mod_snapshot(struct log_io *l)
 {
 	struct tuple *tuple;
 
@@ -560,7 +556,7 @@ mod_snapshot(struct log_io_iter *i)
 		struct iterator *it = pk->position;
 		[pk initIterator: it :ITER_FORWARD];
 		while ((tuple = it->next(it))) {
-			snapshot_write_tuple(i, n, tuple);
+			snapshot_write_tuple(l, n, tuple);
 		}
 	}
 }

@@ -127,6 +127,25 @@ enum suffix { NONE, INPROGRESS };
 
 #define ROW_EOF (void *)1
 
+struct wal_write_request {
+	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
+	/* Auxiliary. */
+	u64 out_lsn;
+	struct fiber *fiber;
+	/** Header. */
+	log_magic_t marker;
+	u32 header_crc32c;
+	i64 lsn;
+	double tm;
+	u32 len;
+	u32 data_crc32c;
+	/* Data. */
+	u16 tag;
+	u64 cookie;
+	u16 op;
+	u8 data[];
+} __attribute__((packed));
+
 /* Context of the WAL writer thread. */
 
 struct wal_writer
@@ -169,17 +188,6 @@ struct wal_watcher {
 };
 
 static struct wal_watcher wal_watcher;
-
-struct log_io_iter {
-	struct tarantool_coro coro;
-	struct log_io *log;
-	void *from;
-	void *to;
-	int error;
-	bool eof;
-	int io_rate_limit;
-};
-
 
 void
 wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn)
@@ -412,14 +420,6 @@ eof:
 	}
 	/* No more rows. */
 	return NULL;
-}
-
-static void
-iter_open(struct log_io *l, struct log_io_iter *i, void (*iterator) (struct log_io_iter * i))
-{
-	memset(i, 0, sizeof(*i));
-	i->log = l;
-	tarantool_coro_create(&i->coro, (void *)iterator, i);
 }
 
 static int
@@ -1737,69 +1737,62 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 	r->snap_class->panic_if_error = on_snap_error;
 }
 
-static void
-write_rows(struct log_io_iter *i)
+struct snap_write_request
 {
-	struct log_io *l = i->log;
-	struct tbuf *row, *data;
-
-	row = tbuf_alloc(eter_pool);
-	tbuf_ensure(row, sizeof(struct row_v11));
-	row->size = sizeof(struct row_v11);
-
-	goto start;
-	for (;;) {
-		coro_transfer(&i->coro.ctx, &fiber->coro.ctx);
-	      start:
-		data = i->to;
-
-		if (fwrite(&l->class->marker, sizeof(l->class->marker), 1, l->f) != 1)
-			panic("fwrite");
-
-		row_v11(row)->lsn = 0;	/* unused */
-		/* @todo: check if we can safely use ev_now() here. */
-		row_v11(row)->tm = ev_now();
-		row_v11(row)->len = data->size;
-		row_v11(row)->data_crc32c = crc32_calc(0, data->data, data->size);
-		row_v11(row)->header_crc32c =
-			crc32_calc(0, row->data + field_sizeof(struct row_v11, header_crc32c),
-				   sizeof(struct row_v11) - field_sizeof(struct row_v11,
-								     header_crc32c));
-
-		if (fwrite(row->data, row->size, 1, l->f) != 1)
-			panic("fwrite");
-
-		if (fwrite(data->data, data->size, 1, l->f) != 1)
-			panic("fwrite");
-
-		prelease_after(fiber->gc_pool, 128 * 1024);
-	}
-}
+	log_magic_t marker;
+	u32 header_crc32c;
+	i64 lsn;
+	double tm;
+	u32 len;
+	u32 data_crc32c;
+	/* Data. */
+	u16 tag;
+	u64 cookie;
+	u8 data[];
+} __attribute__((packed));
 
 void
-snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
+snapshot_write_row(struct log_io *l, u16 tag, u64 cookie,
+		   const void *metadata, size_t metadata_size,
+		   const void *data, size_t data_size)
 {
 	static int rows;
 	static int bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
-	struct tbuf *wal_row = tbuf_alloc(fiber->gc_pool);
 
-	tbuf_append(wal_row, &tag, sizeof(tag));
-	tbuf_append(wal_row, &cookie, sizeof(cookie));
-	tbuf_append(wal_row, row->data, row->size);
+	size_t total_size = (sizeof(struct snap_write_request) +
+			     metadata_size + data_size);
+	struct snap_write_request *req = palloc(fiber->gc_pool, total_size);
+	size_t header_size = (sizeof(req->lsn) + sizeof(req->tm)
+			     + sizeof(req->len) + sizeof(req->data_crc32c));
 
-	i->to = wal_row;
-	if (i->io_rate_limit > 0) {
+	req->marker = l->class->marker;
+	req->lsn = 0;
+	req->tm = ev_now();
+	req->len = (sizeof(req->tag) + sizeof(req->cookie) + metadata_size
+		    + data_size);
+	req->tag = tag;
+	req->cookie = cookie;
+	memcpy(req->data, metadata, metadata_size);
+	memcpy(req->data + metadata_size, data, data_size);
+	req->data_crc32c = crc32_calc(0, (void *) &req->tag, req->len);
+	req->header_crc32c = crc32_calc(0, (void *) &req->lsn, header_size);
+
+	if (fwrite(req, total_size, 1, l->f) != 1)
+		panic("fwrite");
+
+	if (++rows % 100000 == 0)
+		say_crit("%.1fM rows written", rows / 1000000.);
+
+	if (recovery_state->snap_io_rate_limit > 0) {
 		if (last == 0) {
 			ev_now_update();
 			last = ev_now();
 		}
-
-		bytes += row->size + sizeof(struct row_v11);
-
-		while (bytes >= i->io_rate_limit) {
-			log_io_flush(i->log);
+		bytes += total_size;
+		while (bytes >= recovery_state->snap_io_rate_limit) {
+			log_io_flush(l);
 
 			ev_now_update();
 			elapsed = ev_now() - last;
@@ -1808,32 +1801,22 @@ snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
 
 			ev_now_update();
 			last = ev_now();
-			bytes -= i->io_rate_limit;
+			bytes -= recovery_state->snap_io_rate_limit;
 		}
 	}
-	coro_transfer(&fiber->coro.ctx, &i->coro.ctx);
-	if (++rows % 100000 == 0)
-		say_crit("%.1fM rows written", rows / 1000000.);
+	prelease_after(fiber->gc_pool, 128 * 1024);
 }
 
 void
-snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
+snapshot_save(struct recovery_state *r, void (*f) (struct log_io *))
 {
-	struct log_io_iter i;
 	struct log_io *snap;
 	char final_filename[PATH_MAX + 1];
 	char *dot;
 
-	memset(&i, 0, sizeof(i));
-
 	snap = log_io_open_for_write(r->snap_class, r->confirmed_lsn, INPROGRESS);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
-
-	iter_open(snap, &i, write_rows);
-
-	if (r->snap_io_rate_limit > 0)
-		i.io_rate_limit = r->snap_io_rate_limit;
 
 	/*
 	 * While saving a snapshot, snapshot name is set to
@@ -1845,7 +1828,7 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 	*dot = 0;
 
 	say_info("saving snapshot `%s'", final_filename);
-	f(&i);
+	f(snap);
 
 	if (fsync(fileno(snap->f)) < 0)
 		panic("fsync");
