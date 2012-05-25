@@ -97,7 +97,7 @@ endif()
 
 if (ENABLE_BACKTRACE AND HAVE_BFD)
   set (common_libraries ${common_libraries} bfd iberty)
-  if (ENABLE_STATIC OR TARGET_OS_DEBIAN_FREEBSD)
+  if (ENABLE_STATIC OR TARGET_OS_FREEBSD)
      include (FindZLIB)
      set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES})
   endif()
