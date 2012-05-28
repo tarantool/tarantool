@@ -269,7 +269,7 @@ palloc(struct palloc_pool *restrict pool, size_t size)
 		ptr = palloc_slow_path(pool, rz_size);
 
 	assert(poisoned(ptr + PALLOC_REDZONE, size) == NULL);
-	VALGRIND_MAKE_MEM_DEFINED(ptr + PALLOC_REDZONE, size);
+	(void) VALGRIND_MAKE_MEM_DEFINED(ptr + PALLOC_REDZONE, size);
 
 	return ptr + PALLOC_REDZONE;
 }
@@ -328,7 +328,7 @@ ptruncate(struct palloc_pool *pool, size_t new_size)
 			/* This is the last chunk to trim. */
 			chunk->brk -= cut_size;
 			chunk->free += cut_size;
-			VALGRIND_MAKE_MEM_NOACCESS(chunk->brk, cut_size);
+			(void) VALGRIND_MAKE_MEM_NOACCESS(chunk->brk, cut_size);
 			cut_size = 0;
 			break;
 		}

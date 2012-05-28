@@ -50,6 +50,26 @@ iterator_first_equal(struct iterator *it)
 
 /* {{{ Index -- base class for all indexes. ********************/
 
+@interface HashIndex: Index
+- (void) reserve: (u32) n_tuples;
+@end
+
+@interface HashStrIndex: HashIndex {
+	 struct mh_lstrptr_t *str_hash;
+};
+@end
+
+@interface Hash64Index: HashIndex {
+	struct mh_i64ptr_t *int64_hash;
+};
+@end
+
+@interface Hash32Index: HashIndex {
+	 struct mh_i32ptr_t *int_hash;
+};
+@end
+
+
 @implementation Index
 
 @class Hash32Index;
@@ -212,10 +232,6 @@ iterator_first_equal(struct iterator *it)
 
 /* {{{ HashIndex -- base class for all hashes. ********************/
 
-@interface HashIndex: Index
-- (void) reserve: (u32) n_tuples;
-@end
-
 struct hash_iterator {
 	struct iterator base; /* Must be the first member. */
 	struct mh_i32ptr_t *hash;
@@ -339,11 +355,6 @@ int32_key_to_value(void *key)
 }
 
 
-@interface Hash32Index: HashIndex {
-	 struct mh_i32ptr_t *int_hash;
-};
-@end
-
 @implementation Hash32Index
 
 - (void) reserve: (u32) n_tuples
@@ -461,11 +472,6 @@ int64_key_to_value(void *key)
 	return *((u64 *) key);
 }
 
-@interface Hash64Index: HashIndex {
-	struct mh_i64ptr_t *int64_hash;
-};
-@end
-
 @implementation Hash64Index
 - (void) reserve: (u32) n_tuples
 {
@@ -573,11 +579,6 @@ int64_key_to_value(void *key)
 /* }}} */
 
 /* {{{ HashStrIndex ***********************************************/
-
-@interface HashStrIndex: HashIndex {
-	 struct mh_lstrptr_t *str_hash;
-};
-@end
 
 @implementation HashStrIndex
 - (void) reserve: (u32) n_tuples

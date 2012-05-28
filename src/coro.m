@@ -56,7 +56,7 @@ tarantool_coro_create(struct tarantool_coro *coro, void (*f) (void *), void *dat
 	if (coro->stack == MAP_FAILED)
 		return NULL;
 
-	VALGRIND_STACK_REGISTER(coro->stack, coro->stack + coro->stack_size);
+	(void) VALGRIND_STACK_REGISTER(coro->stack, coro->stack + coro->stack_size);
 
 	coro_create(&coro->ctx, f, data, coro->stack, coro->stack_size);
 

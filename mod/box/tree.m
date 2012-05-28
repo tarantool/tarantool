@@ -815,6 +815,28 @@ tree_iterator_free(struct iterator *iterator)
 @class Num32TreeIndex;
 @class FixedTreeIndex;
 
+@interface SparseTreeIndex: TreeIndex
+@end
+
+@interface DenseTreeIndex: TreeIndex {
+	@public
+	u32 first_field;
+	bool is_linear;
+}
+@end
+
+@interface Num32TreeIndex: TreeIndex
+@end
+
+@interface FixedTreeIndex: TreeIndex {
+	@public
+	u32 first_field;
+	u32 first_offset;
+	bool is_linear;
+}
+@end
+
+
 + (Index *) alloc: (struct key_def *) key_def :(struct space *) space
 {
 	enum tree_type type = find_tree_type(space, key_def);
@@ -1041,9 +1063,6 @@ tree_iterator_free(struct iterator *iterator)
 
 /* {{{ SparseTreeIndex ********************************************/
 
-@interface SparseTreeIndex: TreeIndex
-@end
-
 static int
 sparse_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
@@ -1117,13 +1136,6 @@ sparse_key_node_cmp(const void *key, const void *node, void *arg)
 /* }}} */
 
 /* {{{ DenseTreeIndex *********************************************/
-
-@interface DenseTreeIndex: TreeIndex {
-	@public
-	u32 first_field;
-	bool is_linear;
-}
-@end
 
 static int
 dense_node_cmp(const void *node_a, const void *node_b, void *arg)
@@ -1241,9 +1253,6 @@ linear_dense_key_node_cmp(const void *key, const void * node, void *arg)
 
 /* {{{ Num32TreeIndex *********************************************/
 
-@interface Num32TreeIndex: TreeIndex
-@end
-
 static int
 num32_node_cmp(const void * node_a, const void * node_b, void *arg)
 {
@@ -1314,14 +1323,6 @@ num32_key_node_cmp(const void * key, const void * node, void *arg)
 /* }}} */
 
 /* {{{ FixedTreeIndex *********************************************/
-
-@interface FixedTreeIndex: TreeIndex {
-	@public
-	u32 first_field;
-	u32 first_offset;
-	bool is_linear;
-}
-@end
 
 static int
 fixed_node_cmp(const void *node_a, const void *node_b, void *arg)
