@@ -53,10 +53,12 @@ enum log_mode {
 	LOG_WRITE
 };
 
+typedef u32 log_magic_t;
+
 struct log_io_class {
 	row_reader *reader;
-	u64 marker, eof_marker;
-	size_t marker_size, eof_marker_size;
+	log_magic_t marker;
+	log_magic_t eof_marker;
 	bool panic_if_error;
 
 	/* Additional flags to apply at open(2) to write. */
@@ -137,25 +139,6 @@ struct recovery_state {
 
 struct recovery_state *recovery_state;
 
-struct wal_write_request {
-	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
-	/* Auxiliary. */
-	u64 out_lsn;
-	struct fiber *fiber;
-	/** Header. */
-	u32 marker;
-	u32 header_crc32c;
-	i64 lsn;
-	double tm;
-	u32 len;
-	u32 data_crc32c;
-	/* Data. */
-	u16 tag;
-	u64 cookie;
-	u16 op;
-	u8 data[];
-} __attribute__((packed));
-
 /* @todo: merge with wal_write_request. */
 struct row_v11 {
 	u32 header_crc32c;
@@ -198,8 +181,9 @@ int read_log(const char *filename,
 void recovery_follow_remote(struct recovery_state *r, const char *remote);
 void recovery_stop_remote(struct recovery_state *r);
 
-struct log_io_iter;
-void snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row);
-void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io_iter *));
+void snapshot_write_row(struct log_io *i, u16 tag, u64 cookie,
+			const void *metadata, size_t metadata_size,
+			const void *data, size_t data_size);
+void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io *));
 
 #endif /* TARANTOOL_LOG_IO_H_INCLUDED */

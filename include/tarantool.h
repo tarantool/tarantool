@@ -38,7 +38,7 @@ extern const char *mod_name;
 i32 mod_check_config(struct tarantool_cfg *conf);
 i32 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
 int mod_cat(const char *filename);
-void mod_snapshot(struct log_io_iter *);
+void mod_snapshot(struct log_io *);
 void mod_info(struct tbuf *out);
 
 extern struct tarantool_cfg cfg;

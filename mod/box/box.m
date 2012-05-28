@@ -120,7 +120,7 @@ iproto_secondary_port_handler(u32 op, struct tbuf *request_data)
 	box_process_ro(txn_begin(), port_iproto, op, request_data);
 }
 
-static int
+static void
 box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 {
 	struct row_v11 *row = row_v11(t);
@@ -209,39 +209,43 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	default:
 		tbuf_printf(buf, "unknown wal op %" PRIi32, op);
 	}
-	return 0;
 }
-
 
 static int
 snap_print(struct tbuf *t)
 {
-	struct tbuf *out = tbuf_alloc(t->pool);
-	struct box_snap_row *row;
-	struct row_v11 *raw_row = row_v11(t);
+	@try {
+		struct tbuf *out = tbuf_alloc(t->pool);
+		struct row_v11 *raw_row = row_v11(t);
+		struct tbuf *b = palloc(t->pool, sizeof(*b));
+		b->data = raw_row->data;
+		b->size = raw_row->len;
 
-	struct tbuf *b = palloc(fiber->gc_pool, sizeof(*b));
-	b->data = raw_row->data;
-	b->size = raw_row->len;
+		(void)read_u16(b); /* drop tag */
+		(void)read_u64(b); /* drop cookie */
 
-	(void)read_u16(b); /* drop tag */
-	(void)read_u64(b); /* drop cookie */
+		struct box_snap_row *row =  box_snap_row(b);
 
-	row = box_snap_row(b);
-
-	tuple_print(out, row->tuple_size, row->data);
-	printf("n:%i %*s\n", row->space, (int) out->size, (char *)out->data);
+		tuple_print(out, row->tuple_size, row->data);
+		printf("n:%i %*s\n", row->space, (int) out->size,
+		       (char *)out->data);
+	} @catch (id e) {
+		return -1;
+	}
 	return 0;
 }
 
 static int
 xlog_print(struct tbuf *t)
 {
-	struct tbuf *out = tbuf_alloc(t->pool);
-	int res = box_xlog_sprint(out, t);
-	if (res >= 0)
+	@try {
+		struct tbuf *out = tbuf_alloc(t->pool);
+		box_xlog_sprint(out, t);
 		printf("%*s\n", (int)out->size, (char *)out->data);
-	return res;
+	} @catch (id e) {
+		return -1;
+	}
+	return 0;
 }
 
 static struct tbuf *
@@ -268,21 +272,21 @@ recover_row(struct tbuf *t)
 	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
 		return -1;
 
-	u16 tag = read_u16(t);
-	read_u64(t); /* drop cookie */
-	if (tag == snap_tag)
-		t = convert_snap_row_to_wal(t);
-	else if (tag != wal_tag) {
-		say_error("unknown row tag: %i", (int)tag);
-		return -1;
-	}
-
-	u16 op = read_u16(t);
-
-	struct txn *txn = txn_begin();
-	txn->txn_flags |= BOX_NOT_STORE;
-
 	@try {
+		u16 tag = read_u16(t);
+		read_u64(t); /* drop cookie */
+		if (tag == snap_tag)
+			t = convert_snap_row_to_wal(t);
+		else if (tag != wal_tag) {
+			say_error("unknown row tag: %i", (int)tag);
+			return -1;
+		}
+
+		u16 op = read_u16(t);
+
+		struct txn *txn = txn_begin();
+		txn->txn_flags |= BOX_NOT_STORE;
+
 		box_process_rw(txn, port_null, op, t);
 	}
 	@catch (id e) {
@@ -523,27 +527,23 @@ mod_cat(const char *filename)
 }
 
 static void
-snapshot_write_tuple(struct log_io_iter *i, unsigned n, struct tuple *tuple)
+snapshot_write_tuple(struct log_io *l, unsigned n, struct tuple *tuple)
 {
-	struct tbuf *row;
-	struct box_snap_row header;
-
 	if (tuple->flags & GHOST)	// do not save fictive rows
 		return;
 
+	struct box_snap_row header;
 	header.space = n;
 	header.tuple_size = tuple->field_count;
 	header.data_size = tuple->bsize;
 
-	row = tbuf_alloc(fiber->gc_pool);
-	tbuf_append(row, &header, sizeof(header));
-	tbuf_append(row, tuple->data, tuple->bsize);
-
-	snapshot_write_row(i, snap_tag, default_cookie, row);
+	snapshot_write_row(l, snap_tag, default_cookie,
+			   (void *) &header, sizeof(header),
+			   tuple->data, tuple->bsize);
 }
 
 void
-mod_snapshot(struct log_io_iter *i)
+mod_snapshot(struct log_io *l)
 {
 	struct tuple *tuple;
 
@@ -556,7 +556,7 @@ mod_snapshot(struct log_io_iter *i)
 		struct iterator *it = pk->position;
 		[pk initIterator: it :ITER_FORWARD];
 		while ((tuple = it->next(it))) {
-			snapshot_write_tuple(i, n, tuple);
+			snapshot_write_tuple(l, n, tuple);
 		}
 	}
 }

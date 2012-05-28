@@ -111,8 +111,8 @@ const u16 snap_tag = -1;
 const u16 wal_tag = -2;
 const u64 default_cookie = 0;
 const u32 default_version = 11;
-const u32 marker_v11 = 0xba0babed;
-const u32 eof_marker_v11 = 0x10adab1e;
+const log_magic_t marker_v11 = 0xba0babed;
+const log_magic_t eof_marker_v11 = 0x10adab1e;
 const char snap_ext[] = ".snap";
 const char xlog_ext[] = ".xlog";
 const char inprogress_suffix[] = ".inprogress";
@@ -126,6 +126,25 @@ struct recovery_state *recovery_state;
 enum suffix { NONE, INPROGRESS };
 
 #define ROW_EOF (void *)1
+
+struct wal_write_request {
+	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
+	/* Auxiliary. */
+	u64 out_lsn;
+	struct fiber *fiber;
+	/** Header. */
+	log_magic_t marker;
+	u32 header_crc32c;
+	i64 lsn;
+	double tm;
+	u32 len;
+	u32 data_crc32c;
+	/* Data. */
+	u16 tag;
+	u64 cookie;
+	u16 op;
+	u8 data[];
+} __attribute__((packed));
 
 /* Context of the WAL writer thread. */
 
@@ -169,17 +188,6 @@ struct wal_watcher {
 };
 
 static struct wal_watcher wal_watcher;
-
-struct log_io_iter {
-	struct tarantool_coro coro;
-	struct log_io *log;
-	void *from;
-	void *to;
-	int error;
-	bool eof;
-	int io_rate_limit;
-};
-
 
 void
 wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn)
@@ -252,9 +260,7 @@ v11_class(struct log_io_class *c)
 	c->filetype = xlog_mark;
 	c->version = v11;
 	c->marker = marker_v11;
-	c->marker_size = sizeof(marker_v11);
 	c->eof_marker = eof_marker_v11;
-	c->eof_marker_size = sizeof(eof_marker_v11);
 }
 
 static void
@@ -298,6 +304,7 @@ struct log_io_cursor
 	struct log_io *log;
 	int row_count;
 	off_t good_offset;
+	bool eof_read;
 };
 
 void
@@ -306,6 +313,7 @@ log_io_cursor_open(struct log_io_cursor *i, struct log_io *l)
 	i->log = l;
 	i->row_count = 0;
 	i->good_offset = ftello(l->f);
+	i->eof_read  = false;
 }
 
 void
@@ -317,8 +325,9 @@ log_io_cursor_close(struct log_io_cursor *i)
 	 * Since we don't close log_io
 	 * we must rewind log_io to last known
 	 * good position if there was an error.
+	 * Seek back to last known good offset.
 	 */
-	fseeko(l->f, i->good_offset, SEEK_SET);	/* seek back to last known good offset */
+	fseeko(l->f, i->good_offset, SEEK_SET);
 	prelease(fiber->gc_pool);
 }
 
@@ -334,12 +343,13 @@ static struct tbuf *
 log_io_cursor_next(struct log_io_cursor *i)
 {
 	struct log_io *l = i->log;
-	u64 magic;
+	log_magic_t magic;
 	off_t marker_offset = 0;
-	const u64 marker_mask = (u64)-1 >> ((sizeof(u64) - l->class->marker_size) * 8);
 
-	say_debug("log_io_cursor_next: marker:0x%016" PRIX64 "/%" PRI_SZ,
-		  l->class->marker, l->class->marker_size);
+	assert(i->eof_read == false);
+
+	say_debug("log_io_cursor_next: marker:0x%016" PRIX32 "/%" PRI_SZ,
+		  l->class->marker, sizeof(l->class->marker));
 
 	/*
 	 * Don't let gc pool grow too much. Yet to
@@ -352,19 +362,19 @@ restart:
 	if (marker_offset > 0)
 		fseeko(l->f, marker_offset + 1, SEEK_SET);
 
-	if (fread(&magic, l->class->marker_size, 1, l->f) != 1)
+	if (fread(&magic, sizeof(magic), 1, l->f) != 1)
 		goto eof;
 
-	while ((magic & marker_mask) != l->class->marker) {
+	while (magic != l->class->marker) {
 		int c = fgetc(l->f);
 		if (c == EOF) {
 			say_debug("eof while looking for magic");
 			goto eof;
 		}
-		magic >>= 8;
-		magic |= (((u64)c & 0xff) << ((l->class->marker_size - 1) * 8));
+		magic = magic >> 8 |
+			((log_magic_t) c & 0xff) << (sizeof(magic)*8 - 8);
 	}
-	marker_offset = ftello(l->f) - l->class->marker_size;
+	marker_offset = ftello(l->f) - sizeof(l->class->marker);
 	if (i->good_offset != marker_offset)
 		say_warn("skipped %" PRI_OFFT " bytes after 0x%08" PRI_XFFT " offset",
 			 marker_offset - i->good_offset, i->good_offset);
@@ -382,38 +392,34 @@ restart:
 	}
 
 	i->good_offset = ftello(l->f);
+	i->row_count++;
 
-	if (++i->row_count % 100000 == 0)
+	if (i->row_count % 100000 == 0)
 		say_info("%.1fM rows processed", i->row_count / 1000000.);
+
 	return row;
 eof:
 	/*
 	 * The only two cases of fully read file:
-	 * 1. eof_marker_size > 0 and it is the last record in file
-	 * 2. eof_marker_size == 0 and there is no unread data in file
+	 * 1. sizeof(eof_marker) > 0 and it is the last record in file
+	 * 2. sizeof(eof_marker) == 0 and there is no unread data in file
 	 */
-	if (ftello(l->f) == i->good_offset + l->class->eof_marker_size) {
+	if (ftello(l->f) == i->good_offset + sizeof(l->class->eof_marker)) {
 		fseeko(l->f, i->good_offset, SEEK_SET);
-		if (fread(&magic, l->class->eof_marker_size, 1, l->f) != 1) {
+		if (fread(&magic, sizeof(magic), 1, l->f) != 1) {
 			say_error("can't read eof marker");
-		} else if (memcmp(&magic, &l->class->eof_marker, l->class->eof_marker_size) != 0) {
-			say_error("eof marker is corrupt: %llu",
-				  (unsigned long long) magic);
+		}
+		else if (magic != l->class->eof_marker) {
+			say_error("eof marker is corrupt: %lu",
+				  (unsigned long) magic);
 		}
 		else {
 			i->good_offset = ftello(l->f);
+			i->eof_read = true;
 		}
 	}
-	/* EOF */
+	/* No more rows. */
 	return NULL;
-}
-
-static void
-iter_open(struct log_io *l, struct log_io_iter *i, void (*iterator) (struct log_io_iter * i))
-{
-	memset(i, 0, sizeof(*i));
-	i->log = l;
-	tarantool_coro_create(&i->coro, (void *)iterator, i);
 }
 
 static int
@@ -632,7 +638,8 @@ log_io_close(struct log_io **lptr)
 	}
 
 	if (l->mode == LOG_WRITE) {
-		if (fwrite(&l->class->eof_marker, l->class->eof_marker_size, 1, l->f) != 1)
+		if (fwrite(&l->class->eof_marker,
+			   sizeof(log_magic_t), 1, l->f) != 1)
 			say_error("can't write eof_marker");
 	}
 
@@ -877,21 +884,15 @@ read_log(const char *filename,
 	FILE *f = fopen(filename, "r");
 	struct log_io *l = log_io_open(c, LOG_READ, filename, NONE, f);
 	struct log_io_cursor i;
-	@try {
-		log_io_cursor_open(&i, l);
-		struct tbuf *row;
-		while ((row = log_io_cursor_next(&i)))
-			h(row);
-	}
-	@catch (id e) {
-		say_error("binary log `%s' wasn't correctly closed", filename);
-		return -1;
-	}
-	@finally {
-		log_io_cursor_close(&i);
-		log_io_close(&l);
-		v11_class_free(c);
-	}
+
+	log_io_cursor_open(&i, l);
+	struct tbuf *row;
+	while ((row = log_io_cursor_next(&i)))
+		h(row);
+
+	log_io_cursor_close(&i);
+	log_io_close(&l);
+	v11_class_free(c);
 	return 0;
 }
 
@@ -904,6 +905,7 @@ read_log(const char *filename,
 static int
 recover_snap(struct recovery_state *r)
 {
+	int res = -1;
 	struct log_io *snap;
 	i64 lsn;
 
@@ -919,80 +921,62 @@ recover_snap(struct recovery_state *r)
 	}
 	say_info("recover from `%s'", snap->filename);
 	struct log_io_cursor i;
-	@try {
-		log_io_cursor_open(&i, snap);
 
-		struct tbuf *row;
-		while ((row = log_io_cursor_next(&i))) {
-			if (r->row_handler(row) < 0) {
-				say_error("can't apply row");
-				return -1;
-			}
+	log_io_cursor_open(&i, snap);
+
+	struct tbuf *row;
+	while ((row = log_io_cursor_next(&i))) {
+		if (r->row_handler(row) < 0) {
+			say_error("can't apply row");
+			goto end;
 		}
-		r->lsn = r->confirmed_lsn = lsn;
-
-		return 0;
 	}
-	@catch (id e) {
-		say_error("failure reading snapshot");
-
-		return -1;
-	}
-	@finally {
-		log_io_cursor_close(&i);
-		log_io_close(&snap);
-	}
+	r->lsn = r->confirmed_lsn = lsn;
+	res = 0;
+end:
+	log_io_cursor_close(&i);
+	log_io_close(&snap);
+	return res;
 }
-
-/*
- * return value:
- * -1: error
- * 0: eof
- * 1: ok, maybe read something
- */
 
 #define LOG_EOF 0
 
+/**
+ * @retval -1 error
+ * @retval 0 EOF
+ * @retval 1 ok, maybe read something
+ */
 static int
 recover_wal(struct recovery_state *r, struct log_io *l)
 {
+	int res = -1;
 	struct log_io_cursor i;
 
-	@try {
-		log_io_cursor_open(&i, l);
+	log_io_cursor_open(&i, l);
 
-		struct tbuf *row = NULL;
-		while ((row = log_io_cursor_next(&i))) {
-			i64 lsn = row_v11(row)->lsn;
-			if (lsn <= r->confirmed_lsn) {
-				say_debug("skipping too young row");
-				continue;
-			}
-
-			/*  after handler(r, row) returned, row may be modified, do not use it */
-			if (r->row_handler(row) < 0) {
-				say_error("can't apply row");
-				return -1;
-			}
-
-			next_lsn(r, lsn);
-			confirm_lsn(r, lsn);
+	struct tbuf *row = NULL;
+	while ((row = log_io_cursor_next(&i))) {
+		i64 lsn = row_v11(row)->lsn;
+		if (lsn <= r->confirmed_lsn) {
+			say_debug("skipping too young row");
+			continue;
 		}
-	}
-	@catch (id e) {
-		say_error("failure reading xlog");
-
-		return -1;
-	}
-	@finally {
 		/*
-		 * Since we don't close log_io
-		 * we must rewind log_io to last known
-		 * good position if where was an error.
+		 * After handler(row) returned, row may be
+		 * modified, do not use it.
 		 */
-		log_io_cursor_close(&i);
+		if (r->row_handler(row) < 0) {
+			say_error("can't apply row");
+			goto end;
+		}
+		next_lsn(r, lsn);
+		confirm_lsn(r, lsn);
 	}
-	return LOG_EOF;
+	res = i.eof_read ? LOG_EOF : 1;
+end:
+	log_io_cursor_close(&i);
+	/* Sic: we don't close the log here. */
+	return res;
 }
 
 /** Find out if there are new .xlog files since the current
@@ -1753,69 +1737,62 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 	r->snap_class->panic_if_error = on_snap_error;
 }
 
-static void
-write_rows(struct log_io_iter *i)
+struct snap_write_request
 {
-	struct log_io *l = i->log;
-	struct tbuf *row, *data;
-
-	row = tbuf_alloc(eter_pool);
-	tbuf_ensure(row, sizeof(struct row_v11));
-	row->size = sizeof(struct row_v11);
-
-	goto start;
-	for (;;) {
-		coro_transfer(&i->coro.ctx, &fiber->coro.ctx);
-	      start:
-		data = i->to;
-
-		if (fwrite(&l->class->marker, l->class->marker_size, 1, l->f) != 1)
-			panic("fwrite");
-
-		row_v11(row)->lsn = 0;	/* unused */
-		/* @todo: check if we can safely use ev_now() here. */
-		row_v11(row)->tm = ev_now();
-		row_v11(row)->len = data->size;
-		row_v11(row)->data_crc32c = crc32_calc(0, data->data, data->size);
-		row_v11(row)->header_crc32c =
-			crc32_calc(0, row->data + field_sizeof(struct row_v11, header_crc32c),
-				   sizeof(struct row_v11) - field_sizeof(struct row_v11,
-								     header_crc32c));
-
-		if (fwrite(row->data, row->size, 1, l->f) != 1)
-			panic("fwrite");
-
-		if (fwrite(data->data, data->size, 1, l->f) != 1)
-			panic("fwrite");
-
-		prelease_after(fiber->gc_pool, 128 * 1024);
-	}
-}
+	log_magic_t marker;
+	u32 header_crc32c;
+	i64 lsn;
+	double tm;
+	u32 len;
+	u32 data_crc32c;
+	/* Data. */
+	u16 tag;
+	u64 cookie;
+	u8 data[];
+} __attribute__((packed));
 
 void
-snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
+snapshot_write_row(struct log_io *l, u16 tag, u64 cookie,
+		   const void *metadata, size_t metadata_size,
+		   const void *data, size_t data_size)
 {
 	static int rows;
 	static int bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
-	struct tbuf *wal_row = tbuf_alloc(fiber->gc_pool);
 
-	tbuf_append(wal_row, &tag, sizeof(tag));
-	tbuf_append(wal_row, &cookie, sizeof(cookie));
-	tbuf_append(wal_row, row->data, row->size);
+	size_t total_size = (sizeof(struct snap_write_request) +
+			     metadata_size + data_size);
+	struct snap_write_request *req = palloc(fiber->gc_pool, total_size);
+	size_t header_size = (sizeof(req->lsn) + sizeof(req->tm)
+			     + sizeof(req->len) + sizeof(req->data_crc32c));
 
-	i->to = wal_row;
-	if (i->io_rate_limit > 0) {
+	req->marker = l->class->marker;
+	req->lsn = 0;
+	req->tm = ev_now();
+	req->len = (sizeof(req->tag) + sizeof(req->cookie) + metadata_size
+		    + data_size);
+	req->tag = tag;
+	req->cookie = cookie;
+	memcpy(req->data, metadata, metadata_size);
+	memcpy(req->data + metadata_size, data, data_size);
+	req->data_crc32c = crc32_calc(0, (void *) &req->tag, req->len);
+	req->header_crc32c = crc32_calc(0, (void *) &req->lsn, header_size);
+
+	if (fwrite(req, total_size, 1, l->f) != 1)
+		panic("fwrite");
+
+	if (++rows % 100000 == 0)
+		say_crit("%.1fM rows written", rows / 1000000.);
+
+	if (recovery_state->snap_io_rate_limit > 0) {
 		if (last == 0) {
 			ev_now_update();
 			last = ev_now();
 		}
-
-		bytes += row->size + sizeof(struct row_v11);
-
-		while (bytes >= i->io_rate_limit) {
-			log_io_flush(i->log);
+		bytes += total_size;
+		while (bytes >= recovery_state->snap_io_rate_limit) {
+			log_io_flush(l);
 
 			ev_now_update();
 			elapsed = ev_now() - last;
@@ -1824,32 +1801,22 @@ snapshot_write_row(struct log_io_iter *i, u16 tag, u64 cookie, struct tbuf *row)
 
 			ev_now_update();
 			last = ev_now();
-			bytes -= i->io_rate_limit;
+			bytes -= recovery_state->snap_io_rate_limit;
 		}
 	}
-	coro_transfer(&fiber->coro.ctx, &i->coro.ctx);
-	if (++rows % 100000 == 0)
-		say_crit("%.1fM rows written", rows / 1000000.);
+	prelease_after(fiber->gc_pool, 128 * 1024);
 }
 
 void
-snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
+snapshot_save(struct recovery_state *r, void (*f) (struct log_io *))
 {
-	struct log_io_iter i;
 	struct log_io *snap;
 	char final_filename[PATH_MAX + 1];
 	char *dot;
 
-	memset(&i, 0, sizeof(i));
-
 	snap = log_io_open_for_write(r->snap_class, r->confirmed_lsn, INPROGRESS);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
-
-	iter_open(snap, &i, write_rows);
-
-	if (r->snap_io_rate_limit > 0)
-		i.io_rate_limit = r->snap_io_rate_limit;
 
 	/*
 	 * While saving a snapshot, snapshot name is set to
@@ -1861,7 +1828,7 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io_iter *))
 	*dot = 0;
 
 	say_info("saving snapshot `%s'", final_filename);
-	f(&i);
+	f(snap);
 
 	if (fsync(fileno(snap->f)) < 0)
 		panic("fsync");
