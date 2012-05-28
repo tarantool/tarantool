@@ -614,7 +614,7 @@ replication_relay_loop(int client_sock)
 	ev_io_start(&sock_read_ev);
 
 	/* Initialize the recovery process */
-	recovery_init(NULL, cfg.wal_dir, replication_relay_send_row,
+	recovery_init(cfg.snap_dir, cfg.wal_dir, replication_relay_send_row,
 		      INT32_MAX, "fsync_delay", 0,
 		      RECOVER_READONLY);
 

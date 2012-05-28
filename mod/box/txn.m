@@ -132,8 +132,7 @@ txn_commit(struct txn *txn)
 		fiber_peer_name(fiber); /* fill the cookie */
 
 		i64 lsn = next_lsn(recovery_state, 0);
-		int res = wal_write(recovery_state, wal_tag,
-				    txn->op,
+		int res = wal_write(recovery_state, txn->op,
 				    fiber->cookie, lsn, &txn->req);
 		confirm_lsn(recovery_state, lsn);
 		if (res)

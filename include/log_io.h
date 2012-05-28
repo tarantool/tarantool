@@ -36,39 +36,19 @@
 #include <netinet/in.h> /* struct sockaddr_in */
 #include <third_party/queue.h>
 
-struct tbuf;
-
 #define RECOVER_READONLY 1
 
-extern const u16 wal_tag, snap_tag;
-extern const u64 default_cookie;
 extern const u32 default_version;
 
 struct recovery_state;
 typedef int (row_handler)(struct tbuf *);
-typedef struct tbuf *(row_reader) (FILE *f, struct palloc_pool *pool);
 
 enum log_mode {
 	LOG_READ,
 	LOG_WRITE
 };
 
-typedef u32 log_magic_t;
-
-struct log_io_class {
-	row_reader *reader;
-	log_magic_t marker;
-	log_magic_t eof_marker;
-	bool panic_if_error;
-
-	/* Additional flags to apply at open(2) to write. */
-	int  open_wflags;
-	const char *filetype;
-	const char *version;
-	const char *filename_ext;
-	char *dirname;
-};
-
+enum log_format { XLOG = 65534, SNAP = 65535 };
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.
@@ -90,7 +70,7 @@ wait_lsn_clear(struct wait_lsn *wait_lsn)
 }
 
 struct log_io {
-	struct log_io_class *class;
+	struct log_dir *dir;
 	FILE *f;
 
 	enum log_mode mode;
@@ -114,14 +94,18 @@ struct recovery_state {
 	 * we save the old WAL here.
 	 */
 	struct log_io *previous_wal;
-	struct log_io_class *snap_class;
-	struct log_io_class *wal_class;
+	struct log_dir *snap_dir;
+	struct log_dir *wal_dir;
 	struct wal_writer *writer;
 	struct wal_watcher *watcher;
 	struct fiber *remote_recovery;
 
-	/* row_handler will be presented by most recent format of data
-	   log_io_class->reader is responsible of converting data from old format */
+	/**
+	 * Row_handler is invoked during initial recovery.
+	 * It will be presented with the most recent format of
+	 * data. Row_reader is responsible for converting data
+	 * from old formats.
+	 */
 	row_handler *row_handler;
 	struct sockaddr_in remote_addr;
 
@@ -166,7 +150,7 @@ void recovery_free();
 void recover(struct recovery_state *, i64 lsn);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
-int wal_write(struct recovery_state *r, u16 tag, u16 op,
+int wal_write(struct recovery_state *r, u16 op,
 	      u64 cookie, i64 lsn, struct tbuf *data);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
@@ -181,7 +165,7 @@ int read_log(const char *filename,
 void recovery_follow_remote(struct recovery_state *r, const char *remote);
 void recovery_stop_remote(struct recovery_state *r);
 
-void snapshot_write_row(struct log_io *i, u16 tag, u64 cookie,
+void snapshot_write_row(struct log_io *i,
 			const void *metadata, size_t metadata_size,
 			const void *data, size_t data_size);
 void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io *));

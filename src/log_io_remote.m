@@ -162,7 +162,9 @@ remote_apply_row(struct recovery_state *r, struct tbuf *row)
 	(void)read_u64(data); /* drop the cookie */
 	op = read_u16(data);
 
-	if (wal_write(r, tag, op, r->cookie, lsn, data))
+	assert(tag == XLOG);
+
+	if (wal_write(r, op, r->cookie, lsn, data))
 		panic("replication failure: can't write row to WAL");
 
 	next_lsn(r, lsn);

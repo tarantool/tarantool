@@ -275,9 +275,9 @@ recover_row(struct tbuf *t)
 	@try {
 		u16 tag = read_u16(t);
 		read_u64(t); /* drop cookie */
-		if (tag == snap_tag)
+		if (tag == SNAP)
 			t = convert_snap_row_to_wal(t);
-		else if (tag != wal_tag) {
+		else if (tag != XLOG) {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
 		}
@@ -537,8 +537,7 @@ snapshot_write_tuple(struct log_io *l, unsigned n, struct tuple *tuple)
 	header.tuple_size = tuple->field_count;
 	header.data_size = tuple->bsize;
 
-	snapshot_write_row(l, snap_tag, default_cookie,
-			   (void *) &header, sizeof(header),
+	snapshot_write_row(l, (void *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);
 }
 
