@@ -6,20 +6,29 @@ http://fedoraproject.org/wiki/EPEL/FAQ#How_can_I_install_the_packages_from_the_E
 
 sudo rpm -iv ./epel-release-5-4.noarch.rpm
 
-2. Install build-required packages:
+2. Install necessary packages:
 -------------
 
 sudo yum install gcc gcc-c++ gcc-objc cmake git readline-devel ncurses-devel binutuls-devel
 
-3. Download & build tarantool source code:
+3. Install gcc 4.6.x and gcc infrastructure pre-requisites
+-------------
+(x) From one of the gcc mirrors download from /gcc/infrastructure: gmp, mpfr and mpc packages;
+(x) Configure and build the pre-requisites using --prefix=/usr/local and --with-gmp=/usr/local (see gcc.gnu.org/install);
+(x) Configure gcc as:
+    configure --prefix=/usr/local --enable-languages=c,c++,objc --program-suffix=463 --enable-shared --enable-threads=posix --with-mpc=/usr/local
+(x) Build gcc as per steps outlined in GCC documentation gcc.gnu.org/install;
+(x) Set up the environment to include the new GCC's libs: export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib:/usr/local/lib64
+
+4. Download & build tarantool source code:
 -------------
 
 git clone git://github.com/mailru/tarantool.git
 
 cd tarantool
-cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true && make
+CC=gcc463 CXX=g++463 cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true && make
 
-4. Install test-required packages and modules for Python 2.6
+5. Install test-required packages and modules for Python 2.6
 -------------
 
 sudo yum install python26 python26-PyYAML python26-argparse
@@ -32,12 +41,12 @@ wget http://pypi.python.org/packages/source/d/daemon/daemon-1.0.tar.gz#md5=b0beb
 tar -xzvf daemon-1.0.tar.gz
 sudo python26 setup.py install
 
-5. Set up python 2.6 to run tarantool tests
+6. Set up python 2.6 to run tarantool tests
 -------------
 
 mkdir ~/build/bin && ln -s /usr/bin/python26 ~/build/bin/python
 
-6. Run tarantool test suite
+7. Run tarantool test suite
 -------------
 
 cd ~/build/tarantool/test
