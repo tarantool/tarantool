@@ -27,6 +27,11 @@
 
 #include <tbuf.h> /* for struct tbuf */
 
+enum {
+	/** Maximal iproto package length (2GiB) */
+	IPROTO_LEN_MAX = 2147483648,
+};
+
 /*
  * struct iproto_header and struct iproto_header_retcode
  * share common prefix {msg_code, len, sync}
