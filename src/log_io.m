@@ -142,67 +142,9 @@ enum suffix { NONE, INPROGRESS };
 
 #define ROW_EOF (void *)1
 
-struct wal_write_request {
-	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
-	/* Auxiliary. */
-	u64 out_lsn;
-	struct fiber *fiber;
-	/** Header. */
-	log_magic_t marker;
-	u32 header_crc32c;
-	i64 lsn;
-	double tm;
-	u32 len;
-	u32 data_crc32c;
-	/* Data. */
-	u16 tag;
-	u64 cookie;
-	u16 op;
-	u8 data[];
-} __attribute__((packed));
-
-/* Context of the WAL writer thread. */
-
-struct wal_writer
-{
-	STAILQ_HEAD(wal_fifo, wal_write_request) input, output;
-	pthread_t thread;
-	pthread_mutex_t mutex;
-	pthread_cond_t cond;
-	ev_async async;
-	bool is_shutdown;
-};
-
 static int
 wal_writer_start(struct recovery_state *state);
-
-static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
-
-static struct wal_writer wal_writer;
-
 static struct tbuf *row_reader_v11(FILE *f, struct palloc_pool *pool);
-
-/**
- * This is used in local hot standby or replication
- * relay mode: look for changes in the wal_dir and apply them
- * locally or send to the replica.
- */
-struct wal_watcher {
-	/**
-	 * Rescan the WAL directory in search for new WAL files
-	 * every wal_dir_rescan_delay seconds.
-	 */
-	ev_timer dir_timer;
-	/**
-	 * When the latest WAL does not contain a EOF marker,
-	 * re-read its tail on every change in file metadata.
-	 */
-	ev_stat stat;
-	/** Path to the file being watched with 'stat'. */
-	char filename[PATH_MAX+1];
-};
-
-static struct wal_watcher wal_watcher;
 
 void
 wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn)
@@ -417,7 +359,7 @@ scan_dir(struct log_dir *dir, i64 **ret_lsn)
 
 		char *ext = strchr(dent->d_name, '.');
 		if (ext == NULL)
-			continue;
+		continue;
 
 		const char *suffix = strchr(ext + 1, '.');
 		/*
@@ -1107,6 +1049,30 @@ out:
 	prelease(fiber->gc_pool);
 }
 
+/* {{{ Local recovery: support of hot standby and replication relay */
+
+/**
+ * This is used in local hot standby or replication
+ * relay mode: look for changes in the wal_dir and apply them
+ * locally or send to the replica.
+ */
+struct wal_watcher {
+	/**
+	 * Rescan the WAL directory in search for new WAL files
+	 * every wal_dir_rescan_delay seconds.
+	 */
+	ev_timer dir_timer;
+	/**
+	 * When the latest WAL does not contain a EOF marker,
+	 * re-read its tail on every change in file metadata.
+	 */
+	ev_stat stat;
+	/** Path to the file being watched with 'stat'. */
+	char filename[PATH_MAX+1];
+};
+
+static struct wal_watcher wal_watcher;
+
 static void recovery_rescan_file(ev_stat *w, int revents __attribute__((unused)));
 
 static void
@@ -1192,6 +1158,8 @@ recovery_stop_local(struct recovery_state *r)
 	r->watcher = NULL;
 }
 
+/* }}} */
+
 void
 recovery_finalize(struct recovery_state *r)
 {
@@ -1237,6 +1205,42 @@ recovery_finalize(struct recovery_state *r)
 /* {{{ WAL writer - maintain a Write Ahead Log for every change
  * in the data state.
  */
+
+struct wal_write_request {
+	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
+	/* Auxiliary. */
+	u64 out_lsn;
+	struct fiber *fiber;
+	/** Header. */
+	log_magic_t marker;
+	u32 header_crc32c;
+	i64 lsn;
+	double tm;
+	u32 len;
+	u32 data_crc32c;
+	/* Data. */
+	u16 tag;
+	u64 cookie;
+	u16 op;
+	u8 data[];
+} __attribute__((packed));
+
+/* Context of the WAL writer thread. */
+
+struct wal_writer
+{
+	STAILQ_HEAD(wal_fifo, wal_write_request) input, output;
+	pthread_t thread;
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+	ev_async async;
+	bool is_shutdown;
+};
+
+static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
+
+static struct wal_writer wal_writer;
+
 
 /**
  * A pthread_atfork() callback for a child process. Today we only
