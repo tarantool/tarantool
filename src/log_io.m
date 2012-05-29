@@ -109,6 +109,14 @@
 
 typedef u32 log_magic_t;
 
+struct row_v11 {
+	log_magic_t marker;
+	struct header_v11 header;
+	u16 tag;
+	u64 cookie;
+	u8 data[];
+} __attribute__((packed));
+
 struct log_dir {
 	bool panic_if_error;
 
@@ -141,6 +149,42 @@ struct recovery_state *recovery_state;
 enum suffix { NONE, INPROGRESS };
 
 #define ROW_EOF (void *)1
+
+void
+header_v11_fill(struct header_v11 *header, u64 lsn, size_t data_len)
+{
+	header->lsn = lsn;
+	header->tm = ev_now();
+	header->len = data_len;
+}
+
+void
+header_v11_sign(struct header_v11 *header)
+{
+	header->data_crc32c = crc32_calc(0, (void *) header + sizeof(struct
+						  header_v11), header->len);
+	header->header_crc32c = crc32_calc(0, (void *) &header->lsn,
+					   sizeof(struct header_v11) -
+					   sizeof(header->header_crc32c));
+}
+
+void
+row_v11_fill(struct row_v11 *row, u64 lsn, u16 tag, u64 cookie, const void *metadata,
+	     size_t metadata_len, const void *data, size_t data_len)
+{
+	row->marker = row_marker_v11;
+	row->tag  = tag;
+	row->cookie = cookie;
+	memcpy(row->data, metadata, metadata_len);
+	memcpy(row->data + metadata_len, data, data_len);
+	header_v11_fill(&row->header, lsn, metadata_len + data_len +
+			sizeof(row->tag) + sizeof(row->cookie));
+}
+
+static inline size_t row_v11_size(struct row_v11 *row)
+{
+	return sizeof(row->marker) + sizeof(struct header_v11) + row->header.len;
+}
 
 static int
 wal_writer_start(struct recovery_state *state);
@@ -460,34 +504,34 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 
 	u32 header_crc, data_crc;
 
-	tbuf_ensure(m, sizeof(struct row_v11));
-	if (fread(m->data, sizeof(struct row_v11), 1, f) != 1)
+	tbuf_ensure(m, sizeof(struct header_v11));
+	if (fread(m->data, sizeof(struct header_v11), 1, f) != 1)
 		return ROW_EOF;
 
-	m->size = offsetof(struct row_v11, data);
+	m->size = sizeof(struct header_v11);
 
 	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
-	header_crc = crc32_calc(0, m->data + offsetof(struct row_v11, lsn),
-				sizeof(struct row_v11) - offsetof(struct row_v11, lsn));
+	header_crc = crc32_calc(0, m->data + offsetof(struct header_v11, lsn),
+				sizeof(struct header_v11) - offsetof(struct header_v11, lsn));
 
-	if (row_v11(m)->header_crc32c != header_crc) {
+	if (header_v11(m)->header_crc32c != header_crc) {
 		say_error("header crc32c mismatch");
 		return NULL;
 	}
 
-	tbuf_ensure(m, m->size + row_v11(m)->len);
-	if (fread(row_v11(m)->data, row_v11(m)->len, 1, f) != 1)
+	tbuf_ensure(m, m->size + header_v11(m)->len);
+	if (fread(m->data + sizeof(struct header_v11), header_v11(m)->len, 1, f) != 1)
 		return ROW_EOF;
 
-	m->size += row_v11(m)->len;
+	m->size += header_v11(m)->len;
 
-	data_crc = crc32_calc(0, row_v11(m)->data, row_v11(m)->len);
-	if (row_v11(m)->data_crc32c != data_crc) {
+	data_crc = crc32_calc(0, m->data + sizeof(struct header_v11), header_v11(m)->len);
+	if (header_v11(m)->data_crc32c != data_crc) {
 		say_error("data crc32c mismatch");
 		return NULL;
 	}
 
-	say_debug("read row v11 success lsn:%" PRIi64, row_v11(m)->lsn);
+	say_debug("read row v11 success lsn:%" PRIi64, header_v11(m)->lsn);
 	return m;
 }
 
@@ -845,7 +889,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 	struct tbuf *row = NULL;
 	while ((row = log_io_cursor_next(&i))) {
-		i64 lsn = row_v11(row)->lsn;
+		i64 lsn = header_v11(row)->lsn;
 		if (lsn <= r->confirmed_lsn) {
 			say_debug("skipping too young row");
 			continue;
@@ -1209,21 +1253,10 @@ recovery_finalize(struct recovery_state *r)
 struct wal_write_request {
 	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
 	/* Auxiliary. */
-	u64 out_lsn;
+	int res;
 	struct fiber *fiber;
-	/** Header. */
-	log_magic_t marker;
-	u32 header_crc32c;
-	i64 lsn;
-	double tm;
-	u32 len;
-	u32 data_crc32c;
-	/* Data. */
-	u16 tag;
-	u64 cookie;
-	u16 op;
-	u8 data[];
-} __attribute__((packed));
+	struct row_v11 row;
+};
 
 /* Context of the WAL writer thread. */
 
@@ -1431,15 +1464,15 @@ wal_writer_pop(struct wal_writer *writer, bool input_was_empty)
  * Write a single request to disk.
  */
 static int
-write_to_disk(struct recovery_state *r, struct wal_write_request *req)
+write_to_disk(struct recovery_state *r, struct row_v11 *row,
+	      bool is_bulk_end)
 {
 	static ev_tstamp last_flush = 0;
-	bool is_bulk_end = STAILQ_NEXT(req, wal_fifo_entry) == NULL;
 
 	if (r->current_wal == NULL) {
 		/* Open WAL with '.inprogress' suffix. */
 		r->current_wal =
-			log_io_open_for_write(r->wal_dir, req->lsn, INPROGRESS);
+			log_io_open_for_write(r->wal_dir, row->header.lsn, INPROGRESS);
 	}
 	else if (r->current_wal->rows == 1) {
 		/*
@@ -1467,18 +1500,10 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 		say_syserror("can't open WAL");
 		goto fail;
 	}
-	req->marker = row_marker_v11;
-	req->tm = ev_now();
-	req->data_crc32c = crc32_calc(0, (u8 *) &req->tag, req->len);
-	/* Header size. */
-	size_t sz = (sizeof(req->lsn) + sizeof(req->tm) + sizeof(req->len) +
-		     sizeof(req->data_crc32c));
-	req->header_crc32c = crc32_calc(0, (u8 *) &req->lsn, sz);
-	/* Total size. */
-	sz += sizeof(req->marker) + sizeof(req->header_crc32c) + req->len;
+	header_v11_sign(&row->header);
 	/* Write the request. */
-	if (fwrite(&req->marker, sz, 1, wal->f) != 1) {
-		say_syserror("can't write row header to WAL");
+	if (fwrite(row, row_v11_size(row), 1, wal->f) != 1) {
+		say_syserror("can't write row to WAL");
 		goto fail;
 	}
 
@@ -1505,16 +1530,13 @@ write_to_disk(struct recovery_state *r, struct wal_write_request *req)
 
 	wal->rows++;
 	if (r->rows_per_wal <= wal->rows ||
-	    (req->lsn + 1) % r->rows_per_wal == 0) {
+	    (row->header.lsn + 1) % r->rows_per_wal == 0) {
 		r->previous_wal = r->current_wal;
 		r->current_wal = NULL;
 	}
 
-	req->out_lsn = req->lsn;
 	return 0;
-
 fail:
-	req->out_lsn = 0;
 	return -1;
 }
 
@@ -1543,7 +1565,8 @@ wal_writer_thread(void *worker_args)
 			ev_async_send(&writer->async);
 
 		STAILQ_FOREACH(req, &input, wal_fifo_entry) {
-			(void) write_to_disk(r, req);
+			bool is_bulk_end = STAILQ_NEXT(req, wal_fifo_entry) == NULL;
+			req->res = write_to_disk(r, &req->row, is_bulk_end);
 		}
 		input_was_empty = STAILQ_EMPTY(&input);
 		tt_pthread_mutex_lock(&writer->mutex);
@@ -1569,8 +1592,8 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, u16 op, u64 cookie,
-	  i64 lsn, struct tbuf *row)
+wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
+	  u16 op, struct tbuf *row)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
@@ -1578,17 +1601,13 @@ wal_write(struct recovery_state *r, u16 op, u64 cookie,
 	struct wal_writer *writer = r->writer;
 
 	struct wal_write_request *req =
-		palloc(fiber->gc_pool, sizeof(struct wal_write_request)
-		       + row->size);
+		palloc(fiber->gc_pool, sizeof(struct wal_write_request) +
+		       sizeof(op) + row->size);
 
 	req->fiber = fiber;
-	req->lsn = lsn;
-	req->tag = XLOG;
-	req->cookie = cookie;
-	req->op = op;
-	req->len = (sizeof(req->tag) + sizeof(req->cookie) +
-		    sizeof(req->op) + row->size);
-	memcpy(&req->data, row->data, row->size);
+	req->res = -1;
+	row_v11_fill(&req->row, lsn, XLOG, cookie, &op, sizeof(op),
+		     row->data, row->size);
 
 	tt_pthread_mutex_lock(&writer->mutex);
 
@@ -1603,9 +1622,7 @@ wal_write(struct recovery_state *r, u16 op, u64 cookie,
 
 	fiber_yield();
 
-	assert(req->out_lsn == 0 || (req->lsn == lsn && req->out_lsn == lsn));
-
-	return req->out_lsn == 0 ? -1 : 0;
+	return req->res;
 }
 
 /* }}} */
@@ -1689,49 +1706,25 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 	r->snap_dir->panic_if_error = on_snap_error;
 }
 
-struct snap_write_request
-{
-	log_magic_t marker;
-	u32 header_crc32c;
-	i64 lsn;
-	double tm;
-	u32 len;
-	u32 data_crc32c;
-	/* Data. */
-	u16 tag;
-	u64 cookie;
-	u8 data[];
-} __attribute__((packed));
-
 void
 snapshot_write_row(struct log_io *l,
-		   const void *metadata, size_t metadata_size,
-		   const void *data, size_t data_size)
+		   const void *metadata, size_t metadata_len,
+		   const void *data, size_t data_len)
 {
 	static int rows;
 	static int bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
-	size_t total_size = (sizeof(struct snap_write_request) +
-			     metadata_size + data_size);
-	struct snap_write_request *req = palloc(fiber->gc_pool, total_size);
-	size_t header_size = (sizeof(req->lsn) + sizeof(req->tm)
-			     + sizeof(req->len) + sizeof(req->data_crc32c));
+	struct row_v11 *row = palloc(fiber->gc_pool,
+				     sizeof(struct row_v11) +
+				     data_len + metadata_len);
 
-	req->marker = row_marker_v11;
-	req->lsn = 0;
-	req->tm = ev_now();
-	req->len = (sizeof(req->tag) + sizeof(req->cookie) + metadata_size
-		    + data_size);
-	req->tag = SNAP;
-	req->cookie = snapshot_cookie;
-	memcpy(req->data, metadata, metadata_size);
-	memcpy(req->data + metadata_size, data, data_size);
-	req->data_crc32c = crc32_calc(0, (void *) &req->tag, req->len);
-	req->header_crc32c = crc32_calc(0, (void *) &req->lsn, header_size);
+	row_v11_fill(row, 0, SNAP, snapshot_cookie,
+		     metadata, metadata_len, data, data_len);
+	header_v11_sign(&row->header);
 
-	if (fwrite(req, total_size, 1, l->f) != 1)
+	if (fwrite(row, row_v11_size(row), 1, l->f) != 1)
 		panic("fwrite");
 
 	if (++rows % 100000 == 0)
@@ -1742,7 +1735,7 @@ snapshot_write_row(struct log_io *l,
 			ev_now_update();
 			last = ev_now();
 		}
-		bytes += total_size;
+		bytes += row_v11_size(row);
 		while (bytes >= recovery_state->snap_io_rate_limit) {
 			log_io_flush(l);
 

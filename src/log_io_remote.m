@@ -45,12 +45,12 @@ remote_apply_row(struct recovery_state *r, struct tbuf *row);
 static struct tbuf *
 remote_row_reader_v11()
 {
-	ssize_t to_read = sizeof(struct row_v11) - fiber->rbuf->size;
+	ssize_t to_read = sizeof(struct header_v11) - fiber->rbuf->size;
 
 	if (to_read > 0 && fiber_bread(fiber->rbuf, to_read) <= 0)
 		goto error;
 
-	ssize_t request_len = row_v11(fiber->rbuf)->len + sizeof(struct row_v11);
+	ssize_t request_len = header_v11(fiber->rbuf)->len + sizeof(struct header_v11);
 	to_read = request_len - fiber->rbuf->size;
 
 	if (to_read > 0 && fiber_bread(fiber->rbuf, to_read) <= 0)
@@ -131,7 +131,7 @@ pull_from_remote(void *state)
 		row = remote_read_row(&r->remote_addr, r->confirmed_lsn + 1);
 		fiber_setcancelstate(false);
 
-		r->recovery_lag = ev_now() - row_v11(row)->tm;
+		r->recovery_lag = ev_now() - header_v11(row)->tm;
 		r->recovery_last_update_tstamp = ev_now();
 
 		if (remote_apply_row(r, row) < 0) {
@@ -147,13 +147,13 @@ static int
 remote_apply_row(struct recovery_state *r, struct tbuf *row)
 {
 	struct tbuf *data;
-	i64 lsn = row_v11(row)->lsn;
+	i64 lsn = header_v11(row)->lsn;
 	u16 tag;
 	u16 op;
 
 	/* save row data since wal_row_handler may clobber it */
 	data = tbuf_alloc(row->pool);
-	tbuf_append(data, row_v11(row)->data, row_v11(row)->len);
+	tbuf_append(data, row->data + sizeof(struct header_v11), header_v11(row)->len);
 
 	if (r->row_handler(row) < 0)
 		panic("replication failure: can't apply row");
@@ -164,7 +164,7 @@ remote_apply_row(struct recovery_state *r, struct tbuf *row)
 
 	assert(tag == XLOG);
 
-	if (wal_write(r, op, r->cookie, lsn, data))
+	if (wal_write(r, lsn, r->cookie, op, data))
 		panic("replication failure: can't write row to WAL");
 
 	next_lsn(r, lsn);

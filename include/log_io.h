@@ -123,20 +123,17 @@ struct recovery_state {
 
 struct recovery_state *recovery_state;
 
-/* @todo: merge with wal_write_request. */
-struct row_v11 {
+struct header_v11 {
 	u32 header_crc32c;
 	i64 lsn;
 	double tm;
 	u32 len;
 	u32 data_crc32c;
-	u8 data[];
 } __attribute__((packed));
 
-
-static inline struct row_v11 *row_v11(const struct tbuf *t)
+static inline struct header_v11 *header_v11(const struct tbuf *t)
 {
-	return (struct row_v11 *)t->data;
+	return (struct header_v11 *)t->data;
 }
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
@@ -150,8 +147,8 @@ void recovery_free();
 void recover(struct recovery_state *, i64 lsn);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
-int wal_write(struct recovery_state *r, u16 op,
-	      u64 cookie, i64 lsn, struct tbuf *data);
+int wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
+	      u16 op, struct tbuf *data);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 

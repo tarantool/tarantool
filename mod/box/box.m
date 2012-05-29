@@ -123,10 +123,10 @@ iproto_secondary_port_handler(u32 op, struct tbuf *request_data)
 static void
 box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 {
-	struct row_v11 *row = row_v11(t);
+	struct header_v11 *row = header_v11(t);
 
 	struct tbuf *b = palloc(fiber->gc_pool, sizeof(*b));
-	b->data = row->data;
+	b->data = t->data + sizeof(struct header_v11);
 	b->size = row->len;
 	u16 tag, op;
 	u64 cookie;
@@ -216,9 +216,9 @@ snap_print(struct tbuf *t)
 {
 	@try {
 		struct tbuf *out = tbuf_alloc(t->pool);
-		struct row_v11 *raw_row = row_v11(t);
+		struct header_v11 *raw_row = header_v11(t);
 		struct tbuf *b = palloc(t->pool, sizeof(*b));
-		b->data = raw_row->data;
+		b->data = t->data + sizeof(struct header_v11);
 		b->size = raw_row->len;
 
 		(void)read_u16(b); /* drop tag */
@@ -269,7 +269,7 @@ static int
 recover_row(struct tbuf *t)
 {
 	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct row_v11)) == NULL)
+	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL)
 		return -1;
 
 	@try {
