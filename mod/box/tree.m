@@ -808,8 +808,6 @@ tree_iterator_free(struct iterator *iterator)
 
 /* {{{ TreeIndex -- base tree index class *************************/
 
-@implementation TreeIndex
-
 @class SparseTreeIndex;
 @class DenseTreeIndex;
 @class Num32TreeIndex;
@@ -836,6 +834,7 @@ tree_iterator_free(struct iterator *iterator)
 }
 @end
 
+@implementation TreeIndex
 
 + (Index *) alloc: (struct key_def *) key_def :(struct space *) space
 {
