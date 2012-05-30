@@ -9,13 +9,6 @@
 # sending the package with invalid length
 12
 # checking what is server alive
-show stat
+ping
+ok
 ---
-statistics:
-  REPLACE:    { rps:  0    , total:  0           }
-  SELECT:     { rps:  0    , total:  0           }
-  UPDATE:     { rps:  0    , total:  0           }
-  DELETE_1_3: { rps:  0    , total:  0           }
-  DELETE:     { rps:  0    , total:  0           }
-  CALL:       { rps:  0    , total:  0           }
-...

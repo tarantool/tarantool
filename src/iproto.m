@@ -132,9 +132,12 @@ static void iproto_reply(iproto_callback callback, struct tbuf *request)
 static void
 iproto_validate_header(struct iproto_header *header)
 {
-	if (header->len > IPROTO_LEN_MAX) {
-		/* the package has invalid length, close connection */
-		say_error("Invalid iproto package length: %llu",
+	if (header->len > IPROTO_BODY_LEN_MAX) {
+		/*
+		 * The package is too big, just close connection for now to
+		 * avoid DoS.
+		 */
+		say_error("received package is too big: %llu",
 			  (unsigned long long)header->len);
 		tnt_raise(FiberCancelException);
 	}

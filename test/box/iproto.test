@@ -21,7 +21,7 @@ print "# sending the package with invalid length"
 inval_request = struct.pack('<LLL', 17, 4294967290, 1)
 print s.send(inval_request)
 print "# checking what is server alive"
-exec admin "show stat"
+exec sql "ping"
 
 # closing connection
 s.close()
