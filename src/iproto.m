@@ -39,6 +39,9 @@ const uint32_t msg_ping = 0xff00;
 
 static void iproto_reply(iproto_callback callback, struct tbuf *request);
 
+static void
+iproto_validate_header(struct iproto_header *header);
+
 inline static int
 iproto_flush(struct tbuf **in, ssize_t to_read)
 {
@@ -68,7 +71,11 @@ iproto_interact(iproto_callback callback)
 		if (to_read > 0 && fiber_bread(in, to_read) <= 0)
 			break;
 
-		ssize_t request_len = sizeof(struct iproto_header) + iproto(in)->len;
+		/* validating iproto package header */
+		iproto_validate_header(iproto(in));
+
+		ssize_t request_len = sizeof(struct iproto_header)
+			+ iproto(in)->len;
 		to_read = request_len - in->size;
 
 		if (iproto_flush(&in, to_read) == -1)
@@ -120,4 +127,18 @@ static void iproto_reply(iproto_callback callback, struct tbuf *request)
 	}
 	for (; saved_iov_cnt < fiber->iov_cnt; saved_iov_cnt++)
 		reply->len += iovec(fiber->iov)[saved_iov_cnt].iov_len;
+}
+
+static void
+iproto_validate_header(struct iproto_header *header)
+{
+	if (header->len > IPROTO_BODY_LEN_MAX) {
+		/*
+		 * The package is too big, just close connection for now to
+		 * avoid DoS.
+		 */
+		say_error("received package is too big: %llu",
+			  (unsigned long long)header->len);
+		tnt_raise(FiberCancelException);
+	}
 }
