@@ -69,3 +69,23 @@ exec admin "lua box.insert(14, 9, 0)"
 exec admin "lua box.select_range(14, 1, 10)"
 exec admin "lua box.select_reverse_range(14, 1, 10)"
 exec admin "lua box.select_reverse_range(14, 1, 4)"
+
+print """
+#
+# Tests for box.index iterators
+#
+"""
+pid = 1
+tid = 999
+for sid in {1, 2}:
+    for i in range(1, 4):
+        exec admin "lua box.insert(16, 'pid_%d', 'sid_%d', 'tid_%d')" % (pid, sid, tid)
+        pid += 1
+        tid -= 1
+
+exec admin "lua for k, v in box.space[16].index[1].idx.next, box.space[16].index[1].idx, 'sid_1' do print(v) end"
+exec admin "lua for k, v in box.space[16].index[1].idx.prev, box.space[16].index[1].idx, 'sid_2' do print(v) end"
+exec admin "lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end"
+exec admin "lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end"
+exec admin "lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end"
+exec admin "lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end"
