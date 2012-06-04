@@ -45,4 +45,30 @@ struct tnt_header {
 	uint32_t reqid;
 };
 
+struct tnt_header_insert {
+	uint32_t ns;
+	uint32_t flags;
+};
+
+struct tnt_header_delete {
+	uint32_t ns;
+	uint32_t flags;
+};
+
+struct tnt_header_update {
+	uint32_t ns;
+	uint32_t flags;
+};
+
+struct tnt_header_call {
+	uint32_t flags;
+};
+
+struct tnt_header_select {
+	uint32_t ns;
+	uint32_t index;
+	uint32_t offset;
+	uint32_t limit;
+};
+
 #endif /* TNT_PROTO_H_INCLUDED */

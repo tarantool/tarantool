@@ -119,9 +119,9 @@ query_reply(struct tnt_stream *t)
 {
 	int rc = -1;
 	struct tnt_iter i;
-	tnt_iter_stream(&i, t);
+	tnt_iter_reply(&i, t);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		if (query_reply_handle(t, r) == -1)
 			goto error;
 

@@ -29,7 +29,9 @@
 #include <string.h>
 
 #include <connector/c/include/tarantool/tnt_mem.h>
+#include <connector/c/include/tarantool/tnt_proto.h>
 #include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
 #include <connector/c/include/tarantool/tnt_reply.h>
 #include <connector/c/include/tarantool/tnt_stream.h>
 #include <connector/c/include/tarantool/tnt_buf.h>
@@ -122,6 +124,20 @@ tnt_buf_reply(struct tnt_stream *s, struct tnt_reply *r) {
 	return rc;
 }
 
+static int
+tnt_buf_request(struct tnt_stream *s, struct tnt_request *r) {
+	struct tnt_stream_buf *sb = TNT_SBUF_CAST(s);
+	if (sb->data == NULL)
+		return -1;
+	if (sb->size == sb->rdoff)
+		return 1;
+	size_t off = 0;
+	int rc = tnt_request(r, sb->data + sb->rdoff, sb->size - sb->rdoff, &off);
+	if (rc == 0)
+		sb->rdoff += off;
+	return rc;
+}
+
 /*
  * tnt_buf()
  *
@@ -147,7 +163,8 @@ struct tnt_stream *tnt_buf(struct tnt_stream *s) {
 	}
 	/* initializing interfaces */
 	s->read = tnt_buf_read;
-	s->reply = tnt_buf_reply;
+	s->read_reply = tnt_buf_reply;
+	s->read_request = tnt_buf_request;
 	s->write = tnt_buf_write;
 	s->writev = tnt_buf_writev;
 	s->free = tnt_buf_free;

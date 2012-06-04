@@ -81,7 +81,7 @@ tnt_net_writev(struct tnt_stream *s, struct iovec *iov, int count) {
 }
 
 static ssize_t
-tnt_net_reply_cb(struct tnt_stream *s, char *buf, ssize_t size) {
+tnt_net_recv_cb(struct tnt_stream *s, char *buf, ssize_t size) {
 	struct tnt_stream_net *sn = TNT_SNET_CAST(s);
 	return tnt_io_recv(sn, buf, size);
 }
@@ -91,7 +91,15 @@ tnt_net_reply(struct tnt_stream *s, struct tnt_reply *r) {
 	if (s->wrcnt == 0)
 		return 1;
 	s->wrcnt--;
-	return tnt_reply_from(r, (tnt_replyf_t)tnt_net_reply_cb, s);
+	return tnt_reply_from(r, (tnt_reply_t)tnt_net_recv_cb, s);
+}
+
+static int
+tnt_net_request(struct tnt_stream *s, struct tnt_request *r) {
+	if (s->wrcnt == 0)
+		return 1;
+	s->wrcnt--;
+	return tnt_request_from(r, (tnt_request_t)tnt_net_recv_cb, s);
 }
 
 /*
@@ -120,7 +128,8 @@ struct tnt_stream *tnt_net(struct tnt_stream *s) {
 	memset(s->data, 0, sizeof(struct tnt_stream_net));
 	/* initializing interfaces */
 	s->read = tnt_net_read;
-	s->reply = tnt_net_reply;
+	s->read_reply = tnt_net_reply;
+	s->read_request = tnt_net_request;
 	s->write = tnt_net_write;
 	s->writev = tnt_net_writev;
 	s->free = tnt_net_free;

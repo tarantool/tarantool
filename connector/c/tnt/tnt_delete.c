@@ -30,14 +30,10 @@
 
 #include <connector/c/include/tarantool/tnt_proto.h>
 #include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
 #include <connector/c/include/tarantool/tnt_reply.h>
 #include <connector/c/include/tarantool/tnt_stream.h>
 #include <connector/c/include/tarantool/tnt_delete.h>
-
-struct tnt_header_delete {
-	uint32_t ns;
-	uint32_t flags;
-};
 
 /*
  * tnt_delete()

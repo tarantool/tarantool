@@ -30,6 +30,7 @@
 
 #include <connector/c/include/tarantool/tnt_proto.h>
 #include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
 #include <connector/c/include/tarantool/tnt_reply.h>
 #include <connector/c/include/tarantool/tnt_stream.h>
 #include <connector/c/include/tarantool/tnt_ping.h>

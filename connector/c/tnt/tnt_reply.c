@@ -36,20 +36,20 @@
 /*
  * tnt_reply_init()
  *
- * initialize reply;
+ * initialize reply object;
  *
- * r - reply pointer
+ * r - reply object pointer
 */
 void tnt_reply_init(struct tnt_reply *r) {
 	memset(r, 0, sizeof(struct tnt_reply));
 }
 
 /*
- * tnt_buf_free()
+ * tnt_reply_free()
  *
- * free reply;
+ * free reply object;
  *
- * r - reply pointer
+ * r - reply object pointer
 */
 void tnt_reply_free(struct tnt_reply *r) {
 	if (r->error)
@@ -68,7 +68,7 @@ void tnt_reply_free(struct tnt_reply *r) {
  * 
  * returns zero on fully read reply, or -1 on error.
 */
-int tnt_reply_from(struct tnt_reply *r, tnt_replyf_t rcv, void *ptr) {
+int tnt_reply_from(struct tnt_reply *r, tnt_reply_t rcv, void *ptr) {
 	/* reading iproto header */
 	struct tnt_header hdr;
 	if (rcv(ptr, (char*)&hdr, sizeof(struct tnt_header)) == -1)
@@ -129,7 +129,7 @@ int tnt_reply_from(struct tnt_reply *r, tnt_replyf_t rcv, void *ptr) {
 	if (buf == NULL)
 		return -1;
 	if (rcv(ptr, buf, size) == -1) {
-		free(buf);
+		tnt_mem_free(buf);
 		return -1;
 	}
 	char *p = buf;
@@ -150,12 +150,12 @@ int tnt_reply_from(struct tnt_reply *r, tnt_replyf_t rcv, void *ptr) {
 		p += tsize + 4;
 		total += (4 + 4 + tsize); /* length + cardinality + tuple size */
 	}
-	free(buf);
+	tnt_mem_free(buf);
 	return 0;
 
 rollback:
 	tnt_list_free(&r->tuples);
-	free(buf);
+	tnt_mem_free(buf);
 	return -1;
 }
 
@@ -187,7 +187,8 @@ static ssize_t tnt_reply_cb(void *ptr[2], char *buf, ssize_t size) {
 	return size;
 }
 
-int tnt_reply(struct tnt_reply *r, char *buf, size_t size, size_t *off) {
+int
+tnt_reply(struct tnt_reply *r, char *buf, size_t size, size_t *off) {
 	/* supplied buffer must contain full reply,
 	 * if it doesn't then returning count of bytes
 	 * needed to process */
@@ -204,7 +205,7 @@ int tnt_reply(struct tnt_reply *r, char *buf, size_t size, size_t *off) {
 	}
 	size_t offv = 0;
 	void *ptr[2] = { buf, &offv };
-	int rc = tnt_reply_from(r, (tnt_replyf_t)tnt_reply_cb, ptr);
+	int rc = tnt_reply_from(r, (tnt_reply_t)tnt_reply_cb, ptr);
 	if (off)
 		*off = offv;
 	return rc;

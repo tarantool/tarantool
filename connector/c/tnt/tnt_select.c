@@ -31,17 +31,11 @@
 #include <connector/c/include/tarantool/tnt_mem.h>
 #include <connector/c/include/tarantool/tnt_proto.h>
 #include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
 #include <connector/c/include/tarantool/tnt_reply.h>
 #include <connector/c/include/tarantool/tnt_stream.h>
 #include <connector/c/include/tarantool/tnt_iter.h>
 #include <connector/c/include/tarantool/tnt_select.h>
-
-struct tnt_header_select {
-	uint32_t ns;
-	uint32_t index;
-	uint32_t offset;
-	uint32_t limit;
-};
 
 /*
  * tnt_select()
