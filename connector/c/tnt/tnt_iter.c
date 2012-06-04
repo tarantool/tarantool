@@ -37,7 +37,7 @@
 #include <connector/c/include/tarantool/tnt_stream.h>
 #include <connector/c/include/tarantool/tnt_iter.h>
 
-static struct tnt_iter *tnt_iter_tryalloc(struct tnt_iter *i) {
+static struct tnt_iter *tnt_iter_init(struct tnt_iter *i) {
 	if (i) {
 		memset(i, 0, sizeof(struct tnt_iter));
 		return i;
@@ -109,7 +109,7 @@ static void tnt_iter_field_rewind(struct tnt_iter *i) {
 struct tnt_iter*
 tnt_iter(struct tnt_iter *i, struct tnt_tuple *t)
 {
-	i = tnt_iter_tryalloc(i);
+	i = tnt_iter_init(i);
 	if (i == NULL)
 		return NULL;
 	i->type = TNT_ITER_FIELD;
@@ -151,7 +151,7 @@ static void tnt_iter_list_rewind(struct tnt_iter *i) {
 struct tnt_iter*
 tnt_iter_list(struct tnt_iter *i, struct tnt_list *l)
 {
-	i = tnt_iter_tryalloc(i);
+	i = tnt_iter_init(i);
 	if (i == NULL)
 		return NULL;
 	i->type = TNT_ITER_LIST;
@@ -195,7 +195,7 @@ static void tnt_iter_reply_free(struct tnt_iter *i) {
  * returns stream iterator pointer, or NULL on error.
 */
 struct tnt_iter *tnt_iter_reply(struct tnt_iter *i, struct tnt_stream *s) {
-	i = tnt_iter_tryalloc(i);
+	i = tnt_iter_init(i);
 	if (i == NULL)
 		return NULL;
 	i->type = TNT_ITER_REPLY;
@@ -240,7 +240,7 @@ static void tnt_iter_request_free(struct tnt_iter *i) {
  * returns stream iterator pointer, or NULL on error.
 */
 struct tnt_iter *tnt_iter_request(struct tnt_iter *i, struct tnt_stream *s) {
-	i = tnt_iter_tryalloc(i);
+	i = tnt_iter_init(i);
 	if (i == NULL)
 		return NULL;
 	i->type = TNT_ITER_REQUEST;

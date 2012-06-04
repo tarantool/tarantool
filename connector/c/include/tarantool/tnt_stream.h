@@ -44,7 +44,9 @@ struct tnt_stream {
 	uint32_t reqid;
 };
 
-uint32_t tnt_stream_reqid(struct tnt_stream *s, uint32_t reqid);
+struct tnt_stream *tnt_stream_init(struct tnt_stream *s);
 void tnt_stream_free(struct tnt_stream *s);
+
+uint32_t tnt_stream_reqid(struct tnt_stream *s, uint32_t reqid);
 
 #endif /* TNT_STREAM_H_INCLUDED */

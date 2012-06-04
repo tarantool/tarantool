@@ -36,19 +36,6 @@
 #include <connector/c/include/tarantool/tnt_stream.h>
 #include <connector/c/include/tarantool/tnt_buf.h>
 
-static struct tnt_stream *tnt_buf_tryalloc(struct tnt_stream *s) {
-	if (s) {
-		memset(s, 0, sizeof(struct tnt_stream));
-		return s;
-	}
-	s = tnt_mem_alloc(sizeof(struct tnt_stream));
-	if (s == NULL)
-		return NULL;
-	memset(s, 0, sizeof(struct tnt_stream));
-	s->alloc = 1;
-	return s;
-}
-
 static void tnt_buf_free(struct tnt_stream *s) {
 	struct tnt_stream_buf *sb = TNT_SBUF_CAST(s);
 	if (sb->data)
@@ -151,7 +138,7 @@ tnt_buf_request(struct tnt_stream *s, struct tnt_request *r) {
 */
 struct tnt_stream *tnt_buf(struct tnt_stream *s) {
 	int allocated = s == NULL;
-	s = tnt_buf_tryalloc(s);
+	s = tnt_stream_init(s);
 	if (s == NULL)
 		return NULL;
 	/* allocating stream data */

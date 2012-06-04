@@ -55,6 +55,29 @@ tnt_stream_reqid(struct tnt_stream *s, uint32_t reqid)
 }
 
 /*
+ * tnt_stream_init()
+ *
+ * free stream object.
+ *
+ * s - stream pointer
+ *
+*/
+struct tnt_stream*
+tnt_stream_init(struct tnt_stream *s)
+{
+	if (s) {
+		memset(s, 0, sizeof(struct tnt_stream));
+		return s;
+	}
+	s = tnt_mem_alloc(sizeof(struct tnt_stream));
+	if (s == NULL)
+		return NULL;
+	memset(s, 0, sizeof(struct tnt_stream));
+	s->alloc = 1;
+	return s;
+}
+
+/*
  * tnt_stream_free()
  *
  * free stream object.
