@@ -27,6 +27,11 @@
 
 #include <tbuf.h> /* for struct tbuf */
 
+enum {
+	/** Maximal iproto package body length (2GiB) */
+	IPROTO_BODY_LEN_MAX = 2147483648,
+};
+
 /*
  * struct iproto_header and struct iproto_header_retcode
  * share common prefix {msg_code, len, sync}
@@ -54,6 +59,6 @@ static inline struct iproto_header *iproto(const struct tbuf *t)
 
 typedef void (*iproto_callback) (uint32_t msg_code, struct tbuf *request);
 
-void iproto_interact(iproto_callback *callback);
+void iproto_interact(iproto_callback callback);
 
 #endif

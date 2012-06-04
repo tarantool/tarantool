@@ -37,6 +37,7 @@ enum {
 #if LJ_64
   RID_FPRET = RID_XMM0,
 #else
+  RID_RETLO = RID_EAX,
   RID_RETHI = RID_EDX,
 #endif
 
@@ -84,6 +85,7 @@ enum {
 #define REGARG_GPRS \
   (RID_ECX|((RID_EDX|((RID_R8D|(RID_R9D<<5))<<5))<<5))
 #define REGARG_NUMGPR	4
+#define REGARG_NUMFPR	4
 #define REGARG_FIRSTFPR	RID_XMM0
 #define REGARG_LASTFPR	RID_XMM3
 #define STACKARG_OFS	(4*8)
@@ -95,6 +97,7 @@ enum {
   (RID_EDI|((RID_ESI|((RID_EDX|((RID_ECX|((RID_R8D|(RID_R9D \
    <<5))<<5))<<5))<<5))<<5))
 #define REGARG_NUMGPR	6
+#define REGARG_NUMFPR	8
 #define REGARG_FIRSTFPR	RID_XMM0
 #define REGARG_LASTFPR	RID_XMM7
 #define STACKARG_OFS	0
@@ -104,6 +107,7 @@ enum {
 #define RSET_SCRATCH	(RSET_ACD|RSET_FPR)
 #define REGARG_GPRS	(RID_ECX|(RID_EDX<<5))  /* Fastcall only. */
 #define REGARG_NUMGPR	2  /* Fastcall only. */
+#define REGARG_NUMFPR	0
 #define STACKARG_OFS	0
 #endif
 
@@ -188,9 +192,11 @@ typedef enum {
   XI_CALL =	0xe8,
   XI_JMP =	0xe9,
   XI_JMPs =	0xeb,
+  XI_PUSH =	0x50, /* Really 50+r. */
   XI_JCCs =	0x70, /* Really 7x. */
   XI_JCCn =	0x80, /* Really 0f8x. */
   XI_LEA =	0x8d,
+  XI_MOVrib =	0xb0, /* Really b0+r. */
   XI_MOVri =	0xb8, /* Really b8+r. */
   XI_ARITHib =	0x80,
   XI_ARITHi =	0x81,
@@ -198,6 +204,7 @@ typedef enum {
   XI_PUSHi8 =	0x6a,
   XI_TEST =	0x85,
   XI_MOVmi =	0xc7,
+  XI_GROUP5 =	0xff,
 
   /* Note: little-endian byte-order! */
   XI_FLDZ =	0xeed9,

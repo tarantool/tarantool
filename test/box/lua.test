@@ -147,6 +147,7 @@ exec admin "lua box.fiber.sleep(0.01)"
 exec admin "lua box.fiber.sleep(0.0001)"
 exec admin "lua box.fiber.sleep('hello')"
 exec admin "lua box.fiber.sleep(box, 0.001)"
+exec admin "lua box.fiber.cancel(box.fiber.self())"
 exec admin "lua f = box.fiber.self()"
 exec admin "lua old_id = f:id()"
 exec admin "lua box.fiber.cancel(f)"
@@ -237,6 +238,7 @@ exec admin "lua box.space[0]:insert(4, 'world')"
 exec admin "lua box.space[0]:insert(5, 'hello world')"
 exec sql "call box.crossjoin('0', '0', '10000')"
 exec admin "lua box.space[0]:truncate()"
+exec admin "lua box.crossjoin = nil"
 print """
 # A test case for Bug#901674
 # No way to inspect exceptions from Box in Lua
@@ -250,3 +252,198 @@ print """
 # Lua provides access to os.execute()
 """
 exec admin "lua os.execute('ls')"
+
+
+print """
+#
+# box.fiber test (create, resume, yield, status)
+#
+"""
+
+box_fiber_lua = os.path.abspath("box/box_fiber.lua")
+# don't log the path name
+sys.stdout.push_filter("lua dofile(.*)", "lua dofile(...)")
+exec admin "lua dofile('{0}')".format(box_fiber_lua)
+sys.stdout.pop_filter()
+
+print """
+# test box.fiber.status functions: invalid arguments
+"""
+exec admin "lua box.fiber.status(1)"
+exec admin "lua box.fiber.status('fafa-gaga')"
+exec admin "lua box.fiber.status(nil)"
+
+print """
+# run fiber's test
+"""
+exec admin "lua box_fiber_run_test()"
+# Testing 64bit
+exec admin "lua tonumber64(123)"
+exec admin "lua tonumber64('123')"
+exec admin "lua type(tonumber64('123')) == 'cdata'"
+exec admin "lua tonumber64('9223372036854775807') == tonumber64('9223372036854775807')"
+exec admin "lua tonumber64('9223372036854775807') - tonumber64('9223372036854775800')"
+exec admin "lua tonumber64('18446744073709551615') == tonumber64('18446744073709551615')"
+exec admin "lua tonumber64('18446744073709551615') + 1"
+exec admin "lua tonumber64(-1)"
+exec admin "lua tonumber64('184467440737095516155')"
+exec admin "lua string.byte(box.pack('p', tonumber64(123)))"
+# test delete field
+exec admin "lua box.space[0]:truncate()"
+exec sql "call box.insert(0, 'tes1', 'tes2', 'tes3', 'tes4', 'tes5')"
+exec sql "call box.update(0, 'tes1', '#p', 0, '')"
+exec sql "call box.update(0, 'tes2', '#p', 0, '')"
+exec sql "call box.update(0, 'tes3', '#p', 0, '')"
+exec sql "call box.update(0, 'tes4', '#p', 0, '')"
+exec admin "lua box.update(0, 'tes5', '#p', 0, '')"
+exec admin "lua box.space[0]:truncate()"
+
+print """
+# test box.update: INSERT field
+"""
+exec admin "lua box.insert(0, 1, 3, 6, 9)"
+exec admin "lua box.update(0, 1, '!p', 1, 2)"
+exec admin "lua box.update(0, 1, '!p!p!p!p', 3, 4, 3, 5, 4, 7, 4, 8)"
+exec admin "lua box.update(0, 1, '!p!p!p', 9, 10, 9, 11, 9, 12)"
+exec admin "lua box.space[0]:truncate()"
+exec admin "lua box.insert(0, 1, 'tuple')"
+exec admin "lua box.update(0, 1, '#p!p=p', 1, '', 1, 'inserted tuple', 1, 'set tuple')"
+exec admin "lua box.space[0]:truncate()"
+exec admin "lua box.insert(0, 1, 'tuple')"
+exec admin "lua box.update(0, 1, '=p!p#p', 1, 'set tuple', 1, 'inerted tuple', 1, '')"
+exec admin "lua box.update(0, 1, '!p!p', 0, 3, 0, 2)"
+exec admin "lua box.space[0]:truncate()"
+print """
+# Test for Bug #955226
+# Lua Numbers are passed back wrongly as strings
+#
+"""
+exec admin "lua function foo() return 1, 2, '1', '2' end"
+exec sql "call foo()"
+
+
+print """
+#
+# test box.update_ol function test
+#
+"""
+
+print """
+# test update's assign opearations
+"""
+exec admin "lua box.replace(0, 1, 'field string value')"
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.assign(1, 'new field stirng value'))"
+exec admin "lua table.insert(ops_list, box.upd.assign(2, 42))"
+exec admin "lua table.insert(ops_list, box.upd.assign(3, 0xdeadbeef))"
+exec admin "lua box.update_ol(0, ops_list, 1)"
+
+print """
+# test update's arith opearations
+"""
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.arith_add(2, 16))"
+exec admin "lua table.insert(ops_list, box.upd.arith_and(3, 0xffff0000))"
+exec admin "lua table.insert(ops_list, box.upd.arith_or(3, 0x0000a0a0))"
+exec admin "lua table.insert(ops_list, box.upd.arith_xor(3, 0xffff00aa))"
+exec admin "lua box.update_ol(0, ops_list, 1)"
+
+print """
+# test update splice operation
+"""
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.splice(1, 0, 3, 'the newest'))"
+exec admin "lua box.update_ol(0, ops_list, 1)"
+
+print """
+# test update delete operations
+"""
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.delete(3))"
+exec admin "lua table.insert(ops_list, box.upd.delete(2))"
+exec admin "lua box.update_ol(0, ops_list, 1)"
+
+print """
+# test update insert operations
+"""
+exec admin "lua ops_list = {}"
+exec admin "lua table.insert(ops_list, box.upd.insert(1, 1))"
+exec admin "lua table.insert(ops_list, box.upd.insert(1, 2))"
+exec admin "lua table.insert(ops_list, box.upd.insert(1, 3))"
+exec admin "lua table.insert(ops_list, box.upd.insert(1, 4))"
+exec admin "lua box.update_ol(0, ops_list, 1)"
+
+exec admin "lua box.space[0]:truncate()"
+
+
+print """
+#
+# test that ffi extension is inaccessible
+#
+"""
+
+exec admin "lua ffi"
+
+
+print """
+#
+# Lua init lua script test
+#
+"""
+
+print """
+# Load testing init lua script
+"""
+server.stop()
+server.deploy(init_lua="box/test_init.lua")
+
+print """
+# Test asscess to box configuration
+"""
+exec admin "lua print_config()"
+
+print """
+# Test bug #977898
+"""
+# Run a dummy insert to avoid race conditions under valgrind
+exec admin "lua box.insert(0, 4, 8, 16)"
+
+print """
+# Test insert from init.lua
+"""
+exec admin "lua box.select(0, 0, 1)"
+exec admin "lua box.select(0, 0, 2)"
+exec admin "lua box.select(0, 0, 4)"
+
+print """
+# Test bug #1002272
+"""
+exec admin "lua floor(0.5)"
+exec admin "lua floor(0.9)"
+exec admin "lua floor(1.1)"
+
+print """
+# clean-up after tests
+"""
+server.stop()
+server.deploy(init_lua=None)
+print """
+# Test box.tuple:slice()
+"""
+exec admin "lua t=box.space[0]:insert(0, '1', '2', '3', '4', '5', '6', '7')"
+exec admin "lua t:slice(0)"
+exec admin "lua t:slice(-1)"
+exec admin "lua t:slice(1)"
+exec admin "lua t:slice(-1, -1)"
+exec admin "lua t:slice(-1, 1)"
+exec admin "lua t:slice(1, -1)"
+exec admin "lua t:slice(1, 3)"
+exec admin "lua t:slice(7)"
+exec admin "lua t:slice(9)"
+exec admin "lua t:slice(9, -1)"
+exec admin "lua t:slice(6, -1)"
+exec admin "lua t:slice(9, 10)"
+exec admin "lua t:slice(500, 700)"
+exec admin "lua box.space[0]:truncate()"
+
+

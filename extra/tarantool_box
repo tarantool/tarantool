@@ -1,0 +1,83 @@
+#!/bin/bash
+
+#  /etc/rc.d/init.d/tarantool_box
+#
+# chkconfig: 2345 99 99
+# description: tarantool_box
+# processname: tarantool_box
+
+. /etc/init.d/functions
+
+RETVAL=0
+INST="$(basename $0)"
+export PIDFILE="/var/${INST}/box.pid"
+export WRAP_PIDFILE="/var/${INST}/wrapper.pid"
+export OPTIONS=""
+
+# This script is normally invoked via a symlink.
+# An own symlink is created for each instance.
+# E.g., in case of 4 instances, there are symlinks
+# tarantool0, tarantool1, tarantool2, tarantool3.
+# If, for some reason, this script is invoked not via
+# a symlink, do nothing.
+#
+if [ "${INST}" == "tarantool_box" ]
+then
+        echo_failure
+        echo
+        exit
+fi
+
+start() {
+        echo -n $"Starting ${INST}: "
+        /usr/local/bin/${INST}.sh ${OPTIONS} >> /var/${INST}/logs/init.log 2>&1
+        RETVAL=${?}
+        if [ ${RETVAL} -eq 0 ]
+        then
+                echo_success
+        else
+                echo_failure
+        fi
+        echo
+        return ${RETVAL}
+}
+
+stop() {
+        echo -n $"Stopping $INST: "
+        if [ -f ${WRAP_PIDFILE} ]
+        then
+                kill $(cat ${WRAP_PIDFILE}) >/dev/null 2>&1
+                rm -f ${WRAP_PIDFILE} >/dev/null 2>&1
+        fi
+        if [ -f ${PIDFILE} ]
+        then
+                kill $(cat ${PIDFILE}) >/dev/null 2>&1
+                rm -f ${PIDFILE} >/dev/null 2>&1
+        fi
+        echo_success
+        echo
+        return ${RETVAL}
+}
+
+restart(){
+        stop
+        sleep 3
+        start
+}
+
+case "$1" in
+        start)
+                start
+                ;;
+        stop)
+                stop
+                ;;
+        restart)
+                restart
+                ;;
+        *)
+                echo $"Usage: $0 {start|stop|restart}"
+                RETVAL=1
+esac
+
+exit ${RETVAL}

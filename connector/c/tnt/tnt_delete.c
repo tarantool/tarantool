@@ -28,12 +28,17 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <connector/c/include/libtnt/tnt_proto.h>
-#include <connector/c/include/libtnt/tnt_tuple.h>
-#include <connector/c/include/libtnt/tnt_request.h>
-#include <connector/c/include/libtnt/tnt_reply.h>
-#include <connector/c/include/libtnt/tnt_stream.h>
-#include <connector/c/include/libtnt/tnt_delete.h>
+#include <connector/c/include/tarantool/tnt_proto.h>
+#include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
+#include <connector/c/include/tarantool/tnt_reply.h>
+#include <connector/c/include/tarantool/tnt_stream.h>
+#include <connector/c/include/tarantool/tnt_delete.h>
+
+struct tnt_header_delete {
+	uint32_t ns;
+	uint32_t flags;
+};
 
 /*
  * tnt_delete()
@@ -58,7 +63,7 @@ tnt_delete(struct tnt_stream *s, uint32_t ns, uint32_t flags, struct tnt_tuple *
 	/* filling delete header */
 	struct tnt_header_delete hdr_del;
 	hdr_del.ns = ns;
-	(void)flags;
+	hdr_del.flags = flags;
 	/* writing data to stream */
 	struct iovec v[3];
 	v[0].iov_base = &hdr;

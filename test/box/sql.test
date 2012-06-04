@@ -30,7 +30,7 @@ exec sql "select * from t0 where k0 = 1"
 # this is illegal
 exec sql "update t0 set k1 = 'Huh', k1000 = 'invalid field' where k0=1"
 exec sql "select * from t0 where k0 = 1"
-exec sql "insert into t0 values (1, 'I am a new tuple', 'stub')"
+exec sql "replace into t0 values (1, 'I am a new tuple', 'stub')"
 exec sql "update t0 set k1 = 'Huh', k2 = 'Oh-ho-ho' where k0=1"
 exec sql "select * from t0 where k0 = 1"
 # check empty strings
@@ -57,6 +57,7 @@ print """#
 exec sql "select * from t1 where k0 = 0"
 exec sql "select * from t65537 where k0 = 0"
 exec sql "select * from t4294967295 where k0 = 0"
+exec admin "lua box.space[0]:truncate()"
 
 print """#
 # A test case for: http://bugs.launchpad.net/bugs/716683

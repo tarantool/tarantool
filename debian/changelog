@@ -1,0 +1,113 @@
+tarantool (1.4.6+20120524-1) unstable; urgency=low
+
+  * Fix version number.
+  * Fix tarantool_instance: user could not to define 'file_descriptors'
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 24 May 2012 12:57:27 +0400
+
+tarantool (1.4.5+20120522-1) unstable; urgency=low
+
+  * New git snapshot: upstream upgraded libtarantool.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 22 May 2012 22:55:07 +0400
+
+tarantool (1.4.5+20120510-1) unstable; urgency=low
+
+  * New git snapshot (it provides script_dir option).
+  * Add binutils-dev to B-D list (for debugging crashes, #672327).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 10 May 2012 10:23:28 +0400
+
+tarantool (1.4.5+20120503-2) unstable; urgency=low
+
+  * Add librt to linklist (fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 04 May 2012 09:27:04 +0400
+
+tarantool (1.4.5+20120503-1) unstable; urgency=low
+
+  * New upstream snapshot.
+  * Add Priority for sources.
+  * Add libtarantool* packages that weren't be packaged earlier: upstream
+    renamed them, now we have no conflicts with the other debian packages.
+  * Add libncurses5-dev into Build-Depends.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 03 May 2012 17:35:18 +0400
+
+tarantool (1.4.4+20120127-1) unstable; urgency=low
+
+  * Merge with upstream.
+  * Package can purge not owned files, closes: #657132.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 27 Jan 2012 23:37:53 +0400
+
+tarantool (1.4.4+20120117-1) unstable; urgency=low
+
+  * Merge my changes with upstream.
+  * Disable tests after building process.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 16 Jan 2012 22:35:44 +0400
+
+tarantool (1.4.4+20120116-2) unstable; urgency=low
+
+  * Add rt into Debian/kFreeBSD likdepends.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 16 Jan 2012 16:54:17 +0400
+
+tarantool (1.4.4+20120116-1) unstable; urgency=low
+
+  * New git snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 16 Jan 2012 11:36:19 +0400
+
+tarantool (1.4.4+20111229+2-2) unstable; urgency=low
+
+  * use cd instead chdir, closes: 653611;
+  * use spaces instead '\t' symbol, closes: 653607;
+  * use readlink instead perl command, closes: 653613.
+  thanks to Norbert Kiesel <nkiesel@tbdnetworks.com> for all bugreports.
+  * add libmr-tarantool-perl to 'suggests' section of debian/control.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 23:21:06 +0400
+
+tarantool (1.4.4+20111229+2-1) unstable; urgency=low
+
+  * Debian/kFreeBSD doesn't have proctitle.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 17:18:51 +0400
+
+tarantool (1.4.4+20111229+1-1) unstable; urgency=low
+
+  * Try to patch build-system for Debian kFreeBSD.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 13:41:48 +0400
+
+tarantool (1.4.4+20111229-1) unstable; urgency=low
+
+  * Fix test box/args.test.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 29 Dec 2011 08:49:34 +0400
+
+tarantool (1.4.4+20111228-3) unstable; urgency=low
+
+  * kFreeBSD: uses glibc, amd64 is x86 architecture.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 28 Dec 2011 23:38:12 +0400
+
+tarantool (1.4.4+20111228-2) unstable; urgency=low
+
+  * Specify architectures.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 28 Dec 2011 22:40:28 +0400
+
+tarantool (1.4.4+20111228-1) unstable; urgency=low
+
+  * Fix build system for kFreeBSD.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 28 Dec 2011 21:36:33 +0400
+
+tarantool (1.4.4-1) unstable; urgency=low
+
+  * Init debian release, closes: #652911.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 18 Dec 2011 11:35:37 +0400

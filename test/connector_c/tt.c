@@ -30,13 +30,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <connector/c/include/libtnt/tnt.h>
-#include <connector/c/include/libtnt/tnt_net.h>
-#include <connector/c/include/libtnt/tnt_io.h>
-#include <connector/c/include/libtnt/tnt_queue.h>
-#include <connector/c/include/libtnt/tnt_utf8.h>
-#include <connector/c/include/libtnt/tnt_lex.h>
-#include <connector/c/include/libtnt/tnt_sql.h>
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_net.h>
+#include <connector/c/include/tarantool/tnt_io.h>
+#include <connector/c/include/tarantool/tnt_queue.h>
+#include <connector/c/include/tarantool/tnt_utf8.h>
+#include <connector/c/include/tarantool/tnt_lex.h>
+#include <connector/c/include/tarantool/tnt_sql.h>
 
 struct tt_test;
 
@@ -186,6 +186,25 @@ static void tt_tnt_sbuf(struct tt_test *test) {
 	TT_ASSERT(s.wrcnt == 2);
 	tnt_tuple_free(kv);
 	tnt_stream_free(&s);
+}
+
+/* tuple set */
+static void tt_tnt_tuple_set(struct tt_test *test) {
+	char buf[75];
+	*((uint32_t*)buf) = 2; /* cardinality */
+	/* 4 + 1 + 5 + 1 + 64 = 75 */
+	uint32_t off = sizeof(uint32_t);
+	int esize = tnt_enc_size(5);
+	tnt_enc_write(buf + off, 5);
+	off += esize + 5;
+	esize = tnt_enc_size(64);
+	tnt_enc_write(buf + off, 64);
+	off += esize + 64;
+	struct tnt_tuple t;
+	tnt_tuple_init(&t);
+	TT_ASSERT(tnt_tuple_set(&t, buf, 70) == NULL);
+	TT_ASSERT(tnt_tuple_set(&t, buf, sizeof(buf)) != NULL);
+	tnt_tuple_free(&t);
 }
 
 /* iterator tuple */
@@ -667,7 +686,7 @@ static void tt_tnt_net_call_na(struct tt_test *test) {
 	while (tnt_next(&i)) {
 		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code != 0);
-		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple cardinality is 0") == 0);
+		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple field count is 0") == 0);
 	}
 	tnt_iter_free(&i);
 }
@@ -1101,6 +1120,7 @@ main(int argc, char * argv[])
 	tt_test(&t, "tuple2", tt_tnt_tuple2);
 	tt_test(&t, "list", tt_tnt_list);
 	tt_test(&t, "stream buffer", tt_tnt_sbuf);
+	tt_test(&t, "tuple set", tt_tnt_tuple_set);
 	tt_test(&t, "iterator tuple", tt_tnt_iter1);
 	tt_test(&t, "iterator tuple (single field)", tt_tnt_iter11);
 	tt_test(&t, "iterator tuple (tnt_field)", tt_tnt_iter2);

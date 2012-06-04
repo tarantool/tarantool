@@ -1,0 +1,31 @@
+=head1 NAME
+
+tarantool - readline SQL-client for L<tarantool>.
+
+=head1 SYNOPSIS
+
+    tarantool [OPTIONS]
+
+=head1 Command-line options
+
+=over
+
+=item -a <host>, --host <host>
+
+Defines Server address.
+
+=item -p <port>, --port <port>
+
+Defines server port.
+
+=item -m <port>, --port-admin <port>
+
+Defines Server admin port.
+
+=item -h, --help
+
+Displays helpscreen and exits.
+
+=back
+
+

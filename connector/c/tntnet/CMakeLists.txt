@@ -40,19 +40,22 @@ string(REPLACE "-static" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 #
 # Static library
 #
-
 project(tntnet)
 add_library(tntnet STATIC ${tntnet_sources})
 set_target_properties(tntnet PROPERTIES COMPILE_FLAGS "${tntnet_cflags}")
+set_target_properties(tntnet PROPERTIES VERSION ${LIBTNT_VERSION} SOVERSION ${LIBTNT_SOVERSION})
+set_target_properties(tntnet PROPERTIES OUTPUT_NAME "tarantoolnet")
 
 #
 # Shared library
 #
-
 project(tntnet_shared)
 add_library(tntnet_shared SHARED ${tntnet_sources})
+target_link_libraries(tntnet_shared tnt_shared)
 set_target_properties(tntnet_shared PROPERTIES OUTPUT_NAME tntnet)
 set_target_properties(tntnet_shared PROPERTIES COMPILE_FLAGS "${tntnet_cflags}")
+set_target_properties(tntnet_shared PROPERTIES VERSION ${LIBTNT_VERSION} SOVERSION ${LIBTNT_SOVERSION})
+set_target_properties(tntnet_shared PROPERTIES OUTPUT_NAME "tarantoolnet")
 
 #----------------------------------------------------------------------------#
 # Install

@@ -29,7 +29,7 @@
 #include <stdbool.h>
 #include <util.h>
 
-struct box_tuple;
+struct tuple;
 struct space;
 struct index;
 
@@ -44,9 +44,11 @@ extern const char *field_data_type_strs[];
 enum index_type { HASH, TREE, index_type_MAX };
 extern const char *index_type_strs[];
 
+enum iterator_type { ITER_FORWARD, ITER_REVERSE };
+
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
-	u32 fieldno;
+	int fieldno;
 	enum field_data_type type;
 };
 
@@ -65,16 +67,14 @@ struct key_def {
 	 */
 	u32 *cmp_order;
 	/* The size of the 'parts' array. */
-	u32 part_count;
+	int part_count;
 	/*
 	 * The size of 'cmp_order' array (= max fieldno in 'parts'
 	 * array).
 	 */
-	u32 max_fieldno;
+	int max_fieldno;
 	bool is_unique;
 };
-
-@class Index;
 
 @interface Index: Object {
  @public
@@ -111,26 +111,40 @@ struct key_def {
  * Finish index construction.
  */
 - (void) enable;
+- (void) build: (Index *) pk;
 - (size_t) size;
-- (struct box_tuple *) min;
-- (struct box_tuple *) max;
-- (struct box_tuple *) find: (void *) key_arg; /* only for unique lookups */
-- (struct box_tuple *) findByTuple: (struct box_tuple *) tuple;
-- (void) remove: (struct box_tuple *) tuple;
-- (void) replace: (struct box_tuple *) old_tuple :(struct box_tuple *) new_tuple;
+- (struct tuple *) min;
+- (struct tuple *) max;
+- (struct tuple *) findByKey: (void *) key :(int) part_count;
+- (struct tuple *) findByTuple: (struct tuple *) tuple;
+- (void) remove: (struct tuple *) tuple;
+- (void) replace: (struct tuple *) old_tuple :(struct tuple *) new_tuple;
 /**
  * Create a structure to represent an iterator. Must be
  * initialized separately.
  */
 - (struct iterator *) allocIterator;
-- (void) initIterator: (struct iterator *) iterator;
-- (void) initIterator: (struct iterator *) iterator :(void *) key
-			:(int) part_count;
+- (void) initIterator: (struct iterator *) iterator
+			:(enum iterator_type) type;
+- (void) initIteratorByKey: (struct iterator *) iterator
+			:(enum iterator_type) type
+			:(void *) key :(int) part_count;
+/**
+ * Check key part count.
+ */
+- (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed;
+/**
+ * Unsafe search methods that do not check key part count.
+ */
+- (struct tuple *) findUnsafe: (void *) key :(int) part_count;
+- (void) initIteratorUnsafe: (struct iterator *) iterator
+			:(enum iterator_type) type
+			:(void *) key :(int) part_count;
 @end
 
 struct iterator {
-	struct box_tuple *(*next)(struct iterator *);
-	struct box_tuple *(*next_equal)(struct iterator *);
+	struct tuple *(*next)(struct iterator *);
+	struct tuple *(*next_equal)(struct iterator *);
 	void (*free)(struct iterator *);
 };
 

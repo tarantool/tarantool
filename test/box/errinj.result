@@ -1,0 +1,56 @@
+show injections
+---
+error injections:
+  - name: ERRINJ_TESTING
+    state: off
+  - name: ERRINJ_WAL_IO
+    state: off
+...
+set injection some-injection on
+---
+fail:can't find error injection 'some-injection'
+...
+select * from t0 where k0 = 222444
+No match
+set injection ERRINJ_TESTING on
+---
+ok
+...
+select * from t0 where k0 = 222444
+An error occurred: ER_INJECTION, 'Error injection 'ERRINJ_TESTING''
+set injection ERRINJ_TESTING off
+---
+ok
+...
+set injection ERRINJ_WAL_IO on
+---
+ok
+...
+insert into t0 values (1)
+An error occurred: ER_WAL_IO, 'Failed to write to disk'
+select * from t0 where k0=1
+No match
+set injection ERRINJ_WAL_IO off
+---
+ok
+...
+insert into t0 values (1)
+Insert OK, 1 row affected
+set injection ERRINJ_WAL_IO on
+---
+ok
+...
+update t0 set k0=2 where k0=1
+An error occurred: ER_WAL_IO, 'Failed to write to disk'
+select * from t0 where k0=1
+Found 1 tuple:
+[1]
+select * from t0 where k0=2
+No match
+set injection ERRINJ_WAL_IO off
+---
+ok
+...
+lua box.space[0]:truncate()
+---
+...

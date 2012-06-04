@@ -27,6 +27,7 @@
 #include "lj_cconv.h"
 #include "lj_carith.h"
 #include "lj_ccall.h"
+#include "lj_ccallback.h"
 #include "lj_clib.h"
 #include "lj_ff.h"
 #include "lj_lib.h"
@@ -207,7 +208,10 @@ LJLIB_CF(ffi_meta___concat)	LJLIB_REC(cdata_arith MM_concat)
 static int ffi_call_meta(lua_State *L, CTypeID id)
 {
   CTState *cts = ctype_cts(L);
-  cTValue *tv = lj_ctype_meta(cts, id, MM_call);
+  CType *ct = ctype_raw(cts, id);
+  cTValue *tv;
+  if (ctype_isptr(ct->info)) id = ctype_cid(ct->info);
+  tv = lj_ctype_meta(cts, id, MM_call);
   if (!tv)
     lj_err_callerv(L, LJ_ERR_FFI_BADCALL, strdata(lj_ctype_repr(L, id, NULL)));
   return lj_meta_tailcall(L, tv);
@@ -325,7 +329,7 @@ static TValue *ffi_clib_index(lua_State *L)
   return lj_clib_index(L, cl, strV(o+1));
 }
 
-LJLIB_CF(ffi_clib___index)	LJLIB_REC(clib_index)
+LJLIB_CF(ffi_clib___index)	LJLIB_REC(clib_index 1)
 {
   TValue *tv = ffi_clib_index(L);
   if (tviscdata(tv)) {
@@ -335,7 +339,9 @@ LJLIB_CF(ffi_clib___index)	LJLIB_REC(clib_index)
     if (ctype_isextern(s->info)) {
       CTypeID sid = ctype_cid(s->info);
       void *sp = *(void **)cdataptr(cd);
-      if (lj_cconv_tv_ct(cts, ctype_raw(cts, sid), sid, L->top-1, sp))
+      CType *ct = ctype_raw(cts, sid);
+      if (ctype_isenum(ct->info)) ct = ctype_child(cts, ct);
+      if (lj_cconv_tv_ct(cts, ct, sid, L->top-1, sp))
 	lj_gc_check(L);
       return 1;
     }
@@ -344,7 +350,7 @@ LJLIB_CF(ffi_clib___index)	LJLIB_REC(clib_index)
   return 1;
 }
 
-LJLIB_CF(ffi_clib___newindex)
+LJLIB_CF(ffi_clib___newindex)	LJLIB_REC(clib_index 0)
 {
   TValue *tv = ffi_clib_index(L);
   TValue *o = L->base+2;
@@ -376,6 +382,50 @@ LJLIB_CF(ffi_clib___gc)
     lj_clib_unload((CLibrary *)uddata(udataV(o)));
   return 0;
 }
+
+#include "lj_libdef.h"
+
+/* -- Callback function metamethods --------------------------------------- */
+
+#define LJLIB_MODULE_ffi_callback
+
+static int ffi_callback_set(lua_State *L, GCfunc *fn)
+{
+  GCcdata *cd = ffi_checkcdata(L, 1);
+  CTState *cts = ctype_cts(L);
+  CType *ct = ctype_raw(cts, cd->typeid);
+  if (ctype_isptr(ct->info) && (LJ_32 || ct->size == 8)) {
+    MSize slot = lj_ccallback_ptr2slot(cts, *(void **)cdataptr(cd));
+    if (slot < cts->cb.sizeid && cts->cb.cbid[slot] != 0) {
+      GCtab *t = cts->miscmap;
+      TValue *tv = lj_tab_setint(L, t, (int32_t)slot);
+      if (fn) {
+	setfuncV(L, tv, fn);
+	lj_gc_anybarriert(L, t);
+      } else {
+	setnilV(tv);
+	cts->cb.cbid[slot] = 0;
+	cts->cb.topid = slot < cts->cb.topid ? slot : cts->cb.topid;
+      }
+      return 0;
+    }
+  }
+  lj_err_caller(L, LJ_ERR_FFI_BADCBACK);
+  return 0;
+}
+
+LJLIB_CF(ffi_callback_free)
+{
+  return ffi_callback_set(L, NULL);
+}
+
+LJLIB_CF(ffi_callback_set)
+{
+  GCfunc *fn = lj_lib_checkfunc(L, 2);
+  return ffi_callback_set(L, fn);
+}
+
+LJLIB_PUSH(top-1) LJLIB_SET(__index)
 
 #include "lj_libdef.h"
 
@@ -423,7 +473,7 @@ LJLIB_CF(ffi_new)	LJLIB_REC(.)
 		   o, (MSize)(L->top - o));  /* Initialize cdata. */
   if (ctype_isstruct(ct->info)) {
     /* Handle ctype __gc metamethod. Use the fast lookup here. */
-    cTValue *tv = lj_tab_getint(cts->metatype, (int32_t)id);
+    cTValue *tv = lj_tab_getinth(cts->miscmap, -(int32_t)id);
     if (tv && tvistab(tv) && (tv = lj_meta_fast(L, tabV(tv), MM_gc))) {
       GCtab *t = cts->finalizer;
       if (gcref(t->metatable)) {
@@ -553,7 +603,7 @@ LJLIB_CF(ffi_offsetof)
   return 0;
 }
 
-LJLIB_CF(ffi_errno)
+LJLIB_CF(ffi_errno)	LJLIB_REC(.)
 {
   int err = errno;
   if (L->top > L->base)
@@ -645,21 +695,21 @@ LJLIB_CF(ffi_abi)	LJLIB_REC(.)
 
 #undef H_
 
-LJLIB_PUSH(top-8) LJLIB_SET(!)  /* Store reference to metatype table. */
+LJLIB_PUSH(top-8) LJLIB_SET(!)  /* Store reference to miscmap table. */
 
 LJLIB_CF(ffi_metatype)
 {
   CTState *cts = ctype_cts(L);
   CTypeID id = ffi_checkctype(L, cts);
   GCtab *mt = lj_lib_checktab(L, 2);
-  GCtab *t = cts->metatype;
+  GCtab *t = cts->miscmap;
   CType *ct = ctype_get(cts, id);  /* Only allow raw types. */
   TValue *tv;
   GCcdata *cd;
   if (!(ctype_isstruct(ct->info) || ctype_iscomplex(ct->info) ||
 	ctype_isvector(ct->info)))
     lj_err_arg(L, 1, LJ_ERR_FFI_INVTYPE);
-  tv = lj_tab_setint(L, t, (int32_t)id);
+  tv = lj_tab_setinth(L, t, -(int32_t)id);
   if (!tvisnil(tv))
     lj_err_caller(L, LJ_ERR_PROTMT);
   settabV(L, tv, mt);
@@ -740,12 +790,16 @@ static void ffi_register_module(lua_State *L)
 LUALIB_API int luaopen_ffi(lua_State *L)
 {
   CTState *cts = lj_ctype_init(L);
-  settabV(L, L->top++, (cts->metatype = lj_tab_new(L, 0, 0)));
+  settabV(L, L->top++, (cts->miscmap = lj_tab_new(L, 0, 1)));
   cts->finalizer = ffi_finalizer(L);
   LJ_LIB_REG(L, NULL, ffi_meta);
   /* NOBARRIER: basemt is a GC root. */
   setgcref(basemt_it(G(L), LJ_TCDATA), obj2gco(tabV(L->top-1)));
   LJ_LIB_REG(L, NULL, ffi_clib);
+  LJ_LIB_REG(L, NULL, ffi_callback);
+  /* NOBARRIER: the key is new and lj_tab_newkey() handles the barrier. */
+  settabV(L, lj_tab_setstr(L, cts->miscmap, &cts->g->strempty), tabV(L->top-1));
+  L->top--;
   lj_clib_default(L, tabV(L->top-1));  /* Create ffi.C default namespace. */
   lua_pushliteral(L, LJ_OS_NAME);
   lua_pushliteral(L, LJ_ARCH_NAME);

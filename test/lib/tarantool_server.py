@@ -33,8 +33,14 @@ class TarantoolServer(Server):
     def __init__(self, core, module):
         Server.__init__(self, core, module)
         self.default_config_name = "tarantool.cfg"
+        self.default_init_lua_name = "init.lua"
         # append additional cleanup patterns
-        self.re_vardir_cleanup += ['*.snap', '*.xlog', '*.inprogress', '*.cfg', '*.sup']
+        self.re_vardir_cleanup += ['*.snap',
+                                   '*.xlog',
+                                   '*.inprogress',
+                                   '*.cfg',
+                                   '*.sup',
+                                   '*.lua']
 
     def find_exe(self, builddir, silent=True):
         return Server.find_exe(self, "{0}/mod/{1}".format(builddir, self.module), silent)

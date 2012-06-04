@@ -43,6 +43,8 @@ string(REPLACE "-static" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 project(tntsql)
 add_library(tntsql STATIC ${tntsql_sources})
 set_target_properties(tntsql PROPERTIES COMPILE_FLAGS "${tntsql_cflags}")
+set_target_properties(tntsql PROPERTIES VERSION ${LIBTNT_VERSION} SOVERSION ${LIBTNT_SOVERSION})
+set_target_properties(tntsql PROPERTIES OUTPUT_NAME "tarantoolsql")
 
 #
 # Shared library
@@ -50,8 +52,11 @@ set_target_properties(tntsql PROPERTIES COMPILE_FLAGS "${tntsql_cflags}")
 
 project(tntsql_shared)
 add_library(tntsql_shared SHARED ${tntsql_sources})
+target_link_libraries(tntsql_shared tnt_shared)
 set_target_properties(tntsql_shared PROPERTIES OUTPUT_NAME tntsql)
 set_target_properties(tntsql_shared PROPERTIES COMPILE_FLAGS "${tntsql_cflags}")
+set_target_properties(tntsql_shared PROPERTIES VERSION ${LIBTNT_VERSION} SOVERSION ${LIBTNT_SOVERSION})
+set_target_properties(tntsql_shared PROPERTIES OUTPUT_NAME "tarantoolsql")
 
 #----------------------------------------------------------------------------#
 # Install

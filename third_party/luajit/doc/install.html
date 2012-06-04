@@ -105,7 +105,7 @@ operating systems, CPUs and compilers:
 <td class="compatos"><a href="#posix">Linux</a> or<br><a href="#android">Android</a></td>
 <td class="compatos"><a href="#posix">*BSD, Other</a></td>
 <td class="compatos"><a href="#posix">OSX 10.3+</a> or<br><a href="#ios">iOS 3.0+</a></td>
-<td class="compatos"><a href="#windows">Windows<br>98/XP/Vista/7</a></td>
+<td class="compatos"><a href="#windows">Windows<br>XP/Vista/7</a></td>
 </tr>
 <tr class="odd separate">
 <td class="compatcpu">x86 (32 bit)</td>
@@ -122,14 +122,21 @@ operating systems, CPUs and compilers:
 <td class="compatos">MSVC + SDK v7.0<br>WinSDK v7.0</td>
 </tr>
 <tr class="odd">
-<td class="compatcpu">ARMv5+<br>ARM9E+</td>
+<td class="compatcpu"><a href="#android">ARMv5+<br>ARM9E+</a></td>
 <td class="compatos">GCC 4.2+</td>
 <td class="compatos">GCC 4.2+</td>
 <td class="compatos">GCC 4.2+</td>
 <td class="compatos compatno">&nbsp;</td>
 </tr>
 <tr class="even">
-<td class="compatcpu">PPC/e500v2</td>
+<td class="compatcpu"><a href="#ppc">PPC</a></td>
+<td class="compatos">GCC 4.3+</td>
+<td class="compatos">GCC 4.3+</td>
+<td class="compatos compatno">&nbsp;</td>
+<td class="compatos compatno">&nbsp;</td>
+</tr>
+<tr class="odd">
+<td class="compatcpu"><a href="#ppc">PPC/e500v2</a></td>
 <td class="compatos">GCC 4.3+</td>
 <td class="compatos">GCC 4.3+</td>
 <td class="compatos compatno">&nbsp;</td>
@@ -171,8 +178,8 @@ open a terminal window and change to this directory. Now unpack the archive
 and change to the newly created directory:
 </p>
 <pre class="code">
-tar zxf LuaJIT-2.0.0-beta8.tar.gz
-cd LuaJIT-2.0.0-beta8</pre>
+tar zxf LuaJIT-2.0.0-beta9.tar.gz
+cd LuaJIT-2.0.0-beta9</pre>
 <h3>Building LuaJIT</h3>
 <p>
 The supplied Makefiles try to auto-detect the settings needed for your
@@ -222,11 +229,11 @@ Obviously the prefixes given during build and installation need to be the same.
 <p style="color: #c00000;">
 Note: to avoid overwriting a previous version, the beta test releases
 only install the LuaJIT executable under the versioned name (i.e.
-<tt>luajit-2.0.0-beta8</tt>). You probably want to create a symlink
+<tt>luajit-2.0.0-beta9</tt>). You probably want to create a symlink
 for convenience, with a command like this:
 </p>
 <pre class="code" style="color: #c00000;">
-sudo ln -sf luajit-2.0.0-beta8&nbsp;/usr/local/bin/luajit
+sudo ln -sf luajit-2.0.0-beta9&nbsp;/usr/local/bin/luajit
 </pre>
 
 <h2 id="windows">Windows Systems</h2>
@@ -383,12 +390,18 @@ make HOST_CC="gcc -m32 -arch i386" CROSS=$ISDKP TARGET_FLAGS="$ISDKF" \
      TARGET=arm TARGET_SYS=iOS
 </pre>
 <p>
-You can cross-compile for a <b>PPC/e500v2 target</b> on an x86 or x64 host system
-using a standard GNU cross-compile toolchain (Binutils, GCC, EGLIBC).
+You can cross-compile for a <b id="ppc">PPC target</b> or a
+<b>PPC/e500v2 target</b> on x86 or x64 host systems using a standard
+GNU cross-compile toolchain (Binutils, GCC, EGLIBC).
 The <tt>CROSS</tt> prefix may vary depending on the <tt>--target</tt>
 of the toolchain:
 </p>
 <pre class="code">
+# PPC
+make HOST_CC="gcc -m32" CROSS=powerpc-linux-gnu- TARGET=ppc
+</pre>
+<pre class="code">
+# PPC/e500v2
 make HOST_CC="gcc -m32" CROSS=powerpc-e500v2-linux-gnuspe- TARGET=ppcspe
 </pre>
 <p>

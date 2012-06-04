@@ -30,16 +30,21 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-struct tbuf;
-struct box_txn;
+#include "request.h"
+struct lua_State;
 
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void box_lua_call(struct box_txn *txn, struct tbuf *req);
+@interface Call: Request
+- (void) execute: (struct txn *) txn :(Port *) port;
+@end
+
 /**
  * Create an instance of Lua interpreter in box.
  */
 void box_lua_init();
+
+struct tuple *lua_istuple(struct lua_State *L, int narg);
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_H */

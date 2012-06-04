@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-
 int admin_init(void);
 
 #endif /* TARANTOOL_ADMIN_H_INCLUDED */

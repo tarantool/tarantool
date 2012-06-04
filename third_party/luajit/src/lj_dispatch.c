@@ -50,7 +50,8 @@ void lj_dispatch_init(GG_State *GG)
 /* Initialize hotcount table. */
 void lj_dispatch_init_hotcount(global_State *g)
 {
-  HotCount start = (HotCount)G2J(g)->param[JIT_P_hotloop];
+  int32_t hotloop = G2J(g)->param[JIT_P_hotloop];
+  HotCount start = (HotCount)(hotloop*HOTCOUNT_LOOP - 1);
   HotCount *hotcount = G2GG(g)->hotcount;
   uint32_t i;
   for (i = 0; i < HOTCOUNT_SIZE; i++)
@@ -430,8 +431,12 @@ ASMFunction LJ_FASTCALL lj_dispatch_call(lua_State *L, const BCIns *pc)
     goto out;
   } else if (J->state != LJ_TRACE_IDLE &&
 	     !(g->hookmask & (HOOK_GC|HOOK_VMEVENT))) {
+#ifdef LUA_USE_ASSERT
+    ptrdiff_t delta = L->top - L->base;
+#endif
     /* Record the FUNC* bytecodes, too. */
     lj_trace_ins(J, pc-1);  /* The interpreter bytecode PC is offset by 1. */
+    lua_assert(L->top - L->base == delta);
   }
 #endif
   if ((g->hookmask & LUA_MASKCALL)) {

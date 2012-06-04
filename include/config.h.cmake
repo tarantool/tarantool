@@ -13,6 +13,8 @@
 #cmakedefine TARGET_OS_LINUX 1
 /*  Defined if building for FreeBSD */
 #cmakedefine TARGET_OS_FREEBSD 1
+/*  Defined if building for Darwin */
+#cmakedefine TARGET_OS_DARWIN 1
 /*
  * Defined if gcov instrumentation should be enabled.
  */
@@ -41,7 +43,27 @@
  */
 #define MAP_ANONYMOUS MAP_ANON
 #endif
-
+/*
+ * Defined if O_DSYNC mode exists for open(2).
+ */
+#cmakedefine HAVE_O_DSYNC 1
+#if defined(HAVE_O_DSYNC)
+    #define WAL_SYNC_FLAG O_DSYNC
+#else
+    #define WAL_SYNC_FLAG O_SYNC
+#endif
+/*
+ * Defined if fdatasync(2) call is present.
+ */
+#cmakedefine HAVE_FDATASYNC 1
+/*
+ * Defined if this platform has GNU specific memmem().
+ */
+#cmakedefine HAVE_MEMMEM 1
+/*
+ * Defined if this platform has GNU specific memrchr().
+ */
+#cmakedefine HAVE_MEMRCHR 1
 /*
  * Set if this is a GNU system and libc has __libc_stack_end.
  */
@@ -50,8 +72,15 @@
  * Defined if this is a big-endian system.
  */
 #cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
-
+/*
+ * predefined /etc directory prefix.
+ */
 #define SYSCONF_DIR "@CMAKE_SYSCONF_DIR@"
+#define INSTALL_PREFIX "@CMAKE_INSTALL_PREFIX@"
+#define BUILD_TYPE "@CMAKE_BUILD_TYPE@"
+#define BUILD_INFO "@TARANTOOL_BUILD@"
+#define BUILD_CFLAGS "@CMAKE_C_FLAGS@ @core_cflags@"
+#define BUILD_OPTIONS "cmake . @TARANTOOL_OPTIONS@"
 /*
  * vim: syntax=c
  */

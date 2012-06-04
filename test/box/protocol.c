@@ -6,9 +6,9 @@
 #include "util.h"
 #include "errcode.h"
 
-#include <libtnt/tnt.h>
-#include <libtnt/tnt_net.h>
-#include <libtnt/tnt_io.h>
+#include <tarantool/tnt.h>
+#include <tarantool/tnt_net.h>
+#include <tarantool/tnt_io.h>
 
 /** Client handler. Reused between tests. */
 struct tnt_stream *t;

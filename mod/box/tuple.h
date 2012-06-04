@@ -32,19 +32,11 @@
 
 struct tbuf;
 
-/** tuple's flags */
-enum tuple_flags {
-	/** Waiting on WAL write to complete. */
-	WAL_WAIT = 0x1,
-	/** A new primary key is created but not yet written to WAL. */
-	GHOST = 0x2,
-};
-
 /**
  * An atom of Tarantool/Box storage. Consists of a list of fields.
  * The first field is always the primary key.
  */
-struct box_tuple
+struct tuple
 {
 	/** reference counter */
 	u16 refs;
@@ -53,7 +45,7 @@ struct box_tuple
 	/** length of the variable part of the tuple */
 	u32 bsize;
 	/** number of fields in the variable part. */
-	u32 cardinality;
+	u32 field_count;
 	/**
 	 * Fields can have variable length, and thus are packed
 	 * into a contiguous byte array. Each field is prefixed
@@ -67,7 +59,7 @@ struct box_tuple
  * @param size  tuple->bsize
  * @post tuple->refs = 1
  */
-struct box_tuple *
+struct tuple *
 tuple_alloc(size_t size);
 
 /**
@@ -76,7 +68,7 @@ tuple_alloc(size_t size);
  * @pre tuple->refs + count >= 0
  */
 void
-tuple_ref(struct box_tuple *tuple, int count);
+tuple_ref(struct tuple *tuple, int count);
 
 /**
  * Get a field from tuple by index.
@@ -84,20 +76,22 @@ tuple_ref(struct box_tuple *tuple, int count);
  * @returns field data if the field exists, or NULL
  */
 void *
-tuple_field(struct box_tuple *tuple, size_t i);
+tuple_field(struct tuple *tuple, size_t i);
 
 /**
  * Print a tuple in yaml-compatible mode to tbuf:
  * key: { value, value, value }
  */
 void
-tuple_print(struct tbuf *buf, uint8_t cardinality, void *f);
+tuple_print(struct tbuf *buf, uint8_t field_count, void *f);
 
 /** Tuple length when adding to iov. */
-static inline size_t tuple_len(struct box_tuple *tuple)
+static inline size_t tuple_len(struct tuple *tuple)
 {
 	return tuple->bsize + sizeof(tuple->bsize) +
-		sizeof(tuple->cardinality);
+		sizeof(tuple->field_count);
 }
+
+void tuple_free(struct tuple *tuple);
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

@@ -107,7 +107,7 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
 	    ins, sym);
     exit(1);
   }
-#elif LJ_TARGET_PPC
+#elif LJ_TARGET_PPC || LJ_TARGET_PPCSPE
   if ((ins >> 26) == 16) {
     fprintf(ctx->fp, "\t%s %d, %d, %s\n",
 	    (ins & 1) ? "bcl" : "bc", (ins >> 21) & 31, (ins >> 16) & 31, sym);
@@ -191,7 +191,7 @@ void emit_asm(BuildCtx *ctx)
   if (ctx->mode != BUILD_machasm)
     fprintf(ctx->fp, ".Lbegin:\n");
 
-#if LJ_TARGET_ARM && defined(__GNUC__) && !defined(__symbian__)
+#if LJ_TARGET_ARM && defined(__GNUC__) && !defined(LUAJIT_NO_UNWIND)
   /* This should really be moved into buildvm_arm.dasc. */
   fprintf(ctx->fp,
 	  ".fnstart\n"
@@ -202,6 +202,17 @@ void emit_asm(BuildCtx *ctx)
   for (i = rel = 0; i < ctx->nsym; i++) {
     int32_t ofs = ctx->sym[i].ofs;
     int32_t next = ctx->sym[i+1].ofs;
+#if LJ_TARGET_ARM && defined(__GNUC__) && !defined(LUAJIT_NO_UNWIND) && \
+    LJ_HASFFI
+    if (!strcmp(ctx->sym[i].name, "lj_vm_ffi_call"))
+      fprintf(ctx->fp,
+	      ".globl lj_err_unwind_arm\n"
+	      ".personality lj_err_unwind_arm\n"
+	      ".fnend\n"
+	      ".fnstart\n"
+	      ".save {r4, r5, r11, lr}\n"
+	      ".setfp r11, sp\n");
+#endif
     emit_asm_label(ctx, ctx->sym[i].name, next - ofs, 1);
     while (rel < ctx->nreloc && ctx->reloc[rel].ofs <= next) {
       BuildReloc *r = &ctx->reloc[rel];
@@ -227,10 +238,12 @@ void emit_asm(BuildCtx *ctx)
 #endif
   }
 
-#if LJ_TARGET_ARM && defined(__GNUC__) && !defined(__symbian__)
+#if LJ_TARGET_ARM && defined(__GNUC__) && !defined(LUAJIT_NO_UNWIND)
   fprintf(ctx->fp,
+#if !LJ_HASFFI
 	  ".globl lj_err_unwind_arm\n"
 	  ".personality lj_err_unwind_arm\n"
+#endif
 	  ".fnend\n");
 #endif
 

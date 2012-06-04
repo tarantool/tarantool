@@ -226,8 +226,14 @@ Tarantool/Box IPROTO protocol.
 
 <insert_request_body> ::= <space_no><flags><tuple>
 
-; The only defined flag BOX_RETURN_TUPLE (0x01) indicates
+; Flag BOX_RETURN_TUPLE (0x01) indicates
 ; that it is required to return the inserted tuple back:
+; Flag BOX_ADD (0x02) requests that no tuple with the same primary
+; key exists in the space. I.e. it turns INSERT into INSERT,
+; without this flag INSERT behaves like REPLACE: replaces
+; an existing tuple if it is found.
+; Flag BOX_REPLACE (0x04) requests that a tuple with the same
+; primary key is present in the space.
 
 <flags> ::= <int32>
 
@@ -243,8 +249,6 @@ Tarantool/Box IPROTO protocol.
 ; - <flags>, <tuple>: same as in <insert>
 ; Index number for tuple lookup does not need to be provided,
 ; since only primary key updates are allowed.
-; Moreover, <tuple> cardinality is always 1, since currently
-; primary keys are always single-dimensioned.
 ; - <count> specifies possibly zero operation count
 ;
 
@@ -264,8 +268,11 @@ Tarantool/Box IPROTO protocol.
 <field_no> ::= <int32>
 
 ;
-; 0 - assign operation argument to field <field_no>
-; The rest of operations are only defined for 32-bit integer
+; The operation(s) below operate on fields of arbitrary types:
+; 0 - assign operation argument to field <field_no>;
+;     will extend the tuple if <field_no> == <max_field_no> + 1
+;
+; The following operation(s) are only defined for 32-bit integer
 ; types:
 ; 1 - add argument to field <field_no>, both arguments
 ; are treated as signed 32-bit ints
@@ -275,8 +282,12 @@ Tarantool/Box IPROTO protocol.
 ; Tarantool 1.3.5 features one more command, which operates
 ; on strings:
 ; 5 - implementation of Perl 'splice' command
+;
+; The operation(s) below operate on fields of arbitrary types:
+; 6 - delete <field_no>
+; 7 - insert before <field_no>
 
-<op_code> ::= <int8> # 0 | 1 | 2 | 3 | 4 | 5
+<op_code> ::= <int8> # 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 ;
 ; It's an error to specify an argument of a type that

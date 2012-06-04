@@ -12,6 +12,7 @@
 #include "lj_ctype.h"
 #include "lj_cdata.h"
 #include "lj_cconv.h"
+#include "lj_ccallback.h"
 
 /* -- Conversion errors --------------------------------------------------- */
 
@@ -390,7 +391,7 @@ int lj_cconv_tv_ct(CTState *cts, CType *s, CTypeID sid,
 	lua_assert(tvisnum(o));
       }
     } else {
-      uint32_t b = ((*sp) & 1);
+      uint32_t b = (*sp != 0);
       setboolV(o, b);
       setboolV(&cts->g->tmptv2, b);  /* Remember for trace recorder. */
     }
@@ -603,6 +604,13 @@ void lj_cconv_ct_tv(CTState *cts, CType *d,
     tmpptr = uddata(udataV(o));
   } else if (tvislightud(o)) {
     tmpptr = lightudV(o);
+  } else if (tvisfunc(o)) {
+    void *p = lj_ccallback_new(cts, d, funcV(o));
+    if (p) {
+      *(void **)dp = p;
+      return;
+    }
+    goto err_conv;
   } else {
   err_conv:
     cconv_err_convtv(cts, d, o, flags);

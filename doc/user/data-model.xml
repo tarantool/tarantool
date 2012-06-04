@@ -90,7 +90,7 @@
     <listitem><para>
        REPLACE replaces data when a
        tuple with given primary key already exists. Such replace
-       can insert a tuple of different cardinality.
+       can insert a tuple with a different number of fields.
     </para></listitem>
   </itemizedlist>
 </para>

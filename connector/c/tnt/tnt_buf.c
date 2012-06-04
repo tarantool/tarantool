@@ -28,13 +28,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <connector/c/include/libtnt/tnt_mem.h>
-#include <connector/c/include/libtnt/tnt_tuple.h>
-#include <connector/c/include/libtnt/tnt_proto.h>
-#include <connector/c/include/libtnt/tnt_request.h>
-#include <connector/c/include/libtnt/tnt_reply.h>
-#include <connector/c/include/libtnt/tnt_stream.h>
-#include <connector/c/include/libtnt/tnt_buf.h>
+#include <connector/c/include/tarantool/tnt_mem.h>
+#include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
+#include <connector/c/include/tarantool/tnt_reply.h>
+#include <connector/c/include/tarantool/tnt_stream.h>
+#include <connector/c/include/tarantool/tnt_buf.h>
 
 static struct tnt_stream *tnt_buf_tryalloc(struct tnt_stream *s) {
 	if (s) {

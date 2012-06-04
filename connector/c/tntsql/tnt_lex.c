@@ -33,10 +33,10 @@
 #include <ctype.h>
 #include <errno.h>
 
-#include <connector/c/include/libtnt/tnt.h>
-#include <connector/c/include/libtnt/tnt_utf8.h>
-#include <connector/c/include/libtnt/tnt_queue.h>
-#include <connector/c/include/libtnt/tnt_lex.h>
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_utf8.h>
+#include <connector/c/include/tarantool/tnt_queue.h>
+#include <connector/c/include/tarantool/tnt_lex.h>
 
 bool tnt_lex_init(struct tnt_lex *l, unsigned char *buf, size_t size)
 {
@@ -148,6 +148,7 @@ static struct {
 	{  "VALUES",  6, TNT_TK_VALUES },
 	{  "SELECT",  6, TNT_TK_SELECT },
 	{  "OR",      2, TNT_TK_OR },
+	{  "AND",     3, TNT_TK_AND },
 	{  "LIMIT",   5, TNT_TK_LIMIT },
 	{  "CALL",    4, TNT_TK_CALL },
 	{  NULL,      0, TNT_TK_NONE }

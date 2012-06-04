@@ -6,21 +6,24 @@ include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
 include(CheckSymbolExists)
+include(CheckCXXSourceRuns)
 include(TestBigEndian)
+include(CheckFunctionExists)
 
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
 find_program(XMLLINT xmllint)
+find_program(JING jing)
+find_program(LYNX lynx)
 find_program(CAT cat)
 find_program(GIT git)
 find_program(RAGEL ragel)
 find_program(CONFETTI confetti)
 find_program(LD ld)
-
-set(luadir ${PROJECT_BINARY_DIR}/third_party/luajit/src)
-link_directories(${luadir})
+find_program(POD2MAN pod2man)
 
 include(cmake/check_objective_c_compiler.cmake)
+include(cmake/luajit.cmake)
 
 #
 # This instructs the rest of the build system what product
@@ -30,7 +33,6 @@ set (TARANTOOL_PRODUCT "box")
 set (TARANTOOL_MODULES "box")
 set (TARANTOOL_CLIENTS "")
 
-
 #
 # Set default build type to Debug. This is to ease a developer's
 # life. Release binaries are built by BuildBot automatically anyway.
@@ -39,6 +41,14 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING
         "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
         FORCE)
+endif()
+
+execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
+                OUTPUT_VARIABLE GCC_VERSION)
+if (GCC_VERSION VERSION_GREATER 4.1 OR GCC_VERSION VERSION_EQUAL 4.1)
+        message(STATUS "GCC Version >= 4.1")
+else()
+    message (FATAL_ERROR "GCC version should be >= 4.1")
 endif()
 
 #
@@ -53,14 +63,33 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 # On 32-bit systems, support files larger than 2GB
 # (see man page for feature_test_macros).
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64")
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "kFreeBSD")
+    set(TARGET_OS_FREEBSD 1)
+    set(TARGET_OS_DEBIAN_FREEBSD 1)
+# Enable GNU glibc extentions.
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_GNU_SOURCE")
+#
+# On 32-bit systems, support files larger than 2GB
+# (see man page for feature_test_macros).
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
     set(TARGET_OS_FREEBSD 1)
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+    set(TARGET_OS_DARWIN 1)
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
 endif()
 
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
+check_include_file(sys/time.h HAVE_SYS_TIME_H)
+check_include_file(unwind.h HAVE_UNWIND_H)
+check_include_file(cpuid.h HAVE_CPUID_H)
+
+check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
+check_function_exists(fdatasync HAVE_FDATASYNC)
+check_function_exists(memmem HAVE_MEMMEM)
+check_function_exists(memrchr HAVE_MEMRCHR)
 
 test_big_endian(HAVE_BYTE_ORDER_BIG_ENDIAN)
 
@@ -102,7 +131,7 @@ endif()
 # Perform build type specific configuration.
 #
 set (CMAKE_C_FLAGS_DEBUG "-ggdb -O0 -fexceptions -funwind-tables")
-set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2 -fexceptions -funwind-tables")
+set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2 -fexceptions -funwind-tables -DNDEBUG -DNVALGRIND")
 set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 
 #
@@ -125,12 +154,11 @@ execute_process (COMMAND ${GIT} describe HEAD
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "4")
-set (CPACK_PACKAGE_VERSION_PATCH "4")
+set (CPACK_PACKAGE_VERSION_PATCH "6")
 if (TARANTOOL_VERSION STREQUAL "")
     set (TARANTOOL_VERSION
         "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
 endif()
-
 
 #
 # Set flags for all include files: those maintained by us and
@@ -159,6 +187,9 @@ endif()
 
 if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set (core_cflags "${core_cflags} -Werror")
+else()
+# Remove VALGRIND code and assertions in *any* type of release build.
+    set (core_cflags "${core_cflags} -DNDEBUG -DNVALGRIND")
 endif()
 
 #
@@ -178,22 +209,31 @@ endif()
 if (NOT DEFINED CMAKE_LOCALSTATE_DIR)
     set (CMAKE_LOCALSTATE_DIR "var")
 endif()
+if (NOT DEFINED CMAKE_MAN_DIR)
+    set (CMAKE_MAN_DIR "man")
+endif()
 
 #
 # Now handle all configuration options.
 #
-option(ENABLE_CLIENT "Enable building of console client" Off)
+option(ENABLE_DOC "Enable building of documentation" OFF)
+
+# LuaJIT options are defined in cmake/luajit.cmake
+
+option(ENABLE_CLIENT "Enable building of console client" OFF)
 if (ENABLE_CLIENT)
     set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
 endif()
 
-option(ENABLE_GCOV "Enable integration with gcov, a code coverage program" ON)
+option(ENABLE_GCOV "Enable integration with gcov, a code coverage program" OFF)
 if (ENABLE_GCOV)
     check_library_exists (gcov __gcov_flush  ""  HAVE_GCOV)
     if (NOT HAVE_GCOV)
         message (FATAL_ERROR
                  "ENABLE_GCOV option requested but gcov library is not found")
     endif()
+    set (GCOV_C_FLAGS "-fprofile-arcs -ftest-coverage")
+    set (GCOV_LDFLAGS "-fprofile-arcs -ftest-coverage")
 endif()
 
 option(ENABLE_TRACE "Enable debug trace of tarantool_box execution to
@@ -208,28 +248,20 @@ addresses are printed." ${CMAKE_COMPILER_IS_GNUCC})
 set (HAVE_BFD False)
 if (ENABLE_BACKTRACE)
     if (NOT ${CMAKE_COMPILER_IS_GNUCC} OR
-        NOT (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86"))
+        NOT (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86|amd64"))
         # We only know this option to work with gcc
         # on x86 architecture.
         message (FATAL_ERROR "ENABLE_BACKTRACE option is set but the system is not x86 based (${CMAKE_SYSTEM_PROCESSOR}) or the compiler is not GNU GCC (${CMAKE_C_COMPILER}).")
     endif()
-# Use GNU bfd if present.
+    # Use GNU bfd if present.
     check_library_exists (bfd bfd_init ""  HAVE_BFD_LIB)
     check_include_file(bfd.h HAVE_BFD_H)
     if (HAVE_BFD_LIB AND HAVE_BFD_H)
         set (HAVE_BFD True)
-        message (STATUS "Found GNU bfd headers and libs, enabling symbol ")
-        message (STATUS "resolve in backtraces.")
-    elseif (NOT HAVE_BFD_LIB)
-        message (STATUS "Not found GNU bfd binaries, no symbol resolve.")
-    elseif (NOT HAVE_BFD_H)
-        message (STATUS "Not found GNU bfd headers, no symbol resolve. ")
-        message (STATUS "Consider installing binutils-dev.")
     endif()
 endif()
 
 option(ENABLE_STATIC "Perform static linking whenever possible." OFF)
-
 if (ENABLE_STATIC)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static")
 endif()
@@ -243,20 +275,35 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fobjc-exceptions")
 
+# Use GNU Objective C runtime on Mac OS X
+if (TARGET_OS_DARWIN)
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fgnu-runtime")
+endif()
+
 add_subdirectory(third_party)
 add_subdirectory(cfg)
 add_subdirectory(connector)
-add_subdirectory(core)
+add_subdirectory(src)
+add_subdirectory(extra)
 add_subdirectory(mod)
 add_subdirectory(client)
 add_subdirectory(test)
-add_subdirectory(doc EXCLUDE_FROM_ALL)
-add_subdirectory(extra)
+add_subdirectory(doc)
 
 install (FILES README LICENSE doc/box-protocol.txt
          DESTINATION share/doc/tarantool)
 
 include (cmake/tarantool_cpack.cmake)
+
+# tarantool info summary (used in server version output)
+#
+set(TARANTOOL_OPTIONS "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
+set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_STATIC=${ENABLE_STATIC} -DENABLE_GCOV=${ENABLE_GCOV}")
+set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_TRACE=${ENABLE_TRACE} -DENABLE_BACKTRACE=${ENABLE_BACKTRACE}")
+set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_CLIENT=${ENABLE_CLIENT}")
+
+set(TARANTOOL_BUILD "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_BUILD_TYPE}")
+
 #
 # Output compile-time defines into config.h. Do it at the end
 # of the script to make sure all variables are set.
@@ -270,18 +317,25 @@ configure_file(
     "${PROJECT_BINARY_DIR}/doc/tnt.ent"
     )
 
+configure_file(
+    "${PROJECT_SOURCE_DIR}/doc/www-data.in/download.cmake"
+    "${PROJECT_BINARY_DIR}/doc/www-data.in/download"
+    )
 message (STATUS "")
-message (STATUS "Successfully configured Tarantool infrastructure on ")
-message (STATUS "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}, build type '${CMAKE_BUILD_TYPE}'. ")
-message (STATUS "The product you're building is \"${TARANTOOL_PRODUCT}\", enabled modules are ")
-message (STATUS "${TARANTOOL_MODULES}.")
-message (STATUS "Please check out CMakeCache.txt to view or modify configuration results.")
+message (STATUS "Tarantool configuration is complete:")
 message (STATUS "")
-message (STATUS "*** The following options are on in this configuration: ***")
-message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
+message (STATUS "VERSION: ${TARANTOOL_VERSION}")
+message (STATUS "BUILD: ${TARANTOOL_BUILD}")
+message (STATUS "CFLAGS:${CMAKE_C_FLAGS} ${core_cflags}")
+message (STATUS "PREFIX: ${CMAKE_INSTALL_PREFIX}")
+message (STATUS "MODULES: ${TARANTOOL_MODULES}")
+message (STATUS "ENABLE_STATIC: ${ENABLE_STATIC}")
 message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
 message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
-message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE}")
-message (STATUS "Backtrace is with symbol resolve: ${HAVE_BFD}")
-message (STATUS "ENABLE_STATIC: ${ENABLE_STATIC}")
+message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE} (symbol resolve: ${HAVE_BFD})")
+message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
+message (STATUS "ENABLE_BUNDLED_LUAJIT: ${ENABLE_BUNDLED_LUAJIT}")
+message (STATUS "ENABLE_DOC: ${ENABLE_DOC}")
+message (STATUS "")
+message (STATUS "To view or modify configuration results, check out CMakeCache.txt.")
 message (STATUS "")

@@ -3,7 +3,31 @@ exec sql "insert into t1 values ('brave', 'new', 'world')"
 exec admin "lua box.space[1].index[1]:min()"
 exec admin "lua box.space[1].index[1]:max()"
 exec sql "call box.select(1, 1, 'new', 'world')"
+print """#
+# A test case for Bug #904208
+# "assert failed, when key cardinality is greater than index cardinality"
+# https://bugs.launchpad.net/tarantool/+bug/904208
+#"""
+exec sql "call box.select(1, 1, 'new', 'world', 'order')"
 exec sql "call box.delete(1, 'brave')"
+
+print """#
+# A test case for Bug #902091
+# "Positioned iteration over a multipart index doesn't work"
+# https://bugs.launchpad.net/tarantool/+bug/902091
+#"""
+exec sql "insert into t1 values ('item 1', 'alabama', 'song')"
+exec sql "insert into t1 values ('item 2', 'california', 'dreaming ')"
+exec sql "insert into t1 values ('item 3', 'california', 'uber alles')"
+exec sql "insert into t1 values ('item 4', 'georgia', 'on my mind')"
+exec admin "lua iter, tuple = box.space[1].index[1]:next('california')"
+exec admin "lua tuple"
+exec admin "lua iter, tuple = box.space[1].index[1]:next(iter)"
+exec admin "lua tuple"
+exec sql "call box.delete(1, 'item 1')"
+exec sql "call box.delete(1, 'item 2')"
+exec sql "call box.delete(1, 'item 3')"
+exec sql "call box.delete(1, 'item 4')"
 
 #
 # Check range scan over multipart keys
@@ -12,4 +36,36 @@ exec sql "insert into t5 values ('01234567', 'new', 'world')"
 exec sql "insert into t5 values ('00000000', 'of', 'puppets')"
 exec sql "insert into t5 values ('00000001', 'of', 'might', 'and', 'magic')"
 exec sql "call box.select_range(5, 1, 2, 'of')"
+exec sql "call box.select_reverse_range(5, 1, 2, 'of')"
 exec admin "lua box.space[5]:truncate()"
+
+#
+# Lua 64bit numbers support
+#
+exec admin "lua box.insert('8', tonumber64('18446744073709551615'), 'magic')"
+exec admin "lua tu = box.select('8', '0', tonumber64('18446744073709551615'))"
+exec admin "lua num = box.unpack('l', tu[0])"
+exec admin "lua print(num)"
+exec admin "lua type(num) == 'cdata'"
+exec admin "lua num == tonumber64('18446744073709551615')"
+exec admin "lua num,num1,num2 = box.unpack('lll', tu[0], tu[0], tu[0])"
+exec admin "lua num == tonumber64('18446744073709551615')"
+exec admin "lua num1 == tonumber64('18446744073709551615')"
+exec admin "lua num2 == tonumber64('18446744073709551615')"
+
+#
+# Lua select_reverse_range
+#
+exec admin "lua box.insert(14, 0, 0)"
+exec admin "lua box.insert(14, 1, 0)"
+exec admin "lua box.insert(14, 2, 0)"
+exec admin "lua box.insert(14, 3, 0)"
+exec admin "lua box.insert(14, 4, 0)"
+exec admin "lua box.insert(14, 5, 0)"
+exec admin "lua box.insert(14, 6, 0)"
+exec admin "lua box.insert(14, 7, 0)"
+exec admin "lua box.insert(14, 8, 0)"
+exec admin "lua box.insert(14, 9, 0)"
+exec admin "lua box.select_range(14, 1, 10)"
+exec admin "lua box.select_reverse_range(14, 1, 10)"
+exec admin "lua box.select_reverse_range(14, 1, 4)"

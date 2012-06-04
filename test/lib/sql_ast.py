@@ -28,39 +28,62 @@ ER = {
     0: "ER_OK"                  ,
     1: "ER_NONMASTER"           ,
     2: "ER_ILLEGAL_PARAMS"      ,
-    3: "ER_BAD_UID"             ,
+    3: "ER_UNUSED3"             ,
     4: "ER_TUPLE_IS_RO"         ,
-    5: "ER_TUPLE_IS_NOT_LOCKED" ,
-    6: "ER_TUPLE_IS_LOCKED"     ,
+    5: "ER_UNUSED5"             ,
+    6: "ER_UNUSED6"             ,
     7: "ER_MEMORY_ISSUE"        ,
-    8: "ER_BAD_INTEGRITY"       ,
-   10: "ER_UNSUPPORTED_COMMAND" ,
-   24: "ER_CANNOT_REGISTER"     ,
-   26: "ER_CANNOT_INIT_ALERT_ID",
-   27: "ER_CANNOT_DEL"          ,
-   28: "ER_USER_NOT_REGISTERED" ,
-   29: "ER_SYNTAX_ERROR"        ,
-   30: "ER_WRONG_FIELD"         ,
-   31: "ER_WRONG_NUMBER"        ,
-   32: "ER_DUPLICATE"           ,
-   34: "ER_UNSUPPORTED_ORDER"   ,
-   35: "ER_MULTIWRITE"          ,
-   36: "ER_NOTHING"             ,
-   37: "ER_UPDATE_ID"           ,
-   38: "ER_WRONG_VERSION"       ,
+    8: "ER_UNUSED8"             ,
+    9: "ER_INJECTION"           ,
+   10: "ER_UNSUPPORTED"         ,
+   11: "ER_RESERVED11"          ,
+   12: "ER_RESERVED12"          ,
+   13: "ER_RESERVED13"          ,
+   14: "ER_RESERVED14"          ,
+   15: "ER_RESERVED15"          ,
+   16: "ER_RESERVED16"          ,
+   17: "ER_RESERVED17"          ,
+   18: "ER_RESERVED18"          ,
+   19: "ER_RESERVED19"          ,
+   20: "ER_RESERVED20"          ,
+   21: "ER_RESERVED21"          ,
+   22: "ER_RESERVED22"          ,
+   23: "ER_RESERVED23"          ,
+   24: "ER_UNUSED24"            ,
+   25: "ER_TUPLE_IS_EMPTY"      ,
+   26: "ER_UNUSED26"            ,
+   27: "ER_UNUSED27"            ,
+   28: "ER_UNUSED28"            ,
+   29: "ER_UNUSED29"            ,
+   30: "ER_UNUSED30"            ,
+   31: "ER_UNUSED31"            ,
+   32: "ER_UNUSED32"            ,
+   33: "ER_UNUSED33"            ,
+   34: "ER_UNUSED34"            ,
+   35: "ER_UNUSED35"            ,
+   36: "ER_UNUSED36"            ,
+   37: "ER_UNUSED37"            ,
+   38: "ER_KEY_FIELD_TYPE"      ,
    39: "ER_WAL_IO"              ,
+   40: "ER_FIELD_TYPE"          ,
+   41: "ER_ARG_TYPE"            ,
+   42: "ER_SPLICE"              ,
+   43: "ER_TUPLE_IS_TOO_LONG"   ,
+   44: "ER_UNKNOWN_UPDATE_OP"   ,
+   45: "ER_EXACT_MATCH"         ,
+   46: "ER_UNUSED46"            ,
+   47: "ER_KEY_PART_COUNT"      ,
    48: "ER_PROC_RET"            ,
    49: "ER_TUPLE_NOT_FOUND"     ,
    50: "ER_NO_SUCH_PROC"        ,
    51: "ER_PROC_LUA"            ,
-   52: "ER_SPACE_DISABLED"  ,
+   52: "ER_SPACE_DISABLED"      ,
    53: "ER_NO_SUCH_INDEX"       ,
    54: "ER_NO_SUCH_FIELD"       ,
    55: "ER_TUPLE_FOUND"         ,
    56: "ER_INDEX_VIOLATION"     ,
    57: "ER_NO_SUCH_SPACE"
 }
-
 
 def format_error(return_code, response):
     return "An error occurred: {0}, '{1}'".format(ER[return_code >> 8],
@@ -187,7 +210,7 @@ class StatementInsert(StatementPing):
 
     def __init__(self, table_name, value_list):
         self.space_no = table_name
-        self.flags = 0
+        self.flags = 0x02 # ADD
         self.value_list = value_list
 
     def pack(self):
@@ -203,6 +226,26 @@ class StatementInsert(StatementPing):
         (tuple_count,) = struct.unpack("<L", response[4:8])
         return "Insert OK, {0} row affected".format(tuple_count)
 
+class StatementReplace(StatementPing):
+    reqeust_type = INSERT_REQUEST_TYPE
+
+    def __init__(self, table_name, value_list):
+        self.space_no = table_name
+        self.flags = 0x04 # REPLACE
+        self.value_list = value_list
+
+    def pack(self):
+        buf = ctypes.create_string_buffer(PACKET_BUF_LEN)
+        (buf, offset) = pack_tuple(self.value_list, buf, INSERT_REQUEST_FIXED_LEN)
+        struct.pack_into("<LL", buf, 0, self.space_no, self.flags)
+        return buf[:offset]
+
+    def unpack(self, response):
+        (return_code,) = struct.unpack("<L", response[:4])
+        if return_code:
+            return format_error(return_code, response)
+        (tuple_count,) = struct.unpack("<L", response[4:8])
+        return "Replace OK, {0} row affected".format(tuple_count)
 
 class StatementUpdate(StatementPing):
     reqeust_type = UPDATE_REQUEST_TYPE

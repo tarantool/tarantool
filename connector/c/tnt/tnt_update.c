@@ -28,15 +28,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <connector/c/include/libtnt/tnt_mem.h>
-#include <connector/c/include/libtnt/tnt_proto.h>
-#include <connector/c/include/libtnt/tnt_enc.h>
-#include <connector/c/include/libtnt/tnt_tuple.h>
-#include <connector/c/include/libtnt/tnt_request.h>
-#include <connector/c/include/libtnt/tnt_reply.h>
-#include <connector/c/include/libtnt/tnt_stream.h>
-#include <connector/c/include/libtnt/tnt_buf.h>
-#include <connector/c/include/libtnt/tnt_update.h>
+#include <connector/c/include/tarantool/tnt_mem.h>
+#include <connector/c/include/tarantool/tnt_proto.h>
+#include <connector/c/include/tarantool/tnt_enc.h>
+#include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
+#include <connector/c/include/tarantool/tnt_reply.h>
+#include <connector/c/include/tarantool/tnt_stream.h>
+#include <connector/c/include/tarantool/tnt_buf.h>
+#include <connector/c/include/tarantool/tnt_update.h>
 
 static ssize_t
 tnt_update_op(struct tnt_stream *s,
@@ -69,7 +69,7 @@ tnt_update_op(struct tnt_stream *s,
 /*
  * tnt_update_arith()
  *
- * write arithmetic update operation to buffer stream;
+ * write 32-bit arithmetic update operation to buffer stream;
  *
  * s     - stream buffer pointer
  * field - field number
@@ -81,6 +81,44 @@ tnt_update_op(struct tnt_stream *s,
 ssize_t
 tnt_update_arith(struct tnt_stream *s, uint32_t field,
 		 uint8_t op, uint32_t value)
+{
+	return tnt_update_op(s, field, op, (char*)&value, sizeof(value));
+}
+
+/*
+ * tnt_update_arith_i32()
+ *
+ * write 32-bit arithmetic update operation to buffer stream;
+ *
+ * s     - stream buffer pointer
+ * field - field number
+ * op    - update operation type
+ * value - update operation value
+ * 
+ * returns number of bytes written, or -1 on error.
+*/
+ssize_t
+tnt_update_arith_i32(struct tnt_stream *s, uint32_t field,
+		     uint8_t op, uint32_t value)
+{
+	return tnt_update_op(s, field, op, (char*)&value, sizeof(value));
+}
+
+/*
+ * tnt_update_arith_i64()
+ *
+ * write 64-bit arithmetic update operation to buffer stream;
+ *
+ * s     - stream buffer pointer
+ * field - field number
+ * op    - update operation type
+ * value - update operation value
+ * 
+ * returns number of bytes written, or -1 on error.
+*/
+ssize_t
+tnt_update_arith_i64(struct tnt_stream *s, uint32_t field,
+		     uint8_t op, uint64_t value)
 {
 	return tnt_update_op(s, field, op, (char*)&value, sizeof(value));
 }
@@ -121,7 +159,7 @@ tnt_update_assign(struct tnt_stream *s, uint32_t field,
 ssize_t
 tnt_update_splice(struct tnt_stream *s, uint32_t field,
 		  uint32_t offset,
-		  uint32_t length, char *data, size_t size)
+		  int32_t length, char *data, size_t size)
 {
 	/* calculating splice data sizes */
 	uint32_t offset_len = tnt_enc_size(sizeof(offset)),
@@ -169,6 +207,17 @@ tnt_update_delete(struct tnt_stream *s, uint32_t field)
 	return tnt_update_op(s, field, TNT_UPDATE_DELETE, NULL, 0);
 }
 
+ssize_t
+tnt_update_insert(struct tnt_stream *s, uint32_t field,
+			 char *data, uint32_t size)
+{
+	return tnt_update_op(s, field, TNT_UPDATE_INSERT, data, size);
+}
+
+struct tnt_header_update {
+	uint32_t ns;
+	uint32_t flags;
+};
 /*
  * tnt_update()
  *

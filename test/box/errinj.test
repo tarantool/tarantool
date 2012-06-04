@@ -1,0 +1,27 @@
+# encoding: tarantool
+#
+import sys
+# clear statistics:
+server.stop()
+server.deploy()
+
+exec admin "show injections"
+exec admin "set injection some-injection on"
+exec sql "select * from t0 where k0 = 222444"
+exec admin "set injection ERRINJ_TESTING on"
+exec sql "select * from t0 where k0 = 222444"
+exec admin "set injection ERRINJ_TESTING off"
+
+# Check how well we handle a failed log write.
+exec admin "set injection ERRINJ_WAL_IO on"
+exec sql "insert into t0 values (1)"
+exec sql "select * from t0 where k0=1"
+exec admin "set injection ERRINJ_WAL_IO off"
+exec sql "insert into t0 values (1)"
+exec admin "set injection ERRINJ_WAL_IO on"
+exec sql "update t0 set k0=2 where k0=1"
+exec sql "select * from t0 where k0=1"
+exec sql "select * from t0 where k0=2"
+exec admin "set injection ERRINJ_WAL_IO off"
+exec admin "lua box.space[0]:truncate()"
+# vim: syntax=python

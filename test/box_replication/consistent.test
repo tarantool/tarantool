@@ -25,8 +25,7 @@ master = server
 replica = TarantoolBoxServer()
 replica.deploy("box_replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
-               os.path.join(self.args.vardir, "replica"),
-               valgrind_sup="box/valgrind.sup")
+               os.path.join(self.args.vardir, "replica"))
 
 # Id counter
 id = 0

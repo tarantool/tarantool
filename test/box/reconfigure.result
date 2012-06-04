@@ -53,6 +53,14 @@ lua box.cfg.too_long_threshold
 ---
  - 2
 ...
+lua box.cfg.snap_io_rate_limit
+---
+ - 10
+...
+lua box.cfg.io_collect_interval
+---
+ - 0.01
+...
 reload configuration
 ---
 fail:
@@ -111,9 +119,6 @@ reload configuration
 ---
 ok
 ...
-delete from t0 where k0 = 1
-Delete OK, 1 row affected
-delete from t0 where k0 = 2
-Delete OK, 1 row affected
-delete from t0 where k0 = 3
-Delete OK, 1 row affected
+lua box.space[0]:truncate()
+---
+...

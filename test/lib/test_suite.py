@@ -208,6 +208,13 @@ class TestSuite:
         config.read(os.path.join(suite_path, "suite.ini"))
         self.ini.update(dict(config.items("default")))
         self.ini["config"] = os.path.join(suite_path, self.ini["config"])
+
+        if self.ini.has_key("init_lua"):
+            self.ini["init_lua"] = os.path.join(suite_path,
+                                                self.ini["init_lua"])
+        else:
+            self.ini["init_lua"] = None
+
         if self.ini.has_key("disabled"):
             self.ini["disabled"] = dict.fromkeys(self.ini["disabled"].split(" "))
         else:
@@ -217,6 +224,11 @@ class TestSuite:
             self.ini["valgrind_disabled"] = dict.fromkeys(self.ini["valgrind_disabled"].split(" "))
         else:
             self.ini["valgrind_disabled"] = dict()
+
+        if self.ini.has_key("release_disabled"):
+            self.ini["release_disabled"] = dict.fromkeys(self.ini["release_disabled"].split(" "))
+        else:
+            self.ini["release_disabled"] = dict()
 
         print "Collecting tests in \"" + suite_path + "\": " +\
             self.ini["description"] + "."
@@ -243,8 +255,9 @@ class TestSuite:
 
         server.deploy(self.ini["config"],
                       server.find_exe(self.args.builddir, silent=False),
-                      self.args.vardir, self.args.mem, self.args.start_and_exit, self.args.gdb,
-                      self.args.valgrind, silent=False)
+                      self.args.vardir, self.args.mem, self.args.start_and_exit,
+                      self.args.gdb, self.args.valgrind,
+                      init_lua=self.ini["init_lua"], silent=False)
         if self.args.start_and_exit:
             print "  Start and exit requested, exiting..."
             exit(0)
@@ -264,6 +277,8 @@ class TestSuite:
 
             test_name = os.path.basename(test.name)
             if test_name in self.ini["disabled"]:
+                print "[ skip ]"
+            elif not server.debug and test_name in self.ini["release_disabled"]:
                 print "[ skip ]"
             elif self.args.valgrind and test_name in self.ini["valgrind_disabled"]:
                 print "[ skip ]"

@@ -29,19 +29,25 @@
  * SUCH DAMAGE.
  */
 #include "box_lua.h"
-#include "tarantool.h"
+#include <objc/runtime.h>
+#include <tarantool_lua.h>
+#include <fiber.h>
 #include "box.h"
-/* use a full path to avoid clashes with system Lua */
-#include "third_party/luajit/src/lua.h"
-#include "third_party/luajit/src/lauxlib.h"
-#include "third_party/luajit/src/lualib.h"
+#include "request.h"
+#include "txn.h"
+
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 #include "pickle.h"
 #include "tuple.h"
-#include "salloc.h"
+#include "space.h"
+#include "port.h"
+
 
 /* contents of box.lua */
-extern const char _binary_box_lua_start;
+extern const char box_lua[];
 
 /**
  * All box connections share the same Lua state. We use
@@ -70,19 +76,19 @@ lua_State *root_L;
 
 static const char *tuplelib_name = "box.tuple";
 
-static inline struct box_tuple *
+static inline struct tuple *
 lua_checktuple(struct lua_State *L, int narg)
 {
 	return *(void **) luaL_checkudata(L, narg, tuplelib_name);
 }
 
-static inline struct box_tuple *
+struct tuple *
 lua_istuple(struct lua_State *L, int narg)
 {
 	if (lua_getmetatable(L, narg) == 0)
 		return NULL;
 	luaL_getmetatable(L, tuplelib_name);
-	struct box_tuple *tuple = 0;
+	struct tuple *tuple = 0;
 	if (lua_equal(L, -1, -2))
 		tuple = * (void **) lua_touserdata(L, narg);
 	lua_pop(L, 2);
@@ -92,7 +98,7 @@ lua_istuple(struct lua_State *L, int narg)
 static int
 lbox_tuple_gc(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	tuple_ref(tuple, -1);
 	return 0;
 }
@@ -100,15 +106,61 @@ lbox_tuple_gc(struct lua_State *L)
 static int
 lbox_tuple_len(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
-	lua_pushnumber(L, tuple->cardinality);
+	struct tuple *tuple = lua_checktuple(L, 1);
+	lua_pushnumber(L, tuple->field_count);
 	return 1;
+}
+
+static int
+lbox_tuple_slice(struct lua_State *L)
+{
+	struct tuple *tuple = lua_checktuple(L, 1);
+	int argc = lua_gettop(L) - 1;
+	int start, end;
+
+	/*
+	 * Prepare the range. The second argument is optional.
+	 * If the end is beyond tuple size, adjust it.
+	 * If no arguments, or start > end, return an error.
+	 */
+	if (argc == 0 || argc > 2)
+		luaL_error(L, "tuple.slice(): bad arguments");
+	start = lua_tointeger(L, 2);
+	if (start < 0)
+		start += tuple->field_count;
+	if (argc == 2) {
+		end = lua_tointeger(L, 3);
+		if (end < 0)
+			end += tuple->field_count;
+		else if (end > tuple->field_count)
+			end = tuple->field_count;
+	} else {
+		end = tuple->field_count;
+	}
+	if (end <= start)
+		luaL_error(L, "tuple.slice(): start must be less than end");
+
+	u8 *field = tuple->data;
+	int fieldno = 0;
+	int stop = end - 1;
+
+	while (field < tuple->data + tuple->bsize) {
+		size_t len = load_varint32((void **) &field);
+		if (fieldno >= start) {
+			lua_pushlstring(L, (char *) field, len);
+			if (fieldno == stop)
+				break;
+		}
+		field += len;
+		fieldno += 1;
+	}
+	return end - start;
 }
 
 static int
 lbox_tuple_unpack(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	u8 *field = tuple->data;
 
 	while (field < tuple->data + tuple->bsize) {
@@ -116,8 +168,8 @@ lbox_tuple_unpack(struct lua_State *L)
 		lua_pushlstring(L, (char *) field, len);
 		field += len;
 	}
-	assert(lua_gettop(L) == tuple->cardinality + 1);
-	return tuple->cardinality;
+	assert(lua_gettop(L) == tuple->field_count + 1);
+	return tuple->field_count;
 }
 
 /**
@@ -130,13 +182,13 @@ lbox_tuple_unpack(struct lua_State *L)
 static int
 lbox_tuple_index(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	/* For integer indexes, implement [] operator */
 	if (lua_isnumber(L, 2)) {
 		int i = luaL_checkint(L, 2);
-		if (i >= tuple->cardinality)
+		if (i >= tuple->field_count)
 			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
-				   tuplelib_name, i, tuple->cardinality-1);
+				   tuplelib_name, i, tuple->field_count-1);
 		void *field = tuple_field(tuple, i);
 		u32 len = load_varint32(&field);
 		lua_pushlstring(L, field, len);
@@ -151,16 +203,16 @@ lbox_tuple_index(struct lua_State *L)
 static int
 lbox_tuple_tostring(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	/* @todo: print the tuple */
 	struct tbuf *tbuf = tbuf_alloc(fiber->gc_pool);
-	tuple_print(tbuf, tuple->cardinality, tuple->data);
+	tuple_print(tbuf, tuple->field_count, tuple->data);
 	lua_pushlstring(L, tbuf->data, tbuf->size);
 	return 1;
 }
 
 static void
-lbox_pushtuple(struct lua_State *L, struct box_tuple *tuple)
+lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
 	if (tuple) {
 		void **ptr = lua_newuserdata(L, sizeof(void *));
@@ -181,7 +233,7 @@ lbox_pushtuple(struct lua_State *L, struct box_tuple *tuple)
 static int
 lbox_tuple_next(struct lua_State *L)
 {
-	struct box_tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	u8 *field = NULL;
 	size_t len;
@@ -224,6 +276,7 @@ static const struct luaL_reg lbox_tuple_meta [] = {
 	{"__tostring", lbox_tuple_tostring},
 	{"next", lbox_tuple_next},
 	{"pairs", lbox_tuple_pairs},
+	{"slice", lbox_tuple_slice},
 	{"unpack", lbox_tuple_unpack},
 	{NULL, NULL}
 };
@@ -275,12 +328,12 @@ lbox_index_new(struct lua_State *L)
 	int n = luaL_checkint(L, 1); /* get space id */
 	int idx = luaL_checkint(L, 2); /* get index id in */
 	/* locate the appropriate index */
-	if (n >= BOX_SPACE_MAX || !space[n].enabled ||
-	    idx >= BOX_INDEX_MAX || space[n].index[idx] == nil)
+	if (n >= BOX_SPACE_MAX || !spaces[n].enabled ||
+	    idx >= BOX_INDEX_MAX || spaces[n].index[idx] == nil)
 		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
 	/* create a userdata object */
 	void **ptr = lua_newuserdata(L, sizeof(void *));
-	*ptr = space[n].index[idx];
+	*ptr = spaces[n].index[idx];
 	/* set userdata object metatable to indexlib */
 	luaL_getmetatable(L, indexlib_name);
 	lua_setmetatable(L, -2);
@@ -301,6 +354,14 @@ lbox_index_len(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	lua_pushinteger(L, [index size]);
+	return 1;
+}
+
+static int
+lbox_index_part_count(struct lua_State *L)
+{
+	Index *index = lua_checkindex(L, 1);
+	lua_pushinteger(L, index->key_def->part_count);
 	return 1;
 }
 
@@ -367,6 +428,7 @@ void append_key_part(struct lua_State *L, int i,
  * Lua iterator over a Taratnool/Box index.
  *
  *	(iteration_state, tuple) = index.next(index, [iteration_state])
+ *	(iteration_state, tuple) = index.prev(index, [iteration_state])
  *
  * When [iteration_state] is absent or nil
  * returns a pointer to a new iterator and
@@ -381,13 +443,9 @@ void append_key_part(struct lua_State *L, int i,
  * the iterator with one or several Lua scalars
  * (numbers, strings) and start iteration from an
  * offset.
- *
- * @todo/FIXME: Currently we always store iteration
- * state within index. This limits the total
- * amount of active iterators to 1.
  */
 static int
-lbox_index_next(struct lua_State *L)
+lbox_index_move(struct lua_State *L, enum iterator_type type)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
@@ -395,10 +453,11 @@ lbox_index_next(struct lua_State *L)
 	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
 		/*
 		 * If there is nothing or nil on top of the stack,
-		 * start iteration from the beginning.
+		 * start iteration from the beginning (ITER_FORWARD) or
+		 * end (ITER_REVERSE).
 		 */
 		it = [index allocIterator];
-		[index initIterator: it];
+		[index initIterator: it :type];
 		lbox_pushiterator(L, it);
 	} else if (argc > 1 || lua_type(L, 2) != LUA_TUSERDATA) {
 		/*
@@ -406,17 +465,17 @@ lbox_index_next(struct lua_State *L)
 		 * userdata: must be a key to start iteration from
 		 * an offset. Seed the iterator with this key.
 		 */
-		int cardinality;
+		int field_count;
 		void *key;
 
 		if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 			/* Searching by tuple. */
-			struct box_tuple *tuple = lua_checktuple(L, 2);
+			struct tuple *tuple = lua_checktuple(L, 2);
 			key = tuple->data;
-			cardinality = tuple->cardinality;
+			field_count = tuple->field_count;
 		} else {
 			/* Single or multi- part key. */
-			cardinality = argc;
+			field_count = argc;
 			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
 			for (int i = 0; i < argc; ++i)
 				append_key_part(L, i + 2, data,
@@ -428,29 +487,53 @@ lbox_index_next(struct lua_State *L)
 		 * indexes. HASH indexes can only use single-part
 		 * keys.
 		*/
-		assert(cardinality != 0);
-		if (cardinality > index->key_def->part_count)
+		assert(field_count != 0);
+		if (field_count > index->key_def->part_count)
 			luaL_error(L, "index.next(): key part count (%d) "
-				   "does not match index cardinality (%d)",
-				   cardinality, index->key_def->part_count);
+				   "does not match index field count (%d)",
+				   field_count, index->key_def->part_count);
 		it = [index allocIterator];
-		[index initIterator: it :key :cardinality];
+		[index initIteratorByKey: it :type :key :field_count];
 		lbox_pushiterator(L, it);
 	} else { /* 1 item on the stack and it's a userdata. */
 		it = lua_checkiterator(L, 2);
 	}
-	struct box_tuple *tuple = it->next(it);
+	struct tuple *tuple = it->next(it);
 	/* If tuple is NULL, pushes nil as end indicator. */
 	lbox_pushtuple(L, tuple);
 	return tuple ? 2 : 1;
 }
 
+/**
+ * Lua forward index iterator function.
+ * See lbox_index_move comment for a functional
+ * description.
+ */
+static int
+lbox_index_next(struct lua_State *L)
+{
+	return lbox_index_move(L, ITER_FORWARD);
+}
+
+/**
+ * Lua reverse index iterator function.
+ * See lbox_index_move comment for a functional
+ * description.
+ */
+static int
+lbox_index_prev(struct lua_State *L)
+{
+	return lbox_index_move(L, ITER_REVERSE);
+}
+
 static const struct luaL_reg lbox_index_meta[] = {
 	{"__tostring", lbox_index_tostring},
 	{"__len", lbox_index_len},
+	{"part_count", lbox_index_part_count},
 	{"min", lbox_index_min},
 	{"max", lbox_index_max},
 	{"next", lbox_index_next},
+	{"prev", lbox_index_prev},
 	{NULL, NULL}
 };
 
@@ -467,157 +550,46 @@ static const struct luaL_reg lbox_iterator_meta[] = {
 /* }}} */
 
 /** {{{ Lua I/O: facilities to intercept box output
- * and push into Lua stack and the opposite: append Lua types
- * to fiber IOV.
+ * and push into Lua stack.
  */
 
-/* Add a Lua table to iov as if it was a tuple, with as little
- * overhead as possible. */
-
-static void
-iov_add_lua_table(struct lua_State *L, int index)
-{
-	u32 *cardinality = palloc(fiber->gc_pool, sizeof(u32));
-	u32 *tuple_len = palloc(fiber->gc_pool, sizeof(u32));
-
-	*cardinality = 0;
-	*tuple_len = 0;
-
-	iov_add(tuple_len, sizeof(u32));
-	iov_add(cardinality, sizeof(u32));
-
-	u8 field_len_buf[5];
-	size_t field_len, field_len_len;
-	const char *field;
-
-	lua_pushnil(L);  /* first key */
-	while (lua_next(L, index) != 0) {
-		++*cardinality;
-
-		switch (lua_type(L, -1)) {
-		case LUA_TNUMBER:
-		case LUA_TSTRING:
-			field = lua_tolstring(L, -1, &field_len);
-			field_len_len =
-				save_varint32(field_len_buf,
-					      field_len) - field_len_buf;
-			iov_dup(field_len_buf, field_len_len);
-			iov_dup(field, field_len);
-			*tuple_len += field_len_len + field_len;
-			break;
-		default:
-			tnt_raise(ClientError, :ER_PROC_RET,
-				  lua_typename(L, lua_type(L, -1)));
-			break;
-		}
-		lua_pop(L, 1);
-	}
-}
-
-void iov_add_ret(struct lua_State *L, int index)
-{
-	int type = lua_type(L, index);
-	struct box_tuple *tuple;
-	switch (type) {
-	case LUA_TTABLE:
-	{
-		iov_add_lua_table(L, index);
-		return;
-	}
-	case LUA_TNUMBER:
-	case LUA_TSTRING:
-	{
-		size_t len;
-		const char *str = lua_tolstring(L, index, &len);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->cardinality = 1;
-		memcpy(save_varint32(tuple->data, len), str, len);
-		break;
-	}
-	case LUA_TNIL:
-	case LUA_TBOOLEAN:
-	{
-		const char *str = tarantool_lua_tostring(L, index);
-		size_t len = strlen(str);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->cardinality = 1;
-		memcpy(save_varint32(tuple->data, len), str, len);
-		break;
-	}
-	case LUA_TUSERDATA:
-		tuple = lua_istuple(L, index);
-		if (tuple)
-			break;
-	default:
-		/*
-		 * LUA_TNONE, LUA_TTABLE, LUA_THREAD, LUA_TFUNCTION
-		 */
-		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
-		break;
-	}
-	tuple_txn_ref(in_txn(), tuple);
-	iov_add(&tuple->bsize, tuple_len(tuple));
-}
-
-/**
- * Add all elements from Lua stack to fiber iov.
- *
- * To allow clients to understand a complex return from
- * a procedure, we are compatible with SELECT protocol,
- * and return the number of return values first, and
- * then each return value as a tuple.
+/*
+ * For addU32/dupU32 do nothing -- the only u32 Box can give
+ * us is tuple count, and we don't need it, since we intercept
+ * everything into Lua stack first.
+ * @sa iov_add_multret
  */
-void
-iov_add_multret(struct lua_State *L)
+@interface PortLua: PortNull {
+	struct lua_State *L;
+}
++ (PortLua *) alloc;
+- (id) init: (struct lua_State *) L_arg;
+@end
+
+@implementation PortLua
++ (PortLua *) alloc
 {
-	int nargs = lua_gettop(L);
-	iov_dup(&nargs, sizeof(u32));
-	for (int i = 1; i <= nargs; ++i)
-		iov_add_ret(L, i);
+	size_t sz = class_getInstanceSize(self);
+	id new = palloc(fiber->gc_pool, sz);
+	object_setClass(new, self);
+	return new;
 }
 
-static void
-box_lua_dup_u32(u32 u32 __attribute__((unused)))
+- (id) init: (struct lua_State *) L_arg
 {
-	/*
-	 * Do nothing -- the only u32 Box can give us is
-	 * tuple count, and we don't need it, since we intercept
-	 * everything into Lua stack first.
-	 * @sa iov_add_multret
-	 */
+	if ((self = [super init]))
+		L = L_arg;
+	return self;
 }
 
-static void
-box_lua_add_u32(u32 *p_u32 __attribute__((unused)))
+- (void) addTuple: (struct tuple *) tuple
 {
-	/* See the comment in box_lua_dup_u32. */
-}
-
-static void
-box_lua_add_tuple(struct box_tuple *tuple)
-{
-	struct lua_State *L = in_txn()->L;
 	lbox_pushtuple(L, tuple);
 }
 
-static struct box_out box_out_lua = {
-	box_lua_add_u32,
-	box_lua_dup_u32,
-	box_lua_add_tuple
-};
+@end
 
 /* }}} */
-
-static inline struct box_txn *
-txn_enter_lua(lua_State *L)
-{
-	struct box_txn *old_txn = in_txn();
-	fiber->mod_data.txn = NULL;
-	struct box_txn *txn = fiber->mod_data.txn = txn_begin();
-	txn->out = &box_out_lua;
-	txn->L = L;
-	return old_txn;
-}
 
 /**
  * The main extension provided to Lua by Tarantool/Box --
@@ -650,11 +622,17 @@ static int lbox_process(lua_State *L)
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
-	struct box_txn *old_txn = txn_enter_lua(L);
+	struct txn *txn = txn_begin();
+	Port *port_lua = [[PortLua alloc] init: L];
+	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	@try {
-		rw_callback(op, &req);
+		box_process(txn, port_lua, op, &req);
 	} @finally {
-		fiber->mod_data.txn = old_txn;
+		/*
+		 * This only works as long as port_lua doesn't
+		 * use fiber->cleanup and fiber->gc_pool.
+		 */
+		ptruncate(fiber->gc_pool, allocated_size);
 	}
 	return lua_gettop(L) - top;
 }
@@ -704,16 +682,18 @@ box_lua_panic(struct lua_State *L)
 	return 0;
 }
 
+@implementation Call
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-void box_lua_call(struct box_txn *txn __attribute__((unused)),
-		  struct tbuf *data)
+- (void) execute: (struct txn *) txn : (Port *)port
 {
+	(void) txn;
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
-
+	/* Request flags: not used. */
+	(void) (read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS);
 	@try {
 		u32 field_len = read_varint32(data);
 		void *field = read_str(data, field_len); /* proc name */
@@ -728,7 +708,7 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 		}
 		lua_call(L, nargs, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
-		iov_add_multret(L);
+		[port addLuaMultret: L];
 	} @finally {
 		/*
 		 * Allow the used coro to be garbage collected.
@@ -737,6 +717,7 @@ void box_lua_call(struct box_txn *txn __attribute__((unused)),
 		luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
 	}
 }
+@end
 
 struct lua_State *
 mod_lua_init(struct lua_State *L)
@@ -752,7 +733,7 @@ mod_lua_init(struct lua_State *L)
 	lua_pop(L, 1);
 	tarantool_lua_register_type(L, iteratorlib_name, lbox_iterator_meta);
 	/* Load box.lua */
-	if (luaL_dostring(L, &_binary_box_lua_start))
+	if (luaL_dostring(L, box_lua))
 		panic("Error loading box.lua: %s", lua_tostring(L, -1));
 	assert(lua_gettop(L) == 0);
 	return L;

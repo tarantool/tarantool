@@ -42,17 +42,14 @@ typedef int (*tree_cmp_t)(const void *, const void *, void *);
 };
 
 + (Index *) alloc: (struct key_def *) key_def :(struct space *) space;
-- (void) build: (Index *) pk;
 
 /** To be defined in subclasses. */
 - (size_t) node_size;
 - (tree_cmp_t) node_cmp;
 - (tree_cmp_t) dup_node_cmp;
 - (tree_cmp_t) key_node_cmp;
-- (void) fold: (void *) node :(struct box_tuple *) tuple;
-- (struct box_tuple *) unfold: (const void *) node;
-- (int) compare: (const void *) node_a :(const void *) node_b;
-- (int) key_compare: (const void *) key :(const void *) node;
+- (void) fold: (void *) node :(struct tuple *) tuple;
+- (struct tuple *) unfold: (const void *) node;
 
 @end
 

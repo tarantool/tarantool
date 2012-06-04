@@ -1,19 +1,19 @@
 ;  
 ; Tarantool SQL parser is implemented entirely on the client side.
 ; This BNF provides a reference of the supported subset of 
-; the standard SQL, to which all clients are strongly encouraged 
+; SQL, to which all clients are strongly encouraged
 ; to stick.
 ; 
 ; Convention: UPPERCASE letters are used for terminals and literals.
 ; Lowercase letters are used for <non-terminals>. SQL is
-; case-insensitive, so this convention is present only to imporve
+; case-insensitive, so this convention is present only to improve
 ; legibility of the BNF.
 
 <sql> ::= <insert> | <replace> | <update> | <delete> | <select>
 
 <insert> ::= INSERT [INTO] <ident> VALUES <value_list>
 
-<insert> ::= REPLACE [INTO] <ident> VALUES <value_list>
+<replace> ::= REPLACE [INTO] <ident> VALUES <value_list>
 
 <update> ::= UPDATE <ident> SET <update_list> <simple_where>
 

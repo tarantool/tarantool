@@ -1,0 +1,19 @@
+Target OS: FreeBSD 8.3 (RELEASE)
+
+pkg_add -r sudo git cmake gmake libbfd
+pkg_add -r python27
+
+cd /usr/ports/misc/py-pexpect
+sudo make install
+
+cd /usr/ports/devel/py-yaml
+sudo make install
+
+cd /usr/ports/devel/py-daemon
+sudo make install
+
+git clone git://github.com/mailru/tarantool.git
+cd tarantool
+gmake
+
+

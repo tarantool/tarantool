@@ -11,9 +11,55 @@ lua box.space[1].index[1]:max()
 call box.select(1, 1, 'new', 'world')
 Found 1 tuple:
 ['brave', 'new', 'world']
+#
+# A test case for Bug #904208
+# "assert failed, when key cardinality is greater than index cardinality"
+# https://bugs.launchpad.net/tarantool/+bug/904208
+#
+call box.select(1, 1, 'new', 'world', 'order')
+An error occurred: ER_KEY_PART_COUNT, 'Key part count 3 is greater than index part count 2'
 call box.delete(1, 'brave')
 Found 1 tuple:
 ['brave', 'new', 'world']
+#
+# A test case for Bug #902091
+# "Positioned iteration over a multipart index doesn't work"
+# https://bugs.launchpad.net/tarantool/+bug/902091
+#
+insert into t1 values ('item 1', 'alabama', 'song')
+Insert OK, 1 row affected
+insert into t1 values ('item 2', 'california', 'dreaming ')
+Insert OK, 1 row affected
+insert into t1 values ('item 3', 'california', 'uber alles')
+Insert OK, 1 row affected
+insert into t1 values ('item 4', 'georgia', 'on my mind')
+Insert OK, 1 row affected
+lua iter, tuple = box.space[1].index[1]:next('california')
+---
+...
+lua tuple
+---
+ - 'item 2': {'california', 'dreaming '}
+...
+lua iter, tuple = box.space[1].index[1]:next(iter)
+---
+...
+lua tuple
+---
+ - 'item 3': {'california', 'uber alles'}
+...
+call box.delete(1, 'item 1')
+Found 1 tuple:
+['item 1', 'alabama', 1735290739]
+call box.delete(1, 'item 2')
+Found 1 tuple:
+['item 2', 'california', 'dreaming ']
+call box.delete(1, 'item 3')
+Found 1 tuple:
+['item 3', 'california', 'uber alles']
+call box.delete(1, 'item 4')
+Found 1 tuple:
+['item 4', 'georgia', 'on my mind']
 insert into t5 values ('01234567', 'new', 'world')
 Insert OK, 1 row affected
 insert into t5 values ('00000000', 'of', 'puppets')
@@ -24,6 +70,120 @@ call box.select_range(5, 1, 2, 'of')
 Found 2 tuples:
 ['00000001', 'of', 'might', 'and', 'magic']
 ['00000000', 'of', 'puppets']
+call box.select_reverse_range(5, 1, 2, 'of')
+Found 2 tuples:
+['00000000', 'of', 'puppets']
+['00000001', 'of', 'might', 'and', 'magic']
 lua box.space[5]:truncate()
 ---
+...
+lua box.insert('8', tonumber64('18446744073709551615'), 'magic')
+---
+ - 18446744073709551615: {'magic'}
+...
+lua tu = box.select('8', '0', tonumber64('18446744073709551615'))
+---
+...
+lua num = box.unpack('l', tu[0])
+---
+...
+lua print(num)
+---
+18446744073709551615
+...
+lua type(num) == 'cdata'
+---
+ - true
+...
+lua num == tonumber64('18446744073709551615')
+---
+ - true
+...
+lua num,num1,num2 = box.unpack('lll', tu[0], tu[0], tu[0])
+---
+...
+lua num == tonumber64('18446744073709551615')
+---
+ - true
+...
+lua num1 == tonumber64('18446744073709551615')
+---
+ - true
+...
+lua num2 == tonumber64('18446744073709551615')
+---
+ - true
+...
+lua box.insert(14, 0, 0)
+---
+ - 0: {0}
+...
+lua box.insert(14, 1, 0)
+---
+ - 1: {0}
+...
+lua box.insert(14, 2, 0)
+---
+ - 2: {0}
+...
+lua box.insert(14, 3, 0)
+---
+ - 3: {0}
+...
+lua box.insert(14, 4, 0)
+---
+ - 4: {0}
+...
+lua box.insert(14, 5, 0)
+---
+ - 5: {0}
+...
+lua box.insert(14, 6, 0)
+---
+ - 6: {0}
+...
+lua box.insert(14, 7, 0)
+---
+ - 7: {0}
+...
+lua box.insert(14, 8, 0)
+---
+ - 8: {0}
+...
+lua box.insert(14, 9, 0)
+---
+ - 9: {0}
+...
+lua box.select_range(14, 1, 10)
+---
+ - 0: {0}
+ - 1: {0}
+ - 2: {0}
+ - 3: {0}
+ - 4: {0}
+ - 5: {0}
+ - 6: {0}
+ - 7: {0}
+ - 8: {0}
+ - 9: {0}
+...
+lua box.select_reverse_range(14, 1, 10)
+---
+ - 9: {0}
+ - 8: {0}
+ - 7: {0}
+ - 6: {0}
+ - 5: {0}
+ - 4: {0}
+ - 3: {0}
+ - 2: {0}
+ - 1: {0}
+ - 0: {0}
+...
+lua box.select_reverse_range(14, 1, 4)
+---
+ - 9: {0}
+ - 8: {0}
+ - 7: {0}
+ - 6: {0}
 ...

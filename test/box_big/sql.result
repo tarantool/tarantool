@@ -13,12 +13,6 @@ insert into t0 values ('Major', 'Tomas')
 Insert OK, 1 row affected
 insert into t0 values ('Kytes', 'Tomas')
 Insert OK, 1 row affected
-insert into t0 values ('Stiles', 'Tomas')
-Insert OK, 1 row affected
-insert into t0 values ('Wales', 'Tomas')
-Insert OK, 1 row affected
-insert into t0 values ('Callaghan', 'Tomas')
-Insert OK, 1 row affected
 select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5
 Found 5 tuples:
 ['Doe', 'Richard']
@@ -42,12 +36,6 @@ Delete OK, 1 row affected
 delete from t0 where k0='Major'
 Delete OK, 1 row affected
 delete from t0 where k0='Kytes'
-Delete OK, 1 row affected
-delete from t0 where k0='Stiles'
-Delete OK, 1 row affected
-delete from t0 where k0='Wales'
-Delete OK, 1 row affected
-delete from t0 where k0='Callaghan'
 Delete OK, 1 row affected
 #
 # A test case for Bug#730593
@@ -88,8 +76,8 @@ Delete OK, 1 row affected
 #
 insert into t1 values ('key1', 'part1', 'part2')
 Insert OK, 1 row affected
-insert into t1 values ('key1', 'part1', 'part2')
-Insert OK, 1 row affected
+replace into t1 values ('key1', 'part1', 'part2')
+Replace OK, 1 row affected
 insert into t1 values ('key2', 'part1', 'part2_a')
 Insert OK, 1 row affected
 insert into t1 values ('key3', 'part1', 'part2_b')
@@ -139,11 +127,11 @@ insert into t5 values ('41234567', 'part1_a', 'part2_a')
 Insert OK, 1 row affected
 lua for k, v in box.space[5]:pairs() do print(v) end
 ---
-'01234567': {'part1', 'part2'}
-'11234567': {'part1', 'part2'}
-'21234567': {'part1', 'part2_a'}
-'31234567': {'part1_a', 'part2'}
-'41234567': {'part1_a', 'part2_a'}
+3978425819141910832: {'part1', 'part2'}
+3978425819141910833: {'part1', 'part2'}
+3978425819141910834: {'part1', 'part2_a'}
+3978425819141910835: {'part1_a', 'part2'}
+3978425819141910836: {'part1_a', 'part2_a'}
 ...
 select * from t5 where k0='01234567'
 Found 1 tuple:
@@ -165,10 +153,35 @@ Found 2 tuples:
 ['41234567', 'part1_a', 'part2_a']
 select * from t5 where k1='part_none'
 No match
-lua box.space[5]:select(1, 'part1', 'part2')
+call box.select('5', '1', 'part1', 'part2')
+Found 2 tuples:
+['01234567', 'part1', 'part2']
+['11234567', 'part1', 'part2']
+insert into t7 values (1, 'hello')
+Insert OK, 1 row affected
+insert into t7 values (2, 'brave')
+Insert OK, 1 row affected
+insert into t7 values (3, 'new')
+Insert OK, 1 row affected
+insert into t7 values (4, 'world')
+Insert OK, 1 row affected
+#
+# Bug#929654 - secondary hash index is not built with build_indexes()
+#
+select * from t7 where k1='hello'
+Found 1 tuple:
+[1, 'hello']
+select * from t7 where k1='brave'
+Found 1 tuple:
+[2, 'brave']
+select * from t7 where k1='new'
+Found 1 tuple:
+[3, 'new']
+select * from t7 where k1='world'
+Found 1 tuple:
+[4, 'world']
+lua box.space[7]:truncate()
 ---
- - '01234567': {'part1', 'part2'}
- - '11234567': {'part1', 'part2'}
 ...
 select * from t1 where k0='key1'
 Found 1 tuple:
@@ -192,8 +205,8 @@ delete from t1 where k0='key3'
 Delete OK, 1 row affected
 select * from t5 where k1='part1'
 Found 3 tuples:
-['11234567', 'part1', 'part2']
 ['01234567', 'part1', 'part2']
+['11234567', 'part1', 'part2']
 ['21234567', 'part1', 'part2_a']
 select * from t5 where k1='part2'
 No match
@@ -228,7 +241,7 @@ Found 1 tuple:
 select * from t4 where k1='Britney'
 Found 1 tuple:
 ['Spears', 'Britney']
-insert into t4 values ('Spears')
+replace into t4 values ('Spears')
 An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
 select * from t4 where k0='Spears'
 Found 1 tuple:
@@ -286,24 +299,6 @@ Found 5 tuples:
 [13, 'duplicate three']
 [14, 'duplicate three']
 [15, 'duplicate three']
-lua for k, v in box.space[4]:pairs() do print(v) end
----
-10: {'duplicate two'}
-13: {'duplicate three'}
-4: {'duplicate one'}
-14: {'duplicate three'}
-3: {'duplicate one'}
-8: {'duplicate two'}
-1: {'duplicate one'}
-15: {'duplicate three'}
-2: {'duplicate one'}
-9: {'duplicate two'}
-11: {'duplicate three'}
-7: {'duplicate two'}
-6: {'duplicate two'}
-5: {'duplicate one'}
-12: {'duplicate three'}
-...
 delete from t4 where k0=1
 Delete OK, 1 row affected
 delete from t4 where k0=2
@@ -334,33 +329,33 @@ delete from t4 where k0=14
 Delete OK, 1 row affected
 delete from t4 where k0=15
 Delete OK, 1 row affected
-insert into t4 values(1, 'Aardvark')
+insert into t4 values(1, 'Aardvark ')
 Insert OK, 1 row affected
 insert into t4 values(2, 'Bilimbi')
 Insert OK, 1 row affected
-insert into t4 values(3, 'Creature')
+insert into t4 values(3, 'Creature ')
 Insert OK, 1 row affected
 lua for k, v in box.space[4]:pairs() do print(v) end
 ---
-3: {'Creature'}
-1: {'Aardvark'}
+3: {'Creature '}
+1: {'Aardvark '}
 2: {'Bilimbi'}
 ...
 lua box.space[4].index[0].idx:min()
 ---
-error: 'Unsupported'
+error: 'Hash index does not support min()'
 ...
 lua box.space[4].index[0].idx:max()
 ---
-error: 'Unsupported'
+error: 'Hash index does not support max()'
 ...
 lua box.space[4].index[1].idx:min()
 ---
- - 1: {'Aardvark'}
+ - 1: {'Aardvark '}
 ...
 lua box.space[4].index[1].idx:max()
 ---
- - 3: {'Creature'}
+ - 3: {'Creature '}
 ...
 delete from t4 where k0=1
 Delete OK, 1 row affected

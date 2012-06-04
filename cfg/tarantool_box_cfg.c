@@ -29,6 +29,7 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->__confetti_flags = 0;
 
 	c->username = NULL;
+	c->local_hot_standby = false;
 	c->bind_ipaddr = NULL;
 	c->coredump = false;
 	c->admin_port = 0;
@@ -38,14 +39,23 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->slab_alloc_minimal = 0;
 	c->slab_alloc_factor = 0;
 	c->work_dir = NULL;
+	c->snap_dir = NULL;
+	c->wal_dir = NULL;
+	c->script_dir = NULL;
 	c->pid_file = NULL;
 	c->logger = NULL;
 	c->logger_nonblock = false;
 	c->io_collect_interval = 0;
 	c->backlog = 0;
 	c->readahead = 0;
-	c->snap_dir = NULL;
-	c->wal_dir = NULL;
+	c->snap_io_rate_limit = 0;
+	c->rows_per_wal = 0;
+	c->wal_writer_inbox_size = 0;
+	c->wal_mode = NULL;
+	c->wal_fsync_delay = 0;
+	c->wal_dir_rescan_delay = 0;
+	c->panic_on_snap_error = false;
+	c->panic_on_wal_error = false;
 	c->primary_port = 0;
 	c->secondary_port = 0;
 	c->too_long_threshold = 0;
@@ -55,14 +65,6 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->memcached_expire = false;
 	c->memcached_expire_per_loop = 0;
 	c->memcached_expire_full_sweep = 0;
-	c->snap_io_rate_limit = 0;
-	c->rows_per_wal = 0;
-	c->wal_fsync_delay = 0;
-	c->wal_writer_inbox_size = 0;
-	c->local_hot_standby = false;
-	c->wal_dir_rescan_delay = 0;
-	c->panic_on_snap_error = false;
-	c->panic_on_wal_error = false;
 	c->replication_source = NULL;
 	c->space = NULL;
 }
@@ -72,6 +74,7 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->__confetti_flags = 0;
 
 	c->username = NULL;
+	c->local_hot_standby = false;
 	c->bind_ipaddr = strdup("INADDR_ANY");
 	if (c->bind_ipaddr == NULL) return CNF_NOMEMORY;
 	c->coredump = false;
@@ -82,6 +85,12 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->slab_alloc_minimal = 64;
 	c->slab_alloc_factor = 2;
 	c->work_dir = NULL;
+	c->snap_dir = strdup(".");
+	if (c->snap_dir == NULL) return CNF_NOMEMORY;
+	c->wal_dir = strdup(".");
+	if (c->wal_dir == NULL) return CNF_NOMEMORY;
+	c->script_dir = strdup(".");
+	if (c->script_dir == NULL) return CNF_NOMEMORY;
 	c->pid_file = strdup("tarantool.pid");
 	if (c->pid_file == NULL) return CNF_NOMEMORY;
 	c->logger = NULL;
@@ -89,10 +98,15 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->io_collect_interval = 0;
 	c->backlog = 1024;
 	c->readahead = 16320;
-	c->snap_dir = strdup(".");
-	if (c->snap_dir == NULL) return CNF_NOMEMORY;
-	c->wal_dir = strdup(".");
-	if (c->wal_dir == NULL) return CNF_NOMEMORY;
+	c->snap_io_rate_limit = 0;
+	c->rows_per_wal = 500000;
+	c->wal_writer_inbox_size = 16384;
+	c->wal_mode = strdup("fsync_delay");
+	if (c->wal_mode == NULL) return CNF_NOMEMORY;
+	c->wal_fsync_delay = 0;
+	c->wal_dir_rescan_delay = 0.1;
+	c->panic_on_snap_error = true;
+	c->panic_on_wal_error = false;
 	c->primary_port = 0;
 	c->secondary_port = 0;
 	c->too_long_threshold = 0.5;
@@ -102,14 +116,6 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->memcached_expire = false;
 	c->memcached_expire_per_loop = 1024;
 	c->memcached_expire_full_sweep = 3600;
-	c->snap_io_rate_limit = 0;
-	c->rows_per_wal = 500000;
-	c->wal_fsync_delay = 0;
-	c->wal_writer_inbox_size = 128;
-	c->local_hot_standby = false;
-	c->wal_dir_rescan_delay = 0.1;
-	c->panic_on_snap_error = true;
-	c->panic_on_wal_error = false;
 	c->replication_source = NULL;
 	c->space = NULL;
 	return 0;
@@ -151,6 +157,9 @@ acceptDefault_name__space__index__key_field(tarantool_cfg_space_index_key_field 
 static NameAtom _name__username[] = {
 	{ "username", -1, NULL }
 };
+static NameAtom _name__local_hot_standby[] = {
+	{ "local_hot_standby", -1, NULL }
+};
 static NameAtom _name__bind_ipaddr[] = {
 	{ "bind_ipaddr", -1, NULL }
 };
@@ -178,6 +187,15 @@ static NameAtom _name__slab_alloc_factor[] = {
 static NameAtom _name__work_dir[] = {
 	{ "work_dir", -1, NULL }
 };
+static NameAtom _name__snap_dir[] = {
+	{ "snap_dir", -1, NULL }
+};
+static NameAtom _name__wal_dir[] = {
+	{ "wal_dir", -1, NULL }
+};
+static NameAtom _name__script_dir[] = {
+	{ "script_dir", -1, NULL }
+};
 static NameAtom _name__pid_file[] = {
 	{ "pid_file", -1, NULL }
 };
@@ -196,11 +214,29 @@ static NameAtom _name__backlog[] = {
 static NameAtom _name__readahead[] = {
 	{ "readahead", -1, NULL }
 };
-static NameAtom _name__snap_dir[] = {
-	{ "snap_dir", -1, NULL }
+static NameAtom _name__snap_io_rate_limit[] = {
+	{ "snap_io_rate_limit", -1, NULL }
 };
-static NameAtom _name__wal_dir[] = {
-	{ "wal_dir", -1, NULL }
+static NameAtom _name__rows_per_wal[] = {
+	{ "rows_per_wal", -1, NULL }
+};
+static NameAtom _name__wal_writer_inbox_size[] = {
+	{ "wal_writer_inbox_size", -1, NULL }
+};
+static NameAtom _name__wal_mode[] = {
+	{ "wal_mode", -1, NULL }
+};
+static NameAtom _name__wal_fsync_delay[] = {
+	{ "wal_fsync_delay", -1, NULL }
+};
+static NameAtom _name__wal_dir_rescan_delay[] = {
+	{ "wal_dir_rescan_delay", -1, NULL }
+};
+static NameAtom _name__panic_on_snap_error[] = {
+	{ "panic_on_snap_error", -1, NULL }
+};
+static NameAtom _name__panic_on_wal_error[] = {
+	{ "panic_on_wal_error", -1, NULL }
 };
 static NameAtom _name__primary_port[] = {
 	{ "primary_port", -1, NULL }
@@ -228,30 +264,6 @@ static NameAtom _name__memcached_expire_per_loop[] = {
 };
 static NameAtom _name__memcached_expire_full_sweep[] = {
 	{ "memcached_expire_full_sweep", -1, NULL }
-};
-static NameAtom _name__snap_io_rate_limit[] = {
-	{ "snap_io_rate_limit", -1, NULL }
-};
-static NameAtom _name__rows_per_wal[] = {
-	{ "rows_per_wal", -1, NULL }
-};
-static NameAtom _name__wal_fsync_delay[] = {
-	{ "wal_fsync_delay", -1, NULL }
-};
-static NameAtom _name__wal_writer_inbox_size[] = {
-	{ "wal_writer_inbox_size", -1, NULL }
-};
-static NameAtom _name__local_hot_standby[] = {
-	{ "local_hot_standby", -1, NULL }
-};
-static NameAtom _name__wal_dir_rescan_delay[] = {
-	{ "wal_dir_rescan_delay", -1, NULL }
-};
-static NameAtom _name__panic_on_snap_error[] = {
-	{ "panic_on_snap_error", -1, NULL }
-};
-static NameAtom _name__panic_on_wal_error[] = {
-	{ "panic_on_wal_error", -1, NULL }
 };
 static NameAtom _name__replication_source[] = {
 	{ "replication_source", -1, NULL }
@@ -345,6 +357,37 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->username = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
 		if (opt->paramValue.stringval && c->username == NULL)
 			return CNF_NOMEMORY;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__local_hot_standby) ) {
+		if (opt->paramType != stringType && opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		bool bln;
+
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->local_hot_standby != bln)
+			return CNF_RDONLY;
+		c->local_hot_standby = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__bind_ipaddr) ) {
 		if (opt->paramType != stringType )
@@ -479,6 +522,42 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramValue.stringval && c->work_dir == NULL)
 			return CNF_NOMEMORY;
 	}
+	else if ( cmpNameAtoms( opt->name, _name__snap_dir) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->snap_dir == NULL) || strcmp(opt->paramValue.stringval, c->snap_dir) != 0))
+			return CNF_RDONLY;
+		 if (c->snap_dir) free(c->snap_dir);
+		c->snap_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->snap_dir == NULL)
+			return CNF_NOMEMORY;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__wal_dir) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_dir == NULL) || strcmp(opt->paramValue.stringval, c->wal_dir) != 0))
+			return CNF_RDONLY;
+		 if (c->wal_dir) free(c->wal_dir);
+		c->wal_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->wal_dir == NULL)
+			return CNF_NOMEMORY;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__script_dir) ) {
+		if (opt->paramType != stringType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->script_dir == NULL) || strcmp(opt->paramValue.stringval, c->script_dir) != 0))
+			return CNF_RDONLY;
+		 if (c->script_dir) free(c->script_dir);
+		c->script_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->script_dir == NULL)
+			return CNF_NOMEMORY;
+	}
 	else if ( cmpNameAtoms( opt->name, _name__pid_file) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
@@ -542,8 +621,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		double dbl = strtod(opt->paramValue.numberval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->io_collect_interval != dbl)
-			return CNF_RDONLY;
 		c->io_collect_interval = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
@@ -572,29 +649,137 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGRANGE;
 		c->readahead = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__snap_dir) ) {
+	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		double dbl = strtod(opt->paramValue.numberval, NULL);
+		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		c->snap_io_rate_limit = dbl;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__rows_per_wal) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->rows_per_wal != i32)
+			return CNF_RDONLY;
+		c->rows_per_wal = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__wal_writer_inbox_size) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		if (i32 == 0 && errno == EINVAL)
+			return CNF_WRONGINT;
+		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->wal_writer_inbox_size != i32)
+			return CNF_RDONLY;
+		c->wal_writer_inbox_size = i32;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__wal_mode) ) {
 		if (opt->paramType != stringType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->snap_dir == NULL) || strcmp(opt->paramValue.stringval, c->snap_dir) != 0))
-			return CNF_RDONLY;
-		 if (c->snap_dir) free(c->snap_dir);
-		c->snap_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->snap_dir == NULL)
+		 if (c->wal_mode) free(c->wal_mode);
+		c->wal_mode = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
+		if (opt->paramValue.stringval && c->wal_mode == NULL)
 			return CNF_NOMEMORY;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__wal_dir) ) {
-		if (opt->paramType != stringType )
+	else if ( cmpNameAtoms( opt->name, _name__wal_fsync_delay) ) {
+		if (opt->paramType != numberType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_dir == NULL) || strcmp(opt->paramValue.stringval, c->wal_dir) != 0))
+		double dbl = strtod(opt->paramValue.numberval, NULL);
+		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		c->wal_fsync_delay = dbl;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__wal_dir_rescan_delay) ) {
+		if (opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		double dbl = strtod(opt->paramValue.numberval, NULL);
+		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->wal_dir_rescan_delay != dbl)
 			return CNF_RDONLY;
-		 if (c->wal_dir) free(c->wal_dir);
-		c->wal_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->wal_dir == NULL)
-			return CNF_NOMEMORY;
+		c->wal_dir_rescan_delay = dbl;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__panic_on_snap_error) ) {
+		if (opt->paramType != stringType && opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		bool bln;
+
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->panic_on_snap_error != bln)
+			return CNF_RDONLY;
+		c->panic_on_snap_error = bln;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__panic_on_wal_error) ) {
+		if (opt->paramType != stringType && opt->paramType != numberType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		bool bln;
+
+		if (opt->paramType == numberType) {
+			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
+				bln = opt->paramValue.numberval[0] - '0';
+			else
+				return CNF_WRONGRANGE;
+		}
+		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
+				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+			bln = false;
+		else
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->panic_on_wal_error != bln)
+			return CNF_RDONLY;
+		c->panic_on_wal_error = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__primary_port) ) {
 		if (opt->paramType != numberType )
@@ -726,163 +911,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		c->memcached_expire_full_sweep = dbl;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
-		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->snap_io_rate_limit != dbl)
-			return CNF_RDONLY;
-		c->snap_io_rate_limit = dbl;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__rows_per_wal) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->rows_per_wal != i32)
-			return CNF_RDONLY;
-		c->rows_per_wal = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__wal_fsync_delay) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
-		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->wal_fsync_delay != dbl)
-			return CNF_RDONLY;
-		c->wal_fsync_delay = dbl;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__wal_writer_inbox_size) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->wal_writer_inbox_size != i32)
-			return CNF_RDONLY;
-		c->wal_writer_inbox_size = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__local_hot_standby) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		bool bln;
-
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
-			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
-			bln = false;
-		else
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->local_hot_standby != bln)
-			return CNF_RDONLY;
-		c->local_hot_standby = bln;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__wal_dir_rescan_delay) ) {
-		if (opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
-		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->wal_dir_rescan_delay != dbl)
-			return CNF_RDONLY;
-		c->wal_dir_rescan_delay = dbl;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__panic_on_snap_error) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		bool bln;
-
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
-			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
-			bln = false;
-		else
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->panic_on_snap_error != bln)
-			return CNF_RDONLY;
-		c->panic_on_snap_error = bln;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__panic_on_wal_error) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		bool bln;
-
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
-			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
-			bln = false;
-		else
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->panic_on_wal_error != bln)
-			return CNF_RDONLY;
-		c->panic_on_wal_error = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__replication_source) ) {
 		if (opt->paramType != stringType )
@@ -1207,6 +1235,7 @@ parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly,
 typedef enum IteratorState {
 	_S_Initial = 0,
 	S_name__username,
+	S_name__local_hot_standby,
 	S_name__bind_ipaddr,
 	S_name__coredump,
 	S_name__admin_port,
@@ -1216,14 +1245,23 @@ typedef enum IteratorState {
 	S_name__slab_alloc_minimal,
 	S_name__slab_alloc_factor,
 	S_name__work_dir,
+	S_name__snap_dir,
+	S_name__wal_dir,
+	S_name__script_dir,
 	S_name__pid_file,
 	S_name__logger,
 	S_name__logger_nonblock,
 	S_name__io_collect_interval,
 	S_name__backlog,
 	S_name__readahead,
-	S_name__snap_dir,
-	S_name__wal_dir,
+	S_name__snap_io_rate_limit,
+	S_name__rows_per_wal,
+	S_name__wal_writer_inbox_size,
+	S_name__wal_mode,
+	S_name__wal_fsync_delay,
+	S_name__wal_dir_rescan_delay,
+	S_name__panic_on_snap_error,
+	S_name__panic_on_wal_error,
 	S_name__primary_port,
 	S_name__secondary_port,
 	S_name__too_long_threshold,
@@ -1233,14 +1271,6 @@ typedef enum IteratorState {
 	S_name__memcached_expire,
 	S_name__memcached_expire_per_loop,
 	S_name__memcached_expire_full_sweep,
-	S_name__snap_io_rate_limit,
-	S_name__rows_per_wal,
-	S_name__wal_fsync_delay,
-	S_name__wal_writer_inbox_size,
-	S_name__local_hot_standby,
-	S_name__wal_dir_rescan_delay,
-	S_name__panic_on_snap_error,
-	S_name__panic_on_wal_error,
 	S_name__replication_source,
 	S_name__space,
 	S_name__space__enabled,
@@ -1287,6 +1317,17 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "username");
+			i->state = S_name__local_hot_standby;
+			return buf;
+		case S_name__local_hot_standby:
+			*v = malloc(8);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%s", c->local_hot_standby ? "true" : "false");
+			snprintf(buf, PRINTBUFLEN-1, "local_hot_standby");
 			i->state = S_name__bind_ipaddr;
 			return buf;
 		case S_name__bind_ipaddr:
@@ -1384,6 +1425,36 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "work_dir");
+			i->state = S_name__snap_dir;
+			return buf;
+		case S_name__snap_dir:
+			*v = (c->snap_dir) ? strdup(c->snap_dir) : NULL;
+			if (*v == NULL && c->snap_dir) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "snap_dir");
+			i->state = S_name__wal_dir;
+			return buf;
+		case S_name__wal_dir:
+			*v = (c->wal_dir) ? strdup(c->wal_dir) : NULL;
+			if (*v == NULL && c->wal_dir) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "wal_dir");
+			i->state = S_name__script_dir;
+			return buf;
+		case S_name__script_dir:
+			*v = (c->script_dir) ? strdup(c->script_dir) : NULL;
+			if (*v == NULL && c->script_dir) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "script_dir");
 			i->state = S_name__pid_file;
 			return buf;
 		case S_name__pid_file:
@@ -1448,26 +1519,93 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->readahead);
 			snprintf(buf, PRINTBUFLEN-1, "readahead");
-			i->state = S_name__snap_dir;
+			i->state = S_name__snap_io_rate_limit;
 			return buf;
-		case S_name__snap_dir:
-			*v = (c->snap_dir) ? strdup(c->snap_dir) : NULL;
-			if (*v == NULL && c->snap_dir) {
+		case S_name__snap_io_rate_limit:
+			*v = malloc(32);
+			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			snprintf(buf, PRINTBUFLEN-1, "snap_dir");
-			i->state = S_name__wal_dir;
+			sprintf(*v, "%g", c->snap_io_rate_limit);
+			snprintf(buf, PRINTBUFLEN-1, "snap_io_rate_limit");
+			i->state = S_name__rows_per_wal;
 			return buf;
-		case S_name__wal_dir:
-			*v = (c->wal_dir) ? strdup(c->wal_dir) : NULL;
-			if (*v == NULL && c->wal_dir) {
+		case S_name__rows_per_wal:
+			*v = malloc(32);
+			if (*v == NULL) {
 				free(i);
 				out_warning(CNF_NOMEMORY, "No memory to output value");
 				return NULL;
 			}
-			snprintf(buf, PRINTBUFLEN-1, "wal_dir");
+			sprintf(*v, "%"PRId32, c->rows_per_wal);
+			snprintf(buf, PRINTBUFLEN-1, "rows_per_wal");
+			i->state = S_name__wal_writer_inbox_size;
+			return buf;
+		case S_name__wal_writer_inbox_size:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%"PRId32, c->wal_writer_inbox_size);
+			snprintf(buf, PRINTBUFLEN-1, "wal_writer_inbox_size");
+			i->state = S_name__wal_mode;
+			return buf;
+		case S_name__wal_mode:
+			*v = (c->wal_mode) ? strdup(c->wal_mode) : NULL;
+			if (*v == NULL && c->wal_mode) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "wal_mode");
+			i->state = S_name__wal_fsync_delay;
+			return buf;
+		case S_name__wal_fsync_delay:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%g", c->wal_fsync_delay);
+			snprintf(buf, PRINTBUFLEN-1, "wal_fsync_delay");
+			i->state = S_name__wal_dir_rescan_delay;
+			return buf;
+		case S_name__wal_dir_rescan_delay:
+			*v = malloc(32);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%g", c->wal_dir_rescan_delay);
+			snprintf(buf, PRINTBUFLEN-1, "wal_dir_rescan_delay");
+			i->state = S_name__panic_on_snap_error;
+			return buf;
+		case S_name__panic_on_snap_error:
+			*v = malloc(8);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%s", c->panic_on_snap_error ? "true" : "false");
+			snprintf(buf, PRINTBUFLEN-1, "panic_on_snap_error");
+			i->state = S_name__panic_on_wal_error;
+			return buf;
+		case S_name__panic_on_wal_error:
+			*v = malloc(8);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%s", c->panic_on_wal_error ? "true" : "false");
+			snprintf(buf, PRINTBUFLEN-1, "panic_on_wal_error");
 			i->state = S_name__primary_port;
 			return buf;
 		case S_name__primary_port:
@@ -1566,94 +1704,6 @@ again:
 			}
 			sprintf(*v, "%g", c->memcached_expire_full_sweep);
 			snprintf(buf, PRINTBUFLEN-1, "memcached_expire_full_sweep");
-			i->state = S_name__snap_io_rate_limit;
-			return buf;
-		case S_name__snap_io_rate_limit:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%g", c->snap_io_rate_limit);
-			snprintf(buf, PRINTBUFLEN-1, "snap_io_rate_limit");
-			i->state = S_name__rows_per_wal;
-			return buf;
-		case S_name__rows_per_wal:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->rows_per_wal);
-			snprintf(buf, PRINTBUFLEN-1, "rows_per_wal");
-			i->state = S_name__wal_fsync_delay;
-			return buf;
-		case S_name__wal_fsync_delay:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%g", c->wal_fsync_delay);
-			snprintf(buf, PRINTBUFLEN-1, "wal_fsync_delay");
-			i->state = S_name__wal_writer_inbox_size;
-			return buf;
-		case S_name__wal_writer_inbox_size:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->wal_writer_inbox_size);
-			snprintf(buf, PRINTBUFLEN-1, "wal_writer_inbox_size");
-			i->state = S_name__local_hot_standby;
-			return buf;
-		case S_name__local_hot_standby:
-			*v = malloc(8);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%s", c->local_hot_standby ? "true" : "false");
-			snprintf(buf, PRINTBUFLEN-1, "local_hot_standby");
-			i->state = S_name__wal_dir_rescan_delay;
-			return buf;
-		case S_name__wal_dir_rescan_delay:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%g", c->wal_dir_rescan_delay);
-			snprintf(buf, PRINTBUFLEN-1, "wal_dir_rescan_delay");
-			i->state = S_name__panic_on_snap_error;
-			return buf;
-		case S_name__panic_on_snap_error:
-			*v = malloc(8);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%s", c->panic_on_snap_error ? "true" : "false");
-			snprintf(buf, PRINTBUFLEN-1, "panic_on_snap_error");
-			i->state = S_name__panic_on_wal_error;
-			return buf;
-		case S_name__panic_on_wal_error:
-			*v = malloc(8);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%s", c->panic_on_wal_error ? "true" : "false");
-			snprintf(buf, PRINTBUFLEN-1, "panic_on_wal_error");
 			i->state = S_name__replication_source;
 			return buf;
 		case S_name__replication_source:
@@ -1945,6 +1995,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	if (dst->username) free(dst->username);dst->username = src->username == NULL ? NULL : strdup(src->username);
 	if (src->username != NULL && dst->username == NULL)
 		return CNF_NOMEMORY;
+	dst->local_hot_standby = src->local_hot_standby;
 	if (dst->bind_ipaddr) free(dst->bind_ipaddr);dst->bind_ipaddr = src->bind_ipaddr == NULL ? NULL : strdup(src->bind_ipaddr);
 	if (src->bind_ipaddr != NULL && dst->bind_ipaddr == NULL)
 		return CNF_NOMEMORY;
@@ -1958,6 +2009,15 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	if (dst->work_dir) free(dst->work_dir);dst->work_dir = src->work_dir == NULL ? NULL : strdup(src->work_dir);
 	if (src->work_dir != NULL && dst->work_dir == NULL)
 		return CNF_NOMEMORY;
+	if (dst->snap_dir) free(dst->snap_dir);dst->snap_dir = src->snap_dir == NULL ? NULL : strdup(src->snap_dir);
+	if (src->snap_dir != NULL && dst->snap_dir == NULL)
+		return CNF_NOMEMORY;
+	if (dst->wal_dir) free(dst->wal_dir);dst->wal_dir = src->wal_dir == NULL ? NULL : strdup(src->wal_dir);
+	if (src->wal_dir != NULL && dst->wal_dir == NULL)
+		return CNF_NOMEMORY;
+	if (dst->script_dir) free(dst->script_dir);dst->script_dir = src->script_dir == NULL ? NULL : strdup(src->script_dir);
+	if (src->script_dir != NULL && dst->script_dir == NULL)
+		return CNF_NOMEMORY;
 	if (dst->pid_file) free(dst->pid_file);dst->pid_file = src->pid_file == NULL ? NULL : strdup(src->pid_file);
 	if (src->pid_file != NULL && dst->pid_file == NULL)
 		return CNF_NOMEMORY;
@@ -1968,12 +2028,16 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->io_collect_interval = src->io_collect_interval;
 	dst->backlog = src->backlog;
 	dst->readahead = src->readahead;
-	if (dst->snap_dir) free(dst->snap_dir);dst->snap_dir = src->snap_dir == NULL ? NULL : strdup(src->snap_dir);
-	if (src->snap_dir != NULL && dst->snap_dir == NULL)
+	dst->snap_io_rate_limit = src->snap_io_rate_limit;
+	dst->rows_per_wal = src->rows_per_wal;
+	dst->wal_writer_inbox_size = src->wal_writer_inbox_size;
+	if (dst->wal_mode) free(dst->wal_mode);dst->wal_mode = src->wal_mode == NULL ? NULL : strdup(src->wal_mode);
+	if (src->wal_mode != NULL && dst->wal_mode == NULL)
 		return CNF_NOMEMORY;
-	if (dst->wal_dir) free(dst->wal_dir);dst->wal_dir = src->wal_dir == NULL ? NULL : strdup(src->wal_dir);
-	if (src->wal_dir != NULL && dst->wal_dir == NULL)
-		return CNF_NOMEMORY;
+	dst->wal_fsync_delay = src->wal_fsync_delay;
+	dst->wal_dir_rescan_delay = src->wal_dir_rescan_delay;
+	dst->panic_on_snap_error = src->panic_on_snap_error;
+	dst->panic_on_wal_error = src->panic_on_wal_error;
 	dst->primary_port = src->primary_port;
 	dst->secondary_port = src->secondary_port;
 	dst->too_long_threshold = src->too_long_threshold;
@@ -1985,14 +2049,6 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->memcached_expire = src->memcached_expire;
 	dst->memcached_expire_per_loop = src->memcached_expire_per_loop;
 	dst->memcached_expire_full_sweep = src->memcached_expire_full_sweep;
-	dst->snap_io_rate_limit = src->snap_io_rate_limit;
-	dst->rows_per_wal = src->rows_per_wal;
-	dst->wal_fsync_delay = src->wal_fsync_delay;
-	dst->wal_writer_inbox_size = src->wal_writer_inbox_size;
-	dst->local_hot_standby = src->local_hot_standby;
-	dst->wal_dir_rescan_delay = src->wal_dir_rescan_delay;
-	dst->panic_on_snap_error = src->panic_on_snap_error;
-	dst->panic_on_wal_error = src->panic_on_wal_error;
 	if (dst->replication_source) free(dst->replication_source);dst->replication_source = src->replication_source == NULL ? NULL : strdup(src->replication_source);
 	if (src->replication_source != NULL && dst->replication_source == NULL)
 		return CNF_NOMEMORY;
@@ -2005,6 +2061,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 		while (src->space[i->idx_name__space] != NULL) {
 			ARRAYALLOC(dst->space, i->idx_name__space + 1, _name__space, 0, 0);
 
+			dst->space[i->idx_name__space]->__confetti_flags = src->space[i->idx_name__space]->__confetti_flags;
 			dst->space[i->idx_name__space]->enabled = src->space[i->idx_name__space]->enabled;
 			dst->space[i->idx_name__space]->cardinality = src->space[i->idx_name__space]->cardinality;
 			dst->space[i->idx_name__space]->estimated_rows = src->space[i->idx_name__space]->estimated_rows;
@@ -2017,6 +2074,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 				while (src->space[i->idx_name__space]->index[i->idx_name__space__index] != NULL) {
 					ARRAYALLOC(dst->space[i->idx_name__space]->index, i->idx_name__space__index + 1, _name__space__index, 0, 0);
 
+					dst->space[i->idx_name__space]->index[i->idx_name__space__index]->__confetti_flags = src->space[i->idx_name__space]->index[i->idx_name__space__index]->__confetti_flags;
 					if (dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type) free(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type);dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type = src->space[i->idx_name__space]->index[i->idx_name__space__index]->type == NULL ? NULL : strdup(src->space[i->idx_name__space]->index[i->idx_name__space__index]->type);
 					if (src->space[i->idx_name__space]->index[i->idx_name__space__index]->type != NULL && dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type == NULL)
 						return CNF_NOMEMORY;
@@ -2030,6 +2088,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 						while (src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field] != NULL) {
 							ARRAYALLOC(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field, i->idx_name__space__index__key_field + 1, _name__space__index__key_field, 0, 0);
 
+							dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->__confetti_flags = src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->__confetti_flags;
 							dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->fieldno = src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->fieldno;
 							if (dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type) free(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type);dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type = src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type == NULL ? NULL : strdup(src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type);
 							if (src->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type != NULL && dst->space[i->idx_name__space]->index[i->idx_name__space__index]->key_field[i->idx_name__space__index__key_field]->type == NULL)
@@ -2062,14 +2121,18 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 		free(c->bind_ipaddr);
 	if (c->work_dir != NULL)
 		free(c->work_dir);
-	if (c->pid_file != NULL)
-		free(c->pid_file);
-	if (c->logger != NULL)
-		free(c->logger);
 	if (c->snap_dir != NULL)
 		free(c->snap_dir);
 	if (c->wal_dir != NULL)
 		free(c->wal_dir);
+	if (c->script_dir != NULL)
+		free(c->script_dir);
+	if (c->pid_file != NULL)
+		free(c->pid_file);
+	if (c->logger != NULL)
+		free(c->logger);
+	if (c->wal_mode != NULL)
+		free(c->wal_mode);
 	if (c->custom_proc_title != NULL)
 		free(c->custom_proc_title);
 	if (c->replication_source != NULL)
@@ -2140,6 +2203,11 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 }
+	if (c1->local_hot_standby != c2->local_hot_standby) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->local_hot_standby");
+
+		return diff;
+	}
 	if (confetti_strcmp(c1->bind_ipaddr, c2->bind_ipaddr) != 0) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->bind_ipaddr");
 
@@ -2187,6 +2255,21 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 }
+	if (confetti_strcmp(c1->snap_dir, c2->snap_dir) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->snap_dir");
+
+		return diff;
+}
+	if (confetti_strcmp(c1->wal_dir, c2->wal_dir) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_dir");
+
+		return diff;
+}
+	if (confetti_strcmp(c1->script_dir, c2->script_dir) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->script_dir");
+
+		return diff;
+}
 	if (confetti_strcmp(c1->pid_file, c2->pid_file) != 0) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->pid_file");
 
@@ -2202,10 +2285,12 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 	}
-	if (c1->io_collect_interval != c2->io_collect_interval) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->io_collect_interval");
+	if (!only_check_rdonly) {
+		if (c1->io_collect_interval != c2->io_collect_interval) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->io_collect_interval");
 
-		return diff;
+			return diff;
+		}
 	}
 	if (c1->backlog != c2->backlog) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->backlog");
@@ -2219,16 +2304,52 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 			return diff;
 		}
 	}
-	if (confetti_strcmp(c1->snap_dir, c2->snap_dir) != 0) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->snap_dir");
+	if (!only_check_rdonly) {
+		if (c1->snap_io_rate_limit != c2->snap_io_rate_limit) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->snap_io_rate_limit");
+
+			return diff;
+		}
+	}
+	if (c1->rows_per_wal != c2->rows_per_wal) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->rows_per_wal");
 
 		return diff;
-}
-	if (confetti_strcmp(c1->wal_dir, c2->wal_dir) != 0) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_dir");
+	}
+	if (c1->wal_writer_inbox_size != c2->wal_writer_inbox_size) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_writer_inbox_size");
 
 		return diff;
+	}
+	if (!only_check_rdonly) {
+		if (confetti_strcmp(c1->wal_mode, c2->wal_mode) != 0) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_mode");
+
+			return diff;
 }
+	}
+	if (!only_check_rdonly) {
+		if (c1->wal_fsync_delay != c2->wal_fsync_delay) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_fsync_delay");
+
+			return diff;
+		}
+	}
+	if (c1->wal_dir_rescan_delay != c2->wal_dir_rescan_delay) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_dir_rescan_delay");
+
+		return diff;
+	}
+	if (c1->panic_on_snap_error != c2->panic_on_snap_error) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->panic_on_snap_error");
+
+		return diff;
+	}
+	if (c1->panic_on_wal_error != c2->panic_on_wal_error) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->panic_on_wal_error");
+
+		return diff;
+	}
 	if (c1->primary_port != c2->primary_port) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->primary_port");
 
@@ -2279,46 +2400,6 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 			return diff;
 		}
-	}
-	if (c1->snap_io_rate_limit != c2->snap_io_rate_limit) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->snap_io_rate_limit");
-
-		return diff;
-	}
-	if (c1->rows_per_wal != c2->rows_per_wal) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->rows_per_wal");
-
-		return diff;
-	}
-	if (c1->wal_fsync_delay != c2->wal_fsync_delay) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_fsync_delay");
-
-		return diff;
-	}
-	if (c1->wal_writer_inbox_size != c2->wal_writer_inbox_size) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_writer_inbox_size");
-
-		return diff;
-	}
-	if (c1->local_hot_standby != c2->local_hot_standby) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->local_hot_standby");
-
-		return diff;
-	}
-	if (c1->wal_dir_rescan_delay != c2->wal_dir_rescan_delay) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->wal_dir_rescan_delay");
-
-		return diff;
-	}
-	if (c1->panic_on_snap_error != c2->panic_on_snap_error) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->panic_on_snap_error");
-
-		return diff;
-	}
-	if (c1->panic_on_wal_error != c2->panic_on_wal_error) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->panic_on_wal_error");
-
-		return diff;
 	}
 	if (!only_check_rdonly) {
 		if (confetti_strcmp(c1->replication_source, c2->replication_source) != 0) {

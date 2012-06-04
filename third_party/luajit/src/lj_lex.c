@@ -137,14 +137,17 @@ static int lex_number64(LexState *ls, TValue *tv)
 /* Parse a number literal. */
 static void lex_number(LexState *ls, TValue *tv)
 {
-  int c;
+  int c, xp = 'E';
   lua_assert(lj_char_isdigit(ls->current));
-  do {
+  if ((c = ls->current) == '0') {
+    save_and_next(ls);
+    if ((ls->current & ~0x20) == 'X') xp = 'P';
+  }
+  while (lj_char_isident(ls->current) || ls->current == '.' ||
+	 ((ls->current == '-' || ls->current == '+') && (c & ~0x20) == xp)) {
     c = ls->current;
     save_and_next(ls);
-  } while (lj_char_isident(ls->current) || ls->current == '.' ||
-	   ((ls->current == '-' || ls->current == '+') &&
-	    ((c & ~0x20) == 'E' || (c & ~0x20) == 'P')));
+  }
 #if LJ_HASFFI
   c &= ~0x20;
   if ((c == 'I' || c == 'L' || c == 'U') && !ctype_ctsG(G(ls->L)))
@@ -238,9 +241,8 @@ static void read_string(LexState *ls, int delim, TValue *tv)
       lj_lex_error(ls, TK_string, LJ_ERR_XSTR);
       continue;
     case '\\': {
-      int c;
-      next(ls);  /* Skip the '\\'. */
-      switch (ls->current) {
+      int c = next(ls);  /* Skip the '\\'. */
+      switch (c) {
       case 'a': c = '\a'; break;
       case 'b': c = '\b'; break;
       case 'f': c = '\f'; break;
@@ -260,31 +262,30 @@ static void read_string(LexState *ls, int delim, TValue *tv)
 	  c += 9;
 	}
 	break;
-      case '*':  /* Skip whitespace. */
+      case 'z':  /* Skip whitespace. */
 	next(ls);
 	while (lj_char_isspace(ls->current))
 	  if (currIsNewline(ls)) inclinenumber(ls); else next(ls);
 	continue;
       case '\n': case '\r': save(ls, '\n'); inclinenumber(ls); continue;
+      case '\\': case '\"': case '\'': break;
       case END_OF_STREAM: continue;
       default:
-	if (!lj_char_isdigit(ls->current)) {
-	  save_and_next(ls);  /* Handles '\\', '\"' and "\'". */
-	} else {  /* Decimal escape '\ddd'. */
-	  c = (ls->current - '0');
+	if (!lj_char_isdigit(c))
+	  goto err_xesc;
+	c -= '0';  /* Decimal escape '\ddd'. */
+	if (lj_char_isdigit(next(ls))) {
+	  c = c*10 + (ls->current - '0');
 	  if (lj_char_isdigit(next(ls))) {
 	    c = c*10 + (ls->current - '0');
-	    if (lj_char_isdigit(next(ls))) {
-	      c = c*10 + (ls->current - '0');
-	      if (c > 255) {
-	      err_xesc:
-		lj_lex_error(ls, TK_string, LJ_ERR_XESC);
-	      }
-	      next(ls);
+	    if (c > 255) {
+	    err_xesc:
+	      lj_lex_error(ls, TK_string, LJ_ERR_XESC);
 	    }
+	    next(ls);
 	  }
-	  save(ls, c);
 	}
+	save(ls, c);
 	continue;
       }
       save(ls, c);

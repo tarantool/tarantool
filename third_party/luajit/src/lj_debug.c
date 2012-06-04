@@ -14,6 +14,9 @@
 #include "lj_state.h"
 #include "lj_frame.h"
 #include "lj_bc.h"
+#if LJ_HASJIT
+#include "lj_jit.h"
+#endif
 
 /* -- Frames -------------------------------------------------------------- */
 
@@ -49,6 +52,8 @@ cTValue *lj_debug_frame(lua_State *L, int level, int *size)
 static BCPos debug_framepc(lua_State *L, GCfunc *fn, cTValue *nextframe)
 {
   const BCIns *ins;
+  GCproto *pt;
+  BCPos pos;
   lua_assert(fn->c.gct == ~LJ_TFUNC || fn->c.gct == ~LJ_TTHREAD);
   if (!isluafunc(fn)) {  /* Cannot derive a PC for non-Lua functions. */
     return NO_BCPOS;
@@ -82,7 +87,16 @@ static BCPos debug_framepc(lua_State *L, GCfunc *fn, cTValue *nextframe)
       ins = cframe_pc(cf);
     }
   }
-  return proto_bcpos(funcproto(fn), ins) - 1;
+  pt = funcproto(fn);
+  pos = proto_bcpos(pt, ins) - 1;
+#if LJ_HASJIT
+  if (pos > pt->sizebc) {  /* Undo the effects of lj_trace_exit for JLOOP. */
+    GCtrace *T = (GCtrace *)((char *)(ins-1) - offsetof(GCtrace, startins));
+    lua_assert(bc_isret(bc_op(ins[-1])));
+    pos = proto_bcpos(pt, mref(T->startpc, const BCIns));
+  }
+#endif
+  return pos;
 }
 
 /* -- Line numbers -------------------------------------------------------- */
@@ -91,8 +105,9 @@ static BCPos debug_framepc(lua_State *L, GCfunc *fn, cTValue *nextframe)
 BCLine LJ_FASTCALL lj_debug_line(GCproto *pt, BCPos pc)
 {
   const void *lineinfo = proto_lineinfo(pt);
-  if (pc < pt->sizebc && lineinfo) {
+  if (pc <= pt->sizebc && lineinfo) {
     BCLine first = pt->firstline;
+    if (pc == pt->sizebc) return first + pt->numline;
     if (pc-- == 0) return first;
     if (pt->numline < 256)
       return first + (BCLine)((const uint8_t *)lineinfo)[pc];
@@ -110,7 +125,7 @@ static BCLine debug_frameline(lua_State *L, GCfunc *fn, cTValue *nextframe)
   BCPos pc = debug_framepc(L, fn, nextframe);
   if (pc != NO_BCPOS) {
     GCproto *pt = funcproto(fn);
-    lua_assert(pc < pt->sizebc);
+    lua_assert(pc <= pt->sizebc);
     return lj_debug_line(pt, pc);
   }
   return -1;

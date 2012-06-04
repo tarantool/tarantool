@@ -58,16 +58,6 @@
 @interface FiberCancelException: tnt_Exception
 @end
 
-struct msg {
-	uint32_t sender_fid;
-	struct tbuf *msg;
-};
-
-struct ring {
-	size_t size, head, tail;
-	struct msg *ring[];
-};
-
 struct fiber {
 	ev_io io;
 	ev_async async;
@@ -91,17 +81,10 @@ struct fiber {
 
 	SLIST_ENTRY(fiber) link, zombie_link;
 
-	struct ring *inbox;
-
 	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];
 	void (*f) (void *);
 	void *f_data;
-	/* Store execution context in a fiber. */
-	union {
-		struct box_txn *txn;
-	} mod_data;
-
 	u64 cookie;
 	bool has_peer;
 	/* ASCIIZ name of the peer, if there is one. */
@@ -113,11 +96,6 @@ struct fiber {
 };
 
 SLIST_HEAD(, fiber) fibers, zombie_fibers;
-
-struct child {
-	pid_t pid;
-	struct fiber *in, *out;
-};
 
 static inline struct iovec *iovec(const struct tbuf *t)
 {
@@ -131,7 +109,7 @@ extern struct fiber *fiber;
 
 void fiber_init(void);
 void fiber_free(void);
-struct fiber *fiber_create(const char *name, int fd, int inbox_size, void (*f) (void *), void *);
+struct fiber *fiber_create(const char *name, int fd, void (*f) (void *), void *);
 void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for_child(pid_t pid);
 
@@ -148,7 +126,9 @@ void
 fiber_yield(void);
 void fiber_destroy_all();
 
-struct msg *read_inbox(void);
+bool
+fiber_is_caller(struct fiber *f);
+
 ssize_t fiber_bread(struct tbuf *, size_t v);
 
 inline static void iov_add_unsafe(const void *buf, size_t len)
@@ -185,10 +165,6 @@ inline static void iov_dup(const void *buf, size_t len)
 ssize_t iov_flush(void);
 /* Write everything in the fiber's iov vector to fiber socket. */
 void iov_reset();
-
-bool write_inbox(struct fiber *recipient, struct tbuf *msg);
-int inbox_size(struct fiber *recipient);
-void wait_inbox(struct fiber *recipient);
 
 const char *fiber_peer_name(struct fiber *fiber);
 ssize_t fiber_read(void *buf, size_t count);
@@ -239,9 +215,5 @@ struct fiber *fiber_server(const char *name, int port,
  */
 int
 fiber_serv_socket(struct fiber *fiber, unsigned short port, bool retry, ev_tstamp delay);
-
-struct child *spawn_child(const char *name,
-			  int inbox_size,
-			  struct tbuf *(*handler) (void *, struct tbuf *), void *state);
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

@@ -1,0 +1,14 @@
+
+#
+# iproto packages test
+#
+
+
+# Test bug #899343 (server assertion failure on incorrect packet)
+
+# sending the package with invalid length
+12
+# checking what is server alive
+ping
+ok
+---

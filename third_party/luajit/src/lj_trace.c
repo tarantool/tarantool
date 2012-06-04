@@ -497,6 +497,7 @@ static int trace_abort(jit_State *J)
   if (tvisnumber(L->top-1))
     e = (TraceError)numberVint(L->top-1);
   if (e == LJ_TRERR_MCODELM) {
+    L->top--;  /* Remove error object */
     J->state = LJ_TRACE_ASM;
     return 1;  /* Retry ASM with new MCode area. */
   }
@@ -509,6 +510,7 @@ static int trace_abort(jit_State *J)
   if (traceno) {
     ptrdiff_t errobj = savestack(L, L->top-1);  /* Stack may be resized. */
     J->cur.link = 0;
+    J->cur.linktype = LJ_TRLINK_NONE;
     lj_vmevent_send(L, TRACE,
       TValue *frame;
       const BCIns *pc;
@@ -545,9 +547,13 @@ static int trace_abort(jit_State *J)
 /* Perform pending re-patch of a bytecode instruction. */
 static LJ_AINLINE void trace_pendpatch(jit_State *J, int force)
 {
-  if (LJ_UNLIKELY(J->patchpc) && (force || J->chain[IR_RETF])) {
-    *J->patchpc = J->patchins;
-    J->patchpc = NULL;
+  if (LJ_UNLIKELY(J->patchpc)) {
+    if (force || J->bcskip == 0) {
+      *J->patchpc = J->patchins;
+      J->patchpc = NULL;
+    } else {
+      J->bcskip = 0;
+    }
   }
 }
 
@@ -568,11 +574,17 @@ static TValue *trace_state(lua_State *L, lua_CFunction dummy, void *ud)
     case LJ_TRACE_RECORD:
       trace_pendpatch(J, 0);
       setvmstate(J2G(J), RECORD);
-      lj_vmevent_send(L, RECORD,
+      lj_vmevent_send_(L, RECORD,
+	/* Save/restore tmptv state for trace recorder. */
+	TValue savetv = J2G(J)->tmptv;
+	TValue savetv2 = J2G(J)->tmptv2;
 	setintV(L->top++, J->cur.traceno);
 	setfuncV(L, L->top++, J->fn);
 	setintV(L->top++, J->pt ? (int32_t)proto_bcpos(J->pt, J->pc) : -1);
 	setintV(L->top++, J->framedepth);
+      ,
+	J2G(J)->tmptv = savetv;
+	J2G(J)->tmptv2 = savetv2;
       );
       lj_record_ins(J);
       break;
@@ -586,6 +598,7 @@ static TValue *trace_state(lua_State *L, lua_CFunction dummy, void *ud)
 	lj_opt_dce(J);
 	if (lj_opt_loop(J)) {  /* Loop optimization failed? */
 	  J->cur.link = 0;
+	  J->cur.linktype = LJ_TRLINK_NONE;
 	  J->loopref = J->cur.nins;
 	  J->state = LJ_TRACE_RECORD;  /* Try to continue recording. */
 	  break;
@@ -637,9 +650,10 @@ void lj_trace_ins(jit_State *J, const BCIns *pc)
 /* A hotcount triggered. Start recording a root trace. */
 void LJ_FASTCALL lj_trace_hot(jit_State *J, const BCIns *pc)
 {
-  ERRNO_SAVE
   /* Note: pc is the interpreter bytecode PC here. It's offset by 1. */
-  hotcount_set(J2GG(J), pc, J->param[JIT_P_hotloop]+1);  /* Reset hotcount. */
+  ERRNO_SAVE
+  /* Reset hotcount. */
+  hotcount_set(J2GG(J), pc, J->param[JIT_P_hotloop]*HOTCOUNT_LOOP);
   /* Only start a new trace if not recording or inside __gc call or vmevent. */
   if (J->state == LJ_TRACE_IDLE &&
       !(J2G(J)->hookmask & (HOOK_GC|HOOK_VMEVENT))) {
@@ -713,14 +727,8 @@ static TraceNo trace_exit_find(jit_State *J, MCode *pc)
   TraceNo traceno;
   for (traceno = 1; traceno < J->sizetrace; traceno++) {
     GCtrace *T = traceref(J, traceno);
-    if (T && pc >= T->mcode && pc < (MCode *)((char *)T->mcode + T->szmcode)) {
-      if (J->exitno == T->nsnap) {  /* Treat stack check like a parent exit. */
-	lua_assert(T->root != 0);
-	traceno = T->ir[REF_BASE].op1;
-	J->exitno = T->ir[REF_BASE].op2;
-      }
+    if (T && pc >= T->mcode && pc < (MCode *)((char *)T->mcode + T->szmcode))
       return traceno;
-    }
   }
   lua_assert(0);
   return 0;
@@ -737,11 +745,20 @@ int LJ_FASTCALL lj_trace_exit(jit_State *J, void *exptr)
   int errcode;
   const BCIns *pc;
   void *cf;
+  GCtrace *T;
 #ifdef EXITSTATE_PCREG
   J->parent = trace_exit_find(J, (MCode *)(intptr_t)ex->gpr[EXITSTATE_PCREG]);
 #endif
-  lua_assert(traceref(J, J->parent) != NULL &&
-	     J->exitno < traceref(J, J->parent)->nsnap);
+  T = traceref(J, J->parent); UNUSED(T);
+#ifdef EXITSTATE_CHECKEXIT
+  if (J->exitno == T->nsnap) {  /* Treat stack check like a parent exit. */
+    lua_assert(T->root != 0);
+    J->exitno = T->ir[REF_BASE].op2;
+    J->parent = T->ir[REF_BASE].op1;
+    T = traceref(J, J->parent);
+  }
+#endif
+  lua_assert(T != NULL && J->exitno < T->nsnap);
   exd.J = J;
   exd.exptr = exptr;
   errcode = lj_vm_cpcall(L, NULL, &exd, trace_exit_cp);
@@ -769,6 +786,7 @@ int LJ_FASTCALL lj_trace_exit(jit_State *J, void *exptr)
 	J->patchins = *pc;
 	J->patchpc = (BCIns *)pc;
 	*J->patchpc = *retpc;
+	J->bcskip = 1;
       } else {
 	pc = retpc;
 	setcframe_pc(cf, pc);

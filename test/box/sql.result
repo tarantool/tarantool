@@ -2,7 +2,7 @@ ping
 ok
 ---
 select * from t0
-An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, key is not u32'
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected u32'
 insert into t0 values (1, 'I am a tuple')
 Insert OK, 1 row affected
 select * from t0 where k0 = 1
@@ -53,8 +53,8 @@ An error occurred: ER_NO_SUCH_FIELD, 'Field 1000 was not found in the tuple'
 select * from t0 where k0 = 1
 Found 1 tuple:
 [1, 'Huh', 'I am a new field! I was added via append']
-insert into t0 values (1, 'I am a new tuple', 'stub')
-Insert OK, 1 row affected
+replace into t0 values (1, 'I am a new tuple', 'stub')
+Replace OK, 1 row affected
 update t0 set k1 = 'Huh', k2 = 'Oh-ho-ho' where k0=1
 Update OK, 1 row affected
 select * from t0 where k0 = 1
@@ -93,9 +93,12 @@ Delete OK, 1 row affected
 select * from t1 where k0 = 0
 An error occurred: ER_SPACE_DISABLED, 'Space 1 is disabled'
 select * from t65537 where k0 = 0
-An error occurred: ER_NO_SUCH_SPACE, 'Space 65537 does not exists'
+An error occurred: ER_NO_SUCH_SPACE, 'Space 65537 does not exist'
 select * from t4294967295 where k0 = 0
-An error occurred: ER_NO_SUCH_SPACE, 'Space 4294967295 does not exists'
+An error occurred: ER_NO_SUCH_SPACE, 'Space 4294967295 does not exist'
+lua box.space[0]:truncate()
+---
+...
 #
 # A test case for: http://bugs.launchpad.net/bugs/716683
 # Admin console should not stall on unknown command.

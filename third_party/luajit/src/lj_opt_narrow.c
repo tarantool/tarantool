@@ -284,7 +284,8 @@ static int narrow_conv_backprop(NarrowConv *nc, IRRef ref, int depth)
       }
     } else {
       int32_t k = lj_num2int(n);
-      if (n == (lua_Number)k) {  /* Only if constant is really an integer. */
+      /* Only if constant is a small integer. */
+      if (checki16(k) && n == (lua_Number)k) {
 	*nc->sp++ = NARROWINS(NARROW_INT, 0);
 	*nc->sp++ = (NarrowIns)k;
 	return 0;
@@ -495,7 +496,7 @@ TRef LJ_FASTCALL lj_opt_narrow_cindex(jit_State *J, TRef tr)
 {
   lua_assert(tref_isnumber(tr));
   if (tref_isnum(tr))
-    return emitir(IRTI(IR_CONV), tr,
+    return emitir(IRT(IR_CONV, IRT_INTP), tr,
 		  (IRT_INTP<<5)|IRT_NUM|IRCONV_TRUNC|IRCONV_ANY);
   /* Undefined overflow semantics allow stripping of ADDOV, SUBOV and MULOV. */
   return narrow_stripov(J, tr, IR_MULOV,

@@ -30,10 +30,6 @@
 #include <util.h>
 #include <log_io.h>
 
-struct lua_State;
-struct luaL_Reg;
-
-extern struct recovery_state *recovery_state;
 void mod_init(void);
 void mod_free(void);
 struct tarantool_cfg;
@@ -42,44 +38,8 @@ extern const char *mod_name;
 i32 mod_check_config(struct tarantool_cfg *conf);
 i32 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
 int mod_cat(const char *filename);
-void mod_snapshot(struct log_io_iter *);
+void mod_snapshot(struct log_io *);
 void mod_info(struct tbuf *out);
-/**
- * This is a callback used by tarantool_lua_init() to open
- * module-specific libraries into given Lua state.
- *
- * @return  L on success, 0 if out of memory
- */
-struct lua_State *mod_lua_init(struct lua_State *L);
-
-void
-tarantool_lua_register_type(struct lua_State *L, const char *type_name,
-			    const struct luaL_Reg *methods);
-
-/**
- * Create an instance of Lua interpreter and load it with
- * Tarantool modules.  Creates a Lua state, imports global
- * Tarantool modules, then calls mod_lua_init(), which performs
- * module-specific imports. The created state can be freed as any
- * other, with lua_close().
- *
- * @return  L on success, 0 if out of memory
- */
-struct lua_State *tarantool_lua_init();
-void tarantool_lua_close(struct lua_State *L);
-
-/*
- * Single global lua_State shared by core and modules.
- * Created with tarantool_lua_init().
- */
-extern struct lua_State *tarantool_L;
-/* Call Lua 'tostring' built-in to print userdata nicely. */
-const char *
-tarantool_lua_tostring(struct lua_State *L, int index);
-
-/* Make a new configuration available in Lua */
-void tarantool_lua_load_cfg(struct lua_State *L,
-			    struct tarantool_cfg *cfg);
 
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
@@ -96,9 +56,4 @@ void tarantool_free(void);
 char **init_set_proc_title(int argc, char **argv);
 void free_proc_title(int argc, char **argv);
 void set_proc_title(const char *format, ...);
-
-void
-tarantool_lua(struct lua_State *L,
-	      struct tbuf *out, const char *str);
-
 #endif /* TARANTOOL_H_INCLUDED */

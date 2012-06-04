@@ -30,6 +30,12 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#ifndef NDEBUG
+#define TRASH(ptr) memset(ptr, '#', sizeof(*ptr))
+#else
+#define TRASH(ptr)
+#endif
+
 #ifndef MAX
 # define MAX(a, b) ((a) > (b) ? (a) : (b))
 # define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -139,5 +145,17 @@ void symbols_free();
 void assert_fail(const char *assertion, const char *file,
 		 unsigned int line, const char *function) __attribute__ ((noreturn));
 #endif
+
+#ifndef HAVE_MEMMEM
+/* Declare memmem(). */
+void *
+memmem(const void *block, size_t blen, const void *pat, size_t plen);
+#endif /* HAVE_MEMMEM */
+
+#ifndef HAVE_MEMRCHR
+/* Declare memrchr(). */
+void *
+memrchr(const void *s, int c, size_t n);
+#endif /* HAVE_MEMRCHR */
 
 #endif /* TARANTOOL_UTIL_H_INCLUDED */

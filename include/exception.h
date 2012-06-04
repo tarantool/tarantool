@@ -48,6 +48,23 @@
 @end
 
 
+/** Internal error resulting from a failed system call.
+ */
+@interface SystemError: tnt_Exception {
+	@public
+		/* errno code */
+		int errnum;
+		/* error description */
+		char errmsg[TNT_ERRMSG_MAX];
+}
+
+- (id) init: (const char *)msg, ...;
+- (id) init: (int)errnum_arg: (const char *)format, ...;
+- (id) init: (int)errnum_arg: (const char *)format: (va_list)ap;
+- (void) log;
+@end
+
+
 /** Errors that should make it to the client.
  */
 @interface ClientError: tnt_Exception {
@@ -74,6 +91,10 @@
 - (id) init: (const char *)msg;
 @end
 
+/** ER_INJECTION wrapper. */
+@interface ErrorInjection: LoggedError
+- (id) init: (const char *)msg;
+@end
 
 /**
  * A helper macro to add __FILE__ and __LINE__ information to

@@ -66,18 +66,21 @@ LJ_ASMF void lj_vm_powi_sse(void);
 #else
 LJ_ASMF double lj_vm_trunc(double);
 LJ_ASMF double lj_vm_powi(double, int32_t);
-#if defined(__ANDROID__) || defined(__symbian__)
+#ifdef LUAJIT_NO_LOG2
 LJ_ASMF double lj_vm_log2(double);
 #else
 #define lj_vm_log2	log2
 #endif
-#if defined(__symbian__)
+#ifdef LUAJIT_NO_EXP2
 LJ_ASMF double lj_vm_exp2(double);
 #else
 #define lj_vm_exp2	exp2
 #endif
 #endif
 LJ_ASMF int32_t LJ_FASTCALL lj_vm_modi(int32_t, int32_t);
+#if LJ_HASFFI
+LJ_ASMF int lj_vm_errno(void);
+#endif
 #endif
 
 /* Continuations for metamethods. */
@@ -87,6 +90,8 @@ LJ_ASMF void lj_cont_nop(void);  /* Do nothing, just continue execution. */
 LJ_ASMF void lj_cont_condt(void);  /* Branch if result is true. */
 LJ_ASMF void lj_cont_condf(void);  /* Branch if result is false. */
 LJ_ASMF void lj_cont_hook(void);  /* Continue from hook yield. */
+
+enum { LJ_CONT_TAILCALL, LJ_CONT_FFI_CALLBACK };  /* Special continuations. */
 
 /* Start of the ASM code. */
 LJ_ASMF char lj_vm_asm_begin[];
