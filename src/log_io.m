@@ -594,12 +594,12 @@ log_io_close(struct log_io **lptr)
 	if (l->mode == LOG_WRITE) {
 		if (fwrite(&eof_marker_v11,
 			   sizeof(log_magic_t), 1, l->f) != 1)
-			say_error("can't write eof_marker");
+			say_syserror("can't write eof_marker");
 	}
 
 	r = fclose(l->f);
 	if (r < 0)
-		say_error("can't close");
+		say_syserror("can't close");
 	free(l);
 	*lptr = NULL;
 	return r;
@@ -1461,6 +1461,67 @@ wal_writer_pop(struct wal_writer *writer, bool input_was_empty)
 }
 
 /**
+ * If there is no current WAL, try to open it, and close the
+ * previous WAL. We close the previous WAL only after opening
+ * a new one to smoothly move local hot standby and replication
+ * over to the next WAL.
+ * If the current WAL has only 1 record, it means we need to
+ * rename it from '.inprogress' to '.xlog'. We maintain
+ * '.inprogress' WALs to ensure that, at any point in time,
+ * an .xlog file contains at least 1 valid record.
+ * In case of error, we try to close any open WALs.
+ *
+ * @post r->previous_wal is NULL. r->current_wal is in a good
+ * shape for writes or is NULL.
+ * @return 0 in case of success, -1 on error.
+ */
+
+static int
+recovery_rotate_current_wal(struct recovery_state *r, u64 lsn)
+{
+	if (r->current_wal) {
+		/*
+		 * Rename WAL after the first successful write
+		 * to a name  without .inprogress suffix.
+		 */
+		if (r->current_wal->rows == 1) {
+			if (log_io_inprogress_rename(r->current_wal->filename))
+				log_io_close(&r->current_wal);
+		}
+	} else {
+		/* Open WAL with '.inprogress' suffix. */
+		r->current_wal = log_io_open_for_write(r->wal_dir, lsn,
+						       INPROGRESS);
+		/*
+		 * Close the file *after* we create the new WAL, since
+		 * this is when replication relays get an inotify alarm
+		 * (when we close the file), and try to reopen the next
+		 * WAL. In other words, make sure that replication relays
+		 * try to open the next WAL only when it exists.
+		 */
+		if (r->previous_wal) {
+			/*
+			 * We can not handle log_io_close()
+			 * failure in any reasonable way.
+			 * A warning is written to the server
+			 * log file.
+			 */
+			log_io_close(&r->previous_wal);
+		}
+	}
+	assert(r->previous_wal == NULL);
+	return r->current_wal ? 0 : -1;
+}
+
+static void
+recovery_start_new_wal(struct recovery_state *r)
+{
+	assert(r->previous_wal == NULL);
+	r->previous_wal = r->current_wal;
+	r->current_wal = NULL;
+}
+
+/**
  * Write a single request to disk.
  */
 static int
@@ -1469,37 +1530,9 @@ write_to_disk(struct recovery_state *r, struct row_v11 *row,
 {
 	static ev_tstamp last_flush = 0;
 
-	if (r->current_wal == NULL) {
-		/* Open WAL with '.inprogress' suffix. */
-		r->current_wal =
-			log_io_open_for_write(r->wal_dir, row->header.lsn, INPROGRESS);
-	}
-	else if (r->current_wal->rows == 1) {
-		/*
-		 * Rename WAL after the first successful write
-		 * to a name  without inprogress suffix.
-		 */
-		if (log_io_inprogress_rename(r->current_wal->filename) != 0) {
-			say_error("can't rename inprogress WAL");
-			goto fail;
-		}
-	}
-	/*
-	 * Close the file *after* we create the new WAL, since
-	 * this is when replication relays get an inotify alarm
-	 * (when we close the file), and try to reopen the next
-	 * WAL. In other words, make sure that replication relays
-	 * try to open the next WAL only when it exists.
-	 */
-	if (r->previous_wal != NULL) {
-		if (log_io_close(&r->previous_wal) != 0)
-			goto fail;
-	}
-	struct log_io *wal = r->current_wal;
-	if (wal == NULL) {
-		say_syserror("can't open WAL");
+	if (recovery_rotate_current_wal(r, row->header.lsn) != 0)
 		goto fail;
-	}
+	struct log_io *wal = r->current_wal;
 	header_v11_sign(&row->header);
 	/* Write the request. */
 	if (fwrite(row, row_v11_size(row), 1, wal->f) != 1) {
@@ -1531,8 +1564,7 @@ write_to_disk(struct recovery_state *r, struct row_v11 *row,
 	wal->rows++;
 	if (r->rows_per_wal <= wal->rows ||
 	    (row->header.lsn + 1) % r->rows_per_wal == 0) {
-		r->previous_wal = r->current_wal;
-		r->current_wal = NULL;
+		recovery_start_new_wal(r);
 	}
 
 	return 0;
