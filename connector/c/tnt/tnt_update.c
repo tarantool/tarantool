@@ -214,10 +214,6 @@ tnt_update_insert(struct tnt_stream *s, uint32_t field,
 	return tnt_update_op(s, field, TNT_UPDATE_INSERT, data, size);
 }
 
-struct tnt_header_update {
-	uint32_t ns;
-	uint32_t flags;
-};
 /*
  * tnt_update()
  *

@@ -52,6 +52,7 @@ struct tnt_header_insert {
 
 struct tnt_header_delete {
 	uint32_t ns;
+	uint32_t flags;
 };
 
 struct tnt_header_update {
