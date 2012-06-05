@@ -99,7 +99,7 @@ tnt_net_request(struct tnt_stream *s, struct tnt_request *r) {
 	if (s->wrcnt == 0)
 		return 1;
 	s->wrcnt--;
-	return tnt_request_from(r, (tnt_request_t)tnt_net_recv_cb, s);
+	return tnt_request_from(r, (tnt_request_t)tnt_net_recv_cb, s, NULL);
 }
 
 /*

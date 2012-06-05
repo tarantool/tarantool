@@ -1,8 +1,8 @@
-#ifndef TNT_BUF_H_INCLUDED
-#define TNT_BUF_H_INCLUDED
+#ifndef TNT_XLOG_CRC32_H_INCLUDED
+#define TNT_XLOG_CRC32_H_INCLUDED
 
 /*
- * Copyright (C) 2011 Mail.RU
+ * Copyright (C) 2012 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,20 +26,8 @@
  * SUCH DAMAGE.
  */
 
-/* buffer stream object */
+uint32_t tnt_xlog_crc32(const void *buf, size_t size);
+uint32_t tnt_xlog_crc32c(uint32_t crc32c,
+		         const unsigned char *buffer, unsigned int length);
 
-struct tnt_stream_buf {
-	char *data;   /* buffer data */
-	size_t size;  /* buffer size */
-	size_t rdoff; /* read offset */
-};
-
-/* buffer stream accessors */
-
-#define TNT_SBUF_CAST(S) ((struct tnt_stream_buf*)(S)->data)
-#define TNT_SBUF_DATA(S) TNT_SBUF_CAST(S)->data
-#define TNT_SBUF_SIZE(S) TNT_SBUF_CAST(S)->size
-
-struct tnt_stream *tnt_buf(struct tnt_stream *s);
-
-#endif /* TNT_BUF_H_INCLUDED */
+#endif /* TNT_XLOG_CRC32_H_INCLUDED */

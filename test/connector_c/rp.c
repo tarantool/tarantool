@@ -1,5 +1,3 @@
-#ifndef TNT_BUF_H_INCLUDED
-#define TNT_BUF_H_INCLUDED
 
 /*
  * Copyright (C) 2011 Mail.RU
@@ -26,20 +24,62 @@
  * SUCH DAMAGE.
  */
 
-/* buffer stream object */
+#include <stdlib.h>
+#include <stdint.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 
-struct tnt_stream_buf {
-	char *data;   /* buffer data */
-	size_t size;  /* buffer size */
-	size_t rdoff; /* read offset */
-};
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_xlog.h>
 
-/* buffer stream accessors */
+int
+main(int argc, char * argv[])
+{
+	(void)argc, (void)argv;
 
-#define TNT_SBUF_CAST(S) ((struct tnt_stream_buf*)(S)->data)
-#define TNT_SBUF_DATA(S) TNT_SBUF_CAST(S)->data
-#define TNT_SBUF_SIZE(S) TNT_SBUF_CAST(S)->size
+	struct tnt_stream s;
+	tnt_xlog(&s);
+	tnt_xlog_open(&s, "./log");
 
-struct tnt_stream *tnt_buf(struct tnt_stream *s);
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
 
-#endif /* TNT_BUF_H_INCLUDED */
+	while (tnt_next(&i)) {
+		struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+		switch (r->type) {
+		case TNT_REQUEST_NONE:
+			printf("unknown?!\n");
+			continue;
+		case TNT_REQUEST_PING:
+			printf("ping:");
+			break;
+		case TNT_REQUEST_INSERT:
+			printf("insert:");
+			break;
+		case TNT_REQUEST_DELETE:
+			printf("delete:");
+			break;
+		case TNT_REQUEST_UPDATE:
+			printf("update:");
+			break;
+		case TNT_REQUEST_CALL:
+			printf("call:");
+			break;
+		case TNT_REQUEST_SELECT:
+			printf("select:");
+			break;
+		}
+
+		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
+		printf(" lsn: %"PRIu64", time: %f, len: %d\n",
+		       sx->hdr.lsn, sx->hdr.tm, sx->hdr.len);
+	}
+	if (i.status == TNT_ITER_FAIL)
+		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
+
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+	return 0;
+}

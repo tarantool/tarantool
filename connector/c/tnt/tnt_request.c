@@ -369,14 +369,20 @@ error:
  * r   - request object pointer
  * rcv - supplied recv function
  * ptr - recv function argument
+ * hdr - pointer to iproto header, may be NULL
  * 
  * returns zero on fully read reply, or -1 on error.
 */
 int
-tnt_request_from(struct tnt_request *r, tnt_request_t rcv, void *ptr)
+tnt_request_from(struct tnt_request *r, tnt_request_t rcv, void *ptr,
+		 struct tnt_header *hdr)
 {
-	if (rcv(ptr, (char*)&r->h, sizeof(struct tnt_header)) == -1)
-		return -1;
+	if (hdr) {
+		memcpy(&r->h, hdr, sizeof(struct tnt_header));
+	} else {
+		if (rcv(ptr, (char*)&r->h, sizeof(struct tnt_header)) == -1)
+			return -1;
+	}
 	switch (r->h.type) {
 	case TNT_OP_INSERT: return tnt_request_insert(r, rcv, ptr);
 	case TNT_OP_DELETE: return tnt_request_delete(r, rcv, ptr);
@@ -401,6 +407,7 @@ tnt_request_from(struct tnt_request *r, tnt_request_t rcv, void *ptr)
  * buf  - buffer data pointer
  * size - buffer data size
  * off  - returned offset, maybe NULL
+ * hdr  - iproto header, maybe NULL
  * 
  * if request is fully read, then zero is returned and offset set to the
  * end of reply data in buffer.
@@ -421,21 +428,25 @@ static ssize_t tnt_request_cb(void *ptr[2], char *buf, ssize_t size) {
 }
 
 int
-tnt_request(struct tnt_request *r, char *buf, size_t size, size_t *off) {
-	if (size < (sizeof(struct tnt_header))) {
-		if (off)
-			*off = sizeof(struct tnt_header) - size;
-		return 1;
-	}
-	struct tnt_header *hdr = (struct tnt_header*)buf;
-	if (size < hdr->len) {
-		if (off)
-			*off = hdr->len - size;
-		return 1;
+tnt_request(struct tnt_request *r, char *buf, size_t size, size_t *off,
+	    struct tnt_header *hdr)
+{
+	if (hdr == NULL) {
+		if (size < (sizeof(struct tnt_header))) {
+			if (off)
+				*off = sizeof(struct tnt_header) - size;
+			return 1;
+		}
+		struct tnt_header *hdr_ = (struct tnt_header*)buf;
+		if (size < hdr_->len) {
+			if (off)
+				*off = hdr_->len - size;
+			return 1;
+		}
 	}
 	size_t offv = 0;
 	void *ptr[2] = { buf, &offv };
-	int rc = tnt_request_from(r, (tnt_request_t)tnt_request_cb, ptr);
+	int rc = tnt_request_from(r, (tnt_request_t)tnt_request_cb, ptr, hdr);
 	if (off)
 		*off = offv;
 	return rc;

@@ -75,7 +75,9 @@ struct tnt_request {
 void tnt_request_init(struct tnt_request *r);
 void tnt_request_free(struct tnt_request *r);
 
-int tnt_request(struct tnt_request *r, char *buf, size_t size, size_t *off);
-int tnt_request_from(struct tnt_request *r, tnt_request_t rcv, void *ptr);
+int tnt_request(struct tnt_request *r, char *buf, size_t size, size_t *off,
+		struct tnt_header *hdr);
+int tnt_request_from(struct tnt_request *r, tnt_request_t rcv, void *ptr,
+		     struct tnt_header *hdr);
 
 #endif /* TNT_REQUEST_H_INCLUDED */

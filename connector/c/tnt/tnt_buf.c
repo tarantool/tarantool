@@ -119,7 +119,8 @@ tnt_buf_request(struct tnt_stream *s, struct tnt_request *r) {
 	if (sb->size == sb->rdoff)
 		return 1;
 	size_t off = 0;
-	int rc = tnt_request(r, sb->data + sb->rdoff, sb->size - sb->rdoff, &off);
+	int rc = tnt_request(r, sb->data + sb->rdoff, sb->size - sb->rdoff,
+			     &off, NULL);
 	if (rc == 0)
 		sb->rdoff += off;
 	return rc;
