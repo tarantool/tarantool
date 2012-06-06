@@ -42,6 +42,7 @@
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_sql.h>
 #include <connector/c/include/tarantool/tnt_net.h>
+#include <connector/c/include/tarantool/tnt_xlog.h>
 
 #include <client/tarantool/tnt_admin.h>
 
@@ -269,6 +270,91 @@ next:
 	return 0;
 }
 
+static int
+run_wal_cat(const char *file)
+{
+	struct tnt_stream s;
+	tnt_xlog(&s);
+	if (tnt_xlog_open(&s, (char*)file) == -1) {
+		tnt_stream_free(&s);
+		return -1;
+	}
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+	while (tnt_next(&i)) {
+		struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+		switch (r->type) {
+		case TNT_REQUEST_NONE:
+			printf("unknown?!\n");
+			continue;
+		case TNT_REQUEST_PING:
+			printf("Ping:");
+			break;
+		case TNT_REQUEST_INSERT:
+			printf("Insert:");
+			break;
+		case TNT_REQUEST_DELETE:
+			printf("Delete:");
+			break;
+		case TNT_REQUEST_UPDATE:
+			printf("Update:");
+			break;
+		case TNT_REQUEST_CALL:
+			printf("Call:");
+			break;
+		case TNT_REQUEST_SELECT:
+			printf("Select:");
+			break;
+		}
+		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
+		printf(" lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
+		       sx->hdr.lsn,
+		       sx->hdr.tm, sx->hdr.len);
+	}
+	int rc = 0;
+	if (i.status == TNT_ITER_FAIL) {
+		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
+		rc = 1;
+
+	}
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+	return rc;
+}
+
+static int
+run_wal_player(struct tnt_stream *t, const char *file)
+{
+	struct tnt_stream s;
+	tnt_xlog(&s);
+	if (tnt_xlog_open(&s, (char*)file) == -1) {
+		tnt_stream_free(&s);
+		return -1;
+	}
+	int rc = 0;
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+	while (tnt_next(&i)) {
+		struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+		if (t->write_request(t, r) == -1) {
+			printf("failed to write request\n");
+			rc = 1;
+			goto done;
+		}
+	}
+	if (i.status == TNT_ITER_FAIL) {
+		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
+		rc = 1;
+		goto done;
+	}
+	if (query_reply(t) == -1)
+		rc = 1;
+done:
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+	return rc;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -279,6 +365,10 @@ main(int argc, char *argv[])
 				       gopt_longs("port"), " <port>", "server port"),
 			   gopt_option('m', GOPT_ARG, gopt_shorts('m'),
 				       gopt_longs("port-admin"), " <port>", "server admin port"),
+			   gopt_option('C', GOPT_ARG, gopt_shorts('C'),
+				       gopt_longs("wal-cat"), " <file>", "print xlog file content"),
+			   gopt_option('P', GOPT_ARG, gopt_shorts('P'),
+				       gopt_longs("wal-player"), " <file>", "replay xlog file to the specified host"),
 			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
 				       NULL, "display this help and exit"));
 	void *opt = gopt_sort(&argc, (const char**)argv, opt_def);
@@ -290,8 +380,12 @@ main(int argc, char *argv[])
 		return 0;
 	}
 
-	/* server host */
+	/* wal-cat */
 	const char *arg = NULL;
+	if (gopt_arg(opt, 'C', &arg))
+		return run_wal_cat(arg);
+
+	/* server host */
 	gopt_arg(opt, 'a', &arg);
 
 	char host[128];
@@ -306,6 +400,10 @@ main(int argc, char *argv[])
 	int admin_port = DEFAULT_PORT_ADMIN;
 	if (gopt_arg(opt, 'm', &arg))
 		admin_port = atoi(arg);
+
+	/* wal-player mode */
+	const char *wal_player_file = NULL;
+	gopt_arg(opt, 'P', &wal_player_file);
 	gopt_free(opt);
 
 	/* creating and initializing tarantool network stream */
@@ -316,7 +414,6 @@ main(int argc, char *argv[])
 	tnt_set(t, TNT_OPT_PORT, port);
 	tnt_set(t, TNT_OPT_SEND_BUF, 0);
 	tnt_set(t, TNT_OPT_RECV_BUF, 0);
-
 	if (tnt_init(t) == -1) {
 		printf("error: %s\n", tnt_strerror(t));
 		tnt_stream_free(t);
@@ -328,6 +425,13 @@ main(int argc, char *argv[])
 		printf("error: %s\n", tnt_strerror(t));
 		tnt_stream_free(t);
 		return 1;
+	}
+
+	/* wal-player mode */
+	if (wal_player_file) {
+		int rc = run_wal_player(t, wal_player_file);
+		tnt_stream_free(t);
+		return rc;
 	}
 
 	/* creating tarantool admin handler */
@@ -344,7 +448,7 @@ main(int argc, char *argv[])
 		rc = run_cmdline(t, &a, argc, argv);
 	else
 		rc = run_interactive(t, &a, host);
-	tnt_stream_free(t);
 	tnt_admin_free(&a);
+	tnt_stream_free(t);
 	return rc;
 }

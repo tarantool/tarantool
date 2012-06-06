@@ -81,6 +81,11 @@ tnt_net_writev(struct tnt_stream *s, struct iovec *iov, int count) {
 }
 
 static ssize_t
+tnt_net_write_request(struct tnt_stream *s, struct tnt_request *r) {
+	return tnt_net_writev(s, r->v, r->vc);
+}
+
+static ssize_t
 tnt_net_recv_cb(struct tnt_stream *s, char *buf, ssize_t size) {
 	struct tnt_stream_net *sn = TNT_SNET_CAST(s);
 	return tnt_io_recv(sn, buf, size);
@@ -132,6 +137,7 @@ struct tnt_stream *tnt_net(struct tnt_stream *s) {
 	s->read_request = tnt_net_request;
 	s->write = tnt_net_write;
 	s->writev = tnt_net_writev;
+	s->write_request = tnt_net_write_request;
 	s->free = tnt_net_free;
 	/* initializing internal data */
 	struct tnt_stream_net *sn = TNT_SNET_CAST(s);
@@ -273,7 +279,7 @@ struct tnt_error_desc {
 
 static struct tnt_error_desc tnt_error_list[] = 
 {
-	{ TNT_EOK,      "ok"                       },
+	{ TNT_EOK,      "OK"                       },
 	{ TNT_EFAIL,    "fail"                     },
 	{ TNT_EMEMORY,  "memory allocation failed" },
 	{ TNT_ESYSTEM,  "system error"             },

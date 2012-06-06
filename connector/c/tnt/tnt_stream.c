@@ -91,4 +91,3 @@ void tnt_stream_free(struct tnt_stream *s) {
 	if (s->alloc)
 		tnt_mem_free(s);
 }
-

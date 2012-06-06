@@ -97,6 +97,11 @@ tnt_buf_writev(struct tnt_stream *s, struct iovec *iov, int count) {
 	return size;
 }
 
+static ssize_t
+tnt_buf_write_request(struct tnt_stream *s, struct tnt_request *r) {
+	return tnt_buf_writev(s, r->v, r->vc);
+}
+
 static int
 tnt_buf_reply(struct tnt_stream *s, struct tnt_reply *r) {
 	struct tnt_stream_buf *sb = TNT_SBUF_CAST(s);
@@ -155,6 +160,7 @@ struct tnt_stream *tnt_buf(struct tnt_stream *s) {
 	s->read_request = tnt_buf_request;
 	s->write = tnt_buf_write;
 	s->writev = tnt_buf_writev;
+	s->write_request = tnt_buf_write_request;
 	s->free = tnt_buf_free;
 	/* initializing internal data */
 	struct tnt_stream_buf *sb = TNT_SBUF_CAST(s);
