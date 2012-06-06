@@ -14,6 +14,8 @@ Tarantool/Box IPROTO protocol.
 ; int8 - a single 8-bit byte (i.e. an octet)
 ;
 ; int32 - a 32-bit integer in little-endian format (Intel x86)
+
+; int64 - a 64-bit integer in little-endian format (Intel x86)
 ;
 ; int32_varint - a 1 to 5 byte representation of an integer
 ;
@@ -272,13 +274,17 @@ Tarantool/Box IPROTO protocol.
 ; 0 - assign operation argument to field <field_no>;
 ;     will extend the tuple if <field_no> == <max_field_no> + 1
 ;
-; The following operation(s) are only defined for 32-bit integer
-; types:
+; The following operation(s) are only defined for integer
+; types (32 and 64 bit):
 ; 1 - add argument to field <field_no>, both arguments
-; are treated as signed 32-bit ints
+; are treated as signed 32 or 64 -bit ints
 ; 2 - bitwise AND of argument and field <field_no>
 ; 3 - bitwise XOR of argument and field <field_no>
 ; 4 - bitwise OR of argument and field <field_no>
+; For arithmetic operations, size of the argument must be
+; less or equal to the size of the field: it's possible
+; to add 32-bit ints to 32- and 64- bit fields, but
+; 64-bit ints can be added only to 64-bit fields.
 ; Tarantool 1.3.5 features one more command, which operates
 ; on strings:
 ; 5 - implementation of Perl 'splice' command
