@@ -37,8 +37,16 @@
 #include <connector/c/include/tarantool/tnt_xlog.h>
 #include <connector/c/tntrpl/tnt_crc32.h>
 
-const uint32_t tnt_xlog_marker_v11 = 0xba0babed;
-const uint32_t tnt_xlog_marker_eof_v11 = 0x10adab1e;
+static const uint32_t tnt_xlog_marker_v11 = 0xba0babed;
+static const uint32_t tnt_xlog_marker_eof_v11 = 0x10adab1e;
+
+inline static int
+tnt_xlog_seterr(struct tnt_stream_xlog *s, enum tnt_xlog_error e) {
+	s->error = e;
+	if (e == TNT_XLOG_ESYSTEM)
+		s->errno_ = errno;
+	return -1;
+}
 
 static void tnt_xlog_free(struct tnt_stream *s) {
 	struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(s);
@@ -52,6 +60,25 @@ static void tnt_xlog_free(struct tnt_stream *s) {
 	}
 }
 
+inline static int
+tnt_xlog_eof(struct tnt_stream_xlog *s, unsigned char *data) {
+	uint32_t marker = 0;
+	if (data)
+		tnt_mem_free(data);
+	/* checking eof condition */
+	if (ftello(s->fd) == s->offset + sizeof(tnt_xlog_marker_eof_v11)) {
+		fseeko(s->fd, s->offset, SEEK_SET);
+		if (fread(&marker, sizeof(marker), 1, s->fd) != 1)
+			return tnt_xlog_seterr(s, TNT_XLOG_ESYSTEM);
+		else
+		if (marker != tnt_xlog_marker_eof_v11)
+			return tnt_xlog_seterr(s, TNT_XLOG_ECORRUPT);
+		s->offset = ftello(s->fd);
+	}
+	/* eof */
+	return 1;
+}
+
 static int
 tnt_xlog_request(struct tnt_stream *s, struct tnt_request *r)
 {
@@ -60,46 +87,41 @@ tnt_xlog_request(struct tnt_stream *s, struct tnt_request *r)
 	unsigned char *data = NULL;
 	uint32_t marker = 0;
 	if (fread(&marker, sizeof(marker), 1, sx->fd) != 1)
-		goto eof;
+		return tnt_xlog_eof(sx, data);
 
 	/* seeking for marker if necessary */
 	while (marker != tnt_xlog_marker_v11) {
 		int c = fgetc(sx->fd);
 		if (c == EOF)
-			goto eof;
+			return tnt_xlog_eof(sx, data);
 		marker = marker >> 8 | ((uint32_t) c & 0xff) <<
 			 (sizeof(marker) * 8 - 8);
 	}
 
 	/* reading header */
 	if (fread(&sx->hdr, sizeof(sx->hdr), 1, sx->fd) != 1)
-		goto eof;
+		return tnt_xlog_eof(sx, data);
 
 	/* checking header crc, starting from lsn */
 	uint32_t crc32_hdr =
 		tnt_xlog_crc32c(0, (unsigned char*)&sx->hdr + sizeof(uint32_t),
 				sizeof(struct tnt_xlog_header_v11) -
 				sizeof(uint32_t));
-	if (crc32_hdr != sx->hdr.crc32_hdr) {
-		sx->error = TNT_XLOG_ECORRUPT;
-		return -1;
-	}
+	if (crc32_hdr != sx->hdr.crc32_hdr)
+		return tnt_xlog_seterr(sx, TNT_XLOG_ECORRUPT);
 
 	/* allocating memory and reading data */
 	data = tnt_mem_alloc(sx->hdr.len);
-	if (data == NULL) {
-		sx->error = TNT_XLOG_EMEMORY;
-		return -1;
-	}
+	if (data == NULL)
+		return tnt_xlog_seterr(sx, TNT_XLOG_EMEMORY);
 	if (fread(data, sx->hdr.len, 1, sx->fd) != 1)
-		goto eof;
+		return tnt_xlog_eof(sx, data);
 
 	/* checking data crc */
 	uint32_t crc32_data = tnt_xlog_crc32c(0, data, sx->hdr.len);
 	if (crc32_data != sx->hdr.crc32_data) {
 		tnt_mem_free(data);
-		sx->error = TNT_XLOG_ECORRUPT;
-		return -1;
+		return tnt_xlog_seterr(sx, TNT_XLOG_ECORRUPT);
 	}
 
 	/* copying row data */
@@ -111,7 +133,7 @@ tnt_xlog_request(struct tnt_stream *s, struct tnt_request *r)
 	hdr_iproto.len = sx->hdr.len;
 	hdr_iproto.reqid = 0;
 
-	/* deserialing operation */
+	/* deserializing operation */
 	tnt_request_init(r);
 	size_t off = 0;
 	int rc = tnt_request(r, (char*)data + sizeof(struct tnt_xlog_row_v11),
@@ -119,32 +141,12 @@ tnt_xlog_request(struct tnt_stream *s, struct tnt_request *r)
 			     &off,
 			     &hdr_iproto);
 	tnt_mem_free(data);
-	if (rc != 0) {
-		/* not complete or error parsing */
-		sx->error = TNT_XLOG_ECORRUPT;
-		return -1;
-	}
+	/* in case of not completed request or parsing error */
+	if (rc != 0)
+		return tnt_xlog_seterr(sx, TNT_XLOG_ECORRUPT);
 	/* updating offset */
 	sx->offset = ftello(sx->fd);
 	return 0;
-eof:
-	if (data)
-		tnt_mem_free(data);
-	/* checking eof condition */
-	if (ftello(sx->fd) == sx->offset + sizeof(tnt_xlog_marker_eof_v11)) {
-		fseeko(sx->fd, sx->offset, SEEK_SET);
-		if (fread(&marker, sizeof(marker), 1, sx->fd) != 1) {
-			sx->error = TNT_XLOG_ESYSTEM;
-			sx->errno_ = errno;
-			return -1;
-		} else if (marker != tnt_xlog_marker_eof_v11) {
-			sx->error = TNT_XLOG_ECORRUPT;
-			return -1;
-		}
-		sx->offset = ftello(sx->fd);
-	}
-	/* eof */
-	return 1;
 }
 
 /*
@@ -186,6 +188,16 @@ struct tnt_stream *tnt_xlog(struct tnt_stream *s)
 	return s;
 }
 
+inline static int
+tnt_xlog_open_err(struct tnt_stream_xlog *s, enum tnt_xlog_error e) {
+	tnt_xlog_seterr(s, e);
+	if (s->fd) {
+		fclose(s->fd);
+		s->fd = NULL;
+	}
+	return -1;
+}
+
 static int tnt_xlog_open_init(struct tnt_stream *s)
 {
 	struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(s);
@@ -194,52 +206,33 @@ static int tnt_xlog_open_init(struct tnt_stream *s)
 	char *rc;
 	/* trying to open file */
 	sx->fd = fopen(sx->file, "r");
-	if (sx->fd == NULL) {
-		sx->error = TNT_XLOG_ESYSTEM;
-		sx->errno_ = errno;
-		goto error;
-	}
+	if (sx->fd == NULL)
+		return tnt_xlog_open_err(sx, TNT_XLOG_ESYSTEM);
 	/* reading xlog filetype */
 	rc = fgets(filetype, sizeof(filetype), sx->fd);
-	if (rc == NULL) {
-		sx->error = TNT_XLOG_ESYSTEM;
-		sx->errno_ = errno;
-		goto error;
-	}
+	if (rc == NULL)
+		return tnt_xlog_open_err(sx, TNT_XLOG_ESYSTEM);
 	/* reading xlog version */
 	rc = fgets(version, sizeof(version), sx->fd);
-	if (rc == NULL) {
-		sx->error = TNT_XLOG_ESYSTEM;
-		sx->errno_ = errno;
-		goto error;
-	}
-	/* checking type and version */
-	if (strcmp(filetype, "XLOG\n")) {
-		sx->error = TNT_XLOG_ETYPE;
-		goto error;
-	}
-	if (strcmp(version, "0.11\n")) {
-		sx->error = TNT_XLOG_EVERSION;
-		goto error;
-	}
+	if (rc == NULL)
+		return tnt_xlog_open_err(sx, TNT_XLOG_ESYSTEM);
+	/* checking type */
+	if (strcmp(filetype, "XLOG\n"))
+		return tnt_xlog_open_err(sx, TNT_XLOG_ETYPE);
+	/* checking version */
+	if (strcmp(version, "0.11\n"))
+		return tnt_xlog_open_err(sx, TNT_XLOG_EVERSION);
 	for (;;) {
 		char buf[256];
 		rc = fgets(buf, sizeof(buf), sx->fd);
-		if (rc == NULL) {
-			sx->error = TNT_XLOG_EFAIL;
-			sx->errno_ = errno;
-			goto error;
-		}
+		if (rc == NULL)
+			return tnt_xlog_open_err(sx, TNT_XLOG_EFAIL);
 		if (strcmp(rc, "\n") == 0 || strcmp(rc, "\r\n") == 0)
 			break;
 	}
 	/* getting current offset */
 	sx->offset = ftello(sx->fd);
 	return 0;
-error:
-	fclose(sx->fd);
-	sx->fd = NULL;
-	return -1;
 }
 
 /*
@@ -254,16 +247,14 @@ error:
 int tnt_xlog_open(struct tnt_stream *s, char *file) {
 	struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(s);
 	sx->file = tnt_mem_dup(file);
-	if (sx->file == NULL) {
-		sx->error = TNT_XLOG_EMEMORY;
-		return -1;
-	}
+	if (sx->file == NULL)
+		return tnt_xlog_seterr(sx, TNT_XLOG_EMEMORY);
 	if (tnt_xlog_open_init(s) == -1) {
 		tnt_mem_free(sx->file);
 		sx->file = NULL;
 		return -1;
 	}
-	sx->error = TNT_XLOG_EOK;
+	tnt_xlog_seterr(sx, TNT_XLOG_EOK);
 	return 0;
 }
 
@@ -309,7 +300,7 @@ struct tnt_xlog_error_desc {
 
 static struct tnt_xlog_error_desc tnt_xlog_error_list[] = 
 {
-	{ TNT_XLOG_EOK,      "ok"                                },
+	{ TNT_XLOG_EOK,      "OK"                                },
 	{ TNT_XLOG_EFAIL,    "fail"                              },
 	{ TNT_XLOG_EMEMORY,  "memory allocation failed"          },
 	{ TNT_XLOG_ETYPE,    "xlog type mismatch"                },

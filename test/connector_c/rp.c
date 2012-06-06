@@ -71,10 +71,10 @@ main(int argc, char * argv[])
 			printf("select:");
 			break;
 		}
-
 		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
 		printf(" lsn: %"PRIu64", time: %f, len: %d\n",
-		       sx->hdr.lsn, sx->hdr.tm, sx->hdr.len);
+		       sx->hdr.lsn,
+		       sx->hdr.tm, sx->hdr.len);
 	}
 	if (i.status == TNT_ITER_FAIL)
 		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
