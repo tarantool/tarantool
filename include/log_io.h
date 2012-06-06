@@ -93,7 +93,6 @@ struct recovery_state {
 	 * a new file before closing the previous one. Thus
 	 * we save the old WAL here.
 	 */
-	struct log_io *previous_wal;
 	struct log_dir *snap_dir;
 	struct log_dir *wal_dir;
 	struct wal_writer *writer;
@@ -162,9 +161,12 @@ int read_log(const char *filename,
 void recovery_follow_remote(struct recovery_state *r, const char *remote);
 void recovery_stop_remote(struct recovery_state *r);
 
-void snapshot_write_row(struct log_io *i,
+struct nbatch;
+
+void snapshot_write_row(struct log_io *i, struct nbatch *batch,
 			const void *metadata, size_t metadata_size,
 			const void *data, size_t data_size);
-void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io *));
+void snapshot_save(struct recovery_state *r,
+		   void (*loop) (struct log_io *, struct nbatch *));
 
 #endif /* TARANTOOL_LOG_IO_H_INCLUDED */

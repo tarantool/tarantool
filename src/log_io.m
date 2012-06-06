@@ -45,6 +45,8 @@
 #include <crc32.h>
 #include <tarantool_pthread.h>
 #include "errinj.h"
+#include "nio.h"
+
 /*
  * Recovery subsystem
  * ------------------
@@ -181,7 +183,8 @@ row_v11_fill(struct row_v11 *row, u64 lsn, u16 tag, u64 cookie, const void *meta
 			sizeof(row->tag) + sizeof(row->cookie));
 }
 
-static inline size_t row_v11_size(struct row_v11 *row)
+static inline size_t
+row_v11_size(struct row_v11 *row)
 {
 	return sizeof(row->marker) + sizeof(struct header_v11) + row->header.len;
 }
@@ -224,7 +227,6 @@ confirm_lsn(struct recovery_state *r, i64 lsn)
 
 	return -1;
 }
-
 
 /** Wait until the given LSN makes its way to disk. */
 void
@@ -591,11 +593,8 @@ log_io_close(struct log_io **lptr)
 			panic("can't rename 'inprogress' WAL");
 	}
 
-	if (l->mode == LOG_WRITE) {
-		if (fwrite(&eof_marker_v11,
-			   sizeof(log_magic_t), 1, l->f) != 1)
-			say_syserror("can't write eof_marker");
-	}
+	if (l->mode == LOG_WRITE)
+		nwrite(fileno(l->f), &eof_marker_v11, sizeof(log_magic_t));
 
 	r = fclose(l->f);
 	if (r < 0)
@@ -626,13 +625,10 @@ log_io_atfork(struct log_io **lptr)
 }
 
 static int
-log_io_flush(struct log_io *l)
+log_io_sync(struct log_io *l)
 {
-	if (fflush(l->f) < 0)
-		return -1;
-
 	if (fsync(fileno(l->f)) < 0) {
-		say_syserror("fsync");
+		say_syserror("%s: fsync failed", l->filename);
 		return -1;
 	}
 	return 0;
@@ -727,6 +723,7 @@ log_io_open(struct log_dir *dir, enum log_mode mode,
 		if (log_io_verify_meta(l, &errmsg) != 0)
 			goto error;
 	} else { /* LOG_WRITE */
+		setvbuf(l->f, NULL, _IONBF, 0);
 		if (write_header(l) != 0)
 			goto error;
 	}
@@ -1267,13 +1264,13 @@ struct wal_writer
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	ev_async async;
+	struct nbatch *batch;
 	bool is_shutdown;
 };
 
 static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
 
 static struct wal_writer wal_writer;
-
 
 /**
  * A pthread_atfork() callback for a child process. Today we only
@@ -1284,7 +1281,10 @@ static void
 wal_writer_child()
 {
 	log_io_atfork(&recovery_state->current_wal);
-	log_io_atfork(&recovery_state->previous_wal);
+	if (wal_writer.batch) {
+		free(wal_writer.batch);
+		wal_writer.batch = NULL;
+	}
 	/*
 	 * Make sure that atexit() handlers in the child do
 	 * not try to stop the non-existent thread.
@@ -1367,6 +1367,11 @@ wal_writer_init(struct wal_writer *writer)
 	writer->async.data = writer;
 
 	tt_pthread_once(&wal_writer_once, wal_writer_init_once);
+
+	writer->batch = nbatch_alloc(sysconf(_SC_IOV_MAX));
+
+	if (writer->batch == NULL)
+		panic_syserror("nbatch_alloc");
 }
 
 /** Destroy a WAL writer structure. */
@@ -1375,6 +1380,7 @@ wal_writer_destroy(struct wal_writer *writer)
 {
 	tt_pthread_mutex_destroy(&writer->mutex);
 	tt_pthread_cond_destroy(&writer->cond);
+	free(writer->batch);
 }
 
 /** WAL writer thread routine. */
@@ -1397,6 +1403,7 @@ wal_writer_start(struct recovery_state *r)
 {
 	assert(r->writer == NULL);
 	assert(r->watcher == NULL);
+	assert(r->current_wal == NULL);
 	assert(wal_writer.is_shutdown == false);
 	assert(STAILQ_EMPTY(&wal_writer.input));
 	assert(STAILQ_EMPTY(&wal_writer.output));
@@ -1471,27 +1478,29 @@ wal_writer_pop(struct wal_writer *writer, bool input_was_empty)
  * an .xlog file contains at least 1 valid record.
  * In case of error, we try to close any open WALs.
  *
- * @post r->previous_wal is NULL. r->current_wal is in a good
- * shape for writes or is NULL.
+ * @post r->current_wal is in a good shape for writes or is NULL.
  * @return 0 in case of success, -1 on error.
  */
-
 static int
-recovery_rotate_current_wal(struct recovery_state *r, u64 lsn)
+wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir, u64 lsn)
 {
-	if (r->current_wal) {
+	struct log_io *l = *wal, *wal_to_close = NULL;
+	if (l == NULL || l->rows >= rows_per_wal || lsn % rows_per_wal == 0) {
+		wal_to_close = l;
+		l = NULL;
+	}
+	if (l) {
 		/*
 		 * Rename WAL after the first successful write
 		 * to a name  without .inprogress suffix.
 		 */
-		if (r->current_wal->rows == 1) {
-			if (log_io_inprogress_rename(r->current_wal->filename))
-				log_io_close(&r->current_wal);
+		if (l->rows == 1) {
+			if (log_io_inprogress_rename(l->filename))
+				log_io_close(&l);
 		}
 	} else {
 		/* Open WAL with '.inprogress' suffix. */
-		r->current_wal = log_io_open_for_write(r->wal_dir, lsn,
-						       INPROGRESS);
+		l = log_io_open_for_write(dir, lsn, INPROGRESS);
 		/*
 		 * Close the file *after* we create the new WAL, since
 		 * this is when replication relays get an inotify alarm
@@ -1499,77 +1508,67 @@ recovery_rotate_current_wal(struct recovery_state *r, u64 lsn)
 		 * WAL. In other words, make sure that replication relays
 		 * try to open the next WAL only when it exists.
 		 */
-		if (r->previous_wal) {
+		if (wal_to_close) {
 			/*
 			 * We can not handle log_io_close()
 			 * failure in any reasonable way.
 			 * A warning is written to the server
 			 * log file.
 			 */
-			log_io_close(&r->previous_wal);
+			log_io_close(&wal_to_close);
 		}
 	}
-	assert(r->previous_wal == NULL);
-	return r->current_wal ? 0 : -1;
+	assert(wal_to_close == NULL);
+	*wal = l;
+	return l ? 0 : -1;
 }
 
 static void
-recovery_start_new_wal(struct recovery_state *r)
+wal_opt_sync(struct log_io *wal, double sync_delay)
 {
-	assert(r->previous_wal == NULL);
-	r->previous_wal = r->current_wal;
-	r->current_wal = NULL;
+	static ev_tstamp last_sync = 0;
+
+	if (sync_delay > 0 && ev_now() - last_sync >= sync_delay) {
+		/*
+		 * XXX: in case of error, we don't really know how
+		 * many records were not written to disk: probably
+		 * way more than the last one.
+		 */
+		(void) log_io_sync(wal);
+		last_sync = ev_now();
+	}
 }
 
-/**
- * Write a single request to disk.
- */
-static int
-write_to_disk(struct recovery_state *r, struct row_v11 *row,
-	      bool is_bulk_end)
+static struct wal_write_request *
+wal_fill_batch(struct log_io *wal, struct nbatch *batch, int rows_per_wal,
+	       struct wal_write_request *req)
 {
-	static ev_tstamp last_flush = 0;
-
-	if (recovery_rotate_current_wal(r, row->header.lsn) != 0)
-		goto fail;
-	struct log_io *wal = r->current_wal;
-	header_v11_sign(&row->header);
-	/* Write the request. */
-	if (fwrite(row, row_v11_size(row), 1, wal->f) != 1) {
-		say_syserror("can't write row to WAL");
-		goto fail;
+	int max_rows = wal->is_inprogress ? 1 : rows_per_wal - wal->rows;
+	/* Post-condition of successful by wal_opt_rotate(). */
+	assert(max_rows > 0);
+	nbatch_start(batch, max_rows);
+	while (req) {
+		struct row_v11 *row = &req->row;
+		header_v11_sign(&row->header);
+		nbatch_add(batch, row, row_v11_size(row));
+		req = STAILQ_NEXT(req, wal_fifo_entry);
+		if (nbatch_is_full(batch))
+			break;
 	}
+	return req;
+}
 
-	/* Flush stdio buffer to keep replication in sync. */
-	if (is_bulk_end && fflush(wal->f) < 0) {
-		say_syserror("%s: fflush() failed", wal->filename);
-		goto fail;
+static int
+wal_write_batch(struct log_io *wal, struct nbatch *batch,
+		struct wal_write_request *req, struct wal_write_request *end)
+{
+	int rows_written = nbatch_write(batch, fileno(wal->f));
+	wal->rows += rows_written;
+	while (req != end) {
+		req->res = rows_written-- > 0 ? 0 : -1;
+		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
-
-	if (r->wal_fsync_delay > 0 &&
-	    ev_now() - last_flush >= r->wal_fsync_delay) {
-		if (log_io_flush(wal) < 0) {
-			say_syserror("%s: fsync() failed", wal->filename);
-			/*
-			 * XXX: we don't really know how many
-			 * records were not written to disk:
-			 * probably way more than the current
-			 * one.
-			 */
-			goto fail;
-		}
-		last_flush = ev_now();
-	}
-
-	wal->rows++;
-	if (r->rows_per_wal <= wal->rows ||
-	    (row->header.lsn + 1) % r->rows_per_wal == 0) {
-		recovery_start_new_wal(r);
-	}
-
-	return 0;
-fail:
-	return -1;
+	return rows_written >= 0 ? 0 : -1;
 }
 
 /** WAL writer thread main loop.  */
@@ -1579,10 +1578,8 @@ wal_writer_thread(void *worker_args)
 	struct recovery_state *r = worker_args;
 	struct wal_writer *writer = r->writer;
 	bool input_was_empty = true;
-	struct wal_write_request *req;
-
-	assert(r->current_wal == NULL);
-	assert(r->previous_wal == NULL);
+	struct log_io **wal = &r->current_wal;
+	struct nbatch *batch = writer->batch;
 
 	tt_pthread_mutex_lock(&writer->mutex);
 	while (writer->is_shutdown == false) {
@@ -1596,11 +1593,21 @@ wal_writer_thread(void *worker_args)
 		if (input_was_empty == false)
 			ev_async_send(&writer->async);
 
-		STAILQ_FOREACH(req, &input, wal_fifo_entry) {
-			bool is_bulk_end = STAILQ_NEXT(req, wal_fifo_entry) == NULL;
-			req->res = write_to_disk(r, &req->row, is_bulk_end);
+		struct wal_write_request *req = STAILQ_FIRST(&input);
+		input_was_empty = req == NULL;
+		while (req) {
+			if (wal_opt_rotate(wal, r->rows_per_wal, r->wal_dir,
+					   req->row.header.lsn) != 0) {
+				req->res = -1;
+				req = STAILQ_NEXT(req, wal_fifo_entry);
+				continue;
+			}
+			struct wal_write_request *end;
+			end = wal_fill_batch(*wal, batch, r->rows_per_wal, req);
+			(void) wal_write_batch(*wal, batch, req, end);
+			wal_opt_sync(*wal, r->wal_fsync_delay);
+			req = end;
 		}
-		input_was_empty = STAILQ_EMPTY(&input);
 		tt_pthread_mutex_lock(&writer->mutex);
 		STAILQ_CONCAT(&writer->output, &input);
 	}
@@ -1610,10 +1617,8 @@ wal_writer_thread(void *worker_args)
 	 * we were able to awake all fibers waiting on the
 	 * previous pack.
 	 */
-	if (r->current_wal != NULL)
-		log_io_close(&r->current_wal);
-	if (r->previous_wal != NULL)
-		log_io_close(&r->previous_wal);
+	if (*wal != NULL)
+		log_io_close(wal);
 	if (input_was_empty == false)
 		ev_async_send(&writer->async);
 	return NULL;
@@ -1726,7 +1731,6 @@ recovery_free()
 		 */
 		log_io_close(&r->current_wal);
 	}
-	assert(r->previous_wal == NULL);
 
 	recovery_state = NULL;
 }
@@ -1739,7 +1743,7 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 }
 
 void
-snapshot_write_row(struct log_io *l,
+snapshot_write_row(struct log_io *l, struct nbatch *batch,
 		   const void *metadata, size_t metadata_len,
 		   const void *data, size_t data_len)
 {
@@ -1756,11 +1760,17 @@ snapshot_write_row(struct log_io *l,
 		     metadata, metadata_len, data, data_len);
 	header_v11_sign(&row->header);
 
-	if (fwrite(row, row_v11_size(row), 1, l->f) != 1)
-		panic("fwrite");
+	nbatch_add(batch, row, row_v11_size(row));
 
 	if (++rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
+
+	if (nbatch_is_full(batch)) {
+		if (nbatch_write(batch, fileno(l->f)) != batch->rows)
+			panic_syserror("nbatch_write");
+		nbatch_start(batch, INT_MAX);
+		prelease_after(fiber->gc_pool, 128 * 1024);
+	}
 
 	if (recovery_state->snap_io_rate_limit > 0) {
 		if (last == 0) {
@@ -1769,7 +1779,6 @@ snapshot_write_row(struct log_io *l,
 		}
 		bytes += row_v11_size(row);
 		while (bytes >= recovery_state->snap_io_rate_limit) {
-			log_io_flush(l);
 
 			ev_now_update();
 			elapsed = ev_now() - last;
@@ -1781,34 +1790,35 @@ snapshot_write_row(struct log_io *l,
 			bytes -= recovery_state->snap_io_rate_limit;
 		}
 	}
-	prelease_after(fiber->gc_pool, 128 * 1024);
 }
 
 void
-snapshot_save(struct recovery_state *r, void (*f) (struct log_io *))
+snapshot_save(struct recovery_state *r,
+	      void (*f) (struct log_io *, struct nbatch *))
 {
 	struct log_io *snap;
-	char final_filename[PATH_MAX + 1];
-	char *dot;
-
 	snap = log_io_open_for_write(r->snap_dir, r->confirmed_lsn,
 				     INPROGRESS);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
-
+	struct nbatch *batch = nbatch_alloc(sysconf(_SC_IOV_MAX));
+	if (batch == NULL)
+		panic_syserror("malloc");
+	nbatch_start(batch, INT_MAX);
 	/*
 	 * While saving a snapshot, snapshot name is set to
 	 * <lsn>.snap.inprogress. When done, the snapshot is
 	 * renamed to <lsn>.snap.
 	 */
-	strncpy(final_filename, snap->filename, PATH_MAX);
-	dot = strrchr(final_filename, '.');
-	*dot = 0;
-
+	const char *final_filename =
+		format_filename(r->snap_dir, r->confirmed_lsn, NONE);
 	say_info("saving snapshot `%s'", final_filename);
-	f(snap);
+	f(snap, batch);
 
-	if (log_io_flush(snap) < 0)
+	if (batch->rows && nbatch_write(batch, fileno(snap->f)) != batch->rows)
+		panic_syserror("nbatch_write");
+
+	if (log_io_sync(snap) < 0)
 		panic("fsync");
 
 	if (link(snap->filename, final_filename) == -1)
@@ -1817,6 +1827,7 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io *))
 	if (unlink(snap->filename) == -1)
 		say_syserror("can't unlink 'inprogress' snapshot");
 
+	free(batch);
 	log_io_close(&snap);
 
 	say_info("done");

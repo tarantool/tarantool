@@ -159,7 +159,8 @@ remote_apply_row(struct recovery_state *r, struct tbuf *row)
 		panic("replication failure: can't apply row");
 
 	tag = read_u16(data);
-	(void)read_u64(data); /* drop the cookie */
+	(void) tag;
+	(void) read_u64(data); /* drop the cookie */
 	op = read_u16(data);
 
 	assert(tag == XLOG);

@@ -527,7 +527,8 @@ mod_cat(const char *filename)
 }
 
 static void
-snapshot_write_tuple(struct log_io *l, unsigned n, struct tuple *tuple)
+snapshot_write_tuple(struct log_io *l, struct nbatch *batch,
+		     unsigned n, struct tuple *tuple)
 {
 	if (tuple->flags & GHOST)	// do not save fictive rows
 		return;
@@ -537,12 +538,12 @@ snapshot_write_tuple(struct log_io *l, unsigned n, struct tuple *tuple)
 	header.tuple_size = tuple->field_count;
 	header.data_size = tuple->bsize;
 
-	snapshot_write_row(l, (void *) &header, sizeof(header),
+	snapshot_write_row(l, batch, (void *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);
 }
 
 void
-mod_snapshot(struct log_io *l)
+mod_snapshot(struct log_io *l, struct nbatch *batch)
 {
 	struct tuple *tuple;
 
@@ -555,7 +556,7 @@ mod_snapshot(struct log_io *l)
 		struct iterator *it = pk->position;
 		[pk initIterator: it :ITER_FORWARD];
 		while ((tuple = it->next(it))) {
-			snapshot_write_tuple(l, n, tuple);
+			snapshot_write_tuple(l, batch, n, tuple);
 		}
 	}
 }
