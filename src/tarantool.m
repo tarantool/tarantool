@@ -47,12 +47,13 @@
 #include <fiber.h>
 #include <iproto.h>
 #include <latch.h>
-#include <log_io.h>
+#include <recovery.h>
 #include <crc32.h>
 #include <palloc.h>
 #include <salloc.h>
 #include <say.h>
 #include <stat.h>
+#include <limits.h>
 #include TARANTOOL_CONFIG
 #include <util.h>
 #include <third_party/gopt/gopt.h>

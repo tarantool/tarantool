@@ -34,6 +34,7 @@
 #include <exception.h>
 #include "tuple.h"
 #include <pickle.h>
+#include <palloc.h>
 
 struct space *spaces = NULL;
 

@@ -29,7 +29,7 @@
 #include "txn.h"
 #include "tuple.h"
 #include "space.h"
-#include <log_io.h>
+#include <recovery.h>
 #include <fiber.h>
 
 static void

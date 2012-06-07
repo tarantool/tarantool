@@ -23,21 +23,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "recovery.h"
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include "log_io.h"
 #include "fiber.h"
-
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <errno.h>
-
-#include <say.h>
-#include <pickle.h>
+#include "pickle.h"
 
 static int
 remote_apply_row(struct recovery_state *r, struct tbuf *row);

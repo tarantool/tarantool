@@ -37,7 +37,11 @@
 #include <sys/uio.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <limits.h>
+
 #include "fiber.h"
+#include "recovery.h"
+#include "log_io.h"
 
 /** Replication topology
  * ----------------------

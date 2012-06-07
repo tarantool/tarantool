@@ -25,49 +25,43 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdbool.h>
 #include <stdio.h>
 #include <limits.h>
-
-#include <tarantool_ev.h>
-#include <tbuf.h>
-#include <util.h>
-#include <palloc.h>
-#include <netinet/in.h> /* struct sockaddr_in */
-#include <third_party/queue.h>
-
-#define RECOVER_READONLY 1
+#include <stdbool.h>
+#include "util.h"
+#include "tbuf.h"
+#include "tarantool_ev.h"
 
 extern const u32 default_version;
 
-struct recovery_state;
-typedef int (row_handler)(struct tbuf *);
+enum log_format { XLOG = 65534, SNAP = 65535 };
 
 enum log_mode {
 	LOG_READ,
 	LOG_WRITE
 };
 
-enum log_format { XLOG = 65534, SNAP = 65535 };
+enum log_suffix { NONE, INPROGRESS };
 
-/** A "condition variable" that allows fibers to wait when a given
- * LSN makes it to disk.
- */
+struct log_dir {
+	bool panic_if_error;
 
-struct wait_lsn {
-	struct fiber *waiter;
-	i64 lsn;
+	/* Additional flags to apply at open(2) to write. */
+	int  open_wflags;
+	const char *filetype;
+	const char *filename_ext;
+	char *dirname;
 };
 
-void
-wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn);
+extern struct log_dir snap_dir;
+extern struct log_dir wal_dir;
 
-inline static void
-wait_lsn_clear(struct wait_lsn *wait_lsn)
-{
-	wait_lsn->waiter = NULL;
-	wait_lsn->lsn = 0LL;
-}
+i64
+greatest_lsn(struct log_dir *dir);
+char *
+format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix);
+i64
+find_including_file(struct log_dir *dir, i64 target_lsn);
 
 struct log_io {
 	struct log_dir *dir;
@@ -81,46 +75,36 @@ struct log_io {
 	bool is_inprogress;
 };
 
-struct wal_writer;
-struct wal_watcher;
+struct log_io *
+log_io_open_for_read(struct log_dir *dir, i64 lsn, enum log_suffix suffix);
+struct log_io *
+log_io_open_for_write(struct log_dir *dir, i64 lsn, enum log_suffix suffix);
+struct log_io *
+log_io_open(struct log_dir *dir, enum log_mode mode,
+	    const char *filename, enum log_suffix suffix, FILE *file);
+int
+log_io_sync(struct log_io *l);
+int
+log_io_close(struct log_io **lptr);
+void
+log_io_atfork(struct log_io **lptr);
 
-struct recovery_state {
-	i64 lsn, confirmed_lsn;
-	/* The WAL we're currently reading/writing from/to. */
-	struct log_io *current_wal;
-	/*
-	 * When opening the next WAL, we want to first open
-	 * a new file before closing the previous one. Thus
-	 * we save the old WAL here.
-	 */
-	struct log_dir *snap_dir;
-	struct log_dir *wal_dir;
-	struct wal_writer *writer;
-	struct wal_watcher *watcher;
-	struct fiber *remote_recovery;
-
-	/**
-	 * Row_handler is invoked during initial recovery.
-	 * It will be presented with the most recent format of
-	 * data. Row_reader is responsible for converting data
-	 * from old formats.
-	 */
-	row_handler *row_handler;
-	struct sockaddr_in remote_addr;
-
-	ev_tstamp recovery_lag, recovery_last_update_tstamp;
-
-	int snap_io_rate_limit;
-	int rows_per_wal;
-	int flags;
-	double wal_fsync_delay;
-	u64 cookie;
-	struct wait_lsn wait_lsn;
-
-	bool finalize;
+struct log_io_cursor
+{
+	struct log_io *log;
+	int row_count;
+	off_t good_offset;
+	bool eof_read;
 };
 
-struct recovery_state *recovery_state;
+void
+log_io_cursor_open(struct log_io_cursor *i, struct log_io *l);
+void
+log_io_cursor_close(struct log_io_cursor *i);
+struct tbuf *
+log_io_cursor_next(struct log_io_cursor *i);
+
+typedef u32 log_magic_t;
 
 struct header_v11 {
 	u32 header_crc32c;
@@ -135,38 +119,39 @@ static inline struct header_v11 *header_v11(const struct tbuf *t)
 	return (struct header_v11 *)t->data;
 }
 
-void recovery_init(const char *snap_dirname, const char *xlog_dirname,
-		   row_handler row_handler,
-		   int rows_per_wal, const char *wal_mode,
-		   double wal_fsync_delay,
-		   int flags);
-void recovery_update_mode(const char *wal_mode, double fsync_delay);
-void recovery_update_io_rate_limit(double new_limit);
-void recovery_free();
-void recover(struct recovery_state *, i64 lsn);
-void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
-void recovery_finalize(struct recovery_state *r);
-int wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
-	      u16 op, struct tbuf *data);
+static inline void
+header_v11_fill(struct header_v11 *header, u64 lsn, size_t data_len)
+{
+	header->lsn = lsn;
+	header->tm = ev_now();
+	header->len = data_len;
+}
 
-void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
+void
+header_v11_sign(struct header_v11 *header);
 
-int confirm_lsn(struct recovery_state *r, i64 lsn);
-int64_t next_lsn(struct recovery_state *r, i64 new_lsn);
-void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
+struct row_v11 {
+	log_magic_t marker;
+	struct header_v11 header;
+	u16 tag;
+	u64 cookie;
+	u8 data[];
+} __attribute__((packed));
 
-int read_log(const char *filename,
-	     row_handler xlog_handler, row_handler snap_handler);
+void
+row_v11_fill(struct row_v11 *row, u64 lsn, u16 tag, u64 cookie,
+	     const void *metadata, size_t metadata_len, const void
+	     *data, size_t data_len);
 
-void recovery_follow_remote(struct recovery_state *r, const char *remote);
-void recovery_stop_remote(struct recovery_state *r);
+static inline size_t
+row_v11_size(struct row_v11 *row)
+{
+	return sizeof(row->marker) + sizeof(struct header_v11) + row->header.len;
+}
 
-struct nbatch;
-
-void snapshot_write_row(struct log_io *i, struct nbatch *batch,
-			const void *metadata, size_t metadata_size,
-			const void *data, size_t data_size);
-void snapshot_save(struct recovery_state *r,
-		   void (*loop) (struct log_io *, struct nbatch *));
+int
+inprogress_log_unlink(char *filename);
+int
+inprogress_log_rename(char *filename);
 
 #endif /* TARANTOOL_LOG_IO_H_INCLUDED */

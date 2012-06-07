@@ -24,6 +24,9 @@
  * SUCH DAMAGE.
  */
 #include "tarantool.h"
+
+#include <limits.h>
+
 #include "box.h"
 #include "request.h"
 #include "txn.h"
