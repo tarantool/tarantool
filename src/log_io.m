@@ -111,34 +111,6 @@
 
 typedef u32 log_magic_t;
 
-struct row_v11 {
-	log_magic_t marker;
-	struct header_v11 header;
-	u16 tag;
-	u64 cookie;
-	u8 data[];
-} __attribute__((packed));
-
-struct log_dir {
-	bool panic_if_error;
-
-	/* Additional flags to apply at open(2) to write. */
-	int  open_wflags;
-	const char *filetype;
-	const char *filename_ext;
-	char *dirname;
-};
-
-static struct log_dir snap_dir = {
-	.filetype = "SNAP\n",
-	.filename_ext = ".snap"
-};
-
-static struct log_dir wal_dir = {
-	.filetype = "XLOG\n",
-	.filename_ext = ".xlog"
-};
-
 const u32 default_version = 11;
 const u64 snapshot_cookie = 0;
 const log_magic_t row_marker_v11 = 0xba0babed;
@@ -148,9 +120,16 @@ const char v11[] = "0.11\n";
 
 struct recovery_state *recovery_state;
 
-enum suffix { NONE, INPROGRESS };
+/* {{{ Row V11 */
 
-#define ROW_EOF (void *)1
+struct row_v11 {
+	log_magic_t marker;
+	struct header_v11 header;
+	u16 tag;
+	u64 cookie;
+	u8 data[];
+} __attribute__((packed));
+
 
 void
 header_v11_fill(struct header_v11 *header, u64 lsn, size_t data_len)
@@ -189,9 +168,9 @@ row_v11_size(struct row_v11 *row)
 	return sizeof(row->marker) + sizeof(struct header_v11) + row->header.len;
 }
 
-static int
-wal_writer_start(struct recovery_state *state);
-static struct tbuf *row_reader_v11(FILE *f, struct palloc_pool *pool);
+/* }}} */
+
+/* {{{ LSN API */
 
 void
 wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn)
@@ -254,6 +233,208 @@ next_lsn(struct recovery_state *r, i64 new_lsn)
 	say_debug("next_lsn(%p, %" PRIi64 ") => %" PRIi64, r, new_lsn, r->lsn);
 	return r->lsn;
 }
+
+/* }}} */
+
+/* {{{ struct log_dir and related functions */
+
+enum suffix { NONE, INPROGRESS };
+
+struct log_dir {
+	bool panic_if_error;
+
+	/* Additional flags to apply at open(2) to write. */
+	int  open_wflags;
+	const char *filetype;
+	const char *filename_ext;
+	char *dirname;
+};
+
+static struct log_dir snap_dir = {
+	.filetype = "SNAP\n",
+	.filename_ext = ".snap"
+};
+
+static struct log_dir wal_dir = {
+	.filetype = "XLOG\n",
+	.filename_ext = ".xlog"
+};
+
+static int
+cmp_i64(const void *_a, const void *_b)
+{
+	const i64 *a = _a, *b = _b;
+	if (*a == *b)
+		return 0;
+	return (*a > *b) ? 1 : -1;
+}
+
+static ssize_t
+scan_dir(struct log_dir *dir, i64 **ret_lsn)
+{
+	ssize_t result = -1;
+	size_t i = 0, size = 1024;
+	ssize_t ext_len = strlen(dir->filename_ext);
+	i64 *lsn = palloc(fiber->gc_pool, sizeof(i64) * size);
+	DIR *dh = opendir(dir->dirname);
+
+	if (lsn == NULL || dh == NULL)
+		goto out;
+
+	errno = 0;
+	struct dirent *dent;
+	while ((dent = readdir(dh)) != NULL) {
+
+		char *ext = strchr(dent->d_name, '.');
+		if (ext == NULL)
+		continue;
+
+		const char *suffix = strchr(ext + 1, '.');
+		/*
+		 * A valid ending is either .xlog or
+		 * .xlog.inprogress, given dir->filename_ext ==
+		 * 'xlog'.
+		 */
+		bool ext_is_ok;
+		if (suffix == NULL)
+			ext_is_ok = strcmp(ext, dir->filename_ext) == 0;
+		else
+			ext_is_ok = (strncmp(ext, dir->filename_ext,
+					     ext_len) == 0 &&
+				     strcmp(suffix, inprogress_suffix) == 0);
+		if (!ext_is_ok)
+			continue;
+
+		lsn[i] = strtoll(dent->d_name, &ext, 10);
+		if (strncmp(ext, dir->filename_ext, ext_len) != 0) {
+			/* d_name doesn't parse entirely, ignore it */
+			say_warn("can't parse `%s', skipping", dent->d_name);
+			continue;
+		}
+
+		if (lsn[i] == LLONG_MAX || lsn[i] == LLONG_MIN) {
+			say_warn("can't parse `%s', skipping", dent->d_name);
+			continue;
+		}
+
+		i++;
+		if (i == size) {
+			i64 *n = palloc(fiber->gc_pool, sizeof(i64) * size * 2);
+			if (n == NULL)
+				goto out;
+			memcpy(n, lsn, sizeof(i64) * size);
+			lsn = n;
+			size = size * 2;
+		}
+	}
+
+	qsort(lsn, i, sizeof(i64), cmp_i64);
+
+	*ret_lsn = lsn;
+	result = i;
+out:
+	if (errno != 0)
+		say_syserror("error reading directory `%s'", dir->dirname);
+
+	if (dh != NULL)
+		closedir(dh);
+	return result;
+}
+
+static i64
+greatest_lsn(struct log_dir *dir)
+{
+	i64 *lsn;
+	ssize_t count = scan_dir(dir, &lsn);
+
+	if (count <= 0)
+		return count;
+
+	return lsn[count - 1];
+}
+
+static i64
+find_including_file(struct log_dir *dir, i64 target_lsn)
+{
+	i64 *lsn;
+	ssize_t count = scan_dir(dir, &lsn);
+
+	if (count <= 0)
+		return count;
+
+	while (count > 1) {
+		if (*lsn <= target_lsn && target_lsn < *(lsn + 1)) {
+			goto out;
+			return *lsn;
+		}
+		lsn++;
+		count--;
+	}
+
+	/*
+	 * we can't check here for sure will or will not last file
+	 * contain record with desired lsn since number of rows in file
+	 * is not known beforehand. so, we simply return the last one.
+	 */
+
+      out:
+	return *lsn;
+}
+
+static char *
+format_filename(struct log_dir *dir, i64 lsn, enum suffix suffix)
+{
+	static __thread char filename[PATH_MAX + 1];
+	const char *suffix_str = suffix == INPROGRESS ? inprogress_suffix : "";
+	snprintf(filename, PATH_MAX, "%s/%020" PRIi64 "%s%s",
+		 dir->dirname, lsn, dir->filename_ext, suffix_str);
+	return filename;
+}
+
+/* }}} */
+
+/* {{{ struct log_io_cursor */
+
+#define ROW_EOF (void *)1
+
+static struct tbuf *
+row_reader_v11(FILE *f, struct palloc_pool *pool)
+{
+	struct tbuf *m = tbuf_alloc(pool);
+
+	u32 header_crc, data_crc;
+
+	tbuf_ensure(m, sizeof(struct header_v11));
+	if (fread(m->data, sizeof(struct header_v11), 1, f) != 1)
+		return ROW_EOF;
+
+	m->size = sizeof(struct header_v11);
+
+	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
+	header_crc = crc32_calc(0, m->data + offsetof(struct header_v11, lsn),
+				sizeof(struct header_v11) - offsetof(struct header_v11, lsn));
+
+	if (header_v11(m)->header_crc32c != header_crc) {
+		say_error("header crc32c mismatch");
+		return NULL;
+	}
+
+	tbuf_ensure(m, m->size + header_v11(m)->len);
+	if (fread(m->data + sizeof(struct header_v11), header_v11(m)->len, 1, f) != 1)
+		return ROW_EOF;
+
+	m->size += header_v11(m)->len;
+
+	data_crc = crc32_calc(0, m->data + sizeof(struct header_v11), header_v11(m)->len);
+	if (header_v11(m)->data_crc32c != data_crc) {
+		say_error("data crc32c mismatch");
+		return NULL;
+	}
+
+	say_debug("read row v11 success lsn:%" PRIi64, header_v11(m)->lsn);
+	return m;
+}
+
 
 struct log_io_cursor
 {
@@ -378,167 +559,10 @@ eof:
 	return NULL;
 }
 
-static int
-cmp_i64(const void *_a, const void *_b)
-{
-	const i64 *a = _a, *b = _b;
-	if (*a == *b)
-		return 0;
-	return (*a > *b) ? 1 : -1;
-}
-
-static ssize_t
-scan_dir(struct log_dir *dir, i64 **ret_lsn)
-{
-	ssize_t result = -1;
-	size_t i = 0, size = 1024;
-	ssize_t ext_len = strlen(dir->filename_ext);
-	i64 *lsn = palloc(fiber->gc_pool, sizeof(i64) * size);
-	DIR *dh = opendir(dir->dirname);
-
-	if (lsn == NULL || dh == NULL)
-		goto out;
-
-	errno = 0;
-	struct dirent *dent;
-	while ((dent = readdir(dh)) != NULL) {
-
-		char *ext = strchr(dent->d_name, '.');
-		if (ext == NULL)
-		continue;
-
-		const char *suffix = strchr(ext + 1, '.');
-		/*
-		 * A valid ending is either .xlog or
-		 * .xlog.inprogress, given dir->filename_ext ==
-		 * 'xlog'.
-		 */
-		bool ext_is_ok;
-		if (suffix == NULL)
-			ext_is_ok = strcmp(ext, dir->filename_ext) == 0;
-		else
-			ext_is_ok = (strncmp(ext, dir->filename_ext,
-					     ext_len) == 0 &&
-				     strcmp(suffix, inprogress_suffix) == 0);
-		if (!ext_is_ok)
-			continue;
-
-		lsn[i] = strtoll(dent->d_name, &ext, 10);
-		if (strncmp(ext, dir->filename_ext, ext_len) != 0) {
-			/* d_name doesn't parse entirely, ignore it */
-			say_warn("can't parse `%s', skipping", dent->d_name);
-			continue;
-		}
-
-		if (lsn[i] == LLONG_MAX || lsn[i] == LLONG_MIN) {
-			say_warn("can't parse `%s', skipping", dent->d_name);
-			continue;
-		}
-
-		i++;
-		if (i == size) {
-			i64 *n = palloc(fiber->gc_pool, sizeof(i64) * size * 2);
-			if (n == NULL)
-				goto out;
-			memcpy(n, lsn, sizeof(i64) * size);
-			lsn = n;
-			size = size * 2;
-		}
-	}
-
-	qsort(lsn, i, sizeof(i64), cmp_i64);
-
-	*ret_lsn = lsn;
-	result = i;
-out:
-	if (errno != 0)
-		say_syserror("error reading directory `%s'", dir->dirname);
-
-	if (dh != NULL)
-		closedir(dh);
-	return result;
-}
-
-static i64
-greatest_lsn(struct log_dir *dir)
-{
-	i64 *lsn;
-	ssize_t count = scan_dir(dir, &lsn);
-
-	if (count <= 0)
-		return count;
-
-	return lsn[count - 1];
-}
-
-static i64
-find_including_file(struct log_dir *dir, i64 target_lsn)
-{
-	i64 *lsn;
-	ssize_t count = scan_dir(dir, &lsn);
-
-	if (count <= 0)
-		return count;
-
-	while (count > 1) {
-		if (*lsn <= target_lsn && target_lsn < *(lsn + 1)) {
-			goto out;
-			return *lsn;
-		}
-		lsn++;
-		count--;
-	}
-
-	/*
-	 * we can't check here for sure will or will not last file
-	 * contain record with desired lsn since number of rows in file
-	 * is not known beforehand. so, we simply return the last one.
-	 */
-
-      out:
-	return *lsn;
-}
-
-static struct tbuf *
-row_reader_v11(FILE *f, struct palloc_pool *pool)
-{
-	struct tbuf *m = tbuf_alloc(pool);
-
-	u32 header_crc, data_crc;
-
-	tbuf_ensure(m, sizeof(struct header_v11));
-	if (fread(m->data, sizeof(struct header_v11), 1, f) != 1)
-		return ROW_EOF;
-
-	m->size = sizeof(struct header_v11);
-
-	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
-	header_crc = crc32_calc(0, m->data + offsetof(struct header_v11, lsn),
-				sizeof(struct header_v11) - offsetof(struct header_v11, lsn));
-
-	if (header_v11(m)->header_crc32c != header_crc) {
-		say_error("header crc32c mismatch");
-		return NULL;
-	}
-
-	tbuf_ensure(m, m->size + header_v11(m)->len);
-	if (fread(m->data + sizeof(struct header_v11), header_v11(m)->len, 1, f) != 1)
-		return ROW_EOF;
-
-	m->size += header_v11(m)->len;
-
-	data_crc = crc32_calc(0, m->data + sizeof(struct header_v11), header_v11(m)->len);
-	if (header_v11(m)->data_crc32c != data_crc) {
-		say_error("data crc32c mismatch");
-		return NULL;
-	}
-
-	say_debug("read row v11 success lsn:%" PRIi64, header_v11(m)->lsn);
-	return m;
-}
+/* }}} */
 
 static int
-log_io_inprogress_rename(char *filename)
+inprogress_log_rename(char *filename)
 {
 	char *new_filename;
 	char *suffix = strrchr(filename, '.');
@@ -581,6 +605,8 @@ inprogress_log_unlink(char *filename)
 	return 0;
 }
 
+/* {{{ struct log_io */
+
 int
 log_io_close(struct log_io **lptr)
 {
@@ -589,7 +615,7 @@ log_io_close(struct log_io **lptr)
 
 	if (l->rows == 1 && l->mode == LOG_WRITE) {
 		/* Rename WAL before finalize. */
-		if (log_io_inprogress_rename(l->filename) != 0)
+		if (inprogress_log_rename(l->filename) != 0)
 			panic("can't rename 'inprogress' WAL");
 	}
 
@@ -635,21 +661,11 @@ log_io_sync(struct log_io *l)
 }
 
 static int
-write_header(struct log_io *l)
+log_io_write_header(struct log_io *l)
 {
 	int ret = fprintf(l->f, "%s%s\n", l->dir->filetype, v11);
 
 	return ret < 0 ? -1 : 0;
-}
-
-static char *
-format_filename(struct log_dir *dir, i64 lsn, enum suffix suffix)
-{
-	static __thread char filename[PATH_MAX + 1];
-	const char *suffix_str = suffix == INPROGRESS ? inprogress_suffix : "";
-	snprintf(filename, PATH_MAX, "%s/%020" PRIi64 "%s%s",
-		 dir->dirname, lsn, dir->filename_ext, suffix_str);
-	return filename;
 }
 
 /**
@@ -724,7 +740,7 @@ log_io_open(struct log_dir *dir, enum log_mode mode,
 			goto error;
 	} else { /* LOG_WRITE */
 		setvbuf(l->f, NULL, _IONBF, 0);
-		if (write_header(l) != 0)
+		if (log_io_write_header(l) != 0)
 			goto error;
 	}
 	return l;
@@ -788,43 +804,96 @@ error:
 	return NULL;
 }
 
-/**
- * Read the WAL and invoke a callback on every record (used for --cat
- * command line option).
- * @retval 0  success
- * @retval -1 error
- */
-int
-read_log(const char *filename,
-	 row_handler *xlog_handler, row_handler *snap_handler)
-{
-	struct log_dir *dir;
-	row_handler *h;
+/* }}} */
 
-	if (strstr(filename, wal_dir.filename_ext)) {
-		dir = &wal_dir;
-		h = xlog_handler;
-	} else if (strstr(filename, snap_dir.filename_ext)) {
-		dir = &snap_dir;
-		h = snap_handler;
-	} else {
-		say_error("don't know how to read `%s'", filename);
-		return -1;
+/* {{{ Initial recovery */
+
+static int
+wal_writer_start(struct recovery_state *state);
+void
+wal_writer_stop(struct recovery_state *r);
+static void
+recovery_stop_local(struct recovery_state *r);
+
+
+void
+recovery_init(const char *snap_dirname, const char *wal_dirname,
+	      row_handler row_handler, int rows_per_wal,
+	      const char *wal_mode, double wal_fsync_delay, int flags)
+{
+	assert(recovery_state == NULL);
+	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
+	struct recovery_state *r = recovery_state;
+
+	if (rows_per_wal <= 1)
+		panic("unacceptable value of 'rows_per_wal'");
+
+	r->row_handler = row_handler;
+
+	r->snap_dir = &snap_dir;
+	r->snap_dir->dirname = strdup(snap_dirname);
+	r->wal_dir = &wal_dir;
+	r->wal_dir->dirname = strdup(wal_dirname);
+	r->wal_dir->open_wflags = strcasecmp(wal_mode, "fsync") ? 0 : WAL_SYNC_FLAG;
+	r->rows_per_wal = rows_per_wal;
+	r->wal_fsync_delay = wal_fsync_delay;
+	wait_lsn_clear(&r->wait_lsn);
+	r->flags = flags;
+}
+
+void
+recovery_update_mode(const char *mode, double fsync_delay)
+{
+	struct recovery_state *r = recovery_state;
+	(void) mode;
+	/* No mutex lock: let's not bother with whether
+	 * or not a WAL writer thread is present, and
+	 * if it's present, the delay will be propagated
+	 * to it whenever there is a next lock/unlock of
+	 * wal_writer->mutex.
+	 */
+	r->wal_fsync_delay = fsync_delay;
+}
+
+void
+recovery_update_io_rate_limit(double new_limit)
+{
+	recovery_state->snap_io_rate_limit = new_limit * 1024 * 1024;
+}
+
+void
+recovery_free()
+{
+	struct recovery_state *r = recovery_state;
+	if (r == NULL)
+		return;
+
+	if (r->watcher)
+		recovery_stop_local(r);
+
+	if (r->writer)
+		wal_writer_stop(r);
+
+	free(r->snap_dir->dirname);
+	free(r->wal_dir->dirname);
+	if (r->current_wal) {
+		/*
+		 * Possible if shutting down a replication
+		 * relay or if error during startup.
+		 */
+		log_io_close(&r->current_wal);
 	}
 
-	FILE *f = fopen(filename, "r");
-	struct log_io *l = log_io_open(dir, LOG_READ, filename, NONE, f);
-	struct log_io_cursor i;
-
-	log_io_cursor_open(&i, l);
-	struct tbuf *row;
-	while ((row = log_io_cursor_next(&i)))
-		h(row);
-
-	log_io_cursor_close(&i);
-	log_io_close(&l);
-	return 0;
+	recovery_state = NULL;
 }
+
+void
+recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error)
+{
+	r->wal_dir->panic_if_error = on_wal_error;
+	r->snap_dir->panic_if_error = on_snap_error;
+}
+
 
 /**
  * Read a snapshot and call row_handler for every snapshot row.
@@ -954,7 +1023,7 @@ recover_remaining_wals(struct recovery_state *r)
 		 * For the last WAL, first try to open .inprogress
 		 * file: if it doesn't exist, we can safely try an
 		 * .xlog, with no risk of a concurrent
-		 * log_io_inprogress_rename().
+		 * inprogress_log_rename().
 		 */
 		FILE *f = NULL;
 		char *filename;
@@ -1090,6 +1159,51 @@ out:
 	prelease(fiber->gc_pool);
 }
 
+void
+recovery_finalize(struct recovery_state *r)
+{
+	int result;
+
+	if (r->watcher)
+		recovery_stop_local(r);
+
+	r->finalize = true;
+
+	result = recover_remaining_wals(r);
+	if (result < 0)
+		panic("unable to successfully finalize recovery");
+
+	if (r->current_wal != NULL && result != LOG_EOF) {
+		say_warn("WAL `%s' wasn't correctly closed", r->current_wal->filename);
+
+		if (!r->current_wal->is_inprogress) {
+			if (r->current_wal->rows == 0)
+			        /* Regular WAL (not inprogress) must contain at least one row */
+				panic("zero rows was successfully read from last WAL `%s'",
+				      r->current_wal->filename);
+		} else if (r->current_wal->rows == 0) {
+			/* Unlink empty inprogress WAL */
+			say_warn("unlink broken %s WAL", r->current_wal->filename);
+			if (inprogress_log_unlink(r->current_wal->filename) != 0)
+				panic("can't unlink 'inprogress' WAL");
+		} else if (r->current_wal->rows == 1) {
+			/* Rename inprogress wal with one row */
+			say_warn("rename unfinished %s WAL", r->current_wal->filename);
+			if (inprogress_log_rename(r->current_wal->filename) != 0)
+				panic("can't rename 'inprogress' WAL");
+		} else
+			panic("too many rows in inprogress WAL `%s'", r->current_wal->filename);
+
+		log_io_close(&r->current_wal);
+	}
+
+	if ((r->flags & RECOVER_READONLY) == 0)
+		wal_writer_start(r);
+}
+
+
+/* }}} */
+
 /* {{{ Local recovery: support of hot standby and replication relay */
 
 /**
@@ -1200,48 +1314,6 @@ recovery_stop_local(struct recovery_state *r)
 }
 
 /* }}} */
-
-void
-recovery_finalize(struct recovery_state *r)
-{
-	int result;
-
-	if (r->watcher)
-		recovery_stop_local(r);
-
-	r->finalize = true;
-
-	result = recover_remaining_wals(r);
-	if (result < 0)
-		panic("unable to successfully finalize recovery");
-
-	if (r->current_wal != NULL && result != LOG_EOF) {
-		say_warn("WAL `%s' wasn't correctly closed", r->current_wal->filename);
-
-		if (!r->current_wal->is_inprogress) {
-			if (r->current_wal->rows == 0)
-			        /* Regular WAL (not inprogress) must contain at least one row */
-				panic("zero rows was successfully read from last WAL `%s'",
-				      r->current_wal->filename);
-		} else if (r->current_wal->rows == 0) {
-			/* Unlink empty inprogress WAL */
-			say_warn("unlink broken %s WAL", r->current_wal->filename);
-			if (inprogress_log_unlink(r->current_wal->filename) != 0)
-				panic("can't unlink 'inprogress' WAL");
-		} else if (r->current_wal->rows == 1) {
-			/* Rename inprogress wal with one row */
-			say_warn("rename unfinished %s WAL", r->current_wal->filename);
-			if (log_io_inprogress_rename(r->current_wal->filename) != 0)
-				panic("can't rename 'inprogress' WAL");
-		} else
-			panic("too many rows in inprogress WAL `%s'", r->current_wal->filename);
-
-		log_io_close(&r->current_wal);
-	}
-
-	if ((r->flags & RECOVER_READONLY) == 0)
-		wal_writer_start(r);
-}
 
 /* {{{ WAL writer - maintain a Write Ahead Log for every change
  * in the data state.
@@ -1495,7 +1567,7 @@ wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir, u64 l
 		 * to a name  without .inprogress suffix.
 		 */
 		if (l->rows == 1) {
-			if (log_io_inprogress_rename(l->filename))
+			if (inprogress_log_rename(l->filename))
 				log_io_close(&l);
 		}
 	} else {
@@ -1664,83 +1736,7 @@ wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 
 /* }}} */
 
-void
-recovery_init(const char *snap_dirname, const char *wal_dirname,
-	      row_handler row_handler, int rows_per_wal,
-	      const char *wal_mode, double wal_fsync_delay, int flags)
-{
-	assert(recovery_state == NULL);
-	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
-	struct recovery_state *r = recovery_state;
-
-	if (rows_per_wal <= 1)
-		panic("unacceptable value of 'rows_per_wal'");
-
-	r->row_handler = row_handler;
-
-	r->snap_dir = &snap_dir;
-	r->snap_dir->dirname = strdup(snap_dirname);
-	r->wal_dir = &wal_dir;
-	r->wal_dir->dirname = strdup(wal_dirname);
-	r->wal_dir->open_wflags = strcasecmp(wal_mode, "fsync") ? 0 : WAL_SYNC_FLAG;
-	r->rows_per_wal = rows_per_wal;
-	r->wal_fsync_delay = wal_fsync_delay;
-	wait_lsn_clear(&r->wait_lsn);
-	r->flags = flags;
-}
-
-void
-recovery_update_mode(const char *mode, double fsync_delay)
-{
-	struct recovery_state *r = recovery_state;
-	(void) mode;
-	/* No mutex lock: let's not bother with whether
-	 * or not a WAL writer thread is present, and
-	 * if it's present, the delay will be propagated
-	 * to it whenever there is a next lock/unlock of
-	 * wal_writer->mutex.
-	 */
-	r->wal_fsync_delay = fsync_delay;
-}
-
-void
-recovery_update_io_rate_limit(double new_limit)
-{
-	recovery_state->snap_io_rate_limit = new_limit * 1024 * 1024;
-}
-
-void
-recovery_free()
-{
-	struct recovery_state *r = recovery_state;
-	if (r == NULL)
-		return;
-
-	if (r->watcher)
-		recovery_stop_local(r);
-
-	if (r->writer)
-		wal_writer_stop(r);
-
-	free(r->snap_dir->dirname);
-	free(r->wal_dir->dirname);
-	if (r->current_wal) {
-		/*
-		 * Possible if shutting down a replication
-		 * relay or if error during startup.
-		 */
-		log_io_close(&r->current_wal);
-	}
-
-	recovery_state = NULL;
-}
-
-void
-recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error)
-{
-	r->wal_dir->panic_if_error = on_wal_error;
-	r->snap_dir->panic_if_error = on_snap_error;
-}
+/* {{{ SAVE SNAPSHOT and tarantool_box --cat */
 
 void
 snapshot_write_row(struct log_io *l, struct nbatch *batch,
@@ -1832,6 +1828,48 @@ snapshot_save(struct recovery_state *r,
 
 	say_info("done");
 }
+
+/**
+ * Read WAL/SNAPSHOT and invoke a callback on every record (used
+ * for --cat command line option).
+ * @retval 0  success
+ * @retval -1 error
+ */
+
+int
+read_log(const char *filename,
+	 row_handler *xlog_handler, row_handler *snap_handler)
+{
+	struct log_dir *dir;
+	row_handler *h;
+
+	if (strstr(filename, wal_dir.filename_ext)) {
+		dir = &wal_dir;
+		h = xlog_handler;
+	} else if (strstr(filename, snap_dir.filename_ext)) {
+		dir = &snap_dir;
+		h = snap_handler;
+	} else {
+		say_error("don't know how to read `%s'", filename);
+		return -1;
+	}
+
+	FILE *f = fopen(filename, "r");
+	struct log_io *l = log_io_open(dir, LOG_READ, filename, NONE, f);
+	struct log_io_cursor i;
+
+	log_io_cursor_open(&i, l);
+	struct tbuf *row;
+	while ((row = log_io_cursor_next(&i)))
+		h(row);
+
+	log_io_cursor_close(&i);
+	log_io_close(&l);
+	return 0;
+}
+
+
+/* }}} */
 
 /*
  * vim: foldmethod=marker
