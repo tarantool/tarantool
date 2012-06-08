@@ -26,7 +26,7 @@
 #
 
 #
-# Tarantool instance expansion script
+# Tarantool instance deployment script
 #
 
 prompt_name=`basename $0`
@@ -35,7 +35,6 @@ act_prompt=1
 act_status=0
 act_debug=0
 act_dry=0
-instance_current=0
 
 error() {
 	echo "$prompt_name error: $*" 1>&2
@@ -47,8 +46,8 @@ log() {
 }
 
 usage() {
-	echo "Tarantool expansion script: add more Tarantool instances."
-	echo "usage: tarantool_expand.sh [options] <instances>"
+	echo "Tarantool deployment script: add more Tarantool instances."
+	echo "usage: tarantool_deploy.sh [options] <instance>"
 	echo
 	echo "  --prefix <path>       installation path (/usr/local)"
 	echo "  --prefix_etc <path>   installation etc path (/etc)"
@@ -64,12 +63,6 @@ usage() {
 	exit $1
 }
 
-is_num_positive() {
-	num=$1
-	[ $num -eq $num ] 2>/dev/null && [ $num -ge 0 ] 2>/dev/null || \
-		return 1
-}
-
 rollback_instance() {
 	id=$1
 	workdir="${prefix_var}/tarantool_box$id"
@@ -81,11 +74,8 @@ rollback_instance() {
 }
 
 rollback() {
-	log ">>>> rolling back changes"
-	start=`expr $deploy_current + 1`
-	for instance in `seq $start $instance_current`; do
-		rollback_instance $instance
-	done
+	log ">>> rolling back changes"
+	rollback_instance $deploy_name
 	exit 1
 }
 
@@ -100,12 +90,12 @@ try() {
 	fi
 }
 
-deploy_instance() {
+deploy() {
 	id=$1
 	workdir="${prefix_var}/tarantool_box$id"
 	config="${prefix}/etc/tarantool_box$id.cfg"
 
-	log ">>>> deploying instance $id"
+	log ">>> deploying instance $id"
 
 	# setting up work environment
 	try "mkdir -p $workdir/logs"
@@ -127,36 +117,27 @@ deploy_instance() {
 	try "ln -s \"${prefix_etc}/init.d/tarantool_box\" \"${prefix_etc}/init.d/tarantool_box$id\""
 }
 
-deploy() {
-	start=`expr $deploy_current + 1`
-	for instance in `seq $start $deploy_count`; do
-		instance_current=$instance
-		deploy_instance $instance
-	done
-}
-
 commit() {
-	log ">>>> updating deploy config"
-	try "echo $deploy_count > $deploy_cfg"
+	log ">>> updating deployment config"
+	try "echo $1 >> $deploy_cfg"
 }
 
 # processing command line arguments
-if [ $# -eq 0 ]; then
-	usage 1
-fi
+[ $# -eq 0 ] && usage 1
 
-deploy_count=0
+deploy_name_set=0
+deploy_name=""
 while [ $# -ge 1 ]; do
 	case $1 in
-		--yes) act_prompt=0 ; shift 1 ;;
-		--prefix) prefix=$2 ; shift 2 ;;
-		--prefix_var) prefix_var=$2 ; shift 2 ;;
-		--prefix_etc) prefix_etc=$2 ; shift 2 ;;
+		--yes) act_prompt=0; shift 1 ;;
+		--prefix) prefix=$2; shift 2 ;;
+		--prefix_var) prefix_var=$2; shift 2 ;;
+		--prefix_etc) prefix_etc=$2; shift 2 ;;
 		--dry) act_dry=1 ; act_debug=1 ; shift 1 ;;
 		--debug) act_debug=1; shift 1 ;;
-		--status) act_status=1 ; shift 1 ;;
-		--help) usage 0 ; shift 1 ;;
-		*) deploy_count=$1 ; shift 1 ; break ;;
+		--status) act_status=1; shift 1 ;;
+		--help) usage 0; shift 1 ;;
+		*) deploy_name=$1; deploy_name_set=1; break ;;
 	esac
 done
 
@@ -166,59 +147,54 @@ set ${prefix_etc:="/etc"}
 
 deploy_cfg="${prefix}/etc/tarantool_deploy.cfg"
 deploy_exists=0
-deploy_current=0
 
 # checking deployment configuration file
-if [ -f $deploy_cfg ]; then
-	deploy_exists=1
-	deploy_current=`cat $deploy_cfg`
-	[ $? -eq 0 ] || error "failed to read deploy config"
-	# validating instance number
-	is_num_positive $deploy_current
-	[ $? -eq 0 ] || error "bad deploy config instance number"
-	# dont' change deploy if it said so in configuration file
-	if [ $deploy_current -eq 0 ]; then
-		log "skipping deploy setup (cancel by config)"
-		exit 0
-	fi
-fi
+[ -f $deploy_cfg ] && deploy_exists=1
 
 # displaying status
 if [ $act_status -ne 0 ]; then
 	if [ $deploy_exists -eq 0 ]; then
-		log "no tarantool instances found."
+		log "No tarantool instances found."
 	else
-		log "$deploy_current tarantool instances deployed"
+		log "Current instances:\n`cat $deploy_cfg`"
 	fi
 	exit 0
 fi
 
-# validating instance number
-is_num_positive $deploy_count
-[ $? -eq 0 ] && [ $deploy_count -gt 0 ] || error "bad instance number"
+# checking that instance name was specified
+[ $deploy_name_set -eq 0 ] && usage 1
 
-if [ $deploy_count -le $deploy_current ]; then
-	error "expand only is supported (required instances number $deploy_count" \
-	      "is lower/equal than deployed $deploy_current)"
+# checking if instance already deployed
+if [ $deploy_exists -eq 1 ]; then
+	grep "^\(${deploy_name}\)$" $deploy_cfg > /dev/null
+	if [ $? -eq 0 ]; then 
+		error "Instance '${deploy_name}' is already deployed."
+	fi
+fi
+
+# validating instance name
+echo $deploy_name | grep '^[[:digit:]]\+.\(1\|2\)' > /dev/null
+if [ $? -eq 1 ]; then 
+	error "Bad instance name format, should be e.g: 1.1, 1.2, etc."
 fi
 
 # asking permission to continue
 if [ $act_prompt -eq 1 ]; then
 	[ $act_dry -ne 0 ] && log "(dry mode)"
-	log "About to extend tarantool instances from $deploy_current to $deploy_count."
+	log "About to deploy Tarantool instance $deploy_name."
 	log "Continue? [n/y]"
 	read answer
 	case "$answer" in
 		[Yy]) ;;
 		*)
-			log "aborting"
+			log "Aborting"
 			exit 0
 			;;
 	esac
 fi
 
-deploy
-commit
+deploy $deploy_name
+commit $deploy_name
 
 log "done"
 
