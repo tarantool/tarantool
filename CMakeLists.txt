@@ -273,12 +273,14 @@ endif()
 # -x option, simply use CXX flags to build Objective C files.
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fobjc-exceptions")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fgnu89-inline -fobjc-exceptions")
 
 # Use GNU Objective C runtime on Mac OS X
 if (TARGET_OS_DARWIN)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fgnu-runtime")
 endif()
+
+set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
 
 add_subdirectory(third_party)
 add_subdirectory(cfg)
