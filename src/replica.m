@@ -122,11 +122,11 @@ pull_from_remote(void *state)
 
 	for (;;) {
 		fiber_setcancelstate(true);
-		row = remote_read_row(&r->remote_addr, r->confirmed_lsn + 1);
+		row = remote_read_row(&r->remote->addr, r->confirmed_lsn + 1);
 		fiber_setcancelstate(false);
 
-		r->recovery_lag = ev_now() - header_v11(row)->tm;
-		r->recovery_last_update_tstamp = ev_now();
+		r->remote->recovery_lag = ev_now() - header_v11(row)->tm;
+		r->remote->recovery_last_update_tstamp = ev_now();
 
 		if (remote_apply_row(r, row) < 0) {
 			fiber_close();
@@ -159,7 +159,7 @@ remote_apply_row(struct recovery_state *r, struct tbuf *row)
 
 	assert(tag == XLOG);
 
-	if (wal_write(r, lsn, r->cookie, op, data))
+	if (wal_write(r, lsn, r->remote->cookie, op, data))
 		panic("replication failure: can't write row to WAL");
 
 	next_lsn(r, lsn);
@@ -169,7 +169,7 @@ remote_apply_row(struct recovery_state *r, struct tbuf *row)
 }
 
 void
-recovery_follow_remote(struct recovery_state *r, const char *remote)
+recovery_follow_remote(struct recovery_state *r, const char *addr)
 {
 	char name[FIBER_NAME_MAXLEN];
 	char ip_addr[32];
@@ -178,16 +178,16 @@ recovery_follow_remote(struct recovery_state *r, const char *remote)
 	struct fiber *f;
 	struct in_addr server;
 
-	assert(r->remote_recovery == NULL);
+	assert(r->remote == NULL);
 
-	say_crit("initializing the replica, WAL master %s", remote);
-	snprintf(name, sizeof(name), "replica/%s", remote);
+	say_crit("initializing the replica, WAL master %s", addr);
+	snprintf(name, sizeof(name), "replica/%s", addr);
 
 	f = fiber_create(name, -1, pull_from_remote, r);
 	if (f == NULL)
 		return;
 
-	rc = sscanf(remote, "%31[^:]:%i", ip_addr, &port);
+	rc = sscanf(addr, "%31[^:]:%i", ip_addr, &port);
 	assert(rc == 2);
 	(void)rc;
 
@@ -196,20 +196,21 @@ recovery_follow_remote(struct recovery_state *r, const char *remote)
 		return;
 	}
 
-	memset(&r->remote_addr, 0, sizeof(r->remote_addr));
-	r->remote_addr.sin_family = AF_INET;
-	memcpy(&r->remote_addr.sin_addr.s_addr, &server, sizeof(server));
-	r->remote_addr.sin_port = htons(port);
-	memcpy(&r->cookie, &r->remote_addr, MIN(sizeof(r->cookie), sizeof(r->remote_addr)));
+	static struct remote remote;
+	memset(&remote, 0, sizeof(remote));
+	remote.addr.sin_family = AF_INET;
+	memcpy(&remote.addr.sin_addr.s_addr, &server, sizeof(server));
+	remote.addr.sin_port = htons(port);
+	memcpy(&remote.cookie, &remote.addr, MIN(sizeof(remote.cookie), sizeof(remote.addr)));
+	remote.reader = f;
+	r->remote = &remote;
 	fiber_call(f);
-	r->remote_recovery = f;
 }
 
 void
 recovery_stop_remote(struct recovery_state *r)
 {
 	say_info("shutting down the replica");
-	fiber_cancel(r->remote_recovery);
-	r->remote_recovery = NULL;
-	memset(&r->remote_addr, 0, sizeof(r->remote_addr));
+	fiber_cancel(r->remote->reader);
+	r->remote = NULL;
 }

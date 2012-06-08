@@ -1229,7 +1229,6 @@ read_log(const char *filename,
 	return 0;
 }
 
-
 /* }}} */
 
 /*

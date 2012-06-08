@@ -63,37 +63,35 @@ wait_lsn_clear(struct wait_lsn *wait_lsn)
 struct wal_writer;
 struct wal_watcher;
 
+/** Master connection */
+struct remote {
+	struct sockaddr_in addr;
+	struct fiber *reader;
+	u64 cookie;
+	ev_tstamp recovery_lag, recovery_last_update_tstamp;
+};
+
 struct recovery_state {
 	i64 lsn, confirmed_lsn;
 	/* The WAL we're currently reading/writing from/to. */
 	struct log_io *current_wal;
-	/*
-	 * When opening the next WAL, we want to first open
-	 * a new file before closing the previous one. Thus
-	 * we save the old WAL here.
-	 */
 	struct log_dir *snap_dir;
 	struct log_dir *wal_dir;
 	struct wal_writer *writer;
 	struct wal_watcher *watcher;
-	struct fiber *remote_recovery;
-
+	struct remote *remote;
 	/**
-	 * Row_handler is invoked during initial recovery.
-	 * It will be presented with the most recent format of
-	 * data. Row_reader is responsible for converting data
-	 * from old formats.
+	 * row_handler is a module callback invoked during initial
+	 * recovery and when reading rows from the master.  It is
+	 * presented with the most recent format of data.
+	 * row_reader is responsible for converting data from old
+	 * formats.
 	 */
 	row_handler *row_handler;
-	struct sockaddr_in remote_addr;
-
-	ev_tstamp recovery_lag, recovery_last_update_tstamp;
-
 	int snap_io_rate_limit;
 	int rows_per_wal;
 	int flags;
 	double wal_fsync_delay;
-	u64 cookie;
 	struct wait_lsn wait_lsn;
 
 	bool finalize;
@@ -124,7 +122,7 @@ void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
 int read_log(const char *filename,
 	     row_handler xlog_handler, row_handler snap_handler);
 
-void recovery_follow_remote(struct recovery_state *r, const char *remote);
+void recovery_follow_remote(struct recovery_state *r, const char *addr);
 void recovery_stop_remote(struct recovery_state *r);
 
 struct nbatch;

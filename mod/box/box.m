@@ -51,8 +51,6 @@ static void box_process_rw(struct txn *txn, Port *port,
 			   u32 op, struct tbuf *request_data);
 box_process_func box_process = box_process_ro;
 
-extern pid_t logger_pid;
-
 const char *mod_name = "Box";
 
 static char status[64] = "unknown";
@@ -436,7 +434,7 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 		if (!old_is_replica && new_is_replica)
 			memcached_stop_expire();
 
-		if (recovery_state->remote_recovery)
+		if (recovery_state->remote)
 			recovery_stop_remote(recovery_state);
 
 		box_enter_master_or_replica_mode(new_conf);
@@ -565,14 +563,6 @@ mod_snapshot(struct log_io *l, struct nbatch *batch)
 void
 mod_info(struct tbuf *out)
 {
-	tbuf_printf(out, "  version: \"%s\"" CRLF, tarantool_version());
-	tbuf_printf(out, "  uptime: %i" CRLF, (int)tarantool_uptime());
-	tbuf_printf(out, "  pid: %i" CRLF, getpid());
-	tbuf_printf(out, "  logger_pid: %i" CRLF, logger_pid);
-	tbuf_printf(out, "  lsn: %" PRIi64 CRLF, recovery_state->confirmed_lsn);
-	tbuf_printf(out, "  recovery_lag: %.3f" CRLF, recovery_state->recovery_lag);
-	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,
-		    recovery_state->recovery_last_update_tstamp);
 	tbuf_printf(out, "  status: %s" CRLF, status);
 }
 

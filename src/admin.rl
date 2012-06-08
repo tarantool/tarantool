@@ -37,6 +37,7 @@
 #include <stat.h>
 #include <tarantool.h>
 #include <tarantool_lua.h>
+#include <recovery.h>
 #include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
@@ -103,6 +104,17 @@ static void
 tarantool_info(struct tbuf *out)
 {
 	tbuf_printf(out, "info:" CRLF);
+	tbuf_printf(out, "  version: \"%s\"" CRLF, tarantool_version());
+	tbuf_printf(out, "  uptime: %i" CRLF, (int)tarantool_uptime());
+	tbuf_printf(out, "  pid: %i" CRLF, getpid());
+	tbuf_printf(out, "  logger_pid: %i" CRLF, logger_pid);
+	tbuf_printf(out, "  lsn: %" PRIi64 CRLF, recovery_state->confirmed_lsn);
+	if (recovery_state->remote) {
+		tbuf_printf(out, "  recovery_lag: %.3f" CRLF,
+			    recovery_state->remote->recovery_lag);
+		tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,
+			    recovery_state->remote->recovery_last_update_tstamp);
+	}
 	mod_info(out);
 	const char *path = cfg_filename_fullpath;
 	if (path == NULL)

@@ -42,6 +42,7 @@ enum say_level {
 };
 
 extern int sayfd;
+extern pid_t logger_pid;
 
 void say_logger_init(int nonblock);
 void vsay(int level, const char *filename, int line, const char *error,
