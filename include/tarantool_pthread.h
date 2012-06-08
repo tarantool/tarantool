@@ -39,7 +39,7 @@
  *
  * Still give the user an opportunity to manually
  * check for error, by returning the pthread_* 
- * function status up.
+ * function status.
  */
 
 #define tt_pthread_error(e)			\
@@ -166,5 +166,9 @@
 	tt_pthread_error(e);				\
 })
 
+#define tt_pthread_join(thread, ret)			\
+({	int e = pthread_join(thread, ret);		\
+	tt_pthread_error(e);				\
+})
 
 #endif /* TARANTOOL_PTHREAD_H_INCLUDED */

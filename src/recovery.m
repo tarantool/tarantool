@@ -734,7 +734,7 @@ wal_writer_child()
 static void
 wal_writer_init_once()
 {
-	tt_pthread_atfork(NULL, NULL, wal_writer_child);
+	(void) tt_pthread_atfork(NULL, NULL, wal_writer_child);
 }
 
 /**
@@ -754,10 +754,10 @@ wal_writer_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 	struct wal_writer *writer = watcher->data;
 	struct wal_fifo output;
 
-	tt_pthread_mutex_lock(&writer->mutex);
+	(void) tt_pthread_mutex_lock(&writer->mutex);
 	output = writer->output;
 	STAILQ_INIT(&writer->output);
-	tt_pthread_mutex_unlock(&writer->mutex);
+	(void) tt_pthread_mutex_unlock(&writer->mutex);
 
 	/*
 	 * Can't use STAILQ_FOREACH since fiber_call()
@@ -782,16 +782,16 @@ wal_writer_init(struct wal_writer *writer)
 	/* I. Initialize the state. */
 	pthread_mutexattr_t errorcheck;
 
-	tt_pthread_mutexattr_init(&errorcheck);
+	(void) tt_pthread_mutexattr_init(&errorcheck);
 
 #ifndef NDEBUG
-	tt_pthread_mutexattr_settype(&errorcheck, PTHREAD_MUTEX_ERRORCHECK);
+	(void) tt_pthread_mutexattr_settype(&errorcheck, PTHREAD_MUTEX_ERRORCHECK);
 #endif
 	/* Initialize queue lock mutex. */
-	tt_pthread_mutex_init(&writer->mutex, &errorcheck);
-	tt_pthread_mutexattr_destroy(&errorcheck);
+	(void) tt_pthread_mutex_init(&writer->mutex, &errorcheck);
+	(void) tt_pthread_mutexattr_destroy(&errorcheck);
 
-	tt_pthread_cond_init(&writer->cond, NULL);
+	(void) tt_pthread_cond_init(&writer->cond, NULL);
 
 	STAILQ_INIT(&writer->input);
 	STAILQ_INIT(&writer->output);
@@ -799,7 +799,7 @@ wal_writer_init(struct wal_writer *writer)
 	ev_async_init(&writer->async, (void *) wal_writer_schedule);
 	writer->async.data = writer;
 
-	tt_pthread_once(&wal_writer_once, wal_writer_init_once);
+	(void) tt_pthread_once(&wal_writer_once, wal_writer_init_once);
 
 	writer->batch = nbatch_alloc(sysconf(_SC_IOV_MAX));
 
@@ -811,8 +811,8 @@ wal_writer_init(struct wal_writer *writer)
 static void
 wal_writer_destroy(struct wal_writer *writer)
 {
-	tt_pthread_mutex_destroy(&writer->mutex);
-	tt_pthread_cond_destroy(&writer->cond);
+	(void) tt_pthread_mutex_destroy(&writer->mutex);
+	(void) tt_pthread_cond_destroy(&writer->cond);
 	free(writer->batch);
 }
 
@@ -865,12 +865,12 @@ wal_writer_stop(struct recovery_state *r)
 
 	/* Stop the worker thread. */
 
-	tt_pthread_mutex_lock(&writer->mutex);
+	(void) tt_pthread_mutex_lock(&writer->mutex);
 	writer->is_shutdown= true;
-	tt_pthread_cond_signal(&writer->cond);
-	tt_pthread_mutex_unlock(&writer->mutex);
+	(void) tt_pthread_cond_signal(&writer->cond);
+	(void) tt_pthread_mutex_unlock(&writer->mutex);
 
-	if (pthread_join(writer->thread, NULL) != 0) {
+	if (tt_pthread_join(writer->thread, NULL) != 0) {
 		/* We can't recover from this in any reasonable way. */
 		panic_syserror("WAL writer: thread join failed");
 	}
@@ -895,7 +895,7 @@ wal_writer_pop(struct wal_writer *writer, bool input_was_empty)
 		STAILQ_INIT(&writer->input);
 		if (STAILQ_EMPTY(&input) == false || input_was_empty == false)
 			break;
-		tt_pthread_cond_wait(&writer->cond, &writer->mutex);
+		(void) tt_pthread_cond_wait(&writer->cond, &writer->mutex);
 	} while (writer->is_shutdown == false);
 	return input;
 }
@@ -1014,10 +1014,10 @@ wal_writer_thread(void *worker_args)
 	struct log_io **wal = &r->current_wal;
 	struct nbatch *batch = writer->batch;
 
-	tt_pthread_mutex_lock(&writer->mutex);
+	(void) tt_pthread_mutex_lock(&writer->mutex);
 	while (writer->is_shutdown == false) {
 		struct wal_fifo input = wal_writer_pop(writer, input_was_empty);
-		pthread_mutex_unlock(&writer->mutex);
+		(void) tt_pthread_mutex_unlock(&writer->mutex);
 		/*
 		 * Wake up fibers waiting on the old list *here*
 		 * since we need a membar for request out_lsn's to
@@ -1041,10 +1041,10 @@ wal_writer_thread(void *worker_args)
 			wal_opt_sync(*wal, r->wal_fsync_delay);
 			req = end;
 		}
-		tt_pthread_mutex_lock(&writer->mutex);
+		(void) tt_pthread_mutex_lock(&writer->mutex);
 		STAILQ_CONCAT(&writer->output, &input);
 	}
-	tt_pthread_mutex_unlock(&writer->mutex);
+	(void) tt_pthread_mutex_unlock(&writer->mutex);
 	/*
 	 * Handle the case when a shutdown request came before
 	 * we were able to awake all fibers waiting on the
@@ -1079,16 +1079,16 @@ wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 	row_v11_fill(&req->row, lsn, XLOG, cookie, &op, sizeof(op),
 		     row->data, row->size);
 
-	tt_pthread_mutex_lock(&writer->mutex);
+	(void) tt_pthread_mutex_lock(&writer->mutex);
 
 	bool was_empty = STAILQ_EMPTY(&writer->input);
 
 	STAILQ_INSERT_TAIL(&writer->input, req, wal_fifo_entry);
 
 	if (was_empty)
-		tt_pthread_cond_signal(&writer->cond);
+		(void) tt_pthread_cond_signal(&writer->cond);
 
-	tt_pthread_mutex_unlock(&writer->mutex);
+	(void) tt_pthread_mutex_unlock(&writer->mutex);
 
 	fiber_yield();
 

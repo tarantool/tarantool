@@ -25,7 +25,9 @@ read http://www.purposeful.co.uk/tfl/
 #define GOPT_NOARG  0
 #define GOPT_ARG    2
 
-#define gopt_start(...)  (const void*)( const struct { int k; int f; const char *s; const char*const*l; const char *a; const char *h;}[]){ __VA_ARGS__, {0, 0, NULL, NULL, NULL, NULL}}
+struct goptargs { int k; int f; const char *s; const char*const*l; const char *a; const char *h; };
+#define gopt_start(...)  (const void*)(const struct goptargs[]){ __VA_ARGS__, {0, 0, NULL, NULL, NULL, NULL}}
+
 #define gopt_option(k,f,s,l,a,h)    { k, f, s, l, a, h }
 #define gopt_shorts( ... )      (const char*)(const char[]){ __VA_ARGS__, 0 }
 #define gopt_longs( ... )       (const char**)(const char*[]){ __VA_ARGS__, NULL }

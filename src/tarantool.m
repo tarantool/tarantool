@@ -370,7 +370,7 @@ signal_init(void)
 	ev_signal_start(&sigs[3]);
 
 	atexit(signal_free);
-	tt_pthread_atfork(NULL, NULL, signal_reset);
+	(void) tt_pthread_atfork(NULL, NULL, signal_reset);
 }
 
 static void
@@ -494,7 +494,7 @@ main(int argc, char **argv)
 #ifndef HAVE_LIBC_STACK_END
 /*
  * GNU libc provides a way to get at the top of the stack. This
- * is, of course, not standard and doesn't work on non-GNU
+ * is, of course, not-standard and doesn't work on non-GNU
  * systems, such as FreeBSD. But as far as we're concerned, argv
  * is at the top of the main thread's stack, so save the address
  * of it.

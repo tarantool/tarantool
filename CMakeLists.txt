@@ -43,12 +43,14 @@ if(NOT CMAKE_BUILD_TYPE)
         FORCE)
 endif()
 
-execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
-                OUTPUT_VARIABLE GCC_VERSION)
-if (GCC_VERSION VERSION_GREATER 4.1 OR GCC_VERSION VERSION_EQUAL 4.1)
-        message(STATUS "GCC Version >= 4.1")
-else()
-    message (FATAL_ERROR "GCC version should be >= 4.1")
+if (CMAKE_COMPILER_IS_GNUCC)
+	execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
+			OUTPUT_VARIABLE GCC_VERSION)
+	if (GCC_VERSION VERSION_GREATER 4.1 OR GCC_VERSION VERSION_EQUAL 4.1)
+		message(STATUS "GCC Version >= 4.1 -- ${GCC_VERSION}")
+	else()
+	    message (FATAL_ERROR "GCC version should be >= 4.1 -- ${GCC_VERSION}")
+	endif()
 endif()
 
 #
@@ -175,12 +177,11 @@ set (CMAKE_C_FLAGS
 # Additionally, compile it with more strict flags than the rest
 # of the code.
 #
-if (${CMAKE_BUILD_TYPE} STREQUAL "None")
-    set (core_cflags "-std=gnu99")
-else()
-    set (core_cflags "-std=gnu99 -Wall -Wextra")
-    set (core_cflags "${core_cflags} -Wno-sign-compare -Wno-strict-aliasing")
+set (core_cflags "-std=gnu99")
+if(CMAKE_COMPILER_IS_GNUCC)
+    set (core_cflags "${core_cflags} -Wall -Wextra")
 endif()
+set (core_cflags "${core_cflags} -Wno-sign-compare -Wno-strict-aliasing")
 
 # Only add -Werror if it's a debug build, done by developers.
 # Community builds should not cause extra trouble.
@@ -273,7 +274,10 @@ endif()
 # -x option, simply use CXX flags to build Objective C files.
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fgnu89-inline -fobjc-exceptions")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fobjc-exceptions")
+if (CMAKE_COMPILER_IS_GNUCC)
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fgnu89-inline")
+endif()
 
 # Use GNU Objective C runtime on Mac OS X
 if (TARGET_OS_DARWIN)

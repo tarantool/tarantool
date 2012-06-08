@@ -281,9 +281,9 @@ salloc(size_t size, const char *what)
 		assert(valid_item(slab, slab->free));
 		item = slab->free;
 
-		VALGRIND_MAKE_MEM_DEFINED(item, sizeof(void *));
+		(void) VALGRIND_MAKE_MEM_DEFINED(item, sizeof(void *));
 		slab->free = item->next;
-		VALGRIND_MAKE_MEM_UNDEFINED(item, sizeof(void *));
+		(void) VALGRIND_MAKE_MEM_UNDEFINED(item, sizeof(void *));
 	}
 
 	if (fully_formatted(slab) && slab->free == NULL)
