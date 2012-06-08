@@ -378,6 +378,7 @@ sub new {
             confess "space[$namespace] long_fields must be ARRAYREF" unless ref $ns->{long_fields} eq 'ARRAY';
             confess "space[$namespace] long_fields number must match format" if @{$ns->{long_fields}} != @{$ns->{long_field_format}};
             m/^[A-Za-z]/ or confess "space[$namespace] long_fields names must begin with [A-Za-z]: bad name $_" for @{$ns->{long_fields}};
+            $ns->{long_fields_hash} = { map { $ns->{long_fields}->[$_] => $_ } 0..$#{$ns->{long_fields}} };
         }
         $ns->{default_raw} = 1 if !defined$ns->{default_raw} and defined $ns->{hashify} and !$ns->{hashify};
     }
@@ -1339,16 +1340,28 @@ sub UpdateMulti {
     $flags |= WANT_RESULT if $param->{want_result};
 
     my $fmt = $namespace->{field_format};
+    my $long_fmt = $namespace->{long_field_format};
     my $fields_hash = $namespace->{fields_hash};
+    my $long_fields_hash = $namespace->{long_fields_hash};
 
     foreach (@op) {
         confess "$self->{name}: bad op <$_>" if ref ne 'ARRAY' or @$_ != 3;
         my ($field_num, $op, $value) = @$_;
+        my $long_field_num;
 
-        if($field_num =~ m/^[A-Za-z]/) {
+        if(ref $field_num eq 'ARRAY' && $long_fmt) {
+            my ($i, $n) = @$field_num;
+            if($n =~ m/^[A-Za-z]/) {
+                confess "no such long field $n in space $namespace->{name}($namespace->{space})" unless exists $long_fields_hash->{$n};
+                $n = $long_fields_hash->{$n};
+            }
+            $field_num = $n + @$fmt + $i*@$long_fmt;
+        } elsif($field_num =~ m/^[A-Za-z]/) {
             confess "no such field $field_num in space $namespace->{name}($namespace->{space})" unless exists $fields_hash->{$field_num};
             $field_num = $fields_hash->{$field_num};
         }
+
+        $long_field_num = ($field_num - @$fmt) % @$long_fmt if $field_num >= @$fmt && $long_fmt;
 
         my $field_type = $namespace->{string_keys}->{$field_num} ? 'string' : 'number';
 
@@ -1376,8 +1389,10 @@ sub UpdateMulti {
         $value = [ $value ] unless ref $value;
         confess "dunno what to do with ref `$value'" if ref $value ne 'ARRAY';
 
-        confess "bad fieldnum: $field_num" if $field_num >= @$fmt;
-        $value = pack($update_arg_fmt{$op} || $fmt->[$field_num], @$value);
+        confess "bad fieldnum: $field_num" if $field_num >= @$fmt && !defined $long_field_num;
+        confess "bad long_fieldnum: $long_field_num" if defined $long_field_num && $long_field_num >= @$long_fmt;
+
+        $value = pack($update_arg_fmt{$op} || ($field_num < @$fmt ? $fmt->[$field_num] : $long_fmt->[$long_field_num]), @$value);
         $_ = pack('LCw/a*', $field_num, $op, $value);
     }
 
