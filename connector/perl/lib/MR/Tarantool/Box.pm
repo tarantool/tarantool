@@ -81,7 +81,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.23;
+$VERSION = 0.0.24;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -1277,7 +1277,7 @@ Returns false upon error.
 
 =item B<$field>
 
-Field-to-update number or name (see L</fields>).
+Field-to-update number or name (see L</fields>, L</LongTuple>).
 
 =item B<$op>
 
@@ -1517,9 +1517,9 @@ If C<format> given to L</new>, or C<unpack_format> given to L</Call> ends with a
 I<long tuple> is enabled. Last field or group of fields of C<format> represent variable-length
 tail of the tuple. C<long_fields> option given to L</new> will fold the tail into array of hashes.
 
-    $box->Insert(1,"2",3);
-    $box->Insert(3,"2",3,4,5);
-    $box->Insert(5,"2",3,4,5,6,7);
+    $box->Insert(1,"2",3);         #1
+    $box->Insert(3,"2",3,4,5);     #2
+    $box->Insert(5,"2",3,4,5,6,7); #3
 
 If we set up
 
@@ -1531,9 +1531,9 @@ we'll get:
 
     $result = $box->Select([1,2,3,4,5]);
     $result = [
-        { a => 1, b => "2", c => 3, d => [] },
-        { a => 3, b => "2", c => 3, d => [4,5] },
-        { a => 5, b => "2", c => 3, d => [4,5,6,7] },
+        { a => 1, b => "2", c => 3, d => [] },        #1
+        { a => 3, b => "2", c => 3, d => [4,5] },     #2
+        { a => 5, b => "2", c => 3, d => [4,5,6,7] }, #3
     ];
 
 And if we set up
@@ -1545,11 +1545,25 @@ And if we set up
 we'll get:
 
     $result = [
-        { a => 1, b => "2", c => 3, d => [] },
-        { a => 3, b => "2", c => 3, d => [{d1=>4, d2=>5}] },
-        { a => 5, b => "2", c => 3, d => [{d1=>4, d2=>5}, {d1=>6, d2=>7}] },
+        { a => 1, b => "2", c => 3, d => [] },                               #1
+        { a => 3, b => "2", c => 3, d => [{d1=>4, d2=>5}] },                 #2
+        { a => 5, b => "2", c => 3, d => [{d1=>4, d2=>5}, {d1=>6, d2=>7}] }, #3
     ];
 
+L</UpdateMulti> can be given a field number in several ways:
+
+=over
+
+=item $linear_index_int
+
+    $box->UpdateMulti(5, [ 5 => set => $val ]) #3: set 6 to $val
+
+=item an arrayref of [$index_of_folded_subtuple_int, $long_field_name_str_or_index_int] 
+
+    $box->UpdateMulti(5, [ [1,0]    => set => $val ]) #3: set 6 to $val
+    $box->UpdateMulti(5, [ [1,'d1'] => set => $val ]) #3: set 6 to $val
+
+=back
 
 =head2 utf8
 
