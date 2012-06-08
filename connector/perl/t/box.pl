@@ -13,7 +13,7 @@ use FindBin qw($Bin);
 use lib "$Bin";
 use Carp qw/confess/;
 
-use Test::More tests => 360;
+use Test::More tests => 366;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
@@ -973,6 +973,12 @@ do {
     ok         $box->UpdateMulti($tuples->[2]->[0],[ $flds->[3] => set => $tuples->[2]->[3] ]), 'update2';
     is_deeply [$box->UpdateMulti($tuples->[2]->[0],[ 3          => set => $tuples->[2]->[3] ],{want_updated_tuple => 1})], [$check->[2]], 'update3';
     ok         $box->UpdateMulti($tuples->[2]->[0],[ 3          => set => $tuples->[2]->[3] ]), 'update4';
+    is_deeply [$box->UpdateMulti($tuples->[2]->[0],[ 6          => set => $tuples->[2]->[6] ],{want_updated_tuple => 1})], [$check->[2]], 'update5';
+    ok         $box->UpdateMulti($tuples->[2]->[0],[ 6          => set => $tuples->[2]->[6] ]), 'update6';
+    is_deeply [$box->UpdateMulti($tuples->[2]->[0],[ [0,2]      => set => $tuples->[2]->[6] ],{want_updated_tuple => 1})], [$check->[2]], 'update7';
+    ok         $box->UpdateMulti($tuples->[2]->[0],[ [0,2]      => set => $tuples->[2]->[6] ]), 'update8';
+    is_deeply [$box->UpdateMulti($tuples->[2]->[0],[ [0,'l3']   => set => $tuples->[2]->[6] ],{want_updated_tuple => 1})], [$check->[2]], 'update9';
+    ok         $box->UpdateMulti($tuples->[2]->[0],[ [0,'l3']   => set => $tuples->[2]->[6] ]), 'update10';
 
     is_deeply [$box->Delete($tuples->[$_]->[0],{want_deleted_tuple => 1})], [$check->[$_]], "delete$_" for 0..$#$tuples;
 };

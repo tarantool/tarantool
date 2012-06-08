@@ -145,8 +145,13 @@ sub recv {
         if (vec($rin, $fileno, 1)) {
             if (my $list = $pend->continue) {
                 if (ref $list) {
-                    delete $pending->{$shard};
-                    $self->runcatch($pend->onok, ($pend->id, $list, $pend, $self));
+                    if(defined(my $okay = $self->runcatch($pend->onok, ($pend->id, $list, $pend, $self)))) {
+                        if($okay) {
+                            delete $pending->{$shard};
+                        } else {
+                            $pend->set_sleeping_mode;
+                        }
+                    }
                 }
             } else {
                 $pend->close("error while receiving (".$pend->last_error.")");
@@ -249,6 +254,12 @@ has retry => (
     predicate => "_has_retry",
 );
 
+has status_unknown => (
+    is       => 'rw',
+    isa      => 'Bool',
+    default  => 0,
+);
+
 has _done => (
     is       => 'rw',
     isa      => 'Bool',
@@ -308,6 +319,7 @@ sub is_sleeping { return !$_[0]->_done && !$_[0]->_has__connection }
 
 sub set_pending_mode {
     my ($self, $cont) = @_;
+    $self->_done(0);
     $self->_clear__connection;
     $self->_clear__continue;
     $self->_clear__postprocess;
@@ -317,7 +329,10 @@ sub set_pending_mode {
         $self->_continue($cont->{continue});
         $self->_postprocess($cont->{postprocess});
     }
-    $self->_set_try($self->try + 1) if @_ > 1;
+    if (@_ > 1) {
+        $self->status_unknown(0);
+        $self->_set_try($self->try + 1);
+    }
     $self->_time(time);
     return $self;
 }
@@ -356,7 +371,10 @@ sub continue {
 
 sub close {
     my ($self, $reason) = @_;
-    $self->_connection->Close($reason) if $self->is_pending;
+    if ($self->is_pending) {
+        $self->_connection->Close($reason);
+        $self->status_unknown(1);
+    }
     $self->set_sleeping_mode;
 }
 
