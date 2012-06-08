@@ -444,8 +444,8 @@ void append_key_part(struct lua_State *L, int i,
  * (numbers, strings) and start iteration from an
  * offset.
  */
-static int
-lbox_index_move(struct lua_State *L, enum iterator_type type)
+static inline struct iterator *
+lbox_index_iterator(struct lua_State *L, enum iterator_type type)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
@@ -498,6 +498,34 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 	} else { /* 1 item on the stack and it's a userdata. */
 		it = lua_checkiterator(L, 2);
 	}
+
+	return it;
+}
+
+/**
+ * Lua forward index iterator function.
+ * See lbox_index_iterator comment for a functional
+ * description.
+ */
+static int
+lbox_index_next(struct lua_State *L)
+{
+	struct iterator *it = lbox_index_iterator(L, ITER_FORWARD);
+	struct tuple *tuple = it->next(it);
+	/* If tuple is NULL, pushes nil as end indicator. */
+	lbox_pushtuple(L, tuple);
+	return tuple ? 2 : 1;
+}
+
+/**
+ * Lua reverse index iterator function.
+ * See lbox_index_iterator comment for a functional
+ * description.
+ */
+static int
+lbox_index_prev(struct lua_State *L)
+{
+	struct iterator *it = lbox_index_iterator(L, ITER_REVERSE);
 	struct tuple *tuple = it->next(it);
 	/* If tuple is NULL, pushes nil as end indicator. */
 	lbox_pushtuple(L, tuple);
@@ -506,24 +534,32 @@ lbox_index_move(struct lua_State *L, enum iterator_type type)
 
 /**
  * Lua forward index iterator function.
- * See lbox_index_move comment for a functional
+ * See lbox_index_iterator comment for a functional
  * description.
  */
 static int
-lbox_index_next(struct lua_State *L)
+lbox_index_next_equal(struct lua_State *L)
 {
-	return lbox_index_move(L, ITER_FORWARD);
+	struct iterator *it = lbox_index_iterator(L, ITER_FORWARD);
+	struct tuple *tuple = it->next_equal(it);
+	/* If tuple is NULL, pushes nil as end indicator. */
+	lbox_pushtuple(L, tuple);
+	return tuple ? 2 : 1;
 }
 
 /**
  * Lua reverse index iterator function.
- * See lbox_index_move comment for a functional
+ * See lbox_index_iterator comment for a functional
  * description.
  */
 static int
-lbox_index_prev(struct lua_State *L)
+lbox_index_prev_equal(struct lua_State *L)
 {
-	return lbox_index_move(L, ITER_REVERSE);
+	struct iterator *it = lbox_index_iterator(L, ITER_REVERSE);
+	struct tuple *tuple = it->next_equal(it);
+	/* If tuple is NULL, pushes nil as end indicator. */
+	lbox_pushtuple(L, tuple);
+	return tuple ? 2 : 1;
 }
 
 static const struct luaL_reg lbox_index_meta[] = {
@@ -534,6 +570,8 @@ static const struct luaL_reg lbox_index_meta[] = {
 	{"max", lbox_index_max},
 	{"next", lbox_index_next},
 	{"prev", lbox_index_prev},
+	{"next_equal", lbox_index_next_equal},
+	{"prev_equal", lbox_index_prev_equal},
 	{NULL, NULL}
 };
 

@@ -187,3 +187,74 @@ lua box.select_reverse_range(14, 1, 4)
  - 7: {0}
  - 6: {0}
 ...
+
+#
+# Tests for box.index iterators
+#
+
+lua box.insert(16, 'pid_1', 'sid_1', 'tid_999')
+---
+ - 'pid_1': {'sid_1', 'tid_999'}
+...
+lua box.insert(16, 'pid_2', 'sid_1', 'tid_998')
+---
+ - 'pid_2': {'sid_1', 'tid_998'}
+...
+lua box.insert(16, 'pid_3', 'sid_1', 'tid_997')
+---
+ - 'pid_3': {'sid_1', 'tid_997'}
+...
+lua box.insert(16, 'pid_4', 'sid_2', 'tid_996')
+---
+ - 'pid_4': {'sid_2', 'tid_996'}
+...
+lua box.insert(16, 'pid_5', 'sid_2', 'tid_995')
+---
+ - 'pid_5': {'sid_2', 'tid_995'}
+...
+lua box.insert(16, 'pid_6', 'sid_2', 'tid_994')
+---
+ - 'pid_6': {'sid_2', 'tid_994'}
+...
+lua for k, v in box.space[16].index[1].idx.next, box.space[16].index[1].idx, 'sid_1' do print(v) end
+---
+'pid_3': {'sid_1', 'tid_997'}
+'pid_2': {'sid_1', 'tid_998'}
+'pid_1': {'sid_1', 'tid_999'}
+'pid_6': {'sid_2', 'tid_994'}
+'pid_5': {'sid_2', 'tid_995'}
+'pid_4': {'sid_2', 'tid_996'}
+...
+lua for k, v in box.space[16].index[1].idx.prev, box.space[16].index[1].idx, 'sid_2' do print(v) end
+---
+'pid_4': {'sid_2', 'tid_996'}
+'pid_5': {'sid_2', 'tid_995'}
+'pid_6': {'sid_2', 'tid_994'}
+'pid_1': {'sid_1', 'tid_999'}
+'pid_2': {'sid_1', 'tid_998'}
+'pid_3': {'sid_1', 'tid_997'}
+...
+lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end
+---
+'pid_3': {'sid_1', 'tid_997'}
+'pid_2': {'sid_1', 'tid_998'}
+'pid_1': {'sid_1', 'tid_999'}
+...
+lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end
+---
+'pid_1': {'sid_1', 'tid_999'}
+'pid_2': {'sid_1', 'tid_998'}
+'pid_3': {'sid_1', 'tid_997'}
+...
+lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end
+---
+'pid_6': {'sid_2', 'tid_994'}
+'pid_5': {'sid_2', 'tid_995'}
+'pid_4': {'sid_2', 'tid_996'}
+...
+lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end
+---
+'pid_4': {'sid_2', 'tid_996'}
+'pid_5': {'sid_2', 'tid_995'}
+'pid_6': {'sid_2', 'tid_994'}
+...
