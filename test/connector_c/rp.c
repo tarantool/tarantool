@@ -48,27 +48,27 @@ main(int argc, char * argv[])
 
 	while (tnt_next(&i)) {
 		struct tnt_request *r = TNT_IREQUEST_PTR(&i);
-		switch (r->type) {
-		case TNT_REQUEST_NONE:
-			printf("unknown?!\n");
-			continue;
-		case TNT_REQUEST_PING:
+		switch (r->h.type) {
+		case TNT_OP_PING:
 			printf("ping:");
 			break;
-		case TNT_REQUEST_INSERT:
+		case TNT_OP_INSERT:
 			printf("insert:");
 			break;
-		case TNT_REQUEST_DELETE:
+		case TNT_OP_DELETE:
 			printf("delete:");
 			break;
-		case TNT_REQUEST_UPDATE:
+		case TNT_OP_UPDATE:
 			printf("update:");
 			break;
-		case TNT_REQUEST_CALL:
+		case TNT_OP_CALL:
 			printf("call:");
 			break;
-		case TNT_REQUEST_SELECT:
+		case TNT_OP_SELECT:
 			printf("select:");
+			break;
+		default:
+			printf("unknown?!\n");
 			break;
 		}
 		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);

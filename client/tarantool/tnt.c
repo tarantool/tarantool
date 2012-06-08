@@ -51,80 +51,83 @@
 #define DEFAULT_PORT_ADMIN 33015
 #define HISTORY_FILE ".tarantool_history"
 
-static int query_reply_handle(struct tnt_stream *t, struct tnt_reply *r) {
-	switch (r->op) {
-	case TNT_OP_PING:
-		printf("Ping ");
-		break;
-	case TNT_OP_INSERT:
-		printf("Insert ");
-		break;
-	case TNT_OP_DELETE:
-		printf("Delete ");
-		break;
-	case TNT_OP_UPDATE:
-		printf("Update ");
-		break;
-	case TNT_OP_SELECT:
-		printf("Select ");
-		break;
-	case TNT_OP_CALL:
-		printf("Call ");
-		break;
-	default:
-		printf("Unknown ");
-		break;
+static char *query_op_type(uint32_t type) {
+	switch (type) {
+	case TNT_OP_PING:   return "Ping";
+	case TNT_OP_INSERT: return "Insert";
+	case TNT_OP_DELETE: return "Delete";
+	case TNT_OP_UPDATE: return "Update";
+	case TNT_OP_SELECT: return "Select";
+	case TNT_OP_CALL:   return "Call";
 	}
-	if (tnt_error(t) != TNT_EOK) {
-		printf("ERROR, %s\n", tnt_strerror(t));
-		return -1;
-	} else if (r->code != 0) {
-		printf("ERROR, %s (%s)\n",
-		       ((r->error) ? r->error : ""), tnt_errcode_str(r->code >> 8));
-		return -1;
-	}
-	printf("OK, %d rows affected\n", r->count);
-	struct tnt_iter it;
-	tnt_iter_list(&it, TNT_REPLY_LIST(r));
-	while (tnt_next(&it)) {
-		printf("[");
-		struct tnt_tuple *tu = TNT_ILIST_TUPLE(&it);
-		struct tnt_iter ifl;
-		tnt_iter(&ifl, tu);
-		while (tnt_next(&ifl)) {
-			if (TNT_IFIELD_IDX(&ifl) != 0)
-				printf(", ");
-			char *data = TNT_IFIELD_DATA(&ifl);
-			uint32_t size = TNT_IFIELD_SIZE(&ifl);
-			if (!isprint(data[0]) && (size == 4 || size == 8)) {
-				if (size == 4) {
-					uint32_t i = *((uint32_t*)data);
-					printf("%"PRIu32, i);
-				} else {
-					uint64_t i = *((uint64_t*)data);
-					printf("%"PRIu64, i);
-				}
+	return "Unknown";
+}
+
+static char *query_op(struct tnt_reply *r) {
+	return query_op_type(r->op);
+}
+
+static void print_tuple(struct tnt_tuple *tu) {
+	struct tnt_iter ifl;
+	tnt_iter(&ifl, tu);
+	printf("[");
+	while (tnt_next(&ifl)) {
+		if (TNT_IFIELD_IDX(&ifl) != 0)
+			printf(", ");
+		char *data = TNT_IFIELD_DATA(&ifl);
+		uint32_t size = TNT_IFIELD_SIZE(&ifl);
+		if (!isprint(data[0]) && (size == 4 || size == 8)) {
+			if (size == 4) {
+				uint32_t i = *((uint32_t*)data);
+				printf("%"PRIu32, i);
 			} else {
-				printf("'%-.*s'", size, data);
+				uint64_t i = *((uint64_t*)data);
+				printf("%"PRIu64, i);
 			}
+		} else {
+			printf("'%-.*s'", size, data);
 		}
-		if (ifl.status == TNT_ITER_FAIL)
-			printf("<parsing error>");
-		printf("]\n");
 	}
-	return 0;
+	if (ifl.status == TNT_ITER_FAIL)
+		printf("<parsing error>");
+	printf("]\n");
+}
+
+static void print_tuple_list(struct tnt_list *l) {
+	struct tnt_iter it;
+	tnt_iter_list(&it, l);
+	while (tnt_next(&it)) {
+		struct tnt_tuple *tu = TNT_ILIST_TUPLE(&it);
+		print_tuple(tu);
+	}
+}
+
+static void
+query_reply_show(struct tnt_reply *r)
+{
+	printf("%s OK, %d rows affected\n", query_op(r), r->count);
+	print_tuple_list(TNT_REPLY_LIST(r));
 }
 
 static int
-query_reply(struct tnt_stream *t)
+query_reply(struct tnt_stream *t, int show_reply)
 {
 	int rc = -1;
 	struct tnt_iter i;
 	tnt_iter_reply(&i, t);
 	while (tnt_next(&i)) {
 		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
-		if (query_reply_handle(t, r) == -1)
+		if (tnt_error(t) != TNT_EOK) {
+			printf("%s ERROR, %s\n", query_op(r),
+			       tnt_strerror(t));
 			goto error;
+		} else if (r->code != 0) {
+			printf("%s ERROR, %s (%s)\n", query_op(r),
+			       ((r->error) ? r->error : ""), tnt_errcode_str(r->code >> 8));
+			goto error;
+		}
+		if (show_reply)
+			query_reply_show(r);
 
 	}
 	rc = (i.status == TNT_ITER_FAIL) ? -1 : 0;
@@ -150,7 +153,7 @@ query(struct tnt_stream *t, char *q)
 		printf("error: %s\n", tnt_strerror(t));
 		return -1;
 	}
-	if (query_reply(t) == -1)
+	if (query_reply(t, 1) == -1)
 		return -1;
 	return 0;
 }
@@ -283,39 +286,27 @@ run_wal_cat(const char *file)
 	tnt_iter_request(&i, &s);
 	while (tnt_next(&i)) {
 		struct tnt_request *r = TNT_IREQUEST_PTR(&i);
-		switch (r->type) {
-		case TNT_REQUEST_NONE:
-			printf("unknown?!\n");
-			continue;
-		case TNT_REQUEST_PING:
-			printf("Ping:");
-			break;
-		case TNT_REQUEST_INSERT:
-			printf("Insert:");
-			break;
-		case TNT_REQUEST_DELETE:
-			printf("Delete:");
-			break;
-		case TNT_REQUEST_UPDATE:
-			printf("Update:");
-			break;
-		case TNT_REQUEST_CALL:
-			printf("Call:");
-			break;
-		case TNT_REQUEST_SELECT:
-			printf("Select:");
-			break;
-		}
 		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
-		printf(" lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
+		printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
+		       query_op_type(r->h.type),
 		       sx->hdr.lsn,
 		       sx->hdr.tm, sx->hdr.len);
+		switch (r->h.type) {
+		case TNT_OP_INSERT:
+			print_tuple(&r->r.insert.t);
+			break;
+		case TNT_OP_DELETE:
+			print_tuple(&r->r.delete.t);
+			break;
+		case TNT_OP_UPDATE:
+			print_tuple(&r->r.update.t);
+			break;
+		}
 	}
 	int rc = 0;
 	if (i.status == TNT_ITER_FAIL) {
 		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
 		rc = 1;
-
 	}
 	tnt_iter_free(&i);
 	tnt_stream_free(&s);
@@ -323,7 +314,7 @@ run_wal_cat(const char *file)
 }
 
 static int
-run_wal_player(struct tnt_stream *t, const char *file)
+run_wal_play(struct tnt_stream *t, const char *file)
 {
 	struct tnt_stream s;
 	tnt_xlog(&s);
@@ -331,28 +322,26 @@ run_wal_player(struct tnt_stream *t, const char *file)
 		tnt_stream_free(&s);
 		return -1;
 	}
-	int rc = 0;
 	struct tnt_iter i;
 	tnt_iter_request(&i, &s);
 	while (tnt_next(&i)) {
 		struct tnt_request *r = TNT_IREQUEST_PTR(&i);
 		if (t->write_request(t, r) == -1) {
 			printf("failed to write request\n");
-			rc = 1;
-			goto done;
+			goto error;
 		}
+		if (query_reply(t, 0) == -1)
+			goto error;
 	}
 	if (i.status == TNT_ITER_FAIL) {
 		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
-		rc = 1;
-		goto done;
+		goto error;
 	}
-	if (query_reply(t) == -1)
-		rc = 1;
-done:
+	return 0;
+error:
 	tnt_iter_free(&i);
 	tnt_stream_free(&s);
-	return rc;
+	return 1;
 }
 
 int
@@ -368,7 +357,7 @@ main(int argc, char *argv[])
 			   gopt_option('C', GOPT_ARG, gopt_shorts('C'),
 				       gopt_longs("wal-cat"), " <file>", "print xlog file content"),
 			   gopt_option('P', GOPT_ARG, gopt_shorts('P'),
-				       gopt_longs("wal-player"), " <file>", "replay xlog file to the specified host"),
+				       gopt_longs("wal-play"), " <file>", "replay xlog file to the specified server"),
 			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
 				       NULL, "display this help and exit"));
 	void *opt = gopt_sort(&argc, (const char**)argv, opt_def);
@@ -429,7 +418,7 @@ main(int argc, char *argv[])
 
 	/* wal-player mode */
 	if (wal_player_file) {
-		int rc = run_wal_player(t, wal_player_file);
+		int rc = run_wal_play(t, wal_player_file);
 		tnt_stream_free(t);
 		return rc;
 	}

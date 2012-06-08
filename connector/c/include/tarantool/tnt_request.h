@@ -6,16 +6,6 @@
 
 typedef ssize_t (*tnt_request_t)(void *ptr, char *dst, ssize_t size);
 
-enum tnt_request_type {
-	TNT_REQUEST_NONE,
-	TNT_REQUEST_PING,
-	TNT_REQUEST_INSERT,
-	TNT_REQUEST_DELETE,
-	TNT_REQUEST_UPDATE,
-	TNT_REQUEST_CALL,
-	TNT_REQUEST_SELECT
-};
-
 struct tnt_request_insert {
 	struct tnt_header_insert h;
 	struct tnt_tuple t;
@@ -59,7 +49,6 @@ struct tnt_request_select {
 };
 
 struct tnt_request {
-	enum tnt_request_type type;
 	struct tnt_header h;
 	union {
 		struct tnt_request_insert insert;

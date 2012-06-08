@@ -130,7 +130,7 @@ tnt_xlog_request(struct tnt_stream *s, struct tnt_request *r)
 	/* preparing pseudo iproto header */
 	struct tnt_header hdr_iproto;
 	hdr_iproto.type = sx->row.op;
-	hdr_iproto.len = sx->hdr.len;
+	hdr_iproto.len = sx->hdr.len - sizeof(struct tnt_xlog_row_v11);
 	hdr_iproto.reqid = 0;
 
 	/* deserializing operation */
@@ -300,7 +300,7 @@ struct tnt_xlog_error_desc {
 
 static struct tnt_xlog_error_desc tnt_xlog_error_list[] = 
 {
-	{ TNT_XLOG_EOK,      "OK"                                },
+	{ TNT_XLOG_EOK,      "ok"                                },
 	{ TNT_XLOG_EFAIL,    "fail"                              },
 	{ TNT_XLOG_EMEMORY,  "memory allocation failed"          },
 	{ TNT_XLOG_ETYPE,    "xlog type mismatch"                },

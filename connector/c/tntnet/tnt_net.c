@@ -279,7 +279,7 @@ struct tnt_error_desc {
 
 static struct tnt_error_desc tnt_error_list[] = 
 {
-	{ TNT_EOK,      "OK"                       },
+	{ TNT_EOK,      "ok"                       },
 	{ TNT_EFAIL,    "fail"                     },
 	{ TNT_EMEMORY,  "memory allocation failed" },
 	{ TNT_ESYSTEM,  "system error"             },

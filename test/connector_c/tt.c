@@ -305,9 +305,9 @@ static void tt_tnt_marshal_ping(struct tt_test *test) {
 	tnt_iter_request(&i, &s);
 	TT_ASSERT(tnt_next(&i) == 1);
 	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
-	TT_ASSERT(r->type == TNT_REQUEST_PING);
+	TT_ASSERT(r->h.type == TNT_OP_PING);
 	TT_ASSERT(tnt_next(&i) == 1);
-	TT_ASSERT(r->type == TNT_REQUEST_PING);
+	TT_ASSERT(r->h.type == TNT_OP_PING);
 	TT_ASSERT(tnt_next(&i) == 0);
 	tnt_iter_free(&i);
 	tnt_stream_free(&s);
@@ -326,7 +326,7 @@ static void tt_tnt_marshal_insert(struct tt_test *test) {
 	tnt_iter_request(&i, &s);
 	TT_ASSERT(tnt_next(&i) == 1);
 	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
-	TT_ASSERT(r->type == TNT_REQUEST_INSERT);
+	TT_ASSERT(r->h.type == TNT_OP_INSERT);
 	struct tnt_iter *f = tnt_field(NULL, &r->r.insert.t, 0);
 	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
 	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
@@ -338,7 +338,7 @@ static void tt_tnt_marshal_insert(struct tt_test *test) {
 	TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 123);
 	TT_ASSERT(tnt_next(&i) == 1);
 	r = TNT_IREQUEST_PTR(&i);
-	TT_ASSERT(r->type == TNT_REQUEST_INSERT);
+	TT_ASSERT(r->h.type == TNT_OP_INSERT);
 	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
 	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
 	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
@@ -366,7 +366,7 @@ static void tt_tnt_marshal_delete(struct tt_test *test) {
 	tnt_iter_request(&i, &s);
 	TT_ASSERT(tnt_next(&i) == 1);
 	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
-	TT_ASSERT(r->type == TNT_REQUEST_DELETE);
+	TT_ASSERT(r->h.type == TNT_OP_DELETE);
 	struct tnt_iter *f = tnt_field(NULL, &r->r.delete.t, 0);
 	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
 	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
@@ -374,7 +374,7 @@ static void tt_tnt_marshal_delete(struct tt_test *test) {
 	TT_ASSERT(memcmp(TNT_IFIELD_DATA(f), "foo", 3) == 0);
 	TT_ASSERT(tnt_next(&i) == 1);
 	r = TNT_IREQUEST_PTR(&i);
-	TT_ASSERT(r->type == TNT_REQUEST_DELETE);
+	TT_ASSERT(r->h.type == TNT_OP_DELETE);
 	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
 	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
 	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
@@ -398,7 +398,7 @@ static void tt_tnt_marshal_call(struct tt_test *test) {
 	tnt_iter_request(&i, &s);
 	TT_ASSERT(tnt_next(&i) == 1);
 	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
-	TT_ASSERT(r->type == TNT_REQUEST_CALL);
+	TT_ASSERT(r->h.type == TNT_OP_CALL);
 	TT_ASSERT(strcmp(r->r.call.proc, "box.select") == 0);
 	struct tnt_iter *f = tnt_field(NULL, &r->r.call.t, 0);
 	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
@@ -411,7 +411,7 @@ static void tt_tnt_marshal_call(struct tt_test *test) {
 	TT_ASSERT(*(uint32_t*)TNT_IFIELD_DATA(f) == 123);
 	TT_ASSERT(tnt_next(&i) == 1);
 	r = TNT_IREQUEST_PTR(&i);
-	TT_ASSERT(r->type == TNT_REQUEST_CALL);
+	TT_ASSERT(r->h.type == TNT_OP_CALL);
 	TT_ASSERT(strcmp(r->r.call.proc, "box.select") == 0);
 	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
 	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
@@ -442,7 +442,7 @@ static void tt_tnt_marshal_select(struct tt_test *test) {
 	tnt_iter_request(&i, &s);
 	TT_ASSERT(tnt_next(&i) == 1);
 	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
-	TT_ASSERT(r->type == TNT_REQUEST_SELECT);
+	TT_ASSERT(r->h.type == TNT_OP_SELECT);
 	struct tnt_iter il;
 	tnt_iter_list(&il, &r->r.select.l);
 	TT_ASSERT(tnt_next(&il) == 1);
@@ -503,7 +503,7 @@ static void tt_tnt_marshal_update(struct tt_test *test) {
 	tnt_iter_request(&i, &s);
 	TT_ASSERT(tnt_next(&i) == 1);
 	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
-	TT_ASSERT(r->type == TNT_REQUEST_UPDATE);
+	TT_ASSERT(r->h.type == TNT_OP_UPDATE);
 	TT_ASSERT(r->r.update.opc == 2);
 	struct tnt_iter *f = tnt_field(NULL, &r->r.update.t, 0);
 	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
