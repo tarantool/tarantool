@@ -108,13 +108,14 @@ tarantool_info(struct tbuf *out)
 	tbuf_printf(out, "  uptime: %i" CRLF, (int)tarantool_uptime());
 	tbuf_printf(out, "  pid: %i" CRLF, getpid());
 	tbuf_printf(out, "  logger_pid: %i" CRLF, logger_pid);
-	tbuf_printf(out, "  lsn: %" PRIi64 CRLF, recovery_state->confirmed_lsn);
-	if (recovery_state->remote) {
-		tbuf_printf(out, "  recovery_lag: %.3f" CRLF,
-			    recovery_state->remote->recovery_lag);
-		tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,
-			    recovery_state->remote->recovery_last_update_tstamp);
-	}
+	tbuf_printf(out, "  lsn: %" PRIi64 CRLF,
+		    recovery_state->confirmed_lsn);
+	tbuf_printf(out, "  recovery_lag: %.3f" CRLF,
+		    recovery_state->remote ? 
+		    recovery_state->remote->recovery_lag : 0);
+	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,
+		    recovery_state->remote ?
+		    recovery_state->remote->recovery_last_update_tstamp :0);
 	mod_info(out);
 	const char *path = cfg_filename_fullpath;
 	if (path == NULL)
