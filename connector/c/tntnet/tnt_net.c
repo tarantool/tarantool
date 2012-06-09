@@ -33,19 +33,6 @@
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_io.h>
 
-static struct tnt_stream *tnt_net_tryalloc(struct tnt_stream *s) {
-	if (s) {
-		memset(s, 0, sizeof(struct tnt_stream));
-		return s;
-	}
-	s = tnt_mem_alloc(sizeof(struct tnt_stream));
-	if (s == NULL)
-		return NULL;
-	memset(s, 0, sizeof(struct tnt_stream));
-	s->alloc = 1;
-	return s;
-}
-
 static void tnt_net_free(struct tnt_stream *s) {
 	struct tnt_stream_net *sn = TNT_SNET_CAST(s);
 	tnt_io_close(sn);
@@ -101,9 +88,7 @@ tnt_net_reply(struct tnt_stream *s, struct tnt_reply *r) {
 
 static int
 tnt_net_request(struct tnt_stream *s, struct tnt_request *r) {
-	if (s->wrcnt == 0)
-		return 1;
-	s->wrcnt--;
+	/* read doesn't touches wrcnt */
 	return tnt_request_from(r, (tnt_request_t)tnt_net_recv_cb, s, NULL);
 }
 
@@ -120,7 +105,7 @@ tnt_net_request(struct tnt_stream *s, struct tnt_request *r) {
 */
 struct tnt_stream *tnt_net(struct tnt_stream *s) {
 	int allocated = s == NULL;
-	s = tnt_net_tryalloc(s);
+	s = tnt_stream_init(s);
 	if (s == NULL)
 		return NULL;
 	/* allocating stream data */

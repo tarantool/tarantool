@@ -29,6 +29,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <limits.h>
 
 #include <signal.h>
 #include <errno.h>
@@ -43,6 +44,7 @@
 #include <connector/c/include/tarantool/tnt_sql.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_rpl.h>
 
 #include <client/tarantool/tnt_admin.h>
 
@@ -344,6 +346,49 @@ error:
 	return 1;
 }
 
+static int
+run_replica(char *host, int port, uint64_t lsn)
+{
+	struct tnt_stream s;
+	tnt_rpl(&s);
+
+	struct tnt_stream *sn = tnt_rpl_net(&s);
+	tnt_set(sn, TNT_OPT_HOSTNAME, host);
+	tnt_set(sn, TNT_OPT_PORT, port);
+	tnt_set(sn, TNT_OPT_SEND_BUF, 0);
+	tnt_set(sn, TNT_OPT_RECV_BUF, 0);
+	if (tnt_rpl_open(&s, lsn) == -1)
+		return 1;
+
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+
+	while (tnt_next(&i)) {
+		struct tnt_request *r = TNT_IREQUEST_PTR(&i);
+		struct tnt_stream_rpl *sr = TNT_RPL_CAST(&s);
+		printf("%s lsn: %"PRIu64"\n",
+		       query_op_type(r->h.type),
+		       sr->hdr.lsn);
+		switch (r->h.type) {
+		case TNT_OP_INSERT:
+			print_tuple(&r->r.insert.t);
+			break;
+		case TNT_OP_DELETE:
+			print_tuple(&r->r.delete.t);
+			break;
+		case TNT_OP_UPDATE:
+			print_tuple(&r->r.update.t);
+			break;
+		}
+	}
+	if (i.status == TNT_ITER_FAIL)
+		printf("parsing failed\n");
+
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+	return 0;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -358,6 +403,8 @@ main(int argc, char *argv[])
 				       gopt_longs("wal-cat"), " <file>", "print xlog file content"),
 			   gopt_option('P', GOPT_ARG, gopt_shorts('P'),
 				       gopt_longs("wal-play"), " <file>", "replay xlog file to the specified server"),
+			   gopt_option('R', GOPT_ARG, gopt_shorts('R'),
+				       gopt_longs("rpl"), " <lsn>", "act as replica for to the specified server"),
 			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
 				       NULL, "display this help and exit"));
 	void *opt = gopt_sort(&argc, (const char**)argv, opt_def);
@@ -384,6 +431,16 @@ main(int argc, char *argv[])
 	int port = DEFAULT_PORT;
 	if (gopt_arg(opt, 'p', &arg))
 		port = atoi(arg);
+
+	/* replica mode */
+	if (gopt_arg(opt, 'R', &arg)) {
+		uint64_t lsn = strtoll(arg, NULL, 10);
+		if (lsn == LLONG_MIN || lsn == LLONG_MAX) {
+			printf("bad lsn number\n");
+			return 1;
+		}
+		return run_replica(host, port, lsn);
+	}
 
 	/* server admin port */
 	int admin_port = DEFAULT_PORT_ADMIN;

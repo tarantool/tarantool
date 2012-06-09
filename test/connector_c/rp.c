@@ -32,8 +32,23 @@
 #include <string.h>
 
 #include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_rpl.h>
 
+static char *opname(uint32_t type) {
+	switch (type) {
+	case TNT_OP_PING:   return "Ping";
+	case TNT_OP_INSERT: return "Insert";
+	case TNT_OP_DELETE: return "Delete";
+	case TNT_OP_UPDATE: return "Update";
+	case TNT_OP_SELECT: return "Select";
+	case TNT_OP_CALL:   return "Call";
+	}
+	return "Unknown";
+}
+
+#if 0
 int
 main(int argc, char * argv[])
 {
@@ -47,37 +62,49 @@ main(int argc, char * argv[])
 	tnt_iter_request(&i, &s);
 
 	while (tnt_next(&i)) {
-		struct tnt_request *r = TNT_IREQUEST_PTR(&i);
-		switch (r->h.type) {
-		case TNT_OP_PING:
-			printf("ping:");
-			break;
-		case TNT_OP_INSERT:
-			printf("insert:");
-			break;
-		case TNT_OP_DELETE:
-			printf("delete:");
-			break;
-		case TNT_OP_UPDATE:
-			printf("update:");
-			break;
-		case TNT_OP_CALL:
-			printf("call:");
-			break;
-		case TNT_OP_SELECT:
-			printf("select:");
-			break;
-		default:
-			printf("unknown?!\n");
-			break;
-		}
 		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
-		printf(" lsn: %"PRIu64", time: %f, len: %d\n",
+		printf("%s lsn: %"PRIu64", time: %f, len: %d\n",
+		       opname(sx->row.op),
 		       sx->hdr.lsn,
 		       sx->hdr.tm, sx->hdr.len);
 	}
 	if (i.status == TNT_ITER_FAIL)
 		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
+
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+	return 0;
+}
+#endif
+
+int
+main(int argc, char * argv[])
+{
+	(void)argc, (void)argv;
+
+	struct tnt_stream s;
+	tnt_rpl(&s);
+
+	struct tnt_stream *sn = tnt_rpl_net(&s);
+	tnt_set(sn, TNT_OPT_HOSTNAME, "127.0.0.1");
+	tnt_set(sn, TNT_OPT_PORT, 33018);
+	tnt_set(sn, TNT_OPT_SEND_BUF, 0);
+	tnt_set(sn, TNT_OPT_RECV_BUF, 0);
+	if (tnt_rpl_open(&s, 2) == -1)
+		return 1;
+
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+
+	while (tnt_next(&i)) {
+		struct tnt_stream_rpl *sr = TNT_RPL_CAST(&s);
+		printf("%s lsn: %"PRIu64", time: %f, len: %d\n",
+		       opname(sr->row.op),
+		       sr->hdr.lsn,
+		       sr->hdr.tm, sr->hdr.len);
+	}
+	if (i.status == TNT_ITER_FAIL)
+		printf("parsing failed\n");
 
 	tnt_iter_free(&i);
 	tnt_stream_free(&s);

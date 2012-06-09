@@ -58,6 +58,7 @@ static void tnt_xlog_free(struct tnt_stream *s) {
 		fclose(sx->fd);
 		sx->fd = NULL;
 	}
+	tnt_mem_free(s->data);
 }
 
 inline static int
@@ -282,13 +283,12 @@ void tnt_xlog_close(struct tnt_stream *s) {
 /*
  * tnt_xlog_error()
  *
- * get library error status;
+ * get stream error status;
  *
  * s - xlog stream pointer
 */
 enum tnt_xlog_error tnt_xlog_error(struct tnt_stream *s) {
-	struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(s);
-	return sx->error;
+	return TNT_SXLOG_CAST(s)->error;
 }
 
 /* must be in sync with enum tnt_xlog_error */
@@ -313,7 +313,7 @@ static struct tnt_xlog_error_desc tnt_xlog_error_list[] =
 /*
  * tnt_xlog_strerror()
  *
- * get library error status description string;
+ * get stream error status description string;
  *
  * s - xlog stream pointer
 */
@@ -336,6 +336,5 @@ char *tnt_xlog_strerror(struct tnt_stream *s) {
  * s - xlog stream pointer
 */
 int tnt_xlog_errno(struct tnt_stream *s) {
-	struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(s);
-	return sx->errno_;
+	return TNT_SXLOG_CAST(s)->errno_;
 }

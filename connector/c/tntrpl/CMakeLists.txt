@@ -23,7 +23,7 @@ endif()
 # source files
 #
 
-set (tntrpl_sources tnt_crc32.c tnt_xlog.c)
+set (tntrpl_sources tnt_crc32.c tnt_xlog.c tnt_rpl.c)
 
 #----------------------------------------------------------------------------#
 # Builds
