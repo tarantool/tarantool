@@ -78,8 +78,6 @@ txn_add_undo(struct txn *txn, struct space *space,
 	/* txn_add_undo() must be done after txn_add_redo() */
 	assert(txn->op != 0);
 	txn->new_tuple = new_tuple;
-	txn->old_tuple = old_tuple;
-	txn->space = space;
 	if (new_tuple == NULL) {                /* DELETE */
 		if (old_tuple == NULL) {
 			/*
@@ -114,6 +112,12 @@ txn_add_undo(struct txn *txn, struct space *space,
 	} else {                                /* REPLACE */
 		txn_lock(txn, old_tuple);
 	}
+	/* Remember the old tuple only if we locked it
+	 * successfully, to not unlock a tuple locked by another
+	 * transaction in rollback().
+	 */
+	txn->old_tuple = old_tuple;
+	txn->space = space;
 }
 
 struct txn *
