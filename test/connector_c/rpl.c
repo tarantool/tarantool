@@ -48,46 +48,20 @@ static char *opname(uint32_t type) {
 	return "Unknown";
 }
 
-#if 0
 int
 main(int argc, char * argv[])
 {
-	(void)argc, (void)argv;
-
-	struct tnt_stream s;
-	tnt_xlog(&s);
-	tnt_xlog_open(&s, "./log");
-
-	struct tnt_iter i;
-	tnt_iter_request(&i, &s);
-
-	while (tnt_next(&i)) {
-		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
-		printf("%s lsn: %"PRIu64", time: %f, len: %d\n",
-		       opname(sx->row.op),
-		       sx->hdr.lsn,
-		       sx->hdr.tm, sx->hdr.len);
+	if (argc != 4) {
+		printf("usage %s: host port limit\n", argv[0]);
+		return 1;
 	}
-	if (i.status == TNT_ITER_FAIL)
-		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
-
-	tnt_iter_free(&i);
-	tnt_stream_free(&s);
-	return 0;
-}
-#endif
-
-int
-main(int argc, char * argv[])
-{
-	(void)argc, (void)argv;
 
 	struct tnt_stream s;
 	tnt_rpl(&s);
 
 	struct tnt_stream *sn = tnt_rpl_net(&s);
-	tnt_set(sn, TNT_OPT_HOSTNAME, "127.0.0.1");
-	tnt_set(sn, TNT_OPT_PORT, 33018);
+	tnt_set(sn, TNT_OPT_HOSTNAME, argv[1]);
+	tnt_set(sn, TNT_OPT_PORT, atoi(argv[2]));
 	tnt_set(sn, TNT_OPT_SEND_BUF, 0);
 	tnt_set(sn, TNT_OPT_RECV_BUF, 0);
 	if (tnt_rpl_open(&s, 2) == -1)
@@ -96,7 +70,8 @@ main(int argc, char * argv[])
 	struct tnt_iter i;
 	tnt_iter_request(&i, &s);
 
-	while (tnt_next(&i)) {
+	int limit = atoi(argv[3]);
+	while (limit-- > 0 && tnt_next(&i)) {
 		struct tnt_stream_rpl *sr = TNT_RPL_CAST(&s);
 		printf("%s lsn: %"PRIu64", time: %f, len: %d\n",
 		       opname(sr->row.op),

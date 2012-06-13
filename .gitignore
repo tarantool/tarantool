@@ -44,6 +44,7 @@ test/connector_c/update
 *.reject
 extra/txt2c
 mod/box/box.lua.c
+mod/box/tarantool.cfg
 doc/www-data/*.html
 doc/www-data/*.ru.html
 doc/www-data.in/download

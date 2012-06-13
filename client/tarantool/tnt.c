@@ -303,6 +303,9 @@ run_wal_cat(const char *file)
 		case TNT_OP_UPDATE:
 			print_tuple(&r->r.update.t);
 			break;
+		case TNT_OP_CALL:
+			print_tuple(&r->r.call.t);
+			break;
 		}
 	}
 	int rc = 0;
@@ -378,6 +381,9 @@ run_replica(char *host, int port, uint64_t lsn)
 			break;
 		case TNT_OP_UPDATE:
 			print_tuple(&r->r.update.t);
+			break;
+		case TNT_OP_CALL:
+			print_tuple(&r->r.call.t);
 			break;
 		}
 	}

@@ -1,8 +1,7 @@
-#ifndef TNT_RPL_H_INCLUDED
-#define TNT_RPL_H_INCLUDED
+
 
 /*
- * Copyright (C) 2012 Mail.RU
+ * Copyright (C) 2011 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,18 +25,56 @@
  * SUCH DAMAGE.
  */
 
-struct tnt_stream_rpl {
-	struct tnt_xlog_header_v11 hdr;
-	struct tnt_xlog_row_v11 row;
-	struct tnt_stream *net;
-};
+#include <stdlib.h>
+#include <stdint.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 
-#define TNT_RPL_CAST(S) ((struct tnt_stream_rpl*)(S)->data)
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_net.h>
+#include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_rpl.h>
 
-struct tnt_stream *tnt_rpl(struct tnt_stream *s);
-struct tnt_stream *tnt_rpl_net(struct tnt_stream *s);
+static char *opname(uint32_t type) {
+	switch (type) {
+	case TNT_OP_PING:   return "Ping";
+	case TNT_OP_INSERT: return "Insert";
+	case TNT_OP_DELETE: return "Delete";
+	case TNT_OP_UPDATE: return "Update";
+	case TNT_OP_SELECT: return "Select";
+	case TNT_OP_CALL:   return "Call";
+	}
+	return "Unknown";
+}
 
-int tnt_rpl_open(struct tnt_stream *s, uint64_t lsn);
-void tnt_rpl_close(struct tnt_stream *s);
+int
+main(int argc, char * argv[])
+{
+	if (argc != 2)
+		return 1;
 
-#endif /* TNT_XLOG_H_INCLUDED */
+	struct tnt_stream s;
+	tnt_xlog(&s);
+
+	if (tnt_xlog_open(&s, argv[1]) == -1)
+		return 1;
+
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+
+	while (tnt_next(&i)) {
+		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
+		printf("%s lsn: %"PRIu64", time: %f, len: %d\n",
+		       opname(sx->row.op),
+		       sx->hdr.lsn,
+		       sx->hdr.tm, sx->hdr.len);
+	}
+	if (i.status == TNT_ITER_FAIL)
+		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
+
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+	return 0;
+}
