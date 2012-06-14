@@ -304,6 +304,31 @@ struct {								\
 		(head)->stqh_last = &STAILQ_FIRST((head));		\
 } while (0)
 
+/* Reverse a list in-place. */
+#define STAILQ_REVERSE(head, type, member) do {				\
+	struct type *elem = STAILQ_FIRST(head), *next;			\
+	STAILQ_INIT(head);						\
+	while (elem) {							\
+		next = STAILQ_NEXT(elem, member);			\
+		STAILQ_INSERT_HEAD(head, elem, member);			\
+		elem = next;						\
+	}								\
+} while (0)
+
+/* Concat all members of head1 starting from elem to the end of head2. */
+#define STAILQ_SPLICE(head1, elem, member, head2) do {			\
+	if (elem) {							\
+		*(head2)->stqh_last = (elem);				\
+		(head2)->stqh_last = (head1)->stqh_last;		\
+		(head1)->stqh_last = &STAILQ_FIRST(head1);		\
+		while (*(head1)->stqh_last != (elem)) {			\
+			(head1)->stqh_last = &STAILQ_NEXT(		\
+				*(head1)->stqh_last, member);		\
+		}							\
+		*(head1)->stqh_last = NULL;				\
+	}								\
+} while (0)
+
 /*
  * List declarations.
  */

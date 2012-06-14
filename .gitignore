@@ -13,6 +13,7 @@ test/lib/*.pyc
 test/lib/*/*.pyc
 test/box/protocol
 test/box/connector
+test/unit/queue
 Makefile
 CMakeFiles
 CMakeCache.txt

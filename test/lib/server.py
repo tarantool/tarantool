@@ -177,7 +177,7 @@ class Server(object):
         if start_and_exit != None: self.start_and_exit = start_and_exit
         if gdb != None: self.gdb = gdb
         if valgrind != None: self.valgrind = valgrind
-	self.debug = self.test_debug()
+        self.debug = self.test_debug()
 
         if self.is_started:
             if not silent:
@@ -269,7 +269,7 @@ class Server(object):
 
     def test_option_get(self, show, option_list_str):
         args = [self.binary] + option_list_str.split()
-	if show:
+        if show:
            print " ".join([os.path.basename(self.binary)] + args[1:])
         output = subprocess.Popen(args,
                                   cwd = self.vardir,
@@ -282,7 +282,7 @@ class Server(object):
 
     def test_debug(self):
         output = self.test_option_get(False, "-V")
-	if re.search("-Debug", output):
+        if re.search("-Debug", output):
            return True
         return False
 
