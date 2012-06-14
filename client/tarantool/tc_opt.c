@@ -31,7 +31,7 @@
 
 #include <third_party/gopt/gopt.h>
 
-#include "client/tc/tc_opt.h"
+#include "client/tarantool/tc_opt.h"
 
 #define TC_DEFAULT_HOST "localhost"
 #define TC_DEFAULT_PORT 33013
@@ -58,7 +58,7 @@ static const void *tc_options_def = gopt_start(
 void tc_opt_usage(void)
 {
 	printf("usage: tarantool [options] [query]\n\n");
-	printf("tarantool cli.\n");
+	printf("tarantool client.\n");
 	gopt_help(tc_options_def);
 	exit(0);
 }

@@ -33,7 +33,7 @@
 
 #include <connector/c/include/tarantool/tnt.h>
 
-#include "client/tc/tc_print.h"
+#include "client/tarantool/tc_print.h"
 
 void tc_print_tuple(struct tnt_tuple *tu)
 {

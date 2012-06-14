@@ -34,11 +34,11 @@
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_sql.h>
 
-#include "client/tc/tc_opt.h"
-#include "client/tc/tc_admin.h"
-#include "client/tc/tc.h"
-#include "client/tc/tc_cli.h"
-#include "client/tc/tc_wal.h"
+#include "client/tarantool/tc_opt.h"
+#include "client/tarantool/tc_admin.h"
+#include "client/tarantool/tc.h"
+#include "client/tarantool/tc_cli.h"
+#include "client/tarantool/tc_wal.h"
 
 struct tc tc;
 

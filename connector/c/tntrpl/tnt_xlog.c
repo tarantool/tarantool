@@ -33,9 +33,10 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include <third_party/crc32.h>
+
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
-#include <connector/c/tntrpl/tnt_crc32.h>
 
 static const uint32_t tnt_xlog_marker_v11 = 0xba0babed;
 static const uint32_t tnt_xlog_marker_eof_v11 = 0x10adab1e;
@@ -105,9 +106,9 @@ tnt_xlog_request(struct tnt_stream *s, struct tnt_request *r)
 
 	/* checking header crc, starting from lsn */
 	uint32_t crc32_hdr =
-		tnt_xlog_crc32c(0, (unsigned char*)&sx->hdr + sizeof(uint32_t),
-				sizeof(struct tnt_xlog_header_v11) -
-				sizeof(uint32_t));
+		crc32c(0, (unsigned char*)&sx->hdr + sizeof(uint32_t),
+		       sizeof(struct tnt_xlog_header_v11) -
+		       sizeof(uint32_t));
 	if (crc32_hdr != sx->hdr.crc32_hdr)
 		return tnt_xlog_seterr(sx, TNT_XLOG_ECORRUPT);
 
@@ -119,7 +120,7 @@ tnt_xlog_request(struct tnt_stream *s, struct tnt_request *r)
 		return tnt_xlog_eof(sx, data);
 
 	/* checking data crc */
-	uint32_t crc32_data = tnt_xlog_crc32c(0, data, sx->hdr.len);
+	uint32_t crc32_data = crc32c(0, data, sx->hdr.len);
 	if (crc32_data != sx->hdr.crc32_data) {
 		tnt_mem_free(data);
 		return tnt_xlog_seterr(sx, TNT_XLOG_ECORRUPT);

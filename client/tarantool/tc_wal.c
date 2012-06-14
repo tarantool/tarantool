@@ -37,12 +37,12 @@
 #include <connector/c/include/tarantool/tnt_xlog.h>
 #include <connector/c/include/tarantool/tnt_rpl.h>
 
-#include "client/tc/tc_opt.h"
-#include "client/tc/tc_admin.h"
-#include "client/tc/tc.h"
-#include "client/tc/tc_print.h"
-#include "client/tc/tc_query.h"
-#include "client/tc/tc_wal.h"
+#include "client/tarantool/tc_opt.h"
+#include "client/tarantool/tc_admin.h"
+#include "client/tarantool/tc.h"
+#include "client/tarantool/tc_print.h"
+#include "client/tarantool/tc_query.h"
+#include "client/tarantool/tc_wal.h"
 
 extern struct tc tc;
 

@@ -222,7 +222,7 @@ option(ENABLE_DOC "Enable building of documentation" OFF)
 
 option(ENABLE_CLIENT "Enable building of console client" OFF)
 if (ENABLE_CLIENT)
-    set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tc")
+    set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
 endif()
 
 option(ENABLE_GCOV "Enable integration with gcov, a code coverage program" OFF)

@@ -41,7 +41,7 @@
 #include <errno.h>
 #include <limits.h>
 
-#include "client/tc/tc_admin.h"
+#include "client/tarantool/tc_admin.h"
 
 int tc_admin_connect(struct tc_admin *a, const char *host, int port)
 {
