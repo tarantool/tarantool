@@ -109,24 +109,6 @@ port_send_tuple(u32 flags, Port *port, struct tuple *tuple)
 
 	space_validate(sp, old_tuple, txn->new_tuple);
 
-	/** XXX: bug! This must be in space_validate(),
-	 * not here. Update can also replace a tuple,
-	 * and it can modify the primary key. We do not
-	 * take a gap lock for the tuple inserted by UPDATE.
-	 */
-#ifndef NDEBUG
-	if (old_tuple != NULL) {
-		Index *index = sp->index[0];
-		void *ka, *kb;
-		ka = tuple_field(txn->new_tuple,
-				 index->key_def->parts[0].fieldno);
-		kb = tuple_field(old_tuple, index->key_def->parts[0].fieldno);
-		int kal, kab;
-		kal = load_varint32(&ka);
-		kab = load_varint32(&kb);
-		assert(kal == kab && memcmp(ka, kb, kal) == 0);
-	}
-#endif
 	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
 
 	[port dupU32: 1]; /* Affected tuples */

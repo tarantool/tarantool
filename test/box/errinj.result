@@ -5,6 +5,8 @@ error injections:
     state: off
   - name: ERRINJ_WAL_IO
     state: off
+  - name: ERRINJ_WAL_ROTATE
+    state: off
 ...
 set injection some-injection on
 ---
@@ -48,6 +50,57 @@ Found 1 tuple:
 select * from t0 where k0=2
 No match
 set injection ERRINJ_WAL_IO off
+---
+ok
+...
+lua box.space[0]:truncate()
+---
+...
+set injection ERRINJ_WAL_ROTATE on
+---
+ok
+...
+insert into t0 values (1)
+An error occurred: ER_WAL_IO, 'Failed to write to disk'
+select * from t0 where k0=1
+No match
+set injection ERRINJ_WAL_ROTATE off
+---
+ok
+...
+insert into t0 values (1)
+Insert OK, 1 row affected
+set injection ERRINJ_WAL_ROTATE on
+---
+ok
+...
+update t0 set k0=2 where k0=1
+An error occurred: ER_WAL_IO, 'Failed to write to disk'
+select * from t0 where k0=1
+Found 1 tuple:
+[1]
+select * from t0 where k0=2
+No match
+set injection ERRINJ_WAL_ROTATE off
+---
+ok
+...
+update t0 set k0=2 where k0=1
+Update OK, 1 row affected
+select * from t0 where k0=1
+No match
+select * from t0 where k0=2
+Found 1 tuple:
+[2]
+set injection ERRINJ_WAL_ROTATE on
+---
+ok
+...
+lua box.space[0]:truncate()
+---
+error: 'Failed to write to disk'
+...
+set injection ERRINJ_WAL_ROTATE off
 ---
 ok
 ...

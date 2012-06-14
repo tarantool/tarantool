@@ -35,30 +35,17 @@
 static void
 txn_lock(struct txn *txn __attribute__((unused)), struct tuple *tuple)
 {
-	if (tuple->flags & WAL_WAIT)
-		tnt_raise(ClientError, :ER_TUPLE_IS_RO);
-
 	say_debug("txn_lock(%p)", tuple);
 	tuple->flags |= WAL_WAIT;
-}
-
-static void
-txn_lock_gap(struct txn *txn, struct tuple *tuple)
-{
-	txn_lock(txn, tuple);
-	tuple->flags |= GHOST;
 }
 
 static void
 txn_unlock(struct txn *txn __attribute__((unused)), struct tuple *tuple)
 {
 	assert(tuple->flags & WAL_WAIT);
-	tuple->flags &= ~(WAL_WAIT|GHOST);
+	tuple->flags &= ~WAL_WAIT;
 }
 
-/** Add redo information to the txn.
- * It will be written to the WAL at commit.
- */
 void
 txn_add_redo(struct txn *txn, u16 op, struct tbuf *data)
 {
@@ -78,39 +65,19 @@ txn_add_undo(struct txn *txn, struct space *space,
 	/* txn_add_undo() must be done after txn_add_redo() */
 	assert(txn->op != 0);
 	txn->new_tuple = new_tuple;
-	if (new_tuple == NULL) {                /* DELETE */
-		if (old_tuple == NULL) {
-			/*
-			 * There is no subject tuple we could write to
-			 * WAL, which means, to do a write, we would have
-			 * to allocate one. Too complicated, for now, just
-			 * do no logging for DELETEs that do nothing.
-			 */
-			txn->txn_flags |= BOX_NOT_STORE;
-		} else {
-			txn_lock(txn, old_tuple);
-		}
-	} else if (old_tuple == NULL) {         /* INSERT */
-		assert(new_tuple != NULL);
+	if (new_tuple == NULL && old_tuple == NULL) {
 		/*
-		 * Mark the tuple as GHOST before attempting an
-		 * index replace: if it fails, txn_rollback() will
-		 * look at the flag and remove the tuple.
-		 */
-		txn_lock_gap(txn, new_tuple);
-		/*
-		 * There is no old tuple, insert a GHOST
-		 * tuple in all indices in order to avoid a race
-		 * condition when another REPLACE comes along:
-		 * a concurrent REPLACE, UPDATE, or DELETE, returns
-		 * an error when meets a GHOST tuple.
-		 *
-		 * Tuple reference counter will be incremented in
-		 * txn_commit().
-		 */
+		 * There is no subject tuple we could write to
+		 * WAL, which means, to do a write, we would have
+		 * to allocate one. Too complicated, for now, just
+		 * do no logging for DELETEs that do nothing.
+		*/
+		txn->txn_flags |= BOX_NOT_STORE;
+	} else if (new_tuple == NULL) {
+		space_remove(space, old_tuple);
+	} else {
 		space_replace(space, old_tuple, new_tuple);
-	} else {                                /* REPLACE */
-		txn_lock(txn, old_tuple);
+		txn_lock(txn, new_tuple);
 	}
 	/* Remember the old tuple only if we locked it
 	 * successfully, to not unlock a tuple locked by another
@@ -142,21 +109,11 @@ txn_commit(struct txn *txn)
 		if (res)
 			tnt_raise(LoggedError, :ER_WAL_IO);
 	}
-	if (txn->new_tuple == NULL) {           /* DELETE */
-		if (txn->old_tuple != NULL) {
-			txn_unlock(txn, txn->old_tuple);
-			space_remove(txn->space, txn->old_tuple);
-			tuple_ref(txn->old_tuple, -1);
-		}
-	} else if (txn->old_tuple == NULL) {    /* INSERT */
-		assert(txn->new_tuple != NULL);
-		txn_unlock(txn, txn->new_tuple); /* Clear the gap lock. */
-		tuple_ref(txn->new_tuple, +1);
-	} else {                                /* REPLACE */
-		space_replace(txn->space, txn->old_tuple, txn->new_tuple);
-		txn_unlock(txn, txn->old_tuple);
+	if (txn->old_tuple)
 		tuple_ref(txn->old_tuple, -1);
+	if (txn->new_tuple) {
 		tuple_ref(txn->new_tuple, +1);
+		txn_unlock(txn, txn->new_tuple);
 	}
 	TRASH(txn);
 }
@@ -166,16 +123,12 @@ txn_rollback(struct txn *txn)
 {
 	if (txn->op == 0) /* Nothing to do. */
 		return;
-
-	if (txn->old_tuple)
-		txn_unlock(txn, txn->old_tuple);
-
-	if (txn->new_tuple) {
-		if (txn->new_tuple->flags & GHOST) {
-			/* Roll back the gap lock. */
-			space_remove(txn->space, txn->new_tuple);
-		}
-		tuple_free(txn->new_tuple);
+	if (txn->old_tuple) {
+		space_replace(txn->space, txn->new_tuple, txn->old_tuple);
+	} else if (txn->new_tuple && txn->new_tuple->flags & WAL_WAIT) {
+		space_remove(txn->space, txn->new_tuple);
 	}
+	if (txn->new_tuple)
+		tuple_free(txn->new_tuple);
 	TRASH(txn);
 }

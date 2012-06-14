@@ -689,14 +689,18 @@ struct wal_write_request {
 };
 
 /* Context of the WAL writer thread. */
+STAILQ_HEAD(wal_fifo, wal_write_request);
 
 struct wal_writer
 {
-	STAILQ_HEAD(wal_fifo, wal_write_request) input, output;
+	struct wal_fifo input_queue;
+	struct wal_fifo commit_queue;
+	struct wal_fifo rollback_queue;
 	pthread_t thread;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
-	ev_async async;
+	ev_async commit_event;
+	ev_async rollback_event;
 	struct nbatch *batch;
 	bool is_shutdown;
 };
@@ -738,10 +742,15 @@ wal_writer_init_once()
 }
 
 /**
- * A watcher callback which is invoked whenever there
- * are requests in wal_writer->output. This callback is
+ * A commit watcher callback is invoked whenever there
+ * are requests in wal_writer->commit_queue. This callback is
  * associated with an internal WAL writer watcher and is
  * invoked in the front-end main event loop.
+ *
+ * A rollback watcher callback is invoked only when there is
+ * no input in writer->input_queue (we processed all pending
+ * requests, and either put them to commit_queue or to
+ * rollback_queue).
  *
  * ev_async, under the hood, is a simple pipe. The WAL
  * writer thread writes to that pipe whenever it's done
@@ -749,26 +758,37 @@ wal_writer_init_once()
  * call in the writer thread loop).
  */
 static void
-wal_writer_schedule(ev_watcher *watcher, int event __attribute__((unused)))
+wal_schedule_queue(struct wal_writer *writer, struct wal_fifo *qptr)
 {
-	struct wal_writer *writer = watcher->data;
-	struct wal_fifo output;
+	struct wal_fifo queue = STAILQ_HEAD_INITIALIZER(queue);
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
-	output = writer->output;
-	STAILQ_INIT(&writer->output);
+	STAILQ_CONCAT(&queue, qptr);
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
-
 	/*
 	 * Can't use STAILQ_FOREACH since fiber_call()
 	 * destroys the list entry.
 	 */
-	struct wal_write_request *req = STAILQ_FIRST(&output);
-	while (req) {
-		struct fiber *f = req->fiber;
-		req = STAILQ_NEXT(req, wal_fifo_entry);
-		fiber_call(f);
-	}
+	struct wal_write_request *req, *tmp;
+	STAILQ_FOREACH_SAFE(req, &queue, wal_fifo_entry, tmp)
+		fiber_call(req->fiber);
+}
+
+static void
+wal_schedule_commit(ev_watcher *watcher, int event __attribute__((unused)))
+{
+	struct wal_writer *writer = watcher->data;
+	wal_schedule_queue(writer, &writer->commit_queue);
+}
+
+static void
+wal_schedule_rollback(ev_watcher *watcher, int event __attribute__((unused)))
+{
+	struct wal_writer *writer = watcher->data;
+	/* First, commit pending commit transactions, if any. */
+	wal_schedule_queue(writer, &writer->commit_queue);
+	/* Rollback queue is already in reverse order, thanks to wal_writer */
+	wal_schedule_queue(writer, &writer->rollback_queue);
 }
 
 /**
@@ -793,11 +813,14 @@ wal_writer_init(struct wal_writer *writer)
 
 	(void) tt_pthread_cond_init(&writer->cond, NULL);
 
-	STAILQ_INIT(&writer->input);
-	STAILQ_INIT(&writer->output);
+	STAILQ_INIT(&writer->input_queue);
+	STAILQ_INIT(&writer->commit_queue);
+	STAILQ_INIT(&writer->rollback_queue);
 
-	ev_async_init(&writer->async, (void *) wal_writer_schedule);
-	writer->async.data = writer;
+	ev_async_init(&writer->commit_event, (void *)wal_schedule_commit);
+	writer->commit_event.data = writer;
+	ev_async_init(&writer->rollback_event, (void *)wal_schedule_rollback);
+	writer->rollback_event.data = writer;
 
 	(void) tt_pthread_once(&wal_writer_once, wal_writer_init_once);
 
@@ -838,14 +861,16 @@ wal_writer_start(struct recovery_state *r)
 	assert(r->watcher == NULL);
 	assert(r->current_wal == NULL);
 	assert(wal_writer.is_shutdown == false);
-	assert(STAILQ_EMPTY(&wal_writer.input));
-	assert(STAILQ_EMPTY(&wal_writer.output));
+	assert(STAILQ_EMPTY(&wal_writer.input_queue));
+	assert(STAILQ_EMPTY(&wal_writer.commit_queue));
+	assert(STAILQ_EMPTY(&wal_writer.rollback_queue));
 
 	/* I. Initialize the state. */
 	wal_writer_init(&wal_writer);
 	r->writer = &wal_writer;
 
-	ev_async_start(&wal_writer.async);
+	ev_async_start(&wal_writer.commit_event);
+	ev_async_start(&wal_writer.rollback_event);
 
 	/* II. Start the thread. */
 
@@ -875,7 +900,8 @@ wal_writer_stop(struct recovery_state *r)
 		panic_syserror("WAL writer: thread join failed");
 	}
 
-	ev_async_stop(&writer->async);
+	ev_async_stop(&writer->commit_event);
+	ev_async_stop(&writer->rollback_event);
 	wal_writer_destroy(writer);
 
 	r->writer = NULL;
@@ -886,18 +912,15 @@ wal_writer_stop(struct recovery_state *r)
  * Block on the condition only if we have no other work to
  * do. Loop in case of a spurious wakeup.
  */
-static struct wal_fifo
-wal_writer_pop(struct wal_writer *writer, bool input_was_empty)
+void
+wal_writer_pop(struct wal_writer *writer, struct wal_fifo *input, bool wait)
 {
-	struct wal_fifo input;
 	do {
-		input = writer->input;
-		STAILQ_INIT(&writer->input);
-		if (STAILQ_EMPTY(&input) == false || input_was_empty == false)
+		STAILQ_CONCAT(input, &writer->input_queue);
+		if (STAILQ_EMPTY(input) == false || wait == false)
 			break;
 		(void) tt_pthread_cond_wait(&writer->cond, &writer->mutex);
 	} while (writer->is_shutdown == false);
-	return input;
 }
 
 /**
@@ -918,20 +941,18 @@ static int
 wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir, u64 lsn)
 {
 	struct log_io *l = *wal, *wal_to_close = NULL;
-	if (l == NULL || l->rows >= rows_per_wal || lsn % rows_per_wal == 0) {
+
+	ERROR_INJECT_RETURN(ERRINJ_WAL_ROTATE);
+
+	if (l != NULL && (l->rows >= rows_per_wal || lsn % rows_per_wal == 0)) {
+		/*
+		 * if l->rows == 1, log_io_close() does
+		 * inprogress_log_rename() for us.
+		 */
 		wal_to_close = l;
 		l = NULL;
 	}
-	if (l) {
-		/*
-		 * Rename WAL after the first successful write
-		 * to a name  without .inprogress suffix.
-		 */
-		if (l->rows == 1) {
-			if (inprogress_log_rename(l->filename))
-				log_io_close(&l);
-		}
-	} else {
+	if (l == NULL) {
 		/* Open WAL with '.inprogress' suffix. */
 		l = log_io_open_for_write(dir, lsn, INPROGRESS);
 		/*
@@ -950,6 +971,13 @@ wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir, u64 l
 			 */
 			log_io_close(&wal_to_close);
 		}
+	} else if (l->rows == 1) {
+		/*
+		 * Rename WAL after the first successful write
+		 * to a name  without .inprogress suffix.
+		 */
+		if (inprogress_log_rename(l->filename))
+			log_io_close(&l);       /* error. */
 	}
 	assert(wal_to_close == NULL);
 	*wal = l;
@@ -980,28 +1008,53 @@ wal_fill_batch(struct log_io *wal, struct nbatch *batch, int rows_per_wal,
 	/* Post-condition of successful by wal_opt_rotate(). */
 	assert(max_rows > 0);
 	nbatch_start(batch, max_rows);
-	while (req) {
+	while (req != NULL && nbatch_is_full(batch) == false) {
 		struct row_v11 *row = &req->row;
 		header_v11_sign(&row->header);
 		nbatch_add(batch, row, row_v11_size(row));
 		req = STAILQ_NEXT(req, wal_fifo_entry);
-		if (nbatch_is_full(batch))
-			break;
 	}
 	return req;
 }
 
-static int
+static struct wal_write_request *
 wal_write_batch(struct log_io *wal, struct nbatch *batch,
 		struct wal_write_request *req, struct wal_write_request *end)
 {
 	int rows_written = nbatch_write(batch, fileno(wal->f));
 	wal->rows += rows_written;
-	while (req != end) {
-		req->res = rows_written-- > 0 ? 0 : -1;
+	while (req != end && rows_written-- != 0)  {
+		req->res = 0;
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
-	return rows_written >= 0 ? 0 : -1;
+	return req;
+}
+
+static void
+wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
+		  struct wal_fifo *input_queue, struct wal_fifo *commit_queue,
+		  struct wal_fifo *rollback_queue)
+{
+	struct log_io **wal = &r->current_wal;
+	struct nbatch *batch = writer->batch;
+
+	struct wal_write_request *req = STAILQ_FIRST(input_queue);
+	struct wal_write_request *write_end = req;
+
+	while (req) {
+		if (wal_opt_rotate(wal, r->rows_per_wal, r->wal_dir,
+				   req->row.header.lsn) != 0)
+			break;
+		struct wal_write_request *batch_end;
+		batch_end = wal_fill_batch(*wal, batch, r->rows_per_wal, req);
+		write_end = wal_write_batch(*wal, batch, req, batch_end);
+		if (batch_end != write_end)
+			break;
+		wal_opt_sync(*wal, r->wal_fsync_delay);
+		req = write_end;
+	}
+	STAILQ_SPLICE(input_queue, req, wal_fifo_entry, rollback_queue);
+	STAILQ_CONCAT(commit_queue, input_queue);
 }
 
 /** WAL writer thread main loop.  */
@@ -1011,49 +1064,51 @@ wal_writer_thread(void *worker_args)
 	struct recovery_state *r = worker_args;
 	struct wal_writer *writer = r->writer;
 	bool input_was_empty = true;
-	struct log_io **wal = &r->current_wal;
-	struct nbatch *batch = writer->batch;
+	struct wal_fifo input_queue = STAILQ_HEAD_INITIALIZER(input_queue);
+	struct wal_fifo commit_queue = STAILQ_HEAD_INITIALIZER(commit_queue);
+	struct wal_fifo rollback_queue = STAILQ_HEAD_INITIALIZER(rollback_queue);
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
 	while (writer->is_shutdown == false) {
-		struct wal_fifo input = wal_writer_pop(writer, input_was_empty);
+		bool in_rollback = ! STAILQ_EMPTY(&writer->rollback_queue);
+		wal_writer_pop(writer, &input_queue, input_was_empty && !in_rollback);
 		(void) tt_pthread_mutex_unlock(&writer->mutex);
-		/*
-		 * Wake up fibers waiting on the old list *here*
-		 * since we need a membar for request out_lsn's to
-		 * sync up.
-		 */
-		if (input_was_empty == false)
-			ev_async_send(&writer->async);
-
-		struct wal_write_request *req = STAILQ_FIRST(&input);
-		input_was_empty = req == NULL;
-		while (req) {
-			if (wal_opt_rotate(wal, r->rows_per_wal, r->wal_dir,
-					   req->row.header.lsn) != 0) {
-				req->res = -1;
-				req = STAILQ_NEXT(req, wal_fifo_entry);
-				continue;
-			}
-			struct wal_write_request *end;
-			end = wal_fill_batch(*wal, batch, r->rows_per_wal, req);
-			(void) wal_write_batch(*wal, batch, req, end);
-			wal_opt_sync(*wal, r->wal_fsync_delay);
-			req = end;
+		if (input_was_empty == false) {
+			/*
+			 * Wake up fibers waiting on the old list *here*
+			 * since we need a membar for request res to
+			 * sync up.
+			 */
+			ev_async_send(&writer->commit_event);
+		} else if (in_rollback && STAILQ_EMPTY(&input_queue)) {
+			/*
+			 * We can initiate a rollback only when
+			 * all input has been put to the rollback
+			 * queue, since rollback must start from
+			 * the last processed request.
+			 */
+			ev_async_send(&writer->rollback_event);
+		}
+		input_was_empty = STAILQ_EMPTY(&input_queue);
+		if (in_rollback) {
+			STAILQ_CONCAT(&rollback_queue, &input_queue);
+		} else {
+			wal_write_to_disk(r, writer, &input_queue,
+					  &commit_queue, &rollback_queue);
 		}
 		(void) tt_pthread_mutex_lock(&writer->mutex);
-		STAILQ_CONCAT(&writer->output, &input);
+		STAILQ_CONCAT(&writer->commit_queue, &commit_queue);
+		/* Rollback is done in reverse order. */
+		if (STAILQ_EMPTY(&rollback_queue) == false) {
+			STAILQ_REVERSE(&rollback_queue, wal_write_request,
+				       wal_fifo_entry);
+			STAILQ_CONCAT(&rollback_queue, &writer->rollback_queue);
+			STAILQ_CONCAT(&writer->rollback_queue, &rollback_queue);
+		}
 	}
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
-	/*
-	 * Handle the case when a shutdown request came before
-	 * we were able to awake all fibers waiting on the
-	 * previous pack.
-	 */
-	if (*wal != NULL)
-		log_io_close(wal);
-	if (input_was_empty == false)
-		ev_async_send(&writer->async);
+	if (r->current_wal != NULL)
+		log_io_close(&r->current_wal);
 	return NULL;
 }
 
@@ -1081,16 +1136,23 @@ wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
 
-	bool was_empty = STAILQ_EMPTY(&writer->input);
-
-	STAILQ_INSERT_TAIL(&writer->input, req, wal_fifo_entry);
-
-	if (was_empty)
-		(void) tt_pthread_cond_signal(&writer->cond);
+	bool input_was_empty = STAILQ_EMPTY(&writer->input_queue);
+	bool in_rollback = ! STAILQ_EMPTY(&writer->rollback_queue);
+	/*
+	 * If the rollback queue is not empty,
+	 * abort the request right away until we've finished
+	 * with rollback.
+	 */
+	if (! in_rollback) {
+		STAILQ_INSERT_TAIL(&writer->input_queue, req, wal_fifo_entry);
+		if (input_was_empty)
+			(void) tt_pthread_cond_signal(&writer->cond);
+	}
 
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
 
-	fiber_yield();
+	if (! in_rollback)
+		fiber_yield(); /* Request was inserted. */
 
 	return req->res;
 }
