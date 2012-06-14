@@ -54,7 +54,7 @@ class FilteredStream:
 
 def check_valgrind_log(path_to_log):
     """ Check that there were no warnings in the log."""
-    return os.path.getsize(path_to_log) != 0
+    return os.path.exists(path_to_log) and os.path.getsize(path_to_log) != 0
 
 
 def print_tail_n(filename, num_lines):
