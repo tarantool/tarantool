@@ -1,5 +1,5 @@
-#ifndef TNT_RPL_H_INCLUDED
-#define TNT_RPL_H_INCLUDED
+#ifndef TC_OPT_H_INCLUDED
+#define TC_OPT_H_INCLUDED
 
 /*
  * Copyright (C) 2012 Mail.RU
@@ -26,18 +26,29 @@
  * SUCH DAMAGE.
  */
 
-struct tnt_stream_rpl {
-	struct tnt_xlog_header_v11 hdr;
-	struct tnt_xlog_row_v11 row;
-	struct tnt_stream *net;
+enum tc_opt_mode {
+	TC_OPT_USAGE,
+	TC_OPT_RPL,
+	TC_OPT_WAL_CAT,
+	TC_OPT_WAL_PLAY,
+	TC_OPT_CMD,
+	TC_OPT_INTERACTIVE
 };
 
-#define TNT_RPL_CAST(S) ((struct tnt_stream_rpl*)(S)->data)
+struct tc_opt {
+	enum tc_opt_mode mode;
+	const char *host;
+	int port;
+	int port_admin;
+	uint64_t lsn;
+	const char *xlog;
+	char **cmdv;
+	int cmdc;
+};
 
-struct tnt_stream *tnt_rpl(struct tnt_stream *s);
-void tnt_rpl_attach(struct tnt_stream *s, struct tnt_stream *net);
+void tc_opt_usage(void);
 
-int tnt_rpl_open(struct tnt_stream *s, uint64_t lsn);
-void tnt_rpl_close(struct tnt_stream *s);
+enum tc_opt_mode
+tc_opt_init(struct tc_opt *opt, int argc, char **argv);
 
-#endif /* TNT_XLOG_H_INCLUDED */
+#endif /* TC_OPT_H_INCLUDED */

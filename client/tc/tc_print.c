@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2011 Mail.RU
+ * Copyright (C) 2012 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,64 +25,51 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include <connector/c/include/tarantool/tnt.h>
-#include <connector/c/include/tarantool/tnt_net.h>
-#include <connector/c/include/tarantool/tnt_xlog.h>
-#include <connector/c/include/tarantool/tnt_rpl.h>
 
-static char *opname(uint32_t type) {
-	switch (type) {
-	case TNT_OP_PING:   return "Ping";
-	case TNT_OP_INSERT: return "Insert";
-	case TNT_OP_DELETE: return "Delete";
-	case TNT_OP_UPDATE: return "Update";
-	case TNT_OP_SELECT: return "Select";
-	case TNT_OP_CALL:   return "Call";
+#include "client/tc/tc_print.h"
+
+void tc_print_tuple(struct tnt_tuple *tu)
+{
+	struct tnt_iter ifl;
+	tnt_iter(&ifl, tu);
+	printf("[");
+	while (tnt_next(&ifl)) {
+		if (TNT_IFIELD_IDX(&ifl) != 0)
+			printf(", ");
+		char *data = TNT_IFIELD_DATA(&ifl);
+		uint32_t size = TNT_IFIELD_SIZE(&ifl);
+		if (!isprint(data[0]) && (size == 4 || size == 8)) {
+			if (size == 4) {
+				uint32_t i = *((uint32_t*)data);
+				printf("%"PRIu32, i);
+			} else {
+				uint64_t i = *((uint64_t*)data);
+				printf("%"PRIu64, i);
+			}
+		} else {
+			printf("'%-.*s'", size, data);
+		}
 	}
-	return "Unknown";
+	if (ifl.status == TNT_ITER_FAIL)
+		printf("<parsing error>");
+	printf("]\n");
+	tnt_iter_free(&ifl);
 }
 
-int
-main(int argc, char * argv[])
+void tc_print_list(struct tnt_list *l)
 {
-	if (argc != 4) {
-		printf("usage %s: host port limit\n", argv[0]);
-		return 1;
+	struct tnt_iter it;
+	tnt_iter_list(&it, l);
+	while (tnt_next(&it)) {
+		struct tnt_tuple *tu = TNT_ILIST_TUPLE(&it);
+		tc_print_tuple(tu);
 	}
-	struct tnt_stream s;
-	tnt_rpl(&s);
-	struct tnt_stream sn;
-	tnt_net(&sn);
-	tnt_set(&sn, TNT_OPT_HOSTNAME, argv[1]);
-	tnt_set(&sn, TNT_OPT_PORT, atoi(argv[2]));
-	tnt_set(&sn, TNT_OPT_SEND_BUF, 0);
-	tnt_set(&sn, TNT_OPT_RECV_BUF, 0);
-	tnt_rpl_attach(&s, &sn);
-	if (tnt_rpl_open(&s, 2) == -1)
-		return 1;
-
-	struct tnt_iter i;
-	tnt_iter_request(&i, &s);
-
-	int limit = atoi(argv[3]);
-	while (limit-- > 0 && tnt_next(&i)) {
-		struct tnt_stream_rpl *sr = TNT_RPL_CAST(&s);
-		printf("%s lsn: %"PRIu64", time: %f, len: %d\n",
-		       opname(sr->row.op),
-		       sr->hdr.lsn,
-		       sr->hdr.tm, sr->hdr.len);
-	}
-	if (i.status == TNT_ITER_FAIL)
-		printf("parsing failed\n");
-
-	tnt_iter_free(&i);
-	tnt_stream_free(&s);
-	tnt_stream_free(&sn);
-	return 0;
+	tnt_iter_free(&it);
 }

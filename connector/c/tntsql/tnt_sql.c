@@ -55,7 +55,7 @@ tnt_sql_error(struct tnt_sql *sql, struct tnt_tk *last, char *fmt, ...)
 	int line = (last) ? last->line : sql->l->line;
 	int col = (last) ? last->col : sql->l->col;
 	char msg[256];
-	snprintf(msg, sizeof(msg), "%d:%d %s\n", line, col, msgu);
+	snprintf(msg, sizeof(msg), "%d:%d %s", line, col, msgu);
 	if (sql->error == NULL)
 		sql->error = tnt_mem_dup(msg);
 	return false;

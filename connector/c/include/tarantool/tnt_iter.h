@@ -80,6 +80,7 @@ struct tnt_iter_request {
 
 #define TNT_IREQUEST(I) (&(I)->data.request)
 #define TNT_IREQUEST_PTR(I) &TNT_IREQUEST(I)->r
+#define TNT_IREQUEST_STREAM(I) TNT_IREQUEST(I)->s
 
 /* reply iterator */
 

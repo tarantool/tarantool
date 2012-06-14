@@ -1,5 +1,5 @@
-#ifndef TNT_RPL_H_INCLUDED
-#define TNT_RPL_H_INCLUDED
+#ifndef TC_QUERY_H_INCLUDED
+#define TC_QUERY_H_INCLUDED
 
 /*
  * Copyright (C) 2012 Mail.RU
@@ -26,18 +26,16 @@
  * SUCH DAMAGE.
  */
 
-struct tnt_stream_rpl {
-	struct tnt_xlog_header_v11 hdr;
-	struct tnt_xlog_row_v11 row;
-	struct tnt_stream *net;
-};
+typedef int (*tc_query_t)(struct tnt_reply *r, void *ptr, char **e);
+typedef int (*tc_query_admin_t)(char *r, char **e);
 
-#define TNT_RPL_CAST(S) ((struct tnt_stream_rpl*)(S)->data)
+char *tc_query_type(uint32_t type);
 
-struct tnt_stream *tnt_rpl(struct tnt_stream *s);
-void tnt_rpl_attach(struct tnt_stream *s, struct tnt_stream *net);
+int tc_query_printer(struct tnt_reply *r, void *ptr, char **e);
+int tc_query_foreach(tc_query_t cb, void *cba, char **e);
+int tc_query(char *q, char **e);
 
-int tnt_rpl_open(struct tnt_stream *s, uint64_t lsn);
-void tnt_rpl_close(struct tnt_stream *s);
+int tc_query_admin_printer(char *r, char **e);
+int tc_query_admin(char *q, tc_query_admin_t cb, char **e);
 
-#endif /* TNT_XLOG_H_INCLUDED */
+#endif /* TC_QUERY_H_INCLUDED */

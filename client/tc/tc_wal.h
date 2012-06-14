@@ -1,5 +1,5 @@
-#ifndef TNT_RPL_H_INCLUDED
-#define TNT_RPL_H_INCLUDED
+#ifndef TC_WAL_H_INCLUDED
+#define TC_WAL_H_INCLUDED
 
 /*
  * Copyright (C) 2012 Mail.RU
@@ -26,18 +26,8 @@
  * SUCH DAMAGE.
  */
 
-struct tnt_stream_rpl {
-	struct tnt_xlog_header_v11 hdr;
-	struct tnt_xlog_row_v11 row;
-	struct tnt_stream *net;
-};
+int tc_wal_cat(void);
+int tc_wal_play(void);
+int tc_wal_remote(void);
 
-#define TNT_RPL_CAST(S) ((struct tnt_stream_rpl*)(S)->data)
-
-struct tnt_stream *tnt_rpl(struct tnt_stream *s);
-void tnt_rpl_attach(struct tnt_stream *s, struct tnt_stream *net);
-
-int tnt_rpl_open(struct tnt_stream *s, uint64_t lsn);
-void tnt_rpl_close(struct tnt_stream *s);
-
-#endif /* TNT_XLOG_H_INCLUDED */
+#endif /* TC_WAL_H_INCLUDED */

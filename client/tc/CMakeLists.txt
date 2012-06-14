@@ -1,4 +1,3 @@
-
 project(tnt_cli)
 
 include(FindCurses)
@@ -19,18 +18,15 @@ set (cli_deps ${READLINE_LIB} ${READLINE_HISTORY_LIB})
 if (CURSES_FOUND)
     set(cli_deps ${cli_deps} ${CURSES_LIBRARIES})
 else()
-    message(FATAL_ERROR "curses library not found.")
-endif()
-
-find_library(TERMCAP_LIBRARY NAMES "termcap")
-if (TERMCAP_LIBRARY)
-    set(cli_deps ${cli_deps} ${TERMCAP_LIBRARY})
-else()
-    message(FATAL_ERROR "termcap library not found.")
+    # readline could be compiled with termcap
+    find_library(TERMCAP_LIB NAMES "termcap")
+	if (TERMCAP_LIB)
+	set(cli_deps ${cli_deps} ${TERMCAP_LIB})
+    endif()
 endif()
 
 set (cli "tarantool")
-set (cli_sources tnt.c tnt_admin.c)
+set (cli_sources tc.c tc_opt.c tc_admin.c tc_query.c tc_print.c tc_cli.c tc_wal.c)
 set (cli_libs tntrpl tntnet tntsql tnt gopt ${cli_deps})
 
 add_executable(${cli} ${cli_sources} ${CMAKE_SOURCE_DIR}/src/errcode.c)

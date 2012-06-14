@@ -44,7 +44,7 @@ static const uint32_t tnt_rpl_version = 11;
 static void tnt_rpl_free(struct tnt_stream *s) {
 	struct tnt_stream_rpl *sr = TNT_RPL_CAST(s);
 	if (sr->net) {
-		tnt_stream_free(sr->net);
+		/* network stream should not be free'd here */
 		sr->net = NULL;
 	}
 	tnt_mem_free(s->data);
@@ -111,9 +111,7 @@ struct tnt_stream *tnt_rpl(struct tnt_stream *s)
 	s->free = tnt_rpl_free;
 	/* initializing internal data */
 	struct tnt_stream_rpl *sr = TNT_RPL_CAST(s);
-	sr->net = tnt_net(NULL);
-	if (sr->net == NULL)
-		goto error;
+	sr->net = NULL;
 	return s;
 error:
 	if (s->data) {
@@ -181,6 +179,6 @@ void tnt_rpl_close(struct tnt_stream *s) {
  *
  * s - replication stream pointer
 */
-struct tnt_stream *tnt_rpl_net(struct tnt_stream *s) {
-	return TNT_RPL_CAST(s)->net;
+void tnt_rpl_attach(struct tnt_stream *s, struct tnt_stream *net) {
+	TNT_RPL_CAST(s)->net = net;
 }

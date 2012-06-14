@@ -1,5 +1,5 @@
-#ifndef TNT_RPL_H_INCLUDED
-#define TNT_RPL_H_INCLUDED
+#ifndef TC_ADMIN_H_INCLUDED
+#define TC_ADMIN_H_INCLUDED
 
 /*
  * Copyright (C) 2012 Mail.RU
@@ -26,18 +26,18 @@
  * SUCH DAMAGE.
  */
 
-struct tnt_stream_rpl {
-	struct tnt_xlog_header_v11 hdr;
-	struct tnt_xlog_row_v11 row;
-	struct tnt_stream *net;
+struct tc_admin {
+	const char *host;
+	int port;
+	int fd;
 };
 
-#define TNT_RPL_CAST(S) ((struct tnt_stream_rpl*)(S)->data)
+int tc_admin_connect(struct tc_admin *a, const char *host, int port);
+int tc_admin_reconnect(struct tc_admin *a);
 
-struct tnt_stream *tnt_rpl(struct tnt_stream *s);
-void tnt_rpl_attach(struct tnt_stream *s, struct tnt_stream *net);
+void tc_admin_close(struct tc_admin *a);
 
-int tnt_rpl_open(struct tnt_stream *s, uint64_t lsn);
-void tnt_rpl_close(struct tnt_stream *s);
+int tc_admin_query(struct tc_admin *a, char *q);
+int tc_admin_reply(struct tc_admin *a, char **r, size_t *size);
 
-#endif /* TNT_XLOG_H_INCLUDED */
+#endif /* TC_ADMIN_H_INCLUDED */
