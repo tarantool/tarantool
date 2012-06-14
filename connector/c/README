@@ -6,3 +6,4 @@
 tnt    - tarantool iproto library
 tntsql - tarantool sql library
 tntnet - tarantool network io library
+tntrpl - tarantool replication library

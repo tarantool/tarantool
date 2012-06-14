@@ -37,6 +37,7 @@ extern "C" {
 #include <tarantool/tnt_proto.h>
 #include <tarantool/tnt_enc.h>
 #include <tarantool/tnt_tuple.h>
+#include <tarantool/tnt_request.h>
 #include <tarantool/tnt_reply.h>
 #include <tarantool/tnt_stream.h>
 #include <tarantool/tnt_iter.h>

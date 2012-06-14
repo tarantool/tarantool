@@ -29,23 +29,12 @@
 #include <string.h>
 
 #include <connector/c/include/tarantool/tnt_mem.h>
+#include <connector/c/include/tarantool/tnt_proto.h>
 #include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
 #include <connector/c/include/tarantool/tnt_reply.h>
 #include <connector/c/include/tarantool/tnt_stream.h>
 #include <connector/c/include/tarantool/tnt_buf.h>
-
-static struct tnt_stream *tnt_buf_tryalloc(struct tnt_stream *s) {
-	if (s) {
-		memset(s, 0, sizeof(struct tnt_stream));
-		return s;
-	}
-	s = tnt_mem_alloc(sizeof(struct tnt_stream));
-	if (s == NULL)
-		return NULL;
-	memset(s, 0, sizeof(struct tnt_stream));
-	s->alloc = 1;
-	return s;
-}
 
 static void tnt_buf_free(struct tnt_stream *s) {
 	struct tnt_stream_buf *sb = TNT_SBUF_CAST(s);
@@ -108,6 +97,11 @@ tnt_buf_writev(struct tnt_stream *s, struct iovec *iov, int count) {
 	return size;
 }
 
+static ssize_t
+tnt_buf_write_request(struct tnt_stream *s, struct tnt_request *r) {
+	return tnt_buf_writev(s, r->v, r->vc);
+}
+
 static int
 tnt_buf_reply(struct tnt_stream *s, struct tnt_reply *r) {
 	struct tnt_stream_buf *sb = TNT_SBUF_CAST(s);
@@ -117,6 +111,21 @@ tnt_buf_reply(struct tnt_stream *s, struct tnt_reply *r) {
 		return 1;
 	size_t off = 0;
 	int rc = tnt_reply(r, sb->data + sb->rdoff, sb->size - sb->rdoff, &off);
+	if (rc == 0)
+		sb->rdoff += off;
+	return rc;
+}
+
+static int
+tnt_buf_request(struct tnt_stream *s, struct tnt_request *r) {
+	struct tnt_stream_buf *sb = TNT_SBUF_CAST(s);
+	if (sb->data == NULL)
+		return -1;
+	if (sb->size == sb->rdoff)
+		return 1;
+	size_t off = 0;
+	int rc = tnt_request(r, sb->data + sb->rdoff, sb->size - sb->rdoff,
+			     &off, NULL);
 	if (rc == 0)
 		sb->rdoff += off;
 	return rc;
@@ -135,7 +144,7 @@ tnt_buf_reply(struct tnt_stream *s, struct tnt_reply *r) {
 */
 struct tnt_stream *tnt_buf(struct tnt_stream *s) {
 	int allocated = s == NULL;
-	s = tnt_buf_tryalloc(s);
+	s = tnt_stream_init(s);
 	if (s == NULL)
 		return NULL;
 	/* allocating stream data */
@@ -147,9 +156,11 @@ struct tnt_stream *tnt_buf(struct tnt_stream *s) {
 	}
 	/* initializing interfaces */
 	s->read = tnt_buf_read;
-	s->reply = tnt_buf_reply;
+	s->read_reply = tnt_buf_reply;
+	s->read_request = tnt_buf_request;
 	s->write = tnt_buf_write;
 	s->writev = tnt_buf_writev;
+	s->write_request = tnt_buf_write_request;
 	s->free = tnt_buf_free;
 	/* initializing internal data */
 	struct tnt_stream_buf *sb = TNT_SBUF_CAST(s);

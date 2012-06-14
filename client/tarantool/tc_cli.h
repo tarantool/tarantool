@@ -1,8 +1,8 @@
-#ifndef TNT_ADMIN_H_INCLUDED
-#define TNT_ADMIN_H_INCLUDED
+#ifndef TC_CLI_H_INCLUDED
+#define TC_CLI_H_INCLUDED
 
 /*
- * Copyright (C) 2011 Mail.RU
+ * Copyright (C) 2012 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,18 +26,7 @@
  * SUCH DAMAGE.
  */
 
-struct tnt_admin {
-	char *host;
-	int port;
-	int fd;
-};
+int tc_cli_cmdv(void);
+int tc_cli(void);
 
-int tnt_admin_init(struct tnt_admin *a, char *host, int port);
-void tnt_admin_free(struct tnt_admin *a);
-
-int tnt_admin_reconnect(struct tnt_admin *a);
-
-int tnt_admin_query(struct tnt_admin *a, char *q);
-int tnt_admin_reply(struct tnt_admin *a, char **r, size_t *size);
-
-#endif /* TNT_ADMIN_H_INCLUDED */
+#endif /* TC_CLI_H_INCLUDED */

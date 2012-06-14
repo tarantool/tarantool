@@ -1,4 +1,5 @@
 
+
 /*
  * Copyright (C) 2011 Mail.RU
  *
@@ -26,46 +27,54 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
-#include <connector/c/include/tarantool/tnt_proto.h>
-#include <connector/c/include/tarantool/tnt_tuple.h>
-#include <connector/c/include/tarantool/tnt_request.h>
-#include <connector/c/include/tarantool/tnt_reply.h>
-#include <connector/c/include/tarantool/tnt_stream.h>
-#include <connector/c/include/tarantool/tnt_delete.h>
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_net.h>
+#include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_rpl.h>
 
-/*
- * tnt_delete()
- *
- * write delete request to stream;
- *
- * s     - stream pointer
- * ns    - space
- * flags - request flags
- * k     - tuple key
- * 
- * returns number of bytes written, or -1 on error.
-*/
-ssize_t
-tnt_delete(struct tnt_stream *s, uint32_t ns, uint32_t flags, struct tnt_tuple *k)
+static char *opname(uint32_t type) {
+	switch (type) {
+	case TNT_OP_PING:   return "Ping";
+	case TNT_OP_INSERT: return "Insert";
+	case TNT_OP_DELETE: return "Delete";
+	case TNT_OP_UPDATE: return "Update";
+	case TNT_OP_SELECT: return "Select";
+	case TNT_OP_CALL:   return "Call";
+	}
+	return "Unknown";
+}
+
+int
+main(int argc, char * argv[])
 {
-	/* filling major header */
-	struct tnt_header hdr;
-	hdr.type  = TNT_OP_DELETE;
-	hdr.len = sizeof(struct tnt_header_delete) + k->size;
-	hdr.reqid = s->reqid;
-	/* filling delete header */
-	struct tnt_header_delete hdr_del;
-	hdr_del.ns = ns;
-	hdr_del.flags = flags;
-	/* writing data to stream */
-	struct iovec v[3];
-	v[0].iov_base = &hdr;
-	v[0].iov_len  = sizeof(struct tnt_header);
-	v[1].iov_base = &hdr_del;
-	v[1].iov_len  = sizeof(struct tnt_header_delete);
-	v[2].iov_base = k->data;
-	v[2].iov_len  = k->size;
-	return s->writev(s, v, 3);
+	if (argc != 2)
+		return 1;
+
+	struct tnt_stream s;
+	tnt_xlog(&s);
+
+	if (tnt_xlog_open(&s, argv[1]) == -1)
+		return 1;
+
+	struct tnt_iter i;
+	tnt_iter_request(&i, &s);
+
+	while (tnt_next(&i)) {
+		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
+		printf("%s lsn: %"PRIu64", time: %f, len: %d\n",
+		       opname(sx->row.op),
+		       sx->hdr.lsn,
+		       sx->hdr.tm, sx->hdr.len);
+	}
+	if (i.status == TNT_ITER_FAIL)
+		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
+
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+	return 0;
 }

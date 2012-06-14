@@ -62,4 +62,4 @@ void tnt_opt_free(struct tnt_opt *opt);
 int
 tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name, va_list args);
 
-#endif
+#endif /* TNT_OPT_H_INCLUDED */

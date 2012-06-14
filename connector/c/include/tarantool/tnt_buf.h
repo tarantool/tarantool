@@ -36,9 +36,9 @@ struct tnt_stream_buf {
 
 /* buffer stream accessors */
 
-#define TNT_SBUF_CAST(S)  ((struct tnt_stream_buf*)(S)->data)
-#define TNT_SBUF_DATA(S)  TNT_SBUF_CAST(S)->data
-#define TNT_SBUF_SIZE(S)  TNT_SBUF_CAST(S)->size
+#define TNT_SBUF_CAST(S) ((struct tnt_stream_buf*)(S)->data)
+#define TNT_SBUF_DATA(S) TNT_SBUF_CAST(S)->data
+#define TNT_SBUF_SIZE(S) TNT_SBUF_CAST(S)->size
 
 struct tnt_stream *tnt_buf(struct tnt_stream *s);
 

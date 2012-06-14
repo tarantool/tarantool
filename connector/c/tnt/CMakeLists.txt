@@ -35,7 +35,8 @@ set (tnt_sources
 	tnt_delete.c
 	tnt_call.c
 	tnt_select.c
-	tnt_reply.c)
+	tnt_reply.c
+	tnt_request.c)
 
 #----------------------------------------------------------------------------#
 # Builds

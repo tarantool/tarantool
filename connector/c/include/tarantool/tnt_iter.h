@@ -31,7 +31,8 @@
 enum tnt_iter_type {
 	TNT_ITER_FIELD,
 	TNT_ITER_LIST,
-	TNT_ITER_STREAM
+	TNT_ITER_REQUEST,
+	TNT_ITER_REPLY
 };
 
 /* tuple field iterator */
@@ -48,11 +49,11 @@ struct tnt_iter_field {
 
 /* tuple field iterator accessors */
 
-#define TNT_IFIELD(I)       (&(I)->data.field)
+#define TNT_IFIELD(I) (&(I)->data.field)
 #define TNT_IFIELD_TUPLE(I) TNT_IFIELD(I)->tu
-#define TNT_IFIELD_IDX(I)   TNT_IFIELD(I)->fld_index
-#define TNT_IFIELD_DATA(I)  TNT_IFIELD(I)->fld_data
-#define TNT_IFIELD_SIZE(I)  TNT_IFIELD(I)->fld_size
+#define TNT_IFIELD_IDX(I) TNT_IFIELD(I)->fld_index
+#define TNT_IFIELD_DATA(I) TNT_IFIELD(I)->fld_data
+#define TNT_IFIELD_SIZE(I) TNT_IFIELD(I)->fld_size
 
 /* list iterator */
 
@@ -64,21 +65,34 @@ struct tnt_iter_list {
 
 /* list iterator accessors */
 
-#define TNT_ILIST(I)        (&(I)->data.list)
-#define TNT_ILIST_TUPLE(I)  TNT_ILIST(I)->tu
-#define TNT_ILIST_INDEX(I)  TNT_ILIST(I)->tu_index
+#define TNT_ILIST(I) (&(I)->data.list)
+#define TNT_ILIST_TUPLE(I) TNT_ILIST(I)->tu
+#define TNT_ILIST_INDEX(I) TNT_ILIST(I)->tu_index
 
-/* stream iterator */
+/* request iterator */
 
-struct tnt_iter_stream {
+struct tnt_iter_request {
+	struct tnt_stream *s; /* stream pointer */
+	struct tnt_request r; /* current request */
+};
+
+/* request iterator accessors */
+
+#define TNT_IREQUEST(I) (&(I)->data.request)
+#define TNT_IREQUEST_PTR(I) &TNT_IREQUEST(I)->r
+#define TNT_IREQUEST_STREAM(I) TNT_IREQUEST(I)->s
+
+/* reply iterator */
+
+struct tnt_iter_reply {
 	struct tnt_stream *s; /* stream pointer */
 	struct tnt_reply r;   /* current reply */
 };
 
-/* stream iterator accessors */
+/* reply iterator accessors */
 
-#define TNT_ISTREAM(I)        (&(I)->data.stream)
-#define TNT_ISTREAM_REPLY(I)  &TNT_ISTREAM(I)->r
+#define TNT_IREPLY(I) (&(I)->data.reply)
+#define TNT_IREPLY_PTR(I) &TNT_IREPLY(I)->r
 
 enum tnt_iter_status {
 	TNT_ITER_OK,
@@ -99,13 +113,15 @@ struct tnt_iter {
 	union {
 		struct tnt_iter_field field;
 		struct tnt_iter_list list;
-		struct tnt_iter_stream stream;
+		struct tnt_iter_request request;
+		struct tnt_iter_reply reply;
 	} data;
 };
 
 struct tnt_iter *tnt_iter(struct tnt_iter *i, struct tnt_tuple *t);
 struct tnt_iter *tnt_iter_list(struct tnt_iter *i, struct tnt_list *l);
-struct tnt_iter *tnt_iter_stream(struct tnt_iter *i, struct tnt_stream *s);
+struct tnt_iter *tnt_iter_request(struct tnt_iter *i, struct tnt_stream *s);
+struct tnt_iter *tnt_iter_reply(struct tnt_iter *i, struct tnt_stream *s);
 
 void tnt_iter_free(struct tnt_iter *i);
 

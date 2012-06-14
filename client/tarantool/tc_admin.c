@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2011 Mail.RU
+ * Copyright (C) 2012 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,11 +41,12 @@
 #include <errno.h>
 #include <limits.h>
 
-#include <client/tarantool/tnt_admin.h>
+#include "client/tarantool/tc_admin.h"
 
-static int
-tnt_admin_connect(struct tnt_admin *a)
+int tc_admin_connect(struct tc_admin *a, const char *host, int port)
 {
+	a->host = host;
+	a->port = port;
 	a->fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (a->fd < 0)
 		return -1;
@@ -69,32 +70,21 @@ error:
 	return -1;
 }
 
-int
-tnt_admin_init(struct tnt_admin *a, char *host, int port)
+int tc_admin_reconnect(struct tc_admin *a)
 {
-	a->host = host;
-	a->port = port;
-	return tnt_admin_connect(a);
+	tc_admin_close(a);
+	return tc_admin_connect(a, a->host, a->port);
 }
 
-int
-tnt_admin_reconnect(struct tnt_admin *a)
-{
-	tnt_admin_free(a);
-	return tnt_admin_connect(a);
-}
-
-void
-tnt_admin_free(struct tnt_admin *a)
+void tc_admin_close(struct tc_admin *a)
 {
 	if (a->fd > 0)
 		close(a->fd);
-	a->fd = -1;
+	a->fd = 0;
 }
 
 static int
-tnt_admin_send(struct tnt_admin *a, char *buf, size_t size) 
-{
+tc_admin_send(struct tc_admin *a, char *buf, size_t size) {
 	ssize_t rc, off = 0;
 	do {
 		rc = send(a->fd, buf + off, size - off, 0);
@@ -105,18 +95,16 @@ tnt_admin_send(struct tnt_admin *a, char *buf, size_t size)
 	return 0;
 }
 
-int
-tnt_admin_query(struct tnt_admin *a, char *q)
+int tc_admin_query(struct tc_admin *a, char *q)
 {
-	if (tnt_admin_send(a, q, strlen(q)) == -1)
+	if (tc_admin_send(a, q, strlen(q)) == -1)
 		return -1;
-	if (tnt_admin_send(a, "\n", 1) == -1)
+	if (tc_admin_send(a, "\n", 1) == -1)
 		return -1;
 	return 0;
 }
 
-int
-tnt_admin_reply(struct tnt_admin *a, char **r, size_t *size)
+int tc_admin_reply(struct tc_admin *a, char **r, size_t *size)
 {
 	char *buf = NULL;
 	size_t off = 0;

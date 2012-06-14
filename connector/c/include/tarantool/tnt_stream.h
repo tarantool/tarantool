@@ -35,15 +35,19 @@ struct tnt_stream {
 	int alloc;
 	ssize_t (*write)(struct tnt_stream *s, char *buf, size_t size);
 	ssize_t (*writev)(struct tnt_stream *s, struct iovec *iov, int count);
+	ssize_t (*write_request)(struct tnt_stream *s, struct tnt_request *r);
 	ssize_t (*read)(struct tnt_stream *s, char *buf, size_t size);
-	int (*reply)(struct tnt_stream *s, struct tnt_reply *r);
+	int (*read_reply)(struct tnt_stream *s, struct tnt_reply *r);
+	int (*read_request)(struct tnt_stream *s, struct tnt_request *r);
 	void (*free)(struct tnt_stream *s);
 	void *data;
 	uint32_t wrcnt; /* count of write operations */
 	uint32_t reqid;
 };
 
-uint32_t tnt_stream_reqid(struct tnt_stream *s, uint32_t reqid);
+struct tnt_stream *tnt_stream_init(struct tnt_stream *s);
 void tnt_stream_free(struct tnt_stream *s);
+
+uint32_t tnt_stream_reqid(struct tnt_stream *s, uint32_t reqid);
 
 #endif /* TNT_STREAM_H_INCLUDED */

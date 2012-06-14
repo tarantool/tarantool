@@ -28,14 +28,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <tarantool/tnt_mem.h>
-#include <tarantool/tnt_proto.h>
-#include <tarantool/tnt_enc.h>
-#include <tarantool/tnt_tuple.h>
-#include <tarantool/tnt_reply.h>
-#include <tarantool/tnt_stream.h>
-#include <tarantool/tnt_buf.h>
-#include <tarantool/tnt_update.h>
+#include <connector/c/include/tarantool/tnt_mem.h>
+#include <connector/c/include/tarantool/tnt_proto.h>
+#include <connector/c/include/tarantool/tnt_enc.h>
+#include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
+#include <connector/c/include/tarantool/tnt_reply.h>
+#include <connector/c/include/tarantool/tnt_stream.h>
+#include <connector/c/include/tarantool/tnt_buf.h>
+#include <connector/c/include/tarantool/tnt_update.h>
 
 static ssize_t
 tnt_update_op(struct tnt_stream *s,
@@ -212,11 +213,6 @@ tnt_update_insert(struct tnt_stream *s, uint32_t field,
 {
 	return tnt_update_op(s, field, TNT_UPDATE_INSERT, data, size);
 }
-
-struct tnt_header_update {
-	uint32_t ns;
-	uint32_t flags;
-};
 
 /*
  * tnt_update()

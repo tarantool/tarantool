@@ -29,13 +29,15 @@
 #include <string.h>
 
 #include <connector/c/include/tarantool/tnt_mem.h>
+#include <connector/c/include/tarantool/tnt_proto.h>
 #include <connector/c/include/tarantool/tnt_enc.h>
 #include <connector/c/include/tarantool/tnt_tuple.h>
+#include <connector/c/include/tarantool/tnt_request.h>
 #include <connector/c/include/tarantool/tnt_reply.h>
 #include <connector/c/include/tarantool/tnt_stream.h>
 #include <connector/c/include/tarantool/tnt_iter.h>
 
-static struct tnt_iter *tnt_iter_tryalloc(struct tnt_iter *i) {
+static struct tnt_iter *tnt_iter_init(struct tnt_iter *i) {
 	if (i) {
 		memset(i, 0, sizeof(struct tnt_iter));
 		return i;
@@ -107,7 +109,7 @@ static void tnt_iter_field_rewind(struct tnt_iter *i) {
 struct tnt_iter*
 tnt_iter(struct tnt_iter *i, struct tnt_tuple *t)
 {
-	i = tnt_iter_tryalloc(i);
+	i = tnt_iter_init(i);
 	if (i == NULL)
 		return NULL;
 	i->type = TNT_ITER_FIELD;
@@ -149,7 +151,7 @@ static void tnt_iter_list_rewind(struct tnt_iter *i) {
 struct tnt_iter*
 tnt_iter_list(struct tnt_iter *i, struct tnt_list *l)
 {
-	i = tnt_iter_tryalloc(i);
+	i = tnt_iter_init(i);
 	if (i == NULL)
 		return NULL;
 	i->type = TNT_ITER_LIST;
@@ -161,11 +163,11 @@ tnt_iter_list(struct tnt_iter *i, struct tnt_list *l)
 	return i;
 }
 
-static int tnt_iter_stream_next(struct tnt_iter *i) {
-	struct tnt_iter_stream *is = TNT_ISTREAM(i);
-	tnt_reply_free(&is->r);
-	tnt_reply_init(&is->r);
-	int rc = is->s->reply(is->s, &is->r);
+static int tnt_iter_reply_next(struct tnt_iter *i) {
+	struct tnt_iter_reply *ir = TNT_IREPLY(i);
+	tnt_reply_free(&ir->r);
+	tnt_reply_init(&ir->r);
+	int rc = ir->s->read_reply(ir->s, &ir->r);
 	if (rc == -1) {
 		i->status = TNT_ITER_FAIL;
 		return 0;
@@ -173,18 +175,18 @@ static int tnt_iter_stream_next(struct tnt_iter *i) {
 	return (rc == 1 /* finish */ ) ? 0 : 1;
 }
 
-static void tnt_iter_stream_free(struct tnt_iter *i) {
-	struct tnt_iter_stream *is = TNT_ISTREAM(i);
-	tnt_reply_free(&is->r);
+static void tnt_iter_reply_free(struct tnt_iter *i) {
+	struct tnt_iter_reply *ir = TNT_IREPLY(i);
+	tnt_reply_free(&ir->r);
 }
 
 /*
- * tnt_iter_stream()
+ * tnt_iter_reply()
  *
- * initialize tuple stream iterator;
- * create and initialize stream iterator;
+ * initialize tuple reply iterator;
+ * create and initialize reply iterator;
  *
- * i - tuple list iterator pointer, maybe NULL
+ * i - tuple reply iterator pointer, maybe NULL
  * s - stream pointer
  * 
  * if stream iterator pointer is NULL, then new stream
@@ -192,17 +194,62 @@ static void tnt_iter_stream_free(struct tnt_iter *i) {
  *
  * returns stream iterator pointer, or NULL on error.
 */
-struct tnt_iter *tnt_iter_stream(struct tnt_iter *i, struct tnt_stream *s) {
-	i = tnt_iter_tryalloc(i);
+struct tnt_iter *tnt_iter_reply(struct tnt_iter *i, struct tnt_stream *s) {
+	i = tnt_iter_init(i);
 	if (i == NULL)
 		return NULL;
-	i->type = TNT_ITER_STREAM;
-	i->next = tnt_iter_stream_next;
+	i->type = TNT_ITER_REPLY;
+	i->next = tnt_iter_reply_next;
 	i->rewind = NULL;
-	i->free = tnt_iter_stream_free;
-	struct tnt_iter_stream *is = TNT_ISTREAM(i);
-	is->s = s;
-	tnt_reply_init(&is->r);
+	i->free = tnt_iter_reply_free;
+	struct tnt_iter_reply *ir = TNT_IREPLY(i);
+	ir->s = s;
+	tnt_reply_init(&ir->r);
+	return i;
+}
+
+static int tnt_iter_request_next(struct tnt_iter *i) {
+	struct tnt_iter_request *ir = TNT_IREQUEST(i);
+	tnt_request_free(&ir->r);
+	tnt_request_init(&ir->r);
+	int rc = ir->s->read_request(ir->s, &ir->r);
+	if (rc == -1) {
+		i->status = TNT_ITER_FAIL;
+		return 0;
+	}
+	return (rc == 1 /* finish */ ) ? 0 : 1;
+}
+
+static void tnt_iter_request_free(struct tnt_iter *i) {
+	struct tnt_iter_request *ir = TNT_IREQUEST(i);
+	tnt_request_free(&ir->r);
+}
+
+/*
+ * tnt_iter_request()
+ *
+ * initialize tuple request iterator;
+ * create and initialize request iterator;
+ *
+ * i - tuple request iterator pointer, maybe NULL
+ * s - stream pointer
+ * 
+ * if stream iterator pointer is NULL, then new stream
+ * iterator will be created. 
+ *
+ * returns stream iterator pointer, or NULL on error.
+*/
+struct tnt_iter *tnt_iter_request(struct tnt_iter *i, struct tnt_stream *s) {
+	i = tnt_iter_init(i);
+	if (i == NULL)
+		return NULL;
+	i->type = TNT_ITER_REQUEST;
+	i->next = tnt_iter_request_next;
+	i->rewind = NULL;
+	i->free = tnt_iter_request_free;
+	struct tnt_iter_request *ir = TNT_IREQUEST(i);
+	ir->s = s;
+	tnt_request_init(&ir->r);
 	return i;
 }
 

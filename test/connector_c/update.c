@@ -310,9 +310,9 @@ void
 recv_command(char *command)
 {
 	struct tnt_iter i;
-	tnt_iter_stream(&i, tnt);
+	tnt_iter_reply(&i, tnt);
 	while (tnt_next(&i)) {
-		struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		printf("%s: respond %s (op: %"PRIu32", reqid: %"PRIu32", code: %"PRIu32", count: %"PRIu32")\n",
 			command, tnt_strerror(tnt),
 			r->op,

@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  */
 
-typedef ssize_t (*tnt_replyf_t)(void *ptr, char *dst, ssize_t size);
+typedef ssize_t (*tnt_reply_t)(void *ptr, char *dst, ssize_t size);
 
 struct tnt_reply {
 	uint32_t op;
@@ -37,13 +37,13 @@ struct tnt_reply {
 	uint32_t count;
 };
 
-#define TNT_REPLY_ERR(R)  ((R)->code >> 8)
+#define TNT_REPLY_ERR(R) ((R)->code >> 8)
 #define TNT_REPLY_LIST(R) (&(R)->tuples)
 
 void tnt_reply_init(struct tnt_reply *r);
 void tnt_reply_free(struct tnt_reply *r);
 
 int tnt_reply(struct tnt_reply *r, char *buf, size_t size, size_t *off);
-int tnt_reply_from(struct tnt_reply *r, tnt_replyf_t rcv, void *ptr);
+int tnt_reply_from(struct tnt_reply *r, tnt_reply_t rcv, void *ptr);
 
 #endif /* TNT_REPLY_H_INCLUDED */

@@ -1,0 +1,35 @@
+import subprocess
+import sys
+import os
+
+from lib.tarantool_box_server import TarantoolBoxServer
+
+p = subprocess.Popen([os.path.join(builddir, "test/connector_c/xlog"),
+		      os.path.join(builddir, "test/connector_c/connector.xlog")],
+                     stdout=subprocess.PIPE)
+p.wait()
+for line in p.stdout.readlines():
+      sys.stdout.write(line)
+
+server.stop()
+server.deploy("connector_c/cfg/master.cfg")
+server.stop()
+
+current_xlog = os.path.join(vardir, "00000000000000000002.xlog")
+os.symlink(os.path.abspath("connector_c/connector.xlog"), current_xlog)
+
+server.start()
+
+print ""
+
+p = subprocess.Popen([os.path.join(builddir, "test/connector_c/rpl"),
+		     "127.0.0.1", "33016", "1200"],
+                     stdout=subprocess.PIPE)
+p.wait()
+for line in p.stdout.readlines():
+      sys.stdout.write(line)
+
+server.stop()
+server.deploy()
+
+# vim: syntax=python

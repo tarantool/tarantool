@@ -1,6 +1,8 @@
+#ifndef TC_H_INCLUDED
+#define TC_H_INCLUDED
 
 /*
- * Copyright (C) 2011 Mail.RU
+ * Copyright (C) 2012 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,48 +26,12 @@
  * SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+struct tc {
+	struct tc_opt opt;
+	struct tc_admin admin;
+	struct tnt_stream *net;
+};
 
-#include <connector/c/include/tarantool/tnt_proto.h>
-#include <connector/c/include/tarantool/tnt_tuple.h>
-#include <connector/c/include/tarantool/tnt_request.h>
-#include <connector/c/include/tarantool/tnt_reply.h>
-#include <connector/c/include/tarantool/tnt_stream.h>
-#include <connector/c/include/tarantool/tnt_delete.h>
+void tc_error(char *fmt, ...);
 
-/*
- * tnt_delete()
- *
- * write delete request to stream;
- *
- * s     - stream pointer
- * ns    - space
- * flags - request flags
- * k     - tuple key
- * 
- * returns number of bytes written, or -1 on error.
-*/
-ssize_t
-tnt_delete(struct tnt_stream *s, uint32_t ns, uint32_t flags, struct tnt_tuple *k)
-{
-	/* filling major header */
-	struct tnt_header hdr;
-	hdr.type  = TNT_OP_DELETE;
-	hdr.len = sizeof(struct tnt_header_delete) + k->size;
-	hdr.reqid = s->reqid;
-	/* filling delete header */
-	struct tnt_header_delete hdr_del;
-	hdr_del.ns = ns;
-	hdr_del.flags = flags;
-	/* writing data to stream */
-	struct iovec v[3];
-	v[0].iov_base = &hdr;
-	v[0].iov_len  = sizeof(struct tnt_header);
-	v[1].iov_base = &hdr_del;
-	v[1].iov_len  = sizeof(struct tnt_header_delete);
-	v[2].iov_base = k->data;
-	v[2].iov_len  = k->size;
-	return s->writev(s, v, 3);
-}
+#endif /* TC_H_INCLUDED */

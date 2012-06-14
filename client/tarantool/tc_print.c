@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2011 Mail.RU
+ * Copyright (C) 2012 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,47 +25,51 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
+#include <ctype.h>
 
-#include <connector/c/include/tarantool/tnt_proto.h>
-#include <connector/c/include/tarantool/tnt_tuple.h>
-#include <connector/c/include/tarantool/tnt_request.h>
-#include <connector/c/include/tarantool/tnt_reply.h>
-#include <connector/c/include/tarantool/tnt_stream.h>
-#include <connector/c/include/tarantool/tnt_delete.h>
+#include <connector/c/include/tarantool/tnt.h>
 
-/*
- * tnt_delete()
- *
- * write delete request to stream;
- *
- * s     - stream pointer
- * ns    - space
- * flags - request flags
- * k     - tuple key
- * 
- * returns number of bytes written, or -1 on error.
-*/
-ssize_t
-tnt_delete(struct tnt_stream *s, uint32_t ns, uint32_t flags, struct tnt_tuple *k)
+#include "client/tarantool/tc_print.h"
+
+void tc_print_tuple(struct tnt_tuple *tu)
 {
-	/* filling major header */
-	struct tnt_header hdr;
-	hdr.type  = TNT_OP_DELETE;
-	hdr.len = sizeof(struct tnt_header_delete) + k->size;
-	hdr.reqid = s->reqid;
-	/* filling delete header */
-	struct tnt_header_delete hdr_del;
-	hdr_del.ns = ns;
-	hdr_del.flags = flags;
-	/* writing data to stream */
-	struct iovec v[3];
-	v[0].iov_base = &hdr;
-	v[0].iov_len  = sizeof(struct tnt_header);
-	v[1].iov_base = &hdr_del;
-	v[1].iov_len  = sizeof(struct tnt_header_delete);
-	v[2].iov_base = k->data;
-	v[2].iov_len  = k->size;
-	return s->writev(s, v, 3);
+	struct tnt_iter ifl;
+	tnt_iter(&ifl, tu);
+	printf("[");
+	while (tnt_next(&ifl)) {
+		if (TNT_IFIELD_IDX(&ifl) != 0)
+			printf(", ");
+		char *data = TNT_IFIELD_DATA(&ifl);
+		uint32_t size = TNT_IFIELD_SIZE(&ifl);
+		if (!isprint(data[0]) && (size == 4 || size == 8)) {
+			if (size == 4) {
+				uint32_t i = *((uint32_t*)data);
+				printf("%"PRIu32, i);
+			} else {
+				uint64_t i = *((uint64_t*)data);
+				printf("%"PRIu64, i);
+			}
+		} else {
+			printf("'%-.*s'", size, data);
+		}
+	}
+	if (ifl.status == TNT_ITER_FAIL)
+		printf("<parsing error>");
+	printf("]\n");
+	tnt_iter_free(&ifl);
+}
+
+void tc_print_list(struct tnt_list *l)
+{
+	struct tnt_iter it;
+	tnt_iter_list(&it, l);
+	while (tnt_next(&it)) {
+		struct tnt_tuple *tu = TNT_ILIST_TUPLE(&it);
+		tc_print_tuple(tu);
+	}
+	tnt_iter_free(&it);
 }

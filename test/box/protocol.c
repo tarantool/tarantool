@@ -26,9 +26,9 @@ void test_ping()
 	t->wrcnt++;
 
 	struct tnt_iter i;
-	tnt_iter_stream(&i, t);
+	tnt_iter_reply(&i, t);
 	tnt_next(&i);
-	struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+	struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 	printf("return_code: %"PRIu32"\n", r->code); /* =0 */
 	tnt_iter_free(&i);
 }
@@ -49,9 +49,9 @@ void test_bug702397()
 	t->wrcnt++;
 
 	struct tnt_iter i;
-	tnt_iter_stream(&i, t);
+	tnt_iter_reply(&i, t);
 	tnt_next(&i);
-	struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+	struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 	printf("return_code: %s, %s\n",
 	       tnt_errcode_str(r->code >> 8), r->error);
 	tnt_iter_free(&i);
@@ -76,9 +76,9 @@ void test_bug702399()
 	t->wrcnt++;
 
 	struct tnt_iter i;
-	tnt_iter_stream(&i, t);
+	tnt_iter_reply(&i, t);
 	tnt_next(&i);
-	struct tnt_reply *r = TNT_ISTREAM_REPLY(&i);
+	struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 	printf("return_code: %s, %s\n",
 	       tnt_errcode_str(r->code >> 8), r->error);
 	tnt_iter_free(&i);

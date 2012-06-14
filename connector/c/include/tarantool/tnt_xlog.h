@@ -1,6 +1,8 @@
+#ifndef TNT_XLOG_H_INCLUDED
+#define TNT_XLOG_H_INCLUDED
 
 /*
- * Copyright (C) 2011 Mail.RU
+ * Copyright (C) 2012 Mail.RU
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,48 +26,50 @@
  * SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+enum tnt_xlog_error {
+	TNT_XLOG_EOK,
+	TNT_XLOG_EFAIL,
+	TNT_XLOG_EMEMORY,
+	TNT_XLOG_ETYPE,
+	TNT_XLOG_EVERSION,
+	TNT_XLOG_ECORRUPT,
+	TNT_XLOG_ESYSTEM,
+	TNT_XLOG_LAST
+};
 
-#include <connector/c/include/tarantool/tnt_proto.h>
-#include <connector/c/include/tarantool/tnt_tuple.h>
-#include <connector/c/include/tarantool/tnt_request.h>
-#include <connector/c/include/tarantool/tnt_reply.h>
-#include <connector/c/include/tarantool/tnt_stream.h>
-#include <connector/c/include/tarantool/tnt_delete.h>
+struct tnt_xlog_header_v11 {
+	uint32_t crc32_hdr;
+	uint64_t lsn;
+	double tm;
+	uint32_t len;
+	uint32_t crc32_data;
+} __attribute__((packed));
 
-/*
- * tnt_delete()
- *
- * write delete request to stream;
- *
- * s     - stream pointer
- * ns    - space
- * flags - request flags
- * k     - tuple key
- * 
- * returns number of bytes written, or -1 on error.
-*/
-ssize_t
-tnt_delete(struct tnt_stream *s, uint32_t ns, uint32_t flags, struct tnt_tuple *k)
-{
-	/* filling major header */
-	struct tnt_header hdr;
-	hdr.type  = TNT_OP_DELETE;
-	hdr.len = sizeof(struct tnt_header_delete) + k->size;
-	hdr.reqid = s->reqid;
-	/* filling delete header */
-	struct tnt_header_delete hdr_del;
-	hdr_del.ns = ns;
-	hdr_del.flags = flags;
-	/* writing data to stream */
-	struct iovec v[3];
-	v[0].iov_base = &hdr;
-	v[0].iov_len  = sizeof(struct tnt_header);
-	v[1].iov_base = &hdr_del;
-	v[1].iov_len  = sizeof(struct tnt_header_delete);
-	v[2].iov_base = k->data;
-	v[2].iov_len  = k->size;
-	return s->writev(s, v, 3);
-}
+struct tnt_xlog_row_v11 {
+	uint16_t tag;
+	uint64_t cookie;
+	uint16_t op;
+} __attribute__((packed));
+
+struct tnt_stream_xlog {
+	char *file;
+	FILE *fd;
+	off_t offset;
+	struct tnt_xlog_header_v11 hdr;
+	struct tnt_xlog_row_v11 row;
+	enum tnt_xlog_error error;
+	int errno_;
+};
+
+#define TNT_SXLOG_CAST(S) ((struct tnt_stream_xlog*)(S)->data)
+
+struct tnt_stream *tnt_xlog(struct tnt_stream *s);
+
+int tnt_xlog_open(struct tnt_stream *s, char *file);
+void tnt_xlog_close(struct tnt_stream *s);
+
+enum tnt_xlog_error tnt_xlog_error(struct tnt_stream *s);
+char *tnt_xlog_strerror(struct tnt_stream *s);
+int tnt_xlog_errno(struct tnt_stream *s);
+
+#endif /* TNT_XLOG_H_INCLUDED */

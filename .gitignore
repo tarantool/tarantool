@@ -11,6 +11,10 @@ lcov
 test/var
 test/lib/*.pyc
 test/lib/*/*.pyc
+test/connector_c/rpl
+test/connector_c/xlog
+test/connector_c/tt
+test/connector_c/update
 test/box/protocol
 test/box/connector
 test/unit/queue
@@ -41,8 +45,6 @@ third_party/luajit/src/lj_folddef.h
 third_party/luajit/src/lj_libdef.h
 third_party/luajit/src/lj_recdef.h
 third_party/luajit/src/lj_vm.s
-test/connector_c/tt
-test/connector_c/update
 *.reject
 extra/txt2c
 mod/box/box.lua.c
@@ -57,3 +59,5 @@ connector/c/tntnet/libtarantoolnet.so.1
 connector/c/tntnet/libtarantoolnet.so.1.1
 connector/c/tntsql/libtarantoolsql.so.1
 connector/c/tntsql/libtarantoolsql.so.1.1
+connector/c/tntrpl/libtarantoolrpl.so.1
+connector/c/tntrpl/libtarantoolrpl.so.1.1
