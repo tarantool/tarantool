@@ -56,6 +56,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
+#include <string.h>
 
 #define mh_cat(a, b) mh##a##_##b
 #define mh_ecat(a, b) mh_cat(a, b)

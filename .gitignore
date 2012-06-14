@@ -14,6 +14,7 @@ test/lib/*/*.pyc
 test/box/protocol
 test/box/connector
 test/unit/queue
+test/unit/mhash
 Makefile
 CMakeFiles
 CMakeCache.txt

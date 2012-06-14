@@ -28,8 +28,18 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <unistd.h>
 
-#define header() printf("\t*** %s ***\n", __FUNCTION__)
-#define footer() printf("\t*** %s: done ***\n ", __FUNCTION__)
+#define header() printf("\t*** %s ***\n", __func__)
+#define footer() printf("\t*** %s: done ***\n ", __func__)
+
+#define fail(expr, result) do {						\
+	fprintf(stderr, "Test failed: %s is %s at %s:%d, in function '%s'\n",\
+		expr, result, __FILE__, __LINE__, __func__);		\
+	exit(-1);							\
+} while (0)
+
+#define fail_if(expr) if (expr) fail(#expr, "true")
+#define fail_unless(expr) if (!(expr)) fail(#expr, "false")
 
 #endif /* INCLUDES_TARANTOOL_TEST_UNIT_H */
