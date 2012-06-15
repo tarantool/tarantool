@@ -547,7 +547,8 @@ main(int argc, char **argv)
 		printf("Tarantool/%s %s\n", mod_name, tarantool_version());
 		printf("Target: %s\n", BUILD_INFO);
 		printf("Build options: %s\n", BUILD_OPTIONS);
-		printf("CFLAGS:%s\n", BUILD_CFLAGS);
+		printf("Compiler: %s\n", COMPILER_INFO);
+		printf("CFLAGS:%s\n", COMPILER_CFLAGS);
 		return 0;
 	}
 

@@ -77,12 +77,14 @@ tarantool_box --version
 Tarantool/Box 1.minor.patch-<rev>-<commit>
 Target: platform <build>
 Build options: flags
+Compiler: cc
 CFLAGS: flags
 
 tarantool_box -V
 Tarantool/Box 1.minor.patch-<rev>-<commit>
 Target: platform <build>
 Build options: flags
+Compiler: cc
 CFLAGS: flags
 
 #
