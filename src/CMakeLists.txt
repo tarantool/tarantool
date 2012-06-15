@@ -3,11 +3,16 @@
 #
 add_library(ev tarantool_ev.c)
 
-check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
 
-if (gcc_has_wno_unused_result)
+if (CMAKE_COMPILER_IS_GNUCC)
+    check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
+    if (gcc_has_wno_unused_result)
+        set_source_files_properties(tarantool_ev.c
+                PROPERTIES COMPILE_FLAGS "-Wno-unused-result")
+    endif()
+elseif (CMAKE_COMPILER_IS_CLANG)
     set_source_files_properties(tarantool_ev.c
-        PROPERTIES COMPILE_FLAGS "-Wno-unused-result")
+            PROPERTIES COMPILE_FLAGS "-Wno-unused-value -Wno-comment -Wno-bitwise-op-parentheses")
 endif()
 
 if (TARGET_OS_LINUX)
