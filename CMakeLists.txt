@@ -43,6 +43,10 @@ if(NOT CMAKE_BUILD_TYPE)
         FORCE)
 endif()
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL Clang)
+    set(CMAKE_COMPILER_IS_CLANG true)
+endif()
+
 if (CMAKE_COMPILER_IS_GNUCC)
 	execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
 			OUTPUT_VARIABLE GCC_VERSION)
@@ -180,6 +184,8 @@ set (CMAKE_C_FLAGS
 set (core_cflags "-std=gnu99")
 if(CMAKE_COMPILER_IS_GNUCC)
     set (core_cflags "${core_cflags} -Wall -Wextra")
+elseif(CMAKE_COMPILER_IS_CLANG)
+    set (core_cflgas "${core_cflags} -Wno-unused-result")
 endif()
 set (core_cflags "${core_cflags} -Wno-sign-compare -Wno-strict-aliasing")
 

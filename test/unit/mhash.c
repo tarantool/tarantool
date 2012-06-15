@@ -27,7 +27,7 @@ static void mhash_int32_id_test()
 	header();
 	int ret, k;
 	struct mh_i32_t *h;
-#define init()		({ mh_i32_init(NULL);		})
+#define init()		({ mh_i32_init();		})
 #define clear(x)	({ mh_i32_clear((x));		})
 #define destroy(x)	({ mh_i32_destroy((x));		})
 #define get(x)		({ mh_i32_get(h, (x));		})
@@ -44,7 +44,7 @@ static void mhash_int32_collision_test()
 	header();
 	int ret, k;
 	struct mh_i32_collision_t *h;
-#define init()		({ mh_i32_collision_init(NULL);		})
+#define init()		({ mh_i32_collision_init();		})
 #define clear(x)	({ mh_i32_collision_clear((x));		})
 #define destroy(x)	({ mh_i32_collision_destroy((x));		})
 #define get(x)		({ mh_i32_collision_get(h, (x));		})

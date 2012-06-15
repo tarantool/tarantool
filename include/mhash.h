@@ -113,8 +113,8 @@ struct _mh(t) {
 #define mh_setexist(h, i)	({ h->b[i >> 4] |= (1 << (i % 16)); })
 #define mh_setdirty(h, i)	({ h->b[i >> 4] |= (1 << (i % 16 + 16)); })
 
-#define mh_value(h, i)		({ (h)->p[(i)].val;	})
-#define mh_size(h)		({ (h)->size; 		})
+#define mh_value(h, i)		(h)->p[(i)].val
+#define mh_size(h)		({ (h)->size;		})
 #define mh_capacity(h)		({ (h)->n_buckets;	})
 #define mh_begin(h)		({ 0;			})
 #define mh_end(h)		({ (h)->n_buckets;	})
