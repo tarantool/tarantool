@@ -173,9 +173,9 @@ void tnt_rpl_close(struct tnt_stream *s) {
 }
 
 /*
- * tnt_rpl_net()
+ * tnt_rpl_attach()
  *
- * get network stream (tnt_stream_net object);
+ * attach network stream (tnt_stream_net object);
  *
  * s - replication stream pointer
 */
