@@ -10,21 +10,7 @@ public class Select extends Request{
     int _limit;
     byte[][][] _tuples;
     
-    public Select(int space, int index, int offset, int limit, byte[][] tuple){
-    	super();
-    	if (space < 0 || space > 255){
-    		_space = -1;
-    		return;
-    	}
-    	_space = space;
-    	_index = index;
-    	_offset = offset;
-    	_limit = limit;
-    	_tuples = new byte[1][][];
-    	_tuples[0] = tuple;
-    }
-    
-    public Select(int space, int index, int offset, int limit, byte[][][] tuples){
+    public Select(int space, int index, int offset, int limit, byte[][] ... tuples){
     	super();
     	if (space < 0 || space > 255){
     		_space = -1;
@@ -35,7 +21,7 @@ public class Select extends Request{
     	_offset = offset;
     	_limit = limit;
     	_tuples = tuples;
-    } 
+    }
     
     @Override
     public byte[] toByte(){

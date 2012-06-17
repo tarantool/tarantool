@@ -15,12 +15,3 @@ public abstract class Request{
 		return _reqId;
 	}
 }
-/*public class Update implements Request{
-    int _space;
-    int _flags;
-    byte[][] _tuple;
-    int _count;
-    Operation[] _operation_;
-
-    Update(int space, int flags, byte[][] tuple, int count, Operation[] _operation_);
-}*/

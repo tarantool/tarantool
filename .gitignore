@@ -8,6 +8,8 @@ lcov
 *.so
 *.d
 *.dylib
+*.class
+*.jar
 test/var
 test/lib/*.pyc
 test/lib/*/*.pyc
