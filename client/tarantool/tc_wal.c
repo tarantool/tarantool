@@ -87,7 +87,7 @@ static void tc_wal_print(struct tnt_xlog_header_v11 *hdr,
 		tc_print_tuple(&r->r.insert.t);
 		break;
 	case TNT_OP_DELETE:
-		tc_print_tuple(&r->r.delete.t);
+		tc_print_tuple(&r->r.del.t);
 		break;
 	case TNT_OP_UPDATE:
 		tc_print_tuple(&r->r.update.t);

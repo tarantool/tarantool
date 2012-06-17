@@ -52,7 +52,7 @@ struct tnt_request {
 	struct tnt_header h;
 	union {
 		struct tnt_request_insert insert;
-		struct tnt_request_delete delete;
+		struct tnt_request_delete del;
 		struct tnt_request_call call;
 		struct tnt_request_select select;
 		struct tnt_request_update update;

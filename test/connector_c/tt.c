@@ -367,7 +367,7 @@ static void tt_tnt_marshal_delete(struct tt_test *test) {
 	TT_ASSERT(tnt_next(&i) == 1);
 	struct tnt_request *r = TNT_IREQUEST_PTR(&i);
 	TT_ASSERT(r->h.type == TNT_OP_DELETE);
-	struct tnt_iter *f = tnt_field(NULL, &r->r.delete.t, 0);
+	struct tnt_iter *f = tnt_field(NULL, &r->r.del.t, 0);
 	TT_ASSERT(tnt_field(f, NULL, 0) != NULL);
 	TT_ASSERT(TNT_IFIELD_IDX(f) == 0);
 	TT_ASSERT(TNT_IFIELD_SIZE(f) == 3);
