@@ -1,5 +1,6 @@
 return_code: 0
 return_code: ER_ILLEGAL_PARAMS, Illegal parameters, tuple count must be positive
 return_code: ER_NO_SUCH_INDEX, No index #1 is defined in space 0
+return_code: ER_ILLEGAL_PARAMS, Illegal parameters, unsupported command code, check the error log
 delete from t0 where k0 = 1
 Delete OK, 1 row affected
