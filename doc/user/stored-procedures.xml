@@ -1070,6 +1070,17 @@ localhost> lua for k,v in i.next, i, nil do print(v) end
         </listitem>
     </varlistentry>
 
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:count()</emphasis>
+        </term>
+        <listitem><simpara>
+            Function iterates over an index, counting number of tuples which
+	    equals key search criteria. Key can be multi-parted.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
 </variablelist>
 
 <variablelist>
