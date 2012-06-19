@@ -253,12 +253,19 @@ function box.on_reload_configuration()
     index_mt.max = function(index) return index.idx:max() end
     -- iteration
     index_mt.pairs = function(index)
-        return index.idx.next, index.idx, nil end
+        return index.idx.next, index.idx, nil
+    end
     --
     index_mt.next = function(index, ...)
-        return index.idx:next(...) end
+        return index.idx:next(...)
+    end
     index_mt.prev = function(index, ...)
-        return index.idx:prev(...) end
+        return index.idx:prev(...)
+    end
+    -- index subtree size
+    index_mt.count = function(index, ...)
+        return index.idx:count(...)
+    end
     --
     index_mt.select_range = function(index, limit, ...)
         local range = {}
