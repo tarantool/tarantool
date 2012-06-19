@@ -288,15 +288,17 @@ sub send_bulk {
         die "Method must be called in void context if you want to use async" if defined wantarray;
         my $cv = AnyEvent->condvar();
         $cv->begin( sub { $callback->(\@result) } );
+        my $i = 0;
         foreach my $message ( @$messages ) {
+            my $idx = $i;
             $cv->begin();
             $self->_send($message, sub {
                 my ($data, $error) = @_;
-                push @result, blessed($data) ? $data
-                    : { data => $data, error => $error };
+                $result[$idx] = blessed($data) ? $data : { data => $data, error => $error };
                 $cv->end();
                 return;
             });
+            ++$i;
         }
         $cv->end();
         return;
@@ -306,13 +308,15 @@ sub send_bulk {
         my $olddie = ref $SIG{__DIE__} eq 'CODE' ? $SIG{__DIE__} : ref $SIG{__DIE__} eq 'GLOB' ? *{$SIG{__DIE__}}{CODE} : undef;
         local $SIG{__DIE__} = sub { local $! = 0; $olddie->(@_); } if $olddie;
         my %servers;
+        my $i = 0;
         foreach my $message ( @$messages ) {
+            my $idx = $i;
             $self->_send_now($message, sub {
                 my ($data, $error) = @_;
-                push @result, blessed($data) ? $data
-                    : { data => $data, error => $error };
+                $result[$idx] = blessed($data) ? $data : { data => $data, error => $error };
                 return;
             }, \%servers);
+            ++$i;
         }
         $self->_recv_now(\%servers);
         return \@result;
