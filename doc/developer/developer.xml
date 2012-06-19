@@ -53,18 +53,55 @@ The other alternative, if you have actually modified
 <title>How to build the XML manual</title>
 <para>
 To build XML manual, you'll need:
-<itemizedlist>
 
+<itemizedlist>
 <listitem><para>xsltproc</para></listitem>
 <listitem><para>docbook5-xml</para></listitem>
 <listitem><para>docbook-xsl-ns</para></listitem>
 <listitem><para>libsaxon-java- for saxon processing</para></listitem>
 <listitem><para>libxml-commons-resolver1.1-java</para></listitem>
+<listitem><para>libxml2-utils</para></listitem>
 <listitem><para>libxerces2-java</para></listitem>
 <listitem><para>libxslthl-java</para></listitem>
+<listitem><para>lynx</para></listitem>
+<listitem><para>jing</para></listitem>
 </itemizedlist>
-Once all pre-requisites are met, <computeroutput>make html</computeroutput>
-to build the user guide.
+
+
+
+When all pre-requisites are met, you should run:
+
+<programlisting>
+  <prompt>$ </prompt> cmake . -DENABLE_DOC=yes
+</programlisting>
+
+to enable documentation builder.
+
+If you want to make tarantool user guide, you should run the following command
+from taratnool root directory:
+
+<programlisting>
+  <prompt>$ </prompt> make html
+</programlisting>
+
+or
+
+<programlisting>
+  <prompt>$ </prompt> cd doc/user
+  <prompt>$ </prompt> make
+</programlisting>
+
+The html version of the user guide will be generated in doc/www-data.
+
+To building the developer guilde, you should run:
+
+<programlisting>
+  <prompt>$ </prompt> cd doc/developer
+  <prompt>$ </prompt> make
+</programlisting>
+
+The html version of the developer guide will be generated in doc/www-data.
+
 </para>
 </section>
 </chapter>

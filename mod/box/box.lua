@@ -259,6 +259,11 @@ function box.on_reload_configuration()
         return index.idx:next(...) end
     index_mt.prev = function(index, ...)
         return index.idx:prev(...) end
+
+    index_mt.next_equal = function(index, ...)
+        return index.idx:next_equal(...) end
+    index_mt.prev_equal = function(index, ...)
+        return index.idx:prev_equal(...) end
     --
     index_mt.select_range = function(index, limit, ...)
         local range = {}
