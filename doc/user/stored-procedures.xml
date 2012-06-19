@@ -984,87 +984,148 @@ xreflabel="box.index">box.index</code></title>
         </simpara>
         </listitem>
     </varlistentry>
+</variablelist>
 
-    <varlistentry>
-        <term>
-            <emphasis role="lua">index:pairs()</emphasis>
-        </term>
-        <listitem><simpara>
-            A helper function to iterate over all tuples in an
-            index.
-        </simpara>
-        </listitem>
-    </varlistentry>
-
+<para>
+    The following functions provide iteration support within an index.
+    <code>next</code> and <code>next_equal</code> provide common
+    iterators which go from the beginning to the end of the index.
+    <code>prev</code> and <code>prev_equal</code> provide reverse
+    iterators which travers the index in the reverse order.
+    In a non-unique index the routines with the <code>'_equal'</code>
+    suffix will traverse sequences of tuples with the same key value.
+</para>
+<variablelist>
     <varlistentry>
         <term>
             <emphasis role="lua">index:next(iteration_state, key)</emphasis>
         </term>
-        <listitem><simpara>
-            This function can be used for positioned iteration, or
-            resuming iteration from a given key. It follows the
-            <link xlink:href='http://pgl.yoyo.org/luai/i/next'>Lua
-            iteration pattern</link> and returns a pair
-            <code>&lt;iteration_state, tuple&gt;</code>.
-            When called with no arguments, it starts iteration
-            from the beginning. If called with userdata
-            <code>iteration_state</code>, it returns a tuple
-            corresponding to iterator position, plus a new
-            <code>iteration_state</code>. When called with a key,
-            it positions the iterator on the key, and returns the
-            respective tuple and <code>iteration_state</code>.
-        </simpara>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:prev(iteration_state, key)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:next_equal(iteration_state, key)</emphasis>
+        </term>
+        <listitem><simpara></simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:prev_equal(iteration_state, key)</emphasis>
+        </term>
+        <listitem>
+        <para>
+	    The first argument is the iteration state and the second one is the
+	    key. The functions create a new iterator if <code>iteration_state
+	    </code> is not defined or <code>nil</code>.
+	    The new iterator is positioned at the begining (or the end -- for
+	    reverse iterators) of the sequence of tuples satifsying the key.
+	    If the key is <code>nil</code> (or empty) the first (last) member
+	    of the sequence will be the first (last) member of the index.
+        </para>
+
+        <para>
+	    The functions follow the
+	    <link xlink:href='http://pgl.yoyo.org/luai/i/next'>Lua iteration
+	    pattern</link> returning <code>{iteration_state, tuple}</code> pair,
+	    where <code>iteration_state</code> is the iterator and
+	    <code>tuple</code> is the tuple the iterator points at.
+	    The function returns <code>nil</code> if the iterator reaches the
+	    end of the index or there are no more tuples satifsying the
+	    <code>key</code> (for <code>_equal</code> functions).
+        </para>
         <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> insert into t0 values (1, 'Russia')
-Insert OK, 1 rows affected
-localhost> insert into t0 values (2, 'Serbia')
-Insert OK, 1 rows affected
-localhost> insert into t0 values (3, 'Bulgaria')
-Insert OK, 1 rows affected
-localhost> lua i = box.space[0].index[0]
----
-...
-localhost> lua k,v=i:next()
----
-...
-localhost> lua print(v)
---
-1: {'Russia'}
-...
-localhost> lua k,v=i:next(k)
+localhost> lua box.insert(0, "United Kingdom, The", "Europe")
+localhost> lua box.insert(0, "France", "Europe")
+localhost> lua box.insert(0, "Netherlands", "Europe")
+localhost> lua box.insert(0, "Australia", "Oceania")
+localhost> lua box.insert(0, "Vanuatu", "Oceania")
+localhost> lua box.insert(0, "United States of America, The", "North America")
+localhost> lua box.insert(0, "Canada", "North America")
+localhost> lua box.insert(0, "Mexico", "North America")
+localhost> lua pi = box.space[0].index[0] -- primary index
+localhost> lua si = box.space[0].index[1] -- secondary index
+localhost> lua k,v=pi:next() -- init iterator by primary from the begining
 ---
 ...
 localhost> lua print(v)
 ---
-2: {'Serbia'}
+'Australia': {'Oceania'}
 ...
-localhost> lua k,v=i:next(k)
+localhost> lua k,v=pi:next(k) -- move to next
 ---
 ...
 localhost> lua print(v)
 ---
-3: {'Bulgaria'}
+'Canada': {'North America'}
 ...
-localhost> lua k,v=i:next(k)
+localhost> lua k,v=pi:next(k) -- move to next
 ---
 ...
 localhost> lua print(v)
 ---
-nil
+'France': {'Europe'}
 ...
-localhost> lua k,v=i:next(2)
+localhost> lua k,v=si:next_equal() -- init iterator by secondary from the begining
 ---
 ...
 localhost> lua print(v)
 ---
-2: {'Serbia'}
+'United Kingdom, The': {'Europe'}
 ...
-localhost> lua for k,v in i.next, i, nil do print(v) end
+localhost> lua k,v=si:next_equal(k) -- move to next
 ---
-1: {'Russia'}
-2: {'Serbia'}
-3: {'Bulgaria'}
+...
+localhost> lua print(v)
+---
+'France': {'Europe'}
+...
+localhost> lua k,v=si:next_equal(k) -- move to next
+---
+...
+localhost> lua print(v)
+---
+'Netherlands': {'Europe'}
+...
+localhost> lua for k,v in pi.next, pi, nil do print(v) end
+---
+'Australia': {'Oceania'}
+'Canada': {'North America'}
+'France': {'Europe'}
+'Mexico': {'North America'}
+'Netherlands': {'Europe'}
+'United Kingdom, The': {'Europe'}
+'United States of America, The': {'North America'}
+'Vanuatu': {'Oceania'}
+...
+localhost> lua for k,v in pi.prev, pi, nil do print(v) end
+---
+'Vanuatu': {'Oceania'}
+'United States of America, The': {'North America'}
+'United Kingdom, The': {'Europe'}
+'Netherlands': {'Europe'}
+'Mexico': {'North America'}
+'France': {'Europe'}
+'Canada': {'North America'}
+'Australia': {'Oceania'}
+...
+localhost> lua for k,v in si.next_equal, si, 'Oceania' do print(v) end
+---
+'Australia': {'Oceania'}
+'Vanuatu': {'Oceania'}
+...
+localhost> lua for k,v in si.prev_equal, si, 'North America' do print(v) end
+---
+'Mexico': {'North America'}
+'Canada': {'North America'}
+'United States of America, The': {'North America'}
 ...
 </programlisting>
         </listitem>
