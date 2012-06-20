@@ -115,12 +115,12 @@ sub wait {
     vec($in, $_->fileno, 1) = 1 for grep { $_->is_pending } values %$pending;
 
     my $n;
-    while(1) {
+    {
         my $ein = my $rin = $in;
         $n = CORE::select($rin, undef, $ein, $self->itertime);
         $self->_waitresult([$rin,$ein]);
         if ($n < 0) {
-            next if $!{EINTR};
+            redo if $!{EINTR};
             warn $self->name.": select() failed: $!";
             return undef;
         }

@@ -81,7 +81,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.24;
+$VERSION = 0.0.25;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
