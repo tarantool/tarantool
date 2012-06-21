@@ -1075,8 +1075,10 @@ localhost> lua for k,v in i.next, i, nil do print(v) end
             <emphasis role="lua">index:count()</emphasis>
         </term>
         <listitem><simpara>
-            Function iterates over an index, counting number of tuples which
-	    equals key search criteria. Key can be multi-parted.
+	    Iterate over an index, count the number of tuples which equal the
+	    provided search criteria. The argument can either point to a
+	    tuple, a key, or one or more key parts. Returns the number of matched
+	    tuples.
         </simpara>
         </listitem>
     </varlistentry>

@@ -564,15 +564,20 @@ lbox_index_prev_equal(struct lua_State *L)
 
 /**
  * Lua index subtree count function.
- * Function iterates over an index, counting
- * number of tuples which equals key search criteria.
- * Key can be multi-parted.
+ * Iterate over an index, count the number of tuples which equal the
+ * provided search criteria. The argument can either point to a
+ * tuple, a key, or one or more key parts. Returns the number of matched
+ * tuples.
  */
 static int
 lbox_index_count(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
+	if (argc == 0) {
+		tnt_raise(ClientError, :ER_ILLEGAL_PARAMS,
+			  "one or more arguments expected");
+	}
 	/* preparing single or multi-part key */
 	void *key;
 	int key_part_count;
