@@ -259,6 +259,9 @@ symbols_load(const char *name)
                 goto out;
 
 	symbol_table = malloc(storage_needed);
+	if (symbol_table == NULL)
+		goto out;
+
 	number_of_symbols = bfd_canonicalize_symtab (h, symbol_table);
 	if (number_of_symbols < 0)
 		goto out;
@@ -270,8 +273,11 @@ symbols_load(const char *name)
 		vma = bfd_get_section_vma(h, section);
 		size = bfd_get_section_size(section);
 
-		if (symbol_table[i]->flags & BSF_FUNCTION &&
-		    vma + symbol_table[i]->value > 0 &&
+		/* On ELF (but not elsewhere) use BSF_FUNCTION flag.  */
+		bool is_func = (bfd_target_elf_flavour == h->xvec->flavour) ?
+			symbol_table[i]->flags & BSF_FUNCTION : 1;
+
+		if (is_func && vma + symbol_table[i]->value > 0 &&
 		    symbol_table[i]->value < size)
 			symbol_count++;
 	}
@@ -281,6 +287,8 @@ symbols_load(const char *name)
 
 	j = 0;
 	symbols = malloc(symbol_count * sizeof(struct symbol));
+	if (symbols == NULL)
+		goto out;
 
 	for (int i = 0; i < number_of_symbols; i++) {
 		struct bfd_section *section;
@@ -289,8 +297,11 @@ symbols_load(const char *name)
 		vma = bfd_get_section_vma(h, section);
 		size = bfd_get_section_size(section);
 
-		if (symbol_table[i]->flags & BSF_FUNCTION &&
-		    vma + symbol_table[i]->value > 0 &&
+		/* On ELF (but not elsewhere) use BSF_FUNCTION flag.  */
+		bool is_func = (bfd_target_elf_flavour == h->xvec->flavour) ?
+			symbol_table[i]->flags & BSF_FUNCTION : 1;
+
+		if (is_func && (vma + symbol_table[i]->value) > 0 &&
 		    symbol_table[i]->value < size)
 		{
 			symbols[j].name = strdup(symbol_table[i]->name);
@@ -328,6 +339,9 @@ void symbols_free()
 struct symbol *
 addr2symbol(void *addr)
 {
+	if (symbols == NULL)
+		return NULL;
+
 	struct symbol key = {.addr = addr, .name = NULL, .end = NULL};
 	struct symbol *low = symbols;
 	struct symbol *high = symbols + symbol_count;

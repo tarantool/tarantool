@@ -1,3 +1,7 @@
+if (TARGET_OS_DARWIN)
+    set(module_link_flags "-pagezero_size 10000 -image_base 100000000")
+endif()
+
 add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/mod/box/memcached-grammar.m
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMAND ${RAGEL} -G2 mod/box/memcached-grammar.rl

@@ -29,6 +29,9 @@
 #include "exception.h"
 #include "say.h"
 
+#include <stdio.h>
+#include <string.h>
+
 
 @implementation tnt_Exception
 + (id) alloc

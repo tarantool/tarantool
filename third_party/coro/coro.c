@@ -122,8 +122,13 @@ trampoline (int sig)
 
   asm (
        "\t.text\n"
+#if defined(__APPLE__) && defined(__MACH__)
+       "\t.globl _coro_transfer\n"
+       "_coro_transfer:\n"
+#else
        "\t.globl coro_transfer\n"
        "coro_transfer:\n"
+#endif
        /* windows, of course, gives a shit on the amd64 ABI and uses different registers */
        /* http://blogs.msdn.com/freik/archive/2005/03/17/398200.aspx */
        #if __amd64

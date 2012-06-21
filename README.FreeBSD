@@ -26,18 +26,21 @@ sudo make install
 cd /usr/ports/devel/py-daemon
 sudo make install
 
+4. Download & build tarantool source code:
+-------------
+
 git clone git://github.com/mailru/tarantool.git
 
 cd tarantool
 CC=gcc463 CXX=g++463 cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
 gmake
 
-4. Set up python 2.6 to run tarantool tests
+5. Set up python 2.6 to run tarantool tests
 -------------
 
 mkdir ~/build/bin && ln -s /usr/bin/python26 ~/build/bin/python
 
-5. Run tarantool test suite
+6. Run tarantool test suite
 -------------
 
 cd ~/build/tarantool/test

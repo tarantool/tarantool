@@ -1,0 +1,49 @@
+Target OS: MacOS X "Lion"
+
+First of all, make sure mac ports are available (to install packages from).
+
+1. Install necessary packages (ports):
+-------------
+
+port install autoconf binutils cmake ncurses zlib readline
+
+2. Install gcc 4.6.x and gcc infrastructure pre-requisites
+-------------
+(x) Install gcc/g++ 4.6.x from mac ports (port install gcc46); the respective compiler(s) will be named gcc-mp-4.6, g++-mp-4.6;
+(x) Set up the environment to include the new GCC's libs: export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/local/lib
+
+
+3. Install necessary python modules: pexpect, pyYAML, daemon
+-------------
+NB: it is recommended to install python modules through setup.py,
+using the default python (which should be >= 2.6.x and < 3.x);
+
+tar -xzf module.tar.gz
+cd module-dir
+sudo python setup.py install
+
+where module is the name of the installed module and module-dir is the name of the directory
+the module's archive deflates into.
+
+4. Download & build tarantool source code:
+-------------
+
+git clone git://github.com/mailru/tarantool.git
+
+cd tarantool
+CC=gcc-mp-4.6 CXX=g++-mp-4.6 cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
+CC=gcc-mp-4.6 make
+
+5. Run tarantool test suite
+-------------
+NB: box/lua.test in not runnable on MacOS X at this point, in order to skip it add:
+
+disabled = lua.test
+
+to tarantool/test/suite.ini file;
+
+cd ~/build/tarantool/test
+PATH=~/build/bin:$PATH ./run
+
+-- EOF
+

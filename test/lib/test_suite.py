@@ -29,14 +29,17 @@ class FilteredStream:
         Do line-oriented filtering: the fragment doesn't have to represent
         just one line."""
         fragment_stream = cStringIO.StringIO(fragment)
+        skipped = False
         for line in fragment_stream:
             original_len = len(line.strip())
             for pattern, replacement in self.filters:
                 line = re.sub(pattern, replacement, line)
                 # don't write lines that are completely filtered out:
-                if original_len and len(line.strip()) == 0:
-                    return
-            self.stream.write(line)
+                skipped = original_len and len(line.strip()) == 0
+                if skipped:
+                    break
+            if not skipped:
+                self.stream.write(line)
 
     def push_filter(self, pattern, replacement):
         self.filters.append([pattern, replacement])

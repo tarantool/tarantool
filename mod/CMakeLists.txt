@@ -1,7 +1,6 @@
 
 function(tarantool_module mod)
-  set (module_sources ${ARGV})
-  list(REMOVE_ITEM module_sources ${mod})
+  set (module_sources ${ARGN})
   set_source_files_properties(
       ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c
       PROPERTIES COMPILE_FLAGS "-Wno-unused" GENERATED True)
@@ -23,6 +22,10 @@ function(tarantool_module mod)
           LINK_SEARCH_END_STATIC ON)
   endif()
 
+  if (module_link_flags)
+      set_target_properties(tarantool_${mod} PROPERTIES
+          LINK_FLAGS ${module_link_flags})
+  endif()
   install (TARGETS tarantool_${mod} DESTINATION bin)
 
 endfunction()

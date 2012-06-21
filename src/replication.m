@@ -38,6 +38,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <limits.h>
+#include <fcntl.h>
 
 #include "fiber.h"
 #include "recovery.h"
@@ -229,6 +230,16 @@ replication_init()
 	fiber_call(acceptor);
 }
 
+int sock_set_blocking(int sock)
+{
+	int flags = fcntl(sock, F_GETFL, 0);
+	if (flags >= 0 && flags & O_NONBLOCK)
+		flags = fcntl(sock, F_SETFL, flags & ~O_NONBLOCK);
+	if (flags < 0)
+		say_syserror("fcntl");
+	return flags;
+}
+
 
 /*-----------------------------------------------------------------------------*/
 /* replication accept/sender fibers                                            */
@@ -260,7 +271,12 @@ acceptor_handler(void *data __attribute__((unused)))
 			}
 			panic_syserror("accept");
 		}
-
+		/*
+		 * Drop the O_NONBLOCK flag, which was possible
+		 * inherited from the accept fd (happens on
+		 * Darwin).
+		 */
+		sock_set_blocking(client_sock);
 		/* up SO_KEEPALIVE flag */
 		int keepalive = 1;
 		if (setsockopt(client_sock, SOL_SOCKET, SO_KEEPALIVE,
