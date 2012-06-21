@@ -2,10 +2,14 @@ package tarantool.common;
 
 import java.util.AbstractList;
 import java.util.Arrays;
+import java.util.ConcurrentModificationException;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.RandomAccess;
+import java.util.ListIterator;
 
-public class Tuple extends AbstractList<byte[]> implements List<byte[]>, RandomAccess, Cloneable{
+public class Tuple extends AbstractList<byte[]> implements List<byte[]>, RandomAccess{
 
 	private byte[][] data;
 	
@@ -16,7 +20,7 @@ public class Tuple extends AbstractList<byte[]> implements List<byte[]>, RandomA
 		if (length < 0)
 			throw new IllegalArgumentException("Illegal Capacity: " + length);
 		this.data = new byte[length][];
-		size = length;
+		size = 0;
 	}
 	
 	public Tuple(){
@@ -138,4 +142,117 @@ public class Tuple extends AbstractList<byte[]> implements List<byte[]>, RandomA
 	}
 	
 	//TODO: Make iterators, make push(int, long..) add(index, (int, long, ..));
+	private class ListItr extends Itr implements ListIterator<byte []>{
+		ListItr(int index){
+			super();
+			cursor = index;
+		}
+		
+		public boolean hasPrevious(){
+			return cursor != 0;
+		}
+		public int nextIndex(){
+			return cursor;
+		}
+		
+		public int previousIndex(){
+			return cursor - 1;
+		}
+		
+		//@SuppressWarnings("Unchecked")
+		public byte[] previous(){
+			if (modCount != expectedModCount)
+				throw new ConcurrentModificationException();
+			int i = cursor - 1;
+			if (i < 0)
+				throw new NoSuchElementException();
+			byte[][] _data = Tuple.this.data;
+			if (i >= data.length)
+				throw new ConcurrentModificationException();
+			cursor = i;
+			return _data[lastRet = i];
+		}
+		
+		public void set(byte[] arr){
+			if (lastRet < 0)
+				throw new IllegalStateException();
+			if (modCount != expectedModCount)
+				throw new ConcurrentModificationException();
+			
+			try{
+				Tuple.this.set(lastRet, arr);
+			} catch(IndexOutOfBoundsException ex){
+				throw new ConcurrentModificationException();
+			}
+		}
+		
+		public void add(byte[] arr){
+			if (modCount != expectedModCount)
+				throw new ConcurrentModificationException();
+			try{
+				int i = cursor;
+				 Tuple.this.add(i, arr);
+				 cursor = i + 1;
+				 lastRet = -1;
+				 expectedModCount = modCount;
+			} catch (IndexOutOfBoundsException ex){
+				throw new ConcurrentModificationException();
+			}
+		}
+	}
+	
+	private class Itr implements Iterator<byte []>{
+
+		int cursor;
+		int lastRet = -1;
+		int expectedModCount = modCount;
+		
+		@Override
+		public boolean hasNext() {
+			return cursor != size;
+		}
+
+		@Override
+		public byte[] next() {
+			if (modCount != expectedModCount)
+				throw new ConcurrentModificationException();
+			int i = cursor;
+			if (i >= size)
+				throw new NoSuchElementException();
+			byte[][] _data = Tuple.this.data;
+			if (i >= _data.length)
+				throw new ConcurrentModificationException();
+			cursor = i + 1;
+			return _data[lastRet = i];
+		}
+
+		@Override
+		public void remove() {
+			if (lastRet < 0)
+				throw new IllegalStateException();
+			if (modCount != expectedModCount)
+				throw new ConcurrentModificationException();
+			try{
+				Tuple.this.remove(lastRet);
+				cursor = lastRet;
+				lastRet = -1;
+				expectedModCount = modCount;
+			} catch (IndexOutOfBoundsException ex){
+				throw new ConcurrentModificationException();
+			}
+		}
+	
+		public ListIterator<byte []> listIterator(int index){
+			if (index < 0 || index > size)
+				throw new IndexOutOfBoundsException("Index: "+index);
+			return new ListItr(index);
+		}
+		public ListIterator<byte []> listIterator(){
+			return new ListItr(0);
+		}
+		public Iterator<byte []> iterator(){
+			return new Itr();
+		}
+	}
+
 }
