@@ -86,14 +86,6 @@ int tnt_reply_from(struct tnt_reply *r, tnt_reply_t rcv, void *ptr) {
 	if (r->op == TNT_OP_PING)
 		return 0;
 
-	/* checking validity of operation */
-	if (r->op != TNT_OP_INSERT &&
-	    r->op != TNT_OP_UPDATE &&
-	    r->op != TNT_OP_DELETE &&
-	    r->op != TNT_OP_SELECT &&
-	    r->op != TNT_OP_CALL)
-		return -1;
-
 	/* reading code */
 	if (rcv(ptr, (char*)&r->code, sizeof(r->code)) == -1)
 		return -1;
@@ -110,6 +102,14 @@ int tnt_reply_from(struct tnt_reply *r, tnt_reply_t rcv, void *ptr) {
 		}
 		return 0;
 	}
+
+	/* checking validity of the operation */
+	if (r->op != TNT_OP_INSERT &&
+	    r->op != TNT_OP_UPDATE &&
+	    r->op != TNT_OP_DELETE &&
+	    r->op != TNT_OP_SELECT &&
+	    r->op != TNT_OP_CALL)
+		return -1;
 
 	/* code only (BOX_QUIET flag) */
 	if (size == 0)

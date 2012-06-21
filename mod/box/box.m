@@ -77,10 +77,9 @@ box_process_rw(struct txn *txn, Port *port,
 {
 	ev_tstamp start = ev_now(), stop;
 
-	stat_collect(stat_base, op, 1);
-
 	@try {
 		Request *request = [[Request build: op] init: data];
+		stat_collect(stat_base, op, 1);
 		[request execute: txn :port];
 		txn_commit(txn);
 	}
