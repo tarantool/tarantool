@@ -188,6 +188,23 @@ exec admin "lua collectgarbage('collect')"
 exec admin "lua box.fiber.find(900)"
 exec admin "lua box.fiber.find(910)"
 exec admin "lua box.fiber.find(920)"
+#
+#
+print """# A test case for Bug##933487 
+# tarantool crashed during shutdown if non running LUA fiber
+# was created 
+#"""
+exec admin "lua f = box.fiber.create(function () return true end)"
+exec admin "save snapshot"
+exec admin "save snapshot"
+exec admin "save snapshot"
+exec admin "lua box.fiber.resume(f)"
+exec admin "lua f = box.fiber.create(function () return true end)"
+#
+#
+print """#
+#
+#"""
 exec admin "lua box.space[0]:insert('test', 'something to splice')"
 exec admin "lua box.space[0]:update('test', ':p', 1, box.pack('ppp', 0, 4, 'no'))"
 exec admin "lua box.space[0]:update('test', ':p', 1, box.pack('ppp', 0, 2, 'every'))"

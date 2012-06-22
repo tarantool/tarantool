@@ -444,6 +444,13 @@ error:
 void
 tarantool_free(void)
 {
+	/*
+	 * Got to be done prior to anything else, since GC 
+	 * handlers can refer to other subsystems (e.g. fibers).
+	 */
+	if (tarantool_L)
+		tarantool_lua_close(tarantool_L);
+
 	recovery_free();
 	stat_free();
 
@@ -467,8 +474,6 @@ tarantool_free(void)
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
-	if (tarantool_L)
-		tarantool_lua_close(tarantool_L);
 }
 
 static void

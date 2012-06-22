@@ -148,7 +148,7 @@ fiber_wakeup(struct fiber *f)
 void
 fiber_cancel(struct fiber *f)
 {
-	assert(fiber->fid != 0);
+	assert(f->fid != 0);
 	assert(!(f->flags & FIBER_CANCEL));
 
 	f->flags |= FIBER_CANCEL;
