@@ -52,7 +52,9 @@ static const void *tc_options_def = gopt_start(
 	gopt_option('R', GOPT_ARG, gopt_shorts('R'),
 		    gopt_longs("rpl"), " <lsn>", "act as replica for the specified server"),
 	gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
-		    NULL, "display this help and exit")
+		    NULL, "display this help and exit"),
+	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
+		    NULL, "display version information and exit")
 );
 
 void tc_opt_usage(void)
@@ -63,12 +65,26 @@ void tc_opt_usage(void)
 	exit(0);
 }
 
+void tc_opt_version(void)
+{
+	printf("tarantool client, version %s.%s\n",
+	       TC_VERSION_MAJOR,
+	       TC_VERSION_MINOR);
+	exit(0);
+}
+
 enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 {
 	/* usage */
 	void *tc_options = gopt_sort(&argc, (const char**)argv, tc_options_def);
 	if (gopt(tc_options, 'h')) {
 		opt->mode = TC_OPT_USAGE;
+		goto done;
+	}
+
+	/* version */
+	if (gopt(tc_options, 'v')) {
+		opt->mode = TC_OPT_VERSION;
 		goto done;
 	}
 

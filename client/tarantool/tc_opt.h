@@ -26,8 +26,12 @@
  * SUCH DAMAGE.
  */
 
+#define TC_VERSION_MAJOR "0"
+#define TC_VERSION_MINOR "1"
+
 enum tc_opt_mode {
 	TC_OPT_USAGE,
+	TC_OPT_VERSION,
 	TC_OPT_RPL,
 	TC_OPT_WAL_CAT,
 	TC_OPT_WAL_PLAY,
@@ -47,6 +51,7 @@ struct tc_opt {
 };
 
 void tc_opt_usage(void);
+void tc_opt_version(void);
 
 enum tc_opt_mode
 tc_opt_init(struct tc_opt *opt, int argc, char **argv);

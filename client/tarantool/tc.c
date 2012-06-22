@@ -101,6 +101,9 @@ int main(int argc, char *argv[])
 	case TC_OPT_USAGE:
 		tc_opt_usage();
 		break;
+	case TC_OPT_VERSION:
+		tc_opt_version();
+		break;
 	case TC_OPT_RPL:
 		tc_connect();
 		rc = tc_wal_remote();
