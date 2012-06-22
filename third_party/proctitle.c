@@ -256,10 +256,12 @@ free_proc_title(int argc, char **argv)
 		free(environ[i]);
 	free(environ);
 	environ = save_environ;
-#endif
+#endif /* PS_USE_CLOBBER_ARGV */
+#if defined(PS_USE_CHANGE_ARGV) || defined(PS_USE_CLOBBER_ARGV)
 	for (i = 0; i < argc; i++)
 		free(argv[i]);
 	free(argv);
+#endif /* PS_USE_CHANGE_ARGV or PS_USE_CLOBBER_ARGV */
 }
 
 void
