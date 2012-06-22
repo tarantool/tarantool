@@ -4,5 +4,7 @@ build-area/connector/c/tntnet/*.so          /usr/lib/
 build-area/connector/c/tntnet/*.a           /usr/lib/
 build-area/connector/c/tntsql/*.so          /usr/lib/
 build-area/connector/c/tntsql/*.a           /usr/lib/
+build-area/connector/c/tntrpl/*.so          /usr/lib/
+build-area/connector/c/tntrpl/*.a           /usr/lib/
 connector/c/include/tarantool/*             /usr/include/tarantool/
 
