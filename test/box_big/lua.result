@@ -308,5 +308,5 @@ lua box.space[17].index[1].idx:count(3, 3)
 ...
 lua box.space[17].index[1].idx:count()
 ---
-error: 'Illegal parameters, one or more arguments expected'
+error: 'Lua error: index.count(): one or more arguments expected'
 ...

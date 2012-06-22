@@ -574,10 +574,8 @@ lbox_index_count(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
-	if (argc == 0) {
-		tnt_raise(ClientError, :ER_ILLEGAL_PARAMS,
-			  "one or more arguments expected");
-	}
+	if (argc == 0)
+		luaL_error(L, "index.count(): one or more arguments expected");
 	/* preparing single or multi-part key */
 	void *key;
 	int key_part_count;
