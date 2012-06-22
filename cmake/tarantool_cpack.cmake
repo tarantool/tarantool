@@ -3,14 +3,13 @@
 # List generators
 #
 if ("${CPACK_GENERATOR}" STREQUAL "RPM")
-    set (CPACK_RPM_PACKAGE_NAME "tarantool_box")
-    set (CPACK_RPM_PACKAGE_SUMMARY "tarantool_box")
-    execute_process (COMMAND "date" "+%Y%m%d.%H%M" OUTPUT_VARIABLE RPM_PACKAGE_VERSION)
-    set (CPACK_RPM_PACKAGE_VERSION "${RPM_PACKAGE_VERSION}")
+    set (CPACK_RPM_PACKAGE_NAME "tarantool")
+    set (CPACK_RPM_PACKAGE_SUMMARY "tarantool")
+    set (CPACK_RPM_PACKAGE_VERSION "${TARANTOOL_VERSION}")
     set (CPACK_RPM_PACKAGE_RELEASE "8")
     set (CPACK_RPM_PACKAGE_LICENSE "BSD")
-    set (CPACK_RPM_PACKAGE_GROUP "MAIL.RU")
-    set (CPACK_RPM_PACKAGE_DESCRIPTION "Tarantool in-memory DB storage")
+    set (CPACK_RPM_PACKAGE_VENDOR "MAIL.RU")
+    set (CPACK_RPM_PACKAGE_DESCRIPTION "Tarantool/Box - an efficient in-memory data store")
     set (CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/cmake/rpm_post_install.sh")
     set (CPACK_SET_DESTDIR "ON") 
     set (CPACK_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
@@ -30,7 +29,6 @@ set (CPACK_SOURCE_IGNORE_FILES
     "\\\\.o" "\\\\.so" "\\\\.a"
     "client/tarantool/tarantool"
     "mod/box/tarantool_box"
-    "mod/box/tarantool_feeder"
     "install_manifest.txt"
     "cmake_install.cmake" "test/var/"
 )
