@@ -562,6 +562,53 @@ lbox_index_prev_equal(struct lua_State *L)
 	return tuple ? 2 : 1;
 }
 
+/**
+ * Lua index subtree count function.
+ * Iterate over an index, count the number of tuples which equal the
+ * provided search criteria. The argument can either point to a
+ * tuple, a key, or one or more key parts. Returns the number of matched
+ * tuples.
+ */
+static int
+lbox_index_count(struct lua_State *L)
+{
+	Index *index = lua_checkindex(L, 1);
+	int argc = lua_gettop(L) - 1;
+	if (argc == 0)
+		luaL_error(L, "index.count(): one or more arguments expected");
+	/* preparing single or multi-part key */
+	void *key;
+	int key_part_count;
+	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
+		/* Searching by tuple. */
+		struct tuple *tuple = lua_checktuple(L, 2);
+		key = tuple->data;
+		key_part_count = tuple->field_count;
+	} else {
+		/* Single or multi- part key. */
+		key_part_count = argc;
+		struct tbuf *data = tbuf_alloc(fiber->gc_pool);
+		for (int i = 0; i < argc; ++i)
+			append_key_part(L, i + 2, data,
+					index->key_def->parts[i].type);
+		key = data->data;
+	}
+	u32 count = 0;
+	/* preparing index iterator */
+	struct iterator *it = index->position;
+	[index initIteratorByKey: it :ITER_FORWARD :key :key_part_count];
+	/* iterating over the index and counting tuples */
+	struct tuple *tuple;
+	while ((tuple = it->next_equal(it)) != NULL) {
+		if (tuple->flags & GHOST)
+			continue;
+		count++;
+	}
+	/* returning subtree size */
+	lua_pushnumber(L, count);
+	return 1;
+}
+
 static const struct luaL_reg lbox_index_meta[] = {
 	{"__tostring", lbox_index_tostring},
 	{"__len", lbox_index_len},
@@ -572,6 +619,7 @@ static const struct luaL_reg lbox_index_meta[] = {
 	{"prev", lbox_index_prev},
 	{"next_equal", lbox_index_next_equal},
 	{"prev_equal", lbox_index_prev_equal},
+	{"count", lbox_index_count},
 	{NULL, NULL}
 };
 

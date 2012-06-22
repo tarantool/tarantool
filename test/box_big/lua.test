@@ -89,3 +89,20 @@ exec admin "lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16]
 exec admin "lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end"
 exec admin "lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end"
 exec admin "lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end"
+
+#
+# Tests for lua idx:count()
+#
+exec admin "lua box.insert(17, 1, 1, 1)"
+exec admin "lua box.insert(17, 2, 2, 0)"
+exec admin "lua box.insert(17, 3, 2, 1)"
+exec admin "lua box.insert(17, 4, 3, 0)"
+exec admin "lua box.insert(17, 5, 3, 1)"
+exec admin "lua box.insert(17, 6, 3, 2)"
+exec admin "lua box.space[17].index[1].idx:count(1)"
+exec admin "lua box.space[17].index[1].idx:count(2)"
+exec admin "lua box.space[17].index[1].idx:count(2, 1)"
+exec admin "lua box.space[17].index[1].idx:count(2, 2)"
+exec admin "lua box.space[17].index[1].idx:count(3)"
+exec admin "lua box.space[17].index[1].idx:count(3, 3)"
+exec admin "lua box.space[17].index[1].idx:count()"

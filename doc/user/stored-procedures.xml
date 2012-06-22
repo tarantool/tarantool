@@ -1131,6 +1131,19 @@ localhost> lua for k,v in si.prev_equal, si, 'North America' do print(v) end
         </listitem>
     </varlistentry>
 
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:count()</emphasis>
+        </term>
+        <listitem><simpara>
+	    Iterate over an index, count the number of tuples which equal the
+	    provided search criteria. The argument can either point to a
+	    tuple, a key, or one or more key parts. Returns the number of matched
+	    tuples.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
 </variablelist>
 
 <variablelist>
