@@ -14,10 +14,19 @@ public class Response{
 
 	final byte[][][] _tuple;
 
+	public Response(){
+		_type = 0;
+		_bodyLen = 0;
+		_reqId = 0;
+		_count = 0;
+		_error = 0;
+		_tuple = new byte[0][0][0];
+	}
+	
     public Response(byte[] header, byte[] body) {
     	
-		System.out.println(Arrays.toString(header));
-		System.out.println(Arrays.toString(body));
+		//System.out.println(Arrays.toString(header));
+		//System.out.println(Arrays.toString(body));
 
     	
         _type = ByteUtil.readInteger(header, 0); 

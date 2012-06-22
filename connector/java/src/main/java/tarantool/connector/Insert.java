@@ -8,7 +8,18 @@ public class Insert extends Request{
     int _flags;
     byte[][] _tuple;
     
-    public Insert(int space, int flags, byte[][] tuple){
+    /*public Insert(int space, int flags, byte[][] tuple){
+    	super();
+    	if (space < 0 || space > 255){
+    		_space = -1;
+    		return;
+    	}
+    	_space = space;
+    	_flags = flags;
+    	_tuple = tuple;
+    }*/
+    
+    public Insert(int space, int flags, byte[] ... tuple){
     	super();
     	if (space < 0 || space > 255){
     		_space = -1;

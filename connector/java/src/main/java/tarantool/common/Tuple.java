@@ -254,5 +254,9 @@ public class Tuple extends AbstractList<byte[]> implements List<byte[]>, RandomA
 			return new Itr();
 		}
 	}
+	
+	public byte[][] toByte(){
+		return Arrays.copyOf(this.data, size);	
+	}
 
 }
