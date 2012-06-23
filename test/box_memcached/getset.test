@@ -61,6 +61,22 @@ while len < (1024 * 1028):
         print exec memcached silent "set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val)
     len += 1024 * 512
 
+print """#
+# A test for Bug#898198 memcached protocol isn't case-insensitive"
+#"""
+
+exec memcached "SET foo 0 0 6\r\nfooval\r\n"
+exec memcached "GET foo\r\n"
+exec memcached "ADD foo 0 0 5\r\nfoov2\r\n"
+exec memcached "GET foo\r\n"
+exec memcached "REPLACE bar 0 0 6\r\nbarva2\r\n"
+exec memcached "GET bar\r\n"
+exec memcached "DELETE foo\r\n"
+exec memcached "GET foo\r\n"
+exec memcached "CAS moo 0 0 6 0\r\nMOOVAL\r\n"
+exec memcached "GET moo\r\n"
+exec memcached "GETS moo\r\n"
+
 # resore default suite config
 server.stop()
 server.deploy(self.suite_ini["config"])

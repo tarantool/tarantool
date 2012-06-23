@@ -47,17 +47,17 @@ class MemcachedConnection(TarantoolConnection):
                 # end of buffer reached
                 break
 
-            if re.match('set|add|replace|append|prepend|cas', cmd):
+            if re.match('set|add|replace|append|prepend|cas', cmd, re.I):
                 self.reply_storage(cmd)
-            elif re.match('get|gets', cmd):
+            elif re.match('get|gets', cmd, re.I):
                 self.reply_retrieval(cmd)
-            elif re.match('delete', cmd):
+            elif re.match('delete', cmd, re.I):
                 self.reply_deletion(cmd)
-            elif re.match('incr|decr', cmd):
+            elif re.match('incr|decr', cmd, re.I):
                 self.reply_incr_decr(cmd)
-            elif re.match('stats', cmd):
+            elif re.match('stats', cmd, re.I):
                 self.reply_stats(cmd)
-            elif re.match('flush_all|version|quit', cmd):
+            elif re.match('flush_all|version|quit', cmd, re.I):
                 self.reply_other(cmd)
             elif cmd == '':
                 continue
@@ -130,7 +130,7 @@ class MemcachedConnection(TarantoolConnection):
 
     def reply_single_line(self, cmd):
         params = cmd.split()
-        if params[-1] == "noreply":
+        if re.match('noreply', params[-1], re.I):
             # Noreply option exist
             noreply = True
         else:

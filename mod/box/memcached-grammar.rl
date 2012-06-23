@@ -229,7 +229,7 @@ memcached_dispatch()
 				p--;
 			} else
 				p = fstart;
- 		}
+		}
 
 
 		printable = [^ \t\r\n];
@@ -277,26 +277,26 @@ memcached_dispatch()
 
 		eol = ("\r\n" | "\n") @{ p++; };
 		spc = " "+;
-		noreply = (spc "noreply" %{ noreply = true; })?;
+		noreply = (spc "noreply"i %{ noreply = true; })?;
 		store_command_body = spc key spc flags spc exptime spc bytes noreply eol;
 
-		set = ("set" store_command_body) @read_data @done @set;
-		add = ("add" store_command_body) @read_data @done @add;
-		replace = ("replace" store_command_body) @read_data @done @replace;
-		append  = ("append"  %{append = true; } store_command_body) @read_data @done @append_prepend;
-		prepend = ("prepend" %{append = false;} store_command_body) @read_data @done @append_prepend;
-		cas = ("cas" spc key spc flags spc exptime spc bytes spc cas_value noreply spc?) eol @read_data @done @cas;
+		set = ("set"i store_command_body) @read_data @done @set;
+		add = ("add"i store_command_body) @read_data @done @add;
+		replace = ("replace"i store_command_body) @read_data @done @replace;
+		append  = ("append"i  %{append = true; } store_command_body) @read_data @done @append_prepend;
+		prepend = ("prepend"i %{append = false;} store_command_body) @read_data @done @append_prepend;
+		cas = ("cas"i spc key spc flags spc exptime spc bytes spc cas_value noreply spc?) eol @read_data @done @cas;
 
 
-		get = "get" %{show_cas = false;} spc key (spc key)* spc? eol @done @get;
-		gets = "gets" %{show_cas = true;} spc key (spc key)* spc? eol @done @get;
-		delete = "delete" spc key (spc exptime)? noreply spc? eol @done @delete;
-		incr = "incr" %{incr_sign = 1; } spc key spc incr_value noreply spc? eol @done @incr_decr;
-		decr = "decr" %{incr_sign = -1;} spc key spc incr_value noreply spc? eol @done @incr_decr;
+		get = "get"i %{show_cas = false;} spc key (spc key)* spc? eol @done @get;
+		gets = "gets"i %{show_cas = true;} spc key (spc key)* spc? eol @done @get;
+		delete = "delete"i spc key (spc exptime)? noreply spc? eol @done @delete;
+		incr = "incr"i %{incr_sign = 1; } spc key spc incr_value noreply spc? eol @done @incr_decr;
+		decr = "decr"i %{incr_sign = -1;} spc key spc incr_value noreply spc? eol @done @incr_decr;
 
-		stats = "stats" eol @done @stats;
-		flush_all = "flush_all" (spc flush_delay)? noreply spc? eol @done @flush_all;
-		quit = "quit" eol @done @quit;
+		stats = "stats"i eol @done @stats;
+		flush_all = "flush_all"i (spc flush_delay)? noreply spc? eol @done @flush_all;
+		quit = "quit"i eol @done @quit;
 
 	        main := set | cas | add | replace | append | prepend | get | gets | delete | incr | decr | stats | flush_all | quit;
 	        #main := set;

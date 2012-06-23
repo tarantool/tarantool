@@ -104,3 +104,42 @@ set foo_1049600 0 0 1049600
 
 SERVER_ERROR object too large for cache
 
+#
+# A test for Bug#898198 memcached protocol isn't case-insensitive"
+#
+SET foo 0 0 6
+fooval
+STORED
+GET foo
+VALUE foo 0 6
+fooval
+END
+ADD foo 0 0 5
+foov2
+NOT_STORED
+GET foo
+VALUE foo 0 6
+fooval
+END
+REPLACE bar 0 0 6
+barva2
+STORED
+GET bar
+VALUE bar 0 6
+barva2
+END
+DELETE foo
+DELETED
+GET foo
+END
+CAS moo 0 0 6 0
+MOOVAL
+EXISTS
+GET moo
+VALUE moo 0 6
+MOOVAL
+END
+GETS moo
+VALUE moo 0 6 46
+MOOVAL
+END

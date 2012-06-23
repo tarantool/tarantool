@@ -77,6 +77,16 @@ memcached_dispatch()
 	{
 case 1:
 	switch( (*p) ) {
+		case 65: goto st2;
+		case 67: goto st44;
+		case 68: goto st67;
+		case 70: goto st103;
+		case 71: goto st124;
+		case 73: goto st132;
+		case 80: goto st136;
+		case 81: goto st143;
+		case 82: goto st148;
+		case 83: goto st172;
 		case 97: goto st2;
 		case 99: goto st44;
 		case 100: goto st67;
@@ -97,6 +107,8 @@ st2:
 		goto _test_eof2;
 case 2:
 	switch( (*p) ) {
+		case 68: goto st3;
+		case 80: goto st22;
 		case 100: goto st3;
 		case 112: goto st22;
 	}
@@ -105,8 +117,10 @@ st3:
 	if ( ++p == pe )
 		goto _test_eof3;
 case 3:
-	if ( (*p) == 100 )
-		goto st4;
+	switch( (*p) ) {
+		case 68: goto st4;
+		case 100: goto st4;
+	}
 	goto st0;
 st4:
 	if ( ++p == pe )
@@ -138,13 +152,13 @@ tr15:
 				p--;
 			} else
 				p = fstart;
- 		}
+		}
 	goto st6;
 st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 148 "mod/box/memcached-grammar.m"
+#line 162 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st7;
 	goto st0;
@@ -165,7 +179,7 @@ st8:
 	if ( ++p == pe )
 		goto _test_eof8;
 case 8:
-#line 169 "mod/box/memcached-grammar.m"
+#line 183 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr18;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -179,7 +193,7 @@ st9:
 	if ( ++p == pe )
 		goto _test_eof9;
 case 9:
-#line 183 "mod/box/memcached-grammar.m"
+#line 197 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st9;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -193,7 +207,7 @@ st10:
 	if ( ++p == pe )
 		goto _test_eof10;
 case 10:
-#line 197 "mod/box/memcached-grammar.m"
+#line 211 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr22;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -211,7 +225,7 @@ st11:
 	if ( ++p == pe )
 		goto _test_eof11;
 case 11:
-#line 215 "mod/box/memcached-grammar.m"
+#line 229 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st11;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -225,7 +239,7 @@ st12:
 	if ( ++p == pe )
 		goto _test_eof12;
 case 12:
-#line 229 "mod/box/memcached-grammar.m"
+#line 243 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr26;
 		case 13: goto tr27;
@@ -1310,7 +1324,7 @@ st197:
 	if ( ++p == pe )
 		goto _test_eof197;
 case 197:
-#line 1314 "mod/box/memcached-grammar.m"
+#line 1328 "mod/box/memcached-grammar.m"
 	goto st0;
 tr27:
 #line 246 "mod/box/memcached-grammar.rl"
@@ -1324,7 +1338,7 @@ st13:
 	if ( ++p == pe )
 		goto _test_eof13;
 case 13:
-#line 1328 "mod/box/memcached-grammar.m"
+#line 1342 "mod/box/memcached-grammar.m"
 	if ( (*p) == 10 )
 		goto tr30;
 	goto st0;
@@ -1336,9 +1350,10 @@ st14:
 	if ( ++p == pe )
 		goto _test_eof14;
 case 14:
-#line 1340 "mod/box/memcached-grammar.m"
+#line 1354 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 32: goto st14;
+		case 78: goto st15;
 		case 110: goto st15;
 	}
 	goto st0;
@@ -1346,43 +1361,55 @@ st15:
 	if ( ++p == pe )
 		goto _test_eof15;
 case 15:
-	if ( (*p) == 111 )
-		goto st16;
+	switch( (*p) ) {
+		case 79: goto st16;
+		case 111: goto st16;
+	}
 	goto st0;
 st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-	if ( (*p) == 114 )
-		goto st17;
+	switch( (*p) ) {
+		case 82: goto st17;
+		case 114: goto st17;
+	}
 	goto st0;
 st17:
 	if ( ++p == pe )
 		goto _test_eof17;
 case 17:
-	if ( (*p) == 101 )
-		goto st18;
+	switch( (*p) ) {
+		case 69: goto st18;
+		case 101: goto st18;
+	}
 	goto st0;
 st18:
 	if ( ++p == pe )
 		goto _test_eof18;
 case 18:
-	if ( (*p) == 112 )
-		goto st19;
+	switch( (*p) ) {
+		case 80: goto st19;
+		case 112: goto st19;
+	}
 	goto st0;
 st19:
 	if ( ++p == pe )
 		goto _test_eof19;
 case 19:
-	if ( (*p) == 108 )
-		goto st20;
+	switch( (*p) ) {
+		case 76: goto st20;
+		case 108: goto st20;
+	}
 	goto st0;
 st20:
 	if ( ++p == pe )
 		goto _test_eof20;
 case 20:
-	if ( (*p) == 121 )
-		goto st21;
+	switch( (*p) ) {
+		case 89: goto st21;
+		case 121: goto st21;
+	}
 	goto st0;
 st21:
 	if ( ++p == pe )
@@ -1397,29 +1424,37 @@ st22:
 	if ( ++p == pe )
 		goto _test_eof22;
 case 22:
-	if ( (*p) == 112 )
-		goto st23;
+	switch( (*p) ) {
+		case 80: goto st23;
+		case 112: goto st23;
+	}
 	goto st0;
 st23:
 	if ( ++p == pe )
 		goto _test_eof23;
 case 23:
-	if ( (*p) == 101 )
-		goto st24;
+	switch( (*p) ) {
+		case 69: goto st24;
+		case 101: goto st24;
+	}
 	goto st0;
 st24:
 	if ( ++p == pe )
 		goto _test_eof24;
 case 24:
-	if ( (*p) == 110 )
-		goto st25;
+	switch( (*p) ) {
+		case 78: goto st25;
+		case 110: goto st25;
+	}
 	goto st0;
 st25:
 	if ( ++p == pe )
 		goto _test_eof25;
 case 25:
-	if ( (*p) == 100 )
-		goto st26;
+	switch( (*p) ) {
+		case 68: goto st26;
+		case 100: goto st26;
+	}
 	goto st0;
 st26:
 	if ( ++p == pe )
@@ -1440,7 +1475,7 @@ st27:
 	if ( ++p == pe )
 		goto _test_eof27;
 case 27:
-#line 1444 "mod/box/memcached-grammar.m"
+#line 1479 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 13: goto st0;
 		case 32: goto st27;
@@ -1460,13 +1495,13 @@ tr46:
 				p--;
 			} else
 				p = fstart;
- 		}
+		}
 	goto st28;
 st28:
 	if ( ++p == pe )
 		goto _test_eof28;
 case 28:
-#line 1470 "mod/box/memcached-grammar.m"
+#line 1505 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st29;
 	goto st0;
@@ -1487,7 +1522,7 @@ st30:
 	if ( ++p == pe )
 		goto _test_eof30;
 case 30:
-#line 1491 "mod/box/memcached-grammar.m"
+#line 1526 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr50;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1501,7 +1536,7 @@ st31:
 	if ( ++p == pe )
 		goto _test_eof31;
 case 31:
-#line 1505 "mod/box/memcached-grammar.m"
+#line 1540 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st31;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1515,7 +1550,7 @@ st32:
 	if ( ++p == pe )
 		goto _test_eof32;
 case 32:
-#line 1519 "mod/box/memcached-grammar.m"
+#line 1554 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr54;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1533,7 +1568,7 @@ st33:
 	if ( ++p == pe )
 		goto _test_eof33;
 case 33:
-#line 1537 "mod/box/memcached-grammar.m"
+#line 1572 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st33;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1547,7 +1582,7 @@ st34:
 	if ( ++p == pe )
 		goto _test_eof34;
 case 34:
-#line 1551 "mod/box/memcached-grammar.m"
+#line 1586 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr58;
 		case 13: goto tr59;
@@ -1568,7 +1603,7 @@ st35:
 	if ( ++p == pe )
 		goto _test_eof35;
 case 35:
-#line 1572 "mod/box/memcached-grammar.m"
+#line 1607 "mod/box/memcached-grammar.m"
 	if ( (*p) == 10 )
 		goto tr62;
 	goto st0;
@@ -1580,9 +1615,10 @@ st36:
 	if ( ++p == pe )
 		goto _test_eof36;
 case 36:
-#line 1584 "mod/box/memcached-grammar.m"
+#line 1619 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 32: goto st36;
+		case 78: goto st37;
 		case 110: goto st37;
 	}
 	goto st0;
@@ -1590,43 +1626,55 @@ st37:
 	if ( ++p == pe )
 		goto _test_eof37;
 case 37:
-	if ( (*p) == 111 )
-		goto st38;
+	switch( (*p) ) {
+		case 79: goto st38;
+		case 111: goto st38;
+	}
 	goto st0;
 st38:
 	if ( ++p == pe )
 		goto _test_eof38;
 case 38:
-	if ( (*p) == 114 )
-		goto st39;
+	switch( (*p) ) {
+		case 82: goto st39;
+		case 114: goto st39;
+	}
 	goto st0;
 st39:
 	if ( ++p == pe )
 		goto _test_eof39;
 case 39:
-	if ( (*p) == 101 )
-		goto st40;
+	switch( (*p) ) {
+		case 69: goto st40;
+		case 101: goto st40;
+	}
 	goto st0;
 st40:
 	if ( ++p == pe )
 		goto _test_eof40;
 case 40:
-	if ( (*p) == 112 )
-		goto st41;
+	switch( (*p) ) {
+		case 80: goto st41;
+		case 112: goto st41;
+	}
 	goto st0;
 st41:
 	if ( ++p == pe )
 		goto _test_eof41;
 case 41:
-	if ( (*p) == 108 )
-		goto st42;
+	switch( (*p) ) {
+		case 76: goto st42;
+		case 108: goto st42;
+	}
 	goto st0;
 st42:
 	if ( ++p == pe )
 		goto _test_eof42;
 case 42:
-	if ( (*p) == 121 )
-		goto st43;
+	switch( (*p) ) {
+		case 89: goto st43;
+		case 121: goto st43;
+	}
 	goto st0;
 st43:
 	if ( ++p == pe )
@@ -1641,15 +1689,19 @@ st44:
 	if ( ++p == pe )
 		goto _test_eof44;
 case 44:
-	if ( (*p) == 97 )
-		goto st45;
+	switch( (*p) ) {
+		case 65: goto st45;
+		case 97: goto st45;
+	}
 	goto st0;
 st45:
 	if ( ++p == pe )
 		goto _test_eof45;
 case 45:
-	if ( (*p) == 115 )
-		goto st46;
+	switch( (*p) ) {
+		case 83: goto st46;
+		case 115: goto st46;
+	}
 	goto st0;
 st46:
 	if ( ++p == pe )
@@ -1681,13 +1733,13 @@ tr76:
 				p--;
 			} else
 				p = fstart;
- 		}
+		}
 	goto st48;
 st48:
 	if ( ++p == pe )
 		goto _test_eof48;
 case 48:
-#line 1691 "mod/box/memcached-grammar.m"
+#line 1743 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st49;
 	goto st0;
@@ -1708,7 +1760,7 @@ st50:
 	if ( ++p == pe )
 		goto _test_eof50;
 case 50:
-#line 1712 "mod/box/memcached-grammar.m"
+#line 1764 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr79;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1722,7 +1774,7 @@ st51:
 	if ( ++p == pe )
 		goto _test_eof51;
 case 51:
-#line 1726 "mod/box/memcached-grammar.m"
+#line 1778 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st51;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1736,7 +1788,7 @@ st52:
 	if ( ++p == pe )
 		goto _test_eof52;
 case 52:
-#line 1740 "mod/box/memcached-grammar.m"
+#line 1792 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr83;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1754,7 +1806,7 @@ st53:
 	if ( ++p == pe )
 		goto _test_eof53;
 case 53:
-#line 1758 "mod/box/memcached-grammar.m"
+#line 1810 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st53;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1768,7 +1820,7 @@ st54:
 	if ( ++p == pe )
 		goto _test_eof54;
 case 54:
-#line 1772 "mod/box/memcached-grammar.m"
+#line 1824 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr87;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1782,7 +1834,7 @@ st55:
 	if ( ++p == pe )
 		goto _test_eof55;
 case 55:
-#line 1786 "mod/box/memcached-grammar.m"
+#line 1838 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st55;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -1796,7 +1848,7 @@ st56:
 	if ( ++p == pe )
 		goto _test_eof56;
 case 56:
-#line 1800 "mod/box/memcached-grammar.m"
+#line 1852 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr91;
 		case 13: goto tr92;
@@ -1817,7 +1869,7 @@ st57:
 	if ( ++p == pe )
 		goto _test_eof57;
 case 57:
-#line 1821 "mod/box/memcached-grammar.m"
+#line 1873 "mod/box/memcached-grammar.m"
 	if ( (*p) == 10 )
 		goto tr95;
 	goto st0;
@@ -1829,11 +1881,12 @@ st58:
 	if ( ++p == pe )
 		goto _test_eof58;
 case 58:
-#line 1833 "mod/box/memcached-grammar.m"
+#line 1885 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr95;
 		case 13: goto st57;
 		case 32: goto st58;
+		case 78: goto st59;
 		case 110: goto st59;
 	}
 	goto st0;
@@ -1841,43 +1894,55 @@ st59:
 	if ( ++p == pe )
 		goto _test_eof59;
 case 59:
-	if ( (*p) == 111 )
-		goto st60;
+	switch( (*p) ) {
+		case 79: goto st60;
+		case 111: goto st60;
+	}
 	goto st0;
 st60:
 	if ( ++p == pe )
 		goto _test_eof60;
 case 60:
-	if ( (*p) == 114 )
-		goto st61;
+	switch( (*p) ) {
+		case 82: goto st61;
+		case 114: goto st61;
+	}
 	goto st0;
 st61:
 	if ( ++p == pe )
 		goto _test_eof61;
 case 61:
-	if ( (*p) == 101 )
-		goto st62;
+	switch( (*p) ) {
+		case 69: goto st62;
+		case 101: goto st62;
+	}
 	goto st0;
 st62:
 	if ( ++p == pe )
 		goto _test_eof62;
 case 62:
-	if ( (*p) == 112 )
-		goto st63;
+	switch( (*p) ) {
+		case 80: goto st63;
+		case 112: goto st63;
+	}
 	goto st0;
 st63:
 	if ( ++p == pe )
 		goto _test_eof63;
 case 63:
-	if ( (*p) == 108 )
-		goto st64;
+	switch( (*p) ) {
+		case 76: goto st64;
+		case 108: goto st64;
+	}
 	goto st0;
 st64:
 	if ( ++p == pe )
 		goto _test_eof64;
 case 64:
-	if ( (*p) == 121 )
-		goto st65;
+	switch( (*p) ) {
+		case 89: goto st65;
+		case 121: goto st65;
+	}
 	goto st0;
 st65:
 	if ( ++p == pe )
@@ -1897,7 +1962,7 @@ st66:
 	if ( ++p == pe )
 		goto _test_eof66;
 case 66:
-#line 1901 "mod/box/memcached-grammar.m"
+#line 1966 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr95;
 		case 13: goto st57;
@@ -1908,14 +1973,18 @@ st67:
 	if ( ++p == pe )
 		goto _test_eof67;
 case 67:
-	if ( (*p) == 101 )
-		goto st68;
+	switch( (*p) ) {
+		case 69: goto st68;
+		case 101: goto st68;
+	}
 	goto st0;
 st68:
 	if ( ++p == pe )
 		goto _test_eof68;
 case 68:
 	switch( (*p) ) {
+		case 67: goto st69;
+		case 76: goto st85;
 		case 99: goto st69;
 		case 108: goto st85;
 	}
@@ -1924,8 +1993,10 @@ st69:
 	if ( ++p == pe )
 		goto _test_eof69;
 case 69:
-	if ( (*p) == 114 )
-		goto st70;
+	switch( (*p) ) {
+		case 82: goto st70;
+		case 114: goto st70;
+	}
 	goto st0;
 st70:
 	if ( ++p == pe )
@@ -1946,7 +2017,7 @@ st71:
 	if ( ++p == pe )
 		goto _test_eof71;
 case 71:
-#line 1950 "mod/box/memcached-grammar.m"
+#line 2021 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 13: goto st0;
 		case 32: goto st71;
@@ -1966,13 +2037,13 @@ tr114:
 				p--;
 			} else
 				p = fstart;
- 		}
+		}
 	goto st72;
 st72:
 	if ( ++p == pe )
 		goto _test_eof72;
 case 72:
-#line 1976 "mod/box/memcached-grammar.m"
+#line 2047 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st73;
 	goto st0;
@@ -1993,7 +2064,7 @@ st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 1997 "mod/box/memcached-grammar.m"
+#line 2068 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr118;
 		case 13: goto tr119;
@@ -2014,7 +2085,7 @@ st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 2018 "mod/box/memcached-grammar.m"
+#line 2089 "mod/box/memcached-grammar.m"
 	if ( (*p) == 10 )
 		goto tr122;
 	goto st0;
@@ -2026,11 +2097,12 @@ st76:
 	if ( ++p == pe )
 		goto _test_eof76;
 case 76:
-#line 2030 "mod/box/memcached-grammar.m"
+#line 2101 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr122;
 		case 13: goto st75;
 		case 32: goto st76;
+		case 78: goto st77;
 		case 110: goto st77;
 	}
 	goto st0;
@@ -2038,43 +2110,55 @@ st77:
 	if ( ++p == pe )
 		goto _test_eof77;
 case 77:
-	if ( (*p) == 111 )
-		goto st78;
+	switch( (*p) ) {
+		case 79: goto st78;
+		case 111: goto st78;
+	}
 	goto st0;
 st78:
 	if ( ++p == pe )
 		goto _test_eof78;
 case 78:
-	if ( (*p) == 114 )
-		goto st79;
+	switch( (*p) ) {
+		case 82: goto st79;
+		case 114: goto st79;
+	}
 	goto st0;
 st79:
 	if ( ++p == pe )
 		goto _test_eof79;
 case 79:
-	if ( (*p) == 101 )
-		goto st80;
+	switch( (*p) ) {
+		case 69: goto st80;
+		case 101: goto st80;
+	}
 	goto st0;
 st80:
 	if ( ++p == pe )
 		goto _test_eof80;
 case 80:
-	if ( (*p) == 112 )
-		goto st81;
+	switch( (*p) ) {
+		case 80: goto st81;
+		case 112: goto st81;
+	}
 	goto st0;
 st81:
 	if ( ++p == pe )
 		goto _test_eof81;
 case 81:
-	if ( (*p) == 108 )
-		goto st82;
+	switch( (*p) ) {
+		case 76: goto st82;
+		case 108: goto st82;
+	}
 	goto st0;
 st82:
 	if ( ++p == pe )
 		goto _test_eof82;
 case 82:
-	if ( (*p) == 121 )
-		goto st83;
+	switch( (*p) ) {
+		case 89: goto st83;
+		case 121: goto st83;
+	}
 	goto st0;
 st83:
 	if ( ++p == pe )
@@ -2094,7 +2178,7 @@ st84:
 	if ( ++p == pe )
 		goto _test_eof84;
 case 84:
-#line 2098 "mod/box/memcached-grammar.m"
+#line 2182 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr122;
 		case 13: goto st75;
@@ -2105,22 +2189,28 @@ st85:
 	if ( ++p == pe )
 		goto _test_eof85;
 case 85:
-	if ( (*p) == 101 )
-		goto st86;
+	switch( (*p) ) {
+		case 69: goto st86;
+		case 101: goto st86;
+	}
 	goto st0;
 st86:
 	if ( ++p == pe )
 		goto _test_eof86;
 case 86:
-	if ( (*p) == 116 )
-		goto st87;
+	switch( (*p) ) {
+		case 84: goto st87;
+		case 116: goto st87;
+	}
 	goto st0;
 st87:
 	if ( ++p == pe )
 		goto _test_eof87;
 case 87:
-	if ( (*p) == 101 )
-		goto st88;
+	switch( (*p) ) {
+		case 69: goto st88;
+		case 101: goto st88;
+	}
 	goto st0;
 st88:
 	if ( ++p == pe )
@@ -2152,13 +2242,13 @@ tr140:
 				p--;
 			} else
 				p = fstart;
- 		}
+		}
 	goto st90;
 st90:
 	if ( ++p == pe )
 		goto _test_eof90;
 case 90:
-#line 2162 "mod/box/memcached-grammar.m"
+#line 2252 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr141;
 		case 13: goto st91;
@@ -2181,7 +2271,7 @@ st91:
 	if ( ++p == pe )
 		goto _test_eof91;
 case 91:
-#line 2185 "mod/box/memcached-grammar.m"
+#line 2275 "mod/box/memcached-grammar.m"
 	if ( (*p) == 10 )
 		goto tr141;
 	goto st0;
@@ -2193,6 +2283,7 @@ case 92:
 		case 10: goto tr141;
 		case 13: goto st91;
 		case 32: goto st92;
+		case 78: goto st95;
 		case 110: goto st95;
 	}
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2206,7 +2297,7 @@ st93:
 	if ( ++p == pe )
 		goto _test_eof93;
 case 93:
-#line 2210 "mod/box/memcached-grammar.m"
+#line 2301 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr146;
 		case 13: goto tr147;
@@ -2227,11 +2318,12 @@ st94:
 	if ( ++p == pe )
 		goto _test_eof94;
 case 94:
-#line 2231 "mod/box/memcached-grammar.m"
+#line 2322 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr141;
 		case 13: goto st91;
 		case 32: goto st94;
+		case 78: goto st95;
 		case 110: goto st95;
 	}
 	goto st0;
@@ -2239,43 +2331,55 @@ st95:
 	if ( ++p == pe )
 		goto _test_eof95;
 case 95:
-	if ( (*p) == 111 )
-		goto st96;
+	switch( (*p) ) {
+		case 79: goto st96;
+		case 111: goto st96;
+	}
 	goto st0;
 st96:
 	if ( ++p == pe )
 		goto _test_eof96;
 case 96:
-	if ( (*p) == 114 )
-		goto st97;
+	switch( (*p) ) {
+		case 82: goto st97;
+		case 114: goto st97;
+	}
 	goto st0;
 st97:
 	if ( ++p == pe )
 		goto _test_eof97;
 case 97:
-	if ( (*p) == 101 )
-		goto st98;
+	switch( (*p) ) {
+		case 69: goto st98;
+		case 101: goto st98;
+	}
 	goto st0;
 st98:
 	if ( ++p == pe )
 		goto _test_eof98;
 case 98:
-	if ( (*p) == 112 )
-		goto st99;
+	switch( (*p) ) {
+		case 80: goto st99;
+		case 112: goto st99;
+	}
 	goto st0;
 st99:
 	if ( ++p == pe )
 		goto _test_eof99;
 case 99:
-	if ( (*p) == 108 )
-		goto st100;
+	switch( (*p) ) {
+		case 76: goto st100;
+		case 108: goto st100;
+	}
 	goto st0;
 st100:
 	if ( ++p == pe )
 		goto _test_eof100;
 case 100:
-	if ( (*p) == 121 )
-		goto st101;
+	switch( (*p) ) {
+		case 89: goto st101;
+		case 121: goto st101;
+	}
 	goto st0;
 st101:
 	if ( ++p == pe )
@@ -2295,7 +2399,7 @@ st102:
 	if ( ++p == pe )
 		goto _test_eof102;
 case 102:
-#line 2299 "mod/box/memcached-grammar.m"
+#line 2403 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr141;
 		case 13: goto st91;
@@ -2306,29 +2410,37 @@ st103:
 	if ( ++p == pe )
 		goto _test_eof103;
 case 103:
-	if ( (*p) == 108 )
-		goto st104;
+	switch( (*p) ) {
+		case 76: goto st104;
+		case 108: goto st104;
+	}
 	goto st0;
 st104:
 	if ( ++p == pe )
 		goto _test_eof104;
 case 104:
-	if ( (*p) == 117 )
-		goto st105;
+	switch( (*p) ) {
+		case 85: goto st105;
+		case 117: goto st105;
+	}
 	goto st0;
 st105:
 	if ( ++p == pe )
 		goto _test_eof105;
 case 105:
-	if ( (*p) == 115 )
-		goto st106;
+	switch( (*p) ) {
+		case 83: goto st106;
+		case 115: goto st106;
+	}
 	goto st0;
 st106:
 	if ( ++p == pe )
 		goto _test_eof106;
 case 106:
-	if ( (*p) == 104 )
-		goto st107;
+	switch( (*p) ) {
+		case 72: goto st107;
+		case 104: goto st107;
+	}
 	goto st0;
 st107:
 	if ( ++p == pe )
@@ -2341,22 +2453,28 @@ st108:
 	if ( ++p == pe )
 		goto _test_eof108;
 case 108:
-	if ( (*p) == 97 )
-		goto st109;
+	switch( (*p) ) {
+		case 65: goto st109;
+		case 97: goto st109;
+	}
 	goto st0;
 st109:
 	if ( ++p == pe )
 		goto _test_eof109;
 case 109:
-	if ( (*p) == 108 )
-		goto st110;
+	switch( (*p) ) {
+		case 76: goto st110;
+		case 108: goto st110;
+	}
 	goto st0;
 st110:
 	if ( ++p == pe )
 		goto _test_eof110;
 case 110:
-	if ( (*p) == 108 )
-		goto st111;
+	switch( (*p) ) {
+		case 76: goto st111;
+		case 108: goto st111;
+	}
 	goto st0;
 st111:
 	if ( ++p == pe )
@@ -2380,7 +2498,7 @@ st112:
 	if ( ++p == pe )
 		goto _test_eof112;
 case 112:
-#line 2384 "mod/box/memcached-grammar.m"
+#line 2502 "mod/box/memcached-grammar.m"
 	if ( (*p) == 10 )
 		goto tr169;
 	goto st0;
@@ -2392,6 +2510,7 @@ case 113:
 		case 10: goto tr169;
 		case 13: goto st112;
 		case 32: goto st113;
+		case 78: goto st116;
 		case 110: goto st116;
 	}
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2405,7 +2524,7 @@ st114:
 	if ( ++p == pe )
 		goto _test_eof114;
 case 114:
-#line 2409 "mod/box/memcached-grammar.m"
+#line 2528 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr174;
 		case 13: goto tr175;
@@ -2422,11 +2541,12 @@ st115:
 	if ( ++p == pe )
 		goto _test_eof115;
 case 115:
-#line 2426 "mod/box/memcached-grammar.m"
+#line 2545 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr169;
 		case 13: goto st112;
 		case 32: goto st115;
+		case 78: goto st116;
 		case 110: goto st116;
 	}
 	goto st0;
@@ -2434,43 +2554,55 @@ st116:
 	if ( ++p == pe )
 		goto _test_eof116;
 case 116:
-	if ( (*p) == 111 )
-		goto st117;
+	switch( (*p) ) {
+		case 79: goto st117;
+		case 111: goto st117;
+	}
 	goto st0;
 st117:
 	if ( ++p == pe )
 		goto _test_eof117;
 case 117:
-	if ( (*p) == 114 )
-		goto st118;
+	switch( (*p) ) {
+		case 82: goto st118;
+		case 114: goto st118;
+	}
 	goto st0;
 st118:
 	if ( ++p == pe )
 		goto _test_eof118;
 case 118:
-	if ( (*p) == 101 )
-		goto st119;
+	switch( (*p) ) {
+		case 69: goto st119;
+		case 101: goto st119;
+	}
 	goto st0;
 st119:
 	if ( ++p == pe )
 		goto _test_eof119;
 case 119:
-	if ( (*p) == 112 )
-		goto st120;
+	switch( (*p) ) {
+		case 80: goto st120;
+		case 112: goto st120;
+	}
 	goto st0;
 st120:
 	if ( ++p == pe )
 		goto _test_eof120;
 case 120:
-	if ( (*p) == 108 )
-		goto st121;
+	switch( (*p) ) {
+		case 76: goto st121;
+		case 108: goto st121;
+	}
 	goto st0;
 st121:
 	if ( ++p == pe )
 		goto _test_eof121;
 case 121:
-	if ( (*p) == 121 )
-		goto st122;
+	switch( (*p) ) {
+		case 89: goto st122;
+		case 121: goto st122;
+	}
 	goto st0;
 st122:
 	if ( ++p == pe )
@@ -2490,7 +2622,7 @@ st123:
 	if ( ++p == pe )
 		goto _test_eof123;
 case 123:
-#line 2494 "mod/box/memcached-grammar.m"
+#line 2626 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr169;
 		case 13: goto st112;
@@ -2501,15 +2633,19 @@ st124:
 	if ( ++p == pe )
 		goto _test_eof124;
 case 124:
-	if ( (*p) == 101 )
-		goto st125;
+	switch( (*p) ) {
+		case 69: goto st125;
+		case 101: goto st125;
+	}
 	goto st0;
 st125:
 	if ( ++p == pe )
 		goto _test_eof125;
 case 125:
-	if ( (*p) == 116 )
-		goto st126;
+	switch( (*p) ) {
+		case 84: goto st126;
+		case 116: goto st126;
+	}
 	goto st0;
 st126:
 	if ( ++p == pe )
@@ -2517,6 +2653,7 @@ st126:
 case 126:
 	switch( (*p) ) {
 		case 32: goto tr191;
+		case 83: goto st131;
 		case 115: goto st131;
 	}
 	goto st0;
@@ -2532,7 +2669,7 @@ st127:
 	if ( ++p == pe )
 		goto _test_eof127;
 case 127:
-#line 2536 "mod/box/memcached-grammar.m"
+#line 2673 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 13: goto st0;
 		case 32: goto st127;
@@ -2552,13 +2689,13 @@ tr193:
 				p--;
 			} else
 				p = fstart;
- 		}
+		}
 	goto st128;
 st128:
 	if ( ++p == pe )
 		goto _test_eof128;
 case 128:
-#line 2562 "mod/box/memcached-grammar.m"
+#line 2699 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr195;
 		case 13: goto st129;
@@ -2594,22 +2731,28 @@ st132:
 	if ( ++p == pe )
 		goto _test_eof132;
 case 132:
-	if ( (*p) == 110 )
-		goto st133;
+	switch( (*p) ) {
+		case 78: goto st133;
+		case 110: goto st133;
+	}
 	goto st0;
 st133:
 	if ( ++p == pe )
 		goto _test_eof133;
 case 133:
-	if ( (*p) == 99 )
-		goto st134;
+	switch( (*p) ) {
+		case 67: goto st134;
+		case 99: goto st134;
+	}
 	goto st0;
 st134:
 	if ( ++p == pe )
 		goto _test_eof134;
 case 134:
-	if ( (*p) == 114 )
-		goto st135;
+	switch( (*p) ) {
+		case 82: goto st135;
+		case 114: goto st135;
+	}
 	goto st0;
 st135:
 	if ( ++p == pe )
@@ -2622,43 +2765,55 @@ st136:
 	if ( ++p == pe )
 		goto _test_eof136;
 case 136:
-	if ( (*p) == 114 )
-		goto st137;
+	switch( (*p) ) {
+		case 82: goto st137;
+		case 114: goto st137;
+	}
 	goto st0;
 st137:
 	if ( ++p == pe )
 		goto _test_eof137;
 case 137:
-	if ( (*p) == 101 )
-		goto st138;
+	switch( (*p) ) {
+		case 69: goto st138;
+		case 101: goto st138;
+	}
 	goto st0;
 st138:
 	if ( ++p == pe )
 		goto _test_eof138;
 case 138:
-	if ( (*p) == 112 )
-		goto st139;
+	switch( (*p) ) {
+		case 80: goto st139;
+		case 112: goto st139;
+	}
 	goto st0;
 st139:
 	if ( ++p == pe )
 		goto _test_eof139;
 case 139:
-	if ( (*p) == 101 )
-		goto st140;
+	switch( (*p) ) {
+		case 69: goto st140;
+		case 101: goto st140;
+	}
 	goto st0;
 st140:
 	if ( ++p == pe )
 		goto _test_eof140;
 case 140:
-	if ( (*p) == 110 )
-		goto st141;
+	switch( (*p) ) {
+		case 78: goto st141;
+		case 110: goto st141;
+	}
 	goto st0;
 st141:
 	if ( ++p == pe )
 		goto _test_eof141;
 case 141:
-	if ( (*p) == 100 )
-		goto st142;
+	switch( (*p) ) {
+		case 68: goto st142;
+		case 100: goto st142;
+	}
 	goto st0;
 st142:
 	if ( ++p == pe )
@@ -2671,22 +2826,28 @@ st143:
 	if ( ++p == pe )
 		goto _test_eof143;
 case 143:
-	if ( (*p) == 117 )
-		goto st144;
+	switch( (*p) ) {
+		case 85: goto st144;
+		case 117: goto st144;
+	}
 	goto st0;
 st144:
 	if ( ++p == pe )
 		goto _test_eof144;
 case 144:
-	if ( (*p) == 105 )
-		goto st145;
+	switch( (*p) ) {
+		case 73: goto st145;
+		case 105: goto st145;
+	}
 	goto st0;
 st145:
 	if ( ++p == pe )
 		goto _test_eof145;
 case 145:
-	if ( (*p) == 116 )
-		goto st146;
+	switch( (*p) ) {
+		case 84: goto st146;
+		case 116: goto st146;
+	}
 	goto st0;
 st146:
 	if ( ++p == pe )
@@ -2708,43 +2869,55 @@ st148:
 	if ( ++p == pe )
 		goto _test_eof148;
 case 148:
-	if ( (*p) == 101 )
-		goto st149;
+	switch( (*p) ) {
+		case 69: goto st149;
+		case 101: goto st149;
+	}
 	goto st0;
 st149:
 	if ( ++p == pe )
 		goto _test_eof149;
 case 149:
-	if ( (*p) == 112 )
-		goto st150;
+	switch( (*p) ) {
+		case 80: goto st150;
+		case 112: goto st150;
+	}
 	goto st0;
 st150:
 	if ( ++p == pe )
 		goto _test_eof150;
 case 150:
-	if ( (*p) == 108 )
-		goto st151;
+	switch( (*p) ) {
+		case 76: goto st151;
+		case 108: goto st151;
+	}
 	goto st0;
 st151:
 	if ( ++p == pe )
 		goto _test_eof151;
 case 151:
-	if ( (*p) == 97 )
-		goto st152;
+	switch( (*p) ) {
+		case 65: goto st152;
+		case 97: goto st152;
+	}
 	goto st0;
 st152:
 	if ( ++p == pe )
 		goto _test_eof152;
 case 152:
-	if ( (*p) == 99 )
-		goto st153;
+	switch( (*p) ) {
+		case 67: goto st153;
+		case 99: goto st153;
+	}
 	goto st0;
 st153:
 	if ( ++p == pe )
 		goto _test_eof153;
 case 153:
-	if ( (*p) == 101 )
-		goto st154;
+	switch( (*p) ) {
+		case 69: goto st154;
+		case 101: goto st154;
+	}
 	goto st0;
 st154:
 	if ( ++p == pe )
@@ -2776,13 +2949,13 @@ tr222:
 				p--;
 			} else
 				p = fstart;
- 		}
+		}
 	goto st156;
 st156:
 	if ( ++p == pe )
 		goto _test_eof156;
 case 156:
-#line 2786 "mod/box/memcached-grammar.m"
+#line 2959 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st157;
 	goto st0;
@@ -2803,7 +2976,7 @@ st158:
 	if ( ++p == pe )
 		goto _test_eof158;
 case 158:
-#line 2807 "mod/box/memcached-grammar.m"
+#line 2980 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr225;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2817,7 +2990,7 @@ st159:
 	if ( ++p == pe )
 		goto _test_eof159;
 case 159:
-#line 2821 "mod/box/memcached-grammar.m"
+#line 2994 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st159;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2831,7 +3004,7 @@ st160:
 	if ( ++p == pe )
 		goto _test_eof160;
 case 160:
-#line 2835 "mod/box/memcached-grammar.m"
+#line 3008 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr229;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2849,7 +3022,7 @@ st161:
 	if ( ++p == pe )
 		goto _test_eof161;
 case 161:
-#line 2853 "mod/box/memcached-grammar.m"
+#line 3026 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st161;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -2863,7 +3036,7 @@ st162:
 	if ( ++p == pe )
 		goto _test_eof162;
 case 162:
-#line 2867 "mod/box/memcached-grammar.m"
+#line 3040 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr233;
 		case 13: goto tr234;
@@ -2884,7 +3057,7 @@ st163:
 	if ( ++p == pe )
 		goto _test_eof163;
 case 163:
-#line 2888 "mod/box/memcached-grammar.m"
+#line 3061 "mod/box/memcached-grammar.m"
 	if ( (*p) == 10 )
 		goto tr237;
 	goto st0;
@@ -2896,9 +3069,10 @@ st164:
 	if ( ++p == pe )
 		goto _test_eof164;
 case 164:
-#line 2900 "mod/box/memcached-grammar.m"
+#line 3073 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 32: goto st164;
+		case 78: goto st165;
 		case 110: goto st165;
 	}
 	goto st0;
@@ -2906,43 +3080,55 @@ st165:
 	if ( ++p == pe )
 		goto _test_eof165;
 case 165:
-	if ( (*p) == 111 )
-		goto st166;
+	switch( (*p) ) {
+		case 79: goto st166;
+		case 111: goto st166;
+	}
 	goto st0;
 st166:
 	if ( ++p == pe )
 		goto _test_eof166;
 case 166:
-	if ( (*p) == 114 )
-		goto st167;
+	switch( (*p) ) {
+		case 82: goto st167;
+		case 114: goto st167;
+	}
 	goto st0;
 st167:
 	if ( ++p == pe )
 		goto _test_eof167;
 case 167:
-	if ( (*p) == 101 )
-		goto st168;
+	switch( (*p) ) {
+		case 69: goto st168;
+		case 101: goto st168;
+	}
 	goto st0;
 st168:
 	if ( ++p == pe )
 		goto _test_eof168;
 case 168:
-	if ( (*p) == 112 )
-		goto st169;
+	switch( (*p) ) {
+		case 80: goto st169;
+		case 112: goto st169;
+	}
 	goto st0;
 st169:
 	if ( ++p == pe )
 		goto _test_eof169;
 case 169:
-	if ( (*p) == 108 )
-		goto st170;
+	switch( (*p) ) {
+		case 76: goto st170;
+		case 108: goto st170;
+	}
 	goto st0;
 st170:
 	if ( ++p == pe )
 		goto _test_eof170;
 case 170:
-	if ( (*p) == 121 )
-		goto st171;
+	switch( (*p) ) {
+		case 89: goto st171;
+		case 121: goto st171;
+	}
 	goto st0;
 st171:
 	if ( ++p == pe )
@@ -2958,6 +3144,8 @@ st172:
 		goto _test_eof172;
 case 172:
 	switch( (*p) ) {
+		case 69: goto st173;
+		case 84: goto st192;
 		case 101: goto st173;
 		case 116: goto st192;
 	}
@@ -2966,8 +3154,10 @@ st173:
 	if ( ++p == pe )
 		goto _test_eof173;
 case 173:
-	if ( (*p) == 116 )
-		goto st174;
+	switch( (*p) ) {
+		case 84: goto st174;
+		case 116: goto st174;
+	}
 	goto st0;
 st174:
 	if ( ++p == pe )
@@ -2999,13 +3189,13 @@ tr252:
 				p--;
 			} else
 				p = fstart;
- 		}
+		}
 	goto st176;
 st176:
 	if ( ++p == pe )
 		goto _test_eof176;
 case 176:
-#line 3009 "mod/box/memcached-grammar.m"
+#line 3199 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st177;
 	goto st0;
@@ -3026,7 +3216,7 @@ st178:
 	if ( ++p == pe )
 		goto _test_eof178;
 case 178:
-#line 3030 "mod/box/memcached-grammar.m"
+#line 3220 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr255;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3040,7 +3230,7 @@ st179:
 	if ( ++p == pe )
 		goto _test_eof179;
 case 179:
-#line 3044 "mod/box/memcached-grammar.m"
+#line 3234 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st179;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3054,7 +3244,7 @@ st180:
 	if ( ++p == pe )
 		goto _test_eof180;
 case 180:
-#line 3058 "mod/box/memcached-grammar.m"
+#line 3248 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto tr259;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3072,7 +3262,7 @@ st181:
 	if ( ++p == pe )
 		goto _test_eof181;
 case 181:
-#line 3076 "mod/box/memcached-grammar.m"
+#line 3266 "mod/box/memcached-grammar.m"
 	if ( (*p) == 32 )
 		goto st181;
 	if ( 48 <= (*p) && (*p) <= 57 )
@@ -3086,7 +3276,7 @@ st182:
 	if ( ++p == pe )
 		goto _test_eof182;
 case 182:
-#line 3090 "mod/box/memcached-grammar.m"
+#line 3280 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 10: goto tr263;
 		case 13: goto tr264;
@@ -3107,7 +3297,7 @@ st183:
 	if ( ++p == pe )
 		goto _test_eof183;
 case 183:
-#line 3111 "mod/box/memcached-grammar.m"
+#line 3301 "mod/box/memcached-grammar.m"
 	if ( (*p) == 10 )
 		goto tr267;
 	goto st0;
@@ -3119,9 +3309,10 @@ st184:
 	if ( ++p == pe )
 		goto _test_eof184;
 case 184:
-#line 3123 "mod/box/memcached-grammar.m"
+#line 3313 "mod/box/memcached-grammar.m"
 	switch( (*p) ) {
 		case 32: goto st184;
+		case 78: goto st185;
 		case 110: goto st185;
 	}
 	goto st0;
@@ -3129,43 +3320,55 @@ st185:
 	if ( ++p == pe )
 		goto _test_eof185;
 case 185:
-	if ( (*p) == 111 )
-		goto st186;
+	switch( (*p) ) {
+		case 79: goto st186;
+		case 111: goto st186;
+	}
 	goto st0;
 st186:
 	if ( ++p == pe )
 		goto _test_eof186;
 case 186:
-	if ( (*p) == 114 )
-		goto st187;
+	switch( (*p) ) {
+		case 82: goto st187;
+		case 114: goto st187;
+	}
 	goto st0;
 st187:
 	if ( ++p == pe )
 		goto _test_eof187;
 case 187:
-	if ( (*p) == 101 )
-		goto st188;
+	switch( (*p) ) {
+		case 69: goto st188;
+		case 101: goto st188;
+	}
 	goto st0;
 st188:
 	if ( ++p == pe )
 		goto _test_eof188;
 case 188:
-	if ( (*p) == 112 )
-		goto st189;
+	switch( (*p) ) {
+		case 80: goto st189;
+		case 112: goto st189;
+	}
 	goto st0;
 st189:
 	if ( ++p == pe )
 		goto _test_eof189;
 case 189:
-	if ( (*p) == 108 )
-		goto st190;
+	switch( (*p) ) {
+		case 76: goto st190;
+		case 108: goto st190;
+	}
 	goto st0;
 st190:
 	if ( ++p == pe )
 		goto _test_eof190;
 case 190:
-	if ( (*p) == 121 )
-		goto st191;
+	switch( (*p) ) {
+		case 89: goto st191;
+		case 121: goto st191;
+	}
 	goto st0;
 st191:
 	if ( ++p == pe )
@@ -3180,22 +3383,28 @@ st192:
 	if ( ++p == pe )
 		goto _test_eof192;
 case 192:
-	if ( (*p) == 97 )
-		goto st193;
+	switch( (*p) ) {
+		case 65: goto st193;
+		case 97: goto st193;
+	}
 	goto st0;
 st193:
 	if ( ++p == pe )
 		goto _test_eof193;
 case 193:
-	if ( (*p) == 116 )
-		goto st194;
+	switch( (*p) ) {
+		case 84: goto st194;
+		case 116: goto st194;
+	}
 	goto st0;
 st194:
 	if ( ++p == pe )
 		goto _test_eof194;
 case 194:
-	if ( (*p) == 115 )
-		goto st195;
+	switch( (*p) ) {
+		case 83: goto st195;
+		case 115: goto st195;
+	}
 	goto st0;
 st195:
 	if ( ++p == pe )
