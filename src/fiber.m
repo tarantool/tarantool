@@ -587,6 +587,7 @@ fiber_close(void)
 	fiber->fd = -1;
 	fiber->has_peer = false;
 	fiber->peer_name[0] = 0;
+	tbuf_reset(fiber->rbuf);
 
 	return r;
 }
