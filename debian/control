@@ -9,7 +9,8 @@ Build-Depends: cdbs, debhelper (>= 8),
  python-daemon,
  python-pexpect,
  libncurses5-dev,
- binutils-dev
+ binutils-dev,
+ dpkg-dev (>= 1.16.1~)
 Section: database
 Standards-Version: 3.9.2
 Homepage: http://tarantool.org/
@@ -265,7 +266,8 @@ Description: high performance key/value storage server
   * available on Linux and FreeBSD
   * stored procedures in Lua are supported
  .
- This package provides c-connector library for tarantool (xlog and replication support).
+ This package provides c-connector library for tarantool
+ (xlog and replication support).
 
 Package: libtarantoolrpl1-dbg
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386

@@ -44,11 +44,11 @@ License:
 
 Files: third_party/crc32.c
 Copyright: 1986 Gary S. Brown.
+	2004-2006 Intel Corporation - All Rights Reserved
 License:
  You may use this program, or code or tables extracted from it,
  as desired without restriction.
-Copyright: 2004-2006 Intel Corporation - All Rights Reserved
-License:
+ .
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
  are met:

@@ -1,5 +1,9 @@
 #!/usr/bin/make -f
 
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+
 VERSION  := $(shell dpkg-parsechangelog|grep ^Version|awk '{print $$2}')
 UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
 
@@ -13,6 +17,8 @@ DEB_CMAKE_INSTALL_PREFIX := /usr
 DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
     -DCMAKE_C_FLAGS="$(CFLAGS)" \
     -DCMAKE_CXX_FLAGS="$(CXXFLAGS)" \
+    -DCMAKE_CPP_FLAGS="$(CPPFLAGS)" \
+    -DCMAKE_LD_FLAGS="$(LDFLAGS)" \
     -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_SYSCONF_DIR=/etc/tarantool \

@@ -1,3 +1,11 @@
+tarantool (1.4.6+20120626-1) unstable; urgency=low
+
+  * New upstream version.
+  * Add libtarantoolrpl package: (replication protocol).
+  * Fixed segfaults by adminport.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 26 Jun 2012 15:30:02 +0400
+
 tarantool (1.4.6+20120524-1) unstable; urgency=low
 
   * Fix version number.
