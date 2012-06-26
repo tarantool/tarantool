@@ -4,6 +4,8 @@
 import os
 import sys
 
+sys.stdout.push_filter("unable to read unknown load command 0x\d+", "")
+
 print """
 # Bug #855616:
 # memcached_space must not be configured
@@ -26,5 +28,7 @@ sys.stdout.pop_filter()
 # restore default server
 server.stop()
 server.deploy(self.suite_ini["config"])
+
+sys.stdout.pop_filter()
 
 # vim: syntax=python

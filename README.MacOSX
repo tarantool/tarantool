@@ -40,7 +40,7 @@ NB: box/lua.test in not runnable on MacOS X at this point, in order to skip it a
 
 disabled = lua.test
 
-to tarantool/test/suite.ini file;
+to tarantool/test/box/suite.ini file;
 
 cd ~/build/tarantool/test
 PATH=~/build/bin:$PATH ./run
