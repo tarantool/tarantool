@@ -830,6 +830,3 @@ void box_lua_init()
 	root_L = tarantool_L;
 }
 
-/**
- * vim: foldmethod=marker
- */

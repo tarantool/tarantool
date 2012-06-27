@@ -1293,6 +1293,3 @@ read_log(const char *filename,
 
 /* }}} */
 
-/*
- * vim: foldmethod=marker
- */

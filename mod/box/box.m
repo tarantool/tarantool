@@ -565,6 +565,3 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  status: %s" CRLF, status);
 }
 
-/**
- * vim: foldmethod=marker
- */

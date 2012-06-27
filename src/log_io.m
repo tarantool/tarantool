@@ -610,6 +610,3 @@ error:
 
 /* }}} */
 
-/*
- * vim: foldmethod=marker
- */

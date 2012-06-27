@@ -989,6 +989,3 @@ do_update_ops(struct update_cmd *cmd, struct tuple *new_tuple)
 }
 @end
 
-/**
- * vim: foldmethod=marker
- */

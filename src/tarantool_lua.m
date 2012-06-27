@@ -1222,6 +1222,3 @@ tarantool_lua_load_init_script(struct lua_State *L)
 
 }
 
-/*
- * vim: foldmethod=marker
- */
