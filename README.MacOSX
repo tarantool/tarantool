@@ -36,14 +36,20 @@ CC=gcc-mp-4.6 make
 
 5. Run tarantool test suite
 -------------
-NB: box/lua.test in not runnable on MacOS X at this point, in order to skip it add:
+NB: the following tests are not runnable on MacOS X at this point:
 
-disabled = lua.test
+box/lua.test
+box_big/lua.test
+connector_c/xlog_rpl.test
 
-to tarantool/test/box/suite.ini file;
+To disable those add each of them to the 'disabled' clause in suite.ini file
+in the appropriate directory; for instance, tarantool/test/box/suite.ini must
+be edited to disable any test in the 'box' suite;
+
+To run all tests then, execute:
 
 cd ~/build/tarantool/test
-PATH=~/build/bin:$PATH ./run
+./run
 
 -- EOF
 

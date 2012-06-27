@@ -4,7 +4,8 @@
 import os
 import sys
 
-sys.stdout.push_filter("unable to read unknown load command 0x\d+", "")
+# mask BFD warnings: https://bugs.launchpad.net/tarantool/+bug/1018356
+sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
 
 print """
 # Bug #855616:

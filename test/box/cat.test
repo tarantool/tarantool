@@ -8,7 +8,8 @@ import yaml
 import sys
 from signal import SIGUSR1
 
-sys.stdout.push_filter("unable to read unknown load command 0x\d+", "")
+# mask BFD warnings: https://bugs.launchpad.net/tarantool/+bug/1018356
+sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
 
 print """
 # Verify that the server starts from a pre-recorded snapshot.
