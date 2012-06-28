@@ -13,7 +13,14 @@ This class is used to implement balancing between several servers.
 use Mouse;
 use Mouse::Util::TypeConstraints;
 use MR::IProto::Cluster::Server;
-use String::CRC32 qw(crc32);
+
+BEGIN {
+    eval "use String::CRC32 qw(crc32)";
+    if ($@) {
+        eval "use Digest::CRC 'crc32'";
+        die $@ if $@;
+    }
+}
 
 =head1 EXPORTED CONSTANTS
 
