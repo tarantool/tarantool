@@ -54,7 +54,9 @@ nfilename(int fd)
 		filename_path[sz] = '\0';
 		return filename_path;
 	}
-#endif /* TARGET_OS_LINUX */
+#else /* TARGET_OS_LINUX */
+	(void) fd;
+#endif
 	return ""; /* Not implemented. */
 }
 
@@ -133,14 +135,14 @@ nlseek(int fd, off_t offset, int whence)
 	off_t effective_offset = lseek(fd, offset, whence);
 
 	if (effective_offset == -1) {
-		say_syserror("lseek, offset=%"PRI_OFFT", whence=%d, [%s]",
-			     (u64) offset, whence,
+		say_syserror("lseek, offset=%jd, whence=%d, [%s]",
+			     (intmax_t) offset, whence,
 			     nfilename(fd));
 	} else if (whence == SEEK_SET && effective_offset != offset) {
 		say_error("lseek, offset set to unexpected value: "
-			  "requested %"PRI_OFFT", effective %"PRI_OFFT", "
+			  "requested %jd effective %jd, "
 			  "[%s]",
-			  offset, effective_offset, nfilename(fd));
+			  (intmax_t)offset, (intmax_t)effective_offset, nfilename(fd));
 	}
 	return effective_offset;
 }
