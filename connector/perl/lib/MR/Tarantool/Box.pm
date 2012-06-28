@@ -592,7 +592,11 @@ An array of bytestrings to be passed as is to the procecedure.
 
 =over
 
-=item B<unpack_format>
+=item B<unpack_format_from_space> => $space_id_uint32_or_name_string
+
+Unpack the result tuple as a tuple from space.
+
+=item B<unpack_format> => $format_string
 
 Format to unpack the result tuple, the same as C<format> option for C<new()>
 
@@ -603,7 +607,7 @@ Format to unpack the result tuple, the same as C<format> option for C<new()>
 =cut
 
 sub Call {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/flags raise unpack unpack_format unpack_format_from_namespace/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/flags raise unpack unpack_format unpack_format_from_space/);
     my ($self, $sp_name, $tuple) = @_;
 
     my $flags = $param->{flags} || 0;
@@ -613,10 +617,10 @@ sub Call {
     confess "All fields must be defined" if grep { !defined } @$tuple;
 
     confess "Required `unpack_format` option wasn't defined"
-        unless exists $param->{unpack} or exists $param->{unpack_format} && $param->{unpack_format} or defined $param->{unpack_format_from_namespace};
+        unless exists $param->{unpack} or exists $param->{unpack_format} && $param->{unpack_format} or defined $param->{unpack_format_from_space};
 
     my $space;
-    (undef, $space) = $_[0]->_validate_param([space => $param->{unpack_format_from_namespace}]) if defined $param->{unpack_format_from_namespace};
+    (undef, $space) = $_[0]->_validate_param([space => $param->{unpack_format_from_space}]) if defined $param->{unpack_format_from_space};
 
     my $unpack_format = $param->{unpack_format};
     if(!$space && $unpack_format) {
