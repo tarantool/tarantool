@@ -224,7 +224,7 @@ sub declare_stored_procedure {
             for my $i (0..$#params) {
                 $p->[$i] = $def[$i] if !defined$p->[$i] and $i < @def;
                 confess "All params must be defined" unless defined $p->[$i];
-                $p->[$i] = pack $fmt[$i], $p->[$i];
+                $p->[$i] = $fmt[$i] =~ m/^[\$\&]$/ ? $p->[$i] : pack($fmt[$i], $p->[$i]);
             }
             return $p;
         };
@@ -244,6 +244,8 @@ sub declare_stored_procedure {
             undef $unpack;
         }
         $options->{unpack_format} = '&*';
+    } elsif(defined $opts{unpack_format_from_namespace}) {
+        $options->{unpack_format_from_namespace} = $opts{unpack_format_from_namespace};
     } else {
         confess "no `unpack` nor `unpack_format` given" if !exists $opts{unpack_format};
         my $f = $opts{unpack_format};

@@ -81,7 +81,7 @@ use constant {
 sub IPROTOCLASS () { 'MR::IProto' }
 
 use vars qw/$VERSION %ERRORS/;
-$VERSION = 0.0.25;
+$VERSION = 0.0.26;
 
 BEGIN { *confess = \&MR::IProto::confess }
 
@@ -603,7 +603,7 @@ Format to unpack the result tuple, the same as C<format> option for C<new()>
 =cut
 
 sub Call {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/flags raise unpack unpack_format/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/flags raise unpack unpack_format unpack_format_from_namespace/);
     my ($self, $sp_name, $tuple) = @_;
 
     my $flags = $param->{flags} || 0;
@@ -613,18 +613,21 @@ sub Call {
     confess "All fields must be defined" if grep { !defined } @$tuple;
 
     confess "Required `unpack_format` option wasn't defined"
-        unless exists $param->{unpack} or exists $param->{unpack_format} and $param->{unpack_format};
+        unless exists $param->{unpack} or exists $param->{unpack_format} && $param->{unpack_format} or defined $param->{unpack_format_from_namespace};
+
+    my $space;
+    (undef, $space) = $_[0]->_validate_param([space => $param->{unpack_format_from_namespace}]) if defined $param->{unpack_format_from_namespace};
 
     my $unpack_format = $param->{unpack_format};
-    if($unpack_format) {
+    if(!$space && $unpack_format) {
         $unpack_format = join '', @$unpack_format if ref $unpack_format;
         my $f = { format => $unpack_format };
         _make_unpack_format($f, "CALL");
         $unpack_format = $f->{unpack_format};
     }
 
-    local $namespace->{unpack_format} = $unpack_format if $unpack_format; # XXX
-    local $namespace->{append_for_unpack} = ''         if $unpack_format; # shit...
+    local $namespace->{unpack_format} = $unpack_format if !$space && $unpack_format; # XXX
+    local $namespace->{append_for_unpack} = ''         if !$space && $unpack_format; # shit...
 
     $tuple = [ map {
         my $x = $_;
@@ -635,7 +638,7 @@ sub Call {
     $self->_chat (
         msg      => 22,
         payload  => pack("L w/a* L(w/a*)*", $flags, $sp_name, scalar(@$tuple), @$tuple),
-        unpack   => $param->{unpack} || sub { $self->_unpack_select($namespace, "CALL", @_) },
+        unpack   => $param->{unpack} || sub { $self->_unpack_select($space||$namespace, "CALL", @_) },
         callback => $param->{callback},
     );
 }
