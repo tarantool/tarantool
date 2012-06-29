@@ -67,7 +67,7 @@ set (recompiled_sources
 
 set (common_sources tbuf.m palloc.m util.m
      salloc.m pickle.m coro.m stat.m log_io.m recovery.m cpu_feature.m
-     replica.m iproto.m exception.m errcode.c errinj.m latch.m
+     replica.m iproto.m object.m exception.m errcode.c errinj.m latch.m
      nio.c crc32.c)
 
 if (ENABLE_TRACE)
@@ -75,7 +75,7 @@ if (ENABLE_TRACE)
 endif()
 
 add_library(core STATIC ${common_sources})
-add_dependencies(core generate_headers luajit)
+add_dependencies(core generate_headers)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
 set (common_libraries cfg core ev coro gopt misc objc)

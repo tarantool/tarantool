@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <objc/Object.h>
+#import "object.h"
 #include <util.h>
 #include <tbuf.h>
 #include <iproto.h>
@@ -100,7 +100,7 @@ request_is_select(u32 type)
 	return type == SELECT || type == CALL;
 }
 
-@interface Request: Object {
+@interface Request: tnt_Object {
 	u32 type;
 	struct tbuf *data;
 }

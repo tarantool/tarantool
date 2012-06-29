@@ -28,6 +28,7 @@
  */
 #include "space.h"
 #include <stdlib.h>
+#include <string.h>
 #include <cfg/tarantool_box_cfg.h>
 #include <cfg/warning.h>
 #include <tarantool.h>
