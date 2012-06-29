@@ -69,6 +69,37 @@ macro (luajit_build)
     unset (luajit_buildoptions)
 endmacro()
 
+macro(libobjc_build)
+    if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+        set (extra_cflags "-g -O0 -fno-inline")
+    else ()
+        set (extra_cflags "-O3")
+    endif()
+    if (${TARGET_OS_LINUX})
+        set (extra_cflags "${extra_cflags} -D_GNU_SOURCE")
+    endif()
+    if (CMAKE_COMPILER_IS_CLANG)
+        set (extra_cflags "${extra_cflags} -Wno-deprecated-objc-isa-usage")
+    endif()
+    if (NOT (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR}))
+        add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/libobjc
+            COMMAND mkdir ${PROJECT_BINARY_DIR}/third_party/libobjc
+            COMMAND cp -r ${PROJECT_SOURCE_DIR}/third_party/libobjc/*
+                ${PROJECT_BINARY_DIR}/third_party/libobjc
+        )
+    endif()
+    add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/libobjc
+        COMMAND $(MAKE) clean
+        COMMAND $(MAKE) EXTRA_CFLAGS=""${extra_cflags}""
+        DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt
+    )
+    add_custom_target(libobjc
+        DEPENDS ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a
+    )
+    unset (extra_cflags)
+endmacro()
+
 #
 # building shipped luajit only if there is no
 # usable system one (see cmake/luajit.cmake) or by demand.
@@ -76,3 +107,4 @@ endmacro()
 if (ENABLE_BUNDLED_LUAJIT)
     luajit_build()
 endif()
+libobjc_build()

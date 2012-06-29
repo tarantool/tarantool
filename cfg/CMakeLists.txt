@@ -70,4 +70,4 @@ add_custom_target(config
     DEPENDS ${CMAKE_SOURCE_DIR}/cfg/prscfg.h ${generated_headers})
 
 
-add_dependencies(cfg libluajit)
+add_dependencies(cfg libluajit libobjc)
