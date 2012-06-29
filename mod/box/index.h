@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#import <objc/Object.h>
+#import "object.h"
 #include <stdbool.h>
 #include <util.h>
 
@@ -76,7 +76,7 @@ struct key_def {
 	bool is_unique;
 };
 
-@interface Index: Object {
+@interface Index: tnt_Object {
  @public
 	/* Index owner space */
 	struct space *space;

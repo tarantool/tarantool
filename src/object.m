@@ -1,5 +1,3 @@
-#ifndef INCLUDES_TARANTOOL_BOX_PORT_H
-#define INCLUDES_TARANTOOL_BOX_PORT_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,39 +26,26 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <util.h>
 #import "object.h"
+#include <stdlib.h>
 
-struct tuple;
-struct lua_State;
+@implementation tnt_Object
++ (id) alloc
+{
+	return class_createInstance(self, 0);
+}
+- (id) init
+{
+	return self;
+}
+- (void) subclassResponsibility: (SEL) cmd
+{
+	(void) cmd;
+	abort();
+}
 
-@interface Port: tnt_Object
-- (void) addU32: (u32 *) u32;
-- (void) dupU32: (u32) u32;
-- (void) addTuple: (struct tuple *) tuple;
-- (void) addLuaMultret: (struct lua_State *) L;
+- (void) free
+{
+	object_dispose(self);
+}
 @end
-
-@interface PortNull: Port
-@end
-
-/**
- * A hack to keep tuples alive until iov_flush(fiber->iovec).
- * Is internal to port_iproto implementation, but is also
- * used in memcached.m, which doesn't uses fiber->iovec
- * bypassing port_iproto a public declaration here.
- */
-void fiber_ref_tuple(struct tuple *tuple);
-
-/** These do not have state currently, thus a single
- * instance is sufficient.
- */
-Port *port_null;
-Port *port_iproto;
-
-/** Init the subsystem. */
-void port_init();
-/** Stop the susbystem. */
-void port_free();
-
-#endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

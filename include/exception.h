@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#import <objc/Object.h>
+#import "object.h"
 #include <stdarg.h>
 #include "errcode.h"
 #include "say.h"
@@ -38,12 +38,11 @@
  * Note: implements garbage collection (see +alloc
  * implementation).
  */
-@interface tnt_Exception: Object {
+@interface tnt_Exception: tnt_Object {
 	@public
 		const char *file;
 		unsigned line;
 }
-
 + (id) alloc;
 @end
 

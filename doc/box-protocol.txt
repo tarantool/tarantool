@@ -299,25 +299,21 @@ Tarantool/Box IPROTO protocol.
 ; It's an error to specify an argument of a type that
 ; differs from expected type.
 ;
-; 'splice' operates on string field, and has 4 arguments:
-; field number, offset in the field, number of bytes to remove,
-; length of the string argument to inject, the string
+<op_arg> ::= <field>
 
-<op_arg> ::= <field> | <splice_op_arg>
+; For simple operations <op_arg> field contains either a string
+; to assign, a number to add or subtract.
+; When <op_code> is splice, <field> has to carry not one argument,
+; but 3: offset in the target field, number of bytes to remove,
+; string argument to inject. Since <op_arg> is always a <field>,
+; field data in case of splice argument contains 3 nested <field>
+; objects, which store the arguments:
 
-;
-; <offset> is a non-negative integer, within the size of the
-; original field. If offset is beyond the length of the
-; field, it is set to the current length of the field.
-; <length> is an integer, indicating the number of bytes to remove.
-; If <length> ; is negative, all bytes until <length> to the
-; end of the field are removed. <field> is injected in place of the
-; removed string.
-;
-<splice_op_arg> ::= <offset><length><field>
+<splice_field_data> ::= <offset><length><string>
 
 <offset> ::= <field>
 <length> ::= <field>
+<string> ::= <field>
 
 ;
 

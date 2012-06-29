@@ -78,9 +78,9 @@
     response, even if the latter arrived out of order.
   </para>
   <para>Request type defines the format of the payload.
-    INSERTs and DELETEs can only be made by the primary key, so
+    INSERTs, UPDATEs and DELETEs can only be made by the primary key, so
     an index id and key value are always present in these requests.
-    SELECTs and UPDATEs can use secondary keys. UPDATE only needs to
+    SELECTs can use secondary keys. UPDATE only needs to
     list the fields that are actually changed. With this one
     exception, all commands operate on whole tuple(s).
   </para>
