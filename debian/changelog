@@ -1,3 +1,21 @@
+tarantool (1.4.6+20120629+2112-1) unstable; urgency=low
+
+  * Package is built by gcc-4.7.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 29 Jun 2012 21:11:30 +0400
+
+tarantool (1.4.6+20120629+2105-1) unstable; urgency=low
+
+  * Really fixed FTBFS with BSD (#679317).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 29 Jun 2012 21:05:21 +0400
+
+tarantool (1.4.6+20120629-1) unstable; urgency=low
+
+  * New upstream version: fixed FTBFS with Debian/kFreeBSD. closes: #679317.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 29 Jun 2012 17:26:03 +0400
+
 tarantool (1.4.6+20120626-1) unstable; urgency=low
 
   * New upstream version.
