@@ -3,7 +3,6 @@
 #
 add_library(ev tarantool_ev.c)
 
-
 if (CMAKE_COMPILER_IS_GNUCC)
     check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
     if (gcc_has_wno_unused_result)
@@ -24,10 +23,19 @@ elseif (TARGET_OS_FREEBSD)
 # On FreeBSD build libev loop on top of
   set_target_properties(ev PROPERTIES COMPILE_FLAGS "-DEV_USE_KQUEUE")
 endif()
+
 #
 # libev uses ceil and floor from the standard math library
 #
-target_link_libraries(ev m)
+set (ev_libs m)
+
+#
+# libev depends on librt under kFreeBSD
+if (TARGET_OS_DEBIAN_FREEBSD)
+  set (ev_libs "${ev_libs} rt")
+endif()
+
+target_link_libraries(ev ${ev_libs})
 
 #
 # Build admin.m from admin.rl, but only if admin.rl was changed.
