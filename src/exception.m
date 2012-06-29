@@ -39,7 +39,7 @@
 	static __thread tnt_Exception *e = nil;
 	static __thread size_t sz = 0;
 
-	if (e != nil && class_getInstanceSize(object_getClass(e)) <= sz) {
+	if (e != nil && class_getInstanceSize(self) <= sz) {
 		object_setClass(e, self);
 	} else {
 		object_dispose(e);
