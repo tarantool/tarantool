@@ -27,12 +27,13 @@ endif()
 #
 # libev uses ceil and floor from the standard math library
 #
-set (ev_libs m)
 
 #
 # libev depends on librt under kFreeBSD
 if (TARGET_OS_DEBIAN_FREEBSD)
-  set (ev_libs "${ev_libs} rt")
+  set (ev_libs m rt)
+else()
+  set (ev_libs m)
 endif()
 
 target_link_libraries(ev ${ev_libs})
