@@ -4,6 +4,9 @@
 import os
 import sys
 
+# mask BFD warnings: https://bugs.launchpad.net/tarantool/+bug/1018356
+sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
+
 print """
 # Bug #855616:
 # memcached_space must not be configured
@@ -26,5 +29,7 @@ sys.stdout.pop_filter()
 # restore default server
 server.stop()
 server.deploy(self.suite_ini["config"])
+
+sys.stdout.pop_filter()
 
 # vim: syntax=python
