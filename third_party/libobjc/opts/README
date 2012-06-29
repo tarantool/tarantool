@@ -1,0 +1,30 @@
+GNUstep Runtime Optimisations
+=============================
+
+This directory contains LLVM optimisations specific to libobjc2.  To build
+them, you must copy this directory to llvm/lib/Transforms/GNURuntime (where
+llvm is the root of your llvm checkout).
+
+Running GNU make will then create GNUObjCRuntime.so.  This library can be
+passed to opt to run optimisations on bitcode generated with clang or
+LanguageKit.
+
+Non-Fragile Ivar Pass
+---------------------
+
+Running `opt -gnu-nonfragile-ivar` will invoke the non-fragile instance
+variable lowering pass.  This will turn non-fragile instance variable accesses,
+which go via one or two indirection layers, into more fragile ones.  If a class
+and all of its superclasses are present in the module then this pass will turn
+indirect instance variable accesses into hard-coded ones.
+
+For this pass to be most useful, it should be run as a link-time optimisation.
+
+Type Feedback
+-------------
+
+Running `opt -gnu-objc-type-feedback` enables type feedback.  Objective-C
+message lookups will be replaced by calls to the profiling version in the
+runtime library.  The generated data can then be used for future optimisations
+(speculative inlining, polymorphic inline caching, and so on), which have not
+yet been written.

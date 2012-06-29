@@ -1,0 +1,35 @@
+How to update libcoro
+=====================
+
+cvs up
+
+How to update libev
+===================
+
+cvs up
+
+How to update luajit
+====================
+
+- download the latest release source tarball
+- replace the contents of the luajit directory 
+with the contents of the tarball
+- merge the original Makefile and the Makefile
+from the new tarball.
+
+How to update libobjc2
+======================
+
+How initial import was done:
+
+svn co http://svn.gna.org/svn/gnustep/libs/libobjc2/trunk/ ./libobjc
+
+find . -name '.svn' | xargs rm -rf
+rm Makefile.clang
+rm GNUMakefile
+
+How to update it:
+
+- delete GNUMakefile
+- merge our Makefile with the Makefile in
+the source tarball
