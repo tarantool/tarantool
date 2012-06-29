@@ -1,3 +1,9 @@
+tarantool (1.4.6+20120629-1) unstable; urgency=low
+
+  * New upstream version: fixed FTBFS with Debian/kFreeBSD. closes: #679317.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 29 Jun 2012 17:26:03 +0400
+
 tarantool (1.4.6+20120626-1) unstable; urgency=low
 
   * New upstream version.
