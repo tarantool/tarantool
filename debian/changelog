@@ -1,3 +1,9 @@
+tarantool (1.4.6+20120629+2158-1) unstable; urgency=low
+
+  * Some fixes for Objective C 2.0.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 29 Jun 2012 21:58:42 +0400
+
 tarantool (1.4.6+20120629+2112-1) unstable; urgency=low
 
   * Package is built by gcc-4.7.
