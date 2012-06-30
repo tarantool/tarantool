@@ -939,7 +939,7 @@ do_update_ops(struct update_cmd *cmd, struct tuple *new_tuple)
 + (Request *) alloc
 {
 	size_t sz = class_getInstanceSize(self);
-	id new = palloc(fiber->gc_pool, sz);
+	id new = palloca(fiber->gc_pool, sz, sizeof(void *));
 	object_setClass(new, self);
 	return new;
 }

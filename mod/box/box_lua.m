@@ -656,7 +656,7 @@ static const struct luaL_reg lbox_iterator_meta[] = {
 + (PortLua *) alloc
 {
 	size_t sz = class_getInstanceSize(self);
-	id new = palloc(fiber->gc_pool, sz);
+	id new = palloca(fiber->gc_pool, sz, sizeof(void *));
 	object_setClass(new, self);
 	return new;
 }

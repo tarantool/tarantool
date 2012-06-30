@@ -42,7 +42,8 @@
 	if (e != nil && class_getInstanceSize(self) <= sz) {
 		object_setClass(e, self);
 	} else {
-		object_dispose(e);
+		if (e != nil)
+			object_dispose(e);
 		e = class_createInstance(self, 0);
 		sz = class_getInstanceSize(self);
 	}
