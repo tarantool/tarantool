@@ -639,6 +639,7 @@ sub Call {
         $x;
     } @$tuple ];
 
+
     $self->_chat (
         msg      => 22,
         payload  => pack("L w/a* L(w/a*)*", $flags, $sp_name, scalar(@$tuple), @$tuple),
@@ -741,9 +742,10 @@ sub Insert {
     my $chk_divisor = $namespace->{long_tuple} ? @$long_fmt : @$fmt;
     confess "Wrong fields number in tuple" if 0 != (@tuple - @$fmt) % $chk_divisor;
     for (0..$#tuple) {
-        confess "$self->{name}: ref in tuple $_=`$tuple[$_]'" if ref $tuple[$_];
+        confess "$self->{name}: ref in tuple $_=`$tuple[$_]'"
+            if ref $tuple[$_];
         no warnings 'uninitialized';
-        Encode::_utf8_off($_) if Encode::is_utf8($_,0);
+        Encode::_utf8_off($tuple[$_]) if Encode::is_utf8($tuple[$_],0);
         if(exists $chkkey->{$_}) {
             if($chkkey->{$_}) {
                 confess "$self->{name}: undefined key $_" unless defined $tuple[$_];
@@ -1217,9 +1219,8 @@ my %update_ops = (
     or          => OP_OR,
     splice      => sub {
         confess "value for operation splice must be an ARRAYREF of <int[, int[, string]]>" if ref $_[0] ne 'ARRAY' || @{$_[0]} < 1;
-        $_[0]->[0] = 0x7FFFFFFF unless defined $_[0]->[0];
-        $_[0]->[0] = pack 'l', $_[0]->[0];
-        $_[0]->[1] = defined $_[0]->[1] ? pack 'l', $_[0]->[1] : '';
+        $_[0]->[0] = pack 'l', defined($_[0]->[0]) ? $_[0]->[0] : 0x7FFF_FFFF;
+        $_[0]->[1] = pack 'l', defined($_[0]->[1]) ? $_[0]->[1] : 0x7FFF_FFFF;
         $_[0]->[2] = '' unless defined $_[0]->[2];
         return (OP_SPLICE, [ pack '(w/a*)*', @{$_[0]} ]);
     },
@@ -1565,7 +1566,7 @@ L</UpdateMulti> can be given a field number in several ways:
 
     $box->UpdateMulti(5, [ 5 => set => $val ]) #3: set 6 to $val
 
-=item an arrayref of [$index_of_folded_subtuple_int, $long_field_name_str_or_index_int] 
+=item an arrayref of [$index_of_folded_subtuple_int, $long_field_name_str_or_index_int]
 
     $box->UpdateMulti(5, [ [1,0]    => set => $val ]) #3: set 6 to $val
     $box->UpdateMulti(5, [ [1,'d1'] => set => $val ]) #3: set 6 to $val
