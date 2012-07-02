@@ -11,14 +11,19 @@ BEGIN {
 }
 use FindBin qw($Bin);
 use lib "$Bin";
+use lib "$Bin/../lib";
+
 use Carp qw/confess/;
 
-use Test::More tests => 24;
+use Test::More tests => 29;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
 
-use MR::Pending;
+BEGIN {
+    use_ok 'Test::Tarantool';
+    use_ok 'MR::Pending';
+}
 
 local $SIG{__DIE__} = \&confess;
 
@@ -35,7 +40,25 @@ use constant NO_SUCCESS        => qr/no success after/;
 use constant TOO_BIG_FIELD => qr/too big field/;
 
 our $box;
-our $server = (shift || $ENV{BOX}) or die;
+
+
+our $server = shift || $ENV{BOX};
+
+my $tarantool_config = "$Bin/data/pending.t.cfg";
+ok -r $tarantool_config, "-r $tarantool_config";
+my $tnt_srv;
+
+SKIP: {
+    skip 'The test uses external tarantool', 2 if $server;
+
+    $tnt_srv = Test::Tarantool->run(cfg => $tarantool_config);
+    ok $tnt_srv, 'server instance created';
+    diag $tnt_srv->log unless ok $tnt_srv->started, 'server is started';
+
+    $server = sprintf '127.0.0.1:%d', $tnt_srv->primary_port;
+}
+
+
 our %opts = (
     debug => $ENV{DEBUG}||0,
     ipdebug => $ENV{IPDEBUG}||0,
@@ -48,6 +71,8 @@ sub cleanup ($) {
     ok defined $box->Delete($id), 'delete of possible existing record';
     ok $box->Delete($id) == 0, 'delete of non existing record';
 }
+
+
 
 sub def_param  {
     my $format = shift || 'l& SSLL';
@@ -145,66 +170,4 @@ MR::Pending->new(
 
 
 
-__END__
 
-space[0].enabled = 1
-space[0].index[0].type = "HASH"
-space[0].index[0].unique = 1
-space[0].index[0].key_field[0].fieldno = 0
-space[0].index[0].key_field[0].type = "NUM"
-space[0].index[1].type = "HASH"
-space[0].index[1].unique = 1
-space[0].index[1].key_field[0].fieldno = 1
-space[0].index[1].key_field[0].type = "STR"
-
-space[20].enabled = 1
-space[20].index[0].type = "HASH"
-space[20].index[0].unique = 1
-space[20].index[0].key_field[0].fieldno = 0
-space[20].index[0].key_field[0].type = "NUM64"
-
-
-space[26].enabled = 1
-space[26].index[0].type = "HASH"
-space[26].index[0].unique = 1
-space[26].index[0].key_field[0].fieldno = 0
-space[26].index[0].key_field[0].type = "NUM"
-space[26].index[1].type = "TREE"
-space[26].index[1].unique = 0
-space[26].index[1].key_field[0].fieldno = 1
-space[26].index[1].key_field[0].type = "STR"
-space[26].index[2].type = "TREE"
-space[26].index[2].unique = 0
-space[26].index[2].key_field[0].fieldno = 1
-space[26].index[2].key_field[0].type = "STR"
-space[26].index[2].key_field[1].fieldno = 2
-space[26].index[2].key_field[1].type = "NUM"
-
-
-
-space[27].enabled = 1
-space[27].index[0].type = "HASH"
-space[27].index[0].unique = 1
-space[27].index[0].key_field[0].fieldno = 0
-space[27].index[0].key_field[0].type = "NUM"
-space[27].index[1].type = "HASH"
-space[27].index[1].unique = 1
-space[27].index[1].key_field[0].fieldno = 1
-space[27].index[1].key_field[0].type = "STR"
-
-space[27].index[2].type = "TREE"
-space[27].index[2].unique = 1
-space[27].index[2].key_field[0].fieldno = 2
-space[27].index[2].key_field[0].type = "STR"
-
-space[27].index[2].type = "TREE"
-space[27].index[2].unique = 1
-space[27].index[2].key_field[0].fieldno = 3
-space[27].index[2].key_field[0].type = "STR"
-
-space[27].index[3].type = "TREE"
-space[27].index[3].unique = 1
-space[27].index[3].key_field[0].fieldno = 2
-space[27].index[3].key_field[0].type = "STR"
-space[27].index[3].key_field[1].fieldno = 3
-space[27].index[3].key_field[1].type = "STR"
