@@ -1,6 +1,38 @@
+=head1 NAME
+
+MR::Pending - watcher for some requests results
+
+
+=head1 SYNOPSIS
+
+    my $pnd = MR::Pending->new(
+        maxtime             => 10,
+        itertime            => 0.1,
+        secondary_itertime  => 0.01,
+        name                => 'My waiter',
+
+        onidle      => sub { ... },
+
+        pending     => [ ... ]
+    );
+
+
+    $pnd->work;
+
+=cut
+
 package MR::Pending;
 use Mouse;
 use Time::HiRes qw/time/;
+use Data::Dumper;
+
+=head1 ATTRIBUTES
+
+=head2 maxtime
+
+Timeout for all requests.
+
+=cut
 
 has maxtime => (
     is        => 'rw',
@@ -9,6 +41,13 @@ has maxtime => (
     default   => 6.0,
 );
 
+=head2 itertime
+
+One iteration time. If all requests have no data, L<onidle> will be called
+with the time.
+
+=cut
+
 has itertime => (
     is        => 'rw',
     isa       => 'Num',
@@ -16,11 +55,40 @@ has itertime => (
     default   => 0.1,
 );
 
+
+=head2 secondary_itertime
+
+Module will do secondary requests (L<onsecondary_retry>) if the first request
+have no data after te timeout.
+
+=cut
+
+has secondary_itertime => (
+    is        => 'rw',
+    isa       => 'Num',
+    predicate => '_has_secondary_itertime',
+    default   => 0.01,
+);
+
+
+=head2 name
+
+Name of pending instance (for debug messages)
+
+=cut
+
 has name => (
     is        => 'rw',
     isa       => 'Str',
     required  => 1,
 );
+
+
+=head2 onidle
+
+callback. will be called for each iteration if there are no data from servers.
+
+=cut
 
 has onidle => (
     is        => 'rw',
@@ -33,6 +101,13 @@ has _pending => (
     isa       => 'HashRef[MR::Pending::Item]',
     default   => sub { {} },
 );
+
+
+=head2 exceptions
+
+count of exceptions in callbacks
+
+=cut
 
 has exceptions => (
     is       => 'rw',
@@ -50,6 +125,17 @@ has _waitresult => (
     is   => 'rw',
     isa  => 'ArrayRef',
 );
+
+
+=head1 METHODS
+
+
+=head2 new
+
+Constructor. receives one additionall argiments: B<pending> that can contain
+array of pending requests (L<MR::Pending::Item>).
+
+=cut
 
 around BUILDARGS => sub {
     my $orig  = shift;
@@ -71,6 +157,13 @@ sub runcatch {
     return $ret;
 }
 
+
+=head2 add(@pends)
+
+add pending requests (L<MR::Pending::Item>)
+
+=cut
+
 sub add {
     my ($self, @p) = @_;
     my $p = $self->_pending;
@@ -80,6 +173,13 @@ sub add {
     }
     return $self;
 }
+
+
+=head2 remove(@pends)
+
+remove pending requests (L<MR::Pending::Item>)
+
+=cut
 
 sub remove {
     my ($self, @p) = @_;
@@ -98,7 +198,8 @@ sub send {
         my $pend = $pending->{$shard};
         if ($pend->try < $pend->retry) {
             next unless $pend->is_timeout;
-            $pend->set_pending_mode(scalar $self->runcatch($pend->onretry, ($pend->id, $pend, $self)));
+            my $cont = $self->runcatch($pend->onretry, ($pend->id, $pend, $self));
+            $pend->set_pending_mode($cont);
         } else {
             delete $pending->{$shard};
             $self->runcatch($pend->onerror, ($pend->id, "no success after @{[$pend->try]} retries", $pend, $self));
@@ -195,6 +296,13 @@ sub iter {
     return 1;
 }
 
+
+=head2 work
+
+do all pending requests, wait their results or timeout (L<maxtime>)
+
+=cut
+
 sub work {
     my ($self) = @_;
 
@@ -212,7 +320,9 @@ sub check_exceptions {
     my ($self, $raise) = @_;
     my $e = $self->_exceptions;
     return unless $e && @$e;
-    my $str = "$$: PENDING EXCEPTIONS BEGIN\n".join("\n$$:###################\n", @$e)."$$: PENDING EXCEPTIONS END";
+    my $str = "$$: PENDING EXCEPTIONS BEGIN\n"
+        . join("\n$$:###################\n", @$e)
+        . "$$: PENDING EXCEPTIONS END";
     die $str if $raise;
     warn $str if defined $raise;
     return $str;
@@ -222,12 +332,27 @@ no Mouse;
 __PACKAGE__->meta->make_immutable();
 
 
+=head1 MR::Pending::Item
+
+one pending task
+
+
+=head1 ATTRIBUTES
+
+=cut
 
 
 package MR::Pending::Item;
 use Mouse;
 use Time::HiRes qw/time/;
 use Carp;
+
+
+=head2 id
+
+unique id for the task
+
+=cut
 
 has id => (
     is        => 'ro',
@@ -241,6 +366,13 @@ has $_ => (
     predicate => "_has_$_",
     required  => 1,
 ) for qw/onok onerror onretry/;
+
+has $_ => (
+    is        => 'ro',
+    isa       => 'CodeRef',
+    predicate => "_has_$_",
+    default   => sub { sub {} },
+) for qw{onsecondary_retry};
 
 has $_ => (
     is        => 'rw',

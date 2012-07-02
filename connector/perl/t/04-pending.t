@@ -117,6 +117,7 @@ foreach my $tuple (@$tt) {
 }
 
 my @box = ($box, $box2);
+
 my @select = ([1,2,3],[2,3,4]);
 
 my $onok = sub {
@@ -136,6 +137,12 @@ my $ontry = sub {
     my ($i) = @_;
     return $box[$i]->Select($select[$i], {want => "arrayref", return_fh => 1});
 };
+
+MR::Pending->new(
+    name     => "PENDINGTEST",
+    maxtime  => 1.1,
+    itertime => 0.01,
+)->work;
 
 MR::Pending->new(
     name     => "PENDINGTEST",
@@ -166,8 +173,6 @@ MR::Pending->new(
         retry        => 3,
     ) } (0, 1)],
 )->work;
-
-
 
 
 
