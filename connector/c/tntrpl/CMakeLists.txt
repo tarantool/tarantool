@@ -50,7 +50,7 @@ set_target_properties(tntrpl PROPERTIES OUTPUT_NAME "tarantoolrpl")
 
 project(tntrpl_shared)
 add_library(tntrpl_shared SHARED ${tntrpl_sources})
-target_link_libraries(tntrpl_shared tnt_shared)
+target_link_libraries(tntrpl_shared tnt_shared tntnet_shared)
 set_target_properties(tntrpl_shared PROPERTIES OUTPUT_NAME tntrpl)
 set_target_properties(tntrpl_shared PROPERTIES COMPILE_FLAGS "${tntrpl_cflags}")
 set_target_properties(tntrpl_shared PROPERTIES VERSION ${LIBTNT_VERSION} SOVERSION ${LIBTNT_SOVERSION})

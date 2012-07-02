@@ -177,7 +177,11 @@ its parameter mandatory.
 
 C<< pack() >>-compatible format to pack input parameters. Must match C<params>.
 
-=item B<unpack_format> => $format
+=item B<unpack_format_from_space> => $space_id_uint32_or_name_string
+
+Unpack the result tuple as a tuple from space.
+
+=item B<unpack_format> => $format_string
 
 C<< pack() >>-compatible format to unpack procedure output.
 
@@ -224,7 +228,7 @@ sub declare_stored_procedure {
             for my $i (0..$#params) {
                 $p->[$i] = $def[$i] if !defined$p->[$i] and $i < @def;
                 confess "All params must be defined" unless defined $p->[$i];
-                $p->[$i] = pack $fmt[$i], $p->[$i];
+                $p->[$i] = $fmt[$i] =~ m/^[\$\&]$/ ? $p->[$i] : pack($fmt[$i], $p->[$i]);
             }
             return $p;
         };
@@ -244,6 +248,8 @@ sub declare_stored_procedure {
             undef $unpack;
         }
         $options->{unpack_format} = '&*';
+    } elsif(defined $opts{unpack_format_from_space}) {
+        $options->{unpack_format_from_space} = $opts{unpack_format_from_space};
     } else {
         confess "no `unpack` nor `unpack_format` given" if !exists $opts{unpack_format};
         my $f = $opts{unpack_format};
@@ -252,7 +258,7 @@ sub declare_stored_procedure {
     }
 
     my $method = $opts{method_name} or confess "`method_name` not given";
-    confess "bad `method_name` $method" unless $method =~ m/^[a-zA-Z]\w*$/;
+    confess "bad `method_name` $method" unless $method =~ m/^[_a-zA-Z]\w*$/;
     my $fn = "${class}::${method}";
     confess "Method $method is already defined in class $class" if defined &{$fn};
     do {

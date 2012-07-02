@@ -3,7 +3,6 @@
 #
 add_library(ev tarantool_ev.c)
 
-
 if (CMAKE_COMPILER_IS_GNUCC)
     check_c_compiler_flag ("-Wno-unused-result" gcc_has_wno_unused_result)
     if (gcc_has_wno_unused_result)
@@ -24,10 +23,20 @@ elseif (TARGET_OS_FREEBSD)
 # On FreeBSD build libev loop on top of
   set_target_properties(ev PROPERTIES COMPILE_FLAGS "-DEV_USE_KQUEUE")
 endif()
+
 #
 # libev uses ceil and floor from the standard math library
 #
-target_link_libraries(ev m)
+
+#
+# libev depends on librt under kFreeBSD
+if (TARGET_OS_DEBIAN_FREEBSD)
+  set (ev_libs m rt)
+else()
+  set (ev_libs m)
+endif()
+
+target_link_libraries(ev ${ev_libs})
 
 #
 # Build admin.m from admin.rl, but only if admin.rl was changed.
@@ -67,7 +76,7 @@ set (recompiled_sources
 
 set (common_sources tbuf.m palloc.m util.m
      salloc.m pickle.m coro.m stat.m log_io.m recovery.m cpu_feature.m
-     replica.m iproto.m exception.m errcode.c errinj.m latch.m
+     replica.m iproto.m object.m exception.m errcode.c errinj.m latch.m
      nio.c crc32.c)
 
 if (ENABLE_TRACE)
@@ -75,7 +84,7 @@ if (ENABLE_TRACE)
 endif()
 
 add_library(core STATIC ${common_sources})
-add_dependencies(core generate_headers luajit)
+add_dependencies(core generate_headers)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
 set (common_libraries cfg core ev coro gopt misc objc)

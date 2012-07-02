@@ -200,8 +200,8 @@ format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
 {
 	static __thread char filename[PATH_MAX + 1];
 	const char *suffix_str = suffix == INPROGRESS ? inprogress_suffix : "";
-	snprintf(filename, PATH_MAX, "%s/%020" PRIi64 "%s%s",
-		 dir->dirname, lsn, dir->filename_ext, suffix_str);
+	snprintf(filename, PATH_MAX, "%s/%020lld%s%s",
+		 dir->dirname, (long long)lsn, dir->filename_ext, suffix_str);
 	return filename;
 }
 
@@ -245,7 +245,7 @@ row_reader_v11(FILE *f, struct palloc_pool *pool)
 		return NULL;
 	}
 
-	say_debug("read row v11 success lsn:%" PRIi64, header_v11(m)->lsn);
+	say_debug("read row v11 success lsn:%lld", (long long)header_v11(m)->lsn);
 	return m;
 }
 
@@ -289,7 +289,7 @@ log_io_cursor_next(struct log_io_cursor *i)
 
 	assert(i->eof_read == false);
 
-	say_debug("log_io_cursor_next: marker:0x%016" PRIX32 "/%" PRI_SZ,
+	say_debug("log_io_cursor_next: marker:0x%016X/%zu",
 		  row_marker_v11, sizeof(row_marker_v11));
 
 	/*
@@ -317,9 +317,10 @@ restart:
 	}
 	marker_offset = ftello(l->f) - sizeof(row_marker_v11);
 	if (i->good_offset != marker_offset)
-		say_warn("skipped %" PRI_OFFT " bytes after 0x%08" PRI_XFFT " offset",
-			 marker_offset - i->good_offset, i->good_offset);
-	say_debug("magic found at 0x%08" PRI_XFFT, marker_offset);
+		say_warn("skipped %jd bytes after 0x%08jx offset",
+			(intmax_t)(marker_offset - i->good_offset),
+			(uintmax_t)i->good_offset);
+	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
 
 	struct tbuf *row = row_reader_v11(l->f, fiber->gc_pool);
 	if (row == ROW_EOF)
@@ -610,6 +611,3 @@ error:
 
 /* }}} */
 
-/*
- * vim: foldmethod=marker
- */

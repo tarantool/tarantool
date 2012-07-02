@@ -5,6 +5,9 @@ import os
 import sys
 import shutil
 
+# mask BFD warnings: https://bugs.launchpad.net/tarantool/+bug/1018356
+sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
+
 print """
 # Bug #708685:
 #  Addition of required configuration file options broke backward
@@ -77,5 +80,7 @@ exec admin "lua print_config()"
 server.stop()
 shutil.rmtree(script_dir_path, True)
 server.deploy(self.suite_ini["config"])
+
+sys.stdout.pop_filter()
 
 # vim: syntax=python

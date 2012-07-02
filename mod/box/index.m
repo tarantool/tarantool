@@ -688,6 +688,3 @@ int64_key_to_value(void *key)
 
 /* }}} */
 
-/**
- * vim: foldmethod=marker
- */

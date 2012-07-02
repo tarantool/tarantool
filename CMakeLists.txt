@@ -87,6 +87,12 @@ else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
 endif()
 
+if (TARGET_OS_DARWIN)
+# Mac ports get installed into /opt/local, hence:
+    set (CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} /opt/local/include")
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I/opt/local/include -L/opt/local/lib")
+endif()
+
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
 check_include_file(sys/time.h HAVE_SYS_TIME_H)

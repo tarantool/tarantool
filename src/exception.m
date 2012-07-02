@@ -37,17 +37,18 @@
 + (id) alloc
 {
 	static __thread tnt_Exception *e = nil;
+	static __thread size_t sz = 0;
 
-	if ([e isKindOf:self]) {
-		*(Class *) e = self;
+	if (e != nil && class_getInstanceSize(self) <= sz) {
+		object_setClass(e, self);
 	} else {
-		[e free];
-		e = [super alloc];
+		object_dispose(e);
+		e = class_createInstance(self, 0);
+		sz = class_getInstanceSize(self);
 	}
 	return e;
 }
 @end
-
 
 @implementation SystemError
 
@@ -114,7 +115,7 @@
 	va_start(ap, errcode_);
 	[super init: errcode_ args: ap];
 
-	say_error("%s at %s:%d, %s", [self name], file, line, errmsg);
+	say_error("%s at %s:%d, %s", object_getClassName(self), file, line, errmsg);
 
 	return self;
 }

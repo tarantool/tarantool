@@ -450,7 +450,7 @@ fiber_loop(void *data __attribute__((unused)))
 			say_info("fiber `%s': exiting", fiber->name);
 		}
 		@catch (id e) {
-			say_error("fiber `%s': exception `%s'", fiber->name, [e name]);
+			say_error("fiber `%s': exception `%s'", fiber->name, object_getClassName(e));
 			panic("fiber `%s': exiting", fiber->name);
 		}
 		fiber_close();

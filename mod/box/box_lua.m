@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "box_lua.h"
-#include <objc/runtime.h>
+#import "object.h"
 #include <tarantool_lua.h>
 #include <fiber.h>
 #include "box.h"
@@ -830,6 +830,3 @@ void box_lua_init()
 	root_L = tarantool_L;
 }
 
-/**
- * vim: foldmethod=marker
- */

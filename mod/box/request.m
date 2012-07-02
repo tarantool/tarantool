@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 #include "request.h"
-#include <objc/runtime.h>
 #include "txn.h"
 #include "tuple.h"
 #include "index.h"
@@ -989,6 +988,3 @@ do_update_ops(struct update_cmd *cmd, struct tuple *new_tuple)
 }
 @end
 
-/**
- * vim: foldmethod=marker
- */
