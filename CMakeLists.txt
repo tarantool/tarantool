@@ -145,8 +145,14 @@ endif()
 #
 # Perform build type specific configuration.
 #
-set (CMAKE_C_FLAGS_DEBUG "-ggdb -O0 -fexceptions -funwind-tables")
-set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2 -fexceptions -funwind-tables -DNDEBUG -DNVALGRIND")
+if (CMAKE_COMPILER_IS_GNUCC)
+    set (CC_DEBUG_OPT "-ggdb")
+else()
+    set (CC_DEBUG_OPT "-g")
+endif()
+
+set (CMAKE_C_FLAGS_DEBUG "${CC_DEBUG_OPT} -O0 -fexceptions -funwind-tables")
+set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "${CC_DEBUG_OPT} -O2 -fexceptions -funwind-tables -DNDEBUG -DNVALGRIND")
 set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 
 #
