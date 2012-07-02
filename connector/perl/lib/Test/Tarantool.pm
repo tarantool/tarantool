@@ -46,7 +46,7 @@ sub run {
     my ($module, %opts) = @_;
 
     my $cfg_file = delete $opts{cfg} or croak "config file not defined";
-    croak "File not found" unless -r $cfg_file;
+    croak "File not found: $cfg_file" unless -r $cfg_file;
     open my $fh, '<:encoding(UTF-8)', $cfg_file or die "$@\n";
     local $/;
     my $cfg = <$fh>;
