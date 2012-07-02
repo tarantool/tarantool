@@ -113,6 +113,11 @@ has _one => (
     lazy_build => 1,
 );
 
+has _server => (
+    is  => 'rw',
+    isa => 'Maybe[MR::IProto::Cluster::Server]',
+);
+
 has _ketama => (
     is  => 'ro',
     isa => 'ArrayRef[ArrayRef]',
@@ -145,9 +150,12 @@ sub server {
     my ($self, $key) = @_;
     my $one = $self->_one;
     return $one if defined $one;
-    my $method = $self->balance == RR ? '_balance_rr'
-        : $self->balance == KETAMA ? '_balance_ketama'
-        : '_balance_hash';
+    if($self->balance == RR) {
+        my $server = $self->_server;
+        return $server if $server && $server->active;
+        return $self->_server($self->_balance_rr);
+    }
+    my $method = $self->balance == KETAMA ? '_balance_ketama' : '_balance_hash';
     return $self->$method($key);
 }
 

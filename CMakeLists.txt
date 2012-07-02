@@ -45,6 +45,7 @@ endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL Clang)
     set(CMAKE_COMPILER_IS_CLANG true)
+    set(CMAKE_COMPILER_IS_GNUCC false)
 endif()
 
 if (CMAKE_COMPILER_IS_GNUCC)
@@ -90,7 +91,8 @@ endif()
 if (TARGET_OS_DARWIN)
 # Mac ports get installed into /opt/local, hence:
     set (CMAKE_REQUIRED_INCLUDES "${CMAKE_REQUIRED_INCLUDES} /opt/local/include")
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I/opt/local/include -L/opt/local/lib")
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I/opt/local/include")
+    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/opt/local/lib")
 endif()
 
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
@@ -143,8 +145,14 @@ endif()
 #
 # Perform build type specific configuration.
 #
-set (CMAKE_C_FLAGS_DEBUG "-ggdb -O0 -fexceptions -funwind-tables")
-set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "-ggdb -O2 -fexceptions -funwind-tables -DNDEBUG -DNVALGRIND")
+if (CMAKE_COMPILER_IS_GNUCC)
+    set (CC_DEBUG_OPT "-ggdb")
+else()
+    set (CC_DEBUG_OPT "-g")
+endif()
+
+set (CMAKE_C_FLAGS_DEBUG "${CC_DEBUG_OPT} -O0 -fexceptions -funwind-tables")
+set (CMAKE_C_FLAGS_RELWITHDEBUGINFO "${CC_DEBUG_OPT} -O2 -fexceptions -funwind-tables -DNDEBUG -DNVALGRIND")
 set (CMAKE_C_FLAGS_RELEASE "-DNDEBUG -DNVALGRIND")
 
 #
@@ -298,7 +306,9 @@ if (TARGET_OS_DARWIN)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fgnu-runtime")
 endif()
 
-set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
+if (CMAKE_COMPILER_IS_GNUCC)
+    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
+endif()
 
 add_subdirectory(third_party)
 add_subdirectory(cfg)
