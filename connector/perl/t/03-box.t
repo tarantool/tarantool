@@ -50,12 +50,20 @@ our $box;
 
 my $tarantool_config = "$Bin/data/box.t.cfg";
 ok -r $tarantool_config, "-r $tarantool_config";
-my $tnt_srv = Test::Tarantool->run(cfg => $tarantool_config);
-ok $tnt_srv, 'server instance created';
-diag $tnt_srv->log unless ok $tnt_srv->started, 'server is started';
 
-our $server = shift || $ENV{BOX} ||
-    sprintf '127.0.0.1:%d', $tnt_srv->primary_port;
+
+our $server = shift || $ENV{BOX};
+
+SKIP: {
+    skip 'The test uses external tarantool instance', 2 if $server;
+
+    my $tnt_srv = Test::Tarantool->run(cfg => $tarantool_config);
+    ok $tnt_srv, 'server instance created';
+    diag $tnt_srv->log unless ok $tnt_srv->started, 'server is started';
+
+    $server = sprintf '127.0.0.1:%d', $tnt_srv->primary_port;
+
+}
 
 ok $server, 'server address was defined ' . $server || 'undef';
 
@@ -836,7 +844,11 @@ is_deeply [$box->Select([[$tuple1[1]]], { use_index => 'secondary_complex' })], 
 ok $box->Insert(@tuple2);
 
 is_deeply [$box->Select([[$tuple2[0]]])], [\@tuple2], 'select by primary_num1 index';
-is_deeply [$box->Select([[$tuple1[1]]], { use_index => 'secondary_str2', limit => 2, offset => 0 })], [\@tuple1, \@tuple2], 'select by secondary_str2 index';
+is_deeply [sort { $a->[0] <=> $b->[0]  } $box->Select([[$tuple1[1]]],
+    { use_index => 'secondary_str2', limit => 2, offset => 0 })],
+    [\@tuple1, \@tuple2],
+    'select by secondary_str2 index'
+;
 is_deeply [$box->Select([[$tuple2[1], $tuple2[2]]], { use_index => 'secondary_complex' })], [\@tuple2], 'select by secondary_complex index';
 
 ## Check index constrains
