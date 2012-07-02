@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 17;
+use Test::More tests    => 16;
 use Encode qw(decode encode);
 
 
@@ -103,28 +103,15 @@ ok $box_union, 'connector is created';
 ok $box1, 'connector is created';
 ok $box2, 'connector is created';
 
+
 my %resps;
-for (1 .. 2) {
-    my $tuples = $box_union->Call(tst_sleep => [], { unpack_format => '$$' });
+for (1 .. 20) {
+    my $tuples = $box_union->Call(
+        tst_server_name => [], { unpack_format => '$' }
+    );
     $resps{ $tuples->[0][0] }++;
 }
 
-ok exists $resps{first}, 'first server was used';
-ok exists $resps{second}, 'second server was used';
-
-
-%resps = ();
-for (1 .. 100) {
-    my $started = time;
-    my $tuples = $box_union->Call(tst_sleep => [], { unpack_format => '$$' });
-    my $done = time - $started;
-
-    if ($done <= .3) {
-        $resps{ok}++;
-    } else {
-        $resps{fail}++;
-    }
-}
-
-ok $resps{fail} < $resps{ok} / 8, 'random fails';
+is 1, scalar keys %resps, 'one server was used for all requests';
+is $resps{first} || $resps{second}, 20, 'all requests were handled';
 
