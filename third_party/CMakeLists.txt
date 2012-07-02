@@ -28,9 +28,7 @@ macro (luajit_build)
     else ()
         set (luajit_copt ${luajit_copt} -O2)
     endif()
-    if (NOT HAVE_UNWIND_H)
-        set (luajit_copt ${luajit_copt} -I${PROJECT_SOURCE_DIR}/third_party/compat)
-    endif()
+    set (luajit_copt ${luajit_copt} -I${PROJECT_SOURCE_DIR}/libobjc)
     set (luajit_cc ${CMAKE_C_COMPILER})
     if (NOT luajit_cc)
         set (luajit_cc cc)
@@ -72,8 +70,10 @@ endmacro()
 macro(libobjc_build)
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (extra_cflags "-g -O0 -fno-inline")
+        set (extra_ldflags "")
     else ()
-        set (extra_cflags "-O3")
+        set (extra_cflags "-O3 -Wno-unused-result")
+        set (extra_ldflags "-s")
     endif()
     if (${TARGET_OS_LINUX})
         set (extra_cflags "${extra_cflags} -D_GNU_SOURCE")
@@ -91,13 +91,14 @@ macro(libobjc_build)
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/libobjc
         COMMAND $(MAKE) clean
-        COMMAND $(MAKE) EXTRA_CFLAGS=""${extra_cflags}""
+        COMMAND $(MAKE) EXTRA_CFLAGS=""${extra_cflags}"" EXTRA_LDFLAGS=""${extra_ldflags}""
         DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt
     )
     add_custom_target(libobjc
         DEPENDS ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a
     )
     unset (extra_cflags)
+    unset (extra_ldlags)
 endmacro()
 
 #

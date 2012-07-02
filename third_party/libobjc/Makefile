@@ -11,12 +11,12 @@ LIBOBJCLIBNAME=objc
 LIBOBJC=libobjc
 LIBOBJCXX=libobjcxx
 
-SILENT=@
+#SILENT=@
 
-CFLAGS += -std=gnu99 -fPIC -fexceptions
-CXXFLAGS += -fPIC -fexceptions
-CPPFLAGS += -DTYPE_DEPENDENT_DISPATCH -DGNUSTEP
-CPPFLAGS += -D__OBJC_RUNTIME_INTERNAL__=1 -D_XOPEN_SOURCE=500 -D__BSD_VISIBLE=1 -D_BSD_SOURCE=1
+CFLAGS+= -std=gnu99 -fexceptions
+CXXFLAGS+= -fexceptions
+CPPFLAGS+= -DTYPE_DEPENDENT_DISPATCH -DGNUSTEP
+CPPFLAGS+= -D__OBJC_RUNTIME_INTERNAL__=1 -D_XOPEN_SOURCE=500 -D__BSD_VISIBLE=1 -D_BSD_SOURCE=1
 
 ASMFLAGS += `if $(CC) -v 2>&1| grep -q 'clang' ; then echo -no-integrated-as ; fi`
 
@@ -83,7 +83,7 @@ $(LIBOBJC).so.$(VERSION): $(OBJECTS)
 
 $(LIBOBJC).a: $(OBJECTS)
 	$(SILENT)echo Linking static Objective-C runtime library...
-	$(SILENT)ld -r -o $@ $(OBJECTS)
+	$(SILENT)ld -r ${EXTRA_LDFLAGS} -o $@ $(OBJECTS)
 
 .cc.o: Makefile
 	$(SILENT)echo Compiling `basename $<`...

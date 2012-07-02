@@ -590,6 +590,12 @@ box_lua_fiber_run(void *arg __attribute__((unused)))
 		lua_pushboolean(L, false);
 		/* error message */
 		lua_pushstring(L, e->errmsg);
+	} @catch (tnt_Exception *e) {
+		@throw;
+	} @catch (...) {
+		lua_settop(L, 1);
+		lua_pushboolean(L, false);
+		lua_insert(L, -2);
 	} @finally {
 		/*
 		 * If the coroutine has detached itself, collect
@@ -939,6 +945,14 @@ lbox_pcall(struct lua_State *L)
 		lua_pushboolean(L, false);
 		/* error message */
 		lua_pushstring(L, e->errmsg);
+	} @catch (tnt_Exception *e) {
+		@throw;
+	} @catch (...) {
+		lua_settop(L, 1);
+		/* completion status */
+		lua_pushboolean(L, false);
+		/* put the completion status below the error message. */
+		lua_insert(L, -2);
 	}
 	return lua_gettop(L);
 }
@@ -1041,6 +1055,10 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 		lua_call(L, 0, LUA_MULTRET);
 	} @catch (ClientError *e) {
 		lua_pushstring(L, e->errmsg);
+		return 1;
+	} @catch (tnt_Exception *e) {
+		@throw;
+	} @catch (...) {
 		return 1;
 	}
 	return 0;

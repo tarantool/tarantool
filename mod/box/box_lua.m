@@ -760,14 +760,6 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
 		lua_remove(L, index);
 }
 
-
-static int
-box_lua_panic(struct lua_State *L)
-{
-	tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
-	return 0;
-}
-
 @implementation Call
 /**
  * Invoke a Lua stored procedure from the binary protocol
@@ -795,6 +787,10 @@ box_lua_panic(struct lua_State *L)
 		lua_call(L, nargs, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
 		[port addLuaMultret: L];
+	} @catch (tnt_Exception *e) {
+		@throw;
+	} @catch (...) {
+		tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
 	} @finally {
 		/*
 		 * Allow the used coro to be garbage collected.
@@ -808,7 +804,6 @@ box_lua_panic(struct lua_State *L)
 struct lua_State *
 mod_lua_init(struct lua_State *L)
 {
-	lua_atpanic(L, box_lua_panic);
 	/* box, box.tuple */
 	tarantool_lua_register_type(L, tuplelib_name, lbox_tuple_meta);
 	luaL_register(L, "box", boxlib);
