@@ -4,26 +4,40 @@
 
 use strict;
 use warnings;
+use FindBin qw($Bin);
+use lib "$Bin";
+use lib "$Bin/../lib";
+
 BEGIN {
     sub mPOP::Config::GetValue ($) {
         die;
     }
 }
-use FindBin qw($Bin);
-use lib "$Bin";
-use Carp qw/confess/;
 
-use Test::More tests => 366;
+use Carp qw/confess/;
+use Test::More tests => 372;
 use Test::Exception;
+
+BEGIN {
+    warn "$Bin/../lib";
+
+    use_ok 'Test::Tarantool';
+    use_ok 'POSIX';
+}
 
 use List::MoreUtils qw/zip/;
 
 local $SIG{__DIE__} = \&confess;
 
 our $CLASS;
-BEGIN { $CLASS = $ENV{BOXCLASS} || 'MR::Tarantool::Box'; eval "require $CLASS" or die $@; }
+BEGIN {
+    $CLASS = $ENV{BOXCLASS} || 'MR::Tarantool::Box';
+    eval "require $CLASS" or die $@;
+}
 
-use constant ILL_PARAM         => qr/Error 00000202/;
+POSIX::setlocale(LC_ALL, 'C');
+
+use constant ILL_PARAM         => qr/Error (00000202|00002A02)/;
 use constant TUPLE_NOT_EXISTS  => qr/Error 00003102/;
 use constant TUPLE_EXISTS      => qr/Error 00003702/;
 use constant INDEX_VIOLATION   => qr/Error 00003802/;
@@ -33,7 +47,18 @@ use constant NO_SUCCESS        => qr/no success after/;
 use constant TOO_BIG_FIELD => qr/too big field/;
 
 our $box;
-our $server = (shift || $ENV{BOX}) or die;
+
+my $tarantool_config = "$Bin/data/box.t.cfg";
+ok -r $tarantool_config, "-r $tarantool_config";
+my $tnt_srv = Test::Tarantool->run(cfg => $tarantool_config);
+ok $tnt_srv, 'server instance created';
+diag $tnt_srv->log unless ok $tnt_srv->started, 'server is started';
+
+our $server = shift || $ENV{BOX} ||
+    sprintf '127.0.0.1:%d', $tnt_srv->primary_port;
+
+ok $server, 'server address was defined ' . $server || 'undef';
+
 our %opts = (
     debug => $ENV{DEBUG}||0,
     ipdebug => $ENV{IPDEBUG}||0,
@@ -96,6 +121,8 @@ is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, '
 
 ok $box->Substr(13, 6 => [3,4,'12345']), 'substr op';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, 'EPE123456APPE'], 'select/substr';
+
+
 
 ok $box->UpdateMulti(13, [6 => splice => [0]]), 'generic splice (offset = 0)';
 is_deeply scalar $box->Select(13), [13, 'some_email@test.mail.ru', 2, 1, 3, 4, ''], 'select/splice (offset = 0)';
@@ -275,12 +302,12 @@ sub countwarn {
     my ($qr, $counter) = @_;
     return sub {
         ++$$counter if $_[0] =~ $qr;
-        warn @_;
+#         note "caught warning: ", @_;
     };
 };
 
 do {
-    local $server = "127.0.0.1:1111";
+    local $server = sprintf "127.0.0.1:%s", Test::Tarantool::_find_free_port;
     local $opts{raise} = 0;
     my $try = 3;
 
@@ -290,7 +317,7 @@ do {
     my $box = $CLASS->new(def_param('l&SSLL&'));
 
     throws_ok sub{my$x=$box->Select(13,{ want => "arrayref", raise => 1 })}, NO_SUCCESS, "reject/select/raise/sync";
-    ok $counter == $try, "reject/select/raise/sync/counter";
+    is $counter, $try, "reject/select/raise/sync/counter";
     $counter = 0;
 
     ok !$box->Select(13,{ want => "arrayref", raise => 0 }), "reject/select/noraise/sync";
@@ -556,6 +583,7 @@ ok $box->isa($CLASS), 'connect';
 
 
 for (1..3) {
+    %MR::IProto::sockets = ();
     %MR::IProto::sockets = ();
     $box = $CLASS->new(def_param);
     ok $box->isa($CLASS), 'connect';
@@ -875,26 +903,28 @@ $box = $CLASS->new(def_param_unique);
 ok $box->isa($CLASS), 'connect';
 
 my $tuples = [ [1, 'rtokarev@corp.mail.ru', 'Roman', 'Tokarev'],
-	       [2, 'vostrikov@corp.mail.ru', 'Yuri', 'Vostrikov'],
-	       [3, 'aleinikov@corp.mail.ru', 'Roman', 'Aleinikov'],
-	       [4, 'roman.s.tokarev@gmail.com', 'Roman', 'Tokarev'],
-	       [5, 'vostrikov@corp.mail.ru', 'delamon', 'delamon'] ];
+               [2, 'vostrikov@corp.mail.ru', 'Yuri', 'Vostrikov'],
+               [3, 'aleinikov@corp.mail.ru', 'Roman', 'Aleinikov'],
+               [4, 'roman.s.tokarev@gmail.com', 'Roman', 'Tokarev'],
+               [5, 'vostrikov@corp.mail.ru', 'delamon', 'delamon'] ];
 
 foreach my $tuple (@$tuples) {
-	cleanup $tuple->[0];
+        cleanup $tuple->[0];
 }
 
 foreach my $tuple (@$tuples) {
-	if ($tuple == $tuples->[-1] || $tuple == $tuples->[-2]) {
-		throws_ok sub { $box->Insert(@$tuple) }, INDEX_VIOLATION, "unique_tree_index/insert \'$tuple->[0]\'";
-	} else {
-		ok $box->Insert(@$tuple), "unique_tree_index/insert \'$tuple->[0]\'";
-	}
+        if ($tuple == $tuples->[-1] || $tuple == $tuples->[-2]) {
+                throws_ok sub { $box->Insert(@$tuple) }, INDEX_VIOLATION, "unique_tree_index/insert \'$tuple->[0]\'";
+        } else {
+                ok $box->Insert(@$tuple), "unique_tree_index/insert \'$tuple->[0]\'";
+        }
 }
+
 
 my @res = $box->Select([map $_->[0], @$tuples], { limit => 100 });
 foreach my $r (@res) {
-	ok sub { return $r != $tuples->[-1] && $r != $tuples->[-2] };
+        ok sub { return $r->[0] != $tuples->[-1] && $r->[0] != $tuples->[-2] },
+            'invalid insert into unique index';
 }
 
 my $flds;
@@ -926,6 +956,8 @@ BEGIN{ $lflds = [qw/ l1 l2 l3 /] }
 
     }
 
+
+
 $box = 'TestBox';
 #$box = $CLASS->new(def_param_flds);
 #ok $box->isa($CLASS), 'connect';
@@ -952,11 +984,12 @@ do {
         push @$check, $t;
     }
 
+
     foreach my $tuple (@$tuples) {
         cleanup $tuple->[0];
     }
 
-    foreach my $i (0..$#$tuples) {
+    foreach my $i (0 .. $#$tuples) {
         is_deeply [$box->Insert(@{$tuples->[$i]}, {want_inserted_tuple => 1})], [$check->[$i]], "flds/insert \'$tuples->[$i]->[0]\'";
     }
 
@@ -1009,76 +1042,15 @@ ok $box->isa($CLASS), 'connect';
 $_->[0] = pack('ll', $_->[0], 0) foreach @$tuples;
 
 foreach my $tuple (@$tuples) {
-	cleanup $tuple->[0];
+        cleanup $tuple->[0];
 }
 
 foreach my $tuple (@$tuples) {
     ok $box->Insert(@$tuple), "unique_tree_index/insert \'$tuple->[0]\'";
 }
 
-is_deeply($tuples, [$box->Select([map $_->[0], @$tuples])]);
+is_deeply($tuples, [$box->Select([map $_->[0], @$tuples])], 'Select tuples');
 
 
 __END__
 
-space[0].enabled = 1
-space[0].index[0].type = "HASH"
-space[0].index[0].unique = 1
-space[0].index[0].key_field[0].fieldno = 0
-space[0].index[0].key_field[0].type = "NUM"
-space[0].index[1].type = "HASH"
-space[0].index[1].unique = 1
-space[0].index[1].key_field[0].fieldno = 1
-space[0].index[1].key_field[0].type = "STR"
-
-space[20].enabled = 1
-space[20].index[0].type = "HASH"
-space[20].index[0].unique = 1
-space[20].index[0].key_field[0].fieldno = 0
-space[20].index[0].key_field[0].type = "NUM64"
-
-
-space[26].enabled = 1
-space[26].index[0].type = "HASH"
-space[26].index[0].unique = 1
-space[26].index[0].key_field[0].fieldno = 0
-space[26].index[0].key_field[0].type = "NUM"
-space[26].index[1].type = "TREE"
-space[26].index[1].unique = 0
-space[26].index[1].key_field[0].fieldno = 1
-space[26].index[1].key_field[0].type = "STR"
-space[26].index[2].type = "TREE"
-space[26].index[2].unique = 0
-space[26].index[2].key_field[0].fieldno = 1
-space[26].index[2].key_field[0].type = "STR"
-space[26].index[2].key_field[1].fieldno = 2
-space[26].index[2].key_field[1].type = "NUM"
-
-
-
-space[27].enabled = 1
-space[27].index[0].type = "HASH"
-space[27].index[0].unique = 1
-space[27].index[0].key_field[0].fieldno = 0
-space[27].index[0].key_field[0].type = "NUM"
-space[27].index[1].type = "HASH"
-space[27].index[1].unique = 1
-space[27].index[1].key_field[0].fieldno = 1
-space[27].index[1].key_field[0].type = "STR"
-
-space[27].index[2].type = "TREE"
-space[27].index[2].unique = 1
-space[27].index[2].key_field[0].fieldno = 2
-space[27].index[2].key_field[0].type = "STR"
-
-space[27].index[2].type = "TREE"
-space[27].index[2].unique = 1
-space[27].index[2].key_field[0].fieldno = 3
-space[27].index[2].key_field[0].type = "STR"
-
-space[27].index[3].type = "TREE"
-space[27].index[3].unique = 1
-space[27].index[3].key_field[0].fieldno = 2
-space[27].index[3].key_field[0].type = "STR"
-space[27].index[3].key_field[1].fieldno = 3
-space[27].index[3].key_field[1].type = "STR"
