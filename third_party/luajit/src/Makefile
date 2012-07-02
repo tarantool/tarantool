@@ -220,8 +220,10 @@ TARGET_ALDFLAGS= $(LDOPTIONS) $(TARGET_XLDFLAGS) $(TARGET_FLAGS) $(TARGET_LDFLAG
 TARGET_ASHLDFLAGS= $(LDOPTIONS) $(TARGET_XSHLDFLAGS) $(TARGET_FLAGS) $(TARGET_SHLDFLAGS)
 TARGET_ALIBS= $(TARGET_XLIBS) $(LIBS) $(TARGET_LIBS)
 
-ifneq (,$(findstring stack-protector,$(shell $(TARGET_CC) -dumpspecs)))
-  TARGET_XCFLAGS+= -fno-stack-protector
+ifneq (,$(findstring gcc,$(TARGET_CC)))
+    ifneq (,$(findstring stack-protector,$(shell $(TARGET_CC) -dumpspecs)))
+        TARGET_XCFLAGS+= -fno-stack-protector
+    endif
 endif
 
 TARGET_TESTARCH=$(shell $(TARGET_CC) $(TARGET_ACFLAGS) -E lj_arch.h -dM)
