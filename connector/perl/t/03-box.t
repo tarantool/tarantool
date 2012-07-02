@@ -61,9 +61,7 @@ SKIP: {
     $tnt_srv = Test::Tarantool->run(cfg => $tarantool_config);
     ok $tnt_srv, 'server instance created';
     diag $tnt_srv->log unless ok $tnt_srv->started, 'server is started';
-
     $server = sprintf '127.0.0.1:%d', $tnt_srv->primary_port;
-
 }
 
 ok $server, 'server address was defined ' . $server || 'undef';
