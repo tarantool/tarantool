@@ -360,6 +360,13 @@ has id => (
     required  => 1,
 );
 
+
+=head2 onok onerror onretry onsecondary_retry
+
+functions that are called on different stages
+
+=cut
+
 has $_ => (
     is        => 'ro',
     isa       => 'CodeRef',

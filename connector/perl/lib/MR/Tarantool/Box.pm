@@ -607,8 +607,10 @@ Format to unpack the result tuple, the same as C<format> option for C<new()>
 =cut
 
 sub Call {
-    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/flags raise unpack unpack_format unpack_format_from_space/);
+    my ($param, $namespace) = $_[0]->_validate_param(\@_, qw/flags raise unpack unpack_format unpack_format_from_space return_fh/);
     my ($self, $sp_name, $tuple) = @_;
+
+    my $return_fh = delete $param->{return_fh};
 
     my $flags = $param->{flags} || 0;
     local $self->{raise} = $param->{raise} if defined $param->{raise};
@@ -640,11 +642,19 @@ sub Call {
     } @$tuple ];
 
 
+
     $self->_chat (
         msg      => 22,
         payload  => pack("L w/a* L(w/a*)*", $flags, $sp_name, scalar(@$tuple), @$tuple),
-        unpack   => $param->{unpack} || sub { $self->_unpack_select($space||$namespace, "CALL", @_) },
+        unpack   => $param->{unpack} || sub {
+            local $namespace->{unpack_format} = $unpack_format
+                if !$space && $unpack_format;
+            local $namespace->{append_for_unpack} = ''
+                if !$space && $unpack_format;
+            $self->_unpack_select($space||$namespace, "CALL", @_)
+        },
         callback => $param->{callback},
+        return_fh => $return_fh ? sub { return $_[0] } : 0
     );
 }
 
@@ -783,6 +793,7 @@ sub Insert {
 
 sub _unpack_select {
     my ($self, $ns, $debug_prefix) = @_;
+
     $debug_prefix ||= "SELECT";
     confess __LINE__."$self->{name}: [$debug_prefix]: Bad response" if length $_[3] < 4;
     my $result_count = unpack('L', substr($_[3], 0, 4, ''));
