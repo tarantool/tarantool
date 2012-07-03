@@ -296,7 +296,8 @@ sub _make_unpack_format {
     $ns->{byfield_unpack_format} = [ map { m/[\&\$]/ ? 'w/a*' : "x$_" } @f ];
     $ns->{field_format}          = [ map { m/[\&\$]/ ? 'a*'   : $_    } @f ];
     $ns->{unpack_format}  = join('', @{$ns->{byfield_unpack_format}});
-    $ns->{unpack_format} .= '('.join('', @{$ns->{long_byfield_unpack_format}}).')*' if $ns->{long_tuple};
+    $ns->{long_unpack_format} = $ns->{long_tuple} ? join('', @{$ns->{long_byfield_unpack_format}})          : '';
+    $ns->{full_unpack_format} = $ns->{long_tuple} ? $ns->{unpack_format}.'('.$ns->{long_unpack_format}.')*' : $ns->{unpack_format};
     $ns->{string_keys} = { map { $_ =>  1 } grep { $f[$_] =~ m/[\&\$]/ } 0..$#f };
     $ns->{utf8_fields} = { map { $_ => $_ } grep { $f[$_] eq '$' } 0..$#f };
 }
@@ -788,6 +789,7 @@ sub _unpack_select {
     my (@res);
     my $appe = $ns->{append_for_unpack};
     my $fmt  = $ns->{unpack_format};
+    my $ffmt = $ns->{full_unpack_format};
     for(my $i = 0; $i < $result_count; ++$i) {
         confess __LINE__."$self->{name}: [$debug_prefix]: Bad response" if length $_[3] < 8;
         my ($len, $cardinality) = unpack('LL', substr($_[3], 0, 8, ''));
@@ -796,7 +798,7 @@ sub _unpack_select {
         my $packed_tuple = substr($_[3], 0, $len, '');
         $self->_debug("$self->{name}: [$debug_prefix]: ROW[$i]: DATA=[@{[unpack '(H2)*', $packed_tuple]}];") if $self->{debug} >= 6;
         $packed_tuple .= $appe;
-        my @tuple = eval { unpack($fmt, $packed_tuple) };
+        my @tuple = eval { unpack($cardinality > @{$ns->{byfield_unpack_format}} ? $ffmt : $fmt, $packed_tuple) };
         confess "$self->{name}: [$debug_prefix]: ROW[$i]: can't unpack tuple [@{[unpack('(H2)*', $packed_tuple)]}]: $@" if !@tuple || $@;
         $self->_debug("$self->{name}: [$debug_prefix]: ROW[$i]: FIELDS=[@{[map { qq{`$_'} } @tuple]}];") if $self->{debug} >= 5;
         push @res, \@tuple;
@@ -910,7 +912,7 @@ sub _PostSelect {
             for my $row (@$r) {
                 my $h = { zip @{$namespace->{fields}}, @{[splice(@$row,0,0+@f)]} };
                 if($last) {
-                    $row = [ map +{ zip @f_long, @{[splice(@$row,0,0+@f_long)]} }, 0..((@$row-1)/@f_long) ] if @f_long;
+                    $row = @f_long && @$row ? [ map +{ zip @f_long, @{[splice(@$row,0,0+@f_long)]} }, 0..((@$row-1)/@f_long) ] : [];
                     $h->{$last} = $row;
                 }
                 $row = $h;

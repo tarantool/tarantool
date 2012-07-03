@@ -13,7 +13,7 @@ use FindBin qw($Bin);
 use lib "$Bin";
 use Carp qw/confess/;
 
-use Test::More tests => 366;
+use Test::More tests => 371;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
@@ -37,6 +37,7 @@ our $server = (shift || $ENV{BOX}) or die;
 our %opts = (
     debug => $ENV{DEBUG}||0,
     ipdebug => $ENV{IPDEBUG}||0,
+    retry_delay => 0.1,
     raise => 1,
 );
 
@@ -936,6 +937,7 @@ do {
         [3, "asdasdasd3", "qqq\xD0\x8Eqqq3", "ww\xD0\x8Eww3", "la\xD0\x8Elalala31", "la\xD0\x8Elala31", "lala31", "lalalala32", "lalala32", "lala32"],
         [4, "asdasdasd4", "qqq\xD0\x8Eqqq4", "ww\xD0\x8Eww4", "la\xD0\x8Elalala41", "la\xD0\x8Elala41", "lala41", "lalalala42", "lalala42", "lala42", "lalalala43", "lalala43", "lala43"],
         [5, "asdasdasd5", "qqq\xD0\x8Eqqq5", "ww\xD0\x8Eww5", "la\xD0\x8Elalala51", "la\xD0\x8Elala51", "lala51"],
+        [6, "asdasdasd6", "qqq\xD0\x8Eqqq6", "ww\xD0\x8Eww6"],
     ];
 
     my $check = [];
@@ -966,8 +968,10 @@ do {
     is_deeply [$res=$box->Select([map {$_->[0]} @$tuples],{want=>'arrayref'})], [$check], 'select all';
     # print $res->[0]->{f3}, "\n";
     # print $check->[0]->{f3}, "\n";
-    ok $res->[$_]->{f3}            eq $check->[$_]->{f3}, "utf8chk"                for 0..$#$tuples;
-    ok $res->[$_]->{LL}->[0]->{l2} eq $check->[$_]->{LL}->[0]->{l2}, "utf8chklong" for 0..$#$tuples;
+
+    ok $res->[$_]->{f3} eq $check->[$_]->{f3}, "utf8chk" for 0..$#$tuples;
+
+    @{$check->[$_]->{LL}} and ok $res->[$_]->{LL}->[0]->{l2} eq $check->[$_]->{LL}->[0]->{l2}, "utf8chklong" for 0..$#$tuples;
 
     is_deeply [$box->UpdateMulti($tuples->[2]->[0],[ $flds->[3] => set => $tuples->[2]->[3] ],{want_updated_tuple => 1})], [$check->[2]], 'update1';
     ok         $box->UpdateMulti($tuples->[2]->[0],[ $flds->[3] => set => $tuples->[2]->[3] ]), 'update2';
