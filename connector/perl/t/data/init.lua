@@ -1,3 +1,7 @@
+function tst_lua_test()
+    return 'test'
+end
+
 function tst_server_name()
     local tuple = box.select( 0, 0, box.pack('i', 1) )
     if tuple == nil then
