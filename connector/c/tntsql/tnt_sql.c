@@ -126,13 +126,20 @@ tnt_sql_keyval(struct tnt_sql *sql, struct tnt_tuple *tu, bool key, struct tnt_t
 	struct tnt_tk *v = NULL;
 	if (tnt_lex(sql->l, &v) == TNT_TK_ERROR)
 		return tnt_sql_error(sql, NULL, "%s", sql->l->error);
-	if (v->tk != TNT_TK_NUM && v->tk != TNT_TK_STRING)
-		return tnt_sql_error(sql, k, "expected NUM or STRING");
-	/* tuple field operation */
-	if (v->tk == TNT_TK_NUM)
-		tnt_tuple_add(tu, (char*)&TNT_TK_I(v), 4);
-	else
-		tnt_tuple_add(tu, (char*)TNT_TK_S(v)->data, TNT_TK_S(v)->size);
+	switch (v->tk) {
+	case TNT_TK_NUM32:
+		tnt_tuple_add(tu, (char*)&TNT_TK_I32(v), 4);
+		break;
+	case TNT_TK_NUM64:
+		tnt_tuple_add(tu, (char*)&TNT_TK_I64(v), 8);
+		break;
+	case TNT_TK_STRING:
+		tnt_tuple_add(tu, (char*)TNT_TK_S(v)->data,
+			      TNT_TK_S(v)->size);
+		break;
+	default:
+		return tnt_sql_error(sql, k, "expected NUM32 or NUM64 or STRING");
+	}
 	return true;
 }
 
@@ -149,9 +156,9 @@ tnt_sql_kv_select(struct tnt_sql *sql, struct tnt_tuple *tu, int32_t *index)
 	if (rc == false)
 		return false;
 	if (*index == -1)
-		*index = TNT_TK_I(key);
+		*index = TNT_TK_I32(key);
 	else
-	if (*index != TNT_TK_I(key))
+	if (*index != TNT_TK_I32(key))
 		return tnt_sql_error(sql, key,
 				     "select key values must refer to the same index");
 	return true;
@@ -178,7 +185,7 @@ tnt_sql_stmt_update(struct tnt_sql *sql, struct tnt_tuple *tu, struct tnt_stream
 		switch (tnt_lex(sql->l, &v)) {
 		/* k = k op v */
 		case TNT_TK_KEY:
-			if (TNT_TK_I(k) != TNT_TK_I(v)) {
+			if (TNT_TK_I32(k) != TNT_TK_I32(v)) {
 				tnt_sql_error(sql, k, "can't update on different keys");
 				goto error;
 			}
@@ -199,35 +206,39 @@ tnt_sql_stmt_update(struct tnt_sql *sql, struct tnt_tuple *tu, struct tnt_stream
 				tnt_sql_error(sql, k, "bad update operation");
 				goto error;
 			}
-			tnt_expect(tnt_sqltkv(sql, TNT_TK_NUM, &v));
-			tnt_update_arith(u, TNT_TK_I(k), ut, TNT_TK_I(v));
+			tnt_expect(tnt_sqltkv(sql, TNT_TK_NUM32, &v));
+			tnt_update_arith(u, TNT_TK_I32(k), ut, TNT_TK_I32(v));
 			break;
 		/* k = string */
 		case TNT_TK_STRING:
-			tnt_update_assign(u, TNT_TK_I(k), (char*)TNT_TK_S(v)->data,
+			tnt_update_assign(u, TNT_TK_I32(k), (char*)TNT_TK_S(v)->data,
 					  TNT_TK_S(v)->size);
 			break;
-		/* k = num */
-		case TNT_TK_NUM:
-			tnt_update_assign(u, TNT_TK_I(k), (char*)&TNT_TK_I(v), 4);
+		/* k = num32 */
+		case TNT_TK_NUM32:
+			tnt_update_assign(u, TNT_TK_I32(k), (char*)&TNT_TK_I32(v), 4);
+			break;
+		/* k = num64 */
+		case TNT_TK_NUM64:
+			tnt_update_assign(u, TNT_TK_I64(k), (char*)&TNT_TK_I64(v), 8);
 			break;
 		/* k = splice(k, a, b) */
 		case TNT_TK_SPLICE: {
 			struct tnt_tk *field, *off, *len, *list;
 			tnt_expect(tnt_sqltk(sql, '('));
 			tnt_expect(tnt_sqltkv(sql, TNT_TK_KEY, &field));
-			if (TNT_TK_I(k) != TNT_TK_I(field)) {
+			if (TNT_TK_I32(k) != TNT_TK_I32(field)) {
 				tnt_sql_error(sql, k, "can't update on different keys");
 				goto error;
 			}
 			tnt_expect(tnt_sqltk(sql, ','));
-			tnt_expect(tnt_sqltkv(sql, TNT_TK_NUM, &off));
+			tnt_expect(tnt_sqltkv(sql, TNT_TK_NUM32, &off));
 			tnt_expect(tnt_sqltk(sql, ','));
-			tnt_expect(tnt_sqltkv(sql, TNT_TK_NUM, &len));
+			tnt_expect(tnt_sqltkv(sql, TNT_TK_NUM32, &len));
 			tnt_expect(tnt_sqltk(sql, ','));
 			tnt_expect(tnt_sqltkv(sql, TNT_TK_STRING, &list));
 			tnt_expect(tnt_sqltk(sql, ')'));
-			tnt_update_splice(u, TNT_TK_I(k), TNT_TK_I(off), TNT_TK_I(len),
+			tnt_update_splice(u, TNT_TK_I32(k), TNT_TK_I32(off), TNT_TK_I32(len),
 					  (char*)TNT_TK_S(list)->data,
 					  TNT_TK_S(list)->size);
 			break;
@@ -246,7 +257,7 @@ tnt_sql_stmt_update(struct tnt_sql *sql, struct tnt_tuple *tu, struct tnt_stream
 	/* predicate */
 	tnt_expect(tnt_sql_kv(sql, tu, true));
 	tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
-	if (tnt_update(sql->s, TNT_TK_I(tn), 0, tu, u) == -1) {
+	if (tnt_update(sql->s, TNT_TK_I32(tn), 0, tu, u) == -1) {
 		tnt_sql_error(sql, tn, "update failed");
 		goto error;
 	}
@@ -293,7 +304,7 @@ tnt_sql_stmt(struct tnt_sql *sql)
 			flags = TNT_FLAG_REPLACE;
 		tnt_expect(tnt_sqltk(sql, ')'));
 		tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
-		if (tnt_insert(sql->s, TNT_TK_I(tn), flags, &tu) == -1) {
+		if (tnt_insert(sql->s, TNT_TK_I32(tn), flags, &tu) == -1) {
 			tnt_sql_error(sql, tk, "insert failed");
 			goto error;
 		}
@@ -311,7 +322,7 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		/* predicate */
 		tnt_expect(tnt_sql_kv(sql, &tu, true));
 		tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
-		if (tnt_delete(sql->s, TNT_TK_I(tn), 0, &tu) == -1) {
+		if (tnt_delete(sql->s, TNT_TK_I32(tn), 0, &tu) == -1) {
 			tnt_sql_error(sql, tk, "delete failed"); 
 			goto error;
 		}
@@ -342,13 +353,13 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		uint32_t limit = UINT32_MAX;
 		if (tnt_sqltry(sql, TNT_TK_LIMIT)) {
 			struct tnt_tk *ltk;
-			tnt_expect(tnt_sqltkv(sql, TNT_TK_NUM, &ltk));
-			limit = TNT_TK_I(ltk);
+			tnt_expect(tnt_sqltkv(sql, TNT_TK_NUM32, &ltk));
+			limit = TNT_TK_I32(ltk);
 		} else
 		if (sql->error)
 			goto error;
 		tnt_expect(tnt_sqltk(sql, TNT_TK_EOF));
-		if (tnt_select(sql->s, TNT_TK_I(tn), index, 0, limit, &tuples) == -1) {
+		if (tnt_select(sql->s, TNT_TK_I32(tn), index, 0, limit, &tuples) == -1) {
 			tnt_sql_error(sql, tk, "select failed");
 			goto error;
 		}

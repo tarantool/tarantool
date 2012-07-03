@@ -29,6 +29,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
@@ -792,13 +793,22 @@ static void tt_tnt_lex_ws(struct tt_test *test) {
 
 /* lex integer */
 static void tt_tnt_lex_int(struct tt_test *test) {
-	unsigned char sz[] = "\f\r\n 123 34\n\t\r56";
+	unsigned char sz[] = "\f\r\n 123 34\n\t\r56 888L56 2147483646 2147483647 "
+		             "-2147483648 -2147483649 72057594037927935";
 	struct tnt_lex l;
 	tnt_lex_init(&l, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM && TNT_TK_I(tk) == 123);
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM && TNT_TK_I(tk) == 34);
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM && TNT_TK_I(tk) == 56);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 123);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 34);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 56);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM64 && TNT_TK_I64(tk) == 888);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 56);
+
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == INT_MAX - 1);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM64 && TNT_TK_I64(tk) == INT_MAX);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == INT_MIN);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM64 && TNT_TK_I64(tk) == INT_MIN - 1LL);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM64 && TNT_TK_I64(tk) == 72057594037927935LL);
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_EOF);
 	tnt_lex_free(&l);
 }
@@ -809,14 +819,14 @@ static void tt_tnt_lex_punct(struct tt_test *test) {
 	struct tnt_lex l;
 	tnt_lex_init(&l, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM && TNT_TK_I(tk) == 123);
-	TT_ASSERT(tnt_lex(&l, &tk) == ',' && TNT_TK_I(tk) == ',');
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM && TNT_TK_I(tk) == 34);
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM && TNT_TK_I(tk) == -10);
-	TT_ASSERT(tnt_lex(&l, &tk) == ':' && TNT_TK_I(tk) == ':');
-	TT_ASSERT(tnt_lex(&l, &tk) == '('&& TNT_TK_I(tk) == '(');
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM && TNT_TK_I(tk) == 56);
-	TT_ASSERT(tnt_lex(&l, &tk) == ')' && TNT_TK_I(tk) == ')');
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 123);
+	TT_ASSERT(tnt_lex(&l, &tk) == ',' && TNT_TK_I32(tk) == ',');
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 34);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == -10);
+	TT_ASSERT(tnt_lex(&l, &tk) == ':' && TNT_TK_I32(tk) == ':');
+	TT_ASSERT(tnt_lex(&l, &tk) == '('&& TNT_TK_I32(tk) == '(');
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 56);
+	TT_ASSERT(tnt_lex(&l, &tk) == ')' && TNT_TK_I32(tk) == ')');
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_EOF);
 	tnt_lex_free(&l);
 }
@@ -874,13 +884,13 @@ static void tt_tnt_lex_kt(struct tt_test *test) {
 	struct tnt_lex l;
 	tnt_lex_init(&l, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I(tk) == 0);
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I(tk) == 20);
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_TABLE && TNT_TK_I(tk) == 0);
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I(tk) == 1000);
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_TABLE && TNT_TK_I(tk) == 55);
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I(tk) == 1);
-	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_TABLE && TNT_TK_I(tk) == 8);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I32(tk) == 0);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I32(tk) == 20);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_TABLE && TNT_TK_I32(tk) == 0);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I32(tk) == 1000);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_TABLE && TNT_TK_I32(tk) == 55);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I32(tk) == 1);
+	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_TABLE && TNT_TK_I32(tk) == 8);
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_EOF);
 	tnt_lex_free(&l);
 }
@@ -908,22 +918,22 @@ static void tt_tnt_lex_stack(struct tt_test *test) {
 	struct tnt_lex l;
 	tnt_lex_init(&l, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk1, *tk2, *tk3, *tk4, *tk5, *tk6;
-	TT_ASSERT(tnt_lex(&l, &tk1) == TNT_TK_NUM);
+	TT_ASSERT(tnt_lex(&l, &tk1) == TNT_TK_NUM32);
 	TT_ASSERT(tnt_lex(&l, &tk2) == TNT_TK_STRING);
 	TT_ASSERT(tnt_lex(&l, &tk3) == ',');
 	TT_ASSERT(tnt_lex(&l, &tk4) == '.');
-	TT_ASSERT(tnt_lex(&l, &tk5) == TNT_TK_NUM);
+	TT_ASSERT(tnt_lex(&l, &tk5) == TNT_TK_NUM32);
 	TT_ASSERT(tnt_lex(&l, &tk6) == TNT_TK_EOF);
 	tnt_lex_push(&l, tk5);
 	tnt_lex_push(&l, tk4);
 	tnt_lex_push(&l, tk3);
 	tnt_lex_push(&l, tk2);
 	tnt_lex_push(&l, tk1);
-	TT_ASSERT(tnt_lex(&l, &tk1) == TNT_TK_NUM);
+	TT_ASSERT(tnt_lex(&l, &tk1) == TNT_TK_NUM32);
 	TT_ASSERT(tnt_lex(&l, &tk2) == TNT_TK_STRING);
 	TT_ASSERT(tnt_lex(&l, &tk3) == ',');
 	TT_ASSERT(tnt_lex(&l, &tk4) == '.');
-	TT_ASSERT(tnt_lex(&l, &tk5) == TNT_TK_NUM);
+	TT_ASSERT(tnt_lex(&l, &tk5) == TNT_TK_NUM32);
 	TT_ASSERT(tnt_lex(&l, &tk6) == TNT_TK_EOF);
 	tnt_lex_free(&l);
 }
