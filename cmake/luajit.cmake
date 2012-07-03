@@ -170,9 +170,10 @@ macro(luajit_build)
             DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt ${PROJECT_BINARY_DIR}/third_party/luajit
         )
     endif()
-    add_custom_target(libluajit ALL
+    add_custom_target(libluajit
         DEPENDS ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
     )
+    add_dependencies(build_bundled_libs libluajit)
     unset (luajit_buildoptions)
 endmacro()
 

@@ -31,6 +31,7 @@ macro(libobjc_build)
     add_custom_target(libobjc ALL
         DEPENDS ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a
     )
+    add_dependencies(build_bundled_libs libobjc)
     unset (extra_cflags)
     unset (extra_ldlags)
 endmacro()

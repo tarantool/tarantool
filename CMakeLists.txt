@@ -44,6 +44,14 @@ endif()
 include(cmake/arch.cmake)
 include(cmake/os.cmake)
 include(cmake/compiler.cmake)
+# 
+# Since we *optionally* build bundled libs, a direct build
+# dependency between tarantool_box and libluajit/libobjc won't
+# wor: dadd an empty custom target for this dependency instead.
+# If a bundled objc or luajit is built, it is added to the
+# dependency list of build_bundled_libs target.
+#
+add_custom_target(build_bundled_libs)
 include(cmake/libobjc.cmake)
 include(cmake/luajit.cmake)
 

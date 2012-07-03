@@ -15,7 +15,7 @@ function(tarantool_module mod)
     add_library(lt${mod} STATIC ${recompiled_sources})
     set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
         "${core_cflags} ${GCOV_C_FLAGS} -DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
-    add_dependencies(lt${mod} generate_headers generate_admin_m)
+    add_dependencies(lt${mod} generate_headers generate_admin_m build_bundled_libs)
 
     target_link_libraries(tarantool_${mod} lt${mod} ${GCOV_LDFLAGS} ${common_libraries})
     set_target_properties(tarantool_${mod} PROPERTIES COMPILE_FLAGS

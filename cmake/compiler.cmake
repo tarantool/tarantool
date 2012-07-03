@@ -68,6 +68,12 @@ if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 #
+# GCC started to warn for unused result starting from 4.2, and
+# this is when it introduced -Wno-unused-result
+# GCC can also be built on top of llvm runtime (on mac).
+#
+check_c_compiler_flag("-Wno-unused-result" CC_HAS_WNO_UNUSED_RESULT)
+#
 # Tarantool code is written in GNU C dialect.
 # Additionally, compile it with more strict flags than the rest
 # of the code.
@@ -77,7 +83,7 @@ set (core_cflags "${core_cflags} -Wno-strict-aliasing")
 set (core_cflags "${core_cflags} -std=gnu99")
 if(CMAKE_COMPILER_IS_GNUCC)
     set (core_cflags "${core_cflags} -Wall -Wextra")
-elseif(CMAKE_COMPILER_IS_CLANG)
+elseif(CMAKE_COMPILER_IS_CLANG AND CC_HAS_WNO_UNUSED_RESULT)
     set (core_cflags "${core_cflags} -Wno-unused-result")
 endif()
 
