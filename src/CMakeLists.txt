@@ -94,14 +94,9 @@ if (ENABLE_STATIC)
     set (THREAD_LIB -Wl,--whole-archive pthread -Wl,--no-whole-archive)
 endif()
 
-set (LIBOBJC_LIB "${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a")
 set (common_libraries ${common_libraries} ${LUAJIT_LIB} ${LIBOBJC_LIB} ${THREAD_LIB})
 
-if (TARGET_OS_LINUX)
-    set (common_libraries ${common_libraries} dl)
-endif()
-
-if (TARGET_OS_DEBIAN_FREEBSD)
+if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
     set (common_libraries ${common_libraries} dl)
 endif()
 
