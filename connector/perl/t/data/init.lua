@@ -3,6 +3,33 @@ function tst_lua_test()
 end
 
 
+function tst_pending_server_name()
+    local tuple = box.select( 0, 0, box.pack('i', 151274) )
+    if tuple == nil then
+        return { 'unknown' }
+    else
+        return { tuple[1] }
+    end
+end
+
+function tst_pending_server_pause()
+    local sname = tst_pending_server_name()
+    
+    if sname[1] == 'box1' then
+        box.fiber.sleep(.1)
+        return sname
+    end
+
+    if sname[1] == 'box2' then
+        box.fiber.sleep(1)
+        return sname
+    end
+
+    return sname
+end
+
+
+
 function tst_server_name()
     local tuple = box.select( 0, 0, box.pack('i', 1) )
     if tuple == nil then
