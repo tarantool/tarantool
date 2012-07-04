@@ -73,6 +73,10 @@ endif()
 # GCC can also be built on top of llvm runtime (on mac).
 #
 check_c_compiler_flag("-Wno-unused-result" CC_HAS_WNO_UNUSED_RESULT)
+check_c_compiler_flag("-Wno-unused-value" CC_HAS_WNO_UNUSED_VALUE)
+check_c_compiler_flag("-Wno-bitwise-op-parentheses"
+CC_HAS_WNO_WNO_BITWISE_OP_PARENTHESES)
+
 #
 # Tarantool code is written in GNU C dialect.
 # Additionally, compile it with more strict flags than the rest
@@ -86,7 +90,6 @@ if(CMAKE_COMPILER_IS_GNUCC)
 elseif(CMAKE_COMPILER_IS_CLANG AND CC_HAS_WNO_UNUSED_RESULT)
     set (core_cflags "${core_cflags} -Wno-unused-result")
 endif()
-
 
 # Only add -Werror if it's a debug build, done by developers.
 # Community builds should not cause extra trouble.
