@@ -200,7 +200,7 @@ sub send {
             next unless $pend->is_timeout;
 
             # don't repead request that have secondary retry
-            next if $pend->_has_onsecondary_retry and $pend->try;
+            next if $pend->_has_second_retry_delay and $pend->try;
 
             my $cont = $self->runcatch($pend->onretry,
                 ($pend->id, $pend, $self));
@@ -227,9 +227,9 @@ sub _check_if_second_restart {
     my ($self, $pend) = @_;
 
     return unless $pend->is_pending;
-    return unless $pend->_has_onsecondary_retry;
+    return unless $pend->_has_second_retry_delay;
     return unless $pend->is_secondarytimeout;
-    return if $pend->is_second_pend;
+    return if $pend->is_second;
 
 
     my $id = $pend->id;
@@ -245,9 +245,9 @@ sub _check_if_second_restart {
         timeout         => $pend->timeout,
         retry_delay     => $pend->retry_delay,
         retry           => $pend->retry,
-        is_second_pend  => 1,
+        is_second       => 1,
 
-        onretry         => $pend->onsecondary_retry,
+        onretry         => $pend->onretry,
         _time           => $pend->_time,
         onok            => sub {
 
@@ -333,7 +333,7 @@ sub recv {
             }
         } elsif (vec($ein, $fileno, 1)) {
             $pend->close("connection reset (".$pend->last_error.")");
-        } elsif ($pend->_has_onsecondary_retry) {
+        } elsif ($pend->_has_second_retry_delay) {
             $self->_check_if_second_restart( $pend );
         } elsif ($pend->is_timeout) {
             $pend->close("timeout (".$pend->last_error.")");
@@ -448,13 +448,13 @@ has id => (
 );
 
 
-has is_second_pend => (
+has is_second => (
     is          => 'ro',
     isa         => 'Bool',
     default     => 0,
 );
 
-=head2 onok onerror onretry onsecondary_retry
+=head2 onok onerror onretry
 
 functions that are called on different stages
 
@@ -469,13 +469,6 @@ has $_ => (
     writer    => "_set_$_",
     required  => 1,
 ) for qw/onok onerror onretry/;
-
-has $_ => (
-    is        => 'ro',
-    isa       => 'CodeRef',
-    predicate => "_has_$_",
-    clearer   => '_clear__onsecondary_retry',
-) for qw{onsecondary_retry};
 
 has $_ => (
     is        => 'rw',
@@ -543,9 +536,9 @@ has try => (
 );
 
 has second_retry_delay => (
-    is      => 'ro',
-    isa     => 'Num',
-    default => .1,
+    is          => 'ro',
+    isa         => 'Num',
+    predicate   => '_has_second_retry_delay',
 );
 
 # has bornat => (
@@ -587,10 +580,10 @@ sub is_timeout {
 
     if ($self->is_pending) {
         # second pends is never timeout
-        return 0 if $self->is_second_pend;
+        return 0 if $self->is_second;
 
         # if pend has second_retry it is never timeout
-        return 0 if $self->_has_onsecondary_retry;
+        return 0 if $self->_has_second_retry_delay;
 
         $timeout ||= $self->timeout;
     } else {

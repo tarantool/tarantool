@@ -15,7 +15,7 @@ use lib "$Bin/../lib";
 
 use Carp qw/confess/;
 
-use Test::More tests => 59;
+use Test::More tests => 61;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
@@ -205,7 +205,8 @@ my $started = time;
 my @done;
 
 $ontry = sub {
-    my ($i) = @_;
+    my ($i, $pend) = @_;
+    $i = 0 if $pend->is_second;
     return $box[$i]->Call(
         tst_pending_server_pause => [],
         {
@@ -243,16 +244,6 @@ cmp_ok $done[1], '<', 1.1, 'first server response time less than 1.1 seconds';
 cmp_ok $done[1], '>', 1, 'first server response time more than 1 seconds';
 
 
-my $onsecondary_retry = sub {
-    my ($i) = @_;
-    return $box[0]->Call(
-        tst_pending_server_pause => [],
-        {
-            return_fh       => 1,
-            unpack_format   => '$'
-        }
-    );
-};
 
 
 note '** check onsecondary_retry';
@@ -297,11 +288,10 @@ for ( 1 .. 2) {
                     },
                     onerror             => $onerror,
                     onretry             => $ontry,
-                    onsecondary_retry   => $onsecondary_retry,
                     timeout             => 0.9,
                     second_retry_delay  => 0.4,
-                    retry_delay  => 0.4,
-                    retry        => 3,
+                    retry_delay         => 0.4,
+                    retry               => 3,
                 ),
             ]
         )->work;
@@ -315,23 +305,13 @@ for ( 1 .. 2) {
 }
 
 
-$ontry = sub {
-    my ($i) = @_;
-    return $box[$i]->Call(
-        tst_pending_server_pause => [ 1 ],
-        {
-            return_fh       => 1,
-            unpack_format   => '$'
-        }
-    );
-};
-
-
 my $onsecondary_retry_touched = 0;
-$onsecondary_retry = sub {
-    $onsecondary_retry_touched++;
-    return $box->Call(
-        tst_pending_server_pause => [ 3 ],
+$ontry = sub {
+    my ($i, $pend) = @_;
+    $i = 0 if $pend->is_second;
+    $onsecondary_retry_touched++ if $pend->is_second;
+    return $box[$i]->Call(
+        tst_pending_server_pause => [ $pend->is_second ? 3 : 1 ],
         {
             return_fh       => 1,
             unpack_format   => '$'
@@ -384,21 +364,23 @@ my @res = ([], []);
                 },
                 onerror             => $onerror,
                 onretry             => $ontry,
-                onsecondary_retry   => $onsecondary_retry,
                 timeout             => 3,
                 second_retry_delay  => 0.1,
-                retry_delay  => 0.4,
-                retry        => 3,
+                retry_delay         => 0.4,
+                retry               => 3,
             ),
         ]
     );
     $pd->work;
     is scalar @{ $res[0] }, 1, 'first callback was touched once';
     is scalar @{ $res[1] }, 1, 'second callback was touched once';
-    is $res[0][0]{box}, 'box1', 'it was a box1';
-    is $res[1][0]{box}, 'box2', 'it was a box2';
-    cmp_ok time - $started, '<', 2, 'Both requests got less than 2 second';
+    is $res[0][0]{box}, 'box1', 'first replay was from box1';
+    cmp_ok $res[0][0]{time}, '>=', 1, 'first replay took more than 1 second';
+    cmp_ok $res[1][0]{time}, '>=', 1, 'second replay took more than 1 second';
+    is $res[1][0]{box}, 'box2', 'second replay was from box2';
+    cmp_ok time - $started, '<', 1.1, 'Both requests got less than 1.1 second';
     is $onsecondary_retry_touched, 1, 'onsecondary_retry touched once';
+
 }
 
 cmp_ok time - $started, '>', 3, 'Destructor waited for longer request';
