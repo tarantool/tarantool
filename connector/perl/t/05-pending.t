@@ -15,7 +15,7 @@ use lib "$Bin/../lib";
 
 use Carp qw/confess/;
 
-use Test::More tests => 50;
+use Test::More tests => 59;
 use Test::Exception;
 
 use List::MoreUtils qw/zip/;
@@ -308,9 +308,98 @@ for ( 1 .. 2) {
 
     }
 
-    is scalar @res, 2, 'count of results';
     is scalar @{ $res[0] }, 1, 'first callback was touched once';
     is scalar @{ $res[1] }, 1, 'second callback was touched once';
     is $res[0][0]{box}, $res[1][0]{box}, 'both requests were done by one box';
     is $res[0][0]{box}, 'box1', 'it was a box1';
 }
+
+
+$ontry = sub {
+    my ($i) = @_;
+    return $box[$i]->Call(
+        tst_pending_server_pause => [ 1 ],
+        {
+            return_fh       => 1,
+            unpack_format   => '$'
+        }
+    );
+};
+
+
+my $onsecondary_retry_touched = 0;
+$onsecondary_retry = sub {
+    $onsecondary_retry_touched++;
+    return $box->Call(
+        tst_pending_server_pause => [ 3 ],
+        {
+            return_fh       => 1,
+            unpack_format   => '$'
+        }
+    );
+};
+
+
+$started = time;
+$box->Call(tst_pending_server_pause => [ .3 ], { unpack_format => '$' });
+cmp_ok time - $started, '>=', .3, 'tst_pending_server_pause(.3)';
+cmp_ok time - $started, '<', .4, 'tst_pending_server_pause(.3)';
+
+note "** another test";
+$started = time;
+my @res = ([], []);
+{
+    my $pd = MR::Pending->new(
+        name                => "PENDINGTEST",
+        maxtime             => 1.5,
+        itertime            => 0.01,
+        pending  => [
+            MR::Pending::Item->new(
+                id           => 0,
+                onok         => sub {
+                    like $_[0], qr{^\d+$},
+                        "first request is done id: $_[0]";
+                    push @{ $res[ $_[0] ] } => {
+                        box     => $_[1][0][0][0],
+                        time    => time - $started
+                    };
+                    return 1;
+                },
+                onerror      => $onerror,
+                onretry      => $ontry,
+                timeout      => 3,
+                retry_delay  => 0.4,
+                retry        => 3,
+            ),
+            MR::Pending::Item->new(
+                id                  => 1,
+                onok                => sub {
+                    like $_[0], qr{^\d+$},
+                        "second request is done id: $_[0]";
+                    push @{ $res[ $_[0] ] } => {
+                        box     => $_[1][0][0][0],
+                        time    => time - $started
+                    };
+                    return 1;
+                },
+                onerror             => $onerror,
+                onretry             => $ontry,
+                onsecondary_retry   => $onsecondary_retry,
+                timeout             => 3,
+                second_retry_delay  => 0.1,
+                retry_delay  => 0.4,
+                retry        => 3,
+            ),
+        ]
+    );
+    $pd->work;
+    is scalar @{ $res[0] }, 1, 'first callback was touched once';
+    is scalar @{ $res[1] }, 1, 'second callback was touched once';
+    is $res[0][0]{box}, 'box1', 'it was a box1';
+    is $res[1][0]{box}, 'box2', 'it was a box2';
+    cmp_ok time - $started, '<', 2, 'Both requests got less than 2 second';
+    is $onsecondary_retry_touched, 1, 'onsecondary_retry touched once';
+}
+
+cmp_ok time - $started, '>', 3, 'Destructor waited for longer request';
+

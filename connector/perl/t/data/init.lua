@@ -12,17 +12,22 @@ function tst_pending_server_name()
     end
 end
 
-function tst_pending_server_pause()
+function tst_pending_server_pause(delay)
     local sname = tst_pending_server_name()
-    
-    if sname[1] == 'box1' then
-        box.fiber.sleep(.1)
-        return sname
-    end
 
-    if sname[1] == 'box2' then
-        box.fiber.sleep(1)
-        return sname
+    if delay == nil then
+    
+        if sname[1] == 'box1' then
+            box.fiber.sleep(.1)
+            return sname
+        end
+
+        if sname[1] == 'box2' then
+            box.fiber.sleep(1)
+            return sname
+        end
+    else
+        box.fiber.sleep(delay)
     end
 
     return sname
