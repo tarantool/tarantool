@@ -980,7 +980,7 @@ tree_iterator_free(struct iterator *iterator)
 {
 	u32 n_tuples = [pk size];
 	u32 estimated_tuples = n_tuples * 1.2;
-	int node_size = [self node_size];
+	size_t node_size = [self node_size];
 
 	void *nodes = NULL;
 	if (n_tuples) {
