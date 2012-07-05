@@ -940,6 +940,7 @@ do_update_ops(struct update_cmd *cmd, struct tuple *new_tuple)
 {
 	size_t sz = class_getInstanceSize(self);
 	id new = palloca(fiber->gc_pool, sz, sizeof(void *));
+	memset(new, 0, sz);
 	object_setClass(new, self);
 	return new;
 }
