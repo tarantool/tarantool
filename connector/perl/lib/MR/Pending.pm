@@ -56,20 +56,6 @@ has itertime => (
 );
 
 
-=head2 secondary_itertime
-
-Module will do secondary requests (L<onsecondary_retry>) if the first request
-have no data after te timeout.
-
-=cut
-
-has secondary_itertime => (
-    is        => 'rw',
-    isa       => 'Num',
-    predicate => '_has_secondary_itertime',
-    default   => 0.01,
-);
-
 
 =head2 name
 
@@ -102,6 +88,11 @@ has _pending => (
     default   => sub { {} },
 );
 
+has _ignoring => (
+    is        => 'ro',
+    isa       => 'HashRef[MR::Pending::Item]',
+    default   => sub { {} }
+);
 
 =head2 exceptions
 
@@ -126,6 +117,14 @@ has _waitresult => (
     isa  => 'ArrayRef',
 );
 
+
+has _started_time => (
+    is  => 'rw',
+    isa => 'Num',
+    builder => sub { time },
+    lazy    => 1,
+    clearer => '_clear__started_time'
+);
 
 =head1 METHODS
 
@@ -196,16 +195,84 @@ sub send {
     my $pending = $self->_pending;
     foreach my $shard ( grep { $pending->{$_}->is_sleeping } keys %$pending ) {
         my $pend = $pending->{$shard};
-        if ($pend->try < $pend->retry) {
+
+        if ($pend->try < $pend->retry or !$pend->try) {
             next unless $pend->is_timeout;
-            my $cont = $self->runcatch($pend->onretry, ($pend->id, $pend, $self));
+
+            # don't repead request that have secondary retry
+            next if $pend->_has_second_retry_delay and $pend->try;
+
+            my $cont = $self->runcatch($pend->onretry,
+                ($pend->id, $pend, $self));
             $pend->set_pending_mode($cont);
+
         } else {
+
             delete $pending->{$shard};
-            $self->runcatch($pend->onerror, ($pend->id, "no success after @{[$pend->try]} retries", $pend, $self));
+            $self->runcatch($pend->onerror,
+                (
+                    $pend->id,
+                    "no success after @{[$pend->try]} retries",
+                    $pend,
+                    $self
+                )
+            );
         }
     }
     return $self;
+}
+
+
+sub _check_if_second_restart {
+    my ($self, $pend) = @_;
+
+    return unless $pend->is_pending;
+    return unless $pend->_has_second_retry_delay;
+    return unless $pend->is_secondarytimeout;
+    return if $pend->is_second;
+
+
+    my $id = $pend->id;
+    my $new_id = "$id:second_retry";
+    return if exists  $self->_pending->{$new_id};
+
+    my $orig_onerror    = $pend->onerror;
+    my $orig_onok       = $pend->onok;
+
+    my $new_pend = $self->_pending->{ $new_id } = ref($pend)->new(
+        id              => $new_id,
+        try             => 0,
+        timeout         => $pend->timeout,
+        retry_delay     => $pend->retry_delay,
+        retry           => $pend->retry,
+        is_second       => 1,
+
+        onretry         => $pend->onretry,
+        _time           => $pend->_time,
+        onok            => sub {
+
+#             warn "second pending is done ------- $_[0]";
+            splice @_, 0, 1, $id;
+
+            $pend->_set_onok(sub { 1 }),
+            $pend->_set_onerror(sub { 1 }),
+            $self->_ignoring->{ $id } = delete $self->_pending->{ $id };
+            &$orig_onok
+        },
+        onerror => $pend->onerror
+    );
+
+#     warn ">>>>>>>>> started new pending: " . $new_pend->id;
+
+    $pend->_set_onok(sub {
+#         warn "first pending is done ($new_id) ------- $_[0]";
+        $new_pend->_set_onok(sub { 1 });
+        $new_pend->_set_onerror(sub { 1 });
+        $self->_ignoring->{ $new_id } = delete $self->_pending->{ $new_id };
+        &$orig_onok;
+    });
+
+    return 1;
 }
 
 sub wait {
@@ -229,6 +296,10 @@ sub wait {
 
     if ($n == 0) {
         $self->runcatch($self->onidle, ($self)) if $self->_has_onidle;
+
+        for my $pend (grep { $_->is_pending } values %$pending) {
+            $self->_check_if_second_restart( $pend );
+        }
         return 0;
     }
 
@@ -241,12 +312,15 @@ sub recv {
     my ($rin, $ein) = @{$self->_waitresult};
 
     for my $shard (grep { $pending->{$_}->is_pending } keys %$pending) {
+        next unless exists $pending->{$shard};
         my $pend = $pending->{$shard};
         my $fileno = $pend->fileno;
         if (vec($rin, $fileno, 1)) {
             if (my $list = $pend->continue) {
                 if (ref $list) {
-                    if(defined(my $okay = $self->runcatch($pend->onok, ($pend->id, $list, $pend, $self)))) {
+                    if(defined(my $okay =
+                            $self->runcatch($pend->onok,
+                                ($pend->id, $list, $pend, $self)))) {
                         if($okay) {
                             delete $pending->{$shard};
                         } else {
@@ -259,6 +333,8 @@ sub recv {
             }
         } elsif (vec($ein, $fileno, 1)) {
             $pend->close("connection reset (".$pend->last_error.")");
+        } elsif ($pend->_has_second_retry_delay) {
+            $self->_check_if_second_restart( $pend );
         } elsif ($pend->is_timeout) {
             $pend->close("timeout (".$pend->last_error.")");
         }
@@ -281,6 +357,7 @@ sub finish {
 
 sub iter {
     my ($self) = @_;
+
 
     $self->send or return;
     return if $self->exceptions;
@@ -307,9 +384,10 @@ sub work {
     my ($self) = @_;
 
     my $pending = $self->_pending;
-    my $time0 = time;
 
-    while(%$pending and time() - $time0 <= $self->maxtime) {
+    $self->_clear__started_time;
+
+    while(%$pending and time() - $self->_started_time <= $self->maxtime) {
         last unless $self->iter;
     }
     $self->finish;
@@ -326,6 +404,15 @@ sub check_exceptions {
     die $str if $raise;
     warn $str if defined $raise;
     return $str;
+}
+
+sub DEMOLISH {
+    my ($self) = @_;
+    for my $pend (values %{ $self->_ignoring }) {
+        next unless $pend->is_pending;
+#         warn "waiting for pending(id=@{[$pend->id]}) is done";
+        $pend->continue;
+    }
 }
 
 no Mouse;
@@ -361,25 +448,27 @@ has id => (
 );
 
 
-=head2 onok onerror onretry onsecondary_retry
+has is_second => (
+    is          => 'ro',
+    isa         => 'Bool',
+    default     => 0,
+);
+
+=head2 onok onerror onretry
 
 functions that are called on different stages
 
 =cut
 
-has $_ => (
-    is        => 'ro',
-    isa       => 'CodeRef',
-    predicate => "_has_$_",
-    required  => 1,
-) for qw/onok onerror onretry/;
+
 
 has $_ => (
     is        => 'ro',
     isa       => 'CodeRef',
     predicate => "_has_$_",
-    default   => sub { sub {} },
-) for qw{onsecondary_retry};
+    writer    => "_set_$_",
+    required  => 1,
+) for qw/onok onerror onretry/;
 
 has $_ => (
     is        => 'rw',
@@ -446,6 +535,12 @@ has try => (
     writer   => '_set_try',
 );
 
+has second_retry_delay => (
+    is          => 'ro',
+    isa         => 'Num',
+    predicate   => '_has_second_retry_delay',
+);
+
 # has bornat => (
 #     is       => 'ro',
 #     isa      => 'Str',
@@ -482,8 +577,25 @@ sub set_sleeping_mode {
 
 sub is_timeout {
     my ($self, $timeout) = @_;
-    $timeout ||= $self->is_pending ? $self->timeout : $self->retry_delay;
+
+    if ($self->is_pending) {
+        # second pends is never timeout
+        return 0 if $self->is_second;
+
+        # if pend has second_retry it is never timeout
+        return 0 if $self->_has_second_retry_delay;
+
+        $timeout ||= $self->timeout;
+    } else {
+        $timeout ||= $self->retry_delay;
+    }
     return time() - $self->_time > $timeout;
+}
+
+sub is_secondarytimeout {
+    my ($self, $timeout) = @_;
+    $timeout ||= $self->second_retry_delay;
+    return time - $self->_time > $timeout;
 }
 
 sub continue {
