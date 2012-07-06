@@ -3,7 +3,12 @@
 #
 macro(libobjc_build)
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        set (extra_cflags "${CC_DEBUG_OPT} -O0 -fno-inline")
+        set (extra_cflags "${CC_DEBUG_OPT} -O0")
+        if (CMAKE_COMPILER_IS_GNUCC)
+            set (extra_cflags "${extra_cflags} -fgnu89-inline")
+        else()
+            set (extra_cflags "${extra_cflags} -fno-inline")
+        endif()
         set (extra_ldflags "")
     else ()
         set (extra_cflags "-O3")
