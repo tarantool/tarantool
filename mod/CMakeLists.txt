@@ -24,6 +24,7 @@ function(tarantool_module mod)
     if (ENABLE_STATIC)
         set_target_properties(tarantool_${mod} PROPERTIES
             LINK_SEARCH_END_STATIC ON)
+        set (module_link_flags "${module_link_flags} -static")
     endif()
 
     if (module_link_flags)
