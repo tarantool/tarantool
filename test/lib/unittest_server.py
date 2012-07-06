@@ -26,6 +26,13 @@ class UnittestServer(Server):
                 sys.stdout.write(line)
 
         self.run_test = run_test
+        if not os.access(self.vardir, os.F_OK):
+            if (self.mem == True and check_tmpfs_exists() and
+                os.path.basename(self.vardir) == self.vardir):
+                create_tmpfs_vardir(self.vardir)
+            else:
+                os.makedirs(self.vardir)
+
 
     def start(self):
         pass

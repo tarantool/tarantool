@@ -9,7 +9,10 @@ macro(libobjc_build)
         set (extra_cflags "-O3")
         if (CC_HAS_WNO_UNUSED_RESULT)
             set (extra_cflags "${extra_cflags} -Wno-unused-result")
-       endif()
+        endif()
+        if (CMAKE_C_COMPILER_IS_GNUSS)
+                set (extra_cflags "${extra_cflags} -fgnu89-inline")
+        endif()
         set (extra_ldflags "-s")
     endif()
     if (${TARGET_OS_LINUX})
@@ -28,7 +31,7 @@ macro(libobjc_build)
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/libobjc
         COMMAND $(MAKE) clean
-        COMMAND $(MAKE) EXTRA_CFLAGS=""${extra_cflags}"" EXTRA_LDFLAGS=""${extra_ldflags}""
+        COMMAND $(MAKE) CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} EXTRA_CFLAGS=""${extra_cflags}"" EXTRA_LDFLAGS=""${extra_ldflags}""
         DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt
     )
     add_custom_target(libobjc ALL
