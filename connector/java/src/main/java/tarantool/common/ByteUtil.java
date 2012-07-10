@@ -72,6 +72,15 @@ public class ByteUtil {
         bytes[0] = (byte) ((value) & 0xFF);
         return bytes;
     }
+    
+    public static byte[] toBytes(int value) {
+        byte[] bytes = new byte[LENGTH_LONG];
+        bytes[3] = (byte) ((value >>> 24) & 0xFF);
+        bytes[2] = (byte) ((value >>> 16) & 0xFF);
+        bytes[1] = (byte) ((value >>>  8) & 0xFF);
+        bytes[0] = (byte) ((value) & 0xFF);
+        return bytes;
+    }
 
     public static long toLong(byte[] bytes) {
         return ((long)(bytes[7] & 0xFF) << 56) |
@@ -82,6 +91,13 @@ public class ByteUtil {
                ((long)(bytes[2] & 0xFF) << 16) |
                ((long)(bytes[1] & 0xFF) << 8)  |
                ((long)(bytes[0] & 0xFF));
+    }
+    
+    public static int toInt(byte[] bytes) {
+        return ((int)(bytes[3] & 0xFF) << 24) |
+               ((int)(bytes[2] & 0xFF) << 16) |
+               ((int)(bytes[1] & 0xFF) << 8)  |
+               ((int)(bytes[0] & 0xFF));
     }
 
     public static int writeBytes(byte[] bytes, int position, byte[] value, int start, int length) {
@@ -121,7 +137,7 @@ public class ByteUtil {
         }
         return 5;
     }
-
+    
     public static int decodeLengthInVar32Int(byte[] in, int offset) {
         if ((in[offset] & 0x80) == 0) {
             return (in[offset] & 0x7F);
@@ -156,7 +172,7 @@ public class ByteUtil {
      * Encodes the length.
      *
      * @param out    an <code>byte[]</code> to which the length is encoded.
-     * @param offset positoin in out where start to write length
+     * @param offset position in out where start to write length
      * @param length the length of the object
      */
     public static int encodeLengthInVar32Int(byte[] out, int offset, int length) {
