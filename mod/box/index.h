@@ -76,7 +76,15 @@ struct key_def {
 	bool is_unique;
 };
 
+/** Descriptor of index features. */
+struct index_traits
+{
+	bool allows_partial_key;
+};
+
 @interface Index: tnt_Object {
+	/* Index features. */
+	struct index_traits *traits;
  @public
 	/* Index owner space */
 	struct space *space;
@@ -89,6 +97,10 @@ struct key_def {
 	struct iterator *position;
 };
 
+/**
+ * Get index traits.
+ */
++ (struct index_traits *) traits;
 /**
  * Allocate index instance.
  *
@@ -129,10 +141,6 @@ struct key_def {
 - (void) initIteratorByKey: (struct iterator *) iterator
 			:(enum iterator_type) type
 			:(void *) key :(int) part_count;
-/**
- * Check key part count.
- */
-- (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed;
 /**
  * Unsafe search methods that do not check key part count.
  */

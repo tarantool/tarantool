@@ -32,6 +32,14 @@
 #include "space.h"
 #include "assoc.h"
 
+static struct index_traits index_traits = {
+	.allows_partial_key = true,
+};
+
+static struct index_traits hash_index_traits = {
+	.allows_partial_key = false,
+};
+
 const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
 const char *index_type_strs[] = { "HASH", "TREE", "\0" };
 
@@ -46,6 +54,18 @@ iterator_first_equal(struct iterator *it)
 {
 	it->next_equal = iterator_next_equal;
 	return it->next(it);
+}
+
+static void
+check_key_parts(struct key_def *key_def,
+		int part_count, bool partial_key_allowed)
+{
+	if (part_count > key_def->part_count)
+		tnt_raise(ClientError, :ER_KEY_PART_COUNT,
+			  part_count, key_def->part_count);
+	if (!partial_key_allowed && part_count < key_def->part_count)
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  part_count, key_def->part_count);
 }
 
 /* {{{ Index -- base class for all indexes. ********************/
@@ -76,6 +96,11 @@ iterator_first_equal(struct iterator *it)
 @class Hash64Index;
 @class HashStrIndex;
 @class TreeIndex;
+
++ (struct index_traits *) traits
+{
+	return &index_traits;
+}
 
 + (Index *) alloc: (enum index_type) type
 	 :(struct key_def *) key_def
@@ -108,6 +133,7 @@ iterator_first_equal(struct iterator *it)
 - (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
 	self = [super init];
+	traits = [object_getClass(self) traits];
 	key_def = key_def_arg;
 	space = space_arg;
 	position = [self allocIterator];
@@ -153,7 +179,7 @@ iterator_first_equal(struct iterator *it)
 
 - (struct tuple *) findByKey: (void *) key :(int) part_count
 {
-	[self checkKeyParts: part_count :false];
+	check_key_parts(key_def, part_count, false);
 	return [self findUnsafe: key :part_count];
 }
 
@@ -202,7 +228,7 @@ iterator_first_equal(struct iterator *it)
 - (void) initIteratorByKey: (struct iterator *) iterator :(enum iterator_type) type
                         :(void *) key :(int) part_count
 {
-	[self checkKeyParts: part_count :true];
+	check_key_parts(key_def, part_count, traits->allows_partial_key);
 	[self initIteratorUnsafe: iterator :type :key :part_count];
 }
 
@@ -214,16 +240,6 @@ iterator_first_equal(struct iterator *it)
 	(void) key;
 	(void) part_count;
 	[self subclassResponsibility: _cmd];
-}
-
-- (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed
-{
-	if (part_count > key_def->part_count)
-		tnt_raise(ClientError, :ER_KEY_PART_COUNT,
-			  part_count, key_def->part_count);
-	if (!partial_key_allowed && part_count < key_def->part_count)
-		tnt_raise(ClientError, :ER_EXACT_MATCH,
-			  part_count, key_def->part_count);
 }
 
 @end
@@ -267,6 +283,11 @@ hash_iterator_free(struct iterator *iterator)
 
 
 @implementation HashIndex
+
++ (struct index_traits *) traits
+{
+	return &hash_index_traits;
+}
 
 - (void) reserve: (u32) n_tuples
 {
@@ -330,13 +351,6 @@ hash_iterator_free(struct iterator *iterator)
 		it->base.free = hash_iterator_free;
 	}
 	return (struct iterator *) it;
-}
-
-- (void) checkKeyParts: (int) part_count :(bool) partial_key_allowed
-{
-	/* Hash indexes never allow partial keys. */
-	(void) partial_key_allowed;
-	[super checkKeyParts: part_count :false];
 }
 
 @end
