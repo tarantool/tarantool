@@ -7,9 +7,8 @@ from lib.tarantool_box_server import TarantoolBoxServer
 p = subprocess.Popen([os.path.join(builddir, "test/connector_c/xlog"),
 		      os.path.join(builddir, "test/connector_c/connector.xlog")],
                      stdout=subprocess.PIPE)
-p.wait()
-for line in p.stdout.readlines():
-      sys.stdout.write(line)
+o,e = p.communicate()
+sys.stdout.write(o)
 
 server.stop()
 server.deploy("connector_c/cfg/master.cfg")
@@ -25,9 +24,8 @@ print ""
 p = subprocess.Popen([os.path.join(builddir, "test/connector_c/rpl"),
 		     "127.0.0.1", "33016", "1200"],
                      stdout=subprocess.PIPE)
-p.wait()
-for line in p.stdout.readlines():
-      sys.stdout.write(line)
+o,e = p.communicate()
+sys.stdout.write(o)
 
 server.stop()
 server.deploy()
