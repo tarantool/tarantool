@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 #include <errno.h>
 
 #include <connector/c/include/tarantool/tnt.h>
@@ -161,7 +162,8 @@ tnt_lex_nameof(int tk)
 	switch (tk) {
 	case TNT_TK_EOF: return "End-Of-Statement";
 	case TNT_TK_ERROR: return "ERROR";
-	case TNT_TK_NUM: return "NUM";
+	case TNT_TK_NUM32: return "NUM32";
+	case TNT_TK_NUM64: return "NUM64";
 	case TNT_TK_STRING: return "STRING";
 	case TNT_TK_ID: return "ID";
 	case TNT_TK_KEY: return "KEY";
@@ -202,7 +204,7 @@ tnt_lex(struct tnt_lex *l, struct tnt_tk **tk)
 	if (l->count) {
 		*tk = tnt_lex_pop(l);
 		if ((*tk)->tk == TNT_TK_PUNCT)
-			return TNT_TK_I(*tk);
+			return TNT_TK_I32(*tk);
 		return (*tk)->tk;
 	}
 	
@@ -276,16 +278,16 @@ tnt_lex(struct tnt_lex *l, struct tnt_tk **tk)
 			}
 		}
 		*tk = tnt_lex_tk(l, TNT_TK_PUNCT, line, col);
-		TNT_TK_I(*tk) = ch;
+		TNT_TK_I32(*tk) = ch;
 		return ch;
 	}
 
 numeric: /* numeric value */
 	if (isdigit(ch)) {
-		int32_t num = 0;
+		int64_t num = 0;
 		while (1) {
 			if (isdigit(tnt_lex_chr(l)))
-				num *= 10, num += tnt_lex_chr(l) - '0';
+				num = (num * 10) + tnt_lex_chr(l) - '0';
 			else
 				break;
 			ssize_t r = tnt_lex_next(l);
@@ -296,9 +298,19 @@ numeric: /* numeric value */
 		}
 		if (minus)
 			num *= -1;
-		*tk = tnt_lex_tk(l, TNT_TK_NUM, line, col);
-		TNT_TK_I(*tk) = num;
-		return TNT_TK_NUM;
+		if (tnt_lex_chr(l) == 'L') {
+			ssize_t r = tnt_lex_next(l);
+			if (r == -1)
+				return tnt_lex_error(l, "utf8 decoding error");
+		} else
+		if (num >= INT_MIN && num < INT_MAX) {
+			*tk = tnt_lex_tk(l, TNT_TK_NUM32, line, col);
+			TNT_TK_I32(*tk) = (int32_t)num;
+			return TNT_TK_NUM32;
+		}
+		*tk = tnt_lex_tk(l, TNT_TK_NUM64, line, col);
+		TNT_TK_I64(*tk) = num;
+		return TNT_TK_NUM64;
 	}
 
 	/* skipping to the end of lexem */
@@ -324,7 +336,8 @@ numeric: /* numeric value */
 	for (i = 0 ; tnt_keywords[i].name ; i++) {
 		if (tnt_keywords[i].size != size)
 			continue;
-		if (strncasecmp(tnt_keywords[i].name, (const char*)TNT_UTF8_CHAR(&l->buf, start), size) == 0) {
+		if (strncasecmp(tnt_keywords[i].name,
+			        (const char*)TNT_UTF8_CHAR(&l->buf, start), size) == 0) {
 			*tk = tnt_lex_tk(l, tnt_keywords[i].tk, line, col);
 			return tnt_keywords[i].tk;
 		}
@@ -343,7 +356,7 @@ numeric: /* numeric value */
 				goto id;
 		}
 		*tk = tnt_lex_tk(l, idtk, line, col);
-		TNT_TK_I(*tk) = id;
+		TNT_TK_I32(*tk) = id;
 		return idtk;
 	}
 

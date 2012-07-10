@@ -32,7 +32,8 @@ enum {
 	TNT_TK_ERROR = -1,
 	TNT_TK_EOF = 0,
 	TNT_TK_NONE = 1000,
-	TNT_TK_NUM,
+	TNT_TK_NUM32,
+	TNT_TK_NUM64,
 	TNT_TK_ID,
 	TNT_TK_KEY,
 	TNT_TK_TABLE,
@@ -61,7 +62,8 @@ enum {
 struct tnt_tk {
 	int tk;
 	union {
-		int32_t i;
+		int32_t i32;
+		int64_t i64;
 		struct tnt_utf8 s;
 	} v;
 	int line, col;
@@ -72,7 +74,8 @@ struct tnt_tk {
 /* token object accessors */
 
 #define TNT_TK_S(TK) (&(TK)->v.s)
-#define TNT_TK_I(TK)  ((TK)->v.i)
+#define TNT_TK_I32(TK) ((TK)->v.i32)
+#define TNT_TK_I64(TK) ((TK)->v.i64)
 
 /* lexer object */
 
