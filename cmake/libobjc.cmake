@@ -40,7 +40,8 @@ macro(libobjc_build)
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/libobjc
         COMMAND $(MAKE) clean
         COMMAND $(MAKE) CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} EXTRA_CFLAGS=""${extra_cflags}"" EXTRA_LDFLAGS=""${extra_ldflags}""
-        DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt
+        DEPENDS ${PROJECT_BINARY_DIR}/third_party/libobjc
+                ${PROJECT_BINARY_DIR}/CMakeCache.txt
     )
     add_custom_target(libobjc ALL
         DEPENDS ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a
