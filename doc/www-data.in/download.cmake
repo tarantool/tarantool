@@ -102,7 +102,7 @@ that production systems use the builds provided on this site.
   </tr>
   <th colspan=4>Mac OS X</th>
   <tr> 
-    <td align=center colspan=4><i>Coming soon...</i></td>
+    <td align=center colspan=4>brew install http://tarantool.org/dist/tarantool.rb</td>
   <tr>
 
 </table>
@@ -241,7 +241,7 @@ Tarantool/Box использует стандартную схему нумер�
   </tr>
   <th colspan=4>Mac OS X</th>
   <tr> 
-    <td align=center colspan=4><i>Coming soon...</i></td>
+    <td align=center colspan=4>brew install http://tarantool.org/dist/tarantool.rb</td>
   <tr>
 
 </table>
