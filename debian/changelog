@@ -1,3 +1,14 @@
+tarantool (1.4.7-1) unstable; urgency=low
+
+  * New upstream stable version.
+    - can be built by gcc-4.7;
+    - new transaction processor;
+    - add libtarantoolrpl library (provides replication protocol);
+    - extract perl and php drivers to their own repositaries.
+    - etc
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 11 Jul 2012 10:06:52 +0400
+
 tarantool (1.4.6+20120629+2158-1) unstable; urgency=low
 
   * Some fixes for Objective C 2.0.
