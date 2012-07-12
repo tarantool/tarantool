@@ -204,7 +204,7 @@ static handler_type check_action_record(struct _Unwind_Context *context,
                                         Class thrown_class,
                                         unsigned long *selector)
 {
-	//if (!action_record) { return handler_cleanup; }
+	if (!action_record) { return handler_cleanup; }
 	while (action_record)
 	{
 		int filter = read_sleb128(&action_record);
@@ -343,6 +343,7 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 		action = dwarf_eh_find_callsite(context, &lsda);
 		handler_type handler = check_action_record(context, foreignException,
 				&lsda, action.action_record, thrown_class, &selector);
+		fprintf(stderr, "handler: %d\n", handler);
 		// If there's no action record, we've only found a cleanup, so keep
 		// searching for something real
 		if (handler == handler_class ||

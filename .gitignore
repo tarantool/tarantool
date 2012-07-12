@@ -19,6 +19,8 @@ test/box/protocol
 test/box/connector
 test/unit/queue
 test/unit/mhash
+test/unit/objc_finally
+test/unit/objc_catchcxx
 Makefile
 CMakeFiles
 CMakeCache.txt
