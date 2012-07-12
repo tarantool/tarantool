@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<classpath>
-	<classpathentry kind="src" path="src/main/java"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="/home/bigbes/workspace/ycsb-tarantool/lib/commons-logging-1.1.1.jar"/>
-	<classpathentry kind="lib" path="/home/bigbes/workspace/ycsb-tarantool/lib/log4j-1.2.16.jar"/>
-	<classpathentry kind="lib" path="/home/bigbes/workspace/ycsb-tarantool/lib/testng-6.5.2.jar"/>
-	<classpathentry kind="output" path="bin"/>
-</classpath>
