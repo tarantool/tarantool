@@ -1,7 +1,11 @@
 package tarantool.connector.socketpool.exception;
 
-
 public class SocketPoolClosedException extends SocketPoolException {
+
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 8900867895783257561L;
 
     public SocketPoolClosedException(String message) {
         super(message);

@@ -7,25 +7,43 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
+import sun.rmi.runtime.Log;
 import tarantool.connector.socketpool.AbstractSocketPool;
-
 
 class PlainSocketWorker extends SocketWorkerInternal {
 
     private static final Log LOG = LogFactory.getLog(PlainSocketWorker.class);
 
-    private Socket socket;
-    
-    private OutputStream outputStream;
     private InputStream inputStream;
 
-    PlainSocketWorker(InetAddress address, int port, int soTimeout, AbstractSocketPool pool)
-            throws IOException {
+    private OutputStream outputStream;
+    private Socket socket;
+
+    PlainSocketWorker(InetAddress address, int port, int soTimeout,
+            AbstractSocketPool pool) throws IOException {
         super(pool, address, port, soTimeout);
         connect();
+    }
+
+    @Override
+    public void close() {
+        try {
+            socket.shutdownInput();
+        } catch (final IOException e) {
+            LOG.error("Can't shutdown input which associated with the socket");
+        }
+        try {
+            socket.shutdownOutput();
+        } catch (final IOException e) {
+            LOG.error("Can't shutdown output which associated with the socket");
+        }
+        try {
+            socket.close();
+        } catch (final IOException e) {
+            LOG.error("Can't close socket");
+        }
+
+        disconnected();
     }
 
     @Override
@@ -43,24 +61,22 @@ class PlainSocketWorker extends SocketWorkerInternal {
     }
 
     @Override
-    public void close() {
+    public int readData(byte[] buffer, int length) throws IOException {
         try {
-            socket.shutdownInput();
-        } catch (IOException e) {
-            LOG.error("Can't shutdown input which associated with the socket");
+            int loadedBytes = 0, currentReadBytes = 0;
+            while ((loadedBytes += currentReadBytes) != length) {
+                currentReadBytes = inputStream.read(buffer, loadedBytes, length
+                        - loadedBytes);
+                if (currentReadBytes == -1) {
+                    throw new EOFException("Unexpected end of stream");
+                }
+            }
+            return loadedBytes;
+        } catch (final IOException e) {
+            LOG.error("Error occurred in read socket operation", e);
+            disconnected();
+            throw e;
         }
-        try {
-            socket.shutdownOutput();
-        } catch (IOException e) {
-            LOG.error("Can't shutdown output which associated with the socket");
-        }
-        try {
-            socket.close();
-        } catch (IOException e) {
-            LOG.error("Can't close socket");
-        }
-
-        disconnected();
     }
 
     @Override
@@ -68,28 +84,10 @@ class PlainSocketWorker extends SocketWorkerInternal {
         try {
             outputStream.write(buffer);
             outputStream.flush();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             LOG.error("Error occurred in write socket operation", e);
             disconnected();
             throw e;
         }
-    }
-
-    @Override
-    public int readData(byte[] buffer, int length) throws IOException {
-        try {
-            int loadedBytes = 0, currentReadBytes = 0;
-            while((loadedBytes += currentReadBytes) != length) {
-                currentReadBytes = inputStream.read(buffer, loadedBytes, length - loadedBytes);
-                if (currentReadBytes == -1) {
-                    throw new EOFException("Unexpected end of stream");
-                }
-            }
-            return loadedBytes;
-        } catch (IOException e) {
-            LOG.error("Error occurred in read socket operation", e);
-            disconnected();
-            throw e;
-        } 
     }
 }

@@ -4,22 +4,23 @@ import tarantool.connector.socketpool.worker.FactoryType;
 
 public class SocketPoolConfig {
 
-    private String host;
-    private int port;
-    private int socketReadTimeout;
-    private int minPoolSize;
-    private int maxPoolSize;
-    private long waitingTimeout;
-    private long reconnectTimeout;
-    private long initializeTimeout;
-    private int disconnectBound;
-    private FactoryType type;
-    private SocketPoolType socketPoolType;
+    private final int disconnectBound;
+    private final String host;
+    private final long initializeTimeout;
     private long latencyPeriod;
+    private int maxPoolSize;
+    private final int minPoolSize;
+    private final int port;
+    private final long reconnectTimeout;
+    private final SocketPoolType socketPoolType;
+    private final int socketReadTimeout;
+    private final FactoryType type;
+    private final long waitingTimeout;
 
-    public SocketPoolConfig(String host, int port, int socketReadTimeout, int minPoolSize, int maxPoolSize, long waitingTimeout,
-            long reconnectTimeout, long initializeTimeout, int disconnectBound, FactoryType type, SocketPoolType socketPoolType,
-            long latencyPeriod) {
+    public SocketPoolConfig(String host, int port, int socketReadTimeout,
+            int minPoolSize, int maxPoolSize, long waitingTimeout,
+            long reconnectTimeout, long initializeTimeout, int disconnectBound,
+            FactoryType type, SocketPoolType socketPoolType, long latencyPeriod) {
         this.host = host;
         this.port = port;
         this.socketReadTimeout = socketReadTimeout;
@@ -34,8 +35,10 @@ public class SocketPoolConfig {
         this.latencyPeriod = latencyPeriod;
     }
 
-    public SocketPoolConfig(String host, int port, int socketReadTimeout, int minPoolSize, long waitingTimeout, long reconnectTimeout,
-            long initializeTimeout, int disconnectBound, FactoryType type, SocketPoolType socketPoolType) {
+    public SocketPoolConfig(String host, int port, int socketReadTimeout,
+            int minPoolSize, long waitingTimeout, long reconnectTimeout,
+            long initializeTimeout, int disconnectBound, FactoryType type,
+            SocketPoolType socketPoolType) {
         this.host = host;
         this.port = port;
         this.socketReadTimeout = socketReadTimeout;
@@ -48,69 +51,63 @@ public class SocketPoolConfig {
         this.socketPoolType = socketPoolType;
     }
 
+    public int getDisconnectBound() {
+        return disconnectBound;
+    }
+
     public String getHost() {
         return host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-    
-    public int getSocketReadTimeout() {
-        return socketReadTimeout;
-    }
-
-    public int getMinPoolSize() {
-        return minPoolSize;
-    }
-
-    public int getMaxPoolSize() {
-        return maxPoolSize;
-    }
-
-    public long getWaitingTimeout() {
-        return waitingTimeout;
-    }
-
-    public long getReconnectTimeout() {
-        return reconnectTimeout;
     }
 
     public long getInitializeTimeout() {
         return initializeTimeout;
     }
 
-    public int getDisconnectBound() {
-        return disconnectBound;
-    }
-
-    public FactoryType getType() {
-        return type;
-    }
-
     public long getLatencyPeriod() {
         return latencyPeriod;
+    }
+
+    public int getMaxPoolSize() {
+        return maxPoolSize;
+    }
+
+    public int getMinPoolSize() {
+        return minPoolSize;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public long getReconnectTimeout() {
+        return reconnectTimeout;
     }
 
     public SocketPoolType getSocketPoolType() {
         return socketPoolType;
     }
 
+    public int getSocketReadTimeout() {
+        return socketReadTimeout;
+    }
+
+    public FactoryType getType() {
+        return type;
+    }
+
+    public long getWaitingTimeout() {
+        return waitingTimeout;
+    }
+
     @Override
     public String toString() {
-        return "SocketPoolConfig{" +
-                "host='" + host + '\'' +
-                ", port=" + port +
-                ", socketReadTimeout=" + socketReadTimeout +
-                ", minPoolSize=" + minPoolSize +
-                ", maxPoolSize=" + maxPoolSize +
-                ", waitingTimeout=" + waitingTimeout +
-                ", reconnectTimeout=" + reconnectTimeout +
-                ", initializeTimeout=" + initializeTimeout +
-                ", disconnectBound=" + disconnectBound +
-                ", type=" + type +
-                ", socketPoolType=" + socketPoolType +
-                ", latencyPeriod=" + latencyPeriod +
-                '}';
+        return "SocketPoolConfig{" + "host='" + host + '\'' + ", port=" + port
+                + ", socketReadTimeout=" + socketReadTimeout + ", minPoolSize="
+                + minPoolSize + ", maxPoolSize=" + maxPoolSize
+                + ", waitingTimeout=" + waitingTimeout + ", reconnectTimeout="
+                + reconnectTimeout + ", initializeTimeout=" + initializeTimeout
+                + ", disconnectBound=" + disconnectBound + ", type=" + type
+                + ", socketPoolType=" + socketPoolType + ", latencyPeriod="
+                + latencyPeriod + '}';
     }
 }

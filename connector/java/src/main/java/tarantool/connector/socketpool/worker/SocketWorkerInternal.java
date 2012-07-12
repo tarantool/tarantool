@@ -5,24 +5,23 @@ import java.net.InetAddress;
 
 import tarantool.connector.socketpool.AbstractSocketPool;
 
-
 public abstract class SocketWorkerInternal implements SocketWorker {
 
     private enum ConnectionState {
-        CONNECTED,
-        DISCONNECTED
+        CONNECTED, DISCONNECTED
     }
 
-    private long lastTimeStamp;
-    private final AbstractSocketPool pool;
-
     final InetAddress address;
+    private long lastTimeStamp;
+
+    private final AbstractSocketPool pool;
     final int port;
     final int soTimeout;
 
     ConnectionState state = ConnectionState.DISCONNECTED;
 
-    SocketWorkerInternal(AbstractSocketPool pool, InetAddress address, int port, int soTimeout) {
+    SocketWorkerInternal(AbstractSocketPool pool, InetAddress address,
+            int port, int soTimeout) {
         this.pool = pool;
         this.address = address;
         this.port = port;
@@ -30,6 +29,10 @@ public abstract class SocketWorkerInternal implements SocketWorker {
 
         lastTimeStamp = System.currentTimeMillis();
     }
+
+    public abstract void close();
+
+    public abstract void connect() throws IOException;
 
     final void connected() {
         state = ConnectionState.CONNECTED;
@@ -39,12 +42,12 @@ public abstract class SocketWorkerInternal implements SocketWorker {
         state = ConnectionState.DISCONNECTED;
     }
 
-    public final boolean isConnected() {
-        return state == ConnectionState.CONNECTED;
-    }
-
     public long getLastTimeStamp() {
         return lastTimeStamp;
+    }
+
+    public final boolean isConnected() {
+        return state == ConnectionState.CONNECTED;
     }
 
     @Override
@@ -52,7 +55,4 @@ public abstract class SocketWorkerInternal implements SocketWorker {
         lastTimeStamp = System.currentTimeMillis();
         pool.returnSocketWorker(this);
     }
-
-    public abstract void close();
-    public abstract void connect() throws IOException;
 }

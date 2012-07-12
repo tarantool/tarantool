@@ -10,44 +10,43 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
+import sun.rmi.runtime.Log;
 import tarantool.connector.socketpool.exception.SocketPoolException;
 import tarantool.connector.socketpool.worker.FactoryType;
 import tarantool.connector.socketpool.worker.SocketFactory;
 import tarantool.connector.socketpool.worker.SocketWorker;
 import tarantool.connector.socketpool.worker.SocketWorkerInternal;
 
-
 public abstract class AbstractSocketPool implements SocketPool {
 
-    private static final Log LOG = LogFactory.getLog(AbstractSocketPool.class);
-
-    public static final long WAITING_SOCKET_POOL_TIMEOUT = 1000L; // 1 sec
-    public static final long RECONNECT_SOCKET_TIMEOUT = 1000L; // 1 sec
-    public static final long INITIALIZE_SOCKET_POOL_TIMEOUT = 20000L; // 20 sec
     public static final int DISCONNECT_BOUND = 10;
 
-    private static final long DISCONNECT_BOUND_CHECK_PERIOD = TimeUnit.SECONDS.toNanos(1);
+    private static final long DISCONNECT_BOUND_CHECK_PERIOD = TimeUnit.SECONDS
+            .toNanos(1);
+    public static final long INITIALIZE_SOCKET_POOL_TIMEOUT = 20000L; // 20 sec
+    private static final Log LOG = LogFactory.getLog(AbstractSocketPool.class);
+    public static final long RECONNECT_SOCKET_TIMEOUT = 1000L; // 1 sec
 
-    final long waitingTimeout;
-    final long reconnectTimeout;
-    final long initializeTimeout;
-
-    final SocketFactory socketWorkerFactory;
+    public static final long WAITING_SOCKET_POOL_TIMEOUT = 1000L; // 1 sec
 
     private final int disconnectBound;
+    final long initializeTimeout;
+    private final ExecutorService reconnectExecutor;
+
+    private final BlockingQueue<SocketWorkerInternal> reconnectQueue = new LinkedBlockingQueue<SocketWorkerInternal>();
+
+    final long reconnectTimeout;
+    final SocketFactory socketWorkerFactory;
+    final SocketPoolStateMachine stateMachine = new SocketPoolStateMachine();
+
     private long[] timeQueue;
     private int timeQueueIndex = 0;
 
-    private final ExecutorService reconnectExecutor;
-    private final BlockingQueue<SocketWorkerInternal> reconnectQueue = new LinkedBlockingQueue<SocketWorkerInternal>();
+    final long waitingTimeout;
 
-    final SocketPoolStateMachine stateMachine = new SocketPoolStateMachine();
-
-    public AbstractSocketPool(String host, int port, int socketReadTimeout, long waitingTimeout,
-            long reconnectTimeout, long initializeTimeout, int disconnectBound, FactoryType type) throws UnknownHostException {
+    public AbstractSocketPool(String host, int port, int socketReadTimeout,
+            long waitingTimeout, long reconnectTimeout, long initializeTimeout,
+            int disconnectBound, FactoryType type) throws UnknownHostException {
 
         if (host == null || "".equals(host.trim())) {
             throw new IllegalArgumentException("Incorrect host:" + host);
@@ -58,23 +57,28 @@ public abstract class AbstractSocketPool implements SocketPool {
         }
 
         if (waitingTimeout < 0L) {
-            throw new IllegalArgumentException("Incorrect value of waiting timeout");
+            throw new IllegalArgumentException(
+                    "Incorrect value of waiting timeout");
         }
 
         if (reconnectTimeout < 0L) {
-            throw new IllegalArgumentException("Incorrect value of reconnect timeout");
+            throw new IllegalArgumentException(
+                    "Incorrect value of reconnect timeout");
         }
 
         if (disconnectBound < 0) {
-            throw new IllegalArgumentException("Incorrect value of disconnect bound");
+            throw new IllegalArgumentException(
+                    "Incorrect value of disconnect bound");
         }
-        
+
         if (socketReadTimeout < 0) {
-            throw new IllegalArgumentException("Incorrect value of socket read timeout");
+            throw new IllegalArgumentException(
+                    "Incorrect value of socket read timeout");
         }
 
         if (initializeTimeout < 0L) {
-            throw new IllegalArgumentException("Incorrect value of initialize timeout");
+            throw new IllegalArgumentException(
+                    "Incorrect value of initialize timeout");
         }
 
         this.waitingTimeout = waitingTimeout;
@@ -83,45 +87,54 @@ public abstract class AbstractSocketPool implements SocketPool {
         this.disconnectBound = disconnectBound;
         this.timeQueue = new long[disconnectBound];
 
-        socketWorkerFactory = type.createFactory(InetAddress.getByName(host), port, socketReadTimeout, this);
+        socketWorkerFactory = type.createFactory(InetAddress.getByName(host),
+                port, socketReadTimeout, this);
 
-        reconnectExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread thread = new Thread(r, "ReconnectionThread");
-                thread.setDaemon(true);
-                thread.setPriority(Thread.MIN_PRIORITY);
-                return thread;
-            }
-        });
+        reconnectExecutor = Executors
+                .newSingleThreadExecutor(new ThreadFactory() {
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        final Thread thread = new Thread(r,
+                                "ReconnectionThread");
+                        thread.setDaemon(true);
+                        thread.setPriority(Thread.MIN_PRIORITY);
+                        return thread;
+                    }
+                });
         reconnectExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                Thread thread = Thread.currentThread();
+                final Thread thread = Thread.currentThread();
                 while (!thread.isInterrupted()) {
                     SocketWorkerInternal worker = null;
                     try {
                         worker = reconnectQueue.take();
                         worker.connect();
-                        if (stateMachine.isReconnecting() && reconnectQueue.isEmpty()) {
+                        if (stateMachine.isReconnecting()
+                                && reconnectQueue.isEmpty()) {
                             Thread.sleep(AbstractSocketPool.this.reconnectTimeout);
-                            if (reconnectQueue.isEmpty()) { // wait reconnectTimeout for check unstable net
+                            if (reconnectQueue.isEmpty()) { // wait
+                                                            // reconnectTimeout
+                                                            // for check
+                                                            // unstable net
                                 stateMachine.connect();
                             }
                         }
                         LOG.info("Reconnect completed successfully");
                         internalReturnSocketWorker(worker);
-                    } catch (InterruptedException e) {
+                    } catch (final InterruptedException e) {
                         LOG.info("Reconnecting thread is stopped");
-                        thread.interrupt(); // thread was stopped, propagate interruption
-                    } catch (IOException e) {
+                        thread.interrupt(); // thread was stopped, propagate
+                                            // interruption
+                    } catch (final IOException e) {
                         LOG.info("Reconnect completed failed");
                         try {
                             reconnectQueue.put(worker);
                             Thread.sleep(AbstractSocketPool.this.reconnectTimeout);
-                        } catch (InterruptedException e1) {
+                        } catch (final InterruptedException e1) {
                             LOG.info("Reconnecting thread is stopped");
-                            thread.interrupt(); // thread was stopped, propagate interruption
+                            thread.interrupt(); // thread was stopped, propagate
+                                                // interruption
                         }
                     }
                 }
@@ -129,10 +142,27 @@ public abstract class AbstractSocketPool implements SocketPool {
         });
     }
 
+    @Override
+    public abstract SocketWorker borrowSocketWorker()
+            throws InterruptedException, SocketPoolException;
+
+    @Override
     public void close() {
         stateMachine.close();
         reconnectExecutor.shutdownNow();
         internalClose();
+    }
+
+    abstract void feedReconnect();
+
+    abstract void internalClose();
+
+    abstract void internalReturnSocketWorker(SocketWorkerInternal socketWorker);
+
+    void pushToReconnect(SocketWorkerInternal socketWorker) {
+        socketWorker.close();
+        final boolean added = reconnectQueue.offer(socketWorker);
+        assert added : "Queue can't add wrapper, too many socket worker for queue size";
     }
 
     public void returnSocketWorker(SocketWorkerInternal socketWorker) {
@@ -145,11 +175,12 @@ public abstract class AbstractSocketPool implements SocketPool {
                     if (!stateMachine.isRunning()) {
                         return;
                     }
-                    int index = timeQueueIndex++ % timeQueue.length;
-                    long lastTimePoint = timeQueue[index];
+                    final int index = timeQueueIndex++ % timeQueue.length;
+                    final long lastTimePoint = timeQueue[index];
                     timeQueue[index] = System.nanoTime();
 
-                    if (lastTimePoint > 0 && System.nanoTime() - lastTimePoint < DISCONNECT_BOUND_CHECK_PERIOD) {
+                    if (lastTimePoint > 0
+                            && System.nanoTime() - lastTimePoint < DISCONNECT_BOUND_CHECK_PERIOD) {
                         stateMachine.disconnect();
                         timeQueueIndex = 0;
                         timeQueue = new long[disconnectBound];
@@ -159,15 +190,4 @@ public abstract class AbstractSocketPool implements SocketPool {
             }
         }
     }
-
-    void pushToReconnect(SocketWorkerInternal socketWorker) {
-        socketWorker.close();
-        boolean added = reconnectQueue.offer(socketWorker);
-        assert added: "Queue can't add wrapper, too many socket worker for queue size";
-    }
-
-    public abstract SocketWorker borrowSocketWorker() throws InterruptedException, SocketPoolException;
-    abstract void internalReturnSocketWorker(SocketWorkerInternal socketWorker);
-    abstract void feedReconnect();
-    abstract void internalClose();
 }

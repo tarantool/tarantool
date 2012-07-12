@@ -6,9 +6,26 @@ import java.net.InetAddress;
 import tarantool.connector.socketpool.AbstractSocketPool;
 
 public enum FactoryType {
+    CHANNEL_SOCKET {
+        @Override
+        public SocketFactory createFactory(final InetAddress address,
+                final int port, final int soTimeout,
+                final AbstractSocketPool pool) {
+            return new SocketFactory() {
+                @Override
+                public SocketWorkerInternal create() throws IOException {
+                    return new ChannelSocketWorker(address, port, soTimeout,
+                            pool);
+                }
+            };
+        }
+    },
+
     PLAIN_SOCKET {
         @Override
-        public SocketFactory createFactory(final InetAddress address, final int port, final int soTimeout, final AbstractSocketPool pool) {
+        public SocketFactory createFactory(final InetAddress address,
+                final int port, final int soTimeout,
+                final AbstractSocketPool pool) {
             return new SocketFactory() {
                 @Override
                 public SocketWorkerInternal create() throws IOException {
@@ -16,19 +33,8 @@ public enum FactoryType {
                 }
             };
         }
-    },
-
-    CHANNEL_SOCKET {
-        @Override
-        public SocketFactory createFactory(final InetAddress address, final int port, final int soTimeout, final AbstractSocketPool pool) {
-            return new SocketFactory() {
-                @Override
-                public SocketWorkerInternal create() throws IOException {
-                    return new ChannelSocketWorker(address, port,soTimeout, pool);
-                }
-            };
-        }
     };
 
-    public abstract SocketFactory createFactory(InetAddress address, int port, int soTimeout, AbstractSocketPool pool);
+    public abstract SocketFactory createFactory(InetAddress address, int port,
+            int soTimeout, AbstractSocketPool pool);
 }

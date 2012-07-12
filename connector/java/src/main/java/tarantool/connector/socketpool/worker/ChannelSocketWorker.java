@@ -8,11 +8,8 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
+import sun.rmi.runtime.Log;
 import tarantool.connector.socketpool.AbstractSocketPool;
-
 
 class ChannelSocketWorker extends SocketWorkerInternal {
 
@@ -20,28 +17,17 @@ class ChannelSocketWorker extends SocketWorkerInternal {
 
     private SocketChannel socketChannel;
 
-    ChannelSocketWorker(InetAddress address, int port, int soTimeout, AbstractSocketPool pool) throws IOException {
+    ChannelSocketWorker(InetAddress address, int port, int soTimeout,
+            AbstractSocketPool pool) throws IOException {
         super(pool, address, port, soTimeout);
         connect();
-    }
-
-    @Override
-    public void connect() throws IOException {
-        socketChannel = SocketChannel.open(new InetSocketAddress(address, port));
-        Socket socket = socketChannel.socket();
-
-        socket.setKeepAlive(true);
-        socket.setTcpNoDelay(true);
-        socket.setSoTimeout(soTimeout);  // set but NIO not supported socket timeout
-
-        connected();
     }
 
     @Override
     public void close() {
         try {
             socketChannel.close();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             LOG.error("Can't close socket channel which associated with the socket");
         }
 
@@ -49,31 +35,45 @@ class ChannelSocketWorker extends SocketWorkerInternal {
     }
 
     @Override
-    public void writeData(byte[] buffer) throws IOException {
-        try {
-            ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
-            while(byteBuffer.hasRemaining()) {
-                socketChannel.write(byteBuffer);
-            }
-        } catch (IOException e) {
-            LOG.error("Error occurred in write channel operation", e);
-            disconnected();
-            throw e;
-        }
+    public void connect() throws IOException {
+        socketChannel = SocketChannel
+                .open(new InetSocketAddress(address, port));
+        final Socket socket = socketChannel.socket();
+
+        socket.setKeepAlive(true);
+        socket.setTcpNoDelay(true);
+        socket.setSoTimeout(soTimeout); // set but NIO not supported socket
+                                        // timeout
+
+        connected();
     }
 
     @Override
     public int readData(byte[] buffer, int length) throws IOException {
         try {
-            ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+            final ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
             while (byteBuffer.hasRemaining()) {
                 if (socketChannel.read(byteBuffer) == -1) {
                     throw new EOFException("Unexpected end of stream");
                 }
             }
             return byteBuffer.position();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             LOG.error("Error occurred in read channel operation", e);
+            disconnected();
+            throw e;
+        }
+    }
+
+    @Override
+    public void writeData(byte[] buffer) throws IOException {
+        try {
+            final ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+            while (byteBuffer.hasRemaining()) {
+                socketChannel.write(byteBuffer);
+            }
+        } catch (final IOException e) {
+            LOG.error("Error occurred in write channel operation", e);
             disconnected();
             throw e;
         }

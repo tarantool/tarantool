@@ -1,55 +1,72 @@
 package tarantool.connector.socketpool;
 
-
 class SocketPoolStateMachine {
-    // state  diagram
+    // state diagram
     enum PoolState {
-        RUNNING {
-            @Override
-            PoolState connect() {
-                return RUNNING;
-            }
-            @Override
-            PoolState disconnect() {
-                return RECONNECTING;
-            }
-            @Override
-            PoolState close() {
-                return CLOSED;
-            }},
-        RECONNECTING {
-            @Override
-            PoolState connect() {
-                return RUNNING;
-            }
-            @Override
-            PoolState disconnect() {
-                return RECONNECTING;
-            }
-            @Override
-            PoolState close() {
-                return CLOSED;
-            }},
         CLOSED {
             @Override
-            PoolState connect() {
-                throw new IllegalStateException("Can't change closed pool state");
+            PoolState close() {
+                throw new IllegalStateException(
+                        "Can't change closed pool state");
             }
+
+            @Override
+            PoolState connect() {
+                throw new IllegalStateException(
+                        "Can't change closed pool state");
+            }
+
             @Override
             PoolState disconnect() {
-                throw new IllegalStateException("Can't change closed pool state");
+                throw new IllegalStateException(
+                        "Can't change closed pool state");
             }
+        },
+        RECONNECTING {
             @Override
             PoolState close() {
-                throw new IllegalStateException("Can't change closed pool state");
-            }};
+                return CLOSED;
+            }
+
+            @Override
+            PoolState connect() {
+                return RUNNING;
+            }
+
+            @Override
+            PoolState disconnect() {
+                return RECONNECTING;
+            }
+        },
+        RUNNING {
+            @Override
+            PoolState close() {
+                return CLOSED;
+            }
+
+            @Override
+            PoolState connect() {
+                return RUNNING;
+            }
+
+            @Override
+            PoolState disconnect() {
+                return RECONNECTING;
+            }
+        };
+
+        abstract PoolState close();
 
         abstract PoolState connect();
+
         abstract PoolState disconnect();
-        abstract PoolState close();
     }
 
     private volatile PoolState state = PoolState.RUNNING;
+
+    public void close() {
+        state = state.close();
+    }
 
     public void connect() {
         state = state.connect();
@@ -59,19 +76,15 @@ class SocketPoolStateMachine {
         state = state.disconnect();
     }
 
-    public void close() {
-        state = state.close();
-    }
-
-    public boolean isRunning() {
-        return state == PoolState.RUNNING;
+    public boolean isClosed() {
+        return state == PoolState.CLOSED;
     }
 
     public boolean isReconnecting() {
         return state == PoolState.RECONNECTING;
     }
 
-    public boolean isClosed() {
-        return state == PoolState.CLOSED; 
+    public boolean isRunning() {
+        return state == PoolState.RUNNING;
     }
 }
