@@ -1,0 +1,6 @@
+# encoding: tarantool
+exec admin "lua box.space[box.cfg.memcached_space].cardinality"
+exec admin "lua box.space[box.cfg.memcached_space].estimated_rows"
+exec admin "lua box.space[box.cfg.memcached_space].n"
+exec admin "lua box.space[box.cfg.memcached_space].index[0].idx"
+exec admin "lua box.space[box.cfg.memcached_space].index[0].type"

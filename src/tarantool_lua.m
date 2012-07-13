@@ -1150,6 +1150,21 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		}
 		free(value);
 	}
+	if (cfg->memcached_port) {
+		lua_pushfstring(L,
+		"box.space[%d].enabled = true\n"
+		"box.space[%d].cardinality = 4\n"
+		"box.space[%d].estimated_rows = 0\n"
+		"box.space[%d].index[0].unique = true\n"
+		"box.space[%d].index[0].type = 'HASH'\n"
+		"box.space[%d].index[0].key_field[0].field_no = 0\n"
+		"box.space[%d].index[0].key_field[0].field_type = 'STRING'\n",
+		cfg->memcached_space, cfg->memcached_space,
+		cfg->memcached_space, cfg->memcached_space,
+		cfg->memcached_space, cfg->memcached_space,
+		cfg->memcached_space);
+		luaL_addvalue(&b);
+	}
 	luaL_addstring(&b,
 		       "getmetatable(box.cfg).__newindex = "
 		       "function(table, index)\n"

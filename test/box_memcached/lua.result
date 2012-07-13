@@ -1,0 +1,20 @@
+lua box.space[box.cfg.memcached_space].cardinality
+---
+ - 4
+...
+lua box.space[box.cfg.memcached_space].estimated_rows
+---
+ - 0
+...
+lua box.space[box.cfg.memcached_space].n
+---
+ - 2
+...
+lua box.space[box.cfg.memcached_space].index[0].idx
+---
+ - index 0 in space 2
+...
+lua box.space[box.cfg.memcached_space].index[0].type
+---
+ - HASH
+...
