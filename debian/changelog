@@ -1,3 +1,9 @@
+tarantool (1.4.7+20120714-1) unstable; urgency=low
+
+  * Fixed memcached space and some troubles in build system.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 14 Jul 2012 10:05:37 +0400
+
 tarantool (1.4.7-1) unstable; urgency=low
 
   * New upstream stable version.
