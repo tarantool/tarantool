@@ -901,6 +901,9 @@ tree_iterator_free(struct iterator *iterator)
 
 - (struct tuple *) findByTuple: (struct tuple *) tuple
 {
+	if (building)
+		return NULL;
+
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
 

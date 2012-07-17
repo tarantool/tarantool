@@ -268,36 +268,10 @@ convert_snap_row_to_wal(struct tbuf *t)
 }
 
 static void
-title(const char *fmt, ...)
-{
-	va_list ap;
-	char buf[128], *bufptr = buf, *bufend = buf + sizeof(buf);
-
-	va_start(ap, fmt);
-	bufptr += vsnprintf(bufptr, bufend - bufptr, fmt, ap);
-	va_end(ap);
-
-	int ports[] = { cfg.primary_port, cfg.secondary_port,
-			cfg.memcached_port, cfg.admin_port,
-			cfg.replication_port };
-	int *pptr = ports;
-	char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
-	char **nptr = names;
-
-	for (; *nptr; nptr++, pptr++)
-		if (*pptr)
-			bufptr += snprintf(bufptr, bufend - bufptr,
-					   " %s: %i", *nptr, *pptr);
-
-	set_proc_title(buf);
-}
-
-
-static void
 recovery_phase_1(void)
 {
 	recovery_phase = RECOVERY_PHASE_1;
-	title("begin snapshot recovery");
+	say_info("begin snapshot recovery");
 	begin_build_primary_indexes();
 }
 
@@ -306,7 +280,7 @@ recovery_phase_2(void)
 {
 	assert(recovery_phase == RECOVERY_PHASE_1);
 	recovery_phase = RECOVERY_PHASE_2;
-	title("end snapshot recovery and building primary indexes");
+	say_info("end snapshot recovery and building primary indexes");
 	end_build_primary_indexes();
 }
 
@@ -344,6 +318,31 @@ recover_row(struct tbuf *t)
 	}
 
 	return 0;
+}
+
+static void
+title(const char *fmt, ...)
+{
+	va_list ap;
+	char buf[128], *bufptr = buf, *bufend = buf + sizeof(buf);
+
+	va_start(ap, fmt);
+	bufptr += vsnprintf(bufptr, bufend - bufptr, fmt, ap);
+	va_end(ap);
+
+	int ports[] = { cfg.primary_port, cfg.secondary_port,
+			cfg.memcached_port, cfg.admin_port,
+			cfg.replication_port };
+	int *pptr = ports;
+	char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
+	char **nptr = names;
+
+	for (; *nptr; nptr++, pptr++)
+		if (*pptr)
+			bufptr += snprintf(bufptr, bufend - bufptr,
+					   " %s: %i", *nptr, *pptr);
+
+	set_proc_title(buf);
 }
 
 static void
@@ -515,7 +514,7 @@ mod_init(void)
 
 	stat_cleanup(stat_base, requests_MAX);
 
-	title("building secondary indexes");
+	say_info("building secondary indexes");
 	build_secondary_indexes();
 
 	title("orphan");
@@ -571,7 +570,8 @@ snapshot_write_tuple(struct log_io *l, struct nbatch *batch,
 void
 mod_snapshot(struct log_io *l, struct nbatch *batch)
 {
-	struct tuple *tuple;
+	if (recovery_phase == RECOVERY_PHASE_1)
+		return;
 
 	for (uint32_t n = 0; n < BOX_SPACE_MAX; ++n) {
 		if (!spaces[n].enabled)
@@ -581,6 +581,8 @@ mod_snapshot(struct log_io *l, struct nbatch *batch)
 
 		struct iterator *it = pk->position;
 		[pk initIterator: it :ITER_FORWARD];
+
+		struct tuple *tuple;
 		while ((tuple = it->next(it))) {
 			snapshot_write_tuple(l, batch, n, tuple);
 		}
