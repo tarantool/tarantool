@@ -53,10 +53,17 @@ static struct tnt_iter *tnt_iter_init(struct tnt_iter *i) {
 
 static int tnt_iter_field_next(struct tnt_iter *i) {
 	struct tnt_iter_field *ip = TNT_IFIELD(i);
-	/* intitializing iter to the first field */
+	/* initializing iter to the first field */
 	if (ip->fld_ptr == NULL) {
+		/* in case of insufficient data */
 		if (ip->tu->size < 4) {
 			i->status = TNT_ITER_FAIL;
+			return 0;
+		}
+		/* tuple could be empty */
+		if (ip->tu->size == 4) {
+			if (ip->tu->cardinality != 0)
+				i->status = TNT_ITER_FAIL;
 			return 0;
 		}
 		ip->fld_ptr = ip->tu->data + 4; /* skipping tuple cardinality */

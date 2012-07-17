@@ -296,6 +296,20 @@ static void tt_tnt_iter3(struct tt_test *test) {
 	tnt_list_free(l);
 }
 
+/* iterator empty tuple */
+static void tt_tnt_iter4(struct tt_test *test) {
+	char buf[4];
+	memset(buf, 0, sizeof(buf));
+	struct tnt_tuple t;
+	tnt_tuple_init(&t);
+	tnt_tuple_set(&t, buf, sizeof(buf));
+	struct tnt_iter i;
+	tnt_iter(&i, &t);
+	TT_ASSERT(tnt_next(&i) == 0);
+	tnt_iter_free(&i);
+	tnt_tuple_free(&t);
+}
+
 /* marshal ping */
 static void tt_tnt_marshal_ping(struct tt_test *test) {
 	struct tnt_stream s;
@@ -1134,6 +1148,7 @@ main(int argc, char * argv[])
 	tt_test(&t, "iterator tuple", tt_tnt_iter1);
 	tt_test(&t, "iterator tuple (single field)", tt_tnt_iter11);
 	tt_test(&t, "iterator tuple (tnt_field)", tt_tnt_iter2);
+	tt_test(&t, "iterator tuple (empty)", tt_tnt_iter4);
 	tt_test(&t, "iterator list", tt_tnt_iter3);
 	/* marshaling */
 	tt_test(&t, "marshaling ping", tt_tnt_marshal_ping);
