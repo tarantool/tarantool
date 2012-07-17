@@ -64,6 +64,10 @@ struct box_snap_row {
 	u8 data[];
 } __attribute__((packed));
 
+static enum {
+	RECOVERY_PHASE_1,
+	RECOVERY_PHASE_2,
+} recovery_phase;
 
 static inline struct box_snap_row *
 box_snap_row(const struct tbuf *t)
@@ -263,37 +267,6 @@ convert_snap_row_to_wal(struct tbuf *t)
 	return r;
 }
 
-static int
-recover_row(struct tbuf *t)
-{
-	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL)
-		return -1;
-
-	@try {
-		u16 tag = read_u16(t);
-		read_u64(t); /* drop cookie */
-		if (tag == SNAP)
-			t = convert_snap_row_to_wal(t);
-		else if (tag != XLOG) {
-			say_error("unknown row tag: %i", (int)tag);
-			return -1;
-		}
-
-		u16 op = read_u16(t);
-
-		struct txn *txn = txn_begin();
-		txn->txn_flags |= BOX_NOT_STORE;
-
-		box_process_rw(txn, port_null, op, t);
-	}
-	@catch (id e) {
-		return -1;
-	}
-
-	return 0;
-}
-
 static void
 title(const char *fmt, ...)
 {
@@ -319,6 +292,59 @@ title(const char *fmt, ...)
 	set_proc_title(buf);
 }
 
+
+static void
+recovery_phase_1(void)
+{
+	recovery_phase = RECOVERY_PHASE_1;
+	title("begin snapshot recovery");
+	begin_build_primary_indexes();
+}
+
+static void
+recovery_phase_2(void)
+{
+	assert(recovery_phase == RECOVERY_PHASE_1);
+	recovery_phase = RECOVERY_PHASE_2;
+	title("end snapshot recovery and building primary indexes");
+	end_build_primary_indexes();
+}
+
+static int
+recover_row(struct tbuf *t)
+{
+	/* drop wal header */
+	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL)
+		return -1;
+
+	@try {
+		u16 tag = read_u16(t);
+		read_u64(t); /* drop cookie */
+		if (tag == SNAP) {
+			assert(recovery_phase == RECOVERY_PHASE_1);
+			t = convert_snap_row_to_wal(t);
+		} else if (tag == XLOG) {
+			if (recovery_phase == RECOVERY_PHASE_1) {
+				recovery_phase_2();
+			}
+		} else {
+			say_error("unknown row tag: %i", (int)tag);
+			return -1;
+		}
+
+		u16 op = read_u16(t);
+
+		struct txn *txn = txn_begin();
+		txn->txn_flags |= BOX_NOT_STORE;
+
+		box_process_rw(txn, port_null, op, t);
+	}
+	@catch (id e) {
+		return -1;
+	}
+
+	return 0;
+}
 
 static void
 box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
@@ -478,17 +504,19 @@ mod_init(void)
 	/* memcached initialize */
 	memcached_init();
 
-
 	if (init_storage)
 		return;
 
+	recovery_phase_1();
 	recover(recovery_state, 0);
+	if (recovery_phase == RECOVERY_PHASE_1) {
+		recovery_phase_2();
+	}
+
 	stat_cleanup(stat_base, requests_MAX);
 
-	title("building indexes");
-
-	/* build secondary indexes */
-	build_indexes();
+	title("building secondary indexes");
+	build_secondary_indexes();
 
 	title("orphan");
 

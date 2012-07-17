@@ -858,15 +858,14 @@ tree_iterator_free(struct iterator *iterator)
 	[super free];
 }
 
-- (void) enable
+- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
-	memset(&tree, 0, sizeof tree);
-	if (index_is_primary(self)) {
-		sptree_index_init(&tree,
-				  [self node_size], NULL, 0, 0,
-				  [self key_node_cmp], [self node_cmp],
-				  self);
+	self = [super init: key_def_arg :space_arg];
+	if (self) {
+		memset(&tree, 0, sizeof tree);
+		building = false;
 	}
+	return self;
 }
 
 - (size_t) size
@@ -927,6 +926,12 @@ tree_iterator_free(struct iterator *iterator)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 			  key_def->max_fieldno);
 
+	if (building) {
+		assert(old_tuple == NULL);
+		[self buildNext: new_tuple];
+		return;
+	}
+
 	void *node = alloca([self node_size]);
 	if (old_tuple) {
 		[self fold: node :old_tuple];
@@ -974,6 +979,57 @@ tree_iterator_free(struct iterator *iterator)
 		it->base.next_equal = tree_iterator_reverse_next_equal;
 		sptree_index_iterator_reverse_init_set(&tree, &it->iter, &it->key_data);
 	}
+}
+
+- (void) buildBegin
+{
+	assert(index_is_primary(self));
+
+	building = true;
+
+	tree.size = 0;
+	tree.max_size = 64;
+
+	size_t node_size = [self node_size];
+	size_t sz = tree.max_size * node_size;
+	tree.members = malloc(sz);
+	if (tree.members == NULL) {
+		panic("malloc(): failed to allocate %"PRI_SZ" bytes", sz);
+	}
+}
+
+- (void) buildNext: (struct tuple *) tuple
+{
+	size_t node_size = [self node_size];
+
+	if (tree.size == tree.max_size) {
+		tree.max_size *= 2;
+
+		size_t sz = tree.max_size * node_size;
+		tree.members = realloc(tree.members, sz);
+		if (tree.members == NULL) {
+			panic("malloc(): failed to allocate %"PRI_SZ" bytes", sz);
+		}
+	}
+
+	void *node = ((u8 *) tree.members + tree.size * node_size);
+	[self fold: node :tuple];
+	tree.size++;
+}
+
+- (void) buildEnd
+{
+	assert(index_is_primary(self));
+
+	u32 n_tuples = tree.size;
+	u32 estimated_tuples = tree.max_size;
+	void *nodes = tree.members;
+
+	building = false;
+	sptree_index_init(&tree,
+			  [self node_size], nodes, n_tuples, estimated_tuples,
+			  [self key_node_cmp], [self node_cmp],
+			  self);
 }
 
 - (void) build: (Index *) pk
@@ -1206,11 +1262,14 @@ linear_dense_key_node_cmp(const void *key, const void * node, void *arg)
 
 @implementation DenseTreeIndex
 
-- (void) enable
+- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
-	[super enable];
-	first_field = find_first_field(key_def);
-	is_linear = key_is_linear(key_def);
+	self = [super init: key_def_arg :space_arg];
+	if (self) {
+		first_field = find_first_field(key_def);
+		is_linear = key_is_linear(key_def);
+	}
+	return self;
 }
 
 - (size_t) node_size
@@ -1393,12 +1452,15 @@ linear_fixed_key_node_cmp(const void *key, const void * node, void *arg)
 
 @implementation FixedTreeIndex
 
-- (void) enable
+- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
-	[super enable];
-	first_field = find_first_field(key_def);
-	first_offset = find_fixed_offset(space, first_field, 0);
-	is_linear = key_is_linear(key_def);
+	self = [super init: key_def_arg :space_arg];
+	if (self) {
+		first_field = find_first_field(key_def);
+		first_offset = find_fixed_offset(space, first_field, 0);
+		is_linear = key_is_linear(key_def);
+	}
+	return self;
 }
 
 - (size_t) node_size

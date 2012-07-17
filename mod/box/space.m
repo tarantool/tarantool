@@ -302,7 +302,31 @@ space_init(void)
 }
 
 void
-build_indexes(void)
+begin_build_primary_indexes(void)
+{
+	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
+		if (spaces[n].enabled == false)
+			continue;
+
+		Index *pk = spaces[n].index[0];
+		[pk buildBegin];
+	}
+}
+
+void
+end_build_primary_indexes(void)
+{
+	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
+		if (spaces[n].enabled == false)
+			continue;
+
+		Index *pk = spaces[n].index[0];
+		[pk buildEnd];
+	}
+}
+
+void
+build_secondary_indexes(void)
 {
 	assert(secondary_indexes_enabled == false);
 
@@ -322,6 +346,7 @@ build_indexes(void)
 
 		say_info("Space %"PRIu32": done", n);
 	}
+
 	/* enable secondary indexes now */
 	secondary_indexes_enabled = true;
 }
