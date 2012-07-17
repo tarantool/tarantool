@@ -819,7 +819,6 @@ tree_iterator_free(struct iterator *iterator)
 @interface DenseTreeIndex: TreeIndex {
 	@public
 	u32 first_field;
-	bool is_linear;
 }
 @end
 
@@ -830,7 +829,6 @@ tree_iterator_free(struct iterator *iterator)
 	@public
 	u32 first_field;
 	u32 first_offset;
-	bool is_linear;
 }
 @end
 
@@ -1270,7 +1268,6 @@ linear_dense_key_node_cmp(const void *key, const void * node, void *arg)
 	self = [super init: key_def_arg :space_arg];
 	if (self) {
 		first_field = find_first_field(key_def);
-		is_linear = key_is_linear(key_def);
 	}
 	return self;
 }
@@ -1282,17 +1279,23 @@ linear_dense_key_node_cmp(const void *key, const void * node, void *arg)
 
 - (tree_cmp_t) node_cmp
 {
-	return is_linear ? linear_dense_node_cmp : dense_node_cmp;
+	return key_is_linear(key_def)
+		? linear_dense_node_cmp
+		: dense_node_cmp;
 }
 
 - (tree_cmp_t) dup_node_cmp
 {
-	return is_linear ? linear_dense_dup_node_cmp : dense_dup_node_cmp;
+	return key_is_linear(key_def)
+		? linear_dense_dup_node_cmp
+		: dense_dup_node_cmp;
 }
 
 - (tree_cmp_t) key_node_cmp
 {
-	return is_linear ? linear_dense_key_node_cmp : dense_key_node_cmp;
+	return key_is_linear(key_def)
+		? linear_dense_key_node_cmp
+		: dense_key_node_cmp;
 }
 
 - (void) fold: (void *) node :(struct tuple *) tuple
@@ -1461,7 +1464,6 @@ linear_fixed_key_node_cmp(const void *key, const void * node, void *arg)
 	if (self) {
 		first_field = find_first_field(key_def);
 		first_offset = find_fixed_offset(space, first_field, 0);
-		is_linear = key_is_linear(key_def);
 	}
 	return self;
 }
@@ -1473,17 +1475,23 @@ linear_fixed_key_node_cmp(const void *key, const void * node, void *arg)
 
 - (tree_cmp_t) node_cmp
 {
-	return is_linear ? linear_fixed_node_cmp : fixed_node_cmp;
+	return key_is_linear(key_def)
+		? linear_fixed_node_cmp
+		: fixed_node_cmp;
 }
 
 - (tree_cmp_t) dup_node_cmp
 {
-	return is_linear ? linear_fixed_dup_node_cmp : fixed_dup_node_cmp;
+	return key_is_linear(key_def)
+		? linear_fixed_dup_node_cmp
+		: fixed_dup_node_cmp;
 }
 
 - (tree_cmp_t) key_node_cmp
 {
-	return is_linear ? linear_fixed_key_node_cmp : fixed_key_node_cmp;
+	return key_is_linear(key_def)
+		? linear_fixed_key_node_cmp
+		: fixed_key_node_cmp;
 }
 
 - (void) fold: (void *) node :(struct tuple *) tuple
