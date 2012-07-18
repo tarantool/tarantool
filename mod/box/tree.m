@@ -861,7 +861,6 @@ tree_iterator_free(struct iterator *iterator)
 	self = [super init: key_def_arg :space_arg];
 	if (self) {
 		memset(&tree, 0, sizeof tree);
-		building = false;
 	}
 	return self;
 }
@@ -899,9 +898,6 @@ tree_iterator_free(struct iterator *iterator)
 
 - (struct tuple *) findByTuple: (struct tuple *) tuple
 {
-	if (building)
-		return NULL;
-
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
 
@@ -926,12 +922,6 @@ tree_iterator_free(struct iterator *iterator)
 	if (new_tuple->field_count < key_def->max_fieldno)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 			  key_def->max_fieldno);
-
-	if (building) {
-		assert(old_tuple == NULL);
-		[self buildNext: new_tuple];
-		return;
-	}
 
 	void *node = alloca([self node_size]);
 	if (old_tuple) {
@@ -986,8 +976,6 @@ tree_iterator_free(struct iterator *iterator)
 {
 	assert(index_is_primary(self));
 
-	building = true;
-
 	tree.size = 0;
 	tree.max_size = 64;
 
@@ -1026,7 +1014,6 @@ tree_iterator_free(struct iterator *iterator)
 	u32 estimated_tuples = tree.max_size;
 	void *nodes = tree.members;
 
-	building = false;
 	sptree_index_init(&tree,
 			  [self node_size], nodes, n_tuples, estimated_tuples,
 			  [self key_node_cmp], [self node_cmp],

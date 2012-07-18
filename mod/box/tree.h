@@ -39,7 +39,6 @@ typedef int (*tree_cmp_t)(const void *, const void *, void *);
 @interface TreeIndex: Index {
 @public
 	sptree_index tree;
-	bool building;
 };
 
 + (Index *) alloc: (struct key_def *) key_def :(struct space *) space;

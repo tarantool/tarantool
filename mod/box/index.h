@@ -111,6 +111,7 @@ struct key_def {
  * Finish index construction.
  */
 - (void) buildBegin;
+- (void) buildNext: (struct tuple *)tuple;
 - (void) buildEnd;
 - (void) build: (Index *) pk;
 - (size_t) size;

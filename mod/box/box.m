@@ -250,23 +250,6 @@ xlog_print(struct tbuf *t)
 	return 0;
 }
 
-static struct tbuf *
-convert_snap_row_to_wal(struct tbuf *t)
-{
-	struct tbuf *r = tbuf_alloc(fiber->gc_pool);
-	struct box_snap_row *row = box_snap_row(t);
-	u16 op = REPLACE;
-	u32 flags = 0;
-
-	tbuf_append(r, &op, sizeof(op));
-	tbuf_append(r, &row->space, sizeof(row->space));
-	tbuf_append(r, &flags, sizeof(flags));
-	tbuf_append(r, &row->tuple_size, sizeof(row->tuple_size));
-	tbuf_append(r, row->data, row->data_size);
-
-	return r;
-}
-
 static void
 recovery_phase_1(void)
 {
@@ -284,6 +267,27 @@ recovery_phase_2(void)
 	end_build_primary_indexes();
 }
 
+static void
+recover_snap_row(struct tbuf *t)
+{
+	struct box_snap_row *row = box_snap_row(t);
+
+	struct tuple *tuple = tuple_alloc(row->data_size);
+	memcpy(tuple->data, row->data, row->data_size);
+	tuple->field_count = row->tuple_size;
+	tuple_ref(tuple, 1);
+
+	@try {
+		struct space *space = space_find(row->space);
+		Index *index = space->index[0];
+		[index buildNext: tuple];
+	}
+	@catch(...) {
+		tuple_ref(tuple, -1);
+		@throw;
+	}
+}
+
 static int
 recover_row(struct tbuf *t)
 {
@@ -296,22 +300,19 @@ recover_row(struct tbuf *t)
 		read_u64(t); /* drop cookie */
 		if (tag == SNAP) {
 			assert(recovery_phase == RECOVERY_PHASE_1);
-			t = convert_snap_row_to_wal(t);
+			recover_snap_row(t);
 		} else if (tag == XLOG) {
 			if (recovery_phase == RECOVERY_PHASE_1) {
 				recovery_phase_2();
 			}
+			u16 op = read_u16(t);
+			struct txn *txn = txn_begin();
+			txn->txn_flags |= BOX_NOT_STORE;
+			box_process_rw(txn, port_null, op, t);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
 		}
-
-		u16 op = read_u16(t);
-
-		struct txn *txn = txn_begin();
-		txn->txn_flags |= BOX_NOT_STORE;
-
-		box_process_rw(txn, port_null, op, t);
 	}
 	@catch (id e) {
 		return -1;

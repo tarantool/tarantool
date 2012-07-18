@@ -127,6 +127,12 @@ iterator_first_equal(struct iterator *it)
 	[self subclassResponsibility: _cmd];
 }
 
+- (void) buildNext: (struct tuple *)tuple
+{
+	(void) tuple;
+	[self subclassResponsibility: _cmd];
+}
+
 - (void) buildEnd
 {
 	[self subclassResponsibility: _cmd];
@@ -282,6 +288,11 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) buildBegin
 {
+}
+
+- (void) buildNext: (struct tuple *)tuple
+{
+	[self replace: NULL :tuple];
 }
 
 - (void) buildEnd
