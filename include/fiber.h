@@ -124,10 +124,11 @@ fiber_io_stop(int fd, int events);
 
 void
 fiber_yield(void);
-void fiber_destroy_all();
 
-bool
-fiber_is_caller(struct fiber *f);
+void
+fiber_yield_to(struct fiber *f);
+
+void fiber_destroy_all();
 
 ssize_t fiber_bread(struct tbuf *, size_t v);
 
@@ -172,7 +173,6 @@ ssize_t fiber_write(const void *buf, size_t count);
 int fiber_close(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
-bool fiber_checkstack();
 void fiber_call(struct fiber *callee);
 void fiber_wakeup(struct fiber *f);
 struct fiber *fiber_find(int fid);

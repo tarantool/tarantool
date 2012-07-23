@@ -34,14 +34,14 @@ local function printer_task_routine(x)
     print("printer: tester status = ", box.fiber.status(tester_task))
     print("printer: printer status = ", box.fiber.status(printer_task))
     for i = 1, x do
-	if i == 3 then
-	    box.fiber.yield(-1)
-	end
-	if i % 2 == 0 then
-	    even(i)
-	else
-	    odd(i)
-	end
+        if i == 3 then
+            box.fiber.yield(-1)
+        end
+        if i % 2 == 0 then
+            even(i)
+        else
+            odd(i)
+        end
     end
 end
 
@@ -54,14 +54,14 @@ end
 local function tester_task_routine()
     printer_task = box.fiber.create(printer_task_routine)
     print("tester: status(tester) = ", box.fiber.status(tester_task))
-    print("tester: status(tester) = ", box.fiber.status(printer_task))
+    print("tester: status(printer) = ", box.fiber.status(printer_task))
 
     count = 1
     while box.fiber.status(printer_task) ~= "dead" do
-	print("count: ", count)
-	value = box.fiber.resume(printer_task, 5)
-	print("status: ", box.fiber.status(printer_task))
-	count = count + 1
+        print("count: ", count)
+        box.fiber.resume(printer_task, 5)
+        print("status: ", box.fiber.status(printer_task))
+        count = count + 1
     end
 end
 

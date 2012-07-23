@@ -417,6 +417,32 @@ static const struct luaL_reg boxlib[] = {
 
 static const char *fiberlib_name = "box.fiber";
 
+enum fiber_state { DONE, YIELD, DETACH };
+
+/**
+ * @pre: stack top contains a table
+ * @post: sets table field specified by name of the table on top
+ * of the stack to a weak kv table and pops that weak table.
+ */
+static void
+lbox_create_weak_table(struct lua_State *L, const char *name)
+{
+	lua_newtable(L);
+	/* and a metatable */
+	lua_newtable(L);
+	/* weak keys and values */
+	lua_pushstring(L, "kv");
+	/* pops 'kv' */
+	lua_setfield(L, -2, "__mode");
+	/* pops the metatable */
+	lua_setmetatable(L, -2);
+	/* assigns and pops table */
+	lua_setfield(L, -2, name);
+	/* gets memoize back. */
+	lua_getfield(L, -1, name);
+	assert(! lua_isnil(L, -1));
+}
+
 /**
  * Push a userdata for the given fiber onto Lua stack.
  */
@@ -435,20 +461,7 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 		/* pop the nil */
 		lua_pop(L, 1);
 		/* create memoize table */
-		lua_newtable(L);
-		/* and a metatable */
-		lua_newtable(L);
-		/* weak keys and values */
-		lua_pushstring(L, "kv");
-		/* pops 'kv' */
-		lua_setfield(L, -2, "__mode");
-		/* pops the metatable */
-		lua_setmetatable(L, -2);
-		/* assigns and pops memoize */
-		lua_setfield(L, -2, "memoize");
-		/* gets memoize back. */
-		lua_getfield(L, -1, "memoize");
-		assert(! lua_isnil(L, -1));
+		lbox_create_weak_table(L, "memoize");
 	}
 	/* Find out whether the fiber is  already in the memoize table. */
 	lua_pushlightuserdata(L, f);
@@ -513,6 +526,47 @@ box_lua_fiber_clear_coro(struct lua_State *L, struct fiber *f)
 	lua_settable(L, LUA_REGISTRYINDEX);
 }
 
+/**
+ * To yield control to the calling fiber
+ * we need to be able to find the caller of an
+ * attached fiber. Instead of passing the caller
+ * around on the child fiber stack, we create a
+ * weak table associated with child fiber
+ * lua_State, and save the caller in it.
+ *
+ * When the child fiber lua thread is garbage collected,
+ * the table is automatically cleared.
+ */
+static void
+box_lua_fiber_push_caller(struct lua_State *child_L)
+{
+	luaL_getmetatable(child_L, fiberlib_name);
+	lua_getfield(child_L, -1, "callers");
+	if (lua_isnil(child_L, -1)) {
+		lua_pop(child_L, 1);
+		lbox_create_weak_table(child_L, "callers");
+	}
+	lua_pushthread(child_L);
+	lua_pushlightuserdata(child_L, fiber);
+	lua_settable(child_L, -3);
+	/* Pop the fiberlib metatable and callers table. */
+	lua_pop(child_L, 2);
+}
+
+
+static struct fiber *
+box_lua_fiber_get_caller(struct lua_State *L)
+{
+	luaL_getmetatable(L, fiberlib_name);
+	lua_getfield(L, -1, "callers");
+	lua_pushthread(L);
+	lua_gettable(L, -2);
+	struct fiber *caller = lua_touserdata(L, -1);
+	/* Pop the caller, the callers table, the fiberlib metatable. */
+	lua_pop(L, 3);
+	return caller;
+}
+
 static int
 lbox_fiber_gc(struct lua_State *L)
 {
@@ -550,6 +604,22 @@ lbox_fiber_gc(struct lua_State *L)
 		 */
 		fiber_cancel(f);
 	}
+	return 0;
+}
+
+/**
+ * Detach the current fiber.
+ */
+static int
+lbox_fiber_detach(struct lua_State *L)
+{
+	if (box_lua_fiber_get_coro(L, fiber) == NULL)
+		luaL_error(L, "fiber.detach(): not attached");
+	struct fiber *caller = box_lua_fiber_get_caller(L);
+	/* Clear the caller, to avoid a reference leak. */
+	/* Request a detach. */
+	lua_pushinteger(L, DETACH);
+	fiber_yield_to(caller);
 	return 0;
 }
 
@@ -594,6 +664,10 @@ box_lua_fiber_run(void *arg __attribute__((unused)))
 		@throw;
 	} @catch (...) {
 		lua_settop(L, 1);
+		/*
+		 * The error message is already there.
+		 * Add completion status.
+		 */
 		lua_pushboolean(L, false);
 		lua_insert(L, -2);
 	} @finally {
@@ -603,15 +677,40 @@ box_lua_fiber_run(void *arg __attribute__((unused)))
 		 */
 		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
 	}
-	/* L stack contains nothing but call results */
+	/*
+	 * L stack contains nothing but call results.
+	 * If we're still attached, synchronously pass
+	 * them to the caller, and then terminate.
+	 */
+	if (box_lua_fiber_get_coro(L, fiber)) {
+		struct fiber *caller = box_lua_fiber_get_caller(L);
+		lua_pushinteger(L, DONE);
+		fiber_yield_to(caller);
+	}
 }
+
+/** @retval true if check failed, false otherwise */
+static bool
+fiber_checkstack(struct lua_State *L)
+{
+	struct fiber *f = fiber;
+	const int MAX_STACK_DEPTH = 16;
+	int depth = 1;
+	while ((L = box_lua_fiber_get_coro(L, f)) != NULL) {
+		if (depth++ == MAX_STACK_DEPTH)
+			return true;
+		f = box_lua_fiber_get_caller(L);
+	}
+	return false;
+}
+
 
 static int
 lbox_fiber_create(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isfunction(L, 1))
 		luaL_error(L, "fiber.create(function): bad arguments");
-	if (fiber_checkstack())
+	if (fiber_checkstack(L))
 		luaL_error(L, "fiber.create(function): recursion limit"
 			   " reached");
 
@@ -621,7 +720,7 @@ lbox_fiber_create(struct lua_State *L)
 	lua_pushlightuserdata(L, f);
 	struct lua_State *child_L = lua_newthread(L);
 	lua_settable(L, LUA_REGISTRYINDEX);
-	/* move the argument to the new coro */
+	/* Move the argument (function of the coro) to the new coro */
 	lua_xmove(L, child_L, 1);
 	lbox_pushfiber(L, f);
 	return 1;
@@ -631,6 +730,8 @@ static int
 lbox_fiber_resume(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
+	if (f->fid == 0)
+		luaL_error(L, "fiber.resume(): the fiber is dead");
 	struct lua_State *child_L = box_lua_fiber_get_coro(L, f);
 	if (child_L == NULL)
 		luaL_error(L, "fiber.resume(): can't resume a "
@@ -640,14 +741,48 @@ lbox_fiber_resume(struct lua_State *L)
 		lua_xmove(L, child_L, nargs);
 	/* dup 'out' for admin fibers */
 	tarantool_lua_dup_out(L, child_L);
-	fiber_call(f);
+	int fid = f->fid;
+	/* Silent compiler warnings in a release build. */
+	(void) fid;
+	box_lua_fiber_push_caller(child_L);
+	/*
+	 * We don't use fiber_call() since this breaks any sort
+	 * of yield in the called fiber: for a yield to work,
+	 * the callee got to be scheduled by 'sched'.
+	 */
+	fiber_yield_to(f);
+	/*
+	 * The called fiber could have done only 3 things:
+	 * - yielded to us (then we should grab its return)
+	 * - completed (grab return values, wake up the fiber,
+	 *   so that it can die)
+	 * - detached (grab return values, wakeup the fiber so it
+	 *   can continue).
+	 */
+	assert(f->fid == fid);
 	tarantool_lua_set_out(child_L, NULL);
+	/* Find out the state of the child fiber. */
+	enum fiber_state child_state = lua_tointeger(child_L, -1);
+	lua_pop(child_L, 1);
 	/* Get the results */
 	nargs = lua_gettop(child_L);
 	lua_xmove(child_L, L, nargs);
-	if (f->f == 0) {
-		/* The fiber is dead. Garbage collect the associated coro. */
+	if (child_state != YIELD) {
+		/*
+		 * The fiber is dead or requested a detach.
+		 * Garbage collect the associated coro.
+		 */
 		box_lua_fiber_clear_coro(L, f);
+		if (child_state == DETACH) {
+			/*
+			 * Schedule the runaway child at least
+			 * once.
+			 */
+			fiber_wakeup(f);
+		} else {
+			/* Synchronously reap a dead child. */
+			fiber_call(f);
+		}
 	}
 	return nargs;
 }
@@ -668,9 +803,15 @@ lbox_fiber_yield(struct lua_State *L)
 	 * Yield to the caller. The caller will take care of
 	 * whatever arguments are taken.
 	 */
-	fiber_yield();
-	/* throws an error if we were cancelled. */
-	fiber_testcancel();
+	if (box_lua_fiber_get_coro(L, fiber) == NULL) {
+		fiber_wakeup(fiber);
+		fiber_yield();
+		fiber_testcancel();
+	} else {
+		struct fiber *caller = box_lua_fiber_get_caller(L);
+		lua_pushinteger(L, YIELD);
+		fiber_yield_to(caller);
+	}
 	/*
 	 * Got resumed. Return whatever the caller has passed
 	 * to us with box.fiber.resume().
@@ -678,6 +819,18 @@ lbox_fiber_yield(struct lua_State *L)
 	 * to sched always gets back whatever it yields.
 	 */
 	return lua_gettop(L);
+}
+
+static bool
+fiber_is_caller(struct lua_State *L, struct fiber *f) {
+	struct fiber *child = fiber;
+	while ((L = box_lua_fiber_get_coro(L, child)) != NULL) {
+		struct fiber *caller = box_lua_fiber_get_caller(L);
+		if (caller == f)
+			return true;
+		child = caller;
+	}
+	return false;
 }
 
 /**
@@ -703,7 +856,7 @@ lbox_fiber_status(struct lua_State *L)
 	} else if (f == fiber) {
 		/* The fiber is the current running fiber. */
 		status = "running";
-	} else if (fiber_is_caller(f)) {
+	} else if (fiber_is_caller(L, f)) {
 		/* The fiber is current fiber's caller. */
 		status = "normal";
 	} else {
@@ -712,28 +865,6 @@ lbox_fiber_status(struct lua_State *L)
 	}
 	lua_pushstring(L, status);
 	return 1;
-}
-
-/**
- * Detach the current fiber.
- */
-static int
-lbox_fiber_detach(struct lua_State *L)
-{
-	struct lua_State *self_L = box_lua_fiber_get_coro(L, fiber);
-	if (self_L == NULL)
-		luaL_error(L, "fiber.detach(): not attached");
-	assert(self_L == L);
-	/* Clear our association with the parent. */
-	box_lua_fiber_clear_coro(L, fiber);
-	tarantool_lua_set_out(L, NULL);
-	/* Make sure we get awoken, at least once. */
-	fiber_wakeup(fiber);
-	/* Yield to the parent. */
-	fiber_yield();
-	/* check if we were cancelled. */
-	fiber_testcancel();
-	return 0;
 }
 
 /**
@@ -1240,8 +1371,8 @@ tarantool_lua_load_init_script(struct lua_State *L)
 {
 	/*
 	 * init script can call box.fiber.yield (including implicitly via
-	 * box.insert, box.update, etc...) but box.fiber.yield() today,
-	 * when called from 'sched' fiber crashes the server.
+	 * box.insert, box.update, etc...), but box.fiber.yield() today,
+	 * which, when called from 'sched' fiber crashes the server.
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */

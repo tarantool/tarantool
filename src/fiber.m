@@ -90,13 +90,6 @@ update_last_stack_frame(struct fiber *fiber)
 #endif /* ENABLE_BACKTRACE */
 }
 
-/** @retval true if check failed, false otherwise */
-bool
-fiber_checkstack()
-{
-	return sp >= call_stack + FIBER_CALL_STACK;
-}
-
 void
 fiber_call(struct fiber *callee)
 {
@@ -238,21 +231,13 @@ fiber_yield(void)
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }
 
-/**
- * Return true if the current fiber is a callee of fiber f,
- * false otherwise.
- */
-bool
-fiber_is_caller(struct fiber *f)
+void
+fiber_yield_to(struct fiber *f)
 {
-	/* 'Unwinding' the fiber stack. */
-	for (struct fiber **sp_ptr = sp; sp_ptr > call_stack; --sp_ptr) {
-		if (f == *sp_ptr)
-			return true;
-	}
-	return false;
+	fiber_wakeup(f);
+	fiber_yield();
+	fiber_testcancel();
 }
-
 
 /**
  * @note: this is a cancellation point (@sa fiber_testcancel())
