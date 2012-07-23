@@ -6,6 +6,7 @@
 > iterator tuple                [OK]
 > iterator tuple (single field) [OK]
 > iterator tuple (tnt_field)    [OK]
+> iterator tuple (empty)        [OK]
 > iterator list                 [OK]
 > marshaling ping               [OK]
 > marshaling insert             [OK]
