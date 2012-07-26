@@ -64,7 +64,7 @@ lua box.cfg.io_collect_interval
 reload configuration
 ---
 fail:
- - gram_yyerror: syntax error, unexpected $end, expecting KEY_P or NULL_P or '[' at line 1
+ - empty configuration file 'tarantool.cfg'
 ...
 lua box.cfg.too_long_threshold
 ---
