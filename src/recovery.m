@@ -258,26 +258,27 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 
 /**
  * Read a snapshot and call row_handler for every snapshot row.
- *
- * @retval 0 success
- * @retval -1 failure
+ * Panic in case of error.
  */
-static int
+void
 recover_snap(struct recovery_state *r)
 {
-	int res = -1;
+	/*  current_wal isn't open during initial recover. */
+	assert(r->current_wal == NULL);
+	say_info("recovery start");
+
 	struct log_io *snap;
 	i64 lsn;
 
 	lsn = greatest_lsn(r->snap_dir);
 	if (lsn <= 0) {
 		say_error("can't find snapshot");
-		return -1;
+		goto error;
 	}
 	snap = log_io_open_for_read(r->snap_dir, lsn, NONE);
 	if (snap == NULL) {
 		say_error("can't find/open snapshot");
-		return -1;
+		goto error;
 	}
 	say_info("recover from `%s'", snap->filename);
 	struct log_io_cursor i;
@@ -288,15 +289,24 @@ recover_snap(struct recovery_state *r)
 	while ((row = log_io_cursor_next(&i))) {
 		if (r->row_handler(row) < 0) {
 			say_error("can't apply row");
-			goto end;
+			break;
 		}
 	}
-	r->lsn = r->confirmed_lsn = lsn;
-	res = 0;
-end:
 	log_io_cursor_close(&i);
 	log_io_close(&snap);
-	return res;
+
+	if (row == NULL) {
+		r->lsn = r->confirmed_lsn = lsn;
+		say_info("snapshot recovered, confirmed lsn: %"
+			 PRIi64, r->confirmed_lsn);
+		return;
+	}
+error:
+	if (greatest_lsn(r->snap_dir) <= 0) {
+		say_crit("didn't you forget to initialize storage with --init-storage switch?");
+		_exit(1);
+	}
+	panic("snapshot recovery failed");
 }
 
 #define LOG_EOF 0
@@ -465,48 +475,16 @@ recover_current_wal:
 	return result;
 }
 
+/**
+ * Recover all WALs created after the last snapshot. Panic if
+ * error.
+ */
 void
-recover(struct recovery_state *r, i64 lsn)
+recover_existing_wals(struct recovery_state *r)
 {
-	/* * current_wal isn't open during initial recover. */
-	assert(r->current_wal == NULL);
-	/*
-	 * If the caller sets confirmed_lsn to a non-zero value,
-	 * snapshot recovery is skipped and we proceed directly to
-	 * finding the WAL with the respective LSN and continue
-	 * recovery from this WAL.  @fixme: this is a gotcha, due
-	 * to whihc a replica is unable to read data from a master
-	 * if the replica has no snapshot or the master has no WAL
-	 * with the requested LSN.
-	 */
-	say_info("recovery start");
-	if (lsn == 0) {
-		if (recover_snap(r) != 0) {
-			if (greatest_lsn(r->snap_dir) <= 0) {
-				say_crit("didn't you forget to initialize storage with --init-storage switch?");
-				_exit(1);
-			}
-			panic("snapshot recovery failed");
-		}
-		say_info("snapshot recovered, confirmed lsn: %"
-			 PRIi64, r->confirmed_lsn);
-	} else {
-		/*
-		 * Note that recovery starts with lsn _NEXT_ to
-		 * the confirmed one.
-		 */
-		r->lsn = r->confirmed_lsn = lsn - 1;
-	}
 	i64 next_lsn = r->confirmed_lsn + 1;
 	i64 wal_lsn = find_including_file(r->wal_dir, next_lsn);
 	if (wal_lsn <= 0) {
-		if (lsn != 0) {
-			/*
-			 * Recovery for replication relay, did not
-			 * find the requested LSN.
-			 */
-			say_error("can't find WAL containing record with lsn: %" PRIi64, next_lsn);
-		}
 		/* No WALs to recover from. */
 		goto out;
 	}

@@ -108,11 +108,12 @@ struct key_def {
 /** Destroy and free index instance. */
 - (void) free;
 /**
- * Finish index construction.
+ * Two-phase index creation: begin building, add tuples, finish.
  */
-- (void) buildBegin;
+- (void) beginBuild;
 - (void) buildNext: (struct tuple *)tuple;
-- (void) buildEnd;
+- (void) endBuild;
+/** Build this index based on the contents of another index. */
 - (void) build: (Index *) pk;
 - (size_t) size;
 - (struct tuple *) min;

@@ -40,6 +40,7 @@
 struct space *spaces = NULL;
 
 bool secondary_indexes_enabled = false;
+bool primary_indexes_enabled = false;
 /** Free a key definition. */
 static void
 key_free(struct key_def *key_def)
@@ -304,12 +305,13 @@ space_init(void)
 void
 begin_build_primary_indexes(void)
 {
+	assert(primary_indexes_enabled == false);
 	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
 		if (spaces[n].enabled == false)
 			continue;
 
 		Index *pk = spaces[n].index[0];
-		[pk buildBegin];
+		[pk beginBuild];
 	}
 }
 
@@ -321,13 +323,15 @@ end_build_primary_indexes(void)
 			continue;
 
 		Index *pk = spaces[n].index[0];
-		[pk buildEnd];
+		[pk endBuild];
 	}
+	primary_indexes_enabled = true;
 }
 
 void
 build_secondary_indexes(void)
 {
+	assert(primary_indexes_enabled == true);
 	assert(secondary_indexes_enabled == false);
 
 	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {

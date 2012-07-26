@@ -64,11 +64,6 @@ struct box_snap_row {
 	u8 data[];
 } __attribute__((packed));
 
-static enum {
-	RECOVERY_PHASE_1,
-	RECOVERY_PHASE_2,
-} recovery_phase;
-
 static inline struct box_snap_row *
 box_snap_row(const struct tbuf *t)
 {
@@ -251,41 +246,20 @@ xlog_print(struct tbuf *t)
 }
 
 static void
-recovery_phase_1(void)
-{
-	recovery_phase = RECOVERY_PHASE_1;
-	say_info("begin snapshot recovery");
-	begin_build_primary_indexes();
-}
-
-static void
-recovery_phase_2(void)
-{
-	assert(recovery_phase == RECOVERY_PHASE_1);
-	recovery_phase = RECOVERY_PHASE_2;
-	say_info("end snapshot recovery and building primary indexes");
-	end_build_primary_indexes();
-}
-
-static void
 recover_snap_row(struct tbuf *t)
 {
+	assert(primary_indexes_enabled == false);
+
 	struct box_snap_row *row = box_snap_row(t);
 
 	struct tuple *tuple = tuple_alloc(row->data_size);
 	memcpy(tuple->data, row->data, row->data_size);
 	tuple->field_count = row->tuple_size;
-	tuple_ref(tuple, 1);
 
-	@try {
-		struct space *space = space_find(row->space);
-		Index *index = space->index[0];
-		[index buildNext: tuple];
-	}
-	@catch(...) {
-		tuple_ref(tuple, -1);
-		@throw;
-	}
+	struct space *space = space_find(row->space);
+	Index *index = space->index[0];
+	[index buildNext: tuple];
+	tuple_ref(tuple, 1);
 }
 
 static int
@@ -299,12 +273,8 @@ recover_row(struct tbuf *t)
 		u16 tag = read_u16(t);
 		read_u64(t); /* drop cookie */
 		if (tag == SNAP) {
-			assert(recovery_phase == RECOVERY_PHASE_1);
 			recover_snap_row(t);
 		} else if (tag == XLOG) {
-			if (recovery_phase == RECOVERY_PHASE_1) {
-				recovery_phase_2();
-			}
 			u16 op = read_u16(t);
 			struct txn *txn = txn_begin();
 			txn->txn_flags |= BOX_NOT_STORE;
@@ -507,11 +477,10 @@ mod_init(void)
 	if (init_storage)
 		return;
 
-	recovery_phase_1();
-	recover(recovery_state, 0);
-	if (recovery_phase == RECOVERY_PHASE_1) {
-		recovery_phase_2();
-	}
+	begin_build_primary_indexes();
+	recover_snap(recovery_state);
+	end_build_primary_indexes();
+	recover_existing_wals(recovery_state);
 
 	stat_cleanup(stat_base, requests_MAX);
 
@@ -571,7 +540,8 @@ snapshot_write_tuple(struct log_io *l, struct nbatch *batch,
 void
 mod_snapshot(struct log_io *l, struct nbatch *batch)
 {
-	if (recovery_phase == RECOVERY_PHASE_1)
+	/* --init-storage switch */
+	if (primary_indexes_enabled == false)
 		return;
 
 	for (uint32_t n = 0; n < BOX_SPACE_MAX; ++n) {

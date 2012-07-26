@@ -122,7 +122,7 @@ iterator_first_equal(struct iterator *it)
 	[super free];
 }
 
-- (void) buildBegin
+- (void) beginBuild
 {
 	[self subclassResponsibility: _cmd];
 }
@@ -133,7 +133,7 @@ iterator_first_equal(struct iterator *it)
 	[self subclassResponsibility: _cmd];
 }
 
-- (void) buildEnd
+- (void) endBuild
 {
 	[self subclassResponsibility: _cmd];
 }
@@ -286,7 +286,7 @@ hash_iterator_free(struct iterator *iterator)
 	[self subclassResponsibility: _cmd];
 }
 
-- (void) buildBegin
+- (void) beginBuild
 {
 }
 
@@ -295,7 +295,7 @@ hash_iterator_free(struct iterator *iterator)
 	[self replace: NULL :tuple];
 }
 
-- (void) buildEnd
+- (void) endBuild
 {
 }
 

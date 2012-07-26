@@ -972,7 +972,7 @@ tree_iterator_free(struct iterator *iterator)
 	}
 }
 
-- (void) buildBegin
+- (void) beginBuild
 {
 	assert(index_is_primary(self));
 
@@ -1006,7 +1006,7 @@ tree_iterator_free(struct iterator *iterator)
 	tree.size++;
 }
 
-- (void) buildEnd
+- (void) endBuild
 {
 	assert(index_is_primary(self));
 

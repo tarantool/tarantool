@@ -124,6 +124,10 @@ index_is_primary(Index *index)
  * already built and ready for use.
  */
 extern bool secondary_indexes_enabled;
+/**
+ * Primary indexes are enabled only after reading the snapshot.
+ */
+extern bool primary_indexes_enabled;
 
 static inline int
 index_count(struct space *sp)
