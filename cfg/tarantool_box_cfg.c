@@ -347,41 +347,35 @@ static ConfettyError
 acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 
 	if ( cmpNameAtoms( opt->name, _name__username) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->username == NULL) || strcmp(opt->paramValue.stringval, c->username) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->username == NULL) || strcmp(opt->paramValue.scalarval, c->username) != 0))
 			return CNF_RDONLY;
 		 if (c->username) free(c->username);
-		c->username = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->username == NULL)
+		c->username = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->username == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__local_hot_standby) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
 			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
 			bln = false;
 		else
 			return CNF_WRONGRANGE;
@@ -390,41 +384,35 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->local_hot_standby = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__bind_ipaddr) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->bind_ipaddr == NULL) || strcmp(opt->paramValue.stringval, c->bind_ipaddr) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->bind_ipaddr == NULL) || strcmp(opt->paramValue.scalarval, c->bind_ipaddr) != 0))
 			return CNF_RDONLY;
 		 if (c->bind_ipaddr) free(c->bind_ipaddr);
-		c->bind_ipaddr = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->bind_ipaddr == NULL)
+		c->bind_ipaddr = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->bind_ipaddr == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__coredump) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
 			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
 			bln = false;
 		else
 			return CNF_WRONGRANGE;
@@ -433,11 +421,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->coredump = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__admin_port) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -447,11 +435,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->admin_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__replication_port) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -461,11 +449,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->replication_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__log_level) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -473,11 +461,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->log_level = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__slab_alloc_arena) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
+		double dbl = strtod(opt->paramValue.scalarval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		if (check_rdonly && c->slab_alloc_arena != dbl)
@@ -485,11 +473,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->slab_alloc_arena = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__slab_alloc_minimal) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -499,11 +487,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->slab_alloc_minimal = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__slab_alloc_factor) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
+		double dbl = strtod(opt->paramValue.scalarval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		if (check_rdonly && c->slab_alloc_factor != dbl)
@@ -511,101 +499,95 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->slab_alloc_factor = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__work_dir) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->work_dir == NULL) || strcmp(opt->paramValue.stringval, c->work_dir) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->work_dir == NULL) || strcmp(opt->paramValue.scalarval, c->work_dir) != 0))
 			return CNF_RDONLY;
 		 if (c->work_dir) free(c->work_dir);
-		c->work_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->work_dir == NULL)
+		c->work_dir = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->work_dir == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__snap_dir) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->snap_dir == NULL) || strcmp(opt->paramValue.stringval, c->snap_dir) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->snap_dir == NULL) || strcmp(opt->paramValue.scalarval, c->snap_dir) != 0))
 			return CNF_RDONLY;
 		 if (c->snap_dir) free(c->snap_dir);
-		c->snap_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->snap_dir == NULL)
+		c->snap_dir = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->snap_dir == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_dir) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->wal_dir == NULL) || strcmp(opt->paramValue.stringval, c->wal_dir) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->wal_dir == NULL) || strcmp(opt->paramValue.scalarval, c->wal_dir) != 0))
 			return CNF_RDONLY;
 		 if (c->wal_dir) free(c->wal_dir);
-		c->wal_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->wal_dir == NULL)
+		c->wal_dir = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->wal_dir == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__script_dir) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->script_dir == NULL) || strcmp(opt->paramValue.stringval, c->script_dir) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->script_dir == NULL) || strcmp(opt->paramValue.scalarval, c->script_dir) != 0))
 			return CNF_RDONLY;
 		 if (c->script_dir) free(c->script_dir);
-		c->script_dir = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->script_dir == NULL)
+		c->script_dir = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->script_dir == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__pid_file) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->pid_file == NULL) || strcmp(opt->paramValue.stringval, c->pid_file) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->pid_file == NULL) || strcmp(opt->paramValue.scalarval, c->pid_file) != 0))
 			return CNF_RDONLY;
 		 if (c->pid_file) free(c->pid_file);
-		c->pid_file = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->pid_file == NULL)
+		c->pid_file = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->pid_file == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__logger) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->logger == NULL) || strcmp(opt->paramValue.stringval, c->logger) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->logger == NULL) || strcmp(opt->paramValue.scalarval, c->logger) != 0))
 			return CNF_RDONLY;
 		 if (c->logger) free(c->logger);
-		c->logger = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->logger == NULL)
+		c->logger = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->logger == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__logger_nonblock) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
 			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
 			bln = false;
 		else
 			return CNF_WRONGRANGE;
@@ -614,21 +596,21 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->logger_nonblock = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__io_collect_interval) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
+		double dbl = strtod(opt->paramValue.scalarval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		c->io_collect_interval = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -638,11 +620,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->backlog = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__readahead) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -650,21 +632,21 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->readahead = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__snap_io_rate_limit) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
+		double dbl = strtod(opt->paramValue.scalarval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		c->snap_io_rate_limit = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__rows_per_wal) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -674,11 +656,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->rows_per_wal = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_writer_inbox_size) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -688,31 +670,31 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->wal_writer_inbox_size = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_mode) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		 if (c->wal_mode) free(c->wal_mode);
-		c->wal_mode = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->wal_mode == NULL)
+		c->wal_mode = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->wal_mode == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_fsync_delay) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
+		double dbl = strtod(opt->paramValue.scalarval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		c->wal_fsync_delay = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__wal_dir_rescan_delay) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
+		double dbl = strtod(opt->paramValue.scalarval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		if (check_rdonly && c->wal_dir_rescan_delay != dbl)
@@ -720,29 +702,23 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->wal_dir_rescan_delay = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__panic_on_snap_error) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
 			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
 			bln = false;
 		else
 			return CNF_WRONGRANGE;
@@ -751,29 +727,23 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->panic_on_snap_error = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__panic_on_wal_error) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
 			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
 			bln = false;
 		else
 			return CNF_WRONGRANGE;
@@ -782,11 +752,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->panic_on_wal_error = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__primary_port) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -796,11 +766,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->primary_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__secondary_port) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -810,33 +780,33 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->secondary_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__too_long_threshold) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
+		double dbl = strtod(opt->paramValue.scalarval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		c->too_long_threshold = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__custom_proc_title) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->custom_proc_title == NULL) || strcmp(opt->paramValue.stringval, c->custom_proc_title) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->custom_proc_title == NULL) || strcmp(opt->paramValue.scalarval, c->custom_proc_title) != 0))
 			return CNF_RDONLY;
 		 if (c->custom_proc_title) free(c->custom_proc_title);
-		c->custom_proc_title = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->custom_proc_title == NULL)
+		c->custom_proc_title = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->custom_proc_title == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_port) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -846,11 +816,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->memcached_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_space) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -860,29 +830,23 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->memcached_space = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_expire) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		bool bln;
 
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
 			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
 			bln = false;
 		else
 			return CNF_WRONGRANGE;
@@ -891,11 +855,11 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->memcached_expire = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_expire_per_loop) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -903,23 +867,23 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->memcached_expire_per_loop = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__memcached_expire_full_sweep) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		double dbl = strtod(opt->paramValue.numberval, NULL);
+		double dbl = strtod(opt->paramValue.scalarval, NULL);
 		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
 			return CNF_WRONGRANGE;
 		c->memcached_expire_full_sweep = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__replication_source) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
 		 if (c->replication_source) free(c->replication_source);
-		c->replication_source = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->replication_source == NULL)
+		c->replication_source = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->replication_source == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space) ) {
@@ -928,7 +892,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		ARRAYALLOC(c->space, 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__enabled) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
@@ -938,23 +902,17 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		bool bln;
 
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
 			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
 			bln = false;
 		else
 			return CNF_WRONGRANGE;
@@ -963,7 +921,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->enabled = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__cardinality) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
@@ -971,7 +929,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -981,7 +939,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->cardinality = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__estimated_rows) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
@@ -989,7 +947,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -1008,7 +966,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		ARRAYALLOC(c->space[opt->name->index]->index, 1, _name__space__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__index__type) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
@@ -1020,15 +978,15 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->space[opt->name->index]->index[opt->name->next->index]->type == NULL) || strcmp(opt->paramValue.stringval, c->space[opt->name->index]->index[opt->name->next->index]->type) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->space[opt->name->index]->index[opt->name->next->index]->type == NULL) || strcmp(opt->paramValue.scalarval, c->space[opt->name->index]->index[opt->name->next->index]->type) != 0))
 			return CNF_RDONLY;
 		 if (c->space[opt->name->index]->index[opt->name->next->index]->type) free(c->space[opt->name->index]->index[opt->name->next->index]->type);
-		c->space[opt->name->index]->index[opt->name->next->index]->type = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->space[opt->name->index]->index[opt->name->next->index]->type == NULL)
+		c->space[opt->name->index]->index[opt->name->next->index]->type = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->space[opt->name->index]->index[opt->name->next->index]->type == NULL)
 			return CNF_NOMEMORY;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__index__unique) ) {
-		if (opt->paramType != stringType && opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
@@ -1042,23 +1000,17 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		errno = 0;
 		bool bln;
 
-		if (opt->paramType == numberType) {
-			if (strcmp(opt->paramValue.numberval, "0") == 0 || strcmp(opt->paramValue.numberval, "1") == 0)
-				bln = opt->paramValue.numberval[0] - '0';
-			else
-				return CNF_WRONGRANGE;
-		}
-		else if (strcasecmp(opt->paramValue.stringval, "true") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "on") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "1") == 0 )
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
 			bln = true;
-		else if (strcasecmp(opt->paramValue.stringval, "false") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "no") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "off") == 0 ||
-				strcasecmp(opt->paramValue.stringval, "0") == 0 )
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
 			bln = false;
 		else
 			return CNF_WRONGRANGE;
@@ -1080,7 +1032,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		ARRAYALLOC(c->space[opt->name->index]->index[opt->name->next->index]->key_field, 1, _name__space__index__key_field, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__index__key_field__fieldno) ) {
-		if (opt->paramType != numberType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
@@ -1096,7 +1048,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		long int i32 = strtol(opt->paramValue.numberval, NULL, 10);
+		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
 		if (i32 == 0 && errno == EINVAL)
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
@@ -1106,7 +1058,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->fieldno = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__index__key_field__type) ) {
-		if (opt->paramType != stringType )
+		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
@@ -1122,15 +1074,15 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.stringval == NULL && c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL) || strcmp(opt->paramValue.stringval, c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL) || strcmp(opt->paramValue.scalarval, c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type) != 0))
 			return CNF_RDONLY;
 		 if (c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type) free(c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type);
-		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type = (opt->paramValue.stringval) ? strdup(opt->paramValue.stringval) : NULL;
-		if (opt->paramValue.stringval && c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL)
+		c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->space[opt->name->index]->index[opt->name->next->index]->key_field[opt->name->next->next->index]->type == NULL)
 			return CNF_NOMEMORY;
 	}
 	else {
-		return CNF_MISSED;
+		return opt->optional ? CNF_OPTIONAL : CNF_MISSED;
 	}
 	return CNF_OK;
 }
@@ -1156,18 +1108,23 @@ dumpOptDef(NameAtom *atom) {
 }
 
 static void
-acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, int *n_skipped) {
+acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional) {
 	ConfettyError	r;
 	OptDef		*orig_opt = opt;
 
 	if (n_accepted) *n_accepted=0;
 	if (n_skipped) *n_skipped=0;
+	if (n_optional) *n_optional=0;
 
 	while(opt) {
 		r = acceptValue(c, opt, check_rdonly);
 		switch(r) {
 			case CNF_OK:
 				if (n_accepted) (*n_accepted)++;
+				break;
+			case CNF_OPTIONAL:
+				out_warning(r, "Option '%s' is not supported", dumpOptDef(opt->name));
+				if (n_optional) (*n_optional)++;
 				break;
 			case CNF_MISSED:
 				out_warning(r, "Could not find '%s' option", dumpOptDef(opt->name));
@@ -1214,20 +1171,20 @@ acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, i
 }
 
 void
-parse_cfg_file_tarantool_cfg(tarantool_cfg *c, FILE *fh, int check_rdonly, int *n_accepted, int *n_skipped) {
+parse_cfg_file_tarantool_cfg(tarantool_cfg *c, FILE *fh, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional) {
 	OptDef *option;
 
 	option = parseCfgDef(fh);
-	acceptCfgDef(c, option, check_rdonly, n_accepted, n_skipped);
+	acceptCfgDef(c, option, check_rdonly, n_accepted, n_skipped, n_optional);
 	freeCfgDef(option);
 }
 
 void
-parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly, int *n_accepted, int *n_skipped) {
+parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional) {
 	OptDef *option;
 
 	option = parseCfgDefBuffer(buffer);
-	acceptCfgDef(c, option, check_rdonly, n_accepted, n_skipped);
+	acceptCfgDef(c, option, check_rdonly, n_accepted, n_skipped, n_optional);
 	freeCfgDef(option);
 }
 

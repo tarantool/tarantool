@@ -93,7 +93,7 @@ static i32
 load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 {
 	FILE *f;
-	i32 n_accepted, n_skipped;
+	i32 n_accepted, n_skipped, n_ignored;
 
 	tbuf_reset(cfg_out);
 
@@ -108,14 +108,21 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 		return -1;
 	}
 
-	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly, &n_accepted, &n_skipped);
+	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly,
+				     &n_accepted, &n_skipped, &n_ignored);
 
 	fclose(f);
+
 	if (check_cfg_tarantool_cfg(conf) != 0)
 		return -1;
 
-	if (n_accepted == 0 || n_skipped != 0)
+	if (n_skipped != 0)
 		return -1;
+
+	if (n_accepted == 0) {
+		out_warning(0, "empty configuration file '%s'", cfg_filename);
+		return -1;
+	}
 
 	if (core_check_config(conf) != 0)
 		return -1;

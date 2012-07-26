@@ -12,15 +12,15 @@ typedef struct NameAtom {
 typedef struct OptDef {
 
 	enum {
-		numberType 	= 0,
-		stringType 	= 1,
-		structType 	= 2,
-		arrayType	= 3 
+		scalarType 	= 0,
+		structType 	= 1,
+		arrayType	= 2 
 	} paramType;
 
+	int optional;
+
 	union {
-		char			*numberval;
-		char			*stringval;
+		char		*scalarval;
 		struct OptDef 	*structval;
 		struct OptDef 	*arrayval;
 	} paramValue;
@@ -46,6 +46,7 @@ typedef	enum ConfettyError {
 	CNF_NOMEMORY,
 	CNF_SYNTAXERROR,
 	CNF_NOTSET,
+	CNF_OPTIONAL,
 	CNF_INTERNALERROR
 } ConfettyError;
 
