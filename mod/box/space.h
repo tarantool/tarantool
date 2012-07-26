@@ -124,6 +124,10 @@ index_is_primary(Index *index)
  * already built and ready for use.
  */
 extern bool secondary_indexes_enabled;
+/**
+ * Primary indexes are enabled only after reading the snapshot.
+ */
+extern bool primary_indexes_enabled;
 
 static inline int
 index_count(struct space *sp)
@@ -144,7 +148,9 @@ void space_init(void);
 void space_free(void);
 i32 check_spaces(struct tarantool_cfg *conf);
 /* Build secondary keys. */
-void build_indexes(void);
+void begin_build_primary_indexes(void);
+void end_build_primary_indexes(void);
+void build_secondary_indexes(void);
 
 static inline struct space *
 space_find(u32 space_no)

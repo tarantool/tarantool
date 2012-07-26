@@ -107,7 +107,8 @@ void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 void recovery_update_mode(const char *wal_mode, double fsync_delay);
 void recovery_update_io_rate_limit(double new_limit);
 void recovery_free();
-void recover(struct recovery_state *, i64 lsn);
+void recover_snap(struct recovery_state *);
+void recover_existing_wals(struct recovery_state *);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
 int wal_write(struct recovery_state *r, i64 lsn, u64 cookie,

@@ -637,8 +637,15 @@ replication_relay_loop(int client_sock)
 	recovery_init(cfg.snap_dir, cfg.wal_dir, replication_relay_send_row,
 		      INT32_MAX, "fsync_delay", 0,
 		      RECOVER_READONLY);
-
-	recover(recovery_state, lsn);
+	/*
+	 * Note that recovery starts with lsn _NEXT_ to
+	 * the confirmed one.
+	 */
+	recovery_state->lsn = recovery_state->confirmed_lsn = lsn - 1;
+	recover_existing_wals(recovery_state);
+	/* Found nothing. */
+	if (recovery_state->lsn == lsn - 1)
+		say_error("can't find WAL containing record with lsn: %" PRIi64, lsn);
 	recovery_follow_local(recovery_state, 0.1);
 
 	ev_loop(0);

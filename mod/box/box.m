@@ -64,7 +64,6 @@ struct box_snap_row {
 	u8 data[];
 } __attribute__((packed));
 
-
 static inline struct box_snap_row *
 box_snap_row(const struct tbuf *t)
 {
@@ -246,21 +245,21 @@ xlog_print(struct tbuf *t)
 	return 0;
 }
 
-static struct tbuf *
-convert_snap_row_to_wal(struct tbuf *t)
+static void
+recover_snap_row(struct tbuf *t)
 {
-	struct tbuf *r = tbuf_alloc(fiber->gc_pool);
+	assert(primary_indexes_enabled == false);
+
 	struct box_snap_row *row = box_snap_row(t);
-	u16 op = REPLACE;
-	u32 flags = 0;
 
-	tbuf_append(r, &op, sizeof(op));
-	tbuf_append(r, &row->space, sizeof(row->space));
-	tbuf_append(r, &flags, sizeof(flags));
-	tbuf_append(r, &row->tuple_size, sizeof(row->tuple_size));
-	tbuf_append(r, row->data, row->data_size);
+	struct tuple *tuple = tuple_alloc(row->data_size);
+	memcpy(tuple->data, row->data, row->data_size);
+	tuple->field_count = row->tuple_size;
 
-	return r;
+	struct space *space = space_find(row->space);
+	Index *index = space->index[0];
+	[index buildNext: tuple];
+	tuple_ref(tuple, 1);
 }
 
 static int
@@ -273,19 +272,17 @@ recover_row(struct tbuf *t)
 	@try {
 		u16 tag = read_u16(t);
 		read_u64(t); /* drop cookie */
-		if (tag == SNAP)
-			t = convert_snap_row_to_wal(t);
-		else if (tag != XLOG) {
+		if (tag == SNAP) {
+			recover_snap_row(t);
+		} else if (tag == XLOG) {
+			u16 op = read_u16(t);
+			struct txn *txn = txn_begin();
+			txn->txn_flags |= BOX_NOT_STORE;
+			box_process_rw(txn, port_null, op, t);
+		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
 		}
-
-		u16 op = read_u16(t);
-
-		struct txn *txn = txn_begin();
-		txn->txn_flags |= BOX_NOT_STORE;
-
-		box_process_rw(txn, port_null, op, t);
 	}
 	@catch (id e) {
 		return -1;
@@ -318,7 +315,6 @@ title(const char *fmt, ...)
 
 	set_proc_title(buf);
 }
-
 
 static void
 box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
@@ -478,17 +474,18 @@ mod_init(void)
 	/* memcached initialize */
 	memcached_init();
 
-
 	if (init_storage)
 		return;
 
-	recover(recovery_state, 0);
+	begin_build_primary_indexes();
+	recover_snap(recovery_state);
+	end_build_primary_indexes();
+	recover_existing_wals(recovery_state);
+
 	stat_cleanup(stat_base, requests_MAX);
 
-	title("building indexes");
-
-	/* build secondary indexes */
-	build_indexes();
+	say_info("building secondary indexes");
+	build_secondary_indexes();
 
 	title("orphan");
 
@@ -543,7 +540,9 @@ snapshot_write_tuple(struct log_io *l, struct nbatch *batch,
 void
 mod_snapshot(struct log_io *l, struct nbatch *batch)
 {
-	struct tuple *tuple;
+	/* --init-storage switch */
+	if (primary_indexes_enabled == false)
+		return;
 
 	for (uint32_t n = 0; n < BOX_SPACE_MAX; ++n) {
 		if (!spaces[n].enabled)
@@ -553,6 +552,8 @@ mod_snapshot(struct log_io *l, struct nbatch *batch)
 
 		struct iterator *it = pk->position;
 		[pk initIterator: it :ITER_FORWARD];
+
+		struct tuple *tuple;
 		while ((tuple = it->next(it))) {
 			snapshot_write_tuple(l, batch, n, tuple);
 		}

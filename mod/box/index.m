@@ -133,11 +133,12 @@ check_key_parts(struct key_def *key_def,
 - (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
 	self = [super init];
-	traits = [object_getClass(self) traits];
-	key_def = key_def_arg;
-	space = space_arg;
-	position = [self allocIterator];
-	[self enable];
+	if (self) {
+		traits = [object_getClass(self) traits];
+		key_def = key_def_arg;
+		space = space_arg;
+		position = [self allocIterator];
+	}
 	return self;
 }
 
@@ -147,7 +148,18 @@ check_key_parts(struct key_def *key_def,
 	[super free];
 }
 
-- (void) enable
+- (void) beginBuild
+{
+	[self subclassResponsibility: _cmd];
+}
+
+- (void) buildNext: (struct tuple *)tuple
+{
+	(void) tuple;
+	[self subclassResponsibility: _cmd];
+}
+
+- (void) endBuild
 {
 	[self subclassResponsibility: _cmd];
 }
@@ -295,6 +307,19 @@ hash_iterator_free(struct iterator *iterator)
 	[self subclassResponsibility: _cmd];
 }
 
+- (void) beginBuild
+{
+}
+
+- (void) buildNext: (struct tuple *)tuple
+{
+	[self replace: NULL :tuple];
+}
+
+- (void) endBuild
+{
+}
+
 - (void) build: (Index *) pk
 {
 	u32 n_tuples = [pk size];
@@ -382,9 +407,13 @@ int32_key_to_value(void *key)
 	[super free];
 }
 
-- (void) enable
+- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
-	int_hash = mh_i32ptr_init();
+	self = [super init: key_def_arg :space_arg];
+	if (self) {
+		int_hash = mh_i32ptr_init();
+	}
+	return self;
 }
 
 - (size_t) size
@@ -498,9 +527,13 @@ int64_key_to_value(void *key)
 	[super free];
 }
 
-- (void) enable
+- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
-	int64_hash = mh_i64ptr_init();
+	self = [super init: key_def_arg :space_arg];
+	if (self) {
+		int64_hash = mh_i64ptr_init();
+	}
+	return self;
 }
 
 - (size_t) size
@@ -606,9 +639,13 @@ int64_key_to_value(void *key)
 	[super free];
 }
 
-- (void) enable
+- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
-	str_hash = mh_lstrptr_init();
+	self = [super init: key_def_arg :space_arg];
+	if (self) {
+		str_hash = mh_lstrptr_init();
+	}
+	return self;
 }
 
 - (size_t) size

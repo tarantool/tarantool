@@ -37,11 +37,13 @@ SPTREE_DEF(index, realloc);
 typedef int (*tree_cmp_t)(const void *, const void *, void *);
 
 @interface TreeIndex: Index {
-	@public
+@public
 	sptree_index tree;
 };
 
 + (Index *) alloc: (struct key_def *) key_def :(struct space *) space;
+
+- (void) buildNext: (struct tuple *) tuple;
 
 /** To be defined in subclasses. */
 - (size_t) node_size;
