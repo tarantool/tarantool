@@ -157,6 +157,114 @@ lbox_tuple_slice(struct lua_State *L)
 	return end - start;
 }
 
+static void
+morph_push(struct lua_State *L, struct tuple *tuple,
+	    int start, int end)
+{
+	int fieldno = start;
+	u8 *field = tuple_field(tuple, fieldno);
+	while (fieldno < end) {
+		size_t len = load_varint32((void **) &field);
+		lua_pushlstring(L, (char *) field, len);
+		field += len;
+		fieldno++;
+	}
+}
+
+/**
+ * Tuple transforming function.
+ *
+ * Removes the fields designated by 'offset' and 'len' from an tuple,
+ * and replaces them with the elements of supplied data fields,
+ * if any.
+ *
+ * Function returns string fields of newly formed tuple.
+ * It does not change any parent tuple data.
+ *
+ */
+static int
+morph(struct lua_State *L, struct tuple *tuple, int start,
+      int argc,
+      int offset, int len)
+{
+	/* validating offset and len */
+	if (offset < 0) {
+		if (-offset > tuple->field_count)
+			luaL_error(L, "tuple.morph(): offset is out of bound");
+		offset += tuple->field_count;
+	} else if (offset > tuple->field_count) {
+		offset = tuple->field_count;
+	}
+	if (len < 0)
+		luaL_error(L, "tuple.morph(): len is negative");
+	if (len > tuple->field_count - offset)
+		len = tuple->field_count - offset;
+	/* pasting fields prior to offset */
+	morph_push(L, tuple, 0, offset);
+	/* pasting supplied fields */
+	for (int i = start ; i <= argc ; i++) {
+		size_t field_size;
+		const char *field = luaL_checklstring(L, i + 1, &field_size);
+		lua_pushlstring(L, field, field_size);
+	}
+	/* pasting last part of the tuple fields */
+	morph_push(L, tuple, offset + len, tuple->field_count);
+	return (tuple->field_count - len) +
+	       (argc - (start - 1));
+}
+
+static int
+lbox_tuple_morph(struct lua_State *L)
+{
+	struct tuple *tuple = lua_checktuple(L, 1);
+	int argc = lua_gettop(L) - 1;
+	if (argc < 2)
+		luaL_error(L, "tuple.morph(): bad arguments");
+	int len = lua_tointeger(L, 3);
+	int offset = lua_tointeger(L, 2);
+	return morph(L, tuple, 3, argc, offset, len);
+}
+
+static int
+tuple_find(struct lua_State *L, struct tuple *tuple,
+	   const char *key,
+	   size_t key_size, bool first)
+{
+	u8 *field = tuple->data;
+	int fieldno = 0;
+	int count = 0;
+	while (fieldno < tuple->field_count) {
+		size_t len = load_varint32((void **) &field);
+		if (len == key_size && (memcmp(field, key, len) == 0)) {
+			lua_pushinteger(L, fieldno);
+			count++;
+			if (first)
+				break;
+		}
+		field += len;
+		fieldno++;
+	}
+	return count;
+}
+
+static int
+lbox_tuple_find(struct lua_State *L)
+{
+	struct tuple *tuple = lua_checktuple(L, 1);
+	size_t key_size;
+	const char *key = luaL_checklstring(L, 2, &key_size);
+	return tuple_find(L, tuple, key, key_size, true);
+}
+
+static int
+lbox_tuple_findall(struct lua_State *L)
+{
+	struct tuple *tuple = lua_checktuple(L, 1);
+	size_t key_size;
+	const char *key = luaL_checklstring(L, 2, &key_size);
+	return tuple_find(L, tuple, key, key_size, false);
+}
+
 static int
 lbox_tuple_unpack(struct lua_State *L)
 {
@@ -277,6 +385,9 @@ static const struct luaL_reg lbox_tuple_meta [] = {
 	{"next", lbox_tuple_next},
 	{"pairs", lbox_tuple_pairs},
 	{"slice", lbox_tuple_slice},
+	{"morph", lbox_tuple_morph},
+	{"find", lbox_tuple_find},
+	{"findall", lbox_tuple_findall},
 	{"unpack", lbox_tuple_unpack},
 	{NULL, NULL}
 };

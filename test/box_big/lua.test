@@ -106,3 +106,37 @@ exec admin "lua box.space[17].index[1].idx:count(2, 2)"
 exec admin "lua box.space[17].index[1].idx:count(3)"
 exec admin "lua box.space[17].index[1].idx:count(3, 3)"
 exec admin "lua box.space[17].index[1].idx:count()"
+
+#
+# Tests for lua tuple:morph()
+#
+exec admin "lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')"
+exec admin "lua t:morph(7, 0, '8', '9', '10')"
+exec admin "lua t:morph(0, 1)"
+exec admin "lua t:morph(1, 4)"
+exec admin "lua t:morph(-1, 1)"
+exec admin "lua t:morph(-3, 2)"
+exec admin "lua t:morph(0, 0, 'A')"
+exec admin "lua t:morph(-1, 0, 'A')"
+exec admin "lua t:morph(0, 1, 'A')"
+exec admin "lua t:morph(-1, 1, 'B')"
+exec admin "lua t:morph(0, 2, 'C')"
+exec admin "lua t:morph(2, 0, 'hello')"
+exec admin "lua t:morph(0, -1, 'C')"
+exec admin "lua t:morph(0, 100)"
+exec admin "lua t:morph(-100, 1)"
+
+#
+# Tests for lua tuple:find() and tuple:findall()
+#
+exec admin "lua t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')"
+exec admin "lua t:find('2')"
+exec admin "lua t:find('4')"
+exec admin "lua t:find('5')"
+exec admin "lua t:find('A')"
+exec admin "lua t:find('0')"
+
+exec admin "lua t:findall('A')"
+exec admin "lua t:findall('2')"
+exec admin "lua t:findall('3')"
+exec admin "lua t:findall('0')"
