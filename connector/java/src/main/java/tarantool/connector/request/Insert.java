@@ -27,8 +27,8 @@
 package tarantool.connector.request;
 
 import tarantool.common.ByteUtil;
+import tarantool.common.Constants;
 import tarantool.common.Tuple;
-import tarantool.connector.Constants;
 import tarantool.connector.Request;
 
 public class Insert extends Request {

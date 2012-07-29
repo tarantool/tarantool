@@ -26,7 +26,7 @@
 
 package tarantool.connector.update;
 
-import tarantool.connector.Constants;
+import tarantool.common.Constants;
 import tarantool.connector.Operation;
 
 public class Assign extends Operation {

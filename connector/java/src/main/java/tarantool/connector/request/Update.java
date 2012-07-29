@@ -27,7 +27,7 @@
 package tarantool.connector.request;
 
 import tarantool.common.ByteUtil;
-import tarantool.connector.Constants;
+import tarantool.common.Constants;
 import tarantool.connector.Operation;
 import tarantool.connector.Request;
 

@@ -27,6 +27,7 @@
 package tarantool.connector;
 
 import tarantool.common.ByteUtil;
+import tarantool.common.Constants;
 
 public class Operation {
     byte[] _field;

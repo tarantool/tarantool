@@ -27,7 +27,7 @@
 package tarantool.connector.update;
 
 import tarantool.common.ByteUtil;
-import tarantool.connector.Constants;
+import tarantool.common.Constants;
 import tarantool.connector.Operation;
 
 public class Insert extends Operation {

@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import tarantool.common.ByteUtil;
+import tarantool.common.Constants;
 import tarantool.connector.exception.TarantoolConnectorException;
 import tarantool.connector.request.Ping;
 import tarantool.connector.socketpool.SocketPool;
