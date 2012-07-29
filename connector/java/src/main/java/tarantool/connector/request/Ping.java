@@ -27,7 +27,7 @@
 package tarantool.connector.request;
 
 import tarantool.common.ByteUtil;
-import tarantool.connector.Constans;
+import tarantool.connector.Constants;
 import tarantool.connector.Request;
 
 public class Ping extends Request {
@@ -37,10 +37,10 @@ public class Ping extends Request {
 
     @Override
     public byte[] toByte() {
-        final byte[] body = new byte[Constans.HEADER_LENGTH];
+        final byte[] body = new byte[Constants.HEADER_LENGTH];
         int offset = 0;
 
-        offset = ByteUtil.writeInteger(body, offset, Constans.REQ_TYPE_PING);
+        offset = ByteUtil.writeInteger(body, offset, Constants.REQ_TYPE_PING);
         offset += ByteUtil.writeInteger(body, offset, 0);
         offset += ByteUtil.writeInteger(body, offset, _reqId);
 

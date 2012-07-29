@@ -28,7 +28,7 @@ package tarantool.connector.request;
 
 import tarantool.common.ByteUtil;
 import tarantool.common.Tuple;
-import tarantool.connector.Constans;
+import tarantool.connector.Constants;
 import tarantool.connector.Request;
 
 public class Insert extends Request {
@@ -52,7 +52,7 @@ public class Insert extends Request {
 
     @Override
     public byte[] toByte() {
-        int length = Constans.INSERT_REQUEST_BODY + Constans.HEADER_LENGTH;
+        int length = Constants.INSERT_REQUEST_BODY + Constants.HEADER_LENGTH;
         length += 4;
         for (final byte[] i : _tuple)
             length += i.length + ByteUtil.sizeOfInVarInt32(i.length);
@@ -60,9 +60,9 @@ public class Insert extends Request {
         final byte[] body = new byte[length];
         int offset = 0;
 
-        offset = ByteUtil.writeInteger(body, offset, Constans.REQ_TYPE_INSERT);
+        offset = ByteUtil.writeInteger(body, offset, Constants.REQ_TYPE_INSERT);
         offset += ByteUtil.writeInteger(body, offset, length
-                - Constans.HEADER_LENGTH);
+                - Constants.HEADER_LENGTH);
         offset += ByteUtil.writeInteger(body, offset, _reqId);
 
         offset += ByteUtil.writeInteger(body, offset, _space);

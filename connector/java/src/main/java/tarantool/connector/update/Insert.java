@@ -27,15 +27,15 @@
 package tarantool.connector.update;
 
 import tarantool.common.ByteUtil;
-import tarantool.connector.Constans;
+import tarantool.connector.Constants;
 import tarantool.connector.Operation;
 
 public class Insert extends Operation {
     public Insert(int field_no, int value) {
-        super(field_no, Constans.OP_INSERT, ByteUtil.toBytes(value));
+        super(field_no, Constants.OP_INSERT, ByteUtil.toBytes(value));
     }
 
     public Insert(int field_no, long value) {
-        super(field_no, Constans.OP_INSERT, ByteUtil.toBytes(value));
+        super(field_no, Constants.OP_INSERT, ByteUtil.toBytes(value));
     }
 }

@@ -7,7 +7,9 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 
-import sun.rmi.runtime.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.Log;
+
 import tarantool.connector.socketpool.AbstractSocketPool;
 
 class PlainSocketWorker extends SocketWorkerInternal {

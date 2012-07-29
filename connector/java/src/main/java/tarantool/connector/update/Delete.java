@@ -27,15 +27,15 @@
 package tarantool.connector.update;
 
 import tarantool.common.ByteUtil;
-import tarantool.connector.Constans;
+import tarantool.connector.Constants;
 import tarantool.connector.Operation;
 
 public class Delete extends Operation {
     public Delete(int field_no, int value) {
-        super(field_no, Constans.OP_DELETE, ByteUtil.toBytes(value));
+        super(field_no, Constants.OP_DELETE, ByteUtil.toBytes(value));
     }
 
     public Delete(int field_no, long value) {
-        super(field_no, Constans.OP_DELETE, ByteUtil.toBytes(value));
+        super(field_no, Constants.OP_DELETE, ByteUtil.toBytes(value));
     }
 }

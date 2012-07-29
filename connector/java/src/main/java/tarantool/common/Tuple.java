@@ -86,7 +86,7 @@ public class Tuple extends AbstractList<byte[]> implements List<byte[]>,
                 cursor = lastRet;
                 lastRet = -1;
                 expectedModCount = modCount;
-            } catch (final IndexOutOfBoundsException ex) {
+            } catch (IndexOutOfBoundsException ex) {
                 throw new ConcurrentModificationException();
             }
         }
@@ -109,7 +109,7 @@ public class Tuple extends AbstractList<byte[]> implements List<byte[]>,
                 cursor = i + 1;
                 lastRet = -1;
                 expectedModCount = modCount;
-            } catch (final IndexOutOfBoundsException ex) {
+            } catch (IndexOutOfBoundsException ex) {
                 throw new ConcurrentModificationException();
             }
         }
@@ -152,7 +152,7 @@ public class Tuple extends AbstractList<byte[]> implements List<byte[]>,
 
             try {
                 Tuple.this.set(lastRet, arr);
-            } catch (final IndexOutOfBoundsException ex) {
+            } catch (IndexOutOfBoundsException ex) {
                 throw new ConcurrentModificationException();
             }
         }

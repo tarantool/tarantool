@@ -27,7 +27,7 @@
 package tarantool.connector.request;
 
 import tarantool.common.ByteUtil;
-import tarantool.connector.Constans;
+import tarantool.connector.Constants;
 import tarantool.connector.Request;
 
 public class Select extends Request {
@@ -49,7 +49,7 @@ public class Select extends Request {
 
     @Override
     public byte[] toByte() {
-        int length = Constans.SELECT_REQUEST_BODY + Constans.HEADER_LENGTH;
+        int length = Constants.SELECT_REQUEST_BODY + Constants.HEADER_LENGTH;
         length += 4 * _tuples.length;
         for (final byte[][] i : _tuples)
             for (final byte[] j : i)
@@ -58,9 +58,9 @@ public class Select extends Request {
         final byte[] body = new byte[length];
         int offset = 0;
 
-        offset = ByteUtil.writeInteger(body, offset, Constans.REQ_TYPE_SELECT);
+        offset = ByteUtil.writeInteger(body, offset, Constants.REQ_TYPE_SELECT);
         offset += ByteUtil.writeInteger(body, offset, length
-                - Constans.HEADER_LENGTH);
+                - Constants.HEADER_LENGTH);
         offset += ByteUtil.writeInteger(body, offset, _reqId);
 
         offset += ByteUtil.writeInteger(body, offset, _space);

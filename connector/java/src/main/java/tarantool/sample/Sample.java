@@ -29,9 +29,12 @@ package tarantool.sample;
 import java.io.IOException;
 import java.util.Arrays;
 
+import org.testng.Assert;
+
 import tarantool.common.ByteUtil;
 import tarantool.common.Tuple;
 import tarantool.connector.Connection;
+import tarantool.connector.ConnectionImpl;
 import tarantool.connector.Response;
 import tarantool.connector.exception.TarantoolConnectorException;
 import tarantool.connector.request.Delete;
@@ -44,7 +47,7 @@ public class Sample {
 
     public static void main(String[] args) throws TarantoolConnectorException,
             SocketPoolException, InterruptedException, IOException {
-        final Connection conn = new Connection();
+        final Connection conn = new ConnectionImpl();
         conn.connect("127.0.0.1", 33013);
         final byte[][] Req = new byte[200][];
         final Response Resp[] = new Response[200];

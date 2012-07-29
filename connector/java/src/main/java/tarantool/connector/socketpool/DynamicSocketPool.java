@@ -12,7 +12,10 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import sun.rmi.runtime.Log;
+
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.Log;
+
 import tarantool.connector.socketpool.exception.SocketPoolClosedException;
 import tarantool.connector.socketpool.exception.SocketPoolException;
 import tarantool.connector.socketpool.exception.SocketPoolTimeOutException;
@@ -30,10 +33,11 @@ class DynamicSocketPool extends AbstractSocketPool {
 
     private static final long MIN_LATENCY_PERIOD = 5000; // 5 sec
 
-    private final Condition cond = lock.newCondition();
+
     private int currentUsed = 0;
     private final long latency;
     private final Lock lock = new ReentrantLock();
+    private final Condition cond = lock.newCondition();
 
     private final int maxPoolSize;
 
@@ -103,7 +107,7 @@ class DynamicSocketPool extends AbstractSocketPool {
                     if (currentUsed < maxPoolSize) {
                         try {
                             socketWorker = socketWorkerFactory.create();
-                        } catch (final IOException e) {
+                        } catch (IOException e) {
                             LOG.warn("Can't establish socket connection because: Exception - "
                                     + e.getClass().getSimpleName()
                                     + " and case - " + e.getMessage());
@@ -168,7 +172,7 @@ class DynamicSocketPool extends AbstractSocketPool {
                             .create();
                     queue.addFirst(socketWorker);
                     i++;
-                } catch (final IOException e) {
+                } catch (IOException e) {
                     LOG.warn("Can't establish socket connection because: Exception - "
                             + e.getClass().getSimpleName()
                             + " and case - "
@@ -176,7 +180,7 @@ class DynamicSocketPool extends AbstractSocketPool {
 
                     try {
                         Thread.sleep(reconnectTimeout);
-                    } catch (final InterruptedException e1) {
+                    } catch (InterruptedException e1) {
                         LOG.error("Thread in reconnect timeout state is interrupted. Reconnection is aborted");
                         Thread.currentThread().interrupt();
                         return;

@@ -27,7 +27,7 @@
 package tarantool.connector.request;
 
 import tarantool.common.ByteUtil;
-import tarantool.connector.Constans;
+import tarantool.connector.Constants;
 import tarantool.connector.Request;
 
 public class Call extends Request {
@@ -51,7 +51,7 @@ public class Call extends Request {
 
     @Override
     public byte[] toByte() {
-        int length = Constans.CALL_REQUEST_BODY + Constans.HEADER_LENGTH;
+        int length = Constants.CALL_REQUEST_BODY + Constants.HEADER_LENGTH;
         length += _proc.length + ByteUtil.sizeOfInVarInt32(_proc.length);
         length += 4;
         for (final byte[] i : _tuple)
@@ -60,9 +60,9 @@ public class Call extends Request {
         final byte[] body = new byte[length];
         int offset = 0;
 
-        offset = ByteUtil.writeInteger(body, offset, Constans.REQ_TYPE_CALL);
+        offset = ByteUtil.writeInteger(body, offset, Constants.REQ_TYPE_CALL);
         offset += ByteUtil.writeInteger(body, offset, length
-                - Constans.HEADER_LENGTH);
+                - Constants.HEADER_LENGTH);
         offset += ByteUtil.writeInteger(body, offset, _reqId);
 
         offset += ByteUtil.writeInteger(body, offset, _flags);

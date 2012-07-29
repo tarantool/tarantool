@@ -26,11 +26,11 @@
 
 package tarantool.connector.update;
 
-import tarantool.connector.Constans;
+import tarantool.connector.Constants;
 import tarantool.connector.Operation;
 
 public class Assign extends Operation {
     public Assign(int field_no, byte[] value) {
-        super(field_no, Constans.OP_ASSIGN, value);
+        super(field_no, Constants.OP_ASSIGN, value);
     }
 }

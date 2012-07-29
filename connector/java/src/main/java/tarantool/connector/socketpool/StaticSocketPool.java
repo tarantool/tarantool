@@ -8,7 +8,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import sun.rmi.runtime.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.Log;
+
 import tarantool.connector.socketpool.exception.SocketPoolClosedException;
 import tarantool.connector.socketpool.exception.SocketPoolException;
 import tarantool.connector.socketpool.exception.SocketPoolTimeOutException;
@@ -95,7 +97,7 @@ class StaticSocketPool extends AbstractSocketPool {
                     LOG.info("Socket pool is closed, initialization aborted");
                     break;
                 }
-            } catch (final IOException e) {
+            } catch (IOException e) {
                 LOG.warn("Can't establish socket connection because: Exception - "
                         + e.getClass().getSimpleName()
                         + " and case - "
@@ -103,7 +105,7 @@ class StaticSocketPool extends AbstractSocketPool {
 
                 try {
                     Thread.sleep(reconnectTimeout);
-                } catch (final InterruptedException e1) {
+                } catch (InterruptedException e1) {
                     LOG.error("Thread in reconnect timeout state is interrupted. Reconnection is aborted");
                     Thread.currentThread().interrupt();
                     return;

@@ -8,7 +8,9 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
-import sun.rmi.runtime.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.Log;
+
 import tarantool.connector.socketpool.AbstractSocketPool;
 
 class ChannelSocketWorker extends SocketWorkerInternal {

@@ -27,15 +27,15 @@
 package tarantool.connector.update;
 
 import tarantool.common.ByteUtil;
-import tarantool.connector.Constans;
+import tarantool.connector.Constants;
 import tarantool.connector.Operation;
 
 public class And extends Operation {
     public And(int field_no, int value) {
-        super(field_no, Constans.OP_AND, ByteUtil.toBytes(value));
+        super(field_no, Constants.OP_AND, ByteUtil.toBytes(value));
     }
 
     public And(int field_no, long value) {
-        super(field_no, Constans.OP_AND, ByteUtil.toBytes(value));
+        super(field_no, Constants.OP_AND, ByteUtil.toBytes(value));
     }
 }

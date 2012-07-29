@@ -37,7 +37,7 @@ public class Operation {
 
     public Operation(int field_no, byte[] offset, byte[] length, byte[] field) {
         _field_no = field_no;
-        _op_code = Constans.OP_SPLICE;
+        _op_code = Constants.OP_SPLICE;
 
         _offset = offset;
         _length = length;

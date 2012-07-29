@@ -10,7 +10,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import sun.rmi.runtime.Log;
+
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.Log;
+
 import tarantool.connector.socketpool.exception.SocketPoolException;
 import tarantool.connector.socketpool.worker.FactoryType;
 import tarantool.connector.socketpool.worker.SocketFactory;
@@ -122,16 +125,16 @@ public abstract class AbstractSocketPool implements SocketPool {
                         }
                         LOG.info("Reconnect completed successfully");
                         internalReturnSocketWorker(worker);
-                    } catch (final InterruptedException e) {
+                    } catch (InterruptedException e) {
                         LOG.info("Reconnecting thread is stopped");
                         thread.interrupt(); // thread was stopped, propagate
                                             // interruption
-                    } catch (final IOException e) {
+                    } catch (IOException e) {
                         LOG.info("Reconnect completed failed");
                         try {
                             reconnectQueue.put(worker);
                             Thread.sleep(AbstractSocketPool.this.reconnectTimeout);
-                        } catch (final InterruptedException e1) {
+                        } catch (InterruptedException e1) {
                             LOG.info("Reconnecting thread is stopped");
                             thread.interrupt(); // thread was stopped, propagate
                                                 // interruption

@@ -27,15 +27,15 @@
 package tarantool.connector.update;
 
 import tarantool.common.ByteUtil;
-import tarantool.connector.Constans;
+import tarantool.connector.Constants;
 import tarantool.connector.Operation;
 
 public class Xor extends Operation {
     public Xor(int field_no, int value) {
-        super(field_no, Constans.OP_XOR, ByteUtil.toBytes(value));
+        super(field_no, Constants.OP_XOR, ByteUtil.toBytes(value));
     }
 
     public Xor(int field_no, long value) {
-        super(field_no, Constans.OP_XOR, ByteUtil.toBytes(value));
+        super(field_no, Constants.OP_XOR, ByteUtil.toBytes(value));
     }
 }
