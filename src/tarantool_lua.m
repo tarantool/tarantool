@@ -155,6 +155,7 @@ static char format_to_opcode(char format)
 	case ':': return 5;
 	case '#': return 6;
 	case '!': return 7;
+	case '-': return 8;
 	default: return format;
 	}
 }
@@ -255,6 +256,8 @@ lbox_pack(struct lua_State *L)
 			/* update tuple set foo = bar */
 		case '+':
 			/* set field += val */
+		case '-':
+			/* set field -= val */
 		case '&':
 			/* set field & =val */
 		case '|':
