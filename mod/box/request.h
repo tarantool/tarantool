@@ -89,8 +89,9 @@ extern const char *requests_strs[];
 	_(UPDATE_OP_SPLICE, 5)			\
 	_(UPDATE_OP_DELETE, 6)			\
 	_(UPDATE_OP_INSERT, 7)			\
-	_(UPDATE_OP_NONE, 8)			\
-	_(UPDATE_OP_MAX, 9)			\
+	_(UPDATE_OP_SUBTRACT, 8)		\
+	_(UPDATE_OP_NONE, 9)			\
+	_(UPDATE_OP_MAX, 10)			\
 
 ENUM(update_op_codes, UPDATE_OP_CODES);
 

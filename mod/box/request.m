@@ -308,6 +308,19 @@ do_update_op_add(struct op_arith_arg *arg, void *in, void *out)
 }
 
 static void
+do_update_op_subtract(struct op_arith_arg *arg, void *in, void *out)
+{
+	switch (arg->val_size) {
+	case sizeof(i32):
+		*(i32 *)out = *(i32 *)in - arg->i32_val;
+		break;
+	case sizeof(i64):
+		*(i64 *)out = *(i64 *)in - arg->i64_val;
+		break;
+	}
+}
+
+static void
 do_update_op_and(struct op_arith_arg *arg, void *in, void *out)
 {
 	switch (arg->val_size) {
@@ -535,6 +548,7 @@ static struct update_op_meta update_op_meta[UPDATE_OP_MAX + 1] = {
 	{ init_update_op_splice, (do_op_func) do_update_op_splice, false },
 	{ init_update_op_delete, (do_op_func) NULL, true },
 	{ init_update_op_insert, (do_op_func) do_update_op_insert, true },
+	{ init_update_op_arith, (do_op_func) do_update_op_subtract, true },
 	{ init_update_op_none, (do_op_func) do_update_op_none, false },
 	{ init_update_op_error, (do_op_func) NULL, true }
 };
