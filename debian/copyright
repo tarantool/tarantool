@@ -383,9 +383,7 @@ License: GPLv3
  /usr/share/common-licenses/GPL-3
 
 Files: *
-Copyright: 2009, 2010 Mail.RU,
-    2009, 2010 Yuriy Vostrikov,
-    2011 Konstantin Osipov
+Copyright (C) Tarantool/Box AUTHORS
 License:
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
