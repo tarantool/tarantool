@@ -64,7 +64,7 @@ uint32_t
 strindex(const char **haystack, const char *needle, uint32_t hmax)
 {
 	for (int index = 0; index != hmax && haystack[index]; index++)
-		if (strcmp(haystack[index], needle) == 0)
+		if (strcasecmp(haystack[index], needle) == 0)
 			return index;
 	return hmax;
 }

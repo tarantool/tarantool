@@ -76,6 +76,7 @@ rows_per_wal=500000, ro
 wal_writer_inbox_size=16384, ro
 
 # Defines fiber/data synchronization fsync(2) policy:
+#   "none":           does not write to WAL
 #   "write":          fibers wait for their data to be written to the log.
 #   "fsync":          fibers wait for their data, fsync(2) follows each write(2)
 #   "fsync_delay":    fibers wait for their data, fsync every N=wal_fsync_delay seconds,

@@ -83,10 +83,9 @@ bool init_storage, booting = true;
 static int
 core_check_config(struct tarantool_cfg *conf)
 {
-	/* Check that the mode is a supported one. */
-	if (strcmp(conf->wal_mode, "fsync") != 0 &&
-	    strcmp(conf->wal_mode, "fsync_delay") != 0) {
-		out_warning(0, "wal_mode is not one of 'fsync', 'fsync_delay'");
+	if (strindex(wal_mode_STRS, conf->wal_mode,
+		     WAL_MODE_MAX) == WAL_MODE_MAX) {
+		out_warning(0, "wal_mode %s is not recognized", conf->wal_mode);
 		return -1;
 	}
 	return 0;
@@ -167,9 +166,9 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 		say_debug("%s: wal_fsync_delay [%f] -> [%f]",
 			__func__, old_conf->wal_fsync_delay, new_delay);
 
-	recovery_update_mode(new_conf->wal_mode, new_delay);
+	recovery_update_mode(recovery_state, new_conf->wal_mode, new_delay);
 
-	recovery_update_io_rate_limit(new_conf->snap_io_rate_limit);
+	recovery_update_io_rate_limit(recovery_state, new_conf->snap_io_rate_limit);
 
 	ev_set_io_collect_interval(new_conf->io_collect_interval);
 

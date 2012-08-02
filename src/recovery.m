@@ -102,6 +102,8 @@ struct recovery_state *recovery_state;
 
 static const u64 snapshot_cookie = 0;
 
+const char *wal_mode_STRS[] = { "none", "write", "fsync", "fsync_delay", NULL };
+
 /* {{{ LSN API */
 
 void
@@ -185,6 +187,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	assert(recovery_state == NULL);
 	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
 	struct recovery_state *r = recovery_state;
+	recovery_update_mode(r, wal_mode, wal_fsync_delay);
 
 	if (rows_per_wal <= 1)
 		panic("unacceptable value of 'rows_per_wal'");
@@ -195,7 +198,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	r->snap_dir->dirname = strdup(snap_dirname);
 	r->wal_dir = &wal_dir;
 	r->wal_dir->dirname = strdup(wal_dirname);
-	r->wal_dir->open_wflags = strcasecmp(wal_mode, "fsync") ? 0 : WAL_SYNC_FLAG;
+	r->wal_dir->open_wflags = r->wal_mode == WAL_FSYNC ? WAL_SYNC_FLAG : 0;
 	r->rows_per_wal = rows_per_wal;
 	r->wal_fsync_delay = wal_fsync_delay;
 	wait_lsn_clear(&r->wait_lsn);
@@ -203,10 +206,11 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 }
 
 void
-recovery_update_mode(const char *mode, double fsync_delay)
+recovery_update_mode(struct recovery_state *r,
+		     const char *mode, double fsync_delay)
 {
-	struct recovery_state *r = recovery_state;
-	(void) mode;
+	r->wal_mode = strindex(wal_mode_STRS, mode, WAL_MODE_MAX);
+	assert(r->wal_mode != WAL_MODE_MAX);
 	/* No mutex lock: let's not bother with whether
 	 * or not a WAL writer thread is present, and
 	 * if it's present, the delay will be propagated
@@ -217,9 +221,9 @@ recovery_update_mode(const char *mode, double fsync_delay)
 }
 
 void
-recovery_update_io_rate_limit(double new_limit)
+recovery_update_io_rate_limit(struct recovery_state *r, double new_limit)
 {
-	recovery_state->snap_io_rate_limit = new_limit * 1024 * 1024;
+	r->snap_io_rate_limit = new_limit * 1024 * 1024;
 }
 
 void
@@ -1100,6 +1104,9 @@ wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
+
+	if (r->wal_mode == WAL_NONE)
+		return 0;
 
 	struct wal_writer *writer = r->writer;
 

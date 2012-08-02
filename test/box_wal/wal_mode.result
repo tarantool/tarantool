@@ -1,0 +1,36 @@
+lua box.cfg.wal_mode
+---
+ - none
+...
+insert into t0 values  (1)
+Insert OK, 1 row affected
+insert into t0 values  (2)
+Insert OK, 1 row affected
+insert into t0 values  (3)
+Insert OK, 1 row affected
+select * from t0 where k0 = 1
+Found 1 tuple:
+[1]
+select * from t0 where k0 = 2
+Found 1 tuple:
+[2]
+select * from t0 where k0 = 3
+Found 1 tuple:
+[3]
+select * from t0 where k0 = 4
+No match
+save snapshot
+---
+ok
+...
+save snapshot
+---
+fail: can't save snapshot, errno 17 (File exists)
+...
+lua box.space[0]:truncate()
+---
+...
+save snapshot
+---
+ok
+...

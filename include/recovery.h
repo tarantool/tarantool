@@ -71,6 +71,11 @@ struct remote {
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
 };
 
+enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_FSYNC_DELAY, WAL_MODE_MAX };
+
+/** String constants for the supported modes. */
+extern const char *wal_mode_STRS[];
+
 struct recovery_state {
 	i64 lsn, confirmed_lsn;
 	/* The WAL we're currently reading/writing from/to. */
@@ -93,6 +98,7 @@ struct recovery_state {
 	int flags;
 	double wal_fsync_delay;
 	struct wait_lsn wait_lsn;
+	enum wal_mode wal_mode;
 
 	bool finalize;
 };
@@ -104,8 +110,10 @@ void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   int rows_per_wal, const char *wal_mode,
 		   double wal_fsync_delay,
 		   int flags);
-void recovery_update_mode(const char *wal_mode, double fsync_delay);
-void recovery_update_io_rate_limit(double new_limit);
+void recovery_update_mode(struct recovery_state *r,
+			  const char *wal_mode, double fsync_delay);
+void recovery_update_io_rate_limit(struct recovery_state *r,
+				   double new_limit);
 void recovery_free();
 void recover_snap(struct recovery_state *);
 void recover_existing_wals(struct recovery_state *);
