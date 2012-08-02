@@ -1,0 +1,12 @@
+--- doc/man/CMakeLists.txt.orig	2012-07-27 19:39:47.550688521 +0400
++++ doc/man/CMakeLists.txt	2012-07-27 19:39:59.834015592 +0400
+@@ -5,7 +5,7 @@ add_custom_target(man ALL
+ 	    ${CMAKE_SOURCE_DIR}/doc/man/tarantool.pod > ${PROJECT_BINARY_DIR}/doc/man/tarantool.1
+     )
+ 
+-install(FILES ${PROJECT_BINARY_DIR}/doc/man/tarantool_box.1 DESTINATION "${CMAKE_MAN_DIR}")
++install(FILES ${PROJECT_BINARY_DIR}/doc/man/tarantool_box.1 DESTINATION "${CMAKE_MAN_DIR}/man1")
+ if (ENABLE_CLIENT)
+-    install(FILES ${PROJECT_BINARY_DIR}/doc/man/tarantool.1 DESTINATION "${CMAKE_MAN_DIR}")
++    install(FILES ${PROJECT_BINARY_DIR}/doc/man/tarantool.1 DESTINATION "${CMAKE_MAN_DIR}/man1")
+ endif()
