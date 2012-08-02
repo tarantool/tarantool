@@ -683,3 +683,5 @@ Found 1 tuple:
 [59, 'master 59']
 master lsn = 61
 replica lsn = 61
+insert into t0 values (0, 'replica is read only')
+An error occurred: ER_NONMASTER, 'Can't modify data on a replication slave. My master is: 127.0.0.1:33016'

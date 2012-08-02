@@ -48,6 +48,10 @@
 #include "request.h"
 #include "txn.h"
 
+static void box_process_replica(struct txn *txn, Port *port,
+				u32 op, struct tbuf *request_data);
+static void box_process_ro(struct txn *txn, Port *port,
+			   u32 op, struct tbuf *request_data);
 static void box_process_ro(struct txn *txn, Port *port,
 			   u32 op, struct tbuf *request_data);
 static void box_process_rw(struct txn *txn, Port *port,
@@ -98,15 +102,28 @@ box_process_rw(struct txn *txn, Port *port,
 }
 
 static void
+box_process_replica(struct txn *txn, Port *port,
+	       u32 op, struct tbuf *request_data)
+{
+	if (!request_is_select(op)) {
+		txn_rollback(txn);
+		tnt_raise(ClientError, :ER_NONMASTER,
+			  cfg.replication_source);
+	}
+	return box_process_rw(txn, port, op, request_data);
+}
+
+static void
 box_process_ro(struct txn *txn, Port *port,
 	       u32 op, struct tbuf *request_data)
 {
 	if (!request_is_select(op)) {
 		txn_rollback(txn);
-		tnt_raise(LoggedError, :ER_NONMASTER);
+		tnt_raise(LoggedError, :ER_SECONDARY);
 	}
 	return box_process_rw(txn, port, op, request_data);
 }
+
 
 static void
 iproto_primary_port_handler(u32 op, struct tbuf *request_data)
@@ -323,7 +340,7 @@ static void
 box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 {
 	if (conf->replication_source != NULL) {
-		box_process = box_process_ro;
+		box_process = box_process_replica;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 		recovery_follow_remote(recovery_state, conf->replication_source);

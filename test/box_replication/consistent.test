@@ -154,6 +154,10 @@ select_tuples(replica, id, id + (ID_STEP * 2))
 
 print "master lsn = %s" % master.get_param("lsn")
 print "replica lsn = %s" % replica.get_param("lsn")
+# Test that a replica replies with master connection URL on
+# update requests.
+replica_sql = replica.sql
+exec replica_sql "insert into t0 values (0, 'replica is read only')"
 
 # Cleanup.
 replica.stop()
