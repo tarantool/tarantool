@@ -28,7 +28,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+typedef void (*tc_printerf_t)(struct tnt_xlog_header_v11 *hdr,
+		              struct tnt_request *r);
+
 void tc_print_tuple(struct tnt_tuple *tu);
 void tc_print_list(struct tnt_list *l);
+
+tc_printerf_t tc_print_getcb(const char *name);
 
 #endif /* TC_PRINT_H_INCLUDED */

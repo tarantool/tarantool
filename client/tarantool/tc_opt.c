@@ -51,6 +51,19 @@ static const void *tc_options_def = gopt_start(
 		    gopt_longs("cat"), " <file>", "print xlog file content"),
 	gopt_option('P', GOPT_ARG, gopt_shorts('P'),
 		    gopt_longs("play"), " <file>", "replay xlog file to the specified server"),
+
+	gopt_option('S', GOPT_ARG, gopt_shorts('S'),
+		    gopt_longs("space"), " <space>", "xlog file space number"),
+
+	gopt_option('F', GOPT_ARG, gopt_shorts('F'),
+		    gopt_longs("from"), " <lsn>", "start xlog file from the specified lsn"),
+
+	gopt_option('T', GOPT_ARG, gopt_shorts('T'),
+		    gopt_longs("to"), " <lsn>", "stop on specified xlog lsn"),
+
+	gopt_option('M', GOPT_ARG, gopt_shorts('M'),
+		    gopt_longs("format"), " <name>", "cat output format (tarantool, sql, yaml)"),
+
 	gopt_option('R', GOPT_ARG, gopt_shorts('R'),
 		    gopt_longs("rpl"), " <lsn>", "act as replica for the specified server"),
 	gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
@@ -105,6 +118,33 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	opt->port_admin = TC_DEFAULT_PORT_ADMIN;
 	if (gopt_arg(tc_options, 'm', &arg))
 		opt->port_admin = atoi(arg);
+
+	/* space */
+	opt->space = 0;
+	opt->space_set = 0;
+	if (gopt_arg(tc_options, 'S', &arg)) {
+		opt->space = atoi(arg);
+		opt->space_set = 1;
+	}
+
+	/* from lsn */
+	opt->lsn_from = 0;
+	if (gopt_arg(tc_options, 'F', &arg)) {
+		opt->lsn_from = atoi(arg);
+		opt->lsn_from_set = 1;
+	}
+
+	/* to lsn */
+	opt->lsn_to = 0;
+	if (gopt_arg(tc_options, 'T', &arg)) {
+		opt->lsn_to = atoi(arg);
+		opt->lsn_to_set = 1;
+	}
+
+	/* output format */
+	opt->format = NULL;
+	if (gopt_arg(tc_options, 'M', &arg))
+		opt->format = arg;
 
 	/* replica mode */
 	if (gopt_arg(tc_options, 'R', &arg)) {
