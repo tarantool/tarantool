@@ -1,0 +1,10 @@
+#########################################################
+#
+#
+#        After install you'll need init storage:
+#
+#    %%PREFIX%%/bin/tarantool_box --init-storage \
+#    	-c %%ETCDIR%%/tarantool.cfg
+#
+#
+#########################################################
