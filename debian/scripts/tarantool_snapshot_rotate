@@ -1,0 +1,220 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+
+use constant CONFIG_DIR     => '/var/lib/tarantool/started';
+use constant PID_DIR        => '/var/run/tarantool';
+use constant SNAPSHOT_DIR   => '/var/lib/tarantool/snapshot';
+use File::Spec::Functions 'catfile';
+use File::Basename 'basename', 'dirname';
+use IO::Socket::INET;
+use Getopt::Long;
+use Pod::Usage;
+use Data::Dumper;
+
+
+pod2usage(-exitstatus => 0, -verbose => 2) unless
+    GetOptions
+        'help|h'            => \my $help,
+        'verbose|v'         => \my $verbose,
+        'snapshots|s=i'     => \my $snapshots,
+;
+$snapshots //= 10;
+
+sub DEBUGF($;@) {
+    return unless $verbose;
+    my ($fmt, @arg) = @_;
+    $fmt =~ s/\s*$/\n/;
+    printf STDERR $fmt, @arg;
+}
+
+
+sub list_files($) {
+    my $sndir = shift;
+    unless (-d $sndir) {
+        DEBUGF 'Snapshot directory "%s" was not found', $sndir;
+        return;
+    }
+
+    unless (-w $sndir) {
+        DEBUGF 'Can not write into directory %s', $sndir;
+        return;
+    }
+
+    my $dh;
+    opendir $dh, $sndir;
+    my @files = sort
+        grep /\.(snap|xlog)$/,
+        grep { -r $_ and -f $_ }
+            map { catfile $sndir, $_ }
+            readdir $dh;
+    return @files;
+}
+
+sub rotate_snapshot($) {
+    my ($pidfile) = @_;
+
+    my $pid;
+
+
+    if (open my $ph, '<', $pidfile) {
+        $pid = <$ph>;
+        $pid =~ s/\D+//g;
+    } else {
+        warn "Can't open file $pidfile: $!\n";
+        return;
+    }
+
+    unless($pid) {
+        warn "PID was not received\n";
+        return;
+    }
+
+    my $sndir = catfile SNAPSHOT_DIR, basename $pidfile, '.pid';
+    my @files = list_files $sndir;
+    goto FINISH unless @files;
+
+    while(@files and $files[0] =~ /\.xlog$/) {
+        DEBUGF 'Remove orphaned %s', $files[0];
+        unless (unlink $files[0]) {
+            DEBUGF "Can't unlink file %s: %s", $files[0], $!;
+            return;
+        }
+        shift @files;
+    }
+
+    if (kill USR1 => $pid) {
+        goto FINISH unless @files;
+        for (my $i = 0; $i < 5; $i++) {
+            sleep 1;
+            my @inpr = sort glob catfile SNAPSHOT_DIR, '*.snap.inprogress';
+            last unless @inpr;
+            if ($inpr[-1] and $inpr[-1] gt $files[-1]) {
+                DEBUGF "snapshot %s is still in progress...", $inpr[-1];
+                next;
+            }
+        }
+    } else {
+        warn "Error while sending snapshot signal: $!";
+        return;
+    }
+
+    if ($snapshots) {
+        @files = list_files $sndir;
+        my $snaps = grep /\.snap$/, @files;
+        if ($snaps > $snapshots) {
+            my $to_remove = $snaps - $snapshots;
+
+            while (@files) {
+                my $file = shift @files;
+                $to_remove-- if $file =~ /\.snap$/;
+                DEBUGF "Unlink file: %s...", $file;
+                unless (unlink $file) {
+                    DEBUGF "Can't unlink file %s: %s", $file, $!;
+                    return;
+                }
+                last unless $to_remove > 0;
+            }
+            while(@files and $files[0] =~ /\.xlog$/) {
+                DEBUGF 'Remove orphaned %s', $files[0];
+                unless (unlink $files[0]) {
+                    DEBUGF "Can't unlink file %s: %s", $files[0], $!;
+                    return;
+                }
+                shift @files;
+            }
+        }
+    }
+
+    FINISH:
+}
+
+
+DEBUGF "Looking through %s...", PID_DIR;
+for (glob catfile PID_DIR, '*.pid') {
+    my $cfg = catfile CONFIG_DIR, basename $_, '.pid';
+
+    unless(-r $cfg) {
+        warn "Config file '$cfg' is not found\n";
+        next;
+    }
+    DEBUGF 'Found instance "%s" (%s)', basename($cfg), basename $_;
+
+    if (open my $fh, '<:encoding(UTF-8)', $cfg) {
+        my @lines = <$fh>;
+
+        my ($user_snapshots) =
+            grep /^\s*save_snapshots\s*=\s*\d+\s*(?:#.*)?$/,
+                reverse @lines;
+
+        if ($user_snapshots) {
+            for ($user_snapshots) {
+                s/#.*//;
+                s/\D+//g;
+            }
+            DEBUGF "Found user's option save_snapshots=%s, use it",
+                $user_snapshots;
+            $snapshots = $user_snapshots;
+        } else {
+            DEBUGF "Use default value: save_snapshots=%s", $snapshots;
+        }
+
+        rotate_snapshot $_;
+
+
+    } else {
+        warn "Can't open file $cfg: $!\n";
+        next;
+    }
+}
+
+exit 0 unless -x PID_DIR;
+exit 0 unless -x CONFIG_DIR;
+
+=head1 NAME
+
+tarantool_snapshot_rotate - script to creates/rotates snapshots
+
+=head1 SYNOPSIS
+
+    tarantool_snapshot_rotate
+    tarantool_snapshot_rotate --verbose
+
+=head1 DESCRIPTION
+
+The script passes through all started tarantool instances and creates
+snapshots for each instance.
+
+The script understands some additional options in tarantool.cfg:
+
+=over
+
+=item save_snapshots = COUNT
+
+Count of snapshots to save (default = 10). COUNT=0 disables removing
+old snapshots.
+
+=item
+
+=back
+
+=head1 OPTIONS
+
+=over
+
+=item -h | --help
+
+show the helpscreen
+
+=item -v | --verbose
+
+log process to B<STDOUT>
+
+=item -s | --snapshots COUNT
+
+redefines B<save_snapshots> option of config file
+
+=back
+
+=cut

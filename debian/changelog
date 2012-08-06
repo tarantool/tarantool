@@ -1,3 +1,11 @@
+tarantool (1.4.7+20120803-1) UNRELEASED; urgency=low
+
+  * New upstream version.
+   + Add WAL rotate script.
+  * Add all contributors to debian/copyright (fix lintian warning).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 03 Aug 2012 12:09:14 +0400
+
 tarantool (1.4.7+20120714-1) unstable; urgency=low
 
   * Fixed memcached space and some troubles in build system.

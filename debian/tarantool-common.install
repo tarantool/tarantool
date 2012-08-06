@@ -1,3 +1,4 @@
 debian/etc/example.cfg /etc/tarantool/instances.available/
-debian/scripts/tarantool_instance /usr/sbin
+debian/scripts/tarantool_instance /usr/sbin/
+debian/scripts/tarantool_snapshot_rotate /usr/sbin/
 debian/scripts/tarantool_logrotate /usr/lib/tarantool/
