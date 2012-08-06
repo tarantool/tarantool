@@ -383,7 +383,23 @@ License: GPLv3
  /usr/share/common-licenses/GPL-3
 
 Files: *
-Copyright (C) Tarantool/Box AUTHORS
+Copyright: Aleksey Demakov,
+ Aleksey Mashanov,
+ Alexandre Kalendarev,
+ Damien Lefortier,
+ Dmitry E. Oboukhov,
+ Dmitry Simonenko,
+ Fedor Sigaev,
+ Konstantin Osipov,
+ Konstantin Shulgin,
+ Yuri Nevinitsin,
+ Pavel Cherenkov,
+ Roman Antipin,
+ Roman Tokarev,
+ Teodor Sigaev,
+ Timofey Khryukin,
+ Yuriy Nevinitsin,
+ Yuriy Vostrikov
 License:
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
