@@ -127,11 +127,41 @@ tc_printer_sql(struct tnt_xlog_header_v11 *hdr,
 		printf("\n");
 		break;
 	case TNT_OP_DELETE:
-		printf("delete from t0 where k%"PRIu32" = ", r->r.del.h.ns);
+		printf("delete from t%"PRIu32" where k0 = ", r->r.del.h.ns);
 		tc_printer_sql_tuple(&r->r.del.t);
 		printf("\n");
 		break;
-	case TNT_OP_UPDATE:
+	case TNT_OP_UPDATE: {
+		printf("update t%"PRIu32" set ", r->r.update.h.ns);
+		int i = 0;
+		while (i < r->r.update.opc) {
+			struct tnt_request_update_op *op = &r->r.update.opv[i];
+			switch (op->op) {
+			case TNT_UPDATE_ASSIGN:
+				/* XXX: hexademical data input needed */
+				break;
+			case TNT_UPDATE_ADD:
+				break;
+			case TNT_UPDATE_AND:
+				break;
+			case TNT_UPDATE_XOR:
+				break;
+			case TNT_UPDATE_OR:
+				break;
+			case TNT_UPDATE_SPLICE:
+				break;
+			case TNT_UPDATE_DELETE:
+				break;
+			case TNT_UPDATE_INSERT:
+				break;
+			default:
+				break;
+			}
+
+			i++;
+		}
+		break;
+	}
 	default:
 		break;
 	}
@@ -141,13 +171,13 @@ tc_printerf_t tc_print_getcb(const char *name)
 {
 	if (name == NULL)
 		return tc_printer_tarantool;
-	if (strcasecmp(name, "tarantool"))
+	if (!strcasecmp(name, "tarantool"))
 		return tc_printer_tarantool;
 	else
-	if (strcasecmp(name, "sql"))
+	if (!strcasecmp(name, "sql"))
 		return tc_printer_sql;
 	else
-	if (strcasecmp(name, "yaml"))
+	if (!strcasecmp(name, "yaml"))
 		return NULL;
 	return NULL;
 }
