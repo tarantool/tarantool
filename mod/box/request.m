@@ -95,6 +95,7 @@ port_send_tuple(u32 flags, Port *port, struct tuple *tuple)
 		tnt_raise(IllegalParams, :"incorrect tuple length");
 
 	txn->new_tuple = tuple_alloc(data->size);
+	tuple_ref(txn->new_tuple, 1);
 	txn->new_tuple->field_count = field_count;
 	memcpy(txn->new_tuple->data, data->data, data->size);
 
@@ -855,6 +856,7 @@ do_update_ops(struct update_cmd *cmd, struct tuple *new_tuple)
 		init_update_operations(cmd, old_tuple);
 		/* allocate new tuple */
 		txn->new_tuple = tuple_alloc(cmd->new_tuple_len);
+		tuple_ref(txn->new_tuple, 1);
 		do_update_ops(cmd, txn->new_tuple);
 		space_validate(sp, old_tuple, txn->new_tuple);
 	}

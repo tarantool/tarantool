@@ -155,6 +155,6 @@ row_v11_size(struct row_v11 *row)
 int
 inprogress_log_unlink(char *filename);
 int
-inprogress_log_rename(char *filename);
+inprogress_log_rename(struct log_io *l);
 
 #endif /* TARANTOOL_LOG_IO_H_INCLUDED */

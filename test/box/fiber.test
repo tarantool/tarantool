@@ -1,0 +1,81 @@
+# encoding: tarantool
+# A test case for a race condition between ev_schedule
+# and wal_schedule fiber schedulers. 
+# The same fiber should not be scheduled by ev_schedule (e.g. 
+# due to cancellation) if it is within th wal_schedule queue.
+# The test case is dependent on rows_per_wal, since this is when
+# we reopen the .xlog file and thus wal_scheduler takes a long
+# pause.
+exec admin "lua box.cfg.rows_per_wal"
+exec sql "insert into t0 values (1, 'testing', 'lua rocks')"
+exec sql "delete from t0 where k0=1"
+exec sql "insert into t0 values (1, 'testing', 'lua rocks')"
+exec sql "delete from t0 where k0=1"
+# check delete:
+exec admin "lua box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, 1))"
+exec admin "lua box.process(22, box.pack('iii', 0, 0, 0))"
+
+exec sql "insert into t0 values (1, 'test box delete')"
+exec sql "call box.delete(0, '\1\0\0\0')"
+exec sql "insert into t0 values (1, 'test box delete')"
+exec admin "lua box.delete(0, 1)"
+exec sql "insert into t0 values ('abcd', 'test box delete')"
+exec sql "call box.delete(0, 'abcd')"
+exec sql "insert into t0 values ('abcd', 'test box delete')"
+exec admin "lua box.delete(0, 'abcd')"
+exec sql "insert into t0 values ('abcd', 'test box.select()')"
+exec sql "call box.replace(0, 'abcd', 'hello', 'world')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'defc', 'goodbye', 'universe')"
+exec sql "call box.replace(0, 'abcd')"
+exec sql "call box.delete(0, 'abcd')"
+exec sql "call box.delete(0, 'defc')"
+exec sql "call box.insert(0, 'test', 'old', 'abcd')"
+# test that insert produces a duplicate key error
+exec sql "call box.insert(0, 'test', 'old', 'abcd')"
+exec sql "call box.update(0, 'test', '=p=p', 0, 'pass', 1, 'new')"
+exec sql "call box.update(0, 'miss', '+p', 2, '\1\0\0\0')"
+exec sql "call box.update(0, 'pass', '+p', 2, '\1\0\0\0')"
+exec sql "call box.update(0, 'pass', '-p', 2, '\1\0\0\0')"
+exec sql "call box.update(0, 'pass', '-p', 2, '\1\0\0\0')"
+exec admin "lua box.update(0, 'pass', '+p', 2, 1)"
+exec sql "call box.delete(0, 'pass')"
+exec admin "reload configuration"
+# must be read-only
+
+exec admin "lua box.insert(0, 'test')"
+exec admin "lua box.insert(0, 'abcd')"
+exec admin "lua box.delete(0, 'test')"
+exec admin "lua box.delete(0, 'abcd')"
+exec admin "lua box.space[0]:insert('test', 'hello world')"
+exec admin "lua box.space[0]:update('test', '=p', 1, 'bye, world')"
+exec admin "lua box.space[0]:delete('test')"
+# test tuple iterators
+exec admin "lua t=box.space[0]:insert('test')"
+exec admin "lua t=box.space[0]:replace('test', 'another field')"
+exec admin "lua t=box.space[0]:replace('test', 'another field', 'one more')"
+exec admin "lua box.space[0]:truncate()"
+# test passing arguments in and out created fiber
+exec admin "lua function y() print('started') box.fiber.detach() while true do box.replace(0, 'test', os.time()) box.fiber.sleep(0.001) end end"
+exec admin "lua f = box.fiber.create(y)"
+exec admin "lua box.fiber.resume(f)"
+exec admin "lua box.fiber.sleep(0.002)"
+exec admin "lua box.fiber.cancel(f)"
+exec admin "lua box.fiber.resume(f)"
+exec admin "lua for k=1, 1000, 1 do box.fiber.create(function() box.fiber.detach() end) end"
+exec admin "lua collectgarbage('collect')"
+# check that these newly created fibers are garbage collected
+exec admin "lua box.fiber.find(900)"
+exec admin "lua box.fiber.find(910)"
+exec admin "lua box.fiber.find(920)"
+exec admin "lua box.space[0]:truncate()"

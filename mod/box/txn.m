@@ -111,10 +111,8 @@ txn_commit(struct txn *txn)
 	}
 	if (txn->old_tuple)
 		tuple_ref(txn->old_tuple, -1);
-	if (txn->new_tuple) {
-		tuple_ref(txn->new_tuple, +1);
+	if (txn->new_tuple)
 		txn_unlock(txn, txn->new_tuple);
-	}
 	TRASH(txn);
 }
 
@@ -129,6 +127,6 @@ txn_rollback(struct txn *txn)
 		space_remove(txn->space, txn->new_tuple);
 	}
 	if (txn->new_tuple)
-		tuple_free(txn->new_tuple);
+		tuple_ref(txn->new_tuple, -1);
 	TRASH(txn);
 }

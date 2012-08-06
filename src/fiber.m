@@ -152,20 +152,18 @@ fiber_cancel(struct fiber *f)
 		fiber_testcancel();
 		return;
 	}
-	/**
-	 * In most cases the fiber is CANCELLABLE and
-	 * will notice it's been cancelled right away.
-	 * So we just invoke it here in hope it'll die
-	 * and yield to us without a full scheduler loop.
+	/*
+	 * The subject fiber is passing through a wait
+	 * point and can be kicked out of it right away.
 	 */
-	fiber_call(f);
+	if (f->flags & FIBER_CANCELLABLE)
+		fiber_call(f);
 
 	if (f->fid) {
 		/*
-		 * Syncrhonous cancel did not work: apparently
-		 * the fiber is not CANCELLABLE or for some reason
-		 * chose to yield without dying. We have no
-		 * choice but to wait asynchronously.
+		 * The fiber is not dead. We have no other
+		 * choice but wait for it to discover that
+		 * it has been cancelled, and die.
 		 */
 		assert(f->waiter == NULL);
 		f->waiter = fiber;
@@ -184,8 +182,7 @@ fiber_cancel(struct fiber *f)
 static bool
 fiber_is_cancelled()
 {
-	return (fiber->flags & FIBER_CANCELLABLE &&
-		fiber->flags & FIBER_CANCEL);
+	return fiber->flags & FIBER_CANCEL;
 }
 
 /** Test if this fiber is in a cancellable state and was indeed

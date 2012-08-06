@@ -532,7 +532,7 @@ recovery_finalize(struct recovery_state *r)
 		} else if (r->current_wal->rows == 1) {
 			/* Rename inprogress wal with one row */
 			say_warn("rename unfinished %s WAL", r->current_wal->filename);
-			if (inprogress_log_rename(r->current_wal->filename) != 0)
+			if (inprogress_log_rename(r->current_wal) != 0)
 				panic("can't rename 'inprogress' WAL");
 		} else
 			panic("too many rows in inprogress WAL `%s'", r->current_wal->filename);
@@ -958,7 +958,7 @@ wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir, u64 l
 		 * Rename WAL after the first successful write
 		 * to a name  without .inprogress suffix.
 		 */
-		if (inprogress_log_rename(l->filename))
+		if (inprogress_log_rename(l))
 			log_io_close(&l);       /* error. */
 	}
 	assert(wal_to_close == NULL);
@@ -1214,22 +1214,13 @@ snapshot_save(struct recovery_state *r,
 	 * <lsn>.snap.inprogress. When done, the snapshot is
 	 * renamed to <lsn>.snap.
 	 */
-	const char *final_filename =
-		format_filename(r->snap_dir, r->confirmed_lsn, NONE);
-	say_info("saving snapshot `%s'", final_filename);
+	say_info("saving snapshot `%s'",
+		 format_filename(r->snap_dir, r->confirmed_lsn,
+				 NONE));
 	f(snap, batch);
 
 	if (batch->rows && nbatch_write(batch, fileno(snap->f)) != batch->rows)
 		panic_syserror("nbatch_write");
-
-	if (log_io_sync(snap) < 0)
-		panic("fsync");
-
-	if (link(snap->filename, final_filename) == -1)
-		panic_status(errno, "can't create hard link to snapshot");
-
-	if (unlink(snap->filename) == -1)
-		say_syserror("can't unlink 'inprogress' snapshot");
 
 	free(batch);
 	log_io_close(&snap);

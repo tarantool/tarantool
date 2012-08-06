@@ -48,10 +48,12 @@
 #define FIBER_NAME_MAXLEN 32
 
 #define FIBER_READING_INBOX 0x1
-/** Can this fiber be cancelled? */
+/** This fiber can be cancelled synchronously. */
 #define FIBER_CANCELLABLE   0x2
 /** Indicates that a fiber has been cancelled. */
 #define FIBER_CANCEL        0x4
+/** This fiber was created via stored procedures API. */
+#define FIBER_USER_MODE     0x8
 
 /** This is thrown by fiber_* API calls when the fiber is
  * cancelled.

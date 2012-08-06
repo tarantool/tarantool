@@ -370,11 +370,13 @@ eof:
 /* }}} */
 
 int
-inprogress_log_rename(char *filename)
+inprogress_log_rename(struct log_io *l)
 {
+	char *filename = l->filename;
 	char *new_filename;
 	char *suffix = strrchr(filename, '.');
 
+	assert(l->is_inprogress);
 	assert(suffix);
 	assert(strcmp(suffix, inprogress_suffix) == 0);
 
@@ -388,7 +390,7 @@ inprogress_log_rename(char *filename)
 
 		return -1;
 	}
-
+	l->is_inprogress = false;
 	return 0;
 }
 
@@ -421,14 +423,19 @@ log_io_close(struct log_io **lptr)
 	struct log_io *l = *lptr;
 	int r;
 
-	if (l->rows == 1 && l->mode == LOG_WRITE) {
-		/* Rename WAL before finalize. */
-		if (inprogress_log_rename(l->filename) != 0)
+	if (l->mode == LOG_WRITE) {
+		nwrite(fileno(l->f), &eof_marker_v11, sizeof(log_magic_t));
+		/*
+		 * Sync the file before closing, since
+		 * otherwise we can end up with a partially
+		 * written file in case of a crash.
+		 * Do not sync if the file is opened with O_SYNC.
+		 */
+		if (! (l->dir->open_wflags & WAL_SYNC_FLAG))
+			log_io_sync(l);
+		if (l->is_inprogress && inprogress_log_rename(l) != 0)
 			panic("can't rename 'inprogress' WAL");
 	}
-
-	if (l->mode == LOG_WRITE)
-		nwrite(fileno(l->f), &eof_marker_v11, sizeof(log_magic_t));
 
 	r = fclose(l->f);
 	if (r < 0)

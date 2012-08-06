@@ -594,7 +594,8 @@ lbox_fiber_gc(struct lua_State *L)
 	 */
 	if (child_L) {
 		assert(f != fiber && child_L != L);
-		/* Garbage collect the associated coro.
+		/*
+		 * Garbage collect the associated coro.
 		 * Do it first, since the cancelled fiber
 		 * can get recycled quickly.
 		 */
@@ -627,8 +628,9 @@ lbox_fiber_detach(struct lua_State *L)
 static void
 box_lua_fiber_run(void *arg __attribute__((unused)))
 {
-	fiber_setcancelstate(true);
 	fiber_testcancel();
+	fiber_setcancelstate(false);
+
 	struct lua_State *L = box_lua_fiber_get_coro(tarantool_L, fiber);
 	/*
 	 * Reference the coroutine to make sure it's not garbage
@@ -662,6 +664,7 @@ box_lua_fiber_run(void *arg __attribute__((unused)))
 		/* error message */
 		lua_pushstring(L, e->errmsg);
 	} @catch (tnt_Exception *e) {
+		box_lua_fiber_clear_coro(tarantool_L, fiber);
 		@throw;
 	} @catch (...) {
 		lua_settop(L, 1);
@@ -716,6 +719,8 @@ lbox_fiber_create(struct lua_State *L)
 			   " reached");
 
 	struct fiber *f = fiber_create("lua", -1, box_lua_fiber_run, NULL);
+	/* Initially the fiber is cancellable */
+	f->flags |= FIBER_USER_MODE | FIBER_CANCELLABLE;
 
 	/* associate coro with fiber */
 	lua_pushlightuserdata(L, f);
@@ -804,6 +809,7 @@ lbox_fiber_yield(struct lua_State *L)
 	 * Yield to the caller. The caller will take care of
 	 * whatever arguments are taken.
 	 */
+	fiber_setcancelstate(true);
 	if (box_lua_fiber_get_coro(L, fiber) == NULL) {
 		fiber_wakeup(fiber);
 		fiber_yield();
@@ -813,6 +819,7 @@ lbox_fiber_yield(struct lua_State *L)
 		lua_pushinteger(L, YIELD);
 		fiber_yield_to(caller);
 	}
+	fiber_setcancelstate(false);
 	/*
 	 * Got resumed. Return whatever the caller has passed
 	 * to us with box.fiber.resume().
@@ -880,7 +887,9 @@ lbox_fiber_sleep(struct lua_State *L)
 	if (! lua_isnumber(L, 1) || lua_gettop(L) != 1)
 		luaL_error(L, "fiber.sleep(delay): bad arguments");
 	double delay = lua_tonumber(L, 1);
+	fiber_setcancelstate(true);
 	fiber_sleep(delay);
+	fiber_setcancelstate(false);
 	return 0;
 }
 
@@ -911,7 +920,7 @@ static int
 lbox_fiber_cancel(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
-	if (! (f->flags & FIBER_CANCELLABLE))
+	if (! (f->flags & FIBER_USER_MODE))
 		luaL_error(L, "fiber.cancel(): subject fiber does "
 			   "not permit cancel");
 	fiber_cancel(f);

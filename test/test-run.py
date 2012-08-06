@@ -26,6 +26,7 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 
 import argparse
 import os.path
+import time
 import sys
 from lib.test_suite import TestSuite
 
@@ -170,6 +171,8 @@ def main():
             failed_tests += suite.run_all()
     except RuntimeError as e:
         print "\nFatal error: {0}. Execution aborted.".format(e)
+        if options.args.gdb:
+            time.sleep(100)
         return (-1)
     finally:
         os.chdir(oldcwd)
