@@ -775,6 +775,18 @@ localhost> lua t:morph(-1, 1, 'zyx')
  - ghq
  - zyx
 ...
+localhost> lua t=box.insert(0, 'abc', 'def', 'abc')
+---
+...
+localhost> lua t:find('abc')
+---
+ - 0
+...
+localhost> lua t:findall('abc')
+---
+ - 0
+ - 2
+...
 </programlisting>
 
         </para></listitem>
