@@ -755,8 +755,12 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
 		tnt_raise(ClientError, :ER_NO_SUCH_PROC,
 			  name_end - name, name);
 	}
-	if (index != LUA_GLOBALSINDEX)
-		lua_remove(L, index);
+	/* setting stack that it would contain only
+	 * the function pointer. */
+	if (index != LUA_GLOBALSINDEX) {
+		lua_replace(L, 1);
+		lua_settop(L, 1);
+	}
 }
 
 @implementation Call

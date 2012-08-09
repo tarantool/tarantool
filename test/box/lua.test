@@ -522,3 +522,17 @@ exec admin "lua box.fiber.resume(f)"
 exec admin "lua box.fiber.resume(f)"
 exec admin "lua box.fiber.cancel(f)"
 exec admin "lua box.fiber.resume(f)"
+
+print """
+# A test case for Bug#103491
+# server CALL processing bug with name path longer than two
+# https://bugs.launchpad.net/tarantool/+bug/1034912
+"""
+exec admin "lua f = function() return 'OK' end"
+exec admin "lua test = {}"
+exec admin "lua test.f = f"
+exec admin "lua test.test = {}"
+exec admin "lua test.test.f = f"
+exec sql "call f()"
+exec sql "call test.f()"
+exec sql "call test.test.f()"
