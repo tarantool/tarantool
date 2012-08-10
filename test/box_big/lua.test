@@ -106,3 +106,11 @@ exec admin "lua box.space[17].index[1].idx:count(2, 2)"
 exec admin "lua box.space[17].index[1].idx:count(3)"
 exec admin "lua box.space[17].index[1].idx:count(3, 3)"
 exec admin "lua box.space[17].index[1].idx:count()"
+
+#
+# Tests for lua box.auto_increment
+#
+exec admin "lua box.auto_increment(18, 'a')"
+exec admin "lua box.insert(18, 5)"
+exec admin "lua box.auto_increment(18, 'b')"
+exec admin "lua box.auto_increment(18, 'c')"

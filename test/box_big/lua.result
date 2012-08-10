@@ -310,3 +310,19 @@ lua box.space[17].index[1].idx:count()
 ---
 error: 'index.count(): one or more arguments expected'
 ...
+lua box.auto_increment(18, 'a')
+---
+ - 0: {'a'}
+...
+lua box.insert(18, 5)
+---
+ - 5: {}
+...
+lua box.auto_increment(18, 'b')
+---
+ - 6: {'b'}
+...
+lua box.auto_increment(18, 'c')
+---
+ - 7: {'c'}
+...
