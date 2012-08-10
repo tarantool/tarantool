@@ -51,19 +51,14 @@ static const void *tc_options_def = gopt_start(
 		    gopt_longs("cat"), " <file>", "print xlog file content"),
 	gopt_option('P', GOPT_ARG, gopt_shorts('P'),
 		    gopt_longs("play"), " <file>", "replay xlog file to the specified server"),
-
 	gopt_option('S', GOPT_ARG, gopt_shorts('S'),
 		    gopt_longs("space"), " <space>", "xlog file space number"),
-
 	gopt_option('F', GOPT_ARG, gopt_shorts('F'),
 		    gopt_longs("from"), " <lsn>", "start xlog file from the specified lsn"),
-
 	gopt_option('T', GOPT_ARG, gopt_shorts('T'),
 		    gopt_longs("to"), " <lsn>", "stop on specified xlog lsn"),
-
 	gopt_option('M', GOPT_ARG, gopt_shorts('M'),
-		    gopt_longs("format"), " <name>", "cat output format (tarantool, sql, yaml)"),
-
+		    gopt_longs("format"), " <name>", "cat output format (tarantool)"),
 	gopt_option('R', GOPT_ARG, gopt_shorts('R'),
 		    gopt_longs("rpl"), " <lsn>", "act as replica for the specified server"),
 	gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
