@@ -231,6 +231,10 @@ tnt_lex(struct tnt_lex *l, struct tnt_tk **tk)
 		} else
 		if (ch == '#') {
 			while (1) {
+				if (l->pos == l->buf.size) {
+					*tk = tnt_lex_tk(l, TNT_TK_EOF, l->line, l->col);
+					return TNT_TK_EOF;
+				}
 				tnt_lex_step(l);
 				if (tnt_lex_chr(l) == '\n') {
 					if (((l->pos + 1) != l->buf.size))
