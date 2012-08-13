@@ -797,7 +797,7 @@ static void tt_tnt_net_reply(struct tt_test *test) {
 
 /* lex ws */
 static void tt_tnt_lex_ws(struct tt_test *test) {
-	unsigned char sz[] = " 	# abcde fghjk ## hh\n   # zzz\n";
+	unsigned char sz[] = " 	# abcde fghjk ## hh\n   # zzz\n#NOCR";
 	struct tnt_lex l;
 	tnt_lex_init(&l, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
