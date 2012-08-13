@@ -48,6 +48,14 @@ struct tc_opt {
 	int port;
 	int port_admin;
 	uint64_t lsn;
+	uint64_t lsn_from;
+	int lsn_from_set;
+	uint64_t lsn_to;
+	int lsn_to_set;
+	int space;
+	int space_set;
+	const char *format;
+	void *printer;
 	const char *xlog;
 	char **cmdv;
 	int cmdc;

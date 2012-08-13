@@ -37,6 +37,8 @@
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_sql.h>
+#include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_rpl.h>
 
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"

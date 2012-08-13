@@ -35,11 +35,13 @@
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_sql.h>
+#include <connector/c/include/tarantool/tnt_xlog.h>
 
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
 #include "client/tarantool/tc.h"
 #include "client/tarantool/tc_cli.h"
+#include "client/tarantool/tc_print.h"
 #include "client/tarantool/tc_wal.h"
 
 struct tc tc;
@@ -93,12 +95,21 @@ static void tc_connect_admin(void)
 		tc_error("admin console connection failed");
 }
 
+static void tc_validate(void)
+{
+	tc.opt.printer = tc_print_getcb(tc.opt.format);
+	if (tc.opt.printer == NULL)
+		return tc_error("unsupported output format '%s'",
+				tc.opt.format);
+}
+
 int main(int argc, char *argv[])
 {
 	tc_init();
 
 	int rc = 0;
 	enum tc_opt_mode mode = tc_opt_init(&tc.opt, argc, argv);
+	tc_validate();
 	switch (mode) {
 	case TC_OPT_USAGE:
 		tc_opt_usage();

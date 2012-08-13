@@ -34,14 +34,15 @@
 #include <ctype.h>
 
 #include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_rpl.h>
 
 #include "client/tarantool/tc_print.h"
+#include "client/tarantool/tc_query.h"
 
-void tc_print_tuple(struct tnt_tuple *tu)
-{
+static void tc_print_fields(struct tnt_tuple *tu) {
 	struct tnt_iter ifl;
 	tnt_iter(&ifl, tu);
-	printf("[");
 	while (tnt_next(&ifl)) {
 		if (TNT_IFIELD_IDX(&ifl) != 0)
 			printf(", ");
@@ -61,8 +62,14 @@ void tc_print_tuple(struct tnt_tuple *tu)
 	}
 	if (ifl.status == TNT_ITER_FAIL)
 		printf("<parsing error>");
-	printf("]\n");
 	tnt_iter_free(&ifl);
+}
+
+void tc_print_tuple(struct tnt_tuple *tu)
+{
+	printf("[");
+	tc_print_fields(tu);
+	printf("]\n");
 }
 
 void tc_print_list(struct tnt_list *l)
@@ -74,4 +81,35 @@ void tc_print_list(struct tnt_list *l)
 		tc_print_tuple(tu);
 	}
 	tnt_iter_free(&it);
+}
+
+static void
+tc_printer_tarantool(struct tnt_xlog_header_v11 *hdr,
+		     struct tnt_request *r)
+{
+	printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
+	       tc_query_type(r->h.type),
+	       hdr->lsn,
+	       hdr->tm,
+	       hdr->len);
+	switch (r->h.type) {
+	case TNT_OP_INSERT:
+		tc_print_tuple(&r->r.insert.t);
+		break;
+	case TNT_OP_DELETE:
+		tc_print_tuple(&r->r.del.t);
+		break;
+	case TNT_OP_UPDATE:
+		tc_print_tuple(&r->r.update.t);
+		break;
+	}
+}
+
+tc_printerf_t tc_print_getcb(const char *name)
+{
+	if (name == NULL)
+		return tc_printer_tarantool;
+	if (!strcasecmp(name, "tarantool"))
+		return tc_printer_tarantool;
+	return NULL;
 }

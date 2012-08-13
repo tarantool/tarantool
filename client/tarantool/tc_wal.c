@@ -104,7 +104,22 @@ static int tc_wal_printer(struct tnt_iter *i) {
 	struct tnt_request *r = TNT_IREQUEST_PTR(i);
 	struct tnt_stream_xlog *s =
 		TNT_SXLOG_CAST(TNT_IREQUEST_STREAM(i));
-	tc_wal_print(&s->hdr, r);
+	if (tc.opt.space_set) {
+		if (r->h.type == TNT_OP_CALL)
+			return 0;
+		uint32_t ns = *(uint32_t*)&r->r;
+		if (ns != tc.opt.space)
+			return 0;
+	}
+	if (tc.opt.lsn_from_set) {
+		if (s->hdr.lsn < tc.opt.lsn_from)
+			return 0;
+	}
+	if (tc.opt.lsn_to_set) {
+		if (s->hdr.lsn >= tc.opt.lsn_to)
+			return 0;
+	}
+	((tc_printerf_t)tc.opt.printer)(&s->hdr, r);
 	return 0;
 }
 
