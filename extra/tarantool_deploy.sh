@@ -168,7 +168,8 @@ fi
 if [ $deploy_exists -eq 1 ]; then
 	grep "^\(${deploy_name}\)$" $deploy_cfg > /dev/null
 	if [ $? -eq 0 ]; then 
-		error "Instance '${deploy_name}' is already deployed."
+		log "Instance '${deploy_name}' is already deployed."
+		exit 0
 	fi
 fi
 
