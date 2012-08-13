@@ -79,6 +79,16 @@ enum tc_cli_cmd_ret {
 	TC_CLI_EXIT
 };
 
+static int tc_cli_cmd_ispartof(char *cmd, char *sz) {
+	int i = 0;
+	for (; cmd[i] && sz[i] ; i++)
+		if (cmd[i] != sz[i])
+			return 0;
+	if (sz[i] != 0)
+		return 0;
+	return i > 0;
+}
+
 static enum tc_cli_cmd_ret tc_cli_cmd(char *cmd, size_t size)
 {
 	int reconnect = 0;
@@ -100,14 +110,14 @@ static enum tc_cli_cmd_ret tc_cli_cmd(char *cmd, size_t size)
 			if (reconnect && tnt_error(tc.net) != TNT_ESYSTEM)
 				reconnect = 0;
 		} else {
-			int reply = strcmp(cmd, "exit") &&
-				    strcmp(cmd, "quit");
+			int noreply = tc_cli_cmd_ispartof("quit", cmd) ||
+				      tc_cli_cmd_ispartof("exit", cmd);
 			tc_query_admin_t cb = tc_query_admin_printer;
-			if (!reply)
+			if (noreply)
 				cb = NULL;
 			if (tc_query_admin(cmd, cb, &e) == -1)
 				reconnect = tc_cli_error(e);
-			if (!reply)
+			if (noreply)
 				return TC_CLI_EXIT;
 		}
 	} while (reconnect);
