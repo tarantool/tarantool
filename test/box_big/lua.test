@@ -108,23 +108,23 @@ exec admin "lua box.space[17].index[1].idx:count(3, 3)"
 exec admin "lua box.space[17].index[1].idx:count()"
 
 #
-# Tests for lua tuple:morph()
+# Tests for lua tuple:transform()
 #
 exec admin "lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')"
-exec admin "lua t:morph(7, 0, '8', '9', '10')"
-exec admin "lua t:morph(0, 1)"
-exec admin "lua t:morph(1, 4)"
-exec admin "lua t:morph(-1, 1)"
-exec admin "lua t:morph(-3, 2)"
-exec admin "lua t:morph(0, 0, 'A')"
-exec admin "lua t:morph(-1, 0, 'A')"
-exec admin "lua t:morph(0, 1, 'A')"
-exec admin "lua t:morph(-1, 1, 'B')"
-exec admin "lua t:morph(0, 2, 'C')"
-exec admin "lua t:morph(2, 0, 'hello')"
-exec admin "lua t:morph(0, -1, 'C')"
-exec admin "lua t:morph(0, 100)"
-exec admin "lua t:morph(-100, 1)"
+exec admin "lua t:transform(7, 0, '8', '9', '100')"
+exec admin "lua t:transform(0, 1)"
+exec admin "lua t:transform(1, 4)"
+exec admin "lua t:transform(-1, 1)"
+exec admin "lua t:transform(-3, 2)"
+exec admin "lua t:transform(0, 0, 'A')"
+exec admin "lua t:transform(-1, 0, 'A')"
+exec admin "lua t:transform(0, 1, 'A')"
+exec admin "lua t:transform(-1, 1, 'B')"
+exec admin "lua t:transform(0, 2, 'C')"
+exec admin "lua t:transform(2, 0, 'hello')"
+exec admin "lua t:transform(0, -1, 'C')"
+exec admin "lua t:transform(0, 100)"
+exec admin "lua t:transform(-100, 1)"
 
 #
 # Tests for lua tuple:find() and tuple:findall()

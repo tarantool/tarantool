@@ -313,123 +313,61 @@ error: 'index.count(): one or more arguments expected'
 lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')
 ---
 ...
-lua t:morph(7, 0, '8', '9', '10')
+lua t:transform(7, 0, '8', '9', '100')
 ---
- - 1
- - 2
- - 3
- - 4
- - 5
- - 6
- - 7
- - 8
- - 9
- - 10
+ - '1': {'2', '3', '4', '5', '6', '7', '8', '9', '100'}
 ...
-lua t:morph(0, 1)
+lua t:transform(0, 1)
 ---
- - 2
- - 3
- - 4
- - 5
- - 6
- - 7
+ - '2': {'3', '4', '5', '6', '7'}
 ...
-lua t:morph(1, 4)
+lua t:transform(1, 4)
 ---
- - 1
- - 6
- - 7
+ - '1': {'6', '7'}
 ...
-lua t:morph(-1, 1)
+lua t:transform(-1, 1)
 ---
- - 1
- - 2
- - 3
- - 4
- - 5
- - 6
+ - '1': {'2', '3', '4', '5', '6'}
 ...
-lua t:morph(-3, 2)
+lua t:transform(-3, 2)
 ---
- - 1
- - 2
- - 3
- - 4
- - 7
+ - '1': {'2', '3', '4', '7'}
 ...
-lua t:morph(0, 0, 'A')
+lua t:transform(0, 0, 'A')
 ---
- - A
- - 1
- - 2
- - 3
- - 4
- - 5
- - 6
- - 7
+ - 'A': {'1', '2', '3', '4', '5', '6', '7'}
 ...
-lua t:morph(-1, 0, 'A')
+lua t:transform(-1, 0, 'A')
 ---
- - 1
- - 2
- - 3
- - 4
- - 5
- - 6
- - A
- - 7
+ - '1': {'2', '3', '4', '5', '6', 'A', '7'}
 ...
-lua t:morph(0, 1, 'A')
+lua t:transform(0, 1, 'A')
 ---
- - A
- - 2
- - 3
- - 4
- - 5
- - 6
- - 7
+ - 'A': {'2', '3', '4', '5', '6', '7'}
 ...
-lua t:morph(-1, 1, 'B')
+lua t:transform(-1, 1, 'B')
 ---
- - 1
- - 2
- - 3
- - 4
- - 5
- - 6
- - B
+ - '1': {'2', '3', '4', '5', '6', 'B'}
 ...
-lua t:morph(0, 2, 'C')
+lua t:transform(0, 2, 'C')
 ---
- - C
- - 3
- - 4
- - 5
- - 6
- - 7
+ - 'C': {'3', '4', '5', '6', '7'}
 ...
-lua t:morph(2, 0, 'hello')
+lua t:transform(2, 0, 'hello')
 ---
- - 1
- - 2
- - hello
- - 3
- - 4
- - 5
- - 6
- - 7
+ - '1': {'2', 'hello', '3', '4', '5', '6', '7'}
 ...
-lua t:morph(0, -1, 'C')
+lua t:transform(0, -1, 'C')
 ---
-error: 'tuple.morph(): len is negative'
+error: 'tuple.transform(): len is negative'
 ...
-lua t:morph(0, 100)
+lua t:transform(0, 100)
 ---
+ - '': {}
 ...
-lua t:morph(-100, 1)
+lua t:transform(-100, 1)
 ---
-error: 'tuple.morph(): offset is out of bound'
+error: 'tuple.transform(): offset is out of bound'
 ...
 lua t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')
 ---

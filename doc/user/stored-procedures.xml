@@ -751,29 +751,17 @@ localhost> lua t:slice(1, -1)
  - efg
  - ghq
 ...
-localhost> lua t:morph(1, 3)
+localhost> lua t:transform(1, 3)
 ---
- -
- - ghq
- - qkl
+ - 1: {'ghq', 'qkl'}
 ...
-localhost> lua t:morph(0, 1, 'zyx')
+localhost> lua t:transform(0, 1, 'zyx')
 ---
- - zyx
- - abc
- - cde
- - efg
- - ghq
- - qkl
+ - 'zyx': {'abc', 'cde', 'efg', 'ghq', 'qkl'}
 ...
-localhost> lua t:morph(-1, 1, 'zyx')
+localhost> lua t:transform(-1, 1, 'zyx')
 ---
- -
- - abc
- - cde
- - efg
- - ghq
- - zyx
+ - 1: {'abc', 'cde', 'efg', 'ghq', 'zyx'}
 ...
 localhost> lua t=box.insert(0, 'abc', 'def', 'abc')
 ---

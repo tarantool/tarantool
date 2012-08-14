@@ -158,18 +158,7 @@ lbox_tuple_slice(struct lua_State *L)
 }
 
 static void
-morph_push(struct lua_State *L, struct tuple *tuple,
-	    int start, int end)
-{
-	int fieldno = start;
-	u8 *field = tuple_field(tuple, fieldno);
-	while (fieldno < end) {
-		size_t len = load_varint32((void **) &field);
-		lua_pushlstring(L, (char *) field, len);
-		field += len;
-		fieldno++;
-	}
-}
+lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
 
 /**
  * Tuple transforming function.
@@ -178,51 +167,89 @@ morph_push(struct lua_State *L, struct tuple *tuple,
  * and replaces them with the elements of supplied data fields,
  * if any.
  *
- * Function returns string fields of newly formed tuple.
+ * Function returns newly allocated tuple.
  * It does not change any parent tuple data.
  *
  */
+static size_t
+transform_calculate(struct lua_State *L, struct tuple *tuple, int start,
+		    int argc,
+		    int offset, int len,
+		    size_t *left,
+		    size_t *right)
+{
+	/* calculating size of the new tuple */
+	*left = tuple_sizeof(tuple, 0, offset);
+	/* calculating sizes of supplied fields */
+	size_t middle = 0;
+	for (int i = start ; i <= argc ; i++) {
+		size_t field_size = lua_objlen(L, i + 1);
+		middle += varint32_sizeof(field_size) + field_size;
+	}
+	/* calculating last part of the tuple fields */
+	*right = tuple_sizeof(tuple, offset + len,
+			      tuple->field_count - offset + len);
+	return *left + middle + *right;
+}
+
 static int
-morph(struct lua_State *L, struct tuple *tuple, int start,
+transform(struct lua_State *L, struct tuple *tuple, int start,
       int argc,
       int offset, int len)
 {
 	/* validating offset and len */
 	if (offset < 0) {
 		if (-offset > tuple->field_count)
-			luaL_error(L, "tuple.morph(): offset is out of bound");
+			luaL_error(L, "tuple.transform(): offset is out of bound");
 		offset += tuple->field_count;
 	} else if (offset > tuple->field_count) {
 		offset = tuple->field_count;
 	}
 	if (len < 0)
-		luaL_error(L, "tuple.morph(): len is negative");
+		luaL_error(L, "tuple.transform(): len is negative");
 	if (len > tuple->field_count - offset)
 		len = tuple->field_count - offset;
-	/* pasting fields prior to offset */
-	morph_push(L, tuple, 0, offset);
-	/* pasting supplied fields */
-	for (int i = start ; i <= argc ; i++) {
-		size_t field_size;
-		const char *field = luaL_checklstring(L, i + 1, &field_size);
-		lua_pushlstring(L, field, field_size);
+	/* calculating size of the new tuple */
+	size_t left = 0, right = 0;
+	size_t size = transform_calculate(L, tuple, start, argc, offset, len,
+			                  &left,
+					  &right);
+	/* allocating new tuple */
+	struct tuple *dest = tuple_alloc(size);
+	dest->field_count = (tuple->field_count - len) +
+		            (argc - (start - 1));
+	/* constructing tuple */
+	if (left) {
+		memcpy(dest->data, tuple->data, left);
 	}
-	/* pasting last part of the tuple fields */
-	morph_push(L, tuple, offset + len, tuple->field_count);
-	return (tuple->field_count - len) +
-	       (argc - (start - 1));
+	size_t off = left;
+	for (int i = start ; i <= argc ; i++) {
+		size_t field_size = 0;
+		const char *field = luaL_checklstring(L, i + 1, &field_size);
+		save_varint32(dest->data + off, field_size);
+		off += varint32_sizeof(field_size);
+		memcpy(dest->data + off, field, field_size); 
+		off += field_size;
+	}
+	if (right) {
+		memcpy(dest->data + off,
+		       tuple_field(tuple, offset + len),
+		       right);
+	}
+	lbox_pushtuple(L, dest);
+	return 1;
 }
 
 static int
-lbox_tuple_morph(struct lua_State *L)
+lbox_tuple_transform(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 	if (argc < 2)
-		luaL_error(L, "tuple.morph(): bad arguments");
+		luaL_error(L, "tuple.transform(): bad arguments");
 	int len = lua_tointeger(L, 3);
 	int offset = lua_tointeger(L, 2);
-	return morph(L, tuple, 3, argc, offset, len);
+	return transform(L, tuple, 3, argc, offset, len);
 }
 
 static int
@@ -385,7 +412,7 @@ static const struct luaL_reg lbox_tuple_meta [] = {
 	{"next", lbox_tuple_next},
 	{"pairs", lbox_tuple_pairs},
 	{"slice", lbox_tuple_slice},
-	{"morph", lbox_tuple_morph},
+	{"transform", lbox_tuple_transform},
 	{"find", lbox_tuple_find},
 	{"findall", lbox_tuple_findall},
 	{"unpack", lbox_tuple_unpack},
