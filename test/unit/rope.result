@@ -1,0 +1,299 @@
+insert offset = 0, str = 'who's gonna be'
+size = 14
+string = 'who's gonna be'
+└──{ len = 14, height = 1, data = 'who's gonna be'}
+
+insert offset = 14, str = '<Mr.X>'
+size = 20
+string = 'who's gonna be<Mr.X>'
+│  ┌──nil
+└──{ len = 14, height = 2, data = 'who's gonna be'}
+   └──{ len = 6, height = 1, data = '<Mr.X>'}
+
+insert offset = 20, str = ', Mr. <black!?!>Black'
+size = 41
+string = 'who's gonna be<Mr.X>, Mr. <black!?!>Black'
+│  ┌──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 2, data = '<Mr.X>'}
+   └──{ len = 21, height = 1, data = ', Mr. <black!?!>Black'}
+
+insert offset = 41, str = ', but they <know-something-'
+size = 68
+string = 'who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-'
+│  ┌──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 3, data = '<Mr.X>'}
+   │  ┌──nil
+   └──{ len = 21, height = 2, data = ', Mr. <black!?!>Black'}
+      └──{ len = 27, height = 1, data = ', but they <know-something-'}
+
+insert offset = 0, str = 'guys all '
+size = 77
+string = 'guys all who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-'
+│     ┌──{ len = 9, height = 1, data = 'guys all '}
+│  ┌──{ len = 14, height = 2, data = 'who's gonna be'}
+│  │  └──nil
+└──{ len = 6, height = 3, data = '<Mr.X>'}
+   │  ┌──nil
+   └──{ len = 21, height = 2, data = ', Mr. <black!?!>Black'}
+      └──{ len = 27, height = 1, data = ', but they <know-something-'}
+
+insert offset = 9, str = 'five fighting over '
+size = 96
+string = 'guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-'
+│     ┌──{ len = 9, height = 1, data = 'guys all '}
+│  ┌──{ len = 19, height = 2, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 3, data = '<Mr.X>'}
+   │  ┌──nil
+   └──{ len = 21, height = 2, data = ', Mr. <black!?!>Black'}
+      └──{ len = 27, height = 1, data = ', but they <know-something-'}
+
+insert offset = 0, str = '<yes, got got>You got four of '
+size = 126
+string = '<yes, got got>You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-'
+│        ┌──{ len = 30, height = 1, data = '<yes, got got>You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 4, data = '<Mr.X>'}
+   │  ┌──nil
+   └──{ len = 21, height = 2, data = ', Mr. <black!?!>Black'}
+      └──{ len = 27, height = 1, data = ', but they <know-something-'}
+
+insert offset = 126, str = 'special> don't know each other'
+size = 156
+string = '<yes, got got>You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-special> don't know each other'
+│        ┌──{ len = 30, height = 1, data = '<yes, got got>You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 4, data = '<Mr.X>'}
+   │  ┌──{ len = 21, height = 1, data = ', Mr. <black!?!>Black'}
+   └──{ len = 27, height = 2, data = ', but they <know-something-'}
+      └──{ len = 30, height = 1, data = 'special> don't know each other'}
+
+insert offset = 4294967295, str = ', so nobody wants to back.'
+size = 182
+string = '<yes, got got>You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-special> don't know each other, so nobody wants to back.'
+│        ┌──{ len = 30, height = 1, data = '<yes, got got>You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 4, data = '<Mr.X>'}
+   │  ┌──{ len = 21, height = 1, data = ', Mr. <black!?!>Black'}
+   └──{ len = 27, height = 3, data = ', but they <know-something-'}
+      │  ┌──nil
+      └──{ len = 30, height = 2, data = 'special> don't know each other'}
+         └──{ len = 26, height = 1, data = ', so nobody wants to back.'}
+
+insert offset = 181, str = ' down'
+size = 187
+string = '<yes, got got>You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-special> don't know each other, so nobody wants to back down.'
+│        ┌──{ len = 30, height = 1, data = '<yes, got got>You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 4, data = '<Mr.X>'}
+   │     ┌──{ len = 21, height = 1, data = ', Mr. <black!?!>Black'}
+   │  ┌──{ len = 27, height = 2, data = ', but they <know-something-'}
+   │  │  └──nil
+   └──{ len = 30, height = 3, data = 'special> don't know each other'}
+      │  ┌──{ len = 25, height = 1, data = ', so nobody wants to back'}
+      └──{ len = 5, height = 2, data = ' down'}
+         └──{ len = 1, height = 1, data = '.'}
+
+insert offset = 4294967295, str = '<point-point>'
+size = 200
+string = '<yes, got got>You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-special> don't know each other, so nobody wants to back down.<point-point>'
+│        ┌──{ len = 30, height = 1, data = '<yes, got got>You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 5, data = '<Mr.X>'}
+   │     ┌──{ len = 21, height = 1, data = ', Mr. <black!?!>Black'}
+   │  ┌──{ len = 27, height = 2, data = ', but they <know-something-'}
+   │  │  └──nil
+   └──{ len = 30, height = 4, data = 'special> don't know each other'}
+      │  ┌──{ len = 25, height = 1, data = ', so nobody wants to back'}
+      └──{ len = 5, height = 3, data = ' down'}
+         │  ┌──nil
+         └──{ len = 1, height = 2, data = '.'}
+            └──{ len = 13, height = 1, data = '<point-point>'}
+
+erase offset = 0, size = 5 
+size = 195
+string = ' got got>You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-special> don't know each other, so nobody wants to back down.<point-point>'
+│        ┌──{ len = 25, height = 1, data = ' got got>You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 5, data = '<Mr.X>'}
+   │     ┌──{ len = 21, height = 1, data = ', Mr. <black!?!>Black'}
+   │  ┌──{ len = 27, height = 2, data = ', but they <know-something-'}
+   │  │  └──nil
+   └──{ len = 30, height = 4, data = 'special> don't know each other'}
+      │  ┌──{ len = 25, height = 1, data = ', so nobody wants to back'}
+      └──{ len = 5, height = 3, data = ' down'}
+         │  ┌──nil
+         └──{ len = 1, height = 2, data = '.'}
+            └──{ len = 13, height = 1, data = '<point-point>'}
+
+erase offset = 0, size = 9 
+size = 186
+string = 'You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-special> don't know each other, so nobody wants to back down.<point-point>'
+│        ┌──{ len = 16, height = 1, data = 'You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 5, data = '<Mr.X>'}
+   │     ┌──{ len = 21, height = 1, data = ', Mr. <black!?!>Black'}
+   │  ┌──{ len = 27, height = 2, data = ', but they <know-something-'}
+   │  │  └──nil
+   └──{ len = 30, height = 4, data = 'special> don't know each other'}
+      │  ┌──{ len = 25, height = 1, data = ', so nobody wants to back'}
+      └──{ len = 5, height = 3, data = ' down'}
+         │  ┌──nil
+         └──{ len = 1, height = 2, data = '.'}
+            └──{ len = 13, height = 1, data = '<point-point>'}
+
+erase offset = 179, size = 7 
+size = 179
+string = 'You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-special> don't know each other, so nobody wants to back down.<point'
+│        ┌──{ len = 16, height = 1, data = 'You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 5, data = '<Mr.X>'}
+   │     ┌──{ len = 21, height = 1, data = ', Mr. <black!?!>Black'}
+   │  ┌──{ len = 27, height = 2, data = ', but they <know-something-'}
+   │  │  └──nil
+   └──{ len = 30, height = 4, data = 'special> don't know each other'}
+      │  ┌──{ len = 25, height = 1, data = ', so nobody wants to back'}
+      └──{ len = 5, height = 3, data = ' down'}
+         │  ┌──{ len = 1, height = 1, data = '.'}
+         └──{ len = 6, height = 2, data = '<point'}
+            └──nil
+
+erase offset = 173, size = 1 
+size = 178
+string = 'You got four of guys all five fighting over who's gonna be<Mr.X>, Mr. <black!?!>Black, but they <know-something-special> don't know each other, so nobody wants to back down.point'
+│        ┌──{ len = 16, height = 1, data = 'You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 6, height = 5, data = '<Mr.X>'}
+   │     ┌──{ len = 21, height = 1, data = ', Mr. <black!?!>Black'}
+   │  ┌──{ len = 27, height = 2, data = ', but they <know-something-'}
+   │  │  └──nil
+   └──{ len = 30, height = 4, data = 'special> don't know each other'}
+      │  ┌──{ len = 25, height = 1, data = ', so nobody wants to back'}
+      └──{ len = 5, height = 3, data = ' down'}
+         │  ┌──{ len = 1, height = 1, data = '.'}
+         └──{ len = 5, height = 2, data = 'point'}
+            └──nil
+
+erase offset = 58, size = 7 
+size = 171
+string = 'You got four of guys all five fighting over who's gonna be Mr. <black!?!>Black, but they <know-something-special> don't know each other, so nobody wants to back down.point'
+│        ┌──{ len = 16, height = 1, data = 'You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 20, height = 4, data = ' Mr. <black!?!>Black'}
+   │     ┌──{ len = 27, height = 1, data = ', but they <know-something-'}
+   │  ┌──{ len = 30, height = 2, data = 'special> don't know each other'}
+   │  │  └──{ len = 25, height = 1, data = ', so nobody wants to back'}
+   └──{ len = 5, height = 3, data = ' down'}
+      │  ┌──{ len = 1, height = 1, data = '.'}
+      └──{ len = 5, height = 2, data = 'point'}
+         └──nil
+
+erase offset = 63, size = 10 
+size = 161
+string = 'You got four of guys all five fighting over who's gonna be Mr. Black, but they <know-something-special> don't know each other, so nobody wants to back down.point'
+│        ┌──{ len = 16, height = 1, data = 'You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 5, height = 5, data = ' Mr. '}
+   │        ┌──{ len = 5, height = 1, data = 'Black'}
+   │     ┌──{ len = 27, height = 2, data = ', but they <know-something-'}
+   │     │  └──nil
+   │  ┌──{ len = 30, height = 3, data = 'special> don't know each other'}
+   │  │  └──{ len = 25, height = 1, data = ', so nobody wants to back'}
+   └──{ len = 5, height = 4, data = ' down'}
+      │  ┌──{ len = 1, height = 1, data = '.'}
+      └──{ len = 5, height = 2, data = 'point'}
+         └──nil
+
+erase offset = 79, size = 25 
+size = 136
+string = 'You got four of guys all five fighting over who's gonna be Mr. Black, but they don't know each other, so nobody wants to back down.point'
+│        ┌──{ len = 16, height = 1, data = 'You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 19, height = 3, data = 'five fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 5, height = 5, data = ' Mr. '}
+   │        ┌──{ len = 5, height = 1, data = 'Black'}
+   │     ┌──{ len = 11, height = 2, data = ', but they '}
+   │     │  └──nil
+   │  ┌──{ len = 21, height = 3, data = 'don't know each other'}
+   │  │  └──{ len = 25, height = 1, data = ', so nobody wants to back'}
+   └──{ len = 5, height = 4, data = ' down'}
+      │  ┌──{ len = 1, height = 1, data = '.'}
+      └──{ len = 5, height = 2, data = 'point'}
+         └──nil
+
+erase offset = 25, size = 5 
+size = 131
+string = 'You got four of guys all fighting over who's gonna be Mr. Black, but they don't know each other, so nobody wants to back down.point'
+│        ┌──{ len = 16, height = 1, data = 'You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 14, height = 3, data = 'fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 5, height = 5, data = ' Mr. '}
+   │        ┌──{ len = 5, height = 1, data = 'Black'}
+   │     ┌──{ len = 11, height = 2, data = ', but they '}
+   │     │  └──nil
+   │  ┌──{ len = 21, height = 3, data = 'don't know each other'}
+   │  │  └──{ len = 25, height = 1, data = ', so nobody wants to back'}
+   └──{ len = 5, height = 4, data = ' down'}
+      │  ┌──{ len = 1, height = 1, data = '.'}
+      └──{ len = 5, height = 2, data = 'point'}
+         └──nil
+
+erase offset = 126, size = 5 
+size = 126
+string = 'You got four of guys all fighting over who's gonna be Mr. Black, but they don't know each other, so nobody wants to back down.'
+│        ┌──{ len = 16, height = 1, data = 'You got four of '}
+│     ┌──{ len = 9, height = 2, data = 'guys all '}
+│     │  └──nil
+│  ┌──{ len = 14, height = 3, data = 'fighting over '}
+│  │  └──{ len = 14, height = 1, data = 'who's gonna be'}
+└──{ len = 5, height = 4, data = ' Mr. '}
+   │     ┌──{ len = 5, height = 1, data = 'Black'}
+   │  ┌──{ len = 11, height = 2, data = ', but they '}
+   │  │  └──nil
+   └──{ len = 21, height = 3, data = 'don't know each other'}
+      │  ┌──{ len = 25, height = 1, data = ', so nobody wants to back'}
+      └──{ len = 5, height = 2, data = ' down'}
+         └──{ len = 1, height = 1, data = '.'}
+
+extract pos = 0: You got four of 
+extract pos = 5: ot four of 
+extract pos = 19: s all 
+extract pos = 59: lack
+extract pos = 124: n

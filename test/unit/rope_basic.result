@@ -1,0 +1,140 @@
+	*** test_empty_rope ***
+size = 0
+string = ''
+└──nil
+
+	*** test_empty_rope: done ***
+ 	*** test_append ***
+insert offset = 0, str = ' a '
+size = 3
+string = ' a '
+└──{ len = 3, height = 1, data = ' a '}
+
+insert offset = 3, str = ' b '
+size = 6
+string = ' a  b '
+│  ┌──nil
+└──{ len = 3, height = 2, data = ' a '}
+   └──{ len = 3, height = 1, data = ' b '}
+
+insert offset = 6, str = ' c '
+size = 9
+string = ' a  b  c '
+│  ┌──{ len = 3, height = 1, data = ' a '}
+└──{ len = 3, height = 2, data = ' b '}
+   └──{ len = 3, height = 1, data = ' c '}
+
+	*** test_append: done ***
+ 	*** test_prepend ***
+insert offset = 0, str = ' c '
+size = 3
+string = ' c '
+└──{ len = 3, height = 1, data = ' c '}
+
+insert offset = 0, str = ' b '
+size = 6
+string = ' b  c '
+│  ┌──{ len = 3, height = 1, data = ' b '}
+└──{ len = 3, height = 2, data = ' c '}
+   └──nil
+
+insert offset = 0, str = ' a '
+size = 9
+string = ' a  b  c '
+│  ┌──{ len = 3, height = 1, data = ' a '}
+└──{ len = 3, height = 2, data = ' b '}
+   └──{ len = 3, height = 1, data = ' c '}
+
+	*** test_prepend: done ***
+ 	*** test_insert ***
+insert offset = 0, str = '   a '
+size = 5
+string = '   a '
+└──{ len = 5, height = 1, data = '   a '}
+
+insert offset = 4, str = 'b '
+size = 7
+string = '   ab  '
+│  ┌──{ len = 4, height = 1, data = '   a'}
+└──{ len = 2, height = 2, data = 'b '}
+   └──{ len = 1, height = 1, data = ' '}
+
+insert offset = 5, str = 'c '
+size = 9
+string = '   abc   '
+│  ┌──{ len = 4, height = 1, data = '   a'}
+└──{ len = 1, height = 3, data = 'b'}
+   │  ┌──{ len = 2, height = 1, data = 'c '}
+   └──{ len = 1, height = 2, data = ' '}
+      └──{ len = 1, height = 1, data = ' '}
+
+insert offset = 1, str = ' '
+size = 10
+string = '    abc   '
+│     ┌──{ len = 1, height = 1, data = ' '}
+│  ┌──{ len = 1, height = 2, data = ' '}
+│  │  └──{ len = 3, height = 1, data = '  a'}
+└──{ len = 1, height = 3, data = 'b'}
+   │  ┌──{ len = 2, height = 1, data = 'c '}
+   └──{ len = 1, height = 2, data = ' '}
+      └──{ len = 1, height = 1, data = ' '}
+
+insert offset = 9, str = ' '
+size = 11
+string = '    abc    '
+│     ┌──{ len = 1, height = 1, data = ' '}
+│  ┌──{ len = 1, height = 2, data = ' '}
+│  │  └──{ len = 3, height = 1, data = '  a'}
+└──{ len = 1, height = 4, data = 'b'}
+   │  ┌──{ len = 2, height = 1, data = 'c '}
+   └──{ len = 1, height = 3, data = ' '}
+      │  ┌──{ len = 1, height = 1, data = ' '}
+      └──{ len = 1, height = 2, data = ' '}
+         └──nil
+
+insert offset = 4, str = '*'
+size = 12
+string = '    *abc    '
+│     ┌──{ len = 1, height = 1, data = ' '}
+│  ┌──{ len = 1, height = 3, data = ' '}
+│  │  │  ┌──{ len = 2, height = 1, data = '  '}
+│  │  └──{ len = 1, height = 2, data = '*'}
+│  │     └──{ len = 1, height = 1, data = 'a'}
+└──{ len = 1, height = 4, data = 'b'}
+   │  ┌──{ len = 2, height = 1, data = 'c '}
+   └──{ len = 1, height = 3, data = ' '}
+      │  ┌──{ len = 1, height = 1, data = ' '}
+      └──{ len = 1, height = 2, data = ' '}
+         └──nil
+
+insert offset = 8, str = '*'
+size = 13
+string = '    *abc*    '
+│     ┌──{ len = 1, height = 1, data = ' '}
+│  ┌──{ len = 1, height = 3, data = ' '}
+│  │  │  ┌──{ len = 2, height = 1, data = '  '}
+│  │  └──{ len = 1, height = 2, data = '*'}
+│  │     └──{ len = 1, height = 1, data = 'a'}
+└──{ len = 1, height = 4, data = 'b'}
+   │     ┌──{ len = 1, height = 1, data = 'c'}
+   │  ┌──{ len = 1, height = 2, data = '*'}
+   │  │  └──{ len = 1, height = 1, data = ' '}
+   └──{ len = 1, height = 3, data = ' '}
+      │  ┌──{ len = 1, height = 1, data = ' '}
+      └──{ len = 1, height = 2, data = ' '}
+         └──nil
+
+	*** test_insert: done ***
+ 	*** test_erase ***
+erase offset = 0
+size = 0
+string = ''
+└──nil
+
+erase offset = 0
+size = 1
+string = 'b'
+└──{ len = 1, height = 1, data = 'b'}
+
+	*** test_erase: done ***
+ 

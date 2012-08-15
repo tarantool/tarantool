@@ -21,6 +21,10 @@ test/unit/queue
 test/unit/mhash
 test/unit/objc_finally
 test/unit/objc_catchcxx
+test/unit/rope
+test/unit/rope_avl
+test/unit/rope_basic
+test/unit/rope_stress
 Makefile
 CMakeFiles
 CMakeCache.txt
