@@ -16,6 +16,14 @@ function box.select_limit(space, index, offset, limit, ...)
                                  ...))
 end
 
+function box.dostring(s, ...)
+    local chunk, message = loadstring(s)
+    if chunk == nil then
+        error(message, 2)
+    end
+    return chunk(...)
+end
+
 --
 --
 --

@@ -526,3 +526,11 @@ exec admin "lua box.counter.dec(0, 1)"
 exec admin "lua box.select(0, 0, 1)"
 exec admin "lua box.counter.dec(0, 1)"
 exec admin "lua box.select(0, 0, 1)"
+
+
+print """# box.dostring()"""
+exec admin "lua box.dostring('abc')"
+exec admin "lua box.dostring('abc=2')"
+exec admin "lua box.dostring('return abc')"
+exec admin "lua box.dostring('return ...', 1, 2, 3)"
+
