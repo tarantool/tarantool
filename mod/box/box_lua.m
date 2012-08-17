@@ -161,43 +161,59 @@ static void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
 
 /**
+ * Given a tuple, range of fields to remove (start and end field
+ * numbers), and a list of fields to paste, calculate the size of
+ * the resulting tuple.
+ *
+ * @param L      lua stack, contains a list of arguments to paste
+ * @param start  offset in the lua stack where paste arguments start
+ * @param tuple  old tuple
+ * @param offset cut field offset
+ * @param len    how many fields to cut
+ * @param[out]   sizes of the left and right part
+ *
+ * @return size of the new tuple
+*/
+static size_t
+transform_calculate(struct lua_State *L, struct tuple *tuple,
+		    int start, int argc, int offset, int len,
+		    size_t lr[2])
+{
+	/* calculate size of the new tuple */
+	lr[0] = tuple_range_size(tuple, 0, offset);
+	/* calculate sizes of supplied fields */
+	size_t mid = 0;
+	for (int i = start ; i <= argc ; i++) {
+		size_t field_size = lua_objlen(L, i);
+		mid += varint32_sizeof(field_size) + field_size;
+	}
+	/* calculate last part of the tuple fields */
+	lr[1] = tuple_range_size(tuple, offset + len,
+			         tuple->field_count - offset + len);
+	return lr[0] + mid + lr[1];
+}
+
+/**
  * Tuple transforming function.
  *
- * Removes the fields designated by 'offset' and 'len' from an tuple,
- * and replaces them with the elements of supplied data fields,
+ * Remove the fields designated by 'offset' and 'len' from an tuple,
+ * and replace them with the elements of supplied data fields,
  * if any.
  *
  * Function returns newly allocated tuple.
  * It does not change any parent tuple data.
- *
  */
-static size_t
-transform_calculate(struct lua_State *L, struct tuple *tuple, int start,
-		    int argc,
-		    int offset, int len,
-		    size_t *left,
-		    size_t *right)
-{
-	/* calculating size of the new tuple */
-	*left = tuple_sizeof(tuple, 0, offset);
-	/* calculating sizes of supplied fields */
-	size_t middle = 0;
-	for (int i = start ; i <= argc ; i++) {
-		size_t field_size = lua_objlen(L, i + 1);
-		middle += varint32_sizeof(field_size) + field_size;
-	}
-	/* calculating last part of the tuple fields */
-	*right = tuple_sizeof(tuple, offset + len,
-			      tuple->field_count - offset + len);
-	return *left + middle + *right;
-}
-
 static int
-transform(struct lua_State *L, struct tuple *tuple, int start,
-      int argc,
-      int offset, int len)
+lbox_tuple_transform(struct lua_State *L)
 {
-	/* validating offset and len */
+	struct tuple *tuple = lua_checktuple(L, 1);
+	int argc = lua_gettop(L);
+	if (argc < 3)
+		luaL_error(L, "tuple.transform(): bad arguments");
+	int offset = lua_tointeger(L, 2);
+	int len = lua_tointeger(L, 3);
+
+	/* validate offset and len */
 	if (offset < 0) {
 		if (-offset > tuple->field_count)
 			luaL_error(L, "tuple.transform(): offset is out of bound");
@@ -209,47 +225,30 @@ transform(struct lua_State *L, struct tuple *tuple, int start,
 		luaL_error(L, "tuple.transform(): len is negative");
 	if (len > tuple->field_count - offset)
 		len = tuple->field_count - offset;
-	/* calculating size of the new tuple */
-	size_t left = 0, right = 0;
-	size_t size = transform_calculate(L, tuple, start, argc, offset, len,
-			                  &left,
-					  &right);
-	/* allocating new tuple */
+
+	/* calculate size of the new tuple */
+	size_t lr[2]; /* left and right part sizes */
+	size_t size = transform_calculate(L, tuple, 3, argc - 1, offset, len, lr);
+
+	/* allocate new tuple */
 	struct tuple *dest = tuple_alloc(size);
-	dest->field_count = (tuple->field_count - len) +
-		            (argc - (start - 1));
-	/* constructing tuple */
-	if (left) {
-		memcpy(dest->data, tuple->data, left);
-	}
-	size_t off = left;
-	for (int i = start ; i <= argc ; i++) {
+	dest->field_count = (tuple->field_count - len) + (argc - 3);
+
+	/* construct tuple */
+	memcpy(dest->data, tuple->data, lr[0]);
+	u8 *ptr = dest->data + lr[0];
+	for (int i = 4; i <= argc; i++) {
 		size_t field_size = 0;
-		const char *field = luaL_checklstring(L, i + 1, &field_size);
-		save_varint32(dest->data + off, field_size);
-		off += varint32_sizeof(field_size);
-		memcpy(dest->data + off, field, field_size); 
-		off += field_size;
+		const char *field = luaL_checklstring(L, i, &field_size);
+		save_varint32(ptr, field_size);
+		ptr += varint32_sizeof(field_size);
+		memcpy(ptr, field, field_size);
+		ptr += field_size;
 	}
-	if (right) {
-		memcpy(dest->data + off,
-		       tuple_field(tuple, offset + len),
-		       right);
-	}
+	memcpy(ptr, tuple_field(tuple, offset + len), lr[1]);
+
 	lbox_pushtuple(L, dest);
 	return 1;
-}
-
-static int
-lbox_tuple_transform(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	int argc = lua_gettop(L) - 1;
-	if (argc < 2)
-		luaL_error(L, "tuple.transform(): bad arguments");
-	int len = lua_tointeger(L, 3);
-	int offset = lua_tointeger(L, 2);
-	return transform(L, tuple, 3, argc, offset, len);
 }
 
 static int
@@ -257,21 +256,20 @@ tuple_find(struct lua_State *L, struct tuple *tuple,
 	   const char *key,
 	   size_t key_size, bool first)
 {
+	int top = lua_gettop(L);
+	int idx = 0;
 	u8 *field = tuple->data;
-	int fieldno = 0;
-	int count = 0;
-	while (fieldno < tuple->field_count) {
+	while (field < tuple->data + tuple->bsize) {
 		size_t len = load_varint32((void **) &field);
 		if (len == key_size && (memcmp(field, key, len) == 0)) {
-			lua_pushinteger(L, fieldno);
-			count++;
+			lua_pushinteger(L, idx);
 			if (first)
 				break;
 		}
 		field += len;
-		fieldno++;
+		idx++;
 	}
-	return count;
+	return lua_gettop(L) - top;
 }
 
 static int

@@ -109,7 +109,7 @@ tuple_field(struct tuple *tuple, size_t i)
  * @returns size of fields data including size of varint data
  */
 size_t
-tuple_sizeof(struct tuple *tuple, size_t start, size_t count)
+tuple_range_size(struct tuple *tuple, size_t start, size_t count)
 {
 	if (tuple->field_count < start)
 		return 0;
