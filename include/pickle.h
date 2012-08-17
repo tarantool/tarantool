@@ -84,4 +84,20 @@ inline static u32 load_varint32(void **data)
 	return 0;
 }
 
+/**
+ * Calculate size for a specified fields range
+ *
+ * @returns size of fields data including size of varint data
+ */
+inline static size_t
+tuple_range_size(void **begin, void *end, size_t count)
+{
+	void *start = *begin;
+	while (*begin < end && count-- > 0) {
+		size_t len = load_varint32(begin);
+		*begin += len;
+	}
+	return *begin - start;
+}
+
 #endif /* TARANTOOL_PICKLE_H_INCLUDED */
