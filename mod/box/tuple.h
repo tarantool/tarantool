@@ -79,14 +79,6 @@ void *
 tuple_field(struct tuple *tuple, size_t i);
 
 /**
- * Calculate size for a specified fields range
- *
- * @returns size of fields data including size of varint data
- */
-size_t
-tuple_range_size(struct tuple *tuple, size_t start, size_t count);
-
-/**
  * Print a tuple in yaml-compatible mode to tbuf:
  * key: { value, value, value }
  */

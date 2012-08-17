@@ -180,15 +180,24 @@ transform_calculate(struct lua_State *L, struct tuple *tuple,
 		    size_t lr[2])
 {
 	/* calculate size of the new tuple */
-	lr[0] = tuple_range_size(tuple, 0, offset);
+	void *tuple_end = tuple->data + tuple->bsize;
+	void *tuple_field = tuple->data;
+
+	lr[0] = tuple_range_size(&tuple_field, tuple_end, offset);
+
 	/* calculate sizes of supplied fields */
 	size_t mid = 0;
 	for (int i = start ; i <= argc ; i++) {
 		size_t field_size = lua_objlen(L, i);
 		mid += varint32_sizeof(field_size) + field_size;
 	}
+
+	/* calculate size of the removed fields */
+	tuple_range_size(&tuple_field, tuple_end, len);
+
 	/* calculate last part of the tuple fields */
-	lr[1] = tuple_range_size(tuple, offset + len,
+	lr[1] = tuple_range_size(&tuple_field,
+				 tuple_end,
 			         tuple->field_count - offset + len);
 	return lr[0] + mid + lr[1];
 }
@@ -242,7 +251,7 @@ lbox_tuple_transform(struct lua_State *L)
 		const char *field = luaL_checklstring(L, i, &field_size);
 		save_varint32(ptr, field_size);
 		ptr += varint32_sizeof(field_size);
-		memcpy(ptr, field, field_size);
+		memcpy(ptr, field, field_size); 
 		ptr += field_size;
 	}
 	memcpy(ptr, tuple_field(tuple, offset + len), lr[1]);

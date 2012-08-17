@@ -103,26 +103,6 @@ tuple_field(struct tuple *tuple, size_t i)
 	return field;
 }
 
-/**
- * Calculate size for a specified fields range
- *
- * @returns size of fields data including size of varint data
- */
-size_t
-tuple_range_size(struct tuple *tuple, size_t start, size_t count)
-{
-	if (tuple->field_count < start)
-		return 0;
-	u8 *field = tuple_field(tuple, start);
-	size_t size = 0, i = start;
-	for (; i < start + count && i < tuple->field_count; i++) {
-		size_t len = load_varint32((void **) &field);
-		size += varint32_sizeof(len) + len;
-		field += len;
-	}
-	return size;
-}
-
 /** print field to tbuf */
 static void
 print_field(struct tbuf *buf, void *f)
