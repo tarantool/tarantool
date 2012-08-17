@@ -751,6 +751,30 @@ localhost> lua t:slice(1, -1)
  - efg
  - ghq
 ...
+localhost> lua t:transform(1, 3)
+---
+ - 1: {'ghq', 'qkl'}
+...
+localhost> lua t:transform(0, 1, 'zyx')
+---
+ - 'zyx': {'abc', 'cde', 'efg', 'ghq', 'qkl'}
+...
+localhost> lua t:transform(-1, 1, 'zyx')
+---
+ - 1: {'abc', 'cde', 'efg', 'ghq', 'zyx'}
+...
+localhost> lua t=box.insert(0, 'abc', 'def', 'abc')
+---
+...
+localhost> lua t:find('abc')
+---
+ - 0
+...
+localhost> lua t:findall('abc')
+---
+ - 0
+ - 2
+...
 </programlisting>
 
         </para></listitem>
