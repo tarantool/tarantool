@@ -687,6 +687,45 @@ to the socket.
 Note: the administrative console output must be YAML-compatible.
         </para></listitem>
     </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.dostring(s, ...)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Evaluates an arbitrary chunk of lua code passed in
+                <code>s</code>. If there is a compilation error,
+                it's raised as a Lua error. In case of compilation
+                success, all arguments which follow <code>s</code>
+                are passed to the compiled chunk and the chunk is
+                invoked.
+            </para>
+            <para>
+                This function is mainly useful to define and run
+                an arbitrary piece of Lua code, without having to
+                introduce changes to the global Lua environment.
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>lua box.dostring('abc')
+---
+error: '[string "abc"]:1: ''='' expected near ''&lt;eof&gt;'''
+...
+lua box.dostring('return 1')
+---
+ - 1
+...
+lua box.dostring('return ...', 'hello', 'world')
+---
+ - hello
+ - world
+...
+lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil then return t[0] else return nil end end return f(...)', 0)
+---
+ - nil
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
 </variablelist>
 
 <variablelist>
