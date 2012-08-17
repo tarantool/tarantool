@@ -196,9 +196,8 @@ transform_calculate(struct lua_State *L, struct tuple *tuple,
 	tuple_range_size(&tuple_field, tuple_end, len);
 
 	/* calculate last part of the tuple fields */
-	lr[1] = tuple_range_size(&tuple_field,
-				 tuple_end,
-			         tuple->field_count - offset + len);
+	lr[1] = tuple_end - tuple_field;
+
 	return lr[0] + mid + lr[1];
 }
 
