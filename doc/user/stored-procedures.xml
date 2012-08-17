@@ -1061,38 +1061,38 @@ xreflabel="box.index">box.index</code></title>
 <variablelist>
     <varlistentry>
         <term>
-            <emphasis role="lua">index:next(iteration_state, key)</emphasis>
+            <emphasis role="lua">index:next([iteration_state or key])</emphasis>
         </term>
         <listitem><simpara></simpara></listitem>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">index:prev(iteration_state, key)</emphasis>
+            <emphasis role="lua">index:prev([iteration_state or key])</emphasis>
         </term>
         <listitem><simpara></simpara></listitem>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">index:next_equal(iteration_state, key)</emphasis>
+            <emphasis role="lua">index:next_equal([iteration_state or key])</emphasis>
         </term>
         <listitem><simpara></simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">index:prev_equal(iteration_state, key)</emphasis>
+            <emphasis role="lua">index:prev_equal([iteration_state or key])</emphasis>
         </term>
         <listitem>
         <para>
-	    The first argument is the iteration state and the second one is the
-	    key. The functions create a new iterator if <code>iteration_state
-	    </code> is not defined or <code>nil</code>.
-	    The new iterator is positioned at the begining (or the end -- for
-	    reverse iterators) of the sequence of tuples satifsying the key.
-	    If the key is <code>nil</code> (or empty) the first (last) member
-	    of the sequence will be the first (last) member of the index.
+ All these function can be used either to start iteration, or to fetch
+the next tuple which satisfies iteration criteria.
         </para>
-
+        <para>
+To start iteration, either supply a key (possibly multipart) to
+position the iterator at the matching tuple. If key is nil or
+a function is called with no arguments, iteration is started
+from the first (last) tuple in the index.
+        </para>
         <para>
 	    The functions follow the
 	    <link xlink:href='http://pgl.yoyo.org/luai/i/next'>Lua iteration
@@ -1100,7 +1100,7 @@ xreflabel="box.index">box.index</code></title>
 	    where <code>iteration_state</code> is the iterator and
 	    <code>tuple</code> is the tuple the iterator points at.
 	    The function returns <code>nil</code> if the iterator reaches the
-	    end of the index or there are no more tuples satifsying the
+	    end of the index or there are no more tuples satisfying the
 	    <code>key</code> (for <code>_equal</code> functions).
         </para>
         <bridgehead renderas="sect4">Example</bridgehead>
@@ -1115,7 +1115,7 @@ localhost> lua box.insert(0, "Canada", "North America")
 localhost> lua box.insert(0, "Mexico", "North America")
 localhost> lua pi = box.space[0].index[0] -- primary index
 localhost> lua si = box.space[0].index[1] -- secondary index
-localhost> lua k,v=pi:next() -- init iterator by primary from the begining
+localhost> lua k,v=pi:next() -- init iterator by primary from the beginning
 ---
 ...
 localhost> lua print(v)
@@ -1136,7 +1136,7 @@ localhost> lua print(v)
 ---
 'France': {'Europe'}
 ...
-localhost> lua k,v=si:next_equal() -- init iterator by secondary from the begining
+localhost> lua k,v=si:next_equal() -- init iterator by secondary from the beginning
 ---
 ...
 localhost> lua print(v)
