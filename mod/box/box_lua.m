@@ -234,7 +234,7 @@ lbox_tuple_transform(struct lua_State *L)
 
 	/* calculate size of the new tuple */
 	size_t lr[2]; /* left and right part sizes */
-	size_t size = transform_calculate(L, tuple, 3, argc - 1, offset, len, lr);
+	size_t size = transform_calculate(L, tuple, 4, argc - 1, offset, len, lr);
 
 	/* allocate new tuple */
 	struct tuple *dest = tuple_alloc(size);

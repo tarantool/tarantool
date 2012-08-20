@@ -425,3 +425,23 @@ lua t:findall('3')
 lua t:findall('0')
 ---
 ...
+#
+# A test case for Bug #1038784
+# transform returns wrong tuple and put broken reply into socket
+# https://bugs.launchpad.net/tarantool/+bug/1038784
+#
+lua dofile('push.lua')
+---
+...
+lua push_collection(0, 1038784, 'hello')
+---
+ - 1038784: {'hello'}
+...
+lua push_collection(0, 1038784, 'hello')
+---
+ - 1038784: {}
+...
+lua push_collection(0, 1038784, 'hello')
+---
+ - 1038784: {}
+...

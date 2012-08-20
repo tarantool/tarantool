@@ -1,4 +1,8 @@
 # encoding: tarantool
+#
+import os
+import shutil
+
 exec sql "insert into t1 values ('brave', 'new', 'world')"
 exec admin "lua box.space[1].index[1]:min()"
 exec admin "lua box.space[1].index[1]:max()"
@@ -148,3 +152,20 @@ exec admin "lua t:findall('A')"
 exec admin "lua t:findall('2')"
 exec admin "lua t:findall('3')"
 exec admin "lua t:findall('0')"
+
+print """#
+# A test case for Bug #1038784
+# transform returns wrong tuple and put broken reply into socket
+# https://bugs.launchpad.net/tarantool/+bug/1038784
+#"""
+
+push_lua_path = os.path.join(vardir, "push.lua")
+shutil.copy("box_big/push.lua", push_lua_path)
+
+exec admin "lua dofile('push.lua')"
+shutil.rmtree(push_lua_path, True)
+
+exec admin "lua push_collection(0, 1038784, 'hello')"
+# this could crash the server
+exec admin "lua push_collection(0, 1038784, 'hello')"
+exec admin "lua push_collection(0, 1038784, 'hello')"
