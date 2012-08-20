@@ -166,6 +166,14 @@ exec admin "lua dofile('push.lua')"
 shutil.rmtree(push_lua_path, True)
 
 exec admin "lua push_collection(0, 1038784, 'hello')"
-# this could crash the server
 exec admin "lua push_collection(0, 1038784, 'hello')"
 exec admin "lua push_collection(0, 1038784, 'hello')"
+
+exec admin "lua push_collection(1, 1038784, 'hi')"
+exec admin "lua push_collection(2, 1038784, 'hi')"
+exec admin "lua push_collection(2, 1038784, 'hi')"
+
+exec admin "lua push_collection(5, 1038784, 'hey')"
+exec admin "lua push_collection(5, 1038784, 'hey')"
+exec admin "lua push_collection(5, 1038784, 'hey')"
+exec admin "lua push_collection(5, 1038784, 'hey')"

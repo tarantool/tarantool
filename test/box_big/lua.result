@@ -445,3 +445,31 @@ lua push_collection(0, 1038784, 'hello')
 ---
  - 1038784: {}
 ...
+lua push_collection(1, 1038784, 'hi')
+---
+ - 1038784: {26984}
+...
+lua push_collection(2, 1038784, 'hi')
+---
+ - 1038784: {26984, 26984}
+...
+lua push_collection(2, 1038784, 'hi')
+---
+ - 1038784: {26984, 26984}
+...
+lua push_collection(5, 1038784, 'hey')
+---
+ - 1038784: {26984, 26984, 'hey'}
+...
+lua push_collection(5, 1038784, 'hey')
+---
+ - 1038784: {26984, 26984, 'hey', 'hey'}
+...
+lua push_collection(5, 1038784, 'hey')
+---
+ - 1038784: {26984, 26984, 'hey', 'hey', 'hey'}
+...
+lua push_collection(5, 1038784, 'hey')
+---
+ - 1038784: {26984, 'hey', 'hey', 'hey', 'hey'}
+...
