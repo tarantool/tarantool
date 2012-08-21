@@ -153,6 +153,15 @@ exec admin "lua t:findall('2')"
 exec admin "lua t:findall('3')"
 exec admin "lua t:findall('0')"
 
+exec admin "lua t:find(2, '2')"
+exec admin "lua t:find(89, '2')"
+exec admin "lua t:findall(4, '3')"
+
+exec admin "lua t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))"
+exec admin "lua t:find(2)"
+exec admin "lua t:find(tonumber64(2))"
+exec admin "lua t:find('2')"
+
 print """#
 # A test case for Bug #1038784
 # transform returns wrong tuple and put broken reply into socket
