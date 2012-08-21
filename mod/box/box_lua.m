@@ -300,19 +300,30 @@ lbox_tuple_transform(struct lua_State *L)
 	return 1;
 }
 
+/*
+ * Tuple find function.
+ *
+ * Find each or one tuple field according to the specified key.
+ *
+ * Function returns indexes of the tuple fields that match
+ * key criteria.
+ *
+ */
 static int
-tuple_find(struct lua_State *L, struct tuple *tuple,
-	   const char *key,
-	   size_t key_size, bool first)
+tuple_find(struct lua_State *L, struct tuple *tuple, size_t offset,
+	   const char *key, size_t key_size,
+	   bool all)
 {
 	int top = lua_gettop(L);
-	int idx = 0;
-	u8 *field = tuple->data;
+	int idx = offset;
+	if (idx >= tuple->field_count)
+		return 0;
+	u8 *field = tuple_field(tuple, idx);
 	while (field < tuple->data + tuple->bsize) {
 		size_t len = load_varint32((void **) &field);
 		if (len == key_size && (memcmp(field, key, len) == 0)) {
 			lua_pushinteger(L, idx);
-			if (first)
+			if (!all)
 				break;
 		}
 		field += len;
@@ -322,21 +333,53 @@ tuple_find(struct lua_State *L, struct tuple *tuple,
 }
 
 static int
-lbox_tuple_find(struct lua_State *L)
+lbox_tuple_find_do(struct lua_State *L, bool all)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
+	int argc = lua_gettop(L);
+	size_t offset = 0;
+	switch (argc - 1) {
+	case 1: break;
+	case 2:
+		offset = lua_tointeger(L, 2);
+		break;
+	default:
+		luaL_error(L, "tuple.find(): bad arguments");
+	}
 	size_t key_size;
-	const char *key = luaL_checklstring(L, 2, &key_size);
-	return tuple_find(L, tuple, key, key_size, true);
+	const char *key;
+	u32 u32v;
+	u64 u64v;
+	switch (lua_type(L, argc)) {
+	case LUA_TNUMBER:
+		u32v = lua_tonumber(L, argc);
+		key_size = sizeof(u32);
+		key = (const char*)&u32v;
+		break;
+	case LUA_TCDATA:
+		u64v = tarantool_lua_tointeger64(L, argc);
+		key_size = sizeof(u64);
+		key = (const char*)&u64v;
+		break;
+	case LUA_TSTRING:
+		key = luaL_checklstring(L, argc, &key_size);
+		break;
+	default:
+		luaL_error(L, "tuple.find(): bad field type");
+	}
+	return tuple_find(L, tuple, offset, key, key_size, all);
+}
+
+static int
+lbox_tuple_find(struct lua_State *L)
+{
+	return lbox_tuple_find_do(L, false);
 }
 
 static int
 lbox_tuple_findall(struct lua_State *L)
 {
-	struct tuple *tuple = lua_checktuple(L, 1);
-	size_t key_size;
-	const char *key = luaL_checklstring(L, 2, &key_size);
-	return tuple_find(L, tuple, key, key_size, false);
+	return lbox_tuple_find_do(L, true);
 }
 
 static int

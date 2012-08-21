@@ -437,6 +437,33 @@ lua t:findall('3')
 lua t:findall('0')
 ---
 ...
+lua t:find(2, '2')
+---
+ - 5
+...
+lua t:find(89, '2')
+---
+...
+lua t:findall(4, '3')
+---
+ - 4
+ - 8
+...
+lua t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))
+---
+...
+lua t:find(2)
+---
+ - 2
+...
+lua t:find(tonumber64(2))
+---
+ - 4
+...
+lua t:find('2')
+---
+ - 1
+...
 #
 # A test case for Bug #1038784
 # transform returns wrong tuple and put broken reply into socket

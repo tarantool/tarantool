@@ -814,6 +814,10 @@ localhost> lua t:findall('abc')
  - 0
  - 2
 ...
+localhost> lua t:find(1, 'abc')
+---
+ - 2
+...
 </programlisting>
 
         </para></listitem>
