@@ -41,14 +41,12 @@ set_source_files_properties(memcached.m
 
 
 if (HAVE_UUID_GEN)
-	message(STATUS "UUID: the function uuid_generate was found")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_UUID_GEN")
 	set(module_link_flags ${module_link_flags} -luuid)
 
 endif()
 
 if (HAVE_UUID_H)
-	message(STATUS "UUID: uuid/uuid.h was found")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_UUID_H")
 endif()
 
