@@ -137,6 +137,9 @@ exec admin "lua t:transform(2, 0, 'hello')"
 exec admin "lua t:transform(0, -1, 'C')"
 exec admin "lua t:transform(0, 100)"
 exec admin "lua t:transform(-100, 1)"
+exec admin "lua t:transform(0, 3, 1, 2, 3)"
+exec admin "lua t:transform(3, 1, tonumber64(4))"
+exec admin "lua t:transform(0, 1, {})"
 
 #
 # Tests for lua tuple:find() and tuple:findall()
