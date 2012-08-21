@@ -6,9 +6,6 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
-#define UUIDLIB_SOVERSION	"1"
-#define LIBNAME			( "libuuid.so." UUIDLIB_SOVERSION )
-
 
 int lbox_uuid(struct lua_State *L) {
 
