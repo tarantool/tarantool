@@ -31,6 +31,9 @@ CMake is used for configuration management.
 The only external library dependency is readline: libreadline-dev
 is required to build the command line client.
 
+There is one OPTIONAL dependency: uuid-dev. It is required for
+box.uuid_* functions.
+
 Please follow these steps to compile Tarantool:
 
 tarantool $ cmake .
