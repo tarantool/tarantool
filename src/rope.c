@@ -88,27 +88,8 @@ rope_node_new(struct rope *rope, void *data, rsize_t size)
 	return node;
 }
 
-struct rope *
-rope_new(void *(*seq_getn)(void *, size_t),
-	 void *(*alloc_func)(void *, size_t),
-	 void (*free_func)(void *, void *),
-	 void *alloc_ctx)
-{
-	struct rope *rope= (struct rope *) alloc_func(alloc_ctx,
-						      sizeof(struct rope));
-	if (rope == NULL)
-		return NULL;
-
-	rope->root = NULL;
-	rope->seq_getn = seq_getn;
-	rope->alloc = alloc_func;
-	rope->free = free_func;
-	rope->alloc_ctx = alloc_ctx;
-	return rope;
-}
-
 void
-rope_delete(struct rope *rope)
+rope_clear(struct rope *rope)
 {
 	struct rope_node *it = rope->root;
 	struct rope_node *save;
@@ -127,18 +108,17 @@ rope_delete(struct rope *rope)
 		}
 		it = save;
 	}
-	rope->free(rope->alloc_ctx, rope);
+	rope->root = NULL;
 }
-
 
 static struct rope_node *
 rope_node_split(struct rope *rope, struct rope_node *node, rsize_t offset)
 {
-	rsize_t split_size = node->leaf_size - offset;
+	rsize_t old_size = node->leaf_size;
 	node->leaf_size = offset;
 
-	return rope_node_new(rope, rope->seq_getn(node->data, offset),
-			     split_size);
+	return rope_node_new(rope, rope->split(node->data, old_size, offset),
+			     old_size - offset);
 }
 
 static inline struct rope_node *
@@ -400,7 +380,7 @@ rope_insert(struct rope *rope, rsize_t offset, void *data, rsize_t size)
 
 /** Make sure there is a rope node at the given offset. */
 struct rope_node *
-rope_extract(struct rope *rope, rsize_t offset)
+rope_extract_node(struct rope *rope, rsize_t offset)
 {
 	assert(offset < rope_size(rope));
 
@@ -454,12 +434,13 @@ rope_erase(struct rope *rope, rsize_t offset)
 		/* Check if we can simply trim the node. */
 		if (offset == node->leaf_size - 1) {
 			/* Trim the tail. */
-			node->leaf_size -= 1;
+			rope->split(node->data, node->leaf_size, offset);
+			node->leaf_size = offset;
 			return 0;
 		}
 		if (offset == 0) {
 			/* Cut the head. */
-			node->data = rope->seq_getn(node->data, 1);
+			node->data = rope->split(node->data, node->leaf_size, 1);
 			node->leaf_size -= 1;
 			return 0;
 		}

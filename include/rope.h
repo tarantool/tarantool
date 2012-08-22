@@ -33,6 +33,9 @@
 
 typedef unsigned int rsize_t;
 typedef int rssize_t;
+typedef void *(*rope_split_func)(void *, size_t, size_t);
+typedef void *(*rope_alloc_func)(void *, size_t);
+typedef void (*rope_free_func)(void *, void *);
 
 /** Tallest allowable tree, 1.44*log(2^32) */
 enum { ROPE_HEIGHT_MAX = 46 };
@@ -56,7 +59,7 @@ struct rope {
 	/** Memory management context. */
 	void *alloc_ctx;
 	/** Get a sequence tail, given offset. */
-	void *(*seq_getn)(void *, size_t);
+	void *(*split)(void *, size_t, size_t);
 	/** Allocate memory (context, size). */
 	void *(*alloc)(void *, size_t);
 	/** Free memory (context, pointer) */
@@ -79,13 +82,38 @@ rope_node_size(struct rope_node *node)
 }
 
 static inline rsize_t
+rope_leaf_size(struct rope_node *node)
+{
+	return node->leaf_size;
+}
+
+static inline void *
+rope_leaf_data(struct rope_node *node)
+{
+	return node->data;
+}
+
+static inline rsize_t
 rope_size(struct rope *rope)
 {
 	return rope_node_size(rope->root);
 }
 
+/** Initialize an empty rope. */
+static inline void
+rope_init(struct rope *rope, rope_split_func split_func,
+	  rope_alloc_func alloc_func, rope_free_func free_func,
+	  void *alloc_ctx)
+{
+	rope->root = NULL;
+	rope->split = split_func;
+	rope->alloc = alloc_func;
+	rope->free = free_func;
+	rope->alloc_ctx = alloc_ctx;
+}
+
 /** Create a new empty rope.
- * @param seq_getn  a function which returns
+ * @param split_func a function which returns
  *                  a pointer to substring
  *                  given an offset. Used
  *                  to split substrings when
@@ -97,16 +125,34 @@ rope_size(struct rope *rope)
  * @return  an empty rope, or NULL if failed
  *          to allocate memory
  */
+static inline struct rope *
+rope_new(rope_split_func split_func, rope_alloc_func alloc_func,
+	 rope_free_func free_func, void *alloc_ctx)
+{
+	struct rope *rope= (struct rope *) alloc_func(alloc_ctx,
+						      sizeof(struct rope));
+	if (rope == NULL)
+		return NULL;
+	rope_init(rope, split_func, alloc_func, free_func, alloc_ctx);
+	return rope;
+}
 
-struct rope *
-rope_new(void *(*seq_getn)(void *, size_t),
-	 void *(*alloc_func)(void *, size_t),
-	 void (*free_func)(void *, void *),
-	 void *alloc_ctx);
 
-/** Delete a rope. Doesn't delete rope entries. */
+/** Delete rope contents. Can also be used
+ * to free a rope which is allocated on stack.
+ * Doesn't delete rope substrings, only
+ * rope nodes.
+ */
 void
-rope_delete(struct rope *rope);
+rope_clear(struct rope *rope);
+
+/** Delete a rope allocated with rope_new() */
+static inline void
+rope_delete(struct rope *rope)
+{
+	rope_clear(rope);
+	rope->free(rope->alloc_ctx, rope);
+}
 
 /** Insert a substring into a rope at the given
  * offset.
@@ -121,16 +167,28 @@ int
 rope_insert(struct rope *rope, rsize_t offset, void *data,
 	    rsize_t size);
 
+/** Append a substring at rope tail. */
+static inline int
+rope_append(struct rope *rope, void *data, size_t size)
+{
+	return rope_insert(rope, rope_size(rope), data, size);
+}
+
 /** Make sure there is a rope node which has a substring
  * which starts at the given offset. Useful when
  * rope substrings carry additional information.
  *
- * @retval 0   success
- * @retval -1  failed to allocate memory for a new
- *             tree node
+ * @retval NULL failed to allocate memory for a new
+ *              tree node
  */
 struct rope_node *
-rope_extract(struct rope *rope, rsize_t offset);
+rope_extract_node(struct rope *rope, rsize_t offset);
+
+static inline void *
+rope_extract(struct rope *rope, rsize_t offset)
+{
+	return rope_leaf_data(rope_extract_node(rope, offset));
+}
 
 /**
  * Erase a single element from a rope at the given

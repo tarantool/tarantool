@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 static inline void *
-str_getn(void *data, size_t n)
+str_getn(void *data, size_t size, size_t offset)
 {
-	return (char *) data + n;
+	return (char *) data + offset;
 }
 
 static inline void
