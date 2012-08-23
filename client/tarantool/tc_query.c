@@ -67,8 +67,8 @@ static char *tc_query_op(struct tnt_reply *r) {
 int tc_query_printer(struct tnt_reply *r, void *ptr, char **e) {
 	(void)ptr;
 	(void)e;
-	printf("%s OK, %d rows affected\n", tc_query_op(r),
-	       r->count);
+	tc_printf("%s OK, %d rows affected\n", tc_query_op(r),
+		  r->count);
 	tc_print_list(TNT_REPLY_LIST(r));
 	return 0;
 }
@@ -132,7 +132,7 @@ int tc_query(char *q, char **e) {
 
 int tc_query_admin_printer(char *r, char **e) {
 	(void)e;
-	printf("%s", r);
+	tc_printf("%s", r);
 	return 0;
 }
 
