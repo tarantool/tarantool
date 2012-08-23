@@ -37,6 +37,10 @@
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lj_obj.h"
+#include "lj_ctype.h"
+#include "lj_cdata.h"
+#include "lj_cconv.h"
 
 #include "pickle.h"
 #include "tuple.h"
@@ -186,8 +190,23 @@ transform_calculate(struct lua_State *L, struct tuple *tuple,
 	/* calculate sizes of supplied fields */
 	size_t mid = 0;
 	for (int i = start ; i <= argc ; i++) {
-		size_t field_size = lua_objlen(L, i);
-		mid += varint32_sizeof(field_size) + field_size;
+		switch (lua_type(L, i)) {
+		case LUA_TNUMBER:
+			mid += varint32_sizeof(sizeof(u32)) + sizeof(u32);
+			break;
+		case LUA_TCDATA:
+			mid += varint32_sizeof(sizeof(u64)) + sizeof(u64);
+			break;
+		case LUA_TSTRING: {
+			size_t field_size = lua_objlen(L, i);
+			mid += varint32_sizeof(field_size) + field_size;
+			break;
+		}
+		default:
+			luaL_error(L, "tuple.transform(): unsupported field type '%s'",
+				   lua_typename(L, lua_type(L, i)));
+			break;
+		}
 	}
 
 	/* calculate size of the removed fields */
@@ -197,6 +216,14 @@ transform_calculate(struct lua_State *L, struct tuple *tuple,
 	lr[1] = tuple_end - tuple_field;
 
 	return lr[0] + mid + lr[1];
+}
+
+static inline void
+transform_set_field(u8 **ptr, const void *data, size_t size)
+{
+	*ptr = save_varint32(*ptr, size);
+	memcpy(*ptr, data, size); 
+	*ptr += size;
 }
 
 /**
@@ -234,7 +261,7 @@ lbox_tuple_transform(struct lua_State *L)
 
 	/* calculate size of the new tuple */
 	size_t lr[2]; /* left and right part sizes */
-	size_t size = transform_calculate(L, tuple, 3, argc - 1, offset, len, lr);
+	size_t size = transform_calculate(L, tuple, 4, argc, offset, len, lr);
 
 	/* allocate new tuple */
 	struct tuple *dest = tuple_alloc(size);
@@ -244,12 +271,28 @@ lbox_tuple_transform(struct lua_State *L)
 	memcpy(dest->data, tuple->data, lr[0]);
 	u8 *ptr = dest->data + lr[0];
 	for (int i = 4; i <= argc; i++) {
-		size_t field_size = 0;
-		const char *field = luaL_checklstring(L, i, &field_size);
-		save_varint32(ptr, field_size);
-		ptr += varint32_sizeof(field_size);
-		memcpy(ptr, field, field_size); 
-		ptr += field_size;
+		switch (lua_type(L, i)) {
+		case LUA_TNUMBER: {
+			u32 v = lua_tonumber(L, i);
+			transform_set_field(&ptr, &v, sizeof(v));
+			break;
+		}
+		case LUA_TCDATA: {
+			u64 v = tarantool_lua_tointeger64(L, i);
+			transform_set_field(&ptr, &v, sizeof(v));
+			break;
+		}
+		case LUA_TSTRING: {
+			size_t field_size = 0;
+			const char *v = luaL_checklstring(L, i, &field_size);
+			transform_set_field(&ptr, v, field_size);
+			break;
+		}
+		default:
+			/* default type check is done in transform_calculate()
+			 * function */
+			break;
+		}
 	}
 	memcpy(ptr, tuple_field(tuple, offset + len), lr[1]);
 
@@ -257,19 +300,30 @@ lbox_tuple_transform(struct lua_State *L)
 	return 1;
 }
 
+/*
+ * Tuple find function.
+ *
+ * Find each or one tuple field according to the specified key.
+ *
+ * Function returns indexes of the tuple fields that match
+ * key criteria.
+ *
+ */
 static int
-tuple_find(struct lua_State *L, struct tuple *tuple,
-	   const char *key,
-	   size_t key_size, bool first)
+tuple_find(struct lua_State *L, struct tuple *tuple, size_t offset,
+	   const char *key, size_t key_size,
+	   bool all)
 {
 	int top = lua_gettop(L);
-	int idx = 0;
-	u8 *field = tuple->data;
+	int idx = offset;
+	if (idx >= tuple->field_count)
+		return 0;
+	u8 *field = tuple_field(tuple, idx);
 	while (field < tuple->data + tuple->bsize) {
 		size_t len = load_varint32((void **) &field);
 		if (len == key_size && (memcmp(field, key, len) == 0)) {
 			lua_pushinteger(L, idx);
-			if (first)
+			if (!all)
 				break;
 		}
 		field += len;
@@ -279,21 +333,53 @@ tuple_find(struct lua_State *L, struct tuple *tuple,
 }
 
 static int
-lbox_tuple_find(struct lua_State *L)
+lbox_tuple_find_do(struct lua_State *L, bool all)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
+	int argc = lua_gettop(L);
+	size_t offset = 0;
+	switch (argc - 1) {
+	case 1: break;
+	case 2:
+		offset = lua_tointeger(L, 2);
+		break;
+	default:
+		luaL_error(L, "tuple.find(): bad arguments");
+	}
 	size_t key_size;
-	const char *key = luaL_checklstring(L, 2, &key_size);
-	return tuple_find(L, tuple, key, key_size, true);
+	const char *key;
+	u32 u32v;
+	u64 u64v;
+	switch (lua_type(L, argc)) {
+	case LUA_TNUMBER:
+		u32v = lua_tonumber(L, argc);
+		key_size = sizeof(u32);
+		key = (const char*)&u32v;
+		break;
+	case LUA_TCDATA:
+		u64v = tarantool_lua_tointeger64(L, argc);
+		key_size = sizeof(u64);
+		key = (const char*)&u64v;
+		break;
+	case LUA_TSTRING:
+		key = luaL_checklstring(L, argc, &key_size);
+		break;
+	default:
+		luaL_error(L, "tuple.find(): bad field type");
+	}
+	return tuple_find(L, tuple, offset, key, key_size, all);
+}
+
+static int
+lbox_tuple_find(struct lua_State *L)
+{
+	return lbox_tuple_find_do(L, false);
 }
 
 static int
 lbox_tuple_findall(struct lua_State *L)
 {
-	struct tuple *tuple = lua_checktuple(L, 1);
-	size_t key_size;
-	const char *key = luaL_checklstring(L, 2, &key_size);
-	return tuple_find(L, tuple, key, key_size, false);
+	return lbox_tuple_find_do(L, true);
 }
 
 static int

@@ -1,4 +1,10 @@
-tarantool (1.4.7+20120803-1) UNRELEASED; urgency=low
+tarantool (1.4.7+20120820-1) unstable; urgency=low
+
+  * New snapshot (fixed tuple:transform crash).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 20 Aug 2012 21:42:21 +0400
+
+tarantool (1.4.7+20120817-1) unstable; urgency=low
 
   * New upstream version.
    + Add WAL rotate script.

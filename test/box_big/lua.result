@@ -385,6 +385,18 @@ lua t:transform(-100, 1)
 ---
 error: 'tuple.transform(): offset is out of bound'
 ...
+lua t:transform(0, 3, 1, 2, 3)
+---
+ - 1: {2, 3, '4', '5', '6', '7'}
+...
+lua t:transform(3, 1, tonumber64(4))
+---
+ - '1': {'2', '3', 4, '5', '6', '7'}
+...
+lua t:transform(0, 1, {})
+---
+error: 'tuple.transform(): unsupported field type ''table'''
+...
 lua t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')
 ---
 ...
@@ -424,4 +436,79 @@ lua t:findall('3')
 ...
 lua t:findall('0')
 ---
+...
+lua t:find(2, '2')
+---
+ - 5
+...
+lua t:find(89, '2')
+---
+...
+lua t:findall(4, '3')
+---
+ - 4
+ - 8
+...
+lua t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))
+---
+...
+lua t:find(2)
+---
+ - 2
+...
+lua t:find(tonumber64(2))
+---
+ - 4
+...
+lua t:find('2')
+---
+ - 1
+...
+#
+# A test case for Bug #1038784
+# transform returns wrong tuple and put broken reply into socket
+# https://bugs.launchpad.net/tarantool/+bug/1038784
+#
+lua dofile('push.lua')
+---
+...
+lua push_collection(0, 1038784, 'hello')
+---
+ - 1038784: {'hello'}
+...
+lua push_collection(0, 1038784, 'hello')
+---
+ - 1038784: {}
+...
+lua push_collection(0, 1038784, 'hello')
+---
+ - 1038784: {}
+...
+lua push_collection(1, 1038784, 'hi')
+---
+ - 1038784: {26984}
+...
+lua push_collection(2, 1038784, 'hi')
+---
+ - 1038784: {26984, 26984}
+...
+lua push_collection(2, 1038784, 'hi')
+---
+ - 1038784: {26984, 26984}
+...
+lua push_collection(5, 1038784, 'hey')
+---
+ - 1038784: {26984, 26984, 'hey'}
+...
+lua push_collection(5, 1038784, 'hey')
+---
+ - 1038784: {26984, 26984, 'hey', 'hey'}
+...
+lua push_collection(5, 1038784, 'hey')
+---
+ - 1038784: {26984, 26984, 'hey', 'hey', 'hey'}
+...
+lua push_collection(5, 1038784, 'hey')
+---
+ - 1038784: {26984, 'hey', 'hey', 'hey', 'hey'}
 ...

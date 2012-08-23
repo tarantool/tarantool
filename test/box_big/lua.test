@@ -1,4 +1,8 @@
 # encoding: tarantool
+#
+import os
+import shutil
+
 exec sql "insert into t1 values ('brave', 'new', 'world')"
 exec admin "lua box.space[1].index[1]:min()"
 exec admin "lua box.space[1].index[1]:max()"
@@ -133,6 +137,9 @@ exec admin "lua t:transform(2, 0, 'hello')"
 exec admin "lua t:transform(0, -1, 'C')"
 exec admin "lua t:transform(0, 100)"
 exec admin "lua t:transform(-100, 1)"
+exec admin "lua t:transform(0, 3, 1, 2, 3)"
+exec admin "lua t:transform(3, 1, tonumber64(4))"
+exec admin "lua t:transform(0, 1, {})"
 
 #
 # Tests for lua tuple:find() and tuple:findall()
@@ -148,3 +155,37 @@ exec admin "lua t:findall('A')"
 exec admin "lua t:findall('2')"
 exec admin "lua t:findall('3')"
 exec admin "lua t:findall('0')"
+
+exec admin "lua t:find(2, '2')"
+exec admin "lua t:find(89, '2')"
+exec admin "lua t:findall(4, '3')"
+
+exec admin "lua t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))"
+exec admin "lua t:find(2)"
+exec admin "lua t:find(tonumber64(2))"
+exec admin "lua t:find('2')"
+
+print """#
+# A test case for Bug #1038784
+# transform returns wrong tuple and put broken reply into socket
+# https://bugs.launchpad.net/tarantool/+bug/1038784
+#"""
+
+push_lua_path = os.path.join(vardir, "push.lua")
+shutil.copy("box_big/push.lua", push_lua_path)
+
+exec admin "lua dofile('push.lua')"
+shutil.rmtree(push_lua_path, True)
+
+exec admin "lua push_collection(0, 1038784, 'hello')"
+exec admin "lua push_collection(0, 1038784, 'hello')"
+exec admin "lua push_collection(0, 1038784, 'hello')"
+
+exec admin "lua push_collection(1, 1038784, 'hi')"
+exec admin "lua push_collection(2, 1038784, 'hi')"
+exec admin "lua push_collection(2, 1038784, 'hi')"
+
+exec admin "lua push_collection(5, 1038784, 'hey')"
+exec admin "lua push_collection(5, 1038784, 'hey')"
+exec admin "lua push_collection(5, 1038784, 'hey')"
+exec admin "lua push_collection(5, 1038784, 'hey')"
