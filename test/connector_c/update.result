@@ -1,4 +1,4 @@
->>> test simple set
+	*** test_simple_set ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 2 (0x00000002), 0 (0x00000000), '')
@@ -11,8 +11,8 @@ update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 # test set primary key
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (2 (0x00000002), 'field's new value', '', 1130450022 (0x43614c66))
-<<< test simple set done
->>> test long set
+	*** test_simple_set: done ***
+ 	*** test_long_set ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'first', '', 'third')
@@ -36,8 +36,8 @@ freedom to the galaxy....', 'third')
 # test replace long value to short
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'first', 'short string', 'third')
-<<< test long set done
->>> test append
+	*** test_long_set: done ***
+ 	*** test_append ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'first')
@@ -83,8 +83,8 @@ that can save her people and restore
 freedom to the galaxy....', 765239998 (0x2d9ca2be))
 # test set to not an exist field
 update fields: respond ok (op: 19, reqid: 0, code: 13826, count: 0)
-<<< test append done
->>> test 32-bit int arith
+	*** test_append: done ***
+ 	*** test_arith_i32 ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 2 (0x00000002), 0 (0x00000000), 0 (0x00000000))
@@ -106,8 +106,8 @@ update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 # test and
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 17 (0x00000011), 1076903984 (0x40304030), 84083971 (0x05030503))
-<<< test 32-bit arith done
->>> test 64-bit int arith
+	*** test_arith_i32: done ***
+ 	*** test_arith_i64 ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 2 (0x0000000000000002), 0 (0x0000000000000000), 0 (0x0000000000000000))
@@ -132,16 +132,16 @@ update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 # test casting 32-bit operand to 64-bit
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 33 (0x0000000000000021), 4625267393289011248 (0x4030403040304030), 361137905646896387 (0x0503050305030503))
-<<< test 64-bit arith done
->>> test multi splice
+	*** test_arith_i64: done ***
+ 	*** test_multi_arith ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'first', 128 (0x00000080), 'third')
 # test simple and
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'first field new value', 61455 (0x0000f00f), 'third field new value')
-<<< test multi arith done
->>> test simple splice
+	*** test_multi_arith: done ***
+ 	*** test_splice ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'first', 'hi, this is a test string!', 'third')
@@ -169,8 +169,8 @@ update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 # test replace in end
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'first', 'Hello, this is a field! Is this Sparta!?', 'third')
-<<< test simple splice done
->>> test set and splice
+	*** test_splice: done ***
+ 	*** test_set_and_splice ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'first', 'hi, this is a test string!', 'third')
@@ -211,8 +211,8 @@ Princess Leia races home aboard her
 starship, custodian of the stolen plans
 that can save her people and restore
 freedom to the galaxy....')
-<<< test set and splice done
->>> test delete field
+	*** test_set_and_splice: done ***
+ 	*** test_delete_field ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'first', 'hi, this is a test string!', 'third', 1 (0x00000001), 2 (0x00000002), 3 (0x00000003), 4 (0x00000004), 5 (0x00000005), 6 (0x00000006), 7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a))
@@ -223,53 +223,50 @@ update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
 (1 (0x00000001), 'third', 1 (0x00000001), 2 (0x00000002), 3 (0x00000003), 4 (0x00000004), 5 (0x00000005), 6 (0x00000006), 7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a))
 # test multi delete fields
-update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(1 (0x00000001), 'third', 10 (0x0000000a))
+update fields: respond ok (op: 19, reqid: 0, code: 13826, count: 0)
 # test multi delete fields
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(1 (0x00000001), 9 (0x00000009), 10 (0x0000000a))
+(1 (0x00000001), 9 (0x00000009), 2 (0x00000002), 3 (0x00000003), 4 (0x00000004), 5 (0x00000005), 6 (0x00000006), 7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a))
 # test append and delete
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(1 (0x00000001), 9 (0x00000009), 10 (0x0000000a), 'third', 'fourth', 'fifth', 'eighth', 'ninth')
+(1 (0x00000001), 9 (0x00000009), 2 (0x00000002), 'third', 'fourth', 'fifth', 'eighth', 'ninth')
 # test double delete
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(1 (0x00000001), 9 (0x00000009), 10 (0x0000000a), 'fourth', 'fifth', 'eighth', 'ninth')
+(1 (0x00000001), 9 (0x00000009), 2 (0x00000002), 'fifth', 'eighth', 'ninth')
 select: respond ok (op: 17, reqid: 0, code: 0, count: 1)
-(1 (0x00000001), 9 (0x00000009), 10 (0x0000000a), 'fourth', 'fifth', 'eighth', 'ninth')
+(1 (0x00000001), 9 (0x00000009), 2 (0x00000002), 'fifth', 'eighth', 'ninth')
 # test delete not an exist field
 update fields: respond ok (op: 19, reqid: 0, code: 13826, count: 0)
 select: respond ok (op: 17, reqid: 0, code: 0, count: 1)
-(1 (0x00000001), 9 (0x00000009), 10 (0x0000000a), 'fourth', 'fifth', 'eighth', 'ninth')
-<<< test delete field done
->>> test insert field
+(1 (0x00000001), 9 (0x00000009), 2 (0x00000002), 'fifth', 'eighth', 'ninth')
+	*** test_delete_field: done ***
+ 	*** test_insert_field ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (9 (0x00000009), 'eleven')
 # insert new field before primary key
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 'eleven')
+(8 (0x00000008), 7 (0x00000007), 9 (0x00000009), 'eleven')
 # insert a new field before last field
-update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven')
-# double insert before set
-update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven', 12 (0x0000000c), 13 (0x0000000d), 14 (0x0000000e))
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 0)
+# double insert at the end
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 0)
+# multi insert 
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 0)
 # insert before next to last field
-update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven', 12 (0x0000000c), 13 (0x0000000d), 14 (0x0000000e), 15 (0x0000000f))
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 0)
 # insert before next to last field
-update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 'eleven', 12 (0x0000000c), 13 (0x0000000d), 14 (0x0000000e), 15 (0x0000000f), 16 (0x00000010), 17 (0x00000011), 18 (0x00000012), 19 (0x00000013))
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 0)
 # insert second tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (0 (0x00000000), 'one', 11 (0x0000000b))
 # multi insert
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(0 (0x00000000), 1 (0x00000001), 2 (0x00000002), 3 (0x00000003), 4 (0x00000004), 5 (0x00000005), 6 (0x00000006), 7 (0x00000007), 8 (0x00000008), 9 (0x00000009), 10 (0x0000000a), 11 (0x0000000b))
+(0 (0x00000000), 9 (0x00000009), 8 (0x00000008), 7 (0x00000007), 6 (0x00000006), 11 (0x0000000b), 4 (0x00000004), 15 (0x0000000f), 2 (0x00000002), 3 (0x00000003), -10 (0xfffffff6), 11 (0x0000000b))
 # insert before invalid field number
-update fields: respond ok (op: 19, reqid: 0, code: 13826, count: 0)
-<<< insert field test done
->>> test boundaty argumets values
+update fields: respond ok (op: 19, reqid: 0, code: 0, count: 0)
+	*** test_insert_field: done ***
+ 	*** test_boundary_args ***
 # insert tuple
 insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 (0 (0x00000000), 1 (0x00000001))
@@ -277,6 +274,8 @@ insert: respond ok (op: 13, reqid: 0, code: 0, count: 1)
 update fields: respond ok (op: 19, reqid: 0, code: 514, count: 0)
 # test: update w/ maximal allowed opearions count
 update fields: respond ok (op: 19, reqid: 0, code: 0, count: 1)
-(0 (0x00000000), 129 (0x00000081))
+(0 (0x00000000), 4001 (0x00000fa1))
 # test: update w/ grater than maximal allowed opearions count
 update fields: respond ok (op: 19, reqid: 0, code: 514, count: 0)
+	*** test_boundary_args: done ***
+ 

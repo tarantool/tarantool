@@ -82,7 +82,7 @@ set (recompiled_sources
 set (common_sources tbuf.m palloc.m util.m
      salloc.m pickle.m coro.m stat.m log_io.m recovery.m cpu_feature.m
      replica.m iproto.m object.m exception.m errcode.c errinj.m latch.m
-     nio.c crc32.c)
+     nio.c crc32.c rope.c)
 
 if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.m)

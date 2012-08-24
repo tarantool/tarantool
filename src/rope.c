@@ -432,28 +432,28 @@ rope_erase(struct rope *rope, rsize_t offset)
 
 	if (node->leaf_size > 1) {
 		/* Check if we can simply trim the node. */
-		if (offset == node->leaf_size - 1) {
-			/* Trim the tail. */
-			rope->split(node->data, node->leaf_size, offset);
-			node->leaf_size = offset;
-			return 0;
-		}
 		if (offset == 0) {
 			/* Cut the head. */
 			node->data = rope->split(node->data, node->leaf_size, 1);
 			node->leaf_size -= 1;
 			return 0;
 		}
+		rsize_t size = node->leaf_size;
+		/* Cut the tail */
+		void *next = rope->split(node->data, node->leaf_size, offset);
+		node->leaf_size = offset;
+		if (offset == size - 1)
+			return 0; /* Trimmed the tail, nothing else to do */
 		/*
-		 * Offset falls inside a substring.
-		 * Cut & paste the tail.
+		 * Offset falls inside a substring. Erase the
+		 * first field and insert the tail.
 		 */
-		struct rope_node *new_node = rope_node_split(rope, node,
-							     offset + 1);
+		next = rope->split(next, size - offset, 1);
+		struct rope_node *new_node =
+			rope_node_new(rope, next, size - offset - 1);
 		if (new_node == NULL)
 			return -1;
 		/* Trim the old node. */
-		node->leaf_size -= 1;
 		p_end = avl_route_to_next(p_end, 1, new_node->tree_size);
 		**p_end = new_node;
 		avl_rebalance_after_insert(path, p_end, new_node->height);
