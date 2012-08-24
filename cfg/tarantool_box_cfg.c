@@ -1170,22 +1170,26 @@ acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, i
 	cleanFlags(c, orig_opt);
 }
 
-void
+int
 parse_cfg_file_tarantool_cfg(tarantool_cfg *c, FILE *fh, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional) {
-	OptDef *option;
-
-	option = parseCfgDef(fh);
+	int error;
+	OptDef *option = parseCfgDef(fh, &error);
+	if (option == NULL)
+		return error ? -1 : 0;
 	acceptCfgDef(c, option, check_rdonly, n_accepted, n_skipped, n_optional);
 	freeCfgDef(option);
+	return 0;
 }
 
-void
+int
 parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional) {
-	OptDef *option;
-
-	option = parseCfgDefBuffer(buffer);
+	int error;
+	OptDef *option = parseCfgDefBuffer(buffer, &error);
+	if (option == NULL)
+		return error ? -1 : 0;
 	acceptCfgDef(c, option, check_rdonly, n_accepted, n_skipped, n_optional);
 	freeCfgDef(option);
+	return 0;
 }
 
 /************** Iterator **************/
