@@ -106,14 +106,17 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 
 	if (f == NULL) {
 		out_warning(0, "can't open config `%s'", cfg_filename);
-
 		return -1;
 	}
 
-	parse_cfg_file_tarantool_cfg(conf, f, check_rdonly,
-				     &n_accepted, &n_skipped, &n_ignored);
-
+	int syntax = parse_cfg_file_tarantool_cfg(conf, f, check_rdonly,
+						  &n_accepted,
+						  &n_skipped,
+						  &n_ignored);
 	fclose(f);
+
+	if (syntax != 0)
+		return -1;
 
 	if (check_cfg_tarantool_cfg(conf) != 0)
 		return -1;
