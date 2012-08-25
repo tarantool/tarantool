@@ -280,6 +280,23 @@ update_field_len(struct update_field *f)
 	return last? last->new_field_len : f->tail - f->old;
 }
 
+static inline void
+op_check_field_no(u32 field_no, u32 field_max)
+{
+	if (field_no > field_max)
+		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, field_no);
+}
+
+static inline void
+op_adjust_field_no(struct update_op *op, u32 field_max)
+{
+	if (op->field_no == UINT32_MAX)
+		op->field_no = field_max;
+	else
+		op_check_field_no(op->field_no, field_max);
+}
+
+
 static void
 do_update_op_set(struct op_set_arg *arg, void *in __attribute__((unused)),
 		 void *out)
@@ -352,6 +369,7 @@ do_update_op_insert(struct op_set_arg *arg, void *in __attribute__((unused)),
 static void
 init_update_op_insert(struct rope *rope, struct update_op *op)
 {
+	op_adjust_field_no(op, rope_size(rope));
 	struct update_field *field = palloc(fiber->gc_pool,
 					    sizeof(struct update_field));
 	update_field_init(field, op->arg.set.value, op->arg.set.length, 0);
@@ -376,12 +394,15 @@ init_update_op_set(struct rope *rope, struct update_op *op)
 static void
 init_update_op_delete(struct rope *rope, struct update_op *op)
 {
+	op_adjust_field_no(op, rope_size(rope) - 1);
 	rope_erase(rope, op->field_no);
 }
 
 static void
 init_update_op_arith(struct rope *rope, struct update_op *op)
 {
+	op_check_field_no(op->field_no, rope_size(rope) - 1);
+
 	struct update_field *field = rope_extract(rope, op->field_no);
 	struct op_arith_arg *arg = &op->arg.arith;
 	u32 field_len = update_field_len(field);
@@ -425,6 +446,7 @@ init_update_op_arith(struct rope *rope, struct update_op *op)
 static void
 init_update_op_splice(struct rope *rope, struct update_op *op)
 {
+	op_check_field_no(op->field_no, rope_size(rope) - 1);
 	struct update_field *field = rope_extract(rope, op->field_no);
 
 	u32 field_len = update_field_len(field);
@@ -550,18 +572,9 @@ update_create_rope(struct update_op *op, struct update_op *op_end,
 
 	rope_append(rope, first, tuple->field_count);
 
-	for (; op < op_end; op++) {
-
-		if (op->field_no > rope_size(rope) ||
-		    (op->field_no == rope_size(rope) &&
-		    op->opcode != UPDATE_OP_SET &&
-		    op->opcode != UPDATE_OP_INSERT)) {
-
-			tnt_raise(ClientError, :ER_NO_SUCH_FIELD, op->field_no);
-		}
-
+	for (; op < op_end; op++)
 		op->meta->init_op(rope, op);
-	}
+
 	return rope;
 }
 
@@ -647,6 +660,7 @@ do_update_ops(struct rope *rope, struct tuple *new_tuple)
 		if (new_field != new_data)
 			memcpy(new_data, new_field, field_len);
 		new_data += field_len;
+		assert(field->tail_len == 0 || field_count > 1);
 		if (field_count > 1) {
 			memcpy(new_data, field->tail, field->tail_len);
 			new_data += field->tail_len;
