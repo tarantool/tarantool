@@ -352,13 +352,14 @@ eof:
 	if (ftello(l->f) == i->good_offset + sizeof(eof_marker_v11)) {
 		fseeko(l->f, i->good_offset, SEEK_SET);
 		if (fread(&magic, sizeof(magic), 1, l->f) != 1) {
+
 			say_error("can't read eof marker");
-		}
-		else if (magic != eof_marker_v11) {
+		} else if (magic != eof_marker_v11 &&
+			   magic != row_marker_v11) {
+
 			say_error("eof marker is corrupt: %lu",
 				  (unsigned long) magic);
-		}
-		else {
+		} else {
 			i->good_offset = ftello(l->f);
 			i->eof_read = true;
 		}
