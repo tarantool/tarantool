@@ -872,6 +872,7 @@ static const struct luaL_reg boxlib[] = {
 	{"process", lbox_process},
 	{"uuid", lbox_uuid},
 	{"uuid_hex", lbox_uuid_hex},
+	{"uuid_is_loaded", lbox_uuid_is_loaded},
 	{NULL, NULL}
 };
 
