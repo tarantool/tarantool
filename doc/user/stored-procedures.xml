@@ -732,10 +732,10 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
         </term>
         <listitem>
             <para>
-                Generates 128-bit (16 bytes) unique id.
+                Generate 128-bit (16 bytes) unique id.
             </para>
             <para>
-                Requires <emphasis>libuuid</emphasis> to be
+                Require <emphasis>libuuid</emphasis> to be
                 installed.
             </para>
         </listitem>
@@ -746,8 +746,8 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
         </term>
         <listitem>
             <para>
-                Generates hex-string of 128-bit (16 bytes) unique id.
-                Returns 32-bytes string.
+                Generate hex-string of 128-bit (16 bytes) unique id.
+                Return 32-bytes string.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
             <programlisting>
