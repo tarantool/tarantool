@@ -1,35 +1,70 @@
 #include <stdio.h>
+#include <string.h>
+#include <dlfcn.h>
+#include <alloca.h>
 #include "box_lua_uuid.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
 
-#ifdef HAVE_UUID_GEN
+
+/* libuuid API */
+typedef unsigned char uuid_t[16];
+static void (*uuid_generate)(uuid_t uuid);
 
 
-#ifdef HAVE_UUID_H
-	#include <uuid/uuid.h>
-#else
-	typedef unsigned char uuid_t[16];
-	void uuid_generate(uuid_t out);
-#endif
+/* box functions */
+typedef int(*box_foo)(struct lua_State *L);
 
 
-int lbox_uuid(struct lua_State *L) {
+static int lbox_uuid_load_and_call(lua_State *L);
+static int lbox_uuid_hex_load_and_call(lua_State *L);
 
+/* functions that are called after library is loaded */
+static int lbox_uuid_loaded(struct lua_State *L);
+static int lbox_uuid_hex_loaded(struct lua_State *L);
+
+static box_foo
+	_lbox_uuid = lbox_uuid_load_and_call,
+	_lbox_uuid_hex = lbox_uuid_hex_load_and_call;
+
+static int loaddl_and_call(struct lua_State *L, box_foo f) {
+	
+	void *libuuid = dlopen("libuuid.so.1", RTLD_LAZY);
+	if (!libuuid)
+		luaL_error(L, "box.uuid(): %s", dlerror());
+
+	uuid_generate = dlsym(libuuid, "uuid_generate");
+	if (uuid_generate) {
+		_lbox_uuid = lbox_uuid_loaded;
+		_lbox_uuid_hex = lbox_uuid_hex_loaded;
+		return f(L);
+	}
+
+	/* dlclose can destroy errorstring, so keep copy */
+	char *dl_error = dlerror();
+	char *sdl_error = alloca(strlen(dl_error) + 1);
+	strcpy(sdl_error, dl_error);
+	dlclose(libuuid);
+	return luaL_error(L, "box.uuid(): %s", sdl_error);
+}
+
+
+static int lbox_uuid_loaded(struct lua_State *L) {
 	uuid_t uuid;
+
 	uuid_generate(uuid);
 	lua_pushlstring(L, (char *)uuid, sizeof(uuid_t));
 
 	return 1;
 }
 
-int lbox_uuid_hex(struct lua_State *L) {
-
+static int lbox_uuid_hex_loaded(struct lua_State *L) {
 	unsigned i;
 	char uuid_hex[ sizeof(uuid_t) * 2 + 1 ];
 
 	uuid_t uuid;
+	
 	uuid_generate(uuid);
 
 	for (i = 0; i < sizeof(uuid_t); i++)
@@ -39,18 +74,20 @@ int lbox_uuid_hex(struct lua_State *L) {
 	return 1;
 }
 
-#else /* HAVE_UUID_GEN */
 
-#define LIB_IS_ABSENT_MESSAGE "libuuid was not linked with tarantool_box"
+static int lbox_uuid_load_and_call(lua_State *L) {
+	return loaddl_and_call(L, lbox_uuid_loaded);
+}
+
+static int lbox_uuid_hex_load_and_call(lua_State *L) {
+	return loaddl_and_call(L, lbox_uuid_hex_loaded);
+}
 
 int lbox_uuid(struct lua_State *L) {
-	luaL_error(L, "box.uuid(): %s", LIB_IS_ABSENT_MESSAGE);
-	return 0;
+	return _lbox_uuid(L);
 }
 
 int lbox_uuid_hex(struct lua_State *L) {
-	luaL_error(L, "box.uuid_hex(): %s", LIB_IS_ABSENT_MESSAGE);
-	return 0;
+	return _lbox_uuid_hex(L);
 }
 
-#endif /* HAVE_UUID_GEN */

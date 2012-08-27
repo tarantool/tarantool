@@ -39,16 +39,7 @@ set_source_files_properties(memcached-grammar.m
 set_source_files_properties(memcached.m
     PROPERTIES COMPILE_FLAGS "-Wno-uninitialized")
 
-
-if (HAVE_UUID_GEN)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_UUID_GEN")
-	set(module_link_flags ${module_link_flags} -luuid)
-
-endif()
-
-if (HAVE_UUID_H)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_UUID_H")
-endif()
+set(module_link_flags ${module_link_flags} -ldl)
 
 tarantool_module("box" tuple.m index.m tree.m space.m port.m request.m
     txn.m box.m box.lua.c box_lua.m memcached.m memcached-grammar.m

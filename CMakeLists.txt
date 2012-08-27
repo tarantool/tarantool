@@ -72,10 +72,6 @@ check_function_exists(memrchr HAVE_MEMRCHR)
 # stack. Find whether or not it's present.
 check_library_exists("" __libc_stack_end "" HAVE_LIBC_STACK_END)
 
-# libuuid
-check_library_exists(uuid "uuid_generate" "" HAVE_UUID_GEN)
-check_include_file("uuid/uuid.h" HAVE_UUID_H)
-
 #
 # Enable 'make TAGS' target.
 #
