@@ -36,8 +36,12 @@ static box_foo
 static int loaddl_and_call(struct lua_State *L, box_foo f, int raise) {
 	
 	void *libuuid = dlopen("libuuid.so.1", RTLD_LAZY);
-	if (!libuuid)
-		luaL_error(L, "box.uuid(): %s", dlerror());
+	if (!libuuid) {
+		if (raise)
+			return luaL_error(L, "box.uuid(): %s", dlerror());
+		else
+			return 0;
+	}
 
 	uuid_generate = dlsym(libuuid, "uuid_generate");
 	if (!uuid_generate) {
@@ -64,7 +68,6 @@ static int lbox_uuid_loaded(struct lua_State *L) {
 
 	uuid_generate(uuid);
 	lua_pushlstring(L, (char *)uuid, sizeof(uuid_t));
-
 	return 1;
 }
 

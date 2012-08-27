@@ -758,6 +758,23 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
             </programlisting>
         </listitem>
     </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.uuid_is_loaded()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Check if <emphasis>libuuid</emphasis> is available
+                and loaded.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>
+                lua box.uuid_is_loaded()
+                ---
+                 - 1
+                ...
+            </programlisting>
+        </listitem>
 </variablelist>
 
 <variablelist>
