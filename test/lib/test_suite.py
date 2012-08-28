@@ -70,7 +70,11 @@ def print_tail_n(filename, num_lines):
 
 class Test:
     """An individual test file. A test object can run itself
-    and remembers completion state of the run."""
+    and remembers completion state of the run.
+    
+    If file <test_name>.skipcond is exists it will be executed before
+    test and if it sets self.skip to True value the test will be skipped.
+    """
 
     def __init__(self, name, args, suite_ini):
         """Initialize test properties: path to test file, path to
@@ -80,6 +84,7 @@ class Test:
         self.args = args
         self.suite_ini = suite_ini
         self.result = name.replace(".test", ".result")
+        self.skip_cond = name.replace(".test", ".skipcond")
         self.tmp_result = os.path.join(self.args.vardir,
                                        os.path.basename(self.result))
 	self.reject = "{0}/test/{1}".format(self.args.builddir,
@@ -102,13 +107,24 @@ class Test:
         exception. The exception is raised only if is_force flag is
         not set."""
 
+
         diagnostics = "unknown"
         save_stdout = sys.stdout
         builddir = self.args.builddir
         try:
-            sys.stdout = FilteredStream(self.tmp_result)
-            stdout_fileno = sys.stdout.stream.fileno()
-            execfile(self.name, dict(locals(), **server.__dict__))
+            self.skip = 0
+            if os.path.exists(self.skip_cond):
+                sys.stdout = FilteredStream(self.tmp_result)
+                stdout_fileno = sys.stdout.stream.fileno()
+                execfile(self.skip_cond, dict(locals(), **server.__dict__))
+                sys.stdout.close()
+                sys.stdout = save_stdout
+
+
+            if not self.skip:
+                sys.stdout = FilteredStream(self.tmp_result)
+                stdout_fileno = sys.stdout.stream.fileno()
+                execfile(self.name, dict(locals(), **server.__dict__))
             self.is_executed_ok = True
         except Exception as e:
             traceback.print_exc(e)
@@ -120,16 +136,23 @@ class Test:
 
         self.is_executed = True
 
-        if self.is_executed_ok and os.path.isfile(self.result):
-            self.is_equal_result = filecmp.cmp(self.result, self.tmp_result)
+        if not self.skip:
+            if self.is_executed_ok and os.path.isfile(self.result):
+                self.is_equal_result = filecmp.cmp(self.result, self.tmp_result)
+        else:
+            self.is_equal_result = 1
 
         if self.args.valgrind:
             self.is_valgrind_clean = \
             check_valgrind_log(server.valgrind_log) == False
 
-        if self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
+        if self.skip:
+            print "[ runtime skip ]"
+
+        elif self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
             print "[ pass ]"
-            os.remove(self.tmp_result)
+            if os.path.exists(self.tmp_result):
+                os.remove(self.tmp_result)
         elif (self.is_executed_ok and not self.is_equal_result and not
               os.path.isfile(self.result)):
             os.rename(self.tmp_result, self.result)
