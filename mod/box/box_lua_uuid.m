@@ -23,13 +23,11 @@ static int lbox_uuid_hex_load_and_call(lua_State *L);
 /* functions that are called after library is loaded */
 static int lbox_uuid_loaded(struct lua_State *L);
 static int lbox_uuid_hex_loaded(struct lua_State *L);
-static int lbox_uuid_is_loaded_loaded(struct lua_State *L);
-static int lbox_uuid_is_loaded_load_and_call(struct lua_State *L);
 
 static box_foo
 	_lbox_uuid = lbox_uuid_load_and_call,
-	_lbox_uuid_hex = lbox_uuid_hex_load_and_call,
-	_lbox_uuid_is_loaded = lbox_uuid_is_loaded_load_and_call;
+	_lbox_uuid_hex = lbox_uuid_hex_load_and_call
+;
 
 
 
@@ -58,7 +56,6 @@ static int loaddl_and_call(struct lua_State *L, box_foo f, int raise) {
 
 	_lbox_uuid = lbox_uuid_loaded;
 	_lbox_uuid_hex = lbox_uuid_hex_loaded;
-	_lbox_uuid_is_loaded = lbox_uuid_is_loaded_loaded;
 	return f(L);
 }
 
@@ -95,14 +92,6 @@ static int lbox_uuid_hex_load_and_call(lua_State *L) {
 	return loaddl_and_call(L, lbox_uuid_hex_loaded, 1);
 }
 
-static int lbox_uuid_is_loaded_loaded(struct lua_State *L) {
-	lua_pushnumber(L, 1);
-	return 1;
-}
-
-static int lbox_uuid_is_loaded_load_and_call(struct lua_State *L) {
-	return loaddl_and_call(L, lbox_uuid_is_loaded_loaded, 0);
-}
 
 int lbox_uuid(struct lua_State *L) {
 	return _lbox_uuid(L);
@@ -112,6 +101,3 @@ int lbox_uuid_hex(struct lua_State *L) {
 	return _lbox_uuid_hex(L);
 }
 
-int lbox_uuid_is_loaded(struct lua_State *L) {
-	return _lbox_uuid_is_loaded(L);
-}
