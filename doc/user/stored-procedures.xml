@@ -726,6 +726,41 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
             </para>
         </listitem>
     </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.uuid()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Generate 128-bit (16 bytes) unique id. The id
+                is returned in binary form.
+            </para>
+            <para>
+                Requires <emphasis>libuuid</emphasis> library to be
+                installed. The library is loaded in runtime,
+                and if the library is not available, this
+                function returns an error.
+            </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.uuid_hex()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Generate hex-string of 128-bit (16 bytes) unique id.
+                Return 32-bytes string.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>
+                lua box.uuid_hex()
+                ---
+                 - a4f29fa0eb6d11e19f7737696d7fa8ff
+                ...
+            </programlisting>
+        </listitem>
+    </varlistentry>
 </variablelist>
 
 <variablelist>
