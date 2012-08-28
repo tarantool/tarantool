@@ -343,7 +343,7 @@ fold_with_key_parts(struct key_def *key_def, struct key_data *key_data)
 	u8 *part_data = key_data->data;
 	union sparse_part* parts = key_data->parts;
 
-	memset(parts, 0, sizeof(parts[0]) * key_data->part_count);
+	memset(parts, 0, sizeof(parts[0]) * key_def->part_count);
 
 	int part_count = MIN(key_def->part_count, key_data->part_count);
 	for (int part = 0; part < part_count; ++part) {
@@ -1334,7 +1334,9 @@ num32_key_node_cmp(const void * key, const void * node, void *arg)
 	(void) arg;
 	const struct key_data *key_data = key;
 	const struct num32_node *node_x = node;
-	return u32_cmp(key_data->parts[0].num32, node_x->value);
+	if (key_data->part_count)
+		return u32_cmp(key_data->parts[0].num32, node_x->value);
+	return 0;
 }
 
 @implementation Num32TreeIndex
