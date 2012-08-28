@@ -71,7 +71,7 @@ def print_tail_n(filename, num_lines):
 class Test:
     """An individual test file. A test object can run itself
     and remembers completion state of the run.
-    
+
     If file <test_name>.skipcond is exists it will be executed before
     test and if it sets self.skip to True value the test will be skipped.
     """
