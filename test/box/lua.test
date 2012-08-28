@@ -535,8 +535,3 @@ exec admin "lua box.dostring('return abc')"
 exec admin "lua box.dostring('return ...', 1, 2, 3)"
 
 
-print """# box.uuid()"""
-# exec admin "lua box.uuid()"
-exec admin "lua string.len(box.uuid())"
-exec admin "lua string.len(box.uuid_hex())"
-exec admin "lua string.match(box.uuid_hex(), '^[a-f0-9]+$') ~= nil"
