@@ -1,0 +1,40 @@
+lua
+---
+unknown command. try typing help.
+...
+lua 1
+---
+ - 1
+...
+lua box.info.version
+---
+ - 1.4.7-92-g4ba95ca
+...
+lua string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
+---
+ - true
+...
+lua string.match(box.info.logger_pid, '^[1-9][0-9]*$') ~= nil
+---
+ - true
+...
+lua box.info.lsn > 0
+---
+ - true
+...
+lua box.info.recovery_lag
+---
+ - nil
+...
+lua box.info.recovery_last_update
+---
+ - nil
+...
+lua box.info.status
+---
+ - primary
+...
+lua box.info.config
+---
+ - /home/unera/work/tarantool/test/var/tarantool.cfg
+...

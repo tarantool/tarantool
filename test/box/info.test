@@ -1,0 +1,16 @@
+# encoding: tarantool
+import os
+import sys
+# Test Lua from admin console. Whenever producing output,
+# make sure it's a valid YAML.
+exec admin "lua"
+exec admin "lua 1"
+exec admin "lua box.info.version"
+exec admin "lua string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil"
+exec admin "lua string.match(box.info.logger_pid, '^[1-9][0-9]*$') ~= nil"
+exec admin "lua box.info.lsn > 0"
+exec admin "lua box.info.recovery_lag"
+exec admin "lua box.info.recovery_last_update"
+exec admin "lua box.info.status"
+exec admin "lua box.info.config"
+

@@ -299,7 +299,7 @@ luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
 	return cd;
 }
 
-static int
+int
 luaL_pushnumber64(struct lua_State *L, uint64_t val)
 {
 	GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);

@@ -102,4 +102,12 @@ void
 tarantool_lua(struct lua_State *L,
 	      struct tbuf *out, const char *str);
 
+/**
+ * push uint64_t to Lua stack
+ *
+ * @param L is a Lua State
+ * @param val is a value to push
+ *
+ */
+int luaL_pushnumber64(struct lua_State *L, uint64_t val);
 #endif /* INCLUDES_TARANTOOL_LUA_H */
