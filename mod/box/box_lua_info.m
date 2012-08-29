@@ -9,41 +9,57 @@
 #include <recovery.h>
 
 
-static int lbox_info_index(struct lua_State *L) {
-
-    const char *key = lua_tolstring(L, -1, NULL);
-
-    if (strcmp(key, "lsn") == 0) {
-        luaL_pushnumber64(L, recovery_state->confirmed_lsn);
-        return 1;
-    }
-
-    if (strcmp(key, "recovery_lag") == 0) {
-
+static int lbox_info_index_get_recovery_lag(struct lua_State *L) {
         if (recovery_state->remote)
             lua_pushnumber(L, recovery_state->remote->recovery_lag);
         else
             lua_pushnil(L);
         return 1;
-    }
+}
 
-    if (strcmp(key, "recovery_last_update") == 0) {
-
+static int
+lbox_info_index_get_recovery_last_update_tstamp(struct lua_State *L) {
         if (recovery_state->remote)
             lua_pushnumber(L,
                 recovery_state->remote->recovery_last_update_tstamp);
         else
             lua_pushnil(L);
         return 1;
+}
+
+static int lbox_info_get_lsn(struct lua_State *L) {
+    luaL_pushnumber64(L, recovery_state->confirmed_lsn);
+    return 1;
+}
+
+
+static int lbox_info_get_status(struct lua_State *L) {
+    lua_pushstring(L, mod_status());
+    return 1;
+}
+
+static const struct luaL_reg lbox_info_dynamic_meta [] = {
+    {"recovery_lag", lbox_info_index_get_recovery_lag},
+    {"recovery_last_update", lbox_info_index_get_recovery_last_update_tstamp},
+    {"lsn", lbox_info_get_lsn},
+    {"status", lbox_info_get_status},
+    {NULL, NULL}
+};
+
+static int lbox_info_index(struct lua_State *L) {
+
+    const char *key = lua_tolstring(L, -1, NULL);
+    unsigned i;
+
+    for (i = 0; lbox_info_dynamic_meta[i].name; i++) {
+        if (strcmp(key, lbox_info_dynamic_meta[i].name) == 0) {
+            return lbox_info_dynamic_meta[i].func(L);
+        }
+
     }
 
-    if (strcmp(key, "status") == 0) {
-        lua_pushstring(L, mod_status());
-        return 1;
-    }
-    
-
-    return 0;
+    lua_pushnil(L);
+    return 1;
 }
 
 

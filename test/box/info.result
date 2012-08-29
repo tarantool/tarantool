@@ -6,9 +6,21 @@ lua 1
 ---
  - 1
 ...
-lua box.info.version
+lua box.info.unknown_variable
 ---
- - 1.4.7-92-g4ba95ca
+ - nil
+...
+lua box.info[23]
+---
+ - nil
+...
+lua box.info['unknown_variable']
+---
+ - nil
+...
+lua string.match(box.info.version, '^[1-9]') ~= nil
+---
+ - true
 ...
 lua string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
 ---

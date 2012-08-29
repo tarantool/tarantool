@@ -1406,6 +1406,57 @@ logger = cat - >> tarantool.log
     </varlistentry>
 </variablelist>
 
+<variablelist>
+    <title>Package <code>box.info</code></title>
+    <para>
+        This package provides access to information about
+        server status.
+        The information and information from <olink
+        targetptr="show-info"/> are the same.
+    </para>
+    <varlistentry>
+        <term><emphasis role="lua">box.info</emphasis></term>
+        <listitem>
+            
+        <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+localhost> lua box.info.pid
+---
+ - 1747
+...
+localhost> lua box.info.logger_pid
+---
+ - 1748
+...
+localhost> lua box.info.version
+---
+ - 1.4.7-92-g4ba95ca
+...
+localhost> lua box.info.config
+---
+ - /home/unera/work/tarantool/test/box/tarantool_good.cfg
+...
+localhost> lua box.info.lsn
+---
+ - 1
+...
+localhost> lua box.info.status
+---
+ - primary
+...
+localhost> lua box.info.recovery_lag
+---
+ - 0.000
+...
+localhost> lua box.info.recovery_last_update
+---
+ - 1306964594.980
+...
+localhost>
+</programlisting>
+        </listitem>
+    </varlistentry>
+</variablelist>
+
 <para>
     Additional examples can be found in the open source <link
     xlink:href="https://github.com/mailru/tntlua">Lua stored
