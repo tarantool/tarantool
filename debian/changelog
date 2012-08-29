@@ -1,3 +1,9 @@
+tarantool (1.4.7+20120829-1) unstable; urgency=low
+
+  * New snapshot (some fixes, add box.uuid() and box.uuid_hex() functions).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 29 Aug 2012 16:46:58 +0400
+
 tarantool (1.4.7+20120820-1) unstable; urgency=low
 
   * New snapshot (fixed tuple:transform crash).

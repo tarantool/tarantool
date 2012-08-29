@@ -10,7 +10,6 @@ Build-Depends: cdbs, debhelper (>= 8),
  python-pexpect,
  libncurses5-dev,
  binutils-dev,
- uuid-dev,
  dpkg-dev (>= 1.16.1~)
 Section: database
 Standards-Version: 3.9.3
