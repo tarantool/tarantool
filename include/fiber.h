@@ -99,8 +99,6 @@ struct fiber {
 	struct fiber *waiter;
 };
 
-SLIST_HEAD(, fiber) fibers, zombie_fibers;
-
 static inline struct iovec *iovec(const struct tbuf *t)
 {
 	return (struct iovec *)t->data;
