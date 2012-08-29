@@ -1435,9 +1435,13 @@ localhost> lua box.info.config
 ---
  - /home/unera/work/tarantool/test/box/tarantool_good.cfg
 ...
+localhost> lua box.info.uptime
+---
+ - 3672
+...
 localhost> lua box.info.lsn
 ---
- - 1
+ - 1712
 ...
 localhost> lua box.info.status
 ---
