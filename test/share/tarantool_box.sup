@@ -27,6 +27,32 @@
    ...
 }
 
+{
+   <obj-c internals>
+   Memcheck:Leak
+   ...
+   fun:objc_msg_lookup
+   ...
+}
+
+{
+   <obj-c internals>
+   Memcheck:Leak
+   ...
+   fun:.objc_load_function
+   ...
+}
+
+{
+   <obj-c internals>
+   Memcheck:Leak
+   fun:malloc
+   fun:strdup
+   fun:objc_register_selector_copy
+   ...
+}
+
+
 ##
 ## libev internals
 ##
