@@ -1451,6 +1451,13 @@ localhost> lua box.info.recovery_last_update
 ---
  - 1306964594.980
 ...
+localhost> lua for k, v in pairs(box.info.build) do print(k .. ': ', v) end
+---
+flags:  -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DCORO_ASM -fno-omit-frame-pointer -fno-stack-protector -fexceptions -funwind-tables -fgnu89-inline -pthread  -Wno-sign-compare -Wno-strict-aliasing -std=gnu99 -Wall -Wextra -Werror
+target: Linux-x86_64-Debug
+compiler: /usr/bin/gcc
+options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF -DENABLE_GCOV=OFF -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=OFF
+...
 localhost>
 </programlisting>
         </listitem>

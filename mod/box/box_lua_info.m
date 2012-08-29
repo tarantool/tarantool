@@ -101,6 +101,32 @@ void lbox_info_init(struct lua_State *L) {
     lua_settable(L, -3);
 
 
+    /* build */
+    lua_pushstring(L, "build");
+    lua_newtable(L);
+
+    /* box.info.build.target */
+    lua_pushstring(L, "target");
+    lua_pushstring(L, BUILD_INFO);
+    lua_settable(L, -3);
+
+    /* box.info.build.options */
+    lua_pushstring(L, "options");
+    lua_pushstring(L, BUILD_OPTIONS);
+    lua_settable(L, -3);
+
+    /* box.info.build.compiler */
+    lua_pushstring(L, "compiler");
+    lua_pushstring(L, COMPILER_INFO);
+    lua_settable(L, -3);
+
+    /* box.info.build.flags */
+    lua_pushstring(L, "flags");
+    lua_pushstring(L, COMPILER_CFLAGS);
+    lua_settable(L, -3);
+
+    lua_settable(L, -3);    /* box.info.build */
+
     lua_settable(L, -3);    /* box.info = created table */
     lua_pop(L, 1);          /* cleanup stack */
 }
