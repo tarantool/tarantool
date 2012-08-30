@@ -31,7 +31,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <dlfcn.h>
-#include <alloca.h>
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
@@ -73,12 +72,9 @@ loaddl_and_call(struct lua_State *L, box_function f)
 
 	uuid_generate = dlsym(libuuid, "uuid_generate");
 	if (!uuid_generate) {
-		/* dlclose can destroy errorstring, so keep copy */
-		char *dl_error = dlerror();
-		char *sdl_error = alloca(strlen(dl_error) + 1);
-		strcpy(sdl_error, dl_error);
+		lua_pushfstring(L, "box.uuid(): %s", dlerror());
 		dlclose(libuuid);
-		return luaL_error(L, "box.uuid(): %s", sdl_error);
+		return lua_error(L);
 	}
 
 	_lbox_uuid = lbox_uuid_loaded;

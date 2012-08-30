@@ -135,14 +135,13 @@ nlseek(int fd, off_t offset, int whence)
 	off_t effective_offset = lseek(fd, offset, whence);
 
 	if (effective_offset == -1) {
-		say_syserror("lseek, offset=%jd, whence=%d, [%s]",
-			     (intmax_t) offset, whence,
-			     nfilename(fd));
+		say_syserror("lseek, [%s]: offset=%jd, whence=%d",
+			     nfilename(fd), (intmax_t) offset, whence);
 	} else if (whence == SEEK_SET && effective_offset != offset) {
-		say_error("lseek, offset set to unexpected value: "
-			  "requested %jd effective %jd, "
-			  "[%s]",
-			  (intmax_t)offset, (intmax_t)effective_offset, nfilename(fd));
+		say_error("lseek, [%s]: offset set to unexpected value: "
+			  "requested %jd effective %jd",
+			  nfilename(fd),
+			  (intmax_t)offset, (intmax_t)effective_offset);
 	}
 	return effective_offset;
 }
@@ -188,6 +187,11 @@ nbatch_write(struct nbatch *batch, int fd)
 
 	if (bytes_written == batch->bytes)
 		return batch->rows;
+
+	say_warn("nbatch_write, [%s]: partial write,"
+		 " wrote %jd out of %jd bytes",
+		 nfilename(fd),
+		 (intmax_t) bytes_written, (intmax_t) batch->bytes);
 
 	ssize_t good_bytes = 0;
 	struct iovec *iov = batch->iov;

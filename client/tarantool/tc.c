@@ -32,6 +32,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include <unistd.h>
+
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_sql.h>
@@ -48,6 +50,7 @@ struct tc tc;
 
 static void tc_init(void) {
 	memset(&tc, 0, sizeof(tc));
+	tc.tee_fd = -1;
 }
 
 static void tc_free(void) {
@@ -55,6 +58,7 @@ static void tc_free(void) {
 		tnt_stream_free(tc.net);
 	}
 	tc_admin_close(&tc.admin);
+	tc_cmd_tee_close();
 }
 
 void tc_error(char *fmt, ...) {
@@ -65,7 +69,7 @@ void tc_error(char *fmt, ...) {
 	va_start(args, fmt);
 	vsnprintf(msg, sizeof(msg), fmt, args);
 	va_end(args);
-	printf("error: %s\n", msg);
+	tc_printf("error: %s\n", msg);
 	exit(1);
 }
 

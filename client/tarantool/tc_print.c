@@ -33,43 +33,89 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <unistd.h>
+#include <errno.h>
+
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
 #include <connector/c/include/tarantool/tnt_rpl.h>
 
+#include "client/tarantool/tc_opt.h"
+#include "client/tarantool/tc_admin.h"
+#include "client/tarantool/tc.h"
 #include "client/tarantool/tc_print.h"
 #include "client/tarantool/tc_query.h"
+
+extern struct tc tc;
+
+void tc_print_tee(char *buf, size_t size) {
+	if (tc.tee_fd == -1)
+		return;
+	size_t off = 0;
+	do {
+		ssize_t r = write(tc.tee_fd, buf + off, size - off);
+		if (r == -1) {
+			printf("error: read(): %s\n", strerror(errno));
+			return;
+		}
+		off += r;
+	} while (off != size);
+}
+
+void tc_print_cmd2tee(char *prompt, char *cmd, int size) {
+	if (tc.tee_fd == -1)
+		return;
+	if (prompt)
+		tc_print_tee(prompt, strlen(prompt));
+	tc_print_tee(cmd, size);
+	tc_print_tee("\n", 1);
+}
+
+void tc_print_buf(char *buf, size_t size) {
+	printf("%-.*s", (int)size, buf);
+	fflush(stdout);
+	tc_print_tee(buf, size);
+}
+
+void tc_printf(char *fmt, ...) {
+	char msg[512];
+	va_list args;
+	va_start(args, fmt);
+	int size = vsnprintf(msg, sizeof(msg), fmt, args);
+	va_end(args);
+	tc_print_buf(msg, size);
+}
 
 static void tc_print_fields(struct tnt_tuple *tu) {
 	struct tnt_iter ifl;
 	tnt_iter(&ifl, tu);
 	while (tnt_next(&ifl)) {
 		if (TNT_IFIELD_IDX(&ifl) != 0)
-			printf(", ");
+			tc_printf(", ");
 		char *data = TNT_IFIELD_DATA(&ifl);
 		uint32_t size = TNT_IFIELD_SIZE(&ifl);
 		if (!isprint(data[0]) && (size == 4 || size == 8)) {
 			if (size == 4) {
 				uint32_t i = *((uint32_t*)data);
-				printf("%"PRIu32, i);
+				tc_printf("%"PRIu32, i);
 			} else {
 				uint64_t i = *((uint64_t*)data);
-				printf("%"PRIu64, i);
+				tc_printf("%"PRIu64, i);
 			}
 		} else {
-			printf("'%-.*s'", size, data);
+			tc_printf("'%-.*s'", size, data);
 		}
 	}
 	if (ifl.status == TNT_ITER_FAIL)
-		printf("<parsing error>");
+		tc_printf("<parsing error>");
 	tnt_iter_free(&ifl);
 }
 
 void tc_print_tuple(struct tnt_tuple *tu)
 {
-	printf("[");
+	tc_printf("[");
 	tc_print_fields(tu);
-	printf("]\n");
+	tc_printf("]\n");
 }
 
 void tc_print_list(struct tnt_list *l)
@@ -87,11 +133,11 @@ static void
 tc_printer_tarantool(struct tnt_xlog_header_v11 *hdr,
 		     struct tnt_request *r)
 {
-	printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
-	       tc_query_type(r->h.type),
-	       hdr->lsn,
-	       hdr->tm,
-	       hdr->len);
+	tc_printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
+		  tc_query_type(r->h.type),
+		  hdr->lsn,
+		  hdr->tm,
+		  hdr->len);
 	switch (r->h.type) {
 	case TNT_OP_INSERT:
 		tc_print_tuple(&r->r.insert.t);

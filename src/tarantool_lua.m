@@ -1221,10 +1221,11 @@ tarantool_lua(struct lua_State *L,
 	int r = tarantool_lua_dostring(L, str);
 	tarantool_lua_set_out(L, NULL);
 	if (r) {
+		const char *msg = lua_tostring(L, -1);
+		msg = msg ? msg : "";
 		/* Make sure the output is YAMLish */
 		tbuf_printf(out, "error: '%s'\r\n",
-			    luaL_gsub(L, lua_tostring(L, -1),
-				      "'", "''"));
+			    luaL_gsub(L, msg, "'", "''"));
 	} else {
 		tarantool_lua_printstack_yaml(L, out);
 	}

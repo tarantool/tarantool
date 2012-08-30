@@ -1112,10 +1112,6 @@ acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, i
 	ConfettyError	r;
 	OptDef		*orig_opt = opt;
 
-	if (n_accepted) *n_accepted=0;
-	if (n_skipped) *n_skipped=0;
-	if (n_optional) *n_optional=0;
-
 	while(opt) {
 		r = acceptValue(c, opt, check_rdonly);
 		switch(r) {
@@ -1174,6 +1170,9 @@ int
 parse_cfg_file_tarantool_cfg(tarantool_cfg *c, FILE *fh, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional) {
 	int error;
 	OptDef *option = parseCfgDef(fh, &error);
+	if (n_accepted) *n_accepted=0;
+	if (n_skipped) *n_skipped=0;
+	if (n_optional) *n_optional=0;
 	if (option == NULL)
 		return error ? -1 : 0;
 	acceptCfgDef(c, option, check_rdonly, n_accepted, n_skipped, n_optional);
@@ -1185,6 +1184,9 @@ int
 parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional) {
 	int error;
 	OptDef *option = parseCfgDefBuffer(buffer, &error);
+	if (n_accepted) *n_accepted=0;
+	if (n_skipped) *n_skipped=0;
+	if (n_optional) *n_optional=0;
 	if (option == NULL)
 		return error ? -1 : 0;
 	acceptCfgDef(c, option, check_rdonly, n_accepted, n_skipped, n_optional);

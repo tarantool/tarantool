@@ -795,11 +795,13 @@ static void tt_tnt_net_reply(struct tt_test *test) {
 	net.wrcnt -= 2;
 }
 
+extern struct tnt_lex_keyword tnt_sql_keywords[];
+
 /* lex ws */
 static void tt_tnt_lex_ws(struct tt_test *test) {
 	unsigned char sz[] = " 	# abcde fghjk ## hh\n   # zzz\n#NOCR";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_EOF);
 	tnt_lex_free(&l);
@@ -810,7 +812,7 @@ static void tt_tnt_lex_int(struct tt_test *test) {
 	unsigned char sz[] = "\f\r\n 123 34\n\t\r56 888L56 2147483646 2147483647 "
 		             "-2147483648 -2147483649 72057594037927935";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 123);
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 34);
@@ -831,7 +833,7 @@ static void tt_tnt_lex_int(struct tt_test *test) {
 static void tt_tnt_lex_punct(struct tt_test *test) {
 	unsigned char sz[] = "123,34\n-10\t:\r(56)";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_NUM32 && TNT_TK_I32(tk) == 123);
 	TT_ASSERT(tnt_lex(&l, &tk) == ',' && TNT_TK_I32(tk) == ',');
@@ -849,7 +851,7 @@ static void tt_tnt_lex_punct(struct tt_test *test) {
 static void tt_tnt_lex_str(struct tt_test *test) {
 	unsigned char sz[] = "  'hello'\n\t  'world'  'всем привет!'";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_STRING &&
 	       TNT_TK_S(tk)->size == 5 &&
@@ -868,7 +870,7 @@ static void tt_tnt_lex_str(struct tt_test *test) {
 static void tt_tnt_lex_ids(struct tt_test *test) {
 	unsigned char sz[] = "  hello\nэтот безумный безумный мир\t  world  ";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_ID &&
 	       TNT_TK_S(tk)->size == 5 &&
@@ -896,7 +898,7 @@ static void tt_tnt_lex_ids(struct tt_test *test) {
 static void tt_tnt_lex_kt(struct tt_test *test) {
 	unsigned char sz[] = "  k0\n\tk20 t0 k1000 t55 k001 t8";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I32(tk) == 0);
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_KEY && TNT_TK_I32(tk) == 20);
@@ -913,7 +915,7 @@ static void tt_tnt_lex_kt(struct tt_test *test) {
 static void tt_tnt_lex_kw(struct tt_test *test) {
 	unsigned char sz[] = "  INSERT UPDATE INTO OR FROM WHERE VALUES";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_INSERT);
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_UPDATE);
@@ -930,7 +932,7 @@ static void tt_tnt_lex_kw(struct tt_test *test) {
 static void tt_tnt_lex_stack(struct tt_test *test) {
 	unsigned char sz[] = "  1 'hey' ,.55";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk1, *tk2, *tk3, *tk4, *tk5, *tk6;
 	TT_ASSERT(tnt_lex(&l, &tk1) == TNT_TK_NUM32);
 	TT_ASSERT(tnt_lex(&l, &tk2) == TNT_TK_STRING);
@@ -956,7 +958,7 @@ static void tt_tnt_lex_stack(struct tt_test *test) {
 static void tt_tnt_lex_badstr1(struct tt_test *test) {
 	unsigned char sz[] = "  '";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_ERROR);
 	tnt_lex_free(&l);
@@ -967,7 +969,7 @@ static void tt_tnt_lex_badstr1(struct tt_test *test) {
 static void tt_tnt_lex_badstr2(struct tt_test *test) {
 	unsigned char sz[] = "  '\n'";
 	struct tnt_lex l;
-	tnt_lex_init(&l, sz, sizeof(sz) - 1);
+	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
 	TT_ASSERT(tnt_lex(&l, &tk) == TNT_TK_ERROR);
 	tnt_lex_free(&l);

@@ -32,6 +32,11 @@
 typedef void (*tc_printerf_t)(struct tnt_xlog_header_v11 *hdr,
 		              struct tnt_request *r);
 
+void tc_print_tee(char *buf, size_t size);
+void tc_print_cmd2tee(char *prompt, char *cmd, int size);
+void tc_printf(char *fmt, ...);
+void tc_print_buf(char *buf, size_t size);
+
 void tc_print_tuple(struct tnt_tuple *tu);
 void tc_print_list(struct tnt_list *l);
 
