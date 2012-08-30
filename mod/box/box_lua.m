@@ -901,7 +901,11 @@ static const struct luaL_reg lbox_iterator_meta[] = {
 
 - (void) addTuple: (struct tuple *) tuple
 {
-	lbox_pushtuple(L, tuple);
+	@try {
+		lbox_pushtuple(L, tuple);
+	} @catch (...) {
+		tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
+	}
 }
 
 @end
