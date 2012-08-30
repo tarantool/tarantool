@@ -47,6 +47,8 @@
 #include "space.h"
 #include "port.h"
 
+#include "box_lua_uuid.h"
+
 
 /* contents of box.lua */
 extern const char box_lua[];
@@ -937,9 +939,9 @@ static int lbox_process(lua_State *L)
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
+	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	struct txn *txn = txn_begin();
 	Port *port_lua = [[PortLua alloc] init: L];
-	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	@try {
 		box_process(txn, port_lua, op, &req);
 	} @finally {
@@ -954,6 +956,8 @@ static int lbox_process(lua_State *L)
 
 static const struct luaL_reg boxlib[] = {
 	{"process", lbox_process},
+	{"uuid", lbox_uuid},
+	{"uuid_hex", lbox_uuid_hex},
 	{NULL, NULL}
 };
 

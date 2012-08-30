@@ -148,7 +148,7 @@ remote_apply_row(struct recovery_state *r, struct tbuf *row)
 	u16 tag;
 	u16 op;
 
-	/* save row data since wal_row_handler may clobber it */
+	/* save row data since row_handler() may clobber it */
 	data = tbuf_alloc(row->pool);
 	tbuf_append(data, row->data + sizeof(struct header_v11), header_v11(row)->len);
 

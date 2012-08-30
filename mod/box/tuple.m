@@ -138,6 +138,11 @@ print_field(struct tbuf *buf, void *f)
 void
 tuple_print(struct tbuf *buf, uint8_t field_count, void *f)
 {
+	if (field_count == 0) {
+		tbuf_printf(buf, "'': {}");
+		return;
+	}
+
 	print_field(buf, f);
 	tbuf_printf(buf, ": {");
 	f = next_field(f);

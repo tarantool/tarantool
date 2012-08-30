@@ -56,6 +56,7 @@ exec admin "lua num,num1,num2 = box.unpack('lll', tu[0], tu[0], tu[0])"
 exec admin "lua num == tonumber64('18446744073709551615')"
 exec admin "lua num1 == tonumber64('18446744073709551615')"
 exec admin "lua num2 == tonumber64('18446744073709551615')"
+exec admin "lua box.space[8]:truncate()"
 
 #
 # Lua select_reverse_range
@@ -73,6 +74,7 @@ exec admin "lua box.insert(14, 9, 0)"
 exec admin "lua box.select_range(14, 1, 10)"
 exec admin "lua box.select_reverse_range(14, 1, 10)"
 exec admin "lua box.select_reverse_range(14, 1, 4)"
+exec admin "lua box.space[14]:truncate()"
 
 print """
 #
@@ -93,6 +95,7 @@ exec admin "lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16]
 exec admin "lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end"
 exec admin "lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end"
 exec admin "lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end"
+exec admin "lua box.space[16]:truncate()"
 
 #
 # Tests for lua idx:count()
@@ -110,14 +113,17 @@ exec admin "lua box.space[17].index[1].idx:count(2, 2)"
 exec admin "lua box.space[17].index[1].idx:count(3)"
 exec admin "lua box.space[17].index[1].idx:count(3, 3)"
 exec admin "lua box.space[17].index[1].idx:count()"
+exec admin "lua box.space[17]:truncate()"
 
 #
 # Tests for lua box.auto_increment
 #
+exec admin "lua box.space[18]:truncate()"
 exec admin "lua box.auto_increment(18, 'a')"
 exec admin "lua box.insert(18, 5)"
 exec admin "lua box.auto_increment(18, 'b')"
 exec admin "lua box.auto_increment(18, 'c')"
+exec admin "lua box.space[18]:truncate()"
 
 #
 # Tests for lua tuple:transform()
@@ -164,6 +170,7 @@ exec admin "lua t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))"
 exec admin "lua t:find(2)"
 exec admin "lua t:find(tonumber64(2))"
 exec admin "lua t:find('2')"
+exec admin "lua box.space[12]:truncate()"
 
 print """#
 # A test case for Bug #1038784
@@ -189,3 +196,4 @@ exec admin "lua push_collection(5, 1038784, 'hey')"
 exec admin "lua push_collection(5, 1038784, 'hey')"
 exec admin "lua push_collection(5, 1038784, 'hey')"
 exec admin "lua push_collection(5, 1038784, 'hey')"
+

@@ -6,7 +6,7 @@ static void
 test_rope_extract(struct rope *rope, rsize_t pos)
 {
 	printf("extract pos = %zu: ", (size_t) pos);
-	struct rope_node *node = rope_extract(rope, pos);
+	struct rope_node *node = rope_extract_node(rope, pos);
 	rope_check(rope);
 	str_print(node->data, node->leaf_size);
 	printf("\n");

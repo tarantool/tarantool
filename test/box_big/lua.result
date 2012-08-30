@@ -114,6 +114,9 @@ lua num2 == tonumber64('18446744073709551615')
 ---
  - true
 ...
+lua box.space[8]:truncate()
+---
+...
 lua box.insert(14, 0, 0)
 ---
  - 0: {0}
@@ -187,6 +190,9 @@ lua box.select_reverse_range(14, 1, 4)
  - 7: {0}
  - 6: {0}
 ...
+lua box.space[14]:truncate()
+---
+...
 
 #
 # Tests for box.index iterators
@@ -258,6 +264,9 @@ lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].id
 'pid_5': {'sid_2', 'tid_995'}
 'pid_6': {'sid_2', 'tid_994'}
 ...
+lua box.space[16]:truncate()
+---
+...
 lua box.insert(17, 1, 1, 1)
 ---
  - 1: {1, 1}
@@ -310,6 +319,12 @@ lua box.space[17].index[1].idx:count()
 ---
 error: 'index.count(): one or more arguments expected'
 ...
+lua box.space[17]:truncate()
+---
+...
+lua box.space[18]:truncate()
+---
+...
 lua box.auto_increment(18, 'a')
 ---
  - 0: {'a'}
@@ -325,6 +340,9 @@ lua box.auto_increment(18, 'b')
 lua box.auto_increment(18, 'c')
 ---
  - 7: {'c'}
+...
+lua box.space[18]:truncate()
+---
 ...
 lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')
 ---
@@ -463,6 +481,9 @@ lua t:find(tonumber64(2))
 lua t:find('2')
 ---
  - 1
+...
+lua box.space[12]:truncate()
+---
 ...
 #
 # A test case for Bug #1038784

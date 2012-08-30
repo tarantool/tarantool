@@ -36,7 +36,7 @@
 
 enum {
 	/** A limit on how many operations a single UPDATE can have. */
-	BOX_UPDATE_OP_CNT_MAX = 128,
+	BOX_UPDATE_OP_CNT_MAX = 4000,
 };
 @class Port;
 struct txn;
@@ -90,7 +90,6 @@ extern const char *requests_strs[];
 	_(UPDATE_OP_DELETE, 6)			\
 	_(UPDATE_OP_INSERT, 7)			\
 	_(UPDATE_OP_SUBTRACT, 8)		\
-	_(UPDATE_OP_NONE, 9)			\
 	_(UPDATE_OP_MAX, 10)			\
 
 ENUM(update_op_codes, UPDATE_OP_CODES);

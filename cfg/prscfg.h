@@ -31,8 +31,8 @@ typedef struct OptDef {
 	struct OptDef	*next;
 } OptDef;
 
-OptDef* parseCfgDef(FILE *fh);
-OptDef* parseCfgDefBuffer(char *buffer);
+OptDef* parseCfgDef(FILE *fh, int *error);
+OptDef* parseCfgDefBuffer(char *buffer, int *error);
 void 	freeCfgDef(OptDef *def);
 
 typedef	enum ConfettyError {

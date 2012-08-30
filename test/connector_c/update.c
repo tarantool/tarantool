@@ -36,6 +36,7 @@
 
 #include <util.h>
 #include <errcode.h>
+#include <unit.h>
 
 /*==========================================================================
  * test variables
@@ -124,10 +125,6 @@ test_suite_setup();
 /** clean-up test suite */
 void
 test_suite_tear_down();
-
-/** print error message and exit */
-void
-fail(char *msg);
 
 /** print tarantool error message and exit */
 void
@@ -366,8 +363,7 @@ print_tuple(struct tnt_tuple *tuple)
 			break;
 		}
 	}
-	if (ifl.status == TNT_ITER_FAIL)
-		fail("tuple parsing error");
+	fail_if(ifl.status == TNT_ITER_FAIL);
 	tnt_iter_free(&ifl);
 	printf(")\n");
 }
@@ -381,12 +377,11 @@ void
 test_suite_setup()
 {
 	tnt = tnt_net(NULL);
-	if (tnt == NULL) {
-		fail("tnt_alloc");
-	}
+	fail_if(tnt == NULL);
 
 	tnt_set(tnt, TNT_OPT_HOSTNAME, "localhost");
 	tnt_set(tnt, TNT_OPT_PORT, 33013);
+	tnt_set(tnt, TNT_OPT_SEND_BUF, 128000);
 
 	if (tnt_init(tnt) == -1)
 		fail_tnt_perror("tnt_init");
@@ -398,13 +393,6 @@ void
 test_suite_tear_down()
 {
 	tnt_stream_free(tnt);
-}
-
-void
-fail(char *msg)
-{
-	printf("fail: %s\n", msg);
-	exit(EXIT_FAILURE);
 }
 
 void
@@ -429,7 +417,7 @@ fail_tnt_perror(char *msg)
 void
 test_simple_set()
 {
-	printf(">>> test simple set\n");
+	header();
 
 	/* insert tuple */
 	printf("# insert tuple\n");
@@ -437,66 +425,61 @@ test_simple_set()
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
-	/* test simple set field */
-	struct tnt_stream *stream = tnt_buf(NULL);
 	printf("# test simple set field\n");
+	struct tnt_stream *stream = tnt_buf(NULL);
 	update_set_str(stream, 1, "new field value");
 	update_set_str(stream, 2, "");
 	update_set_str(stream, 3, "fLaC");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test useless set operations */
-	stream = tnt_buf(NULL);
 	printf("# set field\n");
+	stream = tnt_buf(NULL);
 	update_set_str(stream, 1, "value?");
 	update_set_str(stream, 1, "very very very very very long field value?");
 	update_set_str(stream, 1, "field's new value");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test set primary key */
 	stream = tnt_buf(NULL);
 	printf("# test set primary key\n");
 	update_set_i32(stream, 0, 2);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< test simple set done\n");
+	footer();
 }
 
 void
 test_long_set()
 {
-	printf(">>> test long set\n");
+	header();
 
-	/* insert tuple */
 	printf("# insert tuple\n");
-	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%s%s", 1, "first", "", "third");
+	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%s%s",
+					    1, "first", "", "third");
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
-	/* test set long value in empty field */
-	struct tnt_stream *stream = tnt_buf(NULL);
 	printf("# test set big value in empty field\n");
+	struct tnt_stream *stream = tnt_buf(NULL);
 	update_set_str(stream, 2, long_string);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test replace long value to short */
-	stream = tnt_buf(NULL);
 	printf("# test replace long value to short\n");
+	stream = tnt_buf(NULL);
 	update_set_str(stream, 2, "short string");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< test long set done\n");
+	footer();
 }
 
 void
 test_append()
 {
-	printf(">>> test append\n");
+	header();
 
 	/* insert tuple */
 	printf("# insert tuple\n");
@@ -549,149 +532,132 @@ test_append()
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< test append done\n");
+	footer();
 }
 
 void
 test_arith_i32()
 {
-	printf(">>> test 32-bit int arith\n");
+	header();
 
-	/* insert tuple */
 	printf("# insert tuple\n");
 	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%d%d%d", 1, 2, 0, 0);
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
-	/* test simple add */
-	struct tnt_stream *stream = tnt_buf(NULL);
 	printf("# test add\n");
+	struct tnt_stream *stream = tnt_buf(NULL);
 	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 16);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test overflow add */
-	stream = tnt_buf(NULL);
 	printf("# test overflow add\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, INT32_MAX);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test overflow add */
-	stream = tnt_buf(NULL);
 	printf("# test underflow add\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, INT32_MIN);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test or */
-	stream = tnt_buf(NULL);
 	printf("# test or\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i32(stream, 2, TNT_UPDATE_OR, 0xbacfbacf);
 	tnt_update_arith_i32(stream, 3, TNT_UPDATE_OR, 0xfabcfabc);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test xor */
-	stream = tnt_buf(NULL);
 	printf("# test xor\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i32(stream, 2, TNT_UPDATE_XOR, 0xffffffff);
 	tnt_update_arith_i32(stream, 3, TNT_UPDATE_XOR, 0xffffffff);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test and */
-	stream = tnt_buf(NULL);
 	printf("# test and\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i32(stream, 2, TNT_UPDATE_AND, 0xf0f0f0f0);
 	tnt_update_arith_i32(stream, 3, TNT_UPDATE_AND, 0x0f0f0f0f);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< test 32-bit arith done\n");
+	footer();
 }
 
 /** update fields test case: 64-bit arithmetics operations test */
 void
 test_arith_i64()
 {
-	printf(">>> test 64-bit int arith\n");
+	header();
 
-	/* insert tuple */
 	printf("# insert tuple\n");
 	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%ll%ll%ll", 1, 2, 0, 0, 0);
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
-	/* test simple add */
-	struct tnt_stream *stream = tnt_buf(NULL);
 	printf("# test add\n");
+	struct tnt_stream *stream = tnt_buf(NULL);
 	tnt_update_arith_i64(stream, 1, TNT_UPDATE_ADD, 16);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test overflow add */
-	stream = tnt_buf(NULL);
 	printf("# test overflow add\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i64(stream, 1, TNT_UPDATE_ADD, INT64_MAX);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test overflow add */
-	stream = tnt_buf(NULL);
 	printf("# test underflow add\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i64(stream, 1, TNT_UPDATE_ADD, INT64_MIN);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test or */
-	stream = tnt_buf(NULL);
 	printf("# test or\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i64(stream, 2, TNT_UPDATE_OR, 0xbacfbacfbacfbacf);
 	tnt_update_arith_i64(stream, 3, TNT_UPDATE_OR, 0xfabcfabcfabcfabc);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test xor */
-	stream = tnt_buf(NULL);
 	printf("# test xor\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i64(stream, 2, TNT_UPDATE_XOR, 0xffffffffffffffff);
 	tnt_update_arith_i64(stream, 3, TNT_UPDATE_XOR, 0xffffffffffffffff);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test and */
-	stream = tnt_buf(NULL);
 	printf("# test and\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i64(stream, 2, TNT_UPDATE_AND, 0xf0f0f0f0f0f0f0f0);
 	tnt_update_arith_i64(stream, 3, TNT_UPDATE_AND, 0x0f0f0f0f0f0f0f0f);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test cast 32-bit operand to 64-bit */
-	stream = tnt_buf(NULL);
 	printf("# test casting 32-bit operand to 64-bit\n");
+	stream = tnt_buf(NULL);
 	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 16);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< test 64-bit arith done\n");
+	footer();
 }
 
 void
 test_multi_arith()
 {
-	printf(">>> test multi splice\n");
+	header();
 
-	/* insert tuple */
 	printf("# insert tuple\n");
 	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%d%s", 1, "first", 128, "third");
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
-	/* test and */
-	struct tnt_stream *stream = tnt_buf(NULL);
 	printf("# test simple and\n");
+	struct tnt_stream *stream = tnt_buf(NULL);
 	update_set_i32(stream, 2, 0);
 	update_set_str(stream, 1, "first field new value");
 	tnt_update_arith_i32(stream, 2, TNT_UPDATE_XOR, 0xF00F);
@@ -700,85 +666,75 @@ test_multi_arith()
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< test multi arith done\n");
+	footer();
 }
 
 void
 test_splice()
 {
-	printf(">>> test simple splice\n");
+	header();
 
-	/* insert tuple */
 	printf("# insert tuple\n");
 	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%s%s", 1, "first", "hi, this is a test string!", "third");
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
-	/* test cut from begin */
 	struct tnt_stream *stream = tnt_buf(NULL);
 	printf("# test cut from begin\n");
 	update_splice_str(stream, 2, 0, 4, "");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test cut from middle */
-	stream = tnt_buf(NULL);
 	printf("# test cut from middle\n");
+	stream = tnt_buf(NULL);
 	update_splice_str(stream, 2, 9, -8, "");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test cut from end */
-	stream = tnt_buf(NULL);
 	printf("# test cut from end\n");
+	stream = tnt_buf(NULL);
 	update_splice_str(stream, 2, -1, 1, "");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test insert before begin */
-	stream = tnt_buf(NULL);
 	printf("# test insert before begin\n");
+	stream = tnt_buf(NULL);
 	update_splice_str(stream, 2, 0, 0, "Bonjour, ");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test insert  */
-	stream = tnt_buf(NULL);
 	printf("# test insert after end\n");
+	stream = tnt_buf(NULL);
 	update_splice_str(stream, 2, 10000, 0, " o_O!?");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test replace in begin */
-	stream = tnt_buf(NULL);
 	printf("# test replace in begin\n");
+	stream = tnt_buf(NULL);
 	update_splice_str(stream, 2, 0, 7, "Hello");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test replace in middle */
-	stream = tnt_buf(NULL);
 	printf("# test replace in middle\n");
+	stream = tnt_buf(NULL);
 	update_splice_str(stream, 2, 17, -6, "field");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test replace in end */
-	stream = tnt_buf(NULL);
 	printf("# test replace in end\n");
+	stream = tnt_buf(NULL);
 	update_splice_str(stream, 2, -6, 4, "! Is this Sparta");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< test simple splice done\n");
+	footer();
 }
 
 void
 test_set_and_splice()
 {
-	printf(">>> test set and splice\n");
+	header();
 
-	/* insert tuple */
 	printf("# insert tuple\n");
 	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%s%s", 1,
 					    "first",
@@ -787,39 +743,35 @@ test_set_and_splice()
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
-	/* test set long string and splice to short */
-	struct tnt_stream *stream = tnt_buf(NULL);
 	printf("# test set long string and splice to short\n");
+	struct tnt_stream *stream = tnt_buf(NULL);
 	update_set_str(stream, 2, long_string);
 	update_splice_str(stream, 2, 45, 500, " away away away");
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test set short value and splice to long */
-	stream = tnt_buf(NULL);
 	printf("# test set short value and splice to long\n");
+	stream = tnt_buf(NULL);
 	update_set_str(stream, 2, "test");
 	update_splice_str(stream, 2, -4, 4, long_string);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test splice to long and set to short */
-	stream = tnt_buf(NULL);
 	printf("# test splice to long and set to short\n");
+	stream = tnt_buf(NULL);
 	update_splice_str(stream, 3, -5, 5, long_string);
 	update_set_str(stream, 2, "short name");	
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< test set and splice done\n");
+	footer();
 }
 
 void
 test_delete_field()
 {
-	printf(">>> test delete field\n");
+	header();
 
-	/* insert tuple */
 	printf("# insert tuple\n");
 	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s%s%s%d%d%d%d%d%d%d%d%d%d",
 					    1,
@@ -830,16 +782,14 @@ test_delete_field()
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
-	/* test simple delete fields */
-	struct tnt_stream *stream = tnt_buf(NULL);
 	printf("# test simple delete fields\n");
+	struct tnt_stream *stream = tnt_buf(NULL);
 	update_delete_field(stream, 2);
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test useless operations with delete fields*/
-	stream = tnt_buf(NULL);
 	printf("# test useless operations with delete fields\n");
+	stream = tnt_buf(NULL);
 	update_set_i32(stream, 1, 0);
 	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
 	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
@@ -853,9 +803,8 @@ test_delete_field()
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test multi delete fields */
-	stream = tnt_buf(NULL);
 	printf("# test multi delete fields\n");
+	stream = tnt_buf(NULL);
 	update_delete_field(stream, 2);
 	update_delete_field(stream, 3);
 	update_delete_field(stream, 4);
@@ -868,9 +817,8 @@ test_delete_field()
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test delete and set */
-	stream = tnt_buf(NULL);
 	printf("# test multi delete fields\n");
+	stream = tnt_buf(NULL);
 	update_delete_field(stream, 1);
 	update_set_i32(stream, 1, 3);
 	tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
@@ -882,9 +830,8 @@ test_delete_field()
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test append and delete */
-	stream = tnt_buf(NULL);
 	printf("# test append and delete\n");
+	stream = tnt_buf(NULL);
 	update_set_str(stream, 3, "second");
 	update_delete_field(stream, 3);
 	update_set_str(stream, 3, "third");
@@ -902,30 +849,28 @@ test_delete_field()
 	update(1, stream);
 	tnt_stream_free(stream);
 
-	/* test double delete */
-	stream = tnt_buf(NULL);
 	printf("# test double delete\n");
+	stream = tnt_buf(NULL);
 	update_delete_field(stream, 3);
 	update_delete_field(stream, 3);
 	update(1, stream);
 	tnt_stream_free(stream);
 	select_tuple(1);
 
-	/* test delete not an exist field */
-	stream = tnt_buf(NULL);
 	printf("# test delete not an exist field\n");
+	stream = tnt_buf(NULL);
 	update_delete_field(stream, 0xDEADBEEF);
 	update(1, stream);
 	tnt_stream_free(stream);
 	select_tuple(1);
 
-	printf("<<< test delete field done\n");
+	footer();
 }
 
 void
 test_insert_field()
 {
-	printf(">>> test insert field\n");
+	header();
 
 	printf("# insert tuple\n");
 	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%s", 9, "eleven");
@@ -945,11 +890,20 @@ test_insert_field()
 	update(7, stream);
 	tnt_stream_free(stream);
 
-	printf("# double insert before set\n");
+	printf("# double insert at the end\n");
 	stream = tnt_buf(NULL);
 	update_set_i32(stream, 5, 14);
-	update_insert_i32(stream, 5, 12);
+	update_insert_i32(stream, 6, 12);
 	update_insert_i32(stream, 5, 13);
+	update(7, stream);
+	tnt_stream_free(stream);
+
+	printf("# multi insert \n");
+	stream = tnt_buf(NULL);
+	update_insert_i32(stream, 5, 15);
+	update_insert_i32(stream, 5, 14);
+	update_insert_i32(stream, 5, 13);
+	update_insert_i32(stream, 5, 12);
 	update(7, stream);
 	tnt_stream_free(stream);
 
@@ -1000,38 +954,39 @@ test_insert_field()
 	update(7, stream);
 	tnt_stream_free(stream);
 
-	printf("<<< insert field test done\n");
+	footer();
 }
 
 void
 test_boundary_args()
 {
-	const int max_update_op_cnt = 128;
-	printf(">>> test boundaty argumets values\n");
+	header();
 
-	/* insert tuple */
+	const int max_update_op_cnt = 4000;
+
 	printf("# insert tuple\n");
 	struct tnt_tuple *tuple = tnt_tuple(NULL, "%d%d", 0, 1);
 	insert_tuple(tuple);
 	tnt_tuple_free(tuple);
 
-	/* test simple delete fields */
-	struct tnt_stream *stream = tnt_buf(NULL);
 	printf("# test: try to do update w/o operations\n");
+	struct tnt_stream *stream = tnt_buf(NULL);
 	update(0, stream);
 	tnt_stream_free(stream);
 
-	stream = tnt_buf(NULL);
 	printf("# test: update w/ maximal allowed opearions count\n");
+	stream = tnt_buf(NULL);
 	for (int i = 0; i < max_update_op_cnt; ++i)
 		tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
 	update(0, stream);
 	tnt_stream_free(stream);
 
-	stream = tnt_buf(NULL);
 	printf("# test: update w/ grater than maximal allowed opearions count\n");
+	stream = tnt_buf(NULL);
 	for (int i = 0; i < max_update_op_cnt + 1; ++i)
 		tnt_update_arith_i32(stream, 1, TNT_UPDATE_ADD, 1);
 	update(0, stream);
 	tnt_stream_free(stream);
+
+	footer();
 }

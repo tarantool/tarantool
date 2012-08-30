@@ -134,6 +134,7 @@ typedef struct tarantool_cfg {
 
 	/*
 	 * Defines fiber/data synchronization fsync(2) policy:
+	 * "none":           does not write to WAL
 	 * "write":          fibers wait for their data to be written to the log.
 	 * "fsync":          fibers wait for their data, fsync(2) follows each write(2)
 	 * "fsync_delay":    fibers wait for their data, fsync every N=wal_fsync_delay seconds,
@@ -222,9 +223,9 @@ int fill_default_tarantool_cfg(tarantool_cfg *c);
 
 void swap_tarantool_cfg(struct tarantool_cfg *c1, struct tarantool_cfg *c2);
 
-void parse_cfg_file_tarantool_cfg(tarantool_cfg *c, FILE *fh, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional);
+int parse_cfg_file_tarantool_cfg(tarantool_cfg *c, FILE *fh, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional);
 
-void parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional);
+int parse_cfg_buffer_tarantool_cfg(tarantool_cfg *c, char *buffer, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional);
 
 int check_cfg_tarantool_cfg(tarantool_cfg *c);
 

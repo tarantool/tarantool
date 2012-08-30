@@ -63,10 +63,13 @@
 #define FIBER_CALL_STACK 16
 
 static struct fiber sched;
-struct fiber *fiber = &sched;
-static struct fiber **sp, *call_stack[FIBER_CALL_STACK];
-static uint32_t last_used_fid;
-static struct palloc_pool *ex_pool;
+__thread struct fiber *fiber = &sched;
+static __thread struct fiber *call_stack[FIBER_CALL_STACK];
+static __thread struct fiber **sp;
+static __thread uint32_t last_used_fid;
+static __thread struct palloc_pool *ex_pool;
+static __thread struct mh_i32ptr_t *fibers_registry;
+__thread SLIST_HEAD(, fiber) fibers, zombie_fibers;
 
 struct fiber_cleanup {
 	void (*handler) (void *data);
@@ -79,8 +82,6 @@ struct fiber_server {
 	void (*handler) (void *data);
 	void (*on_bind) (void *data);
 };
-
-static struct mh_i32ptr_t *fibers_registry;
 
 static void
 update_last_stack_frame(struct fiber *fiber)
