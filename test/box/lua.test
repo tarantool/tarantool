@@ -547,3 +547,6 @@ exec admin "lua box.update(0, 'abcd', '#p=p', -1, '', -1, 'noop1')"
 exec admin "lua box.update(0, 'abcd', '#p=p', -1, '', -1, 'noop2')"
 exec admin "lua box.update(0, 'abcd', '#p=p', -1, '', -1, 'noop3')"
 exec admin "lua box.space[0]:truncate()"
+
+print """# A test case for Bug#1043804 lua error() -> server crash"""
+exec admin "lua error()"
