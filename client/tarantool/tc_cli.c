@@ -141,7 +141,7 @@ int tc_cmd_tee_close(void)
 {
 	if (tc.tee_fd == -1)
 		return 0;
-	fdatasync(tc.tee_fd);
+	fsync(tc.tee_fd);
 	int rc = close(tc.tee_fd);
 	tc.tee_fd = -1;
 	return rc;
