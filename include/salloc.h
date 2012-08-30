@@ -30,7 +30,6 @@
  */
 #include <stddef.h>
 #include <stdbool.h>
-#include <third_party/queue.h>
 #include "util.h" /* for u64 */
 
 struct tbuf;

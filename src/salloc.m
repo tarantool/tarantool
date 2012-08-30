@@ -330,13 +330,13 @@ sfree(void *ptr)
 
 
 /*
- * full_slab_stat_foreach(cb, user_data) - look through slabs statistic
+ * full_slab_stat(cb, arena_stat, user_data) - look through slabs statistic
  *
  * @cb - a callback to receive statistic item
+ * @arena_stat - a structure to get stat of arena
  * @user_data - user's data that will be sent to cb
  *
  */
-
 
 void full_slab_stat(
 	int (*cb)(const struct one_slab_stat *, void *),
@@ -356,7 +356,8 @@ void full_slab_stat(
 
 		for (int i = 0; i < slab_active_classes; i++) {
 			memset(&st, 0, sizeof(st));
-			TAILQ_FOREACH(slab, &slab_classes[i].slabs, class_link) {
+			TAILQ_FOREACH(slab, &slab_classes[i].slabs, class_link)
+			{
 				st.slabs++;
 				st.items += slab->items;
 				st.bytes_free += SLAB_SIZE;
