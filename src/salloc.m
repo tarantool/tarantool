@@ -328,44 +328,49 @@ sfree(void *ptr)
 	VALGRIND_FREELIKE_BLOCK(item, sizeof(red_zone));
 }
 
-void
-slab_stat(struct tbuf *t)
-{
-	struct slab *slab;
-	int slabs;
-	i64 items, used, free, total_used = 0;
-	tbuf_printf(t, "slab statistics:\n  classes:" CRLF);
-	for (int i = 0; i < slab_active_classes; i++) {
-		slabs = items = used = free = 0;
-		TAILQ_FOREACH(slab, &slab_classes[i].slabs, class_link) {
-			free += SLAB_SIZE - slab->used - sizeof(struct slab);
-			items += slab->items;
-			used += sizeof(struct slab) + slab->used;
-			total_used += sizeof(struct slab) + slab->used;
-			slabs++;
-		}
 
-		if (slabs == 0)
-			continue;
+/*
+ * full_slab_stat_foreach(cb, user_data) - look through slabs statistic
+ *
+ * @cb - a callback to receive statistic item
+ * @user_data - user's data that will be sent to cb
+ *
+ */
 
-		tbuf_printf(t,
-			    "     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
-			    ", bytes_used: %- 12" PRIi64 ", bytes_free: %- 12" PRIi64 " }" CRLF,
-			    (int)slab_classes[i].item_size, slabs, items, used, free);
 
+void full_slab_stat(
+	int (*cb)(const struct one_slab_stat *, void *),
+	struct arena_stat *astat,
+	void *user_data) {
+
+
+	if (astat) {
+		astat->used = arena.used;
+		astat->size = arena.size;
 	}
-	tbuf_printf(t, "  items_used: %.2f%%" CRLF, (double)total_used / arena.size * 100);
-	tbuf_printf(t, "  arena_used: %.2f%%" CRLF, (double)arena.used / arena.size * 100);
-}
 
-void
-slab_stat2(u64 *bytes_used, u64 *items)
-{
-	struct slab *slab;
+	if (cb) {
+		struct slab *slab;
+		struct one_slab_stat st;
 
-	*bytes_used = *items = 0;
-	SLIST_FOREACH(slab, &slabs, link) {
-		*bytes_used += slab->used;
-		*items += slab->items;
+
+		for (int i = 0; i < slab_active_classes; i++) {
+			memset(&st, 0, sizeof(st));
+			TAILQ_FOREACH(slab, &slab_classes[i].slabs, class_link) {
+				st.slabs++;
+				st.items += slab->items;
+				st.bytes_free += SLAB_SIZE;
+				st.bytes_free -= slab->used;
+				st.bytes_free -= sizeof(struct slab);
+				st.bytes_used += sizeof(struct slab);
+				st.bytes_used += slab->used;
+			}
+			st.item_size = slab_classes[i].item_size;
+
+			if (st.slabs == 0)
+				continue;
+			if (cb(&st, user_data) != 0)
+				break;
+		}
 	}
 }

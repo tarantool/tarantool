@@ -73,6 +73,48 @@ static const char *unknown_command = "unknown command. try typing help." CRLF;
 	write data;
 }%%
 
+struct _total_slab_stat {
+	i64 total_used;
+	struct tbuf *out;
+};
+
+static int
+_one_slab_stat(const struct one_slab_stat *st, void *udata) {
+	struct _total_slab_stat *ts = udata;
+
+	tbuf_printf(ts->out,
+		"     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
+		", bytes_used: %- 12" PRIi64
+			", bytes_free: %- 12" PRIi64 " }" CRLF,
+		(int)st->item_size,
+		(int)st->slabs,
+		st->items,
+		st->bytes_used,
+		st->bytes_free
+	);
+
+	ts->total_used += st->bytes_used;
+	return 0;
+}
+
+static void
+slab_stat(struct tbuf *out)
+{
+	struct _total_slab_stat ts;
+	struct arena_stat astat;
+	ts.total_used = 0;
+	ts.out = out;
+
+	tbuf_printf(out, "slab statistics:\n  classes:" CRLF);
+
+	full_slab_stat(_one_slab_stat, &astat, &ts);
+
+	tbuf_printf(out, "  items_used: %.2f%%" CRLF,
+		(double)ts.total_used / astat.size * 100);
+	tbuf_printf(out, "  arena_used: %.2f%%" CRLF,
+		(double)astat.used / astat.size * 100);
+}
+
 
 static void
 end(struct tbuf *out)

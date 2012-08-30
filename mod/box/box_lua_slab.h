@@ -1,5 +1,6 @@
-#ifndef TARANTOOL_SALLOC_H_INCLUDED
-#define TARANTOOL_SALLOC_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_SLAB_H
+#define INCLUDES_TARANTOOL_MOD_BOX_LUA_SLAB_H
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,39 +29,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stddef.h>
-#include <stdbool.h>
-#include <third_party/queue.h>
-#include "util.h" /* for u64 */
 
-struct tbuf;
+struct lua_State;
+void lbox_slab_init(struct lua_State *L);
 
-bool salloc_init(size_t size, size_t minimal, double factor);
-void salloc_destroy(void);
-void *salloc(size_t size, const char *what);
-void sfree(void *ptr);
-void slab_validate();
-
-
-struct one_slab_stat {
-	i64 item_size;
-	i64 slabs;
-	i64 items;
-	i64 bytes_used;
-	i64 bytes_free;
-};
-
-struct arena_stat {
-	size_t size;
-	size_t used;
-};
-
-void full_slab_stat(
-	int (*cb)(const struct one_slab_stat *st, void *udata),
-	struct arena_stat *stat,
-	void *data
-);
-
-// void
-// slab_stat2(u64 *bytes_used, u64 *items);
-#endif /* TARANTOOL_SALLOC_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_SLAB_H */
