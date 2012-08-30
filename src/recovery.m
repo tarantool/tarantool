@@ -1035,7 +1035,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 		wal_opt_sync(*wal, r->wal_fsync_delay);
 		req = write_end;
 	}
-	STAILQ_SPLICE(input_queue, req, wal_fifo_entry, rollback_queue);
+	STAILQ_SPLICE(input_queue, write_end, wal_fifo_entry, rollback_queue);
 	STAILQ_CONCAT(commit_queue, input_queue);
 }
 
