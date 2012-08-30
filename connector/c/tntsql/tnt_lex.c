@@ -43,10 +43,12 @@
 #include <connector/c/include/tarantool/tnt_queue.h>
 #include <connector/c/include/tarantool/tnt_lex.h>
 
-bool tnt_lex_init(struct tnt_lex *l, unsigned char *buf, size_t size)
+bool tnt_lex_init(struct tnt_lex *l, struct tnt_lex_keyword *keywords,
+		  unsigned char *buf, size_t size)
 {
 	if (!tnt_utf8_init(&l->buf, buf, size))
 		return false;
+	l->keywords = keywords;
 	l->pos = 0;
 	l->col = 1;
 	l->line = 1;
@@ -132,35 +134,8 @@ tnt_lex_next(struct tnt_lex *l) {
 	return r;
 }
 
-/* keywords */
-
-static struct {
-	char *name;
-	int size;
-	int tk;
-} tnt_keywords[] =
-{
-	{  "PING",    4, TNT_TK_PING },
-	{  "UPDATE",  6, TNT_TK_UPDATE },
-	{  "SET",     3, TNT_TK_SET },
-	{  "WHERE",   5, TNT_TK_WHERE },
-	{  "SPLICE",  6, TNT_TK_SPLICE },
-	{  "DELETE",  6, TNT_TK_DELETE },
-	{  "FROM",    4, TNT_TK_FROM },
-	{  "INSERT",  6, TNT_TK_INSERT },
-	{  "REPLACE", 7, TNT_TK_REPLACE },
-	{  "INTO",    4, TNT_TK_INTO },
-	{  "VALUES",  6, TNT_TK_VALUES },
-	{  "SELECT",  6, TNT_TK_SELECT },
-	{  "OR",      2, TNT_TK_OR },
-	{  "AND",     3, TNT_TK_AND },
-	{  "LIMIT",   5, TNT_TK_LIMIT },
-	{  "CALL",    4, TNT_TK_CALL },
-	{  NULL,      0, TNT_TK_NONE }
-};
-
 char*
-tnt_lex_nameof(int tk)
+tnt_lex_nameof(struct tnt_lex *l, int tk)
 {
 	/* system tokens */
 	switch (tk) {
@@ -176,9 +151,9 @@ tnt_lex_nameof(int tk)
 	}
 	/* matching keyword */
 	int i;
-	for (i = 0 ; tnt_keywords[i].name ; i++)
-		if (tnt_keywords[i].tk == tk)
-			return tnt_keywords[i].name;
+	for (i = 0 ; l->keywords[i].name ; i++)
+		if (l->keywords[i].tk == tk)
+			return l->keywords[i].name;
 	return NULL;
 }
 
@@ -341,13 +316,13 @@ numeric: /* numeric value */
 
 	/* matching keyword */
 	int i;
-	for (i = 0 ; tnt_keywords[i].name ; i++) {
-		if (tnt_keywords[i].size != size)
+	for (i = 0 ; l->keywords[i].name ; i++) {
+		if (l->keywords[i].size != size)
 			continue;
-		if (strncasecmp(tnt_keywords[i].name,
+		if (strncasecmp(l->keywords[i].name,
 			        (const char*)TNT_UTF8_CHAR(&l->buf, start), size) == 0) {
-			*tk = tnt_lex_tk(l, tnt_keywords[i].tk, line, col);
-			return tnt_keywords[i].tk;
+			*tk = tnt_lex_tk(l, l->keywords[i].tk, line, col);
+			return l->keywords[i].tk;
 		}
 	}
 

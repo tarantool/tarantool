@@ -56,7 +56,7 @@ static int tc_wal_error(char *fmt, ...) {
 	va_start(args, fmt);
 	vsnprintf(msg, sizeof(msg), fmt, args);
 	va_end(args);
-	printf("error: %s\n", msg);
+	tc_printf("error: %s\n", msg);
 	return -1;
 }
 
@@ -79,11 +79,11 @@ static int tc_wal_foreach(struct tnt_stream *s, tc_wal_t cb) {
 static void tc_wal_print(struct tnt_xlog_header_v11 *hdr,
 		         struct tnt_request *r)
 {
-	printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
-	       tc_query_type(r->h.type),
-	       hdr->lsn,
-	       hdr->tm,
-	       hdr->len);
+	tc_printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
+		  tc_query_type(r->h.type),
+		  hdr->lsn,
+		  hdr->tm,
+		  hdr->len);
 	switch (r->h.type) {
 	case TNT_OP_INSERT:
 		tc_print_tuple(&r->r.insert.t);

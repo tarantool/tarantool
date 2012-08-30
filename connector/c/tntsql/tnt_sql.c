@@ -77,7 +77,7 @@ tnt_sql_tk(struct tnt_sql *sql, int tk, struct tnt_tk **tkp)
 	if (tk_ != tk) {
 		if (tk < 0xff && ispunct(tk))
 			return tnt_sql_error(sql, tkp_, "expected '%c'", tk);
-		return tnt_sql_error(sql, tkp_, "expected '%s'", tnt_lex_nameof(tk));
+		return tnt_sql_error(sql, tkp_, "expected '%s'", tnt_lex_nameof(sql->l, tk));
 	}
 	if (tkp)
 		*tkp = tkp_;
@@ -440,6 +440,27 @@ static bool tnt_sql(struct tnt_sql *sql) {
 	return tnt_sql_stmt(sql);
 }
 
+struct tnt_lex_keyword tnt_sql_keywords[] =
+{
+	{  "PING",    4, TNT_TK_PING },
+	{  "UPDATE",  6, TNT_TK_UPDATE },
+	{  "SET",     3, TNT_TK_SET },
+	{  "WHERE",   5, TNT_TK_WHERE },
+	{  "SPLICE",  6, TNT_TK_SPLICE },
+	{  "DELETE",  6, TNT_TK_DELETE },
+	{  "FROM",    4, TNT_TK_FROM },
+	{  "INSERT",  6, TNT_TK_INSERT },
+	{  "REPLACE", 7, TNT_TK_REPLACE },
+	{  "INTO",    4, TNT_TK_INTO },
+	{  "VALUES",  6, TNT_TK_VALUES },
+	{  "SELECT",  6, TNT_TK_SELECT },
+	{  "OR",      2, TNT_TK_OR },
+	{  "AND",     3, TNT_TK_AND },
+	{  "LIMIT",   5, TNT_TK_LIMIT },
+	{  "CALL",    4, TNT_TK_CALL },
+	{  NULL,      0, TNT_TK_NONE }
+};
+
 /*
  * tnt_query()
  *
@@ -457,7 +478,7 @@ int
 tnt_query(struct tnt_stream *s, char *q, size_t qsize, char **e)
 {
 	struct tnt_lex l;
-	if (!tnt_lex_init(&l, (unsigned char*)q, qsize))
+	if (!tnt_lex_init(&l, tnt_sql_keywords, (unsigned char*)q, qsize))
 		return -1;
 	struct tnt_sql sql = { s, &l, NULL };
 	bool ret = tnt_sql(&sql);
@@ -485,7 +506,7 @@ int
 tnt_query_is(char *q, size_t qsize)
 {
 	struct tnt_lex l;
-	if (!tnt_lex_init(&l, (unsigned char*)q, qsize))
+	if (!tnt_lex_init(&l, tnt_sql_keywords, (unsigned char*)q, qsize))
 		return 0;
 	int rc = 0;
 	struct tnt_tk *tk;

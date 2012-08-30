@@ -58,7 +58,16 @@ enum {
 	TNT_TK_LIMIT,
 	TNT_TK_CALL,
 	TNT_TK_OR,
-	TNT_TK_AND
+	TNT_TK_AND,
+	TNT_TK_CUSTOM = 2000
+};
+
+/* keyword descriptor */
+
+struct tnt_lex_keyword {
+	char *name;
+	int size;
+	int tk;
 };
 
 /* token object */
@@ -85,6 +94,7 @@ struct tnt_tk {
 
 struct tnt_lex {
 	struct tnt_utf8 buf;
+	struct tnt_lex_keyword *keywords;
 	size_t pos;
 	int line, col;
 	int count;
@@ -95,10 +105,11 @@ struct tnt_lex {
 	char *error;
 };
 
-bool tnt_lex_init(struct tnt_lex *l, unsigned char *buf, size_t size);
+bool tnt_lex_init(struct tnt_lex *l, struct tnt_lex_keyword *keywords,
+		  unsigned char *buf, size_t size);
 void tnt_lex_free(struct tnt_lex *l);
 
-char *tnt_lex_nameof(int tk);
+char *tnt_lex_nameof(struct tnt_lex *l, int tk);
 void tnt_lex_idonly(struct tnt_lex *l, bool on);
 
 void tnt_lex_push(struct tnt_lex *l, struct tnt_tk *tk);
