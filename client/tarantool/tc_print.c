@@ -72,7 +72,7 @@ void tc_print_cmd2tee(char *prompt, char *cmd, int size) {
 }
 
 void tc_print_buf(char *buf, size_t size) {
-	printf("%-.*s", size, buf);
+	printf("%-.*s", (int)size, buf);
 	fflush(stdout);
 	tc_print_tee(buf, size);
 }
