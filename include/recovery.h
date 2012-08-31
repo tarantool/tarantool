@@ -124,9 +124,11 @@ int wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 
-int confirm_lsn(struct recovery_state *r, i64 lsn);
-int64_t next_lsn(struct recovery_state *r, i64 new_lsn);
-void recovery_wait_lsn(struct recovery_state *r, i64 lsn);
+int confirm_lsn(struct recovery_state *r, int64_t lsn);
+int64_t next_lsn(struct recovery_state *r);
+void set_lsn(struct recovery_state *r, int64_t lsn);
+
+void recovery_wait_lsn(struct recovery_state *r, int64_t lsn);
 
 int read_log(const char *filename,
 	     row_handler xlog_handler, row_handler snap_handler);

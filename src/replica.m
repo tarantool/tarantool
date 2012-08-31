@@ -165,8 +165,7 @@ remote_apply_row(struct recovery_state *r, struct tbuf *row)
 	if (wal_write(r, lsn, r->remote->cookie, op, data))
 		panic("replication failure: can't write row to WAL");
 
-	next_lsn(r, lsn);
-	confirm_lsn(r, lsn);
+	set_lsn(r, lsn);
 
 	return 0;
 }

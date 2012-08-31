@@ -697,8 +697,7 @@ main(int argc, char **argv)
 		init_storage = true;
 		initialize_minimal();
 		mod_init();
-		next_lsn(recovery_state, 1);
-		confirm_lsn(recovery_state, 1);
+		set_lsn(recovery_state, 1);
 		snapshot_save(recovery_state, mod_snapshot);
 		exit(EXIT_SUCCESS);
 	}

@@ -102,7 +102,7 @@ txn_commit(struct txn *txn)
 	if (! (txn->txn_flags & BOX_NOT_STORE)) {
 		fiber_peer_name(fiber); /* fill the cookie */
 
-		i64 lsn = next_lsn(recovery_state, 0);
+		int64_t lsn = next_lsn(recovery_state);
 		int res = wal_write(recovery_state, lsn, fiber->cookie,
 				    txn->op, &txn->req);
 		confirm_lsn(recovery_state, lsn);

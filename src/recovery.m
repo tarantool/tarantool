@@ -107,7 +107,7 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", "fsync_delay", NULL };
 /* {{{ LSN API */
 
 void
-wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn)
+wait_lsn_set(struct wait_lsn *wait_lsn, int64_t lsn)
 {
 	assert(wait_lsn->waiter == NULL);
 	wait_lsn->waiter = fiber;
@@ -115,7 +115,7 @@ wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn)
 }
 
 int
-confirm_lsn(struct recovery_state *r, i64 lsn)
+confirm_lsn(struct recovery_state *r, int64_t lsn)
 {
 	assert(r->confirmed_lsn <= r->lsn);
 
@@ -143,7 +143,7 @@ confirm_lsn(struct recovery_state *r, i64 lsn)
 
 /** Wait until the given LSN makes its way to disk. */
 void
-recovery_wait_lsn(struct recovery_state *r, i64 lsn)
+recovery_wait_lsn(struct recovery_state *r, int64_t lsn)
 {
 	while (lsn < r->confirmed_lsn) {
 		wait_lsn_set(&r->wait_lsn, lsn);
@@ -156,16 +156,20 @@ recovery_wait_lsn(struct recovery_state *r, i64 lsn)
 }
 
 
-i64
-next_lsn(struct recovery_state *r, i64 new_lsn)
+int64_t
+next_lsn(struct recovery_state *r)
 {
-	if (new_lsn == 0)
-		r->lsn++;
-	else
-		r->lsn = new_lsn;
-
-	say_debug("next_lsn(%p, %" PRIi64 ") => %" PRIi64, r, new_lsn, r->lsn);
+	r->lsn++;
+	say_debug("next_lsn(%p, %" PRIi64, r, r->lsn);
 	return r->lsn;
+}
+
+void
+set_lsn(struct recovery_state *r, int64_t lsn)
+{
+	r->lsn = lsn;
+	say_debug("set_lsn(%p, %" PRIi64, r, r->lsn);
+	confirm_lsn(r, r->lsn);
 }
 
 /* }}} */
@@ -343,8 +347,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 			say_error("can't apply row");
 			goto end;
 		}
-		next_lsn(r, lsn);
-		confirm_lsn(r, lsn);
+		set_lsn(r, lsn);
 	}
 	res = i.eof_read ? LOG_EOF : 1;
 end:
