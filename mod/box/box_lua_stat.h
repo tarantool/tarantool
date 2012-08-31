@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_STAT_H_INCLUDED
-#define TARANTOOL_STAT_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA__STAT_H
+#define INCLUDES_TARANTOOL_MOD_BOX_LUA__STAT_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,19 +28,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tbuf.h>
 
-void stat_init(void);
-void stat_free(void);
-void stat_cleanup(int base, size_t max_idx);
-int stat_register(const char **name, size_t count);
-void stat_collect(int base, int name, i64 value);
-void stat_print(struct tbuf *buf);
+struct lua_State;
+void box_lua_stat_init(struct lua_State *L);
 
-int stat_foreach(
-	int cb(const char *name, i64 value, int rps, void *udata),
-	void *data
-);
+#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_STAT_H */
 
-
-#endif /* TARANTOOL_STAT_H_INCLUDED */

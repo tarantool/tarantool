@@ -108,6 +108,32 @@ stat_print(struct tbuf *buf)
 	}
 }
 
+int
+stat_foreach(
+	int cb(const char *name, i64 value, int rps, void *udata),
+	void *udata
+)
+{
+	if (!cb)
+		return 0;
+	for (unsigned i = 0; i <= stats_max; i++) {
+		if (stats[i].name == NULL)
+			continue;
+
+		int diff = 0;
+		for (int j = 0; j < SECS; j++)
+			diff += stats[i].value[j];
+
+		diff /= SECS;
+
+		int res = cb(stats[i].name, diff, stats[i].value[SECS], udata);
+		if (res != 0)
+			return res;
+	}
+	return 0;
+
+}
+
 void
 stat_age(ev_timer *timer, int events __attribute__((unused)))
 {
