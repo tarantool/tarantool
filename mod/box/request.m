@@ -520,6 +520,12 @@ static struct update_op_meta update_op_meta[UPDATE_OP_MAX + 1] = {
 	{ init_update_op_arith, (do_op_func) do_update_op_subtract, true },
 };
 
+static void *
+rope_alloc(void *ctx, size_t size)
+{
+	return palloc(ctx, size);
+}
+
 /** Free rope node - do nothing, since we use a pool allocator. */
 static void
 rope_free(void *ctx __attribute__((unused)), void *mem __attribute__((unused)))
@@ -558,7 +564,7 @@ update_create_rope(struct update_op *op, struct update_op *op_end,
 		   struct tuple *tuple)
 {
 	struct rope *rope = rope_new(update_field_split,
-				     (rope_alloc_func) palloc, rope_free,
+				     rope_alloc, rope_free,
 				     fiber->gc_pool);
 
 	/* Initialize the rope with the old tuple. */
