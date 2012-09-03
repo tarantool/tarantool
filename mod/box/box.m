@@ -286,8 +286,11 @@ static int
 recover_row(struct tbuf *t)
 {
 	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL)
+	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL) {
+		say_error("incorrect row header: expected %zd, got %zd bytes",
+			  sizeof(struct header_v11), (size_t) t->size);
 		return -1;
+	}
 
 	@try {
 		u16 tag = read_u16(t);
@@ -303,8 +306,10 @@ recover_row(struct tbuf *t)
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
 		}
-	}
-	@catch (id e) {
+	} @catch (tnt_Exception *e) {
+		[e log];
+		return -1;
+	} @catch (id e) {
 		return -1;
 	}
 

@@ -49,6 +49,11 @@
 	}
 	return e;
 }
+
+- (void) log
+{
+	[self subclassResponsibility: _cmd];
+}
 @end
 
 @implementation SystemError
@@ -106,6 +111,12 @@
 	vsnprintf(errmsg, sizeof(errmsg), tnt_errcode_desc(errcode), ap);
 	return self;
 }
+
+- (void) log
+{
+	say_error("%s at %s:%d, %s", object_getClassName(self),
+		  file, line, errmsg);
+}
 @end
 
 
@@ -116,7 +127,7 @@
 	va_start(ap, errcode_);
 	[super init: errcode_ args: ap];
 
-	say_error("%s at %s:%d, %s", object_getClassName(self), file, line, errmsg);
+	[self log];
 
 	return self;
 }
