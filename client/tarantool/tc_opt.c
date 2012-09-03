@@ -41,11 +41,11 @@
 
 /* supported cli options */
 static const void *tc_options_def = gopt_start(
-	gopt_option('a', GOPT_ARG, gopt_shorts('a'),
+	gopt_option('h', GOPT_ARG, gopt_shorts('h'),
 		    gopt_longs("host"), " <host>", "server address"),
 	gopt_option('p', GOPT_ARG, gopt_shorts('p'),
 		    gopt_longs("port"), " <port>", "server port"),
-	gopt_option('m', GOPT_ARG, gopt_shorts('m'),
+	gopt_option('a', GOPT_ARG, gopt_shorts('a'),
 		    gopt_longs("admin-port"), " <port>", "server admin port"),
 	gopt_option('C', GOPT_ARG, gopt_shorts('C'),
 		    gopt_longs("cat"), " <file>", "print xlog file content"),
@@ -61,7 +61,7 @@ static const void *tc_options_def = gopt_start(
 		    gopt_longs("format"), " <name>", "cat output format (tarantool)"),
 	gopt_option('R', GOPT_ARG, gopt_shorts('R'),
 		    gopt_longs("rpl"), " <lsn>", "act as replica for the specified server"),
-	gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
+	gopt_option('?', 0, gopt_shorts(0), gopt_longs("help"),
 		    NULL, "display this help and exit"),
 	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
 		    NULL, "display version information and exit")
@@ -87,7 +87,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 {
 	/* usage */
 	void *tc_options = gopt_sort(&argc, (const char**)argv, tc_options_def);
-	if (gopt(tc_options, 'h')) {
+	if (gopt(tc_options, '?')) {
 		opt->mode = TC_OPT_USAGE;
 		goto done;
 	}
@@ -99,7 +99,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	}
 
 	/* server host */
-	gopt_arg(tc_options, 'a', &opt->host);
+	gopt_arg(tc_options, 'h', &opt->host);
 	if (opt->host == NULL)
 		opt->host = TC_DEFAULT_HOST;
 
@@ -111,7 +111,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 
 	/* server admin port */
 	opt->port_admin = TC_DEFAULT_PORT_ADMIN;
-	if (gopt_arg(tc_options, 'm', &arg))
+	if (gopt_arg(tc_options, 'a', &arg))
 		opt->port_admin = atoi(arg);
 
 	/* space */
