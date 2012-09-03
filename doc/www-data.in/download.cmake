@@ -132,9 +132,12 @@ href="http://tarantool.org/dist">http://tarantool.org/dist</a>.
 
 #### Connectors
 
-- Perl driver, [CPAN home](http://search.cpan.org/~yuran/MR-Tarantool/)
+- Perl driver, [MR:Tarantool](http://search.cpan.org/~yuran/MR-Tarantool/)
+- An alternative Perl driver implementation, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.22/lib/DR/Tarantool.pm)
 - [Ruby driver](https://github.com/mailru/tarantool-ruby)
 - Python driver, [hosted at pypi.python.org](http://pypi.python.org/pypi/tarantool)
+- PHP driver [https://github.com/mailru/tarantool-php](https://github.com/mailru/tarantool-php)
+- Java driver, [Maven repository](http://dgreenru.github.com/tarantool-java)
 
 {% page download ru %}
 
@@ -273,6 +276,9 @@ href="http://tarantool.org/dist">http://tarantool.org/dist</a>.
 
 ### Доступ из языков программирования
 
-- Perl driver, [CPAN home](http://search.cpan.org/~yuran/MR-Tarantool/)
+- Perl driver, [MR:Tarantool](http://search.cpan.org/~yuran/MR-Tarantool/)
+- An alternative Perl driver implementation, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.22/lib/DR/Tarantool.pm)
 - [Ruby driver](https://github.com/mailru/tarantool-ruby)
 - Python driver, [hosted at pypi.python.org](http://pypi.python.org/pypi/tarantool)
+- PHP driver [https://github.com/mailru/tarantool-php](https://github.com/mailru/tarantool-php)
+- Java driver, [Maven repository](http://dgreenru.github.com/tarantool-java)
