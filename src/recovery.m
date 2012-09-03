@@ -114,31 +114,34 @@ wait_lsn_set(struct wait_lsn *wait_lsn, int64_t lsn)
 	wait_lsn->lsn = lsn;
 }
 
-int
-confirm_lsn(struct recovery_state *r, int64_t lsn)
+void
+confirm_lsn(struct recovery_state *r, int64_t lsn, bool is_commit)
 {
 	assert(r->confirmed_lsn <= r->lsn);
 
 	if (r->confirmed_lsn < lsn) {
-		if (r->confirmed_lsn + 1 != lsn)
-			say_warn("non consecutive lsn, last confirmed:%" PRIi64
-				 " new:%" PRIi64 " diff: %" PRIi64,
-				 r->confirmed_lsn, lsn, lsn - r->confirmed_lsn);
-		r->confirmed_lsn = lsn;
-		/* Alert the waiter, if any. There can be holes in
-		 * confirmed_lsn, in case of disk write failure,
-		 * but wal_writer never confirms LSNs out order.
-		 */
-		if (r->wait_lsn.waiter && r->confirmed_lsn >= r->wait_lsn.lsn) {
-			fiber_call(r->wait_lsn.waiter);
-		}
-
-		return 0;
+		if (is_commit) {
+			if (r->confirmed_lsn + 1 != lsn)
+				say_warn("non consecutive LSN, confirmed: %jd, "
+					 " new: %jd, diff: %jd",
+					 (intmax_t) r->confirmed_lsn,
+					 (intmax_t) lsn,
+					 (intmax_t) (lsn - r->confirmed_lsn));
+			r->confirmed_lsn = lsn;
+		 }
 	} else {
-		say_warn("lsn double confirmed:%" PRIi64, lsn);
+		assert(false);
+		say_error("LSN is used twice or COMMIT order is broken: "
+			  "confirmed: %jd, new: %jd",
+			  (intmax_t) r->confirmed_lsn, (intmax_t) lsn);
 	}
-
-	return -1;
+	/*
+	 * Alert the waiter, if any. There can be holes in
+	 * confirmed_lsn, in case of disk write failure, but
+	 * wal_writer never confirms LSNs out order.
+	 */
+	if (r->wait_lsn.waiter && r->confirmed_lsn >= r->wait_lsn.lsn)
+		fiber_call(r->wait_lsn.waiter);
 }
 
 /** Wait until the given LSN makes its way to disk. */
@@ -169,7 +172,7 @@ set_lsn(struct recovery_state *r, int64_t lsn)
 {
 	r->lsn = lsn;
 	say_debug("set_lsn(%p, %" PRIi64, r, r->lsn);
-	confirm_lsn(r, r->lsn);
+	confirm_lsn(r, r->lsn, true);
 }
 
 /* }}} */
@@ -1116,6 +1119,17 @@ wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 
 /* {{{ SAVE SNAPSHOT and tarantool_box --cat */
 
+static void
+snap_write_batch(struct nbatch *batch, int fd)
+{
+	int rows_written = nbatch_write(batch, fd);
+	if (rows_written != batch->rows) {
+		say_error("partial write: %d out of %d rows",
+			  rows_written, batch->rows);
+		panic_syserror("nbatch_write");
+	}
+}
+
 void
 snapshot_write_row(struct log_io *l, struct nbatch *batch,
 		   const void *metadata, size_t metadata_len,
@@ -1140,8 +1154,7 @@ snapshot_write_row(struct log_io *l, struct nbatch *batch,
 		say_crit("%.1fM rows written", rows / 1000000.);
 
 	if (nbatch_is_full(batch)) {
-		if (nbatch_write(batch, fileno(l->f)) != batch->rows)
-			panic_syserror("nbatch_write");
+		snap_write_batch(batch, fileno(l->f));
 		nbatch_start(batch, INT_MAX);
 		prelease_after(fiber->gc_pool, 128 * 1024);
 	}
@@ -1189,8 +1202,8 @@ snapshot_save(struct recovery_state *r,
 				 NONE));
 	f(snap, batch);
 
-	if (batch->rows && nbatch_write(batch, fileno(snap->f)) != batch->rows)
-		panic_syserror("nbatch_write");
+	if (batch->rows)
+		snap_write_batch(batch, fileno(snap->f));
 
 	free(batch);
 	log_io_close(&snap);
