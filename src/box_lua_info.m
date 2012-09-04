@@ -38,41 +38,52 @@
 #include <recovery.h>
 
 
-static int lbox_info_index_get_recovery_lag(struct lua_State *L) {
+static int
+lbox_info_index_get_recovery_lag(struct lua_State *L)
+{
 	if (recovery_state->remote)
 		lua_pushnumber(L, recovery_state->remote->recovery_lag);
 	else
-		lua_pushnil(L);
+		lua_pushnumber(L, 0);
 	return 1;
 }
 
 static int
-lbox_info_index_get_recovery_last_update_tstamp(struct lua_State *L) {
+lbox_info_index_get_recovery_last_update_tstamp(struct lua_State *L)
+{
 	if (recovery_state->remote)
 		lua_pushnumber(L,
 			recovery_state->remote->recovery_last_update_tstamp);
 	else
-		lua_pushnil(L);
+		lua_pushnumber(L, 0);
 	return 1;
 }
 
-static int lbox_info_get_lsn(struct lua_State *L) {
+static int
+lbox_info_get_lsn(struct lua_State *L)
+{
 	luaL_pushnumber64(L, recovery_state->confirmed_lsn);
 	return 1;
 }
 
 
-static int lbox_info_get_status(struct lua_State *L) {
+static int
+lbox_info_get_status(struct lua_State *L)
+{
 	lua_pushstring(L, mod_status());
 	return 1;
 }
 
-static int lbox_info_uptime(struct lua_State *L) {
-	lua_pushnumber(L, (unsigned)tarantool_uptime() + 1); 
+static int
+lbox_info_uptime(struct lua_State *L)
+{
+	lua_pushnumber(L, (unsigned)tarantool_uptime() + 1);
 	return 1;
 }
 
-static const struct luaL_reg lbox_info_dynamic_meta [] = {
+static const struct luaL_reg
+lbox_info_dynamic_meta [] =
+{
 	{"recovery_lag", lbox_info_index_get_recovery_lag},
 	{"recovery_last_update",
 		lbox_info_index_get_recovery_last_update_tstamp},
@@ -82,40 +93,26 @@ static const struct luaL_reg lbox_info_dynamic_meta [] = {
 	{NULL, NULL}
 };
 
-static int lbox_info_index(struct lua_State *L) {
+static int
+lbox_info_index(struct lua_State *L)
+{
 
-	const char *key = lua_tolstring(L, -1, NULL);
-	unsigned i;
+	lua_pushvalue(L, lua_upvalueindex(1));	/* table */
+	lua_pushvalue(L, -2);			/* key */
+	lua_gettable(L, -2);			/* table[key] */
+	lua_remove(L, -2);			/* remove table */
 
-	for (i = 0; lbox_info_dynamic_meta[i].name; i++) {
-		if (strcmp(key, lbox_info_dynamic_meta[i].name) == 0) {
-			return lbox_info_dynamic_meta[i].func(L);
-		}
+	if (!lua_isfunction(L, -1))
+		return 1;
 
-	}
-
-	lua_pushnil(L);
+	lua_call(L, 0, 1);
+	lua_remove(L, -2);
 	return 1;
 }
 
 
-static const struct luaL_reg lbox_info_meta [] = {
-	{"__index", lbox_info_index},
-	{NULL, NULL}
-};
-
-void lbox_info_init(struct lua_State *L) {
-
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-
-	lua_pushstring(L, "info");
-	lua_newtable(L);
-
-	lua_newtable(L);
-	luaL_register(L, NULL, lbox_info_meta);
-	lua_setmetatable(L, -2);
-
-
+static void
+lbox_info_staticvalues(struct lua_State *L) {
 	/* tarantool version */
 	lua_pushstring(L, "version");
 	lua_pushstring(L, tarantool_version());
@@ -162,6 +159,48 @@ void lbox_info_init(struct lua_State *L) {
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);    /* box.info.build */
+}
+
+static int
+lbox_info_call(struct lua_State *L)
+{
+	unsigned i;
+	lua_newtable(L);
+	lbox_info_staticvalues(L);
+	for (i = 0; lbox_info_dynamic_meta[i].name; i++) {
+		lua_pushstring(L, lbox_info_dynamic_meta[i].name);
+		lbox_info_dynamic_meta[i].func(L);
+		lua_settable(L, -3);
+	}
+	return 1;
+}
+
+void
+lbox_info_init(struct lua_State *L)
+{
+
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+
+	lua_pushstring(L, "info");
+	lua_newtable(L);		/* box.info table */
+
+	lua_newtable(L);		/* metatable for box.info */
+
+	lua_pushstring(L, "__index");
+
+	lua_newtable(L);
+	luaL_register(L, NULL, lbox_info_dynamic_meta); /* table for __index */
+	lua_pushcclosure(L, lbox_info_index, 1);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "__call");
+	lua_pushcfunction(L, lbox_info_call);
+	lua_settable(L, -3);
+
+
+	lua_setmetatable(L, -2);
+
+	lbox_info_staticvalues(L);		/* fill table */
 
 	lua_settable(L, -3);    /* box.info = created table */
 	lua_pop(L, 1);          /* cleanup stack */

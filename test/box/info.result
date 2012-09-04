@@ -1,11 +1,3 @@
-lua
----
-unknown command. try typing help.
-...
-lua 1
----
- - 1
-...
 lua box.info.unknown_variable
 ---
  - nil
@@ -36,11 +28,11 @@ lua box.info.lsn > 0
 ...
 lua box.info.recovery_lag
 ---
- - nil
+ - 0
 ...
 lua box.info.recovery_last_update
 ---
- - nil
+ - 0
 ...
 lua box.info.status
 ---
@@ -73,4 +65,17 @@ lua string.len(box.info.uptime) > 0
 lua string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
 ---
  - true
+...
+lua for k, v in pairs(box.info()) do print(k) end
+---
+version
+status
+pid
+lsn
+recovery_last_update
+recovery_lag
+uptime
+build
+logger_pid
+config
 ...

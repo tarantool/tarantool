@@ -46,7 +46,6 @@
 #include "tuple.h"
 #include "space.h"
 #include "port.h"
-#include "box_lua_info.h"
 
 /* contents of box.lua */
 extern const char box_lua[];
@@ -1049,8 +1048,6 @@ mod_lua_init(struct lua_State *L)
 	/* Load box.lua */
 	if (luaL_dostring(L, box_lua))
 		panic("Error loading box.lua: %s", lua_tostring(L, -1));
-	
-	lbox_info_init(L);
 
 	assert(lua_gettop(L) == 0);
 
