@@ -78,12 +78,15 @@ void tc_print_buf(char *buf, size_t size) {
 }
 
 void tc_printf(char *fmt, ...) {
-	char msg[512];
+	char *buf;
 	va_list args;
 	va_start(args, fmt);
-	int size = vsnprintf(msg, sizeof(msg), fmt, args);
+	int size = vasprintf(&buf, fmt, args);
 	va_end(args);
-	tc_print_buf(msg, size);
+	if (size >= 0) {
+		tc_print_buf(buf, size);
+		free(buf);
+	}
 }
 
 static void tc_print_fields(struct tnt_tuple *tu) {
