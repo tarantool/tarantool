@@ -338,7 +338,7 @@ sfree(void *ptr)
  *
  */
 
-void full_slab_stat(
+int full_slab_stat(
 	int (*cb)(const struct one_slab_stat *, void *),
 	struct arena_stat *astat,
 	void *user_data) {
@@ -370,8 +370,11 @@ void full_slab_stat(
 
 			if (st.slabs == 0)
 				continue;
-			if (cb(&st, user_data) != 0)
-				break;
+			int res = cb(&st, user_data);
+			if (res != 0)
+				return res;
 		}
 	}
+
+	return 0;
 }

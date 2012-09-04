@@ -54,7 +54,7 @@ struct arena_stat {
 	size_t used;
 };
 
-void full_slab_stat(
+int full_slab_stat(
 	int (*cb)(const struct one_slab_stat *st, void *udata),
 	struct arena_stat *stat,
 	void *data
