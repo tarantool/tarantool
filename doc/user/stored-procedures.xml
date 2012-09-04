@@ -86,9 +86,12 @@ function is_expired(args, tuple)
    local tuple_ts = box.unpack("i", field)
    return current_time >= tuple_ts + args.ttl
 end
+function purge(args, tuple)
+    box.space[0]:delete(tuple[0])
+end
 
 -- Run task
-expirationd.run_task("exprd space 0", 0, is_expired, nil,
+expirationd.run_task("exprd space 0", 0, is_expired, purge,
                     { field_no = 1, ttl = 30 * 60 })
 ]]>
     </programlisting>
