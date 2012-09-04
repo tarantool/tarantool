@@ -96,11 +96,8 @@ lbox_info_dynamic_meta [] =
 static int
 lbox_info_index(struct lua_State *L)
 {
-
-	lua_pushvalue(L, lua_upvalueindex(1));	/* table */
-	lua_pushvalue(L, -2);			/* key */
-	lua_gettable(L, -2);			/* table[key] */
-	lua_remove(L, -2);			/* remove table */
+	lua_pushvalue(L, -1);			/* dup key */
+	lua_gettable(L, lua_upvalueindex(1));   /* table[key] */
 
 	if (!lua_isfunction(L, -1))
 		return 1;
