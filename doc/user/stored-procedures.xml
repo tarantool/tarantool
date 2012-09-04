@@ -761,6 +761,73 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
             </programlisting>
         </listitem>
     </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.auto_increment(space_no, ...)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Insert values into space designated by space_no, using
+                an auto-increment primary key. The space must have a
+                NUM or NUM64 primary key index of type TREE.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost> lua box.auto_increment(0, "I am a duplicate")
+---
+ - 1: {'I am a duplicate'}
+...
+localhost> lua box.auto_increment(2, "I am a duplicate")
+---
+ - 2: {'I am a duplicate'}
+...
+            </programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.counter.inc(space_no, key)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Increments a counter identified by the key. The key can be
+                multi-part, but there must be an index covering
+                all fields of the key. If there is no tuple
+                identified by the given key, creates a new one
+                with initial counter value set to 1.  Returns the
+                new counter value back.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost> lua box.counter.inc(0, 'top.mail.ru')
+---
+ - 1
+...
+localhost> lua box.counter.inc(0, 'top.mail.ru')
+---
+ - 2
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.counter.dec(space_no, key)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Decrements a counter identified by the given key. If
+                the key is not found, is a no-op. When counter value
+                drops to 0, the tuple is deleted.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost> lua box.counter.dec(0, 'top.mail.ru')
+---
+ - 1
+...
+localhost> lua box.counter.dec(0, 'top.mail.ru')
+---
+ - 0
+...</programlisting>
+        </listitem>
+    </varlistentry>
 </variablelist>
 
 <variablelist>
