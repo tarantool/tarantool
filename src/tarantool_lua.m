@@ -42,6 +42,8 @@
 #include "pickle.h"
 #include "fiber.h"
 #include <ctype.h>
+#include "box_lua_stat.h"
+
 #include TARANTOOL_CONFIG
 
 /**
@@ -1159,6 +1161,8 @@ tarantool_lua_init()
 	lua_register(L, "print", lbox_print);
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
+
+	box_lua_stat_init(L);
 	L = mod_lua_init(L);
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);

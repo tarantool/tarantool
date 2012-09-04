@@ -37,7 +37,9 @@
 #include <stat.h>
 
 
-static int _one_stat_item(const char *name, i64 value, int rps, void *udata) {
+static int
+_one_stat_item(const char *name, i64 value, int rps, void *udata)
+{
 	struct lua_State *L = udata;
 
 	lua_pushstring(L, name);
@@ -57,12 +59,11 @@ static int _one_stat_item(const char *name, i64 value, int rps, void *udata) {
 }
 
 
-struct _seek_udata {
-	const char *key;
-	struct lua_State *L;
-};
+struct _seek_udata { const char *key; struct lua_State *L; };
 
-static int _seek_stat_item(const char *name, i64 value, int rps, void *udata) {
+static int
+_seek_stat_item(const char *name, i64 value, int rps, void *udata)
+{
 
 	struct _seek_udata *sst = udata;
 	if (strcmp(name, sst->key) != 0)
@@ -81,9 +82,10 @@ static int _seek_stat_item(const char *name, i64 value, int rps, void *udata) {
 	return 1;
 }
 
-static int lbox_stat_index(struct lua_State *L) {
 
-
+static int
+lbox_stat_index(struct lua_State *L)
+{
 	struct _seek_udata sst;
 	sst.key = lua_tolstring(L, -1, NULL);
 	sst.L = L;
@@ -92,13 +94,16 @@ static int lbox_stat_index(struct lua_State *L) {
 }
 
 
-static int lbox_stat_full(struct lua_State *L) {
+static int
+lbox_stat_full(struct lua_State *L)
+{
 	lua_newtable(L);
 
 	stat_foreach(_one_stat_item, L);
 
 	return 1;
 }
+
 
 static const struct luaL_reg lbox_stat_meta [] = {
 	{"__index", lbox_stat_index},
@@ -107,7 +112,9 @@ static const struct luaL_reg lbox_stat_meta [] = {
 };
 
 
-void box_lua_stat_init(struct lua_State *L) {
+void
+box_lua_stat_init(struct lua_State *L)
+{
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 
 	lua_pushstring(L, "stat");
