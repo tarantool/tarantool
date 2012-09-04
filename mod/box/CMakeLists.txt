@@ -39,5 +39,4 @@ set_source_files_properties(memcached.m
     PROPERTIES COMPILE_FLAGS "-Wno-uninitialized")
 
 tarantool_module("box" tuple.m index.m tree.m space.m port.m request.m
-    box_lua_slab.m
     txn.m box.m box.lua.c box_lua.m memcached.m memcached-grammar.m)

@@ -35,41 +35,9 @@
 
 
 
-/*
-void
-slab_stat(struct tbuf *t)
+static int
+_one_slab_stat(const struct one_slab_stat *st, void *udata)
 {
-	struct slab *slab;
-	int slabs;
-	i64 items, used, free, total_used = 0;
-	tbuf_printf(t, "slab statistics:\n  classes:" CRLF);
-	for (int i = 0; i < slab_active_classes; i++) {
-		slabs = items = used = free = 0;
-		TAILQ_FOREACH(slab, &slab_classes[i].slabs, class_link) {
-			free += SLAB_SIZE - slab->used - sizeof(struct slab);
-			items += slab->items;
-			used += sizeof(struct slab) + slab->used;
-			total_used += sizeof(struct slab) + slab->used;
-			slabs++;
-		}
-
-		if (slabs == 0)
-			continue;
-
-		tbuf_printf(t,
-			    "     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
-			    ", bytes_used: %- 12" PRIi64 ", bytes_free: %- 12" PRIi64 " }" CRLF,
-			    (int)slab_classes[i].item_size, slabs, items, used, free);
-
-	}
-	tbuf_printf(t, "  items_used: %.2f%%" CRLF, (double)total_used / arena.size * 100);
-	tbuf_printf(t, "  arena_used: %.2f%%" CRLF, (double)arena.used / arena.size * 100);
-}
-*/
-
-
-
-static int _one_slab_stat(const struct one_slab_stat *st, void *udata) {
 
 	struct lua_State *L = udata;
 
@@ -103,7 +71,9 @@ static int _one_slab_stat(const struct one_slab_stat *st, void *udata) {
 	return 0;
 }
 
-static int lbox_slab_get_slabs(struct lua_State *L) {
+static int
+lbox_slab_get_slabs(struct lua_State *L)
+{
 
 	lua_newtable(L);
 	full_slab_stat(_one_slab_stat, NULL, L);
@@ -111,13 +81,18 @@ static int lbox_slab_get_slabs(struct lua_State *L) {
 }
 
 
-static int lbox_slab_get_arena_used(struct lua_State *L) {
+static int
+lbox_slab_get_arena_used(struct lua_State *L)
+{
 	struct arena_stat astat;
 	full_slab_stat(NULL, &astat, NULL);
 	lua_pushnumber(L, astat.used);
 	return 1;
 }
-static int lbox_slab_get_arena_size(struct lua_State *L) {
+
+static int
+lbox_slab_get_arena_size(struct lua_State *L)
+{
 	struct arena_stat astat;
 	full_slab_stat(NULL, &astat, NULL);
 	lua_pushnumber(L, astat.size);
@@ -125,7 +100,9 @@ static int lbox_slab_get_arena_size(struct lua_State *L) {
 }
 
 
-static int lbox_slab_call(struct lua_State *L) {
+static int
+lbox_slab_call(struct lua_State *L)
+{
 	struct arena_stat astat;
 
 	lua_newtable(L);
@@ -153,37 +130,40 @@ static const struct luaL_reg lbox_slab_dynamic_meta [] = {
 	{NULL, NULL}
 };
 
-static int lbox_slab_index(struct lua_State *L) {
 
-	const char *key = lua_tolstring(L, -1, NULL);
-	unsigned i;
+static int
+lbox_slab_index(struct lua_State *L)
+{
+	lua_pushvalue(L, -1);			/* dup key */
+	lua_gettable(L, lua_upvalueindex(1));   /* table[key] */
 
-	for (i = 0; lbox_slab_dynamic_meta[i].name; i++) {
-		if (strcmp(key, lbox_slab_dynamic_meta[i].name) == 0) {
-			return lbox_slab_dynamic_meta[i].func(L);
-		}
-	}
+	if (!lua_isfunction(L, -1))
+		return 1;
 
-	lua_pushnil(L);
+	lua_call(L, 0, 1);
+	lua_remove(L, -2);
 	return 1;
 }
 
 
-static const struct luaL_reg lbox_slab_meta [] = {
-	{"__index", lbox_slab_index},
-	{"__call",  lbox_slab_call},
-	{NULL, NULL}
-};
-
-void lbox_slab_init(struct lua_State *L) {
+void
+lbox_slab_init(struct lua_State *L) {
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 
 	lua_pushstring(L, "slab");
-	lua_newtable(L);
+	lua_newtable(L);		/* box.slab */
 
 	lua_newtable(L);
-	luaL_register(L, NULL, lbox_slab_meta);
+	lua_pushstring(L, "__call");
+	lua_pushcfunction(L, lbox_slab_call);
+	lua_settable(L, -3);
+	lua_pushstring(L, "__index");
+	lua_newtable(L);
+	luaL_register(L, NULL, lbox_slab_dynamic_meta);
+	lua_pushcclosure(L, lbox_slab_index, 1);
+	lua_settable(L, -3);
+
 	lua_setmetatable(L, -2);
 
 	lua_settable(L, -3);    /* box.slab = created table */
