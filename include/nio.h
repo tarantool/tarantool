@@ -129,6 +129,10 @@ nwritev(int fd, struct iovec *iov, int iovcnt);
 off_t
 nlseek(int fd, off_t offset, int whence);
 
+/** Truncate a file and log a message in case of error. */
+int
+nftruncate(int fd, off_t offset);
+
 /**
  * A helper wrapper around writev() to do batched
  * writes.

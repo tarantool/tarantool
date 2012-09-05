@@ -140,8 +140,10 @@
 
 #define tt_pthread_cond_timedwait(cond, mutex, timeout)	\
 ({	int e = pthread_cond_timedwait(cond, mutex, timeout);\
-	if (ETIMEDOUT != e)			\
-		tt_pthread_error(e);		\
+	if (ETIMEDOUT != e)                           \
+		say_error("%s error %d", __func__, e);\
+	assert(e == 0 || e == ETIMEDOUT);             \
+	e                                             \
 })
 
 #define tt_pthread_once(control, function)	\

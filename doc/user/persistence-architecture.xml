@@ -70,7 +70,12 @@ unaffected by disk load.
 <para>
 WAL writer employs a number of modes for synchronization between
 requesting fibers, WAL writer and disk hardware, as defined
-in configuration for <olink targetptr="wal_mode"/>.
+in configuration for <olink targetptr="wal_mode"/>. It is also
+possible to turn the write ahead log completely off, by setting
+<olink targetptr="wal_mode"/> to <emphasis>none</emphasis>.
+Even without the write ahead log it's still possible to take a
+persistent copy of the entire data set with
+<olink targetptr="save-snapshot"/>.
 </para>
 
 

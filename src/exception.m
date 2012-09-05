@@ -49,6 +49,17 @@
 	}
 	return e;
 }
+
+- (void) log
+{
+	[self subclassResponsibility: _cmd];
+}
+
+- (const char *) errmsg
+{
+	[self subclassResponsibility: _cmd];
+	return  NULL;
+}
 @end
 
 @implementation SystemError
@@ -84,6 +95,10 @@
 	say(S_ERROR, strerror(errnum), "%s", errmsg);
 }
 
+- (const char *) errmsg
+{
+	return errmsg;
+}
 @end
 
 
@@ -106,6 +121,17 @@
 	vsnprintf(errmsg, sizeof(errmsg), tnt_errcode_desc(errcode), ap);
 	return self;
 }
+
+- (void) log
+{
+	say_error("%s at %s:%d, %s", object_getClassName(self),
+		  file, line, errmsg);
+}
+
+- (const char *) errmsg
+{
+	return errmsg;
+}
 @end
 
 
@@ -116,7 +142,7 @@
 	va_start(ap, errcode_);
 	[super init: errcode_ args: ap];
 
-	say_error("%s at %s:%d, %s", object_getClassName(self), file, line, errmsg);
+	[self log];
 
 	return self;
 }

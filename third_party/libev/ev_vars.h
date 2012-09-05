@@ -43,6 +43,17 @@ VARx(ev_tstamp, now_floor) /* last time we refreshed rt_time */
 VARx(ev_tstamp, mn_now)    /* monotonic clock "now" */
 VARx(ev_tstamp, rtmn_diff) /* difference realtime - monotonic time */
 
+/* for reverse feeding of events */
+VARx(W *, rfeeds)
+VARx(int, rfeedmax)
+VARx(int, rfeedcnt)
+
+VAR (pendings, ANPENDING *pendings [NUMPRI])
+VAR (pendingmax, int pendingmax [NUMPRI])
+VAR (pendingcnt, int pendingcnt [NUMPRI])
+VARx(int, pendingpri) /* highest priority currently pending */
+VARx(ev_prepare, pending_w) /* dummy pending watcher */
+
 VARx(ev_tstamp, io_blocktime)
 VARx(ev_tstamp, timeout_blocktime)
 
@@ -58,19 +69,6 @@ VAR (backend_poll  , void (*backend_poll)(EV_P_ ev_tstamp timeout))
 VARx(ANFD *, anfds)
 VARx(int, anfdmax)
 
-VAR (pendings, ANPENDING *pendings [NUMPRI])
-VAR (pendingmax, int pendingmax [NUMPRI])
-VAR (pendingcnt, int pendingcnt [NUMPRI])
-VARx(ev_prepare, pending_w) /* dummy pending watcher */
-
-/* for reverse feeding of events */
-VARx(W *, rfeeds)
-VARx(int, rfeedmax)
-VARx(int, rfeedcnt)
-
-#if EV_USE_EVENTFD || EV_GENWRAP
-VARx(int, evfd)
-#endif
 VAR (evpipe, int evpipe [2])
 VARx(ev_io, pipe_w)
 VARx(EV_ATOMIC_T, pipe_write_wanted)

@@ -193,10 +193,8 @@ struct ev_loop;
 
 #ifdef EV_API_STATIC
 # define EV_API_DECL static
-# define EV_API_DEF static
 #else
 # define EV_API_DECL extern
-# define EV_API_DEF
 #endif
 
 /* EV_PROTOTYPES can be used to switch of prototype declarations */

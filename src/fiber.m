@@ -455,6 +455,7 @@ fiber_set_name(struct fiber *fiber, const char *name)
 {
 	assert(name != NULL);
 	snprintf(fiber->name, sizeof(fiber->name), "%s", name);
+	palloc_set_name(fiber->gc_pool, fiber->name);
 }
 
 /* fiber never dies, just become zombie */
@@ -496,7 +497,6 @@ fiber_create(const char *name, int fd, void (*f) (void *), void *f_data)
 	fiber->flags = 0;
 	fiber->waiter = NULL;
 	fiber_set_name(fiber, name);
-	palloc_set_name(fiber->gc_pool, fiber->name);
 	register_fid(fiber);
 
 	return fiber;
@@ -998,8 +998,8 @@ fiber_init(void)
 
 	memset(&sched, 0, sizeof(sched));
 	sched.fid = 1;
+	sched.gc_pool = palloc_create_pool("");
 	fiber_set_name(&sched, "sched");
-	sched.gc_pool = palloc_create_pool(sched.name);
 
 	sp = call_stack;
 	fiber = &sched;

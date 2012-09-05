@@ -44,6 +44,8 @@
 		unsigned line;
 }
 + (id) alloc;
+- (void) log;
+- (const char *) errmsg;
 @end
 
 
@@ -61,6 +63,7 @@
 - (id) init: (int)errnum_arg: (const char *)format, ...;
 - (id) init: (int)errnum_arg: (const char *)format: (va_list)ap;
 - (void) log;
+- (const char *) errmsg;
 @end
 
 
@@ -74,6 +77,8 @@
 
 - (id) init: (uint32_t)errcode_, ...;
 - (id) init: (uint32_t)errcode_ args: (va_list)ap;
+- (void) log;
+- (const char *) errmsg;
 @end
 
 

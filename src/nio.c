@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include <say.h>
 #include <nio.h>
@@ -146,6 +147,16 @@ nlseek(int fd, off_t offset, int whence)
 	return effective_offset;
 }
 
+int
+nftruncate(int fd, off_t offset)
+{
+	int rc = ftruncate(fd, offset);
+	if (rc)
+		say_syserror("ftruncate, [%s]: offset=%jd",
+			     nfilename(fd), (intmax_t) offset);
+	return rc;
+}
+
 struct nbatch *
 nbatch_alloc(long max_iov)
 {
@@ -205,6 +216,20 @@ nbatch_write(struct nbatch *batch, int fd)
 	 * Unwind file position back to ensure we do not leave
 	 * partially written rows.
 	 */
-	nlseek(fd, good_bytes - bytes_written, SEEK_CUR);
+	off_t good_offset = nlseek(fd, good_bytes - bytes_written, SEEK_CUR);
+	/*
+	 * The caller may choose to close the file right after
+	 * a partial write. Don't take chances and make sure that
+	 * there is no garbage at the end of file if it happens.
+	 */
+	if (good_offset != -1)
+		(void) nftruncate(fd, good_offset);
+	/*
+	 * writev() doesn't set errno in case of a partial write.
+	 * If nothing else from the above failed, set errno to
+	 * EAGAIN.
+	 */
+	if (! errno)
+		errno = EAGAIN;
 	return iov - batch->iov;
 }

@@ -86,9 +86,12 @@ function is_expired(args, tuple)
    local tuple_ts = box.unpack("i", field)
    return current_time >= tuple_ts + args.ttl
 end
+function purge(args, tuple)
+    box.space[0]:delete(tuple[0])
+end
 
 -- Run task
-expirationd.run_task("exprd space 0", 0, is_expired, nil,
+expirationd.run_task("exprd space 0", 0, is_expired, purge,
                     { field_no = 1, ttl = 30 * 60 })
 ]]>
     </programlisting>
@@ -759,6 +762,73 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
                  - a4f29fa0eb6d11e19f7737696d7fa8ff
                 ...
             </programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.auto_increment(space_no, ...)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Insert values into space designated by space_no, using
+                an auto-increment primary key. The space must have a
+                NUM or NUM64 primary key index of type TREE.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost> lua box.auto_increment(0, "I am a duplicate")
+---
+ - 1: {'I am a duplicate'}
+...
+localhost> lua box.auto_increment(2, "I am a duplicate")
+---
+ - 2: {'I am a duplicate'}
+...
+            </programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.counter.inc(space_no, key)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Increments a counter identified by the key. The key can be
+                multi-part, but there must be an index covering
+                all fields of the key. If there is no tuple
+                identified by the given key, creates a new one
+                with initial counter value set to 1.  Returns the
+                new counter value back.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost> lua box.counter.inc(0, 'top.mail.ru')
+---
+ - 1
+...
+localhost> lua box.counter.inc(0, 'top.mail.ru')
+---
+ - 2
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.counter.dec(space_no, key)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Decrements a counter identified by the given key. If
+                the key is not found, is a no-op. When counter value
+                drops to 0, the tuple is deleted.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost> lua box.counter.dec(0, 'top.mail.ru')
+---
+ - 1
+...
+localhost> lua box.counter.dec(0, 'top.mail.ru')
+---
+ - 0
+...</programlisting>
         </listitem>
     </varlistentry>
 </variablelist>
