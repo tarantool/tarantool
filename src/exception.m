@@ -54,6 +54,12 @@
 {
 	[self subclassResponsibility: _cmd];
 }
+
+- (const char *) errmsg
+{
+	[self subclassResponsibility: _cmd];
+	return  NULL;
+}
 @end
 
 @implementation SystemError
@@ -89,6 +95,10 @@
 	say(S_ERROR, strerror(errnum), "%s", errmsg);
 }
 
+- (const char *) errmsg
+{
+	return errmsg;
+}
 @end
 
 
@@ -116,6 +126,11 @@
 {
 	say_error("%s at %s:%d, %s", object_getClassName(self),
 		  file, line, errmsg);
+}
+
+- (const char *) errmsg
+{
+	return errmsg;
 }
 @end
 
