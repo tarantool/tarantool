@@ -1,3 +1,9 @@
+tarantool (1.4.7+20120905-1) unstable; urgency=low
+
+  * New snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 05 Sep 2012 15:36:27 +0400
+
 tarantool (1.4.7+20120829-1) unstable; urgency=low
 
   * New snapshot (some fixes, add box.uuid() and box.uuid_hex() functions).
