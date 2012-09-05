@@ -348,8 +348,8 @@ lbox_tuple_find_do(struct lua_State *L, bool all)
 	default:
 		luaL_error(L, "tuple.find(): bad arguments");
 	}
-	size_t key_size;
-	const char *key;
+	size_t key_size = 0;
+	const char *key = NULL;
 	u32 u32v;
 	u64 u64v;
 	switch (lua_type(L, argc)) {
