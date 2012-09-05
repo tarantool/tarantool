@@ -9,7 +9,7 @@
 . /etc/init.d/functions
 
 RETVAL=0
-INST="$(basename $0)"
+INST="$(basename $0 | grep -oP '\D+\d+.\d+$')"
 export PIDFILE="/var/${INST}/box.pid"
 export WRAP_PIDFILE="/var/${INST}/wrapper.pid"
 export OPTIONS=""
