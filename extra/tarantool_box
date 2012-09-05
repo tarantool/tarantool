@@ -9,6 +9,10 @@
 . /etc/init.d/functions
 
 RETVAL=0
+# If we're running from sysinit, the basename is
+# prefixed with a prefix like:
+# /etc/rc3.d/S99tarantool_box1.1 -> ../init.d/tarantool_box1.1
+# Filter S99 out.
 INST="$(basename $0 | grep -oP '\D+\d+.\d+$')"
 export PIDFILE="/var/${INST}/box.pid"
 export WRAP_PIDFILE="/var/${INST}/wrapper.pid"
