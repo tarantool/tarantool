@@ -30,7 +30,7 @@
  */
 
 #define TC_VERSION_MAJOR "0"
-#define TC_VERSION_MINOR "1"
+#define TC_VERSION_MINOR "2"
 
 enum tc_opt_mode {
 	TC_OPT_USAGE,
