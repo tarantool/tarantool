@@ -82,8 +82,8 @@ tnt_call(struct tnt_stream *s, uint32_t flags, char *proc,
 	v[2].iov_len  = proc_enc_size;
 	v[3].iov_base = proc;
 	v[3].iov_len  = proc_len;
+	uint32_t argc = 0;
 	if (args->size == 0) {
-		uint32_t argc = 0;
 		v[4].iov_base = &argc;
 		v[4].iov_len  = 4;
 	} else {
