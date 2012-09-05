@@ -554,8 +554,8 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
             <entry>no</entry>
             <entry>yes</entry>
             <entry>Specify fiber-WAL-disk synchronization mode as:
-                <emphasis>write:</emphasis> fibers wait for their data to
-                be written to WAL (no fsync(2)); <emphasis>fsync</emphasis>:
+                <emphasis>none:</emphasis> write ahead log is not maintained; <emphasis>write:</emphasis> fibers wait for their data to
+                be written to the write ahead log (no fsync(2)); <emphasis>fsync</emphasis>:
                 fibers wait for their data, fsync(2) follows each write(2);
                 <emphasis>fsync_delay</emphasis>: fibers wait for their
                 data, fsync(2) is called every N=<emphasis>wal_fsync_delay</emphasis>
