@@ -39,7 +39,7 @@
 
 
 static int
-lbox_info_index_get_recovery_lag(struct lua_State *L)
+lbox_info_get_recovery_lag(struct lua_State *L)
 {
 	if (recovery_state->remote)
 		lua_pushnumber(L, recovery_state->remote->recovery_lag);
@@ -49,7 +49,7 @@ lbox_info_index_get_recovery_lag(struct lua_State *L)
 }
 
 static int
-lbox_info_index_get_recovery_last_update_tstamp(struct lua_State *L)
+lbox_info_get_recovery_last_update_tstamp(struct lua_State *L)
 {
 	if (recovery_state->remote)
 		lua_pushnumber(L,
@@ -84,9 +84,8 @@ lbox_info_uptime(struct lua_State *L)
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
 {
-	{"recovery_lag", lbox_info_index_get_recovery_lag},
-	{"recovery_last_update",
-		lbox_info_index_get_recovery_last_update_tstamp},
+	{"recovery_lag", lbox_info_get_recovery_lag},
+	{"recovery_last_update", lbox_info_get_recovery_last_update_tstamp},
 	{"lsn", lbox_info_get_lsn},
 	{"status", lbox_info_get_status},
 	{"uptime", lbox_info_uptime},
