@@ -43,7 +43,10 @@
 #include "fiber.h"
 #include <ctype.h>
 #include "tarantool_lua_info.h"
+#include "tarantool_lua_slab.h"
+
 #include TARANTOOL_CONFIG
+
 
 /**
  * tarantool start-up file
@@ -1210,6 +1213,8 @@ tarantool_lua_init()
 	lua_register(L, "print", lbox_print);
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
+	lbox_slab_init(L);
+
 	L = mod_lua_init(L);
 	lbox_info_init(L);
 	/* clear possible left-overs of init */

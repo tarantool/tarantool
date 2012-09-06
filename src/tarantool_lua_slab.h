@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_SALLOC_H_INCLUDED
-#define TARANTOOL_SALLOC_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_LUA_SLAB_H
+#define INCLUDES_TARANTOOL_LUA_SLAB_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,36 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stddef.h>
-#include <stdbool.h>
-#include "util.h" /* for u64 */
 
-struct tbuf;
+struct lua_State;
+void lbox_slab_init(struct lua_State *L);
 
-bool salloc_init(size_t size, size_t minimal, double factor);
-void salloc_destroy(void);
-void *salloc(size_t size, const char *what);
-void sfree(void *ptr);
-void slab_validate();
-
-/** Statistics on utilization of a single slab class. */
-struct slab_class_stats {
-	i64 item_size;
-	i64 slabs;
-	i64 items;
-	i64 bytes_used;
-	i64 bytes_free;
-};
-
-/** Statistics on utilization of the slab allocator. */
-struct slab_arena_stats {
-	size_t size;
-	size_t used;
-};
-
-typedef int (*salloc_stat_cb)(const struct slab_class_stats *st, void *ctx);
-
-int
-salloc_stat(salloc_stat_cb cb, struct slab_arena_stats *astat, void *cb_ctx);
-
-#endif /* TARANTOOL_SALLOC_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_LUA_SLAB_H */

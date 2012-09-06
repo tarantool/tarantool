@@ -1510,7 +1510,6 @@ logger = cat - >> tarantool.log
 </programlisting></listitem>
     </varlistentry>
 </variablelist>
-
 <variablelist>
     <title>Package <code>box.info</code></title>
     <para>
@@ -1600,6 +1599,37 @@ options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF -DENABLE_
 ...
 </programlisting>
         </listitem>
+    </varlistentry>
+</variablelist>
+
+<variablelist>
+    <title>Package <code>box.slab</code></title>
+    <para>This package provides access to slab allocator statistics.</para>
+    <varlistentry>
+        <term><emphasis role="lua">box.slab</emphasis></term>
+        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
+localhost> lua box.slab.arena_used
+---
+ - 4194304
+...
+localhost> lua box.slab.arena_size
+---
+ - 104857600
+...
+localhost> lua for k, v in pairs(box.slab.slabs) do print(k) end
+---
+64
+128
+...
+localhost> lua for k, v in pairs(box.slab.slabs[64]) do print(k, ':', v) end
+---
+items:1
+bytes_used:160
+item_size:64
+slabs:1
+bytes_free:4194144
+...
+</programlisting></listitem>
     </varlistentry>
 </variablelist>
 

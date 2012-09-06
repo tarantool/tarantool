@@ -82,6 +82,49 @@ static const int admin_en_main = 1;
 #line 74 "src/admin.rl"
 
 
+struct salloc_stat_admin_cb_ctx {
+	i64 total_used;
+	struct tbuf *out;
+};
+
+static int
+salloc_stat_admin_cb(const struct slab_class_stats *cstat, void *cb_ctx)
+{
+	struct salloc_stat_admin_cb_ctx *ctx = cb_ctx;
+
+	tbuf_printf(ctx->out,
+		    "     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
+		    ", bytes_used: %- 12" PRIi64
+		    ", bytes_free: %- 12" PRIi64 " }" CRLF,
+		    (int)cstat->item_size,
+		    (int)cstat->slabs,
+		    cstat->items,
+		    cstat->bytes_used,
+		    cstat->bytes_free);
+
+	ctx->total_used += cstat->bytes_used;
+	return 0;
+}
+
+static void
+show_slab(struct tbuf *out)
+{
+	struct salloc_stat_admin_cb_ctx cb_ctx;
+	struct slab_arena_stats astat;
+
+	cb_ctx.total_used = 0;
+	cb_ctx.out = out;
+
+	tbuf_printf(out, "slab statistics:\n  classes:" CRLF);
+
+	salloc_stat(salloc_stat_admin_cb, &astat, &cb_ctx);
+
+	tbuf_printf(out, "  items_used: %.2f%%" CRLF,
+		(double)cb_ctx.total_used / astat.size * 100);
+	tbuf_printf(out, "  arena_used: %.2f%%" CRLF,
+		(double)astat.used / astat.size * 100);
+}
+
 
 static void
 end(struct tbuf *out)
@@ -153,12 +196,12 @@ admin_dispatch(lua_State *L)
 	p = fiber->rbuf->data;
 
 	
-#line 157 "src/admin.m"
+#line 200 "src/admin.m"
 	{
 	cs = admin_start;
 	}
 
-#line 162 "src/admin.m"
+#line 205 "src/admin.m"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -221,15 +264,15 @@ case 6:
 	}
 	goto st0;
 tr13:
-#line 256 "src/admin.rl"
+#line 299 "src/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st135;
 tr20:
-#line 244 "src/admin.rl"
+#line 287 "src/admin.rl"
 	{return 0;}
 	goto st135;
 tr25:
-#line 171 "src/admin.rl"
+#line 214 "src/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
@@ -237,9 +280,9 @@ tr25:
 		}
 	goto st135;
 tr36:
-#line 230 "src/admin.rl"
+#line 273 "src/admin.rl"
 	{strend = p;}
-#line 177 "src/admin.rl"
+#line 220 "src/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
@@ -248,7 +291,7 @@ tr36:
 		}
 	goto st135;
 tr43:
-#line 184 "src/admin.rl"
+#line 227 "src/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -257,11 +300,11 @@ tr43:
 		}
 	goto st135;
 tr67:
-#line 254 "src/admin.rl"
+#line 297 "src/admin.rl"
 	{coredump(60); ok(out);}
 	goto st135;
 tr76:
-#line 191 "src/admin.rl"
+#line 234 "src/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -276,9 +319,9 @@ tr76:
 		}
 	goto st135;
 tr98:
-#line 240 "src/admin.rl"
+#line 283 "src/admin.rl"
 	{ state = false; }
-#line 204 "src/admin.rl"
+#line 247 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -290,9 +333,9 @@ tr98:
 		}
 	goto st135;
 tr101:
-#line 239 "src/admin.rl"
+#line 282 "src/admin.rl"
 	{ state = true; }
-#line 204 "src/admin.rl"
+#line 247 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -304,7 +347,7 @@ tr101:
 		}
 	goto st135;
 tr117:
-#line 147 "src/admin.rl"
+#line 190 "src/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -324,15 +367,15 @@ tr117:
 		}
 	goto st135;
 tr131:
-#line 247 "src/admin.rl"
+#line 290 "src/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st135;
 tr137:
-#line 246 "src/admin.rl"
+#line 289 "src/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st135;
 tr146:
-#line 165 "src/admin.rl"
+#line 208 "src/admin.rl"
 	{
 			start(out);
 			errinj_info(out);
@@ -340,33 +383,33 @@ tr146:
 		}
 	goto st135;
 tr152:
-#line 250 "src/admin.rl"
+#line 293 "src/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st135;
 tr160:
-#line 249 "src/admin.rl"
-	{start(out); slab_stat(out); end(out);}
+#line 292 "src/admin.rl"
+	{start(out); show_slab(out); end(out);}
 	goto st135;
 tr164:
-#line 251 "src/admin.rl"
+#line 294 "src/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st135;
 st135:
 	if ( ++p == pe )
 		goto _test_eof135;
 case 135:
-#line 359 "src/admin.m"
+#line 402 "src/admin.m"
 	goto st0;
 tr14:
-#line 256 "src/admin.rl"
+#line 299 "src/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
 tr21:
-#line 244 "src/admin.rl"
+#line 287 "src/admin.rl"
 	{return 0;}
 	goto st7;
 tr26:
-#line 171 "src/admin.rl"
+#line 214 "src/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
@@ -374,9 +417,9 @@ tr26:
 		}
 	goto st7;
 tr37:
-#line 230 "src/admin.rl"
+#line 273 "src/admin.rl"
 	{strend = p;}
-#line 177 "src/admin.rl"
+#line 220 "src/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
@@ -385,7 +428,7 @@ tr37:
 		}
 	goto st7;
 tr44:
-#line 184 "src/admin.rl"
+#line 227 "src/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -394,11 +437,11 @@ tr44:
 		}
 	goto st7;
 tr68:
-#line 254 "src/admin.rl"
+#line 297 "src/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
 tr77:
-#line 191 "src/admin.rl"
+#line 234 "src/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -413,9 +456,9 @@ tr77:
 		}
 	goto st7;
 tr99:
-#line 240 "src/admin.rl"
+#line 283 "src/admin.rl"
 	{ state = false; }
-#line 204 "src/admin.rl"
+#line 247 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -427,9 +470,9 @@ tr99:
 		}
 	goto st7;
 tr102:
-#line 239 "src/admin.rl"
+#line 282 "src/admin.rl"
 	{ state = true; }
-#line 204 "src/admin.rl"
+#line 247 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -441,7 +484,7 @@ tr102:
 		}
 	goto st7;
 tr118:
-#line 147 "src/admin.rl"
+#line 190 "src/admin.rl"
 	{
 			tarantool_cfg_iterator_t *i;
 			char *key, *value;
@@ -461,15 +504,15 @@ tr118:
 		}
 	goto st7;
 tr132:
-#line 247 "src/admin.rl"
+#line 290 "src/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st7;
 tr138:
-#line 246 "src/admin.rl"
+#line 289 "src/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st7;
 tr147:
-#line 165 "src/admin.rl"
+#line 208 "src/admin.rl"
 	{
 			start(out);
 			errinj_info(out);
@@ -477,22 +520,22 @@ tr147:
 		}
 	goto st7;
 tr153:
-#line 250 "src/admin.rl"
+#line 293 "src/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st7;
 tr161:
-#line 249 "src/admin.rl"
-	{start(out); slab_stat(out); end(out);}
+#line 292 "src/admin.rl"
+	{start(out); show_slab(out); end(out);}
 	goto st7;
 tr165:
-#line 251 "src/admin.rl"
+#line 294 "src/admin.rl"
 	{start(out); stat_print(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 496 "src/admin.m"
+#line 539 "src/admin.m"
 	if ( (*p) == 10 )
 		goto st135;
 	goto st0;
@@ -645,28 +688,28 @@ case 23:
 	}
 	goto tr33;
 tr33:
-#line 230 "src/admin.rl"
+#line 273 "src/admin.rl"
 	{strstart = p;}
 	goto st24;
 st24:
 	if ( ++p == pe )
 		goto _test_eof24;
 case 24:
-#line 656 "src/admin.m"
+#line 699 "src/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
 	}
 	goto st24;
 tr34:
-#line 230 "src/admin.rl"
+#line 273 "src/admin.rl"
 	{strstart = p;}
 	goto st25;
 st25:
 	if ( ++p == pe )
 		goto _test_eof25;
 case 25:
-#line 670 "src/admin.m"
+#line 713 "src/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
@@ -1116,28 +1159,28 @@ case 73:
 		goto tr91;
 	goto st0;
 tr91:
-#line 238 "src/admin.rl"
+#line 281 "src/admin.rl"
 	{ strstart = p; }
 	goto st74;
 st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 1127 "src/admin.m"
+#line 1170 "src/admin.m"
 	if ( (*p) == 32 )
 		goto tr92;
 	if ( 33 <= (*p) && (*p) <= 126 )
 		goto st74;
 	goto st0;
 tr92:
-#line 238 "src/admin.rl"
+#line 281 "src/admin.rl"
 	{ strend = p; }
 	goto st75;
 st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 1141 "src/admin.m"
+#line 1184 "src/admin.m"
 	switch( (*p) ) {
 		case 32: goto st75;
 		case 111: goto st76;
@@ -1829,7 +1872,7 @@ case 134:
 	_out: {}
 	}
 
-#line 262 "src/admin.rl"
+#line 305 "src/admin.rl"
 
 
 	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);
