@@ -1410,15 +1410,46 @@ logger = cat - >> tarantool.log
     <title>Package <code>box.info</code></title>
     <para>
         This package provides access to information about
-        server status.
-        The information and information from <olink
-        targetptr="show-info"/> are the same.
+        server variables: pid, uptime, version and such.
+        Its contents is identical to output of <olink
+        targetptr="show-info"/>.
     </para>
     <varlistentry>
-        <term><emphasis role="lua">box.info</emphasis></term>
+        <term>
+            <emphasis role="lua">box.info()</emphasis>
+        </term>
         <listitem>
-            
-        <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+            <simpara>
+            Since contents of box.info is dynamic, it's
+            not possible to iterate over keys with Lua <emphasis>pairs()</emphasis>
+            function. For this purpose, <emphasis>box.info()</emphasis> builds
+            and returns a Lua table with all keys and values
+            provided in the package.
+            </simpara>
+
+       <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+localhost> lua for k,v in pairs(box.info()) do print(k, ": ", v) end
+---
+version: 1.4.7-92-g4ba95ca
+status: primary
+pid: 1747
+lsn: 1712
+recovery_last_update: 1306964594.980
+recovery_lag: 0.000
+uptime: 39
+build: table: 0x419cb880
+logger_pid: 1748
+config: /home/unera/work/tarantool/test/box/tarantool_good.cfg
+...
+</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.info.status, box.info.pid, box.info.lsn, ...</emphasis>
+        </term>
+        <listitem>
+       <bridgehead renderas="sect4">Example</bridgehead><programlisting>
 localhost> lua box.info.pid
 ---
  - 1747
@@ -1462,7 +1493,6 @@ target: Linux-x86_64-Debug
 compiler: /usr/bin/gcc
 options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF -DENABLE_GCOV=OFF -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=OFF
 ...
-localhost>
 </programlisting>
         </listitem>
     </varlistentry>

@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_INFO_H
-#define INCLUDES_TARANTOOL_MOD_BOX_LUA_INFO_H
+#ifndef INCLUDES_TARANTOOL_LUA_INFO_H
+#define INCLUDES_TARANTOOL_LUA_INFO_H
 
 /*
  * Redistribution and use in source and binary forms, with or
@@ -33,4 +33,4 @@
 struct lua_State;
 void lbox_info_init(struct lua_State *L);
 
-#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_INFO_H */
+#endif /* INCLUDES_TARANTOOL_LUA_INFO_H */

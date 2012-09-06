@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#include "box_lua_info.h"
+#include "tarantool_lua_info.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
@@ -92,14 +92,17 @@ lbox_info_dynamic_meta [] =
 	{NULL, NULL}
 };
 
+/** Evaluate box.info.* function value and push it on the stack. */
 static int
 lbox_info_index(struct lua_State *L)
 {
 	lua_pushvalue(L, -1);			/* dup key */
 	lua_gettable(L, lua_upvalueindex(1));   /* table[key] */
 
-	if (!lua_isfunction(L, -1))
+	if (!lua_isfunction(L, -1)) {
+		/* No such key. Leave nil is on the stack. */
 		return 1;
+	}
 
 	lua_call(L, 0, 1);
 	lua_remove(L, -2);
@@ -108,7 +111,8 @@ lbox_info_index(struct lua_State *L)
 
 
 static void
-lbox_info_staticvalues(struct lua_State *L) {
+lbox_info_init_static_values(struct lua_State *L)
+{
 	/* tarantool version */
 	lua_pushstring(L, "version");
 	lua_pushstring(L, tarantool_version());
@@ -157,13 +161,16 @@ lbox_info_staticvalues(struct lua_State *L) {
 	lua_settable(L, -3);    /* box.info.build */
 }
 
+/**
+ * When user invokes box.info(), return a table of key/value
+ * pairs containing the current info.
+ */
 static int
 lbox_info_call(struct lua_State *L)
 {
-	unsigned i;
 	lua_newtable(L);
-	lbox_info_staticvalues(L);
-	for (i = 0; lbox_info_dynamic_meta[i].name; i++) {
+	lbox_info_init_static_values(L);
+	for (int i = 0; lbox_info_dynamic_meta[i].name; i++) {
 		lua_pushstring(L, lbox_info_dynamic_meta[i].name);
 		lbox_info_dynamic_meta[i].func(L);
 		lua_settable(L, -3);
@@ -196,7 +203,7 @@ lbox_info_init(struct lua_State *L)
 
 	lua_setmetatable(L, -2);
 
-	lbox_info_staticvalues(L);		/* fill table */
+	lbox_info_init_static_values(L);
 
 	lua_settable(L, -3);    /* box.info = created table */
 	lua_pop(L, 1);          /* cleanup stack */

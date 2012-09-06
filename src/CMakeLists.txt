@@ -100,7 +100,7 @@ set (common_sources
 	nio.c
 	crc32.c
 	rope.c
-	box_lua_info.m
+	tarantool_lua_info.m
 )
 
 if (ENABLE_TRACE)

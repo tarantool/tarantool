@@ -586,6 +586,8 @@ mod_info(struct tbuf *out)
 }
 
 
-const char * mod_status(void) {
+const char *
+mod_status(void)
+{
     return status;
 }
