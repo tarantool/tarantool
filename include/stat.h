@@ -37,10 +37,9 @@ int stat_register(const char **name, size_t count);
 void stat_collect(int base, int name, i64 value);
 void stat_print(struct tbuf *buf);
 
-int stat_foreach(
-	int cb(const char *name, i64 value, int rps, void *udata),
-	void *data
-);
+typedef int (*stat_cb)(const char *name, i64 value, int rps, void *udata);
+
+int stat_foreach(stat_cb cb, void *data);
 
 
 #endif /* TARANTOOL_STAT_H_INCLUDED */

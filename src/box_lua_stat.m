@@ -38,7 +38,7 @@
 
 
 static int
-_one_stat_item(const char *name, i64 value, int rps, void *udata)
+set_stat_item(const char *name, i64 value, int rps, void *udata)
 {
 	struct lua_State *L = udata;
 
@@ -59,13 +59,12 @@ _one_stat_item(const char *name, i64 value, int rps, void *udata)
 }
 
 
-struct _seek_udata { const char *key; struct lua_State *L; };
+struct stat_udata { const char *key; struct lua_State *L; };
 
 static int
-_seek_stat_item(const char *name, i64 value, int rps, void *udata)
+seek_stat_item(const char *name, i64 value, int rps, void *udata)
 {
-
-	struct _seek_udata *sst = udata;
+	struct stat_udata *sst = udata;
 	if (strcmp(name, sst->key) != 0)
 		return 0;
 
@@ -86,11 +85,11 @@ _seek_stat_item(const char *name, i64 value, int rps, void *udata)
 static int
 lbox_stat_index(struct lua_State *L)
 {
-	struct _seek_udata sst;
+	struct stat_udata sst;
 	sst.key = lua_tolstring(L, -1, NULL);
 	sst.L = L;
 
-	return stat_foreach(_seek_stat_item, &sst);
+	return stat_foreach(seek_stat_item, &sst);
 }
 
 
@@ -98,9 +97,7 @@ static int
 lbox_stat_full(struct lua_State *L)
 {
 	lua_newtable(L);
-
-	stat_foreach(_one_stat_item, L);
-
+	stat_foreach(set_stat_item, L);
 	return 1;
 }
 
