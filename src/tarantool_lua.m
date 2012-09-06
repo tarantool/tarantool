@@ -42,6 +42,7 @@
 #include "pickle.h"
 #include "fiber.h"
 #include <ctype.h>
+#include "tarantool_lua_info.h"
 #include TARANTOOL_CONFIG
 
 /**
@@ -299,7 +300,7 @@ luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
 	return cd;
 }
 
-static int
+int
 luaL_pushnumber64(struct lua_State *L, uint64_t val)
 {
 	GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
@@ -1210,6 +1211,7 @@ tarantool_lua_init()
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 	L = mod_lua_init(L);
+	lbox_info_init(L);
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);
 	return L;

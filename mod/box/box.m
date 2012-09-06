@@ -590,3 +590,9 @@ mod_info(struct tbuf *out)
 	tbuf_printf(out, "  status: %s" CRLF, status);
 }
 
+
+const char *
+mod_status(void)
+{
+    return status;
+}
