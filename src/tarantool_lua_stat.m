@@ -26,75 +26,63 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-
+#include "tarantool_lua_stat.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
 #include <string.h>
-
-#include "box_lua_stat.h"
 #include <stat.h>
 
 
-static int
-set_stat_item(const char *name, i64 value, int rps, void *udata)
+static void
+fill_stat_item(struct lua_State *L, int rps, i64 total)
 {
-	struct lua_State *L = udata;
-
-	lua_pushstring(L, name);
-	lua_newtable(L);
-
 	lua_pushstring(L, "rps");
 	lua_pushnumber(L, rps);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "total");
-	lua_pushnumber(L, value);
+	lua_pushnumber(L, total);
 	lua_settable(L, -3);
+}
+
+static int
+set_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
+{
+	struct lua_State *L = cb_ctx;
+
+	lua_pushstring(L, name);
+	lua_newtable(L);
+
+	fill_stat_item(L, rps, total);
 
 	lua_settable(L, -3);
 
 	return 0;
 }
 
-
-struct stat_udata { const char *key; struct lua_State *L; };
-
 static int
-seek_stat_item(const char *name, i64 value, int rps, void *udata)
+seek_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
 {
-	struct stat_udata *sst = udata;
-	if (strcmp(name, sst->key) != 0)
+	struct lua_State *L = cb_ctx;
+	if (strcmp(name, lua_tostring(L, -1)) != 0)
 		return 0;
 
-	lua_newtable(sst->L);
-
-	lua_pushstring(sst->L, "rps");
-	lua_pushnumber(sst->L, rps);
-	lua_settable(sst->L, -3);
-
-	lua_pushstring(sst->L, "total");
-	lua_pushnumber(sst->L, value);
-	lua_settable(sst->L, -3);
+	lua_newtable(L);
+	fill_stat_item(L, rps, total);
 
 	return 1;
 }
 
-
 static int
 lbox_stat_index(struct lua_State *L)
 {
-	struct stat_udata sst;
-	sst.key = lua_tolstring(L, -1, NULL);
-	sst.L = L;
-
-	return stat_foreach(seek_stat_item, &sst);
+	luaL_checkstring(L, -1);
+	return stat_foreach(seek_stat_item, L);
 }
 
-
 static int
-lbox_stat_full(struct lua_State *L)
+lbox_stat_call(struct lua_State *L)
 {
 	lua_newtable(L);
 	stat_foreach(set_stat_item, L);
@@ -104,10 +92,9 @@ lbox_stat_full(struct lua_State *L)
 
 static const struct luaL_reg lbox_stat_meta [] = {
 	{"__index", lbox_stat_index},
-	{"__call",  lbox_stat_full},
+	{"__call",  lbox_stat_call},
 	{NULL, NULL}
 };
-
 
 void
 box_lua_stat_init(struct lua_State *L)
@@ -120,7 +107,6 @@ box_lua_stat_init(struct lua_State *L)
 	lua_newtable(L);
 	luaL_register(L, NULL, lbox_stat_meta);
 	lua_setmetatable(L, -2);
-
 
 	lua_settable(L, -3);    /* box.stat = created table */
 	lua_pop(L, 1);          /* cleanup stack */

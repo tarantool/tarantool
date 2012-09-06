@@ -1444,15 +1444,15 @@ logger = cat - >> tarantool.log
 <variablelist>
     <title>Package <code>box.stat</code></title>
     <para>This package provides access to request
-    statistic.</para>
+    statistics.</para>
     <varlistentry>
         <term><emphasis role="lua">box.stat</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> lua box.stat -- virtual table
+localhost> lua box.stat -- a virtual table
 ---
  - table: 0x41a07a08
 ...
-localhost> lua box.stat() -- full table (the same)
+localhost> lua box.stat() -- a full table (the same)
 ---
  - table: 0x41a0ebb0
 ...

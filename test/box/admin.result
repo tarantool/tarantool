@@ -1,12 +1,12 @@
 show stat
 ---
 statistics:
-  REPLACE:           { rps:  0    , total:  0           }
-  SELECT:            { rps:  0    , total:  0           }
-  UPDATE:            { rps:  0    , total:  0           }
-  DELETE_1_3:        { rps:  0    , total:  0           }
-  DELETE:            { rps:  0    , total:  0           }
-  CALL:              { rps:  0    , total:  0           }
+  REPLACE:    { rps:  0    , total:  0           }
+  SELECT:     { rps:  0    , total:  0           }
+  UPDATE:     { rps:  0    , total:  0           }
+  DELETE_1_3: { rps:  0    , total:  0           }
+  DELETE:     { rps:  0    , total:  0           }
+  CALL:       { rps:  0    , total:  0           }
 ...
 help
 ---
@@ -78,12 +78,12 @@ configuration:
 show stat
 ---
 statistics:
-  REPLACE:           { rps:  0    , total:  0           }
-  SELECT:            { rps:  0    , total:  0           }
-  UPDATE:            { rps:  0    , total:  0           }
-  DELETE_1_3:        { rps:  0    , total:  0           }
-  DELETE:            { rps:  0    , total:  0           }
-  CALL:              { rps:  0    , total:  0           }
+  REPLACE:    { rps:  0    , total:  0           }
+  SELECT:     { rps:  0    , total:  0           }
+  UPDATE:     { rps:  0    , total:  0           }
+  DELETE_1_3: { rps:  0    , total:  0           }
+  DELETE:     { rps:  0    , total:  0           }
+  CALL:       { rps:  0    , total:  0           }
 ...
 insert into t0 values (1, 'tuple')
 Insert OK, 1 row affected

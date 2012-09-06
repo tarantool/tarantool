@@ -42,7 +42,7 @@
 #include "pickle.h"
 #include "fiber.h"
 #include <ctype.h>
-#include "box_lua_stat.h"
+#include "tarantool_lua_stat.h"
 
 #include TARANTOOL_CONFIG
 

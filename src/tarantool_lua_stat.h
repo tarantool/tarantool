@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA__STAT_H
-#define INCLUDES_TARANTOOL_MOD_BOX_LUA__STAT_H
+#ifndef INCLUDES_TARANTOOL_LUA_STAT_H
+#define INCLUDES_TARANTOOL_LUA_STAT_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -32,5 +32,4 @@
 struct lua_State;
 void box_lua_stat_init(struct lua_State *L);
 
-#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_STAT_H */
-
+#endif /* INCLUDES_TARANTOOL_LUA_STAT_H */

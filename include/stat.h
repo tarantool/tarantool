@@ -34,12 +34,12 @@ void stat_init(void);
 void stat_free(void);
 void stat_cleanup(int base, size_t max_idx);
 int stat_register(const char **name, size_t count);
+int stat_max_name_len;
+
 void stat_collect(int base, int name, i64 value);
-void stat_print(struct tbuf *buf);
 
-typedef int (*stat_cb)(const char *name, i64 value, int rps, void *udata);
+typedef int (*stat_cb)(const char *name, int rps, i64 total, void *cb_ctx);
 
-int stat_foreach(stat_cb cb, void *data);
-
+int stat_foreach(stat_cb cb, void *cb_ctx);
 
 #endif /* TARANTOOL_STAT_H_INCLUDED */
