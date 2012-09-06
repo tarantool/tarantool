@@ -37,9 +37,8 @@
 #include <string.h>
 #include <recovery.h>
 
-
 static int
-lbox_info_get_recovery_lag(struct lua_State *L)
+lbox_info_recovery_lag(struct lua_State *L)
 {
 	if (recovery_state->remote)
 		lua_pushnumber(L, recovery_state->remote->recovery_lag);
@@ -49,7 +48,7 @@ lbox_info_get_recovery_lag(struct lua_State *L)
 }
 
 static int
-lbox_info_get_recovery_last_update_tstamp(struct lua_State *L)
+lbox_info_recovery_last_update_tstamp(struct lua_State *L)
 {
 	if (recovery_state->remote)
 		lua_pushnumber(L,
@@ -60,15 +59,14 @@ lbox_info_get_recovery_last_update_tstamp(struct lua_State *L)
 }
 
 static int
-lbox_info_get_lsn(struct lua_State *L)
+lbox_info_lsn(struct lua_State *L)
 {
 	luaL_pushnumber64(L, recovery_state->confirmed_lsn);
 	return 1;
 }
 
-
 static int
-lbox_info_get_status(struct lua_State *L)
+lbox_info_status(struct lua_State *L)
 {
 	lua_pushstring(L, mod_status());
 	return 1;
@@ -84,10 +82,10 @@ lbox_info_uptime(struct lua_State *L)
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
 {
-	{"recovery_lag", lbox_info_get_recovery_lag},
-	{"recovery_last_update", lbox_info_get_recovery_last_update_tstamp},
-	{"lsn", lbox_info_get_lsn},
-	{"status", lbox_info_get_status},
+	{"recovery_lag", lbox_info_recovery_lag},
+	{"recovery_last_update", lbox_info_recovery_last_update_tstamp},
+	{"lsn", lbox_info_lsn},
+	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{NULL, NULL}
 };
@@ -109,7 +107,7 @@ lbox_info_index(struct lua_State *L)
 	return 1;
 }
 
-
+/** Push a bunch of compile-time or start-time constants into a Lua table. */
 static void
 lbox_info_init_static_values(struct lua_State *L)
 {
@@ -132,7 +130,6 @@ lbox_info_init_static_values(struct lua_State *L)
 	lua_pushstring(L, "config");
 	lua_pushstring(L, cfg_filename_fullpath);
 	lua_settable(L, -3);
-
 
 	/* build */
 	lua_pushstring(L, "build");
@@ -178,10 +175,10 @@ lbox_info_call(struct lua_State *L)
 	return 1;
 }
 
+/** Initialize box.info package. */
 void
 tarantool_lua_info_init(struct lua_State *L)
 {
-
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 
 	lua_pushstring(L, "info");
@@ -199,7 +196,6 @@ tarantool_lua_info_init(struct lua_State *L)
 	lua_pushstring(L, "__call");
 	lua_pushcfunction(L, lbox_info_call);
 	lua_settable(L, -3);
-
 
 	lua_setmetatable(L, -2);
 

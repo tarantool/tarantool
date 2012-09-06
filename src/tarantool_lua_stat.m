@@ -61,6 +61,10 @@ set_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
 	return 0;
 }
 
+/**
+ * A stat_foreach() callback used to handle access to e.g.
+ * box.stats.DELETE.
+ */
 static int
 seek_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
 {
@@ -89,13 +93,13 @@ lbox_stat_call(struct lua_State *L)
 	return 1;
 }
 
-
 static const struct luaL_reg lbox_stat_meta [] = {
 	{"__index", lbox_stat_index},
 	{"__call",  lbox_stat_call},
 	{NULL, NULL}
 };
 
+/** Initialize bos.stat package. */
 void
 tarantool_lua_stat_init(struct lua_State *L)
 {

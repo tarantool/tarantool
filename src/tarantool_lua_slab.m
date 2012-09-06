@@ -32,11 +32,16 @@
 #include "lualib.h"
 #include <salloc.h>
 
+/** A callback passed into salloc_stat() and invoked for every slab class. */
 static int
 salloc_stat_lua_cb(const struct slab_class_stats *cstat, void *cb_ctx)
 {
 	struct lua_State *L = cb_ctx;
 
+	/*
+	 * Create a Lua table for every slab class. A class is
+	 * defined by its item size.
+	 */
 	lua_pushnumber(L, cstat->item_size);
 	lua_newtable(L);
 
@@ -136,6 +141,7 @@ lbox_slab_index(struct lua_State *L)
 	return 1;
 }
 
+/** Initialize box.slab package. */
 void
 tarantool_lua_slab_init(struct lua_State *L)
 {
