@@ -1404,7 +1404,7 @@ logger = cat - >> tarantool.log
 
 <variablelist>
     <title>Package <code>box.slab</code></title>
-    <para>This package provides access to slab statistic.</para>
+    <para>This package provides access to slab allocator statistics.</para>
     <varlistentry>
         <term><emphasis role="lua">box.slab</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>

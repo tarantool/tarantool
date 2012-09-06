@@ -73,44 +73,45 @@ static const char *unknown_command = "unknown command. try typing help." CRLF;
 	write data;
 }%%
 
-struct slab_stat_totals {
+struct salloc_stat_admin_cb_ctx {
 	i64 total_used;
 	struct tbuf *out;
 };
 
 static int
-_one_slab_stat(const struct slab_stat_one *st, void *udata) {
-	struct slab_stat_totals *ts = udata;
+salloc_stat_admin_cb(const struct slab_class_stats *cstat, void *cb_ctx)
+{
+	struct salloc_stat_admin_cb_ctx *ctx = cb_ctx;
 
-	tbuf_printf(ts->out,
-		"     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
-		", bytes_used: %- 12" PRIi64
-			", bytes_free: %- 12" PRIi64 " }" CRLF,
-		(int)st->item_size,
-		(int)st->slabs,
-		st->items,
-		st->bytes_used,
-		st->bytes_free
-	);
+	tbuf_printf(ctx->out,
+		    "     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
+		    ", bytes_used: %- 12" PRIi64
+		    ", bytes_free: %- 12" PRIi64 " }" CRLF,
+		    (int)cstat->item_size,
+		    (int)cstat->slabs,
+		    cstat->items,
+		    cstat->bytes_used,
+		    cstat->bytes_free);
 
-	ts->total_used += st->bytes_used;
+	ctx->total_used += cstat->bytes_used;
 	return 0;
 }
 
 static void
-slab_stat(struct tbuf *out)
+show_slab(struct tbuf *out)
 {
-	struct slab_stat_totals ts;
-	struct arena_stat astat;
-	ts.total_used = 0;
-	ts.out = out;
+	struct salloc_stat_admin_cb_ctx cb_ctx;
+	struct slab_arena_stats astat;
+
+	cb_ctx.total_used = 0;
+	cb_ctx.out = out;
 
 	tbuf_printf(out, "slab statistics:\n  classes:" CRLF);
 
-	full_slab_stat(_one_slab_stat, &astat, &ts);
+	salloc_stat(salloc_stat_admin_cb, &astat, &cb_ctx);
 
 	tbuf_printf(out, "  items_used: %.2f%%" CRLF,
-		(double)ts.total_used / astat.size * 100);
+		(double)cb_ctx.total_used / astat.size * 100);
 	tbuf_printf(out, "  arena_used: %.2f%%" CRLF,
 		(double)astat.used / astat.size * 100);
 }
@@ -288,7 +289,7 @@ admin_dispatch(lua_State *L)
 			    show " "+ info		%{start(out); tarantool_info(out); end(out);}	|
 			    show " "+ fiber		%{start(out); fiber_info(out); end(out);}	|
 			    show " "+ configuration 	%show_configuration				|
-			    show " "+ slab		%{start(out); slab_stat(out); end(out);}	|
+			    show " "+ slab		%{start(out); show_slab(out); end(out);}	|
 			    show " "+ palloc		%{start(out); palloc_stat(out); end(out);}	|
 			    show " "+ stat		%{start(out); stat_print(out);end(out);}	|
 			    show " "+ injections	%show_injections                                |

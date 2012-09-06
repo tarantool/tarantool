@@ -1,6 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_SLAB_H
-#define INCLUDES_TARANTOOL_MOD_BOX_LUA_SLAB_H
-
+#ifndef INCLUDES_TARANTOOL_LUA_SLAB_H
+#define INCLUDES_TARANTOOL_LUA_SLAB_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -33,4 +32,4 @@
 struct lua_State;
 void lbox_slab_init(struct lua_State *L);
 
-#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_SLAB_H */
+#endif /* INCLUDES_TARANTOOL_LUA_SLAB_H */

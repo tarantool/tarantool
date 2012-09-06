@@ -174,46 +174,37 @@ static struct stats {
 	u64 bytes_written;
 } stats;
 
-struct slab_stat_totals {
+struct salloc_stat_memcached_cb_ctx {
 	i64 bytes_used;
 	i64 items;
 };
 
 static int
-slab_stat_one(const struct slab_stat_one *st, void *udata)
+salloc_stat_memcached_cb(const struct slab_class_stats *cstat, void *cb_ctx)
 {
-	struct slab_stat_totals *ts = udata;
-	ts->bytes_used	+= st->bytes_used;
-	ts->items	+= st->items;
+	struct salloc_stat_memcached_cb_ctx *ctx = cb_ctx;
+	ctx->bytes_used	+= cstat->bytes_used;
+	ctx->items	+= cstat->items;
 	return 0;
-}
-
-static void
-slab_stat2(u64 *bytes_used, u64 *items)
-{
-	struct slab_stat_totals ts;
-	ts.bytes_used = ts.items = 0;
-	full_slab_stat(slab_stat_one, NULL, &ts);
-
-	*bytes_used = ts.bytes_used;
-	*items = ts.items;
 }
 
 static void
 print_stats()
 {
-	u64 bytes_used, items;
 	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
-	slab_stat2(&bytes_used, &items);
+
+	struct salloc_stat_memcached_cb_ctx memstats;
+	memstats.bytes_used = memstats.items = 0;
+	salloc_stat(salloc_stat_memcached_cb, NULL, &memstats);
 
 	tbuf_printf(out, "STAT pid %"PRIu32"\r\n", (u32)getpid());
 	tbuf_printf(out, "STAT uptime %"PRIu32"\r\n", (u32)tarantool_uptime());
 	tbuf_printf(out, "STAT time %"PRIu32"\r\n", (u32)ev_now());
 	tbuf_printf(out, "STAT version 1.2.5 (tarantool/box)\r\n");
 	tbuf_printf(out, "STAT pointer_size %"PRI_SZ"\r\n", sizeof(void *)*8);
-	tbuf_printf(out, "STAT curr_items %"PRIu64"\r\n", items);
+	tbuf_printf(out, "STAT curr_items %"PRIu64"\r\n", memstats.items);
 	tbuf_printf(out, "STAT total_items %"PRIu64"\r\n", stats.total_items);
-	tbuf_printf(out, "STAT bytes %"PRIu64"\r\n", bytes_used);
+	tbuf_printf(out, "STAT bytes %"PRIu64"\r\n", memstats.bytes_used);
 	tbuf_printf(out, "STAT curr_connections %"PRIu32"\r\n", stats.curr_connections);
 	tbuf_printf(out, "STAT total_connections %"PRIu32"\r\n", stats.total_connections);
 	tbuf_printf(out, "STAT connection_structures %"PRIu32"\r\n", stats.curr_connections); /* lie a bit */

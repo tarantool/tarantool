@@ -26,45 +26,39 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include "box_lua_slab.h"
+#include "tarantool_lua_slab.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
 #include <salloc.h>
 
-
-
 static int
-slab_stat_one(const struct slab_stat_one *st, void *udata)
+salloc_stat_lua_cb(const struct slab_class_stats *cstat, void *cb_ctx)
 {
+	struct lua_State *L = cb_ctx;
 
-	struct lua_State *L = udata;
-
-	lua_pushnumber(L, st->item_size);
+	lua_pushnumber(L, cstat->item_size);
 	lua_newtable(L);
 
-
 	lua_pushstring(L, "slabs");
-	lua_pushnumber(L, st->slabs);
+	lua_pushnumber(L, cstat->slabs);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "items");
-	lua_pushnumber(L, st->items);
+	lua_pushnumber(L, cstat->items);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "bytes_used");
-	lua_pushnumber(L, st->bytes_used);
+	lua_pushnumber(L, cstat->bytes_used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "bytes_free");
-	lua_pushnumber(L, st->bytes_free);
+	lua_pushnumber(L, cstat->bytes_free);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "item_size");
-	lua_pushnumber(L, st->item_size);
+	lua_pushnumber(L, cstat->item_size);
 	lua_settable(L, -3);
-
 
 	lua_settable(L, -3);
 
@@ -72,42 +66,40 @@ slab_stat_one(const struct slab_stat_one *st, void *udata)
 }
 
 static int
-lbox_slab_get_slabs(struct lua_State *L)
+lbox_slab_slabs(struct lua_State *L)
 {
 	lua_newtable(L);
-	full_slab_stat(slab_stat_one, NULL, L);
+	salloc_stat(salloc_stat_lua_cb, NULL, L);
 	return 1;
 }
 
-
 static int
-lbox_slab_get_arena_used(struct lua_State *L)
+lbox_slab_arena_used(struct lua_State *L)
 {
-	struct arena_stat astat;
-	full_slab_stat(NULL, &astat, NULL);
+	struct slab_arena_stats astat;
+	salloc_stat(NULL, &astat, NULL);
 	lua_pushnumber(L, astat.used);
 	return 1;
 }
 
 static int
-lbox_slab_get_arena_size(struct lua_State *L)
+lbox_slab_arena_size(struct lua_State *L)
 {
-	struct arena_stat astat;
-	full_slab_stat(NULL, &astat, NULL);
+	struct slab_arena_stats astat;
+	salloc_stat(NULL, &astat, NULL);
 	lua_pushnumber(L, astat.size);
 	return 1;
 }
 
-
 static int
 lbox_slab_call(struct lua_State *L)
 {
-	struct arena_stat astat;
+	struct slab_arena_stats astat;
 
 	lua_newtable(L);
 	lua_pushstring(L, "slabs");
 	lua_newtable(L);
-	full_slab_stat(slab_stat_one, &astat, L);
+	salloc_stat(salloc_stat_lua_cb, &astat, L);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_used");
@@ -121,11 +113,10 @@ lbox_slab_call(struct lua_State *L)
 	return 1;
 }
 
-
 static const struct luaL_reg lbox_slab_dynamic_meta [] = {
-	{"slabs", lbox_slab_get_slabs},
-	{"arena_used", lbox_slab_get_arena_used},
-	{"arena_size", lbox_slab_get_arena_size},
+	{"slabs", lbox_slab_slabs},
+	{"arena_used", lbox_slab_arena_used},
+	{"arena_size", lbox_slab_arena_size},
 	{NULL, NULL}
 };
 
@@ -135,8 +126,10 @@ lbox_slab_index(struct lua_State *L)
 	lua_pushvalue(L, -1);			/* dup key */
 	lua_gettable(L, lua_upvalueindex(1));   /* table[key] */
 
-	if (!lua_isfunction(L, -1))
+	if (!lua_isfunction(L, -1)) {
+		/* If key is not found, leave nil on the stack. */
 		return 1;
+	}
 
 	lua_call(L, 0, 1);
 	lua_remove(L, -2);
@@ -144,8 +137,8 @@ lbox_slab_index(struct lua_State *L)
 }
 
 void
-lbox_slab_init(struct lua_State *L) {
-
+lbox_slab_init(struct lua_State *L)
+{
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 
 	lua_pushstring(L, "slab");

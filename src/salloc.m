@@ -329,21 +329,17 @@ sfree(void *ptr)
 }
 
 
-/*
- * full_slab_stat(cb, arena_stat, user_data) - look through slabs statistic
+/**
+ * Collect slab allocator statistics.
  *
- * @cb - a callback to receive statistic item
- * @arena_stat - a structure to get stat of arena
+ * @param cb - a callback to receive statistic item
+ * @param astat - a structure to fill with of arena
  * @user_data - user's data that will be sent to cb
  *
  */
-
-int full_slab_stat(
-	int (*cb)(const struct slab_stat_totals *, void *),
-	struct arena_stat *astat,
-	void *user_data) {
-
-
+int
+salloc_stat(salloc_stat_cb cb, struct slab_arena_stats *astat, void *cb_ctx)
+{
 	if (astat) {
 		astat->used = arena.used;
 		astat->size = arena.size;
@@ -351,8 +347,7 @@ int full_slab_stat(
 
 	if (cb) {
 		struct slab *slab;
-		struct slab_stat_totals st;
-
+		struct slab_class_stats st;
 
 		for (int i = 0; i < slab_active_classes; i++) {
 			memset(&st, 0, sizeof(st));
@@ -370,11 +365,10 @@ int full_slab_stat(
 
 			if (st.slabs == 0)
 				continue;
-			int res = cb(&st, user_data);
+			int res = cb(&st, cb_ctx);
 			if (res != 0)
 				return res;
 		}
 	}
-
 	return 0;
 }
