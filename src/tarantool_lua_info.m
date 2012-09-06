@@ -179,7 +179,7 @@ lbox_info_call(struct lua_State *L)
 }
 
 void
-lbox_info_init(struct lua_State *L)
+tarantool_lua_info_init(struct lua_State *L)
 {
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");

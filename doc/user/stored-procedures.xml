@@ -1633,6 +1633,50 @@ bytes_free:4194144
     </varlistentry>
 </variablelist>
 
+<variablelist>
+    <title>Package <code>box.stat</code></title>
+    <para>This package provides access to request
+    statistics.</para>
+    <varlistentry>
+        <term><emphasis role="lua">box.stat</emphasis></term>
+        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
+localhost> lua box.stat -- a virtual table
+---
+ - table: 0x41a07a08
+...
+localhost> lua box.stat() -- a full table (the same)
+---
+ - table: 0x41a0ebb0
+...
+localhost> lua for k, v in pairs(box.stat()) do print(k) end
+---
+DELETE
+SELECT
+REPLACE
+CALL
+UPDATE
+DELETE_1_3
+...
+localhost> lua for k, v in pairs(box.stat().DELETE) do print(k, ': ', v) end
+---
+total: 23210
+rps: 22
+...
+localhost> lua for k, v in pairs(box.stat.DELETE) do print(k, ': ', v) end -- the same
+---
+total: 23210
+rps: 22
+...
+localhost> lua for k, v in pairs(box.stat.SELECT) do print(k, ': ', v) end
+---
+total: 34553330
+rps: 23
+...
+localhost>
+</programlisting></listitem>
+    </varlistentry>
+</variablelist>
+
 <para>
     Additional examples can be found in the open source <link
     xlink:href="https://github.com/mailru/tntlua">Lua stored

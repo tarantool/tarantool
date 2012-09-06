@@ -101,6 +101,7 @@ set (common_sources
      crc32.c
      rope.c
      tarantool_lua_info.m
+     tarantool_lua_stat.m
      tarantool_lua_slab.m)
 
 if (ENABLE_TRACE)

@@ -137,7 +137,7 @@ lbox_slab_index(struct lua_State *L)
 }
 
 void
-lbox_slab_init(struct lua_State *L)
+tarantool_lua_slab_init(struct lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 

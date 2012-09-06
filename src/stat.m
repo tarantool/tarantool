@@ -45,6 +45,18 @@ struct {
 static int stats_size = 0;
 static int stats_max = 0;
 static int base = 0;
+int stat_max_name_len = 0;
+
+static void
+stat_recalc_max_name_len()
+{
+	stat_max_name_len = 0;
+	for (unsigned i = 0; i <= stats_max; i++) {
+		if (stats[i].name != NULL)
+			stat_max_name_len = MAX(stat_max_name_len,
+						strlen(stats[i].name));
+	}
+}
 
 int
 stat_register(const char **name, size_t max_idx)
@@ -69,6 +81,7 @@ stat_register(const char **name, size_t max_idx)
 
 		stats_max = base;
 	}
+	stat_recalc_max_name_len();
 
 	return initial_base;
 }
@@ -80,19 +93,10 @@ stat_collect(int base, int name, i64 value)
 	stats[base + name].value[SECS] += value;
 }
 
-void
-stat_print(struct tbuf *buf)
+int
+stat_foreach(stat_cb cb, void *cb_ctx)
 {
-	int max_len = 0;
-	tbuf_printf(buf, "statistics:" CRLF);
-
-	for (int i = 0; i <= stats_max; i++) {
-		if (stats[i].name == NULL)
-			continue;
-		max_len = MAX(max_len, strlen(stats[i].name));
-	}
-
-	for (int i = 0; i <= stats_max; i++) {
+	for (unsigned i = 0; i <= stats_max; i++) {
 		if (stats[i].name == NULL)
 			continue;
 
@@ -102,10 +106,13 @@ stat_print(struct tbuf *buf)
 
 		diff /= SECS;
 
-		tbuf_printf(buf, "  %s:%*s{ rps: %- 6i, total: %- 12" PRIi64 " }" CRLF,
-			    stats[i].name, 1 + max_len - (int)strlen(stats[i].name), " ",
-			    diff, stats[i].value[SECS]);
+		int res = cb(stats[i].name, diff,
+			     stats[i].value[SECS], cb_ctx);
+		if (res != 0)
+			return res;
 	}
+	return 0;
+
 }
 
 void

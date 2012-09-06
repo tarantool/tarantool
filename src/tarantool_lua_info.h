@@ -31,6 +31,6 @@
  */
 
 struct lua_State;
-void lbox_info_init(struct lua_State *L);
+void tarantool_lua_info_init(struct lua_State *L);
 
 #endif /* INCLUDES_TARANTOOL_LUA_INFO_H */

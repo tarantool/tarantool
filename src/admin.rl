@@ -169,6 +169,24 @@ tarantool_info(struct tbuf *out)
 }
 
 static int
+show_stat_item(const char *name, int rps, i64 total, void *ctx)
+{
+	struct tbuf *buf = ctx;
+	int name_len = strlen(name);
+	tbuf_printf(buf,
+		    "  %s:%*s{ rps: %- 6i, total: %- 12" PRIi64 " }" CRLF,
+		    name, 1 + stat_max_name_len - name_len, " ", rps, total);
+	return 0;
+}
+
+void
+show_stat(struct tbuf *buf)
+{
+	tbuf_printf(buf, "statistics:" CRLF);
+	stat_foreach(show_stat_item, buf);
+}
+
+static int
 admin_dispatch(lua_State *L)
 {
 	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
@@ -291,7 +309,7 @@ admin_dispatch(lua_State *L)
 			    show " "+ configuration 	%show_configuration				|
 			    show " "+ slab		%{start(out); show_slab(out); end(out);}	|
 			    show " "+ palloc		%{start(out); palloc_stat(out); end(out);}	|
-			    show " "+ stat		%{start(out); stat_print(out);end(out);}	|
+			    show " "+ stat		%{start(out); show_stat(out);end(out);}		|
 			    show " "+ injections	%show_injections                                |
 			    set " "+ injection " "+ name " "+ state	%set_injection                  |
 			    save " "+ coredump		%{coredump(60); ok(out);}			|
