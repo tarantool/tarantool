@@ -82,14 +82,14 @@ static const int admin_en_main = 1;
 #line 74 "src/admin.rl"
 
 
-struct _total_slab_stat {
+struct slab_stat_totals {
 	i64 total_used;
 	struct tbuf *out;
 };
 
 static int
-_one_slab_stat(const struct one_slab_stat *st, void *udata) {
-	struct _total_slab_stat *ts = udata;
+_one_slab_stat(const struct slab_stat_one *st, void *udata) {
+	struct slab_stat_totals *ts = udata;
 
 	tbuf_printf(ts->out,
 		"     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
@@ -109,7 +109,7 @@ _one_slab_stat(const struct one_slab_stat *st, void *udata) {
 static void
 slab_stat(struct tbuf *out)
 {
-	struct _total_slab_stat ts;
+	struct slab_stat_totals ts;
 	struct arena_stat astat;
 	ts.total_used = 0;
 	ts.out = out;

@@ -41,7 +41,7 @@ void sfree(void *ptr);
 void slab_validate();
 
 
-struct one_slab_stat {
+struct slab_stat_one {
 	i64 item_size;
 	i64 slabs;
 	i64 items;
@@ -55,7 +55,7 @@ struct arena_stat {
 };
 
 int full_slab_stat(
-	int (*cb)(const struct one_slab_stat *st, void *udata),
+	int (*cb)(const struct slab_stat_one *st, void *udata),
 	struct arena_stat *stat,
 	void *data
 );

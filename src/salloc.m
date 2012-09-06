@@ -339,7 +339,7 @@ sfree(void *ptr)
  */
 
 int full_slab_stat(
-	int (*cb)(const struct one_slab_stat *, void *),
+	int (*cb)(const struct slab_stat_totals *, void *),
 	struct arena_stat *astat,
 	void *user_data) {
 
@@ -351,7 +351,7 @@ int full_slab_stat(
 
 	if (cb) {
 		struct slab *slab;
-		struct one_slab_stat st;
+		struct slab_stat_totals st;
 
 
 		for (int i = 0; i < slab_active_classes; i++) {

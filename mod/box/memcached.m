@@ -174,15 +174,15 @@ static struct stats {
 	u64 bytes_written;
 } stats;
 
-struct _total_slab_stat {
+struct slab_stat_totals {
 	i64 bytes_used;
 	i64 items;
 };
 
 static int
-_one_slab_stat(const struct one_slab_stat *st, void *udata)
+slab_stat_one(const struct slab_stat_one *st, void *udata)
 {
-	struct _total_slab_stat *ts = udata;
+	struct slab_stat_totals *ts = udata;
 	ts->bytes_used	+= st->bytes_used;
 	ts->items	+= st->items;
 	return 0;
@@ -191,9 +191,9 @@ _one_slab_stat(const struct one_slab_stat *st, void *udata)
 static void
 slab_stat2(u64 *bytes_used, u64 *items)
 {
-	struct _total_slab_stat ts;
+	struct slab_stat_totals ts;
 	ts.bytes_used = ts.items = 0;
-	full_slab_stat(_one_slab_stat, NULL, &ts);
+	full_slab_stat(slab_stat_one, NULL, &ts);
 
 	*bytes_used = ts.bytes_used;
 	*items = ts.items;

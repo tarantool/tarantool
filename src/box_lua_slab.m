@@ -36,7 +36,7 @@
 
 
 static int
-_one_slab_stat(const struct one_slab_stat *st, void *udata)
+slab_stat_one(const struct slab_stat_one *st, void *udata)
 {
 
 	struct lua_State *L = udata;
@@ -74,9 +74,8 @@ _one_slab_stat(const struct one_slab_stat *st, void *udata)
 static int
 lbox_slab_get_slabs(struct lua_State *L)
 {
-
 	lua_newtable(L);
-	full_slab_stat(_one_slab_stat, NULL, L);
+	full_slab_stat(slab_stat_one, NULL, L);
 	return 1;
 }
 
@@ -108,7 +107,7 @@ lbox_slab_call(struct lua_State *L)
 	lua_newtable(L);
 	lua_pushstring(L, "slabs");
 	lua_newtable(L);
-	full_slab_stat(_one_slab_stat, &astat, L);
+	full_slab_stat(slab_stat_one, &astat, L);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_used");
@@ -119,9 +118,9 @@ lbox_slab_call(struct lua_State *L)
 	lua_pushnumber(L, astat.size);
 	lua_settable(L, -3);
 
-
 	return 1;
 }
+
 
 static const struct luaL_reg lbox_slab_dynamic_meta [] = {
 	{"slabs", lbox_slab_get_slabs},
@@ -129,7 +128,6 @@ static const struct luaL_reg lbox_slab_dynamic_meta [] = {
 	{"arena_size", lbox_slab_get_arena_size},
 	{NULL, NULL}
 };
-
 
 static int
 lbox_slab_index(struct lua_State *L)
@@ -144,7 +142,6 @@ lbox_slab_index(struct lua_State *L)
 	lua_remove(L, -2);
 	return 1;
 }
-
 
 void
 lbox_slab_init(struct lua_State *L) {
