@@ -143,8 +143,17 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 		if (*f == '/' && *(f + 1) != '\0')
 			filename = f + 1;
 
-	p += snprintf(buf + p, len - p, "%.3f %i %i/%s %s",
-		      ev_now(), getpid(), fiber->fid, fiber->name, peer_name);
+	time_t now = (time_t) ev_now();
+	struct tm tm;
+	localtime_r(&now, &tm);
+
+	/* Print time in format 2012-08-07 18:30:00.634 */
+	p += strftime(buf + p, len - p, "%F %H:%M", &tm);
+	p += snprintf(buf + p, len - p, ":%06.3f",
+		      ev_now() - now + tm.tm_sec);
+
+	p += snprintf(buf + p, len - p, " [%i] %i/%s %s", getpid(),
+		      fiber->fid, fiber->name, peer_name);
 
 	if (level == S_WARN || level == S_ERROR)
 		p += snprintf(buf + p, len - p, " %s:%i", filename, line);
