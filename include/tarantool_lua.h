@@ -45,9 +45,9 @@ extern struct lua_State *tarantool_L;
  * This is a callback used by tarantool_lua_init() to open
  * module-specific libraries into given Lua state.
  *
- * @return  L on success, 0 if out of memory
+ * No return value, panics if error.
  */
-struct lua_State *
+void
 mod_lua_init(struct lua_State *L);
 
 void

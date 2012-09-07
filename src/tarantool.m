@@ -741,7 +741,6 @@ main(int argc, char **argv)
 	tarantool_lua_load_cfg(tarantool_L, &cfg);
 	admin_init();
 	replication_init();
-
 	/*
 	 * Load user init script.  The script should have access
 	 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that

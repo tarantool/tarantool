@@ -56,7 +56,7 @@ extern const char box_lua[];
  * Lua coroutines (lua_newthread()) to have multiple
  * procedures running at the same time.
  */
-lua_State *root_L;
+static lua_State *root_L;
 
 /*
  * Functions, exported in box_lua.h should have prefix
@@ -1040,7 +1040,7 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
 }
 @end
 
-struct lua_State *
+void
 mod_lua_init(struct lua_State *L)
 {
 	/* box, box.tuple */
@@ -1058,11 +1058,5 @@ mod_lua_init(struct lua_State *L)
 
 	assert(lua_gettop(L) == 0);
 
-	return L;
+	root_L = L;
 }
-
-void box_lua_init()
-{
-	root_L = tarantool_L;
-}
-

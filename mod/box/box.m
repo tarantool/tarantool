@@ -478,7 +478,6 @@ mod_init(void)
 	atexit(mod_free);
 
 	port_init();
-	box_lua_init();
 
 	/* initialization spaces */
 	space_init();

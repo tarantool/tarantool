@@ -1,4 +1,4 @@
-box.flags = { BOX_RETURN_TUPLE = 0x01, BOX_ADD = 0x02, BOX_REPLACE = 0x04, }
+box.flags = { BOX_RETURN_TUPLE = 0x01, BOX_ADD = 0x02, BOX_REPLACE = 0x04 }
 
 --
 --
@@ -241,9 +241,6 @@ function box.on_reload_configuration()
     end
     space_mt.insert = function(space, ...) return box.insert(space.n, ...) end
     space_mt.update = function(space, ...) return box.update(space.n, ...) end
-    space_mt.update_ol = function(space, ops_list, ...)
-        return box.update_ol(space.n, ops_list,...)
-    end
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.truncate = function(space)
