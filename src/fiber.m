@@ -127,7 +127,7 @@ fiber_wakeup(struct fiber *f)
  * Note: this is not guaranteed to succeed, and requires a level
  * of cooperation on behalf of the fiber. A fiber may opt to set
  * FIBER_CANCELLABLE to false, and never test that it was
- * cancelled.  Such fiber we won't be ever to cancel, ever, and
+ * cancelled.  Such fiber can not ever be cancelled, and
  * for such fiber this call will lead to an infinite wait.
  * However, fiber_testcancel() is embedded to the rest of fiber_*
  * API (@sa fiber_yield()), which makes most of the fibers that opt in,
@@ -203,7 +203,6 @@ fiber_testcancel(void)
 /** Change the current cancellation state of a fiber. This is not
  * a cancellation point.
  */
-
 void fiber_setcancelstate(bool enable)
 {
 	if (enable == true)
@@ -217,7 +216,6 @@ void fiber_setcancelstate(bool enable)
  * but it is considered good practice to call testcancel()
  * after each yield.
  */
-
 void
 fiber_yield(void)
 {

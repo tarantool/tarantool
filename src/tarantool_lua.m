@@ -1255,11 +1255,11 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 	}
 	@try {
 		lua_call(L, 0, LUA_MULTRET);
-	} @catch (ClientError *e) {
-		lua_pushstring(L, e->errmsg);
-		return 1;
-	} @catch (tnt_Exception *e) {
+	} @catch (FiberCancelException *e) {
 		@throw;
+	} @catch (tnt_Exception *e) {
+		lua_pushstring(L, [e errmsg]);
+		return 1;
 	} @catch (...) {
 		return 1;
 	}

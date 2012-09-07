@@ -22,7 +22,7 @@ copy_box_cfg()
 
 --
 -- Test for bug #977898
--- Insert from detached field
+-- Insert from detached fiber
 --
 
 local function do_insert()
