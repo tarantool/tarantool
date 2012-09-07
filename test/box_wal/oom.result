@@ -1,0 +1,107 @@
+lua i = 1 while true do box.insert(0, box.space[0]:len(), string.rep('test', i)) i = i + 1 end
+---
+error: 'Failed to allocate 19436 bytes in slab allocator for tuple'
+...
+lua box.space[0]:len()
+---
+ - 4853
+...
+lua i = 1 while true do box.insert(0, box.space[0]:len(), string.rep('test', i)) i = i + 1 end
+---
+error: 'Failed to allocate 4095 bytes in slab allocator for tuple'
+...
+lua box.space[0]:len()
+---
+ - 5871
+...
+lua i = 1 while true do box.insert(0, box.space[0]:len(), string.rep('test', i)) i = i + 1 end
+---
+error: 'Failed to allocate 2051 bytes in slab allocator for tuple'
+...
+lua box.space[0]:len()
+---
+ - 6378
+...
+lua box.space[0]:select(0, 0)
+---
+ - 0: {1953719668}
+...
+lua box.space[0]:select(0, 5)
+---
+ - 5: {'testtesttesttesttesttest'}
+...
+lua box.space[0]:select(0, 9)
+---
+ - 9: {'testtesttesttesttesttesttesttesttesttest'}
+...
+lua box.space[0]:select(0, 11)
+---
+ - 11: {'testtesttesttesttesttesttesttesttesttesttesttest'}
+...
+lua box.space[0]:select(0, 15)
+---
+ - 15: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+...
+lua i = 0 for k,v in box.space[0]:pairs() do print(v) i = i + 1 if i == 50 then break end end
+---
+0: {1953719668}
+1: {8391162081565697396}
+2: {'testtesttest'}
+3: {'testtesttesttest'}
+4: {'testtesttesttesttest'}
+5: {'testtesttesttesttesttest'}
+6: {'testtesttesttesttesttesttest'}
+7: {'testtesttesttesttesttesttesttest'}
+8: {'testtesttesttesttesttesttesttesttest'}
+9: {'testtesttesttesttesttesttesttesttesttest'}
+10: {'testtesttesttesttesttesttesttesttesttesttest'}
+11: {'testtesttesttesttesttesttesttesttesttesttesttest'}
+12: {'testtesttesttesttesttesttesttesttesttesttesttesttest'}
+13: {'testtesttesttesttesttesttesttesttesttesttesttesttesttest'}
+14: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+15: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+16: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+17: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+18: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+19: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+20: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+21: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+22: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+23: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+24: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+25: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+26: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+27: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+28: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+29: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+30: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+31: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+32: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+33: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+34: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+35: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+36: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+37: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+38: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+39: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+40: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+41: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+42: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+43: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+44: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+45: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+46: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+47: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+48: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+49: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
+...
+lua box.space[0]:truncate()
+---
+...
+lua box.space[0]:insert(0, 'test')
+---
+ - 0: {1953719668}
+...
+lua box.space[0]:truncate()
+---
+...
