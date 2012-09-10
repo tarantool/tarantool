@@ -127,7 +127,7 @@ struct _mh(t) * _mh(init)();
 void _mh(clear)(struct _mh(t) *h);
 void _mh(destroy)(struct _mh(t) *h);
 void _mh(resize)(struct _mh(t) *h);
-mh_int_t _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch);
+int _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch);
 void _mh(reserve)(struct _mh(t) *h, mh_int_t size);
 void __attribute__((noinline)) _mh(put_resize)(struct _mh(t) *h, mh_key_t key, mh_val_t val);
 void __attribute__((noinline)) _mh(del_resize)(struct _mh(t) *h, mh_int_t x);
@@ -207,11 +207,19 @@ _mh(put)(struct _mh(t) *h, mh_key_t key, mh_val_t val, int * ret)
 		goto put_done;
 
 #if MH_INCREMENTAL_RESIZE
-	if (mh_unlikely(h->n_dirty >= h->upper_bound || h->resize_position > 0))
-		_mh(put_resize)(h, key, val);
+	if (mh_unlikely(h->resize_position > 0))
+		_mh(resize)(h);
+	else if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
+		if (_mh(start_resize)(h, h->n_buckets + 1, 0))
+			goto put_done;
+	}
+	if (h->resize_position)
+		_mh(put)(h->shadow, key, val, NULL);
 #else
-	if (mh_unlikely(h->n_dirty >= h->upper_bound))
-		_mh(start_resize)(h, h->n_buckets + 1, -1);
+	if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
+		if (_mh(start_resize)(h, h->n_buckets + 1, h->size))
+			goto put_done;
+	}
 #endif
 
 	x = put_slot(h, key);
@@ -255,17 +263,6 @@ _mh(del)(struct _mh(t) *h, mh_int_t x)
 
 
 #ifdef MH_SOURCE
-void __attribute__((noinline))
-_mh(put_resize)(struct _mh(t) *h, mh_key_t key, mh_val_t val)
-{
-	if (h->resize_position > 0)
-		_mh(resize)(h);
-	else
-		_mh(start_resize)(h, h->n_buckets + 1, 0);
-	if (h->resize_position)
-		_mh(put)(h->shadow, key, val, NULL);
-}
-
 
 void __attribute__((noinline))
 _mh(del_resize)(struct _mh(t) *h, mh_int_t x)
@@ -336,16 +333,16 @@ _mh(resize)(struct _mh(t) *h)
 	h->resize_cnt++;
 }
 
-mh_int_t
+int
 _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch)
 {
 	if (h->resize_position) {
 		/* resize has already been started */
-		return h->n_buckets;
+		return 0;
 	}
 	if (buckets < h->n_buckets) {
 		/* hash size is already greater than requested */
-		return h->n_buckets;
+		return 0;
 	}
 	while (h->prime < __ac_HASH_PRIME_SIZE) {
 		if (__ac_prime_list[h->prime] >= buckets)
@@ -370,10 +367,16 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch)
 	s->upper_bound = s->n_buckets * MH_DENSITY;
 	s->n_dirty = 0;
 	s->p = malloc(s->n_buckets * sizeof(struct _mh(pair)));
+	if (s->p == NULL)
+		return -1;
 	s->b = calloc(s->n_buckets / 16 + 1, sizeof(unsigned));
+	if (s->b == NULL) {
+		free(s->p);
+		s->p = NULL;
+		return -1;
+	}
 	_mh(resize)(h);
-
-	return h->n_buckets;
+	return 0;
 }
 
 void

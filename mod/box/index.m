@@ -467,7 +467,11 @@ int32_key_to_value(void *key)
 			mh_i32ptr_del(int_hash, k);
 	}
 
-	mh_i32ptr_put(int_hash, num, new_tuple, NULL);
+	mh_int_t pos = mh_i32ptr_put(int_hash, num, new_tuple, NULL);
+
+	if (pos == mh_end(int_hash))
+		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) pos,
+			  "int hash", "key");
 
 #ifdef DEBUG
 	say_debug("Hash32Index replace(self:%p, old_tuple:%p, new_tuple:%p) key:%i",
@@ -588,7 +592,10 @@ int64_key_to_value(void *key)
 			mh_i64ptr_del(int64_hash, k);
 	}
 
-	mh_i64ptr_put(int64_hash, num, new_tuple, NULL);
+	mh_int_t pos = mh_i64ptr_put(int64_hash, num, new_tuple, NULL);
+	if (pos == mh_end(int64_hash))
+		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) pos,
+			  "int64 hash", "key");
 #ifdef DEBUG
 	say_debug("Hash64Index replace(self:%p, old_tuple:%p, tuple:%p) key:%"PRIu64,
 		  self, old_tuple, new_tuple, num);
@@ -702,7 +709,10 @@ int64_key_to_value(void *key)
 			mh_lstrptr_del(str_hash, k);
 	}
 
-	mh_lstrptr_put(str_hash, field, new_tuple, NULL);
+	mh_int_t pos = mh_lstrptr_put(str_hash, field, new_tuple, NULL);
+	if (pos == mh_end(str_hash))
+		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) pos,
+			  "str hash", "key");
 #ifdef DEBUG
 	u32 field_size = load_varint32(&field);
 	say_debug("HashStrIndex replace(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'",
