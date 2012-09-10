@@ -36,7 +36,7 @@ set (LUAJIT_BUNDLED_LIB "${LUAJIT_BUNDLED_PREFIX}/libluajit.a")
 
 macro (luajit_use_bundled)
     set (LUAJIT_PREFIX "${LUAJIT_BUNDLED_PREFIX}")
-    set (LUAJIT_INCLUDE "${LUAJIT_BUNDLED_PREFIX}")
+    set (LUAJIT_INCLUDE "${PROJECT_SOURCE_DIR}/third_party/luajit/src")
     set (LUAJIT_LIB "${LUAJIT_BUNDLED_LIB}")
     set (ENABLE_BUNDLED_LUAJIT True)
 endmacro()
