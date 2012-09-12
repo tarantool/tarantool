@@ -91,7 +91,7 @@ static enum tnt_error tnt_io_nonblock(struct tnt_stream_net *s, int set) {
 }
 
 static enum tnt_error
-tnt_io_connect_do(struct tnt_stream_net *s, char *host, int port)
+tnt_io_connect_do(struct tnt_stream_net *s, const char *host, int port)
 {
 	/* resolving address */
 	struct sockaddr_in addr;
@@ -209,7 +209,7 @@ error:
 }
 
 enum tnt_error
-tnt_io_connect(struct tnt_stream_net *s, char *host, int port)
+tnt_io_connect(struct tnt_stream_net *s, const char *host, int port)
 {
 	s->fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (s->fd < 0) {
@@ -249,7 +249,7 @@ ssize_t tnt_io_flush(struct tnt_stream_net *s) {
 }
 
 ssize_t
-tnt_io_send_raw(struct tnt_stream_net *s, char *buf, size_t size, int all)
+tnt_io_send_raw(struct tnt_stream_net *s, const char *buf, size_t size, int all)
 {
 	size_t off = 0;
 	do {
@@ -308,7 +308,7 @@ tnt_io_sendv_raw(struct tnt_stream_net *s, struct iovec *iov, int count, int all
 }
 
 ssize_t
-tnt_io_send(struct tnt_stream_net *s, char *buf, size_t size)
+tnt_io_send(struct tnt_stream_net *s, const char *buf, size_t size)
 {
 	if (s->sbuf.buf == NULL)
 		return tnt_io_send_raw(s, buf, size, 1);

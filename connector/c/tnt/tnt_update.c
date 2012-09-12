@@ -44,7 +44,7 @@
 
 static ssize_t
 tnt_update_op(struct tnt_stream *s,
-	      uint32_t field, uint8_t op, char *data, uint32_t size) 
+	      uint32_t field, uint8_t op, const char *data, uint32_t size) 
 {
 	/* encoding size */
 	int encs = tnt_enc_size(size);
@@ -63,7 +63,7 @@ tnt_update_op(struct tnt_stream *s,
 	iov[2].iov_len = encs;
 	/* data */
 	if (data) {
-		iov[3].iov_base = data;
+		iov[3].iov_base = (void *) data;
 		iov[3].iov_len = size;
 		iovc++;
 	}
@@ -163,7 +163,7 @@ tnt_update_assign(struct tnt_stream *s, uint32_t field,
 ssize_t
 tnt_update_splice(struct tnt_stream *s, uint32_t field,
 		  uint32_t offset,
-		  int32_t length, char *data, size_t size)
+		  int32_t length, const char *data, size_t size)
 {
 	/* calculating splice data sizes */
 	uint32_t offset_len = tnt_enc_size(sizeof(offset)),
@@ -213,7 +213,7 @@ tnt_update_delete(struct tnt_stream *s, uint32_t field)
 
 ssize_t
 tnt_update_insert(struct tnt_stream *s, uint32_t field,
-			 char *data, uint32_t size)
+			 const char *data, uint32_t size)
 {
 	return tnt_update_op(s, field, TNT_UPDATE_INSERT, data, size);
 }

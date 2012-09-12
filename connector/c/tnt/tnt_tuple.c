@@ -86,7 +86,7 @@ void tnt_tuple_free(struct tnt_tuple *t) {
  * returns tuple pointer, or NULL on error.
 */
 struct tnt_tuple*
-tnt_tuple_add(struct tnt_tuple *t, char *data, uint32_t size)
+tnt_tuple_add(struct tnt_tuple *t, const void *data, uint32_t size)
 {
 	int allocated = t == NULL;
 	if (t == NULL) {
@@ -137,7 +137,7 @@ tnt_tuple_add(struct tnt_tuple *t, char *data, uint32_t size)
  * returns tuple pointer, or NULL on error.
 */
 struct tnt_tuple*
-tnt_tuple(struct tnt_tuple *t, char *fmt, ...)
+tnt_tuple(struct tnt_tuple *t, const char *fmt, ...)
 {
 	if (t == NULL) {
 		t = tnt_tuple_add(NULL, NULL, 0);
@@ -148,7 +148,7 @@ tnt_tuple(struct tnt_tuple *t, char *fmt, ...)
 	}
 	va_list args;
 	va_start(args, fmt);
-	char *p = fmt;
+	const char *p = fmt;
 	while (*p) {
 		if (isspace(*p)) {
 			p++;
@@ -223,14 +223,14 @@ tnt_tuple(struct tnt_tuple *t, char *fmt, ...)
  *
  * returns 0, or -1 on error.
 */
-static int tnt_tuple_validate(char *buf, size_t size) {
+static int tnt_tuple_validate(const void *buf, size_t size) {
 	if (size < sizeof(uint32_t))
 		return -1;
 	size_t fld_off = sizeof(uint32_t);
 	uint32_t cardinality = *(uint32_t*)buf;
 	while (cardinality-- != 0) {
 		uint32_t fld_size;
-		int fld_esize = tnt_enc_read(buf + fld_off, &fld_size);
+		int fld_esize = tnt_enc_read((const char *)buf + fld_off, &fld_size);
 		if (fld_esize == -1)
 			return -1;
 		fld_off += fld_esize + fld_size;
@@ -254,7 +254,7 @@ static int tnt_tuple_validate(char *buf, size_t size) {
  *
  * returns tuple pointer, or NULL on error.
 */
-struct tnt_tuple *tnt_tuple_set(struct tnt_tuple *t, char *buf, size_t size) {
+struct tnt_tuple *tnt_tuple_set(struct tnt_tuple *t, const void *buf, size_t size) {
 	if (tnt_tuple_validate(buf, size) == -1)
 		return NULL;
 	int allocated = t == NULL;
