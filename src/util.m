@@ -118,13 +118,87 @@ coredump(int dump_interval)
 	}
 }
 
-void *
-tnt_xrealloc(void *ptr, size_t size)
+static int
+itoa(int val, char *buf)
 {
-	void *ret = realloc(ptr, size);
-	if (size > 0 && ret == NULL)
-		abort();
-	return ret;
+	char *p = buf;
+
+	if (val < 0) {
+		*p++ = '-';
+		val = -val;
+	}
+	/* Print full range if it is an unsigned number. */
+	unsigned uval = val;
+	char *start = p;
+	do {
+		*p++ = '0' + uval % 10;
+		uval /= 10;
+	} while (uval > 0);
+
+	int len = (int)(p - buf);
+
+	*p-- = '\0';
+
+	/* Reverse the resulting string. */
+	do {
+		char tmp = *p;
+		*p = *start;
+		*start = tmp;
+	} while (++start < --p);
+
+	return len;
+}
+
+/**
+ * Async-signal-safe implementation of printf() into an fd, to be
+ * able to write messages into the error log inside a signal
+ * handler. Only supports %s and %d, %u, format specifiers.
+ */
+ssize_t
+fdprintf(int fd, const char *format, ...)
+{
+	ssize_t total = 0;
+	char buf[22];
+	va_list args;
+	va_start(args, format);
+
+	while (*format) {
+		const char *start = format;
+		ssize_t len, res;
+		if (*format++ != '%') {
+			while (*format != '\0' && *format != '%')
+				format++;
+			len = format - start;
+			goto out;
+		}
+		switch (*format++) {
+		case '%':
+			len = 1;
+			break;
+		case 's':
+			start = va_arg(args, char *);
+			if (start == NULL)
+				start = "(null)";
+			len = strlen(start);
+			break;
+		case 'd':
+		case 'u':
+			start = buf;
+			len = itoa(va_arg(args, int), buf);
+			break;
+		default:
+			len = 2;
+			break;
+		}
+out:
+		res = write(fd, start, len);
+		if (res > 0)
+			total += res;
+		if (res != len)
+			break;
+	}
+	va_end(args);
+	return total;
 }
 
 #ifdef ENABLE_BACKTRACE
@@ -194,14 +268,10 @@ out:
 	*p = 0;
         return backtrace_buf;
 }
-#endif /* ENABLE_BACKTRACE */
 
-void __attribute__ ((noreturn))
-assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)
+void
+print_backtrace()
 {
-	fprintf(stderr, "%s:%i: %s: assertion %s failed.\n", file, line, function, assertion);
-
-#ifdef ENABLE_BACKTRACE
 	void *frame = __builtin_frame_address(0);
 	void *stack_top;
 	size_t stack_size;
@@ -214,7 +284,17 @@ assert_fail(const char *assertion, const char *file, unsigned int line, const ch
 		stack_size = fiber->coro.stack_size;
 	}
 
-	fprintf(stderr, "%s", backtrace(frame, stack_top, stack_size));
+	fdprintf(STDERR_FILENO, "%s", backtrace(frame, stack_top, stack_size));
+}
+#endif /* ENABLE_BACKTRACE */
+
+
+void __attribute__ ((noreturn))
+assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)
+{
+	fprintf(stderr, "%s:%i: %s: assertion %s failed.\n", file, line, function, assertion);
+#ifdef ENABLE_BACKTRACE
+	print_backtrace();
 #endif /* ENABLE_BACKTRACE */
 	close_all_xcpt(0);
 	abort();

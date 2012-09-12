@@ -313,9 +313,63 @@ snapshot(void *ev, int events __attribute__((unused)))
 static void
 signal_cb(void)
 {
-	/* terminating main event loop */
+	/* Terminate the main event loop */
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 }
+
+/** Try to log as much as possible before dumping a core.
+ *
+ * Core files are not aways allowed and it takes an effort to
+ * extract useful information from them.
+ *
+ * *Recursive invocation*
+ *
+ * Unless SIGSEGV is sent by kill(), Linux
+ * resets the signal a default value before invoking
+ * the handler.
+ *
+ * Despite that, as an extra precaution to avoid infinite
+ * recursion, we count invocations of the handler, and
+ * quietly _exit() when called for a second time.
+ */
+static void
+sig_fatal_cb(int signo)
+{
+	static volatile sig_atomic_t in_cb = 0;
+	int fd = STDERR_FILENO;
+	struct sigaction sa;
+
+	/* Got a signal while running the handler. */
+	if (in_cb) {
+		fdprintf(fd, "Fatal %d while backtracing", signo);
+		goto end;
+	}
+
+	in_cb = 1;
+
+	if (signo == SIGSEGV)
+		fdprintf(fd, "Segmentation fault\n");
+	else
+		fdprintf(fd, "Got a fatal signal %d\n", signo);
+
+	fdprintf(fd, "Current time: %u\n", (unsigned) time(0));
+	fdprintf(fd,
+		 "Please file a bug at http://bugs.launchpad.net/tarantool\n"
+		 "Attempting backtrace... Note: since the server has "
+		 "already crashed, \nthis may fail as well\n");
+#ifdef ENABLE_BACKTRACE
+	print_backtrace();
+#endif
+end:
+	/* Try to dump core. */
+	memset(&sa, 0, sizeof(sa));
+	sigemptyset(&sa.sa_mask);
+	sa.sa_handler = SIG_DFL;
+	sigaction(SIGABRT, &sa, NULL);
+
+	abort();
+}
+
 
 static void
 signal_free(void)
@@ -342,7 +396,9 @@ signal_reset()
 	if (sigaction(SIGUSR1, &sa, NULL) == -1 ||
 	    sigaction(SIGINT, &sa, NULL) == -1 ||
 	    sigaction(SIGTERM, &sa, NULL) == -1 ||
-	    sigaction(SIGHUP, &sa, NULL) == -1)
+	    sigaction(SIGHUP, &sa, NULL) == -1 ||
+	    sigaction(SIGSEGV, &sa, NULL) == -1 ||
+	    sigaction(SIGFPE, &sa, NULL) == -1)
 		say_syserror("sigaction");
 
 	/* Unblock any signals blocked by libev. */
@@ -366,6 +422,14 @@ signal_init(void)
 	sigemptyset(&sa.sa_mask);
 
 	if (sigaction(SIGPIPE, &sa, 0) == -1) {
+		say_syserror("sigaction");
+		exit(EX_OSERR);
+	}
+
+	sa.sa_handler = sig_fatal_cb;
+
+	if (sigaction(SIGSEGV, &sa, 0) == -1 ||
+	    sigaction(SIGFPE, &sa, 0) == -1) {
 		say_syserror("sigaction");
 		exit(EX_OSERR);
 	}

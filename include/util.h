@@ -120,14 +120,21 @@ extern int forked;
 pid_t tfork();
 void close_all_xcpt(int fdc, ...);
 void coredump(int dump_interval);
-void *tnt_xrealloc(void *ptr, size_t size);
 
 void __gcov_flush();
 
+/**
+ * Async-signal-safe implementation of printf(), to
+ * be able to write messages into the error log
+ * inside a signal handler.
+ */
+ssize_t
+fdprintf(int fd, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 extern void *__libc_stack_end;
 
 #ifdef ENABLE_BACKTRACE
+void print_backtrace();
 char *backtrace(void *frame, void *stack, size_t stack_size);
 #endif /* ENABLE_BACKTRACE */
 
