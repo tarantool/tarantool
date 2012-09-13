@@ -30,6 +30,10 @@
  * SUCH DAMAGE.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdarg.h>
 
@@ -77,5 +81,9 @@ int tnt_fd(struct tnt_stream *s);
 enum tnt_error tnt_error(struct tnt_stream *s);
 char *tnt_strerror(struct tnt_stream *s);
 int tnt_errno(struct tnt_stream *s);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* TNT_NET_H_INCLUDED */

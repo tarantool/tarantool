@@ -49,7 +49,7 @@ struct tnt_sql {
 };
 
 static bool
-tnt_sql_error(struct tnt_sql *sql, struct tnt_tk *last, char *fmt, ...)
+tnt_sql_error(struct tnt_sql *sql, struct tnt_tk *last, const char *fmt, ...)
 {
 	char msgu[256];
 	va_list args;
@@ -475,7 +475,7 @@ struct tnt_lex_keyword tnt_sql_keywords[] =
  * and string description returned (must be freed after use).
 */
 int
-tnt_query(struct tnt_stream *s, char *q, size_t qsize, char **e)
+tnt_query(struct tnt_stream *s, const char *q, size_t qsize, char **e)
 {
 	struct tnt_lex l;
 	if (!tnt_lex_init(&l, tnt_sql_keywords, (unsigned char*)q, qsize))

@@ -54,7 +54,7 @@ tnt_net_read(struct tnt_stream *s, char *buf, size_t size) {
 }
 
 static ssize_t
-tnt_net_write(struct tnt_stream *s, char *buf, size_t size) {
+tnt_net_write(struct tnt_stream *s, const char *buf, size_t size) {
 	struct tnt_stream_net *sn = TNT_SNET_CAST(s);
 	ssize_t rc = tnt_io_send(sn, buf, size);
 	if (rc != -1)

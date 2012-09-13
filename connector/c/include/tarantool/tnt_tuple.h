@@ -42,9 +42,9 @@ struct tnt_tuple {
 void tnt_tuple_init(struct tnt_tuple *t);
 void tnt_tuple_free(struct tnt_tuple *t);
 
-struct tnt_tuple *tnt_tuple(struct tnt_tuple *t, char *fmt, ...);
-struct tnt_tuple *tnt_tuple_add(struct tnt_tuple *t, char *data, uint32_t size);
-struct tnt_tuple *tnt_tuple_set(struct tnt_tuple *t, char *buf, size_t size);
+struct tnt_tuple *tnt_tuple(struct tnt_tuple *t, const char *fmt, ...);
+struct tnt_tuple *tnt_tuple_add(struct tnt_tuple *t, const void *data, uint32_t size);
+struct tnt_tuple *tnt_tuple_set(struct tnt_tuple *t, const void *buf, size_t size);
 
 /* tuple list */
 

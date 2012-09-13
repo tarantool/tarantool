@@ -60,14 +60,14 @@ tnt_update_assign(struct tnt_stream *s, uint32_t field,
 ssize_t
 tnt_update_splice(struct tnt_stream *s, uint32_t field,
 		  uint32_t offset,
-		  int32_t length, char *data, size_t size);
+		  int32_t length, const char *data, size_t size);
 
 ssize_t
 tnt_update_delete(struct tnt_stream *s, uint32_t field);
 
 ssize_t
 tnt_update_insert(struct tnt_stream *s, uint32_t field,
-		  char *data, uint32_t size);
+		  const char *data, uint32_t size);
 
 ssize_t
 tnt_update(struct tnt_stream *s, uint32_t ns, uint32_t flags,

@@ -110,7 +110,7 @@ tnt_lex_tk(struct tnt_lex *l, int tk, int line, int col) {
 }
 
 static int
-tnt_lex_error(struct tnt_lex *l, char *fmt, ...) {
+tnt_lex_error(struct tnt_lex *l, const char *fmt, ...) {
 	if (fmt == NULL)
 		return TNT_TK_EOF;
 	if (l->error)

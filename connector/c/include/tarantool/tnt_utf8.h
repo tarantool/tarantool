@@ -38,13 +38,13 @@ struct tnt_utf8 {
 
 #define TNT_UTF8_CHAR(U, P) ((U)->data + (P))
 
-bool tnt_utf8_init(struct tnt_utf8 *u, unsigned char *data, size_t size);
+bool tnt_utf8_init(struct tnt_utf8 *u, const unsigned char *data, size_t size);
 void tnt_utf8_free(struct tnt_utf8 *u);
 
-ssize_t tnt_utf8_chrlen(unsigned char *data, size_t size);
-ssize_t tnt_utf8_strlen(unsigned char *data, size_t size);
+ssize_t tnt_utf8_chrlen(const unsigned char *data, size_t size);
+ssize_t tnt_utf8_strlen(const unsigned char *data, size_t size);
 
-ssize_t tnt_utf8_sizeof(unsigned char *data, size_t size, size_t n);
+ssize_t tnt_utf8_sizeof(const unsigned char *data, size_t size, size_t n);
 bool tnt_utf8_cmp(struct tnt_utf8 *u, struct tnt_utf8 *us);
 
 ssize_t tnt_utf8_next(struct tnt_utf8 *u, size_t off);

@@ -30,16 +30,16 @@
  * SUCH DAMAGE.
  */
 
-enum tnt_error tnt_io_connect(struct tnt_stream_net *s, char *host, int port);
+enum tnt_error tnt_io_connect(struct tnt_stream_net *s, const char *host, int port);
 void tnt_io_close(struct tnt_stream_net *s);
 
 ssize_t tnt_io_flush(struct tnt_stream_net *s);
 
-ssize_t tnt_io_send_raw(struct tnt_stream_net *s, char *buf, size_t size, int all);
+ssize_t tnt_io_send_raw(struct tnt_stream_net *s, const char *buf, size_t size, int all);
 ssize_t tnt_io_sendv_raw(struct tnt_stream_net *s, struct iovec *iov, int count, int all);
 ssize_t tnt_io_recv_raw(struct tnt_stream_net *s, char *buf, size_t size, int all);
 
-ssize_t tnt_io_send(struct tnt_stream_net *s, char *buf, size_t size);
+ssize_t tnt_io_send(struct tnt_stream_net *s, const char *buf, size_t size);
 ssize_t tnt_io_sendv(struct tnt_stream_net *s, struct iovec *iov, int count);
 ssize_t tnt_io_recv(struct tnt_stream_net *s, char *buf, size_t size);
 
