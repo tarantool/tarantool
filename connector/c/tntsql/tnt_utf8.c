@@ -38,7 +38,7 @@
 #include <connector/c/include/tarantool/tnt_utf8.h>
 
 bool
-tnt_utf8_init(struct tnt_utf8 *u, unsigned char *data, size_t size)
+tnt_utf8_init(struct tnt_utf8 *u, const unsigned char *data, size_t size)
 {
 	u->size = size;
 	u->data = (unsigned char*)tnt_mem_alloc(u->size + 1);
@@ -64,7 +64,7 @@ tnt_utf8_free(struct tnt_utf8 *u)
 }
 
 ssize_t
-tnt_utf8_chrlen(unsigned char *data, size_t size)
+tnt_utf8_chrlen(const unsigned char *data, size_t size)
 {
 #define tnt_bit(I) (1 << (I))
 #define tnt_bit_is(B, I) ((B) & tnt_bit(I))
@@ -106,7 +106,7 @@ tnt_utf8_chrlen(unsigned char *data, size_t size)
 }
 
 ssize_t
-tnt_utf8_strlen(unsigned char *data, size_t size)
+tnt_utf8_strlen(const unsigned char *data, size_t size)
 {
 	register size_t i = 0;
 	register ssize_t c = 0, r = 0;
@@ -121,7 +121,7 @@ tnt_utf8_strlen(unsigned char *data, size_t size)
 }
 
 ssize_t
-tnt_utf8_sizeof(unsigned char *data, size_t size, size_t n)
+tnt_utf8_sizeof(const unsigned char *data, size_t size, size_t n)
 {
 	register size_t i = 0, c = 0;
 	register ssize_t r = 0;

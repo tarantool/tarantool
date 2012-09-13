@@ -53,7 +53,7 @@
  * returns number of bytes written, or -1 on error.
 */
 ssize_t
-tnt_call(struct tnt_stream *s, uint32_t flags, char *proc,
+tnt_call(struct tnt_stream *s, uint32_t flags, const char *proc,
 	 struct tnt_tuple *args)
 {
 	/* encoding procedure name */
@@ -80,7 +80,7 @@ tnt_call(struct tnt_stream *s, uint32_t flags, char *proc,
 	v[1].iov_len  = sizeof(struct tnt_header_call);
 	v[2].iov_base = proc_enc;
 	v[2].iov_len  = proc_enc_size;
-	v[3].iov_base = proc;
+	v[3].iov_base = (void *)proc;
 	v[3].iov_len  = proc_len;
 	uint32_t argc = 0;
 	if (args->size == 0) {

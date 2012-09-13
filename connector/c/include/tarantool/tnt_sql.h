@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  */
 
-int tnt_query(struct tnt_stream *s, char *q, size_t qsize, char **e);
-int tnt_query_is(char *q, size_t qsize);
+int tnt_query(struct tnt_stream *s, const char *q, size_t qsize, char **e);
+int tnt_query_is(const char *q, size_t qsize);
 
 #endif /* TNT_SQL_H_INCLUDED */

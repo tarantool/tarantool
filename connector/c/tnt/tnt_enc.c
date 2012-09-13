@@ -35,7 +35,7 @@
 #include <connector/c/include/tarantool/tnt_enc.h>
 
 int
-tnt_enc_read(char *buf, uint32_t *value)
+tnt_enc_read(const char *buf, uint32_t *value)
 {
 	*value = 0;
 	if (!(buf[0] & 0x80)) {

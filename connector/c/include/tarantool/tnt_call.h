@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  */
 
-ssize_t tnt_call(struct tnt_stream *s, uint32_t flags, char *proc,
+ssize_t tnt_call(struct tnt_stream *s, uint32_t flags, const char *proc,
 		 struct tnt_tuple *args);
 
 #endif /* TNT_CALL_H_INCLUDED */

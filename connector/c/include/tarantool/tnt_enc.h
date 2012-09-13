@@ -31,7 +31,7 @@
  */
 
 int tnt_enc_size(uint32_t value);
-int tnt_enc_read(char *buf, uint32_t *value);
+int tnt_enc_read(const char *buf, uint32_t *value);
 void tnt_enc_write(char *buf, uint32_t value);
 
 #endif /* TNT_ENC_H_INCLUDED */

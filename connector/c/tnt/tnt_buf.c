@@ -75,7 +75,7 @@ static char* tnt_buf_resize(struct tnt_stream *s, size_t size) {
 }
 
 static ssize_t
-tnt_buf_write(struct tnt_stream *s, char *buf, size_t size) {
+tnt_buf_write(struct tnt_stream *s, const char *buf, size_t size) {
 	char *p = tnt_buf_resize(s, size);
 	if (p == NULL)
 		return -1;
