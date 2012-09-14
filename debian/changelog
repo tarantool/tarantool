@@ -1,3 +1,9 @@
+tarantool (1.4.7+20120915-1) unstable; urgency=low
+
+  * New snapshot (enable box.info, box.slab, box.stat, etc)
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sat, 15 Sep 2012 00:02:10 +0400
+
 tarantool (1.4.7+20120905-1) unstable; urgency=low
 
   * New snapshot.
