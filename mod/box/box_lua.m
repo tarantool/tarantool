@@ -81,7 +81,9 @@ static const char *tuplelib_name = "box.tuple";
 static inline struct tuple *
 lua_checktuple(struct lua_State *L, int narg)
 {
-	return *(void **) luaL_checkudata(L, narg, tuplelib_name);
+	struct tuple *t = *(void **) luaL_checkudata(L, narg, tuplelib_name);
+	assert(t->refs);
+	return t;
 }
 
 struct tuple *

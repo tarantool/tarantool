@@ -244,3 +244,90 @@ lua box.space[9]:len()
 ---
  - 0
 ...
+ A test case for Bug#1051006 Tree iterators return garbage
+if an index is modified between calls
+lua box.space[16]:insert('a', 'a', 'a')
+---
+ - 'a': {'a', 'a'}
+...
+lua box.space[16]:insert('d', 'd', 'd')
+---
+ - 'd': {'d', 'd'}
+...
+lua box.space[16]:insert('e', 'e', 'e')
+---
+ - 'e': {'e', 'e'}
+...
+lua box.space[16]:insert('b', 'b', 'b')
+---
+ - 'b': {'b', 'b'}
+...
+lua box.space[16]:insert('c', 'c', 'c')
+---
+ - 'c': {'c', 'c'}
+...
+lua k,v = box.space[16].index[1]:next(k)
+---
+...
+lua print(v)
+---
+'a': {'a', 'a'}
+...
+lua k,v = box.space[16].index[1]:next(k)
+---
+...
+lua print(v)
+---
+'b': {'b', 'b'}
+...
+lua box.space[16]:truncate()
+---
+...
+lua print(v)
+---
+'b': {'b', 'b'}
+...
+lua collectgarbage('collect')
+---
+ - 0
+...
+lua print(v)
+---
+'b': {'b', 'b'}
+...
+lua k,v = box.space[16].index[1]:next(k)
+---
+...
+lua print(v)
+---
+nil
+...
+lua collectgarbage('collect')
+---
+ - 0
+...
+lua print(v)
+---
+nil
+...
+lua k,v = box.space[16].index[1]:next(k)
+---
+...
+lua print(v)
+---
+nil
+...
+lua k,v = box.space[16].index[1]:next(k)
+---
+...
+lua print(v)
+---
+nil
+...
+lua k,v = box.space[16].index[1]:next(k)
+---
+...
+lua print(v)
+---
+nil
+...

@@ -290,6 +290,11 @@ sptree_##name##_balance(sptree_##name *t, spnode_t node, spnode_t size) {       
                                                                                           \
     z = _GET_SPNODE_LEFT(fake);                                                           \
     _SET_SPNODE_LEFT(fake, t->garbage_head);                                              \
+    /*                                                                                    \
+     * Loop back on the right link indicates that the node                                \
+     * is in the garbage list.                                                            \
+     */                                                                                   \
+    _SET_SPNODE_RIGHT(fake, fake);                                                        \
     t->garbage_head = fake;                                                               \
     return z;                                                                             \
 }                                                                                         \
@@ -430,6 +435,11 @@ sptree_##name##_delete(sptree_##name *t, void *k) {                             
             }                                                                             \
                                                                                           \
             _SET_SPNODE_LEFT(node, t->garbage_head);                                      \
+            /*                                                                            \
+             * Loop back on the right link indicates that the node                        \
+             * is in the garbage list.                                                    \
+             */                                                                           \
+            _SET_SPNODE_RIGHT(node, node);                                                \
             t->garbage_head = node;                                                       \
                                                                                           \
             break;                                                                        \
@@ -645,50 +655,67 @@ sptree_##name##_iterator_free(sptree_##name##_iterator *i) {                    
     free(i);                                                                              \
 }                                                                                         \
                                                                                           \
+/** Nodes in the garbage list have a loop on their right link. */                         \
+static inline bool                                                                        \
+sptree_##name##_node_is_deleted(sptree_##name *t, spnode_t node) {                        \
+                                                                                          \
+    return _GET_SPNODE_RIGHT(node) == node;                                               \
+}                                                                                         \
+                                                                                          \
+/**                                                                                       \
+ * Get the last node on the iterator stack, check                                         \
+ * if the node is not deleted.                                                            \
+ */                                                                                       \
+static inline spnode_t                                                                    \
+sptree_##name##_iterator_next_node(sptree_##name##_iterator *i) {                         \
+                                                                                          \
+    while (i->level >= 0) {                                                               \
+        spnode_t return_node = i->stack[i->level--];                                      \
+        if (! sptree_##name##_node_is_deleted(i->t, return_node))                         \
+            return return_node;                                                           \
+    }                                                                                     \
+    return SPNIL;                                                                         \
+}                                                                                         \
+                                                                                          \
 static inline void*                                                                       \
 sptree_##name##_iterator_next(sptree_##name##_iterator *i) {                              \
-    sptree_##name *t;                                                                     \
-    spnode_t node, returnNode = SPNIL;                                                    \
                                                                                           \
     if (i == NULL)  return NULL;                                                          \
                                                                                           \
-    t = i->t;                                                                             \
-    if ( i->level >= 0 ) {                                                                \
-        returnNode = i->stack[i->level];                                                  \
+    sptree_##name *t = i->t;                                                              \
+    spnode_t returnNode = sptree_##name##_iterator_next_node(i);                          \
                                                                                           \
-        node = _GET_SPNODE_RIGHT( i->stack[i->level] );                                   \
-        i->level--;                                                                       \
-        while( node != SPNIL ) {                                                          \
-            i->level++;                                                                   \
-            i->stack[i->level] = node;                                                    \
-            node = _GET_SPNODE_LEFT( i->stack[i->level] );                                \
-        }                                                                                 \
+    if (returnNode == SPNIL) return NULL;                                                 \
+                                                                                          \
+    spnode_t node = _GET_SPNODE_RIGHT(returnNode);                                        \
+    while (node != SPNIL) {                                                               \
+        i->level++;                                                                       \
+        i->stack[i->level] = node;                                                        \
+        node = _GET_SPNODE_LEFT(i->stack[i->level]);                                      \
     }                                                                                     \
                                                                                           \
-    return (returnNode == SPNIL) ? NULL : ITHELEM(t, returnNode);                         \
+    return ITHELEM(t, returnNode);                                                        \
 }                                                                                         \
                                                                                           \
 static inline void*                                                                       \
 sptree_##name##_iterator_reverse_next(sptree_##name##_iterator *i) {                      \
-    sptree_##name *t;                                                                     \
-    spnode_t node, returnNode = SPNIL;                                                    \
                                                                                           \
     if (i == NULL)  return NULL;                                                          \
                                                                                           \
-    t = i->t;                                                                             \
-    if ( i->level >= 0 ) {                                                                \
-        returnNode = i->stack[i->level];                                                  \
+    sptree_##name *t = i->t;                                                              \
+    spnode_t returnNode = sptree_##name##_iterator_next_node(i);                          \
                                                                                           \
-        node = _GET_SPNODE_LEFT( i->stack[i->level] );                                    \
-        i->level--;                                                                       \
-        while( node != SPNIL ) {                                                          \
-            i->level++;                                                                   \
-            i->stack[i->level] = node;                                                    \
-            node = _GET_SPNODE_RIGHT( i->stack[i->level] );                               \
-        }                                                                                 \
+    if (returnNode == SPNIL) return NULL;                                                 \
+                                                                                          \
+    spnode_t node = _GET_SPNODE_LEFT(returnNode);                                         \
+    while (node != SPNIL) {                                                               \
+        i->level++;                                                                       \
+        i->stack[i->level] = node;                                                        \
+        node = _GET_SPNODE_RIGHT(i->stack[i->level]);                                     \
     }                                                                                     \
-                                                                                          \
-    return (returnNode == SPNIL) ? NULL : ITHELEM(t, returnNode);                         \
+    return ITHELEM(t, returnNode);                                                        \
 }
-
+/*
+ * vim: ts=4 sts=4 et
+ */
 #endif
