@@ -300,7 +300,8 @@ recover_snap(struct recovery_state *r)
 	while ((row = log_io_cursor_next(&i))) {
 		if (r->row_handler(row) < 0) {
 			say_error("can't apply row");
-			break;
+			if (snap->dir->panic_if_error)
+				break;
 		}
 	}
 	log_io_cursor_close(&i);
@@ -348,7 +349,8 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		 */
 		if (r->row_handler(row) < 0) {
 			say_error("can't apply row");
-			goto end;
+			if (l->dir->panic_if_error)
+				goto end;
 		}
 		set_lsn(r, lsn);
 	}
@@ -463,7 +465,6 @@ recover_current_wal:
 				  r->current_wal->filename);
 			break;
 		}
-
 		if (result == LOG_EOF) {
 			say_info("done `%s' confirmed_lsn: %" PRIi64,
 				 r->current_wal->filename,

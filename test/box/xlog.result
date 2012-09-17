@@ -32,3 +32,19 @@ Stopping the server...
 # Inprogress xlog with bad record must be deleted during recovery.
 
 00000000000000000006.xlog.inprogress has been successfully deleted
+
+A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
+panic_on_wal_error doens't work for duplicate key errors
+
+lua box.space[0]:select(0, 1)
+---
+ - 1: {}
+...
+lua box.space[0]:select(0, 2)
+---
+ - 2: {}
+...
+lua #box.space[0]
+---
+ - 0
+...
