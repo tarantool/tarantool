@@ -74,7 +74,7 @@ rollback_instance() {
 }
 
 rollback() {
-	log ">>> rolling back changes"
+	log ">>> rollback changes"
 	rollback_instance $deploy_name
 	exit 1
 }
@@ -95,26 +95,48 @@ deploy() {
 	workdir="${prefix_var}/tarantool_box$id"
 	config="${prefix}/etc/tarantool_box$id.cfg"
 
-	log ">>> deploying instance $id"
+	log ">>> deploy instance $id"
 
-	# setting up work environment
+	# setup work environment
 	try "mkdir -p $workdir/logs"
 
-	# setting up startup snapshot
+	# setup startup snapshot
 	try "cp \"${prefix}/share/tarantool/00000000000000000001.snap\" $workdir"
 	try "chown tarantool:tarantool -R $workdir"
 
-	# setting up configuration file
+	# setup configuration file
 	try "cp \"${prefix}/etc/tarantool.cfg\" $config"
 	try 'echo work_dir = \"$workdir\" >> $config'
 	try 'echo username = \"tarantool\" >> $config'
 	try 'echo logger = \"cat - \>\> logs/tarantool.log\" >> $config'
 
-	# setting up wrapper
+	# setup wrapper
 	try "ln -s \"${prefix}/bin/tarantool_multi.sh\" \"${prefix}/bin/tarantool_box$id.sh\""
 
-	# setting up startup script
+	# setup startup script
 	try "ln -s \"${prefix_etc}/init.d/tarantool_box\" \"${prefix_etc}/init.d/tarantool_box$id\""
+}
+
+deploy_check() {
+	id=$1
+	# check, if instance is already exist (configuration file, consistent way)
+	if [ $deploy_exists -eq 1 ]; then
+		grep "^\(${id}\)$" $deploy_cfg > /dev/null
+		if [ $? -eq 0 ]; then
+			log "Instance '${id}' is already deployed."
+			exit 0
+		fi
+	fi
+	# check, if there are any instance-related files exists that could be
+	# accidently removed or overwritten by setup.
+	instance_workdir="${prefix_var}/tarantool_box$id"
+	instance_config="${prefix}/etc/tarantool_box$id.cfg"
+	instance_wrapper="${prefix}/bin/tarantool_box$id.sh"
+	isntance_startup="${prefix_etc}/init.d/tarantool_box$id"
+	[ -d $instance_workdir ] && error "Instance workdir exists: '$instance_workdir'"
+	[ -f $instance_config ] && error "Instance configuration file exists: $instance_config"
+	[ -f $instance_wrapper ] && error "Instance wrapper file exists: $instance_wrapper"
+	[ -f $instance_startup ] && error "Instance startup file exists: $instance_startup"
 }
 
 commit() {
@@ -122,7 +144,7 @@ commit() {
 	try "echo $1 >> $deploy_cfg"
 }
 
-# processing command line arguments
+# process command line arguments
 [ $# -eq 0 ] && usage 1
 
 deploy_name_set=0
@@ -148,10 +170,10 @@ set ${prefix_etc:="/etc"}
 deploy_cfg="${prefix}/etc/tarantool_deploy.cfg"
 deploy_exists=0
 
-# checking deployment configuration file
+# check deployment configuration file
 [ -f $deploy_cfg ] && deploy_exists=1
 
-# displaying status
+# display status
 if [ $act_status -ne 0 ]; then
 	if [ $deploy_exists -eq 0 ]; then
 		log "No tarantool instances found."
@@ -161,25 +183,19 @@ if [ $act_status -ne 0 ]; then
 	exit 0
 fi
 
-# checking that instance name was specified
+# check that instance name was specified
 [ $deploy_name_set -eq 0 ] && usage 1
 
-# checking if instance already deployed
-if [ $deploy_exists -eq 1 ]; then
-	grep "^\(${deploy_name}\)$" $deploy_cfg > /dev/null
-	if [ $? -eq 0 ]; then 
-		log "Instance '${deploy_name}' is already deployed."
-		exit 0
-	fi
-fi
-
-# validating instance name
+# validate instance name
 echo $deploy_name | grep '^[[:digit:]]\+.\(1\|2\)' > /dev/null
 if [ $? -eq 1 ]; then 
 	error "Bad instance name format, should be e.g: 1.1, 1.2, etc."
 fi
 
-# asking permission to continue
+# check if it consistent to deploy new instance
+deploy_check $deploy_name
+
+# ask permission to continue
 if [ $act_prompt -eq 1 ]; then
 	[ $act_dry -ne 0 ] && log "(dry mode)"
 	log "About to deploy Tarantool instance $deploy_name."
@@ -188,7 +204,7 @@ if [ $act_prompt -eq 1 ]; then
 	case "$answer" in
 		[Yy]) ;;
 		*)
-			log "Aborting"
+			log "Abort"
 			exit 0
 			;;
 	esac
