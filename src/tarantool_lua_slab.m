@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "tarantool_lua_slab.h"
+#include "tarantool_lua.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
@@ -42,27 +43,27 @@ salloc_stat_lua_cb(const struct slab_class_stats *cstat, void *cb_ctx)
 	 * Create a Lua table for every slab class. A class is
 	 * defined by its item size.
 	 */
-	lua_pushnumber(L, cstat->item_size);
+	luaL_pushnumber64(L, cstat->item_size);
 	lua_newtable(L);
 
 	lua_pushstring(L, "slabs");
-	lua_pushnumber(L, cstat->slabs);
+	luaL_pushnumber64(L, cstat->slabs);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "items");
-	lua_pushnumber(L, cstat->items);
+	luaL_pushnumber64(L, cstat->items);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "bytes_used");
-	lua_pushnumber(L, cstat->bytes_used);
+	luaL_pushnumber64(L, cstat->bytes_used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "bytes_free");
-	lua_pushnumber(L, cstat->bytes_free);
+	luaL_pushnumber64(L, cstat->bytes_free);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "item_size");
-	lua_pushnumber(L, cstat->item_size);
+	luaL_pushnumber64(L, cstat->item_size);
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);
@@ -83,7 +84,7 @@ lbox_slab_arena_used(struct lua_State *L)
 {
 	struct slab_arena_stats astat;
 	salloc_stat(NULL, &astat, NULL);
-	lua_pushnumber(L, astat.used);
+	luaL_pushnumber64(L, astat.used);
 	return 1;
 }
 
@@ -92,7 +93,7 @@ lbox_slab_arena_size(struct lua_State *L)
 {
 	struct slab_arena_stats astat;
 	salloc_stat(NULL, &astat, NULL);
-	lua_pushnumber(L, astat.size);
+	luaL_pushnumber64(L, astat.size);
 	return 1;
 }
 
@@ -108,11 +109,11 @@ lbox_slab_call(struct lua_State *L)
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_used");
-	lua_pushnumber(L, astat.used);
+	luaL_pushnumber64(L, astat.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_size");
-	lua_pushnumber(L, astat.size);
+	luaL_pushnumber64(L, astat.size);
 	lua_settable(L, -3);
 
 	return 1;
