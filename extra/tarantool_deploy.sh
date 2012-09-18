@@ -132,7 +132,7 @@ deploy_check() {
 	instance_workdir="${prefix_var}/tarantool_box$id"
 	instance_config="${prefix}/etc/tarantool_box$id.cfg"
 	instance_wrapper="${prefix}/bin/tarantool_box$id.sh"
-	isntance_startup="${prefix_etc}/init.d/tarantool_box$id"
+	instance_startup="${prefix_etc}/init.d/tarantool_box$id"
 	[ -d $instance_workdir ] && error "Instance workdir exists: '$instance_workdir'"
 	[ -f $instance_config ] && error "Instance configuration file exists: $instance_config"
 	[ -f $instance_wrapper ] && error "Instance wrapper file exists: $instance_wrapper"
