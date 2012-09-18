@@ -1,3 +1,9 @@
+tarantool (1.4.7+20120918-1) unstable; urgency=low
+
+  * New snapshot (some fixes in lua:box.slab).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 18 Sep 2012 21:57:51 +0400
+
 tarantool (1.4.7+20120915-1) unstable; urgency=low
 
   * New snapshot (enable box.info, box.slab, box.stat, etc)
