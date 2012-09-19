@@ -73,6 +73,7 @@
     uptime: 548
     pid: 3459
     logger_pid: 3461
+    snapshotting: 0
     lsn: 1
     recovery_lag: 0.000
     recovery_last_update: 0.000

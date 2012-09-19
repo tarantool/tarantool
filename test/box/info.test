@@ -26,3 +26,4 @@ exec admin "lua string.len(box.info.uptime) > 0"
 exec admin "lua string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil"
 
 exec admin "lua for k, v in pairs(box.info()) do print(k) end"
+exec admin "lua box.info.snapshotting"

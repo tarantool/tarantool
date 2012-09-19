@@ -153,6 +153,7 @@ tarantool_info(struct tbuf *out)
 	tbuf_printf(out, "  uptime: %i" CRLF, (int)tarantool_uptime());
 	tbuf_printf(out, "  pid: %i" CRLF, getpid());
 	tbuf_printf(out, "  logger_pid: %i" CRLF, logger_pid);
+	tbuf_printf(out, "  snapshotting: %i" CRLF, tarantool_snapshotting);
 	tbuf_printf(out, "  lsn: %" PRIi64 CRLF,
 		    recovery_state->confirmed_lsn);
 	tbuf_printf(out, "  recovery_lag: %.3f" CRLF,

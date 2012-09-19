@@ -79,6 +79,13 @@ lbox_info_uptime(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_snapshotting(struct lua_State *L)
+{
+	lua_pushnumber(L, (unsigned)tarantool_snapshotting);
+	return 1;
+}
+
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
 {
@@ -87,6 +94,7 @@ lbox_info_dynamic_meta [] =
 	{"lsn", lbox_info_lsn},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
+	{"snapshotting", lbox_info_snapshotting},
 	{NULL, NULL}
 };
 

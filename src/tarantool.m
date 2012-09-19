@@ -78,6 +78,7 @@ static void *main_opt = NULL;
 struct tarantool_cfg cfg;
 static ev_signal *sigs = NULL;
 
+int tarantool_snapshotting = 0; /* snapshot processes are running */
 bool init_storage, booting = true;
 
 static int
@@ -290,7 +291,10 @@ snapshot(void *ev, int events __attribute__((unused)))
 		 * make 'save snapshot' synchronous, and propagate
 		 * any possible error up to the user.
 		 */
+		tarantool_snapshotting++;
 		wait_for_child(p);
+		tarantool_snapshotting--;
+		assert(tarantool_snapshotting >= 0);
 		assert(p == fiber->cw.rpid);
 		return (WIFSIGNALED(fiber->cw.rstatus) ? EINTR :
 			WEXITSTATUS(fiber->cw.rstatus));

@@ -1590,6 +1590,10 @@ localhost> lua box.info.recovery_last_update
 ---
  - 1306964594.980
 ...
+localhost> lua box.info.snapshotting
+---
+ - 0
+...
 localhost> lua for k, v in pairs(box.info.build) do print(k .. ': ', v) end
 ---
 flags:  -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DCORO_ASM -fno-omit-frame-pointer -fno-stack-protector -fexceptions -funwind-tables -fgnu89-inline -pthread  -Wno-sign-compare -Wno-strict-aliasing -std=gnu99 -Wall -Wextra -Werror
