@@ -33,7 +33,7 @@
 #include "log_io.h"
 #include "fiber.h"
 #include "tarantool_pthread.h"
-#include "nio.h"
+#include "fio.h"
 #include "errinj.h"
 
 /*
@@ -688,7 +688,7 @@ struct wal_writer
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	ev_async write_event;
-	struct nbatch *batch;
+	struct fio_batch *batch;
 	bool is_shutdown;
 	bool is_rollback;
 };
@@ -806,10 +806,10 @@ wal_writer_init(struct wal_writer *writer)
 
 	(void) tt_pthread_once(&wal_writer_once, wal_writer_init_once);
 
-	writer->batch = nbatch_alloc(sysconf(_SC_IOV_MAX));
+	writer->batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
 
 	if (writer->batch == NULL)
-		panic_syserror("nbatch_alloc");
+		panic_syserror("fio_batch_alloc");
 }
 
 /** Destroy a WAL writer structure. */
@@ -982,27 +982,27 @@ wal_opt_sync(struct log_io *wal, double sync_delay)
 }
 
 static struct wal_write_request *
-wal_fill_batch(struct log_io *wal, struct nbatch *batch, int rows_per_wal,
+wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 	       struct wal_write_request *req)
 {
 	int max_rows = wal->is_inprogress ? 1 : rows_per_wal - wal->rows;
 	/* Post-condition of successful by wal_opt_rotate(). */
 	assert(max_rows > 0);
-	nbatch_start(batch, max_rows);
-	while (req != NULL && ! nbatch_is_full(batch)) {
+	fio_batch_start(batch, max_rows);
+	while (req != NULL && ! fio_batch_is_full(batch)) {
 		struct row_v11 *row = &req->row;
 		header_v11_sign(&row->header);
-		nbatch_add(batch, row, row_v11_size(row));
+		fio_batch_add(batch, row, row_v11_size(row));
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
 	return req;
 }
 
 static struct wal_write_request *
-wal_write_batch(struct log_io *wal, struct nbatch *batch,
+wal_write_batch(struct log_io *wal, struct fio_batch *batch,
 		struct wal_write_request *req, struct wal_write_request *end)
 {
-	int rows_written = nbatch_write(batch, fileno(wal->f));
+	int rows_written = fio_batch_write(batch, fileno(wal->f));
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
 		req->res = 0;
@@ -1017,7 +1017,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 		  struct wal_fifo *rollback)
 {
 	struct log_io **wal = &r->current_wal;
-	struct nbatch *batch = writer->batch;
+	struct fio_batch *batch = writer->batch;
 
 	struct wal_write_request *req = STAILQ_FIRST(input);
 	struct wal_write_request *write_end = req;
@@ -1121,18 +1121,18 @@ wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 /* {{{ SAVE SNAPSHOT and tarantool_box --cat */
 
 static void
-snap_write_batch(struct nbatch *batch, int fd)
+snap_write_batch(struct fio_batch *batch, int fd)
 {
-	int rows_written = nbatch_write(batch, fd);
+	int rows_written = fio_batch_write(batch, fd);
 	if (rows_written != batch->rows) {
 		say_error("partial write: %d out of %d rows",
 			  rows_written, batch->rows);
-		panic_syserror("nbatch_write");
+		panic_syserror("fio_batch_write");
 	}
 }
 
 void
-snapshot_write_row(struct log_io *l, struct nbatch *batch,
+snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 		   const void *metadata, size_t metadata_len,
 		   const void *data, size_t data_len)
 {
@@ -1149,14 +1149,14 @@ snapshot_write_row(struct log_io *l, struct nbatch *batch,
 		     metadata, metadata_len, data, data_len);
 	header_v11_sign(&row->header);
 
-	nbatch_add(batch, row, row_v11_size(row));
+	fio_batch_add(batch, row, row_v11_size(row));
 
 	if (++rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
 
-	if (nbatch_is_full(batch)) {
+	if (fio_batch_is_full(batch)) {
 		snap_write_batch(batch, fileno(l->f));
-		nbatch_start(batch, INT_MAX);
+		fio_batch_start(batch, INT_MAX);
 		prelease_after(fiber->gc_pool, 128 * 1024);
 	}
 
@@ -1182,17 +1182,17 @@ snapshot_write_row(struct log_io *l, struct nbatch *batch,
 
 void
 snapshot_save(struct recovery_state *r,
-	      void (*f) (struct log_io *, struct nbatch *))
+	      void (*f) (struct log_io *, struct fio_batch *))
 {
 	struct log_io *snap;
 	snap = log_io_open_for_write(r->snap_dir, r->confirmed_lsn,
 				     INPROGRESS);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
-	struct nbatch *batch = nbatch_alloc(sysconf(_SC_IOV_MAX));
+	struct fio_batch *batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
 	if (batch == NULL)
-		panic_syserror("malloc");
-	nbatch_start(batch, INT_MAX);
+		panic_syserror("fio_batch_alloc");
+	fio_batch_start(batch, INT_MAX);
 	/*
 	 * While saving a snapshot, snapshot name is set to
 	 * <lsn>.snap.inprogress. When done, the snapshot is

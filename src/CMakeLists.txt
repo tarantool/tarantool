@@ -97,7 +97,7 @@ set (common_sources
      errcode.c
      errinj.m
      latch.m
-     nio.c
+     fio.c
      crc32.c
      rope.c
      tarantool_lua_info.m

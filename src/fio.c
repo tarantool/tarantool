@@ -26,8 +26,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "fio.h"
+
 #include <sys/types.h>
-#include <sys/uio.h>
 
 #include <string.h>
 #include <unistd.h>
@@ -37,10 +38,9 @@
 #include <errno.h>
 
 #include <say.h>
-#include <nio.h>
 
 static const char *
-nfilename(int fd)
+fio_filename(int fd)
 {
 #ifdef TARGET_OS_LINUX
 	char proc_path[32];
@@ -62,7 +62,7 @@ nfilename(int fd)
 }
 
 ssize_t
-nread(int fd, void *buf, size_t count)
+fio_read(int fd, void *buf, size_t count)
 {
 	ssize_t to_read = (ssize_t) count;
 	while (to_read > 0) {
@@ -74,7 +74,7 @@ nread(int fd, void *buf, size_t count)
 			}
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				return count != to_read ? count - to_read : -1;
-			say_syserror("read, [%s]", nfilename(fd));
+			say_syserror("read, [%s]", fio_filename(fd));
 			return -1; /* XXX: file position is unspecified */
 		}
 		if (nrd == 0)
@@ -87,7 +87,7 @@ nread(int fd, void *buf, size_t count)
 }
 
 ssize_t
-nwrite(int fd, const void *buf, size_t count)
+fio_write(int fd, const void *buf, size_t count)
 {
 	ssize_t to_write = (ssize_t) count;
 	while (to_write > 0) {
@@ -99,7 +99,7 @@ nwrite(int fd, const void *buf, size_t count)
 			}
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				return count != to_write ? count - to_write : -1;
-			say_syserror("write, [%s]", nfilename(fd));
+			say_syserror("write, [%s]", fio_filename(fd));
 			return -1; /* XXX: file position is unspecified */
 		}
 		if (nwr == 0)
@@ -113,7 +113,7 @@ nwrite(int fd, const void *buf, size_t count)
 
 
 ssize_t
-nwritev(int fd, struct iovec *iov, int iovcnt)
+fio_writev(int fd, struct iovec *iov, int iovcnt)
 {
 	assert(iov && iovcnt >= 0);
 	ssize_t nwr;
@@ -125,43 +125,43 @@ restart:
 			goto restart;
 		}
 		if (errno != EAGAIN && errno != EWOULDBLOCK)
-			say_syserror("writev, [%s]", nfilename(fd));
+			say_syserror("writev, [%s]", fio_filename(fd));
 	}
 	return nwr;
 }
 
 off_t
-nlseek(int fd, off_t offset, int whence)
+fio_lseek(int fd, off_t offset, int whence)
 {
 	off_t effective_offset = lseek(fd, offset, whence);
 
 	if (effective_offset == -1) {
 		say_syserror("lseek, [%s]: offset=%jd, whence=%d",
-			     nfilename(fd), (intmax_t) offset, whence);
+			     fio_filename(fd), (intmax_t) offset, whence);
 	} else if (whence == SEEK_SET && effective_offset != offset) {
 		say_error("lseek, [%s]: offset set to unexpected value: "
 			  "requested %jd effective %jd",
-			  nfilename(fd),
+			  fio_filename(fd),
 			  (intmax_t)offset, (intmax_t)effective_offset);
 	}
 	return effective_offset;
 }
 
 int
-nftruncate(int fd, off_t offset)
+fio_truncate(int fd, off_t offset)
 {
 	int rc = ftruncate(fd, offset);
 	if (rc)
-		say_syserror("ftruncate, [%s]: offset=%jd",
-			     nfilename(fd), (intmax_t) offset);
+		say_syserror("fio_truncate, [%s]: offset=%jd",
+			     fio_filename(fd), (intmax_t) offset);
 	return rc;
 }
 
-struct nbatch *
-nbatch_alloc(long max_iov)
+struct fio_batch *
+fio_batch_alloc(long max_iov)
 {
-	struct nbatch *batch = (struct nbatch *)
-		malloc(sizeof(struct nbatch) +
+	struct fio_batch *batch = (struct fio_batch *)
+		malloc(sizeof(struct fio_batch) +
 		       sizeof(struct iovec) * max_iov);
 	if (batch == NULL)
 		return NULL;
@@ -171,17 +171,17 @@ nbatch_alloc(long max_iov)
 }
 
 void
-nbatch_start(struct nbatch *batch, long max_rows)
+fio_batch_start(struct fio_batch *batch, long max_rows)
 {
 	batch->bytes = batch->rows = 0;
 	batch->max_rows = max_rows;
 }
 
 void
-nbatch_add(struct nbatch *batch, void *row, ssize_t row_len)
+fio_batch_add(struct fio_batch *batch, void *row, ssize_t row_len)
 {
 	assert(batch->max_rows > 0);
-	assert(! nbatch_is_full(batch));
+	assert(! fio_batch_is_full(batch));
 
 	batch->iov[batch->rows].iov_base = row;
 	batch->iov[batch->rows].iov_len = row_len;
@@ -190,18 +190,18 @@ nbatch_add(struct nbatch *batch, void *row, ssize_t row_len)
 }
 
 int
-nbatch_write(struct nbatch *batch, int fd)
+fio_batch_write(struct fio_batch *batch, int fd)
 {
-	ssize_t bytes_written = nwritev(fd, batch->iov, batch->rows);
+	ssize_t bytes_written = fio_writev(fd, batch->iov, batch->rows);
 	if (bytes_written <= 0)
 		return 0;
 
 	if (bytes_written == batch->bytes)
 		return batch->rows;
 
-	say_warn("nbatch_write, [%s]: partial write,"
+	say_warn("fio_batch_write, [%s]: partial write,"
 		 " wrote %jd out of %jd bytes",
-		 nfilename(fd),
+		 fio_filename(fd),
 		 (intmax_t) bytes_written, (intmax_t) batch->bytes);
 
 	ssize_t good_bytes = 0;
@@ -216,14 +216,15 @@ nbatch_write(struct nbatch *batch, int fd)
 	 * Unwind file position back to ensure we do not leave
 	 * partially written rows.
 	 */
-	off_t good_offset = nlseek(fd, good_bytes - bytes_written, SEEK_CUR);
+	off_t good_offset = fio_lseek(fd,
+				      good_bytes - bytes_written, SEEK_CUR);
 	/*
 	 * The caller may choose to close the file right after
 	 * a partial write. Don't take chances and make sure that
 	 * there is no garbage at the end of file if it happens.
 	 */
 	if (good_offset != -1)
-		(void) nftruncate(fd, good_offset);
+		(void) fio_truncate(fd, good_offset);
 	/*
 	 * writev() doesn't set errno in case of a partial write.
 	 * If nothing else from the above failed, set errno to

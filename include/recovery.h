@@ -136,12 +136,12 @@ int read_log(const char *filename,
 void recovery_follow_remote(struct recovery_state *r, const char *addr);
 void recovery_stop_remote(struct recovery_state *r);
 
-struct nbatch;
+struct fio_batch;
 
-void snapshot_write_row(struct log_io *i, struct nbatch *batch,
+void snapshot_write_row(struct log_io *i, struct fio_batch *batch,
 			const void *metadata, size_t metadata_size,
 			const void *data, size_t data_size);
 void snapshot_save(struct recovery_state *r,
-		   void (*loop) (struct log_io *, struct nbatch *));
+		   void (*loop) (struct log_io *, struct fio_batch *));
 
 #endif /* TARANTOOL_RECOVERY_H_INCLUDED */

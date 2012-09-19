@@ -33,7 +33,7 @@
 #include "palloc.h"
 #include "fiber.h"
 #include "crc32.h"
-#include "nio.h"
+#include "fio.h"
 
 const u32 default_version = 11;
 const log_magic_t row_marker_v11 = 0xba0babed;
@@ -434,7 +434,7 @@ log_io_close(struct log_io **lptr)
 	int r;
 
 	if (l->mode == LOG_WRITE) {
-		nwrite(fileno(l->f), &eof_marker_v11, sizeof(log_magic_t));
+		fio_write(fileno(l->f), &eof_marker_v11, sizeof(log_magic_t));
 		/*
 		 * Sync the file before closing, since
 		 * otherwise we can end up with a partially

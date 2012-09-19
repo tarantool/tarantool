@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_NIO_H_INCLUDED
-#define TARANTOOL_NIO_H_INCLUDED
+#ifndef TARANTOOL_FIO_H_INCLUDED
+#define TARANTOOL_FIO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,8 +28,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/**
+ * POSIX file I/O: take into account EINTR (read and write exactly
+ * the requested number of bytes), log errors nicely, provide batch
+ * writes.
+ */
 #include <sys/types.h>
 #include <stdbool.h>
+#include <sys/uio.h>
 
 struct iovec;
 /**
@@ -61,7 +67,7 @@ struct iovec;
  *        read, the actual number of bytes read is returned.
  */
 ssize_t
-nread(int fd, void *buf, size_t count);
+fio_read(int fd, void *buf, size_t count);
 
 /**
  * Write the given buffer, re-trying for partial writes
@@ -92,7 +98,7 @@ nread(int fd, void *buf, size_t count);
  *         returned.
  */
 ssize_t
-nwrite(int fd, const void *buf, size_t count);
+fio_write(int fd, const void *buf, size_t count);
 
 /**
  * A simple wrapper around writev().
@@ -119,7 +125,7 @@ nwrite(int fd, const void *buf, size_t count);
  *         returns the total number of bytes written, or -1 if error.
  */
 ssize_t
-nwritev(int fd, struct iovec *iov, int iovcnt);
+fio_writev(int fd, struct iovec *iov, int iovcnt);
 
 /**
  * An error-reporting aware wrapper around lseek().
@@ -127,17 +133,17 @@ nwritev(int fd, struct iovec *iov, int iovcnt);
  * @return	file offset value or -1 if error
  */
 off_t
-nlseek(int fd, off_t offset, int whence);
+fio_lseek(int fd, off_t offset, int whence);
 
 /** Truncate a file and log a message in case of error. */
 int
-nftruncate(int fd, off_t offset);
+fio_truncate(int fd, off_t offset);
 
 /**
  * A helper wrapper around writev() to do batched
  * writes.
  */
-struct nbatch
+struct fio_batch
 {
 	/** Total number of bytes in batched rows. */
 	ssize_t bytes;
@@ -151,25 +157,26 @@ struct nbatch
 	struct iovec iov[];
 };
 
-struct nbatch *
-nbatch_alloc(long max_iov);
+struct fio_batch *
+fio_batch_alloc(long max_iov);
 
 /** Begin a new batch write. Set a cap on the number of rows in the batch.  */
 void
-nbatch_start(struct nbatch *batch, long max_rows);
+fio_batch_start(struct fio_batch *batch, long max_rows);
 
 static inline bool
-nbatch_is_full(struct nbatch *batch)
+fio_batch_is_full(struct fio_batch *batch)
 {
-	return batch->rows >= batch->max_iov || batch->rows >= batch->max_rows;
+	return batch->rows >= batch->max_iov ||
+		batch->rows >= batch->max_rows;
 }
 
 /**
  * Add a row to a batch.
- * @pre nbatch_is_full() == false
+ * @pre fio_batch_is_full() == false
  */
 void
-nbatch_add(struct nbatch *batch, void *row, ssize_t row_len);
+fio_batch_add(struct fio_batch *batch, void *row, ssize_t row_len);
 
 /**
  * Write all rows stacked into the batch.
@@ -179,7 +186,7 @@ nbatch_add(struct nbatch *batch, void *row, ssize_t row_len);
  * @return   The number of rows written.
  */
 int
-nbatch_write(struct nbatch *batch, int fd);
+fio_batch_write(struct fio_batch *batch, int fd);
 
-#endif /* TARANTOOL_NIO_H_INCLUDED */
+#endif /* TARANTOOL_FIO_H_INCLUDED */
 
