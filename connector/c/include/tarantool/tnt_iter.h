@@ -36,7 +36,8 @@ enum tnt_iter_type {
 	TNT_ITER_FIELD,
 	TNT_ITER_LIST,
 	TNT_ITER_REQUEST,
-	TNT_ITER_REPLY
+	TNT_ITER_REPLY,
+	TNT_ITER_STORAGE
 };
 
 /* tuple field iterator */
@@ -86,6 +87,19 @@ struct tnt_iter_request {
 #define TNT_IREQUEST_PTR(I) &TNT_IREQUEST(I)->r
 #define TNT_IREQUEST_STREAM(I) TNT_IREQUEST(I)->s
 
+/* storage iterator */
+
+struct tnt_iter_storage {
+	struct tnt_stream *s; /* stream pointer */
+	struct tnt_tuple t;   /* current fetched tuple */
+};
+
+/* request iterator accessors */
+
+#define TNT_ISTORAGE(I) (&(I)->data.storage)
+#define TNT_ISTORAGE_TUPLE(I) &TNT_ISTORAGE(I)->t
+#define TNT_ISTORAGE_STREAM(I) TNT_ISTORAGE(I)->s
+
 /* reply iterator */
 
 struct tnt_iter_reply {
@@ -119,6 +133,7 @@ struct tnt_iter {
 		struct tnt_iter_list list;
 		struct tnt_iter_request request;
 		struct tnt_iter_reply reply;
+		struct tnt_iter_storage storage;
 	} data;
 };
 
@@ -126,6 +141,7 @@ struct tnt_iter *tnt_iter(struct tnt_iter *i, struct tnt_tuple *t);
 struct tnt_iter *tnt_iter_list(struct tnt_iter *i, struct tnt_list *l);
 struct tnt_iter *tnt_iter_request(struct tnt_iter *i, struct tnt_stream *s);
 struct tnt_iter *tnt_iter_reply(struct tnt_iter *i, struct tnt_stream *s);
+struct tnt_iter *tnt_iter_storage(struct tnt_iter *i, struct tnt_stream *s);
 
 void tnt_iter_free(struct tnt_iter *i);
 

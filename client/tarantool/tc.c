@@ -44,7 +44,7 @@
 #include "client/tarantool/tc.h"
 #include "client/tarantool/tc_cli.h"
 #include "client/tarantool/tc_print.h"
-#include "client/tarantool/tc_wal.h"
+#include "client/tarantool/tc_store.h"
 
 struct tc tc;
 
@@ -123,14 +123,14 @@ int main(int argc, char *argv[])
 		break;
 	case TC_OPT_RPL:
 		tc_connect();
-		rc = tc_wal_remote();
+		rc = tc_store_remote();
 		break;
 	case TC_OPT_WAL_CAT:
-		rc = tc_wal_cat();
+		rc = tc_store_cat();
 		break;
 	case TC_OPT_WAL_PLAY:
 		tc_connect();
-		rc = tc_wal_play();
+		rc = tc_store_play();
 		break;
 	case TC_OPT_CMD:
 		tc_connect();

@@ -264,6 +264,52 @@ struct tnt_iter *tnt_iter_request(struct tnt_iter *i, struct tnt_stream *s) {
 	return i;
 }
 
+static int tnt_iter_storage_next(struct tnt_iter *i) {
+	struct tnt_iter_storage *is = TNT_ISTORAGE(i);
+	tnt_tuple_free(&is->t);
+	tnt_tuple_init(&is->t);
+
+	int rc = is->s->read_tuple(is->s, &is->t);
+	if (rc == -1) {
+		i->status = TNT_ITER_FAIL;
+		return 0;
+	}
+	return (rc == 1 /* finish */ ) ? 0 : 1;
+}
+
+static void tnt_iter_storage_free(struct tnt_iter *i) {
+	struct tnt_iter_storage *is = TNT_ISTORAGE(i);
+	tnt_tuple_free(&is->t);
+}
+
+/*
+ * tnt_iter_storage()
+ *
+ * initialize tuple storage iterator;
+ * create and initialize storage iterator;
+ *
+ * i - tuple storage iterator pointer, maybe NULL
+ * s - stream pointer
+ *
+ * if stream iterator pointer is NULL, then new stream
+ * iterator will be created.
+ *
+ * returns stream iterator pointer, or NULL on error.
+*/
+struct tnt_iter *tnt_iter_storage(struct tnt_iter *i, struct tnt_stream *s) {
+	i = tnt_iter_init(i);
+	if (i == NULL)
+		return NULL;
+	i->type = TNT_ITER_STORAGE;
+	i->next = tnt_iter_storage_next;
+	i->rewind = NULL;
+	i->free = tnt_iter_storage_free;
+	struct tnt_iter_storage *is = TNT_ISTORAGE(i);
+	is->s = s;
+	tnt_tuple_init(&is->t);
+	return i;
+}
+
 /*
  * tnt_iter_free()
  *

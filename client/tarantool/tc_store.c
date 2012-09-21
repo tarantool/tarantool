@@ -37,6 +37,7 @@
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_sql.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_snapshot.h>
 #include <connector/c/include/tarantool/tnt_rpl.h>
 
 #include "client/tarantool/tc_opt.h"
@@ -44,13 +45,13 @@
 #include "client/tarantool/tc.h"
 #include "client/tarantool/tc_print.h"
 #include "client/tarantool/tc_query.h"
-#include "client/tarantool/tc_wal.h"
+#include "client/tarantool/tc_store.h"
 
 extern struct tc tc;
 
-typedef int (*tc_wal_t)(struct tnt_iter *i);
+typedef int (*tc_iter_t)(struct tnt_iter *i);
 
-static int tc_wal_error(char *fmt, ...) {
+static int tc_store_error(char *fmt, ...) {
 	char msg[256];
 	va_list args;
 	va_start(args, fmt);
@@ -60,23 +61,20 @@ static int tc_wal_error(char *fmt, ...) {
 	return -1;
 }
 
-static int tc_wal_foreach(struct tnt_stream *s, tc_wal_t cb) {
-	struct tnt_iter i;
-	tnt_iter_request(&i, s);
-	while (tnt_next(&i)) {
-		if (cb(&i) == -1) {
-			tnt_iter_free(&i);
+static int tc_store_foreach(struct tnt_iter *i, tc_iter_t cb) {
+	while (tnt_next(i)) {
+		if (cb(i) == -1) {
+			tnt_iter_free(i);
 			return -1;
 		}
 	}
 	int rc = 0;
-	if (i.status == TNT_ITER_FAIL)
-		rc = tc_wal_error("parsing failed");
-	tnt_iter_free(&i);
+	if (i->status == TNT_ITER_FAIL)
+		rc = tc_store_error("parsing failed");
 	return rc;
 }
 
-static void tc_wal_print(struct tnt_xlog_header_v11 *hdr,
+static void tc_store_print(struct tnt_log_header_v11 *hdr,
 		         struct tnt_request *r)
 {
 	tc_printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
@@ -100,7 +98,7 @@ static void tc_wal_print(struct tnt_xlog_header_v11 *hdr,
 	}
 }
 
-static int tc_wal_printer(struct tnt_iter *i) {
+static int tc_store_printer(struct tnt_iter *i) {
 	struct tnt_request *r = TNT_IREQUEST_PTR(i);
 	struct tnt_stream_xlog *s =
 		TNT_SXLOG_CAST(TNT_IREQUEST_STREAM(i));
@@ -112,68 +110,102 @@ static int tc_wal_printer(struct tnt_iter *i) {
 			return 0;
 	}
 	if (tc.opt.lsn_from_set) {
-		if (s->hdr.lsn < tc.opt.lsn_from)
+		if (s->log.current.hdr.lsn < tc.opt.lsn_from)
 			return 0;
 	}
 	if (tc.opt.lsn_to_set) {
-		if (s->hdr.lsn >= tc.opt.lsn_to)
+		if (s->log.current.hdr.lsn >= tc.opt.lsn_to)
 			return 0;
 	}
-	((tc_printerf_t)tc.opt.printer)(&s->hdr, r);
+	((tc_printerf_t)tc.opt.printer)(&s->log.current.hdr, r);
 	return 0;
 }
 
-static int tc_wal_foreach_xlog(tc_wal_t cb) {
+static int tc_snapshot_printer(struct tnt_iter *i) {
+	struct tnt_tuple *tu = TNT_ISTORAGE_TUPLE(i);
+	tc_print_tuple(tu);
+	return 0;
+}
+
+static int tc_store_foreach_request(struct tnt_stream *s, tc_iter_t cb) {
+	struct tnt_iter i;
+	tnt_iter_request(&i, s);
+	int rc = tc_store_foreach(&i, cb);
+	tnt_iter_free(&i);
+	return rc;
+}
+
+static int tc_store_foreach_xlog(tc_iter_t cb) {
 	struct tnt_stream s;
 	tnt_xlog(&s);
-	if (tnt_xlog_open(&s, (char*)tc.opt.xlog) == -1) {
+	if (tnt_xlog_open(&s, (char*)tc.opt.file) == -1) {
 		tnt_stream_free(&s);
 		return 1;
 	}
-	if (tc_wal_foreach(&s, cb) == -1) {
-		tnt_stream_free(&s);
-		return 1;
-	}
+	int rc = tc_store_foreach_request(&s, cb);
 	tnt_stream_free(&s);
-	return 0;
+	return rc;
 }
 
-int tc_wal_cat(void)
+static int tc_store_foreach_snapshot(tc_iter_t cb) {
+	struct tnt_stream s;
+	tnt_snapshot(&s);
+	if (tnt_snapshot_open(&s, (char*)tc.opt.file) == -1) {
+		tnt_stream_free(&s);
+		return 1;
+	}
+	struct tnt_iter i;
+	tnt_iter_storage(&i, &s);
+	int rc = tc_store_foreach(&i, cb);
+	tnt_iter_free(&i);
+	tnt_stream_free(&s);
+	return rc;
+}
+
+int tc_store_cat(void)
 {
-	return tc_wal_foreach_xlog(tc_wal_printer);
+	switch (tnt_log_guess((char*)tc.opt.file)) {
+	case TNT_LOG_SNAPSHOT:
+		return tc_store_foreach_snapshot(tc_snapshot_printer);
+	case TNT_LOG_XLOG:
+		return tc_store_foreach_xlog(tc_store_printer);
+	case TNT_LOG_NONE:
+		break;
+	}
+	return 1;
 }
 
-static int tc_wal_resender(struct tnt_iter *i) {
+static int tc_store_resender(struct tnt_iter *i) {
 	struct tnt_request *r = TNT_IREQUEST_PTR(i);
 	if (tc.net->write_request(tc.net, r) == -1)
-		return tc_wal_error("failed to write request");
+		return tc_store_error("failed to write request");
 	char *e = NULL;
 	if (tc_query_foreach(NULL, NULL, &e) == -1) {
-		tc_wal_error("%s", e);
+		tc_store_error("%s", e);
 		free(e);
 		return -1;
 	}
 	return 0;
 }
 
-int tc_wal_play(void)
+int tc_store_play(void)
 {
-	return tc_wal_foreach_xlog(tc_wal_resender);
+	return tc_store_foreach_xlog(tc_store_resender);
 }
 
-static int tc_wal_printer_from_rpl(struct tnt_iter *i) {
+static int tc_store_printer_from_rpl(struct tnt_iter *i) {
 	struct tnt_request *r = TNT_IREQUEST_PTR(i);
 	struct tnt_stream_rpl *s =
 		TNT_RPL_CAST(TNT_IREQUEST_STREAM(i));
-	tc_wal_print(&s->hdr, r);
+	tc_store_print(&s->hdr, r);
 	return 0;
 }
 
-int tc_wal_remote(void)
+int tc_store_remote(void)
 {
 	if (tc.opt.lsn == LLONG_MAX ||
 	    tc.opt.lsn == LLONG_MIN) {
-		tc_wal_error("bad lsn number");
+		tc_store_error("bad lsn number");
 		return 1;
 	}
 	struct tnt_stream s;
@@ -184,7 +216,8 @@ int tc_wal_remote(void)
 		rc = 1;
 		goto done;
 	}
-	if (tc_wal_foreach(&s, tc_wal_printer_from_rpl) == -1)
+
+	if (tc_store_foreach_request(&s, tc_store_printer_from_rpl) == -1)
 		rc = 1;
 done:
 	tnt_stream_free(&s);

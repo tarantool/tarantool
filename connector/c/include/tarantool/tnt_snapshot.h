@@ -1,5 +1,6 @@
-#ifndef TC_PRINT_H_INCLUDED
-#define TC_PRINT_H_INCLUDED
+#ifndef TNT_SNAPSHOT_H_INCLUDED
+#define TNT_SNAPSHOT_H_INCLUDED
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,17 +30,21 @@
  * SUCH DAMAGE.
  */
 
-typedef void (*tc_printerf_t)(struct tnt_log_header_v11 *hdr,
-		              struct tnt_request *r);
+#include <tarantool/tnt_log.h>
 
-void tc_print_tee(char *buf, size_t size);
-void tc_print_cmd2tee(char *prompt, char *cmd, int size);
-void tc_printf(char *fmt, ...);
-void tc_print_buf(char *buf, size_t size);
+struct tnt_stream_snapshot {
+	struct tnt_log log;
+};
 
-void tc_print_tuple(struct tnt_tuple *tu);
-void tc_print_list(struct tnt_list *l);
+#define TNT_SSNAPSHOT_CAST(S) ((struct tnt_stream_snapshot*)(S)->data)
 
-tc_printerf_t tc_print_getcb(const char *name);
+struct tnt_stream *tnt_snapshot(struct tnt_stream *s);
 
-#endif /* TC_PRINT_H_INCLUDED */
+int tnt_snapshot_open(struct tnt_stream *s, char *file);
+void tnt_snapshot_close(struct tnt_stream *s);
+
+enum tnt_log_error tnt_snapshot_error(struct tnt_stream *s);
+char *tnt_snapshot_strerror(struct tnt_stream *s);
+int tnt_snapshot_errno(struct tnt_stream *s);
+
+#endif /* TNT_SNAPSHOT_H_INCLUDED */
