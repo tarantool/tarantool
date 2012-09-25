@@ -201,15 +201,15 @@ find_fixed_offset(struct space *space, int fieldno, int skip)
 
 	while (i < fieldno) {
 		/* if the field is unknown give up on it */
-		if (i >= space->max_fieldno || space->field_types[i] == UNKNOWN) {
+		if (i >= space_max_fieldno(space) || space_field_type(space, i) == UNKNOWN) {
 			return -1;
 		}
 
 		/* On a fixed length field account for the appropiate
 		   varint length code and for the actual data length */
-		if (space->field_types[i] == NUM) {
+		if (space_field_type(space, i) == NUM) {
 			offset += 1 + 4;
-		} else if (space->field_types[i] == NUM64) {
+		} else if (space_field_type(space, i) == NUM64) {
 			offset += 1 + 8;
 		}
 		/* On a variable length field give up */

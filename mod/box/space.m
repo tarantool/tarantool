@@ -37,10 +37,183 @@
 #include <pickle.h>
 #include <palloc.h>
 
-struct space *spaces = NULL;
+#define BOX_SPACE_MAX 256
+
+static struct space *spaces = NULL;
 
 bool secondary_indexes_enabled = false;
 bool primary_indexes_enabled = false;
+
+struct space {
+	Index *index[BOX_INDEX_MAX];
+	/** If not set (is 0), any tuple in the
+	 * space can have any number of fields (but
+	 * @sa max_fieldno). If set, Each tuple
+	 * must have exactly this many fields.
+	 */
+	int arity;
+
+	/**
+	 * The number of indexes in the space.
+	 *
+	 * It is equal to the number of non-nil members of the index
+	 * array and defines the key_defs array size as well.
+	 */
+	int key_count;
+
+	/**
+	 * The descriptors for all indexes that belong to the space.
+	 */
+	struct key_def *key_defs;
+
+	/**
+	 * Field types of indexed fields. This is an array of size
+	 * field_count. If there are gaps, i.e. fields that do not
+	 * participate in any index and thus we cannot infer their
+	 * type, then respective array members have value UNKNOWN.
+	 * XXX: right now UNKNOWN is also set for fields which types
+	 * in two indexes contradict each other.
+	 */
+	enum field_data_type *field_types;
+
+	/**
+	 * Max field no which participates in any of the space indexes.
+	 * Each tuple in this space must have, therefore, at least
+	 * field_count fields.
+	 */
+	int max_fieldno;
+
+	bool enabled;
+};
+
+
+bool
+space_number_is_valid(i32 space_no)
+{
+	return space_no >= 0 && space_no < BOX_SPACE_MAX;
+}
+
+int
+space_max_fieldno(struct space *sp)
+{
+	return sp->max_fieldno;
+}
+
+enum field_data_type
+space_field_type(struct space *sp, int no)
+{
+	return sp->field_types[no];
+}
+
+struct space *
+space_create(i32 space_no, struct key_def *key, int key_count, int arity)
+{
+	if (space_no < 0 || space_no >= BOX_SPACE_MAX)
+		panic("Can't create space %d", space_no);
+	if (spaces[space_no].enabled)
+		panic("Space %d is already enabled", space_no);
+	struct space *space = spaces + space_no;
+	space->enabled = true;
+	space->arity = arity;
+	space->key_defs = key;
+	space->key_count = key_count;
+
+	return space;
+}
+
+
+/* return space by its number */
+struct space *
+space_by_n(i32 n)
+{
+	if (n < 0)
+		return NULL;
+	if (n >= BOX_SPACE_MAX)
+		return NULL;
+	return spaces + n;
+}
+
+/** Get key_def ordinal number. */
+int
+key_def_n(struct space *sp, struct key_def *kp)
+{
+	assert(kp >= sp->key_defs && kp < (sp->key_defs + sp->key_count));
+	return kp - sp->key_defs;
+}
+
+int
+index_count(struct space *sp)
+{
+	if (!secondary_indexes_enabled) {
+		/* If secondary indexes are not enabled yet,
+		   we can use only the primary index. So return
+		   1 if there is at least one index (which
+		   must be primary) and return 0 otherwise. */
+		return sp->key_count > 0;
+	} else {
+		/* Return the actual number of indexes. */
+		return sp->key_count;
+	}
+}
+
+int
+space_n(struct space *sp)
+{
+	assert(sp >= spaces && sp < (spaces + BOX_SPACE_MAX));
+	return sp - spaces;
+}
+
+/* look through all enabled spaces */
+int
+space_foreach(int (*space_i)(struct space *sp, void *udata), void *udata) {
+	unsigned i, res = 0;
+	for (i = 0; i < BOX_SPACE_MAX; i++) {
+		if (!spaces[i].enabled)
+			continue;
+		res = space_i(spaces + i, udata);
+		if (res)
+			break;
+	}
+	return res;
+}
+
+/* Get index by index no */
+Index *
+space_index(struct space *sp, int index_no)
+{
+	if (index_no >= BOX_INDEX_MAX)
+		return NULL;
+	if (index_no < 0)
+		return NULL;
+	return sp->index[index_no];
+}
+
+/* Set index by index no */
+Index *
+space_set_index(struct space *sp, int index_no, Index *idx)
+{
+	if (index_no >= BOX_INDEX_MAX)
+		return NULL;
+	if (index_no < 0)
+		return NULL;
+	sp->index[index_no] = idx;
+
+	return idx;
+}
+
+struct space *
+space_find(i32 space_no)
+{
+	struct space *s = space_by_n(space_no);
+	if (s) {
+		if (!s->enabled)
+			tnt_raise(ClientError, :ER_SPACE_DISABLED, space_no);
+		return s;
+	}
+
+	tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
+}
+
 /** Free a key definition. */
 static void
 key_free(struct key_def *key_def)

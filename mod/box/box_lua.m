@@ -224,7 +224,7 @@ static inline void
 transform_set_field(u8 **ptr, const void *data, size_t size)
 {
 	*ptr = save_varint32(*ptr, size);
-	memcpy(*ptr, data, size); 
+	memcpy(*ptr, data, size);
 	*ptr += size;
 }
 
@@ -558,15 +558,21 @@ lbox_index_new(struct lua_State *L)
 	int n = luaL_checkint(L, 1); /* get space id */
 	int idx = luaL_checkint(L, 2); /* get index id in */
 	/* locate the appropriate index */
-	if (n >= BOX_SPACE_MAX || !spaces[n].enabled ||
-	    idx >= BOX_INDEX_MAX || spaces[n].index[idx] == nil)
+	struct space *sp = space_by_n(n);
+	if (!sp)
 		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
+
+	Index *index = space_index(sp, idx);
+	if (!index)
+		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
+
 	/* create a userdata object */
 	void **ptr = lua_newuserdata(L, sizeof(void *));
-	*ptr = spaces[n].index[idx];
+	*ptr = index;
 	/* set userdata object metatable to indexlib */
 	luaL_getmetatable(L, indexlib_name);
 	lua_setmetatable(L, -2);
+
 	return 1;
 }
 

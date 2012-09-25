@@ -32,63 +32,16 @@
 #include <exception.h>
 
 struct tarantool_cfg;
+struct space;
 
 enum {
 	BOX_INDEX_MAX = 10,
-	BOX_SPACE_MAX = 256,
+//	BOX_SPACE_MAX = 256,
 };
 
-struct space {
-	Index *index[BOX_INDEX_MAX];
-	/** If not set (is 0), any tuple in the
-	 * space can have any number of fields (but
-	 * @sa max_fieldno). If set, Each tuple
-	 * must have exactly this many fields.
-	 */
-	int arity;
-
-	/**
-	 * The number of indexes in the space.
-	 *
-	 * It is equal to the number of non-nil members of the index
-	 * array and defines the key_defs array size as well.
-	 */
-	int key_count;
-
-	/**
-	 * The descriptors for all indexes that belong to the space.
-	 */
-	struct key_def *key_defs;
-
-	/**
-	 * Field types of indexed fields. This is an array of size
-	 * field_count. If there are gaps, i.e. fields that do not
-	 * participate in any index and thus we cannot infer their
-	 * type, then respective array members have value UNKNOWN.
-	 * XXX: right now UNKNOWN is also set for fields which types
-	 * in two indexes contradict each other.
-	 */
-	enum field_data_type *field_types;
-
-	/**
-	 * Max field no which participates in any of the space indexes.
-	 * Each tuple in this space must have, therefore, at least
-	 * field_count fields.
-	 */
-	int max_fieldno;
-
-	bool enabled;
-};
-
-extern struct space *spaces;
 
 /** Get space ordinal number. */
-static inline int
-space_n(struct space *sp)
-{
-	assert(sp >= spaces && sp < (spaces + BOX_SPACE_MAX));
-	return sp - spaces;
-}
+int space_n(struct space *sp);
 
 void space_validate(struct space *sp, struct tuple *old_tuple,
 		    struct tuple *new_tuple);
@@ -96,13 +49,34 @@ void space_replace(struct space *sp, struct tuple *old_tuple,
 		   struct tuple *new_tuple);
 void space_remove(struct space *sp, struct tuple *tuple);
 
-/** Get key_def ordinal number. */
-static inline int
-key_def_n(struct space *sp, struct key_def *kp)
-{
-	assert(kp >= sp->key_defs && kp < (sp->key_defs + sp->key_count));
-	return kp - sp->key_defs;
-}
+
+/* Get index by index no */
+Index * space_index(struct space *sp, int index_no);
+
+/* Set index by index no */
+Index * space_set_index(struct space *sp, int index_no, Index *idx);
+
+
+/* look through all enabled spaces */
+int space_foreach(int (*space_i)(struct space *sp, void *udata), void *udata);
+
+
+struct space * space_by_n(i32 space_no);	/* NULL if space not found */
+struct space * space_find(i32 space_no);	/* raise if space not found */
+
+int space_max_fieldno(struct space *sp);
+
+enum field_data_type space_field_type(struct space *sp, int no);
+
+int key_def_n(struct space *sp, struct key_def *kp);
+
+
+struct space * space_create(
+	i32 space_no, struct key_def *key, int key_count, int arity
+);
+
+bool space_number_is_valid(i32 space_no);
+
 
 /** Get index ordinal number in space. */
 static inline int
@@ -129,20 +103,7 @@ extern bool secondary_indexes_enabled;
  */
 extern bool primary_indexes_enabled;
 
-static inline int
-index_count(struct space *sp)
-{
-	if (!secondary_indexes_enabled) {
-		/* If secondary indexes are not enabled yet,
-		   we can use only the primary index. So return
-		   1 if there is at least one index (which
-		   must be primary) and return 0 otherwise. */
-		return sp->key_count > 0;
-	} else {
-		/* Return the actual number of indexes. */
-		return sp->key_count;
-	}
-}
+int index_count(struct space *sp);
 
 void space_init(void);
 void space_free(void);
@@ -152,26 +113,15 @@ void begin_build_primary_indexes(void);
 void end_build_primary_indexes(void);
 void build_secondary_indexes(void);
 
-static inline struct space *
-space_find(u32 space_no)
-{
-	if (space_no >= BOX_SPACE_MAX)
-		tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
-
-	struct space *sp = &spaces[space_no];
-
-	if (!sp->enabled)
-		tnt_raise(ClientError, :ER_SPACE_DISABLED, space_no);
-	return sp;
-}
 
 static inline Index *
-index_find(struct space *sp, u32 index_no)
+index_find(struct space *sp, int index_no)
 {
-	if (index_no >= sp->key_count)
+	Index *idx = space_index(sp, index_no);
+	if (!idx)
 		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, index_no,
 			  space_n(sp));
-	return sp->index[index_no];
+	return idx;
 }
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */
