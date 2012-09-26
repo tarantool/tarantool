@@ -270,10 +270,8 @@ tarantool_uptime(void)
 int
 snapshot(void *ev, int events __attribute__((unused)))
 {
-	if (snapshot_pid) {
-		say_error("snapshot process is already running");
-		return 0;
-	}
+	if (snapshot_pid)
+		return EINPROGRESS;
 
 	pid_t p = fork();
 	if (p < 0) {
