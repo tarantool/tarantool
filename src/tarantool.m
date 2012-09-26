@@ -78,7 +78,7 @@ static void *main_opt = NULL;
 struct tarantool_cfg cfg;
 static ev_signal *sigs = NULL;
 
-int tarantool_snapshotting = 0; /* snapshot processes are running */
+int snapshot_pid = 0; /* snapshot processes pid */
 bool init_storage, booting = true;
 
 static int
@@ -270,6 +270,11 @@ tarantool_uptime(void)
 int
 snapshot(void *ev, int events __attribute__((unused)))
 {
+	if (snapshot_pid) {
+		say_error("snapshot process is already running");
+		return 0;
+	}
+
 	pid_t p = fork();
 	if (p < 0) {
 		say_syserror("fork");
@@ -291,10 +296,10 @@ snapshot(void *ev, int events __attribute__((unused)))
 		 * make 'save snapshot' synchronous, and propagate
 		 * any possible error up to the user.
 		 */
-		tarantool_snapshotting++;
+
+		snapshot_pid = p;
 		wait_for_child(p);
-		tarantool_snapshotting--;
-		assert(tarantool_snapshotting >= 0);
+		snapshot_pid = 0;
 		assert(p == fiber->cw.rpid);
 		return (WIFSIGNALED(fiber->cw.rstatus) ? EINTR :
 			WEXITSTATUS(fiber->cw.rstatus));

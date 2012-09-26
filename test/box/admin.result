@@ -100,7 +100,7 @@ info:
   uptime: <uptime>
   pid: <pid>
   logger_pid: <pid>
-  snapshotting: 0
+  snapshot_pid: <pid>
   lsn: 3
   recovery_lag: 0.000
   recovery_last_update: 0.000

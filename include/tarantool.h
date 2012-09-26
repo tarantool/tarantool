@@ -47,7 +47,7 @@ void mod_snapshot(struct log_io *, struct nbatch *batch);
 void mod_info(struct tbuf *out);
 const char *mod_status(void);
 
-extern int tarantool_snapshotting;
+extern int snapshot_pid;
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern char *cfg_filename_fullpath;

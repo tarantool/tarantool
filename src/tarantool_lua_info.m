@@ -80,9 +80,9 @@ lbox_info_uptime(struct lua_State *L)
 }
 
 static int
-lbox_info_snapshotting(struct lua_State *L)
+lbox_info_snapshot_pid(struct lua_State *L)
 {
-	lua_pushnumber(L, (unsigned)tarantool_snapshotting);
+	lua_pushnumber(L, snapshot_pid);
 	return 1;
 }
 
@@ -94,7 +94,7 @@ lbox_info_dynamic_meta [] =
 	{"lsn", lbox_info_lsn},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
-	{"snapshotting", lbox_info_snapshotting},
+	{"snapshot_pid", lbox_info_snapshot_pid},
 	{NULL, NULL}
 };
 
