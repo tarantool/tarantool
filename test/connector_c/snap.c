@@ -32,22 +32,37 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
-#include <connector/c/include/tarantool/tnt_xlog.h>
-#include <connector/c/include/tarantool/tnt_rpl.h>
+#include <connector/c/include/tarantool/tnt_snapshot.h>
 
-static char *opname(uint32_t type) {
-	switch (type) {
-	case TNT_OP_PING:   return "Ping";
-	case TNT_OP_INSERT: return "Insert";
-	case TNT_OP_DELETE: return "Delete";
-	case TNT_OP_UPDATE: return "Update";
-	case TNT_OP_SELECT: return "Select";
-	case TNT_OP_CALL:   return "Call";
+static void print_tuple(struct tnt_tuple *tu) {
+	printf("[");
+	struct tnt_iter ifl;
+	tnt_iter(&ifl, tu);
+	while (tnt_next(&ifl)) {
+		if (TNT_IFIELD_IDX(&ifl) != 0)
+			printf(", ");
+		char *data = TNT_IFIELD_DATA(&ifl);
+		uint32_t size = TNT_IFIELD_SIZE(&ifl);
+		if (!isprint(data[0]) && (size == 4 || size == 8)) {
+			if (size == 4) {
+				uint32_t i = *((uint32_t*)data);
+				printf("%"PRIu32, i);
+			} else {
+				uint64_t i = *((uint64_t*)data);
+				printf("%"PRIu64, i);
+			}
+		} else {
+			printf("'%-.*s'", size, data);
+		}
 	}
-	return "Unknown";
+	if (ifl.status == TNT_ITER_FAIL)
+		printf("<parsing error>");
+	tnt_iter_free(&ifl);
+	printf("]\n");
 }
 
 int
@@ -57,24 +72,20 @@ main(int argc, char * argv[])
 		return 1;
 
 	struct tnt_stream s;
-	tnt_xlog(&s);
+	tnt_snapshot(&s);
 
-	if (tnt_xlog_open(&s, argv[1]) == -1)
+	if (tnt_snapshot_open(&s, argv[1]) == -1)
 		return 1;
 
 	struct tnt_iter i;
-	tnt_iter_request(&i, &s);
+	tnt_iter_storage(&i, &s);
 
 	while (tnt_next(&i)) {
-		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
-		printf("%s lsn: %"PRIu64", time: %f, len: %d\n",
-		       opname(sx->log.current.row.op),
-		       sx->log.current.hdr.lsn,
-		       sx->log.current.hdr.tm,
-		       sx->log.current.hdr.len);
+		struct tnt_iter_storage *is = TNT_ISTORAGE(&i);
+		print_tuple(&is->t);
 	}
 	if (i.status == TNT_ITER_FAIL)
-		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
+		printf("parsing failed: %s\n", tnt_snapshot_strerror(&s));
 
 	tnt_iter_free(&i);
 	tnt_stream_free(&s);

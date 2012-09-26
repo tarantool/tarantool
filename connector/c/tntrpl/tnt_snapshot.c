@@ -41,33 +41,33 @@
 
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_log.h>
-#include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_snapshot.h>
 
-static void tnt_xlog_free(struct tnt_stream *s) {
-	struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(s);
-	tnt_log_close(&sx->log);
+static void tnt_snapshot_free(struct tnt_stream *s) {
+	struct tnt_stream_snapshot *ss = TNT_SSNAPSHOT_CAST(s);
+	tnt_log_close(&ss->log);
 	tnt_mem_free(s->data);
 	s->data = NULL;
 }
 
 static int
-tnt_xlog_request(struct tnt_stream *s, struct tnt_request *r)
+tnt_snapshot_read_tuple(struct tnt_stream *s, struct tnt_tuple *t)
 {
-	struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(s);
+	struct tnt_stream_snapshot *ss = TNT_SSNAPSHOT_CAST(s);
 
 	struct tnt_log_row *row =
-		tnt_log_next_to(&sx->log, (union tnt_log_value*)r);
+		tnt_log_next_to(&ss->log, (union tnt_log_value*)t);
 
-	if (row == NULL && tnt_log_error(&sx->log) == TNT_LOG_EOK)
+	if (row == NULL && tnt_log_error(&ss->log) == TNT_LOG_EOK)
 		return 1;
 
 	return (row) ? 0: -1;
 }
 
 /*
- * tnt_xlog()
+ * tnt_snapshot()
  *
- * create and initialize xlog stream;
+ * create and initialize snapshot stream;
  *
  * s - stream pointer, maybe NULL
  * 
@@ -75,89 +75,89 @@ tnt_xlog_request(struct tnt_stream *s, struct tnt_request *r)
  *
  * returns stream pointer, or NULL on error.
 */
-struct tnt_stream *tnt_xlog(struct tnt_stream *s)
+struct tnt_stream *tnt_snapshot(struct tnt_stream *s)
 {
 	int allocated = s == NULL;
 	s = tnt_stream_init(s);
 	if (s == NULL)
 		return NULL;
 	/* allocating stream data */
-	s->data = tnt_mem_alloc(sizeof(struct tnt_stream_xlog));
+	s->data = tnt_mem_alloc(sizeof(struct tnt_stream_snapshot));
 	if (s->data == NULL) {
 		if (allocated)
 			tnt_stream_free(s);
 		return NULL;
 	}
-	memset(s->data, 0, sizeof(struct tnt_stream_xlog));
+	memset(s->data, 0, sizeof(struct tnt_stream_snapshot));
 	/* initializing interfaces */
 	s->read = NULL;
-	s->read_request = tnt_xlog_request;
+	s->read_request = NULL;
 	s->read_reply = NULL;
-	s->read_tuple = NULL;
+	s->read_tuple = tnt_snapshot_read_tuple;
 	s->write = NULL;
 	s->writev = NULL;
-	s->free = tnt_xlog_free;
+	s->free = tnt_snapshot_free;
 	/* initializing internal data */
 	return s;
 }
 
 /*
- * tnt_xlog_open()
+ * tnt_snapshot_open()
  *
- * open xlog file and associate it with stream;
+ * open snapshot file and associate it with stream;
  *
- * s - xlog stream pointer
+ * s - snapshot stream pointer
  * 
  * returns 0 on success, or -1 on error.
 */
-int tnt_xlog_open(struct tnt_stream *s, char *file) {
-	struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(s);
-	return tnt_log_open(&sx->log, file, TNT_LOG_XLOG);
+int tnt_snapshot_open(struct tnt_stream *s, char *file) {
+	struct tnt_stream_snapshot *ss = TNT_SSNAPSHOT_CAST(s);
+	return tnt_log_open(&ss->log, file, TNT_LOG_SNAPSHOT);
 }
 
 /*
- * tnt_xlog_close()
+ * tnt_snapshot_close()
  *
- * close xlog stream; 
+ * close snapshot stream; 
  *
- * s - xlog stream pointer
+ * s - snapshot stream pointer
  * 
  * returns 0 on success, or -1 on error.
 */
-void tnt_xlog_close(struct tnt_stream *s) {
-	struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(s);
-	tnt_log_close(&sx->log);
+void tnt_snapshot_close(struct tnt_stream *s) {
+	struct tnt_stream_snapshot *ss = TNT_SSNAPSHOT_CAST(s);
+	tnt_log_close(&ss->log);
 }
 
 /*
- * tnt_xlog_error()
+ * tnt_snapshot_error()
  *
  * get stream error status;
  *
- * s - xlog stream pointer
+ * s - snapshot stream pointer
 */
-enum tnt_log_error tnt_xlog_error(struct tnt_stream *s) {
-	return TNT_SXLOG_CAST(s)->log.error;
+enum tnt_log_error tnt_snapshot_error(struct tnt_stream *s) {
+	return TNT_SSNAPSHOT_CAST(s)->log.error;
 }
 
 /*
- * tnt_xlog_strerror()
+ * tnt_snapshot_strerror()
  *
  * get stream error status description string;
  *
- * s - xlog stream pointer
+ * s - snapshot stream pointer
 */
-char *tnt_xlog_strerror(struct tnt_stream *s) {
-	return tnt_log_strerror(&TNT_SXLOG_CAST(s)->log);
+char *tnt_snapshot_strerror(struct tnt_stream *s) {
+	return tnt_log_strerror(&TNT_SSNAPSHOT_CAST(s)->log);
 }
 
 /*
- * tnt_xlog_errno()
+ * tnt_snapshot_errno()
  *
  * get saved errno;
  *
- * s - xlog stream pointer
+ * s - snapshot stream pointer
 */
-int tnt_xlog_errno(struct tnt_stream *s) {
-	return TNT_SXLOG_CAST(s)->log.errno_;
+int tnt_snapshot_errno(struct tnt_stream *s) {
+	return TNT_SSNAPSHOT_CAST(s)->log.errno_;
 }

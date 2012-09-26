@@ -48,7 +48,7 @@ static const void *tc_options_def = gopt_start(
 	gopt_option('a', GOPT_ARG, gopt_shorts('a'),
 		    gopt_longs("admin-port"), " <port>", "server admin port"),
 	gopt_option('C', GOPT_ARG, gopt_shorts('C'),
-		    gopt_longs("cat"), " <file>", "print xlog file content"),
+		    gopt_longs("cat"), " <file>", "print xlog or snapshot file content"),
 	gopt_option('P', GOPT_ARG, gopt_shorts('P'),
 		    gopt_longs("play"), " <file>", "replay xlog file to the specified server"),
 	gopt_option('S', GOPT_ARG, gopt_shorts('S'),
@@ -149,13 +149,13 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	}
 
 	/* wal-cat mode */
-	if (gopt_arg(tc_options, 'C', &opt->xlog)) {
+	if (gopt_arg(tc_options, 'C', &opt->file)) {
 		opt->mode = TC_OPT_WAL_CAT;
 		goto done;
 	}
 
 	/* wal-play mode */
-	if (gopt_arg(tc_options, 'P', &opt->xlog)) {
+	if (gopt_arg(tc_options, 'P', &opt->file)) {
 		opt->mode = TC_OPT_WAL_PLAY;
 		goto done;
 	}

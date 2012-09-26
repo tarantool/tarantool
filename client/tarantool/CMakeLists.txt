@@ -26,7 +26,7 @@ else()
 endif()
 
 set (cli "tarantool")
-set (cli_sources tc.c tc_opt.c tc_admin.c tc_query.c tc_print.c tc_cli.c tc_wal.c)
+set (cli_sources tc.c tc_opt.c tc_admin.c tc_query.c tc_print.c tc_cli.c tc_store.c)
 set (cli_libs tntrpl tntnet tntsql tnt gopt ${cli_deps})
 
 add_executable(${cli} ${cli_sources} ${CMAKE_SOURCE_DIR}/src/errcode.c)

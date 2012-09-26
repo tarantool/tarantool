@@ -40,7 +40,7 @@
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_io.h>
-#include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_log.h>
 #include <connector/c/include/tarantool/tnt_rpl.h>
 
 static const uint32_t tnt_rpl_version = 11;
@@ -74,7 +74,7 @@ tnt_rpl_request(struct tnt_stream *s, struct tnt_request *r)
 	/* preparing pseudo iproto header */
 	struct tnt_header hdr_iproto;
 	hdr_iproto.type = sr->row.op;
-	hdr_iproto.len = sr->hdr.len - sizeof(struct tnt_xlog_row_v11);
+	hdr_iproto.len = sr->hdr.len - sizeof(struct tnt_log_row_v11);
 	hdr_iproto.reqid = 0;
 	/* deserializing operation */
 	if (tnt_request_from(r, (tnt_request_t)tnt_rpl_recv_cb,
@@ -110,6 +110,7 @@ struct tnt_stream *tnt_rpl(struct tnt_stream *s)
 	s->read = NULL;
 	s->read_request = tnt_rpl_request;
 	s->read_reply = NULL;
+	s->read_tuple = NULL;
 	s->write = NULL;
 	s->writev = NULL;
 	s->free = tnt_rpl_free;
