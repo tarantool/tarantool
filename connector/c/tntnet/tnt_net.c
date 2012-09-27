@@ -44,6 +44,7 @@ static void tnt_net_free(struct tnt_stream *s) {
 	tnt_iob_free(&sn->rbuf);
 	tnt_opt_free(&sn->opt);
 	tnt_mem_free(s->data);
+	s->data = NULL;
 }
 
 static ssize_t
@@ -124,6 +125,7 @@ struct tnt_stream *tnt_net(struct tnt_stream *s) {
 	s->read = tnt_net_read;
 	s->read_reply = tnt_net_reply;
 	s->read_request = tnt_net_request;
+	s->read_tuple = NULL;
 	s->write = tnt_net_write;
 	s->writev = tnt_net_writev;
 	s->write_request = tnt_net_write_request;

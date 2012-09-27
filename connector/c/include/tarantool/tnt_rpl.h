@@ -31,8 +31,8 @@
  */
 
 struct tnt_stream_rpl {
-	struct tnt_xlog_header_v11 hdr;
-	struct tnt_xlog_row_v11 row;
+	struct tnt_log_header_v11 hdr;
+	struct tnt_log_row_v11 row;
 	struct tnt_stream *net;
 };
 

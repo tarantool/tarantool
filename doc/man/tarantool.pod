@@ -24,7 +24,7 @@ Defines server admin port.
 
 =item -C <file>, --cat <file>
 
-Outputs xlog file content.
+Outputs xlog file or snapshot content.
 
 =item -P <file>, --play <file>
 
@@ -36,7 +36,7 @@ Acts as replica for the specified server.
 
 =item -S <space>, --space <space>
 
-Filer xlog file space number.
+Filter xlog file records by space number.
 
 =item -F <lsn>, --from <lsn>
 

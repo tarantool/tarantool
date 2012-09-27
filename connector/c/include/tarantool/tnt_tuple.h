@@ -45,6 +45,7 @@ void tnt_tuple_free(struct tnt_tuple *t);
 struct tnt_tuple *tnt_tuple(struct tnt_tuple *t, const char *fmt, ...);
 struct tnt_tuple *tnt_tuple_add(struct tnt_tuple *t, const void *data, uint32_t size);
 struct tnt_tuple *tnt_tuple_set(struct tnt_tuple *t, const void *buf, size_t size);
+struct tnt_tuple* tnt_tuple_set_as(struct tnt_tuple *t, const void *buf, size_t size, uint32_t num);
 
 /* tuple list */
 

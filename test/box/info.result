@@ -72,10 +72,15 @@ version
 status
 pid
 lsn
+snapshot_pid
 recovery_last_update
 recovery_lag
 uptime
 build
 logger_pid
 config
+...
+lua box.info.snapshot_pid
+---
+ - 0
 ...

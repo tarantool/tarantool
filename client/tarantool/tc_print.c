@@ -133,7 +133,7 @@ void tc_print_list(struct tnt_list *l)
 }
 
 static void
-tc_printer_tarantool(struct tnt_xlog_header_v11 *hdr,
+tc_printer_tarantool(struct tnt_log_header_v11 *hdr,
 		     struct tnt_request *r)
 {
 	tc_printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",

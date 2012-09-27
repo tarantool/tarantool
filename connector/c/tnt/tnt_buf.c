@@ -45,6 +45,7 @@ static void tnt_buf_free(struct tnt_stream *s) {
 	if (sb->data)
 		tnt_mem_free(sb->data);
 	tnt_mem_free(s->data);
+	s->data = NULL;
 }
 
 static ssize_t
@@ -162,6 +163,7 @@ struct tnt_stream *tnt_buf(struct tnt_stream *s) {
 	s->read = tnt_buf_read;
 	s->read_reply = tnt_buf_reply;
 	s->read_request = tnt_buf_request;
+	s->read_tuple = NULL;
 	s->write = tnt_buf_write;
 	s->writev = tnt_buf_writev;
 	s->write_request = tnt_buf_write_request;

@@ -56,7 +56,7 @@ struct tc_opt {
 	int space_set;
 	const char *format;
 	void *printer;
-	const char *xlog;
+	const char *file;
 	char **cmdv;
 	int cmdc;
 };

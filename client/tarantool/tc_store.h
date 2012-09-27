@@ -1,5 +1,5 @@
-#ifndef TC_WAL_H_INCLUDED
-#define TC_WAL_H_INCLUDED
+#ifndef TC_STORE_H_INCLUDED
+#define TC_STORE_H_INCLUDED
 
 /*
  * Copyright (C) 2012 Mail.RU
@@ -26,8 +26,8 @@
  * SUCH DAMAGE.
  */
 
-int tc_wal_cat(void);
-int tc_wal_play(void);
-int tc_wal_remote(void);
+int tc_store_cat(void);
+int tc_store_play(void);
+int tc_store_remote(void);
 
-#endif /* TC_WAL_H_INCLUDED */
+#endif /* TC_STORE_H_INCLUDED */

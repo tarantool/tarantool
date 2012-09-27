@@ -23,7 +23,7 @@ endif()
 # source files
 #
 
-set (tntrpl_sources tnt_xlog.c tnt_rpl.c
+set (tntrpl_sources tnt_log.c tnt_xlog.c tnt_snapshot.c tnt_rpl.c
      ${CMAKE_SOURCE_DIR}/third_party/crc32.c)
 
 #----------------------------------------------------------------------------#

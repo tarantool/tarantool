@@ -277,6 +277,44 @@ error:
 }
 
 /*
+ * tnt_tuple_set_as()
+ *
+ * set tuple from data;
+ * create new tuple and set it from data;
+ *
+ * t    - tuple pointer, maybe NULL
+ * buf  - iproto tuple fields buffer representation
+ * size - buffer size
+ * num  - tuple cardinality
+ *
+ * if tuple pointer is NULL, then new tuple will be created.
+ *
+ * returns tuple pointer, or NULL on error.
+*/
+struct tnt_tuple*
+tnt_tuple_set_as(struct tnt_tuple *t, const void *buf, size_t size, uint32_t num)
+{
+	int allocated = t == NULL;
+	if (t == NULL) {
+		t = tnt_tuple_add(NULL, NULL, 0);
+		if (t == NULL)
+			return NULL;
+	}
+	t->cardinality = num;
+	t->size = sizeof(uint32_t) + size;
+	t->data = tnt_mem_alloc(t->size);
+	if (t->data == NULL)
+		goto error;
+	memcpy(t->data, &num, sizeof(uint32_t));
+	memcpy(t->data + sizeof(uint32_t), buf, size);
+	return t;
+error:
+	if (allocated)
+		tnt_tuple_free(t);
+	return NULL;
+}
+
+/*
  * tnt_list_init()
  *
  * initialize tuple list;

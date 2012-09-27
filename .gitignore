@@ -15,6 +15,7 @@ test/connector_c/rpl
 test/connector_c/xlog
 test/connector_c/tt
 test/connector_c/update
+test/connector_c/snap
 test/box/protocol
 test/box/connector
 test/unit/queue
