@@ -32,16 +32,58 @@
 #include <exception.h>
 
 struct tarantool_cfg;
-struct space;
+
 
 enum {
 	BOX_INDEX_MAX = 10,
-//	BOX_SPACE_MAX = 256,
+};
+
+struct space {
+	Index *index[BOX_INDEX_MAX];
+	/** If not set (is 0), any tuple in the
+	 * space can have any number of fields (but
+	 * @sa max_fieldno). If set, Each tuple
+	 * must have exactly this many fields.
+	 */
+	int arity;
+
+	/**
+	 * The number of indexes in the space.
+	 *
+	 * It is equal to the number of non-nil members of the index
+	 * array and defines the key_defs array size as well.
+	 */
+	int key_count;
+
+	/**
+	 * The descriptors for all indexes that belong to the space.
+	 */
+	struct key_def *key_defs;
+
+	/**
+	 * Field types of indexed fields. This is an array of size
+	 * field_count. If there are gaps, i.e. fields that do not
+	 * participate in any index and thus we cannot infer their
+	 * type, then respective array members have value UNKNOWN.
+	 * XXX: right now UNKNOWN is also set for fields which types
+	 * in two indexes contradict each other.
+	 */
+	enum field_data_type *field_types;
+
+	/**
+	 * Max field no which participates in any of the space indexes.
+	 * Each tuple in this space must have, therefore, at least
+	 * field_count fields.
+	 */
+	int max_fieldno;
+
+	/* space number */
+	i32 no;
 };
 
 
 /** Get space ordinal number. */
-int space_n(struct space *sp);
+static inline i32 space_n(struct space *sp) { return sp->no; }
 
 void space_validate(struct space *sp, struct tuple *old_tuple,
 		    struct tuple *new_tuple);
@@ -51,31 +93,52 @@ void space_remove(struct space *sp, struct tuple *tuple);
 
 
 /* Get index by index no */
-Index * space_index(struct space *sp, int index_no);
+Index *space_index(struct space *sp, int index_no);
 
 /* Set index by index no */
-Index * space_set_index(struct space *sp, int index_no, Index *idx);
+Index *space_set_index(struct space *sp, int index_no, Index *idx);
 
 
 /* look through all enabled spaces */
 int space_foreach(int (*space_i)(struct space *sp, void *udata), void *udata);
 
 
-struct space * space_by_n(i32 space_no);	/* NULL if space not found */
-struct space * space_find(i32 space_no);	/* raise if space not found */
+struct space *space_by_n(i32 space_no);	/* NULL if space not found */
 
-int space_max_fieldno(struct space *sp);
+static inline struct space *
+space_find(i32 space_no)
+{
+	struct space *s = space_by_n(space_no);
+	if (s)
+		return s;
 
-enum field_data_type space_field_type(struct space *sp, int no);
+	tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
+}
 
-int key_def_n(struct space *sp, struct key_def *kp);
+
+/** Get key_def ordinal number. */
+static inline int
+key_def_n(struct space *sp, struct key_def *kp)
+{
+	assert(kp >= sp->key_defs && kp < (sp->key_defs + sp->key_count));
+	return kp - sp->key_defs;
+}
+
+static inline int
+space_max_fieldno(struct space *sp)
+{
+	return sp->max_fieldno;
+}
+
+static inline enum field_data_type
+space_field_type(struct space *sp, int no)
+{
+	return sp->field_types[no];
+}
 
 
-struct space * space_create(
-	i32 space_no, struct key_def *key, int key_count, int arity
-);
-
-bool space_number_is_valid(i32 space_no);
+struct space *
+space_create(i32 space_no, struct key_def *key, int key_count, int arity);
 
 
 /** Get index ordinal number in space. */

@@ -36,84 +36,32 @@
 #include "tuple.h"
 #include <pickle.h>
 #include <palloc.h>
+#include <assoc.h>
 
-#define BOX_SPACE_MAX 256
 
-static struct space *spaces = NULL;
+
+static struct mh_iovec_t *spaces;
 
 bool secondary_indexes_enabled = false;
 bool primary_indexes_enabled = false;
 
-struct space {
-	Index *index[BOX_INDEX_MAX];
-	/** If not set (is 0), any tuple in the
-	 * space can have any number of fields (but
-	 * @sa max_fieldno). If set, Each tuple
-	 * must have exactly this many fields.
-	 */
-	int arity;
-
-	/**
-	 * The number of indexes in the space.
-	 *
-	 * It is equal to the number of non-nil members of the index
-	 * array and defines the key_defs array size as well.
-	 */
-	int key_count;
-
-	/**
-	 * The descriptors for all indexes that belong to the space.
-	 */
-	struct key_def *key_defs;
-
-	/**
-	 * Field types of indexed fields. This is an array of size
-	 * field_count. If there are gaps, i.e. fields that do not
-	 * participate in any index and thus we cannot infer their
-	 * type, then respective array members have value UNKNOWN.
-	 * XXX: right now UNKNOWN is also set for fields which types
-	 * in two indexes contradict each other.
-	 */
-	enum field_data_type *field_types;
-
-	/**
-	 * Max field no which participates in any of the space indexes.
-	 * Each tuple in this space must have, therefore, at least
-	 * field_count fields.
-	 */
-	int max_fieldno;
-
-	bool enabled;
-};
-
-
-bool
-space_number_is_valid(i32 space_no)
-{
-	return space_no >= 0 && space_no < BOX_SPACE_MAX;
-}
-
-int
-space_max_fieldno(struct space *sp)
-{
-	return sp->max_fieldno;
-}
-
-enum field_data_type
-space_field_type(struct space *sp, int no)
-{
-	return sp->field_types[no];
-}
 
 struct space *
 space_create(i32 space_no, struct key_def *key, int key_count, int arity)
 {
-	if (space_no < 0 || space_no >= BOX_SPACE_MAX)
-		panic("Can't create space %d", space_no);
-	if (spaces[space_no].enabled)
-		panic("Space %d is already enabled", space_no);
-	struct space *space = spaces + space_no;
-	space->enabled = true;
+
+	struct space *space = space_by_n(space_no);
+	if (space)
+		panic("Space %d is already exists", space_no);
+	space = p0alloc(eter_pool, sizeof(struct space));
+	space->no = space_no;
+
+	struct iovec k = {
+		.iov_len	= sizeof(space->no),
+		.iov_base	= &space->no
+	};
+	mh_iovec_put(spaces, k, space, NULL);
+
 	space->arity = arity;
 	space->key_defs = key;
 	space->key_count = key_count;
@@ -126,20 +74,16 @@ space_create(i32 space_no, struct key_def *key, int key_count, int arity)
 struct space *
 space_by_n(i32 n)
 {
-	if (n < 0)
+	struct iovec key;
+	key.iov_len = sizeof(n);
+	key.iov_base = &n;
+
+	mh_int_t space = mh_iovec_get(spaces, key);
+	if (space == mh_end(spaces))
 		return NULL;
-	if (n >= BOX_SPACE_MAX)
-		return NULL;
-	return spaces + n;
+	return mh_value(spaces, space);
 }
 
-/** Get key_def ordinal number. */
-int
-key_def_n(struct space *sp, struct key_def *kp)
-{
-	assert(kp >= sp->key_defs && kp < (sp->key_defs + sp->key_count));
-	return kp - sp->key_defs;
-}
 
 int
 index_count(struct space *sp)
@@ -156,24 +100,20 @@ index_count(struct space *sp)
 	}
 }
 
-int
-space_n(struct space *sp)
-{
-	assert(sp >= spaces && sp < (spaces + BOX_SPACE_MAX));
-	return sp - spaces;
-}
-
 /* look through all enabled spaces */
 int
 space_foreach(int (*space_i)(struct space *sp, void *udata), void *udata) {
-	unsigned i, res = 0;
-	for (i = 0; i < BOX_SPACE_MAX; i++) {
-		if (!spaces[i].enabled)
-			continue;
-		res = space_i(spaces + i, udata);
+
+	mh_int_t i;
+	int res = 0;
+
+	mh_foreach(spaces, i) {
+		struct space *space = mh_value(spaces, i);
+		res = space_i(space, udata);
 		if (res)
 			break;
 	}
+
 	return res;
 }
 
@@ -199,19 +139,6 @@ space_set_index(struct space *sp, int index_no, Index *idx)
 	sp->index[index_no] = idx;
 
 	return idx;
-}
-
-struct space *
-space_find(i32 space_no)
-{
-	struct space *s = space_by_n(space_no);
-	if (s) {
-		if (!s->enabled)
-			tnt_raise(ClientError, :ER_SPACE_DISABLED, space_no);
-		return s;
-	}
-
-	tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
 }
 
 /** Free a key definition. */
@@ -291,24 +218,27 @@ space_remove(struct space *sp, struct tuple *tuple)
 	}
 }
 
+
 void
 space_free(void)
 {
-	int i;
-	for (i = 0 ; i < BOX_SPACE_MAX ; i++) {
-		if (!spaces[i].enabled)
-			continue;
+	mh_int_t i;
+
+	mh_foreach(spaces, i) {
+		struct space *space = mh_value(spaces, i);
 
 		int j;
-		for (j = 0 ; j < spaces[i].key_count; j++) {
-			Index *index = spaces[i].index[j];
+		for (j = 0 ; j < space->key_count; j++) {
+			Index *index = space->index[j];
 			[index free];
-			key_free(&spaces[i].key_defs[j]);
+			key_free(&space->key_defs[j]);
 		}
 
-		free(spaces[i].key_defs);
-		free(spaces[i].field_types);
+		free(space->key_defs);
+		free(space->field_types);
+		mh_iovec_del(spaces, i);
 	}
+
 }
 
 static void
@@ -428,39 +358,52 @@ space_config()
 
 		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
 
-		spaces[i].enabled = true;
-		spaces[i].arity = cfg_space->cardinality;
+		struct space *space = space_by_n(i);
+		if (space)
+			panic("space %i is already exists", i);
+
+		space = p0alloc(eter_pool, sizeof(struct space));
+		space->no = i;
+
+
+		space->arity = cfg_space->cardinality;
 
 		/*
 		 * Collect key/field info. We need aggregate
 		 * information on all keys before we can create
 		 * indexes.
 		 */
-		spaces[i].key_count = 0;
+		space->key_count = 0;
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
-			++spaces[i].key_count;
+			++space->key_count;
 		}
 
-		spaces[i].key_defs = malloc(spaces[i].key_count *
+		space->key_defs = malloc(space->key_count *
 					    sizeof(struct key_def));
-		if (spaces[i].key_defs == NULL) {
+		if (space->key_defs == NULL) {
 			panic("can't allocate key def array");
 		}
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
-			key_init(&spaces[i].key_defs[j], cfg_index);
+			key_init(&space->key_defs[j], cfg_index);
 		}
-		space_init_field_types(&spaces[i]);
+		space_init_field_types(space);
 
 		/* fill space indexes */
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
-			struct key_def *key_def = &spaces[i].key_defs[j];
-			Index *index = [Index alloc: type :key_def :&spaces[i]];
-			[index init: key_def :&spaces[i]];
-			spaces[i].index[j] = index;
+			struct key_def *key_def = &space->key_defs[j];
+			Index *index = [Index alloc: type :key_def :space];
+			[index init: key_def :space];
+			space->index[j] = index;
 		}
+
+		struct iovec k = {
+			.iov_len	= sizeof(space->no),
+			.iov_base	= &space->no
+		};
+		mh_iovec_put(spaces, k, space, NULL);
 		say_info("space %i successfully configured", i);
 	}
 }
@@ -468,8 +411,7 @@ space_config()
 void
 space_init(void)
 {
-	/* Allocate and initialize space memory. */
-	spaces = p0alloc(eter_pool, sizeof(struct space) * BOX_SPACE_MAX);
+	spaces = mh_iovec_init();
 
 	/* configure regular spaces */
 	space_config();
@@ -479,11 +421,12 @@ void
 begin_build_primary_indexes(void)
 {
 	assert(primary_indexes_enabled == false);
-	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
-		if (spaces[n].enabled == false)
-			continue;
 
-		Index *pk = spaces[n].index[0];
+	mh_int_t i;
+
+	mh_foreach(spaces, i) {
+		struct space *space = mh_value(spaces, i);
+		Index *pk = space->index[0];
 		[pk beginBuild];
 	}
 }
@@ -491,11 +434,10 @@ begin_build_primary_indexes(void)
 void
 end_build_primary_indexes(void)
 {
-	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
-		if (spaces[n].enabled == false)
-			continue;
-
-		Index *pk = spaces[n].index[0];
+	mh_int_t i;
+	mh_foreach(spaces, i) {
+		struct space *space = mh_value(spaces, i);
+		Index *pk = space->index[0];
 		[pk endBuild];
 	}
 	primary_indexes_enabled = true;
@@ -507,21 +449,22 @@ build_secondary_indexes(void)
 	assert(primary_indexes_enabled == true);
 	assert(secondary_indexes_enabled == false);
 
-	for (u32 n = 0; n < BOX_SPACE_MAX; ++n) {
-		if (spaces[n].enabled == false)
-			continue;
-		if (spaces[n].key_count <= 1)
+	mh_int_t i;
+	mh_foreach(spaces, i) {
+		struct space *space = mh_value(spaces, i);
+
+		if (space->key_count <= 1)
 			continue; /* no secondary keys */
 
-		say_info("Building secondary keys in space %" PRIu32 "...", n);
+		say_info("Building secondary keys in space %" PRIu32 "...", i);
 
-		Index *pk = spaces[n].index[0];
-		for (int i = 1; i < spaces[n].key_count; i++) {
-			Index *index = spaces[n].index[i];
+		Index *pk = space->index[0];
+		for (int j = 1; j < space->key_count; j++) {
+			Index *index = space->index[j];
 			[index build: pk];
 		}
 
-		say_info("Space %"PRIu32": done", n);
+		say_info("Space %"PRIu32": done", i);
 	}
 
 	/* enable secondary indexes now */
@@ -547,14 +490,6 @@ check_spaces(struct tarantool_cfg *conf)
 		if (!space->enabled) {
 			/* space disabled, skip it */
 			continue;
-		}
-
-		/* check space bound */
-		if (i >= BOX_SPACE_MAX) {
-			/* maximum space is reached */
-			out_warning(0, "(space = %zu) "
-				    "too many spaces (%i maximum)", i, space);
-			return -1;
 		}
 
 		if (conf->memcached_port && i == conf->memcached_space) {

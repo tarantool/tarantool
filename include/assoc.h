@@ -29,6 +29,7 @@
 #include <pickle.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/uio.h>
 
 #if !MH_SOURCE
 #define MH_UNDEF
@@ -68,3 +69,18 @@ static inline int lstrcmp(void *a, void *b)
 #define mh_hash(key) ({ void *_k = (key); unsigned l = load_varint32(&_k); MurmurHash2(_k, l, 13); })
 #define mh_eq(a, b) (lstrcmp((a), (b)) == 0)
 #include <mhash.h>
+
+static inline int iovcmp(const struct iovec *a, const struct iovec *b)
+{
+	if (a->iov_len != b->iov_len)
+		return b->iov_len - a->iov_len;
+	return memcmp(a->iov_base, b->iov_base, a->iov_len);
+}
+
+#define mh_name		_iovec
+#define mh_key_t	struct iovec
+#define mh_val_t	ptr_t
+#define mh_hash(key)	(MurmurHash2(key.iov_base, key.iov_len, 17))
+#define mh_eq(a, b)	(iovcmp((&a), (&b)) == 0)
+#include <mhash.h>
+

@@ -401,12 +401,6 @@ memcached_check_config(struct tarantool_cfg *conf)
 	}
 
 	/* check memcached space number: it shoud be in segment [0, max_space] */
-	if (!space_number_is_valid(conf->memcached_space)) {
-		/* invalid space number */
-		out_warning(0, "invalid memcached space number: %i",
-			    conf->memcached_space);
-		return -1;
-	}
 
 	if (conf->memcached_expire_per_loop <= 0) {
 		/* invalid expire per loop value */
@@ -476,27 +470,6 @@ memcached_space_init()
 	Index *memc_index = [Index alloc: HASH :key_def :memc_s];
 	memc_index = space_set_index(memc_s, 0, memc_index);
 
-
-
-
-	/* Configure memcached space. */
-/*         struct space *memc_s = space_by_n(cfg.memcached_space); */
-
-/*         memc_s->enabled = true; */
-/*         memc_s->arity = 4; */
-
-/*         memc_s->key_count = 1; */
-/*         memc_s->key_defs = malloc(sizeof(struct key_def)); */
-
-/*         if (memc_s->key_defs == NULL) */
-/*                 panic("out of memory when configuring memcached_space"); */
-
-/*         struct key_def *key_def = memc_s->key_defs; */
-
-	/* Configure memcached index. */
-/*         Index *memc_index = */
-/*                 space_set_index( */
-/*                         memc_s, 0, [Index alloc: HASH :key_def :memc_s]); */
 	[memc_index init: key_def :memc_s];
 }
 
