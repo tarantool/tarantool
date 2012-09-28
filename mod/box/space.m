@@ -40,7 +40,7 @@
 
 
 
-static struct mh_iovec_t *spaces;
+static struct mh_i32ptr_t *spaces;
 
 bool secondary_indexes_enabled = false;
 bool primary_indexes_enabled = false;
@@ -56,11 +56,7 @@ space_create(i32 space_no, struct key_def *key, int key_count, int arity)
 	space = p0alloc(eter_pool, sizeof(struct space));
 	space->no = space_no;
 
-	struct iovec k = {
-		.iov_len	= sizeof(space->no),
-		.iov_base	= &space->no
-	};
-	mh_iovec_put(spaces, k, space, NULL);
+	mh_i32ptr_put(spaces, space->no, space, NULL);
 
 	space->arity = arity;
 	space->key_defs = key;
@@ -74,11 +70,7 @@ space_create(i32 space_no, struct key_def *key, int key_count, int arity)
 struct space *
 space_by_n(i32 n)
 {
-	struct iovec key;
-	key.iov_len = sizeof(n);
-	key.iov_base = &n;
-
-	mh_int_t space = mh_iovec_get(spaces, key);
+	mh_int_t space = mh_i32ptr_get(spaces, n);
 	if (space == mh_end(spaces))
 		return NULL;
 	return mh_value(spaces, space);
@@ -226,6 +218,7 @@ space_free(void)
 
 	mh_foreach(spaces, i) {
 		struct space *space = mh_value(spaces, i);
+		mh_i32ptr_del(spaces, i);
 
 		int j;
 		for (j = 0 ; j < space->key_count; j++) {
@@ -236,7 +229,6 @@ space_free(void)
 
 		free(space->key_defs);
 		free(space->field_types);
-		mh_iovec_del(spaces, i);
 	}
 
 }
@@ -399,11 +391,7 @@ space_config()
 			space->index[j] = index;
 		}
 
-		struct iovec k = {
-			.iov_len	= sizeof(space->no),
-			.iov_base	= &space->no
-		};
-		mh_iovec_put(spaces, k, space, NULL);
+		mh_i32ptr_put(spaces, space->no, space, NULL);
 		say_info("space %i successfully configured", i);
 	}
 }
@@ -411,7 +399,7 @@ space_config()
 void
 space_init(void)
 {
-	spaces = mh_iovec_init();
+	spaces = mh_i32ptr_init();
 
 	/* configure regular spaces */
 	space_config();
