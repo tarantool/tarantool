@@ -118,12 +118,10 @@ struct _mh(t) {
 #define mh_value(h, i)		(h)->p[(i)].val
 #define mh_size(h)		({ (h)->size;		})
 #define mh_capacity(h)		({ (h)->n_buckets;	})
-#define mh_begin(h)		({ 0;			})
 #define mh_end(h)		({ (h)->n_buckets;	})
-#define mh_next(h, i)		({ i + 1; })
 
 
-#define mh_begin_exists(h)	({				\
+#define mh_first(h) ({						\
 	mh_int_t i;						\
 	for (i = 0; i < mh_end(h); i++) {			\
 		if (mh_exist(h, i))				\
@@ -132,7 +130,7 @@ struct _mh(t) {
 	i;							\
 })
 
-#define mh_next_exists(h, i)		({			\
+#define mh_next(h, i) ({					\
 	mh_int_t n = i;						\
 	if (n < mh_end(h)) {					\
 		for (n = i + 1; n < mh_end(h); n++) {		\
@@ -144,7 +142,7 @@ struct _mh(t) {
 })
 
 #define mh_foreach(h, i) \
-	for (i = mh_begin_exists(h); i < mh_end(h); i = mh_next_exists(h, i))
+	for (i = mh_first(h); i < mh_end(h); i = mh_next(h, i))
 
 
 #define MH_DENSITY 0.7

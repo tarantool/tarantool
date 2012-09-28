@@ -281,12 +281,12 @@ hash_iterator_next(struct iterator *iterator)
 	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	while (it->h_pos != mh_end(it->hash)) {
-		if (mh_exist(it->hash, it->h_pos))
-			return mh_value(it->hash, it->h_pos++);
-		it->h_pos++;
-	}
-	return NULL;
+	if (it->h_pos == mh_end(it->hash))
+		return NULL;
+
+	struct tuple *t = mh_value(it->hash, it->h_pos);
+	it->h_pos = mh_next(it->hash, it->h_pos);
+	return t;
 }
 
 void
@@ -488,7 +488,7 @@ int32_key_to_value(void *key)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	it->base.next_equal = 0; /* Should not be used. */
-	it->h_pos = mh_begin(int_hash);
+	it->h_pos = mh_first(int_hash);
 	it->hash = int_hash;
 }
 
@@ -611,7 +611,7 @@ int64_key_to_value(void *key)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
-	it->h_pos = mh_begin(int64_hash);
+	it->h_pos = mh_first(int64_hash);
 	it->hash = (struct mh_i32ptr_t *) int64_hash;
 }
 
@@ -729,7 +729,7 @@ int64_key_to_value(void *key)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
-	it->h_pos = mh_begin(str_hash);
+	it->h_pos = mh_first(str_hash);
 	it->hash = (struct mh_i32ptr_t *) str_hash;
 }
 
