@@ -560,7 +560,7 @@ lbox_index_new(struct lua_State *L)
 	/* locate the appropriate index */
 	struct space *sp = space_by_n(n);
 	if (!sp)
-		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
+		tnt_raise(LoggedError, :ER_NO_SUCH_SPACE, n);
 
 	Index *index = space_index(sp, idx);
 	if (!index)
