@@ -414,8 +414,8 @@ begin_build_primary_indexes(void)
 
 	mh_foreach(spaces, i) {
 		struct space *space = mh_value(spaces, i);
-		Index *pk = space->index[0];
-		[pk beginBuild];
+		Index *index = space->index[0];
+		[index beginBuild];
 	}
 }
 
@@ -425,8 +425,8 @@ end_build_primary_indexes(void)
 	mh_int_t i;
 	mh_foreach(spaces, i) {
 		struct space *space = mh_value(spaces, i);
-		Index *pk = space->index[0];
-		[pk endBuild];
+		Index *index = space->index[0];
+		[index endBuild];
 	}
 	primary_indexes_enabled = true;
 }
@@ -446,10 +446,10 @@ build_secondary_indexes(void)
 
 		say_info("Building secondary keys in space %" PRIu32 "...", i);
 
-		Index *pk = space->index[0];
+		Index *primary_index = space->index[0];
 		for (int j = 1; j < space->key_count; j++) {
 			Index *index = space->index[j];
-			[index build: pk];
+			[index build: primary_index];
 		}
 
 		say_info("Space %"PRIu32": done", i);
