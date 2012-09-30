@@ -46,7 +46,7 @@ static void
 iproto_validate_header(struct iproto_header *header);
 
 inline static int
-iproto_flush(struct tbuf **in, ssize_t to_read)
+iproto_flush(ssize_t to_read)
 {
 	/*
 	 * Flush output and garbage collect before reading
@@ -58,8 +58,6 @@ iproto_flush(struct tbuf **in, ssize_t to_read)
 			return -1;
 		}
 		fiber_gc();
-		/* Must be reset after fiber_gc() */
-		*in = fiber->rbuf;
 	}
 	return 0;
 }
@@ -67,7 +65,7 @@ iproto_flush(struct tbuf **in, ssize_t to_read)
 void
 iproto_interact(iproto_callback callback)
 {
-	struct tbuf *in = fiber->rbuf;
+	struct tbuf *in = &fiber->rbuf;
 	ssize_t to_read = sizeof(struct iproto_header);
 
 	for (;;) {
@@ -81,7 +79,7 @@ iproto_interact(iproto_callback callback)
 			+ iproto(in)->len;
 		to_read = request_len - in->size;
 
-		if (iproto_flush(&in, to_read) == -1)
+		if (iproto_flush(to_read) == -1)
 			break;
 		if (to_read > 0 && fiber_bread(in, to_read) <= 0)
 			break;
@@ -90,7 +88,7 @@ iproto_interact(iproto_callback callback)
 		iproto_reply(callback, request);
 
 		to_read = sizeof(struct iproto_header) - in->size;
-		if (iproto_flush(&in, to_read) == -1)
+		if (iproto_flush(to_read) == -1)
 			break;
 	}
 }
@@ -123,13 +121,13 @@ static void iproto_reply(iproto_callback callback, struct tbuf *request)
 		reply->ret_code = 0;
 	}
 	@catch (ClientError *e) {
-		fiber->iov->size -= (fiber->iov_cnt - saved_iov_cnt) * sizeof(struct iovec);
+		fiber->iov.size -= (fiber->iov_cnt - saved_iov_cnt) * sizeof(struct iovec);
 		fiber->iov_cnt = saved_iov_cnt;
 		reply->ret_code = tnt_errcode_val(e->errcode);
 		iov_dup(e->errmsg, strlen(e->errmsg)+1);
 	}
 	for (; saved_iov_cnt < fiber->iov_cnt; saved_iov_cnt++)
-		reply->len += iovec(fiber->iov)[saved_iov_cnt].iov_len;
+		reply->len += iovec(&fiber->iov)[saved_iov_cnt].iov_len;
 }
 
 static void

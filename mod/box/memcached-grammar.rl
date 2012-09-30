@@ -52,8 +52,8 @@ memcached_dispatch()
 	uintptr_t flush_delay = 0;
 	size_t keys_count = 0;
 
-	p = fiber->rbuf->data;
-	pe = fiber->rbuf->data + fiber->rbuf->size;
+	p = fiber->rbuf.data;
+	pe = fiber->rbuf.data + fiber->rbuf.size;
 
 	say_debug("memcached_dispatch '%.*s'", MIN((int)(pe - p), 40) , p);
 
@@ -252,16 +252,16 @@ memcached_dispatch()
 		flush_delay = digit+ >fstart %{flush_delay = natoq(fstart, p);};
 
 		action read_data {
-			size_t parsed = p - (u8 *)fiber->rbuf->data;
-			while (fiber->rbuf->size - parsed < bytes + 2) {
-				if ((r = fiber_bread(fiber->rbuf, bytes + 2 - (pe - p))) <= 0) {
+			size_t parsed = p - (u8 *)fiber->rbuf.data;
+			while (fiber->rbuf.size - parsed < bytes + 2) {
+				if ((r = fiber_bread(&fiber->rbuf, bytes + 2 - (pe - p))) <= 0) {
 					say_debug("read returned %i, closing connection", r);
 					return 0;
 				}
 			}
 
-			p = fiber->rbuf->data + parsed;
-			pe = fiber->rbuf->data + fiber->rbuf->size;
+			p = fiber->rbuf.data + parsed;
+			pe = fiber->rbuf.data + fiber->rbuf.size;
 
 			data = p;
 
@@ -274,8 +274,8 @@ memcached_dispatch()
 
 		action done {
 			done = true;
-			stats.bytes_read += p - (u8 *)fiber->rbuf->data;
-			tbuf_peek(fiber->rbuf, p - (u8 *)fiber->rbuf->data);
+			stats.bytes_read += p - (u8 *)fiber->rbuf.data;
+			tbuf_peek(&fiber->rbuf, p - (u8 *)fiber->rbuf.data);
 		}
 
 		eol = ("\r\n" | "\n") @{ p++; };
@@ -318,7 +318,7 @@ memcached_dispatch()
 		}
 		char *r;
 		if ((r = memmem(p, pe - p, "\r\n", 2)) != NULL) {
-			tbuf_peek(fiber->rbuf, r + 2 - (char *)fiber->rbuf->data);
+			tbuf_peek(&fiber->rbuf, r + 2 - (char *)fiber->rbuf.data);
 			iov_add("CLIENT_ERROR bad command line format\r\n", 38);
 			return 1;
 		}
@@ -327,7 +327,7 @@ memcached_dispatch()
 
 	if (noreply) {
 		fiber->iov_cnt = saved_iov_cnt;
-		fiber->iov->size = saved_iov_cnt * sizeof(struct iovec);
+		fiber->iov.size = saved_iov_cnt * sizeof(struct iovec);
 	}
 
 	return 1;

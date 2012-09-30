@@ -342,7 +342,7 @@ memcached_handler(void *_data __attribute__((unused)))
 
 	for (;;) {
 		batch_count = 0;
-		if ((r = fiber_bread(fiber->rbuf, 1)) <= 0) {
+		if ((r = fiber_bread(&fiber->rbuf, 1)) <= 0) {
 			say_debug("read returned %i, closing connection", r);
 			goto exit;
 		}
@@ -360,7 +360,7 @@ memcached_handler(void *_data __attribute__((unused)))
 		if (p == 1) {
 			batch_count++;
 			/* some unparsed commands remain and batch count less than 20 */
-			if (fiber->rbuf->size > 0 && batch_count < 20)
+			if (fiber->rbuf.size > 0 && batch_count < 20)
 				goto dispatch;
 		}
 
@@ -373,7 +373,7 @@ memcached_handler(void *_data __attribute__((unused)))
 		stats.bytes_written += r;
 		fiber_gc();
 
-		if (p == 1 && fiber->rbuf->size > 0) {
+		if (p == 1 && fiber->rbuf.size > 0) {
 			batch_count = 0;
 			goto dispatch;
 		}

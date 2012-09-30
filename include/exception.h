@@ -60,7 +60,6 @@
 }
 
 - (id) init: (const char *)msg, ...;
-- (id) init: (int)errnum_arg: (const char *)format, ...;
 - (id) init: (int)errnum_arg: (const char *)format: (va_list)ap;
 - (void) log;
 - (const char *) errmsg;
