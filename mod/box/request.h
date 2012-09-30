@@ -100,14 +100,14 @@ request_is_select(u32 type)
 	return type == SELECT || type == CALL;
 }
 
-@interface Request: tnt_Object {
+struct request
+{
 	u32 type;
 	struct tbuf *data;
-}
-+ (Request *) alloc;
-+ (Request *) build: (u32) type_arg;
-- (id) init: (struct tbuf *) data_arg;
-- (void) execute: (struct txn *) txn :(struct port *) port;
-@end
+};
+
+struct request *request_create(u32 type, struct tbuf *data);
+
+void request_execute(struct request *request, struct txn *txn, struct port *port);
 
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

@@ -77,14 +77,11 @@ port_send_tuple(u32 flags, struct port *port, struct tuple *tuple)
 	}
 }
 
-@interface Replace: Request
-- (void) execute: (struct txn *) txn :(struct port *) port;
-@end
-
-@implementation Replace
-- (void) execute: (struct txn *) txn :(struct port *) port
+static void
+execute_replace(struct request *request, struct txn *txn, struct port *port)
 {
-	txn_add_redo(txn, type, data);
+	struct tbuf *data = request->data;
+	txn_add_redo(txn, request->type, data);
 	struct space *sp = read_space(data);
 	u32 flags = read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 	size_t field_count = read_u32(data);
@@ -117,7 +114,6 @@ port_send_tuple(u32 flags, struct port *port, struct tuple *tuple)
 	if (flags & BOX_RETURN_TUPLE)
 		port_add_tuple(port, txn->new_tuple);
 }
-@end
 
 /** {{{ UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations, each
@@ -180,10 +176,6 @@ port_send_tuple(u32 flags, struct port *port, struct tuple *tuple)
  * allocated memory, the main loop may allocate a temporary buffer
  * to store intermediate operation results.
  */
-
-@interface Update: Request
-- (void) execute: (struct txn *) txn :(struct port *) port;
-@end
 
 /** Argument of SET operation. */
 struct op_set_arg {
@@ -682,10 +674,7 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 		tnt_raise(IllegalParams, :"too many operations for update");
 	if (op_cnt == 0)
 		tnt_raise(IllegalParams, :"no operations for update");
-	/*
-	 * Read update operations. Allocate an extra dummy op to
-	 * optionally "apply" to the first field.
-	 */
+	/* Read update operations.  */
 	struct update_op *ops = palloc(fiber->gc_pool, op_cnt *
 				       sizeof(struct update_op));
 	struct update_op *op = ops, *ops_end = ops + op_cnt;
@@ -707,11 +696,11 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 	return ops;
 }
 
-
-@implementation Update
-- (void) execute: (struct txn *) txn :(struct port *) port
+static void
+execute_update(struct request *request, struct txn *txn, struct port *port)
 {
-	txn_add_redo(txn, type, data);
+	struct tbuf *data = request->data;
+	txn_add_redo(txn, request->type, data);
 	struct space *sp = read_space(data);
 	u32 flags = read_u32(data) & BOX_ALLOWED_REQUEST_FLAGS;
 
@@ -742,17 +731,13 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
 	port_send_tuple(flags, port, txn->new_tuple);
 }
-@end
 
 /** }}} */
 
-@interface Select: Request
-- (void) execute: (struct txn *) txn :(struct port *) port;
-@end
-
-@implementation Select
-- (void) execute: (struct txn *) txn :(struct port *) port
+static void
+execute_select(struct request *request, struct txn *txn, struct port *port)
 {
+	struct tbuf *data = request->data;
 	(void) txn; /* Not used. */
 	struct space *sp = read_space(data);
 	u32 index_no = read_u32(data);
@@ -801,15 +786,12 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 	if (data->size != 0)
 		tnt_raise(IllegalParams, :"can't unpack request");
 }
-@end
 
-@interface Delete: Request
-- (void) execute: (struct txn *) txn :(struct port *) port;
-@end
-
-@implementation Delete
-- (void) execute: (struct txn *) txn :(struct port *) port
+static void
+execute_delete(struct request *request, struct txn *txn, struct port *port)
 {
+	struct tbuf *data = request->data;
+	u32 type = request->type;
 	txn_add_redo(txn, type, data);
 	u32 flags = 0;
 	struct space *sp = read_space(data);
@@ -826,59 +808,57 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 
 	port_send_tuple(flags, port, old_tuple);
 }
-@end
 
-@implementation Request
-+ (Request *) alloc
+/** To collects stats, we need a valid request type.
+ * We must collect stats before execute.
+ * Check request type here for now.
+ */
+static void
+request_check_type(u32 type)
 {
-	size_t sz = class_getInstanceSize(self);
-	id new = palloca(fiber->gc_pool, sz, sizeof(void *));
-	memset(new, 0, sz);
-	object_setClass(new, self);
-	return new;
-}
+	if (type != REPLACE && type != SELECT &&
+	    type != UPDATE && type != DELETE_1_3 &&
+	    type != DELETE && type != CALL) {
 
-+ (Request *) build: (u32) type_arg
-{
-	Request *new = nil;
-	switch (type_arg) {
-	case REPLACE:
-		new = [Replace alloc]; break;
-	case SELECT:
-		new = [Select alloc]; break;
-	case UPDATE:
-		new = [Update alloc]; break;
-	case DELETE_1_3:
-	case DELETE:
-		new = [Delete alloc]; break;
-	case CALL:
-		new = [Call alloc]; break;
-	default:
-		say_error("Unsupported request = %" PRIi32 "", type_arg);
+		say_error("Unsupported request = %" PRIi32 "", type);
 		tnt_raise(IllegalParams, :"unsupported command code, "
 			  "check the error log");
+	}
+}
+
+struct request *
+request_create(u32 type, struct tbuf *data)
+{
+	request_check_type(type);
+	struct request *request = palloc(fiber->gc_pool, sizeof(struct request));
+	request->type = type;
+	request->data = data;
+	return request;
+}
+
+void
+request_execute(struct request *request, struct txn *txn, struct port *port)
+{
+	switch (request->type) {
+	case REPLACE:
+		execute_replace(request, txn, port);
+		break;
+	case SELECT:
+		execute_select(request, txn, port);
+		break;
+	case UPDATE:
+		execute_update(request, txn, port);
+		break;
+	case DELETE_1_3:
+	case DELETE:
+		execute_delete(request, txn, port);
+		break;
+	case CALL:
+		box_lua_execute(request, txn, port);
+		break;
+	default:
+		assert(false);
+		request_check_type(request->type);
 		break;
 	}
-	new->type = type_arg;
-	return new;
 }
-
-- (id) init: (struct tbuf *) data_arg
-{
-	assert(type);
-	self = [super init];
-	if (self == nil)
-		return self;
-
-	data = data_arg;
-	return self;
-}
-
-- (void) execute: (struct txn *) txn :(struct port *) port
-{
-	(void) txn;
-	(void) port;
-	[self subclassResponsibility: _cmd];
-}
-@end
-

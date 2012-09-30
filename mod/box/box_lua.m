@@ -986,14 +986,15 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
 	}
 }
 
-@implementation Call
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-- (void) execute: (struct txn *) txn : (struct port *)port
+void
+box_lua_execute(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) txn;
+	struct tbuf *data = request->data;
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
 	/* Request flags: not used. */
@@ -1025,7 +1026,6 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
 		luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
 	}
 }
-@end
 
 void
 mod_lua_init(struct lua_State *L)
