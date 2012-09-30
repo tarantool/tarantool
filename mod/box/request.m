@@ -66,23 +66,23 @@ read_space(struct tbuf *data)
 }
 
 static void
-port_send_tuple(u32 flags, Port *port, struct tuple *tuple)
+port_send_tuple(u32 flags, struct port *port, struct tuple *tuple)
 {
 	if (tuple) {
-		[port dupU32: 1]; /* affected tuples */
+		port_dup_u32(port, 1); /* affected tuples */
 		if (flags & BOX_RETURN_TUPLE)
-			[port addTuple: tuple];
+			port_add_tuple(port, tuple);
 	} else {
-		[port dupU32: 0]; /* affected tuples. */
+		port_dup_u32(port, 0); /* affected tuples. */
 	}
 }
 
 @interface Replace: Request
-- (void) execute: (struct txn *) txn :(Port *) port;
+- (void) execute: (struct txn *) txn :(struct port *) port;
 @end
 
 @implementation Replace
-- (void) execute: (struct txn *) txn :(Port *) port
+- (void) execute: (struct txn *) txn :(struct port *) port
 {
 	txn_add_redo(txn, type, data);
 	struct space *sp = read_space(data);
@@ -112,10 +112,10 @@ port_send_tuple(u32 flags, Port *port, struct tuple *tuple)
 
 	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
 
-	[port dupU32: 1]; /* Affected tuples */
+	port_dup_u32(port, 1); /* Affected tuples */
 
 	if (flags & BOX_RETURN_TUPLE)
-		[port addTuple: txn->new_tuple];
+		port_add_tuple(port, txn->new_tuple);
 }
 @end
 
@@ -182,7 +182,7 @@ port_send_tuple(u32 flags, Port *port, struct tuple *tuple)
  */
 
 @interface Update: Request
-- (void) execute: (struct txn *) txn :(Port *) port;
+- (void) execute: (struct txn *) txn :(struct port *) port;
 @end
 
 /** Argument of SET operation. */
@@ -709,7 +709,7 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 
 
 @implementation Update
-- (void) execute: (struct txn *) txn :(Port *) port
+- (void) execute: (struct txn *) txn :(struct port *) port
 {
 	txn_add_redo(txn, type, data);
 	struct space *sp = read_space(data);
@@ -747,11 +747,11 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 /** }}} */
 
 @interface Select: Request
-- (void) execute: (struct txn *) txn :(Port *) port;
+- (void) execute: (struct txn *) txn :(struct port *) port;
 @end
 
 @implementation Select
-- (void) execute: (struct txn *) txn :(Port *) port
+- (void) execute: (struct txn *) txn :(struct port *) port
 {
 	(void) txn; /* Not used. */
 	struct space *sp = read_space(data);
@@ -763,9 +763,8 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 	if (count == 0)
 		tnt_raise(IllegalParams, :"tuple count must be positive");
 
-	uint32_t *found = palloc(fiber->gc_pool, sizeof(*found));
+	uint32_t *found = port_add_u32(port);
 	*found = 0;
-	[port addU32: found];
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
@@ -793,7 +792,7 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 				continue;
 			}
 
-			[port addTuple: tuple];
+			port_add_tuple(port, tuple);
 
 			if (limit == ++(*found))
 				break;
@@ -805,11 +804,11 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 @end
 
 @interface Delete: Request
-- (void) execute: (struct txn *) txn :(Port *) port;
+- (void) execute: (struct txn *) txn :(struct port *) port;
 @end
 
 @implementation Delete
-- (void) execute: (struct txn *) txn :(Port *) port
+- (void) execute: (struct txn *) txn :(struct port *) port
 {
 	txn_add_redo(txn, type, data);
 	u32 flags = 0;
@@ -875,7 +874,7 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 	return self;
 }
 
-- (void) execute: (struct txn *) txn :(Port *) port
+- (void) execute: (struct txn *) txn :(struct port *) port
 {
 	(void) txn;
 	(void) port;

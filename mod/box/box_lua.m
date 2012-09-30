@@ -875,32 +875,11 @@ static const struct luaL_reg lbox_iterator_meta[] = {
  * everything into Lua stack first.
  * @sa iov_add_multret
  */
-@interface PortLua: PortNull {
-	struct lua_State *L;
-}
-+ (PortLua *) alloc;
-- (id) init: (struct lua_State *) L_arg;
-@end
 
-@implementation PortLua
-+ (PortLua *) alloc
+static void
+port_lua_add_tuple(void *data, struct tuple *tuple)
 {
-	size_t sz = class_getInstanceSize(self);
-	id new = palloca(fiber->gc_pool, sz, sizeof(void *));
-	memset(new, 0, sz);
-	object_setClass(new, self);
-	return new;
-}
-
-- (id) init: (struct lua_State *) L_arg
-{
-	if ((self = [super init]))
-		L = L_arg;
-	return self;
-}
-
-- (void) addTuple: (struct tuple *) tuple
-{
+	lua_State *L = data;
 	@try {
 		lbox_pushtuple(L, tuple);
 	} @catch (...) {
@@ -908,7 +887,12 @@ static const struct luaL_reg lbox_iterator_meta[] = {
 	}
 }
 
-@end
+struct port_vtab port_lua_vtab = {
+	port_null_add_u32,
+	port_null_dup_u32,
+	port_lua_add_tuple,
+	port_null_add_lua_multret
+};
 
 /* }}} */
 
@@ -945,7 +929,8 @@ static int lbox_process(lua_State *L)
 
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	struct txn *txn = txn_begin();
-	Port *port_lua = [[PortLua alloc] init: L];
+	struct port *port_lua = palloc(fiber->gc_pool, sizeof(struct port));
+	port_init(port_lua, &port_lua_vtab, L);
 	@try {
 		box_process(txn, port_lua, op, &req);
 	} @finally {
@@ -1006,7 +991,7 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-- (void) execute: (struct txn *) txn : (Port *)port
+- (void) execute: (struct txn *) txn : (struct port *)port
 {
 	(void) txn;
 	lua_State *L = lua_newthread(root_L);
@@ -1027,7 +1012,7 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
 		}
 		lua_call(L, nargs, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
-		[port addLuaMultret: L];
+		port_add_lua_multret(port, L);
 	} @catch (tnt_Exception *e) {
 		@throw;
 	} @catch (...) {

@@ -36,7 +36,7 @@ struct lua_State;
  * (implementation of 'CALL' command code).
  */
 @interface Call: Request
-- (void) execute: (struct txn *) txn :(Port *) port;
+- (void) execute: (struct txn *) txn :(struct port *) port;
 @end
 
 /**

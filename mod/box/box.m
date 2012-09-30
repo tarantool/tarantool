@@ -48,13 +48,13 @@
 #include "request.h"
 #include "txn.h"
 
-static void box_process_replica(struct txn *txn, Port *port,
+static void box_process_replica(struct txn *txn, struct port *port,
 				u32 op, struct tbuf *request_data);
-static void box_process_ro(struct txn *txn, Port *port,
+static void box_process_ro(struct txn *txn, struct port *port,
 			   u32 op, struct tbuf *request_data);
-static void box_process_ro(struct txn *txn, Port *port,
+static void box_process_ro(struct txn *txn, struct port *port,
 			   u32 op, struct tbuf *request_data);
-static void box_process_rw(struct txn *txn, Port *port,
+static void box_process_rw(struct txn *txn, struct port *port,
 			   u32 op, struct tbuf *request_data);
 box_process_func box_process = box_process_ro;
 
@@ -78,7 +78,7 @@ box_snap_row(const struct tbuf *t)
 }
 
 static void
-box_process_rw(struct txn *txn, Port *port,
+box_process_rw(struct txn *txn, struct port *port,
 	       u32 op, struct tbuf *data)
 {
 	ev_tstamp start = ev_now(), stop;
@@ -102,7 +102,7 @@ box_process_rw(struct txn *txn, Port *port,
 }
 
 static void
-box_process_replica(struct txn *txn, Port *port,
+box_process_replica(struct txn *txn, struct port *port,
 	       u32 op, struct tbuf *request_data)
 {
 	if (!request_is_select(op)) {
@@ -114,7 +114,7 @@ box_process_replica(struct txn *txn, Port *port,
 }
 
 static void
-box_process_ro(struct txn *txn, Port *port,
+box_process_ro(struct txn *txn, struct port *port,
 	       u32 op, struct tbuf *request_data)
 {
 	if (!request_is_select(op)) {
@@ -128,13 +128,13 @@ box_process_ro(struct txn *txn, Port *port,
 static void
 iproto_primary_port_handler(u32 op, struct tbuf *request_data)
 {
-	box_process(txn_begin(), port_iproto, op, request_data);
+	box_process(txn_begin(), &port_iproto, op, request_data);
 }
 
 static void
 iproto_secondary_port_handler(u32 op, struct tbuf *request_data)
 {
-	box_process_ro(txn_begin(), port_iproto, op, request_data);
+	box_process_ro(txn_begin(), &port_iproto, op, request_data);
 }
 
 static void
@@ -301,7 +301,7 @@ recover_row(struct tbuf *t)
 			u16 op = read_u16(t);
 			struct txn *txn = txn_begin();
 			txn->txn_flags |= BOX_NOT_STORE;
-			box_process_rw(txn, port_null, op, t);
+			box_process_rw(txn, &port_null, op, t);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
@@ -468,7 +468,6 @@ mod_free(void)
 {
 	space_free();
 	memcached_free();
-	port_free();
 }
 
 void
@@ -476,8 +475,6 @@ mod_init(void)
 {
 	title("loading");
 	atexit(mod_free);
-
-	port_init();
 
 	/* initialization spaces */
 	space_init();
