@@ -114,7 +114,7 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
 	 */
-	box_process(txn_begin(), port_null, REPLACE, req);
+	box_process(txn_begin(), &port_null, REPLACE, req);
 }
 
 static void
@@ -129,7 +129,7 @@ delete(void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	box_process(txn_begin(), port_null, DELETE, req);
+	box_process(txn_begin(), &port_null, DELETE, req);
 }
 
 static struct tuple *
@@ -277,7 +277,7 @@ void memcached_get(size_t keys_count, struct tbuf *keys,
 		stats.get_hits++;
 		stat_collect(stat_base, MEMC_GET_HIT, 1);
 
-		fiber_ref_tuple(tuple);
+		iov_ref_tuple(tuple);
 
 		if (show_cas) {
 			struct tbuf *b = tbuf_alloc(fiber->gc_pool);
@@ -342,7 +342,7 @@ memcached_handler(void *_data __attribute__((unused)))
 
 	for (;;) {
 		batch_count = 0;
-		if ((r = fiber_bread(fiber->rbuf, 1)) <= 0) {
+		if ((r = fiber_bread(&fiber->rbuf, 1)) <= 0) {
 			say_debug("read returned %i, closing connection", r);
 			goto exit;
 		}
@@ -360,7 +360,7 @@ memcached_handler(void *_data __attribute__((unused)))
 		if (p == 1) {
 			batch_count++;
 			/* some unparsed commands remain and batch count less than 20 */
-			if (fiber->rbuf->size > 0 && batch_count < 20)
+			if (fiber->rbuf.size > 0 && batch_count < 20)
 				goto dispatch;
 		}
 
@@ -373,7 +373,7 @@ memcached_handler(void *_data __attribute__((unused)))
 		stats.bytes_written += r;
 		fiber_gc();
 
-		if (p == 1 && fiber->rbuf->size > 0) {
+		if (p == 1 && fiber->rbuf.size > 0) {
 			batch_count = 0;
 			goto dispatch;
 		}

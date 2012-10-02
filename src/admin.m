@@ -206,13 +206,13 @@ admin_dispatch(lua_State *L)
 	char *strstart, *strend;
 	bool state;
 
-	while ((pe = memchr(fiber->rbuf->data, '\n', fiber->rbuf->size)) == NULL) {
-		if (fiber_bread(fiber->rbuf, 1) <= 0)
+	while ((pe = memchr(fiber->rbuf.data, '\n', fiber->rbuf.size)) == NULL) {
+		if (fiber_bread(&fiber->rbuf, 1) <= 0)
 			return 0;
 	}
 
 	pe++;
-	p = fiber->rbuf->data;
+	p = fiber->rbuf.data;
 
 	
 #line 219 "src/admin.m"
@@ -1894,7 +1894,7 @@ case 134:
 #line 324 "src/admin.rl"
 
 
-	tbuf_ltrim(fiber->rbuf, (void *)pe - (void *)fiber->rbuf->data);
+	tbuf_ltrim(&fiber->rbuf, (void *)pe - (void *)fiber->rbuf.data);
 
 	if (p != pe) {
 		start(out);

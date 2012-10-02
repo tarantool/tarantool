@@ -29,12 +29,12 @@
  * SUCH DAMAGE.
  */
 #include <util.h>
-@class Port;
 struct txn;
 struct tbuf;
+struct port;
 
 typedef void (*box_process_func)(struct txn *,
-				 Port *, u32, struct tbuf *);
+				 struct port *, u32, struct tbuf *);
 extern box_process_func box_process;
 
 #endif /* INCLUDES_TARANTOOL_BOX_H */

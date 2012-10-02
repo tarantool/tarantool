@@ -45,6 +45,7 @@ struct tbuf {
 };
 
 struct tbuf *tbuf_alloc(struct palloc_pool *pool);
+void tbuf_init(struct tbuf *tbuf, struct palloc_pool *pool);
 
 void tbuf_ensure_resize(struct tbuf *e, size_t bytes_required);
 static inline void tbuf_ensure(struct tbuf *e, size_t required)
@@ -62,14 +63,17 @@ static inline void tbuf_append(struct tbuf *b, const void *data, size_t len)
 	*(((char *)b->data) + b->size) = '\0';
 }
 
-static inline const char *tbuf_str(const struct tbuf *tbuf)
-{
-	return tbuf->data;
-}
+static inline char *
+tbuf_str(struct tbuf *tbuf) { return tbuf->data; }
+
+static inline void *
+tbuf_end(struct tbuf *tbuf) { return tbuf->data + tbuf->size; }
+
+static inline size_t
+tbuf_unused(struct tbuf *tbuf) { return tbuf->capacity - tbuf->size; }
 
 struct tbuf *tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig);
 struct tbuf *tbuf_split(struct tbuf *e, size_t at);
-size_t tbuf_reserve(struct tbuf *b, size_t count);
 void tbuf_reset(struct tbuf *b);
 void *tbuf_peek(struct tbuf *b, size_t count);
 

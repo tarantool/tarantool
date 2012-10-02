@@ -340,10 +340,9 @@ static void
 fiber_alloc(struct fiber *fiber)
 {
 	prelease(fiber->gc_pool);
-	fiber->rbuf = tbuf_alloc(fiber->gc_pool);
-	fiber->iov = tbuf_alloc(fiber->gc_pool);
-	fiber->cleanup = tbuf_alloc(fiber->gc_pool);
-
+	tbuf_init(&fiber->rbuf, fiber->gc_pool);
+	tbuf_init(&fiber->iov, fiber->gc_pool);
+	tbuf_init(&fiber->cleanup, fiber->gc_pool);
 	fiber->iov_cnt = 0;
 }
 
@@ -353,20 +352,20 @@ fiber_register_cleanup(fiber_cleanup_handler handler, void *data)
 	struct fiber_cleanup i;
 	i.handler = handler;
 	i.data = data;
-	tbuf_append(fiber->cleanup, &i, sizeof(struct fiber_cleanup));
+	tbuf_append(&fiber->cleanup, &i, sizeof(struct fiber_cleanup));
 }
 
 void
 fiber_cleanup(void)
 {
-	struct fiber_cleanup *cleanup = fiber->cleanup->data;
-	int i = fiber->cleanup->size / sizeof(struct fiber_cleanup);
+	struct fiber_cleanup *cleanup = fiber->cleanup.data;
+	int i = fiber->cleanup.size / sizeof(struct fiber_cleanup);
 
 	while (i-- > 0) {
 		cleanup->handler(cleanup->data);
 		cleanup++;
 	}
-	tbuf_reset(fiber->cleanup);
+	tbuf_reset(&fiber->cleanup);
 }
 
 void
@@ -385,17 +384,13 @@ fiber_gc(void)
 	palloc_set_name(fiber->gc_pool, fiber->name);
 	palloc_set_name(ex_pool, "ex_pool");
 
-	fiber->rbuf = tbuf_clone(fiber->gc_pool, fiber->rbuf);
-	fiber->cleanup = tbuf_clone(fiber->gc_pool, fiber->cleanup);
+	struct tbuf tmp_rbuf = fiber->rbuf;
+	tbuf_init(&fiber->rbuf, fiber->gc_pool);
+	tbuf_append(&fiber->rbuf, tmp_rbuf.data, tmp_rbuf.size);
 
-	struct tbuf *new_iov = tbuf_alloc(fiber->gc_pool);
-	for (int i = 0; i < fiber->iov_cnt; i++) {
-		struct iovec *v;
-		size_t o = tbuf_reserve(new_iov, sizeof(*v));
-		v = new_iov->data + o;
-		memcpy(v, iovec(fiber->iov) + i, sizeof(*v));
-	}
-	fiber->iov = new_iov;
+	assert(fiber->iov_cnt == 0);
+	tbuf_init(&fiber->iov, fiber->gc_pool);
+	tbuf_init(&fiber->cleanup, fiber->gc_pool);
 
 	prelease(ex_pool);
 }
@@ -570,7 +565,7 @@ fiber_close(void)
 	fiber->fd = -1;
 	fiber->has_peer = false;
 	fiber->peer_name[0] = 0;
-	tbuf_reset(fiber->rbuf);
+	tbuf_reset(&fiber->rbuf);
 
 	return r;
 }
@@ -614,7 +609,7 @@ void
 iov_reset()
 {
 	fiber->iov_cnt = 0;	/* discard anything unwritten */
-	tbuf_reset(fiber->iov);
+	tbuf_reset(&fiber->iov);
 }
 
 /**
@@ -625,7 +620,7 @@ ssize_t
 iov_flush(void)
 {
 	ssize_t result, r = 0, bytes = 0;
-	struct iovec *iov = iovec(fiber->iov);
+	struct iovec *iov = iovec(&fiber->iov);
 	size_t iov_cnt = fiber->iov_cnt;
 
 	fiber_io_start(fiber->fd, EV_WRITE);

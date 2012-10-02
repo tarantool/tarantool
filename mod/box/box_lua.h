@@ -36,9 +36,8 @@ struct tuple;
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
-@interface Call: Request
-- (void) execute: (struct txn *) txn :(Port *) port;
-@end
+void
+box_lua_execute(struct request *request, struct txn *txn, struct port *port);
 
 
 /* return true if new_tuple can be in index */

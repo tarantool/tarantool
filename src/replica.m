@@ -42,19 +42,19 @@ remote_apply_row(struct recovery_state *r, struct tbuf *row);
 static struct tbuf *
 remote_row_reader_v11()
 {
-	ssize_t to_read = sizeof(struct header_v11) - fiber->rbuf->size;
+	ssize_t to_read = sizeof(struct header_v11) - fiber->rbuf.size;
 
-	if (to_read > 0 && fiber_bread(fiber->rbuf, to_read) <= 0)
+	if (to_read > 0 && fiber_bread(&fiber->rbuf, to_read) <= 0)
 		goto error;
 
-	ssize_t request_len = header_v11(fiber->rbuf)->len + sizeof(struct header_v11);
-	to_read = request_len - fiber->rbuf->size;
+	ssize_t request_len = header_v11(&fiber->rbuf)->len + sizeof(struct header_v11);
+	to_read = request_len - fiber->rbuf.size;
 
-	if (to_read > 0 && fiber_bread(fiber->rbuf, to_read) <= 0)
+	if (to_read > 0 && fiber_bread(&fiber->rbuf, to_read) <= 0)
 		goto error;
 
 	say_debug("read row bytes:%" PRI_SSZ, request_len);
-	return tbuf_split(fiber->rbuf, request_len);
+	return tbuf_split(&fiber->rbuf, request_len);
 error:
 	say_error("unexpected eof reading row header");
 	return NULL;

@@ -73,15 +73,6 @@
 	return self;
 }
 
-- (id) init: (int)errnum_arg: (const char *)format, ...
-{
-	va_list ap;
-	va_start(ap, format);
-	[self init: errnum_arg :format: ap];
-	va_end(ap);
-	return self;
-}
-
 - (id) init: (int)errnum_arg :(const char *)format: (va_list)ap
 {
 	self = [super init];

@@ -78,10 +78,10 @@ struct fiber {
 	ev_timer timer;
 	ev_child cw;
 
-	struct tbuf *iov;
+	struct tbuf iov;
 	size_t iov_cnt;
-	struct tbuf *rbuf;
-	struct tbuf *cleanup;
+	struct tbuf rbuf;
+	struct tbuf cleanup;
 
 	SLIST_ENTRY(fiber) link, zombie_link;
 
@@ -137,17 +137,17 @@ ssize_t fiber_bread(struct tbuf *, size_t v);
 inline static void iov_add_unsafe(const void *buf, size_t len)
 {
 	struct iovec *v;
-	assert(fiber->iov->capacity - fiber->iov->size >= sizeof(*v));
-	v = fiber->iov->data + fiber->iov->size;
+	assert(tbuf_unused(&fiber->iov) >= sizeof(*v));
+	v = tbuf_end(&fiber->iov);
 	v->iov_base = (void *)buf;
 	v->iov_len = len;
-	fiber->iov->size += sizeof(*v);
+	fiber->iov.size += sizeof(*v);
 	fiber->iov_cnt++;
 }
 
 inline static void iov_ensure(size_t count)
 {
-	tbuf_ensure(fiber->iov, sizeof(struct iovec) * count);
+	tbuf_ensure(&fiber->iov, sizeof(struct iovec) * count);
 }
 
 /* Add to fiber's iov vector. */

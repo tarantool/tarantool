@@ -48,6 +48,9 @@
 #  define poison(ptr, len)
 #endif
 
+/** Try to make all palloc allocations a multiple of  this number. */
+enum { TBUF_ALLOC_FACTOR = 128 };
+
 static void
 tbuf_assert(const struct tbuf *b)
 {
@@ -55,14 +58,23 @@ tbuf_assert(const struct tbuf *b)
 	assert(b->size <= b->capacity);
 }
 
+void
+tbuf_init(struct tbuf *e, struct palloc_pool *pool)
+{
+	e->pool = pool;
+	e->data = palloc(pool, TBUF_ALLOC_FACTOR);
+	e->capacity = TBUF_ALLOC_FACTOR;
+	e->size = 0;
+	tbuf_assert(e);
+}
+
 struct tbuf *
 tbuf_alloc(struct palloc_pool *pool)
 {
-	const size_t initial_capacity = 128 - sizeof(struct tbuf);
-	struct tbuf *e = palloc(pool, sizeof(*e) + initial_capacity);
+	struct tbuf *e = palloc(pool, TBUF_ALLOC_FACTOR);
 	e->size = 0;
-	e->capacity = initial_capacity;
-	e->data = (char *)e + sizeof(*e);
+	e->capacity = TBUF_ALLOC_FACTOR - sizeof(struct tbuf);
+	e->data = (char *)e + sizeof(struct tbuf);
 	e->pool = pool;
 	poison(e->data, e->capacity);
 	tbuf_assert(e);
@@ -74,8 +86,8 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 {
 	tbuf_assert(e);
 
-	const size_t initial_capacity = MAX(e->capacity, 128 - sizeof(*e));
-	size_t new_capacity = initial_capacity * 2;
+	/* Make new capacity a multiple of alloc factor. */
+	size_t new_capacity = MAX(e->capacity, TBUF_ALLOC_FACTOR) * 2;
 
 	while (new_capacity < e->size + required)
 		new_capacity *= 2;
@@ -138,16 +150,6 @@ tbuf_ltrim(struct tbuf *b, size_t count)
 
 	memmove(b->data, b->data + count, b->size - count);
 	b->size -= count;
-}
-
-size_t
-tbuf_reserve(struct tbuf *b, size_t count)
-{
-	tbuf_assert(b);
-	tbuf_ensure(b, count);
-	size_t offt = b->size;
-	b->size += count;
-	return offt;
 }
 
 void
