@@ -332,7 +332,8 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) buildNext: (struct tuple *)tuple
 {
-	[self replace_where: NULL :tuple];
+	/* not replace_where: buildNext is used only for primary indexes */
+	[self replace: NULL :tuple];
 }
 
 - (void) endBuild

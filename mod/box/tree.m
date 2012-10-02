@@ -31,6 +31,7 @@
 #include "space.h"
 #include "exception.h"
 #include <pickle.h>
+#include "box_lua.h"
 
 /* {{{ Utilities. *************************************************/
 
@@ -1047,8 +1048,13 @@ tree_iterator_free(struct iterator *iterator)
 	[pk initIterator: it :ITER_FORWARD];
 
 	struct tuple *tuple;
+
+	int nodes_created = 0;
 	for (u32 i = 0; (tuple = it->next(it)) != NULL; ++i) {
-		void *node = ((u8 *) nodes + i * node_size);
+		if (!box_index_where_trigger(key_def->where, tuple))
+			continue;
+		void *node = ((u8 *) nodes + nodes_created * node_size);
+		nodes_created++;
 		[self fold: node :tuple];
 	}
 
@@ -1059,7 +1065,7 @@ tree_iterator_free(struct iterator *iterator)
 
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
 	sptree_index_init(&tree,
-			  node_size, nodes, n_tuples, estimated_tuples,
+			  node_size, nodes, nodes_created, estimated_tuples,
 			  [self key_node_cmp],
 			  key_def->is_unique ? [self node_cmp] : [self dup_node_cmp],
 			  self);
