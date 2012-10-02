@@ -34,6 +34,9 @@ struct index_t {
   enum index_type type;
   /* Secondary index may be non-unique */
   bool unique;
+
+  /* Secondary index can be partially */
+  char *where;  /* name of lua procedure */
 };
 
 struct space_t
@@ -101,6 +104,38 @@ please be aware of these restrictions:
     not be non-unique.
   </simpara></listitem>
 </itemizedlist>
+
+<bridgehead>Partial indexes</bridgehead>
+
+If secondary index has section where, it means that lua procedure
+that have the name will be called for each modifying operation.
+If the function returns <emphasis>true</emphasis> the tuple will
+be included in the index. Example:
+
+
+<programlisting language="c">
+space[0].enabled = 1
+space[0].index[1].type = HASH
+space[0].index[1].unique = 1
+space[0].index[1].where = "my_index_condition"
+space[0].index[1].key_field[0].fieldno = 1
+space[0].index[1].key_field[0].type = NUM
+</programlisting>
+
+<programlisting language="lua">
+    function my_index_condition(tuple)
+        if tuple[2] == 'abc' then
+            return true
+        end
+        if box.unpack('i', tuple[1]) > 1234 then
+            return true
+        end
+
+        return false
+    end
+</programlisting>
+
+
 </para>
 <!--
 vim: tw=66 syntax=docbk

@@ -79,6 +79,14 @@ of existing codes.</para>
     <listitem><para>An error inside Lua procedure.
     </para></listitem>
   </varlistentry>
+  
+  <varlistentry>
+    <term
+        xml:id="ER_INDEX_TRIGGER"
+        xreflabel="ER_INDEX_TRIGGER">ER_INDEX_TRIGGER</term>
+    <listitem><para>An error inside index trigger.
+    </para></listitem>
+  </varlistentry>
 
 </variablelist>
 </appendix>
