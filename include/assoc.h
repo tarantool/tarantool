@@ -29,7 +29,6 @@
 #include <pickle.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/uio.h>
 
 #if !MH_SOURCE
 #define MH_UNDEF
