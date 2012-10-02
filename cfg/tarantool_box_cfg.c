@@ -139,6 +139,7 @@ acceptDefault_name__space(tarantool_cfg_space *c) {
 
 static int
 acceptDefault_name__space__index(tarantool_cfg_space_index *c) {
+	c->where = NULL;
 	c->type = strdup("");
 	if (c->type == NULL) return CNF_NOMEMORY;
 	c->unique = -1;
@@ -286,6 +287,11 @@ static NameAtom _name__space__estimated_rows[] = {
 static NameAtom _name__space__index[] = {
 	{ "space", -1, _name__space__index + 1 },
 	{ "index", -1, NULL }
+};
+static NameAtom _name__space__index__where[] = {
+	{ "space", -1, _name__space__index__where + 1 },
+	{ "index", -1, _name__space__index__where + 2 },
+	{ "where", -1, NULL }
 };
 static NameAtom _name__space__index__type[] = {
 	{ "space", -1, _name__space__index__type + 1 },
@@ -965,6 +971,26 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		ARRAYALLOC(c->space[opt->name->index]->index, 1, _name__space__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
 	}
+	else if ( cmpNameAtoms( opt->name, _name__space__index__where) ) {
+		if (opt->paramType != scalarType )
+			return CNF_WRONGTYPE;
+		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+			check_rdonly = 0;
+		c->space[opt->name->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		ARRAYALLOC(c->space[opt->name->index]->index, opt->name->next->index + 1, _name__space__index, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
+		if (c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags & CNF_FLAG_STRUCT_NEW)
+			check_rdonly = 0;
+		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		c->space[opt->name->index]->index[opt->name->next->index]->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->space[opt->name->index]->index[opt->name->next->index]->where == NULL) || strcmp(opt->paramValue.scalarval, c->space[opt->name->index]->index[opt->name->next->index]->where) != 0))
+			return CNF_RDONLY;
+		 if (c->space[opt->name->index]->index[opt->name->next->index]->where) free(c->space[opt->name->index]->index[opt->name->next->index]->where);
+		c->space[opt->name->index]->index[opt->name->next->index]->where = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->space[opt->name->index]->index[opt->name->next->index]->where == NULL)
+			return CNF_NOMEMORY;
+	}
 	else if ( cmpNameAtoms( opt->name, _name__space__index__type) ) {
 		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
@@ -1240,6 +1266,7 @@ typedef enum IteratorState {
 	S_name__space__cardinality,
 	S_name__space__estimated_rows,
 	S_name__space__index,
+	S_name__space__index__where,
 	S_name__space__index__type,
 	S_name__space__index__unique,
 	S_name__space__index__key_field,
@@ -1685,6 +1712,7 @@ again:
 		case S_name__space__cardinality:
 		case S_name__space__estimated_rows:
 		case S_name__space__index:
+		case S_name__space__index__where:
 		case S_name__space__index__type:
 		case S_name__space__index__unique:
 		case S_name__space__index__key_field:
@@ -1728,6 +1756,7 @@ again:
 						return buf;
 					case S_name__space__index:
 						i->state = S_name__space__index;
+					case S_name__space__index__where:
 					case S_name__space__index__type:
 					case S_name__space__index__unique:
 					case S_name__space__index__key_field:
@@ -1736,6 +1765,16 @@ again:
 						if (c->space[i->idx_name__space]->index && c->space[i->idx_name__space]->index[i->idx_name__space__index]) {
 							switch(i->state) {
 								case S_name__space__index:
+								case S_name__space__index__where:
+									*v = (c->space[i->idx_name__space]->index[i->idx_name__space__index]->where) ? strdup(c->space[i->idx_name__space]->index[i->idx_name__space__index]->where) : NULL;
+									if (*v == NULL && c->space[i->idx_name__space]->index[i->idx_name__space__index]->where) {
+										free(i);
+										out_warning(CNF_NOMEMORY, "No memory to output value");
+										return NULL;
+									}
+									snprintf(buf, PRINTBUFLEN-1, "space[%d].index[%d].where", i->idx_name__space, i->idx_name__space__index);
+									i->state = S_name__space__index__type;
+									return buf;
 								case S_name__space__index__type:
 									*v = (c->space[i->idx_name__space]->index[i->idx_name__space__index]->type) ? strdup(c->space[i->idx_name__space]->index[i->idx_name__space__index]->type) : NULL;
 									if (*v == NULL && c->space[i->idx_name__space]->index[i->idx_name__space__index]->type) {
@@ -2038,6 +2077,9 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 					ARRAYALLOC(dst->space[i->idx_name__space]->index, i->idx_name__space__index + 1, _name__space__index, 0, 0);
 
 					dst->space[i->idx_name__space]->index[i->idx_name__space__index]->__confetti_flags = src->space[i->idx_name__space]->index[i->idx_name__space__index]->__confetti_flags;
+					if (dst->space[i->idx_name__space]->index[i->idx_name__space__index]->where) free(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->where);dst->space[i->idx_name__space]->index[i->idx_name__space__index]->where = src->space[i->idx_name__space]->index[i->idx_name__space__index]->where == NULL ? NULL : strdup(src->space[i->idx_name__space]->index[i->idx_name__space__index]->where);
+					if (src->space[i->idx_name__space]->index[i->idx_name__space__index]->where != NULL && dst->space[i->idx_name__space]->index[i->idx_name__space__index]->where == NULL)
+						return CNF_NOMEMORY;
 					if (dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type) free(dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type);dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type = src->space[i->idx_name__space]->index[i->idx_name__space__index]->type == NULL ? NULL : strdup(src->space[i->idx_name__space]->index[i->idx_name__space__index]->type);
 					if (src->space[i->idx_name__space]->index[i->idx_name__space__index]->type != NULL && dst->space[i->idx_name__space]->index[i->idx_name__space__index]->type == NULL)
 						return CNF_NOMEMORY;
@@ -2108,6 +2150,8 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 			if (c->space[i->idx_name__space]->index != NULL) {
 				i->idx_name__space__index = 0;
 				while (c->space[i->idx_name__space]->index[i->idx_name__space__index] != NULL) {
+					if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->where != NULL)
+						free(c->space[i->idx_name__space]->index[i->idx_name__space__index]->where);
 					if (c->space[i->idx_name__space]->index[i->idx_name__space__index]->type != NULL)
 						free(c->space[i->idx_name__space]->index[i->idx_name__space__index]->type);
 
@@ -2394,6 +2438,11 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 		i1->idx_name__space__index = 0;
 		i2->idx_name__space__index = 0;
 		while (c1->space[i1->idx_name__space]->index != NULL && c1->space[i1->idx_name__space]->index[i1->idx_name__space__index] != NULL && c2->space[i2->idx_name__space]->index != NULL && c2->space[i2->idx_name__space]->index[i2->idx_name__space__index] != NULL) {
+			if (confetti_strcmp(c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->where, c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->where) != 0) {
+				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->index[]->where");
+
+				return diff;
+}
 			if (confetti_strcmp(c1->space[i1->idx_name__space]->index[i1->idx_name__space__index]->type, c2->space[i2->idx_name__space]->index[i2->idx_name__space__index]->type) != 0) {
 				snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->index[]->type");
 

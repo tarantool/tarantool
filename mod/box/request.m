@@ -100,8 +100,8 @@ port_send_tuple(u32 flags, Port *port, struct tuple *tuple)
 	txn->new_tuple->field_count = field_count;
 	memcpy(txn->new_tuple->data, data->data, data->size);
 
-	Index *pi = space_index(sp, 0);
-	struct tuple *old_tuple = [pi findByTuple: txn->new_tuple];
+	Index *primary_index = space_index(sp, 0);
+	struct tuple *old_tuple = [primary_index findByTuple: txn->new_tuple];
 
 	if (flags & BOX_ADD && old_tuple != NULL)
 		tnt_raise(ClientError, :ER_TUPLE_FOUND);
@@ -724,9 +724,10 @@ update_read_ops(struct tbuf *data, u32 op_cnt)
 
 	read_key(data, &key, &key_part_count);
 
-	Index *pi = space_index(sp, 0);
+	Index *primary_index = space_index(sp, 0);
 	/* Try to find the tuple. */
-	struct tuple *old_tuple = [pi findByKey :key :key_part_count];
+	struct tuple *old_tuple =
+		[primary_index findByKey :key :key_part_count];
 
 	if (old_tuple != NULL) {
 		/* number of operations */

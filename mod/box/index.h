@@ -77,6 +77,7 @@ struct key_def {
 	 */
 	int max_fieldno;
 	bool is_unique;
+	const char *where;
 };
 
 /** Descriptor of index features. */
@@ -137,6 +138,7 @@ struct index_traits
 - (struct tuple *) findByTuple: (struct tuple *) tuple;
 - (void) remove: (struct tuple *) tuple;
 - (void) replace: (struct tuple *) old_tuple :(struct tuple *) new_tuple;
+- (void) replace_where: (struct tuple *)old_tuple :(struct tuple *) new_tuple;
 /**
  * Create a structure to represent an iterator. Must be
  * initialized separately.

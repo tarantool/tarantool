@@ -23,6 +23,7 @@ typedef struct tarantool_cfg_space_index_key_field {
 typedef struct tarantool_cfg_space_index {
 	unsigned char __confetti_flags;
 
+	char*	where;
 	char*	type;
 	confetti_bool_t	unique;
 	tarantool_cfg_space_index_key_field**	key_field;

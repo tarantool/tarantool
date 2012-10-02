@@ -34,6 +34,7 @@
 #include "exception.h"
 #include "space.h"
 #include "assoc.h"
+#include "box_lua.h"
 
 static struct index_traits index_traits = {
 	.allows_partial_key = true,
@@ -227,6 +228,20 @@ check_key_parts(struct key_def *key_def,
 	[self subclassResponsibility: _cmd];
 }
 
+- (void) replace_where: (struct tuple *) old_tuple
+	:(struct tuple *) new_tuple
+{
+	if (box_index_where_trigger(key_def->where, new_tuple)) {
+		if (new_tuple)
+			return [self replace: old_tuple :new_tuple];
+		else
+			return [self remove: old_tuple];
+	}
+	if (old_tuple) {
+		return [self remove: old_tuple];
+	}
+}
+
 - (struct iterator *) allocIterator
 {
 	[self subclassResponsibility: _cmd];
@@ -256,6 +271,7 @@ check_key_parts(struct key_def *key_def,
 	(void) part_count;
 	[self subclassResponsibility: _cmd];
 }
+
 
 @end
 
@@ -316,7 +332,7 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) buildNext: (struct tuple *)tuple
 {
-	[self replace: NULL :tuple];
+	[self replace_where: NULL :tuple];
 }
 
 - (void) endBuild
@@ -340,7 +356,7 @@ hash_iterator_free(struct iterator *iterator)
 	[pk initIterator: it :ITER_FORWARD];
 
 	while ((tuple = it->next(it)))
-	      [self replace: NULL :tuple];
+	      [self replace_where: NULL :tuple];
 }
 
 - (void) free
@@ -456,6 +472,7 @@ int32_key_to_value(void *key)
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
 	u32 num = int32_key_to_value(field);
+
 
 	if (old_tuple != NULL) {
 		void *old_field = tuple_field(old_tuple,

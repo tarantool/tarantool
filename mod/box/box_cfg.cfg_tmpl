@@ -39,6 +39,7 @@ space = [
     estimated_rows = 0
     index = [
       {
+      	where = NULL
         type = "", required
         unique = false, required
         key_field = [

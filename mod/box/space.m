@@ -145,10 +145,20 @@ void
 space_replace(struct space *sp, struct tuple *old_tuple,
 	      struct tuple *new_tuple)
 {
+	int i;
 	int n = index_count(sp);
-	for (int i = 0; i < n; i++) {
-		Index *index = sp->index[i];
-		[index replace: old_tuple :new_tuple];
+	@try {
+		for (i = 0; i < n; i++) {
+			Index *index = sp->index[i];
+			[index replace_where: old_tuple :new_tuple];
+		}
+	}
+	@catch(...) {
+		for (i--; i >= 0; i--) {
+			Index *index = sp->index[i];
+			[index replace_where: new_tuple :old_tuple];
+		}
+		@throw;
 	}
 }
 
@@ -282,6 +292,7 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 		def->cmp_order[cfg_key->fieldno] = k;
 	}
 	def->is_unique = cfg_index->unique;
+	def->where = cfg_index->where;
 }
 
 /**
@@ -369,6 +380,10 @@ space_config()
 		for (int j = 0; cfg_space->index[j] != NULL; ++j) {
 			++space->key_count;
 		}
+
+		if (space->key_count && !i && cfg_space->index[0]->where)
+			panic("Primary index can't be partial (space %d)", i);
+
 
 		space->key_defs = malloc(space->key_count *
 					    sizeof(struct key_def));
