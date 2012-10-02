@@ -805,8 +805,9 @@ execute_delete(struct request *request, struct txn *txn, struct port *port)
 	void *key;
 	read_key(data, &key, &key_part_count);
 	/* try to find tuple in primary index */
-	Index *pi = space_index(sp, 0);
-	struct tuple *old_tuple = [pi findByKey :key :key_part_count];
+	Index *primary_index = space_index(sp, 0);
+	struct tuple *old_tuple =
+		[primary_index findByKey :key :key_part_count];
 
 	txn_add_undo(txn, sp, old_tuple, NULL);
 
