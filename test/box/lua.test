@@ -559,3 +559,8 @@ exec admin "lua box.fiber.name()"
 exec admin "lua box.fiber.self():name('bye fiber')"
 exec admin "lua box.fiber.self():name()"
 exec admin "lua box.fiber.self():name(old_name)"
+
+print """# A test case for bitwise operations """
+exec admin "lua bit.lshift(1, 32)"
+exec admin "lua bit.band(1, 3)"
+exec admin "lua bit.bor(1, 2)"
