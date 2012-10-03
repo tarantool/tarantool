@@ -242,9 +242,15 @@ lbox_pack(struct lua_State *L)
 		case 'P':
 		case 'p':
 			if (lua_type(L, i) == LUA_TNUMBER) {
-				u32buf = (u32) lua_tointeger(L, i);
-				str = (char *) &u32buf;
-				size = sizeof(u32);
+				u64buf = lua_tonumber(L, i);
+				if (u64buf > UINT32_MAX) {
+					str = (char *) &u64buf;
+					size = sizeof(u64);
+				} else {
+					u32buf = (u32) u64buf;
+					str = (char *) &u32buf;
+					size = sizeof(u32);
+				}
 			} else if (lua_type(L, i) == LUA_TCDATA) {
 				u64buf = tarantool_lua_tointeger64(L, i);
 				str = (char *) &u64buf;

@@ -533,3 +533,15 @@ lua push_collection(5, 1038784, 'hey')
 ---
  - 1038784: {26984, 'hey', 'hey', 'hey', 'hey'}
 ...
+A test case for Bug#1060967: truncation of 64-bit numbers
+lua box.space[5]:insert(2^51, 'hello', 'world')
+---
+ - 2251799813685248: {'hello', 'world'}
+...
+lua box.space[5]:select(0, 2^51)
+---
+ - 2251799813685248: {'hello', 'world'}
+...
+lua box.space[5]:truncate()
+---
+...
