@@ -48,7 +48,6 @@
 
 #include TARANTOOL_CONFIG
 
-
 /**
  * tarantool start-up file
  */
@@ -113,7 +112,7 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 
 	switch (lua_type(L, idx)) {
 	case LUA_TNUMBER:
-		result = lua_tointeger(L, idx);
+		result = lua_tonumber(L, idx);
 		break;
 	case LUA_TSTRING:
 	{
@@ -137,7 +136,8 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 		break;
 	}
 	default:
-		luaL_error(L, "lua_tointeger64: unsupported type");
+		luaL_error(L, "lua_tointeger64: unsupported type: %s",
+			   lua_typename(L, lua_type(L, idx)));
 	}
 
 	return result;
@@ -522,7 +522,7 @@ lua_isfiber(struct lua_State *L, int narg)
 static int
 lbox_fiber_id(struct lua_State *L)
 {
-	struct fiber *f = lbox_checkfiber(L, 1);
+	struct fiber *f = lua_gettop(L) ? lbox_checkfiber(L, 1) : fiber;
 	lua_pushinteger(L, f->fid);
 	return 1;
 }
@@ -1004,6 +1004,7 @@ static const struct luaL_reg lbox_fiber_meta [] = {
 static const struct luaL_reg fiberlib[] = {
 	{"sleep", lbox_fiber_sleep},
 	{"self", lbox_fiber_self},
+	{"id", lbox_fiber_id},
 	{"find", lbox_fiber_find},
 	{"cancel", lbox_fiber_cancel},
 	{"testcancel", lbox_fiber_testcancel},
