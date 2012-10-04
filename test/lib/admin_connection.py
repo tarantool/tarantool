@@ -43,7 +43,7 @@ class AdminConnection(TarantoolConnection):
             if not buf:
                 break
             res = res + buf;
-            if (res.rfind("\r\n...\r\n") >= 0):
+            if (res.rfind("\n...\n") >= 0 or res.rfind("\r\n...\r\n") >= 0):
                 break
 
         # validate yaml by parsing it
@@ -51,7 +51,7 @@ class AdminConnection(TarantoolConnection):
 
         if not silent:
             sys.stdout.write(command + ADMIN_SEPARATOR)
-            sys.stdout.write(res)
+            sys.stdout.write(res.replace("\r\n", "\n"))
 
         return res
 

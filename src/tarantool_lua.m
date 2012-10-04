@@ -1081,9 +1081,9 @@ tarantool_lua_printstack_yaml(struct lua_State *L, struct tbuf *out)
 		if (lua_type(L, i) == LUA_TCDATA) {
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
-			tbuf_printf(out, " - %-.*s\r\n", len - 3, sz);
+			tbuf_printf(out, " - %-.*s" CRLF, len - 3, sz);
 		} else
-			tbuf_printf(out, " - %s\r\n",
+			tbuf_printf(out, " - %s" CRLF,
 				    tarantool_lua_tostring(L, i));
 	}
 }
@@ -1100,7 +1100,7 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
 		if (lua_type(L, i) == LUA_TCDATA) {
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
-			tbuf_printf(out, "%-.*s\r\n", len - 3, sz);
+			tbuf_printf(out, "%-.*s" CRLF, len - 3, sz);
 		} else
 			tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
 	}
@@ -1120,7 +1120,7 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
  * If this is done automatically, the result is ugly, so we
  * don't do it. Creators of Lua procedures have to do it
  * themselves. Best we can do here is to add a trailing
- * \r\n if it's forgotten.
+ * CRLF if it's forgotten.
  */
 static int
 lbox_print(struct lua_State *L)
@@ -1134,9 +1134,9 @@ lbox_print(struct lua_State *L)
 	if (out) {
 		/* Administrative console */
 		tarantool_lua_printstack(L, out);
-		/* Courtesy: append YAML's \r\n if it's not already there */
+		/* Courtesy: append YAML's end of line if it's not already there */
 		if (out->size < 2 || tbuf_str(out)[out->size-1] != '\n')
-			tbuf_printf(out, "\r\n");
+			tbuf_printf(out, CRLF);
 	} else {
 		/* Add a message to the server log */
 		out = tbuf_alloc(fiber->gc_pool);
@@ -1321,7 +1321,7 @@ tarantool_lua(struct lua_State *L,
 		const char *msg = lua_tostring(L, -1);
 		msg = msg ? msg : "";
 		/* Make sure the output is YAMLish */
-		tbuf_printf(out, "error: '%s'\r\n",
+		tbuf_printf(out, "error: '%s'" CRLF,
 			    luaL_gsub(L, msg, "'", "''"));
 	} else {
 		tarantool_lua_printstack_yaml(L, out);
