@@ -852,7 +852,7 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
 ---
  - 1: {'I am a duplicate'}
 ...
-localhost> lua box.auto_increment(2, "I am a duplicate")
+localhost> lua box.auto_increment(0, "I am a duplicate")
 ---
  - 2: {'I am a duplicate'}
 ...
