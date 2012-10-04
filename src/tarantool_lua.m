@@ -195,6 +195,7 @@ lbox_pack(struct lua_State *L)
 	/* first arg comes second */
 	int i = 2;
 	int nargs = lua_gettop(L);
+	u16 u16buf;
 	u32 u32buf;
 	u64 u64buf;
 	size_t size;
@@ -215,6 +216,16 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "box.pack: argument too big for "
 					   "8-bit integer");
 			luaL_addchar(&b, (char) u32buf);
+			break;
+		case 'S':
+		case 's':
+			/* signed and unsigned 8-bit integers */
+			u32buf = lua_tointeger(L, i);
+			if (u32buf > 0xffff)
+				luaL_error(L, "box.pack: argument too big for "
+					   "16-bit integer");
+			u16buf = (u16) u32buf;
+			luaL_addlstring(&b, (char *) &u16buf, sizeof(u16));
 			break;
 		case 'I':
 		case 'i':
@@ -326,6 +337,8 @@ lbox_unpack(struct lua_State *L)
 	int nargs = lua_gettop(L);
 	size_t size;
 	const char *str;
+	u8  u8buf;
+	u16 u16buf;
 	u32 u32buf;
 
 	while (*format) {
@@ -333,6 +346,24 @@ lbox_unpack(struct lua_State *L)
 			luaL_error(L, "box.unpack: argument count does not "
 				   "match the format");
 		switch (*format) {
+		case 'b':
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u8))
+				luaL_error(L, "box.unpack('%c'): got %d bytes "
+					   "(expected: 1)", *format,
+					   (int) size);
+			u8buf = * (u8 *) str;
+			lua_pushnumber(L, u8buf);
+			break;
+		case 's':
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u16))
+				luaL_error(L, "box.unpack('%c'): got %d bytes "
+					   "(expected: 2)", *format,
+					   (int) size);
+			u16buf = * (u16 *) str;
+			lua_pushnumber(L, u16buf);
+			break;
 		case 'i':
 			str = lua_tolstring(L, i, &size);
 			if (str == NULL || size != sizeof(u32))
