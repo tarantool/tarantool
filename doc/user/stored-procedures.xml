@@ -1637,6 +1637,16 @@ function consumer_fiber()
     while true do
         task = box.select(...)
         channel:put(task)
+
+
+        ...
+        if channel:is_empty() then
+            # channel is empty
+        end
+
+        if channel:is_full() then
+            # channel is full
+        end
     end
 end
                     </programlisting>
