@@ -1,0 +1,198 @@
+================ semaphores =======================
+lua sm = box.fiber.semaphore(1)
+---
+...
+lua print(sm.up())
+---
+error: '[string "return print(sm.up())"]:1: usage: semaphore:up()'
+...
+lua print(sm.up({}))
+---
+error: '[string "return print(sm.up({}))"]:1: usage: semaphore:up()'
+...
+lua print(sm())
+---
+1
+...
+lua print(sm:up())
+---
+2
+...
+lua print(sm:down())
+---
+1
+...
+lua print(sm:down())
+---
+0
+...
+lua flag = 1
+---
+...
+lua tfbr = box.fiber.create(function() box.fiber.detach() sm:down() flag = 2 sm:up() end)
+---
+...
+lua box.fiber.resume(tfbr)
+---
+...
+lua flag
+---
+ - 1
+...
+lua box.fiber.sleep(.5)
+---
+...
+lua sm()
+---
+ - -1
+...
+lua sm:up()
+---
+ - 0
+...
+lua flag
+---
+ - 2
+...
+lua sm:trydown()
+---
+ - true
+...
+lua sm:trydown()
+---
+ - false
+...
+lua flag = 3
+---
+...
+lua tfbr = box.fiber.create(function() box.fiber.detach() sm:down() flag = 4 sm:up() end)
+---
+...
+lua box.fiber.resume(tfbr)
+---
+...
+lua flag
+---
+ - 3
+...
+lua box.fiber.sleep(.5)
+---
+...
+lua sm()
+---
+ - -1
+...
+lua sm:up()
+---
+ - 0
+...
+lua flag
+---
+ - 4
+...
+lua sm = nil
+---
+...
+lua sm
+---
+ - nil
+...
+================ mutexes =======================
+lua m = box.fiber.mutex()
+---
+...
+lua print(m())
+---
+true
+...
+lua flag = 0
+---
+...
+lua m:lock()
+---
+...
+lua tfbr = box.fiber.create(function() box.fiber.detach() m:lock() flag = 1 m:unlock() end)
+---
+...
+lua box.fiber.resume(tfbr)
+---
+...
+lua print(flag)
+---
+0
+...
+lua box.fiber.sleep(.5)
+---
+...
+lua m:trylock()
+---
+ - false
+...
+lua m:unlock()
+---
+...
+lua print(flag)
+---
+1
+...
+lua m = nil
+---
+...
+lua print(m)
+---
+nil
+...
+================ channels =======================
+lua ch = box.fiber.channel()
+---
+...
+lua ch:is_full()
+---
+ - false
+...
+lua ch:is_empty()
+---
+ - true
+...
+lua ch:put()
+---
+error: 'usage: channel:put(variable)'
+...
+lua ch:put(234)
+---
+ - 234
+...
+lua ch:is_full()
+---
+ - true
+...
+lua ch:is_empty()
+---
+ - false
+...
+lua buffer = {}
+---
+...
+lua tfbr = box.fiber.create(function() box.fiber.detach() while true do table.insert(buffer, ch:get()) end end)
+---
+...
+lua box.fiber.resume(tfbr)
+---
+...
+lua for i = 1, 10 do ch:put(i) box.fiber.sleep(0.01) end
+---
+...
+lua for i, v in pairs(buffer) do print(v) end
+---
+234
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+...

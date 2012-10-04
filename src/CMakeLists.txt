@@ -77,6 +77,8 @@ set (recompiled_sources
      ${CMAKE_SOURCE_DIR}/src/assoc.m
      ${CMAKE_SOURCE_DIR}/src/admin.m
      ${CMAKE_SOURCE_DIR}/src/replication.m
+     ${CMAKE_SOURCE_DIR}/src/fiber_ifc.m
+     ${CMAKE_SOURCE_DIR}/src/fiber_ifc_lua.m
      ${CMAKE_SOURCE_DIR}/src/fiber.m PARENT_SCOPE)
 
 set (common_sources

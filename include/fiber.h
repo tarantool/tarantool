@@ -84,6 +84,7 @@ struct fiber {
 	struct tbuf cleanup;
 
 	SLIST_ENTRY(fiber) link, zombie_link;
+	STAILQ_ENTRY(fiber) ifc;	/* inter fiber communication */
 
 	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];

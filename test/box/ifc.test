@@ -1,0 +1,78 @@
+# encoding: tarantool
+# 
+import sys
+
+
+print "================ semaphores ======================="
+exec admin "lua sm = box.fiber.semaphore(1)"
+exec admin "lua print(sm.up())"
+exec admin "lua print(sm.up({}))"
+
+exec admin "lua print(sm())"
+exec admin "lua print(sm:up())"
+exec admin "lua print(sm:down())"
+exec admin "lua print(sm:down())"
+# next call will lock semaphore
+
+exec admin "lua flag = 1"
+exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() sm:down() flag = 2 sm:up() end)"
+
+exec admin "lua box.fiber.resume(tfbr)"
+exec admin "lua flag"
+
+exec admin "lua box.fiber.sleep(.5)"
+
+exec admin "lua sm()"
+exec admin "lua sm:up()"
+exec admin "lua flag"
+exec admin "lua sm:trydown()"
+exec admin "lua sm:trydown()"
+
+
+exec admin "lua flag = 3"
+exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() sm:down() flag = 4 sm:up() end)"
+
+exec admin "lua box.fiber.resume(tfbr)"
+exec admin "lua flag"
+
+exec admin "lua box.fiber.sleep(.5)"
+
+exec admin "lua sm()"
+exec admin "lua sm:up()"
+exec admin "lua flag"
+exec admin "lua sm = nil"
+exec admin "lua sm"
+
+print "================ mutexes ======================="
+
+exec admin "lua m = box.fiber.mutex()"
+exec admin "lua print(m())"
+exec admin "lua flag = 0"
+exec admin "lua m:lock()"
+exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() m:lock() flag = 1 m:unlock() end)"
+exec admin "lua box.fiber.resume(tfbr)"
+exec admin "lua print(flag)"
+exec admin "lua box.fiber.sleep(.5)"
+exec admin "lua m:trylock()"
+exec admin "lua m:unlock()"
+exec admin "lua print(flag)"
+
+exec admin "lua m = nil"
+exec admin "lua print(m)"
+
+
+print "================ channels ======================="
+exec admin "lua ch = box.fiber.channel()"
+exec admin "lua ch:is_full()"
+exec admin "lua ch:is_empty()"
+exec admin "lua ch:put()"
+exec admin "lua ch:put(234)"
+exec admin "lua ch:is_full()"
+exec admin "lua ch:is_empty()"
+exec admin "lua buffer = {}"
+exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() while true do table.insert(buffer, ch:get()) end end)"
+exec admin "lua box.fiber.resume(tfbr)"
+exec admin "lua for i = 1, 10 do ch:put(i) box.fiber.sleep(0.01) end"
+exec admin "lua for i, v in pairs(buffer) do print(v) end"
+
+
