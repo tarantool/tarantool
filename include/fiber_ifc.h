@@ -75,7 +75,6 @@ void fiber_semaphore_up(struct fiber_semaphore *s);
 int  fiber_semaphore_trydown(struct fiber_semaphore *s);
 int  fiber_semaphore_counter(struct fiber_semaphore *s);
 
-
 /* MUTEXES
 	static struct fiber_mutex mutex;
 
@@ -112,44 +111,7 @@ void fiber_mutex_init(struct fiber_mutex *m);
 void fiber_mutex_lock(struct fiber_mutex *m);
 void fiber_mutex_unlock(struct fiber_mutex *m);
 int  fiber_mutex_trylock(struct fiber_mutex *m);
-int  fiber_mutex_isfree(struct fiber_mutex *m);
-
-/* RW-MUTEXES
-	static struct fiber_rwlock rw;
-
-	init(...) {
-		...
-		fiber_rwlock_init(&rw);
-		...
-	}
-
-	writer_fiber(...) {
-
-		...
-		fiber_rwlock_wrlock(&rw);
-		...
-		// write
-		...
-		fiber_rwlock_unlock(&rw);
-	}
-
-	the_other_fiber(...) {
-
-		...
-		fiber_rwlock_rdlock(&rd);
-		...
-		// read
-		...
-		fiber_rwlock_unlock(&rw);
-	}
-*/
-
-struct fiber_rwlock;
-struct fiber_rwlock *fiber_rwlock_alloc(void);
-void fiber_rwlock_init(struct fiber_rwlock *rw);
-void fiber_rwlock_rdlock(struct fiber_rwlock *rw);
-void fiber_rwlock_wrlock(struct fiber_rwlock *rw);
-void fiber_rwlock_unlock(struct fiber_rwlock *rw);
+int  fiber_mutex_islocked(struct fiber_mutex *m);
 
 /* CHANNELS
 	static struct fiber_channel ch;
@@ -181,7 +143,6 @@ void fiber_rwlock_unlock(struct fiber_rwlock *rw);
 	}
 
 */
-
 
 struct fiber_channel;
 struct fiber_channel *fiber_channel_alloc(unsigned size);

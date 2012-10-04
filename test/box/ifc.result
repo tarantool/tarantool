@@ -135,6 +135,10 @@ lua print(flag)
 ---
 1
 ...
+lua m:locked()
+---
+ - true
+...
 lua m = nil
 ---
 ...

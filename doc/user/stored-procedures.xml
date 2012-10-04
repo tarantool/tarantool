@@ -1541,6 +1541,110 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         </simpara></listitem>
     </varlistentry>
 
+
+    <bridgehead renderas="sect4">Interfiber communication</bridgehead>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.semaphore(count)</emphasis>
+            <listitem>
+                <simpara>
+                    Create new semaphore. Example:
+                    <programlisting>
+local semaphore = box.fiber.semaphore(10)
+function worker_fiber()
+    while true do
+        semaphore:down()
+        # do something
+        semaphore:up()
+    end
+end
+
+function theother_fiber()
+    while true do
+        if semaphore:trydown() then
+            # semaphore is down
+            
+            # do something
+
+            semaphore:up()
+        else
+            # semaphore isn't down
+        end
+    end
+end
+                    </programlisting>
+                </simpara>
+            </listitem>
+        </term>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.mutex()</emphasis>
+            <listitem>
+                <simpara>
+                    Create new mutex. Example:
+                    <programlisting>
+local mutex = box.fiber.mutex()
+function worker_fiber()
+    while true do
+        mutex:lock()
+        # do something
+        mutex:unlock()
+    end
+end
+
+function theother_fiber()
+    while true do
+        if mutex:trylock() then
+            # mutex is locked
+            
+            # do something
+
+            mutex:unlock()
+        else
+            # mutex was not locked
+        end
+    end
+
+    if mutex:locked() then
+            # mutex is already locked
+    end
+end
+                    </programlisting>
+                </simpara>
+            </listitem>
+        </term>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.fiber.channel(size)</emphasis>
+            <listitem>
+                <simpara>
+                    Create new channel (pipe) with predefined
+                    capacity. Example:
+                    <programlisting>
+local channel = box.fiber.channel(10)
+function worker_fiber()
+    while true do
+        local task = channel:get()
+        ...
+    end
+end
+
+function consumer_fiber()
+    while true do
+        task = box.select(...)
+        channel:put(task)
+    end
+end
+                    </programlisting>
+                </simpara>
+            </listitem>
+        </term>
+    </varlistentry>
+
 </variablelist>
 
 <variablelist>

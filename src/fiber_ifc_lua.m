@@ -141,14 +141,14 @@ lbox_fiber_mutex_gc(struct lua_State *L)
 }
 
 static int
-lbox_fiber_mutex_isfree(struct lua_State *L)
+lbox_fiber_mutex_locked(struct lua_State *L)
 {
 	say_info(":%s()", __func__);
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		luaL_error(L, "usage: mutex()");
 	struct fiber_mutex *m = lbox_check_mutex(L, -1);
 
-	lua_pushboolean(L, fiber_mutex_isfree(m));
+	lua_pushboolean(L, fiber_mutex_islocked(m));
 	return 1;
 }
 
@@ -390,7 +390,8 @@ fiber_ifc_lua_init(struct lua_State *L)
 
 	static const struct luaL_reg mutex_meta[] = {
 		{"__gc",	lbox_fiber_mutex_gc},
-		{"__call",	lbox_fiber_mutex_isfree},
+		{"__call",	lbox_fiber_mutex_locked},
+		{"locked",	lbox_fiber_mutex_locked},
 		{"lock",	lbox_fiber_mutex_lock},
 		{"unlock",	lbox_fiber_mutex_unlock},
 		{"trylock",	lbox_fiber_mutex_trylock},

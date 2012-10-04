@@ -56,6 +56,7 @@ exec admin "lua box.fiber.sleep(.5)"
 exec admin "lua m:trylock()"
 exec admin "lua m:unlock()"
 exec admin "lua print(flag)"
+exec admin "lua m:locked()"
 
 exec admin "lua m = nil"
 exec admin "lua print(m)"
