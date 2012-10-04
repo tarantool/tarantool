@@ -126,12 +126,11 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 	}
 	case LUA_TCDATA:
 	{
-		if (lua_type(L, idx) != LUA_TCDATA)
-			luaL_error(L, "lua_tointeger64: cdata expected");
-		GCcdata *cd = cdataV(L->base + (idx - 1));
-		if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64)
+		GCcdata *cd = cdataV(L->base + idx - 1);
+		if (cd->typeid != CTID_INT64) {
 			luaL_error(L,
 				   "lua_tointeger64: unsupported cdata type");
+		}
 		result = *(uint64_t*)cdataptr(cd);
 		break;
 	}
@@ -351,8 +350,7 @@ lbox_unpack(struct lua_State *L)
 					   "(expected: 8)", *format,
 					   (int) size);
 			GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
-			uint64_t *u64buf = (uint64_t*)cdataptr(cd);
-			*u64buf = *(u64*)str;
+			*(uint64_t*)cdataptr(cd) = *(uint64_t*)str;
 			break;
 		}
 		default:
