@@ -83,6 +83,8 @@ set (common_sources
      tbuf.m
      palloc.m
      util.m
+     sio.m
+     evio.m
      salloc.m
      pickle.m
      coro.m
