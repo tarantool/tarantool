@@ -203,12 +203,15 @@ fiber_testcancel(void)
 /** Change the current cancellation state of a fiber. This is not
  * a cancellation point.
  */
-void fiber_setcancelstate(bool enable)
+bool
+fiber_setcancellable(bool enable)
 {
+	bool prev = fiber->flags & FIBER_CANCELLABLE;
 	if (enable == true)
 		fiber->flags |= FIBER_CANCELLABLE;
 	else
 		fiber->flags &= ~FIBER_CANCELLABLE;
+	return prev;
 }
 
 /**

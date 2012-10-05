@@ -14,34 +14,28 @@ exec admin "lua print(sm:down())"
 exec admin "lua print(sm:down())"
 # next call will lock semaphore
 
-exec admin "lua flag = 1"
-exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() sm:down() flag = 2 sm:up() end)"
-
-exec admin "lua box.fiber.resume(tfbr)"
-exec admin "lua flag"
-
-exec admin "lua box.fiber.sleep(.5)"
 
 exec admin "lua sm()"
-exec admin "lua sm:up()"
-exec admin "lua flag"
 exec admin "lua sm:trydown()"
 exec admin "lua sm:trydown()"
 
 
-exec admin "lua flag = 3"
-exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() sm:down() flag = 4 sm:up() end)"
+exec admin "lua state = {}"
+exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() table.insert(state, 'tfbr started') sm:down() table.insert(state, 'tfbr') sm:up() end) box.fiber.resume(tfbr)"
 
-exec admin "lua box.fiber.resume(tfbr)"
-exec admin "lua flag"
+exec admin "lua tfbrd = box.fiber.create(function() box.fiber.detach() table.insert(state, 'tfbrd started') sm:down() table.insert(state, 'tfbrd') sm:up() end) box.fiber.resume(tfbrd)"
 
 exec admin "lua box.fiber.sleep(.5)"
 
+exec admin "lua  for k, v in pairs(state) do print(k, ': ', v) end"
+
+exec admin "lua sm()"
+exec admin "lua box.fiber.cancel(tfbrd)"
 exec admin "lua sm()"
 exec admin "lua sm:up()"
-exec admin "lua flag"
-exec admin "lua sm = nil"
-exec admin "lua sm"
+exec admin "lua box.fiber.sleep(.5)"
+exec admin "lua  for k, v in pairs(state) do print(k, ': ', v) end"
+
 
 print "================ mutexes ======================="
 
@@ -74,6 +68,9 @@ exec admin "lua buffer = {}"
 exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() while true do table.insert(buffer, ch:get()) end end)"
 exec admin "lua box.fiber.resume(tfbr)"
 exec admin "lua for i = 1, 10 do ch:put(i) box.fiber.sleep(0.01) end"
+exec admin "lua box.fiber.sleep(.5)"
+exec admin "lua box.fiber.cancel(tfbr)"
+exec admin "lua ch:put(box.info.logger_pid) > 0"
 exec admin "lua for i, v in pairs(buffer) do print(v) end"
 
 

@@ -509,9 +509,9 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 			([memcached_index size] + 1));
 	if (delay > 1)
 		delay = 1;
-	fiber_setcancelstate(true);
+	fiber_setcancellable(true);
 	fiber_sleep(delay);
-	fiber_setcancelstate(false);
+	fiber_setcancellable(false);
 }
 
 void

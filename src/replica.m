@@ -124,9 +124,9 @@ pull_from_remote(void *state)
 	struct tbuf *row;
 
 	for (;;) {
-		fiber_setcancelstate(true);
+		fiber_setcancellable(true);
 		row = remote_read_row(&r->remote->addr, r->confirmed_lsn + 1);
-		fiber_setcancelstate(false);
+		fiber_setcancellable(false);
 
 		r->remote->recovery_lag = ev_now() - header_v11(row)->tm;
 		r->remote->recovery_last_update_tstamp = ev_now();

@@ -26,56 +26,40 @@ lua print(sm:down())
 ---
 0
 ...
-lua flag = 1
----
-...
-lua tfbr = box.fiber.create(function() box.fiber.detach() sm:down() flag = 2 sm:up() end)
----
-...
-lua box.fiber.resume(tfbr)
----
-...
-lua flag
----
- - 1
-...
-lua box.fiber.sleep(.5)
----
-...
 lua sm()
 ---
- - -1
-...
-lua sm:up()
----
  - 0
-...
-lua flag
----
- - 2
-...
-lua sm:trydown()
----
- - true
 ...
 lua sm:trydown()
 ---
  - false
 ...
-lua flag = 3
+lua sm:trydown()
+---
+ - false
+...
+lua state = {}
 ---
 ...
-lua tfbr = box.fiber.create(function() box.fiber.detach() sm:down() flag = 4 sm:up() end)
+lua tfbr = box.fiber.create(function() box.fiber.detach() table.insert(state, 'tfbr started') sm:down() table.insert(state, 'tfbr') sm:up() end) box.fiber.resume(tfbr)
 ---
 ...
-lua box.fiber.resume(tfbr)
+lua tfbrd = box.fiber.create(function() box.fiber.detach() table.insert(state, 'tfbrd started') sm:down() table.insert(state, 'tfbrd') sm:up() end) box.fiber.resume(tfbrd)
 ---
-...
-lua flag
----
- - 3
 ...
 lua box.fiber.sleep(.5)
+---
+...
+lua  for k, v in pairs(state) do print(k, ': ', v) end
+---
+1: tfbr started
+2: tfbrd started
+...
+lua sm()
+---
+ - -2
+...
+lua box.fiber.cancel(tfbrd)
 ---
 ...
 lua sm()
@@ -86,16 +70,14 @@ lua sm:up()
 ---
  - 0
 ...
-lua flag
----
- - 4
-...
-lua sm = nil
+lua box.fiber.sleep(.5)
 ---
 ...
-lua sm
+lua  for k, v in pairs(state) do print(k, ': ', v) end
 ---
- - nil
+1: tfbr started
+2: tfbrd started
+3: tfbr
 ...
 ================ mutexes =======================
 lua m = box.fiber.mutex()
@@ -185,6 +167,16 @@ lua box.fiber.resume(tfbr)
 ...
 lua for i = 1, 10 do ch:put(i) box.fiber.sleep(0.01) end
 ---
+...
+lua box.fiber.sleep(.5)
+---
+...
+lua box.fiber.cancel(tfbr)
+---
+...
+lua ch:put(box.info.logger_pid) > 0
+---
+ - true
 ...
 lua for i, v in pairs(buffer) do print(v) end
 ---

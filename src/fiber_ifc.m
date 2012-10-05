@@ -83,15 +83,32 @@ fiber_semaphore_down(struct fiber_semaphore *s)
 	if (STAILQ_EMPTY(&s->fibers))
 		ev_async_start(&s->async);
 	STAILQ_INSERT_TAIL(&s->fibers, fiber, ifc);
+	bool cancellable = fiber_setcancellable(true);
 	fiber_yield();
+	@try {
+		fiber_testcancel();
+	} @catch(...) {
+		s->count++;
+		struct fiber *f;
+		STAILQ_FOREACH(f, &s->fibers, ifc) {
+			if (f == fiber) {
+				STAILQ_REMOVE(&s->fibers, f, fiber, ifc);
+				if (STAILQ_EMPTY(&s->fibers))
+					ev_async_stop(&s->async);
+				break;
+			}
+		}
+		@throw;
+	}
+	fiber_setcancellable(cancellable);
 }
 
 void
 fiber_semaphore_up(struct fiber_semaphore *s)
 {
-	if (++s->count < 0 || STAILQ_EMPTY(&s->fibers))
-		return;
-	ev_async_send(&s->async);
+	++s->count;
+	if (!STAILQ_EMPTY(&s->fibers))	/* wake up one fiber */
+		ev_async_send(&s->async);
 }
 
 int
@@ -236,7 +253,26 @@ fiber_channel_get(struct fiber_channel *ch)
 		if (STAILQ_EMPTY(&ch->readers))
 			ev_async_start(&ch->rasync);
 		STAILQ_INSERT_TAIL(&ch->readers, fiber, ifc);
+		bool cancellable = fiber_setcancellable(true);
 		fiber_yield();
+		@try {
+			fiber_testcancel();
+		}
+		@catch(...) {
+			struct fiber *f;
+			STAILQ_FOREACH(f, &ch->readers, ifc) {
+				if (f != fiber)
+					continue;
+
+				STAILQ_REMOVE(&ch->readers, f, fiber, ifc);
+
+				if (STAILQ_EMPTY(&ch->readers))
+					ev_async_stop(&ch->rasync);
+
+			}
+			@throw;
+		}
+		fiber_setcancellable(cancellable);
 	}
 
 	void *res = ch->item[ ch->beg ];
@@ -259,7 +295,27 @@ fiber_channel_put(struct fiber_channel *ch, void *data)
 		if (STAILQ_EMPTY(&ch->writers))
 			ev_async_start(&ch->wasync);
 		STAILQ_INSERT_TAIL(&ch->writers, fiber, ifc);
+		bool cancellable = fiber_setcancellable(true);
 		fiber_yield();
+
+		@try {
+			fiber_testcancel();
+		}
+		@catch(...) {
+			struct fiber *f;
+			STAILQ_FOREACH(f, &ch->writers, ifc) {
+				if (f != fiber)
+					continue;
+
+				STAILQ_REMOVE(&ch->writers, f, fiber, ifc);
+
+				if (STAILQ_EMPTY(&ch->writers))
+					ev_async_stop(&ch->wasync);
+
+			}
+			@throw;
+		}
+		fiber_setcancellable(cancellable);
 	}
 
 	unsigned i = ch->beg;

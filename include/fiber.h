@@ -192,8 +192,10 @@ void fiber_cancel(struct fiber *f);
 void fiber_testcancel(void);
 /** Make it possible or not possible to cancel the current
  * fiber.
+ *
+ * return previous state.
  */
-void fiber_setcancelstate(bool enable);
+bool fiber_setcancellable(bool enable);
 int fiber_connect(struct sockaddr_in *addr);
 void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);
