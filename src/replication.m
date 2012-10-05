@@ -135,18 +135,6 @@ spawner_shutdown_children();
 static void
 replication_relay_loop(int client_sock);
 
-/** A libev callback invoked when a relay client socket is ready
- * for read. This currently only happens when the client closes
- * its socket, and we get an EOF.
- */
-static void
-replication_relay_recv(struct ev_io *w, int revents);
-
-/** Send a single row to the client. */
-static int
-replication_relay_send_row(struct tbuf *t);
-
-
 /*
  * ------------------------------------------------------------------------
  * replication module
@@ -577,6 +565,56 @@ retry:
 	}
 }
 
+/** A libev callback invoked when a relay client socket is ready
+ * for read. This currently only happens when the client closes
+ * its socket, and we get an EOF.
+ */
+static void
+replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
+{
+	int fd = *((int *)w->data);
+	u8 data;
+
+	int result = recv(fd, &data, sizeof(data), 0);
+
+	if (result == 0 || (result < 0 && errno == ECONNRESET)) {
+		say_info("the client has closed its replication socket, exiting");
+		exit(EXIT_SUCCESS);
+	}
+	if (result < 0)
+		say_syserror("recv");
+
+	exit(EXIT_FAILURE);
+}
+
+
+/** Send a single row to the client. */
+static int
+replication_relay_send_row(void *param __attribute__((unused)), struct tbuf *t)
+{
+	u8 *data = t->data;
+	ssize_t bytes, len = t->size;
+	while (len > 0) {
+		bytes = write(fiber->fd, data, len);
+		if (bytes < 0) {
+			if (errno == EPIPE) {
+				/* socket closed on opposite site */
+				goto shutdown_handler;
+			}
+			panic_syserror("write");
+		}
+		len -= bytes;
+		data += bytes;
+	}
+
+	say_debug("send row: %" PRIu32 " bytes %s", t->size, tbuf_to_hex(t));
+	return 0;
+shutdown_handler:
+	say_info("the client has closed its replication socket, exiting");
+	exit(EXIT_SUCCESS);
+}
+
+
 /** The main loop of replication client service process. */
 static void
 replication_relay_loop(int client_sock)
@@ -624,7 +662,7 @@ replication_relay_loop(int client_sock)
 
 	ver = tbuf_alloc(fiber->gc_pool);
 	tbuf_append(ver, &default_version, sizeof(default_version));
-	replication_relay_send_row(ver);
+	replication_relay_send_row(NULL, ver);
 
 	/* init libev events handlers */
 	ev_default_loop(0);
@@ -637,7 +675,8 @@ replication_relay_loop(int client_sock)
 	ev_io_start(&sock_read_ev);
 
 	/* Initialize the recovery process */
-	recovery_init(cfg.snap_dir, cfg.wal_dir, replication_relay_send_row,
+	recovery_init(cfg.snap_dir, cfg.wal_dir,
+		      replication_relay_send_row, NULL,
 		      INT32_MAX, "fsync_delay", 0,
 		      RECOVER_READONLY);
 	/*
@@ -654,51 +693,6 @@ replication_relay_loop(int client_sock)
 	ev_loop(0);
 
 	say_crit("exiting the relay loop");
-	exit(EXIT_SUCCESS);
-}
-
-/** Receive data event to replication socket handler */
-static void
-replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
-{
-	int fd = *((int *)w->data);
-	u8 data;
-
-	int result = recv(fd, &data, sizeof(data), 0);
-
-	if (result == 0 || (result < 0 && errno == ECONNRESET)) {
-		say_info("the client has closed its replication socket, exiting");
-		exit(EXIT_SUCCESS);
-	}
-	if (result < 0)
-		say_syserror("recv");
-
-	exit(EXIT_FAILURE);
-}
-
-/** Send to row to client. */
-static int
-replication_relay_send_row(struct tbuf *t)
-{
-	u8 *data = t->data;
-	ssize_t bytes, len = t->size;
-	while (len > 0) {
-		bytes = write(fiber->fd, data, len);
-		if (bytes < 0) {
-			if (errno == EPIPE) {
-				/* socket closed on opposite site */
-				goto shutdown_handler;
-			}
-			panic_syserror("write");
-		}
-		len -= bytes;
-		data += bytes;
-	}
-
-	say_debug("send row: %" PRIu32 " bytes %s", t->size, tbuf_to_hex(t));
-	return 0;
-shutdown_handler:
-	say_info("the client has closed its replication socket, exiting");
 	exit(EXIT_SUCCESS);
 }
 

@@ -39,7 +39,7 @@ struct tbuf;
 
 #define RECOVER_READONLY 1
 
-typedef int (row_handler)(struct tbuf *);
+typedef int (row_handler)(void *, struct tbuf *);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.
@@ -93,6 +93,7 @@ struct recovery_state {
 	 * formats.
 	 */
 	row_handler *row_handler;
+	void *row_handler_param;
 	int snap_io_rate_limit;
 	int rows_per_wal;
 	int flags;
@@ -106,7 +107,7 @@ struct recovery_state {
 extern struct recovery_state *recovery_state;
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
-		   row_handler row_handler,
+		   row_handler row_handler, void *row_handler_param,
 		   int rows_per_wal, const char *wal_mode,
 		   double wal_fsync_delay,
 		   int flags);
@@ -131,7 +132,8 @@ void set_lsn(struct recovery_state *r, int64_t lsn);
 void recovery_wait_lsn(struct recovery_state *r, int64_t lsn);
 
 int read_log(const char *filename,
-	     row_handler xlog_handler, row_handler snap_handler);
+	     row_handler xlog_handler, row_handler snap_handler,
+	     void *param);
 
 void recovery_follow_remote(struct recovery_state *r, const char *addr);
 void recovery_stop_remote(struct recovery_state *r);

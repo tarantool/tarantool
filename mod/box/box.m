@@ -229,7 +229,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 }
 
 static int
-snap_print(struct tbuf *t)
+snap_print(void *param __attribute__((unused)), struct tbuf *t)
 {
 	@try {
 		struct tbuf *out = tbuf_alloc(t->pool);
@@ -253,7 +253,7 @@ snap_print(struct tbuf *t)
 }
 
 static int
-xlog_print(struct tbuf *t)
+xlog_print(void *param __attribute__((unused)), struct tbuf *t)
 {
 	@try {
 		struct tbuf *out = tbuf_alloc(t->pool);
@@ -283,7 +283,7 @@ recover_snap_row(struct tbuf *t)
 }
 
 static int
-recover_row(struct tbuf *t)
+recover_row(void *param __attribute__((unused)), struct tbuf *t)
 {
 	/* drop wal header */
 	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL) {
@@ -483,7 +483,8 @@ mod_init(void)
 
 	/* recovery initialization */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
-		      recover_row, cfg.rows_per_wal, cfg.wal_mode,
+		      recover_row, NULL,
+		      cfg.rows_per_wal, cfg.wal_mode,
 		      cfg.wal_fsync_delay,
 		      init_storage ? RECOVER_READONLY : 0);
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
@@ -538,7 +539,7 @@ mod_init(void)
 int
 mod_cat(const char *filename)
 {
-	return read_log(filename, xlog_print, snap_print);
+	return read_log(filename, xlog_print, snap_print, NULL);
 }
 
 static void
