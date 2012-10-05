@@ -174,7 +174,7 @@ lua box.fiber.sleep(.5)
 lua box.fiber.cancel(tfbr)
 ---
 ...
-lua ch:put(box.info.logger_pid) > 0
+lua ch:put(box.info.pid) > 0
 ---
  - true
 ...
