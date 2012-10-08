@@ -1562,15 +1562,15 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
     </varlistentry>
 
 
-    <bridgehead renderas="sect4">Interfiber communication</bridgehead>
+    <bridgehead renderas="sect4">Inter-fiber communication</bridgehead>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.semaphore(count)</emphasis>
+            <emphasis role="lua">box.ifc.semaphore(count)</emphasis>
             <listitem>
                 <simpara>
                     Create new semaphore. Example:
                     <programlisting>
-local semaphore = box.fiber.semaphore(10)
+local semaphore = box.ifc.semaphore(10)
 function worker_fiber()
     while true do
         semaphore:down()
@@ -1592,6 +1592,14 @@ function theother_fiber()
         end
     end
 end
+
+function fiberN()
+    if semaphore:down(10) then -- 10 seconds
+        print("semafore was down in 10 seconds")
+    else
+        print("timeout!")
+    end
+end
                     </programlisting>
                 </simpara>
             </listitem>
@@ -1600,12 +1608,12 @@ end
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.mutex()</emphasis>
+            <emphasis role="lua">box.ifc.mutex()</emphasis>
             <listitem>
                 <simpara>
                     Create new mutex. Example:
                     <programlisting>
-local mutex = box.fiber.mutex()
+local mutex = box.ifc.mutex()
 function worker_fiber()
     while true do
         mutex:lock()
@@ -1631,6 +1639,13 @@ function theother_fiber()
             # mutex is already locked
     end
 end
+function fiberN()
+    if mutex:lock(10) then          -- 10 seconds
+        print("mutex was locked in 10 seconds")
+    else
+        print("timeout!")
+    end
+end
                     </programlisting>
                 </simpara>
             </listitem>
@@ -1639,26 +1654,34 @@ end
     
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.channel(size)</emphasis>
+            <emphasis role="lua">box.ifc.channel(size)</emphasis>
             <listitem>
                 <simpara>
                     Create new channel (pipe) with predefined
                     capacity. Example:
                     <programlisting>
-local channel = box.fiber.channel(10)
-function worker_fiber()
+local channel = box.ifc.channel(10)
+function consumer_fiber()
     while true do
         local task = channel:get()
         ...
     end
 end
 
-function consumer_fiber()
+function consumer2_fiber()
+    while true do
+        local task = channel:get(10)        -- 10 seconds
+        if task ~= nil then
+            ...
+        else
+            print("timeout!")
+        end
+    end
+end
+
+function producer_fiber()
     while true do
         task = box.select(...)
-        channel:put(task)
-
-
         ...
         if channel:is_empty() then
             # channel is empty
@@ -1666,6 +1689,20 @@ function consumer_fiber()
 
         if channel:is_full() then
             # channel is full
+        end
+        ...
+        channel:put(task)
+    end
+end
+
+function producer2_fiber()
+    while true do
+        task = box.select(...)
+
+        if channel:put(task, 10) then       -- 10 seconds
+            ...
+        else
+            print("timeout!")
         end
     end
 end
