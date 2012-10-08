@@ -378,13 +378,13 @@ memcached_loop(struct coio *coio)
 
 void memcached_handler(va_list ap)
 {
-	struct coio *coio = va_arg(ap, struct coio *);
+	struct coio coio = va_arg(ap, struct coio);
 	stats.total_connections++;
 	stats.curr_connections++;
 
 	@try {
-		memcached_loop(coio);
-		iov_flush(coio);
+		memcached_loop(&coio);
+		iov_flush(&coio);
 	} @catch (FiberCancelException *e) {
 		@throw;
 	} @catch (tnt_Exception *e) {
@@ -393,8 +393,7 @@ void memcached_handler(va_list ap)
 		iov_reset();
 		fiber_sleep(0.01);
 		stats.curr_connections--;
-		coio_close(coio);
-		free(coio);
+		coio_close(&coio);
 	}
 }
 

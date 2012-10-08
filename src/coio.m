@@ -254,12 +254,9 @@ coio_service_on_accept(struct evio_service *evio_service,
 		       int fd, struct sockaddr_in *addr)
 {
 	struct coio_service *service = evio_service->on_accept_param;
-	struct coio *coio = malloc(sizeof(struct coio));
+	struct coio coio;
 
-	if (coio == NULL)
-		goto error;
-
-	coio_init(coio, fd);
+	coio_init(&coio, fd);
 
 	/* Set connection name. */
 	char name[SERVICE_NAME_MAXLEN];
@@ -268,15 +265,13 @@ coio_service_on_accept(struct evio_service *evio_service,
 
 	/* Create the worker fiber. */
 	struct fiber *f = fiber_create(name, service->handler);
-	if (f == NULL) {
-		free(coio);
+	if (f == NULL)
 		goto error;
-	}
 	/*
 	 * The coio is passed on to the created fiber, reset the
 	 * libev callback param to point at it.
 	 */
-	coio->ev.data = f;
+	coio.ev.data = f;
 	/*
 	 * Start the created fiber. It becomes the coio object owner
 	 * and will have to close it and free before termination.

@@ -1910,19 +1910,18 @@ case 134:
 static void
 admin_handler(va_list ap)
 {
-	struct coio *coio = va_arg(ap, struct coio *);
+	struct coio coio = va_arg(ap, struct coio);
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	@try {
 		for (;;) {
-			if (admin_dispatch(coio, L) < 0)
+			if (admin_dispatch(&coio, L) < 0)
 				return;
 			fiber_gc();
 		}
 	} @finally {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-		coio_close(coio);
-		free(coio);
+		coio_close(&coio);
 	}
 }
 

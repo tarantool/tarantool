@@ -62,13 +62,13 @@ iproto_flush(struct coio *coio, ssize_t to_read)
 void
 iproto_interact(va_list ap)
 {
-	struct coio *coio = va_arg(ap, struct coio *);
+	struct coio coio = va_arg(ap, struct coio);
 	iproto_callback callback = va_arg(ap, iproto_callback);
 	struct tbuf *in = &fiber->rbuf;
 	ssize_t to_read = sizeof(struct iproto_header);
 	@try {
 		for (;;) {
-			if (to_read > 0 && coio_bread(coio, in, to_read) <= 0)
+			if (to_read > 0 && coio_bread(&coio, in, to_read) <= 0)
 				break;
 
 			/* validating iproto package header */
@@ -78,20 +78,19 @@ iproto_interact(va_list ap)
 				+ iproto(in)->len;
 			to_read = request_len - in->size;
 
-			iproto_flush(coio, to_read);
+			iproto_flush(&coio, to_read);
 
-			if (to_read > 0 && coio_bread(coio, in, to_read) <= 0)
+			if (to_read > 0 && coio_bread(&coio, in, to_read) <= 0)
 				break;
 
 			struct tbuf *request = tbuf_split(in, request_len);
 			iproto_reply(callback, request);
 
 			to_read = sizeof(struct iproto_header) - in->size;
-			iproto_flush(coio, to_read);
+			iproto_flush(&coio, to_read);
 		}
 	} @finally {
-		coio_close(coio);
-		free(coio);
+		coio_close(&coio);
 	}
 }
 
