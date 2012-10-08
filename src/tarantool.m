@@ -829,7 +829,8 @@ main(int argc, char **argv)
 		start_time = ev_now();
 		ev_loop(0);
 	} @catch (tnt_Exception *e) {
-		panic("%s", [e errmsg]);
+		[e log];
+		panic("%s", "Fatal error, exiting loop");
 	}
 	say_crit("exiting loop");
 	/* freeing resources */

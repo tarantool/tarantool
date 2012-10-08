@@ -73,7 +73,7 @@ sio_socketname(int fd)
 	va_end(ap);
 	const char *socketname = sio_socketname(fd);
 	errno = save_errno;
-	self = [self init: "in %s, called on %s", buf, socketname];
+	self = [self init: "%s, called on %s", buf, socketname];
 	return self;
 }
 @end

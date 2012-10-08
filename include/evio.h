@@ -78,7 +78,8 @@ struct evio_service
 	 * when it happens, the exception is logged, and the
 	 * accepted socket is closed.
 	 */
-	void (*on_accept)(void *, int, struct sockaddr_in *);
+	void (*on_accept)(struct evio_service *, int,
+			  struct sockaddr_in *);
 	void *on_accept_param;
 
 	/** libev timer object for the bind retry delay. */
@@ -91,7 +92,8 @@ struct evio_service
 void
 evio_service_init(struct evio_service *service, const char *name,
 		  const char *host, int port,
-		  void (*on_accept)(void *, int, struct sockaddr_in *),
+		  void (*on_accept)(struct evio_service *,
+				    int, struct sockaddr_in *),
 		  void *on_accept_param);
 
 /** Set an optional callback to be invoked upon a successful bind. */

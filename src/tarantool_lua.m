@@ -781,7 +781,7 @@ lbox_fiber_create(struct lua_State *L)
 		luaL_error(L, "fiber.create(function): recursion limit"
 			   " reached");
 
-	struct fiber *f = fiber_create("lua", -1, box_lua_fiber_run);
+	struct fiber *f = fiber_create("lua", box_lua_fiber_run);
 	/* Initially the fiber is cancellable */
 	f->flags |= FIBER_USER_MODE | FIBER_CANCELLABLE;
 
@@ -1484,7 +1484,7 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
-	struct fiber *loader = fiber_create(TARANTOOL_LUA_INIT_SCRIPT, -1,
+	struct fiber *loader = fiber_create(TARANTOOL_LUA_INIT_SCRIPT,
 					    load_init_script);
 	fiber_call(loader, L);
 	/* Outside the startup file require() or ffi are not

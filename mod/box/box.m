@@ -47,6 +47,7 @@
 #include "port.h"
 #include "request.h"
 #include "txn.h"
+#include "coio.h"
 
 static void box_process_replica(struct txn *txn, struct port *port,
 				u32 op, struct tbuf *request_data);
@@ -518,22 +519,33 @@ mod_init(void)
 	}
 
 	/* run primary server */
-	if (cfg.primary_port != 0)
-		fiber_server("primary", cfg.primary_port,
-			     iproto_interact,
-			     iproto_primary_port_handler,
-			     box_leave_local_standby_mode);
+	if (cfg.primary_port != 0) {
+		static struct coio_service primary;
+		coio_service_init(&primary, "primary",
+				  cfg.bind_ipaddr, cfg.primary_port,
+				  iproto_interact, iproto_primary_port_handler);
+		evio_service_on_bind(&primary.evio_service,
+				     box_leave_local_standby_mode, NULL);
+		evio_service_start(&primary.evio_service);
+	}
 
 	/* run secondary server */
-	if (cfg.secondary_port != 0)
-		fiber_server("secondary", cfg.secondary_port,
-			     iproto_interact,
-			     iproto_secondary_port_handler, NULL);
+	if (cfg.secondary_port != 0) {
+		static struct coio_service secondary;
+		coio_service_init(&secondary, "secondary",
+				  cfg.bind_ipaddr, cfg.primary_port,
+				  iproto_interact, iproto_secondary_port_handler);
+		evio_service_start(&secondary.evio_service);
+	}
 
 	/* run memcached server */
-	if (cfg.memcached_port != 0)
-		fiber_server("memcached", cfg.memcached_port,
-			     memcached_handler, NULL, NULL);
+	if (cfg.memcached_port != 0) {
+		static struct coio_service memcached;
+		coio_service_init(&memcached, "memcached",
+				  cfg.bind_ipaddr, cfg.memcached_port,
+				  memcached_handler, NULL);
+		evio_service_start(&memcached.evio_service);
+	}
 }
 
 int

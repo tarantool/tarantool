@@ -81,7 +81,7 @@ static int master_to_spawner_socket;
  * to the spawner.
  */
 static void
-replication_on_accept(void *data __attribute__((unused)),
+replication_on_accept(struct evio_service *service __attribute__((unused)),
 		      int fd, struct sockaddr_in *addr __attribute__((unused)));
 
 /** Send a file descriptor to replication relay spawner.
@@ -225,8 +225,9 @@ replication_init()
 
 /** Replication acceptor fiber handler. */
 static void
-replication_on_accept(void *data __attribute__((unused)),
-		      int fd, struct sockaddr_in *addr __attribute__((unused)))
+replication_on_accept(struct evio_service *service __attribute__((unused)),
+		      int fd,
+		      struct sockaddr_in *addr __attribute__((unused)))
 {
 	/*
 	 * Drop the O_NONBLOCK flag, which was possibly
