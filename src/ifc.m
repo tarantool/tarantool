@@ -290,8 +290,6 @@ fiber_channel_get_timeout(struct fiber_channel *ch, ev_tstamp timeout)
 		timeout = 0;
 	/* channel is empty */
 	if (!ch->count) {
-		if (!STAILQ_EMPTY(&ch->writers))
-			ev_async_send(&ch->wasync);
 		if (STAILQ_EMPTY(&ch->readers))
 			ev_async_start(&ch->rasync);
 		STAILQ_INSERT_TAIL(&ch->readers, fiber, ifc);
@@ -358,8 +356,6 @@ fiber_channel_put_timeout(struct fiber_channel *ch, void *data,
 
 	/* channel is full */
 	if (ch->count >= ch->size) {
-		if (!STAILQ_EMPTY(&ch->readers))
-			ev_async_send(&ch->rasync);
 		if (STAILQ_EMPTY(&ch->writers))
 			ev_async_start(&ch->wasync);
 
@@ -377,9 +373,8 @@ fiber_channel_put_timeout(struct fiber_channel *ch, void *data,
 		bool cancellable = fiber_setcancellable(true);
 		fiber_yield();
 
-		if (timeout) {
+		if (timeout)
 			ev_timer_stop(&timer);
-		}
 
 		if (fiber_is_cancelled() || ch->count >= ch->size) {
 			struct fiber *f;
