@@ -63,8 +63,9 @@ iproto_flush(ssize_t to_read)
 }
 
 void
-iproto_interact(iproto_callback callback)
+iproto_interact(va_list ap)
 {
+	iproto_callback callback = va_arg(ap, iproto_callback);
 	struct tbuf *in = &fiber->rbuf;
 	ssize_t to_read = sizeof(struct iproto_header);
 

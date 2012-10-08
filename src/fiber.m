@@ -79,7 +79,7 @@ struct fiber_cleanup {
 struct fiber_server {
 	int port;
 	void *data;
-	void (*handler) (void *data);
+	void (*handler) (va_list ap);
 	void (*on_bind) (void *data);
 };
 
@@ -94,7 +94,7 @@ update_last_stack_frame(struct fiber *fiber)
 }
 
 void
-fiber_call(struct fiber *callee)
+fiber_call(struct fiber *callee, ...)
 {
 	struct fiber *caller = fiber;
 
@@ -107,7 +107,10 @@ fiber_call(struct fiber *callee)
 	update_last_stack_frame(caller);
 
 	callee->csw++;
+
+	va_start(fiber->f_data, callee);
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
+	va_end(fiber->f_data);
 }
 
 
@@ -453,7 +456,7 @@ fiber_set_name(struct fiber *fiber, const char *name)
 
 /* fiber never dies, just become zombie */
 struct fiber *
-fiber_create(const char *name, int fd, void (*f) (void *), void *f_data)
+fiber_create(const char *name, int fd, void (*f) (va_list))
 {
 	struct fiber *fiber = NULL;
 
@@ -484,7 +487,7 @@ fiber_create(const char *name, int fd, void (*f) (void *), void *f_data)
 
 	fiber->fd = fd;
 	fiber->f = f;
-	fiber->f_data = f_data;
+	memset(&fiber->f_data, 0, sizeof(fiber->f_data)); /* safety */
 	while (++last_used_fid <= 100) ;	/* fids from 0 to 100 are reserved */
 	fiber->fid = last_used_fid;
 	fiber->flags = 0;
@@ -778,9 +781,9 @@ set_nonblock(int sock)
 }
 
 static void
-tcp_server_handler(void *data)
+tcp_server_handler(va_list ap)
 {
-	struct fiber_server *server = (void*) data;
+	struct fiber_server *server = va_arg(ap, struct fiber_server *);
 	struct fiber *h;
 	char name[FIBER_NAME_MAXLEN];
 	int fd;
@@ -812,7 +815,7 @@ tcp_server_handler(void *data)
 			}
 
 			snprintf(name, sizeof(name), "%i/handler", server->port);
-			h = fiber_create(name, fd, server->handler, server->data);
+			h = fiber_create(name, fd, server->handler);
 			if (h == NULL) {
 				say_error("can't create handler fiber, dropping client connection");
 				close(fd);
@@ -820,7 +823,7 @@ tcp_server_handler(void *data)
 			}
 
 			h->has_peer = true;
-			fiber_call(h);
+			fiber_call(h, server->data);
 		}
 		if (fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
 			say_syserror("accept");
@@ -831,7 +834,7 @@ tcp_server_handler(void *data)
 }
 
 struct fiber *
-fiber_server(const char *name, int port, void (*handler) (void *data), void *data,
+fiber_server(const char *name, int port, void (*handler) (va_list ap), void *data,
 	     void (*on_bind) (void *data))
 {
 	char server_name[FIBER_NAME_MAXLEN];
@@ -845,9 +848,9 @@ fiber_server(const char *name, int port, void (*handler) (void *data), void *dat
 	server->port = port;
 	server->handler = handler;
 	server->on_bind = on_bind;
-	s = fiber_create(server_name, -1, tcp_server_handler, server);
+	s = fiber_create(server_name, -1, tcp_server_handler);
 
-	fiber_call(s);		/* give a handler a chance */
+	fiber_call(s, server);		/* give a handler a chance */
 	return s;
 }
 

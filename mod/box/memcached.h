@@ -45,6 +45,6 @@ memcached_check_config(struct tarantool_cfg *conf);
 void memcached_start_expire();
 void memcached_stop_expire();
 
-void memcached_handler(void * /* data */);
+void memcached_handler(va_list /* ap */);
 
 #endif /* TARANTOOL_MEMCACHED_H_INCLUDED */

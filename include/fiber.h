@@ -87,8 +87,8 @@ struct fiber {
 
 	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];
-	void (*f) (void *);
-	void *f_data;
+	void (*f) (va_list);
+	va_list f_data;
 	u64 cookie;
 	bool has_peer;
 	/* ASCIIZ name of the peer, if there is one. */
@@ -111,7 +111,7 @@ extern __thread struct fiber *fiber;
 
 void fiber_init(void);
 void fiber_free(void);
-struct fiber *fiber_create(const char *name, int fd, void (*f) (void *), void *);
+struct fiber *fiber_create(const char *name, int fd, void (*f) (va_list));
 void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for_child(pid_t pid);
 
@@ -175,7 +175,7 @@ ssize_t fiber_write(const void *buf, size_t count);
 int fiber_close(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
-void fiber_call(struct fiber *callee);
+void fiber_call(struct fiber *callee, ...);
 void fiber_wakeup(struct fiber *f);
 struct fiber *fiber_find(int fid);
 /** Cancel a fiber. A cancelled fiber will have
@@ -198,7 +198,7 @@ void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);
 int set_nonblock(int sock);
 
-typedef void (*fiber_server_callback)(void *);
+typedef void (*fiber_server_callback)(va_list);
 
 struct fiber *fiber_server(const char *name, int port,
 			   fiber_server_callback callback, void *,

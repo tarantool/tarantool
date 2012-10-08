@@ -679,7 +679,7 @@ lbox_fiber_detach(struct lua_State *L)
 }
 
 static void
-box_lua_fiber_run(void *arg __attribute__((unused)))
+box_lua_fiber_run(va_list ap __attribute__((unused)))
 {
 	fiber_testcancel();
 	fiber_setcancelstate(false);
@@ -781,7 +781,7 @@ lbox_fiber_create(struct lua_State *L)
 		luaL_error(L, "fiber.create(function): recursion limit"
 			   " reached");
 
-	struct fiber *f = fiber_create("lua", -1, box_lua_fiber_run, NULL);
+	struct fiber *f = fiber_create("lua", -1, box_lua_fiber_run);
 	/* Initially the fiber is cancellable */
 	f->flags |= FIBER_USER_MODE | FIBER_CANCELLABLE;
 
@@ -1426,9 +1426,9 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
  * Load start-up file routine.
  */
 static void
-load_init_script(void *L_ptr)
+load_init_script(va_list ap)
 {
-	struct lua_State *L = (struct lua_State *) L_ptr;
+	struct lua_State *L = va_arg(ap, struct lua_State *);
 
 	char path[PATH_MAX + 1];
 	snprintf(path, PATH_MAX, "%s/%s",
@@ -1485,8 +1485,8 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	 * a separate fiber.
 	 */
 	struct fiber *loader = fiber_create(TARANTOOL_LUA_INIT_SCRIPT, -1,
-					    load_init_script, L);
-	fiber_call(loader);
+					    load_init_script);
+	fiber_call(loader, L);
 	/* Outside the startup file require() or ffi are not
 	 * allowed.
 	*/

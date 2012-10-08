@@ -204,12 +204,9 @@ memcached_dispatch()
 		}
 
 		action flush_all {
-			if (flush_delay > 0) {
-				struct fiber *f = fiber_create("flush_all", -1, flush_all, (void *)flush_delay);
-				if (f)
-					fiber_call(f);
-			} else
-				flush_all((void *)0);
+			struct fiber *f = fiber_create("flush_all", -1, flush_all);
+			if (f)
+				fiber_call(f, flush_delay);
 			iov_add("OK\r\n", 4);
 		}
 

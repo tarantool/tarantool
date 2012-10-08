@@ -1906,7 +1906,7 @@ case 134:
 }
 
 static void
-admin_handler(void *data __attribute__((unused)))
+admin_handler(va_list ap __attribute__((unused)))
 {
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);

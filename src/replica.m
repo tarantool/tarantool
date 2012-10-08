@@ -118,9 +118,9 @@ remote_read_row(struct sockaddr_in *remote_addr, i64 initial_lsn)
 }
 
 static void
-pull_from_remote(void *state)
+pull_from_remote(va_list ap)
 {
-	struct recovery_state *r = state;
+	struct recovery_state *r = va_arg(ap, struct recovery_state *);
 	struct tbuf *row;
 
 	for (;;) {
@@ -185,7 +185,7 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 	say_crit("initializing the replica, WAL master %s", addr);
 	snprintf(name, sizeof(name), "replica/%s", addr);
 
-	f = fiber_create(name, -1, pull_from_remote, r);
+	f = fiber_create(name, -1, pull_from_remote);
 	if (f == NULL)
 		return;
 
@@ -206,7 +206,7 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 	memcpy(&remote.cookie, &remote.addr, MIN(sizeof(remote.cookie), sizeof(remote.addr)));
 	remote.reader = f;
 	r->remote = &remote;
-	fiber_call(f);
+	fiber_call(f, r);
 }
 
 void

@@ -520,14 +520,14 @@ mod_init(void)
 	/* run primary server */
 	if (cfg.primary_port != 0)
 		fiber_server("primary", cfg.primary_port,
-			     (fiber_server_callback) iproto_interact,
+			     iproto_interact,
 			     iproto_primary_port_handler,
 			     box_leave_local_standby_mode);
 
 	/* run secondary server */
 	if (cfg.secondary_port != 0)
 		fiber_server("secondary", cfg.secondary_port,
-			     (fiber_server_callback) iproto_interact,
+			     iproto_interact,
 			     iproto_secondary_port_handler, NULL);
 
 	/* run memcached server */

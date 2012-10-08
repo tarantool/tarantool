@@ -298,9 +298,9 @@ void memcached_get(size_t keys_count, struct tbuf *keys,
 }
 
 static void
-flush_all(void *data)
+flush_all(va_list ap)
 {
-	uintptr_t delay = (uintptr_t)data;
+	uintptr_t delay = va_arg(ap, uintptr_t);
 	fiber_sleep(delay - ev_now());
 	struct tuple *tuple;
 	struct iterator *it = [memcached_index allocIterator];
@@ -333,7 +333,7 @@ do {										\
 #include "memcached-grammar.m"
 
 void
-memcached_handler(void *_data __attribute__((unused)))
+memcached_handler(va_list ap __attribute__((unused)))
 {
 	stats.total_connections++;
 	stats.curr_connections++;
@@ -515,7 +515,7 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 }
 
 void
-memcached_expire_loop(void *data __attribute__((unused)))
+memcached_expire_loop(va_list ap __attribute__((unused)))
 {
 	struct tuple *tuple = NULL;
 
@@ -557,7 +557,7 @@ void memcached_start_expire()
 
 	assert(memcached_expire == NULL);
 	memcached_expire = fiber_create("memcached_expire", -1,
-					memcached_expire_loop, NULL);
+					memcached_expire_loop);
 	if (memcached_expire == NULL)
 		say_error("can't start the expire fiber");
 	fiber_call(memcached_expire);
