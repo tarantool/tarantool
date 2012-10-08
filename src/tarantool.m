@@ -801,33 +801,36 @@ main(int argc, char **argv)
 	atexit(tarantool_free);
 
 	ev_default_loop(EVFLAG_AUTO);
-
 	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
 	replication_prefork();
 
 	signal_init();
 
-	tarantool_L = tarantool_lua_init();
-	mod_init();
-	tarantool_lua_load_cfg(tarantool_L, &cfg);
-	admin_init();
-	replication_init();
-	/*
-	 * Load user init script.  The script should have access
-	 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that
-	 * is why script must run only after the server was fully
-	 * initialized.
-	 */
-	tarantool_lua_load_init_script(tarantool_L);
 
-	prelease(fiber->gc_pool);
-	say_crit("log level %i", cfg.log_level);
-	say_crit("entering event loop");
-	if (cfg.io_collect_interval > 0)
-		ev_set_io_collect_interval(cfg.io_collect_interval);
-	ev_now_update();
-	start_time = ev_now();
-	ev_loop(0);
+	@try {
+		tarantool_L = tarantool_lua_init();
+		mod_init();
+		tarantool_lua_load_cfg(tarantool_L, &cfg);
+		admin_init();
+		replication_init();
+		/*
+		 * Load user init script.  The script should have access
+		 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that
+		 * is why script must run only after the server was fully
+		 * initialized.
+		 */
+		tarantool_lua_load_init_script(tarantool_L);
+		prelease(fiber->gc_pool);
+		say_crit("log level %i", cfg.log_level);
+		say_crit("entering event loop");
+		if (cfg.io_collect_interval > 0)
+			ev_set_io_collect_interval(cfg.io_collect_interval);
+		ev_now_update();
+		start_time = ev_now();
+		ev_loop(0);
+	} @catch (tnt_Exception *e) {
+		panic("%s", [e errmsg]);
+	}
 	say_crit("exiting loop");
 	/* freeing resources */
 	return 0;

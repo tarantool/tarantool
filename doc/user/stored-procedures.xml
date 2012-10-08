@@ -651,10 +651,30 @@ localhost> lua box.select_reverse_range(4, 1, 2, '1')
             according to the format.
             <bridgehead renderas="sect4">Format specifiers</bridgehead>
             <simplelist>
+                <member><code>b</code> &mdash; converts Lua
+                variable to a 1-byte
+                integer, and stores the integer in the resulting
+                string
+                </member>
+                <member><code>s</code> &mdash; converts Lua
+                variable to a 2-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
                 <member><code>i</code> &mdash; converts Lua
                 variable to a 4-byte
                 integer, and stores the integer in the resulting
                 string, low byte first,
+                </member>
+                <member><code>l</code> &mdash; converts Lua
+                variable to a 8-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>w</code> &mdash; converts Lua
+                variable to a BER-encoded
+                integer, and stores the integer in the resulting
+                string
                 </member>
                 <member><code>p</code> &mdash; stores the length
                 of the argument as a 4-byte integer, low byte first,
@@ -709,7 +729,7 @@ localhost> lua box.update(0, 0, "^p", 1, 4)
         <term><emphasis role="lua">box.unpack(format, ...)</emphasis></term>
         <listitem><para>
             Counterpart to <code>box.pack()</code>. Only supports
-            <code>'i'</code> format specifier, and can be used
+            <code>'b'</code>, <code>'s'</code>, <code>'i'</code>, <code>'l'</code> format specifiers, and can be used
             to convert packed integers to Lua numbers.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost> lua tuple=box.replace(2, 0)
@@ -832,7 +852,7 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
 ---
  - 1: {'I am a duplicate'}
 ...
-localhost> lua box.auto_increment(2, "I am a duplicate")
+localhost> lua box.auto_increment(0, "I am a duplicate")
 ---
  - 2: {'I am a duplicate'}
 ...

@@ -249,7 +249,7 @@ backtrace(void *frame_, void *stack, size_t stack_size)
 
 		}
 #endif /* HAVE_BFD */
-		r = snprintf(p, len, " }\r\n");
+		r = snprintf(p, len, " }" CRLF);
 		if (r >= len)
 			goto out;
 		p += r;

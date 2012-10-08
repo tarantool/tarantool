@@ -20,6 +20,15 @@ exec admin "lua print(box.pack('www', 0x3030, 0x30))"
 exec admin "lua print(string.byte(box.pack('w', 212345), 1, 2))"
 exec admin "lua print(string.sub(box.pack('p', 1684234849), 2))"
 exec admin "lua print(box.pack('p', 'this string is 45 characters long 1234567890 '))"
+exec admin "lua print(box.pack('s', 0x4d))"
+exec admin "lua print(box.pack('ssss', 25940, 29811, 28448, 11883))"
+exec admin "lua print(box.pack('SSSS', 25940, 29811, 28448, 11883))"
+exec admin "lua print(box.pack('SSSSSSSS', 28493, 29550, 27680, 27497, 29541, 20512, 29285, 8556))"
+exec admin "lua print(box.pack('bsilww', 84, 29541, 1802444916, 2338318684567380014ULL, 103, 111))"
+exec admin "lua print(box.unpack('b', 'T'))"
+exec admin "lua print(box.unpack('s', 'Te'))"
+exec admin "lua print(box.unpack('i', 'Test'))"
+exec admin "lua print(box.unpack('l', 'Test ok.'))"
 # Test the low-level box.process() call, which takes a binary packet
 # and passes it to box for execution.
 # insert:

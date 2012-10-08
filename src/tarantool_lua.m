@@ -127,12 +127,11 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 	}
 	case LUA_TCDATA:
 	{
-		if (lua_type(L, idx) != LUA_TCDATA)
-			luaL_error(L, "lua_tointeger64: cdata expected");
-		GCcdata *cd = cdataV(L->base + (idx - 1));
-		if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64)
+		GCcdata *cd = cdataV(L->base + idx - 1);
+		if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64) {
 			luaL_error(L,
 				   "lua_tointeger64: unsupported cdata type");
+		}
 		result = *(uint64_t*)cdataptr(cd);
 		break;
 	}
@@ -197,6 +196,7 @@ lbox_pack(struct lua_State *L)
 	/* first arg comes second */
 	int i = 2;
 	int nargs = lua_gettop(L);
+	u16 u16buf;
 	u32 u32buf;
 	u64 u64buf;
 	size_t size;
@@ -217,6 +217,16 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "box.pack: argument too big for "
 					   "8-bit integer");
 			luaL_addchar(&b, (char) u32buf);
+			break;
+		case 'S':
+		case 's':
+			/* signed and unsigned 8-bit integers */
+			u32buf = lua_tointeger(L, i);
+			if (u32buf > 0xffff)
+				luaL_error(L, "box.pack: argument too big for "
+					   "16-bit integer");
+			u16buf = (u16) u32buf;
+			luaL_addlstring(&b, (char *) &u16buf, sizeof(u16));
 			break;
 		case 'I':
 		case 'i':
@@ -328,6 +338,8 @@ lbox_unpack(struct lua_State *L)
 	int nargs = lua_gettop(L);
 	size_t size;
 	const char *str;
+	u8  u8buf;
+	u16 u16buf;
 	u32 u32buf;
 
 	while (*format) {
@@ -335,6 +347,24 @@ lbox_unpack(struct lua_State *L)
 			luaL_error(L, "box.unpack: argument count does not "
 				   "match the format");
 		switch (*format) {
+		case 'b':
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u8))
+				luaL_error(L, "box.unpack('%c'): got %d bytes "
+					   "(expected: 1)", *format,
+					   (int) size);
+			u8buf = * (u8 *) str;
+			lua_pushnumber(L, u8buf);
+			break;
+		case 's':
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u16))
+				luaL_error(L, "box.unpack('%c'): got %d bytes "
+					   "(expected: 2)", *format,
+					   (int) size);
+			u16buf = * (u16 *) str;
+			lua_pushnumber(L, u16buf);
+			break;
 		case 'i':
 			str = lua_tolstring(L, i, &size);
 			if (str == NULL || size != sizeof(u32))
@@ -352,8 +382,7 @@ lbox_unpack(struct lua_State *L)
 					   "(expected: 8)", *format,
 					   (int) size);
 			GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
-			uint64_t *u64buf = (uint64_t*)cdataptr(cd);
-			*u64buf = *(u64*)str;
+			*(uint64_t*)cdataptr(cd) = *(uint64_t*)str;
 			break;
 		}
 		default:
@@ -1056,9 +1085,9 @@ tarantool_lua_printstack_yaml(struct lua_State *L, struct tbuf *out)
 		if (lua_type(L, i) == LUA_TCDATA) {
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
-			tbuf_printf(out, " - %-.*s\r\n", len - 3, sz);
+			tbuf_printf(out, " - %-.*s" CRLF, len - 3, sz);
 		} else
-			tbuf_printf(out, " - %s\r\n",
+			tbuf_printf(out, " - %s" CRLF,
 				    tarantool_lua_tostring(L, i));
 	}
 }
@@ -1075,7 +1104,7 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
 		if (lua_type(L, i) == LUA_TCDATA) {
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
-			tbuf_printf(out, "%-.*s\r\n", len - 3, sz);
+			tbuf_printf(out, "%-.*s" CRLF, len - 3, sz);
 		} else
 			tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
 	}
@@ -1095,7 +1124,7 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
  * If this is done automatically, the result is ugly, so we
  * don't do it. Creators of Lua procedures have to do it
  * themselves. Best we can do here is to add a trailing
- * \r\n if it's forgotten.
+ * CRLF if it's forgotten.
  */
 static int
 lbox_print(struct lua_State *L)
@@ -1109,9 +1138,9 @@ lbox_print(struct lua_State *L)
 	if (out) {
 		/* Administrative console */
 		tarantool_lua_printstack(L, out);
-		/* Courtesy: append YAML's \r\n if it's not already there */
+		/* Courtesy: append YAML's end of line if it's not already there */
 		if (out->size < 2 || tbuf_str(out)[out->size-1] != '\n')
-			tbuf_printf(out, "\r\n");
+			tbuf_printf(out, CRLF);
 	} else {
 		/* Add a message to the server log */
 		out = tbuf_alloc(fiber->gc_pool);
@@ -1297,7 +1326,7 @@ tarantool_lua(struct lua_State *L,
 		const char *msg = lua_tostring(L, -1);
 		msg = msg ? msg : "";
 		/* Make sure the output is YAMLish */
-		tbuf_printf(out, "error: '%s'\r\n",
+		tbuf_printf(out, "error: '%s'" CRLF,
 			    luaL_gsub(L, msg, "'", "''"));
 	} else {
 		tarantool_lua_printstack_yaml(L, out);
