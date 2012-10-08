@@ -27,17 +27,23 @@
  * SUCH DAMAGE.
  */
 
-#include "fiber_ifc.h"
+#include "ifc.h"
 #include "fiber.h"
 #include <stdlib.h>
 
 
-struct fiber;
 struct fiber_semaphore {
 	int count;
 	STAILQ_HEAD(, fiber) fibers;
 	ev_async async;
 };
+
+static void
+ifc_timeout_signal(ev_watcher *watcher, int event __attribute__((unused)))
+{
+	struct fiber *f = watcher->data;
+	fiber_call(f);
+}
 
 struct fiber_semaphore *
 fiber_semaphore_alloc(void)
@@ -75,19 +81,34 @@ fiber_semaphore_init(struct fiber_semaphore *s, int cnt)
 	s->async.data = s;
 }
 
-void
-fiber_semaphore_down(struct fiber_semaphore *s)
+
+int
+fiber_semaphore_down_timeout(struct fiber_semaphore *s, ev_tstamp timeout)
 {
 	if (--s->count >= 0)
-		return;
+		return 0;
+
+	if (timeout < 0)
+		timeout = 0;
+
 	if (STAILQ_EMPTY(&s->fibers))
 		ev_async_start(&s->async);
 	STAILQ_INSERT_TAIL(&s->fibers, fiber, ifc);
+
+	ev_timer timer;
+	if (timeout) {
+		ev_timer_init(&timer, (void *)ifc_timeout_signal, timeout, 0);
+		timer.data = fiber;
+		ev_timer_start(&timer);
+	}
+
 	bool cancellable = fiber_setcancellable(true);
 	fiber_yield();
-	@try {
-		fiber_testcancel();
-	} @catch(...) {
+
+	if (timeout)
+		ev_timer_stop(&timer);
+
+	if (fiber_is_cancelled()) {
 		s->count++;
 		struct fiber *f;
 		STAILQ_FOREACH(f, &s->fibers, ifc) {
@@ -98,9 +119,22 @@ fiber_semaphore_down(struct fiber_semaphore *s)
 				break;
 			}
 		}
-		@throw;
+		fiber_testcancel();
 	}
 	fiber_setcancellable(cancellable);
+
+	if (s->count < 0) {
+		s->count++;
+		return ETIMEDOUT;
+	}
+
+	return 0;
+}
+
+void
+fiber_semaphore_down(struct fiber_semaphore *s)
+{
+	fiber_semaphore_down_timeout(s, 0);
 }
 
 void
@@ -119,6 +153,7 @@ fiber_semaphore_trydown(struct fiber_semaphore *s)
 	fiber_semaphore_down(s);
 	return 0;
 }
+
 
 struct fiber_mutex {
 	struct fiber_semaphore semaphore;
@@ -142,6 +177,12 @@ fiber_mutex_lock(struct fiber_mutex *m)
 	fiber_semaphore_down(&m->semaphore);
 }
 
+int
+fiber_mutex_lock_timeout(struct fiber_mutex *m, ev_tstamp timeout)
+{
+	return fiber_semaphore_down_timeout(&m->semaphore, timeout);
+}
+
 void
 fiber_mutex_unlock(struct fiber_mutex *m)
 {
@@ -157,7 +198,7 @@ fiber_mutex_trylock(struct fiber_mutex *m)
 int
 fiber_mutex_islocked(struct fiber_mutex *m)
 {
-	return m->semaphore.count > 0;
+	return m->semaphore.count <= 0;
 }
 
 /**********************************************************************/
@@ -172,7 +213,6 @@ struct fiber_channel {
 
 	void *item[0];
 } __attribute__((packed));
-
 
 int
 fiber_channel_isempty(struct fiber_channel *ch)
@@ -244,8 +284,10 @@ fiber_channel_init(struct fiber_channel *ch)
 }
 
 void *
-fiber_channel_get(struct fiber_channel *ch)
+fiber_channel_get_timeout(struct fiber_channel *ch, ev_tstamp timeout)
 {
+	if (timeout < 0)
+		timeout = 0;
 	/* channel is empty */
 	if (!ch->count) {
 		if (!STAILQ_EMPTY(&ch->writers))
@@ -254,11 +296,21 @@ fiber_channel_get(struct fiber_channel *ch)
 			ev_async_start(&ch->rasync);
 		STAILQ_INSERT_TAIL(&ch->readers, fiber, ifc);
 		bool cancellable = fiber_setcancellable(true);
-		fiber_yield();
-		@try {
-			fiber_testcancel();
+
+		ev_timer timer;
+		if (timeout) {
+			ev_timer_init(&timer,
+				(void *)ifc_timeout_signal, timeout, 0);
+			ev_timer_start(&timer);
+			timer.data = fiber;
 		}
-		@catch(...) {
+
+		fiber_yield();
+
+		if (timeout)
+			ev_timer_stop(&timer);
+
+		if (fiber_is_cancelled() || !ch->count) {
 			struct fiber *f;
 			STAILQ_FOREACH(f, &ch->readers, ifc) {
 				if (f != fiber)
@@ -270,10 +322,15 @@ fiber_channel_get(struct fiber_channel *ch)
 					ev_async_stop(&ch->rasync);
 
 			}
-			@throw;
+			fiber_testcancel();
 		}
 		fiber_setcancellable(cancellable);
+
 	}
+
+	/* timeout */
+	if (!ch->count)
+		return NULL;
 
 	void *res = ch->item[ ch->beg ];
 	if (++ch->beg >= ch->size)
@@ -282,26 +339,49 @@ fiber_channel_get(struct fiber_channel *ch)
 
 	if (!STAILQ_EMPTY(&ch->writers))
 		ev_async_send(&ch->wasync);
+
 	return res;
 }
 
-void
-fiber_channel_put(struct fiber_channel *ch, void *data)
+void *
+fiber_channel_get(struct fiber_channel *ch)
 {
+	return fiber_channel_get_timeout(ch, 0);
+}
+
+int
+fiber_channel_put_timeout(struct fiber_channel *ch, void *data,
+							ev_tstamp timeout)
+{
+	if (timeout < 0)
+		timeout = 0;
+
 	/* channel is full */
 	if (ch->count >= ch->size) {
 		if (!STAILQ_EMPTY(&ch->readers))
 			ev_async_send(&ch->rasync);
 		if (STAILQ_EMPTY(&ch->writers))
 			ev_async_start(&ch->wasync);
+
+
 		STAILQ_INSERT_TAIL(&ch->writers, fiber, ifc);
+
+		ev_timer timer;
+		if (timeout) {
+			ev_timer_init(&timer,
+				(void *)ifc_timeout_signal, timeout, 0);
+			ev_timer_start(&timer);
+			timer.data = fiber;
+		}
+
 		bool cancellable = fiber_setcancellable(true);
 		fiber_yield();
 
-		@try {
-			fiber_testcancel();
+		if (timeout) {
+			ev_timer_stop(&timer);
 		}
-		@catch(...) {
+
+		if (fiber_is_cancelled() || ch->count >= ch->size) {
 			struct fiber *f;
 			STAILQ_FOREACH(f, &ch->writers, ifc) {
 				if (f != fiber)
@@ -313,10 +393,13 @@ fiber_channel_put(struct fiber_channel *ch, void *data)
 					ev_async_stop(&ch->wasync);
 
 			}
-			@throw;
+			fiber_testcancel();
 		}
 		fiber_setcancellable(cancellable);
 	}
+
+	if (ch->count >= ch->size)
+		return ETIMEDOUT;
 
 	unsigned i = ch->beg;
 	i += ch->count;
@@ -327,4 +410,12 @@ fiber_channel_put(struct fiber_channel *ch, void *data)
 	ch->item[i] = data;
 	if (!STAILQ_EMPTY(&ch->readers))
 		ev_async_send(&ch->rasync);
+	return 0;
 }
+
+void
+fiber_channel_put(struct fiber_channel *ch, void *data)
+{
+	fiber_channel_put_timeout(ch, data, 0);
+}
+

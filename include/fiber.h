@@ -135,6 +135,8 @@ void fiber_destroy_all();
 
 ssize_t fiber_bread(struct tbuf *, size_t v);
 
+bool fiber_is_cancelled();
+
 inline static void iov_add_unsafe(const void *buf, size_t len)
 {
 	struct iovec *v;

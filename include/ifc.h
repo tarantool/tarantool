@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_FIBER_IFC_H_INCLUDED
-#define TARANTOOL_FIBER_IFC_H_INCLUDED
+#ifndef TARANTOOL_IFC_H_INCLUDED
+#define TARANTOOL_IFC_H_INCLUDED
 
 #include <tarantool_ev.h>
 #include "third_party/queue.h"
@@ -67,10 +67,12 @@
 
 */
 
+
 struct fiber_semaphore;
 struct fiber_semaphore *fiber_semaphore_alloc(void);
 void fiber_semaphore_init(struct fiber_semaphore *s, int cnt);
 void fiber_semaphore_down(struct fiber_semaphore *s);
+int  fiber_semaphore_down_timeout(struct fiber_semaphore *s, ev_tstamp timeout);
 void fiber_semaphore_up(struct fiber_semaphore *s);
 int  fiber_semaphore_trydown(struct fiber_semaphore *s);
 int  fiber_semaphore_counter(struct fiber_semaphore *s);
@@ -105,10 +107,12 @@ int  fiber_semaphore_counter(struct fiber_semaphore *s);
 	}
 */
 
+
 struct fiber_mutex;
 struct fiber_mutex *fiber_mutex_alloc(void);
 void fiber_mutex_init(struct fiber_mutex *m);
 void fiber_mutex_lock(struct fiber_mutex *m);
+int  fiber_mutex_lock_timeout(struct fiber_mutex *m, ev_tstamp timeout);
 void fiber_mutex_unlock(struct fiber_mutex *m);
 int  fiber_mutex_trylock(struct fiber_mutex *m);
 int  fiber_mutex_islocked(struct fiber_mutex *m);
@@ -144,6 +148,8 @@ int  fiber_mutex_islocked(struct fiber_mutex *m);
 
 */
 
+
+
 struct fiber_channel;
 struct fiber_channel *fiber_channel_alloc(unsigned size);
 void fiber_channel_init(struct fiber_channel *ch);
@@ -152,5 +158,9 @@ void fiber_channel_put(struct fiber_channel *ch, void *data);
 int  fiber_channel_isempty(struct fiber_channel *ch);
 int  fiber_channel_isfull(struct fiber_channel *ch);
 
-#endif /* TARANTOOL_FIBER_IFC_H_INCLUDED */
+void *fiber_channel_get_timeout(struct fiber_channel *ch, ev_tstamp timeout);
+int  fiber_channel_put_timeout(struct fiber_channel *ch,
+						void *data, ev_tstamp timeout);
+
+#endif /* TARANTOOL_IFC_H_INCLUDED */
 

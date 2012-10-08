@@ -41,7 +41,7 @@
 
 #include "pickle.h"
 #include "fiber.h"
-#include "fiber_ifc_lua.h"
+#include "ifc_lua.h"
 #include <ctype.h>
 #include "tarantool_lua_info.h"
 #include "tarantool_lua_slab.h"
@@ -1050,9 +1050,6 @@ static const struct luaL_reg fiberlib[] = {
 	{"status", lbox_fiber_status},
 	{"name", lbox_fiber_name},
 	{"detach", lbox_fiber_detach},
-	{"semaphore", lbox_fiber_semaphore},
-	{"mutex", lbox_fiber_mutex},
-	{"channel", lbox_fiber_channel},
 	{NULL, NULL}
 };
 

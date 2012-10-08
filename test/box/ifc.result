@@ -1,30 +1,54 @@
 ================ semaphores =======================
-lua sm = box.fiber.semaphore(1)
+lua sm = box.ifc.semaphore(1)
 ---
 ...
-lua print(sm.up())
+lua sm.up()
 ---
-error: '[string "return print(sm.up())"]:1: usage: semaphore:up()'
+error: 'usage: semaphore:up()'
 ...
-lua print(sm.up({}))
+lua sm.up({})
 ---
-error: '[string "return print(sm.up({}))"]:1: usage: semaphore:up()'
+error: 'usage: semaphore:up()'
 ...
-lua print(sm())
+lua sm:up()
 ---
-1
+ - 2
 ...
-lua print(sm:up())
+lua sm()
 ---
-2
+ - 2
 ...
-lua print(sm:down())
+lua sm:up()
 ---
-1
+ - 3
 ...
-lua print(sm:down())
+lua sm()
 ---
-0
+ - 3
+...
+lua sm:down()
+---
+ - true
+...
+lua sm()
+---
+ - 2
+...
+lua sm:down(.1)
+---
+ - true
+...
+lua sm()
+---
+ - 1
+...
+lua sm:trydown()
+---
+ - true
+...
+lua sm()
+---
+ - 0
 ...
 lua sm()
 ---
@@ -35,6 +59,10 @@ lua sm:trydown()
  - false
 ...
 lua sm:trydown()
+---
+ - false
+...
+lua sm:down(.5)
 ---
  - false
 ...
@@ -77,21 +105,29 @@ lua  for k, v in pairs(state) do print(k, ': ', v) end
 ---
 1: tfbr started
 2: tfbrd started
-3: tfbr
 ...
 ================ mutexes =======================
-lua m = box.fiber.mutex()
+lua m = box.ifc.mutex()
 ---
+...
+lua m:locked()
+---
+ - false
 ...
 lua print(m())
 ---
-true
+false
 ...
 lua flag = 0
 ---
 ...
 lua m:lock()
 ---
+ - true
+...
+lua m:locked()
+---
+ - true
 ...
 lua tfbr = box.fiber.create(function() box.fiber.detach() m:lock() flag = 1 m:unlock() end)
 ---
@@ -119,6 +155,22 @@ lua print(flag)
 ...
 lua m:locked()
 ---
+ - false
+...
+lua m:lock(.1)
+---
+ - true
+...
+lua m:locked()
+---
+ - true
+...
+lua m:lock(.1)
+---
+ - false
+...
+lua m:locked()
+---
  - true
 ...
 lua m = nil
@@ -129,7 +181,7 @@ lua print(m)
 nil
 ...
 ================ channels =======================
-lua ch = box.fiber.channel()
+lua ch = box.ifc.channel()
 ---
 ...
 lua ch:is_full()
@@ -140,13 +192,37 @@ lua ch:is_empty()
 ---
  - true
 ...
+lua ch:get(.1)
+---
+ - nil
+...
 lua ch:put()
 ---
-error: 'usage: channel:put(variable)'
+error: 'usage: channel:put(var [, timeout])'
+...
+lua ch:put('test')
+---
+ - true
+...
+lua ch:get()
+---
+ - test
+...
+lua ch:get('wrong timeout')
+---
+error: 'timeout must be number'
+...
+lua ch:get(-10)
+---
+error: 'wrong timeout'
 ...
 lua ch:put(234)
 ---
- - 234
+ - true
+...
+lua ch:put(345, .5)
+---
+ - false
 ...
 lua ch:is_full()
 ---
@@ -176,7 +252,7 @@ lua box.fiber.cancel(tfbr)
 ...
 lua ch:put(box.info.pid) > 0
 ---
- - true
+error: '[string "return ch:put(box.info.pid) > 0"]:1: attempt to compare number with boolean'
 ...
 lua for i, v in pairs(buffer) do print(v) end
 ---

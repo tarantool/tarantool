@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  */
 
-#include "fiber_ifc_lua.h"
-#include "fiber_ifc.h"
+#include "ifc_lua.h"
+#include "ifc.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
@@ -37,11 +37,32 @@
 #include <stdlib.h>
 #include <say.h>
 
-static const char semaphore_lib[] = "box.fiber.ifc.semaphore";
-static const char mutex_lib[]     = "box.fiber.ifc.mutex";
-static const char channel_lib[]   = "box.fiber.ifc.channel";
+static const char semaphore_lib[] = "box.ifc.semaphore";
+static const char mutex_lib[]     = "box.ifc.mutex";
+static const char channel_lib[]   = "box.ifc.channel";
 
 /******************** semaphore ***************************/
+
+static int
+lbox_fiber_semaphore(struct lua_State *L)
+{
+	say_info(":%s()", __func__);
+	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1))
+		luaL_error(L, "fiber.semaphore(count): bad arguments");
+
+	struct fiber_semaphore *sm = fiber_semaphore_alloc();
+	if (!sm)
+		luaL_error(L, "fiber.semaphore: Not enough memory");
+	fiber_semaphore_init(sm, lua_tointeger(L, -1));
+
+
+
+	void **ptr = lua_newuserdata(L, sizeof(void *));
+	luaL_getmetatable(L, semaphore_lib);
+	lua_setmetatable(L, -2);
+	*ptr = sm;
+	return 1;
+}
 
 static inline struct fiber_semaphore *
 lbox_check_semaphore(struct lua_State *L, int narg)
@@ -52,7 +73,6 @@ lbox_check_semaphore(struct lua_State *L, int narg)
 static int
 lbox_fiber_semaphore_up(struct lua_State *L)
 {
-	say_info(":%s()", __func__);
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		luaL_error(L, "usage: semaphore:up()");
 
@@ -66,21 +86,35 @@ lbox_fiber_semaphore_up(struct lua_State *L)
 static int
 lbox_fiber_semaphore_down(struct lua_State *L)
 {
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		luaL_error(L, "usage: semaphore:down()");
+	lua_Number timeout;
+	struct fiber_semaphore *sm;
 
 
-	struct fiber_semaphore *sm = lbox_check_semaphore(L, -1);
-	fiber_semaphore_down(sm);
-	lua_pushnumber(L, fiber_semaphore_counter(sm));
+	int top = lua_gettop(L);
+
+	if (top < 1 || top > 2 || !lua_isuserdata(L, -top))
+		luaL_error(L, "usage: semaphore:down([timeout])");
+
+	if (top == 2) {
+		if (!lua_isnumber(L, -1))
+			luaL_error(L, "timeout must be number");
+		timeout = lua_tonumber(L, -1);
+	} else {
+		timeout = 0;
+	}
+
+
+	sm = lbox_check_semaphore(L, -top);
+	if (fiber_semaphore_down_timeout(sm, timeout) == 0)
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
 	return 1;
 }
 
 static int
 lbox_fiber_semaphore_counter(struct lua_State *L)
 {
-	say_info(":%s()", __func__);
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		luaL_error(L, "usage: semaphore()");
 
@@ -96,7 +130,6 @@ lbox_fiber_semaphore_counter(struct lua_State *L)
 static int
 lbox_fiber_semaphore_gc(struct lua_State *L)
 {
-	say_info(":%s()", __func__);
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		return 0;
 
@@ -122,209 +155,7 @@ lbox_fiber_trydown(struct lua_State *L)
 
 /******************** mutex ***************************/
 
-static inline struct fiber_mutex *
-lbox_check_mutex(struct lua_State *L, int narg)
-{
-	return * (void **) luaL_checkudata(L, narg, mutex_lib);
-}
-
-
 static int
-lbox_fiber_mutex_gc(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		return 0;
-	struct fiber_mutex *m = lbox_check_mutex(L, -1);
-	free(m);
-	return 0;
-}
-
-static int
-lbox_fiber_mutex_locked(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		luaL_error(L, "usage: mutex()");
-	struct fiber_mutex *m = lbox_check_mutex(L, -1);
-
-	lua_pushboolean(L, fiber_mutex_islocked(m));
-	return 1;
-}
-
-
-static int
-lbox_fiber_mutex_lock(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		luaL_error(L, "usage: mutex:lock()");
-	struct fiber_mutex *m = lbox_check_mutex(L, -1);
-
-	fiber_mutex_lock(m);
-	return 0;
-}
-
-
-static int
-lbox_fiber_mutex_unlock(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		luaL_error(L, "usage: mutex:unlock()");
-	struct fiber_mutex *m = lbox_check_mutex(L, -1);
-
-	fiber_mutex_unlock(m);
-	return 0;
-}
-
-
-static int
-lbox_fiber_mutex_trylock(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		luaL_error(L, "usage: mutex:trylock()");
-	struct fiber_mutex *m = lbox_check_mutex(L, -1);
-
-	lua_pushboolean(L, fiber_mutex_trylock(m) == 0);
-	return 1;
-}
-
-
-/******************** channel ***************************/
-
-static inline struct fiber_channel *
-lbox_check_channel(struct lua_State *L, int narg)
-{
-	return * (void **) luaL_checkudata(L, narg, channel_lib);
-}
-
-
-static int
-lbox_fiber_channel_gc(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		return 0;
-	struct fiber_channel *ch = lbox_check_channel(L, -1);
-	free(ch);
-	return 0;
-}
-
-
-static int
-lbox_fiber_channel_isfull(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		luaL_error(L, "usage: channel:is_full()");
-	struct fiber_channel *ch = lbox_check_channel(L, -1);
-	if (fiber_channel_isfull(ch))
-		lua_pushboolean(L, 1);
-	else
-		lua_pushboolean(L, 0);
-	return 1;
-}
-
-static int
-lbox_fiber_channel_isempty(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
-		luaL_error(L, "usage: channel:is_empty()");
-	struct fiber_channel *ch = lbox_check_channel(L, -1);
-	if (fiber_channel_isempty(ch))
-		lua_pushboolean(L, 1);
-	else
-		lua_pushboolean(L, 0);
-	return 1;
-}
-
-static int
-lbox_fiber_channel_put(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 2 || !lua_isuserdata(L, -2))
-		luaL_error(L, "usage: channel:put(variable)");
-
-	struct fiber_channel *ch = lbox_check_channel(L, -2);
-
-
-	lua_getmetatable(L, -2);
-
-	lua_pushstring(L, "rid");
-	lua_gettable(L, -2);
-
-	lua_Integer rid = lua_tointeger(L, -1);
-	if (rid < 0x7FFFFFFF)
-		rid++;
-	else
-		rid = 1;
-
-	lua_pushstring(L, "rid");	/* update object id */
-	lua_pushnumber(L, rid);
-	lua_settable(L, -4);
-
-	lua_pushnumber(L, rid);
-	lua_pushvalue(L, 2);
-	lua_settable(L, -4);
-	lua_settop(L, 2);
-
-	lua_pushvalue(L, -1);
-
-
-	fiber_channel_put(ch, (void *)rid);
-	return 1;
-}
-
-static int
-lbox_fiber_channel_get(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isuserdata(L, -1))
-		luaL_error(L, "usage: channel:put(variable)");
-
-	struct fiber_channel *ch = lbox_check_channel(L, -1);
-
-	lua_getmetatable(L, -1);
-	lua_Integer rid = (lua_Integer)fiber_channel_get(ch);
-	lua_pushnumber(L, rid);
-	lua_gettable(L, -2);
-
-	lua_pushnumber(L, rid);
-	lua_pushnil(L);
-	lua_settable(L, -4);
-	lua_remove(L, -2);
-
-	return 1;
-}
-
-/******************** public functions ***************************/
-
-int
-lbox_fiber_semaphore(struct lua_State *L)
-{
-	say_info(":%s()", __func__);
-	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1))
-		luaL_error(L, "fiber.semaphore(count): bad arguments");
-
-	struct fiber_semaphore *sm = fiber_semaphore_alloc();
-	if (!sm)
-		luaL_error(L, "fiber.semaphore: Not enough memory");
-	fiber_semaphore_init(sm, lua_tointeger(L, -1));
-
-
-
-	void **ptr = lua_newuserdata(L, sizeof(void *));
-	luaL_getmetatable(L, semaphore_lib);
-	lua_setmetatable(L, -2);
-	*ptr = sm;
-	return 1;
-}
-
-
-int
 lbox_fiber_mutex(struct lua_State *L)
 {
 	say_info(":%s()", __func__);
@@ -340,8 +171,86 @@ lbox_fiber_mutex(struct lua_State *L)
 	return 1;
 }
 
+static inline struct fiber_mutex *
+lbox_check_mutex(struct lua_State *L, int narg)
+{
+	return * (void **) luaL_checkudata(L, narg, mutex_lib);
+}
 
-int
+
+static int
+lbox_fiber_mutex_gc(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		return 0;
+	struct fiber_mutex *m = lbox_check_mutex(L, -1);
+	free(m);
+	return 0;
+}
+
+static int
+lbox_fiber_mutex_locked(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		luaL_error(L, "usage: mutex()");
+	struct fiber_mutex *m = lbox_check_mutex(L, -1);
+
+	lua_pushboolean(L, fiber_mutex_islocked(m));
+	return 1;
+}
+
+
+static int
+lbox_fiber_mutex_lock(struct lua_State *L)
+{
+	int top = lua_gettop(L);
+	if (top < 1 || top > 2 || !lua_isuserdata(L, -top))
+		luaL_error(L, "usage: mutex:lock([timeout])");
+	struct fiber_mutex *m = lbox_check_mutex(L, -top);
+	lua_Number timeout;
+	if (top == 2) {
+		if (!lua_isnumber(L, -1))
+			luaL_error(L, "timeout must be number");
+		timeout = lua_tonumber(L, -1);
+	} else {
+		timeout = 0;
+	}
+
+	if (fiber_mutex_lock_timeout(m, timeout) == 0)
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
+	return 1;
+}
+
+
+static int
+lbox_fiber_mutex_unlock(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		luaL_error(L, "usage: mutex:unlock()");
+	struct fiber_mutex *m = lbox_check_mutex(L, -1);
+
+	fiber_mutex_unlock(m);
+	return 0;
+}
+
+
+static int
+lbox_fiber_mutex_trylock(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		luaL_error(L, "usage: mutex:trylock()");
+	struct fiber_mutex *m = lbox_check_mutex(L, -1);
+
+	lua_pushboolean(L, fiber_mutex_trylock(m) == 0);
+	return 1;
+}
+
+
+/******************** channel ***************************/
+
+static int
 lbox_fiber_channel(struct lua_State *L)
 {
 	say_info(":%s()", __func__);
@@ -365,13 +274,155 @@ lbox_fiber_channel(struct lua_State *L)
 	luaL_getmetatable(L, channel_lib);
 
 	lua_pushstring(L, "rid");	/* first object id */
-	lua_pushnumber(L, 0);
+	lua_pushnumber(L, 1);
 	lua_settable(L, -3);
 
 	lua_setmetatable(L, -2);
 	*ptr = ch;
 	return 1;
 }
+
+static inline struct fiber_channel *
+lbox_check_channel(struct lua_State *L, int narg)
+{
+	return * (void **) luaL_checkudata(L, narg, channel_lib);
+}
+
+
+static int
+lbox_fiber_channel_gc(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		return 0;
+	struct fiber_channel *ch = lbox_check_channel(L, -1);
+	free(ch);
+	return 0;
+}
+
+
+static int
+lbox_fiber_channel_isfull(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		luaL_error(L, "usage: channel:is_full()");
+	struct fiber_channel *ch = lbox_check_channel(L, -1);
+	if (fiber_channel_isfull(ch))
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
+	return 1;
+}
+
+static int
+lbox_fiber_channel_isempty(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		luaL_error(L, "usage: channel:is_empty()");
+	struct fiber_channel *ch = lbox_check_channel(L, -1);
+	if (fiber_channel_isempty(ch))
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
+	return 1;
+}
+
+static int
+lbox_fiber_channel_put(struct lua_State *L)
+{
+	double timeout;
+	int top = lua_gettop(L);
+	struct fiber_channel *ch;
+
+	switch(top) {
+		case 2:
+			timeout = 0;
+			break;
+		case 3:
+			if (!lua_isnumber(L, -1))
+				luaL_error(L, "timeout must be number");
+			timeout = lua_tonumber(L, -1);
+			if (timeout < 0)
+				luaL_error(L, "wrong timeout");
+			break;
+		default:
+			luaL_error(L, "usage: channel:put(var [, timeout])");
+
+
+	}
+	ch = lbox_check_channel(L, -top);
+
+	lua_getmetatable(L, -top);
+
+	lua_pushstring(L, "rid");
+	lua_gettable(L, -2);
+
+	lua_Integer rid = lua_tointeger(L, -1);
+	if (rid < 0x7FFFFFFF)
+		rid++;
+	else
+		rid = 1;
+
+	lua_pushstring(L, "rid");	/* update object id */
+	lua_pushnumber(L, rid);
+	lua_settable(L, -4);
+
+	lua_pushnumber(L, rid);
+	lua_pushvalue(L, 2);
+	lua_settable(L, -4);
+	lua_settop(L, top);
+
+
+	if (fiber_channel_put_timeout(ch, (void *)rid, timeout) == 0)
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
+	return 1;
+}
+
+static int
+lbox_fiber_channel_get(struct lua_State *L)
+{
+	int top = lua_gettop(L);
+	double timeout;
+
+	if (top > 2 || top < 1 || !lua_isuserdata(L, -top))
+		luaL_error(L, "usage: channel:get([timeout])");
+
+	if (top == 2) {
+		if (!lua_isnumber(L, -1))
+			luaL_error(L, "timeout must be number");
+		timeout = lua_tonumber(L, -1);
+		if (timeout < 0)
+			luaL_error(L, "wrong timeout");
+	} else {
+		timeout = 0;
+	}
+
+	struct fiber_channel *ch = lbox_check_channel(L, -top);
+
+	lua_Integer rid = (lua_Integer)fiber_channel_get_timeout(ch, timeout);
+
+	if (!rid) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_getmetatable(L, -1);
+	lua_pushnumber(L, rid);
+	lua_gettable(L, -2);
+
+	lua_pushnumber(L, rid);
+	lua_pushnil(L);
+	lua_settable(L, -4);
+
+	lua_remove(L, -2);	/* cleanup stack */
+	return 1;
+}
+
+
+
+
+
 
 void
 fiber_ifc_lua_init(struct lua_State *L)
@@ -408,5 +459,23 @@ fiber_ifc_lua_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 	tarantool_lua_register_type(L, channel_lib, channel_meta);
+
+
+
+	static const struct luaL_reg ifc_meta[] = {
+		{"semaphore",	lbox_fiber_semaphore},
+		{"mutex",	lbox_fiber_mutex},
+		{"channel",	lbox_fiber_channel},
+		{NULL, NULL}
+	};
+
+
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+
+	lua_pushstring(L, "ifc");
+	lua_newtable(L);			/* box.ifc table */
+	luaL_register(L, NULL, ifc_meta);
+	lua_settable(L, -3);
+	lua_pop(L, -1);
 }
 

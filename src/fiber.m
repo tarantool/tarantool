@@ -60,6 +60,7 @@
 @implementation FiberCancelException
 @end
 
+
 #define FIBER_CALL_STACK 16
 
 static struct fiber sched;
@@ -180,7 +181,7 @@ fiber_cancel(struct fiber *f)
 	fiber_testcancel(); /* Check if we're ourselves cancelled. */
 }
 
-static bool
+bool
 fiber_is_cancelled()
 {
 	return fiber->flags & FIBER_CANCEL;
