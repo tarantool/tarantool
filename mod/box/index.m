@@ -228,20 +228,6 @@ check_key_parts(struct key_def *key_def,
 	[self subclassResponsibility: _cmd];
 }
 
-- (void) replace_where: (struct tuple *) old_tuple
-	:(struct tuple *) new_tuple
-{
-	if (box_index_where_trigger(key_def->where, new_tuple)) {
-		if (new_tuple)
-			return [self replace: old_tuple :new_tuple];
-		else
-			return [self remove: old_tuple];
-	}
-	if (old_tuple) {
-		return [self remove: old_tuple];
-	}
-}
-
 - (struct iterator *) allocIterator
 {
 	[self subclassResponsibility: _cmd];
@@ -332,7 +318,6 @@ hash_iterator_free(struct iterator *iterator)
 
 - (void) buildNext: (struct tuple *)tuple
 {
-	/* not replace_where: buildNext is used only for primary indexes */
 	[self replace: NULL :tuple];
 }
 
@@ -357,7 +342,7 @@ hash_iterator_free(struct iterator *iterator)
 	[pk initIterator: it :ITER_FORWARD];
 
 	while ((tuple = it->next(it)))
-	      [self replace_where: NULL :tuple];
+	      [self replace: NULL :tuple];
 }
 
 - (void) free

@@ -80,41 +80,6 @@ static lua_State *root_L;
 static void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
 
-/* return true if new_tuple can be in index */
-bool
-box_index_where_trigger(const char *trigger_name, struct tuple *new_tuple)
-{
-	/* if where-trigger isn't used all tuples pass to index */
-	if (!trigger_name)
-		return true;
-
-	/* removing old_tuple */
-	if (!new_tuple)
-		return true;
-
-	lua_State *L = root_L; //lua_newthread(root_L);
-	int top = lua_gettop(L);
-
-	@try {
-		lua_getfield(L, LUA_GLOBALSINDEX, trigger_name);
-		lbox_pushtuple(L, new_tuple);
-		lua_call(L, 1, 1);
-		say_info("%s(tuple) - called", trigger_name);
-
-		if (lua_toboolean(L, -1)) {
-			return true;
-		}
-		return false;
-
-	} @catch (tnt_Exception *e) {
-		@throw;
-	} @catch (...) {
-		tnt_raise(ClientError,
-			:ER_INDEX_TRIGGER, trigger_name, lua_tostring(L, -1));
-	} @finally {
-		lua_settop(L, top);	/* cleanup stack */
-	}
-}
 
 static const char *tuplelib_name = "box.tuple";
 

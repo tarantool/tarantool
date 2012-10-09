@@ -70,7 +70,6 @@ configuration:
   space[0].enabled: "true"
   space[0].cardinality: "-1"
   space[0].estimated_rows: "0"
-  space[0].index[0].where: (null)
   space[0].index[0].type: "HASH"
   space[0].index[0].unique: "true"
   space[0].index[0].key_field[0].fieldno: "0"

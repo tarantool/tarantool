@@ -30,7 +30,6 @@
  */
 #include "request.h"
 struct lua_State;
-struct tuple;
 
 /**
  * Invoke a Lua stored procedure from the binary protocol
@@ -38,11 +37,6 @@ struct tuple;
  */
 void
 box_lua_execute(struct request *request, struct txn *txn, struct port *port);
-
-
-/* return true if new_tuple can be in index */
-bool box_index_where_trigger(const char *trigger_name, struct tuple *new_tuple);
-
 
 /**
  * Create an instance of Lua interpreter in box.
