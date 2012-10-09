@@ -264,11 +264,17 @@ coio_service_on_accept(struct evio_service *evio_service,
 		 "%s/%s", evio_service->name, sio_strfaddr(addr));
 
 	/* Create the worker fiber. */
-	struct fiber *f = fiber_create(name, service->handler);
-	if (f == NULL)
-		goto error;
+	struct fiber *f;
+
+	@try {
+		f = fiber_create(name, service->handler);
+	} @catch (tnt_Exception *e) {
+		say_error("can't create a handler fiber, dropping client connection");
+		coio_close(&coio);
+		@throw;
+	}
 	/*
-	 * The coio is passed on to the created fiber, reset the
+	 * The coio is passed into the created fiber, reset the
 	 * libev callback param to point at it.
 	 */
 	coio.ev.data = f;
@@ -277,11 +283,6 @@ coio_service_on_accept(struct evio_service *evio_service,
 	 * and will have to close it and free before termination.
 	 */
 	fiber_call(f, coio, service->handler_param);
-	return;
-
-error:
-	say_error("can't create a handler fiber, dropping client connection");
-	close(fd);
 }
 
 void

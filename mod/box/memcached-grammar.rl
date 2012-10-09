@@ -204,8 +204,7 @@ memcached_dispatch(struct coio *coio)
 
 		action flush_all {
 			struct fiber *f = fiber_create("flush_all", flush_all);
-			if (f)
-				fiber_call(f, flush_delay);
+			fiber_call(f, flush_delay);
 			iov_add("OK\r\n", 4);
 		}
 

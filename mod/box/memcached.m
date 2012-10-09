@@ -567,10 +567,13 @@ void memcached_start_expire()
 		return;
 
 	assert(memcached_expire == NULL);
-	memcached_expire = fiber_create("memcached_expire",
-					memcached_expire_loop);
-	if (memcached_expire == NULL)
+	@try {
+		memcached_expire = fiber_create("memcached_expire",
+						memcached_expire_loop);
+	} @catch (tnt_Exception *e) {
 		say_error("can't start the expire fiber");
+		return;
+	}
 	fiber_call(memcached_expire);
 }
 

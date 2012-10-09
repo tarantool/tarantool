@@ -167,9 +167,11 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 	say_crit("initializing the replica, WAL master %s", addr);
 	snprintf(name, sizeof(name), "replica/%s", addr);
 
-	f = fiber_create(name, pull_from_remote);
-	if (f == NULL)
+	@try {
+		f = fiber_create(name, pull_from_remote);
+	} @catch (tnt_Exception *e) {
 		return;
+	}
 
 	rc = sscanf(addr, "%31[^:]:%i", ip_addr, &port);
 	assert(rc == 2);

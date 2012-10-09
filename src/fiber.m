@@ -415,7 +415,17 @@ fiber_set_name(struct fiber *fiber, const char *name)
 	palloc_set_name(fiber->gc_pool, fiber->name);
 }
 
-/* fiber never dies, just become zombie */
+/**
+ * Create a new fiber.
+ *
+ * Takes a fiber from fiber cache, if it's not empty.
+ * Can fail only if there is not enough memory for
+ * the fiber structure or fiber stack.
+ *
+ * The created fiber automatically returns itself
+ * to the fiber cache when its "main" function
+ * completes.
+ */
 struct fiber *
 fiber_create(const char *name, void (*f) (va_list))
 {
@@ -426,12 +436,9 @@ fiber_create(const char *name, void (*f) (va_list))
 		SLIST_REMOVE_HEAD(&zombie_fibers, zombie_link);
 	} else {
 		fiber = palloc(eter_pool, sizeof(*fiber));
-		if (fiber == NULL)
-			return NULL;
 
 		memset(fiber, 0, sizeof(*fiber));
-		if (tarantool_coro_create(&fiber->coro, fiber_loop, NULL) == NULL)
-			return NULL;
+		tarantool_coro_init(&fiber->coro, fiber_loop, NULL);
 
 		fiber->gc_pool = palloc_create_pool("");
 
@@ -456,11 +463,12 @@ fiber_create(const char *name, void (*f) (va_list))
 	return fiber;
 }
 
-/*
- * note, we can't release memory allocated via palloc(eter_pool, ...)
- * so, struct fiber and some of its members are leaked forever
+/**
+ * Free as much memory as possible taken by the fiber.
+ *
+ * @note we can't release memory allocated via palloc(eter_pool, ...)
+ * so, struct fiber and some of its members are leaked forever.
  */
-
 void
 fiber_destroy(struct fiber *f)
 {
