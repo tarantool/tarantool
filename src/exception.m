@@ -68,7 +68,7 @@
 {
 	va_list ap;
 	va_start(ap, format);
-	[self init: errno :format :ap];
+	self = [self init: errno :format :ap];
 	va_end(ap);
 	return self;
 }
@@ -83,7 +83,7 @@
 
 - (void) log
 {
-	say(S_ERROR, strerror(errnum), "%s", errmsg);
+	say(S_ERROR, strerror(errnum), "%s in %s", object_getClassName(self), errmsg);
 }
 
 - (const char *) errmsg

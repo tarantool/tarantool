@@ -63,7 +63,6 @@
 @end
 
 struct fiber {
-	ev_io io;
 	ev_async async;
 #ifdef ENABLE_BACKTRACE
 	void *last_stack_frame;
@@ -73,7 +72,6 @@ struct fiber {
 	/* A garbage-collected memory pool. */
 	struct palloc_pool *gc_pool;
 	uint32_t fid;
-	int fd;
 
 	ev_timer timer;
 	ev_child cw;
@@ -87,15 +85,9 @@ struct fiber {
 
 	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];
-	void (*f) (void *);
-	void *f_data;
-	u64 cookie;
-	bool has_peer;
-	/* ASCIIZ name of the peer, if there is one. */
-	char peer_name[32];
-
+	void (*f) (va_list);
+	va_list f_data;
 	u32 flags;
-
 	struct fiber *waiter;
 };
 
@@ -111,18 +103,9 @@ extern __thread struct fiber *fiber;
 
 void fiber_init(void);
 void fiber_free(void);
-struct fiber *fiber_create(const char *name, int fd, void (*f) (void *), void *);
+struct fiber *fiber_create(const char *name, void (*f) (va_list));
 void fiber_set_name(struct fiber *fiber, const char *name);
 void wait_for_child(pid_t pid);
-
-void
-fiber_io_start(int fd, int events);
-
-void
-fiber_io_yield();
-
-void
-fiber_io_stop(int fd, int events);
 
 void
 fiber_yield(void);
@@ -131,8 +114,6 @@ void
 fiber_yield_to(struct fiber *f);
 
 void fiber_destroy_all();
-
-ssize_t fiber_bread(struct tbuf *, size_t v);
 
 inline static void iov_add_unsafe(const void *buf, size_t len)
 {
@@ -164,18 +145,15 @@ inline static void iov_dup(const void *buf, size_t len)
 	iov_add(copy, len);
 }
 
+struct coio;
 /* Reset the fiber's iov vector. */
-ssize_t iov_flush(void);
+ssize_t iov_flush(struct coio *coio);
 /* Write everything in the fiber's iov vector to fiber socket. */
 void iov_reset();
 
-const char *fiber_peer_name(struct fiber *fiber);
-ssize_t fiber_read(void *buf, size_t count);
-ssize_t fiber_write(const void *buf, size_t count);
-int fiber_close(void);
 void fiber_cleanup(void);
 void fiber_gc(void);
-void fiber_call(struct fiber *callee);
+void fiber_call(struct fiber *callee, ...);
 void fiber_wakeup(struct fiber *f);
 struct fiber *fiber_find(int fid);
 /** Cancel a fiber. A cancelled fiber will have
@@ -193,29 +171,9 @@ void fiber_testcancel(void);
  * fiber.
  */
 void fiber_setcancelstate(bool enable);
-int fiber_connect(struct sockaddr_in *addr);
 void fiber_sleep(ev_tstamp s);
 void fiber_info(struct tbuf *out);
-int set_nonblock(int sock);
-
-typedef void (*fiber_server_callback)(void *);
-
-struct fiber *fiber_server(const char *name, int port,
-			   fiber_server_callback callback, void *,
-			   void (*on_bind) (void *));
-
-/**
- * Create server socket and bind his on port. cfd.bind_ipaddr param using as IP address.
- *
- * @param type the fiber server type (TCP or UDP)
- * @param port the bind ip port.
- * @param retry the retry flag, if flag up the function will be try again to bind
- *              socket after delay.
- * @param delay the bind socket retry delay in sec.
- *
- * @return on success, zero is returned. on error, -1 is returned.
- */
-int
-fiber_serv_socket(struct fiber *fiber, unsigned short port, bool retry, ev_tstamp delay);
+void
+fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

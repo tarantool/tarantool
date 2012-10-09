@@ -266,4 +266,6 @@ function box.on_reload_configuration()
     end
 end
 
+require("bit")
+
 -- vim: set et ts=4 sts

@@ -47,6 +47,7 @@
 #include "port.h"
 #include "request.h"
 #include "txn.h"
+#include "coio.h"
 
 static void box_process_replica(struct txn *txn, struct port *port,
 				u32 op, struct tbuf *request_data);
@@ -229,7 +230,7 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 }
 
 static int
-snap_print(struct tbuf *t)
+snap_print(void *param __attribute__((unused)), struct tbuf *t)
 {
 	@try {
 		struct tbuf *out = tbuf_alloc(t->pool);
@@ -253,7 +254,7 @@ snap_print(struct tbuf *t)
 }
 
 static int
-xlog_print(struct tbuf *t)
+xlog_print(void *param __attribute__((unused)), struct tbuf *t)
 {
 	@try {
 		struct tbuf *out = tbuf_alloc(t->pool);
@@ -283,7 +284,7 @@ recover_snap_row(struct tbuf *t)
 }
 
 static int
-recover_row(struct tbuf *t)
+recover_row(void *param __attribute__((unused)), struct tbuf *t)
 {
 	/* drop wal header */
 	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL) {
@@ -483,7 +484,8 @@ mod_init(void)
 
 	/* recovery initialization */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
-		      recover_row, cfg.rows_per_wal, cfg.wal_mode,
+		      recover_row, NULL,
+		      cfg.rows_per_wal, cfg.wal_mode,
 		      cfg.wal_fsync_delay,
 		      init_storage ? RECOVER_READONLY : 0);
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
@@ -517,28 +519,39 @@ mod_init(void)
 	}
 
 	/* run primary server */
-	if (cfg.primary_port != 0)
-		fiber_server("primary", cfg.primary_port,
-			     (fiber_server_callback) iproto_interact,
-			     iproto_primary_port_handler,
-			     box_leave_local_standby_mode);
+	if (cfg.primary_port != 0) {
+		static struct coio_service primary;
+		coio_service_init(&primary, "primary",
+				  cfg.bind_ipaddr, cfg.primary_port,
+				  iproto_interact, iproto_primary_port_handler);
+		evio_service_on_bind(&primary.evio_service,
+				     box_leave_local_standby_mode, NULL);
+		evio_service_start(&primary.evio_service);
+	}
 
 	/* run secondary server */
-	if (cfg.secondary_port != 0)
-		fiber_server("secondary", cfg.secondary_port,
-			     (fiber_server_callback) iproto_interact,
-			     iproto_secondary_port_handler, NULL);
+	if (cfg.secondary_port != 0) {
+		static struct coio_service secondary;
+		coio_service_init(&secondary, "secondary",
+				  cfg.bind_ipaddr, cfg.primary_port,
+				  iproto_interact, iproto_secondary_port_handler);
+		evio_service_start(&secondary.evio_service);
+	}
 
 	/* run memcached server */
-	if (cfg.memcached_port != 0)
-		fiber_server("memcached", cfg.memcached_port,
-			     memcached_handler, NULL, NULL);
+	if (cfg.memcached_port != 0) {
+		static struct coio_service memcached;
+		coio_service_init(&memcached, "memcached",
+				  cfg.bind_ipaddr, cfg.memcached_port,
+				  memcached_handler, NULL);
+		evio_service_start(&memcached.evio_service);
+	}
 }
 
 int
 mod_cat(const char *filename)
 {
-	return read_log(filename, xlog_print, snap_print);
+	return read_log(filename, xlog_print, snap_print, NULL);
 }
 
 static void

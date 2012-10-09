@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "memcached.h"
 #include "tarantool.h"
 
 #include <limits.h>
@@ -43,6 +44,7 @@
 #include "pickle.h"
 #include "space.h"
 #include "port.h"
+#include "coio_buf.h"
 
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
@@ -298,9 +300,9 @@ void memcached_get(size_t keys_count, struct tbuf *keys,
 }
 
 static void
-flush_all(void *data)
+flush_all(va_list ap)
 {
-	uintptr_t delay = (uintptr_t)data;
+	uintptr_t delay = va_arg(ap, uintptr_t);
 	fiber_sleep(delay - ev_now());
 	struct tuple *tuple;
 	struct iterator *it = [memcached_index allocIterator];
@@ -333,58 +335,67 @@ do {										\
 #include "memcached-grammar.m"
 
 void
-memcached_handler(void *_data __attribute__((unused)))
+memcached_loop(struct coio *coio)
 {
-	stats.total_connections++;
-	stats.curr_connections++;
-	int r, p;
+	int rc;
+	int bytes_written;
 	int batch_count;
 
 	for (;;) {
 		batch_count = 0;
-		if ((r = fiber_bread(&fiber->rbuf, 1)) <= 0) {
-			say_debug("read returned %i, closing connection", r);
-			goto exit;
-		}
+		if (coio_bread(coio, &fiber->rbuf, 1) <= 0)
+			return;
 
 	dispatch:
-		p = memcached_dispatch();
-		if (p < 0) {
+		rc = memcached_dispatch(coio);
+		if (rc < 0) {
 			say_debug("negative dispatch, closing connection");
-			goto exit;
+			return;
 		}
 
-		if (p == 0 && batch_count == 0) /* we havn't successfully parsed any requests */
+		if (rc == 0 && batch_count == 0) /* we haven't successfully parsed any requests */
 			continue;
 
-		if (p == 1) {
+		if (rc == 1) {
 			batch_count++;
 			/* some unparsed commands remain and batch count less than 20 */
 			if (fiber->rbuf.size > 0 && batch_count < 20)
 				goto dispatch;
 		}
 
-		r = iov_flush();
-		if (r < 0) {
-			say_debug("flush_output failed, closing connection");
-			goto exit;
-		}
+		bytes_written = iov_flush(coio);
 
-		stats.bytes_written += r;
+		stats.bytes_written += bytes_written;
 		fiber_gc();
 
-		if (p == 1 && fiber->rbuf.size > 0) {
+		if (rc == 1 && fiber->rbuf.size > 0) {
 			batch_count = 0;
 			goto dispatch;
 		}
 	}
-exit:
-        iov_flush();
-	fiber_sleep(0.01);
-	say_debug("exit");
-	stats.curr_connections--; /* FIXME: nonlocal exit via exception will leak this counter */
 }
 
+
+void memcached_handler(va_list ap)
+{
+	struct coio coio = va_arg(ap, struct coio);
+	stats.total_connections++;
+	stats.curr_connections++;
+
+	@try {
+		memcached_loop(&coio);
+		iov_flush(&coio);
+	} @catch (FiberCancelException *e) {
+		@throw;
+	} @catch (tnt_Exception *e) {
+		[e log];
+	} @finally {
+		iov_reset();
+		fiber_sleep(0.01);
+		stats.curr_connections--;
+		coio_close(&coio);
+	}
+}
 
 int
 memcached_check_config(struct tarantool_cfg *conf)
@@ -504,7 +515,7 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 }
 
 void
-memcached_expire_loop(void *data __attribute__((unused)))
+memcached_expire_loop(va_list ap __attribute__((unused)))
 {
 	struct tuple *tuple = NULL;
 
@@ -545,8 +556,8 @@ void memcached_start_expire()
 		return;
 
 	assert(memcached_expire == NULL);
-	memcached_expire = fiber_create("memcached_expire", -1,
-					memcached_expire_loop, NULL);
+	memcached_expire = fiber_create("memcached_expire",
+					memcached_expire_loop);
 	if (memcached_expire == NULL)
 		say_error("can't start the expire fiber");
 	fiber_call(memcached_expire);

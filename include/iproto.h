@@ -64,6 +64,6 @@ static inline struct iproto_header *iproto(const struct tbuf *t)
 
 typedef void (*iproto_callback) (uint32_t msg_code, struct tbuf *request);
 
-void iproto_interact(iproto_callback callback);
+void iproto_interact(va_list ap);
 
 #endif

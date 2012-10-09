@@ -46,6 +46,7 @@
 #include "fiber.h"
 #include "recovery.h"
 #include "log_io.h"
+#include "evio.h"
 
 /** Replication topology
  * ----------------------
@@ -61,8 +62,8 @@
  * incoming connections. This is done in the master to be able to
  * correctly handle RELOAD CONFIGURATION, which happens in the
  * master, and, in future, perform authentication of replication
- * clients. Since the master uses fibers to serve all clients,
- * replication acceptor fiber is just one of many fibers in use.
+ * clients.
+ *
  * Once a client socket is accepted, it is sent to the spawner
  * process, through the master's end of the socket pair.
  *
@@ -74,18 +75,21 @@
  * The spawner then reads EOF from its end, terminates all
  * children and exits.
  */
-static int master_to_spawner_sock;
+static int master_to_spawner_socket;
 
-/** replication_port acceptor fiber */
+/** Accept a new connection on the replication port: push the accepted socket
+ * to the spawner.
+ */
 static void
-acceptor_handler(void *data __attribute__((unused)));
+replication_on_accept(struct evio_service *service __attribute__((unused)),
+		      int fd, struct sockaddr_in *addr __attribute__((unused)));
 
 /** Send a file descriptor to replication relay spawner.
  *
- * @param client_sock the file descriptor to be sent.
+ * Invoked when spawner's end of the socketpair becomes ready.
  */
 static void
-acceptor_send_sock(int client_sock);
+replication_send_socket(ev_io *watcher, int events __attribute__((unused)));
 
 /** Replication spawner process */
 static struct spawner {
@@ -135,18 +139,6 @@ spawner_shutdown_children();
 static void
 replication_relay_loop(int client_sock);
 
-/** A libev callback invoked when a relay client socket is ready
- * for read. This currently only happens when the client closes
- * its socket, and we get an EOF.
- */
-static void
-replication_relay_recv(struct ev_io *w, int revents);
-
-/** Send a single row to the client. */
-static int
-replication_relay_send_row(struct tbuf *t);
-
-
 /*
  * ------------------------------------------------------------------------
  * replication module
@@ -191,9 +183,8 @@ replication_prefork()
 	if (pid != 0) {
 		/* parent process: tarantool */
 		close(sockpair[1]);
-		master_to_spawner_sock = sockpair[0];
-		if (set_nonblock(master_to_spawner_sock) == -1)
-			panic("set_nonblock");
+		master_to_spawner_socket = sockpair[0];
+		sio_setfl(master_to_spawner_socket, O_NONBLOCK, 1);
 	} else {
 		ev_default_fork();
 		ev_loop(EVLOOP_NONBLOCK);
@@ -219,28 +210,12 @@ replication_init()
 	if (cfg.replication_port == 0)
 		return;                        /* replication is not in use */
 
-	char fiber_name[FIBER_NAME_MAXLEN];
+	static struct evio_service replication;
 
-	/* create acceptor fiber */
-	snprintf(fiber_name, FIBER_NAME_MAXLEN, "%i/replication", cfg.replication_port);
+	evio_service_init(&replication, "replication", cfg.bind_ipaddr,
+			  cfg.replication_port, replication_on_accept, NULL);
 
-	struct fiber *acceptor = fiber_create(fiber_name, -1, acceptor_handler, NULL);
-
-	if (acceptor == NULL) {
-		panic("create fiber fail");
-	}
-
-	fiber_call(acceptor);
-}
-
-int sock_set_blocking(int sock)
-{
-	int flags = fcntl(sock, F_GETFL, 0);
-	if (flags >= 0 && flags & O_NONBLOCK)
-		flags = fcntl(sock, F_SETFL, flags & ~O_NONBLOCK);
-	if (flags < 0)
-		say_syserror("fcntl");
-	return flags;
+	evio_service_start(&replication);
 }
 
 
@@ -250,55 +225,33 @@ int sock_set_blocking(int sock)
 
 /** Replication acceptor fiber handler. */
 static void
-acceptor_handler(void *data __attribute__((unused)))
+replication_on_accept(struct evio_service *service __attribute__((unused)),
+		      int fd,
+		      struct sockaddr_in *addr __attribute__((unused)))
 {
-	if (fiber_serv_socket(fiber, cfg.replication_port, true, 0.1) != 0) {
-		panic("can not bind to replication port");
+	/*
+	 * Drop the O_NONBLOCK flag, which was possibly
+	 * inherited from the acceptor fd (happens on
+	 * Darwin).
+         */
+	sio_setfl(fd, O_NONBLOCK, 0);
+
+	struct ev_io *io = malloc(sizeof(struct ev_io));
+	if (io == NULL) {
+		close(fd);
+		return;
 	}
-
-	for (;;) {
-		struct sockaddr_in addr;
-		socklen_t addrlen = sizeof(addr);
-		int client_sock = -1;
-
-		/* wait new connection request */
-		fiber_io_start(fiber->fd, EV_READ);
-		fiber_io_yield();
-
-		/* accept connection */
-		client_sock = accept(fiber->fd, (struct sockaddr*)&addr,
-				     &addrlen);
-		if (client_sock == -1) {
-			if (errno == EAGAIN && errno == EWOULDBLOCK) {
-				continue;
-			}
-			panic_syserror("accept");
-		}
-		/*
-		 * Drop the O_NONBLOCK flag, which was possible
-		 * inherited from the accept fd (happens on
-		 * Darwin).
-		 */
-		sock_set_blocking(client_sock);
-		/* up SO_KEEPALIVE flag */
-		int keepalive = 1;
-		if (setsockopt(client_sock, SOL_SOCKET, SO_KEEPALIVE,
-			       &keepalive, sizeof(int)) < 0)
-			/* just print error, it's not critical error */
-			say_syserror("setsockopt()");
-
-		fiber_io_stop(fiber->fd, EV_READ);
-		say_info("connection from %s:%d", inet_ntoa(addr.sin_addr),
-			 ntohs(addr.sin_port));
-		acceptor_send_sock(client_sock);
-	}
+	io->data = (void *) (intptr_t) fd;
+	ev_io_init(io, replication_send_socket, master_to_spawner_socket, EV_WRITE);
+	ev_io_start(io);
 }
 
 
 /** Send a file descriptor to the spawner. */
 static void
-acceptor_send_sock(int client_sock)
+replication_send_socket(ev_io *watcher, int events __attribute__((unused)))
 {
+	int client_sock = (intptr_t) watcher->data;
 	struct msghdr msg;
 	struct iovec iov[1];
 	char control_buf[CMSG_SPACE(sizeof(int))];
@@ -323,15 +276,13 @@ acceptor_send_sock(int client_sock)
 	control_message->cmsg_type = SCM_RIGHTS;
 	*((int *) CMSG_DATA(control_message)) = client_sock;
 
-	/* wait, when interprocess comm. socket is ready for write */
-	fiber_io_start(master_to_spawner_sock, EV_WRITE);
-	fiber_io_yield();
-	/* send client socket to the spawner */
-	if (sendmsg(master_to_spawner_sock, &msg, 0) < 0)
+	/* Send the client socket to the spawner. */
+	if (sendmsg(master_to_spawner_socket, &msg, 0) < 0)
 		say_syserror("sendmsg");
 
-	fiber_io_stop(master_to_spawner_sock, EV_WRITE);
-	/* close client socket in the main process */
+	ev_io_stop(watcher);
+	free(watcher);
+	/* Close client socket in the main process. */
 	close(client_sock);
 }
 
@@ -577,6 +528,57 @@ retry:
 	}
 }
 
+/** A libev callback invoked when a relay client socket is ready
+ * for read. This currently only happens when the client closes
+ * its socket, and we get an EOF.
+ */
+static void
+replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
+{
+	int client_sock = (int) (intptr_t) w->data;
+	u8 data;
+
+	int rc = recv(client_sock, &data, sizeof(data), 0);
+
+	if (rc == 0 || (rc < 0 && errno == ECONNRESET)) {
+		say_info("the client has closed its replication socket, exiting");
+		exit(EXIT_SUCCESS);
+	}
+	if (rc < 0)
+		say_syserror("recv");
+
+	exit(EXIT_FAILURE);
+}
+
+
+/** Send a single row to the client. */
+static int
+replication_relay_send_row(void *param, struct tbuf *t)
+{
+	int client_sock = (int) (intptr_t) param;
+	u8 *data = t->data;
+	ssize_t bytes, len = t->size;
+	while (len > 0) {
+		bytes = write(client_sock, data, len);
+		if (bytes < 0) {
+			if (errno == EPIPE) {
+				/* socket closed on opposite site */
+				goto shutdown_handler;
+			}
+			panic_syserror("write");
+		}
+		len -= bytes;
+		data += bytes;
+	}
+
+	say_debug("send row: %" PRIu32 " bytes %s", t->size, tbuf_to_hex(t));
+	return 0;
+shutdown_handler:
+	say_info("the client has closed its replication socket, exiting");
+	exit(EXIT_SUCCESS);
+}
+
+
 /** The main loop of replication client service process. */
 static void
 replication_relay_loop(int client_sock)
@@ -587,12 +589,14 @@ replication_relay_loop(int client_sock)
 	i64 lsn;
 	ssize_t r;
 
-	fiber->has_peer = true;
-	fiber->fd = client_sock;
-
-	/* set process title and fiber name */
-	memset(name, 0, sizeof(name));
-	snprintf(name, sizeof(name), "relay/%s", fiber_peer_name(fiber));
+	/* Set process title and fiber name.
+	 * Even though we use only the main fiber, the logger
+	 * uses the current fiber name.
+	 */
+	struct sockaddr_in peer;
+	socklen_t addrlen = sizeof(peer);
+	getpeername(client_sock, &peer, &addrlen);
+	snprintf(name, sizeof(name), "relay/%s", sio_strfaddr(&peer));
 	fiber_set_name(fiber, name);
 	set_proc_title("%s%s", name, custom_proc_title);
 
@@ -613,7 +617,7 @@ replication_relay_loop(int client_sock)
 	if (sigaction(SIGPIPE, &sa, NULL) == -1)
 		say_syserror("sigaction");
 
-	r = read(fiber->fd, &lsn, sizeof(lsn));
+	r = read(client_sock, &lsn, sizeof(lsn));
 	if (r != sizeof(lsn)) {
 		if (r < 0) {
 			panic_syserror("read");
@@ -624,20 +628,24 @@ replication_relay_loop(int client_sock)
 
 	ver = tbuf_alloc(fiber->gc_pool);
 	tbuf_append(ver, &default_version, sizeof(default_version));
-	replication_relay_send_row(ver);
+	replication_relay_send_row((void *)(intptr_t) client_sock, ver);
 
 	/* init libev events handlers */
 	ev_default_loop(0);
 
-	/* init read events */
+	/*
+	 * Init a read event: when replica closes its end
+	 * of the socket, we can read EOF and shutdown the
+	 * relay.
+	 */
 	struct ev_io sock_read_ev;
-	int sock_read_fd = fiber->fd;
-	sock_read_ev.data = (void *)&sock_read_fd;
-	ev_io_init(&sock_read_ev, replication_relay_recv, sock_read_fd, EV_READ);
+	sock_read_ev.data = (void *)(intptr_t) client_sock;
+	ev_io_init(&sock_read_ev, replication_relay_recv, client_sock, EV_READ);
 	ev_io_start(&sock_read_ev);
 
 	/* Initialize the recovery process */
-	recovery_init(cfg.snap_dir, cfg.wal_dir, replication_relay_send_row,
+	recovery_init(cfg.snap_dir, cfg.wal_dir,
+		      replication_relay_send_row, (void *)(intptr_t) client_sock,
 		      INT32_MAX, "fsync_delay", 0,
 		      RECOVER_READONLY);
 	/*
@@ -654,51 +662,6 @@ replication_relay_loop(int client_sock)
 	ev_loop(0);
 
 	say_crit("exiting the relay loop");
-	exit(EXIT_SUCCESS);
-}
-
-/** Receive data event to replication socket handler */
-static void
-replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
-{
-	int fd = *((int *)w->data);
-	u8 data;
-
-	int result = recv(fd, &data, sizeof(data), 0);
-
-	if (result == 0 || (result < 0 && errno == ECONNRESET)) {
-		say_info("the client has closed its replication socket, exiting");
-		exit(EXIT_SUCCESS);
-	}
-	if (result < 0)
-		say_syserror("recv");
-
-	exit(EXIT_FAILURE);
-}
-
-/** Send to row to client. */
-static int
-replication_relay_send_row(struct tbuf *t)
-{
-	u8 *data = t->data;
-	ssize_t bytes, len = t->size;
-	while (len > 0) {
-		bytes = write(fiber->fd, data, len);
-		if (bytes < 0) {
-			if (errno == EPIPE) {
-				/* socket closed on opposite site */
-				goto shutdown_handler;
-			}
-			panic_syserror("write");
-		}
-		len -= bytes;
-		data += bytes;
-	}
-
-	say_debug("send row: %" PRIu32 " bytes %s", t->size, tbuf_to_hex(t));
-	return 0;
-shutdown_handler:
-	say_info("the client has closed its replication socket, exiting");
 	exit(EXIT_SUCCESS);
 }
 

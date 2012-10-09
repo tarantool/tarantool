@@ -37,6 +37,7 @@
 #include <fiber.h>
 #include <tbuf.h>
 #include <say.h>
+#include "coio_buf.h"
 
 const uint32_t msg_ping = 0xff00;
 
@@ -45,51 +46,51 @@ static void iproto_reply(iproto_callback callback, struct tbuf *request);
 static void
 iproto_validate_header(struct iproto_header *header);
 
-inline static int
-iproto_flush(ssize_t to_read)
+inline static void
+iproto_flush(struct coio *coio, ssize_t to_read)
 {
 	/*
 	 * Flush output and garbage collect before reading
 	 * next header.
 	 */
 	if (to_read > 0) {
-		if (iov_flush() < 0) {
-			say_warn("io_error: %s", strerror(errno));
-			return -1;
-		}
+		iov_flush(coio);
 		fiber_gc();
 	}
-	return 0;
 }
 
 void
-iproto_interact(iproto_callback callback)
+iproto_interact(va_list ap)
 {
+	struct coio coio = va_arg(ap, struct coio);
+	iproto_callback callback = va_arg(ap, iproto_callback);
 	struct tbuf *in = &fiber->rbuf;
 	ssize_t to_read = sizeof(struct iproto_header);
+	@try {
+		for (;;) {
+			if (to_read > 0 && coio_bread(&coio, in, to_read) <= 0)
+				break;
 
-	for (;;) {
-		if (to_read > 0 && fiber_bread(in, to_read) <= 0)
-			break;
+			/* validating iproto package header */
+			iproto_validate_header(iproto(in));
 
-		/* validating iproto package header */
-		iproto_validate_header(iproto(in));
+			ssize_t request_len = sizeof(struct iproto_header)
+				+ iproto(in)->len;
+			to_read = request_len - in->size;
 
-		ssize_t request_len = sizeof(struct iproto_header)
-			+ iproto(in)->len;
-		to_read = request_len - in->size;
+			iproto_flush(&coio, to_read);
 
-		if (iproto_flush(to_read) == -1)
-			break;
-		if (to_read > 0 && fiber_bread(in, to_read) <= 0)
-			break;
+			if (to_read > 0 && coio_bread(&coio, in, to_read) <= 0)
+				break;
 
-		struct tbuf *request = tbuf_split(in, request_len);
-		iproto_reply(callback, request);
+			struct tbuf *request = tbuf_split(in, request_len);
+			iproto_reply(callback, request);
 
-		to_read = sizeof(struct iproto_header) - in->size;
-		if (iproto_flush(to_read) == -1)
-			break;
+			to_read = sizeof(struct iproto_header) - in->size;
+			iproto_flush(&coio, to_read);
+		}
+	} @finally {
+		coio_close(&coio);
 	}
 }
 

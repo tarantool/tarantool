@@ -188,8 +188,9 @@ recovery_stop_local(struct recovery_state *r);
 
 void
 recovery_init(const char *snap_dirname, const char *wal_dirname,
-	      row_handler row_handler, int rows_per_wal,
-	      const char *wal_mode, double wal_fsync_delay, int flags)
+	      row_handler row_handler, void *row_handler_param,
+	      int rows_per_wal, const char *wal_mode,
+	      double wal_fsync_delay, int flags)
 {
 	assert(recovery_state == NULL);
 	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
@@ -200,6 +201,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 		panic("unacceptable value of 'rows_per_wal'");
 
 	r->row_handler = row_handler;
+	r->row_handler_param = row_handler_param;
 
 	r->snap_dir = &snap_dir;
 	r->snap_dir->dirname = strdup(snap_dirname);
@@ -298,7 +300,7 @@ recover_snap(struct recovery_state *r)
 
 	struct tbuf *row;
 	while ((row = log_io_cursor_next(&i))) {
-		if (r->row_handler(row) < 0) {
+		if (r->row_handler(r->row_handler_param, row) < 0) {
 			say_error("can't apply row");
 			if (snap->dir->panic_if_error)
 				break;
@@ -347,7 +349,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		 * After handler(row) returned, row may be
 		 * modified, do not use it.
 		 */
-		if (r->row_handler(row) < 0) {
+		if (r->row_handler(r->row_handler_param, row) < 0) {
 			say_error("can't apply row");
 			if (l->dir->panic_if_error)
 				goto end;
@@ -1221,7 +1223,8 @@ snapshot_save(struct recovery_state *r,
 
 int
 read_log(const char *filename,
-	 row_handler *xlog_handler, row_handler *snap_handler)
+	 row_handler *xlog_handler, row_handler *snap_handler,
+	 void *param)
 {
 	struct log_dir *dir;
 	row_handler *h;
@@ -1244,7 +1247,7 @@ read_log(const char *filename,
 	log_io_cursor_open(&i, l);
 	struct tbuf *row;
 	while ((row = log_io_cursor_next(&i)))
-		h(row);
+		h(param, row);
 
 	log_io_cursor_close(&i);
 	log_io_close(&l);

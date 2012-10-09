@@ -289,7 +289,8 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 		def->parts[k].fieldno = cfg_key->fieldno;
 		def->parts[k].type = STR2ENUM(field_data_type, cfg_key->type);
 		/* fill compare order */
-		def->cmp_order[cfg_key->fieldno] = k;
+		if (def->cmp_order[cfg_key->fieldno] == -1)
+			def->cmp_order[cfg_key->fieldno] = k;
 	}
 	def->is_unique = cfg_index->unique;
 	def->where = cfg_index->where;

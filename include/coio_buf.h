@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_MEMCACHED_H_INCLUDED
-#define TARANTOOL_MEMCACHED_H_INCLUDED
+#ifndef TARANTOOL_COIO_BUF_H_INCLUDED
+#define TARANTOOL_COIO_BUF_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,25 +28,36 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdarg.h>
+#include "coio.h"
+#include "tbuf.h"
+/** Buffered cooperative IO */
 
-struct tarantool_cfg;
+extern int coio_readahead;
 
-void
-memcached_init();
+static inline void
+coio_binit(int readahead)
+{
+	coio_readahead =  readahead;
+}
 
-void
-memcached_free();
+static inline ssize_t
+coio_bread(struct coio *coio, struct tbuf *buf, size_t sz)
+{
+	tbuf_ensure(buf, MAX(sz, coio_readahead));
+	ssize_t n = coio_read_ahead(coio, tbuf_end(buf),
+				    sz, tbuf_unused(buf));
+	buf->size += n;
+	return n;
+}
 
-void
-memcached_space_init();
+static inline ssize_t
+coio_breadn(struct coio *coio, struct tbuf *buf, size_t sz)
+{
+	tbuf_ensure(buf, MAX(sz, coio_readahead));
+	ssize_t n = coio_readn_ahead(coio, tbuf_end(buf),
+				     sz, tbuf_unused(buf));
+	buf->size += n;
+	return n;
+}
 
-int
-memcached_check_config(struct tarantool_cfg *conf);
-
-void memcached_start_expire();
-void memcached_stop_expire();
-
-void memcached_handler(va_list ap);
-
-#endif /* TARANTOOL_MEMCACHED_H_INCLUDED */
+#endif /* TARANTOOL_COIO_BUF_H_INCLUDED */
