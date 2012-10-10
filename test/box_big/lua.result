@@ -533,7 +533,7 @@ lua push_collection(5, 1038784, 'hey')
 ---
  - 1038784: {26984, 'hey', 'hey', 'hey', 'hey'}
 ...
-A test case for Bug#1060967: truncation of 64-bit numbers
+# A test case for Bug#1060967: truncation of 64-bit numbers
 lua box.space[5]:insert(2^51, 'hello', 'world')
 ---
  - 2251799813685248: {'hello', 'world'}
@@ -543,5 +543,17 @@ lua box.space[5]:select(0, 2^51)
  - 2251799813685248: {'hello', 'world'}
 ...
 lua box.space[5]:truncate()
+---
+...
+# Test that we print index number in error ER_INDEX_VIOLATION
+lua box.space[1]:insert(1, 'hello', 'world')
+---
+ - 1: {'hello', 'world'}
+...
+lua box.space[1]:insert(2, 'hello', 'world')
+---
+error: 'Duplicate key exists in unique index 1'
+...
+lua box.space[1]:truncate()
 ---
 ...

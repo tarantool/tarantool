@@ -175,7 +175,8 @@ space_validate(struct space *sp, struct tuple *old_tuple,
 		if (index->key_def->is_unique) {
 			struct tuple *tuple = [index findByTuple: new_tuple];
 			if (tuple != NULL && tuple != old_tuple)
-				tnt_raise(ClientError, :ER_INDEX_VIOLATION);
+				tnt_raise(ClientError, :ER_INDEX_VIOLATION,
+					  index_n(index));
 		}
 	}
 }
