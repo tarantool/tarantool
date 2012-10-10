@@ -47,19 +47,19 @@ bool primary_indexes_enabled = false;
 
 
 struct space *
-space_create(i32 space_no, struct key_def *key, int key_count, int arity)
+space_create(i32 space_no, struct key_def *key_defs, int key_count, int arity)
 {
 
 	struct space *space = space_by_n(space_no);
 	if (space)
 		panic("Space %d is already exists", space_no);
-	space = p0alloc(eter_pool, sizeof(struct space));
+	space = calloc(sizeof(struct space), 1);
 	space->no = space_no;
 
 	mh_i32ptr_put(spaces, space->no, space, NULL);
 
 	space->arity = arity;
-	space->key_defs = key;
+	space->key_defs = key_defs;
 	space->key_count = key_count;
 
 	return space;
@@ -76,8 +76,8 @@ space_by_n(i32 n)
 	return mh_value(spaces, space);
 }
 
-
-int
+/** Return the number of active indexes in a space. */
+static inline int
 index_count(struct space *sp)
 {
 	if (!secondary_indexes_enabled) {
@@ -92,45 +92,25 @@ index_count(struct space *sp)
 	}
 }
 
-/* look through all enabled spaces */
-int
-space_foreach(int (*space_i)(struct space *sp, void *udata), void *udata) {
+/**
+ * Visit all enabled spaces and apply 'func'.
+ */
+void
+space_foreach(void (*func)(struct space *sp, void *udata), void *udata) {
 
 	mh_int_t i;
-	int res = 0;
-
 	mh_foreach(spaces, i) {
 		struct space *space = mh_value(spaces, i);
-		res = space_i(space, udata);
-		if (res)
-			break;
+		func(space, udata);
 	}
-
-	return res;
 }
 
-/* Get index by index no */
-Index *
-space_index(struct space *sp, int index_no)
-{
-	if (index_no >= BOX_INDEX_MAX)
-		return NULL;
-	if (index_no < 0)
-		return NULL;
-	return sp->index[index_no];
-}
-
-/* Set index by index no */
-Index *
+/** Set index by index no */
+void
 space_set_index(struct space *sp, int index_no, Index *idx)
 {
-	if (index_no >= BOX_INDEX_MAX)
-		return NULL;
-	if (index_no < 0)
-		return NULL;
+	assert(index_no >= 0 && index_no < BOX_INDEX_MAX);
 	sp->index[index_no] = idx;
-
-	return idx;
 }
 
 /** Free a key definition. */
@@ -210,7 +190,6 @@ space_remove(struct space *sp, struct tuple *tuple)
 	}
 }
 
-
 void
 space_free(void)
 {
@@ -229,6 +208,7 @@ space_free(void)
 
 		free(space->key_defs);
 		free(space->field_types);
+		free(space);
 	}
 
 }
@@ -355,12 +335,10 @@ space_config()
 		if (space)
 			panic("space %i is already exists", i);
 
-		space = p0alloc(eter_pool, sizeof(struct space));
+		space = calloc(sizeof(struct space), 1);
 		space->no = i;
 
-
 		space->arity = cfg_space->cardinality;
-
 		/*
 		 * Collect key/field info. We need aggregate
 		 * information on all keys before we can create
@@ -446,15 +424,15 @@ build_secondary_indexes(void)
 		if (space->key_count <= 1)
 			continue; /* no secondary keys */
 
-		say_info("Building secondary keys in space %" PRIu32 "...", i);
+		say_info("Building secondary keys in space %d...", space->no);
 
-		Index *primary_index = space->index[0];
+		Index *pk = space->index[0];
 		for (int j = 1; j < space->key_count; j++) {
 			Index *index = space->index[j];
-			[index build: primary_index];
+			[index build: pk];
 		}
 
-		say_info("Space %"PRIu32": done", i);
+		say_info("Space %d: done", space->no);
 	}
 
 	/* enable secondary indexes now */

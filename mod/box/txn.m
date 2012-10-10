@@ -64,6 +64,7 @@ txn_add_undo(struct txn *txn, struct space *space,
 {
 	/* txn_add_undo() must be done after txn_add_redo() */
 	assert(txn->op != 0);
+	txn->new_tuple = new_tuple;
 	if (new_tuple == NULL && old_tuple == NULL) {
 		/*
 		 * There is no subject tuple we could write to
@@ -78,8 +79,6 @@ txn_add_undo(struct txn *txn, struct space *space,
 		space_replace(space, old_tuple, new_tuple);
 		txn_lock(txn, new_tuple);
 	}
-
-	txn->new_tuple = new_tuple;
 	/* Remember the old tuple only if we locked it
 	 * successfully, to not unlock a tuple locked by another
 	 * transaction in rollback().

@@ -571,7 +571,7 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 }
 
 
-static int
+static void
 snapshot_space(struct space *sp, void *udata)
 {
 	struct tuple *tuple;
@@ -580,11 +580,8 @@ snapshot_space(struct space *sp, void *udata)
 	struct iterator *it = pk->position;
 	[pk initIterator: it :ITER_FORWARD];
 
-	while ((tuple = it->next(it))) {
+	while ((tuple = it->next(it)))
 		snapshot_write_tuple(ud->l, ud->batch, space_n(sp), tuple);
-	}
-
-	return 0;
 }
 
 void

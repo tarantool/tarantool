@@ -77,7 +77,7 @@ struct space {
 	 */
 	int max_fieldno;
 
-	/* space number */
+	/** Space number. */
 	i32 no;
 };
 
@@ -92,18 +92,34 @@ void space_replace(struct space *sp, struct tuple *old_tuple,
 void space_remove(struct space *sp, struct tuple *tuple);
 
 
-/* Get index by index no */
-Index *space_index(struct space *sp, int index_no);
+/**
+ * Get index by index number.
+ * @return NULL if index not found.
+ */
+static inline Index *
+space_index(struct space *sp, int index_no)
+{
+	if (index_no >= 0 && index_no < BOX_INDEX_MAX)
+		return sp->index[index_no];
+	return NULL;
+}
 
-/* Set index by index no */
-Index *space_set_index(struct space *sp, int index_no, Index *idx);
+/** Set index by index no. */
+void
+space_set_index(struct space *sp, int index_no, Index *idx);
 
+/**
+ * Call a visitor function on every enabled space.
+ */
+void
+space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
 
-/* look through all enabled spaces */
-int space_foreach(int (*space_i)(struct space *sp, void *udata), void *udata);
-
-
-struct space *space_by_n(i32 space_no);	/* NULL if space not found */
+/**
+ * Try to look up a space by space number.
+ *
+ * @return NULL if space not found, otherwise space object.
+ */
+struct space *space_by_n(i32 space_no);
 
 static inline struct space *
 space_find(i32 space_no)
@@ -138,7 +154,7 @@ space_field_type(struct space *sp, int no)
 
 
 struct space *
-space_create(i32 space_no, struct key_def *key, int key_count, int arity);
+space_create(i32 space_no, struct key_def *key_defs, int key_count, int arity);
 
 
 /** Get index ordinal number in space. */
@@ -166,8 +182,6 @@ extern bool secondary_indexes_enabled;
  */
 extern bool primary_indexes_enabled;
 
-int index_count(struct space *sp);
-
 void space_init(void);
 void space_free(void);
 i32 check_spaces(struct tarantool_cfg *conf);
@@ -181,7 +195,7 @@ static inline Index *
 index_find(struct space *sp, int index_no)
 {
 	Index *idx = space_index(sp, index_no);
-	if (!idx)
+	if (idx == NULL)
 		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, index_no,
 			  space_n(sp));
 	return idx;

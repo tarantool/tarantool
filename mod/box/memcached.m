@@ -479,7 +479,7 @@ memcached_space_init()
 		space_create(cfg.memcached_space, key_def, 1, 4);
 
 	Index *memc_index = [Index alloc: HASH :key_def :memc_s];
-	memc_index = space_set_index(memc_s, 0, memc_index);
+	space_set_index(memc_s, 0, memc_index);
 
 	[memc_index init: key_def :memc_s];
 }

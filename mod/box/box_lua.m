@@ -47,7 +47,6 @@
 #include "space.h"
 #include "port.h"
 #include "box_lua_uuid.h"
-#include "exception.h"
 
 /* contents of box.lua */
 extern const char box_lua[];
@@ -77,11 +76,10 @@ static lua_State *root_L;
  * the slab allocator.
  */
 
+static const char *tuplelib_name = "box.tuple";
+
 static void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
-
-
-static const char *tuplelib_name = "box.tuple";
 
 static inline struct tuple *
 lua_checktuple(struct lua_State *L, int narg)
@@ -561,13 +559,8 @@ lbox_index_new(struct lua_State *L)
 	int n = luaL_checkint(L, 1); /* get space id */
 	int idx = luaL_checkint(L, 2); /* get index id in */
 	/* locate the appropriate index */
-	struct space *sp = space_by_n(n);
-	if (!sp)
-		tnt_raise(LoggedError, :ER_NO_SUCH_SPACE, n);
-
-	Index *index = space_index(sp, idx);
-	if (!index)
-		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, idx, n);
+	struct space *sp = space_find(n);
+	Index *index = index_find(sp, idx);
 
 	/* create a userdata object */
 	void **ptr = lua_newuserdata(L, sizeof(void *));
