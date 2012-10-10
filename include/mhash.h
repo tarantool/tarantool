@@ -118,6 +118,7 @@ struct _mh(t) {
 #define mh_value(h, i)		(h)->p[(i)].val
 #define mh_size(h)		({ (h)->size;		})
 #define mh_capacity(h)		({ (h)->n_buckets;	})
+#define mh_begin(h)		({ 0;			})
 #define mh_end(h)		({ (h)->n_buckets;	})
 
 
