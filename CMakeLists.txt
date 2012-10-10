@@ -217,7 +217,7 @@ configure_file(
 message (STATUS "")
 message (STATUS "Tarantool configuration is complete:")
 message (STATUS "")
-message (STATUS "VERSION: ${TARANTOOL_VERSION}")
+message (STATUS "VERSION: ${PACKAGE_VERSION}")
 message (STATUS "BUILD: ${TARANTOOL_BUILD}")
 message (STATUS "COMPILER: ${TARANTOOL_COMPILER}")
 message (STATUS "CFLAGS:${CMAKE_C_FLAGS} ${core_cflags}")
