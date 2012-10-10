@@ -28,11 +28,10 @@
  */
 #include "sio.h"
 
+#include <sys/uio.h>
 #include <errno.h>
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include <netinet/tcp.h> /* TCP_NODELAY */
 #include <arpa/inet.h> /* inet_ntoa */
 
 #include "say.h"

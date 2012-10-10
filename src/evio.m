@@ -28,8 +28,8 @@
  */
 #include "evio.h"
 #include <stdio.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 
 #define BIND_RETRY_DELAY 0.1
