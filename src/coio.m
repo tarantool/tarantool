@@ -28,6 +28,7 @@
  */
 #include "coio.h"
 
+#include <netinet/tcp.h>
 #include <stdio.h>
 
 #include "fiber.h"

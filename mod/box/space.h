@@ -33,9 +33,9 @@
 
 struct tarantool_cfg;
 
+
 enum {
 	BOX_INDEX_MAX = 10,
-	BOX_SPACE_MAX = 256,
 };
 
 struct space {
@@ -77,24 +77,60 @@ struct space {
 	 */
 	int max_fieldno;
 
-	bool enabled;
+	/** Space number. */
+	i32 no;
 };
 
-extern struct space *spaces;
 
 /** Get space ordinal number. */
-static inline int
-space_n(struct space *sp)
-{
-	assert(sp >= spaces && sp < (spaces + BOX_SPACE_MAX));
-	return sp - spaces;
-}
+static inline i32 space_n(struct space *sp) { return sp->no; }
 
 void space_validate(struct space *sp, struct tuple *old_tuple,
 		    struct tuple *new_tuple);
 void space_replace(struct space *sp, struct tuple *old_tuple,
 		   struct tuple *new_tuple);
 void space_remove(struct space *sp, struct tuple *tuple);
+
+
+/**
+ * Get index by index number.
+ * @return NULL if index not found.
+ */
+static inline Index *
+space_index(struct space *sp, int index_no)
+{
+	if (index_no >= 0 && index_no < BOX_INDEX_MAX)
+		return sp->index[index_no];
+	return NULL;
+}
+
+/** Set index by index no. */
+void
+space_set_index(struct space *sp, int index_no, Index *idx);
+
+/**
+ * Call a visitor function on every enabled space.
+ */
+void
+space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
+
+/**
+ * Try to look up a space by space number.
+ *
+ * @return NULL if space not found, otherwise space object.
+ */
+struct space *space_by_n(i32 space_no);
+
+static inline struct space *
+space_find(i32 space_no)
+{
+	struct space *s = space_by_n(space_no);
+	if (s)
+		return s;
+
+	tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
+}
+
 
 /** Get key_def ordinal number. */
 static inline int
@@ -103,6 +139,23 @@ key_def_n(struct space *sp, struct key_def *kp)
 	assert(kp >= sp->key_defs && kp < (sp->key_defs + sp->key_count));
 	return kp - sp->key_defs;
 }
+
+static inline int
+space_max_fieldno(struct space *sp)
+{
+	return sp->max_fieldno;
+}
+
+static inline enum field_data_type
+space_field_type(struct space *sp, int no)
+{
+	return sp->field_types[no];
+}
+
+
+struct space *
+space_create(i32 space_no, struct key_def *key_defs, int key_count, int arity);
+
 
 /** Get index ordinal number in space. */
 static inline int
@@ -129,21 +182,6 @@ extern bool secondary_indexes_enabled;
  */
 extern bool primary_indexes_enabled;
 
-static inline int
-index_count(struct space *sp)
-{
-	if (!secondary_indexes_enabled) {
-		/* If secondary indexes are not enabled yet,
-		   we can use only the primary index. So return
-		   1 if there is at least one index (which
-		   must be primary) and return 0 otherwise. */
-		return sp->key_count > 0;
-	} else {
-		/* Return the actual number of indexes. */
-		return sp->key_count;
-	}
-}
-
 void space_init(void);
 void space_free(void);
 i32 check_spaces(struct tarantool_cfg *conf);
@@ -152,26 +190,15 @@ void begin_build_primary_indexes(void);
 void end_build_primary_indexes(void);
 void build_secondary_indexes(void);
 
-static inline struct space *
-space_find(u32 space_no)
-{
-	if (space_no >= BOX_SPACE_MAX)
-		tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
-
-	struct space *sp = &spaces[space_no];
-
-	if (!sp->enabled)
-		tnt_raise(ClientError, :ER_SPACE_DISABLED, space_no);
-	return sp;
-}
 
 static inline Index *
-index_find(struct space *sp, u32 index_no)
+index_find(struct space *sp, int index_no)
 {
-	if (index_no >= sp->key_count)
+	Index *idx = space_index(sp, index_no);
+	if (idx == NULL)
 		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, index_no,
 			  space_n(sp));
-	return sp->index[index_no];
+	return idx;
 }
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */

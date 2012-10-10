@@ -97,7 +97,9 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 	txn->new_tuple->field_count = field_count;
 	memcpy(txn->new_tuple->data, data->data, data->size);
 
-	struct tuple *old_tuple = [sp->index[0] findByTuple: txn->new_tuple];
+	/* Try to find tuple by primary key */
+	Index *pk = space_index(sp, 0);
+	struct tuple *old_tuple = [pk findByTuple: txn->new_tuple];
 
 	if (flags & BOX_ADD && old_tuple != NULL)
 		tnt_raise(ClientError, :ER_TUPLE_FOUND);
@@ -711,9 +713,10 @@ execute_update(struct request *request, struct txn *txn, struct port *port)
 	u32 key_part_count;
 
 	read_key(data, &key, &key_part_count);
-	/* Try to find the tuple. */
-	struct tuple *old_tuple =
-		[sp->index[0] findByKey :key :key_part_count];
+
+	Index *pk = space_index(sp, 0);
+	/* Try to find the tuple by primary key. */
+	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
 
 	if (old_tuple != NULL) {
 		/* number of operations */
@@ -801,8 +804,9 @@ execute_delete(struct request *request, struct txn *txn, struct port *port)
 	u32 key_part_count;
 	void *key;
 	read_key(data, &key, &key_part_count);
-	/* try to find tuple in primary index */
-	struct tuple *old_tuple = [sp->index[0] findByKey :key :key_part_count];
+	/* Try to find tuple by primary key */
+	Index *pk = space_index(sp, 0);
+	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
 
 	txn_add_undo(txn, sp, old_tuple, NULL);
 

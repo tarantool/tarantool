@@ -256,7 +256,7 @@ reload_cfg(struct tbuf *out)
 const char *
 tarantool_version(void)
 {
-	return TARANTOOL_VERSION;
+	return PACKAGE_VERSION;
 }
 
 static double start_time;

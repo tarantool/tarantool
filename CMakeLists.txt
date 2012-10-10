@@ -29,6 +29,8 @@ find_program(POD2MAN pod2man)
 set (TARANTOOL_PRODUCT "box")
 set (TARANTOOL_MODULES "box")
 set (TARANTOOL_CLIENTS "")
+# Define PACKAGE macro in config.h
+set (PACKAGE "Tarantool")
 
 #
 # Set default build type to Debug. This is to ease a developer's
@@ -79,11 +81,11 @@ add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m -e -f TAGS
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #
-# Define TARANTOOL_VERSION -- a string constant with tarantool version.
+# Define PACKAGE_VERSION -- a string constant with tarantool version.
 #
-set (TARANTOOL_VERSION "")
+set (PACKAGE_VERSION "")
 execute_process (COMMAND ${GIT} describe HEAD
-    OUTPUT_VARIABLE TARANTOOL_VERSION
+    OUTPUT_VARIABLE PACKAGE_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE
     )
 #
@@ -93,8 +95,8 @@ execute_process (COMMAND ${GIT} describe HEAD
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "4")
 set (CPACK_PACKAGE_VERSION_PATCH "7")
-if (TARANTOOL_VERSION STREQUAL "")
-    set (TARANTOOL_VERSION
+if (PACKAGE_VERSION STREQUAL "")
+    set (PACKAGE_VERSION
         "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
 endif()
 
@@ -158,7 +160,9 @@ if (ENABLE_BACKTRACE)
     endif()
     # Use GNU bfd if present.
     check_library_exists (bfd bfd_init ""  HAVE_BFD_LIB)
+    set(CMAKE_REQUIRED_DEFINITIONS -DPACKAGE=${PACKAGE} -DPACKAGE_VERSION=${PACKAGE_VERSION})
     check_include_file(bfd.h HAVE_BFD_H)
+    set(CMAKE_REQUIRED_DEFINITIONS)
     if (HAVE_BFD_LIB AND HAVE_BFD_H)
         set (HAVE_BFD True)
     endif()
@@ -213,7 +217,7 @@ configure_file(
 message (STATUS "")
 message (STATUS "Tarantool configuration is complete:")
 message (STATUS "")
-message (STATUS "VERSION: ${TARANTOOL_VERSION}")
+message (STATUS "VERSION: ${PACKAGE_VERSION}")
 message (STATUS "BUILD: ${TARANTOOL_BUILD}")
 message (STATUS "COMPILER: ${TARANTOOL_COMPILER}")
 message (STATUS "CFLAGS:${CMAKE_C_FLAGS} ${core_cflags}")

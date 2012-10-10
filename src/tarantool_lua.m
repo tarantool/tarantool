@@ -126,6 +126,9 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 	}
 	case LUA_TCDATA:
 	{
+		/* Calculate absolute value in the stack. */
+		if (idx < 0)
+			idx = lua_gettop(L) + idx + 1;
 		GCcdata *cd = cdataV(L->base + idx - 1);
 		if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64) {
 			luaL_error(L,

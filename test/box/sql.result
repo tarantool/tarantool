@@ -91,7 +91,7 @@ Delete OK, 1 row affected
 #
 
 select * from t1 where k0 = 0
-An error occurred: ER_SPACE_DISABLED, 'Space 1 is disabled'
+An error occurred: ER_NO_SUCH_SPACE, 'Space 1 does not exist'
 select * from t65537 where k0 = 0
 An error occurred: ER_NO_SUCH_SPACE, 'Space 65537 does not exist'
 select * from t4294967295 where k0 = 0

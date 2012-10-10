@@ -278,7 +278,7 @@ recover_snap_row(struct tbuf *t)
 	tuple->field_count = row->tuple_size;
 
 	struct space *space = space_find(row->space);
-	Index *index = space->index[0];
+	Index *index = space_index(space, 0);
 	[index buildNext: tuple];
 	tuple_ref(tuple, 1);
 }
@@ -570,6 +570,20 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 			   tuple->data, tuple->bsize);
 }
 
+
+static void
+snapshot_space(struct space *sp, void *udata)
+{
+	struct tuple *tuple;
+	struct { struct log_io *l; struct fio_batch *batch; } *ud = udata;
+	Index *pk = space_index(sp, 0);
+	struct iterator *it = pk->position;
+	[pk initIterator: it :ITER_FORWARD];
+
+	while ((tuple = it->next(it)))
+		snapshot_write_tuple(ud->l, ud->batch, space_n(sp), tuple);
+}
+
 void
 mod_snapshot(struct log_io *l, struct fio_batch *batch)
 {
@@ -577,20 +591,9 @@ mod_snapshot(struct log_io *l, struct fio_batch *batch)
 	if (primary_indexes_enabled == false)
 		return;
 
-	for (uint32_t n = 0; n < BOX_SPACE_MAX; ++n) {
-		if (!spaces[n].enabled)
-			continue;
+	struct { struct log_io *l; struct fio_batch *batch; } ud = { l, batch };
 
-		Index *pk = spaces[n].index[0];
-
-		struct iterator *it = pk->position;
-		[pk initIterator: it :ITER_FORWARD];
-
-		struct tuple *tuple;
-		while ((tuple = it->next(it))) {
-			snapshot_write_tuple(l, batch, n, tuple);
-		}
-	}
+	space_foreach(snapshot_space, &ud);
 }
 
 void
