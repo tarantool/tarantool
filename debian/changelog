@@ -1,3 +1,9 @@
+tarantool (1.4.7+20121010-1) unstable; urgency=low
+
+  * New snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 10 Oct 2012 17:22:26 +0400
+
 tarantool (1.4.7+20120918-1) unstable; urgency=low
 
   * New snapshot (some fixes in lua:box.slab).
