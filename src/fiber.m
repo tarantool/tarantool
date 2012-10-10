@@ -391,6 +391,8 @@ fiber_loop(void *data __attribute__((unused)))
 		} @catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled", fiber->name);
 			say_info("fiber `%s': exiting", fiber->name);
+		} @catch (tnt_Exception *e) {
+			[e log];
 		} @catch (id e) {
 			say_error("fiber `%s': exception `%s'", fiber->name, object_getClassName(e));
 			panic("fiber `%s': exiting", fiber->name);
