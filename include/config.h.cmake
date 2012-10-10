@@ -8,7 +8,8 @@
  * A string with major-minor-patch-commit-id identifier of the
  * release.
  */
-#define TARANTOOL_VERSION "@TARANTOOL_VERSION@"
+#define PACKAGE_VERSION "@TARANTOOL_VERSION@"
+#define PACKAGE "@PACKAGE@"
 /*  Defined if building for Linux */
 #cmakedefine TARGET_OS_LINUX 1
 /*  Defined if building for FreeBSD */
