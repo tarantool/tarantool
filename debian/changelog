@@ -1,3 +1,9 @@
+tarantool (1.4.7+20121010.2202-2) unstable; urgency=low
+
+  * New snapshot (Don't exit on a trivial socket error).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 10 Oct 2012 22:01:58 +0400
+
 tarantool (1.4.7+20121010-1) unstable; urgency=low
 
   * New snapshot.
