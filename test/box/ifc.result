@@ -255,6 +255,14 @@ lua ch:put(box.info.pid)
 ---
  - true
 ...
+lua ch:is_full()
+---
+ - true
+...
+lua ch:is_empty()
+---
+ - false
+...
 lua ch:get(box.info.pid) == box.info.pid
 ---
  - true
