@@ -121,8 +121,6 @@ lbox_fiber_semaphore_counter(struct lua_State *L)
 
 	struct fiber_semaphore *sm = lbox_check_semaphore(L, -1);
 
-
-	lua_pop(L, -1);
 	lua_pushnumber(L, fiber_semaphore_counter(sm));
 	return 1;
 }
@@ -389,16 +387,16 @@ lbox_fiber_channel_get(struct lua_State *L)
 		luaL_error(L, "usage: channel:get([timeout])");
 
 	if (top == 2) {
-		if (!lua_isnumber(L, -1))
+		if (!lua_isnumber(L, 2))
 			luaL_error(L, "timeout must be number");
-		timeout = lua_tonumber(L, -1);
+		timeout = lua_tonumber(L, 2);
 		if (timeout < 0)
 			luaL_error(L, "wrong timeout");
 	} else {
 		timeout = 0;
 	}
 
-	struct fiber_channel *ch = lbox_check_channel(L, -top);
+	struct fiber_channel *ch = lbox_check_channel(L, 1);
 
 	lua_Integer rid = (lua_Integer)fiber_channel_get_timeout(ch, timeout);
 
@@ -407,20 +405,59 @@ lbox_fiber_channel_get(struct lua_State *L)
 		return 1;
 	}
 
-	lua_getmetatable(L, -1);
-	lua_pushnumber(L, rid);
+	lua_getmetatable(L, 1);
+
+	lua_pushstring(L, "broadcast_message");
 	lua_gettable(L, -2);
 
-	lua_pushnumber(L, rid);
-	lua_pushnil(L);
-	lua_settable(L, -4);
+	if (lua_isnil(L, -1)) {	/* common messages */
+		lua_pop(L, 1);		/* nil */
 
-	lua_remove(L, -2);	/* cleanup stack */
+		lua_pushnumber(L, rid);		/* extract and delete value */
+		lua_gettable(L, -2);
+
+		lua_pushnumber(L, rid);
+		lua_pushnil(L);
+		lua_settable(L, -4);
+	}
+
+	lua_remove(L, -2);	/* cleanup stack (metatable) */
 	return 1;
 }
 
 
 
+static int
+lbox_fiber_channel_broadcast(struct lua_State *L)
+{
+	struct fiber_channel *ch;
+
+	if (lua_gettop(L) != 2)
+		luaL_error(L, "usage: channel:broadcast(variable)");
+
+	ch = lbox_check_channel(L, -2);
+
+	lua_getmetatable(L, -2);			/* 3 */
+
+	lua_pushstring(L, "broadcast_message");		/* 4 */
+
+	/* save old value */
+	lua_pushstring(L, "broadcast_message");
+	lua_gettable(L, 3);				/* 5 */
+
+	lua_pushstring(L, "broadcast_message");		/* save object */
+	lua_pushvalue(L, 2);
+	lua_settable(L, 3);
+
+	int count = fiber_channel_broadcast(ch, (void *)1);
+
+	lua_settable(L, 3);
+
+	lua_pop(L, 1);		/* stack cleanup */
+	lua_pushnumber(L, count);
+
+	return 1;
+}
 
 
 
@@ -456,6 +493,7 @@ fiber_ifc_lua_init(struct lua_State *L)
 		{"is_empty",	lbox_fiber_channel_isempty},
 		{"put",		lbox_fiber_channel_put},
 		{"get",		lbox_fiber_channel_get},
+		{"broadcast",	lbox_fiber_channel_broadcast},
 		{NULL, NULL}
 	};
 	tarantool_lua_register_type(L, channel_lib, channel_meta);
@@ -476,6 +514,6 @@ fiber_ifc_lua_init(struct lua_State *L)
 	lua_newtable(L);			/* box.ifc table */
 	luaL_register(L, NULL, ifc_meta);
 	lua_settable(L, -3);
-	lua_pop(L, -1);
+	lua_pop(L, 1);
 }
 

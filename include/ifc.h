@@ -245,6 +245,15 @@ void fiber_channel_put(struct fiber_channel *ch, void *data);
 */
 void *fiber_channel_get(struct fiber_channel *ch);
 
+
+/**
+@brief wake up all fibers that sleep by fiber_channel_get and send message to them
+@param channel
+@param data
+@return count of fibers received the message
+*/
+int fiber_channel_broadcast(struct fiber_channel *ch, void *data);
+
 /**
 @brief check if channel is empty
 @param channel
