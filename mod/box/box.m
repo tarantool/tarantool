@@ -98,7 +98,7 @@ box_process_rw(struct txn *txn, struct port *port,
 		stop = ev_now();
 		if (stop - start > cfg.too_long_threshold)
 			say_warn("too long %s: %.3f sec",
-				 requests_strs[op], stop - start);
+				 request_name(op), stop - start);
 	}
 }
 

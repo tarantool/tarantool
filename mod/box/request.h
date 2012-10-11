@@ -100,6 +100,8 @@ request_is_select(u32 type)
 	return type == SELECT || type == CALL;
 }
 
+const char *request_name(u32 type);
+
 struct request
 {
 	u32 type;

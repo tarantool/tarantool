@@ -817,22 +817,30 @@ execute_delete(struct request *request, struct txn *txn, struct port *port)
  * We must collect stats before execute.
  * Check request type here for now.
  */
-static void
+static bool
 request_check_type(u32 type)
 {
-	if (type != REPLACE && type != SELECT &&
-	    type != UPDATE && type != DELETE_1_3 &&
-	    type != DELETE && type != CALL) {
+	return (type != REPLACE && type != SELECT &&
+		type != UPDATE && type != DELETE_1_3 &&
+		type != DELETE && type != CALL);
+}
 
-		say_error("Unsupported request = %" PRIi32 "", type);
-		tnt_raise(IllegalParams, :"unsupported command code, "
-			  "check the error log");
-	}
+const char *
+request_name(u32 type)
+{
+	if (request_check_type(type))
+		return "unsupported";
+	return requests_strs[type];
 }
 
 struct request *
 request_create(u32 type, struct tbuf *data)
 {
+	if (request_check_type(type)) {
+		say_error("Unsupported request = %" PRIi32 "", type);
+		tnt_raise(IllegalParams, :"unsupported command code, "
+			  "check the error log");
+	}
 	request_check_type(type);
 	struct request *request = palloc(fiber->gc_pool, sizeof(struct request));
 	request->type = type;
