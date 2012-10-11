@@ -533,7 +533,7 @@ mod_init(void)
 	if (cfg.secondary_port != 0) {
 		static struct coio_service secondary;
 		coio_service_init(&secondary, "secondary",
-				  cfg.bind_ipaddr, cfg.primary_port,
+				  cfg.bind_ipaddr, cfg.secondary_port,
 				  iproto_interact, iproto_secondary_port_handler);
 		evio_service_start(&secondary.evio_service);
 	}
