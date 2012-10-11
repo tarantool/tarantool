@@ -47,6 +47,7 @@
 #include "port.h"
 #include "request.h"
 #include "txn.h"
+#include "coio.h"
 
 static void box_process_replica(struct txn *txn, struct port *port,
 				u32 op, struct tbuf *request_data);
@@ -277,7 +278,7 @@ recover_snap_row(struct tbuf *t)
 	tuple->field_count = row->tuple_size;
 
 	struct space *space = space_find(row->space);
-	Index *index = space->index[0];
+	Index *index = space_index(space, 0);
 	[index buildNext: tuple];
 	tuple_ref(tuple, 1);
 }
@@ -518,22 +519,33 @@ mod_init(void)
 	}
 
 	/* run primary server */
-	if (cfg.primary_port != 0)
-		fiber_server("primary", cfg.primary_port,
-			     (fiber_server_callback) iproto_interact,
-			     iproto_primary_port_handler,
-			     box_leave_local_standby_mode);
+	if (cfg.primary_port != 0) {
+		static struct coio_service primary;
+		coio_service_init(&primary, "primary",
+				  cfg.bind_ipaddr, cfg.primary_port,
+				  iproto_interact, iproto_primary_port_handler);
+		evio_service_on_bind(&primary.evio_service,
+				     box_leave_local_standby_mode, NULL);
+		evio_service_start(&primary.evio_service);
+	}
 
 	/* run secondary server */
-	if (cfg.secondary_port != 0)
-		fiber_server("secondary", cfg.secondary_port,
-			     (fiber_server_callback) iproto_interact,
-			     iproto_secondary_port_handler, NULL);
+	if (cfg.secondary_port != 0) {
+		static struct coio_service secondary;
+		coio_service_init(&secondary, "secondary",
+				  cfg.bind_ipaddr, cfg.primary_port,
+				  iproto_interact, iproto_secondary_port_handler);
+		evio_service_start(&secondary.evio_service);
+	}
 
 	/* run memcached server */
-	if (cfg.memcached_port != 0)
-		fiber_server("memcached", cfg.memcached_port,
-			     memcached_handler, NULL, NULL);
+	if (cfg.memcached_port != 0) {
+		static struct coio_service memcached;
+		coio_service_init(&memcached, "memcached",
+				  cfg.bind_ipaddr, cfg.memcached_port,
+				  memcached_handler, NULL);
+		evio_service_start(&memcached.evio_service);
+	}
 }
 
 int
@@ -558,6 +570,20 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 			   tuple->data, tuple->bsize);
 }
 
+
+static void
+snapshot_space(struct space *sp, void *udata)
+{
+	struct tuple *tuple;
+	struct { struct log_io *l; struct fio_batch *batch; } *ud = udata;
+	Index *pk = space_index(sp, 0);
+	struct iterator *it = pk->position;
+	[pk initIterator: it :ITER_FORWARD];
+
+	while ((tuple = it->next(it)))
+		snapshot_write_tuple(ud->l, ud->batch, space_n(sp), tuple);
+}
+
 void
 mod_snapshot(struct log_io *l, struct fio_batch *batch)
 {
@@ -565,20 +591,9 @@ mod_snapshot(struct log_io *l, struct fio_batch *batch)
 	if (primary_indexes_enabled == false)
 		return;
 
-	for (uint32_t n = 0; n < BOX_SPACE_MAX; ++n) {
-		if (!spaces[n].enabled)
-			continue;
+	struct { struct log_io *l; struct fio_batch *batch; } ud = { l, batch };
 
-		Index *pk = spaces[n].index[0];
-
-		struct iterator *it = pk->position;
-		[pk initIterator: it :ITER_FORWARD];
-
-		struct tuple *tuple;
-		while ((tuple = it->next(it))) {
-			snapshot_write_tuple(l, batch, n, tuple);
-		}
-	}
+	space_foreach(snapshot_space, &ud);
 }
 
 void

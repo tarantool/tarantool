@@ -41,6 +41,7 @@
 #include <fiber.h>
 #include TARANTOOL_CONFIG
 #include "tarantool.h"
+#include "sio.h"
 
 int sayfd = STDERR_FILENO;
 pid_t logger_pid;
@@ -112,7 +113,7 @@ say_logger_init(int nonblock)
 	}
       out:
 	if (nonblock)
-		set_nonblock(sayfd);
+		sio_setfl(sayfd, O_NONBLOCK, 1);
 
 	setvbuf(stderr, NULL, _IONBF, 0);
 }
@@ -120,7 +121,6 @@ say_logger_init(int nonblock)
 void
 vsay(int level, const char *filename, int line, const char *error, const char *format, va_list ap)
 {
-	const char *peer_name = fiber_peer_name(fiber);
 	size_t p = 0, len = PIPE_BUF;
 	const char *f;
 	static __thread char buf[PIPE_BUF];
@@ -136,9 +136,6 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 
 	ev_now_update();
 
-	if (peer_name == NULL)
-		peer_name = "_";
-
 	for (f = filename; *f; f++)
 		if (*f == '/' && *(f + 1) != '\0')
 			filename = f + 1;
@@ -152,8 +149,8 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 	p += snprintf(buf + p, len - p, ":%06.3f",
 		      ev_now() - now + tm.tm_sec);
 
-	p += snprintf(buf + p, len - p, " [%i] %i/%s %s", getpid(),
-		      fiber->fid, fiber->name, peer_name);
+	p += snprintf(buf + p, len - p, " [%i] %i/%s", getpid(),
+		      fiber->fid, fiber->name);
 
 	if (level == S_WARN || level == S_ERROR)
 		p += snprintf(buf + p, len - p, " %s:%i", filename, line);

@@ -281,7 +281,7 @@ hash_iterator_next(struct iterator *iterator)
 	assert(iterator->next == hash_iterator_next);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	while (it->h_pos != mh_end(it->hash)) {
+	while (it->h_pos < mh_end(it->hash)) {
 		if (mh_exist(it->hash, it->h_pos))
 			return mh_value(it->hash, it->h_pos++);
 		it->h_pos++;

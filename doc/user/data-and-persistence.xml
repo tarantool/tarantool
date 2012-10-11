@@ -6,7 +6,7 @@
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xmlns:xi="http://www.w3.org/2001/XInclude"
          xml:id="data-and-persistence">
-<title>Data model and data persitence</title>
+<title>Data model and data persistence</title>
 <blockquote><para>
   This chapter describes how Tarantool stores 
   values and what operations with data it supports.

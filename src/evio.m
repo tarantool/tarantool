@@ -28,8 +28,8 @@
  */
 #include "evio.h"
 #include <stdio.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 
 #define BIND_RETRY_DELAY 0.1
@@ -79,7 +79,7 @@ evio_service_accept_cb(ev_io *watcher,
 		 * Invoke the callback and pass it the accepted
 		 * socket.
 		 */
-		service->on_accept(service->on_accept_param, fd, &addr);
+		service->on_accept(service, fd, &addr);
 
 	} @catch (tnt_Exception *e) {
 		if (fd >= 0)
@@ -155,7 +155,8 @@ evio_service_timer_cb(ev_timer *watcher, int revents __attribute__((unused)))
 void
 evio_service_init(struct evio_service *service, const char *name,
 		  const char *host, int port,
-		  void (*on_accept)(void *, int, struct sockaddr_in *),
+		  void (*on_accept)(struct evio_service *, int,
+				    struct sockaddr_in *),
 		  void *on_accept_param)
 {
 	memset(service, 0, sizeof(struct evio_service));

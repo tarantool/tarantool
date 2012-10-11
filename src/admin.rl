@@ -44,6 +44,7 @@
 #include <tbuf.h>
 #include <util.h>
 #include <errinj.h>
+#include "coio_buf.h"
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -188,7 +189,7 @@ show_stat(struct tbuf *buf)
 }
 
 static int
-admin_dispatch(lua_State *L)
+admin_dispatch(struct coio *coio, lua_State *L)
 {
 	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
 	struct tbuf *err = tbuf_alloc(fiber->gc_pool);
@@ -198,8 +199,8 @@ admin_dispatch(lua_State *L)
 	bool state;
 
 	while ((pe = memchr(fiber->rbuf.data, '\n', fiber->rbuf.size)) == NULL) {
-		if (fiber_bread(&fiber->rbuf, 1) <= 0)
-			return 0;
+		if (coio_bread(coio, &fiber->rbuf, 1) <= 0)
+			return -1;
 	}
 
 	pe++;
@@ -331,36 +332,36 @@ admin_dispatch(lua_State *L)
 		end(out);
 	}
 
-	return fiber_write(out->data, out->size);
+	coio_write(coio, out->data, out->size);
+	return 0;
 }
 
 static void
-admin_handler(void *data __attribute__((unused)))
+admin_handler(va_list ap)
 {
+	struct coio coio = va_arg(ap, struct coio);
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	@try {
 		for (;;) {
-			if (admin_dispatch(L) <= 0)
+			if (admin_dispatch(&coio, L) < 0)
 				return;
 			fiber_gc();
 		}
 	} @finally {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+		coio_close(&coio);
 	}
 }
 
-int
+void
 admin_init(void)
 {
-	if (fiber_server("admin", cfg.admin_port, admin_handler, NULL, NULL) == NULL) {
-		say_syserror("can't bind to %d", cfg.admin_port);
-		return -1;
-	}
-	return 0;
+	static struct coio_service admin;
+	coio_service_init(&admin, "admin", cfg.bind_ipaddr,
+			  cfg.admin_port, admin_handler, NULL);
+	evio_service_start(&admin.evio_service);
 }
-
-
 
 /*
  * Local Variables:

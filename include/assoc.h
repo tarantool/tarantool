@@ -68,3 +68,4 @@ static inline int lstrcmp(void *a, void *b)
 #define mh_hash(key) ({ void *_k = (key); unsigned l = load_varint32(&_k); MurmurHash2(_k, l, 13); })
 #define mh_eq(a, b) (lstrcmp((a), (b)) == 0)
 #include <mhash.h>
+

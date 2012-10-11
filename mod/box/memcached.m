@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "memcached.h"
 #include "tarantool.h"
 
 #include <limits.h>
@@ -43,6 +44,7 @@
 #include "pickle.h"
 #include "space.h"
 #include "port.h"
+#include "coio_buf.h"
 
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
@@ -298,9 +300,9 @@ void memcached_get(size_t keys_count, struct tbuf *keys,
 }
 
 static void
-flush_all(void *data)
+flush_all(va_list ap)
 {
-	uintptr_t delay = (uintptr_t)data;
+	uintptr_t delay = va_arg(ap, uintptr_t);
 	fiber_sleep(delay - ev_now());
 	struct tuple *tuple;
 	struct iterator *it = [memcached_index allocIterator];
@@ -333,58 +335,67 @@ do {										\
 #include "memcached-grammar.m"
 
 void
-memcached_handler(void *_data __attribute__((unused)))
+memcached_loop(struct coio *coio)
 {
-	stats.total_connections++;
-	stats.curr_connections++;
-	int r, p;
+	int rc;
+	int bytes_written;
 	int batch_count;
 
 	for (;;) {
 		batch_count = 0;
-		if ((r = fiber_bread(&fiber->rbuf, 1)) <= 0) {
-			say_debug("read returned %i, closing connection", r);
-			goto exit;
-		}
+		if (coio_bread(coio, &fiber->rbuf, 1) <= 0)
+			return;
 
 	dispatch:
-		p = memcached_dispatch();
-		if (p < 0) {
+		rc = memcached_dispatch(coio);
+		if (rc < 0) {
 			say_debug("negative dispatch, closing connection");
-			goto exit;
+			return;
 		}
 
-		if (p == 0 && batch_count == 0) /* we havn't successfully parsed any requests */
+		if (rc == 0 && batch_count == 0) /* we haven't successfully parsed any requests */
 			continue;
 
-		if (p == 1) {
+		if (rc == 1) {
 			batch_count++;
 			/* some unparsed commands remain and batch count less than 20 */
 			if (fiber->rbuf.size > 0 && batch_count < 20)
 				goto dispatch;
 		}
 
-		r = iov_flush();
-		if (r < 0) {
-			say_debug("flush_output failed, closing connection");
-			goto exit;
-		}
+		bytes_written = iov_flush(coio);
 
-		stats.bytes_written += r;
+		stats.bytes_written += bytes_written;
 		fiber_gc();
 
-		if (p == 1 && fiber->rbuf.size > 0) {
+		if (rc == 1 && fiber->rbuf.size > 0) {
 			batch_count = 0;
 			goto dispatch;
 		}
 	}
-exit:
-        iov_flush();
-	fiber_sleep(0.01);
-	say_debug("exit");
-	stats.curr_connections--; /* FIXME: nonlocal exit via exception will leak this counter */
 }
 
+
+void memcached_handler(va_list ap)
+{
+	struct coio coio = va_arg(ap, struct coio);
+	stats.total_connections++;
+	stats.curr_connections++;
+
+	@try {
+		memcached_loop(&coio);
+		iov_flush(&coio);
+	} @catch (FiberCancelException *e) {
+		@throw;
+	} @catch (tnt_Exception *e) {
+		[e log];
+	} @finally {
+		iov_reset();
+		fiber_sleep(0.01);
+		stats.curr_connections--;
+		coio_close(&coio);
+	}
+}
 
 int
 memcached_check_config(struct tarantool_cfg *conf)
@@ -401,13 +412,6 @@ memcached_check_config(struct tarantool_cfg *conf)
 	}
 
 	/* check memcached space number: it shoud be in segment [0, max_space] */
-	if ((conf->memcached_space < 0) ||
-	    (conf->memcached_space > BOX_SPACE_MAX)) {
-		/* invalid space number */
-		out_warning(0, "invalid memcached space number: %i",
-			    conf->memcached_space);
-		return -1;
-	}
 
 	if (conf->memcached_expire_per_loop <= 0) {
 		/* invalid expire per loop value */
@@ -435,7 +439,8 @@ memcached_init(void)
 
 	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 
-	memcached_index = spaces[cfg.memcached_space].index[0];
+	struct space *sp = space_by_n(cfg.memcached_space);
+	memcached_index = space_index(sp, 0);
 }
 
 void
@@ -451,19 +456,9 @@ memcached_space_init()
         if (cfg.memcached_port == 0)
                 return;
 
-	/* Configure memcached space. */
-	struct space *memc_s = &spaces[cfg.memcached_space];
-	memc_s->enabled = true;
-	memc_s->arity = 4;
 
-	memc_s->key_count = 1;
-	memc_s->key_defs = malloc(sizeof(struct key_def));
-
-	if (memc_s->key_defs == NULL)
-		panic("out of memory when configuring memcached_space");
-
-	struct key_def *key_def = memc_s->key_defs;
 	/* Configure memcached index key. */
+	struct key_def *key_def = malloc(sizeof(struct key_def));
 	key_def->part_count = 1;
 	key_def->is_unique = true;
 
@@ -479,8 +474,13 @@ memcached_space_init()
 	key_def->max_fieldno = 1;
 	key_def->cmp_order[0] = 0;
 
-	/* Configure memcached index. */
-	Index *memc_index = memc_s->index[0] = [Index alloc: HASH :key_def :memc_s];
+
+	struct space *memc_s =
+		space_create(cfg.memcached_space, key_def, 1, 4);
+
+	Index *memc_index = [Index alloc: HASH :key_def :memc_s];
+	space_set_index(memc_s, 0, memc_index);
+
 	[memc_index init: key_def :memc_s];
 }
 
@@ -515,7 +515,7 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 }
 
 void
-memcached_expire_loop(void *data __attribute__((unused)))
+memcached_expire_loop(va_list ap __attribute__((unused)))
 {
 	struct tuple *tuple = NULL;
 
@@ -556,8 +556,8 @@ void memcached_start_expire()
 		return;
 
 	assert(memcached_expire == NULL);
-	memcached_expire = fiber_create("memcached_expire", -1,
-					memcached_expire_loop, NULL);
+	memcached_expire = fiber_create("memcached_expire",
+					memcached_expire_loop);
 	if (memcached_expire == NULL)
 		say_error("can't start the expire fiber");
 	fiber_call(memcached_expire);

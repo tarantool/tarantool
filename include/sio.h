@@ -33,9 +33,10 @@
  * Provide better error logging and I/O statistics.
  */
 #include <stdbool.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
-#include <netinet/tcp.h> /* TCP_NODELAY */
 #include "exception.h"
 
 enum { SERVICE_NAME_MAXLEN = 32 };

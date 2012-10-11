@@ -43,7 +43,7 @@ salloc_stat_lua_cb(const struct slab_class_stats *cstat, void *cb_ctx)
 	 * Create a Lua table for every slab class. A class is
 	 * defined by its item size.
 	 */
-	luaL_pushnumber64(L, cstat->item_size);
+	lua_pushnumber(L, cstat->item_size);
 	lua_newtable(L);
 
 	lua_pushstring(L, "slabs");

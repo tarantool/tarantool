@@ -28,11 +28,10 @@
  */
 #include "sio.h"
 
+#include <sys/uio.h>
 #include <errno.h>
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include <netinet/tcp.h> /* TCP_NODELAY */
 #include <arpa/inet.h> /* inet_ntoa */
 
 #include "say.h"
@@ -73,7 +72,7 @@ sio_socketname(int fd)
 	va_end(ap);
 	const char *socketname = sio_socketname(fd);
 	errno = save_errno;
-	self = [self init: "in %s, called on %s", buf, socketname];
+	self = [self init: "%s, called on %s", buf, socketname];
 	return self;
 }
 @end
