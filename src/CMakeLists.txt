@@ -86,6 +86,7 @@ set (common_sources
      sio.m
      evio.m
      coio.m
+     iobuf.m
      coio_buf.m
      salloc.m
      pickle.m

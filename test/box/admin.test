@@ -4,6 +4,7 @@ import sys
 # clear statistics:
 server.stop()
 server.deploy()
+exec admin "exit"
 exec admin "show stat"
 exec admin "help"
 exec admin "show configuration"

@@ -27,18 +27,10 @@
  * SUCH DAMAGE.
  */
 #include "port.h"
-#include <pickle.h>
-#include <fiber.h>
-#include <tarantool_lua.h>
 #include "tuple.h"
-#include "box_lua.h"
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-#include "lj_obj.h"
-#include "lj_ctype.h"
-#include "lj_cdata.h"
-#include "lj_cconv.h"
+#include "iobuf.h"
+#include "fiber.h"
+#include "request.h"
 
 /*
   For tuples of size below this threshold, when sending a tuple
@@ -52,19 +44,6 @@
   child.
 */
 const int BOX_REF_THRESHOLD = 8196;
-
-static void
-tuple_unref(void *tuple)
-{
-	tuple_ref((struct tuple *) tuple, -1);
-}
-
-void
-iov_ref_tuple(struct tuple *tuple)
-{
-	tuple_ref(tuple, 1);
-	fiber_register_cleanup(tuple_unref, tuple);
-}
 
 void
 port_null_eof(struct port *port __attribute__((unused)))
@@ -90,8 +69,10 @@ struct port port_null = {
 struct port_iproto
 {
 	struct port_vtab *vtab;
+	struct obuf *buf;
 	/** Number of found tuples. */
 	u32 found;
+	void *pfound;
 };
 
 static inline struct port_iproto *
@@ -106,7 +87,9 @@ port_iproto_eof(struct port *ptr)
 	struct port_iproto *port = port_iproto(ptr);
 	/* found == 0 means add_tuple wasn't called at all. */
 	if (port->found == 0)
-		iov_dup(&port->found, sizeof(port->found));
+		obuf_dup(port->buf, &port->found, sizeof(port->found));
+	else
+		memcpy(port->pfound, &port->found, sizeof(port->found));
 }
 
 static void
@@ -115,17 +98,10 @@ port_iproto_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
 	struct port_iproto *port = port_iproto(ptr);
 	if (++port->found == 1) {
 		/* Found the first tuple, add tuple count. */
-		iov_add(&port->found, sizeof(port->found));
+		port->pfound = obuf_book(port->buf, sizeof(port->found));
 	}
 	if (flags & BOX_RETURN_TUPLE) {
-		size_t len = tuple_len(tuple);
-
-		if (len > BOX_REF_THRESHOLD) {
-			iov_ref_tuple(tuple);
-			iov_add(&tuple->bsize, len);
-		} else {
-			iov_dup(&tuple->bsize, len);
-		}
+		obuf_dup(port->buf, &tuple->bsize, tuple_len(tuple));
 	}
 }
 
@@ -135,11 +111,13 @@ static struct port_vtab port_iproto_vtab = {
 };
 
 struct port *
-port_iproto_create()
+port_iproto_create(struct obuf *buf)
 {
 	struct port_iproto *port = palloc(fiber->gc_pool, sizeof(struct port_iproto));
 	port->vtab = &port_iproto_vtab;
+	port->buf = buf;
 	port->found = 0;
+	port->pfound = NULL;
 	return (struct port *) port;
 }
 

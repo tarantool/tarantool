@@ -28,35 +28,19 @@
  */
 #include "fiber.h"
 #include "config.h"
-#include <arpa/inet.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <sysexits.h>
-#include <third_party/queue.h>
 #include <assoc.h>
 
-#include <palloc.h>
-#include <salloc.h>
 #include <say.h>
 #include <tarantool.h>
 #include TARANTOOL_CONFIG
-#include <tarantool_ev.h>
 #include <tbuf.h>
-#include <util.h>
 #include <stat.h>
 #include <pickle.h>
-#include "coio_buf.h"
+#include "iobuf.h"
 
 @implementation FiberCancelException
 @end
@@ -68,21 +52,8 @@ __thread struct fiber *fiber = &sched;
 static __thread struct fiber *call_stack[FIBER_CALL_STACK];
 static __thread struct fiber **sp;
 static __thread uint32_t last_used_fid;
-static __thread struct palloc_pool *ex_pool;
 static __thread struct mh_i32ptr_t *fibers_registry;
 __thread SLIST_HEAD(, fiber) fibers, zombie_fibers;
-
-struct fiber_cleanup {
-	void (*handler) (void *data);
-	void *data;
-};
-
-struct fiber_server {
-	int port;
-	void *data;
-	void (*handler) (va_list ap);
-	void (*on_bind) (void *data);
-};
 
 static void
 update_last_stack_frame(struct fiber *fiber)
@@ -180,7 +151,6 @@ fiber_cancel(struct fiber *f)
 	 * at least that we can't get scheduled ourselves
 	 * unless asynchronously woken up is somewhat a relief.
 	 */
-
 	fiber_testcancel(); /* Check if we're ourselves cancelled. */
 }
 
@@ -194,7 +164,6 @@ fiber_is_cancelled()
  * cancelled, and raise an exception (FiberCancelException) if
  * that's the case.
  */
-
 void
 fiber_testcancel(void)
 {
@@ -258,7 +227,6 @@ fiber_sleep(ev_tstamp delay)
 /** Wait for a forked child to complete.
  * @note: this is a cancellation point (@sa fiber_testcancel()).
 */
-
 void
 wait_for_child(pid_t pid)
 {
@@ -306,59 +274,15 @@ static void
 fiber_alloc(struct fiber *fiber)
 {
 	prelease(fiber->gc_pool);
-	tbuf_init(&fiber->rbuf, fiber->gc_pool);
-	tbuf_init(&fiber->iov, fiber->gc_pool);
-	tbuf_init(&fiber->cleanup, fiber->gc_pool);
-	fiber->iov_cnt = 0;
-}
-
-void
-fiber_register_cleanup(fiber_cleanup_handler handler, void *data)
-{
-	struct fiber_cleanup i;
-	i.handler = handler;
-	i.data = data;
-	tbuf_append(&fiber->cleanup, &i, sizeof(struct fiber_cleanup));
-}
-
-void
-fiber_cleanup(void)
-{
-	struct fiber_cleanup *cleanup = fiber->cleanup.data;
-	int i = fiber->cleanup.size / sizeof(struct fiber_cleanup);
-
-	while (i-- > 0) {
-		cleanup->handler(cleanup->data);
-		cleanup++;
-	}
-	tbuf_reset(&fiber->cleanup);
 }
 
 void
 fiber_gc(void)
 {
-	struct palloc_pool *tmp;
-
-	fiber_cleanup();
-
 	if (palloc_allocated(fiber->gc_pool) < 128 * 1024)
 		return;
 
-	tmp = fiber->gc_pool;
-	fiber->gc_pool = ex_pool;
-	ex_pool = tmp;
-	palloc_set_name(fiber->gc_pool, fiber->name);
-	palloc_set_name(ex_pool, "ex_pool");
-
-	struct tbuf tmp_rbuf = fiber->rbuf;
-	tbuf_init(&fiber->rbuf, fiber->gc_pool);
-	tbuf_append(&fiber->rbuf, tmp_rbuf.data, tmp_rbuf.size);
-
-	assert(fiber->iov_cnt == 0);
-	tbuf_init(&fiber->iov, fiber->gc_pool);
-	tbuf_init(&fiber->cleanup, fiber->gc_pool);
-
-	prelease(ex_pool);
+	prelease(fiber->gc_pool);
 }
 
 
@@ -397,7 +321,6 @@ fiber_loop(void *data __attribute__((unused)))
 			say_error("fiber `%s': exception `%s'", fiber->name, object_getClassName(e));
 			panic("fiber `%s': exiting", fiber->name);
 		}
-		tbuf_reset(&fiber->rbuf);
 		fiber_zombificate();
 		fiber_yield();	/* give control back to scheduler */
 	}
@@ -492,28 +415,9 @@ fiber_destroy_all()
 		fiber_destroy(f);
 }
 
-void
-iov_reset()
-{
-	fiber->iov_cnt = 0;	/* discard anything unwritten */
-	tbuf_reset(&fiber->iov);
-}
-
 /**
  * @note: this is a cancellation point.
  */
-
-ssize_t
-iov_flush(struct coio *coio)
-{
-	struct iovec *iov = iovec(&fiber->iov);
-	size_t iov_cnt = fiber->iov_cnt;
-
-	ssize_t nwr = coio_writev(coio, iov, iov_cnt);
-	iov_reset();
-	return nwr;
-}
-
 void
 fiber_info(struct tbuf *out)
 {
@@ -541,8 +445,6 @@ fiber_init(void)
 	SLIST_INIT(&fibers);
 	fibers_registry = mh_i32ptr_init();
 
-	ex_pool = palloc_create_pool("ex_pool");
-
 	memset(&sched, 0, sizeof(sched));
 	sched.fid = 1;
 	sched.gc_pool = palloc_create_pool("");
@@ -552,7 +454,7 @@ fiber_init(void)
 	fiber = &sched;
 	last_used_fid = 100;
 
-	coio_binit(cfg.readahead);
+	iobuf_init_readahead(cfg.readahead);
 }
 
 void

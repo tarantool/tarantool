@@ -40,21 +40,27 @@
 static void
 remote_apply_row(struct recovery_state *r, struct tbuf *row);
 
-static struct tbuf *
-remote_read_row(struct coio *coio)
+static struct tbuf
+remote_read_row(struct coio *coio, struct iobuf *iobuf)
 {
-	ssize_t to_read = sizeof(struct header_v11) - fiber->rbuf.size;
+	struct ibuf *in = &iobuf->in;
+	ssize_t to_read = sizeof(struct header_v11) - ibuf_size(in);
 
 	if (to_read > 0)
-		coio_breadn(coio, &fiber->rbuf, to_read);
+		coio_breadn(coio, in, to_read);
 
-	ssize_t request_len = header_v11(&fiber->rbuf)->len + sizeof(struct header_v11);
-	to_read = request_len - fiber->rbuf.size;
+	ssize_t request_len = ((struct header_v11 *)in->pos)->len + sizeof(struct header_v11);
+	to_read = request_len - ibuf_size(in);
 
 	if (to_read > 0)
-		coio_breadn(coio, &fiber->rbuf, to_read);
+		coio_breadn(coio, in, to_read);
 
-	return tbuf_split(&fiber->rbuf, request_len);
+	struct tbuf row = {
+		.size = request_len, .capacity = request_len,
+		.data = in->pos, .pool = fiber->gc_pool
+	};
+	in->pos += request_len;
+	return row;
 }
 
 static void
@@ -83,8 +89,10 @@ pull_from_remote(va_list ap)
 {
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
 	struct coio coio;
+	struct iobuf *iobuf = NULL;
 	bool warning_said = false;
 	const int reconnect_delay = 1;
+
 	coio_clear(&coio);
 
 	for (;;) {
@@ -92,22 +100,26 @@ pull_from_remote(va_list ap)
 		@try {
 			fiber_setcancelstate(true);
 			if (! coio_is_connected(&coio)) {
+				if (iobuf == NULL)
+					iobuf = iobuf_create(fiber->name);
 				remote_connect(&coio, &r->remote->addr,
 					       r->confirmed_lsn + 1, &err);
 				warning_said = false;
 			}
 			err = "can't read row";
-			struct tbuf *row = remote_read_row(&coio);
+			struct tbuf row = remote_read_row(&coio, iobuf);
 			fiber_setcancelstate(false);
 			err = NULL;
 
-			r->remote->recovery_lag = ev_now() - header_v11(row)->tm;
+			r->remote->recovery_lag = ev_now() - header_v11(&row)->tm;
 			r->remote->recovery_last_update_tstamp = ev_now();
 
-			remote_apply_row(r, row);
+			remote_apply_row(r, &row);
 
+			iobuf_gc(iobuf);
 			fiber_gc();
 		} @catch (FiberCancelException *e) {
+			iobuf_destroy(iobuf);
 			coio_close(&coio);
 			@throw;
 		} @catch (tnt_Exception *e) {

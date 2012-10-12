@@ -33,11 +33,11 @@
 }%%
 
 static int __attribute__((noinline))
-memcached_dispatch(struct coio *coio)
+memcached_dispatch(struct coio *coio, struct iobuf *iobuf)
 {
 	int cs;
-	u8 *p, *pe;
-	u8 *fstart;
+	char *p, *pe;
+	char *fstart;
 	struct tbuf *keys = tbuf_alloc(fiber->gc_pool);
 	void *key;
 	bool append, show_cas;
@@ -45,14 +45,17 @@ memcached_dispatch(struct coio *coio)
 	u64 cas, incr;
 	u32 flags, exptime, bytes;
 	bool noreply = false;
-	u8 *data = NULL;
+	char *data = NULL;
 	bool done = false;
-	size_t saved_iov_cnt = fiber->iov_cnt;
 	uintptr_t flush_delay = 0;
 	size_t keys_count = 0;
+	struct ibuf *in = &iobuf->in;
+	struct obuf *out = &iobuf->out;
+	/* Savepoint for 'noreply' */
+	struct obuf_svp obuf_svp = obuf_create_svp(out);
 
-	p = fiber->rbuf.data;
-	pe = fiber->rbuf.data + fiber->rbuf.size;
+	p = in->pos;
+	pe = in->end;
 
 	say_debug("memcached_dispatch '%.*s'", MIN((int)(pe - p), 40) , p);
 
@@ -66,7 +69,7 @@ memcached_dispatch(struct coio *coio)
 			key = read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple != NULL && !expired(tuple))
-				iov_add("NOT_STORED\r\n", 12);
+				obuf_dup(out, "NOT_STORED\r\n", 12);
 			else
 				STORE;
 		}
@@ -75,7 +78,7 @@ memcached_dispatch(struct coio *coio)
 			key = read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
-				iov_add("NOT_STORED\r\n", 12);
+				obuf_dup(out, "NOT_STORED\r\n", 12);
 			else
 				STORE;
 		}
@@ -84,9 +87,9 @@ memcached_dispatch(struct coio *coio)
 			key = read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
-				iov_add("NOT_FOUND\r\n", 11);
+				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			else if (meta(tuple)->cas != cas)
-				iov_add("EXISTS\r\n", 8);
+				obuf_dup(out, "EXISTS\r\n", 8);
 			else
 				STORE;
 		}
@@ -99,7 +102,7 @@ memcached_dispatch(struct coio *coio)
 			key = read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST) {
-				iov_add("NOT_STORED\r\n", 12);
+				obuf_dup(out, "NOT_STORED\r\n", 12);
 			} else {
 				value = tuple_field(tuple, 3);
 				value_len = load_varint32(&value);
@@ -128,7 +131,7 @@ memcached_dispatch(struct coio *coio)
 			key = read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
-				iov_add("NOT_FOUND\r\n", 11);
+				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			} else {
 				m = meta(tuple);
 				field = tuple_field(tuple, 3);
@@ -158,16 +161,16 @@ memcached_dispatch(struct coio *coio)
 					@try {
 						store(key, exptime, flags, bytes, data);
 						stats.total_items++;
-						iov_add(b->data, b->size);
-						iov_add("\r\n", 2);
+						obuf_dup(out, b->data, b->size);
+						obuf_dup(out, "\r\n", 2);
 					}
 					@catch (ClientError *e) {
-						iov_add("SERVER_ERROR ", 13);
-						iov_add(e->errmsg, strlen(e->errmsg));
-						iov_add("\r\n", 2);
+						obuf_dup(out, "SERVER_ERROR ", 13);
+						obuf_dup(out, e->errmsg, strlen(e->errmsg));
+						obuf_dup(out, "\r\n", 2);
 					}
 				} else {
-					iov_add("CLIENT_ERROR cannot increment or decrement non-numeric value\r\n", 62);
+					obuf_dup(out, "CLIENT_ERROR cannot increment or decrement non-numeric value\r\n", 62);
 				}
 			}
 
@@ -177,39 +180,39 @@ memcached_dispatch(struct coio *coio)
 			key = read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
-				iov_add("NOT_FOUND\r\n", 11);
+				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			} else {
 				@try {
 					delete(key);
-					iov_add("DELETED\r\n", 9);
+					obuf_dup(out, "DELETED\r\n", 9);
 				}
 				@catch (ClientError *e) {
-					iov_add("SERVER_ERROR ", 13);
-					iov_add(e->errmsg, strlen(e->errmsg));
-					iov_add("\r\n", 2);
+					obuf_dup(out, "SERVER_ERROR ", 13);
+					obuf_dup(out, e->errmsg, strlen(e->errmsg));
+					obuf_dup(out, "\r\n", 2);
 				}
 			}
 		}
 
 		action get {
 			@try {
-				memcached_get(keys_count, keys, show_cas);
+				memcached_get(out, keys_count, keys, show_cas);
 			} @catch (ClientError *e) {
-				iov_reset();
-				iov_add("SERVER_ERROR ", 13);
-				iov_add(e->errmsg, strlen(e->errmsg));
-				iov_add("\r\n", 2);
+				obuf_rollback_to_svp(out, &obuf_svp);
+				obuf_dup(out, "SERVER_ERROR ", 13);
+				obuf_dup(out, e->errmsg, strlen(e->errmsg));
+				obuf_dup(out, "\r\n", 2);
 			}
 		}
 
 		action flush_all {
 			struct fiber *f = fiber_create("flush_all", flush_all);
 			fiber_call(f, flush_delay);
-			iov_add("OK\r\n", 4);
+			obuf_dup(out, "OK\r\n", 4);
 		}
 
 		action stats {
-			print_stats();
+			print_stats(out);
 		}
 
 		action quit {
@@ -247,14 +250,17 @@ memcached_dispatch(struct coio *coio)
 		flush_delay = digit+ >fstart %{flush_delay = natoq(fstart, p);};
 
 		action read_data {
-			size_t parsed = p - (u8 *)fiber->rbuf.data;
-			while (fiber->rbuf.size - parsed < bytes + 2) {
-				if (coio_bread(coio, &fiber->rbuf, bytes + 2 - (pe - p)) <= 0)
+			size_t parsed = p - in->pos;
+			while (ibuf_size(in) - parsed < bytes + 2) {
+				if (coio_bread(coio, in, bytes + 2 - (pe - p)) <= 0)
 					return -1;
 			}
-
-			p = fiber->rbuf.data + parsed;
-			pe = fiber->rbuf.data + fiber->rbuf.size;
+			/*
+			 * Buffered read may have reallocated the
+			 * buffer.
+			 */
+			p = in->pos + parsed;
+			pe = in->end;
 
 			data = p;
 
@@ -267,8 +273,8 @@ memcached_dispatch(struct coio *coio)
 
 		action done {
 			done = true;
-			stats.bytes_read += p - (u8 *)fiber->rbuf.data;
-			tbuf_peek(&fiber->rbuf, p - (u8 *)fiber->rbuf.data);
+			stats.bytes_read += p - in->pos;
+			in->pos = p;
 		}
 
 		eol = ("\r\n" | "\n") @{ p++; };
@@ -305,22 +311,21 @@ memcached_dispatch(struct coio *coio)
 		if (pe - p > (1 << 20)) {
 		exit:
 			say_warn("memcached proto error");
-			iov_add("ERROR\r\n", 7);
+			obuf_dup(out, "ERROR\r\n", 7);
 			stats.bytes_written += 7;
 			return -1;
 		}
 		char *r;
 		if ((r = memmem(p, pe - p, "\r\n", 2)) != NULL) {
-			tbuf_peek(&fiber->rbuf, r + 2 - (char *)fiber->rbuf.data);
-			iov_add("CLIENT_ERROR bad command line format\r\n", 38);
+			in->pos = r + 2;
+			obuf_dup(out, "CLIENT_ERROR bad command line format\r\n", 38);
 			return 1;
 		}
 		return 0;
 	}
 
 	if (noreply) {
-		fiber->iov_cnt = saved_iov_cnt;
-		fiber->iov.size = saved_iov_cnt * sizeof(struct iovec);
+		obuf_rollback_to_svp(out, &obuf_svp);
 	}
 	return 1;
 }

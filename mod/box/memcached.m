@@ -71,16 +71,18 @@ struct meta {
 } __packed__;
 
 static u64
-natoq(const u8 *start, const u8 *end)
+natoq(const char *start, const char *end)
 {
 	u64 num = 0;
-	while (start < end)
-		num = num * 10 + (*start++ - '0');
+	while (start < end) {
+		u8 code = *start++;
+		num = num * 10 + (code - '0');
+	}
 	return num;
 }
 
 static void
-store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
+store(void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 {
 	u32 box_flags = 0;
 	u32 field_count = 4;
@@ -111,7 +113,7 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, u8 *data)
 
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
-		  key_len, key_len, (u8 *)key, exptime, flags, cas);
+		  key_len, key_len, (char*) key, exptime, flags, cas);
 	/*
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
@@ -191,45 +193,44 @@ salloc_stat_memcached_cb(const struct slab_class_stats *cstat, void *cb_ctx)
 }
 
 static void
-print_stats()
+print_stats(struct obuf *out)
 {
-	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
+	struct tbuf *buf = tbuf_alloc(fiber->gc_pool);
 
 	struct salloc_stat_memcached_cb_ctx memstats;
 	memstats.bytes_used = memstats.items = 0;
 	salloc_stat(salloc_stat_memcached_cb, NULL, &memstats);
 
-	tbuf_printf(out, "STAT pid %"PRIu32"\r\n", (u32)getpid());
-	tbuf_printf(out, "STAT uptime %"PRIu32"\r\n", (u32)tarantool_uptime());
-	tbuf_printf(out, "STAT time %"PRIu32"\r\n", (u32)ev_now());
-	tbuf_printf(out, "STAT version 1.2.5 (tarantool/box)\r\n");
-	tbuf_printf(out, "STAT pointer_size %"PRI_SZ"\r\n", sizeof(void *)*8);
-	tbuf_printf(out, "STAT curr_items %"PRIu64"\r\n", memstats.items);
-	tbuf_printf(out, "STAT total_items %"PRIu64"\r\n", stats.total_items);
-	tbuf_printf(out, "STAT bytes %"PRIu64"\r\n", memstats.bytes_used);
-	tbuf_printf(out, "STAT curr_connections %"PRIu32"\r\n", stats.curr_connections);
-	tbuf_printf(out, "STAT total_connections %"PRIu32"\r\n", stats.total_connections);
-	tbuf_printf(out, "STAT connection_structures %"PRIu32"\r\n", stats.curr_connections); /* lie a bit */
-	tbuf_printf(out, "STAT cmd_get %"PRIu64"\r\n", stats.cmd_get);
-	tbuf_printf(out, "STAT cmd_set %"PRIu64"\r\n", stats.cmd_set);
-	tbuf_printf(out, "STAT get_hits %"PRIu64"\r\n", stats.get_hits);
-	tbuf_printf(out, "STAT get_misses %"PRIu64"\r\n", stats.get_misses);
-	tbuf_printf(out, "STAT evictions %"PRIu64"\r\n", stats.evictions);
-	tbuf_printf(out, "STAT bytes_read %"PRIu64"\r\n", stats.bytes_read);
-	tbuf_printf(out, "STAT bytes_written %"PRIu64"\r\n", stats.bytes_written);
-	tbuf_printf(out, "STAT limit_maxbytes %"PRIu64"\r\n", (u64)(cfg.slab_alloc_arena * (1 << 30)));
-	tbuf_printf(out, "STAT threads 1\r\n");
-	tbuf_printf(out, "END\r\n");
-	iov_add(out->data, out->size);
+	tbuf_printf(buf, "STAT pid %"PRIu32"\r\n", (u32)getpid());
+	tbuf_printf(buf, "STAT uptime %"PRIu32"\r\n", (u32)tarantool_uptime());
+	tbuf_printf(buf, "STAT time %"PRIu32"\r\n", (u32)ev_now());
+	tbuf_printf(buf, "STAT version 1.2.5 (tarantool/box)\r\n");
+	tbuf_printf(buf, "STAT pointer_size %"PRI_SZ"\r\n", sizeof(void *)*8);
+	tbuf_printf(buf, "STAT curr_items %"PRIu64"\r\n", memstats.items);
+	tbuf_printf(buf, "STAT total_items %"PRIu64"\r\n", stats.total_items);
+	tbuf_printf(buf, "STAT bytes %"PRIu64"\r\n", memstats.bytes_used);
+	tbuf_printf(buf, "STAT curr_connections %"PRIu32"\r\n", stats.curr_connections);
+	tbuf_printf(buf, "STAT total_connections %"PRIu32"\r\n", stats.total_connections);
+	tbuf_printf(buf, "STAT connection_structures %"PRIu32"\r\n", stats.curr_connections); /* lie a bit */
+	tbuf_printf(buf, "STAT cmd_get %"PRIu64"\r\n", stats.cmd_get);
+	tbuf_printf(buf, "STAT cmd_set %"PRIu64"\r\n", stats.cmd_set);
+	tbuf_printf(buf, "STAT get_hits %"PRIu64"\r\n", stats.get_hits);
+	tbuf_printf(buf, "STAT get_misses %"PRIu64"\r\n", stats.get_misses);
+	tbuf_printf(buf, "STAT evictions %"PRIu64"\r\n", stats.evictions);
+	tbuf_printf(buf, "STAT bytes_read %"PRIu64"\r\n", stats.bytes_read);
+	tbuf_printf(buf, "STAT bytes_written %"PRIu64"\r\n", stats.bytes_written);
+	tbuf_printf(buf, "STAT limit_maxbytes %"PRIu64"\r\n", (u64)(cfg.slab_alloc_arena * (1 << 30)));
+	tbuf_printf(buf, "STAT threads 1\r\n");
+	tbuf_printf(buf, "END\r\n");
+	obuf_dup(out, buf->data, buf->size);
 }
 
-void memcached_get(size_t keys_count, struct tbuf *keys,
+void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 		   bool show_cas)
 {
 	stat_collect(stat_base, MEMC_GET, 1);
 	stats.cmd_get++;
 	say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
-	iov_ensure(keys_count * 5 + 1);
 	while (keys_count-- > 0) {
 		struct tuple *tuple;
 		struct meta *m;
@@ -279,23 +280,21 @@ void memcached_get(size_t keys_count, struct tbuf *keys,
 		stats.get_hits++;
 		stat_collect(stat_base, MEMC_GET_HIT, 1);
 
-		iov_ref_tuple(tuple);
-
 		if (show_cas) {
 			struct tbuf *b = tbuf_alloc(fiber->gc_pool);
-			tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (u8 *)key, m->flags, value_len, m->cas);
-			iov_add_unsafe(b->data, b->size);
+			tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (char*) key, m->flags, value_len, m->cas);
+			obuf_dup(out, b->data, b->size);
 			stats.bytes_written += b->size;
 		} else {
-			iov_add_unsafe("VALUE ", 6);
-			iov_add_unsafe(key, key_len);
-			iov_add_unsafe(suffix, suffix_len);
+			obuf_dup(out, "VALUE ", 6);
+			obuf_dup(out, key, key_len);
+			obuf_dup(out, suffix, suffix_len);
 		}
-		iov_add_unsafe(value, value_len);
-		iov_add_unsafe("\r\n", 2);
+		obuf_dup(out, value, value_len);
+		obuf_dup(out, "\r\n", 2);
 		stats.bytes_written += value_len + 2;
 	}
-	iov_add_unsafe("END\r\n", 5);
+	obuf_dup(out, "END\r\n", 5);
 	stats.bytes_written += 5;
 }
 
@@ -317,17 +316,17 @@ flush_all(va_list ap)
 do {										\
 	stats.cmd_set++;							\
 	if (bytes > (1<<20)) {							\
-		iov_add("SERVER_ERROR object too large for cache\r\n", 41);	\
+		obuf_dup(out, "SERVER_ERROR object too large for cache\r\n", 41);\
 	} else {								\
 		@try {								\
 			store(key, exptime, flags, bytes, data);		\
 			stats.total_items++;					\
-			iov_add("STORED\r\n", 8);				\
+			obuf_dup(out, "STORED\r\n", 8);				\
 		}								\
 		@catch (ClientError *e) {					\
-			iov_add("SERVER_ERROR ", 13);				\
-			iov_add(e->errmsg, strlen(e->errmsg));			\
-			iov_add("\r\n", 2);					\
+			obuf_dup(out, "SERVER_ERROR ", 13);			\
+			obuf_dup(out, e->errmsg, strlen(e->errmsg));		\
+			obuf_dup(out, "\r\n", 2);				\
 		}								\
 	}									\
 } while (0)
@@ -335,19 +334,20 @@ do {										\
 #include "memcached-grammar.m"
 
 void
-memcached_loop(struct coio *coio)
+memcached_loop(struct coio *coio, struct iobuf *iobuf)
 {
 	int rc;
 	int bytes_written;
 	int batch_count;
+	struct ibuf *in = &iobuf->in;
 
 	for (;;) {
 		batch_count = 0;
-		if (coio_bread(coio, &fiber->rbuf, 1) <= 0)
+		if (coio_bread(coio, in, 1) <= 0)
 			return;
 
 	dispatch:
-		rc = memcached_dispatch(coio);
+		rc = memcached_dispatch(coio, iobuf);
 		if (rc < 0) {
 			say_debug("negative dispatch, closing connection");
 			return;
@@ -359,16 +359,15 @@ memcached_loop(struct coio *coio)
 		if (rc == 1) {
 			batch_count++;
 			/* some unparsed commands remain and batch count less than 20 */
-			if (fiber->rbuf.size > 0 && batch_count < 20)
+			if (ibuf_size(in) > 0 && batch_count < 20)
 				goto dispatch;
 		}
 
-		bytes_written = iov_flush(coio);
-
-		stats.bytes_written += bytes_written;
+		bytes_written = iobuf_flush(iobuf, coio);
 		fiber_gc();
+		stats.bytes_written += bytes_written;
 
-		if (rc == 1 && fiber->rbuf.size > 0) {
+		if (rc == 1 && ibuf_size(in) > 0) {
 			batch_count = 0;
 			goto dispatch;
 		}
@@ -379,21 +378,22 @@ memcached_loop(struct coio *coio)
 void memcached_handler(va_list ap)
 {
 	struct coio coio = va_arg(ap, struct coio);
+	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
 	stats.total_connections++;
 	stats.curr_connections++;
 
 	@try {
-		memcached_loop(&coio);
-		iov_flush(&coio);
+		memcached_loop(&coio, iobuf);
+		iobuf_flush(iobuf, &coio);
 	} @catch (FiberCancelException *e) {
 		@throw;
 	} @catch (tnt_Exception *e) {
 		[e log];
 	} @finally {
-		iov_reset();
 		fiber_sleep(0.01);
 		stats.curr_connections--;
 		coio_close(&coio);
+		iobuf_destroy(iobuf);
 	}
 }
 

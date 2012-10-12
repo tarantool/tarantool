@@ -45,13 +45,6 @@ struct port
 	struct port_vtab *vtab;
 };
 
-/**
- * A hack to keep tuples alive until iov_flush(fiber->iovec).
- * Is internal to port_iproto implementation, but is also
- * used in memcached.m, which doesn't use fiber->iovec.
- */
-void iov_ref_tuple(struct tuple *tuple);
-
 static inline void
 port_eof(struct port *port)
 {
@@ -74,7 +67,9 @@ port_null_eof(struct port *port __attribute__((unused)));
  */
 extern struct port port_null;
 
+struct obuf;
+
 struct port *
-port_iproto_create();
+port_iproto_create(struct obuf *buf);
 
 #endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

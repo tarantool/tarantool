@@ -32,6 +32,7 @@
 #include <stdio.h>
 
 #include "fiber.h"
+#include "iobuf.h"
 #include "sio.h"
 
 void
@@ -222,7 +223,7 @@ coio_write(struct coio *coio, const void *buf, size_t sz)
 }
 
 ssize_t
-coio_writev(struct coio *coio, struct iovec *iov, int iovcnt)
+coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size)
 {
 	ssize_t total = 0;
 	@try {
@@ -232,6 +233,11 @@ coio_writev(struct coio *coio, struct iovec *iov, int iovcnt)
 			ssize_t nwr = sio_writev(coio->ev.fd, iov, iovcnt);
 			if (nwr >= 0) {
 				total += nwr;
+				/* If there was a hint for the total size
+				 * of the vector, use it.
+				 */
+				if (size > 0 && size == total)
+					return total;
 				iov = sio_advance_iov(iov, &iovcnt, nwr);
 				if (iovcnt == 0)
 					break;
@@ -260,18 +266,24 @@ coio_service_on_accept(struct evio_service *evio_service,
 	coio_init(&coio, fd);
 
 	/* Set connection name. */
-	char name[SERVICE_NAME_MAXLEN];
-	snprintf(name, sizeof(name),
+	char fiber_name[SERVICE_NAME_MAXLEN];
+	char iobuf_name[SERVICE_NAME_MAXLEN];
+	snprintf(fiber_name, sizeof(fiber_name),
 		 "%s/%s", evio_service->name, sio_strfaddr(addr));
+	snprintf(iobuf_name, sizeof(iobuf_name), "%s/%s", "iobuf", sio_strfaddr(addr));
 
 	/* Create the worker fiber. */
+	struct iobuf *iobuf = NULL;
 	struct fiber *f;
 
 	@try {
-		f = fiber_create(name, service->handler);
+		iobuf = iobuf_create(iobuf_name);
+		f = fiber_create(fiber_name, service->handler);
 	} @catch (tnt_Exception *e) {
 		say_error("can't create a handler fiber, dropping client connection");
 		coio_close(&coio);
+		if (iobuf)
+			iobuf_destroy(iobuf);
 		@throw;
 	}
 	/*
@@ -283,7 +295,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 	 * Start the created fiber. It becomes the coio object owner
 	 * and will have to close it and free before termination.
 	 */
-	fiber_call(f, coio, service->handler_param);
+	fiber_call(f, coio, iobuf, service->handler_param);
 }
 
 void

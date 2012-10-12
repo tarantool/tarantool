@@ -28,4 +28,3 @@
  */
 #include "coio_buf.h"
 
-int coio_readahead;

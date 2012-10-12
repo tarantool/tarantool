@@ -29,34 +29,26 @@
  * SUCH DAMAGE.
  */
 #include "coio.h"
-#include "tbuf.h"
+#include "iobuf.h"
 /** Buffered cooperative IO */
 
-extern int coio_readahead;
-
-static inline void
-coio_binit(int readahead)
-{
-	coio_readahead =  readahead;
-}
-
+/** Read at least sz bytes, buffered. Return 0 in case of EOF. */
 static inline ssize_t
-coio_bread(struct coio *coio, struct tbuf *buf, size_t sz)
+coio_bread(struct coio *coio, struct ibuf *buf, size_t sz)
 {
-	tbuf_ensure(buf, MAX(sz, coio_readahead));
-	ssize_t n = coio_read_ahead(coio, tbuf_end(buf),
-				    sz, tbuf_unused(buf));
-	buf->size += n;
+	ibuf_reserve(buf, sz);
+	ssize_t n = coio_read_ahead(coio, buf->end, sz, ibuf_unused(buf));
+	buf->end += n;
 	return n;
 }
 
+/** Read at least sz bytes, buffered. Throw an exception in case of EOF. */
 static inline ssize_t
-coio_breadn(struct coio *coio, struct tbuf *buf, size_t sz)
+coio_breadn(struct coio *coio, struct ibuf *buf, size_t sz)
 {
-	tbuf_ensure(buf, MAX(sz, coio_readahead));
-	ssize_t n = coio_readn_ahead(coio, tbuf_end(buf),
-				     sz, tbuf_unused(buf));
-	buf->size += n;
+	ibuf_reserve(buf, sz);
+	ssize_t n = coio_readn_ahead(coio, buf->end, sz, ibuf_unused(buf));
+	buf->end += n;
 	return n;
 }
 

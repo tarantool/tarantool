@@ -149,7 +149,7 @@ struct fio_batch
 	ssize_t bytes;
 	/** Total number of batched rows.*/
 	int rows;
-	/** A cap on how many can be batched. Can be set to INT_MAX. */
+	/** A cap on how many rows can be batched. Can be set to INT_MAX. */
 	int max_rows;
 	/** A system cap on how many rows can be batched. */
 	long max_iov;

@@ -28,6 +28,7 @@
  */
 #include <tarantool_lua.h>
 #include <tarantool.h>
+#include "tbuf.h"
 
 #include "lua.h"
 #include "lauxlib.h"

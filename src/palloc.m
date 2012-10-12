@@ -42,7 +42,7 @@
 #include <tbuf.h>
 #include "exception.h"
 
-#define PALLOC_POOL_NAME_MAXLEN 16
+#define PALLOC_POOL_NAME_MAXLEN 30
 
 struct chunk {
 	uint32_t magic;
@@ -69,9 +69,9 @@ TAILQ_HEAD(class_tailq_head, chunk_class) classes;
 
 struct palloc_pool {
 	struct chunk_list_head chunks;
-	 SLIST_ENTRY(palloc_pool) link;
+	SLIST_ENTRY(palloc_pool) link;
 	size_t allocated;
-	const char *name;
+	char name[PALLOC_POOL_NAME_MAXLEN];
 };
 
 SLIST_HEAD(palloc_pool_head, palloc_pool) pools;
@@ -464,7 +464,7 @@ palloc_stat(struct tbuf *buf)
 void
 palloc_set_name(struct palloc_pool *pool, const char *name)
 {
-	pool->name = name;
+	snprintf(pool->name, sizeof(pool->name), "%s", name);
 }
 
 size_t
