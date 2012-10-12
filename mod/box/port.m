@@ -66,63 +66,21 @@ iov_ref_tuple(struct tuple *tuple)
 	fiber_register_cleanup(tuple_unref, tuple);
 }
 
-u32*
-port_null_add_u32(struct port *port __attribute__((unused)))
-{
-	static u32 dummy;
-	return &dummy;
-}
-
 void
-port_null_dup_u32(struct port *port __attribute__((unused)),
-		  u32 num __attribute__((unused)))
+port_null_eof(struct port *port __attribute__((unused)))
 {
 }
 
 static void
 port_null_add_tuple(struct port *port __attribute__((unused)),
-		    struct tuple *tuple __attribute__((unused)))
+		    struct tuple *tuple __attribute__((unused)),
+		    u32 flags __attribute__((unused)))
 {
-}
-
-static u32*
-port_iproto_add_u32(struct port *port __attribute__((unused)))
-{
-	u32 *p_u32 = palloc(fiber->gc_pool, sizeof(u32));
-	iov_add(p_u32, sizeof(u32));
-	return p_u32;
-}
-
-static void
-port_iproto_dup_u32(struct port *port __attribute__((unused)), u32 u32)
-{
-	iov_dup(&u32, sizeof(u32));
-}
-
-static void
-port_iproto_add_tuple(struct port *port __attribute__((unused)),
-		      struct tuple *tuple)
-{
-	size_t len = tuple_len(tuple);
-
-	if (len > BOX_REF_THRESHOLD) {
-		iov_ref_tuple(tuple);
-		iov_add(&tuple->bsize, len);
-	} else {
-		iov_dup(&tuple->bsize, len);
-	}
 }
 
 static struct port_vtab port_null_vtab = {
-	port_null_add_u32,
-	port_null_dup_u32,
 	port_null_add_tuple,
-};
-
-static struct port_vtab port_iproto_vtab = {
-	port_iproto_add_u32,
-	port_iproto_dup_u32,
-	port_iproto_add_tuple,
+	port_null_eof,
 };
 
 struct port port_null = {
@@ -134,6 +92,46 @@ struct port_iproto
 	struct port_vtab *vtab;
 	/** Number of found tuples. */
 	u32 found;
+};
+
+static inline struct port_iproto *
+port_iproto(struct port *port)
+{
+	return (struct port_iproto *) port;
+}
+
+static void
+port_iproto_eof(struct port *ptr)
+{
+	struct port_iproto *port = port_iproto(ptr);
+	/* found == 0 means add_tuple wasn't called at all. */
+	if (port->found == 0)
+		iov_dup(&port->found, sizeof(port->found));
+}
+
+static void
+port_iproto_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
+{
+	struct port_iproto *port = port_iproto(ptr);
+	if (++port->found == 1) {
+		/* Found the first tuple, add tuple count. */
+		iov_add(&port->found, sizeof(port->found));
+	}
+	if (flags & BOX_RETURN_TUPLE) {
+		size_t len = tuple_len(tuple);
+
+		if (len > BOX_REF_THRESHOLD) {
+			iov_ref_tuple(tuple);
+			iov_add(&tuple->bsize, len);
+		} else {
+			iov_dup(&tuple->bsize, len);
+		}
+	}
+}
+
+static struct port_vtab port_iproto_vtab = {
+	port_iproto_add_tuple,
+	port_iproto_eof,
 };
 
 struct port *

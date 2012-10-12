@@ -888,7 +888,8 @@ port_lua(struct port *port) { return (struct port_lua *) port; }
  */
 
 static void
-port_lua_add_tuple(struct port *port, struct tuple *tuple)
+port_lua_add_tuple(struct port *port, struct tuple *tuple,
+		   u32 flags __attribute__((unused)))
 {
 	lua_State *L = port_lua(port)->L;
 	@try {
@@ -899,9 +900,8 @@ port_lua_add_tuple(struct port *port, struct tuple *tuple)
 }
 
 struct port_vtab port_lua_vtab = {
-	port_null_add_u32,
-	port_null_dup_u32,
 	port_lua_add_tuple,
+	port_null_eof,
 };
 
 static struct port *
@@ -1068,7 +1068,7 @@ port_add_lua_ret(struct port *port, struct lua_State *L, int index)
 		break;
 	}
 	@try {
-		port_add_tuple(port, tuple);
+		port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
 	} @finally {
 		if (tuple->refs == 0)
 			tuple_free(tuple);
@@ -1084,11 +1084,9 @@ port_add_lua_ret(struct port *port, struct lua_State *L, int index)
  * then each return value as a tuple.
  */
 static void
-port_add_lua_multret(struct port *port __attribute__((unused)),
-			    struct lua_State *L)
+port_add_lua_multret(struct port *port, struct lua_State *L)
 {
 	int nargs = lua_gettop(L);
-	port_dup_u32(port, nargs);
 	for (int i = 1; i <= nargs; ++i)
 		port_add_lua_ret(port, L, i);
 }

@@ -35,9 +35,9 @@ struct port;
 
 struct port_vtab
 {
-	u32* (*add_u32)(struct port *port);
-	void (*dup_u32)(struct port *port, u32 num);
-	void (*add_tuple)(struct port *port, struct tuple *tuple);
+	void (*add_tuple)(struct port *port, struct tuple *tuple, u32 flags);
+	/** Must be called in the end of execution of a single request. */
+	void (*eof)(struct port *port);
 };
 
 struct port
@@ -52,33 +52,24 @@ struct port
  */
 void iov_ref_tuple(struct tuple *tuple);
 
-static inline u32*
-port_add_u32(struct port *port)
+static inline void
+port_eof(struct port *port)
 {
-	return (port->vtab->add_u32)(port);
+	return (port->vtab->eof)(port);
 }
 
 static inline void
-port_dup_u32(struct port *port, u32 num)
+port_add_tuple(struct port *port, struct tuple *tuple, u32 flags)
 {
-	(port->vtab->dup_u32)(port, num);
-}
-
-static inline void
-port_add_tuple(struct port *port, struct tuple *tuple)
-{
-	(port->vtab->add_tuple)(port, tuple);
+	(port->vtab->add_tuple)(port, tuple, flags);
 }
 
 /** Reused in port_lua */
-u32*
-port_null_add_u32(struct port *port __attribute__((unused)));
-
 void
-port_null_dup_u32(struct port *port __attribute__((unused)),
-		  u32 num __attribute__((unused)));
+port_null_eof(struct port *port __attribute__((unused)));
 
-/** These do not have state currently, thus a single
+/**
+ * This one does not have state currently, thus a single
  * instance is sufficient.
  */
 extern struct port port_null;
