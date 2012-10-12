@@ -111,10 +111,7 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 
 	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
 
-	port_dup_u32(port, 1); /* Affected tuples */
-
-	if (flags & BOX_RETURN_TUPLE)
-		port_add_tuple(port, txn->new_tuple);
+	port_send_tuple(flags, port, txn->new_tuple);
 }
 
 /** {{{ UPDATE request implementation.

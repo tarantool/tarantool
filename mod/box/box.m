@@ -129,13 +129,13 @@ box_process_ro(struct txn *txn, struct port *port,
 static void
 iproto_primary_port_handler(u32 op, struct tbuf *request_data)
 {
-	box_process(txn_begin(), &port_iproto, op, request_data);
+	box_process(txn_begin(), port_iproto_create(), op, request_data);
 }
 
 static void
 iproto_secondary_port_handler(u32 op, struct tbuf *request_data)
 {
-	box_process_ro(txn_begin(), &port_iproto, op, request_data);
+	box_process_ro(txn_begin(), port_iproto_create(), op, request_data);
 }
 
 static void

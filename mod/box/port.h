@@ -33,18 +33,19 @@
 struct tuple;
 struct lua_State;
 
+struct port;
+
 struct port_vtab
 {
-	u32* (*add_u32)(void *data);
-	void (*dup_u32)(void *data, u32 num);
-	void (*add_tuple)(void *data, struct tuple *tuple);
-	void (*add_lua_multret)(void *data, struct lua_State *L);
+	u32* (*add_u32)(struct port *port);
+	void (*dup_u32)(struct port *port, u32 num);
+	void (*add_tuple)(struct port *port, struct tuple *tuple);
+	void (*add_lua_multret)(struct port *port, struct lua_State *L);
 };
 
 struct port
 {
 	struct port_vtab *vtab;
-	void *data;
 };
 
 /**
@@ -54,53 +55,47 @@ struct port
  */
 void iov_ref_tuple(struct tuple *tuple);
 
-/** Create a port instance. */
-static inline void
-port_init(struct port *port, struct port_vtab *vtab, void *data)
-{
-	port->vtab = vtab;
-	port->data = data;
-}
-
 static inline u32*
 port_add_u32(struct port *port)
 {
-	return (port->vtab->add_u32)(port->data);
+	return (port->vtab->add_u32)(port);
 }
 
 static inline void
 port_dup_u32(struct port *port, u32 num)
 {
-	(port->vtab->dup_u32)(port->data, num);
+	(port->vtab->dup_u32)(port, num);
 }
 
 static inline void
 port_add_tuple(struct port *port, struct tuple *tuple)
 {
-	(port->vtab->add_tuple)(port->data, tuple);
+	(port->vtab->add_tuple)(port, tuple);
 }
 
 static inline void
 port_add_lua_multret(struct port *port, struct lua_State *L)
 {
-	(port->vtab->add_lua_multret)(port->data, L);
+	(port->vtab->add_lua_multret)(port, L);
 }
 /** Reused in port_lua */
 u32*
-port_null_add_u32(void *data __attribute__((unused)));
+port_null_add_u32(struct port *port __attribute__((unused)));
 
 void
-port_null_dup_u32(void *data __attribute__((unused)),
+port_null_dup_u32(struct port *port __attribute__((unused)),
 		  u32 num __attribute__((unused)));
 
 void
-port_null_add_lua_multret(void *data __attribute__((unused)),
+port_null_add_lua_multret(struct port *port __attribute__((unused)),
 			  struct lua_State *L __attribute__((unused)));
 
 /** These do not have state currently, thus a single
  * instance is sufficient.
  */
 extern struct port port_null;
-extern struct port port_iproto;
+
+struct port *
+port_iproto_create();
 
 #endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

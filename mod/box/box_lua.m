@@ -871,6 +871,15 @@ static const struct luaL_reg lbox_iterator_meta[] = {
  * and push into Lua stack.
  */
 
+struct port_lua
+{
+	struct port_vtab *vtab;
+	struct lua_State *L;
+};
+
+static inline struct port_lua *
+port_lua(struct port *port) { return (struct port_lua *) port; }
+
 /*
  * For addU32/dupU32 do nothing -- the only u32 Box can give
  * us is tuple count, and we don't need it, since we intercept
@@ -879,9 +888,9 @@ static const struct luaL_reg lbox_iterator_meta[] = {
  */
 
 static void
-port_lua_add_tuple(void *data, struct tuple *tuple)
+port_lua_add_tuple(struct port *port, struct tuple *tuple)
 {
-	lua_State *L = data;
+	lua_State *L = port_lua(port)->L;
 	@try {
 		lbox_pushtuple(L, tuple);
 	} @catch (...) {
@@ -895,6 +904,15 @@ struct port_vtab port_lua_vtab = {
 	port_lua_add_tuple,
 	port_null_add_lua_multret
 };
+
+static struct port *
+port_lua_create(struct lua_State *L)
+{
+	struct port_lua *port = palloc(fiber->gc_pool, sizeof(struct port_lua));
+	port->vtab = &port_lua_vtab;
+	port->L = L;
+	return (struct port *) port;
+}
 
 /* }}} */
 
@@ -931,8 +949,7 @@ static int lbox_process(lua_State *L)
 
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	struct txn *txn = txn_begin();
-	struct port *port_lua = palloc(fiber->gc_pool, sizeof(struct port));
-	port_init(port_lua, &port_lua_vtab, L);
+	struct port *port_lua = port_lua_create(L);
 	@try {
 		box_process(txn, port_lua, op, &req);
 	} @finally {

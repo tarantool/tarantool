@@ -67,32 +67,32 @@ iov_ref_tuple(struct tuple *tuple)
 }
 
 u32*
-port_null_add_u32(void *data __attribute__((unused)))
+port_null_add_u32(struct port *port __attribute__((unused)))
 {
 	static u32 dummy;
 	return &dummy;
 }
 
 void
-port_null_dup_u32(void *data __attribute__((unused)),
+port_null_dup_u32(struct port *port __attribute__((unused)),
 		  u32 num __attribute__((unused)))
 {
 }
 
 static void
-port_null_add_tuple(void *data __attribute__((unused)),
+port_null_add_tuple(struct port *port __attribute__((unused)),
 		    struct tuple *tuple __attribute__((unused)))
 {
 }
 
 void
-port_null_add_lua_multret(void *data __attribute__((unused)),
+port_null_add_lua_multret(struct port *port __attribute__((unused)),
 			  struct lua_State *L __attribute__((unused)))
 {
 }
 
 static u32*
-port_iproto_add_u32(void *data __attribute__((unused)))
+port_iproto_add_u32(struct port *port __attribute__((unused)))
 {
 	u32 *p_u32 = palloc(fiber->gc_pool, sizeof(u32));
 	iov_add(p_u32, sizeof(u32));
@@ -100,13 +100,14 @@ port_iproto_add_u32(void *data __attribute__((unused)))
 }
 
 static void
-port_iproto_dup_u32(void *data __attribute__((unused)), u32 u32)
+port_iproto_dup_u32(struct port *port __attribute__((unused)), u32 u32)
 {
 	iov_dup(&u32, sizeof(u32));
 }
 
 static void
-port_iproto_add_tuple(void *data __attribute__((unused)), struct tuple *tuple)
+port_iproto_add_tuple(struct port *port __attribute__((unused)),
+		      struct tuple *tuple)
 {
 	size_t len = tuple_len(tuple);
 
@@ -260,7 +261,8 @@ iov_add_ret(struct lua_State *L, int index)
  * then each return value as a tuple.
  */
 static void
-port_iproto_add_lua_multret(void *data __attribute__((unused)), struct lua_State *L)
+port_iproto_add_lua_multret(struct port *port __attribute__((unused)),
+			    struct lua_State *L)
 {
 	int nargs = lua_gettop(L);
 	iov_dup(&nargs, sizeof(u32));
@@ -268,14 +270,14 @@ port_iproto_add_lua_multret(void *data __attribute__((unused)), struct lua_State
 		iov_add_ret(L, i);
 }
 
-struct port_vtab port_null_vtab = {
+static struct port_vtab port_null_vtab = {
 	port_null_add_u32,
 	port_null_dup_u32,
 	port_null_add_tuple,
 	port_null_add_lua_multret,
 };
 
-struct port_vtab port_iproto_vtab = {
+static struct port_vtab port_iproto_vtab = {
 	port_iproto_add_u32,
 	port_iproto_dup_u32,
 	port_iproto_add_tuple,
@@ -284,11 +286,13 @@ struct port_vtab port_iproto_vtab = {
 
 struct port port_null = {
 	.vtab = &port_null_vtab,
-	.data = NULL,
 };
 
-struct port port_iproto = {
-	.vtab = &port_iproto_vtab,
-	.data = NULL,
-};
+struct port *
+port_iproto_create()
+{
+	struct port *port = palloc(fiber->gc_pool, sizeof(struct port));
+	port->vtab = &port_iproto_vtab;
+	return port;
+}
 
