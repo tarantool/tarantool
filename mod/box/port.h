@@ -31,8 +31,6 @@
 #include <util.h>
 
 struct tuple;
-struct lua_State;
-
 struct port;
 
 struct port_vtab
@@ -40,7 +38,6 @@ struct port_vtab
 	u32* (*add_u32)(struct port *port);
 	void (*dup_u32)(struct port *port, u32 num);
 	void (*add_tuple)(struct port *port, struct tuple *tuple);
-	void (*add_lua_multret)(struct port *port, struct lua_State *L);
 };
 
 struct port
@@ -73,11 +70,6 @@ port_add_tuple(struct port *port, struct tuple *tuple)
 	(port->vtab->add_tuple)(port, tuple);
 }
 
-static inline void
-port_add_lua_multret(struct port *port, struct lua_State *L)
-{
-	(port->vtab->add_lua_multret)(port, L);
-}
 /** Reused in port_lua */
 u32*
 port_null_add_u32(struct port *port __attribute__((unused)));
@@ -85,10 +77,6 @@ port_null_add_u32(struct port *port __attribute__((unused)));
 void
 port_null_dup_u32(struct port *port __attribute__((unused)),
 		  u32 num __attribute__((unused)));
-
-void
-port_null_add_lua_multret(struct port *port __attribute__((unused)),
-			  struct lua_State *L __attribute__((unused)));
 
 /** These do not have state currently, thus a single
  * instance is sufficient.

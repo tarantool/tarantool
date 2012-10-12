@@ -85,12 +85,6 @@ port_null_add_tuple(struct port *port __attribute__((unused)),
 {
 }
 
-void
-port_null_add_lua_multret(struct port *port __attribute__((unused)),
-			  struct lua_State *L __attribute__((unused)))
-{
-}
-
 static u32*
 port_iproto_add_u32(struct port *port __attribute__((unused)))
 {
@@ -119,180 +113,35 @@ port_iproto_add_tuple(struct port *port __attribute__((unused)),
 	}
 }
 
-/* Add a Lua table to iov as if it was a tuple, with as little
- * overhead as possible. */
-
-static void
-iov_add_lua_table(struct lua_State *L, int index)
-{
-	u32 *field_count = palloc(fiber->gc_pool, sizeof(u32));
-	u32 *tuple_len = palloc(fiber->gc_pool, sizeof(u32));
-
-	*field_count = 0;
-	*tuple_len = 0;
-
-	iov_add(tuple_len, sizeof(u32));
-	iov_add(field_count, sizeof(u32));
-
-	u8 field_len_buf[5];
-	size_t field_len, field_len_len;
-	const char *field;
-
-	lua_pushnil(L);  /* first key */
-	while (lua_next(L, index) != 0) {
-		++*field_count;
-
-		switch (lua_type(L, -1)) {
-		case LUA_TNUMBER:
-		{
-			u32 field_num = lua_tonumber(L, -1);
-			field_len = sizeof(u32);
-			field_len_len =
-				save_varint32(field_len_buf,
-					      field_len) - field_len_buf;
-			iov_dup(field_len_buf, field_len_len);
-			iov_dup(&field_num, field_len);
-			*tuple_len += field_len_len + field_len;
-			break;
-		}
-		case LUA_TCDATA:
-		{
-			u64 field_num = tarantool_lua_tointeger64(L, -1);
-			field_len = sizeof(u64);
-			field_len_len =
-				save_varint32(field_len_buf,
-					      field_len) - field_len_buf;
-			iov_dup(field_len_buf, field_len_len);
-			iov_dup(&field_num, field_len);
-			*tuple_len += field_len_len + field_len;
-			break;
-		}
-		case LUA_TSTRING:
-		{
-			field = lua_tolstring(L, -1, &field_len);
-			field_len_len =
-				save_varint32(field_len_buf,
-					      field_len) - field_len_buf;
-			iov_dup(field_len_buf, field_len_len);
-			iov_dup(field, field_len);
-			*tuple_len += field_len_len + field_len;
-			break;
-		}
-		default:
-			tnt_raise(ClientError, :ER_PROC_RET,
-				  lua_typename(L, lua_type(L, -1)));
-			break;
-		}
-		lua_pop(L, 1);
-	}
-}
-
-static void
-iov_add_ret(struct lua_State *L, int index)
-{
-	int type = lua_type(L, index);
-	struct tuple *tuple;
-	switch (type) {
-	case LUA_TTABLE:
-	{
-		iov_add_lua_table(L, index);
-		return;
-	}
-	case LUA_TNUMBER:
-	{
-		size_t len = sizeof(u32);
-		u32 num = lua_tointeger(L, index);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->field_count = 1;
-		memcpy(save_varint32(tuple->data, len), &num, len);
-		break;
-	}
-	case LUA_TCDATA:
-	{
-		u64 num = tarantool_lua_tointeger64(L, index);
-		size_t len = sizeof(u64);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->field_count = 1;
-		memcpy(save_varint32(tuple->data, len), &num, len);
-		break;
-	}
-	case LUA_TSTRING:
-	{
-		size_t len;
-		const char *str = lua_tolstring(L, index, &len);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->field_count = 1;
-		memcpy(save_varint32(tuple->data, len), str, len);
-		break;
-	}
-	case LUA_TNIL:
-	case LUA_TBOOLEAN:
-	{
-		const char *str = tarantool_lua_tostring(L, index);
-		size_t len = strlen(str);
-		tuple = tuple_alloc(len + varint32_sizeof(len));
-		tuple->field_count = 1;
-		memcpy(save_varint32(tuple->data, len), str, len);
-		break;
-	}
-	case LUA_TUSERDATA:
-	{
-		tuple = lua_istuple(L, index);
-		if (tuple)
-			break;
-	}
-	default:
-		/*
-		 * LUA_TNONE, LUA_TTABLE, LUA_THREAD, LUA_TFUNCTION
-		 */
-		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
-		break;
-	}
-	iov_ref_tuple(tuple);
-	iov_add(&tuple->bsize, tuple_len(tuple));
-}
-
-/**
- * Add all elements from Lua stack to fiber iov.
- *
- * To allow clients to understand a complex return from
- * a procedure, we are compatible with SELECT protocol,
- * and return the number of return values first, and
- * then each return value as a tuple.
- */
-static void
-port_iproto_add_lua_multret(struct port *port __attribute__((unused)),
-			    struct lua_State *L)
-{
-	int nargs = lua_gettop(L);
-	iov_dup(&nargs, sizeof(u32));
-	for (int i = 1; i <= nargs; ++i)
-		iov_add_ret(L, i);
-}
-
 static struct port_vtab port_null_vtab = {
 	port_null_add_u32,
 	port_null_dup_u32,
 	port_null_add_tuple,
-	port_null_add_lua_multret,
 };
 
 static struct port_vtab port_iproto_vtab = {
 	port_iproto_add_u32,
 	port_iproto_dup_u32,
 	port_iproto_add_tuple,
-	port_iproto_add_lua_multret,
 };
 
 struct port port_null = {
 	.vtab = &port_null_vtab,
 };
 
+struct port_iproto
+{
+	struct port_vtab *vtab;
+	/** Number of found tuples. */
+	u32 found;
+};
+
 struct port *
 port_iproto_create()
 {
-	struct port *port = palloc(fiber->gc_pool, sizeof(struct port));
+	struct port_iproto *port = palloc(fiber->gc_pool, sizeof(struct port_iproto));
 	port->vtab = &port_iproto_vtab;
-	return port;
+	port->found = 0;
+	return (struct port *) port;
 }
 

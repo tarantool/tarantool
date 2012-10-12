@@ -902,7 +902,6 @@ struct port_vtab port_lua_vtab = {
 	port_null_add_u32,
 	port_null_dup_u32,
 	port_lua_add_tuple,
-	port_null_add_lua_multret
 };
 
 static struct port *
@@ -912,6 +911,186 @@ port_lua_create(struct lua_State *L)
 	port->vtab = &port_lua_vtab;
 	port->L = L;
 	return (struct port *) port;
+}
+
+/**
+ * Convert a Lua table to a tuple with as little
+ * overhead as possible.
+ */
+static struct tuple *
+lua_table_to_tuple(struct lua_State *L, int index)
+{
+	u32 field_count = 0;
+	u32 tuple_len = 0;
+
+	size_t field_len;
+
+	/** First go: calculate tuple length. */
+	lua_pushnil(L);  /* first key */
+	while (lua_next(L, index) != 0) {
+		++field_count;
+
+		switch (lua_type(L, -1)) {
+		case LUA_TNUMBER:
+		{
+			uint64_t n = lua_tonumber(L, -1);
+			field_len = n > UINT32_MAX ? sizeof(uint64_t) : sizeof(uint32_t);
+			break;
+		}
+		case LUA_TCDATA:
+		{
+			/* Check if we can convert. */
+			(void) tarantool_lua_tointeger64(L, -1);
+			field_len = sizeof(u64);
+			break;
+		}
+		case LUA_TSTRING:
+		{
+			(void) lua_tolstring(L, -1, &field_len);
+			break;
+		}
+		default:
+			tnt_raise(ClientError, :ER_PROC_RET,
+				  lua_typename(L, lua_type(L, -1)));
+			break;
+		}
+		tuple_len += field_len + varint32_sizeof(field_len);
+		lua_pop(L, 1);
+	}
+	struct tuple *tuple = tuple_alloc(tuple_len);
+	/*
+	 * Important: from here and on if there is an exception,
+	 * the tuple is leaked.
+	 */
+	tuple->field_count = field_count;
+	u8 *pos = tuple->data;
+
+	/* Second go: store data in the tuple. */
+
+	lua_pushnil(L);  /* first key */
+	while (lua_next(L, index) != 0) {
+		switch (lua_type(L, -1)) {
+		case LUA_TNUMBER:
+		{
+			uint64_t n = lua_tonumber(L, -1);
+			if (n > UINT32_MAX) {
+				pos = memcpy(save_varint32(pos, sizeof(n)), &n,
+							   sizeof(n)) + sizeof(n);
+			} else {
+				uint32_t n32 = (uint32_t) n;
+				pos = memcpy(save_varint32(pos, sizeof(n32)), &n32,
+							   sizeof(n32)) + sizeof(n32);
+			}
+			break;
+		}
+		case LUA_TCDATA:
+		{
+			uint64_t n = tarantool_lua_tointeger64(L, -1);
+			pos = memcpy(save_varint32(pos, sizeof(n)), &n, sizeof(n))
+				+ sizeof(n);
+			break;
+		}
+		case LUA_TSTRING:
+		{
+			const char *field = lua_tolstring(L, -1, &field_len);
+			pos = memcpy(save_varint32(pos, field_len), field, field_len)
+				+ field_len;
+			break;
+		}
+		default:
+			assert(false);
+			break;
+		}
+		lua_pop(L, 1);
+	}
+	return tuple;
+}
+
+static void
+port_add_lua_ret(struct port *port, struct lua_State *L, int index)
+{
+	int type = lua_type(L, index);
+	struct tuple *tuple;
+	switch (type) {
+	case LUA_TTABLE:
+	{
+		tuple = lua_table_to_tuple(L, index);
+		break;
+	}
+	case LUA_TNUMBER:
+	{
+		size_t len = sizeof(u32);
+		u32 num = lua_tointeger(L, index);
+		tuple = tuple_alloc(len + varint32_sizeof(len));
+		tuple->field_count = 1;
+		memcpy(save_varint32(tuple->data, len), &num, len);
+		break;
+	}
+	case LUA_TCDATA:
+	{
+		u64 num = tarantool_lua_tointeger64(L, index);
+		size_t len = sizeof(u64);
+		tuple = tuple_alloc(len + varint32_sizeof(len));
+		tuple->field_count = 1;
+		memcpy(save_varint32(tuple->data, len), &num, len);
+		break;
+	}
+	case LUA_TSTRING:
+	{
+		size_t len;
+		const char *str = lua_tolstring(L, index, &len);
+		tuple = tuple_alloc(len + varint32_sizeof(len));
+		tuple->field_count = 1;
+		memcpy(save_varint32(tuple->data, len), str, len);
+		break;
+	}
+	case LUA_TNIL:
+	case LUA_TBOOLEAN:
+	{
+		const char *str = tarantool_lua_tostring(L, index);
+		size_t len = strlen(str);
+		tuple = tuple_alloc(len + varint32_sizeof(len));
+		tuple->field_count = 1;
+		memcpy(save_varint32(tuple->data, len), str, len);
+		break;
+	}
+	case LUA_TUSERDATA:
+	{
+		tuple = lua_istuple(L, index);
+		if (tuple)
+			break;
+	}
+	default:
+		/*
+		 * LUA_TNONE, LUA_TTABLE, LUA_THREAD, LUA_TFUNCTION
+		 */
+		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
+		break;
+	}
+	@try {
+		port_add_tuple(port, tuple);
+	} @finally {
+		if (tuple->refs == 0)
+			tuple_free(tuple);
+	}
+}
+
+/**
+ * Add all elements from Lua stack to fiber iov.
+ *
+ * To allow clients to understand a complex return from
+ * a procedure, we are compatible with SELECT protocol,
+ * and return the number of return values first, and
+ * then each return value as a tuple.
+ */
+static void
+port_add_lua_multret(struct port *port __attribute__((unused)),
+			    struct lua_State *L)
+{
+	int nargs = lua_gettop(L);
+	port_dup_u32(port, nargs);
+	for (int i = 1; i <= nargs; ++i)
+		port_add_lua_ret(port, L, i);
 }
 
 /* }}} */
