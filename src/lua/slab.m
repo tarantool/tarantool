@@ -26,8 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tarantool_lua_slab.h"
-#include "tarantool_lua.h"
+#include "lua/slab.h"
+#include "lua/init.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"

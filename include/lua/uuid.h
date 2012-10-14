@@ -36,4 +36,7 @@ lbox_uuid(struct lua_State *L);
 int
 lbox_uuid_hex(struct lua_State *L);
 
+void
+tarantool_lua_uuid_init(struct lua_State *L);
+
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_UUID_H */

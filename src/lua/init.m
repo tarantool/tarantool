@@ -26,8 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tarantool_lua.h>
-#include <tarantool.h>
+#include "lua/init.h"
+#include "tarantool.h"
 #include "tbuf.h"
 
 #include "lua.h"
@@ -43,9 +43,10 @@
 #include "pickle.h"
 #include "fiber.h"
 #include <ctype.h>
-#include "tarantool_lua_info.h"
-#include "tarantool_lua_slab.h"
-#include "tarantool_lua_stat.h"
+#include "lua/info.h"
+#include "lua/slab.h"
+#include "lua/stat.h"
+#include "lua/uuid.h"
 
 #include TARANTOOL_CONFIG
 
@@ -1258,6 +1259,7 @@ tarantool_lua_init()
 	tarantool_lua_info_init(L);
 	tarantool_lua_slab_init(L);
 	tarantool_lua_stat_init(L);
+	tarantool_lua_uuid_init(L);
 
 	mod_lua_init(L);
 

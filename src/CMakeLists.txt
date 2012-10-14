@@ -72,7 +72,7 @@ set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM 1)
 #
 set (recompiled_sources
      ${CMAKE_SOURCE_DIR}/src/tarantool.m
-     ${CMAKE_SOURCE_DIR}/src/tarantool_lua.m
+     ${CMAKE_SOURCE_DIR}/src/lua/init.m
      ${CMAKE_SOURCE_DIR}/src/say.m
      ${CMAKE_SOURCE_DIR}/src/assoc.m
      ${CMAKE_SOURCE_DIR}/src/admin.m
@@ -105,9 +105,10 @@ set (common_sources
      fio.c
      crc32.c
      rope.c
-     tarantool_lua_info.m
-     tarantool_lua_stat.m
-     tarantool_lua_slab.m)
+     lua/info.m
+     lua/stat.m
+     lua/slab.m
+     lua/uuid.m)
 
 if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.m)

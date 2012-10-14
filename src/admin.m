@@ -40,7 +40,7 @@
 #include <say.h>
 #include <stat.h>
 #include <tarantool.h>
-#include <tarantool_lua.h>
+#include "lua/init.h"
 #include <recovery.h>
 #include TARANTOOL_CONFIG
 #include <tbuf.h>

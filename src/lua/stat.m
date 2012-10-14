@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tarantool_lua_stat.h"
+#include "lua/stat.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
