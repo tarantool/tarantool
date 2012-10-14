@@ -220,7 +220,7 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
     parameters in two template files, which are easy to maintain
     and extend:
     <filename xlink:href="https://github.com/mailru/tarantool/blob/master/cfg/core_cfg.cfg_tmpl">cfg/core_cfg.cfg_tmpl</filename>,
-    <filename xlink:href="https://github.com/mailru/tarantool/blob/master/mod/box/box_cfg.cfg_tmpl">mod/box/box_cfg.cfg_tmpl</filename>.
+    <filename xlink:href="https://github.com/mailru/tarantool/blob/master/mod/box/box_cfg.cfg_tmpl">src/box/box_cfg.cfg_tmpl</filename>.
     These files can always be used as a reference for any
     parameter in this manual.
   </para>

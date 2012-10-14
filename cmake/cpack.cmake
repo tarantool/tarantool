@@ -5,7 +5,7 @@
 if ("${CPACK_GENERATOR}" STREQUAL "RPM")
     set (CPACK_RPM_PACKAGE_NAME "tarantool")
     set (CPACK_RPM_PACKAGE_SUMMARY "tarantool")
-    set (CPACK_RPM_PACKAGE_VERSION "${TARANTOOL_VERSION}")
+    set (CPACK_RPM_PACKAGE_VERSION "${PACKAGE_VERSION}")
     set (CPACK_RPM_PACKAGE_RELEASE "8")
     set (CPACK_RPM_PACKAGE_LICENSE "BSD")
     set (CPACK_RPM_PACKAGE_VENDOR "MAIL.RU")
@@ -34,7 +34,7 @@ set (CPACK_SOURCE_IGNORE_FILES
     "CMakeFiles" "\\\\.gz" "\\\\.Z" "\\\\.zip" "\\\\.rpm"
     "\\\\.o" "\\\\.so" "\\\\.a"
     "client/tarantool/tarantool"
-    "mod/box/tarantool_box"
+    "src/box/tarantool_box"
     "install_manifest.txt"
     "cmake_install.cmake" "test/var/"
 )
@@ -56,8 +56,8 @@ set (CPACK_SOURCE_IGNORE_FILES "${CPACK_SOURCE_IGNORE_FILES}"
     "${CMAKE_SOURCE_DIR}/connector/c/tntnet/Makefile"
     "${CMAKE_SOURCE_DIR}/connector/c/tntsql/Makefile"
     "${CMAKE_SOURCE_DIR}/connector/c/tntrp/Makefile"
-    "${CMAKE_SOURCE_DIR}/mod/Makefile"
-    "${CMAKE_SOURCE_DIR}/mod/box/Makefile"
+    "${CMAKE_SOURCE_DIR}/src/Makefile"
+    "${CMAKE_SOURCE_DIR}/src/box/Makefile"
     "${CMAKE_SOURCE_DIR}/cfg/Makefile"
     "${CMAKE_SOURCE_DIR}/src/Makefile"
     "${CMAKE_SOURCE_DIR}/extra/Makefile"
@@ -67,14 +67,14 @@ set (CPACK_SOURCE_IGNORE_FILES "${CPACK_SOURCE_IGNORE_FILES}"
     "${CMAKE_SOURCE_DIR}/doc/man/Makefile"
 )
 
-set (CPACK_SOURCE_PACKAGE_FILE_NAME "tarantool-${TARANTOOL_VERSION}-src")
+set (CPACK_SOURCE_PACKAGE_FILE_NAME "tarantool-${PACKAGE_VERSION}-src")
 
 #
 # Provide options for the binary distribution.
 #
 string (TOLOWER "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}" platform)
 
-set (CPACK_PACKAGE_FILE_NAME "tarantool-${TARANTOOL_VERSION}-${platform}")
+set (CPACK_PACKAGE_FILE_NAME "tarantool-${PACKAGE_VERSION}-${platform}")
 if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set (CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}-debug")
 endif()

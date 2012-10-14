@@ -40,7 +40,7 @@
 #include <tarantool.h>
 
 #include <cfg/tarantool_box_cfg.h>
-#include <mod/box/tuple.h>
+#include "tuple.h"
 #include "memcached.h"
 #include "box_lua.h"
 #include "space.h"

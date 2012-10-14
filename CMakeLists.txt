@@ -178,7 +178,6 @@ add_subdirectory(cfg)
 add_subdirectory(connector)
 add_subdirectory(src)
 add_subdirectory(extra)
-add_subdirectory(mod)
 add_subdirectory(client)
 add_subdirectory(test)
 add_subdirectory(doc)
@@ -186,7 +185,7 @@ add_subdirectory(doc)
 install (FILES README LICENSE doc/box-protocol.txt
          DESTINATION share/doc/tarantool)
 
-include (cmake/tarantool_cpack.cmake)
+include (cmake/cpack.cmake)
 
 # tarantool info summary (used in server version output)
 #
