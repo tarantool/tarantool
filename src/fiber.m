@@ -279,8 +279,10 @@ fiber_alloc(struct fiber *fiber)
 void
 fiber_gc(void)
 {
-	if (palloc_allocated(fiber->gc_pool) < 128 * 1024)
+	if (palloc_allocated(fiber->gc_pool) < 128 * 1024) {
+		palloc_reset(fiber->gc_pool);
 		return;
+	}
 
 	prelease(fiber->gc_pool);
 }

@@ -324,8 +324,7 @@ ptruncate(struct palloc_pool *pool, size_t new_size)
 	ssize_t cut_size = pool->allocated - new_size;
 	struct chunk *chunk = SLIST_FIRST(&pool->chunks);
 
-	for (chunk = SLIST_FIRST(&pool->chunks); chunk;
-	     chunk = SLIST_FIRST(&pool->chunks)) {
+	for (; chunk; chunk = SLIST_FIRST(&pool->chunks)) {
 
 		size_t chunk_used = (chunk->size - chunk->free -
 				     sizeof(struct chunk));
@@ -358,6 +357,18 @@ prelease(struct palloc_pool *pool)
 
 	SLIST_INIT(&pool->chunks);
 	pool->allocated = 0;
+}
+
+void
+palloc_reset(struct palloc_pool *pool)
+{
+	struct chunk *chunk = SLIST_FIRST(&pool->chunks);
+	if (chunk) {
+		pool->allocated -= chunk->size - sizeof(struct chunk) -
+				   chunk->free;
+		chunk->free = chunk->size - sizeof(struct chunk);
+		chunk->brk = (void *)chunk + sizeof(struct chunk);
+	}
 }
 
 void
