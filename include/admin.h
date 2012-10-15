@@ -28,6 +28,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-int admin_init(void);
+int admin_init(const char *bind_ipaddr, int admin_port);
 
 #endif /* TARANTOOL_ADMIN_H_INCLUDED */

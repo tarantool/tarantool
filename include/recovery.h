@@ -108,9 +108,7 @@ extern struct recovery_state *recovery_state;
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler, void *row_handler_param,
-		   int rows_per_wal, const char *wal_mode,
-		   double wal_fsync_delay,
-		   int flags);
+		   int rows_per_wal, int flags);
 void recovery_update_mode(struct recovery_state *r,
 			  const char *wal_mode, double fsync_delay);
 void recovery_update_io_rate_limit(struct recovery_state *r,

@@ -1123,10 +1123,9 @@ static int lbox_process(lua_State *L)
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
-	struct txn *txn = txn_begin();
 	struct port *port_lua = port_lua_create(L);
 	@try {
-		box_process(txn, port_lua, op, &req);
+		box_process(port_lua, op, &req);
 	} @finally {
 		/*
 		 * This only works as long as port_lua doesn't

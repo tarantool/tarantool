@@ -253,6 +253,25 @@ reload_cfg(struct tbuf *out)
 	return 0;
 }
 
+/** Print the configuration file in YAML format. */
+void
+show_cfg(struct tbuf *out)
+{
+	tarantool_cfg_iterator_t *i;
+	char *key, *value;
+
+	tbuf_printf(out, "configuration:" CRLF);
+	i = tarantool_cfg_iterator_init();
+	while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
+		if (value) {
+			tbuf_printf(out, "  %s: \"%s\"" CRLF, key, value);
+			free(value);
+		} else {
+			tbuf_printf(out, "  %s: (null)" CRLF, key);
+		}
+	}
+}
+
 const char *
 tarantool_version(void)
 {
@@ -811,7 +830,7 @@ main(int argc, char **argv)
 		tarantool_L = tarantool_lua_init();
 		mod_init();
 		tarantool_lua_load_cfg(tarantool_L, &cfg);
-		admin_init();
+		admin_init(cfg.bind_ipaddr, cfg.admin_port);
 		replication_init();
 		/*
 		 * Load user init script.  The script should have access
