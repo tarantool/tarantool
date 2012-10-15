@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_IPROTO_H_INCLUDED
-#define TARANTOOL_IPROTO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,39 +26,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdint.h>
-#include <stdarg.h>
 
-struct tbuf;
-struct obuf;
+#ifndef TARANTOOL_LUA_IFC_H_INCLUDED
+#define TARANTOOL_LUA_IFC_H_INCLUDED
 
-enum {
-	/** Maximal iproto package body length (2GiB) */
-	IPROTO_BODY_LEN_MAX = 2147483648,
-};
+struct lua_State;
+void ifc_lua_init(struct lua_State *L);
 
-/*
- * struct iproto_header and struct iproto_header_retcode
- * share common prefix {msg_code, len, sync}
- */
-
-struct iproto_header {
-	uint32_t msg_code;
-	uint32_t len;
-	uint32_t sync;
-	uint8_t data[];
-} __attribute__((packed));
-
-struct iproto_header_retcode {
-	uint32_t msg_code;
-	uint32_t len;
-	uint32_t sync;
-	uint32_t ret_code;
-} __attribute__((packed));
-
-typedef void (*iproto_callback)(struct obuf *obuf,
-				uint32_t msg_code, struct tbuf *request);
-
-void iproto_interact(va_list ap);
-
-#endif
+#endif /* TARANTOOL_LUA_IFC_H_INCLUDED */

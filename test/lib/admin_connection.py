@@ -42,7 +42,7 @@ class AdminConnection(TarantoolConnection):
             buf = self.socket.recv(bufsiz)
             if not buf:
                 break
-            res = res + buf;
+            res = res + buf
             if (res.rfind("\n...\n") >= 0 or res.rfind("\r\n...\r\n") >= 0):
                 break
 

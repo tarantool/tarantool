@@ -66,18 +66,6 @@ read_space(struct tbuf *data)
 }
 
 static void
-port_send_tuple(u32 flags, struct port *port, struct tuple *tuple)
-{
-	if (tuple) {
-		port_dup_u32(port, 1); /* affected tuples */
-		if (flags & BOX_RETURN_TUPLE)
-			port_add_tuple(port, tuple);
-	} else {
-		port_dup_u32(port, 0); /* affected tuples. */
-	}
-}
-
-static void
 execute_replace(struct request *request, struct txn *txn, struct port *port)
 {
 	struct tbuf *data = request->data;
@@ -111,10 +99,7 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 
 	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
 
-	port_dup_u32(port, 1); /* Affected tuples */
-
-	if (flags & BOX_RETURN_TUPLE)
-		port_add_tuple(port, txn->new_tuple);
+	port_add_tuple(port, txn->new_tuple, flags);
 }
 
 /** {{{ UPDATE request implementation.
@@ -732,7 +717,8 @@ execute_update(struct request *request, struct txn *txn, struct port *port)
 		space_validate(sp, old_tuple, txn->new_tuple);
 	}
 	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
-	port_send_tuple(flags, port, txn->new_tuple);
+	if (txn->new_tuple)
+		port_add_tuple(port, txn->new_tuple, flags);
 }
 
 /** }}} */
@@ -751,15 +737,14 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 	if (count == 0)
 		tnt_raise(IllegalParams, :"tuple count must be positive");
 
-	uint32_t *found = port_add_u32(port);
-	*found = 0;
-
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
+
+	u32 found = 0;
 
 	for (u32 i = 0; i < count; i++) {
 
 		/* End the loop if reached the limit. */
-		if (limit == *found)
+		if (limit == found)
 			return;
 
 		/* read key */
@@ -780,9 +765,9 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 				continue;
 			}
 
-			port_add_tuple(port, tuple);
+			port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
 
-			if (limit == ++(*found))
+			if (limit == ++found)
 				break;
 		}
 	}
@@ -810,29 +795,38 @@ execute_delete(struct request *request, struct txn *txn, struct port *port)
 
 	txn_add_undo(txn, sp, old_tuple, NULL);
 
-	port_send_tuple(flags, port, old_tuple);
+	if (old_tuple)
+		port_add_tuple(port, old_tuple, flags);
 }
 
 /** To collects stats, we need a valid request type.
  * We must collect stats before execute.
  * Check request type here for now.
  */
-static void
+static bool
 request_check_type(u32 type)
 {
-	if (type != REPLACE && type != SELECT &&
-	    type != UPDATE && type != DELETE_1_3 &&
-	    type != DELETE && type != CALL) {
+	return (type != REPLACE && type != SELECT &&
+		type != UPDATE && type != DELETE_1_3 &&
+		type != DELETE && type != CALL);
+}
 
-		say_error("Unsupported request = %" PRIi32 "", type);
-		tnt_raise(IllegalParams, :"unsupported command code, "
-			  "check the error log");
-	}
+const char *
+request_name(u32 type)
+{
+	if (request_check_type(type))
+		return "unsupported";
+	return requests_strs[type];
 }
 
 struct request *
 request_create(u32 type, struct tbuf *data)
 {
+	if (request_check_type(type)) {
+		say_error("Unsupported request = %" PRIi32 "", type);
+		tnt_raise(IllegalParams, :"unsupported command code, "
+			  "check the error log");
+	}
 	request_check_type(type);
 	struct request *request = palloc(fiber->gc_pool, sizeof(struct request));
 	request->type = type;
@@ -865,4 +859,5 @@ request_execute(struct request *request, struct txn *txn, struct port *port)
 		request_check_type(request->type);
 		break;
 	}
+	port_eof(port);
 }

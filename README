@@ -50,7 +50,7 @@ tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
 -- builds the command line client.
 
 'make' creates tarantool_box executable in directory
-mod/box and tarantool executable in client/tarantool.
+src/box and tarantool executable in client/tarantool.
 
 There is no 'make install' goal, but no installation
 is required either.
@@ -78,10 +78,10 @@ you could follow these steps:
 tarantool $ emacs cfg/tarantool_box_cfg.cfg # edit the configuration
 # Initialize the storage directory, path to this directory
 # is specified in the configuration file:
-tarantool $ mod/box/tarantool_box --config cfg/tarantool_box_cfg.cfg --init-storage
+tarantool $ src/box/tarantool_box --config cfg/tarantool_box_cfg.cfg --init-storage
 #
 # run
-tarantool $ mod/box/tarantool_box --config cfg/tarantool_box_cfg.cfg
+tarantool $ src/box/tarantool_box --config cfg/tarantool_box_cfg.cfg
 
 Please report bugs at http://bugs.launchpad.net/tarantool.
 We also warmly welcome your feedback in the discussion mailing

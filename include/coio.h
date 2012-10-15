@@ -87,7 +87,7 @@ void
 coio_write(struct coio *coio, const void *buf, size_t sz);
 
 ssize_t
-coio_writev(struct coio *coio, struct iovec *iov, int iovcnt);
+coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size);
 
 void
 coio_service_init(struct coio_service *service, const char *name,

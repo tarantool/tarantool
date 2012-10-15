@@ -1012,7 +1012,7 @@ localhost> lua t:find(1, 'abc')
     functions. For example, instead of <code>box.insert(0, ...)</code>
     one can write <code>box.space[0]:insert(...)</code>.
     Package source code is available in file <filename
-    xlink:href="https://github.com/mailru/tarantool/blob/master/mod/box/box.lua">mod/box/box.lua</filename></para>
+    xlink:href="https://github.com/mailru/tarantool/blob/master/src/box/box.lua">src/box/box.lua</filename></para>
     <para>A list of all <code>space</code> members follows.</para>
     <varlistentry>
         <term><emphasis role="lua">space.n</emphasis></term>

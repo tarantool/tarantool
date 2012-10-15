@@ -40,8 +40,9 @@
 #include <stdlib.h>
 #include <third_party/queue.h>
 #include <tbuf.h>
+#include "exception.h"
 
-#define PALLOC_POOL_NAME_MAXLEN 16
+#define PALLOC_POOL_NAME_MAXLEN 30
 
 struct chunk {
 	uint32_t magic;
@@ -68,9 +69,9 @@ TAILQ_HEAD(class_tailq_head, chunk_class) classes;
 
 struct palloc_pool {
 	struct chunk_list_head chunks;
-	 SLIST_ENTRY(palloc_pool) link;
+	SLIST_ENTRY(palloc_pool) link;
 	size_t allocated;
-	const char *name;
+	char name[PALLOC_POOL_NAME_MAXLEN];
 };
 
 SLIST_HEAD(palloc_pool_head, palloc_pool) pools;
@@ -244,8 +245,10 @@ palloc_slow_path(struct palloc_pool *restrict pool, size_t size)
 {
 	struct chunk *chunk;
 	chunk = next_chunk_for(pool, size);
-	if (chunk == NULL)
-		abort();
+	if (chunk == NULL) {
+		tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+			  size, "palloc", "next chunk");
+	}
 
 	assert(chunk->free >= size);
 	void *ptr = chunk->brk;
@@ -321,8 +324,7 @@ ptruncate(struct palloc_pool *pool, size_t new_size)
 	ssize_t cut_size = pool->allocated - new_size;
 	struct chunk *chunk = SLIST_FIRST(&pool->chunks);
 
-	for (chunk = SLIST_FIRST(&pool->chunks); chunk;
-	     chunk = SLIST_FIRST(&pool->chunks)) {
+	for (; chunk; chunk = SLIST_FIRST(&pool->chunks)) {
 
 		size_t chunk_used = (chunk->size - chunk->free -
 				     sizeof(struct chunk));
@@ -358,6 +360,18 @@ prelease(struct palloc_pool *pool)
 }
 
 void
+palloc_reset(struct palloc_pool *pool)
+{
+	struct chunk *chunk = SLIST_FIRST(&pool->chunks);
+	if (chunk) {
+		pool->allocated -= chunk->size - sizeof(struct chunk) -
+				   chunk->free;
+		chunk->free = chunk->size - sizeof(struct chunk);
+		chunk->brk = (void *)chunk + sizeof(struct chunk);
+	}
+}
+
+void
 prelease_after(struct palloc_pool *pool, size_t after)
 {
 	if (pool->allocated > after)
@@ -367,9 +381,12 @@ prelease_after(struct palloc_pool *pool, size_t after)
 struct palloc_pool *
 palloc_create_pool(const char *name)
 {
-	struct palloc_pool *pool = malloc(sizeof(struct palloc_pool));
-	assert(pool != NULL);
-	memset(pool, 0, sizeof(*pool));
+	struct palloc_pool *pool = calloc(sizeof(struct palloc_pool), 1);
+	if (pool == NULL) {
+		tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+			  sizeof(struct palloc_pool),
+			  "malloc", "palloc pool");
+	}
 	palloc_set_name(pool, name);
 	SLIST_INIT(&pool->chunks);
 	SLIST_INSERT_HEAD(&pools, pool, link);
@@ -458,7 +475,7 @@ palloc_stat(struct tbuf *buf)
 void
 palloc_set_name(struct palloc_pool *pool, const char *name)
 {
-	pool->name = name;
+	snprintf(pool->name, sizeof(pool->name), "%s", name);
 }
 
 size_t

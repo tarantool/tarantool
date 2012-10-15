@@ -27,11 +27,13 @@
  * SUCH DAMAGE.
  */
 
-#include "tarantool_lua_info.h"
+#include "lua/info.h"
+#include "lua/init.h"
+
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
-#include <tarantool_lua.h>
+
 #include <tarantool.h>
 #include <say.h>
 #include <string.h>

@@ -72,14 +72,12 @@ set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM 1)
 #
 set (recompiled_sources
      ${CMAKE_SOURCE_DIR}/src/tarantool.m
-     ${CMAKE_SOURCE_DIR}/src/tarantool_lua.m
+     ${CMAKE_SOURCE_DIR}/src/lua/init.m
      ${CMAKE_SOURCE_DIR}/src/say.m
      ${CMAKE_SOURCE_DIR}/src/assoc.m
      ${CMAKE_SOURCE_DIR}/src/admin.m
      ${CMAKE_SOURCE_DIR}/src/replication.m
-     ${CMAKE_SOURCE_DIR}/src/ifc.m
-     ${CMAKE_SOURCE_DIR}/src/ifc_lua.m
-     ${CMAKE_SOURCE_DIR}/src/fiber.m PARENT_SCOPE)
+     ${CMAKE_SOURCE_DIR}/src/fiber.m)
 
 set (common_sources
      tbuf.m
@@ -88,6 +86,7 @@ set (common_sources
      sio.m
      evio.m
      coio.m
+     iobuf.m
      coio_buf.m
      salloc.m
      pickle.m
@@ -106,9 +105,13 @@ set (common_sources
      fio.c
      crc32.c
      rope.c
-     tarantool_lua_info.m
-     tarantool_lua_stat.m
-     tarantool_lua_slab.m)
+     ifc.m
+     lua/info.m
+     lua/stat.m
+     lua/slab.m
+     lua/uuid.m
+     lua/lua_ifc.m
+)
 
 if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.m)
@@ -149,3 +152,42 @@ if (ENABLE_BACKTRACE AND HAVE_BFD)
 endif()
 
 set (common_libraries ${common_libraries} PARENT_SCOPE) 
+
+function(tarantool_module mod)
+    set (module_sources ${ARGN})
+    set_source_files_properties(
+        ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c
+        PROPERTIES COMPILE_FLAGS "-Wno-unused" GENERATED True)
+    add_executable(tarantool_${mod}
+        ${module_sources}
+        ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c)
+
+    set_source_files_properties(${recompiled_sources}
+        PROPERTIES OBJECT_DEPENDS
+        ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.h)
+
+    add_library(lt${mod} STATIC ${recompiled_sources})
+    set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
+        "${core_cflags} ${GCOV_C_FLAGS} -DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
+    add_dependencies(lt${mod} generate_headers generate_admin_m build_bundled_libs)
+
+    target_link_libraries(tarantool_${mod} lt${mod} ${GCOV_LDFLAGS} ${common_libraries})
+    set_target_properties(tarantool_${mod} PROPERTIES COMPILE_FLAGS
+        "${core_cflags} ${GCOV_C_FLAGS}")
+
+    if (ENABLE_STATIC)
+        set_target_properties(tarantool_${mod} PROPERTIES
+            LINK_SEARCH_END_STATIC ON)
+        set (module_link_flags "${module_link_flags} -static")
+    endif()
+
+    if (module_link_flags)
+        set_target_properties(tarantool_${mod} PROPERTIES
+            LINK_FLAGS ${module_link_flags})
+    endif()
+    install (TARGETS tarantool_${mod} DESTINATION bin)
+endfunction()
+
+foreach (module ${TARANTOOL_MODULES})
+add_subdirectory(${module})
+endforeach()

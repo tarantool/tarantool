@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "box_lua_uuid.h"
+#include "lua/uuid.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -133,3 +133,18 @@ int lbox_uuid_hex(struct lua_State *L)
 {
 	return _lbox_uuid_hex(L);
 }
+
+static const struct luaL_reg lbox_uuid_meta[] = {
+	{"uuid", lbox_uuid},
+	{"uuid_hex",  lbox_uuid_hex},
+	{NULL, NULL}
+};
+
+/** Initialize box.uuid and box.uuid_hex. */
+void
+tarantool_lua_uuid_init(struct lua_State *L)
+{
+	luaL_register(L, "box", lbox_uuid_meta);
+	lua_pop(L, 1);
+}
+

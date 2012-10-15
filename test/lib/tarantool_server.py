@@ -43,7 +43,7 @@ class TarantoolServer(Server):
                                    '*.lua']
 
     def find_exe(self, builddir, silent=True):
-        return Server.find_exe(self, "{0}/mod/{1}".format(builddir, self.module), silent)
+        return Server.find_exe(self, "{0}/src/{1}".format(builddir, self.module), silent)
 
     def configure(self, config):
         Server.configure(self, config)

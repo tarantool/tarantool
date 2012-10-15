@@ -1,3 +1,5 @@
+#ifndef INCLUDES_TARANTOOL_BOX_PORT_H
+#define INCLUDES_TARANTOOL_BOX_PORT_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,11 +28,48 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <util.h>
 
-#ifndef TARANTOOL_FIBER_IFC_LUA_H_INCLUDED
-#define TARANTOOL_FIBER_IFC_LUA_H_INCLUDED
+struct tuple;
+struct port;
 
-struct lua_State;
-void fiber_ifc_lua_init(struct lua_State *L);
+struct port_vtab
+{
+	void (*add_tuple)(struct port *port, struct tuple *tuple, u32 flags);
+	/** Must be called in the end of execution of a single request. */
+	void (*eof)(struct port *port);
+};
 
-#endif /* TARANTOOL_FIBER_IFC_LUA_H_INCLUDED */
+struct port
+{
+	struct port_vtab *vtab;
+};
+
+static inline void
+port_eof(struct port *port)
+{
+	return (port->vtab->eof)(port);
+}
+
+static inline void
+port_add_tuple(struct port *port, struct tuple *tuple, u32 flags)
+{
+	(port->vtab->add_tuple)(port, tuple, flags);
+}
+
+/** Reused in port_lua */
+void
+port_null_eof(struct port *port __attribute__((unused)));
+
+/**
+ * This one does not have state currently, thus a single
+ * instance is sufficient.
+ */
+extern struct port port_null;
+
+struct obuf;
+
+struct port *
+port_iproto_create(struct obuf *buf);
+
+#endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

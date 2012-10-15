@@ -27,13 +27,13 @@
  * SUCH DAMAGE.
  */
 
-#include "ifc_lua.h"
-#include "ifc.h"
+#include "lua_ifc.h"
+#include <ifc.h>
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
 
-#include "tarantool_lua.h"
+#include <lua/init.h>
 #include <stdlib.h>
 #include <say.h>
 
@@ -462,7 +462,7 @@ lbox_fiber_channel_broadcast(struct lua_State *L)
 
 
 void
-fiber_ifc_lua_init(struct lua_State *L)
+ifc_lua_init(struct lua_State *L)
 {
 	static const struct luaL_reg semaphore_meta[] = {
 		{"__call",	lbox_fiber_semaphore_counter},

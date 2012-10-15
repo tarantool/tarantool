@@ -29,24 +29,18 @@
 #include "coro.h"
 
 #include "config.h"
+#include "exception.h"
 #include <unistd.h>
 #include <string.h>
 #include <sys/mman.h>
 
 #include "third_party/valgrind/memcheck.h"
 
-#include <palloc.h>
-
-struct tarantool_coro *
-tarantool_coro_create(struct tarantool_coro *coro, void (*f) (void *), void *data)
+void
+tarantool_coro_init(struct tarantool_coro *coro,
+		    void (*f) (void *), void *data)
 {
 	const int page = sysconf(_SC_PAGESIZE);
-
-	if (coro == NULL)
-		coro = palloc(eter_pool, sizeof(*coro));
-
-	if (coro == NULL)
-		return NULL;
 
 	memset(coro, 0, sizeof(*coro));
 
@@ -55,14 +49,15 @@ tarantool_coro_create(struct tarantool_coro *coro, void (*f) (void *), void *dat
 	coro->stack = mmap(0, coro->stack_size, PROT_READ | PROT_WRITE | PROT_EXEC,
 			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
-	if (coro->stack == MAP_FAILED)
-		return NULL;
+	if (coro->stack == MAP_FAILED) {
+		tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+			  sizeof(coro->stack_size),
+			  "mmap", "coro stack");
+	}
 
 	(void) VALGRIND_STACK_REGISTER(coro->stack, coro->stack + coro->stack_size);
 
 	coro_create(&coro->ctx, f, data, coro->stack, coro->stack_size);
-
-	return coro;
 }
 
 void

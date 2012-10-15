@@ -40,7 +40,7 @@
 #include <tarantool.h>
 
 #include <cfg/tarantool_box_cfg.h>
-#include <mod/box/tuple.h>
+#include "tuple.h"
 #include "memcached.h"
 #include "box_lua.h"
 #include "space.h"
@@ -98,7 +98,7 @@ box_process_rw(struct txn *txn, struct port *port,
 		stop = ev_now();
 		if (stop - start > cfg.too_long_threshold)
 			say_warn("too long %s: %.3f sec",
-				 requests_strs[op], stop - start);
+				 request_name(op), stop - start);
 	}
 }
 
@@ -127,15 +127,17 @@ box_process_ro(struct txn *txn, struct port *port,
 
 
 static void
-iproto_primary_port_handler(u32 op, struct tbuf *request_data)
+iproto_primary_port_handler(struct obuf *out, u32 op,
+			    struct tbuf *request_data)
 {
-	box_process(txn_begin(), &port_iproto, op, request_data);
+	box_process(txn_begin(), port_iproto_create(out), op, request_data);
 }
 
 static void
-iproto_secondary_port_handler(u32 op, struct tbuf *request_data)
+iproto_secondary_port_handler(struct obuf *out, u32 op,
+			      struct tbuf *request_data)
 {
-	box_process_ro(txn_begin(), &port_iproto, op, request_data);
+	box_process_ro(txn_begin(), port_iproto_create(out), op, request_data);
 }
 
 static void
@@ -533,7 +535,7 @@ mod_init(void)
 	if (cfg.secondary_port != 0) {
 		static struct coio_service secondary;
 		coio_service_init(&secondary, "secondary",
-				  cfg.bind_ipaddr, cfg.primary_port,
+				  cfg.bind_ipaddr, cfg.secondary_port,
 				  iproto_interact, iproto_secondary_port_handler);
 		evio_service_start(&secondary.evio_service);
 	}
