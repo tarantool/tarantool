@@ -150,7 +150,7 @@ obuf_dup(struct obuf *buf, void *data, size_t size)
 	 * @pre buf->pos points at an array of allocated buffers.
 	 * The array ends with a zero-initialized buffer.
          */
-	if (iov->iov_len + size > capacity) {
+	while (iov->iov_len + size > capacity) {
 		/*
 		 * The data doesn't fit into this buffer.
 		 * It could be because the buffer is not
@@ -158,13 +158,14 @@ obuf_dup(struct obuf *buf, void *data, size_t size)
 		 * Copy as much as possible into already
 		 * allocated buffers.
 		 */
-		while (iov->iov_len < capacity) {
+		if (iov->iov_len < capacity) {
 			/*
 			 * This buffer is allocated, but can't
 			 * fit all the data. Copy as much data as
 			 * possible.
 			 */
 			size_t fill = capacity - iov->iov_len;
+			assert(fill < size);
 			memcpy(iov->iov_base + iov->iov_len, data, fill);
 
 			iov->iov_len += fill;
@@ -172,22 +173,27 @@ obuf_dup(struct obuf *buf, void *data, size_t size)
 			data += fill;
 			size -= fill;
 
-			if (size == 0)          /* Nothing more to do. */
-				return;
 			buf->pos++;
 			iov = &buf->iov[buf->pos];
 			capacity = buf->capacity[buf->pos];
+			/*
+			 * Check if the remainder can fit
+			 * without allocations.
+			 */
+		} else {
+			assert(capacity == 0);
+			/**
+			 * Still some data to copy. We have to get
+			 * a new buffer. Before we allocate
+			 * a buffer for this position, ensure
+			 * there is an unallocated buffer in the
+			 * next one, since it works as an end
+			 * marker for the loop above.
+			 */
+			obuf_init_pos(buf, buf->pos + 1);
+			obuf_alloc_pos(buf, buf->pos, size);
+			break;
 		}
-		assert(capacity == 0);
-		/**
-		 * Still some data to copy. We have to get a new
-		 * buffer. Before we allocate a buffer for this
-		 * position, ensure there is an unallocated buffer
-		 * in the next one, since it works as an end marker
-		 * for the loop above.
-		 */
-		obuf_init_pos(buf, buf->pos + 1);
-		obuf_alloc_pos(buf, buf->pos, size);
 	}
 	memcpy(iov->iov_base + iov->iov_len, data, size);
 	iov->iov_len += size;
