@@ -120,7 +120,6 @@ void fiber_testcancel(void);
  * return previous state.
  */
 bool fiber_setcancellable(bool enable);
-void fiber_setcancelstate(bool enable);
 void fiber_sleep(ev_tstamp s);
 struct tbuf;
 void fiber_info(struct tbuf *out);
