@@ -151,6 +151,13 @@ rlist_empty(struct rlist *item)
 #define rlist_add_tail_entry(head, item, member)			\
 	rlist_add_tail((head), &(item)->member)
 
+
+/**
+ * delete entry from list
+ */
+#define rlist_del_entry(item, member)					\
+	rlist_del(&((item)->member))
+
 /**
  * foreach through list
  */

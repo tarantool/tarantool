@@ -41,9 +41,11 @@
 #include <stat.h>
 #include <pickle.h>
 #include "iobuf.h"
+#include <rlist.h>
 
 @implementation FiberCancelException
 @end
+
 
 enum { FIBER_CALL_STACK = 16 };
 
@@ -54,6 +56,9 @@ static __thread struct fiber **sp;
 static __thread uint32_t last_used_fid;
 static __thread struct mh_i32ptr_t *fibers_registry;
 __thread SLIST_HEAD(, fiber) fibers, zombie_fibers;
+
+static RLIST_HEAD(ready_fibers);
+static ev_async ready_async;
 
 static void
 update_last_stack_frame(struct fiber *fiber)
@@ -80,6 +85,8 @@ fiber_call(struct fiber *callee, ...)
 
 	callee->csw++;
 
+	fiber->flags &= ~FIBER_READY;
+
 	va_start(fiber->f_data, callee);
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 	va_end(fiber->f_data);
@@ -94,7 +101,12 @@ fiber_call(struct fiber *callee, ...)
 void
 fiber_wakeup(struct fiber *f)
 {
-	ev_async_send(&f->async);
+	if (f->flags & FIBER_READY)
+		return;
+	f->flags |= FIBER_READY;
+	if (rlist_empty(&ready_fibers))
+		ev_async_send(&ready_async);
+	rlist_add_tail(&ready_fibers, &f->ready);
 }
 
 /** Cancel the subject fiber.
@@ -247,6 +259,17 @@ fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 	fiber_call(watcher->data);
 }
 
+static void
+fiber_ready_async(void)
+{
+	while(!rlist_empty(&ready_fibers)) {
+		struct fiber *f =
+			rlist_first_entry(&ready_fibers, struct fiber, ready);
+		rlist_del_entry(f, ready);
+		fiber_call(f);
+	}
+}
+
 struct fiber *
 fiber_find(int fid)
 {
@@ -373,14 +396,14 @@ fiber_create(const char *name, void (*f) (va_list))
 		fiber->gc_pool = palloc_create_pool("");
 
 		fiber_alloc(fiber);
-		ev_async_init(&fiber->async, (void *)fiber_schedule);
-		ev_async_start(&fiber->async);
 		ev_init(&fiber->timer, (void *)fiber_schedule);
 		ev_init(&fiber->cw, (void *)fiber_schedule);
-		fiber->async.data = fiber->timer.data = fiber->cw.data = fiber;
+		fiber->timer.data = fiber->cw.data = fiber;
 
 		SLIST_INSERT_HEAD(&fibers, fiber, link);
+		rlist_init(&fiber->ready);
 	}
+
 
 	fiber->f = f;
 	while (++last_used_fid <= 100) ;	/* fids from 0 to 100 are reserved */
@@ -407,7 +430,7 @@ fiber_destroy(struct fiber *f)
 	if (strcmp(f->name, "sched") == 0)
 		return;
 
-	ev_async_stop(&f->async);
+	rlist_del(&f->ready);
 	palloc_destroy_pool(f->gc_pool);
 	tarantool_coro_destroy(&f->coro);
 }
@@ -460,11 +483,15 @@ fiber_init(void)
 	last_used_fid = 100;
 
 	iobuf_init_readahead(cfg.readahead);
+
+	ev_async_init(&ready_async, (void *)fiber_ready_async);
+	ev_async_start(&ready_async);
 }
 
 void
 fiber_free(void)
 {
+	ev_async_stop(&ready_async);
 	/* Only clean up if initialized. */
 	if (fibers_registry) {
 		fiber_destroy_all();

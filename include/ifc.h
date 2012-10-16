@@ -31,33 +31,33 @@
 #define TARANTOOL_IFC_H_INCLUDED
 
 #include <tarantool_ev.h>
-#include "third_party/queue.h"
 
 /**
 @brief SEMAPHORES
 */
 
 
-struct fiber_semaphore;
+struct ifc_semaphore;
+
 /**
 @brief allocator
 @return malloced semaphore
 @code
-	struct fiber_semaphore *s = fiber_semaphore_alloc();
+	struct ifc_semaphore *s = ifc_semaphore_alloc();
 @endcode
 */
-struct fiber_semaphore *fiber_semaphore_alloc(void);
+struct ifc_semaphore *ifc_semaphore_alloc(void);
 
 /**
 @brief init semaphore
 @param s semaphore
 @param cnt initial value of semaphore
 @code
-	struct fiber_semaphore *s = fiber_semaphore_alloc();
-	fiber_semaphore_init(s);
+	struct ifc_semaphore *s = ifc_semaphore_alloc();
+	ifc_semaphore_init(s);
 @endcode
 */
-void fiber_semaphore_init(struct fiber_semaphore *s, int cnt);
+void ifc_semaphore_init(struct ifc_semaphore *s, int cnt);
 
 /**
 @brief down semafore
@@ -66,25 +66,25 @@ fiber (if semaphore counter < 0) until the other fiber
 increments the counter.
 @param s semaphore
 @code
-	fiber_semaphore_down(s);
+	ifc_semaphore_down(s);
 	// do something
-	fiber_semaphore_up(s);
+	ifc_semaphore_up(s);
 @endcode
 */
-void fiber_semaphore_down(struct fiber_semaphore *s);
+void ifc_semaphore_down(struct ifc_semaphore *s);
 
 /**
 @brief up semaphore
 @detail increment semaphore's counter and unlock one locked fiber
 @param s semaphore
 @code
-	fiber_semaphore_down(s);
+	ifc_semaphore_down(s);
 	// do something
-	fiber_semaphore_up(s);
+	ifc_semaphore_up(s);
 @endcode
 */
 
-void fiber_semaphore_up(struct fiber_semaphore *s);
+void ifc_semaphore_up(struct ifc_semaphore *s);
 
 /**
 @brief down semaphore in timeout
@@ -96,7 +96,7 @@ increments the counter or timeout exceeded.
 @return 0 if success
 @return ETIMEDOUT if timeout exceeded
 */
-int  fiber_semaphore_down_timeout(struct fiber_semaphore *s, ev_tstamp timeout);
+int  ifc_semaphore_down_timeout(struct ifc_semaphore *s, ev_tstamp timeout);
 
 /**
 @brief try to down semaphore
@@ -104,14 +104,14 @@ int  fiber_semaphore_down_timeout(struct fiber_semaphore *s, ev_tstamp timeout);
 @param s semaphore
 @return 0 if success
 */
-int  fiber_semaphore_trydown(struct fiber_semaphore *s);
+int  ifc_semaphore_trydown(struct ifc_semaphore *s);
 
 /**
 @brief get semaphore's counter
 @param s semaphore
 @return semaphore's counter
 */
-int  fiber_semaphore_counter(struct fiber_semaphore *s);
+int  ifc_semaphore_counter(struct ifc_semaphore *s);
 
 
 
@@ -119,26 +119,26 @@ int  fiber_semaphore_counter(struct fiber_semaphore *s);
 @brief MUTEXES
 */
 
-struct fiber_mutex;
+struct ifc_mutex;
 
 /**
 @brief allocate new mutex
 @return malloced mutex structure
 @code
-	struct fiber_mutex *m = fiber_mutex_alloc();
+	struct ifc_mutex *m = ifc_mutex_alloc();
 @endcode
 */
-struct fiber_mutex *fiber_mutex_alloc(void);
+struct ifc_mutex *ifc_mutex_alloc(void);
 
 /**
 @brief init mutex
 @param m mutex
 @code
-	struct fiber_mutex *m = fiber_mutex_alloc();
-	fiber_mutex_init(m);
+	struct ifc_mutex *m = ifc_mutex_alloc();
+	ifc_mutex_init(m);
 @endcode
 */
-void fiber_mutex_init(struct fiber_mutex *m);
+void ifc_mutex_init(struct ifc_mutex *m);
 
 /**
 @brief lock mutex
@@ -146,12 +146,12 @@ void fiber_mutex_init(struct fiber_mutex *m);
 the other fiber unlock the mutex.
 @param m mutex
 @code
-	fiber_mutex_lock(m);
+	ifc_mutex_lock(m);
 	// do something
-	fiber_mutex_unlock(m);
+	ifc_mutex_unlock(m);
 @endcode
 */
-void fiber_mutex_lock(struct fiber_mutex *m);
+void ifc_mutex_lock(struct ifc_mutex *m);
 
 /**
 @brief lock mutex in timeout
@@ -161,24 +161,24 @@ unlock the mutex.
 @param mutex
 @param timeout
 @code
-	fiber_mutex_lock(m);
+	ifc_mutex_lock(m);
 	// do something
-	fiber_mutex_unlock(m);
+	ifc_mutex_unlock(m);
 @endcode
 */
-int  fiber_mutex_lock_timeout(struct fiber_mutex *m, ev_tstamp timeout);
+int  ifc_mutex_lock_timeout(struct ifc_mutex *m, ev_tstamp timeout);
 
 /**
 @brief unlock mutex
 @detail unlock one locked fiber
 @param mutex
 @code
-	fiber_mutex_lock(m);
+	ifc_mutex_lock(m);
 	// do something
-	fiber_mutex_unlock(m);
+	ifc_mutex_unlock(m);
 @endcode
 */
-void fiber_mutex_unlock(struct fiber_mutex *m);
+void ifc_mutex_unlock(struct ifc_mutex *m);
 
 /**
 @brief try to lock mutex
@@ -186,7 +186,7 @@ void fiber_mutex_unlock(struct fiber_mutex *m);
 @return 0 if mutex locked
 @return ETIMEDOUT if mutex is already locked
 */
-int  fiber_mutex_trylock(struct fiber_mutex *m);
+int  ifc_mutex_trylock(struct ifc_mutex *m);
 
 /**
 @brief check if mutex is locked
@@ -194,34 +194,34 @@ int  fiber_mutex_trylock(struct fiber_mutex *m);
 @return 0 if mutex is free
 @return 1 if mutex is locked
 */
-int  fiber_mutex_islocked(struct fiber_mutex *m);
+int  ifc_mutex_islocked(struct ifc_mutex *m);
+
 
 /**
 @brief CHANNELS
 */
 
+struct ifc_channel;
 
-
-struct fiber_channel;
 /**
 @brief allocator
 @param size
 @return malloced channel (or NULL)
 @code
-	struct fiber_channel *ch = fiber_channel_alloc(10);
+	struct ifc_channel *ch = ifc_channel_alloc(10);
 @endcode
 */
-struct fiber_channel *fiber_channel_alloc(unsigned size);
+struct ifc_channel *ifc_channel_alloc(unsigned size);
 
 /**
 @brief init channel
 @param channel
 @code
-	struct fiber_channel *ch = fiber_channel_alloc(10);
-	fiber_channel_init(ch);
+	struct ifc_channel *ch = ifc_channel_alloc(10);
+	ifc_channel_init(ch);
 @endcode
 */
-void fiber_channel_init(struct fiber_channel *ch);
+void ifc_channel_init(struct ifc_channel *ch);
 
 /**
 @brief put data into channel
@@ -229,30 +229,29 @@ void fiber_channel_init(struct fiber_channel *ch);
 @param channel
 @param data
 @code
-	fiber_channel_put(ch, "message");
+	ifc_channel_put(ch, "message");
 @endcode
 */
-void fiber_channel_put(struct fiber_channel *ch, void *data);
+void ifc_channel_put(struct ifc_channel *ch, void *data);
 
 /**
 @brief get data from channel
 @detail lock current fiber if channel is empty
 @param channel
-@return data that was put into channel by fiber_channel_put
+@return data that was put into channel by ifc_channel_put
 @code
-	char *msg = fiber_channel_get(ch);
+	char *msg = ifc_channel_get(ch);
 @endcode
 */
-void *fiber_channel_get(struct fiber_channel *ch);
-
+void *ifc_channel_get(struct ifc_channel *ch);
 
 /**
-@brief wake up all fibers that sleep by fiber_channel_get and send message to them
+@brief wake up all fibers that sleep by ifc_channel_get and send message to them
 @param channel
 @param data
 @return count of fibers received the message
 */
-int fiber_channel_broadcast(struct fiber_channel *ch, void *data);
+int ifc_channel_broadcast(struct ifc_channel *ch, void *data);
 
 /**
 @brief check if channel is empty
@@ -260,11 +259,11 @@ int fiber_channel_broadcast(struct fiber_channel *ch, void *data);
 @return 1 (TRUE) if channel is empty
 @return 0 otherwise
 @code
-	if (!fiber_channel_isempty(ch))
-		char *msg = fiber_channel_get(ch);
+	if (!ifc_channel_isempty(ch))
+		char *msg = ifc_channel_get(ch);
 @endcode
 */
-int  fiber_channel_isempty(struct fiber_channel *ch);
+int ifc_channel_isempty(struct ifc_channel *ch);
 
 /**
 @brief check if channel is full
@@ -272,11 +271,12 @@ int  fiber_channel_isempty(struct fiber_channel *ch);
 @return 1 (TRUE) if channel is full
 @return 0 otherwise
 @code
-	if (!fiber_channel_isfull(ch))
-		fiber_channel_put(ch, "message");
+	if (!ifc_channel_isfull(ch))
+		ifc_channel_put(ch, "message");
 @endcode
 */
-int  fiber_channel_isfull(struct fiber_channel *ch);
+
+int ifc_channel_isfull(struct ifc_channel *ch);
 
 /**
 @brief put data into channel in timeout
@@ -286,14 +286,15 @@ int  fiber_channel_isfull(struct fiber_channel *ch);
 @return 0 if success
 @return ETIMEDOUT if timeout exceeded
 @code
-	if (fiber_channel_put_timeout(ch, "message", 0.25) == 0)
+	if (ifc_channel_put_timeout(ch, "message", 0.25) == 0)
 		return "ok";
 	else
 		return "timeout exceeded";
 @endcode
 */
-int  fiber_channel_put_timeout(struct fiber_channel *ch,
-						void *data, ev_tstamp timeout);
+int
+ifc_channel_put_timeout(struct ifc_channel *ch,	void *data, ev_tstamp timeout);
+
 /**
 @brief get data into channel in timeout
 @param channel
@@ -302,13 +303,26 @@ int  fiber_channel_put_timeout(struct fiber_channel *ch,
 @return NULL if timeout exceeded
 @code
 	do {
-		char *msg = fiber_channel_get_timeout(ch, 0.5);
+		char *msg = ifc_channel_get_timeout(ch, 0.5);
 		printf("message: %p\n", msg);
 	} until(msg);
 	return msg;
 @endcode
 */
-void *fiber_channel_get_timeout(struct fiber_channel *ch, ev_tstamp timeout);
+void *ifc_channel_get_timeout(struct ifc_channel *ch, ev_tstamp timeout);
+
+
+/**
+@brief return true if channel has reader fibers that wait data
+@param channel
+*/
+int ifc_channel_has_readers(struct ifc_channel *ch);
+
+/**
+@brief return true if channel has writer fibers that wait data
+@param channel
+*/
+int ifc_channel_has_writers(struct ifc_channel *ch);
 
 #endif /* TARANTOOL_IFC_H_INCLUDED */
 

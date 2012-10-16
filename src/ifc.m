@@ -30,38 +30,38 @@
 #include "ifc.h"
 #include "fiber.h"
 #include <stdlib.h>
+#include <rlist.h>
 
 
-
-struct fiber_semaphore {
+struct ifc_semaphore {
 	int count;
-	STAILQ_HEAD(, fiber) fibers, wakeup;
+	struct rlist fibers, wakeup;
 };
 
 
-struct fiber_semaphore *
-fiber_semaphore_alloc(void)
+struct ifc_semaphore *
+ifc_semaphore_alloc(void)
 {
-	return malloc(sizeof(struct fiber_semaphore));
+	return malloc(sizeof(struct ifc_semaphore));
 }
 
 
 int
-fiber_semaphore_counter(struct fiber_semaphore *s)
+ifc_semaphore_counter(struct ifc_semaphore *s)
 {
 	return s->count;
 }
 
 void
-fiber_semaphore_init(struct fiber_semaphore *s, int cnt)
+ifc_semaphore_init(struct ifc_semaphore *s, int cnt)
 {
 	s->count = cnt;
-	STAILQ_INIT(&s->fibers);
-	STAILQ_INIT(&s->wakeup);
+	rlist_init(&s->fibers);
+	rlist_init(&s->wakeup);
 }
 
 int
-fiber_semaphore_down_timeout(struct fiber_semaphore *s, ev_tstamp timeout)
+ifc_semaphore_down_timeout(struct ifc_semaphore *s, ev_tstamp timeout)
 {
 	int count = --s->count;
 
@@ -71,7 +71,7 @@ fiber_semaphore_down_timeout(struct fiber_semaphore *s, ev_tstamp timeout)
 	if (timeout < 0)
 		timeout = 0;
 
-	STAILQ_INSERT_TAIL(&s->fibers, fiber, ifc);
+	rlist_add_tail_entry(&s->fibers, fiber, ifc);
 
 	bool cancellable = fiber_setcancellable(true);
 
@@ -89,105 +89,102 @@ fiber_semaphore_down_timeout(struct fiber_semaphore *s, ev_tstamp timeout)
 	int timeouted = ETIMEDOUT;
 	struct fiber *f;
 
-	STAILQ_FOREACH(f, &s->wakeup, ifc) {
+	rlist_foreach_entry(f, &s->wakeup, ifc) {
 		if (f != fiber)
 			continue;
-		STAILQ_REMOVE(&s->wakeup, fiber, fiber, ifc);
 		timeouted = 0;
 		break;
 	}
 
-	if (timeouted) {
-		STAILQ_REMOVE(&s->fibers, fiber, fiber, ifc);
+	if (timeouted)
 		s->count++;
-	}
 
+	rlist_del_entry(fiber, ifc);
 	fiber_testcancel();
-
 	return timeouted;
 }
 
 void
-fiber_semaphore_down(struct fiber_semaphore *s)
+ifc_semaphore_down(struct ifc_semaphore *s)
 {
-	fiber_semaphore_down_timeout(s, 0);
+	ifc_semaphore_down_timeout(s, 0);
 }
 
 void
-fiber_semaphore_up(struct fiber_semaphore *s)
+ifc_semaphore_up(struct ifc_semaphore *s)
 {
 	s->count++;
 
-	if (STAILQ_EMPTY(&s->fibers))
+	if (rlist_empty(&s->fibers))
 		return;
 
 	/* wake up one fiber */
-	struct fiber *f = STAILQ_FIRST(&s->fibers);
-	STAILQ_REMOVE(&s->fibers, f, fiber, ifc);
-	STAILQ_INSERT_TAIL(&s->wakeup, f, ifc);
+	struct fiber *f = rlist_first_entry(&s->fibers, struct fiber, ifc);
+	rlist_del_entry(f, ifc);
+	rlist_add_tail_entry(&s->wakeup, f, ifc);
 	fiber_wakeup(f);
 }
 
 int
-fiber_semaphore_trydown(struct fiber_semaphore *s)
+ifc_semaphore_trydown(struct ifc_semaphore *s)
 {
 	if (s->count <= 0)
 		return s->count - 1;
-	fiber_semaphore_down(s);
+	ifc_semaphore_down(s);
 	return 0;
 }
 
 
-struct fiber_mutex {
-	struct fiber_semaphore semaphore;
+struct ifc_mutex {
+	struct ifc_semaphore semaphore;
 };
 
-struct fiber_mutex *
-fiber_mutex_alloc(void)
+struct ifc_mutex *
+ifc_mutex_alloc(void)
 {
-	return malloc(sizeof(struct fiber_mutex));
+	return malloc(sizeof(struct ifc_mutex));
 }
 
 void
-fiber_mutex_init(struct fiber_mutex *m)
+ifc_mutex_init(struct ifc_mutex *m)
 {
-	fiber_semaphore_init(&m->semaphore, 1);
+	ifc_semaphore_init(&m->semaphore, 1);
 }
 
 void
-fiber_mutex_lock(struct fiber_mutex *m)
+ifc_mutex_lock(struct ifc_mutex *m)
 {
-	fiber_semaphore_down(&m->semaphore);
+	ifc_semaphore_down(&m->semaphore);
 }
 
 int
-fiber_mutex_lock_timeout(struct fiber_mutex *m, ev_tstamp timeout)
+ifc_mutex_lock_timeout(struct ifc_mutex *m, ev_tstamp timeout)
 {
-	return fiber_semaphore_down_timeout(&m->semaphore, timeout);
+	return ifc_semaphore_down_timeout(&m->semaphore, timeout);
 }
 
 void
-fiber_mutex_unlock(struct fiber_mutex *m)
+ifc_mutex_unlock(struct ifc_mutex *m)
 {
-	fiber_semaphore_up(&m->semaphore);
+	ifc_semaphore_up(&m->semaphore);
 }
 
 int
-fiber_mutex_trylock(struct fiber_mutex *m)
+ifc_mutex_trylock(struct ifc_mutex *m)
 {
-	return fiber_semaphore_trydown(&m->semaphore);
+	return ifc_semaphore_trydown(&m->semaphore);
 }
 
 int
-fiber_mutex_islocked(struct fiber_mutex *m)
+ifc_mutex_islocked(struct ifc_mutex *m)
 {
 	return m->semaphore.count <= 0;
 }
 
 /**********************************************************************/
 
-struct fiber_channel {
-	STAILQ_HEAD(, fiber) readers, writers, wakeup;
+struct ifc_channel {
+	struct rlist readers, writers, wakeup;
 	unsigned size;
 	unsigned beg;
 	unsigned count;
@@ -199,50 +196,50 @@ struct fiber_channel {
 } __attribute__((packed));
 
 int
-fiber_channel_isempty(struct fiber_channel *ch)
+ifc_channel_isempty(struct ifc_channel *ch)
 {
 	return ch->count == 0;
 }
 
 int
-fiber_channel_isfull(struct fiber_channel *ch)
+ifc_channel_isfull(struct ifc_channel *ch)
 {
 	return ch->count >= ch->size;
 }
 
 
-struct fiber_channel *
-fiber_channel_alloc(unsigned size)
+struct ifc_channel *
+ifc_channel_alloc(unsigned size)
 {
 	if (!size)
 		size = 1;
-	struct fiber_channel *res =
-		malloc(sizeof(struct fiber_channel) + sizeof(void *) * size);
+	struct ifc_channel *res =
+		malloc(sizeof(struct ifc_channel) + sizeof(void *) * size);
 	if (res)
 		res->size = size;
 	return res;
 }
 
 void
-fiber_channel_init(struct fiber_channel *ch)
+ifc_channel_init(struct ifc_channel *ch)
 {
 
 	ch->beg = ch->count = 0;
 	ch->bcast = NULL;
 
-	STAILQ_INIT(&ch->readers);
-	STAILQ_INIT(&ch->writers);
-	STAILQ_INIT(&ch->wakeup);
+	rlist_init(&ch->readers);
+	rlist_init(&ch->writers);
+	rlist_init(&ch->wakeup);
 }
 
 void *
-fiber_channel_get_timeout(struct fiber_channel *ch, ev_tstamp timeout)
+ifc_channel_get_timeout(struct ifc_channel *ch, ev_tstamp timeout)
 {
 	if (timeout < 0)
 		timeout = 0;
 	/* channel is empty */
 	if (!ch->count) {
-		STAILQ_INSERT_TAIL(&ch->readers, fiber, ifc);
+		rlist_add_tail_entry(&ch->readers, fiber, ifc);
 		bool cancellable = fiber_setcancellable(true);
 
 		if (timeout) {
@@ -255,18 +252,7 @@ fiber_channel_get_timeout(struct fiber_channel *ch, ev_tstamp timeout)
 		}
 
 
-		int timeouted = ETIMEDOUT;
-		struct fiber *f;
-		STAILQ_FOREACH(f, &ch->wakeup, ifc) {
-			if (f != fiber)
-				continue;
-			STAILQ_REMOVE(&ch->wakeup, fiber, fiber, ifc);
-			timeouted = 0;
-			break;
-		}
-		if (timeouted)
-			STAILQ_REMOVE(&ch->readers, fiber, fiber, ifc);
-
+		rlist_del_entry(fiber, ifc);
 
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
@@ -287,10 +273,11 @@ fiber_channel_get_timeout(struct fiber_channel *ch, ev_tstamp timeout)
 		ch->beg -= ch->size;
 	ch->count--;
 
-	if (!STAILQ_EMPTY(&ch->writers)) {
-		struct fiber *f = STAILQ_FIRST(&ch->writers);
-		STAILQ_REMOVE_HEAD(&ch->writers, ifc);
-		STAILQ_INSERT_TAIL(&ch->wakeup, f, ifc);
+	if (!rlist_empty(&ch->writers)) {
+		struct fiber *f =
+			rlist_first_entry(&ch->writers, struct fiber, ifc);
+		rlist_del_entry(f, ifc);
+		rlist_add_tail_entry(&ch->wakeup, f, ifc);
 		fiber_wakeup(f);
 	}
 
@@ -298,23 +285,22 @@ fiber_channel_get_timeout(struct fiber_channel *ch, ev_tstamp timeout)
 }
 
 void *
-fiber_channel_get(struct fiber_channel *ch)
+ifc_channel_get(struct ifc_channel *ch)
 {
-	return fiber_channel_get_timeout(ch, 0);
+	return ifc_channel_get_timeout(ch, 0);
 }
 
 int
-fiber_channel_put_timeout(struct fiber_channel *ch, void *data,
+ifc_channel_put_timeout(struct ifc_channel *ch, void *data,
 							ev_tstamp timeout)
 {
-	say_info("==== %s(%lu)", __func__, (unsigned long)data);
 	if (timeout < 0)
 		timeout = 0;
 
 	/* channel is full */
 	if (ch->count >= ch->size) {
 
-		STAILQ_INSERT_TAIL(&ch->writers, fiber, ifc);
+		rlist_add_tail_entry(&ch->writers, fiber, ifc);
 
 		bool cancellable = fiber_setcancellable(true);
 		if (timeout) {
@@ -326,23 +312,14 @@ fiber_channel_put_timeout(struct fiber_channel *ch, void *data,
 			fiber_yield();
 		}
 
-		int timeouted = ETIMEDOUT;
-		struct fiber *f;
-		STAILQ_FOREACH(f, &ch->wakeup, ifc) {
-			if (f != fiber)
-				continue;
-			STAILQ_REMOVE(&ch->wakeup, fiber, fiber, ifc);
-			timeouted = 0;
-			break;
-		}
-		if (timeouted)
-			STAILQ_REMOVE(&ch->writers, fiber, fiber, ifc);
+		rlist_del_entry(fiber, ifc);
 
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
-		if (timeouted)
-			return timeouted;
 	}
+
+	if (ch->count >= ch->size)
+		return ETIMEDOUT;
 
 	unsigned i = ch->beg;
 	i += ch->count;
@@ -351,44 +328,60 @@ fiber_channel_put_timeout(struct fiber_channel *ch, void *data,
 		i -= ch->size;
 
 	ch->item[i] = data;
-	if (!STAILQ_EMPTY(&ch->readers)) {
-		struct fiber *f = STAILQ_FIRST(&ch->readers);
-		STAILQ_REMOVE_HEAD(&ch->readers, ifc);
-		STAILQ_INSERT_TAIL(&ch->wakeup, f, ifc);
+	if (!rlist_empty(&ch->readers)) {
+		struct fiber *f =
+			rlist_first_entry(&ch->readers, struct fiber, ifc);
+		rlist_del_entry(f, ifc);
+		rlist_add_tail_entry(&ch->wakeup, f, ifc);
 		fiber_wakeup(f);
 	}
 	return 0;
 }
 
 void
-fiber_channel_put(struct fiber_channel *ch, void *data)
+ifc_channel_put(struct ifc_channel *ch, void *data)
 {
-	fiber_channel_put_timeout(ch, data, 0);
+	ifc_channel_put_timeout(ch, data, 0);
 }
 
 int
-fiber_channel_broadcast(struct fiber_channel *ch, void *data)
+ifc_channel_has_readers(struct ifc_channel *ch)
 {
-	if (STAILQ_EMPTY(&ch->readers))
-		return 0;
+	return !rlist_empty(&ch->readers);
+}
+
+int
+ifc_channel_has_writers(struct ifc_channel *ch)
+{
+	return !rlist_empty(&ch->writers);
+}
+
+int
+ifc_channel_broadcast(struct ifc_channel *ch, void *data)
+{
+	if (rlist_empty(&ch->readers)) {
+		ifc_channel_put(ch, data);
+		return 1;
+	}
 
 	struct fiber *f;
 	int count = 0;
-	STAILQ_FOREACH(f, &ch->readers, ifc) {
+	rlist_foreach_entry(f, &ch->readers, ifc) {
 		count++;
 	}
 
-	for (int i = 0; i < count && !STAILQ_EMPTY(&ch->readers); i++) {
-		struct fiber *f = STAILQ_FIRST(&ch->readers);
-		STAILQ_REMOVE_HEAD(&ch->readers, ifc);
-		STAILQ_INSERT_TAIL(&ch->wakeup, f, ifc);
+	for (int i = 0; i < count && !rlist_empty(&ch->readers); i++) {
+		struct fiber *f =
+			rlist_first_entry(&ch->readers, struct fiber, ifc);
+		rlist_del_entry(f, ifc);
+		rlist_add_tail_entry(&ch->wakeup, f, ifc);
 		ch->bcast = fiber;
 		ch->bcast_msg = data;
 		fiber_wakeup(f);
 		fiber_yield();
 		ch->bcast = NULL;
 		fiber_testcancel();
-		if (STAILQ_EMPTY(&ch->readers)) {
+		if (rlist_empty(&ch->readers)) {
 			count = i;
 			break;
 		}

@@ -248,8 +248,24 @@ lua for i = 1, 10 do ch:put(i) box.fiber.sleep(0.01) end
 lua box.fiber.sleep(.5)
 ---
 ...
+lua ch:has_readers()
+---
+ - true
+...
+lua ch:has_writers()
+---
+ - false
+...
 lua box.fiber.cancel(tfbr)
 ---
+...
+lua ch:has_readers()
+---
+ - false
+...
+lua ch:has_writers()
+---
+ - false
 ...
 lua ch:put(box.info.pid)
 ---
@@ -281,13 +297,21 @@ lua for i, v in pairs(buffer) do print(v) end
 9
 10
 ...
+lua ch:is_empty()
+---
+ - true
+...
 lua ch:broadcast()
 ---
 error: 'usage: channel:broadcast(variable)'
 ...
 lua ch:broadcast(123)
 ---
- - 0
+ - true
+...
+lua ch:get()
+---
+ - 123
 ...
 lua ch:is_full()
 ---
