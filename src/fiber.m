@@ -57,7 +57,7 @@ static __thread uint32_t last_used_fid;
 static __thread struct mh_i32ptr_t *fibers_registry;
 __thread SLIST_HEAD(, fiber) fibers, zombie_fibers;
 
-static __thread RLIST_HEAD(ready_fibers);
+static __thread struct rlist ready_fibers;
 static __thread ev_async ready_async;
 
 static void
@@ -471,6 +471,7 @@ void
 fiber_init(void)
 {
 	SLIST_INIT(&fibers);
+	rlist_init(&ready_fibers);
 	fibers_registry = mh_i32ptr_init();
 
 	memset(&sched, 0, sizeof(sched));
