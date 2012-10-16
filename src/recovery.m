@@ -114,6 +114,15 @@ wait_lsn_set(struct wait_lsn *wait_lsn, int64_t lsn)
 	wait_lsn->lsn = lsn;
 }
 
+
+/* Alert the waiter, if any. */
+static inline void
+wakeup_lsn_waiter(struct recovery_state *r)
+{
+	if (r->wait_lsn.waiter && r->confirmed_lsn >= r->wait_lsn.lsn)
+		fiber_wakeup(r->wait_lsn.waiter);
+}
+
 void
 confirm_lsn(struct recovery_state *r, int64_t lsn, bool is_commit)
 {
@@ -130,18 +139,26 @@ confirm_lsn(struct recovery_state *r, int64_t lsn, bool is_commit)
 			r->confirmed_lsn = lsn;
 		 }
 	} else {
+		 /*
+		 * There can be holes in
+		 * confirmed_lsn, in case of disk write failure, but
+		 * wal_writer never confirms LSNs out order.
+		 */
 		assert(false);
 		say_error("LSN is used twice or COMMIT order is broken: "
 			  "confirmed: %jd, new: %jd",
 			  (intmax_t) r->confirmed_lsn, (intmax_t) lsn);
 	}
-	/*
-	 * Alert the waiter, if any. There can be holes in
-	 * confirmed_lsn, in case of disk write failure, but
-	 * wal_writer never confirms LSNs out order.
-	 */
-	if (r->wait_lsn.waiter && r->confirmed_lsn >= r->wait_lsn.lsn)
-		fiber_call(r->wait_lsn.waiter);
+	wakeup_lsn_waiter(r);
+}
+
+void
+set_lsn(struct recovery_state *r, int64_t lsn)
+{
+	r->lsn = lsn;
+	r->confirmed_lsn = lsn;
+	say_debug("set_lsn(%p, %" PRIi64, r, r->lsn);
+	wakeup_lsn_waiter(r);
 }
 
 /** Wait until the given LSN makes its way to disk. */
@@ -167,13 +184,6 @@ next_lsn(struct recovery_state *r)
 	return r->lsn;
 }
 
-void
-set_lsn(struct recovery_state *r, int64_t lsn)
-{
-	r->lsn = lsn;
-	say_debug("set_lsn(%p, %" PRIi64, r, r->lsn);
-	confirm_lsn(r, r->lsn, true);
-}
 
 /* }}} */
 
@@ -189,13 +199,12 @@ recovery_stop_local(struct recovery_state *r);
 void
 recovery_init(const char *snap_dirname, const char *wal_dirname,
 	      row_handler row_handler, void *row_handler_param,
-	      int rows_per_wal, const char *wal_mode,
-	      double wal_fsync_delay, int flags)
+	      int rows_per_wal, int flags)
 {
 	assert(recovery_state == NULL);
 	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
 	struct recovery_state *r = recovery_state;
-	recovery_update_mode(r, wal_mode, wal_fsync_delay);
+	recovery_update_mode(r, "none", 0);
 
 	if (rows_per_wal <= 1)
 		panic("unacceptable value of 'rows_per_wal'");
@@ -209,7 +218,6 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_dir->dirname = strdup(wal_dirname);
 	r->wal_dir->open_wflags = r->wal_mode == WAL_FSYNC ? WAL_SYNC_FLAG : 0;
 	r->rows_per_wal = rows_per_wal;
-	r->wal_fsync_delay = wal_fsync_delay;
 	wait_lsn_clear(&r->wait_lsn);
 	r->flags = flags;
 }

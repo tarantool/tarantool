@@ -42,7 +42,6 @@
 #include <tarantool.h>
 #include "lua/init.h"
 #include <recovery.h>
-#include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
 #include <errinj.h>
@@ -72,7 +71,7 @@ static const char *help =
 static const char *unknown_command = "unknown command. try typing help." CRLF;
 
 
-#line 76 "src/admin.m"
+#line 75 "src/admin.m"
 static const int admin_start = 1;
 static const int admin_first_final = 135;
 static const int admin_error = 0;
@@ -80,7 +79,7 @@ static const int admin_error = 0;
 static const int admin_en_main = 1;
 
 
-#line 75 "src/admin.rl"
+#line 74 "src/admin.rl"
 
 
 struct salloc_stat_admin_cb_ctx {
@@ -217,12 +216,12 @@ admin_dispatch(struct coio *coio, struct iobuf *iobuf, lua_State *L)
 	p = in->pos;
 
 	
-#line 221 "src/admin.m"
+#line 220 "src/admin.m"
 	{
 	cs = admin_start;
 	}
 
-#line 226 "src/admin.m"
+#line 225 "src/admin.m"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -285,15 +284,15 @@ case 6:
 	}
 	goto st0;
 tr13:
-#line 320 "src/admin.rl"
+#line 307 "src/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st135;
 tr20:
-#line 308 "src/admin.rl"
+#line 295 "src/admin.rl"
 	{return -1;}
 	goto st135;
 tr25:
-#line 235 "src/admin.rl"
+#line 222 "src/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
@@ -301,9 +300,9 @@ tr25:
 		}
 	goto st135;
 tr36:
-#line 294 "src/admin.rl"
+#line 281 "src/admin.rl"
 	{strend = p;}
-#line 241 "src/admin.rl"
+#line 228 "src/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
@@ -312,7 +311,7 @@ tr36:
 		}
 	goto st135;
 tr43:
-#line 248 "src/admin.rl"
+#line 235 "src/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -321,11 +320,11 @@ tr43:
 		}
 	goto st135;
 tr67:
-#line 318 "src/admin.rl"
+#line 305 "src/admin.rl"
 	{coredump(60); ok(out);}
 	goto st135;
 tr76:
-#line 255 "src/admin.rl"
+#line 242 "src/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -340,9 +339,9 @@ tr76:
 		}
 	goto st135;
 tr98:
-#line 304 "src/admin.rl"
+#line 291 "src/admin.rl"
 	{ state = false; }
-#line 268 "src/admin.rl"
+#line 255 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -354,9 +353,9 @@ tr98:
 		}
 	goto st135;
 tr101:
-#line 303 "src/admin.rl"
+#line 290 "src/admin.rl"
 	{ state = true; }
-#line 268 "src/admin.rl"
+#line 255 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -368,35 +367,23 @@ tr101:
 		}
 	goto st135;
 tr117:
-#line 211 "src/admin.rl"
+#line 210 "src/admin.rl"
 	{
-			tarantool_cfg_iterator_t *i;
-			char *key, *value;
-
 			start(out);
-			tbuf_printf(out, "configuration:" CRLF);
-			i = tarantool_cfg_iterator_init();
-			while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
-				if (value) {
-					tbuf_printf(out, "  %s: \"%s\"" CRLF, key, value);
-					free(value);
-				} else {
-					tbuf_printf(out, "  %s: (null)" CRLF, key);
-				}
-			}
+			show_cfg(out);
 			end(out);
 		}
 	goto st135;
 tr131:
-#line 311 "src/admin.rl"
+#line 298 "src/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st135;
 tr137:
-#line 310 "src/admin.rl"
+#line 297 "src/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st135;
 tr146:
-#line 229 "src/admin.rl"
+#line 216 "src/admin.rl"
 	{
 			start(out);
 			errinj_info(out);
@@ -404,33 +391,33 @@ tr146:
 		}
 	goto st135;
 tr152:
-#line 314 "src/admin.rl"
+#line 301 "src/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st135;
 tr160:
-#line 313 "src/admin.rl"
+#line 300 "src/admin.rl"
 	{start(out); show_slab(out); end(out);}
 	goto st135;
 tr164:
-#line 315 "src/admin.rl"
+#line 302 "src/admin.rl"
 	{start(out); show_stat(out);end(out);}
 	goto st135;
 st135:
 	if ( ++p == pe )
 		goto _test_eof135;
 case 135:
-#line 423 "src/admin.m"
+#line 410 "src/admin.m"
 	goto st0;
 tr14:
-#line 320 "src/admin.rl"
+#line 307 "src/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
 tr21:
-#line 308 "src/admin.rl"
+#line 295 "src/admin.rl"
 	{return -1;}
 	goto st7;
 tr26:
-#line 235 "src/admin.rl"
+#line 222 "src/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
@@ -438,9 +425,9 @@ tr26:
 		}
 	goto st7;
 tr37:
-#line 294 "src/admin.rl"
+#line 281 "src/admin.rl"
 	{strend = p;}
-#line 241 "src/admin.rl"
+#line 228 "src/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
@@ -449,7 +436,7 @@ tr37:
 		}
 	goto st7;
 tr44:
-#line 248 "src/admin.rl"
+#line 235 "src/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -458,11 +445,11 @@ tr44:
 		}
 	goto st7;
 tr68:
-#line 318 "src/admin.rl"
+#line 305 "src/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
 tr77:
-#line 255 "src/admin.rl"
+#line 242 "src/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -477,9 +464,9 @@ tr77:
 		}
 	goto st7;
 tr99:
-#line 304 "src/admin.rl"
+#line 291 "src/admin.rl"
 	{ state = false; }
-#line 268 "src/admin.rl"
+#line 255 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -491,9 +478,9 @@ tr99:
 		}
 	goto st7;
 tr102:
-#line 303 "src/admin.rl"
+#line 290 "src/admin.rl"
 	{ state = true; }
-#line 268 "src/admin.rl"
+#line 255 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -505,35 +492,23 @@ tr102:
 		}
 	goto st7;
 tr118:
-#line 211 "src/admin.rl"
+#line 210 "src/admin.rl"
 	{
-			tarantool_cfg_iterator_t *i;
-			char *key, *value;
-
 			start(out);
-			tbuf_printf(out, "configuration:" CRLF);
-			i = tarantool_cfg_iterator_init();
-			while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
-				if (value) {
-					tbuf_printf(out, "  %s: \"%s\"" CRLF, key, value);
-					free(value);
-				} else {
-					tbuf_printf(out, "  %s: (null)" CRLF, key);
-				}
-			}
+			show_cfg(out);
 			end(out);
 		}
 	goto st7;
 tr132:
-#line 311 "src/admin.rl"
+#line 298 "src/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st7;
 tr138:
-#line 310 "src/admin.rl"
+#line 297 "src/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st7;
 tr147:
-#line 229 "src/admin.rl"
+#line 216 "src/admin.rl"
 	{
 			start(out);
 			errinj_info(out);
@@ -541,22 +516,22 @@ tr147:
 		}
 	goto st7;
 tr153:
-#line 314 "src/admin.rl"
+#line 301 "src/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st7;
 tr161:
-#line 313 "src/admin.rl"
+#line 300 "src/admin.rl"
 	{start(out); show_slab(out); end(out);}
 	goto st7;
 tr165:
-#line 315 "src/admin.rl"
+#line 302 "src/admin.rl"
 	{start(out); show_stat(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 560 "src/admin.m"
+#line 535 "src/admin.m"
 	if ( (*p) == 10 )
 		goto st135;
 	goto st0;
@@ -709,28 +684,28 @@ case 23:
 	}
 	goto tr33;
 tr33:
-#line 294 "src/admin.rl"
+#line 281 "src/admin.rl"
 	{strstart = p;}
 	goto st24;
 st24:
 	if ( ++p == pe )
 		goto _test_eof24;
 case 24:
-#line 720 "src/admin.m"
+#line 695 "src/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
 	}
 	goto st24;
 tr34:
-#line 294 "src/admin.rl"
+#line 281 "src/admin.rl"
 	{strstart = p;}
 	goto st25;
 st25:
 	if ( ++p == pe )
 		goto _test_eof25;
 case 25:
-#line 734 "src/admin.m"
+#line 709 "src/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
@@ -1180,28 +1155,28 @@ case 73:
 		goto tr91;
 	goto st0;
 tr91:
-#line 302 "src/admin.rl"
+#line 289 "src/admin.rl"
 	{ strstart = p; }
 	goto st74;
 st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 1191 "src/admin.m"
+#line 1166 "src/admin.m"
 	if ( (*p) == 32 )
 		goto tr92;
 	if ( 33 <= (*p) && (*p) <= 126 )
 		goto st74;
 	goto st0;
 tr92:
-#line 302 "src/admin.rl"
+#line 289 "src/admin.rl"
 	{ strend = p; }
 	goto st75;
 st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 1205 "src/admin.m"
+#line 1180 "src/admin.m"
 	switch( (*p) ) {
 		case 32: goto st75;
 		case 111: goto st76;
@@ -1893,7 +1868,7 @@ case 134:
 	_out: {}
 	}
 
-#line 326 "src/admin.rl"
+#line 313 "src/admin.rl"
 
 
 	in->pos = pe;
@@ -1930,11 +1905,11 @@ admin_handler(va_list ap)
 }
 
 void
-admin_init(void)
+admin_init(const char *bind_ipaddr, int admin_port)
 {
 	static struct coio_service admin;
-	coio_service_init(&admin, "admin", cfg.bind_ipaddr,
-			  cfg.admin_port, admin_handler, NULL);
+	coio_service_init(&admin, "admin", bind_ipaddr,
+			  admin_port, admin_handler, NULL);
 	evio_service_start(&admin.evio_service);
 }
 

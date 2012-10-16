@@ -118,7 +118,7 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
 	 */
-	box_process(txn_begin(), &port_null, REPLACE, req);
+	box_process(&port_null, REPLACE, req);
 }
 
 static void
@@ -133,7 +133,7 @@ delete(void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	box_process(txn_begin(), &port_null, DELETE, req);
+	box_process(&port_null, DELETE, req);
 }
 
 static struct tuple *

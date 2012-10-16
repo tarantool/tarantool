@@ -40,7 +40,6 @@
 #include <tarantool.h>
 #include "lua/init.h"
 #include <recovery.h>
-#include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <util.h>
 #include <errinj.h>
@@ -209,20 +208,8 @@ admin_dispatch(struct coio *coio, struct iobuf *iobuf, lua_State *L)
 
 	%%{
 		action show_configuration {
-			tarantool_cfg_iterator_t *i;
-			char *key, *value;
-
 			start(out);
-			tbuf_printf(out, "configuration:" CRLF);
-			i = tarantool_cfg_iterator_init();
-			while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
-				if (value) {
-					tbuf_printf(out, "  %s: \"%s\"" CRLF, key, value);
-					free(value);
-				} else {
-					tbuf_printf(out, "  %s: (null)" CRLF, key);
-				}
-			}
+			show_cfg(out);
 			end(out);
 		}
 
@@ -359,11 +346,11 @@ admin_handler(va_list ap)
 }
 
 void
-admin_init(void)
+admin_init(const char *bind_ipaddr, int admin_port)
 {
 	static struct coio_service admin;
-	coio_service_init(&admin, "admin", cfg.bind_ipaddr,
-			  cfg.admin_port, admin_handler, NULL);
+	coio_service_init(&admin, "admin", bind_ipaddr,
+			  admin_port, admin_handler, NULL);
 	evio_service_start(&admin.evio_service);
 }
 

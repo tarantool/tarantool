@@ -35,6 +35,8 @@
 #include <say.h>
 #include "coio_buf.h"
 #include "tbuf.h"
+#include "box/box.h"
+#include "box/port.h"
 
 const uint32_t msg_ping = 0xff00;
 

@@ -31,7 +31,7 @@
 
 #include <cfg/warning.h>
 #include <errcode.h>
-#include <fiber.h>
+#include "palloc.h"
 #include <recovery.h>
 #include <log_io.h>
 #include <pickle.h>
@@ -49,13 +49,11 @@
 #include "txn.h"
 #include "coio.h"
 
-static void box_process_replica(struct txn *txn, struct port *port,
+static void box_process_replica(struct port *port,
 				u32 op, struct tbuf *request_data);
-static void box_process_ro(struct txn *txn, struct port *port,
+static void box_process_ro(struct port *port,
 			   u32 op, struct tbuf *request_data);
-static void box_process_ro(struct txn *txn, struct port *port,
-			   u32 op, struct tbuf *request_data);
-static void box_process_rw(struct txn *txn, struct port *port,
+static void box_process_rw(struct port *port,
 			   u32 op, struct tbuf *request_data);
 box_process_func box_process = box_process_ro;
 
@@ -79,9 +77,10 @@ box_snap_row(const struct tbuf *t)
 }
 
 static void
-box_process_rw(struct txn *txn, struct port *port,
+box_process_rw(struct port *port,
 	       u32 op, struct tbuf *data)
 {
+	struct txn *txn = txn_begin();
 	ev_tstamp start = ev_now(), stop;
 
 	@try {
@@ -103,49 +102,44 @@ box_process_rw(struct txn *txn, struct port *port,
 }
 
 static void
-box_process_replica(struct txn *txn, struct port *port,
-	       u32 op, struct tbuf *request_data)
+box_process_replica(struct port *port, u32 op, struct tbuf *request_data)
 {
 	if (!request_is_select(op)) {
-		txn_rollback(txn);
 		tnt_raise(ClientError, :ER_NONMASTER,
 			  cfg.replication_source);
 	}
-	return box_process_rw(txn, port, op, request_data);
+	return box_process_rw(port, op, request_data);
 }
 
 static void
-box_process_ro(struct txn *txn, struct port *port,
+box_process_ro(struct port *port,
 	       u32 op, struct tbuf *request_data)
 {
-	if (!request_is_select(op)) {
-		txn_rollback(txn);
+	if (!request_is_select(op))
 		tnt_raise(LoggedError, :ER_SECONDARY);
-	}
-	return box_process_rw(txn, port, op, request_data);
+	return box_process_rw(port, op, request_data);
 }
-
-
 static void
 iproto_primary_port_handler(struct obuf *out, u32 op,
 			    struct tbuf *request_data)
 {
-	box_process(txn_begin(), port_iproto_create(out), op, request_data);
+	box_process(port_iproto_create(out), op, request_data);
 }
 
 static void
 iproto_secondary_port_handler(struct obuf *out, u32 op,
 			      struct tbuf *request_data)
 {
-	box_process_ro(txn_begin(), port_iproto_create(out), op, request_data);
+	box_process_ro(port_iproto_create(out), op, request_data);
 }
+
 
 static void
 box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 {
 	struct header_v11 *row = header_v11(t);
 
-	struct tbuf *b = palloc(fiber->gc_pool, sizeof(*b));
+	struct tbuf *b = palloc(buf->pool, sizeof(*b));
 	b->data = t->data + sizeof(struct header_v11);
 	b->size = row->len;
 	u16 tag, op;
@@ -302,9 +296,7 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 			recover_snap_row(t);
 		} else if (tag == XLOG) {
 			u16 op = read_u16(t);
-			struct txn *txn = txn_begin();
-			txn->txn_flags |= BOX_NOT_STORE;
-			box_process_rw(txn, &port_null, op, t);
+			box_process_rw(&port_null, op, t);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
@@ -372,6 +364,9 @@ static void
 box_leave_local_standby_mode(void *data __attribute__((unused)))
 {
 	recovery_finalize(recovery_state);
+
+	recovery_update_mode(recovery_state, cfg.wal_mode,
+			     cfg.wal_fsync_delay);
 
 	box_enter_master_or_replica_mode(&cfg);
 }
@@ -487,8 +482,7 @@ mod_init(void)
 	/* recovery initialization */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
 		      recover_row, NULL,
-		      cfg.rows_per_wal, cfg.wal_mode,
-		      cfg.wal_fsync_delay,
+		      cfg.rows_per_wal,
 		      init_storage ? RECOVER_READONLY : 0);
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);

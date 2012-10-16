@@ -75,7 +75,6 @@ set (recompiled_sources
      ${CMAKE_SOURCE_DIR}/src/lua/init.m
      ${CMAKE_SOURCE_DIR}/src/say.m
      ${CMAKE_SOURCE_DIR}/src/assoc.m
-     ${CMAKE_SOURCE_DIR}/src/admin.m
      ${CMAKE_SOURCE_DIR}/src/replication.m
      ${CMAKE_SOURCE_DIR}/src/fiber.m)
 
@@ -94,6 +93,7 @@ set (common_sources
      stat.m
      log_io.m
      recovery.m
+     admin.m
      cpu_feature.m
      replica.m
      iproto.m
