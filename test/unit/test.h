@@ -1,56 +1,27 @@
 #ifndef TARANTOOL_TEST_H_INCLUDED
 #define TARANTOOL_TEST_H_INCLUDED
 
-#include <stdio.h>
-#include <stdarg.h>
+/**
+@brief example
 
-static int tests_done = 0;
-static int tests_failed = 0;
-static int plan_test = 0;
+@code
+	#include "test.h"
 
-static inline void
-plan(int count)
-{
-	plan_test = count;
-	static showed_plan = 0;
-	if (!showed_plan)
-		printf("%d..%d\n", 1, plan_test);
-	showed_plan = 1;
-}
-
-static inline int
-check_plan(void)
-{
-	int res;
-	if (tests_done != plan_test) {
-		fprintf(stderr,
-			"# Looks like you planned %d tests but ran %d.\n",
-			plan_test, tests_done);
-		res = -1;
+	int main(void) {
+		plan(3);		// count of test You planned to check
+		ok(1, "Test name 1");
+		is(4, 2 * 2, "2 * 2 == 4");
+		isnt(5, 2 * 2, "2 * 2 != 5);
+		return check_plan();	// print resume
 	}
+@endcode
 
-	if (tests_failed) {
-		fprintf(stderr,
-			"# Looks like you failed %d test of %d run.\n",
-			tests_failed, tests_done);
-		res = tests_failed;
-	}
-	return res;
-}
 
-static inline int
-__ok(int condition, const char *fmt, ...)
-{
-	va_list ap;
+*/
 
-	printf("%s %d - ", condition ? "ok" : "not ok", ++tests_done);
-	if (!condition)
-		tests_failed++;
-	va_start(ap, fmt);
-	vprintf(fmt, ap);
-	printf("\n");
-	return condition;
-}
+int __ok(int condition, const char *fmt, ...);
+void plan(int count);
+int check_plan(void);
 
 #define ok(condition, fmt, args...)	{		\
 	int res = __ok(condition, fmt, ##args);		\

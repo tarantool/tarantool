@@ -1,7 +1,7 @@
 #include <rlist.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <test.h>
+#include "test.h"
 
 
 #define PLAN		66
