@@ -1563,94 +1563,6 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
 
     <bridgehead renderas="sect4">Inter-fiber communication</bridgehead>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.ifc.semaphore(count)</emphasis>
-            <listitem>
-                <simpara>
-                    Create new semaphore. Example:
-                    <programlisting>
-local semaphore = box.ifc.semaphore(10)
-function worker_fiber()
-    while true do
-        semaphore:down()
-        # do something
-        semaphore:up()
-    end
-end
-
-function theother_fiber()
-    while true do
-        if semaphore:trydown() then
-            # semaphore is down
-            
-            # do something
-
-            semaphore:up()
-        else
-            # semaphore isn't down
-        end
-    end
-end
-
-function fiberN()
-    if semaphore:down(10) then -- 10 seconds
-        print("semafore was down in 10 seconds")
-    else
-        print("timeout!")
-    end
-end
-                    </programlisting>
-                </simpara>
-            </listitem>
-        </term>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.ifc.mutex()</emphasis>
-            <listitem>
-                <simpara>
-                    Create new mutex. Example:
-                    <programlisting>
-local mutex = box.ifc.mutex()
-function worker_fiber()
-    while true do
-        mutex:lock()
-        # do something
-        mutex:unlock()
-    end
-end
-
-function theother_fiber()
-    while true do
-        if mutex:trylock() then
-            # mutex is locked
-            
-            # do something
-
-            mutex:unlock()
-        else
-            # mutex was not locked
-        end
-    end
-
-    if mutex:locked() then
-            # mutex is already locked
-    end
-end
-function fiberN()
-    if mutex:lock(10) then          -- 10 seconds
-        print("mutex was locked in 10 seconds")
-    else
-        print("timeout!")
-    end
-end
-                    </programlisting>
-                </simpara>
-            </listitem>
-        </term>
-    </varlistentry>
     
     <varlistentry>
         <term>
@@ -1690,7 +1602,16 @@ function producer_fiber()
         if channel:is_full() then
             # channel is full
         end
+
         ...
+        if channel:has_readers() then
+            # there are some fibers that wait data
+        end
+        ...
+
+        if channel:has_writers() then
+            # there are some fibers that wait readers
+        end
         channel:put(task)
     end
 end
