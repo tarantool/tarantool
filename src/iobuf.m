@@ -172,16 +172,11 @@ obuf_dup(struct obuf *buf, void *data, size_t size)
 			buf->size += fill;
 			data += fill;
 			size -= fill;
-
-			buf->pos++;
-			iov = &buf->iov[buf->pos];
-			capacity = buf->capacity[buf->pos];
 			/*
 			 * Check if the remainder can fit
 			 * without allocations.
 			 */
-		} else {
-			assert(capacity == 0);
+		} else if (capacity == 0) {
 			/**
 			 * Still some data to copy. We have to get
 			 * a new buffer. Before we allocate
@@ -194,6 +189,10 @@ obuf_dup(struct obuf *buf, void *data, size_t size)
 			obuf_alloc_pos(buf, buf->pos, size);
 			break;
 		}
+		assert(capacity == iov->iov_len);
+		buf->pos++;
+		iov = &buf->iov[buf->pos];
+		capacity = buf->capacity[buf->pos];
 	}
 	memcpy(iov->iov_base + iov->iov_len, data, size);
 	iov->iov_len += size;

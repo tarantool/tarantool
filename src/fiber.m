@@ -270,12 +270,6 @@ unregister_fid(struct fiber *fiber)
 	mh_i32ptr_del(fibers_registry, k);
 }
 
-static void
-fiber_alloc(struct fiber *fiber)
-{
-	prelease(fiber->gc_pool);
-}
-
 void
 fiber_gc(void)
 {
@@ -302,7 +296,7 @@ fiber_zombificate()
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	fiber->flags = 0;
-	fiber_alloc(fiber);
+	prelease(fiber->gc_pool);
 
 	SLIST_INSERT_HEAD(&zombie_fibers, fiber, zombie_link);
 }
@@ -369,7 +363,6 @@ fiber_create(const char *name, void (*f) (va_list))
 
 		fiber->gc_pool = palloc_create_pool("");
 
-		fiber_alloc(fiber);
 		ev_async_init(&fiber->async, (void *)fiber_schedule);
 		ev_async_start(&fiber->async);
 		ev_init(&fiber->timer, (void *)fiber_schedule);
