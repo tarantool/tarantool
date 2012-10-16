@@ -1,0 +1,67 @@
+1..66
+ok 1 - list is empty
+ok 2 - first item
+ok 3 - first item
+ok 4 - last item
+ok 5 - last item
+ok 6 - rlist_next
+ok 7 - rlist_prev
+ok 8 - element (foreach) 0
+ok 9 - element (foreach) 1
+ok 10 - element (foreach) 2
+ok 11 - element (foreach) 3
+ok 12 - element (foreach) 4
+ok 13 - element (foreach) 5
+ok 14 - element (foreach) 6
+ok 15 - element (foreach_reverse) 6
+ok 16 - element (foreach_reverse) 5
+ok 17 - element (foreach_reverse) 4
+ok 18 - element (foreach_reverse) 3
+ok 19 - element (foreach_reverse) 2
+ok 20 - element (foreach_reverse) 1
+ok 21 - element (foreach_reverse) 0
+ok 22 - rlist_entry
+ok 23 - rlist_first_entry
+ok 24 - rlist_next_entry
+ok 25 - rlist_prev_entry
+ok 26 - element (foreach_entry) 0
+ok 27 - element (foreach_entry) 1
+ok 28 - element (foreach_entry) 2
+ok 29 - element (foreach_entry) 3
+ok 30 - element (foreach_entry) 4
+ok 31 - element (foreach_entry) 5
+ok 32 - element (foreach_entry) 6
+ok 33 - element (foreach_entry_reverse) 6
+ok 34 - element (foreach_entry_reverse) 5
+ok 35 - element (foreach_entry_reverse) 4
+ok 36 - element (foreach_entry_reverse) 3
+ok 37 - element (foreach_entry_reverse) 2
+ok 38 - element (foreach_entry_reverse) 1
+ok 39 - element (foreach_entry_reverse) 0
+ok 40 - element (second deleted) 0
+ok 41 - element (second deleted) 1
+ok 42 - element (second deleted) 3
+ok 43 - element (second deleted) 4
+ok 44 - element (second deleted) 5
+ok 45 - element (second deleted) 6
+ok 46 - element (second deleted) 6
+ok 47 - element (second deleted) 5
+ok 48 - element (second deleted) 4
+ok 49 - element (second deleted) 3
+ok 50 - element (second deleted) 1
+ok 51 - element (second deleted) 0
+ok 52 - list is empty
+ok 53 - element (foreach_entry_reverse) 0
+ok 54 - element (foreach_entry_reverse) 1
+ok 55 - element (foreach_entry_reverse) 2
+ok 56 - element (foreach_entry_reverse) 3
+ok 57 - element (foreach_entry_reverse) 4
+ok 58 - element (foreach_entry_reverse) 5
+ok 59 - element (foreach_entry_reverse) 6
+ok 60 - element (foreach_entry) 6
+ok 61 - element (foreach_entry) 5
+ok 62 - element (foreach_entry) 4
+ok 63 - element (foreach_entry) 3
+ok 64 - element (foreach_entry) 2
+ok 65 - element (foreach_entry) 1
+ok 66 - element (foreach_entry) 0

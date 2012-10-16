@@ -19,8 +19,21 @@
 
 */
 
+/* private function, use ok(...) instead */
 int __ok(int condition, const char *fmt, ...);
+
+/**
+@brief set and print plan
+@param count
+Before anything else, you need a testing plan.  This basically declares
+how many tests your program is going to run to protect against premature
+failure.
+*/
 void plan(int count);
+
+/**
+@brief check if plan is reached and print report
+*/
 int check_plan(void);
 
 #define ok(condition, fmt, args...)	{		\
