@@ -26,6 +26,7 @@ test/unit/rope
 test/unit/rope_avl
 test/unit/rope_basic
 test/unit/rope_stress
+test/unit/rlist
 Makefile
 CMakeFiles
 CMakeCache.txt
