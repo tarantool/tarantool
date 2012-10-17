@@ -40,16 +40,19 @@
 
 #include "exception.h"
 #include "palloc.h"
+#include <rlist.h>
 
 #define FIBER_NAME_MAXLEN 32
 
-#define FIBER_READING_INBOX 0x1
+#define FIBER_READING_INBOX (1 << 0)
 /** This fiber can be cancelled synchronously. */
-#define FIBER_CANCELLABLE   0x2
+#define FIBER_CANCELLABLE   (1 << 1)
 /** Indicates that a fiber has been cancelled. */
-#define FIBER_CANCEL        0x4
+#define FIBER_CANCEL        (1 << 2)
 /** This fiber was created via stored procedures API. */
-#define FIBER_USER_MODE     0x8
+#define FIBER_USER_MODE     (1 << 3)
+/** This fiber was marked as ready for wake up */
+#define FIBER_READY	    (1 << 4)
 
 /** This is thrown by fiber_* API calls when the fiber is
  * cancelled.
@@ -59,7 +62,6 @@
 @end
 
 struct fiber {
-	ev_async async;
 #ifdef ENABLE_BACKTRACE
 	void *last_stack_frame;
 #endif
@@ -73,6 +75,9 @@ struct fiber {
 	ev_child cw;
 
 	SLIST_ENTRY(fiber) link, zombie_link;
+
+	struct rlist ready;	/* wakeup queue */
+	struct rlist ifc;	/* inter fiber communication */
 
 	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];
@@ -115,12 +120,13 @@ void fiber_cancel(struct fiber *f);
 void fiber_testcancel(void);
 /** Make it possible or not possible to cancel the current
  * fiber.
+ *
+ * return previous state.
  */
-void fiber_setcancelstate(bool enable);
+bool fiber_setcancellable(bool enable);
 void fiber_sleep(ev_tstamp s);
 struct tbuf;
 void fiber_info(struct tbuf *out);
-void
-fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
+void fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

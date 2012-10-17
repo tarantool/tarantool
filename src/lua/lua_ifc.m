@@ -1,0 +1,310 @@
+/*
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#include "lua_ifc.h"
+#include <ifc.h>
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+
+#include <lua/init.h>
+#include <stdlib.h>
+#include <say.h>
+
+static const char channel_lib[]   = "box.ifc.channel";
+
+
+/******************** channel ***************************/
+
+static int
+lbox_ifc_channel(struct lua_State *L)
+{
+	say_info(":%s()", __func__);
+
+	lua_Integer size = 1;
+
+	if (lua_gettop(L) > 0) {
+		if (lua_gettop(L) != 1 || !lua_isnumber(L, 1))
+			luaL_error(L, "fiber.channel(size): bad arguments");
+
+		size = lua_tointeger(L, -1);
+		if (size < 0)
+			luaL_error(L, "fiber.channel(size): negative size");
+	}
+	struct ifc_channel *ch = ifc_channel_alloc(size);
+	if (!ch)
+		luaL_error(L, "fiber.channel: Not enough memory");
+	ifc_channel_init(ch);
+
+	void **ptr = lua_newuserdata(L, sizeof(void *));
+	luaL_getmetatable(L, channel_lib);
+
+	lua_pushstring(L, "rid");	/* first object id */
+	lua_pushnumber(L, 1);
+	lua_settable(L, -3);
+
+	lua_setmetatable(L, -2);
+	*ptr = ch;
+	return 1;
+}
+
+static inline struct ifc_channel *
+lbox_check_channel(struct lua_State *L, int narg)
+{
+	return * (void **) luaL_checkudata(L, narg, channel_lib);
+}
+
+
+static int
+lbox_ifc_channel_gc(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		return 0;
+	struct ifc_channel *ch = lbox_check_channel(L, -1);
+	free(ch);
+	return 0;
+}
+
+
+static int
+lbox_ifc_channel_isfull(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		luaL_error(L, "usage: channel:is_full()");
+	struct ifc_channel *ch = lbox_check_channel(L, -1);
+	if (ifc_channel_isfull(ch))
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
+	return 1;
+}
+
+static int
+lbox_ifc_channel_isempty(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
+		luaL_error(L, "usage: channel:is_empty()");
+	struct ifc_channel *ch = lbox_check_channel(L, -1);
+	if (ifc_channel_isempty(ch))
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
+	return 1;
+}
+
+static int
+lbox_ifc_channel_put(struct lua_State *L)
+{
+	double timeout;
+	int top = lua_gettop(L);
+	struct ifc_channel *ch;
+
+	switch(top) {
+		case 2:
+			timeout = 0;
+			break;
+		case 3:
+			if (!lua_isnumber(L, -1))
+				luaL_error(L, "timeout must be number");
+			timeout = lua_tonumber(L, -1);
+			if (timeout < 0)
+				luaL_error(L, "wrong timeout");
+			break;
+		default:
+			luaL_error(L, "usage: channel:put(var [, timeout])");
+
+
+	}
+	ch = lbox_check_channel(L, -top);
+
+	lua_getmetatable(L, -top);
+
+	lua_pushstring(L, "rid");
+	lua_gettable(L, -2);
+
+	lua_Integer rid = lua_tointeger(L, -1);
+	if (rid < 0x7FFFFFFF)
+		rid++;
+	else
+		rid = 1;
+
+	lua_pushstring(L, "rid");	/* update object id */
+	lua_pushnumber(L, rid);
+	lua_settable(L, -4);
+
+	lua_pushnumber(L, rid);
+	lua_pushvalue(L, 2);
+	lua_settable(L, -4);
+	lua_settop(L, top);
+
+
+	if (ifc_channel_put_timeout(ch, (void *)rid, timeout) == 0)
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
+	return 1;
+}
+
+static int
+lbox_ifc_channel_get(struct lua_State *L)
+{
+	int top = lua_gettop(L);
+	double timeout;
+
+	if (top > 2 || top < 1 || !lua_isuserdata(L, -top))
+		luaL_error(L, "usage: channel:get([timeout])");
+
+	if (top == 2) {
+		if (!lua_isnumber(L, 2))
+			luaL_error(L, "timeout must be number");
+		timeout = lua_tonumber(L, 2);
+		if (timeout < 0)
+			luaL_error(L, "wrong timeout");
+	} else {
+		timeout = 0;
+	}
+
+	struct ifc_channel *ch = lbox_check_channel(L, 1);
+
+	lua_Integer rid = (lua_Integer)ifc_channel_get_timeout(ch, timeout);
+
+	if (!rid) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_getmetatable(L, 1);
+
+	lua_pushstring(L, "broadcast_message");
+	lua_gettable(L, -2);
+
+	if (lua_isnil(L, -1)) {	/* common messages */
+		lua_pop(L, 1);		/* nil */
+
+		lua_pushnumber(L, rid);		/* extract and delete value */
+		lua_gettable(L, -2);
+
+		lua_pushnumber(L, rid);
+		lua_pushnil(L);
+		lua_settable(L, -4);
+	}
+
+	lua_remove(L, -2);	/* cleanup stack (metatable) */
+	return 1;
+}
+
+
+
+static int
+lbox_ifc_channel_broadcast(struct lua_State *L)
+{
+	struct ifc_channel *ch;
+
+	if (lua_gettop(L) != 2)
+		luaL_error(L, "usage: channel:broadcast(variable)");
+
+	ch = lbox_check_channel(L, -2);
+
+	if (!ifc_channel_has_readers(ch))
+		return lbox_ifc_channel_put(L);
+
+	lua_getmetatable(L, -2);			/* 3 */
+
+	lua_pushstring(L, "broadcast_message");		/* 4 */
+
+	/* save old value */
+	lua_pushstring(L, "broadcast_message");
+	lua_gettable(L, 3);				/* 5 */
+
+	lua_pushstring(L, "broadcast_message");		/* save object */
+	lua_pushvalue(L, 2);
+	lua_settable(L, 3);
+
+	int count = ifc_channel_broadcast(ch, (void *)1);
+
+	lua_settable(L, 3);
+
+	lua_pop(L, 1);		/* stack cleanup */
+	lua_pushnumber(L, count);
+
+	return 1;
+}
+
+
+static int
+lbox_ifc_channel_has_readers(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "usage: channel:has_readers()");
+	struct ifc_channel *ch = lbox_check_channel(L, -1);
+	lua_pushboolean(L, ifc_channel_has_readers(ch));
+	return 1;
+}
+
+static int
+lbox_ifc_channel_has_writers(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "usage: channel:has_writers()");
+	struct ifc_channel *ch = lbox_check_channel(L, -1);
+	lua_pushboolean(L, ifc_channel_has_writers(ch));
+	return 1;
+}
+
+void
+ifc_lua_init(struct lua_State *L)
+{
+	static const struct luaL_reg channel_meta[] = {
+		{"__gc",	lbox_ifc_channel_gc},
+		{"is_full",	lbox_ifc_channel_isfull},
+		{"is_empty",	lbox_ifc_channel_isempty},
+		{"put",		lbox_ifc_channel_put},
+		{"get",		lbox_ifc_channel_get},
+		{"broadcast",	lbox_ifc_channel_broadcast},
+		{"has_readers",	lbox_ifc_channel_has_readers},
+		{"has_writers",	lbox_ifc_channel_has_writers},
+		{NULL, NULL}
+	};
+	tarantool_lua_register_type(L, channel_lib, channel_meta);
+
+	static const struct luaL_reg ifc_meta[] = {
+		{"channel",	lbox_ifc_channel},
+		{NULL, NULL}
+	};
+
+
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+
+	lua_pushstring(L, "ifc");
+	lua_newtable(L);			/* box.ifc table */
+	luaL_register(L, NULL, ifc_meta);
+	lua_settable(L, -3);
+	lua_pop(L, 1);
+}
+

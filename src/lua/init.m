@@ -42,6 +42,7 @@
 
 #include "pickle.h"
 #include "fiber.h"
+#include "lua_ifc.h"
 #include <ctype.h>
 #include "lua/info.h"
 #include "lua/slab.h"
@@ -687,7 +688,7 @@ static void
 box_lua_fiber_run(va_list ap __attribute__((unused)))
 {
 	fiber_testcancel();
-	fiber_setcancelstate(false);
+	fiber_setcancellable(false);
 
 	struct lua_State *L = box_lua_fiber_get_coro(tarantool_L, fiber);
 	/*
@@ -877,7 +878,7 @@ lbox_fiber_yield(struct lua_State *L)
 	 * Yield to the caller. The caller will take care of
 	 * whatever arguments are taken.
 	 */
-	fiber_setcancelstate(true);
+	fiber_setcancellable(true);
 	if (box_lua_fiber_get_coro(L, fiber) == NULL) {
 		fiber_wakeup(fiber);
 		fiber_yield();
@@ -887,7 +888,7 @@ lbox_fiber_yield(struct lua_State *L)
 		lua_pushinteger(L, YIELD);
 		fiber_yield_to(caller);
 	}
-	fiber_setcancelstate(false);
+	fiber_setcancellable(false);
 	/*
 	 * Got resumed. Return whatever the caller has passed
 	 * to us with box.fiber.resume().
@@ -980,9 +981,9 @@ lbox_fiber_sleep(struct lua_State *L)
 	if (! lua_isnumber(L, 1) || lua_gettop(L) != 1)
 		luaL_error(L, "fiber.sleep(delay): bad arguments");
 	double delay = lua_tonumber(L, 1);
-	fiber_setcancelstate(true);
+	fiber_setcancellable(true);
 	fiber_sleep(delay);
-	fiber_setcancelstate(false);
+	fiber_setcancellable(false);
 	return 0;
 }
 
@@ -1259,6 +1260,7 @@ tarantool_lua_init()
 	tarantool_lua_info_init(L);
 	tarantool_lua_slab_init(L);
 	tarantool_lua_stat_init(L);
+	ifc_lua_init(L);
 	tarantool_lua_uuid_init(L);
 
 	mod_lua_init(L);

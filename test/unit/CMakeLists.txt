@@ -1,3 +1,4 @@
+add_executable(rlist rlist.c test.c)
 add_executable(queue queue.c)
 add_executable(mhash mhash.c)
 add_executable(rope_basic rope_basic.c ${CMAKE_SOURCE_DIR}/src/rope.c)

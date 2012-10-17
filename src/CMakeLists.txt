@@ -105,10 +105,13 @@ set (common_sources
      fio.c
      crc32.c
      rope.c
+     ifc.m
      lua/info.m
      lua/stat.m
      lua/slab.m
-     lua/uuid.m)
+     lua/uuid.m
+     lua/lua_ifc.m
+)
 
 if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.m)

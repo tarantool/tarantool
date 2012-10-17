@@ -98,7 +98,7 @@ pull_from_remote(va_list ap)
 	for (;;) {
 		const char *err = NULL;
 		@try {
-			fiber_setcancelstate(true);
+			fiber_setcancellable(true);
 			if (! coio_is_connected(&coio)) {
 				if (iobuf == NULL)
 					iobuf = iobuf_create(fiber->name);
@@ -108,7 +108,7 @@ pull_from_remote(va_list ap)
 			}
 			err = "can't read row";
 			struct tbuf row = remote_read_row(&coio, iobuf);
-			fiber_setcancelstate(false);
+			fiber_setcancellable(false);
 			err = NULL;
 
 			r->remote->recovery_lag = ev_now() - header_v11(&row)->tm;

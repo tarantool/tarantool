@@ -529,6 +529,10 @@ struct {								\
 	QMD_TRACE_ELEM(&(elm)->field);					\
 } while (0)
 
+#define TAILQ_REMOVE_HEAD(head, field) do {				\
+	TAILQ_REMOVE(head, TAILQ_FIRST(head), field);			\
+} while (0)
+
 
 #ifdef _KERNEL
 
