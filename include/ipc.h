@@ -37,27 +37,27 @@
 @brief CHANNELS
 */
 
-struct ifc_channel;
+struct ipc_channel;
 
 /**
 @brief allocator
 @param size
 @return malloced channel (or NULL)
 @code
-	struct ifc_channel *ch = ifc_channel_alloc(10);
+	struct ipc_channel *ch = ipc_channel_alloc(10);
 @endcode
 */
-struct ifc_channel *ifc_channel_alloc(unsigned size);
+struct ipc_channel *ipc_channel_alloc(unsigned size);
 
 /**
 @brief init channel
 @param channel
 @code
-	struct ifc_channel *ch = ifc_channel_alloc(10);
-	ifc_channel_init(ch);
+	struct ipc_channel *ch = ipc_channel_alloc(10);
+	ipc_channel_init(ch);
 @endcode
 */
-void ifc_channel_init(struct ifc_channel *ch);
+void ipc_channel_init(struct ipc_channel *ch);
 
 /**
 @brief put data into channel
@@ -65,29 +65,29 @@ void ifc_channel_init(struct ifc_channel *ch);
 @param channel
 @param data
 @code
-	ifc_channel_put(ch, "message");
+	ipc_channel_put(ch, "message");
 @endcode
 */
-void ifc_channel_put(struct ifc_channel *ch, void *data);
+void ipc_channel_put(struct ipc_channel *ch, void *data);
 
 /**
 @brief get data from channel
 @detail lock current fiber if channel is empty
 @param channel
-@return data that was put into channel by ifc_channel_put
+@return data that was put into channel by ipc_channel_put
 @code
-	char *msg = ifc_channel_get(ch);
+	char *msg = ipc_channel_get(ch);
 @endcode
 */
-void *ifc_channel_get(struct ifc_channel *ch);
+void *ipc_channel_get(struct ipc_channel *ch);
 
 /**
-@brief wake up all fibers that sleep by ifc_channel_get and send message to them
+@brief wake up all fibers that sleep by ipc_channel_get and send message to them
 @param channel
 @param data
 @return count of fibers received the message
 */
-int ifc_channel_broadcast(struct ifc_channel *ch, void *data);
+int ipc_channel_broadcast(struct ipc_channel *ch, void *data);
 
 /**
 @brief check if channel is empty
@@ -95,11 +95,11 @@ int ifc_channel_broadcast(struct ifc_channel *ch, void *data);
 @return 1 (TRUE) if channel is empty
 @return 0 otherwise
 @code
-	if (!ifc_channel_isempty(ch))
-		char *msg = ifc_channel_get(ch);
+	if (!ipc_channel_isempty(ch))
+		char *msg = ipc_channel_get(ch);
 @endcode
 */
-int ifc_channel_isempty(struct ifc_channel *ch);
+int ipc_channel_isempty(struct ipc_channel *ch);
 
 /**
 @brief check if channel is full
@@ -107,12 +107,12 @@ int ifc_channel_isempty(struct ifc_channel *ch);
 @return 1 (TRUE) if channel is full
 @return 0 otherwise
 @code
-	if (!ifc_channel_isfull(ch))
-		ifc_channel_put(ch, "message");
+	if (!ipc_channel_isfull(ch))
+		ipc_channel_put(ch, "message");
 @endcode
 */
 
-int ifc_channel_isfull(struct ifc_channel *ch);
+int ipc_channel_isfull(struct ipc_channel *ch);
 
 /**
 @brief put data into channel in timeout
@@ -122,14 +122,14 @@ int ifc_channel_isfull(struct ifc_channel *ch);
 @return 0 if success
 @return ETIMEDOUT if timeout exceeded
 @code
-	if (ifc_channel_put_timeout(ch, "message", 0.25) == 0)
+	if (ipc_channel_put_timeout(ch, "message", 0.25) == 0)
 		return "ok";
 	else
 		return "timeout exceeded";
 @endcode
 */
 int
-ifc_channel_put_timeout(struct ifc_channel *ch,	void *data, ev_tstamp timeout);
+ipc_channel_put_timeout(struct ipc_channel *ch,	void *data, ev_tstamp timeout);
 
 /**
 @brief get data into channel in timeout
@@ -139,26 +139,26 @@ ifc_channel_put_timeout(struct ifc_channel *ch,	void *data, ev_tstamp timeout);
 @return NULL if timeout exceeded
 @code
 	do {
-		char *msg = ifc_channel_get_timeout(ch, 0.5);
+		char *msg = ipc_channel_get_timeout(ch, 0.5);
 		printf("message: %p\n", msg);
 	} until(msg);
 	return msg;
 @endcode
 */
-void *ifc_channel_get_timeout(struct ifc_channel *ch, ev_tstamp timeout);
+void *ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout);
 
 
 /**
 @brief return true if channel has reader fibers that wait data
 @param channel
 */
-int ifc_channel_has_readers(struct ifc_channel *ch);
+int ipc_channel_has_readers(struct ipc_channel *ch);
 
 /**
 @brief return true if channel has writer fibers that wait data
 @param channel
 */
-int ifc_channel_has_writers(struct ifc_channel *ch);
+int ipc_channel_has_writers(struct ipc_channel *ch);
 
 #endif /* TARANTOOL_IFC_H_INCLUDED */
 

@@ -1565,11 +1565,11 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 <!--   end of lib -->
 
 <variablelist>
-    <title>Package <code>box.ifc</code> &mdash; inter-fiber communication</title>
+    <title>Package <code>box.ipc</code> &mdash; inter procedure communication</title>
     <simpara>
     </simpara>
     <varlistentry>
-        <term><emphasis role="lua">box.ifc.channel(capacity)</emphasis></term>
+        <term><emphasis role="lua">box.ipc.channel(capacity)</emphasis></term>
         <listitem>
             <simpara>
                 Create a new communication channel with
@@ -1584,51 +1584,51 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
             </simpara>
 <programlisting>
     channel:put(message)
-    box.ifc.channel.put(channel, message)
+    box.ipc.channel.put(channel, message)
 </programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ifc.channel.put(channel, message, timeout)</emphasis></term>
+        <term><emphasis role="lua">box.ipc.channel.put(channel, message, timeout)</emphasis></term>
         <listitem>
             <simpara>
                 Send a message using a channel. If the channel is full,
-                <emphasis role="lua">box.ifc.channel.put()</emphasis>
+                <emphasis role="lua">box.ipc.channel.put()</emphasis>
                 blocks until there is a free slot in the channel.
                 If <emphasis role="lua">timeout</emphasis> is provided,
                 and the channel doesn't become empty in the duration
                 of the timeout,
-                <emphasis role="lua">box.ifc.channel.put()</emphasis>
+                <emphasis role="lua">box.ipc.channel.put()</emphasis>
                 returns false. Otherwise it returns true.
             </simpara>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ifc.channel.get(channel, timeout)</emphasis></term>
+        <term><emphasis role="lua">box.ipc.channel.get(channel, timeout)</emphasis></term>
         <listitem>
             <simpara>
                 Fetch a message from a channel. If the channel is empty,
-                <emphasis role="lua">box.ifc.channel.get()</emphasis>
+                <emphasis role="lua">box.ipc.channel.get()</emphasis>
                 blocks until there is a message.
                 If <emphasis role="lua">timeout</emphasis> is provided,
                 and the channel there are no new messages in the duration
                 of the timeout,
-                <emphasis role="lua">box.ifc.channel.get()</emphasis>
+                <emphasis role="lua">box.ipc.channel.get()</emphasis>
                 returns error.
             </simpara>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ifc.channel.broadcast(channel, message, timeout)</emphasis></term>
+        <term><emphasis role="lua">box.ipc.channel.broadcast(channel, message, timeout)</emphasis></term>
         <listitem>
             <simpara>
-                If the channel is empty, is equivalent to <emphasis role="lua">box.ifc.channel.put()</emphasis>. Otherwise sends the message to
+                If the channel is empty, is equivalent to <emphasis role="lua">box.ipc.channel.put()</emphasis>. Otherwise sends the message to
                 all readers of the channel.
             </simpara>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ifc.channel.is_empty(channel)</emphasis></term>
+        <term><emphasis role="lua">box.ipc.channel.is_empty(channel)</emphasis></term>
         <listitem>
             <simpara>
                 Check if the channel is empty (has no messages).
@@ -1636,7 +1636,7 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ifc.channel.is_full(channel)</emphasis></term>
+        <term><emphasis role="lua">box.ipc.channel.is_full(channel)</emphasis></term>
         <listitem>
             <simpara>
                 Check if the channel is full (has no room for a new message).
@@ -1644,7 +1644,7 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ifc.channel.has_readers(channel)</emphasis></term>
+        <term><emphasis role="lua">box.ipc.channel.has_readers(channel)</emphasis></term>
         <listitem>
             <simpara>
                 Check if the channel is empty and has readers waiting
@@ -1653,14 +1653,14 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ifc.channel.has_writers(channel)</emphasis></term>
+        <term><emphasis role="lua">box.ipc.channel.has_writers(channel)</emphasis></term>
         <listitem>
             <simpara>
                 Check if the channel is full and has writers waiting
                 for empty room.
             </simpara>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-local channel = box.ifc.channel(10)
+local channel = box.ipc.channel(10)
 function consumer_fiber()
     while true do
         local task = channel:get()

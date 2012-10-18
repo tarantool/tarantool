@@ -27,10 +27,10 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_LUA_IFC_H_INCLUDED
-#define TARANTOOL_LUA_IFC_H_INCLUDED
+#ifndef TARANTOOL_LUA_IPC_H_INCLUDED
+#define TARANTOOL_LUA_IPC_H_INCLUDED
 
 struct lua_State;
-void ifc_lua_init(struct lua_State *L);
+void ipc_lua_init(struct lua_State *L);
 
-#endif /* TARANTOOL_LUA_IFC_H_INCLUDED */
+#endif /* TARANTOOL_LUA_IPC_H_INCLUDED */

@@ -2,7 +2,7 @@
 # 
 import sys
 
-exec admin "lua ch = box.ifc.channel()"
+exec admin "lua ch = box.ipc.channel()"
 exec admin "lua ch:is_full()"
 exec admin "lua ch:is_empty()"
 exec admin "lua ch:get(.1)"

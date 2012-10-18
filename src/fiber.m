@@ -55,9 +55,7 @@ static __thread struct fiber *call_stack[FIBER_CALL_STACK];
 static __thread struct fiber **sp;
 static __thread uint32_t last_used_fid;
 static __thread struct mh_i32ptr_t *fibers_registry;
-__thread SLIST_HEAD(, fiber) fibers, zombie_fibers;
-
-static __thread struct rlist ready_fibers;
+static __thread struct rlist fibers, zombie_fibers, ready_fibers;
 static __thread ev_async ready_async;
 
 static void
@@ -232,24 +230,34 @@ fiber_yield_to(struct fiber *f)
 void
 fiber_sleep(ev_tstamp delay)
 {
-	ev_timer_set(&fiber->timer, delay, 0.);
-	ev_timer_start(&fiber->timer);
+	ev_timer timer;
+	ev_init(&timer, (void *)fiber_schedule);
+	timer.data = fiber;
+	ev_timer_set(&timer, delay, 0);
+	ev_timer_start(&timer);
+
 	fiber_yield();
-	ev_timer_stop(&fiber->timer);
+	ev_timer_stop(&timer);
 	fiber_testcancel();
 }
 
 /** Wait for a forked child to complete.
  * @note: this is a cancellation point (@sa fiber_testcancel()).
+ * @return process return status
 */
-void
+int
 wait_for_child(pid_t pid)
 {
-	ev_child_set(&fiber->cw, pid, 0);
-	ev_child_start(&fiber->cw);
+	ev_child cw;
+	ev_init(&cw, (void *)fiber_schedule);
+	ev_child_set(&cw, pid, 0);
+	cw.data = fiber;
+	ev_child_start(&cw);
 	fiber_yield();
-	ev_child_stop(&fiber->cw);
+	ev_child_stop(&cw);
+	int status = cw.rstatus;
 	fiber_testcancel();
+	return status;
 }
 
 void
@@ -316,6 +324,7 @@ fiber_zombificate()
 {
 	if (fiber->waiter)
 		fiber_wakeup(fiber->waiter);
+	rlist_del(&fiber->ready);
 	fiber->waiter = NULL;
 	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
@@ -323,8 +332,7 @@ fiber_zombificate()
 	fiber->fid = 0;
 	fiber->flags = 0;
 	prelease(fiber->gc_pool);
-
-	SLIST_INSERT_HEAD(&zombie_fibers, fiber, zombie_link);
+	rlist_move_entry(&zombie_fibers, fiber, link);
 }
 
 static void
@@ -340,7 +348,8 @@ fiber_loop(void *data __attribute__((unused)))
 		} @catch (tnt_Exception *e) {
 			[e log];
 		} @catch (id e) {
-			say_error("fiber `%s': exception `%s'", fiber->name, object_getClassName(e));
+			say_error("fiber `%s': exception `%s'",
+				fiber->name, object_getClassName(e));
 			panic("fiber `%s': exiting", fiber->name);
 		}
 		fiber_zombificate();
@@ -378,9 +387,9 @@ fiber_create(const char *name, void (*f) (va_list))
 {
 	struct fiber *fiber = NULL;
 
-	if (!SLIST_EMPTY(&zombie_fibers)) {
-		fiber = SLIST_FIRST(&zombie_fibers);
-		SLIST_REMOVE_HEAD(&zombie_fibers, zombie_link);
+	if (!rlist_empty(&zombie_fibers)) {
+		fiber = rlist_first_entry(&zombie_fibers, struct fiber, link);
+		rlist_move_entry(&fibers, fiber, link);
 	} else {
 		fiber = palloc(eter_pool, sizeof(*fiber));
 
@@ -389,17 +398,16 @@ fiber_create(const char *name, void (*f) (va_list))
 
 		fiber->gc_pool = palloc_create_pool("");
 
-		ev_init(&fiber->timer, (void *)fiber_schedule);
-		ev_init(&fiber->cw, (void *)fiber_schedule);
-		fiber->timer.data = fiber->cw.data = fiber;
-
-		SLIST_INSERT_HEAD(&fibers, fiber, link);
+		rlist_add_entry(&fibers, fiber, link);
 		rlist_init(&fiber->ready);
 	}
 
 
 	fiber->f = f;
-	while (++last_used_fid <= 100) ;	/* fids from 0 to 100 are reserved */
+
+	/* fids from 0 to 100 are reserved */
+	if (++last_used_fid < 100)
+		last_used_fid = 100;
 	fiber->fid = last_used_fid;
 	fiber->flags = 0;
 	fiber->waiter = NULL;
@@ -432,39 +440,48 @@ void
 fiber_destroy_all()
 {
 	struct fiber *f;
-	SLIST_FOREACH(f, &fibers, link)
+	rlist_foreach_entry(f, &fibers, link)
+		fiber_destroy(f);
+	rlist_foreach_entry(f, &zombie_fibers, link)
 		fiber_destroy(f);
 }
 
-/**
- * @note: this is a cancellation point.
- */
+
+static void
+fiber_info_print(struct tbuf *out, struct fiber *fiber)
+{
+	void *stack_top = fiber->coro.stack + fiber->coro.stack_size;
+
+	tbuf_printf(out, "  - fid: %4i" CRLF, fiber->fid);
+	tbuf_printf(out, "    csw: %i" CRLF, fiber->csw);
+	tbuf_printf(out, "    name: %s" CRLF, fiber->name);
+	tbuf_printf(out, "    stack: %p" CRLF, stack_top);
+#ifdef ENABLE_BACKTRACE
+	tbuf_printf(out, "    backtrace:" CRLF "%s",
+		    backtrace(fiber->last_stack_frame,
+			      fiber->coro.stack, fiber->coro.stack_size));
+#endif /* ENABLE_BACKTRACE */
+}
+
 void
 fiber_info(struct tbuf *out)
 {
 	struct fiber *fiber;
 
 	tbuf_printf(out, "fibers:" CRLF);
-	SLIST_FOREACH(fiber, &fibers, link) {
-		void *stack_top = fiber->coro.stack + fiber->coro.stack_size;
 
-		tbuf_printf(out, "  - fid: %4i" CRLF, fiber->fid);
-		tbuf_printf(out, "    csw: %i" CRLF, fiber->csw);
-		tbuf_printf(out, "    name: %s" CRLF, fiber->name);
-		tbuf_printf(out, "    stack: %p" CRLF, stack_top);
-#ifdef ENABLE_BACKTRACE
-		tbuf_printf(out, "    backtrace:" CRLF "%s",
-			    backtrace(fiber->last_stack_frame,
-				      fiber->coro.stack, fiber->coro.stack_size));
-#endif /* ENABLE_BACKTRACE */
-	}
+	rlist_foreach_entry(fiber, &fibers, link)
+		fiber_info_print(out, fiber);
+	rlist_foreach_entry(fiber, &zombie_fibers, link)
+		fiber_info_print(out, fiber);
 }
 
 void
 fiber_init(void)
 {
-	SLIST_INIT(&fibers);
+	rlist_init(&fibers);
 	rlist_init(&ready_fibers);
+	rlist_init(&zombie_fibers);
 	fibers_registry = mh_i32ptr_init();
 
 	memset(&sched, 0, sizeof(sched));
