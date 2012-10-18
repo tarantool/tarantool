@@ -223,9 +223,10 @@ coio_write(struct coio *coio, const void *buf, size_t sz)
 }
 
 ssize_t
-coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size)
+coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size_hint)
 {
 	ssize_t total = 0;
+	struct iovec save = iov[0];
 	@try {
 		/* Avoid a syscall in case of 0 iovcnt. */
 		while (iovcnt) {
@@ -233,12 +234,14 @@ coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size)
 			ssize_t nwr = sio_writev(coio->ev.fd, iov, iovcnt);
 			if (nwr >= 0) {
 				total += nwr;
-				/* If there was a hint for the total size
+				/*
+				 * If there was a hint for the total size
 				 * of the vector, use it.
 				 */
-				if (size > 0 && size == total)
+				if (size_hint > 0 && size_hint == total)
 					return total;
-				iov = sio_advance_iov(iov, &iovcnt, nwr);
+
+				sio_advance_iov(&iov, &iovcnt, nwr, &save);
 				if (iovcnt == 0)
 					break;
 			}
@@ -252,6 +255,7 @@ coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size)
 		}
 	} @finally {
 		ev_io_stop(&coio->ev);
+		iov[0] = save;
 	}
 	return total;
 }

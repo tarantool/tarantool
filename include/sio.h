@@ -69,22 +69,36 @@ ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);
 int sio_getpeername(int fd, struct sockaddr_in *addr);
 const char *sio_strfaddr(struct sockaddr_in *addr);
 
-static inline struct iovec *
-sio_advance_iov(struct iovec *iov, int *iovcnt, ssize_t nwr)
+/**
+ * iov[in,out]
+ * save[in,out]  on input must contain value of iov[0]
+ *               to restore, on output contains the original
+ *               value of the changed iov.
+ *               If we didn't really advance iov pointer,
+ *               nothing is restored.
+ */
+static inline void
+sio_advance_iov(struct iovec **iov, int *iovcnt, ssize_t nwr, struct iovec *save)
 {
-	struct iovec *end = iov + *iovcnt;
-	while (iov < end) {
-		if (nwr >= iov->iov_len) {
-			nwr -= iov->iov_len;
-			iov++;
+	struct iovec *cur = *iov;
+	struct iovec *end = cur + *iovcnt;
+	while (cur < end) {
+		if (nwr >= cur->iov_len) {
+			nwr -= cur->iov_len;
+			cur++;
 		} else {
-			iov->iov_base += nwr;
-			iov->iov_len -= nwr;
+			if (cur != *iov) {
+				/* Restore old. */
+				**iov = *save;
+				*save = *cur;
+			}
+			cur->iov_base += nwr;
+			cur->iov_len -= nwr;
 			break;
 		}
 	}
-	*iovcnt = end - iov;
-	return iov;
+	*iov = cur;
+	*iovcnt = end - cur;
 }
 
 

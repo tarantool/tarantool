@@ -29,7 +29,6 @@
 #include "iobuf.h"
 #include "coio_buf.h"
 #include "palloc.h"
-#include <stdio.h>
 
 /* {{{ struct ibuf */
 
