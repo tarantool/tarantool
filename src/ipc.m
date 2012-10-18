@@ -27,163 +27,13 @@
  * SUCH DAMAGE.
  */
 
-#include "ifc.h"
+#include "ipc.h"
 #include "fiber.h"
 #include <stdlib.h>
 #include <rlist.h>
 
 
-struct ifc_semaphore {
-	int count;
-	struct rlist fibers, wakeup;
-};
-
-
-struct ifc_semaphore *
-ifc_semaphore_alloc(void)
-{
-	return malloc(sizeof(struct ifc_semaphore));
-}
-
-
-int
-ifc_semaphore_counter(struct ifc_semaphore *s)
-{
-	return s->count;
-}
-
-void
-ifc_semaphore_init(struct ifc_semaphore *s, int cnt)
-{
-	s->count = cnt;
-	rlist_init(&s->fibers);
-	rlist_init(&s->wakeup);
-}
-
-int
-ifc_semaphore_down_timeout(struct ifc_semaphore *s, ev_tstamp timeout)
-{
-	int count = --s->count;
-
-	if (count >= 0)		/* semaphore is still unlocked */
-		return 0;
-
-	if (timeout < 0)
-		timeout = 0;
-
-	rlist_add_tail_entry(&s->fibers, fiber, ifc);
-
-	bool cancellable = fiber_setcancellable(true);
-
-	if (timeout) {
-		ev_timer_set(&fiber->timer, timeout, 0);
-		ev_timer_start(&fiber->timer);
-		fiber_yield();
-		ev_timer_stop(&fiber->timer);
-	} else {
-		fiber_yield();
-	}
-
-	fiber_setcancellable(cancellable);
-
-	int timeouted = ETIMEDOUT;
-	struct fiber *f;
-
-	rlist_foreach_entry(f, &s->wakeup, ifc) {
-		if (f != fiber)
-			continue;
-		timeouted = 0;
-		break;
-	}
-
-	if (timeouted)
-		s->count++;
-
-	rlist_del_entry(fiber, ifc);
-	fiber_testcancel();
-	return timeouted;
-}
-
-void
-ifc_semaphore_down(struct ifc_semaphore *s)
-{
-	ifc_semaphore_down_timeout(s, 0);
-}
-
-void
-ifc_semaphore_up(struct ifc_semaphore *s)
-{
-	s->count++;
-
-	if (rlist_empty(&s->fibers))
-		return;
-
-	/* wake up one fiber */
-	struct fiber *f = rlist_first_entry(&s->fibers, struct fiber, ifc);
-	rlist_del_entry(f, ifc);
-	rlist_add_tail_entry(&s->wakeup, f, ifc);
-	fiber_wakeup(f);
-}
-
-int
-ifc_semaphore_trydown(struct ifc_semaphore *s)
-{
-	if (s->count <= 0)
-		return s->count - 1;
-	ifc_semaphore_down(s);
-	return 0;
-}
-
-
-struct ifc_mutex {
-	struct ifc_semaphore semaphore;
-};
-
-struct ifc_mutex *
-ifc_mutex_alloc(void)
-{
-	return malloc(sizeof(struct ifc_mutex));
-}
-
-void
-ifc_mutex_init(struct ifc_mutex *m)
-{
-	ifc_semaphore_init(&m->semaphore, 1);
-}
-
-void
-ifc_mutex_lock(struct ifc_mutex *m)
-{
-	ifc_semaphore_down(&m->semaphore);
-}
-
-int
-ifc_mutex_lock_timeout(struct ifc_mutex *m, ev_tstamp timeout)
-{
-	return ifc_semaphore_down_timeout(&m->semaphore, timeout);
-}
-
-void
-ifc_mutex_unlock(struct ifc_mutex *m)
-{
-	ifc_semaphore_up(&m->semaphore);
-}
-
-int
-ifc_mutex_trylock(struct ifc_mutex *m)
-{
-	return ifc_semaphore_trydown(&m->semaphore);
-}
-
-int
-ifc_mutex_islocked(struct ifc_mutex *m)
-{
-	return m->semaphore.count <= 0;
-}
-
-/**********************************************************************/
-
-struct ifc_channel {
+struct ipc_channel {
 	struct rlist readers, writers, wakeup;
 	unsigned size;
 	unsigned beg;
@@ -196,32 +46,32 @@ struct ifc_channel {
 } __attribute__((packed));
 
 int
-ifc_channel_isempty(struct ifc_channel *ch)
+ipc_channel_isempty(struct ipc_channel *ch)
 {
 	return ch->count == 0;
 }
 
 int
-ifc_channel_isfull(struct ifc_channel *ch)
+ipc_channel_isfull(struct ipc_channel *ch)
 {
 	return ch->count >= ch->size;
 }
 
 
-struct ifc_channel *
-ifc_channel_alloc(unsigned size)
+struct ipc_channel *
+ipc_channel_alloc(unsigned size)
 {
 	if (!size)
 		size = 1;
-	struct ifc_channel *res =
-		malloc(sizeof(struct ifc_channel) + sizeof(void *) * size);
+	struct ipc_channel *res =
+		malloc(sizeof(struct ipc_channel) + sizeof(void *) * size);
 	if (res)
 		res->size = size;
 	return res;
 }
 
 void
-ifc_channel_init(struct ifc_channel *ch)
+ipc_channel_init(struct ipc_channel *ch)
 {
 
 	ch->beg = ch->count = 0;
@@ -233,7 +83,7 @@ ifc_channel_init(struct ifc_channel *ch)
 }
 
 void *
-ifc_channel_get_timeout(struct ifc_channel *ch, ev_tstamp timeout)
+ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 {
 	if (timeout < 0)
 		timeout = 0;
@@ -243,10 +93,18 @@ ifc_channel_get_timeout(struct ifc_channel *ch, ev_tstamp timeout)
 		bool cancellable = fiber_setcancellable(true);
 
 		if (timeout) {
-			ev_timer_set(&fiber->timer, timeout, 0);
-			ev_timer_start(&fiber->timer);
+			ev_timer timer;
+			ev_init(&timer, (void *)fiber_schedule);
+			ev_timer_set(&timer, timeout, 0);
+			timer.data = fiber;
+			ev_timer_start(&timer);
 			fiber_yield();
-			ev_timer_stop(&fiber->timer);
+			ev_timer_stop(&timer);
+
+/*                         ev_timer_set(&fiber->timer, timeout, 0); */
+/*                         ev_timer_start(&fiber->timer); */
+/*                         fiber_yield(); */
+/*                         ev_timer_stop(&fiber->timer); */
 		} else {
 			fiber_yield();
 		}
@@ -285,13 +143,13 @@ ifc_channel_get_timeout(struct ifc_channel *ch, ev_tstamp timeout)
 }
 
 void *
-ifc_channel_get(struct ifc_channel *ch)
+ipc_channel_get(struct ipc_channel *ch)
 {
-	return ifc_channel_get_timeout(ch, 0);
+	return ipc_channel_get_timeout(ch, 0);
 }
 
 int
-ifc_channel_put_timeout(struct ifc_channel *ch, void *data,
+ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 							ev_tstamp timeout)
 {
 	if (timeout < 0)
@@ -304,10 +162,18 @@ ifc_channel_put_timeout(struct ifc_channel *ch, void *data,
 
 		bool cancellable = fiber_setcancellable(true);
 		if (timeout) {
-			ev_timer_set(&fiber->timer, timeout, 0);
-			ev_timer_start(&fiber->timer);
+			ev_timer timer;
+			ev_init(&timer, (void *)fiber_schedule);
+			ev_timer_set(&timer, timeout, 0);
+			timer.data = fiber;
+			ev_timer_start(&timer);
 			fiber_yield();
-			ev_timer_stop(&fiber->timer);
+			ev_timer_stop(&timer);
+
+/*                         ev_timer_set(&fiber->timer, timeout, 0); */
+/*                         ev_timer_start(&fiber->timer); */
+/*                         fiber_yield(); */
+/*                         ev_timer_stop(&fiber->timer); */
 		} else {
 			fiber_yield();
 		}
@@ -339,28 +205,28 @@ ifc_channel_put_timeout(struct ifc_channel *ch, void *data,
 }
 
 void
-ifc_channel_put(struct ifc_channel *ch, void *data)
+ipc_channel_put(struct ipc_channel *ch, void *data)
 {
-	ifc_channel_put_timeout(ch, data, 0);
+	ipc_channel_put_timeout(ch, data, 0);
 }
 
 int
-ifc_channel_has_readers(struct ifc_channel *ch)
+ipc_channel_has_readers(struct ipc_channel *ch)
 {
 	return !rlist_empty(&ch->readers);
 }
 
 int
-ifc_channel_has_writers(struct ifc_channel *ch)
+ipc_channel_has_writers(struct ipc_channel *ch)
 {
 	return !rlist_empty(&ch->writers);
 }
 
 int
-ifc_channel_broadcast(struct ifc_channel *ch, void *data)
+ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 {
 	if (rlist_empty(&ch->readers)) {
-		ifc_channel_put(ch, data);
+		ipc_channel_put(ch, data);
 		return 1;
 	}
 

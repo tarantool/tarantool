@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  */
 
-#include "lua_ifc.h"
-#include <ifc.h>
+#include "lua_ipc.h"
+#include <ipc.h>
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
@@ -37,13 +37,13 @@
 #include <stdlib.h>
 #include <say.h>
 
-static const char channel_lib[]   = "box.ifc.channel";
+static const char channel_lib[]   = "box.ipc.channel";
 
 
 /******************** channel ***************************/
 
 static int
-lbox_ifc_channel(struct lua_State *L)
+lbox_ipc_channel(struct lua_State *L)
 {
 	say_info(":%s()", __func__);
 
@@ -57,10 +57,10 @@ lbox_ifc_channel(struct lua_State *L)
 		if (size < 0)
 			luaL_error(L, "fiber.channel(size): negative size");
 	}
-	struct ifc_channel *ch = ifc_channel_alloc(size);
+	struct ipc_channel *ch = ipc_channel_alloc(size);
 	if (!ch)
 		luaL_error(L, "fiber.channel: Not enough memory");
-	ifc_channel_init(ch);
+	ipc_channel_init(ch);
 
 	void **ptr = lua_newuserdata(L, sizeof(void *));
 	luaL_getmetatable(L, channel_lib);
@@ -74,7 +74,7 @@ lbox_ifc_channel(struct lua_State *L)
 	return 1;
 }
 
-static inline struct ifc_channel *
+static inline struct ipc_channel *
 lbox_check_channel(struct lua_State *L, int narg)
 {
 	return * (void **) luaL_checkudata(L, narg, channel_lib);
@@ -82,23 +82,23 @@ lbox_check_channel(struct lua_State *L, int narg)
 
 
 static int
-lbox_ifc_channel_gc(struct lua_State *L)
+lbox_ipc_channel_gc(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		return 0;
-	struct ifc_channel *ch = lbox_check_channel(L, -1);
+	struct ipc_channel *ch = lbox_check_channel(L, -1);
 	free(ch);
 	return 0;
 }
 
 
 static int
-lbox_ifc_channel_isfull(struct lua_State *L)
+lbox_ipc_channel_isfull(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		luaL_error(L, "usage: channel:is_full()");
-	struct ifc_channel *ch = lbox_check_channel(L, -1);
-	if (ifc_channel_isfull(ch))
+	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	if (ipc_channel_isfull(ch))
 		lua_pushboolean(L, 1);
 	else
 		lua_pushboolean(L, 0);
@@ -106,12 +106,12 @@ lbox_ifc_channel_isfull(struct lua_State *L)
 }
 
 static int
-lbox_ifc_channel_isempty(struct lua_State *L)
+lbox_ipc_channel_isempty(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		luaL_error(L, "usage: channel:is_empty()");
-	struct ifc_channel *ch = lbox_check_channel(L, -1);
-	if (ifc_channel_isempty(ch))
+	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	if (ipc_channel_isempty(ch))
 		lua_pushboolean(L, 1);
 	else
 		lua_pushboolean(L, 0);
@@ -119,11 +119,11 @@ lbox_ifc_channel_isempty(struct lua_State *L)
 }
 
 static int
-lbox_ifc_channel_put(struct lua_State *L)
+lbox_ipc_channel_put(struct lua_State *L)
 {
 	double timeout;
 	int top = lua_gettop(L);
-	struct ifc_channel *ch;
+	struct ipc_channel *ch;
 
 	switch(top) {
 		case 2:
@@ -164,7 +164,7 @@ lbox_ifc_channel_put(struct lua_State *L)
 	lua_settop(L, top);
 
 
-	if (ifc_channel_put_timeout(ch, (void *)rid, timeout) == 0)
+	if (ipc_channel_put_timeout(ch, (void *)rid, timeout) == 0)
 		lua_pushboolean(L, 1);
 	else
 		lua_pushboolean(L, 0);
@@ -172,7 +172,7 @@ lbox_ifc_channel_put(struct lua_State *L)
 }
 
 static int
-lbox_ifc_channel_get(struct lua_State *L)
+lbox_ipc_channel_get(struct lua_State *L)
 {
 	int top = lua_gettop(L);
 	double timeout;
@@ -190,9 +190,9 @@ lbox_ifc_channel_get(struct lua_State *L)
 		timeout = 0;
 	}
 
-	struct ifc_channel *ch = lbox_check_channel(L, 1);
+	struct ipc_channel *ch = lbox_check_channel(L, 1);
 
-	lua_Integer rid = (lua_Integer)ifc_channel_get_timeout(ch, timeout);
+	lua_Integer rid = (lua_Integer)ipc_channel_get_timeout(ch, timeout);
 
 	if (!rid) {
 		lua_pushnil(L);
@@ -222,17 +222,17 @@ lbox_ifc_channel_get(struct lua_State *L)
 
 
 static int
-lbox_ifc_channel_broadcast(struct lua_State *L)
+lbox_ipc_channel_broadcast(struct lua_State *L)
 {
-	struct ifc_channel *ch;
+	struct ipc_channel *ch;
 
 	if (lua_gettop(L) != 2)
 		luaL_error(L, "usage: channel:broadcast(variable)");
 
 	ch = lbox_check_channel(L, -2);
 
-	if (!ifc_channel_has_readers(ch))
-		return lbox_ifc_channel_put(L);
+	if (!ipc_channel_has_readers(ch))
+		return lbox_ipc_channel_put(L);
 
 	lua_getmetatable(L, -2);			/* 3 */
 
@@ -246,7 +246,7 @@ lbox_ifc_channel_broadcast(struct lua_State *L)
 	lua_pushvalue(L, 2);
 	lua_settable(L, 3);
 
-	int count = ifc_channel_broadcast(ch, (void *)1);
+	int count = ipc_channel_broadcast(ch, (void *)1);
 
 	lua_settable(L, 3);
 
@@ -258,52 +258,52 @@ lbox_ifc_channel_broadcast(struct lua_State *L)
 
 
 static int
-lbox_ifc_channel_has_readers(struct lua_State *L)
+lbox_ipc_channel_has_readers(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "usage: channel:has_readers()");
-	struct ifc_channel *ch = lbox_check_channel(L, -1);
-	lua_pushboolean(L, ifc_channel_has_readers(ch));
+	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	lua_pushboolean(L, ipc_channel_has_readers(ch));
 	return 1;
 }
 
 static int
-lbox_ifc_channel_has_writers(struct lua_State *L)
+lbox_ipc_channel_has_writers(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "usage: channel:has_writers()");
-	struct ifc_channel *ch = lbox_check_channel(L, -1);
-	lua_pushboolean(L, ifc_channel_has_writers(ch));
+	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	lua_pushboolean(L, ipc_channel_has_writers(ch));
 	return 1;
 }
 
 void
-ifc_lua_init(struct lua_State *L)
+ipc_lua_init(struct lua_State *L)
 {
 	static const struct luaL_reg channel_meta[] = {
-		{"__gc",	lbox_ifc_channel_gc},
-		{"is_full",	lbox_ifc_channel_isfull},
-		{"is_empty",	lbox_ifc_channel_isempty},
-		{"put",		lbox_ifc_channel_put},
-		{"get",		lbox_ifc_channel_get},
-		{"broadcast",	lbox_ifc_channel_broadcast},
-		{"has_readers",	lbox_ifc_channel_has_readers},
-		{"has_writers",	lbox_ifc_channel_has_writers},
+		{"__gc",	lbox_ipc_channel_gc},
+		{"is_full",	lbox_ipc_channel_isfull},
+		{"is_empty",	lbox_ipc_channel_isempty},
+		{"put",		lbox_ipc_channel_put},
+		{"get",		lbox_ipc_channel_get},
+		{"broadcast",	lbox_ipc_channel_broadcast},
+		{"has_readers",	lbox_ipc_channel_has_readers},
+		{"has_writers",	lbox_ipc_channel_has_writers},
 		{NULL, NULL}
 	};
 	tarantool_lua_register_type(L, channel_lib, channel_meta);
 
-	static const struct luaL_reg ifc_meta[] = {
-		{"channel",	lbox_ifc_channel},
+	static const struct luaL_reg ipc_meta[] = {
+		{"channel",	lbox_ipc_channel},
 		{NULL, NULL}
 	};
 
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 
-	lua_pushstring(L, "ifc");
-	lua_newtable(L);			/* box.ifc table */
-	luaL_register(L, NULL, ifc_meta);
+	lua_pushstring(L, "ipc");
+	lua_newtable(L);			/* box.ipc table */
+	luaL_register(L, NULL, ipc_meta);
 	lua_settable(L, -3);
 	lua_pop(L, 1);
 }

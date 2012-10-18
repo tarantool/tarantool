@@ -71,13 +71,9 @@ struct fiber {
 	struct palloc_pool *gc_pool;
 	uint32_t fid;
 
-	ev_timer timer;
-	ev_child cw;
-
-	SLIST_ENTRY(fiber) link, zombie_link;
-
-	struct rlist ready;	/* wakeup queue */
-	struct rlist ifc;	/* inter fiber communication */
+	struct rlist link;
+	struct rlist ready;		/* wakeup queue */
+	struct rlist ifc;		/* inter fiber communication */
 
 	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];
@@ -93,7 +89,7 @@ void fiber_init(void);
 void fiber_free(void);
 struct fiber *fiber_create(const char *name, void (*f) (va_list));
 void fiber_set_name(struct fiber *fiber, const char *name);
-void wait_for_child(pid_t pid);
+int wait_for_child(pid_t pid);
 
 void
 fiber_yield(void);

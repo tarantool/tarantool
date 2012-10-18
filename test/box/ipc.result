@@ -1,4 +1,4 @@
-lua ch = box.ifc.channel()
+lua ch = box.ipc.channel()
 ---
 ...
 lua ch:is_full()

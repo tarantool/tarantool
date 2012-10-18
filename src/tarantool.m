@@ -315,11 +315,9 @@ snapshot(void *ev, int events __attribute__((unused)))
 		 */
 
 		snapshot_pid = p;
-		wait_for_child(p);
+		int status = wait_for_child(p);
 		snapshot_pid = 0;
-		assert(p == fiber->cw.rpid);
-		return (WIFSIGNALED(fiber->cw.rstatus) ? EINTR :
-			WEXITSTATUS(fiber->cw.rstatus));
+		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}
 
 	fiber_set_name(fiber, "dumper");
