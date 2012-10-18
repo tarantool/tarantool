@@ -1,8 +1,7 @@
 Tarantool/Box is a collective effort, and incorporates
-many contributions from community.
+many contributions from the community.
 
-Below not by any means complete list of people, who
-contributed their code.
+Below follows a list of people, who contributed their code.
 
 Aleksey Demakov, Aleksey Mashanov, Alexandre Kalendarev,
 Damien Lefortier, Dmitry E. Oboukhov, Dmitry Simonenko,
@@ -10,5 +9,5 @@ Konstantin Osipov, Konstantin Shulgin, Mons Anderson,
 Pavel Cherenkov, Roman Antipin, Roman Tokarev, Roman Tsisyk,
 Teodor Sigaev, Timofey Khryukin, Yuriy Nevinitsin, Yuriy Vostrikov
 
-NOTE: If you can commit a change this list, please do not hesitate
+NOTE: If you can commit a change to this list, please do not hesitate
 to add your name to it.
