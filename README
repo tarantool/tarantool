@@ -11,9 +11,8 @@ Key features of the pair include:
  * extensibility and speed
 
 Caveats:
- * currently supported platforms are only Linux/x86 and
-   FreeBSD/x86
- * gcc is the only supported compiler.
+ * supported platforms are Linux/x86 and FreeBSD/x86
+ * supported compilers are clang and gcc.
 
 COMPILATION AND INSTALL
 
@@ -31,8 +30,10 @@ CMake is used for configuration management.
 The only external library dependency is readline: libreadline-dev
 is required to build the command line client.
 
-There is one OPTIONAL dependency: uuid-dev. It is required for
-box.uuid_* functions.
+There are two OPTIONAL dependencies: 
+- uuid-dev. It is required for box.uuid_* functions.
+- GNU bfd (part of GNU binutils). It's used to print 
+a stack trace after a crash.
 
 Please follow these steps to compile Tarantool:
 
@@ -63,7 +64,7 @@ additional Python modules:
 
 Once all pre-requisites are installed, try:
 
-tarantool $ cd test && ./test-run.py --start-and-exit
+tarantool $ cd test && ./test-run.py --suite box --start-and-exit
 
 This will create a 'var' subdirectory in directory 'test',
 populate it with necessary files, and
