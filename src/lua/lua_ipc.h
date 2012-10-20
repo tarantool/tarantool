@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_LUA_IPC_H_INCLUDED
+#define TARANTOOL_LUA_IPC_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -27,10 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_LUA_IPC_H_INCLUDED
-#define TARANTOOL_LUA_IPC_H_INCLUDED
-
 struct lua_State;
-void ipc_lua_init(struct lua_State *L);
+void tarantool_lua_ipc_init(struct lua_State *L);
 
 #endif /* TARANTOOL_LUA_IPC_H_INCLUDED */

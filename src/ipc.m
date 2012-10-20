@@ -26,12 +26,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "ipc.h"
 #include "fiber.h"
 #include <stdlib.h>
 #include <rlist.h>
-
 
 struct ipc_channel {
 	struct rlist readers, writers, wakeup;
@@ -45,14 +43,14 @@ struct ipc_channel {
 	void *item[0];
 } __attribute__((packed));
 
-int
-ipc_channel_isempty(struct ipc_channel *ch)
+bool
+ipc_channel_is_empty(struct ipc_channel *ch)
 {
 	return ch->count == 0;
 }
 
-int
-ipc_channel_isfull(struct ipc_channel *ch)
+bool
+ipc_channel_is_full(struct ipc_channel *ch)
 {
 	return ch->count >= ch->size;
 }
@@ -93,6 +91,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 		bool cancellable = fiber_setcancellable(true);
 
 		if (timeout) {
+			/* Sleep for the duration of the timeout.  */
 			ev_timer timer;
 			ev_init(&timer, (void *)fiber_schedule);
 			ev_timer_set(&timer, timeout, 0);
@@ -100,11 +99,6 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 			ev_timer_start(&timer);
 			fiber_yield();
 			ev_timer_stop(&timer);
-
-/*                         ev_timer_set(&fiber->timer, timeout, 0); */
-/*                         ev_timer_start(&fiber->timer); */
-/*                         fiber_yield(); */
-/*                         ev_timer_stop(&fiber->timer); */
 		} else {
 			fiber_yield();
 		}
@@ -126,7 +120,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 	if (!ch->count)
 		return NULL;
 
-	void *res = ch->item[ ch->beg ];
+	void *res = ch->item[ch->beg];
 	if (++ch->beg >= ch->size)
 		ch->beg -= ch->size;
 	ch->count--;
@@ -169,11 +163,6 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 			ev_timer_start(&timer);
 			fiber_yield();
 			ev_timer_stop(&timer);
-
-/*                         ev_timer_set(&fiber->timer, timeout, 0); */
-/*                         ev_timer_start(&fiber->timer); */
-/*                         fiber_yield(); */
-/*                         ev_timer_stop(&fiber->timer); */
 		} else {
 			fiber_yield();
 		}
@@ -184,8 +173,10 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 		fiber_setcancellable(cancellable);
 	}
 
-	if (ch->count >= ch->size)
-		return ETIMEDOUT;
+	if (ch->count >= ch->size) {
+		errno = ETIMEDOUT;
+		return -1;
+	}
 
 	unsigned i = ch->beg;
 	i += ch->count;
@@ -210,13 +201,13 @@ ipc_channel_put(struct ipc_channel *ch, void *data)
 	ipc_channel_put_timeout(ch, data, 0);
 }
 
-int
+bool
 ipc_channel_has_readers(struct ipc_channel *ch)
 {
 	return !rlist_empty(&ch->readers);
 }
 
-int
+bool
 ipc_channel_has_writers(struct ipc_channel *ch)
 {
 	return !rlist_empty(&ch->writers);

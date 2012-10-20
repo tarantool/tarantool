@@ -1260,7 +1260,7 @@ tarantool_lua_init()
 	tarantool_lua_info_init(L);
 	tarantool_lua_slab_init(L);
 	tarantool_lua_stat_init(L);
-	ipc_lua_init(L);
+	tarantool_lua_ipc_init(L);
 	tarantool_lua_uuid_init(L);
 
 	mod_lua_init(L);

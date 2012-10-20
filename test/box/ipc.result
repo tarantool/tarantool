@@ -27,7 +27,7 @@ lua ch:get()
 ...
 lua ch:get('wrong timeout')
 ---
-error: 'timeout must be number'
+error: 'timeout must be a number'
 ...
 lua ch:get(-10)
 ---

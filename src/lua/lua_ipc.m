@@ -26,7 +26,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "lua_ipc.h"
 #include <ipc.h>
 #include "lua.h"
@@ -38,7 +37,6 @@
 #include <say.h>
 
 static const char channel_lib[]   = "box.ipc.channel";
-
 
 /******************** channel ***************************/
 
@@ -55,11 +53,11 @@ lbox_ipc_channel(struct lua_State *L)
 
 		size = lua_tointeger(L, -1);
 		if (size < 0)
-			luaL_error(L, "fiber.channel(size): negative size");
+			luaL_error(L, "box.channel(size): negative size");
 	}
 	struct ipc_channel *ch = ipc_channel_alloc(size);
 	if (!ch)
-		luaL_error(L, "fiber.channel: Not enough memory");
+		luaL_error(L, "box.channel: Not enough memory");
 	ipc_channel_init(ch);
 
 	void **ptr = lua_newuserdata(L, sizeof(void *));
@@ -93,28 +91,22 @@ lbox_ipc_channel_gc(struct lua_State *L)
 
 
 static int
-lbox_ipc_channel_isfull(struct lua_State *L)
+lbox_ipc_channel_is_full(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		luaL_error(L, "usage: channel:is_full()");
 	struct ipc_channel *ch = lbox_check_channel(L, -1);
-	if (ipc_channel_isfull(ch))
-		lua_pushboolean(L, 1);
-	else
-		lua_pushboolean(L, 0);
+	lua_pushboolean(L, ipc_channel_is_full(ch));
 	return 1;
 }
 
 static int
-lbox_ipc_channel_isempty(struct lua_State *L)
+lbox_ipc_channel_is_empty(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		luaL_error(L, "usage: channel:is_empty()");
 	struct ipc_channel *ch = lbox_check_channel(L, -1);
-	if (ipc_channel_isempty(ch))
-		lua_pushboolean(L, 1);
-	else
-		lua_pushboolean(L, 0);
+	lua_pushboolean(L, ipc_channel_is_empty(ch));
 	return 1;
 }
 
@@ -125,21 +117,19 @@ lbox_ipc_channel_put(struct lua_State *L)
 	int top = lua_gettop(L);
 	struct ipc_channel *ch;
 
-	switch(top) {
-		case 2:
-			timeout = 0;
-			break;
-		case 3:
-			if (!lua_isnumber(L, -1))
-				luaL_error(L, "timeout must be number");
-			timeout = lua_tonumber(L, -1);
-			if (timeout < 0)
-				luaL_error(L, "wrong timeout");
-			break;
-		default:
-			luaL_error(L, "usage: channel:put(var [, timeout])");
-
-
+	switch (top) {
+	case 2:
+		timeout = 0;
+		break;
+	case 3:
+		if (!lua_isnumber(L, -1))
+			luaL_error(L, "timeout must be a number");
+		timeout = lua_tonumber(L, -1);
+		if (timeout < 0)
+			luaL_error(L, "wrong timeout");
+		break;
+	default:
+		luaL_error(L, "usage: channel:put(var [, timeout])");
 	}
 	ch = lbox_check_channel(L, -top);
 
@@ -182,7 +172,7 @@ lbox_ipc_channel_get(struct lua_State *L)
 
 	if (top == 2) {
 		if (!lua_isnumber(L, 2))
-			luaL_error(L, "timeout must be number");
+			luaL_error(L, "timeout must be a number");
 		timeout = lua_tonumber(L, 2);
 		if (timeout < 0)
 			luaL_error(L, "wrong timeout");
@@ -219,8 +209,6 @@ lbox_ipc_channel_get(struct lua_State *L)
 	return 1;
 }
 
-
-
 static int
 lbox_ipc_channel_broadcast(struct lua_State *L)
 {
@@ -256,7 +244,6 @@ lbox_ipc_channel_broadcast(struct lua_State *L)
 	return 1;
 }
 
-
 static int
 lbox_ipc_channel_has_readers(struct lua_State *L)
 {
@@ -278,12 +265,12 @@ lbox_ipc_channel_has_writers(struct lua_State *L)
 }
 
 void
-ipc_lua_init(struct lua_State *L)
+tarantool_lua_ipc_init(struct lua_State *L)
 {
 	static const struct luaL_reg channel_meta[] = {
 		{"__gc",	lbox_ipc_channel_gc},
-		{"is_full",	lbox_ipc_channel_isfull},
-		{"is_empty",	lbox_ipc_channel_isempty},
+		{"is_full",	lbox_ipc_channel_is_full},
+		{"is_empty",	lbox_ipc_channel_is_empty},
 		{"put",		lbox_ipc_channel_put},
 		{"get",		lbox_ipc_channel_get},
 		{"broadcast",	lbox_ipc_channel_broadcast},
