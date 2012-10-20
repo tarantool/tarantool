@@ -38,13 +38,10 @@
 #include <palloc.h>
 #include <assoc.h>
 
-
-
 static struct mh_i32ptr_t *spaces;
 
 bool secondary_indexes_enabled = false;
 bool primary_indexes_enabled = false;
-
 
 struct space *
 space_create(i32 space_no, struct key_def *key_defs, int key_count, int arity)

@@ -67,9 +67,4 @@ port_null_eof(struct port *port __attribute__((unused)));
  */
 extern struct port port_null;
 
-struct obuf;
-
-struct port *
-port_iproto_create(struct obuf *buf);
-
 #endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

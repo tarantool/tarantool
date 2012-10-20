@@ -179,7 +179,7 @@ print """#
 #"""
 
 push_lua_path = os.path.join(vardir, "push.lua")
-shutil.copy("box_big/push.lua", push_lua_path)
+shutil.copy("big/push.lua", push_lua_path)
 
 exec admin "lua dofile('push.lua')"
 shutil.rmtree(push_lua_path, True)

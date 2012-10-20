@@ -1125,7 +1125,7 @@ static int lbox_process(lua_State *L)
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	struct port *port_lua = port_lua_create(L);
 	@try {
-		box_process(port_lua, op, &req);
+		mod_process(port_lua, op, &req);
 	} @finally {
 		/*
 		 * This only works as long as port_lua doesn't

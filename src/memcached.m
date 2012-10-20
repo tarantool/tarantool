@@ -31,19 +31,18 @@
 
 #include <limits.h>
 
-#include "box.h"
-#include "request.h"
-#include "txn.h"
-#include "tuple.h"
+#include "box/box.h"
+#include "box/request.h"
+#include "box/space.h"
+#include "box/port.h"
+#include "box/tuple.h"
 #include "fiber.h"
 #include "cfg/warning.h"
-#include "cfg/tarantool_box_cfg.h"
+#include  TARANTOOL_CONFIG
 #include "say.h"
 #include "stat.h"
 #include "salloc.h"
 #include "pickle.h"
-#include "space.h"
-#include "port.h"
 #include "coio_buf.h"
 
 #define STAT(_)					\
@@ -118,7 +117,7 @@ store(void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
 	 */
-	box_process(&port_null, REPLACE, req);
+	mod_process(&port_null, REPLACE, req);
 }
 
 static void
@@ -133,7 +132,7 @@ delete(void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	box_process(&port_null, DELETE, req);
+	mod_process(&port_null, DELETE, req);
 }
 
 static struct tuple *
@@ -246,7 +245,7 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 		tuple = find(key);
 		key_len = load_varint32(&key);
 
-		if (tuple == NULL || tuple->flags & GHOST) {
+		if (tuple == NULL) {
 			stat_collect(stat_base, MEMC_GET_MISS, 1);
 			stats.get_misses++;
 			continue;
@@ -374,8 +373,8 @@ memcached_loop(struct coio *coio, struct iobuf *iobuf)
 	}
 }
 
-
-void memcached_handler(va_list ap)
+static void
+memcached_handler(va_list ap)
 {
 	struct coio coio = va_arg(ap, struct coio);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
@@ -430,24 +429,33 @@ memcached_check_config(struct tarantool_cfg *conf)
 	return 0;
 }
 
-void
-memcached_init(void)
+static void
+memcached_free(void)
 {
-	if (cfg.memcached_port == 0) {
+	if (memcached_it)
+		memcached_it->free(memcached_it);
+}
+
+
+void
+memcached_init(const char *bind_ipaddr, int memcached_port)
+{
+	if (memcached_port == 0)
 		return;
-	}
+
+	atexit(memcached_free);
 
 	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 
 	struct space *sp = space_by_n(cfg.memcached_space);
 	memcached_index = space_index(sp, 0);
-}
 
-void
-memcached_free()
-{
-	if (memcached_it)
-		memcached_it->free(memcached_it);
+	/* run memcached server */
+	static struct coio_service memcached;
+	coio_service_init(&memcached, "memcached",
+			  bind_ipaddr, memcached_port,
+			  memcached_handler, NULL);
+	evio_service_start(&memcached.evio_service);
 }
 
 void

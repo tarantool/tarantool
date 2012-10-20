@@ -33,10 +33,7 @@
 struct tarantool_cfg;
 
 void
-memcached_init();
-
-void
-memcached_free();
+memcached_init(const char *bind_ipaddr, int memcached_port);
 
 void
 memcached_space_init();
@@ -46,7 +43,5 @@ memcached_check_config(struct tarantool_cfg *conf);
 
 void memcached_start_expire();
 void memcached_stop_expire();
-
-void memcached_handler(va_list ap);
 
 #endif /* TARANTOOL_MEMCACHED_H_INCLUDED */

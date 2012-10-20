@@ -2,22 +2,6 @@ if (TARGET_OS_DARWIN)
     set(module_link_flags "-pagezero_size 10000 -image_base 100000000")
 endif()
 
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/box/memcached-grammar.m
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMAND ${RAGEL} -G2 src/box/memcached-grammar.rl
-                     -o src/box/memcached-grammar.m
-    DEPENDS ${CMAKE_SOURCE_DIR}/src/box/memcached-grammar.rl)
-# Do not clean memcached-grammar.m in 'make clean'.
-set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
-
-add_custom_target(generate_memcached_grammar_m DEPENDS
-    ${CMAKE_SOURCE_DIR}/src/box/memcached-grammar.m)
-
-# Do not try to randomly re-generate memcached-grammar.m
-# after a fresh checkout/branch switch.
-execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
-    ${CMAKE_SOURCE_DIR}/src/box/memcached-grammar.m)
-
 function(lua_source filename)
     get_filename_component(module ${filename} NAME_WE)
     ADD_CUSTOM_COMMAND(OUTPUT ${CMAKE_BINARY_DIR}/src/box/${filename}.c
@@ -41,11 +25,5 @@ add_custom_target(generate_lua_sources}
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
-set_source_files_properties(memcached-grammar.m
-    PROPERTIES HEADER_FILE_ONLY true)
-
-set_source_files_properties(memcached.m
-    PROPERTIES COMPILE_FLAGS "-Wno-uninitialized")
-
 tarantool_module("box" tuple.m index.m tree.m space.m port.m request.m
-    txn.m box.m ${lua_sources} box_lua.m memcached.m memcached-grammar.m)
+    txn.m box.m ${lua_sources} box_lua.m)

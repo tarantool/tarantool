@@ -55,17 +55,34 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/admin.m
     COMMAND ${RAGEL} -G2 src/admin.rl -o src/admin.m
     DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.rl)
 
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/memcached-grammar.m
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMAND ${RAGEL} -G2 src/memcached-grammar.rl
+                     -o src/memcached-grammar.m
+    DEPENDS ${CMAKE_SOURCE_DIR}/src/memcached-grammar.rl)
+
 add_custom_target(generate_admin_m DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.m)
-# do not randomly try to re-generate admin.m after a fresh checkout
+add_custom_target(generate_memcached_grammar_m DEPENDS
+    ${CMAKE_SOURCE_DIR}/src/memcached-grammar.m)
+
+# do not randomly try to re-generate admin.m or memcached-grammar.m
+# after a fresh checkout/branch switch.
 execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
-    ${CMAKE_SOURCE_DIR}/src/admin.m)
+    ${CMAKE_SOURCE_DIR}/src/admin.m
+    ${CMAKE_SOURCE_DIR}/src/memcached-grammar.m)
+
+set_source_files_properties(${CMAKE_SOURCE_DIR}/src/memcached-grammar.m
+    PROPERTIES HEADER_FILE_ONLY true)
+
+set_source_files_properties(memcached.m
+    PROPERTIES COMPILE_FLAGS "-Wno-uninitialized")
 
 #
 # Do not clean admin.m, memcached.m or other
 # generated files in 'make clean' -- they are under
 # revision control.
 #
-set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM 1)
+set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
 
 #
 # Used by modules.
@@ -76,6 +93,7 @@ set (recompiled_sources
      ${CMAKE_SOURCE_DIR}/src/say.m
      ${CMAKE_SOURCE_DIR}/src/assoc.m
      ${CMAKE_SOURCE_DIR}/src/replication.m
+     ${CMAKE_SOURCE_DIR}/src/memcached.m
      ${CMAKE_SOURCE_DIR}/src/fiber.m)
 
 set (common_sources
@@ -151,7 +169,7 @@ if (ENABLE_BACKTRACE AND HAVE_BFD)
     endif()
 endif()
 
-set (common_libraries ${common_libraries} PARENT_SCOPE) 
+set (common_libraries ${common_libraries} PARENT_SCOPE)
 
 function(tarantool_module mod)
     set (module_sources ${ARGN})
@@ -169,7 +187,7 @@ function(tarantool_module mod)
     add_library(lt${mod} STATIC ${recompiled_sources})
     set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
         "${core_cflags} ${GCOV_C_FLAGS} -DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
-    add_dependencies(lt${mod} generate_headers generate_admin_m build_bundled_libs)
+    add_dependencies(lt${mod} generate_headers generate_admin_m generate_memcached_grammar_m build_bundled_libs)
 
     target_link_libraries(tarantool_${mod} lt${mod} ${GCOV_LDFLAGS} ${common_libraries})
     set_target_properties(tarantool_${mod} PROPERTIES COMPILE_FLAGS

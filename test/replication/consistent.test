@@ -23,7 +23,7 @@ master = server
 
 # replica server
 replica = TarantoolBoxServer()
-replica.deploy("box_replication/cfg/replica.cfg",
+replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"))
 
@@ -50,7 +50,7 @@ print """
 print """
 # reconfigure replica to master
 """
-replica.reconfigure("box_replication/cfg/replica_to_master.cfg")
+replica.reconfigure("replication/cfg/replica_to_master.cfg")
 
 print "insert to master [%d, %d) entries" % (id, id + ID_STEP)
 insert_tuples(master, id, id + ID_STEP, "mater")
@@ -68,7 +68,7 @@ print "replica lsn = %s" % replica.get_param("lsn")
 print """
 # rollback replica
 """
-replica.reconfigure("box_replication/cfg/replica.cfg")
+replica.reconfigure("replication/cfg/replica.cfg")
 
 print "select from replica [%d, %d) entries" % (id, id + ID_STEP)
 select_tuples(replica, id, id + ID_STEP)
@@ -86,7 +86,7 @@ print """
 print """
 # reconfigure replica to master
 """
-replica.reconfigure("box_replication/cfg/replica_to_master.cfg")
+replica.reconfigure("replication/cfg/replica_to_master.cfg")
 
 print "insert to master [%d, %d) entries" % (id, id + ID_STEP)
 insert_tuples(master, id, id + ID_STEP, "mater")
@@ -104,7 +104,7 @@ print "replica lsn = %s" % replica.get_param("lsn")
 print """
 # rollback replica
 """
-replica.reconfigure("box_replication/cfg/replica.cfg")
+replica.reconfigure("replication/cfg/replica.cfg")
 
 print "select from replica [%d, %d) entries" % (id, id + ID_STEP)
 select_tuples(replica, id, id + ID_STEP)
@@ -122,7 +122,7 @@ print """
 print """
 #reconfigure replica to master
 """
-replica.reconfigure("box_replication/cfg/replica_to_master.cfg")
+replica.reconfigure("replication/cfg/replica_to_master.cfg")
 
 print "insert to master [%d, %d) entries" % (id, id + ID_STEP)
 insert_tuples(master, id, id + ID_STEP, "mater")
@@ -140,7 +140,7 @@ print "replica lsn = %s" % replica.get_param("lsn")
 print """
 # rollback replica
 """
-replica.reconfigure("box_replication/cfg/replica.cfg")
+replica.reconfigure("replication/cfg/replica.cfg")
 
 print "select from replica [%d, %d) entries" % (id, id + (ID_STEP * 2))
 select_tuples(replica, id, id + (ID_STEP * 2))

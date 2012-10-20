@@ -63,6 +63,7 @@
 #include <cfg/warning.h>
 #include "tarantool_pthread.h"
 #include "lua/init.h"
+#include "memcached.h"
 
 
 static pid_t master_pid;
@@ -90,6 +91,31 @@ core_check_config(struct tarantool_cfg *conf)
 		return -1;
 	}
 	return 0;
+}
+
+void
+title(const char *fmt, ...)
+{
+	va_list ap;
+	char buf[128], *bufptr = buf, *bufend = buf + sizeof(buf);
+
+	va_start(ap, fmt);
+	bufptr += vsnprintf(bufptr, bufend - bufptr, fmt, ap);
+	va_end(ap);
+
+	int ports[] = { cfg.primary_port, cfg.secondary_port,
+			cfg.memcached_port, cfg.admin_port,
+			cfg.replication_port };
+	int *pptr = ports;
+	char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
+	char **nptr = names;
+
+	for (; *nptr; nptr++, pptr++)
+		if (*pptr)
+			bufptr += snprintf(bufptr, bufend - bufptr,
+					   " %s: %i", *nptr, *pptr);
+
+	set_proc_title(buf);
 }
 
 static i32
@@ -828,8 +854,20 @@ main(int argc, char **argv)
 		tarantool_L = tarantool_lua_init();
 		mod_init();
 		tarantool_lua_load_cfg(tarantool_L, &cfg);
+		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
+		/*
+		 * init iproto before admin and after memcached:
+		 * recovery is finished on bind to the primary port,
+		 * and it has to happen before requests on the
+		 * administrative port start to arrive.
+		 * And when recovery is finalized, memcached
+		 * expire loop is started, so binding can happen
+		 * only after memcached is initialized.
+		 */
+		iproto_init(cfg.bind_ipaddr, cfg.primary_port,
+			    cfg.secondary_port);
 		admin_init(cfg.bind_ipaddr, cfg.admin_port);
-		replication_init();
+		replication_init(cfg.bind_ipaddr, cfg.replication_port);
 		/*
 		 * Load user init script.  The script should have access
 		 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that

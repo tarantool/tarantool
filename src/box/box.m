@@ -47,7 +47,6 @@
 #include "port.h"
 #include "request.h"
 #include "txn.h"
-#include "coio.h"
 
 static void box_process_replica(struct port *port,
 				u32 op, struct tbuf *request_data);
@@ -55,7 +54,8 @@ static void box_process_ro(struct port *port,
 			   u32 op, struct tbuf *request_data);
 static void box_process_rw(struct port *port,
 			   u32 op, struct tbuf *request_data);
-box_process_func box_process = box_process_ro;
+mod_process_func mod_process = box_process_ro;
+mod_process_func mod_process_ro = box_process_ro;
 
 const char *mod_name = "Box";
 
@@ -119,20 +119,6 @@ box_process_ro(struct port *port,
 		tnt_raise(LoggedError, :ER_SECONDARY);
 	return box_process_rw(port, op, request_data);
 }
-static void
-iproto_primary_port_handler(struct obuf *out, u32 op,
-			    struct tbuf *request_data)
-{
-	box_process(port_iproto_create(out), op, request_data);
-}
-
-static void
-iproto_secondary_port_handler(struct obuf *out, u32 op,
-			      struct tbuf *request_data)
-{
-	box_process_ro(port_iproto_create(out), op, request_data);
-}
-
 
 static void
 box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
@@ -312,35 +298,10 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 }
 
 static void
-title(const char *fmt, ...)
-{
-	va_list ap;
-	char buf[128], *bufptr = buf, *bufend = buf + sizeof(buf);
-
-	va_start(ap, fmt);
-	bufptr += vsnprintf(bufptr, bufend - bufptr, fmt, ap);
-	va_end(ap);
-
-	int ports[] = { cfg.primary_port, cfg.secondary_port,
-			cfg.memcached_port, cfg.admin_port,
-			cfg.replication_port };
-	int *pptr = ports;
-	char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
-	char **nptr = names;
-
-	for (; *nptr; nptr++, pptr++)
-		if (*pptr)
-			bufptr += snprintf(bufptr, bufend - bufptr,
-					   " %s: %i", *nptr, *pptr);
-
-	set_proc_title(buf);
-}
-
-static void
 box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 {
 	if (conf->replication_source != NULL) {
-		box_process = box_process_replica;
+		mod_process = box_process_replica;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 		recovery_follow_remote(recovery_state, conf->replication_source);
@@ -349,7 +310,7 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 			 conf->replication_source, custom_proc_title);
 		title("replica/%s%s", conf->replication_source, custom_proc_title);
 	} else {
-		box_process = box_process_rw;
+		mod_process = box_process_rw;
 
 		memcached_start_expire();
 
@@ -360,8 +321,8 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 	}
 }
 
-static void
-box_leave_local_standby_mode(void *data __attribute__((unused)))
+void
+mod_leave_local_standby_mode(void *data __attribute__((unused)))
 {
 	recovery_finalize(recovery_state);
 
@@ -465,7 +426,6 @@ void
 mod_free(void)
 {
 	space_free();
-	memcached_free();
 }
 
 void
@@ -489,9 +449,6 @@ mod_init(void)
 
 	stat_base = stat_register(requests_strs, requests_MAX);
 
-	/* memcached initialize */
-	memcached_init();
-
 	if (init_storage)
 		return;
 
@@ -504,43 +461,12 @@ mod_init(void)
 
 	say_info("building secondary indexes");
 	build_secondary_indexes();
-
 	title("orphan");
-
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recovery_follow_local(recovery_state, cfg.wal_dir_rescan_delay);
 		snprintf(status, sizeof(status), "hot_standby");
 		title("hot_standby");
-	}
-
-	/* run primary server */
-	if (cfg.primary_port != 0) {
-		static struct coio_service primary;
-		coio_service_init(&primary, "primary",
-				  cfg.bind_ipaddr, cfg.primary_port,
-				  iproto_interact, iproto_primary_port_handler);
-		evio_service_on_bind(&primary.evio_service,
-				     box_leave_local_standby_mode, NULL);
-		evio_service_start(&primary.evio_service);
-	}
-
-	/* run secondary server */
-	if (cfg.secondary_port != 0) {
-		static struct coio_service secondary;
-		coio_service_init(&secondary, "secondary",
-				  cfg.bind_ipaddr, cfg.secondary_port,
-				  iproto_interact, iproto_secondary_port_handler);
-		evio_service_start(&secondary.evio_service);
-	}
-
-	/* run memcached server */
-	if (cfg.memcached_port != 0) {
-		static struct coio_service memcached;
-		coio_service_init(&memcached, "memcached",
-				  cfg.bind_ipaddr, cfg.memcached_port,
-				  memcached_handler, NULL);
-		evio_service_start(&memcached.evio_service);
 	}
 }
 

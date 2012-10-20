@@ -33,7 +33,11 @@ struct txn;
 struct tbuf;
 struct port;
 
-typedef void (*box_process_func)(struct port *, u32, struct tbuf *);
-extern box_process_func box_process;
+typedef void (*mod_process_func)(struct port *, u32, struct tbuf *);
+extern mod_process_func mod_process;
+extern mod_process_func mod_process_ro;
+
+void
+mod_leave_local_standby_mode(void *data __attribute__((unused)));
 
 #endif /* INCLUDES_TARANTOOL_BOX_H */

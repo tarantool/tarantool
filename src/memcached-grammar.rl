@@ -101,7 +101,7 @@ memcached_dispatch(struct coio *coio, struct iobuf *iobuf)
 
 			key = read_field(keys);
 			struct tuple *tuple = find(key);
-			if (tuple == NULL || tuple->flags & GHOST) {
+			if (tuple == NULL) {
 				obuf_dup(out, "NOT_STORED\r\n", 12);
 			} else {
 				value = tuple_field(tuple, 3);
@@ -130,7 +130,7 @@ memcached_dispatch(struct coio *coio, struct iobuf *iobuf)
 
 			key = read_field(keys);
 			struct tuple *tuple = find(key);
-			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
+			if (tuple == NULL || expired(tuple)) {
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			} else {
 				m = meta(tuple);
@@ -179,7 +179,7 @@ memcached_dispatch(struct coio *coio, struct iobuf *iobuf)
 		action delete {
 			key = read_field(keys);
 			struct tuple *tuple = find(key);
-			if (tuple == NULL || tuple->flags & GHOST || expired(tuple)) {
+			if (tuple == NULL || expired(tuple)) {
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			} else {
 				@try {

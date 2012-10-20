@@ -24,7 +24,7 @@ master = server
 
 # replica server
 replica = TarantoolBoxServer()
-replica.deploy("box_replication/cfg/replica.cfg",
+replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"))
 
@@ -46,9 +46,9 @@ for i in range(REPEAT):
 
     print "swap servers"
     # reconfigure replica to master
-    replica.reconfigure("box_replication/cfg/replica_to_master.cfg", silent = False)
+    replica.reconfigure("replication/cfg/replica_to_master.cfg", silent = False)
     # reconfigure master to replica
-    master.reconfigure("box_replication/cfg/master_to_replica.cfg", silent = False)
+    master.reconfigure("replication/cfg/master_to_replica.cfg", silent = False)
 
     # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
@@ -64,9 +64,9 @@ for i in range(REPEAT):
 
     print "rollback servers configuration"
     # reconfigure replica to master
-    master.reconfigure("box_replication/cfg/master.cfg", silent = False)
+    master.reconfigure("replication/cfg/master.cfg", silent = False)
     # reconfigure master to replica
-    replica.reconfigure("box_replication/cfg/replica.cfg", silent = False)
+    replica.reconfigure("replication/cfg/replica.cfg", silent = False)
 
 
 # Cleanup.

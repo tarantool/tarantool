@@ -28,7 +28,7 @@ ER = {
     0: "ER_OK"                  ,
     1: "ER_NONMASTER"           ,
     2: "ER_ILLEGAL_PARAMS"      ,
-    3: "ER_UNUSED3"             ,
+    3: "ER_SECONDARY"           ,
     4: "ER_TUPLE_IS_RO"         ,
     5: "ER_UNUSED5"             ,
     6: "ER_UNUSED6"             ,

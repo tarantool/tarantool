@@ -64,4 +64,5 @@ void tarantool_free(void);
 char **init_set_proc_title(int argc, char **argv);
 void free_proc_title(int argc, char **argv);
 void set_proc_title(const char *format, ...);
+void title(const char *fmt, ...);
 #endif /* TARANTOOL_H_INCLUDED */
