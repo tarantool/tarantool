@@ -32,16 +32,16 @@
 #include <rlist.h>
 
 struct ipc_channel {
-	struct rlist readers, writers, wakeup;
+	struct rlist readers, writers;
 	unsigned size;
 	unsigned beg;
 	unsigned count;
 
 	void *bcast_msg;
-	struct fiber *bcast;
+	struct fiber *bcast_fiber;
 
 	void *item[0];
-} __attribute__((packed));
+};
 
 bool
 ipc_channel_is_empty(struct ipc_channel *ch)
@@ -71,13 +71,11 @@ ipc_channel_alloc(unsigned size)
 void
 ipc_channel_init(struct ipc_channel *ch)
 {
-
 	ch->beg = ch->count = 0;
-	ch->bcast = NULL;
+	ch->bcast_fiber = NULL;
 
 	rlist_init(&ch->readers);
 	rlist_init(&ch->writers);
-	rlist_init(&ch->wakeup);
 }
 
 void *
@@ -109,9 +107,8 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
 
-		if (ch->bcast) {
-			fiber_wakeup(ch->bcast);
-			ch->bcast = NULL;
+		if (ch->bcast_fiber) {
+			fiber_wakeup(ch->bcast_fiber);
 			return ch->bcast_msg;
 		}
 	}
@@ -129,7 +126,6 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 		struct fiber *f =
 			rlist_first_entry(&ch->writers, struct fiber, ifc);
 		rlist_del_entry(f, ifc);
-		rlist_add_tail_entry(&ch->wakeup, f, ifc);
 		fiber_wakeup(f);
 	}
 
@@ -189,7 +185,6 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 		struct fiber *f =
 			rlist_first_entry(&ch->readers, struct fiber, ifc);
 		rlist_del_entry(f, ifc);
-		rlist_add_tail_entry(&ch->wakeup, f, ifc);
 		fiber_wakeup(f);
 	}
 	return 0;
@@ -231,12 +226,12 @@ ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 		struct fiber *f =
 			rlist_first_entry(&ch->readers, struct fiber, ifc);
 		rlist_del_entry(f, ifc);
-		rlist_add_tail_entry(&ch->wakeup, f, ifc);
-		ch->bcast = fiber;
+		assert(ch->bcast_fiber == NULL);
+		ch->bcast_fiber = fiber;
 		ch->bcast_msg = data;
 		fiber_wakeup(f);
 		fiber_yield();
-		ch->bcast = NULL;
+		ch->bcast_fiber = NULL;
 		fiber_testcancel();
 		if (rlist_empty(&ch->readers)) {
 			count = i;
