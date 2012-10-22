@@ -139,27 +139,12 @@ pull_from_remote(va_list ap)
 static void
 remote_apply_row(struct recovery_state *r, struct tbuf *row)
 {
-	struct tbuf *data;
 	i64 lsn = header_v11(row)->lsn;
-	u16 tag;
-	u16 op;
 
-	/* save row data since row_handler() may clobber it */
-	data = tbuf_alloc(row->pool);
-	tbuf_append(data, row->data + sizeof(struct header_v11), header_v11(row)->len);
+	assert(*(uint16_t*)(row->data + sizeof(struct header_v11)) == XLOG);
 
 	if (r->row_handler(r->row_handler_param, row) < 0)
 		panic("replication failure: can't apply row");
-
-	tag = read_u16(data);
-	(void) tag;
-	(void) read_u64(data); /* drop the cookie */
-	op = read_u16(data);
-
-	assert(tag == XLOG);
-
-	if (wal_write(r, lsn, r->remote->cookie, op, data))
-		panic("replication failure: can't write row to WAL");
 
 	set_lsn(r, lsn);
 }
