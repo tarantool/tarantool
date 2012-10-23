@@ -104,7 +104,7 @@ fiber_wakeup(struct fiber *f)
 	f->flags |= FIBER_READY;
 	if (rlist_empty(&ready_fibers))
 		ev_async_send(&ready_async);
-	rlist_add_tail(&ready_fibers, &f->ready);
+	rlist_move_tail_entry(&ready_fibers, f, state);
 }
 
 /** Cancel the subject fiber.
@@ -215,6 +215,38 @@ fiber_yield(void)
 	coro_transfer(&caller->coro.ctx, &callee->coro.ctx);
 }
 
+
+static void
+fiber_schedule_timeout(ev_watcher *watcher)
+{
+	assert(fiber == &sched);
+	struct { struct fiber *f; int timeouted; } *state = watcher->data;
+	state->timeouted = 1;
+	fiber_call(state->f);
+}
+
+/**
+ * @brief yield & check timeout
+ * @return true if timeout exceeded
+ */
+int
+fiber_yield_timeout(ev_tstamp delay)
+{
+	if (delay <= 0) {
+		fiber_yield();
+		return 0;
+	}
+	struct ev_timer timer;
+	ev_init(&timer, (void *)fiber_schedule_timeout);
+	struct { struct fiber *f; int timeouted; } state = { fiber, 0 };
+	timer.data = &state;
+	ev_timer_set(&timer, delay, 0);
+	ev_timer_start(&timer);
+	fiber_yield();
+	ev_timer_stop(&timer);
+	return state.timeouted;
+}
+
 void
 fiber_yield_to(struct fiber *f)
 {
@@ -272,8 +304,8 @@ fiber_ready_async(void)
 {
 	while(!rlist_empty(&ready_fibers)) {
 		struct fiber *f =
-			rlist_first_entry(&ready_fibers, struct fiber, ready);
-		rlist_del_entry(f, ready);
+			rlist_first_entry(&ready_fibers, struct fiber, state);
+		rlist_del_entry(f, state);
 		fiber_call(f);
 	}
 }
@@ -324,7 +356,7 @@ fiber_zombificate()
 {
 	if (fiber->waiter)
 		fiber_wakeup(fiber->waiter);
-	rlist_del(&fiber->ready);
+	rlist_del(&fiber->state);
 	fiber->waiter = NULL;
 	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
@@ -399,7 +431,7 @@ fiber_create(const char *name, void (*f) (va_list))
 		fiber->gc_pool = palloc_create_pool("");
 
 		rlist_add_entry(&fibers, fiber, link);
-		rlist_init(&fiber->ready);
+		rlist_init(&fiber->state);
 	}
 
 
@@ -431,7 +463,7 @@ fiber_destroy(struct fiber *f)
 	if (strcmp(f->name, "sched") == 0)
 		return;
 
-	rlist_del(&f->ready);
+	rlist_del(&f->state);
 	palloc_destroy_pool(f->gc_pool);
 	tarantool_coro_destroy(&f->coro);
 }

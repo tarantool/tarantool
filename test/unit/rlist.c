@@ -4,7 +4,7 @@
 #include "test.h"
 
 
-#define PLAN		67
+#define PLAN		65
 
 #define ITEMS		7
 
@@ -78,16 +78,17 @@ main(void)
 	ok(!rlist_empty(&head2), "head2 isnt empty");
 	is(rlist_first_entry(&head2, struct test, list),
 					&items[3], "Item was moved");
+	rlist_move_tail(&head2, &items[4].list);
 	rlist_foreach_entry(it, &head, list) {
 		is(it, items + i, "element (second deleted) %d", i);
 		i++;
 		if (i == 2)
-			i += 2;
+			i += 3;
 	}
 	rlist_foreach_entry_reverse(it, &head, list) {
 		i--;
-		if (i == 3)
-			i -= 2;
+		if (i == 4)
+			i -= 3;
 		is(it, items + i, "element (second deleted) %d", i);
 	}
 

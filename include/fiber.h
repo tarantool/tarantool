@@ -72,8 +72,7 @@ struct fiber {
 	uint32_t fid;
 
 	struct rlist link;
-	struct rlist ready;		/* wakeup queue */
-	struct rlist ifc;		/* inter fiber communication */
+	struct rlist state;
 
 	/* ASCIIZ name of this fiber. */
 	char name[FIBER_NAME_MAXLEN];
@@ -91,11 +90,15 @@ struct fiber *fiber_create(const char *name, void (*f) (va_list));
 void fiber_set_name(struct fiber *fiber, const char *name);
 int wait_for_child(pid_t pid);
 
-void
-fiber_yield(void);
+void fiber_yield(void);
+void fiber_yield_to(struct fiber *f);
 
-void
-fiber_yield_to(struct fiber *f);
+/**
+ * @brief yield & check timeout
+ * @return true if timeout exceeded
+ */
+int fiber_yield_timeout(ev_tstamp delay);
+
 
 void fiber_destroy_all();
 

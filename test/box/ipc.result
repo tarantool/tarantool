@@ -58,11 +58,18 @@ lua tfbr = box.fiber.create(function() box.fiber.detach() while true do table.in
 lua box.fiber.resume(tfbr)
 ---
 ...
-lua for i = 1, 10 do ch:put(i) box.fiber.sleep(0.01) end
+lua for i = 1, 10 do print(i, ' ', ch:put(i, 0.1)) end
 ---
-...
-lua box.fiber.sleep(.5)
----
+1 true
+2 true
+3 true
+4 true
+5 true
+6 true
+7 true
+8 true
+9 true
+10 true
 ...
 lua ch:has_readers()
 ---
@@ -152,9 +159,6 @@ lua box.fiber.resume(tfbr2)
 lua buffer = {}
 ---
 ...
-lua box.fiber.sleep(2)
----
-...
 lua for i, v in pairs(buffer) do print(v) end
 ---
 ...
@@ -185,9 +189,6 @@ lua ch:put(4)
 lua ch:put(5)
 ---
  - true
-...
-lua box.fiber.sleep(0.5)
----
 ...
 lua ch:broadcast('broadcast message!')
 ---
