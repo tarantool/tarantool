@@ -79,6 +79,15 @@ ibuf_unused(struct ibuf *ibuf)
 	return ibuf->buf + ibuf->capacity - ibuf->end;
 }
 
+/* Integer value of the position in the buffer - stable
+ * in case of realloc.
+ */
+static inline size_t
+ibuf_pos(struct ibuf *ibuf)
+{
+	return ibuf->pos - ibuf->buf;
+}
+
 /* }}} */
 
 /* {{{ Output buffer. */
@@ -118,6 +127,14 @@ obuf_size(struct obuf *obuf)
 {
 	return obuf->size;
 }
+
+/** The size of iov vector in the buffer. */
+static inline int
+obuf_iovcnt(struct obuf *obuf)
+{
+	return obuf->iov[obuf->pos].iov_len > 0 ? obuf->pos + 1 : obuf->pos;
+}
+
 /**
  * Reserve size bytes in the output buffer
  * and return a pointer to the reserved

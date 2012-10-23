@@ -306,10 +306,8 @@ iobuf_destroy(struct iobuf *iobuf)
 ssize_t
 iobuf_flush(struct iobuf *iobuf, struct ev_io *coio)
 {
-	int iovcnt = iobuf->out.pos;
-	if (iobuf->out.iov[iovcnt].iov_len > 0)
-		iovcnt++;
-	ssize_t total = coio_writev(coio, iobuf->out.iov, iovcnt,
+	ssize_t total = coio_writev(coio, iobuf->out.iov,
+				    obuf_iovcnt(&iobuf->out),
 				    obuf_size(&iobuf->out));
 	iobuf_gc(iobuf);
 	return total;
