@@ -32,6 +32,8 @@
 #include "util.h"
 #include "third_party/queue.h"
 
+struct ev_io;
+
 /** {{{ Input buffer.
  *
  * Continuous piece of memory to store input.
@@ -190,7 +192,7 @@ struct coio;
  * @return number of bytes written
  */
 ssize_t
-iobuf_flush(struct iobuf *iobuf, struct coio *coio);
+iobuf_flush(struct iobuf *iobuf, struct ev_io *coio);
 
 /**
  * Must be called when we are done sending all output,

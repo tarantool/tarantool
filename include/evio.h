@@ -114,4 +114,17 @@ evio_service_start(struct evio_service *service);
 void
 evio_service_stop(struct evio_service *service);
 
+void
+evio_clear(struct ev_io *ev);
+
+void
+evio_close(struct ev_io *ev);
+
+static inline bool
+evio_is_connected(struct ev_io *ev)
+{
+	return ev->fd >= 0;
+}
+
+
 #endif /* TARANTOOL_EVIO_H_INCLUDED */

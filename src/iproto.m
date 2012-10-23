@@ -141,7 +141,7 @@ static void
 iproto_validate_header(struct iproto_header *header);
 
 inline static void
-iproto_flush(struct coio *coio, struct iobuf *iobuf, ssize_t to_read)
+iproto_flush(struct ev_io *coio, struct iobuf *iobuf, ssize_t to_read)
 {
 	/*
 	 * Flush output and garbage collect before reading
@@ -156,7 +156,7 @@ iproto_flush(struct coio *coio, struct iobuf *iobuf, ssize_t to_read)
 void
 iproto_interact(va_list ap)
 {
-	struct coio coio = va_arg(ap, struct coio);
+	struct ev_io coio = va_arg(ap, struct ev_io);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
 	mod_process_func *callback = va_arg(ap, mod_process_func *);
 	struct ibuf *in = &iobuf->in;
@@ -185,7 +185,7 @@ iproto_interact(va_list ap)
 			iproto_flush(&coio, iobuf, to_read);
 		}
 	} @finally {
-		coio_close(&coio);
+		evio_close(&coio);
 		iobuf_destroy(iobuf);
 	}
 }

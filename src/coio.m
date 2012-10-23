@@ -35,37 +35,16 @@
 #include "iobuf.h"
 #include "sio.h"
 
-void
-coio_clear(struct coio *coio)
-{
-	ev_init(&coio->ev, (void *) fiber_schedule);
-	coio->ev.data = fiber;
-	coio->ev.fd = -1;
-}
-
 /** Note: this function does not throw */
 void
-coio_init(struct coio *coio, int fd)
+coio_init(struct ev_io *coio, int fd)
 {
 	assert(fd >= 0);
 
 	/* Prepare for ev events. */
-	coio->ev.data = fiber;
-	ev_init(&coio->ev, (void *) fiber_schedule);
-	coio->ev.fd = fd;
-}
-
-/** Note: this function does not throw. */
-void
-coio_close(struct coio *coio)
-{
-	/* Stop I/O events. Safe to do even if not started. */
-	ev_io_stop(&coio->ev);
-
-	/* Close the socket. */
-	close(coio->ev.fd);
-	/* Make sure coio_is_connected() returns a proper value. */
-	coio->ev.fd = -1;
+	coio->data = fiber;
+	ev_init(coio, (void *) fiber_schedule);
+	coio->fd = fd;
 }
 
 /**
@@ -73,7 +52,7 @@ coio_close(struct coio *coio)
  * socket.
  */
 void
-coio_connect(struct coio *coio, struct sockaddr_in *addr)
+coio_connect(struct ev_io *coio, struct sockaddr_in *addr)
 {
 	int fd = sio_socket();
 	@try {
@@ -100,10 +79,10 @@ coio_connect(struct coio *coio, struct sockaddr_in *addr)
 		if (sio_connect(fd, addr, sizeof(*addr)) < 0) {
 			assert(errno == EINPROGRESS);
 			/* Wait until socket is ready for writing. */
-			ev_io_set(&coio->ev, fd, EV_WRITE);
-			ev_io_start(&coio->ev);
+			ev_io_set(coio, fd, EV_WRITE);
+			ev_io_start(coio);
 			fiber_yield();
-			ev_io_stop(&coio->ev);
+			ev_io_stop(coio);
 			fiber_testcancel();
 
 			int error = EINPROGRESS;
@@ -116,7 +95,7 @@ coio_connect(struct coio *coio, struct sockaddr_in *addr)
 			}
 		}
 	} @catch (tnt_Exception *e) {
-		coio_close(coio);
+		evio_close(coio);
 		@throw;
 	}
 }
@@ -130,7 +109,7 @@ coio_connect(struct coio *coio, struct sockaddr_in *addr)
  * Returns the number of bytes read.
  */
 ssize_t
-coio_read_ahead(struct coio *coio, void *buf, size_t sz, size_t bufsiz)
+coio_read_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz)
 {
 	assert(sz <= bufsiz);
 
@@ -142,7 +121,7 @@ coio_read_ahead(struct coio *coio, void *buf, size_t sz, size_t bufsiz)
 			 * the user called read(), some data must
 			 * be expected.
 		         */
-			ssize_t nrd = sio_read(coio->ev.fd, buf, bufsiz);
+			ssize_t nrd = sio_read(coio->fd, buf, bufsiz);
 			if (nrd > 0) {
 				to_read -= nrd;
 				if (to_read <= 0)
@@ -153,15 +132,15 @@ coio_read_ahead(struct coio *coio, void *buf, size_t sz, size_t bufsiz)
 				return 0;
 			}
 			/* The socket is not ready, yield */
-			if (! ev_is_active(&coio->ev)) {
-				ev_io_set(&coio->ev, coio->ev.fd, EV_READ);
-				ev_io_start(&coio->ev);
+			if (! ev_is_active(coio)) {
+				ev_io_set(coio, coio->fd, EV_READ);
+				ev_io_start(coio);
 			}
 			fiber_yield();
 			fiber_testcancel();
 		}
 	} @finally {
-		ev_io_stop(&coio->ev);
+		ev_io_stop(coio);
 	}
 }
 
@@ -173,12 +152,12 @@ coio_read_ahead(struct coio *coio, void *buf, size_t sz, size_t bufsiz)
  * @retval the number of bytes read, > 0.
  */
 ssize_t
-coio_readn_ahead(struct coio *coio, void *buf, size_t sz, size_t bufsiz)
+coio_readn_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz)
 {
 	ssize_t nrd = coio_read_ahead(coio, buf, sz, bufsiz);
 	if (nrd < sz) {
 		errno = EPIPE;
-		tnt_raise(SocketError, :coio->ev.fd in:"unexpected EOF when reading "
+		tnt_raise(SocketError, :coio->fd in:"unexpected EOF when reading "
 			  "from socket");
 	}
 	return nrd;
@@ -193,7 +172,7 @@ coio_readn_ahead(struct coio *coio, void *buf, size_t sz, size_t bufsiz)
  * all data is written.
  */
 void
-coio_write(struct coio *coio, const void *buf, size_t sz)
+coio_write(struct ev_io *coio, const void *buf, size_t sz)
 {
 	@try {
 		while (true) {
@@ -201,7 +180,7 @@ coio_write(struct coio *coio, const void *buf, size_t sz)
 			 * Sic: write as much data as possible,
 			 * assuming the socket is ready.
 		         */
-			ssize_t nwr = sio_write(coio->ev.fd, buf, sz);
+			ssize_t nwr = sio_write(coio->fd, buf, sz);
 			if (nwr > 0) {
 				/* Go past the data just written. */
 				if (nwr >= sz)
@@ -209,21 +188,21 @@ coio_write(struct coio *coio, const void *buf, size_t sz)
 				sz -= nwr;
 				buf += nwr;
 			}
-			if (! ev_is_active(&coio->ev)) {
-				ev_io_set(&coio->ev, coio->ev.fd, EV_WRITE);
-				ev_io_start(&coio->ev);
+			if (! ev_is_active(coio)) {
+				ev_io_set(coio, coio->fd, EV_WRITE);
+				ev_io_start(coio);
 			}
 			/* Yield control to other fibers. */
 			fiber_yield();
 			fiber_testcancel();
 		}
 	} @finally {
-		ev_io_stop(&coio->ev);
+		ev_io_stop(coio);
 	}
 }
 
 ssize_t
-coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size_hint)
+coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt, size_t size_hint)
 {
 	ssize_t total = 0;
 	struct iovec save = iov[0];
@@ -231,7 +210,7 @@ coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size_hint)
 		/* Avoid a syscall in case of 0 iovcnt. */
 		while (iovcnt) {
 			/* Write as much data as possible. */
-			ssize_t nwr = sio_writev(coio->ev.fd, iov, iovcnt);
+			ssize_t nwr = sio_writev(coio->fd, iov, iovcnt);
 			if (nwr >= 0) {
 				total += nwr;
 				/*
@@ -245,16 +224,16 @@ coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size_hint)
 				if (iovcnt == 0)
 					break;
 			}
-			if (! ev_is_active(&coio->ev)) {
-				ev_io_set(&coio->ev, coio->ev.fd, EV_WRITE);
-				ev_io_start(&coio->ev);
+			if (! ev_is_active(coio)) {
+				ev_io_set(coio, coio->fd, EV_WRITE);
+				ev_io_start(coio);
 			}
 			/* Yield control to other fibers. */
 			fiber_yield();
 			fiber_testcancel();
 		}
 	} @finally {
-		ev_io_stop(&coio->ev);
+		ev_io_stop(coio);
 		iov[0] = save;
 	}
 	return total;
@@ -265,7 +244,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 		       int fd, struct sockaddr_in *addr)
 {
 	struct coio_service *service = evio_service->on_accept_param;
-	struct coio coio;
+	struct ev_io coio;
 
 	coio_init(&coio, fd);
 
@@ -285,7 +264,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 		f = fiber_create(fiber_name, service->handler);
 	} @catch (tnt_Exception *e) {
 		say_error("can't create a handler fiber, dropping client connection");
-		coio_close(&coio);
+		evio_close(&coio);
 		if (iobuf)
 			iobuf_destroy(iobuf);
 		@throw;
@@ -294,7 +273,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 	 * The coio is passed into the created fiber, reset the
 	 * libev callback param to point at it.
 	 */
-	coio.ev.data = f;
+	coio.data = f;
 	/*
 	 * Start the created fiber. It becomes the coio object owner
 	 * and will have to close it and free before termination.

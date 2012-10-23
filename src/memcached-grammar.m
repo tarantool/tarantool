@@ -42,7 +42,7 @@ static const int memcached_en_main = 1;
 
 
 static int __attribute__((noinline))
-memcached_dispatch(struct coio *coio, struct iobuf *iobuf)
+memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 {
 	int cs;
 	char *p, *pe;

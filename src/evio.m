@@ -34,6 +34,27 @@
 
 #define BIND_RETRY_DELAY 0.1
 
+void
+evio_clear(struct ev_io *ev)
+{
+	ev_init(ev, NULL);
+	ev->data = NULL;
+	ev->fd = -1;
+}
+
+/** Note: this function does not throw. */
+void
+evio_close(struct ev_io *ev)
+{
+	/* Stop I/O events. Safe to do even if not started. */
+	ev_io_stop(ev);
+
+	/* Close the socket. */
+	close(ev->fd);
+	/* Make sure evio_is_connected() returns a proper value. */
+	ev->fd = -1;
+}
+
 static inline int
 evio_service_port(struct evio_service *service)
 {

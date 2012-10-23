@@ -304,7 +304,7 @@ iobuf_destroy(struct iobuf *iobuf)
 
 /** Send all data in the output buffer and garbage collect. */
 ssize_t
-iobuf_flush(struct iobuf *iobuf, struct coio *coio)
+iobuf_flush(struct iobuf *iobuf, struct ev_io *coio)
 {
 	int iovcnt = iobuf->out.pos;
 	if (iobuf->out.iov[iovcnt].iov_len > 0)

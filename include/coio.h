@@ -33,10 +33,6 @@
  * Co-operative I/O
  * Yield the current fiber until IO is ready.
  */
-struct coio
-{
-	struct ev_io ev;
-};
 
 struct coio_service
 {
@@ -48,46 +44,34 @@ struct coio_service
 };
 
 void
-coio_clear(struct coio *coio);
-
-static inline bool
-coio_is_connected(struct coio *coio)
-{
-	return coio->ev.fd >= 0;
-}
+coio_connect(struct ev_io *coio, struct sockaddr_in *addr);
 
 void
-coio_connect(struct coio *coio, struct sockaddr_in *addr);
-
-void
-coio_init(struct coio *coio, int fd);
-
-void
-coio_close(struct coio *coio);
+coio_init(struct ev_io *coio, int fd);
 
 ssize_t
-coio_read_ahead(struct coio *coio, void *buf, size_t sz, size_t bufsiz);
+coio_read_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz);
 
 ssize_t
-coio_readn_ahead(struct coio *coio, void *buf, size_t sz, size_t bufsiz);
+coio_readn_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz);
 
 static inline ssize_t
-coio_read(struct coio *coio, void *buf, size_t sz)
+coio_read(struct ev_io *coio, void *buf, size_t sz)
 {
 	return coio_read_ahead(coio, buf, sz, sz);
 }
 
 static inline ssize_t
-coio_readn(struct coio *coio, void *buf, size_t sz)
+coio_readn(struct ev_io *coio, void *buf, size_t sz)
 {
 	return coio_readn_ahead(coio, buf, sz, sz);
 }
 
 void
-coio_write(struct coio *coio, const void *buf, size_t sz);
+coio_write(struct ev_io *coio, const void *buf, size_t sz);
 
 ssize_t
-coio_writev(struct coio *coio, struct iovec *iov, int iovcnt, size_t size);
+coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt, size_t size);
 
 void
 coio_service_init(struct coio_service *service, const char *name,

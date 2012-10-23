@@ -333,7 +333,7 @@ do {										\
 #include "memcached-grammar.m"
 
 void
-memcached_loop(struct coio *coio, struct iobuf *iobuf)
+memcached_loop(struct ev_io *coio, struct iobuf *iobuf)
 {
 	int rc;
 	int bytes_written;
@@ -376,7 +376,7 @@ memcached_loop(struct coio *coio, struct iobuf *iobuf)
 static void
 memcached_handler(va_list ap)
 {
-	struct coio coio = va_arg(ap, struct coio);
+	struct ev_io coio = va_arg(ap, struct ev_io);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
 	stats.total_connections++;
 	stats.curr_connections++;
@@ -391,7 +391,7 @@ memcached_handler(va_list ap)
 	} @finally {
 		fiber_sleep(0.01);
 		stats.curr_connections--;
-		coio_close(&coio);
+		evio_close(&coio);
 		iobuf_destroy(iobuf);
 	}
 }

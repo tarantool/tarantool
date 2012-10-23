@@ -41,7 +41,7 @@ static void
 remote_apply_row(struct recovery_state *r, struct tbuf *row);
 
 static struct tbuf
-remote_read_row(struct coio *coio, struct iobuf *iobuf)
+remote_read_row(struct ev_io *coio, struct iobuf *iobuf)
 {
 	struct ibuf *in = &iobuf->in;
 	ssize_t to_read = sizeof(struct header_v11) - ibuf_size(in);
@@ -64,7 +64,7 @@ remote_read_row(struct coio *coio, struct iobuf *iobuf)
 }
 
 static void
-remote_connect(struct coio *coio, struct sockaddr_in *remote_addr,
+remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	       i64 initial_lsn, const char **err)
 {
 	*err = "can't connect to master";
@@ -88,18 +88,18 @@ static void
 pull_from_remote(va_list ap)
 {
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
-	struct coio coio;
+	struct ev_io coio;
 	struct iobuf *iobuf = NULL;
 	bool warning_said = false;
 	const int reconnect_delay = 1;
 
-	coio_clear(&coio);
+	evio_clear(&coio);
 
 	for (;;) {
 		const char *err = NULL;
 		@try {
 			fiber_setcancellable(true);
-			if (! coio_is_connected(&coio)) {
+			if (! evio_is_connected(&coio)) {
 				if (iobuf == NULL)
 					iobuf = iobuf_create(fiber->name);
 				remote_connect(&coio, &r->remote->addr,
@@ -120,7 +120,7 @@ pull_from_remote(va_list ap)
 			fiber_gc();
 		} @catch (FiberCancelException *e) {
 			iobuf_destroy(iobuf);
-			coio_close(&coio);
+			evio_close(&coio);
 			@throw;
 		} @catch (tnt_Exception *e) {
 			[e log];
@@ -130,7 +130,7 @@ pull_from_remote(va_list ap)
 				say_info("will retry every %i second", reconnect_delay);
 				warning_said = true;
 			}
-			coio_close(&coio);
+			evio_close(&coio);
 			fiber_sleep(reconnect_delay);
 		}
 	}

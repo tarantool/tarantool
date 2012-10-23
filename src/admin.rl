@@ -188,7 +188,7 @@ show_stat(struct tbuf *buf)
 }
 
 static int
-admin_dispatch(struct coio *coio, struct iobuf *iobuf, lua_State *L)
+admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 {
 	struct ibuf *in = &iobuf->in;
 	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
@@ -327,7 +327,7 @@ admin_dispatch(struct coio *coio, struct iobuf *iobuf, lua_State *L)
 static void
 admin_handler(va_list ap)
 {
-	struct coio coio = va_arg(ap, struct coio);
+	struct ev_io coio = va_arg(ap, struct ev_io);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
@@ -340,7 +340,7 @@ admin_handler(va_list ap)
 		}
 	} @finally {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-		coio_close(&coio);
+		evio_close(&coio);
 		iobuf_destroy(iobuf);
 	}
 }

@@ -34,7 +34,7 @@
 
 /** Read at least sz bytes, buffered. Return 0 in case of EOF. */
 static inline ssize_t
-coio_bread(struct coio *coio, struct ibuf *buf, size_t sz)
+coio_bread(struct ev_io *coio, struct ibuf *buf, size_t sz)
 {
 	ibuf_reserve(buf, sz);
 	ssize_t n = coio_read_ahead(coio, buf->end, sz, ibuf_unused(buf));
@@ -44,7 +44,7 @@ coio_bread(struct coio *coio, struct ibuf *buf, size_t sz)
 
 /** Read at least sz bytes, buffered. Throw an exception in case of EOF. */
 static inline ssize_t
-coio_breadn(struct coio *coio, struct ibuf *buf, size_t sz)
+coio_breadn(struct ev_io *coio, struct ibuf *buf, size_t sz)
 {
 	ibuf_reserve(buf, sz);
 	ssize_t n = coio_readn_ahead(coio, buf->end, sz, ibuf_unused(buf));
