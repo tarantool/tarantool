@@ -115,6 +115,18 @@ rlist_move(struct rlist *to, struct rlist *item)
 }
 
 /**
+@brief delete from one list and add_tail as another's head
+@param to the head that will precede our entry
+@param item the entry to move
+*/
+static inline void
+rlist_move_tail(struct rlist *to, struct rlist *item)
+{
+	rlist_del(item);
+	rlist_add_tail(to, item);
+}
+
+/**
  * allocate and init head of list
  */
 #define RLIST_HEAD(name)	\
@@ -168,6 +180,12 @@ delete from one list and add as another's head
 */
 #define rlist_move_entry(to, item, member) \
 	rlist_move((to), &((item)->member))
+
+/**
+delete from one list and add_tail as another's head
+*/
+#define rlist_move_tail_entry(to, item, member) \
+	rlist_move_tail((to), &((item)->member))
 
 /**
  * delete entry from list

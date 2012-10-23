@@ -34,7 +34,6 @@
 
 #include <lua/init.h>
 #include <stdlib.h>
-#include <say.h>
 
 static const char channel_lib[]   = "box.ipc.channel";
 
@@ -43,8 +42,6 @@ static const char channel_lib[]   = "box.ipc.channel";
 static int
 lbox_ipc_channel(struct lua_State *L)
 {
-	say_info(":%s()", __func__);
-
 	lua_Integer size = 1;
 
 	if (lua_gettop(L) > 0) {
