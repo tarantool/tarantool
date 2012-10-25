@@ -1,6 +1,8 @@
 # Test that commands can take 'noreply' parameter. 
 flush_all noreply
 flush_all 0 noreply
+get noreply:foo
+END
 add noreply:foo 0 0 1 noreply
 1
 get noreply:foo

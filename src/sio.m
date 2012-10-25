@@ -41,7 +41,7 @@ static const char *
 sio_socketname(int fd)
 {
 	static __thread char name[2 * SERVICE_NAME_MAXLEN];
-	int n = snprintf(name, sizeof(name), "%d", fd);
+	int n = snprintf(name, sizeof(name), "fd %d", fd);
 	if (fd >= 0) {
 		struct sockaddr_in addr;
 		socklen_t addrlen = sizeof(addr);

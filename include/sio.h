@@ -70,36 +70,38 @@ int sio_getpeername(int fd, struct sockaddr_in *addr);
 const char *sio_strfaddr(struct sockaddr_in *addr);
 
 /**
- * iov[in,out]
- * save[in,out]  on input must contain value of iov[0]
- *               to restore, on output contains the original
- *               value of the changed iov.
- *               If we didn't really advance iov pointer,
- *               nothing is restored.
+ * Advance write position in the iovec array
+ * based on its current value and the number of
+ * bytes written.
+ *
+ * @param[in]  iov        the vector being written with writev().
+ * @param[in]  nwr        number of bytes written, @pre >= 0
+ * @param[in,out] iov_len offset in iov[0];
+ *
+ * @return                offset of iov[0] for the next write
  */
-static inline void
-sio_advance_iov(struct iovec **iov, int *iovcnt, ssize_t nwr, struct iovec *save)
+static inline int
+sio_move_iov(struct iovec *iov, ssize_t nwr, ssize_t *iov_len)
 {
-	struct iovec *cur = *iov;
-	struct iovec *end = cur + *iovcnt;
-	while (cur < end) {
-		if (nwr >= cur->iov_len) {
-			nwr -= cur->iov_len;
-			cur++;
-		} else {
-			if (cur != *iov) {
-				/* Restore old. */
-				**iov = *save;
-				*save = *cur;
-			}
-			cur->iov_base += nwr;
-			cur->iov_len -= nwr;
-			break;
-		}
+	nwr += *iov_len;
+	struct iovec *begin = iov;
+	while (nwr > 0 && nwr >= iov->iov_len) {
+		nwr -= iov->iov_len;
+		iov++;
 	}
-	*iov = cur;
-	*iovcnt = end - cur;
+	*iov_len = nwr;
+	return iov - begin;
 }
 
+/**
+ * Change values of iov->iov_len and iov->iov_base
+ * to adjust to a partial write.
+ */
+static inline void
+sio_add_to_iov(struct iovec *iov, ssize_t size)
+{
+	iov->iov_len += size;
+	iov->iov_base -= size;
+}
 
 #endif /* TARANTOOL_SIO_H_INCLUDED */

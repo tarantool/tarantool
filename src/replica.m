@@ -46,8 +46,10 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf)
 	struct ibuf *in = &iobuf->in;
 	ssize_t to_read = sizeof(struct header_v11) - ibuf_size(in);
 
-	if (to_read > 0)
+	if (to_read > 0) {
+		ibuf_reserve(in, cfg_readahead);
 		coio_breadn(coio, in, to_read);
+	}
 
 	ssize_t request_len = ((struct header_v11 *)in->pos)->len + sizeof(struct header_v11);
 	to_read = request_len - ibuf_size(in);

@@ -203,8 +203,6 @@ iobuf_create(const char *name);
 void
 iobuf_destroy(struct iobuf *iobuf);
 
-struct coio;
-
 /** Flush output using cooperative I/O and garbage collect.
  * @return number of bytes written
  */
@@ -219,6 +217,10 @@ iobuf_flush(struct iobuf *iobuf, struct ev_io *coio);
 void
 iobuf_gc(struct iobuf *iobuf);
 
+/**
+ * Network readahead. A signed integer to avoid
+ * automatic type coercion to an unsigned type.
+ */
 extern int cfg_readahead;
 
 static inline void

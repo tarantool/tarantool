@@ -5,6 +5,7 @@ print """# Test that commands can take 'noreply' parameter. """
 exec memcached "flush_all noreply\r\n"
 exec memcached "flush_all 0 noreply\r\n"
 
+exec memcached "get noreply:foo\r\n"
 exec memcached "add noreply:foo 0 0 1 noreply\r\n1\r\n"
 exec memcached "get noreply:foo\r\n"
 
