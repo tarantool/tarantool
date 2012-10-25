@@ -82,6 +82,7 @@ lbox_ipc_channel_gc(struct lua_State *L)
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		return 0;
 	struct ipc_channel *ch = lbox_check_channel(L, -1);
+	ipc_channel_cleanup(ch);
 	free(ch);
 	return 0;
 }
@@ -110,13 +111,13 @@ lbox_ipc_channel_is_empty(struct lua_State *L)
 static int
 lbox_ipc_channel_put(struct lua_State *L)
 {
-	double timeout;
+	ev_tstamp timeout;
 	int top = lua_gettop(L);
 	struct ipc_channel *ch;
 
 	switch (top) {
 	case 2:
-		timeout = 0;
+		timeout = IPC_TIMEOUT_INFINITY;
 		break;
 	case 3:
 		if (!lua_isnumber(L, -1))
@@ -162,7 +163,7 @@ static int
 lbox_ipc_channel_get(struct lua_State *L)
 {
 	int top = lua_gettop(L);
-	double timeout;
+	ev_tstamp timeout;
 
 	if (top > 2 || top < 1 || !lua_isuserdata(L, -top))
 		luaL_error(L, "usage: channel:get([timeout])");
@@ -174,7 +175,7 @@ lbox_ipc_channel_get(struct lua_State *L)
 		if (timeout < 0)
 			luaL_error(L, "wrong timeout");
 	} else {
-		timeout = 0;
+		timeout = IPC_TIMEOUT_INFINITY;
 	}
 
 	struct ipc_channel *ch = lbox_check_channel(L, 1);

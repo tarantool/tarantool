@@ -220,8 +220,8 @@ static void
 fiber_schedule_timeout(ev_watcher *watcher)
 {
 	assert(fiber == &sched);
-	struct { struct fiber *f; int timeouted; } *state = watcher->data;
-	state->timeouted = 1;
+	struct { struct fiber *f; bool timed_out; } *state = watcher->data;
+	state->timed_out = true;
 	fiber_call(state->f);
 }
 
@@ -229,22 +229,17 @@ fiber_schedule_timeout(ev_watcher *watcher)
  * @brief yield & check timeout
  * @return true if timeout exceeded
  */
-int
+bool
 fiber_yield_timeout(ev_tstamp delay)
 {
-	if (delay <= 0) {
-		fiber_yield();
-		return 0;
-	}
 	struct ev_timer timer;
-	ev_init(&timer, (void *)fiber_schedule_timeout);
-	struct { struct fiber *f; int timeouted; } state = { fiber, 0 };
+	ev_timer_init(&timer, (void *)fiber_schedule_timeout, delay, 0);
+	struct { struct fiber *f; bool timed_out; } state = { fiber, false };
 	timer.data = &state;
-	ev_timer_set(&timer, delay, 0);
 	ev_timer_start(&timer);
 	fiber_yield();
 	ev_timer_stop(&timer);
-	return state.timeouted;
+	return state.timed_out;
 }
 
 void
@@ -262,14 +257,7 @@ fiber_yield_to(struct fiber *f)
 void
 fiber_sleep(ev_tstamp delay)
 {
-	ev_timer timer;
-	ev_init(&timer, (void *)fiber_schedule);
-	timer.data = fiber;
-	ev_timer_set(&timer, delay, 0);
-	ev_timer_start(&timer);
-
-	fiber_yield();
-	ev_timer_stop(&timer);
+	fiber_yield_timeout(delay);
 	fiber_testcancel();
 }
 

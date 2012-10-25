@@ -94,10 +94,10 @@ void fiber_yield(void);
 void fiber_yield_to(struct fiber *f);
 
 /**
- * @brief yield & check timeout
+ * @brief yield & check for timeout
  * @return true if timeout exceeded
  */
-int fiber_yield_timeout(ev_tstamp delay);
+bool fiber_yield_timeout(ev_tstamp delay);
 
 
 void fiber_destroy_all();

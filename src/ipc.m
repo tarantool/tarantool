@@ -31,6 +31,8 @@
 #include <stdlib.h>
 #include <rlist.h>
 
+const ev_tstamp IPC_TIMEOUT_INFINITY = 365*86400*100.0;
+
 struct ipc_channel {
 	struct rlist readers, writers;
 	unsigned size;
@@ -75,6 +77,21 @@ ipc_channel_init(struct ipc_channel *ch)
 	rlist_init(&ch->writers);
 }
 
+void
+ipc_channel_cleanup(struct ipc_channel *ch)
+{
+	while (!rlist_empty(&ch->writers)) {
+		struct fiber *f =
+			rlist_first_entry(&ch->writers, struct fiber, state);
+		rlist_del_entry(f, state);
+	}
+	while (!rlist_empty(&ch->readers)) {
+		struct fiber *f =
+			rlist_first_entry(&ch->readers, struct fiber, state);
+		rlist_del_entry(f, state);
+	}
+}
+
 void *
 ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 {
@@ -83,13 +100,13 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 		rlist_add_tail_entry(&ch->readers, fiber, state);
 		bool cancellable = fiber_setcancellable(true);
 
-		int timeouted = fiber_yield_timeout(timeout);
+		bool timed_out = fiber_yield_timeout(timeout);
 		rlist_del_entry(fiber, state);
 
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
 
-		if (timeouted)
+		if (timed_out)
 			return NULL;
 
 		if (fiber->waiter) {
@@ -116,12 +133,12 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 void *
 ipc_channel_get(struct ipc_channel *ch)
 {
-	return ipc_channel_get_timeout(ch, 0);
+	return ipc_channel_get_timeout(ch, IPC_TIMEOUT_INFINITY);
 }
 
 int
 ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
-							ev_tstamp timeout)
+			ev_tstamp timeout)
 {
 	/* channel is full */
 	if (ch->count >= ch->size) {
@@ -129,14 +146,16 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 		rlist_add_tail_entry(&ch->writers, fiber, state);
 
 		bool cancellable = fiber_setcancellable(true);
-		int timeouted = fiber_yield_timeout(timeout);
+		bool timed_out = fiber_yield_timeout(timeout);
 		rlist_del_entry(fiber, state);
 
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
 
-		if (timeouted)
-			return ETIMEDOUT;
+		if (timed_out) {
+			errno = ETIMEDOUT;
+			return -1;
+		}
 
 	}
 
@@ -159,7 +178,7 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 void
 ipc_channel_put(struct ipc_channel *ch, void *data)
 {
-	ipc_channel_put_timeout(ch, data, 0);
+	ipc_channel_put_timeout(ch, data, IPC_TIMEOUT_INFINITY);
 }
 
 bool
