@@ -11,7 +11,7 @@ whenever the source tree receives a few important bugfixes.
 The version string may also contain a git revision id, to ease
 identification of the unqiue commit used to generate the build.
 
-The current version of the stable branch is **@TARANTOOL_VERSION@**.
+The current version of the stable branch is **@PACKAGE_VERSION@**.
 
 An automatic build system creates, tests and publishes packages
 for every push into the stable branch. All binary packages contain
@@ -21,7 +21,7 @@ packages contain asserts and are compiled without optimization.
 #### Source tarball
 
 The latest source archive is
-<a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-src.tar.gz">tarantool-@TARANTOOL_VERSION@-src.tar.gz</a>.
+<a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-src.tar.gz">tarantool-@PACKAGE_VERSION@-src.tar.gz</a>.
 Please consult with README for build instructions on your system.
 
 ### Binary downloads
@@ -32,7 +32,7 @@ that production systems use the builds provided on this site.
 
 #### RedHat, FreeBSD, Mac OS X
 
-<table border=1 title="Download the latest build, @TARANTOOL_VERSION@" width=100%> 
+<table border=1 title="Download the latest build, @PACKAGE_VERSION@" width=100%> 
 
 <!-- RPM -->
 
@@ -44,12 +44,12 @@ that production systems use the builds provided on this site.
     </td>
 
     <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686.rpm">32-bit</a>
+        <a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-i686.rpm">32-bit</a>
     </td>
 
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64.rpm">64-bit</a>
+        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64.rpm">64-bit</a>
     </td>
   </tr>
 
@@ -59,12 +59,12 @@ that production systems use the builds provided on this site.
     </td>
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686-debug.rpm">32-bit</a>
+        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-i686-debug.rpm">32-bit</a>
     </td>
 
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64-debug.rpm">64-bit</a>
+        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64-debug.rpm">64-bit</a>
     </td>
   </tr>
 
@@ -76,11 +76,11 @@ that production systems use the builds provided on this site.
         Binary tarball (<b>.tar.gz</b>) 
     </td>
     <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686.tar.gz">32-bit</a>
+        <a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-i686.tar.gz">32-bit</a>
     </td>
 
     <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64.tar.gz">64-bit</a>
+        <a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64.tar.gz">64-bit</a>
     </td>
   </tr>
 
@@ -94,7 +94,7 @@ that production systems use the builds provided on this site.
     </td>
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-freebsd-i386.tar.gz">32-bit</a>
+        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-freebsd-i386.tar.gz">32-bit</a>
     </td>
 
     <td align=center>
@@ -158,13 +158,13 @@ Tarantool/Box использует стандартную схему нумер�
 что упрощает определение конкретной версии репозитория, использованной
 для создания релиза.
 
-Текущая стабильная версия **@TARANTOOL_VERSION@**.
+Текущая стабильная версия **@PACKAGE_VERSION@**.
 
 #### Исходный код 
 
 Архив .tar.gz с последний версией исходного кода доступен по следующей
 ссылке: 
-<a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-src.tar.gz">tarantool-@TARANTOOL_VERSION@-src.tar.gz</a>.
+<a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-src.tar.gz">tarantool-@PACKAGE_VERSION@-src.tar.gz</a>.
 Файл README.<OS> содержит инструкции по сборке из исходников.
 
 ### Бинарные пакеты 
@@ -174,7 +174,7 @@ Tarantool/Box использует стандартную схему нумер�
 
 #### RedHat, FreeBSD, Mac OS X
 
-<table border=1 title="Download the latest build, @TARANTOOL_VERSION@" width=100%> 
+<table border=1 title="Download the latest build, @PACKAGE_VERSION@" width=100%> 
 
 <!-- RPM -->
 
@@ -186,12 +186,12 @@ Tarantool/Box использует стандартную схему нумер�
     </td>
 
     <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686.rpm">32-bit</a>
+        <a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-i686.rpm">32-bit</a>
     </td>
 
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64.rpm">64-bit</a>
+        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64.rpm">64-bit</a>
     </td>
   </tr>
 
@@ -201,12 +201,12 @@ Tarantool/Box использует стандартную схему нумер�
     </td>
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686-debug.rpm">32-bit</a>
+        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-i686-debug.rpm">32-bit</a>
     </td>
 
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64-debug.rpm">64-bit</a>
+        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64-debug.rpm">64-bit</a>
     </td>
   </tr>
 
@@ -218,11 +218,11 @@ Tarantool/Box использует стандартную схему нумер�
         Binary tarball (<b>.tar.gz</b>) 
     </td>
     <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-i686.tar.gz">32-bit</a>
+        <a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-i686.tar.gz">32-bit</a>
     </td>
 
     <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-linux-x86_64.tar.gz">64-bit</a>
+        <a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64.tar.gz">64-bit</a>
     </td>
   </tr>
 
@@ -236,7 +236,7 @@ Tarantool/Box использует стандартную схему нумер�
     </td>
     <td align=center>
         <a
-        href="http://tarantool.org/dist/tarantool-@TARANTOOL_VERSION@-freebsd-i386.tar.gz">32-bit</a>
+        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-freebsd-i386.tar.gz">32-bit</a>
     </td>
 
     <td align=center>
