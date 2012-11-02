@@ -595,7 +595,7 @@ replication_relay_loop(int client_sock)
 	 */
 	struct sockaddr_in peer;
 	socklen_t addrlen = sizeof(peer);
-	getpeername(client_sock, &peer, &addrlen);
+	getpeername(client_sock, ((struct sockaddr*)&peer), &addrlen);
 	snprintf(name, sizeof(name), "relay/%s", sio_strfaddr(&peer));
 	fiber_set_name(fiber, name);
 	set_proc_title("%s%s", name, custom_proc_title);
