@@ -47,6 +47,7 @@
 #include "port.h"
 #include "request.h"
 #include "txn.h"
+#include "archive.h"
 
 static void box_process_replica(struct port *port,
 				u32 op, struct tbuf *request_data);
@@ -329,6 +330,8 @@ mod_leave_local_standby_mode(void *data __attribute__((unused)))
 	recovery_update_mode(recovery_state, cfg.wal_mode,
 			     cfg.wal_fsync_delay);
 
+    arc_start();
+
 	box_enter_master_or_replica_mode(&cfg);
 }
 
@@ -447,6 +450,8 @@ mod_init(void)
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
+	arc_init(cfg.snap_dir);
+	
 	stat_base = stat_register(requests_strs, requests_MAX);
 
 	if (init_storage)
