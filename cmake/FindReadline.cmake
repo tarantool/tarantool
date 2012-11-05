@@ -6,7 +6,7 @@
 # READLINE_LIBRARIES
 #
 include(FindCurses)
-include(./FindTermcap.cmake)
+include(FindTermcap)
 
 FIND_LIBRARY(READLINE_HISTORY_LIBRARY NAMES history)
 FIND_LIBRARY(READLINE_READLINE_LIBRARY NAMES readline)

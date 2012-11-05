@@ -1,6 +1,7 @@
 project(tnt_cli)
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/" ${CMAKE_MODULE_PATH})
 
-include(./FindReadline.cmake)
+include(FindReadline)
 
 if (NOT READLINE_FOUND)
     message(FATAL_ERROR "readline library not found.")
