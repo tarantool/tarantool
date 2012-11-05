@@ -37,7 +37,7 @@
 
 extern const u32 default_version;
 
-enum log_format { XLOG = 65534, SNAP = 65535 };
+enum log_format { XLOG = 65534, SNAP = 65535, ARCH = 65533 };
 
 enum log_mode {
 	LOG_READ,
