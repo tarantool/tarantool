@@ -184,30 +184,66 @@ function box.on_reload_configuration()
     index_mt.min = function(index) return index.idx:min() end
     index_mt.max = function(index) return index.idx:max() end
     -- iteration
-    index_mt.pairs = function(index)
-        return index.idx.next, index.idx, nil
+    index_mt.iter = function(index, ...)
+        return index.idx:iter(...)
     end
     --
+    -- next/prev methods are provided for backward compatibility purposes only
+    local next_prev_compat = function(index, strategy, ...)
+        local arg = {...}
+        local iterator_state = nil;
+        if #arg == 1 and type(arg[1]) == "function" then
+            -- next call, already have an iterator closure
+            iterator_state = arg[1]
+        else
+            -- first call, create new iterator closure
+            local iter = index:iter(strategy, ...);
+            iterator_state = function()
+                local value = iter()
+                if value == nil then
+                    return nil
+                else
+                    return iterator_state, value
+                end
+            end
+        end
+
+        -- return iterator_state, value
+        return iterator_state()
+    end
     index_mt.next = function(index, ...)
-        return index.idx:next(...)
+        return next_prev_compat(index, box.index.ITER_GE, ...)
     end
     index_mt.prev = function(index, ...)
-        return index.idx:prev(...)
+        return next_prev_compat(index, box.index.ITER_LE, ...)
     end
     index_mt.next_equal = function(index, ...)
-        return index.idx:next_equal(...)
+        return next_prev_compat(index, box.index.ITER_EQ, ...)
     end
+    -- there is no difference between next_equal and prev_equal
     index_mt.prev_equal = function(index, ...)
-        return index.idx:prev_equal(...)
+        return next_prev_compat(index, box.index.ITER_EQ, ...)
     end
     -- index subtree size
     index_mt.count = function(index, ...)
         return index.idx:count(...)
     end
+    index_mt.pairs = function(index)
+        iterator_state = function(iter)
+            local value = iter()
+            if value == nil then
+                return nil
+            else
+                return iterator_state, value
+            end
+        end
+
+        return iterator_state, index:iter(box.index.ITER_GE)
+    end
     --
     index_mt.select_range = function(index, limit, ...)
         local range = {}
-        for k, v in index.idx.next, index.idx, ... do
+        for v in index:iter(box.index.ITER_GE, ...) do
             if #range >= limit then
                 break
             end
@@ -217,7 +253,7 @@ function box.on_reload_configuration()
     end
     index_mt.select_reverse_range = function(index, limit, ...)
         local range = {}
-        for k, v in index.idx.prev, index.idx, ... do
+        for v in index:iter(box.index.ITER_LE, ...) do
             if #range >= limit then
                 break
             end
@@ -247,7 +283,7 @@ function box.on_reload_configuration()
         local pk = space.index[0].idx
         local part_count = pk:part_count()
         while #pk > 0 do
-            for k, v in pk.next, pk, nil do
+            for v in space.index[0]:iter() do
                 space:delete(v:slice(0, part_count))
             end
         end

@@ -35,6 +35,8 @@
 #include "space.h"
 #include "assoc.h"
 
+/* TODO(roman): split hash index to new file */
+
 static struct index_traits index_traits = {
 	.allows_partial_key = true,
 };
@@ -46,30 +48,11 @@ static struct index_traits hash_index_traits = {
 const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
 const char *index_type_strs[] = { "HASH", "TREE", "\0" };
 
-static struct tuple *
-iterator_next_equal(struct iterator *it __attribute__((unused)))
-{
-	return NULL;
-}
+STRS(iteration_strategy, ITERATION_STRATEGY);
+ENUM_VALS(iteration_strategy, ITERATION_STRATEGY);
 
-static struct tuple *
-iterator_first_equal(struct iterator *it)
-{
-	it->next_equal = iterator_next_equal;
-	return it->next(it);
-}
 
-static void
-check_key_parts(struct key_def *key_def,
-		int part_count, bool partial_key_allowed)
-{
-	if (part_count > key_def->part_count)
-		tnt_raise(ClientError, :ER_KEY_PART_COUNT,
-			  part_count, key_def->part_count);
-	if (!partial_key_allowed && part_count < key_def->part_count)
-		tnt_raise(ClientError, :ER_EXACT_MATCH,
-			  part_count, key_def->part_count);
-}
+
 
 /* {{{ Index -- base class for all indexes. ********************/
 
@@ -194,7 +177,7 @@ check_key_parts(struct key_def *key_def,
 
 - (struct tuple *) findByKey: (void *) key :(int) part_count
 {
-	check_key_parts(key_def, part_count, false);
+	[self checkKeyParts: key_def: part_count: false];
 	return [self findUnsafe: key :part_count];
 }
 
@@ -233,28 +216,33 @@ check_key_parts(struct key_def *key_def,
 	return NULL;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator
+	:(enum iteration_strategy) strategy
 {
-	(void) iterator;
-	(void) type;
-	[self subclassResponsibility: _cmd];
+	[self initIterator: iterator: strategy: NULL: 0];
 }
 
-- (void) initIteratorByKey: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) part_count
-{
-	check_key_parts(key_def, part_count, traits->allows_partial_key);
-	[self initIteratorUnsafe: iterator :type :key :part_count];
-}
-
-- (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) part_count
+- (void) initIterator: (struct iterator *) iterator
+	:(enum iteration_strategy) strategy
+	:(void *) key :(int) part_count
 {
 	(void) iterator;
-	(void) type;
 	(void) key;
+	(void) strategy;
 	(void) part_count;
 	[self subclassResponsibility: _cmd];
+}
+
+- (void)
+checkKeyParts: (struct key_def *)key_def_arg
+	: (int) part_count: (bool) partial_key_allowed
+{
+	if (part_count > key_def_arg->part_count)
+		tnt_raise(ClientError, :ER_KEY_PART_COUNT,
+			  part_count, key_def_arg->part_count);
+	if (!partial_key_allowed && part_count < key_def_arg->part_count)
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  part_count, key_def_arg->part_count);
 }
 
 @end
@@ -275,10 +263,17 @@ hash_iterator(struct iterator *it)
 	return (struct hash_iterator *) it;
 }
 
+void
+hash_iterator_free(struct iterator *iterator)
+{
+	assert(iterator->free == hash_iterator_free);
+	free(iterator);
+}
+
 struct tuple *
 hash_iterator_next(struct iterator *iterator)
 {
-	assert(iterator->next == hash_iterator_next);
+	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	while (it->h_pos < mh_end(it->hash)) {
@@ -289,13 +284,19 @@ hash_iterator_next(struct iterator *iterator)
 	return NULL;
 }
 
-void
-hash_iterator_free(struct iterator *iterator)
+static struct tuple *
+hash_iterator_next_null(struct iterator *it __attribute__((unused)))
 {
-	assert(iterator->next == hash_iterator_next);
-	free(iterator);
+	return NULL;
 }
 
+static struct tuple *
+hash_iterator_next_equal(struct iterator *it)
+{
+	assert(it->next == hash_iterator_next_equal);
+	it->next = hash_iterator_next_null;
+	return hash_iterator_next(it);
+}
 
 @implementation HashIndex
 
@@ -337,7 +338,7 @@ hash_iterator_free(struct iterator *iterator)
 
 	struct iterator *it = pk->position;
 	struct tuple *tuple;
-	[pk initIterator: it :ITER_FORWARD];
+	[pk initIterator: it :ITER_GE];
 
 	while ((tuple = it->next(it)))
 	      [self replace: NULL :tuple];
@@ -479,32 +480,35 @@ int32_key_to_value(void *key)
 #endif
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-{
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
-
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
-
-	it->base.next_equal = 0; /* Should not be used. */
-	it->h_pos = mh_begin(int_hash);
-	it->hash = int_hash;
-}
-
-- (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) part_count
+- (void) initIterator: (struct iterator *) iterator
+	:(enum iteration_strategy) strategy
+	:(void *) key :(int) part_count
 {
 	(void) part_count;
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
-
-	assert(iterator->next == hash_iterator_next);
+	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	u32 num = int32_key_to_value(key);
-	it->base.next_equal = iterator_first_equal;
-	it->h_pos = mh_i32ptr_get(int_hash, num);
+	if (strategy == ITER_GE) {
+		if (key == NULL) {
+			it->base.next = hash_iterator_next;
+			it->h_pos = mh_begin(int_hash);
+		} else {
+			[self checkKeyParts: key_def: part_count:
+					     traits->allows_partial_key];
+			u32 num = int32_key_to_value(key);
+			it->h_pos = mh_i32ptr_get(int_hash, num);
+			it->base.next = hash_iterator_next;
+		}
+	} else if (strategy == ITER_EQ) {
+		[self checkKeyParts: key_def: part_count:
+				     traits->allows_partial_key];
+		u32 num = int32_key_to_value(key);
+		it->h_pos = mh_i32ptr_get(int_hash, num);
+		it->base.next = hash_iterator_next_equal;
+	} else {
+		tnt_raise(IllegalParams, :"unsupported strategy");
+	}
+
 	it->hash = int_hash;
 }
 @end
@@ -602,33 +606,36 @@ int64_key_to_value(void *key)
 #endif
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIterator: (struct iterator *) iterator
+	:(enum iteration_strategy) strategy
+	:(void *) key :(int) part_count
 {
-	assert(iterator->next == hash_iterator_next);
+	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
-
-	it->base.next_equal = 0; /* Should not be used if not positioned. */
-	it->h_pos = mh_begin(int64_hash);
-	it->hash = (struct mh_i32ptr_t *) int64_hash;
-}
-
-- (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) part_count
-{
 	(void) part_count;
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	if (strategy == ITER_GE) {
+		if (key == NULL) {
+			it->base.next = hash_iterator_next;
+			it->h_pos = mh_begin(int64_hash);
+		} else {
+			[self checkKeyParts: key_def: part_count:
+					     traits->allows_partial_key];
+			u64 num = int64_key_to_value(key);
+			it->h_pos = mh_i64ptr_get(int64_hash, num);
+			it->base.next = hash_iterator_next;
+		}
+	} else if (strategy == ITER_EQ) {
+		[self checkKeyParts: key_def: part_count:
+				     traits->allows_partial_key];
+		u64 num = int64_key_to_value(key);
+		it->h_pos = mh_i64ptr_get(int64_hash, num);
+		it->base.next = hash_iterator_next_equal;
+	} else {
+		tnt_raise(IllegalParams, :"unsupported strategy");
+	}
 
-	u64 num = int64_key_to_value(key);
-
-	it->base.next_equal = iterator_first_equal;
-	it->h_pos = mh_i64ptr_get(int64_hash, num);
 	it->hash = (struct mh_i32ptr_t *) int64_hash;
 }
 @end
@@ -720,32 +727,34 @@ int64_key_to_value(void *key)
 #endif
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-{
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
-
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
-
-	it->base.next_equal = 0; /* Should not be used if not positioned. */
-	it->h_pos = mh_begin(str_hash);
-	it->hash = (struct mh_i32ptr_t *) str_hash;
-}
-
-- (void) initIteratorUnsafe: (struct iterator *) iterator
-			:(enum iterator_type) type
-                        :(void *) key :(int) part_count
+- (void) initIterator: (struct iterator *) iterator
+	:(enum iteration_strategy) strategy
+	:(void *) key :(int) part_count
 {
 	(void) part_count;
-	if (type == ITER_REVERSE)
-		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	assert(iterator->next == hash_iterator_next);
+	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	it->base.next_equal = iterator_first_equal;
-	it->h_pos = mh_lstrptr_get(str_hash, key);
+	if (strategy == ITER_GE) {
+		if (key == NULL) {
+			it->base.next = hash_iterator_next;
+			it->h_pos = mh_begin(str_hash);
+		} else {
+			[self checkKeyParts: key_def: part_count:
+					     traits->allows_partial_key];
+			it->h_pos = mh_lstrptr_get(str_hash, key);
+			it->base.next = hash_iterator_next;
+		}
+	} else if (strategy == ITER_EQ) {
+		[self checkKeyParts: key_def: part_count:
+				     traits->allows_partial_key];
+		it->h_pos = mh_lstrptr_get(str_hash, key);
+		it->base.next = hash_iterator_next_equal;
+	} else {
+		tnt_raise(IllegalParams, :"unsupported strategy");
+	}
+
 	it->hash = (struct mh_i32ptr_t *) str_hash;
 }
 @end

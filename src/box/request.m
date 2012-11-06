@@ -753,10 +753,10 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 		read_key(data, &key, &key_part_count);
 
 		struct iterator *it = index->position;
-		[index initIteratorByKey: it :ITER_FORWARD :key :key_part_count];
+		[index initIterator: it :ITER_EQ :key :key_part_count];
 
 		struct tuple *tuple;
-		while ((tuple = it->next_equal(it)) != NULL) {
+		while ((tuple = it->next(it)) != NULL) {
 			if (tuple->flags & GHOST)
 				continue;
 

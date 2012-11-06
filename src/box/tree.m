@@ -746,56 +746,6 @@ tree_iterator(struct iterator *it)
 	return (struct tree_iterator *) it;
 }
 
-static struct tuple *
-tree_iterator_next(struct iterator *iterator)
-{
-	assert(iterator->next == tree_iterator_next);
-	struct tree_iterator *it = tree_iterator(iterator);
-
-	void *node = sptree_index_iterator_next(it->iter);
-	return [it->index unfold: node];
-}
-
-static struct tuple *
-tree_iterator_reverse_next(struct iterator *iterator)
-{
-	assert(iterator->next == tree_iterator_reverse_next);
-	struct tree_iterator *it = tree_iterator(iterator);
-
-	void *node = sptree_index_iterator_reverse_next(it->iter);
-	return [it->index unfold: node];
-}
-
-static struct tuple *
-tree_iterator_next_equal(struct iterator *iterator)
-{
-	assert(iterator->next == tree_iterator_next);
-	struct tree_iterator *it = tree_iterator(iterator);
-
-	void *node = sptree_index_iterator_next(it->iter);
-	if (node != NULL
-	    && it->index->tree.compare(&it->key_data, node, it->index) == 0) {
-		return [it->index unfold: node];
-	}
-
-	return NULL;
-}
-
-static struct tuple *
-tree_iterator_reverse_next_equal(struct iterator *iterator)
-{
-	assert(iterator->next == tree_iterator_reverse_next);
-	struct tree_iterator *it = tree_iterator(iterator);
-
-	void *node = sptree_index_iterator_reverse_next(it->iter);
-	if (node != NULL
-	    && it->index->tree.compare(&it->key_data, node, it->index) == 0) {
-		return [it->index unfold: node];
-	}
-
-	return NULL;
-}
-
 static void
 tree_iterator_free(struct iterator *iterator)
 {
@@ -805,6 +755,41 @@ tree_iterator_free(struct iterator *iterator)
 		sptree_index_iterator_free(it->iter);
 
 	free(it);
+}
+
+static struct tuple *
+tree_iterator_next(struct iterator *iterator)
+{
+	assert(iterator->free == tree_iterator_free);
+	struct tree_iterator *it = tree_iterator(iterator);
+
+	void *node = sptree_index_iterator_next(it->iter);
+	return [it->index unfold: node];
+}
+
+static struct tuple *
+tree_iterator_reverse_next(struct iterator *iterator)
+{
+	assert(iterator->free == tree_iterator_free);
+	struct tree_iterator *it = tree_iterator(iterator);
+
+	void *node = sptree_index_iterator_reverse_next(it->iter);
+	return [it->index unfold: node];
+}
+
+static struct tuple *
+tree_iterator_next_equal(struct iterator *iterator)
+{
+	assert(iterator->free == tree_iterator_free);
+	struct tree_iterator *it = tree_iterator(iterator);
+
+	void *node = sptree_index_iterator_next(it->iter);
+	if (node != NULL
+	    && it->index->tree.compare(&it->key_data, node, it->index) == 0) {
+		return [it->index unfold: node];
+	}
+
+	return NULL;
 }
 
 /* }}} */
@@ -949,29 +934,51 @@ tree_iterator_free(struct iterator *iterator)
 	return (struct iterator *) it;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
-{
-	[self initIteratorUnsafe: iterator :type :NULL :0];
-}
-
-- (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
-                        :(void *) key :(int) part_count
+- (void) initIterator: (struct iterator *) iterator
+	:(enum iteration_strategy) strategy
+	:(void *) key :(int) part_count
 {
 	assert(iterator->free == tree_iterator_free);
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	it->key_data.data = key;
-	it->key_data.part_count = part_count;
+	assert((key == NULL && part_count == 0)
+	    || (key != NULL && part_count > 0));
+
+	if (key != NULL) {
+		[self checkKeyParts: key_def: part_count:
+				     traits->allows_partial_key];
+		it->key_data.data = key;
+		it->key_data.part_count = part_count;
+	} else {
+		it->key_data.data = NULL;
+		it->key_data.part_count = 0;
+	}
+
 	fold_with_key_parts(key_def, &it->key_data);
 
-	if (type == ITER_FORWARD) {
+	switch (strategy) {
+	case ITER_EQ:
+		if (key == NULL) {
+			tnt_raise(ClientError, :ER_KEY_PART_COUNT,
+				part_count, key_def->part_count);
+		}
+
+		it->base.next = tree_iterator_next_equal;
+		sptree_index_iterator_init_set(&tree, &it->iter,
+					       &it->key_data);
+		break;
+	case ITER_GE:
 		it->base.next = tree_iterator_next;
-		it->base.next_equal = tree_iterator_next_equal;
-		sptree_index_iterator_init_set(&tree, &it->iter, &it->key_data);
-	} else if (type == ITER_REVERSE) {
+		sptree_index_iterator_init_set(&tree, &it->iter,
+					       &it->key_data);
+		break;
+	case ITER_LE:
 		it->base.next = tree_iterator_reverse_next;
-		it->base.next_equal = tree_iterator_reverse_next_equal;
-		sptree_index_iterator_reverse_init_set(&tree, &it->iter, &it->key_data);
+		sptree_index_iterator_reverse_init_set(&tree, &it->iter,
+						       &it->key_data);
+		break;
+	default:
+		tnt_raise(IllegalParams, :"unsupported strategy");
 	}
 }
 
@@ -1044,7 +1051,7 @@ tree_iterator_free(struct iterator *iterator)
 	}
 
 	struct iterator *it = pk->position;
-	[pk initIterator: it :ITER_FORWARD];
+	[pk initIterator: it :ITER_GE];
 
 	struct tuple *tuple;
 

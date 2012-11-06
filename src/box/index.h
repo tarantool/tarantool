@@ -47,7 +47,39 @@ extern const char *field_data_type_strs[];
 enum index_type { HASH, TREE, index_type_MAX };
 extern const char *index_type_strs[];
 
-enum iterator_type { ITER_FORWARD, ITER_REVERSE };
+/**
+ * @abstract Iterator strategy
+ * Controls how to iterate over tuples in the index.
+ * Various indexes may support different iteration strategies.
+ * For example, you can start iteration from one particaluar value (request key)
+ * and then retrive all tuples where keys are great or equal (= GE) to this key.
+ * There is no more special flags for iteration direction, since this direction
+ * only depends on in chosen iteration strategy.
+ *
+ * If strategy is not supported in the implementation, iterator constructor
+ * must fail with IllegalParams. Primary keys should support at least ITER_EQ
+ * and ITER_GE strategies. By default, box.select uses ITER_EQ strategy.
+ *
+ * NULL request keys note. NULL value of request key usually correspond to
+ * first or last key in the index, depending on the iteration direction
+ * (first of GE GT and last for LE LT). So if you want to iterate over all
+ * tuples in the index, just use ITER_GE or ITER_LE with key = NULL.
+ * For ITER_EQ key must not be NULL.
+ *
+ * ITER_EQ order note. ITER_EQ must return all tuples that have same key
+ * (make sense for non-unique indexes). The return order of equal
+ * tuples is implementation-defined.
+ */
+#define ITERATION_STRATEGY(_)                          \
+	_(ITER_EQ, 0)                 /* key == x */   \
+	_(ITER_LT, 1)                 /* key <  x */   \
+	_(ITER_LE, 2)                 /* key <= x */   \
+	_(ITER_GE, 3)                 /* key >= x */   \
+	_(ITER_GT, 4)                 /* key >  x */   \
+
+ENUM(iteration_strategy, ITERATION_STRATEGY);
+extern const char *iteration_strategy_strs[];
+extern const enum iteration_strategy iteration_strategy_vals[];
 
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
@@ -143,22 +175,22 @@ struct index_traits
  */
 - (struct iterator *) allocIterator;
 - (void) initIterator: (struct iterator *) iterator
-			:(enum iterator_type) type;
-- (void) initIteratorByKey: (struct iterator *) iterator
-			:(enum iterator_type) type
-			:(void *) key :(int) part_count;
+		     :(enum iteration_strategy) strategy;
+- (void) initIterator: (struct iterator *) iterator
+		     :(enum iteration_strategy) strategy
+		     :(void *) key :(int) part_count;
+
 /**
  * Unsafe search methods that do not check key part count.
  */
 - (struct tuple *) findUnsafe: (void *) key :(int) part_count;
-- (void) initIteratorUnsafe: (struct iterator *) iterator
-			:(enum iterator_type) type
-			:(void *) key :(int) part_count;
+- (void) checkKeyParts: (struct key_def *)key_def
+	: (int) part_count: (bool) partial_key_allowed;
+
 @end
 
 struct iterator {
 	struct tuple *(*next)(struct iterator *);
-	struct tuple *(*next_equal)(struct iterator *);
 	void (*free)(struct iterator *);
 };
 

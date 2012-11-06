@@ -49,10 +49,14 @@
 #define ENUM0_MEMBER(s, ...) s,
 #define ENUM_MEMBER(s, v, ...) s = v,
 #define ENUM_STRS_MEMBER(s, v, ...) [s] = #s,
+#define ENUM_VALS_MEMBER(s, v, ...) s,
 #define ENUM0(enum_name, enum_members) enum enum_name {enum_members(ENUM0_MEMBER) enum_name##_MAX}
 #define ENUM(enum_name, enum_members) enum enum_name {enum_members(ENUM_MEMBER) enum_name##_MAX}
+/* TODO(roman): replace STRS with ENUM_STRS in order to avoid name clash */
 #define STRS(enum_name, enum_members) \
 	const char *enum_name##_strs[enum_name##_MAX + 1] = {enum_members(ENUM_STRS_MEMBER) '\0'}
+#define ENUM_VALS(enum_name, enum_members) \
+	const enum enum_name enum_name##_vals[] = {enum_members(ENUM_VALS_MEMBER) enum_name##_MAX}
 #define STR2ENUM(enum_name, str) ((enum enum_name) strindex(enum_name##_strs, str, enum_name##_MAX))
 
 uint32_t

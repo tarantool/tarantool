@@ -44,6 +44,7 @@
 #include "pickle.h"
 #include "tuple.h"
 #include "space.h"
+#include "index.h"
 #include "port.h"
 
 /* contents of box.lua */
@@ -654,142 +655,71 @@ void append_key_part(struct lua_State *L, int i,
 	tbuf_append(tbuf, str, size);
 }
 
+static int
+lbox_index_iter_closure(struct lua_State *L);
+
 /**
- * Lua iterator over a Taratnool/Box index.
- *
- *	(iteration_state, tuple) = index.next(index, [iteration_state])
- *	(iteration_state, tuple) = index.prev(index, [iteration_state])
- *
- * When [iteration_state] is absent or nil
- * returns a pointer to a new iterator and
- * to the first tuple (or nil, if the index is
- * empty).
- *
- * When [iteration_state] is a userdata,
- * i.e. we're inside an iteration loop, retrieves
- * the next tuple from the iterator.
- *
- * Otherwise, [iteration_state] can be used to seed
- * the iterator with one or several Lua scalars
- * (numbers, strings) and start iteration from an
- * offset.
+ * @brief Lua iterator over a Taratnool/Box index.
+ * @example lua iter = box.space[0].index[0]:iter(box.index.ITER_GE, 1);
+ *   print(iter(), iter()).
+ * @param L lua stack
+ * @see http://www.lua.org/pil/7.1.html
+ * @return number of return values put on the stack
  */
-static inline struct iterator *
-lbox_index_iterator(struct lua_State *L, enum iterator_type type)
+static int
+lbox_index_iter(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
-	struct iterator *it = NULL;
-	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
-		/*
-		 * If there is nothing or nil on top of the stack,
-		 * start iteration from the beginning (ITER_FORWARD) or
-		 * end (ITER_REVERSE).
-		 */
-		it = [index allocIterator];
-		[index initIterator: it :type];
-		lbox_pushiterator(L, it);
-	} else if (argc > 1 || lua_type(L, 2) != LUA_TUSERDATA) {
-		/*
-		 * We've got something different from iterator's
-		 * userdata: must be a key to start iteration from
-		 * an offset. Seed the iterator with this key.
-		 */
-		int field_count;
-		void *key;
 
-		if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
-			/* Searching by tuple. */
-			struct tuple *tuple = lua_checktuple(L, 2);
-			key = tuple->data;
-			field_count = tuple->field_count;
-		} else {
-			/* Single or multi- part key. */
-			field_count = argc;
-			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
-			for (int i = 0; i < argc; ++i)
-				append_key_part(L, i + 2, data,
-						index->key_def->parts[i].type);
-			key = data->data;
-		}
-		/*
-		 * We allow partially specified keys for TREE
-		 * indexes. HASH indexes can only use single-part
-		 * keys.
-		*/
-		assert(field_count != 0);
-		if (field_count > index->key_def->part_count)
-			luaL_error(L, "index.next(): key part count (%d) "
-				   "does not match index field count (%d)",
-				   field_count, index->key_def->part_count);
-		it = [index allocIterator];
-		[index initIteratorByKey: it :type :key :field_count];
-		lbox_pushiterator(L, it);
-	} else { /* 1 item on the stack and it's a userdata. */
-		it = lua_checkiterator(L, 2);
+	enum iteration_strategy strategy;
+	if (argc > 0) {
+		/* first parameter must be iterator flags */
+		strategy = (enum iteration_strategy) luaL_checkint(L, 2);
+	} else {
+		strategy = ITER_GE;
 	}
 
-	return it;
+	void *key = NULL;
+	int field_count = 0;
+
+	if (argc == 2 && lua_istuple(L, 3)) {
+		/* Searching by tuple. */
+		struct tuple *tuple = lua_checktuple(L, 3);
+		key = tuple->data;
+		field_count = tuple->field_count;
+	} else if (argc == 2 && lua_isnil(L, 3)) {
+		key = NULL;
+		field_count = 0;
+	} else if (argc >= 2) {
+		/* Single or multi- part key. */
+		field_count = argc - 1;
+		struct tbuf *data = tbuf_alloc(fiber->gc_pool);
+			for (int i = 0; i < field_count; ++i)
+				append_key_part(L, i + 3, data,
+						index->key_def->parts[i].type);
+		key = data->data;
+	}
+
+	struct iterator *it = [index allocIterator];
+	[index initIterator: it :strategy :key :field_count];
+	lbox_pushiterator(L, it);
+
+	lua_pushcclosure(L, &lbox_index_iter_closure, 1);
+	return 1;
 }
 
-/**
- * Lua forward index iterator function.
- * See lbox_index_iterator comment for a functional
- * description.
- */
 static int
-lbox_index_next(struct lua_State *L)
+lbox_index_iter_closure(struct lua_State *L)
 {
-	struct iterator *it = lbox_index_iterator(L, ITER_FORWARD);
+	/* extract closure arguments */
+	struct iterator *it = lua_checkiterator(L, lua_upvalueindex(1));
+
 	struct tuple *tuple = it->next(it);
-	/* If tuple is NULL, pushes nil as end indicator. */
-	lbox_pushtuple(L, tuple);
-	return tuple ? 2 : 1;
-}
 
-/**
- * Lua reverse index iterator function.
- * See lbox_index_iterator comment for a functional
- * description.
- */
-static int
-lbox_index_prev(struct lua_State *L)
-{
-	struct iterator *it = lbox_index_iterator(L, ITER_REVERSE);
-	struct tuple *tuple = it->next(it);
 	/* If tuple is NULL, pushes nil as end indicator. */
 	lbox_pushtuple(L, tuple);
-	return tuple ? 2 : 1;
-}
-
-/**
- * Lua forward index iterator function.
- * See lbox_index_iterator comment for a functional
- * description.
- */
-static int
-lbox_index_next_equal(struct lua_State *L)
-{
-	struct iterator *it = lbox_index_iterator(L, ITER_FORWARD);
-	struct tuple *tuple = it->next_equal(it);
-	/* If tuple is NULL, pushes nil as end indicator. */
-	lbox_pushtuple(L, tuple);
-	return tuple ? 2 : 1;
-}
-
-/**
- * Lua reverse index iterator function.
- * See lbox_index_iterator comment for a functional
- * description.
- */
-static int
-lbox_index_prev_equal(struct lua_State *L)
-{
-	struct iterator *it = lbox_index_iterator(L, ITER_REVERSE);
-	struct tuple *tuple = it->next_equal(it);
-	/* If tuple is NULL, pushes nil as end indicator. */
-	lbox_pushtuple(L, tuple);
-	return tuple ? 2 : 1;
+	return 1;
 }
 
 /**
@@ -826,10 +756,10 @@ lbox_index_count(struct lua_State *L)
 	u32 count = 0;
 	/* preparing index iterator */
 	struct iterator *it = index->position;
-	[index initIteratorByKey: it :ITER_FORWARD :key :key_part_count];
+	[index initIterator: it :ITER_EQ :key :key_part_count];
 	/* iterating over the index and counting tuples */
 	struct tuple *tuple;
-	while ((tuple = it->next_equal(it)) != NULL) {
+	while ((tuple = it->next(it)) != NULL) {
 		if (tuple->flags & GHOST)
 			continue;
 		count++;
@@ -845,10 +775,7 @@ static const struct luaL_reg lbox_index_meta[] = {
 	{"part_count", lbox_index_part_count},
 	{"min", lbox_index_min},
 	{"max", lbox_index_max},
-	{"next", lbox_index_next},
-	{"prev", lbox_index_prev},
-	{"next_equal", lbox_index_next_equal},
-	{"prev_equal", lbox_index_prev_equal},
+	{"iter", lbox_index_iter},
 	{"count", lbox_index_count},
 	{NULL, NULL}
 };
@@ -1218,6 +1145,17 @@ box_lua_execute(struct request *request, struct txn *txn, struct port *port)
 	}
 }
 
+static
+void mod_lua_init_index_constants(struct lua_State *L, int index) {
+	for (int i = 0;
+	     iteration_strategy_vals[i] != iteration_strategy_MAX;
+	     i++) {
+		enum iteration_strategy val = iteration_strategy_vals[i];
+		lua_pushnumber(L, val);
+		lua_setfield(L, index, iteration_strategy_strs[val]);
+	}
+}
+
 void
 mod_lua_init(struct lua_State *L)
 {
@@ -1228,6 +1166,7 @@ mod_lua_init(struct lua_State *L)
 	/* box.index */
 	tarantool_lua_register_type(L, indexlib_name, lbox_index_meta);
 	luaL_register(L, "box.index", indexlib);
+	mod_lua_init_index_constants(L, -2);
 	lua_pop(L, 1);
 	tarantool_lua_register_type(L, iteratorlib_name, lbox_iterator_meta);
 	/* Load box.lua */
