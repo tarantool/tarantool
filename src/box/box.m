@@ -428,7 +428,8 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 void
 mod_free(void)
 {
-	space_free();
+    arc_free();
+    space_free();
 }
 
 void
@@ -450,7 +451,7 @@ mod_init(void)
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
-	arc_init(cfg.snap_dir);
+    arc_init(cfg.archive_dir,cfg.archive_filename_pattern);
 	
 	stat_base = stat_register(requests_strs, requests_MAX);
 
@@ -491,7 +492,7 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 	struct box_snap_row header;
 	header.space = n;
 	header.tuple_size = tuple->field_count;
-	header.data_size = tuple->bsize;
+    header.data_size = tuple->bsize;
 
 	snapshot_write_row(l, batch, (void *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);

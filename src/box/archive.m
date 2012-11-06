@@ -3,12 +3,18 @@
 #include <limits.h>
 #include <sys/stat.h> 
 #include <fcntl.h>
+#include <time.h>
 #include "archive.h"
 #include "fio.h"
+#include "log_io.h"
 #include "fiber.h"
 #include "request.h"
 #include "space.h"
 #include "tarantool_pthread.h"
+
+#ifndef ARC_NAME_MAX_LEN
+#define ARC_NAME_MAX_LEN 64
+#endif
 
 struct arc_write_request {
     STAILQ_ENTRY(arc_write_request) fifo_entry;
@@ -22,6 +28,8 @@ STAILQ_HEAD(arc_fifo, arc_write_request);
 struct arc_state {
     struct log_io *current_io;
     struct log_dir *arc_dir;
+
+    char *filename_format;
 
     pthread_t worker_thread;
     pthread_cond_t queue_not_empty;
@@ -60,12 +68,6 @@ struct arc_state *archive_state;
 
 
 
-char *archive_filename ( struct log_dir *dir) {
-    static __thread char filename[PATH_MAX + 1];
-    snprintf(filename, PATH_MAX, "%s/archive%s",
-             dir->dirname, dir->filename_ext);
-    return filename;
-}
 
 
 
@@ -85,11 +87,12 @@ void arc_wakeup_fibers(ev_watcher *watcher, int event __attribute__((unused))) {
 }
 
 
-void arc_init(const char *arc_dirname) {
+void arc_init(const char *arc_dirname,const char *arc_filename_patter) {
     assert(archive_state == NULL);
 
     archive_state = p0alloc(eter_pool, sizeof(struct arc_state));
     archive_state->arc_dir = &arc_dir;
+    archive_state->filename_format = strdup(arc_filename_patter);
     archive_state->arc_dir->dirname = strdup(arc_dirname);
     archive_state->batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
     if(archive_state->batch == NULL) {
@@ -110,12 +113,29 @@ void arc_init(const char *arc_dirname) {
 
     STAILQ_INIT(&archive_state->input_queue);
     STAILQ_INIT(&archive_state->processed_queue);
+}
 
-    char *filename =archive_filename(archive_state->arc_dir);
+char* get_filename_for_time(double action_time) {
+    static __thread char filename[PATH_MAX + 1];
+    static __thread char name[ARC_NAME_MAX_LEN + 1];
+    time_t time=(time_t)action_time;
+    struct tm* tm = localtime (&time);
+    strftime(name,ARC_NAME_MAX_LEN,archive_state->filename_format,tm);
+
+    snprintf(filename, PATH_MAX, "%s/%s%s",
+             archive_state->arc_dir->dirname, name,archive_state->arc_dir->filename_ext);
+    return filename;
+}
+
+void create_new_io(char* filename) {
+    say_info("creating new archive file `%s'", filename);
+    if(archive_state ->current_io!=NULL) {
+        log_io_close(&archive_state->current_io);
+    }
+
     int fd = open(filename,
                   O_WRONLY | O_CREAT | archive_state -> arc_dir->open_wflags, 0664);
     if (fd > 0) {
-        say_info("creating `%s'", filename);
         FILE *f = fdopen(fd, "w");
         archive_state -> current_io = log_io_open(archive_state -> arc_dir, LOG_WRITE, filename, NONE, f);
     } else {
@@ -134,7 +154,8 @@ int arc_start() {
     return 0;
 }
 
-void arc_stop() {
+void arc_free() {
+    say_info("stopping archive module");
     tt_pthread_mutex_lock(&archive_state->mutex);
     archive_state -> is_shutdown = true;
     tt_pthread_cond_signal(&archive_state->queue_not_empty);
@@ -199,7 +220,9 @@ bool arc_read_input(struct arc_state *arc_state,struct arc_fifo *queue) {
 }
 
 
+
 void *arc_writer_thread(void *args) {
+    static __thread char current_filename[PATH_MAX + 1];
     struct arc_state *arc_state = args;
     struct arc_fifo queue = STAILQ_HEAD_INITIALIZER(queue);
     struct fio_batch *batch = arc_state->batch;
@@ -209,9 +232,15 @@ void *arc_writer_thread(void *args) {
     while (arc_read_input(arc_state,&queue)) {
         struct arc_write_request *request = STAILQ_FIRST(&queue);
         do {
-            //TODO check for rows written
-            //TODO move rows to right file using row->header.tm value
-            //limit batch by max tm value
+            char* required_filename = get_filename_for_time(request->row.header.tm);
+            if(strcmp(current_filename,required_filename) != 0) {
+                if(batch->rows > 0) {
+                    fio_batch_write(batch,fileno(arc_state->current_io->f)),
+                    fio_batch_start(batch,max_rows);
+                }
+                create_new_io(required_filename);
+                strcpy(current_filename,required_filename);
+            }
             fio_batch_add(batch,&request->row,row_v11_size(&request->row));
             request->res = 0;
             if(fio_batch_is_full(batch) || STAILQ_NEXT(request,fifo_entry)==NULL) {
