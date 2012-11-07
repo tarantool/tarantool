@@ -338,7 +338,7 @@ hash_iterator_next_equal(struct iterator *it)
 
 	struct iterator *it = pk->position;
 	struct tuple *tuple;
-	[pk initIterator: it :ITER_GE];
+	[pk initIterator: it :ITER_ALL];
 
 	while ((tuple = it->next(it)))
 	      [self replace: NULL :tuple];
@@ -488,7 +488,13 @@ int32_key_to_value(void *key)
 	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	if (strategy == ITER_GE) {
+	switch (strategy) {
+	case ITER_ALL:
+		it->base.next = hash_iterator_next;
+		it->h_pos = mh_begin(int_hash);
+		break;
+	case ITER_GE:
+		/* TODO(roman): backward compatibility only, remove in future */
 		if (key == NULL) {
 			it->base.next = hash_iterator_next;
 			it->h_pos = mh_begin(int_hash);
@@ -499,13 +505,15 @@ int32_key_to_value(void *key)
 			it->h_pos = mh_i32ptr_get(int_hash, num);
 			it->base.next = hash_iterator_next;
 		}
-	} else if (strategy == ITER_EQ) {
+		break;
+	case ITER_EQ:
 		[self checkKeyParts: key_def: part_count:
 				     traits->allows_partial_key];
 		u32 num = int32_key_to_value(key);
 		it->h_pos = mh_i32ptr_get(int_hash, num);
 		it->base.next = hash_iterator_next_equal;
-	} else {
+		break;
+	default:
 		tnt_raise(IllegalParams, :"unsupported strategy");
 	}
 
@@ -615,7 +623,13 @@ int64_key_to_value(void *key)
 
 	(void) part_count;
 
-	if (strategy == ITER_GE) {
+	switch (strategy) {
+	case ITER_ALL:
+		it->base.next = hash_iterator_next;
+		it->h_pos = mh_begin(int64_hash);
+		break;
+	case ITER_GE:
+		/* TODO(roman): backward compatibility only, remove in future */
 		if (key == NULL) {
 			it->base.next = hash_iterator_next;
 			it->h_pos = mh_begin(int64_hash);
@@ -626,13 +640,15 @@ int64_key_to_value(void *key)
 			it->h_pos = mh_i64ptr_get(int64_hash, num);
 			it->base.next = hash_iterator_next;
 		}
-	} else if (strategy == ITER_EQ) {
+		break;
+	case ITER_EQ:
 		[self checkKeyParts: key_def: part_count:
 				     traits->allows_partial_key];
 		u64 num = int64_key_to_value(key);
 		it->h_pos = mh_i64ptr_get(int64_hash, num);
 		it->base.next = hash_iterator_next_equal;
-	} else {
+		break;
+	default:
 		tnt_raise(IllegalParams, :"unsupported strategy");
 	}
 
@@ -736,7 +752,13 @@ int64_key_to_value(void *key)
 	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	if (strategy == ITER_GE) {
+	switch (strategy) {
+	case ITER_ALL:
+		it->base.next = hash_iterator_next;
+		it->h_pos = mh_begin(str_hash);
+		break;
+	case ITER_GE:
+		/* TODO(roman): backward compatibility only, remove in future */
 		if (key == NULL) {
 			it->base.next = hash_iterator_next;
 			it->h_pos = mh_begin(str_hash);
@@ -746,12 +768,14 @@ int64_key_to_value(void *key)
 			it->h_pos = mh_lstrptr_get(str_hash, key);
 			it->base.next = hash_iterator_next;
 		}
-	} else if (strategy == ITER_EQ) {
+		break;
+	case ITER_EQ:
 		[self checkKeyParts: key_def: part_count:
 				     traits->allows_partial_key];
 		it->h_pos = mh_lstrptr_get(str_hash, key);
 		it->base.next = hash_iterator_next_equal;
-	} else {
+		break;
+	default:
 		tnt_raise(IllegalParams, :"unsupported strategy");
 	}
 

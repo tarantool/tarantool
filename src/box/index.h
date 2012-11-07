@@ -69,13 +69,17 @@ extern const char *index_type_strs[];
  * ITER_EQ order note. ITER_EQ must return all tuples that have same key
  * (make sense for non-unique indexes). The return order of equal
  * tuples is implementation-defined.
+ *
+ * ITER_ALL note. ITER_ALL must be supported by every index, because it is used
+ * in various parts of our code (snapshotting, building secondary keys, etc.).
  */
-#define ITERATION_STRATEGY(_)                          \
-	_(ITER_EQ, 0)                 /* key == x */   \
-	_(ITER_LT, 1)                 /* key <  x */   \
-	_(ITER_LE, 2)                 /* key <= x */   \
-	_(ITER_GE, 3)                 /* key >= x */   \
-	_(ITER_GT, 4)                 /* key >  x */   \
+#define ITERATION_STRATEGY(_)                             \
+	_(ITER_ALL, 0)                 /* all tuples */   \
+	_(ITER_EQ,  1)                 /* key == x   */   \
+	_(ITER_LT,  2)                 /* key <  x   */   \
+	_(ITER_LE,  3)                 /* key <= x   */   \
+	_(ITER_GE,  4)                 /* key >= x   */   \
+	_(ITER_GT,  5)                 /* key >  x   */   \
 
 ENUM(iteration_strategy, ITERATION_STRATEGY);
 extern const char *iteration_strategy_strs[];

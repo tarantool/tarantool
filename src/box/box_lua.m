@@ -677,7 +677,7 @@ lbox_index_iter(struct lua_State *L)
 		/* first parameter must be iterator flags */
 		strategy = (enum iteration_strategy) luaL_checkint(L, 2);
 	} else {
-		strategy = ITER_GE;
+		strategy = ITER_ALL;
 	}
 
 	void *key = NULL;

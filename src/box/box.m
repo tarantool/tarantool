@@ -500,7 +500,7 @@ snapshot_space(struct space *sp, void *udata)
 	struct { struct log_io *l; struct fio_batch *batch; } *ud = udata;
 	Index *pk = space_index(sp, 0);
 	struct iterator *it = pk->position;
-	[pk initIterator: it :ITER_GE];
+	[pk initIterator: it :ITER_ALL];
 
 	while ((tuple = it->next(it)))
 		snapshot_write_tuple(ud->l, ud->batch, space_n(sp), tuple);

@@ -944,7 +944,7 @@ tree_iterator_next_equal(struct iterator *iterator)
 	assert((key == NULL && part_count == 0)
 	    || (key != NULL && part_count > 0));
 
-	if (key != NULL) {
+	if (key != NULL && strategy != ITER_ALL) {
 		[self checkKeyParts: key_def: part_count:
 				     traits->allows_partial_key];
 		it->key_data.data = key;
@@ -967,6 +967,7 @@ tree_iterator_next_equal(struct iterator *iterator)
 		sptree_index_iterator_init_set(&tree, &it->iter,
 					       &it->key_data);
 		break;
+	case ITER_ALL:
 	case ITER_GE:
 		it->base.next = tree_iterator_next;
 		sptree_index_iterator_init_set(&tree, &it->iter,
@@ -1051,7 +1052,7 @@ tree_iterator_next_equal(struct iterator *iterator)
 	}
 
 	struct iterator *it = pk->position;
-	[pk initIterator: it :ITER_GE];
+	[pk initIterator: it :ITER_ALL];
 
 	struct tuple *tuple;
 
