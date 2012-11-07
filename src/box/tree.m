@@ -778,6 +778,24 @@ tree_iterator_reverse_next(struct iterator *iterator)
 }
 
 static struct tuple *
+tree_iterator_reverse_next_great(struct iterator *iterator)
+{
+	assert(iterator->free == tree_iterator_free);
+	struct tree_iterator *it = tree_iterator(iterator);
+
+	void *node = NULL;
+	while ((node = sptree_index_iterator_reverse_next(it->iter)) != NULL) {
+		if (it->index->tree.compare(&it->key_data, node, it->index)
+				!= 0) {
+			it->base.next = tree_iterator_reverse_next;
+			return [it->index unfold: node];
+		}
+	} while (true);
+
+	return NULL;
+}
+
+static struct tuple *
 tree_iterator_next_equal(struct iterator *iterator)
 {
 	assert(iterator->free == tree_iterator_free);
@@ -788,6 +806,24 @@ tree_iterator_next_equal(struct iterator *iterator)
 	    && it->index->tree.compare(&it->key_data, node, it->index) == 0) {
 		return [it->index unfold: node];
 	}
+
+	return NULL;
+}
+
+static struct tuple *
+tree_iterator_next_great(struct iterator *iterator)
+{
+	assert(iterator->free == tree_iterator_free);
+	struct tree_iterator *it = tree_iterator(iterator);
+
+	void *node = NULL;
+	while ((node = sptree_index_iterator_next(it->iter)) != NULL) {
+		if (it->index->tree.compare(&it->key_data, node, it->index)
+				!= 0) {
+			it->base.next = tree_iterator_next;
+			return [it->index unfold: node];
+		}
+	};
 
 	return NULL;
 }
@@ -973,8 +1009,18 @@ tree_iterator_next_equal(struct iterator *iterator)
 		sptree_index_iterator_init_set(&tree, &it->iter,
 					       &it->key_data);
 		break;
+	case ITER_GT:
+		it->base.next = tree_iterator_next_great;
+		sptree_index_iterator_init_set(&tree, &it->iter,
+					       &it->key_data);
+		break;
 	case ITER_LE:
 		it->base.next = tree_iterator_reverse_next;
+		sptree_index_iterator_reverse_init_set(&tree, &it->iter,
+						       &it->key_data);
+		break;
+	case ITER_LT:
+		it->base.next = tree_iterator_reverse_next_great;
 		sptree_index_iterator_reverse_init_set(&tree, &it->iter,
 						       &it->key_data);
 		break;
