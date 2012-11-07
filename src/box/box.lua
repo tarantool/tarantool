@@ -188,7 +188,20 @@ function box.on_reload_configuration()
         return index.idx:iter(...)
     end
     --
-    -- next/prev methods are provided for backward compatibility purposes only
+    -- pairs/next/prev methods are provided for backward compatibility purposes only
+    index_mt.pairs = function(index, ...)
+        local iter = index:iter(...)
+        iterator_state = function()
+            local value = iter()
+            if value == nil then
+                return nil
+            else
+                return iterator_state, value
+            end
+        end
+
+        return iterator_state
+    end
     local next_prev_compat = function(index, strategy, ...)
         local arg = {...}
         local iterator_state = nil;
@@ -197,15 +210,7 @@ function box.on_reload_configuration()
             iterator_state = arg[1]
         else
             -- first call, create new iterator closure
-            local iter = index:iter(strategy, ...);
-            iterator_state = function()
-                local value = iter()
-                if value == nil then
-                    return nil
-                else
-                    return iterator_state, value
-                end
-            end
+            iterator_state = index:pairs(strategy, ...);
         end
 
         -- return iterator_state, value
@@ -227,18 +232,6 @@ function box.on_reload_configuration()
     -- index subtree size
     index_mt.count = function(index, ...)
         return index.idx:count(...)
-    end
-    index_mt.pairs = function(index)
-        iterator_state = function(iter)
-            local value = iter()
-            if value == nil then
-                return nil
-            else
-                return iterator_state, value
-            end
-        end
-
-        return iterator_state, index:iter(box.index.ITER_GE)
     end
     --
     index_mt.select_range = function(index, limit, ...)
