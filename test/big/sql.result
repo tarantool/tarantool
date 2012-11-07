@@ -111,8 +111,7 @@ call box.select_range(1, 0, 100, 'key2')
 Found 1 tuple:
 [846816619, 'part1', 'part2_a']
 call box.select_range(1, 1, 100, 'part1', 'part2_a')
-Found 3 tuples:
-[830039403, 'part1', 'part2']
+Found 2 tuples:
 [846816619, 'part1', 'part2_a']
 [863593835, 'part1', 'part2_b']
 insert into t5 values ('01234567', 'part1', 'part2')
