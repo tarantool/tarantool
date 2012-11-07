@@ -344,7 +344,9 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.select(space_no, index_no, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.select"
+            xreflabel="box.select">
+            box.select(space_no, index_no, ...)</emphasis>
         </term>
         <listitem>
             <para>
@@ -507,24 +509,20 @@ Call ERROR, Illegal parameters, key is not u32 (ER_ILLEGAL_PARAMS)
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.select_range(space_no, index_no, limit, key, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.select_range"
+            xreflabel="box.select_range">
+            box.select_range(space_no, index_no, limit, key, ...)</emphasis>
         </term>
         <listitem><para>
             Select a range of tuples, starting from offset
-            specified by <code>key</code>. The key can be
-            multipart.
-            Limit selection with at most <code>limit</code>
-            tuples.
-            If no key is specified, start from the first key in
-            the index.
-            </para>
-            <para>
-            For TREE indexes, this returns tuples in sorted order.
-            For HASH indexes, the order of tuples is unspecified, and
-            can change significantly if data is inserted or deleted
-            between two calls to <code>box.select_range()</code>.
-            If <code>key</code> is <code>nil</code> or unspecified,
-            the selection starts from the start of the index.
+            specified by <code>key</code>. The key can be multipart.
+            Limit selection with at most <code>limit</code> tuples.
+            If no key is specified, start from the first key in the index.
+        </para><para>
+            This method is equivalent to <code>box.space[space_no].index[index_no]:select_range(limit, key, ...)</code> call.
+            <emphasis>Please also see notes for <code xlink:href="#box.index.select_range">
+            box.index.select_range</code></emphasis>.
+        </para><para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost> show configuration
 ---
@@ -577,7 +575,9 @@ localhost> lua box.select_range(4, 1, 2, '1')
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.select_reverse_range(space_no, index_no, limit, key, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.select_reverse_range"
+            xreflabel="box.select_reverse_range">
+            box.select_reverse_range(space_no, index_no, limit, key, ...)</emphasis>
         </term>
         <listitem><para>
             Select a reverse range of tuples, starting from the offset
@@ -1186,22 +1186,211 @@ xreflabel="box.index">box.index</code></title>
             <emphasis role="lua">index.idx</emphasis>
         </term>
         <listitem><simpara>
-            The underlying userdata which does all the magic.
+            The underlying internal userdata which does all the magic.
+            <emphasis>Please do not use it directly! Compatibility is not guaranteed.</emphasis>
         </simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">space:select_range(limit, key)</emphasis>
+             <emphasis role="lua" xml:id="box.index.iter"
+            xreflabel="box.index.iter">
+            index:iter(strategy, ...)</emphasis>
         </term>
-        <listitem><simpara>Select a range of tuples, limited by
-        <code>limit</code>, starting from <code>key</code>.
+        <listitem>
+            <simpara>
+                This method provides iteration support within an index.
+                Parameter <code>strategy</code> is used to identify the semantics
+                of iteration. Various indexes may support different iteration
+                strategies. For example, TREE index maintain strict order of keys
+                and it can easily return all tuples in ascending or descending
+                order, starting from one specific key, but HASH index can only
+                return either all tuples or tuples, where key exactly equal
+                to specific key.
+                There is no special flags for iteration direction, since
+                the direction only depends on chosen iteration strategy.
+            </simpara>
+            <para>
+                <bridgehead renderas="sect4">Parameters</bridgehead>
+                <simplelist>
+                        <member><code>strategy</code> &mdash; iteration strategy as defined in a table below.</member>
+                </simplelist>
+
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                    This method returns iteration closure, i.e. <code>function</code>
+                    which can used for getting next value on each call.
+                    See <link xlink:href="http://www.lua.org/pil/7.1.html">
+                        Lua Manual</link> for more details.
+                <bridgehead renderas="sect4">Errors</bridgehead>
+                    Selected strategy might not be supported.
+                    Parameters might not be suitable for selected strategy.
+            </para>
+
+            <table frame='all' pgwide='1'>
+                <title>Iteration strategies</title>
+                <tgroup cols='3' colsep='1' rowsep='1'>
+                <colspec colnum="5" colname="col4" colwidth="6*"/>
+
+                <thead>
+                    <row>
+                    <entry>Name</entry>
+                    <entry>Parameters</entry>
+                    <entry>TREE</entry>
+                    <entry>HASH</entry>
+                    <entry>Description</entry>
+                    </row>
+                </thead>
+
+                <tbody>
+                    <row>
+                    <entry>box.index.ITER_ALL</entry>
+                    <entry>none</entry>
+                    <entry>yes</entry>
+                    <entry>yes</entry>
+                    <entry>Iterate over all tuples in the index. In general, <emphasis>tuples order is not defined</emphasis>. However, implementation guarantees that for TREE index this strategy is equivalent to ITER_GE with <code>nil</code> key.</entry>
+                    </row>
+
+                    <row>
+                    <entry>box.index.ITER_EQ</entry>
+                    <entry>key, ...</entry>
+                    <entry>yes</entry>
+                    <entry>yes</entry>
+                    <entry>Iterate over tuples where <code>tuple.key == key</code>. The &quot;tail&quot; part of the key can be omitted if partial keys are supported by the index. <emphasis>The sort order for non-unique indexes or indexes with multi-part keys is not defined</emphasis>, please do not rely on that. At least one part of the key must be specified, i.e. <code>nil</code> key is not supported.</entry>
+                    </row>
+
+                    <row>
+                    <entry>box.index.ITER_LE</entry>
+                    <entry>key, ...</entry>
+                    <entry>yes</entry>
+                    <entry>no</entry>
+                    <entry>Iterate over tuples where <code>tuple.key &lt;= key</code> in ascending order. The &quot;tail&quot; part of the key can be omitted if partial keys are supported by the index. If key is not specified (or <code>nil</code>), the key will be interpreted as a first value of the index. Therefore, you can use <code>nil</code> to iterate over all tuples in the index in ascending order.</entry>
+                    </row>
+
+                    <row>
+                    <entry>box.index.ITER_LT</entry>
+                    <entry>key, ...</entry>
+                    <entry>yes</entry>
+                    <entry>no</entry>
+                    <entry>Iterate over tuples where <code>tuple.key &lt; key</code> in ascending order. The &quot;tail&quot; part of the key can be omitted if partial keys are supported by the index. If key is not specified (or <code>nil</code>), the key will be interpreted as a first value of the index. Therefore, you can use <code>nil</code> to iterate over all tuples in the index in ascending order.</entry>
+                    </row>
+
+                    <row>
+                    <entry>box.index.ITER_GE</entry>
+                    <entry>key, ...</entry>
+                    <entry>yes</entry>
+                    <entry>no</entry>
+                    <entry>Iterate over tuples where <code>tuple.key &gt;= key</code> in descending order. The &quot;tail&quot; part of the key can be omitted if partial keys are supported by the index. If key is not specified (or <code>nil</code>), the key will be interpreted as a last value of the index. Therefore, you can use <code>nil</code> to iterate over all tuples in the index in descending order.</entry>
+                    </row>
+
+                    <row>
+                    <entry>box.index.ITER_GT</entry>
+                    <entry>key, ...</entry>
+                    <entry>yes</entry>
+                    <entry>no</entry>
+                    <entry>Iterate over tuples where <code>tuple.key &gt; key</code> in descending order. The tail part of the key can be omitted if partial keys are supported by the index. If key is not specified (or <code>nil</code>), the key will be interpreted as a last value of the index. Therefore, you can use <code>nil</code> to iterate over all tuples in the index in descending order.</entry>
+                    </row>
+                </tbody>
+
+                </tgroup>
+            </table>
+            <simpara>This strategies are internally used for 
+                construction various high-level APIs, such as
+                <code xlink:href="#box.select">box.select</code> or
+                <code xlink:href="#box.index">box.select_range</code>.
+                The implementation guarantees that
+                <code xlink:href="#box.select">box.select</code>
+                semantics is equivalent to ITER_EQ semantics,
+                <code xlink:href="#box.select_range">box.select_range</code>
+                semantics is equivalent to ITER_GE semantics (with added limit)
+                and <code xlink:href="#box.select_reverse_range">box.select_reverse_range</code>
+                semantics is equivalent to ITER_LE semantics (with added limit).
+            </simpara>
+            <para>
+                <bridgehead renderas="sect4">Examples</bridgehead>
+<programlisting>
+localhost> show configuration
+---
+...
+  space[0].enabled: "true"
+  space[0].index[0].type: "HASH"
+  space[0].index[0].unique: "true"
+  space[0].index[0].key_field[0].fieldno: "0"
+  space[0].index[0].key_field[0].type: "NUM"
+  space[0].index[1].type: "TREE"
+  space[0].index[1].unique: "false"
+  space[0].index[1].key_field[0].fieldno: "1"
+  space[0].index[1].key_field[0].type: "NUM"
+  space[0].index[1].key_field[1].fieldno: "2"
+  space[0].index[1].key_field[1].type: "NUM"
+...
+localhost> INSERT INTO t0 VALUES (1, 1, 0)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (2, 1, 1)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (3, 1, 2)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (4, 2, 0)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (5, 2, 1)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (6, 2, 2)
+Insert OK, 1 rows affected
+localhost> lua iter = box.space[0].index[1]:iter(box.index.ITER_EQ, 1); print(iter(), iter(), iter());
+---
+1: {1, 0}2: {1, 1}3: {1, 2}
+...
+localhost> lua iter = box.space[0].index[1]:iter(box.index.ITER_EQ, 1, 2); print(iter(), iter(), iter());
+---
+3: {1, 2}nilnil
+...
+localhost> lua iter = box.space[0].index[1]:iter(box.index.ITER_GE, 2, 1); print(iter(), iter(), iter());
+---
+5: {2, 1}6: {2, 2}nil
+...
+localhost> lua for v in box.space[0].index[1]:iter(box.index.ITER_ALL) do print(v) end
+---
+1: {1, 0}
+2: {1, 1}
+3: {1, 2}
+4: {2, 0}
+5: {2, 1}
+6: {2, 2}
+...
+localhost> lua iter = box.space[0].index[0]:iter(box.index.ITER_LT, 1);
+---
+error: 'Illegal parameters, unsupported strategy'
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua"
+            xml:id="box.index.select_range" xreflabel="box.index.select_range">
+            index:select_range(limit, key)</emphasis>
+        </term>
+        <listitem><simpara>
+            Select a range of tuples, starting from offset specified by
+            <code>key</code>. The key can be multipart.
+            Limit selection with at most <code>limit</code> tuples.
+            If no key is specified, start from the first key in the index.
+        </simpara><simpara>
+            For TREE indexes, this returns tuples in sorted order.
+            For other indexes, the order of tuples is unspecified, and
+            can change significantly if data is inserted or deleted
+            between two calls to <code>select_range()</code>.
+            If <code>key</code> is <code>nil</code> or unspecified,
+            the selection starts from the start of the index.
         </simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">space:select_reverse_range(limit, key)</emphasis>
+            <emphasis role="lua"
+            xml:id="box.index.select_reverse_range"
+            xreflabel="box.index.select_reverse_range">
+            index:select_reverse_range(limit, key)</emphasis>
         </term>
         <listitem><simpara>Select a reverse range of tuples, limited by
         <code>limit</code>, starting from <code>key</code>.
@@ -1229,10 +1418,26 @@ xreflabel="box.index">box.index</code></title>
         </simpara>
         </listitem>
     </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">index:count()</emphasis>
+        </term>
+        <listitem><simpara>
+        Iterate over an index, count the number of tuples which equal the
+        provided search criteria. The argument can either point to a
+        tuple, a key, or one or more key parts. Returns the number of matched
+        tuples.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
 </variablelist>
 
 <para>
-    The following functions provide iteration support within an index.
+    <emphasis>The following methods of box.index are deprecated and will be
+    removed in future releases, please use
+    <code xlink:href="#box.index.iter">box.index.iter</code> instead!</emphasis>
     <code>next</code> and <code>next_equal</code> provide common
     iterators which go from the beginning to the end of the index.
     <code>prev</code> and <code>prev_equal</code> provide reverse
@@ -1240,6 +1445,7 @@ xreflabel="box.index">box.index</code></title>
     In a non-unique index the routines with the <code>'_equal'</code>
     suffix will traverse sequences of tuples with the same key value.
 </para>
+
 <variablelist>
     <varlistentry>
         <term>
@@ -1285,110 +1491,8 @@ from the first (last) tuple in the index.
 	    end of the index or there are no more tuples satisfying the
 	    <code>key</code> (for <code>_equal</code> functions).
         </para>
-        <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-localhost> lua box.insert(0, "United Kingdom, The", "Europe")
-localhost> lua box.insert(0, "France", "Europe")
-localhost> lua box.insert(0, "Netherlands", "Europe")
-localhost> lua box.insert(0, "Australia", "Oceania")
-localhost> lua box.insert(0, "Vanuatu", "Oceania")
-localhost> lua box.insert(0, "United States of America, The", "North America")
-localhost> lua box.insert(0, "Canada", "North America")
-localhost> lua box.insert(0, "Mexico", "North America")
-localhost> lua pi = box.space[0].index[0] -- primary index
-localhost> lua si = box.space[0].index[1] -- secondary index
-localhost> lua k,v=pi:next() -- init iterator by primary from the beginning
----
-...
-localhost> lua print(v)
----
-'Australia': {'Oceania'}
-...
-localhost> lua k,v=pi:next(k) -- move to next
----
-...
-localhost> lua print(v)
----
-'Canada': {'North America'}
-...
-localhost> lua k,v=pi:next(k) -- move to next
----
-...
-localhost> lua print(v)
----
-'France': {'Europe'}
-...
-localhost> lua k,v=si:next_equal() -- init iterator by secondary from the beginning
----
-...
-localhost> lua print(v)
----
-'United Kingdom, The': {'Europe'}
-...
-localhost> lua k,v=si:next_equal(k) -- move to next
----
-...
-localhost> lua print(v)
----
-'France': {'Europe'}
-...
-localhost> lua k,v=si:next_equal(k) -- move to next
----
-...
-localhost> lua print(v)
----
-'Netherlands': {'Europe'}
-...
-localhost> lua for k,v in pi.next, pi, nil do print(v) end
----
-'Australia': {'Oceania'}
-'Canada': {'North America'}
-'France': {'Europe'}
-'Mexico': {'North America'}
-'Netherlands': {'Europe'}
-'United Kingdom, The': {'Europe'}
-'United States of America, The': {'North America'}
-'Vanuatu': {'Oceania'}
-...
-localhost> lua for k,v in pi.prev, pi, nil do print(v) end
----
-'Vanuatu': {'Oceania'}
-'United States of America, The': {'North America'}
-'United Kingdom, The': {'Europe'}
-'Netherlands': {'Europe'}
-'Mexico': {'North America'}
-'France': {'Europe'}
-'Canada': {'North America'}
-'Australia': {'Oceania'}
-...
-localhost> lua for k,v in si.next_equal, si, 'Oceania' do print(v) end
----
-'Australia': {'Oceania'}
-'Vanuatu': {'Oceania'}
-...
-localhost> lua for k,v in si.prev_equal, si, 'North America' do print(v) end
----
-'Mexico': {'North America'}
-'Canada': {'North America'}
-'United States of America, The': {'North America'}
-...
-</programlisting>
         </listitem>
     </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">index:count()</emphasis>
-        </term>
-        <listitem><simpara>
-	    Iterate over an index, count the number of tuples which equal the
-	    provided search criteria. The argument can either point to a
-	    tuple, a key, or one or more key parts. Returns the number of matched
-	    tuples.
-        </simpara>
-        </listitem>
-    </varlistentry>
-
 </variablelist>
 
 <variablelist>
