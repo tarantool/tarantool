@@ -74,8 +74,10 @@ endif()
 #
 check_c_compiler_flag("-Wno-unused-result" CC_HAS_WNO_UNUSED_RESULT)
 check_c_compiler_flag("-Wno-unused-value" CC_HAS_WNO_UNUSED_VALUE)
-check_c_compiler_flag("-Wno-bitwise-op-parentheses"
-CC_HAS_WNO_WNO_BITWISE_OP_PARENTHESES)
+check_c_compiler_flag("-fno-strict-aliasing" CC_HAS_FNO_STRICT_ALIASING)
+check_c_compiler_flag("-Wno-comment" CC_HAS_WNO_COMMENT)
+
+check_c_compiler_flag("-Wno-parentheses" CC_HAS_WNO_PARENTHESES)
 
 #
 # Tarantool code is written in GNU C dialect.
