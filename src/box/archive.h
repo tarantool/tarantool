@@ -1,19 +1,19 @@
 #ifndef INCLUDES_TARANTOOL_ARCHIVE_H
 #define INCLUDES_TARANTOOL_ARCHIVE_H
-#include "tuple.h"
-#include "txn.h"
+#include <util.h>
 
-void arc_init(const char *arc_dirname,const char *arc_filename_format);
+struct txn;
+struct tuple;
 
-int arc_write(u32 space,u64 cookie,struct tuple *tuple);
+void arc_init(const char *arc_dirname,const char *arc_filename_format, double fsync_delay);
 
 void arc_do_txn(struct txn *txn);
-
-void *arc_writer_thread(void *args);
 
 void arc_free();
 
 int arc_start();
+
+void arc_save_real_tm(double tm);
 
 
 #endif

@@ -39,6 +39,7 @@ extern const u32 default_version;
 
 enum log_format { XLOG = 65534, SNAP = 65535, ARCH = 65533 };
 
+
 enum log_mode {
 	LOG_READ,
 	LOG_WRITE
@@ -77,6 +78,9 @@ struct log_io {
 
 	bool is_inprogress;
 };
+
+
+int log_io_write_header(struct log_io *l);
 
 struct log_io *
 log_io_open_for_read(struct log_dir *dir, i64 lsn, enum log_suffix suffix);

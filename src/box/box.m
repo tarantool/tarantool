@@ -64,12 +64,7 @@ static char status[64] = "unknown";
 
 static int stat_base;
 
-struct box_snap_row {
-	u32 space;
-	u32 tuple_size;
-	u32 data_size;
-	u8 data[];
-} __attribute__((packed));
+
 
 static inline struct box_snap_row *
 box_snap_row(const struct tbuf *t)
@@ -270,7 +265,8 @@ static int
 recover_row(void *param __attribute__((unused)), struct tbuf *t)
 {
 	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL) {
+    struct header_v11 *header = tbuf_peek(t, sizeof(struct header_v11));
+    if (header == NULL) {
 		say_error("incorrect row header: expected %zd, got %zd bytes",
 			  sizeof(struct header_v11), (size_t) t->size);
 		return -1;
@@ -283,6 +279,7 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 			recover_snap_row(t);
 		} else if (tag == XLOG) {
 			u16 op = read_u16(t);
+            arc_save_real_tm(header->tm);
 			box_process_rw(&port_null, op, t);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
@@ -451,7 +448,7 @@ mod_init(void)
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
-    arc_init(cfg.archive_dir,cfg.archive_filename_pattern);
+    arc_init(cfg.archive_dir,cfg.archive_filename_pattern,-1.0);
 	
 	stat_base = stat_register(requests_strs, requests_MAX);
 

@@ -37,6 +37,13 @@ typedef void (*mod_process_func)(struct port *, u32, struct tbuf *);
 extern mod_process_func mod_process;
 extern mod_process_func mod_process_ro;
 
+struct box_snap_row {
+    u32 space;
+    u32 tuple_size;
+    u32 data_size;
+    u8 data[];
+} __attribute__((packed));
+
 void
 mod_leave_local_standby_mode(void *data __attribute__((unused)));
 
