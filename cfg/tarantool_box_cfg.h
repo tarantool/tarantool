@@ -103,6 +103,8 @@ typedef struct tarantool_cfg {
 	/* archive file format for strftime default is %Y-%m-%d */
 	char*	archive_filename_pattern;
 
+	/* delay between archive files fsync */
+	double archive_fsync_delay;
 
 	/* name of pid file */
 	char*	pid_file;

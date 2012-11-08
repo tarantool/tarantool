@@ -448,7 +448,7 @@ mod_init(void)
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
-    arc_init(cfg.archive_dir,cfg.archive_filename_pattern,-1.0);
+    arc_init(cfg.archive_dir,cfg.archive_filename_pattern,cfg.archive_fsync_delay);
 	
 	stat_base = stat_register(requests_strs, requests_MAX);
 

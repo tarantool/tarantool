@@ -44,6 +44,7 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->script_dir = NULL;
 	c->archive_dir = NULL;
 	c->archive_filename_pattern = NULL;
+	c->archive_fsync_delay = 0.0;
 	c->pid_file = NULL;
 	c->logger = NULL;
 	c->logger_nonblock = false;
@@ -93,10 +94,10 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	if (c->wal_dir == NULL) return CNF_NOMEMORY;
 	c->script_dir = strdup(".");
 	if (c->script_dir == NULL) return CNF_NOMEMORY;
-	c->archive_dir = strdup(".");
-	if (c->archive_dir == NULL) return CNF_NOMEMORY;
+	c->archive_dir = NULL;
 	c->archive_filename_pattern = strdup("%Y-%m-%d");
 	if (c->archive_filename_pattern == NULL) return CNF_NOMEMORY;
+	c->archive_fsync_delay = 0.0;
 	c->pid_file = strdup("tarantool.pid");
 	if (c->pid_file == NULL) return CNF_NOMEMORY;
 	c->logger = NULL;
@@ -207,6 +208,9 @@ static NameAtom _name__archive_dir[] = {
 };
 static NameAtom _name__archive_filename_pattern[] = {
 	{ "archive_filename_pattern", -1, NULL }
+};
+static NameAtom _name__archive_fsync_delay[] = {
+	{ "archive_fsync_delay", -1, NULL }
 };
 static NameAtom _name__pid_file[] = {
 	{ "pid_file", -1, NULL }
@@ -569,6 +573,16 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->archive_filename_pattern = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->archive_filename_pattern == NULL)
 			return CNF_NOMEMORY;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__archive_fsync_delay) ) {
+		if (opt->paramType != scalarType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		double dbl = strtod(opt->paramValue.scalarval, NULL);
+		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
+			return CNF_WRONGRANGE;
+		c->archive_fsync_delay = dbl;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__script_dir) ) {
 		if (opt->paramType != scalarType )
