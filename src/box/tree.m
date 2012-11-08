@@ -785,8 +785,8 @@ tree_iterator_reverse_next_great(struct iterator *iterator)
 
 	void *node = NULL;
 	while ((node = sptree_index_iterator_reverse_next(it->iter)) != NULL) {
-		if (it->index->tree.compare(&it->key_data, node, it->index)
-				!= 0) {
+		if (it->key_data.part_count == 0 || it->index->tree.compare(
+			&it->key_data, node, it->index) != 0) {
 			it->base.next = tree_iterator_reverse_next;
 			return [it->index unfold: node];
 		}
@@ -818,8 +818,8 @@ tree_iterator_next_great(struct iterator *iterator)
 
 	void *node = NULL;
 	while ((node = sptree_index_iterator_next(it->iter)) != NULL) {
-		if (it->index->tree.compare(&it->key_data, node, it->index)
-				!= 0) {
+		if (it->key_data.part_count == 0 || it->index->tree.compare(
+			&it->key_data, node, it->index) != 0) {
 			it->base.next = tree_iterator_next;
 			return [it->index unfold: node];
 		}
