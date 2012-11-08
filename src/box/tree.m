@@ -995,8 +995,7 @@ tree_iterator_next_great(struct iterator *iterator)
 	switch (strategy) {
 	case ITER_EQ:
 		if (key == NULL) {
-			tnt_raise(ClientError, :ER_KEY_PART_COUNT,
-				part_count, key_def->part_count);
+			tnt_raise(ClientError, :ER_EXACT_MATCH, 0, 1);
 		}
 
 		it->base.next = tree_iterator_next_equal;
