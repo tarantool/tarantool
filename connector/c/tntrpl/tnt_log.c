@@ -218,7 +218,7 @@ tnt_log_open(struct tnt_log *l, char *file, enum tnt_log_type type)
 {
 	char filetype[32];
 	char version[32];
-	char *rc, *magic;
+	char *rc, *magic = "\0";
 	l->type = type;
 	/* trying to open file */
 	l->fd = fopen(file, "r");
