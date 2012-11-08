@@ -130,6 +130,7 @@ void arc_init(const char *arc_dirname,const char *arc_filename_patter, double fs
     archive_state->fsync_deplay = fsync_delay;
     archive_state->arc_dir->dirname = strdup(arc_dirname);
     archive_state->batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
+    fio_batch_start(archive_state->batch,ARC_BATCH_MAX_ROWS);
     if(archive_state->batch == NULL) {
         panic_syserror("fio_batch_alloc");
     }
@@ -155,7 +156,7 @@ void arc_init(const char *arc_dirname,const char *arc_filename_patter, double fs
 
 char* arc_get_filename_for_time(double action_time) {
     static __thread char filename[PATH_MAX + 1];
-    char name[ARC_NAME_MAX_LEN + 1];
+    static __thread char name[ARC_NAME_MAX_LEN + 1];
     memset(name, 0, PATH_MAX+1);
     memset(filename, 0, PATH_MAX+1);
     time_t time=(time_t)action_time;
@@ -173,6 +174,7 @@ struct log_io *arc_create_io_from_file(struct log_dir *dir,const char *filename,
     l->f = file;
     strncpy(l->filename, filename, PATH_MAX);
     l->dir = dir;
+    l->mode = LOG_WRITE;
     return l;
 }
 
@@ -194,16 +196,17 @@ void arc_new_io(char* filename) {
         do {
             size_t n=strrchr(filename,'-') - filename;
             strncpy(newfilename,filename,n);
-            int len=snprintf(newsuffix,PATH_MAX,"-%d%s",i,archive_state->arc_dir->filename_ext);
+            int len=snprintf(newsuffix,PATH_MAX,"-%04d%s",i,archive_state->arc_dir->filename_ext);
             strncpy(newfilename+n,newsuffix, len);
             i++;
-        } while(rename(filename,newfilename)!=0 && i<100);
+        } while(rename(filename,newfilename)!=0 && i<10000);
     }
     int fd = open(filename, O_CREAT |  O_APPEND | O_WRONLY | archive_state -> arc_dir->open_wflags, 0664);
     if (fd > 0) {
         FILE *f = fdopen(fd, "a");
         archive_state -> current_io = arc_create_io_from_file(archive_state -> arc_dir, filename, f);
         log_io_write_header(archive_state->current_io);
+        fflush(archive_state->current_io->f);
     } else {
         say_syserror("%s: failed to open `%s'", __func__, filename);
     }
@@ -240,10 +243,10 @@ struct arc_write_request* arc_create_write_request(u32 space, u64 cookie, struct
     struct row_v11 *row = &request->row;
     request->callback_fiber = fiber;
     request->res = -1;
+    row_v11_fill ( row, 0, ARCH, cookie, &metadata, sizeof ( struct box_snap_row ), tuple->data, tuple->bsize );
     if(tm > 0) {
         row->header.tm = tm;
     }
-    row_v11_fill ( row, 0, ARCH, cookie, &metadata, sizeof ( struct box_snap_row ), tuple->data, tuple->bsize );
     header_v11_sign ( &row->header );
     return request;
 }
@@ -358,6 +361,9 @@ void *arc_writer_thread(void *args) {
         ev_async_send(&arc_state->wakeup_fibers);
     }
     if (arc_state->current_io != NULL)
+        if(arc_state->batch->rows > 0) {
+            arc_flush_batch();
+        }
         log_io_close(&arc_state->current_io);
 
     return NULL;
