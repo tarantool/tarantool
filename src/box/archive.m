@@ -193,14 +193,17 @@ void arc_new_io(char* filename) {
     bool file_exists = (access(filename,W_OK)==0);
     if(file_exists) {
         say_info("archive with name `%s` found, trying to rename",filename);
-        int i=0;
-        do {
+        for(int i=0;i<1000;i++) {
             size_t n=strrchr(filename,'-') - filename;
             strncpy(newfilename,filename,n);
             int len=snprintf(newsuffix,PATH_MAX,"-%04d%s",i,archive_state->arc_dir->filename_ext);
             strncpy(newfilename+n,newsuffix, len);
-            i++;
-        } while(rename(filename,newfilename)!=0 && i<10000);
+           if(access(newfilename,W_OK)==-1) {
+               rename(filename,newfilename);
+               say_info("renaming old one to `%s`",newfilename);
+               break;
+           }
+        }
     }
     int fd = open(filename, O_CREAT |  O_APPEND | O_WRONLY | archive_state -> arc_dir->open_wflags, 0664);
     if (fd > 0) {
@@ -288,8 +291,8 @@ void arc_batch_write(struct arc_write_request *request,bool is_flush_after) {
     fio_batch_add(batch,&request->row,row_v11_size(&request->row));
     request->res = 0;
     if(fio_batch_is_full(batch) || is_flush_after) {
-        arc_flush_batch();
         archive_state->not_synced_rows+=batch->rows;
+        arc_flush_batch();
         if(archive_state->fsync_deplay == 0 ) {
             log_io_sync(archive_state -> current_io);
             archive_state->not_synced_rows = 0;
@@ -327,7 +330,7 @@ bool arc_read_input(struct arc_state *arc_state,struct arc_fifo *queue) {
     bool result = false;
     tt_pthread_mutex_lock(&arc_state->mutex);
     while(!arc_state -> is_shutdown) {
-        if(arc_state->not_synced_rows > 0 && arc_state->fsync_deplay > 0 && arc_state->current_io!=NULL && ev_now() - arc_state -> last_fsync > arc_state->fsync_deplay) {
+        if(arc_state->not_synced_rows > 0 && arc_state->fsync_deplay > 0 && arc_state->current_io!=NULL && (ev_time() - arc_state -> last_fsync >= arc_state->fsync_deplay - 0.01)) {
             log_io_sync(arc_state->current_io);
             arc_state->last_fsync = ev_now();
             arc_state->not_synced_rows = 0;
@@ -340,8 +343,8 @@ bool arc_read_input(struct arc_state *arc_state,struct arc_fifo *queue) {
             if(arc_state->not_synced_rows > 0 && arc_state -> fsync_deplay > 0 && arc_state->current_io != NULL) {
                 double next_sync = arc_state->last_fsync + archive_state->fsync_deplay;
                 timeout.tv_sec = (time_t)next_sync;
-                timeout.tv_nsec = (next_sync - timeout.tv_sec)*1000000;
-                (void) tt_pthread_cond_timedwait(&arc_state->queue_not_empty, &arc_state->mutex,&timeout);
+                timeout.tv_nsec = (u64)((next_sync - (double)timeout.tv_sec)*1000000000.0);
+                tt_pthread_cond_timedwait(&arc_state->queue_not_empty, &arc_state->mutex,&timeout);
             } else {
                 tt_pthread_cond_wait(&arc_state->queue_not_empty, &arc_state->mutex);
             }
