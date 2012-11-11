@@ -123,34 +123,35 @@ bool is_any_archive_exists() {
 
 void arc_init(const char *arc_dirname,const char *arc_filename_patter, double fsync_delay) {
     assert(archive_state == NULL);
+    if(arc_dirname != NULL) {
+        archive_state = p0alloc(eter_pool, sizeof(struct arc_state));
+        archive_state->arc_dir = &arc_dir;
+        archive_state->filename_format = strdup(arc_filename_patter);
+        archive_state->fsync_deplay = fsync_delay;
+        archive_state->arc_dir->dirname = strdup(arc_dirname);
+        archive_state->batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
+        fio_batch_start(archive_state->batch,ARC_BATCH_MAX_ROWS);
+        if(archive_state->batch == NULL) {
+            panic_syserror("fio_batch_alloc");
+        }
 
-    archive_state = p0alloc(eter_pool, sizeof(struct arc_state));
-    archive_state->arc_dir = &arc_dir;
-    archive_state->filename_format = strdup(arc_filename_patter);
-    archive_state->fsync_deplay = fsync_delay;
-    archive_state->arc_dir->dirname = strdup(arc_dirname);
-    archive_state->batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
-    fio_batch_start(archive_state->batch,ARC_BATCH_MAX_ROWS);
-    if(archive_state->batch == NULL) {
-        panic_syserror("fio_batch_alloc");
-    }
+        pthread_mutexattr_t errorcheck;
 
-    pthread_mutexattr_t errorcheck;
+        (void) tt_pthread_mutexattr_init(&errorcheck);
 
-    (void) tt_pthread_mutexattr_init(&errorcheck);
+        (void) tt_pthread_mutex_init(&archive_state->mutex, &errorcheck);
+        (void) tt_pthread_cond_init(&archive_state->queue_not_empty,NULL);
 
-    (void) tt_pthread_mutex_init(&archive_state->mutex, &errorcheck);
-    (void) tt_pthread_cond_init(&archive_state->queue_not_empty,NULL);
+        (void) tt_pthread_mutexattr_destroy(&errorcheck);
 
-    (void) tt_pthread_mutexattr_destroy(&errorcheck);
+        ev_async_init(&archive_state->wakeup_fibers, (void *)arc_wakeup_fibers);
+        archive_state->wakeup_fibers.data = archive_state;
 
-    ev_async_init(&archive_state->wakeup_fibers, (void *)arc_wakeup_fibers);
-    archive_state->wakeup_fibers.data = archive_state;
-
-    STAILQ_INIT(&archive_state->input_queue);
-    STAILQ_INIT(&archive_state->processed_queue);
-    if(!is_any_archive_exists()) {
-        archive_state -> is_save_recovery = true;
+        STAILQ_INIT(&archive_state->input_queue);
+        STAILQ_INIT(&archive_state->processed_queue);
+        if(!is_any_archive_exists()) {
+            archive_state -> is_save_recovery = true;
+        }
     }
 }
 
@@ -217,18 +218,20 @@ void arc_new_io(char* filename) {
 
 
 void arc_free() {
-    say_info("stopping archive module");
-    tt_pthread_mutex_lock(&archive_state->mutex);
-    archive_state -> is_shutdown = true;
-    tt_pthread_cond_signal(&archive_state->queue_not_empty);
-    tt_pthread_mutex_unlock(&archive_state->mutex);
-    if (tt_pthread_join(archive_state->worker_thread, NULL) != 0) {
-        panic_syserror("Archive: thread join failed");
+    if(archive_state!=NULL) {
+        say_info("stopping archive module");
+        tt_pthread_mutex_lock(&archive_state->mutex);
+        archive_state -> is_shutdown = true;
+        tt_pthread_cond_signal(&archive_state->queue_not_empty);
+        tt_pthread_mutex_unlock(&archive_state->mutex);
+        if (tt_pthread_join(archive_state->worker_thread, NULL) != 0) {
+            panic_syserror("Archive: thread join failed");
+        }
+        tt_pthread_mutex_destroy(&archive_state->mutex);
+        tt_pthread_cond_destroy(&archive_state->queue_not_empty);
+        free(archive_state->batch);
+        ev_async_stop(&archive_state->wakeup_fibers);
     }
-    tt_pthread_mutex_destroy(&archive_state->mutex);
-    tt_pthread_cond_destroy(&archive_state->queue_not_empty);
-    free(archive_state->batch);
-    ev_async_stop(&archive_state->wakeup_fibers);
 }
 
 struct arc_write_request* arc_create_write_request(u32 space, u64 cookie, struct tuple *tuple,double tm) {
@@ -301,18 +304,22 @@ void arc_write(u32 space, u64 cookie, struct tuple *tuple,double tm) {
 }
 
 void arc_do_txn(struct txn *txn) {
-    if(txn->op == DELETE && txn->old_tuple) {
-        if(archive_state -> is_started) {
-            arc_schedule_write(txn->space->no,0,txn->old_tuple);
-        } else if(archive_state->is_save_recovery) {
-            arc_write(txn->space->no,0,txn->old_tuple,archive_state->xlog_tm);
-            archive_state->xlog_tm = 0;
+    if(archive_state != NULL) {
+        if(txn->op == DELETE && txn->old_tuple) {
+            if(archive_state -> is_started) {
+                arc_schedule_write(txn->space->no,0,txn->old_tuple);
+            } else if(archive_state->is_save_recovery) {
+                arc_write(txn->space->no,0,txn->old_tuple,archive_state->xlog_tm);
+                archive_state->xlog_tm = 0;
+            }
         }
     }
 }
 
 void arc_save_real_tm(double tm) {
-    archive_state->xlog_tm = tm;
+    if(archive_state!=NULL) {
+        archive_state->xlog_tm = tm;
+    }
 }
 
 bool arc_read_input(struct arc_state *arc_state,struct arc_fifo *queue) {
@@ -331,7 +338,9 @@ bool arc_read_input(struct arc_state *arc_state,struct arc_fifo *queue) {
             break;
         } else {
             if(arc_state->not_synced_rows > 0 && arc_state -> fsync_deplay > 0 && arc_state->current_io != NULL) {
-                timeout.tv_sec = arc_state->last_fsync + archive_state->fsync_deplay;
+                double next_sync = arc_state->last_fsync + archive_state->fsync_deplay;
+                timeout.tv_sec = (time_t)next_sync;
+                timeout.tv_nsec = (next_sync - timeout.tv_sec)*1000000;
                 (void) tt_pthread_cond_timedwait(&arc_state->queue_not_empty, &arc_state->mutex,&timeout);
             } else {
                 tt_pthread_cond_wait(&arc_state->queue_not_empty, &arc_state->mutex);
@@ -364,23 +373,25 @@ void *arc_writer_thread(void *args) {
         if(arc_state->batch->rows > 0) {
             arc_flush_batch();
         }
-        log_io_close(&arc_state->current_io);
+    log_io_close(&arc_state->current_io);
 
     return NULL;
 }
 
 int arc_start() {
-    if(!archive_state -> is_started) {
-        ev_async_start(&archive_state->wakeup_fibers);
-        if (tt_pthread_create(&archive_state->worker_thread, NULL, &arc_writer_thread,archive_state)) {
-            return -1;
+    if(archive_state != NULL) {
+        if(!archive_state -> is_started) {
+            ev_async_start(&archive_state->wakeup_fibers);
+            if (tt_pthread_create(&archive_state->worker_thread, NULL, &arc_writer_thread,archive_state)) {
+                return -1;
+            }
+            archive_state -> is_started = true;
         }
-        archive_state -> is_started = true;
+        if(archive_state->batch->rows > 0) {
+            arc_flush_batch(archive_state->batch);
+        }
+        archive_state->is_save_recovery = false;
     }
-    if(archive_state->batch->rows > 0) {
-        arc_flush_batch(archive_state->batch);
-    }
-    archive_state->is_save_recovery = false;
     return 0;
 }
 
