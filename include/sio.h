@@ -81,7 +81,7 @@ const char *sio_strfaddr(struct sockaddr_in *addr);
  * @return                offset of iov[0] for the next write
  */
 static inline int
-sio_move_iov(struct iovec *iov, ssize_t nwr, ssize_t *iov_len)
+sio_move_iov(struct iovec *iov, ssize_t nwr, size_t *iov_len)
 {
 	nwr += *iov_len;
 	struct iovec *begin = iov;

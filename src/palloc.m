@@ -478,6 +478,12 @@ palloc_set_name(struct palloc_pool *pool, const char *name)
 	snprintf(pool->name, sizeof(pool->name), "%s", name);
 }
 
+const char *
+palloc_name(struct palloc_pool *pool)
+{
+	return pool->name;
+}
+
 size_t
 palloc_allocated(struct palloc_pool *pool)
 {

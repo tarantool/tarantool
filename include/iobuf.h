@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include <sys/uio.h>
+#include <stdbool.h>
 #include "util.h"
 #include "third_party/queue.h"
 
@@ -216,6 +217,13 @@ iobuf_flush(struct iobuf *iobuf, struct ev_io *coio);
  */
 void
 iobuf_gc(struct iobuf *iobuf);
+
+/** Return true if there is no input and no output. */
+static inline bool
+iobuf_is_idle(struct iobuf *iobuf)
+{
+	return ibuf_size(&iobuf->in) == 0 && obuf_size(&iobuf->out) == 0;
+}
 
 /**
  * Network readahead. A signed integer to avoid

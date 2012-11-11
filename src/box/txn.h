@@ -59,6 +59,7 @@ enum tuple_flags {
 
 struct txn *txn_begin();
 void txn_commit(struct txn *txn);
+void txn_finish(struct txn *txn);
 void txn_rollback(struct txn *txn);
 void txn_add_redo(struct txn *txn, u16 op, struct tbuf *data);
 void txn_add_undo(struct txn *txn, struct space *space,

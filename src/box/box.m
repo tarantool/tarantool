@@ -76,6 +76,14 @@ box_snap_row(const struct tbuf *t)
 	return (struct box_snap_row *)t->data;
 }
 
+void
+port_send_tuple(struct port *port, struct txn *txn, u32 flags)
+{
+	struct tuple *tuple;
+	if ((tuple = txn->new_tuple) || (tuple = txn->old_tuple))
+		port_add_tuple(port, tuple, flags);
+}
+
 static void
 box_process_rw(struct port *port,
 	       u32 op, struct tbuf *data)
@@ -88,12 +96,13 @@ box_process_rw(struct port *port,
 		stat_collect(stat_base, op, 1);
 		request_execute(request, txn, port);
 		txn_commit(txn);
-	}
-	@catch (id e) {
+		port_send_tuple(port, txn, request->flags);
+		port_eof(port);
+		txn_finish(txn);
+	} @catch (id e) {
 		txn_rollback(txn);
 		@throw;
-	}
-	@finally {
+	} @finally {
 		stop = ev_now();
 		if (stop - start > cfg.too_long_threshold)
 			say_warn("too long %s: %.3f sec",

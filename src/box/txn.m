@@ -107,6 +107,11 @@ txn_commit(struct txn *txn)
 		if (res)
 			tnt_raise(LoggedError, :ER_WAL_IO);
 	}
+}
+
+void
+txn_finish(struct txn *txn)
+{
 	if (txn->old_tuple)
 		tuple_ref(txn->old_tuple, -1);
 	if (txn->new_tuple)
