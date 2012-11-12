@@ -330,9 +330,10 @@ bool arc_read_input(struct arc_state *arc_state,struct arc_fifo *queue) {
     bool result = false;
     tt_pthread_mutex_lock(&arc_state->mutex);
     while(!arc_state -> is_shutdown) {
-        if(arc_state->not_synced_rows > 0 && arc_state->fsync_deplay > 0 && arc_state->current_io!=NULL && (ev_time() - arc_state -> last_fsync >= arc_state->fsync_deplay - 0.01)) {
+        double now;
+        if(arc_state->not_synced_rows > 0 && arc_state->fsync_deplay > 0 && arc_state->current_io!=NULL && ((now = ev_time()) - arc_state -> last_fsync >= arc_state->fsync_deplay - 0.01)) {
             log_io_sync(arc_state->current_io);
-            arc_state->last_fsync = ev_now();
+            arc_state->last_fsync = now;
             arc_state->not_synced_rows = 0;
         }
         if(!STAILQ_EMPTY(&arc_state->input_queue)) {
