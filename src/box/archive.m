@@ -20,9 +20,7 @@
 #ifndef ARC_NAME_MAX_LEN
 #define ARC_NAME_MAX_LEN 64
 #endif
-#ifndef ARC_BATCH_MAX_ROWS
-#define ARC_BATCH_MAX_ROWS 1024
-#endif
+
 
 /**
  * @brief The arc_write_request struct is used to schedule writes for io thread
@@ -270,7 +268,7 @@ void arc_init(const char *arc_dirname,const char *arc_filename_patter, double fs
         archive_state->fsync_delay = fsync_delay;
         archive_state->arc_dir->dirname = strdup(arc_dirname);
         archive_state->batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
-        fio_batch_start(archive_state->batch,ARC_BATCH_MAX_ROWS);
+        fio_batch_start(archive_state->batch,archive_state->batch->max_iov);
         if(archive_state->batch == NULL) {
             panic_syserror("fio_batch_alloc");
         }
@@ -414,7 +412,7 @@ void arc_flush_batch() {
     struct fio_batch *batch = archive_state->batch;
     if(batch->rows > 0) {
         fio_batch_write(batch,fileno(archive_state->current_io->f));
-        fio_batch_start(batch,ARC_BATCH_MAX_ROWS);
+        fio_batch_start(batch,archive_state->batch->max_iov);
     }
 
 }
@@ -443,7 +441,7 @@ void arc_batch_write(struct arc_write_request *request,bool is_flush_after) {
 
 void arc_write(u32 space, u64 cookie, struct tuple *tuple,double tm) {
     struct arc_write_request* request=arc_create_write_request(space,cookie,tuple,tm);
-    arc_batch_write(request,false);
+    arc_batch_write(request,true);
 }
 
 void arc_do_txn(struct txn *txn) {
@@ -532,7 +530,7 @@ int arc_start() {
             archive_state -> is_started = true;
         }
         if(archive_state->batch->rows > 0) {
-            arc_flush_batch(archive_state->batch);
+            arc_flush_batch();
         }
         archive_state->is_save_recovery = false;
     }
