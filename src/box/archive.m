@@ -228,11 +228,13 @@ void arc_wakeup_fibers(ev_watcher *watcher, int event __attribute__((unused))) {
 
     STAILQ_CONCAT(&queue,&arc_state->processed_queue);
     tt_pthread_mutex_unlock(&arc_state->mutex);
-    struct arc_write_request *request = STAILQ_FIRST(&queue);
-    do {
-        fiber_call(request->callback_fiber);
-        request = STAILQ_NEXT(request,fifo_entry);
-    } while(request!=NULL);
+    if(!STAILQ_EMPTY(&queue)) {
+        struct arc_write_request *request = STAILQ_FIRST(&queue);
+        do {
+            fiber_call(request->callback_fiber);
+            request = STAILQ_NEXT(request,fifo_entry);
+        } while(request!=NULL);
+    }
 
 
 }
@@ -336,11 +338,11 @@ void arc_new_io(char* filename) {
             strncpy(newfilename,filename,n);
             int len=snprintf(newsuffix,PATH_MAX,"-%04d%s",i,archive_state->arc_dir->filename_ext);
             strncpy(newfilename+n,newsuffix, len);
-           if(access(newfilename,W_OK)==-1) {
-               rename(filename,newfilename);
-               say_info("renaming old one to `%s`",newfilename);
-               break;
-           }
+            if(access(newfilename,W_OK)==-1) {
+                rename(filename,newfilename);
+                say_info("renaming old one to `%s`",newfilename);
+                break;
+            }
         }
     }
     int fd = open(filename, O_CREAT |  O_APPEND | O_WRONLY | archive_state -> arc_dir->open_wflags, 0664);
@@ -359,7 +361,7 @@ void arc_new_io(char* filename) {
 
 
 void arc_free() {
-    if(archive_state!=NULL) {
+    if(archive_state!=NULL && archive_state->is_started) {
         say_info("stopping archive module");
         tt_pthread_mutex_lock(&archive_state->mutex);
         archive_state -> is_shutdown = true;

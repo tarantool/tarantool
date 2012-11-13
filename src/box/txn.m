@@ -104,8 +104,8 @@ txn_commit(struct txn *txn)
 		int64_t lsn = next_lsn(recovery_state);
 		int res = wal_write(recovery_state, lsn, 0,
 				    txn->op, &txn->req);
-        arc_do_txn(txn);
 		confirm_lsn(recovery_state, lsn, res == 0);
+        arc_do_txn(txn);
 		if (res)
 			tnt_raise(LoggedError, :ER_WAL_IO);
 	}
