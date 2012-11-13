@@ -580,7 +580,6 @@ tarantool_free(void)
 	recovery_free();
 	stat_free();
 
-
 	if (cfg_filename_fullpath)
 		free(cfg_filename_fullpath);
 	if (main_opt)
