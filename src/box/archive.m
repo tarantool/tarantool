@@ -24,6 +24,9 @@
 #define ARC_BATCH_MAX_ROWS 1024
 #endif
 
+/**
+ * @brief The arc_write_request struct is used to schedule writes for io thread
+ */
 struct arc_write_request {
     STAILQ_ENTRY(arc_write_request) fifo_entry;
     struct fiber *callback_fiber;
@@ -33,34 +36,90 @@ struct arc_write_request {
 
 STAILQ_HEAD(arc_fifo, arc_write_request);
 
+/**
+ * @brief The arc_state struct is global state of archive module
+ */
 struct arc_state {
+    /**
+     * @brief current_io latest log_io
+     */
     struct log_io *current_io;
+    /**
+     * @brief arc_dir module folder, relative to process work_dir
+     */
     struct log_dir *arc_dir;
 
+    /**
+     * @brief filename_format date format pattern to name files
+     */
     char *filename_format;
 
+    /**
+     * @brief worker_thread worker thread used to reduce io wait of main event loop
+     */
     pthread_t worker_thread;
+    /**
+     * @brief queue_not_empty condition to signal that new element is pushed to queue
+     */
     pthread_cond_t queue_not_empty;
 
+    /**
+     * @brief mutex to safe exchange between threads
+     */
     pthread_mutex_t mutex;
 
+    /**
+     * @brief input_queue stores schedule requests
+     */
     struct arc_fifo input_queue;
 
+    /**
+     * @brief wakeup_fibers event to wakes up fibers waited in main thread
+     */
     ev_async wakeup_fibers;
+    /**
+     * @brief processed_queue stores processed requests when wakeup_fibers called
+     */
     struct arc_fifo processed_queue;
 
 
 
-
+    /**
+     * @brief is_shutdown
+     */
     bool is_shutdown;
+    /**
+     * @brief is_started
+     */
     bool is_started;
-
+    /**
+     * @brief batch current fio batch
+     */
     struct fio_batch *batch;
-    double fsync_deplay;
+
+    /**
+     * @brief fsync_deplay between fsyncs
+     */
+    double fsync_delay;
+
+    /**
+     * @brief last_fsync to calculate fsync intervals
+     */
     ev_tstamp last_fsync;
+
+    /**
+     * @brief not_synced_rows rows since last fsync
+     */
     int not_synced_rows;
 
+    /**
+     * @brief xlog_tm real time of current transaction.
+     */
     double xlog_tm;
+
+    /**
+     * @brief is_save_recovery to save or not to save deleted tuples during recovery
+     */
     bool is_save_recovery;
 };
 
@@ -76,7 +135,86 @@ struct log_dir arc_dir = {
 
 struct arc_state *archive_state;
 
+/**
+ * @brief arc_wakeup_fibers wakes up fibers waited for write operation
+ * @param watcher
+ * @param event
+ */
+void arc_wakeup_fibers(ev_watcher *watcher, int event __attribute__((unused)));
 
+/**
+ * @brief is_any_archive_exists checks that any archive file exists in arc_dir
+ * @return true or false
+ */
+bool is_any_archive_exists();
+
+/**
+ * @brief arc_get_filename_for_time creates filename for specified time
+ * @param action_time
+ * @return filename
+ */
+char* arc_get_filename_for_time(double action_time);
+/**
+ * @brief arc_create_io_from_file fills log_io structure
+ * @param dir
+ * @param filename
+ * @param file
+ * @return filled
+ */
+struct log_io *arc_create_io_from_file(struct log_dir *dir,const char *filename, FILE *file);
+/**
+ * @brief arc_new_io creates and set new log_io to global state with specified filename.
+ * @param filename
+ */
+void arc_new_io(char* filename);
+/**
+ * @brief arc_create_write_request creates request from specified params
+ * @param space
+ * @param cookie
+ * @param tuple
+ * @param tm
+ * @return
+ */
+struct arc_write_request* arc_create_write_request(u32 space, u64 cookie, struct tuple *tuple,double tm);
+/**
+ * @brief arc_schedule_write creates and schedule write of v11 row in io thread.
+ * @param space
+ * @param cookie
+ * @param tuple
+ * @return
+ */
+int arc_schedule_write( u32 space, u64 cookie, struct tuple *tuple);
+/**
+ * @brief arc_flush_batch flushes current batch
+ */
+void arc_flush_batch();
+/**
+ * @brief arc_batch_write writes specified request to batch
+ * @param request
+ * @param is_flush_after is flush batch after write
+ */
+void arc_batch_write(struct arc_write_request *request,bool is_flush_after);
+/**
+ * @brief arc_schedule_write creates and writes v11 row in current thread. Used when recovery running.
+ * @param space
+ * @param cookie
+ * @param tuple
+ * @return
+ */
+void arc_write(u32 space, u64 cookie, struct tuple *tuple,double tm);
+/**
+ * @brief arc_read_requests wait for requests and fsync io if has unmodified rows
+ * @param arc_state
+ * @param queue
+ * @return
+ */
+bool arc_read_requests(struct arc_state *arc_state,struct arc_fifo *queue);
+/**
+ * @brief arc_writer_thread io thread function
+ * @param args
+ * @return
+ */
+void *arc_writer_thread(void *args);
 
 
 
@@ -127,7 +265,7 @@ void arc_init(const char *arc_dirname,const char *arc_filename_patter, double fs
         archive_state = p0alloc(eter_pool, sizeof(struct arc_state));
         archive_state->arc_dir = &arc_dir;
         archive_state->filename_format = strdup(arc_filename_patter);
-        archive_state->fsync_deplay = fsync_delay;
+        archive_state->fsync_delay = fsync_delay;
         archive_state->arc_dir->dirname = strdup(arc_dirname);
         archive_state->batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
         fio_batch_start(archive_state->batch,ARC_BATCH_MAX_ROWS);
@@ -293,7 +431,7 @@ void arc_batch_write(struct arc_write_request *request,bool is_flush_after) {
     if(fio_batch_is_full(batch) || is_flush_after) {
         archive_state->not_synced_rows+=batch->rows;
         arc_flush_batch();
-        if(archive_state->fsync_deplay == 0 ) {
+        if(archive_state->fsync_delay == 0 ) {
             log_io_sync(archive_state -> current_io);
             archive_state->not_synced_rows = 0;
         }
@@ -325,13 +463,13 @@ void arc_save_real_tm(double tm) {
     }
 }
 
-bool arc_read_input(struct arc_state *arc_state,struct arc_fifo *queue) {
+bool arc_read_requests(struct arc_state *arc_state,struct arc_fifo *queue) {
     static __thread struct timespec timeout;
     bool result = false;
     tt_pthread_mutex_lock(&arc_state->mutex);
     while(!arc_state -> is_shutdown) {
         double now;
-        if(arc_state->not_synced_rows > 0 && arc_state->fsync_deplay > 0 && arc_state->current_io!=NULL && ((now = ev_time()) - arc_state -> last_fsync >= arc_state->fsync_deplay - 0.01)) {
+        if(arc_state->not_synced_rows > 0 && arc_state->fsync_delay > 0 && arc_state->current_io!=NULL && ((now = ev_time()) - arc_state -> last_fsync >= arc_state->fsync_delay - 0.01)) {
             log_io_sync(arc_state->current_io);
             arc_state->last_fsync = now;
             arc_state->not_synced_rows = 0;
@@ -341,8 +479,8 @@ bool arc_read_input(struct arc_state *arc_state,struct arc_fifo *queue) {
             result = true;
             break;
         } else {
-            if(arc_state->not_synced_rows > 0 && arc_state -> fsync_deplay > 0 && arc_state->current_io != NULL) {
-                double next_sync = arc_state->last_fsync + archive_state->fsync_deplay;
+            if(arc_state->not_synced_rows > 0 && arc_state -> fsync_delay > 0 && arc_state->current_io != NULL) {
+                double next_sync = arc_state->last_fsync + archive_state->fsync_delay;
                 timeout.tv_sec = (time_t)next_sync;
                 timeout.tv_nsec = (u64)((next_sync - (double)timeout.tv_sec)*1000000000.0);
                 tt_pthread_cond_timedwait(&arc_state->queue_not_empty, &arc_state->mutex,&timeout);
@@ -361,7 +499,7 @@ void *arc_writer_thread(void *args) {
     struct arc_state *arc_state = args;
     struct arc_fifo queue = STAILQ_HEAD_INITIALIZER(queue);
 
-    while (arc_read_input(arc_state,&queue)) {
+    while (arc_read_requests(arc_state,&queue)) {
         struct arc_write_request *request = STAILQ_FIRST(&queue);
         do {
             bool is_last_item = STAILQ_NEXT(request,fifo_entry) == NULL;
