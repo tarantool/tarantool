@@ -1182,9 +1182,8 @@ void box_lua_find(lua_State *L, const char *name, const char *name_end)
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_execute(struct request *request, struct txn *txn, struct port *port)
+box_lua_execute(struct request *request, struct port *port)
 {
-	(void) txn;
 	struct tbuf *data = request->data;
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);

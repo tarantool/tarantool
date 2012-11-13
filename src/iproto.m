@@ -27,13 +27,13 @@
  * SUCH DAMAGE.
  */
 #include "iproto.h"
-#include "exception.h"
 #include <string.h>
 
-#include <errcode.h>
-#include <fiber.h>
-#include <say.h>
 #include "coio_buf.h"
+#include "exception.h"
+#include "errcode.h"
+#include "fiber.h"
+#include "say.h"
 #include "tbuf.h"
 #include "box/box.h"
 #include "box/port.h"
@@ -43,16 +43,13 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-struct tbuf;
-struct obuf;
-
 enum {
 	/** Maximal iproto package body length (2GiB) */
 	IPROTO_BODY_LEN_MAX = 2147483648,
 };
 
 /*
- * struct iproto_header and struct iproto_header_retcode
+ * struct iproto_header and struct iproto_reply_header
  * share common prefix {msg_code, len, sync}
  */
 
@@ -60,16 +57,13 @@ struct iproto_header {
 	uint32_t msg_code;
 	uint32_t len;
 	uint32_t sync;
-	uint8_t data[];
 } __attribute__((packed));
 
-struct iproto_header_retcode {
-	uint32_t msg_code;
-	uint32_t len;
-	uint32_t sync;
+struct iproto_reply_header {
+	struct iproto_header hdr;
 	uint32_t ret_code;
-} __attribute__((packed));
-
+	uint32_t found;
+}  __attribute__((packed));
 
 const uint32_t msg_ping = 0xff00;
 
@@ -79,13 +73,33 @@ iproto(const void *pos)
 	return (struct iproto_header *) pos;
 }
 
+/* {{{ struct port_iproto */
+
+/**
+ * struct port_iproto users need to be careful to:
+ * - not unwind output of other fibers when
+ *   rolling back to a savepoint (provided that
+ *   multiple fibers work on the same session),
+ * - not increment write position before there is a complete
+ *   response, i.e. a response which will not be rolled back
+ *   and which has a complete header.
+ * - never increment write position without having
+ *   a complete response. Otherwise a situation can occur
+ *   when many requests started processing, but completed
+ *   in a different order, and thus incomplete output is
+ *   sent to the client
+ *
+ * To ensure this, port_iproto must be used only in
+ * atomic manner, i.e. once first port_add_tuple() is done,
+ * there can be no yields until port_eof().
+ */
 struct port_iproto
 {
 	struct port_vtab *vtab;
 	struct obuf *buf;
-	/** Number of found tuples. */
-	u32 found;
-	void *pfound;
+	struct iproto_reply_header reply;
+	void *p_reply;
+	struct obuf_svp svp;
 };
 
 static inline struct port_iproto *
@@ -99,19 +113,25 @@ port_iproto_eof(struct port *ptr)
 {
 	struct port_iproto *port = port_iproto(ptr);
 	/* found == 0 means add_tuple wasn't called at all. */
-	if (port->found == 0)
-		obuf_dup(port->buf, &port->found, sizeof(port->found));
-	else
-		memcpy(port->pfound, &port->found, sizeof(port->found));
+	if (port->reply.found == 0) {
+		port->reply.hdr.len = sizeof(port->reply) -
+			sizeof(port->reply.hdr);
+		obuf_dup(port->buf, &port->reply, sizeof(port->reply));
+	} else {
+		port->reply.hdr.len = obuf_size(port->buf) - port->svp.size -
+			sizeof(port->reply.hdr);
+		memcpy(port->p_reply, &port->reply, sizeof(port->reply));
+	}
 }
 
 static void
 port_iproto_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
 {
 	struct port_iproto *port = port_iproto(ptr);
-	if (++port->found == 1) {
-		/* Found the first tuple, add tuple count. */
-		port->pfound = obuf_book(port->buf, sizeof(port->found));
+	if (++port->reply.found == 1) {
+		/* Found the first tuple, add header. */
+		port->svp = obuf_create_svp(port->buf);
+		port->p_reply = obuf_book(port->buf, sizeof(port->reply));
 	}
 	if (flags & BOX_RETURN_TUPLE) {
 		obuf_dup(port->buf, &tuple->bsize, tuple_len(tuple));
@@ -123,22 +143,37 @@ static struct port_vtab port_iproto_vtab = {
 	port_iproto_eof,
 };
 
-struct port *
-port_iproto_create(struct obuf *buf)
+struct port_iproto *
+port_iproto_create(struct obuf *buf, struct iproto_header *req)
 {
 	struct port_iproto *port = palloc(fiber->gc_pool, sizeof(struct port_iproto));
 	port->vtab = &port_iproto_vtab;
 	port->buf = buf;
-	port->found = 0;
-	port->pfound = NULL;
-	return (struct port *) port;
+	port->reply.hdr = *req;
+	port->reply.found = 0;
+	port->reply.ret_code = 0;
+	return port;
+}
+
+/* }}} */
+
+static inline void
+iproto_validate_header(struct iproto_header *header, int fd)
+{
+	if (header->len > IPROTO_BODY_LEN_MAX) {
+		/*
+		 * The package is too big, just close connection for now to
+		 * avoid DoS.
+		 */
+		tnt_raise(SocketError, :fd in:
+			  "received package is too big: %llu",
+			  (unsigned long long) header->len);
+	}
 }
 
 static void
-iproto_reply(mod_process_func callback, struct obuf *out, void *req);
-
-static void
-iproto_validate_header(struct iproto_header *header);
+iproto_reply(mod_process_func callback, struct obuf *out,
+	     struct iproto_header *header);
 
 inline static void
 iproto_flush(struct ev_io *coio, struct iobuf *iobuf, ssize_t to_read)
@@ -167,7 +202,7 @@ iproto_interact(va_list ap)
 				break;
 
 			/* validating iproto package header */
-			iproto_validate_header(iproto(in->pos));
+			iproto_validate_header(iproto(in->pos), coio.fd);
 
 			ssize_t request_len = sizeof(struct iproto_header)
 				+ iproto(in->pos)->len;
@@ -178,7 +213,7 @@ iproto_interact(va_list ap)
 			if (to_read > 0 && coio_bread(&coio, in, to_read) <= 0)
 				break;
 
-			iproto_reply(*callback, &iobuf->out, in->pos);
+			iproto_reply(*callback, &iobuf->out, iproto(in->pos));
 			in->pos += request_len;
 
 			to_read = sizeof(struct iproto_header) - ibuf_size(in);
@@ -190,64 +225,64 @@ iproto_interact(va_list ap)
 	}
 }
 
+
+/** Stack reply to 'ping' packet. */
+static inline void
+iproto_reply_ping(struct obuf *out, struct iproto_header *req)
+{
+	struct iproto_header reply = *req;
+	reply.len = 0;
+	obuf_dup(out, &reply, sizeof(reply));
+}
+
+/** Send an error packet back. */
+static inline void
+iproto_reply_error(struct obuf *out, struct iproto_header *req,
+		   ClientError *e)
+{
+	struct iproto_header reply = *req;
+	int errmsg_len = strlen(e->errmsg) + 1;
+	uint32_t ret_code = tnt_errcode_val(e->errcode);
+	reply.len = sizeof(ret_code) + errmsg_len;;
+	obuf_dup(out, &reply, sizeof(reply));
+	obuf_dup(out, &ret_code, sizeof(ret_code));
+	obuf_dup(out, e->errmsg, errmsg_len);
+}
+
 /** Stack a reply to a single request to the fiber's io vector. */
-
-static void
-iproto_reply(mod_process_func callback, struct obuf *out, void *req)
+static inline void
+iproto_reply(mod_process_func callback, struct obuf *out,
+	     struct iproto_header *header)
 {
-	struct iproto_header_retcode reply;
 
-	reply.msg_code = iproto(req)->msg_code;
-	reply.sync = iproto(req)->sync;
+	if (header->msg_code == msg_ping)
+		return iproto_reply_ping(out, header);
 
-	if (unlikely(reply.msg_code == msg_ping)) {
-		reply.len = 0;
-		obuf_dup(out, &reply, sizeof(struct iproto_header));
-		return;
-	}
-	reply.len = sizeof(uint32_t); /* ret_code */
-
-	void *p_reply = obuf_book(out, sizeof(struct iproto_header_retcode));
-	struct obuf_svp svp = obuf_create_svp(out);
-
-	/* make request point to iproto data */
-	struct tbuf request = {
-		.size = iproto(req)->len, .capacity = iproto(req)->len,
-		.data = iproto(req)->data, .pool = fiber->gc_pool
+	/* Make request body point to iproto data */
+	struct tbuf body = {
+		.size = header->len, .capacity = header->len,
+		.data = (char *) &header[1], .pool = fiber->gc_pool
 	};
-
+	struct port_iproto *port = port_iproto_create(out, header);
 	@try {
-		callback(port_iproto_create(out), reply.msg_code, &request);
-		reply.ret_code = 0;
-	}
-	@catch (ClientError *e) {
-		obuf_rollback_to_svp(out, &svp);
-		reply.ret_code = tnt_errcode_val(e->errcode);
-		obuf_dup(out, e->errmsg, strlen(e->errmsg)+1);
-	}
-	reply.len += obuf_size(out) - svp.size;
-	memcpy(p_reply, &reply, sizeof(struct iproto_header_retcode));
-}
-
-static void
-iproto_validate_header(struct iproto_header *header)
-{
-	if (header->len > IPROTO_BODY_LEN_MAX) {
-		/*
-		 * The package is too big, just close connection for now to
-		 * avoid DoS.
-		 */
-		say_error("received package is too big: %llu",
-			  (unsigned long long)header->len);
-		tnt_raise(FiberCancelException);
+		callback((struct port *) port, header->msg_code, &body);
+	} @catch (ClientError *e) {
+		if (port->reply.found)
+			obuf_rollback_to_svp(out, &port->svp);
+		iproto_reply_error(out, header, e);
 	}
 }
 
+
+/**
+ * Initialize read-write and read-only ports
+ * with binary protocol handlers.
+ */
 void
 iproto_init(const char *bind_ipaddr, int primary_port,
 	    int secondary_port)
 {
-	/* run primary server */
+	/* Run a primary server. */
 	if (primary_port != 0) {
 		static struct coio_service primary;
 		coio_service_init(&primary, "primary",
@@ -258,7 +293,7 @@ iproto_init(const char *bind_ipaddr, int primary_port,
 		evio_service_start(&primary.evio_service);
 	}
 
-	/* run secondary server */
+	/* Run a secondary server. */
 	if (secondary_port != 0) {
 		static struct coio_service secondary;
 		coio_service_init(&secondary, "secondary",

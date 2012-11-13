@@ -204,7 +204,8 @@ coio_write(struct ev_io *coio, const void *buf, size_t sz)
 ssize_t
 coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt, size_t size_hint)
 {
-	ssize_t total = 0, iov_len = 0;
+	ssize_t total = 0;
+	size_t iov_len = 0;
 	struct iovec *end = iov + iovcnt;
 	@try {
 		/* Avoid a syscall in case of 0 iovcnt. */
