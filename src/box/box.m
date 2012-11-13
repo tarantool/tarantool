@@ -50,11 +50,11 @@
 #include "archive.h"
 
 static void box_process_replica(struct port *port,
-                                u32 op, struct tbuf *request_data);
+                u32 op, struct tbuf *request_data);
 static void box_process_ro(struct port *port,
-                           u32 op, struct tbuf *request_data);
+               u32 op, struct tbuf *request_data);
 static void box_process_rw(struct port *port,
-                           u32 op, struct tbuf *request_data);
+               u32 op, struct tbuf *request_data);
 mod_process_func mod_process = box_process_ro;
 mod_process_func mod_process_ro = box_process_ro;
 
@@ -64,7 +64,12 @@ static char status[64] = "unknown";
 
 static int stat_base;
 
-
+struct box_snap_row {
+    u32 space;
+    u32 tuple_size;
+    u32 data_size;
+    u8 data[];
+} __attribute__((packed));
 
 static inline struct box_snap_row *
 box_snap_row(const struct tbuf *t)
@@ -82,7 +87,7 @@ port_send_tuple(struct port *port, struct txn *txn, u32 flags)
 
 static void
 box_process_rw(struct port *port,
-               u32 op, struct tbuf *data)
+           u32 op, struct tbuf *data)
 {
     struct txn *txn = txn_begin();
     ev_tstamp start = ev_now(), stop;
@@ -102,7 +107,7 @@ box_process_rw(struct port *port,
         stop = ev_now();
         if (stop - start > cfg.too_long_threshold)
             say_warn("too long %s: %.3f sec",
-                     request_name(op), stop - start);
+                 request_name(op), stop - start);
     }
 }
 
@@ -111,14 +116,14 @@ box_process_replica(struct port *port, u32 op, struct tbuf *request_data)
 {
     if (!request_is_select(op)) {
         tnt_raise(ClientError, :ER_NONMASTER,
-                  cfg.replication_source);
+              cfg.replication_source);
     }
     return box_process_rw(port, op, request_data);
 }
 
 static void
 box_process_ro(struct port *port,
-               u32 op, struct tbuf *request_data)
+           u32 op, struct tbuf *request_data)
 {
     if (!request_is_select(op))
         tnt_raise(LoggedError, :ER_SECONDARY);
@@ -153,8 +158,8 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
     n = read_u32(b);
 
     tbuf_printf(buf, "tm:%.3f t:%" PRIu16 " %s:%d %s n:%i",
-                row->tm, tag, inet_ntoa(peer->sin_addr), ntohs(peer->sin_port),
-                requests_strs[op], n);
+            row->tm, tag, inet_ntoa(peer->sin_addr), ntohs(peer->sin_port),
+            requests_strs[op], n);
 
     switch (op) {
     case REPLACE:
@@ -274,10 +279,9 @@ static int
 recover_row(void *param __attribute__((unused)), struct tbuf *t)
 {
     /* drop wal header */
-    struct header_v11 *header = tbuf_peek(t, sizeof(struct header_v11));
-    if (header == NULL) {
+    if (tbuf_peek(t, sizeof(struct header_v11)) == NULL) {
         say_error("incorrect row header: expected %zd, got %zd bytes",
-                  sizeof(struct header_v11), (size_t) t->size);
+              sizeof(struct header_v11), (size_t) t->size);
         return -1;
     }
 
@@ -314,7 +318,7 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
         recovery_follow_remote(recovery_state, conf->replication_source);
 
         snprintf(status, sizeof(status), "replica/%s%s",
-                 conf->replication_source, custom_proc_title);
+             conf->replication_source, custom_proc_title);
         title("replica/%s%s", conf->replication_source, custom_proc_title);
     } else {
         mod_process = box_process_rw;
@@ -334,9 +338,7 @@ mod_leave_local_standby_mode(void *data __attribute__((unused)))
     recovery_finalize(recovery_state);
 
     recovery_update_mode(recovery_state, cfg.wal_mode,
-                         cfg.wal_fsync_delay);
-
-    arc_start();
+                 cfg.wal_fsync_delay);
 
     box_enter_master_or_replica_mode(&cfg);
 }
@@ -347,7 +349,7 @@ mod_check_config(struct tarantool_cfg *conf)
     /* replication & hot standby modes can not work together */
     if (conf->replication_source != NULL && conf->local_hot_standby > 0) {
         out_warning(0, "replication and local hot standby modes "
-                    "can't be enabled simultaneously");
+                   "can't be enabled simultaneously");
         return -1;
     }
 
@@ -358,7 +360,7 @@ mod_check_config(struct tarantool_cfg *conf)
         int port;
 
         if (sscanf(conf->replication_source, "%31[^:]:%i",
-                   ip_addr, &port) != 2) {
+               ip_addr, &port) != 2) {
             out_warning(0, "replication source IP address is not recognized");
             return -1;
         }
@@ -370,14 +372,14 @@ mod_check_config(struct tarantool_cfg *conf)
 
     /* check primary port */
     if (conf->primary_port != 0 &&
-            (conf->primary_port <= 0 || conf->primary_port >= USHRT_MAX)) {
+        (conf->primary_port <= 0 || conf->primary_port >= USHRT_MAX)) {
         out_warning(0, "invalid primary port value: %i", conf->primary_port);
         return -1;
     }
 
     /* check secondary port */
     if (conf->secondary_port != 0 &&
-            (conf->secondary_port <= 0 || conf->secondary_port >= USHRT_MAX)) {
+        (conf->secondary_port <= 0 || conf->secondary_port >= USHRT_MAX)) {
         out_warning(0, "invalid secondary port value: %i", conf->primary_port);
         return -1;
     }
@@ -408,13 +410,13 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
     bool new_is_replica = new_conf->replication_source != NULL;
 
     if (old_is_replica != new_is_replica ||
-            (old_is_replica &&
-             (strcmp(old_conf->replication_source, new_conf->replication_source) != 0))) {
+        (old_is_replica &&
+         (strcmp(old_conf->replication_source, new_conf->replication_source) != 0))) {
 
         if (recovery_state->finalize != true) {
             out_warning(0, "Could not propagate %s before local recovery finished",
-                        old_is_replica == true ? "slave to master" :
-                                                 "master to slave");
+                    old_is_replica == true ? "slave to master" :
+                    "master to slave");
 
             return -1;
         }
@@ -434,7 +436,6 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 void
 mod_free(void)
 {
-    arc_free();
     space_free();
 }
 
@@ -451,13 +452,11 @@ mod_init(void)
 
     /* recovery initialization */
     recovery_init(cfg.snap_dir, cfg.wal_dir,
-                  recover_row, NULL,
-                  cfg.rows_per_wal,
-                  init_storage ? RECOVER_READONLY : 0);
+              recover_row, NULL,
+              cfg.rows_per_wal,
+              init_storage ? RECOVER_READONLY : 0);
     recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
     recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
-
-    arc_init(cfg.archive_dir,cfg.archive_filename_pattern,cfg.archive_fsync_delay);
 
     stat_base = stat_register(requests_strs, requests_MAX);
 
@@ -490,7 +489,7 @@ mod_cat(const char *filename)
 
 static void
 snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
-                     unsigned n, struct tuple *tuple)
+             unsigned n, struct tuple *tuple)
 {
     if (tuple->flags & GHOST)	// do not save fictive rows
         return;
@@ -501,7 +500,7 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
     header.data_size = tuple->bsize;
 
     snapshot_write_row(l, batch, (void *) &header, sizeof(header),
-                       tuple->data, tuple->bsize);
+               tuple->data, tuple->bsize);
 }
 
 
