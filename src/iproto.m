@@ -182,7 +182,7 @@ struct iproto_request_queue
 {
 	int begin, end;
 	struct iproto_request queue[IPROTO_REQUEST_QUEUE_SIZE];
-} ir_queue = { 0, 0 };
+} ir_queue;
 
 static struct ev_async iproto_postio;
 
@@ -604,7 +604,6 @@ iproto_handler(va_list arg __attribute__((unused)))
 {
 	struct iproto_header *header;
 	struct iproto_session *session;
-	struct iproto_session *prev_session = NULL;
 	struct iobuf *iobuf;
 	struct port_iproto port;
 restart:
