@@ -38,4 +38,5 @@ int
 main()
 {
 	test_avl_rotations();
+	return 0;
 }

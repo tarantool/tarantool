@@ -12,4 +12,6 @@ int main()
 		printf("exception handled\n");
 	}
 	lua_close(L);
+
+	return 0;
 }
