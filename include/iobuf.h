@@ -131,9 +131,9 @@ obuf_size(struct obuf *obuf)
 
 /** The size of iov vector in the buffer. */
 static inline int
-obuf_iovcnt(struct obuf *obuf)
+obuf_iovcnt(struct obuf *buf)
 {
-	return obuf->iov[obuf->pos].iov_len > 0 ? obuf->pos + 1 : obuf->pos;
+	return buf->iov[buf->pos].iov_len > 0 ? buf->pos + 1 : buf->pos;
 }
 
 /**
@@ -177,6 +177,13 @@ obuf_create_svp(struct obuf *buf)
 		.size = buf->size
 	};
 	return svp;
+}
+
+/** Convert a savepoint position to a pointer in the buffer. */
+static inline void *
+obuf_svp_to_ptr(struct obuf *buf, struct obuf_svp *svp)
+{
+	return buf->iov[svp->pos].iov_base + svp->iov_len;
 }
 
 /** Forget anything added to output buffer after the savepoint. */
