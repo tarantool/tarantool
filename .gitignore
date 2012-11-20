@@ -33,6 +33,7 @@ CMakeCache.txt
 cmake_install.cmake
 src/box/tarantool_box
 client/tarantool/tarantool
+client/tarantool_checksum/tarantool_checksum
 include/config.h
 CPackConfig.cmake
 CPackSourceConfig.cmake

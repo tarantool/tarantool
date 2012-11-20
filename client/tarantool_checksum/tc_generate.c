@@ -240,9 +240,11 @@ tc_generate_xlog(struct tc_spaces *s, char *wal_dir, uint64_t file_lsn,
 		 uint64_t *last)
 {
 	char path[1024];
-	snprintf(path, sizeof(path), "%s/%020lld.xlog", wal_dir, file_lsn);
+	snprintf(path, sizeof(path), "%s/%020llu.xlog", wal_dir,
+		 (unsigned long long) file_lsn);
 
-	printf("(xlog) %020lld.xlog\r", file_lsn);
+	printf("(xlog) %020llu.xlog\r",
+	       (unsigned long long) file_lsn);
 	fflush(stdout);
 
 	struct tnt_stream st;
@@ -269,7 +271,8 @@ tc_generate_xlog(struct tc_spaces *s, char *wal_dir, uint64_t file_lsn,
 		if (rc == -1)
 			goto done;
 		if (count % 10000 == 0) {
-			printf("(xlog) %020lld.xlog %.3fM processed\r", file_lsn,
+			printf("(xlog) %020llu.xlog %.3fM processed\r",
+			       (unsigned long long) file_lsn,
 			       (float)count / 1000000);
 			fflush(stdout);
 		}
@@ -391,8 +394,10 @@ static int
 tc_generate_snapshot(struct tc_spaces *s, uint64_t lsn, char *snap_dir)
 {
 	char path[1024];
-	snprintf(path, sizeof(path), "%s/%020lld.snap", snap_dir, lsn);
-	printf("(snapshot) %020lld.snap\n", lsn);
+	snprintf(path, sizeof(path), "%s/%020llu.snap", snap_dir,
+		 (unsigned long long) lsn);
+	printf("(snapshot) %020llu.snap\n",
+	       (unsigned long long) lsn);
 
 	struct tnt_stream st;
 	tnt_snapshot(&st);
@@ -465,7 +470,8 @@ int tc_generate(struct tc_options *opts)
 		printf("failed to match greatest snapshot lsn\n");
 		goto error;
 	}
-	printf("last snapshot lsn: %llu\n", last_snap_lsn);
+	printf("last snapshot lsn: %llu\n",
+	       (unsigned long long) last_snap_lsn);
 
 	/* 3. 
 	 *  a. get latest existing lsn after snapshot
@@ -475,7 +481,7 @@ int tc_generate(struct tc_options *opts)
 	rc = tc_generate_waldir(&s, last_snap_lsn, &last_xlog_lsn, opts->cfg.wal_dir);
 	if (rc == -1)
 		goto error;
-	printf("last xlog lsn: %llu\n", last_xlog_lsn);
+	printf("last xlog lsn: %llu\n", (unsigned long long) last_xlog_lsn);
 
 	/* 4. build index on each snapshot row which doesnt not exist in
 	 * index dump (2)
