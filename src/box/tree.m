@@ -1009,19 +1009,11 @@ tree_iterator_next_great(struct iterator *iterator)
 
 	switch (strategy) {
 	case ITER_EQ:
-		if (key == NULL) {
-			tnt_raise(ClientError, :ER_EXACT_MATCH, 0, 1);
-		}
-
 		it->base.next = tree_iterator_next_equal;
 		sptree_index_iterator_init_set(&tree, &it->iter,
 					       &it->key_data);
 		break;
 	case ITER_REQ:
-		if (key == NULL) {
-			tnt_raise(ClientError, :ER_EXACT_MATCH, 0, 1);
-		}
-
 		it->base.next = tree_iterator_reverse_next_equal;
 		sptree_index_iterator_reverse_init_set(&tree, &it->iter,
 					       &it->key_data);
