@@ -108,7 +108,8 @@ done:
 int tc_verify_process(struct tc_spaces *s, uint64_t lsn, char *snap_dir)
 {
 	char path[1024];
-	snprintf(path, sizeof(path), "%s/%020lld.snap", snap_dir, lsn);
+	snprintf(path, sizeof(path), "%s/%020llu.snap", snap_dir,
+		(long long unsigned)lsn);
 
 	printf("(snapshot) %s\n", path);
 
