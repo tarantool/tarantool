@@ -207,21 +207,21 @@ function box.on_reload_configuration()
     --
     index_mt.select_range = function(index, limit, ...)
         local range = {}
-        for k, v in index.idx.next, index.idx, ... do
-            if #range >= limit then
-                break
-            end
+        local iterator_state, v = index:next(...)
+        while true do
+            if (#range >= limit) or (iterator_state == nil) then break end
             table.insert(range, v)
+            iterator_state, v = index:next(iterator_state)
         end
         return unpack(range)
     end
     index_mt.select_reverse_range = function(index, limit, ...)
         local range = {}
-        for k, v in index.idx.prev, index.idx, ... do
-            if #range >= limit then
-                break
-            end
+        local iterator_state, v = index:prev(...)
+        while true do
+            if (#range >= limit) or (iterator_state == nil) then break end
             table.insert(range, v)
+            iterator_state, v = index:prev(iterator_state)
         end
         return unpack(range)
     end
