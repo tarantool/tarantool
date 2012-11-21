@@ -73,13 +73,14 @@ extern const char *index_type_strs[];
  * ITER_ALL note. ITER_ALL must be supported by every index, because it is used
  * in various parts of our code (snapshotting, building secondary keys, etc.).
  */
-#define ITERATION_STRATEGY(_)                             \
-	_(ITER_ALL, 0)                 /* all tuples */   \
-	_(ITER_EQ,  1)                 /* key == x   */   \
-	_(ITER_LT,  2)                 /* key <  x   */   \
-	_(ITER_LE,  3)                 /* key <= x   */   \
-	_(ITER_GE,  4)                 /* key >= x   */   \
-	_(ITER_GT,  5)                 /* key >  x   */   \
+#define ITERATION_STRATEGY(_)                                                  \
+	_(ITER_ALL, 0)                 /* all tuples                      */   \
+	_(ITER_EQ,  1)                 /* key == x ASC order              */   \
+	_(ITER_REQ, 2)                 /* key == x DESC order             */   \
+	_(ITER_LT,  3)                 /* key <  x                        */   \
+	_(ITER_LE,  4)                 /* key <= x                        */   \
+	_(ITER_GE,  5)                 /* key >= x                        */   \
+	_(ITER_GT,  6)                 /* key >  x                        */   \
 
 ENUM(iteration_strategy, ITERATION_STRATEGY);
 extern const char *iteration_strategy_strs[];
