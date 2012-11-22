@@ -37,10 +37,6 @@
 #define MH_UNDEF
 #endif
 
-#define MH_TYPEDEFS 1
-
-typedef u32 mh_int_t;
-
 /*
  * Map: (i32) => (void *)
  */

@@ -72,6 +72,11 @@
 #define unlikely(x)  __builtin_expect((x),0)
 #endif
 
+#ifndef MH_TYPEDEFS
+#define MH_TYPEDEFS 1
+typedef uint32_t mh_int_t;
+#endif
+
 #ifndef __ac_HASH_PRIME_SIZE
 #define __ac_HASH_PRIME_SIZE 31
 static const mh_int_t __ac_prime_list[__ac_HASH_PRIME_SIZE] = {
