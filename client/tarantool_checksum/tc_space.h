@@ -20,8 +20,8 @@ struct tc_space_key {
 
 struct tc_space {
 	uint32_t id;
-	struct mh_pk_t hash_log;
-	struct mh_pk_t hash_snap;
+	struct mh_pk_t *hash_log;
+	struct mh_pk_t *hash_snap;
 	struct tc_space_key pk;
 };
 

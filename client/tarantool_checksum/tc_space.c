@@ -53,28 +53,30 @@ void tc_space_free(struct tc_spaces *s)
 {
 	mh_int_t i;
 	mh_foreach(s->t, i) {
-		struct tc_space *space = mh_value(s->t, i);
-		mh_u32ptr_del(s->t, i);
+		struct tc_space *space = mh_u32ptr_node(s->t, i)->val;
+		mh_u32ptr_del(s->t, i, NULL, NULL);
 
 		mh_int_t pos = 0;
-		while (pos != mh_end(&space->hash_log)) {
-			if (mh_exist((&space->hash_log), pos)) {
-				struct tc_key *k = mh_value(&space->hash_log, pos);
+		while (pos != mh_end(space->hash_log)) {
+			if (mh_exist((space->hash_log), pos)) {
+				struct tc_key *k = (struct tc_key *)
+					*mh_pk_node(space->hash_log, pos);
 				free(k);
 			}
 			pos++;
 		}
 		pos = 0;
-		while (pos != mh_end(&space->hash_snap)) {
-			if (mh_exist((&space->hash_snap), pos)) {
-				struct tc_key *k = mh_value(&space->hash_snap, pos);
+		while (pos != mh_end(space->hash_snap)) {
+			if (mh_exist((space->hash_snap), pos)) {
+				struct tc_key *k = (struct tc_key *)
+					*mh_pk_node(space->hash_snap, pos);
 				free(k);
 			}
 			pos++;
 		}
 
-		mh_pk_destroy(&space->hash_log);
-		mh_pk_destroy(&space->hash_snap);
+		mh_pk_destroy(space->hash_log);
+		mh_pk_destroy(space->hash_snap);
 
 		free(space->pk.fields);
 		free(space);
@@ -88,18 +90,21 @@ struct tc_space *tc_space_create(struct tc_spaces *s, uint32_t id) {
 		return NULL;
 	memset(space, 0, sizeof(struct tc_space));
 	space->id = id;
-	mh_pk_init(&space->hash_log);
-	mh_pk_init(&space->hash_snap);
+	space->hash_log = mh_pk_init();
+	space->hash_snap = mh_pk_init();
 	int ret;
-	mh_u32ptr_put(s->t, space->id, space, &ret);
+
+	const struct mh_u32ptr_node_t node = { .key = space->id, .val = space };
+	mh_u32ptr_put(s->t, &node, space, space, &ret);
 	return space;
 }
 
 struct tc_space *tc_space_match(struct tc_spaces *s, uint32_t id) {
-	mh_int_t k = mh_u32ptr_get(s->t, id);
+	const struct mh_u32ptr_node_t node = { .key = id };
+	mh_int_t k = mh_u32ptr_get(s->t, &node, NULL, NULL);
 	struct tc_space *space = NULL;
 	if (k != mh_end(s->t))
-		space = mh_value(s->t, k);
+		space = mh_u32ptr_node(s->t, k)->val;
 	return space;
 }
 

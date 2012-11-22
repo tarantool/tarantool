@@ -71,26 +71,26 @@ int tc_file_save_space(struct tc_space *s, FILE *f)
 {
 	struct tc_file_header_space h = {
 		.space = s->id,
-		.count_log = s->hash_log.size,
-		.count_snap = s->hash_snap.size,
+		.count_log = s->hash_log->size,
+		.count_snap = s->hash_snap->size,
 		.data_offset = 0
 	};
 
 	fwrite(&h, sizeof(struct tc_file_header_space), 1, f);
 
 	mh_int_t pos = 0;
-	while (pos != mh_end(&s->hash_log)) {
-		if (mh_exist((&s->hash_log), pos)) {
-			struct tc_key *k = mh_value(&s->hash_log, pos);
+	while (pos != mh_end(s->hash_log)) {
+		if (mh_exist((s->hash_log), pos)) {
+			const struct tc_key *k = *mh_pk_node(s->hash_log, pos);
 			if (fwrite((char*)k, sizeof(struct tc_key) + k->size, 1, f) != 1)
 				return -1;
 		}
 		pos++;
 	}
 	pos = 0;
-	while (pos != mh_end(&s->hash_snap)) {
-		if (mh_exist((&s->hash_snap), pos)) {
-			struct tc_key *k = mh_value(&s->hash_snap, pos);
+	while (pos != mh_end(s->hash_snap)) {
+		if (mh_exist((s->hash_snap), pos)) {
+			const struct tc_key *k = *mh_pk_node(s->hash_snap, pos);
 			if (fwrite((char*)k, sizeof(struct tc_key) + k->size, 1, f) != 1)
 				return -1;
 		}
@@ -124,7 +124,7 @@ int tc_file_save(struct tc_spaces *s,
 	mh_int_t pos = 0;
 	while (pos != mh_end(s->t)) {
 		if (mh_exist((s->t), pos)) {
-			struct tc_space *space = mh_value(s->t, pos);
+			struct tc_space *space = mh_u32ptr_node(s->t, pos)->val;
 			int rc = tc_file_save_space(space, f);
 			if (rc == -1) {
 				fclose(f);
@@ -192,8 +192,10 @@ int tc_file_load(struct tc_spaces *s, char *file,
 				fclose(f);
 				return -1;
 			}
-			mh_int_t pos = mh_pk_put(space, &space->hash_log, k, NULL);
-			if (pos == mh_end(&space->hash_log)) {
+			const struct tc_key *node = k;
+			mh_int_t pos = mh_pk_put(space->hash_log, &node,
+						  space, space, NULL);
+			if (pos == mh_end(space->hash_log)) {
 				fclose(f);
 				return -1;
 			}
@@ -207,8 +209,10 @@ int tc_file_load(struct tc_spaces *s, char *file,
 				fclose(f);
 				return -1;
 			}
-			mh_int_t pos = mh_pk_put(space, &space->hash_snap, k, NULL);
-			if (pos == mh_end(&space->hash_log)) {
+			const struct tc_key *node = k;
+			mh_int_t pos = mh_pk_put(space->hash_snap, &node,
+						 space, space, NULL);
+			if (pos == mh_end(space->hash_log)) {
 				fclose(f);
 				return -1;
 			}

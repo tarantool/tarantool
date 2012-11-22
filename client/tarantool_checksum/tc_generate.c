@@ -55,9 +55,8 @@
 #include "tc_file.h"
 
 uint32_t
-search_hash(void *x, const struct tc_key *k)
+search_hash(const struct tc_key *k, struct tc_space *s)
 {
-	struct tc_space *s = x;
 	uint32_t h = 13;
 	int i;
 	for (i = 0; i < s->pk.count; i++) {
@@ -87,12 +86,12 @@ search_hash(void *x, const struct tc_key *k)
 }
 
 int
-search_equal(void *x, const struct tc_key *a,
-	     const struct tc_key *b)
+search_equal(const struct tc_key *a,
+	     const struct tc_key *b, struct tc_space *s)
 {
 	if (a->size != b->size)
 		return 0;
-	struct tc_space *s = x;
+
 	int i;
 	for (i = 0; i < s->pk.count; i++) {
 		switch (s->pk.fields[i].type) {
@@ -226,8 +225,9 @@ tc_generate_entry(struct tc_spaces *s, struct tnt_request *r)
 		return -1;
 	}
 	/* 3. put into hash */
-	mh_int_t pos = mh_pk_put(space, &space->hash_log, k, NULL);
-	if (pos == mh_end(&space->hash_log)) {
+	const struct tc_key *node = k;
+	mh_int_t pos = mh_pk_put(space->hash_log, &node, space, space, NULL);
+	if (pos == mh_end(space->hash_log)) {
 		free(k);
 		return -1;
 	}
@@ -372,14 +372,17 @@ tc_generate_snaprow(struct tc_spaces *s, struct tnt_iter_storage *is,
 
 	/* foreach snapshot row which does not exist in index dump:
 	 * calculate crc and add to the index */
-	mh_int_t pos = mh_pk_get(space, &space->hash_log, k);
-	struct tc_key *v = NULL;
-	if (pos != mh_end(&space->hash_log))
-		v = mh_value(&space->hash_log, pos);
+	const struct tc_key *node = k;
+	mh_int_t pos = mh_pk_get(space->hash_log, &node, space, space);
+	const struct tc_key *v = NULL;
+	if (pos != mh_end(space->hash_log))
+		v = *mh_pk_node(space->hash_log, pos);
 	if (v == NULL) {
 		k->crc = crc32c(0, (unsigned char*)is->t.data, is->t.size);
-		mh_int_t pos = mh_pk_put(space, &space->hash_snap, k, NULL);
-		if (pos == mh_end(&space->hash_snap)) {
+		const struct tc_key *node = k;
+		mh_int_t pos = mh_pk_put(space->hash_snap, &node,
+					 space, space, NULL);
+		if (pos == mh_end(space->hash_snap)) {
 			free(k);
 			return -1;
 		}
