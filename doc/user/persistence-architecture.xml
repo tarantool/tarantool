@@ -62,7 +62,7 @@ example:
 The master and the WAL writer threads communicate using asynchronous (yet reliable)
 messaging; the master thread, not being blocked on
 WAL tasks, continues to handle requests quickly
-even at hight volumes of disk I/O. For instance, SELECT performance,
+even when volume of disk I/O is high. For instance, SELECT performance,
 provided SELECTs are run in their own connections, remains
 unaffected by disk load.
 </para>
