@@ -115,6 +115,7 @@ exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GT, nil) do p
 exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LE, nil) do print(v) end"
 exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LT, nil) do print(v) end"
 exec admin "lua for v in box.space[16].index[1]:iterator(box.index.EQ, 'sid_1') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.REQ, 'sid_1') do print(v) end"
 exec admin "lua for v in box.space[16].index[1]:iterator(box.index.EQ, 'sid_2', 'tid_996') do print(v) end"
 exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GE, 'sid_2', 'tid_994') do print(v) end"
 exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GT, 'sid_2', 'tid_994') do print(v) end"
