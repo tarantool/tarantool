@@ -64,14 +64,12 @@
 #define mh_ecat(a, b) mh_cat(a, b)
 #define _mh(x) mh_ecat(mh_name, x)
 
-#ifndef mh_unlikely
 #define mh_unlikely(x)  __builtin_expect((x),0)
-#endif
 
 #ifndef MH_TYPEDEFS
 #define MH_TYPEDEFS 1
 typedef uint32_t mh_int_t;
-#endif
+#endif /* MH_TYPEDEFS */
 
 #ifndef __ac_HASH_PRIME_SIZE
 #define __ac_HASH_PRIME_SIZE 31
@@ -148,11 +146,11 @@ void _mh(clear)(struct _mh(t) *h);
 void _mh(destroy)(struct _mh(t) *h);
 void _mh(resize)(struct _mh(t) *h, mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg);
 int _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
-	mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg);
+		      mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg);
 void _mh(reserve)(struct _mh(t) *h, mh_int_t size,
-	mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg);
+		  mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg);
 void __attribute__((noinline)) _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
-	mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg);
+					       mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg);
 void _mh(dump)(struct _mh(t) *h);
 
 #define put_slot(h, node, hash_arg, eq_arg) \
@@ -174,8 +172,7 @@ _mh(next_slot)(mh_int_t slot, mh_int_t inc, mh_int_t size)
 
 static inline mh_int_t
 _mh(get)(struct _mh(t) *h, const mh_node_t *node,
-		mh_hash_arg_t hash_arg,
-		mh_eq_arg_t eq_arg)
+	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
 {
 	(void) hash_arg;
 	(void) eq_arg;
@@ -196,8 +193,7 @@ _mh(get)(struct _mh(t) *h, const mh_node_t *node,
 
 static inline mh_int_t
 _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node,
-		mh_hash_arg_t hash_arg,
-		mh_eq_arg_t eq_arg)
+	      mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
 {
 	(void) hash_arg;
 	(void) eq_arg;
@@ -215,7 +211,7 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node,
 		 * chain always ends with a non-marked link.
 		 * Note: the collision chain for this key may share
 		 * links with collision chains of other keys.
-		*/
+		 */
 		mh_setdirty(h, i);
 		i = _mh(next_slot)(i, inc, h->n_buckets);
 	}
@@ -240,9 +236,7 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node,
 
 static inline mh_int_t
 _mh(put)(struct _mh(t) *h, const mh_node_t *node,
-		mh_hash_arg_t hash_arg,
-		mh_eq_arg_t eq_arg,
-		int *ret)
+	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg, int *ret)
 {
 	mh_int_t x = mh_end(h);
 	if (h->size == h->n_buckets)
@@ -261,7 +255,7 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node,
 #else
 	if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
 		if (_mh(start_resize)(h, h->n_buckets + 1, h->size,
-			hash_arg, eq_arg))
+				      hash_arg, eq_arg))
 			goto put_done;
 	}
 #endif
@@ -290,8 +284,7 @@ put_done:
 
 static inline void
 _mh(del)(struct _mh(t) *h, mh_int_t x,
-		mh_hash_arg_t hash_arg,
-		mh_eq_arg_t eq_arg)
+	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
 {
 	if (x != h->n_buckets && mh_exist(h, x)) {
 		mh_setfree(h, x);
@@ -311,12 +304,11 @@ _mh(del)(struct _mh(t) *h, mh_int_t x,
 
 void __attribute__((noinline))
 _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
-		mh_hash_arg_t hash_arg,
-		mh_eq_arg_t eq_arg)
+		mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
 {
 	struct _mh(t) *s = h->shadow;
 	uint32_t y = _mh(get)(s, (const mh_node_t *) &(h->p[x]),
-				hash_arg, eq_arg);
+			      hash_arg, eq_arg);
 	_mh(del)(s, y, hash_arg, eq_arg);
 	_mh(resize)(h, hash_arg, eq_arg);
 }
@@ -350,12 +342,12 @@ _mh(destroy)(struct _mh(t) *h)
 	free(h->shadow);
 	free(h->b);
 	free(h->p);
+	free(h);
 }
 
 void
 _mh(resize)(struct _mh(t) *h,
-		mh_hash_arg_t hash_arg,
-		mh_eq_arg_t eq_arg)
+	    mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
 {
 	struct _mh(t) *s = h->shadow;
 #if MH_INCREMENTAL_RESIZE
@@ -384,8 +376,7 @@ _mh(resize)(struct _mh(t) *h,
 
 int
 _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
-		mh_hash_arg_t hash_arg,
-		mh_eq_arg_t eq_arg)
+		  mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
 {
 	if (h->resize_position) {
 		/* resize has already been started */
@@ -433,8 +424,7 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 
 void
 _mh(reserve)(struct _mh(t) *h, mh_int_t size,
-		mh_hash_arg_t hash_arg,
-		mh_eq_arg_t eq_arg)
+	     mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
 {
 	_mh(start_resize)(h, size/MH_DENSITY, h->size, hash_arg, eq_arg);
 }
@@ -494,6 +484,7 @@ _mh(dump)(struct _mh(t) *h)
 #undef mh_setdirty
 #undef mh_setexist
 #undef mh_setvalue
+#undef mh_unlikely
 #undef slot
 #undef slot_and_dirty
 #undef MH_DENSITY

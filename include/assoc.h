@@ -41,7 +41,7 @@
 struct mh_i32ptr_node_t {
 	i32 key;
 	void *val;
-} /* __attribute__((packed)) */;
+};
 
 #define mh_node_t struct mh_i32ptr_node_t
 #define mh_hash_arg_t void *
@@ -58,7 +58,7 @@ struct mh_i32ptr_node_t {
 struct mh_i64ptr_node_t {
 	i64 key;
 	void *val;
-} __attribute__((packed));
+};
 
 #define mh_node_t struct mh_i64ptr_node_t
 #define mh_int_t u32
@@ -87,7 +87,7 @@ static inline int lstrcmp(void *a, void *b)
 struct mh_lstrptr_node_t {
 	void *key;
 	void *val;
-} __attribute__((packed));
+};
 
 #define mh_node_t struct mh_lstrptr_node_t
 #define mh_int_t u32

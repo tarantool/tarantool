@@ -263,59 +263,61 @@ check_key_parts(struct key_def *key_def,
 
 /* {{{ HashIndex -- base class for all hashes. ********************/
 
-struct hash_iterator {
+struct hash_i32_iterator {
 	struct iterator base; /* Must be the first member. */
-	union {
-		struct mh_i32ptr_t *i32ptr_hash;
-		struct mh_i64ptr_t *i64ptr_hash;
-		struct mh_lstrptr_t *lstrptr_hash;
-	};
+	struct mh_i32ptr_t *hash;
 	mh_int_t h_pos;
 };
 
-static struct hash_iterator *
-hash_iterator(struct iterator *it)
-{
-	return (struct hash_iterator *) it;
-}
+struct hash_i64_iterator {
+	struct iterator base;
+	struct mh_i64ptr_t *hash;
+	mh_int_t h_pos;
+};
+
+struct hash_lstr_iterator {
+	struct iterator base;
+	struct mh_lstrptr_t *hash;
+	mh_int_t h_pos;
+};
 
 struct tuple *
-hash_iterator_i32_next(struct iterator *iterator)
+hash_iterator_i32_next(struct iterator *ptr)
 {
 	assert(iterator->next == hash_iterator_i32_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
 
-	while (it->h_pos < mh_end(it->i32ptr_hash)) {
-		if (mh_exist(it->i32ptr_hash, it->h_pos))
-			return mh_i32ptr_node(it->i32ptr_hash, it->h_pos++)->val;
+	while (it->h_pos < mh_end(it->hash)) {
+		if (mh_exist(it->hash, it->h_pos))
+			return mh_i32ptr_node(it->hash, it->h_pos++)->val;
 		it->h_pos++;
 	}
 	return NULL;
 }
 
 struct tuple *
-hash_iterator_i64_next(struct iterator *iterator)
+hash_iterator_i64_next(struct iterator *ptr)
 {
 	assert(iterator->next == hash_iterator_i64_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
 
-	while (it->h_pos < mh_end(it->i64ptr_hash)) {
-		if (mh_exist(it->i64ptr_hash, it->h_pos))
-			return mh_i64ptr_node(it->i64ptr_hash, it->h_pos++)->val;
+	while (it->h_pos < mh_end(it->hash)) {
+		if (mh_exist(it->hash, it->h_pos))
+			return mh_i64ptr_node(it->hash, it->h_pos++)->val;
 		it->h_pos++;
 	}
 	return NULL;
 }
 
 struct tuple *
-hash_iterator_lstr_next(struct iterator *iterator)
+hash_iterator_lstr_next(struct iterator *ptr)
 {
 	assert(iterator->next == hash_iterator_lstr_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	struct hash_lstr_iterator *it = (struct hash_lstr_iterator *) ptr;
 
-	while (it->h_pos < mh_end(it->lstrptr_hash)) {
-		if (mh_exist(it->lstrptr_hash, it->h_pos))
-			return mh_lstrptr_node(it->lstrptr_hash, it->h_pos++)->val;
+	while (it->h_pos < mh_end(it->hash)) {
+		if (mh_exist(it->hash, it->h_pos))
+			return mh_lstrptr_node(it->hash, it->h_pos++)->val;
 		it->h_pos++;
 	}
 	return NULL;
@@ -506,29 +508,29 @@ int32_key_to_value(void *key)
 
 - (struct iterator *) allocIterator
 {
-	struct hash_iterator *it = malloc(sizeof(struct hash_iterator));
+	struct hash_i32_iterator *it = malloc(sizeof(struct hash_i32_iterator));
 	if (it) {
-		memset(it, 0, sizeof(struct hash_iterator));
+		memset(it, 0, sizeof(*it));
 		it->base.next = hash_iterator_i32_next;
 		it->base.free = hash_iterator_free;
 	}
 	return (struct iterator *) it;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIterator: (struct iterator *) ptr:(enum iterator_type) type
 {
 	assert(iterator->free == hash_iterator_free);
-	struct hash_iterator *it = hash_iterator(iterator);
+	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
 
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	it->base.next_equal = 0; /* Should not be used. */
 	it->h_pos = mh_begin(int_hash);
-	it->i32ptr_hash = int_hash;
+	it->hash = int_hash;
 }
 
-- (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIteratorUnsafe: (struct iterator *) ptr: (enum iterator_type) type
                         :(void *) key :(int) part_count
 {
 	(void) part_count;
@@ -536,13 +538,13 @@ int32_key_to_value(void *key)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	assert(iterator->free == hash_iterator_free);
-	struct hash_iterator *it = hash_iterator(iterator);
+	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
 
 	u32 num = int32_key_to_value(key);
 	it->base.next_equal = iterator_first_equal;
 	const struct mh_i32ptr_node_t node = { .key = num };
 	it->h_pos = mh_i32ptr_get(int_hash, &node, NULL, NULL);
-	it->i32ptr_hash = int_hash;
+	it->hash = int_hash;
 }
 @end
 
@@ -645,29 +647,29 @@ int64_key_to_value(void *key)
 
 - (struct iterator *) allocIterator
 {
-	struct hash_iterator *it = malloc(sizeof(struct hash_iterator));
+	struct hash_i64_iterator *it = malloc(sizeof(struct hash_i64_iterator));
 	if (it) {
-		memset(it, 0, sizeof(struct hash_iterator));
+		memset(it, 0, sizeof(*it));
 		it->base.next = hash_iterator_i64_next;
 		it->base.free = hash_iterator_free;
 	}
 	return (struct iterator *) it;
 }
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIterator: (struct iterator *) ptr: (enum iterator_type) type
 {
 	assert(iterator->free == hash_iterator_free);
-	struct hash_iterator *it = hash_iterator(iterator);
+	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
 
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
 	it->h_pos = mh_begin(int64_hash);
-	it->i64ptr_hash = int64_hash;
+	it->hash = int64_hash;
 }
 
-- (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIteratorUnsafe: (struct iterator *) ptr: (enum iterator_type) type
                         :(void *) key :(int) part_count
 {
 	(void) part_count;
@@ -675,14 +677,14 @@ int64_key_to_value(void *key)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	assert(iterator->free == hash_iterator_free);
-	struct hash_iterator *it = hash_iterator(iterator);
+	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
 
 	u64 num = int64_key_to_value(key);
 
 	it->base.next_equal = iterator_first_equal;
 	const struct mh_i64ptr_node_t node = { .key = num };
 	it->h_pos = mh_i64ptr_get(int64_hash, &node, NULL, NULL);
-	it->i64ptr_hash = int64_hash;
+	it->hash = int64_hash;
 }
 @end
 
@@ -779,9 +781,9 @@ int64_key_to_value(void *key)
 
 - (struct iterator *) allocIterator
 {
-	struct hash_iterator *it = malloc(sizeof(struct hash_iterator));
+	struct hash_lstr_iterator *it = malloc(sizeof(struct hash_lstr_iterator));
 	if (it) {
-		memset(it, 0, sizeof(struct hash_iterator));
+		memset(it, 0, sizeof(*it));
 		it->base.next = hash_iterator_lstr_next;
 		it->base.free = hash_iterator_free;
 	}
@@ -789,20 +791,20 @@ int64_key_to_value(void *key)
 }
 
 
-- (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
+- (void) initIterator: (struct iterator *) ptr: (enum iterator_type) type
 {
-	assert(iterator->free == hash_iterator_free);
-	struct hash_iterator *it = hash_iterator(iterator);
+	assert(ptr->free == hash_iterator_free);
+	struct hash_lstr_iterator *it = (struct hash_lstr_iterator *) ptr;
 
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
 	it->h_pos = mh_begin(str_hash);
-	it->lstrptr_hash = str_hash;
+	it->hash = str_hash;
 }
 
-- (void) initIteratorUnsafe: (struct iterator *) iterator
+- (void) initIteratorUnsafe: (struct iterator *) ptr
 			:(enum iterator_type) type
                         :(void *) key :(int) part_count
 {
@@ -811,12 +813,12 @@ int64_key_to_value(void *key)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	assert(iterator->free == hash_iterator_free);
-	struct hash_iterator *it = hash_iterator(iterator);
+	struct hash_lstr_iterator *it = (struct hash_lstr_iterator *) ptr;
 
 	it->base.next_equal = iterator_first_equal;
 	const struct mh_lstrptr_node_t node = { .key = key };
 	it->h_pos = mh_lstrptr_get(str_hash, &node, NULL, NULL);
-	it->lstrptr_hash = str_hash;
+	it->hash = str_hash;
 }
 @end
 

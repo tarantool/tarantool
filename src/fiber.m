@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assoc.h>
 
 #include <say.h>
 #include <tarantool.h>
