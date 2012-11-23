@@ -48,8 +48,8 @@ static struct index_traits hash_index_traits = {
 const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
 const char *index_type_strs[] = { "HASH", "TREE", "\0" };
 
-STRS(iteration_strategy, ITERATION_STRATEGY);
-ENUM_VALS(iteration_strategy, ITERATION_STRATEGY);
+STRS(iterator_type, ITERATOR_TYPE);
+ENUM_VALS(iterator_type, ITERATOR_TYPE);
 
 /* {{{ Index -- base class for all indexes. ********************/
 
@@ -214,18 +214,18 @@ ENUM_VALS(iteration_strategy, ITERATION_STRATEGY);
 }
 
 - (void) initIterator: (struct iterator *) iterator
-	:(enum iteration_strategy) strategy
+	:(enum iterator_type) type
 {
-	[self initIterator: iterator: strategy: NULL: 0];
+	[self initIterator: iterator: type: NULL: 0];
 }
 
 - (void) initIterator: (struct iterator *) iterator
-	:(enum iteration_strategy) strategy
+	:(enum iterator_type) type
 	:(void *) key :(int) part_count
 {
 	(void) iterator;
 	(void) key;
-	(void) strategy;
+	(void) type;
 	(void) part_count;
 	[self subclassResponsibility: _cmd];
 }
@@ -478,14 +478,14 @@ int32_key_to_value(void *key)
 }
 
 - (void) initIterator: (struct iterator *) iterator
-	:(enum iteration_strategy) strategy
+	:(enum iterator_type) type
 	:(void *) key :(int) part_count
 {
 	(void) part_count;
 	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	switch (strategy) {
+	switch (type) {
 	case ITER_ALL:
 		it->base.next = hash_iterator_next;
 		it->h_pos = mh_begin(int_hash);
@@ -511,7 +511,7 @@ int32_key_to_value(void *key)
 		it->base.next = hash_iterator_next_equal;
 		break;
 	default:
-		tnt_raise(IllegalParams, :"unsupported strategy");
+		tnt_raise(IllegalParams, :"unsupported iterator type");
 	}
 
 	it->hash = int_hash;
@@ -612,7 +612,7 @@ int64_key_to_value(void *key)
 }
 
 - (void) initIterator: (struct iterator *) iterator
-	:(enum iteration_strategy) strategy
+	:(enum iterator_type) type
 	:(void *) key :(int) part_count
 {
 	assert(iterator->free == hash_iterator_free);
@@ -620,7 +620,7 @@ int64_key_to_value(void *key)
 
 	(void) part_count;
 
-	switch (strategy) {
+	switch (type) {
 	case ITER_ALL:
 		it->base.next = hash_iterator_next;
 		it->h_pos = mh_begin(int64_hash);
@@ -646,7 +646,7 @@ int64_key_to_value(void *key)
 		it->base.next = hash_iterator_next_equal;
 		break;
 	default:
-		tnt_raise(IllegalParams, :"unsupported strategy");
+		tnt_raise(IllegalParams, :"unsupported iterator type");
 	}
 
 	it->hash = (struct mh_i32ptr_t *) int64_hash;
@@ -741,7 +741,7 @@ int64_key_to_value(void *key)
 }
 
 - (void) initIterator: (struct iterator *) iterator
-	:(enum iteration_strategy) strategy
+	:(enum iterator_type) type
 	:(void *) key :(int) part_count
 {
 	(void) part_count;
@@ -749,7 +749,7 @@ int64_key_to_value(void *key)
 	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
-	switch (strategy) {
+	switch (type) {
 	case ITER_ALL:
 		it->base.next = hash_iterator_next;
 		it->h_pos = mh_begin(str_hash);
@@ -773,7 +773,7 @@ int64_key_to_value(void *key)
 		it->base.next = hash_iterator_next_equal;
 		break;
 	default:
-		tnt_raise(IllegalParams, :"unsupported strategy");
+		tnt_raise(IllegalParams, :"unsupported iterator type");
 	}
 
 	it->hash = (struct mh_i32ptr_t *) str_hash;

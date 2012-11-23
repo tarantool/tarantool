@@ -48,17 +48,17 @@ enum index_type { HASH, TREE, index_type_MAX };
 extern const char *index_type_strs[];
 
 /**
- * @abstract Iterator strategy
+ * @abstract Iterator type
  * Controls how to iterate over tuples in the index.
  * Various indexes may support different iteration strategies.
  * For example, you can start iteration from one particaluar value (request key)
  * and then retrive all tuples where keys are great or equal (= GE) to this key.
  * There is no more special flags for iteration direction, since this direction
- * only depends on in chosen iteration strategy.
+ * only depends on in chosen iterator type.
  *
- * If strategy is not supported in the implementation, iterator constructor
+ * If type is not supported in the implementation, iterator constructor
  * must fail with IllegalParams. Primary keys should support at least ITER_EQ
- * and ITER_GE strategies. By default, box.select uses ITER_EQ strategy.
+ * and ITER_GE strategies. By default, box.select uses ITER_EQ type.
  *
  * NULL request keys note. NULL value of request key usually correspond to
  * first or last key in the index, depending on the iteration direction
@@ -73,7 +73,7 @@ extern const char *index_type_strs[];
  * ITER_ALL note. ITER_ALL must be supported by every index, because it is used
  * in various parts of our code (snapshotting, building secondary keys, etc.).
  */
-#define ITERATION_STRATEGY(_)                                                  \
+#define ITERATOR_TYPE(_)                                                  \
 	_(ITER_ALL, 0)                 /* all tuples                      */   \
 	_(ITER_EQ,  1)                 /* key == x ASC order              */   \
 	_(ITER_REQ, 2)                 /* key == x DESC order             */   \
@@ -82,9 +82,9 @@ extern const char *index_type_strs[];
 	_(ITER_GE,  5)                 /* key >= x                        */   \
 	_(ITER_GT,  6)                 /* key >  x                        */   \
 
-ENUM(iteration_strategy, ITERATION_STRATEGY);
-extern const char *iteration_strategy_strs[];
-extern const enum iteration_strategy iteration_strategy_vals[];
+ENUM(iterator_type, ITERATOR_TYPE);
+extern const char *iterator_type_strs[];
+extern const enum iterator_type iterator_type_vals[];
 
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
@@ -180,9 +180,9 @@ struct index_traits
  */
 - (struct iterator *) allocIterator;
 - (void) initIterator: (struct iterator *) iterator
-		     :(enum iteration_strategy) strategy;
+		     :(enum iterator_type) type;
 - (void) initIterator: (struct iterator *) iterator
-		     :(enum iteration_strategy) strategy
+		     :(enum iterator_type) type
 		     :(void *) key :(int) part_count;
 
 /**

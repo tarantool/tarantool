@@ -986,7 +986,7 @@ tree_iterator_next_great(struct iterator *iterator)
 }
 
 - (void) initIterator: (struct iterator *) iterator
-	:(enum iteration_strategy) strategy
+	:(enum iterator_type) type
 	:(void *) key :(int) part_count
 {
 	assert(iterator->free == tree_iterator_free);
@@ -995,7 +995,7 @@ tree_iterator_next_great(struct iterator *iterator)
 	assert((key == NULL && part_count == 0)
 	    || (key != NULL && part_count > 0));
 
-	if (key != NULL && strategy != ITER_ALL) {
+	if (key != NULL && type != ITER_ALL) {
 		[self checkKeyParts: key_def: part_count:
 				     traits->allows_partial_key];
 		it->key_data.data = key;
@@ -1007,7 +1007,7 @@ tree_iterator_next_great(struct iterator *iterator)
 
 	fold_with_key_parts(key_def, &it->key_data);
 
-	switch (strategy) {
+	switch (type) {
 	case ITER_EQ:
 		if (key == NULL) {
 			tnt_raise(ClientError, :ER_EXACT_MATCH, 0, 1);
@@ -1048,7 +1048,7 @@ tree_iterator_next_great(struct iterator *iterator)
 						       &it->key_data);
 		break;
 	default:
-		tnt_raise(IllegalParams, :"unsupported strategy");
+		tnt_raise(IllegalParams, :"unsupported iterator type");
 	}
 }
 

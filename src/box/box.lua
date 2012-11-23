@@ -202,7 +202,7 @@ function box.on_reload_configuration()
 
         return iterator_state
     end
-    local next_prev_compat = function(index, strategy, ...)
+    local next_prev_compat = function(index, iterator_type, ...)
         local arg = {...}
         local iterator_state = nil;
         if #arg == 1 and type(arg[1]) == "function" then
@@ -210,7 +210,7 @@ function box.on_reload_configuration()
             iterator_state = arg[1]
         else
             -- first call, create new iterator closure
-            iterator_state = index:pairs(strategy, ...);
+            iterator_state = index:pairs(iterator_type, ...);
         end
 
         -- return iterator_state, value

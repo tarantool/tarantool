@@ -672,12 +672,12 @@ lbox_index_iterator(struct lua_State *L)
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
 
-	enum iteration_strategy strategy;
+	enum iterator_type type;
 	if (argc > 0) {
 		/* first parameter must be iterator flags */
-		strategy = (enum iteration_strategy) luaL_checkint(L, 2);
+		type = (enum iterator_type) luaL_checkint(L, 2);
 	} else {
-		strategy = ITER_ALL;
+		type = ITER_ALL;
 	}
 
 	void *key = NULL;
@@ -702,7 +702,7 @@ lbox_index_iterator(struct lua_State *L)
 	}
 
 	struct iterator *it = [index allocIterator];
-	[index initIterator: it :strategy :key :field_count];
+	[index initIterator: it :type :key :field_count];
 	lbox_pushiterator(L, it);
 
 	lua_pushcclosure(L, &lbox_index_iter_closure, 1);
@@ -1148,13 +1148,13 @@ box_lua_execute(struct request *request, struct txn *txn, struct port *port)
 static
 void mod_lua_init_index_constants(struct lua_State *L, int index) {
 	for (int i = 0;
-	     iteration_strategy_vals[i] != iteration_strategy_MAX;
+	     iterator_type_vals[i] != iterator_type_MAX;
 	     i++) {
-		enum iteration_strategy val = iteration_strategy_vals[i];
-		assert(strncmp(iteration_strategy_strs[val], "ITER_", 5) == 0);
+		enum iterator_type val = iterator_type_vals[i];
+		assert(strncmp(iterator_type_strs[val], "ITER_", 5) == 0);
 		lua_pushnumber(L, val);
 		/* cut ITER_ prefix from enum name */
-		lua_setfield(L, index, iteration_strategy_strs[val] + 5);
+		lua_setfield(L, index, iterator_type_strs[val] + 5);
 	}
 }
 
