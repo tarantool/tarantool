@@ -64,12 +64,8 @@
 #define mh_ecat(a, b) mh_cat(a, b)
 #define _mh(x) mh_ecat(mh_name, x)
 
-#ifndef likely
-#define likely(x)    __builtin_expect((x),1)
-#endif
-
-#ifndef unlikely
-#define unlikely(x)  __builtin_expect((x),0)
+#ifndef mh_unlikely
+#define mh_unlikely(x)  __builtin_expect((x),0)
 #endif
 
 #ifndef MH_TYPEDEFS
@@ -254,16 +250,16 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node,
 		goto put_done;
 
 #if MH_INCREMENTAL_RESIZE
-	if (unlikely(h->resize_position > 0))
+	if (mh_unlikely(h->resize_position > 0))
 		_mh(resize)(h, hash_arg, eq_arg);
-	else if (unlikely(h->n_dirty >= h->upper_bound)) {
+	else if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
 		if (_mh(start_resize)(h, h->n_buckets + 1, 0, hash_arg, eq_arg))
 			goto put_done;
 	}
 	if (h->resize_position)
 		_mh(put)(h->shadow, node, hash_arg, eq_arg, NULL);
 #else
-	if (unlikely(h->n_dirty >= h->upper_bound)) {
+	if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
 		if (_mh(start_resize)(h, h->n_buckets + 1, h->size,
 			hash_arg, eq_arg))
 			goto put_done;
@@ -303,7 +299,7 @@ _mh(del)(struct _mh(t) *h, mh_int_t x,
 		if (!mh_dirty(h, x))
 			h->n_dirty--;
 #if MH_INCREMENTAL_RESIZE
-		if (unlikely(h->resize_position))
+		if (mh_unlikely(h->resize_position))
 			_mh(del_resize)(h, x, hash_arg, eq_arg);
 #endif
 	}

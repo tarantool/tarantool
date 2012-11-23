@@ -1,6 +1,3 @@
-#ifndef TARANTOOL_ASSOC_H_INCLUDED
-#define TARANTOOL_ASSOC_H_INCLUDED
-
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -106,5 +103,3 @@ mh_strptr_hash(const mh_node_t *a, mh_hash_arg_t arg) {
 #define mh_eq_arg_t void *
 #define mh_eq(a, b, arg) (lstrcmp(a->key, b->key) == 0)
 #include <mhash.h>
-
-#endif /* TARANTOOL_ASSOC_H_INCLUDED */
