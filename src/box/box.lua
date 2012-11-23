@@ -217,17 +217,17 @@ function box.on_reload_configuration()
         return iterator_state()
     end
     index_mt.next = function(index, ...)
-        return next_prev_compat(index, box.index.ITER_GE, ...)
+        return next_prev_compat(index, box.index.GE, ...)
     end
     index_mt.prev = function(index, ...)
-        return next_prev_compat(index, box.index.ITER_LE, ...)
+        return next_prev_compat(index, box.index.LE, ...)
     end
     index_mt.next_equal = function(index, ...)
-        return next_prev_compat(index, box.index.ITER_EQ, ...)
+        return next_prev_compat(index, box.index.EQ, ...)
     end
     -- there is no difference between next_equal and prev_equal
     index_mt.prev_equal = function(index, ...)
-        return next_prev_compat(index, box.index.ITER_EQ, ...)
+        return next_prev_compat(index, box.index.EQ, ...)
     end
     -- index subtree size
     index_mt.count = function(index, ...)
@@ -236,7 +236,7 @@ function box.on_reload_configuration()
     --
     index_mt.select_range = function(index, limit, ...)
         local range = {}
-        for v in index:iterator(box.index.ITER_GE, ...) do
+        for v in index:iterator(box.index.GE, ...) do
             if #range >= limit then
                 break
             end
@@ -246,7 +246,7 @@ function box.on_reload_configuration()
     end
     index_mt.select_reverse_range = function(index, limit, ...)
         local range = {}
-        for v in index:iterator(box.index.ITER_LE, ...) do
+        for v in index:iterator(box.index.LE, ...) do
             if #range >= limit then
                 break
             end

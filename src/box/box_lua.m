@@ -1151,8 +1151,10 @@ void mod_lua_init_index_constants(struct lua_State *L, int index) {
 	     iteration_strategy_vals[i] != iteration_strategy_MAX;
 	     i++) {
 		enum iteration_strategy val = iteration_strategy_vals[i];
+		assert(strncmp(iteration_strategy_strs[val], "ITER_", 5) == 0);
 		lua_pushnumber(L, val);
-		lua_setfield(L, index, iteration_strategy_strs[val]);
+		/* cut ITER_ prefix from enum name */
+		lua_setfield(L, index, iteration_strategy_strs[val] + 5);
 	}
 }
 

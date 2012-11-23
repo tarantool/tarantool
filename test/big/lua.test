@@ -109,23 +109,23 @@ for sid in {1, 2}:
         tid -= 1
 
 # Tree
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_ALL) do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_GE, nil) do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_GT, nil) do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_LE, nil) do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_LT, nil) do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_EQ, 'sid_1') do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_EQ, 'sid_2', 'tid_996') do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_GE, 'sid_2', 'tid_994') do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_GT, 'sid_2', 'tid_994') do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_LE, 'sid_1', 'tid_999') do print(v) end"
-exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ITER_LT, 'sid_1', 'tid_999') do print(v) end"
-exec admin "lua iter = box.space[16].index[1]:iterator(box.index.ITER_EQ, 'sid_2', 'tid_994'); print(iter())"
-exec admin "lua box.space[16].index[1]:iterator(box.index.ITER_EQ, 'sid_2', 'tid_992', '1')"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ALL) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GE, nil) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GT, nil) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LE, nil) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LT, nil) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.EQ, 'sid_1') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.EQ, 'sid_2', 'tid_996') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GE, 'sid_2', 'tid_994') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GT, 'sid_2', 'tid_994') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LE, 'sid_1', 'tid_999') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LT, 'sid_1', 'tid_999') do print(v) end"
+exec admin "lua iter = box.space[16].index[1]:iterator(box.index.EQ, 'sid_2', 'tid_994'); print(iter())"
+exec admin "lua box.space[16].index[1]:iterator(box.index.EQ, 'sid_2', 'tid_992', '1')"
 
 # Hash
-exec admin "lua for v in box.space[16].index[0]:iterator(box.index.ITER_EQ, 'pid_2') do print(v) end"
-exec admin "lua for v in box.space[16].index[0]:iterator(box.index.ITER_ALL) do print(v) end"
+exec admin "lua for v in box.space[16].index[0]:iterator(box.index.EQ, 'pid_2') do print(v) end"
+exec admin "lua for v in box.space[16].index[0]:iterator(box.index.ALL) do print(v) end"
 
 exec admin "lua box.space[16]:truncate()"
 
