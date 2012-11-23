@@ -51,9 +51,6 @@ const char *index_type_strs[] = { "HASH", "TREE", "\0" };
 STRS(iteration_strategy, ITERATION_STRATEGY);
 ENUM_VALS(iteration_strategy, ITERATION_STRATEGY);
 
-
-
-
 /* {{{ Index -- base class for all indexes. ********************/
 
 @interface HashIndex: Index
