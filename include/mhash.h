@@ -162,10 +162,10 @@ void _mh(dump)(struct _mh(t) *h);
 #define put_slot(h, node, hash_arg, eq_arg) \
 	_mh(put_slot)(h, node, hash_arg, eq_arg)
 
-static inline const mh_node_t *
+static inline mh_node_t *
 _mh(node)(struct _mh(t) *h, mh_int_t x)
 {
-	return (const mh_node_t *) &(h->p[x]);
+	return (mh_node_t *) &(h->p[x]);
 }
 
 

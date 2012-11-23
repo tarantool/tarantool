@@ -59,7 +59,7 @@ void tc_space_free(struct tc_spaces *s)
 		mh_int_t pos = 0;
 		while (pos != mh_end(space->hash_log)) {
 			if (mh_exist((space->hash_log), pos)) {
-				struct tc_key *k = (struct tc_key *)
+				struct tc_key *k =
 					*mh_pk_node(space->hash_log, pos);
 				free(k);
 			}
@@ -68,7 +68,7 @@ void tc_space_free(struct tc_spaces *s)
 		pos = 0;
 		while (pos != mh_end(space->hash_snap)) {
 			if (mh_exist((space->hash_snap), pos)) {
-				struct tc_key *k = (struct tc_key *)
+				struct tc_key *k =
 					*mh_pk_node(space->hash_snap, pos);
 				free(k);
 			}
