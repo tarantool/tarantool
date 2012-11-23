@@ -660,14 +660,14 @@ lbox_index_iter_closure(struct lua_State *L);
 
 /**
  * @brief Lua iterator over a Taratnool/Box index.
- * @example lua iter = box.space[0].index[0]:iter(box.index.ITER_GE, 1);
+ * @example lua iter = box.space[0].index[0]:iterator(box.index.ITER_GE, 1);
  *   print(iter(), iter()).
  * @param L lua stack
  * @see http://www.lua.org/pil/7.1.html
  * @return number of return values put on the stack
  */
 static int
-lbox_index_iter(struct lua_State *L)
+lbox_index_iterator(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L) - 1;
@@ -775,7 +775,7 @@ static const struct luaL_reg lbox_index_meta[] = {
 	{"part_count", lbox_index_part_count},
 	{"min", lbox_index_min},
 	{"max", lbox_index_max},
-	{"iter", lbox_index_iter},
+	{"iterator", lbox_index_iterator},
 	{"count", lbox_index_count},
 	{NULL, NULL}
 };

@@ -184,13 +184,13 @@ function box.on_reload_configuration()
     index_mt.min = function(index) return index.idx:min() end
     index_mt.max = function(index) return index.idx:max() end
     -- iteration
-    index_mt.iter = function(index, ...)
-        return index.idx:iter(...)
+    index_mt.iterator = function(index, ...)
+        return index.idx:iterator(...)
     end
     --
     -- pairs/next/prev methods are provided for backward compatibility purposes only
     index_mt.pairs = function(index, ...)
-        local iter = index:iter(...)
+        local iter = index:iterator(...)
         iterator_state = function()
             local value = iter()
             if value == nil then
@@ -236,7 +236,7 @@ function box.on_reload_configuration()
     --
     index_mt.select_range = function(index, limit, ...)
         local range = {}
-        for v in index:iter(box.index.ITER_GE, ...) do
+        for v in index:iterator(box.index.ITER_GE, ...) do
             if #range >= limit then
                 break
             end
@@ -246,7 +246,7 @@ function box.on_reload_configuration()
     end
     index_mt.select_reverse_range = function(index, limit, ...)
         local range = {}
-        for v in index:iter(box.index.ITER_LE, ...) do
+        for v in index:iterator(box.index.ITER_LE, ...) do
             if #range >= limit then
                 break
             end
@@ -276,7 +276,7 @@ function box.on_reload_configuration()
         local pk = space.index[0].idx
         local part_count = pk:part_count()
         while #pk > 0 do
-            for v in space.index[0]:iter() do
+            for v in space.index[0]:iterator() do
                 space:delete(v:slice(0, part_count))
             end
         end

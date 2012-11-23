@@ -280,7 +280,7 @@ lua box.insert(16, 'pid_6', 'sid_2', 'tid_994')
 ---
  - 'pid_6': {'sid_2', 'tid_994'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_ALL) do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_ALL) do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
@@ -289,7 +289,7 @@ lua for v in box.space[16].index[1]:iter(box.index.ITER_ALL) do print(v) end
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_GE, nil) do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_GE, nil) do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
@@ -298,7 +298,7 @@ lua for v in box.space[16].index[1]:iter(box.index.ITER_GE, nil) do print(v) end
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_GT, nil) do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_GT, nil) do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
@@ -307,7 +307,7 @@ lua for v in box.space[16].index[1]:iter(box.index.ITER_GT, nil) do print(v) end
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_LE, nil) do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_LE, nil) do print(v) end
 ---
 'pid_4': {'sid_2', 'tid_996'}
 'pid_5': {'sid_2', 'tid_995'}
@@ -316,7 +316,7 @@ lua for v in box.space[16].index[1]:iter(box.index.ITER_LE, nil) do print(v) end
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_LT, nil) do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_LT, nil) do print(v) end
 ---
 'pid_4': {'sid_2', 'tid_996'}
 'pid_5': {'sid_2', 'tid_995'}
@@ -325,51 +325,51 @@ lua for v in box.space[16].index[1]:iter(box.index.ITER_LT, nil) do print(v) end
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_EQ, 'sid_1') do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_EQ, 'sid_1') do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
 'pid_1': {'sid_1', 'tid_999'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_EQ, 'sid_2', 'tid_996') do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_EQ, 'sid_2', 'tid_996') do print(v) end
 ---
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_GE, 'sid_2', 'tid_994') do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_GE, 'sid_2', 'tid_994') do print(v) end
 ---
 'pid_6': {'sid_2', 'tid_994'}
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_GT, 'sid_2', 'tid_994') do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_GT, 'sid_2', 'tid_994') do print(v) end
 ---
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_LE, 'sid_1', 'tid_999') do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_LE, 'sid_1', 'tid_999') do print(v) end
 ---
 'pid_1': {'sid_1', 'tid_999'}
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua for v in box.space[16].index[1]:iter(box.index.ITER_LT, 'sid_1', 'tid_999') do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.ITER_LT, 'sid_1', 'tid_999') do print(v) end
 ---
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua iter = box.space[16].index[1]:iter(box.index.ITER_EQ, 'sid_2', 'tid_994'); print(iter())
+lua iter = box.space[16].index[1]:iterator(box.index.ITER_EQ, 'sid_2', 'tid_994'); print(iter())
 ---
 'pid_6': {'sid_2', 'tid_994'}
 ...
-lua box.space[16].index[1]:iter(box.index.ITER_EQ, 'sid_2', 'tid_992', '1')
+lua box.space[16].index[1]:iterator(box.index.ITER_EQ, 'sid_2', 'tid_992', '1')
 ---
 error: 'Key part count 3 is greater than index part count 2'
 ...
-lua for v in box.space[16].index[0]:iter(box.index.ITER_EQ, 'pid_2') do print(v) end
+lua for v in box.space[16].index[0]:iterator(box.index.ITER_EQ, 'pid_2') do print(v) end
 ---
 'pid_2': {'sid_1', 'tid_998'}
 ...
-lua for v in box.space[16].index[0]:iter(box.index.ITER_ALL) do print(v) end
+lua for v in box.space[16].index[0]:iterator(box.index.ITER_ALL) do print(v) end
 ---
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
