@@ -227,7 +227,7 @@ function box.on_reload_configuration()
     end
     -- there is no difference between next_equal and prev_equal
     index_mt.prev_equal = function(index, ...)
-        return next_prev_compat(index, box.index.EQ, ...)
+        return next_prev_compat(index, box.index.REQ, ...)
     end
     -- index subtree size
     index_mt.count = function(index, ...)
