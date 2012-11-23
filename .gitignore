@@ -31,6 +31,7 @@ Makefile
 CMakeFiles
 CMakeCache.txt
 cmake_install.cmake
+*.cbp
 src/box/tarantool_box
 client/tarantool/tarantool
 client/tarantool_checksum/tarantool_checksum

@@ -5,25 +5,37 @@
 #define MH_UNDEF
 #endif
 
-typedef void* ptr_t;
+#include <stdint.h>
 
 #define mh_name _u32ptr
-#define mh_key_t uint32_t
-#define mh_val_t ptr_t
-#define mh_hash(a) (a)
-#define mh_eq(a, b) ((a) == (b))
+struct mh_u32ptr_node_t {
+	uint32_t key;
+	void *val;
+};
+
+#define mh_node_t struct mh_u32ptr_node_t
+#define mh_hash_arg_t void *
+#define mh_hash(a, arg) (a->key)
+#define mh_eq_arg_t void *
+#define mh_eq(a, b, arg) ((a->key) == (b->key))
 #include <mhash.h>
 
-uint32_t search_hash(void *x, const struct tc_key *k);
-int search_equal(void *x, const struct tc_key *a, const struct tc_key *b);
 
-#undef put_slot
+struct tc_space;
+
+uint32_t
+search_hash(const struct tc_key *k, struct tc_space *s);
+
+int
+search_equal(const struct tc_key *a, const struct tc_key *b,
+	     struct tc_space *s);
 
 #define mh_name _pk
-#define mh_arg_t void*
-#define mh_val_t struct tc_key*
-#define mh_hash(x, k) search_hash((x), (k))
-#define mh_eq(x, ka, kb) search_equal((x), (ka), (kb))
-#include "mhash-val.h"
+#define mh_node_t struct tc_key *
+#define mh_hash_arg_t struct tc_space *
+#define mh_hash(a, arg) search_hash(*(a), arg)
+#define mh_eq_arg_t struct tc_space *
+#define mh_eq(a, b, arg) search_equal(*(a), *(b), arg)
+#include <mhash.h>
 
 #endif

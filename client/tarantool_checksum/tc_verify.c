@@ -74,20 +74,22 @@ int tc_verify_cmp(struct tc_spaces *s,
 	}
 
 	/* 1. check in hash, if found then skip */
-	mh_int_t pos = mh_pk_get(space, &space->hash_log, k);
-	struct tc_key *v = NULL;
-	if (pos != mh_end(&space->hash_log))
-		v = mh_value(&space->hash_log, pos);
+	const struct tc_key *node = k;
+	mh_int_t pos = mh_pk_get(space->hash_log, &node, space, space);
+	const struct tc_key *v = NULL;
+	if (pos != mh_end(space->hash_log))
+		v = *mh_pk_node(space->hash_log, pos);
 	if (v) {
 		rc = 0;
 		goto done;
 	}
 
 	/* 2. if key was not found in xlog hash, then try snapshot hash */
-	pos = mh_pk_get(space, &space->hash_snap, k);
+	node = k;
+	pos = mh_pk_get(space->hash_snap, &node, space, space);
 	v = NULL;
-	if (pos != mh_end(&space->hash_snap))
-		v = mh_value(&space->hash_snap, pos);
+	if (pos != mh_end(space->hash_snap))
+		v = *mh_pk_node(space->hash_snap, pos);
 	if (v) {
 		/* generate and compare checksum */
 		uint32_t crc = crc32c(0, (unsigned char*)is->t.data, is->t.size);
