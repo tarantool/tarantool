@@ -901,6 +901,10 @@ tree_iterator_free(struct iterator *iterator)
 
 - (struct tuple *) findByTuple: (struct tuple *) tuple
 {
+	if (unlikely(tuple->field_count < key_def->max_fieldno)) {
+		return NULL;
+	}
+
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
 
