@@ -1,18 +1,20 @@
-#define set(x) ({						\
-			k = put(x);				\
-			mh_value(h, k) = (x) << 1;	\
-		})
+#define set(x) ({							\
+	k = put(x);							\
+	val(k) = (x) << 1;						\
+})
 
-#define rm(x) ({					\
-			k = get(x);			\
-			del(k);				\
-		})
+
+#define rm(x) ({							\
+	mh_int_t k = get(x);						\
+	del(k);								\
+})
 
 #define tst(x) ({							\
-			k = get(x);					\
-			fail_unless(k != mh_end(h));			\
-			fail_unless(mh_value(h, k) == (x) << 1);\
-		})
+	mh_int_t k = get((x));						\
+	fail_unless(k != mh_end(h));					\
+	fail_unless(val(k) == ((x) << 1));				\
+})
+
 
 #define clr(x) fail_unless(get(x) == mh_end(h))
 #define usd(x) fail_unless(get(x) != mh_end(h))
@@ -174,3 +176,5 @@ destroy(h);
 #undef get
 #undef put
 #undef del
+#undef key
+#undef val
