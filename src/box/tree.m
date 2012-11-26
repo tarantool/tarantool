@@ -299,6 +299,8 @@ key_is_linear(struct key_def *key_def)
 static void
 fold_with_sparse_parts(struct key_def *key_def, struct tuple *tuple, union sparse_part* parts)
 {
+	assert (tuple->field_count >= key_def->max_fieldno);
+
 	u8 *part_data = tuple->data;
 
 	memset(parts, 0, sizeof(parts[0]) * key_def->part_count);
@@ -901,10 +903,6 @@ tree_iterator_free(struct iterator *iterator)
 
 - (struct tuple *) findByTuple: (struct tuple *) tuple
 {
-	if (unlikely(tuple->field_count < key_def->max_fieldno)) {
-		return NULL;
-	}
-
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
 
