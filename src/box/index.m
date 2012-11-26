@@ -284,7 +284,7 @@ struct hash_lstr_iterator {
 struct tuple *
 hash_iterator_i32_next(struct iterator *ptr)
 {
-	assert(iterator->next == hash_iterator_i32_next);
+	assert(ptr->next == hash_iterator_i32_next);
 	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
 
 	while (it->h_pos < mh_end(it->hash)) {
@@ -298,7 +298,7 @@ hash_iterator_i32_next(struct iterator *ptr)
 struct tuple *
 hash_iterator_i64_next(struct iterator *ptr)
 {
-	assert(iterator->next == hash_iterator_i64_next);
+	assert(ptr->next == hash_iterator_i64_next);
 	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
 
 	while (it->h_pos < mh_end(it->hash)) {
@@ -312,7 +312,7 @@ hash_iterator_i64_next(struct iterator *ptr)
 struct tuple *
 hash_iterator_lstr_next(struct iterator *ptr)
 {
-	assert(iterator->next == hash_iterator_lstr_next);
+	assert(ptr->next == hash_iterator_lstr_next);
 	struct hash_lstr_iterator *it = (struct hash_lstr_iterator *) ptr;
 
 	while (it->h_pos < mh_end(it->hash)) {
@@ -519,7 +519,7 @@ int32_key_to_value(void *key)
 
 - (void) initIterator: (struct iterator *) ptr:(enum iterator_type) type
 {
-	assert(iterator->free == hash_iterator_free);
+	assert(ptr->free == hash_iterator_free);
 	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
 
 	if (type == ITER_REVERSE)
@@ -537,7 +537,7 @@ int32_key_to_value(void *key)
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	assert(iterator->free == hash_iterator_free);
+	assert(ptr->free == hash_iterator_free);
 	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
 
 	u32 num = int32_key_to_value(key);
@@ -658,7 +658,7 @@ int64_key_to_value(void *key)
 
 - (void) initIterator: (struct iterator *) ptr: (enum iterator_type) type
 {
-	assert(iterator->free == hash_iterator_free);
+	assert(ptr->free == hash_iterator_free);
 	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
 
 	if (type == ITER_REVERSE)
@@ -676,7 +676,7 @@ int64_key_to_value(void *key)
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	assert(iterator->free == hash_iterator_free);
+	assert(ptr->free == hash_iterator_free);
 	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
 
 	u64 num = int64_key_to_value(key);
@@ -812,7 +812,7 @@ int64_key_to_value(void *key)
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	assert(iterator->free == hash_iterator_free);
+	assert(ptr->free == hash_iterator_free);
 	struct hash_lstr_iterator *it = (struct hash_lstr_iterator *) ptr;
 
 	it->base.next_equal = iterator_first_equal;
