@@ -88,6 +88,7 @@ execute_replace(struct request *request, struct txn *txn)
 	/* Try to find tuple by primary key */
 	Index *pk = space_index(sp, 0);
 
+	/* Check to see if the tuple has a sufficient number of fields. */
 	if (unlikely(txn->new_tuple->field_count < sp->max_fieldno)) {
 		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 	}
