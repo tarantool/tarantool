@@ -189,45 +189,29 @@ function box.on_reload_configuration()
     end
     --
     -- pairs/next/prev methods are provided for backward compatibility purposes only
-    index_mt.pairs = function(index, ...)
-        local iter = index:iterator(...)
-        iterator_state = function()
-            local value = iter()
-            if value == nil then
-                return nil
-            else
-                return iterator_state, value
-            end
-        end
-
-        return iterator_state
+    index_mt.pairs = function(index)
+        return index.idx.next, index.idx, nil
     end
-    local next_prev_compat = function(index, iterator_type, ...)
+    --
+    local next_compat = function(idx, iterator_type, ...)
         local arg = {...}
-        local iterator_state = nil;
-        if #arg == 1 and type(arg[1]) == "function" then
-            -- next call, already have an iterator closure
-            iterator_state = arg[1]
+        if #arg == 1 and type(arg[1]) == "userdata" then
+            return idx:next(...)
         else
-            -- first call, create new iterator closure
-            iterator_state = index:pairs(iterator_type, ...);
+            return idx:next(iterator_type, ...)
         end
-
-        -- return iterator_state, value
-        return iterator_state()
     end
     index_mt.next = function(index, ...)
-        return next_prev_compat(index, box.index.GE, ...)
+        return next_compat(index.idx, box.index.GE, ...);
     end
     index_mt.prev = function(index, ...)
-        return next_prev_compat(index, box.index.LE, ...)
+        return next_compat(index.idx, box.index.LE, ...);
     end
     index_mt.next_equal = function(index, ...)
-        return next_prev_compat(index, box.index.EQ, ...)
+        return next_compat(index.idx, box.index.EQ, ...);
     end
-    -- there is no difference between next_equal and prev_equal
     index_mt.prev_equal = function(index, ...)
-        return next_prev_compat(index, box.index.REQ, ...)
+        return next_compat(index.idx, box.index.REQ, ...);
     end
     -- index subtree size
     index_mt.count = function(index, ...)
@@ -276,7 +260,7 @@ function box.on_reload_configuration()
         local pk = space.index[0].idx
         local part_count = pk:part_count()
         while #pk > 0 do
-            for v in space.index[0]:iterator() do
+            for v in pk:iterator() do
                 space:delete(v:slice(0, part_count))
             end
         end

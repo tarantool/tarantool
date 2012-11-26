@@ -13,6 +13,6 @@ print """
 # A test case for Bug#1043858 server crash on lua stack overflow on CentOS
 # 5.4
 #"""
-exec admin "lua for i = 1, 100000, 1 do box.space[1]:insert(i,0) end"
-exec admin "lua local t1 = {box.select(1, 1, 0)}"
+exec admin "lua for i = 1, 100000, 1 do box.space[1]:insert(i,i) end"
+exec admin "lua local t1 = {box.select(1, 1)}"
 exec admin "lua box.space[1]:truncate()"

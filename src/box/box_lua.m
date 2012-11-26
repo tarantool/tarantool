@@ -44,7 +44,6 @@
 #include "pickle.h"
 #include "tuple.h"
 #include "space.h"
-#include "index.h"
 #include "port.h"
 
 /* contents of box.lua */
@@ -655,13 +654,138 @@ void append_key_part(struct lua_State *L, int i,
 	tbuf_append(tbuf, str, size);
 }
 
-static int
-lbox_index_iter_closure(struct lua_State *L);
+/*
+ * Lua iterator over a Taratnool/Box index.
+ *
+ *	(iteration_state, tuple) = index.next(index, [params])
+ *
+ * When [params] are absent or nil
+ * returns a pointer to a new ALL iterator and
+ * to the first tuple (or nil, if the index is
+ * empty).
+ *
+ * When [params] is a userdata,
+ * i.e. we're inside an iteration loop, retrieves
+ * the next tuple from the iterator.
+ *
+ * Otherwise, [params] can be used to seed
+ * a new iterator with iterator type and
+ * type-specific arguments. For exaple,
+ * for GE iterator, a list of Lua scalars
+ * cann follow the box.index.GE: this will
+ * start iteration from the offset specified by
+ * the given (multipart) key.
+ *
+ * @return Returns an iterator object, either created
+ *         or taken from Lua stack.
+ */
+static inline struct iterator *
+lbox_toiterator(struct lua_State *L)
+{
+	Index *index = lua_checkindex(L, 1);
+	int argc = lua_gettop(L);
+	struct iterator *it = NULL;
+	if (argc == 2 && lua_type(L, 2) == LUA_TUSERDATA) {
+		/*
+		 * Apart from the index itself, we have only one
+		 * other argument, and it's a userdata: must be
+		 * iteration state created before.
+		 */
+		it = lua_checkiterator(L, 2);
+		return it;
+	}
+	/* Create a new iterator. */
+	enum iterator_type type;
+	int field_count;
+	void *key;
+	if (argc == 1 || (argc == 2 && lua_type(L, 2) == LUA_TNIL)) {
+		/*
+		 * Nothing or nil on top of the stack,
+		 * iteration over entire range from the
+		 * beginning (ITER_ALL).
+		 */
+		type = ITER_ALL;
+		field_count = 0;
+		key = NULL;
+	} else {
+		/*
+		 * In all other cases iterator type must
+		 * follow next.
+		 */
+		 type = luaL_checkint(L, 2);
+		 if (type >= iterator_type_MAX)
+			 luaL_error(L, "unknown iterator type: %d", type);
+		 /* What else do we have on the stack? */
+		 if (argc == 2 || (argc == 3 && lua_type(L, 3) == LUA_TNIL)) {
+			 /* Nothing */
+			 field_count = 0;
+			 key = NULL;
+		 } else if (argc == 3 && lua_type(L, 3) == LUA_TUSERDATA) {
+			/* Tuple. */
+			struct tuple *tuple = lua_checktuple(L, 2);
+			field_count = tuple->field_count;
+			key = tuple->data;
+		} else {
+			/* Single or multi- part key. */
+			field_count = argc - 2;
+			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
+			for (int i = 3; i <= argc; i++)
+				append_key_part(L, i, data,
+						index->key_def->parts[i-3].type);
+			key = data->data;
+		}
+		/*
+		 * We allow partially specified keys for TREE
+		 * indexes. HASH indexes can only use single-part
+		 * keys.
+		*/
+		if (field_count > index->key_def->part_count)
+			luaL_error(L, "Key part count %d"
+				   " is greater than index part count %d",
+				   field_count, index->key_def->part_count);
+	}
+	it = [index allocIterator];
+	[index initIterator: it :type :key :field_count];
+	lbox_pushiterator(L, it);
+
+	return it;
+}
 
 /**
- * @brief Lua iterator over a Taratnool/Box index.
- * @example lua iter = box.space[0].index[0]:iterator(box.index.ITER_GE, 1);
- *   print(iter(), iter()).
+ * Lua-style next() function, for use in pairs().
+ * @example:
+ * for k, v in box.space[0].index[0].idx.next, box.space[0].index[0].idx, nil do
+ *	print(v)
+ * end
+ */
+static int
+lbox_index_next(struct lua_State *L)
+{
+	struct iterator *it = lbox_toiterator(L);
+	struct tuple *tuple = it->next(it);
+	/* If tuple is NULL, pushes nil as end indicator. */
+	lbox_pushtuple(L, tuple);
+	return tuple ? 2 : 1;
+}
+
+/** iterator() closure function. */
+static int
+lbox_index_iterator_closure(struct lua_State *L)
+{
+	/* Extract closure arguments. */
+	struct iterator *it = lua_checkiterator(L, lua_upvalueindex(1));
+
+	struct tuple *tuple = it->next(it);
+
+	/* If tuple is NULL, push nil as end indicator. */
+	lbox_pushtuple(L, tuple);
+	return 1;
+}
+
+/**
+ * @brief Create iterator closure over a Taratnool/Box index.
+ * @example lua it = box.space[0].index[0]:iterator(box.index.GE, 1);
+ *   print(it(), it()).
  * @param L lua stack
  * @see http://www.lua.org/pil/7.1.html
  * @return number of return values put on the stack
@@ -669,58 +793,12 @@ lbox_index_iter_closure(struct lua_State *L);
 static int
 lbox_index_iterator(struct lua_State *L)
 {
-	Index *index = lua_checkindex(L, 1);
-	int argc = lua_gettop(L) - 1;
-
-	enum iterator_type type;
-	if (argc > 0) {
-		/* first parameter must be iterator flags */
-		type = (enum iterator_type) luaL_checkint(L, 2);
-	} else {
-		type = ITER_ALL;
-	}
-
-	void *key = NULL;
-	int field_count = 0;
-
-	if (argc == 2 && lua_istuple(L, 3)) {
-		/* Searching by tuple. */
-		struct tuple *tuple = lua_checktuple(L, 3);
-		key = tuple->data;
-		field_count = tuple->field_count;
-	} else if (argc == 2 && lua_isnil(L, 3)) {
-		key = NULL;
-		field_count = 0;
-	} else if (argc >= 2) {
-		/* Single or multi- part key. */
-		field_count = argc - 1;
-		struct tbuf *data = tbuf_alloc(fiber->gc_pool);
-			for (int i = 0; i < field_count; ++i)
-				append_key_part(L, i + 3, data,
-						index->key_def->parts[i].type);
-		key = data->data;
-	}
-
-	struct iterator *it = [index allocIterator];
-	[index initIterator: it :type :key :field_count];
-	lbox_pushiterator(L, it);
-
-	lua_pushcclosure(L, &lbox_index_iter_closure, 1);
+	/* Create iterator and push it onto the stack. */
+	(void) lbox_toiterator(L);
+	lua_pushcclosure(L, &lbox_index_iterator_closure, 1);
 	return 1;
 }
 
-static int
-lbox_index_iter_closure(struct lua_State *L)
-{
-	/* extract closure arguments */
-	struct iterator *it = lua_checkiterator(L, lua_upvalueindex(1));
-
-	struct tuple *tuple = it->next(it);
-
-	/* If tuple is NULL, pushes nil as end indicator. */
-	lbox_pushtuple(L, tuple);
-	return 1;
-}
 
 /**
  * Lua index subtree count function.
@@ -775,6 +853,7 @@ static const struct luaL_reg lbox_index_meta[] = {
 	{"part_count", lbox_index_part_count},
 	{"min", lbox_index_min},
 	{"max", lbox_index_max},
+	{"next", lbox_index_next},
 	{"iterator", lbox_index_iterator},
 	{"count", lbox_index_count},
 	{NULL, NULL}
@@ -1031,7 +1110,8 @@ port_add_lua_multret(struct port *port, struct lua_State *L)
  * Signature:
  * box.process(op_code, request)
  */
-static int lbox_process(lua_State *L)
+static int
+lbox_process(lua_State *L)
 {
 	u32 op = lua_tointeger(L, 1); /* Get the first arg. */
 	struct tbuf req;
@@ -1072,8 +1152,8 @@ static const struct luaL_reg boxlib[] = {
  * A helper to find a Lua function by name and put it
  * on top of the stack.
  */
-static
-void box_lua_find(lua_State *L, const char *name, const char *name_end)
+static void
+box_lua_find(lua_State *L, const char *name, const char *name_end)
 {
 	int index = LUA_GLOBALSINDEX;
 	const char *start = name, *end;
@@ -1145,16 +1225,14 @@ box_lua_execute(struct request *request, struct txn *txn, struct port *port)
 	}
 }
 
-static
-void mod_lua_init_index_constants(struct lua_State *L, int index) {
-	for (int i = 0;
-	     iterator_type_vals[i] != iterator_type_MAX;
-	     i++) {
-		enum iterator_type val = iterator_type_vals[i];
-		assert(strncmp(iterator_type_strs[val], "ITER_", 5) == 0);
-		lua_pushnumber(L, val);
+static void
+box_index_init_iterator_types(struct lua_State *L, int idx)
+{
+	for (int i = 0; i < iterator_type_MAX; i++) {
+		assert(strncmp(iterator_type_strs[i], "ITER_", 5) == 0);
+		lua_pushnumber(L, i);
 		/* cut ITER_ prefix from enum name */
-		lua_setfield(L, index, iterator_type_strs[val] + 5);
+		lua_setfield(L, idx, iterator_type_strs[i] + 5);
 	}
 }
 
@@ -1168,7 +1246,7 @@ mod_lua_init(struct lua_State *L)
 	/* box.index */
 	tarantool_lua_register_type(L, indexlib_name, lbox_index_meta);
 	luaL_register(L, "box.index", indexlib);
-	mod_lua_init_index_constants(L, -2);
+	box_index_init_iterator_types(L, -2);
 	lua_pop(L, 1);
 	tarantool_lua_register_type(L, iteratorlib_name, lbox_iterator_meta);
 	/* Load box.lua */

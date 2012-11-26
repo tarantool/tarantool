@@ -13,10 +13,10 @@ lua box.space[1]:truncate()
 # A test case for Bug#1043858 server crash on lua stack overflow on CentOS
 # 5.4
 #
-lua for i = 1, 100000, 1 do box.space[1]:insert(i,0) end
+lua for i = 1, 100000, 1 do box.space[1]:insert(i,i) end
 ---
 ...
-lua local t1 = {box.select(1, 1, 0)}
+lua local t1 = {box.select(1, 1)}
 ---
 error: 'Lua error: stack overflow'
 ...

@@ -34,14 +34,14 @@ insert into t1 values ('item 3', 'california', 'uber alles')
 Insert OK, 1 row affected
 insert into t1 values ('item 4', 'georgia', 'on my mind')
 Insert OK, 1 row affected
-lua iter, tuple = box.space[1].index[1]:next('california')
+lua it, tuple = box.space[1].index[1]:next('california')
 ---
 ...
 lua tuple
 ---
  - 'item 2': {'california', 'dreaming '}
 ...
-lua iter, tuple = box.space[1].index[1]:next(iter)
+lua it, tuple = box.space[1].index[1]:next(it)
 ---
 ...
 lua tuple
@@ -195,9 +195,8 @@ lua box.space[14]:truncate()
 ...
 
 #
-# Tests for box.index iterators (deprecated)
+# Tests for box.index iterators
 #
-
 
 lua box.insert(16, 'pid_1', 'sid_1', 'tid_999')
 ---
@@ -289,7 +288,7 @@ lua for v in box.space[16].index[1]:iterator(box.index.ALL) do print(v) end
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for v in box.space[16].index[1]:iterator(box.index.GE, nil) do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.GE) do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
@@ -298,7 +297,7 @@ lua for v in box.space[16].index[1]:iterator(box.index.GE, nil) do print(v) end
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for v in box.space[16].index[1]:iterator(box.index.GT, nil) do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.GT) do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
@@ -307,7 +306,7 @@ lua for v in box.space[16].index[1]:iterator(box.index.GT, nil) do print(v) end
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for v in box.space[16].index[1]:iterator(box.index.LE, nil) do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.LE) do print(v) end
 ---
 'pid_4': {'sid_2', 'tid_996'}
 'pid_5': {'sid_2', 'tid_995'}
@@ -316,7 +315,7 @@ lua for v in box.space[16].index[1]:iterator(box.index.LE, nil) do print(v) end
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua for v in box.space[16].index[1]:iterator(box.index.LT, nil) do print(v) end
+lua for v in box.space[16].index[1]:iterator(box.index.LT) do print(v) end
 ---
 'pid_4': {'sid_2', 'tid_996'}
 'pid_5': {'sid_2', 'tid_995'}
@@ -363,7 +362,7 @@ lua for v in box.space[16].index[1]:iterator(box.index.LT, 'sid_1', 'tid_999') d
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua iter = box.space[16].index[1]:iterator(box.index.EQ, 'sid_2', 'tid_994'); print(iter())
+lua it = box.space[16].index[1]:iterator(box.index.EQ, 'sid_2', 'tid_994'); print(it())
 ---
 'pid_6': {'sid_2', 'tid_994'}
 ...
@@ -377,12 +376,12 @@ lua for v in box.space[16].index[0]:iterator(box.index.EQ, 'pid_2') do print(v) 
 ...
 lua for v in box.space[16].index[0]:iterator(box.index.ALL) do print(v) end
 ---
+'pid_1': {'sid_1', 'tid_999'}
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
-'pid_1': {'sid_1', 'tid_999'}
-'pid_6': {'sid_2', 'tid_994'}
 'pid_4': {'sid_2', 'tid_996'}
 'pid_5': {'sid_2', 'tid_995'}
+'pid_6': {'sid_2', 'tid_994'}
 ...
 lua box.space[16]:truncate()
 ---

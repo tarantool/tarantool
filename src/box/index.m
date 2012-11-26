@@ -35,8 +35,6 @@
 #include "space.h"
 #include "assoc.h"
 
-/* TODO(roman): split hash index to new file */
-
 static struct index_traits index_traits = {
 	.allows_partial_key = true,
 };
@@ -49,7 +47,18 @@ const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
 const char *index_type_strs[] = { "HASH", "TREE", "\0" };
 
 STRS(iterator_type, ITERATOR_TYPE);
-ENUM_VALS(iterator_type, ITERATOR_TYPE);
+
+void
+check_key_parts(struct key_def *key_def,
+		int part_count, bool partial_key_allowed)
+{
+	if (part_count > key_def->part_count)
+		tnt_raise(ClientError, :ER_KEY_PART_COUNT,
+			  part_count, key_def->part_count);
+	if (!partial_key_allowed && part_count < key_def->part_count)
+		tnt_raise(ClientError, :ER_EXACT_MATCH,
+			  part_count, key_def->part_count);
+}
 
 /* {{{ Index -- base class for all indexes. ********************/
 
@@ -174,7 +183,7 @@ ENUM_VALS(iterator_type, ITERATOR_TYPE);
 
 - (struct tuple *) findByKey: (void *) key :(int) part_count
 {
-	[self checkKeyParts: key_def: part_count: false];
+	check_key_parts(key_def, part_count, false);
 	return [self findUnsafe: key :part_count];
 }
 
@@ -213,34 +222,18 @@ ENUM_VALS(iterator_type, ITERATOR_TYPE);
 	return NULL;
 }
 
-- (void) initIterator: (struct iterator *) iterator
-	:(enum iterator_type) type
-{
-	[self initIterator: iterator: type: NULL: 0];
-}
 
 - (void) initIterator: (struct iterator *) iterator
 	:(enum iterator_type) type
 	:(void *) key :(int) part_count
 {
 	(void) iterator;
-	(void) key;
 	(void) type;
+	(void) key;
 	(void) part_count;
 	[self subclassResponsibility: _cmd];
 }
 
-- (void)
-checkKeyParts: (struct key_def *)key_def_arg
-	: (int) part_count: (bool) partial_key_allowed
-{
-	if (part_count > key_def_arg->part_count)
-		tnt_raise(ClientError, :ER_KEY_PART_COUNT,
-			  part_count, key_def_arg->part_count);
-	if (!partial_key_allowed && part_count < key_def_arg->part_count)
-		tnt_raise(ClientError, :ER_EXACT_MATCH,
-			  part_count, key_def_arg->part_count);
-}
 
 @end
 
@@ -254,12 +247,6 @@ struct hash_iterator {
 	mh_int_t h_pos;
 };
 
-static struct hash_iterator *
-hash_iterator(struct iterator *it)
-{
-	return (struct hash_iterator *) it;
-}
-
 void
 hash_iterator_free(struct iterator *iterator)
 {
@@ -267,10 +254,15 @@ hash_iterator_free(struct iterator *iterator)
 	free(iterator);
 }
 
+static struct hash_iterator *
+hash_iterator(struct iterator *iterator)
+{
+	assert(iterator->free == hash_iterator_free);
+	return (struct hash_iterator *) iterator;
+}
 struct tuple *
 hash_iterator_next(struct iterator *iterator)
 {
-	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	while (it->h_pos < mh_end(it->hash)) {
@@ -288,9 +280,9 @@ hash_iterator_next_null(struct iterator *it __attribute__((unused)))
 }
 
 static struct tuple *
-hash_iterator_next_equal(struct iterator *it)
+hash_iterator_eq(struct iterator *it)
 {
-	assert(it->next == hash_iterator_next_equal);
+	assert(it->next == hash_iterator_eq);
 	it->next = hash_iterator_next_null;
 	return hash_iterator_next(it);
 }
@@ -335,7 +327,7 @@ hash_iterator_next_equal(struct iterator *it)
 
 	struct iterator *it = pk->position;
 	struct tuple *tuple;
-	[pk initIterator: it :ITER_ALL];
+	[pk initIterator: it :ITER_ALL :NULL :0];
 
 	while ((tuple = it->next(it)))
 	      [self replace: NULL :tuple];
@@ -482,35 +474,33 @@ int32_key_to_value(void *key)
 	:(void *) key :(int) part_count
 {
 	(void) part_count;
-	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	switch (type) {
+	case ITER_GE:
+		if (key != NULL) {
+			check_key_parts(key_def, part_count,
+					traits->allows_partial_key);
+			u32 num = int32_key_to_value(key);
+			it->h_pos = mh_i32ptr_get(int_hash, num);
+			it->base.next = hash_iterator_next;
+			break;
+		}
+		/* Fall through. */
 	case ITER_ALL:
 		it->base.next = hash_iterator_next;
 		it->h_pos = mh_begin(int_hash);
 		break;
-	case ITER_GE:
-		if (key == NULL) {
-			it->base.next = hash_iterator_next;
-			it->h_pos = mh_begin(int_hash);
-		} else {
-			[self checkKeyParts: key_def: part_count:
-					     traits->allows_partial_key];
-			u32 num = int32_key_to_value(key);
-			it->h_pos = mh_i32ptr_get(int_hash, num);
-			it->base.next = hash_iterator_next;
-		}
-		break;
 	case ITER_EQ:
-		[self checkKeyParts: key_def: part_count:
-				     traits->allows_partial_key];
+		check_key_parts(key_def, part_count,
+				traits->allows_partial_key);
 		u32 num = int32_key_to_value(key);
 		it->h_pos = mh_i32ptr_get(int_hash, num);
-		it->base.next = hash_iterator_next_equal;
+		it->base.next = hash_iterator_eq;
 		break;
 	default:
-		tnt_raise(IllegalParams, :"unsupported iterator type");
+		tnt_raise(ClientError, :ER_UNSUPPORTED,
+			  "Hash index", "requested iterator type");
 	}
 
 	it->hash = int_hash;
@@ -614,37 +604,35 @@ int64_key_to_value(void *key)
 	:(enum iterator_type) type
 	:(void *) key :(int) part_count
 {
-	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	(void) part_count;
 
 	switch (type) {
+	case ITER_GE:
+		if (key != NULL) {
+			check_key_parts(key_def, part_count,
+					traits->allows_partial_key);
+			u64 num = int64_key_to_value(key);
+			it->h_pos = mh_i64ptr_get(int64_hash, num);
+			it->base.next = hash_iterator_next;
+			break;
+		}
+		/* Fallthrough. */
 	case ITER_ALL:
 		it->base.next = hash_iterator_next;
 		it->h_pos = mh_begin(int64_hash);
 		break;
-	case ITER_GE:
-		if (key == NULL) {
-			it->base.next = hash_iterator_next;
-			it->h_pos = mh_begin(int64_hash);
-		} else {
-			[self checkKeyParts: key_def: part_count:
-					     traits->allows_partial_key];
-			u64 num = int64_key_to_value(key);
-			it->h_pos = mh_i64ptr_get(int64_hash, num);
-			it->base.next = hash_iterator_next;
-		}
-		break;
 	case ITER_EQ:
-		[self checkKeyParts: key_def: part_count:
-				     traits->allows_partial_key];
+		check_key_parts(key_def, part_count,
+				traits->allows_partial_key);
 		u64 num = int64_key_to_value(key);
 		it->h_pos = mh_i64ptr_get(int64_hash, num);
-		it->base.next = hash_iterator_next_equal;
+		it->base.next = hash_iterator_eq;
 		break;
 	default:
-		tnt_raise(IllegalParams, :"unsupported iterator type");
+		tnt_raise(ClientError, :ER_UNSUPPORTED,
+			  "Hash index", "requested iterator type");
 	}
 
 	it->hash = (struct mh_i32ptr_t *) int64_hash;
@@ -744,33 +732,31 @@ int64_key_to_value(void *key)
 {
 	(void) part_count;
 
-	assert(iterator->free == hash_iterator_free);
 	struct hash_iterator *it = hash_iterator(iterator);
 
 	switch (type) {
+	case ITER_GE:
+		if (key != NULL) {
+			check_key_parts(key_def, part_count,
+					traits->allows_partial_key);
+			it->h_pos = mh_lstrptr_get(str_hash, key);
+			it->base.next = hash_iterator_next;
+			break;
+		}
+		/* Fall through. */
 	case ITER_ALL:
 		it->base.next = hash_iterator_next;
 		it->h_pos = mh_begin(str_hash);
 		break;
-	case ITER_GE:
-		if (key == NULL) {
-			it->base.next = hash_iterator_next;
-			it->h_pos = mh_begin(str_hash);
-		} else {
-			[self checkKeyParts: key_def: part_count:
-					     traits->allows_partial_key];
-			it->h_pos = mh_lstrptr_get(str_hash, key);
-			it->base.next = hash_iterator_next;
-		}
-		break;
 	case ITER_EQ:
-		[self checkKeyParts: key_def: part_count:
-				     traits->allows_partial_key];
+		check_key_parts(key_def, part_count,
+				traits->allows_partial_key);
 		it->h_pos = mh_lstrptr_get(str_hash, key);
-		it->base.next = hash_iterator_next_equal;
+		it->base.next = hash_iterator_eq;
 		break;
 	default:
-		tnt_raise(IllegalParams, :"unsupported iterator type");
+		tnt_raise(ClientError, :ER_UNSUPPORTED,
+			  "Hash index", "requested iterator type");
 	}
 
 	it->hash = (struct mh_i32ptr_t *) str_hash;
