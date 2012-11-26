@@ -491,7 +491,6 @@ int32_key_to_value(void *key)
 		it->h_pos = mh_begin(int_hash);
 		break;
 	case ITER_GE:
-		/* TODO(roman): backward compatibility only, remove in future */
 		if (key == NULL) {
 			it->base.next = hash_iterator_next;
 			it->h_pos = mh_begin(int_hash);
@@ -626,7 +625,6 @@ int64_key_to_value(void *key)
 		it->h_pos = mh_begin(int64_hash);
 		break;
 	case ITER_GE:
-		/* TODO(roman): backward compatibility only, remove in future */
 		if (key == NULL) {
 			it->base.next = hash_iterator_next;
 			it->h_pos = mh_begin(int64_hash);
@@ -755,7 +753,6 @@ int64_key_to_value(void *key)
 		it->h_pos = mh_begin(str_hash);
 		break;
 	case ITER_GE:
-		/* TODO(roman): backward compatibility only, remove in future */
 		if (key == NULL) {
 			it->base.next = hash_iterator_next;
 			it->h_pos = mh_begin(str_hash);
