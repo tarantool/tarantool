@@ -48,6 +48,7 @@
 #include "lua/slab.h"
 #include "lua/stat.h"
 #include "lua/uuid.h"
+#include "space.h"
 
 #include TARANTOOL_CONFIG
 
@@ -1374,14 +1375,13 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 	luaL_addstring(&b,
 		       "box.cfg = {}\n"
 		       "setmetatable(box.cfg, {})\n"
-		       "box.space = {}\n"
-		       "setmetatable(box.space, getmetatable(box.cfg))\n"
-		       "getmetatable(box.space).__index = "
+		       "getmetatable(box.cfg).__index = "
 		       "function(table, index)\n"
 		       "  table[index] = {}\n"
 		       "  setmetatable(table[index], getmetatable(table))\n"
 		       "  return rawget(table, index)\n"
-		       "end\n");
+		       "end\n"
+	);
 	while ((key = tarantool_cfg_iterator_next(i, cfg, &value)) != NULL) {
 		if (value == NULL)
 			continue;
@@ -1390,44 +1390,33 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 			lua_pushfstring(L, "box.cfg.%s = %s%s%s\n",
 					key, quote, value, quote);
 			luaL_addvalue(&b);
-		} else if (strncmp(key, "space", strlen("space")) == 0) {
-			lua_pushfstring(L, "box.%s = %s%s%s\n",
-					key, quote, value, quote);
-			luaL_addvalue(&b);
 		}
 		free(value);
 	}
-	if (cfg->memcached_port) {
-		lua_pushfstring(L,
-		"box.space[%d].enabled = true\n"
-		"box.space[%d].cardinality = 4\n"
-		"box.space[%d].estimated_rows = 0\n"
-		"box.space[%d].index[0].unique = true\n"
-		"box.space[%d].index[0].type = 'HASH'\n"
-		"box.space[%d].index[0].key_field[0].field_no = 0\n"
-		"box.space[%d].index[0].key_field[0].field_type = 'STRING'\n",
-		cfg->memcached_space, cfg->memcached_space,
-		cfg->memcached_space, cfg->memcached_space,
-		cfg->memcached_space, cfg->memcached_space,
-		cfg->memcached_space);
-		luaL_addvalue(&b);
-	}
+
 	luaL_addstring(&b,
 		       "getmetatable(box.cfg).__newindex = "
 		       "function(table, index)\n"
 		       "  error('Attempt to modify a read-only table')\n"
 		       "end\n"
 		       "getmetatable(box.cfg).__index = nil\n"
-		       "if type(box.on_reload_configuration) == 'function' "
-		       "then\n"
-		       "  box.on_reload_configuration()\n"
-		       "end\n");
+	);
 	luaL_pushresult(&b);
 	if (luaL_loadstring(L, lua_tostring(L, -1)) != 0 ||
 	    lua_pcall(L, 0, 0, 0) != 0) {
 		panic("%s", lua_tostring(L, -1));
 	}
-	lua_pop(L, 1);
+	lua_pop(L, 1);	/* cleanup stack */
+
+	lbox_space_init(L);
+
+	/* on_reload_configuration hook */
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	lua_pushstring(L, "on_reload_configuration");
+	lua_gettable(L, -2);
+	if (lua_isfunction(L, -1))
+		lua_call(L, 0, 0);
+	lua_pop(L, 1);	/* cleanup stack */
 }
 
 /**

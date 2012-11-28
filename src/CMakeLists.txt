@@ -132,6 +132,7 @@ set (common_sources
      lua/slab.m
      lua/uuid.m
      lua/lua_ipc.m
+     lua/space.m
 )
 
 if (ENABLE_TRACE)
