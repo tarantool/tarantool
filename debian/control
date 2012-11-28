@@ -9,8 +9,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  python-daemon,
  python-pexpect,
  libncurses5-dev,
- binutils-dev,
- dpkg-dev (>= 1.16.1~)
+ binutils-dev
 Section: database
 Standards-Version: 3.9.3
 Homepage: http://tarantool.org/
