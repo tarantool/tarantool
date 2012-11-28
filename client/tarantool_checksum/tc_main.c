@@ -1,5 +1,4 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,31 +27,71 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stddef.h>
+
+#include <stdlib.h>
+#include <stdarg.h>
 #include <stdint.h>
-#include "util.h"
+#include <stdio.h>
+#include <string.h>
 
-struct tbuf;
+#include <connector/c/include/tarantool/tnt.h>
+#include <connector/c/include/tarantool/tnt_xlog.h>
+#include <connector/c/include/tarantool/tnt_snapshot.h>
+#include <connector/c/include/tarantool/tnt_dir.h>
 
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void palloc_free(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void palloc_reset(struct palloc_pool *pool);
-void ptruncate(struct palloc_pool *pool, size_t sz);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-const char *palloc_name(struct palloc_pool *);
-size_t palloc_allocated(struct palloc_pool *);
+#include <third_party/gopt/gopt.h>
 
-void palloc_stat(struct tbuf *buf);
+#include <cfg/prscfg.h>
+#include <cfg/tarantool_box_cfg.h>
 
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+#include "tc_key.h"
+#define MH_SOURCE 1
+#include "tc_hash.h"
+#include "tc_options.h"
+#include "tc_config.h"
+#include "tc_space.h"
+#include "tc_generate.h"
+#include "tc_verify.h"
+
+void out_warning(ConfettyError v, char *format, ...) {
+	(void)v;
+	va_list ap;
+	va_start(ap, format);
+	vprintf(format, ap);
+	printf("\n");
+	va_end(ap);
+}
+
+int main(int argc, char *argv[])
+{
+	struct tc_options opts;
+	tc_options_init(&opts);
+
+	int rc;
+	enum tc_options_mode mode = tc_options_process(&opts, argc, argv);
+	switch (mode) {
+	case TC_MODE_USAGE:
+		return tc_options_usage();
+	case TC_MODE_VERSION:
+		return 0;
+	case TC_MODE_VERIFY:
+		rc = tc_config_load(&opts);
+		if (rc == -1)
+			return 1;
+		rc = tc_verify(&opts);
+		if (rc == -1)
+			break;
+		break;
+	case TC_MODE_GENERATE:
+		rc = tc_config_load(&opts);
+		if (rc == -1)
+			return 1;
+		rc = tc_generate(&opts);
+		if (rc == -1)
+			break;
+		break;
+	}
+
+	tc_options_free(&opts);
+	return 0;
+}

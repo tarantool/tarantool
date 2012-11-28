@@ -111,7 +111,7 @@ lbox_ipc_channel_is_empty(struct lua_State *L)
 static int
 lbox_ipc_channel_put(struct lua_State *L)
 {
-	ev_tstamp timeout;
+	ev_tstamp timeout = 0;
 	int top = lua_gettop(L);
 	struct ipc_channel *ch;
 

@@ -53,7 +53,8 @@ space_create(i32 space_no, struct key_def *key_defs, int key_count, int arity)
 	space = calloc(sizeof(struct space), 1);
 	space->no = space_no;
 
-	mh_i32ptr_put(spaces, space->no, space, NULL);
+	const struct mh_i32ptr_node_t node = { .key = space->no, .val = space };
+	mh_i32ptr_put(spaces, &node, NULL, NULL, NULL);
 
 	space->arity = arity;
 	space->key_defs = key_defs;
@@ -67,10 +68,11 @@ space_create(i32 space_no, struct key_def *key_defs, int key_count, int arity)
 struct space *
 space_by_n(i32 n)
 {
-	mh_int_t space = mh_i32ptr_get(spaces, n);
+	const struct mh_i32ptr_node_t node = { .key = n };
+	mh_int_t space = mh_i32ptr_get(spaces, &node, NULL, NULL);
 	if (space == mh_end(spaces))
 		return NULL;
-	return mh_value(spaces, space);
+	return mh_i32ptr_node(spaces, space)->val;
 }
 
 /** Return the number of active indexes in a space. */
@@ -97,7 +99,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata) {
 
 	mh_int_t i;
 	mh_foreach(spaces, i) {
-		struct space *space = mh_value(spaces, i);
+		struct space *space = mh_i32ptr_node(spaces, i)->val;
 		func(space, udata);
 	}
 }
@@ -194,8 +196,8 @@ space_free(void)
 	mh_int_t i;
 
 	mh_foreach(spaces, i) {
-		struct space *space = mh_value(spaces, i);
-		mh_i32ptr_del(spaces, i);
+		struct space *space = mh_i32ptr_node(spaces, i)->val;
+		mh_i32ptr_del(spaces, i, NULL, NULL);
 
 		int j;
 		for (j = 0 ; j < space->key_count; j++) {
@@ -369,7 +371,9 @@ space_config()
 			space->index[j] = index;
 		}
 
-		mh_i32ptr_put(spaces, space->no, space, NULL);
+		const struct mh_i32ptr_node_t node =
+			{ .key = space->no, .val = space };
+		mh_i32ptr_put(spaces, &node, NULL, NULL, NULL);
 		say_info("space %i successfully configured", i);
 	}
 }
@@ -391,7 +395,7 @@ begin_build_primary_indexes(void)
 	mh_int_t i;
 
 	mh_foreach(spaces, i) {
-		struct space *space = mh_value(spaces, i);
+		struct space *space = mh_i32ptr_node(spaces, i)->val;
 		Index *index = space->index[0];
 		[index beginBuild];
 	}
@@ -402,7 +406,7 @@ end_build_primary_indexes(void)
 {
 	mh_int_t i;
 	mh_foreach(spaces, i) {
-		struct space *space = mh_value(spaces, i);
+		struct space *space = mh_i32ptr_node(spaces, i)->val;
 		Index *index = space->index[0];
 		[index endBuild];
 	}
@@ -417,7 +421,7 @@ build_secondary_indexes(void)
 
 	mh_int_t i;
 	mh_foreach(spaces, i) {
-		struct space *space = mh_value(spaces, i);
+		struct space *space = mh_i32ptr_node(spaces, i)->val;
 
 		if (space->key_count <= 1)
 			continue; /* no secondary keys */

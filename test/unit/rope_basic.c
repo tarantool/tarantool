@@ -103,4 +103,5 @@ main()
 	test_prepend();
 	test_insert();
 	test_erase();
+	return 0;
 }

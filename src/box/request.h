@@ -103,6 +103,7 @@ const char *request_name(u32 type);
 struct request
 {
 	u32 type;
+	u32 flags;
 	struct tbuf *data;
 };
 

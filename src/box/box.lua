@@ -225,6 +225,7 @@ function box.on_reload_configuration()
                 break
             end
             table.insert(range, v)
+            iterator_state, v = index:next(iterator_state)
         end
         return unpack(range)
     end
@@ -235,6 +236,7 @@ function box.on_reload_configuration()
                 break
             end
             table.insert(range, v)
+            iterator_state, v = index:prev(iterator_state)
         end
         return unpack(range)
     end

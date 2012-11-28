@@ -12,6 +12,8 @@
 
 What's new
 ==========
+2012-10-20: Tarantool 1.4.8 is out, more raw performance and features
+
 2012-07-10: Tarantool 1.4.7 is out, ported to Mac OS X
 
 2012-05-09: Tarantool 1.4.6 is out, featuring multipart primary keys
@@ -32,6 +34,8 @@ What's new
 
 Новости
 =======
+2012-10-20: Очередной релиз ветки 1.4: Tarantool 1.4.8
+
 2012-07-10: Tarantool 1.4.7 is out, с поддержкой Mac OS X
 
 2012-05-09: Tarantool 1.4.6 добавляет поддержку первичных ключей по нескольким полям 

@@ -182,7 +182,7 @@ tnt_sql_stmt_update(struct tnt_sql *sql, struct tnt_tuple *tu, struct tnt_stream
 	tnt_expect(tnt_sqltkv(sql, TNT_TK_TABLE, &tn));
 	tnt_expect(tnt_sqltk(sql, TNT_TK_SET));
 	while (1) {
-		struct tnt_tk *k;
+		struct tnt_tk *k = NULL;
 		tnt_expect(tnt_sqltkv(sql, TNT_TK_KEY, &k));
 		tnt_expect(tnt_sqltk(sql, '='));
 		struct tnt_tk *v;
@@ -228,7 +228,8 @@ tnt_sql_stmt_update(struct tnt_sql *sql, struct tnt_tuple *tu, struct tnt_stream
 			break;
 		/* k = splice(k, a, b) */
 		case TNT_TK_SPLICE: {
-			struct tnt_tk *field, *off, *len, *list;
+			struct tnt_tk *field = NULL, *off = NULL,
+				      *len = NULL, *list = NULL;
 			tnt_expect(tnt_sqltk(sql, '('));
 			tnt_expect(tnt_sqltkv(sql, TNT_TK_KEY, &field));
 			if (TNT_TK_I32(k) != TNT_TK_I32(field)) {
@@ -374,7 +375,7 @@ tnt_sql_stmt(struct tnt_sql *sql)
 		char proc[512];
 		int len = 0;
 		while (1) {
-			struct tnt_tk *name;
+			struct tnt_tk *name = NULL;
 			tnt_lex_idonly(sql->l, true);
 			tnt_expect(tnt_sqltkv(sql, TNT_TK_ID, &name));
 			tnt_lex_idonly(sql->l, false);

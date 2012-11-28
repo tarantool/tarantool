@@ -11,7 +11,7 @@ void
 plan(int count)
 {
 	plan_test = count;
-	static showed_plan = 0;
+	static int showed_plan = 0;
 	if (!showed_plan)
 		printf("%d..%d\n", 1, plan_test);
 	showed_plan = 1;

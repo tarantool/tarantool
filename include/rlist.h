@@ -85,6 +85,18 @@ rlist_del(struct rlist *item)
 	rlist_init(item);
 }
 
+inline static struct rlist *
+rlist_shift(struct rlist *head)
+{
+	if (head->next == head->prev)
+                return 0;
+        struct rlist *shift = head->next;
+        head->next = shift->next;
+        shift->next->prev = head;
+        shift->next = shift->prev = shift;
+        return shift;
+}
+
 /**
  * return first element
  */
@@ -172,6 +184,10 @@ rlist_move_tail(struct rlist *to, struct rlist *item)
  */
 #define rlist_first_entry(head, type, member)				\
 	rlist_entry(rlist_first(head), type, member)
+
+#define rlist_shift_entry(head, type, member) ({			\
+        struct rlist *_shift = rlist_shift(head);			\
+        _shift ? rlist_entry(_shift, type, member) : 0; })
 
 /**
  * return last entry

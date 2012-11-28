@@ -201,22 +201,35 @@ coio_write(struct ev_io *coio, const void *buf, size_t sz)
 	}
 }
 
+/*
+ * Write iov using sio API.
+ * Put in an own function to workaround gcc bug with @finally
+ */
+static inline ssize_t
+coio_flush(int fd, struct iovec *iov, ssize_t offset, int iovcnt)
+{
+	ssize_t nwr;
+	@try {
+		sio_add_to_iov(iov, -offset);
+		nwr = sio_writev(fd, iov, iovcnt);
+	} @finally {
+		sio_add_to_iov(iov, offset);
+	}
+	return nwr;
+}
+
 ssize_t
 coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt, size_t size_hint)
 {
-	ssize_t total = 0, iov_len = 0;
+	ssize_t total = 0;
+	size_t iov_len = 0;
 	struct iovec *end = iov + iovcnt;
 	@try {
 		/* Avoid a syscall in case of 0 iovcnt. */
 		while (iov < end) {
 			/* Write as much data as possible. */
-			ssize_t nwr;
-			@try {
-				sio_add_to_iov(iov, -iov_len);
-				nwr = sio_writev(coio->fd, iov, end - iov);
-			} @finally {
-				sio_add_to_iov(iov, iov_len);
-			}
+			ssize_t nwr = coio_flush(coio->fd, iov, iov_len,
+						 end - iov);
 			if (nwr >= 0) {
 				total += nwr;
 				/*
