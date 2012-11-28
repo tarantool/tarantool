@@ -519,7 +519,7 @@ static const char *indexlib_name = "box.index";
 static const char *iteratorlib_name = "box.index.iterator";
 
 static struct iterator *
-lua_checkiterator(struct lua_State *L, int i)
+lbox_checkiterator(struct lua_State *L, int i)
 {
 	struct iterator **it = luaL_checkudata(L, i, iteratorlib_name);
 	assert(it != NULL);
@@ -538,7 +538,7 @@ lbox_pushiterator(struct lua_State *L, struct iterator *it)
 static int
 lbox_iterator_gc(struct lua_State *L)
 {
-	struct iterator *it = lua_checkiterator(L, -1);
+	struct iterator *it = lbox_checkiterator(L, -1);
 	it->free(it);
 	return 0;
 }
@@ -679,21 +679,12 @@ void append_key_part(struct lua_State *L, int i,
  * @return Returns an iterator object, either created
  *         or taken from Lua stack.
  */
+
 static inline struct iterator *
-lbox_toiterator(struct lua_State *L)
+lbox_create_iterator(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L);
-	struct iterator *it = NULL;
-	if (argc == 2 && lua_type(L, 2) == LUA_TUSERDATA) {
-		/*
-		 * Apart from the index itself, we have only one
-		 * other argument, and it's a userdata: must be
-		 * iteration state created before.
-		 */
-		it = lua_checkiterator(L, 2);
-		return it;
-	}
 	/* Create a new iterator. */
 	enum iterator_type type;
 	int field_count;
@@ -744,7 +735,7 @@ lbox_toiterator(struct lua_State *L)
 				   " is greater than index part count %d",
 				   field_count, index->key_def->part_count);
 	}
-	it = [index allocIterator];
+	struct iterator *it = [index allocIterator];
 	[index initIterator: it :type :key :field_count];
 	lbox_pushiterator(L, it);
 
@@ -761,7 +752,18 @@ lbox_toiterator(struct lua_State *L)
 static int
 lbox_index_next(struct lua_State *L)
 {
-	struct iterator *it = lbox_toiterator(L);
+	int argc = lua_gettop(L);
+	struct iterator *it = NULL;
+	if (argc == 2 && lua_type(L, 2) == LUA_TUSERDATA) {
+		/*
+		 * Apart from the index itself, we have only one
+		 * other argument, and it's a userdata: must be
+		 * iteration state created before.
+		 */
+		it = lbox_checkiterator(L, 2);
+	} else {
+		it = lbox_create_iterator(L);
+	}
 	struct tuple *tuple = it->next(it);
 	/* If tuple is NULL, pushes nil as end indicator. */
 	lbox_pushtuple(L, tuple);
@@ -773,7 +775,7 @@ static int
 lbox_index_iterator_closure(struct lua_State *L)
 {
 	/* Extract closure arguments. */
-	struct iterator *it = lua_checkiterator(L, lua_upvalueindex(1));
+	struct iterator *it = lbox_checkiterator(L, lua_upvalueindex(1));
 
 	struct tuple *tuple = it->next(it);
 
@@ -794,7 +796,7 @@ static int
 lbox_index_iterator(struct lua_State *L)
 {
 	/* Create iterator and push it onto the stack. */
-	(void) lbox_toiterator(L);
+	(void) lbox_create_iterator(L);
 	lua_pushcclosure(L, &lbox_index_iterator_closure, 1);
 	return 1;
 }
