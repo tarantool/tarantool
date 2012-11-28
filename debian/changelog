@@ -1,3 +1,9 @@
+tarantool (1.4.8-1) unstable; urgency=low
+
+  * New tarantool release.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 23 Nov 2012 11:56:02 +0400
+
 tarantool (1.4.7+20121010.2202-1) unstable; urgency=low
 
   * New snapshot (Don't exit on a trivial socket error).

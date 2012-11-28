@@ -141,10 +141,6 @@ space_validate(struct space *sp, struct tuple *old_tuple,
 		return;
 	}
 
-	/* Check to see if the tuple has a sufficient number of fields. */
-	if (new_tuple->field_count < sp->max_fieldno)
-		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
-
 	if (sp->arity > 0 && sp->arity != new_tuple->field_count)
 		tnt_raise(IllegalParams, :"tuple field count must match space cardinality");
 

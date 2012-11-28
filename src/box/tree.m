@@ -299,6 +299,8 @@ key_is_linear(struct key_def *key_def)
 static void
 fold_with_sparse_parts(struct key_def *key_def, struct tuple *tuple, union sparse_part* parts)
 {
+	assert (tuple->field_count >= key_def->max_fieldno);
+
 	u8 *part_data = tuple->data;
 
 	memset(parts, 0, sizeof(parts[0]) * key_def->part_count);

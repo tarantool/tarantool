@@ -139,3 +139,7 @@ exec admin "lua k,v = box.space[16].index[1]:next(k)"
 exec admin "lua print(v)"
 exec admin "lua k,v = box.space[16].index[1]:next(k)"
 exec admin "lua print(v)"
+
+# Bug #1082356
+exec sql "insert into t19 values(1, 1)"
+exec sql "replace into t19 values(1, 1)"
