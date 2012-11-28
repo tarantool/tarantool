@@ -331,3 +331,7 @@ lua print(v)
 ---
 nil
 ...
+insert into t19 values(1, 1)
+An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
+replace into t19 values(1, 1)
+An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
