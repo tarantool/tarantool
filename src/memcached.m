@@ -304,7 +304,7 @@ flush_all(va_list ap)
 	fiber_sleep(delay - ev_now());
 	struct tuple *tuple;
 	struct iterator *it = [memcached_index allocIterator];
-	[memcached_index initIterator: it :ITER_FORWARD];
+	[memcached_index initIterator: it :ITER_ALL :NULL :0];
 	while ((tuple = it->next(it))) {
 	       meta(tuple)->exptime = 1;
 	}
@@ -532,7 +532,7 @@ memcached_expire_loop(va_list ap __attribute__((unused)))
 	@try {
 restart:
 		if (tuple == NULL)
-			[memcached_index initIterator: memcached_it :ITER_FORWARD];
+			[memcached_index initIterator: memcached_it :ITER_ALL :NULL :0];
 
 		struct tbuf *keys_to_delete = tbuf_alloc(fiber->gc_pool);
 
