@@ -1,0 +1,159 @@
+<!DOCTYPE table [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<table xmlns="http://docbook.org/ns/docbook" version="5.0"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xml:id="iterator-types" frame='all' pgwide='1'>
+
+<title>Iterator types</title>
+
+<tgroup cols='3' colsep='1' rowsep='1'>
+<colspec colnum="5" colname="col4" colwidth="6*"/>
+
+<thead>
+    <row>
+        <entry>Type</entry>
+        <entry>Arguments</entry>
+        <entry>HASH</entry>
+        <entry>TREE</entry>
+        <entry>Description</entry>
+    </row>
+</thead>
+
+<tbody>
+    <row>
+        <entry>box.index.ALL</entry>
+        <entry>none</entry>
+        <entry>yes</entry>
+        <entry>yes</entry>
+        <entry>
+            Iterate over all tuples in an index. When iterating
+            over a TREE index, tuples are returned in ascending
+            order of the key. When iterating over a HASH index,
+            tuples are returned in physical order or, in other words,
+            unordered.
+        </entry>
+    </row>
+
+    <row>
+        <entry>box.index.EQ</entry>
+        <entry>key</entry>
+        <entry>yes</entry>
+        <entry>yes</entry>
+        <entry>
+            <simpara>
+            Equality iterator: iterate over all tuples matching
+            the key.
+            Parts of a multipart key need to be separated by
+            comma.
+            </simpara>
+            <simpara>
+            Semantics of the match depends on the index.
+            A HASH index only supports exact match: all parts
+            of a key participating in the index must be provided.
+            In case of TREE index, only few parts of a key or a
+            key prefix are accepted for search.
+            In this case, all tuples with the same prefix or
+            matching key parts are considered matching the search
+            criteria.
+            </simpara>
+            <simpara>
+            A non-unique HASH index returns tuples in unspecified
+            order.
+            When a TREE index is not unique, or only part of a key
+            is given as a search criteria, matching tuples are
+            returned in ascending order.
+            </simpara>
+        </entry>
+    </row>
+
+    <row>
+        <entry>box.index.REQ</entry>
+        <entry>key</entry>
+        <entry>no</entry>
+        <entry>yes</entry>
+        <entry>
+            Reverse equality iterator. Is equivalent to
+            <code>box.index.EQ</code> with only distinction that
+            the order of returned tuples is descending, not
+            ascending. Is only supported by TREE
+            index.
+        </entry>
+    </row>
+
+    <row>
+        <entry>box.index.GT</entry>
+        <entry>key</entry>
+        <entry>yes (*)</entry>
+        <entry>yes </entry>
+        <entry>
+            Iterate over tuples strictly greater than the search key.
+            For TREE indexes, a key prefix or key part can be sufficient.
+            If the key is <code>nil</code>, iteration starts from
+            the smallest key in the index. The tuples are returned
+            in ascending order of the key.
+            HASH index also supports this iterator type, but returns
+            tuples in unspecified order. However, if the server
+            does not receive updates, this iterator can be used
+            to retrieve all tuples via a HASH index piece by piece,
+            by supplying the last key from the previous range as the
+            start key for an iterator over the next range.
+        </entry>
+    </row>
+
+    <row>
+        <entry>box.index.GE</entry>
+        <entry>key</entry>
+        <entry>no</entry>
+        <entry>yes</entry>
+        <entry>
+            Iterate over all tuples for which the corresponding fields are
+            greater or equal to the search key. TREE index returns
+            tuples in ascending order. Similarly to <code>box.index.EQ</code>,
+            key prefix or key part can be used to seed the iterator.
+            If the key is <code>nil</code>, iteration starts from the
+            smallest key in the index.
+        </entry>
+    </row>
+
+    <row>
+        <entry>box.index.LT</entry>
+        <entry>key</entry>
+        <entry>no</entry>
+        <entry>yes</entry>
+        <entry>
+            Similar to <code>box.index.GT</code>,
+            but returns all tuples which are strictly less
+            than the search key. The tuples are returned
+            in the descending order of the key.
+            <code>nil</code> key can be used to start
+            from the end  of the index range.
+        </entry>
+    </row>
+
+    <row>
+        <entry>box.index.LE</entry>
+        <entry>key</entry>
+        <entry>no</entry>
+        <entry>yes</entry>
+        <entry>
+            Similar to <code>box.index.GE</code>, but
+            returns all tuples which are less or equal to the
+            search key or key prefix, and returns tuples
+            in descending order, from biggest to smallest.
+            If the key is <code>nil</code>, iteration starts
+            from the end of the index range.
+        </entry>
+    </row>
+
+</tbody>
+
+</tgroup>
+</table>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

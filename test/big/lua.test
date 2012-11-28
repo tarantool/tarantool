@@ -24,9 +24,9 @@ exec sql "insert into t1 values ('item 1', 'alabama', 'song')"
 exec sql "insert into t1 values ('item 2', 'california', 'dreaming ')"
 exec sql "insert into t1 values ('item 3', 'california', 'uber alles')"
 exec sql "insert into t1 values ('item 4', 'georgia', 'on my mind')"
-exec admin "lua iter, tuple = box.space[1].index[1]:next('california')"
+exec admin "lua it, tuple = box.space[1].index[1]:next('california')"
 exec admin "lua tuple"
-exec admin "lua iter, tuple = box.space[1].index[1]:next(iter)"
+exec admin "lua it, tuple = box.space[1].index[1]:next(it)"
 exec admin "lua tuple"
 exec sql "call box.delete(1, 'item 1')"
 exec sql "call box.delete(1, 'item 2')"
@@ -89,12 +89,44 @@ for sid in {1, 2}:
         pid += 1
         tid -= 1
 
-exec admin "lua for k, v in box.space[16].index[1].idx.next, box.space[16].index[1].idx, 'sid_1' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].idx.prev, box.space[16].index[1].idx, 'sid_2' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end"
+exec admin "lua for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do print(v) end"
+exec admin "lua for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do print(v) end"
+exec admin "lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(v) end"
+exec admin "lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(v) end"
+exec admin "lua box.space[16]:truncate()"
+
+#
+# Tests for box.index iterators (new)
+#
+
+pid = 1
+tid = 999
+for sid in {1, 2}:
+    for i in range(1, 4):
+        exec admin "lua box.insert(16, 'pid_%d', 'sid_%d', 'tid_%d')" % (pid, sid, tid)
+        pid += 1
+        tid -= 1
+
+# Tree
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.ALL) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GE) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GT) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LE) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LT) do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.EQ, 'sid_1') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.REQ, 'sid_1') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.EQ, 'sid_2', 'tid_996') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GE, 'sid_2', 'tid_994') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.GT, 'sid_2', 'tid_994') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LE, 'sid_1', 'tid_999') do print(v) end"
+exec admin "lua for v in box.space[16].index[1]:iterator(box.index.LT, 'sid_1', 'tid_999') do print(v) end"
+exec admin "lua it = box.space[16].index[1]:iterator(box.index.EQ, 'sid_2', 'tid_994'); print(it())"
+exec admin "lua box.space[16].index[1]:iterator(box.index.EQ, 'sid_2', 'tid_992', '1')"
+
+# Hash
+exec admin "lua for v in box.space[16].index[0]:iterator(box.index.EQ, 'pid_2') do print(v) end"
+exec admin "lua for v in box.space[16].index[0]:iterator(box.index.ALL) do print(v) end"
+
 exec admin "lua box.space[16]:truncate()"
 
 #
@@ -106,13 +138,13 @@ exec admin "lua box.insert(17, 3, 2, 1)"
 exec admin "lua box.insert(17, 4, 3, 0)"
 exec admin "lua box.insert(17, 5, 3, 1)"
 exec admin "lua box.insert(17, 6, 3, 2)"
-exec admin "lua box.space[17].index[1].idx:count(1)"
-exec admin "lua box.space[17].index[1].idx:count(2)"
-exec admin "lua box.space[17].index[1].idx:count(2, 1)"
-exec admin "lua box.space[17].index[1].idx:count(2, 2)"
-exec admin "lua box.space[17].index[1].idx:count(3)"
-exec admin "lua box.space[17].index[1].idx:count(3, 3)"
-exec admin "lua box.space[17].index[1].idx:count()"
+exec admin "lua box.space[17].index[1]:count(1)"
+exec admin "lua box.space[17].index[1]:count(2)"
+exec admin "lua box.space[17].index[1]:count(2, 1)"
+exec admin "lua box.space[17].index[1]:count(2, 2)"
+exec admin "lua box.space[17].index[1]:count(3)"
+exec admin "lua box.space[17].index[1]:count(3, 3)"
+exec admin "lua box.space[17].index[1]:count()"
 exec admin "lua box.space[17]:truncate()"
 
 #
