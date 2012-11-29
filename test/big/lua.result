@@ -222,7 +222,7 @@ lua box.insert(16, 'pid_6', 'sid_2', 'tid_994')
 ---
  - 'pid_6': {'sid_2', 'tid_994'}
 ...
-lua for k, v in box.space[16].index[1].idx.next, box.space[16].index[1].idx, 'sid_1' do print(v) end
+lua for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
@@ -231,7 +231,7 @@ lua for k, v in box.space[16].index[1].idx.next, box.space[16].index[1].idx, 'si
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for k, v in box.space[16].index[1].idx.prev, box.space[16].index[1].idx, 'sid_2' do print(v) end
+lua for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do print(v) end
 ---
 'pid_4': {'sid_2', 'tid_996'}
 'pid_5': {'sid_2', 'tid_995'}
@@ -240,25 +240,25 @@ lua for k, v in box.space[16].index[1].idx.prev, box.space[16].index[1].idx, 'si
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end
+lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
 'pid_1': {'sid_1', 'tid_999'}
 ...
-lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_1' do print(v) end
+lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(v) end
 ---
 'pid_1': {'sid_1', 'tid_999'}
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua for k, v in box.space[16].index[1].idx.next_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end
+lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(v) end
 ---
 'pid_6': {'sid_2', 'tid_994'}
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for k, v in box.space[16].index[1].idx.prev_equal, box.space[16].index[1].idx, 'sid_2' do print(v) end
+lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(v) end
 ---
 'pid_4': {'sid_2', 'tid_996'}
 'pid_5': {'sid_2', 'tid_995'}
@@ -291,31 +291,31 @@ lua box.insert(17, 6, 3, 2)
 ---
  - 6: {3, 2}
 ...
-lua box.space[17].index[1].idx:count(1)
+lua box.space[17].index[1]:count(1)
 ---
  - 1
 ...
-lua box.space[17].index[1].idx:count(2)
+lua box.space[17].index[1]:count(2)
 ---
  - 2
 ...
-lua box.space[17].index[1].idx:count(2, 1)
+lua box.space[17].index[1]:count(2, 1)
 ---
  - 1
 ...
-lua box.space[17].index[1].idx:count(2, 2)
+lua box.space[17].index[1]:count(2, 2)
 ---
  - 0
 ...
-lua box.space[17].index[1].idx:count(3)
+lua box.space[17].index[1]:count(3)
 ---
  - 3
 ...
-lua box.space[17].index[1].idx:count(3, 3)
+lua box.space[17].index[1]:count(3, 3)
 ---
  - 0
 ...
-lua box.space[17].index[1].idx:count()
+lua box.space[17].index[1]:count()
 ---
 error: 'index.count(): one or more arguments expected'
 ...

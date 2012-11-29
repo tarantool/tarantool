@@ -775,8 +775,15 @@ main(int argc, char **argv)
 	if (cfg.username != NULL) {
 		if (getuid() == 0 || geteuid() == 0) {
 			struct passwd *pw;
+			errno = 0;
 			if ((pw = getpwnam(cfg.username)) == 0) {
-				say_syserror("getpwnam: %s", cfg.username);
+				if (errno) {
+					say_syserror("getpwnam: %s",
+						     cfg.username);
+				} else {
+					say_error("User not found: %s",
+						  cfg.username);
+				}
 				exit(EX_NOUSER);
 			}
 			if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0 || seteuid(pw->pw_uid)) {
@@ -853,8 +860,8 @@ main(int argc, char **argv)
 	@try {
 		tarantool_L = tarantool_lua_init();
 		mod_init();
-		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
+		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		/*
 		 * init iproto before admin and after memcached:
 		 * recovery is finished on bind to the primary port,

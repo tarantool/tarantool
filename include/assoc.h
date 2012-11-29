@@ -34,22 +34,43 @@
 #define MH_UNDEF
 #endif
 
-typedef void* ptr_t;
-
+/*
+ * Map: (i32) => (void *)
+ */
 #define mh_name _i32ptr
-#define mh_key_t i32
-#define mh_val_t ptr_t
-#define mh_hash(a) (a)
-#define mh_eq(a, b) ((a) == (b))
+struct mh_i32ptr_node_t {
+	i32 key;
+	void *val;
+};
+
+#define mh_node_t struct mh_i32ptr_node_t
+#define mh_hash_arg_t void *
+#define mh_hash(a, arg) (a->key)
+#define mh_eq_arg_t void *
+#define mh_eq(a, b, arg) ((a->key) == (b->key))
 #include <mhash.h>
 
+
+/*
+ * Map: (i64) => (void *)
+ */
 #define mh_name _i64ptr
-#define mh_key_t i64
-#define mh_val_t ptr_t
-#define mh_hash(a) ((mh_int_t)((a)>>33^(a)^(a)<<11))
-#define mh_eq(a, b) ((a) == (b))
+struct mh_i64ptr_node_t {
+	i64 key;
+	void *val;
+};
+
+#define mh_node_t struct mh_i64ptr_node_t
+#define mh_int_t u32
+#define mh_hash_arg_t void *
+#define mh_hash(a, arg) ((u32)((a->key)>>33^(a->key)^(a->key)<<11))
+#define mh_eq_arg_t void *
+#define mh_eq(a, b, arg) ((a->key) == (b->key))
 #include <mhash.h>
 
+/*
+ * Map: (char *) => (void *)
+ */
 static inline int lstrcmp(void *a, void *b)
 {
 	unsigned int al, bl;
@@ -63,9 +84,22 @@ static inline int lstrcmp(void *a, void *b)
 }
 #include <third_party/murmur_hash2.c>
 #define mh_name _lstrptr
-#define mh_key_t ptr_t
-#define mh_val_t ptr_t
-#define mh_hash(key) ({ void *_k = (key); unsigned l = load_varint32(&_k); MurmurHash2(_k, l, 13); })
-#define mh_eq(a, b) (lstrcmp((a), (b)) == 0)
-#include <mhash.h>
+struct mh_lstrptr_node_t {
+	void *key;
+	void *val;
+};
 
+#define mh_node_t struct mh_lstrptr_node_t
+#define mh_int_t u32
+#define mh_hash_arg_t void *
+static inline u32
+mh_strptr_hash(const mh_node_t *a, mh_hash_arg_t arg) {
+	(void) arg;
+	void *_k = (a->key);
+	const u32 l = load_varint32(&_k);
+	return (u32) MurmurHash2(_k, l, 13);
+}
+#define mh_hash(a, arg) mh_strptr_hash(a, arg)
+#define mh_eq_arg_t void *
+#define mh_eq(a, b, arg) (lstrcmp(a->key, b->key) == 0)
+#include <mhash.h>

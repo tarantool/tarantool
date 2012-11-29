@@ -266,6 +266,10 @@ recover_snap_row(struct tbuf *t)
 
 	struct space *space = space_find(row->space);
 	Index *index = space_index(space, 0);
+	/* Check to see if the tuple has a sufficient number of fields. */
+	if (unlikely(tuple->field_count < space->max_fieldno)) {
+		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+	}
 	[index buildNext: tuple];
 	tuple_ref(tuple, 1);
 }
@@ -510,7 +514,7 @@ snapshot_space(struct space *sp, void *udata)
 	struct { struct log_io *l; struct fio_batch *batch; } *ud = udata;
 	Index *pk = space_index(sp, 0);
 	struct iterator *it = pk->position;
-	[pk initIterator: it :ITER_FORWARD];
+	[pk initIterator: it :ITER_ALL :NULL :0];
 
 	while ((tuple = it->next(it)))
 		snapshot_write_tuple(ud->l, ud->batch, space_n(sp), tuple);

@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assoc.h>
 
 #include <say.h>
 #include <tarantool.h>
@@ -40,6 +39,7 @@
 #include <tbuf.h>
 #include <stat.h>
 #include <pickle.h>
+#include <assoc.h>
 #include "iobuf.h"
 #include <rlist.h>
 
@@ -301,27 +301,30 @@ fiber_ready_async(void)
 struct fiber *
 fiber_find(int fid)
 {
-	mh_int_t k = mh_i32ptr_get(fibers_registry, fid);
+	struct mh_i32ptr_node_t node = { .key = fid };
+	mh_int_t k = mh_i32ptr_get(fibers_registry, &node, NULL, NULL);
 
 	if (k == mh_end(fibers_registry))
 		return NULL;
 	if (!mh_exist(fibers_registry, k))
 		return NULL;
-	return mh_value(fibers_registry, k);
+	return mh_i32ptr_node(fibers_registry, k)->val;
 }
 
 static void
 register_fid(struct fiber *fiber)
 {
 	int ret;
-	mh_i32ptr_put(fibers_registry, fiber->fid, fiber, &ret);
+	struct mh_i32ptr_node_t node = { .key = fiber -> fid, .val = fiber };
+	mh_i32ptr_put(fibers_registry, &node, NULL, NULL, &ret);
 }
 
 static void
 unregister_fid(struct fiber *fiber)
 {
-	mh_int_t k = mh_i32ptr_get(fibers_registry, fiber->fid);
-	mh_i32ptr_del(fibers_registry, k);
+	struct mh_i32ptr_node_t node = { .key = fiber->fid };
+	mh_int_t k = mh_i32ptr_get(fibers_registry, &node, NULL, NULL);
+	mh_i32ptr_del(fibers_registry, k, NULL, NULL);
 }
 
 void
