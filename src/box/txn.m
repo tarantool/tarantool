@@ -59,32 +59,41 @@ txn_add_redo(struct txn *txn, u16 op, struct tbuf *data)
 }
 
 void
-txn_add_undo(struct txn *txn, struct space *space,
-	     struct tuple *old_tuple, struct tuple *new_tuple)
+txn_replace(struct txn *txn, struct space *space,
+	    struct tuple *tuple, u32 flags)
 {
 	/* txn_add_undo() must be done after txn_add_redo() */
 	assert(txn->op != 0);
-	txn->new_tuple = new_tuple;
-	if (new_tuple == NULL && old_tuple == NULL) {
-		/*
-		 * There is no subject tuple we could write to
-		 * WAL, which means, to do a write, we would have
-		 * to allocate one. Too complicated, for now, just
-		 * do no logging for DELETEs that do nothing.
-		*/
-		txn->txn_flags |= BOX_NOT_STORE;
-	} else if (new_tuple == NULL) {
-		space_remove(space, old_tuple);
-	} else {
-		space_replace(space, old_tuple, new_tuple);
-		txn_lock(txn, new_tuple);
-	}
+
+	txn_lock(txn, tuple);
+
 	/* Remember the old tuple only if we locked it
 	 * successfully, to not unlock a tuple locked by another
 	 * transaction in rollback().
 	 */
-	txn->old_tuple = old_tuple;
+
+	assert(txn->space == NULL || txn->space == space);
 	txn->space = space;
+	txn->new_tuple = tuple;
+
+	struct tuple *old_tuple = space_replace(space, tuple, flags);
+	assert (txn->old_tuple == old_tuple || !old_tuple || !txn->old_tuple);
+	if (old_tuple) {
+		txn->old_tuple = old_tuple;
+	}
+}
+
+void
+txn_remove(struct txn *txn, struct space *space, struct tuple *tuple)
+{
+	/* txn_add_undo() must be done after txn_add_redo() */
+	assert(txn->op != 0);
+
+	assert(txn->space == NULL || txn->space == space);
+	txn->space = space;
+	txn->old_tuple = tuple;
+
+	space_remove(space, tuple);
 }
 
 struct txn *
@@ -124,12 +133,16 @@ txn_rollback(struct txn *txn)
 {
 	if (txn->op == 0) /* Nothing to do. */
 		return;
-	if (txn->old_tuple) {
-		space_replace(txn->space, txn->new_tuple, txn->old_tuple);
-	} else if (txn->new_tuple && txn->new_tuple->flags & WAL_WAIT) {
+	if (txn->new_tuple && txn->new_tuple->flags & WAL_WAIT) {
 		space_remove(txn->space, txn->new_tuple);
 	}
+
 	if (txn->new_tuple)
 		tuple_ref(txn->new_tuple, -1);
+
+	if (txn->old_tuple) {
+		space_replace(txn->space, txn->old_tuple, 0);
+	}
+
 	TRASH(txn);
 }

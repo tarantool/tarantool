@@ -85,10 +85,8 @@ struct space {
 /** Get space ordinal number. */
 static inline i32 space_n(struct space *sp) { return sp->no; }
 
-void space_validate(struct space *sp, struct tuple *old_tuple,
-		    struct tuple *new_tuple);
-void space_replace(struct space *sp, struct tuple *old_tuple,
-		   struct tuple *new_tuple);
+struct tuple *
+space_replace(struct space *sp, struct tuple *new_tuple, u32 flags);
 void space_remove(struct space *sp, struct tuple *tuple);
 
 

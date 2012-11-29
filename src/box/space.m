@@ -33,6 +33,7 @@
 #include <cfg/warning.h>
 #include <tarantool.h>
 #include <exception.h>
+#include "request.h" /* for BOX_ADD, BOX_REPLACE */
 #include "tuple.h"
 #include <pickle.h>
 #include <palloc.h>
@@ -42,6 +43,9 @@ static struct mh_i32ptr_t *spaces;
 
 bool secondary_indexes_enabled = false;
 bool primary_indexes_enabled = false;
+
+static void
+space_validate_tuple(struct space *sp, struct tuple *new_tuple);
 
 struct space *
 space_create(i32 space_no, struct key_def *key_defs, int key_count, int arity)
@@ -120,20 +124,53 @@ key_free(struct key_def *key_def)
 	free(key_def->cmp_order);
 }
 
-void
-space_replace(struct space *sp, struct tuple *old_tuple,
-	      struct tuple *new_tuple)
+struct tuple *
+space_replace(struct space *sp, struct tuple *tuple, u32 flags)
 {
+	struct tuple *old_tuple = NULL;
+
+	space_validate_tuple(sp, tuple);
+
 	int n = index_count(sp);
-	for (int i = 0; i < n; i++) {
-		Index *index = sp->index[i];
-		[index replace: old_tuple :new_tuple];
+
+	int i = 0;
+	@try {
+		/* Primary key is always unique */
+		assert(sp->index[0]->key_def->is_unique);
+		/* replace tuple in the pkey and get old tuple */
+		old_tuple = [sp->index[0] replace: tuple: flags];
+		i++;
+
+		for (; i < n; i++) {
+			Index *index = sp->index[i];
+
+			/* remove old tuple from the secondary key */
+			if (old_tuple) {
+				[index remove: old_tuple];
+			}
+
+			/* insert new tuple to tuple to the secondary key */
+			[index replace: tuple: BOX_ADD];
+		}
+
+		return old_tuple;
+	} @catch (tnt_Exception *e) {
+		/* rollback changes on exception */
+		if (old_tuple != NULL) {
+			i--;
+			for (; i >= 0;  i--) {
+				Index *index = sp->index[i];
+				[index remove: tuple];
+				[index replace: old_tuple: 0];
+			}
+		}
+		/* lift exception e to upper levels */
+		@throw e;
 	}
 }
 
-void
-space_validate(struct space *sp, struct tuple *old_tuple,
-	       struct tuple *new_tuple)
+static void
+space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
 	int n = index_count(sp);
 
@@ -161,17 +198,6 @@ space_validate(struct space *sp, struct tuple *old_tuple,
 		} else if (sp->field_types[f] == NUM64) {
 			if (len != sizeof(u64))
 				tnt_raise(IllegalParams, :"field must be NUM64");
-		}
-	}
-
-	/* Check key uniqueness */
-	for (int i = 1; i < n; ++i) {
-		Index *index = sp->index[i];
-		if (index->key_def->is_unique) {
-			struct tuple *tuple = [index findByTuple: new_tuple];
-			if (tuple != NULL && tuple != old_tuple)
-				tnt_raise(ClientError, :ER_INDEX_VIOLATION,
-					  index_n(index));
 		}
 	}
 }

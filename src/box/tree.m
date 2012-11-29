@@ -30,6 +30,7 @@
 #include "tuple.h"
 #include "space.h"
 #include "exception.h"
+#include "request.h" /* for BOX_ADD, BOX_REPLACE */
 #include <pickle.h>
 
 /* {{{ Utilities. *************************************************/
@@ -949,20 +950,48 @@ tree_iterator_gt(struct iterator *iterator)
 	sptree_index_delete(&tree, node);
 }
 
-- (void) replace: (struct tuple *) old_tuple
-		: (struct tuple *) new_tuple
+- (struct tuple *) replace: (struct tuple *) tuple :(u32) flags
 {
-	if (new_tuple->field_count < key_def->max_fieldno)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
-			  key_def->max_fieldno);
-
-	void *node = alloca([self node_size]);
-	if (old_tuple) {
-		[self fold: node :old_tuple];
-		sptree_index_delete(&tree, node);
+	if (!key_def->is_unique) {
+		/* insert new node */
+		void *node = alloca([self node_size]);
+		[self fold: node :tuple];
+		sptree_index_insert(&tree, node);
+		return NULL;
 	}
-	[self fold: node :new_tuple];
-	sptree_index_insert(&tree, node);
+
+	/* index is unique */
+
+	/* search for old tuple */
+	struct key_data *key_data
+		= alloca(sizeof(struct key_data) +
+			 _SIZEOF_SPARSE_PARTS(tuple->field_count));
+
+	key_data->data = tuple->data;
+	key_data->part_count = tuple->field_count;
+	fold_with_sparse_parts(key_def, tuple, key_data->parts);
+	void *node = sptree_index_find(&tree, key_data);
+
+	if (node == NULL) {
+		if (unlikely(flags & BOX_REPLACE)) {
+			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
+		}
+
+		/* insert new node */
+		node = alloca([self node_size]);
+		[self fold: node :tuple];
+		sptree_index_insert(&tree, node);
+		return NULL;
+	} else {
+		if (unlikely(flags & BOX_ADD)) {
+			tnt_raise(ClientError, :ER_TUPLE_FOUND);
+		}
+
+		/* update node in-place */
+		struct tuple *ret = [self unfold: node];
+		[self fold: node :tuple];
+		return ret;
+	}
 }
 
 - (struct iterator *) allocIterator

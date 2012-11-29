@@ -80,31 +80,18 @@ execute_replace(struct request *request, struct txn *txn)
 	if (data->size == 0 || data->size != valid_tuple(data, field_count))
 		tnt_raise(IllegalParams, :"incorrect tuple length");
 
-	txn->new_tuple = tuple_alloc(data->size);
-	tuple_ref(txn->new_tuple, 1);
-	txn->new_tuple->field_count = field_count;
-	memcpy(txn->new_tuple->data, data->data, data->size);
-
-	/* Try to find tuple by primary key */
-	Index *pk = space_index(sp, 0);
-
 	/* Check to see if the tuple has a sufficient number of fields. */
-	if (unlikely(txn->new_tuple->field_count < sp->max_fieldno)) {
+	if (unlikely(field_count < sp->max_fieldno)) {
 		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 	}
 
-	/* lookup old_tuple only when we have enough fields in new_tuple */
-	struct tuple *old_tuple = [pk findByTuple: txn->new_tuple];
+	struct tuple *new_tuple = tuple_alloc(data->size);
+	/* txn decreases ref counter on exception */
+	tuple_ref(new_tuple, 1);
+	new_tuple->field_count = field_count;
+	memcpy(new_tuple->data, data->data, data->size);
 
-	if (request->flags & BOX_ADD && old_tuple != NULL)
-		tnt_raise(ClientError, :ER_TUPLE_FOUND);
-
-	if (request->flags & BOX_REPLACE && old_tuple == NULL)
-		tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
-
-	space_validate(sp, old_tuple, txn->new_tuple);
-
-	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
+	txn_replace(txn, sp, new_tuple, request->flags);
 }
 
 /** {{{ UPDATE request implementation.
@@ -708,20 +695,40 @@ execute_update(struct request *request, struct txn *txn)
 	/* Try to find the tuple by primary key. */
 	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
 
-	if (old_tuple != NULL) {
-		/* number of operations */
-		u32 op_cnt = read_u32(data);
-		struct update_op *ops = update_read_ops(data, op_cnt);
-		struct rope *rope = update_create_rope(ops, ops + op_cnt,
-						       old_tuple);
-		/* allocate new tuple */
-		size_t new_tuple_len = update_calc_new_tuple_length(rope);
-		txn->new_tuple = tuple_alloc(new_tuple_len);
-		tuple_ref(txn->new_tuple, 1);
-		do_update_ops(rope, txn->new_tuple);
-		space_validate(sp, old_tuple, txn->new_tuple);
+	if (old_tuple == NULL) {
+		return;
 	}
-	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
+	/* number of operations */
+	u32 op_cnt = read_u32(data);
+	struct update_op *ops = update_read_ops(data, op_cnt);
+	struct rope *rope = update_create_rope(ops, ops + op_cnt,
+						       old_tuple);
+	/* allocate new tuple */
+	size_t new_tuple_len = update_calc_new_tuple_length(rope);
+	struct tuple *new_tuple = tuple_alloc(new_tuple_len);
+	tuple_ref(new_tuple, 1);
+
+	@try {
+		do_update_ops(rope, new_tuple);
+	} @catch(id e) {
+		tuple_ref(new_tuple, -1);
+		@throw e;
+	}
+
+	if (new_tuple->field_count < sp->max_fieldno) {
+		tuple_ref(new_tuple, -1);
+		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+	}
+
+	/* TODO(roman):
+	 * Currently we don't support multi-statement transactions.
+	 * However, combination of txn operations below work
+	 * in the current implementation. Please review this part when
+	 * multi-statement transaction will be ready.
+	 */
+	txn_remove(txn, sp, old_tuple);
+	/* TODO(roman): is BOX_ADD here? */
+	txn_replace(txn, sp, new_tuple, 0);
 }
 
 /** }}} */
@@ -794,7 +801,9 @@ execute_delete(struct request *request, struct txn *txn)
 	Index *pk = space_index(sp, 0);
 	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
 
-	txn_add_undo(txn, sp, old_tuple, NULL);
+	if (likely(old_tuple != NULL)) {
+		txn_remove(txn, sp, old_tuple);
+	}
 }
 
 /** To collects stats, we need a valid request type.

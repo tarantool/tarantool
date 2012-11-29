@@ -32,6 +32,7 @@
 #include "tuple.h"
 #include "pickle.h"
 #include "exception.h"
+#include "request.h" /* for BOX_ADD, BOX_REPLACE */
 #include "space.h"
 #include "assoc.h"
 
@@ -208,12 +209,12 @@ check_key_parts(struct key_def *key_def,
 	[self subclassResponsibility: _cmd];
 }
 
-- (void) replace: (struct tuple *) old_tuple
-	:(struct tuple *) new_tuple
+- (struct tuple *) replace: (struct tuple *) new_tuple :(u32) flags
 {
-	(void) old_tuple;
 	(void) new_tuple;
+	(void) flags;
 	[self subclassResponsibility: _cmd];
+	return NULL;
 }
 
 - (struct iterator *) allocIterator
@@ -353,7 +354,7 @@ hash_iterator_lstr_eq(struct iterator *it)
 
 - (void) buildNext: (struct tuple *)tuple
 {
-	[self replace: NULL :tuple];
+	[self replace: tuple :BOX_ADD];
 }
 
 - (void) endBuild
@@ -377,7 +378,7 @@ hash_iterator_lstr_eq(struct iterator *it)
 	[pk initIterator: it :ITER_ALL :NULL :0];
 
 	while ((tuple = it->next(it)))
-	      [self replace: NULL :tuple];
+	      [self replace: tuple:BOX_ADD];
 }
 
 - (void) free
@@ -472,41 +473,50 @@ int32_key_to_value(void *key)
 	u32 num = int32_key_to_value(field);
 	const struct mh_i32ptr_node_t node = { .key = num };
 	mh_int_t k = mh_i32ptr_get(int_hash, &node, NULL, NULL);
-	if (k != mh_end(int_hash))
+	if (k != mh_end(int_hash) && mh_i32ptr_node(int_hash, k)->val == tuple)
 		mh_i32ptr_del(int_hash, k, NULL, NULL);
 #ifdef DEBUG
 	say_debug("Hash32Index remove(self:%p, key:%i)", self, num);
 #endif
 }
 
-- (void) replace: (struct tuple *) old_tuple
-	:(struct tuple *) new_tuple
+- (struct tuple *) replace: (struct tuple *) new_tuple :(u32) flags
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
 	u32 num = int32_key_to_value(field);
-
-	if (old_tuple != NULL) {
-		void *old_field = tuple_field(old_tuple,
-					      key_def->parts[0].fieldno);
-		load_varint32(&old_field);
-		u32 old_num = *(u32 *)old_field;
-		const struct mh_i32ptr_node_t node = { .key = old_num };
-		mh_int_t k = mh_i32ptr_get(int_hash, &node, NULL, NULL);
-		if (k != mh_end(int_hash))
-			mh_i32ptr_del(int_hash, k, NULL, NULL);
-	}
-
 	const struct mh_i32ptr_node_t node = { .key = num, .val = new_tuple };
-	mh_int_t pos = mh_i32ptr_put(int_hash, &node, NULL, NULL, NULL);
-
-	if (pos == mh_end(int_hash))
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) pos,
-			  "int hash", "key");
 
 #ifdef DEBUG
-	say_debug("Hash32Index replace(self:%p, old_tuple:%p, new_tuple:%p) key:%i",
-		  self, old_tuple, new_tuple, num);
+	say_debug("Hash32Index replace(self:%p, new_tuple:%p) key:%i",
+		  self, new_tuple, num);
 #endif
+
+	assert (key_def->is_unique);
+
+	mh_int_t old_k = mh_i32ptr_get(int_hash, &node, NULL, NULL);
+	if (old_k == mh_end(int_hash)) {
+		if (unlikely(flags & BOX_REPLACE)) {
+			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
+		}
+
+		/* insert new node */
+		mh_int_t k = mh_i32ptr_put(int_hash, &node, NULL, NULL, NULL);
+		if (unlikely(k == mh_end(int_hash))) {
+			tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) k,
+				  "int hash", "key");
+		}
+
+		return NULL;
+	} else {
+		if (unlikely(flags & BOX_ADD)) {
+			tnt_raise(ClientError, :ER_TUPLE_FOUND);
+		}
+
+		/* update existing node in-place */
+		struct tuple *ret = mh_i32ptr_node(int_hash, old_k)->val;
+		mh_i32ptr_node(int_hash, old_k)->val = new_tuple;
+		return ret;
+	}
 }
 
 - (struct iterator *) allocIterator
@@ -621,39 +631,50 @@ int64_key_to_value(void *key)
 
 	const struct mh_i64ptr_node_t node = { .key = num };
 	mh_int_t k = mh_i64ptr_get(int64_hash, &node, NULL, NULL);
-	if (k != mh_end(int64_hash))
+	if (k != mh_end(int64_hash) && mh_i64ptr_node(int64_hash, k)->val == tuple)
 		mh_i64ptr_del(int64_hash, k, NULL, NULL);
 #ifdef DEBUG
 	say_debug("Hash64Index remove(self:%p, key:%"PRIu64")", self, num);
 #endif
 }
 
-- (void) replace: (struct tuple *) old_tuple
-	:(struct tuple *) new_tuple
+- (struct tuple *) replace: (struct tuple *) new_tuple :(u32) flags
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
 	u64 num = int64_key_to_value(field);
-
-	if (old_tuple != NULL) {
-		void *old_field = tuple_field(old_tuple,
-					      key_def->parts[0].fieldno);
-		load_varint32(&old_field);
-		u64 old_num = *(u64 *)old_field;
-		const struct mh_i64ptr_node_t node = { .key = old_num };
-		mh_int_t k = mh_i64ptr_get(int64_hash, &node, NULL, NULL);
-		if (k != mh_end(int64_hash))
-			mh_i64ptr_del(int64_hash, k, NULL, NULL);
-	}
-
 	const struct mh_i64ptr_node_t node = { .key = num, .val = new_tuple };
-	mh_int_t pos = mh_i64ptr_put(int64_hash, &node, NULL, NULL, NULL);
-	if (pos == mh_end(int64_hash))
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) pos,
-			  "int64 hash", "key");
+
 #ifdef DEBUG
-	say_debug("Hash64Index replace(self:%p, old_tuple:%p, tuple:%p) key:%"PRIu64,
-		  self, old_tuple, new_tuple, num);
+	say_debug("Hash64Index replace(self:%p, tuple:%p) key:%"PRIu64,
+		  self, new_tuple, num);
 #endif
+
+	assert (key_def->is_unique);
+
+	mh_int_t old_k = mh_i64ptr_get(int64_hash, &node, NULL, NULL);
+	if (old_k == mh_end(int64_hash)) {
+		if (unlikely(flags & BOX_REPLACE)) {
+			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
+		}
+
+		/* insert new node */
+		mh_int_t k = mh_i64ptr_put(int64_hash, &node, NULL, NULL, NULL);
+		if (unlikely(k == mh_end(int64_hash))) {
+			tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) k,
+				  "int64 hash", "key");
+		}
+
+		return NULL;
+	} else {
+		if (unlikely(flags & BOX_ADD)) {
+			tnt_raise(ClientError, :ER_TUPLE_FOUND);
+		}
+
+		/* update existing node in-place */
+		struct tuple *ret = mh_i64ptr_node(int64_hash, old_k)->val;
+		mh_i64ptr_node(int64_hash, old_k)->val = new_tuple;
+		return ret;
+	}
 }
 
 - (struct iterator *) allocIterator
@@ -755,11 +776,13 @@ int64_key_to_value(void *key)
 
 - (void) remove: (struct tuple *) tuple
 {
+
 	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
 
 	const struct mh_lstrptr_node_t node = { .key = field };
 	mh_int_t k = mh_lstrptr_get(str_hash, &node, NULL, NULL);
-	if (k != mh_end(str_hash))
+
+	if (k != mh_end(str_hash) && mh_lstrptr_node(str_hash, k)->val == tuple)
 		mh_lstrptr_del(str_hash, k, NULL, NULL);
 #ifdef DEBUG
 	u32 field_size = load_varint32(&field);
@@ -768,34 +791,50 @@ int64_key_to_value(void *key)
 #endif
 }
 
-- (void) replace: (struct tuple *) old_tuple
-	:(struct tuple *) new_tuple
+- (struct tuple *) replace: (struct tuple *) new_tuple :(u32) flags
 {
 	void *field = tuple_field(new_tuple, key_def->parts[0].fieldno);
-
 	if (field == NULL)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 			  key_def->parts[0].fieldno);
 
-	if (old_tuple != NULL) {
-		void *old_field = tuple_field(old_tuple,
-					      key_def->parts[0].fieldno);
-		const struct mh_lstrptr_node_t node = { .key = old_field };
-		mh_int_t k = mh_lstrptr_get(str_hash, &node, NULL, NULL);
-		if (k != mh_end(str_hash))
-			mh_lstrptr_del(str_hash, k, NULL, NULL);
-	}
+	const struct mh_lstrptr_node_t node = { .key = field,.val = new_tuple };
 
-	const struct mh_lstrptr_node_t node = { .key = field, .val = new_tuple};
-	mh_int_t pos = mh_lstrptr_put(str_hash, &node, NULL, NULL, NULL);
-	if (pos == mh_end(str_hash))
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) pos,
-			  "str hash", "key");
 #ifdef DEBUG
-	u32 field_size = load_varint32(&field);
-	say_debug("HashStrIndex replace(self:%p, old_tuple:%p, tuple:%p) key:'%.*s'",
-		  self, old_tuple, new_tuple, field_size, (u8 *)field);
+	void *field2 = field;
+	u32 field_size = load_varint32(&field2);
+	say_warn("HashStrIndex replace(self:%p, tuple:%p) key:'%.*s'",
+		  self, new_tuple, field_size, (u8 *)field);
 #endif
+
+	assert (key_def->is_unique);
+
+	mh_int_t old_k = mh_lstrptr_get(str_hash, &node, NULL, NULL);
+	if (old_k == mh_end(str_hash)) {
+		if (unlikely(flags & BOX_REPLACE)) {
+			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
+		}
+
+		/* insert new node */
+		mh_int_t k = mh_lstrptr_put(str_hash, &node, NULL, NULL, NULL);
+		if (unlikely(k == mh_end(str_hash))) {
+			tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) k,
+				  "str hash", "key");
+		}
+
+		return NULL;
+	} else {
+		if (unlikely(flags & BOX_ADD)) {
+			tnt_raise(ClientError, :ER_TUPLE_FOUND);
+		}
+
+		/* update existing node in-place */
+		struct tuple *ret = mh_lstrptr_node(str_hash, old_k)->val;
+		/* update both pointer to tuple and pointer to key here
+		 * key bytes are same */
+		memcpy(mh_lstrptr_node(str_hash, old_k), &node, sizeof(node));
+		return ret;
+	}
 }
 
 - (struct iterator *) allocIterator
