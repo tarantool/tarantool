@@ -254,7 +254,7 @@ function box.bless_space(space)
     end
     space_mt.pairs = function(space) return space.index[0]:pairs() end
     space_mt.__index = space_mt
-    
+
     setmetatable(space, space_mt)
     if type(space.index) == 'table' and space.enabled then
         for j, index in pairs(space.index) do

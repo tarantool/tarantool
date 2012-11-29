@@ -27,13 +27,15 @@
  * SUCH DAMAGE.
  */
 #include "lua_ipc.h"
-#include <ipc.h>
+
+#include <stdlib.h>
+
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
 
-#include <lua/init.h>
-#include <stdlib.h>
+#include "ipc.h"
+#include "lua/init.h"
 
 static const char channel_lib[]   = "box.ipc.channel";
 
@@ -75,7 +77,6 @@ lbox_check_channel(struct lua_State *L, int narg)
 	return * (void **) luaL_checkudata(L, narg, channel_lib);
 }
 
-
 static int
 lbox_ipc_channel_gc(struct lua_State *L)
 {
@@ -86,7 +87,6 @@ lbox_ipc_channel_gc(struct lua_State *L)
 	free(ch);
 	return 0;
 }
-
 
 static int
 lbox_ipc_channel_is_full(struct lua_State *L)

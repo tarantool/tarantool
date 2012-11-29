@@ -26,15 +26,20 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
+#include "box_lua_space.h"
 #include "space.h"
-#include "../box/space.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
 #include <say.h>
 
-
+/**
+ * Make a single space available in Lua,
+ * via box.space[] array.
+ *
+ * @return A new table representing a space on top of the Lua
+ * stack.
+ */
 int
 lbox_pushspace(struct lua_State *L, struct space *space)
 {
@@ -63,31 +68,29 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 	/* space.index */
 	lua_pushstring(L, "index");
 	lua_newtable(L);
-
-
-	for(int i = 0; i < space->key_count; i++) {
+	/*
+	 * Fill space.index table with
+	 * all defined indexes.
+	 */
+	for (int i = 0; i < space->key_count; i++) {
 		lua_pushnumber(L, i);
 		lua_newtable(L);		/* space.index[i] */
-
-		lua_pushstring(L, "idx");
-		lua_pushfstring(L, "index %d in space %d", i, space->no);
-		lua_settable(L, -3);
 
 		lua_pushstring(L, "unique");
 		lua_pushboolean(L, space->key_defs[i].is_unique);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "type");
-		switch(space->key_defs[i].type) {
-			case HASH:
-				lua_pushstring(L, "HASH");
-				break;
-			case TREE:
-				lua_pushstring(L, "TREE");
-				break;
-			default:
-				panic("unknown index type %d",
-					space->key_defs[i].parts[0].type);
+		switch (space->key_defs[i].type) {
+		case HASH:
+			lua_pushstring(L, "HASH");
+			break;
+		case TREE:
+			lua_pushstring(L, "TREE");
+			break;
+		default:
+			panic("unknown index type %d",
+				space->key_defs[i].parts[0].type);
 		}
 		lua_settable(L, -3);
 
@@ -99,19 +102,19 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 			lua_newtable(L);
 
 			lua_pushstring(L, "type");
-			switch(space->key_defs[i].parts[j].type) {
-				case NUM:
-					lua_pushstring(L, "NUM");
-					break;
-				case NUM64:
-					lua_pushstring(L, "NUM64");
-					break;
-				case STRING:
-					lua_pushstring(L, "STR");
-					break;
-				default:
-					lua_pushstring(L, "UNKNOWN");
-					break;
+			switch (space->key_defs[i].parts[j].type) {
+			case NUM:
+				lua_pushstring(L, "NUM");
+				break;
+			case NUM64:
+				lua_pushstring(L, "NUM64");
+				break;
+			case STRING:
+				lua_pushstring(L, "STR");
+				break;
+			default:
+				lua_pushstring(L, "UNKNOWN");
+				break;
 			}
 			lua_settable(L, -3);
 
@@ -129,14 +132,9 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 
 	lua_settable(L, -3);	/* push space.index */
 
-
-	/* on_reload_configuration hook */
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "bless_space");
 	lua_gettable(L, -2);
-
-	if (!lua_isfunction(L, -1))
-		panic("box.bless_space isn't a function");
 
 	lua_pushvalue(L, -3);			/* box, bless, space */
 	lua_call(L, 1, 0);
@@ -145,6 +143,9 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 	return 1;
 }
 
+/**
+ * A callback adapter for space_foreach().
+ */
 static void
 lbox_add_space(struct space *space, struct lua_State *L)
 {
@@ -153,8 +154,12 @@ lbox_add_space(struct space *space, struct lua_State *L)
 	lua_settable(L, -3);
 }
 
+/**
+ * Make all spaces available in Lua via box.space
+ * array.
+ */
 void
-lbox_space_init(struct lua_State *L)
+mod_lua_load_cfg(struct lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "space");

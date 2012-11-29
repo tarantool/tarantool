@@ -39,16 +39,15 @@
 #include "lj_cdata.h"
 #include "lj_cconv.h"
 #include "lj_state.h"
+#include <ctype.h>
 
 #include "pickle.h"
 #include "fiber.h"
 #include "lua_ipc.h"
-#include <ctype.h>
 #include "lua/info.h"
 #include "lua/slab.h"
 #include "lua/stat.h"
 #include "lua/uuid.h"
-#include "space.h"
 
 #include TARANTOOL_CONFIG
 
@@ -1380,8 +1379,7 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		       "  table[index] = {}\n"
 		       "  setmetatable(table[index], getmetatable(table))\n"
 		       "  return rawget(table, index)\n"
-		       "end\n"
-	);
+		       "end\n");
 	while ((key = tarantool_cfg_iterator_next(i, cfg, &value)) != NULL) {
 		if (value == NULL)
 			continue;
@@ -1399,8 +1397,7 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		       "function(table, index)\n"
 		       "  error('Attempt to modify a read-only table')\n"
 		       "end\n"
-		       "getmetatable(box.cfg).__index = nil\n"
-	);
+		       "getmetatable(box.cfg).__index = nil\n");
 	luaL_pushresult(&b);
 	if (luaL_loadstring(L, lua_tostring(L, -1)) != 0 ||
 	    lua_pcall(L, 0, 0, 0) != 0) {
@@ -1408,14 +1405,18 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 	}
 	lua_pop(L, 1);	/* cleanup stack */
 
-	lbox_space_init(L);
-
-	/* on_reload_configuration hook */
+	mod_lua_load_cfg(L);
+	/*
+	 * Invoke a user-defined on_reload_configuration hook,
+	 * if it exists. Do it after everything else is done.
+	 */
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "on_reload_configuration");
 	lua_gettable(L, -2);
-	if (lua_isfunction(L, -1))
-		lua_call(L, 0, 0);
+	if (lua_isfunction(L, -1) && lua_pcall(L, 0, 0, 0) != 0) {
+		say_error("on_reload_configuration() hook failed: %s",
+			  lua_tostring(L, -1));
+	}
 	lua_pop(L, 1);	/* cleanup stack */
 }
 
