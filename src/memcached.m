@@ -469,6 +469,7 @@ memcached_space_init()
 	struct key_def *key_def = malloc(sizeof(struct key_def));
 	key_def->part_count = 1;
 	key_def->is_unique = true;
+	key_def->type = HASH;
 
 	key_def->parts = malloc(sizeof(struct key_part));
 	key_def->cmp_order = malloc(sizeof(u32));

@@ -173,7 +173,7 @@ function box.counter.dec(space, ...)
     end
 end
 
-function box.on_reload_configuration()
+function box.bless_space(space)
     local index_mt = {}
     -- __len and __index
     index_mt.len = function(index) return #index.idx end
@@ -254,16 +254,18 @@ function box.on_reload_configuration()
     end
     space_mt.pairs = function(space) return space.index[0]:pairs() end
     space_mt.__index = space_mt
-    for i, space in pairs(box.space) do
-        rawset(space, 'n', i)
-        setmetatable(space, space_mt)
-        if type(space.index) == 'table' and space.enabled then
-            for j, index in pairs(space.index) do
-                rawset(index, 'idx', box.index.new(i, j))
-                setmetatable(index, index_mt)
-            end
+
+    setmetatable(space, space_mt)
+    if type(space.index) == 'table' and space.enabled then
+        for j, index in pairs(space.index) do
+            rawset(index, 'idx', box.index.new(space.n, j))
+            setmetatable(index, index_mt)
         end
     end
+end
+
+-- User can redefine the hook
+function box.on_reload_configuration()
 end
 
 require("bit")

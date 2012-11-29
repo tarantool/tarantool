@@ -860,8 +860,8 @@ main(int argc, char **argv)
 	@try {
 		tarantool_L = tarantool_lua_init();
 		mod_init();
-		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
+		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		/*
 		 * init iproto before admin and after memcached:
 		 * recovery is finished on bind to the primary port,

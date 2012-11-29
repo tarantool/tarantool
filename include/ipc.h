@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_IFC_H_INCLUDED
-#define TARANTOOL_IFC_H_INCLUDED
+#ifndef TARANTOOL_IPC_H_INCLUDED
+#define TARANTOOL_IPC_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -177,4 +177,4 @@ ipc_channel_has_writers(struct ipc_channel *ch);
 
 extern const ev_tstamp IPC_TIMEOUT_INFINITY;
 
-#endif /* TARANTOOL_IFC_H_INCLUDED */
+#endif /* TARANTOOL_IPC_H_INCLUDED */

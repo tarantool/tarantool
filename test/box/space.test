@@ -1,0 +1,5 @@
+# encoding: tarantool
+exec admin "lua type(box)"
+exec admin "lua type(box.space)"
+exec admin "lua box.cfg.memcached_space"
+exec admin "lua for i, v in pairs(box.space[0].index[0].key_field[0]) do print(i, ': ', v) end"
