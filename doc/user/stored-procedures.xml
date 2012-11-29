@@ -293,8 +293,9 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
     </varlistentry>
 </variablelist>
 
-<variablelist>
-    <title>Package <code xml:id="box" xreflabel="box">box</code> function index</title>
+<section>
+    <title>Package <code>box</code></title>
+<variablelist xml:id="box" xreflabel="box">
     <varlistentry>
         <term>
             <emphasis role="lua">box.process(op, request)</emphasis>
@@ -344,7 +345,9 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.select(space_no, index_no, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.select" xreflabel="box.select">
+                box.select(space_no, index_no, ...)
+            </emphasis>
         </term>
         <listitem>
             <para>
@@ -507,24 +510,27 @@ Call ERROR, Illegal parameters, key is not u32 (ER_ILLEGAL_PARAMS)
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.select_range(space_no, index_no, limit, key, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.select_range" xreflabel="box.select_range">
+                box.select_range(space_no, index_no, limit, key, ...)
+            </emphasis>
         </term>
         <listitem><para>
             Select a range of tuples, starting from offset
             specified by <code>key</code>. The key can be
-            multipart.
-            Limit selection with at most <code>limit</code>
-            tuples.
-            If no key is specified, start from the first key in
-            the index.
-            </para>
-            <para>
+            multipart.  Limit selection with at most
+            <code>limit</code> tuples.  If no key is specified,
+            start from the first key in the index.
+        </para>
+        <para>
             For TREE indexes, this returns tuples in sorted order.
             For HASH indexes, the order of tuples is unspecified, and
             can change significantly if data is inserted or deleted
             between two calls to <code>box.select_range()</code>.
             If <code>key</code> is <code>nil</code> or unspecified,
             the selection starts from the start of the index.
+            This is a simple wrapper around <code xlink:href="#box.space.select_range">box.space[space_no]:select_range(index_no, ...)</code>.
+        </para>
+        <para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost> show configuration
 ---
@@ -577,7 +583,9 @@ localhost> lua box.select_range(4, 1, 2, '1')
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.select_reverse_range(space_no, index_no, limit, key, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.select_reverse_range" xreflabel="box.select_reverse_range">
+                box.select_reverse_range(space_no, index_no, limit, key, ...)
+            </emphasis>
         </term>
         <listitem><para>
             Select a reverse range of tuples, starting from the offset
@@ -590,7 +598,7 @@ localhost> lua box.select_range(4, 1, 2, '1')
             </para>
             <para>
             For TREE indexes, this returns tuples in sorted order.
-	    Reverse iteration for HASH indexes is not supported.
+            Reverse iteration for HASH indexes is not supported.
             If <code>key</code> is <code>nil</code> or unspecified,
             the selection starts from the end of the index.
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -905,9 +913,12 @@ localhost> lua box.counter.dec(0, 'top.mail.ru')
         </listitem>
     </varlistentry>
 </variablelist>
+</section>
 
-<variablelist>
-    <title>Package <code xml:id="box.tuple" xreflabel="box.tuple">box.tuple</code></title>
+<section>
+    <title>Package <code>box.tuple</code></title>
+
+<variablelist xml:id="box.tuple" xreflabel="box.tuple">
     <para>The package contains no functions, but stands for
     <code>box.tuple</code> userdata type. It is possible to access individual
     tuple fields using an index, select a range of fields, iterate
@@ -1001,9 +1012,11 @@ localhost> lua t:find(1, 'abc')
         </para></listitem>
     </varlistentry>
 </variablelist>
+</section>
 
-<variablelist>
-    <title>Package <code xml:id="box.space" xreflabel="box.space">box.space</code></title>
+<section>
+    <title>Package <code>box.space</code></title>
+<variablelist xml:id="box.space" xreflabel="box.space">
     <para>This package is a container for all
     configured spaces. A space object provides access to space
     attributes, such as id, whether or not a space is
@@ -1056,16 +1069,43 @@ localhost> lua t:find(1, 'abc')
 
     <varlistentry>
         <term>
-            <emphasis role="lua">space:select_range(index_no, limit, key, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.space.select_range" xreflabel="box.space[i].select_range()">
+                space:select_range(index_no, limit, key)
+            </emphasis>
         </term>
-        <listitem><simpara></simpara></listitem>
+        <listitem>
+            <simpara>
+                Select a range of tuples, starting from offset specified by
+                <code>key</code>. The key can be multipart.
+                Limit selection with at most <code>limit</code> tuples.
+                If no key is specified, start from the first key in the index.
+            </simpara>
+            <simpara>
+                For TREE indexes, this returns tuples in sorted order.
+                For other indexes, the order of tuples is unspecified, and
+                can change significantly if data is inserted or deleted
+                between two calls to <code>select_range()</code>.
+                If <code>key</code> is <code>nil</code> or unspecified,
+                the selection starts from the start of the index.
+            </simpara>
+        </listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">space:select_reverse_range(index_no, limit, key, ...)</emphasis>
+            <emphasis role="lua"
+            xml:id="box.space.select_reverse_range"
+            xreflabel="box.space.select_reverse_range">
+            space:select_reverse_range(limit, key)</emphasis>
         </term>
-        <listitem><simpara></simpara></listitem>
+        <listitem>
+            <simpara>
+                Select a reverse range of tuples, limited by
+                <code>limit</code>, starting from <code>key</code>.
+                The key can be multipart. TREE index returns tuples in descending
+                order. Not supported by HASH indexes.
+            </simpara>
+        </listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1145,10 +1185,11 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
         </listitem>
     </varlistentry>
 </variablelist>
+</section>
 
-<variablelist>
-    <title>Package <code xml:id="box.index"
-xreflabel="box.index">box.index</code></title>
+<section>
+    <title>Package <code >box.index</code></title>
+<variablelist xml:id="box.index" xreflabel="box.index">
     <para>
         This package implements methods of type <code>box.index</code>.
         Indexes are contained in <code
@@ -1192,21 +1233,99 @@ xreflabel="box.index">box.index</code></title>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">space:select_range(limit, key)</emphasis>
+             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.iterator">
+            index:iterator(type, ...)</emphasis>
         </term>
-        <listitem><simpara>Select a range of tuples, limited by
-        <code>limit</code>, starting from <code>key</code>.
-        </simpara></listitem>
+        <listitem>
+            <simpara>
+                This method provides iteration support within an
+                index. Parameter <code>type</code> is used to
+                identify the semantics of iteration. Different
+                index types support different iterators. The
+                remaining arguments of the function are varying
+                and depend on the iteration type. For example,
+                TREE index maintains a strict order of keys and
+                can return all tuples in ascending or descending
+                order, starting from the specified key. A HASH
+                index, however, doesn't support ordering.
+            </simpara>
+            <para>
+                <bridgehead renderas="sect4">Parameters</bridgehead>
+                <simplelist>
+                        <member><code>type</code> &mdash; iteration strategy as defined in a table below.</member>
+                </simplelist>
+
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                    This method returns an iterator closure, i.e.
+                    a <code>function</code> which can be used to
+                    get the next value on each invocation.
+                <bridgehead renderas="sect4">Errors</bridgehead>
+                    Selected iteration type is not supported in
+                    the subject index type or supplied parameters
+                    do not match iteration type.
+            </para>
+
+            <xi:include href="iterator-types.xml"/>
+
+            <para>
+                <bridgehead renderas="sect4">Examples</bridgehead>
+<programlisting>
+localhost> show configuration
+---
+...
+  space[0].enabled: "true"
+  space[0].index[0].type: "HASH"
+  space[0].index[0].unique: "true"
+  space[0].index[0].key_field[0].fieldno: "0"
+  space[0].index[0].key_field[0].type: "NUM"
+  space[0].index[1].type: "TREE"
+  space[0].index[1].unique: "false"
+  space[0].index[1].key_field[0].fieldno: "1"
+  space[0].index[1].key_field[0].type: "NUM"
+  space[0].index[1].key_field[1].fieldno: "2"
+  space[0].index[1].key_field[1].type: "NUM"
+...
+localhost> INSERT INTO t0 VALUES (1, 1, 0)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (2, 1, 1)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (3, 1, 2)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (4, 2, 0)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (5, 2, 1)
+Insert OK, 1 rows affected
+localhost> INSERT INTO t0 VALUES (6, 2, 2)
+Insert OK, 1 rows affected
+localhost> lua it = box.space[0].index[1]:iterator(box.index.EQ, 1); print(it(), " ", it(), " ", it());
+---
+1: {1, 0} 2: {1, 1} 3: {1, 2}
+...
+localhost> lua it = box.space[0].index[1]:iterator(box.index.EQ, 1, 2); print(it(), " ", it(), " ", it());
+---
+3: {1, 2} nil nil
+...
+localhost> lua i = box.space[0].index[1]:iterator(box.index.GE, 2, 1);  print(it(), " ", it(), " ", it());
+---
+5: {2, 1} 6: {2, 2} nil
+...
+localhost> lua for v in box.space[0].index[1]:iterator(box.index.ALL) do print(v) end
+---
+1: {1, 0}
+2: {1, 1}
+3: {1, 2}
+4: {2, 0}
+5: {2, 1}
+6: {2, 2}
+...
+localhost> lua i = box.space[0].index[0]:iterator(box.index.LT, 1);
+---
+error: 'Iterator type is not supported'
+</programlisting>
+            </para>
+        </listitem>
     </varlistentry>
 
-    <varlistentry>
-        <term>
-            <emphasis role="lua">space:select_reverse_range(limit, key)</emphasis>
-        </term>
-        <listitem><simpara>Select a reverse range of tuples, limited by
-        <code>limit</code>, starting from <code>key</code>.
-        </simpara></listitem>
-    </varlistentry>
 
     <varlistentry>
         <term>
@@ -1229,170 +1348,26 @@ xreflabel="box.index">box.index</code></title>
         </simpara>
         </listitem>
     </varlistentry>
-</variablelist>
-
-<para>
-    The following functions provide iteration support within an index.
-    <code>next</code> and <code>next_equal</code> provide common
-    iterators which go from the beginning to the end of the index.
-    <code>prev</code> and <code>prev_equal</code> provide reverse
-    iterators which travers the index in the reverse order.
-    In a non-unique index the routines with the <code>'_equal'</code>
-    suffix will traverse sequences of tuples with the same key value.
-</para>
-<variablelist>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">index:next([iteration_state or key])</emphasis>
-        </term>
-        <listitem><simpara></simpara></listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">index:prev([iteration_state or key])</emphasis>
-        </term>
-        <listitem><simpara></simpara></listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">index:next_equal([iteration_state or key])</emphasis>
-        </term>
-        <listitem><simpara></simpara></listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">index:prev_equal([iteration_state or key])</emphasis>
-        </term>
-        <listitem>
-        <para>
- All these function can be used either to start iteration, or to fetch
-the next tuple which satisfies iteration criteria.
-        </para>
-        <para>
-To start iteration, either supply a key (possibly multipart) to
-position the iterator at the matching tuple. If key is nil or
-a function is called with no arguments, iteration is started
-from the first (last) tuple in the index.
-        </para>
-        <para>
-	    The functions follow the
-	    <link xlink:href='http://pgl.yoyo.org/luai/i/next'>Lua iteration
-	    pattern</link> returning <code>{iteration_state, tuple}</code> pair,
-	    where <code>iteration_state</code> is the iterator and
-	    <code>tuple</code> is the tuple the iterator points at.
-	    The function returns <code>nil</code> if the iterator reaches the
-	    end of the index or there are no more tuples satisfying the
-	    <code>key</code> (for <code>_equal</code> functions).
-        </para>
-        <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-localhost> lua box.insert(0, "United Kingdom, The", "Europe")
-localhost> lua box.insert(0, "France", "Europe")
-localhost> lua box.insert(0, "Netherlands", "Europe")
-localhost> lua box.insert(0, "Australia", "Oceania")
-localhost> lua box.insert(0, "Vanuatu", "Oceania")
-localhost> lua box.insert(0, "United States of America, The", "North America")
-localhost> lua box.insert(0, "Canada", "North America")
-localhost> lua box.insert(0, "Mexico", "North America")
-localhost> lua pi = box.space[0].index[0] -- primary index
-localhost> lua si = box.space[0].index[1] -- secondary index
-localhost> lua k,v=pi:next() -- init iterator by primary from the beginning
----
-...
-localhost> lua print(v)
----
-'Australia': {'Oceania'}
-...
-localhost> lua k,v=pi:next(k) -- move to next
----
-...
-localhost> lua print(v)
----
-'Canada': {'North America'}
-...
-localhost> lua k,v=pi:next(k) -- move to next
----
-...
-localhost> lua print(v)
----
-'France': {'Europe'}
-...
-localhost> lua k,v=si:next_equal() -- init iterator by secondary from the beginning
----
-...
-localhost> lua print(v)
----
-'United Kingdom, The': {'Europe'}
-...
-localhost> lua k,v=si:next_equal(k) -- move to next
----
-...
-localhost> lua print(v)
----
-'France': {'Europe'}
-...
-localhost> lua k,v=si:next_equal(k) -- move to next
----
-...
-localhost> lua print(v)
----
-'Netherlands': {'Europe'}
-...
-localhost> lua for k,v in pi.next, pi, nil do print(v) end
----
-'Australia': {'Oceania'}
-'Canada': {'North America'}
-'France': {'Europe'}
-'Mexico': {'North America'}
-'Netherlands': {'Europe'}
-'United Kingdom, The': {'Europe'}
-'United States of America, The': {'North America'}
-'Vanuatu': {'Oceania'}
-...
-localhost> lua for k,v in pi.prev, pi, nil do print(v) end
----
-'Vanuatu': {'Oceania'}
-'United States of America, The': {'North America'}
-'United Kingdom, The': {'Europe'}
-'Netherlands': {'Europe'}
-'Mexico': {'North America'}
-'France': {'Europe'}
-'Canada': {'North America'}
-'Australia': {'Oceania'}
-...
-localhost> lua for k,v in si.next_equal, si, 'Oceania' do print(v) end
----
-'Australia': {'Oceania'}
-'Vanuatu': {'Oceania'}
-...
-localhost> lua for k,v in si.prev_equal, si, 'North America' do print(v) end
----
-'Mexico': {'North America'}
-'Canada': {'North America'}
-'United States of America, The': {'North America'}
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua">index:count()</emphasis>
         </term>
         <listitem><simpara>
-	    Iterate over an index, count the number of tuples which equal the
-	    provided search criteria. The argument can either point to a
-	    tuple, a key, or one or more key parts. Returns the number of matched
-	    tuples.
+           Iterate over an index, count the number of tuples which equal the
+           provided search criteria. The argument can either point to a
+           tuple, a key, or one or more key parts. Returns the number of matched
+           tuples.
         </simpara>
         </listitem>
     </varlistentry>
 
 </variablelist>
+</section>
 
-<variablelist>
+<section>
     <title>Package <code>box.fiber</code></title>
+<variablelist xml:id="box.fiber">
     <para>Functions in this package allow you to create, run and
     manage existing <emphasis>fibers</emphasis>.
     </para>
@@ -1490,7 +1465,7 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
             <emphasis role="lua">box.fiber.create(function) </emphasis>
         </term>
         <listitem><simpara>
-		Create a fiber for <code>function</code>.
+            Create a fiber for <code>function</code>.
         </simpara>
         <bridgehead renderas="sect4">Errors</bridgehead>
         <simpara>Can hit a recursion limit.</simpara>
@@ -1561,11 +1536,13 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         </simpara></listitem>
     </varlistentry>
 </variablelist>
+</section>
 
 <!--   end of lib -->
 
-<variablelist>
+<section>
     <title>Package <code>box.ipc</code> &mdash; inter procedure communication</title>
+<variablelist xml:id="box.ipc">
     <simpara>
     </simpara>
     <varlistentry>
@@ -1622,8 +1599,10 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         <term><emphasis role="lua">box.ipc.channel.broadcast(channel, message, timeout)</emphasis></term>
         <listitem>
             <simpara>
-                If the channel is empty, is equivalent to <emphasis role="lua">box.ipc.channel.put()</emphasis>. Otherwise sends the message to
-                all readers of the channel.
+                If the channel is empty, is equivalent to
+                <emphasis role="lua">box.ipc.channel.put()</emphasis>.
+                Otherwise sends the message to all readers of the
+                channel.
             </simpara>
         </listitem>
     </varlistentry>
@@ -1719,9 +1698,15 @@ end
         </listitem>
     </varlistentry>
 </variablelist>
+</section>
+
+<section>
+    <title>Packages <code>box.cfg</code>,
+    <code>box.info</code>, <code>box.slab</code> and
+    <code>box.stat</code>: server introspection</title>
 
 <variablelist>
-    <title>Package <code>box.cfg</code></title>
+    <title>Package <code xml:id="box.cfg">box.cfg</code></title>
     <para>This package provides read-only access to
     all server configuration parameters.</para>
     <varlistentry>
@@ -1740,6 +1725,7 @@ logger = cat - >> tarantool.log
 </programlisting></listitem>
     </varlistentry>
 </variablelist>
+
 <variablelist>
     <title>Package <code>box.info</code></title>
     <para>
@@ -1835,7 +1821,6 @@ options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF -DENABLE_
         </listitem>
     </varlistentry>
 </variablelist>
-
 <variablelist>
     <title>Package <code>box.slab</code></title>
     <para>This package provides access to slab allocator statistics.</para>
@@ -1868,7 +1853,7 @@ bytes_free:4194144
 </variablelist>
 
 <variablelist>
-    <title>Package <code>box.stat</code></title>
+    <title>Package <code xml:id="box.stat">box.stat</code></title>
     <para>This package provides access to request
     statistics.</para>
     <varlistentry>
@@ -1916,6 +1901,7 @@ localhost>
     xlink:href="https://github.com/mailru/tntlua">Lua stored
     procedures repository</link> and in the server test suite.
 </para>
+</section>
 
 <section>
 <title>Limitation of stored procedures</title>

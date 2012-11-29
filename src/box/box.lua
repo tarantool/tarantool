@@ -184,21 +184,34 @@ function box.bless_space(space)
     index_mt.min = function(index) return index.idx:min() end
     index_mt.max = function(index) return index.idx:max() end
     -- iteration
+    index_mt.iterator = function(index, ...)
+        return index.idx:iterator(...)
+    end
+    --
+    -- pairs/next/prev methods are provided for backward compatibility purposes only
     index_mt.pairs = function(index)
         return index.idx.next, index.idx, nil
     end
     --
+    local next_compat = function(idx, iterator_type, ...)
+        local arg = {...}
+        if #arg == 1 and type(arg[1]) == "userdata" then
+            return idx:next(...)
+        else
+            return idx:next(iterator_type, ...)
+        end
+    end
     index_mt.next = function(index, ...)
-        return index.idx:next(...)
+        return next_compat(index.idx, box.index.GE, ...);
     end
     index_mt.prev = function(index, ...)
-        return index.idx:prev(...)
+        return next_compat(index.idx, box.index.LE, ...);
     end
     index_mt.next_equal = function(index, ...)
-        return index.idx:next_equal(...)
+        return next_compat(index.idx, box.index.EQ, ...);
     end
     index_mt.prev_equal = function(index, ...)
-        return index.idx:prev_equal(...)
+        return next_compat(index.idx, box.index.REQ, ...);
     end
     -- index subtree size
     index_mt.count = function(index, ...)
@@ -207,9 +220,10 @@ function box.bless_space(space)
     --
     index_mt.select_range = function(index, limit, ...)
         local range = {}
-        local iterator_state, v = index:next(...)
-        while true do
-            if (#range >= limit) or (iterator_state == nil) then break end
+        for v in index:iterator(box.index.GE, ...) do
+            if #range >= limit then
+                break
+            end
             table.insert(range, v)
             iterator_state, v = index:next(iterator_state)
         end
@@ -217,9 +231,10 @@ function box.bless_space(space)
     end
     index_mt.select_reverse_range = function(index, limit, ...)
         local range = {}
-        local iterator_state, v = index:prev(...)
-        while true do
-            if (#range >= limit) or (iterator_state == nil) then break end
+        for v in index:iterator(box.index.LE, ...) do
+            if #range >= limit then
+                break
+            end
             table.insert(range, v)
             iterator_state, v = index:prev(iterator_state)
         end
@@ -247,7 +262,7 @@ function box.bless_space(space)
         local pk = space.index[0].idx
         local part_count = pk:part_count()
         while #pk > 0 do
-            for k, v in pk.next, pk, nil do
+            for v in pk:iterator() do
                 space:delete(v:slice(0, part_count))
             end
         end
