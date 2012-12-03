@@ -116,7 +116,6 @@ asio_init(void)
 	ev_async_start(&asio_mgr.asio_watcher);
 
 	eio_init(asio_poller, NULL);
-	return 0;
 }
 
 static inline void
