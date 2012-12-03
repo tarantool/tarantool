@@ -47,6 +47,11 @@ endif()
 target_link_libraries(ev ${ev_libs})
 
 #
+# libeio library
+#
+add_library(eio tarantool_eio.c)
+
+#
 # Build admin.m from admin.rl, but only if admin.rl was changed.
 # The same applies to memcached.m/memcached.rl.
 # We track admin.m and memcached.m in revision control, and thus do not
@@ -106,6 +111,7 @@ set (common_sources
      sio.m
      evio.m
      coio.m
+     asio.m
      iobuf.m
      coio_buf.m
      salloc.m
@@ -142,7 +148,7 @@ add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers)
 set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
-set (common_libraries cfg core ev coro gopt misc)
+set (common_libraries cfg core ev eio coro gopt misc)
 
 set (THREAD_LIB pthread)
 if (ENABLE_STATIC)
