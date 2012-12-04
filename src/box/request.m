@@ -80,18 +80,19 @@ execute_replace(struct request *request, struct txn *txn)
 	if (data->size == 0 || data->size != valid_tuple(data, field_count))
 		tnt_raise(IllegalParams, :"incorrect tuple length");
 
-	/* Check to see if the tuple has a sufficient number of fields. */
-	if (unlikely(field_count < sp->max_fieldno)) {
-		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
-	}
-
 	struct tuple *new_tuple = tuple_alloc(data->size);
-	/* txn decreases ref counter on exception */
+
 	tuple_ref(new_tuple, 1);
 	new_tuple->field_count = field_count;
 	memcpy(new_tuple->data, data->data, data->size);
 
-	txn_replace(txn, sp, new_tuple, request->flags);
+	@try {
+		space_validate_tuple(sp, new_tuple);
+		txn_replace(txn, sp, NULL, new_tuple, request->flags);
+	} @catch (tnt_Exception *e) {
+		tuple_ref(new_tuple, -1);
+		@throw;
+	}
 }
 
 /** {{{ UPDATE request implementation.
@@ -695,9 +696,10 @@ execute_update(struct request *request, struct txn *txn)
 	/* Try to find the tuple by primary key. */
 	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
 
-	if (old_tuple == NULL) {
+	if (unlikely(old_tuple == NULL)) {
 		return;
 	}
+
 	/* number of operations */
 	u32 op_cnt = read_u32(data);
 	struct update_op *ops = update_read_ops(data, op_cnt);
@@ -710,25 +712,13 @@ execute_update(struct request *request, struct txn *txn)
 
 	@try {
 		do_update_ops(rope, new_tuple);
-	} @catch(id e) {
-		tuple_ref(new_tuple, -1);
-		@throw e;
-	}
 
-	if (new_tuple->field_count < sp->max_fieldno) {
+		space_validate_tuple(sp, new_tuple);
+		txn_replace(txn, sp, old_tuple, new_tuple, BOX_ADD);
+	} @catch(tnt_Exception *e) {
 		tuple_ref(new_tuple, -1);
-		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+		@throw;
 	}
-
-	/* TODO(roman):
-	 * Currently we don't support multi-statement transactions.
-	 * However, combination of txn operations below work
-	 * in the current implementation. Please review this part when
-	 * multi-statement transaction will be ready.
-	 */
-	txn_remove(txn, sp, old_tuple);
-	/* TODO(roman): is BOX_ADD here? */
-	txn_replace(txn, sp, new_tuple, 0);
 }
 
 /** }}} */
@@ -801,9 +791,10 @@ execute_delete(struct request *request, struct txn *txn)
 	Index *pk = space_index(sp, 0);
 	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
 
-	if (likely(old_tuple != NULL)) {
-		txn_remove(txn, sp, old_tuple);
-	}
+	if (unlikely(old_tuple == NULL))
+		return;
+
+	txn_replace(txn, sp, old_tuple, NULL, request->flags);
 }
 
 /** To collects stats, we need a valid request type.

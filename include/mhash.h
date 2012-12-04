@@ -282,6 +282,21 @@ put_done:
 	return x;
 }
 
+static inline mh_int_t
+_mh(replace)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **pprev,
+	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
+{
+	mh_int_t k = _mh(get)(h, node, hash_arg, eq_arg);
+	if (k == mh_end(h)) {
+		if (pprev) *pprev = NULL;
+		return _mh(put)(h, node, hash_arg, eq_arg, NULL);
+	} else {
+		if (pprev) memcpy(*pprev, &(h->p[k]), sizeof(mh_node_t));
+		memcpy(&(h->p[k]), node, sizeof(mh_node_t));
+		return k;
+	}
+}
+
 static inline void
 _mh(del)(struct _mh(t) *h, mh_int_t x,
 	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)

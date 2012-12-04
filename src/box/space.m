@@ -44,9 +44,6 @@ static struct mh_i32ptr_t *spaces;
 bool secondary_indexes_enabled = false;
 bool primary_indexes_enabled = false;
 
-static void
-space_validate_tuple(struct space *sp, struct tuple *new_tuple);
-
 struct space *
 space_create(i32 space_no, struct key_def *key_defs, int key_count, int arity)
 {
@@ -125,60 +122,53 @@ key_free(struct key_def *key_def)
 }
 
 struct tuple *
-space_replace(struct space *sp, struct tuple *tuple, u32 flags)
+space_replace(struct space *sp, struct tuple *old_tuple,
+	      struct tuple *new_tuple, u32 flags)
 {
-	struct tuple *old_tuple = NULL;
-
-	space_validate_tuple(sp, tuple);
+	struct tuple *removed_tuple = NULL;
 
 	int n = index_count(sp);
-
 	int i = 0;
 	@try {
-		/* Primary key is always unique */
+
+		/* Update the primary key */
 		assert(sp->index[0]->key_def->is_unique);
-		/* replace tuple in the pkey and get old tuple */
-		old_tuple = [sp->index[0] replace: tuple: flags];
+		removed_tuple =
+			[sp->index[0] replace: old_tuple: new_tuple: flags];
+		assert(old_tuple == NULL || removed_tuple == NULL ||
+		       old_tuple == removed_tuple);
 		i++;
 
+		if (unlikely(!removed_tuple && !new_tuple)) {
+			/* Nothing has been changed in the primary key */
+			return NULL;
+		}
+
+		/* Update seconday keys */
 		for (; i < n; i++) {
 			Index *index = sp->index[i];
-
-			/* remove old tuple from the secondary key */
-			if (old_tuple) {
-				[index remove: old_tuple];
-			}
-
-			/* insert new tuple to tuple to the secondary key */
-			[index replace: tuple: BOX_ADD];
+			[index replace: removed_tuple: new_tuple: BOX_ADD];
 		}
 
-		return old_tuple;
+		return removed_tuple;
 	} @catch (tnt_Exception *e) {
-		/* rollback changes on exception */
-		if (old_tuple != NULL) {
-			i--;
-			for (; i >= 0;  i--) {
-				Index *index = sp->index[i];
-				[index remove: tuple];
-				[index replace: old_tuple: 0];
-			}
+		i--;
+		/* Rollback all changes */
+		for (; i >= 0;  i--) {
+			Index *index = sp->index[i];
+			[index replace: new_tuple: removed_tuple: BOX_ADD];
 		}
-		/* lift exception e to upper levels */
-		@throw e;
+
+		@throw;
 	}
 }
 
-static void
+void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
-	int n = index_count(sp);
-
-	/* Only secondary indexes are validated here. So check to see
-	   if there are any.*/
-	if (n <= 1) {
-		return;
-	}
+	/* Check to see if the tuple has a sufficient number of fields. */
+	if (unlikely(new_tuple->field_count < sp->max_fieldno))
+		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
 
 	if (sp->arity > 0 && sp->arity != new_tuple->field_count)
 		tnt_raise(IllegalParams, :"tuple field count must match space cardinality");
@@ -194,21 +184,11 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 		   size fields (STRING and UNKNOWN). */
 		if (sp->field_types[f] == NUM) {
 			if (len != sizeof(u32))
-				tnt_raise(IllegalParams, :"field must be NUM");
+				tnt_raise(ClientError, :ER_KEY_FIELD_TYPE, "u32");
 		} else if (sp->field_types[f] == NUM64) {
 			if (len != sizeof(u64))
-				tnt_raise(IllegalParams, :"field must be NUM64");
+				tnt_raise(ClientError, :ER_KEY_FIELD_TYPE, "u64");
 		}
-	}
-}
-
-void
-space_remove(struct space *sp, struct tuple *tuple)
-{
-	int n = index_count(sp);
-	for (int i = 0; i < n; i++) {
-		Index *index = sp->index[i];
-		[index remove: tuple];
 	}
 }
 

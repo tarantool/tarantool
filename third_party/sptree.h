@@ -77,8 +77,8 @@ typedef struct sptree_node_pointers {
  *                         int (*elemcompare)(const void *e1, const void *e2, void *arg),
  *                         void *arg)
  *
- *   void sptree_NAME_insert(sptree_NAME *tree, void *value)
- *   void sptree_NAME_delete(sptree_NAME *tree, void *value)
+ *   void sptree_NAME_replace(sptree_NAME *tree, void *value, void **pprevvalue)
+ *   void sptree_NAME_delete(sptree_NAME *tree, void *value, void **pprevvalue)
  *   void* sptree_NAME_find(sptree_NAME *tree, void *key)
  *
  *   spnode_t sptree_NAME_walk(sptree_NAME *t, void* array, spnode_t limit, spnode_t offset)
@@ -300,7 +300,7 @@ sptree_##name##_balance(sptree_##name *t, spnode_t node, spnode_t size) {       
 }                                                                                         \
                                                                                           \
 static inline void                                                                        \
-sptree_##name##_insert(sptree_##name *t, void *v) {                                       \
+sptree_##name##_replace(sptree_##name *t, void *v, void **pprev) {                        \
     spnode_t    node, depth = 0;                                                          \
     spnode_t    path[ t->max_depth + 2];                                                  \
                                                                                           \
@@ -312,6 +312,8 @@ sptree_##name##_insert(sptree_##name *t, void *v) {                             
         t->garbage_head = SPNIL;                                                          \
         t->nmember = 1;                                                                   \
         t->size=1;                                                                        \
+        if (pprev)                                                                        \
+            *pprev = NULL;                                                                \
         return;                                                                           \
     } else {                                                                              \
         spnode_t    parent = t->root;                                                     \
@@ -319,6 +321,8 @@ sptree_##name##_insert(sptree_##name *t, void *v) {                             
         for(;;)    {                                                                      \
             int r = t->elemcompare(v, ITHELEM(t, parent), t->arg);                        \
             if (r==0) {                                                                   \
+                if (pprev)                                                                \
+                    memcpy(*pprev, ITHELEM(t, parent), t->elemsize);                      \
                 memcpy(ITHELEM(t, parent), v, t->elemsize);                               \
                 return;                                                                   \
             }                                                                             \
@@ -345,6 +349,8 @@ sptree_##name##_insert(sptree_##name *t, void *v) {                             
             }                                                                             \
         }                                                                                 \
     }                                                                                     \
+    if (pprev)                                                                            \
+        *pprev = NULL;                                                                    \
                                                                                           \
     t->size++;                                                                            \
     if ( t->size > t->max_size )                                                          \
@@ -380,10 +386,11 @@ sptree_##name##_insert(sptree_##name *t, void *v) {                             
             }                                                                             \
         }                                                                                 \
     }                                                                                     \
+                                                                                          \
 }                                                                                         \
                                                                                           \
 static inline void                                                                        \
-sptree_##name##_delete(sptree_##name *t, void *k) {                                       \
+sptree_##name##_delete(sptree_##name *t, void *k, void **pprev) {                         \
     spnode_t    node = t->root;                                                           \
     spnode_t    parent = SPNIL;                                                           \
     int            lr = 0;                                                                \
@@ -398,6 +405,8 @@ sptree_##name##_delete(sptree_##name *t, void *k) {                             
             node = _GET_SPNODE_LEFT(node);                                                \
             lr = -1;                                                                      \
         } else {/* found */                                                               \
+            if (pprev)                                                                    \
+                memcpy(*pprev, ITHELEM(t, node), t->elemsize);                            \
             if (_GET_SPNODE_LEFT(node) == SPNIL && _GET_SPNODE_RIGHT(node) == SPNIL) {    \
                 if ( parent == SPNIL )                                                    \
                     t->root = SPNIL;                                                      \
@@ -445,6 +454,9 @@ sptree_##name##_delete(sptree_##name *t, void *k) {                             
             break;                                                                        \
         }                                                                                 \
     }                                                                                     \
+                                                                                          \
+    if (pprev)                                                                            \
+        pprev = NULL;                                                                     \
                                                                                           \
     if (node == SPNIL) /* not found */                                                    \
         return;                                                                           \

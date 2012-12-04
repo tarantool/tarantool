@@ -60,12 +60,14 @@ txn_add_redo(struct txn *txn, u16 op, struct tbuf *data)
 
 void
 txn_replace(struct txn *txn, struct space *space,
-	    struct tuple *tuple, u32 flags)
+	    struct tuple *old_tuple, struct tuple *new_tuple, u32 flags)
 {
 	/* txn_add_undo() must be done after txn_add_redo() */
 	assert(txn->op != 0);
 
-	txn_lock(txn, tuple);
+	/* TODO(roman): should we lock old_tuple too? */
+	if (new_tuple)
+		txn_lock(txn, new_tuple);
 
 	/* Remember the old tuple only if we locked it
 	 * successfully, to not unlock a tuple locked by another
@@ -73,27 +75,10 @@ txn_replace(struct txn *txn, struct space *space,
 	 */
 
 	assert(txn->space == NULL || txn->space == space);
+
+	txn->old_tuple = space_replace(space, old_tuple, new_tuple, flags);
+	txn->new_tuple = new_tuple;
 	txn->space = space;
-	txn->new_tuple = tuple;
-
-	struct tuple *old_tuple = space_replace(space, tuple, flags);
-	assert (txn->old_tuple == old_tuple || !old_tuple || !txn->old_tuple);
-	if (old_tuple) {
-		txn->old_tuple = old_tuple;
-	}
-}
-
-void
-txn_remove(struct txn *txn, struct space *space, struct tuple *tuple)
-{
-	/* txn_add_undo() must be done after txn_add_redo() */
-	assert(txn->op != 0);
-
-	assert(txn->space == NULL || txn->space == space);
-	txn->space = space;
-	txn->old_tuple = tuple;
-
-	space_remove(space, tuple);
 }
 
 struct txn *
@@ -108,7 +93,8 @@ txn_commit(struct txn *txn)
 {
 	if (txn->op == 0) /* Nothing to do. */
 		return;
-	if (! (txn->txn_flags & BOX_NOT_STORE)) {
+
+	if (txn->old_tuple || txn->new_tuple) {
 		int64_t lsn = next_lsn(recovery_state);
 		int res = wal_write(recovery_state, lsn, 0,
 				    txn->op, &txn->req);
@@ -134,14 +120,14 @@ txn_rollback(struct txn *txn)
 	if (txn->op == 0) /* Nothing to do. */
 		return;
 	if (txn->new_tuple && txn->new_tuple->flags & WAL_WAIT) {
-		space_remove(txn->space, txn->new_tuple);
+		space_replace(txn->space, NULL, txn->new_tuple, 0);
 	}
 
 	if (txn->new_tuple)
 		tuple_ref(txn->new_tuple, -1);
 
 	if (txn->old_tuple) {
-		space_replace(txn->space, txn->old_tuple, 0);
+		space_replace(txn->space, NULL, txn->old_tuple, 0);
 	}
 
 	TRASH(txn);

@@ -930,8 +930,7 @@ tree_iterator_gt(struct iterator *iterator)
 	return [self unfold: node];
 }
 
-- (struct tuple *) findByTuple: (struct tuple *) tuple
-{
+- (void *) findNodeByTuple: (struct tuple *) tuple {
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
 
@@ -939,59 +938,100 @@ tree_iterator_gt(struct iterator *iterator)
 	key_data->part_count = tuple->field_count;
 	fold_with_sparse_parts(key_def, tuple, key_data->parts);
 
-	void *node = sptree_index_find(&tree, key_data);
+	return sptree_index_find(&tree, key_data);
+}
+
+- (struct tuple *) findByTuple: (struct tuple *) tuple
+{
+	void *node = [self findNodeByTuple: tuple];
 	return [self unfold: node];
 }
 
-- (void) remove: (struct tuple *) tuple
+- (struct tuple *) replace: (struct tuple *) old_tuple
+			  : (struct tuple *) new_tuple
+			  : (u32) flags
 {
-	void *node = alloca([self node_size]);
-	[self fold: node :tuple];
-	sptree_index_delete(&tree, node);
-}
+	assert (old_tuple != NULL || new_tuple != NULL);
+	void *node1 = alloca([self node_size]);
+	void *node2 = alloca([self node_size]);
 
-- (struct tuple *) replace: (struct tuple *) tuple :(u32) flags
-{
-	if (!key_def->is_unique) {
-		/* insert new node */
-		void *node = alloca([self node_size]);
-		[self fold: node :tuple];
-		sptree_index_insert(&tree, node);
-		return NULL;
-	}
+	if (new_tuple && !old_tuple)  {
+		/* Case #1: replace(new_tuple); */
 
-	/* index is unique */
+		void *new_node = node1;
+		void *old_node = node2;
+		[self fold: new_node: new_tuple];
+		sptree_index_replace(&tree, new_node, &old_node);
 
-	/* search for old tuple */
-	struct key_data *key_data
-		= alloca(sizeof(struct key_data) +
-			 _SIZEOF_SPARSE_PARTS(tuple->field_count));
-
-	key_data->data = tuple->data;
-	key_data->part_count = tuple->field_count;
-	fold_with_sparse_parts(key_def, tuple, key_data->parts);
-	void *node = sptree_index_find(&tree, key_data);
-
-	if (node == NULL) {
-		if (unlikely(flags & BOX_REPLACE)) {
-			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
-		}
-
-		/* insert new node */
-		node = alloca([self node_size]);
-		[self fold: node :tuple];
-		sptree_index_insert(&tree, node);
-		return NULL;
-	} else {
-		if (unlikely(flags & BOX_ADD)) {
+		if (unlikely((flags & BOX_ADD) && old_node &&
+			     key_def->is_unique)) {
+			/* Rollback changes */
+			sptree_index_replace(&tree, old_node, NULL);
 			tnt_raise(ClientError, :ER_TUPLE_FOUND);
 		}
 
-		/* update node in-place */
-		struct tuple *ret = [self unfold: node];
-		[self fold: node :tuple];
+		if (unlikely((flags & BOX_REPLACE) && !old_node &&
+			     key_def->is_unique)) {
+			/* Rollback changes */
+			sptree_index_delete(&tree, new_node, NULL);
+			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
+		}
+
+		/* Return a removed node */
+		return [self unfold: old_node];
+	} else if (!new_tuple && old_tuple) {
+		/* Case #2: remove(old_tuple) */
+
+		void *old_node  = node1;
+		void *old_node2 = node2;
+
+		[self fold: old_node: old_tuple];
+		sptree_index_delete(&tree, old_node, &old_node2);
+
+#if 0		/* TODO: A new undocumented feature */
+		if (unlikely(key_def->is_unique &&
+			     (flags & BOX_REPLACE) && !old_node2)) {
+			/* Rollback changes */
+			sptree_index_replace(&tree, old_node, NULL);
+			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
+		}
+#endif
+		return [self unfold: old_node2];
+	} else /* (old_tuple != NULL && new_tuple != NULL) */ {
+		/* Case #3: remove(old_tuple); insert(new_tuple) */
+
+		/* BOX_ADD is only supported in this case */
+		assert(!key_def->is_unique || (flags & BOX_ADD));
+
+		void *new_node = node1;
+		void *old_node = node2;
+
+		[self fold: new_node: new_tuple];
+		sptree_index_replace(&tree, new_node, &old_node);
+		assert(key_def->is_unique || old_node == NULL);
+
+		struct tuple *ret = NULL;
+		if (old_node) {
+			ret = [self unfold: old_node];
+
+			if (unlikely(ret != old_tuple)) {
+				/* Rollback changes */
+				sptree_index_replace(&tree, old_node, NULL);
+				tnt_raise(ClientError, :ER_TUPLE_FOUND);
+			}
+		} else {
+			void *old_node  = node1;
+			void *old_node2 = node2;
+			[self fold: old_node: old_tuple];
+			sptree_index_delete(&tree, old_node, &old_node2);
+
+			ret = [self unfold: old_node2];
+		}
+
 		return ret;
 	}
+
+	return NULL;
 }
 
 - (struct iterator *) allocIterator

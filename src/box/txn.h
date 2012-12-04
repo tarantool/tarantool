@@ -64,7 +64,6 @@ void txn_commit(struct txn *txn);
 void txn_finish(struct txn *txn);
 void txn_rollback(struct txn *txn);
 void txn_add_redo(struct txn *txn, u16 op, struct tbuf *data);
-void txn_replace(struct txn *txn, struct space *space, struct tuple *tuple,
-		 u32 flags);
-void txn_remove(struct txn *txn, struct space *space, struct tuple *tuple);
+void txn_replace(struct txn *txn, struct space *space,
+		 struct tuple *old_tuple, struct tuple *new_tuple, u32 flags);
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

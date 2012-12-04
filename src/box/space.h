@@ -85,10 +85,57 @@ struct space {
 /** Get space ordinal number. */
 static inline i32 space_n(struct space *sp) { return sp->no; }
 
+/**
+ * @brief Replaces the @a old_tuple with the @a new_tuple in the @a sp.
+ *
+ * There is three major use cases for this method:
+ *
+ * 1. old_tuple = NULL, new_tuple != NULL
+ * Insert or replace the @a new_tuple in the @a space.
+ *
+ * 2. old_tuple != NULL, new_tuple == NULL
+ * Remove @a old_tuple from the @a space.
+ *
+ * 3. old_tuple != NULL, new_tuple != NULL
+ * Atomically perform operation that equivalent to
+ * replace(old_tuple, NULL, flags) + replace(NULL, new_tuple, flags).
+ *
+ * All possible cases are described in the table:
+ * +--------------------------------------------------------------------------+
+ * | old  | new  | oldf | newf | A | R | Action               | Result        |
+ * +--------------------------------------------------------------------------+
+ * | NULL |  XX  |      |  XX  | 0 |0,1| r(newf), i(new)      | newf          |
+ * | NULL |  XX  |      | NULL |0,1| 0 | i(new)               | NULL          |
+ * | NULL |  XX  |      |  XX  | 1 | 0 |                      | TupleFound    |
+ * | NULL |  XX  |      | NULL | 0 | 1 |                      | TupleNotFound |
+ * +------+------+------+------+---+---+----------------------+---------------+
+ * |  XX  | NULL |  XX  |      | 0 |0,1| r(oldf)              | oldf          |
+ * |  XX  | NULL | NULL |      | 0 | 0 |                      | NULL          |
+ * |  XX  | NULL | NULL |      | 0 | 1 |                      | TupleNotFound |
+ * +------+------+------+------+---+---+----------------------+---------------+
+ * |  XX  |  XX  |  XX  |!=oldf| 1 | 0 |                      | TupleFound    |
+ * |  XX  |  XX  |  XX  |==oldf| 1 | 0 | r(oldf), i(new)      | oldf          |
+ * |  XX  |  XX  |  XX  | NULL | 1 | 0 | r(oldf), i(new)      | oldf          |
+ * |  XX  |  XX  | NULL |  XX  | 1 | 0 | i(new)               | NULL          |
+ * |  XX  |  XX  | NULL | NULL | 1 | 0 | i(new)               | NULL          |
+ * +------+------+------+------+---+---+----------------------+---------------+
+ * oldf = findByTuple(old), newf = findByTuple(new), i = insert, r = remove,
+ * A - BOX_ADD, R = BOX_REPLACE (in @a flags parameter).
+ *
+ * The operation is **atomic**, that is, all changes are either applied
+ * consistently to all space's indexes or aren't applied at all.
+ *
+ * @param sp space
+ * @param old_tuple tuple that should be removed (can be NULL)
+ * @param new_tuple tuple that should be inserted (can be NULL)
+ * @param flags
+ * @return tuple that actually has been removed from the space
+ */
 struct tuple *
-space_replace(struct space *sp, struct tuple *new_tuple, u32 flags);
-void space_remove(struct space *sp, struct tuple *tuple);
-
+space_replace(struct space *space, struct tuple *old_tuple,
+	      struct tuple *new_tuple, u32 flags);
+void
+space_validate_tuple(struct space *sp, struct tuple *new_tuple);
 
 /**
  * Get index by index number.

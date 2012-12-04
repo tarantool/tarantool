@@ -172,9 +172,9 @@ struct index_traits
 - (struct tuple *) max;
 - (struct tuple *) findByKey: (void *) key :(int) part_count;
 - (struct tuple *) findByTuple: (struct tuple *) tuple;
-- (void) remove: (struct tuple *) tuple;
-- (struct tuple *) replace: (struct tuple *) tuple :(u32) flags;
-
+- (struct tuple *) replace: (struct tuple *) old_tuple
+			  : (struct tuple *) new_tuple
+			  : (u32) flags;
 /**
  * Create a structure to represent an iterator. Must be
  * initialized separately.
