@@ -120,7 +120,7 @@ txn_rollback(struct txn *txn)
 	if (txn->op == 0) /* Nothing to do. */
 		return;
 	if (txn->new_tuple && txn->new_tuple->flags & WAL_WAIT) {
-		space_replace(txn->space, NULL, txn->new_tuple, 0);
+		space_replace(txn->space, txn->new_tuple, NULL, 0);
 	}
 
 	if (txn->new_tuple)
