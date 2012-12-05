@@ -30,7 +30,7 @@
 #include "tuple.h"
 #include "space.h"
 #include "exception.h"
-#include "request.h" /* for BOX_ADD, BOX_REPLACE */
+#include "index.h"
 #include <pickle.h>
 
 /* {{{ Utilities. *************************************************/
@@ -946,7 +946,7 @@ tree_iterator_gt(struct iterator *iterator)
 
 - (struct tuple *) replace: (struct tuple *) old_tuple
 			  : (struct tuple *) new_tuple
-			  : (u32) flags
+			  : (enum replace_flags) flags
 {
 	assert (old_tuple != NULL || new_tuple != NULL);
 	void *node1 = alloca([self node_size]);
@@ -962,14 +962,14 @@ tree_iterator_gt(struct iterator *iterator)
 		/* Try to optimistically replace the new_tuple in the space */
 		sptree_index_replace(&tree, new_node, &replaced_node);
 
-		if (unlikely(key_def->is_unique && (flags & BOX_ADD)
+		if (unlikely(key_def->is_unique && (flags & THROW_INSERT)
 			     && replaced_node != NULL)) {
 			/* BOX_ADD, a tuple with the same key is found */
 			sptree_index_replace(&tree, replaced_node, NULL);
 			tnt_raise(ClientError, :ER_TUPLE_FOUND);
 		}
 
-		if (unlikely(key_def->is_unique && (flags & BOX_REPLACE)
+		if (unlikely(key_def->is_unique && (flags & REPLACE_THROW)
 			     && replaced_node == NULL)) {
 			/* BOX_REPLACE,a tuple with the same key is not found */
 			sptree_index_delete(&tree, new_node, NULL);
@@ -993,7 +993,7 @@ tree_iterator_gt(struct iterator *iterator)
 	} else /* (old_tuple != NULL && new_tuple != NULL) */ {
 		/* Case #3: remove(old_tuple); insert(new_tuple) */
 
-		assert(!key_def->is_unique || (flags & BOX_ADD));
+		assert(!key_def->is_unique || (flags & THROW_INSERT));
 		void *new_node = node1;
 		void *replaced_node = node2;
 

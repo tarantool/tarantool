@@ -93,11 +93,11 @@ static inline i32 space_n(struct space *sp) { return sp->no; }
  * 1. old_tuple = NULL, new_tuple != NULL
  * Inserts or replaces the @a new_tuple in the @a space. If no flags are set
  * and an old tuple in the @a sp has the same primary key as @a new_tuple,
- * the old tuple is removed before new tuple is inserted. If BOX_ADD flag is set
- * and old tuple with same primary key is found, TupleFound exception is thrown.
- * If BOX_REPLACE flags is set and old tple is not found, TupleNotFound
- * exception is thrown. The return value is an tuple that was actually removed.
- * This case is usually used for box.replace.
+ * the old tuple is removed before new tuple is inserted. If THROW_INSERT flag
+ * is set and old tuple with same primary key is found, TupleFound exception
+ * is thrown. If REPLACE_THROW flags is set and old tple is not found,
+ * TupleNotFound exception is thrown. The return value is an tuple that was
+ * actually removed. This case is usually used for box.replace.
  *
  * 2. old_tuple != NULL, new_tuple == NULL
  * Removes @a old_tuple from the @a space. Please note, that @a old_tuple
@@ -108,8 +108,8 @@ static inline i32 space_n(struct space *sp) { return sp->no; }
  * 3. old_tuple != NULL, new_tuple != NULL
  * Perform atomically an operation that equivalent to
  * replace(sp, old_tuple, NULL, flags) + replace(sp, NULL, new_tuple, flags).
- * BOX_ADD flag must be always set, because only one tuple can be removed per
- * one call. This case is usually used for box.update.
+ * THROW_INSERT flag must be always set, because only one tuple can be removed
+ * per one call. This case is usually used for box.update.
  *
  * The method is **atomic** in all cases. Changes are either applied to all
  * indexes, or nothing applied at all.
@@ -134,17 +134,17 @@ static inline i32 space_n(struct space *sp) { return sp->no; }
  * |  XX  |  XX  | NULL | NULL | 1 | 0 | i(new)               | NULL          |
  * +------+------+------+------+---+---+----------------------+---------------+
  * oldf = findByTuple(old), newf = findByTuple(new), i = insert, r = remove,
- * A - BOX_ADD, R = BOX_REPLACE (in @a flags parameter).
+ * A - THROW_INSERT, R = REPLACE_THROW (in @a flags parameter).
  *
  * @param sp space
  * @param old_tuple the tuple that should be removed (can be NULL)
  * @param new_tuple the tuple that should be inserted (can be NULL)
- * @param flags BOX_ADD and BOX_REPLACE flags, as defined in @a request.h
+ * @param flags THROW_INSERT and REPLACE_THROW flags
  * @return tuple that actually has been removed from the space
  */
 struct tuple *
 space_replace(struct space *space, struct tuple *old_tuple,
-	      struct tuple *new_tuple, u32 flags);
+	      struct tuple *new_tuple, enum replace_flags flags);
 void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple);
 

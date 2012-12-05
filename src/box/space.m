@@ -33,7 +33,6 @@
 #include <cfg/warning.h>
 #include <tarantool.h>
 #include <exception.h>
-#include "request.h" /* for BOX_ADD, BOX_REPLACE */
 #include "tuple.h"
 #include <pickle.h>
 #include <palloc.h>
@@ -123,7 +122,7 @@ key_free(struct key_def *key_def)
 
 struct tuple *
 space_replace(struct space *sp, struct tuple *old_tuple,
-	      struct tuple *new_tuple, u32 flags)
+	      struct tuple *new_tuple, enum replace_flags flags)
 {
 	struct tuple *removed_tuple = NULL;
 
@@ -147,7 +146,7 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 		/* Update secondary keys */
 		for (; i < n; i++) {
 			Index *index = sp->index[i];
-			[index replace: removed_tuple: new_tuple: BOX_ADD];
+			[index replace: removed_tuple: new_tuple: THROW_INSERT];
 		}
 
 		return removed_tuple;
@@ -156,7 +155,7 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 		/* Rollback all changes */
 		for (; i >= 0;  i--) {
 			Index *index = sp->index[i];
-			[index replace: new_tuple: removed_tuple: BOX_ADD];
+			[index replace: new_tuple: removed_tuple: THROW_INSERT];
 		}
 
 		@throw;

@@ -122,6 +122,12 @@ struct index_traits
 	bool allows_partial_key;
 };
 
+enum replace_flags {
+	REPLACE_INSERT   = 0,
+	THROW_INSERT     = 0x02,
+	REPLACE_THROW    = 0x04
+};
+
 @interface Index: tnt_Object {
 	/* Index features. */
 	struct index_traits *traits;
@@ -174,7 +180,7 @@ struct index_traits
 - (struct tuple *) findByTuple: (struct tuple *) tuple;
 - (struct tuple *) replace: (struct tuple *) old_tuple
 			  : (struct tuple *) new_tuple
-			  : (u32) flags;
+			  : (enum replace_flags) flags;
 /**
  * Create a structure to represent an iterator. Must be
  * initialized separately.

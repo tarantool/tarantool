@@ -32,7 +32,6 @@
 #include "tuple.h"
 #include "pickle.h"
 #include "exception.h"
-#include "request.h" /* for BOX_ADD, BOX_REPLACE */
 #include "space.h"
 #include "assoc.h"
 
@@ -214,7 +213,7 @@ check_key_parts(struct key_def *key_def,
 
 - (struct tuple *) replace: (struct tuple *) old_tuple
 			  : (struct tuple *) new_tuple
-			  : (u32) flags
+			  : (enum replace_flags) flags
 {
 	(void) old_tuple;
 	(void) new_tuple;
@@ -380,7 +379,7 @@ hash_iterator_lstr_eq(struct iterator *it)
 
 - (void) buildNext: (struct tuple *)tuple
 {
-	[self replace: NULL: tuple: BOX_ADD];
+	[self replace: NULL: tuple: THROW_INSERT];
 }
 
 - (void) endBuild
@@ -404,7 +403,7 @@ hash_iterator_lstr_eq(struct iterator *it)
 	[pk initIterator: it :ITER_ALL :NULL :0];
 
 	while ((tuple = it->next(it)))
-	      [self replace: NULL: tuple: BOX_ADD];
+	      [self replace: NULL: tuple: THROW_INSERT];
 }
 
 - (void) free
@@ -452,7 +451,7 @@ hash_iterator_lstr_eq(struct iterator *it)
 
 - (struct tuple *) replace: (struct tuple *) old_tuple
 			  : (struct tuple *) new_tuple
-			  : (u32) flags
+			  : (enum replace_flags) flags
 {
 	/* Mostly like tree::replace */
 
@@ -470,16 +469,16 @@ hash_iterator_lstr_eq(struct iterator *it)
 		/* Try to optimistically replace the new_tuple in the space */
 		[self replaceNode: hash: new_node: &replaced_node];
 
-		if (unlikely(key_def->is_unique && (flags & BOX_ADD)
+		if (unlikely(key_def->is_unique && (flags & THROW_INSERT)
 			     && replaced_node != NULL)) {
-			/* BOX_ADD, a tuple with the same key is found */
+			/* THROW_INSERT, a tuple with the same key is found */
 			[self replaceNode: hash: replaced_node: NULL];
 			tnt_raise(ClientError, :ER_TUPLE_FOUND);
 		}
 
-		if (unlikely(key_def->is_unique && (flags & BOX_REPLACE)
+		if (unlikely(key_def->is_unique && (flags & REPLACE_THROW)
 			     && replaced_node == NULL)) {
-			/* BOX_REPLACE,a tuple with the same key is not found */
+			/* REPLACE_THROW, a tuple with the same key is not found*/
 			[self deleteNode: hash: new_node: NULL];
 			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
 		}
@@ -501,7 +500,7 @@ hash_iterator_lstr_eq(struct iterator *it)
 	} else /* (old_tuple != NULL && new_tuple != NULL) */ {
 		/* Case #3: remove(old_tuple); insert(new_tuple) */
 
-		assert(!key_def->is_unique || (flags & BOX_ADD));
+		assert(!key_def->is_unique || (flags & THROW_INSERT));
 		void *new_node = node1;
 		void *replaced_node = node2;
 

@@ -86,9 +86,13 @@ execute_replace(struct request *request, struct txn *txn)
 	new_tuple->field_count = field_count;
 	memcpy(new_tuple->data, data->data, data->size);
 
+	assert(BOX_ADD == THROW_INSERT);
+	assert(BOX_REPLACE == REPLACE_THROW);
+	const enum replace_flags flags = (enum replace_flags) request->flags;
+
 	@try {
 		space_validate_tuple(sp, new_tuple);
-		txn_replace(txn, sp, NULL, new_tuple, request->flags);
+		txn_replace(txn, sp, NULL, new_tuple, flags);
 	} @catch (tnt_Exception *e) {
 		tuple_ref(new_tuple, -1);
 		@throw;
@@ -713,7 +717,7 @@ execute_update(struct request *request, struct txn *txn)
 		do_update_ops(rope, new_tuple);
 
 		space_validate_tuple(sp, new_tuple);
-		txn_replace(txn, sp, old_tuple, new_tuple, BOX_ADD);
+		txn_replace(txn, sp, old_tuple, new_tuple, THROW_INSERT);
 	} @catch(tnt_Exception *e) {
 		tuple_ref(new_tuple, -1);
 		@throw;
@@ -793,7 +797,7 @@ execute_delete(struct request *request, struct txn *txn)
 	if (unlikely(old_tuple == NULL))
 		return;
 
-	txn_replace(txn, sp, old_tuple, NULL, request->flags);
+	txn_replace(txn, sp, old_tuple, NULL, REPLACE_INSERT);
 }
 
 /** To collects stats, we need a valid request type.
