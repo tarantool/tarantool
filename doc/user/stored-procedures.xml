@@ -680,15 +680,12 @@ localhost> lua box.select_reverse_range(4, 1, 2, '1')
                 string, low byte first,
                 </member>
                 <member><code>w</code> &mdash; converts Lua
-                variable to a BER-encoded
-                integer, and stores the integer in the resulting
-                string
+                integer to a BER-encoded integer,
                 </member>
                 <member><code>p</code> &mdash; stores the length
-                of the argument as a 4-byte integer, low byte first,
-                followed by the argument itself: a 4-byte integer, low
-                byte first, for integers, or a binary blob for
-                anything else,
+                of the argument as a BER-encoded integer
+                followed by the argument itself (a 4-bytes for integers (LE order)
+                and a binary blob for other types),
                 </member>
                 <member><code>=, +, &amp;, |, ^, : </code>&mdash;
                 stores the corresponding Tarantool UPDATE
@@ -734,11 +731,9 @@ localhost> lua box.update(0, 0, "^p", 1, 4)
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">box.unpack(format, ...)</emphasis></term>
+        <term><emphasis role="lua">box.unpack(format, binary)</emphasis></term>
         <listitem><para>
-            Counterpart to <code>box.pack()</code>. Only supports
-            <code>'b'</code>, <code>'s'</code>, <code>'i'</code>, <code>'l'</code> format specifiers, and can be used
-            to convert packed integers to Lua numbers.
+            Counterpart to <code>box.pack()</code>.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost> lua tuple=box.replace(2, 0)
 ---
@@ -751,6 +746,32 @@ localhost> lua box.unpack('i', tuple[0])
 ---
  - 0
 ...
+localhost> lua box.unpack('bsil', box.pack('bsil', 255, 65535, 4294967295, tonumber64('18446744073709551615')))
+---
+ - 255
+ - 65535
+ - 4294967295
+ - 18446744073709551615
+...
+localhost> lua num, str, num64 = box.unpack('ppp', box.pack('ppp', 666, 'string', tonumber64('666666666666666')))
+---
+...
+localhost> lua print(box.unpack('i', num));
+---
+666
+...
+localhost> lua print(str);
+---
+string
+...
+localhost> lua print(box.unpack('l', num64))
+---
+666666666666666
+...
+localhost> lua box.unpack('=p', box.pack('=p', 1, '666'))
+---
+ - 1
+ - 666
 </programlisting>
         </para></listitem>
     </varlistentry>

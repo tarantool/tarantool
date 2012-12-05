@@ -52,10 +52,8 @@ exec admin "lua num = box.unpack('l', tu[0])"
 exec admin "lua print(num)"
 exec admin "lua type(num) == 'cdata'"
 exec admin "lua num == tonumber64('18446744073709551615')"
-exec admin "lua num,num1,num2 = box.unpack('lll', tu[0], tu[0], tu[0])"
+exec admin "lua num = box.unpack('l', tu[0])"
 exec admin "lua num == tonumber64('18446744073709551615')"
-exec admin "lua num1 == tonumber64('18446744073709551615')"
-exec admin "lua num2 == tonumber64('18446744073709551615')"
 exec admin "lua box.space[8]:truncate()"
 
 #
