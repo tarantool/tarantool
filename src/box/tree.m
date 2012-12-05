@@ -930,7 +930,8 @@ tree_iterator_gt(struct iterator *iterator)
 	return [self unfold: node];
 }
 
-- (void *) findNodeByTuple: (struct tuple *) tuple {
+- (struct tuple *) findByTuple: (struct tuple *) tuple
+{
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
 
@@ -938,12 +939,8 @@ tree_iterator_gt(struct iterator *iterator)
 	key_data->part_count = tuple->field_count;
 	fold_with_sparse_parts(key_def, tuple, key_data->parts);
 
-	return sptree_index_find(&tree, key_data);
-}
+	void *node = sptree_index_find(&tree, key_data);
 
-- (struct tuple *) findByTuple: (struct tuple *) tuple
-{
-	void *node = [self findNodeByTuple: tuple];
 	return [self unfold: node];
 }
 
@@ -959,76 +956,68 @@ tree_iterator_gt(struct iterator *iterator)
 		/* Case #1: replace(new_tuple); */
 
 		void *new_node = node1;
-		void *old_node = node2;
+		void *replaced_node = node2;
 		[self fold: new_node: new_tuple];
-		sptree_index_replace(&tree, new_node, &old_node);
 
-		if (unlikely((flags & BOX_ADD) && old_node &&
-			     key_def->is_unique)) {
-			/* Rollback changes */
-			sptree_index_replace(&tree, old_node, NULL);
+		/* Try to optimistically replace the new_tuple in the space */
+		sptree_index_replace(&tree, new_node, &replaced_node);
+
+		if (unlikely(key_def->is_unique && (flags & BOX_ADD)
+			     && replaced_node != NULL)) {
+			/* BOX_ADD, a tuple with the same key is found */
+			sptree_index_replace(&tree, replaced_node, NULL);
 			tnt_raise(ClientError, :ER_TUPLE_FOUND);
 		}
 
-		if (unlikely((flags & BOX_REPLACE) && !old_node &&
-			     key_def->is_unique)) {
-			/* Rollback changes */
+		if (unlikely(key_def->is_unique && (flags & BOX_REPLACE)
+			     && replaced_node == NULL)) {
+			/* BOX_REPLACE,a tuple with the same key is not found */
 			sptree_index_delete(&tree, new_node, NULL);
 			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
 		}
 
-		/* Return a removed node */
-		return [self unfold: old_node];
+		/* Return the removed node */
+		return [self unfold: replaced_node];
 	} else if (!new_tuple && old_tuple) {
 		/* Case #2: remove(old_tuple) */
 
 		void *old_node  = node1;
-		void *old_node2 = node2;
+		void *removed_node = node2;
 
 		[self fold: old_node: old_tuple];
-		sptree_index_delete(&tree, old_node, &old_node2);
+		sptree_index_delete(&tree, old_node, &removed_node);
+		assert([self unfold: removed_node] == NULL ||
+		       [self unfold: removed_node] == old_tuple);
 
-#if 0		/* TODO: A new undocumented feature */
-		if (unlikely(key_def->is_unique &&
-			     (flags & BOX_REPLACE) && !old_node2)) {
-			/* Rollback changes */
-			sptree_index_replace(&tree, old_node, NULL);
-			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
-		}
-#endif
-		return [self unfold: old_node2];
+		return [self unfold: removed_node];
 	} else /* (old_tuple != NULL && new_tuple != NULL) */ {
 		/* Case #3: remove(old_tuple); insert(new_tuple) */
 
-		/* BOX_ADD is only supported in this case */
 		assert(!key_def->is_unique || (flags & BOX_ADD));
-
 		void *new_node = node1;
-		void *old_node = node2;
+		void *replaced_node = node2;
 
 		[self fold: new_node: new_tuple];
-		sptree_index_replace(&tree, new_node, &old_node);
-		assert(key_def->is_unique || old_node == NULL);
+		sptree_index_replace(&tree, new_node, &replaced_node);
+		assert(key_def->is_unique || replaced_node == NULL);
 
-		struct tuple *ret = NULL;
-		if (old_node) {
-			ret = [self unfold: old_node];
-
-			if (unlikely(ret != old_tuple)) {
-				/* Rollback changes */
-				sptree_index_replace(&tree, old_node, NULL);
-				tnt_raise(ClientError, :ER_TUPLE_FOUND);
-			}
-		} else {
-			void *old_node  = node1;
-			void *old_node2 = node2;
-			[self fold: old_node: old_tuple];
-			sptree_index_delete(&tree, old_node, &old_node2);
-
-			ret = [self unfold: old_node2];
+		if (replaced_node) {
+			/* The old_tuple had the same key as the new_tuple and
+			 * it was succesfully removed during replace call */
+			assert(old_tuple == [self unfold: replaced_node]);
+			return old_tuple;
 		}
 
-		return ret;
+		/* Nothing was removed during replace call,
+		 * so remove the old_tuple manually */
+		void *old_node  = node1;
+		void *removed_node = node2;
+		[self fold: old_node: old_tuple];
+		sptree_index_delete(&tree, old_node, &removed_node);
+
+		assert([self unfold: removed_node] == NULL ||
+		       [self unfold: removed_node] == old_tuple);
+		return  [self unfold: removed_node];
 	}
 
 	return NULL;

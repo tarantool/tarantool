@@ -144,7 +144,7 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 			return NULL;
 		}
 
-		/* Update seconday keys */
+		/* Update secondary keys */
 		for (; i < n; i++) {
 			Index *index = sp->index[i];
 			[index replace: removed_tuple: new_tuple: BOX_ADD];

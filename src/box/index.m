@@ -454,9 +454,9 @@ hash_iterator_lstr_eq(struct iterator *it)
 			  : (struct tuple *) new_tuple
 			  : (u32) flags
 {
-	assert (old_tuple != NULL || new_tuple != NULL);
-	assert(key_def->is_unique);
+	/* Mostly like tree::replace */
 
+	assert (old_tuple != NULL || new_tuple != NULL);
 	void *node1 = alloca([self node_size]);
 	void *node2 = alloca([self node_size]);
 
@@ -464,72 +464,68 @@ hash_iterator_lstr_eq(struct iterator *it)
 		/* Case #1: replace(new_tuple); */
 
 		void *new_node = node1;
-		void *old_node = node2;
-
+		void *replaced_node = node2;
 		[self fold: new_node: new_tuple];
-		[self replaceNode: hash: new_node: &old_node];
 
-		if (unlikely(old_node && (flags & BOX_ADD))) {
-			/* Rollback changes */
-			[self replaceNode: hash: old_node: NULL];
+		/* Try to optimistically replace the new_tuple in the space */
+		[self replaceNode: hash: new_node: &replaced_node];
+
+		if (unlikely(key_def->is_unique && (flags & BOX_ADD)
+			     && replaced_node != NULL)) {
+			/* BOX_ADD, a tuple with the same key is found */
+			[self replaceNode: hash: replaced_node: NULL];
 			tnt_raise(ClientError, :ER_TUPLE_FOUND);
 		}
 
-		if (unlikely(!old_node && (flags & BOX_REPLACE))) {
-			/* Rollback changes */
+		if (unlikely(key_def->is_unique && (flags & BOX_REPLACE)
+			     && replaced_node == NULL)) {
+			/* BOX_REPLACE,a tuple with the same key is not found */
 			[self deleteNode: hash: new_node: NULL];
 			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
 		}
 
-		/* Return a removed node */
-		return [self unfold: old_node];
+		/* Return the removed node */
+		return [self unfold: replaced_node];
 	} else if (!new_tuple && old_tuple) {
 		/* Case #2: remove(old_tuple) */
 
 		void *old_node  = node1;
-		void *old_node2 = node2;
+		void *removed_node = node2;
 
 		[self fold: old_node: old_tuple];
-		[self deleteNode: hash: old_node: &old_node2];
-#if 0		/* TODO: A new undocumented feature */
-		if (unlikely((flags & BOX_REPLACE) && !old_node2)) {
-			/* Rollback changes */
-			[self replaceNode: hash: old_node: NULL];
-			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
-		}
-#endif
-		return [self unfold: old_node2];
+		[self deleteNode: hash: old_node: &removed_node];
+		assert([self unfold: removed_node] == NULL ||
+		       [self unfold: removed_node] == old_tuple);
+
+		return [self unfold: removed_node];
 	} else /* (old_tuple != NULL && new_tuple != NULL) */ {
 		/* Case #3: remove(old_tuple); insert(new_tuple) */
 
-		/* BOX_ADD is only supported in this case */
-		assert(flags & BOX_ADD);
-
+		assert(!key_def->is_unique || (flags & BOX_ADD));
 		void *new_node = node1;
-		void *old_node = node2;
+		void *replaced_node = node2;
 
 		[self fold: new_node: new_tuple];
-		[self replaceNode: hash: new_node: &old_node];
+		[self replaceNode: hash: new_node: &replaced_node];
+		assert(key_def->is_unique || replaced_node == NULL);
 
-		struct tuple *ret = NULL;
-		if (old_node) {
-			ret = [self unfold: old_node];
-
-			if (unlikely(ret != old_tuple)) {
-				/* Rollback changes */
-				[self replaceNode: hash: old_node: NULL];
-				tnt_raise(ClientError, :ER_TUPLE_FOUND);
-			}
-		} else {
-			void *old_node  = node1;
-			void *old_node2 = node2;
-			[self fold: old_node: old_tuple];
-			[self deleteNode: hash: old_node: &old_node2];
-
-			ret = [self unfold: old_node2];
+		if (replaced_node) {
+			/* The old_tuple had the same key as the new_tuple and
+			 * it was succesfully removed during replace call */
+			assert(old_tuple == [self unfold: replaced_node]);
+			return old_tuple;
 		}
 
-		return ret;
+		/* Nothing was removed during replace call,
+		 * so remove the old_tuple manually */
+		void *old_node  = node1;
+		void *removed_node = node2;
+		[self fold: old_node: old_tuple];
+		[self deleteNode: hash: old_node: &removed_node];
+
+		assert([self unfold: removed_node] == NULL ||
+		       [self unfold: removed_node] == old_tuple);
+		return  [self unfold: removed_node];
 	}
 
 	return NULL;
@@ -626,8 +622,7 @@ int32_key_to_value(void *key)
 	const struct mh_i32ptr_node_t *node_x = (struct mh_i32ptr_node_t *) node;
 
 	mh_int_t k = mh_i32ptr_get(h, node_x, NULL, NULL);
-	if (k != mh_end(int_hash) &&
-			mh_i32ptr_node(int_hash, k)->val == node_x->val) {
+	if (k != mh_end(int_hash)) {
 		if (pprev) {
 			memcpy(*pprev, mh_i32ptr_node(int_hash, k),
 			       sizeof(struct mh_i32ptr_node_t));
@@ -775,8 +770,7 @@ int64_key_to_value(void *key)
 	const struct mh_i64ptr_node_t *node_x = (struct mh_i64ptr_node_t *) node;
 
 	mh_int_t k = mh_i64ptr_get(h, node_x, NULL, NULL);
-	if (k != mh_end(int64_hash) &&
-			mh_i64ptr_node(int64_hash, k)->val == node_x->val) {
+	if (k != mh_end(int64_hash)) {
 		if (pprev) {
 			memcpy(*pprev, mh_i64ptr_node(int64_hash, k),
 			       sizeof(struct mh_i64ptr_node_t));
@@ -920,8 +914,7 @@ int64_key_to_value(void *key)
 	const struct mh_lstrptr_node_t *node_x = (struct mh_lstrptr_node_t *) node;
 
 	mh_int_t k = mh_lstrptr_get(h, node_x, NULL, NULL);
-	if (k != mh_end(str_hash) &&
-			mh_lstrptr_node(str_hash, k)->val == node_x->val) {
+	if (k != mh_end(str_hash)) {
 		if (pprev) {
 			memcpy(*pprev, mh_lstrptr_node(str_hash, k),
 			       sizeof(struct mh_lstrptr_node_t));

@@ -74,8 +74,6 @@ txn_replace(struct txn *txn, struct space *space,
 	 * transaction in rollback().
 	 */
 
-	assert(txn->space == NULL || txn->space == space);
-
 	txn->old_tuple = space_replace(space, old_tuple, new_tuple, flags);
 	txn->new_tuple = new_tuple;
 	txn->space = space;
@@ -94,7 +92,8 @@ txn_commit(struct txn *txn)
 	if (txn->op == 0) /* Nothing to do. */
 		return;
 
-	if (txn->old_tuple || txn->new_tuple) {
+	if (!(txn->txn_flags & BOX_NOT_STORE) &&
+			(txn->old_tuple || txn->new_tuple)) {
 		int64_t lsn = next_lsn(recovery_state);
 		int res = wal_write(recovery_state, lsn, 0,
 				    txn->op, &txn->req);

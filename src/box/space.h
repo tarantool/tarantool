@@ -91,14 +91,28 @@ static inline i32 space_n(struct space *sp) { return sp->no; }
  * There is three major use cases for this method:
  *
  * 1. old_tuple = NULL, new_tuple != NULL
- * Insert or replace the @a new_tuple in the @a space.
+ * Inserts or replaces the @a new_tuple in the @a space. If no flags are set
+ * and an old tuple in the @a sp has the same primary key as @a new_tuple,
+ * the old tuple is removed before new tuple is inserted. If BOX_ADD flag is set
+ * and old tuple with same primary key is found, TupleFound exception is thrown.
+ * If BOX_REPLACE flags is set and old tple is not found, TupleNotFound
+ * exception is thrown. The return value is an tuple that was actually removed.
+ * This case is usually used for box.replace.
  *
  * 2. old_tuple != NULL, new_tuple == NULL
- * Remove @a old_tuple from the @a space.
+ * Removes @a old_tuple from the @a space. Please note, that @a old_tuple
+ * is removed only if it has same pointer address as an tuple in the @a sp.
+ * The return value is an @a old_tuple if it was found or NULL otherwise.
+ * This case is usually used for box.remove.
  *
  * 3. old_tuple != NULL, new_tuple != NULL
- * Atomically perform operation that equivalent to
- * replace(old_tuple, NULL, flags) + replace(NULL, new_tuple, flags).
+ * Perform atomically an operation that equivalent to
+ * replace(sp, old_tuple, NULL, flags) + replace(sp, NULL, new_tuple, flags).
+ * BOX_ADD flag must be always set, because only one tuple can be removed per
+ * one call. This case is usually used for box.update.
+ *
+ * The method is **atomic** in all cases. Changes are either applied to all
+ * indexes, or nothing applied at all.
  *
  * All possible cases are described in the table:
  * +--------------------------------------------------------------------------+
@@ -109,9 +123,9 @@ static inline i32 space_n(struct space *sp) { return sp->no; }
  * | NULL |  XX  |      |  XX  | 1 | 0 |                      | TupleFound    |
  * | NULL |  XX  |      | NULL | 0 | 1 |                      | TupleNotFound |
  * +------+------+------+------+---+---+----------------------+---------------+
- * |  XX  | NULL |  XX  |      | 0 |0,1| r(oldf)              | oldf          |
- * |  XX  | NULL | NULL |      | 0 | 0 |                      | NULL          |
- * |  XX  | NULL | NULL |      | 0 | 1 |                      | TupleNotFound |
+ * |  XX  | NULL |  XX  |      | * |0,1| r(oldf)              | oldf          |
+ * |  XX  | NULL | NULL |      | * | 0 |                      | NULL          |
+ * |  XX  | NULL | NULL |      | * | 1 |                      | TupleNotFound |
  * +------+------+------+------+---+---+----------------------+---------------+
  * |  XX  |  XX  |  XX  |!=oldf| 1 | 0 |                      | TupleFound    |
  * |  XX  |  XX  |  XX  |==oldf| 1 | 0 | r(oldf), i(new)      | oldf          |
@@ -122,13 +136,10 @@ static inline i32 space_n(struct space *sp) { return sp->no; }
  * oldf = findByTuple(old), newf = findByTuple(new), i = insert, r = remove,
  * A - BOX_ADD, R = BOX_REPLACE (in @a flags parameter).
  *
- * The operation is **atomic**, that is, all changes are either applied
- * consistently to all space's indexes or aren't applied at all.
- *
  * @param sp space
- * @param old_tuple tuple that should be removed (can be NULL)
- * @param new_tuple tuple that should be inserted (can be NULL)
- * @param flags
+ * @param old_tuple the tuple that should be removed (can be NULL)
+ * @param new_tuple the tuple that should be inserted (can be NULL)
+ * @param flags BOX_ADD and BOX_REPLACE flags, as defined in @a request.h
  * @return tuple that actually has been removed from the space
  */
 struct tuple *

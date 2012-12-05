@@ -696,9 +696,8 @@ execute_update(struct request *request, struct txn *txn)
 	/* Try to find the tuple by primary key. */
 	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
 
-	if (unlikely(old_tuple == NULL)) {
+	if (unlikely(old_tuple == NULL))
 		return;
-	}
 
 	/* number of operations */
 	u32 op_cnt = read_u32(data);
