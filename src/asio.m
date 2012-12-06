@@ -28,15 +28,11 @@
  */
 #include "asio.h"
 #include "fiber.h"
-#include "config.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 
-#include <say.h>
-#include <tarantool.h>
 #include <rlist.h>
 
 /*
@@ -47,12 +43,12 @@
  * manner, when libeio is ready to process some requests it
  * calls asio_poller callback.
  *
- * Due to libeio desing, asio_poller is called while locks
+ * Due to libeio design, asio_poller is called while locks
  * are being held, so it's unable to call any libeio function
  * inside this callback.
  *
- * asio_poller triggers asio_watcher to start polling process.
- * In case if none of requests are complete by that time, it
+ * asio_poller triggers asio_watcher to start the polling process.
+ * In case if none of the requests are complete by that time, it
  * starts idle_watcher, which would periodically invoke eio_poll
  * until any of requests are complete.
  *
@@ -67,7 +63,7 @@ struct asio_manager {
 	struct rlist ready;
 };
 
-static struct asio_manager asio_mgr;
+static struct asio_manager asio_manager;
 
 inline static void
 asio_put(struct asio *a, struct rlist *list)
@@ -89,12 +85,12 @@ asio_schedule(struct ev_async *w __attribute__((unused)),
 	      int events __attribute__((unused)))
 {
 	if (eio_poll() == -1)
-		ev_idle_start(&asio_mgr.asio_repeat_watcher);
+		ev_idle_start(&asio_manager.asio_repeat_watcher);
 }
 
 static void asio_poller(void)
 {
-	ev_async_send(&asio_mgr.asio_watcher);
+	ev_async_send(&asio_manager.asio_watcher);
 }
 
 /**
@@ -105,15 +101,15 @@ static void asio_poller(void)
 void
 asio_init(void)
 {
-	memset(&asio_mgr, 0, sizeof(struct asio_manager));
+	memset(&asio_manager, 0, sizeof(struct asio_manager));
 
-	rlist_init(&asio_mgr.active);
-	rlist_init(&asio_mgr.complete);
-	rlist_init(&asio_mgr.ready);
+	rlist_init(&asio_manager.active);
+	rlist_init(&asio_manager.complete);
+	rlist_init(&asio_manager.ready);
 
-	ev_idle_init(&asio_mgr.asio_repeat_watcher, asio_schedule_repeat);
-	ev_async_init(&asio_mgr.asio_watcher, asio_schedule);
-	ev_async_start(&asio_mgr.asio_watcher);
+	ev_idle_init(&asio_manager.asio_repeat_watcher, asio_schedule_repeat);
+	ev_async_init(&asio_manager.asio_watcher, asio_schedule);
+	ev_async_start(&asio_manager.asio_watcher);
 
 	eio_init(asio_poller, NULL);
 }
@@ -139,11 +135,11 @@ asio_free(void)
 {
 	struct asio *a;
 	/* cancel active requests */
-	rlist_foreach_entry(a, &asio_mgr.active, link)
+	rlist_foreach_entry(a, &asio_manager.active, link)
 		asio_cancel(a);
 	/* free all complete and ready requests */
-	asio_free_list(&asio_mgr.complete);
-	asio_free_list(&asio_mgr.ready);
+	asio_free_list(&asio_manager.complete);
+	asio_free_list(&asio_manager.ready);
 }
 
 inline static struct asio*
@@ -163,7 +159,7 @@ asio_on_complete(eio_req *req)
 	struct asio *a = req->data;
 	struct fiber *f = a->f;
 	a->complete = true;
-	asio_put(a, &asio_mgr.complete);
+	asio_put(a, &asio_manager.complete);
 	if (a->wakeup)
 		fiber_wakeup(f);
 	return 0;
@@ -176,11 +172,11 @@ asio_on_complete(eio_req *req)
  * @return asio object pointer, or NULL on error.
  *
  * @code
- * 	static void request(eio_req *req) {
- * 		(void)req->data; // "arg"
+ *	static void request(eio_req *req) {
+ *		(void)req->data; // "arg"
  *
- * 		req->result = "result";
- * 	}
+ *		req->result = "result";
+ *	}
  *
  *      struct asio *a = asio_create(request, "arg");
  *      assert(a != NULL);
@@ -190,8 +186,8 @@ struct asio*
 asio_create(void (*f)(eio_req*), void *arg)
 {
 	struct asio *a;
-	if (!rlist_empty(&asio_mgr.complete)) {
-		a = rlist_first_entry(&asio_mgr.complete, struct asio, link);
+	if (!rlist_empty(&asio_manager.complete)) {
+		a = rlist_first_entry(&asio_manager.complete, struct asio, link);
 	} else {
 		a = asio_alloc();
 		if (a == NULL)
@@ -205,7 +201,7 @@ asio_create(void (*f)(eio_req*), void *arg)
 	a->req = eio_custom(f, 0, asio_on_complete, a);
 	if (a->req == NULL)
 		return NULL;
-	asio_put(a, &asio_mgr.active);
+	asio_put(a, &asio_manager.active);
 	return a;
 }
 
@@ -232,14 +228,14 @@ void
 asio_cancel(struct asio *a)
 {
 	eio_cancel(a->req);
-	asio_put(a, &asio_mgr.ready);
+	asio_put(a, &asio_manager.ready);
 }
 
-/** 
+/**
  * Finish with request interaction.
  */
 void
 asio_finish(struct asio *a)
 {
-	asio_put(a, &asio_mgr.ready);
+	asio_put(a, &asio_manager.ready);
 }

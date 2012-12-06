@@ -41,10 +41,15 @@
 #include <util.h>
 #include <rlist.h>
 
-/*
+/**
  * Asynchronous IO Tasks (libeio wrapper)
  *
  * Yield the current fiber until a created task is complete.
+ */
+
+
+/**
+ * A single task' context.
  */
 struct asio {
 	struct eio_req *req;
