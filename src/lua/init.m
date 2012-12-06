@@ -169,6 +169,25 @@ static char format_to_opcode(char format)
 }
 
 /**
+ * Counterpart to @a format_to_opcode
+ */
+static char opcode_to_format(char opcode)
+{
+	switch (opcode) {
+	case 0: return '=';
+	case 1: return '+';
+	case 2: return '&';
+	case 3: return '^';
+	case 4: return '|';
+	case 5: return ':';
+	case 6: return '#';
+	case 7: return '!';
+	case 8: return '-';
+	default: return opcode;
+	}
+}
+
+/**
  * To use Tarantool/Box binary protocol primitives from Lua, we
  * need a way to pack Lua variables into a binary representation.
  * We do it by exporting a helper function
@@ -334,70 +353,125 @@ luaL_pushnumber64(struct lua_State *L, uint64_t val)
 	return 1;
 }
 
+
 static int
 lbox_unpack(struct lua_State *L)
 {
-	const char *format = luaL_checkstring(L, 1);
-	/* first arg comes second */
-	int i = 2;
-	int nargs = lua_gettop(L);
-	size_t size;
-	const char *str;
+	size_t format_size = 0;
+	const char *format = luaL_checklstring(L, 1, &format_size);
+	const char *f = format;
+
+	size_t str_size = 0;
+	const u8 *str = (const u8 *) luaL_checklstring(L, 2, &str_size);
+	const u8 *end = str + str_size;
+	const u8 *s = str;
+
+	int i = 0;
+
+	char charbuf;
 	u8  u8buf;
 	u16 u16buf;
 	u32 u32buf;
 
-	while (*format) {
-		if (i > nargs)
-			luaL_error(L, "box.unpack: argument count does not "
-				   "match the format");
-		switch (*format) {
+#define CHECK_SIZE(cur) if (unlikely((cur) >= end)) {	                \
+	luaL_error(L, "box.unpack('%c'): got %d bytes (expected: %d+)",	\
+		   *f, (int) (end - str), (int) 1 + ((cur) - str));	\
+}
+	while (*f) {
+		switch (*f) {
 		case 'b':
-			str = lua_tolstring(L, i, &size);
-			if (str == NULL || size != sizeof(u8))
-				luaL_error(L, "box.unpack('%c'): got %d bytes "
-					   "(expected: 1)", *format,
-					   (int) size);
-			u8buf = * (u8 *) str;
+			CHECK_SIZE(s);
+			u8buf = *(u8 *) s;
 			lua_pushnumber(L, u8buf);
+			s++;
 			break;
 		case 's':
-			str = lua_tolstring(L, i, &size);
-			if (str == NULL || size != sizeof(u16))
-				luaL_error(L, "box.unpack('%c'): got %d bytes "
-					   "(expected: 2)", *format,
-					   (int) size);
-			u16buf = * (u16 *) str;
+			CHECK_SIZE(s + 1);
+			u16buf = *(u16 *) s;
 			lua_pushnumber(L, u16buf);
+			s += 2;
 			break;
 		case 'i':
-			str = lua_tolstring(L, i, &size);
-			if (str == NULL || size != sizeof(u32))
-				luaL_error(L, "box.unpack('%c'): got %d bytes "
-					   "(expected: 4)", *format,
-					   (int) size);
-			u32buf = * (u32 *) str;
+			CHECK_SIZE(s + 3);
+			u32buf = *(u32 *) s;
 			lua_pushnumber(L, u32buf);
+			s += 4;
 			break;
 		case 'l':
-		{
-			str = lua_tolstring(L, i, &size);
-			if (str == NULL || size != sizeof(u64))
-				luaL_error(L, "box.unpack('%c'): got %d bytes "
-					   "(expected: 8)", *format,
-					   (int) size);
+			CHECK_SIZE(s + 7);
 			GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
-			*(uint64_t*)cdataptr(cd) = *(uint64_t*)str;
+			*(uint64_t*)cdataptr(cd) = *(uint64_t*) s;
+			s += 8;
 			break;
-		}
+		case 'w':
+			/* load_varint32_s throws exception on error. */
+			u32buf = load_varint32_s((void *)&s, end - s);
+			lua_pushnumber(L, u32buf);
+			break;
+		case 'P':
+		case 'p':
+			/* load_varint32_s throws exception on error. */
+			u32buf = load_varint32_s((void *)&s, end - s);
+			CHECK_SIZE(s + u32buf - 1);
+			lua_pushlstring(L, (const char *) s, u32buf);
+			s += u32buf;
+			break;
+		case '=':
+			/* update tuple set foo = bar */
+		case '+':
+			/* set field += val */
+		case '-':
+			/* set field -= val */
+		case '&':
+			/* set field & =val */
+		case '|':
+			/* set field |= val */
+		case '^':
+			/* set field ^= val */
+		case ':':
+			/* splice */
+		case '#':
+			/* delete field */
+		case '!':
+			/* insert field */
+			CHECK_SIZE(s + 4);
+
+			/* field no */
+			u32buf = *(u32 *) s;
+
+			/* opcode */
+			charbuf = *(char *) (s + 4);
+			charbuf = opcode_to_format(charbuf);
+			if (charbuf != *f) {
+				luaL_error(L, "box.unpack('%s'): "
+					   "unexpected opcode: "
+					   "offset %d, expected '%c',"
+					   "found '%c'",
+					   format, s - str, *f, charbuf);
+			}
+
+			lua_pushnumber(L, u32buf);
+			s += 5;
+			break;
 		default:
-			luaL_error(L, "box.unpack: unsupported pack "
-				   "format specifier '%c'", *format);
+			luaL_error(L, "box.unpack: unsupported "
+				   "format specifier '%c'", *f);
 		}
 		i++;
-		format++;
+		f++;
 	}
-	return i-2;
+
+	assert(s <= end);
+
+	if (s != end) {
+		luaL_error(L, "box.unpack('%s'): too many bytes: "
+			   "unpacked %d, total %d",
+			   format, s - str, str_size);
+	}
+
+	return i;
+
+#undef CHECK_SIZE
 }
 
 /**
