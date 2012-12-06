@@ -833,6 +833,31 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
     </varlistentry>
     <varlistentry>
         <term>
+            <emphasis role="lua">box.time()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns current system time (in seconds) as a Lua
+                number.  The time is taken from the event loop
+                clock, which makes this call very cheap,
+                but still useful for constructing artificial
+                tuple keys.
+            </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.time64()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns current system time (in seconds) as a 64-bit
+                integer. The time is taken from the event loop clock.
+            </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
             <emphasis role="lua">box.uuid()</emphasis>
         </term>
         <listitem>

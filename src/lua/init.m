@@ -49,6 +49,9 @@
 #include "lua/stat.h"
 #include "lua/uuid.h"
 
+#include <sys/time.h>
+#include <sys/types.h>
+
 #include TARANTOOL_CONFIG
 
 /**
@@ -474,12 +477,32 @@ lbox_unpack(struct lua_State *L)
 #undef CHECK_SIZE
 }
 
+/** Report libev time (cheap). */
+static int
+lbox_time(struct lua_State *L)
+{
+	lua_pushnumber(L, ev_now());
+	return 1;
+}
+
+/** Report libev time as 64-bit integer */
+static int
+lbox_time64(struct lua_State *L)
+{
+	luaL_pushnumber64(L, (u64) ( ev_now() * 1000000 + 0.5 ) );
+	return 1;
+}
+
+
+
 /**
  * descriptor for box methods
  */
 static const struct luaL_reg boxlib[] = {
 	{"pack", lbox_pack},
 	{"unpack", lbox_unpack},
+	{"time", lbox_time},
+	{"time64", lbox_time64},
 	{NULL, NULL}
 };
 
@@ -1275,9 +1298,13 @@ lbox_pcall(struct lua_State *L)
 static int
 lbox_tonumber64(struct lua_State *L)
 {
-	uint64_t result = tarantool_lua_tointeger64(L, -1);
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "tonumber64: wrong number of arguments");
+	uint64_t result = tarantool_lua_tointeger64(L, 1);
 	return luaL_pushnumber64(L, result);
 }
+
+
 
 /**
  * A helper to register a single type metatable.
