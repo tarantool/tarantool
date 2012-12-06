@@ -373,10 +373,10 @@ lbox_unpack(struct lua_State *L)
 	u16 u16buf;
 	u32 u32buf;
 
-#define CHECK_SIZE(cur) { if (unlikely((cur) >= end))                          \
-		luaL_error(L, "box.unpack('%c'): got %d bytes (expected: %d+)",\
-			   *f, (int) (end - str), (int) 1 + ((cur) - str));}
-
+#define CHECK_SIZE(cur) if (unlikely((cur) >= end)) {	                \
+	luaL_error(L, "box.unpack('%c'): got %d bytes (expected: %d+)",	\
+		   *f, (int) (end - str), (int) 1 + ((cur) - str));	\
+}
 	while (*f) {
 		switch (*f) {
 		case 'b':
@@ -404,16 +404,16 @@ lbox_unpack(struct lua_State *L)
 			s += 8;
 			break;
 		case 'w':
-			/* exception is thrown on error */
+			/* load_varint32_s throws exception on error. */
 			u32buf = load_varint32_s((void *)&s, end - s);
 			lua_pushnumber(L, u32buf);
 			break;
 		case 'P':
 		case 'p':
-			/* exception is thrown on error */
+			/* load_varint32_s throws exception on error. */
 			u32buf = load_varint32_s((void *)&s, end - s);
-			CHECK_SIZE(s + u32buf-1);
-			lua_pushlstring (L, (const char *) s, u32buf);
+			CHECK_SIZE(s + u32buf - 1);
+			lua_pushlstring(L, (const char *) s, u32buf);
 			s += u32buf;
 			break;
 		case '=':
@@ -454,7 +454,7 @@ lbox_unpack(struct lua_State *L)
 			s += 5;
 			break;
 		default:
-			luaL_error(L, "box.unpack: unsupported pack "
+			luaL_error(L, "box.unpack: unsupported "
 				   "format specifier '%c'", *f);
 		}
 		i++;
@@ -465,7 +465,7 @@ lbox_unpack(struct lua_State *L)
 
 	if (s != end) {
 		luaL_error(L, "box.unpack('%s'): too many bytes: "
-			   "unpacked %d, size %d",
+			   "unpacked %d, total %d",
 			   format, s - str, str_size);
 	}
 

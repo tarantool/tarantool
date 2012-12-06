@@ -31,13 +31,11 @@
 #include <fiber.h>
 #include <iproto.h>		/* for err codes */
 #include "say.h"
-#include "exception.h"
 
 /* caller must ensure that there is space in target */
 u8 *
 save_varint32(u8 *target, u32 value)
 {
-
 	if (value >= (1 << 7)) {
 		if (value >= (1 << 14)) {
 			if (value >= (1 << 21)) {

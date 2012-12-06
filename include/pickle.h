@@ -77,7 +77,7 @@ load_varint32_s(void **data, size_t size)
 	}
 
 	if (unlikely(size < 3))
-		tnt_raise(IllegalParams, :"varint is too short (expected 3+ bytes)");
+		tnt_raise(IllegalParams, :"BER int is too short (expected 3+ bytes)");
 
 	if (!(b[2] & 0x80)) {
 		*data += 3;
@@ -85,7 +85,7 @@ load_varint32_s(void **data, size_t size)
 	}
 
 	if (unlikely(size < 4))
-		tnt_raise(IllegalParams, :"varint is too short (expected 4+ bytes)");
+		tnt_raise(IllegalParams, :"BER int is too short (expected 4+ bytes)");
 
 	if (!(b[3] & 0x80)) {
 		*data += 4;
@@ -94,7 +94,7 @@ load_varint32_s(void **data, size_t size)
 	}
 
 	if (unlikely(size < 5))
-		tnt_raise(IllegalParams, :"varint is too short (expected 5+ bytes)");
+		tnt_raise(IllegalParams, :"BER int is too short (expected 5+ bytes)");
 
 	if (!(b[4] & 0x80)) {
 		*data += 5;
@@ -102,7 +102,7 @@ load_varint32_s(void **data, size_t size)
 			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
 
-	tnt_raise(IllegalParams, :"incorrect varint format");
+	tnt_raise(IllegalParams, :"incorrect BER integer format");
 }
 
 static inline u32
