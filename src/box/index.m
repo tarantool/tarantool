@@ -34,6 +34,7 @@
 #include "exception.h"
 #include "space.h"
 #include "assoc.h"
+#include "errinj.h
 
 static struct index_traits index_traits = {
 	.allows_partial_key = true,
@@ -469,6 +470,16 @@ hash_iterator_lstr_eq(struct iterator *it)
 		/* Try to optimistically replace the new_tuple in the space */
 		[self replaceNode: hash: new_node: &replaced_node];
 
+		/* some result from replaceNode */
+		bool replace_failed = false;
+		ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
+			replace_failed = true;
+		});
+
+		if (unlikely(replace_failed))
+			tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+				[self node_size], "hash", "replace");
+
 		if (unlikely(key_def->is_unique && (flags & THROW_INSERT)
 			     && replaced_node != NULL)) {
 			/* THROW_INSERT, a tuple with the same key is found */
@@ -507,6 +518,16 @@ hash_iterator_lstr_eq(struct iterator *it)
 		[self fold: new_node: new_tuple];
 		[self replaceNode: hash: new_node: &replaced_node];
 		assert(key_def->is_unique || replaced_node == NULL);
+
+		/* some result from replaceNode */
+		bool replace_failed = false;
+		ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
+			replace_failed = true;
+		});
+
+		if (unlikely(replace_failed))
+			tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+				[self node_size], "hash", "replace");
 
 		if (replaced_node) {
 			/* The old_tuple had the same key as the new_tuple and

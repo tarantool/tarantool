@@ -31,6 +31,7 @@
 #include "space.h"
 #include "exception.h"
 #include "index.h"
+#include "errinj.h"
 #include <pickle.h>
 
 /* {{{ Utilities. *************************************************/
@@ -962,6 +963,16 @@ tree_iterator_gt(struct iterator *iterator)
 		/* Try to optimistically replace the new_tuple in the space */
 		sptree_index_replace(&tree, new_node, &replaced_node);
 
+		/* some result from sptree_index_replace */
+		bool replace_failed = false;
+		ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
+			replace_failed = true;
+		});
+
+		if (unlikely(replace_failed))
+			tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+				[self node_size], "tree", "replace");
+
 		if (unlikely(key_def->is_unique && (flags & THROW_INSERT)
 			     && replaced_node != NULL)) {
 			/* BOX_ADD, a tuple with the same key is found */
@@ -1000,6 +1011,16 @@ tree_iterator_gt(struct iterator *iterator)
 		[self fold: new_node: new_tuple];
 		sptree_index_replace(&tree, new_node, &replaced_node);
 		assert(key_def->is_unique || replaced_node == NULL);
+
+		/* some result from sptree_index_replace */
+		bool replace_failed = false;
+		ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
+			replace_failed = true;
+		});
+
+		if (unlikely(replace_failed))
+			tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+				[self node_size], "tree", "replace");
 
 		if (replaced_node) {
 			/* The old_tuple had the same key as the new_tuple and

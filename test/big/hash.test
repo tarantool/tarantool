@@ -265,3 +265,91 @@ exec admin "lua box.space[12]:delete('key 1', 'key 2')"
 exec admin "lua box.space[10]:truncate()"
 exec admin "lua box.space[11]:truncate()"
 exec admin "lua box.space[12]:truncate()"
+
+#
+# hash::replace tests
+#
+
+exec sql "insert into t21 values (0, 0, 0, 0)"
+exec sql "insert into t21 values (1, 1, 1, 1)"
+exec sql "insert into t21 values (2, 2, 2, 2)"
+
+# OK
+exec sql "replace into t21 values (1, 1, 1, 1)"
+exec sql "replace into t21 values (1, 10, 10, 10)"
+exec sql "replace into t21 values (1, 1, 1, 1)"
+exec sql "select * from t21 WHERE k0 = 10"
+exec sql "select * from t21 WHERE k1 = 10"
+exec sql "select * from t21 WHERE k2 = 10"
+exec sql "select * from t21 WHERE k3 = 10"
+exec sql "select * from t21 WHERE k0 = 1"
+exec sql "select * from t21 WHERE k1 = 1"
+exec sql "select * from t21 WHERE k2 = 1"
+exec sql "select * from t21 WHERE k3 = 1"
+
+# OK
+exec sql "insert into t21 values (10, 10, 10, 10)"
+exec sql "delete from t21 WHERE k0 = 10"
+exec sql "select * from t21 WHERE k0 = 10"
+exec sql "select * from t21 WHERE k1 = 10"
+exec sql "select * from t21 WHERE k2 = 10"
+exec sql "select * from t21 WHERE k3 = 10"
+
+
+# TupleFound (primary key)
+exec sql "insert into t21 values (1, 10, 10, 10)"
+exec sql "select * from t21 WHERE k0 = 10"
+exec sql "select * from t21 WHERE k1 = 10"
+exec sql "select * from t21 WHERE k2 = 10"
+exec sql "select * from t21 WHERE k3 = 10"
+exec sql "select * from t21 WHERE k0 = 1"
+
+# TupleNotFound (primary key)
+exec sql "replace into t21 values (10, 10, 10, 10)"
+exec sql "select * from t21 WHERE k0 = 10"
+exec sql "select * from t21 WHERE k1 = 10"
+exec sql "select * from t21 WHERE k2 = 10"
+exec sql "select * from t21 WHERE k3 = 10"
+
+# TupleFound (key #1)
+exec sql "insert into t21 values (10, 0, 10, 10)"
+exec sql "select * from t21 WHERE k0 = 10"
+exec sql "select * from t21 WHERE k1 = 10"
+exec sql "select * from t21 WHERE k2 = 10"
+exec sql "select * from t21 WHERE k3 = 10"
+exec sql "select * from t21 WHERE k1 = 0"
+
+# TupleFound (key #1)
+exec sql "replace into t21 values (2, 0, 10, 10)"
+exec sql "select * from t21 WHERE k0 = 10"
+exec sql "select * from t21 WHERE k1 = 10"
+exec sql "select * from t21 WHERE k2 = 10"
+exec sql "select * from t21 WHERE k3 = 10"
+exec sql "select * from t21 WHERE k1 = 0"
+
+# TupleFound (key #3)
+exec sql "insert into t21 values (10, 10, 10, 0)"
+exec sql "select * from t21 WHERE k0 = 10"
+exec sql "select * from t21 WHERE k1 = 10"
+exec sql "select * from t21 WHERE k2 = 10"
+exec sql "select * from t21 WHERE k3 = 10"
+exec sql "select * from t21 WHERE k3 = 0"
+
+# TupleFound (key #3)
+exec sql "replace into t21 values (2, 10, 10, 0)"
+exec sql "select * from t21 WHERE k0 = 10"
+exec sql "select * from t21 WHERE k1 = 10"
+exec sql "select * from t21 WHERE k2 = 10"
+exec sql "select * from t21 WHERE k3 = 10"
+exec sql "select * from t21 WHERE k3 = 0"
+
+# alloc test
+#exec admin "set injection ERRINJ_INDEX_ALLOC on"
+#exec sql "insert into t21 values (10, 10, 10, 10)"
+#exec sql "select * from t21 WHERE k0 = 10"
+#exec sql "select * from t21 WHERE k1 = 10"
+#exec sql "select * from t21 WHERE k2 = 10"
+#exec sql "select * from t21 WHERE k3 = 10"
+#exec admin "set injection ERRINJ_INDEX_ALLOC off"
+
+exec admin "lua box.space[21]:truncate()"

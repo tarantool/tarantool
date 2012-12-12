@@ -420,3 +420,143 @@ lua box.space[11]:truncate()
 lua box.space[12]:truncate()
 ---
 ...
+insert into t21 values (0, 0, 0, 0)
+Insert OK, 1 row affected
+insert into t21 values (1, 1, 1, 1)
+Insert OK, 1 row affected
+insert into t21 values (2, 2, 2, 2)
+Insert OK, 1 row affected
+replace into t21 values (1, 1, 1, 1)
+Replace OK, 1 row affected
+replace into t21 values (1, 10, 10, 10)
+Replace OK, 1 row affected
+replace into t21 values (1, 1, 1, 1)
+Replace OK, 1 row affected
+select * from t21 WHERE k0 = 10
+No match
+select * from t21 WHERE k1 = 10
+No match
+select * from t21 WHERE k2 = 10
+No match
+select * from t21 WHERE k3 = 10
+No match
+select * from t21 WHERE k0 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+select * from t21 WHERE k1 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+select * from t21 WHERE k2 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+select * from t21 WHERE k3 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+insert into t21 values (10, 10, 10, 10)
+Insert OK, 1 row affected
+delete from t21 WHERE k0 = 10
+Delete OK, 1 row affected
+select * from t21 WHERE k0 = 10
+No match
+select * from t21 WHERE k1 = 10
+No match
+select * from t21 WHERE k2 = 10
+No match
+select * from t21 WHERE k3 = 10
+No match
+insert into t21 values (1, 10, 10, 10)
+An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 0'
+select * from t21 WHERE k0 = 10
+No match
+select * from t21 WHERE k1 = 10
+No match
+select * from t21 WHERE k2 = 10
+No match
+select * from t21 WHERE k3 = 10
+No match
+select * from t21 WHERE k0 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+replace into t21 values (10, 10, 10, 10)
+An error occurred: ER_TUPLE_NOT_FOUND, 'Tuple doesn't exist, index 0'
+select * from t21 WHERE k0 = 10
+No match
+select * from t21 WHERE k1 = 10
+No match
+select * from t21 WHERE k2 = 10
+No match
+select * from t21 WHERE k3 = 10
+No match
+insert into t21 values (10, 0, 10, 10)
+An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 1'
+select * from t21 WHERE k0 = 10
+No match
+select * from t21 WHERE k1 = 10
+No match
+select * from t21 WHERE k2 = 10
+No match
+select * from t21 WHERE k3 = 10
+No match
+select * from t21 WHERE k1 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+replace into t21 values (2, 0, 10, 10)
+An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 1'
+select * from t21 WHERE k0 = 10
+No match
+select * from t21 WHERE k1 = 10
+No match
+select * from t21 WHERE k2 = 10
+No match
+select * from t21 WHERE k3 = 10
+No match
+select * from t21 WHERE k1 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+insert into t21 values (10, 10, 10, 0)
+An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 3'
+select * from t21 WHERE k0 = 10
+No match
+select * from t21 WHERE k1 = 10
+No match
+select * from t21 WHERE k2 = 10
+No match
+select * from t21 WHERE k3 = 10
+No match
+select * from t21 WHERE k3 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+replace into t21 values (2, 10, 10, 0)
+An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 3'
+select * from t21 WHERE k0 = 10
+No match
+select * from t21 WHERE k1 = 10
+No match
+select * from t21 WHERE k2 = 10
+No match
+select * from t21 WHERE k3 = 10
+No match
+select * from t21 WHERE k3 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+set injection ERRINJ_INDEX_ALLOC on
+---
+ok
+...
+insert into t21 values (10, 10, 10, 10)
+An error occurred: ER_MEMORY_ISSUE, 'Failed to allocate X bytes in hash for replace'
+select * from t21 WHERE k0 = 10
+No match
+select * from t21 WHERE k1 = 10
+No match
+select * from t21 WHERE k2 = 10
+No match
+select * from t21 WHERE k3 = 10
+No match
+set injection ERRINJ_INDEX_ALLOC off
+---
+ok
+...
+lua box.space[21]:truncate()
+---
+...
