@@ -30,7 +30,6 @@
 #include "tuple.h"
 #include "space.h"
 #include "exception.h"
-#include "index.h"
 #include "errinj.h"
 #include <pickle.h>
 
@@ -941,107 +940,42 @@ tree_iterator_gt(struct iterator *iterator)
 	fold_with_sparse_parts(key_def, tuple, key_data->parts);
 
 	void *node = sptree_index_find(&tree, key_data);
-
 	return [self unfold: node];
 }
 
 - (struct tuple *) replace: (struct tuple *) old_tuple
-			  : (struct tuple *) new_tuple
-			  : (enum replace_flags) flags
+			  :(struct tuple *) new_tuple
+			  :(enum dup_replace_mode) mode
 {
-	assert (old_tuple != NULL || new_tuple != NULL);
-	void *node1 = alloca([self node_size]);
-	void *node2 = alloca([self node_size]);
+	size_t node_size = [self node_size];
+	void *new_node = alloca(node_size);
+	void *old_node = alloca(node_size);
+	uint32_t errcode;
 
-	if (new_tuple && !old_tuple)  {
-		/* Case #1: replace(new_tuple); */
+	if (new_tuple) {
+		void *dup_node = old_node;
+		[self fold: new_node :new_tuple];
 
-		void *new_node = node1;
-		void *replaced_node = node2;
-		[self fold: new_node: new_tuple];
+		/* Try to optimistically replace the new_tuple. */
+		sptree_index_replace(&tree, new_node, &dup_node);
 
-		/* Try to optimistically replace the new_tuple in the space */
-		sptree_index_replace(&tree, new_node, &replaced_node);
+		struct tuple *dup_tuple = [self unfold: dup_node];
+		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
-		/* some result from sptree_index_replace */
-		bool replace_failed = false;
-		ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
-			replace_failed = true;
-		});
-
-		if (unlikely(replace_failed))
-			tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
-				[self node_size], "tree", "replace");
-
-		if (unlikely(key_def->is_unique && (flags & THROW_INSERT)
-			     && replaced_node != NULL)) {
-			/* BOX_ADD, a tuple with the same key is found */
-			sptree_index_replace(&tree, replaced_node, NULL);
-			tnt_raise(ClientError, :ER_TUPLE_FOUND);
+		if (errcode) {
+			sptree_index_delete(&tree, new_node);
+			if (dup_node)
+				sptree_index_replace(&tree, dup_node, NULL);
+			tnt_raise(ClientError, :errcode, index_n(self));
 		}
-
-		if (unlikely(key_def->is_unique && (flags & REPLACE_THROW)
-			     && replaced_node == NULL)) {
-			/* BOX_REPLACE,a tuple with the same key is not found */
-			sptree_index_delete(&tree, new_node, NULL);
-			tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
-		}
-
-		/* Return the removed node */
-		return [self unfold: replaced_node];
-	} else if (!new_tuple && old_tuple) {
-		/* Case #2: remove(old_tuple) */
-
-		void *old_node  = node1;
-		void *removed_node = node2;
-
-		[self fold: old_node: old_tuple];
-		sptree_index_delete(&tree, old_node, &removed_node);
-		assert([self unfold: removed_node] == NULL ||
-		       [self unfold: removed_node] == old_tuple);
-
-		return [self unfold: removed_node];
-	} else /* (old_tuple != NULL && new_tuple != NULL) */ {
-		/* Case #3: remove(old_tuple); insert(new_tuple) */
-
-		assert(!key_def->is_unique || (flags & THROW_INSERT));
-		void *new_node = node1;
-		void *replaced_node = node2;
-
-		[self fold: new_node: new_tuple];
-		sptree_index_replace(&tree, new_node, &replaced_node);
-		assert(key_def->is_unique || replaced_node == NULL);
-
-		/* some result from sptree_index_replace */
-		bool replace_failed = false;
-		ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
-			replace_failed = true;
-		});
-
-		if (unlikely(replace_failed))
-			tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
-				[self node_size], "tree", "replace");
-
-		if (replaced_node) {
-			/* The old_tuple had the same key as the new_tuple and
-			 * it was succesfully removed during replace call */
-			assert(old_tuple == [self unfold: replaced_node]);
-			return old_tuple;
-		}
-
-		/* Nothing was removed during replace call,
-		 * so remove the old_tuple manually */
-		void *old_node  = node1;
-		void *removed_node = node2;
-		[self fold: old_node: old_tuple];
-		sptree_index_delete(&tree, old_node, &removed_node);
-
-		assert([self unfold: removed_node] == NULL ||
-		       [self unfold: removed_node] == old_tuple);
-		return  [self unfold: removed_node];
+		if (dup_tuple)
+			return dup_tuple;
 	}
-
-	return NULL;
+	if (old_tuple) {
+		[self fold: old_node :old_tuple];
+		sptree_index_delete(&tree, old_node);
+	}
+	return old_tuple;
 }
 
 - (struct iterator *) allocIterator

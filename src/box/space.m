@@ -122,42 +122,34 @@ key_free(struct key_def *key_def)
 
 struct tuple *
 space_replace(struct space *sp, struct tuple *old_tuple,
-	      struct tuple *new_tuple, enum replace_flags flags)
+	      struct tuple *new_tuple, enum dup_replace_mode mode)
 {
-	struct tuple *removed_tuple = NULL;
-
-	int n = index_count(sp);
 	int i = 0;
 	@try {
-
 		/* Update the primary key */
-		assert(sp->index[0]->key_def->is_unique);
-		removed_tuple =
-			[sp->index[0] replace: old_tuple: new_tuple: flags];
-		assert(old_tuple == NULL || removed_tuple == NULL ||
-		       old_tuple == removed_tuple);
-		i++;
+		Index *pk = sp->index[0];
+		assert(pk->key_def->is_unique);
+		/*
+		 * If old_tuple is not NULL, the index
+		 * has to find and delete it, or raise an
+		 * error.
+		 */
+		old_tuple = [pk replace: old_tuple :new_tuple :mode];
 
-		if (unlikely(!removed_tuple && !new_tuple)) {
-			/* Nothing has been changed in the primary key */
-			return NULL;
-		}
-
+		assert(old_tuple || new_tuple);
+		int n = index_count(sp);
 		/* Update secondary keys */
-		for (; i < n; i++) {
+		for (i = i + 1; i < n; i++) {
 			Index *index = sp->index[i];
-			[index replace: removed_tuple: new_tuple: THROW_INSERT];
+			[index replace: old_tuple :new_tuple :DUP_INSERT];
 		}
-
-		return removed_tuple;
+		return old_tuple;
 	} @catch (tnt_Exception *e) {
-		i--;
 		/* Rollback all changes */
-		for (; i >= 0;  i--) {
+		for (i = i - 1; i >= 0;  i--) {
 			Index *index = sp->index[i];
-			[index replace: new_tuple: removed_tuple: THROW_INSERT];
+			[index replace: new_tuple: old_tuple: DUP_INSERT];
 		}
-
 		@throw;
 	}
 }
@@ -166,11 +158,13 @@ void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
 	/* Check to see if the tuple has a sufficient number of fields. */
-	if (unlikely(new_tuple->field_count < sp->max_fieldno))
-		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+	if (new_tuple->field_count < sp->max_fieldno)
+		tnt_raise(IllegalParams,
+			  :"tuple must have all indexed fields");
 
 	if (sp->arity > 0 && sp->arity != new_tuple->field_count)
-		tnt_raise(IllegalParams, :"tuple field count must match space cardinality");
+		tnt_raise(IllegalParams,
+			  :"tuple field count must match space cardinality");
 
 	/* Sweep through the tuple and check the field sizes. */
 	u8 *data = new_tuple->data;
@@ -178,15 +172,18 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 		/* Get the size of the current field and advance. */
 		u32 len = load_varint32((void **) &data);
 		data += len;
-
-		/* Check fixed size fields (NUM and NUM64) and skip undefined
-		   size fields (STRING and UNKNOWN). */
+		/*
+		 * Check fixed size fields (NUM and NUM64) and
+		 * skip undefined size fields (STRING and UNKNOWN).
+		 */
 		if (sp->field_types[f] == NUM) {
 			if (len != sizeof(u32))
-				tnt_raise(ClientError, :ER_KEY_FIELD_TYPE, "u32");
+				tnt_raise(ClientError, :ER_KEY_FIELD_TYPE,
+					  "u32");
 		} else if (sp->field_types[f] == NUM64) {
 			if (len != sizeof(u64))
-				tnt_raise(ClientError, :ER_KEY_FIELD_TYPE, "u64");
+				tnt_raise(ClientError, :ER_KEY_FIELD_TYPE,
+					  "u64");
 		}
 	}
 }

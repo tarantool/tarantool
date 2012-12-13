@@ -282,16 +282,32 @@ put_done:
 	return x;
 }
 
+
+/**
+ * Find a node in the hash and replace it with a new value.
+ * Save the old node in p_old pointer, if it is provided.
+ * If the old node didn't exist, just insert the new node.
+ */
 static inline mh_int_t
-_mh(replace)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **pprev,
+_mh(replace)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **p_old,
 	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
 {
 	mh_int_t k = _mh(get)(h, node, hash_arg, eq_arg);
 	if (k == mh_end(h)) {
-		if (pprev) *pprev = NULL;
+		/* No such node yet: insert a new one. */
+		if (p_old) {
+			*p_old = NULL;
+		}
 		return _mh(put)(h, node, hash_arg, eq_arg, NULL);
 	} else {
-		if (pprev) memcpy(*pprev, &(h->p[k]), sizeof(mh_node_t));
+		/*
+		 * Maintain uniqueness: replace the old node
+		 * with a new value.
+		 */
+		if (p_old) {
+			/* Save the old value. */
+			memcpy(*p_old, &(h->p[k]), sizeof(mh_node_t));
+		}
 		memcpy(&(h->p[k]), node, sizeof(mh_node_t));
 		return k;
 	}
@@ -313,6 +329,15 @@ _mh(del)(struct _mh(t) *h, mh_int_t x,
 	}
 }
 #endif
+
+static inline void
+_mh(remove)(struct _mh(t) *h, const mh_node_t *node,
+	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
+{
+	mh_int_t k = _mh(get)(h, node, hash_arg, eq_arg);
+	if (k != mh_end(h))
+		_mh(del)(h, k, hash_arg, eq_arg);
+}
 
 
 #ifdef MH_SOURCE

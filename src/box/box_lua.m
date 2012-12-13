@@ -835,11 +835,9 @@ lbox_index_count(struct lua_State *L)
 	[index initIterator: it :ITER_EQ :key :key_part_count];
 	/* iterating over the index and counting tuples */
 	struct tuple *tuple;
-	while ((tuple = it->next(it)) != NULL) {
-		if (tuple->flags & GHOST)
-			continue;
+	while ((tuple = it->next(it)) != NULL)
 		count++;
-	}
+
 	/* returning subtree size */
 	lua_pushnumber(L, count);
 	return 1;

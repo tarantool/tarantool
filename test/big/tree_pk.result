@@ -174,7 +174,7 @@ No match
 select * from t22 WHERE k3 = 10
 No match
 insert into t22 values (1, 10, 10, 10)
-An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 0'
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 0'
 select * from t22 WHERE k0 = 10
 No match
 select * from t22 WHERE k1 = 10
@@ -187,7 +187,7 @@ select * from t22 WHERE k0 = 1
 Found 1 tuple:
 [1, 1, 1, 1]
 replace into t22 values (10, 10, 10, 10)
-An error occurred: ER_TUPLE_NOT_FOUND, 'Tuple doesn't exist, index 0'
+An error occurred: ER_TUPLE_NOT_FOUND, 'Tuple doesn't exist in index 0'
 select * from t22 WHERE k0 = 10
 No match
 select * from t22 WHERE k1 = 10
@@ -197,7 +197,7 @@ No match
 select * from t22 WHERE k3 = 10
 No match
 insert into t22 values (10, 0, 10, 10)
-An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 1'
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
 select * from t22 WHERE k0 = 10
 No match
 select * from t22 WHERE k1 = 10
@@ -210,7 +210,7 @@ select * from t22 WHERE k1 = 0
 Found 1 tuple:
 [0, 0, 0, 0]
 replace into t22 values (2, 0, 10, 10)
-An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 1'
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
 select * from t22 WHERE k0 = 10
 No match
 select * from t22 WHERE k1 = 10
@@ -223,7 +223,7 @@ select * from t22 WHERE k1 = 0
 Found 1 tuple:
 [0, 0, 0, 0]
 insert into t22 values (10, 10, 10, 0)
-An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 3'
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
 select * from t22 WHERE k0 = 10
 No match
 select * from t22 WHERE k1 = 10
@@ -236,7 +236,7 @@ select * from t22 WHERE k3 = 0
 Found 1 tuple:
 [0, 0, 0, 0]
 replace into t22 values (2, 10, 10, 0)
-An error occurred: ER_TUPLE_FOUND, 'Tuple already exists, index 3'
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
 select * from t22 WHERE k0 = 10
 No match
 select * from t22 WHERE k1 = 10
@@ -274,15 +274,19 @@ set injection ERRINJ_INDEX_ALLOC on
 ok
 ...
 insert into t22 values (10, 10, 10, 10)
-An error occurred: ER_MEMORY_ISSUE, 'Failed to allocate 8 bytes in tree for replace'
+Insert OK, 1 row affected
 select * from t22 WHERE k0 = 10
-No match
+Found 1 tuple:
+[10, 10, 10, 10]
 select * from t22 WHERE k1 = 10
-No match
+Found 1 tuple:
+[10, 10, 10, 10]
 select * from t22 WHERE k2 = 10
-No match
+Found 1 tuple:
+[10, 10, 10, 10]
 select * from t22 WHERE k3 = 10
-No match
+Found 1 tuple:
+[10, 10, 10, 10]
 set injection ERRINJ_INDEX_ALLOC off
 ---
 ok

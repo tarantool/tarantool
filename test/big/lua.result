@@ -552,7 +552,7 @@ lua box.space[1]:insert(1, 'hello', 'world')
 ...
 lua box.space[1]:insert(2, 'hello', 'world')
 ---
-error: 'Tuple already exists'
+error: 'Duplicate key exists in unique index 1'
 ...
 lua box.space[1]:truncate()
 ---
