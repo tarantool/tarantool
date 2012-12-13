@@ -114,6 +114,7 @@ struct key_def {
 	 */
 	int max_fieldno;
 	bool is_unique;
+	enum index_type type;
 };
 
 /** Descriptor of index features. */

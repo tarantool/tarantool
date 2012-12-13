@@ -29,6 +29,17 @@ exec admin "lua print(box.unpack('b', 'T'))"
 exec admin "lua print(box.unpack('s', 'Te'))"
 exec admin "lua print(box.unpack('i', 'Test'))"
 exec admin "lua print(box.unpack('l', 'Test ok.'))"
+exec admin "lua box.unpack('bsil', box.pack('bsil', 255, 65535, 4294967295, tonumber64('18446744073709551615')))"
+exec admin "lua box.unpack('www', box.pack('www', 255, 65535, 4294967295))"
+exec admin "lua box.unpack('ppp', box.pack('ppp', 'one', 'two', 'three'))"
+exec admin "lua num, str, num64 = box.unpack('ppp', box.pack('ppp', 666, 'string', tonumber64('666666666666666')))"
+exec admin "lua print(box.unpack('i', num), str, box.unpack('l', num64))"
+exec admin "lua box.unpack('=p', box.pack('=p', 1, '666'))"
+exec admin "lua box.unpack('','')"
+exec admin "lua box.unpack('ii', box.pack('i', 1))"
+exec admin "lua box.unpack('i', box.pack('ii', 1, 1))"
+exec admin "lua box.unpack('+p', box.pack('=p', 1, '666'))"
+
 # Test the low-level box.process() call, which takes a binary packet
 # and passes it to box for execution.
 # insert:

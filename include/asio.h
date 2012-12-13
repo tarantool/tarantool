@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_H_INCLUDED
-#define TARANTOOL_H_INCLUDED
+#ifndef TARANTOOL_ASIO_H_INCLUDED
+#define TARANTOOL_ASIO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,43 +28,44 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include "config.h"
+
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdarg.h>
+#include <unistd.h>
+#include <tarantool_ev.h>
+#include <tarantool_eio.h>
+#include <coro.h>
 #include <util.h>
+#include <rlist.h>
 
-struct tarantool_cfg;
-struct tbuf;
-struct log_io;
-struct fio_batch;
-struct lua_State;
+/**
+ * Asynchronous IO Tasks (libeio wrapper)
+ *
+ * Yield the current fiber until a created task is complete.
+ */
 
-void mod_init(void);
-void mod_free(void);
 
-extern const char *mod_name;
-i32 mod_check_config(struct tarantool_cfg *conf);
-i32 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
-void mod_lua_load_cfg(struct lua_State *L);
-int mod_cat(const char *filename);
-void mod_snapshot(struct log_io *, struct fio_batch *batch);
-void mod_info(struct tbuf *out);
-const char *mod_status(void);
+/**
+ * A single task' context.
+ */
+struct asio {
+	struct eio_req *req;
+	bool complete;
+	bool wakeup;
+	struct fiber *f;
+	void *f_data;
+	void *result;
+	struct rlist link;
+};
 
-extern int snapshot_pid;
-extern struct tarantool_cfg cfg;
-extern const char *cfg_filename;
-extern char *cfg_filename_fullpath;
-extern bool init_storage, booting;
-extern char *binary_filename;
-extern char *custom_proc_title;
-i32 reload_cfg(struct tbuf *out);
-void show_cfg(struct tbuf *out);
-int snapshot(void * /* ev */, int /* events */);
-const char *tarantool_version(void);
-double tarantool_uptime(void);
-void tarantool_free(void);
+void asio_init(void);
+void asio_free(void);
+struct asio *asio_create(void (*f)(eio_req*), void *arg);
+bool asio_wait(struct asio *a, ev_tstamp timeout);
+void asio_cancel(struct asio *a);
+void asio_finish(struct asio *a);
 
-char **init_set_proc_title(int argc, char **argv);
-void free_proc_title(int argc, char **argv);
-void set_proc_title(const char *format, ...);
-void title(const char *fmt, ...);
-#endif /* TARANTOOL_H_INCLUDED */
+#endif /* TARANTOOL_ASIO_H_INCLUDED */

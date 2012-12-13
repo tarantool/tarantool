@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_H_INCLUDED
-#define TARANTOOL_H_INCLUDED
+#ifndef TARANTOOL_EIO_H_INCLUDED
+#define TARANTOOL_EIO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,43 +28,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdbool.h>
-#include <util.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <utime.h>
+#include <unistd.h>
 
-struct tarantool_cfg;
-struct tbuf;
-struct log_io;
-struct fio_batch;
-struct lua_State;
-
-void mod_init(void);
-void mod_free(void);
-
-extern const char *mod_name;
-i32 mod_check_config(struct tarantool_cfg *conf);
-i32 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
-void mod_lua_load_cfg(struct lua_State *L);
-int mod_cat(const char *filename);
-void mod_snapshot(struct log_io *, struct fio_batch *batch);
-void mod_info(struct tbuf *out);
-const char *mod_status(void);
-
-extern int snapshot_pid;
-extern struct tarantool_cfg cfg;
-extern const char *cfg_filename;
-extern char *cfg_filename_fullpath;
-extern bool init_storage, booting;
-extern char *binary_filename;
-extern char *custom_proc_title;
-i32 reload_cfg(struct tbuf *out);
-void show_cfg(struct tbuf *out);
-int snapshot(void * /* ev */, int /* events */);
-const char *tarantool_version(void);
-double tarantool_uptime(void);
-void tarantool_free(void);
-
-char **init_set_proc_title(int argc, char **argv);
-void free_proc_title(int argc, char **argv);
-void set_proc_title(const char *format, ...);
-void title(const char *fmt, ...);
-#endif /* TARANTOOL_H_INCLUDED */
+#include "third_party/libeio/eio.h"
+#endif /* TARANTOOL_EIO_H_INCLUDED */

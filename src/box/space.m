@@ -216,6 +216,12 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 {
 	def->max_fieldno = 0;
 	def->part_count = 0;
+	if (strcmp(cfg_index->type, "HASH") == 0)
+		def->type = HASH;
+	else if (strcmp(cfg_index->type, "TREE") == 0)
+		def->type = TREE;
+	else
+		panic("Wrong index type: %s", cfg_index->type);
 
 	/* Calculate key part count and maximal field number. */
 	for (int k = 0; cfg_index->key_field[k] != NULL; ++k) {

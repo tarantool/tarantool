@@ -25,4 +25,5 @@ exec admin "show fiber"
 exec admin "show slab"
 exec admin "show palloc"
 sys.stdout.clear_all_filters()
+
 # vim: syntax=python
