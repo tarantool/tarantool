@@ -33,7 +33,7 @@
     <title>PHP</title>
     <para>
        Please see <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/php"><filename>connector/php</filename></link> in the source tree.
+       xlink:href="https://github.com/mailru/tarantool-php/"><filename>tarantool-php</filename></link> project at GitHub.
     </para>
   </section>
 
