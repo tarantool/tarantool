@@ -37,7 +37,7 @@
 #include "errinj.h"
 
 static struct index_traits index_traits = {
-	.allows_partial_key = true,
+	.allows_partial_key = false,
 };
 
 static struct index_traits hash_index_traits = {
@@ -216,12 +216,6 @@ replace_check_dup(struct tuple *old_tuple,
 }
 
 - (struct tuple *) findByKey: (void *) key :(int) part_count
-{
-	check_key_parts(key_def, part_count, false);
-	return [self findUnsafe: key :part_count];
-}
-
-- (struct tuple *) findUnsafe: (void *) key :(int) part_count
 {
 	(void) key;
 	(void) part_count;
@@ -473,8 +467,11 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(int_hash);
 }
 
-- (struct tuple *) findUnsafe: (void *) key :(int) part_count
+- (struct tuple *) findByKey: (void *) key :(int) part_count
 {
+	assert(key_def->is_unique);
+	check_key_parts(key_def, part_count, false);
+
 	(void) part_count;
 
 	struct tuple *ret = NULL;
@@ -551,7 +548,6 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 - (void) initIterator: (struct iterator *) ptr: (enum iterator_type) type
                         :(void *) key :(int) part_count
 {
-	(void) part_count;
 	assert(ptr->free == hash_iterator_free);
 	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
 	struct mh_i32ptr_node_t node;
@@ -635,9 +631,10 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(int64_hash);
 }
 
-- (struct tuple *) findUnsafe: (void *) key :(int) part_count
+- (struct tuple *) findByKey: (void *) key :(int) part_count
 {
-	(void) part_count;
+	assert(key_def->is_unique);
+	check_key_parts(key_def, part_count, false);
 
 	struct tuple *ret = NULL;
 	struct mh_i64ptr_node_t node = int64_key_to_node(key);
@@ -791,9 +788,11 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(str_hash);
 }
 
-- (struct tuple *) findUnsafe: (void *) key :(int) part_count
+- (struct tuple *) findByKey: (void *) key :(int) part_count
 {
-	(void) part_count;
+	assert(key_def->is_unique);
+	check_key_parts(key_def, part_count, false);
+
 	struct tuple *ret = NULL;
 	const struct mh_lstrptr_node_t node = { .key = key };
 	mh_int_t k = mh_lstrptr_get(str_hash, &node, NULL, NULL);

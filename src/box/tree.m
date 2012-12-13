@@ -35,6 +35,10 @@
 
 /* {{{ Utilities. *************************************************/
 
+static struct index_traits tree_index_traits = {
+	.allows_partial_key = true,
+};
+
 /**
  * Unsigned 32-bit int comparison.
  */
@@ -868,6 +872,11 @@ tree_iterator_gt(struct iterator *iterator)
 
 @implementation TreeIndex
 
++ (struct index_traits *) traits
+{
+	return &tree_index_traits;
+}
+
 + (Index *) alloc: (struct key_def *) key_def :(struct space *) space
 {
 	enum tree_type type = find_tree_type(space, key_def);
@@ -916,8 +925,11 @@ tree_iterator_gt(struct iterator *iterator)
 	return [self unfold: node];
 }
 
-- (struct tuple *) findUnsafe: (void *) key : (int) part_count
+- (struct tuple *) findByKey: (void *) key : (int) part_count
 {
+	assert(key_def->is_unique);
+	check_key_parts(key_def, part_count, false);
+
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) +
 			 _SIZEOF_SPARSE_PARTS(part_count));

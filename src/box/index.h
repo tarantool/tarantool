@@ -206,10 +206,6 @@ enum dup_replace_mode {
 		     :(enum iterator_type) type
 		     :(void *) key :(int) part_count;
 
-/**
- * Unsafe search methods that do not check key part count.
- */
-- (struct tuple *) findUnsafe: (void *) key :(int) part_count;
 @end
 
 struct iterator {
