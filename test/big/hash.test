@@ -270,6 +270,8 @@ exec admin "lua box.space[12]:truncate()"
 # hash::replace tests
 #
 
+exec admin "lua box.space[21]:truncate()"
+
 exec sql "insert into t21 values (0, 0, 0, 0)"
 exec sql "insert into t21 values (1, 1, 1, 1)"
 exec sql "insert into t21 values (2, 2, 2, 2)"
@@ -342,14 +344,5 @@ exec sql "select * from t21 WHERE k1 = 10"
 exec sql "select * from t21 WHERE k2 = 10"
 exec sql "select * from t21 WHERE k3 = 10"
 exec sql "select * from t21 WHERE k3 = 0"
-
-# alloc test
-#exec admin "set injection ERRINJ_INDEX_ALLOC on"
-#exec sql "insert into t21 values (10, 10, 10, 10)"
-#exec sql "select * from t21 WHERE k0 = 10"
-#exec sql "select * from t21 WHERE k1 = 10"
-#exec sql "select * from t21 WHERE k2 = 10"
-#exec sql "select * from t21 WHERE k3 = 10"
-#exec admin "set injection ERRINJ_INDEX_ALLOC off"
 
 exec admin "lua box.space[21]:truncate()"

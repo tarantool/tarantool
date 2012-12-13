@@ -53,6 +53,7 @@ bool errinj_get(int id);
 void errinj_set(int id, bool state);
 int errinj_set_byname(char *name, bool state);
 
+struct tbuf;
 void errinj_info(struct tbuf *out);
 
 #ifdef NDEBUG

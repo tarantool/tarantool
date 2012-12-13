@@ -84,6 +84,8 @@ exec admin "lua box.space[15]:truncate()"
 # tree::replace tests
 #
 
+exec admin "lua box.space[22]:truncate()"
+
 exec sql "insert into t22 values (0, 0, 0, 0)"
 exec sql "insert into t22 values (1, 1, 1, 1)"
 exec sql "insert into t22 values (2, 2, 2, 2)"
@@ -165,15 +167,6 @@ exec sql "replace into t22 values (5, 5, 0, 5)"
 exec sql "select * from t22 WHERE k2 = 0"
 exec sql "delete from t22 WHERE k0 = 5"
 exec sql "select * from t22 WHERE k2 = 0"
-
-# tree alloc test
-exec admin "set injection ERRINJ_INDEX_ALLOC on"
-exec sql "insert into t22 values (10, 10, 10, 10)"
-exec sql "select * from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k1 = 10"
-exec sql "select * from t22 WHERE k2 = 10"
-exec sql "select * from t22 WHERE k3 = 10"
-exec admin "set injection ERRINJ_INDEX_ALLOC off"
 
 exec admin "lua box.space[22]:truncate()"
 

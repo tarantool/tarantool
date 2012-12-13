@@ -500,7 +500,7 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	if (k != mh_end(int_hash))
 		ret = mh_i32ptr_node(int_hash, k)->val;
 #ifdef DEBUG
-	say_debug("Hash32Index find(self:%p, key:%i) = %p", self, num, ret);
+	say_debug("Hash32Index find(self:%p, key:%i) = %p", self, node.key, ret);
 #endif
 	return ret;
 }
@@ -521,7 +521,7 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
 			mh_i32ptr_del(int_hash, pos, NULL, NULL);
-		        pos = mh_end(int_hash);
+			pos = mh_end(int_hash);
 		});
 
 		if (pos == mh_end(int_hash)) {
@@ -662,7 +662,7 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	if (k != mh_end(int64_hash))
 		ret = mh_i64ptr_node(int64_hash, k)->val;
 #ifdef DEBUG
-	say_debug("Hash64Index find(self:%p, key:%"PRIu64") = %p", self, num, ret);
+	say_debug("Hash64Index find(self:%p, key:%"PRIu64") = %p", self, node.key, ret);
 #endif
 	return ret;
 }
@@ -683,7 +683,7 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
 			mh_i64ptr_del(int64_hash, pos, NULL, NULL);
-		        pos = mh_end(int64_hash);
+			pos = mh_end(int64_hash);
 		});
 		if (pos == mh_end(int64_hash)) {
 			tnt_raise(LoggedError, :ER_MEMORY_ISSUE, (ssize_t) pos,
@@ -840,7 +840,7 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
 			mh_lstrptr_del(str_hash, pos, NULL, NULL);
-		        pos = mh_end(str_hash);
+			pos = mh_end(str_hash);
 		});
 
 		if (pos == mh_end(str_hash)) {

@@ -420,6 +420,9 @@ lua box.space[11]:truncate()
 lua box.space[12]:truncate()
 ---
 ...
+lua box.space[21]:truncate()
+---
+...
 insert into t21 values (0, 0, 0, 0)
 Insert OK, 1 row affected
 insert into t21 values (1, 1, 1, 1)
