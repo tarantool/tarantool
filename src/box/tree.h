@@ -45,6 +45,8 @@ typedef int (*tree_cmp_t)(const void *, const void *, void *);
 	sptree_index tree;
 };
 
++ (struct index_traits *) traits;
+
 + (Index *) alloc: (struct key_def *) key_def :(struct space *) space;
 
 - (void) buildNext: (struct tuple *) tuple;

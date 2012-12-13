@@ -79,3 +79,94 @@ exec sql "insert into t15 values ('abcdc')"
 exec sql "insert into t15 values ('abcdc_')"
 exec admin "lua box.space[15].index[0]:select_range(3, 'abcdb')"
 exec admin "lua box.space[15]:truncate()"
+
+#
+# tree::replace tests
+#
+
+exec admin "lua box.space[22]:truncate()"
+
+exec sql "insert into t22 values (0, 0, 0, 0)"
+exec sql "insert into t22 values (1, 1, 1, 1)"
+exec sql "insert into t22 values (2, 2, 2, 2)"
+
+# OK
+exec sql "replace into t22 values (1, 1, 1, 1)"
+exec sql "replace into t22 values (1, 10, 10, 10)"
+exec sql "replace into t22 values (1, 1, 1, 1)"
+exec sql "select * from t22 WHERE k0 = 10"
+exec sql "select * from t22 WHERE k1 = 10"
+exec sql "select * from t22 WHERE k2 = 10"
+exec sql "select * from t22 WHERE k3 = 10"
+exec sql "select * from t22 WHERE k0 = 1"
+exec sql "select * from t22 WHERE k1 = 1"
+exec sql "select * from t22 WHERE k2 = 1"
+exec sql "select * from t22 WHERE k3 = 1"
+
+# OK
+exec sql "insert into t22 values (10, 10, 10, 10)"
+exec sql "delete from t22 WHERE k0 = 10"
+exec sql "select * from t22 WHERE k0 = 10"
+exec sql "select * from t22 WHERE k1 = 10"
+exec sql "select * from t22 WHERE k2 = 10"
+exec sql "select * from t22 WHERE k3 = 10"
+
+
+# TupleFound (primary key)
+exec sql "insert into t22 values (1, 10, 10, 10)"
+exec sql "select * from t22 WHERE k0 = 10"
+exec sql "select * from t22 WHERE k1 = 10"
+exec sql "select * from t22 WHERE k2 = 10"
+exec sql "select * from t22 WHERE k3 = 10"
+exec sql "select * from t22 WHERE k0 = 1"
+
+# TupleNotFound (primary key)
+exec sql "replace into t22 values (10, 10, 10, 10)"
+exec sql "select * from t22 WHERE k0 = 10"
+exec sql "select * from t22 WHERE k1 = 10"
+exec sql "select * from t22 WHERE k2 = 10"
+exec sql "select * from t22 WHERE k3 = 10"
+
+# TupleFound (key #1)
+exec sql "insert into t22 values (10, 0, 10, 10)"
+exec sql "select * from t22 WHERE k0 = 10"
+exec sql "select * from t22 WHERE k1 = 10"
+exec sql "select * from t22 WHERE k2 = 10"
+exec sql "select * from t22 WHERE k3 = 10"
+exec sql "select * from t22 WHERE k1 = 0"
+
+# TupleFound (key #1)
+exec sql "replace into t22 values (2, 0, 10, 10)"
+exec sql "select * from t22 WHERE k0 = 10"
+exec sql "select * from t22 WHERE k1 = 10"
+exec sql "select * from t22 WHERE k2 = 10"
+exec sql "select * from t22 WHERE k3 = 10"
+exec sql "select * from t22 WHERE k1 = 0"
+
+# TupleFound (key #3)
+exec sql "insert into t22 values (10, 10, 10, 0)"
+exec sql "select * from t22 WHERE k0 = 10"
+exec sql "select * from t22 WHERE k1 = 10"
+exec sql "select * from t22 WHERE k2 = 10"
+exec sql "select * from t22 WHERE k3 = 10"
+exec sql "select * from t22 WHERE k3 = 0"
+
+# TupleFound (key #3)
+exec sql "replace into t22 values (2, 10, 10, 0)"
+exec sql "select * from t22 WHERE k0 = 10"
+exec sql "select * from t22 WHERE k1 = 10"
+exec sql "select * from t22 WHERE k2 = 10"
+exec sql "select * from t22 WHERE k3 = 10"
+exec sql "select * from t22 WHERE k3 = 0"
+
+# Non-Uniq test (key #2)
+exec sql "insert into t22 values (4, 4, 0, 4)"
+exec sql "insert into t22 values (5, 5, 0, 5)"
+exec sql "insert into t22 values (6, 6, 0, 6)"
+exec sql "replace into t22 values (5, 5, 0, 5)"
+exec sql "select * from t22 WHERE k2 = 0"
+exec sql "delete from t22 WHERE k0 = 5"
+exec sql "select * from t22 WHERE k2 = 0"
+
+exec admin "lua box.space[22]:truncate()"
+

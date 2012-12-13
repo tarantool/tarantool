@@ -85,12 +85,101 @@ struct space {
 /** Get space ordinal number. */
 static inline i32 space_n(struct space *sp) { return sp->no; }
 
-void space_validate(struct space *sp, struct tuple *old_tuple,
-		    struct tuple *new_tuple);
-void space_replace(struct space *sp, struct tuple *old_tuple,
-		   struct tuple *new_tuple);
-void space_remove(struct space *sp, struct tuple *tuple);
+/**
+ * @brief A single method to handle REPLACE, DELETE and UPDATE.
+ *
+ * @param sp space
+ * @param old_tuple the tuple that should be removed (can be NULL)
+ * @param new_tuple the tuple that should be inserted (can be NULL)
+ * @param mode      dup_replace_mode, used only if new_tuple is not
+ *                  NULL and old_tuple is NULL, and only for the
+ *                  primary key.
+ *
+ * For DELETE, new_tuple must be NULL. old_tuple must be
+ * previously found in the primary key.
+ *
+ * For REPLACE, old_tuple must be NULL. The additional
+ * argument dup_replace_mode further defines how REPLACE
+ * should proceed.
+ *
+ * For UPDATE, both old_tuple and new_tuple must be given,
+ * where old_tuple must be previously found in the primary key.
+ *
+ * Let's consider these three cases in detail:
+ *
+ * 1. DELETE, old_tuple is not NULL, new_tuple is NULL
+ *    The effect is that old_tuple is removed from all
+ *    indexes. dup_replace_mode is ignored.
+ *
+ * 2. REPLACE, old_tuple is NULL, new_tuple is not NULL,
+ *    has one simple sub-case and two with further
+ *    ramifications:
+ *
+ *	A. dup_replace_mode is DUP_INSERT. Attempts to insert the
+ *	new tuple into all indexes. If *any* of the unique indexes
+ *	has a duplicate key, deletion is aborted, all of its
+ *	effects are removed, and an error is thrown.
+ *
+ *	B. dup_replace_mode is DUP_REPLACE. It means an existing
+ *	tuple has to be replaced with the new one. To do it, tries
+ *	to find a tuple with a duplicate key in the primary index.
+ *	If the tuple is not found, throws an error. Otherwise,
+ *	replaces the old tuple with a new one in the primary key.
+ *	Continues on to secondary keys, but if there is any
+ *	secondary key, which has a duplicate tuple, but one which
+ *	is different from the duplicate found in the primary key,
+ *	aborts, puts everything back, throws an exception.
+ *
+ *	For example, if there is a space with 3 unique keys and
+ *	two tuples { 1, 2, 3 } and { 3, 1, 2 }:
+ *
+ *	This REPLACE/DUP_REPLACE is OK: { 1, 5, 5 }
+ *	This REPLACE/DUP_REPLACE is not OK: { 2, 2, 2 } (there
+ *	is no tuple with key '2' in the primary key)
+ *	This REPLACE/DUP_REPLACE is not OK: { 1, 1, 1 } (there
+ *	is a conflicting tuple in the secondary unique key).
+ *
+ *	C. dup_replace_mode is DUP_REPLACE_OR_INSERT. If
+ *	there is a duplicate tuple in the primary key, behaves the
+ *	same way as DUP_REPLACE, otherwise behaves the same way as
+ *	DUP_INSERT.
+ *
+ * 3. UPDATE has to delete the old tuple and insert a new one.
+ *    dup_replace_mode is ignored.
+ *    Note that old_tuple primary key doesn't have to match
+ *    new_tuple primary key, thus a duplicate can be found.
+ *    For this reason, and since there can be duplicates in
+ *    other indexes, UPDATE is the same as DELETE +
+ *    REPLACE/DUP_INSERT.
+ *
+ * @return old_tuple. DELETE, UPDATE and REPLACE/DUP_REPLACE
+ * always produce an old tuple. REPLACE/DUP_INSERT always returns
+ * NULL. REPLACE/DUP_REPLACE_OR_INSERT may or may not find
+ * a duplicate.
+ *
+ * The method is all-or-nothing in all cases. Changes are either
+ * applied to all indexes, or nothing applied at all.
+ *
+ * Note, that even in case of REPLACE, dup_replace_mode only
+ * affects the primary key, for secondary keys it's always
+ * DUP_INSERT.
+ *
+ * @return tuple that was removed from the space.
+ *         The call never removes more than one tuple: if
+ *         old_tuple is given, dup_replace_mode is ignored.
+ *         Otherwise, it's taken into account only for the
+ *         primary key.
+ */
+struct tuple *
+space_replace(struct space *space, struct tuple *old_tuple,
+	      struct tuple *new_tuple, enum dup_replace_mode mode);
 
+/**
+ * Check that the tuple has correct arity and correct field
+ * types (a pre-requisite for an INSERT).
+ */
+void
+space_validate_tuple(struct space *sp, struct tuple *new_tuple);
 
 /**
  * Get index by index number.

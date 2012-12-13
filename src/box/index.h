@@ -123,6 +123,29 @@ struct index_traits
 	bool allows_partial_key;
 };
 
+/**
+ * The manner in which replace in a unique index must treat
+ * duplicates (tuples with the same value of indexed key),
+ * possibly present in the index.
+ */
+enum dup_replace_mode {
+        /**
+	 * If a duplicate is found, delete it and insert
+	 * a new tuple instead. Otherwise, insert a new tuple.
+         */
+	DUP_REPLACE_OR_INSERT,
+	/**
+	 * If a duplicate is found, produce an error.
+	 * I.e. require that no old key exists with the same
+	 * value.
+         */
+	DUP_INSERT,
+	/**
+	 * Unless a duplicate exists, throw an error.
+	 */
+	DUP_REPLACE
+};
+
 @interface Index: tnt_Object {
 	/* Index features. */
 	struct index_traits *traits;
@@ -172,9 +195,9 @@ struct index_traits
 - (struct tuple *) min;
 - (struct tuple *) max;
 - (struct tuple *) findByKey: (void *) key :(int) part_count;
-- (struct tuple *) findByTuple: (struct tuple *) tuple;
-- (void) remove: (struct tuple *) tuple;
-- (void) replace: (struct tuple *) old_tuple :(struct tuple *) new_tuple;
+- (struct tuple *) replace: (struct tuple *) old_tuple
+			  :(struct tuple *) new_tuple
+			  :(enum dup_replace_mode) mode;
 /**
  * Create a structure to represent an iterator. Must be
  * initialized separately.
@@ -184,10 +207,6 @@ struct index_traits
 		     :(enum iterator_type) type
 		     :(void *) key :(int) part_count;
 
-/**
- * Unsafe search methods that do not check key part count.
- */
-- (struct tuple *) findUnsafe: (void *) key :(int) part_count;
 @end
 
 struct iterator {
@@ -198,5 +217,10 @@ struct iterator {
 void
 check_key_parts(struct key_def *key_def, int part_count,
 		bool partial_key_allowed);
+
+uint32_t
+replace_check_dup(struct tuple *old_tuple,
+		  struct tuple *dup_tuple,
+		  enum dup_replace_mode mode);
 
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */

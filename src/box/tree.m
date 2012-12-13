@@ -30,9 +30,14 @@
 #include "tuple.h"
 #include "space.h"
 #include "exception.h"
+#include "errinj.h"
 #include <pickle.h>
 
 /* {{{ Utilities. *************************************************/
+
+static struct index_traits tree_index_traits = {
+	.allows_partial_key = true,
+};
 
 /**
  * Unsigned 32-bit int comparison.
@@ -867,6 +872,11 @@ tree_iterator_gt(struct iterator *iterator)
 
 @implementation TreeIndex
 
++ (struct index_traits *) traits
+{
+	return &tree_index_traits;
+}
+
 + (Index *) alloc: (struct key_def *) key_def :(struct space *) space
 {
 	enum tree_type type = find_tree_type(space, key_def);
@@ -915,8 +925,11 @@ tree_iterator_gt(struct iterator *iterator)
 	return [self unfold: node];
 }
 
-- (struct tuple *) findUnsafe: (void *) key : (int) part_count
+- (struct tuple *) findByKey: (void *) key : (int) part_count
 {
+	assert(key_def->is_unique);
+	check_key_parts(key_def, part_count, false);
+
 	struct key_data *key_data
 		= alloca(sizeof(struct key_data) +
 			 _SIZEOF_SPARSE_PARTS(part_count));
@@ -929,40 +942,39 @@ tree_iterator_gt(struct iterator *iterator)
 	return [self unfold: node];
 }
 
-- (struct tuple *) findByTuple: (struct tuple *) tuple
+- (struct tuple *) replace: (struct tuple *) old_tuple
+			  :(struct tuple *) new_tuple
+			  :(enum dup_replace_mode) mode
 {
-	struct key_data *key_data
-		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
+	size_t node_size = [self node_size];
+	void *new_node = alloca(node_size);
+	void *old_node = alloca(node_size);
+	uint32_t errcode;
 
-	key_data->data = tuple->data;
-	key_data->part_count = tuple->field_count;
-	fold_with_sparse_parts(key_def, tuple, key_data->parts);
+	if (new_tuple) {
+		void *dup_node = old_node;
+		[self fold: new_node :new_tuple];
 
-	void *node = sptree_index_find(&tree, key_data);
-	return [self unfold: node];
-}
+		/* Try to optimistically replace the new_tuple. */
+		sptree_index_replace(&tree, new_node, &dup_node);
 
-- (void) remove: (struct tuple *) tuple
-{
-	void *node = alloca([self node_size]);
-	[self fold: node :tuple];
-	sptree_index_delete(&tree, node);
-}
+		struct tuple *dup_tuple = [self unfold: dup_node];
+		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
-- (void) replace: (struct tuple *) old_tuple
-		: (struct tuple *) new_tuple
-{
-	if (new_tuple->field_count < key_def->max_fieldno)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
-			  key_def->max_fieldno);
-
-	void *node = alloca([self node_size]);
-	if (old_tuple) {
-		[self fold: node :old_tuple];
-		sptree_index_delete(&tree, node);
+		if (errcode) {
+			sptree_index_delete(&tree, new_node);
+			if (dup_node)
+				sptree_index_replace(&tree, dup_node, NULL);
+			tnt_raise(ClientError, :errcode, index_n(self));
+		}
+		if (dup_tuple)
+			return dup_tuple;
 	}
-	[self fold: node :new_tuple];
-	sptree_index_insert(&tree, node);
+	if (old_tuple) {
+		[self fold: old_node :old_tuple];
+		sptree_index_delete(&tree, old_node);
+	}
+	return old_tuple;
 }
 
 - (struct iterator *) allocIterator

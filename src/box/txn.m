@@ -32,20 +32,6 @@
 #include <recovery.h>
 #include <fiber.h>
 
-static void
-txn_lock(struct txn *txn __attribute__((unused)), struct tuple *tuple)
-{
-	say_debug("txn_lock(%p)", tuple);
-	tuple->flags |= WAL_WAIT;
-}
-
-static void
-txn_unlock(struct txn *txn __attribute__((unused)), struct tuple *tuple)
-{
-	assert(tuple->flags & WAL_WAIT);
-	tuple->flags &= ~WAL_WAIT;
-}
-
 void
 txn_add_redo(struct txn *txn, u16 op, struct tbuf *data)
 {
@@ -59,31 +45,23 @@ txn_add_redo(struct txn *txn, u16 op, struct tbuf *data)
 }
 
 void
-txn_add_undo(struct txn *txn, struct space *space,
-	     struct tuple *old_tuple, struct tuple *new_tuple)
+txn_replace(struct txn *txn, struct space *space,
+	    struct tuple *old_tuple, struct tuple *new_tuple,
+	    enum dup_replace_mode mode)
 {
 	/* txn_add_undo() must be done after txn_add_redo() */
 	assert(txn->op != 0);
-	txn->new_tuple = new_tuple;
-	if (new_tuple == NULL && old_tuple == NULL) {
-		/*
-		 * There is no subject tuple we could write to
-		 * WAL, which means, to do a write, we would have
-		 * to allocate one. Too complicated, for now, just
-		 * do no logging for DELETEs that do nothing.
-		*/
-		txn->txn_flags |= BOX_NOT_STORE;
-	} else if (new_tuple == NULL) {
-		space_remove(space, old_tuple);
-	} else {
-		space_replace(space, old_tuple, new_tuple);
-		txn_lock(txn, new_tuple);
-	}
-	/* Remember the old tuple only if we locked it
-	 * successfully, to not unlock a tuple locked by another
-	 * transaction in rollback().
+	assert(old_tuple || new_tuple);
+	/*
+	 * Remember the old tuple only if we replaced it
+	 * successfully, to not remove a tuple inserted by
+	 * another transaction in rollback().
 	 */
-	txn->old_tuple = old_tuple;
+	txn->old_tuple = space_replace(space, old_tuple, new_tuple, mode);
+	if (new_tuple) {
+		txn->new_tuple = new_tuple;
+		tuple_ref(txn->new_tuple, 1);
+	}
 	txn->space = space;
 }
 
@@ -97,9 +75,7 @@ txn_begin()
 void
 txn_commit(struct txn *txn)
 {
-	if (txn->op == 0) /* Nothing to do. */
-		return;
-	if (! (txn->txn_flags & BOX_NOT_STORE)) {
+	if (txn->old_tuple || txn->new_tuple) {
 		int64_t lsn = next_lsn(recovery_state);
 		int res = wal_write(recovery_state, lsn, 0,
 				    txn->op, &txn->req);
@@ -114,22 +90,16 @@ txn_finish(struct txn *txn)
 {
 	if (txn->old_tuple)
 		tuple_ref(txn->old_tuple, -1);
-	if (txn->new_tuple)
-		txn_unlock(txn, txn->new_tuple);
 	TRASH(txn);
 }
 
 void
 txn_rollback(struct txn *txn)
 {
-	if (txn->op == 0) /* Nothing to do. */
-		return;
-	if (txn->old_tuple) {
-		space_replace(txn->space, txn->new_tuple, txn->old_tuple);
-	} else if (txn->new_tuple && txn->new_tuple->flags & WAL_WAIT) {
-		space_remove(txn->space, txn->new_tuple);
+	if (txn->old_tuple || txn->new_tuple) {
+		space_replace(txn->space, txn->new_tuple, txn->old_tuple, DUP_INSERT);
+		if (txn->new_tuple)
+			tuple_ref(txn->new_tuple, -1);
 	}
-	if (txn->new_tuple)
-		tuple_ref(txn->new_tuple, -1);
 	TRASH(txn);
 }

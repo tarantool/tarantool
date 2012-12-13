@@ -65,6 +65,14 @@ read_space(struct tbuf *data)
 	return space_find(space_no);
 }
 
+enum dup_replace_mode
+dup_replace_mode(uint32_t flags)
+{
+	return flags & BOX_ADD ? DUP_INSERT :
+		flags & BOX_REPLACE ?
+		DUP_REPLACE : DUP_REPLACE_OR_INSERT;
+}
+
 static void
 execute_replace(struct request *request, struct txn *txn)
 {
@@ -80,31 +88,19 @@ execute_replace(struct request *request, struct txn *txn)
 	if (data->size == 0 || data->size != valid_tuple(data, field_count))
 		tnt_raise(IllegalParams, :"incorrect tuple length");
 
-	txn->new_tuple = tuple_alloc(data->size);
-	tuple_ref(txn->new_tuple, 1);
-	txn->new_tuple->field_count = field_count;
-	memcpy(txn->new_tuple->data, data->data, data->size);
+	struct tuple *new_tuple = tuple_alloc(data->size);
+	new_tuple->field_count = field_count;
+	memcpy(new_tuple->data, data->data, data->size);
 
-	/* Try to find tuple by primary key */
-	Index *pk = space_index(sp, 0);
+	@try {
+		space_validate_tuple(sp, new_tuple);
+		enum dup_replace_mode mode = dup_replace_mode(request->flags);
+		txn_replace(txn, sp, NULL, new_tuple, mode);
 
-	/* Check to see if the tuple has a sufficient number of fields. */
-	if (unlikely(txn->new_tuple->field_count < sp->max_fieldno)) {
-		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+	} @catch (tnt_Exception *e) {
+		tuple_free(new_tuple);
+		@throw;
 	}
-
-	/* lookup old_tuple only when we have enough fields in new_tuple */
-	struct tuple *old_tuple = [pk findByTuple: txn->new_tuple];
-
-	if (request->flags & BOX_ADD && old_tuple != NULL)
-		tnt_raise(ClientError, :ER_TUPLE_FOUND);
-
-	if (request->flags & BOX_REPLACE && old_tuple == NULL)
-		tnt_raise(ClientError, :ER_TUPLE_NOT_FOUND);
-
-	space_validate(sp, old_tuple, txn->new_tuple);
-
-	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
 }
 
 /** {{{ UPDATE request implementation.
@@ -708,20 +704,27 @@ execute_update(struct request *request, struct txn *txn)
 	/* Try to find the tuple by primary key. */
 	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
 
-	if (old_tuple != NULL) {
-		/* number of operations */
-		u32 op_cnt = read_u32(data);
-		struct update_op *ops = update_read_ops(data, op_cnt);
-		struct rope *rope = update_create_rope(ops, ops + op_cnt,
-						       old_tuple);
-		/* allocate new tuple */
-		size_t new_tuple_len = update_calc_new_tuple_length(rope);
-		txn->new_tuple = tuple_alloc(new_tuple_len);
-		tuple_ref(txn->new_tuple, 1);
-		do_update_ops(rope, txn->new_tuple);
-		space_validate(sp, old_tuple, txn->new_tuple);
+	if (old_tuple == NULL)
+		return;
+
+	/* number of operations */
+	u32 op_cnt = read_u32(data);
+	struct update_op *ops = update_read_ops(data, op_cnt);
+	struct rope *rope = update_create_rope(ops, ops + op_cnt,
+					       old_tuple);
+	/* Allocate a new tuple. */
+	size_t new_tuple_len = update_calc_new_tuple_length(rope);
+	struct tuple *new_tuple = tuple_alloc(new_tuple_len);
+
+	@try {
+		do_update_ops(rope, new_tuple);
+		space_validate_tuple(sp, new_tuple);
+		txn_replace(txn, sp, old_tuple, new_tuple, DUP_INSERT);
+
+	} @catch (tnt_Exception *e) {
+		tuple_free(new_tuple);
+		@throw;
 	}
-	txn_add_undo(txn, sp, old_tuple, txn->new_tuple);
 }
 
 /** }}} */
@@ -759,9 +762,6 @@ execute_select(struct request *request, struct port *port)
 
 		struct tuple *tuple;
 		while ((tuple = it->next(it)) != NULL) {
-			if (tuple->flags & GHOST)
-				continue;
-
 			if (offset > 0) {
 				offset--;
 				continue;
@@ -794,7 +794,10 @@ execute_delete(struct request *request, struct txn *txn)
 	Index *pk = space_index(sp, 0);
 	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
 
-	txn_add_undo(txn, sp, old_tuple, NULL);
+	if (old_tuple == NULL)
+		return;
+
+	txn_replace(txn, sp, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
 }
 
 /** To collects stats, we need a valid request type.

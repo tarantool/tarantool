@@ -129,3 +129,149 @@ lua box.space[15].index[0]:select_range(3, 'abcdb')
 lua box.space[15]:truncate()
 ---
 ...
+lua box.space[22]:truncate()
+---
+...
+insert into t22 values (0, 0, 0, 0)
+Insert OK, 1 row affected
+insert into t22 values (1, 1, 1, 1)
+Insert OK, 1 row affected
+insert into t22 values (2, 2, 2, 2)
+Insert OK, 1 row affected
+replace into t22 values (1, 1, 1, 1)
+Replace OK, 1 row affected
+replace into t22 values (1, 10, 10, 10)
+Replace OK, 1 row affected
+replace into t22 values (1, 1, 1, 1)
+Replace OK, 1 row affected
+select * from t22 WHERE k0 = 10
+No match
+select * from t22 WHERE k1 = 10
+No match
+select * from t22 WHERE k2 = 10
+No match
+select * from t22 WHERE k3 = 10
+No match
+select * from t22 WHERE k0 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+select * from t22 WHERE k1 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+select * from t22 WHERE k2 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+select * from t22 WHERE k3 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+insert into t22 values (10, 10, 10, 10)
+Insert OK, 1 row affected
+delete from t22 WHERE k0 = 10
+Delete OK, 1 row affected
+select * from t22 WHERE k0 = 10
+No match
+select * from t22 WHERE k1 = 10
+No match
+select * from t22 WHERE k2 = 10
+No match
+select * from t22 WHERE k3 = 10
+No match
+insert into t22 values (1, 10, 10, 10)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 0'
+select * from t22 WHERE k0 = 10
+No match
+select * from t22 WHERE k1 = 10
+No match
+select * from t22 WHERE k2 = 10
+No match
+select * from t22 WHERE k3 = 10
+No match
+select * from t22 WHERE k0 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+replace into t22 values (10, 10, 10, 10)
+An error occurred: ER_TUPLE_NOT_FOUND, 'Tuple doesn't exist in index 0'
+select * from t22 WHERE k0 = 10
+No match
+select * from t22 WHERE k1 = 10
+No match
+select * from t22 WHERE k2 = 10
+No match
+select * from t22 WHERE k3 = 10
+No match
+insert into t22 values (10, 0, 10, 10)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
+select * from t22 WHERE k0 = 10
+No match
+select * from t22 WHERE k1 = 10
+No match
+select * from t22 WHERE k2 = 10
+No match
+select * from t22 WHERE k3 = 10
+No match
+select * from t22 WHERE k1 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+replace into t22 values (2, 0, 10, 10)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
+select * from t22 WHERE k0 = 10
+No match
+select * from t22 WHERE k1 = 10
+No match
+select * from t22 WHERE k2 = 10
+No match
+select * from t22 WHERE k3 = 10
+No match
+select * from t22 WHERE k1 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+insert into t22 values (10, 10, 10, 0)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
+select * from t22 WHERE k0 = 10
+No match
+select * from t22 WHERE k1 = 10
+No match
+select * from t22 WHERE k2 = 10
+No match
+select * from t22 WHERE k3 = 10
+No match
+select * from t22 WHERE k3 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+replace into t22 values (2, 10, 10, 0)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
+select * from t22 WHERE k0 = 10
+No match
+select * from t22 WHERE k1 = 10
+No match
+select * from t22 WHERE k2 = 10
+No match
+select * from t22 WHERE k3 = 10
+No match
+select * from t22 WHERE k3 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+insert into t22 values (4, 4, 0, 4)
+Insert OK, 1 row affected
+insert into t22 values (5, 5, 0, 5)
+Insert OK, 1 row affected
+insert into t22 values (6, 6, 0, 6)
+Insert OK, 1 row affected
+replace into t22 values (5, 5, 0, 5)
+Replace OK, 1 row affected
+select * from t22 WHERE k2 = 0
+Found 4 tuples:
+[0, 0, 0, 0]
+[4, 4, 0, 4]
+[6, 6, 0, 6]
+[5, 5, 0, 5]
+delete from t22 WHERE k0 = 5
+Delete OK, 1 row affected
+select * from t22 WHERE k2 = 0
+Found 3 tuples:
+[0, 0, 0, 0]
+[4, 4, 0, 4]
+[6, 6, 0, 6]
+lua box.space[22]:truncate()
+---
+...

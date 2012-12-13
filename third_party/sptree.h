@@ -77,7 +77,7 @@ typedef struct sptree_node_pointers {
  *                         int (*elemcompare)(const void *e1, const void *e2, void *arg),
  *                         void *arg)
  *
- *   void sptree_NAME_insert(sptree_NAME *tree, void *value)
+ *   void sptree_NAME_replace(sptree_NAME *tree, void *value, void **p_oldvalue)
  *   void sptree_NAME_delete(sptree_NAME *tree, void *value)
  *   void* sptree_NAME_find(sptree_NAME *tree, void *key)
  *
@@ -300,7 +300,7 @@ sptree_##name##_balance(sptree_##name *t, spnode_t node, spnode_t size) {       
 }                                                                                         \
                                                                                           \
 static inline void                                                                        \
-sptree_##name##_insert(sptree_##name *t, void *v) {                                       \
+sptree_##name##_replace(sptree_##name *t, void *v, void **p_old) {                        \
     spnode_t    node, depth = 0;                                                          \
     spnode_t    path[ t->max_depth + 2];                                                  \
                                                                                           \
@@ -312,6 +312,8 @@ sptree_##name##_insert(sptree_##name *t, void *v) {                             
         t->garbage_head = SPNIL;                                                          \
         t->nmember = 1;                                                                   \
         t->size=1;                                                                        \
+        if (p_old)                                                                        \
+            *p_old = NULL;                                                                \
         return;                                                                           \
     } else {                                                                              \
         spnode_t    parent = t->root;                                                     \
@@ -319,6 +321,8 @@ sptree_##name##_insert(sptree_##name *t, void *v) {                             
         for(;;)    {                                                                      \
             int r = t->elemcompare(v, ITHELEM(t, parent), t->arg);                        \
             if (r==0) {                                                                   \
+                if (p_old)                                                                \
+                    memcpy(*p_old, ITHELEM(t, parent), t->elemsize);                      \
                 memcpy(ITHELEM(t, parent), v, t->elemsize);                               \
                 return;                                                                   \
             }                                                                             \
@@ -345,6 +349,8 @@ sptree_##name##_insert(sptree_##name *t, void *v) {                             
             }                                                                             \
         }                                                                                 \
     }                                                                                     \
+    if (p_old)                                                                        \
+        *p_old = NULL;                                                                \
                                                                                           \
     t->size++;                                                                            \
     if ( t->size > t->max_size )                                                          \

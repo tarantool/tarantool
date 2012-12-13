@@ -29,16 +29,12 @@
  * SUCH DAMAGE.
  */
 #include <tbuf.h>
+#include "index.h"
+
 struct tuple;
 struct space;
 
-enum txn_flags {
-	BOX_NOT_STORE = 0x1
-};
-
 struct txn {
-	u32 txn_flags;
-
 	/* Undo info. */
 	struct space *space;
 	struct tuple *old_tuple;
@@ -49,19 +45,12 @@ struct txn {
 	struct tbuf req;
 };
 
-/** Tuple flags used for locking. */
-enum tuple_flags {
-	/** Waiting on WAL write to complete. */
-	WAL_WAIT = 0x1,
-	/** A new primary key is created but not yet written to WAL. */
-	GHOST = 0x2,
-};
-
 struct txn *txn_begin();
 void txn_commit(struct txn *txn);
 void txn_finish(struct txn *txn);
 void txn_rollback(struct txn *txn);
 void txn_add_redo(struct txn *txn, u16 op, struct tbuf *data);
-void txn_add_undo(struct txn *txn, struct space *space,
-		  struct tuple *old_tuple, struct tuple *new_tuple);
+void txn_replace(struct txn *txn, struct space *space,
+		 struct tuple *old_tuple, struct tuple *new_tuple,
+		 enum dup_replace_mode mode);
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */
