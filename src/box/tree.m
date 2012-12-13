@@ -930,19 +930,6 @@ tree_iterator_gt(struct iterator *iterator)
 	return [self unfold: node];
 }
 
-- (struct tuple *) findByTuple: (struct tuple *) tuple
-{
-	struct key_data *key_data
-		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
-
-	key_data->data = tuple->data;
-	key_data->part_count = tuple->field_count;
-	fold_with_sparse_parts(key_def, tuple, key_data->parts);
-
-	void *node = sptree_index_find(&tree, key_data);
-	return [self unfold: node];
-}
-
 - (struct tuple *) replace: (struct tuple *) old_tuple
 			  :(struct tuple *) new_tuple
 			  :(enum dup_replace_mode) mode
