@@ -194,13 +194,13 @@ ipc_channel_put(struct ipc_channel *ch, void *data)
 bool
 ipc_channel_has_readers(struct ipc_channel *ch)
 {
-	return !rlist_empty(&ch->readers);
+	return ch->creaders > 0;
 }
 
 bool
 ipc_channel_has_writers(struct ipc_channel *ch)
 {
-	return !rlist_empty(&ch->writers);
+	return ch->cwriters > 0;
 }
 
 int
