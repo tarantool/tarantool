@@ -485,7 +485,7 @@ log_io_sync(struct log_io *l)
 	return 0;
 }
 
-static int
+int
 log_io_write_header(struct log_io *l)
 {
 	int ret = fprintf(l->f, "%s%s\n", l->dir->filetype, v11);

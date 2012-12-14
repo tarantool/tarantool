@@ -31,6 +31,7 @@
 #include "space.h"
 #include <recovery.h>
 #include <fiber.h>
+#include "archive.h"
 
 void
 txn_add_redo(struct txn *txn, u16 op, struct tbuf *data)
@@ -80,6 +81,7 @@ txn_commit(struct txn *txn)
 		int res = wal_write(recovery_state, lsn, 0,
 				    txn->op, &txn->req);
 		confirm_lsn(recovery_state, lsn, res == 0);
+        arc_do_txn(txn);
 		if (res)
 			tnt_raise(LoggedError, :ER_WAL_IO);
 	}

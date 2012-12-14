@@ -47,6 +47,7 @@
 #include "port.h"
 #include "request.h"
 #include "txn.h"
+#include "archive.h"
 
 static void box_process_replica(struct port *port,
 				u32 op, struct tbuf *request_data);
@@ -63,12 +64,7 @@ static char status[64] = "unknown";
 
 static int stat_base;
 
-struct box_snap_row {
-	u32 space;
-	u32 tuple_size;
-	u32 data_size;
-	u8 data[];
-} __attribute__((packed));
+
 
 static inline struct box_snap_row *
 box_snap_row(const struct tbuf *t)
@@ -282,7 +278,8 @@ static int
 recover_row(void *param __attribute__((unused)), struct tbuf *t)
 {
 	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL) {
+    struct header_v11 *header = tbuf_peek(t, sizeof(struct header_v11));
+    if (header == NULL) {
 		say_error("incorrect row header: expected %zd, got %zd bytes",
 			  sizeof(struct header_v11), (size_t) t->size);
 		return -1;
@@ -295,6 +292,7 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 			recover_snap_row(t);
 		} else if (tag == XLOG) {
 			u16 op = read_u16(t);
+            arc_save_real_tm(header->tm);
 			box_process_rw(&port_null, op, t);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
@@ -341,7 +339,7 @@ mod_leave_local_standby_mode(void *data __attribute__((unused)))
 
 	recovery_update_mode(recovery_state, cfg.wal_mode,
 			     cfg.wal_fsync_delay);
-
+    arc_start();
 	box_enter_master_or_replica_mode(&cfg);
 }
 
@@ -439,6 +437,7 @@ void
 mod_free(void)
 {
 	space_free();
+    arc_free();
 }
 
 void
@@ -451,6 +450,8 @@ mod_init(void)
 	space_init();
 	/* configure memcached space */
 	memcached_space_init();
+
+    arc_init(cfg.archive_dir,cfg.archive_filename_pattern,cfg.archive_fsync_delay);
 
 	/* recovery initialization */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,

@@ -97,6 +97,15 @@ typedef struct tarantool_cfg {
 	/* script directory (where init.lua is expected to be) */
 	char*	script_dir;
 
+    	/* archive directory */
+	char*	archive_dir;
+
+	/* archive file format for strftime default is %Y-%m-%d */
+	char*	archive_filename_pattern;
+
+	/* delay between archive files fsync */
+	double archive_fsync_delay;
+
 	/* name of pid file */
 	char*	pid_file;
 
