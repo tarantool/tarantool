@@ -159,6 +159,7 @@ exec sql "select * from t22 WHERE k2 = 10"
 exec sql "select * from t22 WHERE k3 = 10"
 exec sql "select * from t22 WHERE k3 = 0"
 
+sql.sort = True
 # Non-Uniq test (key #2)
 exec sql "insert into t22 values (4, 4, 0, 4)"
 exec sql "insert into t22 values (5, 5, 0, 5)"
@@ -167,6 +168,7 @@ exec sql "replace into t22 values (5, 5, 0, 5)"
 exec sql "select * from t22 WHERE k2 = 0"
 exec sql "delete from t22 WHERE k0 = 5"
 exec sql "select * from t22 WHERE k2 = 0"
+sql.sort = False
 
 exec admin "lua box.space[22]:truncate()"
 

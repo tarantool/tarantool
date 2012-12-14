@@ -263,8 +263,8 @@ select * from t22 WHERE k2 = 0
 Found 4 tuples:
 [0, 0, 0, 0]
 [4, 4, 0, 4]
-[6, 6, 0, 6]
 [5, 5, 0, 5]
+[6, 6, 0, 6]
 delete from t22 WHERE k0 = 5
 Delete OK, 1 row affected
 select * from t22 WHERE k2 = 0
