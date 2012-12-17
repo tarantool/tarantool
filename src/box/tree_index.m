@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tree.h"
+#include "tree_index.h"
 #include "tuple.h"
 #include "space.h"
 #include "exception.h"
@@ -738,7 +738,7 @@ linear_key_node_compare(struct key_def *key_def,
 
 /* }}} */
 
-/* {{{ Tree iterator **********************************************/
+/* {{{ TreeIndex Iterators ****************************************/
 
 struct tree_iterator {
 	struct iterator base;
@@ -889,8 +889,9 @@ tree_iterator_gt(struct iterator *iterator)
 		return [Num32TreeIndex alloc];
 	case TREE_FIXED:
 		return [FixedTreeIndex alloc];
+	default:
+		assert(false);
 	}
-	panic("tree index type not implemented");
 }
 
 - (void) free
@@ -902,9 +903,10 @@ tree_iterator_gt(struct iterator *iterator)
 - (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
 	self = [super init: key_def_arg :space_arg];
-	if (self) {
-		memset(&tree, 0, sizeof tree);
-	}
+	if (self == NULL)
+		return NULL;
+
+	memset(&tree, 0, sizeof tree);
 	return self;
 }
 
@@ -1328,9 +1330,10 @@ linear_dense_key_node_cmp(const void *key, const void * node, void *arg)
 - (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
 	self = [super init: key_def_arg :space_arg];
-	if (self) {
-		first_field = find_first_field(key_def);
-	}
+	if (self == NULL)
+		return NULL;
+
+	first_field = find_first_field(key_def);
 	return self;
 }
 
@@ -1525,10 +1528,11 @@ linear_fixed_key_node_cmp(const void *key, const void * node, void *arg)
 - (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
 	self = [super init: key_def_arg :space_arg];
-	if (self) {
-		first_field = find_first_field(key_def);
-		first_offset = find_fixed_offset(space, first_field, 0);
-	}
+	if (self == NULL)
+		return NULL;
+
+	first_field = find_first_field(key_def);
+	first_offset = find_fixed_offset(space, first_field, 0);
 	return self;
 }
 

@@ -81,17 +81,8 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "type");
-		switch (space->key_defs[i].type) {
-		case HASH:
-			lua_pushstring(L, "HASH");
-			break;
-		case TREE:
-			lua_pushstring(L, "TREE");
-			break;
-		default:
-			panic("unknown index type %d",
-				space->key_defs[i].parts[0].type);
-		}
+
+		lua_pushstring(L, index_type_strs[space->key_defs[i].type]);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "key_field");
