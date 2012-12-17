@@ -432,6 +432,7 @@ fiber_create(const char *name, void (*f) (va_list))
 	if (++last_used_fid < 100)
 		last_used_fid = 100;
 	fiber->fid = last_used_fid;
+	fiber->sid = 0;
 	fiber->flags = 0;
 	fiber->waiter = NULL;
 	fiber_set_name(fiber, name);

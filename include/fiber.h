@@ -69,7 +69,18 @@ struct fiber {
 	struct tarantool_coro coro;
 	/* A garbage-collected memory pool. */
 	struct palloc_pool *gc_pool;
+	/** Fiber id. */
 	uint32_t fid;
+	/**
+	 * Session id of the session the fiber is running
+	 * on behalf of. The concept of an associated session
+	 * is similar to the concept of controlling tty
+	 * in a UNIX process. When a fiber is created,
+	 * its sid is 0. If it's running a request on behalf
+	 * of a user connection, it's sid is changed to module-
+	 * generated identifier of the session.
+	 */
+	uint32_t sid;
 
 	struct rlist link;
 	struct rlist state;
@@ -127,5 +138,14 @@ void fiber_sleep(ev_tstamp s);
 struct tbuf;
 void fiber_info(struct tbuf *out);
 void fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
+
+/**
+ * Attach this fiber to a session identified by sid.
+ */
+static inline void
+fiber_set_sid(struct fiber *f, uint32_t sid)
+{
+	f->sid = sid;
+}
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

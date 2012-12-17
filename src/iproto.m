@@ -32,6 +32,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "tarantool.h"
 #include "exception.h"
 #include "errcode.h"
 #include "fiber.h"
@@ -254,6 +255,8 @@ struct iproto_session
 	mod_process_func *handler;
 	struct ev_io input;
 	struct ev_io output;
+	/** Mod session id. */
+	uint32_t sid;
 };
 
 SLIST_HEAD(, iproto_session) iproto_session_cache =
@@ -297,6 +300,7 @@ iproto_session_create(const char *name, int fd, mod_process_func *param)
 	session->iobuf[1] = iobuf_create(name);
 	session->parse_size = 0;
 	session->write_pos = obuf_create_svp(&session->iobuf[0]->out);
+	session->sid = mod_sid();
 	return session;
 }
 
@@ -618,6 +622,7 @@ restart:
 			continue;
 		}
 		@try {
+			fiber_set_sid(fiber, session->sid);
 			iproto_reply(&port, *session->handler, &iobuf->out, header);
 		} @finally {
 			iobuf->in.pos += sizeof(*header) + header->len;

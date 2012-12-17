@@ -1888,6 +1888,7 @@ admin_handler(va_list ap)
 {
 	struct ev_io coio = va_arg(ap, struct ev_io);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
+	fiber_set_sid(fiber, mod_sid());
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	@try {
