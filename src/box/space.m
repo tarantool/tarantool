@@ -216,11 +216,9 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 {
 	def->max_fieldno = 0;
 	def->part_count = 0;
-	if (strcmp(cfg_index->type, "HASH") == 0)
-		def->type = HASH;
-	else if (strcmp(cfg_index->type, "TREE") == 0)
-		def->type = TREE;
-	else
+
+	def->type = STR2ENUM(index_type, cfg_index->type);
+	if (def->type == index_type_MAX)
 		panic("Wrong index type: %s", cfg_index->type);
 
 	/* Calculate key part count and maximal field number. */
@@ -370,8 +368,9 @@ space_config()
 			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
 			struct key_def *key_def = &space->key_defs[j];
-			Index *index = [Index alloc: type :key_def :space];
-			[index init: key_def :space];
+			Index *index = [[Index alloc :type :key_def :space]
+					init :key_def :space];
+			assert (index != NULL);
 			space->index[j] = index;
 		}
 

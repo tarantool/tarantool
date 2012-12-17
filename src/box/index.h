@@ -29,12 +29,12 @@
  * SUCH DAMAGE.
  */
 #import "object.h"
+
 #include <stdbool.h>
 #include <util.h>
 
 struct tuple;
 struct space;
-struct index;
 
 /*
  * Possible field data types. Can't use STRS/ENUM macros for them,
@@ -44,7 +44,11 @@ struct index;
 enum field_data_type { UNKNOWN = -1, NUM = 0, NUM64, STRING, field_data_type_MAX };
 extern const char *field_data_type_strs[];
 
-enum index_type { HASH, TREE, index_type_MAX };
+#define INDEX_TYPE(_)                                             \
+	_(HASH,  0)       /* HASH Index  */                       \
+	_(TREE,  1)       /* TREE Index  */                       \
+
+ENUM(index_type, INDEX_TYPE);
 extern const char *index_type_strs[];
 
 /**
@@ -85,6 +89,11 @@ iterator_type_is_reverse(enum iterator_type type)
 {
 	return type == ITER_REQ || type == ITER_LT || type == ITER_LE;
 }
+
+struct iterator {
+	struct tuple *(*next)(struct iterator *);
+	void (*free)(struct iterator *);
+};
 
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
@@ -206,13 +215,7 @@ enum dup_replace_mode {
 - (void) initIterator: (struct iterator *) iterator
 		     :(enum iterator_type) type
 		     :(void *) key :(int) part_count;
-
 @end
-
-struct iterator {
-	struct tuple *(*next)(struct iterator *);
-	void (*free)(struct iterator *);
-};
 
 void
 check_key_parts(struct key_def *key_def, int part_count,

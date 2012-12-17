@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_TREE_H_INCLUDED
-#define TARANTOOL_BOX_TREE_H_INCLUDED
+#ifndef TARANTOOL_BOX_HASH_INDEX_H_INCLUDED
+#define TARANTOOL_BOX_HASH_INDEX_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,34 +31,14 @@
 
 #include "index.h"
 
-#include <third_party/sptree.h>
+@class Index;
 
-/**
- * Instantiate sptree definitions
- */
-SPTREE_DEF(index, realloc);
-
-typedef int (*tree_cmp_t)(const void *, const void *, void *);
-
-@interface TreeIndex: Index {
-@public
-	sptree_index tree;
-};
+@interface HashIndex: Index
 
 + (struct index_traits *) traits;
++ (HashIndex *) alloc: (struct key_def *) key_def :(struct space *) space;
 
-+ (Index *) alloc: (struct key_def *) key_def :(struct space *) space;
-
-- (void) buildNext: (struct tuple *) tuple;
-
-/** To be defined in subclasses. */
-- (size_t) node_size;
-- (tree_cmp_t) node_cmp;
-- (tree_cmp_t) dup_node_cmp;
-- (tree_cmp_t) key_node_cmp;
-- (void) fold: (void *) node :(struct tuple *) tuple;
-- (struct tuple *) unfold: (const void *) node;
-
+- (void) reserve: (u32) n_tuples;
 @end
 
-#endif /* TARANTOOL_BOX_TREE_H_INCLUDED */
+#endif /* TARANTOOL_BOX_HASH_INDEX_H_INCLUDED */
