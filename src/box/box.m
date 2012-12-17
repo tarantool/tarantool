@@ -543,3 +543,11 @@ mod_status(void)
 {
     return status;
 }
+
+
+uint32_t
+mod_sid()
+{
+	static uint32_t sid = 1;
+	return sid++;
+}

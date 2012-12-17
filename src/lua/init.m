@@ -568,6 +568,14 @@ lbox_fiber_id(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_fiber_sid(struct lua_State *L)
+{
+	struct fiber *f = lua_gettop(L) ? lbox_checkfiber(L, 1) : fiber;
+	lua_pushinteger(L, f->sid);
+	return 1;
+}
+
 static struct lua_State *
 box_lua_fiber_get_coro(struct lua_State *L, struct fiber *f)
 {
@@ -680,6 +688,8 @@ lbox_fiber_detach(struct lua_State *L)
 	/* Clear the caller, to avoid a reference leak. */
 	/* Request a detach. */
 	lua_pushinteger(L, DETACH);
+	/* A detached fiber has no associated session. */
+	fiber_set_sid(fiber, 0);
 	fiber_yield_to(caller);
 	return 0;
 }
@@ -788,6 +798,7 @@ lbox_fiber_create(struct lua_State *L)
 			   " reached");
 
 	struct fiber *f = fiber_create("lua", box_lua_fiber_run);
+	fiber_set_sid(f, fiber->sid);
 	/* Initially the fiber is cancellable */
 	f->flags |= FIBER_USER_MODE | FIBER_CANCELLABLE;
 
@@ -1037,6 +1048,7 @@ lbox_fiber_testcancel(struct lua_State *L)
 
 static const struct luaL_reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
+	{"sid", lbox_fiber_sid},
 	{"name", lbox_fiber_name},
 	{"__gc", lbox_fiber_gc},
 	{NULL, NULL}
@@ -1046,6 +1058,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"sleep", lbox_fiber_sleep},
 	{"self", lbox_fiber_self},
 	{"id", lbox_fiber_id},
+	{"sid", lbox_fiber_sid},
 	{"find", lbox_fiber_find},
 	{"cancel", lbox_fiber_cancel},
 	{"testcancel", lbox_fiber_testcancel},
