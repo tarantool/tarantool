@@ -416,7 +416,7 @@ tr58:
 #line 97 "src/memcached-grammar.rl"
 	{
 			struct tbuf *b;
-			void *value;
+			const void *value;
 			u32 value_len;
 
 			key = read_field(keys);
@@ -475,7 +475,7 @@ tr62:
 #line 97 "src/memcached-grammar.rl"
 	{
 			struct tbuf *b;
-			void *value;
+			const void *value;
 			u32 value_len;
 
 			key = read_field(keys);
@@ -536,7 +536,7 @@ tr71:
 #line 97 "src/memcached-grammar.rl"
 	{
 			struct tbuf *b;
-			void *value;
+			const void *value;
 			u32 value_len;
 
 			key = read_field(keys);
@@ -709,7 +709,7 @@ tr118:
 	{
 			struct meta *m;
 			struct tbuf *b;
-			void *field;
+			const void *field;
 			u32 value_len;
 			u64 value;
 
@@ -774,7 +774,7 @@ tr122:
 	{
 			struct meta *m;
 			struct tbuf *b;
-			void *field;
+			const void *field;
 			u32 value_len;
 			u64 value;
 
@@ -841,7 +841,7 @@ tr132:
 	{
 			struct meta *m;
 			struct tbuf *b;
-			void *field;
+			const void *field;
 			u32 value_len;
 			u64 value;
 

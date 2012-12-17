@@ -81,7 +81,7 @@ natoq(const char *start, const char *end)
 }
 
 static void
-store(void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
+store(const void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 {
 	u32 box_flags = 0;
 	u32 field_count = 4;
@@ -136,7 +136,7 @@ delete(void *key)
 }
 
 static struct tuple *
-find(void *key)
+find(const void *key)
 {
 	return [memcached_index findByKey :key :1];
 }
@@ -156,7 +156,7 @@ expired(struct tuple *tuple)
 }
 
 static bool
-is_numeric(void *field, u32 value_len)
+is_numeric(const void *field, u32 value_len)
 {
 	for (int i = 0; i < value_len; i++)
 		if (*((u8 *)field + i) < '0' || '9' < *((u8 *)field + i))
@@ -232,16 +232,16 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 	say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
 	while (keys_count-- > 0) {
 		struct tuple *tuple;
-		struct meta *m;
-		void *field;
-		void *value;
-		void *suffix;
+		const struct meta *m;
+		const void *field;
+		const void *value;
+		const void *suffix;
 		u32 key_len;
 		u32 value_len;
 		u32 suffix_len;
 		u32 _l;
 
-		void *key = read_field(keys);
+		const void *key = read_field(keys);
 		tuple = find(key);
 		key_len = load_varint32(&key);
 

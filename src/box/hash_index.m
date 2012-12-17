@@ -249,7 +249,7 @@ hash_iterator_lstr_eq(struct iterator *it)
 /* {{{ Hash32Index ************************************************/
 
 static inline struct mh_i32ptr_node_t
-int32_key_to_node(void *key)
+int32_key_to_node(const void *key)
 {
 	u32 key_size = load_varint32(&key);
 	if (key_size != 4)
@@ -296,7 +296,7 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(int_hash);
 }
 
-- (struct tuple *) findByKey: (void *) key :(int) part_count
+- (struct tuple *) findByKey: (const void *) key :(int) part_count
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
@@ -416,7 +416,7 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 /* {{{ Hash64Index ************************************************/
 
 static inline struct mh_i64ptr_node_t
-int64_key_to_node(void *key)
+int64_key_to_node(const void *key)
 {
 	u32 key_size = load_varint32(&key);
 	if (key_size != 8)

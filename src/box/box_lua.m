@@ -150,7 +150,7 @@ lbox_tuple_slice(struct lua_State *L)
 	int stop = end - 1;
 
 	while (field < tuple->data + tuple->bsize) {
-		size_t len = load_varint32((void **) &field);
+		size_t len = load_varint32((const void **) &field);
 		if (fieldno >= start) {
 			lua_pushlstring(L, (char *) field, len);
 			if (fieldno == stop)
@@ -183,8 +183,8 @@ transform_calculate(struct lua_State *L, struct tuple *tuple,
 		    size_t lr[2])
 {
 	/* calculate size of the new tuple */
-	void *tuple_end = tuple->data + tuple->bsize;
-	void *tuple_field = tuple->data;
+	const void *tuple_end = tuple->data + tuple->bsize;
+	const void *tuple_field = tuple->data;
 
 	lr[0] = tuple_range_size(&tuple_field, tuple_end, offset);
 
@@ -321,7 +321,7 @@ tuple_find(struct lua_State *L, struct tuple *tuple, size_t offset,
 		return 0;
 	u8 *field = tuple_field(tuple, idx);
 	while (field < tuple->data + tuple->bsize) {
-		size_t len = load_varint32((void **) &field);
+		size_t len = load_varint32((const void **) &field);
 		if (len == key_size && (memcmp(field, key, len) == 0)) {
 			lua_pushinteger(L, idx);
 			if (!all)
@@ -387,10 +387,10 @@ static int
 lbox_tuple_unpack(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
-	u8 *field = tuple->data;
+	const u8 *field = tuple->data;
 
 	while (field < tuple->data + tuple->bsize) {
-		size_t len = load_varint32((void **) &field);
+		size_t len = load_varint32((const void **) &field);
 		lua_pushlstring(L, (char *) field, len);
 		field += len;
 	}
@@ -415,7 +415,7 @@ lbox_tuple_index(struct lua_State *L)
 		if (i >= tuple->field_count)
 			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
 				   tuplelib_name, i, tuple->field_count-1);
-		void *field = tuple_field(tuple, i);
+		const void *field = tuple_field(tuple, i);
 		u32 len = load_varint32(&field);
 		lua_pushlstring(L, field, len);
 		return 1;
@@ -474,7 +474,7 @@ lbox_tuple_next(struct lua_State *L)
 	(void)field;
 	assert(field >= tuple->data);
 	if (field < tuple->data + tuple->bsize) {
-		len = load_varint32((void **) &field);
+		len = load_varint32((const void **) &field);
 		lua_pushlightuserdata(L, field + len);
 		lua_pushlstring(L, (char *) field, len);
 		return 2;

@@ -168,7 +168,7 @@ execute_replace(struct request *request, struct txn *txn)
 /** Argument of SET operation. */
 struct op_set_arg {
 	u32 length;
-	void *value;
+	const void *value;
 };
 
 /** Argument of ADD, AND, XOR, OR operations. */
@@ -182,10 +182,10 @@ struct op_arith_arg {
 
 /** Argument of SPLICE. */
 struct op_splice_arg {
-	i32 offset;	/** splice position */
-	i32 cut_length; /** cut this many bytes. */
-	void *paste;      /** paste what? */
-	i32 paste_length; /** paste this many bytes. */
+	i32 offset;	   /** splice position */
+	i32 cut_length;    /** cut this many bytes. */
+	const void *paste; /** paste what? */
+	i32 paste_length;  /** paste this many bytes. */
 
 	/** Offset of the tail in the old field */
 	i32 tail_offset;
@@ -203,7 +203,7 @@ struct update_field;
 struct update_op;
 
 typedef void (*init_op_func)(struct rope *rope, struct update_op *op);
-typedef void (*do_op_func)(union update_op_arg *arg, void *in, void *out);
+typedef void (*do_op_func)(union update_op_arg *arg, const void *in, void *out);
 
 /** A set of functions and properties to initialize and do an op. */
 struct update_op_meta {
@@ -232,9 +232,9 @@ struct update_field {
 	/** UPDATE operations against the first field in the range. */
 	struct op_list ops;
 	/** Points at start of field *data* in the old tuple. */
-	void *old;
+	const void *old;
 	/** End of the old field. */
-	void *tail;
+	const void *tail;
 	/**
 	 * Length of the "tail" in the old tuple from end
 	 * of old data to the beginning of the field in the
@@ -245,7 +245,7 @@ struct update_field {
 
 static void
 update_field_init(struct update_field *field,
-		  void *old, u32 old_len, u32 tail_len)
+		  const void *old, u32 old_len, u32 tail_len)
 {
 	STAILQ_INIT(&field->ops);
 	field->old = old;
@@ -278,14 +278,14 @@ op_adjust_field_no(struct update_op *op, u32 field_max)
 
 
 static void
-do_update_op_set(struct op_set_arg *arg, void *in __attribute__((unused)),
+do_update_op_set(struct op_set_arg *arg, const void *in __attribute__((unused)),
 		 void *out)
 {
 	memcpy(out, arg->value, arg->length);
 }
 
 static void
-do_update_op_add(struct op_arith_arg *arg, void *in, void *out)
+do_update_op_add(struct op_arith_arg *arg, const void *in, void *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in + arg->i32_val;
@@ -294,7 +294,7 @@ do_update_op_add(struct op_arith_arg *arg, void *in, void *out)
 }
 
 static void
-do_update_op_subtract(struct op_arith_arg *arg, void *in, void *out)
+do_update_op_subtract(struct op_arith_arg *arg, const void *in, void *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in - arg->i32_val;
@@ -303,7 +303,7 @@ do_update_op_subtract(struct op_arith_arg *arg, void *in, void *out)
 }
 
 static void
-do_update_op_and(struct op_arith_arg *arg, void *in, void *out)
+do_update_op_and(struct op_arith_arg *arg, const void *in, void *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in & arg->i32_val;
@@ -312,7 +312,7 @@ do_update_op_and(struct op_arith_arg *arg, void *in, void *out)
 }
 
 static void
-do_update_op_xor(struct op_arith_arg *arg, void *in, void *out)
+do_update_op_xor(struct op_arith_arg *arg, const void *in, void *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in ^ arg->i32_val;
@@ -321,7 +321,7 @@ do_update_op_xor(struct op_arith_arg *arg, void *in, void *out)
 }
 
 static void
-do_update_op_or(struct op_arith_arg *arg, void *in, void *out)
+do_update_op_or(struct op_arith_arg *arg, const void *in, void *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in | arg->i32_val;
@@ -330,7 +330,7 @@ do_update_op_or(struct op_arith_arg *arg, void *in, void *out)
 }
 
 static void
-do_update_op_splice(struct op_splice_arg *arg, void *in, void *out)
+do_update_op_splice(struct op_splice_arg *arg, const void *in, void *out)
 {
 	memcpy(out, in, arg->offset);           /* copy field head. */
 	out += arg->offset;
@@ -340,8 +340,9 @@ do_update_op_splice(struct op_splice_arg *arg, void *in, void *out)
 }
 
 static void
-do_update_op_insert(struct op_set_arg *arg, void *in __attribute__((unused)),
-		 void *out)
+do_update_op_insert(struct op_set_arg *arg,
+		    const void *in __attribute__((unused)),
+		    void *out)
 {
 	memcpy(out, arg->value, arg->length);
 }
@@ -433,13 +434,13 @@ init_update_op_splice(struct rope *rope, struct update_op *op)
 	struct tbuf operands = {
 		.capacity = op->arg.set.length,
 		.size = op->arg.set.length,
-		.data = op->arg.set.value,
+		.data = (void*) op->arg.set.value,
 		.pool = NULL
 	};
 	struct op_splice_arg *arg = &op->arg.splice;
 
 	/* Read the offset. */
-	void *offset_field = read_field(&operands);
+	const void *offset_field = read_field(&operands);
 	u32 len = load_varint32(&offset_field);
 	if (len != sizeof(i32))
 		tnt_raise(IllegalParams, :"SPLICE offset");
@@ -456,7 +457,7 @@ init_update_op_splice(struct rope *rope, struct update_op *op)
 	assert(arg->offset >= 0 && arg->offset <= field_len);
 
 	/* Read the cut length. */
-	void *length_field = read_field(&operands);
+	const void *length_field = read_field(&operands);
 	len = load_varint32(&length_field);
 	if (len != sizeof(i32))
 		tnt_raise(IllegalParams, :"SPLICE length");
@@ -471,7 +472,7 @@ init_update_op_splice(struct rope *rope, struct update_op *op)
 	}
 
 	/* Read the paste. */
-	void *paste_field = read_field(&operands);
+	const void *paste_field = read_field(&operands);
 	arg->paste_length = load_varint32(&paste_field);
 	arg->paste = paste_field;
 
@@ -524,8 +525,8 @@ update_field_split(void *data, size_t size __attribute__((unused)),
 					   sizeof(struct update_field));
 	assert(offset > 0 && prev->tail_len > 0);
 
-	void *field = prev->tail;
-	void *end = field + prev->tail_len;
+	const void *field = prev->tail;
+	const void *end = field + prev->tail_len;
 
 	prev->tail_len = tuple_range_size(&field, end, offset - 1);
 	u32 field_len = load_varint32(&field);
@@ -551,8 +552,8 @@ update_create_rope(struct update_op *op, struct update_op *op_end,
 
 	struct update_field *first = palloc(fiber->gc_pool,
 					    sizeof(struct update_field));
-	void *field = tuple->data;
-	void *end = tuple->data + tuple->bsize;
+	const void *field = tuple->data;
+	const void *end = tuple->data + tuple->bsize;
 	u32 field_len = load_varint32(&field);
 	update_field_init(first, field, field_len, end - field - field_len);
 
@@ -605,9 +606,9 @@ do_update_ops(struct rope *rope, struct tuple *new_tuple)
 
 		new_data = save_varint32(new_data, field_len);
 
-		void *old_field = field->old;
+		const void *old_field = field->old;
 		void *new_field = (STAILQ_EMPTY(&field->ops) ?
-				   old_field : new_data);
+				   (void*) old_field : new_data);
 		struct update_op *op;
 		STAILQ_FOREACH(op, &field->ops, next) {
 			/*

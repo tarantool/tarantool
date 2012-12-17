@@ -154,7 +154,7 @@ obuf_book(struct obuf *obuf, size_t size);
 
 /** Append data to the output buffer. */
 void
-obuf_dup(struct obuf *obuf, void *data, size_t size);
+obuf_dup(struct obuf *obuf, const void *data, size_t size);
 
 /**
  * Output buffer savepoint. It's possible to

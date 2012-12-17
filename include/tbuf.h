@@ -70,7 +70,7 @@ static inline void *
 tbuf_end(struct tbuf *tbuf) { return tbuf->data + tbuf->size; }
 
 static inline size_t
-tbuf_unused(struct tbuf *tbuf) { return tbuf->capacity - tbuf->size; }
+tbuf_unused(const struct tbuf *tbuf) { return tbuf->capacity - tbuf->size; }
 
 struct tbuf *tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig);
 struct tbuf *tbuf_split(struct tbuf *e, size_t at);
@@ -87,7 +87,7 @@ void *tbuf_peek(struct tbuf *b, size_t count);
  */
 void tbuf_ltrim(struct tbuf *b, size_t count);
 
-void tbuf_append_field(struct tbuf *b, void *f);
+void tbuf_append_field(struct tbuf *b, const void *f);
 void tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 	__attribute__ ((format(FORMAT_PRINTF, 2, 0)));
 void tbuf_printf(struct tbuf *b, const char *format, ...)

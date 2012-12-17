@@ -78,7 +78,7 @@ tuple_ref(struct tuple *tuple, int count)
 
 /** Get the next field from a tuple */
 static void *
-next_field(void *f)
+next_field(const void *f)
 {
 	u32 size = load_varint32(&f);
 	return (u8 *)f + size;
@@ -105,7 +105,7 @@ tuple_field(struct tuple *tuple, size_t i)
 
 /** print field to tbuf */
 static void
-print_field(struct tbuf *buf, void *f)
+print_field(struct tbuf *buf, const void *f)
 {
 	uint32_t size = load_varint32(&f);
 	switch (size) {

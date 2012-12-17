@@ -97,11 +97,11 @@ read_u(64)
 u32
 read_varint32(struct tbuf *buf)
 {
-	void *b = buf->data;
+	const void *b = buf->data;
 	u32 ret = load_varint32_s(&b, buf->size);
 
 	size_t read = (b - buf->data);
-	buf->data = b;
+	buf->data += read;
 	buf->capacity -= read;
 	buf->size -= read;
 

@@ -55,7 +55,7 @@ u32 valid_tuple(struct tbuf *buf, u32 cardinality);
 size_t varint32_sizeof(u32);
 
 static inline u32
-load_varint32_s(void **data, size_t size)
+load_varint32_s(const void **data, size_t size)
 {
 	assert(data != NULL && *data != NULL);
 	const u8 *b = *data;
@@ -106,7 +106,7 @@ load_varint32_s(void **data, size_t size)
 }
 
 static inline u32
-load_varint32(void **data)
+load_varint32(const void **data)
 {
 	return load_varint32_s(data, 5);
 }
@@ -117,9 +117,9 @@ load_varint32(void **data)
  * @returns size of fields data including size of varint data
  */
 inline static size_t
-tuple_range_size(void **begin, void *end, size_t count)
+tuple_range_size(const void **begin, const void *end, size_t count)
 {
-	void *start = *begin;
+	const void *start = *begin;
 	while (*begin < end && count-- > 0) {
 		size_t len = load_varint32(begin);
 		*begin += len;

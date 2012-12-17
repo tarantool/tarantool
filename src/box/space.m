@@ -167,10 +167,10 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 			  :"tuple field count must match space cardinality");
 
 	/* Sweep through the tuple and check the field sizes. */
-	u8 *data = new_tuple->data;
+	const u8 *data = new_tuple->data;
 	for (int f = 0; f < sp->max_fieldno; ++f) {
 		/* Get the size of the current field and advance. */
-		u32 len = load_varint32((void **) &data);
+		u32 len = load_varint32((const void **) &data);
 		data += len;
 		/*
 		 * Check fixed size fields (NUM and NUM64) and

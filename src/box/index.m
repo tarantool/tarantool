@@ -45,7 +45,7 @@ STRS(iterator_type, ITERATOR_TYPE);
 /* {{{ Utilities. **********************************************/
 
 void
-check_key_parts(struct key_def *key_def,
+check_key_parts(const struct key_def *key_def,
 		int part_count, bool partial_key_allowed)
 {
 	if (part_count > key_def->part_count)

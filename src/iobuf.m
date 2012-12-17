@@ -141,7 +141,7 @@ obuf_reset(struct obuf *buf)
 
 /** Add data to the output buffer. Copies the data. */
 void
-obuf_dup(struct obuf *buf, void *data, size_t size)
+obuf_dup(struct obuf *buf, const void *data, size_t size)
 {
 	struct iovec *iov = &buf->iov[buf->pos];
 	size_t capacity = buf->capacity[buf->pos];

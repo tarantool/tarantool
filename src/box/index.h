@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #import "object.h"
-
 #include <stdbool.h>
 #include <util.h>
 
@@ -203,7 +202,7 @@ enum dup_replace_mode {
 - (size_t) size;
 - (struct tuple *) min;
 - (struct tuple *) max;
-- (struct tuple *) findByKey: (void *) key :(int) part_count;
+- (struct tuple *) findByKey: (const void *) key :(int) part_count;
 - (struct tuple *) replace: (struct tuple *) old_tuple
 			  :(struct tuple *) new_tuple
 			  :(enum dup_replace_mode) mode;
@@ -218,7 +217,7 @@ enum dup_replace_mode {
 @end
 
 void
-check_key_parts(struct key_def *key_def, int part_count,
+check_key_parts(const struct key_def *key_def, int part_count,
 		bool partial_key_allowed);
 
 uint32_t

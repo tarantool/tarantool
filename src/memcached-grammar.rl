@@ -96,7 +96,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 
 		action append_prepend {
 			struct tbuf *b;
-			void *value;
+			const void *value;
 			u32 value_len;
 
 			key = read_field(keys);
@@ -124,7 +124,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 		action incr_decr {
 			struct meta *m;
 			struct tbuf *b;
-			void *field;
+			const void *field;
 			u32 value_len;
 			u64 value;
 

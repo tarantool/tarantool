@@ -161,9 +161,9 @@ tbuf_reset(struct tbuf *b)
 }
 
 void
-tbuf_append_field(struct tbuf *b, void *f)
+tbuf_append_field(struct tbuf *b, const void *f)
 {
-	void *s = f;
+	const void *s = f;
 	u32 size = load_varint32(&f);
 	void *next = (u8 *)f + size;
 	tbuf_append(b, s, next - s);

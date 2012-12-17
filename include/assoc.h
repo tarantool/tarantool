@@ -71,7 +71,7 @@ struct mh_i64ptr_node_t {
 /*
  * Map: (char *) => (void *)
  */
-static inline int lstrcmp(void *a, void *b)
+static inline int lstrcmp(const void *a, const void *b)
 {
 	unsigned int al, bl;
 
@@ -95,7 +95,7 @@ struct mh_lstrptr_node_t {
 static inline u32
 mh_strptr_hash(const mh_node_t *a, mh_hash_arg_t arg) {
 	(void) arg;
-	void *_k = (a->key);
+	const void *_k = (a->key);
 	const u32 l = load_varint32(&_k);
 	return (u32) MurmurHash2(_k, l, 13);
 }
