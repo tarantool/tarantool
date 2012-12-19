@@ -10,7 +10,6 @@
   font-weight: bold;
 }
 
-
 .hl-keyword {
   color: green;
   font-weight: bold;
@@ -19,4 +18,16 @@
 .hl-comment{
   color: blue;
   font-weight: bold;
+}
+
+.book {
+    width: 768px;
+    margin: 2pt auto;
+    /*font-family: Verdana, Arial, Helvetica, sans-serif; */
+    font-size: 120%
+}
+
+.book h1 {
+    margin: 80pt auto;
+    font-size: 150%
 }
