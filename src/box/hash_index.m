@@ -242,6 +242,17 @@ hash_iterator_lstr_eq(struct iterator *it)
 	return NULL;
 }
 
+- (struct tuple *) findByTuple: (struct tuple *) tuple
+{
+	assert(key_def->is_unique);
+	if (tuple->field_count < key_def->max_fieldno)
+		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+
+	/* Hash index currently is always single-part. */
+	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	return [self findByKey :field :1];
+}
+
 @end
 
 /* }}} */

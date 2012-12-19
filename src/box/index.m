@@ -182,6 +182,13 @@ replace_check_dup(struct tuple *old_tuple,
 	return NULL;
 }
 
+- (struct tuple *) findByTuple: (struct tuple *) pattern
+{
+	(void) pattern;
+	[self subclassResponsibility: _cmd];
+	return NULL;
+}
+
 - (struct tuple *) replace: (struct tuple *) old_tuple
 			  : (struct tuple *) new_tuple
 			  : (enum dup_replace_mode) mode

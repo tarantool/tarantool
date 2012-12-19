@@ -203,6 +203,7 @@ enum dup_replace_mode {
 - (struct tuple *) min;
 - (struct tuple *) max;
 - (struct tuple *) findByKey: (const void *) key :(int) part_count;
+- (struct tuple *) findByTuple: (struct tuple *) tuple;
 - (struct tuple *) replace: (struct tuple *) old_tuple
 			  :(struct tuple *) new_tuple
 			  :(enum dup_replace_mode) mode;
