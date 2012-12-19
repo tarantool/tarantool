@@ -10,10 +10,10 @@
   <para>
     <productname>Tarantool/Box</productname>, or simply 
     <productname>Tarantool</productname>,
-    is a high performance key/value storage server.  The code is
+    is a high performance NoSQL database.  The code is
     available for free under the terms of <citetitle
     xlink:href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD
-    license</citetitle>. Supported platforms are GNU/Linux and
+    license</citetitle>. Supported platforms are GNU/Linux, Mac OS and
     FreeBSD.
 
   </para>

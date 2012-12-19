@@ -28,5 +28,21 @@
     })();
 
   </script>
+
+<!-- Rating@Mail.ru counter -->
+
+  <script type="text/javascript">//<![CDATA[
+    (function(w,n,d,r,s){(new Image).src='http://dd.cd.b2.a2.top.mail.ru/counter?id=2284916;js=13'+
+    ((r=d.referrer)?';r='+escape(r):'')+((s=w.screen)?';s='+s.width+'*'+s.height:'')+';_='+Math.random();})(window,navigator,document);//]]>
+  </script>
+  <noscript>
+      <img src="http://dd.cd.b2.a2.top.mail.ru/counter?id=2284916;js=na" style="border:0;position:absolute;left:-10000px;" height="1" width="1" alt="" />
+  </noscript>
+
+<!-- //Rating@Mail.ru counter -->
+
+  <div id="header">
+    <p class='book'><a id="home_link" href="index.html">Tarantool/Box - Front page</a></p>
+  </div>
 </xsl:template>
 </xsl:stylesheet>

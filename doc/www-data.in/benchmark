@@ -1,10 +1,168 @@
 {% page benchmark en %}
 
-Coming soon...
+{% text benchmark en %}
+
+# Preface
+
+There are lies, then there is statistics, but the first place in
+misrepresenting the truth is undoubtedly owned by benchmarks.
+
+Comparing Tarantool/Box with other systems, apples to apples, is
+not strictly correct: the server networking subsystem is fully
+asynchronous and it's possible to proxy all clients via a single
+socket. In this case, responses to queries are sent as soon they
+are ready. Most production application use asynchronous and
+batched I/O with Tarantool.
+
+As long as the overhead of system calls and context switches is
+the single largest contributor to the cost of serving a single
+request, use of batched and multiplexed I/O produces an order of
+magnitude better results, when compared with traditional
+multi-threaded workloads. A tool we developed for our own use,
+[nosqlbench](http://github.com/mailru/nosqlbench), is utilizing
+this approach at full.
+
+However, to compare with the rest of the world, a standardized
+benchmarking kit is more appropriate. This is why Yahoo! Cloud
+Serving Benchmark (c) was used to produce the charts
+below. A fork of YCSB with Tarantool/Box support is available
+[here](https://github.com/bigbes92/YCSB). Since YCSB was developed
+to compare cloud key/value servers, it provides a very narrow view
+at performance of a tested server.  For example, performance of
+secondary keys or overhead of locking (which Tarantool/Box doesn't
+have) is not tested at all.
+
+# What is YCSB
+
+Yahoo! Cloud Serving Benchmark (c) consists of two components:
+
+- the client, which generates the load according to a workload type
+and analyzes latency and throughput,
+- workload files, which define a single benchmark by describing
+the size of the data set, the total amount of requests, the ratio of
+read and write queries.
+
+There are 6 major workload types in YCSB:
+
+- workload **A**, 50/50 update/read ratio, size of the data set
+is 200 000 key/value pairs,
+- workload **B**, 5/95 update/read ratio, the same size of the data set,
+- workload **C** is 100% read-only,
+- workload **D** 5/95 insert/read ratio, the read load is skewed
+towards the end of the key range,
+- workload **E**, 5/95 ratio of insert/reads over a range of 10
+records,
+- workload **F**, 95% read/modify/write, 5% read.
+
+For additional information on YCSB and workload types, please visit
+[YCSB official page on Github](http://github.com/brianfrankcooper/YCSB).
+
+All charts below were measured using 1M queries per test, averaged
+over 8 consecutive test runs.
+
+Configuration files for the tested systems can be found
+[here](https://github.com/bigbes92/ycsb-expand-db/tree/master/confs)
+and [here](https://github.com/bigbes92/ycsb-expand-db/blob/master/lib/mongodb.py).
+
+## Workload A
+
+Throughput (more is better):
+
+<a class="imglink" href="ycsb/A_throughput.svg">
+    <img class="ycsb" src="ycsb/A_throughput.svg" alt="Worklod A: throughput"></img>
+</a>
+
+Read latency (less is better):
+
+<a class="imglink" href="ycsb/A_READ_latency.svg">
+    <img class="ycsb" src="ycsb/A_READ_latency.svg" alt="Worklod A: throughput"></img>
+</a>
+
+Update latency (less is better):
+
+<a class="imglink" href="ycsb/A_UPDATE_latency.svg" >
+    <img class="ycsb" src="ycsb/A_UPDATE_latency.svg" alt="Worklod A: throughput"></img>
+</a>
+
+## Workload B
+
+Throughput:
+
+<a class="imglink" href="ycsb/B_throughput.svg">
+    <img class='ycsb' src="ycsb/B_throughput.svg" alt="Worklod B: throughput"></img>
+</a>
+
+Read latency:
+
+<a class="imglink" href="ycsb/B_READ_latency.svg">
+    <img class="ycsb" src="ycsb/B_READ_latency.svg" alt="Worklod B: READ latency"></img>
+</a>
+
+Update latency:
+
+<a class="imglink" href="ycsb/B_UPDATE_latency.svg">
+<img class="ycsb" src="ycsb/B_UPDATE_latency.svg" alt="Worklod B: UPDATE latency"></img>
+</a>
+
+## Workload C (read-only)
+
+Throughput:
+
+<a class="imglink" href="ycsb/C_throughput.svg" >
+<img class="ycsb" src="ycsb/C_throughput.svg" alt="Worklod C: throughput"></img>
+</a>
+
+Read latency:
+
+<a class="imglink" href="ycsb/C_READ_latency.svg">
+    <img class="ycsb" src="ycsb/C_READ_latency.svg" alt="Worklod C: READ latency"></img>
+</a>
+
+## Workload D
+
+Throughput:
+
+<a class="imglink" href="ycsb/D_throughput.svg">
+    <img class="ycsb" src="ycsb/D_throughput.svg" alt="Worklod D: throughput"></img>
+</a>
+
+INSERT latency:
+
+<a class="imglink" href="ycsb/D_INSERT_latency.svg">
+    <img class="ycsb" src="ycsb/D_INSERT_latency.svg" alt="Worklod D: INSERT latency"></img>
+</a>
+
+READ latency:
+
+<a class="imglink" href="ycsb/D_READ_latency.svg">
+   <img class="ycsb" src="ycsb/D_READ_latency.svg" alt="Worklod D: READ latency"></img>
+</a>
+
+## Workload F
+
+Throughput:
+
+<a class="imglink" href="ycsb/F_throughput.svg">
+   <img class="ycsb" src="ycsb/F_throughput.svg" alt="Worklod F: throughput"></img>
+</a>
+
+READ latency:
+
+<a class="imglink" href="ycsb/F_READ_latency.svg">
+    <img class="ycsb" src="ycsb/F_READ_latency.svg" alt="Worklod F: READ latency"></img>
+</a>
+
+READ-MODIFY-WRITE latency:
+
+<a class="imglink" href="ycsb/F_READ-MODIFY-WRITE_latency.svg">
+    <img class="ycsb" src="ycsb/F_READ-MODIFY-WRITE_latency.svg" alt="Worklod F: READ-MODIFY-WRITE latency"></img>
+</a>
+
+UPDATE latency:
+
+<a class="imglink" href="ycsb/F_UPDATE_latency.svg">
+    <img class="ycsb" src="ycsb/F_UPDATE_latency.svg" alt="Worklod F: UPDATE latency"></img>
+</a>
 
 
 {% page benchmark ru %}
-
-Извините, здесь пока ничего нет.
-
-

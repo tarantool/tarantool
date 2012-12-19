@@ -1,119 +1,69 @@
+{% page index en %}
+
 {% text blurb en %}
 
-# Tarantool/Box - an efficient in-memory data store
-##Tarantool is an extensible, persistent, transactional database, designed to store the most volatile and highly accessible web data.
+# Tarantool/Box
+## A transactional NoSQL database
+###[Overview](intro.html) &nbsp;  [Documentation](tarantool_user_guide.html) &nbsp;  [Download](download.html)
 
 {% text blurb ru %}
 
-# Tarantool/Box - NoSQL СУБД для высокой нагрузки
-## Tarantool - расширяемая, транзакционная СУБД для хранения наиболее запрашиваемых и часто меняющихся данных.
+# Tarantool/Box
+## NoSQL СУБД для высокой нагрузки
+###[Введение](intro.html) &nbsp;  [Документация](tarantool_user_guide.html) &nbsp;  [Скачать](download.html)
 
-{% text home_page_news en %}
+{% text tagline en %}
 
-What's new
-==========
-2012-10-20: Tarantool 1.4.8 is out, more raw performance and features
+# Introduction
 
-2012-07-10: Tarantool 1.4.7 is out, ported to Mac OS X
+Tarantool/Box is an in-memory database designed to store the most volatile
+and highly accessible web content. Tarantool/Box has been extensively used
+in production since 2009. It's **open source**, BSD licensed.
 
-2012-05-09: Tarantool 1.4.6 is out, featuring multipart primary keys
+{% text tagline ru %}
 
-2012-04-08: Tarantool 1.4.5, next stable version of 1.4 branch.
+## Что такое Tarantool/Box?
 
-2012-02-18: <a href="http://tarantool.org">http://tarantool.org</a> gets a new look! 
+Tarantool/Box - расширяемая, транзакционная СУБД для хранения наиболее
+запрашиваемых и часто меняющихся данных.
 
-2011-10-07: Tarantool 1.4.3, stable version of 1.4 branch.
+{% text features en %}
 
-2011-08-25: Tarantool 1.4.2, featuring Lua stored prcoedures, is out.
+# Features
 
-2011-06-05: <a href="http://tarantool.org/tarantool_user_guide.html">Tarantool User Guide</a> is published.
+- [lowest CPU and RAM overhead](benchmark.html) to store or serve a
+piece of content,
+- optional Write Ahead Logging for persistency and reliability,
+- universal data access with [rich Lua stored
+procedures](http://github.com/mailru/tntlua), which can exchange messages
+between each other or networked peers,
+- asynchronous master-slave replication and hot backup.
 
-2011-05-14: <a href="http://launchpad.net/tarantool/1.3/1.3.5/+download/tarantool-1.3.5-src.tar.gz">tarantool-1.3.5</a> (stable) is out.
+{% text example en %}
 
-{% text home_page_news ru %}
+# Get started
 
-Новости
-=======
-2012-10-20: Очередной релиз ветки 1.4: Tarantool 1.4.8
+<pre class="example">
+# apt-get install tarantool tarantool-client
+# cd /etc/tarantool
+# cp instances.available/example.cfg instances.enabled/fqueue.cfg
+# cd /usr/share/tarantool/lua
+# wget http://github.com/mailru/tntlua/raw/master/fqueue.lua -O init.lua
+# service tarantool start
+tarantool: Staring instances
+    Starting 'fqueue' ... ok
+</pre>
 
-2012-07-10: Tarantool 1.4.7 is out, с поддержкой Mac OS X
+A fast and customizable message queue server is up and running.
 
-2012-05-09: Tarantool 1.4.6 добавляет поддержку первичных ключей по нескольким полям 
+{% text links en %}
 
-2012-04-08: Tarantool 1.4.5, новая стабильная версия ветки 1.4.
+# Learn more
 
-2012-02-18: Новый дизайн <a href="http://tarantool.org">http://tarantool.org</a>
+- [YCSB benchmark results](benchmark.html)
+- [FAQ](faq.html)
+- [GitHub source](http://github.com/mailru/tarantool)
+- [Lua library]( http://github.com/mailru/tntlua)
 
-2011-10-07: Tarantool 1.4.3, stable version of 1.4 branch.
 
-2011-08-25: Tarantool 1.4.2, featuring Lua stored prcoedures, is out.
-
-2011-06-05: <a href="http://tarantool.org/tarantool_user_guide.html">Tarantool User Guide</a> is published.
-
-2011-05-14: <a href="http://launchpad.net/tarantool/1.3/1.3.5/+download/tarantool-1.3.5-src.tar.gz">tarantool-1.3.5</a> (stable) is out.
-
-{% text home_page_learn en %}
-
-Learn more
-=====================
-
-- [Introduction](intro.html)
-- [Frequently Asked Questions](faq.html)
-- [A benchmark](benchmark.html)
-
-{% text home_page_learn ru %}
-
-Узнать больше
-========================
-
-- [Обзор](intro.ru.html)
-- [Часто задаваемые вопросы](faq.ru.html)
-- [Доклад на TechForum.Mail.Ru](http://habrahabr.ru/company/mailru/blog/136288/)
-
-{% text home_page_use en %}
-
-Use Tarantool
-============
-- <p id="download"><a id="current_download" href="download.html">Download Tarantool</a></p>
-- [Read the User Guide](tarantool_user_guide.html)
-- [Browse a stored procedures archive](http://github.com/mailru/tntlua)
-- [Join the mailing list](http://groups.google.com/group/tarantool/subscribe)
-- [Report a bug](https://bugs.launchpad.net/tarantool/+filebug)
-- [View features and milestones](https://launchpad.net/tarantool)
-
-{% text home_page_use ru %}
-
-Использовать Tarantool
-======================
-
-- <p id="download"><a id="current_download" href="download.ru.html">Скачать Tarantool</a></p>
-- [Руководство пользователя](tarantool_user_guide.html)
-- [Архив процедур на Lua](http://github.com/mailru/tntlua)
-- [Список рассылки](http://groups.google.com/group/tarantool-ru)
-- [Сообщить об ошибке](https://bugs.launchpad.net/tarantool/+filebug)
-
-{% text home_page_join en %}
-
-Get Involved
-============
-
-- [Browse Git source](https://github.com/mailru/tarantool)
-- [Read the Developer Guide](tarantool_developer_guide.html)
-- [IRC chat with developers](http://webchat.freenode.net/?channels=tarantool)
-- [Developer list archives](https://lists.launchpad.net/tarantool-developers/)
-- [Help improve our Wiki](http://github.com/mailru/tarantool/wiki)
-
-{% text home_page_join ru %}
-
-Участвовать в проекте 
-=====================
-
-- [Исходный код](https://github.com/mailru/tarantool)
-- [Руководство разработчика](tarantool_developer_guide.html)
-- [IRC чат](http://webchat.freenode.net/?channels=tarantool)
-- [Список рассылки](https://lists.launchpad.net/tarantool-developers/)
-- [Пополнить Вики](http://github.com/mailru/tarantool/wiki)
-
-{% page home en %}
-
-{% page home ru %}
+{% page index ru %}

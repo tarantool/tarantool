@@ -13,7 +13,7 @@
  */
 
 html {
-    font-size: 100%; /* 1 */
+    font-size: 120%; /* 1 */
     overflow-y: scroll; /* 2 */
     -webkit-text-size-adjust: 100%; /* 3 */
     -ms-text-size-adjust: 100%; /* 3 */
@@ -30,6 +30,9 @@ body {
 /* =============================================================================
    Links
    ========================================================================== */
+a {
+    color: #201e9e;
+}
 
 /*
  * Addresses outline displayed oddly in Chrome
@@ -44,10 +47,29 @@ a:focus {
  * people.opera.com/patrickl/experiments/keyboard/test
  */
 
-a:hover, a:active {
+a:active {
     outline: 0;
 }
 
+a:hover {
+    outline: 0;
+    background-color: rgba(0,0,0,0.1);
+	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+a.imglink:hover {
+    border : 0;
+    background-color: inherit;
+	-moz-box-shadow: none;
+	-webkit-box-shadow: none;
+	box-shadow: none;
+}
+
+a:visited {
+    color: #3f3f3f;
+}
 
 /* =============================================================================
    Typography
@@ -81,8 +103,9 @@ blockquote {
 pre, code, kbd, samp {
     font-family: monospace, serif;
     _font-family: 'courier new', monospace;
-    font-size: 1em;
+    font-size: 80%;
 }
+
 
 /*
  * Improves readability of pre-formatted text in all browsers
@@ -92,6 +115,12 @@ pre {
     white-space: pre;
     white-space: pre-wrap;
     word-wrap: break-word;
+    text-decoration: none;
+    outline: 0;
+    background-color: rgba(0,0,0,0.1);
+	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 /*
@@ -171,6 +200,9 @@ img {
     -ms-interpolation-mode: bicubic; /* 2 */
 }
 
+.ycsb {
+    width: 768px;
+}
 
 /* =============================================================================
    Tables
@@ -196,13 +228,12 @@ table {
  */
 
 #wrapper {
-    width: 970px;
+    width: 768px;
     margin: 0 auto;
     padding: 0;
 }
 
 #header, #footer, #content {
-    width: 970px;
     margin: 0 auto;
     padding: 0;
     overflow: hidden;
@@ -212,11 +243,6 @@ table {
 #header {
    margin-bottom: 5px;
 }
- 
-#footer p, #header p {
-    margin: 0 10px;
-}
-
 /*
  * http://sonspring.com/journal/clearing-floats 
  */
@@ -234,7 +260,7 @@ table {
    ======================================================================== */
 
 .grid {
-    width: 940px;
+    width: 768px;
     overflow: hidden;
     margin-left: auto;
     margin-right: auto;
@@ -243,9 +269,6 @@ table {
 	-webkit-border-radius: 3px;
 	border-radius: 3px;
 	
-	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     clear: both;
 }
 
@@ -310,13 +333,6 @@ html, body, #wrapper {
     height: 100%;
 }
 
-body {
-    background-color: #eee;
-    font-size: 80%;
-    font-family: Verdana, Arial, Helvetica, sans-serif;
-    line-height: 1.5;
-}
-
 #wrapper, #header, #content, #footer {
     background-color: #fff;
 }
@@ -325,137 +341,32 @@ body {
     padding-bottom: 5px;
 }
 
-a { color: #201e9e; }
-a:visited { color: #3f3f3f; }
-
 #footer img {
     vertical-align: middle;
 }
 
-#logo {
-    width: 120px;
-    height: 120px;
-    float: left;
+#footer {
+    text-align: right;
+    padding-top: 16px
 }
 
 #blurb {
-    margin-bottom: 8px;
-    color: #ffffff;
-/*    background-color: #00468c; */
-    background: url('bg_header.png') repeat-x scroll 50% 0 white;
-	-moz-border-radius: 3px;
-	-webkit-border-radius: 3px;
-	border-radius: 3px;
-	
-	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    margin: 40px auto;
 }
 
 #blurb h1 {
-    font-size: 1.5em;
+    font-size: 2em;
     line-height: 1;
+    text-align: center;
 }
 
 #blurb h2 {
     font-size: 1.2em;
     font-weight: normal;
-    font-style: italic;
     line-height: 1;
-    width: 80%;
+    text-align: center
 }
 
-.front_block {
-    /*border: 1px dotted black;*/
-    margin-top: 10px;
-    margin-bottom: 10px;
-    padding: 0 10px;
-}
-
-.news_block {
-    /*border: 1px dotted black;*/
-    margin-top: 10px;
-    margin-bottom: 10px;
-    margin-left: 230px;
-    margin-right: auto;
-    padding: 0 10px;
-}
-
-#download a {
-    color: #ffffff;
-    text-decoration: none;
-}
-#download a:visited {
-    color: #eee;
-    text-decoration: none;
-}
-
-#current_download {
-    font-size: 110%;
-    font-weight: bold;
-    padding: 4px 5px;
-    background-color: #ffaa00;
-	-moz-border-radius: 3px;
-	-webkit-border-radius: 3px;
-	border-radius: 3px;
-	
-	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-}
-
-#content_cap {
-    color: #ffffff;
-    background-color: #00468c;
-}
-
-#content_cap #logo {
-    width: 65px;
-    height: 65px;
-}
-
-/* ===========================================================================
-   Navigation
-   ======================================================================= */
-
-#nav {
-    width: 740px;
-    float: right;
-    -moz-border-radius: 3px;
-    -webkit-border-radius: 3px;
-    border-radius: 3px;
-    background: url('bg_header.png') repeat-x scroll 50% 0 white;
-}
-
-#nav ul, #nav ol {
-    list-style: none outside none;
-    margin: 0 15px;
-    padding: 0;
-}
-
-#nav ul li {
-    display: inline-block;
-}
-
-#nav ul li a {
-    -moz-border-radius: 10px;
-    -webkit-border-radius: 10px;
-    border-radius: 10px;
-    color: #eee;
-    text-decoration: none;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.5);
-    text-transform: uppercase;
-    font-size: 11px;
-    font-weight: bold;
-    line-height: 32px;
-    padding: 3px 12px;
-    margin: 0 10px;
-}
-
-#nav ul li.current_download a {
-    background-color: rgba(0,0,0,0.5) !important;
-}
-
-#nav ul li a:HOVER {
-    background-color: rgba(0,0,0,0.25)
+#blurb h3 {
+    text-align: center
 }

@@ -1,2 +1,5 @@
 {% extends "base" %}
 {% set title = "Tarantool/Box: a benchmark" %}
+{% block content %}
+    {{ benchmark | langselect }}
+{% endblock content%}

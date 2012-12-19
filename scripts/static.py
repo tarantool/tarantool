@@ -12,6 +12,7 @@ import argparse
 import fnmatch
 import glob
 import shutil
+import datetime
 
 
 default_lang = {
@@ -185,13 +186,17 @@ class Scanner(object):
 def langselect(context, data):
     if isinstance(data, dict):
         lang = context['pagelang']
-        data = data[lang]
+        if lang in data:
+            data = data[lang]
+        else:
+            data = data['en']
     return data
 
 
 def make_environ(path):
     env = jinja2.Environment(loader = jinja2.FileSystemLoader(path))
     env.filters['langselect'] = langselect
+    env.globals['date'] = datetime.datetime.today()
     return env
 
 
@@ -224,7 +229,7 @@ class PageHandler(BaseHandler):
         if len(tags) < 2:
             raise StandardError('missing template name for page entry')
         layout = tags[1]
-        lang = tags[2] if tags and len(tags) > 2 else None
+        lang = tags[2] if tags and len(tags) > 2 else Nil
         if lang and lang in self.config['languages']:
             langdesc = self.config['languages'][lang]
         else:
@@ -252,7 +257,7 @@ class TextHandler(BaseHandler):
         if len(tags) < 2:
             raise StandardError('missing item name for text entry')
         item = tags[1]
-        lang = tags[2] if tags and len(tags) > 2 else None
+        lang = tags[2] if tags and len(tags) > 2 else 'en'
         if lang and lang in self.config['languages']:
             langdesc = self.config['languages'][lang]
         else:

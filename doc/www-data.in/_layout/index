@@ -1,0 +1,26 @@
+{% extends "base" %}
+{% set title = "Tarantool/Box -- a transactional NoSQL database" %}
+
+{% block header %}
+    <p class='rwrap'><a id="lang_link" href="{{ pagename + lang_ext | langselect | e }}">{{ lang_tag | langselect | e }}</a></p>
+{% endblock header %}
+
+{% block content %}
+
+    <div id="blurb">
+
+      {{ blurb | langselect }}
+
+      <div class="clear"></div>
+
+    </div>
+
+    {{ tagline | langselect }}
+
+    {{ features | langselect }}
+
+    {{ example | langselect }}
+
+    {{ links | langselect }}
+
+{% endblock content%}
