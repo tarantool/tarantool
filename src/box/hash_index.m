@@ -630,7 +630,7 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	if (k != mh_end(str_hash))
 		ret = mh_lstrptr_node(str_hash, k)->val;
 #ifdef DEBUG
-	u32 key_size = load_varint32(&key);
+	u32 key_size = load_varint32((const void **) &key);
 	say_debug("HashStrIndex find(self:%p, key:(%i)'%.*s') = %p",
 		  self, key_size, key_size, (u8 *)key, ret);
 #endif
