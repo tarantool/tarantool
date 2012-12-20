@@ -782,6 +782,13 @@ wal_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
 
 	wal_schedule_queue(&commit);
+	/*
+	 * Perform a cascading abort of all transactions which
+	 * depend on the transaction which failed to get written
+	 * to the write ahead log. Abort transactions
+	 * in reverse order, performing a playback of the
+	 * in-memory database state.
+	 */
 	STAILQ_REVERSE(&rollback, wal_write_request, wal_fifo_entry);
 	wal_schedule_queue(&rollback);
 }
