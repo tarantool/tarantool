@@ -1003,7 +1003,7 @@ wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 	       struct wal_write_request *req)
 {
 	int max_rows = wal->is_inprogress ? 1 : rows_per_wal - wal->rows;
-	/* Post-condition of successful by wal_opt_rotate(). */
+	/* Post-condition of successful wal_opt_rotate(). */
 	assert(max_rows > 0);
 	fio_batch_start(batch, max_rows);
 	while (req != NULL && ! fio_batch_is_full(batch)) {
