@@ -106,7 +106,6 @@ endif()
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/include")
 include_directories("${PROJECT_BINARY_DIR}/include")
-include_directories("${PROJECT_SOURCE_DIR}/connector/c/include")
 #
 # Specify prefixes
 #

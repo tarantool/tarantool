@@ -64,6 +64,7 @@
 #include "tarantool_pthread.h"
 #include "lua/init.h"
 #include "memcached.h"
+#include "box/box.h"
 
 
 static pid_t master_pid;
@@ -162,7 +163,7 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 	if (replication_check_config(conf) != 0)
 		return -1;
 
-	return mod_check_config(conf);
+	return box_check_config(conf);
 }
 
 static int
@@ -260,7 +261,7 @@ reload_cfg(struct tbuf *out)
 			return -1;
 
 		/* Now pass the config to the module, to take action. */
-		if (mod_reload_config(&cfg, &new_cfg) != 0)
+		if (box_reload_config(&cfg, &new_cfg) != 0)
 			return -1;
 		/* All OK, activate the config. */
 		swap_tarantool_cfg(&cfg, &new_cfg);
@@ -354,7 +355,7 @@ snapshot(void *ev, int events __attribute__((unused)))
 	 * parent stdio buffers at exit().
 	 */
 	close_all_xcpt(1, sayfd);
-	snapshot_save(recovery_state, mod_snapshot);
+	snapshot_save(recovery_state, box_snapshot);
 
 	exit(EXIT_SUCCESS);
 	return 0;
@@ -675,7 +676,7 @@ main(int argc, char **argv)
 	binary_filename = argv[0];
 
 	if (gopt(opt, 'V')) {
-		printf("Tarantool/%s %s\n", mod_name, tarantool_version());
+		printf("Tarantool/Box %s\n", tarantool_version());
 		printf("Target: %s\n", BUILD_INFO);
 		printf("Build options: %s\n", BUILD_OPTIONS);
 		printf("Compiler: %s\n", COMPILER_INFO);
@@ -700,7 +701,7 @@ main(int argc, char **argv)
 			panic("access(\"%s\"): %s", cat_filename, strerror(errno));
 			exit(EX_OSFILE);
 		}
-		return mod_cat(cat_filename);
+		return box_cat(cat_filename);
 	}
 
 	gopt_arg(opt, 'c', &cfg_filename);
@@ -817,9 +818,9 @@ main(int argc, char **argv)
 	if (gopt(opt, 'I')) {
 		init_storage = true;
 		initialize_minimal();
-		mod_init();
+		box_init();
 		set_lsn(recovery_state, 1);
-		snapshot_save(recovery_state, mod_snapshot);
+		snapshot_save(recovery_state, box_snapshot);
 		exit(EXIT_SUCCESS);
 	}
 
@@ -859,7 +860,7 @@ main(int argc, char **argv)
 
 	@try {
 		tarantool_L = tarantool_lua_init();
-		mod_init();
+		box_init();
 		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
 		/*

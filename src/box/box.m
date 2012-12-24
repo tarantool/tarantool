@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "box.h"
+#include "box/box.h"
 #include <arpa/inet.h>
 
 #include <cfg/warning.h>
@@ -48,16 +48,14 @@
 #include "request.h"
 #include "txn.h"
 
-static void box_process_replica(struct port *port,
-				u32 op, struct tbuf *request_data);
-static void box_process_ro(struct port *port,
-			   u32 op, struct tbuf *request_data);
-static void box_process_rw(struct port *port,
-			   u32 op, struct tbuf *request_data);
-mod_process_func mod_process = box_process_ro;
-mod_process_func mod_process_ro = box_process_ro;
-
-const char *mod_name = "Box";
+static void process_replica(struct port *port,
+			    u32 op, struct tbuf *request_data);
+static void process_ro(struct port *port,
+		       u32 op, struct tbuf *request_data);
+static void process_rw(struct port *port,
+		       u32 op, struct tbuf *request_data);
+box_process_func box_process = process_ro;
+box_process_func box_process_ro = process_ro;
 
 static char status[64] = "unknown";
 
@@ -85,8 +83,7 @@ port_send_tuple(struct port *port, struct txn *txn, u32 flags)
 }
 
 static void
-box_process_rw(struct port *port,
-	       u32 op, struct tbuf *data)
+process_rw(struct port *port, u32 op, struct tbuf *data)
 {
 	struct txn *txn = txn_begin();
 	ev_tstamp start = ev_now(), stop;
@@ -111,22 +108,21 @@ box_process_rw(struct port *port,
 }
 
 static void
-box_process_replica(struct port *port, u32 op, struct tbuf *request_data)
+process_replica(struct port *port, u32 op, struct tbuf *request_data)
 {
 	if (!request_is_select(op)) {
 		tnt_raise(ClientError, :ER_NONMASTER,
 			  cfg.replication_source);
 	}
-	return box_process_rw(port, op, request_data);
+	return process_rw(port, op, request_data);
 }
 
 static void
-box_process_ro(struct port *port,
-	       u32 op, struct tbuf *request_data)
+process_ro(struct port *port, u32 op, struct tbuf *request_data)
 {
 	if (!request_is_select(op))
 		tnt_raise(LoggedError, :ER_SECONDARY);
-	return box_process_rw(port, op, request_data);
+	return process_rw(port, op, request_data);
 }
 
 static void
@@ -295,7 +291,7 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 			recover_snap_row(t);
 		} else if (tag == XLOG) {
 			u16 op = read_u16(t);
-			box_process_rw(&port_null, op, t);
+			process_rw(&port_null, op, t);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
@@ -314,7 +310,7 @@ static void
 box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 {
 	if (conf->replication_source != NULL) {
-		mod_process = box_process_replica;
+		box_process = process_replica;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 		recovery_follow_remote(recovery_state, conf->replication_source);
@@ -323,7 +319,7 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 			 conf->replication_source, custom_proc_title);
 		title("replica/%s%s", conf->replication_source, custom_proc_title);
 	} else {
-		mod_process = box_process_rw;
+		box_process = process_rw;
 
 		memcached_start_expire();
 
@@ -335,7 +331,7 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 }
 
 void
-mod_leave_local_standby_mode(void *data __attribute__((unused)))
+box_leave_local_standby_mode(void *data __attribute__((unused)))
 {
 	recovery_finalize(recovery_state);
 
@@ -346,7 +342,7 @@ mod_leave_local_standby_mode(void *data __attribute__((unused)))
 }
 
 i32
-mod_check_config(struct tarantool_cfg *conf)
+box_check_config(struct tarantool_cfg *conf)
 {
 	/* replication & hot standby modes can not work together */
 	if (conf->replication_source != NULL && conf->local_hot_standby > 0) {
@@ -406,7 +402,7 @@ mod_check_config(struct tarantool_cfg *conf)
 }
 
 i32
-mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
+box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
 {
 	bool old_is_replica = old_conf->replication_source != NULL;
 	bool new_is_replica = new_conf->replication_source != NULL;
@@ -436,16 +432,16 @@ mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 }
 
 void
-mod_free(void)
+box_free(void)
 {
 	space_free();
 }
 
 void
-mod_init(void)
+box_init(void)
 {
 	title("loading");
-	atexit(mod_free);
+	atexit(box_free);
 
 	/* initialization spaces */
 	space_init();
@@ -484,7 +480,7 @@ mod_init(void)
 }
 
 int
-mod_cat(const char *filename)
+box_cat(const char *filename)
 {
 	return read_log(filename, xlog_print, snap_print, NULL);
 }
@@ -520,7 +516,7 @@ snapshot_space(struct space *sp, void *udata)
 }
 
 void
-mod_snapshot(struct log_io *l, struct fio_batch *batch)
+box_snapshot(struct log_io *l, struct fio_batch *batch)
 {
 	/* --init-storage switch */
 	if (primary_indexes_enabled == false)
@@ -532,21 +528,21 @@ mod_snapshot(struct log_io *l, struct fio_batch *batch)
 }
 
 void
-mod_info(struct tbuf *out)
+box_info(struct tbuf *out)
 {
 	tbuf_printf(out, "  status: %s" CRLF, status);
 }
 
 
 const char *
-mod_status(void)
+box_status(void)
 {
     return status;
 }
 
 
 uint32_t
-mod_sid()
+box_sid()
 {
 	static uint32_t sid = 1;
 	return sid++;
