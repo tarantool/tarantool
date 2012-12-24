@@ -11,6 +11,8 @@ function(tarantool_client client_name)
 	target_link_libraries (${client_name} ${client_libs})
 endfunction()
 
+include_directories("${PROJECT_SOURCE_DIR}/connector/c/include")
+
 foreach (client ${TARANTOOL_CLIENTS})
 	add_subdirectory(${client})
 endforeach()

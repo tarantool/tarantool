@@ -33,27 +33,6 @@
 
 struct tarantool_cfg;
 struct tbuf;
-struct log_io;
-struct fio_batch;
-struct lua_State;
-
-void mod_init(void);
-void mod_free(void);
-
-extern const char *mod_name;
-i32 mod_check_config(struct tarantool_cfg *conf);
-i32 mod_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
-void mod_lua_load_cfg(struct lua_State *L);
-int mod_cat(const char *filename);
-void mod_snapshot(struct log_io *, struct fio_batch *batch);
-void mod_info(struct tbuf *out);
-const char *mod_status(void);
-/**
- * Issue a new session identifier -
- * called by the networking layer
- * when a new connection is established.
- */
-uint32_t mod_sid();
 
 extern int snapshot_pid;
 extern struct tarantool_cfg cfg;

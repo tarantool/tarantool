@@ -48,6 +48,7 @@
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
+#include "box/box.h"
 
 static const char *help =
 	"available commands:" CRLF
@@ -162,7 +163,7 @@ tarantool_info(struct tbuf *out)
 	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,
 		    recovery_state->remote ?
 		    recovery_state->remote->recovery_last_update_tstamp :0);
-	mod_info(out);
+	box_info(out);
 	const char *path = cfg_filename_fullpath;
 	if (path == NULL)
 		path = cfg_filename;
@@ -329,7 +330,7 @@ admin_handler(va_list ap)
 {
 	struct ev_io coio = va_arg(ap, struct ev_io);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
-	fiber_set_sid(fiber, mod_sid());
+	fiber_set_sid(fiber, box_sid());
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	@try {

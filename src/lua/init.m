@@ -28,6 +28,7 @@
  */
 #include "lua/init.h"
 #include "tarantool.h"
+#include "box/box.h"
 #include "tbuf.h"
 
 #include "lua.h"
@@ -1519,7 +1520,7 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 	}
 	lua_pop(L, 1);	/* cleanup stack */
 
-	mod_lua_load_cfg(L);
+	box_lua_load_cfg(L);
 	/*
 	 * Invoke a user-defined on_reload_configuration hook,
 	 * if it exists. Do it after everything else is done.

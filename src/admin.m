@@ -50,6 +50,7 @@
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
+#include "box/box.h"
 
 static const char *help =
 	"available commands:" CRLF
@@ -71,7 +72,7 @@ static const char *help =
 static const char *unknown_command = "unknown command. try typing help." CRLF;
 
 
-#line 75 "src/admin.m"
+#line 76 "src/admin.m"
 static const int admin_start = 1;
 static const int admin_first_final = 135;
 static const int admin_error = 0;
@@ -79,7 +80,7 @@ static const int admin_error = 0;
 static const int admin_en_main = 1;
 
 
-#line 74 "src/admin.rl"
+#line 75 "src/admin.rl"
 
 
 struct salloc_stat_admin_cb_ctx {
@@ -171,7 +172,7 @@ tarantool_info(struct tbuf *out)
 	tbuf_printf(out, "  recovery_last_update: %.3f" CRLF,
 		    recovery_state->remote ?
 		    recovery_state->remote->recovery_last_update_tstamp :0);
-	mod_info(out);
+	box_info(out);
 	const char *path = cfg_filename_fullpath;
 	if (path == NULL)
 		path = cfg_filename;
@@ -216,12 +217,12 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 	p = in->pos;
 
 	
-#line 220 "src/admin.m"
+#line 221 "src/admin.m"
 	{
 	cs = admin_start;
 	}
 
-#line 225 "src/admin.m"
+#line 226 "src/admin.m"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -284,15 +285,15 @@ case 6:
 	}
 	goto st0;
 tr13:
-#line 307 "src/admin.rl"
+#line 308 "src/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st135;
 tr20:
-#line 295 "src/admin.rl"
+#line 296 "src/admin.rl"
 	{return -1;}
 	goto st135;
 tr25:
-#line 222 "src/admin.rl"
+#line 223 "src/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
@@ -300,9 +301,9 @@ tr25:
 		}
 	goto st135;
 tr36:
-#line 281 "src/admin.rl"
+#line 282 "src/admin.rl"
 	{strend = p;}
-#line 228 "src/admin.rl"
+#line 229 "src/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
@@ -311,7 +312,7 @@ tr36:
 		}
 	goto st135;
 tr43:
-#line 235 "src/admin.rl"
+#line 236 "src/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -320,11 +321,11 @@ tr43:
 		}
 	goto st135;
 tr67:
-#line 305 "src/admin.rl"
+#line 306 "src/admin.rl"
 	{coredump(60); ok(out);}
 	goto st135;
 tr76:
-#line 242 "src/admin.rl"
+#line 243 "src/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -339,9 +340,9 @@ tr76:
 		}
 	goto st135;
 tr98:
-#line 291 "src/admin.rl"
+#line 292 "src/admin.rl"
 	{ state = false; }
-#line 255 "src/admin.rl"
+#line 256 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -353,9 +354,9 @@ tr98:
 		}
 	goto st135;
 tr101:
-#line 290 "src/admin.rl"
+#line 291 "src/admin.rl"
 	{ state = true; }
-#line 255 "src/admin.rl"
+#line 256 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -367,7 +368,7 @@ tr101:
 		}
 	goto st135;
 tr117:
-#line 210 "src/admin.rl"
+#line 211 "src/admin.rl"
 	{
 			start(out);
 			show_cfg(out);
@@ -375,15 +376,15 @@ tr117:
 		}
 	goto st135;
 tr131:
-#line 298 "src/admin.rl"
+#line 299 "src/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st135;
 tr137:
-#line 297 "src/admin.rl"
+#line 298 "src/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st135;
 tr146:
-#line 216 "src/admin.rl"
+#line 217 "src/admin.rl"
 	{
 			start(out);
 			errinj_info(out);
@@ -391,33 +392,33 @@ tr146:
 		}
 	goto st135;
 tr152:
-#line 301 "src/admin.rl"
+#line 302 "src/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st135;
 tr160:
-#line 300 "src/admin.rl"
+#line 301 "src/admin.rl"
 	{start(out); show_slab(out); end(out);}
 	goto st135;
 tr164:
-#line 302 "src/admin.rl"
+#line 303 "src/admin.rl"
 	{start(out); show_stat(out);end(out);}
 	goto st135;
 st135:
 	if ( ++p == pe )
 		goto _test_eof135;
 case 135:
-#line 410 "src/admin.m"
+#line 411 "src/admin.m"
 	goto st0;
 tr14:
-#line 307 "src/admin.rl"
+#line 308 "src/admin.rl"
 	{slab_validate(); ok(out);}
 	goto st7;
 tr21:
-#line 295 "src/admin.rl"
+#line 296 "src/admin.rl"
 	{return -1;}
 	goto st7;
 tr26:
-#line 222 "src/admin.rl"
+#line 223 "src/admin.rl"
 	{
 			start(out);
 			tbuf_append(out, help, strlen(help));
@@ -425,9 +426,9 @@ tr26:
 		}
 	goto st7;
 tr37:
-#line 281 "src/admin.rl"
+#line 282 "src/admin.rl"
 	{strend = p;}
-#line 228 "src/admin.rl"
+#line 229 "src/admin.rl"
 	{
 			strstart[strend-strstart]='\0';
 			start(out);
@@ -436,7 +437,7 @@ tr37:
 		}
 	goto st7;
 tr44:
-#line 235 "src/admin.rl"
+#line 236 "src/admin.rl"
 	{
 			if (reload_cfg(err))
 				fail(out, err);
@@ -445,11 +446,11 @@ tr44:
 		}
 	goto st7;
 tr68:
-#line 305 "src/admin.rl"
+#line 306 "src/admin.rl"
 	{coredump(60); ok(out);}
 	goto st7;
 tr77:
-#line 242 "src/admin.rl"
+#line 243 "src/admin.rl"
 	{
 			int ret = snapshot(NULL, 0);
 
@@ -464,9 +465,9 @@ tr77:
 		}
 	goto st7;
 tr99:
-#line 291 "src/admin.rl"
+#line 292 "src/admin.rl"
 	{ state = false; }
-#line 255 "src/admin.rl"
+#line 256 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -478,9 +479,9 @@ tr99:
 		}
 	goto st7;
 tr102:
-#line 290 "src/admin.rl"
+#line 291 "src/admin.rl"
 	{ state = true; }
-#line 255 "src/admin.rl"
+#line 256 "src/admin.rl"
 	{
 			strstart[strend-strstart] = '\0';
 			if (errinj_set_byname(strstart, state)) {
@@ -492,7 +493,7 @@ tr102:
 		}
 	goto st7;
 tr118:
-#line 210 "src/admin.rl"
+#line 211 "src/admin.rl"
 	{
 			start(out);
 			show_cfg(out);
@@ -500,15 +501,15 @@ tr118:
 		}
 	goto st7;
 tr132:
-#line 298 "src/admin.rl"
+#line 299 "src/admin.rl"
 	{start(out); fiber_info(out); end(out);}
 	goto st7;
 tr138:
-#line 297 "src/admin.rl"
+#line 298 "src/admin.rl"
 	{start(out); tarantool_info(out); end(out);}
 	goto st7;
 tr147:
-#line 216 "src/admin.rl"
+#line 217 "src/admin.rl"
 	{
 			start(out);
 			errinj_info(out);
@@ -516,22 +517,22 @@ tr147:
 		}
 	goto st7;
 tr153:
-#line 301 "src/admin.rl"
+#line 302 "src/admin.rl"
 	{start(out); palloc_stat(out); end(out);}
 	goto st7;
 tr161:
-#line 300 "src/admin.rl"
+#line 301 "src/admin.rl"
 	{start(out); show_slab(out); end(out);}
 	goto st7;
 tr165:
-#line 302 "src/admin.rl"
+#line 303 "src/admin.rl"
 	{start(out); show_stat(out);end(out);}
 	goto st7;
 st7:
 	if ( ++p == pe )
 		goto _test_eof7;
 case 7:
-#line 535 "src/admin.m"
+#line 536 "src/admin.m"
 	if ( (*p) == 10 )
 		goto st135;
 	goto st0;
@@ -684,28 +685,28 @@ case 23:
 	}
 	goto tr33;
 tr33:
-#line 281 "src/admin.rl"
+#line 282 "src/admin.rl"
 	{strstart = p;}
 	goto st24;
 st24:
 	if ( ++p == pe )
 		goto _test_eof24;
 case 24:
-#line 695 "src/admin.m"
+#line 696 "src/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
 	}
 	goto st24;
 tr34:
-#line 281 "src/admin.rl"
+#line 282 "src/admin.rl"
 	{strstart = p;}
 	goto st25;
 st25:
 	if ( ++p == pe )
 		goto _test_eof25;
 case 25:
-#line 709 "src/admin.m"
+#line 710 "src/admin.m"
 	switch( (*p) ) {
 		case 10: goto tr36;
 		case 13: goto tr37;
@@ -1155,28 +1156,28 @@ case 73:
 		goto tr91;
 	goto st0;
 tr91:
-#line 289 "src/admin.rl"
+#line 290 "src/admin.rl"
 	{ strstart = p; }
 	goto st74;
 st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 1166 "src/admin.m"
+#line 1167 "src/admin.m"
 	if ( (*p) == 32 )
 		goto tr92;
 	if ( 33 <= (*p) && (*p) <= 126 )
 		goto st74;
 	goto st0;
 tr92:
-#line 289 "src/admin.rl"
+#line 290 "src/admin.rl"
 	{ strend = p; }
 	goto st75;
 st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 1180 "src/admin.m"
+#line 1181 "src/admin.m"
 	switch( (*p) ) {
 		case 32: goto st75;
 		case 111: goto st76;
@@ -1868,7 +1869,7 @@ case 134:
 	_out: {}
 	}
 
-#line 313 "src/admin.rl"
+#line 314 "src/admin.rl"
 
 
 	in->pos = pe;
@@ -1888,7 +1889,7 @@ admin_handler(va_list ap)
 {
 	struct ev_io coio = va_arg(ap, struct ev_io);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
-	fiber_set_sid(fiber, mod_sid());
+	fiber_set_sid(fiber, box_sid());
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	@try {

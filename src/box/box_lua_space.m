@@ -150,7 +150,7 @@ lbox_add_space(struct space *space, struct lua_State *L)
  * array.
  */
 void
-mod_lua_load_cfg(struct lua_State *L)
+box_lua_load_cfg(struct lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "space");

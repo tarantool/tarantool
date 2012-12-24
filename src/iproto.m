@@ -252,7 +252,7 @@ struct iproto_session
 	ssize_t parse_size;
 	/** Current write position in the output buffer */
 	struct obuf_svp write_pos;
-	mod_process_func *handler;
+	box_process_func *handler;
 	struct ev_io input;
 	struct ev_io output;
 	/** Mod session id. */
@@ -283,7 +283,7 @@ iproto_session_on_output(struct ev_io *watcher,
 			 int revents __attribute__((unused)));
 
 static struct iproto_session *
-iproto_session_create(const char *name, int fd, mod_process_func *param)
+iproto_session_create(const char *name, int fd, box_process_func *param)
 {
 	struct iproto_session *session;
 	if (SLIST_EMPTY(&iproto_session_cache)) {
@@ -300,7 +300,7 @@ iproto_session_create(const char *name, int fd, mod_process_func *param)
 	session->iobuf[1] = iobuf_create(name);
 	session->parse_size = 0;
 	session->write_pos = obuf_create_svp(&session->iobuf[0]->out);
-	session->sid = mod_sid();
+	session->sid = box_sid();
 	return session;
 }
 
@@ -581,7 +581,7 @@ iproto_reply_error(struct obuf *out, struct iproto_header *req,
 
 /** Stack a reply to a single request to the fiber's io vector. */
 static inline void
-iproto_reply(struct port_iproto *port, mod_process_func callback,
+iproto_reply(struct port_iproto *port, box_process_func callback,
 	     struct obuf *out, struct iproto_header *header)
 {
 	if (header->msg_code == msg_ping)
@@ -684,9 +684,9 @@ iproto_init(const char *bind_ipaddr, int primary_port,
 		static struct evio_service primary;
 		evio_service_init(&primary, "primary",
 				  bind_ipaddr, primary_port,
-				  iproto_on_accept, &mod_process);
+				  iproto_on_accept, &box_process);
 		evio_service_on_bind(&primary,
-				     mod_leave_local_standby_mode, NULL);
+				     box_leave_local_standby_mode, NULL);
 		evio_service_start(&primary);
 	}
 
@@ -695,7 +695,7 @@ iproto_init(const char *bind_ipaddr, int primary_port,
 		static struct evio_service secondary;
 		evio_service_init(&secondary, "secondary",
 				  bind_ipaddr, secondary_port,
-				  iproto_on_accept, &mod_process_ro);
+				  iproto_on_accept, &box_process_ro);
 		evio_service_start(&secondary);
 	}
 	/**
