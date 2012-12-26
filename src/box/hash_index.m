@@ -387,7 +387,7 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return (struct iterator *) it;
 }
 
-- (void) initIterator: (struct iterator *) ptr: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) ptr :(enum iterator_type) type
                         :(void *) key :(int) part_count
 {
 	assert(ptr->free == hash_iterator_free);
@@ -550,7 +550,7 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 }
 
 
-- (void) initIterator: (struct iterator *) ptr: (enum iterator_type) type
+- (void) initIterator: (struct iterator *) ptr :(enum iterator_type) type
                         :(void *) key :(int) part_count
 {
 	(void) part_count;

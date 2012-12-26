@@ -27,7 +27,7 @@ macro(libobjc_build)
        endif()
     endif()
     if (CMAKE_COMPILER_IS_CLANG)
-        set (extra_cflags "${extra_cflags} -Wno-deprecated-objc-isa-usage")
+        set (extra_cflags "${extra_cflags} -Wno-deprecated-objc-isa-usage -Wno-objc-root-class")
     endif()
     if (NOT (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR}))
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/libobjc

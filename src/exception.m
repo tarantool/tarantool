@@ -73,7 +73,7 @@
 	return self;
 }
 
-- (id) init: (int)errnum_arg :(const char *)format: (va_list)ap
+- (id) init: (int)errnum_arg :(const char *)format :(va_list)ap
 {
 	self = [super init];
 	errnum = errnum_arg;
@@ -105,7 +105,7 @@
 }
 
 
-- (id) init: (uint32_t)errcode_ args: (va_list)ap
+- (id) init: (uint32_t)errcode_ args :(va_list)ap
 {
 	[super init];
 	errcode = errcode_;
