@@ -28,6 +28,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <stdio.h>
+#include <fcntl.h> /* Definition of AT_* constants */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>

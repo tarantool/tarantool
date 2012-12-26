@@ -49,6 +49,8 @@ target_link_libraries(ev ${ev_libs})
 #
 # libeio library
 #
+set_source_files_properties(tarantool_eio.c
+    PROPERTIES COMPILE_FLAGS "-Wno-unused-value -Wno-dangling-else")
 add_library(eio tarantool_eio.c)
 
 #
