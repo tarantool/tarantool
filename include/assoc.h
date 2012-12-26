@@ -85,7 +85,7 @@ static inline int lstrcmp(const void *a, const void *b)
 #include <third_party/murmur_hash2.c>
 #define mh_name _lstrptr
 struct mh_lstrptr_node_t {
-	void *key;
+	const void *key;
 	void *val;
 };
 

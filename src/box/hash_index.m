@@ -184,6 +184,8 @@ hash_iterator_lstr_eq(struct iterator *it)
 	default:
 		assert(false);
 	}
+
+	return NULL;
 }
 
 - (void) reserve: (u32) n_tuples
@@ -472,7 +474,7 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(int64_hash);
 }
 
-- (struct tuple *) findByKey: (void *) key :(int) part_count
+- (struct tuple *) findByKey: (const void *) key :(int) part_count
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
@@ -630,7 +632,7 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(str_hash);
 }
 
-- (struct tuple *) findByKey: (void *) key :(int) part_count
+- (struct tuple *) findByKey: (const void *) key :(int) part_count
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);

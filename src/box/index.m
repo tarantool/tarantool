@@ -111,6 +111,8 @@ replace_check_dup(struct tuple *old_tuple,
 	default:
 		assert(false);
 	}
+
+	return NULL;
 }
 
 - (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg;
@@ -174,7 +176,7 @@ replace_check_dup(struct tuple *old_tuple,
 	return NULL;
 }
 
-- (struct tuple *) findByKey: (void *) key :(int) part_count
+- (struct tuple *) findByKey: (const void *) key :(int) part_count
 {
 	(void) key;
 	(void) part_count;
