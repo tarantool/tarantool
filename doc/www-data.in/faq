@@ -1,4 +1,6 @@
-{% text main en %}
+{% page faq en %}
+
+{% text faq en %}
 
 ## Frequently Asked Questions
 
@@ -39,7 +41,5 @@ A. It's a prime number which is easy to remember, because 3313, 3301, 313, 13 an
 **Q. My arena_used/items_used in SHOW SLAB output is >> 1. What does it mean and what should I do?**
 
 A. If the ratio of arena_used to items_used >> 1, that indicates that there is fragmentation accumulated by the slab allocator. Imagine there are a lot of small tuples stored in the system initially, and later on each tuple becomes bigger and doesn't fit into its old slab size. The old slabs are never relinquished by the allocator. Currently this can be solved only by a server restart.
-
-{% page faq en %}
 
 {% page faq ru %}
