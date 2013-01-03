@@ -1,3 +1,9 @@
+tarantool (1.4.8+20130104-1) unstable; urgency=low
+
+  * New snapshot (segfault in tree iterator).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 04 Jan 2013 01:29:54 +0400
+
 tarantool (1.4.8+20121214-1) unstable; urgency=low
 
   * New snapshot (fix segfault with box.ipc.channel).

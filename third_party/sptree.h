@@ -564,7 +564,7 @@ sptree_##name##_iterator_init_set(sptree_##name *t, sptree_##name##_iterator **i
     int      lastLevelEq = -1, cmp;                                                       \
                                                                                           \
     if ((*i) == NULL || t->max_depth > (*i)->max_depth)                                   \
-        *i = realloc(*i, sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 1));            \
+        *i = realloc(*i, sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 31));            \
                                                                                           \
     (*i)->t = t;                                                                          \
     (*i)->level = -1;                                                                     \
@@ -621,7 +621,7 @@ sptree_##name##_iterator_reverse_init_set(sptree_##name *t, sptree_##name##_iter
     int      lastLevelEq = -1, cmp;                                                       \
                                                                                           \
     if ((*i) == NULL || t->max_depth > (*i)->max_depth)                                   \
-        *i = realloc(*i, sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 1));            \
+        *i = realloc(*i, sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 31));            \
                                                                                           \
     (*i)->t = t;                                                                          \
     (*i)->level = -1;                                                                     \
