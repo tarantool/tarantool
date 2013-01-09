@@ -296,12 +296,11 @@ tp_delete(struct tp *p, uint32_t space, uint32_t flags) {
 }
 
 static inline ssize_t
-tp_call(struct tp *p, uint32_t flags, char *name) {
+tp_call(struct tp *p, uint32_t flags, char *name, size_t size) {
 	struct {
 		struct tp_h h;
 		struct tp_hcall c;
 	} h;
-	size_t size = strlen(name);
 	size_t sz = tp_leb128sizeof(size);
 	h.h.type = TP_CALL;
 	h.h.len = sizeof(struct tp_hcall) + sz + size;
@@ -442,6 +441,7 @@ tp_reply(struct tp *p) {
 	p->c = p->s;
 	p->h = tp_fetch(p, sizeof(struct tp_h));
 	p->t = NULL;
+	p->f = NULL;
 	p->u = NULL;
 	if (tp_unlikely(p->h->type == TP_PING))
 		return TP_PING;
