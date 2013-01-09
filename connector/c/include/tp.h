@@ -148,6 +148,12 @@ tp_init(struct tp *p, char *buf, size_t size,
 	p->obj = obj;
 }
 
+static inline void
+tp_reqid(struct tp *p, uint32_t reqid) {
+	assert(p->h != NULL);
+	p->h->reqid = reqid;
+}
+
 static tp_noinline ssize_t
 tp_ensure(struct tp *p, size_t size) {
 	if (tp_likely(tp_unused(p) >= size))
