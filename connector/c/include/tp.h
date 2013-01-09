@@ -163,7 +163,7 @@ tp_ensure(struct tp *p, size_t size) {
 	if (tp_likely(p->h))
 		p->h = (struct tp_h*)(np + (((char*)p->h) - p->s));
 	if (tp_unlikely(p->f))
-		p->f = (np + (p->u - p->s));
+		p->f = (np + (p->f - p->s));
 	if (tp_unlikely(p->u))
 		p->u = (np + (p->u - p->s));
 	p->s = np;
