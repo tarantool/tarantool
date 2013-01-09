@@ -7,7 +7,7 @@ int main(void)
 	char buf[128];
 
 	struct tp req;
-	tp_init(&req, buf, sizeof(buf), NULL);
+	tp_init(&req, buf, sizeof(buf), NULL, NULL);
 
 	/*
 	tp_insert(&req, 0, 0);

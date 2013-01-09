@@ -41,6 +41,7 @@
 
 #define tp_function_unused __attribute__((unused))
 #define tp_packed __attribute__((packed))
+#define tp_noinline __attribute__((noinline))
 
 #define tp_likely(expr)   __builtin_expect(!! (expr), 1)
 #define tp_unlikely(expr) __builtin_expect(!! (expr), 0)
@@ -103,6 +104,7 @@ struct tp {
 	uint32_t code;
 	uint32_t cnt;
 	tp_resizer resizer;
+	void *obj;
 };
 
 static inline size_t
@@ -123,14 +125,15 @@ tp_unused(struct tp *p) {
 tp_function_unused static char*
 tp_reallocator(struct tp *p, size_t req, size_t *size) {
 	size_t nsz = tp_size(p) * 2;
-	if (nsz < req)
+	if (tp_unlikely(nsz < req))
 		nsz = req;
 	*size = nsz;
 	return realloc(p->s, nsz);
 }
 
 static inline void
-tp_init(struct tp *p, char *buf, size_t size, tp_resizer resizer) {
+tp_init(struct tp *p, char *buf, size_t size,
+        tp_resizer resizer, void *obj) {
 	p->s = buf;
 	p->p = p->s;
 	p->e = p->s + size;
@@ -142,9 +145,10 @@ tp_init(struct tp *p, char *buf, size_t size, tp_resizer resizer) {
 	p->cnt = 0;
 	p->code = 0;
 	p->resizer = resizer;
+	p->obj = obj;
 }
 
-static ssize_t
+static tp_noinline ssize_t
 tp_ensure(struct tp *p, size_t size) {
 	if (tp_likely(tp_unused(p) >= size))
 		return 0;
@@ -199,7 +203,7 @@ tp_leb128sizeof(uint32_t value) {
 	       (tp_unlikely(value < (1 << 28))) ? 4 : 5;
 }
 
-static void
+static tp_noinline void
 tp_leb128save_slowpath(struct tp *p, uint32_t value) {
 	if (tp_unlikely(value >= (1 << 21))) {
 		if (tp_unlikely(value >= (1 << 28)))
@@ -249,6 +253,12 @@ static inline ssize_t
 tp_appendreq(struct tp *p, void *h, size_t size) {
 	tp_setreq(p);
 	return tp_append(p, h, size);
+}
+
+static inline ssize_t
+tp_ping(struct tp *p) {
+	struct tp_h h = { TP_PING, 0, 0 };
+	return tp_appendreq(p, &h, sizeof(h));
 }
 
 static inline ssize_t
