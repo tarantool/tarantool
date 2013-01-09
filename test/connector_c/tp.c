@@ -8,6 +8,7 @@ int main(void)
 
 	struct tp req;
 	tp_init(&req, buf, sizeof(buf), NULL, NULL);
+	/*tp_ping(&req);*/
 
 	/*
 	tp_insert(&req, 0, 0);
@@ -31,8 +32,17 @@ int main(void)
 	tp_op(&req, 1, TP_OPEQ, "VALUE", 5);
 	*/
 
-	tp_call(&req, 0, "hello_proc");
+	/*
+	char proc[] = "hello_proc";
+	tp_call(&req, 0, proc, sizeof(proc) - 1);
 	tp_tuple(&req);
+
+	char *arg = malloc(500);
+	memset(arg, 0, 500);
+
+	tp_sz(&req, "arg1");
+	tp_sz(&req, "arg2");
+	*/
 
 	fwrite(buf, tp_used(&req), 1, stdout);
 	return 0;

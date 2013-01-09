@@ -148,12 +148,6 @@ tp_init(struct tp *p, char *buf, size_t size,
 	p->obj = obj;
 }
 
-static inline void
-tp_reqid(struct tp *p, uint32_t reqid) {
-	assert(p->h != NULL);
-	p->h->reqid = reqid;
-}
-
 static tp_noinline ssize_t
 tp_ensure(struct tp *p, size_t size) {
 	if (tp_likely(tp_unused(p) >= size))
@@ -164,8 +158,14 @@ tp_ensure(struct tp *p, size_t size) {
 	register char *np = p->resizer(p, size, &sz);
 	if (tp_unlikely(np == NULL))
 		return -1;
-	p->t = np + (p->t - p->s);
 	p->p = np + (p->p - p->s);
+	p->t = np + (p->t - p->s);
+	if (tp_likely(p->h))
+		p->h = (struct tp_h*)(np + (((char*)p->h) - p->s));
+	if (tp_unlikely(p->f))
+		p->f = (np + (p->u - p->s));
+	if (tp_unlikely(p->u))
+		p->u = (np + (p->u - p->s));
 	p->s = np;
 	p->e = np + sz; 
 	return sz;
@@ -178,6 +178,12 @@ tp_append(struct tp *p, void *data, size_t size) {
 	memcpy(p->p, data, size);
 	p->p += size;
 	return tp_used(p);
+}
+
+static inline void
+tp_reqid(struct tp *p, uint32_t reqid) {
+	assert(p->h != NULL);
+	p->h->reqid = reqid;
 }
 
 static inline uint32_t
