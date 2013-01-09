@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_H_INCLUDED
-#define TARANTOOL_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_LUA_SESSION_H
+#define INCLUDES_TARANTOOL_LUA_SESSION_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,28 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdbool.h>
-#include <util.h>
+struct lua_State;
 
-struct tarantool_cfg;
-struct tbuf;
-
-extern int snapshot_pid;
-extern struct tarantool_cfg cfg;
-extern const char *cfg_filename;
-extern char *cfg_filename_fullpath;
-extern bool init_storage, booting;
-extern char *binary_filename;
-extern char *custom_proc_title;
-i32 reload_cfg(struct tbuf *out);
-void show_cfg(struct tbuf *out);
-int snapshot(void * /* ev */, int /* events */);
-const char *tarantool_version(void);
-double tarantool_uptime(void);
-void tarantool_free(void);
-
-char **init_set_proc_title(int argc, char **argv);
-void free_proc_title(int argc, char **argv);
-void set_proc_title(const char *format, ...);
-void title(const char *fmt, ...);
-#endif /* TARANTOOL_H_INCLUDED */
+void
+tarantool_lua_session_init(struct lua_State *L);
+#endif /* INCLUDES_TARANTOOL_LUA_SESSION_H */

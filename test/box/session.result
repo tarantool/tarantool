@@ -1,0 +1,171 @@
+lua box.session.exists(box.session.id())
+---
+ - 1
+...
+lua box.session.exists()
+---
+error: 'session.exists(sid): bad arguments'
+...
+lua box.session.exists(1, 2, 3)
+---
+error: 'session.exists(sid): bad arguments'
+...
+lua box.session.exists(1234567890)
+---
+ - 0
+...
+lua box.session.id() > 0
+---
+ - true
+...
+lua f = box.fiber.create(function() box.fiber.detach() failed = box.session.id() ~= 0 end)
+---
+...
+lua box.fiber.resume(f)
+---
+...
+lua failed
+---
+ - false
+...
+lua f1 = box.fiber.create(function() if box.session.id() == 0 then failed = true end end)
+---
+...
+lua box.fiber.resume(f1)
+---
+ - true
+...
+lua failed
+---
+ - false
+...
+lua box.session.peer() == box.session.peer(box.session.id())
+---
+ - true
+...
+lua box.session.on_connect(function() end)
+---
+ - nil
+...
+lua box.session.on_disconnect(function() end)
+---
+ - nil
+...
+lua type(box.session.on_connect(function() error('hear') end))
+---
+ - function
+...
+lua type(box.session.on_disconnect(function() error('hear') end))
+---
+ - function
+...
+lua box.session.on_connect()
+---
+error: 'session.on_connect(chunk): bad arguments'
+...
+lua box.session.on_disconnect()
+---
+error: 'session.on_connect(chunk): bad arguments'
+...
+lua box.session.on_connect(function() end, function() end)
+---
+error: 'session.on_connect(chunk): bad arguments'
+...
+lua box.session.on_disconnect(function() end, function() end)
+---
+error: 'session.on_connect(chunk): bad arguments'
+...
+lua box.session.on_connect(1, 2)
+---
+error: 'session.on_connect(chunk): bad arguments'
+...
+lua box.session.on_disconnect(1, 2)
+---
+error: 'session.on_connect(chunk): bad arguments'
+...
+lua box.session.on_connect(1)
+---
+error: 'session.on_connect(chunk): bad arguments'
+...
+lua box.session.on_disconnect(1)
+---
+error: 'session.on_connect(chunk): bad arguments'
+...
+lua type(box.session.on_connect(nil))
+---
+ - function
+...
+lua type(box.session.on_disconnect(nil))
+---
+ - function
+...
+lua type(box.session.on_connect(nil))
+---
+ - nil
+...
+lua type(box.session.on_disconnect(nil))
+---
+ - nil
+...
+lua function inc() active_connections = active_connections + 1 end
+---
+...
+lua function dec() active_connections = active_connections - 1 end
+---
+...
+lua box.session.on_connect(inc)
+---
+ - nil
+...
+lua box.session.on_disconnect(dec)
+---
+ - nil
+...
+lua active_connections = 0
+---
+...
+lua active_connections
+---
+ - 1
+...
+lua active_connections
+---
+ - 2
+...
+lua type(box.session.on_connect(nil))
+---
+ - function
+...
+lua type(box.session.on_disconnect(nil))
+---
+ - function
+...
+lua box.session.on_connect(function() box.insert(0, box.session.id()) end)
+---
+ - nil
+...
+lua box.session.on_disconnect(function() box.delete(0, box.session.id()) end)
+---
+ - nil
+...
+lua box.unpack('i', box.select(0, 0, box.session.id())[0]) == box.session.id()
+---
+ - true
+...
+lua type(box.session.on_connect(function() nosuchfunction() end))
+---
+ - function
+...
+disconnected
+lua type(box.session.on_connect(nil))
+---
+ - function
+...
+lua type(box.session.on_disconnect(nil))
+---
+ - function
+...
+lua active_connections
+---
+ - 0
+...

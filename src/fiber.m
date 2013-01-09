@@ -305,8 +305,6 @@ fiber_find(int fid)
 
 	if (k == mh_end(fiber_registry))
 		return NULL;
-	if (!mh_exist(fiber_registry, k))
-		return NULL;
 	return mh_value(fiber_registry, k);
 }
 

@@ -64,6 +64,7 @@
 #include "tarantool_pthread.h"
 #include "lua/init.h"
 #include "memcached.h"
+#include "session.h"
 #include "box/box.h"
 
 
@@ -593,6 +594,7 @@ tarantool_free(void)
 	destroy_tarantool_cfg(&cfg);
 
 	fiber_free();
+	session_free();
 	palloc_free();
 	ev_default_destroy();
 #ifdef ENABLE_GCOV
@@ -876,6 +878,7 @@ main(int argc, char **argv)
 			    cfg.secondary_port);
 		admin_init(cfg.bind_ipaddr, cfg.admin_port);
 		replication_init(cfg.bind_ipaddr, cfg.replication_port);
+		session_init();
 		/*
 		 * Load user init script.  The script should have access
 		 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that

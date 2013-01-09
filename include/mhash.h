@@ -286,6 +286,14 @@ _mh(del)(struct _mh(t) *h, mh_int_t x)
 }
 #endif
 
+static inline void
+_mh(remove)(struct _mh(t) *h, mh_key_t key)
+{
+	mh_int_t k = _mh(get)(h, key);
+	if (k != mh_end(h))
+		_mh(del)(h, k);
+}
+
 
 #ifdef MH_SOURCE
 
