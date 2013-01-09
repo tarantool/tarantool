@@ -80,13 +80,3 @@ exec admin "lua box.fiber.find(900)"
 exec admin "lua box.fiber.find(910)"
 exec admin "lua box.fiber.find(920)"
 exec admin "lua box.space[0]:truncate()"
-
-# check fiber.sid() and fiber.id()
-exec admin "lua box.fiber.sid() > 0"
-exec admin "lua f = box.fiber.create(function() box.fiber.detach() failed = box.fiber.sid() ~= 0 end)"
-exec admin "lua box.fiber.resume(f)"
-exec admin "lua failed"
-exec admin "lua f = box.fiber.create(function() if box.fiber.sid() == 0 then error('wrong sid') end end)"
-exec admin "lua box.fiber.resume(f)"
-
-

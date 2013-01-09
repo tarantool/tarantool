@@ -87,19 +87,10 @@ void box_snapshot(struct log_io *, struct fio_batch *batch);
 void box_info(struct tbuf *out);
 const char *box_status(void);
 /**
- * Issue a new session identifier -
- * called by the networking layer
- * when a new connection is established.
- */
-uint32_t box_sid();
-/**
  * Called to enter master or replica
  * mode (depending on the configuration) after
  * binding to the primary port.
  */
 void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
-
-
-
 #endif /* INCLUDES_TARANTOOL_BOX_H */

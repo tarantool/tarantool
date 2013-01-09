@@ -175,7 +175,7 @@ Call OK, 2 rows affected
     In the above example, the way the procedure receives its
     argument is identical in two protocols, when the argument is a
     string. A numeric field, however, when submitted via the
-    binary protocol, is seen by the procedure as 
+    binary protocol, is seen by the procedure as
     a 4-byte blob, not as a Lua <quote>number</quote> type.
     </para>
     <para>In addition to conventional method invocation,
@@ -435,7 +435,7 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
                 argument. A format specifier also works as a
                 placeholder for the number of a field, which needs
                 to be updated, or for an argument value.
-                For example: 
+                For example:
                 <simplelist>
                     <member><code>+p=p</code> &mdash; add a value
                     to one field and assign another,
@@ -1002,7 +1002,7 @@ qkl
 ...
 localhost> lua t:unpack()
 ---
- - 
+ -
  - abc
  - cde
  - efg
@@ -1413,7 +1413,6 @@ error: 'Iterator type is not supported'
 
 <section>
     <title>Package <code>box.fiber</code></title>
-<variablelist xml:id="box.fiber">
     <para>Functions in this package allow you to create, run and
     manage existing <emphasis>fibers</emphasis>.
     </para>
@@ -1484,6 +1483,7 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
     garbage collected: the garbage collector frees pool allocator
     memory owned by the fiber, resets all fiber data, and returns
     the fiber to the fiber pool.</para>
+<variablelist xml:id="box.fiber">
     <varlistentry>
         <term>
             <emphasis role="lua">box.fiber.id(fiber) </emphasis>
@@ -1579,6 +1579,82 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         <listitem><simpara>
             Check if the current fiber has been canceled and
             throw an exception if this is the case.
+        </simpara></listitem>
+    </varlistentry>
+</variablelist>
+</section>
+
+<!--   end of lib -->
+
+<section>
+    <title>Package <code>box.session</code></title>
+    <para>Learn session state, set on-connect and
+    on-disconnect triggers.
+    </para>
+    <para>
+A session is an object associated with each client connection.
+Through this module, it's possible to query session state,
+as well as set a Lua chunk executed on connect or disconnect
+event.
+    </para>
+<variablelist>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.session.id() </emphasis>
+        </term>
+        <listitem><simpara>Return a unique monotonic identifier of
+        the current session. The identifier can be used to check
+        whether or not a session is alive. 0 means there is no
+        session (e.g. a procedure is running in a detached
+        fiber).
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.session.fd(id) </emphasis>
+        </term>
+        <listitem><simpara>Return an integer file descriptor
+        associated with the connected client.</simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.session.exists(id) </emphasis>
+        </term>
+        <listitem><simpara>Return true if a session is alive,
+        false otherwise.</simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.session.on_connect(chunk) </emphasis>
+        </term>
+        <listitem><para>
+		Set a callback (trigger) invoked on each connected session.
+        The callback doesn't get any arguments, but is the first
+        thing invoked in the scope of the newly created session.
+        If the trigger fails by raising an error, the error
+        is sent to the client and the connection is shut down.
+        Returns the old value of the trigger.
+        </para>
+        <warning>
+        <para>
+        If a trigger always results in an error, it may become
+        impossible to connect to the server to reset it.
+        </para>
+        </warning>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.session.on_disconnect(chunk)</emphasis>
+        </term>
+        <listitem><simpara>Set a trigger invoked after a client has
+        disconnected. Returns the old value of the trigger. If
+        the trigger raises an error, the error is logged but otherwise
+        is ignored.
         </simpara></listitem>
     </varlistentry>
 </variablelist>

@@ -126,6 +126,7 @@ set (common_sources
      cpu_feature.m
      replica.m
      iproto.m
+     session.m
      object.m
      exception.m
      errcode.c
@@ -140,6 +141,7 @@ set (common_sources
      lua/slab.m
      lua/uuid.m
      lua/lua_ipc.m
+     lua/session.m
 )
 
 if (ENABLE_TRACE)

@@ -10,10 +10,10 @@
   length is varying: a tuple can contain any number
   of fields. A field can be either numeric &mdash;
   32- or 64- bit unsigned integer, or binary
-  string &mdash; a sequence of octets.  The first field of a
-  tuple is always assumed to be
-  the identifying (unique) key. The remaining fields make up a 
-  value, associated with the key.
+  string &mdash; a sequence of octets.  Fields included into the
+  first index are always assumed to be the identifying (unique)
+  key. The remaining fields make up a value, associated with the
+  key.
   Tuple sets are called <emphasis>spaces<alt>perhaps, not the best name</alt></emphasis>, and there can be up to 255 spaces defined per
   one Tarantool instance.
 

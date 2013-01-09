@@ -49,6 +49,7 @@
 #include "lua/slab.h"
 #include "lua/stat.h"
 #include "lua/uuid.h"
+#include "lua/session.h"
 
 #include <sys/time.h>
 #include <sys/types.h>
@@ -666,14 +667,6 @@ lbox_fiber_id(struct lua_State *L)
 	return 1;
 }
 
-static int
-lbox_fiber_sid(struct lua_State *L)
-{
-	struct fiber *f = lua_gettop(L) ? lbox_checkfiber(L, 1) : fiber;
-	lua_pushinteger(L, f->sid);
-	return 1;
-}
-
 static struct lua_State *
 box_lua_fiber_get_coro(struct lua_State *L, struct fiber *f)
 {
@@ -896,6 +889,7 @@ lbox_fiber_create(struct lua_State *L)
 			   " reached");
 
 	struct fiber *f = fiber_create("lua", box_lua_fiber_run);
+	/* Preserve the session in a child fiber. */
 	fiber_set_sid(f, fiber->sid);
 	/* Initially the fiber is cancellable */
 	f->flags |= FIBER_USER_MODE | FIBER_CANCELLABLE;
@@ -1146,7 +1140,6 @@ lbox_fiber_testcancel(struct lua_State *L)
 
 static const struct luaL_reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
-	{"sid", lbox_fiber_sid},
 	{"name", lbox_fiber_name},
 	{"__gc", lbox_fiber_gc},
 	{NULL, NULL}
@@ -1156,7 +1149,6 @@ static const struct luaL_reg fiberlib[] = {
 	{"sleep", lbox_fiber_sleep},
 	{"self", lbox_fiber_self},
 	{"id", lbox_fiber_id},
-	{"sid", lbox_fiber_sid},
 	{"find", lbox_fiber_find},
 	{"cancel", lbox_fiber_cancel},
 	{"testcancel", lbox_fiber_testcancel},
@@ -1341,12 +1333,6 @@ tarantool_lua_register_type(struct lua_State *L, const char *type_name,
 	lua_pop(L, 1);
 }
 
-/**
- * Remember the LuaJIT FFI extension reference index
- * to protect it from being garbage collected.
- */
-static int ffi_ref = 0;
-
 struct lua_State *
 tarantool_lua_init()
 {
@@ -1360,7 +1346,11 @@ tarantool_lua_init()
 	if (lua_pcall(L, 1, 0, 0) != 0)
 		panic("%s", lua_tostring(L, -1));
 	lua_getglobal(L, "ffi");
-	ffi_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	/**
+	 * Remember the LuaJIT FFI extension reference index
+	 * to protect it from being garbage collected.
+	 */
+	(void) luaL_ref(L, LUA_REGISTRYINDEX);
 	lua_pushnil(L);
 	lua_setglobal(L, "ffi");
 	luaL_register(L, boxlib_name, boxlib);
@@ -1377,6 +1367,7 @@ tarantool_lua_init()
 	tarantool_lua_stat_init(L);
 	tarantool_lua_ipc_init(L);
 	tarantool_lua_uuid_init(L);
+	tarantool_lua_session_init(L);
 
 	mod_lua_init(L);
 
@@ -1388,7 +1379,6 @@ tarantool_lua_init()
 void
 tarantool_lua_close(struct lua_State *L)
 {
-	luaL_unref(L, LUA_REGISTRYINDEX, ffi_ref);
 	/* collects garbage, invoking userdata gc */
 	lua_close(L);
 }

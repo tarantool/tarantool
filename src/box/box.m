@@ -536,11 +536,3 @@ box_status(void)
 {
     return status;
 }
-
-
-uint32_t
-box_sid()
-{
-	static uint32_t sid = 1;
-	return sid++;
-}

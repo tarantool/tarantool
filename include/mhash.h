@@ -339,7 +339,6 @@ _mh(remove)(struct _mh(t) *h, const mh_node_t *node,
 		_mh(del)(h, k, hash_arg, eq_arg);
 }
 
-
 #ifdef MH_SOURCE
 
 void __attribute__((noinline))
