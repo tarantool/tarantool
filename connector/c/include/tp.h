@@ -62,7 +62,7 @@ typedef char *(*tp_resizer)(struct tp *p, size_t req, size_t *size);
 #define TP_FREP   4
 #define TP_FQUIET 8
 
-#define TP_OPEQ     0
+#define TP_OPSET    0
 #define TP_OPADD    1
 #define TP_OPAND    2
 #define TP_OPXOR    3
@@ -384,12 +384,36 @@ tp_op(struct tp *p, uint32_t field, uint8_t op, char *data,
 	p->p += sizeof(uint8_t);
 	/* data */
 	tp_leb128save(p, size);
-	memcpy(p->p, data, size);
+	if (tp_likely(data))
+		memcpy(p->p, data, size);
 	p->p += size;
 	/* update offset and count */
 	p->h->len += sz;
 	(*(uint32_t*)p->u)++;
 	return tp_used(p);
+}
+
+static inline ssize_t
+tp_opsplice(struct tp *p, uint32_t field, uint32_t off,
+            uint32_t len, char *data, size_t size) {
+	uint32_t olen = tp_leb128sizeof(sizeof(off)),
+	         llen = tp_leb128sizeof(sizeof(len)),
+	         dlen = tp_leb128sizeof(size);
+	uint32_t sz = olen + sizeof(off) + llen + sizeof(len) +
+	              dlen + size;
+	ssize_t rc = tp_op(p, field, TP_OPSPLICE, NULL, sz);
+	if (tp_unlikely(rc == -1))
+		return -1;
+	tp_leb128save(p, sizeof(off));
+	memcpy(p->p, &off, sizeof(off));
+	p->p += sizeof(off);
+	tp_leb128save(p, sizeof(len));
+	memcpy(p->p, &len, sizeof(len));
+	p->p += sizeof(len);
+	tp_leb128save(p, size);
+	memcpy(p->p, data, size);
+	p += size;
+	return rc;
 }
 
 static inline ssize_t
