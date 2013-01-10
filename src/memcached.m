@@ -183,7 +183,7 @@ struct salloc_stat_memcached_cb_ctx {
 };
 
 static int
-salloc_stat_memcached_cb(const struct slab_class_stats *cstat, void *cb_ctx)
+salloc_stat_memcached_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 {
 	struct salloc_stat_memcached_cb_ctx *ctx = cb_ctx;
 	ctx->bytes_used	+= cstat->bytes_used;

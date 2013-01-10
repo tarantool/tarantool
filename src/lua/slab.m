@@ -35,7 +35,7 @@
 
 /** A callback passed into salloc_stat() and invoked for every slab class. */
 static int
-salloc_stat_lua_cb(const struct slab_class_stats *cstat, void *cb_ctx)
+salloc_stat_lua_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 {
 	struct lua_State *L = cb_ctx;
 

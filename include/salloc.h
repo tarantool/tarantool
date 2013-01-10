@@ -41,7 +41,7 @@ void sfree(void *ptr);
 void slab_validate();
 
 /** Statistics on utilization of a single slab class. */
-struct slab_class_stats {
+struct slab_cache_stats {
 	i64 item_size;
 	i64 slabs;
 	i64 items;
@@ -55,7 +55,7 @@ struct slab_arena_stats {
 	size_t used;
 };
 
-typedef int (*salloc_stat_cb)(const struct slab_class_stats *st, void *ctx);
+typedef int (*salloc_stat_cb)(const struct slab_cache_stats *st, void *ctx);
 
 int
 salloc_stat(salloc_stat_cb cb, struct slab_arena_stats *astat, void *cb_ctx);
