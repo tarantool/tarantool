@@ -489,6 +489,7 @@ tp_reply(struct tp *p) {
 	if (tp_unlikely(tp_unfetched(p) == 0))
 		return p->code;
 	p->cnt = *(uint32_t*)tp_fetch(p, sizeof(uint32_t));
+	p->t = p->c;
 	return p->code;
 }
 
@@ -502,16 +503,42 @@ tp_rewindfield(struct tp *p) {
 	p->f = p->t;
 }
 
-static inline ssize_t
-tp_next(struct tp *p) {
-	(void)p;
-	return 0;
+static inline uint32_t
+tp_fqtuplesize(char *p) {
+	return *(uint32_t*)p;
 }
 
-static inline ssize_t
-tp_nextfield(struct tp *p) {
-	(void)p;
-	return 0;
+static inline uint32_t
+tp_fqtuplecount(char *p) {
+	return *(uint32_t*)(p + 4);
+}
+
+static inline char*
+tp_next(struct tp *p) {
+	assert(p->t != NULL);
+	if ((p->t - p->e) < sizeof(uint32_t))
+		return NULL;
+	char *c = p->t;
+	uint32_t size = tp_fqtuplesize(c);
+	/* tuple size + tuple cardinality */
+	p->f = p->t + 8;
+	p->t += size;
+	return c;
+}
+
+static inline char*
+tp_nextfield(struct tp *p, size_t *sz) {
+	assert(p->t != NULL);
+	assert(p->f != NULL);
+	if ((p->f - p->t) <= 1)
+		return NULL;
+	(void)sz;
+	/* loadsize
+	 * set size
+	 * set return data
+	 * inc pointer
+	 */
+	return NULL;
 }
 
 #endif /* TP_H_INCLUDED */
