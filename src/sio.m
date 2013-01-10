@@ -31,6 +31,7 @@
 #include <sys/uio.h>
 #include <errno.h>
 #include <stdio.h>
+#include <limits.h>
 #include <netinet/tcp.h> /* TCP_NODELAY */
 #include <arpa/inet.h> /* inet_ntoa */
 

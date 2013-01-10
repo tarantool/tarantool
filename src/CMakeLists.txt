@@ -1,57 +1,12 @@
 #
-# libev library
+# Set compile flags for entire src/ directory
 #
-add_library(ev tarantool_ev.c)
+enable_tnt_compile_flags()
 
-if (CC_HAS_WNO_UNUSED_RESULT)
-    set (ev_flags "-Wno-unused-result")
+# Require pthread globally if compiling with GCC
+if (CMAKE_COMPILER_IS_GNUCC)
+    add_compile_flags("C;CXX" "-pthread")
 endif()
-if (CC_HAS_WNO_UNUSED_VALUE)
-    set (ev_flags "${ev_flags} -Wno-unused-value")
-endif()
-if(CC_HAS_WNO_COMMENT)
-    set (ev_flags "${ev_flags} -Wno-comment")
-endif()
-if(CC_HAS_FNO_STRICT_ALIASING)
-    set (ev_flags "${ev_flags} -fno-strict-aliasing")
-endif()
-if (CC_HAS_WNO_PARENTHESES)
-    set (ev_flags "${ev_flags} -Wno-parentheses")
-endif()
-set_source_files_properties(tarantool_ev.c
-    PROPERTIES COMPILE_FLAGS "${ev_flags}")
-unset (ev_flags)
-
-if (TARGET_OS_LINUX)
-#
-# Enable Linux-specific event notification API (man inotify)
-  set_target_properties(ev PROPERTIES COMPILE_FLAGS "-DEV_USE_INOTIFY")
-elseif (TARGET_OS_FREEBSD)
-#
-# On FreeBSD build libev loop on top of
-  set_target_properties(ev PROPERTIES COMPILE_FLAGS "-DEV_USE_KQUEUE")
-endif()
-
-#
-# libev uses ceil and floor from the standard math library
-#
-
-#
-# libev depends on librt under kFreeBSD
-if (TARGET_OS_DEBIAN_FREEBSD)
-  set (ev_libs m rt)
-else()
-  set (ev_libs m)
-endif()
-
-target_link_libraries(ev ${ev_libs})
-
-#
-# libeio library
-#
-set_source_files_properties(tarantool_eio.c
-    PROPERTIES COMPILE_FLAGS "-Wno-unused-value -Wno-dangling-else")
-add_library(eio tarantool_eio.c)
 
 #
 # Build admin.m from admin.rl, but only if admin.rl was changed.
@@ -148,27 +103,31 @@ if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.m)
 endif()
 
+set_source_files_compile_flags(${common_sources})
 add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers)
-set_target_properties(core PROPERTIES COMPILE_FLAGS "${core_cflags}")
 
-set (common_libraries cfg core ev eio coro gopt misc)
+set (common_libraries cfg core)
+
+list(APPEND common_libraries
+    ${LIBEV_LIBRARIES}
+    ${LIBEIO_LIBRARIES}
+    ${LIBCORO_LIBRARIES}
+    ${LIBGOPT_LIBRARIES}
+    ${LUAJIT_LIB}
+    ${LIBOBJC_LIBRARIES}
+    misc
+)
 
 set (THREAD_LIB pthread)
 if (ENABLE_STATIC)
     set (THREAD_LIB -Wl,--whole-archive pthread -Wl,--no-whole-archive)
 endif()
 
-set (common_libraries ${common_libraries} ${LUAJIT_LIB} ${LIBOBJC_LIB} ${THREAD_LIB})
+set (common_libraries ${common_libraries} ${THREAD_LIB})
 
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
     set (common_libraries ${common_libraries} dl)
-endif()
-
-if (ENABLE_GCOV)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${GCOV_C_FLAGS}")
-    set (LDFLAGS "${LDFLAGS} ${GCOV_LDFLAGS}")
-    set (common_libraries ${common_libraries} gcov)
 endif()
 
 if (ENABLE_BACKTRACE AND HAVE_BFD)
@@ -186,9 +145,15 @@ set (common_libraries ${common_libraries} PARENT_SCOPE)
 
 function(tarantool_module mod)
     set (module_sources ${ARGN})
+    set(cfg_c_flags "-Wno-unused -Wno-unused-parameter")
+    if (CMAKE_COMPILER_IS_CLANG)
+        set(cfg_c_flags "${cfg_c_flags} -Wno-semicolon-before-method-body")
+    endif()
     set_source_files_properties(
         ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c
-        PROPERTIES COMPILE_FLAGS "-Wno-unused" GENERATED True)
+        PROPERTIES COMPILE_FLAGS ${cfg_c_flags}
+        GENERATED True)
+    unset(cfg_c_flags)
     add_executable(tarantool_${mod}
         ${module_sources}
         ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c)
@@ -197,14 +162,15 @@ function(tarantool_module mod)
         PROPERTIES OBJECT_DEPENDS
         ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.h)
 
+    set_source_files_compile_flags(
+        ${recompiled_sources} ${module_sources})
+
     add_library(lt${mod} STATIC ${recompiled_sources})
     set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
-        "${core_cflags} ${GCOV_C_FLAGS} -DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
+        "-DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
     add_dependencies(lt${mod} generate_headers generate_admin_m generate_memcached_grammar_m build_bundled_libs)
 
-    target_link_libraries(tarantool_${mod} lt${mod} ${GCOV_LDFLAGS} ${common_libraries})
-    set_target_properties(tarantool_${mod} PROPERTIES COMPILE_FLAGS
-        "${core_cflags} ${GCOV_C_FLAGS}")
+    target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries})
 
     if (ENABLE_STATIC)
         set_target_properties(tarantool_${mod} PROPERTIES

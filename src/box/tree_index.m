@@ -891,6 +891,7 @@ tree_iterator_gt(struct iterator *iterator)
 		return [FixedTreeIndex alloc];
 	default:
 		assert(false);
+		return 0;
 	}
 }
 

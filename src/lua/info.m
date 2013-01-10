@@ -163,7 +163,7 @@ lbox_info_init_static_values(struct lua_State *L)
 
 	/* box.info.build.flags */
 	lua_pushstring(L, "flags");
-	lua_pushstring(L, COMPILER_CFLAGS);
+	lua_pushstring(L, COMPILER_C_FLAGS);
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);    /* box.info.build */

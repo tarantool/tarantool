@@ -567,14 +567,14 @@ background()
 	close(STDERR_FILENO);
 	return;
 error:
-        exit(EXIT_FAILURE);
+	exit(EXIT_FAILURE);
 }
 
 void
 tarantool_free(void)
 {
 	/*
-	 * Got to be done prior to anything else, since GC 
+	 * Got to be done prior to anything else, since GC
 	 * handlers can refer to other subsystems (e.g. fibers).
 	 */
 	if (tarantool_L)
@@ -685,7 +685,7 @@ main(int argc, char **argv)
 		printf("Target: %s\n", BUILD_INFO);
 		printf("Build options: %s\n", BUILD_OPTIONS);
 		printf("Compiler: %s\n", COMPILER_INFO);
-		printf("CFLAGS:%s\n", COMPILER_CFLAGS);
+		printf("C_FLAGS:%s\n", COMPILER_C_FLAGS);
 		return 0;
 	}
 

@@ -5,8 +5,6 @@ macro(libobjc_build)
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (extra_cflags "${CC_DEBUG_OPT} -O0")
         if (CMAKE_COMPILER_IS_GNUCC)
-            set (extra_cflags "${extra_cflags} -fgnu89-inline")
-        else()
             set (extra_cflags "${extra_cflags} -fno-inline")
         endif()
         set (extra_ldflags "")
@@ -14,9 +12,6 @@ macro(libobjc_build)
         set (extra_cflags "-O3")
         if (CC_HAS_WNO_UNUSED_RESULT)
             set (extra_cflags "${extra_cflags} -Wno-unused-result")
-        endif()
-        if (CMAKE_COMPILER_IS_GNUCC)
-                set (extra_cflags "${extra_cflags} -fgnu89-inline")
         endif()
         set (extra_ldflags "-s")
     endif()
@@ -27,8 +22,13 @@ macro(libobjc_build)
        endif()
     endif()
     if (CMAKE_COMPILER_IS_CLANG)
-        set (extra_cflags "${extra_cflags} -Wno-deprecated-objc-isa-usage -Wno-objc-root-class")
+        set (extra_cflags "${extra_cflags} -Wno-deprecated-objc-isa-usage")
+        set (extra_cflags "${extra_cflags} -Wno-objc-root-class")
     endif()
+    set (extra_cflags "${extra_cflags} -Wno-attributes")
+    set (extra_cflags "${CMAKE_C_FLAGS} ${extra_cflags}")
+    separate_arguments(extra_cflags UNIX_COMMAND "${extra_cflags}")
+    separate_arguments(extra_ldflags UNIX_COMMAND "${extra_ldflags}")
     if (NOT (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR}))
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/libobjc
             COMMAND mkdir ${PROJECT_BINARY_DIR}/third_party/libobjc
@@ -39,26 +39,20 @@ macro(libobjc_build)
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/libobjc
         COMMAND $(MAKE) clean
-        COMMAND $(MAKE) CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} EXTRA_CFLAGS=""${extra_cflags}"" EXTRA_LDFLAGS=""${extra_ldflags}""
+        COMMAND $(MAKE) CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} EXTRA_CFLAGS="${extra_cflags}" EXTRA_LDFLAGS="${extra_ldflags}"
         DEPENDS ${PROJECT_BINARY_DIR}/third_party/libobjc
                 ${PROJECT_BINARY_DIR}/CMakeCache.txt
     )
-    add_custom_target(libobjc ALL
+    add_custom_target(objc ALL
         DEPENDS ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a
     )
-    add_dependencies(build_bundled_libs libobjc)
+
+    set(LIBOBJC_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/third_party/libobjc)
+    set(LIBOBJC_LIBRARIES ${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a)
+
+    message(STATUS "Use bundled libobjc includes: ${LIBOBJC_INCLUDE_DIR}")
+    message(STATUS "Use bundled libobjc library: ${LIBOBJC_LIBRARIES}")
+
     unset (extra_cflags)
     unset (extra_ldlags)
 endmacro()
-
-if (TARGET_OS_DARWIN)
-    set (LIBOBJC_LIB objc)
-else()
-    set (LIBOBJC_LIB "${PROJECT_BINARY_DIR}/third_party/libobjc/libobjc.a")
-    include_directories("${PROJECT_SOURCE_DIR}/third_party/libobjc")
-    if (CMAKE_C_COMPILER_IS_CLANG)
-        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fobjc-nonfragile-abi")
-        SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-objc-legacy-dispatch")
-    endif()
-    libobjc_build()
-endif()

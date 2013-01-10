@@ -12,8 +12,9 @@ set (cli_sources tc.c tc_opt.c tc_admin.c tc_query.c tc_print.c tc_cli.c tc_stor
 set (cli_libs tntrpl tntnet tntsql tnt gopt ${READLINE_LIBRARIES})
 
 include_directories(${READLINE_INCLUDE_DIR})
-add_executable(${cli} ${cli_sources} ${CMAKE_SOURCE_DIR}/src/errcode.c)
-set_target_properties(${cli} PROPERTIES COMPILE_FLAGS "${core_cflags}")
+list(APPEND cli_sources ${CMAKE_SOURCE_DIR}/src/errcode.c)
+add_executable(${cli} ${cli_sources})
+set_source_files_compile_flags("TARANTOOL" ${cli_sources})
 target_link_libraries (${cli} ${cli_libs})
 
 install (TARGETS ${cli} DESTINATION bin)

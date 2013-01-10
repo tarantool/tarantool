@@ -115,7 +115,7 @@ replace_check_dup(struct tuple *old_tuple,
 	return NULL;
 }
 
-- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg;
+- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
 {
 	self = [super init];
 	if (self == NULL)

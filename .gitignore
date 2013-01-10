@@ -8,6 +8,9 @@ lcov
 *.so
 *.d
 *.dylib
+*.gcno
+*.gcda
+*~
 test/var
 test/lib/*.pyc
 test/lib/*/*.pyc

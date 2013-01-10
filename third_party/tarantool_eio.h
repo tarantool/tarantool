@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_EV_H_INCLUDED
-#define TARANTOOL_EV_H_INCLUDED
+#ifndef TARANTOOL_EIO_H_INCLUDED
+#define TARANTOOL_EIO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,24 +28,21 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#define EV_STANDALONE 1
-#define EV_MULTIPLICITY 0
 
-#define EV_USE_REALTIME 1
-#define EV_USE_SELECT 1
-#define EV_USE_POLL 1
-#define EV_USE_NANOSLEEP 1
+#include "config.h"
 
-#define EV_PERIODIC_ENABLE 1
-#define EV_IDLE_ENABLE 1
-#define EV_STAT_ENABLE 1
-#define EV_FORK_ENABLE 1
-#define EV_CONFIG_H 0
-
-#include <time.h>
+#include <stdio.h>
+#include <fcntl.h> /* Definition of AT_* constants */
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <utime.h>
 #include <unistd.h>
 
-#include "third_party/libev/ev.h"
-#endif /* TARANTOOL_EV_H_INCLUDED */
+#if defined(ENABLE_BUNDLED_LIBEIO)
+#include "third_party/libeio/eio.h"
+#else /* !defined(ENABLE_BUNDLED_LIBEIO) */
+#include <eio.h>
+#endif
+
+#endif /* TARANTOOL_EIO_H_INCLUDED */

@@ -1,8 +1,13 @@
+enable_tnt_compile_flags()
+
+add_compile_flags("C;CXX"
+    "-Wno-unused-parameter")
+
 add_custom_target(test
-    COMMAND ${PROJECT_SOURCE_DIR}/test/run.sh --builddir=${PROJECT_BINARY_DIR} --vardir=${PROJECT_BINARY_DIR}/test/var)
+    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --vardir=${PROJECT_BINARY_DIR}/test/var)
 
 add_custom_target(test-force
-    COMMAND ${PROJECT_SOURCE_DIR}/test/run.sh --builddir=${PROJECT_BINARY_DIR} --force --vardir=${PROJECT_BINARY_DIR}/test/var)
+    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --force --vardir=${PROJECT_BINARY_DIR}/test/var)
 
 add_subdirectory(unit)
 add_subdirectory(box)

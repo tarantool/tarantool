@@ -32,6 +32,10 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 
+#if EV_MULTIPLICITY
+#error libev with enabled EV_MULTIPLICITY is not supported yet
+#endif
+
 #define BIND_RETRY_DELAY 0.1
 
 void
