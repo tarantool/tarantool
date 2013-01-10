@@ -404,6 +404,7 @@ tp_opsplice(struct tp *p, uint32_t field, uint32_t off,
 	ssize_t rc = tp_op(p, field, TP_OPSPLICE, NULL, sz);
 	if (tp_unlikely(rc == -1))
 		return -1;
+	p->p -= sz;
 	tp_leb128save(p, sizeof(off));
 	memcpy(p->p, &off, sizeof(off));
 	p->p += sizeof(off);
@@ -412,7 +413,7 @@ tp_opsplice(struct tp *p, uint32_t field, uint32_t off,
 	p->p += sizeof(len);
 	tp_leb128save(p, size);
 	memcpy(p->p, data, size);
-	p += size;
+	p->p += size;
 	return rc;
 }
 
@@ -426,7 +427,7 @@ tp_required(struct tp *p) {
 	size_t used = tp_used(p);
 	if (tp_unlikely(used < sizeof(struct tp_h)))
 		return sizeof(struct tp_h) - used;
-	struct tp_h *h = (struct tp_h*)p->s;
+	register struct tp_h *h = (struct tp_h*)p->s;
 	return (tp_likely(used < h->len)) ?
 	                  h->len - used : used - h->len;
 }

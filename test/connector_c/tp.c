@@ -36,12 +36,16 @@ int main(void)
 	char proc[] = "hello_proc";
 	tp_call(&req, 0, proc, sizeof(proc) - 1);
 	tp_tuple(&req);
-
-	char *arg = malloc(500);
-	memset(arg, 0, 500);
-
 	tp_sz(&req, "arg1");
 	tp_sz(&req, "arg2");
+	*/
+
+	/*
+	tp_update(&req, 0, 0);
+	tp_tuple(&req);
+	tp_sz(&req, "key");
+	tp_updatebegin(&req);
+	tp_opsplice(&req, 1, 0, 2, "VAL", 3);
 	*/
 
 	fwrite(buf, tp_used(&req), 1, stdout);
