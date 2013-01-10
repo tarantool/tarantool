@@ -1,3 +1,10 @@
+tarantool (1.4.8+20130110-1) unstable; urgency=low
+
+  * New snapshot (Implement box.session, on_connect and
+    on_disconnect triggers.)
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 10 Jan 2013 23:03:42 +0400
+
 tarantool (1.4.8+20130104-1) unstable; urgency=low
 
   * New snapshot (segfault in tree iterator).
