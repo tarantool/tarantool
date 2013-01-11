@@ -88,18 +88,17 @@ struct arena {
 	void *base;
 	size_t size;
 	size_t used;
+	struct slab_slist_head slabs, free_slabs;
 };
 
 static uint32_t slab_active_caches;
 static struct slab_cache slab_caches[256];
 static struct arena arena;
 
-static struct slab_slist_head slabs, free_slabs;
-
 static struct slab *
 slab_header(void *ptr)
 {
-	struct slab *slab = (struct slab *)SLAB_ALIGN_PTR(ptr);
+	struct slab *slab = SLAB_ALIGN_PTR(ptr);
 	assert(slab->magic == SLAB_MAGIC);
 	return slab;
 }
@@ -119,8 +118,6 @@ slab_caches_init(size_t minimal, double factor)
 			   (size + ptr_size) & ~(ptr_size - 1));
 	}
 
-	SLIST_INIT(&slabs);
-	SLIST_INIT(&free_slabs);
 	slab_active_caches = i;
 }
 
@@ -139,6 +136,8 @@ arena_init(struct arena *arena, size_t size)
 	}
 
 	arena->base = (char *)SLAB_ALIGN_PTR(arena->mmap_base) + SLAB_SIZE;
+	SLIST_INIT(&arena->slabs);
+	SLIST_INIT(&arena->free_slabs);
 	return true;
 }
 
@@ -206,7 +205,7 @@ slab_validate(void)
 {
 	struct slab *slab;
 
-	SLIST_FOREACH(slab, &slabs, link) {
+	SLIST_FOREACH(slab, &arena.slabs, link) {
 		for (char *p = (char *)slab + sizeof(struct slab);
 		     p + slab->cache->item_size < (char *)slab + SLAB_SIZE;
 		     p += slab->cache->item_size + sizeof(red_zone)) {
@@ -236,17 +235,17 @@ slab_of(struct slab_cache *cache)
 		return slab;
 	}
 
-	if (!SLIST_EMPTY(&free_slabs)) {
-		slab = SLIST_FIRST(&free_slabs);
+	if (!SLIST_EMPTY(&arena.free_slabs)) {
+		slab = SLIST_FIRST(&arena.free_slabs);
 		assert(slab->magic == SLAB_MAGIC);
-		SLIST_REMOVE_HEAD(&free_slabs, free_link);
+		SLIST_REMOVE_HEAD(&arena.free_slabs, free_link);
 		format_slab(cache, slab);
 		return slab;
 	}
 
 	if ((slab = arena_alloc(&arena)) != NULL) {
 		format_slab(cache, slab);
-		SLIST_INSERT_HEAD(&slabs, slab, link);
+		SLIST_INSERT_HEAD(&arena.slabs, slab, link);
 		return slab;
 	}
 
@@ -323,7 +322,7 @@ sfree(void *ptr)
 	if (slab->items == 0) {
 		TAILQ_REMOVE(&cache->free_slabs, slab, cache_free_link);
 		TAILQ_REMOVE(&cache->slabs, slab, cache_link);
-		SLIST_INSERT_HEAD(&free_slabs, slab, free_link);
+		SLIST_INSERT_HEAD(&arena.free_slabs, slab, free_link);
 	}
 
 	VALGRIND_FREELIKE_BLOCK(item, sizeof(red_zone));
