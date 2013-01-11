@@ -5,6 +5,9 @@
  * TP - Tarantool Protocol request constructor
  * (http://tarantool.org)
  *
+ * protocol description:
+ * https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt
+ *
  * Copyright (c) 2012-2013 Mail.Ru Group 
  *
  * Redistribution and use in source and binary forms, with or
@@ -41,6 +44,7 @@
 
 #define tp_function_unused __attribute__((unused))
 #define tp_packed __attribute__((packed))
+#define tp_inline __attribute__((forceinline))
 #define tp_noinline __attribute__((noinline))
 
 #define tp_likely(expr)   __builtin_expect(!! (expr), 1)
@@ -101,6 +105,7 @@ struct tp {
 	char *s, *p, *e;
 	char *t, *f, *u;
 	char *c;
+	uint32_t tsz, fsz, tc;
 	uint32_t code;
 	uint32_t cnt;
 	tp_resizer resizer;
@@ -124,11 +129,17 @@ tp_unused(struct tp *p) {
 
 tp_function_unused static char*
 tp_reallocator(struct tp *p, size_t req, size_t *size) {
-	size_t nsz = tp_size(p) * 2;
-	if (tp_unlikely(nsz < req))
-		nsz = req;
-	*size = nsz;
-	return realloc(p->s, nsz);
+	size_t toalloc = tp_size(p) * 2;
+	if (tp_unlikely(toalloc < req))
+		toalloc = req;
+	*size = toalloc;
+	return realloc(p->s, toalloc);
+}
+
+tp_function_unused static char*
+tp_reallocator_noloss(struct tp *p, size_t req, size_t *size) {
+	*size = tp_size(p) + (req - tp_unused(p));
+	return realloc(p->s, *size);
 }
 
 static inline void
@@ -142,6 +153,8 @@ tp_init(struct tp *p, char *buf, size_t size,
 	p->u = NULL;
 	p->c = NULL;
 	p->h = NULL;
+	p->tsz = 0;
+	p->fsz = 0;
 	p->cnt = 0;
 	p->code = 0;
 	p->resizer = resizer;
@@ -159,9 +172,10 @@ tp_ensure(struct tp *p, size_t size) {
 	if (tp_unlikely(np == NULL))
 		return -1;
 	p->p = np + (p->p - p->s);
-	p->t = np + (p->t - p->s);
 	if (tp_likely(p->h))
 		p->h = (struct tp_h*)(np + (((char*)p->h) - p->s));
+	if (tp_likely(p->t))
+		p->t = np + (p->t - p->s);
 	if (tp_unlikely(p->f))
 		p->f = (np + (p->f - p->s));
 	if (tp_unlikely(p->u))
@@ -172,12 +186,17 @@ tp_ensure(struct tp *p, size_t size) {
 }
 
 static inline ssize_t
+tp_use(struct tp *p, size_t size) {
+	p->p += size;
+	return tp_used(p);
+}
+
+static inline ssize_t
 tp_append(struct tp *p, void *data, size_t size) {
 	if (tp_unlikely(tp_ensure(p, size) == -1))
 		return -1;
 	memcpy(p->p, data, size);
-	p->p += size;
-	return tp_used(p);
+	return tp_use(p, size);
 }
 
 static inline void
@@ -237,6 +256,46 @@ tp_leb128save(struct tp *p, uint32_t value) {
 	if (tp_likely(value >= (1 << 7)))
 		*(p->p++) = ((value >> 7) | 0x80);
 	*(p->p++) = ((value) & 0x7F);
+}
+
+static tp_noinline int
+tp_leb128load_slowpath(struct tp *p, uint32_t *value) {
+	if (tp_likely(! (p->f[2] & 0x80))) {
+		*value = (p->f[0] & 0x7f) << 14 |
+		         (p->f[1] & 0x7f) << 7  |
+		         (p->f[2] & 0x7f);
+		p->f += 3;
+	} else
+	if (! (p->f[3] & 0x80)) {
+		*value = (p->f[0] & 0x7f) << 21 |
+		         (p->f[1] & 0x7f) << 14 |
+		         (p->f[2] & 0x7f) << 7  |
+		         (p->f[3] & 0x7f);
+		p->f += 4;
+	} else
+	if (! (p->f[4] & 0x80)) {
+		*value = (p->f[0] & 0x7f) << 28 |
+		         (p->f[1] & 0x7f) << 21 |
+		         (p->f[2] & 0x7f) << 14 |
+		         (p->f[3] & 0x7f) << 7  |
+		         (p->f[4] & 0x7f);
+		p->f += 5;
+	} else
+		return -1;
+	return 0;
+}
+
+static inline int
+tp_leb128load(struct tp *p, uint32_t *value) {
+	if (tp_likely(! (p->f[0] & 0x80))) {
+		*value = *(p->f++) & 0x7f;
+	} else
+	if (tp_likely(! (p->f[1] & 0x80))) {
+		*value = (p->f[0] & 0x7f) << 7 | (p->f[1] & 0x7f);
+		p->f += 2;
+	} else
+		return tp_leb128load_slowpath(p, value);
+	return 0;
 }
 
 static inline ssize_t
@@ -424,9 +483,10 @@ tp_sz(struct tp *p, char *sz) {
 
 static ssize_t
 tp_required(struct tp *p) {
-	size_t used = tp_used(p);
+	register size_t used = tp_used(p);
 	if (tp_unlikely(used < sizeof(struct tp_h)))
 		return sizeof(struct tp_h) - used;
+	used -= sizeof(struct tp_h);
 	register struct tp_h *h = (struct tp_h*)p->s;
 	return (tp_likely(used < h->len)) ?
 	                  h->len - used : used - h->len;
@@ -448,6 +508,11 @@ tp_fetch(struct tp *p, int inc) {
 static inline char*
 tp_replyerror(struct tp *p) {
 	return p->c;
+}
+
+static inline int
+tp_replyerrorlen(struct tp *p) {
+	return tp_unfetched(p) + tp_required(p);
 }
 
 static inline uint32_t
@@ -489,56 +554,85 @@ tp_reply(struct tp *p) {
 	if (tp_unlikely(tp_unfetched(p) == 0))
 		return p->code;
 	p->cnt = *(uint32_t*)tp_fetch(p, sizeof(uint32_t));
-	p->t = p->c;
 	return p->code;
 }
 
 static inline void
 tp_rewind(struct tp *p) {
-	p->t = p->c;
+	p->t = NULL;
+	p->f = NULL;
 }
 
 static inline void
 tp_rewindfield(struct tp *p) {
-	p->f = p->t;
+	p->f = NULL;
 }
 
 static inline uint32_t
-tp_fqtuplesize(char *p) {
-	return *(uint32_t*)p;
+tp_tuplesize(struct tp *p) {
+	return *(uint32_t*)(p->t - 4);
 }
 
-static inline uint32_t
-tp_fqtuplecount(char *p) {
-	return *(uint32_t*)(p + 4);
+static inline char*
+tp_tupleend(struct tp *p) {
+	/* tuple_size + p->t + cardinaltiy_size +
+	 * fields_size */
+	return p->t + p->tsz + 4;
+}
+
+static inline int
+tp_hasdata(struct tp *p) {
+	return tp_unfetched(p) > 0;
+}
+
+static inline int
+tp_hasnext(struct tp *p) {
+	assert(p->t != NULL);
+	return (p->e - tp_tupleend(p)) >= 4;
+}
+
+static inline int
+tp_hasnextfield(struct tp *p) {
+	assert(p->t != NULL);
+	register char *f = p->f + p->fsz;
+	if (tp_unlikely(p->f == NULL))
+		f = p->t + 4;
+	return (tp_tupleend(p) - f) >= 1;
 }
 
 static inline char*
 tp_next(struct tp *p) {
-	assert(p->t != NULL);
-	if ((p->t - p->e) < sizeof(uint32_t))
+	if (tp_unlikely(p->t == NULL)) {
+		if (tp_unlikely(! tp_hasdata(p)))
+				return NULL;
+		p->t = p->c + 4;
+		goto fetch;
+	}
+	if (tp_unlikely(! tp_hasnext(p)))
 		return NULL;
-	char *c = p->t;
-	uint32_t size = tp_fqtuplesize(c);
-	/* tuple size + tuple cardinality */
-	p->f = p->t + 8;
-	p->t += size;
-	return c;
+	p->t = tp_tupleend(p) + 4;
+fetch:
+	p->tsz = *(uint32_t*)(p->t - 4);
+	p->f = NULL;
+	return p->t;
 }
 
 static inline char*
-tp_nextfield(struct tp *p, size_t *sz) {
+tp_nextfield(struct tp *p, uint32_t *sz) {
 	assert(p->t != NULL);
-	assert(p->f != NULL);
-	if ((p->f - p->t) <= 1)
+	if (tp_unlikely(p->f == NULL)) {
+		p->f = p->t + 4;
+		goto fetch;
+	}
+	if (tp_unlikely(! tp_hasnextfield(p)))
 		return NULL;
-	(void)sz;
-	/* loadsize
-	 * set size
-	 * set return data
-	 * inc pointer
-	 */
-	return NULL;
+	p->f += p->fsz;
+fetch:;
+	register int rc = tp_leb128load(p, &p->fsz);
+	if (tp_unlikely(rc == -1))
+		return NULL;
+	*sz = p->fsz;
+	return p->f;
 }
 
 #endif /* TP_H_INCLUDED */
