@@ -206,6 +206,12 @@ tp_reqid(struct tp *p, uint32_t reqid) {
 }
 
 static inline uint32_t
+tp_getreqid(struct tp *p) {
+	assert(p->h != NULL);
+	return p->h->reqid;
+}
+
+static inline uint32_t
 tp_tuplecount(struct tp *p) {
 	assert(p->t != NULL);
 	return *(uint32_t*)(p->t);
@@ -493,7 +499,7 @@ tp_reqbuf(char *buf, size_t size) {
 
 static inline ssize_t
 tp_req(struct tp *p) {
-	return tp_reqbuf(p->s, tp_used(p));
+	return tp_reqbuf(p->s, tp_size(p));
 }
 
 static inline size_t
@@ -649,7 +655,7 @@ tp_nextfield(struct tp *p) {
 fetch:;
 	register int rc = tp_leb128load(p, &p->fsz);
 	if (tp_unlikely(rc == -1))
-		return 0;
+		return -1;
 	return 1;
 }
 
