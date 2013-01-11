@@ -499,7 +499,7 @@ tp_reqbuf(char *buf, size_t size) {
 
 static inline ssize_t
 tp_req(struct tp *p) {
-	return tp_reqbuf(p->s, tp_used(p));
+	return tp_reqbuf(p->s, tp_size(p));
 }
 
 static inline size_t
