@@ -23,16 +23,16 @@ if (CMAKE_C_COMPILER_ID STREQUAL Clang)
 endif()
 
 # Check GCC version:
-# GCC older than 4.1 is not supported.
+# GCC older than 4.6 is not supported.
 if (CMAKE_COMPILER_IS_GNUCC)
     execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
         OUTPUT_VARIABLE CC_VERSION)
-    if (CC_VERSION VERSION_GREATER 4.1 OR CC_VERSION VERSION_EQUAL 4.1)
+    if (CC_VERSION VERSION_GREATER 4.6 OR CC_VERSION VERSION_EQUAL 4.6)
         message(STATUS
-            "${CMAKE_C_COMPILER} version >= 4.1 -- ${CC_VERSION}")
+            "${CMAKE_C_COMPILER} version >= 4.6 -- ${CC_VERSION}")
     else()
         message (FATAL_ERROR
-            "${CMAKE_C_COMPILER} version should be >= 4.1 -- ${CC_VERSION}")
+            "${CMAKE_C_COMPILER} version should be >= 4.6 -- ${CC_VERSION}")
     endif()
 endif()
 
