@@ -499,12 +499,12 @@ tp_reqbuf(char *buf, size_t size) {
 
 static inline ssize_t
 tp_req(struct tp *p) {
-	return tp_reqbuf(p->s, tp_size(p));
+	return tp_reqbuf(p->s, tp_used(p));
 }
 
 static inline size_t
 tp_unfetched(struct tp *p) {
-	return p->e - p->c;
+	return p->p - p->c;
 }
 
 static inline void*
@@ -542,13 +542,14 @@ tp_replyop(struct tp *p) {
 
 tp_function_unused static ssize_t
 tp_reply(struct tp *p) {
-	if (tp_unlikely(tp_req(p) > 0))
+	ssize_t used = tp_req(p);
+	if (tp_unlikely(used > 0))
 		return -1;
+	/* this is end of packet in continious buffer */
+	p->p = p->e + used; /* end - used */
 	p->c = p->s;
 	p->h = tp_fetch(p, sizeof(struct tp_h));
-	p->t = NULL;
-	p->f = NULL;
-	p->u = NULL;
+	p->t = p->f = p->u = NULL;
 	p->cnt = 0;
 	p->code = 0;
 	if (tp_unlikely(p->h->type == TP_PING))
@@ -615,7 +616,7 @@ tp_hasdata(struct tp *p) {
 static inline int
 tp_hasnext(struct tp *p) {
 	assert(p->t != NULL);
-	return (p->e - tp_tupleend(p)) >= 4;
+	return (p->p - tp_tupleend(p)) >= 4;
 }
 
 static inline int
