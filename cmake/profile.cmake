@@ -1,6 +1,6 @@
 check_library_exists (gcov __gcov_flush  ""  HAVE_GCOV)
 
-if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(ENABLE_GCOV_DEFAULT ON)
 else()
     set(ENABLE_GCOV_DEFAULT OFF)
