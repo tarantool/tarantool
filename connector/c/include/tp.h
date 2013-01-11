@@ -550,7 +550,7 @@ tp_reply(struct tp *p) {
 	p->f = NULL;
 	p->u = NULL;
 	if (tp_unlikely(p->h->type == TP_PING))
-		return TP_PING;
+		return p->code;
 	if (tp_unlikely(p->h->type != TP_UPDATE &&
 	                p->h->type != TP_INSERT &&
 	                p->h->type != TP_DELETE &&
