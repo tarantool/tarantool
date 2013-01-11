@@ -549,8 +549,10 @@ tp_reply(struct tp *p) {
 	p->t = NULL;
 	p->f = NULL;
 	p->u = NULL;
+	p->cnt = 0;
+	p->code = 0;
 	if (tp_unlikely(p->h->type == TP_PING))
-		return TP_PING;
+		return 0; 
 	if (tp_unlikely(p->h->type != TP_UPDATE &&
 	                p->h->type != TP_INSERT &&
 	                p->h->type != TP_DELETE &&
@@ -607,7 +609,7 @@ tp_tupleend(struct tp *p) {
 
 static inline int
 tp_hasdata(struct tp *p) {
-	return tp_unfetched(p) > 0;
+	return tp_replyop(p) != TP_PING && tp_unfetched(p) > 0;
 }
 
 static inline int
