@@ -3,8 +3,7 @@
 #include <tp.h>
 
 static void reply_print(struct tp *rep) {
-	char *tu;
-	while ((tu = tp_next(rep))) {
+	while (tp_next(rep)) {
 		printf("tuple fields: %d\n", tp_tuplecount(rep));
 		printf("tuple size: %d\n", tp_tuplesize(rep));
 		printf("[");
@@ -24,7 +23,7 @@ static int reply(void) {
 	tp_init(&rep, NULL, 0, tp_reallocator_noloss, NULL);
 
 	while (1) {
-		ssize_t to_read = tp_required(&rep);
+		ssize_t to_read = tp_req(&rep);
 		printf("to_read: %zu\n", to_read);
 		if (to_read <= 0)
 			break;

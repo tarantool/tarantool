@@ -481,8 +481,20 @@ tp_sz(struct tp *p, char *sz) {
 	return tp_field(p, sz, strlen(sz));
 }
 
-static ssize_t
-tp_required(struct tp *p) {
+static inline ssize_t
+tp_reqbuf(char *buf, size_t size) {
+	if (tp_unlikely(size < sizeof(struct tp_h)))
+		return sizeof(struct tp_h) - size;
+	register int sz =
+		((struct tp_h*)buf)->len + sizeof(struct tp_h);
+	return (tp_likely(size < sz)) ?
+	                  sz - size : size - sz;
+}
+
+static inline ssize_t
+tp_req(struct tp *p) {
+	return tp_reqbuf(p->s, tp_used(p));
+	/*
 	register size_t used = tp_used(p);
 	if (tp_unlikely(used < sizeof(struct tp_h)))
 		return sizeof(struct tp_h) - used;
@@ -490,6 +502,7 @@ tp_required(struct tp *p) {
 	register struct tp_h *h = (struct tp_h*)p->s;
 	return (tp_likely(used < h->len)) ?
 	                  h->len - used : used - h->len;
+					  */
 }
 
 static inline size_t
@@ -512,7 +525,7 @@ tp_replyerror(struct tp *p) {
 
 static inline int
 tp_replyerrorlen(struct tp *p) {
-	return tp_unfetched(p) + tp_required(p);
+	return tp_unfetched(p) + tp_req(p);
 }
 
 static inline uint32_t
@@ -532,7 +545,7 @@ tp_replyop(struct tp *p) {
 
 tp_function_unused static ssize_t
 tp_reply(struct tp *p) {
-	if (tp_unlikely(tp_required(p) > 0))
+	if (tp_unlikely(tp_req(p) > 0))
 		return -1;
 	p->c = p->s;
 	p->h = tp_fetch(p, sizeof(struct tp_h));
