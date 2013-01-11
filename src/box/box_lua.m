@@ -707,9 +707,13 @@ lbox_index_iterator(struct lua_State *L, enum iterator_type type)
 			/* Single or multi- part key. */
 			field_count = argc;
 			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
-			for (int i = 0; i < argc; ++i)
-				append_key_part(L, i + 2, data,
-						index->key_def->parts[i].type);
+			for (int i = 0; i < argc; ++i) {
+				enum field_data_type type = UNKNOWN;
+				if (i < index->key_def->part_count) {
+					type = index->key_def->parts[i].type;
+				}
+				append_key_part(L, i + 2, data, type);
+			}
 			key = data->data;
 		}
 		/*
@@ -818,9 +822,13 @@ lbox_index_count(struct lua_State *L)
 		/* Single or multi- part key. */
 		key_part_count = argc;
 		struct tbuf *data = tbuf_alloc(fiber->gc_pool);
-		for (int i = 0; i < argc; ++i)
-			append_key_part(L, i + 2, data,
-					index->key_def->parts[i].type);
+		for (int i = 0; i < argc; ++i) {
+			enum field_data_type type = UNKNOWN;
+			if (i < index->key_def->part_count) {
+				type = index->key_def->parts[i].type;
+			}
+			append_key_part(L, i + 2, data, type);
+		}
 		key = data->data;
 	}
 	u32 count = 0;
