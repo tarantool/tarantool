@@ -522,7 +522,7 @@ tp_replyerror(struct tp *p) {
 
 static inline int
 tp_replyerrorlen(struct tp *p) {
-	return tp_unfetched(p) + tp_req(p);
+	return tp_unfetched(p);
 }
 
 static inline uint32_t
