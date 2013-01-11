@@ -7,10 +7,8 @@ static void reply_print(struct tp *rep) {
 		printf("tuple fields: %d\n", tp_tuplecount(rep));
 		printf("tuple size: %d\n", tp_tuplesize(rep));
 		printf("[");
-		char *field;
-		uint32_t field_size;
-		while ((field = tp_nextfield(rep, &field_size))) {
-			printf("%-.*s", field_size, field);
+		while (tp_nextfield(rep)) {
+			printf("%-.*s", tp_getfieldsize(rep), tp_getfield(rep));
 			if (tp_hasnextfield(rep))
 				printf(", ");
 		}

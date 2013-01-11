@@ -494,15 +494,6 @@ tp_reqbuf(char *buf, size_t size) {
 static inline ssize_t
 tp_req(struct tp *p) {
 	return tp_reqbuf(p->s, tp_used(p));
-	/*
-	register size_t used = tp_used(p);
-	if (tp_unlikely(used < sizeof(struct tp_h)))
-		return sizeof(struct tp_h) - used;
-	used -= sizeof(struct tp_h);
-	register struct tp_h *h = (struct tp_h*)p->s;
-	return (tp_likely(used < h->len)) ?
-	                  h->len - used : used - h->len;
-					  */
 }
 
 static inline size_t
@@ -581,16 +572,31 @@ tp_rewindfield(struct tp *p) {
 	p->f = NULL;
 }
 
+static inline char*
+tp_gettuple(struct tp *p) {
+	return p->t;
+}
+
 static inline uint32_t
 tp_tuplesize(struct tp *p) {
-	return *(uint32_t*)(p->t - 4);
+	return p->tsz;
+}
+
+static inline char*
+tp_getfield(struct tp *p) {
+	return p->f;
+}
+
+static inline uint32_t
+tp_getfieldsize(struct tp *p) {
+	return p->fsz;
 }
 
 static inline char*
 tp_tupleend(struct tp *p) {
 	/* tuple_size + p->t + cardinaltiy_size +
 	 * fields_size */
-	return p->t + p->tsz + 4;
+	return p->t + 4 + p->tsz;
 }
 
 static inline int
@@ -613,39 +619,38 @@ tp_hasnextfield(struct tp *p) {
 	return (tp_tupleend(p) - f) >= 1;
 }
 
-static inline char*
+static inline int
 tp_next(struct tp *p) {
 	if (tp_unlikely(p->t == NULL)) {
 		if (tp_unlikely(! tp_hasdata(p)))
-				return NULL;
+				return 0;
 		p->t = p->c + 4;
 		goto fetch;
 	}
 	if (tp_unlikely(! tp_hasnext(p)))
-		return NULL;
+		return 0;
 	p->t = tp_tupleend(p) + 4;
 fetch:
 	p->tsz = *(uint32_t*)(p->t - 4);
 	p->f = NULL;
-	return p->t;
+	return 1;
 }
 
-static inline char*
-tp_nextfield(struct tp *p, uint32_t *sz) {
+static inline int
+tp_nextfield(struct tp *p) {
 	assert(p->t != NULL);
 	if (tp_unlikely(p->f == NULL)) {
 		p->f = p->t + 4;
 		goto fetch;
 	}
 	if (tp_unlikely(! tp_hasnextfield(p)))
-		return NULL;
+		return 0;
 	p->f += p->fsz;
 fetch:;
 	register int rc = tp_leb128load(p, &p->fsz);
 	if (tp_unlikely(rc == -1))
-		return NULL;
-	*sz = p->fsz;
-	return p->f;
+		return 0;
+	return 1;
 }
 
 #endif /* TP_H_INCLUDED */
