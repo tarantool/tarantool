@@ -494,7 +494,7 @@ tp_reqbuf(char *buf, size_t size) {
 	register int sz =
 		((struct tp_h*)buf)->len + sizeof(struct tp_h);
 	return (tp_likely(size < sz)) ?
-	                  sz - size : size - sz;
+	                  sz - size : -(size - sz);
 }
 
 static inline ssize_t
