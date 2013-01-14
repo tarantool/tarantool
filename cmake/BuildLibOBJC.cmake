@@ -27,11 +27,14 @@ macro(libobjc_build)
     endif()
     set (extra_cflags "${extra_cflags} -Wno-attributes")
     set (extra_cflags "${CMAKE_C_FLAGS} ${extra_cflags}")
-    separate_arguments(extra_cflags UNIX_COMMAND "${extra_cflags}")
-    separate_arguments(extra_ldflags UNIX_COMMAND "${extra_ldflags}")
+    if (HAVE_NON_C99_PTHREAD_H)
+        set (extra_cflags "${extra_cflags} -fgnu89-inline")
+    endif()
+    separate_arguments(extra_cflags)
+    separate_arguments(extra_ldflags)
     if (NOT (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR}))
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/libobjc
-            COMMAND mkdir ${PROJECT_BINARY_DIR}/third_party/libobjc
+            COMMAND mkdir -p ${PROJECT_BINARY_DIR}/third_party/libobjc
             COMMAND cp -r ${PROJECT_SOURCE_DIR}/third_party/libobjc/*
                 ${PROJECT_BINARY_DIR}/third_party/libobjc
         )

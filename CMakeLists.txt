@@ -73,6 +73,27 @@ check_function_exists(memrchr HAVE_MEMRCHR)
 # stack. Find whether or not it's present.
 check_library_exists("" __libc_stack_end "" HAVE_LIBC_STACK_END)
 
+set(HAVE_NON_C99_PTHREAD_H 0)
+if (CMAKE_COMPILER_IS_GNUCC)
+
+    set(CMAKE_REQUIRED_FLAGS "-std=gnu99 -Wall -fexceptions -pthread")
+    check_symbol_exists(__pthread_cleanup_routine pthread.h test1)
+
+    set(HAVE_NON_C99_PTHREAD_H OFF)
+    if (test1)
+        try_compile(HAVE_NON_C99_PTHREAD_H ${CMAKE_BINARY_DIR} 
+            ${CMAKE_SOURCE_DIR}/cmake/pthread-broken-inline-test.c
+            COMPILE_DEFINITIONS "-std=gnu99 -Wall -fexceptions")
+    endif()
+    unset(test1)
+
+    if (HAVE_NON_C99_PTHREAD_H)
+        message(WARNING "The system pthread.h is not compatible with the C99 mode."
+            "A special workaround will be used during compilation."
+            "If it does not work for you, please update system glibc.")
+    endif()
+endif()
+
 #
 # Enable 'make TAGS' target.
 #

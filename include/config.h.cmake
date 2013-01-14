@@ -74,6 +74,11 @@
  */
 #cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
 
+/*
+ * pthread have problems with -std=c99
+ */
+#cmakedefine HAVE_NON_C99_PTHREAD_H 1
+
 #cmakedefine ENABLE_BUNDLED_LIBOBJC 1
 #cmakedefine ENABLE_BUNDLED_LIBEV 1
 #cmakedefine ENABLE_BUNDLED_LIBEIO 1
