@@ -2,7 +2,7 @@
 # Check if ObjectiveC and ObjectiveC++ compilers work
 #
 include(CMakeTestOBJCCompiler)
-include(CMakeTestOBJCXXCompiler)
+#include(CMakeTestOBJCXXCompiler)
 
 #
 # Check if the same compile family is used for both C and CXX
