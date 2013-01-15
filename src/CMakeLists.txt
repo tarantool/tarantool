@@ -143,6 +143,8 @@ endif()
 
 set (common_libraries ${common_libraries} PARENT_SCOPE)
 
+add_subdirectory(lib)
+
 function(tarantool_module mod)
     set (module_sources ${ARGN})
     set(cfg_c_flags "-Wno-unused -Wno-unused-parameter")

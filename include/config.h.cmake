@@ -75,6 +75,18 @@
 #cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
 
 /*
+ * Set if compiler has __builtin_XXX methods.
+ */
+#cmakedefine HAVE_CTZ 1
+#cmakedefine HAVE_CTZLL 1
+#cmakedefine HAVE_CLZ 1
+#cmakedefine HAVE_CLZLL 1
+#cmakedefine HAVE_POPCOUNT 1
+#cmakedefine HAVE_POPCOUNTLL 1
+#cmakedefine HAVE_BSWAP32 1
+#cmakedefine HAVE_BSWAP64 1
+
+/*
  * pthread have problems with -std=c99
  */
 #cmakedefine HAVE_NON_C99_PTHREAD_H 1
