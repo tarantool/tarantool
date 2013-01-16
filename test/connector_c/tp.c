@@ -78,11 +78,10 @@ main(int argc, char *argv[])
 	tp_ping(&req);
 	*/
 
+	/*
 	tp_select(&req, 0, 1, 0, 10);
 	tp_tuple(&req);
 	tp_sz(&req, "key");
-
-	/*
 	*/
 
 	/*
@@ -90,7 +89,7 @@ main(int argc, char *argv[])
 	tp_tuple(&req);
 	tp_sz(&req, "key");
 	tp_updatebegin(&req);
-	tp_op(&req, 1, TP_OPEQ, "VALUE", 5);
+	tp_op(&req, 1, TP_OPSET, "VALUE", 5);
 	*/
 
 	/*
