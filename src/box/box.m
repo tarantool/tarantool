@@ -317,13 +317,15 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 
 		snprintf(status, sizeof(status), "replica/%s%s",
 			 conf->replication_source, custom_proc_title);
-		title("replica/%s%s", conf->replication_source, custom_proc_title);
+		title("replica/%s%s", conf->replication_source,
+		      custom_proc_title);
 	} else {
 		box_process = process_rw;
 
 		memcached_start_expire();
 
-		snprintf(status, sizeof(status), "primary%s", custom_proc_title);
+		snprintf(status, sizeof(status), "primary%s",
+			 custom_proc_title);
 		title("primary%s", custom_proc_title);
 
 		say_info("I am primary");
@@ -474,8 +476,9 @@ box_init(void)
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recovery_follow_local(recovery_state, cfg.wal_dir_rescan_delay);
-		snprintf(status, sizeof(status), "hot_standby");
-		title("hot_standby");
+		snprintf(status, sizeof(status), "hot_standby%s",
+			 custom_proc_title);
+		title("hot_standby%s", custom_proc_title);
 	}
 }
 
