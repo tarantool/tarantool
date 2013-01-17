@@ -6,9 +6,10 @@
  * (http://tarantool.org)
  *
  * protocol description:
- * https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt
+ * (https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt)
  *
- * Copyright (c) 2012-2013 Mail.Ru Group 
+ * Copyright (c) 2010, 2011, 2012, 2013 Tarantool/Box AUTHORS
+ * (https://github.com/mailru/tarantool/blob/master/AUTHORS)
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
