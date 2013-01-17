@@ -37,6 +37,10 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#if defined(HAVE_FFSL) || defined(HAVE_FFSLL)
+#include <string.h>
+#include <strings.h>
+#endif /* defined(HAVE_FFSL) || defined(HAVE_FFSLL) */
 #include <limits.h>
 
 /**
@@ -68,12 +72,17 @@
  __attribute__((const)) inline int
 bit_ctz_u32(uint32_t x)
 {
-#if defined(HAVE_CTZ)
+#if defined(HAVE_BUILTIN_CTZ)
 	return __builtin_ctz(x);
-#else /* !defined(HAVE_CTZ) */
+#elif defined(HAVE_FFSL)
+	return ffsl(x) - 1;
+#else
 	CTZ_NAIVE(x, sizeof(uint32_t) * CHAR_BIT);
 #endif
 }
+
+#include <stdio.h>
+#include <inttypes.h>
 
 /**
  * @copydoc bit_ctz_u32
@@ -81,9 +90,11 @@ bit_ctz_u32(uint32_t x)
  __attribute__((const)) inline int
 bit_ctz_u64(uint64_t x)
 {
-#if   defined(HAVE_CTZLL)
+#if   defined(HAVE_BUILTIN_CTZLL)
 	return __builtin_ctzll(x);
-#else /* !defined(HAVE_CTZLL) */
+#elif defined(HAVE_FFSLL)
+	return ffsll(x) - 1;
+#else
 	CTZ_NAIVE(x, sizeof(uint64_t) * CHAR_BIT);
 #endif
 }
@@ -119,9 +130,9 @@ bit_ctz_u64(uint64_t x)
  __attribute__((const)) inline int
 bit_clz_u32(uint32_t x)
 {
-#if   defined(HAVE_CLZ)
+#if   defined(HAVE_BUILTIN_CLZ)
 	return __builtin_clz(x);
-#else /* !defined(HAVE_CLZ) */
+#else /* !defined(HAVE_BUILTIN_CLZ) */
 	CLZ_NAIVE(x, sizeof(uint32_t) * CHAR_BIT);
 #endif
 }
@@ -132,9 +143,9 @@ bit_clz_u32(uint32_t x)
 __attribute__((const)) inline int
 bit_clz_u64(uint64_t x)
 {
-#if   defined(HAVE_CLZLL)
+#if   defined(HAVE_BUILTIN_CLZLL)
 	return __builtin_clzll(x);
-#else /* !defined(HAVE_CLZLL) */
+#else /* !defined(HAVE_BUILTIN_CLZLL) */
 	CLZ_NAIVE(x, sizeof(uint64_t) * CHAR_BIT);
 #endif
 }
@@ -164,9 +175,9 @@ bit_clz_u64(uint64_t x)
 __attribute__((const)) inline int
 bit_count_u32(uint32_t x)
 {
-#if   defined(HAVE_POPCOUNT)
+#if   defined(HAVE_BUILTIN_POPCOUNT)
 	return __builtin_popcount(x);
-#else /* !defined(HAVE_POPCOUNT) */
+#else /* !defined(HAVE_BUILTIN_POPCOUNT) */
 	POPCOUNT_NAIVE(x, sizeof(uint32_t) * CHAR_BIT);
 #endif
 }
@@ -177,9 +188,9 @@ bit_count_u32(uint32_t x)
 __attribute__((const)) inline int
 bit_count_u64(uint64_t x)
 {
-#if   defined(HAVE_POPCOUNTLL)
+#if   defined(HAVE_BUILTIN_POPCOUNTLL)
 	return __builtin_popcountll(x);
-#else /* !defined(HAVE_POPCOUNTLL) */
+#else /* !defined(HAVE_BUILTIN_POPCOUNTLL) */
 	POPCOUNT_NAIVE(x, sizeof(uint64_t) * CHAR_BIT);
 #endif
 }
@@ -244,9 +255,9 @@ bit_rotr_u64(uint64_t x, int r)
 __attribute__ ((const)) inline uint32_t
 bswap_u32(uint32_t x)
 {
-#if defined(HAVE_BSWAP32)
+#if defined(HAVE_BUILTIN_BSWAP32)
 	return __builtin_bswap32(x);
-#else /* !defined(HAVE_BSWAP32) */
+#else /* !defined(HAVE_BUILTIN_BSWAP32) */
 	return	((x << 24) & UINT32_C(0xff000000)) |
 		((x <<  8) & UINT32_C(0x00ff0000)) |
 		((x >>  8) & UINT32_C(0x0000ff00)) |
@@ -260,9 +271,9 @@ bswap_u32(uint32_t x)
 __attribute__ ((const)) inline uint64_t
 bswap_u64(uint64_t x)
 {
-#if defined(HAVE_BSWAP64)
+#if defined(HAVE_BUILTIN_BSWAP64)
 	return __builtin_bswap64(x);
-#else /* !defined(HAVE_BSWAP64) */
+#else /* !defined(HAVE_BUILTIN_BSWAP64) */
 	return  ( (x << 56) & UINT64_C(0xff00000000000000)) |
 		( (x << 40) & UINT64_C(0x00ff000000000000)) |
 		( (x << 24) & UINT64_C(0x0000ff0000000000)) |

@@ -13,6 +13,8 @@ include(CheckCSourceRuns)
 include(CheckCXXSourceRuns)
 include(TestBigEndian)
 include(CheckFunctionExists)
+include(CheckBuiltInFunctionExists)
+include(CheckPrototypeDefinition)
 
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
@@ -94,24 +96,6 @@ if (CMAKE_COMPILER_IS_GNUCC)
             "If it does not work for you, please update system glibc.")
     endif()
 endif()
-
-# CMake's check_function_exists doesn't check builtins
-check_c_source_runs("int main(int a) { __builtin_ctz(a); return 0; }"
-    HAVE_CTZ)
-check_c_source_runs("int main(int a) { __builtin_ctzll(a); return 0; }"
-    HAVE_CTZLL)
-check_c_source_runs("int main(int a) { __builtin_clz(a); return 0; }"
-    HAVE_CLZ)
-check_c_source_runs("int main(int a) { __builtin_clzll(a); return 0; }"
-    HAVE_CLZLL)
-check_c_source_runs("int main(int a) { __builtin_popcount(a); return 0; }"
-    HAVE_POPCOUNT)
-check_c_source_runs("int main(int a) { __builtin_popcountll(a); return 0; }"
-    HAVE_POPCOUNTLL)
-check_c_source_runs("int main(int a) { __builtin_bswap32(a); return 0; }"
-    HAVE_BSWAP32)
-check_c_source_runs("int main(int a) { __builtin_bswap64(a); return 0; }"
-    HAVE_BSWAP64)
 
 #
 # Enable 'make TAGS' target.

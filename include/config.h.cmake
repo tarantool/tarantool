@@ -77,14 +77,16 @@
 /*
  * Set if compiler has __builtin_XXX methods.
  */
-#cmakedefine HAVE_CTZ 1
-#cmakedefine HAVE_CTZLL 1
-#cmakedefine HAVE_CLZ 1
-#cmakedefine HAVE_CLZLL 1
-#cmakedefine HAVE_POPCOUNT 1
-#cmakedefine HAVE_POPCOUNTLL 1
-#cmakedefine HAVE_BSWAP32 1
-#cmakedefine HAVE_BSWAP64 1
+#cmakedefine HAVE_BUILTIN_CTZ 1
+#cmakedefine HAVE_BUILTIN_CTZLL 1
+#cmakedefine HAVE_BUILTIN_CLZ 1
+#cmakedefine HAVE_BUILTIN_CLZLL 1
+#cmakedefine HAVE_BUILTIN_POPCOUNT 1
+#cmakedefine HAVE_BUILTIN_POPCOUNTLL 1
+#cmakedefine HAVE_BUILTIN_BSWAP32 1
+#cmakedefine HAVE_BUILTIN_BSWAP64 1
+#cmakedefine HAVE_FFSL 1
+#cmakedefine HAVE_FFSLL 1
 
 /*
  * pthread have problems with -std=c99

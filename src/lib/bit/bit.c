@@ -83,11 +83,11 @@ bswap_u64(uint64_t x);
 int *
 bit_index_u32(uint32_t x, int *indexes, int offset)
 {
-#if  defined(HAVE_CTZ)
+#if  defined(HAVE_BUILTIN_CTZ)
 	int prev_pos = 0;
 	int i = 0;
 
-#if defined(HAVE_POPCOUNT)
+#if defined(HAVE_BUILTIN_POPCOUNT)
 	/* fast implementation using built-in popcount function */
 	const int count = bit_count_u32(x);
 	while (i < count) {
@@ -106,7 +106,7 @@ bit_index_u32(uint32_t x, int *indexes, int offset)
 
 	indexes[i] = 0;
 	return indexes + i;
-#else /* !defined(HAVE_CTZ) */
+#else /* !defined(HAVE_BUILTIN_CTZ) */
 	BITINDEX_NAIVE(x, sizeof(uint32_t) * CHAR_BIT);
 #endif
 }
