@@ -143,6 +143,12 @@ endif()
 
 set (common_libraries ${common_libraries} PARENT_SCOPE)
 
+# Save CMAKE_XXX_FLAGS from this directory for config.h (used in --version)
+set(CONFIG_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
+set(CONFIG_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
+set(CONFIG_OBJC_FLAGS ${CMAKE_OBJC_FLAGS} PARENT_SCOPE)
+set(CONFIG_OBJCXX_FLAGS ${CMAKE_OBJCXX_FLAGS} PARENT_SCOPE)
+
 function(tarantool_module mod)
     set (module_sources ${ARGN})
     set(cfg_c_flags "-Wno-unused -Wno-unused-parameter")
