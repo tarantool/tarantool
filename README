@@ -69,13 +69,16 @@ tarantool $ cd test && ./test-run.py --suite box --start-and-exit
 This will create a 'var' subdirectory in directory 'test',
 populate it with necessary files, and
 start the server. To connect, you could use
-a simplistic command-line client:
+a simple command-line client:
 
+'''
 tarantool $ ./test/tarantool
+'''
 
 Alternatively, if a customized server configuration is required,
 you could follow these steps:
 
+```
 tarantool $ emacs cfg/tarantool_box_cfg.cfg # edit the configuration
 # Initialize the storage directory, path to this directory
 # is specified in the configuration file:
@@ -83,6 +86,7 @@ tarantool $ src/box/tarantool_box --config cfg/tarantool_box_cfg.cfg --init-stor
 #
 # run
 tarantool $ src/box/tarantool_box --config cfg/tarantool_box_cfg.cfg
+```
 
 Please report bugs at http://bugs.launchpad.net/tarantool.
 We also warmly welcome your feedback in the discussion mailing
