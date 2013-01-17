@@ -8,7 +8,7 @@
  * protocol description:
  * (https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt)
  *
- * Copyright (c) 2010, 2011, 2012, 2013 Tarantool/Box AUTHORS
+ * Copyright (c) 2012-2013 Tarantool/Box AUTHORS
  * (https://github.com/mailru/tarantool/blob/master/AUTHORS)
  *
  * Redistribution and use in source and binary forms, with or
