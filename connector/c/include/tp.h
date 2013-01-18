@@ -638,7 +638,7 @@ static inline int
 tp_next(struct tp *p) {
 	if (tp_unlikely(p->t == NULL)) {
 		if (tp_unlikely(! tp_hasdata(p)))
-				return 0;
+			return 0;
 		p->t = p->c + 4;
 		goto fetch;
 	}
@@ -655,6 +655,8 @@ static inline int
 tp_nextfield(struct tp *p) {
 	assert(p->t != NULL);
 	if (tp_unlikely(p->f == NULL)) {
+		if (tp_unlikely(! tp_hasnextfield(p)))
+			return 0;
 		p->f = p->t + 4;
 		goto fetch;
 	}
