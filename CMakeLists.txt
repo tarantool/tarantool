@@ -14,7 +14,6 @@ include(CheckCXXSourceRuns)
 include(TestBigEndian)
 include(CheckFunctionExists)
 include(CheckBuiltInFunctionExists)
-include(CheckPrototypeDefinition)
 
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)

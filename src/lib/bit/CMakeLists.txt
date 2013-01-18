@@ -15,10 +15,10 @@ if (NOT HAVE_BUILTIN_CTZ OR NOT HAVE_BUILTIN_CTZLL)
     if (NOT var EQUAL -1)
         set(CMAKE_REQUIRED_FLAGS "-Wno-error")
         set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
-        check_prototype_definition("ffsl" "int ffsl(long int i);" "0"
-             "string.h;strings.h" HAVE_FFSL)
-        check_prototype_definition("ffsll" "int ffsll(long long int i);" "0"
-             "string.h;strings.h" HAVE_FFSLL)
+        check_c_source_compiles("#include <string.h>\n#include <strings.h>\nint main(void) { return ffsl(0L); }"
+            HAVE_FFSL)
+        check_c_source_compiles("#include <string.h>\n#include <strings.h>\nint main(void) { return ffsll(0UL); }"
+            HAVE_FFSLL)
     endif()
 endif()
 
