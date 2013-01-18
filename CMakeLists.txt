@@ -308,7 +308,7 @@ add_subdirectory(client)
 add_subdirectory(test)
 add_subdirectory(doc)
 
-install (FILES README LICENSE doc/box-protocol.txt
+install (FILES README.md LICENSE doc/box-protocol.txt
          DESTINATION share/doc/tarantool)
 
 include (cmake/cpack.cmake)
