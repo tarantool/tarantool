@@ -86,7 +86,6 @@ static void
 process_rw(struct port *port, u32 op, struct tbuf *data)
 {
 	struct txn *txn = txn_begin();
-	ev_tstamp start = ev_now(), stop;
 
 	@try {
 		struct request *request = request_create(op, data);
@@ -99,11 +98,6 @@ process_rw(struct port *port, u32 op, struct tbuf *data)
 	} @catch (id e) {
 		txn_rollback(txn);
 		@throw;
-	} @finally {
-		stop = ev_now();
-		if (stop - start > cfg.too_long_threshold)
-			say_warn("too long %s: %.3f sec",
-				 request_name(op), stop - start);
 	}
 }
 
