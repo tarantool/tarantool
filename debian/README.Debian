@@ -1,15 +1,19 @@
 Debian package provides some additional options in config-file:
 
 
-* file_descriptors = INTVALUE
+* opt file_descriptors = INTVALUE
 
   Init script will do 'ulimit -f INTVALUE' command before starting tarantool.
 
-* save_snapshots = COUNT
+* opt save_snapshots = COUNT
   
   Count of snapshots to save (default = 10). COUNT=0 disables removing
   old snapshots.
 
+* opt snapshot_period = HOURS
 
-There are script tarantool_snapshot_rotate (1) that is started every day
-using cron.daily.
+  Period between two snapshot (default 24).
+
+
+There are script tarantool_snapshot_rotate (1) that is started every hour
+using cron.hourly.

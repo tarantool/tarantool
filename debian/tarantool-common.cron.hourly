@@ -3,4 +3,4 @@
 test -x /usr/bin/tarantool_box || exit 0
 test -x /usr/sbin/tarantool_snapshot_rotate || exit 0
 
-/usr/sbin/tarantool_snapshot_rotate
+exec /usr/sbin/tarantool_snapshot_rotate

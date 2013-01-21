@@ -16,11 +16,12 @@ use Data::Dumper;
 
 pod2usage(-exitstatus => 0, -verbose => 2) unless
     GetOptions
-        'help|h'            => \my $help,
-        'verbose|v'         => \my $verbose,
-        'snapshots|s=i'     => \my $snapshots,
+        'help|h'                => \my $help,
+        'verbose|v'             => \my $verbose,
+        'snapshots|s=i'         => \my $snapshots,
+        'snapshot_period|p=i'   => \my $period,
 ;
-$snapshots //= 10;
+
 
 sub DEBUGF($;@) {
     return unless $verbose;
@@ -52,10 +53,19 @@ sub list_files($) {
     return @files;
 }
 
-sub rotate_snapshot($) {
-    my ($pidfile) = @_;
+sub rotate_snapshot($$$) {
+    my ($pidfile, $snap_count, $snap_period) = @_;
+
+    $snap_count = $snapshots || 10 unless defined $snap_count;
+    $snap_period = $period || 24 unless defined $snap_period;
+    $snap_count = $snapshots if defined $snapshots;
+    $snap_period = $period if defined $period;
+    $snap_period ||= 0;
 
     my $pid;
+
+    DEBUGF "\tBegin rotating process period=%s, count=%s",
+        $snap_period, $snap_count;
 
 
     if (open my $ph, '<', $pidfile) {
@@ -71,17 +81,40 @@ sub rotate_snapshot($) {
         return;
     }
 
+
     my $sndir = catfile SNAPSHOT_DIR, basename $pidfile, '.pid';
     my @files = list_files $sndir;
     goto FINISH unless @files;
 
+    my ($last_snap) = grep /\.snap$/, reverse @files;
+    if ($last_snap) {{
+        my @stat = stat $last_snap;
+        last unless @stat;
+        my $ctime = $stat[10];
+        if (time - $ctime < $snap_period * 3600 - 3600 / 2) {
+            DEBUGF "\tLast snapshot was created %3.2f hours ago, ".
+                "do not create new",
+                (time - $ctime) / 3600;
+            return;
+        }
+        DEBUGF "\tLast snapshot was created %3.2f hours ago, creating new",
+            (time - $ctime) / 3600;
+    }} else {
+        DEBUGF "\tLast snapshot was not found, creating new";
+    }
+
     while(@files and $files[0] =~ /\.xlog$/) {
-        DEBUGF 'Remove orphaned %s', $files[0];
+        DEBUGF "\tRemove orphaned %s", $files[0];
         unless (unlink $files[0]) {
-            DEBUGF "Can't unlink file %s: %s", $files[0], $!;
+            DEBUGF "\tCan't unlink file %s: %s", $files[0], $!;
             return;
         }
         shift @files;
+    }
+
+    unless (kill 0 => $pid) {
+        DEBUGF "\tProcess %s is not started", $pidfile;
+        return;
     }
 
     if (kill USR1 => $pid) {
@@ -91,7 +124,7 @@ sub rotate_snapshot($) {
             my @inpr = sort glob catfile SNAPSHOT_DIR, '*.snap.inprogress';
             last unless @inpr;
             if ($inpr[-1] and $inpr[-1] gt $files[-1]) {
-                DEBUGF "snapshot %s is still in progress...", $inpr[-1];
+                DEBUGF "\tsnapshot %s is still in progress...", $inpr[-1];
                 next;
             }
         }
@@ -100,31 +133,33 @@ sub rotate_snapshot($) {
         return;
     }
 
-    if ($snapshots) {
+    if ($snap_count) {
         @files = list_files $sndir;
         my $snaps = grep /\.snap$/, @files;
-        if ($snaps > $snapshots) {
-            my $to_remove = $snaps - $snapshots;
+        if ($snaps > $snap_count) {
+            my $to_remove = $snaps - $snap_count;
 
             while (@files) {
                 my $file = shift @files;
                 $to_remove-- if $file =~ /\.snap$/;
-                DEBUGF "Unlink file: %s...", $file;
+                DEBUGF "\tUnlink file: %s...", $file;
                 unless (unlink $file) {
-                    DEBUGF "Can't unlink file %s: %s", $file, $!;
+                    DEBUGF "\tCan't unlink file %s: %s", $file, $!;
                     return;
                 }
                 last unless $to_remove > 0;
             }
             while(@files and $files[0] =~ /\.xlog$/) {
-                DEBUGF 'Remove orphaned %s', $files[0];
+                DEBUGF "\tRemove orphaned %s", $files[0];
                 unless (unlink $files[0]) {
-                    DEBUGF "Can't unlink file %s: %s", $files[0], $!;
+                    DEBUGF "\tCan't unlink file %s: %s", $files[0], $!;
                     return;
                 }
                 shift @files;
             }
         }
+    } else {
+        DEBUGF "\tDon't remove any old snapshots";
     }
 
     FINISH:
@@ -145,22 +180,37 @@ for (glob catfile PID_DIR, '*.pid') {
         my @lines = <$fh>;
 
         my ($user_snapshots) =
-            grep /^\s*save_snapshots\s*=\s*\d+\s*(?:#.*)?$/,
+            grep /^\s*(?:opt\s+)?save_snapshots\s*=\s*\d+\s*(?:#.*)?$/,
+                reverse @lines;
+
+        my ($snapshot_period) =
+            grep /^\s*(?:opt\s+)?snapshot_period\s*=\s*\d+\s*(?:#.*)?$/,
                 reverse @lines;
 
         if ($user_snapshots) {
             for ($user_snapshots) {
                 s/#.*//;
-                s/\D+//g;
+                s/\D//g;
             }
-            DEBUGF "Found user's option save_snapshots=%s, use it",
-                $user_snapshots;
-            $snapshots = $user_snapshots;
-        } else {
-            DEBUGF "Use default value: save_snapshots=%s", $snapshots;
+            unless($user_snapshots =~ /^[1-9]\d*$/) {
+                warn "wrong format of save_snapshots\n";
+                $user_snapshots = undef;
+            }
         }
 
-        rotate_snapshot $_;
+        if ($snapshot_period) {
+            for ($snapshot_period) {
+                s/#.*//;
+                s/\D//g;
+            }
+            unless($snapshot_period =~ /^[1-9]\d*$/) {
+                warn "wrong format of snapshot_period\n";
+                $snapshot_period = undef;
+            }
+
+        }
+
+        rotate_snapshot $_, $user_snapshots, $snapshot_period;
 
 
     } else {

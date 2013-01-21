@@ -59,9 +59,10 @@ RUNDIR=$SNAPSHOT_DIR/$NAME
 LOG=$LOG_DIR/$NAME.log
 LOGGER="exec /usr/lib/tarantool/logger $LOG"
 SOCKETS=`grep \
-    '^[[:space:]]*file_descriptors[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
+    '^[[:space:]]*\(opt[[:space:]]\+\)\?file_descriptors[[:space:]]*=[[:space:]]*[[:digit:]]\+' $CFG \
     | tail -n 1 \
     | sed 's/[^[:digit:]]//g'`
+
 
 if test -z $SOCKETS; then
     SOCKETS=1023
@@ -104,6 +105,7 @@ if [ $ACTION = 'start' ]; then
     echo -n "    Starting '$NAME' ... "
 else
     echo -n "    Stopping '$NAME' ... "
+    SSDARGS="--retry 15 $SSDARGS"
 fi
 
 if $SSD --$ACTION $SSDARGS $BOX -- -B -v -c $SCFG; then
