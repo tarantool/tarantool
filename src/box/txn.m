@@ -31,6 +31,7 @@
 #include "space.h"
 #include <recovery.h>
 #include <fiber.h>
+#include "request.h" /* for request_name */
 
 void
 txn_add_redo(struct txn *txn, u16 op, struct tbuf *data)
@@ -77,11 +78,19 @@ txn_commit(struct txn *txn)
 {
 	if (txn->old_tuple || txn->new_tuple) {
 		int64_t lsn = next_lsn(recovery_state);
+
+		ev_tstamp start = ev_now(), stop;
 		int res = wal_write(recovery_state, lsn, 0,
 				    txn->op, &txn->req);
+		stop = ev_now();
+		say_warn("too long %s: %.3f sec",
+			request_name(txn->op), stop - start);
+
 		confirm_lsn(recovery_state, lsn, res == 0);
+
 		if (res)
 			tnt_raise(LoggedError, :ER_WAL_IO);
+
 	}
 }
 
