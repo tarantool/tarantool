@@ -1,3 +1,9 @@
+tarantool (1.4.8+20130122-1) unstable; urgency=low
+
+  * New snapshot (fix in box.session triggers).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 22 Jan 2013 16:40:25 +0400
+
 tarantool (1.4.8+20130110-1) unstable; urgency=low
 
   * New snapshot (Implement box.session, on_connect and
