@@ -1,3 +1,9 @@
+tarantool (1.4.8+20130122.1705-1) unstable; urgency=low
+
+  * New snapshot (fix spam in tarantool.log).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 22 Jan 2013 17:05:18 +0400
+
 tarantool (1.4.8+20130122-1) unstable; urgency=low
 
   * New snapshot (fix in box.session triggers).
