@@ -29,6 +29,8 @@
 #include "txn.h"
 #include "tuple.h"
 #include "space.h"
+#include <cfg/tarantool_box_cfg.h>
+#include <tarantool.h>
 #include <recovery.h>
 #include <fiber.h>
 #include "request.h" /* for request_name */
@@ -83,8 +85,11 @@ txn_commit(struct txn *txn)
 		int res = wal_write(recovery_state, lsn, 0,
 				    txn->op, &txn->req);
 		stop = ev_now();
-		say_warn("too long %s: %.3f sec",
-			request_name(txn->op), stop - start);
+
+		if (stop - start > cfg.too_long_threshold) {
+			say_warn("too long %s: %.3f sec",
+				request_name(txn->op), stop - start);
+		}
 
 		confirm_lsn(recovery_state, lsn, res == 0);
 
