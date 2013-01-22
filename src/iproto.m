@@ -799,6 +799,7 @@ iproto_process_connect(struct iproto_request *request)
 static void
 iproto_process_disconnect(struct iproto_request *request)
 {
+	fiber_set_sid(fiber, request->session->sid);
 	/* Runs the trigger, which may yield. */
 	iproto_session_gc(request->session);
 }
