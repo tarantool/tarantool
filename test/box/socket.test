@@ -2,16 +2,16 @@
 
 import socket
 
-####################
-#                  #
-# box.io.tcp/udp() #
-#                  #
-####################
+########################
+#                      #
+# box.socket.tcp/udp() #
+#                      #
+########################
 
-exec admin "lua s = box.io.udp()"
+exec admin "lua s = box.socket.udp()"
 exec admin "lua type(s)"
 exec admin "lua s:close()"
-exec admin "lua s = box.io.tcp()"
+exec admin "lua s = box.socket.tcp()"
 exec admin "lua type(s)"
 
 ### socket:close()
@@ -76,7 +76,7 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30303))
 s.listen(1)
 
-exec admin "lua s = box.io.tcp()"
+exec admin "lua s = box.socket.tcp()"
 exec admin "lua type(s:connect('127.0.0.1', '30303'))"
 exec admin "lua s:write('ping')"
 exec admin "lua s:error()"
@@ -471,7 +471,7 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30302))
 
 # SOCK_DGRAM
-exec admin "lua s = box.io.udp()"
+exec admin "lua s = box.socket.udp()"
 exec admin "lua type(s:sendto('ping', 'localhost', '30302'))"
 exec admin "lua s:error()"
 
@@ -489,7 +489,7 @@ exec admin "lua s:close()"
 # connect from test to echo server implemented in
 # stored procedure and do send/recv.
 #
-exec admin "lua s = box.io.udp()"
+exec admin "lua s = box.socket.udp()"
 exec admin "lua type(s:bind('localhost', '30301'))"
 exec admin "lua s:error()"
 

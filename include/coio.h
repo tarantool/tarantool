@@ -49,11 +49,11 @@ coio_socket(struct ev_io *coio, int domain, int type, int protocol);
 void
 coio_connect(struct ev_io *coio, struct sockaddr_in *addr);
 
-void
+bool
 coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
 		     socklen_t len, ev_tstamp timeout);
 
-void
+bool
 coio_connect_addrinfo(struct ev_io *coio, struct addrinfo *ai,
 		      ev_tstamp timeout);
 

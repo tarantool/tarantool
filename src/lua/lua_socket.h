@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_LUA_IO_H_INCLUDED
-#define TARANTOOL_LUA_IO_H_INCLUDED
+#ifndef TARANTOOL_LUA_SOCKET_H_INCLUDED
+#define TARANTOOL_LUA_SOCKET_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,6 +30,6 @@
  */
 
 struct lua_State;
-void tarantool_lua_io_init(struct lua_State *L);
+void tarantool_lua_socket_init(struct lua_State *L);
 
-#endif /* TARANTOOL_LUA_IO_H_INCLUDED */
+#endif /* TARANTOOL_LUA_SOCKET_H_INCLUDED */

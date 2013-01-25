@@ -96,7 +96,7 @@ set (common_sources
      lua/slab.m
      lua/uuid.m
      lua/lua_ipc.m
-     lua/lua_io.m
+     lua/lua_socket.m
      lua/session.m
 )
 

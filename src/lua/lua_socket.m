@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua_io.h"
+#include "lua_socket.h"
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
@@ -48,7 +48,7 @@
 #include <lua/init.h>
 #include <stdlib.h>
 
-static const char iolib_name[] = "box.io";
+static const char socketlib_name[] = "box.socket";
 
 enum bio_error {
 	ERESOLVE = -1
@@ -74,7 +74,7 @@ static int
 bio_pushsocket(struct lua_State *L, int socktype)
 {
 	struct bio_socket *s = lua_newuserdata(L, sizeof(struct bio_socket));
-	luaL_getmetatable(L, iolib_name);
+	luaL_getmetatable(L, socketlib_name);
 	lua_setmetatable(L, -2);
 	evio_clear(&s->coio);
 	s->socktype = socktype;
@@ -90,7 +90,7 @@ bio_checksocket(struct lua_State *L, int narg)
 	/* avoiding unnecessary luajit assert */
 	if (lua_gettop(L) < narg)
 		luaL_error(L, "incorrect method call");
-	return luaL_checkudata(L, narg, iolib_name);
+	return luaL_checkudata(L, narg, socketlib_name);
 }
 
 static inline struct bio_socket *
@@ -192,7 +192,7 @@ bio_resolve(int socktype, const char *host, const char *port,
 }
 
 static int
-lbox_io_tostring(struct lua_State *L)
+lbox_socket_tostring(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, -1);
 	lua_pushfstring(L, "%d", s->coio.fd);
@@ -205,7 +205,7 @@ lbox_io_tostring(struct lua_State *L)
  * Create SOCK_STREAM socket object.
  */
 static int
-lbox_io_tcp(struct lua_State *L)
+lbox_socket_tcp(struct lua_State *L)
 {
 	return bio_pushsocket(L, SOCK_STREAM);
 }
@@ -216,7 +216,7 @@ lbox_io_tcp(struct lua_State *L)
  * Create SOCK_DGRAM socket object.
  */
 static int
-lbox_io_udp(struct lua_State *L)
+lbox_socket_udp(struct lua_State *L)
 {
 	return bio_pushsocket(L, SOCK_DGRAM);
 }
@@ -227,7 +227,7 @@ lbox_io_udp(struct lua_State *L)
  * Close socket and reinitialize readahead buffer.
  */
 static int
-lbox_io_close(struct lua_State *L)
+lbox_socket_close(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, -1);
 	bio_close(s);
@@ -245,7 +245,7 @@ lbox_io_close(struct lua_State *L)
  * 2. error: nil, status = "error", eno, estr
  */
 static int
-lbox_io_shutdown(struct lua_State *L)
+lbox_socket_shutdown(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, -1);
 	int how = luaL_checkint(L, 2);
@@ -263,7 +263,7 @@ lbox_io_shutdown(struct lua_State *L)
  * Return error code and error description.
  */
 static int
-lbox_io_error(struct lua_State *L)
+lbox_socket_error(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, -1);
 	return bio_pusherrorcode(L, s);
@@ -281,7 +281,7 @@ lbox_io_error(struct lua_State *L)
  * 3. timeout: nil, status = "timeout", eno, estr
  */
 static int
-lbox_io_connect(struct lua_State *L)
+lbox_socket_connect(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, 1);
 	const char *host = luaL_checkstring(L, 2);
@@ -302,14 +302,14 @@ lbox_io_connect(struct lua_State *L)
 	evio_timeout_update(start, &delay);
 	@try {
 		/* connect to a first available host */
-		coio_connect_addrinfo(&s->coio, ai, delay);
+		if (coio_connect_addrinfo(&s->coio, ai, delay))
+			return bio_pusherror(L, s, ETIMEDOUT);
 	} @catch (SocketError *e) {
-		/* case #2-3: error or timeout */
 		return bio_pusherror(L, s, errno);
 	} @finally {
 		freeaddrinfo(ai);
 	}
-	/* case #1: Success */
+	/* Success */
 	lua_settop(L, 1);
 	return 1;
 }
@@ -331,7 +331,7 @@ lbox_io_connect(struct lua_State *L)
  *
  */
 static int
-lbox_io_write(struct lua_State *L)
+lbox_socket_write(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, 1);
 	size_t buf_size = 0;
@@ -356,7 +356,7 @@ lbox_io_write(struct lua_State *L)
 }
 
 static inline int
-lbox_io_read_ret(struct lua_State *L, struct bio_socket *s, char *buf,
+lbox_socket_read_ret(struct lua_State *L, struct bio_socket *s, char *buf,
                  size_t size, enum bio_status st)
 {
 	lua_pushlstring(L, buf, size);
@@ -365,7 +365,7 @@ lbox_io_read_ret(struct lua_State *L, struct bio_socket *s, char *buf,
 }
 
 static inline int
-lbox_io_read_eof(struct lua_State *L, struct bio_socket *s,
+lbox_socket_read_eof(struct lua_State *L, struct bio_socket *s,
 		 size_t sz)
 {
 	size_t ret = ibuf_size(&s->iob->in);
@@ -375,7 +375,7 @@ lbox_io_read_eof(struct lua_State *L, struct bio_socket *s,
 	 * read limit: return it with eof status
 	 * set.
 	 */
-	lbox_io_read_ret(L, s, s->iob->in.pos, ret, BIO_EOF);
+	lbox_socket_read_ret(L, s, s->iob->in.pos, ret, BIO_EOF);
 	s->iob->in.pos += ret;
 	return 4;
 }
@@ -397,7 +397,7 @@ lbox_io_read_eof(struct lua_State *L, struct bio_socket *s,
  *
  */
 static int
-lbox_io_read(struct lua_State *L)
+lbox_socket_read(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, 1);
 	int sz = luaL_checkint(L, 2);
@@ -414,7 +414,7 @@ lbox_io_read(struct lua_State *L)
 	 *
 	 * See case #4. */
 	if (s->eof) {
-		int rc = lbox_io_read_eof(L, s, sz);
+		int rc = lbox_socket_read_eof(L, s, sz);
 		if (rc == -1)
 			goto case_1;
 		return rc;
@@ -453,7 +453,7 @@ lbox_io_read(struct lua_State *L)
 			enum bio_status st =
 				(s->error == ETIMEDOUT) ? BIO_TIMEOUT :
 				 BIO_ERROR;
-			return lbox_io_read_ret(L, s, NULL, 0, st);
+			return lbox_socket_read_ret(L, s, NULL, 0, st);
 		}
 
 		/* in case of EOF from a client, return partly read chunk and
@@ -466,7 +466,7 @@ lbox_io_read(struct lua_State *L)
 			/* read chunk could be much bigger than limit, in
 			 * this case, don't return eof flag to a user until
 			 * whole data been read. */
-			int rc = lbox_io_read_eof(L, s, sz);
+			int rc = lbox_socket_read_eof(L, s, sz);
 			if (rc == -1)
 				goto case_1;
 			return rc;
@@ -540,7 +540,7 @@ first_matched:		if (unlikely(rs[i].sep_size == rs[i].pos + 1))
 }
 
 static void
-lbox_io_readline_cr(struct lua_State *L)
+lbox_socket_readline_cr(struct lua_State *L)
 {
 	/* emulate user passed {'\n'} as the separate table */
 	lua_newtable(L);
@@ -550,7 +550,7 @@ lbox_io_readline_cr(struct lua_State *L)
 }
 
 static int
-lbox_io_readline_ret(struct lua_State *L, struct bio_socket *s,
+lbox_socket_readline_ret(struct lua_State *L, struct bio_socket *s,
                      char *buf, size_t size,
                      enum bio_status st, int sid)
 {
@@ -561,21 +561,21 @@ lbox_io_readline_ret(struct lua_State *L, struct bio_socket *s,
 }
 
 static int
-lbox_io_readline_opts(struct lua_State *L, unsigned int *limit,
+lbox_socket_readline_opts(struct lua_State *L, unsigned int *limit,
 		      double *timeout)
 {
 	int seplist = 2;
 	switch (lua_gettop(L)) {
 	case 1:
 		/* readline() */
-		lbox_io_readline_cr(L);
+		lbox_socket_readline_cr(L);
 		break;
 	case 2:
 		 /* readline(limit)
 		    readline({seplist}) */
 		if (lua_isnumber(L, 2)) {
 			*limit = luaL_checkint(L, 2);
-			lbox_io_readline_cr(L);
+			lbox_socket_readline_cr(L);
 			seplist = 3;
 		} else if (! lua_istable(L, 2))
 			luaL_error(L, "box.io.readline: bad argument");
@@ -588,7 +588,7 @@ lbox_io_readline_opts(struct lua_State *L, unsigned int *limit,
 			*limit = luaL_checkint(L, 2);
 			if (lua_isnumber(L, 3)) {
 				*timeout = luaL_checknumber(L, 3);
-				lbox_io_readline_cr(L);
+				lbox_socket_readline_cr(L);
 				seplist = 4;
 				break;
 			} else if (! lua_istable(L, 3))
@@ -641,14 +641,14 @@ lbox_io_readline_opts(struct lua_State *L, unsigned int *limit,
  *
  */
 static int
-lbox_io_readline(struct lua_State *L)
+lbox_socket_readline(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, 1);
 	bio_clearerr(s);
 
 	unsigned int limit = UINT_MAX;
 	double timeout = TIMEOUT_INFINITY;
-	int seplist = lbox_io_readline_opts(L, &limit, &timeout);
+	int seplist = lbox_socket_readline_opts(L, &limit, &timeout);
 
 	int rs_size = lua_objlen(L, seplist);
 	if (rs_size == 0)
@@ -675,7 +675,7 @@ lbox_io_readline(struct lua_State *L)
 
 			/* case #4: user limit reached */
 			if (bottom == limit) {
-				lbox_io_readline_ret(L, s, s->iob->in.pos, bottom,
+				lbox_socket_readline_ret(L, s, s->iob->in.pos, bottom,
 				                     BIO_LIMIT, 0);
 				s->iob->in.pos += bottom;
 				return 5;
@@ -693,7 +693,7 @@ lbox_io_readline(struct lua_State *L)
 				 * is fully traversed.
 				 */
 eof:				if (s->eof) {
-					lbox_io_readline_ret(L, s, s->iob->in.pos, bottom,
+					lbox_socket_readline_ret(L, s, s->iob->in.pos, bottom,
 							     BIO_EOF, 0);
 					s->iob->in.pos += bottom;
 					return 5;
@@ -727,7 +727,7 @@ eof:				if (s->eof) {
 		enum bio_status st =
 			(s->error == ETIMEDOUT) ? BIO_TIMEOUT :
 			 BIO_ERROR;
-		return lbox_io_readline_ret(L, s, NULL, 0, st, 0);
+		return lbox_socket_readline_ret(L, s, NULL, 0, st, 0);
 	}
 
 	/* case #1: success, separator matched */
@@ -750,7 +750,7 @@ eof:				if (s->eof) {
  *
  */
 static int
-lbox_io_bind(struct lua_State *L)
+lbox_socket_bind(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, 1);
 	const char *host = luaL_checkstring(L, 2);
@@ -776,19 +776,17 @@ lbox_io_bind(struct lua_State *L)
 	return 1;
 }
 
-/*
+/**
  * socket:listen()
  *
  * Marks the socket that it will be used to accept incoming
  * connection requests using socket:accept().
  *
- * Return:
- *
- * 1. ok:      socket (self)
- * 2. error:   nil, status = "error",   eno, estr
+ * @retval socket (self) on success
+ * @retval nil, status = "error", errno, error string
  */
 static int
-lbox_io_listen(struct lua_State *L)
+lbox_socket_listen(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, 1);
 	bio_clearerr(s);
@@ -805,11 +803,11 @@ lbox_io_listen(struct lua_State *L)
  * socket.
  *
  * 1. ok:      socket (client), address, port
- * 2. error:   nil, nil, nil, status = "error",   eno, estr
- * 3. timeout: nil, nil, nil, status = "timeout", eno, estr
+ * 2. error:   nil, status = "error", eno, estr
+ * 3. timeout: nil, status = "timeout", eno, estr
  */
 static int
-lbox_io_accept(struct lua_State *L)
+lbox_socket_accept(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, 1);
 	double timeout = TIMEOUT_INFINITY;
@@ -826,9 +824,7 @@ lbox_io_accept(struct lua_State *L)
 		coio_init(&client->coio, fd);
 	} @catch (SocketError *e) {
 		/* case #2: error */
-		lua_pushnil(L);
-		lua_pushnil(L);
-		return 2 + bio_pusherror(L, s, errno);
+		return bio_pusherror(L, s, errno);
 	}
 	/* get user host and port */
 	char hbuf[NI_MAXHOST];
@@ -838,9 +834,7 @@ lbox_io_accept(struct lua_State *L)
 			     sbuf, sizeof(sbuf), NI_NUMERICHOST|NI_NUMERICSERV);
 	if (rc != 0) {
 		/* case #2: error */
-		lua_pushnil(L);
-		lua_pushnil(L);
-		return 2 + bio_pusherror(L, s, ERESOLVE);
+		return bio_pusherror(L, s, ERESOLVE);
 	}
 	/* push host and port */
 	lua_pushstring(L, hbuf);
@@ -860,7 +854,7 @@ lbox_io_accept(struct lua_State *L)
  * 3. timeout: nil, status = "timeout", eno, estr
  */
 static int
-lbox_io_sendto(struct lua_State *L)
+lbox_socket_sendto(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, 1);
 	size_t buf_size = 0;
@@ -907,13 +901,11 @@ lbox_io_sendto(struct lua_State *L)
  * Return:
  *
  * 1. ok:      data,      client_addr,       client_port
- * 2. error:   data = "", client_addr = nil, client_port = nil, status = "error",
- *             eno, estr
- * 3. timeout: data = "", client_addr = nil, client_port = nil, status = "timeout",
- *             eno, estr
+ * 2. error:   data = "", status = "error",  eno, estr
+ * 3. timeout: data = "",  status = "timeout", eno, estr
  */
 static int
-lbox_io_recvfrom(struct lua_State *L)
+lbox_socket_recvfrom(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, 1);
 	int buf_size = luaL_checkint(L, 2);
@@ -962,31 +954,31 @@ lbox_io_recvfrom(struct lua_State *L)
 }
 
 void
-tarantool_lua_io_init(struct lua_State *L)
+tarantool_lua_socket_init(struct lua_State *L)
 {
-	static const struct luaL_reg lbox_io_meta[] = {
-		{"__gc", lbox_io_close},
-		{"__tostring", lbox_io_tostring},
-		{"error", lbox_io_error},
-		{"close", lbox_io_close},
-		{"shutdown", lbox_io_shutdown},
-		{"connect", lbox_io_connect},
-		{"write", lbox_io_write},
-		{"read", lbox_io_read},
-		{"readline", lbox_io_readline},
-		{"bind", lbox_io_bind},
-		{"listen", lbox_io_listen},
-		{"accept", lbox_io_accept},
-		{"sendto", lbox_io_sendto},
-		{"recvfrom", lbox_io_recvfrom},
+	static const struct luaL_reg lbox_socket_meta[] = {
+		{"__gc", lbox_socket_close},
+		{"__tostring", lbox_socket_tostring},
+		{"error", lbox_socket_error},
+		{"close", lbox_socket_close},
+		{"shutdown", lbox_socket_shutdown},
+		{"connect", lbox_socket_connect},
+		{"write", lbox_socket_write},
+		{"read", lbox_socket_read},
+		{"readline", lbox_socket_readline},
+		{"bind", lbox_socket_bind},
+		{"listen", lbox_socket_listen},
+		{"accept", lbox_socket_accept},
+		{"sendto", lbox_socket_sendto},
+		{"recvfrom", lbox_socket_recvfrom},
 		{NULL, NULL}
 	};
-	static const struct luaL_reg iolib[] = {
-		{"tcp", lbox_io_tcp},
-		{"udp", lbox_io_udp},
+	static const struct luaL_reg socketlib[] = {
+		{"tcp", lbox_socket_tcp},
+		{"udp", lbox_socket_udp},
 		{NULL, NULL}
 	};
-	tarantool_lua_register_type(L, iolib_name, lbox_io_meta);
-	luaL_register(L, iolib_name, iolib);
+	tarantool_lua_register_type(L, socketlib_name, lbox_socket_meta);
+	luaL_register(L, socketlib_name, socketlib);
 	lua_pop(L, 1);
 }

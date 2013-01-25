@@ -1,4 +1,4 @@
-lua s = box.io.udp()
+lua s = box.socket.udp()
 ---
 ...
 lua type(s)
@@ -8,7 +8,7 @@ lua type(s)
 lua s:close()
 ---
 ...
-lua s = box.io.tcp()
+lua s = box.socket.tcp()
 ---
 ...
 lua type(s)
@@ -120,7 +120,7 @@ lua s:error()
  - 110
  - Connection timed out
 ...
-lua s = box.io.tcp()
+lua s = box.socket.tcp()
 ---
 ...
 lua type(s:connect('127.0.0.1', '30303'))
@@ -859,7 +859,7 @@ lua s:close()
 ---
 ...
 ping
-lua s = box.io.udp()
+lua s = box.socket.udp()
 ---
 ...
 lua type(s:sendto('ping', 'localhost', '30302'))
@@ -879,7 +879,7 @@ lua s:read(4)
 lua s:close()
 ---
 ...
-lua s = box.io.udp()
+lua s = box.socket.udp()
 ---
 ...
 lua type(s:bind('localhost', '30301'))

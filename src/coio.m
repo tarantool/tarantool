@@ -72,16 +72,20 @@ coio_connect(struct ev_io *coio, struct sockaddr_in *addr)
 
 /**
  * Connect to a host with a specified timeout.
+ * @retval true timeout
+ * @retval false connected
  */
-void
+bool
 coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
 		     socklen_t len, ev_tstamp timeout)
 {
 	if (sio_connect(coio->fd, addr, len) == 0)
-		return;
+		return false;
 	assert(errno == EINPROGRESS);
-	/* Wait until socket is ready for writing or
-	 * timed out. */
+	/*
+	 * Wait until socket is ready for writing or
+	 * timed out.
+	 */
 	ev_io_set(coio, coio->fd, EV_WRITE);
 	ev_io_start(coio);
 	bool is_timedout = fiber_yield_timeout(timeout);
@@ -89,16 +93,17 @@ coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
 	fiber_testcancel();
 	if (is_timedout) {
 		errno = ETIMEDOUT;
-		tnt_raise(SocketError, :coio->fd in:"connect");
+		return true;
 	}
 	int error = EINPROGRESS;
 	socklen_t sz = sizeof(error);
 	sio_getsockopt(coio->fd, SOL_SOCKET, SO_ERROR,
 		       &error, &sz);
-	if (error == 0)
-		return;
-	errno = error;
-	tnt_raise(SocketError, :coio->fd in:"connect");
+	if (error != 0) {
+		errno = error;
+		tnt_raise(SocketError, :coio->fd in:"connect");
+	}
+	return false;
 }
 
 /**
@@ -107,39 +112,33 @@ coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
  *
  * Coio should not be initialized.
  */
-void
+bool
 coio_connect_addrinfo(struct ev_io *coio, struct addrinfo *ai,
 		      ev_tstamp timeout)
 {
-	struct addrinfo *a;
-	int error = 0;
-
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
 
-	for (a = ai; a; a = a->ai_next) {
+	while (ai) {
+		struct sockaddr_in *addr = (struct sockaddr_in *) ai->ai_addr;
 		@try {
-			coio_socket(coio, a->ai_family, a->ai_socktype, a->ai_protocol);
+			if (! evio_is_active(coio)) {
+				coio_socket(coio, ai->ai_family,
+					    ai->ai_socktype,
+					    ai->ai_protocol);
 
-			evio_setsockopt_tcp(coio->fd);
-
-			coio_connect_timeout(coio, (struct sockaddr_in*)a->ai_addr,
-					     a->ai_addrlen, delay);
-			return;
-		} @catch (FiberCancelException *e) {
-			evio_close(coio);
-			@throw;
+				evio_setsockopt_tcp(coio->fd);
+			}
+			return coio_connect_timeout(coio, addr,
+						    ai->ai_addrlen, delay);
 		} @catch (tnt_Exception *e) {
-			error = errno;
 			ev_now_update();
 			evio_timeout_update(start, &delay);
 			evio_close(coio);
-			continue;
+			ai = ai->ai_next;
 		}
-		return;
 	}
-	errno = error;
-	tnt_raise(SocketError, :coio->fd in:"connect_addrinfo");
+	tnt_raise(SocketError, :coio->fd in:"connect_addrinfo(): exhausted addrinfo list");
 }
 
 /**
