@@ -69,7 +69,7 @@
  * @see __builtin_ctz()
  * @return the number trailing 0-bits
  */
- __attribute__((const)) inline int
+inline int
 bit_ctz_u32(uint32_t x)
 {
 #if defined(HAVE_BUILTIN_CTZ)
@@ -87,7 +87,7 @@ bit_ctz_u32(uint32_t x)
 /**
  * @copydoc bit_ctz_u32
  */
- __attribute__((const)) inline int
+inline int
 bit_ctz_u64(uint64_t x)
 {
 #if   defined(HAVE_BUILTIN_CTZLL)
@@ -127,7 +127,7 @@ bit_ctz_u64(uint64_t x)
  * @see __builtin_clz()
  * @return the number of leading 0-bits
  */
- __attribute__((const)) inline int
+inline int
 bit_clz_u32(uint32_t x)
 {
 #if   defined(HAVE_BUILTIN_CLZ)
@@ -140,7 +140,7 @@ bit_clz_u32(uint32_t x)
 /**
  * @copydoc bit_clz_u32
  */
-__attribute__((const)) inline int
+inline int
 bit_clz_u64(uint64_t x)
 {
 #if   defined(HAVE_BUILTIN_CLZLL)
@@ -172,7 +172,7 @@ bit_clz_u64(uint64_t x)
  * @see __builtin_popcount()
  * @return the number of 1-bits in @a x
  */
-__attribute__((const)) inline int
+inline int
 bit_count_u32(uint32_t x)
 {
 #if   defined(HAVE_BUILTIN_POPCOUNT)
@@ -185,7 +185,7 @@ bit_count_u32(uint32_t x)
 /**
  * @copydoc bit_count_u32
  */
-__attribute__((const)) inline int
+inline int
 bit_count_u64(uint64_t x)
 {
 #if   defined(HAVE_BUILTIN_POPCOUNTLL)
@@ -203,7 +203,7 @@ bit_count_u64(uint64_t x)
  * @param r number for bits to rotate
  * @return @a x rotated left by @a r bits
  */
-__attribute__ ((const)) inline uint32_t
+inline uint32_t
 bit_rotl_u32(uint32_t x, int r)
 {
 	/* gcc recognises this code and generates a rotate instruction */
@@ -213,7 +213,7 @@ bit_rotl_u32(uint32_t x, int r)
 /**
  * @copydoc bit_rotl_u32
  */
-__attribute__ ((const)) inline uint64_t
+inline uint64_t
 bit_rotl_u64(uint64_t x, int r)
 {
 	/* gcc recognises this code and generates a rotate instruction */
@@ -227,7 +227,7 @@ bit_rotl_u64(uint64_t x, int r)
  * @return @a x rotated right by @a r bits
  * @todo Move this method to bit.h
  */
-__attribute__ ((const)) inline uint32_t
+inline uint32_t
 bit_rotr_u32(uint32_t x, int r)
 {
 	/* gcc recognises this code and generates a rotate instruction */
@@ -237,7 +237,7 @@ bit_rotr_u32(uint32_t x, int r)
 /**
  * @copydoc bit_rotr_u32
  */
-__attribute__ ((const)) inline uint64_t
+inline uint64_t
 bit_rotr_u64(uint64_t x, int r)
 {
 	/* gcc recognises this code and generates a rotate instruction */
@@ -252,7 +252,7 @@ bit_rotr_u64(uint64_t x, int r)
  * @param x integer
  * @return @a x with swapped bytes
  */
-__attribute__ ((const)) inline uint32_t
+inline uint32_t
 bswap_u32(uint32_t x)
 {
 #if defined(HAVE_BUILTIN_BSWAP32)
@@ -268,7 +268,7 @@ bswap_u32(uint32_t x)
 /**
  * @copydoc bswap_u32
  */
-__attribute__ ((const)) inline uint64_t
+inline uint64_t
 bswap_u64(uint64_t x)
 {
 #if defined(HAVE_BUILTIN_BSWAP64)
