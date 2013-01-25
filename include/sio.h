@@ -47,15 +47,6 @@ enum { SERVICE_NAME_MAXLEN = 32 };
 - (id) init: (int) fd in: (const char *) format, ...;
 @end
 
-@interface SocketRWError: SocketError {
-	@public
-		/* written/read bytes before exception */
-		size_t n;
-}
-
-- (id) init: (int) fd in: (size_t) size: (const char *) format, ...;
-@end
-
 int sio_socket(int domain, int type, int protocol);
 
 int sio_shutdown(int fd, int how);

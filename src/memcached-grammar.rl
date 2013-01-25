@@ -252,8 +252,9 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 		action read_data {
 			size_t parsed = p - in->pos;
 			while (ibuf_size(in) - parsed < bytes + 2) {
-				if (coio_bread(coio, in, bytes + 2 - (pe - p)) <= 0)
-					return -1;
+				size_t to_read = bytes + 2 - (pe - p);
+				if (coio_bread(coio, in, to_read) < to_read)
+					return -1; /* premature EOF */
 			}
 			/*
 			 * Buffered read may have reallocated the

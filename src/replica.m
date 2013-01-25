@@ -51,7 +51,8 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf)
 		coio_breadn(coio, in, to_read);
 	}
 
-	ssize_t request_len = ((struct header_v11 *)in->pos)->len + sizeof(struct header_v11);
+	ssize_t request_len = ((struct header_v11 *)in->pos)->len
+		+ sizeof(struct header_v11);
 	to_read = request_len - ibuf_size(in);
 
 	if (to_read > 0)
@@ -69,8 +70,7 @@ static void
 remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	       i64 initial_lsn, const char **err)
 {
-	coio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	evio_setsockopt_tcp(coio->fd);
+	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	*err = "can't connect to master";
 	coio_connect(coio, remote_addr);
@@ -98,7 +98,7 @@ pull_from_remote(va_list ap)
 	bool warning_said = false;
 	const int reconnect_delay = 1;
 
-	evio_clear(&coio);
+	coio_init(&coio);
 
 	for (;;) {
 		const char *err = NULL;

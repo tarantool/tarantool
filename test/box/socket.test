@@ -61,13 +61,13 @@ exec admin "lua s:close()"
 
 ##################
 #                #
-# socket:write() #
+# socket:send() #
 #                #
 ##################
 
 # bad args
-exec admin "lua s:write()"
-exec admin "lua s:write(1)"
+exec admin "lua s:send()"
+exec admin "lua s:send(1)"
 # bad file descriptor
 exec admin "lua s:error()"
 
@@ -78,11 +78,11 @@ s.listen(1)
 
 exec admin "lua s = box.socket.tcp()"
 exec admin "lua type(s:connect('127.0.0.1', '30303'))"
-exec admin "lua s:write('ping')"
+exec admin "lua s:send('ping')"
 exec admin "lua s:error()"
 
 # timedout
-exec admin "lua n, status, error_code, error_str = s:write(string.rep('=', 200000), 0.0000001)"
+exec admin "lua n, status, error_code, error_str = s:send(string.rep('=', 200000), 0.0000001)"
 exec admin "lua type(n)"
 exec admin "lua type(status)"
 exec admin "lua type(error_code)"
@@ -101,21 +101,21 @@ conn.close()
 s.close()
 
 # connection reset by peer
-exec admin "lua s:write('ping')"
+exec admin "lua s:send('ping')"
 exec admin "lua s:error()"
 
 exec admin "lua s:close()"
 
 #################
 #               #
-# socket:read() #
+# socket:recv() #
 #               #
 #################
 
 # bad args
-exec admin "lua s:read()"
+exec admin "lua s:recv()"
 
-# test for case #1: successful read
+# test for case #1: successful recv
 #
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -125,13 +125,13 @@ exec admin "lua type(s:connect('127.0.0.1', '30308'))"
 exec admin "lua s:error()"
 conn, addr = s.accept()
 print(conn.send("Hello, World"))
-exec admin "lua s:read(12)"
+exec admin "lua s:recv(12)"
 exec admin "lua s:error()"
 exec admin "lua s:close()"
 conn.close()
 s.close()
 
-# test for case #1: successful serial chunk read (3 x chunk)
+# test for case #1: successful serial chunk recv (3 x chunk)
 #
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -141,9 +141,9 @@ exec admin "lua type(s:connect('127.0.0.1', '30308'))"
 exec admin "lua s:error()"
 conn, addr = s.accept()
 print(conn.send("Hello World Oversized"))
-exec admin "lua s:read(11)"
-exec admin "lua s:read(5)"
-exec admin "lua s:read(5)"
+exec admin "lua s:recv(11)"
+exec admin "lua s:recv(5)"
+exec admin "lua s:recv(5)"
 exec admin "lua s:error()"
 exec admin "lua s:close()"
 conn.close()
@@ -163,21 +163,21 @@ conn, addr = s.accept()
 print('connected')
 
 print(conn.send("pin"))
-exec admin "lua s:read(4, 0.01)"
+exec admin "lua s:recv(4, 0.01)"
 # timedout
 exec admin "lua s:error()"
 
 conn.send("g")
 
 # ping
-exec admin "lua s:read(4)"
+exec admin "lua s:recv(4)"
 exec admin "lua s:error()"
 
 exec admin "lua s:close()"
 conn.close()
 s.close()
 
-# test for case #4: EOF (data is less then read size)
+# test for case #4: EOF (data is less then recv size)
 #
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -192,12 +192,12 @@ print('connected')
 
 print(conn.send("ping"))
 conn.close()
-exec admin "lua s:read(6)"
+exec admin "lua s:recv(6)"
 exec admin "lua s:error()"
 exec admin "lua s:close()"
 s.close()
 
-# test for case #4: EOF (data is more then read size)
+# test for case #4: EOF (data is more then recv size)
 #
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -213,18 +213,18 @@ print('connected')
 print(conn.send("ping ping ping ping end "))
 conn.close()
 
-# read should not say EOF, even if it really happened
-exec admin "lua s:read(5)"
-exec admin "lua s:read(5)"
-exec admin "lua s:read(5)"
-exec admin "lua s:read(5)"
+# recv should not say EOF, even if it really happened
+exec admin "lua s:recv(5)"
+exec admin "lua s:recv(5)"
+exec admin "lua s:recv(5)"
+exec admin "lua s:recv(5)"
 
 # eof
-exec admin "lua s:read(5)"
+exec admin "lua s:recv(5)"
 # eof (zero)
-exec admin "lua s:read(5)"
+exec admin "lua s:recv(5)"
 # eof (zero)
-exec admin "lua s:read(5)"
+exec admin "lua s:recv(5)"
 
 exec admin "lua s:error()"
 exec admin "lua s:close()"
@@ -416,22 +416,22 @@ s.bind(('localhost', 30303))
 s.listen(1)
 
 exec admin "lua type(s:connect('localhost', '30303'))"
-exec admin "lua s:write('ping')"
+exec admin "lua s:send('ping')"
 
 conn, addr = s.accept()
 print('connected')
 data = conn.recv(4)
 conn.sendall(data)
 
-exec admin "lua s:read(4)"
+exec admin "lua s:recv(4)"
 conn.close()
 s.close()
 
-exec admin "lua s:write('ping')"
+exec admin "lua s:send('ping')"
 exec admin "lua s:error()"
 
 # broken pipe
-exec admin "lua s:write('ping')"
+exec admin "lua s:send('ping')"
 exec admin "lua s:error()"
 
 exec admin "lua s:close()"
@@ -449,11 +449,11 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.connect(('localhost', 30303))
 s.sendall('ping')
 
-exec admin "lua client, addr = s:accept()"
+exec admin "lua client, status, addr = s:accept()"
 exec admin "lua addr"
-exec admin "lua data = client:read(4)"
+exec admin "lua data = client:recv(4)"
 exec admin "lua data"
-exec admin "lua client:write(data, 4)"
+exec admin "lua client:send(data, 4)"
 exec admin "lua client:close()"
 exec admin "lua s:close()"
 
@@ -479,7 +479,7 @@ data, addr = s.recvfrom(4)
 print(data)
 s.sendto(data, addr)
 
-exec admin "lua s:read(4)"
+exec admin "lua s:recv(4)"
 
 s.close()
 exec admin "lua s:close()"
@@ -496,7 +496,7 @@ exec admin "lua s:error()"
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.sendto('ping', ('127.0.0.1', 30301))
 
-exec admin "lua data, client, port = s:recvfrom(4)"
+exec admin "lua data, status, client, port = s:recvfrom(4)"
 exec admin "lua s:error()"
 exec admin "lua data"
 exec admin "lua client"

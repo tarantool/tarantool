@@ -83,18 +83,6 @@ sio_socketname(int fd)
 }
 @end
 
-@implementation SocketRWError
-- (id) init: (int) fd in: (size_t) size: (const char *) format, ...
-{
-	n = size;
-	va_list ap;
-	va_start(ap, format);
-	self = [self init: fd :format :ap];
-	va_end(ap);
-	return self;
-}
-@end
-
 /** Get a string representation of a socket option name,
  * for logging.
  */
@@ -254,20 +242,6 @@ sio_read(int fd, void *buf, size_t count)
 	return n;
 }
 
-/** Read up to 'count' bytes from a socket.
- *  @throws SocketRWError exception.
- */
-ssize_t
-sio_read_total(int fd, void *buf, size_t count, size_t total)
-{
-	ssize_t n = read(fd, buf, count);
-	if (n < 0 && errno != EAGAIN &&
-	    errno != EWOULDBLOCK && errno != EINTR)
-			tnt_raise(SocketRWError, :fd in: total :"read(%zd)",
-				  count);
-	return n;
-}
-
 /** Write up to 'count' bytes to a socket. */
 ssize_t
 sio_write(int fd, const void *buf, size_t count)
@@ -276,21 +250,6 @@ sio_write(int fd, const void *buf, size_t count)
 	if (n < 0 && errno != EAGAIN &&
 	    errno != EWOULDBLOCK && errno != EINTR)
 			tnt_raise(SocketError, :fd in:"write(%zd)", count);
-	return n;
-}
-
-/** Write up to 'count' bytes to a socket.
- *
- *  @throws SocketRWError exception.
- */
-ssize_t
-sio_write_total(int fd, const void *buf, size_t count, size_t total)
-{
-	ssize_t n = write(fd, buf, count);
-	if (n < 0 && errno != EAGAIN &&
-	    errno != EWOULDBLOCK && errno != EINTR)
-			tnt_raise(SocketRWError, :fd in: total :"write(%zd)",
-				  count);
 	return n;
 }
 

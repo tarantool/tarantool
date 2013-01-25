@@ -32,7 +32,11 @@
 #include "iobuf.h"
 /** Buffered cooperative IO */
 
-/** Read at least sz bytes, buffered. Return 0 in case of EOF. */
+/**
+ * Read at least sz bytes, buffered.
+ * Return the number of bytes read (can be less than n in case
+ * of EOF).
+ */
 static inline ssize_t
 coio_bread(struct ev_io *coio, struct ibuf *buf, size_t sz)
 {
@@ -42,8 +46,11 @@ coio_bread(struct ev_io *coio, struct ibuf *buf, size_t sz)
 	return n;
 }
 
-/** Read at least sz bytes buffered and wait until a timeout reached.
- *  Return 0 in case of EOF. */
+/**
+ * Read at least sz bytes buffered or until a timeout reached.
+ * Return the amount of bytes read (can be less than sz
+ * in case of EOF or timeout).
+ */
 static inline ssize_t
 coio_bread_timeout(struct ev_io *coio, struct ibuf *buf, size_t sz,
 		   ev_tstamp timeout)
@@ -65,6 +72,11 @@ coio_breadn(struct ev_io *coio, struct ibuf *buf, size_t sz)
 	return n;
 }
 
+/** Reat at least sz bytes, buffered. Throw an exception in case
+ * of EOF.
+ * @return the number of bytes read. Can be less than sz in
+ * case of timeout.
+ */
 static inline ssize_t
 coio_breadn_timeout(struct ev_io *coio, struct ibuf *buf, size_t sz,
 		    ev_tstamp timeout)

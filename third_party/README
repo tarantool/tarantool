@@ -33,3 +33,15 @@ How to update it:
 - delete GNUMakefile
 - merge our Makefile with the Makefile in
 the source tarball
+
+
+How to update libeio
+====================
+Note: we have two important changes to the stock libeio:
+- it's possible to change the libeio thread stack size
+  with EIO_STACKSIZE constant. In particular, EIO_STACKSIZE
+  set to 0 means the default stack size.
+  A larger stack size is necessary to make getaddrinfo()
+  work.
+
+Otherwise: cvs up

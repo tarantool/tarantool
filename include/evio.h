@@ -115,10 +115,10 @@ void
 evio_service_stop(struct evio_service *service);
 
 void
-evio_clear(struct ev_io *ev);
+evio_socket(struct ev_io *coio, int domain, int type, int protocol);
 
 void
-evio_close(struct ev_io *ev);
+evio_close(struct ev_io *evio);
 
 static inline bool
 evio_is_active(struct ev_io *ev)
@@ -145,5 +145,8 @@ evio_setsockopt_tcp(int fd);
 
 void
 evio_setsockopt_tcpserver(int fd);
+
+void
+evio_bind_addrinfo(struct ev_io *coio, struct addrinfo *ai);
 
 #endif /* TARANTOOL_EVIO_H_INCLUDED */

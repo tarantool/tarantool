@@ -107,13 +107,13 @@ lua s:error()
 lua s:close()
 ---
 ...
-lua s:write()
+lua s:send()
 ---
-error: 'socket is not initialized'
+error: 'box.socket: socket is not initialized'
 ...
-lua s:write(1)
+lua s:send(1)
 ---
-error: 'socket is not initialized'
+error: 'box.socket: socket is not initialized'
 ...
 lua s:error()
 ---
@@ -127,7 +127,7 @@ lua type(s:connect('127.0.0.1', '30303'))
 ---
  - userdata
 ...
-lua s:write('ping')
+lua s:send('ping')
 ---
  - 4
 ...
@@ -136,7 +136,7 @@ lua s:error()
  - 0
  - Success
 ...
-lua n, status, error_code, error_str = s:write(string.rep('=', 200000), 0.0000001)
+lua n, status, error_code, error_str = s:send(string.rep('=', 200000), 0.0000001)
 ---
 ...
 lua type(n)
@@ -177,7 +177,7 @@ lua s:error()
  - Connection timed out
 ...
 connected
-lua s:write('ping')
+lua s:send('ping')
 ---
  - 0
  - error
@@ -192,9 +192,9 @@ lua s:error()
 lua s:close()
 ---
 ...
-lua s:read()
+lua s:recv()
 ---
-error: 'socket is not initialized'
+error: 'box.socket: socket is not initialized'
 ...
 lua type(s:connect('127.0.0.1', '30308'))
 ---
@@ -206,7 +206,7 @@ lua s:error()
  - Success
 ...
 12
-lua s:read(12)
+lua s:recv(12)
 ---
  - Hello, World
 ...
@@ -228,15 +228,15 @@ lua s:error()
  - Success
 ...
 21
-lua s:read(11)
+lua s:recv(11)
 ---
  - Hello World
 ...
-lua s:read(5)
+lua s:recv(5)
 ---
  -  Over
 ...
-lua s:read(5)
+lua s:recv(5)
 ---
  - sized
 ...
@@ -259,7 +259,7 @@ lua s:error()
 ...
 connected
 3
-lua s:read(4, 0.01)
+lua s:recv(4, 0.01)
 ---
  - 
  - timeout
@@ -271,7 +271,7 @@ lua s:error()
  - 110
  - Connection timed out
 ...
-lua s:read(4)
+lua s:recv(4)
 ---
  - ping
 ...
@@ -294,12 +294,10 @@ lua s:error()
 ...
 connected
 4
-lua s:read(6)
+lua s:recv(6)
 ---
  - ping
  - eof
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -320,42 +318,36 @@ lua s:error()
 ...
 connected
 24
-lua s:read(5)
+lua s:recv(5)
 ---
  - ping 
 ...
-lua s:read(5)
+lua s:recv(5)
 ---
  - ping 
 ...
-lua s:read(5)
+lua s:recv(5)
 ---
  - ping 
 ...
-lua s:read(5)
+lua s:recv(5)
 ---
  - ping 
 ...
-lua s:read(5)
+lua s:recv(5)
 ---
  - end 
  - eof
- - 0
- - Success
 ...
-lua s:read(5)
+lua s:recv(5)
 ---
  - 
  - eof
- - 0
- - Success
 ...
-lua s:read(5)
+lua s:recv(5)
 ---
  - 
  - eof
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -379,6 +371,7 @@ lua s:readline()
 ---
  - Hello World
 
+ - nil
  - 1
 ...
 lua s:error()
@@ -390,10 +383,7 @@ lua s:error()
 lua s:readline(5)
 ---
  - Hello
- - 0
  - limit
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -403,10 +393,7 @@ lua s:error()
 lua s:readline(5, 0.01)
 ---
  -  Worl
- - 0
  - limit
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -417,6 +404,7 @@ lua s:readline(6, 0.01)
 ---
  - d
 
+ - nil
  - 1
 ...
 lua s:error()
@@ -428,6 +416,7 @@ lua s:error()
 lua s:readline({'i', 'D'})
 ---
  - AbcD
+ - nil
  - 2
 ...
 lua s:error()
@@ -438,6 +427,7 @@ lua s:error()
 lua s:readline({'i', 'G'})
 ---
  - efG
+ - nil
  - 2
 ...
 lua s:error()
@@ -448,6 +438,7 @@ lua s:error()
 lua s:readline({'i'})
 ---
  - hi
+ - nil
  - 1
 ...
 lua s:error()
@@ -459,6 +450,7 @@ lua s:error()
 lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
  - Cat
+ - nil
  - 1
 ...
 lua s:error()
@@ -469,6 +461,7 @@ lua s:error()
 lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
  - Cow
+ - nil
  - 2
 ...
 lua s:error()
@@ -479,6 +472,7 @@ lua s:error()
 lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
  - Dog
+ - nil
  - 3
 ...
 lua s:error()
@@ -489,6 +483,7 @@ lua s:error()
 lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
  - Star
+ - nil
  - 4
 ...
 lua s:error()
@@ -500,6 +495,7 @@ lua s:error()
 lua s:readline(3, {'Cat', 'Coow'})
 ---
  - Cat
+ - nil
  - 1
 ...
 lua s:error()
@@ -510,10 +506,7 @@ lua s:error()
 lua s:readline(3, {'Cat', 'Coow'})
 ---
  - Coo
- - 0
  - limit
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -523,10 +516,7 @@ lua s:error()
 lua s:readline(3, {'Dogg', 'Star'})
 ---
  - wDo
- - 0
  - limit
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -536,10 +526,7 @@ lua s:error()
 lua s:readline(3, {'Dogg', 'Star'})
 ---
  - ggS
- - 0
  - limit
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -549,10 +536,7 @@ lua s:error()
 lua s:readline(3)
 ---
  - tar
- - 0
  - limit
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -566,6 +550,7 @@ lua sl = {'Crown', 'King', 'Kong', 'Cezar'}
 lua s:readline(sl, 1.0)
 ---
  - KKong
+ - nil
  - 3
 ...
 lua s:error()
@@ -576,6 +561,7 @@ lua s:error()
 lua s:readline(sl, 1.0)
 ---
  - King
+ - nil
  - 2
 ...
 lua s:error()
@@ -586,6 +572,7 @@ lua s:error()
 lua s:readline(sl, 1.0)
 ---
  - CezaCezar
+ - nil
  - 4
 ...
 lua s:error()
@@ -596,6 +583,7 @@ lua s:error()
 lua s:readline(sl, 1.0)
 ---
  - Crown
+ - nil
  - 1
 ...
 lua s:error()
@@ -610,6 +598,7 @@ lua sl = {'Agatha', 'Road', 'Corn', 'Drive', 'Pop'}
 lua s:readline(64, sl, 1.0)
 ---
  - RoAgatha
+ - nil
  - 1
 ...
 lua s:error()
@@ -620,6 +609,7 @@ lua s:error()
 lua s:readline(64, sl, 1.0)
 ---
  - Pop
+ - nil
  - 5
 ...
 lua s:error()
@@ -630,6 +620,7 @@ lua s:error()
 lua s:readline(64, sl, 1.0)
 ---
  - PoCorn
+ - nil
  - 3
 ...
 lua s:error()
@@ -640,6 +631,7 @@ lua s:error()
 lua s:readline(64, sl, 1.0)
 ---
  - Drive
+ - nil
  - 4
 ...
 lua s:error()
@@ -651,7 +643,6 @@ lua s:error()
 lua s:readline({'Canada'}, 0.01)
 ---
  - 
- - 0
  - timeout
  - 110
  - Connection timed out
@@ -665,6 +656,7 @@ lua s:error()
 lua s:readline({'Canada'}, 0.01)
 ---
  - RoadAfricaCubaRomaniaCanada
+ - nil
  - 1
 ...
 lua s:error()
@@ -676,6 +668,7 @@ lua s:error()
 lua s:readline({'Canada'}, 0.01)
 ---
  - Canada
+ - nil
  - 1
 ...
 lua s:error()
@@ -687,6 +680,7 @@ lua s:error()
 lua s:readline({'msg'})
 ---
  - msg
+ - nil
  - 1
 ...
 lua s:error()
@@ -697,6 +691,7 @@ lua s:error()
 lua s:readline({'msg'})
 ---
  -  msg
+ - nil
  - 1
 ...
 lua s:error()
@@ -707,6 +702,7 @@ lua s:error()
 lua s:readline({'msg'})
 ---
  -  msg
+ - nil
  - 1
 ...
 lua s:error()
@@ -717,6 +713,7 @@ lua s:error()
 lua s:readline({'msg'})
 ---
  -  msg
+ - nil
  - 1
 ...
 lua s:error()
@@ -727,6 +724,7 @@ lua s:error()
 lua s:readline({'msg'})
 ---
  -  msg
+ - nil
  - 1
 ...
 lua s:error()
@@ -737,10 +735,7 @@ lua s:error()
 lua s:readline({'msg'})
 ---
  - 
- - 0
  - eof
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -750,10 +745,7 @@ lua s:error()
 lua s:readline({'msg'})
 ---
  - 
- - 0
  - eof
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -776,10 +768,7 @@ lua s:error()
 lua s:readline({'Z'})
 ---
  - SomelongLongStringStrinString
- - 0
  - eof
- - 0
- - Success
 ...
 lua s:error()
 ---
@@ -793,16 +782,16 @@ lua type(s:connect('localhost', '30303'))
 ---
  - userdata
 ...
-lua s:write('ping')
+lua s:send('ping')
 ---
  - 4
 ...
 connected
-lua s:read(4)
+lua s:recv(4)
 ---
  - ping
 ...
-lua s:write('ping')
+lua s:send('ping')
 ---
  - 4
 ...
@@ -811,7 +800,7 @@ lua s:error()
  - 0
  - Success
 ...
-lua s:write('ping')
+lua s:send('ping')
 ---
  - 0
  - error
@@ -834,21 +823,21 @@ lua type(s:listen())
 ---
  - userdata
 ...
-lua client, addr = s:accept()
+lua client, status, addr = s:accept()
 ---
 ...
 lua addr
 ---
  - 127.0.0.1
 ...
-lua data = client:read(4)
+lua data = client:recv(4)
 ---
 ...
 lua data
 ---
  - ping
 ...
-lua client:write(data, 4)
+lua client:send(data, 4)
 ---
  - 4
 ...
@@ -864,7 +853,7 @@ lua s = box.socket.udp()
 ...
 lua type(s:sendto('ping', 'localhost', '30302'))
 ---
- - userdata
+ - number
 ...
 lua s:error()
 ---
@@ -872,9 +861,12 @@ lua s:error()
  - Success
 ...
 ping
-lua s:read(4)
+lua s:recv(4)
 ---
- - ping
+ - 
+ - error
+ - 107
+ - Transport endpoint is not connected
 ...
 lua s:close()
 ---
@@ -891,7 +883,7 @@ lua s:error()
  - 0
  - Success
 ...
-lua data, client, port = s:recvfrom(4)
+lua data, status, client, port = s:recvfrom(4)
 ---
 ...
 lua s:error()
@@ -909,7 +901,7 @@ lua client
 ...
 lua type(s:sendto(data, client, port))
 ---
- - userdata
+ - number
 ...
 lua s:error()
 ---
