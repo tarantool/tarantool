@@ -29,6 +29,15 @@
 
 #include <lib/bit/bit.h>
 
+extern inline bool
+bit_test(const void *data, size_t pos);
+
+extern inline bool
+bit_set(void *data, size_t pos);
+
+extern inline bool
+bit_clear(void *data, size_t pos);
+
 extern inline int
 bit_ctz_u32(uint32_t x);
 
@@ -142,3 +151,9 @@ bit_index_u64(uint64_t x, int *indexes, int offset) {
 }
 
 #undef BITINDEX_NAIVE
+
+extern inline void
+bit_iter_init(struct bit_iter *it, const void *data, size_t size, bool set);
+
+extern inline size_t
+bit_iter_next(struct bit_iter *it);
