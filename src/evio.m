@@ -50,13 +50,51 @@ evio_clear(struct ev_io *ev)
 void
 evio_close(struct ev_io *ev)
 {
+	assert(ev->fd >= 0);
 	/* Stop I/O events. Safe to do even if not started. */
 	ev_io_stop(ev);
-
 	/* Close the socket. */
 	close(ev->fd);
-	/* Make sure evio_is_connected() returns a proper value. */
+	/* Make sure evio_is_active() returns a proper value. */
 	ev->fd = -1;
+}
+
+/** Set common tcp socket client options. */
+void
+evio_setsockopt_tcp(int fd)
+{
+	int on = 1;
+	/* SO_KEEPALIVE to ensure connections don't hang
+	 * around for too long when a link goes away.
+	 */
+	sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
+		       &on, sizeof(on));
+	/*
+	 * Lower latency is more important than higher
+	 * bandwidth, and we usually write entire
+	 * request/response in a single syscall.
+	 */
+	sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
+		       &on, sizeof(on));
+}
+
+/** Set tcp options for server sockets. */
+void
+evio_setsockopt_tcpserver(int fd)
+{
+	int on = 1;
+	/* Allow reuse local adresses. */
+	sio_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
+		       &on, sizeof(on));
+	sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
+		       &on, sizeof(on));
+
+	/* Send all buffered messages on socket before take
+	 * control out from close(2) or shutdown(2). */
+	struct linger linger = { 0, 0 };
+
+	sio_setsockopt(fd, SOL_SOCKET, SO_LINGER,
+		       &linger, sizeof(linger));
 }
 
 static inline int
@@ -84,22 +122,13 @@ evio_service_accept_cb(ev_io *watcher,
 
 		if (fd < 0) /* EAGAIN, EWOULDLOCK, EINTR */
 			return;
-
 		int on = 1;
 		/* libev is non-blocking */
 		sio_setfl(fd, O_NONBLOCK, on);
-		/* SO_KEEPALIVE to ensure connections don't hang
-		 * around for too long when a link goes away
-		 */
-		sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
-			       &on, sizeof(on));
-		/*
-		 * Lower latency is more important than higher
-		 * bandwidth, and we usually write entire
-		 * request/response in a single syscall.
-		 */
-		sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
-			       &on, sizeof(on));
+
+		/* set common tcp options */
+		evio_setsockopt_tcp(fd);
+
 		/*
 		 * Invoke the callback and pass it the accepted
 		 * socket.
@@ -123,22 +152,14 @@ static int
 evio_service_bind_and_listen(struct evio_service *service)
 {
 	/* Create a socket. */
-	int fd = sio_socket();
+	int fd = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	@try {
 		int on = 1;
 		/* Set appropriate options. */
 		sio_setfl(fd, O_NONBLOCK, on);
 
-		sio_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
-			       &on, sizeof(on));
-		sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
-			       &on, sizeof(on));
-
-		struct linger linger = { 0, 0 };
-
-		sio_setsockopt(fd, SOL_SOCKET, SO_LINGER,
-			       &linger, sizeof(linger));
+		evio_setsockopt_tcpserver(fd);
 
 		if (sio_bind(fd, &service->addr, sizeof(service->addr)) ||
 		    sio_listen(fd)) {

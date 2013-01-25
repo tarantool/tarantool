@@ -61,19 +61,36 @@ sio_socketname(int fd)
 	return name;
 }
 
-
 @implementation SocketError
-- (id) init: (int) fd in: (const char *) format, ...
+- (id) init: (int) fd in: (const char *) format: (va_list) ap
 {
 	int save_errno = errno;
 	char buf[TNT_ERRMSG_MAX];
-	va_list ap;
-	va_start(ap, format);
 	vsnprintf(buf, sizeof(buf), format, ap);
-	va_end(ap);
 	const char *socketname = sio_socketname(fd);
 	errno = save_errno;
 	self = [self init: "%s, called on %s", buf, socketname];
+	return self;
+}
+
+- (id) init: (int) fd in: (const char *) format, ...
+{
+	va_list ap;
+	va_start(ap, format);
+	self = [self init: fd :format :ap];
+	va_end(ap);
+	return self;
+}
+@end
+
+@implementation SocketRWError
+- (id) init: (int) fd in: (size_t) size: (const char *) format, ...
+{
+	n = size;
+	va_list ap;
+	va_start(ap, format);
+	self = [self init: fd :format :ap];
+	va_end(ap);
 	return self;
 }
 @end
@@ -97,12 +114,22 @@ sio_option_name(int option)
 #undef CASE_OPTION
 }
 
+/** shut down part of a full-duplex connection */
+int
+sio_shutdown(int fd, int how)
+{
+	int rc = shutdown(fd, how);
+	if (rc < 0)
+		tnt_raise(SocketError, :fd in:"shutdown");
+	return rc;
+}
+
 /** Try to automatically configure a listen backlog.
  * On Linux, use the system setting, which defaults
  * to 128. This way a system administrator can tune
  * the backlog as needed. On other systems, use SOMAXCONN.
  */
-static int
+int
 sio_listen_backlog()
 {
 #ifdef TARGET_OS_LINUX
@@ -120,9 +147,9 @@ sio_listen_backlog()
 
 /** Create a TCP socket. */
 int
-sio_socket(void)
+sio_socket(int domain, int type, int protocol)
 {
-	int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	int fd = socket(domain, type, protocol);
 	if (fd < 0)
 		tnt_raise(SocketError, :fd in:"socket");
 	return fd;
@@ -179,8 +206,9 @@ sio_connect(int fd, struct sockaddr_in *addr, socklen_t addrlen)
 {
 	/* Establish the connection. */
 	int rc = connect(fd, (struct sockaddr *) addr, addrlen);
-	if (rc < 0 && errno != EINPROGRESS)
+	if (rc < 0 && errno != EINPROGRESS) {
 		tnt_raise(SocketError, :fd in:"connect");
+	}
 	return rc;
 }
 
@@ -226,6 +254,20 @@ sio_read(int fd, void *buf, size_t count)
 	return n;
 }
 
+/** Read up to 'count' bytes from a socket.
+ *  @throws SocketRWError exception.
+ */
+ssize_t
+sio_read_total(int fd, void *buf, size_t count, size_t total)
+{
+	ssize_t n = read(fd, buf, count);
+	if (n < 0 && errno != EAGAIN &&
+	    errno != EWOULDBLOCK && errno != EINTR)
+			tnt_raise(SocketRWError, :fd in: total :"read(%zd)",
+				  count);
+	return n;
+}
+
 /** Write up to 'count' bytes to a socket. */
 ssize_t
 sio_write(int fd, const void *buf, size_t count)
@@ -234,6 +276,21 @@ sio_write(int fd, const void *buf, size_t count)
 	if (n < 0 && errno != EAGAIN &&
 	    errno != EWOULDBLOCK && errno != EINTR)
 			tnt_raise(SocketError, :fd in:"write(%zd)", count);
+	return n;
+}
+
+/** Write up to 'count' bytes to a socket.
+ *
+ *  @throws SocketRWError exception.
+ */
+ssize_t
+sio_write_total(int fd, const void *buf, size_t count, size_t total)
+{
+	ssize_t n = write(fd, buf, count);
+	if (n < 0 && errno != EAGAIN &&
+	    errno != EWOULDBLOCK && errno != EINTR)
+			tnt_raise(SocketRWError, :fd in: total :"write(%zd)",
+				  count);
 	return n;
 }
 
@@ -247,6 +304,30 @@ sio_writev(int fd, const struct iovec *iov, int iovcnt)
 	    errno != EINTR) {
 		tnt_raise(SocketError, :fd in:"writev(%d)", iovcnt);
 	}
+	return n;
+}
+
+/** Send a message on a socket. */
+ssize_t
+sio_sendto(int fd, const void *buf, size_t len, int flags,
+	   const struct sockaddr_in *dest_addr, socklen_t addrlen)
+{
+	ssize_t n = sendto(fd, buf, len, flags, dest_addr, addrlen);
+	if (n < 0 && errno != EAGAIN &&
+	    errno != EWOULDBLOCK && errno != EINTR)
+			tnt_raise(SocketError, :fd in:"sendto(%zd)", len);
+	return n;
+}
+
+/** Receive a message on a socket. */
+ssize_t
+sio_recvfrom(int fd, void *buf, size_t len, int flags,
+	     struct sockaddr_in *src_addr, socklen_t *addrlen)
+{
+	ssize_t n = recvfrom(fd, buf, len, flags, src_addr, addrlen);
+	if (n < 0 && errno != EAGAIN &&
+	    errno != EWOULDBLOCK && errno != EINTR)
+			tnt_raise(SocketError, :fd in:"recvfrom(%zd)", len);
 	return n;
 }
 
@@ -276,4 +357,3 @@ sio_strfaddr(struct sockaddr_in *addr)
 		 inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
 	return name;
 }
-

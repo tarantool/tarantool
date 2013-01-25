@@ -44,13 +44,39 @@ struct coio_service
 };
 
 void
+coio_socket(struct ev_io *coio, int domain, int type, int protocol);
+
+void
 coio_connect(struct ev_io *coio, struct sockaddr_in *addr);
+
+void
+coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
+		     socklen_t len, ev_tstamp timeout);
+
+void
+coio_connect_addrinfo(struct ev_io *coio, struct addrinfo *ai,
+		      ev_tstamp timeout);
+
+void
+coio_bind(struct ev_io *coio, struct sockaddr_in *addr,
+	  socklen_t addrlen);
+
+void
+coio_bind_addrinfo(struct ev_io *coio, struct addrinfo *ai);
+
+int
+coio_accept(struct ev_io *coio, struct sockaddr_in *addr, socklen_t addrlen,
+	    ev_tstamp timeout);
 
 void
 coio_init(struct ev_io *coio, int fd);
 
 ssize_t
 coio_read_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz);
+
+ssize_t
+coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz,
+		        ev_tstamp timeout);
 
 ssize_t
 coio_readn_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz);
@@ -62,16 +88,41 @@ coio_read(struct ev_io *coio, void *buf, size_t sz)
 }
 
 static inline ssize_t
+coio_read_timeout(struct ev_io *coio, void *buf, size_t sz, ev_tstamp timeout)
+{
+	return coio_read_ahead_timeout(coio, buf, sz, sz, timeout);
+}
+
+static inline ssize_t
 coio_readn(struct ev_io *coio, void *buf, size_t sz)
 {
 	return coio_readn_ahead(coio, buf, sz, sz);
 }
 
+ssize_t
+coio_readn_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz,
+		         ev_tstamp timeout);
+
 void
 coio_write(struct ev_io *coio, const void *buf, size_t sz);
 
+void
+coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
+		   ev_tstamp timeout);
+
 ssize_t
 coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt, size_t size);
+
+
+void
+coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
+		    const struct sockaddr_in *dest_addr, socklen_t addrlen,
+		    ev_tstamp timeout);
+
+size_t
+coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
+		      struct sockaddr_in *src_addr, socklen_t addrlen,
+		      ev_tstamp timeout);
 
 void
 coio_service_init(struct coio_service *service, const char *name,

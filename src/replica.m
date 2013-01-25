@@ -69,6 +69,9 @@ static void
 remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	       i64 initial_lsn, const char **err)
 {
+	coio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	evio_setsockopt_tcp(coio->fd);
+
 	*err = "can't connect to master";
 	coio_connect(coio, remote_addr);
 
@@ -101,7 +104,7 @@ pull_from_remote(va_list ap)
 		const char *err = NULL;
 		@try {
 			fiber_setcancellable(true);
-			if (! evio_is_connected(&coio)) {
+			if (! evio_is_active(&coio)) {
 				if (iobuf == NULL)
 					iobuf = iobuf_create(fiber->name);
 				remote_connect(&coio, &r->remote->addr,

@@ -121,10 +121,29 @@ void
 evio_close(struct ev_io *ev);
 
 static inline bool
-evio_is_connected(struct ev_io *ev)
+evio_is_active(struct ev_io *ev)
 {
 	return ev->fd >= 0;
 }
 
+static inline void
+evio_timeout_init(ev_tstamp *start, ev_tstamp *delay, ev_tstamp timeout)
+{
+	*start = ev_now();
+	*delay = timeout;
+}
+
+static inline void
+evio_timeout_update(ev_tstamp start, ev_tstamp *delay)
+{
+	ev_tstamp elapsed = ev_now() - start;
+	*delay = (elapsed >= *delay) ? 0 : *delay - elapsed;
+}
+
+void
+evio_setsockopt_tcp(int fd);
+
+void
+evio_setsockopt_tcpserver(int fd);
 
 #endif /* TARANTOOL_EVIO_H_INCLUDED */

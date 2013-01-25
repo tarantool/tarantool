@@ -42,8 +42,6 @@
 #include <tbuf.h>
 #include "exception.h"
 
-#define PALLOC_POOL_NAME_MAXLEN 30
-
 struct chunk {
 	uint32_t magic;
 	void *brk;

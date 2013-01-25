@@ -117,7 +117,7 @@ lbox_ipc_channel_put(struct lua_State *L)
 
 	switch (top) {
 	case 2:
-		timeout = IPC_TIMEOUT_INFINITY;
+		timeout = TIMEOUT_INFINITY;
 		break;
 	case 3:
 		if (!lua_isnumber(L, -1))
@@ -175,7 +175,7 @@ lbox_ipc_channel_get(struct lua_State *L)
 		if (timeout < 0)
 			luaL_error(L, "wrong timeout");
 	} else {
-		timeout = IPC_TIMEOUT_INFINITY;
+		timeout = TIMEOUT_INFINITY;
 	}
 
 	struct ipc_channel *ch = lbox_check_channel(L, 1);

@@ -36,16 +36,29 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <fcntl.h>
 #include "exception.h"
 
 enum { SERVICE_NAME_MAXLEN = 32 };
 
 @interface SocketError: SystemError
+- (id) init: (int) fd in: (const char *) format: (va_list) ap;
 - (id) init: (int) fd in: (const char *) format, ...;
 @end
 
-int sio_socket(void);
+@interface SocketRWError: SocketError {
+	@public
+		/* written/read bytes before exception */
+		size_t n;
+}
+
+- (id) init: (int) fd in: (size_t) size: (const char *) format, ...;
+@end
+
+int sio_socket(int domain, int type, int protocol);
+
+int sio_shutdown(int fd, int how);
 
 int sio_getfl(int fd);
 int sio_setfl(int fd, int flag, int on);
@@ -60,11 +73,22 @@ sio_getsockopt(int fd, int level, int optname,
 int sio_connect(int fd, struct sockaddr_in *addr, socklen_t addrlen);
 int sio_bind(int fd, struct sockaddr_in *addr, socklen_t addrlen);
 int sio_listen(int fd);
+int sio_listen_backlog();
 int sio_accept(int fd, struct sockaddr_in *addr, socklen_t *addrlen);
 
 ssize_t sio_read(int fd, void *buf, size_t count);
+ssize_t sio_read_total(int fd, void *buf, size_t count, size_t total);
+
 ssize_t sio_write(int fd, const void *buf, size_t count);
 ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);
+
+ssize_t sio_write_total(int fd, const void *buf, size_t count, size_t total);
+
+ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
+		   const struct sockaddr_in *dest_addr, socklen_t addrlen);
+
+ssize_t sio_recvfrom(int fd, void *buf, size_t len, int flags,
+		     struct sockaddr_in *src_addr, socklen_t *addrlen);
 
 int sio_getpeername(int fd, struct sockaddr_in *addr);
 const char *sio_strfaddr(struct sockaddr_in *addr);

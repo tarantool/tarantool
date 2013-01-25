@@ -594,9 +594,8 @@ tarantool_free(void)
 		unlink(cfg.pid_file);
 	destroy_tarantool_cfg(&cfg);
 
-	fiber_free();
-	coeio_free();
 	session_free();
+	fiber_free();
 	palloc_free();
 	ev_default_destroy();
 #ifdef ENABLE_GCOV

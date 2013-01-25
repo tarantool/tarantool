@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_ASIO_H_INCLUDED
-#define TARANTOOL_ASIO_H_INCLUDED
+#ifndef TARANTOOL_LUA_IO_H_INCLUDED
+#define TARANTOOL_LUA_IO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,43 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#include "config.h"
+struct lua_State;
+void tarantool_lua_io_init(struct lua_State *L);
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <tarantool_ev.h>
-#include <tarantool_eio.h>
-#include <coro.h>
-#include <util.h>
-#include <rlist.h>
-
-/**
- * Asynchronous IO Tasks (libeio wrapper)
- *
- * Yield the current fiber until a created task is complete.
- */
-
-
-/**
- * A single task' context.
- */
-struct asio {
-	struct eio_req *req;
-	bool complete;
-	bool wakeup;
-	struct fiber *f;
-	void *f_data;
-	void *result;
-	struct rlist link;
-};
-
-void asio_init(void);
-void asio_free(void);
-struct asio *asio_create(void (*f)(eio_req*), void *arg);
-bool asio_wait(struct asio *a, ev_tstamp timeout);
-void asio_cancel(struct asio *a);
-void asio_finish(struct asio *a);
-
-#endif /* TARANTOOL_ASIO_H_INCLUDED */
+#endif /* TARANTOOL_LUA_IO_H_INCLUDED */

@@ -31,8 +31,6 @@
 #include <stdlib.h>
 #include <rlist.h>
 
-const ev_tstamp IPC_TIMEOUT_INFINITY = 365*86400*100.0;
-
 struct ipc_channel {
 	struct rlist readers, writers, bcast;
 	unsigned size;
@@ -147,7 +145,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 void *
 ipc_channel_get(struct ipc_channel *ch)
 {
-	return ipc_channel_get_timeout(ch, IPC_TIMEOUT_INFINITY);
+	return ipc_channel_get_timeout(ch, TIMEOUT_INFINITY);
 }
 
 int
@@ -200,7 +198,7 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 void
 ipc_channel_put(struct ipc_channel *ch, void *data)
 {
-	ipc_channel_put_timeout(ch, data, IPC_TIMEOUT_INFINITY);
+	ipc_channel_put_timeout(ch, data, TIMEOUT_INFINITY);
 }
 
 bool

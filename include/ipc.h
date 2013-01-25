@@ -175,6 +175,4 @@ ipc_channel_has_readers(struct ipc_channel *ch);
 bool
 ipc_channel_has_writers(struct ipc_channel *ch);
 
-extern const ev_tstamp IPC_TIMEOUT_INFINITY;
-
 #endif /* TARANTOOL_IPC_H_INCLUDED */
