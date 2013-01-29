@@ -129,6 +129,19 @@ At the moment the repository contains builds for Debian "Sid", "Squeeze",
     sudo apt-get update
     sudo apt-get install tarantool tarantool-client
 
+### CentOS 5-6 GNU/Linux
+
+CentOS GNU/Linux repository available at
+<a href="http://tarantool.org/dist/centos">http://tarantoo.org/dist/centos</a>.
+
+It can be added to your yum repository list (/etc/yum.repos.d/tarantool.repo) with:
+
+    [tarantool]
+    name=CentOS-$releasever - Tarantool
+    baseurl=http://tarantool.org/dist/centos/$releasever/os/$basearch/
+    enabled=1
+    gpgcheck=0
+
 # Development branch
 
 In the same manner as for [the stable
