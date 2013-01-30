@@ -32,6 +32,7 @@ test/unit/rope_basic
 test/unit/rope_stress
 test/unit/rlist
 test/unit/bit_test
+test/unit/bitset_basic_test
 Makefile
 CMakeFiles
 CMakeCache.txt

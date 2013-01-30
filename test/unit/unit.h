@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include <unistd.h>
+#include <stdlib.h> /* exit() */
 
 #define header() printf("\t*** %s ***\n", __func__)
 #define footer() printf("\t*** %s: done ***\n ", __func__)
