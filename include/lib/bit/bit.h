@@ -386,7 +386,7 @@ bit_index_u64(uint64_t x, int *indexes, int offset);
 /**
  * @brief The Bit Iterator
  */
-struct bit_iter {
+struct bit_iterator {
 	/** @cond false **/
 	/** Current word to process using ctz **/
 	ITER_UINT word;
@@ -411,7 +411,8 @@ struct bit_iter {
  * @param set true to iterate over set bits or false to iterate over clear bits
  */
 inline void
-bit_iter_init(struct bit_iter *it, const void *data, size_t size, bool set)
+bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
+		  bool set)
 {
 	it->start = (const char *) data;
 	it->next = it->start;
@@ -446,7 +447,7 @@ bit_iter_init(struct bit_iter *it, const void *data, size_t size, bool set)
  * @retval SIZE_MAX if \a it does not have more set bits
  */
 inline size_t
-bit_iter_next(struct bit_iter *it)
+bit_iterator_next(struct bit_iterator *it)
 {
 	while (bit_unlikely(it->word == 0)) {
 		if (bit_unlikely(it->next >= it->end))

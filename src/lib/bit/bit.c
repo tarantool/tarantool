@@ -153,7 +153,8 @@ bit_index_u64(uint64_t x, int *indexes, int offset) {
 #undef BITINDEX_NAIVE
 
 extern inline void
-bit_iter_init(struct bit_iter *it, const void *data, size_t size, bool set);
+bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
+		  bool set);
 
 extern inline size_t
-bit_iter_next(struct bit_iter *it);
+bit_iterator_next(struct bit_iterator *it);

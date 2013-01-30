@@ -164,23 +164,23 @@ test_bit_iter(void)
 {
 	header();
 
-	struct bit_iter it;
+	struct bit_iterator it;
 	uint64_t *data = vals + 6;
 	size_t size = 10;
 
 	size_t pos = 0;
 
 	printf("Set: ");
-	bit_iter_init(&it, data, size, true);
-	while ( (pos = bit_iter_next(&it)) != SIZE_MAX) {
+	bit_iterator_init(&it, data, size, true);
+	while ( (pos = bit_iterator_next(&it)) != SIZE_MAX) {
 		printf("%zu, ", pos);
 		fail_unless(bit_test(data, pos));
 	}
 	printf("\n");
 
 	printf("Clear: ");
-	bit_iter_init(&it, data, size, false);
-	while ( (pos = bit_iter_next(&it)) != SIZE_MAX) {
+	bit_iterator_init(&it, data, size, false);
+	while ( (pos = bit_iterator_next(&it)) != SIZE_MAX) {
 		printf("%zu, ", pos);
 		fail_if(bit_test(data, pos));
 	}
