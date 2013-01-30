@@ -1,6 +1,8 @@
 set(lib_sources
     bitset.c
     page.c
+    expr.c
+    iterator.c
 )
 
 set_source_files_compile_flags(${lib_sources})

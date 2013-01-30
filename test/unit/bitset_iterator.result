@@ -1,0 +1,17 @@
+	*** test_empty ***
+	*** test_empty: done ***
+ 	*** test_first ***
+	*** test_first: done ***
+ 	*** test_simple ***
+	*** test_simple: done ***
+ 	*** test_big ***
+Setting bits... ok
+Iterating... ok
+	*** test_big: done ***
+ 	*** test_not_empty ***
+	*** test_not_empty: done ***
+ 	*** test_not_last ***
+	*** test_not_last: done ***
+ 	*** test_disjunction ***
+	*** test_disjunction: done ***
+ 

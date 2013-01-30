@@ -12,6 +12,8 @@ add_executable(bit_test bit.c bit.c)
 target_link_libraries(bit_test bit)
 add_executable(bitset_basic_test bitset_basic.c)
 target_link_libraries(bitset_basic_test bitset)
+add_executable(bitset_iterator_test bitset_iterator.c)
+target_link_libraries(bitset_iterator_test bitset)
 
 add_executable(objc_finally objc_finally.m)
 add_executable(objc_catchcxx objc_catchcxx.m)
