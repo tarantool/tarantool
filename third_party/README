@@ -33,3 +33,8 @@ How to update it:
 - delete GNUMakefile
 - merge our Makefile with the Makefile in
 the source tarball
+
+How to update rb.h
+======================
+Get the header from
+git://canonware.com/jemalloc.git
