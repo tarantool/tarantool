@@ -3,6 +3,7 @@ set(lib_sources
     page.c
     expr.c
     iterator.c
+    index.c
 )
 
 set_source_files_compile_flags(${lib_sources})
