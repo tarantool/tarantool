@@ -78,7 +78,88 @@ nums_shuffle(size_t *nums, size_t size)
 }
 
 static
-void test_empty()
+void test_empty_expr(void)
+{
+	header();
+
+	struct bitset_expr expr;
+	bitset_expr_create(&expr, realloc);
+	struct bitset_iterator it;
+	bitset_iterator_create(&it, realloc);
+
+	fail_unless(bitset_iterator_init(&it, &expr, NULL, 0) == 0);
+	bitset_expr_destroy(&expr);
+
+	size_t pos = bitset_iterator_next(&it);
+	fail_unless(pos == SIZE_MAX);
+
+	bitset_iterator_destroy(&it);
+
+	footer();
+}
+
+static
+void test_empty_expr_conj1(void)
+{
+	header();
+
+	struct bitset_expr expr;
+	bitset_expr_create(&expr, realloc);
+	struct bitset_iterator it;
+	bitset_iterator_create(&it, realloc);
+
+	fail_unless(bitset_expr_add_conj(&expr) == 0);
+
+	fail_unless(bitset_iterator_init(&it, &expr, NULL, 0) == 0);
+	bitset_expr_destroy(&expr);
+
+	size_t pos = bitset_iterator_next(&it);
+	fail_unless(pos == SIZE_MAX);
+
+	bitset_iterator_destroy(&it);
+
+	footer();
+}
+
+static
+void test_empty_expr_conj2(void)
+{
+	header();
+
+	size_t big_i = (size_t) 1 << 15;
+	struct bitset **bitsets = bitsets_create(2);
+	bitset_set(bitsets[0], 1);
+	bitset_set(bitsets[0], big_i);
+
+	struct bitset_expr expr;
+	bitset_expr_create(&expr, realloc);
+	struct bitset_iterator it;
+	bitset_iterator_create(&it, realloc);
+
+	fail_unless(bitset_expr_add_conj(&expr) == 0);
+	fail_unless(bitset_expr_add_conj(&expr) == 0);
+	fail_unless(bitset_expr_add_conj(&expr) == 0);
+
+	fail_unless(bitset_expr_add_param(&expr, 0, false) == 0);
+	fail_unless(bitset_expr_add_param(&expr, 1, true) == 0);
+	fail_unless(bitset_expr_add_conj(&expr) == 0);
+	fail_unless(bitset_expr_add_conj(&expr) == 0);
+
+	fail_unless(bitset_iterator_init(&it, &expr, bitsets, 2) == 0);
+	bitset_expr_destroy(&expr);
+
+	fail_unless(bitset_iterator_next(&it) == 1);
+	fail_unless(bitset_iterator_next(&it) == big_i);
+	fail_unless(bitset_iterator_next(&it) == SIZE_MAX);
+
+	bitset_iterator_destroy(&it);
+	bitsets_destroy(bitsets, 2);
+
+	footer();
+}
+
+static
+void test_empty_result(void)
 {
 	header();
 
@@ -123,7 +204,7 @@ void test_empty()
 }
 
 static
-void test_first()
+void test_first_result(void)
 {
 	header();
 
@@ -398,8 +479,11 @@ int main(void)
 	setbuf(stdout, NULL);
 	nums_fill(NUMS, NUMS_SIZE);
 
-	test_empty();
-	test_first();
+	test_empty_expr();
+	test_empty_expr_conj1();
+	test_empty_expr_conj2();
+	test_empty_result();
+	test_first_result();
 	test_simple();
 	test_big();
 	test_not_empty();

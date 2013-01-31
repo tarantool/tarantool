@@ -48,11 +48,17 @@ void
 bitset_expr_destroy(struct bitset_expr *expr)
 {
 	for (size_t c = 0; c < expr->size; c++) {
+		if (expr->conjs[c].capacity == 0)
+			continue;
+
 		expr->realloc(expr->conjs[c].bitset_ids, 0);
 		expr->realloc(expr->conjs[c].pre_nots, 0);
-		memset(&expr->conjs[c], 0, sizeof(expr->conjs[c]));
 	}
-	expr->realloc(expr->conjs, 0);
+
+	if (expr->capacity > 0) {
+		expr->realloc(expr->conjs, 0);
+	}
+
 	memset(expr, 0, sizeof(*expr));
 }
 

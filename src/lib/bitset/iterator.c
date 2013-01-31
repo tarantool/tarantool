@@ -67,16 +67,28 @@ void
 bitset_iterator_destroy(struct bitset_iterator *it)
 {
 	for (size_t c = 0; c < it->size; c++) {
+		if (it->conjs[c].capacity == 0)
+			continue;
+
 		it->realloc(it->conjs[c].bitsets, 0);
 		it->realloc(it->conjs[c].pre_nots, 0);
 		it->realloc(it->conjs[c].pages, 0);
 	}
-	it->realloc(it->conjs, 0);
 
-	bitset_page_destroy(it->page);
-	bitset_page_destroy(it->page_tmp);
-	it->realloc(it->page, 0);
-	it->realloc(it->page_tmp, 0);
+	if (it->capacity > 0) {
+		it->realloc(it->conjs, 0);
+	}
+
+	if (it->page != NULL) {
+		bitset_page_destroy(it->page);
+		it->realloc(it->page, 0);
+	}
+
+	if (it->page != NULL) {
+		bitset_page_destroy(it->page_tmp);
+		it->realloc(it->page_tmp, 0);
+	}
+
 	memset(it, 0, sizeof(*it));
 }
 
@@ -165,20 +177,27 @@ bitset_iterator_init(struct bitset_iterator *it, struct bitset_expr *expr,
 {
 	assert(it != NULL);
 	assert(expr != NULL);
-	assert(p_bitsets != NULL);
-	assert(expr->size > 0);
+	if (bitsets_size > 0) {
+		assert(p_bitsets != NULL);
+	}
 
 	size_t page_alloc_size = bitset_page_alloc_size(it->realloc);
-	it->page = it->realloc(NULL, page_alloc_size);
-	it->page_tmp = it->realloc(NULL, page_alloc_size);
-
-	if (it->page == NULL || it->page_tmp == NULL) {
-		it->realloc(it->page, 0);
-		it->realloc(it->page_tmp, 0);
-		return -1;
+	if (it->page != NULL) {
+		bitset_page_destroy(it->page);
+	} else {
+		it->page = it->realloc(NULL, page_alloc_size);
 	}
 
 	bitset_page_create(it->page);
+
+	if (it->page_tmp != NULL) {
+		bitset_page_destroy(it->page_tmp);
+	} else {
+		it->page_tmp = it->realloc(NULL, page_alloc_size);
+		if (it->page_tmp == NULL)
+			return -1;
+	}
+
 	bitset_page_create(it->page_tmp);
 
 	if (bitset_iterator_reserve(it, expr->size) != 0)
@@ -187,7 +206,6 @@ bitset_iterator_init(struct bitset_iterator *it, struct bitset_expr *expr,
 	for (size_t c = 0; c < expr->size; c++) {
 		struct bitset_expr_conj *exconj = &expr->conjs[c];
 		struct bitset_iterator_conj *itconj = &it->conjs[c];
-		assert(exconj->size > 0);
 
 		if (bitset_iterator_conj_reserve(it, itconj, exconj->size) != 0)
 			return -1;
@@ -216,8 +234,12 @@ bitset_iterator_conj_rewind(struct bitset_iterator_conj *conj, size_t pos)
 {
 	assert(conj != NULL);
 	assert(pos % (BITSET_PAGE_DATA_SIZE * CHAR_BIT) == 0);
-	assert(conj->size > 0);
 	assert(conj->page_first_pos <= pos);
+
+	if (conj->size == 0) {
+		conj->page_first_pos = SIZE_MAX;
+		return;
+	}
 
 	struct bitset_page key;
 	key.first_pos = pos;
@@ -312,7 +334,11 @@ bitset_iterator_prepare_page(struct bitset_iterator *it)
 	      bitset_iterator_conj_cmp);
 
 	bitset_page_set_zeros(it->page);
-	it->page->first_pos = it->conjs[0].page_first_pos;
+	if (it->size > 0) {
+		it->page->first_pos = it->conjs[0].page_first_pos;
+	} else {
+		it->page->first_pos = SIZE_MAX;
+	}
 
 	/* There is no more conjunctions that can be ORed */
 	if (it->page->first_pos == SIZE_MAX)
