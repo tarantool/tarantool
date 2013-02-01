@@ -56,6 +56,10 @@ static const uint32_t SLAB_MAGIC = 0x51abface;
 static const size_t SLAB_SIZE = 1 << 22;
 static const size_t MAX_SLAB_ITEM = 1 << 20;
 
+/* maximum number of items in one slab */
+/* updated in slab_classes_init, depends on salloc_init params */
+size_t MAX_SLAB_ITEM_COUNT;
+
 struct slab_item {
 	struct slab_item *next;
 };
@@ -119,6 +123,9 @@ slab_caches_init(size_t minimal, double factor)
 	}
 
 	slab_active_caches = i;
+
+	MAX_SLAB_ITEM_COUNT = (size_t) (SLAB_SIZE - sizeof(struct slab)) /
+			slab_caches[0].item_size;
 }
 
 static bool
@@ -138,6 +145,7 @@ arena_init(struct arena *arena, size_t size)
 	arena->base = (char *)SLAB_ALIGN_PTR(arena->mmap_base) + SLAB_SIZE;
 	SLIST_INIT(&arena->slabs);
 	SLIST_INIT(&arena->free_slabs);
+
 	return true;
 }
 
@@ -328,6 +336,47 @@ sfree(void *ptr)
 	VALGRIND_FREELIKE_BLOCK(item, sizeof(red_zone));
 }
 
+
+size_t
+salloc_ptr_to_index(void *ptr)
+{
+	struct slab *slab = slab_header(ptr);
+	struct slab_item *item = ptr;
+	struct slab_cache *clazz = slab->cache;
+
+	(void) item;
+	assert(valid_item(slab, item));
+
+	void *brk_start = (void *)CACHEALIGN((void *)slab+sizeof(struct slab));
+	ptrdiff_t item_no = (ptr - brk_start) / clazz->item_size;
+	assert(item_no >= 0);
+
+	ptrdiff_t slab_no = ((void *) slab - (void *) arena.base) / SLAB_SIZE;
+	assert(slab_no >= 0);
+
+	size_t index = (size_t)slab_no * MAX_SLAB_ITEM_COUNT + (size_t) item_no;
+
+	assert(salloc_ptr_from_index(index) == ptr);
+
+	return index;
+}
+
+void *
+salloc_ptr_from_index(size_t index)
+{
+	size_t slab_no = index / MAX_SLAB_ITEM_COUNT;
+	size_t item_no = index % MAX_SLAB_ITEM_COUNT;
+
+	struct slab *slab = slab_header(
+		(void *) ((size_t) arena.base + SLAB_SIZE * slab_no));
+	struct slab_cache *clazz = slab->cache;
+
+	void *brk_start = (void *)CACHEALIGN((void *)slab+sizeof(struct slab));
+	struct slab_item *item = brk_start + item_no * clazz->item_size;
+	assert(valid_item(slab, item));
+
+	return (void *) item;
+}
 
 /**
  * Collect slab allocator statistics.
