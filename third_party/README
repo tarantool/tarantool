@@ -45,3 +45,8 @@ Note: we have two important changes to the stock libeio:
   work.
 
 Otherwise: cvs up
+
+How to update rb.h
+======================
+Get the header from
+git://canonware.com/jemalloc.git
