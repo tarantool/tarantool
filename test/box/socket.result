@@ -54,13 +54,13 @@ lua s:connect('::1', '30303')
 ---
  - nil
  - error
- - 111
- - Connection refused
+ - -1
+ - Host name resolution failed
 ...
 lua s:error()
 ---
- - 111
- - Connection refused
+ - -1
+ - Host name resolution failed
 ...
 lua s:connect('127.0.0.1', '30303', 0.01)
 ---

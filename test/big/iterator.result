@@ -830,9 +830,9 @@ lua iterate(20, 4, 0, 1, box.index.GE, 'pid_001')
 ---
 sorted output
 $pid_001$
-$pid_002$
-$pid_005$
-$pid_017$
+$pid_007$
+$pid_011$
+$pid_019$
 $pid_023$
 ...
 lua iterate(20, 4, 0, 1, box.index.GE, 'pid_999')

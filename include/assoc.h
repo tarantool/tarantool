@@ -82,7 +82,7 @@ static inline int lstrcmp(const void *a, const void *b)
 		return bl - al;
 	return memcmp(a, b, al);
 }
-#include <third_party/murmur_hash2.c>
+#include <third_party/PMurHash.h>
 #define mh_name _lstrptr
 struct mh_lstrptr_node_t {
 	const void *key;
@@ -97,7 +97,7 @@ mh_strptr_hash(const mh_node_t *a, mh_hash_arg_t arg) {
 	(void) arg;
 	const void *_k = (a->key);
 	const u32 l = load_varint32(&_k);
-	return (u32) MurmurHash2(_k, l, 13);
+	return PMurHash32(13, _k, l);
 }
 #define mh_hash(a, arg) mh_strptr_hash(a, arg)
 #define mh_eq_arg_t void *

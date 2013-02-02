@@ -50,3 +50,9 @@ How to update rb.h
 ======================
 Get the header from
 git://canonware.com/jemalloc.git
+
+How to update murmur hash
+=========================
+
+wget http://smhasher.googlecode.com/svn/trunk/PMurHash.c -O PMurHash.c
+wget http://smhasher.googlecode.com/svn/trunk/PMurHash.h -O PMurHash.h

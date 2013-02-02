@@ -43,7 +43,7 @@
 #include <cfg/prscfg.h>
 #include <cfg/tarantool_box_cfg.h>
 
-#include <third_party/murmur_hash2.c>
+#include <third_party/PMurHash.h>
 #include <third_party/crc32.h>
 
 #include "tc_key.h"
@@ -74,7 +74,7 @@ search_hash(const struct tc_key *k, struct tc_space *s)
 			break;
 		}
 		case TC_SPACE_KEY_STRING:
-			 h = MurmurHash2(TC_KEY_DATA(k, i), TC_KEY_SIZE(k, i), h);
+			 h = PMurHash32(h, TC_KEY_DATA(k, i), TC_KEY_SIZE(k, i));
 			break;
 		case TC_SPACE_KEY_UNKNOWN:
 			assert(1);
