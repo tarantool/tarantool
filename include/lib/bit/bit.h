@@ -37,11 +37,74 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 #if defined(HAVE_FFSL) || defined(HAVE_FFSLL)
 #include <string.h>
 #include <strings.h>
 #endif /* defined(HAVE_FFSL) || defined(HAVE_FFSLL) */
 #include <limits.h>
+
+/** @cond false **/
+#define bit_likely(x)    __builtin_expect((x),1)
+#define bit_unlikely(x)  __builtin_expect((x),0)
+/** @endcond **/
+
+/**
+ * @brief Test bit \a pos in memory chunk \a data
+ * @param data memory chunk
+ * @param pos bit number (zero-based)
+*  @retval true bit \a pos is set in \a data
+ * @retval false otherwise
+ */
+inline bool
+bit_test(const void *data, size_t pos)
+{
+	size_t chunk = pos / CHAR_BIT;
+	size_t offset = pos % CHAR_BIT;
+
+	const unsigned char *cdata = (const unsigned char  *) data;
+	return (cdata[chunk] >> offset) & 0x1;
+}
+
+/**
+ * @brief Set bit \a pos in a memory chunk \a data
+ * @param data memory chunk
+ * @param pos bit number (zero-based)
+ * @return previous value
+ * @see bit_test
+ * @see bit_clear
+ */
+inline bool
+bit_set(void *data, size_t pos)
+{
+	size_t chunk = pos / CHAR_BIT;
+	size_t offset = pos % CHAR_BIT;
+
+	unsigned char *cdata = (unsigned char  *) data;
+	bool prev = (cdata[chunk] >> offset) & 0x1;
+	cdata[chunk] |= (1U << offset);
+	return prev;
+}
+
+/**
+ * @brief Clear bit \a pos in memory chunk \a data
+ * @param data memory chunk
+ * @param pos bit number (zero-based)
+ * @return previous value
+ * @see bit_test
+ * @see bit_set
+ */
+inline bool
+bit_clear(void *data, size_t pos)
+{
+	size_t chunk = pos / CHAR_BIT;
+	size_t offset = pos % CHAR_BIT;
+
+	unsigned char *cdata = (unsigned char *) data;
+	bool prev = (cdata[chunk] >> offset) & 0x1;
+	cdata[chunk] &= ~(1U << offset);
+	return prev;
+}
 
 /**
  * @cond false
@@ -69,7 +132,7 @@
  * @see __builtin_ctz()
  * @return the number trailing 0-bits
  */
- __attribute__((const)) inline int
+inline int
 bit_ctz_u32(uint32_t x)
 {
 #if defined(HAVE_BUILTIN_CTZ)
@@ -81,13 +144,10 @@ bit_ctz_u32(uint32_t x)
 #endif
 }
 
-#include <stdio.h>
-#include <inttypes.h>
-
 /**
  * @copydoc bit_ctz_u32
  */
- __attribute__((const)) inline int
+inline int
 bit_ctz_u64(uint64_t x)
 {
 #if   defined(HAVE_BUILTIN_CTZLL)
@@ -127,7 +187,7 @@ bit_ctz_u64(uint64_t x)
  * @see __builtin_clz()
  * @return the number of leading 0-bits
  */
- __attribute__((const)) inline int
+inline int
 bit_clz_u32(uint32_t x)
 {
 #if   defined(HAVE_BUILTIN_CLZ)
@@ -140,7 +200,7 @@ bit_clz_u32(uint32_t x)
 /**
  * @copydoc bit_clz_u32
  */
-__attribute__((const)) inline int
+inline int
 bit_clz_u64(uint64_t x)
 {
 #if   defined(HAVE_BUILTIN_CLZLL)
@@ -172,7 +232,7 @@ bit_clz_u64(uint64_t x)
  * @see __builtin_popcount()
  * @return the number of 1-bits in @a x
  */
-__attribute__((const)) inline int
+inline int
 bit_count_u32(uint32_t x)
 {
 #if   defined(HAVE_BUILTIN_POPCOUNT)
@@ -185,7 +245,7 @@ bit_count_u32(uint32_t x)
 /**
  * @copydoc bit_count_u32
  */
-__attribute__((const)) inline int
+inline int
 bit_count_u64(uint64_t x)
 {
 #if   defined(HAVE_BUILTIN_POPCOUNTLL)
@@ -203,7 +263,7 @@ bit_count_u64(uint64_t x)
  * @param r number for bits to rotate
  * @return @a x rotated left by @a r bits
  */
-__attribute__ ((const)) inline uint32_t
+inline uint32_t
 bit_rotl_u32(uint32_t x, int r)
 {
 	/* gcc recognises this code and generates a rotate instruction */
@@ -213,7 +273,7 @@ bit_rotl_u32(uint32_t x, int r)
 /**
  * @copydoc bit_rotl_u32
  */
-__attribute__ ((const)) inline uint64_t
+inline uint64_t
 bit_rotl_u64(uint64_t x, int r)
 {
 	/* gcc recognises this code and generates a rotate instruction */
@@ -221,13 +281,22 @@ bit_rotl_u64(uint64_t x, int r)
 }
 
 /**
+ * @copydoc bit_rotl_u32
+ */
+__attribute__ ((const)) inline uintmax_t
+bit_rotl_umax(uintmax_t x, int r)
+{
+	/* gcc recognises this code and generates a rotate instruction */
+	return ((x << r) | (x >> (sizeof(uintmax_t) * CHAR_BIT - r)));
+}
+/**
  * @brief Rotate @a x right by @a r bits
  * @param x integer
  * @param r number for bits to rotate
  * @return @a x rotated right by @a r bits
  * @todo Move this method to bit.h
  */
-__attribute__ ((const)) inline uint32_t
+inline uint32_t
 bit_rotr_u32(uint32_t x, int r)
 {
 	/* gcc recognises this code and generates a rotate instruction */
@@ -237,7 +306,7 @@ bit_rotr_u32(uint32_t x, int r)
 /**
  * @copydoc bit_rotr_u32
  */
-__attribute__ ((const)) inline uint64_t
+inline uint64_t
 bit_rotr_u64(uint64_t x, int r)
 {
 	/* gcc recognises this code and generates a rotate instruction */
@@ -252,7 +321,7 @@ bit_rotr_u64(uint64_t x, int r)
  * @param x integer
  * @return @a x with swapped bytes
  */
-__attribute__ ((const)) inline uint32_t
+inline uint32_t
 bswap_u32(uint32_t x)
 {
 #if defined(HAVE_BUILTIN_BSWAP32)
@@ -268,7 +337,7 @@ bswap_u32(uint32_t x)
 /**
  * @copydoc bswap_u32
  */
-__attribute__ ((const)) inline uint64_t
+inline uint64_t
 bswap_u64(uint64_t x)
 {
 #if defined(HAVE_BUILTIN_BSWAP64)
@@ -302,5 +371,104 @@ bit_index_u32(uint32_t x, int *indexes, int offset);
  */
 int *
 bit_index_u64(uint64_t x, int *indexes, int offset);
+
+/** @cond false **/
+#if defined(__x86_64__)
+/* Use bigger words on x86_64 */
+#define ITER_UINT uint64_t
+#define ITER_CTZ bit_ctz_u64
+#else
+#define ITER_UINT uint32_t
+#define ITER_CTZ bit_ctz_u32
+#endif
+/** @endcond **/
+
+/**
+ * @brief The Bit Iterator
+ */
+struct bit_iterator {
+	/** @cond false **/
+	/** Current word to process using ctz **/
+	ITER_UINT word;
+	/** A bitmask that XORed with word (for set = false iteration) **/
+	ITER_UINT word_xor;
+	/** A base offset of the word in bits **/
+	size_t word_base;
+	/** A pointer to the start of a memory chunk **/
+	const char *start;
+	/** A pointer to the next part of a memory chunk */
+	const char *next;
+	/** A pointer to the end of a memory chunk */
+	const char *end;
+	/** @endcond **/
+};
+
+/**
+ * @brief Initialize bit iterator \a it
+ * @param it bit iterator
+ * @param data memory chunk
+ * @param size size of the memory chunk \a data
+ * @param set true to iterate over set bits or false to iterate over clear bits
+ */
+inline void
+bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
+		  bool set)
+{
+	it->start = (const char *) data;
+	it->next = it->start;
+	it->end = it->next + size;
+	it->word_xor = set ? 0 : (ITER_UINT) -1;
+	it->word_base = 0;
+
+	/* Check if size is a multiple of sizeof(ITER_UINT) */
+	const char *e = it->next + size % sizeof(ITER_UINT);
+	if (bit_likely(it->next == e)) {
+		it->word = *(ITER_UINT *) it->next;
+		it->word ^= it->word_xor;
+		it->next += sizeof(ITER_UINT);
+		return;
+	}
+
+	it->word = it->word_xor;
+	char *w = (char *) &it->word;
+	while (it->next < e) {
+		*w = *it->next;
+		it->next++;
+		w++;
+	}
+	it->word ^= it->word_xor;
+}
+
+/**
+ * @brief Return a number of a next set bit in \a it or \a SIZE_MAX
+ * if no bits are remain in \a it
+ * @param it bit iterator
+ * @retval a zero-based number of a next set bit in iterator \a it
+ * @retval SIZE_MAX if \a it does not have more set bits
+ */
+inline size_t
+bit_iterator_next(struct bit_iterator *it)
+{
+	while (bit_unlikely(it->word == 0)) {
+		if (bit_unlikely(it->next >= it->end))
+			return SIZE_MAX;
+
+		/* Extract the next word from memory */
+		it->word = *(ITER_UINT *) it->next;
+		it->word ^= it->word_xor;
+		it->word_base = (it->next - it->start) * CHAR_BIT;
+		it->next += sizeof(ITER_UINT);
+	}
+
+	/* Find the position of a first traling bit in the current word */
+	int bit = ITER_CTZ(it->word);
+	/* Remove the first trailing bit from the current word */
+	it->word &= it->word - 1;
+	/* Add start position if the current word to the found bit */
+	return it->word_base + bit;
+}
+
+#undef ITER_CTZ
+#undef ITER_UINT
 
 #endif /* TARANTOOL_LIB_BIT_BIT_H_INCLUDED */

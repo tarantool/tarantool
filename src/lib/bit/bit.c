@@ -29,40 +29,49 @@
 
 #include <lib/bit/bit.h>
 
-__attribute__((const)) extern inline int
+extern inline bool
+bit_test(const void *data, size_t pos);
+
+extern inline bool
+bit_set(void *data, size_t pos);
+
+extern inline bool
+bit_clear(void *data, size_t pos);
+
+extern inline int
 bit_ctz_u32(uint32_t x);
 
-__attribute__((const))  extern inline int
+extern inline int
 bit_ctz_u64(uint64_t x);
 
-__attribute__((const)) extern inline int
+extern inline int
 bit_clz_u32(uint32_t x);
 
-__attribute__((const)) extern inline int
+extern inline int
 bit_clz_u64(uint64_t x);
 
-__attribute__((const)) extern inline int
+extern inline int
 bit_count_u32(uint32_t x);
 
-__attribute__((const)) extern inline int
+extern inline int
 bit_count_u64(uint64_t x);
 
-__attribute__ ((const)) extern inline uint32_t
+extern inline uint32_t
 bit_rotl_u32(uint32_t x, int r);
 
-__attribute__ ((const)) extern inline uint64_t
+extern inline uint64_t
 bit_rotl_u64(uint64_t x, int r);
 
-__attribute__ ((const)) extern inline uint32_t
+extern inline uint32_t
 bit_rotr_u32(uint32_t x, int r);
 
-__attribute__ ((const)) extern inline uint64_t
+extern inline uint64_t
 bit_rotr_u64(uint64_t x, int r);
 
-__attribute__ ((const)) extern inline uint32_t
+extern inline uint32_t
 bswap_u32(uint32_t x);
 
-__attribute__ ((const)) extern inline uint64_t
+extern inline uint64_t
 bswap_u64(uint64_t x);
 
 #define BITINDEX_NAIVE(x, bitsize) {					\
@@ -142,3 +151,10 @@ bit_index_u64(uint64_t x, int *indexes, int offset) {
 }
 
 #undef BITINDEX_NAIVE
+
+extern inline void
+bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
+		  bool set);
+
+extern inline size_t
+bit_iterator_next(struct bit_iterator *it);
