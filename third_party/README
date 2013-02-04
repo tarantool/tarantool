@@ -38,3 +38,4 @@ How to update rb.h
 ======================
 Get the header from
 git://canonware.com/jemalloc.git
+apply rb.patch patch
