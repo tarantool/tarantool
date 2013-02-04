@@ -45,6 +45,7 @@
 #include "pickle.h"
 #include "fiber.h"
 #include "lua_ipc.h"
+#include "lua_socket.h"
 #include "lua/info.h"
 #include "lua/slab.h"
 #include "lua/stat.h"
@@ -1367,6 +1368,7 @@ tarantool_lua_init()
 	tarantool_lua_stat_init(L);
 	tarantool_lua_ipc_init(L);
 	tarantool_lua_uuid_init(L);
+	tarantool_lua_socket_init(L);
 	tarantool_lua_session_init(L);
 
 	mod_lua_init(L);

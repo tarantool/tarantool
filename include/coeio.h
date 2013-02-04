@@ -47,22 +47,7 @@
  * Yield the current fiber until a created task is complete.
  */
 
-/**
- * A single task' context.
- */
-struct coeio_req {
-	struct eio_req *req;
-	struct fiber *f;
-	bool complete;
-	bool wait;
-	void *f_data;
-	void *result;
-	struct rlist link;
-};
-
 void coeio_init(void);
-void coeio_free(void);
-struct coeio_req *coeio_custom(void (*f)(eio_req*), void *arg);
-void *coeio_wait(struct coeio_req *r);
+ssize_t coeio_custom(ssize_t (*f)(va_list ap), ev_tstamp timeout, ...);
 
 #endif /* TARANTOOL_COEIO_H_INCLUDED */

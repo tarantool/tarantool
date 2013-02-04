@@ -401,7 +401,7 @@ SLIST_HEAD(, iproto_session) iproto_session_cache =
 static inline bool
 iproto_session_is_idle(struct iproto_session *session)
 {
-	return !evio_is_connected(&session->input) &&
+	return !evio_is_active(&session->input) &&
 		ibuf_size(&session->iobuf[0]->in) == 0 &&
 		ibuf_size(&session->iobuf[1]->in) == 0;
 }
@@ -751,14 +751,14 @@ iproto_process_request(struct iproto_request *request)
 	struct iobuf *iobuf = request->iobuf;
 	struct port_iproto port;
 	@try {
-		if (unlikely(! evio_is_connected(&session->output)))
+		if (unlikely(! evio_is_active(&session->output)))
 			return;
 
 		fiber_set_sid(fiber, session->sid);
 		iproto_reply(&port, *session->handler,
 			     &iobuf->out, header);
 
-		if (unlikely(! evio_is_connected(&session->output)))
+		if (unlikely(! evio_is_active(&session->output)))
 			return;
 		if (! ev_is_active(&session->output))
 			ev_feed_event(&session->output, EV_WRITE);

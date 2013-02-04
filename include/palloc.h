@@ -32,6 +32,8 @@
 #include <stdint.h>
 #include "util.h"
 
+#define PALLOC_POOL_NAME_MAXLEN 30
+
 struct tbuf;
 
 struct palloc_pool;

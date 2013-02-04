@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "unit.h"
 

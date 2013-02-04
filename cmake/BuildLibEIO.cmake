@@ -6,6 +6,7 @@ macro(libeio_build)
     set(eio_compile_flags "${eio_compile_flags} -Wno-unused-value")
     set(eio_compile_flags "${eio_compile_flags} -Wno-dangling-else")
     set(eio_compile_flags "${eio_compile_flags} -DENABLE_BUNDLED_LIBEIO=1")
+    set(eio_compile_flags "${eio_compile_flags} -DEIO_STACKSIZE=0")
 
     set(eio_src
         ${PROJECT_SOURCE_DIR}/third_party/tarantool_eio.c

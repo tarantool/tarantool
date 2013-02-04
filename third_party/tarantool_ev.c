@@ -26,5 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 #include "tarantool_ev.h"
 #include "third_party/libev/ev.c"
+
+const ev_tstamp TIMEOUT_INFINITY = 365*86400*100.0;

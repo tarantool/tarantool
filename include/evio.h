@@ -115,16 +115,38 @@ void
 evio_service_stop(struct evio_service *service);
 
 void
-evio_clear(struct ev_io *ev);
+evio_socket(struct ev_io *coio, int domain, int type, int protocol);
 
 void
-evio_close(struct ev_io *ev);
+evio_close(struct ev_io *evio);
 
 static inline bool
-evio_is_connected(struct ev_io *ev)
+evio_is_active(struct ev_io *ev)
 {
 	return ev->fd >= 0;
 }
 
+static inline void
+evio_timeout_init(ev_tstamp *start, ev_tstamp *delay, ev_tstamp timeout)
+{
+	*start = ev_now();
+	*delay = timeout;
+}
+
+static inline void
+evio_timeout_update(ev_tstamp start, ev_tstamp *delay)
+{
+	ev_tstamp elapsed = ev_now() - start;
+	*delay = (elapsed >= *delay) ? 0 : *delay - elapsed;
+}
+
+void
+evio_setsockopt_tcp(int fd);
+
+void
+evio_setsockopt_tcpserver(int fd);
+
+void
+evio_bind_addrinfo(struct ev_io *coio, struct addrinfo *ai);
 
 #endif /* TARANTOOL_EVIO_H_INCLUDED */

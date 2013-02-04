@@ -16,6 +16,9 @@ list(APPEND util_checksum_sources
     ${CMAKE_SOURCE_DIR}/cfg/tarantool_box_cfg.c
     ${CMAKE_SOURCE_DIR}/cfg/prscfg.c)
 
+list(APPEND util_checksum_sources
+    ${CMAKE_SOURCE_DIR}/third_party/PMurHash.c)
+
 set_source_files_compile_flags(
     ${util_checksum_sources})
 add_executable(${util_checksum} ${util_checksum_sources})

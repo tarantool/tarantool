@@ -115,7 +115,7 @@ that production systems use the builds provided on this site.
 
 We maintain an always up-to-date Debian GNU/Linux and Ubuntu package
 repository at <a
-href="http://tarantool.org/dist/debian">http://tarantoo.org/dist/debian</a> and <a
+href="http://tarantool.org/dist/debian">http://tarantool.org/dist/debian</a> and <a
 href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/ubuntu</a> respectively.
 
 At the moment the repository contains builds for Debian "Sid", "Squeeze",
@@ -128,6 +128,20 @@ At the moment the repository contains builds for Debian "Sid", "Squeeze",
     echo "deb-src http://tarantool.org/dist/debian/ $release main" | sudo tee -a /etc/apt/sources.list.d/tarantool.list
     sudo apt-get update
     sudo apt-get install tarantool tarantool-client
+
+### CentOS 5-6 GNU/Linux
+
+CentOS GNU/Linux repository is available at
+<a href="http://tarantool.org/dist/centos">http://tarantool.org/dist/centos</a>.
+
+Add the following section to your yum repository list (/etc/yum.repos.d/tarantool.repo)
+to enable it:
+
+    [tarantool]
+    name=CentOS-$releasever - Tarantool
+    baseurl=http://tarantool.org/dist/centos/$releasever/os/$basearch/
+    enabled=1
+    gpgcheck=0
 
 # Development branch
 
@@ -262,7 +276,7 @@ Tarantool/Box использует стандартную схему нумер�
 Мы поддерживаем собственные репозитории .deb пакетов, который
 содержит последние версии сервера и клиентских библиотек для
 *Debian GNU/Linux* и  *Ubuntu*:
-<a href="http://tarantool.org/dist/debian">http://tarantoo.org/dist/debian</a>,
+<a href="http://tarantool.org/dist/debian">http://tarantool.org/dist/debian</a>,
 <a href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/ubuntu</a>.
 
 Репозитории содержат пакеты для Debian "Sid", "Squeeze",
@@ -276,6 +290,18 @@ Tarantool/Box использует стандартную схему нумер�
     echo "deb-src http://tarantool.org/dist/debian/ $release main" | sudo tee -a /etc/apt/sources.list.d/tarantool.list
     sudo apt-get update
     sudo apt-get install tarantool tarantool-client
+
+CentOS GNU/Linux репозиторий доступен по адресу:
+<a href="http://tarantool.org/dist/centos">http://tarantool.org/dist/centos</a>.
+
+Добавьте следующую секцию в Ваш список репозиториев
+(/etc/yum.repos.d/tarantool.repo) чтобы сделать его доступным для Yum:
+
+    [tarantool]
+    name=CentOS-$releasever - Tarantool
+    baseurl=http://tarantool.org/dist/centos/$releasever/os/$basearch/
+    enabled=1
+    gpgcheck=0
 
 ### Архив старых релизов
 

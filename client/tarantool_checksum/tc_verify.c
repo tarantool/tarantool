@@ -44,7 +44,6 @@
 #include <cfg/prscfg.h>
 #include <cfg/tarantool_box_cfg.h>
 
-#include <third_party/murmur_hash2.c>
 #include <third_party/crc32.h>
 
 #include "tc_key.h"
