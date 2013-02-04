@@ -1,0 +1,5 @@
+# encoding: tarantool
+exec admin "lua 1 + 1"
+exec admin "lua box.raise(123, 'test')"
+exec admin "lua box.raise(0, 'the other test')"
+exec admin "lua box.raise(12, 345)"

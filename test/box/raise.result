@@ -1,0 +1,16 @@
+lua 1 + 1
+---
+ - 2
+...
+lua box.raise(123, 'test')
+---
+error: 'test'
+...
+lua box.raise(0, 'the other test')
+---
+error: 'box.raise(): code can''t be zero'
+...
+lua box.raise(12, 345)
+---
+error: '345'
+...

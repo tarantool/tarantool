@@ -113,6 +113,14 @@
 	return self;
 }
 
+- (id) init: (uint32_t)errcode_ :(const char *)msg
+{
+	[super init];
+	errcode = errcode_;
+	snprintf(errmsg, sizeof(errmsg), "%s", msg);
+	return self;
+}
+
 - (void) log
 {
 	say_error("%s at %s:%d, %s", object_getClassName(self),
