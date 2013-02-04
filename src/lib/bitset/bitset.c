@@ -44,17 +44,20 @@ bitset_create(struct bitset *bitset, void *(*realloc)(void *ptr, size_t size))
 	bitset_pages_new(&bitset->pages);
 }
 
+static struct bitset_page *
+bitset_destroy_iter_cb(bitset_pages_t *t, struct bitset_page *page, void *arg)
+{
+	(void) t;
+	struct bitset *bitset = (struct bitset *) arg;
+	bitset_page_destroy(page);
+	bitset->realloc(page, 0);
+	return NULL;
+}
+
 void
 bitset_destroy(struct bitset *bitset)
 {
-	/* Cleanup pages tree */
-	struct bitset_page *page;
-	while ((page = bitset_pages_first(&bitset->pages)) != NULL) {
-		bitset_pages_remove(&bitset->pages, page);
-		bitset_page_destroy(page);
-		bitset->realloc(page, 0);
-	}
-
+	bitset_pages_iter(&bitset->pages, NULL, bitset_destroy_iter_cb, bitset);
 	memset(&bitset->pages, 0, sizeof(bitset->pages));
 }
 
