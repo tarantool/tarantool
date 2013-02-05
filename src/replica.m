@@ -106,7 +106,7 @@ pull_from_remote(va_list ap)
 			fiber_setcancellable(true);
 			if (! evio_is_active(&coio)) {
 				if (iobuf == NULL)
-					iobuf = iobuf_create(fiber->name);
+					iobuf = iobuf_new(fiber->name);
 				remote_connect(&coio, &r->remote->addr,
 					       r->confirmed_lsn + 1, &err);
 				warning_said = false;
@@ -124,7 +124,7 @@ pull_from_remote(va_list ap)
 			iobuf_gc(iobuf);
 			fiber_gc();
 		} @catch (FiberCancelException *e) {
-			iobuf_destroy(iobuf);
+			iobuf_delete(iobuf);
 			evio_close(&coio);
 			@throw;
 		} @catch (tnt_Exception *e) {
@@ -170,7 +170,7 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 	snprintf(name, sizeof(name), "replica/%s", addr);
 
 	@try {
-		f = fiber_create(name, pull_from_remote);
+		f = fiber_new(name, pull_from_remote);
 	} @catch (tnt_Exception *e) {
 		return;
 	}

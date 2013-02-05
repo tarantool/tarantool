@@ -58,18 +58,8 @@ tbuf_assert(const struct tbuf *b)
 	assert(b->size <= b->capacity);
 }
 
-void
-tbuf_init(struct tbuf *e, struct palloc_pool *pool)
-{
-	e->pool = pool;
-	e->data = palloc(pool, TBUF_ALLOC_FACTOR);
-	e->capacity = TBUF_ALLOC_FACTOR;
-	e->size = 0;
-	tbuf_assert(e);
-}
-
 struct tbuf *
-tbuf_alloc(struct palloc_pool *pool)
+tbuf_new(struct palloc_pool *pool)
 {
 	struct tbuf *e = palloc(pool, TBUF_ALLOC_FACTOR);
 	e->size = 0;
@@ -105,7 +95,7 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 struct tbuf *
 tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig)
 {
-	struct tbuf *clone = tbuf_alloc(pool);
+	struct tbuf *clone = tbuf_new(pool);
 	tbuf_assert(orig);
 	tbuf_append(clone, orig->data, orig->size);
 	return clone;

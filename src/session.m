@@ -110,7 +110,7 @@ session_fd(uint32_t sid)
 void
 session_init()
 {
-	session_registry = mh_i32ptr_init();
+	session_registry = mh_i32ptr_new();
 	if (session_registry == NULL)
 		panic("out of memory");
 }
@@ -119,5 +119,5 @@ void
 session_free()
 {
 	if (session_registry)
-		mh_i32ptr_destroy(session_registry);
+		mh_i32ptr_delete(session_registry);
 }

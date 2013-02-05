@@ -216,7 +216,7 @@ reload_cfg(struct tbuf *out)
 
 	if (latch == NULL) {
 		latch = palloc(eter_pool, sizeof(*latch));
-		tnt_latch_init(latch);
+		tnt_latch_create(latch);
 	}
 
 	if (tnt_latch_trylock(latch) == -1) {
@@ -737,7 +737,7 @@ main(int argc, char **argv)
 		strcat(cfg_filename_fullpath, cfg_filename);
 	}
 
-	cfg_out = tbuf_alloc(eter_pool);
+	cfg_out = tbuf_new(eter_pool);
 	assert(cfg_out);
 
 	if (gopt(opt, 'k')) {

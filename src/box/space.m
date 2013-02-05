@@ -384,7 +384,7 @@ space_config()
 void
 space_init(void)
 {
-	spaces = mh_i32ptr_init();
+	spaces = mh_i32ptr_new();
 
 	/* configure regular spaces */
 	space_config();

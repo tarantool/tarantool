@@ -572,7 +572,7 @@ update_calc_new_tuple_length(struct rope *rope)
 	struct rope_iter it;
 	struct rope_node *node;
 
-	rope_iter_init(&it, rope);
+	rope_iter_create(&it, rope);
 	for (node = rope_iter_start(&it); node; node = rope_iter_next(&it)) {
 		struct update_field *field = rope_leaf_data(node);
 		u32 field_len = update_field_len(field);
@@ -597,7 +597,7 @@ do_update_ops(struct rope *rope, struct tuple *new_tuple)
 	struct rope_iter it;
 	struct rope_node *node;
 
-	rope_iter_init(&it, rope);
+	rope_iter_create(&it, rope);
 	for (node = rope_iter_start(&it); node; node = rope_iter_next(&it)) {
 
 		struct update_field *field = rope_leaf_data(node);

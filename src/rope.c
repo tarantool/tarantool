@@ -570,7 +570,7 @@ void
 rope_traverse(struct rope *rope, void (*visit_leaf)(void *, size_t))
 {
 	struct rope_iter iter;
-	rope_iter_init(&iter, rope);
+	rope_iter_create(&iter, rope);
 
 	struct rope_node *leaf;
 
@@ -586,7 +586,7 @@ void
 rope_check(struct rope *rope)
 {
 	struct rope_iter iter;
-	rope_iter_init(&iter, rope);
+	rope_iter_create(&iter, rope);
 
 	struct rope_node *node;
 

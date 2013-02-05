@@ -44,8 +44,8 @@ struct tbuf {
 	struct palloc_pool *pool;
 };
 
-struct tbuf *tbuf_alloc(struct palloc_pool *pool);
-void tbuf_init(struct tbuf *tbuf, struct palloc_pool *pool);
+struct tbuf *
+tbuf_new(struct palloc_pool *pool);
 
 void tbuf_ensure_resize(struct tbuf *e, size_t bytes_required);
 static inline void tbuf_ensure(struct tbuf *e, size_t required)

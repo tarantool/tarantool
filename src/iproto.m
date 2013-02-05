@@ -310,7 +310,7 @@ iproto_queue_schedule(struct ev_async *watcher,
 		struct fiber *f = rlist_shift_entry(&i_queue->fiber_cache,
 						    struct fiber, state);
 		if (f == NULL)
-			f = fiber_create("iproto", i_queue->handler);
+			f = fiber_new("iproto", i_queue->handler);
 		fiber_call(f, i_queue);
 	}
 }
@@ -330,7 +330,7 @@ iproto_queue_init(struct iproto_queue *i_queue,
 	ev_async_init(&i_queue->watcher, iproto_queue_schedule);
 	i_queue->watcher.data = i_queue;
 	i_queue->handler = handler;
-	rlist_init(&i_queue->fiber_cache);
+	rlist_create(&i_queue->fiber_cache);
 }
 
 /** A handler to process all queued requests. */
@@ -436,8 +436,8 @@ iproto_session_create(const char *name, int fd, box_process_func *param)
 	session->handler = param;
 	ev_io_init(&session->input, iproto_session_on_input, fd, EV_READ);
 	ev_io_init(&session->output, iproto_session_on_output, fd, EV_WRITE);
-	session->iobuf[0] = iobuf_create(name);
-	session->iobuf[1] = iobuf_create(name);
+	session->iobuf[0] = iobuf_new(name);
+	session->iobuf[1] = iobuf_new(name);
 	session->parse_size = 0;
 	session->write_pos = obuf_create_svp(&session->iobuf[0]->out);
 	session->sid = 0;
@@ -450,8 +450,8 @@ iproto_session_destroy(struct iproto_session *session)
 {
 	assert(iproto_session_is_idle(session));
 	session_destroy(session->sid); /* Never throws. No-op if sid is 0. */
-	iobuf_destroy(session->iobuf[0]);
-	iobuf_destroy(session->iobuf[1]);
+	iobuf_delete(session->iobuf[0]);
+	iobuf_delete(session->iobuf[1]);
 	SLIST_INSERT_HEAD(&iproto_session_cache, session, next_in_cache);
 }
 

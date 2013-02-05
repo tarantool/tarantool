@@ -47,7 +47,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 	int cs;
 	char *p, *pe;
 	char *fstart;
-	struct tbuf *keys = tbuf_alloc(fiber->gc_pool);
+	struct tbuf *keys = tbuf_new(fiber->gc_pool);
 	void *key;
 	bool append, show_cas;
 	int incr_sign;
@@ -430,7 +430,7 @@ tr58:
 			} else {
 				value = tuple_field(tuple, 3);
 				value_len = load_varint32(&value);
-				b = tbuf_alloc(fiber->gc_pool);
+				b = tbuf_new(fiber->gc_pool);
 				if (append) {
 					tbuf_append(b, value, value_len);
 					tbuf_append(b, data, bytes);
@@ -490,7 +490,7 @@ tr62:
 			} else {
 				value = tuple_field(tuple, 3);
 				value_len = load_varint32(&value);
-				b = tbuf_alloc(fiber->gc_pool);
+				b = tbuf_new(fiber->gc_pool);
 				if (append) {
 					tbuf_append(b, value, value_len);
 					tbuf_append(b, data, bytes);
@@ -552,7 +552,7 @@ tr71:
 			} else {
 				value = tuple_field(tuple, 3);
 				value_len = load_varint32(&value);
-				b = tbuf_alloc(fiber->gc_pool);
+				b = tbuf_new(fiber->gc_pool);
 				if (append) {
 					tbuf_append(b, value, value_len);
 					tbuf_append(b, data, bytes);
@@ -746,7 +746,7 @@ tr118:
 					exptime = m->exptime;
 					flags = m->flags;
 
-					b = tbuf_alloc(fiber->gc_pool);
+					b = tbuf_new(fiber->gc_pool);
 					tbuf_printf(b, "%"PRIu64, value);
 					data = b->data;
 					bytes = b->size;
@@ -811,7 +811,7 @@ tr122:
 					exptime = m->exptime;
 					flags = m->flags;
 
-					b = tbuf_alloc(fiber->gc_pool);
+					b = tbuf_new(fiber->gc_pool);
 					tbuf_printf(b, "%"PRIu64, value);
 					data = b->data;
 					bytes = b->size;
@@ -878,7 +878,7 @@ tr132:
 					exptime = m->exptime;
 					flags = m->flags;
 
-					b = tbuf_alloc(fiber->gc_pool);
+					b = tbuf_new(fiber->gc_pool);
 					tbuf_printf(b, "%"PRIu64, value);
 					data = b->data;
 					bytes = b->size;
@@ -1005,7 +1005,7 @@ tr169:
 		}
 #line 208 "src/memcached-grammar.rl"
 	{
-			struct fiber *f = fiber_create("flush_all", flush_all);
+			struct fiber *f = fiber_new("flush_all", flush_all);
 			fiber_call(f, flush_delay);
 			obuf_dup(out, "OK\r\n", 4);
 		}
@@ -1023,7 +1023,7 @@ tr174:
 		}
 #line 208 "src/memcached-grammar.rl"
 	{
-			struct fiber *f = fiber_create("flush_all", flush_all);
+			struct fiber *f = fiber_new("flush_all", flush_all);
 			fiber_call(f, flush_delay);
 			obuf_dup(out, "OK\r\n", 4);
 		}
@@ -1041,7 +1041,7 @@ tr185:
 		}
 #line 208 "src/memcached-grammar.rl"
 	{
-			struct fiber *f = fiber_create("flush_all", flush_all);
+			struct fiber *f = fiber_new("flush_all", flush_all);
 			fiber_call(f, flush_delay);
 			obuf_dup(out, "OK\r\n", 4);
 		}

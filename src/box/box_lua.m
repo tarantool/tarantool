@@ -431,7 +431,7 @@ lbox_tuple_tostring(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
 	/* @todo: print the tuple */
-	struct tbuf *tbuf = tbuf_alloc(fiber->gc_pool);
+	struct tbuf *tbuf = tbuf_new(fiber->gc_pool);
 	tuple_print(tbuf, tuple->field_count, tuple->data);
 	lua_pushlstring(L, tbuf->data, tbuf->size);
 	return 1;
@@ -715,7 +715,7 @@ lbox_create_iterator(struct lua_State *L)
 		} else {
 			/* Single or multi- part key. */
 			field_count = argc - 2;
-			struct tbuf *data = tbuf_alloc(fiber->gc_pool);
+			struct tbuf *data = tbuf_new(fiber->gc_pool);
 			for (int i = 0; i < field_count; i++) {
 				enum field_data_type type = UNKNOWN;
 				if (i < index->key_def->part_count) {
@@ -827,7 +827,7 @@ lbox_index_count(struct lua_State *L)
 	} else {
 		/* Single or multi- part key. */
 		key_part_count = argc;
-		struct tbuf *data = tbuf_alloc(fiber->gc_pool);
+		struct tbuf *data = tbuf_new(fiber->gc_pool);
 		for (int i = 0; i < argc; ++i) {
 			enum field_data_type type = UNKNOWN;
 			if (i < index->key_def->part_count) {
