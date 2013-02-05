@@ -32,14 +32,16 @@
 
 /**
  * @file
- * @brief Iterator for @link bitset @endlink objects with expressions support.
+ * @brief Iterator for @link bitset @endlink objects with
+ * expression support.
  *
- * @link bitset_iterator @endlink is used to iterate over a result of the
- * evaluation a @link bitset_expr logical expression @endlink on the set
- * of bitsets. The iterator evaluates expressions on the fly, without producing
- * temporary bitsets. Each iteration (@link bitset_iterator_next @endlink)
- * returns the next position where a given expression evaluates to true on a
- * given set of bitsets.
+ * @link bitset_iterator @endlink is used to iterate over a result
+ * of the evaluation a @link bitset_expr logical expression
+ * @endlink on a set of bitsets. The iterator evaluates its
+ * expression on the fly, without producing temporary bitsets.
+ * Each iteration (@link bitset_iterator_next @endlink) returns
+ * the next position where a given expression evaluates to true on
+ * a given set of bitsets.
  *
  * @see expr.h
  */
@@ -111,7 +113,7 @@ bitset_iterator_init(struct bitset_iterator *it, struct bitset_expr *expr,
 
 /**
  * @brief Rewind the \a it to the start position.
- * @param expr bitset expression
+ * @param it bitset iterator
  * @see @link bitset_iterator_init @endlink
  */
 void
@@ -119,9 +121,9 @@ bitset_iterator_rewind(struct bitset_iterator *it);
 
 /**
  * @brief Move \a it to a next position
- * @param expr bitset expression
- * @return a next offset where the expression evaluates to true or SIZE_MAX
- * if there is no more bits in the result set.
+ * @param it bitset iterator
+ * @return the next offset where the expression evaluates to true
+ * or SIZE_MAX if there is no more bits in the result set.
  * @see @link bitset_iterator_init @endlink
  */
 size_t
