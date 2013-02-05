@@ -1012,8 +1012,8 @@ lua_table_to_tuple(struct lua_State *L, int index)
 	return tuple;
 }
 
-static void
-port_add_lua_ret(struct port *port, struct lua_State *L, int index)
+static struct tuple*
+lua_totuple(struct lua_State *L, int index)
 {
 	int type = lua_type(L, index);
 	struct tuple *tuple;
@@ -1073,6 +1073,13 @@ port_add_lua_ret(struct port *port, struct lua_State *L, int index)
 		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
 		break;
 	}
+	return tuple;
+}
+
+static void
+port_add_lua_ret(struct port *port, struct lua_State *L, int index)
+{
+	struct tuple *tuple = lua_totuple(L, index);
 	@try {
 		port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
 	} @finally {
@@ -1144,8 +1151,20 @@ static int lbox_process(lua_State *L)
 	return lua_gettop(L) - top;
 }
 
+static int
+lbox_totuple(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	if (argc < 1)
+		luaL_error(L, "box.totuple(): bad arguments");
+	struct tuple *tuple = lua_totuple(L, 1);
+	lbox_pushtuple(L, tuple);
+	return 1;
+}
+
 static const struct luaL_reg boxlib[] = {
 	{"process", lbox_process},
+	{"totuple", lbox_totuple},
 	{NULL, NULL}
 };
 
