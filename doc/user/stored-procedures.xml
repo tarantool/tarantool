@@ -293,7 +293,7 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
     </varlistentry>
 </variablelist>
 
-<section>
+<section xml:id="sp-box">
     <title>Package <code>box</code></title>
 <variablelist xml:id="box" xreflabel="box">
     <varlistentry>
@@ -961,7 +961,7 @@ localhost> lua box.counter.dec(0, 'top.mail.ru')
 </variablelist>
 </section>
 
-<section>
+<section xml:id="sp-box-tuple">
     <title>Package <code>box.tuple</code></title>
 
 <variablelist xml:id="box.tuple" xreflabel="box.tuple">
@@ -1060,7 +1060,7 @@ localhost> lua t:find(1, 'abc')
 </variablelist>
 </section>
 
-<section>
+<section xml:id="sp-box-space">
     <title>Package <code>box.space</code></title>
 <variablelist xml:id="box.space" xreflabel="box.space">
     <para>This package is a container for all
@@ -1233,7 +1233,7 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
 </variablelist>
 </section>
 
-<section>
+<section xml:id="sp-box-index">
     <title>Package <code >box.index</code></title>
 <variablelist xml:id="box.index" xreflabel="box.index">
     <para>
@@ -1411,7 +1411,7 @@ error: 'Iterator type is not supported'
 </variablelist>
 </section>
 
-<section>
+<section xml:id="sp-box-fiber">
     <title>Package <code>box.fiber</code></title>
     <para>Functions in this package allow you to create, run and
     manage existing <emphasis>fibers</emphasis>.
@@ -1586,7 +1586,7 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
 <!--   end of lib -->
 
-<section>
+<section xml:id="sp-box-session">
     <title>Package <code>box.session</code></title>
     <para>Learn session state, set on-connect and
     on-disconnect triggers.
@@ -1662,7 +1662,7 @@ event.
 
 <!--   end of lib -->
 
-<section>
+<section xml:id="sp-box-ipc">
     <title>Package <code>box.ipc</code> &mdash; inter procedure communication</title>
 <variablelist xml:id="box.ipc">
     <simpara>
@@ -1679,7 +1679,6 @@ event.
                 Lua object. Channels can be worked with using
                 functional or object-oriented syntax.
                 For example, the following two lines are equivalent:
-
             </simpara>
 <programlisting>
     channel:put(message)
@@ -1695,7 +1694,7 @@ event.
                 <emphasis role="lua">box.ipc.channel.put()</emphasis>
                 blocks until there is a free slot in the channel.
                 If <emphasis role="lua">timeout</emphasis> is provided,
-                and the channel doesn't become empty in the duration
+                and the channel doesn't become empty for the duration
                 of the timeout,
                 <emphasis role="lua">box.ipc.channel.put()</emphasis>
                 returns false. Otherwise it returns true.
@@ -1710,7 +1709,7 @@ event.
                 <emphasis role="lua">box.ipc.channel.get()</emphasis>
                 blocks until there is a message.
                 If <emphasis role="lua">timeout</emphasis> is provided,
-                and the channel there are no new messages in the duration
+                and there are no new messages for the duration
                 of the timeout,
                 <emphasis role="lua">box.ipc.channel.get()</emphasis>
                 returns error.
@@ -1822,7 +1821,295 @@ end
 </variablelist>
 </section>
 
-<section>
+<!--   end of lib -->
+
+<section xml:id="sp-box-socket">
+    <title>Package <code>box.socket</code> &mdash; TCP and UDP sockets</title>
+<variablelist xml:id="box.socket">
+    <simpara>
+      BSD sockets is a mechanism to exchange data with a local or
+      remote host in connection-oriented (TCP) or datagram-oriented
+      (UDP) mode.
+      Semantics of the calls in <code>box.socket</code> API closely follows
+      semantics of the corresponding POSIX calls. Function names
+      and signatures are mostly compatible with
+      <link xlink:href="http://w3.impa.br/~diego/software/luasocket/">luasocket</link>.
+    </simpara>
+    <simpara>
+      Similarly to luasocket, <code>box.socket</code> doesn't throw exceptions
+      on errors. On success, most calls return a socket object.
+      On error, a multiple return of <code>nil, status, errno, errstr</code>
+      is produced.
+      <code>Status</code> can be one of <code>"error"</code>, <code>"timeout"</code>,
+      <code>"eof"</code> or <code>"limit"</code>. On
+      success, status is always <code>nil</code>.
+      A call which returns data (<code>recv()</code>, <code>recvfrom()</code>,
+      <code>readline()</code>) on success returns a Lua string of
+      the requested size and <code>nil</code> status. On error or timeout,
+      an empty string is followed by the corresponding status, error number and message.
+      A call which sends data (<code>send()</code>, <code>sendto()</code>) on
+      success returns the number of bytes sent, and the <code>status</code> is, again,
+      <code>nil</code>. On error or timeout <code>0</code> is returned,
+      followed by status, error number and message.
+    </simpara>
+    <simpara>
+      The last error can be retrieved from the socket using
+      <code>socket:error()</code>. Any call except <code>error()</code> clears
+      the last error first (but may set a new one).
+    </simpara>
+    <simpara>
+      Calls which require a socket address and in POSIX expect
+      <code>struct sockaddr_in</code>, in <code>box.socket</code>
+      simply accept host name and port as additional arguments.
+      Name resolution is done automatically. If it fails,
+      status is set to <code>"error"</code>, errno is set to <code>-1</code>
+      and error string is set to <code>"Host name resolution failed"</code>.
+    </simpara>
+    <simpara>
+      All calls that can take time block the calling fiber
+      and can get it preempted. The implementation, however, uses
+      non-blocking cooperative I/O, so Tarantool/Box continues processing
+      queries while a call is blocked.
+      A timeout can be provided for any socket call which can take
+      a long time.
+    </simpara>
+    <simpara>
+      As all other <code>box</code> libraries, the API can be used
+      in procedural style (e.g. <code>box.socket.close(socket)</code>) as well
+      as in object-oriented style (<code>socket:close()</code>).
+    </simpara>
+    <simpara>
+      A closed socket should not be used any more. Alternatively, the
+      socket will be closed when its userdata is garbage collected
+      by Lua.
+    </simpara>
+
+    <varlistentry>
+        <term><emphasis role="lua">box.socket.tcp()</emphasis></term>
+        <listitem>
+            <para>
+                Create a new TCP socket.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                A new socket or <code>nil</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">box.socket.udp()</emphasis></term>
+        <listitem>
+            <para>
+                Create a new UDP socket.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                A new socket or <code>nil</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:connect(host, port, [timeout])</emphasis></term>
+        <listitem>
+            <para>
+                Connect a socket to a remote host. Can be used with IPv6 and IPv4
+                addresses, as well as domain names. If multiple addresses
+                correspond to a domain, tries them all until successfully
+                connected.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                Returns a connected socket on success,
+                <code>nil, status, errno, errstr</code> on error or timeout.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:send(data, [timeout])</emphasis></term>
+        <listitem>
+            <para>
+             Send data over a connected socket.
+             <bridgehead renderas="sect4">Returns</bridgehead>
+             The number of bytes sent. On success, this is exactly
+             the length of <code>data</code>. In case of error or timeout,
+             returns the number of bytes sent before error,
+             followed by <code>status, errno, errstr</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:recv(size, [timeout])</emphasis></term>
+        <listitem>
+            <para>
+              Read <code>size</code> bytes from a connected socket.
+              An internal read-ahead buffer is used to reduce the cost
+              of this call.
+             <bridgehead renderas="sect4">Returns</bridgehead>
+              A string of the requested length on success.
+              On error or timeout, returns an empty string, followed
+              by <code>status, errno, errstr</code>.
+              If there was some data read before a timeout occurred, it
+              will be available on the next call.
+              In case the writing side has closed its end, returns the remainder
+              read from the socket (possibly an empty string),
+              followed by <code>"eof"</code> status.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:readline([limit], [separator list], [timeout])</emphasis></term>
+        <listitem>
+            <para>
+                Read a line from a connected socket.
+            </para>
+            <para>
+                <code>socket:readline()</code> with no arguments reads data from a socket
+                until '\n' or eof.
+                If a limit is set, the call reads data until a separator is found,
+                or the limit is reached. By default, there is no limit.
+                Instead of the default separator, a Lua table can be used
+                with one or multiple separators. Then the data is read
+                until the first matching separator is found.
+            </para>
+            <para>
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                A Lua string with data in case of success
+                or an empty string in case of error. When
+                multiple separators were provided in a separator
+                table, the matched separator is returned as the third argument.
+                <table>
+                    <title><code>readline()</code> returns</title>
+                    <tgroup cols="2" align="left" colsep="1" rowsep="1">
+                      <tbody>
+                        <row>
+                          <entry><code>data, nil, separator</code></entry><entry>success</entry>
+                        </row>
+                        <row>
+                          <entry><code>"", "timeout", ETIMEDOUT, errstr</code></entry><entry>timeout</entry>
+                        </row>
+                        <row>
+                          <entry><code>"", "error", errno, errstr</code></entry><entry>error</entry>
+                        </row>
+                        <row>
+                          <entry><code>data, "limit"</code></entry><entry>limit</entry>
+                        </row>
+                        <row>
+                          <entry><code>data, "eof"</code></entry><entry>eof</entry>
+                        </row>
+                      </tbody>
+                    </tgroup>
+                </table>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:bind(host, port[, timeout])</emphasis></term>
+        <listitem>
+            <para>
+                Bind a socket to the given host/port.
+                A UDP socket after binding can be used
+                to receive data (see <code>recvfrom()</code>). A TCP socket
+                can be used to accept new connections, after it's
+                been put in listen mode.
+                The timeout is used for name resolution only. If host
+                name is an IP address, the call never yields and
+                the timeout is unused.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                Socket object on success, <code>nil, status, errno, errstr</code> on error.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:listen()</emphasis></term>
+        <listitem>
+            <para>
+                Start listening for incoming connections. The listen
+                backlog, on Linux, is taken from <filename>/proc/sys/net/core/somaxconn</filename>,
+                whereas on BSD is set to <constant>SOMAXCONN</constant>.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                Socket on success, <code>nil, "error", errno, errstr</code> on error.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:accept([timeout])</emphasis></term>
+        <listitem>
+            <para>
+                Wait for a new client connection and create a connected
+                socket.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                <code>peer_socket, nil, peer_host, peer_port</code> on success.
+                <code>nil, status, errno, errstr</code> on error.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:sendto(data, host, port, [timeout])</emphasis></term>
+        <listitem>
+            <para>
+                Send a message on a UDP socket to a specified host.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                The number of bytes sent on success, <code>0, status, errno, errstr</code>
+                on error or timeout.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:recvfrom(limit[, timeout])</emphasis></term>
+        <listitem>
+            <para>
+                Receive a message on a UDP socket.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                Message, <code>nil</code>, client address, client port on success,
+                <code>"", status, errno, errstr</code> on error or timeout.
+            </para>
+        </listitem>
+    </varlistentry>
+
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:shutdown(how)</emphasis></term>
+        <listitem>
+            <para>
+                Shutdown a reading, writing or both ends of a socket.
+                Accepts box.socket.SHUT_RD, box.socket.SHUT_WR
+                and box.socket.SHUT_RDWR.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                Socket on success, <code>nil, "error", errno, errstr</code> on error.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:close()</emphasis></term>
+        <listitem>
+            <para>
+                Close (destroy) a socket. A closed socket should not
+                be used any more.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">socket:error()</emphasis></term>
+        <listitem>
+            <para>
+                Retrieve the last error occurred on a socket.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                <code>errno, errstr</code>. <code>0, "Success"</code>
+                if there is no error.
+            </para>
+        </listitem>
+    </varlistentry>
+
+</variablelist>
+</section>
+
+<section xml:id="sp-box-cfg">
     <title>Packages <code>box.cfg</code>,
     <code>box.info</code>, <code>box.slab</code> and
     <code>box.stat</code>: server introspection</title>
@@ -2025,7 +2312,7 @@ localhost>
 </para>
 </section>
 
-<section>
+<section xml:id="sp-limitations">
 <title>Limitation of stored procedures</title>
 
 <para>
