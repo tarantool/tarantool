@@ -626,7 +626,7 @@ replication_relay_loop(int client_sock)
 	}
 	say_info("starting replication from lsn: %"PRIi64, lsn);
 
-	ver = tbuf_alloc(fiber->gc_pool);
+	ver = tbuf_new(fiber->gc_pool);
 	tbuf_append(ver, &default_version, sizeof(default_version));
 	replication_relay_send_row((void *)(intptr_t) client_sock, ver);
 

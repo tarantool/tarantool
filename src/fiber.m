@@ -403,7 +403,7 @@ fiber_set_name(struct fiber *fiber, const char *name)
  * completes.
  */
 struct fiber *
-fiber_create(const char *name, void (*f) (va_list))
+fiber_new(const char *name, void (*f) (va_list))
 {
 	struct fiber *fiber = NULL;
 
@@ -414,12 +414,12 @@ fiber_create(const char *name, void (*f) (va_list))
 		fiber = palloc(eter_pool, sizeof(*fiber));
 
 		memset(fiber, 0, sizeof(*fiber));
-		tarantool_coro_init(&fiber->coro, fiber_loop, NULL);
+		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
 
 		fiber->gc_pool = palloc_create_pool("");
 
 		rlist_add_entry(&fibers, fiber, link);
-		rlist_init(&fiber->state);
+		rlist_create(&fiber->state);
 	}
 
 
@@ -500,10 +500,10 @@ fiber_info(struct tbuf *out)
 void
 fiber_init(void)
 {
-	rlist_init(&fibers);
-	rlist_init(&ready_fibers);
-	rlist_init(&zombie_fibers);
-	fiber_registry = mh_i32ptr_init();
+	rlist_create(&fibers);
+	rlist_create(&ready_fibers);
+	rlist_create(&zombie_fibers);
+	fiber_registry = mh_i32ptr_new();
 
 	memset(&sched, 0, sizeof(sched));
 	sched.fid = 1;
@@ -527,6 +527,6 @@ fiber_free(void)
 	/* Only clean up if initialized. */
 	if (fiber_registry) {
 		fiber_destroy_all();
-		mh_i32ptr_destroy(fiber_registry);
+		mh_i32ptr_delete(fiber_registry);
 	}
 }

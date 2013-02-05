@@ -40,6 +40,12 @@ struct ipc_channel {
 	void *item[0];
 };
 
+static void
+ipc_channel_create(struct ipc_channel *ch);
+
+static void
+ipc_channel_destroy(struct ipc_channel *ch);
+
 bool
 ipc_channel_is_empty(struct ipc_channel *ch)
 {
@@ -52,30 +58,38 @@ ipc_channel_is_full(struct ipc_channel *ch)
 	return ch->count >= ch->size;
 }
 
-
 struct ipc_channel *
-ipc_channel_alloc(unsigned size)
+ipc_channel_new(unsigned size)
 {
 	if (!size)
 		size = 1;
 	struct ipc_channel *res =
 		malloc(sizeof(struct ipc_channel) + sizeof(void *) * size);
-	if (res)
-		res->size = size;
+	if (res == NULL)
+		return NULL;
+	res->size = size;
+	ipc_channel_create(res);
 	return res;
 }
 
 void
-ipc_channel_init(struct ipc_channel *ch)
+ipc_channel_delete(struct ipc_channel *ch)
 {
-	ch->beg = ch->count = 0;
-	rlist_init(&ch->bcast);
-	rlist_init(&ch->readers);
-	rlist_init(&ch->writers);
+	ipc_channel_destroy(ch);
+	free(ch);
 }
 
-void
-ipc_channel_cleanup(struct ipc_channel *ch)
+static void
+ipc_channel_create(struct ipc_channel *ch)
+{
+	ch->beg = ch->count = 0;
+	rlist_create(&ch->bcast);
+	rlist_create(&ch->readers);
+	rlist_create(&ch->writers);
+}
+
+static void
+ipc_channel_destroy(struct ipc_channel *ch)
 {
 	while (!rlist_empty(&ch->writers)) {
 		struct fiber *f =

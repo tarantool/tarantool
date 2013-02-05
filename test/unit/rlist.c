@@ -93,7 +93,7 @@ main(void)
 	}
 
 
-	rlist_init(&head);
+	rlist_create(&head);
 	ok(rlist_empty(&head), "list is empty");
 	for (i = 0; i < ITEMS; i++) {
 		items[i].no = i;

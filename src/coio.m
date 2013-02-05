@@ -500,13 +500,13 @@ coio_service_on_accept(struct evio_service *evio_service,
 	struct fiber *f;
 
 	@try {
-		iobuf = iobuf_create(iobuf_name);
-		f = fiber_create(fiber_name, service->handler);
+		iobuf = iobuf_new(iobuf_name);
+		f = fiber_new(fiber_name, service->handler);
 	} @catch (tnt_Exception *e) {
 		say_error("can't create a handler fiber, dropping client connection");
 		evio_close(&coio);
 		if (iobuf)
-			iobuf_destroy(iobuf);
+			iobuf_delete(iobuf);
 		@throw;
 	}
 	/*

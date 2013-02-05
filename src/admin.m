@@ -202,8 +202,8 @@ static int
 admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 {
 	struct ibuf *in = &iobuf->in;
-	struct tbuf *out = tbuf_alloc(fiber->gc_pool);
-	struct tbuf *err = tbuf_alloc(fiber->gc_pool);
+	struct tbuf *out = tbuf_new(fiber->gc_pool);
+	struct tbuf *err = tbuf_new(fiber->gc_pool);
 	int cs;
 	char *p, *pe;
 	char *strstart, *strend;
@@ -1909,7 +1909,7 @@ admin_handler(va_list ap)
 	} @finally {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		evio_close(&coio);
-		iobuf_destroy(iobuf);
+		iobuf_delete(iobuf);
 		session_destroy(fiber->sid);
 	}
 }

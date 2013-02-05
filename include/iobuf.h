@@ -205,11 +205,11 @@ struct iobuf
 
 /** Create an instance of input/output buffer. */
 struct iobuf *
-iobuf_create(const char *name);
+iobuf_new(const char *name);
 
 /** Destroy an input/output buffer. */
 void
-iobuf_destroy(struct iobuf *iobuf);
+iobuf_delete(struct iobuf *iobuf);
 
 /** Flush output using cooperative I/O and garbage collect.
  * @return number of bytes written

@@ -132,7 +132,7 @@ bio_initbuf(struct bio_socket *s)
 	const char *type = s->socktype == SOCK_STREAM ? "tcp" : "udp";
 	snprintf(name, sizeof(name), "box.io.%s(%d)",
 		 type, s->coio.fd);
-	s->iob = iobuf_create(name);
+	s->iob = iobuf_new(name);
 }
 
 static inline int
@@ -276,7 +276,7 @@ lbox_socket_close(struct lua_State *L)
 	if (! evio_is_active(&s->coio))
 		return 0;
 	if (s->iob) {
-		iobuf_destroy(s->iob);
+		iobuf_delete(s->iob);
 		s->iob = NULL;
 	}
 	evio_close(&s->coio);

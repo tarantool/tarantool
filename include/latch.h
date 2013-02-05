@@ -49,7 +49,7 @@ struct tnt_latch {
  *
  * @param latch Latch to be initialized.
  */
-void tnt_latch_init(struct tnt_latch *latch);
+void tnt_latch_create(struct tnt_latch *latch);
 /**
  * Destroy the given latch.
  */

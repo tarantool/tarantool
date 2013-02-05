@@ -214,7 +214,7 @@ static int
 snap_print(void *param __attribute__((unused)), struct tbuf *t)
 {
 	@try {
-		struct tbuf *out = tbuf_alloc(t->pool);
+		struct tbuf *out = tbuf_new(t->pool);
 		struct header_v11 *raw_row = header_v11(t);
 		struct tbuf *b = palloc(t->pool, sizeof(*b));
 		b->data = t->data + sizeof(struct header_v11);
@@ -238,7 +238,7 @@ static int
 xlog_print(void *param __attribute__((unused)), struct tbuf *t)
 {
 	@try {
-		struct tbuf *out = tbuf_alloc(t->pool);
+		struct tbuf *out = tbuf_new(t->pool);
 		box_xlog_sprint(out, t);
 		printf("%*s\n", (int)out->size, (char *)out->data);
 	} @catch (id e) {
