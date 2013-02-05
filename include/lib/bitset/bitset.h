@@ -34,10 +34,11 @@
  * @file
  * @brief Module to work with arrays of bits (bitsets)
  *
- * Bitset is an array of bits where each bit can be set or unset independently.
- * The bits of a @link bitset @endlink are indexed by \a size_t position number.
- * Initialy all bits set to false. You can use any values in range [0,SIZE_MAX).
- * The container grows automatically.
+ * Bitset is an array of bits where each bit can be set or unset
+ * independently.  The bits of a @link bitset @endlink are indexed
+ * by \a size_t position number.  Initially all bits are set to
+ * false. You can use any values in range [0,SIZE_MAX).  The
+ * container grows automatically.
  */
 
 #include "config.h"
