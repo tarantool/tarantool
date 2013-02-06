@@ -897,14 +897,26 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
         </term>
         <listitem>
             <para>
+                Raises a client error. The difference between this function
+                and the built-in <code>error()</code> function in Lua
+                is that when the error reaches the client, it's error code
+                is preserved, whereas every Lua error is presented to the
+                client as <constant>ER_PROC_LUA</constant>. This function
+                makes it possible to emulate any kind of native exception,
+                such as a unique constraint violation, no such space/index,
+                etc. A complete list of errors is present in <link xlink:href="https://github.com/mailru/tarantool/blob/master/include/errcode.h">errcode.h</link>
+                file in the source tree.
+                Lua constants which correspond to Tarantool/Box errors
+                are defined in <code>box.error</code> module. The error
+                message can be arbitrary.
                 Throws client error. Lua procedure can emulate any
                 request errors (for example: unique key exception).
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
             <programlisting>
-                lua box.raise(123, 'test')
+                lua box.raise(box.error.ER_WAL_IO, 'Wal I/O error')
                 ---
-                error: 'test'
+                error: 'Wal I/O error'
                 ...
             </programlisting>
         </listitem>

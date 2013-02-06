@@ -1,7 +1,0 @@
-# encoding: tarantool
-import os
-import sys
-
-exec admin "lua for k, v in pairs(box.stat()) do print(k) end"
-exec admin "lua for k, v in pairs(box.stat().DELETE) do print(k) end"
-exec admin "lua for k, v in pairs(box.stat.DELETE) do print(k) end"

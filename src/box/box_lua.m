@@ -1151,10 +1151,10 @@ static int
 lbox_raise(lua_State *L)
 {
 	if (lua_gettop(L) != 2)
-		luaL_error(L, "box.raise(): wrong arguments");
+		luaL_error(L, "box.raise(): bad arguments");
 	uint32_t code = lua_tointeger(L, 1);
 	if (!code)
-		luaL_error(L, "box.raise(): code can't be zero");
+		luaL_error(L, "box.raise(): unknown error code");
 	const char *str = lua_tostring(L, 2);
 	tnt_raise(ClientError, :code :str);
 	return 0;

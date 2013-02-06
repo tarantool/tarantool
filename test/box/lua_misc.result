@@ -1,0 +1,94 @@
+
+#
+# box.raise
+#
+
+lua 1 + 1
+---
+ - 2
+...
+lua box.raise(123, 'test')
+---
+error: 'test'
+...
+lua box.raise(0, 'the other test')
+---
+error: 'box.raise(): unknown error code'
+...
+lua box.raise(12, 345)
+---
+error: '345'
+...
+
+#
+# box.stat
+#
+
+lua for k, v in pairs(box.stat()) do print(k) end
+---
+DELETE
+SELECT
+REPLACE
+CALL
+UPDATE
+DELETE_1_3
+...
+lua for k, v in pairs(box.stat().DELETE) do print(k) end
+---
+total
+rps
+...
+lua for k, v in pairs(box.stat.DELETE) do print(k) end
+---
+total
+rps
+...
+
+#
+# box.space
+#
+
+lua type(box)
+---
+ - table
+...
+lua type(box.space)
+---
+ - table
+...
+lua box.cfg.memcached_space
+---
+ - 23
+...
+lua for i, v in pairs(box.space[0].index[0].key_field[0]) do print(i, ': ', v) end
+---
+type: NUM
+fieldno: 0
+...
+
+#
+# box.space
+#
+
+lua string.match(tostring(box.slab), '^table:') ~= nil
+---
+ - true
+...
+lua box.slab.arena_used >= 0
+---
+ - true
+...
+lua box.slab.arena_size > 0
+---
+ - true
+...
+lua string.match(tostring(box.slab.slabs), '^table:') ~= nil
+---
+ - true
+...
+lua for k, v in pairs(box.slab()) do print(k) end
+---
+slabs
+arena_size
+arena_used
+...
