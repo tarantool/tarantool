@@ -1147,8 +1147,22 @@ lbox_process(lua_State *L)
 	return lua_gettop(L) - top;
 }
 
+static int
+lbox_raise(lua_State *L)
+{
+	if (lua_gettop(L) != 2)
+		luaL_error(L, "box.raise(): bad arguments");
+	uint32_t code = lua_tointeger(L, 1);
+	if (!code)
+		luaL_error(L, "box.raise(): unknown error code");
+	const char *str = lua_tostring(L, 2);
+	tnt_raise(ClientError, :code :str);
+	return 0;
+}
+
 static const struct luaL_reg boxlib[] = {
 	{"process", lbox_process},
+	{"raise", lbox_raise},
 	{NULL, NULL}
 };
 

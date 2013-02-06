@@ -75,6 +75,7 @@
 }
 
 - (id) init: (uint32_t)errcode_, ...;
+- (id) init: (uint32_t)errcode_  :(const char *)msg;
 - (id) init: (uint32_t)errcode_ args :(va_list)ap;
 - (void) log;
 - (const char *) errmsg;
