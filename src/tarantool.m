@@ -684,7 +684,7 @@ main(int argc, char **argv)
 		printf("Target: %s\n", BUILD_INFO);
 		printf("Build options: %s\n", BUILD_OPTIONS);
 		printf("Compiler: %s\n", COMPILER_INFO);
-		printf("C_FLAGS:%s\n", COMPILER_C_FLAGS);
+		printf("C_FLAGS:%s\n", TARANTOOL_C_FLAGS);
 		return 0;
 	}
 
