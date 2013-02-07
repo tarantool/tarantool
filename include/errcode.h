@@ -50,7 +50,7 @@ enum { TNT_ERRMSG_MAX = 512 };
  */
 
 #define ERROR_CODES(_)					    \
-	/*  0 */_(ER_OK=0,			0, "OK") \
+	/*  0 */_(ER_OK,			0, "OK") \
 	/*  1 */_(ER_NONMASTER,			2, "Can't modify data on a replication slave. My master is: %s") \
 	/*  2 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  3 */_(ER_SECONDARY,			2, "Can't modify data upon a request on the secondary port.") \

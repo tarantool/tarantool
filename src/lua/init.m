@@ -1342,8 +1342,11 @@ static void
 tarantool_lua_error_init(struct lua_State *L) {
 	luaL_register(L, "box.error", errorlib);
 	for (int i = 0; i < tnt_error_codes_enum_MAX; i++) {
-		lua_pushnumber(L, i);
-		lua_setfield(L, -2, tnt_error_codes[i].errstr);
+		const char *name = tnt_error_codes[i].errstr;
+		if (strstr(name, "UNUSED") || strstr(name, "RESERVED"))
+			continue;
+		lua_pushnumber(L, tnt_errcode_val(i));
+		lua_setfield(L, -2, name);
 	}
 	lua_pop(L, 1);
 }

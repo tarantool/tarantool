@@ -41,3 +41,10 @@ exec admin "lua box.slab.arena_used >= 0"
 exec admin "lua box.slab.arena_size > 0"
 exec admin "lua string.match(tostring(box.slab.slabs), '^table:') ~= nil"
 exec admin "lua for k, v in pairs(box.slab()) do print(k) end"
+
+print """
+#
+# box.error
+#
+"""
+exec admin "lua for k,v in pairs(box.error) do print('box.error.', k, ': ', v) end"
