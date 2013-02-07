@@ -916,5 +916,14 @@ tarantool_lua_socket_init(struct lua_State *L)
 	};
 	tarantool_lua_register_type(L, socketlib_name, lbox_socket_meta);
 	luaL_register(L, socketlib_name, socketlib);
+	lua_pushstring(L, "SHUT_RD");
+	lua_pushnumber(L, SHUT_RD);
+	lua_settable(L, -3);
+	lua_pushstring(L, "SHUT_WR");
+	lua_pushnumber(L, SHUT_WR);
+	lua_settable(L, -3);
+	lua_pushstring(L, "SHUT_RDWR");
+	lua_pushnumber(L, SHUT_RDWR);
+	lua_settable(L, -3);
 	lua_pop(L, 1);
 }

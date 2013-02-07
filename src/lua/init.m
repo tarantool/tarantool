@@ -1596,6 +1596,4 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	 * allowed.
 	*/
 	tarantool_lua_sandbox(tarantool_L);
-
 }
-
