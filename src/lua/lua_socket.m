@@ -670,7 +670,6 @@ lbox_socket_readline(struct lua_State *L)
 	in->pos += bottom;
 	lua_pushnil(L);
 	lua_rawgeti(L, seplist, match + 1);
-	//lua_pushinteger(L, match + 1);
 	return 3;
 }
 
