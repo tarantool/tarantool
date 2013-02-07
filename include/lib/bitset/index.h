@@ -31,8 +31,74 @@
 
 /**
  * @file
- * @brief BitsetIndex - a bit index based on @link bitset @endlink.
+ * @brief bitset_index - a bit index based on @link bitset @endlink.
+ *
+ * @section Purpose
+ *
+ * bitset_index is an associative container that stores (key, value) pairs
+ * in a way that is very optimized for searching values by performing logical
+ * expressions on key bits. The organization structure of bitset_index makes it
+ * easy to respond to queries like 'give me all pairs where bit i and bit j
+ * in pairs keys are set'. The implementation supports evaluation of arbitrary
+ * logical expressions represented in the Disjunctive normal form.
+ *
+ * bitset_index is optimized for querying a large count of values using a single
+ * logical expression. The expression can be constructed one time and used for
+ * multiple queries. bitset_index is not designed for querying a single value
+ * using exact matching by a key.
+ *
+ * @section Organization
+ *
+ * bitset_index consists of N+1 @link bitset bitsets @endlink where N is a
+ * maximum size of keys in an index (in bits). These bitsets are indexed
+ * by the pair's value. A bitset #n+1 corresponds to a bit #n in keys and
+ * contains all pairs where this bit is set. That is, if a pair with
+ * (key, value) is inserted to the index and its key, say, has 0, 2, 5, 6
+ * bits set then bitsets #1, #3, #6, #7 are set at position = pair.value
+ * (@link bitset_test bitset_test(bitset, pair.value) @endlink is true) and
+ * bitsets #2, #4, #7 , ... are unset at the position.
+ *
+ * bitset_index also uses a special bitset #0 that is set to true for each
+ * position where a pair with value = position exists in an index. This
+ * bitset is mostly needed for evaluation expressions with binary NOTs.
+ *
+ * bitset_index is a little bit different than traditional containers like
+ * 'map' or 'set'. Using bitset_index you can certainly have multiple pairs
+ * with same key, but all values in an index must be unique. You might think
+ * that bitset_index is implemented in an inverted form - a pair's value is
+ * used as a positions in internal bitsets and a key is consist of value of
+ * this bitsets.
+ *
+ * @section Performance
+ *
+ * For certain kind of tasks bitset_index is more efficient by performance and
+ * memory utilization than ordinary binary search tree or hashtable.
+ *
+ * The complexity of the @link bitset_insert @endlink operation is mostly
+ * equivalent to inserting one value into \a k balanced binary search trees with
+ * height \a m, where \a k is a number of set bits in your key and \ m is
+ * a number of pairs in an index divided by some constant (bitset page size).
+ *
+ * The complexity of an iteration is mostly linear to the number of pairs
+ * in where a search expression evals to true. The complexity of an iteration
+ * expression does not affect performance directly. Only the number of resulting
+ * pairs is important.
+ *
+ * The real performance heavily depends on the pairs values. If a values
+ * space is dense, then an internal bitsets also will be compact and better
+ * optimized for iteration.
+ *
+ * @section Limitations
+ *
+ * The size of keys is limited only by available memory.
+ * bitset_index automatically resizes on 'insert' if new bits are found.
+ *
+ * Since values are used as a position in bitsets, the actual range of
+ * values must be in [0..SIZE_MAX) range.
+ *
  * @see bitset.h
+ * @see expr.h
+ * @see iterator.h
  */
 
 #include <lib/bitset/bitset.h>
@@ -43,8 +109,11 @@
  */
 struct bitset_index {
 	/** @cond false **/
+	/* Used bitsets */
 	struct bitset **bitsets;
+	/* Capacity of bitsets array */
 	size_t capacity;
+	/* Memory allocator to use */
 	void *(*realloc)(void *ptr, size_t size);
 	/* A buffer used for rollback changes in bitset_insert */
 	char *rollback_buf;
