@@ -38,7 +38,7 @@
 #include "say.h"
 
 /** Pretty print socket name and peer (for exceptions) */
-static const char *
+const char *
 sio_socketname(int fd)
 {
 	static __thread char name[2 * SERVICE_NAME_MAXLEN];

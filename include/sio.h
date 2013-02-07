@@ -47,6 +47,7 @@ enum { SERVICE_NAME_MAXLEN = 32 };
 - (id) init: (int) fd in: (const char *) format, ...;
 @end
 
+const char *sio_socketname(int fd);
 int sio_socket(int domain, int type, int protocol);
 
 int sio_shutdown(int fd, int how);

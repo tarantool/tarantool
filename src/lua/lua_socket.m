@@ -237,7 +237,7 @@ static int
 lbox_socket_tostring(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, -1);
-	lua_pushfstring(L, "%d", s->coio.fd);
+	lua_pushstring(L, sio_socketname(s->coio.fd));
 	return 1;
 }
 
