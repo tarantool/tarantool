@@ -237,7 +237,7 @@ static int
 lbox_socket_tostring(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, -1);
-	lua_pushfstring(L, "%d", s->coio.fd);
+	lua_pushstring(L, sio_socketname(s->coio.fd));
 	return 1;
 }
 
@@ -669,7 +669,7 @@ lbox_socket_readline(struct lua_State *L)
 	lua_pushlstring(L, in->pos, bottom);
 	in->pos += bottom;
 	lua_pushnil(L);
-	lua_pushinteger(L, match + 1);
+	lua_rawgeti(L, seplist, match + 1);
 	return 3;
 }
 
@@ -916,5 +916,14 @@ tarantool_lua_socket_init(struct lua_State *L)
 	};
 	tarantool_lua_register_type(L, socketlib_name, lbox_socket_meta);
 	luaL_register(L, socketlib_name, socketlib);
+	lua_pushstring(L, "SHUT_RD");
+	lua_pushnumber(L, SHUT_RD);
+	lua_settable(L, -3);
+	lua_pushstring(L, "SHUT_WR");
+	lua_pushnumber(L, SHUT_WR);
+	lua_settable(L, -3);
+	lua_pushstring(L, "SHUT_RDWR");
+	lua_pushnumber(L, SHUT_RDWR);
+	lua_settable(L, -3);
 	lua_pop(L, 1);
 }

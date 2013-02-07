@@ -54,13 +54,13 @@ lua s:connect('::1', '30303')
 ---
  - nil
  - error
- - -1
- - Host name resolution failed
+ - 111
+ - Connection refused
 ...
 lua s:error()
 ---
- - -1
- - Host name resolution failed
+ - 111
+ - Connection refused
 ...
 lua s:connect('127.0.0.1', '30303', 0.01)
 ---
@@ -372,7 +372,8 @@ lua s:readline()
  - Hello World
 
  - nil
- - 1
+ - 
+
 ...
 lua s:error()
 ---
@@ -405,7 +406,8 @@ lua s:readline(6, 0.01)
  - d
 
  - nil
- - 1
+ - 
+
 ...
 lua s:error()
 ---
@@ -417,7 +419,7 @@ lua s:readline({'i', 'D'})
 ---
  - AbcD
  - nil
- - 2
+ - D
 ...
 lua s:error()
 ---
@@ -428,7 +430,7 @@ lua s:readline({'i', 'G'})
 ---
  - efG
  - nil
- - 2
+ - G
 ...
 lua s:error()
 ---
@@ -439,7 +441,7 @@ lua s:readline({'i'})
 ---
  - hi
  - nil
- - 1
+ - i
 ...
 lua s:error()
 ---
@@ -451,7 +453,7 @@ lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
  - Cat
  - nil
- - 1
+ - Cat
 ...
 lua s:error()
 ---
@@ -462,7 +464,7 @@ lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
  - Cow
  - nil
- - 2
+ - Cow
 ...
 lua s:error()
 ---
@@ -473,7 +475,7 @@ lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
  - Dog
  - nil
- - 3
+ - Dog
 ...
 lua s:error()
 ---
@@ -484,7 +486,7 @@ lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
  - Star
  - nil
- - 4
+ - Star
 ...
 lua s:error()
 ---
@@ -496,7 +498,7 @@ lua s:readline(3, {'Cat', 'Coow'})
 ---
  - Cat
  - nil
- - 1
+ - Cat
 ...
 lua s:error()
 ---
@@ -551,7 +553,7 @@ lua s:readline(sl, 1.0)
 ---
  - KKong
  - nil
- - 3
+ - Kong
 ...
 lua s:error()
 ---
@@ -562,7 +564,7 @@ lua s:readline(sl, 1.0)
 ---
  - King
  - nil
- - 2
+ - King
 ...
 lua s:error()
 ---
@@ -573,7 +575,7 @@ lua s:readline(sl, 1.0)
 ---
  - CezaCezar
  - nil
- - 4
+ - Cezar
 ...
 lua s:error()
 ---
@@ -584,7 +586,7 @@ lua s:readline(sl, 1.0)
 ---
  - Crown
  - nil
- - 1
+ - Crown
 ...
 lua s:error()
 ---
@@ -599,7 +601,7 @@ lua s:readline(64, sl, 1.0)
 ---
  - RoAgatha
  - nil
- - 1
+ - Agatha
 ...
 lua s:error()
 ---
@@ -610,7 +612,7 @@ lua s:readline(64, sl, 1.0)
 ---
  - Pop
  - nil
- - 5
+ - Pop
 ...
 lua s:error()
 ---
@@ -621,7 +623,7 @@ lua s:readline(64, sl, 1.0)
 ---
  - PoCorn
  - nil
- - 3
+ - Corn
 ...
 lua s:error()
 ---
@@ -632,7 +634,7 @@ lua s:readline(64, sl, 1.0)
 ---
  - Drive
  - nil
- - 4
+ - Drive
 ...
 lua s:error()
 ---
@@ -657,7 +659,7 @@ lua s:readline({'Canada'}, 0.01)
 ---
  - RoadAfricaCubaRomaniaCanada
  - nil
- - 1
+ - Canada
 ...
 lua s:error()
 ---
@@ -669,7 +671,7 @@ lua s:readline({'Canada'}, 0.01)
 ---
  - Canada
  - nil
- - 1
+ - Canada
 ...
 lua s:error()
 ---
@@ -681,7 +683,7 @@ lua s:readline({'msg'})
 ---
  - msg
  - nil
- - 1
+ - msg
 ...
 lua s:error()
 ---
@@ -692,7 +694,7 @@ lua s:readline({'msg'})
 ---
  -  msg
  - nil
- - 1
+ - msg
 ...
 lua s:error()
 ---
@@ -703,7 +705,7 @@ lua s:readline({'msg'})
 ---
  -  msg
  - nil
- - 1
+ - msg
 ...
 lua s:error()
 ---
@@ -714,7 +716,7 @@ lua s:readline({'msg'})
 ---
  -  msg
  - nil
- - 1
+ - msg
 ...
 lua s:error()
 ---
@@ -725,7 +727,7 @@ lua s:readline({'msg'})
 ---
  -  msg
  - nil
- - 1
+ - msg
 ...
 lua s:error()
 ---
