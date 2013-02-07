@@ -46,6 +46,8 @@ struct bitset_index {
 	struct bitset **bitsets;
 	size_t capacity;
 	void *(*realloc)(void *ptr, size_t size);
+	/* A buffer used for rollback changes in bitset_insert */
+	char *rollback_buf;
 	/** @endcond **/
 };
 
@@ -71,6 +73,8 @@ bitset_index_destroy(struct bitset_index *index);
  * @brief Insert (\a key, \a value) pair into \a index.
  * Only one pair with same value can exist in the index.
  * If pair with same \a value is exist, it will be updated quietly.
+ * The method is atomic, i.e. \a index will be in a consistent state after
+ * a return even in case of error.
  * @param index object
  * @param key key
  * @param key_size size of the key

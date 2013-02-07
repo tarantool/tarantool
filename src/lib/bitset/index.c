@@ -68,6 +68,7 @@ bitset_index_destroy(struct bitset_index *index)
 	}
 	if (index->capacity > 0) {
 		index->realloc(index->bitsets, 0);
+		index->realloc(index->rollback_buf, 0);
 	}
 
 	memset(index, 0, sizeof(*index));
@@ -98,6 +99,15 @@ bitset_index_reserve(struct bitset_index *index, size_t size)
 	/* Save bitset ** but do not update index->capacity */
 	index->bitsets = bitsets;
 
+	/* Resize rollback buffer */
+	char *rollback_buf = (char *) index->realloc(index->rollback_buf,
+						     capacity);
+	if (rollback_buf == NULL)
+		goto error_1;
+
+	index->rollback_buf = rollback_buf;
+
+	/* Initialize bitsets */
 	for (size_t b = index->capacity; b < capacity; b++) {
 		index->bitsets[b] = index->realloc(NULL,
 					sizeof(*index->bitsets[b]));
@@ -132,37 +142,95 @@ bitset_index_insert(struct bitset_index *index, const void *key,
 	assert (key != NULL);
 	assert (index->capacity > 0);
 
+	/*
+	 * Step 0: allocate enough number of bitsets
+	 *
+	 * bitset_index_reserve could fail on realloc and return -1.
+	 * Do not change anything and return the error to the caller.
+	 */
 	const size_t size = 1 + key_size * CHAR_BIT;
 	if (bitset_index_reserve(index, size) != 0)
 		return -1;
 
+	/*
+	 * Step 1: set the 'flag' bitset
+	 *
+	 * bitset_set for 'falg' bitset could fail on realloc.
+	 * Do not change anything. Do not shrink buffers allocated on step 1.
+	 */
+	int rc = bitset_set(index->bitsets[0], value);
+	if (rc < 0)
+		return -1;
+
+	/* if 1 then the value is new in the index */
+	index->rollback_buf[0] = (char) rc;
+
+	/*
+	 * Step 2: iterate over 'set' bits in the key and update related bitsets.
+	 *
+	 * A bitset_set somewhere in the middle also could fail on realloc.
+	 * If this happens, we stop processing and jump to the rollback code.
+	 * Rollback uses index->rollback_buf buffer to restore previous values
+	 * of all bitsets on given position. Remember, that bitset_set
+	 * returns 1 if a previous value was 'true' and 0 if it was 'false'.
+	 * The buffer is indexed by bytes (char *) instead of bits (bit_set)
+	 * because it is a little bit faster here.
+	 */
 	struct bit_iterator bit_it;
 	bit_iterator_init(&bit_it, key, key_size, true);
-	size_t pos;
-	while ( (pos = bit_iterator_next(&bit_it)) != SIZE_MAX) {
+	size_t pos = 0;
+	while ((pos = bit_iterator_next(&bit_it)) != SIZE_MAX) {
 		size_t b = pos + 1;
-		if (bitset_set(index->bitsets[b], value) < 0)
+		rc = bitset_set(index->bitsets[b], value);
+		if (rc < 0)
 			goto rollback;
+
+		index->rollback_buf[b] = (char) rc;
 	}
 
-	if (bitset_set(index->bitsets[0], value) < 0)
-		goto rollback;
+	/* Finish here if the value is new in the index */
+	if (index->rollback_buf[0] == 0)
+		return 0;
+
+	/*
+	 * Step 3: Iterate over 'unset' bits and cleanup other bitsets
+	 * This step is needed if the value was already existed in the index.
+	 * Nothing can fail here because current implementation of
+	 * bitset_clear never fails.
+	 */
+	bit_iterator_init(&bit_it, key, key_size, false);
+	while ((pos = bit_iterator_next(&bit_it)) != SIZE_MAX) {
+		size_t b = pos + 1;
+		rc = bitset_clear(index->bitsets[b], value);
+		assert(rc >= 0); /* bitset_clear never fails */
+	}
 
 	return 0;
 
-	/* TODO: partial rollback is not work properly here */
 rollback:
-	/* Rollback changes */
+	/*
+	 * Rollback changes done by Step 2.
+	 */
 	bit_iterator_init(&bit_it, key, size, true);
-	while ( (pos = bit_iterator_next(&bit_it)) != SIZE_MAX) {
-		size_t b = pos + 1;
-		if (index->bitsets[b] == NULL)
-			continue;
+	size_t rpos;
+	while ((rpos = bit_iterator_next(&bit_it)) != SIZE_MAX && rpos < pos) {
+		size_t b = rpos + 1;
 
-		bitset_clear(index->bitsets[b], value);
+		if (index->rollback_buf[b] == 1) {
+			bitset_set(index->bitsets[b], value);
+		} else {
+			bitset_clear(index->bitsets[b], value);
+		}
 	}
 
-	bitset_clear(index->bitsets[0], value);
+	/*
+	 * Rollback changes done by Step 1.
+	 */
+	if (index->rollback_buf[0] == 1) {
+		bitset_set(index->bitsets[0], value);
+	} else {
+		bitset_clear(index->bitsets[0], value);
+	}
 
 	return -1;
 }
