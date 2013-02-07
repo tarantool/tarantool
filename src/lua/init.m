@@ -1334,6 +1334,20 @@ tarantool_lua_register_type(struct lua_State *L, const char *type_name,
 	lua_pop(L, 1);
 }
 
+static const struct luaL_reg errorlib [] = {
+	{NULL, NULL}
+};
+
+static void
+tarantool_lua_error_init(struct lua_State *L) {
+	luaL_register(L, "box.error", errorlib);
+	for (int i = 0; i < tnt_error_codes_enum_MAX; i++) {
+		lua_pushnumber(L, i);
+		lua_setfield(L, -2, tnt_error_codes[i].errstr);
+	}
+	lua_pop(L, 1);
+}
+
 struct lua_State *
 tarantool_lua_init()
 {
@@ -1370,6 +1384,7 @@ tarantool_lua_init()
 	tarantool_lua_uuid_init(L);
 	tarantool_lua_socket_init(L);
 	tarantool_lua_session_init(L);
+	tarantool_lua_error_init(L);
 
 	mod_lua_init(L);
 
