@@ -908,11 +908,11 @@ localhost> lua box.counter.dec(0, 'top.mail.ru')
 
 <variablelist>
     <title>Package <code xml:id="box.tuple" xreflabel="box.tuple">box.tuple</code></title>
-    <para>The package contains no functions, but stands for
-    <code>box.tuple</code> userdata type. It is possible to access individual
-    tuple fields using an index, select a range of fields, iterate
-    over all fields in a tuple or convert a tuple to a Lua table.
-    Tuples are immutable.</para>
+    <para>The package stands for <code>box.tuple</code> userdata
+    type. It is possible to access individual tuple fields using
+    an index, select a range of fields, iterate over all fields in
+    a tuple or convert a tuple to a Lua table.  Tuples are
+    immutable.</para>
     <varlistentry>
         <term><emphasis role="lua"> </emphasis></term>
         <listitem><para>
@@ -999,6 +999,19 @@ localhost> lua t:find(1, 'abc')
 </programlisting>
 
         </para></listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">box.tuple.new(...)</emphasis></term>
+        <listitem><para>
+        Construct a new tuple from a Lua table or a scalar. 
+        </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost> lua box.tuple.new({tonumber64('18446744073709551615'), 'string', 1})
+--- 
+ - 18446744073709551615: {'string', 1}
+... 
+</programlisting>
+        </listitem>
     </varlistentry>
 </variablelist>
 
