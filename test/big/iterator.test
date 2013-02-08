@@ -3,10 +3,10 @@
 import os
 import shutil
 
-iterator_lua_path = os.path.join(vardir, "iterator.lua")
-shutil.copy("big/iterator.lua", iterator_lua_path)
+iterator_lua_path = os.path.join(vardir, "utils.lua")
+shutil.copy("big/utils.lua", iterator_lua_path)
 
-exec admin "lua dofile('iterator.lua')"
+exec admin "lua dofile('utils.lua')"
 shutil.rmtree(iterator_lua_path, True)
 
 exec admin "lua box.insert(20, 'pid_001', 'sid_001', 'tid_998', 'a')"
