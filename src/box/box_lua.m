@@ -79,6 +79,9 @@ static const char *tuplelib_name = "box.tuple";
 static void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
 
+static struct tuple *
+lua_totuple(struct lua_State *L, int index);
+
 static inline struct tuple *
 lua_checktuple(struct lua_State *L, int narg)
 {
@@ -98,6 +101,17 @@ lua_istuple(struct lua_State *L, int narg)
 		tuple = * (void **) lua_touserdata(L, narg);
 	lua_pop(L, 2);
 	return tuple;
+}
+
+static int
+lbox_tuple_new(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	if (argc < 1)
+		luaL_error(L, "tuple.new(): bad arguments");
+	struct tuple *tuple = lua_totuple(L, 1);
+	lbox_pushtuple(L, tuple);
+	return 1;
 }
 
 static int
@@ -495,7 +509,7 @@ lbox_tuple_pairs(struct lua_State *L)
 	return 3;
 }
 
-static const struct luaL_reg lbox_tuple_meta [] = {
+static const struct luaL_reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
 	{"__len", lbox_tuple_len},
 	{"__index", lbox_tuple_index},
@@ -507,6 +521,11 @@ static const struct luaL_reg lbox_tuple_meta [] = {
 	{"find", lbox_tuple_find},
 	{"findall", lbox_tuple_findall},
 	{"unpack", lbox_tuple_unpack},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg lbox_tuplelib[] = {
+	{"new", lbox_tuple_new},
 	{NULL, NULL}
 };
 
@@ -1014,8 +1033,8 @@ lua_table_to_tuple(struct lua_State *L, int index)
 	return tuple;
 }
 
-static void
-port_add_lua_ret(struct port *port, struct lua_State *L, int index)
+static struct tuple*
+lua_totuple(struct lua_State *L, int index)
 {
 	int type = lua_type(L, index);
 	struct tuple *tuple;
@@ -1075,6 +1094,13 @@ port_add_lua_ret(struct port *port, struct lua_State *L, int index)
 		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
 		break;
 	}
+	return tuple;
+}
+
+static void
+port_add_lua_ret(struct port *port, struct lua_State *L, int index)
+{
+	struct tuple *tuple = lua_totuple(L, index);
 	@try {
 		port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
 	} @finally {
@@ -1258,6 +1284,8 @@ mod_lua_init(struct lua_State *L)
 {
 	/* box, box.tuple */
 	tarantool_lua_register_type(L, tuplelib_name, lbox_tuple_meta);
+	luaL_register(L, tuplelib_name, lbox_tuplelib);
+	lua_pop(L, 1);
 	luaL_register(L, "box", boxlib);
 	lua_pop(L, 1);
 	/* box.index */
