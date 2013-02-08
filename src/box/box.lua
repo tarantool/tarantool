@@ -259,11 +259,15 @@ function box.bless_space(space)
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.truncate = function(space)
-        local pk = space.index[0].idx
-        local part_count = pk:part_count()
-        while #pk > 0 do
-            for v in pk:iterator() do
-                space:delete(v:slice(0, part_count))
+        local pk = space.index[0]
+        while #pk.idx > 0 do
+            for t in pk:iterator() do
+                local key = {};
+                -- ipairs does not work because pk.key_field is zero-indexed
+                for _k2, key_field in pairs(pk.key_field) do
+                    table.insert(key, t[key_field.fieldno])
+                end
+                space:delete(unpack(key))
             end
         end
     end
