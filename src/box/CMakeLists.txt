@@ -26,4 +26,7 @@ add_custom_target(generate_lua_sources}
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 tarantool_module("box" tuple.m index.m hash_index.m tree_index.m space.m
-    port.m request.m txn.m box.m ${lua_sources} box_lua.m box_lua_space.m)
+    port.m request.m txn.m box.m ${lua_sources} box_lua.m box_lua_space.m
+    bitset_index.m)
+
+target_link_libraries(tarantool_box bitset)

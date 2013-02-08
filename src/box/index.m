@@ -29,6 +29,7 @@
 #include "index.h"
 #include "hash_index.h"
 #include "tree_index.h"
+#include "bitset_index.h"
 #include "tuple.h"
 #include "say.h"
 #include "exception.h"
@@ -108,6 +109,8 @@ replace_check_dup(struct tuple *old_tuple,
 		return [HashIndex alloc: key_def :space];
 	case TREE:
 		return [TreeIndex alloc: key_def :space];
+	case BITSET:
+		return [BitsetIndex alloc];
 	default:
 		assert(false);
 	}
