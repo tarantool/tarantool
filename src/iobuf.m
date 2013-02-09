@@ -200,7 +200,7 @@ obuf_dup(struct obuf *buf, void *data, size_t size)
 }
 
 /** Book a few bytes in the output buffer. */
-void *
+struct obuf_svp
 obuf_book(struct obuf *buf, size_t size)
 {
 	struct iovec *iov = &buf->iov[buf->pos];
@@ -221,11 +221,13 @@ obuf_book(struct obuf *buf, size_t size)
 			obuf_alloc_pos(buf, buf->pos, size);
 		}
 	}
-	void *booking = iov->iov_base + iov->iov_len;
+	struct obuf_svp svp = {
+		.pos = buf->pos, .iov_len = iov->iov_len, .size = buf->size
+	};
 	iov->iov_len += size;
 	buf->size += size;
 	assert(iov->iov_len <= buf->capacity[buf->pos]);
-	return booking;
+	return svp;
 }
 
 /** Forget about data in the output buffer beyond the savepoint. */

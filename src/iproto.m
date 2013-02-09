@@ -138,8 +138,7 @@ port_iproto_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
 	struct port_iproto *port = port_iproto(ptr);
 	if (++port->reply.found == 1) {
 		/* Found the first tuple, add header. */
-		port->svp = obuf_create_svp(port->buf);
-		obuf_book(port->buf, sizeof(port->reply));
+		port->svp = obuf_book(port->buf, sizeof(port->reply));
 	}
 	if (flags & BOX_RETURN_TUPLE) {
 		obuf_dup(port->buf, &tuple->bsize, tuple_len(tuple));
@@ -635,7 +634,14 @@ iproto_session_output_iobuf(struct iproto_session *session)
 {
 	if (obuf_size(&session->iobuf[1]->out))
 		return session->iobuf[1];
-	if (obuf_size(&session->iobuf[0]->out))
+	/*
+	 * Don't try to write from a newer buffer if an older one
+	 * exists: in case of a partial write of a newer buffer,
+	 * the client may end up getting a salad of different
+	 * pieces of replies from both buffers.
+	 */
+	if (ibuf_size(&session->iobuf[1]->in) == 0 &&
+	    obuf_size(&session->iobuf[0]->out))
 		return session->iobuf[0];
 	return NULL;
 }
