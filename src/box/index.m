@@ -46,19 +46,6 @@ static struct index_traits hash_index_traits = {
 const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
 const char *index_type_strs[] = { "HASH", "TREE", "\0" };
 
-static struct tuple *
-iterator_next_equal(struct iterator *it __attribute__((unused)))
-{
-	return NULL;
-}
-
-static struct tuple *
-iterator_first_equal(struct iterator *it)
-{
-	it->next_equal = iterator_next_equal;
-	return it->next(it);
-}
-
 static void
 check_key_parts(struct key_def *key_def,
 		int part_count, bool partial_key_allowed)
@@ -261,25 +248,38 @@ check_key_parts(struct key_def *key_def,
 
 /* }}} */
 
-/* {{{ HashIndex -- base class for all hashes. ********************/
+/* {{{ HashIndex Iterators ****************************************/
 
-struct hash_iterator {
+struct hash_i32_iterator {
 	struct iterator base; /* Must be the first member. */
 	struct mh_i32ptr_t *hash;
 	mh_int_t h_pos;
 };
 
-static struct hash_iterator *
-hash_iterator(struct iterator *it)
+struct hash_i64_iterator {
+	struct iterator base;
+	struct mh_i64ptr_t *hash;
+	mh_int_t h_pos;
+};
+
+struct hash_lstr_iterator {
+	struct iterator base;
+	struct mh_lstrptr_t *hash;
+	mh_int_t h_pos;
+};
+
+void
+hash_iterator_free(struct iterator *iterator)
 {
-	return (struct hash_iterator *) it;
+	assert(iterator->free == hash_iterator_free);
+	free(iterator);
 }
 
 struct tuple *
-hash_iterator_next(struct iterator *iterator)
+hash_iterator_i32_ge(struct iterator *ptr)
 {
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	assert(ptr->free == hash_iterator_free);
+	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
 
 	while (it->h_pos < mh_end(it->hash)) {
 		if (mh_exist(it->hash, it->h_pos))
@@ -289,13 +289,64 @@ hash_iterator_next(struct iterator *iterator)
 	return NULL;
 }
 
-void
-hash_iterator_free(struct iterator *iterator)
+struct tuple *
+hash_iterator_i64_ge(struct iterator *ptr)
 {
-	assert(iterator->next == hash_iterator_next);
-	free(iterator);
+	assert(ptr->free == hash_iterator_free);
+	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
+
+	while (it->h_pos < mh_end(it->hash)) {
+		if (mh_exist(it->hash, it->h_pos))
+			return mh_value(it->hash, it->h_pos++);
+		it->h_pos++;
+	}
+	return NULL;
 }
 
+struct tuple *
+hash_iterator_lstr_ge(struct iterator *ptr)
+{
+	assert(ptr->free == hash_iterator_free);
+	struct hash_lstr_iterator *it = (struct hash_lstr_iterator *) ptr;
+
+	while (it->h_pos < mh_end(it->hash)) {
+		if (mh_exist(it->hash, it->h_pos))
+			return mh_value(it->hash, it->h_pos++);
+		it->h_pos++;
+	}
+	return NULL;
+}
+
+static struct tuple *
+hash_iterator_eq_next(struct iterator *it __attribute__((unused)))
+{
+	return NULL;
+}
+
+static struct tuple *
+hash_iterator_i32_eq(struct iterator *it)
+{
+	it->next_equal = hash_iterator_eq_next;
+	return hash_iterator_i32_ge(it);
+}
+
+static struct tuple *
+hash_iterator_i64_eq(struct iterator *it)
+{
+	it->next_equal = hash_iterator_eq_next;
+	return hash_iterator_i64_ge(it);
+}
+
+static struct tuple *
+hash_iterator_lstr_eq(struct iterator *it)
+{
+	it->next_equal = hash_iterator_eq_next;
+	return hash_iterator_lstr_ge(it);
+}
+
+/* }}} */
+
+/* {{{ HashIndex -- base class for all hashes. ********************/
 
 @implementation HashIndex
 
@@ -368,17 +419,6 @@ hash_iterator_free(struct iterator *iterator)
 		tnt_raise(ClientError, :ER_NO_SUCH_FIELD,
 			  key_def->parts[0].fieldno);
 	return [self findUnsafe :field :1];
-}
-
-- (struct iterator *) allocIterator
-{
-	struct hash_iterator *it = malloc(sizeof(struct hash_iterator));
-	if (it) {
-		memset(it, 0, sizeof(struct hash_iterator));
-		it->base.next = hash_iterator_next;
-		it->base.free = hash_iterator_free;
-	}
-	return (struct iterator *) it;
 }
 
 @end
@@ -479,10 +519,21 @@ int32_key_to_value(void *key)
 #endif
 }
 
+- (struct iterator *) allocIterator
+{
+	struct hash_i32_iterator *it = malloc(sizeof(struct hash_i32_iterator));
+	if (it) {
+		memset(it, 0, sizeof(*it));
+		it->base.next = hash_iterator_i32_ge;
+		it->base.free = hash_iterator_free;
+	}
+	return (struct iterator *) it;
+}
+
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	assert(iterator->next == hash_iterator_i32_ge);
+	struct hash_i32_iterator *it = (struct hash_i32_iterator *) iterator;
 
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
@@ -499,11 +550,11 @@ int32_key_to_value(void *key)
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	assert(iterator->next == hash_iterator_i32_ge);
+	struct hash_i32_iterator *it = (struct hash_i32_iterator *) iterator;
 
 	u32 num = int32_key_to_value(key);
-	it->base.next_equal = iterator_first_equal;
+	it->base.next_equal = hash_iterator_i32_eq;
 	it->h_pos = mh_i32ptr_get(int_hash, num);
 	it->hash = int_hash;
 }
@@ -602,17 +653,28 @@ int64_key_to_value(void *key)
 #endif
 }
 
+- (struct iterator *) allocIterator
+{
+	struct hash_i64_iterator *it = malloc(sizeof(struct hash_i64_iterator));
+	if (it) {
+		memset(it, 0, sizeof(*it));
+		it->base.next = hash_iterator_i64_ge;
+		it->base.free = hash_iterator_free;
+	}
+	return (struct iterator *) it;
+}
+
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	assert(iterator->next == hash_iterator_i64_ge);
+	struct hash_i64_iterator *it = (struct hash_i64_iterator *) iterator;
 
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
 	it->h_pos = mh_begin(int64_hash);
-	it->hash = (struct mh_i32ptr_t *) int64_hash;
+	it->hash = int64_hash;
 }
 
 - (void) initIteratorUnsafe: (struct iterator *) iterator :(enum iterator_type) type
@@ -622,14 +684,14 @@ int64_key_to_value(void *key)
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	assert(iterator->next == hash_iterator_i64_ge);
+	struct hash_i64_iterator *it = (struct hash_i64_iterator *) iterator;
 
 	u64 num = int64_key_to_value(key);
 
-	it->base.next_equal = iterator_first_equal;
+	it->base.next_equal = hash_iterator_i64_eq;
 	it->h_pos = mh_i64ptr_get(int64_hash, num);
-	it->hash = (struct mh_i32ptr_t *) int64_hash;
+	it->hash = int64_hash;
 }
 @end
 
@@ -720,17 +782,29 @@ int64_key_to_value(void *key)
 #endif
 }
 
+- (struct iterator *) allocIterator
+{
+	struct hash_lstr_iterator *it = malloc(sizeof(struct hash_lstr_iterator));
+	if (it) {
+		memset(it, 0, sizeof(*it));
+		it->base.next = hash_iterator_lstr_ge;
+		it->base.free = hash_iterator_free;
+	}
+	return (struct iterator *) it;
+}
+
+
 - (void) initIterator: (struct iterator *) iterator :(enum iterator_type) type
 {
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	assert(iterator->next == hash_iterator_lstr_ge);
+	struct hash_lstr_iterator *it = (struct hash_lstr_iterator *) iterator;
 
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
 	it->base.next_equal = 0; /* Should not be used if not positioned. */
 	it->h_pos = mh_begin(str_hash);
-	it->hash = (struct mh_i32ptr_t *) str_hash;
+	it->hash = str_hash;
 }
 
 - (void) initIteratorUnsafe: (struct iterator *) iterator
@@ -741,12 +815,12 @@ int64_key_to_value(void *key)
 	if (type == ITER_REVERSE)
 		tnt_raise(IllegalParams, :"hash iterator is forward only");
 
-	assert(iterator->next == hash_iterator_next);
-	struct hash_iterator *it = hash_iterator(iterator);
+	assert(iterator->next == hash_iterator_lstr_ge);
+	struct hash_lstr_iterator *it = (struct hash_lstr_iterator *) iterator;
 
-	it->base.next_equal = iterator_first_equal;
+	it->base.next_equal = hash_iterator_lstr_eq;
 	it->h_pos = mh_lstrptr_get(str_hash, key);
-	it->hash = (struct mh_i32ptr_t *) str_hash;
+	it->hash = str_hash;
 }
 @end
 

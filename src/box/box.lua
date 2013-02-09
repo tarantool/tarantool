@@ -244,11 +244,15 @@ function box.on_reload_configuration()
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.truncate = function(space)
-        local pk = space.index[0].idx
-        local part_count = pk:part_count()
-        while #pk > 0 do
-            for k, v in pk.next, pk, nil do
-                space:delete(v:slice(0, part_count))
+        local pk = space.index[0]
+        while #pk.idx > 0 do
+            for _k, t in pk.idx.next, pk.idx, nil do
+                local key = {};
+                -- ipairs does not work because pk.key_field is zero-indexed
+                for _k2, key_field in pairs(pk.key_field) do
+                    table.insert(key, t[key_field.fieldno])
+                end
+                space:delete(unpack(key))
             end
         end
     end
