@@ -209,7 +209,6 @@ struct iproto_queue
 
 enum {
 	IPROTO_REQUEST_QUEUE_SIZE = 2048,
-	IPROTO_CONNECT_QUEUE_SIZE = 256
 };
 
 struct iproto_session;
@@ -533,7 +532,7 @@ iproto_session_input_iobuf(struct iproto_session *session)
 	if (ibuf_unused(&old->in) >= to_read)
 		return old;
 
-	/** All requests are procssed, reuse the buffer. */
+	/** All requests are processed, reuse the buffer. */
 	if (ibuf_size(&old->in) == session->parse_size) {
 		ibuf_reserve(&old->in, to_read);
 		return old;
