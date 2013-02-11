@@ -137,26 +137,6 @@ obuf_iovcnt(struct obuf *buf)
 }
 
 /**
- * Reserve size bytes in the output buffer
- * and return a pointer to the reserved
- * data. Returns a pointer to a continuous piece of
- * memory.
- * Typical use case:
- * void *psize = obuf_book(buf, sizeof(uint32_t));
- * for (...)
- *	obuf_dup(buf, ...);
- * uint32_t total = obuf_size(buf);
- * memcpy(psize, &total, sizeof(total);
- * iobuf_flush();
- */
-void *
-obuf_book(struct obuf *obuf, size_t size);
-
-/** Append data to the output buffer. */
-void
-obuf_dup(struct obuf *obuf, void *data, size_t size);
-
-/**
  * Output buffer savepoint. It's possible to
  * save the current buffer state in a savepoint
  * and roll back to the saved state at any time
@@ -168,6 +148,26 @@ struct obuf_svp
 	size_t iov_len;
 	size_t size;
 };
+
+/**
+ * Reserve size bytes in the output buffer
+ * and return a pointer to the reserved
+ * data. Returns a pointer to a continuous piece of
+ * memory.
+ * Typical use case:
+ * struct obuf_svp svp = obuf_book(buf, sizeof(uint32_t));
+ * for (...)
+ *	obuf_dup(buf, ...);
+ * uint32_t total = obuf_size(buf);
+ * memcpy(obuf_svp_to_ptr(&svp), &total, sizeof(total);
+ * iobuf_flush();
+ */
+struct obuf_svp
+obuf_book(struct obuf *obuf, size_t size);
+
+/** Append data to the output buffer. */
+void
+obuf_dup(struct obuf *obuf, void *data, size_t size);
 
 static inline struct obuf_svp
 obuf_create_svp(struct obuf *buf)
