@@ -1170,11 +1170,6 @@ static int lbox_process(lua_State *L)
 	return lua_gettop(L) - top;
 }
 
-static const struct luaL_reg boxlib[] = {
-	{"process", lbox_process},
-	{NULL, NULL}
-};
-
 /**
  * A helper to find a Lua function by name and put it
  * on top of the stack.
@@ -1250,6 +1245,255 @@ box_lua_execute(struct request *request, struct port *port)
 		luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
 	}
 }
+
+/**
+ * Convert box.pack() format specifier to Tarantool
+ * binary protocol UPDATE opcode
+ */
+static char format_to_opcode(char format)
+{
+	switch (format) {
+	case '=': return 0;
+	case '+': return 1;
+	case '&': return 2;
+	case '^': return 3;
+	case '|': return 4;
+	case ':': return 5;
+	case '#': return 6;
+	case '!': return 7;
+	case '-': return 8;
+	default: return format;
+	}
+}
+
+/**
+ * Pack our BER integer into luaL_Buffer
+ */
+static void
+luaL_addvarint32(luaL_Buffer *b, u32 u32)
+{
+	char varint_buf[sizeof(u32)+1];
+	struct tbuf tbuf = { .size = 0, .capacity = sizeof(varint_buf),
+		.data = varint_buf };
+	write_varint32(&tbuf, u32);
+	luaL_addlstring(b, tbuf.data, tbuf.size);
+}
+
+/**
+ * To use Tarantool/Box binary protocol primitives from Lua, we
+ * need a way to pack Lua variables into a binary representation.
+ * We do it by exporting a helper function
+ *
+ * box.pack(format, args...)
+ *
+ * which takes the format, which is very similar to Perl 'pack'
+ * format, and a list of arguments, and returns a binary string
+ * which has the arguments packed according to the format.
+ *
+ * For example, a typical SELECT packet packs in Lua like this:
+ *
+ * pkt = box.pack("iiiiiip", -- pack format
+ *                         0, -- space id
+ *                         0, -- index id
+ *                         0, -- offset
+ *                         2^32, -- limit
+ *                         1, -- number of SELECT arguments
+ *                         1, -- tuple cardinality
+ *                         key); -- the key to use for SELECT
+ *
+ * @sa doc/box-protocol.txt, binary protocol description
+ * @todo: implement box.unpack(format, str), for testing purposes
+ */
+static int
+lbox_pack(struct lua_State *L)
+{
+	luaL_Buffer b;
+	const char *format = luaL_checkstring(L, 1);
+	/* first arg comes second */
+	int i = 2;
+	int nargs = lua_gettop(L);
+	u16 u16buf;
+	u32 u32buf;
+	u64 u64buf;
+	size_t size;
+	const char *str;
+
+	luaL_buffinit(L, &b);
+
+	while (*format) {
+		if (i > nargs)
+			luaL_error(L, "box.pack: argument count does not match "
+				   "the format");
+		switch (*format) {
+		case 'B':
+		case 'b':
+			/* signed and unsigned 8-bit integers */
+			u32buf = lua_tointeger(L, i);
+			if (u32buf > 0xff)
+				luaL_error(L, "box.pack: argument too big for "
+					   "8-bit integer");
+			luaL_addchar(&b, (char) u32buf);
+			break;
+		case 'S':
+		case 's':
+			/* signed and unsigned 8-bit integers */
+			u32buf = lua_tointeger(L, i);
+			if (u32buf > 0xffff)
+				luaL_error(L, "box.pack: argument too big for "
+					   "16-bit integer");
+			u16buf = (u16) u32buf;
+			luaL_addlstring(&b, (char *) &u16buf, sizeof(u16));
+			break;
+		case 'I':
+		case 'i':
+			/* signed and unsigned 32-bit integers */
+			u32buf = lua_tointeger(L, i);
+			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
+			break;
+		case 'L':
+		case 'l':
+			/* signed and unsigned 64-bit integers */
+			u64buf = tarantool_lua_tointeger64(L, i);
+			luaL_addlstring(&b, (char *) &u64buf, sizeof(u64));
+			break;
+		case 'w':
+			/* Perl 'pack' BER-encoded integer */
+			luaL_addvarint32(&b, lua_tointeger(L, i));
+			break;
+		case 'A':
+		case 'a':
+			/* A sequence of bytes */
+			str = luaL_checklstring(L, i, &size);
+			luaL_addlstring(&b, str, size);
+			break;
+		case 'P':
+		case 'p':
+			if (lua_type(L, i) == LUA_TNUMBER) {
+				u64buf = lua_tonumber(L, i);
+				if (u64buf > UINT32_MAX) {
+					str = (char *) &u64buf;
+					size = sizeof(u64);
+				} else {
+					u32buf = (u32) u64buf;
+					str = (char *) &u32buf;
+					size = sizeof(u32);
+				}
+			} else if (lua_type(L, i) == LUA_TCDATA) {
+				u64buf = tarantool_lua_tointeger64(L, i);
+				str = (char *) &u64buf;
+				size = sizeof(u64);
+			} else {
+				str = luaL_checklstring(L, i, &size);
+			}
+			luaL_addvarint32(&b, size);
+			luaL_addlstring(&b, str, size);
+			break;
+		case '=':
+			/* update tuple set foo = bar */
+		case '+':
+			/* set field += val */
+		case '-':
+			/* set field -= val */
+		case '&':
+			/* set field & =val */
+		case '|':
+			/* set field |= val */
+		case '^':
+			/* set field ^= val */
+		case ':':
+			/* splice */
+		case '#':
+			/* delete field */
+		case '!':
+			/* insert field */
+			/* field no */
+			u32buf = (u32) lua_tointeger(L, i);
+			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
+			luaL_addchar(&b, format_to_opcode(*format));
+			break;
+		default:
+			luaL_error(L, "box.pack: unsupported pack "
+				   "format specifier '%c'", *format);
+		}
+		i++;
+		format++;
+	}
+	luaL_pushresult(&b);
+	return 1;
+}
+
+static int
+lbox_unpack(struct lua_State *L)
+{
+	const char *format = luaL_checkstring(L, 1);
+	/* first arg comes second */
+	int i = 2;
+	int nargs = lua_gettop(L);
+	size_t size;
+	const char *str;
+	u8  u8buf;
+	u16 u16buf;
+	u32 u32buf;
+
+	while (*format) {
+		if (i > nargs)
+			luaL_error(L, "box.unpack: argument count does not "
+				   "match the format");
+		switch (*format) {
+		case 'b':
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u8))
+				luaL_error(L, "box.unpack('%c'): got %d bytes "
+					   "(expected: 1)", *format,
+					   (int) size);
+			u8buf = * (u8 *) str;
+			lua_pushnumber(L, u8buf);
+			break;
+		case 's':
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u16))
+				luaL_error(L, "box.unpack('%c'): got %d bytes "
+					   "(expected: 2)", *format,
+					   (int) size);
+			u16buf = * (u16 *) str;
+			lua_pushnumber(L, u16buf);
+			break;
+		case 'i':
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u32))
+				luaL_error(L, "box.unpack('%c'): got %d bytes "
+					   "(expected: 4)", *format,
+					   (int) size);
+			u32buf = * (u32 *) str;
+			lua_pushnumber(L, u32buf);
+			break;
+		case 'l':
+		{
+			str = lua_tolstring(L, i, &size);
+			if (str == NULL || size != sizeof(u64))
+				luaL_error(L, "box.unpack('%c'): got %d bytes "
+					   "(expected: 8)", *format,
+					   (int) size);
+			luaL_pushnumber64(L, *(uint64_t*)str);
+			break;
+		}
+		default:
+			luaL_error(L, "box.unpack: unsupported pack "
+				   "format specifier '%c'", *format);
+		}
+		i++;
+		format++;
+	}
+	return i-2;
+}
+
+
+static const struct luaL_reg boxlib[] = {
+	{"process", lbox_process},
+	{"pack", lbox_pack},
+	{"unpack", lbox_unpack},
+	{NULL, NULL}
+};
 
 void
 mod_lua_init(struct lua_State *L)
