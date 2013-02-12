@@ -1,3 +1,9 @@
+tarantool (1.4.8+20130212.1647-1) nowtaxi; urgency=low
+
+  * New snapshot (fix async I/O bugs).
+
+ -- Roman V. Nikolaev <rshadow@rambler.ru>  Tue, 12 Feb 2013 16:47:10 +0400
+
 tarantool (1.4.8+20130122.1705-1) unstable; urgency=low
 
   * New snapshot (fix spam in tarantool.log).
