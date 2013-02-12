@@ -412,6 +412,23 @@ lbox_tuple_unpack(struct lua_State *L)
 	return tuple->field_count;
 }
 
+static int
+lbox_tuple_totable(struct lua_State *L)
+{
+	struct tuple *tuple = lua_checktuple(L, 1);
+	lua_newtable(L);
+	int index = 1;
+	const u8 *field = tuple->data;
+	while (field < tuple->data + tuple->bsize) {
+		size_t len = load_varint32((void **) &field);
+		lua_pushnumber(L, index++);
+		lua_pushlstring(L, (char *) field, len);
+		lua_rawset(L, -3);
+		field += len;
+	}
+	return 1;
+}
+
 /**
  * Implementation of tuple __index metamethod.
  *
@@ -521,6 +538,7 @@ static const struct luaL_reg lbox_tuple_meta[] = {
 	{"find", lbox_tuple_find},
 	{"findall", lbox_tuple_findall},
 	{"unpack", lbox_tuple_unpack},
+	{"totable", lbox_tuple_totable},
 	{NULL, NULL}
 };
 
@@ -1279,6 +1297,104 @@ luaL_addvarint32(luaL_Buffer *b, u32 u32)
 	luaL_addlstring(b, tbuf.data, tbuf.size);
 }
 
+static int
+luaL_packsize(struct lua_State *L, int index)
+{
+	switch (lua_type(L, index)) {
+	case LUA_TNUMBER:
+	case LUA_TCDATA:
+	case LUA_TSTRING:
+		return 1;
+	case LUA_TUSERDATA:
+	{
+		struct tuple *t = lua_istuple(L, index);
+		if (t == NULL)
+			luaL_error(L, "box.pack: unsupported type");
+		return t->field_count;
+	}
+	case LUA_TTABLE:
+	{
+		int size = 0;
+		lua_pushnil(L);
+		while (lua_next(L, index) != 0) {
+			/* Sic: use absolute index. */
+			size += luaL_packsize(L, lua_gettop(L));
+			lua_pop(L, 1);
+		}
+		return size;
+	}
+	default:
+		luaL_error(L, "box.pack: unsupported type");
+	}
+	return 0;
+}
+
+static void
+luaL_packvalue(struct lua_State *L, luaL_Buffer *b, int index)
+{
+	size_t size;
+	const char *str;
+	u32 u32buf;
+	u64 u64buf;
+	switch (lua_type(L, index)) {
+	case LUA_TNUMBER:
+		u64buf = lua_tonumber(L, index);
+		if (u64buf > UINT32_MAX) {
+			str = (char *) &u64buf;
+			size = sizeof(u64);
+		} else {
+			u32buf = (u32) u64buf;
+			str = (char *) &u32buf;
+			size = sizeof(u32);
+		}
+		break;
+	case LUA_TCDATA:
+		u64buf = tarantool_lua_tointeger64(L, index);
+		str = (char *) &u64buf;
+		size = sizeof(u64);
+		break;
+	case LUA_TSTRING:
+		str = luaL_checklstring(L, index, &size);
+		break;
+	case LUA_TUSERDATA:
+	{
+		struct tuple *tu = lua_istuple(L, index);
+		if (tu == NULL)
+			luaL_error(L, "box.pack: unsupported type");
+		luaL_addlstring(b, (char*)tu->data, tu->bsize);
+		return;
+	}
+	case LUA_TTABLE:
+	{
+		lua_pushnil(L);
+		while (lua_next(L, index) != 0) {
+			/* Sic: use absolute index. */
+			luaL_packvalue(L, b, lua_gettop(L));
+			lua_pop(L, 1);
+		}
+		return;
+	}
+	default:
+		luaL_error(L, "box.pack: unsupported type");
+		break;
+	}
+	luaL_addvarint32(b, size);
+	luaL_addlstring(b, str, size);
+}
+
+static void
+luaL_packstack(struct lua_State *L, luaL_Buffer *b, int first, int last)
+{
+	int size = 0;
+	/* sic: if arg_count is 0, first > last */
+	for (int i = first; i <= last; ++i)
+		size += luaL_packsize(L, i);
+	luaL_addlstring(b, (char *) &size, sizeof(size));
+	for (int i = first; i <= last; ++i)
+		luaL_packvalue(L, b, i);
+}
+
+
 /**
  * To use Tarantool/Box binary protocol primitives from Lua, we
  * need a way to pack Lua variables into a binary representation.
@@ -1368,26 +1484,18 @@ lbox_pack(struct lua_State *L)
 			break;
 		case 'P':
 		case 'p':
-			if (lua_type(L, i) == LUA_TNUMBER) {
-				u64buf = lua_tonumber(L, i);
-				if (u64buf > UINT32_MAX) {
-					str = (char *) &u64buf;
-					size = sizeof(u64);
-				} else {
-					u32buf = (u32) u64buf;
-					str = (char *) &u32buf;
-					size = sizeof(u32);
-				}
-			} else if (lua_type(L, i) == LUA_TCDATA) {
-				u64buf = tarantool_lua_tointeger64(L, i);
-				str = (char *) &u64buf;
-				size = sizeof(u64);
-			} else {
-				str = luaL_checklstring(L, i, &size);
-			}
-			luaL_addvarint32(&b, size);
-			luaL_addlstring(&b, str, size);
+			luaL_packvalue(L, &b, i);
 			break;
+		case 'V':
+		{
+			int arg_count = luaL_checkint(L, i);
+			if (i + arg_count > nargs)
+				luaL_error(L, "box.pack: argument count does not match "
+					   "the format");
+			luaL_packstack(L, &b, i + 1, i + arg_count);
+			i += arg_count;
+			break;
+		}
 		case '=':
 			/* update tuple set foo = bar */
 		case '+':

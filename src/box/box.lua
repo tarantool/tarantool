@@ -4,16 +4,15 @@ box.flags = { BOX_RETURN_TUPLE = 0x01, BOX_ADD = 0x02, BOX_REPLACE = 0x04 }
 --
 --
 function box.select_limit(space, index, offset, limit, ...)
-    local part_count = select('#', ...)
+    local key_part_count = select('#', ...)
     return box.process(17,
-                       box.pack('iiiiii'..string.rep('p', part_count),
+                       box.pack('iiiiiV',
                                  space,
                                  index,
                                  offset,
                                  limit,
                                  1, -- key count
-                                 part_count, -- key part count
-                                 ...))
+                                 key_part_count, ...))
 end
 
 function box.dostring(s, ...)
@@ -28,16 +27,15 @@ end
 --
 --
 function box.select(space, index, ...)
-    local part_count = select('#', ...)
+    local key_part_count = select('#', ...)
     return box.process(17,
-                       box.pack('iiiiii'..string.rep('p', part_count),
+                       box.pack('iiiiiV',
                                  space,
                                  index,
                                  0, -- offset
                                  4294967295, -- limit
                                  1, -- key count
-                                 part_count, -- key part count
-                                 ...))
+                                 key_part_count, ...))
 end
 
 --
@@ -63,54 +61,45 @@ end
 -- index is always 0. It doesn't accept compound keys
 --
 function box.delete(space, ...)
-    local part_count = select('#', ...)
+    local key_part_count = select('#', ...)
     return box.process(21,
-                       box.pack('iii'..string.rep('p', part_count),
+                       box.pack('iiV',
                                  space,
                                  box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 part_count, -- key part count
-                                 ...))
+                                 key_part_count, ...))
 end
 
 -- insert or replace a tuple
 function box.replace(space, ...)
-    local part_count = select('#', ...)
+    local field_count = select('#', ...)
     return box.process(13,
-                       box.pack('iii'..string.rep('p', part_count),
+                       box.pack('iiV',
                                  space,
                                  box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 part_count, -- key part count
-                                 ...))
+                                 field_count, ...))
 end
 
 -- insert a tuple (produces an error if the tuple already exists)
 function box.insert(space, ...)
-    local part_count = select('#', ...)
+    local field_count = select('#', ...)
     return box.process(13,
-                       box.pack('iii'..string.rep('p', part_count),
+                       box.pack('iiV',
                                 space,
                                 bit.bor(box.flags.BOX_RETURN_TUPLE,
                                         box.flags.BOX_ADD),  -- flags
-                                part_count, -- key part count
-                                ...))
+                                field_count, ...))
 end
 
 --
 function box.update(space, key, format, ...)
     local op_count = select('#', ...)/2
-    if type(key) == 'table' then
-        part_count = #key
-        return box.process(19,
-                    box.pack('iii'..string.rep('p', part_count),
-                        space, box.flags.BOX_RETURN_TUPLE, part_count,
-                        unpack(key))..
-                    box.pack('i'..format, op_count, ...))
-    else
-        return box.process(19,
-                    box.pack('iiipi'..format,
-                        space, box.flags.BOX_RETURN_TUPLE, 1,
-                        key, op_count, ...))
-    end
+    return box.process(19,
+                       box.pack('iiVi'..format,
+                                space,
+                                box.flags.BOX_RETURN_TUPLE,
+                                1, key,
+                                op_count,
+                                ...))
 end
 
 -- Assumes that spaceno has a TREE int32 (NUM) primary key
