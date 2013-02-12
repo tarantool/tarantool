@@ -170,7 +170,7 @@ salloc_init(size_t size, size_t minimal, double factor)
 }
 
 void
-salloc_destroy(void)
+salloc_free(void)
 {
 	if (arena.mmap_base != NULL)
 		munmap(arena.mmap_base, arena.mmap_size);

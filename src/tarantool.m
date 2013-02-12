@@ -216,7 +216,7 @@ reload_cfg(struct tbuf *out)
 
 	if (latch == NULL) {
 		latch = palloc(eter_pool, sizeof(*latch));
-		tnt_latch_init(latch);
+		tnt_latch_create(latch);
 	}
 
 	if (tnt_latch_trylock(latch) == -1) {
@@ -594,9 +594,8 @@ tarantool_free(void)
 		unlink(cfg.pid_file);
 	destroy_tarantool_cfg(&cfg);
 
-	fiber_free();
-	coeio_free();
 	session_free();
+	fiber_free();
 	palloc_free();
 	ev_default_destroy();
 #ifdef ENABLE_GCOV
@@ -685,7 +684,7 @@ main(int argc, char **argv)
 		printf("Target: %s\n", BUILD_INFO);
 		printf("Build options: %s\n", BUILD_OPTIONS);
 		printf("Compiler: %s\n", COMPILER_INFO);
-		printf("C_FLAGS:%s\n", COMPILER_C_FLAGS);
+		printf("C_FLAGS:%s\n", TARANTOOL_C_FLAGS);
 		return 0;
 	}
 
@@ -738,7 +737,7 @@ main(int argc, char **argv)
 		strcat(cfg_filename_fullpath, cfg_filename);
 	}
 
-	cfg_out = tbuf_alloc(eter_pool);
+	cfg_out = tbuf_new(eter_pool);
 	assert(cfg_out);
 
 	if (gopt(opt, 'k')) {

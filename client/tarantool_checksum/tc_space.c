@@ -43,7 +43,7 @@
 #include "tc_space.h"
 
 int tc_space_init(struct tc_spaces *s) {
-	s->t = mh_u32ptr_init();
+	s->t = mh_u32ptr_new();
 	if (s->t == NULL)
 		return -1;
 	return 0;
@@ -75,13 +75,13 @@ void tc_space_free(struct tc_spaces *s)
 			pos++;
 		}
 
-		mh_pk_destroy(space->hash_log);
-		mh_pk_destroy(space->hash_snap);
+		mh_pk_delete(space->hash_log);
+		mh_pk_delete(space->hash_snap);
 
 		free(space->pk.fields);
 		free(space);
 	}
-	mh_u32ptr_destroy(s->t);
+	mh_u32ptr_delete(s->t);
 }
 
 struct tc_space *tc_space_create(struct tc_spaces *s, uint32_t id) {
@@ -90,8 +90,8 @@ struct tc_space *tc_space_create(struct tc_spaces *s, uint32_t id) {
 		return NULL;
 	memset(space, 0, sizeof(struct tc_space));
 	space->id = id;
-	space->hash_log = mh_pk_init();
-	space->hash_snap = mh_pk_init();
+	space->hash_log = mh_pk_new();
+	space->hash_snap = mh_pk_new();
 	int ret;
 
 	const struct mh_u32ptr_node_t node = { .key = space->id, .val = space };

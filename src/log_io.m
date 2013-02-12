@@ -217,7 +217,7 @@ format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
 static struct tbuf *
 row_reader_v11(FILE *f, struct palloc_pool *pool)
 {
-	struct tbuf *m = tbuf_alloc(pool);
+	struct tbuf *m = tbuf_new(pool);
 
 	u32 header_crc, data_crc;
 

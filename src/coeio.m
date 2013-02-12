@@ -37,51 +37,57 @@
 
 /*
  * Asynchronous IO Tasks (libeio wrapper).
- * ---
+ * ---------------------------------------
  *
- * Libeio request processing is designed in edge-trigger
+ * libeio request processing is designed in edge-trigger
  * manner, when libeio is ready to process some requests it
  * calls coeio_poller callback.
  *
- * Due to libeio design, coeio_poller is called while locks
- * are being held, so it's unable to call any libeio function
- * inside this callback.
+ * Due to libeio design, want_pall callback is called while
+ * locks are being held, so it's not possible to call any libeio
+ * function inside this callback. Thus coeio_want_poll raises an
+ * async event which will be dealt with normally as part of the
+ * main Tarantool/Box event loop.
  *
- * coeio_poller triggers coeio_watcher to start the polling process.
- * In case if none of the requests are complete by that time, it
- * starts idle_watcher, which would periodically invoke eio_poll
- * until any of requests are complete.
+ * The async event handler, in turn, performs eio_poll(), which
+ * will run on_complete callback for all ready eio tasks.
+ * In case if some of the requests are not complete by the time
+ * eio_poll() has been called, coeio_idle watcher is started, which
+ * would periodically invoke eio_poll() until all requests are
+ * complete.
  *
  * See for details:
  * http://pod.tst.eu/http://cvs.schmorp.de/libeio/eio.pod
 */
+
 struct coeio_manager {
-	ev_idle coeio_repeat_watcher;
-	ev_async coeio_watcher;
-	struct rlist active;
-};
-
-static struct coeio_manager coeio_manager;
+	ev_idle coeio_idle;
+	ev_async coeio_async;
+} coeio_manager;
 
 static void
-coeio_schedule_repeat(struct ev_idle *w,
-		     int events __attribute__((unused)))
+coeio_idle_cb(struct ev_idle *w, int events __attribute__((unused)))
 {
-	if (eio_poll() != -1)
+	if (eio_poll() != -1) {
+		/* nothing to do */
 		ev_idle_stop(w);
+	}
 }
 
 static void
-coeio_schedule(struct ev_async *w __attribute__((unused)),
-	      int events __attribute__((unused)))
+coeio_async_cb(struct ev_async *w __attribute__((unused)),
+	       int events __attribute__((unused)))
 {
-	if (eio_poll() == -1)
-		ev_idle_start(&coeio_manager.coeio_repeat_watcher);
+	if (eio_poll() == -1) {
+		/* not all tasks are complete. */
+		ev_idle_start(&coeio_manager.coeio_idle);
+	}
 }
 
-static void coeio_poller(void)
+static void
+coeio_want_poll_cb(void)
 {
-	ev_async_send(&coeio_manager.coeio_watcher);
+	ev_async_send(&coeio_manager.coeio_async);
 }
 
 /**
@@ -92,127 +98,110 @@ static void coeio_poller(void)
 void
 coeio_init(void)
 {
-	memset(&coeio_manager, 0, sizeof(struct coeio_manager));
+	eio_init(coeio_want_poll_cb, NULL);
 
-	rlist_init(&coeio_manager.active);
+	ev_idle_init(&coeio_manager.coeio_idle, coeio_idle_cb);
+	ev_async_init(&coeio_manager.coeio_async, coeio_async_cb);
 
-	ev_idle_init(&coeio_manager.coeio_repeat_watcher, coeio_schedule_repeat);
-	ev_async_init(&coeio_manager.coeio_watcher, coeio_schedule);
-	ev_async_start(&coeio_manager.coeio_watcher);
-
-	eio_init(coeio_poller, NULL);
+	ev_async_start(&coeio_manager.coeio_async);
 }
 
 /**
- * Cancel active tasks and free memory.
+ * A single task context.
  */
-void
-coeio_free(void)
-{
-	struct coeio_req *r;
-	struct coeio_req *r_next;
+struct coeio_task {
+	/** The calling fiber. */
+	struct fiber *fiber;
+	/** The callback. */
+	ssize_t (*func)(va_list ap);
+	/**
+	 * If the callback sets errno, it's preserved across the
+	 * call.
+	 */
+	/** Callback arguments. */
+	va_list ap;
+	/** Callback results. */
+	ssize_t result;
+	int errorno;
+};
 
-	/* cancel active requests */
-	r = rlist_first_entry(&coeio_manager.active, struct coeio_req, link);
-	while (1) {
-		if (r == rlist_last_entry(&coeio_manager.active,
-					  struct coeio_req, link))
-			break;
-		r_next = rlist_next_entry(r, link);
-		/* eio_cancel sets task as cancelled, this guarantees
-		 * that coeio_on_complete would never be called for
-		 * this request, thus we are allowed to free memory here. */
-		eio_cancel(r->req);
-		free(r);
-		r = r_next;
-	}
+static void
+coeio_custom_cb(eio_req *req)
+{
+	struct coeio_task *task = req->data;
+	req->result = task->func(task->ap);
 }
 
-inline static struct coeio_req*
-coeio_alloc(void)
-{
-	struct coeio_req *r = calloc(1, sizeof(struct coeio_req));
-	if (r == NULL) {
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
-			  sizeof(struct coeio_req), "coeio_alloc",
-			  "coeio_req");
-	}
-	rlist_init(&r->link);
-	return r;
-}
-
+/**
+ * A callback invoked by eio_poll when associated
+ * eio_request is complete.
+ */
 static int
 coeio_on_complete(eio_req *req)
 {
-	struct coeio_req *r = req->data;
-	struct fiber *f = r->f;
-	r->complete = true;
-	rlist_del_entry(r, link);
-	if (r->wait)
-		fiber_wakeup(f);
+	/*
+	 * Don't touch the task if the request is cancelled:
+	 * the task is allocated on the caller's stack and
+	 * may be already gone. Don't wakeup the caller
+	 * if the task is cancelled: in this case the caller
+	 * is already woken up, avoid double wake-up.
+	 */
+	if (! EIO_CANCELLED(req)) {
+		struct coeio_task *task = req->data;
+		task->result = req->result;
+		task->errorno = req->errorno;
+		fiber_wakeup(task->fiber);
+	}
 	return 0;
 }
 
 /**
- * Create new eio task with specified libeio function and
- * argument.
+ * Create new eio task with specified function and
+ * arguments. Yield and wait until the task is complete
+ * or a timeout occurs.
  *
- * @throws ER_MEMORY_ISSUE
+ * This function doesn't throw exceptions to avoid double error
+ * checking: in most cases it's also necessary to check the return
+ * value of the called function and perform necessary actions. If
+ * func sets errno, the errno is preserved across the call.
  *
- * @return coeio object pointer.
+ * @retval -1 and errno = ENOMEM if failed to create a task
+ * @retval -1 and errno = ETIMEDOUT if timed out
+ * @retval the function return (errno is preserved).
  *
  * @code
- *	static void request(eio_req *req) {
- *		(void)req->data; // "arg"
- *
- *		req->result = "result";
+ *	static ssize_t openfile_cb(va_list ap)
+ *	{
+ *	         const char *filename = va_arg(ap);
+ *	         int flags = va_arg(ap);
+ *	         return open(filename, flags);
  *	}
  *
- *      struct coeio_req *r = coeio_custom(request, "arg");
- *
+ *	 if (coeio_custom(openfile_cb, 0.10, "/tmp/file", 0) == -1)
+ *		// handle errors.
+ *	...
  */
-struct coeio_req*
-coeio_custom(void (*f)(eio_req*), void *arg)
+ssize_t
+coeio_custom(ssize_t (*func)(va_list ap), ev_tstamp timeout, ...)
 {
-	struct coeio_req *r = coeio_alloc();
-	r->f = fiber;
-	r->f_data = arg;
-	r->req = eio_custom(f, 0, coeio_on_complete, r);
-	if (r->req == NULL) {
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
-			  sizeof(struct eio_req), "coeio_custom",
-			  "eio_req");
+	struct coeio_task task;
+	task.fiber = fiber;
+	task.func = func;
+	task.result = -1;
+	va_start(task.ap, timeout);
+	struct eio_req *req = eio_custom(coeio_custom_cb, 0,
+					 coeio_on_complete, &task);
+	if (req == NULL) {
+		errno = ENOMEM;
+	} else if (fiber_yield_timeout(timeout)) {
+		/* timeout. */
+		errno = ETIMEDOUT;
+		task.result = -1;
+		eio_cancel(req);
+	} else {
+		/* the task is complete. */
+		errno = task.errorno;
 	}
-	rlist_add_tail_entry(&coeio_manager.active, r, link);
-	return r;
-}
-
-/**
- * Yield and wait for a request completion.
- *
- * @throws FiberCancelException
- *
- * @return request result pointer.
- *
- * @code
- *      struct coeio_req *r = coeio_custom(callback, NULL);
- *
- *      // wait for result and free request object
- *      void *result = coeio_wait(r);
- *
- *      // continue with result
- */
-void *coeio_wait(struct coeio_req *r)
-{
-	if (r->complete) {
-		void *result = r->result;
-		free(r);
-		return result;
-	}
-	r->wait = true;
-	fiber_yield();
-	void *result = r->result;
-	free(r);
-	fiber_testcancel();
-	return result;
+	va_end(task.ap);
+	return task.result;
 }

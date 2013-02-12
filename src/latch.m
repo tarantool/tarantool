@@ -30,7 +30,7 @@
 #include "fiber.h"
 
 void
-tnt_latch_init(struct tnt_latch *latch)
+tnt_latch_create(struct tnt_latch *latch)
 {
 	latch->locked = false;
 	latch->owner = NULL;

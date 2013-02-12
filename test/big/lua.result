@@ -549,3 +549,37 @@ error: 'Duplicate key exists in unique index 1'
 lua box.space[1]:truncate()
 ---
 ...
+#
+# A test case for Bug #1042798
+# Truncate hangs when primary key is not in linear or starts at the first field
+# https://bugs.launchpad.net/tarantool/+bug/1042798
+#
+lua for k, f in pairs(box.space[23].index[0].key_field) do print(k, ' => ', f.fieldno) end
+---
+0 => 2
+1 => 1
+...
+lua box.insert(23, 1, 2, 3, 4)
+---
+ - 1: {2, 3, 4}
+...
+lua box.insert(23, 10, 20, 30, 40)
+---
+ - 10: {20, 30, 40}
+...
+lua box.insert(23, 20, 30, 40, 50)
+---
+ - 20: {30, 40, 50}
+...
+lua for _k, v in box.space[23]:pairs() do print(v) end
+---
+1: {2, 3, 4}
+10: {20, 30, 40}
+20: {30, 40, 50}
+...
+lua box.space[23]:truncate()
+---
+...
+lua for _k, v in box.space[23]:pairs() do print(v) end
+---
+...

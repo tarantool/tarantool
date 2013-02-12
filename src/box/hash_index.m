@@ -289,7 +289,7 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 
 - (void) free
 {
-	mh_i32ptr_destroy(int_hash);
+	mh_i32ptr_delete(int_hash);
 	[super free];
 }
 
@@ -300,7 +300,7 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	if (self == NULL)
 		return NULL;
 
-	int_hash = mh_i32ptr_init();
+	int_hash = mh_i32ptr_new();
 	return self;
 }
 
@@ -455,7 +455,7 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 
 - (void) free
 {
-	mh_i64ptr_destroy(int64_hash);
+	mh_i64ptr_delete(int64_hash);
 	[super free];
 }
 
@@ -465,7 +465,7 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	if (self == NULL)
 		return NULL;
 
-	int64_hash = mh_i64ptr_init();
+	int64_hash = mh_i64ptr_new();
 	return self;
 }
 
@@ -613,7 +613,7 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 
 - (void) free
 {
-	mh_lstrptr_destroy(str_hash);
+	mh_lstrptr_delete(str_hash);
 	[super free];
 }
 
@@ -623,7 +623,7 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	if (self == NULL)
 		return NULL;
 
-	str_hash = mh_lstrptr_init();
+	str_hash = mh_lstrptr_new();
 	return self;
 }
 

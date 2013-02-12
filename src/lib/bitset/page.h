@@ -66,7 +66,8 @@ typedef uint64_t bitset_word_t;
 typedef uint32_t bitset_word_t;
 #endif
 
-#if ((__WORDSIZE == 64) && defined(__GLIBC__) && __GLIBC_PREREQ(2, 8)) || \
+#if (defined(__GLIBC__) && (__WORDSIZE == 64) && \
+     ((__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 8))) || \
     (defined(__FreeBSD__) && !defined(__arm__) && !defined(__mips__)) || \
     (defined(__APPLE__))
 /**

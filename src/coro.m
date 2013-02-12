@@ -37,8 +37,8 @@
 #include "third_party/valgrind/memcheck.h"
 
 void
-tarantool_coro_init(struct tarantool_coro *coro,
-		    void (*f) (void *), void *data)
+tarantool_coro_create(struct tarantool_coro *coro,
+		      void (*f) (void *), void *data)
 {
 	const int page = sysconf(_SC_PAGESIZE);
 

@@ -1,0 +1,80 @@
+diff --git a/third_party/rb.h b/third_party/rb.h
+index 7b675f0..6a6c7e3 100644
+--- a/third_party/rb.h
++++ b/third_party/rb.h
+@@ -861,14 +861,17 @@ a_prefix##iter_recurse(a_rbt_type *rbtree, a_type *node,		\
+     if (node == &rbtree->rbt_nil) {					\
+ 	return (&rbtree->rbt_nil);					\
+     } else {								\
+-	a_type *ret;							\
+-	if ((ret = a_prefix##iter_recurse(rbtree, rbtn_left_get(a_type,	\
+-	  a_field, node), cb, arg)) != &rbtree->rbt_nil			\
+-	  || (ret = cb(rbtree, node, arg)) != NULL) {			\
++	a_type *ret = a_prefix##iter_recurse(rbtree, rbtn_left_get(	\
++	  a_type, a_field, node), cb, arg);				\
++	if (ret != &rbtree->rbt_nil) {					\
+ 	    return (ret);						\
+ 	}								\
+-	return (a_prefix##iter_recurse(rbtree, rbtn_right_get(a_type,	\
+-	  a_field, node), cb, arg));					\
++	a_type *right = rbtn_right_get(a_type, a_field, node);		\
++	ret = cb(rbtree, node, arg);					\
++	if (ret != NULL) {						\
++	    return (ret);						\
++	}								\
++	return (a_prefix##iter_recurse(rbtree, right, cb, arg));	\
+     }									\
+ }									\
+ a_attr a_type *								\
+@@ -889,11 +892,11 @@ a_prefix##iter_start(a_rbt_type *rbtree, a_type *start, a_type *node,	\
+ 	  rbtn_right_get(a_type, a_field, node), cb, arg));		\
+     } else {								\
+ 	a_type *ret;							\
++	a_type *right = rbtn_right_get(a_type, a_field, node);		\
+ 	if ((ret = cb(rbtree, node, arg)) != NULL) {			\
+ 	    return (ret);						\
+ 	}								\
+-	return (a_prefix##iter_recurse(rbtree, rbtn_right_get(a_type,	\
+-	  a_field, node), cb, arg));					\
++	return (a_prefix##iter_recurse(rbtree, right, cb, arg));	\
+     }									\
+ }									\
+ a_attr a_type *								\
+@@ -917,14 +920,17 @@ a_prefix##reverse_iter_recurse(a_rbt_type *rbtree, a_type *node,	\
+     if (node == &rbtree->rbt_nil) {					\
+ 	return (&rbtree->rbt_nil);					\
+     } else {								\
+-	a_type *ret;							\
+-	if ((ret = a_prefix##reverse_iter_recurse(rbtree,		\
+-	  rbtn_right_get(a_type, a_field, node), cb, arg)) !=		\
+-	  &rbtree->rbt_nil || (ret = cb(rbtree, node, arg)) != NULL) {	\
++	a_type *ret = a_prefix##reverse_iter_recurse(rbtree,		\
++	  rbtn_right_get(a_type, a_field, node), cb, arg);		\
++	if (ret != &rbtree->rbt_nil) {					\
+ 	    return (ret);						\
+ 	}								\
+-	return (a_prefix##reverse_iter_recurse(rbtree,			\
+-	  rbtn_left_get(a_type, a_field, node), cb, arg));		\
++	a_type *left = rbtn_left_get(a_type, a_field, node);		\
++	ret = cb(rbtree, node, arg);					\
++	if (ret != NULL) {						\
++	    return (ret);						\
++	}								\
++	return (a_prefix##reverse_iter_recurse(rbtree, left, cb, arg));	\
+     }									\
+ }									\
+ a_attr a_type *								\
+@@ -946,11 +952,11 @@ a_prefix##reverse_iter_start(a_rbt_type *rbtree, a_type *start,		\
+ 	  rbtn_left_get(a_type, a_field, node), cb, arg));		\
+     } else {								\
+ 	a_type *ret;							\
++	a_type *left = rbtn_left_get(a_type, a_field, node);		\
+ 	if ((ret = cb(rbtree, node, arg)) != NULL) {			\
+ 	    return (ret);						\
+ 	}								\
+-	return (a_prefix##reverse_iter_recurse(rbtree,			\
+-	  rbtn_left_get(a_type, a_field, node), cb, arg));		\
++	return (a_prefix##reverse_iter_recurse(rbtree, left, cb, arg));	\
+     }									\
+ }									\
+ a_attr a_type *								\

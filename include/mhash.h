@@ -141,9 +141,9 @@ struct _mh(t) {
 
 #define MH_DENSITY 0.7
 
-struct _mh(t) * _mh(init)();
+struct _mh(t) * _mh(new)();
 void _mh(clear)(struct _mh(t) *h);
-void _mh(destroy)(struct _mh(t) *h);
+void _mh(delete)(struct _mh(t) *h);
 void _mh(resize)(struct _mh(t) *h, mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg);
 int _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 		      mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg);
@@ -353,7 +353,7 @@ _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 }
 
 struct _mh(t) *
-_mh(init)()
+_mh(new)()
 {
 	struct _mh(t) *h = calloc(1, sizeof(*h));
 	h->shadow = calloc(1, sizeof(*h));
@@ -376,7 +376,7 @@ _mh(clear)(struct _mh(t) *h)
 }
 
 void
-_mh(destroy)(struct _mh(t) *h)
+_mh(delete)(struct _mh(t) *h)
 {
 	free(h->shadow);
 	free(h->b);

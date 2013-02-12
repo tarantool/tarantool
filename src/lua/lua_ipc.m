@@ -54,10 +54,9 @@ lbox_ipc_channel(struct lua_State *L)
 		if (size < 0)
 			luaL_error(L, "box.channel(size): negative size");
 	}
-	struct ipc_channel *ch = ipc_channel_alloc(size);
+	struct ipc_channel *ch = ipc_channel_new(size);
 	if (!ch)
 		luaL_error(L, "box.channel: Not enough memory");
-	ipc_channel_init(ch);
 
 	void **ptr = lua_newuserdata(L, sizeof(void *));
 	luaL_getmetatable(L, channel_lib);
@@ -83,8 +82,7 @@ lbox_ipc_channel_gc(struct lua_State *L)
 	if (lua_gettop(L) != 1 || !lua_isuserdata(L, 1))
 		return 0;
 	struct ipc_channel *ch = lbox_check_channel(L, -1);
-	ipc_channel_cleanup(ch);
-	free(ch);
+	ipc_channel_delete(ch);
 	return 0;
 }
 
@@ -117,7 +115,7 @@ lbox_ipc_channel_put(struct lua_State *L)
 
 	switch (top) {
 	case 2:
-		timeout = IPC_TIMEOUT_INFINITY;
+		timeout = TIMEOUT_INFINITY;
 		break;
 	case 3:
 		if (!lua_isnumber(L, -1))
@@ -175,7 +173,7 @@ lbox_ipc_channel_get(struct lua_State *L)
 		if (timeout < 0)
 			luaL_error(L, "wrong timeout");
 	} else {
-		timeout = IPC_TIMEOUT_INFINITY;
+		timeout = TIMEOUT_INFINITY;
 	}
 
 	struct ipc_channel *ch = lbox_check_channel(L, 1);

@@ -34,7 +34,27 @@ How to update it:
 - merge our Makefile with the Makefile in
 the source tarball
 
+
+How to update libeio
+====================
+Note: we have two important changes to the stock libeio:
+- it's possible to change the libeio thread stack size
+  with EIO_STACKSIZE constant. In particular, EIO_STACKSIZE
+  set to 0 means the default stack size.
+  A larger stack size is necessary to make getaddrinfo()
+  work.
+
+Otherwise: cvs up
+
 How to update rb.h
 ======================
 Get the header from
 git://canonware.com/jemalloc.git
+apply rb.patch patch
+=======
+
+How to update murmur hash
+=========================
+
+wget http://smhasher.googlecode.com/svn/trunk/PMurHash.c -O PMurHash.c
+wget http://smhasher.googlecode.com/svn/trunk/PMurHash.h -O PMurHash.h

@@ -51,7 +51,8 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf)
 		coio_breadn(coio, in, to_read);
 	}
 
-	ssize_t request_len = ((struct header_v11 *)in->pos)->len + sizeof(struct header_v11);
+	ssize_t request_len = ((struct header_v11 *)in->pos)->len
+		+ sizeof(struct header_v11);
 	to_read = request_len - ibuf_size(in);
 
 	if (to_read > 0)
@@ -69,6 +70,8 @@ static void
 remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	       i64 initial_lsn, const char **err)
 {
+	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
 	*err = "can't connect to master";
 	coio_connect(coio, remote_addr);
 
@@ -95,15 +98,15 @@ pull_from_remote(va_list ap)
 	bool warning_said = false;
 	const int reconnect_delay = 1;
 
-	evio_clear(&coio);
+	coio_init(&coio);
 
 	for (;;) {
 		const char *err = NULL;
 		@try {
 			fiber_setcancellable(true);
-			if (! evio_is_connected(&coio)) {
+			if (! evio_is_active(&coio)) {
 				if (iobuf == NULL)
-					iobuf = iobuf_create(fiber->name);
+					iobuf = iobuf_new(fiber->name);
 				remote_connect(&coio, &r->remote->addr,
 					       r->confirmed_lsn + 1, &err);
 				warning_said = false;
@@ -121,7 +124,7 @@ pull_from_remote(va_list ap)
 			iobuf_gc(iobuf);
 			fiber_gc();
 		} @catch (FiberCancelException *e) {
-			iobuf_destroy(iobuf);
+			iobuf_delete(iobuf);
 			evio_close(&coio);
 			@throw;
 		} @catch (tnt_Exception *e) {
@@ -167,7 +170,7 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 	snprintf(name, sizeof(name), "replica/%s", addr);
 
 	@try {
-		f = fiber_create(name, pull_from_remote);
+		f = fiber_new(name, pull_from_remote);
 	} @catch (tnt_Exception *e) {
 		return;
 	}

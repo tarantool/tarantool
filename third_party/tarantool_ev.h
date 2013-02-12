@@ -52,5 +52,6 @@
 #else /* !defined(ENABLE_BUNDLED_LIBEV) */
 #include <ev.h>
 #endif
+extern const ev_tstamp TIMEOUT_INFINITY;
 
 #endif /* TARANTOOL_EV_H_INCLUDED */

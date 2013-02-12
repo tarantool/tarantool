@@ -101,9 +101,9 @@ rope_size(struct rope *rope)
 
 /** Initialize an empty rope. */
 static inline void
-rope_init(struct rope *rope, rope_split_func split_func,
-	  rope_alloc_func alloc_func, rope_free_func free_func,
-	  void *alloc_ctx)
+rope_create(struct rope *rope, rope_split_func split_func,
+	    rope_alloc_func alloc_func, rope_free_func free_func,
+	    void *alloc_ctx)
 {
 	rope->root = NULL;
 	rope->split = split_func;
@@ -133,7 +133,7 @@ rope_new(rope_split_func split_func, rope_alloc_func alloc_func,
 						      sizeof(struct rope));
 	if (rope == NULL)
 		return NULL;
-	rope_init(rope, split_func, alloc_func, free_func, alloc_ctx);
+	rope_create(rope, split_func, alloc_func, free_func, alloc_ctx);
 	return rope;
 }
 
@@ -201,7 +201,7 @@ rope_erase(struct rope *rope, rsize_t offset);
 
 /** Initialize an iterator. */
 static inline void
-rope_iter_init(struct rope_iter *it, struct rope *rope)
+rope_iter_create(struct rope_iter *it, struct rope *rope)
 {
 	it->rope = rope;
 }
@@ -215,7 +215,7 @@ rope_iter_new(struct rope *rope)
 
 	if (it == NULL)
 		return NULL;
-	rope_iter_init(it, rope);
+	rope_iter_create(it, rope);
 	return it;
 }
 

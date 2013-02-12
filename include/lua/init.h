@@ -110,4 +110,5 @@ tarantool_lua(struct lua_State *L,
  *
  */
 int luaL_pushnumber64(struct lua_State *L, uint64_t val);
+
 #endif /* INCLUDES_TARANTOOL_LUA_H */

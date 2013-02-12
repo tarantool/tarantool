@@ -34,7 +34,7 @@
 
 /** Initialize an input buffer. */
 static void
-ibuf_init(struct ibuf *ibuf, struct palloc_pool *pool)
+ibuf_create(struct ibuf *ibuf, struct palloc_pool *pool)
 {
 	ibuf->pool = pool;
 	ibuf->capacity = 0;
@@ -119,7 +119,7 @@ obuf_alloc_pos(struct obuf *buf, size_t pos, size_t size)
  * yet -- it may never be needed.
  */
 void
-obuf_init(struct obuf *buf, struct palloc_pool *pool)
+obuf_create(struct obuf *buf, struct palloc_pool *pool)
 {
 	buf->pool = pool;
 	buf->pos = 0;
@@ -200,7 +200,7 @@ obuf_dup(struct obuf *buf, const void *data, size_t size)
 }
 
 /** Book a few bytes in the output buffer. */
-void *
+struct obuf_svp
 obuf_book(struct obuf *buf, size_t size)
 {
 	struct iovec *iov = &buf->iov[buf->pos];
@@ -221,11 +221,13 @@ obuf_book(struct obuf *buf, size_t size)
 			obuf_alloc_pos(buf, buf->pos, size);
 		}
 	}
-	void *booking = iov->iov_base + iov->iov_len;
+	struct obuf_svp svp = {
+		.pos = buf->pos, .iov_len = iov->iov_len, .size = buf->size
+	};
 	iov->iov_len += size;
 	buf->size += size;
 	assert(iov->iov_len <= buf->capacity[buf->pos]);
-	return booking;
+	return svp;
 }
 
 /** Forget about data in the output buffer beyond the savepoint. */
@@ -266,15 +268,15 @@ SLIST_HEAD(iobuf_cache, iobuf) iobuf_cache;
 
 /** Create an instance of input/output buffer or take one from cache. */
 struct iobuf *
-iobuf_create(const char *name)
+iobuf_new(const char *name)
 {
 	struct iobuf *iobuf;
 	if (SLIST_EMPTY(&iobuf_cache)) {
 		iobuf = palloc(eter_pool, sizeof(struct iobuf));
 		struct palloc_pool *pool = palloc_create_pool("");
 		/* Note: do not allocate memory upfront. */
-		ibuf_init(&iobuf->in, pool);
-		obuf_init(&iobuf->out, pool);
+		ibuf_create(&iobuf->in, pool);
+		obuf_create(&iobuf->out, pool);
 	} else {
 		iobuf = SLIST_FIRST(&iobuf_cache);
 		SLIST_REMOVE_HEAD(&iobuf_cache, next);
@@ -287,7 +289,7 @@ iobuf_create(const char *name)
 
 /** Put an instance back to the iobuf_cache. */
 void
-iobuf_destroy(struct iobuf *iobuf)
+iobuf_delete(struct iobuf *iobuf)
 {
 	struct palloc_pool *pool = iobuf->in.pool;
 	if (palloc_allocated(pool) < iobuf_max_pool_size()) {
@@ -295,8 +297,8 @@ iobuf_destroy(struct iobuf *iobuf)
 		obuf_reset(&iobuf->out);
 	} else {
 		prelease(pool);
-		ibuf_init(&iobuf->in, pool);
-		obuf_init(&iobuf->out, pool);
+		ibuf_create(&iobuf->in, pool);
+		obuf_create(&iobuf->out, pool);
 	}
 	palloc_set_name(pool, "iobuf_cache");
 	SLIST_INSERT_HEAD(&iobuf_cache, iobuf, next);

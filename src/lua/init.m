@@ -45,6 +45,7 @@
 #include "pickle.h"
 #include "fiber.h"
 #include "lua_ipc.h"
+#include "lua_socket.h"
 #include "lua/info.h"
 #include "lua/slab.h"
 #include "lua/stat.h"
@@ -100,19 +101,6 @@ tarantool_lua_dup_out(struct lua_State *L, struct lua_State *child_L)
 
 const char *boxlib_name = "box";
 
-/**
- * Pack our BER integer into luaL_Buffer
- */
-static void
-luaL_addvarint32(luaL_Buffer *b, u32 u32)
-{
-	char varint_buf[sizeof(u32)+1];
-	struct tbuf tbuf = { .size = 0, .capacity = sizeof(varint_buf),
-		.data = varint_buf };
-	write_varint32(&tbuf, u32);
-	luaL_addlstring(b, tbuf.data, tbuf.size);
-}
-
 uint64_t
 tarantool_lua_tointeger64(struct lua_State *L, int idx)
 {
@@ -153,188 +141,6 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 	return result;
 }
 
-/**
- * Convert box.pack() format specifier to Tarantool
- * binary protocol UPDATE opcode
- */
-static char format_to_opcode(char format)
-{
-	switch (format) {
-	case '=': return 0;
-	case '+': return 1;
-	case '&': return 2;
-	case '^': return 3;
-	case '|': return 4;
-	case ':': return 5;
-	case '#': return 6;
-	case '!': return 7;
-	case '-': return 8;
-	default: return format;
-	}
-}
-
-/**
- * Counterpart to @a format_to_opcode
- */
-static char opcode_to_format(char opcode)
-{
-	switch (opcode) {
-	case 0: return '=';
-	case 1: return '+';
-	case 2: return '&';
-	case 3: return '^';
-	case 4: return '|';
-	case 5: return ':';
-	case 6: return '#';
-	case 7: return '!';
-	case 8: return '-';
-	default: return opcode;
-	}
-}
-
-/**
- * To use Tarantool/Box binary protocol primitives from Lua, we
- * need a way to pack Lua variables into a binary representation.
- * We do it by exporting a helper function
- *
- * box.pack(format, args...)
- *
- * which takes the format, which is very similar to Perl 'pack'
- * format, and a list of arguments, and returns a binary string
- * which has the arguments packed according to the format.
- *
- * For example, a typical SELECT packet packs in Lua like this:
- *
- * pkt = box.pack("iiiiiip", -- pack format
- *                         0, -- space id
- *                         0, -- index id
- *                         0, -- offset
- *                         2^32, -- limit
- *                         1, -- number of SELECT arguments
- *                         1, -- tuple cardinality
- *                         key); -- the key to use for SELECT
- *
- * @sa doc/box-protocol.txt, binary protocol description
- * @todo: implement box.unpack(format, str), for testing purposes
- */
-static int
-lbox_pack(struct lua_State *L)
-{
-	luaL_Buffer b;
-	const char *format = luaL_checkstring(L, 1);
-	/* first arg comes second */
-	int i = 2;
-	int nargs = lua_gettop(L);
-	u16 u16buf;
-	u32 u32buf;
-	u64 u64buf;
-	size_t size;
-	const char *str;
-
-	luaL_buffinit(L, &b);
-
-	while (*format) {
-		if (i > nargs)
-			luaL_error(L, "box.pack: argument count does not match "
-				   "the format");
-		switch (*format) {
-		case 'B':
-		case 'b':
-			/* signed and unsigned 8-bit integers */
-			u32buf = lua_tointeger(L, i);
-			if (u32buf > 0xff)
-				luaL_error(L, "box.pack: argument too big for "
-					   "8-bit integer");
-			luaL_addchar(&b, (char) u32buf);
-			break;
-		case 'S':
-		case 's':
-			/* signed and unsigned 8-bit integers */
-			u32buf = lua_tointeger(L, i);
-			if (u32buf > 0xffff)
-				luaL_error(L, "box.pack: argument too big for "
-					   "16-bit integer");
-			u16buf = (u16) u32buf;
-			luaL_addlstring(&b, (char *) &u16buf, sizeof(u16));
-			break;
-		case 'I':
-		case 'i':
-			/* signed and unsigned 32-bit integers */
-			u32buf = lua_tointeger(L, i);
-			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
-			break;
-		case 'L':
-		case 'l':
-			/* signed and unsigned 64-bit integers */
-			u64buf = tarantool_lua_tointeger64(L, i);
-			luaL_addlstring(&b, (char *) &u64buf, sizeof(u64));
-			break;
-		case 'w':
-			/* Perl 'pack' BER-encoded integer */
-			luaL_addvarint32(&b, lua_tointeger(L, i));
-			break;
-		case 'A':
-		case 'a':
-			/* A sequence of bytes */
-			str = luaL_checklstring(L, i, &size);
-			luaL_addlstring(&b, str, size);
-			break;
-		case 'P':
-		case 'p':
-			if (lua_type(L, i) == LUA_TNUMBER) {
-				u64buf = lua_tonumber(L, i);
-				if (u64buf > UINT32_MAX) {
-					str = (char *) &u64buf;
-					size = sizeof(u64);
-				} else {
-					u32buf = (u32) u64buf;
-					str = (char *) &u32buf;
-					size = sizeof(u32);
-				}
-			} else if (lua_type(L, i) == LUA_TCDATA) {
-				u64buf = tarantool_lua_tointeger64(L, i);
-				str = (char *) &u64buf;
-				size = sizeof(u64);
-			} else {
-				str = luaL_checklstring(L, i, &size);
-			}
-			luaL_addvarint32(&b, size);
-			luaL_addlstring(&b, str, size);
-			break;
-		case '=':
-			/* update tuple set foo = bar */
-		case '+':
-			/* set field += val */
-		case '-':
-			/* set field -= val */
-		case '&':
-			/* set field & =val */
-		case '|':
-			/* set field |= val */
-		case '^':
-			/* set field ^= val */
-		case ':':
-			/* splice */
-		case '#':
-			/* delete field */
-		case '!':
-			/* insert field */
-			/* field no */
-			u32buf = (u32) lua_tointeger(L, i);
-			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
-			luaL_addchar(&b, format_to_opcode(*format));
-			break;
-		default:
-			luaL_error(L, "box.pack: unsupported pack "
-				   "format specifier '%c'", *format);
-		}
-		i++;
-		format++;
-	}
-	luaL_pushresult(&b);
-	return 1;
-}
-
 static GCcdata*
 luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
 {
@@ -358,127 +164,6 @@ luaL_pushnumber64(struct lua_State *L, uint64_t val)
 	return 1;
 }
 
-
-static int
-lbox_unpack(struct lua_State *L)
-{
-	size_t format_size = 0;
-	const char *format = luaL_checklstring(L, 1, &format_size);
-	const char *f = format;
-
-	size_t str_size = 0;
-	const u8 *str = (const u8 *) luaL_checklstring(L, 2, &str_size);
-	const u8 *end = str + str_size;
-	const u8 *s = str;
-
-	int i = 0;
-
-	char charbuf;
-	u8  u8buf;
-	u16 u16buf;
-	u32 u32buf;
-
-#define CHECK_SIZE(cur) if (unlikely((cur) >= end)) {	                \
-	luaL_error(L, "box.unpack('%c'): got %d bytes (expected: %d+)",	\
-		   *f, (int) (end - str), (int) 1 + ((cur) - str));	\
-}
-	while (*f) {
-		switch (*f) {
-		case 'b':
-			CHECK_SIZE(s);
-			u8buf = *(u8 *) s;
-			lua_pushnumber(L, u8buf);
-			s++;
-			break;
-		case 's':
-			CHECK_SIZE(s + 1);
-			u16buf = *(u16 *) s;
-			lua_pushnumber(L, u16buf);
-			s += 2;
-			break;
-		case 'i':
-			CHECK_SIZE(s + 3);
-			u32buf = *(u32 *) s;
-			lua_pushnumber(L, u32buf);
-			s += 4;
-			break;
-		case 'l':
-			CHECK_SIZE(s + 7);
-			GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
-			*(uint64_t*)cdataptr(cd) = *(uint64_t*) s;
-			s += 8;
-			break;
-		case 'w':
-			/* load_varint32_s throws exception on error. */
-			u32buf = load_varint32_s((void *)&s, end - s);
-			lua_pushnumber(L, u32buf);
-			break;
-		case 'P':
-		case 'p':
-			/* load_varint32_s throws exception on error. */
-			u32buf = load_varint32_s((void *)&s, end - s);
-			CHECK_SIZE(s + u32buf - 1);
-			lua_pushlstring(L, (const char *) s, u32buf);
-			s += u32buf;
-			break;
-		case '=':
-			/* update tuple set foo = bar */
-		case '+':
-			/* set field += val */
-		case '-':
-			/* set field -= val */
-		case '&':
-			/* set field & =val */
-		case '|':
-			/* set field |= val */
-		case '^':
-			/* set field ^= val */
-		case ':':
-			/* splice */
-		case '#':
-			/* delete field */
-		case '!':
-			/* insert field */
-			CHECK_SIZE(s + 4);
-
-			/* field no */
-			u32buf = *(u32 *) s;
-
-			/* opcode */
-			charbuf = *(char *) (s + 4);
-			charbuf = opcode_to_format(charbuf);
-			if (charbuf != *f) {
-				luaL_error(L, "box.unpack('%s'): "
-					   "unexpected opcode: "
-					   "offset %d, expected '%c',"
-					   "found '%c'",
-					   format, s - str, *f, charbuf);
-			}
-
-			lua_pushnumber(L, u32buf);
-			s += 5;
-			break;
-		default:
-			luaL_error(L, "box.unpack: unsupported "
-				   "format specifier '%c'", *f);
-		}
-		i++;
-		f++;
-	}
-
-	assert(s <= end);
-
-	if (s != end) {
-		luaL_error(L, "box.unpack('%s'): too many bytes: "
-			   "unpacked %d, total %d",
-			   format, s - str, str_size);
-	}
-
-	return i;
-
-#undef CHECK_SIZE
-}
-
 /** Report libev time (cheap). */
 static int
 lbox_time(struct lua_State *L)
@@ -495,14 +180,10 @@ lbox_time64(struct lua_State *L)
 	return 1;
 }
 
-
-
 /**
  * descriptor for box methods
  */
 static const struct luaL_reg boxlib[] = {
-	{"pack", lbox_pack},
-	{"unpack", lbox_unpack},
 	{"time", lbox_time},
 	{"time64", lbox_time64},
 	{NULL, NULL}
@@ -888,7 +569,7 @@ lbox_fiber_create(struct lua_State *L)
 		luaL_error(L, "fiber.create(function): recursion limit"
 			   " reached");
 
-	struct fiber *f = fiber_create("lua", box_lua_fiber_run);
+	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
 	/* Preserve the session in a child fiber. */
 	fiber_set_sid(f, fiber->sid);
 	/* Initially the fiber is cancellable */
@@ -1248,7 +929,7 @@ lbox_print(struct lua_State *L)
 			tbuf_printf(out, CRLF);
 	} else {
 		/* Add a message to the server log */
-		out = tbuf_alloc(fiber->gc_pool);
+		out = tbuf_new(fiber->gc_pool);
 		tarantool_lua_printstack(L, out);
 		say_info("%s", tbuf_str(out));
 	}
@@ -1333,6 +1014,23 @@ tarantool_lua_register_type(struct lua_State *L, const char *type_name,
 	lua_pop(L, 1);
 }
 
+static const struct luaL_reg errorlib [] = {
+	{NULL, NULL}
+};
+
+static void
+tarantool_lua_error_init(struct lua_State *L) {
+	luaL_register(L, "box.error", errorlib);
+	for (int i = 0; i < tnt_error_codes_enum_MAX; i++) {
+		const char *name = tnt_error_codes[i].errstr;
+		if (strstr(name, "UNUSED") || strstr(name, "RESERVED"))
+			continue;
+		lua_pushnumber(L, tnt_errcode_val(i));
+		lua_setfield(L, -2, name);
+	}
+	lua_pop(L, 1);
+}
+
 struct lua_State *
 tarantool_lua_init()
 {
@@ -1367,7 +1065,9 @@ tarantool_lua_init()
 	tarantool_lua_stat_init(L);
 	tarantool_lua_ipc_init(L);
 	tarantool_lua_uuid_init(L);
+	tarantool_lua_socket_init(L);
 	tarantool_lua_session_init(L);
+	tarantool_lua_error_init(L);
 
 	mod_lua_init(L);
 
@@ -1392,7 +1092,7 @@ tarantool_lua_close(struct lua_State *L)
 static int
 tarantool_lua_dostring(struct lua_State *L, const char *str)
 {
-	struct tbuf *buf = tbuf_alloc(fiber->gc_pool);
+	struct tbuf *buf = tbuf_new(fiber->gc_pool);
 	tbuf_printf(buf, "%s%s", "return ", str);
 	int r = luaL_loadstring(L, tbuf_str(buf));
 	if (r) {
@@ -1587,13 +1287,11 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
-	struct fiber *loader = fiber_create(TARANTOOL_LUA_INIT_SCRIPT,
+	struct fiber *loader = fiber_new(TARANTOOL_LUA_INIT_SCRIPT,
 					    load_init_script);
 	fiber_call(loader, L);
 	/* Outside the startup file require() or ffi are not
 	 * allowed.
 	*/
 	tarantool_lua_sandbox(tarantool_L);
-
 }
-

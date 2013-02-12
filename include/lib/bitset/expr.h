@@ -34,24 +34,24 @@
  * @file
  * @brief Expressions on bitsets.
  *
- * The library have full featured support for evaluating logical expressions
- * on @link bitset bitsets @endlink. You can prepare an arbitrary logical
+ * This library provides full support for evaluation of logical expressions
+ * on @link bitset bitsets @endlink. One can prepare an arbitrary logical
  * expression in Disjunctive normal form (DNF) using @link bitset_expr @endlink
  * methods and then evaluate the expression on the set of @link bitset @endlink
  * objects. Currently only @link bitset_iterator @endlink supports expressions.
- * It can be used for perfoming iteration over the expression result on the fly,
+ * It can be used for performing iteration over the expression result on the fly,
  * without producing temporary bitsets.
  *
  * @link bitset_expr @endlink holds any expression that can be represented
  * in DNF form. Since every propositional formula can be represented using DNF,
- * you can construct any such logical expression using methods from this module.
+ * one can construct any such logical expression using methods from this module.
  *
  * A DNF example: (~b0 & b1 & ~b2) | (b2 & ~b3 & b4) | (b3 & b6)
  *		  where b[0-9] is an arbitrary bitset.
  *
  * @link bitset_expr @endlink does not operate directly on @link bitset @endlink
- * objects. Instead of this, you should use placeholders (identificators)
- * which will be bound to the actual objects by the selected evaluator
+ * objects. Instead of this, one should use placeholders (identifiers)
+ * which will be bound to the actual bitsets by the selected evaluator
  * (e.g. bitset_iterator).
  *
  * @link http://en.wikipedia.org/wiki/Disjunctive_normal_form @endlink
@@ -104,11 +104,11 @@ void
 bitset_expr_destroy(struct bitset_expr *expr);
 
 /**
- * @brief Clear @a expr (remove all conjuctions from it)
+ * @brief Clear @a expr (remove all conjunctions from it)
  * @param expr bitset expression
- * @note An allocated memory is not freed. You can conitnue use the object
+ * @note Allocated memory is not freed. One can continue using the object
  * after this operation. Use @link bitset_expr_destroy @endlink to destroy
- * object completely.
+ * the object completely.
  */
 void
 bitset_expr_clear(struct bitset_expr *expr);
@@ -125,9 +125,9 @@ bitset_expr_add_conj(struct bitset_expr *expr);
 /**
  * @brief Add a new placeholder for a bitset to the current conjunction.
  * @param expr bitset expression
- * @param bitset_id identificator of bitset (placeholder)
- * @param pre_not if set to true then logical NOT will be performed to
- * bitset during evaluation process.
+ * @param bitset_id identifier of a bitset (placeholder)
+ * @param pre_not if set to true, then logical NOT will be performed on
+ * the bitset during evaluation process.
  * @retval 0  on success
  * @retval -1 on memory error
  */

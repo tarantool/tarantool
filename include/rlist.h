@@ -44,7 +44,7 @@ struct rlist {
  */
 
 inline static void
-rlist_init(struct rlist *list)
+rlist_create(struct rlist *list)
 {
 	list->next = list;
 	list->prev = list;
@@ -82,7 +82,7 @@ rlist_del(struct rlist *item)
 {
 	item->prev->next = item->next;
 	item->next->prev = item->prev;
-	rlist_init(item);
+	rlist_create(item);
 }
 
 inline static struct rlist *

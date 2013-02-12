@@ -31,8 +31,6 @@
 #include <stdlib.h>
 #include <rlist.h>
 
-const ev_tstamp IPC_TIMEOUT_INFINITY = 365*86400*100.0;
-
 struct ipc_channel {
 	struct rlist readers, writers, bcast;
 	unsigned size;
@@ -41,6 +39,12 @@ struct ipc_channel {
 	void *bcast_msg;
 	void *item[0];
 };
+
+static void
+ipc_channel_create(struct ipc_channel *ch);
+
+static void
+ipc_channel_destroy(struct ipc_channel *ch);
 
 bool
 ipc_channel_is_empty(struct ipc_channel *ch)
@@ -54,30 +58,38 @@ ipc_channel_is_full(struct ipc_channel *ch)
 	return ch->count >= ch->size;
 }
 
-
 struct ipc_channel *
-ipc_channel_alloc(unsigned size)
+ipc_channel_new(unsigned size)
 {
 	if (!size)
 		size = 1;
 	struct ipc_channel *res =
 		malloc(sizeof(struct ipc_channel) + sizeof(void *) * size);
-	if (res)
-		res->size = size;
+	if (res == NULL)
+		return NULL;
+	res->size = size;
+	ipc_channel_create(res);
 	return res;
 }
 
 void
-ipc_channel_init(struct ipc_channel *ch)
+ipc_channel_delete(struct ipc_channel *ch)
 {
-	ch->beg = ch->count = 0;
-	rlist_init(&ch->bcast);
-	rlist_init(&ch->readers);
-	rlist_init(&ch->writers);
+	ipc_channel_destroy(ch);
+	free(ch);
 }
 
-void
-ipc_channel_cleanup(struct ipc_channel *ch)
+static void
+ipc_channel_create(struct ipc_channel *ch)
+{
+	ch->beg = ch->count = 0;
+	rlist_create(&ch->bcast);
+	rlist_create(&ch->readers);
+	rlist_create(&ch->writers);
+}
+
+static void
+ipc_channel_destroy(struct ipc_channel *ch)
 {
 	while (!rlist_empty(&ch->writers)) {
 		struct fiber *f =
@@ -147,7 +159,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 void *
 ipc_channel_get(struct ipc_channel *ch)
 {
-	return ipc_channel_get_timeout(ch, IPC_TIMEOUT_INFINITY);
+	return ipc_channel_get_timeout(ch, TIMEOUT_INFINITY);
 }
 
 int
@@ -200,7 +212,7 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 void
 ipc_channel_put(struct ipc_channel *ch, void *data)
 {
-	ipc_channel_put_timeout(ch, data, IPC_TIMEOUT_INFINITY);
+	ipc_channel_put_timeout(ch, data, TIMEOUT_INFINITY);
 }
 
 bool

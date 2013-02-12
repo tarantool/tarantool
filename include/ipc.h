@@ -38,32 +38,22 @@
 struct ipc_channel;
 
 /**
- * @brief allocator
- * @param size
- * @return malloced channel (or NULL)
+ * @brief Allocate and construct new IPC channel
+ * @param size of channel
+ * @return new channel
  * @code
- *	struct ipc_channel *ch = ipc_channel_alloc(10);
+ *	struct ipc_channel *ch = ipc_channel_new(10);
  * @endcode
  */
 struct ipc_channel *
-ipc_channel_alloc(unsigned size);
+ipc_channel_new(unsigned size);
 
 /**
- * @brief Initialize a channel - a constructor.
- * @param channel
- * @code
- *	struct ipc_channel *ch = ipc_channel_alloc(10);
- *	ipc_channel_init(ch);
- * @endcode
+ * @brief Destruct and free a IPC channel
+ * @param ch channel
  */
 void
-ipc_channel_init(struct ipc_channel *ch);
-
-/**
- * Cleanup the channel - a destructor.
- */
-void
-ipc_channel_cleanup(struct ipc_channel *ch);
+ipc_channel_delete(struct ipc_channel *ch);
 
 /**
  * @brief Put data into a channel.
@@ -174,7 +164,5 @@ ipc_channel_has_readers(struct ipc_channel *ch);
  */
 bool
 ipc_channel_has_writers(struct ipc_channel *ch);
-
-extern const ev_tstamp IPC_TIMEOUT_INFINITY;
 
 #endif /* TARANTOOL_IPC_H_INCLUDED */

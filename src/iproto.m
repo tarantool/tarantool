@@ -138,8 +138,7 @@ port_iproto_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
 	struct port_iproto *port = port_iproto(ptr);
 	if (++port->reply.found == 1) {
 		/* Found the first tuple, add header. */
-		port->svp = obuf_create_svp(port->buf);
-		obuf_book(port->buf, sizeof(port->reply));
+		port->svp = obuf_book(port->buf, sizeof(port->reply));
 	}
 	if (flags & BOX_RETURN_TUPLE) {
 		obuf_dup(port->buf, &tuple->bsize, tuple_len(tuple));
@@ -210,7 +209,6 @@ struct iproto_queue
 
 enum {
 	IPROTO_REQUEST_QUEUE_SIZE = 2048,
-	IPROTO_CONNECT_QUEUE_SIZE = 256
 };
 
 struct iproto_session;
@@ -310,7 +308,7 @@ iproto_queue_schedule(struct ev_async *watcher,
 		struct fiber *f = rlist_shift_entry(&i_queue->fiber_cache,
 						    struct fiber, state);
 		if (f == NULL)
-			f = fiber_create("iproto", i_queue->handler);
+			f = fiber_new("iproto", i_queue->handler);
 		fiber_call(f, i_queue);
 	}
 }
@@ -330,7 +328,7 @@ iproto_queue_init(struct iproto_queue *i_queue,
 	ev_async_init(&i_queue->watcher, iproto_queue_schedule);
 	i_queue->watcher.data = i_queue;
 	i_queue->handler = handler;
-	rlist_init(&i_queue->fiber_cache);
+	rlist_create(&i_queue->fiber_cache);
 }
 
 /** A handler to process all queued requests. */
@@ -401,7 +399,7 @@ SLIST_HEAD(, iproto_session) iproto_session_cache =
 static inline bool
 iproto_session_is_idle(struct iproto_session *session)
 {
-	return !evio_is_connected(&session->input) &&
+	return !evio_is_active(&session->input) &&
 		ibuf_size(&session->iobuf[0]->in) == 0 &&
 		ibuf_size(&session->iobuf[1]->in) == 0;
 }
@@ -436,8 +434,8 @@ iproto_session_create(const char *name, int fd, box_process_func *param)
 	session->handler = param;
 	ev_io_init(&session->input, iproto_session_on_input, fd, EV_READ);
 	ev_io_init(&session->output, iproto_session_on_output, fd, EV_WRITE);
-	session->iobuf[0] = iobuf_create(name);
-	session->iobuf[1] = iobuf_create(name);
+	session->iobuf[0] = iobuf_new(name);
+	session->iobuf[1] = iobuf_new(name);
 	session->parse_size = 0;
 	session->write_pos = obuf_create_svp(&session->iobuf[0]->out);
 	session->sid = 0;
@@ -450,8 +448,8 @@ iproto_session_destroy(struct iproto_session *session)
 {
 	assert(iproto_session_is_idle(session));
 	session_destroy(session->sid); /* Never throws. No-op if sid is 0. */
-	iobuf_destroy(session->iobuf[0]);
-	iobuf_destroy(session->iobuf[1]);
+	iobuf_delete(session->iobuf[0]);
+	iobuf_delete(session->iobuf[1]);
 	SLIST_INSERT_HEAD(&iproto_session_cache, session, next_in_cache);
 }
 
@@ -534,7 +532,7 @@ iproto_session_input_iobuf(struct iproto_session *session)
 	if (ibuf_unused(&old->in) >= to_read)
 		return old;
 
-	/** All requests are procssed, reuse the buffer. */
+	/** All requests are processed, reuse the buffer. */
 	if (ibuf_size(&old->in) == session->parse_size) {
 		ibuf_reserve(&old->in, to_read);
 		return old;
@@ -635,7 +633,14 @@ iproto_session_output_iobuf(struct iproto_session *session)
 {
 	if (obuf_size(&session->iobuf[1]->out))
 		return session->iobuf[1];
-	if (obuf_size(&session->iobuf[0]->out))
+	/*
+	 * Don't try to write from a newer buffer if an older one
+	 * exists: in case of a partial write of a newer buffer,
+	 * the client may end up getting a salad of different
+	 * pieces of replies from both buffers.
+	 */
+	if (ibuf_size(&session->iobuf[1]->in) == 0 &&
+	    obuf_size(&session->iobuf[0]->out))
 		return session->iobuf[0];
 	return NULL;
 }
@@ -751,14 +756,14 @@ iproto_process_request(struct iproto_request *request)
 	struct iobuf *iobuf = request->iobuf;
 	struct port_iproto port;
 	@try {
-		if (unlikely(! evio_is_connected(&session->output)))
+		if (unlikely(! evio_is_active(&session->output)))
 			return;
 
 		fiber_set_sid(fiber, session->sid);
 		iproto_reply(&port, *session->handler,
 			     &iobuf->out, header);
 
-		if (unlikely(! evio_is_connected(&session->output)))
+		if (unlikely(! evio_is_active(&session->output)))
 			return;
 		if (! ev_is_active(&session->output))
 			ev_feed_event(&session->output, EV_WRITE);
