@@ -35,66 +35,76 @@
  *
  * @section Purpose
  *
- * bitset_index is an associative container that stores (key, value) pairs
- * in a way that is very optimized for searching values by performing logical
- * expressions on key bits. The organization structure of bitset_index makes it
- * easy to respond to queries like 'give me all pairs where bit i and bit j
- * in pairs keys are set'. The implementation supports evaluation of arbitrary
- * logical expressions represented in the Disjunctive normal form.
+ * bitset_index is an associative container that stores (key,
+ * value) pairs in a way that is optimized for searching values
+ * matching a logical expressions on bits of the key. The
+ * organization structure of bitset_index makes it easy to respond
+ * to queries like 'return all (key, value) pairs where the key
+ * has bit i and bit j set'. The implementation supports
+ * evaluation of arbitrary logical expressions represented in
+ * Disjunctive Normal Form.
  *
- * bitset_index is optimized for querying a large count of values using a single
- * logical expression. The expression can be constructed one time and used for
- * multiple queries. bitset_index is not designed for querying a single value
- * using exact matching by a key.
+ * To search over keys in a bitset_index, a logical expression
+ * needs to be constructed.
+ * logical expression. The expression can be constructed one time
+ * and used for multiple queries. A search for an exact match for
+ * a given key is not what bitset_index is designed for --
+ * a conventional TREE or HASH index suits this task better.
  *
  * @section Organization
  *
- * bitset_index consists of N+1 @link bitset bitsets @endlink where N is a
- * maximum size of keys in an index (in bits). These bitsets are indexed
- * by the pair's value. A bitset #n+1 corresponds to a bit #n in keys and
- * contains all pairs where this bit is set. That is, if a pair with
- * (key, value) is inserted to the index and its key, say, has 0, 2, 5, 6
- * bits set then bitsets #1, #3, #6, #7 are set at position = pair.value
- * (@link bitset_test bitset_test(bitset, pair.value) @endlink is true) and
- * bitsets #2, #4, #7 , ... are unset at the position.
+ * bitset_index is a compressed bit matrix with dimensions N+1xK,
+ * where N corresponds to the bit count of the longest key present
+ * in the index, and K is the maximal value present in the index.
+ * Each column in the matrix stands for a single bit of the key
+ * and is represented by a single bitset.
+ * If there is value k, which corresponding key has bit i set,
+ * then bitset i+1 will have bit k set.
+ * For example, if a pair with (key, value) is inserted to the
+ * index and its key, has 0, 2, 5, 6 bits set then bitsets #1, #3,
+ * #6, #7 are set at position = pair.value (@link bitset_test
+ * bitset_test(bitset, pair.value) @endlink is true) and bitsets
+ * #2, #4, #7 , ... are unset at the position.
  *
- * bitset_index also uses a special bitset #0 that is set to true for each
- * position where a pair with value = position exists in an index. This
- * bitset is mostly needed for evaluation expressions with binary NOTs.
+ * bitset_index also uses a special bitset #0 that is set to true
+ * for each position where a pair with value = position exists in
+ * an index. This bitset is mostly needed for evaluation
+ * expressions with binary NOTs.
  *
- * bitset_index is a little bit different than traditional containers like
- * 'map' or 'set'. Using bitset_index you can certainly have multiple pairs
- * with same key, but all values in an index must be unique. You might think
- * that bitset_index is implemented in an inverted form - a pair's value is
- * used as a positions in internal bitsets and a key is consist of value of
- * this bitsets.
+ * A consequence of to the above design, is that in a bitset_index
+ * one can have multiple pairs with same key, but all values in an
+ * index must be unique.
  *
  * @section Performance
  *
- * For certain kind of tasks bitset_index is more efficient by performance and
- * memory utilization than ordinary binary search tree or hashtable.
+ * For a certain kind of tasks bitset_index is more efficient both
+ * speed- and memory- wise than a binary search tree or a hash
+ * table.
  *
- * The complexity of the @link bitset_insert @endlink operation is mostly
- * equivalent to inserting one value into \a k balanced binary search trees with
- * height \a m, where \a k is a number of set bits in your key and \ m is
- * a number of pairs in an index divided by some constant (bitset page size).
+ * The complexity of @link bitset_insert @endlink operation is
+ * mostly equivalent to inserting one value into \a k balanced
+ * binary search trees, each of size \a m, where \a k is the number of
+ * set bits in the key and \ m is the number of pairs in the index
+ * divided by bitset page size.
  *
- * The complexity of an iteration is mostly linear to the number of pairs
- * in where a search expression evals to true. The complexity of an iteration
- * expression does not affect performance directly. Only the number of resulting
- * pairs is important.
+ * The complexity of iteration is linear from the number of pairs
+ * in which the search expression evaluates to true. The
+ * complexity of an iterator expression does not affect
+ * iteration performance directly, which is more dependent
+ * on the number of matching values.
  *
- * The real performance heavily depends on the pairs values. If a values
- * space is dense, then an internal bitsets also will be compact and better
- * optimized for iteration.
+ * The actual performance heavily depends on the distribution of
+ * values.  If the value space is dense, then internal bitsets are
+ * also compact and better optimized for iteration.
  *
  * @section Limitations
  *
- * The size of keys is limited only by available memory.
- * bitset_index automatically resizes on 'insert' if new bits are found.
+ * Key size is limited only by the available memory.
+ * bitset_index automatically resizes on 'insert' if a key
+ * contains more bits than in any key inserted thus far.
  *
- * Since values are used as a position in bitsets, the actual range of
- * values must be in [0..SIZE_MAX) range.
+ * Since values are used as a position in bitsets, the actual
+ * range of values must be in [0..SIZE_MAX) range.
  *
  * @see bitset.h
  * @see expr.h
@@ -140,10 +150,11 @@ bitset_index_destroy(struct bitset_index *index);
 
 /**
  * @brief Insert (\a key, \a value) pair into \a index.
- * Only one pair with same value can exist in the index.
- * If pair with same \a value is exist, it will be updated quietly.
- * The method is atomic, i.e. \a index will be in a consistent state after
- * a return even in case of error.
+ * Only one pair with a given value can exist in the index.
+ * If a pair with the same \a value exists, it is updated quietly.
+ * This method is atomic, i.e. \a index will be in a consistent
+ * state after a return even in case of error.
+ *
  * @param index object
  * @param key key
  * @param key_size size of the key
@@ -202,7 +213,7 @@ bitset_index_expr_equals(struct bitset_expr *expr, const void *key,
  * The \a expr can be then passed to @link bitset_index_init_iterator @endlink.
  *
  * 'All-Bits-Set' algorithm. Matches all pairs where all bits from \a key
- * is set in pair.key ((\a key & pair.key) == \a key).
+ * are set in pair.key ((\a key & pair.key) == \a key).
  *
  * @param expr bitset expression
  * @retval 0 on success
@@ -216,7 +227,7 @@ bitset_index_expr_all_set(struct bitset_expr *expr, const void *key,
 
 /**
  * @brief Initialize \a expr to iterate over a bitset index.
- * The \a expr can be then passed to @link bitset_index_init_iterator @endlink.
+ * The \a expr can then be passed to @link bitset_index_init_iterator @endlink.
  *
  * 'Any-Bits-Set' algorithm. Matches all pairs where at least one bit from
  * \a key is set in pair.key ((\a key & pair.key) != 0).
@@ -273,7 +284,7 @@ bool
 bitset_index_contains_value(struct bitset_index *index, size_t value);
 
 /**
- * @brief Return a number of pairs in \a index.
+ * @brief Return the number of pairs in \a index.
  * @param index bitset index
  * @return number of pairs in \a index
  */
