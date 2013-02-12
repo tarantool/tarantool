@@ -1,3 +1,9 @@
+tarantool (1.4.8+20130212.1728-1) unstable; urgency=low
+
+  * Rebuilt last snapshot for Debian.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 12 Feb 2013 17:27:48 +0400
+
 tarantool (1.4.8+20130212.1647-1) nowtaxi; urgency=low
 
   * New snapshot (fix async I/O bugs).
