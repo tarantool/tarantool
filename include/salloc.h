@@ -60,4 +60,33 @@ typedef int (*salloc_stat_cb)(const struct slab_cache_stats *st, void *ctx);
 int
 salloc_stat(salloc_stat_cb cb, struct slab_arena_stats *astat, void *cb_ctx);
 
+/**
+ * @brief Return an unique index associated with a chunk allocated by salloc.
+ * This index space is more dense than pointers space, especially in the less
+ * significant bits. This number is needed because some types of box's indexes
+ * (e.g. BITSET) have better performance then they operate on sequencial
+ * offsets (i.e. dense space) instead of memory pointers (sparse space).
+ *
+ * The calculation is based on SLAB number and the position of an item within
+ * it. Current implementation only guarantees that adjacent chunks from one
+ * SLAB will have consecutive indexes. That is, if two chunks were sequencially
+ * allocated from one chunk they will have sequencial ids. If a second chunk was
+ * allocated from another SLAB thеn the difference between indexes may be more
+ * then one.
+ *
+ * @param ptr pointer to memory allocated by salloc
+ * @return unique index
+ */
+size_t
+salloc_ptr_to_index(void *ptr);
+
+/**
+ * @brief Perform the opposite action of a salloc_ptr_to_index.
+ * @param index unique index
+ * @see salloc_ptr_to_index
+ * @return point to memory area associated with \a index.
+ */
+void *
+salloc_ptr_from_index(size_t index);
+
 #endif /* TARANTOOL_SALLOC_H_INCLUDED */
