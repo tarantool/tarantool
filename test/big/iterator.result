@@ -1,4 +1,4 @@
-lua dofile('iterator.lua')
+lua dofile('utils.lua')
 ---
 ...
 lua box.insert(20, 'pid_001', 'sid_001', 'tid_998', 'a')
@@ -764,7 +764,7 @@ lua iterate(20, 3, 2, 4, box.index.LT, 'tid_000')
 ...
 lua iterate(20, 3, 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'keys')
 ---
-error: 'iterator.lua:6: Key part count 4 is greater than index part count 2'
+error: 'utils.lua:27: Key part count 4 is greater than index part count 2'
 ...
 
 #-----------------------------------------------------------------------------#

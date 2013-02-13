@@ -43,9 +43,10 @@ struct space;
 enum field_data_type { UNKNOWN = -1, NUM = 0, NUM64, STRING, field_data_type_MAX };
 extern const char *field_data_type_strs[];
 
-#define INDEX_TYPE(_)                                             \
-	_(HASH,  0)       /* HASH Index  */                       \
-	_(TREE,  1)       /* TREE Index  */                       \
+#define INDEX_TYPE(_)                                               \
+	_(HASH,    0)       /* HASH Index  */                       \
+	_(TREE,    1)       /* TREE Index  */                       \
+	_(BITSET,  2)       /* BITSET Index  */                     \
 
 ENUM(index_type, INDEX_TYPE);
 extern const char *index_type_strs[];
@@ -79,6 +80,9 @@ extern const char *index_type_strs[];
 	_(ITER_LE,  4)       /* key <= x                        */   \
 	_(ITER_GE,  5)       /* key >= x                        */   \
 	_(ITER_GT,  6)       /* key >  x                        */   \
+	_(ITER_BITS_ALL_SET,     7) /* all bits from x are set in key      */ \
+	_(ITER_BITS_ANY_SET,     8) /* at least one x's bit is set         */ \
+	_(ITER_BITS_ALL_NOT_SET, 9) /* all bits are not set                */ \
 
 ENUM(iterator_type, ITERATOR_TYPE);
 extern const char *iterator_type_strs[];
