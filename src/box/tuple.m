@@ -90,7 +90,7 @@ next_field(const void *f)
  * @returns field data if field exists or NULL
  */
 void *
-tuple_field(struct tuple *tuple, size_t i)
+tuple_field(struct tuple *tuple, u32 i)
 {
 	void *field = tuple->data;
 
@@ -136,7 +136,7 @@ print_field(struct tbuf *buf, const void *f)
  * key: { value, value, value }
  */
 void
-tuple_print(struct tbuf *buf, uint8_t field_count, void *f)
+tuple_print(struct tbuf *buf, u32 field_count, void *f)
 {
 	if (field_count == 0) {
 		tbuf_printf(buf, "'': {}");
@@ -147,7 +147,7 @@ tuple_print(struct tbuf *buf, uint8_t field_count, void *f)
 	tbuf_printf(buf, ": {");
 	f = next_field(f);
 
-	for (size_t i = 1; i < field_count; i++, f = next_field(f)) {
+	for (u32 i = 1; i < field_count; i++, f = next_field(f)) {
 		print_field(buf, f);
 		if (likely(i + 1 < field_count))
 			tbuf_printf(buf, ", ");

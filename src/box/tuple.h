@@ -76,14 +76,14 @@ tuple_ref(struct tuple *tuple, int count);
  * @returns field data if the field exists, or NULL
  */
 void *
-tuple_field(struct tuple *tuple, size_t i);
+tuple_field(struct tuple *tuple, u32 i);
 
 /**
  * Print a tuple in yaml-compatible mode to tbuf:
  * key: { value, value, value }
  */
 void
-tuple_print(struct tbuf *buf, uint8_t field_count, void *f);
+tuple_print(struct tbuf *buf, u32 field_count, void *f);
 
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)

@@ -160,8 +160,8 @@ lbox_tuple_slice(struct lua_State *L)
 		luaL_error(L, "tuple.slice(): start must be less than end");
 
 	u8 *field = tuple->data;
-	int fieldno = 0;
-	int stop = end - 1;
+	u32 fieldno = 0;
+	u32 stop = end - 1;
 
 	while (field < tuple->data + tuple->bsize) {
 		size_t len = load_varint32((const void **) &field);
@@ -724,7 +724,7 @@ lbox_create_iterator(struct lua_State *L)
 	int argc = lua_gettop(L);
 	/* Create a new iterator. */
 	enum iterator_type type;
-	int field_count;
+	u32 field_count;
 	void *key;
 	if (argc == 1 || (argc == 2 && lua_type(L, 2) == LUA_TNIL)) {
 		/*
@@ -753,7 +753,7 @@ lbox_create_iterator(struct lua_State *L)
 			/* Single or multi- part key. */
 			field_count = argc - 2;
 			struct tbuf *data = tbuf_new(fiber->gc_pool);
-			for (int i = 0; i < field_count; i++) {
+			for (u32 i = 0; i < field_count; i++) {
 				enum field_data_type type = UNKNOWN;
 				if (i < index->key_def->part_count) {
 					type = index->key_def->parts[i].type;
@@ -855,7 +855,7 @@ lbox_index_count(struct lua_State *L)
 		luaL_error(L, "index.count(): one or more arguments expected");
 	/* preparing single or multi-part key */
 	void *key;
-	int key_part_count;
+	u32 key_part_count;
 	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 		/* Searching by tuple. */
 		struct tuple *tuple = lua_checktuple(L, 2);
@@ -865,7 +865,7 @@ lbox_index_count(struct lua_State *L)
 		/* Single or multi- part key. */
 		key_part_count = argc;
 		struct tbuf *data = tbuf_new(fiber->gc_pool);
-		for (int i = 0; i < argc; ++i) {
+		for (u32 i = 0; i < argc; ++i) {
 			enum field_data_type type = UNKNOWN;
 			if (i < index->key_def->part_count) {
 				type = index->key_def->parts[i].type;

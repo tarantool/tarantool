@@ -93,4 +93,11 @@ const char *box_status(void);
  */
 void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
+
+enum {
+	BOX_SPACE_MAX = UINT32_MAX,
+	BOX_INDEX_MAX = 10,
+	BOX_FIELD_MAX = UINT32_MAX
+};
+
 #endif /* INCLUDES_TARANTOOL_BOX_H */
