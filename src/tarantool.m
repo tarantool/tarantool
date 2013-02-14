@@ -617,7 +617,6 @@ static void
 initialize_minimal()
 {
 	initialize(0.1, 4, 2);
-	fill_default_tarantool_cfg(&cfg);
 }
 
 int
@@ -700,6 +699,7 @@ main(int argc, char **argv)
 
 	if (gopt_arg(opt, 'C', &cat_filename)) {
 		initialize_minimal();
+		fill_default_tarantool_cfg(&cfg);
 		cfg.log_level += gopt(opt, 'v');
 		if (access(cat_filename, R_OK) == -1) {
 			panic("access(\"%s\"): %s", cat_filename, strerror(errno));
