@@ -160,8 +160,11 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	case REPLACE:
 		flags = read_u32(b);
 		field_count = read_u32(b);
-		if (b->size != valid_tuple(b, field_count))
+		if (b->size != valid_tuple(b, field_count)) {
+			say_error("found a corrupt tuple, %s",
+				  tbuf_str(buf));
 			abort();
+		}
 		tuple_print(buf, field_count, b->data);
 		break;
 
@@ -170,8 +173,10 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 	case DELETE_1_3:
 		key_len = read_u32(b);
 		key = read_field(b);
-		if (b->size != 0)
+		if (b->size != 0) {
+			say_error("found a corrupt tuple %s", tbuf_str(buf));
 			abort();
+		}
 		tuple_print(buf, key_len, key);
 		break;
 
