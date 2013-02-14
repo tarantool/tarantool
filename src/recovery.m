@@ -1257,6 +1257,9 @@ read_log(const char *filename,
 
 	FILE *f = fopen(filename, "r");
 	struct log_io *l = log_io_open(dir, LOG_READ, filename, NONE, f);
+	if (l == NULL)
+		return -1;
+
 	struct log_io_cursor i;
 
 	log_io_cursor_open(&i, l);

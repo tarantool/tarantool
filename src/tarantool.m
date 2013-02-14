@@ -619,6 +619,7 @@ static void
 initialize_minimal()
 {
 	initialize(0.1, 4, 2);
+	fill_default_tarantool_cfg(&cfg);
 }
 
 int
@@ -701,6 +702,7 @@ main(int argc, char **argv)
 
 	if (gopt_arg(opt, 'C', &cat_filename)) {
 		initialize_minimal();
+		cfg.log_level += gopt(opt, 'v');
 		if (access(cat_filename, R_OK) == -1) {
 			panic("access(\"%s\"): %s", cat_filename, strerror(errno));
 			exit(EX_OSFILE);
@@ -709,7 +711,10 @@ main(int argc, char **argv)
 	}
 
 	gopt_arg(opt, 'c', &cfg_filename);
-	/* if config is not specified trying ./tarantool.cfg then /etc/tarantool.cfg */
+	/*
+	 * if config is not specified trying ./tarantool.cfg then
+	 * /etc/tarantool.cfg
+	 */
 	if (cfg_filename == NULL) {
 		if (access(DEFAULT_CFG_FILENAME, F_OK) == 0)
 			cfg_filename = DEFAULT_CFG_FILENAME;
