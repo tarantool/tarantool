@@ -54,7 +54,7 @@ void tc_space_free(struct tc_spaces *s)
 	mh_int_t i;
 	mh_foreach(s->t, i) {
 		struct tc_space *space = mh_u32ptr_node(s->t, i)->val;
-		mh_u32ptr_del(s->t, i, NULL, NULL);
+		mh_u32ptr_del(s->t, i, NULL);
 
 		mh_int_t pos = 0;
 		while (pos != mh_end(space->hash_log)) {
@@ -94,13 +94,13 @@ struct tc_space *tc_space_create(struct tc_spaces *s, uint32_t id) {
 	space->hash_snap = mh_pk_new();
 
 	const struct mh_u32ptr_node_t node = { .key = space->id, .val = space };
-	mh_u32ptr_put(s->t, &node, NULL, space, space);
+	mh_u32ptr_put(s->t, &node, NULL, space);
 	return space;
 }
 
 struct tc_space *tc_space_match(struct tc_spaces *s, uint32_t id) {
 	const struct mh_u32ptr_node_t node = { .key = id };
-	mh_int_t k = mh_u32ptr_get(s->t, &node, NULL, NULL);
+	mh_int_t k = mh_u32ptr_get(s->t, &node, NULL);
 	struct tc_space *space = NULL;
 	if (k != mh_end(s->t))
 		space = mh_u32ptr_node(s->t, k)->val;

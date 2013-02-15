@@ -226,7 +226,7 @@ tc_generate_entry(struct tc_spaces *s, struct tnt_request *r)
 	}
 	/* 3. put into hash */
 	const struct tc_key *node = k;
-	mh_int_t pos = mh_pk_put(space->hash_log, &node, NULL, space, space);
+	mh_int_t pos = mh_pk_put(space->hash_log, &node, NULL, space);
 	if (pos == mh_end(space->hash_log)) {
 		free(k);
 		return -1;
@@ -373,7 +373,7 @@ tc_generate_snaprow(struct tc_spaces *s, struct tnt_iter_storage *is,
 	/* foreach snapshot row which does not exist in index dump:
 	 * calculate crc and add to the index */
 	const struct tc_key *node = k;
-	mh_int_t pos = mh_pk_get(space->hash_log, &node, space, space);
+	mh_int_t pos = mh_pk_get(space->hash_log, &node, space);
 	const struct tc_key *v = NULL;
 	if (pos != mh_end(space->hash_log))
 		v = *mh_pk_node(space->hash_log, pos);
@@ -381,7 +381,7 @@ tc_generate_snaprow(struct tc_spaces *s, struct tnt_iter_storage *is,
 		k->crc = crc32c(0, (unsigned char*)is->t.data, is->t.size);
 		const struct tc_key *node = k;
 		mh_int_t pos = mh_pk_put(space->hash_snap, &node, NULL,
-					 space, space);
+					 space);
 		if (pos == mh_end(space->hash_snap)) {
 			free(k);
 			return -1;

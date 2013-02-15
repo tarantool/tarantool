@@ -302,7 +302,7 @@ struct fiber *
 fiber_find(int fid)
 {
 	struct mh_i32ptr_node_t node = { .key = fid };
-	mh_int_t k = mh_i32ptr_get(fiber_registry, &node, NULL, NULL);
+	mh_int_t k = mh_i32ptr_get(fiber_registry, &node, NULL);
 
 	if (k == mh_end(fiber_registry))
 		return NULL;
@@ -313,14 +313,14 @@ static void
 register_fid(struct fiber *fiber)
 {
 	struct mh_i32ptr_node_t node = { .key = fiber -> fid, .val = fiber };
-	mh_i32ptr_put(fiber_registry, &node, NULL, NULL, NULL);
+	mh_i32ptr_put(fiber_registry, &node, NULL, NULL);
 }
 
 static void
 unregister_fid(struct fiber *fiber)
 {
 	struct mh_i32ptr_node_t node = { .key = fiber->fid };
-	mh_i32ptr_remove(fiber_registry, &node, NULL, NULL);
+	mh_i32ptr_remove(fiber_registry, &node, NULL);
 }
 
 void

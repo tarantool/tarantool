@@ -74,7 +74,7 @@ int tc_verify_cmp(struct tc_spaces *s,
 
 	/* 1. check in hash, if found then skip */
 	const struct tc_key *node = k;
-	mh_int_t pos = mh_pk_get(space->hash_log, &node, space, space);
+	mh_int_t pos = mh_pk_get(space->hash_log, &node, space);
 	const struct tc_key *v = NULL;
 	if (pos != mh_end(space->hash_log))
 		v = *mh_pk_node(space->hash_log, pos);
@@ -85,7 +85,7 @@ int tc_verify_cmp(struct tc_spaces *s,
 
 	/* 2. if key was not found in xlog hash, then try snapshot hash */
 	node = k;
-	pos = mh_pk_get(space->hash_snap, &node, space, space);
+	pos = mh_pk_get(space->hash_snap, &node, space);
 	v = NULL;
 	if (pos != mh_end(space->hash_snap))
 		v = *mh_pk_node(space->hash_snap, pos);

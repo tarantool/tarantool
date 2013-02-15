@@ -54,7 +54,7 @@ space_create(i32 space_no, struct key_def *key_defs, int key_count, int arity)
 	space->no = space_no;
 
 	const struct mh_i32ptr_node_t node = { .key = space->no, .val = space };
-	mh_i32ptr_put(spaces, &node, NULL, NULL, NULL);
+	mh_i32ptr_put(spaces, &node, NULL, NULL);
 
 	space->arity = arity;
 	space->key_defs = key_defs;
@@ -69,7 +69,7 @@ struct space *
 space_by_n(i32 n)
 {
 	const struct mh_i32ptr_node_t node = { .key = n };
-	mh_int_t space = mh_i32ptr_get(spaces, &node, NULL, NULL);
+	mh_int_t space = mh_i32ptr_get(spaces, &node, NULL);
 	if (space == mh_end(spaces))
 		return NULL;
 	return mh_i32ptr_node(spaces, space)->val;
@@ -195,7 +195,7 @@ space_free(void)
 
 	mh_foreach(spaces, i) {
 		struct space *space = mh_i32ptr_node(spaces, i)->val;
-		mh_i32ptr_del(spaces, i, NULL, NULL);
+		mh_i32ptr_del(spaces, i, NULL);
 
 		int j;
 		for (j = 0 ; j < space->key_count; j++) {
@@ -376,7 +376,7 @@ space_config()
 
 		const struct mh_i32ptr_node_t node =
 			{ .key = space->no, .val = space };
-		mh_i32ptr_put(spaces, &node, NULL, NULL, NULL);
+		mh_i32ptr_put(spaces, &node, NULL, NULL);
 		say_info("space %i successfully configured", i);
 	}
 }

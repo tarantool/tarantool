@@ -44,9 +44,8 @@ struct mh_i32ptr_node_t {
 };
 
 #define mh_node_t struct mh_i32ptr_node_t
-#define mh_hash_arg_t void *
+#define mh_arg_t void *
 #define mh_hash(a, arg) (a->key)
-#define mh_eq_arg_t void *
 #define mh_eq(a, b, arg) ((a->key) == (b->key))
 #include <mhash.h>
 
@@ -62,9 +61,8 @@ struct mh_i64ptr_node_t {
 
 #define mh_node_t struct mh_i64ptr_node_t
 #define mh_int_t u32
-#define mh_hash_arg_t void *
+#define mh_arg_t void *
 #define mh_hash(a, arg) ((u32)((a->key)>>33^(a->key)^(a->key)<<11))
-#define mh_eq_arg_t void *
 #define mh_eq(a, b, arg) ((a->key) == (b->key))
 #include <mhash.h>
 
@@ -91,15 +89,14 @@ struct mh_lstrptr_node_t {
 
 #define mh_node_t struct mh_lstrptr_node_t
 #define mh_int_t u32
-#define mh_hash_arg_t void *
+#define mh_arg_t void *
 static inline u32
-mh_strptr_hash(const mh_node_t *a, mh_hash_arg_t arg) {
+mh_strptr_hash(const mh_node_t *a, mh_arg_t arg) {
 	(void) arg;
 	const void *_k = (a->key);
 	const u32 l = load_varint32(&_k);
 	return PMurHash32(13, _k, l);
 }
 #define mh_hash(a, arg) mh_strptr_hash(a, arg)
-#define mh_eq_arg_t void *
 #define mh_eq(a, b, arg) (lstrcmp(a->key, b->key) == 0)
 #include <mhash.h>

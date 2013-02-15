@@ -14,9 +14,8 @@ struct mh_u32ptr_node_t {
 };
 
 #define mh_node_t struct mh_u32ptr_node_t
-#define mh_hash_arg_t void *
+#define mh_arg_t void *
 #define mh_hash(a, arg) (a->key)
-#define mh_eq_arg_t void *
 #define mh_eq(a, b, arg) ((a->key) == (b->key))
 #include <mhash.h>
 
@@ -32,9 +31,8 @@ search_equal(const struct tc_key *a, const struct tc_key *b,
 
 #define mh_name _pk
 #define mh_node_t struct tc_key *
-#define mh_hash_arg_t struct tc_space *
+#define mh_arg_t struct tc_space *
 #define mh_hash(a, arg) search_hash(*(a), arg)
-#define mh_eq_arg_t struct tc_space *
 #define mh_eq(a, b, arg) search_equal(*(a), *(b), arg)
 #include <mhash.h>
 
