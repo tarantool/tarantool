@@ -312,9 +312,8 @@ fiber_find(int fid)
 static void
 register_fid(struct fiber *fiber)
 {
-	int ret;
 	struct mh_i32ptr_node_t node = { .key = fiber -> fid, .val = fiber };
-	mh_i32ptr_put(fiber_registry, &node, NULL, NULL, &ret);
+	mh_i32ptr_put(fiber_registry, &node, NULL, NULL, NULL);
 }
 
 static void

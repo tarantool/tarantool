@@ -47,12 +47,11 @@ session_create(int fd)
 		;
 
 	uint32_t sid = sid_max;
-	int ret;
 	struct mh_i32ptr_node_t node = {
 		.key = sid, .val =  (void *) (intptr_t) fd
 	};
 
-	mh_int_t k = mh_i32ptr_put(session_registry, &node, NULL, NULL, &ret);
+	mh_int_t k = mh_i32ptr_put(session_registry, &node, NULL, NULL, NULL);
 
 	if (k == mh_end(session_registry)) {
 		tnt_raise(ClientError, :ER_MEMORY_ISSUE,

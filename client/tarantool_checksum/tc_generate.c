@@ -226,7 +226,7 @@ tc_generate_entry(struct tc_spaces *s, struct tnt_request *r)
 	}
 	/* 3. put into hash */
 	const struct tc_key *node = k;
-	mh_int_t pos = mh_pk_put(space->hash_log, &node, space, space, NULL);
+	mh_int_t pos = mh_pk_put(space->hash_log, &node, NULL, space, space);
 	if (pos == mh_end(space->hash_log)) {
 		free(k);
 		return -1;
@@ -380,8 +380,8 @@ tc_generate_snaprow(struct tc_spaces *s, struct tnt_iter_storage *is,
 	if (v == NULL) {
 		k->crc = crc32c(0, (unsigned char*)is->t.data, is->t.size);
 		const struct tc_key *node = k;
-		mh_int_t pos = mh_pk_put(space->hash_snap, &node,
-					 space, space, NULL);
+		mh_int_t pos = mh_pk_put(space->hash_snap, &node, NULL,
+					 space, space);
 		if (pos == mh_end(space->hash_snap)) {
 			free(k);
 			return -1;

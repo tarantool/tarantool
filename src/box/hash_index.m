@@ -337,8 +337,8 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	if (new_tuple) {
 		struct mh_i32ptr_node_t *dup_node = &old_node;
 		new_node = int32_tuple_to_node(new_tuple, key_def);
-		mh_int_t pos = mh_i32ptr_replace(int_hash, &new_node,
-						 &dup_node, NULL, NULL);
+		mh_int_t pos = mh_i32ptr_put(int_hash, &new_node,
+					     &dup_node, NULL, NULL);
 
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
@@ -356,8 +356,8 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 		if (errcode) {
 			mh_i32ptr_remove(int_hash, &new_node, NULL, NULL);
 			if (dup_node) {
-				pos = mh_i32ptr_replace(int_hash, dup_node,
-							NULL, NULL, NULL);
+				pos = mh_i32ptr_put(int_hash, dup_node,
+						    NULL, NULL, NULL);
 				if (pos == mh_end(int_hash)) {
 					panic("Failed to allocate memory in "
 					      "recover of int hash");
@@ -500,8 +500,8 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	if (new_tuple) {
 		struct mh_i64ptr_node_t *dup_node = &old_node;
 		new_node = int64_tuple_to_node(new_tuple, key_def);
-		mh_int_t pos = mh_i64ptr_replace(int64_hash, &new_node,
-						 &dup_node, NULL, NULL);
+		mh_int_t pos = mh_i64ptr_put(int64_hash, &new_node,
+					     &dup_node, NULL, NULL);
 
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
@@ -518,8 +518,8 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 		if (errcode) {
 			mh_i64ptr_remove(int64_hash, &new_node, NULL, NULL);
 			if (dup_node) {
-				pos = mh_i64ptr_replace(int64_hash, dup_node,
-							NULL, NULL, NULL);
+				pos = mh_i64ptr_put(int64_hash, dup_node,
+						    NULL, NULL, NULL);
 				if (pos == mh_end(int64_hash)) {
 					panic("Failed to allocate memory in "
 					      "recover of int64 hash");
@@ -660,8 +660,8 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	if (new_tuple) {
 		struct mh_lstrptr_node_t *dup_node = &old_node;
 		new_node = lstrptr_tuple_to_node(new_tuple, key_def);
-		mh_int_t pos = mh_lstrptr_replace(str_hash, &new_node,
-						  &dup_node, NULL, NULL);
+		mh_int_t pos = mh_lstrptr_put(str_hash, &new_node,
+					      &dup_node, NULL, NULL);
 
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
@@ -679,8 +679,8 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 		if (errcode) {
 			mh_lstrptr_remove(str_hash, &new_node, NULL, NULL);
 			if (dup_node) {
-				pos = mh_lstrptr_replace(str_hash, dup_node,
-							 NULL, NULL, NULL);
+				pos = mh_lstrptr_put(str_hash, dup_node,
+						     NULL, NULL, NULL);
 				if (pos == mh_end(str_hash)) {
 					panic("Failed to allocate memory in "
 					      "recover of str hash");

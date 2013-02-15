@@ -193,8 +193,8 @@ int tc_file_load(struct tc_spaces *s, char *file,
 				return -1;
 			}
 			const struct tc_key *node = k;
-			mh_int_t pos = mh_pk_put(space->hash_log, &node,
-						  space, space, NULL);
+			mh_int_t pos = mh_pk_put(space->hash_log, &node, NULL,
+						 space, space);
 			if (pos == mh_end(space->hash_log)) {
 				fclose(f);
 				return -1;
@@ -211,7 +211,7 @@ int tc_file_load(struct tc_spaces *s, char *file,
 			}
 			const struct tc_key *node = k;
 			mh_int_t pos = mh_pk_put(space->hash_snap, &node,
-						 space, space, NULL);
+						 NULL, space, space);
 			if (pos == mh_end(space->hash_log)) {
 				fclose(f);
 				return -1;

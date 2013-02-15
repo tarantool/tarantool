@@ -234,9 +234,18 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node,
 	return save_i;
 }
 
+/**
+ * Find a node in the hash and replace it with a new value.
+ * Save the old node in ret pointer, if it is provided.
+ * If the old node didn't exist, just insert the new node.
+ *
+ * @retval != mh_end()   pos of the new node, ret is either NULL
+ *                       or copy of the old node
+ * @retval  mh_end()     out of memory, ret is unchanged.
+ */
 static inline mh_int_t
-_mh(put)(struct _mh(t) *h, const mh_node_t *node,
-	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg, int *ret)
+_mh(put)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **ret,
+	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
 {
 	mh_int_t x = mh_end(h);
 	if (h->size == h->n_buckets)
@@ -251,7 +260,7 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node,
 			goto put_done;
 	}
 	if (h->resize_position)
-		_mh(put)(h->shadow, node, hash_arg, eq_arg, NULL);
+		_mh(put)(h->shadow, node, NULL, hash_arg, eq_arg);
 #else
 	if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
 		if (_mh(start_resize)(h, h->n_buckets + 1, h->size,
@@ -262,8 +271,6 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node,
 
 	x = put_slot(h, node, hash_arg, eq_arg);
 	int exist = mh_exist(h, x);
-	if (ret)
-		*ret = !exist;
 
 	if (!exist) {
 		/* add new */
@@ -273,44 +280,17 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node,
 			h->n_dirty++;
 
 		memcpy(&(h->p[x]), node, sizeof(mh_node_t));
+		if (ret)
+			*ret = NULL;
 	} else {
+		if (ret)
+			memcpy(*ret, &(h->p[x]), sizeof(mh_node_t));
 		/* replace old */
 		memcpy(&(h->p[x]), node, sizeof(mh_node_t));
 	}
 
 put_done:
 	return x;
-}
-
-
-/**
- * Find a node in the hash and replace it with a new value.
- * Save the old node in p_old pointer, if it is provided.
- * If the old node didn't exist, just insert the new node.
- */
-static inline mh_int_t
-_mh(replace)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **p_old,
-	 mh_hash_arg_t hash_arg, mh_eq_arg_t eq_arg)
-{
-	mh_int_t k = _mh(get)(h, node, hash_arg, eq_arg);
-	if (k == mh_end(h)) {
-		/* No such node yet: insert a new one. */
-		if (p_old) {
-			*p_old = NULL;
-		}
-		return _mh(put)(h, node, hash_arg, eq_arg, NULL);
-	} else {
-		/*
-		 * Maintain uniqueness: replace the old node
-		 * with a new value.
-		 */
-		if (p_old) {
-			/* Save the old value. */
-			memcpy(*p_old, &(h->p[k]), sizeof(mh_node_t));
-		}
-		memcpy(&(h->p[k]), node, sizeof(mh_node_t));
-		return k;
-	}
 }
 
 static inline void

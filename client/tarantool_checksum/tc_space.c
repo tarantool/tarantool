@@ -92,10 +92,9 @@ struct tc_space *tc_space_create(struct tc_spaces *s, uint32_t id) {
 	space->id = id;
 	space->hash_log = mh_pk_new();
 	space->hash_snap = mh_pk_new();
-	int ret;
 
 	const struct mh_u32ptr_node_t node = { .key = space->id, .val = space };
-	mh_u32ptr_put(s->t, &node, space, space, &ret);
+	mh_u32ptr_put(s->t, &node, NULL, space, space);
 	return space;
 }
 
