@@ -848,6 +848,7 @@ lbox_index_count(struct lua_State *L)
 	if (argc == 0)
 		luaL_error(L, "index.count(): one or more arguments expected");
 	/* preparing single or multi-part key */
+	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	void *key;
 	int key_part_count;
 	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
@@ -879,6 +880,9 @@ lbox_index_count(struct lua_State *L)
 			continue;
 		count++;
 	}
+	/* truncate memory used by key */
+	ptruncate(fiber->gc_pool, allocated_size);
+
 	/* returning subtree size */
 	lua_pushnumber(L, count);
 	return 1;
