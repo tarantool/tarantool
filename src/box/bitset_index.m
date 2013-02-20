@@ -56,32 +56,32 @@ value_to_tuple(size_t value)
 	return salloc_ptr_from_index(value);
 }
 
-struct iterator_wrapper {
+struct bitset_index_iterator {
 	struct iterator base; /* Must be the first member. */
 	struct bitset_iterator bitset_it;
 };
 
-static struct iterator_wrapper *
-iterator_wrapper(struct iterator *it)
+static struct bitset_index_iterator *
+bitset_index_iterator(struct iterator *it)
 {
-	return (struct iterator_wrapper *) it;
+	return (struct bitset_index_iterator *) it;
 }
 
 void
-iterator_wrapper_free(struct iterator *iterator)
+bitset_index_iterator_free(struct iterator *iterator)
 {
-	assert(iterator->free == iterator_wrapper_free);
-	struct iterator_wrapper *it = iterator_wrapper(iterator);
+	assert(iterator->free == bitset_index_iterator_free);
+	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
 	bitset_iterator_destroy(&it->bitset_it);
 	free(it);
 }
 
 struct tuple *
-iterator_wrapper_next(struct iterator *iterator)
+bitset_index_iterator_next(struct iterator *iterator)
 {
-	assert(iterator->free == iterator_wrapper_free);
-	struct iterator_wrapper *it = iterator_wrapper(iterator);
+	assert(iterator->free == bitset_index_iterator_free);
+	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
 	size_t value = bitset_iterator_next(&it->bitset_it);
 	if (value == SIZE_MAX)
@@ -163,13 +163,13 @@ iterator_wrapper_next(struct iterator *iterator)
 
 - (struct iterator *) allocIterator
 {
-	struct iterator_wrapper *it = malloc(sizeof(struct iterator_wrapper));
+	struct bitset_index_iterator *it = malloc(sizeof(*it));
 	if (!it)
 		return NULL;
 
-	memset(it, 0, sizeof(struct iterator_wrapper));
-	it->base.next = iterator_wrapper_next;
-	it->base.free = iterator_wrapper_free;
+	memset(it, 0, sizeof(*it));
+	it->base.next = bitset_index_iterator_next;
+	it->base.free = bitset_index_iterator_free;
 
 	bitset_iterator_create(&it->bitset_it, realloc);
 
@@ -203,10 +203,6 @@ iterator_wrapper_next(struct iterator *iterator)
 
 	if (old_tuple != NULL) {
 		size_t value = tuple_to_value(old_tuple);
-#if defined(DEBUG)
-		say_debug("BitsetIndex: remove value = %zu (%p)",
-			  value, old_tuple);
-#endif /* defined(DEBUG) */
 		if (bitset_index_contains_value(&self->index, value)) {
 			ret = old_tuple;
 
@@ -223,10 +219,6 @@ iterator_wrapper_next(struct iterator *iterator)
 		const void *bitset_key = field;
 
 		size_t value = tuple_to_value(new_tuple);
-#if defined(DEBUG)
-		say_debug("BitsetIndex: insert value = %zu (%p)",
-			  value, new_tuple);
-#endif /* defined(DEBUG) */
 		if (bitset_index_insert(&self->index, bitset_key,
 					bitset_key_size, value) < 0) {
 			tnt_raise(ClientError, :ER_MEMORY_ISSUE, 0,
@@ -240,8 +232,8 @@ iterator_wrapper_next(struct iterator *iterator)
 - (void) initIterator: (struct iterator *) iterator:(enum iterator_type) type
       :(const void *) key :(u32) part_count
 {
-	assert(iterator->free == iterator_wrapper_free);
-	struct iterator_wrapper *it = iterator_wrapper(iterator);
+	assert(iterator->free == bitset_index_iterator_free);
+	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
 	const void *bitset_key = NULL;
 	size_t bitset_key_size = 0;
