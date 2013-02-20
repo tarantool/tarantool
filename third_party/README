@@ -11,11 +11,8 @@ cvs up
 How to update luajit
 ====================
 
-- download the latest release source tarball
-- replace the contents of the luajit directory 
-with the contents of the tarball
-- merge the original Makefile and the Makefile
-from the new tarball.
+Run from project root dir:
+git submodule update --reference v2.0.1-fixed -- third_party/luajit
 
 How to update libobjc2
 ======================

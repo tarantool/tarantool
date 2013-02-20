@@ -152,9 +152,6 @@ macro(luajit_build)
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND $(MAKE) clean
-            COMMAND $(MAKE) -C src -t buildvm_x86.h buildvm_arm.h
-                            buildvm_x64.h buildvm_x64win.h buildvm_ppc.h
-                            buildvm_ppcspe.h
             COMMAND $(MAKE) -C src ${luajit_buildoptions}
             DEPENDS ${CMAKE_SOURCE_DIR}/CMakeCache.txt
         )
@@ -166,9 +163,6 @@ macro(luajit_build)
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND cp -r ${PROJECT_SOURCE_DIR}/third_party/luajit/* .
             COMMAND $(MAKE) clean
-            COMMAND $(MAKE) -C src -t buildvm_x86.h buildvm_arm.h
-                            buildvm_x64.h buildvm_x64win.h buildvm_ppc.h
-                            buildvm_ppcspe.h
             COMMAND $(MAKE) -C src ${luajit_buildoptions}
             DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt ${PROJECT_BINARY_DIR}/third_party/luajit
         )
