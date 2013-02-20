@@ -39,7 +39,7 @@
  */
 bool sse42_enabled_cpu();
 
-
+#if defined (__x86_64__) || defined (__i386__)
 /* Hardware-calculate CRC32 for the given data buffer.
  *
  * @param	crc 		initial CRC
@@ -50,7 +50,7 @@ bool sse42_enabled_cpu();
  * @return	CRC32 value
  */
 u_int32_t crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len);
-
+#endif
 
 #endif /* TARANTOOL_CPU_FEATURES_H */
 

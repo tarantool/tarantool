@@ -30,17 +30,17 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
-#if !defined (__x86_64__) && !defined (__i386__)
-	#error "Only x86 and x86_64 architectures supported"
-#endif
+#include "cpu_feature.h"
+
+#if defined (__x86_64__) || defined (__i386__)
 
 #ifdef HAVE_CPUID_H
 #include <cpuid.h>
 #else
 #include <third_party/compat/sys/cpuid.h>
 #endif
-#include "cpu_feature.h"
 
 #define SCALE_F		sizeof(unsigned long)
 
@@ -48,8 +48,6 @@
 	#define REX_PRE "0x48, "
 #elif defined (__i386__)
 	#define REX_PRE
-#else
-	#error "Only x86 and x86_64 architectures supported"
 #endif
 
 
@@ -87,12 +85,11 @@ crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
 
 	if (iremainder) {
 		crc = crc32c_hw_byte(crc, (unsigned char const*)ptmp,
-				 			iremainder);
+							iremainder);
 	}
 
 	return crc;
 }
-
 
 bool
 sse42_enabled_cpu()
@@ -105,4 +102,12 @@ sse42_enabled_cpu()
 	return (cx & (1 << 20)) != 0;
 }
 
+#else /* !(defined (__x86_64__) || defined (__i386__)) */
 
+bool
+sse42_enabled_cpu()
+{
+	return false;
+}
+
+#endif
