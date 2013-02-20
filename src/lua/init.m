@@ -126,7 +126,7 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 		if (idx < 0)
 			idx = lua_gettop(L) + idx + 1;
 		GCcdata *cd = cdataV(L->base + idx - 1);
-		if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64) {
+		if (cd->ctypeid != CTID_INT64 && cd->ctypeid != CTID_UINT64) {
 			luaL_error(L,
 				   "lua_tointeger64: unsupported cdata type");
 		}
