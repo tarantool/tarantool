@@ -50,7 +50,7 @@ read_key(struct tbuf *data, void **key_ptr, u32 *key_part_count_ptr)
 	if (key_part_count) {
 		key = read_field(data);
 		/* advance remaining fields of a key */
-		for (int i = 1; i < key_part_count; i++)
+		for (u32 i = 1; i < key_part_count; i++)
 			read_field(data);
 	}
 

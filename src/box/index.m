@@ -39,7 +39,7 @@ static struct index_traits index_traits = {
 	.allows_partial_key = false,
 };
 
-const char *field_data_type_strs[] = {"NUM", "NUM64", "STR", "\0"};
+const char *field_data_type_strs[] = {"UNKNOWN", "NUM", "NUM64", "STR", "\0"};
 STRS(index_type, INDEX_TYPE);
 STRS(iterator_type, ITERATOR_TYPE);
 
@@ -47,7 +47,7 @@ STRS(iterator_type, ITERATOR_TYPE);
 
 void
 check_key_parts(const struct key_def *key_def,
-		int part_count, bool partial_key_allowed)
+		u32 part_count, bool partial_key_allowed)
 {
 	if (part_count > key_def->part_count)
 		tnt_raise(ClientError, :ER_KEY_PART_COUNT,
@@ -179,7 +179,7 @@ replace_check_dup(struct tuple *old_tuple,
 	return NULL;
 }
 
-- (struct tuple *) findByKey: (const void *) key :(int) part_count
+- (struct tuple *) findByKey: (const void *) key :(u32) part_count
 {
 	(void) key;
 	(void) part_count;
@@ -214,7 +214,7 @@ replace_check_dup(struct tuple *old_tuple,
 
 - (void) initIterator: (struct iterator *) iterator
 	:(enum iterator_type) type
-	:(void *) key :(int) part_count
+	:(void *) key :(u32) part_count
 {
 	(void) iterator;
 	(void) type;

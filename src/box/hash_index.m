@@ -309,7 +309,7 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(int_hash);
 }
 
-- (struct tuple *) findByKey: (const void *) key :(int) part_count
+- (struct tuple *) findByKey: (const void *) key :(u32) part_count
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
@@ -388,7 +388,7 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 }
 
 - (void) initIterator: (struct iterator *) ptr :(enum iterator_type) type
-                        :(void *) key :(int) part_count
+			:(const void *) key :(u32) part_count
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
@@ -474,7 +474,7 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(int64_hash);
 }
 
-- (struct tuple *) findByKey: (const void *) key :(int) part_count
+- (struct tuple *) findByKey: (const void *) key :(u32) part_count
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
@@ -551,7 +551,7 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 
 
 - (void) initIterator: (struct iterator *) ptr :(enum iterator_type) type
-                        :(void *) key :(int) part_count
+			:(const void *) key :(u32) part_count
 {
 	(void) part_count;
 	assert(ptr->free == hash_iterator_free);
@@ -632,7 +632,7 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(str_hash);
 }
 
-- (struct tuple *) findByKey: (const void *) key :(int) part_count
+- (struct tuple *) findByKey: (const void *) key :(u32) part_count
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
@@ -712,7 +712,7 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 
 - (void) initIterator: (struct iterator *) ptr
 			:(enum iterator_type) type
-                        :(void *) key :(int) part_count
+			:(const void *) key :(u32) part_count
 {
 	(void) part_count;
 

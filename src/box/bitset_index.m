@@ -176,7 +176,7 @@ iterator_wrapper_next(struct iterator *iterator)
 	return (struct iterator *) it;
 }
 
-- (struct tuple *) findByKey: (void *) key :(int) part_count
+- (struct tuple *) findByKey: (const void *) key :(u32) part_count
 {
 	(void) key;
 	(void) part_count;
@@ -238,7 +238,7 @@ iterator_wrapper_next(struct iterator *iterator)
 }
 
 - (void) initIterator: (struct iterator *) iterator:(enum iterator_type) type
-      :(const void *) key :(int) part_count
+      :(const void *) key :(u32) part_count
 {
 	assert(iterator->free == iterator_wrapper_free);
 	struct iterator_wrapper *it = iterator_wrapper(iterator);

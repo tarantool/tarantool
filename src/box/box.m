@@ -489,7 +489,7 @@ box_cat(const char *filename)
 
 static void
 snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
-		     unsigned n, struct tuple *tuple)
+		     u32 n, struct tuple *tuple)
 {
 	struct box_snap_row header;
 	header.space = n;

@@ -40,7 +40,7 @@ struct space;
  * since there is a mismatch between enum name (STRING) and type
  * name literal ("STR"). STR is already used as Objective C type.
  */
-enum field_data_type { UNKNOWN = -1, NUM = 0, NUM64, STRING, field_data_type_MAX };
+enum field_data_type { UNKNOWN = 0, NUM, NUM64, STRING, field_data_type_MAX };
 extern const char *field_data_type_strs[];
 
 #define INDEX_TYPE(_)                                               \
@@ -100,7 +100,7 @@ struct iterator {
 
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
-	int fieldno;
+	u32 fieldno;
 	enum field_data_type type;
 };
 
@@ -119,12 +119,12 @@ struct key_def {
 	 */
 	u32 *cmp_order;
 	/* The size of the 'parts' array. */
-	int part_count;
+	u32 part_count;
 	/*
 	 * The size of 'cmp_order' array (= max fieldno in 'parts'
 	 * array).
 	 */
-	int max_fieldno;
+	u32 max_fieldno;
 	bool is_unique;
 	enum index_type type;
 };
@@ -206,7 +206,7 @@ enum dup_replace_mode {
 - (size_t) size;
 - (struct tuple *) min;
 - (struct tuple *) max;
-- (struct tuple *) findByKey: (const void *) key :(int) part_count;
+- (struct tuple *) findByKey: (const void *) key :(u32) part_count;
 - (struct tuple *) findByTuple: (struct tuple *) tuple;
 - (struct tuple *) replace: (struct tuple *) old_tuple
 			  :(struct tuple *) new_tuple
@@ -218,11 +218,11 @@ enum dup_replace_mode {
 - (struct iterator *) allocIterator;
 - (void) initIterator: (struct iterator *) iterator
 		     :(enum iterator_type) type
-		     :(void *) key :(int) part_count;
+		     :(const void *) key :(u32) part_count;
 @end
 
 void
-check_key_parts(const struct key_def *key_def, int part_count,
+check_key_parts(const struct key_def *key_def, u32 part_count,
 		bool partial_key_allowed);
 
 uint32_t
