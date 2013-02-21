@@ -452,8 +452,9 @@ lbox_tuple_index(struct lua_State *L)
 		return 1;
 	}
 	/* If we got a string, try to find a method for it. */
+	const char *sz = luaL_checkstring(L, 2);
 	lua_getmetatable(L, 1);
-	lua_getfield(L, -1, lua_tostring(L, 2));
+	lua_getfield(L, -1, sz);
 	return 1;
 }
 
