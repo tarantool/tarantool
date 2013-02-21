@@ -179,6 +179,13 @@ replace_check_dup(struct tuple *old_tuple,
 	return NULL;
 }
 
+- (struct tuple *) random: (u32) rnd
+{
+	(void) rnd;
+	[self subclassResponsibility: _cmd];
+	return NULL;
+}
+
 - (struct tuple *) findByKey: (const void *) key :(u32) part_count
 {
 	(void) key;

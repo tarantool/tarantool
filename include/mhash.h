@@ -191,6 +191,18 @@ _mh(get)(struct _mh(t) *h, const mh_node_t *node,
 }
 
 static inline mh_int_t
+_mh(random)(struct _mh(t) *h, mh_int_t rnd)
+{
+	for (mh_int_t i = 0; i < mh_size(h); i++, rnd++) {
+		rnd %= h->n_buckets;
+		if (mh_exist(h, rnd))
+			return rnd;
+	}
+
+	return h->n_buckets;
+}
+
+static inline mh_int_t
 _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node,
 	      mh_arg_t arg)
 {

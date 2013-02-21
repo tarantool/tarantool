@@ -648,6 +648,18 @@ lbox_index_max(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_index_random(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2 || lua_isnil(L, 2))
+		luaL_error(L, "Usage: index:random((uint32) rnd)");
+
+	Index *index = lua_checkindex(L, 1);
+	u32 rnd = lua_tointeger(L, 2);
+	lbox_pushtuple(L, [index random: rnd]);
+	return 1;
+}
+
 /**
  * Convert an element on Lua stack to a part of an index
  * key.
@@ -894,6 +906,7 @@ static const struct luaL_reg lbox_index_meta[] = {
 	{"part_count", lbox_index_part_count},
 	{"min", lbox_index_min},
 	{"max", lbox_index_max},
+	{"random", lbox_index_random},
 	{"next", lbox_index_next},
 	{"iterator", lbox_index_iterator},
 	{"count", lbox_index_count},

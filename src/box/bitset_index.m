@@ -161,6 +161,12 @@ bitset_index_iterator_next(struct iterator *iterator)
 	return NULL;
 }
 
+- (struct tuple *) random
+{
+	tnt_raise(ClientError, :ER_UNSUPPORTED, "BitsetIndex", "random()");
+	return NULL;
+}
+
 - (struct iterator *) allocIterator
 {
 	struct bitset_index_iterator *it = malloc(sizeof(*it));

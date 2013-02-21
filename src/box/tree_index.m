@@ -928,6 +928,12 @@ tree_iterator_gt(struct iterator *iterator)
 	return [self unfold: node];
 }
 
+- (struct tuple *) random: (u32) rnd
+{
+	void *node = sptree_index_random(&tree, rnd);
+	return [self unfold: node];
+}
+
 - (struct tuple *) findByKey: (const void *) key : (u32) part_count
 {
 	assert(key_def->is_unique);

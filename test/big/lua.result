@@ -1,3 +1,6 @@
+lua dofile('index_random_test.lua')
+---
+...
 insert into t1 values ('brave', 'new', 'world')
 Insert OK, 1 row affected
 lua box.space[1].index[1]:min()
@@ -582,4 +585,24 @@ lua box.space[23]:truncate()
 ...
 lua for _k, v in box.space[23]:pairs() do print(v) end
 ---
+...
+
+#-----------------------------------------------------------------------------#
+# TreeIndex::random()
+#-----------------------------------------------------------------------------#
+
+lua index_random_test(25, 0)
+---
+all values have been found
+ - true
+...
+
+#-----------------------------------------------------------------------------#
+# HashIndex::random()
+#-----------------------------------------------------------------------------#
+
+lua index_random_test(25, 1)
+---
+all values have been found
+ - true
 ...

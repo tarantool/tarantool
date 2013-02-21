@@ -3,6 +3,16 @@
 import os
 import shutil
 
+import os
+import shutil
+
+for file in ("index_random_test.lua",):
+    src_path = os.path.join("big/", file)
+    dst_path = os.path.join(vardir, file)
+    shutil.copy(src_path, dst_path)
+    exec admin "lua dofile('%s')" % (file)
+    os.unlink(dst_path);
+
 exec sql "insert into t1 values ('brave', 'new', 'world')"
 exec admin "lua box.space[1].index[1]:min()"
 exec admin "lua box.space[1].index[1]:max()"
@@ -220,3 +230,20 @@ exec admin "lua for _k, v in box.space[23]:pairs() do print(v) end"
 exec admin "lua box.space[23]:truncate()"
 # Empty result
 exec admin "lua for _k, v in box.space[23]:pairs() do print(v) end"
+
+print """
+#-----------------------------------------------------------------------------#
+# TreeIndex::random()
+#-----------------------------------------------------------------------------#
+""";
+
+exec admin "lua index_random_test(25, 0)"
+
+print """
+#-----------------------------------------------------------------------------#
+# HashIndex::random()
+#-----------------------------------------------------------------------------#
+""";
+
+exec admin "lua index_random_test(25, 1)"
+

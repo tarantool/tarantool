@@ -172,6 +172,7 @@ function box.bless_space(space)
     -- min and max
     index_mt.min = function(index) return index.idx:min() end
     index_mt.max = function(index) return index.idx:max() end
+    index_mt.random = function(index, rnd) return index.idx:random(rnd) end
     -- iteration
     index_mt.iterator = function(index, ...)
         return index.idx:iterator(...)
