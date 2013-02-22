@@ -125,14 +125,14 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	/* from lsn */
 	opt->lsn_from = 0;
 	if (gopt_arg(tc_options, 'F', &arg)) {
-		opt->lsn_from = atoi(arg);
+		opt->lsn_from = strtoll(arg, NULL, 10);
 		opt->lsn_from_set = 1;
 	}
 
 	/* to lsn */
 	opt->lsn_to = 0;
 	if (gopt_arg(tc_options, 'T', &arg)) {
-		opt->lsn_to = atoi(arg);
+		opt->lsn_to = strtoll(arg, NULL, 10);
 		opt->lsn_to_set = 1;
 	}
 
