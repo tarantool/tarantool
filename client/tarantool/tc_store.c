@@ -114,7 +114,7 @@ static int tc_store_printer(struct tnt_iter *i) {
 			return 0;
 	}
 	if (tc.opt.lsn_to_set) {
-		if (s->log.current.hdr.lsn >= tc.opt.lsn_to)
+		if (s->log.current.hdr.lsn > tc.opt.lsn_to)
 			return 0;
 	}
 	((tc_printerf_t)tc.opt.printer)(&s->log.current.hdr, r);
