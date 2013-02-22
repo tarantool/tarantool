@@ -213,7 +213,6 @@ if (ENABLE_BUNDLED_LIBOBJC)
     libobjc_build()
     add_dependencies(build_bundled_libs objc)
     set(HAVE_LIBOBJC_BUNDLED ON)
-    include_directories(${LIBOBJC_INCLUDE_DIR})
 else()
     if (CMAKE_COMPILER_IS_GNUCC)
         # Use compiler's objc library
@@ -241,7 +240,6 @@ set(ENABLE_BUNDLED_LIBEV ON)
 include(BuildLibEV)
 libev_build()
 add_dependencies(build_bundled_libs ev)
-include_directories(${LIBEV_INCLUDE_DIR})
 
 #
 # LibEIO
@@ -257,7 +255,6 @@ else()
     find_package(LibEIO)
 endif()
 
-include_directories(${LIBEIO_INCLUDE_DIR})
 
 #
 # LibCORO
@@ -274,7 +271,6 @@ set(ENABLE_BUNDLED_LIBCORO ON)
 include(BuildLibCORO)
 libcoro_build()
 add_dependencies(build_bundled_libs coro)
-include_directories(${LIBCORO_INCLUDE_DIR})
 
 if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "86" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "amd64")
     add_definitions("-DCORO_ASM")
@@ -289,8 +285,6 @@ endif()
 include(BuildLibGOPT)
 libgopt_build()
 add_dependencies(build_bundled_libs gopt)
-
-include_directories(${LIBGOPT_INCLUDE_DIR})
 
 #
 # Third-Party misc
