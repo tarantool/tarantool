@@ -351,16 +351,16 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
         </term>
         <listitem>
             <para>
-                Select a tuple in the given space. A
+                Search for tuple in the given space. A
                 wrapper around <code>box.process()</code>.
                 <bridgehead renderas="sect4">Parameters</bridgehead>
                 <simplelist>
                     <member><code>space_no</code> &mdash; space id,
                     </member>
                     <member><code>index_no</code> &mdash; index number in the
-                        space,</member>
+                        space, to be used for match</member>
                     <member><code>...</code>&mdash; index key,
-                    possibly compound.
+                    possibly multipart.
                     </member>
                 </simplelist>
                 <bridgehead renderas="sect4">Returns</bridgehead>
