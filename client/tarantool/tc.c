@@ -105,6 +105,8 @@ static void tc_validate(void)
 	if (tc.opt.printer == NULL)
 		return tc_error("unsupported output format '%s'",
 				tc.opt.format);
+	if (tc.opt.format && strcmp(tc.opt.format, "raw") == 0)
+		tc.opt.raw = 1;
 }
 
 int main(int argc, char *argv[])

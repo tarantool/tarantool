@@ -198,7 +198,11 @@ tnt_log_next_to(struct tnt_log *l, union tnt_log_value *value) {
 		tnt_mem_free(buf);
 		return NULL;
 	}
-	tnt_mem_free(buf);
+	if (l->type == TNT_LOG_XLOG) {
+		tnt_request_setorigin(&value->r, buf, size);
+	} else {
+		tnt_mem_free(buf);
+	}
 	return &l->current;
 }
 

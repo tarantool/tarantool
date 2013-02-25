@@ -58,7 +58,7 @@ static const void *tc_options_def = gopt_start(
 	gopt_option('T', GOPT_ARG, gopt_shorts('T'),
 		    gopt_longs("to"), " <lsn>", "stop on specified xlog lsn"),
 	gopt_option('M', GOPT_ARG, gopt_shorts('M'),
-		    gopt_longs("format"), " <name>", "cat output format (tarantool)"),
+		    gopt_longs("format"), " <name>", "cat output format (tarantool, raw)"),
 	gopt_option('R', GOPT_ARG, gopt_shorts('R'),
 		    gopt_longs("rpl"), " <lsn>", "act as replica for the specified server"),
 	gopt_option('?', 0, gopt_shorts(0), gopt_longs("help"),
@@ -137,6 +137,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	}
 
 	/* output format */
+	opt->raw = 0;
 	opt->format = NULL;
 	if (gopt_arg(tc_options, 'M', &arg))
 		opt->format = arg;

@@ -154,11 +154,20 @@ tc_printer_tarantool(struct tnt_log_header_v11 *hdr,
 	}
 }
 
+static void
+tc_printer_raw(struct tnt_log_header_v11 *hdr, struct tnt_request *r)
+{
+	fwrite(hdr, sizeof(*hdr), 1, stdout);
+	fwrite(r->origin, r->origin_size, 1, stdout);
+}
+
 tc_printerf_t tc_print_getcb(const char *name)
 {
 	if (name == NULL)
 		return tc_printer_tarantool;
 	if (!strcasecmp(name, "tarantool"))
 		return tc_printer_tarantool;
+	if (!strcasecmp(name, "raw"))
+		return tc_printer_raw;
 	return NULL;
 }

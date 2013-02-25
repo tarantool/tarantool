@@ -97,6 +97,25 @@ tnt_request_free(struct tnt_request *r)
 		tnt_mem_free(r->v);
 		r->v = NULL;
 	}
+	if (r->origin) {
+		tnt_mem_free(r->origin);
+		r->origin = NULL;
+	}
+}
+
+/*
+ * tnt_request_setorigin()
+ *
+ * set buffer of request source, free it with request free;
+ *
+ * r    - request object pointer
+ * buf  - supplied buffer
+ * size - buffer size
+*/
+void
+tnt_request_setorigin(struct tnt_request *r, char *buf, size_t size) {
+	r->origin = buf;
+	r->origin_size = size;
 }
 
 static int
