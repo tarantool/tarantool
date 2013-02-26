@@ -46,6 +46,8 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+#define ERESOLVE -1
+
 /**
  * Asynchronous IO Tasks (libeio wrapper)
  *

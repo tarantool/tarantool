@@ -218,6 +218,7 @@ getaddrinfo_cb(va_list ap)
 	const struct addrinfo *hints = va_arg(ap, const struct addrinfo *);
 	struct addrinfo **res = va_arg(ap, struct addrinfo **);
 	if (getaddrinfo(host, port, hints, res)) {
+		errno = ERESOLVE;
 		return -1;
 	}
 	return 0;
