@@ -124,6 +124,16 @@ exec admin "lua box.auto_increment(18, 'c')"
 exec admin "lua box.space[18]:truncate()"
 
 #
+# Tests for lua box.auto_increment with NUM64 keys
+#
+exec admin "lua box.space[25]:truncate()"
+exec admin "lua box.auto_increment(25, 'a')"
+exec admin "lua box.insert(25, tonumber64(5))"
+exec admin "lua box.auto_increment(25, 'b')"
+exec admin "lua box.auto_increment(25, 'c')"
+exec admin "lua box.space[25]:truncate()"
+
+#
 # Tests for lua tuple:transform()
 #
 exec admin "lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')"

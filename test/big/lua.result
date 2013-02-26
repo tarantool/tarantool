@@ -319,7 +319,7 @@ lua box.space[18]:truncate()
 ...
 lua box.auto_increment(18, 'a')
 ---
- - 0: {'a'}
+ - 1: {'a'}
 ...
 lua box.insert(18, 5)
 ---
@@ -334,6 +334,28 @@ lua box.auto_increment(18, 'c')
  - 7: {'c'}
 ...
 lua box.space[18]:truncate()
+---
+...
+lua box.space[25]:truncate()
+---
+...
+lua box.auto_increment(25, 'a')
+---
+ - 1: {'a'}
+...
+lua box.insert(25, tonumber64(5))
+---
+ - 5: {}
+...
+lua box.auto_increment(25, 'b')
+---
+ - 6: {'b'}
+...
+lua box.auto_increment(25, 'c')
+---
+ - 7: {'c'}
+...
+lua box.space[25]:truncate()
 ---
 ...
 lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')
