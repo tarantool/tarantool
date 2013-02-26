@@ -196,43 +196,6 @@ bio_pusheof(struct lua_State *L, struct bio_socket *s)
 	return 2;
 }
 
-/*
- * Resolver function, run in separate thread by
- * coeio (libeio).
-*/
-static ssize_t
-bio_getaddrinfo_cb(va_list ap)
-{
-	const char *host = va_arg(ap, const char *);
-	const char *port = va_arg(ap, const char *);
-	const struct addrinfo *hints = va_arg(ap, const struct addrinfo *);
-	struct addrinfo **res = va_arg(ap, struct addrinfo **);
-	if (getaddrinfo(host, port, hints, res)) {
-		errno = ERESOLVE;
-		return -1;
-	}
-	return 0;
-}
-
-static struct addrinfo *
-bio_resolve(int socktype, const char *host, const char *port,
-            ev_tstamp timeout)
-{
-	/* Fill hinting information for use by connect(2) or bind(2). */
-	struct addrinfo *result = NULL;
-	struct addrinfo hints;
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
-	hints.ai_socktype = socktype;
-	hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
-	hints.ai_protocol = 0;
-	/* do resolving */
-	if (coeio_custom(bio_getaddrinfo_cb, timeout, host, port,
-			 &hints, &result))
-		return NULL;
-	return result;
-}
-
 static int
 lbox_socket_tostring(struct lua_State *L)
 {
@@ -342,9 +305,9 @@ lbox_socket_connect(struct lua_State *L)
 	/* try to resolve a hostname */
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
-	struct addrinfo *ai = bio_resolve(s->socktype, host, port, delay);
+	struct addrinfo *ai = coeio_resolve(s->socktype, host, port, delay);
 	if (ai == NULL)
-		return bio_pushsockerror(L, s, errno);
+		return bio_pushsockerror(L, s, ERESOLVE);
 
 	evio_timeout_update(start, &delay);
 	@try {
@@ -695,9 +658,9 @@ lbox_socket_bind(struct lua_State *L)
 		return bio_pusherror(L, s, EALREADY);
 	bio_clearerr(s);
 	/* try to resolve a hostname */
-	struct addrinfo *ai = bio_resolve(s->socktype, host, port, timeout);
+	struct addrinfo *ai = coeio_resolve(s->socktype, host, port, timeout);
 	if (ai == NULL)
-		return bio_pusherror(L, s, errno);
+		return bio_pusherror(L, s, ERESOLVE);
 	@try {
 		evio_bind_addrinfo(&s->coio, ai);
 	} @catch (SocketError *e) {
@@ -802,25 +765,38 @@ lbox_socket_sendto(struct lua_State *L)
 	/* try to resolve a hostname */
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
-	struct addrinfo *a = bio_resolve(s->socktype, host, port, delay);
-	if (a == NULL)
-		return bio_pushsenderror(L, s, 0, errno);
 
-	evio_timeout_update(start, &delay);
+	char addrbuf[sizeof(struct sockaddr_in6)];
+	assert(sizeof(addrbuf) > sizeof(struct sockaddr_in));
+	struct addrinfo *a = NULL;
+	struct sockaddr_in *addr = (struct sockaddr_in*)addrbuf;
+	socklen_t addrlen;
+
+	if (evio_pton(host, port, addrbuf, &addrlen) == -1) {
+		evio_timeout_init(&start, &delay, timeout);
+		/* try to resolve a hostname */
+		struct addrinfo *a = coeio_resolve(s->socktype, host, port, delay);
+		if (a == NULL)
+			return bio_pushsenderror(L, s, 0, ERESOLVE);
+		evio_timeout_update(start, &delay);
+		addr = (struct sockaddr_in *) a->ai_addr;
+		addrlen = a->ai_addrlen;
+	}
+
 	size_t nwr;
 	@try {
 		/* maybe init the socket */
-		struct sockaddr_in *addr = (struct sockaddr_in *) a->ai_addr;
 		if (! evio_is_active(&s->coio))
 			evio_socket(&s->coio, addr->sin_family, s->socktype, 0);
-
 		nwr = coio_sendto_timeout(&s->coio, buf, buf_size, 0,
-					  addr, a->ai_addrlen, delay);
+					  addr, addrlen, delay);
 	} @catch (SocketError *e) {
 		/* case #2-3: error or timeout */
 		return bio_pushsenderror(L, s, 0, errno);
 	} @finally {
-		freeaddrinfo(a);
+		if (a) {
+			freeaddrinfo(a);
+		}
 	}
 	if (nwr == 0) {
 		assert(errno == ETIMEDOUT);

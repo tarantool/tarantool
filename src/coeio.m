@@ -205,3 +205,40 @@ coeio_custom(ssize_t (*func)(va_list ap), ev_tstamp timeout, ...)
 	va_end(task.ap);
 	return task.result;
 }
+
+/*
+ * Resolver function, run in separate thread by
+ * coeio (libeio).
+*/
+static ssize_t
+getaddrinfo_cb(va_list ap)
+{
+	const char *host = va_arg(ap, const char *);
+	const char *port = va_arg(ap, const char *);
+	const struct addrinfo *hints = va_arg(ap, const struct addrinfo *);
+	struct addrinfo **res = va_arg(ap, struct addrinfo **);
+	if (getaddrinfo(host, port, hints, res)) {
+		return -1;
+	}
+	return 0;
+}
+
+struct addrinfo *
+coeio_resolve(int socktype, const char *host, const char *port,
+              ev_tstamp timeout)
+{
+	/* Fill hinting information for use by connect(2) or bind(2). */
+	struct addrinfo *result = NULL;
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
+	hints.ai_socktype = socktype;
+	hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
+	hints.ai_protocol = 0;
+	/* do resolving */
+	errno = 0;
+	if (coeio_custom(getaddrinfo_cb, timeout, host, port,
+			 &hints, &result))
+		return NULL;
+	return result;
+}

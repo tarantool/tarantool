@@ -95,14 +95,14 @@ lua s:close()
 lua s:connect('somewhereelse', '30303', 0.01)
 ---
  - nil
- - timeout
- - 110
- - Connection timed out
+ - error
+ - -1
+ - Host name resolution failed
 ...
 lua s:error()
 ---
- - 110
- - Connection timed out
+ - -1
+ - Host name resolution failed
 ...
 lua s:close()
 ---
@@ -117,8 +117,8 @@ error: 'box.socket: socket is not initialized'
 ...
 lua s:error()
 ---
- - 110
- - Connection timed out
+ - -1
+ - Host name resolution failed
 ...
 lua s = box.socket.tcp()
 ---
