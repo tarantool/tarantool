@@ -736,7 +736,7 @@ lbox_create_iterator(struct lua_State *L)
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 
 	/* Create a new iterator. */
-	enum iterator_type type;
+	enum iterator_type type = ITER_ALL;
 	u32 field_count = 0;
 	void *key = NULL;
 	u32 key_size = 0;
