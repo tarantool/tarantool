@@ -309,6 +309,14 @@ int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(int_hash);
 }
 
+- (struct tuple *) random: (u32) rnd
+{
+	mh_int_t k = mh_i32ptr_random(int_hash, rnd);
+	if (k != mh_end(int_hash))
+		return mh_i32ptr_node(int_hash, k)->val;
+	return NULL;
+}
+
 - (struct tuple *) findByKey: (const void *) key :(u32) part_count
 {
 	assert(key_def->is_unique);
@@ -474,6 +482,14 @@ int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 	return mh_size(int64_hash);
 }
 
+- (struct tuple *) random: (u32) rnd
+{
+	mh_int_t k = mh_i64ptr_random(int64_hash, rnd);
+	if (k != mh_end(int64_hash))
+		return mh_i64ptr_node(int64_hash, k)->val;
+	return NULL;
+}
+
 - (struct tuple *) findByKey: (const void *) key :(u32) part_count
 {
 	assert(key_def->is_unique);
@@ -630,6 +646,14 @@ lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 - (size_t) size
 {
 	return mh_size(str_hash);
+}
+
+- (struct tuple *) random: (u32) rnd
+{
+	mh_int_t k = mh_lstrptr_random(str_hash, rnd);
+	if (k != mh_end(str_hash))
+		return mh_lstrptr_node(str_hash, k)->val;
+	return NULL;
 }
 
 - (struct tuple *) findByKey: (const void *) key :(u32) part_count

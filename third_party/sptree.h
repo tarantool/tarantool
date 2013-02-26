@@ -179,6 +179,13 @@ sptree_##name##_destroy(sptree_##name *t) {                                     
     free(t->lrpointers);                                                                  \
 }                                                                                         \
                                                                                           \
+/** Nodes in the garbage list have a loop on their right link. */                         \
+static inline bool                                                                        \
+sptree_##name##_node_is_deleted(sptree_##name *t, spnode_t node) {                        \
+                                                                                          \
+    return _GET_SPNODE_RIGHT(node) == node;                                               \
+}                                                                                         \
+                                                                                          \
 static inline void*                                                                       \
 sptree_##name##_find(sptree_##name *t, void *k) {                                         \
     spnode_t    node = t->root;                                                           \
@@ -221,6 +228,17 @@ sptree_##name##_last(sptree_##name *t) {                                        
     return NULL;                                                                          \
 }                                                                                         \
                                                                                           \
+static inline void*                                                                       \
+sptree_##name##_random(sptree_##name *t, spnode_t rnd) {                                  \
+    for (spnode_t i = 0; i < t->size; i++, rnd++) {                                       \
+        rnd %= t->nmember;                                                                \
+        if (!sptree_##name##_node_is_deleted(t, rnd))                                     \
+            return ITHELEM(t, rnd);                                                       \
+                                                                                          \
+    }                                                                                     \
+                                                                                          \
+    return NULL;                                                                          \
+}                                                                                         \
 static inline spnode_t                                                                    \
 sptree_##name##_size_of_subtree(sptree_##name *t, spnode_t node) {                        \
     if (node == SPNIL)                                                                    \
@@ -659,13 +677,6 @@ static inline void                                                              
 sptree_##name##_iterator_free(sptree_##name##_iterator *i) {                              \
     if (i == NULL)    return;                                                             \
     free(i);                                                                              \
-}                                                                                         \
-                                                                                          \
-/** Nodes in the garbage list have a loop on their right link. */                         \
-static inline bool                                                                        \
-sptree_##name##_node_is_deleted(sptree_##name *t, spnode_t node) {                        \
-                                                                                          \
-    return _GET_SPNODE_RIGHT(node) == node;                                               \
 }                                                                                         \
                                                                                           \
 /**                                                                                       \
