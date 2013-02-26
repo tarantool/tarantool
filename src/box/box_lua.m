@@ -564,12 +564,26 @@ lua_checkiterator(struct lua_State *L, int i)
 }
 
 static void
-lbox_pushiterator(struct lua_State *L, struct iterator *it)
+lbox_pushiterator(struct lua_State *L, Index *index,
+                  struct iterator *it, enum iterator_type type,
+                  void *key, size_t size, int part_count)
 {
-	void **ptr = lua_newuserdata(L, sizeof(void *));
+	struct {
+		struct iterator *it;
+		char key[];
+	} *holder = lua_newuserdata(L, sizeof(void *) + size);
 	luaL_getmetatable(L, iteratorlib_name);
 	lua_setmetatable(L, -2);
-	*ptr = it;
+
+	holder->it = it;
+	memcpy(holder->key, key, size);
+
+	if (size == 0) {
+		[index initIterator: it :type];
+		return;
+	}
+	[index initIteratorByKey: it :type :(key ? holder->key : NULL)
+				  :part_count];
 }
 
 static int
@@ -724,21 +738,23 @@ lbox_index_iterator(struct lua_State *L, enum iterator_type type)
 		 * end (ITER_REVERSE).
 		 */
 		it = [index allocIterator];
-		[index initIterator: it :type];
-		lbox_pushiterator(L, it);
+		lbox_pushiterator(L, index, it, type, NULL, 0, 0);
 	} else if (argc > 1 || lua_type(L, 2) != LUA_TUSERDATA) {
 		/*
 		 * We've got something different from iterator's
 		 * userdata: must be a key to start iteration from
 		 * an offset. Seed the iterator with this key.
 		 */
+		size_t allocated_size = palloc_allocated(fiber->gc_pool);
 		int field_count;
 		void *key;
+		uint32_t key_size;
 
 		if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 			/* Searching by tuple. */
 			struct tuple *tuple = lua_checktuple(L, 2);
 			key = tuple->data;
+			key_size = tuple->bsize;
 			field_count = tuple->field_count;
 		} else {
 			/* Single or multi- part key. */
@@ -752,6 +768,7 @@ lbox_index_iterator(struct lua_State *L, enum iterator_type type)
 				append_key_part(L, i + 2, data, type);
 			}
 			key = data->data;
+			key_size = data->size;
 		}
 		/*
 		 * We allow partially specified keys for TREE
@@ -764,8 +781,10 @@ lbox_index_iterator(struct lua_State *L, enum iterator_type type)
 				   "does not match index field count (%d)",
 				   field_count, index->key_def->part_count);
 		it = [index allocIterator];
-		[index initIteratorByKey: it :type :key :field_count];
-		lbox_pushiterator(L, it);
+		lbox_pushiterator(L, index, it, type, key, key_size,
+		                  field_count);
+
+		ptruncate(fiber->gc_pool, allocated_size);
 	} else { /* 1 item on the stack and it's a userdata. */
 		it = lua_checkiterator(L, 2);
 	}
@@ -848,6 +867,7 @@ lbox_index_count(struct lua_State *L)
 	if (argc == 0)
 		luaL_error(L, "index.count(): one or more arguments expected");
 	/* preparing single or multi-part key */
+	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	void *key;
 	int key_part_count;
 	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
@@ -879,6 +899,9 @@ lbox_index_count(struct lua_State *L)
 			continue;
 		count++;
 	}
+	/* truncate memory used by key */
+	ptruncate(fiber->gc_pool, allocated_size);
+
 	/* returning subtree size */
 	lua_pushnumber(L, count);
 	return 1;
