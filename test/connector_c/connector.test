@@ -2,6 +2,7 @@ import subprocess
 import sys
 import os
 
+
 p = subprocess.Popen([os.path.join(builddir, "test/connector_c/tt")],
                      stdout=subprocess.PIPE)
 p.wait()
