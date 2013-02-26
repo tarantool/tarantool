@@ -78,6 +78,8 @@ struct tnt_request_select {
 };
 
 struct tnt_request {
+	char *origin;
+	size_t origin_size;
 	struct tnt_header h;
 	union {
 		struct tnt_request_insert insert;
@@ -92,6 +94,7 @@ struct tnt_request {
 
 void tnt_request_init(struct tnt_request *r);
 void tnt_request_free(struct tnt_request *r);
+void tnt_request_setorigin(struct tnt_request *r, char *buf, size_t size);
 
 int tnt_request(struct tnt_request *r, char *buf, size_t size, size_t *off,
 		struct tnt_header *hdr);

@@ -123,7 +123,19 @@ static int tc_store_printer(struct tnt_iter *i) {
 
 static int tc_snapshot_printer(struct tnt_iter *i) {
 	struct tnt_tuple *tu = TNT_ISTORAGE_TUPLE(i);
-	tc_print_tuple(tu);
+	struct tnt_stream_snapshot *ss =
+		TNT_SSNAPSHOT_CAST(TNT_ISTORAGE_STREAM(i));
+	if (tc.opt.raw) {
+		fwrite(&ss->log.current.row_snap,
+		       sizeof(ss->log.current.row_snap), 1, stdout);
+		fwrite(tu->data, tu->size, 1, stdout);
+	} else {
+		tc_printf("tag: %"PRIu16", cookie: %"PRIu64", space: %"PRIu32"\n",
+			  ss->log.current.row_snap.tag,
+			  ss->log.current.row_snap.cookie,
+			  ss->log.current.row_snap.space);
+		tc_print_tuple(tu);
+	}
 	return 0;
 }
 
