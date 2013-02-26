@@ -149,4 +149,7 @@ evio_setsockopt_tcpserver(int fd);
 void
 evio_bind_addrinfo(struct ev_io *coio, struct addrinfo *ai);
 
+int
+evio_pton(const char *addr, const char *port, char *sa, socklen_t *len);
+
 #endif /* TARANTOOL_EVIO_H_INCLUDED */

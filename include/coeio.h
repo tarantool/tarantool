@@ -41,6 +41,11 @@
 #include <util.h>
 #include <rlist.h>
 
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
 /**
  * Asynchronous IO Tasks (libeio wrapper)
  *
@@ -49,5 +54,9 @@
 
 void coeio_init(void);
 ssize_t coeio_custom(ssize_t (*f)(va_list ap), ev_tstamp timeout, ...);
+
+struct addrinfo *
+coeio_resolve(int socktype, const char *host, const char *port,
+              ev_tstamp timeout);
 
 #endif /* TARANTOOL_COEIO_H_INCLUDED */

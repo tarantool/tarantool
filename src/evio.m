@@ -38,6 +38,31 @@
 
 #define BIND_RETRY_DELAY 0.1
 
+/**
+ * Try to convert IPv4 or IPv6 addresses from text to binary form.
+ * sa buf must be sizeo of sizeof(sockaddr_in6).
+ */
+int
+evio_pton(const char *addr, const char *port, char *sa, socklen_t *len) {
+	struct sockaddr_in *v4 = (struct sockaddr_in*)sa;
+	int rc = inet_pton(AF_INET, addr, &v4->sin_addr);
+	if (rc) {
+		v4->sin_family = AF_INET;
+		v4->sin_port = htons(atoi(port));
+		*len = sizeof(struct sockaddr_in);
+		return AF_INET;
+	}
+	struct sockaddr_in6 *v6 = (struct sockaddr_in6*)sa;
+	rc = inet_pton(AF_INET6, addr, &v6->sin6_addr);
+	if (rc) {
+		v6->sin6_family = AF_INET6;
+		v6->sin6_port = htons(atoi(port));
+		*len = sizeof(struct sockaddr_in6);
+		return AF_INET6;
+	}
+	return -1;
+}
+
 /** Note: this function does not throw. */
 void
 evio_close(struct ev_io *evio)
