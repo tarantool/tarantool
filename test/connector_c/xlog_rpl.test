@@ -5,7 +5,7 @@ import os
 from lib.tarantool_box_server import TarantoolBoxServer
 
 p = subprocess.Popen([os.path.join(builddir, "test/connector_c/xlog"),
-		      os.path.join(builddir, "test/connector_c/connector.xlog")],
+		              os.path.abspath("connector_c/connector.xlog")],
                      stdout=subprocess.PIPE)
 o,e = p.communicate()
 sys.stdout.write(o)
@@ -22,7 +22,7 @@ server.start()
 print ""
 
 p = subprocess.Popen([os.path.join(builddir, "test/connector_c/rpl"),
-		     "127.0.0.1", "33016", "1200"],
+                      "127.0.0.1", "33016", "1200"],
                      stdout=subprocess.PIPE)
 o,e = p.communicate()
 sys.stdout.write(o)
