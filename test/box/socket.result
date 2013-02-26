@@ -817,7 +817,7 @@ lua s:error()
 lua s:close()
 ---
 ...
-lua type(s:bind('localhost', '30303'))
+lua type(s:bind('127.0.0.1', '30303'))
 ---
  - userdata
 ...
@@ -853,7 +853,7 @@ ping
 lua s = box.socket.udp()
 ---
 ...
-lua type(s:sendto('ping', 'localhost', '30302'))
+lua type(s:sendto('ping', '127.0.0.1', '30302'))
 ---
  - number
 ...
@@ -876,7 +876,7 @@ lua s:close()
 lua s = box.socket.udp()
 ---
 ...
-lua type(s:bind('localhost', '30301'))
+lua type(s:bind('127.0.0.1', '30301'))
 ---
  - userdata
 ...
