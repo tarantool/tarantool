@@ -56,9 +56,6 @@ static const char socketlib_name[] = "box.socket";
  * Here we map all failures of name resolution to a single
  * socket error number.
  */
-enum bio_error {
-	ERESOLVE = -1
-};
 
 /** last operation status */
 enum bio_status {
@@ -307,7 +304,7 @@ lbox_socket_connect(struct lua_State *L)
 	evio_timeout_init(&start, &delay, timeout);
 	struct addrinfo *ai = coeio_resolve(s->socktype, host, port, delay);
 	if (ai == NULL)
-		return bio_pushsockerror(L, s, ERESOLVE);
+		return bio_pushsockerror(L, s, errno);
 
 	evio_timeout_update(start, &delay);
 	@try {
@@ -660,7 +657,7 @@ lbox_socket_bind(struct lua_State *L)
 	/* try to resolve a hostname */
 	struct addrinfo *ai = coeio_resolve(s->socktype, host, port, timeout);
 	if (ai == NULL)
-		return bio_pusherror(L, s, ERESOLVE);
+		return bio_pusherror(L, s, errno);
 	@try {
 		evio_bind_addrinfo(&s->coio, ai);
 	} @catch (SocketError *e) {
@@ -777,7 +774,7 @@ lbox_socket_sendto(struct lua_State *L)
 		/* try to resolve a hostname */
 		struct addrinfo *a = coeio_resolve(s->socktype, host, port, delay);
 		if (a == NULL)
-			return bio_pushsenderror(L, s, 0, ERESOLVE);
+			return bio_pushsenderror(L, s, 0, errno);
 		evio_timeout_update(start, &delay);
 		addr = (struct sockaddr_in *) a->ai_addr;
 		addrlen = a->ai_addrlen;
