@@ -79,3 +79,10 @@ connector/c/tntsql/libtarantoolsql.so.1
 connector/c/tntsql/libtarantoolsql.so.1.1
 connector/c/tntrpl/libtarantoolrpl.so.1
 connector/c/tntrpl/libtarantoolrpl.so.1.1
+src/box/00000000000000000001.snap
+src/box/tarantool.cfg
+test/connector_c/tp
+test/unit/bit_test
+test/unit/bitset_basic_test
+test/unit/bitset_index_test
+test/unit/bitset_iterator_test
