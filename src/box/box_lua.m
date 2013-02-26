@@ -564,12 +564,22 @@ lbox_checkiterator(struct lua_State *L, int i)
 }
 
 static void
-lbox_pushiterator(struct lua_State *L, struct iterator *it)
+lbox_pushiterator(struct lua_State *L, Index *index,
+                  struct iterator *it, enum iterator_type type,
+                  void *key, size_t size, int part_count)
 {
-	void **ptr = lua_newuserdata(L, sizeof(void *));
+	struct {
+		struct iterator *it;
+		char key[];
+	} *holder = lua_newuserdata(L, sizeof(void *) + size);
 	luaL_getmetatable(L, iteratorlib_name);
 	lua_setmetatable(L, -2);
-	*ptr = it;
+
+	holder->it = it;
+	memcpy(holder->key, key, size);
+
+	[index initIterator: it :type :(key ? holder->key : NULL)
+		:part_count];
 }
 
 static int
@@ -722,19 +732,20 @@ lbox_create_iterator(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L);
+
+	size_t allocated_size = palloc_allocated(fiber->gc_pool);
+
 	/* Create a new iterator. */
 	enum iterator_type type;
-	u32 field_count;
-	void *key;
+	u32 field_count = 0;
+	void *key = NULL;
+	u32 key_size = 0;
 	if (argc == 1 || (argc == 2 && lua_type(L, 2) == LUA_TNIL)) {
 		/*
 		 * Nothing or nil on top of the stack,
 		 * iteration over entire range from the
 		 * beginning (ITER_ALL).
 		 */
-		type = ITER_ALL;
-		field_count = 0;
-		key = NULL;
 	} else {
 		 type = luaL_checkint(L, 2);
 		 if (type >= iterator_type_MAX)
@@ -742,13 +753,12 @@ lbox_create_iterator(struct lua_State *L)
 		 /* What else do we have on the stack? */
 		 if (argc == 2 || (argc == 3 && lua_type(L, 3) == LUA_TNIL)) {
 			 /* Nothing */
-			 field_count = 0;
-			 key = NULL;
 		 } else if (argc == 3 && lua_type(L, 3) == LUA_TUSERDATA) {
 			/* Tuple. */
 			struct tuple *tuple = lua_checktuple(L, 2);
 			field_count = tuple->field_count;
 			key = tuple->data;
+			key_size = tuple->bsize;
 		} else {
 			/* Single or multi- part key. */
 			field_count = argc - 2;
@@ -761,6 +771,7 @@ lbox_create_iterator(struct lua_State *L)
 				append_key_part(L, i + 3, data, type);
 			}
 			key = data->data;
+			key_size = data->size;
 		}
 		/*
 		 * We allow partially specified keys for TREE
@@ -773,9 +784,11 @@ lbox_create_iterator(struct lua_State *L)
 				   field_count, index->key_def->part_count);
 	}
 	struct iterator *it = [index allocIterator];
-	[index initIterator: it :type :key :field_count];
-	lbox_pushiterator(L, it);
+	lbox_pushiterator(L, index, it, type, key, key_size,
+	                  field_count);
 
+	/* truncate memory used by key construction */
+	ptruncate(fiber->gc_pool, allocated_size);
 	return it;
 }
 
@@ -853,7 +866,9 @@ lbox_index_count(struct lua_State *L)
 	int argc = lua_gettop(L) - 1;
 	if (argc == 0)
 		luaL_error(L, "index.count(): one or more arguments expected");
+
 	/* preparing single or multi-part key */
+	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	void *key;
 	u32 key_part_count;
 	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
@@ -882,6 +897,9 @@ lbox_index_count(struct lua_State *L)
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL)
 		count++;
+
+	/* truncate memory used by key construction */
+	ptruncate(fiber->gc_pool, allocated_size);
 
 	/* returning subtree size */
 	lua_pushnumber(L, count);
