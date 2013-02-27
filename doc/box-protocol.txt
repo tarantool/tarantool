@@ -22,7 +22,7 @@ Tarantool/Box IPROTO protocol.
 ; This is what Perl's "pack" function calls "BER compressed 
 ; integer (BER stands for Basic Encoding Rules, but in reality it
 ; has little to do with ASN.1 standard). 
-; See http://en.wikipedia.org/wiki/LEB128
+; See http://en.wikipedia.org/wiki/Variable-length_quantity
 ; for encoding description, or core/pickle.m for implementation
 ; in Tarantool.
 
