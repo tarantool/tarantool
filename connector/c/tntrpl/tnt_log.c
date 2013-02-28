@@ -43,6 +43,8 @@
 #include <connector/c/include/tarantool/tnt_log.h>
 
 enum tnt_log_type tnt_log_guess(char *file) {
+	if (file == NULL)
+		return TNT_LOG_XLOG;
 	char *ext = strrchr(file, '.');
 	if (ext == NULL)
 		return TNT_LOG_NONE;
@@ -61,8 +63,8 @@ tnt_log_seterr(struct tnt_log *l, enum tnt_log_error e) {
 	return -1;
 }
 
-static const uint32_t tnt_log_marker_v11 = 0xba0babed;
-static const uint32_t tnt_log_marker_eof_v11 = 0x10adab1e;
+const uint32_t tnt_log_marker_v11 = 0xba0babed;
+const uint32_t tnt_log_marker_eof_v11 = 0x10adab1e;
 
 inline static int
 tnt_log_eof(struct tnt_log *l, char *data) {
@@ -225,9 +227,13 @@ tnt_log_open(struct tnt_log *l, char *file, enum tnt_log_type type)
 	char *rc, *magic = "\0";
 	l->type = type;
 	/* trying to open file */
-	l->fd = fopen(file, "r");
-	if (l->fd == NULL)
-		return tnt_log_open_err(l, TNT_LOG_ESYSTEM);
+	if (file) {
+		l->fd = fopen(file, "r");
+		if (l->fd == NULL)
+			return tnt_log_open_err(l, TNT_LOG_ESYSTEM);
+	} else {
+		l->fd = stdin;
+	}
 	/* reading xlog filetype */
 	rc = fgets(filetype, sizeof(filetype), l->fd);
 	if (rc == NULL)
@@ -270,10 +276,9 @@ tnt_log_open(struct tnt_log *l, char *file, enum tnt_log_type type)
 }
 
 void tnt_log_close(struct tnt_log *l) {
-	if (l->fd) {
+	if (l->fd && l->fd != stdin)
 		fclose(l->fd);
-		l->fd = NULL;
-	}
+	l->fd = NULL;
 }
 
 enum tnt_log_error tnt_log_error(struct tnt_log *l) {
