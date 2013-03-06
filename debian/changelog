@@ -1,3 +1,9 @@
+tarantool (1.4.8+20130306.1415-1) unstable; urgency=low
+
+  * New snapshot (some fixes in iproto).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 06 Mar 2013 14:15:10 +0400
+
 tarantool (1.4.8+20130212.1728-1) unstable; urgency=low
 
   * Rebuilt last snapshot for Debian.
