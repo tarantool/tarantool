@@ -157,6 +157,10 @@ tc_printer_tarantool(struct tnt_log_header_v11 *hdr,
 static void
 tc_printer_raw(struct tnt_log_header_v11 *hdr, struct tnt_request *r)
 {
+	if (tc.opt.raw_with_headers) {
+		fwrite(&tnt_log_marker_v11,
+		       sizeof(tnt_log_marker_v11), 1, stdout);
+	}
 	fwrite(hdr, sizeof(*hdr), 1, stdout);
 	fwrite(r->origin, r->origin_size, 1, stdout);
 }

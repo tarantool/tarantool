@@ -126,6 +126,10 @@ static int tc_snapshot_printer(struct tnt_iter *i) {
 	struct tnt_stream_snapshot *ss =
 		TNT_SSNAPSHOT_CAST(TNT_ISTORAGE_STREAM(i));
 	if (tc.opt.raw) {
+		if (tc.opt.raw_with_headers) {
+			fwrite(&tnt_log_marker_v11,
+			       sizeof(tnt_log_marker_v11), 1, stdout);
+		}
 		fwrite(&ss->log.current.row_snap,
 		       sizeof(ss->log.current.row_snap), 1, stdout);
 		fwrite(tu->data, tu->size, 1, stdout);
@@ -176,15 +180,34 @@ static int tc_store_foreach_snapshot(tc_iter_t cb) {
 
 int tc_store_cat(void)
 {
-	switch (tnt_log_guess((char*)tc.opt.file)) {
+	enum tnt_log_type type = tnt_log_guess((char*)tc.opt.file);
+	if (type == TNT_LOG_NONE)
+		return 1;
+	int print_headers = tc.opt.raw && tc.opt.raw_with_headers;
+	if (print_headers) {
+		char *h = (type == TNT_LOG_SNAPSHOT ?
+		           TNT_LOG_MAGIC_SNAP : TNT_LOG_MAGIC_XLOG);
+		fputs(h, stdout);
+		fputs(TNT_LOG_VERSION, stdout);
+		fputs("\n", stdout);
+	}
+	int rc;
+	switch (type) {
 	case TNT_LOG_SNAPSHOT:
-		return tc_store_foreach_snapshot(tc_snapshot_printer);
+		rc = tc_store_foreach_snapshot(tc_snapshot_printer);
+		break;
 	case TNT_LOG_XLOG:
-		return tc_store_foreach_xlog(tc_store_printer);
+		rc = tc_store_foreach_xlog(tc_store_printer);
+		break;
 	case TNT_LOG_NONE:
+		rc = 1;
 		break;
 	}
-	return 1;
+	if (rc == 0 && print_headers) {
+		fwrite(&tnt_log_marker_eof_v11,
+		       sizeof(tnt_log_marker_eof_v11), 1, stdout);
+	}
+	return rc;
 }
 
 static int tc_store_resender(struct tnt_iter *i) {

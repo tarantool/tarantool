@@ -98,6 +98,9 @@ struct tnt_log {
 	int errno_;
 };
 
+extern const uint32_t tnt_log_marker_v11;
+extern const uint32_t tnt_log_marker_eof_v11;
+
 enum tnt_log_type tnt_log_guess(char *file);
 
 enum tnt_log_error

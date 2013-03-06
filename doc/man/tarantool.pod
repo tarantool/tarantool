@@ -12,27 +12,31 @@ tarantool - readline SQL-client for L<tarantool>.
 
 =item -h <host>, --host <host>
 
-Defines server address.
+Define server address.
 
 =item -p <port>, --port <port>
 
-Defines server port.
+Define server port.
 
 =item -a <port>, --admin-port <port>
 
-Defines server admin port.
+Define server admin port.
 
 =item -C <file>, --cat <file>
 
-Outputs xlog file or snapshot content.
+Output xlog file or snapshot content.
+
+=item -I, --catin
+
+Output xlog file content from stdin.
 
 =item -P <file>, --play <file>
 
-Replays xlog file to the specified server.
+Replay xlog file to the specified server.
 
 =item -R <lsn>, --rpl <lsn>
 
-Acts as replica for the specified server.
+Act as replica for the specified server.
 
 =item -S <space>, --space <space>
 
@@ -50,13 +54,17 @@ Stop on specified xlog lsn.
 
 Cat output format (default: tarantool).
 
+=item -H, --header
+
+Add file header to the 'raw' output format..
+
 =item --help
 
-Displays helpscreen and exits.
+Display helpscreen and exits.
 
 =item -v, --version
 
-Displays version and exits.
+Display version and exits.
 
 =back
 
