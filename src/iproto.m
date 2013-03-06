@@ -621,6 +621,12 @@ iproto_session_on_input(struct ev_io *watcher,
 		session->parse_size += nrd;
 		/* Enqueue all requests which are fully read up. */
 		iproto_enqueue_batch(session, in, fd);
+		/*
+		 * Keep reading input, as long as the socket
+		 * supplies data.
+		 */
+		if (!ev_is_active(&session->input))
+			ev_feed_event(&session->input, EV_READ);
 	} @catch (tnt_Exception *e) {
 		[e log];
 		iproto_session_shutdown(session);
