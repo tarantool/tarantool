@@ -64,7 +64,7 @@ mv "@CPACK_TOPLEVEL_DIRECTORY@/tmpBBroot" $RPM_BUILD_ROOT
 %dir "/usr/local/share/tarantool"
 "/usr/local/share/tarantool/00000000000000000001.snap"
 %dir "/usr/local/share/doc/tarantool"
-"/usr/local/share/doc/tarantool/README"
+"/usr/local/share/doc/tarantool/README.md"
 "/usr/local/share/doc/tarantool/LICENSE"
 "/usr/local/share/doc/tarantool/box-protocol.txt"
 "/usr/local/man/tarantool.1*"
