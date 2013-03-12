@@ -122,6 +122,7 @@ struct coeio_task {
 	va_list ap;
 	/** Callback results. */
 	ssize_t result;
+	int complete;
 	int errorno;
 };
 
@@ -150,6 +151,7 @@ coeio_on_complete(eio_req *req)
 		struct coeio_task *task = req->data;
 		task->result = req->result;
 		task->errorno = req->errorno;
+		task->complete = 1;
 		fiber_wakeup(task->fiber);
 	}
 	return 0;
@@ -188,12 +190,13 @@ coeio_custom(ssize_t (*func)(va_list ap), ev_tstamp timeout, ...)
 	task.fiber = fiber;
 	task.func = func;
 	task.result = -1;
+	task.complete = 0;
 	va_start(task.ap, timeout);
 	struct eio_req *req = eio_custom(coeio_custom_cb, 0,
 					 coeio_on_complete, &task);
 	if (req == NULL) {
 		errno = ENOMEM;
-	} else if (fiber_yield_timeout(timeout)) {
+	} else if (fiber_yield_timeout(timeout) && !task.complete) {
 		/* timeout. */
 		errno = ETIMEDOUT;
 		task.result = -1;
