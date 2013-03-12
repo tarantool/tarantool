@@ -49,11 +49,11 @@
 #include "txn.h"
 
 static void process_replica(struct port *port,
-			    u32 op, struct tbuf *request_data);
+			    u32 op, const void *reqdata, u32 reqlen);
 static void process_ro(struct port *port,
-		       u32 op, struct tbuf *request_data);
+		       u32 op, const void *reqdata, u32 reqlen);
 static void process_rw(struct port *port,
-		       u32 op, struct tbuf *request_data);
+		       u32 op, const void *reqdata, u32 reqlen);
 box_process_func box_process = process_ro;
 box_process_func box_process_ro = process_ro;
 
@@ -68,12 +68,6 @@ struct box_snap_row {
 	u8 data[];
 } __attribute__((packed));
 
-static inline struct box_snap_row *
-box_snap_row(const struct tbuf *t)
-{
-	return (struct box_snap_row *)t->data;
-}
-
 void
 port_send_tuple(struct port *port, struct txn *txn, u32 flags)
 {
@@ -83,12 +77,12 @@ port_send_tuple(struct port *port, struct txn *txn, u32 flags)
 }
 
 static void
-process_rw(struct port *port, u32 op, struct tbuf *data)
+process_rw(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 {
 	struct txn *txn = txn_begin();
 
 	@try {
-		struct request *request = request_create(op, data);
+		struct request *request = request_create(op, reqdata, reqlen);
 		stat_collect(stat_base, op, 1);
 		request_execute(request, txn, port);
 		txn_commit(txn);
@@ -102,21 +96,21 @@ process_rw(struct port *port, u32 op, struct tbuf *data)
 }
 
 static void
-process_replica(struct port *port, u32 op, struct tbuf *request_data)
+process_replica(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 {
 	if (!request_is_select(op)) {
 		tnt_raise(ClientError, :ER_NONMASTER,
 			  cfg.replication_source);
 	}
-	return process_rw(port, op, request_data);
+	return process_rw(port, op, reqdata, reqlen);
 }
 
 static void
-process_ro(struct port *port, u32 op, struct tbuf *request_data)
+process_ro(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 {
 	if (!request_is_select(op))
 		tnt_raise(LoggedError, :ER_SECONDARY);
-	return process_rw(port, op, request_data);
+	return process_rw(port, op, reqdata, reqlen);
 }
 
 static void
@@ -124,50 +118,47 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 {
 	struct header_v11 *row = header_v11(t);
 
-	struct tbuf *b = palloc(buf->pool, sizeof(*b));
-	b->data = t->data + sizeof(struct header_v11);
-	b->size = row->len;
-	u16 tag, op;
-	u64 cookie;
-	struct sockaddr_in *peer = (void *)&cookie;
-
-	u32 n, key_len;
-	void *key;
-	u32 field_count, field_no;
-	u32 flags;
-	u32 op_cnt;
+	const void *data = t->data + sizeof(struct header_v11);
+	const void *end = data + row->len;
 
 	tbuf_printf(buf, "lsn:%" PRIi64 " ", row->lsn);
 
-	say_debug("b->len:%" PRIu32, b->size);
-
-	tag = read_u16(b);
-	cookie = read_u64(b);
-	op = read_u16(b);
-	n = read_u32(b);
+	u16 tag = pick_u16(&data, end);
+	u64 cookie = pick_u64(&data, end);
+	u16 op = pick_u16(&data, end);
+	u32 n = pick_u32(&data, end);
+	struct sockaddr_in *peer = (void *)&cookie;
 
 	tbuf_printf(buf, "tm:%.3f t:%" PRIu16 " %s:%d %s n:%i",
 		    row->tm, tag, inet_ntoa(peer->sin_addr), ntohs(peer->sin_port),
 		    requests_strs[op], n);
 
+
+	u32 key_len;
+	const void *key;
+	u32 field_count, field_no;
+	u32 flags;
+	u32 op_cnt;
+
 	switch (op) {
 	case REPLACE:
-		flags = read_u32(b);
-		field_count = read_u32(b);
-		if (b->size != valid_tuple(b, field_count)) {
+		flags = pick_u32(&data, end);
+		field_count = pick_u32(&data, end);
+		size_t tuple_len = end - data;
+		if (tuple_len != valid_tuple(data, end, field_count)) {
 			say_error("found a corrupt tuple, %s",
 				  tbuf_str(buf));
 			abort();
 		}
-		tuple_print(buf, field_count, b->data);
+		tuple_print(buf, field_count, data);
 		break;
 
 	case DELETE:
-		flags = read_u32(b);
+		flags = pick_u32(&data, end);
 	case DELETE_1_3:
-		key_len = read_u32(b);
-		key = read_field(b);
-		if (b->size != 0) {
+		key_len = pick_u32(&data, end);
+		key = pick_field(&data, end);
+		if (data != end) {
 			say_error("found a corrupt tuple %s", tbuf_str(buf));
 			abort();
 		}
@@ -175,18 +166,18 @@ box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
 		break;
 
 	case UPDATE:
-		flags = read_u32(b);
-		key_len = read_u32(b);
-		key = read_field(b);
-		op_cnt = read_u32(b);
+		flags = pick_u32(&data, end);
+		key_len = pick_u32(&data, end);
+		key = pick_field(&data, end);
+		op_cnt = pick_u32(&data, end);
 
 		tbuf_printf(buf, "flags:%08X ", flags);
 		tuple_print(buf, key_len, key);
 
 		while (op_cnt-- > 0) {
-			field_no = read_u32(b);
-			u8 op = read_u8(b);
-			void *arg = read_field(b);
+			field_no = pick_u32(&data, end);
+			u8 op = pick_u8(&data, end);
+			const void *arg = pick_field(&data, end);
 
 			tbuf_printf(buf, " [field_no:%i op:", field_no);
 			switch (op) {
@@ -221,14 +212,14 @@ snap_print(void *param __attribute__((unused)), struct tbuf *t)
 	@try {
 		struct tbuf *out = tbuf_new(t->pool);
 		struct header_v11 *raw_row = header_v11(t);
-		struct tbuf *b = palloc(t->pool, sizeof(*b));
-		b->data = t->data + sizeof(struct header_v11);
-		b->size = raw_row->len;
 
-		(void)read_u16(b); /* drop tag */
-		(void)read_u64(b); /* drop cookie */
+		const void *data = t->data + sizeof(struct header_v11);
+		const void *end = data + raw_row->len;
 
-		struct box_snap_row *row =  box_snap_row(b);
+		(void)pick_u16(&data, end); /* drop tag */
+		(void)pick_u64(&data, end); /* drop cookie */
+
+		const struct box_snap_row *row =  data;
 
 		tuple_print(out, row->tuple_size, row->data);
 		printf("n:%i %*s\n", row->space, (int) out->size,
@@ -253,11 +244,11 @@ xlog_print(void *param __attribute__((unused)), struct tbuf *t)
 }
 
 static void
-recover_snap_row(struct tbuf *t)
+recover_snap_row(const void *data)
 {
 	assert(primary_indexes_enabled == false);
 
-	struct box_snap_row *row = box_snap_row(t);
+	const struct box_snap_row *row = data;
 
 	struct tuple *tuple = tuple_alloc(row->data_size);
 	memcpy(tuple->data, row->data, row->data_size);
@@ -284,13 +275,15 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 	}
 
 	@try {
-		u16 tag = read_u16(t);
-		read_u64(t); /* drop cookie */
+		const void *data = t->data;
+		const void *end = t->data + t->size;
+		u16 tag = pick_u16(&data, end);
+		(void) pick_u64(&data, end); /* drop cookie */
 		if (tag == SNAP) {
-			recover_snap_row(t);
+			recover_snap_row(data);
 		} else if (tag == XLOG) {
-			u16 op = read_u16(t);
-			process_rw(&port_null, op, t);
+			u16 op = pick_u16(&data, end);
+			process_rw(&port_null, op, data, end - data);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;

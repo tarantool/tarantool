@@ -42,7 +42,6 @@
 #include "lj_state.h"
 #include <ctype.h>
 
-#include "pickle.h"
 #include "fiber.h"
 #include "lua_ipc.h"
 #include "lua_socket.h"

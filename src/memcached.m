@@ -80,6 +80,41 @@ natoq(const char *start, const char *end)
 	return num;
 }
 
+void
+tbuf_append_field(struct tbuf *b, const void *f)
+{
+	const void *begin = f;
+	u32 size = load_varint32(&f);
+	tbuf_append(b, begin, f + size - begin);
+}
+
+void
+tbuf_store_field(struct tbuf *b, const void *field, u32 len)
+{
+	char buf[sizeof(u32)+1];
+	char *bufend = pack_varint32(buf, len);
+	tbuf_append(b, buf, bufend - buf);
+	tbuf_append(b, field, len);
+}
+
+/**
+ * Check that we have a valid field and return it.
+ * Advances the buffer to point after the field as a side effect.
+ */
+const void *
+tbuf_read_field(struct tbuf *buf)
+{
+	const void *field = buf->data;
+	u32 field_len = pick_varint32((const void **) &buf->data,
+				      buf->data + buf->size);
+	if (buf->data + field_len > field + buf->size)
+		tnt_raise(IllegalParams, :"packet too short (expected a field)");
+	buf->data += field_len;
+	buf->size -= buf->data - field;
+	buf->capacity -= buf->data - field;
+	return field;
+}
+
 static void
 store(const void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 {
@@ -99,16 +134,13 @@ store(const void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 	m.exptime = exptime;
 	m.flags = flags;
 	m.cas = cas++;
-	write_varint32(req, sizeof(m));
-	tbuf_append(req, &m, sizeof(m));
+	tbuf_store_field(req, &m, sizeof(m));
 
 	char b[43];
 	sprintf(b, " %"PRIu32" %"PRIu32"\r\n", flags, bytes);
-	write_varint32(req, strlen(b));
-	tbuf_append(req, b, strlen(b));
+	tbuf_store_field(req, b, strlen(b));
 
-	write_varint32(req, bytes);
-	tbuf_append(req, data, bytes);
+	tbuf_store_field(req, data, bytes);
 
 	int key_len = load_varint32(&key);
 	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
@@ -117,11 +149,11 @@ store(const void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
 	 */
-	box_process(&port_null, REPLACE, req);
+	box_process(&port_null, REPLACE, req->data, req->size);
 }
 
 static void
-delete(void *key)
+delete(const void *key)
 {
 	u32 key_len = 1;
 	u32 box_flags = 0;
@@ -132,7 +164,7 @@ delete(void *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	box_process(&port_null, DELETE, req);
+	box_process(&port_null, DELETE, req->data, req->size);
 }
 
 static struct tuple *
@@ -241,7 +273,7 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 		u32 suffix_len;
 		u32 _l;
 
-		const void *key = read_field(keys);
+		const void *key = tbuf_read_field(keys);
 		tuple = find(key);
 		key_len = load_varint32(&key);
 
@@ -502,7 +534,7 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 
 	while (keys_to_delete->size > 0) {
 		@try {
-			delete(read_field(keys_to_delete));
+			delete(tbuf_read_field(keys_to_delete));
 			expired_keys++;
 		}
 		@catch (ClientError *e) {

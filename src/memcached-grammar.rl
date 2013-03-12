@@ -39,7 +39,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 	char *p, *pe;
 	char *fstart;
 	struct tbuf *keys = tbuf_new(fiber->gc_pool);
-	void *key;
+	const void *key;
 	bool append, show_cas;
 	int incr_sign;
 	u64 cas, incr;
@@ -61,12 +61,12 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 
 	%%{
 		action set {
-			key = read_field(keys);
+			key = tbuf_read_field(keys);
 			STORE;
 		}
 
 		action add {
-			key = read_field(keys);
+			key = tbuf_read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple != NULL && !expired(tuple))
 				obuf_dup(out, "NOT_STORED\r\n", 12);
@@ -75,7 +75,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 		}
 
 		action replace {
-			key = read_field(keys);
+			key = tbuf_read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				obuf_dup(out, "NOT_STORED\r\n", 12);
@@ -84,7 +84,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 		}
 
 		action cas {
-			key = read_field(keys);
+			key = tbuf_read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple))
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
@@ -99,7 +99,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 			const void *value;
 			u32 value_len;
 
-			key = read_field(keys);
+			key = tbuf_read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL) {
 				obuf_dup(out, "NOT_STORED\r\n", 12);
@@ -128,7 +128,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 			u32 value_len;
 			u64 value;
 
-			key = read_field(keys);
+			key = tbuf_read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple)) {
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
@@ -177,7 +177,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 		}
 
 		action delete {
-			key = read_field(keys);
+			key = tbuf_read_field(keys);
 			struct tuple *tuple = find(key);
 			if (tuple == NULL || expired(tuple)) {
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
@@ -224,8 +224,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 			fstart = p;
 			for (; p < pe && *p != ' ' && *p != '\r' && *p != '\n'; p++);
 			if ( *p == ' ' || *p == '\r' || *p == '\n') {
-				write_varint32(keys, p - fstart);
-				tbuf_append(keys, fstart, p - fstart);
+				tbuf_store_field(keys, fstart, p - fstart);
 				keys_count++;
 				p--;
 			} else

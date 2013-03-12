@@ -13,9 +13,32 @@
 /** Client handler. Reused between tests. */
 struct tnt_stream *t;
 
+#define header() printf("\t*** %s ***\n", __func__)
+#define footer() printf("\t*** %s: done ***\n ", __func__)
+
 /** Test the ping command. */
 void test_ping()
 {
+	header();
+	const char message[]= { 0x00, 0xff, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0,
+		0x0, 0x0, 0x0, 0x0
+	};
+	tnt_io_send_raw(TNT_SNET_CAST(t), (char*)message, sizeof(message), 1);
+	t->wrcnt++;
+	struct tnt_iter i;
+	tnt_iter_reply(&i, t);
+	tnt_next(&i);
+	struct tnt_reply *r = TNT_IREPLY_PTR(&i);
+	printf("return_code: %"PRIu32"\n", r->code); /* =0 */
+	tnt_iter_free(&i);
+	footer();
+}
+
+/** Test the ping command. */
+void test_replace()
+{
+	header();
 	const char message[]= {
 		0xd, 0x0, 0x0, 0x0,    0x11, 0x0, 0x0, 0x0,
 		0x0, 0x0, 0x0, 0x0,    0x0, 0x0, 0x0, 0x0,
@@ -29,6 +52,7 @@ void test_ping()
 	struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 	printf("return_code: %"PRIu32"\n", r->code); /* =0 */
 	tnt_iter_free(&i);
+	footer();
 }
 
 /** A test case for Bug#702397
@@ -37,6 +61,7 @@ void test_ping()
  */
 void test_bug702397()
 {
+	header();
 	const char message[]= {
 		0x11, 0x0, 0x0, 0x0,    0x14, 0x0, 0x0, 0x0,    0x0, 0x0, 0x0, 0x0,
 		0x0, 0x0, 0x0, 0x0,     0x0, 0x0, 0x0, 0x0,     0x0, 0x0, 0x0, 0x0,
@@ -50,6 +75,7 @@ void test_bug702397()
 	printf("return_code: %s, %s\n",
 	       tnt_errcode_str(TNT_REPLY_ERR(r)), r->error);
 	tnt_iter_free(&i);
+	footer();
 }
 
 /** A test case for Bug#702399
@@ -58,6 +84,7 @@ void test_bug702397()
  */
 void test_bug702399()
 {
+	header();
 	const char message[]= {
 		0x11, 0x0, 0x0, 0x0,    0x1d, 0x0, 0x0, 0x0,
 		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
@@ -74,6 +101,7 @@ void test_bug702399()
 	printf("return_code: %s, %s\n",
 	       tnt_errcode_str(TNT_REPLY_ERR(r)), r->error);
 	tnt_iter_free(&i);
+	footer();
 }
 
 /** A test case for Bug#1009992
@@ -82,6 +110,7 @@ void test_bug702399()
  */
 void test_bug1009992()
 {
+	header();
 	struct tnt_header h = {
 		.type = 12345678, /* bad operation */
 		.len = 0,
@@ -96,6 +125,7 @@ void test_bug1009992()
 	printf("return_code: %s, %s\n",
 	       tnt_errcode_str(TNT_REPLY_ERR(r)), r->error);
 	tnt_iter_free(&i);
+	footer();
 }
 
 int main()
@@ -111,6 +141,7 @@ int main()
 		return 1;
 
 	test_ping();
+	test_replace();
 	test_bug702397();
 	test_bug702399();
 	test_bug1009992();

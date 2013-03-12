@@ -37,7 +37,6 @@
 #include "errcode.h"
 #include "fiber.h"
 #include "say.h"
-#include "tbuf.h"
 #include "box/box.h"
 #include "box/port.h"
 #include "box/tuple.h"
@@ -740,13 +739,11 @@ iproto_reply(struct port_iproto *port, box_process_func callback,
 		return iproto_reply_ping(out, header);
 
 	/* Make request body point to iproto data */
-	struct tbuf body = {
-		.size = header->len, .capacity = header->len,
-		.data = (char *) &header[1], .pool = fiber->gc_pool
-	};
+	void *body = (char *) &header[1];
 	port_iproto_init(port, out, header);
 	@try {
-		callback((struct port *) port, header->msg_code, &body);
+		callback((struct port *) port, header->msg_code,
+			 body, header->len);
 	} @catch (ClientError *e) {
 		if (port->reply.found)
 			obuf_rollback_to_svp(out, &port->svp);

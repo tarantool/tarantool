@@ -29,36 +29,63 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
-
-#include <util.h>
+#include <stdint.h>
 #include "exception.h"
 
-struct tbuf;
+/**
+ * pickle (pick-little-endian) -- serialize/de-serialize data from
+ * tuple and iproto binary formats.
+ *
+ * load_* - no boundary checking
+ * pick_* - throws exception if no data in the buffer
+ */
 
-u8 *save_varint32(u8 *target, u32 value);
-void write_varint32(struct tbuf *b, u32 value);
+static inline uint32_t
+load_u32(const void **data)
+{
+	const uint32_t *b = *data;
+	*data= b + 1;
+	return *b;
+}
 
-u8 read_u8(struct tbuf *b);
-u16 read_u16(struct tbuf *b);
-u32 read_u32(struct tbuf *b);
-u64 read_u64(struct tbuf *b);
-
-u32 read_varint32(struct tbuf *buf);
-void *read_field(struct tbuf *buf);
-
-void *read_str(struct tbuf *buf, u32 len);
-
-u32 pick_u32(void *data, void **rest);
-
-u32 valid_tuple(struct tbuf *buf, u32 cardinality);
-
-size_t varint32_sizeof(u32);
-
-static inline u32
-load_varint32_s(const void **data, size_t size)
+static inline uint32_t
+load_varint32(const void **data)
 {
 	assert(data != NULL && *data != NULL);
-	const u8 *b = *data;
+	const uint8_t *b = *data;
+
+	if (!(b[0] & 0x80)) {
+		*data += 1;
+		return (b[0] & 0x7f);
+	}
+	if (!(b[1] & 0x80)) {
+		*data += 2;
+		return (b[0] & 0x7f) << 7 | (b[1] & 0x7f);
+	}
+	if (!(b[2] & 0x80)) {
+		*data += 3;
+		return (b[0] & 0x7f) << 14 | (b[1] & 0x7f) << 7 | (b[2] & 0x7f);
+	}
+	if (!(b[3] & 0x80)) {
+		*data += 4;
+		return (b[0] & 0x7f) << 21 | (b[1] & 0x7f) << 14 |
+			(b[2] & 0x7f) << 7 | (b[3] & 0x7f);
+	}
+	if (!(b[4] & 0x80)) {
+		*data += 5;
+		return (b[0] & 0x7f) << 28 | (b[1] & 0x7f) << 21 |
+			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
+	}
+	assert(false);
+	return 0;
+}
+
+static inline uint32_t
+pick_varint32(const void **data, const void *end)
+{
+	assert(data != NULL && *data != NULL);
+	const uint8_t *b = *data;
+	ssize_t size = end - *data;
 
 	if (unlikely(size < 1))
 		tnt_raise(IllegalParams, :"varint is too short (expected 1+ bytes)");
@@ -105,10 +132,72 @@ load_varint32_s(const void **data, size_t size)
 	tnt_raise(IllegalParams, :"incorrect BER integer format");
 }
 
-static inline u32
-load_varint32(const void **data)
+#define pick_u(bits)						\
+static inline uint##bits##_t					\
+pick_u##bits(const void **begin, const void *end)		\
+{								\
+	if (end - *begin < (bits)/8)				\
+		tnt_raise(IllegalParams,			\
+			  :"packet too short (expected "#bits" bits)");\
+	uint##bits##_t r = *(uint##bits##_t *)*begin;		\
+	*begin += (bits)/8;					\
+	return r;						\
+}
+
+pick_u(8)
+pick_u(16)
+pick_u(32)
+pick_u(64)
+
+static inline const void *
+pick_str(const void **data, const void *end, uint32_t size)
 {
-	return load_varint32_s(data, 5);
+	const void *str = *data;
+	if (str + size > end)
+		tnt_raise(IllegalParams,
+			  :"packet too short (expected a field)");
+	*data += size;
+	return str;
+}
+
+static inline const void *
+pick_field(const void **data, const void *end)
+{
+	const void *field = *data;
+	uint32_t field_len = pick_varint32(data, end);
+	pick_str(data, end, field_len);
+	return field;
+}
+
+static inline const void *
+pick_field_str(const void **data, const void *end, uint32_t *size)
+{
+	*size = pick_varint32(data, end);
+	return pick_str(data, end, *size);
+}
+
+
+static inline uint32_t
+pick_field_u32(const void **data, const void *end)
+{
+	uint32_t size = pick_varint32(data, end);
+	if (size != sizeof(uint32_t))
+		tnt_raise(IllegalParams,
+			  :"incorrect packet format (expected a 32-bit int)");
+	return *(uint32_t *) pick_str(data, end, size);
+}
+
+
+
+static inline uint32_t
+valid_tuple(const void *data, const void *end, uint32_t field_count)
+{
+	const void *start = data;
+
+	for (int i = 0; i < field_count; i++)
+		pick_field(&data, end);
+
+	return data - start;
 }
 
 /**
@@ -116,7 +205,7 @@ load_varint32(const void **data)
  *
  * @returns size of fields data including size of varint data
  */
-inline static size_t
+static inline size_t
 tuple_range_size(const void **begin, const void *end, size_t count)
 {
 	const void *start = *begin;
@@ -125,6 +214,47 @@ tuple_range_size(const void **begin, const void *end, size_t count)
 		*begin += len;
 	}
 	return *begin - start;
+}
+
+static inline size_t
+varint32_sizeof(uint32_t value)
+{
+	if (value < (1 << 7))
+		return 1;
+	if (value < (1 << 14))
+		return 2;
+	if (value < (1 << 21))
+		return 3;
+	if (value < (1 << 28))
+		return 4;
+	return 5;
+}
+
+/** The caller must ensure that there is space in the buffer */
+static inline void *
+pack_varint32(void *buf, uint32_t value)
+{
+	uint8_t *target = buf;
+	if (value >= (1 << 7)) {
+		if (value >= (1 << 14)) {
+			if (value >= (1 << 21)) {
+				if (value >= (1 << 28))
+					*(target++) = (uint8_t)(value >> 28) | 0x80;
+				*(target++) = (uint8_t)(value >> 21) | 0x80;
+			}
+			*(target++) = (uint8_t)((value >> 14) | 0x80);
+		}
+		*(target++) = (uint8_t)((value >> 7) | 0x80);
+	}
+	*(target++) = (uint8_t)((value) & 0x7F);
+
+	return target;
+}
+
+static inline void *
+pack_lstr(void *buf, const void *str, uint32_t len)
+{
+	return memcpy(pack_varint32(buf, len), str, len) + len;
 }
 
 #endif /* TARANTOOL_PICKLE_H_INCLUDED */

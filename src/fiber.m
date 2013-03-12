@@ -38,7 +38,6 @@
 #include TARANTOOL_CONFIG
 #include <tbuf.h>
 #include <stat.h>
-#include <pickle.h>
 #include <assoc.h>
 #include "iobuf.h"
 #include <rlist.h>

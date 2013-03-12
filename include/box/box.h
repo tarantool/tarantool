@@ -55,7 +55,7 @@ void box_free(void);
  * change when entering/leaving read-only mode
  * (master->slave propagation).
  */
-typedef void (*box_process_func)(struct port *, u32, struct tbuf *);
+typedef void (*box_process_func)(struct port *, u32, const void *, u32);
 /** For read-write operations. */
 extern box_process_func box_process;
 /** For read-only port. */

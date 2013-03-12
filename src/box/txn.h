@@ -28,7 +28,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tbuf.h>
 #include "index.h"
 
 struct tuple;
@@ -41,15 +40,16 @@ struct txn {
 	struct tuple *new_tuple;
 
 	/* Redo info: binary packet */
+	const void *data;
+	u32 len;
 	u16 op;
-	struct tbuf req;
 };
 
 struct txn *txn_begin();
 void txn_commit(struct txn *txn);
 void txn_finish(struct txn *txn);
 void txn_rollback(struct txn *txn);
-void txn_add_redo(struct txn *txn, u16 op, struct tbuf *data);
+void txn_add_redo(struct txn *txn, u16 op, const void *data, u32 len);
 void txn_replace(struct txn *txn, struct space *space,
 		 struct tuple *old_tuple, struct tuple *new_tuple,
 		 enum dup_replace_mode mode);

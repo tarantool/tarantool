@@ -35,7 +35,6 @@
 #include <stdbool.h>
 
 #include <palloc.h>
-#include <pickle.h>
 #include <util.h>
 
 #ifdef POISON
@@ -148,15 +147,6 @@ tbuf_reset(struct tbuf *b)
 	tbuf_assert(b);
 	poison(b->data, b->size);
 	b->size = 0;
-}
-
-void
-tbuf_append_field(struct tbuf *b, const void *f)
-{
-	const void *s = f;
-	u32 size = load_varint32(&f);
-	void *next = (u8 *)f + size;
-	tbuf_append(b, s, next - s);
 }
 
 void

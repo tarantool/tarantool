@@ -1099,7 +1099,7 @@ wal_writer_thread(void *worker_args)
  */
 int
 wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
-	  u16 op, struct tbuf *row)
+	  u16 op, const void *row, u32 row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
@@ -1111,12 +1111,12 @@ wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 
 	struct wal_write_request *req =
 		palloc(fiber->gc_pool, sizeof(struct wal_write_request) +
-		       sizeof(op) + row->size);
+		       sizeof(op) + row_len);
 
 	req->fiber = fiber;
 	req->res = -1;
 	row_v11_fill(&req->row, lsn, XLOG, cookie, &op, sizeof(op),
-		     row->data, row->size);
+		     row, row_len);
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
 

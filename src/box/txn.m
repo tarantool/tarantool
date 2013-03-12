@@ -36,15 +36,11 @@
 #include "request.h" /* for request_name */
 
 void
-txn_add_redo(struct txn *txn, u16 op, struct tbuf *data)
+txn_add_redo(struct txn *txn, u16 op, const void *data, u32 len)
 {
 	txn->op = op;
-	/* Copy tbuf by-value, it will be changed by parsing. */
-	txn->req = (struct tbuf) {
-			.data = data->data,
-			.size = data->size,
-			.capacity = data->size,
-			.pool = NULL };
+	txn->data = data;
+	txn->len = len;
 }
 
 void
@@ -83,7 +79,7 @@ txn_commit(struct txn *txn)
 
 		ev_tstamp start = ev_now(), stop;
 		int res = wal_write(recovery_state, lsn, 0,
-				    txn->op, &txn->req);
+				    txn->op, txn->data, txn->len);
 		stop = ev_now();
 
 		if (stop - start > cfg.too_long_threshold) {

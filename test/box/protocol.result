@@ -1,6 +1,17 @@
+	*** test_ping ***
 return_code: 0
+	*** test_ping: done ***
+ 	*** test_replace ***
+return_code: 0
+	*** test_replace: done ***
+ 	*** test_bug702397 ***
 return_code: ER_ILLEGAL_PARAMS, Illegal parameters, tuple count must be positive
+	*** test_bug702397: done ***
+ 	*** test_bug702399 ***
 return_code: ER_NO_SUCH_INDEX, No index #1 is defined in space 0
+	*** test_bug702399: done ***
+ 	*** test_bug1009992 ***
 return_code: ER_ILLEGAL_PARAMS, Illegal parameters, unsupported command code, check the error log
-delete from t0 where k0 = 1
+	*** test_bug1009992: done ***
+ delete from t0 where k0 = 1
 Delete OK, 1 row affected

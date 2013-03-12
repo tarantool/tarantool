@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include <util.h>
-#include <tbuf.h>
 #include <stdbool.h>
 
 enum {
@@ -104,10 +103,11 @@ struct request
 {
 	u32 type;
 	u32 flags;
-	struct tbuf *data;
+	const void *data;
+	u32 len;
 };
 
-struct request *request_create(u32 type, struct tbuf *data);
+struct request *request_create(u32 type, const void *data, u32 len);
 
 void request_execute(struct request *request, struct txn *txn, struct port *port);
 
