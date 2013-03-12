@@ -67,17 +67,16 @@ mv "@CPACK_TOPLEVEL_DIRECTORY@/tmpBBroot" $RPM_BUILD_ROOT
 "/usr/local/share/doc/tarantool/README.md"
 "/usr/local/share/doc/tarantool/LICENSE"
 "/usr/local/share/doc/tarantool/box-protocol.txt"
-"/usr/local/man/tarantool.1*"
-"/usr/local/man/tarantool_box.1*"
+"/usr/local/man/tarantool.1"
+"/usr/local/man/tarantool_box.1"
 "/usr/local/bin/tarantool_box"
 "/usr/local/bin/tarantool_checksum"
 "/usr/local/bin/tarantool"
 "/usr/local/bin/tarantool_multi.sh"
 "/usr/local/bin/tarantool_deploy.sh"
+"/etc/rc.d/init.d/tarantool_box"
 
-%config "/usr/local/etc/tarantool.cfg"
-%config "/etc/rc.d/init.d/tarantool_box"
-
+%config(noreplace) "/usr/local/etc/tarantool.cfg"
 
 %changelog
 @CPACK_RPM_SPEC_CHANGELOG@
