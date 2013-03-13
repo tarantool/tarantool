@@ -747,7 +747,7 @@ lbox_fiber_name(struct lua_State *L)
 		fiber_set_name(f, name);
 		return 0;
 	} else {
-		lua_pushstring(L, f->name);
+		lua_pushstring(L, fiber_name(f));
 		return 1;
 	}
 }

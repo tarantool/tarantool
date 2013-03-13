@@ -276,7 +276,8 @@ print_backtrace()
 	void *stack_top;
 	size_t stack_size;
 
-	if (fiber == NULL || fiber->name == NULL || strcmp(fiber->name, "sched") == 0) {
+	if (fiber == NULL || fiber_name(fiber) == NULL ||
+	    strcmp(fiber_name(fiber), "sched") == 0) {
 		stack_top = frame; /* we don't know where the system stack top is */
 		stack_size = __libc_stack_end - frame;
 	} else {

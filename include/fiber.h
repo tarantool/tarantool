@@ -42,7 +42,7 @@
 #include "palloc.h"
 #include <rlist.h>
 
-#define FIBER_NAME_MAXLEN 32
+#define FIBER_NAME_MAXLEN PALLOC_POOL_NAME_MAXLEN
 
 #define FIBER_READING_INBOX (1 << 0)
 /** This fiber can be cancelled synchronously. */
@@ -85,8 +85,6 @@ struct fiber {
 	struct rlist link;
 	struct rlist state;
 
-	/* ASCIIZ name of this fiber. */
-	char name[FIBER_NAME_MAXLEN];
 	void (*f) (va_list);
 	va_list f_data;
 	u32 flags;
@@ -100,6 +98,12 @@ void fiber_free(void);
 struct fiber *fiber_new(const char *name, void (*f) (va_list));
 void fiber_set_name(struct fiber *fiber, const char *name);
 int wait_for_child(pid_t pid);
+
+static inline const char *
+fiber_name(struct fiber *f)
+{
+	return palloc_name(f->gc_pool);
+}
 
 void fiber_yield(void);
 void fiber_yield_to(struct fiber *f);

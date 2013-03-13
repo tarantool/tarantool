@@ -296,7 +296,7 @@ replication_send_socket(ev_io *watcher, int events __attribute__((unused)))
 static void
 spawner_init(int sock)
 {
-	char name[sizeof(fiber->name)];
+	char name[FIBER_NAME_MAXLEN];
 	struct sigaction sa;
 
 	snprintf(name, sizeof(name), "spawner%s", custom_proc_title);
