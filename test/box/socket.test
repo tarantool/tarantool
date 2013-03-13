@@ -54,22 +54,23 @@ exec admin "lua s:connect(123)"
 exec admin "lua s:close()"
 
 exec admin "lua s:close()"
-exec admin "lua s:connect('somewhereelse', '30303', 0.01)"
-# timedout
-exec admin "lua s:error()"
+exec admin "lua sr, se = s:connect('somewhereelse', '30303', 0.0001)"
+exec admin "lua sr == nil and se == 'error' or se == 'timeout'"
+
+# timedout or hostname resolution failed
+exec admin "lua e = s:error()"
+exec admin "lua e == -1 or e == 110"
 exec admin "lua s:close()"
 
-##################
-#                #
+#################
+#               #
 # socket:send() #
-#                #
-##################
+#               #
+#################
 
 # bad args
 exec admin "lua s:send()"
 exec admin "lua s:send(1)"
-# bad file descriptor
-exec admin "lua s:error()"
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -87,7 +88,6 @@ exec admin "lua type(n)"
 exec admin "lua type(status)"
 exec admin "lua type(error_code)"
 exec admin "lua type(error_str)"
-exec admin "lua n"
 exec admin "lua status"
 exec admin "lua error_code"
 exec admin "lua error_str"

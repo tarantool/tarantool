@@ -92,17 +92,19 @@ lua s:close()
 lua s:close()
 ---
 ...
-lua s:connect('somewhereelse', '30303', 0.01)
+lua sr, se = s:connect('somewhereelse', '30303', 0.0001)
 ---
- - nil
- - timeout
- - 110
- - Connection timed out
 ...
-lua s:error()
+lua sr == nil and se == 'error' or se == 'timeout'
 ---
- - 110
- - Connection timed out
+ - true
+...
+lua e = s:error()
+---
+...
+lua e == -1 or e == 110
+---
+ - true
 ...
 lua s:close()
 ---
@@ -114,11 +116,6 @@ error: 'box.socket: socket is not initialized'
 lua s:send(1)
 ---
 error: 'box.socket: socket is not initialized'
-...
-lua s:error()
----
- - 110
- - Connection timed out
 ...
 lua s = box.socket.tcp()
 ---
@@ -154,10 +151,6 @@ lua type(error_code)
 lua type(error_str)
 ---
  - string
-...
-lua n
----
- - 163840
 ...
 lua status
 ---
