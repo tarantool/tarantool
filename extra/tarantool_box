@@ -46,16 +46,37 @@ start() {
         return ${RETVAL}
 }
 
+terminate() {
+	timeout=${1}
+	pid=${2}
+	kill ${pid} >/dev/null 2>&1
+	sleep ${timeout}
+	ps -p ${pid} >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		sleep 10;
+		ps -p ${pid} >/dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			kill -9 ${pid}
+			sleep 3
+			ps -p 0 ${pid} >/dev/null 2>&1
+			if [ $? -eq 0 ]; then
+                		echo_failure
+				exit 1
+			fi
+		fi 
+	fi
+}
+
 stop() {
         echo -n $"Stopping $INST: "
         if [ -f ${WRAP_PIDFILE} ]
         then
-                kill $(cat ${WRAP_PIDFILE}) >/dev/null 2>&1
+		terminate 1 $(cat ${WRAP_PIDFILE})
                 rm -f ${WRAP_PIDFILE} >/dev/null 2>&1
         fi
         if [ -f ${PIDFILE} ]
         then
-                kill $(cat ${PIDFILE}) >/dev/null 2>&1
+		terminate 3 $(cat ${PIDFILE})
                 rm -f ${PIDFILE} >/dev/null 2>&1
         fi
         echo_success
@@ -63,9 +84,8 @@ stop() {
         return ${RETVAL}
 }
 
-restart(){
+restart() {
         stop
-        sleep 3
         start
 }
 
