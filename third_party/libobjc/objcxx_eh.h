@@ -28,11 +28,11 @@ __attribute__((weak))
 void __cxa_free_exception(void *thrown_exception);
 /**
  * Tests whether a C++ exception contains an Objective-C object, and returns if
- * if it does.  Returns -1 if it doesn't.  -1 is used instead of 0, because
- * throwing nil is allowed, but throwing non-nil, invalid objects is not.
+ * if it does.  The second argument is a pointer to a boolean value indicating
+ * whether this is a valid object.
  */
 __attribute__((weak))
-void *objc_object_for_cxx_exception(void *thrown_exception);
+void *objc_object_for_cxx_exception(void *thrown_exception, int *isValid);
 
 /**
  * Prints the type info associated with an exception.  Used only when

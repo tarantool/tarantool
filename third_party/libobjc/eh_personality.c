@@ -7,7 +7,23 @@
 #include "class.h"
 #include "objcxx_eh.h"
 
-#define fprintf(...)
+#ifndef NO_PTHREADS
+#include <pthread.h>
+#endif
+
+#ifndef DEBUG_EXCEPTIONS
+#define DEBUG_LOG(...)
+#else
+#define DEBUG_LOG(str, ...) fprintf(stderr, str, ## __VA_ARGS__)
+#endif
+
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+#if !__has_builtin(__builtin_unreachable)
+#define __builtin_unreachable abort
+#endif
+
 
 /**
  * Class of exceptions to distinguish between this and other exception types.
@@ -26,7 +42,15 @@ struct objc_exception
 	int handlerSwitchValue;
 	/** The cached landing pad for the catch handler.*/
 	void *landingPad;
-
+	/**
+	 * Next pointer for chained exceptions.  
+	 */
+	struct objc_exception *next;
+	/**
+	 * The number of nested catches that may hold this exception.  This is
+	 * negative while an exception is being rethrown.
+	 */
+	int catch_count;
 	/** The language-agnostic part of the exception header. */
 	struct _Unwind_Exception unwindHeader;
 	/** Thrown object.  This is after the unwind header so that the C++
@@ -38,6 +62,12 @@ struct objc_exception
 	 * exceptions for us.  */
 	struct _Unwind_Exception *cxx_exception;
 };
+
+struct objc_exception *objc_exception_from_header(struct _Unwind_Exception *ex)
+{
+	return (struct objc_exception*)((char*)ex -
+			offsetof(struct objc_exception, unwindHeader));
+}
 
 typedef enum
 {
@@ -132,14 +162,14 @@ void objc_exception_throw(id object)
 	if ((nil != object) &&
 	    (class_respondsToSelector(classForObject(object), rethrow_sel)))
 	{
-		fprintf(stderr, "Rethrowing\n");
+		DEBUG_LOG("Rethrowing\n");
 		IMP rethrow = objc_msg_lookup(object, rethrow_sel);
 		rethrow(object, rethrow_sel);
 		// Should not be reached!  If it is, then the rethrow method actually
 		// didn't, so we throw it normally.
 	}
 
-	fprintf(stderr, "Throwing %p\n", object);
+	DEBUG_LOG("Throwing %p\n", object);
 
 	struct objc_exception *ex = calloc(1, sizeof(struct objc_exception));
 
@@ -154,7 +184,7 @@ void objc_exception_throw(id object)
 	{
 		_objc_unexpected_exception(object);
 	}
-	fprintf(stderr, "Throw returned %d\n",(int) err);
+	DEBUG_LOG("Throw returned %d\n",(int) err);
 	abort();
 }
 
@@ -175,7 +205,7 @@ static Class get_type_table_entry(struct _Unwind_Context *context,
 
 	if (0 == class_name) { return Nil; }
 
-	fprintf(stderr, "Class name: %s\n", class_name);
+	DEBUG_LOG("Class name: %s\n", class_name);
 
 	if (strcmp("@id", class_name) == 0) { return (Class)1; }
 
@@ -211,11 +241,11 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 		dw_eh_ptr_t action_record_offset_base = action_record;
 		int displacement = read_sleb128(&action_record);
 		*selector = filter;
-		fprintf(stderr, "Filter: %d\n", filter);
+		DEBUG_LOG("Filter: %d\n", filter);
 		if (filter > 0)
 		{
 			Class type = get_type_table_entry(context, lsda, filter);
-			fprintf(stderr, "%p type: %d\n", type, !foreignException);
+			DEBUG_LOG("%p type: %d\n", type, !foreignException);
 			// Catchall
 			if (Nil == type)
 			{
@@ -225,7 +255,7 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 			// nothing when a foreign exception is thrown
 			else if ((Class)1 == type)
 			{
-				fprintf(stderr, "Found id catch\n");
+				DEBUG_LOG("Found id catch\n");
 				if (!foreignException)
 				{
 					return handler_catchall_id;
@@ -233,7 +263,7 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 			}
 			else if (!foreignException && isKindOfClass(thrown_class, type))
 			{
-				fprintf(stderr, "found handler for %s\n", type->name);
+				DEBUG_LOG("found handler for %s\n", type->name);
 				return handler_class;
 			}
 			else if (thrown_class == type)
@@ -243,14 +273,14 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 		}
 		else if (filter == 0)
 		{
-			fprintf(stderr, "0 filter\n");
+			DEBUG_LOG("0 filter\n");
 			// Cleanup?  I think the GNU ABI doesn't actually use this, but it
 			// would be a good way of indicating a non-id catchall...
 			return handler_cleanup;
 		}
 		else
 		{
-			fprintf(stderr, "Filter value: %d\n"
+			DEBUG_LOG("Filter value: %d\n"
 					"Your compiler and I disagree on the correct layout of EH data.\n", 
 					filter);
 			abort();
@@ -263,10 +293,20 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 }
 
 /**
- * The Objective-C exception personality function.  
+ * The Objective-C exception personality function implementation.  This is
+ * shared by the GCC-compatible and the new implementation.
+ *
+ * The key difference is that the new implementation always returns the
+ * exception object and boxes it.
  */
-BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
-	fprintf(stderr, "Personality function called\n");
+static inline _Unwind_Reason_Code internal_objc_personality(int version,
+                                                            _Unwind_Action actions,
+                                                            uint64_t exceptionClass,
+                                                            struct _Unwind_Exception *exceptionObject,
+                                                            struct _Unwind_Context *context,
+                                                            BOOL isNew)
+{
+	DEBUG_LOG("%s personality function called %p\n", isNew ? "New" : "Old", exceptionObject);
 	
 	// This personality function is for version 1 of the ABI.  If you use it
 	// with a future version of the ABI, it won't know what to do, so it
@@ -276,10 +316,10 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 		return _URC_FATAL_PHASE1_ERROR;
 	}
 	struct objc_exception *ex = 0;
-#ifndef fprintf
+#ifdef DEBUG_EXCEPTIONS
 	char *cls = (char*)&exceptionClass;
 #endif
-	fprintf(stderr, "Class: %c%c%c%c%c%c%c%c\n", cls[7], cls[6], cls[5], cls[4], cls[3], cls[2], cls[1], cls[0]);
+	DEBUG_LOG("Class: %c%c%c%c%c%c%c%c\n", cls[7], cls[6], cls[5], cls[4], cls[3], cls[2], cls[1], cls[0]);
 
 	// Check if this is a foreign exception.  If it is a C++ exception, then we
 	// have to box it.  If it's something else, like a LanguageKit exception
@@ -293,12 +333,13 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 #ifdef NO_OBJCXX
 	if (exceptionClass == cxx_exception_class)
 	{
-		id obj = objc_object_for_cxx_exception(exceptionObject);
-		if (obj != (id)-1)
+		int objcxx;
+		id obj = objc_object_for_cxx_exception(exceptionObject, &objcxx);
+		objcxxException = objcxx;
+		if (objcxxException)
 		{
 			object = obj;
-			fprintf(stderr, "ObjC++ object exception %p\n", object);
-			objcxxException = YES;
+			DEBUG_LOG("ObjC++ object exception %p\n", object);
 			// This is a foreign exception, buy for the purposes of exception
 			// matching, we pretend that it isn't.
 			foreignException = NO;
@@ -316,18 +357,16 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 	// language-specific exception stuff.
 	else if (!foreignException)
 	{
-		ex = (struct objc_exception*) ((char*)exceptionObject - 
-				offsetof(struct objc_exception, unwindHeader));
-
+		ex = objc_exception_from_header(exceptionObject);
 		thrown_class = classForObject(ex->object);
 	}
 	else if (_objc_class_for_boxing_foreign_exception)
 	{
 		thrown_class = _objc_class_for_boxing_foreign_exception(exceptionClass);
-		fprintf(stderr, "Foreign class: %p\n", thrown_class);
+		DEBUG_LOG("Foreign class: %p\n", thrown_class);
 	}
 	unsigned char *lsda_addr = (void*)_Unwind_GetLanguageSpecificData(context);
-	fprintf(stderr, "LSDA: %p\n", lsda_addr);
+	DEBUG_LOG("LSDA: %p\n", lsda_addr);
 
 	// No LSDA implies no landing pads - try the next frame
 	if (0 == lsda_addr) { return _URC_CONTINUE_UNWIND; }
@@ -338,12 +377,12 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 	
 	if (actions & _UA_SEARCH_PHASE)
 	{
-		fprintf(stderr, "Search phase...\n");
+		DEBUG_LOG("Search phase...\n");
 		struct dwarf_eh_lsda lsda = parse_lsda(context, lsda_addr);
 		action = dwarf_eh_find_callsite(context, &lsda);
 		handler_type handler = check_action_record(context, foreignException,
 				&lsda, action.action_record, thrown_class, &selector);
-		fprintf(stderr, "handler: %d\n", handler);
+		DEBUG_LOG("handler: %d\n", handler);
 		// If there's no action record, we've only found a cleanup, so keep
 		// searching for something real
 		if (handler == handler_class ||
@@ -351,17 +390,18 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 			(handler == handler_catchall))
 		{
 			saveLandingPad(context, exceptionObject, ex, selector, action.landing_pad);
-			fprintf(stderr, "Found handler! %d\n", handler);
+			DEBUG_LOG("Found handler! %d\n", handler);
 			return _URC_HANDLER_FOUND;
 		}
 		return _URC_CONTINUE_UNWIND;
 	}
-	fprintf(stderr, "Phase 2: Fight!\n");
+	DEBUG_LOG("Phase 2: Fight!\n");
 
 	// TODO: If this is a C++ exception, we can cache the lookup and cheat a
 	// bit
 	if (!(actions & _UA_HANDLER_FRAME))
 	{
+		DEBUG_LOG("Not the handler frame, looking up the cleanup again\n");
 		struct dwarf_eh_lsda lsda = parse_lsda(context, lsda_addr);
 		action = dwarf_eh_find_callsite(context, &lsda);
 		// If there's no cleanup here, continue unwinding.
@@ -371,20 +411,19 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 		}
 		handler_type handler = check_action_record(context, foreignException,
 				&lsda, action.action_record, thrown_class, &selector);
-		fprintf(stderr, "handler! %d %d\n", (int)handler,  (int)selector);
+		DEBUG_LOG("handler! %d %d\n", (int)handler,  (int)selector);
 		// If this is not a cleanup, ignore it and keep unwinding.
 		//if (check_action_record(context, foreignException, &lsda,
 				//action.action_record, thrown_class, &selector) != handler_cleanup)
 		if (handler != handler_cleanup)
 		{
-			fprintf(stderr, "Ignoring handler! %d\n",handler);
+			DEBUG_LOG("Ignoring handler! %d\n",handler);
 			return _URC_CONTINUE_UNWIND;
 		}
-		fprintf(stderr, "Installing cleanup...\n");
+		DEBUG_LOG("Installing cleanup...\n");
 		// If there is a cleanup, we need to return the exception structure
 		// (not the object) to the calling frame.  The exception object
 		object = exceptionObject;
-		//selector = 0;
 	}
 	else if (foreignException || objcxxException)
 	{
@@ -396,42 +435,57 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 		// exception, then we need to delete the exception object.
 		if (foreignException)
 		{
-			fprintf(stderr, "Doing the foreign exception thing...\n");
+			DEBUG_LOG("Doing the foreign exception thing...\n");
 			//[thrown_class exceptionWithForeignException: exceptionObject];
 			SEL box_sel = sel_registerName("exceptionWithForeignException:");
 			IMP boxfunction = objc_msg_lookup((id)thrown_class, box_sel);
-			object = boxfunction((id)thrown_class, box_sel, exceptionObject);
-			fprintf(stderr, "Boxed as %p\n", object);
+			if (!isNew)
+			{
+				object = boxfunction((id)thrown_class, box_sel, exceptionObject);
+				DEBUG_LOG("Boxed as %p\n", object);
+			}
 		}
-		else // ObjCXX exception
+		else if (!isNew) // ObjCXX exception
 		{
 			_Unwind_DeleteException(exceptionObject);
 		}
+		// In the new EH ABI, we call objc_begin_catch() / and
+		// objc_end_catch(), which will wrap their __cxa* versions.
 	}
 	else
 	{
 		// Restore the saved info if we saved some last time.
 		loadLandingPad(context, exceptionObject, ex, &selector, &action.landing_pad);
 		object = ex->object;
-		free(ex);
+		if (!isNew)
+		{
+			free(ex);
+		}
 	}
 
 	_Unwind_SetIP(context, (unsigned long)action.landing_pad);
 	_Unwind_SetGR(context, __builtin_eh_return_data_regno(0), 
-			(unsigned long)object);
+			(unsigned long)(isNew ? exceptionObject : object));
 	_Unwind_SetGR(context, __builtin_eh_return_data_regno(1), selector);
 
+	DEBUG_LOG("Installing context, selector %d\n", (int)selector);
 	return _URC_INSTALL_CONTEXT;
 }
 
+BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
+	return internal_objc_personality(version, actions, exceptionClass,
+			exceptionObject, context, NO);
+}
+BEGIN_PERSONALITY_FUNCTION(__gnustep_objc_personality_v0)
+	return internal_objc_personality(version, actions, exceptionClass,
+			exceptionObject, context, YES);
+}
 // FIXME!
 #ifndef __arm__
 BEGIN_PERSONALITY_FUNCTION(__gnustep_objcxx_personality_v0)
 	if (exceptionClass == objc_exception_class)
 	{
-		struct objc_exception *ex = (struct objc_exception*)
-			((char*)exceptionObject - offsetof(struct objc_exception,
-				unwindHeader));
+		struct objc_exception *ex = objc_exception_from_header(exceptionObject);
 		if (0 == ex->cxx_exception)
 		{
 			id *newEx = __cxa_allocate_exception(sizeof(id));
@@ -448,3 +502,230 @@ BEGIN_PERSONALITY_FUNCTION(__gnustep_objcxx_personality_v0)
 	return CALL_PERSONALITY_FUNCTION(__gxx_personality_v0);
 }
 #endif
+
+// Weak references to C++ runtime functions.  We don't bother testing that
+// these are 0 before calling them, because if they are not resolved then we
+// should not be in a code path that involves a C++ exception.
+__attribute__((weak)) void *__cxa_begin_catch(void *e);
+__attribute__((weak)) void __cxa_end_catch(void);
+__attribute__((weak)) void __cxa_rethrow(void);
+
+enum exception_type
+{
+	NONE,
+	CXX,
+	OBJC,
+	FOREIGN,
+	BOXED_FOREIGN
+};
+struct thread_data
+{
+	enum exception_type current_exception_type;
+	struct objc_exception *caughtExceptions;
+};
+
+// IF we don't have pthreads, then we fall back to using a per-thread
+// structure.  This will leak memory if we terminate any threads with
+// exceptions in-flight.
+#ifdef NO_PTHREADS
+static __thread struct thread_data thread_data;
+#else
+void clean_tls(void *td)
+{
+	struct thread_data *data = td;
+}
+
+static pthread_key_t key;
+void init_key(void)
+{
+	pthread_key_create(&key, clean_tls);
+}
+#endif
+
+struct thread_data *get_thread_data(void)
+{
+#ifndef NO_PTHREADS
+	static pthread_once_t once_control = PTHREAD_ONCE_INIT;
+	pthread_once(&once_control, init_key);
+	struct thread_data *td = pthread_getspecific(key);
+	if (td == NULL)
+	{
+		td = calloc(sizeof(struct thread_data), 1);
+		pthread_setspecific(key, td);
+		if (pthread_getspecific(key) == NULL)
+		{
+			fprintf(stderr, "Unable to allocate thread-local storage for exceptions\n");
+		}
+	}
+	return td;
+#else
+	return &td;
+#endif
+}
+
+struct thread_data *get_thread_data_fast(void)
+{
+#ifndef NO_PTHREADS
+	struct thread_data *td = pthread_getspecific(key);
+	return td;
+#else
+	return &td;
+#endif
+}
+
+id objc_begin_catch(struct _Unwind_Exception *exceptionObject)
+{
+	struct thread_data *td = get_thread_data();
+	DEBUG_LOG("Beginning catch %p\n", exceptionObject);
+	if (exceptionObject->exception_class == objc_exception_class)
+	{
+		td->current_exception_type = OBJC;
+		struct objc_exception *ex = objc_exception_from_header(exceptionObject);
+		if (ex->catch_count == 0)
+		{
+			// If this is the first catch, add it to the list.
+			ex->catch_count = 1;
+			ex->next = td->caughtExceptions;
+			td->caughtExceptions = ex;
+		}
+		else if (ex->catch_count < 0)
+		{
+			// If this is being thrown, mark it as caught again and increment
+			// the refcount
+			ex->catch_count = -ex->catch_count + 1;
+		}
+		else
+		{
+			// Otherwise, just increment the catch count
+			ex->catch_count++;
+		}
+		DEBUG_LOG("objc catch\n");
+		return ex->object;
+	}
+	// If we have a foreign exception while we have stacked exceptions, we have
+	// a problem.  We can't chain them, so we follow the example of C++ and
+	// just abort.
+	if (td->caughtExceptions != 0)
+	{
+		// FIXME: Actually, we can handle a C++ exception if only ObjC
+		// exceptions are in-flight
+		abort();
+	}
+	// If this is a C++ exception, let the C++ runtime handle it.
+	if (exceptionObject->exception_class == cxx_exception_class)
+	{
+		DEBUG_LOG("c++ catch\n");
+		td->current_exception_type = CXX;
+		return __cxa_begin_catch(exceptionObject);
+	}
+	DEBUG_LOG("foreign exception catch\n");
+	// Box if we have a boxing function.
+	if (_objc_class_for_boxing_foreign_exception)
+	{
+		Class thrown_class =
+			_objc_class_for_boxing_foreign_exception(exceptionObject->exception_class);
+		SEL box_sel = sel_registerName("exceptionWithForeignException:");
+		IMP boxfunction = objc_msg_lookup((id)thrown_class, box_sel);
+		if (boxfunction != 0)
+		{
+			id boxed = boxfunction((id)thrown_class, box_sel, exceptionObject);
+			td->caughtExceptions = (struct objc_exception*)boxed;
+			td->current_exception_type = BOXED_FOREIGN;
+			return boxed;
+		}
+	}
+	td->current_exception_type = FOREIGN;
+	td->caughtExceptions = (struct objc_exception*)exceptionObject;
+	// If this is some other kind of exception, then assume that the value is
+	// at the end of the exception header.
+	return (id)((char*)exceptionObject + sizeof(struct _Unwind_Exception));
+}
+
+void objc_end_catch(void)
+{
+	struct thread_data *td = get_thread_data_fast();
+	// If this is a boxed foreign exception then the boxing class is
+	// responsible for cleaning it up
+	if (td->current_exception_type == BOXED_FOREIGN)
+	{
+		td->caughtExceptions = 0;
+		td->current_exception_type = NONE;
+		return;
+	}
+	DEBUG_LOG("Ending catch\n");
+	// If this is a C++ exception, then just let the C++ runtime handle it.
+	if (td->current_exception_type == CXX)
+	{
+		__cxa_end_catch();
+		td->current_exception_type = OBJC;
+		return;
+	}
+	if (td->current_exception_type == FOREIGN)
+	{
+		struct _Unwind_Exception *e = ((struct _Unwind_Exception*)td->caughtExceptions);
+		e->exception_cleanup(_URC_FOREIGN_EXCEPTION_CAUGHT, e);
+		td->current_exception_type = NONE;
+		td->caughtExceptions = 0;
+		return;
+	}
+	// Otherwise we should do the cleanup thing.  Nested catches are possible,
+	// so we only clean up the exception if this is the last reference.
+	assert(td->caughtExceptions != 0);
+	struct objc_exception *ex = td->caughtExceptions;
+	// If this is being rethrown decrement its (negated) catch count, but don't
+	// delete it even if its catch count would be 0.
+	if (ex->catch_count < 0)
+	{
+		ex->catch_count++;
+		return;
+	}
+	ex->catch_count--;
+	if (ex->catch_count == 0)
+	{
+		td->caughtExceptions = ex->next;
+		free(ex);
+	}
+}
+
+void objc_exception_rethrow(struct _Unwind_Exception *e)
+{
+	struct thread_data *td = get_thread_data_fast();
+	// If this is an Objective-C exception, then 
+	if (td->current_exception_type == OBJC)
+	{
+		struct objc_exception *ex = objc_exception_from_header(e);
+		assert(e->exception_class == objc_exception_class);
+		assert(ex == td->caughtExceptions);
+		assert(ex->catch_count > 0);
+		// Negate the catch count, so that we can detect that this is a
+		// rethrown exception in objc_end_catch
+		ex->catch_count = -ex->catch_count;
+		_Unwind_Reason_Code err = _Unwind_Resume_or_Rethrow(e);
+		free(ex);
+		if (_URC_END_OF_STACK == err && 0 != _objc_unexpected_exception)
+		{
+			_objc_unexpected_exception(ex->object);
+		}
+		abort();
+	}
+	else if (td->current_exception_type == CXX)
+	{
+		assert(e->exception_class == cxx_exception_class);
+		__cxa_rethrow();
+	}
+	if (td->current_exception_type == BOXED_FOREIGN)
+	{
+		SEL rethrow_sel = sel_registerName("rethrow");
+		id object = (id)td->caughtExceptions;
+		if ((nil != object) &&
+		    (class_respondsToSelector(classForObject(object), rethrow_sel)))
+		{
+			DEBUG_LOG("Rethrowing boxed exception\n");
+			IMP rethrow = objc_msg_lookup(object, rethrow_sel);
+			rethrow(object, rethrow_sel);
+		}
+	}
+	assert(e == (struct _Unwind_Exception*)td->caughtExceptions);
+	_Unwind_Resume_or_Rethrow(e);
+	abort();
+}

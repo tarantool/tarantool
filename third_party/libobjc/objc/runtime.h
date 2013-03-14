@@ -1,3 +1,7 @@
+#if defined(__clang__) && !defined(__OBJC_RUNTIME_INTERNAL__)
+#pragma clang system_header
+#endif
+
 #ifndef __LIBOBJC_RUNTIME_H_INCLUDED__
 #define __LIBOBJC_RUNTIME_H_INCLUDED__
 
@@ -208,6 +212,8 @@ typedef struct
 #endif
 
 #include "slot.h"
+#include "message.h"
+
 
 /**
  * Adds an instance variable to the named class.  The class must not have been

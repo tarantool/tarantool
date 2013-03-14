@@ -95,7 +95,7 @@
 	push  %rsi                           # Save self where it can be modified
 	mov   %rsp, %rdi
 	push  %rdx
-	mov   %rdx, %rsi                     # move _cmd to where the callee expects it to be
+	mov   %rdx, %rsi                     # move _cmd to where the callee expects it to be
 .endif
 
 	.cfi_adjust_cfa_offset 0xD8

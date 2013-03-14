@@ -18,7 +18,8 @@ PRIVATE dtable_t uninstalled_dtable;
 PRIVATE InitializingDtable *temporary_dtables;
 /** Lock used to protect the temporary dtables list. */
 PRIVATE mutex_t initialize_lock;
-/** The size of the largest dtable, rounded up to the nearest power of two. */
+/** The size of the largest dtable.  This is a sparse array shift value, so is
+ * 2^x in increments of 8. */
 static uint32_t dtable_depth = 8;
 
 struct objc_slot* objc_get_slot(Class cls, SEL selector);
@@ -555,11 +556,13 @@ PRIVATE void objc_resize_dtables(uint32_t newSize)
 
 	LOCK_RUNTIME_FOR_SCOPE();
 
-	dtable_depth <<= 1;
+	if (1<<dtable_depth > newSize) { return; }
+
+	dtable_depth += 8;
 
 	uint32_t oldMask = uninstalled_dtable->mask;
 
-	SparseArrayExpandingArray(uninstalled_dtable);
+	SparseArrayExpandingArray(uninstalled_dtable, dtable_depth);
 	// Resize all existing dtables
 	void *e = NULL;
 	struct objc_class *next;
@@ -569,7 +572,8 @@ PRIVATE void objc_resize_dtables(uint32_t newSize)
 			NULL != next->dtable &&
 			((SparseArray*)next->dtable)->mask == oldMask)
 		{
-			SparseArrayExpandingArray((void*)next->dtable);
+			SparseArrayExpandingArray((void*)next->dtable, dtable_depth);
+			SparseArrayExpandingArray((void*)next->isa->dtable, dtable_depth);
 		}
 	}
 }
@@ -666,14 +670,11 @@ PRIVATE void objc_send_initialize(id object)
 		objc_send_initialize((id)class->super_class);
 	}
 
-	LOCK(&initialize_lock);
-
 	// Superclass +initialize might possibly send a message to this class, in
 	// which case this method would be called again.  See NSObject and
 	// NSAutoreleasePool +initialize interaction in GNUstep.
 	if (objc_test_class_flag(class, objc_class_flag_initialized))
 	{
-		UNLOCK(&initialize_lock);
 		// We know that initialization has started because the flag is set.
 		// Check that it's finished by grabbing the class lock.  This will be
 		// released once the class has been fully initialized
@@ -683,7 +684,20 @@ PRIVATE void objc_send_initialize(id object)
 		return;
 	}
 
+	// Lock the runtime while we're creating dtables and before we acquire any
+	// other locks.  This prevents a lock-order reversal when 
+	// dtable_for_class is called from something holding the runtime lock while
+	// we're still holding the initialize lock.  We should ensure that we never
+	// acquire the runtime lock after acquiring the initialize lock.
+	LOCK_RUNTIME();
 	LOCK_OBJECT_FOR_SCOPE((id)meta);
+	LOCK(&initialize_lock);
+	if (objc_test_class_flag(class, objc_class_flag_initialized))
+	{
+		UNLOCK(&initialize_lock);
+		return;
+	}
+	BOOL skipMeta = objc_test_class_flag(meta, objc_class_flag_initialized);
 
 	// Set the initialized flag on both this class and its metaclass, to make
 	// sure that +initialize is only ever sent once.
@@ -691,7 +705,15 @@ PRIVATE void objc_send_initialize(id object)
 	objc_set_class_flag(meta, objc_class_flag_initialized);
 
 	dtable_t class_dtable = create_dtable_for_class(class, uninstalled_dtable);
-	dtable_t dtable = create_dtable_for_class(meta, class_dtable);
+	dtable_t dtable = skipMeta ? 0 : create_dtable_for_class(meta, class_dtable);
+	// Now we've finished doing things that may acquire the runtime lock, so we
+	// can hold onto the initialise lock to make anything doing
+	// dtable_for_class block until we've finished updating temporary dtable
+	// lists.
+	// If another thread holds the runtime lock, it can now proceed until it
+	// gets into a dtable_for_class call, and then block there waiting for us
+	// to finish setting up the temporary dtable.
+	UNLOCK_RUNTIME();
 
 	static SEL initializeSel = 0;
 	if (0 == initializeSel)
@@ -699,14 +721,17 @@ PRIVATE void objc_send_initialize(id object)
 		initializeSel = sel_registerName("initialize");
 	}
 
-	struct objc_slot *initializeSlot = 
-		objc_dtable_lookup(dtable, initializeSel->index);
+	struct objc_slot *initializeSlot = skipMeta ? 0 :
+			objc_dtable_lookup(dtable, initializeSel->index);
 
 	// If there's no initialize method, then don't bother installing and
 	// removing the initialize dtable, just install both dtables correctly now
 	if (0 == initializeSlot)
 	{
-		meta->dtable = dtable;
+		if (!skipMeta)
+		{
+			meta->dtable = dtable;
+		}
 		class->dtable = class_dtable;
 		checkARCAccessors(class);
 		UNLOCK(&initialize_lock);
@@ -723,7 +748,12 @@ PRIVATE void objc_send_initialize(id object)
 	__attribute__((cleanup(remove_dtable)))
 	InitializingDtable meta_buffer = { meta, dtable, &buffer };
 	temporary_dtables = &meta_buffer;
+	// We now release the initialize lock.  We'll reacquire it later when we do
+	// the cleanup, but at this point we allow other threads to get the
+	// temporary dtable and call +initialize in other threads.
 	UNLOCK(&initialize_lock);
+	// We still hold the class lock at this point.  dtable_for_class will block
+	// there after acquiring the temporary dtable.
 
 	checkARCAccessors(class);
 

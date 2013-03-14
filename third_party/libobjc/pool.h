@@ -29,13 +29,17 @@ static mutex_t NAME(_lock);
 #define UNLOCK_POOL()
 #endif
 
+static int pool_size = 0;
+static int pool_allocs = 0;
 static inline POOL_TYPE*NAME(_pool_alloc)(void)
 {
 	LOCK_POOL();
+	pool_allocs++;
 	if (0 > NAME(_pool_next_index))
 	{
 		NAME(_pool) = malloc(PAGE_SIZE);
 		NAME(_pool_next_index) = POOL_SIZE - 1;
+		pool_size += PAGE_SIZE;
 	}
 	POOL_TYPE* new = &NAME(_pool)[NAME(_pool_next_index)--];
 	UNLOCK_POOL();

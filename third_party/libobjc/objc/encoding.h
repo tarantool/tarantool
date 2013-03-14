@@ -1,3 +1,7 @@
+#if defined(__clang__) && !defined(__OBJC_RUNTIME_INTERNAL__)
+#pragma clang system_header
+#endif
+
 #ifndef __LIBOBJC_ENCODING_H_INCLUDED__
 #define __LIBOBJC_ENCODING_H_INCLUDED__
 

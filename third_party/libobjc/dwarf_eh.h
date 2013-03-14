@@ -284,7 +284,7 @@ __attribute__((unused))
 static struct dwarf_eh_action 
 	dwarf_eh_find_callsite(struct _Unwind_Context *context, struct dwarf_eh_lsda *lsda)
 {
-	struct dwarf_eh_action result = { 0, 0};
+	struct dwarf_eh_action result = { 0, 0 };
 	uint64_t ip = _Unwind_GetIP(context) - _Unwind_GetRegionStart(context);
 	unsigned char *callsite_table = (unsigned char*)lsda->call_site_table;
 	while (callsite_table <= lsda->action_table)
@@ -320,4 +320,4 @@ static struct dwarf_eh_action
 	return result;
 }
 
-#define EXCEPTION_CLASS(a,b,c,d,e,f,g,h) (((uint64_t)a << 56) + ((uint64_t)b << 48) + ((uint64_t)c << 40) + ((uint64_t)d << 32) + ((uint64_t)e << 24) + ((uint64_t)f << 16) + ((uint64_t)g << 8) + ((uint64_t)h))
+#define EXCEPTION_CLASS(a,b,c,d,e,f,g,h) ((((uint64_t)a) << 56) + (((uint64_t)b) << 48) + (((uint64_t)c) << 40) + (((uint64_t)d) << 32) + (((uint64_t)e) << 24) + (((uint64_t)f) << 16) + (((uint64_t)g) << 8) + (((uint64_t)h)))

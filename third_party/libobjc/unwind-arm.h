@@ -25,6 +25,8 @@ static const _Unwind_State _US_UNWIND_FRAME_RESUME   = 2;
 #	define _US_UNWIND_FRAME_RESUME 2
 #endif
 
+typedef int _Unwind_Action;
+
 typedef struct _Unwind_Context _Unwind_Context;
 
 typedef uint32_t _Unwind_EHT_Header;

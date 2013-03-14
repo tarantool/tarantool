@@ -1,3 +1,7 @@
+#if defined(__clang__) && !defined(__OBJC_RUNTIME_INTERNAL__)
+#pragma clang system_header
+#endif
+
 /**
  * capabilities.h - This file defines the list of capabilities.  Runtime
  * capabilities can be checked.  You may use #ifdef to test at compile time

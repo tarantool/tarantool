@@ -26,7 +26,7 @@ extern int spinlocks[spinlock_count];
  * contention between the same property in different objects, so we can't just
  * use the ivar offset.
  */
-static inline volatile int *lock_for_pointer(void *ptr)
+static inline volatile int *lock_for_pointer(const void *ptr)
 {
 	intptr_t hash = (intptr_t)ptr;
 	// Most properties will be pointers, so disregard the lowest few bits
