@@ -1,8 +1,7 @@
-#include "llvm/Pass.h"
-#include "llvm/Module.h"
+#include "LLVMCompat.h"
 #if LLVM_MAJOR >= 3
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/PassManager.h"
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/PassManager.h>
 #endif
 
 #include "ObjectiveCOpts.h"

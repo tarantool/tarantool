@@ -1,14 +1,6 @@
-#include "llvm/Pass.h"
-#include "llvm/Function.h"
-#include "llvm/Module.h"
-#include "llvm/Instructions.h"
-#include "llvm/Constants.h"
-#include "llvm/GlobalVariable.h"
-#include "llvm/Support/IRBuilder.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/DefaultPasses.h"
 #include "ObjectiveCOpts.h"
 #include <string>
 
@@ -50,7 +42,7 @@ namespace
         for (BasicBlock::iterator b=i->begin(), last=i->end() ;
             b != last ; ++b) {
           if (CallInst *call = dyn_cast<CallInst>(b)) {
-            if (Function *func = call->getCalledFunction()) {
+            if (Function *func = dyn_cast<Function>(call->getCalledValue()->stripPointerCasts())) {
               if (func->getName() == "objc_lookup_class") {
                 ClassLookup lookup;
                 GlobalVariable *classNameVar = dyn_cast<GlobalVariable>(
@@ -79,7 +71,6 @@ namespace
         std::string &cls = i->second;
         LLVMType *clsTy = lookup->getType();
         Value *global = M->getGlobalVariable(("_OBJC_CLASS_" + i->second).c_str(), true);
-        global = 0;
         // If we can see the class reference for this, then reference it
         // directly.  If not, then do the lookup and cache it.
         if (global) {
@@ -88,6 +79,7 @@ namespace
           Value *cls = new BitCastInst(global, clsTy, "class", lookup);
           lookup->replaceAllUsesWith(cls);
           lookup->removeFromParent();
+          delete lookup;
         } else {
           GlobalVariable *cache = statics[cls];
           if (!cache) {

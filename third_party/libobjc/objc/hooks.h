@@ -1,3 +1,7 @@
+#if defined(__clang__) && !defined(__OBJC_RUNTIME_INTERNAL__)
+#pragma clang system_header
+#endif
+
 /**
  * This file includes all of the hooks that can be used to alter the behaviour
  * of the runtime.  

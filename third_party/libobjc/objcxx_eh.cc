@@ -29,7 +29,6 @@ namespace std
 				bool operator==(const type_info &) const;
 				bool operator!=(const type_info &) const;
 				bool before(const type_info &) const;
-				const char* name() const;
 				type_info();
 				private:
 				type_info(const type_info& rhs);
@@ -38,6 +37,7 @@ namespace std
 				protected:
 				type_info(const char *name): __type_name(name) { }
 				public:
+				const char* name() const { return __type_name; }
 				virtual bool __is_pointer_p() const;
 				virtual bool __is_function_p() const;
 				virtual bool __do_catch(const type_info *thrown_type,
@@ -214,7 +214,7 @@ struct _Unwind_Exception *objc_init_cxx_exception(void *thrown_exception)
 	return &ex->unwindHeader;
 }
 
-void* objc_object_for_cxx_exception(void *thrown_exception)
+void* objc_object_for_cxx_exception(void *thrown_exception, int *isValid)
 {
 	__cxa_exception *ex = (__cxa_exception*) ((char*)thrown_exception -
 			offsetof(struct __cxa_exception, unwindHeader));
@@ -222,8 +222,10 @@ void* objc_object_for_cxx_exception(void *thrown_exception)
 	if (!dynamic_cast<const gnustep::libobjc::__objc_id_type_info*>(thrownType) && 
 	    !dynamic_cast<const gnustep::libobjc::__objc_class_type_info*>(thrownType))
 	{
-		return (id)-1;
+		*isValid = 0;
+		return 0;
 	}
+	*isValid = 1;
 	return *(id*)(ex+1);
 }
 

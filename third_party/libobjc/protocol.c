@@ -11,7 +11,7 @@
 // Get the functions for string hashing
 #include "string_hash.h"
 
-static int protocol_compare(const char *name, 
+static int protocol_compare(const char *name,
                             const struct objc_protocol2 *protocol)
 {
 	return string_compare(name, protocol->name);
@@ -31,7 +31,7 @@ static protocol_table *known_protocol_table;
 void init_protocol_table(void)
 {
 	protocol_initialize(&known_protocol_table, 128);
-}  
+}
 
 static void protocol_table_insert(const struct objc_protocol2 *protocol)
 {
@@ -47,10 +47,10 @@ static id ObjC2ProtocolClass = 0;
 
 static int isEmptyProtocol(struct objc_protocol2 *aProto)
 {
-	int isEmpty = 
-		((aProto->instance_methods == NULL) || 
+	int isEmpty =
+		((aProto->instance_methods == NULL) ||
 			(aProto->instance_methods->count == 0)) &&
-		((aProto->class_methods == NULL) || 
+		((aProto->class_methods == NULL) ||
 			(aProto->class_methods->count == 0)) &&
 		((aProto->protocol_list == NULL) ||
 		  (aProto->protocol_list->count == 0));
@@ -67,7 +67,7 @@ static int isEmptyProtocol(struct objc_protocol2 *aProto)
 
 // FIXME: Make p1 adopt all of the stuff in p2
 static void makeProtocolEqualToProtocol(struct objc_protocol2 *p1,
-                                        struct objc_protocol2 *p2) 
+                                        struct objc_protocol2 *p2)
 {
 #define COPY(x) p1->x = p2->x
 	COPY(instance_methods);
@@ -90,7 +90,7 @@ static struct objc_protocol2 *unique_protocol(struct objc_protocol2 *aProto)
 	{
 		ObjC2ProtocolClass = objc_getClass("Protocol2");
 	}
-	struct objc_protocol2 *oldProtocol = 
+	struct objc_protocol2 *oldProtocol =
 		protocol_for_name(aProto->name);
 	if (NULL == oldProtocol)
 	{
@@ -166,7 +166,7 @@ static BOOL init_protocols(struct objc_protocol_list *protocols)
 
 		// Protocols in the protocol list have their class pointers set to the
 		// version of the protocol class that they expect.
-		enum protocol_version version = 
+		enum protocol_version version =
 			(enum protocol_version)(uintptr_t)aProto->isa;
 		switch (version)
 		{
@@ -309,17 +309,16 @@ get_method_list(Protocol *p,
 struct objc_method_description *protocol_copyMethodDescriptionList(Protocol *p,
 	BOOL isRequiredMethod, BOOL isInstanceMethod, unsigned int *count)
 {
-	if (NULL == p) { return NULL; }
-	struct objc_method_description_list *list = 
+	if ((NULL == p) || (NULL == count)){ return NULL; }
+	struct objc_method_description_list *list =
 		get_method_list(p, isRequiredMethod, isInstanceMethod);
 	*count = 0;
 	if (NULL == list || list->count == 0) { return NULL; }
 
 	*count = list->count;
-	struct objc_method_description *out = 
-		calloc(sizeof(struct objc_method_description_list), list->count);
-
-	for (int i=0 ; i<list->count ; i++)
+	struct objc_method_description *out =
+		calloc(sizeof(struct objc_method_description), list->count);
+	for (int i=0 ; i < (list->count) ; i++)
 	{
 		out[i].name = sel_registerTypedName_np(list->methods[i].name,
 		                                       list->methods[i].types);
@@ -403,14 +402,14 @@ objc_property_t protocol_getProperty(Protocol *protocol,
 		return NULL;
 	}
 	Protocol2 *p = (Protocol2*)protocol;
-	struct objc_property_list *properties = 
+	struct objc_property_list *properties =
 	    isRequiredProperty ? p->properties : p->optional_properties;
 	while (NULL != properties)
 	{
 		for (int i=0 ; i<properties->count ; i++)
 		{
 			objc_property_t prop = &properties->properties[i];
-			if (strcmp(prop->name, name) == 0)
+			if (strcmp(property_getName(prop), name) == 0)
 			{
 				return prop;
 			}
@@ -421,20 +420,20 @@ objc_property_t protocol_getProperty(Protocol *protocol,
 }
 
 
-struct objc_method_description 
+struct objc_method_description
 protocol_getMethodDescription(Protocol *p,
                               SEL aSel,
                               BOOL isRequiredMethod,
                               BOOL isInstanceMethod)
 {
 	struct objc_method_description d = {0,0};
-	struct objc_method_description_list *list = 
+	struct objc_method_description_list *list =
 		get_method_list(p, isRequiredMethod, isInstanceMethod);
 	if (NULL == list)
 	{
 		return d;
 	}
-	// TODO: We could make this much more efficient if 
+	// TODO: We could make this much more efficient if
 	for (int i=0 ; i<list->count ; i++)
 	{
 		SEL s = sel_registerTypedName_np(list->methods[i].name, 0);
@@ -464,7 +463,7 @@ BOOL protocol_isEqual(Protocol *p, Protocol *other)
 	{
 		return NO;
 	}
-	if (p == other || 
+	if (p == other ||
 		p->name == other->name ||
 		0 == strcmp(p->name, other->name))
 	{
@@ -609,8 +608,10 @@ void protocol_addProperty(Protocol *aProtocol,
 	}
 	struct objc_property_list *list = *listPtr;
 	int index = list->count-1;
-	struct objc_property p = propertyFromAttrs(attributes, attributeCount);
-	p.name = strdup(name);
+	const char *iVarName = NULL;
+	struct objc_property p = propertyFromAttrs(attributes, attributeCount, &iVarName);
+	p.name = name;
+	constructPropertyAttributes(&p, iVarName);
 	memcpy(&(list->properties[index]), &p, sizeof(p));
 }
 

@@ -1,5 +1,9 @@
 #ifndef __LIBOBJC_BLOCKS_PRIVATE_H_INCLUDED__
 #define __LIBOBJC_BLOCKS_PRIVATE_H_INCLUDED__
+#if defined(__clang__) && !defined(__OBJC_RUNTIME_INTERNAL__)
+#pragma clang system_header
+#endif
+
 
 /*
  * This header file exposes some implementation details of the blocks runtime

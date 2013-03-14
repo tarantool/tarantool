@@ -4,6 +4,7 @@
 #include <ctype.h>
 
 #include "objc/runtime.h"
+#include "objc/encoding.h"
 #include "method_list.h"
 #include "visibility.h"
 
@@ -449,31 +450,22 @@ char* method_copyReturnType(Method method)
 unsigned objc_get_type_qualifiers (const char *type)
 {
 	unsigned flags = 0;
-#define MAP(chr, bit) case chr: flags |= (1<<bit); break;
+#define MAP(chr, bit) case chr: flags |= bit; break;
 	do
 	{
 		switch (*(type++))
 		{
 			default: return flags;
-			MAP('r', 1)
-			MAP('n', 1)
-			MAP('o', 2)
-			MAP('N', 3)
-			MAP('O', 4)
-			MAP('V', 10)
-			MAP('R', 8)
+			MAP('r', _F_CONST)
+			MAP('n', _F_IN)
+			MAP('o', _F_OUT)
+			MAP('N', _F_INOUT)
+			MAP('O', _F_BYCOPY)
+			MAP('V', _F_ONEWAY)
+			MAP('R', _F_BYREF)
 		}
 	} while (1);
 }
-
-struct objc_struct_layout
-{
-	const char *original_type;
-	const char *type;
-	const char *prev_type;
-	unsigned int record_size;
-	unsigned int record_align;
-};
 
 // Note: The implementations of these functions is horrible.
 void objc_layout_structure (const char *type,

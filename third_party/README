@@ -30,6 +30,8 @@ rm GNUMakefile
 
 How to update it:
 
-- delete GNUMakefile
+- delete GNUmakefile
+- delete CMakeLists.txt
 - merge our Makefile with the Makefile in
 the source tarball
+- preserve the zero-warnings patch 43771c84f7f5bf04e426dde30a31303d4699f00d

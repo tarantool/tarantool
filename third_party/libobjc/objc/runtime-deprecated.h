@@ -1,3 +1,7 @@
+#if defined(__clang__) && !defined(__OBJC_RUNTIME_INTERNAL__)
+#pragma clang system_header
+#endif
+
 #if !defined(__GNUSTEP_LIBOBJC_RUNTIME_DEPRECATED_INCLUDED__) && !defined(GNUSTEP_LIBOBJC_NO_LEGACY)
 #	define __GNUSTEP_LIBOBJC_RUNTIME_DEPRECATED_INCLUDED__
 

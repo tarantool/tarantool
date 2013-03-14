@@ -1,27 +1,47 @@
-GNUstep Objective-C Runtime 1.6.1
+GNUstep Objective-C Runtime 1.7
 ===============================
 
-This is a point release to the seventh official release of the GNUstep
+This is a point release to the eighth official release of the GNUstep
 Objective-C runtime (a.k.a.  libobjc2).  This runtime was designed to support
-the features of Objective-C 2 for use with GNUstep and other Objective-C
-programs.  Highlights of this release include:
+the features of modern dialects of Objective-C for use with GNUstep and other
+Objective-C programs.  Highlights of this release include:
 
-- Improved support for ARC autorelease pools.
+- A new CMake-based build system.  This makes all of the configurable options
+  available via a clean interface.  CPack is supported for building RPM and DEB
+  packages out of the box.
 
-- Some small bug fixes in blocks support.
+- A new CTest-based test suite, replacing the old ad-hoc tests.
 
-- Improvements to the Objective-C++ unified exception model support.
+- Build a single libobjc with support for Objective-C++ on platforms where a
+  C++ ABI library (libcxxrt or libsupc++) is installed as a shared library.
 
-- Updated optimisation passes to work with LLVM 3.1
+- Added specialised property accessor functions and support for atomic
+  properties with C++ non-POD types.
+
+- Significant improvements in property introspection and an exhaustive test
+  suite.
+
+- A new exception implementation providing better integration with foreign
+  exceptions (e.g. C++ exceptions).  The new ABI is supported by clang 3.3 when
+  compiling with -fobjc-runtime=gnustep-1.7 (or higher).  The old ABI is still
+  supported and both can be used within the same program, however code compiled
+  with the old ABI remains unreliable in the presence of foreign exceptions.
+  It is strongly recommended that anyone using exceptions with Objective-C++
+  switches to the new version.
+
+- MIPS64 support in the assembly routines. (TODO)
+
+- Updated optimisation passes to work with LLVM 3.2 and recent LLVM trunk.
+
 
 You may obtain the code for this release from subversion at the following
 subversion branch:
 
-svn://svn.gna.org/svn/gnustep/libs/libobjc2/1.6.1
+svn://svn.gna.org/svn/gnustep/libs/libobjc2/1.7
 
 Alternatively, a tarball is available from:
 
-http://download.gna.org/gnustep/libobjc2-1.6.1.tar.bz2
+http://download.gna.org/gnustep/libobjc2-1.7.tar.bz2
 
 The runtime library is responsible for implementing the core features of the
 object model, as well as exposing introspection features to the user.  The
@@ -35,7 +55,5 @@ with the FSF's GCC 4.2.1 Objective-C ABI and also implements a new ABI that is
 supported by Clang and Étoilé's LanguageKit and is required for some of the
 newer features.
 
-Although the runtime has been tested by several people, and is being used
-extensively by the Étoilé project, it is relatively new code and may still
-contain bugs.  If you come across any problems, please report them to the
-GNUstep Developer mailing list <gnustep-dev@gnu.org>.  
+If you come across any problems, please report them to the GNUstep Developer
+mailing list <gnustep-dev@gnu.org>.  

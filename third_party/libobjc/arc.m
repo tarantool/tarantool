@@ -17,6 +17,7 @@ pthread_key_t ARCThreadKey;
 #endif
 
 extern char _NSConcreteMallocBlock;
+extern char _NSConcreteStackBlock;
 extern char _NSConcreteGlobalBlock;
 
 @interface NSAutoreleasePool
@@ -133,13 +134,12 @@ static void emptyPool(struct arc_tls *tls, id *stop)
 
 static void cleanupPools(struct arc_tls* tls)
 {
-	struct arc_autorelease_pool *pool = tls->pool;
 	if (tls->returnRetained)
 	{
 		release(tls->returnRetained);
 		tls->returnRetained = nil;
 	}
-	while(NULL != pool)
+	if (NULL != tls->pool)
 	{
 		emptyPool(tls, NULL);
 		assert(NULL == tls->pool);
@@ -167,7 +167,8 @@ static inline id retain(id obj)
 {
 	if (isSmallObject(obj)) { return obj; }
 	Class cls = obj->isa;
-	if ((Class)&_NSConcreteMallocBlock == cls)
+	if ((Class)&_NSConcreteMallocBlock == cls ||
+	    (Class)&_NSConcreteStackBlock == cls)
 	{
 		return Block_copy(obj);
 	}
@@ -184,6 +185,16 @@ static inline void release(id obj)
 {
 	if (isSmallObject(obj)) { return; }
 	Class cls = obj->isa;
+	if (cls == (Class)&_NSConcreteMallocBlock)
+	{
+		_Block_release(obj);
+		return;
+	}
+	if ((cls == (Class)&_NSConcreteStackBlock) ||
+	    (cls == (Class)&_NSConcreteGlobalBlock))
+	{
+		return;
+	}
 	if (objc_test_class_flag(cls, objc_class_flag_fast_arc))
 	{
 		intptr_t *refCount = ((intptr_t*)obj) - 1;
@@ -519,7 +530,7 @@ id objc_storeWeak(id *addr, id obj)
 					break;
 				}
 			}
-			oldRef = oldRef->next;
+			oldRef = (oldRef == NULL) ? NULL : oldRef->next;
 		}
 	}
 	if (nil == obj)

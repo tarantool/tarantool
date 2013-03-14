@@ -1,12 +1,5 @@
-#include "llvm/Pass.h"
-#include "llvm/Function.h"
-#include "llvm/Module.h"
-#include "llvm/Instructions.h"
-#include "llvm/GlobalAlias.h"
-#include "llvm/GlobalVariable.h"
-#include "llvm/Constants.h"
+#include "LLVMCompat.h"
 #include "llvm/Analysis/Verifier.h"
-#include "llvm/DefaultPasses.h"
 #include "llvm/ADT/DenseSet.h"
 #include "ObjectiveCOpts.h"
 #include <string>
@@ -156,7 +149,6 @@ namespace {
               end=replacements.end() ; i != end ; ++i) {
         if (i->second) 
           i->first->replaceAllUsesWith(i->second);
-        i->first->removeFromParent();
       }
       verifyFunction(F);
       return modified;

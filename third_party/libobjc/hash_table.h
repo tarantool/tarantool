@@ -199,6 +199,7 @@ static int PREFIX(_table_resize)(PREFIX(_table) *table)
 	__sync_synchronize();
 	table->old = NULL;
 #	if !defined(ENABLE_GC) && defined(MAP_TABLE_SINGLE_THREAD)
+	free(copy->table);
 	free(copy);
 #	endif
 	return 1;

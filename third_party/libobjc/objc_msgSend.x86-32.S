@@ -76,11 +76,14 @@
 
 
 	jmp   *%eax
-6:                                        # smallObject:
+6:                                       # smallObject:
 	push  %ebx                           # Save old %ebx
-	call  __i686.get_pc_thunk.bx
-	addl  $_GLOBAL_OFFSET_TABLE_, %ebx
-	mov   SmallObjectClasses@GOT(%ebx), %eax
+	calll 7f
+7:
+	popl  %ebx;
+8:
+	addl  $_GLOBAL_OFFSET_TABLE_+(8b-7b), %ebx
+	leal  SmallObjectClasses@GOTOFF(%ebx), %eax
 	mov   (%eax), %eax
 	popl  %ebx
 	jmp   1b 

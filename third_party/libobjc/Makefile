@@ -5,20 +5,24 @@
 MAJOR_VERSION = 4
 MINOR_VERSION = 6
 SUBMINOR_VERSION = 0
-VERSION = $(MAJOR_VERSION).$(MINOR_VERSION).$(SUBMINOR_VERSION)
+VERSION ?= $(MAJOR_VERSION).$(MINOR_VERSION).$(SUBMINOR_VERSION)
 
 LIBOBJCLIBNAME=objc
 LIBOBJC=libobjc
 LIBOBJCXX=libobjcxx
 
-#SILENT=@
+INSTALL ?= install
+#SILENT ?= @
 
-CFLAGS+= -std=gnu99 -fexceptions
-CXXFLAGS+= -fexceptions
-CPPFLAGS+= -DTYPE_DEPENDENT_DISPATCH -DGNUSTEP
-CPPFLAGS+= -D__OBJC_RUNTIME_INTERNAL__=1 -D_XOPEN_SOURCE=500 -D__BSD_VISIBLE=1 -D_BSD_SOURCE=1
+CFLAGS += -std=gnu99 -fexceptions
+#CFLAGS += -Wno-deprecated-objc-isa-usage
+CXXFLAGS += -fexceptions
+CPPFLAGS += -DTYPE_DEPENDENT_DISPATCH -DGNUSTEP
+CPPFLAGS += -D__OBJC_RUNTIME_INTERNAL__=1 -D_XOPEN_SOURCE=500 -D__BSD_VISIBLE=1 -D_BSD_SOURCE=1
 
 ASMFLAGS += `if $(CC) -v 2>&1| grep -q 'clang' ; then echo -no-integrated-as ; fi`
+
+THE_LD=`if [ "$(LD)" = "" ]; then echo "ld"; else echo "$(LD)"; fi` 
 
 STRIP=`if [ "$(strip)" = "yes" ] ; then echo -s ; fi`
 
@@ -26,6 +30,8 @@ STRIP=`if [ "$(strip)" = "yes" ] ; then echo -s ; fi`
 CPPFLAGS += -DNO_SELECTOR_MISMATCH_WARNINGS
 # Some helpful flags for debugging.
 CPPFLAGS+= ${EXTRA_CFLAGS}
+##CPPFLAGS += -g -O0 -fno-inline
+#CPPFLAGS += -O3
 
 PREFIX?= /usr/local
 LIB_DIR= ${PREFIX}/lib
@@ -72,18 +78,18 @@ all: $(LIBOBJC).a
 $(LIBOBJCXX).so.$(VERSION): $(LIBOBJC).so.$(VERSION) $(OBJCXX_OBJECTS)
 	$(SILENT)echo Linking shared Objective-C++ runtime library...
 	$(SILENT)$(CXX) -shared \
-            -Wl,-soname=$(LIBOBJCXX).so.$(MAJOR_VERSION) \
+            -Wl,-soname=$(LIBOBJCXX).so.$(MAJOR_VERSION) $(LDFLAGS) \
             -o $@ $(OBJCXX_OBJECTS)
 
 $(LIBOBJC).so.$(VERSION): $(OBJECTS)
 	$(SILENT)echo Linking shared Objective-C runtime library...
 	$(SILENT)$(CC) -shared -rdynamic \
-            -Wl,-soname=$(LIBOBJC).so.$(MAJOR_VERSION) \
+            -Wl,-soname=$(LIBOBJC).so.$(MAJOR_VERSION) $(LDFLAGS) \
             -o $@ $(OBJECTS)
 
 $(LIBOBJC).a: $(OBJECTS)
 	$(SILENT)echo Linking static Objective-C runtime library...
-	$(SILENT)ld -r ${EXTRA_LDFLAGS} -o $@ $(OBJECTS)
+	$(SILENT)$(THE_LD) -r -s -o $@ $(OBJECTS)
 
 .cc.o: Makefile
 	$(SILENT)echo Compiling `basename $<`...
@@ -101,7 +107,7 @@ $(LIBOBJC).a: $(OBJECTS)
 	$(SILENT)echo Assembling `basename $<`...
 	$(SILENT)$(CC) $(CPPFLAGS) $(ASMFLAGS) -c $< -o $@
 
-install: all
+$(INSTALL): all
 	$(SILENT)echo Installing libraries...
 	$(SILENT)install -d $(LIB_DIR)
 	$(SILENT)install -m 444 $(STRIP) $(LIBOBJC).so.$(VERSION) $(LIB_DIR)

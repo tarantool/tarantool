@@ -22,7 +22,7 @@ typedef HANDLE mutex_t;
 typedef pthread_mutex_t mutex_t;
 // If this pthread implementation has a static initializer for recursive
 // mutexes, use that, otherwise fall back to the portable version
-#	define INIT_LOCK(x) init_recursive_mutex(&(x))
+#		define INIT_LOCK(x) init_recursive_mutex(&(x))
 
 static inline void init_recursive_mutex(pthread_mutex_t *x)
 {

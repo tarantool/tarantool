@@ -8,6 +8,12 @@
 
 static void *EmptyArrayData[256];
 static SparseArray EmptyArray = { 0xff, 0, 0, (void**)&EmptyArrayData};
+static void *EmptyArrayData8[256] = { [0 ... 255] = &EmptyArray };
+static SparseArray EmptyArray8 = { 0xff00, 8, 0, (void**)&EmptyArrayData8};
+static void *EmptyArrayData16[256] = { [0 ... 255] = &EmptyArray8 };
+static SparseArray EmptyArray16 = { 0xff0000, 16, 0, (void**)&EmptyArrayData16};
+static void *EmptyArrayData24[256] = { [0 ... 255] = &EmptyArray16 };
+static SparseArray EmptyArray24 = { 0xff0000, 24, 0, (void**)&EmptyArrayData24};
 
 #define MAX_INDEX(sarray) (sarray->mask >> sarray->shift)
 #define DATA_SIZE(sarray) ((sarray->mask >> sarray->shift) + 1)
@@ -17,17 +23,35 @@ static SparseArray EmptyArray = { 0xff, 0, 0, (void**)&EmptyArrayData};
 #define base_shift 8
 #define base_mask ((1<<base_shift) - 1)
 
+void *EmptyChildForShift(uint32_t shift)
+{
+	switch(shift)
+	{
+		default: UNREACHABLE("Broken sparse array");
+		case 8:
+			return &EmptyArray;
+		case 16:
+			return &EmptyArray8;
+		case 24:
+			return &EmptyArray16;
+		case 32:
+			return &EmptyArray24;
+	}
+}
+
 static void init_pointers(SparseArray * sarray)
 {
 	sarray->data = calloc(DATA_SIZE(sarray), sizeof(void*));
 	if(sarray->shift != 0)
 	{
+		void *data = EmptyChildForShift(sarray->shift);
 		for(unsigned i=0 ; i<=MAX_INDEX(sarray) ; i++)
 		{
-			sarray->data[i] = &EmptyArray;
+			sarray->data[i] = data;
 		}
 	}
 }
+
 PRIVATE SparseArray * SparseArrayNewWithDepth(uint32_t depth)
 {
 	SparseArray * sarray = calloc(1, sizeof(SparseArray));
@@ -42,8 +66,13 @@ PRIVATE SparseArray *SparseArrayNew()
 {
 	return SparseArrayNewWithDepth(32);
 }
-PRIVATE SparseArray *SparseArrayExpandingArray(SparseArray *sarray)
+PRIVATE SparseArray *SparseArrayExpandingArray(SparseArray *sarray, uint32_t new_depth)
 {
+	if (new_depth == sarray->shift)
+	{
+		return sarray;
+	}
+	assert(new_depth > sarray->shift);
 	// Expanding a child sarray has undefined results.
 	assert(sarray->refCount == 1);
 	SparseArray *new = calloc(1, sizeof(SparseArray));
@@ -51,12 +80,12 @@ PRIVATE SparseArray *SparseArrayExpandingArray(SparseArray *sarray)
 	new->shift = sarray->shift;
 	new->mask = sarray->mask;
 	void **newData = malloc(DATA_SIZE(sarray) * sizeof(void*));
-	for(unsigned i=0 ; i<=MAX_INDEX(sarray) ; i++)
+	void *data = EmptyChildForShift(new->shift + 8);
+	for(unsigned i=1 ; i<=MAX_INDEX(sarray) ; i++)
 	{
-		newData[i] = &EmptyArray;
+		newData[i] = data;
 	}
 	new->data = sarray->data;
-	// new is now an exact copy of sarray.
 	newData[0] = new;
 	sarray->data = newData;
 	// Now, any lookup in sarray for any value less than its capacity will have
@@ -65,7 +94,7 @@ PRIVATE SparseArray *SparseArrayExpandingArray(SparseArray *sarray)
 	sarray->shift += base_shift;
 	// Finally, set the mask to the correct value.  Now all lookups should work.
 	sarray->mask <<= base_shift;
-	return new;
+	return sarray;
 }
 
 static void *SparseArrayFind(SparseArray * sarray, uint32_t * index)
@@ -86,26 +115,33 @@ static void *SparseArrayFind(SparseArray * sarray, uint32_t * index)
 	}
 	else while (j<max)
 	{
+		// If the shift is not 0, then we need to recursively look at child
+		// nodes.
 		uint32_t zeromask = ~(sarray->mask >> base_shift);
 		while (j<max)
 		{
 			//Look in child nodes
-			if (sarray->data[j] != SARRAY_EMPTY)
-			{
-				void * ret = SparseArrayFind(sarray->data[j], index);
-				if (ret != SARRAY_EMPTY)
-				{
-					return ret;
-				}
-				// The recursive call will set index to the correct value for
-				// the next index, but won't update j
-			}
-			else
+			SparseArray *child = sarray->data[j];
+			// Skip over known-empty children
+			if ((&EmptyArray == child) ||
+			    (&EmptyArray8 == child) ||
+			    (&EmptyArray16 == child) ||
+			    (&EmptyArray24 == child))
 			{
 				//Add 2^n to index so j is still correct
 				(*index) += 1<<sarray->shift;
 				//Zero off the next component of the index so we don't miss any.
 				*index &= zeromask;
+			}
+			else
+			{
+				// The recursive call will set index to the correct value for
+				// the next index, but won't update j
+				void * ret = SparseArrayFind(child, index);
+				if (ret != SARRAY_EMPTY)
+				{
+					return ret;
+				}
 			}
 			//Go to the next child
 			j++;
@@ -126,7 +162,10 @@ PRIVATE void SparseArrayInsert(SparseArray * sarray, uint32_t index, void *value
 	{
 		uint32_t i = MASK_INDEX(index);
 		SparseArray *child = sarray->data[i];
-		if(&EmptyArray == child)
+		if ((&EmptyArray == child) ||
+		    (&EmptyArray8 == child) ||
+		    (&EmptyArray16 == child) ||
+		    (&EmptyArray24 == child))
 		{
 			// Insert missing nodes
 			SparseArray * newsarray = calloc(1, sizeof(SparseArray));
@@ -185,6 +224,8 @@ PRIVATE void SparseArrayDestroy(SparseArray * sarray)
 {
 	// Don't really delete this sarray if its ref count is > 0
 	if (sarray == &EmptyArray || 
+	    sarray == &EmptyArray8 || 
+	    sarray == &EmptyArray16 || 
 		(__sync_sub_and_fetch(&sarray->refCount, 1) > 0))
  	{
 		return;
@@ -202,3 +243,24 @@ PRIVATE void SparseArrayDestroy(SparseArray * sarray)
 	free(sarray);
 }
 
+PRIVATE int SparseArraySize(SparseArray *sarray)
+{
+	int size = 0;
+	if (sarray->shift == 0)
+	{
+		return 256*sizeof(void*) + sizeof(SparseArray);
+	}
+	size += 256*sizeof(void*) + sizeof(SparseArray);
+	for(unsigned i=0 ; i<=MAX_INDEX(sarray) ; i++)
+	{
+		SparseArray *child = sarray->data[i];
+		if (child == &EmptyArray || 
+		    child == &EmptyArray8 || 
+		    child == &EmptyArray16)
+		{
+			continue;
+		}
+		size += SparseArraySize(child);
+	}
+	return size;
+}
