@@ -32,7 +32,10 @@ set (tntrpl_sources tnt_log.c tnt_dir.c tnt_xlog.c tnt_snapshot.c tnt_rpl.c
 
 # Here we manage to build static/dynamic libraries ourselves,
 # do not use the top level settings.
+string(REPLACE "-static-libgcc" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 string(REPLACE "-static" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+
+set (tnt_cflags "${tnt_cflags} -static-libgcc")
 
 #
 # Static library
