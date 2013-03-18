@@ -42,7 +42,7 @@
 <!-- //Rating@Mail.ru counter -->
 
   <div id="header">
-    <p class='book'><a id="home_link" href="index.html">Tarantool/Box - Front page</a></p>
+    <p class='book'><a id="home_link" href="/">Tarantool/Box - Front page</a></p>
   </div>
 </xsl:template>
 </xsl:stylesheet>
