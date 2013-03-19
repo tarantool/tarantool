@@ -77,7 +77,7 @@ sio_socketname(int fd)
 {
 	va_list ap;
 	va_start(ap, format);
-	self = [self init: fd :format :ap];
+	self = [self init: fd in:format :ap];
 	va_end(ap);
 	return self;
 }
