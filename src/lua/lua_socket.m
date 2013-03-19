@@ -710,13 +710,13 @@ lbox_socket_accept(struct lua_State *L)
 		timeout = luaL_checknumber(L, 2);
 	bio_clearerr(s);
 
-	struct sockaddr_in addr;
+	struct sockaddr_storage addr;
 	/* push client socket */
 	bio_pushsocket(L, SOCK_STREAM);
 	struct bio_socket *client = lua_touserdata(L, -1);
 	@try {
-		client->coio.fd = coio_accept(&s->coio, &addr, sizeof(addr),
-					      timeout);
+		client->coio.fd = coio_accept(&s->coio, (struct sockaddr_in*)&addr,
+		                              sizeof(addr), timeout);
 	} @catch (SocketError *e) {
 		return bio_pusherror(L, s, errno);
 	}
@@ -763,20 +763,20 @@ lbox_socket_sendto(struct lua_State *L)
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
 
-	char addrbuf[sizeof(struct sockaddr_in6)];
-	assert(sizeof(addrbuf) > sizeof(struct sockaddr_in));
+	struct sockaddr_storage ss;
+	assert(sizeof(ss) > sizeof(struct sockaddr_in6));
 	struct addrinfo *a = NULL;
-	struct sockaddr_in *addr = (struct sockaddr_in*)addrbuf;
+	struct sockaddr *addr = (struct sockaddr*)&ss;
 	socklen_t addrlen;
 
-	if (evio_pton(host, port, addrbuf, &addrlen) == -1) {
+	if (evio_pton(host, port, &ss, &addrlen) == -1) {
 		evio_timeout_init(&start, &delay, timeout);
 		/* try to resolve a hostname */
 		struct addrinfo *a = coeio_resolve(s->socktype, host, port, delay);
 		if (a == NULL)
 			return bio_pushsenderror(L, s, 0, errno);
 		evio_timeout_update(start, &delay);
-		addr = (struct sockaddr_in *) a->ai_addr;
+		addr = (struct sockaddr *) a->ai_addr;
 		addrlen = a->ai_addrlen;
 	}
 
@@ -784,9 +784,9 @@ lbox_socket_sendto(struct lua_State *L)
 	@try {
 		/* maybe init the socket */
 		if (! evio_is_active(&s->coio))
-			evio_socket(&s->coio, addr->sin_family, s->socktype, 0);
+			evio_socket(&s->coio, addr->sa_family, s->socktype, 0);
 		nwr = coio_sendto_timeout(&s->coio, buf, buf_size, 0,
-					  addr, addrlen, delay);
+					  (struct sockaddr_in*)addr, addrlen, delay);
 	} @catch (SocketError *e) {
 		/* case #2-3: error or timeout */
 		return bio_pushsenderror(L, s, 0, errno);
@@ -827,12 +827,13 @@ lbox_socket_recvfrom(struct lua_State *L)
 	if (s->iob == NULL)
 		bio_initbuf(s);
 
-	struct sockaddr_in addr;
+	struct sockaddr_storage addr;
 	struct ibuf *in = &s->iob->in;
 	size_t nrd;
 	@try {
 		ibuf_reserve(in, buf_size);
-		nrd = coio_recvfrom_timeout(&s->coio, in->pos, buf_size, 0, &addr,
+		nrd = coio_recvfrom_timeout(&s->coio, in->pos, buf_size, 0,
+				            (struct sockaddr_in*)&addr,
 				            sizeof(addr), timeout);
 	} @catch (SocketError *e) {
 		return bio_pushrecverror(L, s, errno);
