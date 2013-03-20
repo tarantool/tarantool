@@ -1,41 +1,410 @@
 box.flags = { BOX_RETURN_TUPLE = 0x01, BOX_ADD = 0x02, BOX_REPLACE = 0x04 }
 
+
+box.net = { box = {} }
+box.net.box.lib = {
+    delete = function(self, space, ...)
+        local key_part_count = select('#', ...)
+        return self:process(21,
+                box.pack('iiV',
+                    space,
+                    box.flags.BOX_RETURN_TUPLE,  -- flags
+                    key_part_count, ...))
+    end,
+
+    replace = function(self, space, ...)
+        local field_count = select('#', ...)
+        return self:process(13,
+                box.pack('iiV',
+                    space,
+                    box.flags.BOX_RETURN_TUPLE,  -- flags
+                    field_count, ...))
+    end,
+
+    -- insert a tuple (produces an error if the tuple already exists)
+    insert = function(self, space, ...)
+        local field_count = select('#', ...)
+        return self:process(13,
+               box.pack('iiV',
+                    space,
+                    bit.bor(box.flags.BOX_RETURN_TUPLE,
+                            box.flags.BOX_ADD),  -- flags
+                    field_count, ...))
+    end,
+
+    -- update a tuple
+    update = function(self, space, key, format, ...)
+        local op_count = select('#', ...)/2
+        return self:process(19,
+               box.pack('iiVi'..format,
+                    space,
+                    box.flags.BOX_RETURN_TUPLE,
+                    1, key,
+                    op_count,
+                    ...))
+    end,
+
+    select_limit = function(self, space, index, offset, limit, ...)
+        local key_part_count = select('#', ...)
+        return self:process(17,
+               box.pack('iiiiiV',
+                     space,
+                     index,
+                     offset,
+                     limit,
+                     1, -- key count
+                     key_part_count, ...))
+    end,
+
+    select = function(self, space, index, ...)
+        local key_part_count = select('#', ...)
+        return self:process(17,
+                box.pack('iiiiiV',
+                     space,
+                     index,
+                     0, -- offset
+                     4294967295, -- limit
+                     1, -- key count
+                     key_part_count, ...))
+    end,
+
+
+    ping = function(self)
+        return self:process(65280, '')
+    end,
+
+    call    = function(self, proc_name, ...)
+        local count = select('#', ...)
+        return self:process(22,
+            box.pack('iwaV',
+                0,                      -- flags
+                string.len(proc_name),
+                proc_name,
+                count,
+                ...))
+    end,
+
+    select_range = function(self, sno, ino, limit, ...)
+        return self:call(
+            'box.select_range',
+            tostring(sno),
+            tostring(ino),
+            tostring(limit),
+            ...
+        )
+    end,
+
+    select_reverse_range = function(self, sno, ino, limit, ...)
+        return self:call(
+            'box.select_reverse_range',
+            tostring(sno),
+            tostring(ino),
+            tostring(limit),
+            ...
+        )
+    end,
+
+
+    timeout = function(self, timeout)
+
+        local wrapper = {}
+
+        setmetatable(wrapper, {
+            __index = function(wrp, name, ...)
+                local foo = self[name]
+                if foo ~= nil then
+                    return
+                        function(wr, ...)
+                            self.timeout_request = timeout
+                            return foo(self, ...)
+                        end
+                end
+                
+                error(string.format('Can not find "remote:%s" function', name))
+            end
+        });
+
+        return wrapper
+    end,
+}
+
+
+-- local tarantool
+box.net.box.emb = {
+    process = function(self, ...)
+        return box.process(...)
+    end,
+    
+    select_range = function(self, sno, ino, limit, ...)
+        return box.space[tonumber(sno)].index[tonumber(ino)]
+            :select_range(tonumber(limit), ...)
+    end,
+
+    select_reverse_range = function(self, sno, ino, limit, ...)
+        return box.space[tonumber(sno)].index[tonumber(ino)]
+            :select_reverse_range(tonumber(limit), ...)
+    end,
+
+    call = function(self, proc_name, ...)
+        local fref = _G
+        for spath in string.gmatch(proc_name, '([^.]+)') do
+            fref = fref[spath]
+            if fref == nil then
+                error("function '" .. proc_name .. "' was not found")
+            end
+        end
+        if type(fref) ~= 'function' then
+            error("object '" .. proc_name .. "' is not a function")
+        end
+        return fref(...)
+    end,
+
+    ping = function(self)
+        return true
+    end,
+    
+    -- local tarantool doesn't provide timeouts
+    timeout = function(self, timeout)
+        return self
+    end,
+
+    close = function(self)
+        error("box.net.box.emb can't be closed")
+    end
+}
+
+setmetatable(box.net.box.emb, { __index = box.net.box.lib })
+
+box.net.box.new = function(host, port, timeout)
+
+    local remote = {
+        processing = {
+            last_sync = 0,
+            next_sync = function(self)
+                while true do
+                    self.last_sync = self.last_sync + 1
+                    if self[ self.last_sync ] == nil then
+                        return self.last_sync
+                    end
+
+                    if self.last_sync > 0x7FFFFFFF then
+                        self.last_sync = 0
+                    end
+                end
+            end
+        },
+
+        read_fiber = function(self)
+            return function()
+                box.fiber.detach()
+                local res
+                while true do
+                    if self.s == nil then
+                        box.fiber.sleep(.01)
+                    else
+                        -- TODO: error handling
+
+                        res = { self.s:recv(12) }
+                        if res[3] ~= nil then break end
+                        local header = res[1]
+                        if string.len(header) ~= 12 then break end
+                        local op, blen, sync = box.unpack('iii', header)
+                        
+                        local body = ''
+                        if blen > 0 then
+                            res = { self.s:recv(blen) }
+                            if res[3] ~= nil then break end
+                            body = res[1]
+                            if string.len(body) ~= blen then break end
+
+
+                        end
+                        if self.processing[sync] ~= nil then
+                            local ch = self.processing[sync]
+                            ch:put(header .. body, 0)
+                        else
+                            print("Unexpected response ", sync)
+                        end
+                    end
+                end
+                self:close()
+            end
+        end,
+
+
+        connect_process = function(self, ...)
+            self.s = box.socket.tcp()
+            if self.s == nil then
+                self:close("Can not create socket")
+            end
+
+            local timeout = self.timeout_request
+            self.timeout_request = nil
+            
+            if self.cch ~= nil then
+                if self.connect[3] == nil then
+                    self.cch:get()
+                else
+                    self.cch:get(self.connect[3])
+                end
+
+                if self.o_read_fiber == nil then
+                    local e = { self.s:error() }
+                    error(e[2])
+                end
+
+            else
+                local res = { self.s:connect( unpack(self.connect) ) }
+                if self.cch ~= nil then
+                    while self.cch:has_readers() do
+                        self.cch:put(true, 0)
+                    end
+                end
+                self.cch = nil
+
+
+                if res[1] == nil then
+                    self:close("Can't connect to remote tarantool")
+                    error(res[4])
+                end
+                self.process = self.connected_process
+                self.o_read_fiber = box.fiber.create( self.read_fiber(self) )
+                box.fiber.resume(self.o_read_fiber)
+
+            end
+
+
+            self.timeout_request = timeout
+            return self:connected_process(...)
+        end,
+
+        connected_process = function(self, op, request)
+            local timeout = self.timeout_request
+            self.timeout_request = nil
+            local sync = self.processing:next_sync()
+            self.processing[sync] = box.ipc.channel(1)
+            request = box.pack('iiia', op, string.len(request), sync, request)
+
+
+            local res = { self.s:send(request) }
+            if res[3] ~= nil then
+                self:close(res[3])
+                error(res[3])
+            end
+
+            self.timeout_request = timeout
+            return self:wait_response(sync, op)
+        end,
+        
+        wait_response = function(self, sync, op)
+            local response;
+            if self.timeout_request ~= nil then
+                response = self.processing[sync]
+                    :get(tonumber(self.timeout_request))
+            else
+                response = self.processing[sync]:get()
+            end
+            self.processing[sync] = nil
+
+            if response == false then
+                self:close("Lost connection to remote tarantool")
+                self.ping = function()
+                    return false
+                end
+                if op == 65280 then
+                    return false
+                end
+                self:process()  -- throw exception
+            end
+
+            if response == nil then
+                return nil
+            end
+
+            if op == 65280 then
+                return true
+            end
+
+            local rop, blen, sync, code, body = box.unpack('iiiia', response)
+            if code ~= 0 then
+                box.raise(code, body)
+            end
+
+            return box.unpack('R', body)
+        end,
+        
+        close = function(self, message)
+            if message == nil then
+                message = "Connection isn't established"
+            end
+            self.process = function() error(message) end
+            self.close = function()
+                error("Remote connection is already closed")
+            end
+            self.ping = function()
+                return false
+            end
+
+            for sync, ch in pairs(self.processing) do
+                if type(sync) == 'number' then
+                    ch:put(false, 0)
+                end
+                self.processing[sync] = nil
+            end
+
+            if self.s ~= nil then
+                local s = self.s
+                self.s = nil
+                s:close()
+            end
+        end,
+
+
+    }
+    
+    remote.connect = { host, port }
+    if timeout ~= nil then
+        table.insert(remote.connect, tonumber(timeout))
+    end
+
+    remote.process = remote.connect_process
+
+    setmetatable(
+        remote, {
+            __index = box.net.box.lib,
+            __gc = function(self)
+                if self.s ~= nil then
+                    self.s:close()
+                    self.s = nil
+                end
+            end
+        }
+    )
+
+    return remote
+end
+
+
+--
+--
+--
+function box.call(proc_name, ...)
+    return box.net.box.emb:call(proc_name, ...)
+end
+
 --
 --
 --
 function box.select_limit(space, index, offset, limit, ...)
-    local key_part_count = select('#', ...)
-    return box.process(17,
-                       box.pack('iiiiiV',
-                                 space,
-                                 index,
-                                 offset,
-                                 limit,
-                                 1, -- key count
-                                 key_part_count, ...))
+    return box.net.box.emb:select_limit(space, index, offset, limit, ...)
 end
 
-function box.dostring(s, ...)
-    local chunk, message = loadstring(s)
-    if chunk == nil then
-        error(message, 2)
-    end
-    return chunk(...)
-end
 
 --
 --
 --
 function box.select(space, index, ...)
-    local key_part_count = select('#', ...)
-    return box.process(17,
-                       box.pack('iiiiiV',
-                                 space,
-                                 index,
-                                 0, -- offset
-                                 4294967295, -- limit
-                                 1, -- key count
-                                 key_part_count, ...))
+    return box.net.box.emb:select(space, index, ...)
 end
 
 --
@@ -44,7 +413,7 @@ end
 -- starts from the key.
 --
 function box.select_range(sno, ino, limit, ...)
-    return box.space[tonumber(sno)].index[tonumber(ino)]:select_range(tonumber(limit), ...)
+    return box.net.box.emb:select_range(sno, ino, limit, ...)
 end
 
 --
@@ -53,7 +422,7 @@ end
 -- starts from the key.
 --
 function box.select_reverse_range(sno, ino, limit, ...)
-    return box.space[tonumber(sno)].index[tonumber(ino)]:select_reverse_range(tonumber(limit), ...)
+    return box.net.box.emb:select_reverse_range(sno, ino, limit, ...)
 end
 
 --
@@ -61,45 +430,31 @@ end
 -- index is always 0. It doesn't accept compound keys
 --
 function box.delete(space, ...)
-    local key_part_count = select('#', ...)
-    return box.process(21,
-                       box.pack('iiV',
-                                 space,
-                                 box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 key_part_count, ...))
+    return box.net.box.emb:delete(space, ...)
 end
 
 -- insert or replace a tuple
 function box.replace(space, ...)
-    local field_count = select('#', ...)
-    return box.process(13,
-                       box.pack('iiV',
-                                 space,
-                                 box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 field_count, ...))
+    return box.net.box.emb:replace(space, ...)
 end
 
 -- insert a tuple (produces an error if the tuple already exists)
 function box.insert(space, ...)
-    local field_count = select('#', ...)
-    return box.process(13,
-                       box.pack('iiV',
-                                space,
-                                bit.bor(box.flags.BOX_RETURN_TUPLE,
-                                        box.flags.BOX_ADD),  -- flags
-                                field_count, ...))
+    return box.net.box.emb:insert(space, ...)
 end
 
 --
 function box.update(space, key, format, ...)
-    local op_count = select('#', ...)/2
-    return box.process(19,
-                       box.pack('iiVi'..format,
-                                space,
-                                box.flags.BOX_RETURN_TUPLE,
-                                1, key,
-                                op_count,
-                                ...))
+    return box.net.box.emb:update(space, key, format, ...)
+end
+
+
+function box.dostring(s, ...)
+    local chunk, message = loadstring(s)
+    if chunk == nil then
+        error(message, 2)
+    end
+    return chunk(...)
 end
 
 -- Assumes that spaceno has a TREE int32 (NUM) or int64 (NUM64) primary key
@@ -284,6 +639,38 @@ end
 -- User can redefine the hook
 function box.on_reload_configuration()
 end
+
+
+local s
+local syncno = 0
+
+function iostart()
+    if s ~= nil then
+        return
+    end
+
+    s = box.socket.tcp()
+    s:connect('127.0.0.1', box.cfg.primary_port)
+    
+    box.fiber.resume( box.fiber.create(
+        function()
+            box.fiber.detach()
+            while true do
+                s:recv(12)
+            end
+        end
+    ))
+end
+
+function iotest()
+    iostart()
+
+    syncno = syncno + 1
+    return s:send(box.pack('iii', 65280, 0, syncno))
+
+end
+
+
 
 require("bit")
 

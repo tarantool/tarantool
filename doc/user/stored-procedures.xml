@@ -2215,6 +2215,146 @@ end
 </variablelist>
 </section>
 
+<section xml:id="sp-box-net-box">
+    <title>Package <code>box.net.box</code> &mdash; remote box connector</title>
+<variablelist xml:id="box.net.box">
+    <simpara>
+        box.net.box allows to connect and make requests with remote
+        box.
+    </simpara>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">remote = box.net.box.new(host, port [,
+            connect_timeout])
+            </emphasis>
+        </term>
+        <listitem>
+            <para>
+                Create new remote connection. Real connection will be
+                established before the first request.
+            </para>
+            <para>
+                There is one predefined connection:
+                <code>box.net.box.emb</code>.
+                All <code>box.*</code> methods recall
+                <code>box.net.box.emb</code>'s methods.
+            </para>
+            
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis>Methods list</emphasis></term>
+        <itemizedlist>
+            <listitem>
+                <para>
+                <code>remote:ping()</code> - ping remote tarantool. Return
+                <code>true</code> or <code>false</code>
+                </para>
+            </listitem>
+            
+            <listitem>
+            <para>
+                <code>remote:close()</code> - close and destroy remote box.
+                </para>
+            </listitem>
+            
+            <listitem>
+                <para>
+                <code>remote:select(...)</code> - like <code>box.select</code>
+                </para>
+            </listitem>
+            
+            <listitem>
+                <para>
+                <code>remote:select_limit(...)</code> -
+                    like <code>box.select_limit</code>
+                </para>
+            </listitem>
+            
+            <listitem>
+                <para>
+                <code>remote:select_range(...)</code> -
+                    like <code>box.select_range</code>
+                </para>
+            </listitem>
+            
+            <listitem>
+                <para>
+                <code>remote:select_reverse_range(...)</code> -
+                    like <code>box.select_reverse_range</code>
+                </para>
+            </listitem>
+            
+            <listitem>
+                <para>
+                <code>remote:insert(...)</code> - like <code>box.insert</code>
+                </para>
+            </listitem>
+            
+            <listitem>
+                <para>
+                <code>remote:replace(...)</code> - like <code>box.replace</code>
+                </para>
+            </listitem>
+            
+            <listitem>
+                <para>
+                <code>remote:update(...)</code> - like <code>box.update</code>
+                </para>
+            </listitem>
+            
+            <listitem>
+                <para>
+                <code>remote:delete(...)</code> - like <code>box.delete</code>
+                </para>
+            </listitem>
+            
+            <listitem>
+                <para>
+                <code>remote:call(proc_name, ...)</code> - call lua procedure
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                <code>remote:timeout(timeout)</code> - change timeout wrapper
+                for next remote process. Create wrapper object for one request:
+<programlisting>
+    -- will wait for 'foo' result until 'foo' finished
+    local something = remote:call('foo', 'arg1', ...)
+
+    -- will wait 0.1 second return nil if foo is still continue
+    local other = remote:timeout(0.1):call('foo', 'arg1', ...)
+</programlisting>
+                </para>
+            </listitem>
+
+        </itemizedlist>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis>Examples</emphasis></term>
+<programlisting>
+box.select(1,2,3)
+box.net.box.emb:select(1,2,3) -- the same
+
+box.insert(1,2,3)
+box.net.box.emb:insert(1,2,3) -- the same
+
+
+
+local remote_self = box.net.box.new('127.0.0.1', box.info.primary_port)
+remote_self:ping()
+remote_self:insert(1,3,4)
+
+</programlisting>
+    </varlistentry>
+
+</variablelist>
+</section>
+
 <section xml:id="sp-box-cfg">
     <title>Packages <code>box.cfg</code>,
     <code>box.info</code>, <code>box.slab</code> and

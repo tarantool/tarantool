@@ -20,6 +20,7 @@ print """#
 # https://bugs.launchpad.net/tarantool/+bug/904208
 #"""
 exec sql "call box.select(1, 1, 'new', 'world', 'order')"
+exec admin "lua box.call('box.select', 1, 1, 'new', 'world', 'order')"
 exec sql "call box.delete(1, 'brave')"
 
 print """#
@@ -28,6 +29,8 @@ print """#
 # https://bugs.launchpad.net/tarantool/+bug/902091
 #"""
 exec sql "insert into t1 values ('item 1', 'alabama', 'song')"
+exec admin "lua box.select(1, 1, 'alabama')"
+exec admin "lua box.call('box.select', '1', '1', 'alabama')"
 exec sql "insert into t1 values ('item 2', 'california', 'dreaming ')"
 exec sql "insert into t1 values ('item 3', 'california', 'uber alles')"
 exec sql "insert into t1 values ('item 4', 'georgia', 'on my mind')"

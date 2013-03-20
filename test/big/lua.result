@@ -21,6 +21,10 @@ Found 1 tuple:
 #
 call box.select(1, 1, 'new', 'world', 'order')
 An error occurred: ER_KEY_PART_COUNT, 'Key part count 3 is greater than index part count 2'
+lua box.call('box.select', 1, 1, 'new', 'world', 'order')
+---
+error: 'Key part count 3 is greater than index part count 2'
+...
 call box.delete(1, 'brave')
 Found 1 tuple:
 ['brave', 'new', 'world']
@@ -31,6 +35,14 @@ Found 1 tuple:
 #
 insert into t1 values ('item 1', 'alabama', 'song')
 Insert OK, 1 row affected
+lua box.select(1, 1, 'alabama')
+---
+ - 'item 1': {'alabama', 1735290739}
+...
+lua box.call('box.select', '1', '1', 'alabama')
+---
+ - 'item 1': {'alabama', 1735290739}
+...
 insert into t1 values ('item 2', 'california', 'dreaming ')
 Insert OK, 1 row affected
 insert into t1 values ('item 3', 'california', 'uber alles')

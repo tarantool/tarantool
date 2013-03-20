@@ -1,0 +1,116 @@
+lua remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
+---
+...
+lua type(remote)
+---
+ - table
+...
+lua remote:ping()
+---
+ - true
+...
+lua remote:ping()
+---
+ - true
+...
+lua box.insert(0, 123, 'test1', 'test2')
+---
+ - 123: {'test1', 'test2'}
+...
+lua box.select(0, 0, 123)
+---
+ - 123: {'test1', 'test2'}
+...
+lua tuple = remote:select(0, 0, 123)
+---
+...
+lua remote:call('box.select', '0', '0', 123)
+---
+ - 123: {'test1', 'test2'}
+...
+lua tuple
+---
+ - 123: {'test1', 'test2'}
+...
+lua type(tuple)
+---
+ - userdata
+...
+lua #tuple
+---
+ - 3
+...
+lua box.update(0, 123, '=p', 1, 'test1-updated')
+---
+ - 123: {'test1-updated', 'test2'}
+...
+lua remote:update(0, 123, '=p', 2, 'test2-updated')
+---
+ - 123: {'test1-updated', 'test2-updated'}
+...
+lua box.insert(0, 123, 'test1', 'test2')
+---
+error: 'Duplicate key exists in unique index 0'
+...
+lua remote:insert(0, 123, 'test1', 'test2')
+---
+error: 'Duplicate key exists in unique index 0'
+...
+lua remote:insert(0, 345, 'test1', 'test2')
+---
+ - 345: {'test1', 'test2'}
+...
+lua remote:select(0, 0, 345)
+---
+ - 345: {'test1', 'test2'}
+...
+lua remote:call('box.select', 0, 0, 345)
+---
+ - 345: {'test1', 'test2'}
+...
+lua box.select(0, 0, 345)
+---
+ - 345: {'test1', 'test2'}
+...
+lua remote:replace(0, 345, 'test1-replaced', 'test2-replaced')
+---
+ - 345: {'test1-replaced', 'test2-replaced'}
+...
+lua box.select(0, 0, 345)
+---
+ - 345: {'test1-replaced', 'test2-replaced'}
+...
+lua remote:select_limit(0, 0, 0, 1000, 345)
+---
+ - 345: {'test1-replaced', 'test2-replaced'}
+...
+lua box.select_range(0, 0, 1000)
+---
+ - 123: {'test1-updated', 'test2-updated'}
+ - 345: {'test1-replaced', 'test2-replaced'}
+...
+lua remote:select_range(0, 0, 1000)
+---
+ - 123: {'test1-updated', 'test2-updated'}
+ - 345: {'test1-replaced', 'test2-replaced'}
+...
+lua box.select(0, 0, 345)
+---
+ - 345: {'test1-replaced', 'test2-replaced'}
+...
+lua remote:select(0, 0, 345)
+---
+ - 345: {'test1-replaced', 'test2-replaced'}
+...
+lua remote:timeout(0.5):select(0, 0, 345)
+---
+ - 345: {'test1-replaced', 'test2-replaced'}
+...
+lua remote:call('box.fiber.sleep', '.1')
+---
+ - 0
+...
+lua remote:timeout(0.1):call('box.fiber.sleep', '10')
+---
+ - nil
+...

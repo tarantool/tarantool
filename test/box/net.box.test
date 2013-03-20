@@ -1,0 +1,50 @@
+# encoding: tarantool
+# vim: set ft=python :
+
+
+# exec admin "lua iotest()"
+# exec admin "lua iotest()"
+# exec admin "lua box.fiber.sleep(.5)"
+
+
+
+exec admin "lua remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')"
+exec admin "lua type(remote)"
+exec admin "lua remote:ping()"
+exec admin "lua remote:ping()"
+exec admin "lua box.insert(0, 123, 'test1', 'test2')"
+exec admin "lua box.select(0, 0, 123)"
+exec admin "lua tuple = remote:select(0, 0, 123)"
+exec admin "lua remote:call('box.select', '0', '0', 123)"
+exec admin "lua tuple"
+exec admin "lua type(tuple)"
+exec admin "lua #tuple"
+
+exec admin "lua box.update(0, 123, '=p', 1, 'test1-updated')"
+exec admin "lua remote:update(0, 123, '=p', 2, 'test2-updated')"
+
+
+exec admin "lua box.insert(0, 123, 'test1', 'test2')"
+exec admin "lua remote:insert(0, 123, 'test1', 'test2')"
+
+exec admin "lua remote:insert(0, 345, 'test1', 'test2')"
+exec admin "lua remote:select(0, 0, 345)"
+exec admin "lua remote:call('box.select', 0, 0, 345)"
+exec admin "lua box.select(0, 0, 345)"
+
+
+exec admin "lua remote:replace(0, 345, 'test1-replaced', 'test2-replaced')"
+exec admin "lua box.select(0, 0, 345)"
+exec admin "lua remote:select_limit(0, 0, 0, 1000, 345)"
+
+exec admin "lua box.select_range(0, 0, 1000)"
+exec admin "lua remote:select_range(0, 0, 1000)"
+exec admin "lua box.select(0, 0, 345)"
+exec admin "lua remote:select(0, 0, 345)"
+exec admin "lua remote:timeout(0.5):select(0, 0, 345)"
+
+# exec admin "lua remote:timeout(0.5):select1(0, 0, 345)"
+
+exec admin "lua remote:call('box.fiber.sleep', '.1')"
+exec admin "lua remote:timeout(0.1):call('box.fiber.sleep', '10')"
+
