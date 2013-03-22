@@ -91,7 +91,7 @@ lbox_session_peer(struct lua_State *L)
 struct lbox_session_trigger
 {
 	struct session_trigger *trigger;
-	int coro_ref;
+	int ref;
 };
 
 static struct lbox_session_trigger on_connect =
@@ -104,26 +104,21 @@ lbox_session_run_trigger(void *param)
 {
 	struct lbox_session_trigger *trigger = param;
 	/* Copy the referenced callable object object stack. */
-	lua_rawgeti(tarantool_L, LUA_REGISTRYINDEX, trigger->coro_ref);
+	lua_State *L = lua_newthread(tarantool_L);
+	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	lua_rawgeti(tarantool_L, LUA_REGISTRYINDEX, trigger->ref);
+	/** Move the function to be called to the new coro. */
+	lua_xmove(tarantool_L, L, 1);
 
-	struct lua_State *coro_L = lua_tothread(tarantool_L, -1);
-	lua_pop(tarantool_L, 1);
-	/*
-	 * If there was junk from previous invocation of the
-	 * trigger, clear it, only leaving on the stack the chunk
-	 * to be run. The stack may be polluted when previous
-	 * invocation ended up with an error.
-	 */
-	lua_settop(coro_L, 1);
-	/* lua_call pops the function, make a copy */
-	lua_pushvalue(coro_L, -1);
 	@try {
-		lua_call(coro_L, 0, 0);
+		lua_call(L, 0, 0);
 	} @catch (tnt_Exception *e) {
 		@throw;
 	} @catch (...) {
 		tnt_raise(ClientError, :ER_PROC_LUA,
-			  lua_tostring(coro_L, -1));
+			  lua_tostring(L, -1));
+	} @finally {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 	}
 }
 
@@ -137,36 +132,31 @@ lbox_session_set_trigger(struct lua_State *L,
 		luaL_error(L, "session.on_connect(chunk): bad arguments");
 	}
 
-	struct lua_State *coro_L;
-
-	if (trigger->coro_ref != LUA_NOREF) {
-		lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->coro_ref);
-		coro_L = lua_tothread(L, -1);
-		lua_pop(L, 1); /* pop the coro. */
-		/* If there was junk from previous invocation, clear it. */
-		lua_settop(coro_L, 1);
+	/* Pop the old trigger */
+	if (trigger->ref != LUA_NOREF) {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
+		luaL_unref(L, LUA_REGISTRYINDEX, trigger->ref);
 	} else {
-		coro_L = lua_newthread(L);
-		/* Reference the new thread and pop it. */
-		trigger->coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-		lua_pushnil(coro_L);
+		lua_pushnil(L);
 	}
-	/** Move the chunk to the coroutine in will be run in. */
-	lua_xmove(L, coro_L, 1);
-	/* Return the old chunk. */
-	lua_insert(coro_L, -2);
-	lua_xmove(coro_L, L, 1);
+
 	/*
 	 * Set or clear the trigger. Return the old value of the
 	 * trigger.
 	 */
-	if (lua_type(coro_L, -1) == LUA_TNIL) {
+	if (lua_type(L, -2) == LUA_TNIL) {
+		trigger->ref = LUA_NOREF;
 		trigger->trigger->trigger = NULL;
 		trigger->trigger->param = NULL;
 	} else {
+		/* Move the trigger to the top of the stack. */
+		lua_insert(L, -2);
+		/* Reference the new trigger. Pops it. */
+		trigger->ref = luaL_ref(L, LUA_REGISTRYINDEX);
 		trigger->trigger->trigger = lbox_session_run_trigger;
 		trigger->trigger->param = trigger;
 	}
+	/* Return the old trigger. */
 	return 1;
 }
 
