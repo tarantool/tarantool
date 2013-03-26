@@ -184,6 +184,9 @@ if (ENABLE_STATIC)
     add_compile_flags("C;CXX" "-static")
 endif()
 
+# Compile with builtin libgcc by default.
+add_compile_flags("C;CXX;OBJC;OBJCXX" "-static-libgcc")
+
 ##
 ## Third-Party libraries
 ##
