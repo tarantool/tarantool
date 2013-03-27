@@ -65,6 +65,9 @@ coio_accept(struct ev_io *coio, struct sockaddr_in *addr, socklen_t addrlen,
 void
 coio_init(struct ev_io *coio);
 
+void
+coio_update_fiber(struct ev_io *coio);
+
 ssize_t
 coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz,
 		        ev_tstamp timeout);

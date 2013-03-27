@@ -46,6 +46,12 @@ coio_init(struct ev_io *coio)
 	coio->fd = -1;
 }
 
+void
+coio_update_fiber(struct ev_io *coio)
+{
+	coio->data = fiber;
+}
+
 /**
  * Connect to a host.
  */

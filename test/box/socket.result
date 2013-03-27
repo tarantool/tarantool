@@ -907,3 +907,22 @@ ping
 lua s:close()
 ---
 ...
+lua  reps = 0 function bug1160869() 	local s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(12) 			reps = reps + 1 		end 	end) ) 	return s:send(box.pack('iii', 65280, 0, 1)) end 
+---
+...
+lua bug1160869()
+---
+ - 12
+...
+lua bug1160869()
+---
+ - 12
+...
+lua bug1160869()
+---
+ - 12
+...
+lua reps
+---
+ - 3
+...

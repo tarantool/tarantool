@@ -509,3 +509,27 @@ print(data)
 s.close()
 
 exec admin "lua s:close()"
+
+# Bug #1160869: incorrect fiber call order.
+# (https://bugs.launchpad.net/tarantool/+bug/1160869)
+#
+test="""
+reps = 0
+function bug1160869()
+	local s = box.socket.tcp()
+	s:connect('127.0.0.1', box.cfg.primary_port)
+	box.fiber.resume( box.fiber.create(function()
+		box.fiber.detach()
+		while true do
+			s:recv(12)
+			reps = reps + 1
+		end
+	end) )
+	return s:send(box.pack('iii', 65280, 0, 1))
+end
+"""
+exec admin "lua " + test.replace('\n', ' ')
+exec admin "lua bug1160869()"
+exec admin "lua bug1160869()"
+exec admin "lua bug1160869()"
+exec admin "lua reps"
