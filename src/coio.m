@@ -46,7 +46,7 @@ coio_init(struct ev_io *coio)
 	coio->fd = -1;
 }
 
-void
+static inline void
 coio_update_fiber(struct ev_io *coio)
 {
 	coio->data = fiber;
@@ -78,6 +78,7 @@ coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
 	 * Wait until socket is ready for writing or
 	 * timed out.
 	 */
+	coio_update_fiber(coio);
 	ev_io_set(coio, coio->fd, EV_WRITE);
 	ev_io_start(coio);
 	bool is_timedout = fiber_yield_timeout(timeout);
@@ -150,7 +151,6 @@ coio_accept(struct ev_io *coio, struct sockaddr_in *addr,
 {
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
-
 	while (true) {
 		/* Assume that there are waiting clients
 		 * available */
@@ -159,6 +159,8 @@ coio_accept(struct ev_io *coio, struct sockaddr_in *addr,
 			evio_setsockopt_tcp(fd);
 			return fd;
 		}
+		/* update current coio fiber context */
+		coio_update_fiber(coio);
 		/* The socket is not ready, yield */
 		if (! ev_is_active(coio)) {
 			ev_io_set(coio, coio->fd, EV_READ);
@@ -213,6 +215,8 @@ coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz,
 				errno = 0;
 				return sz - to_read;
 			}
+
+			coio_update_fiber(coio);
 			/* The socket is not ready, yield */
 			if (! ev_is_active(coio)) {
 				ev_io_set(coio, coio->fd, EV_READ);
@@ -305,6 +309,7 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 				towrite -= nwr;
 				buf += nwr;
 			}
+			coio_update_fiber(coio);
 			if (! ev_is_active(coio)) {
 				ev_io_set(coio, coio->fd, EV_WRITE);
 				ev_io_start(coio);
@@ -376,6 +381,7 @@ coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt,
 					break;
 				}
 			}
+			coio_update_fiber(coio);
 			if (! ev_is_active(coio)) {
 				ev_io_set(coio, coio->fd, EV_WRITE);
 				ev_io_start(coio);
@@ -414,6 +420,7 @@ coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
 						 flags, dest_addr, addrlen);
 			if (nwr > 0)
 				return nwr;
+			coio_update_fiber(coio);
 			if (! ev_is_active(coio)) {
 				ev_io_set(coio, coio->fd, EV_WRITE);
 				ev_io_start(coio);
@@ -462,6 +469,7 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 			if (nrd >= 0)
 				return nrd;
 
+			coio_update_fiber(coio);
 			if (! ev_is_active(coio)) {
 				ev_io_set(coio, coio->fd, EV_WRITE);
 				ev_io_start(coio);

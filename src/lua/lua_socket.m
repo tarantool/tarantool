@@ -257,7 +257,6 @@ lbox_socket_shutdown(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, -1);
 	int how = luaL_checkint(L, 2);
-	coio_update_fiber(&s->coio);
 	bio_clearerr(s);
 	if (shutdown(s->coio.fd, how))
 		return bio_pushsockerror(L, s, errno);
@@ -298,7 +297,6 @@ lbox_socket_connect(struct lua_State *L)
 		timeout = luaL_checknumber(L, 4);
 	if (evio_is_active(&s->coio))
 		return bio_pushsockerror(L, s, EALREADY);
-	coio_update_fiber(&s->coio);
 	bio_clearerr(s);
 
 	/* try to resolve a hostname */
@@ -349,7 +347,6 @@ lbox_socket_send(struct lua_State *L)
 		timeout = luaL_checknumber(L, 3);
 	if (s->iob == NULL)
 		return bio_pushsenderror(L, s, 0, ENOTCONN);
-	coio_update_fiber(&s->coio);
 	bio_clearerr(s);
 	@try {
 		ssize_t nwr = coio_write_timeout(&s->coio, buf, buf_size,
@@ -387,7 +384,6 @@ lbox_socket_recv(struct lua_State *L)
 		timeout = luaL_checknumber(L, 3);
 	if (s->iob == NULL)
 		return bio_pushrecverror(L, s, ENOTCONN);
-	coio_update_fiber(&s->coio);
 	/* Clear possible old timeout status. */
 	bio_clearerr(s);
 	/*
@@ -569,7 +565,6 @@ lbox_socket_readline(struct lua_State *L)
 	struct bio_socket *s = bio_checkactivesocket(L, 1);
 	if (s->iob == NULL)
 		return bio_pushrecverror(L, s, ENOTCONN);
-	coio_update_fiber(&s->coio);
 	bio_clearerr(s);
 
 	unsigned int limit = UINT_MAX;
@@ -658,7 +653,6 @@ lbox_socket_bind(struct lua_State *L)
 		timeout = luaL_checknumber(L, 4);
 	if (evio_is_active(&s->coio))
 		return bio_pusherror(L, s, EALREADY);
-	coio_update_fiber(&s->coio);
 	bio_clearerr(s);
 	/* try to resolve a hostname */
 	struct addrinfo *ai = coeio_resolve(s->socktype, host, port, timeout);
@@ -690,7 +684,6 @@ static int
 lbox_socket_listen(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, 1);
-	coio_update_fiber(&s->coio);
 	bio_clearerr(s);
 	if (listen(s->coio.fd, sio_listen_backlog()))
 		return bio_pusherror(L, s, errno);
@@ -715,7 +708,6 @@ lbox_socket_accept(struct lua_State *L)
 	double timeout = TIMEOUT_INFINITY;
 	if (lua_gettop(L) == 2)
 		timeout = luaL_checknumber(L, 2);
-	coio_update_fiber(&s->coio);
 	bio_clearerr(s);
 
 	struct sockaddr_storage addr;
@@ -765,7 +757,6 @@ lbox_socket_sendto(struct lua_State *L)
 	double timeout = TIMEOUT_INFINITY;
 	if (lua_gettop(L) == 5)
 		timeout = luaL_checknumber(L, 5);
-	coio_update_fiber(&s->coio);
 	bio_clearerr(s);
 
 	/* try to resolve a hostname */
@@ -830,7 +821,6 @@ lbox_socket_recvfrom(struct lua_State *L)
 	double timeout = TIMEOUT_INFINITY;
 	if (lua_gettop(L) == 3)
 		timeout = luaL_checknumber(L, 3);
-	coio_update_fiber(&s->coio);
 	bio_clearerr(s);
 
 	/* Maybe initialize the buffer, can throw ER_MEMORY_ISSUE. */
