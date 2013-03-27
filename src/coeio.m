@@ -224,7 +224,7 @@ getaddrinfo_cb(va_list ap)
 	int rc = getaddrinfo(host, port, hints, res);
 	/* getaddrinfo can return EAI_ADDRFAMILY on attempt
 	 * to resolve ::1, if machine has no public ipv6 addresses
-	 * configured. Retry without EAI_ADDRFAMILY flag set.
+	 * configured. Retry without AI_ADDRCONFIG flag set.
 	 *
 	 * See for details: https://bugs.launchpad.net/tarantool/+bug/1160877
 	 */
