@@ -218,9 +218,21 @@ getaddrinfo_cb(va_list ap)
 {
 	const char *host = va_arg(ap, const char *);
 	const char *port = va_arg(ap, const char *);
-	const struct addrinfo *hints = va_arg(ap, const struct addrinfo *);
+	struct addrinfo *hints = va_arg(ap, struct addrinfo *);
 	struct addrinfo **res = va_arg(ap, struct addrinfo **);
-	if (getaddrinfo(host, port, hints, res)) {
+
+	int rc = getaddrinfo(host, port, hints, res);
+	/* getaddrinfo can return EAI_ADDRFAMILY on attempt
+	 * to resolve ::1, if machine has no public ipv6 addresses
+	 * configured. Retry without EAI_ADDRFAMILY flag set.
+	 *
+	 * See for details: https://bugs.launchpad.net/tarantool/+bug/1160877
+	 */
+	if (rc == EAI_ADDRFAMILY || rc == EAI_BADFLAGS) {
+		hints->ai_flags &= ~AI_ADDRCONFIG;
+		rc = getaddrinfo(host, port, hints, res);
+	}
+	if (rc) {
 		errno = ERESOLVE;
 		return -1;
 	}
