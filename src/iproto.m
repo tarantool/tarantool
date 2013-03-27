@@ -332,6 +332,9 @@ iproto_queue_init(struct iproto_queue *i_queue,
 	rlist_init(&i_queue->fiber_cache);
 }
 
+static inline uint32_t
+iproto_session_id(struct iproto_session *session);
+
 /** A handler to process all queued requests. */
 static void
 iproto_queue_handler(va_list ap)
@@ -341,6 +344,7 @@ iproto_queue_handler(va_list ap)
 restart:
 	while (iproto_dequeue_request(i_queue, &request)) {
 
+		fiber_set_sid(fiber, iproto_session_id(request.session));
 		request.process(&request);
 	}
 	iproto_cache_fiber(&request_queue);
@@ -403,6 +407,12 @@ iproto_session_is_idle(struct iproto_session *session)
 	return !evio_is_connected(&session->input) &&
 		ibuf_size(&session->iobuf[0]->in) == 0 &&
 		ibuf_size(&session->iobuf[1]->in) == 0;
+}
+
+static inline uint32_t
+iproto_session_id(struct iproto_session *session)
+{
+	return session->sid;
 }
 
 static void
@@ -533,7 +543,7 @@ iproto_session_input_iobuf(struct iproto_session *session)
 	if (ibuf_unused(&old->in) >= to_read)
 		return old;
 
-	/** All requests are procssed, reuse the buffer. */
+	/** All requests are processed, reuse the buffer. */
 	if (ibuf_size(&old->in) == session->parse_size) {
 		ibuf_reserve(&old->in, to_read);
 		return old;
@@ -766,7 +776,6 @@ iproto_process_request(struct iproto_request *request)
 		if (unlikely(! evio_is_connected(&session->output)))
 			return;
 
-		fiber_set_sid(fiber, session->sid);
 		iproto_reply(&port, *session->handler,
 			     &iobuf->out, header);
 
