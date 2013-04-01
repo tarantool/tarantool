@@ -315,7 +315,7 @@ tarantool_uptime(void)
 }
 
 int
-snapshot(void *ev, int events __attribute__((unused)))
+snapshot(void)
 {
 	if (snapshot_pid)
 		return EINPROGRESS;
@@ -326,23 +326,9 @@ snapshot(void *ev, int events __attribute__((unused)))
 		return -1;
 	}
 	if (p > 0) {
-		/*
-		 * If called from a signal handler, we can't
-		 * access any fiber state, and no one is expecting
-		 * to get an execution status. Just return 0 to
-		 * indicate a successful fork.
-		 */
-		if (ev != NULL)
-			return 0;
-		/*
-		 * This is 'save snapshot' call received from the
-		 * administrative console. Check for the child
-		 * exit status and report it back. This is done to
-		 * make 'save snapshot' synchronous, and propagate
-		 * any possible error up to the user.
-		 */
-
 		snapshot_pid = p;
+		say_warn("Snapshot process was started, pid=%d, fid=%d",
+			snapshot_pid, fiber->fid);
 		int status = wait_for_child(p);
 		snapshot_pid = 0;
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
@@ -360,6 +346,22 @@ snapshot(void *ev, int events __attribute__((unused)))
 
 	exit(EXIT_SUCCESS);
 	return 0;
+}
+
+
+/**
+* Create snapshot from signal handler (SIGUSR1)
+*
+*/
+static void
+sig_snapshot(void)
+{
+	if (snapshot_pid) {
+		say_warn("Snapshot process has already been started, "
+			"signal will be ignored");
+		return;
+	}
+	fiber_call(fiber_create("snapshot", (fiber_func)snapshot));
 }
 
 static void
@@ -488,7 +490,7 @@ signal_init(void)
 
 	sigs = palloc(eter_pool, sizeof(ev_signal) * 4);
 	memset(sigs, 0, sizeof(ev_signal) * 4);
-	ev_signal_init(&sigs[0], (void*)snapshot, SIGUSR1);
+	ev_signal_init(&sigs[0], (void*)sig_snapshot, SIGUSR1);
 	ev_signal_start(&sigs[0]);
 	ev_signal_init(&sigs[1], (void*)signal_cb, SIGINT);
 	ev_signal_start(&sigs[1]);
