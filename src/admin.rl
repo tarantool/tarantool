@@ -242,7 +242,7 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 		}
 
 		action save_snapshot {
-			int ret = snapshot(NULL, 0);
+			int ret = snapshot();
 
 			if (ret == 0)
 				ok(out);

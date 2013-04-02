@@ -328,7 +328,7 @@ tr67:
 tr76:
 #line 244 "src/admin.rl"
 	{
-			int ret = snapshot(NULL, 0);
+			int ret = snapshot();
 
 			if (ret == 0)
 				ok(out);
@@ -453,7 +453,7 @@ tr68:
 tr77:
 #line 244 "src/admin.rl"
 	{
-			int ret = snapshot(NULL, 0);
+			int ret = snapshot();
 
 			if (ret == 0)
 				ok(out);

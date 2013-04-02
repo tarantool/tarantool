@@ -43,7 +43,7 @@ extern char *binary_filename;
 extern char *custom_proc_title;
 i32 reload_cfg(struct tbuf *out);
 void show_cfg(struct tbuf *out);
-int snapshot(void * /* ev */, int /* events */);
+int snapshot(void);
 const char *tarantool_version(void);
 double tarantool_uptime(void);
 void tarantool_free(void);
