@@ -327,8 +327,6 @@ snapshot(void)
 	}
 	if (p > 0) {
 		snapshot_pid = p;
-		say_warn("Snapshot process was started, pid=%d, fid=%d",
-			snapshot_pid, fiber->fid);
 		int status = wait_for_child(p);
 		snapshot_pid = 0;
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
@@ -357,8 +355,8 @@ static void
 sig_snapshot(void)
 {
 	if (snapshot_pid) {
-		say_warn("Snapshot process has already been started, "
-			"signal will be ignored");
+		say_warn("Snapshot process is already running,"
+			" the signal is ignored");
 		return;
 	}
 	fiber_call(fiber_create("snapshot", (fiber_func)snapshot));
