@@ -94,7 +94,6 @@ set (common_sources
      exception.m
      errcode.c
      errinj.m
-     latch.m
      fio.c
      crc32.c
      rope.c

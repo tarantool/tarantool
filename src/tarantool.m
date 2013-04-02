@@ -50,7 +50,7 @@
 #include <fiber.h>
 #include <coeio.h>
 #include <iproto.h>
-#include <latch.h>
+#include "mutex.h"
 #include <recovery.h>
 #include <crc32.h>
 #include <palloc.h>
@@ -211,15 +211,15 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 i32
 reload_cfg(struct tbuf *out)
 {
-	static struct tnt_latch *latch = NULL;
+	static struct mutex *mutex = NULL;
 	struct tarantool_cfg new_cfg, aux_cfg;
 
-	if (latch == NULL) {
-		latch = palloc(eter_pool, sizeof(*latch));
-		tnt_latch_create(latch);
+	if (mutex == NULL) {
+		mutex = palloc(eter_pool, sizeof(*mutex));
+		mutex_create(mutex);
 	}
 
-	if (tnt_latch_trylock(latch) == -1) {
+	if (mutex_trylock(mutex) == true) {
 		out_warning(0, "Could not reload configuration: it is being reloaded right now");
 		tbuf_append(out, cfg_out->data, cfg_out->size);
 
@@ -276,9 +276,8 @@ reload_cfg(struct tbuf *out)
 		if (cfg_out->size != 0)
 			tbuf_append(out, cfg_out->data, cfg_out->size);
 
-		tnt_latch_unlock(latch);
+		mutex_unlock(mutex);
 	}
-
 	return 0;
 }
 
