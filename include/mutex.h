@@ -32,33 +32,58 @@
 #include <assert.h>
 #include <rlist.h>
 
-struct mutex {
-	struct rlist q;
+/** Mutex of cooperative multitasking environment. */
+
+struct mutex
+{
+	/**
+	 * The queue of fibers waiting on a mutex.
+	 * The first fiber owns the mutex.
+	 */
+	struct rlist queue;
 };
 
+/**
+ * Initialize the given mutex.
+ *
+ * @param m   mutex to be initialized.
+ */
 static inline void
-mutex_init(struct mutex *m) {
-	rlist_create(&m->q);
+mutex_create(struct mutex *m)
+{
+	rlist_create(&m->queue);
 }
 
 static inline void
-mutex_destroy(struct mutex *m) {
-	struct fiber *f;
-	while (!rlist_empty(&m->q)) {
-		f = rlist_first_entry(&m->q, struct fiber, state);
+mutex_destroy(struct mutex *m)
+{
+	while (!rlist_empty(&m->queue)) {
+		struct fiber *f = rlist_first_entry(&m->queue,
+						    struct fiber, state);
 		rlist_del_entry(f, state);
 	}
-	rlist_create(&m->q);
 }
 
+/**
+ * Lock a mutex. If the mutex is already locked by another fiber,
+ * waits for timeout.
+ *
+ * @param m mutex to be locked.
+ *
+ * @retval false  success
+ * @retval true   timeout
+ */
 static inline bool
-mutex_lock_timeout(struct mutex *m, ev_tstamp timeout) {
-	rlist_add_tail_entry(&m->q, fiber, state);
+mutex_lock_timeout(struct mutex *m, ev_tstamp timeout)
+{
+	rlist_add_tail_entry(&m->queue, fiber, state);
 	ev_tstamp start = timeout;
 	while (timeout > 0) {
-		struct fiber *f = rlist_first_entry(&m->q, struct fiber, state);
+		struct fiber *f = rlist_first_entry(&m->queue,
+						    struct fiber, state);
 		if (f == fiber)
 			break;
+
 		fiber_yield_timeout(timeout);
 		timeout -= ev_now() - start;
 		if (timeout <= 0) {
@@ -70,21 +95,46 @@ mutex_lock_timeout(struct mutex *m, ev_tstamp timeout) {
 	return false;
 }
 
-static inline bool
-mutex_lock(struct mutex *m) {
-	return mutex_lock_timeout(m, TIMEOUT_INFINITY);
+/**
+ * Lock a mutex (no timeout). Waits indefinitely until
+ * the current fiber can gain access to the mutex.
+ */
+static inline void
+mutex_lock(struct mutex *m)
+{
+	(void) mutex_lock_timeout(m, TIMEOUT_INFINITY);
 }
 
+/**
+ * Try to lock a mutex. Return immediately if the mutex is locked.
+ * @retval false  success
+ * @retval true   the mutex is locked.
+ */
+static inline bool
+mutex_trylock(struct mutex *m)
+{
+	if (rlist_empty(&m->queue)) {
+		mutex_lock(m);
+		return false;
+	}
+	return true;
+}
+
+/**
+ * Unlock a mutex. The fiber calling this function must
+ * own the mutex.
+ */
 static inline void
-mutex_unlock(struct mutex *m) {
+mutex_unlock(struct mutex *m)
+{
 	struct fiber *f;
-	f = rlist_first_entry(&m->q, struct fiber, state);
+	f = rlist_first_entry(&m->queue, struct fiber, state);
 	assert(f == fiber);
 	rlist_del_entry(f, state);
-	if (!rlist_empty(&m->q)) {
-		f = rlist_first_entry(&m->q, struct fiber, state);
+	if (!rlist_empty(&m->queue)) {
+		f = rlist_first_entry(&m->queue, struct fiber, state);
 		fiber_wakeup(f);
 	}
 }
 
-#endif
+#endif /* TARANTOOL_MUTEX_H_INCLUDED */
