@@ -1,6 +1,5 @@
-#ifndef TARANTOOL_ERWLOCK_H_INCLUDED
-#define TARNATOOL_ERWLOCK_H_INCLUDED
-
+#ifndef TARANTOOL_MUTEX_H_INCLUDED
+#define TARNATOOL_MUTEX_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -33,37 +32,31 @@
 #include <assert.h>
 #include <rlist.h>
 
-/* exclusive readers-writers locks */
-
-struct erwlock {
-	struct rlist readers, writers;
+struct mutex {
+	struct rlist q;
 };
 
 static inline void
-erwlock_init(struct erwlock *l) {
-	rlist_create(&l->readers);
-	rlist_create(&l->writers);
+mutex_init(struct mutex *m) {
+	rlist_create(&m->q);
 }
 
 static inline void
-erwlock_destroy(struct erwlock *l) {
+mutex_destroy(struct mutex *m) {
 	struct fiber *f;
-	while (!rlist_empty(&l->readers)) {
-		f = rlist_first_entry(&l->readers, struct fiber, state);
+	while (!rlist_empty(&m->q)) {
+		f = rlist_first_entry(&m->q, struct fiber, state);
 		rlist_del_entry(f, state);
 	}
-	while (!rlist_empty(&l->writers)) {
-		f = rlist_first_entry(&l->writers, struct fiber, state);
-		rlist_del_entry(f, state);
-	}
+	rlist_create(&m->q);
 }
 
 static inline bool
-erwlock_lockq_timeout(struct rlist *q, ev_tstamp timeout) {
-	rlist_add_tail_entry(q, fiber, state);
+mutex_lock_timeout(struct mutex *m, ev_tstamp timeout) {
+	rlist_add_tail_entry(&m->q, fiber, state);
 	ev_tstamp start = timeout;
 	while (timeout > 0) {
-		struct fiber *f = rlist_first_entry(q, struct fiber, state);
+		struct fiber *f = rlist_first_entry(&m->q, struct fiber, state);
 		if (f == fiber)
 			break;
 		fiber_yield_timeout(timeout);
@@ -77,61 +70,21 @@ erwlock_lockq_timeout(struct rlist *q, ev_tstamp timeout) {
 	return false;
 }
 
+static inline bool
+mutex_lock(struct mutex *m) {
+	return mutex_lock_timeout(m, TIMEOUT_INFINITY);
+}
+
 static inline void
-erwlock_unlockq(struct rlist *q) {
+mutex_unlock(struct mutex *m) {
 	struct fiber *f;
-	f = rlist_first_entry(q, struct fiber, state);
+	f = rlist_first_entry(&m->q, struct fiber, state);
 	assert(f == fiber);
 	rlist_del_entry(f, state);
-	if (!rlist_empty(q)) {
-		f = rlist_first_entry(q, struct fiber, state);
+	if (!rlist_empty(&m->q)) {
+		f = rlist_first_entry(&m->q, struct fiber, state);
 		fiber_wakeup(f);
 	}
-}
-
-static inline bool
-erwlock_lockedq(struct rlist *q) {
-	return rlist_empty(q);
-}
-
-static inline bool
-erwlock_lockread_timeout(struct erwlock *l, ev_tstamp timeout) {
-	return erwlock_lockq_timeout(&l->readers, timeout);
-}
-
-static inline bool
-erwlock_lockread(struct erwlock *l) {
-	return erwlock_lockread_timeout(l, TIMEOUT_INFINITY);
-}
-
-static inline void
-erwlock_unlockread(struct erwlock *l) {
-	erwlock_unlockq(&l->readers);
-}
-
-static inline bool
-erwlock_lockedread(struct erwlock *l) {
-	return erwlock_lockedq(&l->readers);
-}
-
-static inline bool
-erwlock_lockwrite_timeout(struct erwlock *l, ev_tstamp timeout) {
-	return erwlock_lockq_timeout(&l->writers, timeout);
-}
-
-static inline bool
-erwlock_lockwrite(struct erwlock *l) {
-	return erwlock_lockwrite_timeout(l, TIMEOUT_INFINITY);
-}
-
-static inline void
-erwlock_unlockwrite(struct erwlock *l) {
-	erwlock_unlockq(&l->writers);
-}
-
-static inline bool
-erwlock_lockedwrite(struct erwlock *l) {
-	return erwlock_lockedq(&l->writers);
 }
 
 #endif

@@ -47,7 +47,7 @@
 #include "tbuf.h"
 #include <lua/init.h>
 #include <stdlib.h>
-#include <erwlock.h>
+#include <mutex.h>
 
 static const char socketlib_name[] = "box.socket";
 
@@ -67,8 +67,8 @@ enum bio_status {
 };
 
 struct bio_socket {
-	struct ev_io coio, coiord;
-	struct erwlock lock;
+	struct ev_io crd, cwr;
+	struct mutex lrd, lwr;
 	struct iobuf *iob;
 	/** SOCK_DGRAM or SOCK_STREAM */
 	int socktype;
@@ -81,12 +81,13 @@ bio_pushsocket(struct lua_State *L, int socktype)
 	struct bio_socket *s = lua_newuserdata(L, sizeof(struct bio_socket));
 	luaL_getmetatable(L, socketlib_name);
 	lua_setmetatable(L, -2);
-	coio_init(&s->coiord);
-	coio_init(&s->coio);
+	coio_init(&s->crd);
+	coio_init(&s->cwr);
 	s->socktype = socktype;
 	s->iob = NULL;
 	s->error = 0;
-	erwlock_init(&s->lock);
+	mutex_init(&s->lrd);
+	mutex_init(&s->lwr);
 	/*
 	 * Do not create a file descriptor yet. Thanks to ipv6,
 	 * socket family is not known until host name is resolved.
@@ -108,7 +109,7 @@ static inline struct bio_socket *
 bio_checkactivesocket(struct lua_State *L, int narg)
 {
 	struct bio_socket *s = bio_checksocket(L, narg);
-	if (! evio_is_active(&s->coio))
+	if (! evio_is_active(&s->cwr))
 		luaL_error(L, "box.socket: socket is not initialized");
 	return s;
 }
@@ -132,7 +133,7 @@ bio_initbuf(struct bio_socket *s)
 	char name[PALLOC_POOL_NAME_MAXLEN];
 	const char *type = s->socktype == SOCK_STREAM ? "tcp" : "udp";
 	snprintf(name, sizeof(name), "box.io.%s(%d)",
-		 type, s->coio.fd);
+		 type, s->cwr.fd);
 	s->iob = iobuf_new(name);
 }
 
@@ -201,7 +202,7 @@ static int
 lbox_socket_tostring(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, -1);
-	lua_pushstring(L, sio_socketname(s->coio.fd));
+	lua_pushstring(L, sio_socketname(s->cwr.fd));
 	return 1;
 }
 
@@ -237,14 +238,15 @@ static int
 lbox_socket_close(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checksocket(L, -1);
-	if (! evio_is_active(&s->coio))
+	if (! evio_is_active(&s->cwr))
 		return 0;
 	if (s->iob) {
 		iobuf_delete(s->iob);
 		s->iob = NULL;
 	}
-	evio_close(&s->coio);
-	erwlock_destroy(&s->lock);
+	evio_close(&s->cwr);
+	mutex_destroy(&s->lrd);
+	mutex_destroy(&s->lwr);
 	bio_clearerr(s);
 	return 0;
 }
@@ -263,7 +265,7 @@ lbox_socket_shutdown(struct lua_State *L)
 	struct bio_socket *s = bio_checkactivesocket(L, -1);
 	int how = luaL_checkint(L, 2);
 	bio_clearerr(s);
-	if (shutdown(s->coio.fd, how))
+	if (shutdown(s->cwr.fd, how))
 		return bio_pushsockerror(L, s, errno);
 	/* case #1: Success */
 	lua_settop(L, 1);
@@ -300,7 +302,7 @@ lbox_socket_connect(struct lua_State *L)
 	double timeout = TIMEOUT_INFINITY;
 	if (lua_gettop(L) == 4)
 		timeout = luaL_checknumber(L, 4);
-	if (evio_is_active(&s->coio))
+	if (evio_is_active(&s->cwr))
 		return bio_pushsockerror(L, s, EALREADY);
 	bio_clearerr(s);
 
@@ -314,10 +316,10 @@ lbox_socket_connect(struct lua_State *L)
 	evio_timeout_update(start, &delay);
 	@try {
 		/* connect to a first available host */
-		if (coio_connect_addrinfo(&s->coio, ai, delay))
+		if (coio_connect_addrinfo(&s->cwr, ai, delay))
 			return bio_pushsockerror(L, s, ETIMEDOUT);
 		/* set coio reader socket */
-		s->coiord.fd = s->coio.fd;
+		s->crd.fd = s->cwr.fd;
 	} @catch (SocketError *e) {
 		return bio_pushsockerror(L, s, errno);
 	} @finally {
@@ -359,28 +361,28 @@ lbox_socket_send(struct lua_State *L)
 	/* acquire write lock */
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
-	bool tmout = erwlock_lockwrite_timeout(&s->lock, delay);
+	bool tmout = mutex_lock_timeout(&s->lwr, delay);
 	if (tmout)
 		return bio_pushsenderror(L, s, 0, ETIMEDOUT);
 	evio_timeout_update(start, &delay);
 
 	int rc;
 	@try {
-		ssize_t nwr = coio_write_timeout(&s->coio, buf, buf_size,
+		ssize_t nwr = coio_write_timeout(&s->cwr, buf, buf_size,
 						 delay);
 		if (nwr < buf_size) {
 			rc = bio_pushsenderror(L, s, nwr, ETIMEDOUT);
-			erwlock_unlockwrite(&s->lock);
+			mutex_unlock(&s->lwr);
 			return rc;
 		}
 	} @catch (SocketError *e) {
 		rc = bio_pushsenderror(L, s, 0, errno);
-		erwlock_unlockwrite(&s->lock);
+		mutex_unlock(&s->lwr);
 		return rc;
 	}
 	/* case #1: Success */
 	lua_pushinteger(L, buf_size);
-	erwlock_unlockwrite(&s->lock);
+	mutex_unlock(&s->lwr);
 	return 1;
 }
 
@@ -413,7 +415,7 @@ lbox_socket_recv(struct lua_State *L)
 	/* acquire read lock */
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
-	bool tmout = erwlock_lockread_timeout(&s->lock, delay);
+	bool tmout = mutex_lock_timeout(&s->lrd, delay);
 	if (tmout)
 		return bio_pushrecverror(L, s, ETIMEDOUT);
 	evio_timeout_update(start, &delay);
@@ -433,11 +435,11 @@ lbox_socket_recv(struct lua_State *L)
 	if (to_read > 0) {
 		ssize_t nrd;
 		@try {
-			nrd = coio_bread_timeout(&s->coiord, in, to_read,
+			nrd = coio_bread_timeout(&s->crd, in, to_read,
 						 delay);
 		} @catch (SocketError *e) {
 			rc = bio_pushrecverror(L, s, errno);
-			erwlock_unlockread(&s->lock);
+			mutex_unlock(&s->lrd);
 			return rc;
 		}
 		if (nrd < to_read) {
@@ -446,13 +448,13 @@ lbox_socket_recv(struct lua_State *L)
 				rc = bio_pushrecverror(L, s, ETIMEDOUT);
 			else
 				rc = bio_pusheof(L, s);
-			erwlock_unlockread(&s->lock);
+			mutex_unlock(&s->lrd);
 			return rc;
 		}
 	}
 	lua_pushlstring(L, in->pos, sz);
 	in->pos += sz;
-	erwlock_unlockread(&s->lock);
+	mutex_unlock(&s->lrd);
 	return 1;
 }
 
@@ -617,7 +619,7 @@ lbox_socket_readline(struct lua_State *L)
 	/* acquire read lock */
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
-	bool tmout = erwlock_lockread_timeout(&s->lock, delay);
+	bool tmout = mutex_lock_timeout(&s->lrd, delay);
 	if (tmout)
 		return bio_pushrecverror(L, s, ETIMEDOUT);
 	evio_timeout_update(start, &delay);
@@ -636,13 +638,12 @@ lbox_socket_readline(struct lua_State *L)
 		readline_state_init(L, rs, seplist);
 
 		while (1) {
-
 			/* case #4: user limit reached */
 			if (bottom == limit) {
 				lua_pushlstring(L, in->pos, bottom);
 				s->iob->in.pos += bottom;
 				bio_pushstatus(L, BIO_LIMIT);
-				erwlock_unlockread(&s->lock);
+				mutex_unlock(&s->lrd);
 				return 2;
 			}
 
@@ -650,15 +651,15 @@ lbox_socket_readline(struct lua_State *L)
 			 * the readahead size, then read new data. */
 			if (bottom == ibuf_size(in)) {
 
-				ssize_t nrd = coio_bread_timeout(&s->coiord, &s->iob->in, 1,
-						                 delay);
+				ssize_t nrd = coio_bread_timeout(&s->crd, &s->iob->in, 1,
+								 delay);
 				/* case #5: eof (step 1)*/
 				if (nrd == 0) {
 					if (errno == ETIMEDOUT)
 						rc = bio_pushrecverror(L, s, ETIMEDOUT);
 					else
 						rc = bio_pusheof(L, s);
-					erwlock_unlockread(&s->lock);
+					mutex_unlock(&s->lrd);
 					return rc;
 				}
 			}
@@ -672,7 +673,7 @@ lbox_socket_readline(struct lua_State *L)
 		}
 	} @catch (SocketError *e) {
 		rc = bio_pushrecverror(L, s, errno);
-		erwlock_unlockread(&s->lock);
+		mutex_unlock(&s->lrd);
 		return rc;
 	}
 
@@ -681,7 +682,7 @@ lbox_socket_readline(struct lua_State *L)
 	in->pos += bottom;
 	lua_pushnil(L);
 	lua_rawgeti(L, seplist, match + 1);
-	erwlock_unlockread(&s->lock);
+	mutex_unlock(&s->lrd);
 	return 3;
 }
 
@@ -703,7 +704,7 @@ lbox_socket_bind(struct lua_State *L)
 	double timeout = TIMEOUT_INFINITY;
 	if (lua_gettop(L) == 4)
 		timeout = luaL_checknumber(L, 4);
-	if (evio_is_active(&s->coio))
+	if (evio_is_active(&s->cwr))
 		return bio_pusherror(L, s, EALREADY);
 	bio_clearerr(s);
 	/* try to resolve a hostname */
@@ -711,7 +712,7 @@ lbox_socket_bind(struct lua_State *L)
 	if (ai == NULL)
 		return bio_pusherror(L, s, errno);
 	@try {
-		evio_bind_addrinfo(&s->coio, ai);
+		evio_bind_addrinfo(&s->cwr, ai);
 	} @catch (SocketError *e) {
 		/* case #2: error */
 		return bio_pusherror(L, s, errno);
@@ -737,7 +738,7 @@ lbox_socket_listen(struct lua_State *L)
 {
 	struct bio_socket *s = bio_checkactivesocket(L, 1);
 	bio_clearerr(s);
-	if (listen(s->coio.fd, sio_listen_backlog()))
+	if (listen(s->cwr.fd, sio_listen_backlog()))
 		return bio_pusherror(L, s, errno);
 	lua_settop(L, 1);
 	return 1;
@@ -767,9 +768,9 @@ lbox_socket_accept(struct lua_State *L)
 	bio_pushsocket(L, SOCK_STREAM);
 	struct bio_socket *client = lua_touserdata(L, -1);
 	@try {
-		client->coio.fd = coio_accept(&s->coio, (struct sockaddr_in*)&addr,
-		                              sizeof(addr), timeout);
-		client->coiord.fd = client->coio.fd;
+		client->cwr.fd = coio_accept(&s->cwr, (struct sockaddr_in*)&addr,
+		                             sizeof(addr), timeout);
+		client->crd.fd = client->cwr.fd;
 	} @catch (SocketError *e) {
 		return bio_pusherror(L, s, errno);
 	}
@@ -836,9 +837,9 @@ lbox_socket_sendto(struct lua_State *L)
 	size_t nwr;
 	@try {
 		/* maybe init the socket */
-		if (! evio_is_active(&s->coio))
-			evio_socket(&s->coio, addr->sa_family, s->socktype, 0);
-		nwr = coio_sendto_timeout(&s->coio, buf, buf_size, 0,
+		if (! evio_is_active(&s->cwr))
+			evio_socket(&s->cwr, addr->sa_family, s->socktype, 0);
+		nwr = coio_sendto_timeout(&s->cwr, buf, buf_size, 0,
 					  (struct sockaddr_in*)addr, addrlen, delay);
 	} @catch (SocketError *e) {
 		/* case #2-3: error or timeout */
@@ -885,7 +886,7 @@ lbox_socket_recvfrom(struct lua_State *L)
 	size_t nrd;
 	@try {
 		ibuf_reserve(in, buf_size);
-		nrd = coio_recvfrom_timeout(&s->coio, in->pos, buf_size, 0,
+		nrd = coio_recvfrom_timeout(&s->cwr, in->pos, buf_size, 0,
 				            (struct sockaddr_in*)&addr,
 				            sizeof(addr), timeout);
 	} @catch (SocketError *e) {
