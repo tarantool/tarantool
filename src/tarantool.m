@@ -856,6 +856,7 @@ main(int argc, char **argv)
 	ev_default_loop(EVFLAG_AUTO);
 	fiber_init();
 	replication_prefork();
+	coeio_init();
 	salloc_init(cfg.slab_alloc_arena * (1 << 30) /* GB */,
 		    cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
 
