@@ -606,18 +606,12 @@ tarantool_free(void)
 }
 
 static void
-initialize(double slab_alloc_arena, int slab_alloc_minimal, double slab_alloc_factor)
+initialize_minimal()
 {
-	if (!salloc_init(slab_alloc_arena * (1 << 30), slab_alloc_minimal, slab_alloc_factor))
+	if (!salloc_init(64 * 1000 * 1000, 4, 2))
 		panic_syserror("can't initialize slab allocator");
 	fiber_init();
 	coeio_init();
-}
-
-static void
-initialize_minimal()
-{
-	initialize(0.1, 4, 2);
 }
 
 int
@@ -860,8 +854,10 @@ main(int argc, char **argv)
 	atexit(tarantool_free);
 
 	ev_default_loop(EVFLAG_AUTO);
-	initialize(cfg.slab_alloc_arena, cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
+	fiber_init();
 	replication_prefork();
+	salloc_init(cfg.slab_alloc_arena * (1 << 30) /* GB */,
+		    cfg.slab_alloc_minimal, cfg.slab_alloc_factor);
 
 	signal_init();
 
