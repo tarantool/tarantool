@@ -1010,6 +1010,13 @@ lua_table_to_tuple(struct lua_State *L, int index)
 			field_len = n > UINT32_MAX ? sizeof(uint64_t) : sizeof(uint32_t);
 			break;
 		}
+		case LUA_TBOOLEAN:
+		{
+			bool value = lua_toboolean(L, -1);
+			const char *str = value ? "true" : "false";
+			field_len = strlen(str) + 1;
+			break;
+		}
 		case LUA_TCDATA:
 		{
 			/* Check if we can convert. */
@@ -1052,6 +1059,13 @@ lua_table_to_tuple(struct lua_State *L, int index)
 				uint32_t n32 = (uint32_t) n;
 				pos = pack_lstr(pos, &n32, sizeof(n32));
 			}
+			break;
+		}
+		case LUA_TBOOLEAN:
+		{
+			bool value = lua_toboolean(L, -1);
+			const char *str = value ? "true" : "false";
+			pos = pack_lstr(pos, str, strlen(str) + 1);
 			break;
 		}
 		case LUA_TCDATA:
