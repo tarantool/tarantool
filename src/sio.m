@@ -271,7 +271,8 @@ ssize_t
 sio_sendto(int fd, const void *buf, size_t len, int flags,
 	   const struct sockaddr_in *dest_addr, socklen_t addrlen)
 {
-	ssize_t n = sendto(fd, buf, len, flags, dest_addr, addrlen);
+	ssize_t n = sendto(fd, buf, len, flags, (struct sockaddr*)dest_addr,
+	                   addrlen);
 	if (n < 0 && errno != EAGAIN &&
 	    errno != EWOULDBLOCK && errno != EINTR)
 			tnt_raise(SocketError, :fd in:"sendto(%zd)", len);
@@ -283,7 +284,8 @@ ssize_t
 sio_recvfrom(int fd, void *buf, size_t len, int flags,
 	     struct sockaddr_in *src_addr, socklen_t *addrlen)
 {
-	ssize_t n = recvfrom(fd, buf, len, flags, src_addr, addrlen);
+	ssize_t n = recvfrom(fd, buf, len, flags, (struct sockaddr*)src_addr,
+	                     addrlen);
 	if (n < 0 && errno != EAGAIN &&
 	    errno != EWOULDBLOCK && errno != EINTR)
 			tnt_raise(SocketError, :fd in:"recvfrom(%zd)", len);
