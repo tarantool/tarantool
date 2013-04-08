@@ -616,3 +616,8 @@ exec admin "lua -1LL"
 exec admin "lua -1ULL"
 exec admin "lua tonumber64(-1.0)"
 exec admin "lua 6LL - 7LL"
+print """# A test case for Bug#1131108 'incorrect conversion from boolean lua value to tarantool tuple'
+"""
+exec admin  "lua function bug1075677() local range = {} table.insert(range, 1>0) return range end"
+exec sql "call bug1075677()"
+exec admin "lua bug1075677=nil"
