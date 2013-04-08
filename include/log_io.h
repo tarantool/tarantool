@@ -48,6 +48,11 @@ enum log_suffix { NONE, INPROGRESS };
 
 struct log_dir {
 	bool panic_if_error;
+	/**
+	 * true if the file can by fsync()ed at close
+	 * in a separate thread.
+	 */
+	bool sync_is_async;
 
 	/* Additional flags to apply at open(2) to write. */
 	int  open_wflags;

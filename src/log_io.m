@@ -34,6 +34,7 @@
 #include "fiber.h"
 #include "crc32.h"
 #include "fio.h"
+#include "tarantool_eio.h"
 
 const u32 default_version = 11;
 const log_magic_t row_marker_v11 = 0xba0babed;
@@ -73,6 +74,7 @@ struct log_dir snap_dir = {
 };
 
 struct log_dir wal_dir = {
+	.sync_is_async = true,
 	.filetype = "XLOG\n",
 	.filename_ext = ".xlog"
 };
@@ -475,10 +477,29 @@ log_io_atfork(struct log_io **lptr)
 	}
 }
 
+static int
+sync_cb(eio_req *req)
+{
+	if (req->result)
+		say_error("%s: fsync failed, errno: %d",
+			  __func__, (int) req->result);
+
+	int fd = (intptr_t) req->data;
+	close(fd);
+	return 0;
+}
+
 int
 log_io_sync(struct log_io *l)
 {
-	if (fsync(fileno(l->f)) < 0) {
+	if (l->dir->sync_is_async) {
+		int fd = dup(fileno(l->f));
+		if (fd == -1) {
+			say_syserror("%s: dup() failed", __func__);
+			return -1;
+		}
+		eio_fsync(fd, 0, sync_cb, (void *) (intptr_t) fd);
+	} else if (fsync(fileno(l->f)) < 0) {
 		say_syserror("%s: fsync failed", l->filename);
 		return -1;
 	}
