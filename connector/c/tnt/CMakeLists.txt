@@ -47,7 +47,9 @@ set (tnt_sources
 string(REPLACE "-static-libgcc" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 string(REPLACE "-static" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 
-set (tnt_cflags "${tnt_cflags} -static-libgcc")
+if (NOT TARGET_OS_DARWIN)
+    set (tnt_cflags "${tnt_cflags} -static-libgcc")
+endif()
 
 #
 # Static library

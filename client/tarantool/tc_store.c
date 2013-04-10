@@ -202,6 +202,8 @@ int tc_store_cat(void)
 	case TNT_LOG_NONE:
 		rc = 1;
 		break;
+	default:
+		return -1;
 	}
 	if (rc == 0 && print_headers) {
 		fwrite(&tnt_log_marker_eof_v11,

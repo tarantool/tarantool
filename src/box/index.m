@@ -221,7 +221,7 @@ replace_check_dup(struct tuple *old_tuple,
 
 - (void) initIterator: (struct iterator *) iterator
 	:(enum iterator_type) type
-	:(void *) key :(u32) part_count
+	:(const void *) key :(u32) part_count
 {
 	(void) iterator;
 	(void) type;

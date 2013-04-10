@@ -154,6 +154,9 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 		}
 		@throw;
 	}
+
+	assert(false);
+	return NULL;
 }
 
 void

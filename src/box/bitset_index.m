@@ -199,7 +199,7 @@ bitset_index_iterator_next(struct iterator *iterator)
 
 - (struct tuple *) replace: (struct tuple *) old_tuple
 	: (struct tuple *) new_tuple
-	: (u32) flags
+	: (enum dup_replace_mode) flags
 {
 	assert(!key_def->is_unique);
 	assert(old_tuple != NULL || new_tuple != NULL);
