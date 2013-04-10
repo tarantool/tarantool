@@ -73,6 +73,10 @@
 # define ELOOP EDOM
 #endif
 
+#ifndef O_CLOEXEC
+# define O_CLOEXEC 0
+#endif
+
 #if !defined(ENOTSOCK) && defined(WSAENOTSOCK)
 # define ENOTSOCK WSAENOTSOCK
 #endif
