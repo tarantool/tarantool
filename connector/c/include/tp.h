@@ -51,7 +51,14 @@ extern "C" {
 #define tp_packed __attribute__((packed))
 #define tp_inline __attribute__((forceinline))
 #define tp_noinline __attribute__((noinline))
+#if defined(__GNUC__)
+#if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
 #define tp_hot __attribute__((hot))
+#endif
+#endif
+#if !defined(tp_hot)
+#define tp_hot
+#endif
 
 #define tp_likely(expr)   __builtin_expect(!! (expr), 1)
 #define tp_unlikely(expr) __builtin_expect(!! (expr), 0)

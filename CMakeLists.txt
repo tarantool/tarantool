@@ -185,7 +185,9 @@ if (ENABLE_STATIC)
 endif()
 
 # Compile with builtin libgcc by default.
-add_compile_flags("C;CXX;OBJC;OBJCXX" "-static-libgcc")
+if (NOT TARGET_OS_DARWIN)
+    add_compile_flags("C;CXX;OBJC;OBJCXX" "-static-libgcc")
+endif()
 
 ##
 ## Third-Party libraries
@@ -209,7 +211,11 @@ include(luajit)
 #
 # LibOBJC
 #
-option(ENABLE_BUNDLED_LIBOBJC "Enable building of the bundled libobjc" ON)
+set (ENABLE_BUNDLED_LIBOBJC_DEFAULT ON)
+if (TARGET_OS_DARWIN)
+set (ENABLE_BUNDLED_LIBOBJC_DEFAULT OFF)
+endif()
+option(ENABLE_BUNDLED_LIBOBJC "Enable building of the bundled libobjc" ${ENABLE_BUNDLED_LIBOBJC_DEFAULT})
 
 if (ENABLE_BUNDLED_LIBOBJC)
     include(BuildLibOBJC)
@@ -309,7 +315,7 @@ add_subdirectory(doc)
 install (FILES README.md LICENSE doc/box-protocol.txt
          DESTINATION share/doc/tarantool)
 
-include (cmake/cpack.cmake)
+include (cmake/package.cmake)
 
 # tarantool info summary (used in server version output)
 #

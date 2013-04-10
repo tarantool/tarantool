@@ -1457,7 +1457,7 @@ luaL_packvalue(struct lua_State *L, luaL_Buffer *b, int index)
 	}
 	default:
 		luaL_error(L, "box.pack: unsupported type");
-		break;
+		return;
 	}
 	luaL_addvarint32(b, size);
 	luaL_addlstring(b, str, size);

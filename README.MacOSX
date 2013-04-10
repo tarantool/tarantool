@@ -7,13 +7,7 @@ First of all, make sure mac ports are available (to install packages from).
 
 port install autoconf binutils cmake ncurses zlib readline
 
-2. Install gcc 4.6.x and gcc infrastructure pre-requisites
--------------
-(x) Install gcc/g++ 4.6.x from mac ports (port install gcc46); the respective compiler(s) will be named gcc-mp-4.6, g++-mp-4.6;
-(x) Set up the environment to include the new GCC's libs: export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/local/lib
-
-
-3. Install necessary python modules: pexpect, pyYAML, daemon
+2. Install necessary python modules: pexpect, pyYAML, daemon
 -------------
 NB: it is recommended to install python modules through setup.py,
 using the default python (which should be >= 2.6.x and < 3.x);
@@ -25,16 +19,15 @@ sudo python setup.py install
 where module is the name of the installed module and module-dir is the name of the directory
 the module's archive deflates into.
 
-4. Download & build tarantool source code:
+3. Download & build tarantool source code:
 -------------
 
 git clone git://github.com/mailru/tarantool.git
 
 cd tarantool
-CC=gcc-mp-4.6 CXX=g++-mp-4.6 cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
-CC=gcc-mp-4.6 make
+CC=clang CXX=clang++ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
 
-5. Run tarantool test suite
+4. Run tarantool test suite
 -------------
 NB: the following tests are not runnable on MacOS X at this point:
 
