@@ -228,7 +228,14 @@ getaddrinfo_cb(va_list ap)
 	 *
 	 * See for details: https://bugs.launchpad.net/tarantool/+bug/1160877
 	 */
-	if (rc == EAI_ADDRFAMILY || rc == EAI_BADFLAGS) {
+
+	/* EAI_ADDRFAMILY is deprecated on FreeBSD */
+#ifdef EAI_ADDRFAMILY
+	int is_rc = EAI_BADFLAGS|EAI_ADDRFAMILY;
+#else
+	int is_rc = EAI_BADFLAGS;
+#endif
+	if (rc == is_rc) {
 		hints->ai_flags &= ~AI_ADDRCONFIG;
 		rc = getaddrinfo(host, port, hints, res);
 	}

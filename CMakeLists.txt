@@ -184,8 +184,13 @@ if (ENABLE_STATIC)
     add_compile_flags("C;CXX" "-static")
 endif()
 
-# Compile with builtin libgcc by default.
-if (NOT TARGET_OS_DARWIN)
+#
+# On CentOS the default gcc is way older than gcc 4.6, required
+# to compile Tarantool. To make the package compiled with gcc 4.6
+# usable on a system which has only gcc 4.1, statically link with
+# builtin libgcc by default.
+#
+if (CMAKE_COMPILER_IS_GNUCC and not CMAKE_COMPILER_IS_CLANG)
     add_compile_flags("C;CXX;OBJC;OBJCXX" "-static-libgcc")
 endif()
 
