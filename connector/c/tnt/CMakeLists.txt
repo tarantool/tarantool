@@ -47,7 +47,7 @@ set (tnt_sources
 string(REPLACE "-static-libgcc" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 string(REPLACE "-static" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 
-if (CMAKE_COMPILER_IS_GNUCC and not CMAKE_COMPILER_IS_CLANG)
+if (CMAKE_COMPILER_IS_GNUCC AND NOT CMAKE_COMPILER_IS_CLANG)
     set (tnt_cflags "${tnt_cflags} -static-libgcc")
 endif()
 
