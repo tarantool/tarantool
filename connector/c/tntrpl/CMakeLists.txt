@@ -35,7 +35,9 @@ set (tntrpl_sources tnt_log.c tnt_dir.c tnt_xlog.c tnt_snapshot.c tnt_rpl.c
 string(REPLACE "-static-libgcc" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 string(REPLACE "-static" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 
-set (tnt_cflags "${tnt_cflags} -static-libgcc")
+if (CMAKE_COMPILER_IS_GNUCC AND NOT CMAKE_COMPILER_IS_CLANG)
+    set (tnt_cflags "${tnt_cflags} -static-libgcc")
+endif()
 
 #
 # Static library
