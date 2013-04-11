@@ -398,6 +398,10 @@ SLIST_HEAD(, iproto_session) iproto_session_cache =
  * A session is idle when the client is gone
  * and there are no outstanding requests in the request queue.
  * An idle session can be safely garbage collected.
+ * Note: a session only becomes idle after iproto_session_shutdown(),
+ * which closes the fd.  This is why here the check is for
+ * evio_is_active() (false if fd is closed), not ev_is_active()
+ * (false if event is not started).
  */
 static inline bool
 iproto_session_is_idle(struct iproto_session *session)
@@ -439,6 +443,8 @@ iproto_session_create(const char *name, int fd, box_process_func *param)
 	} else {
 		session = SLIST_FIRST(&iproto_session_cache);
 		SLIST_REMOVE_HEAD(&iproto_session_cache, next_in_cache);
+		assert(session->input.fd == -1);
+		assert(session->output.fd == -1);
 	}
 	session->handler = param;
 	ev_io_init(&session->input, iproto_session_on_input, fd, EV_READ);
@@ -456,17 +462,11 @@ static inline void
 iproto_session_destroy(struct iproto_session *session)
 {
 	assert(iproto_session_is_idle(session));
+	assert(!evio_is_active(&session->output));
 	session_destroy(session->sid); /* Never throws. No-op if sid is 0. */
 	iobuf_delete(session->iobuf[0]);
 	iobuf_delete(session->iobuf[1]);
 	SLIST_INSERT_HEAD(&iproto_session_cache, session, next_in_cache);
-}
-
-static inline void
-iproto_session_gc(struct iproto_session *session)
-{
-	if (iproto_session_is_idle(session))
-		iproto_session_destroy(session);
 }
 
 static inline void
@@ -482,13 +482,18 @@ iproto_session_shutdown(struct iproto_session *session)
 	 */
 	session->iobuf[0]->in.end -= session->parse_size;
 	/*
-	 * If the session is not idle it will
-	 * be destroyed only after all its requests
-	 * are processed (and dropped).
+	 * If the session is not idle, it is destroyed
+	 * after the last request is handled. Otherwise,
+	 * queue a separate request to run on_disconnect()
+	 * trigger and destroy the session.
+	 * Sic: the check is mandatory to not destroy a session
+	 * twice.
          */
-	iproto_enqueue_request(&request_queue, session,
-			       session->iobuf[0], &dummy_header,
-			       iproto_process_disconnect);
+	if (iproto_session_is_idle(session)) {
+		iproto_enqueue_request(&request_queue, session,
+				       session->iobuf[0], &dummy_header,
+				       iproto_process_disconnect);
+	}
 }
 
 static inline void
@@ -605,6 +610,7 @@ iproto_session_on_input(struct ev_io *watcher,
 {
 	struct iproto_session *session = watcher->data;
 	int fd = session->input.fd;
+	assert(fd >= 0);
 
 	@try {
 		/* Ensure we have sufficient space for the next round.  */
@@ -781,7 +787,8 @@ iproto_process_request(struct iproto_request *request)
 			ev_feed_event(&session->output, EV_WRITE);
 	} @finally {
 		iobuf->in.pos += sizeof(*header) + header->len;
-		iproto_session_gc(session);
+		if (iproto_session_is_idle(session))
+			iproto_session_destroy(session);
 	}
 }
 
@@ -800,7 +807,11 @@ iproto_process_connect(struct iproto_request *request)
 		session->sid = session_create(fd);
 	} @catch (ClientError *e) {
 		iproto_reply_error(&iobuf->out, request->header, e);
-		iproto_flush(iobuf, fd, &session->write_pos);
+		@try {
+			iproto_flush(iobuf, fd, &session->write_pos);
+		} @catch (tnt_Exception *e) {
+			[e log];
+		}
 		iproto_session_shutdown(session);
 		return;
 	} @catch (tnt_Exception *e) {
@@ -809,6 +820,12 @@ iproto_process_connect(struct iproto_request *request)
 		iproto_session_shutdown(session);
 		return;
 	}
+	/*
+	 * Connect is synchronous, so no one could have been
+	 * messing up with the session while it was in
+	 * progress.
+	 */
+	assert(evio_is_active(&session->input));
 	/* Handshake OK, start reading input. */
 	ev_feed_event(&session->input, EV_READ);
 }
@@ -818,7 +835,7 @@ iproto_process_disconnect(struct iproto_request *request)
 {
 	fiber_set_sid(fiber, request->session->sid);
 	/* Runs the trigger, which may yield. */
-	iproto_session_gc(request->session);
+	iproto_session_destroy(request->session);
 }
 
 /** }}} */
