@@ -1,3 +1,10 @@
+tarantool (1.4.9+20130415.1808-1) unstable; urgency=low
+
+  * New upstream release (fix disconnect bug).
+    https://bugs.launchpad.net/tarantool/+bug/1168076
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 15 Apr 2013 18:08:14 +0400
+
 tarantool (1.4.9-1) unstable; urgency=low
 
   * New upstream release.
