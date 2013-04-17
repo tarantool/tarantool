@@ -78,9 +78,14 @@ void tc_print_buf(char *buf, size_t size) {
 }
 
 void tc_printf(char *fmt, ...) {
-	char *buf;
 	va_list args;
 	va_start(args, fmt);
+	if (tc.tee_fd == -1) {
+		vprintf(fmt, args);
+		va_end(args);
+		return;
+	}
+	char *buf;
 	int size = vasprintf(&buf, fmt, args);
 	va_end(args);
 	if (size >= 0) {
@@ -97,16 +102,20 @@ static void tc_print_fields(struct tnt_tuple *tu) {
 			tc_printf(", ");
 		char *data = TNT_IFIELD_DATA(&ifl);
 		uint32_t size = TNT_IFIELD_SIZE(&ifl);
-		if (!isprint(data[0]) && (size == 4 || size == 8)) {
-			if (size == 4) {
-				uint32_t i = *((uint32_t*)data);
-				tc_printf("%"PRIu32, i);
-			} else {
-				uint64_t i = *((uint64_t*)data);
-				tc_printf("%"PRIu64, i);
+		switch (size) {
+		case 4:
+			tc_printf("%"PRIu32, *((uint32_t*)data));
+			break;
+		case 8:
+			tc_printf("%"PRIu64, *((uint64_t*)data));
+			break;
+		default:
+			while (size-- > 0) {
+				if (0x20 <= *data && *data < 0x7f)
+					tc_printf("%c", *data++);
+				else
+					tc_printf("\\0x%02X", *data++);
 			}
-		} else {
-			tc_printf("'%-.*s'", size, data);
 		}
 	}
 	if (ifl.status == TNT_ITER_FAIL)
