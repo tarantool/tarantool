@@ -2,12 +2,113 @@
 #define TP_H_INCLUDED
 
 /*
- * TP - Tarantool Protocol request constructor
+ * TP - Tarantool Protocol library.
  * (http://tarantool.org)
  *
  * protocol description:
- * (https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt)
+ * https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt
+ * -------------------
  *
+ * TP - is a C library designed to create requests and process
+ * replies to or from a Tarantool server.
+ *
+ * The library is highly optimized and designed to be used
+ * by a C/C++ application which require sophisticated memory
+ * control and performance.
+ *
+ * Library does not support network operations. All operations
+ * are done in-memory using specified allocator.
+ *
+ * Library mostly designed to be easly use by protocol drivers
+ * written for a interpret languages that need to avoid double-buffering
+ * and write directly to language objects memory (such as strings,
+ * scalars, etc).
+ *
+ * REQUEST COMPILATION
+ * -------------------
+ *
+ * (1) initialize struct tp object by tp_init call, using specified
+ * buffer and allocator function.
+ *
+ * (2) sequentially call necessary operations, like tp_insert,
+ * tp_delete, tp_update, tp_call. Every request operations is always
+ * a append to a buffer. That is, tp_insert will put a insert header
+ * only, to complete request a tuple must be also placed, containing
+ * a key and a value:
+ *
+ * char buf[256];
+ * struct tp req;
+ * tp_init(&req, buf, sizeof(buf), NULL, NULL);
+ * tp_insert(&req, 0, 0);
+ * tp_tuple(&req);
+ * tp_sz(&req, "key");
+ * tp_sz(&req, "value");
+ *
+ * write(1, buf, tp_used(&req)); // write buffer to the stdout
+ *
+ * (3) buffer can be used right away when all requests are
+ * pushed to it. tp_used can be used to get current buffer size written.
+ *
+ * (4) After finish, buffer must be freed manually.
+ *
+ * See operations for a example.
+ *
+ * REPLY PROCESSING
+ * ----------------
+ *
+ * (1) tp_init must be initialized with a fully read reply.
+ * Functions tp_reqbuf, tp_req can be used to examine if buffer
+ * contains it.
+ *
+ * Following example of tp_req usage (reading from stdin while
+ * reply is completly read):
+ *
+ * struct tp rep;
+ * tp_init(&rep, NULL, 0, tp_reallocator_noloss, NULL);
+ *
+ * while (1) {
+ *  ssize_t to_read = tp_req(&rep);
+ *  printf("to_read: %zu\n", to_read);
+ *  if (to_read <= 0)
+ *    break;
+ *  ssize_t new_size = tp_ensure(&rep, to_read);
+ *  printf("new_size: %zu\n", new_size);
+ *  if (new_size == -1)
+ *    return -1;
+ *  int rc = fread(rep.p, to_read, 1, stdin);
+ *  if (rc != 1)
+ *    return 1;
+ *  tp_use(&rep, to_read);
+ * }
+ * tp_reply(&rep)
+ *
+ * (2) tp_reply function is used:
+ * server_code = tp_reply(&reply) function is used.
+ *
+ * if (server_code != 0) {
+ *   printf("error: %-.*s\n", tp_replyerrorlen(&rep),
+ *          tp_replyerror(&rep));
+ * }
+ *
+ * (3) replied data can be accessed by tp_next, tp_nextfield, tp_gettuple,
+ * tp_getfield functions.
+ *
+ * See tp_reply and tp_next/tp_nextfield for a example.
+ *
+ * RETURN POLICY
+ * -------------
+ *
+ * all request functions: total size written to a buffer or -1 on error.
+ * common functions: 0 on success, -1 on error.
+ *
+ * EXAMPLE
+ * -------
+ *
+ * TP is used by Tarantool Perl driver:
+ * https://github.com/dr-co/dr-tarantool/blob/master/Tarantool.xs
+*/
+
+/*
  * Copyright (c) 2012-2013 Tarantool/Box AUTHORS
  * (https://github.com/mailru/tarantool/blob/master/AUTHORS)
  *
@@ -37,7 +138,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
+*/
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -65,6 +166,7 @@ extern "C" {
 
 struct tp;
 
+/* resizer function, can be customized for own use */
 typedef char *(*tp_resizer)(struct tp *p, size_t req, size_t *size);
 
 #define TP_PING   65280
@@ -74,11 +176,13 @@ typedef char *(*tp_resizer)(struct tp *p, size_t req, size_t *size);
 #define TP_DELETE 21
 #define TP_CALL   22
 
+/* requests flags */
 #define TP_FRET   1
 #define TP_FADD   2
 #define TP_FREP   4
 #define TP_FQUIET 8
 
+/* update operations */
 #define TP_OPSET    0
 #define TP_OPADD    1
 #define TP_OPAND    2
@@ -88,6 +192,7 @@ typedef char *(*tp_resizer)(struct tp *p, size_t req, size_t *size);
 #define TP_OPDELETE 6
 #define TP_OPINSERT 7
 
+/* internal protocol headers */
 struct tp_h {
 	uint32_t type, len, reqid;
 } tp_packed;
@@ -113,10 +218,17 @@ struct tp_hselect {
 	uint32_t keyc;
 } tp_packed;
 
+/*
+ * main tp object.
+ *
+ * object contains private fields, that should
+ * not be accessed directly. Appropriate accessor
+ * functions should be used.
+*/
 struct tp {
-	struct tp_h *h;
-	char *s, *p, *e;
-	char *t, *f, *u;
+	struct tp_h *h;  /* current headers */
+	char *s, *p, *e; /* start, pos, end */
+	char *t, *f, *u; /* tuple, field, update */
 	char *c;
 	uint32_t tsz, fsz, tc;
 	uint32_t code;
@@ -125,21 +237,34 @@ struct tp {
 	void *obj;
 };
 
+/* get allocated buffer size */
 static inline size_t
 tp_size(struct tp *p) {
 	return p->e - p->s;
 }
 
+/* get actual buffer size, written with data */
 static inline size_t
 tp_used(struct tp *p) {
 	return p->p - p->s;
 }
 
+/* get size available for write */
 static inline size_t
 tp_unused(struct tp *p) {
 	return p->e - p->p;
 }
 
+/* common reallocation function.
+ * resizes buffer twice a size larger than a previous one.
+ *
+ * struct tp req;
+ * tp_init(&req, NULL, tp_reallocator, NULL);
+ * tp_ping(&req); // will call reallocator
+ *
+ * data must be manually freed on finish.
+ * (eg. free(p->s));
+*/
 tp_function_unused static char*
 tp_reallocator(struct tp *p, size_t req, size_t *size) {
 	size_t toalloc = tp_size(p) * 2;
@@ -149,12 +274,28 @@ tp_reallocator(struct tp *p, size_t req, size_t *size) {
 	return realloc(p->s, toalloc);
 }
 
+/* common reallocation function.
+ * resizes buffer exact size as required.
+ *
+ * struct tp req;
+ * tp_init(&req, NULL, tp_reallocator_noloss, NULL);
+ * tp_ping(&req); // will call reallocator
+ *
+ * data must be manually freed on finish.
+*/
 tp_function_unused static char*
 tp_reallocator_noloss(struct tp *p, size_t req, size_t *size) {
 	*size = tp_size(p) + (req - tp_unused(p));
 	return realloc(p->s, *size);
 }
 
+/* main initialization function.
+ *
+ * resizer - reallocation function, may be NULL
+ * obj     - pointer to be passed to resizer function
+ * buf     - current buffer, may be NULL
+ * size    - buffer size
+*/
 static inline void
 tp_init(struct tp *p, char *buf, size_t size,
         tp_resizer resizer, void *obj) {
@@ -174,6 +315,8 @@ tp_init(struct tp *p, char *buf, size_t size,
 	p->obj = obj;
 }
 
+/* ensure that buffer has enough space to fill size bytes, resize
+ * buffer if needed. */
 static tp_noinline ssize_t
 tp_ensure(struct tp *p, size_t size) {
 	if (tp_likely(tp_unused(p) >= size))
@@ -198,6 +341,8 @@ tp_ensure(struct tp *p, size_t size) {
 	return sz;
 }
 
+/* mark size bytes as used.
+ * can be used while appending data to complete reply. */
 static inline ssize_t
 tp_use(struct tp *p, size_t size) {
 	p->p += size;
@@ -212,24 +357,32 @@ tp_append(struct tp *p, const void *data, size_t size) {
 	return tp_use(p, size);
 }
 
+/* set current request id.
+ *
+ * tp_ping(&req);
+ * tp_reqid(&req, 777);
+ */
 static inline void
 tp_reqid(struct tp *p, uint32_t reqid) {
 	assert(p->h != NULL);
 	p->h->reqid = reqid;
 }
 
+/* get current request id */
 static inline uint32_t
 tp_getreqid(struct tp *p) {
 	assert(p->h != NULL);
 	return p->h->reqid;
 }
 
+/* get tuple count */
 static inline uint32_t
 tp_tuplecount(struct tp *p) {
 	assert(p->t != NULL);
 	return *(uint32_t*)(p->t);
 }
 
+/* write tuple header */
 static inline ssize_t
 tp_tuple(struct tp *p) {
 	assert(p->h != NULL);
@@ -317,6 +470,7 @@ tp_leb128load(struct tp *p, uint32_t *value) {
 	return 0;
 }
 
+/* write tuple field, usable after tp_tuple call. */
 static inline ssize_t
 tp_field(struct tp *p, const char *data, size_t size) {
 	assert(p->h != NULL);
@@ -345,12 +499,29 @@ tp_appendreq(struct tp *p, void *h, size_t size) {
 	return tp_append(p, h, size);
 }
 
+/* write ping request.
+ *
+ * char buf[64];
+ * struct tp req;
+ * tp_init(&req, buf, sizeof(buf), NULL, NULL);
+ * tp_ping(&req);
+ */
 static inline ssize_t
 tp_ping(struct tp *p) {
 	struct tp_h h = { TP_PING, 0, 0 };
 	return tp_appendreq(p, &h, sizeof(h));
 }
 
+/* write insert request.
+ *
+ * char buf[64];
+ * struct tp req;
+ * tp_init(&req, buf, sizeof(buf), NULL, NULL);
+ * tp_insert(&req, 0, TP_FRET);
+ * tp_tuple(&req);
+ * tp_sz(&req, "key");
+ * tp_sz(&req, "value");
+ */
 static inline ssize_t
 tp_insert(struct tp *p, uint32_t space, uint32_t flags) {
 	struct {
@@ -365,6 +536,15 @@ tp_insert(struct tp *p, uint32_t space, uint32_t flags) {
 	return tp_appendreq(p, &h, sizeof(h));
 }
 
+/* write delete request.
+ *
+ * char buf[64];
+ * struct tp req;
+ * tp_init(&req, buf, sizeof(buf), NULL, NULL);
+ * tp_delete(&req, 0, 0);
+ * tp_tuple(&req);
+ * tp_sz(&req, "key");
+ */
 static inline ssize_t
 tp_delete(struct tp *p, uint32_t space, uint32_t flags) {
 	struct {
@@ -379,6 +559,18 @@ tp_delete(struct tp *p, uint32_t space, uint32_t flags) {
 	return tp_appendreq(p, &h, sizeof(h));
 }
 
+/* write call request.
+ *
+ * char buf[64];
+ * struct tp req;
+ * tp_init(&req, buf, sizeof(buf), NULL, NULL);
+ *
+ * char proc[] = "hello_proc";
+ * tp_call(&req, 0, proc, sizeof(proc) - 1);
+ * tp_tuple(&req);
+ * tp_sz(&req, "arg1");
+ * tp_sz(&req, "arg2");
+ */
 static inline ssize_t
 tp_call(struct tp *p, uint32_t flags, const char *name, size_t size) {
 	struct {
@@ -401,6 +593,15 @@ tp_call(struct tp *p, uint32_t flags, const char *name, size_t size) {
 	return tp_used(p);
 }
 
+/* write select request.
+ *
+ * char buf[64];
+ * struct tp req;
+ * tp_init(&req, buf, sizeof(buf), NULL, NULL);
+ * tp_select(&req, 0, 0, 0, 0);
+ * tp_tuple(&req);
+ * tp_sz(&req, "key");
+ */
 static inline ssize_t
 tp_select(struct tp *p, uint32_t space, uint32_t index,
           uint32_t offset, uint32_t limit) {
@@ -419,6 +620,17 @@ tp_select(struct tp *p, uint32_t space, uint32_t index,
 	return tp_appendreq(p, &h, sizeof(h));
 }
 
+/* write update request.
+ *
+ * char buf[64];
+ * struct tp req;
+ * tp_init(&req, buf, sizeof(buf), NULL, NULL);
+ * tp_update(&req, 0, 0);
+ * tp_tuple(&req);
+ * tp_sz(&req, "key");
+ * tp_updatebegin(&req);
+ * tp_op(&req, 1, TP_OPSET, "VALUE", 5);
+ */
 static inline ssize_t
 tp_update(struct tp *p, uint32_t space, uint32_t flags) {
 	struct {
@@ -433,6 +645,8 @@ tp_update(struct tp *p, uint32_t space, uint32_t flags) {
 	return tp_appendreq(p, &h, sizeof(h));
 }
 
+/* write operation counter,
+ * must be called after update key tuple. */
 static inline ssize_t
 tp_updatebegin(struct tp *p) {
 	assert(p->h != NULL);
@@ -445,6 +659,15 @@ tp_updatebegin(struct tp *p) {
 	return tp_used(p);
 }
 
+/* write update operation.
+ *
+ * may be called after tp_updatebegin.
+ *
+ * can be used to request TP_OPSET, TP_OPADD, TP_OPAND,
+ * TP_OPXOR, TP_OPOR operations.
+ *
+ * see tp_update for example.
+ */
 static inline ssize_t
 tp_op(struct tp *p, uint32_t field, uint8_t op, const char *data,
       size_t size) {
@@ -471,6 +694,7 @@ tp_op(struct tp *p, uint32_t field, uint8_t op, const char *data,
 	return tp_used(p);
 }
 
+/* splice update operation. */
 static inline ssize_t
 tp_opsplice(struct tp *p, uint32_t field, uint32_t off, uint32_t len,
             const char *data, size_t size) {
@@ -495,11 +719,14 @@ tp_opsplice(struct tp *p, uint32_t field, uint32_t off, uint32_t len,
 	return rc;
 }
 
+/* write tuple field as string. */
 static inline ssize_t
 tp_sz(struct tp *p, const char *sz) {
 	return tp_field(p, sz, strlen(sz));
 }
 
+/* get how many bytes is still required to process reply.
+ * return value can be negative. */
 static inline ssize_t
 tp_reqbuf(const char *buf, size_t size) {
 	if (tp_unlikely(size < sizeof(struct tp_h)))
@@ -510,6 +737,7 @@ tp_reqbuf(const char *buf, size_t size) {
 	                  sz - size : -(size - sz);
 }
 
+/* same as tp_reqbuf, but tp initialized with buffer */
 static inline ssize_t
 tp_req(struct tp *p) {
 	return tp_reqbuf(p->s, tp_size(p));
@@ -528,31 +756,53 @@ tp_fetch(struct tp *p, int inc) {
 	return po;
 }
 
+/* get current reply error */
 static inline char*
 tp_replyerror(struct tp *p) {
 	return p->c;
 }
 
+/* get current reply error length */
 static inline int
 tp_replyerrorlen(struct tp *p) {
 	return tp_unfetched(p);
 }
 
+/* get current reply tuple count */
 static inline uint32_t
 tp_replycount(struct tp *p) {
 	return p->cnt;
 }
 
+/* get current reply returned coded */
 static inline uint32_t
 tp_replycode(struct tp *p) {
 	return p->code;
 }
 
+/* get current reply operation */
 static inline uint32_t
 tp_replyop(struct tp *p) {
 	return p->h->type;
 }
 
+/*
+ * process reply.
+ *
+ * struct tp rep;
+ * tp_init(&rep, reply_buf, reply_size, NULL, NULL);
+ *
+ * ssize_t server_code = tp_reply(&rep);
+ *
+ * printf("op:    %d\n", tp_replyop(&rep));
+ * printf("count: %d\n", tp_replycount(&rep));
+ * printf("code:  %zu\n", server_code);
+ *
+ * if (server_code != 0) {
+ *   printf("error: %-.*s\n", tp_replyerrorlen(&rep),
+ *          tp_replyerror(&rep));
+ * }
+ */
 tp_function_unused static ssize_t
 tp_reply(struct tp *p) {
 	ssize_t used = tp_req(p);
@@ -583,32 +833,53 @@ tp_reply(struct tp *p) {
 	return p->code;
 }
 
+/* example: iteration on returned tuples.
+ *
+ * while (tp_next(&rep)) {
+ *   printf("tuple fields: %d\n", tp_tuplecount(&rep));
+ *   printf("tuple size: %d\n", tp_tuplesize(&rep));
+ *   printf("[");
+ *   while (tp_nextfield(&rep)) {
+ *     printf("%-.*s", tp_getfieldsize(rep), tp_getfield(&rep));
+ *     if (tp_hasnextfield(&rep))
+ *       printf(", ");
+ *   }
+ *   printf("]\n");
+ * }
+*/
+
+/* rewind iteration to a first tuple */
 static inline void
 tp_rewind(struct tp *p) {
 	p->t = NULL;
 	p->f = NULL;
 }
 
+/* rewind iteration to a first field */
 static inline void
 tp_rewindfield(struct tp *p) {
 	p->f = NULL;
 }
 
+/* get current tuple data */
 static inline char*
 tp_gettuple(struct tp *p) {
 	return p->t;
 }
 
+/* get current tuple size */
 static inline uint32_t
 tp_tuplesize(struct tp *p) {
 	return p->tsz;
 }
 
+/* get current field data */
 static inline char*
 tp_getfield(struct tp *p) {
 	return p->f;
 }
 
+/* get current field size */
 static inline uint32_t
 tp_getfieldsize(struct tp *p) {
 	return p->fsz;
@@ -626,12 +897,14 @@ tp_hasdata(struct tp *p) {
 	return tp_replyop(p) != TP_PING && tp_unfetched(p) > 0;
 }
 
+/* check if there is more tuple */
 static inline int
 tp_hasnext(struct tp *p) {
 	assert(p->t != NULL);
 	return (p->p - tp_tupleend(p)) >= 4;
 }
 
+/* check if tuple has next field */
 static inline int
 tp_hasnextfield(struct tp *p) {
 	assert(p->t != NULL);
@@ -641,6 +914,9 @@ tp_hasnextfield(struct tp *p) {
 	return (tp_tupleend(p) - f) >= 1;
 }
 
+/* skip to next tuple.
+ * tuple can be accessed using:
+ * tp_tuplecount, tp_tuplesize, tp_gettuple. */
 static inline int
 tp_next(struct tp *p) {
 	if (tp_unlikely(p->t == NULL)) {
@@ -658,6 +934,8 @@ fetch:
 	return 1;
 }
 
+/* skip to next field.
+ * data can be accessed using: tp_getfieldsize, tp_getfield. */
 static inline int
 tp_nextfield(struct tp *p) {
 	assert(p->t != NULL);
