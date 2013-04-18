@@ -12,56 +12,95 @@
  * TP - is a C library designed to create requests and process
  * replies to or from a Tarantool server.
  *
- * The library is highly optimized and designed to be used
- * by a C/C++ application which require sophisticated memory
- * control and performance.
+ * The library is designed to be used by a C/C++ application which
+ * requires sophisticated memory control and/or performance.
  *
- * Library does not support network operations. All operations
- * are done in-memory using specified allocator.
+ * The library does not support network operations. All operations
+ * are done in a user supplied buffer and with help of
+ * a user-supplied allocator.
  *
- * Library mostly designed to be easly use by protocol drivers
- * written for a interpret languages that need to avoid double-buffering
- * and write directly to language objects memory (such as strings,
- * scalars, etc).
+ * The primary design goal of the library was to spare implementors
+ * of Tarantool/Box drivers in other languages, such as Perl,
+ * Ruby, Python, etc, from the details of the binary protocol, and
+ * also to make it possible to avoid double-buffering by writing
+ * directly to/from language objects from/to the serialized binary
+ * packet stream. This allows efficient data transfer from domain
+ * language types (such as strings, scalars, numbers, etc) to
+ * the network format, or directly to the socket.
  *
- * REQUEST COMPILATION
- * -------------------
+ * As a side effect of this design goal, the library has become
+ * usable in any kind of networking environment: synchronous with
+ * buffered sockets, or asynchronous event-based, as well as with
+ * cooperative multitasking.
  *
- * (1) initialize struct tp object by tp_init call, using specified
- * buffer and allocator function.
+ * Before using the library, it's highly recommended to get
+ * acquainted with Tarnatool/Box binary protocol, documented
+ * at https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt
  *
- * (2) sequentially call necessary operations, like tp_insert,
- * tp_delete, tp_update, tp_call. Every request operations is always
- * a append to a buffer. That is, tp_insert will put a insert header
- * only, to complete request a tuple must be also placed, containing
- * a key and a value:
+ * In a nutshell, any request in Tarnatool/Box consists of
+ * a 12-byte header, containing request type, id and length,
+ * and an optional tuple or tuples. Similarly, a response
+ * carries back the same request type and id, and contains a
+ * tuple or tuples.
+ *
+ * Below follows a step-by-step tutorial for the library.
+ *
+ * ASSEMBLING A REQUEST
+ * --------------------
+ *
+ * (1) initialize an instance of struct tp with tp_init().
+ * Provide tp_init() with a buffer object and an (optional)
+ * allocator function.
+ *
+ * (2) construct requests by sequentially calling necessary
+ * operations, such as tp_insert(), tp_delete(), tp_update(),
+ * tp_call(). Note: these operations only construct request
+ * header, the body of the request, which is usually a tuple,
+ * must be appended to the buffer with a separate call.
+ * Each next call of tp_*() API appends a request to
+ * the tail of the buffer. If the buffer becomes too small to
+ * contain the binary packet, the reallocation function is
+ * invoked, to enlarge the buffer.
+ * A buffer can contain multiple requests: Tarantool/Box will
+ * handle them all asynchronously, request id can be then
+ * used to associate responses with requests.
+ *
+ * For example:
  *
  * char buf[256];
  * struct tp req;
+ * // initialize request buffer
  * tp_init(&req, buf, sizeof(buf), NULL, NULL);
+ * // append INSERT packet header to the buffer
+ * // request flags are empty, request id is 0
  * tp_insert(&req, 0, 0);
+ * // begin appending a tuple to the request
  * tp_tuple(&req);
+ * // append one tuple field
  * tp_sz(&req, "key");
+ * // one more tuple field
  * tp_sz(&req, "value");
  *
- * write(1, buf, tp_used(&req)); // write buffer to the stdout
+ * write(1, buf, tp_used(&req)); // write the buffer to stdout
  *
- * (3) buffer can be used right away when all requests are
- * pushed to it. tp_used can be used to get current buffer size written.
+ * (3) the buffer can be used right after all requests are
+ * appended to it. tp_used() can be used to get the current buffer size.
  *
- * (4) After finish, buffer must be freed manually.
+ * (4) In the end, the buffer must be freed manually.
  *
- * See operations for a example.
+ * For additional examples, please read the documentation for various
+ * buffer operations.
  *
  * REPLY PROCESSING
  * ----------------
  *
- * (1) tp_init must be initialized with a fully read reply.
- * Functions tp_reqbuf, tp_req can be used to examine if buffer
- * contains it.
+ * (1) tp_init() must be called with a pointer to a buffer which
+ * contains a fully read reply.
+ * Functions tp_reqbuf(), tp_req() can be then used to examine if
+ * a network buffer contains a full reply or not.
  *
- * Following example of tp_req usage (reading from stdin while
- * reply is completly read):
+ * Following is an example of tp_req() usage (reading from stdin
+ * and parsing reply it is completely read):
  *
  * struct tp rep;
  * tp_init(&rep, NULL, 0, tp_reallocator_noloss, NULL);
@@ -78,28 +117,47 @@
  *  int rc = fread(rep.p, to_read, 1, stdin);
  *  if (rc != 1)
  *    return 1;
+ *  // discard read data and make space available
+ *  // for the next reply
  *  tp_use(&rep, to_read);
  * }
- * tp_reply(&rep)
  *
- * (2) tp_reply function is used:
- * server_code = tp_reply(&reply) function is used.
+ * (2) tp_reply() function can be used to find out if the request
+ * is executed successfully or not :
+ * server_code = tp_reply(&reply);
  *
  * if (server_code != 0) {
  *   printf("error: %-.*s\n", tp_replyerrorlen(&rep),
  *          tp_replyerror(&rep));
  * }
  *
- * (3) replied data can be accessed by tp_next, tp_nextfield, tp_gettuple,
- * tp_getfield functions.
+ * Note: the library itself doesn't contain #defines for server
+ * error codes. Different server error codes are defined in
+ * https://github.com/mailru/tarantool/blob/master/include/errcode.h
  *
- * See tp_reply and tp_next/tp_nextfield for a example.
+ * Generally, a server failure can be either transient, or
+ * persistent.
+ * For example, a failure to allocate memory is transient: as soon
+ * as some data is deleted, the request can be executed again,
+ * successfully. A constraint violation is a non-transient error:
+ * it will persist regardless of how many times a request is
+ * re-executed. Server error codes can be analyzed to better
+ * handle an error.
  *
- * RETURN POLICY
- * -------------
+ * (3) The server usually responds to any kind of request with a
+ * tuple. Tuple data can be accessed by tp_next(), tp_nextfield(),
+ * tp_gettuple(), tp_getfield() functions.
  *
- * all request functions: total size written to a buffer or -1 on error.
- * common functions: 0 on success, -1 on error.
+ * See the docs for tp_reply() and tp_next()/tp_nextfield() for an
+ * example.
+ *
+ * API RETURN VALUE CONVENTION
+ * ---------------------------
+ *
+ * Any API function, generally, returns 0 on success,
+ * -1 on error.
+ * Functions, which append to struct tp, return the
+ * size appended to the buffer on success, or -1 on error.
  *
  * EXAMPLE
  * -------
@@ -169,6 +227,7 @@ struct tp;
 /* resizer function, can be customized for own use */
 typedef char *(*tp_resizer)(struct tp *p, size_t req, size_t *size);
 
+/* request types. */
 #define TP_PING   65280
 #define TP_INSERT 13
 #define TP_SELECT 17
@@ -222,13 +281,13 @@ struct tp_hselect {
  * main tp object.
  *
  * object contains private fields, that should
- * not be accessed directly. Appropriate accessor
- * functions should be used.
+ * not be accessed directly. Appropriate accessors
+ * should be used instead.
 */
 struct tp {
-	struct tp_h *h;  /* current headers */
+	struct tp_h *h;  /* current request header */
 	char *s, *p, *e; /* start, pos, end */
-	char *t, *f, *u; /* tuple, field, update */
+	char *t, *f, *u; /* tuple, tuple field, update operation */
 	char *c;
 	uint32_t tsz, fsz, tc;
 	uint32_t code;
@@ -237,26 +296,26 @@ struct tp {
 	void *obj;
 };
 
-/* get allocated buffer size */
+/* Get the size of allocated buffer*/
 static inline size_t
 tp_size(struct tp *p) {
 	return p->e - p->s;
 }
 
-/* get actual buffer size, written with data */
+/* Get the size of data in the buffer. */
 static inline size_t
 tp_used(struct tp *p) {
 	return p->p - p->s;
 }
 
-/* get size available for write */
+/* Get the size available for write */
 static inline size_t
 tp_unused(struct tp *p) {
 	return p->e - p->p;
 }
 
-/* common reallocation function.
- * resizes buffer twice a size larger than a previous one.
+/* A common reallocation function.
+ * resizes the buffer twice the previous size.
  *
  * struct tp req;
  * tp_init(&req, NULL, tp_reallocator, NULL);
@@ -266,10 +325,10 @@ tp_unused(struct tp *p) {
  * (eg. free(p->s));
 */
 tp_function_unused static char*
-tp_reallocator(struct tp *p, size_t req, size_t *size) {
+tp_reallocator(struct tp *p, size_t required, size_t *size) {
 	size_t toalloc = tp_size(p) * 2;
-	if (tp_unlikely(toalloc < req))
-		toalloc = req;
+	if (tp_unlikely(toalloc < required))
+		toalloc = required;
 	*size = toalloc;
 	return realloc(p->s, toalloc);
 }
@@ -337,11 +396,11 @@ tp_ensure(struct tp *p, size_t size) {
 	if (tp_unlikely(p->u))
 		p->u = (np + (p->u - p->s));
 	p->s = np;
-	p->e = np + sz; 
+	p->e = np + sz;
 	return sz;
 }
 
-/* mark size bytes as used.
+/* Mark size bytes as used.
  * can be used while appending data to complete reply. */
 static inline ssize_t
 tp_use(struct tp *p, size_t size) {
@@ -816,7 +875,7 @@ tp_reply(struct tp *p) {
 	p->cnt = 0;
 	p->code = 0;
 	if (tp_unlikely(p->h->type == TP_PING))
-		return 0; 
+		return 0;
 	if (tp_unlikely(p->h->type != TP_UPDATE &&
 	                p->h->type != TP_INSERT &&
 	                p->h->type != TP_DELETE &&
