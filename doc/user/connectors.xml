@@ -18,14 +18,14 @@
     <title>C</title>
     <para>
        Please see <link
-       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/c"><filename>connector/c</filename></link> in the source tree.
+       xlink:href="https://github.com/mailru/tarantool/blob/master/connector/c/include/tp.h"><filename>connector/c</filename></link> in the source tree.
     </para>
   </section>
 
   <section>
     <title>Perl</title>
     <para>
-       Please refer to CPAN module <link xlink:href='http://search.cpan.org/search?query=Tarantool&amp;mode=all'>MR::Tarantool::Box</link>.
+       Please refer to CPAN module <link xlink:href='http://search.cpan.org/~unera/DR-Tarantool/'>DR::Tarantool::Box</link>.
     </para>
   </section>
 
