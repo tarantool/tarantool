@@ -8,7 +8,7 @@ int main()
 	luaL_openlibs(L);
 	@try {
 		luaL_error(L, "test");
-	} @catch (id allOthers) {
+	} @catch (...) {
 		printf("exception handled\n");
 	}
 	lua_close(L);

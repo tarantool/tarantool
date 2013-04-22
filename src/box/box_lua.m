@@ -967,7 +967,7 @@ port_lua_add_tuple(struct port *port, struct tuple *tuple,
 	lua_State *L = port_lua(port)->L;
 	@try {
 		lbox_pushtuple(L, tuple);
-	} @catch (id allOthers) {
+	} @catch (...) {
 		tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
 	}
 }
@@ -1306,7 +1306,7 @@ box_lua_execute(struct request *request, struct port *port)
 		port_add_lua_multret(port, L);
 	} @catch (tnt_Exception *e) {
 		@throw;
-	} @catch (id allOthers) {
+	} @catch (...) {
 		tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
 	} @finally {
 		/*
