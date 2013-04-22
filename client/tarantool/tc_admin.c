@@ -122,9 +122,9 @@ int tc_admin_reply(struct tc_admin *a, char **r, size_t *size)
 		memcpy(buf + off, rx, rxi);
 		off += rxi;
 		buf[off] = 0;
-		if (off >= 10) {
-			if (!memcmp(buf, "---\r\n", 5) &&
-			    !memcmp(buf + off - 5, "...\r\n", 5)) {
+		if (off >= 8) {
+			if (!memcmp(buf, "---\n", 4) &&
+			    !memcmp(buf + off - 4, "...\n", 4)) {
 				*r = buf;
 				*size = off;
 				return 0;
