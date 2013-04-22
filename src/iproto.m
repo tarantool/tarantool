@@ -667,7 +667,7 @@ iproto_session_output_iobuf(struct iproto_session *session)
 }
 
 /** writev() to the socket and handle the output. */
-static inline int
+static int
 iproto_flush(struct iobuf *iobuf, int fd, struct obuf_svp *svp)
 {
 	/* Begin writing from the saved position. */
