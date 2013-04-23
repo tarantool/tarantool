@@ -617,7 +617,6 @@ initialize_minimal()
 int
 main(int argc, char **argv)
 {
-	const char *cat_filename = NULL;
 	const char *cfg_paramname = NULL;
 
 #ifndef HAVE_LIBC_STACK_END
@@ -653,8 +652,6 @@ main(int argc, char **argv)
 			   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
 				       gopt_longs("config"),
 				       "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
-			   gopt_option('C', GOPT_ARG, gopt_shorts(0), gopt_longs("cat"),
-				       "=FILE", "cat snapshot file to stdout in readable format and exit"),
 			   gopt_option('I', 0, gopt_shorts(0),
 				       gopt_longs("init-storage", "init_storage"),
 				       NULL, "initialize storage (an empty snapshot file) and exit"),
@@ -687,20 +684,9 @@ main(int argc, char **argv)
 		puts("");
 		gopt_help(opt_def);
 		puts("");
-		puts("Please visit project home page at http://launchpad.net/tarantool");
+		puts("Please visit project home page at http://tarantool.org");
 		puts("to see online documentation, submit bugs or contribute a patch.");
 		return 0;
-	}
-
-	if (gopt_arg(opt, 'C', &cat_filename)) {
-		initialize_minimal();
-		fill_default_tarantool_cfg(&cfg);
-		cfg.log_level += gopt(opt, 'v');
-		if (access(cat_filename, R_OK) == -1) {
-			panic("access(\"%s\"): %s", cat_filename, strerror(errno));
-			exit(EX_OSFILE);
-		}
-		return box_cat(cat_filename);
 	}
 
 	gopt_arg(opt, 'c', &cfg_filename);

@@ -114,136 +114,6 @@ process_ro(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 }
 
 static void
-box_xlog_sprint(struct tbuf *buf, const struct tbuf *t)
-{
-	struct header_v11 *row = header_v11(t);
-
-	const void *data = t->data + sizeof(struct header_v11);
-	const void *end = data + row->len;
-
-	tbuf_printf(buf, "lsn:%" PRIi64 " ", row->lsn);
-
-	u16 tag = pick_u16(&data, end);
-	u64 cookie = pick_u64(&data, end);
-	u16 op = pick_u16(&data, end);
-	u32 n = pick_u32(&data, end);
-	struct sockaddr_in *peer = (void *)&cookie;
-
-	tbuf_printf(buf, "tm:%.3f t:%" PRIu16 " %s:%d %s n:%i",
-		    row->tm, tag, inet_ntoa(peer->sin_addr), ntohs(peer->sin_port),
-		    requests_strs[op], n);
-
-
-	u32 key_len;
-	const void *key;
-	u32 field_count, field_no;
-	u32 flags;
-	u32 op_cnt;
-
-	switch (op) {
-	case REPLACE:
-		flags = pick_u32(&data, end);
-		field_count = pick_u32(&data, end);
-		size_t tuple_len = end - data;
-		if (tuple_len != valid_tuple(data, end, field_count)) {
-			say_error("found a corrupt tuple, %s",
-				  tbuf_str(buf));
-			abort();
-		}
-		tuple_print(buf, field_count, data);
-		break;
-
-	case DELETE:
-		flags = pick_u32(&data, end);
-	case DELETE_1_3:
-		key_len = pick_u32(&data, end);
-		key = pick_field(&data, end);
-		if (data != end) {
-			say_error("found a corrupt tuple %s", tbuf_str(buf));
-			abort();
-		}
-		tuple_print(buf, key_len, key);
-		break;
-
-	case UPDATE:
-		flags = pick_u32(&data, end);
-		key_len = pick_u32(&data, end);
-		key = pick_field(&data, end);
-		op_cnt = pick_u32(&data, end);
-
-		tbuf_printf(buf, "flags:%08X ", flags);
-		tuple_print(buf, key_len, key);
-
-		while (op_cnt-- > 0) {
-			field_no = pick_u32(&data, end);
-			u8 op = pick_u8(&data, end);
-			const void *arg = pick_field(&data, end);
-
-			tbuf_printf(buf, " [field_no:%i op:", field_no);
-			switch (op) {
-			case 0:
-				tbuf_printf(buf, "set ");
-				break;
-			case 1:
-				tbuf_printf(buf, "add ");
-				break;
-			case 2:
-				tbuf_printf(buf, "and ");
-				break;
-			case 3:
-				tbuf_printf(buf, "xor ");
-				break;
-			case 4:
-				tbuf_printf(buf, "or ");
-				break;
-			}
-			tuple_print(buf, 1, arg);
-			tbuf_printf(buf, "] ");
-		}
-		break;
-	default:
-		tbuf_printf(buf, "unknown wal op %" PRIi32, op);
-	}
-}
-
-static int
-snap_print(void *param __attribute__((unused)), struct tbuf *t)
-{
-	@try {
-		struct tbuf *out = tbuf_new(t->pool);
-		struct header_v11 *raw_row = header_v11(t);
-
-		const void *data = t->data + sizeof(struct header_v11);
-		const void *end = data + raw_row->len;
-
-		(void)pick_u16(&data, end); /* drop tag */
-		(void)pick_u64(&data, end); /* drop cookie */
-
-		const struct box_snap_row *row =  data;
-
-		tuple_print(out, row->tuple_size, row->data);
-		printf("n:%i %*s\n", row->space, (int) out->size,
-		       (char *)out->data);
-	} @catch (id e) {
-		return -1;
-	}
-	return 0;
-}
-
-static int
-xlog_print(void *param __attribute__((unused)), struct tbuf *t)
-{
-	@try {
-		struct tbuf *out = tbuf_new(t->pool);
-		box_xlog_sprint(out, t);
-		printf("%*s\n", (int)out->size, (char *)out->data);
-	} @catch (id e) {
-		return -1;
-	}
-	return 0;
-}
-
-static void
 recover_snap_row(const void *data)
 {
 	assert(primary_indexes_enabled == false);
@@ -474,12 +344,6 @@ box_init(void)
 	}
 }
 
-int
-box_cat(const char *filename)
-{
-	return read_log(filename, xlog_print, snap_print, NULL);
-}
-
 static void
 snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 		     u32 n, struct tuple *tuple)
@@ -524,7 +388,6 @@ box_info(struct tbuf *out)
 {
 	tbuf_printf(out, "  status: %s" CRLF, status);
 }
-
 
 const char *
 box_status(void)
