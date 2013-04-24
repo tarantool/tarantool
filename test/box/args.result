@@ -6,8 +6,6 @@ Usage: tarantool_box [OPTIONS]
                           KEY
       --check-config      Check configuration file for errors
   -c, --config=FILE       path to configuration file (default: tarantool.cfg)
-      --cat=FILE          cat snapshot file to stdout in readable format and
-                          exit
       --init-storage      initialize storage (an empty snapshot file) and exit
   -v, --verbose           increase verbosity level in log messages
   -B, --background        redirect input/output streams to a log file and run as
@@ -15,7 +13,7 @@ Usage: tarantool_box [OPTIONS]
   -h, --help              display this help and exit
   -V, --version           print program version and exit
 
-Please visit project home page at http://launchpad.net/tarantool
+Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
 
 tarantool_box -h
@@ -26,8 +24,6 @@ Usage: tarantool_box [OPTIONS]
                           KEY
       --check-config      Check configuration file for errors
   -c, --config=FILE       path to configuration file (default: tarantool.cfg)
-      --cat=FILE          cat snapshot file to stdout in readable format and
-                          exit
       --init-storage      initialize storage (an empty snapshot file) and exit
   -v, --verbose           increase verbosity level in log messages
   -B, --background        redirect input/output streams to a log file and run as
@@ -35,7 +31,7 @@ Usage: tarantool_box [OPTIONS]
   -h, --help              display this help and exit
   -V, --version           print program version and exit
 
-Please visit project home page at http://launchpad.net/tarantool
+Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
 
 tarantool_box --cfg-get=custom_proc_title
@@ -107,5 +103,5 @@ tarantool_box: done
 # not require a configuration file.
 
 tarantool_box --config=nonexists.cfg --cat=nonexists.xlog
-tarantool_box: access("nonexists.xlog"): No such file or directory
+tarantool_box: --cat: unknown option
 
