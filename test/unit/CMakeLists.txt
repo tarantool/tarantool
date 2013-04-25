@@ -18,7 +18,7 @@ add_executable(bitset_index_test bitset_index.c)
 target_link_libraries(bitset_index_test bitset)
 
 add_executable(objc_finally objc_finally.m)
-include_directories(${LIBOBJC_INCLUDE_DIRS})
+include_directories(${LIBOBJC_INCLUDE_DIR})
 add_executable(objc_catchcxx objc_catchcxx.m)
 
 add_dependencies(objc_finally build_bundled_libs)
