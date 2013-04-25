@@ -510,7 +510,7 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 			/* The fiber is detached, log the error. */
 			[e log];
 		}
-	} @catch (...) {
+	} @catch (id allOthers) {
 		lua_settop(L, 1);
 		/*
 		 * The error message is already there.
@@ -972,7 +972,7 @@ lbox_pcall(struct lua_State *L)
 		lua_pushstring(L, e->errmsg);
 	} @catch (tnt_Exception *e) {
 		@throw;
-	} @catch (...) {
+	} @catch (id allOthers) {
 		lua_settop(L, 1);
 		/* completion status */
 		lua_pushboolean(L, false);
@@ -1112,7 +1112,7 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 	} @catch (tnt_Exception *e) {
 		lua_pushstring(L, [e errmsg]);
 		return 1;
-	} @catch (...) {
+	} @catch (id allOthers) {
 		return 1;
 	}
 	return 0;
