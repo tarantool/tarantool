@@ -28,10 +28,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <objc/Object.h>
 #include <objc/runtime.h>
 
-@interface tnt_Object: Object
+@interface tnt_Object {
+	Class isa;
+}
 + (id) alloc;
 - (id) init;
 - (void) free;
