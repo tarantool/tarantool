@@ -107,7 +107,7 @@ add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m -e -f TAGS
 # Define PACKAGE_VERSION -- a string constant with tarantool version.
 #
 set (PACKAGE_VERSION "")
-execute_process (COMMAND ${GIT} describe HEAD
+execute_process (COMMAND ${GIT} describe --match "[1-9].*" HEAD
     OUTPUT_VARIABLE PACKAGE_VERSION
     OUTPUT_STRIP_TRAILING_WHITESPACE
     )
