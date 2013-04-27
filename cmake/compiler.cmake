@@ -27,12 +27,12 @@ endif()
 if (CMAKE_COMPILER_IS_GNUCC)
     execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
         OUTPUT_VARIABLE CC_VERSION)
-    if (CC_VERSION VERSION_GREATER 4.6 OR CC_VERSION VERSION_EQUAL 4.6)
+    if (CC_VERSION VERSION_GREATER 4.4.5 OR CC_VERSION VERSION_EQUAL 4.4.5)
         message(STATUS
-            "${CMAKE_C_COMPILER} version >= 4.6 -- ${CC_VERSION}")
+            "${CMAKE_C_COMPILER} version >= 4.4.5 -- ${CC_VERSION}")
     else()
         message (FATAL_ERROR
-            "${CMAKE_C_COMPILER} version should be >= 4.6 -- ${CC_VERSION}")
+            "${CMAKE_C_COMPILER} version should be >= 4.4.5 -- ${CC_VERSION}")
     endif()
 endif()
 
