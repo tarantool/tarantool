@@ -299,7 +299,7 @@ Tarantool/Box IPROTO protocol.
 ; It's an error to specify an argument of a type that
 ; differs from expected type.
 ;
-<op_arg> ::= <field>
+<op_arg> ::= <field> | <op_arg_splice>
 
 ; For simple operations <op_arg> field contains either a string
 ; to assign, a number to add or subtract.
@@ -309,7 +309,7 @@ Tarantool/Box IPROTO protocol.
 ; field data in case of splice argument contains 3 nested <field>
 ; objects, which store the arguments:
 
-<splice_field_data> ::= <offset><length><string>
+<op_arg_splice> ::= <int32_varint><offset><length><string>
 
 <offset> ::= <field>
 <length> ::= <field>
