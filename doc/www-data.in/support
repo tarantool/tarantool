@@ -1,0 +1,20 @@
+{% page support en %}
+
+# Getting support
+
+We are happy to provide help on [tarantool@groups.google.com](http://groups.google.com/group/tarantool). If you need immediate help, try to 
+ping maintainers on [#tarantool](http://webchat.freenode.net/?channels=#tarantool) channel at irc.freenode.net.
+
+Terms of commercial 24x7 support are available upon request, please send
+an inquiry to [support@tarantool.org](mailto:support@tarantool.org).
+
+{% page support ru %}
+
+# Помощь и поддержа
+
+Техническую поддержку можно получить в русскоязычном 
+списке рассылки [tarantool-ru@groups.google.com](http://groups.google.com/group/tarantool-ru)
+или на irc.freenode.net, канал [#tarantool](http://webchat.freenode.net/?channels=#tarantool).
+
+Для того чтобы узнать условия коммерческой поддержки, 
+необходимо сделать запрос по адресу [support@tarantool.org](mailto:support@tarantool.org).

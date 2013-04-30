@@ -4,13 +4,13 @@
 
 # Tarantool/Box
 ## A transactional NoSQL database
-###[Overview](intro.html) &nbsp;  [Documentation](tarantool_user_guide.html) &nbsp;  [Download](download.html)
+###[Overview](intro.html) &nbsp;  [Documentation](tarantool_user_guide.html) &nbsp;  [Download](download.html) &nbsp;  [Support](support.html)
 
 {% text blurb ru %}
 
 # Tarantool/Box
 ## NoSQL СУБД для высокой нагрузки
-###[Введение](intro.html) &nbsp;  [Документация](tarantool_user_guide.html) &nbsp;  [Скачать](download.html)
+###[Введение](intro.ru.html) &nbsp;  [Документация](tarantool_user_guide.html) &nbsp;  [Скачать](download.ru.html) &nbsp;  [Поддержка](support.ru.html)
 
 {% text tagline en %}
 
