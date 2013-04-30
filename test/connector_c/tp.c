@@ -18,7 +18,7 @@ static void reply_print(struct tp *rep) {
 
 static int reply(void) {
 	struct tp rep;
-	tp_init(&rep, NULL, 0, tp_reallocator, NULL);
+	tp_init(&rep, NULL, 0, tp_realloc, NULL);
 
 	while (1) {
 		ssize_t to_read = tp_req(&rep);
