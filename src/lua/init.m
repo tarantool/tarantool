@@ -192,7 +192,7 @@ static const struct luaL_reg boxlib[] = {
  * }}}
  */
 
-/* {{{ box.fiber Lua library: access to Tarantool/Box fibers
+/* {{{ box.fiber Lua library: access to Tarantool fibers
  *
  * Each fiber can be running, suspended or dead.
  * A fiber is created (box.fiber.create()) suspended.

@@ -1,4 +1,4 @@
-Tarantool/Box IPROTO protocol.
+Tarantool IPROTO protocol.
 ;
 ; The latest version of this document can be found in
 ; tarantool source tree, doc/box-protocol.txt

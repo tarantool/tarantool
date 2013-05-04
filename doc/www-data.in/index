@@ -2,13 +2,13 @@
 
 {% text blurb en %}
 
-# Tarantool/Box
+# Tarantool
 ## A transactional NoSQL database
 ###[Overview](intro.html) &nbsp;  [Documentation](tarantool_user_guide.html) &nbsp;  [Download](download.html) &nbsp;  [Support](support.html)
 
 {% text blurb ru %}
 
-# Tarantool/Box
+# Tarantool
 ## NoSQL СУБД для высокой нагрузки
 ###[Введение](intro.ru.html) &nbsp;  [Документация](tarantool_user_guide.html) &nbsp;  [Скачать](download.ru.html) &nbsp;  [Поддержка](support.ru.html)
 
@@ -16,15 +16,15 @@
 
 # Introduction
 
-Tarantool/Box is an in-memory database designed to store the most volatile
-and highly accessible web content. Tarantool/Box has been extensively used
+Tarantool is an in-memory database designed to store the most volatile
+and highly accessible web content. Tarantool has been extensively used
 in production since 2009. It's **open source**, BSD licensed.
 
 {% text tagline ru %}
 
-## Что такое Tarantool/Box?
+## Что такое Tarantool?
 
-Tarantool/Box - расширяемая, транзакционная СУБД для хранения наиболее
+Tarantool - расширяемая, транзакционная СУБД для хранения наиболее
 запрашиваемых и часто меняющихся данных.
 
 {% text features en %}

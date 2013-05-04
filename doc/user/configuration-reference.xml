@@ -50,7 +50,7 @@ both.
       <para><option>--version</option>, <option>-V</option></para>
       <para>Print product name and version, for example:
         <programlisting><prompt>$ </prompt> ./tarantool_box --version
-Tarantool/Box 1.4.0-69-g45551dd
+Tarantool 1.4.0-69-g45551dd
         </programlisting>
         In this example:
         <simplelist>
@@ -362,7 +362,7 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
             targetptr="proctitle">server process title</olink>
             (what's shown in COMMAND column of <command>ps</command>
             and <command>top</command> commands). For example,
-            an unmodified Tarantool/Box process group looks like:
+            an unmodified Tarantool process group looks like:
             </para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
 tarantool_box: primary pri:33013 sec:33014 adm:33015</programlisting>

@@ -15,20 +15,24 @@ happens to be very easy to embed. Lua coroutines relate very closely to
 Tarantool fibers, and Lua architecture works well with Tarantool internals. 
 Lua is the first, but, hopefully, not the last stored program language for Tarantool.
 
+** Q. Why do I need an in-memory database? **
+
+
+
 **Q. What's the key advantage of Tarantool?**
 
-A. Tarantool provides a fairly rich core feature set (HASH and TREE indexes, secondary indexes, composite indexes,
+A. Tarantool provides a fairly rich core feature set (HASH, TREE BITSET indexes, secondary indexes, composite indexes,
 asynchronous replication, hot standby, data durability) along with support for Lua stored procedures.
 These two properties make it possible to code fast, atomic and reliable in-memory data servers which handle non-trivial application-specific logic. The win over traditional SQL servers is in performance: low-overhead, lock-free architecture means Tarantool can serve
 an order of magnitude more requests per second, on comparable hardware. The win over NoSQL alternatives is in flexibility: Lua allows flexible processing of data stored in a compact, denormalized format.
 
 **Q. What are your development plans?**
 
-A. Performance. Better support for transactions. Advanced replication and clustering features.
+A. They are standard. Performance. Better support for transactions. Master-master replication, automatic sharding.
 
 **Q. Who is developing Tarantool?**
 
-A. There is a small engineering team employed by Mail.ru -- check out our commit logs on github. The development is fully open, and Python and PHP drivers are written by Konstantin Cherkasoff and Alexander Kalendarev from community.
+A. There is a small engineering team employed by Mail.ru -- check out our commit logs on github. The development is fully open, and most of the connectors authors and maintainers in different distributions are from the community.
 
 **Q. How serious is Mail.Ru about Tarantool?**
 

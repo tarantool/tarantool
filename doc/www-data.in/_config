@@ -4,7 +4,7 @@ languages:
   ru: { source-encoding: 'utf-8', output-encoding: 'utf-8', suffix: '.ru.html' }
 
 # i18n for small bits
-home_tag: { en: 'Tarantool/Box - Front page', ru: 'Tarantool/Box - Главная' }
+home_tag: { en: 'Tarantool - Front page', ru: 'Tarantool - Главная' }
 
 # implement language switch in the header, note the reversed language tags
 lang_tag: { en: 'Русский', ru: 'English' }

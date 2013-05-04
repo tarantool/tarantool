@@ -6,7 +6,7 @@ href="http://tarantool.org/dist">http://tarantool.org/dist</a>.
 
 # How to choose the right version for download
 
-Tarantool/Box uses a 3-digit versioning scheme
+Tarantool uses a 3-digit versioning scheme
 &lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;.
 Major digits change rarely. A minor version increase indicates one
 or few incompatibile changes. Patch verison counter is increased
@@ -173,7 +173,7 @@ The server roadmap is maintained on [Launchpad](http://launchpad.net/tarantool).
 
 ### Как правильно выбрать версию сервера
 
-Tarantool/Box использует стандартную схему нумерования
+Tarantool использует стандартную схему нумерования
 релизов &lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;.
 
 Первая цифра в версии изменяется крайне редко, по итогам

@@ -190,7 +190,7 @@ error: 1:15 expected '('
   </para>
   <para>
     Every value, returned from a stored function by means of
-    <code>return</code> clause, is converted to a Tarantool/Box tuple.
+    <code>return</code> clause, is converted to a Tarantool tuple.
     Tuples are returned as such, in binary form; a Lua scalar, such as
     a string or an integer, is converted to a tuple with only
     one field. When the returned value is a <emphasis>Lua
@@ -220,7 +220,7 @@ localhost> lua pcall(box.insert, 99, 1, 'test')
   </para>
   <para>
     It's possible not only to invoke trivial Lua code, but call
-    into Tarantool/Box storage functionality, using
+    into Tarantool storage functionality, using
     <code>box</code>
     Lua library. The contents of the library can be
     inspected at runtime:
@@ -320,7 +320,7 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
                 <bridgehead renderas="sect4">Parameters</bridgehead>
                 <simplelist>
                     <member><code>op</code> &mdash; number, any
-                    Tarantool/Box command code, except 22 (CALL). See
+                    Tarantool command code, except 22 (CALL). See
                     <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt">
                     <filename>doc/box-protocol.txt</filename></link>.
                     </member>
@@ -906,7 +906,7 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
                 such as a unique constraint violation, no such space/index,
                 etc. A complete list of errors is present in <link xlink:href="https://github.com/mailru/tarantool/blob/master/include/errcode.h">errcode.h</link>
                 file in the source tree.
-                Lua constants which correspond to Tarantool/Box errors
+                Lua constants which correspond to Tarantool errors
                 are defined in <code>box.error</code> module. The error
                 message can be arbitrary.
                 Throws client error. Lua procedure can emulate any
@@ -1912,7 +1912,7 @@ end
     <simpara>
       All calls that can take time block the calling fiber
       and can get it preempted. The implementation, however, uses
-      non-blocking cooperative I/O, so Tarantool/Box continues processing
+      non-blocking cooperative I/O, so Tarantool continues processing
       queries while a call is blocked.
       A timeout can be provided for any socket call which can take
       a long time.

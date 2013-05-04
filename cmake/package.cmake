@@ -10,10 +10,9 @@ if ("${CPACK_GENERATOR}" STREQUAL "RPM")
     set (CPACK_RPM_PACKAGE_LICENSE "BSD")
     set (CPACK_RPM_PACKAGE_VENDOR "MAIL.RU")
     set (CPACK_RPM_PACKAGE_DESCRIPTION "
-Tarantool/Box, or simply Tarantool, is a high performance
-in-memory NoSQL database. It supports replication, online backup,
-stored procedures in Lua.")
-    set (CPACK_RPM_PACKAGE_SUMMARY "Tarantool/Box - an efficient in-memory data store")
+Tarantool is a high performance in-memory NoSQL database. It supports
+replication, online backup, stored procedures in Lua.")
+    set (CPACK_RPM_PACKAGE_SUMMARY "Tarantool- an efficient in-memory data store")
     set (CPACK_RPM_PACKAGE_GROUP "Databases")
     set (CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/cmake/rpm_post_install.sh")
     set (CPACK_RPM_SPEC_INSTALL_POST /bin/true)

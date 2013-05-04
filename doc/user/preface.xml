@@ -6,9 +6,9 @@
          xmlns:xlink="http://www.w3.org/1999/xlink">
 <title>Preface</title>
 <section xml:id="preface">
-  <title>Tarantool/Box: an overview</title>
+  <title>Tarantool: an overview</title>
   <para>
-    <productname>Tarantool/Box</productname> is an in-memory NoSQL
+    <productname>Tarantool</productname> is an in-memory NoSQL
     database. The code is available for free under the terms of
     <citetitle
     xlink:href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD
@@ -84,7 +84,7 @@
     itself.
     </para>
     <para>
-    Extended with Lua, Tarantool/Box typically replaces
+    Extended with Lua, Tarantool typically replaces
     more not one but a few existing components with a single
     well-performing system, changing and simplifying complex
     multi-tier Web application architectures.
