@@ -32,7 +32,7 @@
 /*
  * Box - data storage (spaces, indexes) and query
  * processor (INSERT, UPDATE, DELETE, SELECT, Lua)
- * subsystem of Tarantool/Box.
+ * subsystem of Tarantool.
  */
 
 struct txn;

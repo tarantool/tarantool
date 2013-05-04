@@ -70,14 +70,14 @@ tarantool_box --config=tarantool_bug750658.cfg --background
 tarantool_box: --background requires 'logger' configuration option to be set
 
 tarantool_box --version
-Tarantool/Box 1.minor.patch-<rev>-<commit>
+Tarantool 1.minor.patch-<rev>-<commit>
 Target: platform <build>
 Build options: flags
 Compiler: cc
 C_FLAGS: flags
 
 tarantool_box -V
-Tarantool/Box 1.minor.patch-<rev>-<commit>
+Tarantool 1.minor.patch-<rev>-<commit>
 Target: platform <build>
 Build options: flags
 Compiler: cc

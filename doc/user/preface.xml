@@ -6,35 +6,34 @@
          xmlns:xlink="http://www.w3.org/1999/xlink">
 <title>Preface</title>
 <section xml:id="preface">
-  <title>Tarantool/Box: an overview</title>
+  <title>Tarantool: an overview</title>
   <para>
-    <productname>Tarantool/Box</productname>, or simply 
-    <productname>Tarantool</productname>,
-    is a high performance NoSQL database.  The code is
-    available for free under the terms of <citetitle
+    <productname>Tarantool</productname> is an in-memory NoSQL
+    database. The code is available for free under the terms of
+    <citetitle
     xlink:href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD
-    license</citetitle>. Supported platforms are GNU/Linux, Mac OS and
-    FreeBSD.
+    license</citetitle>. Supported platforms are GNU/Linux, Mac OS
+    and FreeBSD.
 
   </para>
 
   <para>
     The server <emphasis role="strong">maintains all its data in
-    random-access memory</emphasis>, and therefore can handle read
-    requests blazingly fast.  At the same time, a copy of the data
+    random-access memory</emphasis>, and therefore has very low read
+    latency. At the same time, a copy of the data
     is kept on non-volatile storage (a disk drive), and inserts
     and updates are performed atomically.
   </para>
 
   <para>
     To ensure atomicity, consistency and crash-safety of the
-    persistent copy, a write-ahead
-    log (WAL) is maintained, and each change is recorded
-    in the WAL before it is considered complete.
+    persistent copy, a write-ahead log (WAL) is maintained, and
+    each change is recorded in the WAL before it is considered
+    complete. The logging subsystem supports group commit.
   </para>
 
   <para>
-    If the update and delete rate is high, a constantly growing
+    If update and delete rate is high, a constantly growing
     write-ahead log file (or files) can pose a disk space problem,
     and significantly increase time necessary to restart from disk.
     A simple solution is employed: the server <emphasis
@@ -48,55 +47,77 @@
   </para>
 
   <para>
-    Tarantool supports replication. Replicas may run locally or
-    on a remote host. Tarantool replication
-    is asynchronous and does not block writes to the
-    master. When or if the master becomes unavailable, the replica
-    can be switched to assume the role of the master.
-  </para>
-
-  <para>
     <emphasis role="strong">Tarantool is lock-free</emphasis>.
-    Instead of the underlying operating system's concurrency
-    primitives, Tarantool uses a cooperative multitasking environment
-    to simultaneously operate on thousands of connections. While
-    this approach limits server scalability to a single CPU core, in
-    practice it removes competition for the memory bus and sets the
-    scalability limit to the top of memory and network throughput.
-    CPU utilization of a typical highly-loaded Tarantool server is
-    under 10%.
+    Instead of the operating system's concurrency primitives, such
+    as threads and mutexes, Tarantool uses a cooperative
+    multitasking environment to simultaneously operate on
+    thousands of connections. A fixed number of independent
+    execution threads within the server do not share state, but
+    exchange data using low overhead message queues. While this
+    approach limits server scalability to a few CPU cores,
+    it removes competition for the memory bus and sets
+    the scalability limit to the top of memory and network
+    throughput.  CPU utilization of a typical highly-loaded
+    Tarantool server is under 10%.
   </para>
 
   <para>
-    The key feature of Tarantool is <emphasis role="strong">support
-    for stored procedures</emphasis>, which
-    can access and modify data atomically. With stored procedures,
-    it's possible to turn Tarantool into a highly
-    flexible and extremely fast social web application server.
+    Unlike most of NoSQL databases, Tarantool supports primary,
+    <emphasis role="strong"> secondary keys, multi-part
+    keys</emphasis>, HASH, TREE and BITSET index types.
+  </para>
+
+  <para>
+    The key feature of Tarantool is <emphasis
+    role="strong">support for Lua stored procedures</emphasis>, which
+    can access and modify data atomically.
+    Procedures can be created, modified and dropped at runtime.
+  </para>
+  <para>
+    Use of Lua as an extension language does not end with stored 
+    procedures: Lua programs can be used during startup, to define
+    triggers and background tasks, interact with networked peers.
+    Unlike popular application development frameworks implemented
+    around "reactor" pattern, networking in server-side Lua is
+    sequential, yet very efficient, as is built on top of the
+    cooperating multitasking environment used by the server
+    itself.
+    </para>
+    <para>
+    Extended with Lua, Tarantool typically replaces
+    more not one but a few existing components with a single
+    well-performing system, changing and simplifying complex
+    multi-tier Web application architectures.
+  </para>
+
+  <para>
+    Tarantool supports replication. Replicas may run locally or on
+    a remote host. Tarantool replication is asynchronous and does
+    not block writes to the master. When or if the master becomes
+    unavailable, the replica can be switched to assume the role of
+    the master without server restart.
   </para>
 
   <para>
     <emphasis role="strong">The software is production-ready</emphasis>.
-    Tarantool has been developed and is actively used at
+    Tarantool has been created and is actively used at
     <citetitle xlink:href="http://api.mail.ru">Mail.Ru</citetitle>,
     one of the leading Russian web content providers. At Mail.Ru,
     the software serves the <quote>hottest</quote>
     data, such as online users and their sessions, online application
     properties, mapping between users and their serving shards,
     and so on.
+   </para>
+   <para>
+   Outside Mail.Ru the software is used by a growing
+    number of projects in online gaming, digital marketing, social
+    media industries. While product development is sponsored by Mail.Ru, the
+    roadmap, bugs database and the development process are fully
+    open. The software incorporates patches from dozens of
+    community contributors, and most of the programming language drivers
+    are written and maintained by the community.
   </para>
 
-  <para>
-    To conclude, Tarantool/Box is ideal for highly volatile and/or
-    frequently accessed Web data. With Tarantool, performance overhead
-    on serving data is minimal: a single server can easily deal with
-    tens or even hundreds of thousands of requests per second.
-    Snapshots can be made when Web user activity is at its lowest,
-    for example at night, and thus add little or no restraint on the
-    top throughput of the system.  If the master becomes
-    unavailable, a replica can assume the role of the master with
-    minimal downtime.
-  </para>
 </section>
 <section>
   <title>Conventions</title>

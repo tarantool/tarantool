@@ -7,7 +7,7 @@
 There are lies, then there is statistics, but the first place in
 misrepresenting the truth is undoubtedly owned by benchmarks.
 
-Comparing Tarantool/Box with other systems, apples to apples, is
+Comparing Tarantool with other systems, apples to apples, is
 not strictly correct: the server networking subsystem is fully
 asynchronous and it's possible to proxy all clients via a single
 socket. In this case, responses to queries are sent as soon they
@@ -25,11 +25,11 @@ this approach at full.
 However, to compare with the rest of the world, a standardized
 benchmarking kit is more appropriate. This is why Yahoo! Cloud
 Serving Benchmark (c) was used to produce the charts
-below. A fork of YCSB with Tarantool/Box support is available
+below. A fork of YCSB with Tarantool support is available
 [here](https://github.com/bigbes92/YCSB). Since YCSB was developed
 to compare cloud key/value servers, it provides a very narrow view
 at performance of a tested server.  For example, performance of
-secondary keys or overhead of locking (which Tarantool/Box doesn't
+secondary keys or overhead of locking (which Tarantool doesn't
 have) is not tested at all.
 
 # What is YCSB

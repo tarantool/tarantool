@@ -47,7 +47,7 @@
  * locks are being held, so it's not possible to call any libeio
  * function inside this callback. Thus coeio_want_poll raises an
  * async event which will be dealt with normally as part of the
- * main Tarantool/Box event loop.
+ * main Tarantool event loop.
  *
  * The async event handler, in turn, performs eio_poll(), which
  * will run on_complete callback for all ready eio tasks.

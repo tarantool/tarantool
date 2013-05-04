@@ -20,7 +20,7 @@
  * a user-supplied allocator.
  *
  * The primary purpose of the library was to spare implementors
- * of Tarantool/Box drivers in other languages, such as Perl,
+ * of Tarantool drivers in other languages, such as Perl,
  * Ruby, Python, etc, from the details of the binary protocol, and
  * also to make it possible to avoid double-buffering by writing
  * directly to/from language objects from/to a serialized binary
@@ -34,13 +34,13 @@
  * multitasking.
  *
  * Before using the library, please get acquainted with
- * Tarnatool/Box binary protocol, documented at
+ * Tarnatool binary protocol, documented at
  * https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt
  *
  * BASIC REQUEST STRUCTURE
  * -----------------------
  *
- * Any request in Tarantool/Box consists of a 12-byte header,
+ * Any request in Tarantool consists of a 12-byte header,
  * containing request type, id and length, and an optional tuple
  * or tuples. Similarly, a response carries back the same request
  * type and id, and then a tuple or tuples.
@@ -64,7 +64,7 @@
  * the tail of the buffer. If the buffer becomes too small to
  * contain the binary stream, the reallocation function is
  * invoked to enlarge the buffer.
- * A buffer can contain multiple requests: Tarantool/Box
+ * A buffer can contain multiple requests: Tarantool
  * handles them all asynchronously, sending responses
  * back as soon as they are ready. The request id can be then
  * used to associate responses with requests.
@@ -170,7 +170,7 @@
 */
 
 /*
- * Copyright (c) 2012-2013 Tarantool/Box AUTHORS
+ * Copyright (c) 2012-2013 Tarantool AUTHORS
  * (https://github.com/mailru/tarantool/blob/master/AUTHORS)
  *
  * Redistribution and use in source and binary forms, with or

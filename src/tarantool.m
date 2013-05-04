@@ -670,7 +670,7 @@ main(int argc, char **argv)
 	binary_filename = argv[0];
 
 	if (gopt(opt, 'V')) {
-		printf("Tarantool/Box %s\n", tarantool_version());
+		printf("Tarantool %s\n", tarantool_version());
 		printf("Target: %s\n", BUILD_INFO);
 		printf("Build options: %s\n", BUILD_OPTIONS);
 		printf("Compiler: %s\n", COMPILER_INFO);

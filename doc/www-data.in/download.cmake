@@ -6,7 +6,7 @@ href="http://tarantool.org/dist">http://tarantool.org/dist</a>.
 
 # How to choose the right version for download
 
-Tarantool/Box uses a 3-digit versioning scheme
+Tarantool uses a 3-digit versioning scheme
 &lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;.
 Major digits change rarely. A minor version increase indicates one
 or few incompatibile changes. Patch verison counter is increased
@@ -162,8 +162,7 @@ The server roadmap is maintained on [Launchpad](http://launchpad.net/tarantool).
 
 ## Connectors
 
-- Perl driver, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.22/lib/DR/Tarantool.pm)
-- Perl driver, alternative implementation: [MR:Tarantool](http://search.cpan.org/~yuran/MR-Tarantool/)
+- Perl driver, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.37/lib/DR/Tarantool.pm)
 - Java driver, [Maven repository](http://dgreenru.github.com/tarantool-java)
 - Ruby driver, [http://github.com/mailru/tarantool-ruby](https://github.com/mailru/tarantool-ruby)
 - Python driver, [http://pypi.python.org/pypi/tarantool](http://pypi.python.org/pypi/tarantool)
@@ -174,7 +173,7 @@ The server roadmap is maintained on [Launchpad](http://launchpad.net/tarantool).
 
 ### Как правильно выбрать версию сервера
 
-Tarantool/Box использует стандартную схему нумерования
+Tarantool использует стандартную схему нумерования
 релизов &lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;.
 
 Первая цифра в версии изменяется крайне редко, по итогам
@@ -196,7 +195,7 @@ Tarantool/Box использует стандартную схему нумер�
 Архив .tar.gz с последний версией исходного кода доступен по следующей
 ссылке:
 <a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-src.tar.gz">tarantool-@PACKAGE_VERSION@-src.tar.gz</a>.
-Файл README.<OS> содержит инструкции по сборке из исходников.
+Файл README.&lt;OS&gt; содержит инструкции по сборке из исходников.
 
 ### Бинарные пакеты
 
@@ -319,8 +318,7 @@ href="http://tarantool.org/dist">http://tarantool.org/dist</a>.
 
 ### Доступ из языков программирования
 
-- Perl driver, [MR:Tarantool](http://search.cpan.org/~yuran/MR-Tarantool/)
-- An alternative Perl driver implementation, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.22/lib/DR/Tarantool.pm)
+- Perl driver [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.37/lib/DR/Tarantool.pm)
 - [Ruby driver](https://github.com/mailru/tarantool-ruby)
 - Python driver, [hosted at pypi.python.org](http://pypi.python.org/pypi/tarantool)
 - PHP driver [https://github.com/mailru/tarantool-php](https://github.com/mailru/tarantool-php)
