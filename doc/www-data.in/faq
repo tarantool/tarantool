@@ -15,10 +15,6 @@ happens to be very easy to embed. Lua coroutines relate very closely to
 Tarantool fibers, and Lua architecture works well with Tarantool internals. 
 Lua is the first, but, hopefully, not the last stored program language for Tarantool.
 
-** Q. Why do I need an in-memory database? **
-
-
-
 **Q. What's the key advantage of Tarantool?**
 
 A. Tarantool provides a fairly rich core feature set (HASH, TREE BITSET indexes, secondary indexes, composite indexes,
