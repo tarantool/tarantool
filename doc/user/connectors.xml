@@ -23,6 +23,13 @@
   </section>
 
   <section>
+    <title>node.js</title>
+    <para>
+       <link xlink:href="https://github.com/devgru/node-tarantool"><filename>http://github.com/devgru/node-tarantool</filename></link>.
+    </para>
+  </section>
+
+  <section>
     <title>Perl</title>
     <para>
        Please refer to CPAN module <link xlink:href='http://search.cpan.org/~unera/DR-Tarantool/'>DR::Tarantool</link>.
