@@ -163,7 +163,7 @@ cooperating multitasking environment used by the server
 itself.
 
 Extended with Lua, Tarantool typically replaces
-more not one but a few existing components with a single
+not one but a few existing components with a single
 well-performing system, changing and simplifying complex
 multi-tier Web application architectures.
 
