@@ -167,6 +167,8 @@ The server roadmap is maintained on [Launchpad](http://launchpad.net/tarantool).
 - Ruby driver, [http://github.com/mailru/tarantool-ruby](https://github.com/mailru/tarantool-ruby)
 - Python driver, [http://pypi.python.org/pypi/tarantool](http://pypi.python.org/pypi/tarantool)
 - PHP driver, [https://github.com/mailru/tarantool-php](https://github.com/mailru/tarantool-php)
+- node.js driver,
+  [https://github.com/devgru/node-tarantool](https://github.com/devgru/node-tarantool)
 - C connector [is maintained in the server source tree](https://github.com/mailru/tarantool/blob/master/connector/c)
 
 {% page download ru %}
@@ -323,3 +325,5 @@ href="http://tarantool.org/dist">http://tarantool.org/dist</a>.
 - Python driver, [hosted at pypi.python.org](http://pypi.python.org/pypi/tarantool)
 - PHP driver [https://github.com/mailru/tarantool-php](https://github.com/mailru/tarantool-php)
 - Java driver, [Maven repository](http://dgreenru.github.com/tarantool-java)
+- node.js driver,
+  [https://github.com/devgru/node-tarantool](https://github.com/devgru/node-tarantool)
