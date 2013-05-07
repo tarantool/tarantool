@@ -1177,8 +1177,27 @@ static void
 port_add_lua_multret(struct port *port, struct lua_State *L)
 {
 	int nargs = lua_gettop(L);
-	for (int i = 1; i <= nargs; ++i)
+	for (int i = 1; i <= nargs; ++i) {
+		int do_multiret = 0;
+		if (lua_istable(L, i)) {
+			lua_pushnil(L);
+			if (lua_next(L, i) != 0) {
+				if (lua_istable(L, -1))
+					do_multiret = 1;
+				lua_pop(L, 2);
+			}
+		}
+		if (do_multiret) {
+			lua_pushnil(L);
+			while (lua_next(L, i) != 0) {
+				int vali = lua_gettop(L);
+				port_add_lua_ret(port, L, vali);
+				lua_pop(L, 1);
+			}
+			continue;
+		}
 		port_add_lua_ret(port, L, i);
+	}
 }
 
 /* }}} */
