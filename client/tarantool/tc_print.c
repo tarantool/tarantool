@@ -100,6 +100,7 @@ static void tc_print_fields(struct tnt_tuple *tu) {
 	while (tnt_next(&ifl)) {
 		if (TNT_IFIELD_IDX(&ifl) != 0)
 			tc_printf(", ");
+		tc_printf("'");
 		char *data = TNT_IFIELD_DATA(&ifl);
 		uint32_t size = TNT_IFIELD_SIZE(&ifl);
 		switch (size) {
@@ -118,6 +119,7 @@ static void tc_print_fields(struct tnt_tuple *tu) {
 				data++;
 			}
 		}
+		tc_printf("'");
 	}
 	if (ifl.status == TNT_ITER_FAIL)
 		tc_printf("<parsing error>");
