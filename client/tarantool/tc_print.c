@@ -112,9 +112,10 @@ static void tc_print_fields(struct tnt_tuple *tu) {
 		default:
 			while (size-- > 0) {
 				if (0x20 <= *data && *data < 0x7f)
-					tc_printf("%c", *data++);
+					tc_printf("%c", *data);
 				else
-					tc_printf("\\0x%02X", *data++);
+					tc_printf("\\x%2X", (unsigned char)*data);
+				data++;
 			}
 		}
 	}
