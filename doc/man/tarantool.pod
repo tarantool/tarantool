@@ -24,11 +24,7 @@ Define server admin port.
 
 =item -C <file>, --cat <file>
 
-Output xlog file or snapshot content.
-
-=item -I, --catin
-
-Output xlog file content from stdin.
+Output xlog file or snapshot content. Filename '-' stands for stdin.
 
 =item -P <file>, --play <file>
 
