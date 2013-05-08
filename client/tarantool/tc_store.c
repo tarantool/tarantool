@@ -98,25 +98,33 @@ static void tc_store_print(struct tnt_log_header_v11 *hdr,
 	}
 }
 
-static int tc_store_printer(struct tnt_iter *i) {
-	struct tnt_request *r = TNT_IREQUEST_PTR(i);
+static int tc_store_check_skip(struct tnt_iter *i, struct tnt_request *r) {
 	struct tnt_stream_xlog *s =
 		TNT_SXLOG_CAST(TNT_IREQUEST_STREAM(i));
 	if (tc.opt.space_set) {
 		if (r->h.type == TNT_OP_CALL)
-			return 0;
+			return 1;
 		uint32_t ns = *(uint32_t*)&r->r;
 		if (ns != tc.opt.space)
-			return 0;
+			return 1;
 	}
 	if (tc.opt.lsn_from_set) {
 		if (s->log.current.hdr.lsn < tc.opt.lsn_from)
-			return 0;
+			return 1;
 	}
 	if (tc.opt.lsn_to_set) {
 		if (s->log.current.hdr.lsn > tc.opt.lsn_to)
-			return 0;
+			return 1;
 	}
+	return 0;
+}
+
+static int tc_store_printer(struct tnt_iter *i) {
+	struct tnt_request *r = TNT_IREQUEST_PTR(i);
+	if (tc_store_check_skip(i, r))
+		return 0;
+	struct tnt_stream_xlog *s =
+		TNT_SXLOG_CAST(TNT_IREQUEST_STREAM(i));
 	((tc_printerf_t)tc.opt.printer)(&s->log.current.hdr, r);
 	return 0;
 }
@@ -214,6 +222,8 @@ int tc_store_cat(void)
 
 static int tc_store_resender(struct tnt_iter *i) {
 	struct tnt_request *r = TNT_IREQUEST_PTR(i);
+	if (tc_store_check_skip(i, r))
+		return 0;
 	if (tc.net->write_request(tc.net, r) == -1)
 		return tc_store_error("failed to write request");
 	char *e = NULL;
