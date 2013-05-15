@@ -13,7 +13,7 @@
   a degraded state.
 </para></blockquote>
 
-<section>
+<section xml:id="replication-architecture">
     <title>Replication architecture</title>
   <para>
     A replica gets all updates from the master by continuously
@@ -55,7 +55,7 @@
   </para>
 </section>
 
-<section>
+<section xml:id="setting-up-the-master">
   <title>Setting up the master</title>
   <para>
     To prepare the master for connections from replica, it's only
@@ -67,7 +67,7 @@
     has its own replication state.
   </para>
 </section>
-<section>
+<section xml:id="settin-up-a-replica">
   <title>Setting up a replica</title>
   <para>
     The server, master or replica, always requires a valid
@@ -102,7 +102,7 @@
   </simpara></note>
 
 </section>
-<section>
+<section xml:id="recovering-from-a-degraded-state">
   <title>Recovering from a degraded state</title>
   <para>
     "Degraded state" is a situation when the master becomes

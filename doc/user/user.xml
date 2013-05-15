@@ -15,6 +15,7 @@
 <xi:include href="replication.xml"/>
 <xi:include href="configuration-reference.xml"/>
 <xi:include href="connectors.xml"/>
+<xi:include href="os-install-notes.xml"/>
 <xi:include href="proctitle.xml"/>
 <xi:include href="errcode.xml"/>
 <!--

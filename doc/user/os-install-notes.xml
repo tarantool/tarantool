@@ -1,0 +1,56 @@
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="os-install-notes">
+
+<title>System-specific installation notes</title>
+<blockquote><para>
+  This chapter provides a cheatsheet for most common server management
+  routines on every supported operating system.
+</para></blockquote>
+
+  <section xml:id="Debian">
+    <title>Debian GNU/Linux and Ubuntu</title>
+    <para>
+        Setting up an instance: ln -s /etc/tarantool/instances.available/instance-name.cfg /etc/tarantool/instances.enabled/
+    </para>
+    <para>
+        Starting all instances: service tarantool start
+    </para>
+    <para>
+        Stopping all instances: service tarantool stop
+    </para>
+    <para>
+        Starting/stopping one instance: service tarantool-instance-name start/stop
+    </para>
+  </section>
+  <section xml:id="rpm-based-distros">
+    <title>Fedora, RHEL, CentOS</title>
+    <para>
+        tba
+    </para>
+  </section>
+
+  <section xml:id="FreeBSD">
+    <title>FreeBSD</title>
+    <para>
+        tba
+    </para>
+  </section>
+
+  <section xml:id="mac-os-x">
+    <title>Mac OS X</title>
+    <para>
+        tba
+    </para>
+  </section>
+
+</chapter>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

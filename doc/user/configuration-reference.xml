@@ -25,7 +25,7 @@ the command line, or from the configuration file, but never from
 both.
 </para>
 
-<section>
+<section xml:id="command-line-options">
 <title>Command line options</title>
   <para>
     Tarantool follows the <citetitle
@@ -301,6 +301,17 @@ lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 
           turn off the coredump off when using ulimit</entry>
         </row>
 -->
+        <row>
+          <entry xml:id="bind_ipaddr" xreflabel="bind_ipaddr">bind_ipaddr</entry>
+          <entry>string</entry>
+          <entry><emphasis role="strong">"INADDR_ANY"</emphasis></entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>The network interface to bind to. By default,
+          the server binds to all available addresses.
+          Applies to all ports opened by the server.
+          </entry>
+        </row>
         <row>
           <entry xml:id="primary_port" xreflabel="primary_port">primary_port</entry>
           <entry>integer</entry>
@@ -828,12 +839,8 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
             xreflabel="memcached_expire"/>
             Turn on tuple time-to-live support in
             <olink targetptr="memcached_space"/>. This
-            effectively turns Tarantool into a "persistent" implementation
-            of Memcached. Since a caching server has
-            significantly different purpose than a data server, in
-            this mode Tarantool turns off replication and does not
-            bind to <olink targetptr="primary_port"/> or <olink
-            targetptr="secondary_port"/>.
+            effectively turns Tarantool into a persistent,
+            replicated and scriptable implementation of Memcached.
           </entry>
         </row>
 
