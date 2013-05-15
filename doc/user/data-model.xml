@@ -3,26 +3,67 @@
 %tnt;
 ]>
 <section xmlns="http://docbook.org/ns/docbook" version="5.0"
-         xmlns:xlink="http://www.w3.org/1999/xlink">
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="dynamic-data-model">
 <title>Dynamic data model</title>
 <para>
   Tarantool data is organized in <emphasis>tuples</emphasis>. Tuple
   length is varying: a tuple can contain any number
   of fields. A field can be either numeric &mdash;
   32- or 64- bit unsigned integer, or binary
-  string &mdash; a sequence of octets.  Fields included into the
-  first index are always assumed to be the identifying (unique)
-  key. The remaining fields make up a value, associated with the
-  key.
-  Tuple sets are called <emphasis>spaces<alt>perhaps, not the best name</alt></emphasis>, and there can be up to 255 spaces defined per
-  one Tarantool instance.
+  string &mdash; a sequence of octets.
+  Tuples are stored and retrieved by means of indexing. An index
+  can cover one or multiple fields, in any order. Fields included
+  into the first index are always assumed to be the identifying
+  (unique) key. The remaining fields make up a value, associated
+  with the key. 
 
   Apart from the primary key, it is possible to define secondary
-  <emphasis>indexes</emphasis> on other tuple fields. A secondary index does
-  not have to be unique, and can cover several fields.
-  If a space has a secondary index, the total number of fields in
-  a tuple must be at least equal to the ordinal number of the
-  field participating in the index.
+  <emphasis>indexes</emphasis> on other tuple fields.
+
+  Tuple sets together with defined indexes form
+  <emphasis>spaces<alt>the paradigm of tuples and spaces is
+  derived from distributed computing</alt></emphasis>.
+
+  A secondary index does not have to be unique, and can cover
+  multiple fields. The total number of fields in a tuple must be
+  at least equal to the ordinal number of the last field
+  participating in any index.
+</para>
+<para>
+  Supported index types are HASH, TREE and BITSET. HASH
+  index is the fastest one, with smallest memory footprint.
+  TREE index, in addition to key/value look ups, support partial
+  key lookups, key-part lookups for multipart keys and ordered
+  retrieval. BITSET indexes, while can serve as a standard unique
+  key, are best suited for bit-pattern look-ups, e.g. search for
+  objects satisfying multiple properties.
+</para>
+<para>
+  The basic server operations include insert, replace, delete,
+  update and select. All operations that modify data require
+  the primary key for look up. Select, however, may use any index.
+  A Lua stored procedure can combine multiple trivial commands,
+  as well as access data using index iterators. Indeed,
+  the iterators provide full access to the power of indexes,
+  enabling index-type specific access, such as boolean expression
+  evaluation for BITMAP indexes, or reverse range retrieval for
+  TREEs.
+</para>
+<para>
+  All operations in Tarantool are atomic and durable: they are
+  either executed and written to the write ahead log, or rolled back.
+  A stored procedure, containing a combination of basic operations,
+  holds a consistent view of the database as long as it doesn't 
+  incur writes to the write ahead log or to network. In particular,
+  a select followed by an update or delete is atomic. 
+</para>
+<para>
+  While the subject of each data changing command is a
+  single tuple, an update may modify one or more tuple fields, as
+  well as add or delete fields, all in one command. It thus
+  provides an alternative way to achieve multi-operation
+  atomicity.
 </para>
 <para>
   Currently, entire server <emphasis>schema</emphasis> must be
@@ -31,8 +72,8 @@
   file that doesn't match contents of its data directory will most
   likely crash, but may also behave in a non-defined way. 
   It is, however, possible to stop the server,
-  add new spaces to the schema or temporarily disable
-  existing spaces, and then restart the server.
+  add new spaces and indexes to the schema or temporarily disable
+  existing spaces and indexes, and then restart the server.
 </para>
 <para>
   Schema objects, such as spaces and indexes, are referred to
@@ -47,8 +88,8 @@
   only one space with id <literal>0</literal>. It has no keys
   other than the primary. The primary key numeric id is also 
   <literal>0</literal>. Tarantool command line client
-  supports a small subset of SQL, and we'll use it to demonstrate
-  supported data manipulation commands:
+  supports a small subset of SQL, and it'll be used it to
+  demonstrate supported data manipulation commands:
   <programlisting>
   localhost> insert into t0 values (1)
   Insert OK, 1 row affected

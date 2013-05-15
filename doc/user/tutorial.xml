@@ -1,20 +1,36 @@
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
-         xmlns:xlink="http://www.w3.org/1999/xlink">
+         xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="getting-started">
 <title>Getting started</title>
 <blockquote><para>
-  This chapter describes the contents
-  of binary and source package download, explains how to
-  start or stop the server, and explains how to connect to it with
-  a command line client.
+  This chapter describes installation procedures, the contents of
+  binary and source package download, explains how to start,
+  stop the server or connect to it with a command line client.
 </para></blockquote>
 
 <para>
-  Tarantool is distributed in binary and source code form.
+  To install Tarantool, check out instructions on the project
+  <citetitle xlink:href="http://tarantool.org/download.html"
+  xlink:title="Download Tarantool">download page</citetitle>. For
+  many distributions the server and the command line client are
+  available from the distribution's upstream. Local repositories
+  for popular Linux distributions, as well as a FreeBSD port
+  and a Mac OS X "homebrew" recipe are also available online.
+  The online archive is automatically refreshed on each push
+  into the stable branch of the server. Please follow
+  <olink targetptr="os-install-notes">distribution-specific
+  instructions</olink> to find out how to manage
+  Tarantool instances on your operating system.
+</para>
+<para>
+  The easiest way to try Tarantool without installing it is by
+  downloading a binary or source package tarball.
   Binary packages use <filename>tarantool-<replaceable>&lt;version&gt;</replaceable>-<replaceable>&lt;OS&gt;</replaceable>-<replaceable>&lt;machine&gt;</replaceable>.tar.gz</filename> naming scheme. Source packages are
   named simply <filename>tarantool-<replaceable>&lt;version&gt;</replaceable>-src.tar.gz</filename>.
   You can find out the canonical name of your operating system
   and machine type with <command>uname -o</command> and <command>uname
--m</command> respectively.
+-m</command> respectively. The programs included into the binary
+  tarball are linked statically to not have any external dependencies.
+
   Besides the downloaded package, you will need the following
   software:
 
@@ -45,6 +61,8 @@
   After download, unpack the binary package, a new directory will be created:
   <programlisting>
   <prompt>$ </prompt><command>tar</command> <option>zxvf</option> <filename><replaceable><replaceable>package-name</replaceable></replaceable>.tar.gz</filename></programlisting>
+  To remove a binary tarball package, simply drop the directory
+  containing the unpacked files.
   The binary download contains just two subdirectories:
   <filename>bin</filename> and <filename>doc</filename>.
   The server, by default, looks for its configuration file in
@@ -93,7 +111,7 @@
   of optional features:
   <programlisting>
   -- *** The following options are on in this configuration: ***
-  -- ENABLE_CLIENT: true 
+  -- ENABLE_CLIENT: true
   -- ENABLE_GCOV: ON
   -- ENABLE_TRACE: ON
   -- ENABLE_BACKTRACE: ON

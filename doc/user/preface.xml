@@ -3,9 +3,9 @@
 %tnt;
 ]>
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
-         xmlns:xlink="http://www.w3.org/1999/xlink">
+         xmlns:xlink="http://www.w3.org/1999/xlink" xml:id="preface">
 <title>Preface</title>
-<section xml:id="preface">
+<section xml:id="tarantool-overview">
   <title>Tarantool: an overview</title>
   <para>
     <productname>Tarantool</productname> is an in-memory NoSQL
@@ -119,7 +119,7 @@
   </para>
 
 </section>
-<section>
+<section xml:id="manual-conventions">
   <title>Conventions</title>
   <para>
     This manual is written in <citetitle
@@ -154,14 +154,14 @@
 
   </para>
 </section>
-<section>
+<section xml:id="reporting-bugs">
   <title>Reporting bugs</title>
   <para>
     Please report bugs in Tarantool at <link
     xlink:href="http://bugs.launchpad.net/tarantool"/>. You can
     contact developers directly on
     <link xlink:href="irc://irc.freenode.net#tarantool">#tarantool</link>
-    IRC channel or via mailing list,
+    IRC channel or via a mailing list,
     <link xlink:href="https://launchpad.net/~tarantool-developers">tarantool-developers@lists.launchpad.net</link>.
   </para>
   <para>

@@ -1,0 +1,72 @@
+<!DOCTYPE section [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<section xmlns="http://docbook.org/ns/docbook" version="5.0"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xml:id="triggers">
+  <title>Defining triggers in Lua</title>
+<blockquote>
+    <para>
+        Triggers are Lua scripts invoked by the system upon
+        a certain event. Tarantool currently only supports
+        system-wide triggers, run when a new connection
+        is established or dropped. Since trigger body is
+        a Lua script, it is external to the server, and
+        a trigger must be set up on each server start.
+        This is most commonly done in <olink
+        targetptr="init.lua">the initialization script</olink>.
+        Once a trigger for an event exists, it is automatically
+        invoked whenever an event occurs.  The performance
+        overhead of triggers, as long as they are not defined, is
+        minimal: merely a pointer dereference and check. If a
+        trigger is defined, its overhead is equivalent to the
+        overhead of calling a stored procedure.
+    </para>
+</blockquote>
+<section xml:id="sp-box-session-triggers" xreflabel="session triggers">
+    <title>Triggers on connect and disconnect</title>
+<variablelist>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.session.on_connect(chunk) </emphasis>
+        </term>
+        <listitem><para>
+		Set a callback (trigger) invoked on each connected session.
+        The callback doesn't get any arguments, but is the first
+        thing invoked in the scope of the newly created session.
+        If the trigger fails by raising an error, the error
+        is sent to the client and the connection is shut down.
+        Returns the old value of the trigger.
+        </para>
+        <warning>
+        <para>
+        If a trigger always results in an error, it may become
+        impossible to connect to the server to reset it.
+        </para>
+        </warning>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.session.on_disconnect(chunk)</emphasis>
+        </term>
+        <listitem><simpara>Set a trigger invoked after a client has
+        disconnected. Returns the old value of the trigger. If
+        the trigger raises an error, the error is logged but otherwise
+        is ignored. The trigger is invoked while the session associated
+        with the client still exists and can access session properties,
+        such as id.
+        </simpara></listitem>
+    </varlistentry>
+</variablelist>
+</section>
+
+</section>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->

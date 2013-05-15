@@ -16,7 +16,9 @@
         server-side procedure written in Lua can select and modify
         data, access configuration and perform administrative
         tasks. It is possible to dynamically define, invoke,
-        alter and drop Lua procedures.
+        alter and drop Lua procedures. Lua procedures can run
+        in the background and perform administrative tasks,
+        such as data expiration and re-sharding.
 
     </para>
     <para>
@@ -105,7 +107,22 @@ expirationd.run_task("exprd space 0", 0, is_expired, purge,
                     { field_no = 1, ttl = 30 * 60 })
 ]]>
     </programlisting>
+ </para>
+ <para>
+    The initialization script can select and modify data. However,
+    if the server is a running replica, data change requests from
+    the start script fail just the same way they would fail if
+    were sent from a remote client.
   </para>
+ <para>
+   Another common task to perform in the initialization script
+   is to start background fibers for data expiration, re-sharding,
+   or communication with networked peers.
+ </para>
+ <para>
+   Finally, the script can be used to define Lua triggers run
+   on various events within the system.
+ </para>
 
   <para>
     There is a single global instance of the Lua interpreter, which is
@@ -122,12 +139,11 @@ expirationd.run_task("exprd space 0", 0, is_expired, purge,
     &mdash; set of local variables and definitions.
   </para>
   <para>
-    The interpreter environment is not restricted when
+     The interpreter environment is not restricted when
      <olink targetptr="init.lua"/> is loaded. But before the
      server starts accepting requests, the standard Lua APIs, such
      as for file I/O, process control and module management are
-     unset, to avoid possible trivial security attacks, and
-     Tarantool-specific libraries are loaded.
+     unset, to avoid possible trivial security attacks.
   </para>
   <para>
     In the binary protocol, it's only possible to <emphasis
@@ -187,6 +203,10 @@ Call OK, 2 rows affected
 localhost> call box.space[0]:truncate()
 error: 1:15 expected '('
 </computeroutput></programlisting>
+    Since it's impossible to invoke object methods from the binary
+    protocol, the object-oriented syntax is often used on purpose,
+    to restrict certain operations to be used by a system
+    administrator only.
   </para>
   <para>
     Every value, returned from a stored function by means of
@@ -339,6 +359,16 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
                 <bridgehead renderas="sect4">Errors</bridgehead>
                 Any server error produced by the executed
                 command.
+            </para>
+            <para>
+                Please note, that since all requests from Lua
+                enter the core through <emphasis
+                role="lua">box.process()</emphasis>, all checks
+                and triggers run by the core automatically apply.
+                For example, if the server is in read-only mode,
+                an update or delete fails. Analogously, if a
+                system-wide "instead of" trigger is defined, it
+                is run.
             </para>
         </listitem>
     </varlistentry>
@@ -1091,7 +1121,7 @@ localhost> lua t:find(1, 'abc')
     <varlistentry>
         <term><emphasis role="lua">box.tuple.new(...)</emphasis></term>
         <listitem><para>
-        Construct a new tuple from a Lua table or a scalar. 
+        Construct a new tuple from a Lua table or a scalar.
         </para>
             <bridgehead renderas="sect4">Example</bridgehead>
             <programlisting>localhost> lua box.tuple.new({tonumber64('18446744073709551615'), 'string', 1})
@@ -1669,39 +1699,12 @@ event.
         <listitem><simpara>Return true if a session is alive,
         false otherwise.</simpara></listitem>
     </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.session.on_connect(chunk) </emphasis>
-        </term>
-        <listitem><para>
-		Set a callback (trigger) invoked on each connected session.
-        The callback doesn't get any arguments, but is the first
-        thing invoked in the scope of the newly created session.
-        If the trigger fails by raising an error, the error
-        is sent to the client and the connection is shut down.
-        Returns the old value of the trigger.
-        </para>
-        <warning>
-        <para>
-        If a trigger always results in an error, it may become
-        impossible to connect to the server to reset it.
-        </para>
-        </warning>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.session.on_disconnect(chunk)</emphasis>
-        </term>
-        <listitem><simpara>Set a trigger invoked after a client has
-        disconnected. Returns the old value of the trigger. If
-        the trigger raises an error, the error is logged but otherwise
-        is ignored.
-        </simpara></listitem>
-    </varlistentry>
 </variablelist>
+    <para>
+This module also makes it possible to define triggers on connect
+and disconnect events. Please see <olink targetptr="sp-box-session-triggers">
+the triggers chapter</olink> for details.
+    </para>
 </section>
 
 <!--   end of lib -->

@@ -3,7 +3,8 @@
 %tnt;
 ]>
 <section xmlns="http://docbook.org/ns/docbook" version="5.0"
-         xmlns:xlink="http://www.w3.org/1999/xlink">
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xml:id="data-persistence">
 <title>Data persistence</title>
 <para>
 To maintain data persistence, Tarantool writes each data change
@@ -11,7 +12,8 @@ request (INSERT, UPDATE, DELETE) into a write-ahead log. WAL
 files have extension <filename>.xlog</filename> and are stored in <olink
 targetptr="wal_dir"/>. A new WAL file is created for every <olink
 targetptr="rows_per_wal"/> records.  Each INSERT, UPDATE or DELETE
-gets assigned a continuously growing 64-bit log sequence number. The name of the log file is based on the log sequence
+gets assigned a continuously growing 64-bit log sequence number.
+The name of the log file is based on the log sequence
 number of the first record this file contains.
 </para>
 
@@ -40,8 +42,8 @@ example:
     match the type of the index, the change is aborted.
     </para></listitem>
     <listitem><para>
-    The new tuple is marked 'invisible' and is added to
-    the primary and secondary indexes.
+    The new tuple replaces the old tuple in all
+    existing indexes.
     </para></listitem>
     <listitem><para>
     A message is sent to <quote>wal_writer</quote>, running in a
@@ -50,21 +52,36 @@ example:
     until an acknowledgment from the WAL writer.
     </para></listitem>
     <listitem><para>
-    Upon success, the 'invisible' flag is cleared
-    and the original tuple is deleted. A response is sent to the
-    client. Upon failure, the new tuple is removed and <olink
-    targetptr="ER_WAL_IO"/> error is sent to the client.
+    Upon success, a confirmation is sent to the client that
+    a REPLACE has succeeded.
+    Upon failure, a rollback procedure is begun.
+    During the rollback procedure, all changes to the database
+    which occurred after the failed change are rolled back in reverse
+    order. No new change is applied while rollback is in progress.
+    When the rollback procedure is finished, 
+    <olink targetptr="ER_WAL_IO"/> error is sent to the client.
     </para></listitem>
 </orderedlist>
 </para>
 
 <para>
-The master and the WAL writer threads communicate using asynchronous (yet reliable)
-messaging; the master thread, not being blocked on
-WAL tasks, continues to handle requests quickly
-even at hight volumes of disk I/O. For instance, SELECT performance,
-provided SELECTs are run in their own connections, remains
-unaffected by disk load.
+One advantage of the described algorithm is that complete request
+pipelining is achieved, even for requests on the same primary key.
+In Tarantool, unlike in most database systems, database performance
+doesn't degrade even if all requests touch upon the same key in the
+same space.
+</para>
+
+<para>
+The master and the WAL writer threads communicate using
+asynchronous (yet reliable) messaging; the master thread, not
+being blocked on WAL tasks, continues to handle requests quickly
+even at high volumes of disk I/O. A response to a request
+is sent as soon as it is ready, even if there were earlier
+requests on the same connection which have not completed yet.
+For instance, SELECT performance, even for SELECTs running 
+on the same connection as UPDATEs and DELETEs, remains unaffected
+by disk load.
 </para>
 
 <para>

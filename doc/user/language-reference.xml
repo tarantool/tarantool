@@ -17,12 +17,12 @@
   Unlike many other key/value servers, Tarantool uses
   different TCP ports and client/server protocols for data
   manipulation and administrative statements.
-  On start up, the server can connect to up to five TCP ports:
+  During start up, the server can connect to up to five TCP ports:
   <itemizedlist>
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
-      DELETEs, SELECTs and CALLs. This port speaks the native
-      Tarantool protocol, and provides full access to the server.
+      DELETEs, SELECTs and CALLs. This port speaks the 
+      <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>, and provides full access to the server.
       </para>
       <para>
       The default value of the port is <literal>33013</literal>,
@@ -60,7 +60,7 @@
   SHOW, RELOAD, SAVE and other statements are sent to the administrative port.
 </para>
 
-<section>
+<section xml:id="data-manipulation">
   <title>Data manipulation</title>
 
   <para>Tarantool protocol was designed with focus on asynchronous
@@ -72,17 +72,18 @@
     Five basic request types are supported: INSERT, UPDATE,
     DELETE, SELECT and CALL. The mandatory length, present in the
     header, allows simplifying client or proxy I/O.
-    The server response to a request always carries in its header
-    the same request type and id.
-    The id makes it possible to always match a request to a
-    response, even if the latter arrived out of order.
+    A response to a request is sent to the client as soon as it is
+    ready. It always carries in its header the same type
+    and id as in the request. The id makes it possible to
+    match a request to a response, even if the latter arrived out
+    of order.
   </para>
   <para>Request type defines the format of the payload.
     INSERTs, UPDATEs and DELETEs can only be made by the primary key, so
-    an index id and key value are always present in these requests.
-    SELECTs can use secondary keys. UPDATE only needs to
-    list the fields that are actually changed. With this one
-    exception, all commands operate on whole tuple(s).
+    an index id and a key (possibly multipart) are always present
+    in these requests. SELECTs can use secondary keys. UPDATE
+    only needs to list the fields that are actually changed. With
+    this one exception, all commands operate on whole tuple(s).
   </para>
   <para>Unless implementing a client driver, one needn't
     concern oneself with the complications of the binary
@@ -97,7 +98,7 @@
     and
     <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link> respectively.
   </para>
-  <section>
+  <section xml:id="memcached-protocol">
     <title>Memcached protocol</title>
       <para>If full access to Tarantool functionality is not needed,
       or there is no readily available connector for the
@@ -111,15 +112,22 @@
       targetptr="memcached_space"/>) via its primary key.
       Unless tuple expiration is enabled with <olink
       targetptr="memcached_expire"/>, TTL part of the message is
-      stored but ignored. Note, that we do not support the binary
+      stored but ignored. Note, that Tarantool does not support the binary
       protocol of Memcached. If top performance
       is a must, Tarantool's own binary protocol should be
       used.
-  </para>
+     </para>
+     <para>
+       Notice, that <olink targetptr="memcached_space"/> is also
+       accessible using the primary port or Lua. A common use
+       of the memcached API in Tarantool is when a Memcached default
+       expiration algorithm is insufficient, and a custom expiration
+       procedure is scripted in Lua.
+     </para>
   </section>
 </section>
 
-<section>
+<section xml:id="administrative-console">
   <title>Administrative console</title>
   <para>
     The administrative console uses a simple text protocol.
@@ -157,7 +165,7 @@
         consistent snapshot of all tuples in the child process,
         which is then written to disk tuple by tuple. Since a
         snapshot is written sequentially, you can expect a very
-        high write performance (averaging to 70MB/second on modern
+        high write performance (averaging to 80MB/second on modern
         disks), which means an average database instance gets
         saved in a matter of minutes.  Note, that as long as there
         are any changes to the parent memory through concurrent
@@ -258,8 +266,9 @@ info:
         <emphasis role="tntadmin">show stat</emphasis>
       </term>
       <listitem><para>
-      Show the average number of requests per second, and the total number of requests since startup,
-      broken down by request type: INSERT or SELECT or UPDATE or DELETE."
+      Show the average number of requests per second, and the
+      total number of requests since startup, broken down by
+      request type: INSERT or SELECT or UPDATE or DELETE."
 <programlisting>
 localhost> show stat
 ---
@@ -347,6 +356,7 @@ statistics:
 </section>
 
 <xi:include href="stored-procedures.xml" />
+<xi:include href="triggers.xml" />
 
 </chapter>
 
