@@ -160,7 +160,7 @@ macro(luajit_build)
         )
     else()
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit
-            COMMAND mkdir ${PROJECT_BINARY_DIR}/third_party/luajit
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/third_party/luajit"
         )
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
