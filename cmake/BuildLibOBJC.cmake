@@ -34,7 +34,7 @@ macro(libobjc_build)
     separate_arguments(extra_ldflags)
     if (NOT (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR}))
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/libobjc
-            COMMAND mkdir -p ${PROJECT_BINARY_DIR}/third_party/libobjc
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/third_party/libobjc"
             COMMAND cp -r ${PROJECT_SOURCE_DIR}/third_party/libobjc/*
                 ${PROJECT_BINARY_DIR}/third_party/libobjc
         )
