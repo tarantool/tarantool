@@ -44,7 +44,8 @@
   update and select. All operations that modify data require
   the primary key for look up. Select, however, may use any index.
   A Lua stored procedure can combine multiple trivial commands,
-  as well as access data using index iterators. Indeed,
+  as well as access data using <olink
+  targetptr="box.index.iterator">index iterators</olink>. Indeed,
   the iterators provide full access to the power of indexes,
   enabling index-type specific access, such as boolean expression
   evaluation for BITMAP indexes, or reverse range retrieval for

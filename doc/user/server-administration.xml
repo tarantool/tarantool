@@ -4,9 +4,28 @@
 ]>
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
          xmlns:xlink="http://www.w3.org/1999/xlink"
-         xml:id="os-install-notes">
+         xml:id="server-administration">
+<title>Server administration</title>
+<para>
+    Typical server administration tasks include starting and stopping
+    the server, reloading configuration, taking snapshots, log rotation.
+</para>
+<section xml:id="signal-handling">
+<title>Server signal handling</title>
+<para>
+  The server is configured to gracefully shutdown on SIGTERM and
+  SIGINT (keyboard interrupt) or SIGHUP. SIGUSR1 can be used to
+  save a snapshot.
+  All other signals are blocked or ignored.
+  The signals are processed in the main event loop. Thus, if the
+  control flow never reaches the event loop (thanks to a runaway stored
+  procedure), the server stops responding to any signal, and
+  can be only killed with SIGKILL (this signal can not be ignored).
 
-<title>System-specific installation notes</title>
+</para>
+</section>
+<section xml:id="os-install-notes">
+<title>System-specific administration notes</title>
 <blockquote><para>
   This chapter provides a cheatsheet for most common server management
   routines on every supported operating system.
@@ -47,6 +66,8 @@
         tba
     </para>
   </section>
+
+</section>
 
 </chapter>
 

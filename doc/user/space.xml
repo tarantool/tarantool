@@ -49,9 +49,6 @@ struct space_t
   unsigned int estimated_rows;
   struct index_t index[];
 };
-
-/* You can define up to 255 spaces. */
-struct space_t space[];
 </programlisting>
 The way a space is defined in a configuration file is similar to how
 you would initialize a C structure in a program. For example,

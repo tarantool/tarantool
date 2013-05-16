@@ -11,14 +11,17 @@ a file name, a detailed reason or operating system error code.
 All such messages, however, are logged in the error log. When
 using <emphasis role="strong">Memcached</emphasis> protocol, the error message is sent to the
 client along with the code. Below follow only general descriptions
-of existing codes.</para>
+of some popular codes. A complete list of errors can be found in
+file <filename xlink:href="https://github.com/mailru/tarantool/blob/master/include/errcode.h">errcode.h</filename> in the source tree.
+
+</para>
 <variablelist>
 <title>List of error codes</title>
 
   <varlistentry>
     <term xml:id="ER_NONMASTER" xreflabel="ER_NONMASTER">ER_NONMASTER</term>
-    <listitem><para>Attempt to execute an update over the
-    secondary (read-only) port or on a running replica.
+    <listitem><para>Attempt to execute an update on a running
+    replica.
     </para></listitem>
   </varlistentry>
 
@@ -26,12 +29,6 @@ of existing codes.</para>
     <term xml:id="ER_ILLEGAL_PARAMS" xreflabel="ER_ILLEGAL_PARAMS">ER_ILLEGAL_PARAMS</term>
     <listitem><para>Illegal parameters. Malformed protocol
     message.
-    </para></listitem>
-  </varlistentry>
-
-  <varlistentry>
-    <term xml:id="ER_TUPLE_IS_RO" xreflabel="ER_TUPLE_IS_RO">ER_TUPLE_IS_RO</term>
-    <listitem><para>A parallel update of a tuple is in progress. Try again.
     </para></listitem>
   </varlistentry>
 
@@ -50,8 +47,8 @@ of existing codes.</para>
 
   <varlistentry>
     <term xml:id="ER_INDEX_VIOLATION" xreflabel="ER_INDEX_VIOLATION">ER_INDEX_VIOLATION</term>
-    <listitem><para>A unique index constraint violation: a tuple with the same
-    key is already present in the index.
+    <listitem><para>A unique index constraint violation: a tuple
+    with the same key is already present in the index.
     </para></listitem>
   </varlistentry>
 

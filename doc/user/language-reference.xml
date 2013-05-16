@@ -21,7 +21,7 @@
   <itemizedlist>
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
-      DELETEs, SELECTs and CALLs. This port speaks the 
+      DELETEs, SELECTs and CALLs. This port speaks the
       <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>, and provides full access to the server.
       </para>
       <para>
@@ -63,20 +63,42 @@
 <section xml:id="data-manipulation">
   <title>Data manipulation</title>
 
+  <para>
+    Five basic request types are supported: INSERT, UPDATE,
+    DELETE, SELECT and CALL. All requests, including
+    INSERT, UPDATE and DELETE may return data. A SELECT can be
+    requested to limit the number of returned tuples. This is
+    useful when a SELECT is done over a non-unique or multipart
+    index.
+ </para>
+  <para>
+    UPDATE statement supports operations on fields &mdash;
+    assignment, arithmetic operations (the field must be numeric),
+    cutting and pasting fragments of a field, &mdash; as well as
+    operations on a tuple: push and pop of a field at the tail of
+    a tuple, deletion and insertion of a field.  Multiple
+    operations can be combined into a single update, and in this
+    case they are performed atomically. Each operation expects
+    field number as its first argument. When a sequence of changes
+    is present, field identifier in each operation is assumed to
+    be relative to the most recent state of the tuple, i.e. as if
+    all previous operations in a multi-operation update have
+    already been applied. In other words, it's always safe to
+    merge multiple UPDATE statements into a single one, with no
+    change in semantics.
+  </para>
   <para>Tarantool protocol was designed with focus on asynchronous
     I/O and easy integration with proxies. Each client
     request starts with a 12-byte binary header, containing three
     fields: request type, length, and a numeric id.
   </para>
-  <para>
-    Five basic request types are supported: INSERT, UPDATE,
-    DELETE, SELECT and CALL. The mandatory length, present in the
-    header, allows simplifying client or proxy I/O.
-    A response to a request is sent to the client as soon as it is
-    ready. It always carries in its header the same type
-    and id as in the request. The id makes it possible to
-    match a request to a response, even if the latter arrived out
-    of order.
+ <para>
+    The mandatory length, present in request header simplifies
+    client or proxy I/O.  A response to a request is sent to the
+    client as soon as it is ready. It always carries in its header
+    the same type and id as in the request. The id makes it
+    possible to match a request to a response, even if the latter
+    arrived out of order.
   </para>
   <para>Request type defines the format of the payload.
     INSERTs, UPDATEs and DELETEs can only be made by the primary key, so
@@ -112,17 +134,19 @@
       targetptr="memcached_space"/>) via its primary key.
       Unless tuple expiration is enabled with <olink
       targetptr="memcached_expire"/>, TTL part of the message is
-      stored but ignored. Note, that Tarantool does not support the binary
-      protocol of Memcached. If top performance
-      is a must, Tarantool's own binary protocol should be
-      used.
+      stored but ignored.
      </para>
      <para>
        Notice, that <olink targetptr="memcached_space"/> is also
        accessible using the primary port or Lua. A common use
-       of the memcached API in Tarantool is when a Memcached default
-       expiration algorithm is insufficient, and a custom expiration
-       procedure is scripted in Lua.
+       of the Memcached port in Tarantool is when a Memcached default
+       expiration algorithm is insufficient, and a custom Lua
+       expiration procedure is used.
+     </para>
+     <para>
+      Tarantool does not support the binary protocol of Memcached.
+      If top performance is a must, Tarantool's own binary
+      protocol should be used.
      </para>
   </section>
 </section>
@@ -190,6 +214,23 @@ localhost> save snapshot
 fail: can't save snapshot, errno 17 (File exists)
 ...
 </programlisting>
+      </para>
+      <para>
+        Taking a snapshot does not cause the server to start a new
+        write ahead log. Once a snapshot is taken, old WALs can be
+        deleted as long as all replicas are up to date. But the
+        WAL which was current at the time <emphasis
+        role="tntadmin">save snapshot</emphasis> started must be
+        kept for recovery, since it still contains log records
+        written after the start of <emphasis role="tntadmin">save
+        snapshot</emphasis>.
+      </para>
+      <para>
+        An alternative way to save a snapshot is to send the server
+        SIGUSR1 UNIX signal. While this approach could be handy, it
+        is not recommended for use in automation: a signal provides no
+        way to find out whether the snapshot was taken successfully
+        or not.
       </para>
       </listitem>
     </varlistentry>

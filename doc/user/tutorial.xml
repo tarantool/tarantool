@@ -63,15 +63,20 @@
   <prompt>$ </prompt><command>tar</command> <option>zxvf</option> <filename><replaceable><replaceable>package-name</replaceable></replaceable>.tar.gz</filename></programlisting>
   To remove a binary tarball package, simply drop the directory
   containing the unpacked files.
-  The binary download contains just two subdirectories:
-  <filename>bin</filename> and <filename>doc</filename>.
+ </para>
+ <para>
+  The binary download contains subdirectories:
+  <filename>bin</filename>, <filename>doc</filename>, <filename>man</filename>
+  <filename>share</filename>, <filename>var</filename>,
+  <filename>etc</filename>.
   The server, by default, looks for its configuration file in
-  the current working directory. There is a correct
-  and minimalistic <filename>tarantool.cfg</filename> in directory
-  <filename>bin</filename>, thus the server can be started
-  right out of it:
+  the current working directory and <filename>etc/</filename>.
+  There is a correct and minimalistic
+  <filename>tarantool.cfg</filename> in directory
+  <filename>etc/</filename>, thus the server can be started
+  right from the top level package directory:
   <programlisting>
-  <prompt>$ </prompt><command>cd <replaceable>package-name</replaceable>/bin &amp;&amp; ./tarantool_box</command>
+  <prompt>$ </prompt><command>cd <replaceable>package-name</replaceable> &amp;&amp; ./bin/tarantool_box</command>
   ...
   1301424353.416 3459 104/33013/acceptor _ I> I am primary
   1301424353.416 3459 1/sched _ I> initialized</programlisting>
@@ -82,7 +87,7 @@
   Once the server is started, you can connect to it and issue
   queries using a command line client:
   <programlisting>
-  <prompt>$ </prompt><command>cd <replaceable>package-name</replaceable>/bin &amp;&amp; ./tarantool</command>
+  <prompt>$ </prompt><command>cd <replaceable>package-name</replaceable> &amp;&amp; ./bin/tarantool</command>
   <prompt>localhost> </prompt> <userinput>show info</userinput>
   <computeroutput>
   ---
@@ -140,7 +145,9 @@
 </para>
 <sidebar>
 <para>
-  Congratulations, you have the server up and running.
+  Congratulations, you have the server up and running.  To
+  shutdown the server gracefully, send it SIGTERM or SIGINT
+  (<keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>) UNIX signal.
   Check out the remaining chapters of this manual to learn
   about available commands, contents of
   <filename>tarantool.cfg</filename>,
