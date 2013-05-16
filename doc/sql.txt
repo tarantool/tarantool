@@ -1,13 +1,20 @@
-;  
+;
 ; Tarantool SQL parser is implemented entirely on the client side.
-; This BNF provides a reference of the supported subset of 
+; This BNF provides a reference of the supported subset of
 ; SQL, to which all clients are strongly encouraged
 ; to stick.
-; 
+;
 ; Convention: UPPERCASE letters are used for terminals and literals.
 ; Lowercase letters are used for <non-terminals>. SQL is
 ; case-insensitive, so this convention is present only to improve
 ; legibility of the BNF.
+;
+; Tarantool features not supported in SQL:
+; - multipart keys
+; - update operations, except SET
+; - all index-specific queries, such as range queries,  bitset
+;   expression evaluation, iteration. These are only available
+;   in Lua.
 
 <sql> ::= <insert> | <replace> | <update> | <delete> | <select>
 

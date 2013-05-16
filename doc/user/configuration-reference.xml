@@ -142,20 +142,6 @@ Tarantool 1.4.0-69-g45551dd
       option.
       </para>
     </listitem>
-
-    <listitem>
-      <para><option xml:id="cat-option" xreflabel="--cat">--cat</option>
-      <userinput>snapshot.file</userinput></para>
-      <para>Print the snapshot file, pointed to by the argument,
-      in a human-readable form. For each log record, log sequence
-      number, time of entry, operation type and arguments are
-      printed out. Example:
-        <programlisting><prompt>$ </prompt>./tarantool_box --cat 00000000000000000002.xlog
-lsn:2 tm:1301572243.430 t:65534 127.0.0.1:52728 INSERT n:0&lt;"1:\x01\x00\x00\x00"&gt;
-lsn:3 tm:1301572287.509 t:65534 127.0.0.1:52728 INSERT n:0&lt;"1:\x01\x00\x00\x00", "hello"&gt;
-lsn:4 tm:1301572313.691 t:65534 127.0.0.1:52728 UPDATE_FIELDS n:0flags:00000000 &lt;"1:\x01\x00\x00\x00"&gt; [field_no:1 op:set &lt;"world"&gt;]</programlisting>
-      </para>
-    </listitem>
   </itemizedlist>
   <para>
     The only two options which have effect on a running server are:
@@ -668,8 +654,17 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>16384</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>The size of read-ahead buffer associated with
-              a client connection.</entry>
+          <entry>The size of read-ahead buffer associated with a
+          client connection. The larger is the buffer, the more
+          memory an active connection consumes and more requests
+          can be read from the operating system buffer in a single
+          system call. The rule of tumb is to make sure the buffer
+          can contain at least a few dozen requests. Therefore, if
+          a typical tuple in a request is large, e.g. a few
+          kilobytes or even megabytes, the readahead buffer should
+          be increased.  If batched request processing is not
+          used, it's prudent to leave this setting at its
+          default.</entry>
         </row>
 
         <row>

@@ -349,7 +349,6 @@ snapshot(void)
 
 /**
 * Create snapshot from signal handler (SIGUSR1)
-*
 */
 static void
 sig_snapshot(void)

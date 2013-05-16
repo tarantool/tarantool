@@ -18,7 +18,7 @@
         tasks. It is possible to dynamically define, invoke,
         alter and drop Lua procedures. Lua procedures can run
         in the background and perform administrative tasks,
-        such as data expiration and re-sharding.
+        such as data expiration or re-sharding.
 
     </para>
     <para>
@@ -120,8 +120,9 @@ expirationd.run_task("exprd space 0", 0, is_expired, purge,
    or communication with networked peers.
  </para>
  <para>
-   Finally, the script can be used to define Lua triggers run
-   on various events within the system.
+   Finally, the script can be used to define Lua <olink
+   targetptr="triggers">triggers</olink> invoked on various events
+   within the system.
  </para>
 
   <para>
@@ -204,9 +205,8 @@ localhost> call box.space[0]:truncate()
 error: 1:15 expected '('
 </computeroutput></programlisting>
     Since it's impossible to invoke object methods from the binary
-    protocol, the object-oriented syntax is often used on purpose,
-    to restrict certain operations to be used by a system
-    administrator only.
+    protocol, the object-oriented syntax is often used to restrict
+    certain operations to be used by a system administrator only.
   </para>
   <para>
     Every value, returned from a stored function by means of
@@ -273,7 +273,7 @@ pack: function
             libraries, such as <code>cfg, space, fiber, index, tuple</code>,
             to access server configuration, create, resume and
             interrupt fibers, inspect contents of spaces, indexes
-            and tuples.
+            and tuples, send and receive data over network.
         </para></listitem>
     </itemizedlist>
   </para>
@@ -381,7 +381,7 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
         </term>
         <listitem>
             <para>
-                Search for tuple in the given space. A
+                Search for a tuple or tuples in the given space. A
                 wrapper around <code>box.process()</code>.
                 <bridgehead renderas="sect4">Parameters</bridgehead>
                 <simplelist>
@@ -425,6 +425,25 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
         </term>
         <listitem><simpara></simpara></listitem>
     </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="box.select_limit" xreflabel="box.select_limit">
+                box.select(space_no, index_no, offset, limit, ...)
+            </emphasis>
+        </term>
+        <listitem>
+            <para>
+                Search for tuples in the given space. This is a
+                full version of the built-in SELECT command, in
+                which one can specify offset and limit in a
+                multi-tuple return.  The server may return
+                multiple tuples when the index is non-unique or a
+                partial key is used for search.
+            </para>
+        </listitem>
+    </varlistentry>
+
 
     <varlistentry>
         <term>
@@ -828,7 +847,7 @@ Note: the administrative console output must be YAML-compatible.
         </term>
         <listitem>
             <para>
-                Evaluates an arbitrary chunk of lua code passed in
+                Evaluates an arbitrary chunk of Lua code passed in
                 <code>s</code>. If there is a compilation error,
                 it's raised as a Lua error. In case of compilation
                 success, all arguments which follow <code>s</code>
@@ -1125,9 +1144,9 @@ localhost> lua t:find(1, 'abc')
         </para>
             <bridgehead renderas="sect4">Example</bridgehead>
             <programlisting>localhost> lua box.tuple.new({tonumber64('18446744073709551615'), 'string', 1})
---- 
+---
  - 18446744073709551615: {'string', 1}
-... 
+...
 </programlisting>
         </listitem>
     </varlistentry>
@@ -1315,7 +1334,9 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
         Indexes are contained in <code
         xlink:href="#box.space">box.space[i].index[]</code> array
         within each space object. They provide an API for
-        ordered iteration over tuples.
+        ordered iteration over tuples. This API is a direct
+        binding to corresponding methods of index objects in the
+        storage engine.
     </para>
     <varlistentry>
         <term><emphasis role="lua">index.unique</emphasis></term>
@@ -1353,7 +1374,7 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
 
     <varlistentry>
         <term>
-             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.iterator">
+             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.iterator(type, ...)">
             index:iterator(type, ...)</emphasis>
         </term>
         <listitem>
@@ -1369,6 +1390,23 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
                 order, starting from the specified key. A HASH
                 index, however, doesn't support ordering.
             </simpara>
+            <para xml:id="iterator-consistency">
+                To understand consistency of tuples,
+                returned by an iterator, it's essential to know
+                the principles of the Tarantool transaction processing
+                subsystem.
+                An iterator in Tarantool does not own a consistent
+                read view. Instead, each procedure is granted exclusive
+                access to all tuples and spaces until it
+                encounters a "context switch": caused a write to
+                disk, network, or by an explicit call to <emphasis
+                role="lua" xlink:href="box.fiber.yield">box.fiber.yield()</emphasis>.
+                When the execution flow returns to the yielded
+                procedure, the data set could have changed significantly.
+                Iteration, resumed after a yield point, does not
+                preserve the read view, but continues with the new
+                content of the database.
+            </para>
             <para>
                 <bridgehead renderas="sect4">Parameters</bridgehead>
                 <simplelist>
@@ -1471,6 +1509,21 @@ error: 'Iterator type is not supported'
 
     <varlistentry>
         <term>
+            <emphasis role="lua">index:random(randint)</emphasis>
+        </term>
+        <listitem><simpara>
+           Return a random value from an index. A random
+           non-negative integer must be supplied as input, and
+           a value is selected accordingly in index-specific fashion.
+           This method is useful when it's important to get insight
+           into data distribution in an index without having to
+           iterate over the entire data set.
+        </simpara>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
             <emphasis role="lua">index:count()</emphasis>
         </term>
         <listitem><simpara>
@@ -1540,9 +1593,12 @@ or <code>box.update()</code>, are calling <code>box.fiber.testcancel()</code>.
     <para>
 In practice, a runaway fiber can only become unresponsive
 if it does a lot of computations and doesn't check
-whether it's been canceled. In addition
-to the advisory cancellation, configuration parameter <code>lua_timeout</code>
-can be used to cancel runaway Lua procedures.
+whether it's been canceled.
+<!--
+In addition to the advisory cancellation, configuration parameter
+<code>lua_timeout</code> can be used to cancel runaway Lua
+procedures.
+-->
     </para>
     <para>
 The other potential problem comes from detached
@@ -1602,7 +1658,7 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.yield(...) </emphasis>
+            <emphasis role="lua" xml:id="box.fiber.yield" xreflabel="box.fiber.yield(...)">box.fiber.yield(...) </emphasis>
         </term>
         <listitem><para>
         Yield control to the calling fiber, if the fiber
@@ -1722,10 +1778,10 @@ the triggers chapter</olink> for details.
                 predefined capacity. The channel can be used
                 to synchronously exchange messages between
                 stored procedures. The channel is garbage
-                collected when no one is using it as any other
-                Lua object. Channels can be worked with using
-                functional or object-oriented syntax.
-                For example, the following two lines are equivalent:
+                collected when no one is using it, just like any
+                other Lua object. Channels can be worked with
+                using functional or object-oriented syntax. For
+                example, the following two lines are equivalent:
             </simpara>
 <programlisting>
     channel:put(message)
@@ -2196,11 +2252,12 @@ logger = cat - >> tarantool.log
         </term>
         <listitem>
             <simpara>
-            Since contents of box.info is dynamic, it's
-            not possible to iterate over keys with Lua <emphasis>pairs()</emphasis>
-            function. For this purpose, <emphasis>box.info()</emphasis> builds
-            and returns a Lua table with all keys and values
-            provided in the package.
+            Since contents of box.info is dynamic, it's not
+            possible to iterate over keys with Lua
+            <emphasis>pairs()</emphasis> function. For this
+            purpose, <emphasis>box.info()</emphasis> builds and
+            returns a Lua table with all keys and values provided
+            in the package.
             </simpara>
 
        <bridgehead renderas="sect4">Example</bridgehead><programlisting>

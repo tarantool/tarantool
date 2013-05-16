@@ -8,8 +8,7 @@
 
 <title>Connectors</title>
 <blockquote><para>
-  This chapter documents APIs for various programming languages --
-  C, Perl, Ruby, PHP and Python.
+  This chapter documents APIs for various programming languages.
 </para></blockquote>
 
 <para>Apart from the native Tarantool client driver, you can always use a <emphasis role="strong">Memcached</emphasis> driver of your choice, after enabling Memcached protocol in the configuration file.</para>

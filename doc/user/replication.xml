@@ -26,13 +26,15 @@
     on a single record.
   </para>
   <para>
-    A stored program invocation, unless requested explicitly,
+    A stored program invocation
+    <!-- , unless requested explicitly, -->
     does not enter the Write Ahead Log. Instead, log events
     for actual UPDATEs and DELETEs, performed by the Lua code,
     are written to the log. This ensures that possible
     non-determinism of Lua does not cause replication
     going out of sync.
   </para>
+<!--
   <para>
     It is still sometimes necessary to replicate stored program
     CALLs, rather than their effects: for example, when the
@@ -43,6 +45,7 @@
     flag of the binary protocol can  be used 
     to replicate CALLs as statements.
   </para>
+-->
   <para>
     For replication to work correctly, the latest LSN
     on the replica must match or fall behind the latest LSN
@@ -108,7 +111,7 @@
     "Degraded state" is a situation when the master becomes
     unavailable -- either due to hardware or network failure, or a
     programming bug. There is no reliable way for a replica to detect
-    that the master is gone for all, since sources of failure and
+    that the master is gone for good, since sources of failure and
     replication environments vary significantly.
   </para>
   <para>
