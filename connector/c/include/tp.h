@@ -339,6 +339,19 @@ tp_realloc(struct tp *p, size_t required, size_t *size) {
 	return realloc(p->s, toalloc);
 }
 
+
+/* Free function for use in a pair with tp_realloc */
+static inline void
+tp_free(struct tp *p) {
+	free(p->s);
+}
+
+/* Get currently allocated buffer pointer */
+static inline char*
+tp_buf(struct tp *p) {
+	return p->s;
+}
+
 /* Main initialization function.
  *
  * reserve - reallocation function, may be NULL
@@ -571,8 +584,14 @@ tp_setreq(struct tp *p) {
  */
 static inline ssize_t
 tp_appendreq(struct tp *p, void *h, size_t size) {
+	int isallocated = p->p != NULL;
 	tp_setreq(p);
-	return tp_append(p, h, size);
+	ssize_t rc = tp_append(p, h, size);
+	if (tp_unlikely(rc == -1))
+		return -1;
+	if (!isallocated)
+		p->h = (struct tp_h*)p->s;
+	return rc;
 }
 
 /* Create a ping request.
