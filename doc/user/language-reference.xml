@@ -22,7 +22,7 @@
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
       DELETEs, SELECTs and CALLs. This port speaks the
-      <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>, and provides full access to the server.
+      <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>, and provides full data access.
       </para>
       <para>
       The default value of the port is <literal>33013</literal>,
@@ -30,8 +30,8 @@
       configuration option.
     </para></listitem>
     <listitem><para>
-      Read only port, which only accepts SELECTs, default  port number
-      <literal>33014</literal>, as defined in
+      Read only port, which only accepts SELECTs and CALLs,
+      default  port number <literal>33014</literal>, as defined in
       <olink targetptr="secondary_port"/> configuration option.
     </para></listitem>
     <listitem><para>
@@ -68,8 +68,9 @@
     DELETE, SELECT and CALL. All requests, including
     INSERT, UPDATE and DELETE may return data. A SELECT can be
     requested to limit the number of returned tuples. This is
-    useful when a SELECT is done over a non-unique or multipart
-    index.
+    useful when searching in a non-unique index or when 
+    a special <quote>wildcard</quote> (zero-length string) value
+    is supplied as search key or a key part.
  </para>
   <para>
     UPDATE statement supports operations on fields &mdash;
@@ -183,7 +184,7 @@
         <filename><olink
         targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
         To take a snapshot, Tarantool forks and quickly
-        <function>munmap(2)</function>s all memory except memory
+        <function>munmap(2)</function>s all memory except the area 
         where tuples are stored. Since all modern operating systems support
         virtual memory copy-on-write, this effectively creates a
         consistent snapshot of all tuples in the child process,
@@ -344,6 +345,8 @@ statistics:
           the % of <olink targetptr="slab_alloc_arena"/> that is
           already distributed to the slab allocator.
         </para>
+        <para>
+        </para>
       </listitem>
     </varlistentry>
 
@@ -354,13 +357,13 @@ statistics:
       <listitem><para>
         A pool allocator is used for temporary memory, when
         serving client requests. Every fiber has its own
-        pool. Shows the current state of pools of all fibers.
+        temporary pool. Shows the current state of pools of all fibers.
       </para></listitem>
     </varlistentry>
 
     <varlistentry>
       <term xml:id="save-coredump" xreflabel="SAVE COREDUMP">
-        <emphasis role="tntadmin">SAVE COREDUMP</emphasis>
+        <emphasis role="tntadmin">save coredump</emphasis>
       </term>
       <listitem><para>
         Fork and dump a core. Since Tarantool stores all tuples

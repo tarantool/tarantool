@@ -17,15 +17,12 @@
   into the first index are always assumed to be the identifying
   (unique) key. The remaining fields make up a value, associated
   with the key. 
-
+</para>
+<para>
   Apart from the primary key, it is possible to define secondary
   <emphasis>indexes</emphasis> on other tuple fields.
 
-  Tuple sets together with defined indexes form
-  <emphasis>spaces<alt>the paradigm of tuples and spaces is
-  derived from distributed computing</alt></emphasis>.
-
-  A secondary index does not have to be unique, and can cover
+  A secondary index does not have to be unique and can cover
   multiple fields. The total number of fields in a tuple must be
   at least equal to the ordinal number of the last field
   participating in any index.
@@ -36,15 +33,23 @@
   TREE index, in addition to key/value look ups, support partial
   key lookups, key-part lookups for multipart keys and ordered
   retrieval. BITSET indexes, while can serve as a standard unique
-  key, are best suited for bit-pattern look-ups, e.g. search for
+  key, are best suited for bit-pattern look-ups, i.e. search for
   objects satisfying multiple properties.
 </para>
 <para>
-  The basic server operations include insert, replace, delete,
-  update and select. All operations that modify data require
-  the primary key for look up. Select, however, may use any index.
-  A Lua stored procedure can combine multiple trivial commands,
-  as well as access data using <olink
+  Tuple sets together with defined indexes form
+  <emphasis>spaces<alt>the paradigm of tuples and spaces is
+  derived from distributed computing</alt></emphasis>.
+
+  The basic server operations are insert, replace, delete,
+  update, which modify a tuple in a space, and select,
+  which retrieves tuples from a space. All operations that modify
+  data require the primary key for look up. Select, however, may
+  use any index.
+ </para>
+ <para>
+ A Lua stored procedure can combine multiple
+  trivial commands, as well as access data using <olink
   targetptr="box.index.iterator">index iterators</olink>. Indeed,
   the iterators provide full access to the power of indexes,
   enabling index-type specific access, such as boolean expression
@@ -53,7 +58,7 @@
 </para>
 <para>
   All operations in Tarantool are atomic and durable: they are
-  either executed and written to the write ahead log, or rolled back.
+  either executed and written to the write ahead log or rolled back.
   A stored procedure, containing a combination of basic operations,
   holds a consistent view of the database as long as it doesn't 
   incur writes to the write ahead log or to network. In particular,
@@ -81,7 +86,10 @@
   by a numeric id. For example, to insert a tuple, it is necessary
   to provide id of the destination space; to select
   a tuple, one must provide the identifying key, space id and
-  index id of the index used for lookup.
+  index id of the index used for lookup. Many Tarantool drivers
+  provide a local aliasing scheme, mapping numeric identifiers
+  to names. Use of numeric identifiers on the wire protocol
+  makes it lightweight and easy to parse.
 </para>
 
 <para>
@@ -89,7 +97,7 @@
   only one space with id <literal>0</literal>. It has no keys
   other than the primary. The primary key numeric id is also 
   <literal>0</literal>. Tarantool command line client
-  supports a small subset of SQL, and it'll be used it to
+  supports a small subset of SQL, and it'll be used to
   demonstrate supported data manipulation commands:
   <programlisting>
   localhost> insert into t0 values (1)
@@ -144,11 +152,12 @@
   supported SQL is provided in <olink targetdoc="tarantool-user-guide" targetptr="language-reference">Language reference</olink> chapter.
 </para>
 <para>
-  Since not all NoSQL operations can be expressed in SQL, to gain
+  Since not all Tarantool operations can be expressed in SQL, to gain
   complete access to data manipulation functionality one must use
-  a <olink targetptr="connectors">Perl, Python, Ruby or C connector</olink>. The client/server protocol
-  is open and documented: an annotated BNF can be found in the
-  source tree, file <filename
+  a <olink targetptr="connectors">Perl, Python, Ruby or other
+  programming language connector</olink>.  The client/server
+  protocol is open and documented: an annotated BNF can be found
+  in the source tree, file <filename
   xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/protocol.txt</filename>.
 </para>
 
