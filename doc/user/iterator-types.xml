@@ -1,16 +1,17 @@
-<!DOCTYPE table [
+<!DOCTYPE para [
 <!ENTITY % tnt SYSTEM "../tnt.ent">
 %tnt;
 ]>
-<table xmlns="http://docbook.org/ns/docbook" version="5.0"
+<para xmlns="http://docbook.org/ns/docbook" version="5.0"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       xmlns:xlink="http://www.w3.org/1999/xlink"
-      xml:id="iterator-types" frame='all' pgwide='1'>
+      xml:id="iterator-types">
 
-<title>Iterator types</title>
+<table frame='all' pgwide='1'>
+<title>Common iterator types</title>
 
-<tgroup cols='3' colsep='1' rowsep='1'>
-<colspec colnum="5" colname="col4" colwidth="6*"/>
+<tgroup cols='6' colsep='1' rowsep='1'>
+<colspec colnum='6' colname="description" colwidth="6*"/>
 
 <thead>
     <row>
@@ -18,6 +19,7 @@
         <entry>Arguments</entry>
         <entry>HASH</entry>
         <entry>TREE</entry>
+        <entry>BITSET</entry>
         <entry>Description</entry>
     </row>
 </thead>
@@ -28,18 +30,20 @@
         <entry>none</entry>
         <entry>yes</entry>
         <entry>yes</entry>
+        <entry>yes</entry>
         <entry>
             Iterate over all tuples in an index. When iterating
             over a TREE index, tuples are returned in ascending
-            order of the key. When iterating over a HASH index,
-            tuples are returned in physical order or, in other words,
-            unordered.
+            order of the key. When iterating over a HASH or BITSET
+            index, tuples are returned in physical order or, in
+            other words, unordered.
         </entry>
     </row>
 
     <row>
         <entry>box.index.EQ</entry>
         <entry>key</entry>
+        <entry>yes</entry>
         <entry>yes</entry>
         <entry>yes</entry>
         <entry>
@@ -51,7 +55,7 @@
             </simpara>
             <simpara>
             Semantics of the match depends on the index.
-            A HASH index only supports exact match: all parts
+            A HASH and TREE index only supports exact match: all parts
             of a key participating in the index must be provided.
             In case of TREE index, only few parts of a key or a
             key prefix are accepted for search.
@@ -65,21 +69,8 @@
             When a TREE index is not unique, or only part of a key
             is given as a search criteria, matching tuples are
             returned in ascending order.
+            BITSET indexes are always unique.
             </simpara>
-        </entry>
-    </row>
-
-    <row>
-        <entry>box.index.REQ</entry>
-        <entry>key</entry>
-        <entry>no</entry>
-        <entry>yes</entry>
-        <entry>
-            Reverse equality iterator. Is equivalent to
-            <code>box.index.EQ</code> with only distinction that
-            the order of returned tuples is descending, not
-            ascending. Is only supported by TREE
-            index.
         </entry>
     </row>
 
@@ -88,6 +79,7 @@
         <entry>key</entry>
         <entry>yes (*)</entry>
         <entry>yes </entry>
+        <entry>no </entry>
         <entry>
             Iterate over tuples strictly greater than the search key.
             For TREE indexes, a key prefix or key part can be sufficient.
@@ -100,29 +92,57 @@
             to retrieve all tuples via a HASH index piece by piece,
             by supplying the last key from the previous range as the
             start key for an iterator over the next range.
+            BITSET index does not support this iteration type yet.
+        </entry>
+    </row>
+
+</tbody>
+
+</tgroup>
+</table>
+<table frame='all' pgwide='1'>
+<title>TREE iterator types</title>
+
+<tgroup cols='3' colsep='1' rowsep='1'>
+<colspec colnum='3' colname="Description" colwidth="6*"/>
+
+<thead>
+    <row>
+        <entry>Type</entry>
+        <entry>Arguments</entry>
+        <entry>Description</entry>
+    </row>
+</thead>
+
+<tbody>
+
+    <row>
+        <entry>box.index.REQ</entry>
+        <entry>key or key part</entry>
+        <entry>
+            Reverse equality iterator. Is equivalent to
+            <code>box.index.EQ</code> with only distinction that
+            the order of returned tuples is descending, not
+            ascending.
         </entry>
     </row>
 
     <row>
         <entry>box.index.GE</entry>
-        <entry>key</entry>
-        <entry>no</entry>
-        <entry>yes</entry>
+        <entry>key or key part</entry>
         <entry>
-            Iterate over all tuples for which the corresponding fields are
-            greater or equal to the search key. TREE index returns
-            tuples in ascending order. Similarly to <code>box.index.EQ</code>,
-            key prefix or key part can be used to seed the iterator.
-            If the key is <code>nil</code>, iteration starts from the
-            smallest key in the index.
+            Iterate over all tuples for which the corresponding
+            fields are greater or equal to the search key. The
+            tuples are returned in ascending order. Similarly to
+            <code>box.index.EQ</code>, key prefix or key part can
+            be used to seed the iterator.  If the key is
+            <code>nil</code>, iteration starts from the smallest
+            key in the index.
         </entry>
     </row>
-
     <row>
         <entry>box.index.LT</entry>
-        <entry>key</entry>
-        <entry>no</entry>
-        <entry>yes</entry>
+        <entry>key or key part</entry>
         <entry>
             Similar to <code>box.index.GT</code>,
             but returns all tuples which are strictly less
@@ -135,9 +155,7 @@
 
     <row>
         <entry>box.index.LE</entry>
-        <entry>key</entry>
-        <entry>no</entry>
-        <entry>yes</entry>
+        <entry>key or key part</entry>
         <entry>
             Similar to <code>box.index.GE</code>, but
             returns all tuples which are less or equal to the
@@ -147,11 +165,56 @@
             from the end of the index range.
         </entry>
     </row>
-
 </tbody>
-
 </tgroup>
 </table>
+
+<table frame='all' pgwide='1'>
+<title>BITSET iterator types</title>
+
+<tgroup cols='3' colsep='1' rowsep='1'>
+<colspec colnum='3' colname="Description" colwidth="6*"/>
+
+<thead>
+    <row>
+        <entry>Type</entry>
+        <entry>Arguments</entry>
+        <entry>Description</entry>
+    </row>
+</thead>
+
+<tbody>
+
+
+    <row>
+        <entry>box.index.BITS_ALL_SET</entry>
+        <entry>bit mask</entry>
+        <entry>
+          Matches tuples in which all specified bits
+          are set.
+        </entry>
+    </row>
+
+    <row>
+        <entry>box.index.BITS_ANY_SET</entry>
+        <entry>bit mask</entry>
+        <entry>
+          Matches tuples in which any of the specified bits
+          is set.
+        </entry>
+    </row>
+    <row>
+        <entry>box.index.BITS_ALL_NOT_SET</entry>
+        <entry>bit mask</entry>
+        <entry>
+          Matches tuples in which none of the specified bits
+          is set.
+        </entry>
+    </row>
+</tbody>
+</tgroup>
+</table>
+</para>
 
 <!--
 vim: tw=66 syntax=docbk

@@ -44,9 +44,11 @@ Found 1 tuple:
 </programlisting>
     In the language of the administrative console
     <olink targetptr="lua-command" /> evaluates an arbitrary
-    Lua chunk. CALL is the SQL standard statement used
-    to invoke the CALL command of the binary
-    protocol.
+    Lua chunk. CALL is the SQL standard statement, so its syntax
+    was adopted by Tarantool command line client 
+    to invoke the CALL command of the binary protocol.
+</para>
+<para>
     In the example above, a Lua procedure is first defined
     using the text protocol of the administrative port,
     and then invoked using the Tarantool client-side SQL
@@ -124,7 +126,6 @@ expirationd.run_task("exprd space 0", 0, is_expired, purge,
    targetptr="triggers">triggers</olink> invoked on various events
    within the system.
  </para>
-
   <para>
     There is a single global instance of the Lua interpreter, which is
     shared across all connections. Anything prefixed with
@@ -578,6 +579,7 @@ Call ERROR, Illegal parameters, key is not u32 (ER_ILLEGAL_PARAMS)
             If <code>key</code> is <code>nil</code> or unspecified,
             the selection starts from the start of the index.
             This is a simple wrapper around <code xlink:href="#box.space.select_range">box.space[space_no]:select_range(index_no, ...)</code>.
+            BITSET index does not support this call.
         </para>
         <para>
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -647,7 +649,7 @@ localhost> lua box.select_range(4, 1, 2, '1')
             </para>
             <para>
             For TREE indexes, this returns tuples in sorted order.
-            Reverse iteration for HASH indexes is not supported.
+            Other index types do not support this call.
             If <code>key</code> is <code>nil</code> or unspecified,
             the selection starts from the end of the index.
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -1241,8 +1243,9 @@ localhost> lua t:find(1, 'abc')
             <simpara>
                 Select a reverse range of tuples, limited by
                 <code>limit</code>, starting from <code>key</code>.
-                The key can be multipart. TREE index returns tuples in descending
-                order. Not supported by HASH indexes.
+                The key can be multipart. TREE index returns
+                tuples in descending order. Other index types
+                do not support this call.
             </simpara>
         </listitem>
     </varlistentry>
@@ -1350,7 +1353,7 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
             <emphasis role="lua">index.type</emphasis>
         </term>
         <listitem><simpara>
-            A string for index type, either 'TREE' or 'HASH'.
+            A string for index type, either 'TREE', 'HASH', 'BITSET'.
         </simpara></listitem>
     </varlistentry>
 
@@ -1387,8 +1390,8 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
                 and depend on the iteration type. For example,
                 TREE index maintains a strict order of keys and
                 can return all tuples in ascending or descending
-                order, starting from the specified key. A HASH
-                index, however, doesn't support ordering.
+                order, starting from the specified key. Other
+                index types, however, do not support ordering.
             </simpara>
             <para xml:id="iterator-consistency">
                 To understand consistency of tuples,
@@ -1410,7 +1413,7 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
             <para>
                 <bridgehead renderas="sect4">Parameters</bridgehead>
                 <simplelist>
-                        <member><code>type</code> &mdash; iteration strategy as defined in a table below.</member>
+                        <member><code>type</code> &mdash; iteration strategy as defined in tables below.</member>
                 </simplelist>
 
                 <bridgehead renderas="sect4">Returns</bridgehead>

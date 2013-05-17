@@ -8,13 +8,16 @@
 </para></blockquote>
 
 <para>
-  To install Tarantool, check out instructions on the project
-  <citetitle xlink:href="http://tarantool.org/download.html"
+  To install the latest stable version of Tarantool, check out
+  instructions on the project <citetitle
+  xlink:href="http://tarantool.org/download.html"
   xlink:title="Download Tarantool">download page</citetitle>. For
   many distributions the server and the command line client are
   available from the distribution's upstream. Local repositories
   for popular Linux distributions, as well as a FreeBSD port
-  and a Mac OS X "homebrew" recipe are also available online.
+  and a Mac OS X
+  <quote><productname>homebrew</productname></quote> recipe are
+  also available online.
   The online archive is automatically refreshed on each push
   into the stable branch of the server. Please follow
   <olink targetptr="os-install-notes">distribution-specific
@@ -51,7 +54,7 @@
   <itemizedlist>
     <listitem><para>CMake 2.6 or newer,</para></listitem>
     <listitem><para>GCC 4.4 or newer, with gcc-objc (ObjectiveC)
-    language frontend,</para></listitem>
+    language frontend or Clang 3.1 or newer,</para></listitem>
     <listitem><para>libreadline-dev, when compiling the
     command line client.
     </para></listitem>
@@ -61,8 +64,8 @@
   After download, unpack the binary package, a new directory will be created:
   <programlisting>
   <prompt>$ </prompt><command>tar</command> <option>zxvf</option> <filename><replaceable><replaceable>package-name</replaceable></replaceable>.tar.gz</filename></programlisting>
-  To remove a binary tarball package, simply drop the directory
-  containing the unpacked files.
+  To remove the package, simply drop the directory containing the
+  unpacked files.
  </para>
  <para>
   The binary download contains subdirectories:
@@ -131,6 +134,15 @@
   ...
   Linking C executable tarantool_box
   [100%] Built target tarantool_box</programlisting>
+  A complete instruction for building from source is located
+  in the source tree, file <filename xlink:href="https://github.com/mailru/tarantool/blob/master/README.md">README.md</filename>. There
+  are also specialized build instructions for
+  <productname xlink:href="https://github.com/mailru/tarantool/blob/master/README.CentOS">CetnOS</productname>,
+  <productname xlink:href="https://github.com/mailru/tarantool/blob/master/README.FreeBSD">FreeBSD</productname>,
+  <productname xlink:href="https://github.com/mailru/tarantool/blob/master/README.MacOSX">OS
+  X</productname>.
+</para>
+<para>
   When <command>make</command> is complete, the server can be
   started right out of the in-source build. Use Tarantool
   regression testing framework:
@@ -145,13 +157,15 @@
 </para>
 <sidebar>
 <para>
-  Congratulations, you have the server up and running.  To
+  Congratulations, you have the server up and running! To
   shutdown the server gracefully, send it SIGTERM or SIGINT
-  (<keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>) UNIX signal.
-  Check out the remaining chapters of this manual to learn
-  about available commands, contents of
-  <filename>tarantool.cfg</filename>,
-  replication and high availability with Tarantool.
+  (<keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>).
+ </para>
+ <para>
+  Check out the remaining chapters of this manual to learn about
+  available commands, contents of
+  <filename>tarantool.cfg</filename>, replication and high
+  availability with Tarantool.
 </para>
 </sidebar>
 

@@ -46,48 +46,47 @@ example:
     existing indexes.
     </para></listitem>
     <listitem><para>
-    A message is sent to <quote>wal_writer</quote>, running in a
-    separate thread, requesting that the change be recorded in the WAL.
-    The fiber associated with the current connection is suspended
-    until an acknowledgment from the WAL writer.
+    A message is sent to WAL writer running in a
+    separate thread, requesting that the change is recorded in the WAL.
+    The server switches to work on the next request until the write 
+    is acknowledged.
     </para></listitem>
     <listitem><para>
-    Upon success, a confirmation is sent to the client that
-    a REPLACE has succeeded.
-    Upon failure, a rollback procedure is begun.
-    During the rollback procedure, all changes to the database
-    which occurred after the failed change are rolled back in reverse
-    order. No new change is applied while rollback is in progress.
-    When the rollback procedure is finished, 
-    <olink targetptr="ER_WAL_IO"/> error is sent to the client.
+    On success, a confirmation is sent to the client. Upon
+    failure, a rollback procedure is begun.  During the rollback
+    procedure, the transaction processor rolls back all changes to
+    the database which occurred after the first failed change, from
+    latest to oldest, up to the first failed change. All rolled back
+    requests are aborted with <olink targetptr="ER_WAL_IO"/>
+    error. No new change is applied while rollback is in progress.
+    When the rollback procedure is finished, the servers restarts
+    the processing pipeline.
     </para></listitem>
 </orderedlist>
 </para>
 
 <para>
 One advantage of the described algorithm is that complete request
-pipelining is achieved, even for requests on the same primary key.
-In Tarantool, unlike in most database systems, database performance
-doesn't degrade even if all requests touch upon the same key in the
-same space.
+pipelining is achieved, even for requests on the same value of the
+primary key. As a result, database performance doesn't degrade
+even if all requests touch upon the same key in the same space.
 </para>
 
 <para>
-The master and the WAL writer threads communicate using
-asynchronous (yet reliable) messaging; the master thread, not
-being blocked on WAL tasks, continues to handle requests quickly
-even at high volumes of disk I/O. A response to a request
-is sent as soon as it is ready, even if there were earlier
-requests on the same connection which have not completed yet.
-For instance, SELECT performance, even for SELECTs running 
-on the same connection as UPDATEs and DELETEs, remains unaffected
-by disk load.
+The transaction processor and the WAL writer threads communicate
+using asynchronous (yet reliable) messaging; the transaction
+processor thread, not being blocked on WAL tasks, continues to
+handle requests quickly even at high volumes of disk I/O. A
+response to a request is sent as soon as it is ready, even if
+there were earlier incomplete requests on the same connection.  In
+particular, SELECT performance, even for SELECTs running on a
+connection packed with UPDATEs and DELETEs, remains unaffected by
+disk load.
 </para>
 
 <para>
-WAL writer employs a number of modes for synchronization between
-requesting fibers, WAL writer and disk hardware, as defined
-in configuration for <olink targetptr="wal_mode"/>. It is also
+WAL writer employs a number of durability modes, as defined
+in configuration variable <olink targetptr="wal_mode"/>. It is
 possible to turn the write ahead log completely off, by setting
 <olink targetptr="wal_mode"/> to <emphasis>none</emphasis>.
 Even without the write ahead log it's still possible to take a

@@ -77,8 +77,8 @@
     Use of Lua as an extension language does not end with stored 
     procedures: Lua programs can be used during startup, to define
     triggers and background tasks, interact with networked peers.
-    Unlike popular application development frameworks implemented
-    around "reactor" pattern, networking in server-side Lua is
+    Unlike popular application development frameworks based on
+    "reactor" pattern, networking in server-side Lua is
     sequential, yet very efficient, as is built on top of the
     cooperating multitasking environment used by the server
     itself.
