@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <tp.h>
 
+#if 0
 static void reply_print(struct tp *rep) {
 	while (tp_next(rep)) {
 		printf("tuple fields: %d\n", tp_tuplecount(rep));
@@ -56,10 +57,27 @@ static int reply(void) {
 
 	return 0;
 }
+#endif
+
+static inline void
+test_check_buffer_initialized(void) {
+	struct tp req;
+	tp_init(&req, NULL, 0, tp_realloc, NULL);
+	tp_select(&req, 0, 0, 0, 0); /* could fail on assert */
+	tp_tuple(&req);
+	tp_sz(&req, "key");
+	tp_free(&req);
+}
 
 int
 main(int argc, char *argv[])
 {
+	(void)argc;
+	(void)argv;
+
+	test_check_buffer_initialized();
+
+#if 0
 	if (argc == 2 && !strcmp(argv[1], "--reply"))
 		return reply();
 
@@ -109,5 +127,6 @@ main(int argc, char *argv[])
 	*/
 
 	fwrite(buf, tp_used(&req), 1, stdout);
+#endif
 	return 0;
 }
