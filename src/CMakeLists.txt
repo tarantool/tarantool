@@ -138,6 +138,10 @@ if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
     set (common_libraries ${common_libraries} dl)
 endif()
 
+if (TARGET_OS_FREEBSD)
+    set (common_libraries ${common_libraries} intl)
+endif()
+
 if (ENABLE_BACKTRACE AND HAVE_BFD)
     set (common_libraries ${common_libraries} bfd)
     if (NOT TARGET_OS_DARWIN)
