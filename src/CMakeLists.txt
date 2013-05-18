@@ -149,7 +149,7 @@ if (ENABLE_BACKTRACE AND HAVE_BFD)
     endif()
     if (ENABLE_STATIC OR TARGET_OS_FREEBSD)
         include (FindZLIB)
-        set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES})
+        set (common_libraries ${common_libraries} ${ZLIB_LIBRARIES} iconv intl)
     endif()
 endif()
 
