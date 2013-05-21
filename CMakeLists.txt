@@ -125,7 +125,7 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
     endif()
 endif()
 
-set (VERSION_FILE "${CMAKE_BINARY_DIR}/.version")
+set (VERSION_FILE "${CMAKE_BINARY_DIR}/VERSION")
 
 # Update version file or use it when there is no git
 # repository within sources (source tarballs).
@@ -142,7 +142,7 @@ if (PACKAGE_VERSION STREQUAL "")
         message (FATAL_ERROR "Unable to retrive version from git or ${VERSION_FILE} file.")
     endif()
 else()
-	file(WRITE ${VERSION_FILE} "${PACKAGE_VERSION}")
+	file(WRITE ${VERSION_FILE} "${PACKAGE_VERSION}\n")
 endif()
 
 #
