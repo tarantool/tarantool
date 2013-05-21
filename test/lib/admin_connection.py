@@ -47,11 +47,12 @@ class AdminConnection(TarantoolConnection):
                 break
 
         # validate yaml by parsing it
-        yaml.load(res)
-
-        if not silent:
-            sys.stdout.write(command + ADMIN_SEPARATOR)
-            sys.stdout.write(res.replace("\r\n", "\n"))
+        try:
+            yaml.load(res)
+        finally:
+            if not silent:
+                sys.stdout.write(command + ADMIN_SEPARATOR)
+                sys.stdout.write(res.replace("\r\n", "\n"))
 
         return res
 
