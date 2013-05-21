@@ -230,12 +230,11 @@ getaddrinfo_cb(va_list ap)
 	 */
 
 	/* EAI_ADDRFAMILY is deprecated on FreeBSD */
+	if (rc == EAI_BADFLAGS
 #ifdef EAI_ADDRFAMILY
-	int is_rc = EAI_BADFLAGS|EAI_ADDRFAMILY;
-#else
-	int is_rc = EAI_BADFLAGS;
+	    || rc == EAI_ADDRFAMILY
 #endif
-	if (rc == is_rc) {
+	   ) {
 		hints->ai_flags &= ~AI_ADDRCONFIG;
 		rc = getaddrinfo(host, port, hints, res);
 	}
