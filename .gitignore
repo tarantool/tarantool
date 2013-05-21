@@ -86,3 +86,4 @@ test/unit/bit_test
 test/unit/bitset_basic_test
 test/unit/bitset_index_test
 test/unit/bitset_iterator_test
+VERSION
