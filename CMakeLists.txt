@@ -106,21 +106,43 @@ add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m -e -f TAGS
 #
 # Define PACKAGE_VERSION -- a string constant with tarantool version.
 #
-set (PACKAGE_VERSION "")
-execute_process (COMMAND ${GIT} describe HEAD
-    OUTPUT_VARIABLE PACKAGE_VERSION
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-#
-# Make sure the version is set even if building
-# out of source.
-#
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "4")
 set (CPACK_PACKAGE_VERSION_PATCH "9")
+
+set (PACKAGE_VERSION "")
+
+# Get git version only if source directory has .git repository, this
+# avoids git to search .git repository in parent
+# directories.
+#
+if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
+	execute_process (COMMAND ${GIT} describe HEAD
+		OUTPUT_VARIABLE PACKAGE_VERSION
+		OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if (PACKAGE_VERSION STREQUAL "")
+        message (FATAL_ERROR "Failed to retrive git version.")
+    endif()
+endif()
+
+set (VERSION_FILE "${CMAKE_BINARY_DIR}/VERSION")
+
+# Update version file or use it when there is no git
+# repository within sources (source tarballs).
+#
 if (PACKAGE_VERSION STREQUAL "")
-    set (PACKAGE_VERSION
-        "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
+    if (NOT EXISTS "${VERSION_FILE}")
+        message (FATAL_ERROR "Version file ${VERSION_FILE} does not exists.")
+    endif()
+    message (WARNING "Using version from version file ${VERSION_FILE}")
+	execute_process (COMMAND ${CAT} ${VERSION_FILE}
+		OUTPUT_VARIABLE PACKAGE_VERSION
+		OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if (PACKAGE_VERSION STREQUAL "")
+        message (FATAL_ERROR "Unable to retrive version from git or ${VERSION_FILE} file.")
+    endif()
+else()
+	file(WRITE ${VERSION_FILE} "${PACKAGE_VERSION}\n")
 endif()
 
 #
