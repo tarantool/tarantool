@@ -45,7 +45,7 @@ Found 1 tuple:
     In the language of the administrative console
     <olink targetptr="lua-command" /> evaluates an arbitrary
     Lua chunk. CALL is the SQL standard statement, so its syntax
-    was adopted by Tarantool command line client 
+    was adopted by Tarantool command line client
     to invoke the CALL command of the binary protocol.
 </para>
 <para>
@@ -2216,143 +2216,137 @@ end
 </section>
 
 <section xml:id="sp-box-net-box">
-    <title>Package <code>box.net.box</code> &mdash; remote box connector</title>
+    <title>Package <code>box.net.box</code> &mdash; working with networked Tarantool peers</title>
 <variablelist xml:id="box.net.box">
     <simpara>
-        box.net.box allows to connect and make requests with remote
-        box.
+        Library <code>box.net</code> contains connectors
+        to remote systems, such as MariaDB or PostgreSQL, etc.
+        The first supported system is Tarantool itself, a
+        connector for it is implemented in library <code>box.net.box</code>.
     </simpara>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">remote = box.net.box.new(host, port [,
-            connect_timeout])
-            </emphasis>
+            <emphasis role="lua">conn = box.net.box.new(host, port [, connect_timeout])</emphasis>
         </term>
         <listitem>
             <para>
-                Create new remote connection. Real connection will be
-                established before the first request.
+                Create a new connection to a remote Tarantool. The
+                connection is established on demand, at the time
+                of first request. The returned object supports
+                methods for making remote calls, such as select,
+                update or delete. All calls to a remote server
+                support timeouts.
             </para>
-            <para>
-                There is one predefined connection:
-                <code>box.net.box.emb</code>.
-                All <code>box.*</code> methods recall
-                <code>box.net.box.emb</code>'s methods.
-            </para>
-            
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis>Methods list</emphasis></term>
-        <itemizedlist>
-            <listitem>
-                <para>
-                <code>remote:ping()</code> - ping remote tarantool. Return
-                <code>true</code> or <code>false</code>
-                </para>
-            </listitem>
-            
-            <listitem>
+        <term><emphasis role="lua">conn:ping()</emphasis></term>
+        <listitem>
             <para>
-                <code>remote:close()</code> - close and destroy remote box.
-                </para>
-            </listitem>
-            
-            <listitem>
-                <para>
-                <code>remote:select(...)</code> - like <code>box.select</code>
-                </para>
-            </listitem>
-            
-            <listitem>
-                <para>
-                <code>remote:select_limit(...)</code> -
-                    like <code>box.select_limit</code>
-                </para>
-            </listitem>
-            
-            <listitem>
-                <para>
-                <code>remote:select_range(...)</code> -
-                    like <code>box.select_range</code>
-                </para>
-            </listitem>
-            
-            <listitem>
-                <para>
-                <code>remote:select_reverse_range(...)</code> -
-                    like <code>box.select_reverse_range</code>
-                </para>
-            </listitem>
-            
-            <listitem>
-                <para>
-                <code>remote:insert(...)</code> - like <code>box.insert</code>
-                </para>
-            </listitem>
-            
-            <listitem>
-                <para>
-                <code>remote:replace(...)</code> - like <code>box.replace</code>
-                </para>
-            </listitem>
-            
-            <listitem>
-                <para>
-                <code>remote:update(...)</code> - like <code>box.update</code>
-                </para>
-            </listitem>
-            
-            <listitem>
-                <para>
-                <code>remote:delete(...)</code> - like <code>box.delete</code>
-                </para>
-            </listitem>
-            
-            <listitem>
-                <para>
-                <code>remote:call(proc_name, ...)</code> - call lua procedure
-                </para>
-            </listitem>
-
-            <listitem>
-                <para>
-                <code>remote:timeout(timeout)</code> - change timeout wrapper
-                for next remote process. Create wrapper object for one request:
-<programlisting>
-    -- will wait for 'foo' result until 'foo' finished
-    local something = remote:call('foo', 'arg1', ...)
-
-    -- will wait 0.1 second return nil if foo is still continue
-    local other = remote:timeout(0.1):call('foo', 'arg1', ...)
-</programlisting>
-                </para>
-            </listitem>
-
-        </itemizedlist>
+                Send PING command to a remote server.
+                Returns <code>true</code> on success,
+                <code>false</code> on error.
+            </para>
+        </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis>Examples</emphasis></term>
-<programlisting>
-box.select(1,2,3)
-box.net.box.emb:select(1,2,3) -- the same
-
-box.insert(1,2,3)
-box.net.box.emb:insert(1,2,3) -- the same
-
-
-
-local remote_self = box.net.box.new('127.0.0.1', box.info.primary_port)
-remote_self:ping()
-remote_self:insert(1,3,4)
-
-</programlisting>
+        <term><emphasis role="lua">conn:close()</emphasis></term>
+        <listitem>
+            <para>
+                Close a connection. The connection is also
+                closed when it's garbage collected. It's still
+                recommended to close connections explicitly,
+                to spare the garbage collector from heavy work
+                such as closing the socket.
+            </para>
+        </listitem>
     </varlistentry>
 
+    <varlistentry>
+        <term><emphasis role="lua">conn:select()</emphasis></term>
+        <listitem>
+            <para>See box.select(...). Please note, that unlike
+            a local <code>box.select()</code> any call to a remote
+            server yields, thus local data may change while
+            remote <code>select()</code> is running.</para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">conn:select_limit()</emphasis></term>
+        <listitem>
+            <para>See box.select_limit(...)</para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">conn:select_range()</emphasis></term>
+        <listitem>
+            <para>See box.select_range(...)</para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">conn:insert()</emphasis></term>
+        <listitem>
+            <para>See box.insert(...)</para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">conn:replace()</emphasis></term>
+        <listitem>
+            <para>See box.replace(...)</para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">conn:update(...)</emphasis></term>
+        <listitem>
+            <para>See box.update(...)</para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">conn:delete(...)</emphasis></term>
+        <listitem>
+            <para>See box.delete(...)</para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">conn:call(...)</emphasis></term>
+        <listitem>
+            <para>Call a remote stored procedure, such as <code>box.select_reverse_range()</code> and such.</para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">conn:timeout(timeout)</emphasis></term>
+        <listitem>
+            <para>Returns a closure which is identical to the invoked
+            function, excepts adds time out functionality to it.
+<programlisting>
+-- wait for 'foo' result until 'foo' is finished
+local something = remote:call('foo', 'arg1', ...)
+
+-- wait up to 0.1 second return nil if foo is still continue
+local other = remote:timeout(0.1):call('foo', 'arg1', ...)
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
 </variablelist>
+
+ <bridgehead renderas="sect4">Examples</bridgehead>
+ <programlisting>
+local self = box.net.box.new('127.0.0.1', box.info.primary_port)
+self:ping()
+self:insert(1,3,4)
+</programlisting>
 </section>
 
 <section xml:id="sp-box-cfg">
