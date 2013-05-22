@@ -621,3 +621,5 @@ print """# A test case for Bug#1131108 'incorrect conversion from boolean lua va
 exec admin  "lua function bug1075677() local range = {} table.insert(range, 1>0) return range end"
 exec sql "call bug1075677()"
 exec admin "lua bug1075677=nil"
+exec admin  "lua box.tuple.new(false)"
+exec admin  "lua box.tuple.new({false})"
