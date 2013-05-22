@@ -7,7 +7,7 @@ exec admin "lua"
 exec admin "lua 1"
 exec admin "lua print('  lua says: hello')"
 # What's in the box? 
-exec admin "lua for n in pairs(box) do print('  - box.', n) end"
+exec admin "lua local t = {} for n in pairs(box) do table.insert(t, '  - box.' .. tostring(n)) end table.sort(t) for i = 1, #t do print(t[i]) end t = nil"
 # Test box.pack()
 exec admin "lua box.pack()"
 exec admin "lua box.pack(1)"

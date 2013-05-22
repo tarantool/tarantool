@@ -388,13 +388,6 @@ end
 --
 --
 --
-function box.call(proc_name, ...)
-    return box.net.box.emb:call(proc_name, ...)
-end
-
---
---
---
 function box.select_limit(space, index, offset, limit, ...)
     return box.net.box.emb:select_limit(space, index, offset, limit, ...)
 end
@@ -639,38 +632,6 @@ end
 -- User can redefine the hook
 function box.on_reload_configuration()
 end
-
-
-local s
-local syncno = 0
-
-function iostart()
-    if s ~= nil then
-        return
-    end
-
-    s = box.socket.tcp()
-    s:connect('127.0.0.1', box.cfg.primary_port)
-    
-    box.fiber.resume( box.fiber.create(
-        function()
-            box.fiber.detach()
-            while true do
-                s:recv(12)
-            end
-        end
-    ))
-end
-
-function iotest()
-    iostart()
-
-    syncno = syncno + 1
-    return s:send(box.pack('iii', 65280, 0, syncno))
-
-end
-
-
 
 require("bit")
 

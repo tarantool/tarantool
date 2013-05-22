@@ -1202,15 +1202,15 @@ lbox_process(lua_State *L)
 	u32 op = lua_tointeger(L, 1); /* Get the first arg. */
 	size_t sz;
 	const void *req = luaL_checklstring(L, 2, &sz); /* Second arg. */
-/*         if (op == CALL) { */
+	if (op == CALL) {
 		/*
 		 * We should not be doing a CALL from within a CALL.
 		 * To invoke one stored procedure from another, one must
 		 * do it in Lua directly. This deals with
 		 * infinite recursion, stack overflow and such.
 		 */
-/*                 return luaL_error(L, "box.process(CALL, ...) is not allowed"); */
-/*         } */
+		return luaL_error(L, "box.process(CALL, ...) is not allowed");
+	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
