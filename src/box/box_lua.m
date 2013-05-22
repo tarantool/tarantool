@@ -1276,6 +1276,21 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	}
 }
 
+
+/**
+ * A helper to find lua objects by box.find
+ */
+
+static int
+lbox_find(struct lua_State *L)
+{
+	const char *name;
+	size_t name_len;
+	name = lua_tolstring(L, 1, &name_len);
+	box_lua_find(L, name, name + name_len);
+	return 1;
+}
+
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
@@ -1791,8 +1806,10 @@ lbox_unpack(struct lua_State *L)
 #undef CHECK_SIZE
 }
 
+
 static const struct luaL_reg boxlib[] = {
 	{"process", lbox_process},
+	{"find",  lbox_find},
 	{"raise", lbox_raise},
 	{"pack", lbox_pack},
 	{"unpack", lbox_unpack},

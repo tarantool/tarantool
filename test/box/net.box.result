@@ -13,6 +13,10 @@ lua remote:ping()
 ---
  - true
 ...
+lua box.net.box.ping(remote)
+---
+ - true
+...
 lua box.insert(0, 123, 'test1', 'test2')
 ---
  - 123: {'test1', 'test2'}
@@ -120,7 +124,7 @@ lua pstart = box.time()
 lua parallel = {}
 ---
 ...
-lua function parallel_foo(id) box.fiber.sleep(math.random() * .2) return id end
+lua function parallel_foo(id) box.fiber.sleep(math.random() * .05) return id end
 ---
 ...
 lua parallel_foo('abc')
