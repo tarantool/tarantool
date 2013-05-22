@@ -1014,7 +1014,7 @@ lua_table_to_tuple(struct lua_State *L, int index)
 		{
 			bool value = lua_toboolean(L, -1);
 			const char *str = value ? "true" : "false";
-			field_len = strlen(str) + 1;
+			field_len = strlen(str);
 			break;
 		}
 		case LUA_TCDATA:
@@ -1065,7 +1065,7 @@ lua_table_to_tuple(struct lua_State *L, int index)
 		{
 			bool value = lua_toboolean(L, -1);
 			const char *str = value ? "true" : "false";
-			pos = pack_lstr(pos, str, strlen(str) + 1);
+			pos = pack_lstr(pos, str, strlen(str));
 			break;
 		}
 		case LUA_TCDATA:
