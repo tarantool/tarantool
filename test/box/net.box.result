@@ -114,10 +114,13 @@ lua remote:timeout(0.1):call('box.fiber.sleep', '10')
 ---
  - nil
 ...
+lua pstart = box.time()
+---
+...
 lua parallel = {}
 ---
 ...
-lua function parallel_foo(id) return id end
+lua function parallel_foo(id) box.fiber.sleep(math.random() * .2) return id end
 ---
 ...
 lua parallel_foo('abc')
@@ -127,7 +130,7 @@ lua parallel_foo('abc')
 lua for i = 1, 20 do box.fiber.resume(box.fiber.create(function() box.fiber.detach() local s = string.format('%07d', i) local so = remote:call('parallel_foo', s) table.insert(parallel, tostring(s == so[0]) ) end)) end
 ---
 ...
-lua box.fiber.sleep(0.1)
+lua for i = 1, 20 do if #parallel == 20 then break end box.fiber.sleep(0.1) end
 ---
 ...
 lua unpack(parallel)
@@ -156,4 +159,8 @@ lua unpack(parallel)
 lua #parallel
 ---
  - 20
+...
+lua box.time() - pstart < 0.5
+---
+ - true
 ...

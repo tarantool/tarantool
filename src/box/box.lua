@@ -298,9 +298,10 @@ box.net.box.new = function(host, port, timeout)
         
         wait_response = function(self, sync, op)
             local response;
-            if self.timeout_request ~= nil then
-                response = self.processing[sync]
-                    :get(tonumber(self.timeout_request))
+            local timeout = self.timeout_request
+            self.timeout_request = nil
+            if timeout ~= nil then
+                response = self.processing[sync]:get(tonumber(timeout))
             else
                 response = self.processing[sync]:get()
             end
