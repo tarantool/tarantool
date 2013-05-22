@@ -146,13 +146,7 @@ box.net.box.emb = {
     end,
 
     call = function(self, proc_name, ...)
-        local fref = _G
-        for spath in string.gmatch(proc_name, '([^.]+)') do
-            fref = fref[spath]
-            if fref == nil then
-                error("function '" .. proc_name .. "' was not found")
-            end
-        end
+        local fref = box.find(proc_name)
         if type(fref) ~= 'function' then
             error("object '" .. proc_name .. "' is not a function")
         end
