@@ -125,7 +125,7 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
     endif()
 endif()
 
-set (VERSION_FILE "${CMAKE_BINARY_DIR}/VERSION")
+set (VERSION_FILE "${CMAKE_SOURCE_DIR}/VERSION")
 
 # Update version file or use it when there is no git
 # repository within sources (source tarballs).
