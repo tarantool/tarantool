@@ -168,3 +168,15 @@ lua box.time() - pstart < 0.5
 ---
  - true
 ...
+lua remote:close()
+---
+ - true
+...
+lua remote:close()
+---
+error: '[string "box.net = {..."]:383: box.net.box: already closed'
+...
+lua remote:ping()
+---
+error: '[string "box.net = {..."]:388: box.net.box: connection was closed'
+...

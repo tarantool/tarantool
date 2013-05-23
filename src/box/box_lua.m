@@ -47,8 +47,6 @@
 #include "port.h"
 #include "tbuf.h"
 
-/* contents of box.lua */
-extern const char box_lua[];
 
 /**
  * All box connections share the same Lua state. We use
@@ -1831,9 +1829,16 @@ mod_lua_init(struct lua_State *L)
 	box_index_init_iterator_types(L, -2);
 	lua_pop(L, 1);
 	tarantool_lua_register_type(L, iteratorlib_name, lbox_iterator_meta);
-	/* Load box.lua */
-	if (luaL_dostring(L, box_lua))
-		panic("Error loading box.lua: %s", lua_tostring(L, -1));
+
+	extern const struct { const char *file, *body; } box_lua[];
+	for (int i = 0; box_lua[i].file; i++) {
+		say_debug("Processing internal lua file %s", box_lua[i].file);
+		/* Load box.lua */
+		if (luaL_dostring(L, box_lua[i].body)) {
+			panic("Error loading '%s': %s",
+				box_lua[i].file, lua_tostring(L, -1));
+		}
+	}
 
 	assert(lua_gettop(L) == 0);
 
