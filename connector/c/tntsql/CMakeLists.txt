@@ -68,6 +68,6 @@ set_target_properties(tntsql_shared PROPERTIES OUTPUT_NAME "tarantoolsql")
 #----------------------------------------------------------------------------#
 
 # install static library
-install_targets(/lib tntsql)
+install_targets(/${CMAKE_INSTALL_LIBDIR} tntsql)
 # install shared library
-install_targets(/lib tntsql_shared)
+install_targets(/${CMAKE_INSTALL_LIBDIR} tntsql_shared)
