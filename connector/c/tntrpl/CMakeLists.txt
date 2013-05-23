@@ -66,6 +66,6 @@ set_target_properties(tntrpl_shared PROPERTIES OUTPUT_NAME "tarantoolrpl")
 #----------------------------------------------------------------------------#
 
 # install static library
-install_targets(/lib tntrpl)
+install_targets(/${CMAKE_INSTALL_LIBDIR} tntrpl)
 # install shared library
-install_targets(/lib tntrpl_shared)
+install_targets(/${CMAKE_INSTALL_LIBDIR} tntrpl_shared)
