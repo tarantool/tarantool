@@ -545,8 +545,9 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 
 /** @retval true if check failed, false otherwise */
 static bool
-fiber_checkstack(struct lua_State *L)
+lbox_fiber_checkstack(struct lua_State *L)
 {
+	fiber_checkstack();
 	struct fiber *f = fiber;
 	const int MAX_STACK_DEPTH = 16;
 	int depth = 1;
@@ -564,7 +565,7 @@ lbox_fiber_create(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1 || !lua_isfunction(L, 1))
 		luaL_error(L, "fiber.create(function): bad arguments");
-	if (fiber_checkstack(L))
+	if (lbox_fiber_checkstack(L))
 		luaL_error(L, "fiber.create(function): recursion limit"
 			   " reached");
 
@@ -645,6 +646,52 @@ lbox_fiber_resume(struct lua_State *L)
 	return nargs;
 }
 
+static void
+box_lua_fiber_run_detached(va_list ap)
+{
+	int coro_ref = va_arg(ap, int);
+	struct lua_State *L = va_arg(ap, struct lua_State *);
+	@try {
+		lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
+	} @catch (FiberCancelException *e) {
+		@throw;
+	} @catch (tnt_Exception *e) {
+		[e log];
+	} @catch (id allOthers) {
+		lua_settop(L, 1);
+		if (lua_tostring(L, -1) != NULL)
+			say_error("%s", lua_tostring(L, -1));
+	} @finally {
+		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+	}
+}
+
+/**
+ * Create, resume and detach a fiber
+ * given the function and its arguments.
+ */
+static int
+lbox_fiber_wrap(struct lua_State *L)
+{
+	if (lua_gettop(L) < 1 || !lua_isfunction(L, 1))
+		luaL_error(L, "fiber.wrap(function, ...): bad arguments");
+	fiber_checkstack();
+
+	struct fiber *f = fiber_new("lua", box_lua_fiber_run_detached);
+	/* Not a system fiber. */
+	f->flags |= FIBER_USER_MODE;
+	struct lua_State *child_L = lua_newthread(L);
+	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	/* Move the arguments to the new coro */
+	lua_xmove(L, child_L, lua_gettop(L));
+	fiber_call(f, coro_ref, child_L);
+	if (f->fid)
+		lbox_pushfiber(L, f);
+	else
+		lua_pushnil(L);
+	return 1;
+}
+
 /**
  * Yield the current fiber.
  *
@@ -708,7 +755,7 @@ fiber_is_caller(struct lua_State *L, struct fiber *f) {
 static int
 lbox_fiber_status(struct lua_State *L)
 {
-	struct fiber *f = lbox_checkfiber(L, 1);
+	struct fiber *f = lua_gettop(L) ? lbox_checkfiber(L, 1) : fiber;
 	const char *status;
 	if (f->fid == 0) {
 		/* This fiber is dead. */
@@ -834,6 +881,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"testcancel", lbox_fiber_testcancel},
 	{"create", lbox_fiber_create},
 	{"resume", lbox_fiber_resume},
+	{"wrap", lbox_fiber_wrap},
 	{"yield", lbox_fiber_yield},
 	{"status", lbox_fiber_status},
 	{"name", lbox_fiber_name},

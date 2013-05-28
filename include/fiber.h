@@ -106,6 +106,9 @@ fiber_name(struct fiber *f)
 	return palloc_name(f->gc_pool);
 }
 
+void
+fiber_checkstack();
+
 void fiber_yield(void);
 void fiber_yield_to(struct fiber *f);
 

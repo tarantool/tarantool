@@ -78,7 +78,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 		/* end of silverproxy error codes */ \
 	/* 24 */_(ER_UNUSED24,			2, "Unused24") \
 	/* 25 */_(ER_TUPLE_IS_EMPTY,		2, "UPDATE error: the new tuple has no fields") \
-	/* 26 */_(ER_UNUSED26,			2, "Unused26") \
+	/* 26 */_(ER_FIBER_STACK,		2, "Can not create a new fiber: recursion limit reached") \
 	/* 27 */_(ER_UNUSED27,			2, "Unused27") \
 	/* 28 */_(ER_UNUSED28,			2, "Unused28") \
 	/* 29 */_(ER_UNUSED29,			2, "Unused29") \

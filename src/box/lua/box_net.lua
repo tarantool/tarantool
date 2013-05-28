@@ -1,4 +1,11 @@
 box.net = {
+--
+-- The idea of box.net.box implementation is that
+-- most calls are simply wrappers around 'process'
+-- function. The embedded 'process' function sends
+-- requests to the local server, the remote 'process'
+-- routes requests to a remote.
+--
     box = {
         delete = function(self, space, ...)
             local key_part_count = select('#', ...)
@@ -101,6 +108,10 @@ box.net = {
             )
         end,
 
+        -- To make use of timeouts safe across multiple
+        -- concurrent fibers do not store timeouts as
+        -- part of conection state, but put it inside
+        -- a helper object.
 
         timeout = function(self, timeout)
 
@@ -108,17 +119,17 @@ box.net = {
 
             setmetatable(wrapper, {
                 __index = function(wrp, name, ...)
-                    local foo = self[name]
-                    if foo ~= nil then
+                    local func = self[name]
+                    if func ~= nil then
                         return
                             function(wr, ...)
-                                self.timeout_request = timeout
-                                return foo(self, ...)
+                                self.request_timeout = timeout
+                                return func(self, ...)
                             end
                     end
-                    
-                    error(string.format('Can not find "remote:%s" function',
-                        name))
+
+                    error(string.format('Can not find "box.net.box.%s" function',
+                            name))
                 end
             });
 
@@ -132,7 +143,7 @@ box.net = {
         process = function(self, ...)
             return box.process(...)
         end,
-        
+
         select_range = function(self, sno, ino, limit, ...)
             return box.space[tonumber(sno)].index[tonumber(ino)]
                 :select_range(tonumber(limit), ...)
@@ -143,18 +154,17 @@ box.net = {
                 :select_reverse_range(tonumber(limit), ...)
         end,
 
+        -- for compatibility with the networked version,
+        -- implement call
         call = function(self, proc_name, ...)
-            local fref = box.find(proc_name)
-            if type(fref) ~= 'function' then
-                error("object '" .. proc_name .. "' is not a function")
-            end
-            return fref(...)
+            local proc = box.call_loadproc(proc_name)
+            return proc(...)
         end,
 
         ping = function(self)
             return true
         end,
-        
+
         -- local tarantool doesn't provide timeouts
         timeout = function(self, timeout)
             return self
@@ -166,6 +176,10 @@ box.net = {
     }
 }
 
+--
+-- Make sure box.net.box.select(conn, ...) works
+-- just as well as conn:select(...)
+--
 setmetatable(box.net.self, { __index = box.net.box })
 
 box.net.box.new = function(host, port, reconnect_timeout)
@@ -195,7 +209,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     end
                 end
             end,
-           
+
             -- write channel
             wch = box.ipc.channel(1),
 
@@ -204,12 +218,13 @@ box.net.box.new = function(host, port, reconnect_timeout)
         },
 
 
-       
+
         process = function(self, op, request)
             local started = box.time()
-            local timeout = self.timeout_request
-            self.timeout_request = nil
+            local timeout = self.request_timeout
+            self.request_timeout = nil
 
+            -- get an auto-incremented request id
             local sync = self.processing:next_sync()
             self.processing[sync] = box.ipc.channel(1)
             request = box.pack('iiia', op, string.len(request), sync, request)
@@ -256,6 +271,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                         box.raise(code, body)
                     end
 
+            -- boc.unpack('R') unpacks response body for us (tuple)
                     return box.unpack('R', body)
                 end
             else
@@ -298,9 +314,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 self:fatal("Unexpected eof while reading header")
                 return
             end
-           
+
             local op, blen, sync = box.unpack('iii', header)
-                    
+
             local body = ''
             if blen > 0 then
                 res = { self.s:recv(blen) }
@@ -335,7 +351,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     if sync == nil then
                         break
                     end
-                    
+
                     if self.processing[sync] ~= nil then
                         self.processing[sync]:put({true, resp}, 0)
                     else
@@ -405,3 +421,4 @@ box.net.box.new = function(host, port, reconnect_timeout)
     return remote
 end
 
+-- vim: set et ts=4 sts

@@ -51,7 +51,7 @@ ER = {
    23: "ER_RESERVED23"          ,
    24: "ER_UNUSED24"            ,
    25: "ER_TUPLE_IS_EMPTY"      ,
-   26: "ER_UNUSED26"            ,
+   26: "ER_FIBER_STACK"         ,
    27: "ER_UNUSED27"            ,
    28: "ER_UNUSED28"            ,
    29: "ER_UNUSED29"            ,

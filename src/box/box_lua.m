@@ -47,6 +47,9 @@
 #include "port.h"
 #include "tbuf.h"
 
+/* contents of box.lua, misc.lua, box.net.lua respectively */
+extern char box_lua[], box_net_lua[], misc_lua[];
+const char *lua_sources[] = { box_lua, box_net_lua, misc_lua, NULL };
 
 /**
  * All box connections share the same Lua state. We use
@@ -1276,11 +1279,14 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 
 
 /**
- * A helper to find lua objects by box.find
+ * A helper to find lua stored procedures for box.call.
+ * box.call iteslf is pure Lua, to avoid issues
+ * with infinite call recursion smashing C
+ * thread stack.
  */
 
 static int
-lbox_find(struct lua_State *L)
+lbox_call_loadproc(struct lua_State *L)
 {
 	const char *name;
 	size_t name_len;
@@ -1624,6 +1630,29 @@ lbox_pack(struct lua_State *L)
 	return 1;
 }
 
+const char *
+box_unpack_response(struct lua_State *L, const void *s, const void *end)
+{
+	u32 tuple_count = pick_u32(&s, end);
+
+	/* Unpack and push tuples. */
+	while (tuple_count--) {
+		u32 bsize = pick_u32(&s, end);
+		u32 field_count = pick_u32(&s, end);
+		if (valid_tuple(s, end, field_count) != bsize)
+			luaL_error(L, "box.unpack(): can't unpack tuple");
+
+		struct tuple *t = tuple_alloc(bsize);
+		t->field_count = field_count;
+		memcpy(t->data, s, bsize);
+
+		s += bsize;
+		lbox_pushtuple(L, t);
+	}
+	return s;
+}
+
+
 static int
 lbox_unpack(struct lua_State *L)
 {
@@ -1636,7 +1665,7 @@ lbox_unpack(struct lua_State *L)
 	const void *end = str + str_size;
 	const void *s = str;
 
-	int i = 0;
+	int save_stacksize = lua_gettop(L);
 
 	char charbuf;
 	u8  u8buf;
@@ -1679,7 +1708,7 @@ lbox_unpack(struct lua_State *L)
 			break;
 
 		case 'a':
-		case 'A':
+		case 'A': /* The rest of the data is a Lua string. */
 			lua_pushlstring(L, s, end - s);
 			s = end;
 			break;
@@ -1729,69 +1758,19 @@ lbox_unpack(struct lua_State *L)
 			s += 5;
 			break;
 
-		case 'R': {
-			if (end - s < 4)
-				goto WRONG_RESPONSE;
-			u32 count = *(u32 *)s;
-			s += 4;
-
-			if (s == end) {
-				lua_pushnumber(L, count);
-				break;
-			}
-			while(count--) {
-				if (end - s < 4)
-					goto WRONG_RESPONSE;
-				u32 size = *(u32 *)s;
-				s += 4;
-
-				if (end - s < size)
-					goto WRONG_RESPONSE;
-
-				if (end - s < 4)
-					goto WRONG_RESPONSE;
-				u32 c = *(u32 *)s;
-				s += 4;
-
-
-				/* check input tuple */
-				typeof(s) tdata = s;
-				for (u32 j = 0; j < c; j++) {
-					u32 fsize = pick_varint32(&tdata, end);
-					if (end - tdata < fsize)
-						goto WRONG_RESPONSE;
-					tdata += fsize;
-				}
-				if (tdata != s + size)
-					goto WRONG_RESPONSE;
-
-
-				struct tuple * t = tuple_alloc(size);
-				t->field_count = c;
-				memcpy(t->data, s, size);
-
-				s += size;
-				lbox_pushtuple(L, t);
-
-				/* latest increment outside switch */
-				if (count)
-					i++;
-
-			}
-
+		case 'R': /* Unpack server response, IPROTO format. */
+		{
+			s = box_unpack_response(L, s, end);
 			break;
-			WRONG_RESPONSE:
-				luaL_error(L, "Can't parse response body");
-
 		}
-
 		default:
 			luaL_error(L, "box.unpack: unsupported "
 				   "format specifier '%c'", *f);
 		}
-		i++;
 		f++;
 	}
+
+	assert(s <= end);
 
 	if (s != end) {
 		luaL_error(L, "box.unpack('%s'): too many bytes: "
@@ -1799,15 +1778,14 @@ lbox_unpack(struct lua_State *L)
 			   format, s - str, str_size);
 	}
 
-	return i;
+	return lua_gettop(L) - save_stacksize;
 
 #undef CHECK_SIZE
 }
 
-
 static const struct luaL_reg boxlib[] = {
 	{"process", lbox_process},
-	{"find",  lbox_find},
+	{"call_loadproc",  lbox_call_loadproc},
 	{"raise", lbox_raise},
 	{"pack", lbox_pack},
 	{"unpack", lbox_unpack},
@@ -1830,14 +1808,11 @@ mod_lua_init(struct lua_State *L)
 	lua_pop(L, 1);
 	tarantool_lua_register_type(L, iteratorlib_name, lbox_iterator_meta);
 
-	extern const struct { const char *file, *body; } box_lua[];
-	for (int i = 0; box_lua[i].file; i++) {
-		say_debug("Processing internal lua file %s", box_lua[i].file);
-		/* Load box.lua */
-		if (luaL_dostring(L, box_lua[i].body)) {
-			panic("Error loading '%s': %s",
-				box_lua[i].file, lua_tostring(L, -1));
-		}
+	/* Load Lua extension */
+	for (const char **s = lua_sources; *s; s++) {
+		if (luaL_dostring(L, *s))
+			panic("Error loading Lua source %.160s...: %s",
+			      *s, lua_tostring(L, -1));
 	}
 
 	assert(lua_gettop(L) == 0);

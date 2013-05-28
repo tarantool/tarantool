@@ -110,11 +110,10 @@ lua remote:timeout(0.5):select(0, 0, 345)
 ---
  - 345: {'test1-replaced', 'test2-replaced'}
 ...
-lua remote:call('box.fiber.sleep', '.1')
+lua remote:call('box.fiber.sleep', '.01')
 ---
- - 0
 ...
-lua remote:timeout(0.1):call('box.fiber.sleep', '10')
+lua remote:timeout(0.01):call('box.fiber.sleep', '10')
 ---
  - nil
 ...
@@ -174,9 +173,9 @@ lua remote:close()
 ...
 lua remote:close()
 ---
-error: '[string "box.net = {..."]:383: box.net.box: already closed'
+error: '[string "box.net = {..."]:399: box.net.box: already closed'
 ...
 lua remote:ping()
 ---
-error: '[string "box.net = {..."]:388: box.net.box: connection was closed'
+error: '[string "box.net = {..."]:404: box.net.box: connection was closed'
 ...

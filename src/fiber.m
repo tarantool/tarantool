@@ -72,7 +72,7 @@ fiber_call(struct fiber *callee, ...)
 {
 	struct fiber *caller = fiber;
 
-	assert(sp - call_stack < FIBER_CALL_STACK);
+	assert(sp + 1 - call_stack < FIBER_CALL_STACK);
 	assert(caller);
 
 	fiber = callee;
@@ -89,6 +89,12 @@ fiber_call(struct fiber *callee, ...)
 	va_end(fiber->f_data);
 }
 
+void
+fiber_checkstack()
+{
+	if (sp + 1 - call_stack >= FIBER_CALL_STACK)
+		tnt_raise(ClientError, :ER_FIBER_STACK);
+}
 
 /** Interrupt a synchronous wait of a fiber inside the event loop.
  * We do so by keeping an "async" event in every fiber, solely

@@ -44,8 +44,8 @@ exec admin "lua box.select(0, 0, 345)"
 exec admin "lua remote:select(0, 0, 345)"
 exec admin "lua remote:timeout(0.5):select(0, 0, 345)"
 
-exec admin "lua remote:call('box.fiber.sleep', '.1')"
-exec admin "lua remote:timeout(0.1):call('box.fiber.sleep', '10')"
+exec admin "lua remote:call('box.fiber.sleep', '.01')"
+exec admin "lua remote:timeout(0.01):call('box.fiber.sleep', '10')"
 
 
 exec admin "lua pstart = box.time()"

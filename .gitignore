@@ -65,7 +65,7 @@ third_party/luajit/src/lj_recdef.h
 third_party/luajit/src/lj_vm.s
 *.reject
 extra/txt2c
-src/box/*.lua.c
+src/box/lua/*.lua.c
 doc/www-data/*.html
 doc/www-data/*.ru.html
 doc/www-data.in/download

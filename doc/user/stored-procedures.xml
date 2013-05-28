@@ -319,7 +319,7 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
 <variablelist xml:id="box" xreflabel="box">
     <varlistentry>
         <term>
-            <emphasis role="lua">box.process(op, request)</emphasis>
+            <emphasis role="lua" xml:id="box.process">box.process(op, request)</emphasis>
         </term>
         <listitem>
             <para>
@@ -422,7 +422,7 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.insert(space_no, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.insert">box.insert(space_no, ...)</emphasis>
         </term>
         <listitem><simpara></simpara></listitem>
     </varlistentry>
@@ -430,7 +430,7 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.select_limit" xreflabel="box.select_limit">
-                box.select(space_no, index_no, offset, limit, ...)
+                box.select_limit(space_no, index_no, offset, limit, ...)
             </emphasis>
         </term>
         <listitem>
@@ -448,7 +448,7 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.replace(space_no, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.replace">box.replace(space_no, ...)</emphasis>
         </term>
         <listitem>
             <para>
@@ -467,7 +467,7 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.update(space_no, key, format, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.update">box.update(space_no, key, format, ...)</emphasis>
         </term>
         <listitem>
             <para>
@@ -540,7 +540,7 @@ localhost> lua box.update(0, 2, '#p', 2, 'Bienvenue tout le monde!')
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.delete(space_no, ...)</emphasis>
+            <emphasis role="lua" xml:id="box.delete">box.delete(space_no, ...)</emphasis>
         </term>
         <listitem><para>
             Delete a tuple identified by a primary key.
@@ -1619,14 +1619,14 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 <variablelist xml:id="box.fiber">
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.id(fiber) </emphasis>
+            <emphasis role="lua" xml:id="box.fiber.id">box.fiber.id(fiber) </emphasis>
         </term>
         <listitem><simpara>Return a numeric id of the fiber.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.self() </emphasis>
+            <emphasis role="lua" xml:id="box.fiber.self">box.fiber.self() </emphasis>
         </term>
         <listitem><simpara>Return <code>box.fiber</code> userdata
         object for the currently scheduled fiber.</simpara></listitem>
@@ -1634,14 +1634,14 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.find(id) </emphasis>
+            <emphasis role="lua" xml:id="box.fiber.find">box.fiber.find(id) </emphasis>
         </term>
         <listitem><simpara>Locate a fiber userdata object by id.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.create(function) </emphasis>
+            <emphasis role="lua" xml:id="box.fiber.create">box.fiber.create(function) </emphasis>
         </term>
         <listitem><simpara>
             Create a fiber for <code>function</code>.
@@ -1653,7 +1653,7 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.resume(fiber, ...) </emphasis>
+            <emphasis role="lua" xml:id="box.fiber.resume">box.fiber.resume(fiber, ...) </emphasis>
         </term>
         <listitem><simpara>Resume a created
         or suspended fiber.</simpara></listitem>
@@ -1671,13 +1671,14 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         If the fiber is attached, whatever arguments are passed
         to this call, are passed on to the calling fiber.
         If the fiber is detached, <code>box.fiber.yield()</code>
-        returns back everything passed into it.
+        returns back everything passed into it after temporarily
+        yielding control back to the scheduler.
         </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.detach()</emphasis>
+            <emphasis role="lua" xml:id="box.fiber.detach">box.fiber.detach()</emphasis>
         </term>
         <listitem><simpara>
         Detach the current fiber. This is a cancellation point. This is a yield point.
@@ -1686,7 +1687,19 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.sleep(time)</emphasis>
+            <emphasis role="lua" xml:id="box.fiber.wrap">box.fiber.wrap(function, ...)</emphasis>
+        </term>
+        <listitem><simpara>
+            This is a quick way to create and start a detached
+            fiber. The fiber function is passed in the first
+            argument, the function arguments follow. The fiber is
+            created detached and resumed immediately.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="box.fiber.sleep">box.fiber.sleep(time)</emphasis>
         </term>
         <listitem><simpara>
     Yield to the sched fiber and sleep <code>time</code> seconds.
@@ -1696,7 +1709,20 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.cancel(fiber)</emphasis>
+            <emphasis role="lua" xml:id="box.fiber.status">box.fiber.status(fiber)</emphasis>
+        </term>
+        <listitem><simpara>
+            Returns the status of the fiber. If no argument is
+            provided, the current fiber's status is returned. The
+            status can be either <quote>dead</quote>,
+            <quote>suspended</quote>, <quote>attached</quote>
+            or <quote>running</quote>.
+        </simpara></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="box.fiber.cancel">box.fiber.cancel(fiber)</emphasis>
         </term>
         <listitem><simpara>
         Cancel a <code>fiber</code>.
@@ -1707,7 +1733,7 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.fiber.testcancel()</emphasis>
+            <emphasis role="lua" xml:id="box.fiber.testcancel">box.fiber.testcancel()</emphasis>
         </term>
         <listitem><simpara>
             Check if the current fiber has been canceled and
@@ -2217,35 +2243,98 @@ end
 
 <section xml:id="sp-box-net-box">
     <title>Package <code>box.net.box</code> &mdash; working with networked Tarantool peers</title>
-<variablelist xml:id="box.net.box">
     <simpara>
         Library <code>box.net</code> contains connectors
-        to remote systems, such as MariaDB or PostgreSQL, etc.
-        The first supported system is Tarantool itself, a
-        connector for it is implemented in library <code>box.net.box</code>.
+        to remote database systems, such as MariaDB or PostgreSQL.
+        The first supported system is Tarantool itself.
+    </simpara>
+<variablelist xml:id="box.net.box">
+    <simpara>
+        The basic object provided by <code>box.net.box</code>
+        library is a connection. A connection is created by
+        calling <code>box.net.box.new()</code>. To
+        execute remote requests, simply invoke methods of the
+        connection object, a physical connection is established
+        upon request and is re-established if necessary.
+        When done, issue <code>conn:close()</code>. Connection
+        objects are garbage collected just like any other objects
+        in Lua, so an explicit destruction is not mandatory.
+        However, since <code>close()</code> is a system call, it
+        is a good programming practice to close a connection
+        explicitly when it is no longer needed, to avoid lengthy
+        stalls of the garbage collector.
+    </simpara>
+    <simpara>
+        The library also provides a pre-created connection object
+        to the local server, <code>box.net.self</code>.  This
+        connection is always <quote>established</quote>.  The
+        purpose of this object is to make polymorphic use of
+        <code>box.net.box</code> API easier. There is an
+        important difference, however, between the embedded
+        connection and a remote one. With the embedded connection,
+        requests which do not modify data do not yield. When using
+        a remote connection, it is important to keep in mind that
+        any request can yield, and local database state may
+        have changed by the time it returns.
+    </simpara>
+    <simpara>
+        All <code>box.net.box</code> methods are fiber-safe.  It's
+        safe to share and use the same connection object across
+        multiple concurrent fibers.  In fact, it's perhaps the
+        best programming practice with Tarantool: when multiple
+        fibers use the same connection, all requests are pipelined
+        through the same network socket, but each fiber gets a
+        correct response back. Reducing the number of active sockets
+        lowers the overhead of system calls and increases the
+        overall server performance. There are, however cases, when
+        a single connection is not enough: when it's necessary to
+        prioritize requests, use different authentication ids,
+        etc.
+    </simpara>
+    <simpara>
+        All remote calls support execution timeouts. A specialized
+        wrapper, <code>box.net.box.timeout()</code> allows setting
+        a timeout. Using a wrapper object makes the remote
+        connection API compatible with the local one, removing
+        the need for a separate <code>timeout</code> argument, ignored
+        by the local version. Once sent, a
+        request can not be revoked from the remote server even if
+        a timeout expires: the expired timeout only aborts the
+        wait for the remote server response.
+        <code>box.net.box.timeout()</code>,
+    </simpara>
+    <simpara>
+        Object-oriented and functional APIs are equivalent:
+        <code>conn:close()</code> is identical to
+        <code>box.net.box.close(conn)</code>.
     </simpara>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">conn = box.net.box.new(host, port [, connect_timeout])</emphasis>
+            <emphasis role="lua" xml:id="box.net.box.new">
+            conn = box.net.box.new(host, port [, reconnect_interval])</emphasis>
         </term>
         <listitem>
             <para>
-                Create a new connection to a remote Tarantool. The
-                connection is established on demand, at the time
-                of first request. The returned object supports
-                methods for making remote calls, such as select,
-                update or delete. All calls to a remote server
-                support timeouts.
+                Create a new connection. The connection is
+                established on demand, at the time of the first
+                request. It is re-established automatically after
+                a disconnect. Argument
+                <code>reconnect_interval</code> (in seconds) is
+                responsible for the amount of time the server
+                sleeps between failing attempts to reconnect. The
+                returned object supports methods for making remote
+                calls, such as select, update or delete.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:ping()</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.ping">
+            conn:ping()</emphasis></term>
         <listitem>
             <para>
-                Send PING command to a remote server.
+                Execute a PING command.
                 Returns <code>true</code> on success,
                 <code>false</code> on error.
             </para>
@@ -2253,7 +2342,8 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:close()</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.close">
+            conn:close()</emphasis></term>
         <listitem>
             <para>
                 Close a connection. The connection is also
@@ -2266,86 +2356,120 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:select()</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.select">
+            conn:select(space_no, index_no, ...)</emphasis></term>
         <listitem>
-            <para>See box.select(...). Please note, that unlike
-            a local <code>box.select()</code> any call to a remote
-            server yields, thus local data may change while
-            remote <code>select()</code> is running.</para>
+            <para>
+                See <code
+                xlink:href="#box.select">box.select(...)</code>.
+                Please note, that unlike a local
+                <code>box.select()</code> any call to a remote
+                server yields, thus local data may change while
+                remote <code>select()</code> is running.
+            </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:select_limit()</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.select_limit">
+            conn:select_limit(space_no, index_no, offset, limit, ...)</emphasis></term>
         <listitem>
-            <para>See box.select_limit(...)</para>
+            <para>
+                See <code
+                xlink:href="#box.select_limit">box.select_limit(...)</code>
+            </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:select_range()</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.select_range">
+            conn:select_range(space_no, index_no, limit, key, ...)</emphasis></term>
         <listitem>
-            <para>See box.select_range(...)</para>
+            <para>
+                See <code
+                xlink:href="#box.select_range">box.select_range(...)</code>.
+            </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:insert()</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.insert">conn:insert(space_no, ...)</emphasis></term>
         <listitem>
-            <para>See box.insert(...)</para>
+            <para>
+                See <code xlink:href="#box.insert">box.insert(...)</code>.
+            </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:replace()</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.replace">conn:replace(space_no, ...)</emphasis></term>
         <listitem>
-            <para>See box.replace(...)</para>
+            <para>
+                See <code xlink:href="#box.replace">box.replace(...)</code>.
+            </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:update(...)</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.update">conn:update(...)</emphasis></term>
         <listitem>
-            <para>See box.update(...)</para>
+            <para>
+                See <code
+                xlink:href="#box.update">box.update(...)</code>.
+            </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:delete(...)</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.delete">conn:delete(space_no, key)</emphasis></term>
         <listitem>
-            <para>See box.delete(...)</para>
+            <para>
+                See <code xlink:href="#box.delete">box.delete(...)</code>.
+            </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">conn:call(...)</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.call">conn:call(proc_name, ...)</emphasis></term>
         <listitem>
-            <para>Call a remote stored procedure, such as <code>box.select_reverse_range()</code> and such.</para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua">conn:timeout(timeout)</emphasis></term>
-        <listitem>
-            <para>Returns a closure which is identical to the invoked
-            function, excepts adds time out functionality to it.
+            <para>Call a remote stored procedure, such as
+            <code>box.select_reverse_range()</code>.
+            Please keep in mind that the call is using
+            the binary protocol to pack procedure arguments,
+            and since the latter is type-agnostic it's recommended
+            to pass all arguments of remote stored procedure as
+            strings, for example:
 <programlisting>
--- wait for 'foo' result until 'foo' is finished
-local something = remote:call('foo', 'arg1', ...)
+    conn:call("box.select_reverse_range", "1", "4", "10", "Smith")
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
 
--- wait up to 0.1 second return nil if foo is still continue
-local other = remote:timeout(0.1):call('foo', 'arg1', ...)
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.timeout">conn:timeout(timeout)</emphasis></term>
+        <listitem>
+            <para>
+                Returns a closure which is identical to the
+                invoked function, except the added timeout
+                functionality.
+<programlisting>
+-- wait for 'update' until it is finished
+local tuple = conn:update('1', 'key', ...)
+
+-- send update but don't bother to wait for results
+local other = conn:timeout(0):update('1', 'arg1', ...)
 </programlisting>
             </para>
         </listitem>
     </varlistentry>
 </variablelist>
 
- <bridgehead renderas="sect4">Examples</bridgehead>
+ <bridgehead renderas="sect4">Example</bridgehead>
  <programlisting>
+-- connect to the local server
 local self = box.net.box.new('127.0.0.1', box.info.primary_port)
-self:ping()
-self:insert(1,3,4)
+self:insert("1", "Hello", "World")
 </programlisting>
 </section>
 
