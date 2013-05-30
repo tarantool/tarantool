@@ -61,108 +61,37 @@ All charts below were measured using 1M queries per test, averaged
 over 8 consecutive test runs.
 
 Configuration files for the tested systems can be found
-[here](https://github.com/bigbes92/ycsb-expand-db/tree/master/confs)
-and [here](https://github.com/bigbes92/ycsb-expand-db/blob/master/lib/mongodb.py).
+[here](https://github.com/bigbes92/ycsb-expand-db/tree/master/confs).
 
-## Workload A
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script type="text/javascript" src="highcharts.js"></script>
+<div class="b-tabs">
+    <div>
+        <ul class="b-tabs__list">
+            <li class="b-tabs__li b-tabs__li_on">A</li>
+            <li class="b-tabs__li">B</li>
+            <li class="b-tabs__li">C</li>
+            <li class="b-tabs__li">D</li>
+            <li class="b-tabs__li">E</li>
+            <li class="b-tabs__li">F</li>
+            <li class="b-tabs__li">LOAD</li>
+        </ul>
+    </div>
 
-Throughput (more is better):
-
-<a class="imglink" href="ycsb/A_throughput.svg">
-    <img class="ycsb" src="ycsb/A_throughput.svg" alt="Worklod A: throughput"></img>
-</a>
-
-Read latency (less is better):
-
-<a class="imglink" href="ycsb/A_READ_latency.svg">
-    <img class="ycsb" src="ycsb/A_READ_latency.svg" alt="Worklod A: throughput"></img>
-</a>
-
-Update latency (less is better):
-
-<a class="imglink" href="ycsb/A_UPDATE_latency.svg" >
-    <img class="ycsb" src="ycsb/A_UPDATE_latency.svg" alt="Worklod A: throughput"></img>
-</a>
-
-## Workload B
-
-Throughput:
-
-<a class="imglink" href="ycsb/B_throughput.svg">
-    <img class='ycsb' src="ycsb/B_throughput.svg" alt="Worklod B: throughput"></img>
-</a>
-
-Read latency:
-
-<a class="imglink" href="ycsb/B_READ_latency.svg">
-    <img class="ycsb" src="ycsb/B_READ_latency.svg" alt="Worklod B: READ latency"></img>
-</a>
-
-Update latency:
-
-<a class="imglink" href="ycsb/B_UPDATE_latency.svg">
-<img class="ycsb" src="ycsb/B_UPDATE_latency.svg" alt="Worklod B: UPDATE latency"></img>
-</a>
-
-## Workload C (read-only)
-
-Throughput:
-
-<a class="imglink" href="ycsb/C_throughput.svg" >
-<img class="ycsb" src="ycsb/C_throughput.svg" alt="Worklod C: throughput"></img>
-</a>
-
-Read latency:
-
-<a class="imglink" href="ycsb/C_READ_latency.svg">
-    <img class="ycsb" src="ycsb/C_READ_latency.svg" alt="Worklod C: READ latency"></img>
-</a>
-
-## Workload D
-
-Throughput:
-
-<a class="imglink" href="ycsb/D_throughput.svg">
-    <img class="ycsb" src="ycsb/D_throughput.svg" alt="Worklod D: throughput"></img>
-</a>
-
-INSERT latency:
-
-<a class="imglink" href="ycsb/D_INSERT_latency.svg">
-    <img class="ycsb" src="ycsb/D_INSERT_latency.svg" alt="Worklod D: INSERT latency"></img>
-</a>
-
-READ latency:
-
-<a class="imglink" href="ycsb/D_READ_latency.svg">
-   <img class="ycsb" src="ycsb/D_READ_latency.svg" alt="Worklod D: READ latency"></img>
-</a>
-
-## Workload F
-
-Throughput:
-
-<a class="imglink" href="ycsb/F_throughput.svg">
-   <img class="ycsb" src="ycsb/F_throughput.svg" alt="Worklod F: throughput"></img>
-</a>
-
-READ latency:
-
-<a class="imglink" href="ycsb/F_READ_latency.svg">
-    <img class="ycsb" src="ycsb/F_READ_latency.svg" alt="Worklod F: READ latency"></img>
-</a>
-
-READ-MODIFY-WRITE latency:
-
-<a class="imglink" href="ycsb/F_READ-MODIFY-WRITE_latency.svg">
-    <img class="ycsb" src="ycsb/F_READ-MODIFY-WRITE_latency.svg" alt="Worklod F: READ-MODIFY-WRITE latency"></img>
-</a>
-
-UPDATE latency:
-
-<a class="imglink" href="ycsb/F_UPDATE_latency.svg">
-    <img class="ycsb" src="ycsb/F_UPDATE_latency.svg" alt="Worklod F: UPDATE latency"></img>
-</a>
+    <div class="b-tabs__body">
+        <h3 align=center><p class="b-tabs__header">Workload A</p></h3>
+        <div id="picture1"></div>
+        <ul class="b-tabs__buttons">
+            <li class="b-button b-button_on">A_Read</li>
+            <li class="b-button">A_Update</li>
+        </ul>
+        <div class="clear"></div>
+        <div id="picture2"></div>
+        <p class="b-tabs__description" align="center">50/50 update/read ratio</p>
+    </div>
+</div>
+<script type="text/javascript" src="tabs.js"></script>
 
 
 {% page benchmark ru %}

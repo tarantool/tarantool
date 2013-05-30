@@ -370,3 +370,100 @@ html, body, #wrapper {
 #blurb h3 {
     text-align: center
 }
+
+/* =============================================================================
+   Styles for tabs and buttons used in benchmark*.html
+   ========================================================================== */
+
+.b-schedule{
+    height: 100%;
+    width: 768px;
+    margin:0 auto;
+    padding: 0;
+}
+
+.header{
+    font-size: 2em;
+    line-height: 1;
+    text-align: center;
+    margin: 40 auto;
+}
+
+.b-tabs{
+    height: 100%;
+}
+.b-tabs__list{
+	padding: 0px;
+    list-style: none;
+    border: 1px solid #b2b2b2;
+    border-bottom: 0;
+    -webkit-border-radius: 5px 5px 0 0;
+    -moz-border-radius: 5px 5px 0 0;
+    border-radius: 5px 5px 0 0;
+    -webkit-user-select: none;
+    box-shadow: 0 2px 4px -3px #000;
+    -webkit-padding-start: 0;
+    background-color: #f5f5f5;
+    -webkit-padding-start: 0;
+    overflow: hidden;
+    margin: 0;
+}
+.b-tabs__li{
+    float: left;
+    padding: 10px;
+    cursor: pointer;
+    border-right: 1px solid #b2b2b2;
+}
+.b-tabs__li:last-child{
+    border-right: none;
+}
+.b-tabs__li_on, .b-tabs__li:active{
+    background-color: #fafafa;
+    padding: 11px 9px 9px 11px;
+    color: #3f3f3f;
+}
+.b-tabs__body{
+    position: relative;
+    padding: 20px;
+    height: 980px;
+    border: 2px solid black;
+}
+#picture1, #picture2{
+    min-width: 400px;
+    margin: 0 auto;
+}
+.b-tabs__buttons{
+	padding: 0;
+    right: 20px;
+    border: 2px solid #b2b2b2;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    border-radius: 5px;
+    -webkit-user-select: none;
+    box-shadow: 0 2px 4px -3px #000;
+    -webkit-padding-start: 0;
+    background-color: #eaeaea;
+    outline: none;
+    cursor: pointer;
+    list-style: none;
+    float: right;
+}
+.b-button{
+    float: left;
+    margin: 0;
+    padding: 3px;
+    border-right: 1px solid #b2b2b2;
+    font-size: medium;
+}
+.b-button:last-child{
+    border: none;
+}
+.b-button_on, .b-button:active{
+    background-color: #fafafa;
+    padding: 4px 2px 3px 4px;
+    color: #3f3f3f;
+}
+
+h3 {
+	text-align:center;
+}
