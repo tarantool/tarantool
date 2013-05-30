@@ -18,7 +18,9 @@ function(lua_source filename)
         PARENT_SCOPE)
 endfunction()
 
-lua_source(box.lua)
+lua_source(lua/box.lua)
+lua_source(lua/box_net.lua)
+lua_source(lua/misc.lua)
 
 add_custom_target(generate_lua_sources}
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box

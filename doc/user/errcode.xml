@@ -77,6 +77,14 @@ file <filename xlink:href="https://github.com/mailru/tarantool/blob/master/inclu
     </para></listitem>
   </varlistentry>
 
+  <varlistentry>
+    <term xml:id="ER_FIBER_STACK" xreflabel="ER_FIBER_STACK">ER_FIBER_STACK</term>
+    <listitem><para>Recursion limit reached when creating a new fiber. This is
+    usually an indicator of a bug in a stored procedure, recursively invoking itself
+    ad infinitum.
+    </para></listitem>
+  </varlistentry>
+
 </variablelist>
 </appendix>
 

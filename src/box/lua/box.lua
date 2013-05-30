@@ -1,41 +1,20 @@
 box.flags = { BOX_RETURN_TUPLE = 0x01, BOX_ADD = 0x02, BOX_REPLACE = 0x04 }
 
+
+
 --
 --
 --
 function box.select_limit(space, index, offset, limit, ...)
-    local key_part_count = select('#', ...)
-    return box.process(17,
-                       box.pack('iiiiiV',
-                                 space,
-                                 index,
-                                 offset,
-                                 limit,
-                                 1, -- key count
-                                 key_part_count, ...))
+    return box.net.self:select_limit(space, index, offset, limit, ...)
 end
 
-function box.dostring(s, ...)
-    local chunk, message = loadstring(s)
-    if chunk == nil then
-        error(message, 2)
-    end
-    return chunk(...)
-end
 
 --
 --
 --
 function box.select(space, index, ...)
-    local key_part_count = select('#', ...)
-    return box.process(17,
-                       box.pack('iiiiiV',
-                                 space,
-                                 index,
-                                 0, -- offset
-                                 4294967295, -- limit
-                                 1, -- key count
-                                 key_part_count, ...))
+    return box.net.self:select(space, index, ...)
 end
 
 --
@@ -44,7 +23,7 @@ end
 -- starts from the key.
 --
 function box.select_range(sno, ino, limit, ...)
-    return box.space[tonumber(sno)].index[tonumber(ino)]:select_range(tonumber(limit), ...)
+    return box.net.self:select_range(sno, ino, limit, ...)
 end
 
 --
@@ -53,7 +32,7 @@ end
 -- starts from the key.
 --
 function box.select_reverse_range(sno, ino, limit, ...)
-    return box.space[tonumber(sno)].index[tonumber(ino)]:select_reverse_range(tonumber(limit), ...)
+    return box.net.self:select_reverse_range(sno, ino, limit, ...)
 end
 
 --
@@ -61,113 +40,31 @@ end
 -- index is always 0. It doesn't accept compound keys
 --
 function box.delete(space, ...)
-    local key_part_count = select('#', ...)
-    return box.process(21,
-                       box.pack('iiV',
-                                 space,
-                                 box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 key_part_count, ...))
+    return box.net.self:delete(space, ...)
 end
 
 -- insert or replace a tuple
 function box.replace(space, ...)
-    local field_count = select('#', ...)
-    return box.process(13,
-                       box.pack('iiV',
-                                 space,
-                                 box.flags.BOX_RETURN_TUPLE,  -- flags
-                                 field_count, ...))
+    return box.net.self:replace(space, ...)
 end
 
 -- insert a tuple (produces an error if the tuple already exists)
 function box.insert(space, ...)
-    local field_count = select('#', ...)
-    return box.process(13,
-                       box.pack('iiV',
-                                space,
-                                bit.bor(box.flags.BOX_RETURN_TUPLE,
-                                        box.flags.BOX_ADD),  -- flags
-                                field_count, ...))
+    return box.net.self:insert(space, ...)
 end
 
 --
 function box.update(space, key, format, ...)
-    local op_count = select('#', ...)/2
-    return box.process(19,
-                       box.pack('iiVi'..format,
-                                space,
-                                box.flags.BOX_RETURN_TUPLE,
-                                1, key,
-                                op_count,
-                                ...))
+    return box.net.self:update(space, key, format, ...)
 end
 
--- Assumes that spaceno has a TREE int32 (NUM) or int64 (NUM64) primary key
--- inserts a tuple after getting the next value of the
--- primary key and returns it back to the user
-function box.auto_increment(spaceno, ...)
-    spaceno = tonumber(spaceno)
-    local max_tuple = box.space[spaceno].index[0].idx:max()
-    local max = 0
-    if max_tuple ~= nil then
-        max = max_tuple[0]
-        local fmt = 'i'
-        if #max == 8 then fmt = 'l' end
-        max = box.unpack(fmt, max)
-    else
-        -- first time
-        if box.space[spaceno].index[0].key_field[0].type == "NUM64" then
-            max = tonumber64(max)
-        end
+
+function box.dostring(s, ...)
+    local chunk, message = loadstring(s)
+    if chunk == nil then
+        error(message, 2)
     end
-    return box.insert(spaceno, max + 1, ...)
-end
-
---
--- Simple counter.
---
-box.counter = {}
-
---
--- Increment counter identified by primary key.
--- Create counter if not exists.
--- Returns updated value of the counter.
---
-function box.counter.inc(space, ...)
-    local key = {...}
-    local cnt_index = #key
-
-    local tuple
-    while true do
-        tuple = box.update(space, key, '+p', cnt_index, 1)
-        if tuple ~= nil then break end
-        local data = {...}
-        table.insert(data, 1)
-        tuple = box.insert(space, unpack(data))
-        if tuple ~= nil then break end
-    end
-
-    return box.unpack('i', tuple[cnt_index])
-end
-
---
--- Decrement counter identified by primary key.
--- Delete counter if it decreased to zero.
--- Returns updated value of the counter.
---
-function box.counter.dec(space, ...)
-    local key = {...}
-    local cnt_index = #key
-
-    local tuple = box.select(space, 0, ...)
-    if tuple == nil then return 0 end
-    if box.unpack('i', tuple[cnt_index]) == 1 then
-        box.delete(space, ...)
-        return 0
-    else
-        tuple = box.update(space, key, '-p', cnt_index, 1)
-        return box.unpack('i', tuple[cnt_index])
-    end
+    return chunk(...)
 end
 
 function box.bless_space(space)

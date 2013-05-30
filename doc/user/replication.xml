@@ -177,8 +177,8 @@
         <para>
           Recover the old master. If there are updates that didn't
           make it to the new master, they have to be applied
-          manually. You can use <olink targetptr="cat-option"/>
-          option to read server logs.
+          manually. You can use Tarantool command line client
+          to read server logs.
         </para>
       </listitem>
     </itemizedlist>
