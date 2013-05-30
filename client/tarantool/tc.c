@@ -31,6 +31,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
+#include <locale.h>
 
 #include <unistd.h>
 
@@ -51,6 +52,7 @@ struct tc tc;
 static void tc_init(void) {
 	memset(&tc, 0, sizeof(tc));
 	tc.tee_fd = -1;
+	setlocale(LC_ALL, "");
 }
 
 static void tc_free(void) {
