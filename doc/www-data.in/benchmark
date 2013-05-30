@@ -61,32 +61,32 @@ All charts below were measured using 1M queries per test, averaged
 over 8 consecutive test runs.
 
 Configuration files for the tested systems can be found
-[here](https://github.com/bigbes92/ycsb-expand-db/tree/master/confs)
+[here](https://github.com/bigbes92/ycsb-expand-db/tree/master/confs).
 
-<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script src="http://code.highcharts.com/highcharts.js"></script>
 <script type="text/javascript" src="highcharts.js"></script>
 <div class="b-tabs">
-	<div>
-		<ul class="b-tabs__list">
-       		<li class="b-tabs__li b-tabs__li_on">A</li>
-       		<li class="b-tabs__li">B</li>
-        	<li class="b-tabs__li">C</li>
-        	<li class="b-tabs__li">D</li>
-        	<li class="b-tabs__li">E</li>
-        	<li class="b-tabs__li">F</li>
-        	<li class="b-tabs__li">LOAD</li>
-    	</ul>
-	</div>
-    
+    <div>
+        <ul class="b-tabs__list">
+            <li class="b-tabs__li b-tabs__li_on">A</li>
+            <li class="b-tabs__li">B</li>
+            <li class="b-tabs__li">C</li>
+            <li class="b-tabs__li">D</li>
+            <li class="b-tabs__li">E</li>
+            <li class="b-tabs__li">F</li>
+            <li class="b-tabs__li">LOAD</li>
+        </ul>
+    </div>
+
     <div class="b-tabs__body">
-		<h3 align=center><p class="b-tabs__header">Workload A</p></h3>
-        <div id="picture1"></div> 
+        <h3 align=center><p class="b-tabs__header">Workload A</p></h3>
+        <div id="picture1"></div>
         <ul class="b-tabs__buttons">
             <li class="b-button b-button_on">A_Read</li>
             <li class="b-button">A_Update</li>
         </ul>
-		<div class="clear"></div>
+        <div class="clear"></div>
         <div id="picture2"></div>
         <p class="b-tabs__description" align="center">50/50 update/read ratio</p>
     </div>
