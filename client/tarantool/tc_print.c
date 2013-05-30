@@ -32,6 +32,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <ctype.h>
+#include <wctype.h>
 
 #include <unistd.h>
 #include <errno.h>
@@ -94,6 +95,77 @@ void tc_printf(char *fmt, ...) {
 	}
 }
 
+static int tc_str_valid(char *data, uint32_t size) {
+	int length;
+	wchar_t dest;
+
+	mbtowc(NULL, NULL, 0);
+	while ((length = mbtowc(&dest, data, size)) > -1 && size > 0) {
+		if (length == 0)
+			++length;
+		data += length;
+		size -= length;
+	}
+	if (length == -1)
+		return 0;
+	return 1;
+}
+
+static void tc_print_str(char *data, uint32_t size) {
+	if (tc_str_valid(data, size)) {
+		wchar_t dest;
+		int length;
+		mbtowc (NULL, NULL, 0);
+		while ((length = mbtowc(&dest, data, size)) > -1 && size > 0) {
+			if (dest >= 0x20) {
+				tc_printf ("%lc", dest);
+			}
+			else {
+				switch (dest) {
+				case 0x00:
+					tc_printf("\\0");
+					break;
+				case 0x07:
+					tc_printf("\\a");
+					break;
+				case 0x08:
+					tc_printf("\\b");
+					break;
+				case 0x09:
+					tc_printf("\\t");
+					break;
+				case 0x0A:
+					tc_printf("\\n");
+					break;
+				case 0x0B:
+					tc_printf("\\v");
+					break;
+				case 0x0C:
+					tc_printf("\\f");
+					break;
+				case 0x0D:
+					tc_printf("\\r");
+					break;
+				default:
+					tc_printf("\\x%02lX", 
+						(unsigned long int)dest);
+					break;
+				}
+				if (length == 0) 
+					++length;
+			}
+			size -= length;
+			data += length;
+		}
+	}
+	else {
+		while (size-- > 0) {
+			tc_printf("\\x%02X", (unsigned char)*data);
+			data++;
+		}
+	}
+}
+
 static void tc_print_fields(struct tnt_tuple *tu) {
 	struct tnt_iter ifl;
 	tnt_iter(&ifl, tu);
@@ -111,13 +183,7 @@ static void tc_print_fields(struct tnt_tuple *tu) {
 			tc_printf("%"PRIu64, *((uint64_t*)data));
 			break;
 		default:
-			while (size-- > 0) {
-				if (0x20 <= *data && *data < 0x7f)
-					tc_printf("%c", *data);
-				else
-					tc_printf("\\x%2X", (unsigned char)*data);
-				data++;
-			}
+			tc_print_str(data, size);
 		}
 		tc_printf("'");
 	}
