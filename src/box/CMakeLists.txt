@@ -18,6 +18,7 @@ function(lua_source filename)
         PARENT_SCOPE)
 endfunction()
 
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
 lua_source(lua/box.lua)
 lua_source(lua/box_net.lua)
 lua_source(lua/misc.lua)
