@@ -1082,6 +1082,32 @@ tarantool_lua_error_init(struct lua_State *L) {
 	lua_pop(L, 1);
 }
 
+static void
+tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
+__attribute__((sentinel));
+
+static void
+tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
+{
+	char path[1024];
+	va_list args;
+	va_start(args, type);
+	int off = 0;
+	const char *p;
+	while ((p = va_arg(args, const char*)))
+		if (*p != '\0')
+			off += snprintf(path + off, sizeof(path) - off, "%s;", p);
+	va_end(args);
+	lua_getglobal(L, "package");
+	lua_getfield(L, -1, type);
+	snprintf(path + off, sizeof(path) - off, "%s",
+	         lua_tostring(L, -1));
+	lua_pop(L, 1);
+	lua_pushstring(L, path);
+	lua_setfield(L, -2, type);
+	lua_pop(L, 1);
+}
+
 struct lua_State *
 tarantool_lua_init()
 {
@@ -1089,6 +1115,12 @@ tarantool_lua_init()
 	if (L == NULL)
 		return L;
 	luaL_openlibs(L);
+
+	tarantool_lua_setpath(L, "path", cfg.script_dir, LUA_LIBPATH,
+	                      LUA_SYSPATH, NULL);
+	tarantool_lua_setpath(L, "cpath", LUA_LIBCPATH,
+	                      LUA_SYSCPATH, NULL);
+
 	/* Loading 'ffi' extension and making it inaccessible */
 	lua_getglobal(L, "require");
 	lua_pushstring(L, "ffi");
@@ -1287,7 +1319,6 @@ load_init_script(va_list ap)
 	char path[PATH_MAX + 1];
 	snprintf(path, PATH_MAX, "%s/%s",
 		 cfg.script_dir, TARANTOOL_LUA_INIT_SCRIPT);
-
 
 	if (access(path, F_OK) == 0) {
 		say_info("loading %s", path);
