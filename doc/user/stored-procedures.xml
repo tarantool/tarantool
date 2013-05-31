@@ -1135,6 +1135,18 @@ localhost> lua t:find(1, 'abc')
 ---
  - 2
 ...
+localhost> lua t = box.tuple.new('abc')
+---
+...
+localhost> lua t
+---
+ - 'abc': {}
+...
+localhost> lua t:bsize()
+---
+ - 4
+...
+
 </programlisting>
 
         </para></listitem>

@@ -521,6 +521,18 @@ lbox_tuple_pairs(struct lua_State *L)
 	return 3;
 }
 
+
+/** tuple:bsize()
+ *
+ */
+static int
+lbox_tuple_bsize(struct lua_State *L)
+{
+	struct tuple *tuple = lua_checktuple(L, 1);
+	lua_pushnumber(L, tuple->bsize);
+	return 1;
+}
+
 static const struct luaL_reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
 	{"__len", lbox_tuple_len},
@@ -534,6 +546,7 @@ static const struct luaL_reg lbox_tuple_meta[] = {
 	{"findall", lbox_tuple_findall},
 	{"unpack", lbox_tuple_unpack},
 	{"totable", lbox_tuple_totable},
+	{"bsize", lbox_tuple_bsize},
 	{NULL, NULL}
 };
 

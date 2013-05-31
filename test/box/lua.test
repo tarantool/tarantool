@@ -646,3 +646,8 @@ exec sql "call bug1075677()"
 exec admin "lua bug1075677=nil"
 exec admin  "lua box.tuple.new(false)"
 exec admin  "lua box.tuple.new({false})"
+
+
+exec admin "lua t = box.tuple.new('abc')"
+exec admin "lua t"
+exec admin "lua t:bsize()"
