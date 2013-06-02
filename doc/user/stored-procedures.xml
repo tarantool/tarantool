@@ -1155,6 +1155,67 @@ localhost> lua t:find(1, 'abc')
 </variablelist>
 </section>
 
+<section xml:id="sp-box-cjson">
+    <title>Package <code>box.cjson</code></title>
+
+<variablelist xml:id="box.cjson" xreflabel="box.cjson">
+    <para>
+        This package provides JSON manipulation routines.
+        It's based on the <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson.php">
+        Lua-CJSON package by Mark Pulford</link>.
+
+        For a complete manual on Lua-CJSON please read <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson-manual.html">the official documentation</link>.
+    </para>
+    <varlistentry>
+        <term><emphasis role="lua">box.cjson.encode(object)</emphasis></term>
+        <listitem>
+            <para>Convert a Lua object to a JSON string.</para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">box.cjson.decode(string)</emphasis></term>
+        <listitem>
+            <para>Convert a JSON string to a Lua object.</para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+    <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+lua box.cjson.encode(123)
+---
+ - 123
+...
+lua box.cjson.encode({123})
+---
+ - [123]
+...
+lua box.cjson.encode({123, 234, 345})
+---
+ - [123,234,345]
+...
+lua box.cjson.encode({abc = 234, cde = 345})
+---
+ - {"cde":345,"abc":234}
+...
+lua box.cjson.encode({hello = { 'world' } })
+---
+ - {"hello":["world"]}
+...
+lua box.cjson.decode('123')
+---
+ - 123
+...
+lua box.cjson.decode('[123, "hello"]')[2]
+---
+ - hello
+...
+lua box.cjson.decode('{"hello": "world"}').hello
+---
+ - world
+...
+</programlisting>
+</section>
+
 <section xml:id="sp-box-space">
     <title>Package <code>box.space</code></title>
 <variablelist xml:id="box.space" xreflabel="box.space">
