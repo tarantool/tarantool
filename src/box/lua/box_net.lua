@@ -284,18 +284,21 @@ box.net.box.new = function(host, port, reconnect_timeout)
             if self.s ~= nil then
                 return true
             end
-            self.s = box.socket.tcp()
-            if self.s == nil then
+
+            local sc = box.socket.tcp()
+            if sc == nil then
                 self:fatal("Can't create socket")
                 return false
             end
 
-            local s = { self.s:connect( self.host, self.port ) }
+            local s = { sc:connect( self.host, self.port ) }
             if s[1] == nil then
                 self:fatal("Can't connect to %s:%s: %s",
                     self.host, self.port, s[4])
                 return false
             end
+
+            self.s = sc
 
             return true
         end,
