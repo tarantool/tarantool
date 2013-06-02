@@ -50,6 +50,7 @@
 #include "lua/stat.h"
 #include "lua/uuid.h"
 #include "lua/session.h"
+#include "lua/cjson.h"
 
 #include <sys/time.h>
 #include <sys/types.h>
@@ -1111,6 +1112,7 @@ tarantool_lua_init()
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
+	tarantool_lua_cjson_init(L);
 	tarantool_lua_info_init(L);
 	tarantool_lua_slab_init(L);
 	tarantool_lua_stat_init(L);

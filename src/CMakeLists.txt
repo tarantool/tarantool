@@ -105,6 +105,7 @@ set (common_sources
      lua/lua_ipc.m
      lua/lua_socket.m
      lua/session.m
+     lua/cjson.m
 )
 
 if (ENABLE_TRACE)
@@ -122,6 +123,7 @@ list(APPEND common_libraries
     ${LIBEIO_LIBRARIES}
     ${LIBCORO_LIBRARIES}
     ${LIBGOPT_LIBRARIES}
+    ${LIBCJSON_LIBRARIES}
     ${LUAJIT_LIB}
     ${LIBOBJC_LIBRARIES}
     misc
