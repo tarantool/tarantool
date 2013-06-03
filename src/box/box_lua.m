@@ -971,7 +971,7 @@ port_lua(struct port *port) { return (struct port_lua *) port; }
  * For addU32/dupU32 do nothing -- the only u32 Box can give
  * us is tuple count, and we don't need it, since we intercept
  * everything into Lua stack first.
- * @sa iov_add_multret
+ * @sa port_add_lua_multret
  */
 
 static void
@@ -1186,13 +1186,45 @@ port_add_lua_ret(struct port *port, struct lua_State *L, int index)
  * a procedure, we are compatible with SELECT protocol,
  * and return the number of return values first, and
  * then each return value as a tuple.
+ *
+ * If a Lua stack contains at least one scalar, each
+ * value on the stack is converted to a tuple. A Lua
+ * is converted to a tuple with multiple fields.
+ *
+ * If the stack is a Lua table, each member of which is
+ * not scalar, each member of the table is converted to
+ * a tuple. This way very large lists of return values can
+ * be used, since Lua stack size is limited by 8000 elements,
+ * while Lua table size is pretty much unlimited.
  */
 static void
 port_add_lua_multret(struct port *port, struct lua_State *L)
 {
 	int nargs = lua_gettop(L);
-	for (int i = 1; i <= nargs; ++i)
+	/** Check if we deal with a table of tables. */
+	if (nargs == 1 && lua_istable(L, 1)) {
+		/*
+		 * The table is not empty and consists of tables
+		 * or tuples. Treat each table element as a tuple,
+		 * and push it.
+		 */
+		lua_pushnil(L);
+		int has_keys = lua_next(L, 1);
+		if (has_keys  &&
+		    (lua_istable(L, -1) || lua_isuserdata(L, -1))) {
+
+			do {
+				port_add_lua_ret(port, L, lua_gettop(L));
+				lua_pop(L, 1);
+			} while (lua_next(L, 1));
+			return;
+		} else if (has_keys) {
+			lua_pop(L, 1);
+		}
+	}
+	for (int i = 1; i <= nargs; ++i) {
 		port_add_lua_ret(port, L, i);
+	}
 }
 
 /* }}} */
