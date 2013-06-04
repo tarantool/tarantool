@@ -16,9 +16,8 @@ Caveats:
 
 COMPILATION AND INSTALL
 
-Tarantool is written in C and Objective C.
-To build, you will need GCC Objective C frontend
-(gcc-objc package on most systems) or Apple CLang compiler.
+Tarantool is written in C and C++.
+To build, you will need GCC or Apple CLang compiler.
 
 CMake is used for configuration management.
 3 standard CMake build types are supported:

@@ -16,7 +16,6 @@ if (CMAKE_C_COMPILER_ID STREQUAL Clang)
     set(CMAKE_COMPILER_IS_GNUCXX OFF)
 endif()
 
-# TODO: clang version is not checked
 if(CMAKE_COMPILER_IS_GNUCC)
     # gcc and g++ >= 4.5 are supported
     execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
@@ -75,43 +74,6 @@ add_compile_flags("C;CXX"
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 # Remove VALGRIND code and assertions in *any* type of release build.
     add_definitions("-DNDEBUG" "-DNVALGRIND")
-endif()
-
-#
-# Enable @try/@catch/@finaly syntax in Objective C code.
-#
-add_compile_flags("OBJC;OBJCXX"
-    "-fobjc-exceptions")
-
-#
-# Invoke C++ constructors/destructors in the Objective C class instances.
-#
-add_compile_flags("OBJCXX" "-fobjc-call-cxx-cdtors")
-
-#
-# Assume that all Objective-C message dispatches (e.g., [receiver message:arg])
-# ensure that the receiver is not nil. This allows for more efficient entry
-# points in the runtime to be used
-#
-if (CMAKE_COMPILER_IS_GNUCC)
-    add_compile_flags("OBJC;OBJCXX"
-        "-fno-nil-receivers")
-endif()
-
-if (CMAKE_COMPILER_IS_CLANG)
-    add_compile_flags("OBJC"
-        "-fobjc-nonfragile-abi"
-        "-fno-objc-legacy-dispatch")
-endif()
-
-if (CMAKE_COMPILER_IS_CLANGXX)
-    add_compile_flags("OBJCXX"
-        "-fobjc-nonfragile-abi"
-        "-fno-objc-legacy-dispatch")
-elseif(CMAKE_COMPILER_IS_GNUCXX)
-    # Suppress deprecated warnings in objc/runtime-deprecated.h
-    add_compile_flags("OBJCXX"
-        " -Wno-deprecated-declarations")
 endif()
 
 macro(enable_tnt_compile_flags)
