@@ -99,6 +99,12 @@
 #cmakedefine ENABLE_BUNDLED_LIBCORO 1
 
 /*
+ * SQL clients
+ */
+#define USE_PSQL_CLIENT		@USE_PSQL_CLIENT@
+#define USE_MYSQL_CLIENT	@USE_MYSQL_CLIENT@
+
+/*
  * predefined /etc directory prefix.
  */
 #define SYSCONF_DIR "@CMAKE_SYSCONF_DIR@"

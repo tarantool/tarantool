@@ -27,6 +27,7 @@ find_program(CONFETTI confetti)
 find_program(LD ld)
 find_program(POD2MAN pod2man)
 
+
 #
 # This instructs the rest of the build system what product
 # and what modules to produce.
@@ -265,6 +266,11 @@ else()
         find_package(LibOBJC)
     endif()
 endif()
+
+#
+# MySQL & PgSQL
+#
+include(BuildSQL)
 
 
 #

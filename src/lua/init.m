@@ -45,6 +45,7 @@
 #include "fiber.h"
 #include "lua_ipc.h"
 #include "lua_socket.h"
+#include "lua_sql.h"
 #include "lua/info.h"
 #include "lua/slab.h"
 #include "lua/stat.h"
@@ -1123,6 +1124,9 @@ tarantool_lua_init()
 	tarantool_lua_error_init(L);
 
 	mod_lua_init(L);
+
+	/* init after internal luas are processed */
+	tarantool_lua_sql_init(L);
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);

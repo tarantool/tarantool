@@ -1,0 +1,4 @@
+# encoding: tarantool
+
+exec admin "lua c = box.net.sql.connect('pg', 'localhost', 5432, 'tarantool', 'tarantool', 'tarantool')"
+exec admin "lua c"

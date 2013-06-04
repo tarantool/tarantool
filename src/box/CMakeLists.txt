@@ -22,6 +22,7 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
 lua_source(lua/box.lua)
 lua_source(lua/box_net.lua)
 lua_source(lua/misc.lua)
+lua_source(lua/sql.lua)
 
 add_custom_target(generate_lua_sources}
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box

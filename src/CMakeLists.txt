@@ -106,7 +106,12 @@ set (common_sources
      lua/lua_socket.m
      lua/session.m
      lua/cjson.m
+     lua/lua_sql.m
 )
+
+if (ENABLE_PSQL)
+    set (common_sources ${common_sources} lua/pg.m)
+endif()
 
 if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.m)
