@@ -920,7 +920,7 @@ tarantool_lua_printstack_yaml(struct lua_State *L, struct tbuf *out)
 			GCcdata *cd = cdataV(L->base + i - 1);
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
-			int chop = (cd->typeid == CTID_UINT64 ? 3 : 2);
+			int chop = (cd->ctypeid == CTID_UINT64 ? 3 : 2);
 			tbuf_printf(out, " - %-.*s" CRLF, len - chop, sz);
 		} else
 			tbuf_printf(out, " - %s" CRLF,
@@ -941,7 +941,7 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
 			GCcdata *cd = cdataV(L->base + i - 1);
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
-			int chop = (cd->typeid == CTID_UINT64 ? 3 : 2);
+			int chop = (cd->ctypeid == CTID_UINT64 ? 3 : 2);
 			tbuf_printf(out, "%-.*s" CRLF, len - chop, sz);
 		} else
 			tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
