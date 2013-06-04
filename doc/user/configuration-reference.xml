@@ -258,6 +258,20 @@ Tarantool 1.4.0-69-g45551dd
         </row>
 
         <row>
+          <entry xml:id="script_dir" xreflabel="script_dir">script_dir</entry>
+          <entry>string</entry>
+          <entry>""</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>If this path is set, it is added to the Lua package
+          search path, so that instance-specific Lua scripts can
+          be loaded and executed. If the directory specified in
+          the path contains <filename>init.lua</filename> file, it
+          is loaded and executed at server start.
+          </entry>
+        </row>
+
+        <row>
           <entry xml:id="wal_dir" xreflabel="wal_dir">wal_dir</entry>
           <entry>string</entry>
           <entry>""</entry>

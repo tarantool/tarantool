@@ -171,6 +171,26 @@ if (NOT DEFINED CMAKE_MAN_DIR)
 endif()
 
 #
+# Specify system-specific Lua prefixes
+#
+if (NOT DEFINED LUA_SYSPATH)
+    set (LUA_SYSPATH "")
+endif()
+if (NOT DEFINED LUA_SYSCPATH)
+    set (LUA_SYSCPATH "")
+endif()
+
+#
+# Specify Tarantool modules Lua prefixes
+#
+if (NOT DEFINED LUA_LIBPATH)
+    set (LUA_LIBPATH "")
+endif()
+if (NOT DEFINED LUA_LIBCPATH)
+    set (LUA_LIBCPATH "")
+endif()
+
+#
 # Now handle all configuration options.
 #
 option(ENABLE_DOC "Enable building of documentation" OFF)
