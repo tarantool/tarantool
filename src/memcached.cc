@@ -37,13 +37,16 @@
 #include "box/port.h"
 #include "box/tuple.h"
 #include "fiber.h"
-#include "cfg/warning.h"
-#include  TARANTOOL_CONFIG
+extern "C" {
+#include <cfg/warning.h>
+#include <cfg/tarantool_box_cfg.h>
+} /* extern "C" */
 #include "say.h"
 #include "stat.h"
 #include "salloc.h"
 #include "pickle.h"
 #include "coio_buf.h"
+#include "scoped_guard.h"
 
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
@@ -85,14 +88,14 @@ tbuf_append_field(struct tbuf *b, const void *f)
 {
 	const void *begin = f;
 	u32 size = load_varint32(&f);
-	tbuf_append(b, begin, f + size - begin);
+	tbuf_append(b, begin, (const char *) f - (const char *) begin + size);
 }
 
 void
 tbuf_store_field(struct tbuf *b, const void *field, u32 len)
 {
 	char buf[sizeof(u32)+1];
-	char *bufend = pack_varint32(buf, len);
+	char *bufend = (char *) pack_varint32(buf, len);
 	tbuf_append(b, buf, bufend - buf);
 	tbuf_append(b, field, len);
 }
@@ -107,11 +110,11 @@ tbuf_read_field(struct tbuf *buf)
 	const void *field = buf->data;
 	u32 field_len = pick_varint32((const void **) &buf->data,
 				      buf->data + buf->size);
-	if (buf->data + field_len > field + buf->size)
-		tnt_raise(IllegalParams, :"packet too short (expected a field)");
+	if ((char *) buf->data + field_len > (char *) field + buf->size)
+		tnt_raise(IllegalParams, "packet too short (expected a field)");
 	buf->data += field_len;
-	buf->size -= buf->data - field;
-	buf->capacity -= buf->data - field;
+	buf->size -= (const char *) buf->data - (const char *) field;
+	buf->capacity -= (const char *) buf->data - (const char *) field;
 	return field;
 }
 
@@ -137,13 +140,13 @@ store(const void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 	tbuf_store_field(req, &m, sizeof(m));
 
 	char b[43];
-	sprintf(b, " %"PRIu32" %"PRIu32"\r\n", flags, bytes);
+	sprintf(b, " %" PRIu32 " %" PRIu32 "\r\n", flags, bytes);
 	tbuf_store_field(req, b, strlen(b));
 
 	tbuf_store_field(req, data, bytes);
 
 	int key_len = load_varint32(&key);
-	say_debug("memcached/store key:(%i)'%.*s' exptime:%"PRIu32" flags:%"PRIu32" cas:%"PRIu64,
+	say_debug("memcached/store key:(%i)'%.*s' exptime:%" PRIu32 " flags:%" PRIu32 " cas:%" PRIu64,
 		  key_len, key_len, (char*) key, exptime, flags, cas);
 	/*
 	 * Use a box dispatch wrapper which handles correctly
@@ -153,7 +156,7 @@ store(const void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 }
 
 static void
-delete(const void *key)
+remove(const void *key)
 {
 	u32 key_len = 1;
 	u32 box_flags = 0;
@@ -170,14 +173,14 @@ delete(const void *key)
 static struct tuple *
 find(const void *key)
 {
-	return [memcached_index findByKey :key :1];
+	return memcached_index->findByKey(key, 1);
 }
 
 static struct meta *
 meta(struct tuple *tuple)
 {
 	void *field = tuple_field(tuple, 1);
-	return field + 1;
+	return (struct meta *) ((char *) field + 1);
 }
 
 static bool
@@ -217,7 +220,8 @@ struct salloc_stat_memcached_cb_ctx {
 static int
 salloc_stat_memcached_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 {
-	struct salloc_stat_memcached_cb_ctx *ctx = cb_ctx;
+	struct salloc_stat_memcached_cb_ctx *ctx =
+			(struct salloc_stat_memcached_cb_ctx *) cb_ctx;
 	ctx->bytes_used	+= cstat->bytes_used;
 	ctx->items	+= cstat->items;
 	return 0;
@@ -232,25 +236,25 @@ print_stats(struct obuf *out)
 	memstats.bytes_used = memstats.items = 0;
 	salloc_stat(salloc_stat_memcached_cb, NULL, &memstats);
 
-	tbuf_printf(buf, "STAT pid %"PRIu32"\r\n", (u32)getpid());
-	tbuf_printf(buf, "STAT uptime %"PRIu32"\r\n", (u32)tarantool_uptime());
-	tbuf_printf(buf, "STAT time %"PRIu32"\r\n", (u32)ev_now());
+	tbuf_printf(buf, "STAT pid %" PRIu32 "\r\n", (u32)getpid());
+	tbuf_printf(buf, "STAT uptime %" PRIu32 "\r\n", (u32)tarantool_uptime());
+	tbuf_printf(buf, "STAT time %" PRIu32 "\r\n", (u32)ev_now());
 	tbuf_printf(buf, "STAT version 1.2.5 (tarantool/box)\r\n");
-	tbuf_printf(buf, "STAT pointer_size %"PRI_SZ"\r\n", sizeof(void *)*8);
-	tbuf_printf(buf, "STAT curr_items %"PRIu64"\r\n", memstats.items);
-	tbuf_printf(buf, "STAT total_items %"PRIu64"\r\n", stats.total_items);
-	tbuf_printf(buf, "STAT bytes %"PRIu64"\r\n", memstats.bytes_used);
-	tbuf_printf(buf, "STAT curr_connections %"PRIu32"\r\n", stats.curr_connections);
-	tbuf_printf(buf, "STAT total_connections %"PRIu32"\r\n", stats.total_connections);
-	tbuf_printf(buf, "STAT connection_structures %"PRIu32"\r\n", stats.curr_connections); /* lie a bit */
-	tbuf_printf(buf, "STAT cmd_get %"PRIu64"\r\n", stats.cmd_get);
-	tbuf_printf(buf, "STAT cmd_set %"PRIu64"\r\n", stats.cmd_set);
-	tbuf_printf(buf, "STAT get_hits %"PRIu64"\r\n", stats.get_hits);
-	tbuf_printf(buf, "STAT get_misses %"PRIu64"\r\n", stats.get_misses);
-	tbuf_printf(buf, "STAT evictions %"PRIu64"\r\n", stats.evictions);
-	tbuf_printf(buf, "STAT bytes_read %"PRIu64"\r\n", stats.bytes_read);
-	tbuf_printf(buf, "STAT bytes_written %"PRIu64"\r\n", stats.bytes_written);
-	tbuf_printf(buf, "STAT limit_maxbytes %"PRIu64"\r\n", (u64)(cfg.slab_alloc_arena * (1 << 30)));
+	tbuf_printf(buf, "STAT pointer_size %" PRI_SZ "\r\n", sizeof(void *)*8);
+	tbuf_printf(buf, "STAT curr_items %" PRIu64 "\r\n", memstats.items);
+	tbuf_printf(buf, "STAT total_items %" PRIu64 "\r\n", stats.total_items);
+	tbuf_printf(buf, "STAT bytes %" PRIu64 "\r\n", memstats.bytes_used);
+	tbuf_printf(buf, "STAT curr_connections %" PRIu32 "\r\n", stats.curr_connections);
+	tbuf_printf(buf, "STAT total_connections %" PRIu32 "\r\n", stats.total_connections);
+	tbuf_printf(buf, "STAT connection_structures %" PRIu32 "\r\n", stats.curr_connections); /* lie a bit */
+	tbuf_printf(buf, "STAT cmd_get %" PRIu64 "\r\n", stats.cmd_get);
+	tbuf_printf(buf, "STAT cmd_set %" PRIu64 "\r\n", stats.cmd_set);
+	tbuf_printf(buf, "STAT get_hits %" PRIu64 "\r\n", stats.get_hits);
+	tbuf_printf(buf, "STAT get_misses %" PRIu64 "\r\n", stats.get_misses);
+	tbuf_printf(buf, "STAT evictions %" PRIu64 "\r\n", stats.evictions);
+	tbuf_printf(buf, "STAT bytes_read %" PRIu64 "\r\n", stats.bytes_read);
+	tbuf_printf(buf, "STAT bytes_written %" PRIu64 "\r\n", stats.bytes_written);
+	tbuf_printf(buf, "STAT limit_maxbytes %" PRIu64 "\r\n", (u64)(cfg.slab_alloc_arena * (1 << 30)));
 	tbuf_printf(buf, "STAT threads 1\r\n");
 	tbuf_printf(buf, "END\r\n");
 	obuf_dup(out, buf->data, buf->size);
@@ -261,7 +265,7 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 {
 	stat_collect(stat_base, MEMC_GET, 1);
 	stats.cmd_get++;
-	say_debug("ensuring space for %"PRI_SZ" keys", keys_count);
+	say_debug("ensuring space for %" PRI_SZ " keys", keys_count);
 	while (keys_count-- > 0) {
 		struct tuple *tuple;
 		const struct meta *m;
@@ -287,17 +291,17 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 
 		/* skip key */
 		_l = load_varint32(&field);
-		field += _l;
+		field = (const char *) field + _l;
 
 		/* metainfo */
 		_l = load_varint32(&field);
-		m = field;
-		field += _l;
+		m = (const struct meta *) field;
+		field = (const char *) field + _l;
 
 		/* suffix */
 		suffix_len = load_varint32(&field);
 		suffix = field;
-		field += suffix_len;
+		field = (const char *) field + suffix_len;
 
 		/* value */
 		value_len = load_varint32(&field);
@@ -313,7 +317,7 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 
 		if (show_cas) {
 			struct tbuf *b = tbuf_new(fiber->gc_pool);
-			tbuf_printf(b, "VALUE %.*s %"PRIu32" %"PRIu32" %"PRIu64"\r\n", key_len, (char*) key, m->flags, value_len, m->cas);
+			tbuf_printf(b, "VALUE %.*s %" PRIu32 " %" PRIu32 " %" PRIu64 "\r\n", key_len, (char*) key, m->flags, value_len, m->cas);
 			obuf_dup(out, b->data, b->size);
 			stats.bytes_written += b->size;
 		} else {
@@ -335,8 +339,8 @@ flush_all(va_list ap)
 	uintptr_t delay = va_arg(ap, uintptr_t);
 	fiber_sleep(delay - ev_now());
 	struct tuple *tuple;
-	struct iterator *it = [memcached_index allocIterator];
-	[memcached_index initIterator: it :ITER_ALL :NULL :0];
+	struct iterator *it = memcached_index->allocIterator();
+	memcached_index->initIterator(it, ITER_ALL, NULL, 0);
 	while ((tuple = it->next(it))) {
 	       meta(tuple)->exptime = 1;
 	}
@@ -349,20 +353,20 @@ do {										\
 	if (bytes > (1<<20)) {							\
 		obuf_dup(out, "SERVER_ERROR object too large for cache\r\n", 41);\
 	} else {								\
-		@try {								\
+		try {								\
 			store(key, exptime, flags, bytes, data);		\
 			stats.total_items++;					\
 			obuf_dup(out, "STORED\r\n", 8);				\
 		}								\
-		@catch (ClientError *e) {					\
+		catch (const ClientError& e) {					\
 			obuf_dup(out, "SERVER_ERROR ", 13);			\
-			obuf_dup(out, e->errmsg, strlen(e->errmsg));		\
+			obuf_dup(out, e.errmsg(), strlen(e.errmsg()));		\
 			obuf_dup(out, "\r\n", 2);				\
 		}								\
 	}									\
 } while (0)
 
-#include "memcached-grammar.m"
+#include "memcached-grammar.cc"
 
 void
 memcached_loop(struct ev_io *coio, struct iobuf *iobuf)
@@ -413,18 +417,20 @@ memcached_handler(va_list ap)
 	stats.total_connections++;
 	stats.curr_connections++;
 
-	@try {
+	try {
+		auto scoped_guard = make_scoped_guard([&] {
+			fiber_sleep(0.01);
+			stats.curr_connections--;
+			evio_close(&coio);
+			iobuf_delete(iobuf);
+		});
+
 		memcached_loop(&coio, iobuf);
 		iobuf_flush(iobuf, &coio);
-	} @catch (FiberCancelException *e) {
-		@throw;
-	} @catch (tnt_Exception *e) {
-		[e log];
-	} @finally {
-		fiber_sleep(0.01);
-		stats.curr_connections--;
-		evio_close(&coio);
-		iobuf_delete(iobuf);
+	} catch (const FiberCancelException& e) {
+		throw;
+	} catch (const Exception& e) {
+		e.log();
 	}
 }
 
@@ -437,7 +443,7 @@ memcached_check_config(struct tarantool_cfg *conf)
 
 	if (conf->memcached_port <= 0 || conf->memcached_port >= USHRT_MAX) {
 		/* invalid space number */
-		out_warning(0, "invalid memcached port value: %i",
+		out_warning(CNF_OK, "invalid memcached port value: %i",
 			    conf->memcached_port);
 		return -1;
 	}
@@ -446,14 +452,14 @@ memcached_check_config(struct tarantool_cfg *conf)
 
 	if (conf->memcached_expire_per_loop <= 0) {
 		/* invalid expire per loop value */
-		out_warning(0, "invalid expire per loop value: %i",
+		out_warning(CNF_OK, "invalid expire per loop value: %i",
 			    conf->memcached_expire_per_loop);
 		return -1;
 	}
 
 	if (conf->memcached_expire_full_sweep <= 0) {
 		/* invalid expire full sweep value */
-		out_warning(0, "invalid expire full sweep value: %i",
+		out_warning(CNF_OK, "invalid expire full sweep value: %i",
 			    conf->memcached_expire_full_sweep);
 		return -1;
 	}
@@ -498,13 +504,13 @@ memcached_space_init()
 
 
 	/* Configure memcached index key. */
-	struct key_def *key_def = malloc(sizeof(struct key_def));
+	struct key_def *key_def = (struct key_def *) malloc(sizeof(struct key_def));
 	key_def->part_count = 1;
 	key_def->is_unique = true;
 	key_def->type = HASH;
 
-	key_def->parts = malloc(sizeof(struct key_part));
-	key_def->cmp_order = malloc(sizeof(u32));
+	key_def->parts = (struct key_part *) malloc(sizeof(struct key_part));
+	key_def->cmp_order = (u32 *) malloc(sizeof(u32));
 
 	if (key_def->parts == NULL || key_def->cmp_order == NULL)
 		panic("out of memory when configuring memcached_space");
@@ -519,10 +525,8 @@ memcached_space_init()
 	struct space *memc_s =
 		space_create(cfg.memcached_space, key_def, 1, 4);
 
-	Index *memc_index = [Index alloc: HASH :key_def :memc_s];
+	Index *memc_index = Index::factory(HASH, key_def, memc_s);
 	space_set_index(memc_s, 0, memc_index);
-
-	[memc_index init: key_def :memc_s];
 }
 
 /** Delete a bunch of expired keys. */
@@ -533,13 +537,13 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 	int expired_keys = 0;
 
 	while (keys_to_delete->size > 0) {
-		@try {
-			delete(tbuf_read_field(keys_to_delete));
+		try {
+			remove(tbuf_read_field(keys_to_delete));
 			expired_keys++;
 		}
-		@catch (ClientError *e) {
+		catch (const ClientError& e) {
 			/* expire is off when replication is on */
-			assert(e->errcode != ER_NONMASTER);
+			assert(e.errcode() != ER_NONMASTER);
 			/* The error is already logged. */
 		}
 	}
@@ -547,7 +551,7 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 
 	double delay = ((double) cfg.memcached_expire_per_loop *
 			cfg.memcached_expire_full_sweep /
-			([memcached_index size] + 1));
+			(memcached_index->size() + 1));
 	if (delay > 1)
 		delay = 1;
 	fiber_setcancellable(true);
@@ -561,11 +565,11 @@ memcached_expire_loop(va_list ap __attribute__((unused)))
 	struct tuple *tuple = NULL;
 
 	say_info("memcached expire fiber started");
-	memcached_it = [memcached_index allocIterator];
-	@try {
+	memcached_it = memcached_index->allocIterator();
+	try {
 restart:
 		if (tuple == NULL)
-			[memcached_index initIterator: memcached_it :ITER_ALL :NULL :0];
+			memcached_index->initIterator(memcached_it, ITER_ALL, NULL, 0);
 
 		struct tbuf *keys_to_delete = tbuf_new(fiber->gc_pool);
 
@@ -585,7 +589,7 @@ restart:
 		memcached_delete_expired_keys(keys_to_delete);
 		fiber_gc();
 		goto restart;
-	} @finally {
+	} catch(const Exception& e) {
 		memcached_it->free(memcached_it);
 		memcached_it = NULL;
 	}
@@ -597,10 +601,10 @@ void memcached_start_expire()
 		return;
 
 	assert(memcached_expire == NULL);
-	@try {
+	try {
 		memcached_expire = fiber_new("memcached_expire",
 						memcached_expire_loop);
-	} @catch (tnt_Exception *e) {
+	} catch (const Exception& e) {
 		say_error("can't start the expire fiber");
 		return;
 	}

@@ -50,12 +50,12 @@ tarantool_coro_create(struct tarantool_coro *coro,
 			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
 	if (coro->stack == MAP_FAILED) {
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
 			  sizeof(coro->stack_size),
 			  "mmap", "coro stack");
 	}
 
-	(void) VALGRIND_STACK_REGISTER(coro->stack, coro->stack + coro->stack_size);
+	(void) VALGRIND_STACK_REGISTER(coro->stack, (char *) coro->stack + coro->stack_size);
 
 	coro_create(&coro->ctx, f, data, coro->stack, coro->stack_size);
 }

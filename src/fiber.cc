@@ -35,16 +35,15 @@
 
 #include <say.h>
 #include <tarantool.h>
-#include TARANTOOL_CONFIG
+extern "C" {
+#include <cfg/warning.h>
+#include <cfg/tarantool_box_cfg.h>
+} /* extern "C" */
 #include <tbuf.h>
 #include <stat.h>
 #include <assoc.h>
 #include "iobuf.h"
 #include <rlist.h>
-
-@implementation FiberCancelException
-@end
-
 
 enum { FIBER_CALL_STACK = 16 };
 
@@ -215,11 +214,19 @@ fiber_yield(void)
 }
 
 
+struct fiber_watcher_data {
+	struct fiber *f;
+	bool timed_out;
+};
+
 static void
-fiber_schedule_timeout(ev_watcher *watcher)
+fiber_schedule_timeout(ev_timer *watcher, int revents)
 {
+	(void) revents;
+
 	assert(fiber == &sched);
-	struct { struct fiber *f; bool timed_out; } *state = watcher->data;
+	struct fiber_watcher_data *state =
+			(struct fiber_watcher_data *) watcher->data;
 	state->timed_out = true;
 	fiber_call(state->f);
 }
@@ -232,8 +239,8 @@ bool
 fiber_yield_timeout(ev_tstamp delay)
 {
 	struct ev_timer timer;
-	ev_timer_init(&timer, (void *)fiber_schedule_timeout, delay, 0);
-	struct { struct fiber *f; bool timed_out; } state = { fiber, false };
+	ev_timer_init(&timer, fiber_schedule_timeout, delay, 0);
+	struct fiber_watcher_data state = { fiber, false };
 	timer.data = &state;
 	ev_timer_start(&timer);
 	fiber_yield();
@@ -264,11 +271,17 @@ fiber_sleep(ev_tstamp delay)
  * @note: this is a cancellation point (@sa fiber_testcancel()).
  * @return process return status
 */
+void
+fiber_schedule_child(ev_child *watcher, int event __attribute__((unused)))
+{
+	return fiber_schedule((ev_watcher *) watcher, event);
+}
+
 int
 wait_for_child(pid_t pid)
 {
 	ev_child cw;
-	ev_init(&cw, (void *)fiber_schedule);
+	ev_init(&cw, fiber_schedule_child);
 	ev_child_set(&cw, pid, 0);
 	cw.data = fiber;
 	ev_child_start(&cw);
@@ -283,12 +296,15 @@ void
 fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 {
 	assert(fiber == &sched);
-	fiber_call(watcher->data);
+	fiber_call((struct fiber *) watcher->data);
 }
 
 static void
-fiber_ready_async(void)
+fiber_ready_async(ev_async *watcher, int revents)
 {
+	(void) watcher;
+	(void) revents;
+
 	while(!rlist_empty(&ready_fibers)) {
 		struct fiber *f =
 			rlist_first_entry(&ready_fibers, struct fiber, state);
@@ -298,27 +314,27 @@ fiber_ready_async(void)
 }
 
 struct fiber *
-fiber_find(int fid)
+fiber_find(uint32_t fid)
 {
-	struct mh_i32ptr_node_t node = { .key = fid };
+	struct mh_i32ptr_node_t node = { fid, NULL };
 	mh_int_t k = mh_i32ptr_get(fiber_registry, &node, NULL);
 
 	if (k == mh_end(fiber_registry))
 		return NULL;
-	return mh_i32ptr_node(fiber_registry, k)->val;
+	return (struct fiber *) mh_i32ptr_node(fiber_registry, k)->val;
 }
 
 static void
 register_fid(struct fiber *fiber)
 {
-	struct mh_i32ptr_node_t node = { .key = fiber -> fid, .val = fiber };
+	struct mh_i32ptr_node_t node = { fiber -> fid, fiber };
 	mh_i32ptr_put(fiber_registry, &node, NULL, NULL);
 }
 
 static void
 unregister_fid(struct fiber *fiber)
 {
-	struct mh_i32ptr_node_t node = { .key = fiber->fid };
+	struct mh_i32ptr_node_t node = { fiber->fid, NULL };
 	mh_i32ptr_remove(fiber_registry, &node, NULL);
 }
 
@@ -358,16 +374,17 @@ fiber_loop(void *data __attribute__((unused)))
 {
 	for (;;) {
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
-		@try {
+		try {
 			fiber->f(fiber->f_data);
-		} @catch (FiberCancelException *e) {
+		} catch (const FiberCancelException& e) {
 			say_info("fiber `%s' has been cancelled", fiber_name(fiber));
 			say_info("fiber `%s': exiting", fiber_name(fiber));
-		} @catch (tnt_Exception *e) {
-			[e log];
-		} @catch (id e) {
-			say_error("fiber `%s': exception `%s'",
-				fiber_name(fiber), object_getClassName(e));
+		} catch (const Exception& e) {
+			e.log();
+		} catch (...) {
+			/* TODO: this case should never happen */
+			say_error("fiber `%s': unknown exception",
+				fiber_name(fiber));
 			panic("fiber `%s': exiting", fiber_name(fiber));
 		}
 		fiber_zombificate();
@@ -408,7 +425,7 @@ fiber_new(const char *name, void (*f) (va_list))
 		fiber = rlist_first_entry(&zombie_fibers, struct fiber, link);
 		rlist_move_entry(&fibers, fiber, link);
 	} else {
-		fiber = palloc(eter_pool, sizeof(*fiber));
+		fiber = (struct fiber *) palloc(eter_pool, sizeof(*fiber));
 
 		memset(fiber, 0, sizeof(*fiber));
 		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
@@ -468,7 +485,7 @@ fiber_destroy_all()
 static void
 fiber_info_print(struct tbuf *out, struct fiber *fiber)
 {
-	void *stack_top = fiber->coro.stack + fiber->coro.stack_size;
+	void *stack_top = (char *) fiber->coro.stack + fiber->coro.stack_size;
 
 	tbuf_printf(out, "  - fid: %4i" CRLF, fiber->fid);
 	tbuf_printf(out, "    csw: %i" CRLF, fiber->csw);
@@ -513,7 +530,7 @@ fiber_init(void)
 
 	iobuf_init_readahead(cfg.readahead);
 
-	ev_async_init(&ready_async, (void *)fiber_ready_async);
+	ev_async_init(&ready_async, fiber_ready_async);
 	ev_async_start(&ready_async);
 }
 

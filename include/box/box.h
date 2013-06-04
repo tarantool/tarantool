@@ -29,6 +29,11 @@
  * SUCH DAMAGE.
  */
 #include <util.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /*
  * Box - data storage (spaces, indexes) and query
  * processor (INSERT, UPDATE, DELETE, SELECT, Lua)
@@ -95,5 +100,9 @@ enum {
 	BOX_INDEX_MAX = 10,
 	BOX_FIELD_MAX = UINT32_MAX
 };
+
+#if defined(__cplusplus)
+}
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_H */

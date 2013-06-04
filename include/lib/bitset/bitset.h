@@ -59,6 +59,10 @@
 
 #include <lib/bit/bit.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** @cond false */
 struct bitset_page {
 	size_t first_pos;
@@ -165,5 +169,9 @@ bitset_info(struct bitset *bitset, struct bitset_info *info);
 void
 bitset_dump(struct bitset *bitset, int verbose, FILE *stream);
 #endif /* defined(DEBUG) */
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LIB_BITSET_BITSET_H_INCLUDED */

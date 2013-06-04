@@ -42,7 +42,7 @@
 #include <bfd.h>
 #endif /* HAVE_BFD */
 
-#include <fiber.h>
+#include "fiber.h"
 #include "say.h"
 
 #ifndef HAVE_LIBC_STACK_END
@@ -223,15 +223,15 @@ struct frame {
 char *
 backtrace(void *frame_, void *stack, size_t stack_size)
 {
-	struct frame *frame = frame_;
-	void *stack_top = stack + stack_size;
+	struct frame *frame = (struct frame *) frame_;
+	void *stack_top = (char *) stack + stack_size;
 	void *stack_bottom = stack;
 
 	char *p = backtrace_buf;
 	size_t r, len = sizeof(backtrace_buf);
 	while (stack_bottom <= (void *)frame && (void *)frame < stack_top) {
 		r = snprintf(p, len, "        - { frame: %p, caller: %p",
-			     (void *)frame + 2 * sizeof(void *), frame->ret);
+			     (char *)frame + 2 * sizeof(void *), frame->ret);
 
 		if (r >= len)
 			goto out;
@@ -241,7 +241,7 @@ backtrace(void *frame_, void *stack, size_t stack_size)
 #ifdef HAVE_BFD
 		struct symbol *s = addr2symbol(frame->ret);
 		if (s != NULL) {
-			r = snprintf(p, len, " <%s+%"PRI_SZ"> ", s->name, frame->ret - s->addr);
+			r = snprintf(p, len, " <%s+%" PRI_SZ "> ", s->name, (const char *) frame->ret - (const char *) s->addr);
 			if (r >= len)
 				goto out;
 			p += r;
@@ -266,7 +266,7 @@ backtrace(void *frame_, void *stack, size_t stack_size)
 out:
 	p += MIN(len - 1, r);
 	*p = 0;
-        return backtrace_buf;
+	return backtrace_buf;
 }
 
 void
@@ -279,7 +279,7 @@ print_backtrace()
 	if (fiber == NULL || fiber_name(fiber) == NULL ||
 	    strcmp(fiber_name(fiber), "sched") == 0) {
 		stack_top = frame; /* we don't know where the system stack top is */
-		stack_size = __libc_stack_end - frame;
+		stack_size = (const char *) __libc_stack_end - (const char *) frame;
 	} else {
 		stack_top = fiber->coro.stack;
 		stack_size = fiber->coro.stack_size;
@@ -308,7 +308,8 @@ static ssize_t symbol_count;
 int
 compare_symbol(const void *_a, const void *_b)
 {
-	const struct symbol *a = _a, *b = _b;
+	const struct symbol *a = (const struct symbol *) _a;
+	const struct symbol *b = (const struct symbol *) _b;
 	if (a->addr > b->addr)
 		return 1;
 	if (a->addr == b->addr)
@@ -340,9 +341,9 @@ symbols_load(const char *name)
 	storage_needed = bfd_get_symtab_upper_bound(h);
 
 	if (storage_needed <= 0)
-                goto out;
+		goto out;
 
-	symbol_table = malloc(storage_needed);
+	symbol_table = (asymbol **) malloc(storage_needed);
 	if (symbol_table == NULL)
 		goto out;
 
@@ -370,7 +371,7 @@ symbols_load(const char *name)
 		goto out;
 
 	j = 0;
-	symbols = malloc(symbol_count * sizeof(struct symbol));
+	symbols = (struct symbol *) malloc(symbol_count * sizeof(struct symbol));
 	if (symbols == NULL)
 		goto out;
 
@@ -399,7 +400,8 @@ symbols_load(const char *name)
 	qsort(symbols, symbol_count, sizeof(struct symbol), compare_symbol);
 
 	for (int j = 0; j < symbol_count - 1; j++)
-		symbols[j].end = MIN(symbols[j].end, symbols[j + 1].addr - 1);
+		symbols[j].end = MIN((char *) symbols[j].end,
+				     (char *) symbols[j + 1].addr - 1);
 
 out:
 	if (symbol_count == 0)

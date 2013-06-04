@@ -35,10 +35,6 @@
 #include "exception.h"
 #include "space.h"
 
-static struct index_traits index_traits = {
-	.allows_partial_key = false,
-};
-
 const char *field_data_type_strs[] = {"UNKNOWN", "NUM", "NUM64", "STR", "\0"};
 STRS(index_type, INDEX_TYPE);
 STRS(iterator_type, ITERATOR_TYPE);
@@ -46,14 +42,14 @@ STRS(iterator_type, ITERATOR_TYPE);
 /* {{{ Utilities. **********************************************/
 
 void
-check_key_parts(const struct key_def *key_def,
+Index::check_key_parts(const struct key_def *key_def,
 		u32 part_count, bool partial_key_allowed)
 {
 	if (part_count > key_def->part_count)
-		tnt_raise(ClientError, :ER_KEY_PART_COUNT,
+		tnt_raise(ClientError, ER_KEY_PART_COUNT,
 			  part_count, key_def->part_count);
 	if (!partial_key_allowed && part_count < key_def->part_count)
-		tnt_raise(ClientError, :ER_EXACT_MATCH,
+		tnt_raise(ClientError, ER_EXACT_MATCH,
 			  part_count, key_def->part_count);
 }
 
@@ -62,7 +58,7 @@ check_key_parts(const struct key_def *key_def,
  * allowed.
  */
 uint32_t
-replace_check_dup(struct tuple *old_tuple,
+Index::replace_check_dup(struct tuple *old_tuple,
 		  struct tuple *dup_tuple,
 		  enum dup_replace_mode mode)
 {
@@ -93,24 +89,16 @@ replace_check_dup(struct tuple *old_tuple,
 
 /* {{{ Index -- base class for all indexes. ********************/
 
-@implementation Index
-
-+ (struct index_traits *) traits
-{
-	return &index_traits;
-}
-
-+ (Index *) alloc: (enum index_type) type
-	 :(struct key_def *) key_def
-	 :(struct space *) space
+Index *
+Index::factory(enum index_type type, struct key_def *key_def, struct space *space)
 {
 	switch (type) {
 	case HASH:
-		return [HashIndex alloc: key_def :space];
+		return HashIndex::factory(key_def, space);
 	case TREE:
-		return [TreeIndex alloc: key_def :space];
+		return TreeIndex::factory(key_def, space);
 	case BITSET:
-		return [BitsetIndex alloc];
+		return new BitsetIndex(key_def, space);
 	default:
 		assert(false);
 	}
@@ -118,118 +106,28 @@ replace_check_dup(struct tuple *old_tuple,
 	return NULL;
 }
 
-- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
+Index::Index(struct key_def *key_def, struct space *space)
 {
-	self = [super init];
-	if (self == NULL)
-		return NULL;
-
-	traits = [object_getClass(self) traits];
-	key_def = key_def_arg;
-	space = space_arg;
-	position = [self allocIterator];
-
-	return self;
+	this->key_def = key_def;
+	this->space = space;
+	this->position = NULL;
 }
 
-- (void) free
+Index::~Index()
 {
-	position->free(position);
-	[super free];
+	if (position != NULL) {
+		position->free(position);
+	}
 }
 
-- (void) beginBuild
+struct iterator *
+Index::primaryIterator()
 {
-	[self subclassResponsibility: _cmd];
+	if (position == NULL) {
+		position = allocIterator();
+	}
+
+	return position;
 }
-
-- (void) buildNext: (struct tuple *)tuple
-{
-	(void) tuple;
-	[self subclassResponsibility: _cmd];
-}
-
-- (void) endBuild
-{
-	[self subclassResponsibility: _cmd];
-}
-
-- (void) build: (Index *) pk
-{
-	(void) pk;
-	[self subclassResponsibility: _cmd];
-}
-
-
-- (size_t) size
-{
-	[self subclassResponsibility: _cmd];
-	return 0;
-}
-
-- (struct tuple *) min
-{
-	[self subclassResponsibility: _cmd];
-	return NULL;
-}
-
-- (struct tuple *) max
-{
-	[self subclassResponsibility: _cmd];
-	return NULL;
-}
-
-- (struct tuple *) random: (u32) rnd
-{
-	(void) rnd;
-	[self subclassResponsibility: _cmd];
-	return NULL;
-}
-
-- (struct tuple *) findByKey: (const void *) key :(u32) part_count
-{
-	(void) key;
-	(void) part_count;
-	[self subclassResponsibility: _cmd];
-	return NULL;
-}
-
-- (struct tuple *) findByTuple: (struct tuple *) pattern
-{
-	(void) pattern;
-	[self subclassResponsibility: _cmd];
-	return NULL;
-}
-
-- (struct tuple *) replace: (struct tuple *) old_tuple
-			  : (struct tuple *) new_tuple
-			  : (enum dup_replace_mode) mode
-{
-	(void) old_tuple;
-	(void) new_tuple;
-	(void) mode;
-	[self subclassResponsibility: _cmd];
-	return NULL;
-}
-
-- (struct iterator *) allocIterator
-{
-	[self subclassResponsibility: _cmd];
-	return NULL;
-}
-
-
-- (void) initIterator: (struct iterator *) iterator
-	:(enum iterator_type) type
-	:(const void *) key :(u32) part_count
-{
-	(void) iterator;
-	(void) type;
-	(void) key;
-	(void) part_count;
-	[self subclassResponsibility: _cmd];
-}
-
-@end
 
 /* }}} */

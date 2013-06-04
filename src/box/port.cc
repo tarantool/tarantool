@@ -46,6 +46,6 @@ static struct port_vtab port_null_vtab = {
 };
 
 struct port port_null = {
-	.vtab = &port_null_vtab,
+	/* .vtab = */ &port_null_vtab,
 };
 

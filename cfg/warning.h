@@ -5,6 +5,6 @@
 
 extern struct tbuf *cfg_out;
 
-void out_warning(ConfettyError r, char *format, ...);
+void out_warning(ConfettyError r, const char *format, ...);
 
 #endif

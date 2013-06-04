@@ -31,9 +31,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <dlfcn.h>
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
+
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+} /* extern "C" */
 
 /** libuuid API */
 typedef unsigned char uuid_t[16];
@@ -70,7 +73,7 @@ loaddl_and_call(struct lua_State *L, box_function f)
 	if (!libuuid)
 		return luaL_error(L, "box.uuid(): %s", dlerror());
 
-	uuid_generate = dlsym(libuuid, "uuid_generate");
+	uuid_generate = (decltype(uuid_generate)) dlsym(libuuid, "uuid_generate");
 	if (!uuid_generate) {
 		lua_pushfstring(L, "box.uuid(): %s", dlerror());
 		dlclose(libuuid);

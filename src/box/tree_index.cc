@@ -36,7 +36,7 @@
 /* {{{ Utilities. *************************************************/
 
 static struct index_traits tree_index_traits = {
-	.allows_partial_key = true,
+	/* .allows_partial_key = */ true,
 };
 
 /**
@@ -320,12 +320,12 @@ fold_with_sparse_parts(struct key_def *key_def, struct tuple *tuple, union spars
 		if (part != BOX_FIELD_MAX) {
 			if (key_def->parts[part].type == NUM) {
 				if (len != sizeof parts[part].num32) {
-					tnt_raise(IllegalParams, :"key is not u32");
+					tnt_raise(IllegalParams, "key is not u32");
 				}
 				memcpy(&parts[part].num32, data, len);
 			} else if (key_def->parts[part].type == NUM64) {
 				if (len != sizeof parts[part].num64) {
-					tnt_raise(IllegalParams, :"key is not u64");
+					tnt_raise(IllegalParams, "key is not u64");
 				}
 				memcpy(&parts[part].num64, data, len);
 			} else if (len <= sizeof(parts[part].str.data)) {
@@ -359,11 +359,11 @@ fold_with_key_parts(struct key_def *key_def, struct key_data *key_data)
 
 		if (key_def->parts[part].type == NUM) {
 			if (len != sizeof parts[part].num32)
-				tnt_raise(IllegalParams, :"key is not u32");
+				tnt_raise(IllegalParams, "key is not u32");
 			memcpy(&parts[part].num32, data, len);
 		} else if (key_def->parts[part].type == NUM64) {
 			if (len != sizeof parts[part].num64)
-				tnt_raise(IllegalParams, :"key is not u64");
+				tnt_raise(IllegalParams, "key is not u64");
 			memcpy(&parts[part].num64, data, len);
 		} else if (len <= sizeof(parts[part].str.data)) {
 			parts[part].str.length = len;
@@ -556,7 +556,7 @@ dense_node_compare(struct key_def *key_def, u32 first_field,
 	assert(first_field + part_count <= tuple_b->field_count);
 
 	/* Allocate space for offsets. */
-	u32 *off_a = alloca(2 * part_count * sizeof(u32));
+	u32 *off_a = (u32 *) alloca(2 * part_count * sizeof(u32));
 	u32 *off_b = off_a + part_count;
 
 	/* Find field offsets. */
@@ -580,8 +580,8 @@ dense_node_compare(struct key_def *key_def, u32 first_field,
 		u32 field = key_def->parts[part].fieldno;
 		u8 *ad = tuple_a->data + off_a[field - first_field];
 		u8 *bd = tuple_b->data + off_b[field - first_field];
-		u32 al = load_varint32((void *) &ad);
-		u32 bl = load_varint32((void *) &bd);
+		u32 al = load_varint32((const void **) &ad);
+		u32 bl = load_varint32((const void **) &bd);
 		int r = dense_part_compare(key_def->parts[part].type,
 					   ad, al, bd, bl);
 		if (r) {
@@ -674,7 +674,7 @@ dense_key_node_compare(struct key_def *key_def,
 	assert(first_field + part_count <= tuple->field_count);
 
 	/* Allocate space for offsets. */
-	u32 *off = alloca(part_count * sizeof(u32));
+	u32 *off = (u32 *) alloca(part_count * sizeof(u32));
 
 	/* Find field offsets. */
 	off[0] = offset;
@@ -693,7 +693,7 @@ dense_key_node_compare(struct key_def *key_def,
 	for (u32 part = 0; part < part_count; ++part) {
 		u32 field = key_def->parts[part].fieldno;
 		const u8 *bd = tuple->data + off[field - first_field];
-		u32 bl = load_varint32((void *) &bd);
+		u32 bl = load_varint32((const void **) &bd);
 		int r = dense_key_part_compare(key_def->parts[part].type,
 					       key_data->data,
 					       key_data->parts[part],
@@ -723,7 +723,7 @@ linear_key_node_compare(struct key_def *key_def,
 		part_count = key_data->part_count;
 	u8 *bd = tuple->data + offset;
 	for (u32 part = 0; part < part_count; ++part) {
-		u32 bl = load_varint32((void *) &bd);
+		u32 bl = load_varint32((const void **) &bd);
 		int r = dense_key_part_compare(key_def->parts[part].type,
 					       key_data->data,
 					       key_data->parts[part],
@@ -742,7 +742,7 @@ linear_key_node_compare(struct key_def *key_def,
 
 struct tree_iterator {
 	struct iterator base;
-	TreeIndex *index;
+	const TreeIndex *index;
 	struct sptree_index_iterator *iter;
 	struct key_data key_data;
 };
@@ -771,7 +771,7 @@ tree_iterator_ge(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 	void *node = sptree_index_iterator_next(it->iter);
-	return [it->index unfold: node];
+	return it->index->unfold(node);
 }
 
 static struct tuple *
@@ -779,7 +779,7 @@ tree_iterator_le(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 	void *node = sptree_index_iterator_reverse_next(it->iter);
-	return [it->index unfold: node];
+	return it->index->unfold(node);
 }
 
 static struct tuple *
@@ -788,8 +788,9 @@ tree_iterator_eq(struct iterator *iterator)
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	void *node = sptree_index_iterator_next(it->iter);
-	if (node && it->index->tree.compare(&it->key_data, node, it->index) == 0)
-		return [it->index unfold: node];
+	if (node && it->index->tree.compare(&it->key_data, node,
+					    (void *) it->index) == 0)
+		return it->index->unfold(node);
 
 	return NULL;
 }
@@ -801,8 +802,9 @@ tree_iterator_req(struct iterator *iterator)
 
 	void *node = sptree_index_iterator_reverse_next(it->iter);
 	if (node != NULL
-	    && it->index->tree.compare(&it->key_data, node, it->index) == 0) {
-		return [it->index unfold: node];
+	    && it->index->tree.compare(&it->key_data, node,
+				       (void *) it->index) == 0) {
+		return it->index->unfold(node);
 	}
 
 	return NULL;
@@ -816,9 +818,9 @@ tree_iterator_lt(struct iterator *iterator)
 	void *node ;
 	while ((node = sptree_index_iterator_reverse_next(it->iter)) != NULL) {
 		if (it->index->tree.compare(&it->key_data, node,
-					    it->index) != 0) {
+					    (void *) it->index) != 0) {
 			it->base.next = tree_iterator_le;
-			return [it->index unfold: node];
+			return it->index->unfold(node);
 		}
 	}
 
@@ -833,9 +835,9 @@ tree_iterator_gt(struct iterator *iterator)
 	void *node;
 	while ((node = sptree_index_iterator_next(it->iter)) != NULL) {
 		if (it->index->tree.compare(&it->key_data, node,
-					    it->index) != 0) {
+					    (void *) it->index) != 0) {
 			it->base.next = tree_iterator_ge;
-			return [it->index unfold: node];
+			return it->index->unfold(node);
 		}
 	}
 
@@ -846,186 +848,266 @@ tree_iterator_gt(struct iterator *iterator)
 
 /* {{{ TreeIndex -- base tree index class *************************/
 
-@class SparseTreeIndex;
-@class DenseTreeIndex;
-@class Num32TreeIndex;
-@class FixedTreeIndex;
+class SparseTreeIndex: public TreeIndex {
+public:
+	SparseTreeIndex(struct key_def *key_def, struct space *space);
 
-@interface SparseTreeIndex: TreeIndex
-@end
+// protected:
+	size_t
+	node_size() const;
 
-@interface DenseTreeIndex: TreeIndex {
-	@public
+	tree_cmp_t
+	node_cmp() const;
+
+	tree_cmp_t
+	dup_node_cmp() const;
+
+	tree_cmp_t
+	key_node_cmp() const;
+
+	void
+	fold(void *node, struct tuple *tuple) const;
+
+	struct tuple *
+	unfold(const void *node) const;
+};
+
+
+class DenseTreeIndex: public TreeIndex {
+public:
+	DenseTreeIndex(struct key_def *key_def, struct space *space);
+
+// protected:
+	size_t
+	node_size() const;
+
+	tree_cmp_t
+	node_cmp() const;
+
+	tree_cmp_t
+	dup_node_cmp() const;
+
+	tree_cmp_t
+	key_node_cmp() const;
+
+	void
+	fold(void *node, struct tuple *tuple) const;
+
+	struct tuple *
+	unfold(const void *node) const;
+
+//private:
 	u32 first_field;
-}
-@end
+};
 
-@interface Num32TreeIndex: TreeIndex
-@end
+class Num32TreeIndex: public TreeIndex {
+public:
+	Num32TreeIndex(struct key_def *key_def, struct space *space);
 
-@interface FixedTreeIndex: TreeIndex {
-	@public
+// protected:
+	size_t
+	node_size() const;
+
+	tree_cmp_t
+	node_cmp() const;
+
+	tree_cmp_t
+	dup_node_cmp() const;
+
+	tree_cmp_t
+	key_node_cmp() const;
+
+	void
+	fold(void *node, struct tuple *tuple) const;
+
+	struct tuple *
+	unfold(const void *node) const;
+};
+
+
+class FixedTreeIndex: public TreeIndex {
+public:
+	FixedTreeIndex(struct key_def *key_def, struct space *space);
+
+protected:
+	size_t
+	node_size() const;
+
+	tree_cmp_t
+	node_cmp() const;
+
+	tree_cmp_t
+	dup_node_cmp() const;
+
+	tree_cmp_t
+	key_node_cmp() const;
+
+	void
+	fold(void *node, struct tuple *tuple) const;
+
+	struct tuple *
+	unfold(const void *node) const;
+//private:
+public:
 	u32 first_field;
 	u32 first_offset;
-}
-@end
+};
 
-@implementation TreeIndex
 
-+ (struct index_traits *) traits
-{
-	return &tree_index_traits;
-}
-
-+ (Index *) alloc: (struct key_def *) key_def :(struct space *) space
+TreeIndex *
+TreeIndex::factory(struct key_def *key_def, struct space *space)
 {
 	enum tree_type type = find_tree_type(space, key_def);
 	switch (type) {
 	case TREE_SPARSE:
-		return [SparseTreeIndex alloc];
+		return new SparseTreeIndex(key_def, space);
 	case TREE_DENSE:
-		return [DenseTreeIndex alloc];
+		return new DenseTreeIndex(key_def, space);
 	case TREE_NUM32:
-		return [Num32TreeIndex alloc];
+		return new Num32TreeIndex(key_def, space);
 	case TREE_FIXED:
-		return [FixedTreeIndex alloc];
+		return new FixedTreeIndex(key_def, space);
 	default:
 		assert(false);
 		return 0;
 	}
 }
 
-- (void) free
+TreeIndex::TreeIndex(struct key_def *key_def, struct space *space)
+	: Index(key_def, space)
+{
+	memset(&tree, 0, sizeof tree);
+}
+
+TreeIndex::~TreeIndex()
 {
 	sptree_index_destroy(&tree);
-	[super free];
 }
 
-- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
-{
-	self = [super init: key_def_arg :space_arg];
-	if (self == NULL)
-		return NULL;
-
-	memset(&tree, 0, sizeof tree);
-	return self;
-}
-
-- (size_t) size
+size_t
+TreeIndex::size() const
 {
 	return tree.size;
 }
 
-- (struct tuple *) min
+struct tuple *
+TreeIndex::min() const
 {
 	void *node = sptree_index_first(&tree);
-	return [self unfold: node];
+	return unfold(node);
 }
 
-- (struct tuple *) max
+struct tuple *
+TreeIndex::max() const
 {
 	void *node = sptree_index_last(&tree);
-	return [self unfold: node];
+	return unfold(node);
 }
 
-- (struct tuple *) random: (u32) rnd
+struct tuple *
+TreeIndex::random(u32 rnd) const
 {
 	void *node = sptree_index_random(&tree, rnd);
-	return [self unfold: node];
+	return unfold(node);
 }
 
-- (struct tuple *) findByKey: (const void *) key : (u32) part_count
+struct tuple *
+TreeIndex::findByKey(const void *key, u32 part_count) const
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
 
-	struct key_data *key_data
-		= alloca(sizeof(struct key_data) +
+	struct key_data *key_data = (struct key_data *)
+			alloca(sizeof(struct key_data) +
 			 _SIZEOF_SPARSE_PARTS(part_count));
 
-	key_data->data = key;
+	key_data->data = (const u8 *) key;
 	key_data->part_count = part_count;
 	fold_with_key_parts(key_def, key_data);
 
 	void *node = sptree_index_find(&tree, key_data);
-	return [self unfold: node];
+	return unfold(node);
 }
 
-- (struct tuple *) findByTuple: (struct tuple *) tuple
+struct tuple *
+TreeIndex::findByTuple(struct tuple *tuple) const
 {
 	assert(key_def->is_unique);
 	if (tuple->field_count < key_def->max_fieldno)
-		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+		tnt_raise(IllegalParams, "tuple must have all indexed fields");
 
-	struct key_data *key_data
-		= alloca(sizeof(struct key_data) + _SIZEOF_SPARSE_PARTS(tuple->field_count));
+	struct key_data *key_data = (struct key_data *)
+			alloca(sizeof(struct key_data) +
+			       _SIZEOF_SPARSE_PARTS(tuple->field_count));
 
 	key_data->data = tuple->data;
 	key_data->part_count = tuple->field_count;
 	fold_with_sparse_parts(key_def, tuple, key_data->parts);
 
 	void *node = sptree_index_find(&tree, key_data);
-	return [self unfold: node];
+	return unfold(node);
 }
 
-- (struct tuple *) replace: (struct tuple *) old_tuple
-			  :(struct tuple *) new_tuple
-			  :(enum dup_replace_mode) mode
+struct tuple *
+TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
+		   enum dup_replace_mode mode)
 {
-	size_t node_size = [self node_size];
+	size_t node_size = this->node_size();
 	void *new_node = alloca(node_size);
 	void *old_node = alloca(node_size);
 	uint32_t errcode;
 
 	if (new_tuple) {
 		void *dup_node = old_node;
-		[self fold: new_node :new_tuple];
+		fold(new_node, new_tuple);
 
 		/* Try to optimistically replace the new_tuple. */
 		sptree_index_replace(&tree, new_node, &dup_node);
 
-		struct tuple *dup_tuple = [self unfold: dup_node];
+		struct tuple *dup_tuple = unfold(dup_node);
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
 		if (errcode) {
 			sptree_index_delete(&tree, new_node);
 			if (dup_node)
 				sptree_index_replace(&tree, dup_node, NULL);
-			tnt_raise(ClientError, :errcode, index_n(self));
+			tnt_raise(ClientError, errcode, index_n(this));
 		}
 		if (dup_tuple)
 			return dup_tuple;
 	}
 	if (old_tuple) {
-		[self fold: old_node :old_tuple];
+		fold(old_node, old_tuple);
 		sptree_index_delete(&tree, old_node);
 	}
 	return old_tuple;
 }
 
-- (struct iterator *) allocIterator
+struct iterator *
+TreeIndex::allocIterator() const
 {
 	assert(key_def->part_count);
-	struct tree_iterator *it
-		= malloc(sizeof(struct tree_iterator) + SIZEOF_SPARSE_PARTS(key_def));
+	struct tree_iterator *it = (struct tree_iterator *)
+			malloc(sizeof(struct tree_iterator) +
+			       SIZEOF_SPARSE_PARTS(key_def));
 
 	if (it) {
 		memset(it, 0, sizeof(struct tree_iterator));
-		it->index = self;
+		it->index = this;
 		it->base.free = tree_iterator_free;
 	}
 	return (struct iterator *) it;
 }
 
-- (void) initIterator: (struct iterator *) iterator
-	:(enum iterator_type) type
-	:(const void *) key :(u32) part_count
+void
+TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
+			const void *key, u32 part_count) const
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	if (part_count != 0) {
 		check_key_parts(key_def, part_count,
-				traits->allows_partial_key);
+				tree_index_traits.allows_partial_key);
 	} else {
 		/*
 		 * If no key is specified, downgrade equality
@@ -1034,7 +1116,7 @@ tree_iterator_gt(struct iterator *iterator)
 		type = iterator_type_is_reverse(type) ? ITER_LE : ITER_GE;
 		key = NULL;
 	}
-	it->key_data.data = key;
+	it->key_data.data = (const u8 *) key;
 	it->key_data.part_count = part_count;
 
 	fold_with_key_parts(key_def, &it->key_data);
@@ -1067,29 +1149,31 @@ tree_iterator_gt(struct iterator *iterator)
 		it->base.next = tree_iterator_lt;
 		break;
 	default:
-		tnt_raise(ClientError, :ER_UNSUPPORTED,
+		tnt_raise(ClientError, ER_UNSUPPORTED,
 			  "Tree index", "requested iterator type");
 	}
 }
 
-- (void) beginBuild
+void
+TreeIndex::beginBuild()
 {
-	assert(index_is_primary(self));
+	assert(index_is_primary(this));
 
 	tree.size = 0;
 	tree.max_size = 64;
 
-	size_t node_size = [self node_size];
+	size_t node_size = this->node_size();
 	size_t sz = tree.max_size * node_size;
 	tree.members = malloc(sz);
 	if (tree.members == NULL) {
-		panic("malloc(): failed to allocate %"PRI_SZ" bytes", sz);
+		panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
 	}
 }
 
-- (void) buildNext: (struct tuple *) tuple
+void
+TreeIndex::buildNext(struct tuple *tuple)
 {
-	size_t node_size = [self node_size];
+	size_t node_size = this->node_size();
 
 	if (tree.size == tree.max_size) {
 		tree.max_size *= 2;
@@ -1097,34 +1181,36 @@ tree_iterator_gt(struct iterator *iterator)
 		size_t sz = tree.max_size * node_size;
 		tree.members = realloc(tree.members, sz);
 		if (tree.members == NULL) {
-			panic("malloc(): failed to allocate %"PRI_SZ" bytes", sz);
+			panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
 		}
 	}
 
 	void *node = ((u8 *) tree.members + tree.size * node_size);
-	[self fold: node :tuple];
+	fold(node, tuple);
 	tree.size++;
 }
 
-- (void) endBuild
+void
+TreeIndex::endBuild()
 {
-	assert(index_is_primary(self));
+	assert(index_is_primary(this));
 
 	u32 n_tuples = tree.size;
 	u32 estimated_tuples = tree.max_size;
 	void *nodes = tree.members;
 
 	sptree_index_init(&tree,
-			  [self node_size], nodes, n_tuples, estimated_tuples,
-			  [self key_node_cmp], [self node_cmp],
-			  self);
+			  node_size(), nodes, n_tuples, estimated_tuples,
+			  key_node_cmp(), node_cmp(),
+			  this);
 }
 
-- (void) build: (Index *) pk
+void
+TreeIndex::build(Index *pk)
 {
-	u32 n_tuples = [pk size];
+	u32 n_tuples = pk->size();
 	u32 estimated_tuples = n_tuples * 1.2;
-	size_t node_size = [self node_size];
+	size_t node_size = this->node_size();
 
 	void *nodes = NULL;
 	if (n_tuples) {
@@ -1136,72 +1222,32 @@ tree_iterator_gt(struct iterator *iterator)
 		size_t sz = estimated_tuples * node_size;
 		nodes = malloc(sz);
 		if (nodes == NULL) {
-			panic("malloc(): failed to allocate %"PRI_SZ" bytes", sz);
+			panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
 		}
 	}
 
-	struct iterator *it = pk->position;
-	[pk initIterator: it :ITER_ALL :NULL :0];
+	struct iterator *it = pk->primaryIterator();
+	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	struct tuple *tuple;
 
 	for (u32 i = 0; (tuple = it->next(it)) != NULL; ++i) {
 		void *node = ((u8 *) nodes + i * node_size);
-		[self fold: node :tuple];
+		fold(node, tuple);
 	}
 
 	if (n_tuples) {
-		say_info("Sorting %"PRIu32 " keys in index %" PRIu32 "...", n_tuples,
-			 index_n(self));
+		say_info("Sorting %" PRIu32 " keys in index %" PRIu32 "...", n_tuples,
+			 index_n(this));
 	}
 
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
 	sptree_index_init(&tree,
 			  node_size, nodes, n_tuples, estimated_tuples,
-			  [self key_node_cmp],
-			  key_def->is_unique ? [self node_cmp] : [self dup_node_cmp],
-			  self);
+			  key_node_cmp(),
+			  key_def->is_unique ? node_cmp() : dup_node_cmp(),
+			  this);
 }
-
-- (size_t) node_size
-{
-	[self subclassResponsibility: _cmd];
-	return 0;
-}
-
-- (tree_cmp_t) node_cmp
-{
-	[self subclassResponsibility: _cmd];
-	return 0;
-}
-
-- (tree_cmp_t) dup_node_cmp
-{
-	[self subclassResponsibility: _cmd];
-	return 0;
-}
-
-- (tree_cmp_t) key_node_cmp
-{
-	[self subclassResponsibility: _cmd];
-	return 0;
-}
-
-- (void) fold: (void *) node :(struct tuple *) tuple
-{
-	(void) node;
-	(void) tuple;
-	[self subclassResponsibility: _cmd];
-}
-
-- (struct tuple *) unfold: (const void *) node
-{
-	(void) node;
-	[self subclassResponsibility: _cmd];
-	return NULL;
-}
-
-@end
 
 /* }}} */
 
@@ -1211,8 +1257,8 @@ static int
 sparse_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	SparseTreeIndex *index = (SparseTreeIndex *) arg;
-	const struct sparse_node *node_xa = node_a;
-	const struct sparse_node *node_xb = node_b;
+	const struct sparse_node *node_xa = (const struct sparse_node *) node_a;
+	const struct sparse_node *node_xb = (const struct sparse_node *) node_b;
 	return sparse_node_compare(index->key_def,
 				   node_xa->tuple, node_xa->parts,
 				   node_xb->tuple, node_xb->parts);
@@ -1223,8 +1269,10 @@ sparse_dup_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	int r = sparse_node_cmp(node_a, node_b, arg);
 	if (r == 0) {
-		const struct sparse_node *node_xa = node_a;
-		const struct sparse_node *node_xb = node_b;
+		const struct sparse_node *node_xa =
+				(const struct sparse_node *) node_a;
+		const struct sparse_node *node_xb =
+				(const struct sparse_node *) node_b;
 		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
@@ -1234,48 +1282,57 @@ static int
 sparse_key_node_cmp(const void *key, const void *node, void *arg)
 {
 	SparseTreeIndex *index = (SparseTreeIndex *) arg;
-	const struct key_data *key_data = key;
-	const struct sparse_node *node_x = node;
+	const struct key_data *key_data = (const struct key_data *) key;
+	const struct sparse_node *node_x = (const struct sparse_node *) node;
 	return sparse_key_node_compare(index->key_def, key_data,
 				       node_x->tuple, node_x->parts);
 }
 
-@implementation SparseTreeIndex
+SparseTreeIndex::SparseTreeIndex(struct key_def *key_def, struct space *space)
+	: TreeIndex(key_def, space)
+{
+	/* Nothing */
+}
 
-- (size_t) node_size
+size_t
+SparseTreeIndex::node_size() const
 {
 	return sizeof(struct sparse_node) + SIZEOF_SPARSE_PARTS(key_def);
 }
 
-- (tree_cmp_t) node_cmp
+
+tree_cmp_t
+SparseTreeIndex::node_cmp() const
 {
 	return sparse_node_cmp;
 }
 
-- (tree_cmp_t) dup_node_cmp
+tree_cmp_t
+SparseTreeIndex::dup_node_cmp() const
 {
 	return sparse_dup_node_cmp;
 }
 
-- (tree_cmp_t) key_node_cmp
+tree_cmp_t
+SparseTreeIndex::key_node_cmp() const
 {
 	return sparse_key_node_cmp;
 }
 
-- (void) fold: (void *) node :(struct tuple *) tuple
+void
+SparseTreeIndex::fold(void *node, struct tuple *tuple) const
 {
-	struct sparse_node *node_x = node;
+	struct sparse_node *node_x = (struct sparse_node *) node;
 	node_x->tuple = tuple;
 	fold_with_sparse_parts(key_def, tuple, node_x->parts);
 }
 
-- (struct tuple *) unfold: (const void *) node
+struct tuple *
+SparseTreeIndex::unfold(const void *node) const
 {
-	const struct sparse_node *node_x = node;
+	const struct sparse_node *node_x = (const struct sparse_node *) node;
 	return node_x ? node_x->tuple : NULL;
 }
-
-@end
 
 /* }}} */
 
@@ -1285,8 +1342,8 @@ static int
 dense_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	DenseTreeIndex *index = (DenseTreeIndex *) arg;
-	const struct dense_node *node_xa = node_a;
-	const struct dense_node *node_xb = node_b;
+	const struct dense_node *node_xa = (const struct dense_node *) node_a;
+	const struct dense_node *node_xb = (const struct dense_node *) node_b;
 	return dense_node_compare(index->key_def, index->first_field,
 				  node_xa->tuple, node_xa->offset,
 				  node_xb->tuple, node_xb->offset);
@@ -1297,8 +1354,10 @@ dense_dup_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	int r = dense_node_cmp(node_a, node_b, arg);
 	if (r == 0) {
-		const struct dense_node *node_xa = node_a;
-		const struct dense_node *node_xb = node_b;
+		const struct dense_node *node_xa =
+				(const struct dense_node *) node_a;
+		const struct dense_node *node_xb =
+				(const struct dense_node *) node_b;
 		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
@@ -1308,8 +1367,8 @@ static int
 dense_key_node_cmp(const void *key, const void * node, void *arg)
 {
 	DenseTreeIndex *index = (DenseTreeIndex *) arg;
-	const struct key_data *key_data = key;
-	const struct dense_node *node_x = node;
+	const struct key_data *key_data = (const struct key_data *) key;
+	const struct dense_node *node_x = (const struct dense_node *) node;
 	return dense_key_node_compare(index->key_def, key_data,
 				      index->first_field,
 				      node_x->tuple, node_x->offset);
@@ -1319,8 +1378,8 @@ static int
 linear_dense_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	DenseTreeIndex *index = (DenseTreeIndex *) arg;
-	const struct dense_node *node_xa = node_a;
-	const struct dense_node *node_xb = node_b;
+	const struct dense_node *node_xa = (const struct dense_node *) node_a;
+	const struct dense_node *node_xb = (const struct dense_node *) node_b;
 	return linear_node_compare(index->key_def, index->first_field,
 				   node_xa->tuple, node_xa->offset,
 				   node_xb->tuple, node_xb->offset);
@@ -1331,8 +1390,10 @@ linear_dense_dup_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	int r = linear_dense_node_cmp(node_a, node_b, arg);
 	if (r == 0) {
-		const struct dense_node *node_xa = node_a;
-		const struct dense_node *node_xb = node_b;
+		const struct dense_node *node_xa =
+				(const struct dense_node *) node_a;
+		const struct dense_node *node_xb =
+				(const struct dense_node *) node_b;
 		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
@@ -1342,65 +1403,64 @@ static int
 linear_dense_key_node_cmp(const void *key, const void * node, void *arg)
 {
 	DenseTreeIndex *index = (DenseTreeIndex *) arg;
-	const struct key_data *key_data = key;
-	const struct dense_node *node_x = node;
+	const struct key_data *key_data = (const struct key_data *) key;
+	const struct dense_node *node_x = (const struct dense_node *) node;
 	return linear_key_node_compare(index->key_def, key_data,
 				       index->first_field,
 				       node_x->tuple, node_x->offset);
 }
 
-@implementation DenseTreeIndex
 
-- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
+DenseTreeIndex::DenseTreeIndex(struct key_def *key_def, struct space *space)
+	: TreeIndex(key_def, space)
 {
-	self = [super init: key_def_arg :space_arg];
-	if (self == NULL)
-		return NULL;
-
 	first_field = find_first_field(key_def);
-	return self;
 }
 
-- (size_t) node_size
+size_t
+DenseTreeIndex::node_size() const
 {
 	return sizeof(struct dense_node);
 }
 
-- (tree_cmp_t) node_cmp
+tree_cmp_t
+DenseTreeIndex::node_cmp() const
 {
 	return key_is_linear(key_def)
 		? linear_dense_node_cmp
 		: dense_node_cmp;
 }
 
-- (tree_cmp_t) dup_node_cmp
+tree_cmp_t
+DenseTreeIndex::dup_node_cmp() const
 {
 	return key_is_linear(key_def)
 		? linear_dense_dup_node_cmp
 		: dense_dup_node_cmp;
 }
 
-- (tree_cmp_t) key_node_cmp
+tree_cmp_t
+DenseTreeIndex::key_node_cmp() const
 {
 	return key_is_linear(key_def)
 		? linear_dense_key_node_cmp
 		: dense_key_node_cmp;
 }
 
-- (void) fold: (void *) node :(struct tuple *) tuple
+void
+DenseTreeIndex::fold(void *node, struct tuple *tuple) const
 {
-	struct dense_node *node_x = node;
+	struct dense_node *node_x = (struct dense_node *) node;
 	node_x->tuple = tuple;
 	node_x->offset = fold_with_dense_offset(key_def, tuple);
 }
 
-- (struct tuple *) unfold: (const void *) node
+struct tuple *
+DenseTreeIndex::unfold(const void *node) const
 {
-	const struct dense_node *node_x = node;
+	const struct dense_node *node_x = (const struct dense_node *) node;
 	return node_x ? node_x->tuple : NULL;
 }
-
-@end
 
 /* }}} */
 
@@ -1410,8 +1470,8 @@ static int
 num32_node_cmp(const void * node_a, const void * node_b, void *arg)
 {
 	(void) arg;
-	const struct num32_node *node_xa = node_a;
-	const struct num32_node *node_xb = node_b;
+	const struct num32_node *node_xa = (const struct num32_node *) node_a;
+	const struct num32_node *node_xb = (const struct num32_node *) node_b;
 	return u32_cmp(node_xa->value, node_xb->value);
 }
 
@@ -1420,8 +1480,10 @@ num32_dup_node_cmp(const void * node_a, const void * node_b, void *arg)
 {
 	int r = num32_node_cmp(node_a, node_b, arg);
 	if (r == 0) {
-		const struct num32_node *node_xa = node_a;
-		const struct num32_node *node_xb = node_b;
+		const struct num32_node *node_xa =
+				(const struct num32_node *) node_a;
+		const struct num32_node *node_xb =
+				(const struct num32_node *) node_b;
 		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
@@ -1431,49 +1493,57 @@ static int
 num32_key_node_cmp(const void * key, const void * node, void *arg)
 {
 	(void) arg;
-	const struct key_data *key_data = key;
-	const struct num32_node *node_x = node;
+	const struct key_data *key_data = (const struct key_data *) key;
+	const struct num32_node *node_x = (const struct num32_node *) node;
 	if (key_data->part_count)
 		return u32_cmp(key_data->parts[0].num32, node_x->value);
 	return 0;
 }
 
-@implementation Num32TreeIndex
+Num32TreeIndex::Num32TreeIndex(struct key_def *key_def, struct space *space)
+	: TreeIndex(key_def, space)
+{
+	/* Nothing */
+}
 
-- (size_t) node_size
+size_t
+Num32TreeIndex::node_size() const
 {
 	return sizeof(struct num32_node);
 }
 
-- (tree_cmp_t) node_cmp
+tree_cmp_t
+Num32TreeIndex::node_cmp() const
 {
 	return num32_node_cmp;
 }
 
-- (tree_cmp_t) dup_node_cmp
+tree_cmp_t
+Num32TreeIndex::dup_node_cmp() const
 {
 	return num32_dup_node_cmp;
 }
 
-- (tree_cmp_t) key_node_cmp
+tree_cmp_t
+Num32TreeIndex::key_node_cmp() const
 {
 	return num32_key_node_cmp;
 }
 
-- (void) fold: (void *) node :(struct tuple *) tuple
+void
+Num32TreeIndex::fold(void *node, struct tuple *tuple) const
 {
 	struct num32_node *node_x = (struct num32_node *) node;
 	node_x->tuple = tuple;
 	node_x->value = fold_with_num32_value(key_def, tuple);
 }
 
-- (struct tuple *) unfold: (const void *) node
+struct tuple *
+Num32TreeIndex::unfold(const void *node) const
 {
-	const struct num32_node *node_x = node;
+	const struct num32_node *node_x = (const struct num32_node *) node;
 	return node_x ? node_x->tuple : NULL;
 }
-
-@end
 
 /* }}} */
 
@@ -1483,8 +1553,8 @@ static int
 fixed_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	FixedTreeIndex *index = (FixedTreeIndex *) arg;
-	const struct fixed_node *node_xa = node_a;
-	const struct fixed_node *node_xb = node_b;
+	const struct fixed_node *node_xa = (const struct fixed_node *) node_a;
+	const struct fixed_node *node_xb = (const struct fixed_node *) node_b;
 	return dense_node_compare(index->key_def, index->first_field,
 				  node_xa->tuple, index->first_offset,
 				  node_xb->tuple, index->first_offset);
@@ -1495,8 +1565,10 @@ fixed_dup_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	int r = fixed_node_cmp(node_a, node_b, arg);
 	if (r == 0) {
-		const struct fixed_node *node_xa = node_a;
-		const struct fixed_node *node_xb = node_b;
+		const struct fixed_node *node_xa =
+				(const struct fixed_node *) node_a;
+		const struct fixed_node *node_xb =
+				(const struct fixed_node *) node_b;
 		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
@@ -1506,8 +1578,8 @@ static int
 fixed_key_node_cmp(const void *key, const void * node, void *arg)
 {
 	FixedTreeIndex *index = (FixedTreeIndex *) arg;
-	const struct key_data *key_data = key;
-	const struct fixed_node *node_x = node;
+	const struct key_data *key_data = (const struct key_data *) key;
+	const struct fixed_node *node_x = (const struct fixed_node *) node;
 	return dense_key_node_compare(index->key_def, key_data,
 				      index->first_field,
 				      node_x->tuple, index->first_offset);
@@ -1517,8 +1589,8 @@ static int
 linear_fixed_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	FixedTreeIndex *index = (FixedTreeIndex *) arg;
-	const struct fixed_node *node_xa = node_a;
-	const struct fixed_node *node_xb = node_b;
+	const struct fixed_node *node_xa = (const struct fixed_node *) node_a;
+	const struct fixed_node *node_xb = (const struct fixed_node *) node_b;
 	return linear_node_compare(index->key_def, index->first_field,
 				   node_xa->tuple, index->first_offset,
 				   node_xb->tuple, index->first_offset);
@@ -1529,8 +1601,10 @@ linear_fixed_dup_node_cmp(const void *node_a, const void *node_b, void *arg)
 {
 	int r = linear_fixed_node_cmp(node_a, node_b, arg);
 	if (r == 0) {
-		const struct fixed_node *node_xa = node_a;
-		const struct fixed_node *node_xb = node_b;
+		const struct fixed_node *node_xa =
+				(const struct fixed_node *) node_a;
+		const struct fixed_node *node_xb =
+				(const struct fixed_node *) node_b;
 		r = ta_cmp(node_xa->tuple, node_xb->tuple);
 	}
 	return r;
@@ -1539,66 +1613,66 @@ linear_fixed_dup_node_cmp(const void *node_a, const void *node_b, void *arg)
 static int
 linear_fixed_key_node_cmp(const void *key, const void * node, void *arg)
 {
-	FixedTreeIndex *index = (FixedTreeIndex *) arg;
-	const struct key_data *key_data = key;
-	const struct fixed_node *node_x = node;
+	const FixedTreeIndex *index = (const FixedTreeIndex *) arg;
+	const struct key_data *key_data = (const struct key_data *) key;
+	const struct fixed_node *node_x = (const struct fixed_node *) node;
 	return linear_key_node_compare(index->key_def, key_data,
 					 index->first_field,
 					 node_x->tuple, index->first_offset);
 }
 
-@implementation FixedTreeIndex
 
-- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
+FixedTreeIndex::FixedTreeIndex(struct key_def *key_def, struct space *space)
+	: TreeIndex(key_def, space)
 {
-	self = [super init: key_def_arg :space_arg];
-	if (self == NULL)
-		return NULL;
-
 	first_field = find_first_field(key_def);
 	first_offset = find_fixed_offset(space, first_field, 0);
-	return self;
 }
 
-- (size_t) node_size
+
+size_t
+FixedTreeIndex::node_size() const
 {
 	return sizeof(struct fixed_node);
 }
 
-- (tree_cmp_t) node_cmp
+tree_cmp_t
+FixedTreeIndex::node_cmp() const
 {
 	return key_is_linear(key_def)
 		? linear_fixed_node_cmp
 		: fixed_node_cmp;
 }
 
-- (tree_cmp_t) dup_node_cmp
+tree_cmp_t
+FixedTreeIndex::dup_node_cmp() const
 {
 	return key_is_linear(key_def)
 		? linear_fixed_dup_node_cmp
 		: fixed_dup_node_cmp;
 }
 
-- (tree_cmp_t) key_node_cmp
+tree_cmp_t
+FixedTreeIndex::key_node_cmp() const
 {
 	return key_is_linear(key_def)
 		? linear_fixed_key_node_cmp
 		: fixed_key_node_cmp;
 }
 
-- (void) fold: (void *) node :(struct tuple *) tuple
+void
+FixedTreeIndex::fold(void *node, struct tuple *tuple) const
 {
 	struct fixed_node *node_x = (struct fixed_node *) node;
 	node_x->tuple = tuple;
 }
 
-- (struct tuple *) unfold: (const void *) node
+struct tuple *
+FixedTreeIndex::unfold(const void *node) const
 {
-	const struct fixed_node *node_x = node;
+	const struct fixed_node *node_x = (const struct fixed_node *) node;
 	return node_x ? node_x->tuple : NULL;
 }
-
-@end
 
 /* }}} */
 

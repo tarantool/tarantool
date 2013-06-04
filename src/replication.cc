@@ -29,7 +29,10 @@
 #include <replication.h>
 #include <say.h>
 #include <fiber.h>
-#include TARANTOOL_CONFIG
+extern "C" {
+#include <cfg/warning.h>
+#include <cfg/tarantool_box_cfg.h>
+} /* extern "C" */
 #include <palloc.h>
 #include <stddef.h>
 
@@ -151,7 +154,7 @@ replication_check_config(struct tarantool_cfg *config)
 {
 	if (config->replication_port < 0 ||
 	    config->replication_port >= USHRT_MAX) {
-		say_error("invalid replication port value: %"PRId32,
+		say_error("invalid replication port value: %" PRId32,
 			  config->replication_port);
 		return -1;
 	}
@@ -236,7 +239,7 @@ replication_on_accept(struct evio_service *service __attribute__((unused)),
          */
 	sio_setfl(fd, O_NONBLOCK, 0);
 
-	struct ev_io *io = malloc(sizeof(struct ev_io));
+	struct ev_io *io = (struct ev_io *) malloc(sizeof(struct ev_io));
 	if (io == NULL) {
 		close(fd);
 		return;
@@ -487,7 +490,7 @@ retry:
 	/* We'll wait for children no longer than 5 sec.  */
 	alarm(5);
 
-	say_info("sending signal %d to %"PRIu32" children", kill_signo,
+	say_info("sending signal %d to %" PRIu32 " children", kill_signo,
 		 (u32) spawner.child_count);
 
 	kill(0, kill_signo);
@@ -556,7 +559,7 @@ static int
 replication_relay_send_row(void *param, struct tbuf *t)
 {
 	int client_sock = (int) (intptr_t) param;
-	u8 *data = t->data;
+	u8 *data = (u8 *) t->data;
 	ssize_t bytes, len = t->size;
 	while (len > 0) {
 		bytes = write(client_sock, data, len);
@@ -624,7 +627,7 @@ replication_relay_loop(int client_sock)
 		}
 		panic("invalid LSN request size: %zu", r);
 	}
-	say_info("starting replication from lsn: %"PRIi64, lsn);
+	say_info("starting replication from lsn: %" PRIi64, lsn);
 
 	ver = tbuf_new(fiber->gc_pool);
 	tbuf_append(ver, &default_version, sizeof(default_version));

@@ -58,10 +58,12 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf)
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	struct tbuf row = {
-		.size = request_len, .capacity = request_len,
-		.data = in->pos, .pool = fiber->gc_pool
-	};
+	struct tbuf row;
+	row.size = (uint32_t) request_len;
+	row.capacity = (uint32_t) request_len;
+	row.data = in->pos;
+	row.pool = fiber->gc_pool;
+
 	in->pos += request_len;
 	return row;
 }
@@ -83,7 +85,7 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	coio_readn(coio, &version, sizeof(version));
 	*err = NULL;
 	if (version != default_version)
-		tnt_raise(SystemError, :"remote version mismatch");
+		tnt_raise(IllegalParams, "remote version mismatch");
 
 	say_crit("successfully connected to master");
 	say_crit("starting replication from lsn: %" PRIi64, initial_lsn);
@@ -102,7 +104,7 @@ pull_from_remote(va_list ap)
 
 	for (;;) {
 		const char *err = NULL;
-		@try {
+		try {
 			fiber_setcancellable(true);
 			if (! evio_is_active(&coio)) {
 				if (iobuf == NULL)
@@ -123,12 +125,12 @@ pull_from_remote(va_list ap)
 
 			iobuf_gc(iobuf);
 			fiber_gc();
-		} @catch (FiberCancelException *e) {
+		} catch (const FiberCancelException& e) {
 			iobuf_delete(iobuf);
 			evio_close(&coio);
-			@throw;
-		} @catch (tnt_Exception *e) {
-			[e log];
+			throw;
+		} catch (const Exception& e) {
+			e.log();
 			if (! warning_said) {
 				if (err != NULL)
 					say_info("%s", err);
@@ -169,9 +171,9 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 	say_crit("initializing the replica, WAL master %s", addr);
 	snprintf(name, sizeof(name), "replica/%s", addr);
 
-	@try {
+	try {
 		f = fiber_new(name, pull_from_remote);
-	} @catch (tnt_Exception *e) {
+	} catch (const Exception& ) {
 		return;
 	}
 

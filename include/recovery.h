@@ -34,6 +34,10 @@
 #include "util.h"
 #include "tarantool_ev.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct fiber;
 struct tbuf;
 
@@ -143,5 +147,9 @@ void snapshot_write_row(struct log_io *i, struct fio_batch *batch,
 			const void *data, size_t data_size);
 void snapshot_save(struct recovery_state *r,
 		   void (*loop) (struct log_io *, struct fio_batch *));
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_RECOVERY_H_INCLUDED */

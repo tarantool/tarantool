@@ -38,7 +38,7 @@
 #define SECS 5
 static ev_timer timer;
 
-struct {
+struct stats {
 	const char *name;
 	i64 value[SECS + 1];
 } *stats = NULL;
@@ -66,7 +66,7 @@ stat_register(const char **name, size_t max_idx)
 	for (int i = 0; i < max_idx; i++, name++, base++) {
 		if (stats_size <= base) {
 			stats_size += 1024;
-			stats = realloc(stats, sizeof(*stats) * stats_size);
+			stats = (struct stats *) realloc(stats, sizeof(*stats) * stats_size);
 			if (stats == NULL)
 				abort();
 		}

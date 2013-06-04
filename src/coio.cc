@@ -34,7 +34,13 @@
 #include "fiber.h"
 #include "iobuf.h"
 #include "sio.h"
+#include "scoped_guard.h"
 
+static inline void
+fiber_schedule_coio(ev_io *watcher, int event) {
+	say_warn("fiber schedule IO");
+	return fiber_schedule((ev_watcher *) watcher, event);
+}
 
 /** Note: this function does not throw */
 void
@@ -42,7 +48,7 @@ coio_init(struct ev_io *coio)
 {
 	/* Prepare for ev events. */
 	coio->data = fiber;
-	ev_init(coio, (void *) fiber_schedule);
+	ev_init(coio, fiber_schedule_coio);
 	coio->fd = -1;
 }
 
@@ -108,7 +114,7 @@ coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
 		       &error, &sz);
 	if (error != 0) {
 		errno = error;
-		tnt_raise(SocketError, :coio->fd in:"connect");
+		tnt_raise(SocketError, coio->fd, "connect");
 	}
 	return false;
 }
@@ -133,26 +139,27 @@ coio_connect_addrinfo(struct ev_io *coio, struct addrinfo *ai,
 	bool res = true;
 	while (ai) {
 		struct sockaddr_in *addr = (struct sockaddr_in *)ai->ai_addr;
-		@try {
+		try {
 			evio_socket(coio, ai->ai_family,
 				    ai->ai_socktype,
 				    ai->ai_protocol);
 			res = coio_connect_timeout(coio, addr, ai->ai_addrlen,
 						   delay);
-			return res;
-		} @catch (SocketError *e) {
-			if (ai->ai_next == NULL)
-				@throw;
-			ev_now_update();
-			evio_timeout_update(start, &delay);
-		} @finally {
 			if (res)
 				evio_close(coio);
+			return res;
+		} catch (const SocketError& e) {
+			if (res)
+				evio_close(coio);
+			if (ai->ai_next == NULL)
+				throw;
+			ev_now_update();
+			evio_timeout_update(start, &delay);
 		}
 		ai = ai->ai_next;
 	}
 	/* unreachable. */
-	tnt_raise(SocketError, :coio->fd in: "connect_addrinfo()");
+	tnt_raise(SocketError, coio->fd, "connect_addrinfo()");
 }
 
 /**
@@ -186,7 +193,7 @@ coio_accept(struct ev_io *coio, struct sockaddr_in *addr,
 		fiber_testcancel();
 		if (is_timedout) {
 			errno = ETIMEDOUT;
-			tnt_raise(SocketError, :coio->fd in:"accept");
+			tnt_raise(SocketError, coio->fd, "accept");
 		}
 		evio_timeout_update(start, &delay);
 	}
@@ -211,7 +218,12 @@ coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz,
 	evio_timeout_init(&start, &delay, timeout);
 
 	ssize_t to_read = (ssize_t) sz;
-	@try {
+
+	{
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
+
 		while (true) {
 			/*
 			 * Sic: assume the socket is ready: since
@@ -223,7 +235,7 @@ coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz,
 				to_read -= nrd;
 				if (to_read <= 0)
 					return sz - to_read;
-				buf += nrd;
+				buf = (char *) buf + nrd;
 				bufsiz -= nrd;
 			} else if (nrd == 0) {
 				errno = 0;
@@ -248,8 +260,6 @@ coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz,
 			}
 			evio_timeout_update(start, &delay);
 		}
-	} @finally {
-		ev_io_stop(coio);
 	}
 }
 
@@ -266,7 +276,7 @@ coio_readn_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz)
 	ssize_t nrd = coio_read_ahead(coio, buf, sz, bufsiz);
 	if (nrd < sz) {
 		errno = EPIPE;
-		tnt_raise(SocketError, :coio->fd in:"unexpected EOF when reading "
+		tnt_raise(SocketError, coio->fd, "unexpected EOF when reading "
 			  "from socket");
 	}
 	return nrd;
@@ -286,7 +296,7 @@ coio_readn_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz
 	ssize_t nrd = coio_read_ahead_timeout(coio, buf, sz, bufsiz, timeout);
 	if (nrd < sz && errno == 0) { /* EOF. */
 		errno = EPIPE;
-		tnt_raise(SocketError, :coio->fd in:"unexpected EOF when reading "
+		tnt_raise(SocketError, coio->fd, "unexpected EOF when reading "
 			  "from socket");
 	}
 	return nrd;
@@ -309,7 +319,12 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 	size_t towrite = sz;
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
-	@try {
+
+	{
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
+
 		while (true) {
 			/*
 			 * Sic: write as much data as possible,
@@ -321,7 +336,7 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 				if (nwr >= towrite)
 					return sz;
 				towrite -= nwr;
-				buf += nwr;
+				buf = (char *) buf + nwr;
 			}
 			if (! ev_is_active(coio)) {
 				ev_io_set(coio, coio->fd, EV_WRITE);
@@ -344,8 +359,6 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 			}
 			evio_timeout_update(start, &delay);
 		}
-	} @finally {
-		ev_io_stop(coio);
 	}
 }
 
@@ -357,11 +370,13 @@ static inline ssize_t
 coio_flush(int fd, struct iovec *iov, ssize_t offset, int iovcnt)
 {
 	ssize_t nwr;
-	@try {
+	try {
 		sio_add_to_iov(iov, -offset);
 		nwr = sio_writev(fd, iov, iovcnt);
-	} @finally {
 		sio_add_to_iov(iov, offset);
+	} catch(const Exception& e) {
+		sio_add_to_iov(iov, offset);
+		throw;
 	}
 	return nwr;
 }
@@ -373,7 +388,12 @@ coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt,
 	ssize_t total = 0;
 	size_t iov_len = 0;
 	struct iovec *end = iov + iovcnt;
-	@try {
+
+	{
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
+
 		/* Avoid a syscall in case of 0 iovcnt. */
 		while (iov < end) {
 			/* Write as much data as possible. */
@@ -402,8 +422,6 @@ coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt,
 			coio_fiber_yield(coio);
 			fiber_testcancel();
 		}
-	} @finally {
-		ev_io_stop(coio);
 	}
 	return total;
 }
@@ -422,7 +440,12 @@ coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
 {
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
-	@try {
+
+	{
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
+
 		while (true) {
 			/*
 			 * Sic: write as much data as possible,
@@ -450,8 +473,6 @@ coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
 			}
 			evio_timeout_update(start, &delay);
 		}
-	} @finally {
-		ev_io_stop(coio);
 	}
 }
 
@@ -470,7 +491,11 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
 
-	@try {
+	{
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
+
 		while (true) {
 			/*
 			 * Read as much data as possible,
@@ -499,8 +524,6 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 			}
 			evio_timeout_update(start, &delay);
 		}
-	} @finally {
-		ev_io_stop(coio);
 	}
 }
 
@@ -508,7 +531,8 @@ void
 coio_service_on_accept(struct evio_service *evio_service,
 		       int fd, struct sockaddr_in *addr)
 {
-	struct coio_service *service = evio_service->on_accept_param;
+	struct coio_service *service = (struct coio_service *)
+			evio_service->on_accept_param;
 	struct ev_io coio;
 
 	coio_init(&coio);
@@ -525,15 +549,15 @@ coio_service_on_accept(struct evio_service *evio_service,
 	struct iobuf *iobuf = NULL;
 	struct fiber *f;
 
-	@try {
+	try {
 		iobuf = iobuf_new(iobuf_name);
 		f = fiber_new(fiber_name, service->handler);
-	} @catch (tnt_Exception *e) {
+	} catch (const Exception& e) {
 		say_error("can't create a handler fiber, dropping client connection");
 		evio_close(&coio);
 		if (iobuf)
 			iobuf_delete(iobuf);
-		@throw;
+		throw;
 	}
 	/*
 	 * The coio is passed into the created fiber, reset the

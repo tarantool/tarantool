@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_PALLOC_H_INCLUDED
-#define TARANTOOL_PALLOC_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,41 +26,32 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include "tarantool.h"
+
 #include <stddef.h>
-#include <stdint.h>
-#include "util.h"
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
+#include <third_party/gopt/gopt.h>
 
-#define PALLOC_POOL_NAME_MAXLEN 30
-
-struct tbuf;
-
-struct palloc_pool;
-extern struct palloc_pool *eter_pool;
-int palloc_init(void);
-void palloc_free(void);
-void *palloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *p0alloc(struct palloc_pool *pool, size_t size) __attribute__((regparm(2)));
-void *palloca(struct palloc_pool *pool, size_t size, size_t align);
-void prelease(struct palloc_pool *pool);
-void palloc_reset(struct palloc_pool *pool);
-void ptruncate(struct palloc_pool *pool, size_t sz);
-void prelease_after(struct palloc_pool *pool, size_t after);
-struct palloc_pool *palloc_create_pool(const char *name);
-void palloc_destroy_pool(struct palloc_pool *);
-void palloc_free_unused(void);
-/* Set a name of this pool. Does not copy the argument name. */
-void palloc_set_name(struct palloc_pool *, const char *);
-const char *palloc_name(struct palloc_pool *);
-size_t palloc_allocated(struct palloc_pool *);
-
-void palloc_stat(struct tbuf *buf);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_PALLOC_H_INCLUDED */
+const void *opt_def =
+	gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
+			       gopt_longs("cfg-get", "cfg_get"),
+			       "=KEY", "return a value from configuration file described by KEY"),
+		   gopt_option('k', 0, gopt_shorts(0),
+			       gopt_longs("check-config"),
+			       NULL, "Check configuration file for errors"),
+		   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
+			       gopt_longs("config"),
+			       "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
+		   gopt_option('I', 0, gopt_shorts(0),
+			       gopt_longs("init-storage", "init_storage"),
+			       NULL, "initialize storage (an empty snapshot file) and exit"),
+		   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
+			       NULL, "increase verbosity level in log messages"),
+		   gopt_option('B', 0, gopt_shorts('B'), gopt_longs("background"),
+			       NULL, "redirect input/output streams to a log file and run as daemon"),
+		   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
+			       NULL, "display this help and exit"),
+		   gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
+			       NULL, "print program version and exit")
+);

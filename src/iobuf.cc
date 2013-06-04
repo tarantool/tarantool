@@ -73,7 +73,7 @@ ibuf_reserve(struct ibuf *ibuf, size_t size)
 		while (new_capacity < current_size + size)
 			new_capacity *= 2;
 
-		ibuf->buf = palloc(ibuf->pool, new_capacity);
+		ibuf->buf = (char *) palloc(ibuf->pool, new_capacity);
 		memcpy(ibuf->buf, ibuf->pos, current_size);
 		ibuf->capacity = new_capacity;
 	}
@@ -93,7 +93,7 @@ static inline void
 obuf_init_pos(struct obuf *buf, size_t pos)
 {
 	if (pos >= IOBUF_IOV_MAX) {
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, buf->pos,
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE, buf->pos,
 			  "obuf_init_pos", "iovec");
 	}
 	buf->iov[pos].iov_base = NULL;
@@ -165,11 +165,11 @@ obuf_dup(struct obuf *buf, const void *data, size_t size)
 			 */
 			size_t fill = capacity - iov->iov_len;
 			assert(fill < size);
-			memcpy(iov->iov_base + iov->iov_len, data, fill);
+			memcpy((char *) iov->iov_base + iov->iov_len, data, fill);
 
 			iov->iov_len += fill;
 			buf->size += fill;
-			data += fill;
+			data = (char *) data + fill;
 			size -= fill;
 			/*
 			 * Check if the remainder can fit
@@ -193,7 +193,7 @@ obuf_dup(struct obuf *buf, const void *data, size_t size)
 		iov = &buf->iov[buf->pos];
 		capacity = buf->capacity[buf->pos];
 	}
-	memcpy(iov->iov_base + iov->iov_len, data, size);
+	memcpy((char *) iov->iov_base + iov->iov_len, data, size);
 	iov->iov_len += size;
 	buf->size += size;
 	assert(iov->iov_len <= buf->capacity[buf->pos]);
@@ -221,9 +221,11 @@ obuf_book(struct obuf *buf, size_t size)
 			obuf_alloc_pos(buf, buf->pos, size);
 		}
 	}
-	struct obuf_svp svp = {
-		.pos = buf->pos, .iov_len = iov->iov_len, .size = buf->size
-	};
+	struct obuf_svp svp;
+	svp.pos = buf->pos;
+	svp.iov_len = iov->iov_len;
+	svp.size = buf->size;
+
 	iov->iov_len += size;
 	buf->size += size;
 	assert(iov->iov_len <= buf->capacity[buf->pos]);
@@ -272,7 +274,7 @@ iobuf_new(const char *name)
 {
 	struct iobuf *iobuf;
 	if (SLIST_EMPTY(&iobuf_cache)) {
-		iobuf = palloc(eter_pool, sizeof(struct iobuf));
+		iobuf = (struct iobuf *) palloc(eter_pool, sizeof(struct iobuf));
 		struct palloc_pool *pool = palloc_create_pool("");
 		/* Note: do not allocate memory upfront. */
 		ibuf_create(&iobuf->in, pool);

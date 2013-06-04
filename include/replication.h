@@ -55,7 +55,7 @@ replication_prefork();
  * @return None. Panics and exits on error.
  */
 void
-replication_init();
+replication_init(const char *bind_ipaddr, int replication_port);
 
 #endif // TARANTOOL_REPLICATION_H_INCLUDED
 

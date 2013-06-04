@@ -31,133 +31,87 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
-
-@implementation tnt_Exception
-+ (id) alloc
+Exception::Exception(const char *file, unsigned line)
+	: m_file(file), m_line(line)
 {
-	static __thread tnt_Exception *e = nil;
-	static __thread size_t sz = 0;
-
-	if (e != nil && class_getInstanceSize(self) <= sz) {
-		object_setClass(e, self);
-	} else {
-		if (e != nil)
-			object_dispose(e);
-		e = class_createInstance(self, 0);
-		sz = class_getInstanceSize(self);
-	}
-	return e;
+	m_errmsg[0] = 0;
 }
 
-- (void) log
+Exception::Exception(const Exception& e)
+	: Object(e), m_file(e.m_file), m_line(e.m_line)
 {
-	[self subclassResponsibility: _cmd];
+	memcpy(m_errmsg, e.m_errmsg, sizeof(m_errmsg));
 }
 
-- (const char *) errmsg
+SystemError::SystemError(const char *file, unsigned line)
+	: Exception(file, line),
+	  m_errnum(errno)
 {
-	[self subclassResponsibility: _cmd];
-	return  NULL;
+	/* nothing */
 }
-@end
 
-@implementation SystemError
-
-- (id) init: (const char *) format, ...
+void
+SystemError::init(const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
-	self = [self init: errno :format :ap];
+	init(format, ap);
 	va_end(ap);
-	return self;
 }
 
-- (id) init: (int)errnum_arg :(const char *)format :(va_list)ap
+void
+SystemError::init(const char *format, va_list ap)
 {
-	self = [super init];
-	errnum = errnum_arg;
-	vsnprintf(errmsg, sizeof(errmsg), format, ap);
-	return self;
+	vsnprintf(m_errmsg, sizeof(m_errmsg), format, ap);
 }
 
-- (void) log
+void
+SystemError::log() const
 {
-	say(S_ERROR, strerror(errnum), "%s in %s", object_getClassName(self), errmsg);
+	say(S_ERROR, strerror(m_errnum), "%s in %s", "SystemError",
+	    m_errmsg);
 }
 
-- (const char *) errmsg
+ClientError::ClientError(const char *file, unsigned line, uint32_t errcode, ...)
+	: Exception(file, line)
 {
-	return errmsg;
-}
-@end
-
-
-@implementation ClientError
-- (id) init: (uint32_t)errcode_, ...
-{
+	m_errcode = errcode;
 	va_list ap;
-	va_start(ap, errcode_);
-	[self init: errcode_ args: ap];
+	va_start(ap, errcode);
+	vsnprintf(m_errmsg, sizeof(m_errmsg) - 1,
+		  tnt_errcode_desc(m_errcode), ap);
+	m_errmsg[sizeof(m_errmsg) - 1] = 0;
 	va_end(ap);
-
-	return self;
 }
 
-
-- (id) init: (uint32_t)errcode_ args :(va_list)ap
+ClientError::ClientError(const char *file, unsigned line, const char *msg,
+			 uint32_t errcode)
+	: Exception(file, line)
 {
-	[super init];
-	errcode = errcode_;
-	vsnprintf(errmsg, sizeof(errmsg), tnt_errcode_desc(errcode), ap);
-	return self;
+	m_errcode = errcode;
+	strncpy(m_errmsg, msg, sizeof(m_errmsg) - 1);
+	m_errmsg[sizeof(m_errmsg) - 1] = 0;
 }
 
-- (id) init: (uint32_t)errcode_ :(const char *)msg
+void
+ClientError::log() const
 {
-	[super init];
-	errcode = errcode_;
-	snprintf(errmsg, sizeof(errmsg), "%s", msg);
-	return self;
+	say_error("%s at %s:%d, %s", "ClientError",
+		  m_file, m_line, m_errmsg);
 }
 
-- (void) log
+IllegalParams::IllegalParams(const char *file, unsigned line, const char *msg)
+	: LoggedError(file, line, ER_ILLEGAL_PARAMS, msg)
 {
-	say_error("%s at %s:%d, %s", object_getClassName(self),
-		  file, line, errmsg);
+	/* nothing */
 }
 
-- (const char *) errmsg
+
+ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
+	: LoggedError(file, line, ER_INJECTION, msg)
 {
-	return errmsg;
+	/* nothing */
 }
-@end
 
-
-@implementation LoggedError
-- (id) init: (uint32_t) errcode_, ...
-{
-	va_list ap;
-	va_start(ap, errcode_);
-	[super init: errcode_ args: ap];
-
-	[self log];
-
-	return self;
-}
-@end
-
-
-@implementation IllegalParams
-- (id) init: (const char*) msg
-{
-	return [super init: ER_ILLEGAL_PARAMS, msg];
-}
-@end
-
-@implementation ErrorInjection
-- (id) init: (const char*) msg
-{
-	return [super init: ER_INJECTION, msg];
-}
-@end

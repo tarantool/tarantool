@@ -31,16 +31,16 @@
 #include "box/box.h"
 #include "tbuf.h"
 
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-
-#include "lj_obj.h"
-#include "lj_ctype.h"
-#include "lj_cdata.h"
-#include "lj_cconv.h"
-#include "lj_state.h"
-#include <ctype.h>
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+#include <lj_obj.h>
+#include <lj_ctype.h>
+#include <lj_cdata.h>
+#include <lj_cconv.h>
+#include <lj_state.h>
+} /* extern "C" */
 
 #include "fiber.h"
 #include "lua_ipc.h"
@@ -51,10 +51,13 @@
 #include "lua/uuid.h"
 #include "lua/session.h"
 
+#include <ctype.h>
 #include <sys/time.h>
 #include <sys/types.h>
 
-#include TARANTOOL_CONFIG
+extern "C" {
+#include <cfg/tarantool_box_cfg.h>
+} /* extern "C" */
 
 /**
  * tarantool start-up file
@@ -125,7 +128,7 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 		if (idx < 0)
 			idx = lua_gettop(L) + idx + 1;
 		GCcdata *cd = cdataV(L->base + idx - 1);
-		if (cd->typeid != CTID_INT64 && cd->typeid != CTID_UINT64) {
+		if (cd->ctypeid != CTID_INT64 && cd->ctypeid != CTID_UINT64) {
 			luaL_error(L,
 				   "lua_tointeger64: unsupported cdata type");
 		}
@@ -150,7 +153,7 @@ luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
 	GCcdata *cd = lj_cdata_new(cts, id, bits);
 	TValue *o = L->top;
 	setcdataV(L, o, cd);
-	lj_cconv_ct_init(cts, ct, sz, cdataptr(cd), o, 0);
+	lj_cconv_ct_init(cts, ct, sz, (uint8_t *) cdataptr(cd), o, 0);
 	incr_top(L);
 	return cd;
 }
@@ -299,7 +302,7 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 		/* push the key back */
 		lua_pushlightuserdata(L, f);
 		/* create a new userdata */
-		void **ptr = lua_newuserdata(L, sizeof(void *));
+		void **ptr = (void **) lua_newuserdata(L, sizeof(void *));
 		*ptr = f;
 		luaL_getmetatable(L, fiberlib_name);
 		lua_setmetatable(L, -2);
@@ -323,7 +326,7 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 static struct fiber *
 lbox_checkfiber(struct lua_State *L, int index)
 {
-	return *(void **) luaL_checkudata(L, index, fiberlib_name);
+	return *(struct fiber **) luaL_checkudata(L, index, fiberlib_name);
 }
 
 static struct fiber *
@@ -334,7 +337,7 @@ lua_isfiber(struct lua_State *L, int narg)
 	luaL_getmetatable(L, fiberlib_name);
 	struct fiber *f = NULL;
 	if (lua_equal(L, -1, -2))
-		f = * (void **) lua_touserdata(L, narg);
+		f = * (struct fiber **) lua_touserdata(L, narg);
 	lua_pop(L, 2);
 	return f;
 }
@@ -400,7 +403,7 @@ box_lua_fiber_get_caller(struct lua_State *L)
 	lua_getfield(L, -1, "callers");
 	lua_pushthread(L);
 	lua_gettable(L, -2);
-	struct fiber *caller = lua_touserdata(L, -1);
+	struct fiber *caller = (struct fiber *) lua_touserdata(L, -1);
 	/* Pop the caller, the callers table, the fiberlib metatable. */
 	lua_pop(L, 3);
 	return caller;
@@ -483,13 +486,23 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 	 * completion status plus whatever the coroutine main
 	 * function returns. Follow this style here.
 	 */
-	@try {
+	auto cleanup = [=] {
+		/*
+		 * If the coroutine has detached itself, collect
+		 * its resources here.
+		 */
+		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+	};
+
+	try {
 		lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
 		/* push completion status */
 		lua_pushboolean(L, true);
 		/* move 'true' to stack start */
 		lua_insert(L, 1);
-	} @catch (FiberCancelException *e) {
+
+		cleanup();
+	} catch (const FiberCancelException& e) {
 		box_lua_fiber_clear_coro(tarantool_L, fiber);
 		/*
 		 * Note: FiberCancelException leaves garbage on
@@ -497,20 +510,24 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 		 * possible to cancel a fiber which is not
 		 * scheduled, and cancel() is synchronous.
 		 */
-		@throw;
-	} @catch (tnt_Exception *e) {
+
+		cleanup();
+		throw;
+	} catch (const Exception& e) {
 		/* pop any possible garbage */
 		lua_settop(L, 0);
 		/* completion status */
 		lua_pushboolean(L, false);
 		/* error message */
-		lua_pushstring(L, [e errmsg]);
+		lua_pushstring(L, e.errmsg());
 
 		if (box_lua_fiber_get_coro(tarantool_L, fiber) == NULL) {
 			/* The fiber is detached, log the error. */
-			[e log];
+			e.log();
 		}
-	} @catch (id allOthers) {
+
+		cleanup();
+	} catch (...) {
 		lua_settop(L, 1);
 		/*
 		 * The error message is already there.
@@ -524,12 +541,8 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 			/* The fiber is detached, log the error. */
 			say_error("%s", lua_tostring(L, -1));
 		}
-	} @finally {
-		/*
-		 * If the coroutine has detached itself, collect
-		 * its resources here.
-		 */
-		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+
+		cleanup();
 	}
 	/*
 	 * L stack contains nothing but call results.
@@ -620,7 +633,7 @@ lbox_fiber_resume(struct lua_State *L)
 	assert(f->fid == fid);
 	tarantool_lua_set_out(child_L, NULL);
 	/* Find out the state of the child fiber. */
-	enum fiber_state child_state = lua_tointeger(child_L, -1);
+	enum fiber_state child_state = (enum fiber_state) lua_tointeger(child_L, -1);
 	lua_pop(child_L, 1);
 	/* Get the results */
 	nargs = lua_gettop(child_L);
@@ -871,7 +884,7 @@ tarantool_lua_printstack_yaml(struct lua_State *L, struct tbuf *out)
 			GCcdata *cd = cdataV(L->base + i - 1);
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
-			int chop = (cd->typeid == CTID_UINT64 ? 3 : 2);
+			int chop = (cd->ctypeid == CTID_UINT64 ? 3 : 2);
 			tbuf_printf(out, " - %-.*s" CRLF, len - chop, sz);
 		} else
 			tbuf_printf(out, " - %s" CRLF,
@@ -892,7 +905,7 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
 			GCcdata *cd = cdataV(L->base + i - 1);
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
-			int chop = (cd->typeid == CTID_UINT64 ? 3 : 2);
+			int chop = (cd->ctypeid == CTID_UINT64 ? 3 : 2);
 			tbuf_printf(out, "%-.*s" CRLF, len - chop, sz);
 		} else
 			tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
@@ -952,13 +965,13 @@ lbox_pcall(struct lua_State *L)
 	 * Lua pcall() returns true/false for completion status
 	 * plus whatever the called function returns.
 	 */
-	@try {
+	try {
 		lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
 		/* push completion status */
 		lua_pushboolean(L, true);
 		/* move 'true' to stack start */
 		lua_insert(L, 1);
-	} @catch (ClientError *e) {
+	} catch (const ClientError& e) {
 		/*
 		 * Note: FiberCancelException passes through this
 		 * catch and thus leaves garbage on coroutine
@@ -969,10 +982,10 @@ lbox_pcall(struct lua_State *L)
 		/* completion status */
 		lua_pushboolean(L, false);
 		/* error message */
-		lua_pushstring(L, e->errmsg);
-	} @catch (tnt_Exception *e) {
-		@throw;
-	} @catch (id allOthers) {
+		lua_pushstring(L, e.errmsg());
+	} catch (const Exception& e) {
+		throw;
+	} catch (...) {
 		lua_settop(L, 1);
 		/* completion status */
 		lua_pushboolean(L, false);
@@ -1105,14 +1118,14 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 		if (r)
 			return r;
 	}
-	@try {
+	try {
 		lua_call(L, 0, LUA_MULTRET);
-	} @catch (FiberCancelException *e) {
-		@throw;
-	} @catch (tnt_Exception *e) {
-		lua_pushstring(L, [e errmsg]);
+	} catch (const FiberCancelException& e) {
+		throw;
+	} catch (const Exception& e) {
+		lua_pushstring(L, e.errmsg());
 		return 1;
-	} @catch (id allOthers) {
+	} catch (...) {
 		return 1;
 	}
 	return 0;
@@ -1191,7 +1204,7 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 	while ((key = tarantool_cfg_iterator_next(i, cfg, &value)) != NULL) {
 		if (value == NULL)
 			continue;
-		char *quote = is_string(value) ? "'" : "";
+		const char *quote = is_string(value) ? "'" : "";
 		if (strchr(key, '.') == NULL) {
 			lua_pushfstring(L, "box.cfg.%s = %s%s%s\n",
 					key, quote, value, quote);

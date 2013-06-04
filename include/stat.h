@@ -34,7 +34,7 @@ void stat_init(void);
 void stat_free(void);
 void stat_cleanup(int base, size_t max_idx);
 int stat_register(const char **name, size_t count);
-int stat_max_name_len;
+extern int stat_max_name_len;
 
 void stat_collect(int base, int name, i64 value);
 

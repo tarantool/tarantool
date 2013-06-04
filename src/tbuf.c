@@ -60,7 +60,7 @@ tbuf_assert(const struct tbuf *b)
 struct tbuf *
 tbuf_new(struct palloc_pool *pool)
 {
-	struct tbuf *e = palloc(pool, TBUF_ALLOC_FACTOR);
+	struct tbuf *e = (struct tbuf *) palloc(pool, TBUF_ALLOC_FACTOR);
 	e->size = 0;
 	e->capacity = TBUF_ALLOC_FACTOR - sizeof(struct tbuf);
 	e->data = (char *)e + sizeof(struct tbuf);
@@ -76,7 +76,7 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 	tbuf_assert(e);
 
 	/* Make new capacity a multiple of alloc factor. */
-	size_t new_capacity = MAX(e->capacity, TBUF_ALLOC_FACTOR) * 2;
+	size_t new_capacity = MAX(e->capacity, (uint32_t)TBUF_ALLOC_FACTOR) * 2;
 
 	while (new_capacity < e->size + required)
 		new_capacity *= 2;
@@ -86,7 +86,7 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 	poison(p, new_capacity);
 	memcpy(p, e->data, e->size);
 	poison(e->data, e->size);
-	e->data = p;
+	e->data = (char *) p;
 	e->capacity = new_capacity;
 	tbuf_assert(e);
 }
@@ -103,13 +103,13 @@ tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig)
 struct tbuf *
 tbuf_split(struct tbuf *orig, size_t at)
 {
-	struct tbuf *head = palloc(orig->pool, sizeof(*orig));
+	struct tbuf *head = (struct tbuf *) palloc(orig->pool, sizeof(*orig));
 	assert(at <= orig->size);
 	tbuf_assert(orig);
 	head->pool = orig->pool;
 	head->data = orig->data;
 	head->size = head->capacity = at;
-	orig->data += at;
+	orig->data = (char *) orig->data + at;
 	orig->capacity -= at;
 	orig->size -= at;
 	return head;
@@ -121,7 +121,7 @@ tbuf_peek(struct tbuf *b, size_t count)
 	void *p = b->data;
 	tbuf_assert(b);
 	if (count <= b->size) {
-		b->data += count;
+		b->data = (char *) b->data + count;
 		b->size -= count;
 		b->capacity -= count;
 		return p;
@@ -190,9 +190,9 @@ tbuf_printf(struct tbuf *b, const char *format, ...)
 char *
 tbuf_to_hex(const struct tbuf *x)
 {
-	const unsigned char *data = x->data;
+	const char *data = x->data;
 	size_t size = x->size;
-	char *out = palloc(x->pool, size * 3 + 1);
+	char *out = (char *) palloc(x->pool, size * 3 + 1);
 	out[size * 3] = 0;
 
 	for (int i = 0; i < size; i++) {

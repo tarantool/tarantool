@@ -29,7 +29,11 @@
 #include "box/box.h"
 #include <arpa/inet.h>
 
+extern "C" {
 #include <cfg/warning.h>
+#include <cfg/tarantool_box_cfg.h>
+} /* extern "C" */
+
 #include <errcode.h>
 #include "palloc.h"
 #include <recovery.h>
@@ -38,8 +42,6 @@
 #include <say.h>
 #include <stat.h>
 #include <tarantool.h>
-
-#include <cfg/tarantool_box_cfg.h>
 #include "tuple.h"
 #include "memcached.h"
 #include "box_lua.h"
@@ -81,7 +83,7 @@ process_rw(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 {
 	struct txn *txn = txn_begin();
 
-	@try {
+	try {
 		struct request *request = request_create(op, reqdata, reqlen);
 		stat_collect(stat_base, op, 1);
 		request_execute(request, txn, port);
@@ -89,9 +91,9 @@ process_rw(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 		port_send_tuple(port, txn, request->flags);
 		port_eof(port);
 		txn_finish(txn);
-	} @catch (id e) {
+	} catch (const Exception& e) {
 		txn_rollback(txn);
-		@throw;
+		throw;
 	}
 }
 
@@ -99,7 +101,7 @@ static void
 process_replica(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 {
 	if (!request_is_select(op)) {
-		tnt_raise(ClientError, :ER_NONMASTER,
+		tnt_raise(ClientError, ER_NONMASTER,
 			  cfg.replication_source);
 	}
 	return process_rw(port, op, reqdata, reqlen);
@@ -109,7 +111,7 @@ static void
 process_ro(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 {
 	if (!request_is_select(op))
-		tnt_raise(LoggedError, :ER_SECONDARY);
+		tnt_raise(LoggedError, ER_SECONDARY);
 	return process_rw(port, op, reqdata, reqlen);
 }
 
@@ -118,7 +120,7 @@ recover_snap_row(const void *data)
 {
 	assert(primary_indexes_enabled == false);
 
-	const struct box_snap_row *row = data;
+	const struct box_snap_row *row = (const struct box_snap_row *) data;
 
 	struct tuple *tuple = tuple_alloc(row->data_size);
 	memcpy(tuple->data, row->data, row->data_size);
@@ -128,9 +130,9 @@ recover_snap_row(const void *data)
 	Index *index = space_index(space, 0);
 	/* Check to see if the tuple has a sufficient number of fields. */
 	if (unlikely(tuple->field_count < space->max_fieldno)) {
-		tnt_raise(IllegalParams, :"tuple must have all indexed fields");
+		tnt_raise(IllegalParams, "tuple must have all indexed fields");
 	}
-	[index buildNext: tuple];
+	index->buildNext(tuple);
 	tuple_ref(tuple, 1);
 }
 
@@ -144,7 +146,7 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 		return -1;
 	}
 
-	@try {
+	try {
 		const void *data = t->data;
 		const void *end = t->data + t->size;
 		u16 tag = pick_u16(&data, end);
@@ -153,15 +155,14 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 			recover_snap_row(data);
 		} else if (tag == XLOG) {
 			u16 op = pick_u16(&data, end);
-			process_rw(&port_null, op, data, end - data);
+			process_rw(&port_null, op, data,
+				   (const char *) end - (const char *) data);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
 		}
-	} @catch (tnt_Exception *e) {
-		[e log];
-		return -1;
-	} @catch (id e) {
+	} catch (const Exception& e) {
+		e.log();
 		return -1;
 	}
 
@@ -210,7 +211,7 @@ box_check_config(struct tarantool_cfg *conf)
 {
 	/* replication & hot standby modes can not work together */
 	if (conf->replication_source != NULL && conf->local_hot_standby > 0) {
-		out_warning(0, "replication and local hot standby modes "
+		out_warning(CNF_OK, "replication and local hot standby modes "
 			       "can't be enabled simultaneously");
 		return -1;
 	}
@@ -223,11 +224,11 @@ box_check_config(struct tarantool_cfg *conf)
 
 		if (sscanf(conf->replication_source, "%31[^:]:%i",
 			   ip_addr, &port) != 2) {
-			out_warning(0, "replication source IP address is not recognized");
+			out_warning(CNF_OK, "replication source IP address is not recognized");
 			return -1;
 		}
 		if (port <= 0 || port >= USHRT_MAX) {
-			out_warning(0, "invalid replication source port value: %i", port);
+			out_warning(CNF_OK, "invalid replication source port value: %i", port);
 			return -1;
 		}
 	}
@@ -235,20 +236,20 @@ box_check_config(struct tarantool_cfg *conf)
 	/* check primary port */
 	if (conf->primary_port != 0 &&
 	    (conf->primary_port <= 0 || conf->primary_port >= USHRT_MAX)) {
-		out_warning(0, "invalid primary port value: %i", conf->primary_port);
+		out_warning(CNF_OK, "invalid primary port value: %i", conf->primary_port);
 		return -1;
 	}
 
 	/* check secondary port */
 	if (conf->secondary_port != 0 &&
 	    (conf->secondary_port <= 0 || conf->secondary_port >= USHRT_MAX)) {
-		out_warning(0, "invalid secondary port value: %i", conf->primary_port);
+		out_warning(CNF_OK, "invalid secondary port value: %i", conf->primary_port);
 		return -1;
 	}
 
 	/* check if at least one space is defined */
 	if (conf->space == NULL && conf->memcached_port == 0) {
-		out_warning(0, "at least one space or memcached port must be defined");
+		out_warning(CNF_OK, "at least one space or memcached port must be defined");
 		return -1;
 	}
 
@@ -276,7 +277,7 @@ box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 	     (strcmp(old_conf->replication_source, new_conf->replication_source) != 0))) {
 
 		if (recovery_state->finalize != true) {
-			out_warning(0, "Could not propagate %s before local recovery finished",
+			out_warning(CNF_OK, "Could not propagate %s before local recovery finished",
 				    old_is_replica == true ? "slave to master" :
 				    "master to slave");
 
@@ -358,14 +359,19 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 }
 
 
+struct snapshot_space_param {
+	struct log_io *l;
+	struct fio_batch *batch;
+};
+
 static void
 snapshot_space(struct space *sp, void *udata)
 {
 	struct tuple *tuple;
-	struct { struct log_io *l; struct fio_batch *batch; } *ud = udata;
+	struct snapshot_space_param *ud = (struct snapshot_space_param *) udata;
 	Index *pk = space_index(sp, 0);
-	struct iterator *it = pk->position;
-	[pk initIterator: it :ITER_ALL :NULL :0];
+	struct iterator *it = pk->primaryIterator();;
+	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	while ((tuple = it->next(it)))
 		snapshot_write_tuple(ud->l, ud->batch, space_n(sp), tuple);
@@ -378,7 +384,7 @@ box_snapshot(struct log_io *l, struct fio_batch *batch)
 	if (primary_indexes_enabled == false)
 		return;
 
-	struct { struct log_io *l; struct fio_batch *batch; } ud = { l, batch };
+	struct snapshot_space_param ud = { l, batch };
 
 	space_foreach(snapshot_space, &ud);
 }

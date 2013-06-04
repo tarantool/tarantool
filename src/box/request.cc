@@ -72,31 +72,31 @@ execute_replace(struct request *request, struct txn *txn)
 {
 	txn_add_redo(txn, request->type, request->data, request->len);
 	const void **reqpos = &request->data;
-	const void *reqend = request->data + request->len;
+	const void *reqend = (const char *) request->data + request->len;
 	struct space *sp = read_space(reqpos, reqend);
 	request->flags |= (pick_u32(reqpos, reqend) &
 			   BOX_ALLOWED_REQUEST_FLAGS);
 	size_t field_count = pick_u32(reqpos, reqend);
 
 	if (field_count == 0)
-		tnt_raise(IllegalParams, :"tuple field count is 0");
+		tnt_raise(IllegalParams, "tuple field count is 0");
 
-	size_t tuple_len = reqend - *reqpos;
+	size_t tuple_len = (const char *) reqend - (const char *) *reqpos;
 	if (tuple_len != valid_tuple(*reqpos, reqend, field_count))
-		tnt_raise(IllegalParams, :"incorrect tuple length");
+		tnt_raise(IllegalParams, "incorrect tuple length");
 
 	struct tuple *new_tuple = tuple_alloc(tuple_len);
 	new_tuple->field_count = field_count;
 	memcpy(new_tuple->data, *reqpos, tuple_len);
 
-	@try {
+	try {
 		space_validate_tuple(sp, new_tuple);
 		enum dup_replace_mode mode = dup_replace_mode(request->flags);
 		txn_replace(txn, sp, NULL, new_tuple, mode);
 
-	} @catch (tnt_Exception *e) {
+	} catch (const Exception& e) {
 		tuple_free(new_tuple);
-		@throw;
+		throw;
 	}
 }
 
@@ -236,7 +236,7 @@ struct update_field {
 	 * Length of the "tail" in the old tuple from end
 	 * of old data to the beginning of the field in the
 	 * next update_field structure.
-         */
+	 */
 	u32 tail_len;
 };
 
@@ -246,7 +246,7 @@ update_field_init(struct update_field *field,
 {
 	STAILQ_INIT(&field->ops);
 	field->old = old;
-	field->tail = old + old_len;
+	field->tail = (char *) old + old_len;
 	field->tail_len = tail_len;
 }
 
@@ -254,14 +254,15 @@ static inline u32
 update_field_len(struct update_field *f)
 {
 	struct update_op *last = STAILQ_LAST(&f->ops, update_op, next);
-	return last? last->new_field_len : f->tail - f->old;
+	return last ? last->new_field_len
+		    : (const char *) f->tail - (const char *) f->old;
 }
 
 static inline void
 op_check_field_no(u32 field_no, u32 field_max)
 {
 	if (field_no > field_max)
-		tnt_raise(ClientError, :ER_NO_SUCH_FIELD, field_no);
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_no);
 }
 
 static inline void
@@ -330,10 +331,10 @@ static void
 do_update_op_splice(struct op_splice_arg *arg, const void *in, void *out)
 {
 	memcpy(out, in, arg->offset);           /* copy field head. */
-	out += arg->offset;
+	out = (char *) out + arg->offset;
 	memcpy(out, arg->paste, arg->paste_length); /* copy the paste */
-	out += arg->paste_length;
-	memcpy(out, in + arg->tail_offset, arg->tail_length); /* copy tail */
+	out = (char *) out + arg->paste_length;
+	memcpy(out, (const char *) in + arg->tail_offset, arg->tail_length); /* copy tail */
 }
 
 static void
@@ -348,8 +349,8 @@ static void
 init_update_op_insert(struct rope *rope, struct update_op *op)
 {
 	op_adjust_field_no(op, rope_size(rope));
-	struct update_field *field = palloc(fiber->gc_pool,
-					    sizeof(struct update_field));
+	struct update_field *field = (struct update_field *)
+			palloc(fiber->gc_pool, sizeof(struct update_field));
 	update_field_init(field, op->arg.set.value, op->arg.set.length, 0);
 	rope_insert(rope, op->field_no, field, 1);
 }
@@ -358,8 +359,8 @@ static void
 init_update_op_set(struct rope *rope, struct update_op *op)
 {
 	if (op->field_no < rope_size(rope)) {
-		struct update_field *field = rope_extract(rope,
-							  op->field_no);
+		struct update_field *field = (struct update_field *)
+				rope_extract(rope, op->field_no);
 		/* Skip all previous ops. */
 		STAILQ_INIT(&field->ops);
 		STAILQ_INSERT_TAIL(&field->ops, op, next);
@@ -381,7 +382,8 @@ init_update_op_arith(struct rope *rope, struct update_op *op)
 {
 	op_check_field_no(op->field_no, rope_size(rope) - 1);
 
-	struct update_field *field = rope_extract(rope, op->field_no);
+	struct update_field *field = (struct update_field *)
+			rope_extract(rope, op->field_no);
 	struct op_arith_arg *arg = &op->arg.arith;
 	u32 field_len = update_field_len(field);
 
@@ -391,7 +393,7 @@ init_update_op_arith(struct rope *rope, struct update_op *op)
 
 		/* Check the operand type. */
 		if (op->arg.set.length != sizeof(i32))
-			tnt_raise(ClientError, :ER_ARG_TYPE,
+			tnt_raise(ClientError, ER_ARG_TYPE,
 				  "32-bit int");
 
 		arg->i32_val = *(i32 *)op->arg.set.value;
@@ -409,12 +411,12 @@ init_update_op_arith(struct rope *rope, struct update_op *op)
 			arg->i64_val = *(i64 *)op->arg.set.value;
 			break;
 		default:
-			tnt_raise(ClientError, :ER_ARG_TYPE,
+			tnt_raise(ClientError, ER_ARG_TYPE,
 				  "32-bit or 64-bit int");
 		}
 		break;
 	default:
-		tnt_raise(ClientError, :ER_FIELD_TYPE,
+		tnt_raise(ClientError, ER_FIELD_TYPE,
 			  "32-bit or 64-bit int");
 	}
 	STAILQ_INSERT_TAIL(&field->ops, op, next);
@@ -425,19 +427,20 @@ static void
 init_update_op_splice(struct rope *rope, struct update_op *op)
 {
 	op_check_field_no(op->field_no, rope_size(rope) - 1);
-	struct update_field *field = rope_extract(rope, op->field_no);
+	struct update_field *field = (struct update_field *)
+			rope_extract(rope, op->field_no);
 
 	u32 field_len = update_field_len(field);
 
 	struct op_splice_arg *arg = &op->arg.splice;
 	const void *value = op->arg.set.value;
-	const void *end = value + op->arg.set.length;
+	const void *end = (const char *) value + op->arg.set.length;
 
 	/* Read the offset. */
 	arg->offset = pick_field_u32(&value, end);
 	if (arg->offset < 0) {
 		if (-arg->offset > field_len)
-			tnt_raise(ClientError, :ER_SPLICE,
+			tnt_raise(ClientError, ER_SPLICE,
 				  "offset is out of bound");
 		arg->offset += field_len;
 	} else if (arg->offset > field_len) {
@@ -465,7 +468,7 @@ init_update_op_splice(struct rope *rope, struct update_op *op)
 
 	/* Check that the operands are fully read. */
 	if (value != end)
-		tnt_raise(IllegalParams, :"field splice format error");
+		tnt_raise(IllegalParams, "field splice format error");
 
 	/* Record the new field length. */
 	op->new_field_len = arg->offset + arg->paste_length + arg->tail_length;
@@ -487,7 +490,7 @@ static struct update_op_meta update_op_meta[UPDATE_OP_MAX + 1] = {
 static void *
 rope_alloc(void *ctx, size_t size)
 {
-	return palloc(ctx, size);
+	return palloc((struct palloc_pool *) ctx, size);
 }
 
 /** Free rope node - do nothing, since we use a pool allocator. */
@@ -502,20 +505,20 @@ static void *
 update_field_split(void *data, size_t size __attribute__((unused)),
 		   size_t offset)
 {
-	struct update_field *prev = data;
+	struct update_field *prev = (struct update_field *) data;
 
-	struct update_field *next = palloc(fiber->gc_pool,
-					   sizeof(struct update_field));
+	struct update_field *next = (struct update_field *)
+			palloc(fiber->gc_pool, sizeof(struct update_field));
 	assert(offset > 0 && prev->tail_len > 0);
 
 	const void *field = prev->tail;
-	const void *end = field + prev->tail_len;
+	const void *end = (const char *) field + prev->tail_len;
 
 	prev->tail_len = tuple_range_size(&field, end, offset - 1);
 	u32 field_len = load_varint32(&field);
 
-	update_field_init(next, field, field_len,
-			  end - field - field_len);
+	update_field_init(next, field, field_len, (const char *) end -
+			  (const char *) field - field_len);
 	return next;
 }
 
@@ -533,12 +536,13 @@ update_create_rope(struct update_op *op, struct update_op *op_end,
 
 	/* Initialize the rope with the old tuple. */
 
-	struct update_field *first = palloc(fiber->gc_pool,
-					    sizeof(struct update_field));
+	struct update_field *first = (struct update_field *)
+			palloc(fiber->gc_pool, sizeof(struct update_field));
 	const void *field = tuple->data;
 	const void *end = tuple->data + tuple->bsize;
 	u32 field_len = load_varint32(&field);
-	update_field_init(first, field, field_len, end - field - field_len);
+	update_field_init(first, field, field_len,
+			  (const char *) end - (const char *) field - field_len);
 
 	rope_append(rope, first, tuple->field_count);
 
@@ -557,14 +561,15 @@ update_calc_new_tuple_length(struct rope *rope)
 
 	rope_iter_create(&it, rope);
 	for (node = rope_iter_start(&it); node; node = rope_iter_next(&it)) {
-		struct update_field *field = rope_leaf_data(node);
+		struct update_field *field =
+				(struct update_field *) rope_leaf_data(node);
 		u32 field_len = update_field_len(field);
 		new_tuple_len += (varint32_sizeof(field_len) +
 				  field_len + field->tail_len);
 	}
 
 	if (new_tuple_len == 0)
-		tnt_raise(ClientError, :ER_TUPLE_IS_EMPTY);
+		tnt_raise(ClientError, ER_TUPLE_IS_EMPTY);
 
 	return new_tuple_len;
 }
@@ -572,8 +577,8 @@ update_calc_new_tuple_length(struct rope *rope)
 static void
 do_update_ops(struct rope *rope, struct tuple *new_tuple)
 {
-	void *new_data = new_tuple->data;
-	void *new_data_end = new_data + new_tuple->bsize;
+	char *new_data = (char *) new_tuple->data;
+	char *new_data_end = new_data + new_tuple->bsize;
 
 	new_tuple->field_count = 0;
 
@@ -583,11 +588,12 @@ do_update_ops(struct rope *rope, struct tuple *new_tuple)
 	rope_iter_create(&it, rope);
 	for (node = rope_iter_start(&it); node; node = rope_iter_next(&it)) {
 
-		struct update_field *field = rope_leaf_data(node);
+		struct update_field *field = (struct update_field *)
+				rope_leaf_data(node);
 		u32 field_count = rope_leaf_size(node);
 		u32 field_len = update_field_len(field);
 
-		new_data = pack_varint32(new_data, field_len);
+		new_data = (char *) pack_varint32(new_data, field_len);
 
 		const void *old_field = field->old;
 		void *new_field = (STAILQ_EMPTY(&field->ops) ?
@@ -643,12 +649,12 @@ static struct update_op *
 update_read_ops(const void **reqpos, const void *reqend, u32 op_cnt)
 {
 	if (op_cnt > BOX_UPDATE_OP_CNT_MAX)
-		tnt_raise(IllegalParams, :"too many operations for update");
+		tnt_raise(IllegalParams, "too many operations for update");
 	if (op_cnt == 0)
-		tnt_raise(IllegalParams, :"no operations for update");
+		tnt_raise(IllegalParams, "no operations for update");
 	/* Read update operations.  */
-	struct update_op *ops = palloc(fiber->gc_pool, op_cnt *
-				       sizeof(struct update_op));
+	struct update_op *ops = (struct update_op *) palloc(fiber->gc_pool,
+					op_cnt * sizeof(struct update_op));
 	struct update_op *op = ops, *ops_end = ops + op_cnt;
 	for (; op < ops_end; op++) {
 		/* Read operation */
@@ -656,7 +662,7 @@ update_read_ops(const void **reqpos, const void *reqend, u32 op_cnt)
 		op->opcode = pick_u8(reqpos, reqend);
 
 		if (op->opcode >= UPDATE_OP_MAX)
-			tnt_raise(ClientError, :ER_UNKNOWN_UPDATE_OP);
+			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
 		op->meta = &update_op_meta[op->opcode];
 
 		op->arg.set.value = pick_field(reqpos, reqend);
@@ -664,7 +670,7 @@ update_read_ops(const void **reqpos, const void *reqend, u32 op_cnt)
 	}
 	/* Check the remainder length, the request must be fully read. */
 	if (*reqpos != reqend)
-		tnt_raise(IllegalParams, :"can't unpack request");
+		tnt_raise(IllegalParams, "can't unpack request");
 	return ops;
 }
 
@@ -673,7 +679,7 @@ execute_update(struct request *request, struct txn *txn)
 {
 	txn_add_redo(txn, request->type, request->data, request->len);
 	const void **reqpos = &request->data;
-	const void *reqend = request->data + request->len;
+	const void *reqend = (const char *) request->data + request->len;
 	struct space *sp = read_space(reqpos, reqend);
 	request->flags |= (pick_u32(reqpos, reqend) &
 			   BOX_ALLOWED_REQUEST_FLAGS);
@@ -684,7 +690,7 @@ execute_update(struct request *request, struct txn *txn)
 
 	Index *pk = space_index(sp, 0);
 	/* Try to find the tuple by primary key. */
-	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
+	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
 
 	if (old_tuple == NULL)
 		return;
@@ -698,14 +704,14 @@ execute_update(struct request *request, struct txn *txn)
 	size_t new_tuple_len = update_calc_new_tuple_length(rope);
 	struct tuple *new_tuple = tuple_alloc(new_tuple_len);
 
-	@try {
+	try {
 		do_update_ops(rope, new_tuple);
 		space_validate_tuple(sp, new_tuple);
 		txn_replace(txn, sp, old_tuple, new_tuple, DUP_INSERT);
 
-	} @catch (tnt_Exception *e) {
+	} catch (const Exception& e) {
 		tuple_free(new_tuple);
-		@throw;
+		throw;
 	}
 }
 
@@ -715,7 +721,7 @@ static void
 execute_select(struct request *request, struct port *port)
 {
 	const void **reqpos = &request->data;
-	const void *reqend = request->data + request->len;
+	const void *reqend = (const char *) request->data + request->len;
 	struct space *sp = read_space(reqpos, reqend);
 	u32 index_no = pick_u32(reqpos, reqend);
 	Index *index = index_find(sp, index_no);
@@ -723,7 +729,7 @@ execute_select(struct request *request, struct port *port)
 	u32 limit = pick_u32(reqpos, reqend);
 	u32 count = pick_u32(reqpos, reqend);
 	if (count == 0)
-		tnt_raise(IllegalParams, :"tuple count must be positive");
+		tnt_raise(IllegalParams, "tuple count must be positive");
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
@@ -739,8 +745,8 @@ execute_select(struct request *request, struct port *port)
 		u32 key_part_count;
 		const void *key = read_key(reqpos, reqend, &key_part_count);
 
-		struct iterator *it = index->position;
-		[index initIterator: it :ITER_EQ :key :key_part_count];
+		struct iterator *it = index->primaryIterator();
+		index->initIterator(it, ITER_EQ, key, key_part_count);
 
 		struct tuple *tuple;
 		while ((tuple = it->next(it)) != NULL) {
@@ -756,7 +762,7 @@ execute_select(struct request *request, struct port *port)
 		}
 	}
 	if (*reqpos != reqend)
-		tnt_raise(IllegalParams, :"can't unpack request");
+		tnt_raise(IllegalParams, "can't unpack request");
 }
 
 static void
@@ -765,7 +771,7 @@ execute_delete(struct request *request, struct txn *txn)
 	u32 type = request->type;
 	txn_add_redo(txn, type, request->data, request->len);
 	const void **reqpos = &request->data;
-	const void *reqend = request->data + request->len;
+	const void *reqend = (const char *) request->data + request->len;
 	struct space *sp = read_space(reqpos, reqend);
 	if (type == DELETE) {
 		request->flags |= pick_u32(reqpos, reqend) &
@@ -776,7 +782,7 @@ execute_delete(struct request *request, struct txn *txn)
 	const void *key = read_key(reqpos, reqend, &key_part_count);
 	/* Try to find tuple by primary key */
 	Index *pk = space_index(sp, 0);
-	struct tuple *old_tuple = [pk findByKey :key :key_part_count];
+	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
 
 	if (old_tuple == NULL)
 		return;
@@ -809,11 +815,12 @@ request_create(u32 type, const void *data, u32 len)
 {
 	if (request_check_type(type)) {
 		say_error("Unsupported request = %" PRIi32 "", type);
-		tnt_raise(IllegalParams, :"unsupported command code, "
+		tnt_raise(IllegalParams, "unsupported command code, "
 			  "check the error log");
 	}
 	request_check_type(type);
-	struct request *request = palloc(fiber->gc_pool, sizeof(struct request));
+	struct request *request = (struct request *)
+			palloc(fiber->gc_pool, sizeof(struct request));
 	request->type = type;
 	request->data = data;
 	request->len = len;

@@ -39,7 +39,10 @@
 #endif
 
 #include <fiber.h>
-#include TARANTOOL_CONFIG
+extern "C" {
+#include <cfg/warning.h>
+#include <cfg/tarantool_box_cfg.h>
+} /* extern "C" */
 #include "tarantool.h"
 #include "sio.h"
 
@@ -72,7 +75,9 @@ say_logger_init(int nonblock)
 {
 	int pipefd[2];
 	pid_t pid;
-	char *argv[] = { "/bin/sh", "-c", cfg.logger, NULL };
+	char cmd[] = { "/bin/sh" };
+	char args[] = { "-c" };
+	char *argv[] = { cmd, args, cfg.logger, NULL };
 	char *envp[] = { NULL };
 
 	if (cfg.logger != NULL) {
@@ -178,7 +183,7 @@ void
 _say(int level, const char *filename, int line, const char *error, const char *format, ...)
 {
 	int errsv = errno; /* Preserve the errno. */
-        if (cfg.log_level < level)
+	if (cfg.log_level < level)
 		return;
 	va_list ap;
 	va_start(ap, format);

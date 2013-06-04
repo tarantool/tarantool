@@ -388,4 +388,4 @@ bitset_index_init_iterator(struct bitset_index *index,
 }
 
 extern inline size_t
-bitset_index_size(struct bitset_index *index);
+bitset_index_size(const struct bitset_index *index);

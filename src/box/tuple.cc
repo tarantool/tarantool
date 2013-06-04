@@ -39,7 +39,7 @@ struct tuple *
 tuple_alloc(size_t size)
 {
 	size_t total = sizeof(struct tuple) + size;
-	struct tuple *tuple = salloc(total, "tuple");
+	struct tuple *tuple = (struct tuple *) salloc(total, "tuple");
 
 	tuple->flags = tuple->refs = 0;
 	tuple->bsize = size;
@@ -116,15 +116,17 @@ print_field(struct tbuf *buf, const void *f)
 		tbuf_printf(buf, "%u", *(u32 *)f);
 		break;
 	case 8:
-		tbuf_printf(buf, "%"PRIu64, *(u64 *)f);
+		tbuf_printf(buf, "%" PRIu64, *(u64 *)f);
 		break;
 	default:
 		tbuf_printf(buf, "'");
 		while (size-- > 0) {
-			if (0x20 <= *(u8 *)f && *(u8 *)f < 0x7f)
-				tbuf_printf(buf, "%c", *(u8 *)f++);
-			else
-				tbuf_printf(buf, "\\x%02X", *(u8 *)f++);
+			if (0x20 <= *(u8 *)f && *(u8 *)f < 0x7f) {
+				tbuf_printf(buf, "%c", *(u8 *) f);
+			} else {
+				tbuf_printf(buf, "\\x%02X", *(u8 *)f);
+			}
+			f = (char *) f + 1;
 		}
 		tbuf_printf(buf, "'");
 		break;

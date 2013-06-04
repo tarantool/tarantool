@@ -67,7 +67,7 @@ txn_replace(struct txn *txn, struct space *space,
 struct txn *
 txn_begin()
 {
-	struct txn *txn = p0alloc(fiber->gc_pool, sizeof(*txn));
+	struct txn *txn = (struct txn *) p0alloc(fiber->gc_pool, sizeof(*txn));
 	return txn;
 }
 
@@ -90,7 +90,7 @@ txn_commit(struct txn *txn)
 		confirm_lsn(recovery_state, lsn, res == 0);
 
 		if (res)
-			tnt_raise(LoggedError, :ER_WAL_IO);
+			tnt_raise(LoggedError, ER_WAL_IO);
 
 	}
 }

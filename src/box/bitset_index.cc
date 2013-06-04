@@ -39,7 +39,7 @@
 #include <lib/bitset/index.h>
 
 static struct index_traits bitset_index_traits = {
-	.allows_partial_key = false,
+	/* .allows_partial_key = */ false,
 };
 
 static inline size_t
@@ -53,7 +53,7 @@ tuple_to_value(struct tuple *tuple)
 static inline struct tuple *
 value_to_tuple(size_t value)
 {
-	return salloc_ptr_from_index(value);
+	return (struct tuple *) salloc_ptr_from_index(value);
 }
 
 struct bitset_index_iterator {
@@ -90,86 +90,85 @@ bitset_index_iterator_next(struct iterator *iterator)
 	return value_to_tuple(value);
 }
 
-@implementation BitsetIndex;
-
-+ (struct index_traits *) traits
-{
-	return &bitset_index_traits;
-}
-
-- (id) init: (struct key_def *) key_def_arg :(struct space *) space_arg
-{
-	assert (!key_def_arg->is_unique);
-
-	self = [super init: key_def_arg :space_arg];
-	assert (self != NULL);
-
-	if (bitset_index_create(&self->index, realloc) != 0)
-		panic_syserror("bitset_index_create");
-
-	return self;
-}
-
-- (void) free
-{
-	bitset_index_destroy(&self->index);
-	[super free];
-}
-
-- (void) beginBuild
-{
-	tnt_raise(ClientError, :ER_UNSUPPORTED, "BitsetIndex", "beginBuild()");
-}
-
-- (void) buildNext: (struct tuple *)tuple
-{
-	(void) tuple;
-	tnt_raise(ClientError, :ER_UNSUPPORTED, "BitsetIndex", "buildNext()");
-}
-
-- (void) endBuild
-{
-	tnt_raise(ClientError, :ER_UNSUPPORTED, "BitsetIndex", "endBuild()");
-}
-
-- (void) build: (Index *) pk
+BitsetIndex::BitsetIndex(struct key_def *key_def, struct space *space)
+	: Index(key_def, space)
 {
 	assert (!key_def->is_unique);
 
-	struct iterator *it = pk->position;
+	if (bitset_index_create(&index, realloc) != 0)
+		panic_syserror("bitset_index_create");
+}
+
+BitsetIndex::~BitsetIndex()
+{
+	bitset_index_destroy(&index);
+}
+
+void
+BitsetIndex::beginBuild()
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "beginBuild()");
+}
+
+void
+BitsetIndex::buildNext(struct tuple *tuple)
+{
+	(void) tuple;
+	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "buildNext()");
+}
+
+void
+BitsetIndex::endBuild()
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "endBuild()");
+}
+
+void
+BitsetIndex::build(Index *pk)
+{
+	assert (!key_def->is_unique);
+
+	struct iterator *it = pk->primaryIterator();
 	struct tuple *tuple;
-	[pk initIterator: it :ITER_ALL :NULL :0];
+	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	while ((tuple = it->next(it)))
-		[self replace: NULL :tuple :DUP_INSERT];
+		replace(NULL, tuple, DUP_INSERT);
 }
 
-- (size_t) size
+size_t
+BitsetIndex::size() const
 {
-	return bitset_index_size(&self->index);
+	return bitset_index_size(&index);
 }
 
-- (struct tuple *) min
+struct tuple *
+BitsetIndex::min() const
 {
-	tnt_raise(ClientError, :ER_UNSUPPORTED, "BitsetIndex", "min()");
+	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "min()");
 	return NULL;
 }
 
-- (struct tuple *) max
+struct tuple *
+BitsetIndex::max() const
 {
-	tnt_raise(ClientError, :ER_UNSUPPORTED, "BitsetIndex", "max()");
+	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "max()");
 	return NULL;
 }
 
-- (struct tuple *) random
+struct tuple *
+BitsetIndex::random(u32 rnd) const
 {
-	tnt_raise(ClientError, :ER_UNSUPPORTED, "BitsetIndex", "random()");
+	(void) rnd;
+	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "random()");
 	return NULL;
 }
 
-- (struct iterator *) allocIterator
+struct iterator *
+BitsetIndex::allocIterator() const
 {
-	struct bitset_index_iterator *it = malloc(sizeof(*it));
+	struct bitset_index_iterator *it = (struct bitset_index_iterator *)
+			malloc(sizeof(*it));
 	if (!it)
 		return NULL;
 
@@ -182,38 +181,40 @@ bitset_index_iterator_next(struct iterator *iterator)
 	return (struct iterator *) it;
 }
 
-- (struct tuple *) findByKey: (const void *) key :(u32) part_count
+struct tuple *
+BitsetIndex::findByKey(const void *key, u32 part_count) const
 {
 	(void) key;
 	(void) part_count;
-	tnt_raise(ClientError, :ER_UNSUPPORTED, "BitsetIndex", "findByKey()");
+	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "findByKey()");
 	return NULL;
 }
 
-- (struct tuple *) findByTuple: (struct tuple *) tuple
+struct tuple *
+BitsetIndex::findByTuple(struct tuple *tuple) const
 {
 	(void) tuple;
-	tnt_raise(ClientError, :ER_UNSUPPORTED, "BitsetIndex", "findByTuple()");
+	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "findByTuple()");
 	return NULL;
 }
 
-- (struct tuple *) replace: (struct tuple *) old_tuple
-	: (struct tuple *) new_tuple
-	: (enum dup_replace_mode) flags
+struct tuple *
+BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
+		     enum dup_replace_mode mode)
 {
 	assert(!key_def->is_unique);
 	assert(old_tuple != NULL || new_tuple != NULL);
-	(void) flags;
+	(void) mode;
 
 	struct tuple *ret = NULL;
 
 	if (old_tuple != NULL) {
 		size_t value = tuple_to_value(old_tuple);
-		if (bitset_index_contains_value(&self->index, value)) {
+		if (bitset_index_contains_value(&index, value)) {
 			ret = old_tuple;
 
 			assert (old_tuple != new_tuple);
-			bitset_index_remove_value(&self->index, value);
+			bitset_index_remove_value(&index, value);
 		}
 	}
 
@@ -225,9 +226,9 @@ bitset_index_iterator_next(struct iterator *iterator)
 		const void *bitset_key = field;
 
 		size_t value = tuple_to_value(new_tuple);
-		if (bitset_index_insert(&self->index, bitset_key,
+		if (bitset_index_insert(&index, bitset_key,
 					bitset_key_size, value) < 0) {
-			tnt_raise(ClientError, :ER_MEMORY_ISSUE, 0,
+			tnt_raise(ClientError, ER_MEMORY_ISSUE, 0,
 				  "BitsetIndex", "insert");
 		}
 	}
@@ -235,8 +236,9 @@ bitset_index_iterator_next(struct iterator *iterator)
 	return ret;
 }
 
-- (void) initIterator: (struct iterator *) iterator:(enum iterator_type) type
-      :(const void *) key :(u32) part_count
+void
+BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
+			  const void *key, u32 part_count) const
 {
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
@@ -254,7 +256,7 @@ bitset_index_iterator_next(struct iterator *iterator)
 
 	struct bitset_expr expr;
 	bitset_expr_create(&expr, realloc);
-	@try {
+	try {
 		int rc = 0;
 		switch (type) {
 		case ITER_ALL:
@@ -277,23 +279,27 @@ bitset_index_iterator_next(struct iterator *iterator)
 						       bitset_key_size);
 			break;
 		default:
-			tnt_raise(ClientError, :ER_UNSUPPORTED,
+			tnt_raise(ClientError, ER_UNSUPPORTED,
 				  "BitsetIndex", "requested iterator type");
 		}
 
 		if (rc != 0) {
-			tnt_raise(ClientError, :ER_MEMORY_ISSUE,
+			tnt_raise(ClientError, ER_MEMORY_ISSUE,
 				  0, "BitsetIndex", "iterator expression");
 		}
 
-		if (bitset_index_init_iterator(&self->index, &it->bitset_it,
+		/* TODO: fix bitset_index_init_iterator to work with const obj*/
+		if (bitset_index_init_iterator((bitset_index *) &index,
+					       &it->bitset_it,
 					       &expr) != 0) {
-			tnt_raise(ClientError, :ER_MEMORY_ISSUE,
+			tnt_raise(ClientError, ER_MEMORY_ISSUE,
 				  0, "BitsetIndex", "iterator state");
 		}
-	} @finally {
+
 		bitset_expr_destroy(&expr);
+	} catch(const Exception& e) {
+		bitset_expr_destroy(&expr);
+		throw;
 	}
 }
 
-@end

@@ -29,9 +29,11 @@
 #include "lua/session.h"
 #include "lua/init.h"
 
+extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+}
 
 #include "fiber.h"
 #include "session.h"
@@ -102,7 +104,8 @@ static struct lbox_session_trigger on_disconnect =
 static void
 lbox_session_run_trigger(void *param)
 {
-	struct lbox_session_trigger *trigger = param;
+	struct lbox_session_trigger *trigger =
+			(struct lbox_session_trigger *) param;
 	/* Copy the referenced callable object object stack. */
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
@@ -110,15 +113,15 @@ lbox_session_run_trigger(void *param)
 	/** Move the function to be called to the new coro. */
 	lua_xmove(tarantool_L, L, 1);
 
-	@try {
+	try {
 		lua_call(L, 0, 0);
-	} @catch (tnt_Exception *e) {
-		@throw;
-	} @catch ( id allOthers ) {
-		tnt_raise(ClientError, :ER_PROC_LUA,
-			  lua_tostring(L, -1));
-	} @finally {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+	} catch (const Exception& e) {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+		throw;
+	} catch (...) {
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
 	}
 }
 

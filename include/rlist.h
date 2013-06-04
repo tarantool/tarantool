@@ -29,6 +29,15 @@
  * SUCH DAMAGE.
  */
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+#ifndef typeof
+/* TODO: 'typeof' is a GNU extension */
+#define typeof __typeof__
+#endif
+
 /**
  * list entry and head structure
  */
@@ -264,6 +273,11 @@ delete from one list and add_tail as another's head
 	for(item = rlist_last_entry((head), typeof(*item), member); \
 		&item->member != (head); \
 		item = rlist_prev_entry((item), member))
+
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 
 #endif /* TARANTOOL_RLIST_H_INCLUDED */

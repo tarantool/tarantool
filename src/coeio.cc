@@ -129,7 +129,7 @@ struct coeio_task {
 static void
 coeio_custom_cb(eio_req *req)
 {
-	struct coeio_task *task = req->data;
+	struct coeio_task *task = (struct coeio_task *) req->data;
 	req->result = task->func(task->ap);
 }
 
@@ -148,7 +148,7 @@ coeio_on_complete(eio_req *req)
 	 * is already woken up, avoid double wake-up.
 	 */
 	if (! EIO_CANCELLED(req)) {
-		struct coeio_task *task = req->data;
+		struct coeio_task *task = (struct coeio_task *) req->data;
 		task->result = req->result;
 		task->errorno = req->errorno;
 		task->complete = 1;
@@ -221,6 +221,7 @@ getaddrinfo_cb(va_list ap)
 	struct addrinfo *hints = va_arg(ap, struct addrinfo *);
 	struct addrinfo **res = va_arg(ap, struct addrinfo **);
 
+	say_warn("Host: %s Port: %s, Hints: %p, Res: %p", host, port, hints, res);
 	int rc = getaddrinfo(host, port, hints, res);
 	/* getaddrinfo can return EAI_ADDRFAMILY on attempt
 	 * to resolve ::1, if machine has no public ipv6 addresses

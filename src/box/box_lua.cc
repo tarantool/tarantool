@@ -33,19 +33,22 @@
 #include "request.h"
 #include "txn.h"
 
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-#include "lj_obj.h"
-#include "lj_ctype.h"
-#include "lj_cdata.h"
-#include "lj_cconv.h"
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+#include <lj_obj.h>
+#include <lj_ctype.h>
+#include <lj_cdata.h>
+#include <lj_cconv.h>
+} /* extern "C" */
 
 #include "pickle.h"
 #include "tuple.h"
 #include "space.h"
 #include "port.h"
 #include "tbuf.h"
+#include "scoped_guard.h"
 
 /* contents of box.lua */
 extern const char box_lua[];
@@ -86,7 +89,7 @@ lua_totuple(struct lua_State *L, int index);
 static inline struct tuple *
 lua_checktuple(struct lua_State *L, int narg)
 {
-	struct tuple *t = *(void **) luaL_checkudata(L, narg, tuplelib_name);
+	struct tuple *t = *(struct tuple **) luaL_checkudata(L, narg, tuplelib_name);
 	assert(t->refs);
 	return t;
 }
@@ -99,7 +102,7 @@ lua_istuple(struct lua_State *L, int narg)
 	luaL_getmetatable(L, tuplelib_name);
 	struct tuple *tuple = 0;
 	if (lua_equal(L, -1, -2))
-		tuple = * (void **) lua_touserdata(L, narg);
+		tuple = *(struct tuple **) lua_touserdata(L, narg);
 	lua_pop(L, 2);
 	return tuple;
 }
@@ -160,12 +163,12 @@ lbox_tuple_slice(struct lua_State *L)
 	if (end <= start)
 		luaL_error(L, "tuple.slice(): start must be less than end");
 
-	const void *field = tuple->data;
+	const char *field = (const char *) tuple->data;
 	u32 fieldno = 0;
 	u32 stop = end - 1;
 
-	while (field < (const void *) tuple->data + tuple->bsize) {
-		size_t len = load_varint32(&field);
+	while (field < (const char *) tuple->data + tuple->bsize) {
+		size_t len = load_varint32((const void **) &field);
 		if (fieldno >= start) {
 			lua_pushlstring(L, field, len);
 			if (fieldno == stop)
@@ -229,7 +232,7 @@ transform_calculate(struct lua_State *L, struct tuple *tuple,
 	tuple_range_size(&tuple_field, tuple_end, len);
 
 	/* calculate last part of the tuple fields */
-	lr[1] = tuple_end - tuple_field;
+	lr[1] = (const char *) tuple_end - (const char *) tuple_field;
 
 	return lr[0] + mid + lr[1];
 }
@@ -326,9 +329,9 @@ tuple_find(struct lua_State *L, struct tuple *tuple, size_t offset,
 	int idx = offset;
 	if (idx >= tuple->field_count)
 		return 0;
-	const void *field = tuple_field(tuple, idx);
-	while (field < (const void *) tuple->data + tuple->bsize) {
-		size_t len = load_varint32(&field);
+	const char *field = (const char *) tuple_field(tuple, idx);
+	while (field < (const char *) tuple->data + tuple->bsize) {
+		size_t len = load_varint32((const void **) &field);
 		if (len == key_size && (memcmp(field, key, len) == 0)) {
 			lua_pushinteger(L, idx);
 			if (!all)
@@ -396,10 +399,10 @@ lbox_tuple_unpack(struct lua_State *L)
 	struct tuple *tuple = lua_checktuple(L, 1);
 	const void *field = tuple->data;
 
-	while (field < (const void *) tuple->data + tuple->bsize) {
+	while (field < (const char *) tuple->data + tuple->bsize) {
 		size_t len = load_varint32(&field);
-		lua_pushlstring(L, field, len);
-		field += len;
+		lua_pushlstring(L, (const char *) field, len);
+		field = (const char *) field + len;
 	}
 	assert(lua_gettop(L) == tuple->field_count + 1);
 	return tuple->field_count;
@@ -412,12 +415,12 @@ lbox_tuple_totable(struct lua_State *L)
 	lua_newtable(L);
 	int index = 1;
 	const void *field = tuple->data;
-	while (field < (const void *) tuple->data + tuple->bsize) {
+	while (field < (const char *) tuple->data + tuple->bsize) {
 		size_t len = load_varint32(&field);
 		lua_pushnumber(L, index++);
-		lua_pushlstring(L, field, len);
+		lua_pushlstring(L, (const char *) field, len);
 		lua_rawset(L, -3);
-		field += len;
+		field = (const char *) field + len;
 	}
 	return 1;
 }
@@ -441,7 +444,7 @@ lbox_tuple_index(struct lua_State *L)
 				   tuplelib_name, i, tuple->field_count-1);
 		const void *field = tuple_field(tuple, i);
 		u32 len = load_varint32(&field);
-		lua_pushlstring(L, field, len);
+		lua_pushlstring(L, (const char *) field, len);
 		return 1;
 	}
 	/* If we got a string, try to find a method for it. */
@@ -466,7 +469,8 @@ static void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
 	if (tuple) {
-		void **ptr = lua_newuserdata(L, sizeof(void *));
+		struct tuple **ptr = (struct tuple **)
+				lua_newuserdata(L, sizeof(void *));
 		luaL_getmetatable(L, tuplelib_name);
 		lua_setmetatable(L, -2);
 		*ptr = tuple;
@@ -498,10 +502,10 @@ lbox_tuple_next(struct lua_State *L)
 
 	(void)field;
 	assert(field >= (const void *) tuple->data);
-	if (field < (const void *) tuple->data + tuple->bsize) {
+	if (field < (const char *) tuple->data + tuple->bsize) {
 		len = load_varint32(&field);
-		lua_pushlightuserdata(L, (void *) field + len);
-		lua_pushlstring(L, field, len);
+		lua_pushlightuserdata(L, (char *) field + len);
+		lua_pushlstring(L, (char *) field, len);
 		return 2;
 	}
 	lua_pushnil(L);
@@ -552,28 +556,33 @@ static const char *iteratorlib_name = "box.index.iterator";
 static struct iterator *
 lbox_checkiterator(struct lua_State *L, int i)
 {
-	struct iterator **it = luaL_checkudata(L, i, iteratorlib_name);
+	struct iterator **it = (struct iterator **)
+			luaL_checkudata(L, i, iteratorlib_name);
 	assert(it != NULL);
 	return *it;
 }
 
+
+
 static void
 lbox_pushiterator(struct lua_State *L, Index *index,
-                  struct iterator *it, enum iterator_type type,
-                  const void *key, size_t size, int part_count)
+		  struct iterator *it, enum iterator_type type,
+		  const void *key, size_t size, int part_count)
 {
-	struct {
+	struct lbox_iterator_holder {
 		struct iterator *it;
 		char key[];
-	} *holder = lua_newuserdata(L, sizeof(void *) + size);
+	};
+
+	struct lbox_iterator_holder *holder = (struct lbox_iterator_holder *)
+			lua_newuserdata(L, sizeof(void *) + size);
 	luaL_getmetatable(L, iteratorlib_name);
 	lua_setmetatable(L, -2);
 
 	holder->it = it;
 	memcpy(holder->key, key, size);
 
-	[index initIterator: it :type :(key ? holder->key : NULL)
-		:part_count];
+	index->initIterator(it, type, (key ? holder->key : NULL), part_count);
 }
 
 static int
@@ -587,7 +596,7 @@ lbox_iterator_gc(struct lua_State *L)
 static Index *
 lua_checkindex(struct lua_State *L, int i)
 {
-	Index **index = luaL_checkudata(L, i, indexlib_name);
+	Index **index = (Index **) luaL_checkudata(L, i, indexlib_name);
 	assert(index != NULL);
 	return *index;
 }
@@ -602,7 +611,7 @@ lbox_index_new(struct lua_State *L)
 	Index *index = index_find(sp, idx);
 
 	/* create a userdata object */
-	void **ptr = lua_newuserdata(L, sizeof(void *));
+	void **ptr = (void **) lua_newuserdata(L, sizeof(void *));
 	*ptr = index;
 	/* set userdata object metatable to indexlib */
 	luaL_getmetatable(L, indexlib_name);
@@ -624,7 +633,7 @@ static int
 lbox_index_len(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	lua_pushinteger(L, [index size]);
+	lua_pushinteger(L, index->size());
 	return 1;
 }
 
@@ -640,7 +649,7 @@ static int
 lbox_index_min(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	lbox_pushtuple(L, [index min]);
+	lbox_pushtuple(L, index->min());
 	return 1;
 }
 
@@ -648,7 +657,7 @@ static int
 lbox_index_max(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	lbox_pushtuple(L, [index max]);
+	lbox_pushtuple(L, index->max());
 	return 1;
 }
 
@@ -660,7 +669,7 @@ lbox_index_random(struct lua_State *L)
 
 	Index *index = lua_checkindex(L, 1);
 	u32 rnd = lua_tointeger(L, 2);
-	lbox_pushtuple(L, [index random: rnd]);
+	lbox_pushtuple(L, index->random(rnd));
 	return 1;
 }
 
@@ -704,8 +713,8 @@ void append_key_part(struct lua_State *L, int i,
 		str = luaL_checklstring(L, i, &size);
 	}
 	char varint_buf[sizeof(u32) + 1];
-	size_t pack_len = (pack_varint32(varint_buf, size) -
-			   (void *) varint_buf);
+	size_t pack_len = ((const char *) pack_varint32(varint_buf, size) -
+			   (const char *) varint_buf);
 	tbuf_append(tbuf, varint_buf, pack_len);
 	tbuf_append(tbuf, str, size);
 }
@@ -756,8 +765,8 @@ lbox_create_iterator(struct lua_State *L)
 		 * beginning (ITER_ALL).
 		 */
 	} else {
-		 type = luaL_checkint(L, 2);
-		 if (type >= iterator_type_MAX)
+		 type = (enum iterator_type) luaL_checkint(L, 2);
+		 if (type < ITER_ALL || type >= iterator_type_MAX)
 			 luaL_error(L, "unknown iterator type: %d", type);
 		 /* What else do we have on the stack? */
 		 if (argc == 2 || (argc == 3 && lua_type(L, 3) == LUA_TNIL)) {
@@ -792,9 +801,9 @@ lbox_create_iterator(struct lua_State *L)
 				   " is greater than index part count %d",
 				   field_count, index->key_def->part_count);
 	}
-	struct iterator *it = [index allocIterator];
+	struct iterator *it = index->allocIterator();
 	lbox_pushiterator(L, index, it, type, key, key_size,
-	                  field_count);
+			  field_count);
 
 	/* truncate memory used by key construction */
 	ptruncate(fiber->gc_pool, allocated_size);
@@ -900,8 +909,8 @@ lbox_index_count(struct lua_State *L)
 	}
 	u32 count = 0;
 	/* preparing index iterator */
-	struct iterator *it = index->position;
-	[index initIterator: it :ITER_EQ :key :key_part_count];
+	struct iterator *it = index->primaryIterator();
+	index->initIterator(it, ITER_EQ, key, key_part_count);
 	/* iterating over the index and counting tuples */
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL)
@@ -965,10 +974,10 @@ port_lua_add_tuple(struct port *port, struct tuple *tuple,
 		   u32 flags __attribute__((unused)))
 {
 	lua_State *L = port_lua(port)->L;
-	@try {
+	try {
 		lbox_pushtuple(L, tuple);
-	} @catch (id allOthers) {
-		tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
+	} catch (...) {
+		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
 	}
 }
 
@@ -980,7 +989,8 @@ struct port_vtab port_lua_vtab = {
 static struct port *
 port_lua_create(struct lua_State *L)
 {
-	struct port_lua *port = palloc(fiber->gc_pool, sizeof(struct port_lua));
+	struct port_lua *port = (struct port_lua *)
+			palloc(fiber->gc_pool, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
 	port->L = L;
 	return (struct port *) port;
@@ -1030,7 +1040,7 @@ lua_table_to_tuple(struct lua_State *L, int index)
 			break;
 		}
 		default:
-			tnt_raise(ClientError, :ER_PROC_RET,
+			tnt_raise(ClientError, ER_PROC_RET,
 				  lua_typename(L, lua_type(L, -1)));
 			break;
 		}
@@ -1147,7 +1157,7 @@ lua_totuple(struct lua_State *L, int index)
 		/*
 		 * LUA_TNONE, LUA_TTABLE, LUA_THREAD, LUA_TFUNCTION
 		 */
-		tnt_raise(ClientError, :ER_PROC_RET, lua_typename(L, type));
+		tnt_raise(ClientError, ER_PROC_RET, lua_typename(L, type));
 		break;
 	}
 	return tuple;
@@ -1157,11 +1167,16 @@ static void
 port_add_lua_ret(struct port *port, struct lua_State *L, int index)
 {
 	struct tuple *tuple = lua_totuple(L, index);
-	@try {
+	try {
 		port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
-	} @finally {
+
 		if (tuple->refs == 0)
 			tuple_free(tuple);
+	} catch(...) {
+		if (tuple->refs == 0)
+			tuple_free(tuple);
+
+		throw;
 	}
 }
 
@@ -1215,14 +1230,17 @@ lbox_process(lua_State *L)
 
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	struct port *port_lua = port_lua_create(L);
-	@try {
+	try {
 		box_process(port_lua, op, req, sz);
-	} @finally {
+
 		/*
 		 * This only works as long as port_lua doesn't
 		 * use fiber->cleanup and fiber->gc_pool.
 		 */
 		ptruncate(fiber->gc_pool, allocated_size);
+	} catch(const Exception& e) {
+		ptruncate(fiber->gc_pool, allocated_size);
+		throw;
 	}
 	return lua_gettop(L) - top;
 }
@@ -1236,7 +1254,7 @@ lbox_raise(lua_State *L)
 	if (!code)
 		luaL_error(L, "box.raise(): unknown error code");
 	const char *str = lua_tostring(L, 2);
-	tnt_raise(ClientError, :code :str);
+	tnt_raise(ClientError, str, code);
 	return 0;
 }
 
@@ -1250,12 +1268,12 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	int index = LUA_GLOBALSINDEX;
 	const char *start = name, *end;
 
-	while ((end = memchr(start, '.', name_end - start))) {
+	while ((end = (const char *) memchr(start, '.', name_end - start))) {
 		lua_checkstack(L, 3);
 		lua_pushlstring(L, start, end - start);
 		lua_gettable(L, index);
 		if (! lua_istable(L, -1))
-			tnt_raise(ClientError, :ER_NO_SUCH_PROC,
+			tnt_raise(ClientError, ER_NO_SUCH_PROC,
 				  name_end - name, name);
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
@@ -1265,7 +1283,7 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	if (! lua_isfunction(L, -1)) {
 		/* lua_call or lua_gettable would raise a type error
 		 * for us, but our own message is more verbose. */
-		tnt_raise(ClientError, :ER_NO_SUCH_PROC,
+		tnt_raise(ClientError, ER_NO_SUCH_PROC,
 			  name_end - name, name);
 	}
 	/* setting stack that it would contain only
@@ -1284,36 +1302,40 @@ void
 box_lua_execute(struct request *request, struct port *port)
 {
 	const void **reqpos = &request->data;
-	const void *reqend = request->data + request->len;
+	const void *reqend = (const char *) request->data + request->len;
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
 	/* Request flags: not used. */
 	(void) (pick_u32(reqpos, reqend));
-	@try {
+
+	try {
+		auto scoped_guard = make_scoped_guard([=] {
+			/*
+			 * Allow the used coro to be garbage collected.
+			 * @todo: cache and reuse it instead.
+			 */
+			luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
+		});
+
 		u32 field_len;
 		/* proc name */
 		const void *field = pick_field_str(reqpos, reqend, &field_len);
-		box_lua_find(L, field, field + field_len);
+		box_lua_find(L, (const char *) field,
+			     ((const char *) field + field_len));
 		/* Push the rest of args (a tuple). */
 		u32 nargs = pick_u32(reqpos, reqend);
 		luaL_checkstack(L, nargs, "call: out of stack");
 		for (int i = 0; i < nargs; i++) {
 			field = pick_field_str(reqpos, reqend, &field_len);
-			lua_pushlstring(L, field, field_len);
+			lua_pushlstring(L, (const char *) field, field_len);
 		}
 		lua_call(L, nargs, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
 		port_add_lua_multret(port, L);
-	} @catch (tnt_Exception *e) {
-		@throw;
-	} @catch (id allOthers) {
-		tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
-	} @finally {
-		/*
-		 * Allow the used coro to be garbage collected.
-		 * @todo: cache and reuse it instead.
-		 */
-		luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
+	} catch (const Exception& e) {
+		throw;
+	} catch (...) {
+		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
 	}
 }
 
@@ -1335,7 +1357,7 @@ static void
 luaL_addvarint32(luaL_Buffer *b, u32 value)
 {
 	char buf[sizeof(u32)+1];
-	char *bufend = pack_varint32(buf, value);
+	char *bufend = (char *) pack_varint32(buf, value);
 	luaL_addlstring(b, buf, bufend - buf);
 }
 
@@ -1619,9 +1641,9 @@ lbox_unpack(struct lua_State *L)
 	const char *f = format;
 
 	size_t str_size = 0;
-	const void *str =  luaL_checklstring(L, 2, &str_size);
-	const void *end = str + str_size;
-	const void *s = str;
+	const char *str =  luaL_checklstring(L, 2, &str_size);
+	const char *end = (const char *) str + str_size;
+	const char *s = str;
 
 	int i = 0;
 
@@ -1661,13 +1683,13 @@ lbox_unpack(struct lua_State *L)
 			break;
 		case 'w':
 			/* pick_varint32 throws exception on error. */
-			u32buf = pick_varint32(&s, end);
+			u32buf = pick_varint32((const void **) &s, end);
 			lua_pushnumber(L, u32buf);
 			break;
 		case 'P':
 		case 'p':
 			/* pick_varint32 throws exception on error. */
-			u32buf = pick_varint32(&s, end);
+			u32buf = pick_varint32((const void **) &s, end);
 			CHECK_SIZE(s + u32buf - 1);
 			lua_pushlstring(L, (const char *) s, u32buf);
 			s += u32buf;

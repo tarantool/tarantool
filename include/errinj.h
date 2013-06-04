@@ -32,7 +32,7 @@
 #include "util.h"
 
 struct errinj {
-	char *name;
+	const char *name;
 	bool state;
 };
 
@@ -67,7 +67,7 @@ void errinj_info(struct tbuf *out);
 #endif
 
 #define ERROR_INJECT_EXCEPTION(ID) \
-	ERROR_INJECT(ID, tnt_raise(ErrorInjection, :#ID))
+	ERROR_INJECT(ID, tnt_raise(ErrorInjection, #ID))
 
 #define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
 

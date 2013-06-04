@@ -138,7 +138,8 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 				value_len = load_varint32(&field);
 
 				if (is_numeric(field, value_len)) {
-					value = natoq(field, field + value_len);
+					value = natoq((const char *) field,
+						(const char *) field + value_len);
 
 					if (incr_sign > 0) {
 						value += incr;
@@ -153,20 +154,19 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 					flags = m->flags;
 
 					b = tbuf_new(fiber->gc_pool);
-					tbuf_printf(b, "%"PRIu64, value);
+					tbuf_printf(b, "%" PRIu64, value);
 					data = b->data;
 					bytes = b->size;
 
 					stats.cmd_set++;
-					@try {
+					try {
 						store(key, exptime, flags, bytes, data);
 						stats.total_items++;
 						obuf_dup(out, b->data, b->size);
 						obuf_dup(out, "\r\n", 2);
-					}
-					@catch (ClientError *e) {
+					} catch (const ClientError& e) {
 						obuf_dup(out, "SERVER_ERROR ", 13);
-						obuf_dup(out, e->errmsg, strlen(e->errmsg));
+						obuf_dup(out, e.errmsg(), strlen(e.errmsg()));
 						obuf_dup(out, "\r\n", 2);
 					}
 				} else {
@@ -182,25 +182,25 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 			if (tuple == NULL || expired(tuple)) {
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			} else {
-				@try {
-					delete(key);
+				try {
+					remove(key);
 					obuf_dup(out, "DELETED\r\n", 9);
 				}
-				@catch (ClientError *e) {
+				catch (const ClientError& e) {
 					obuf_dup(out, "SERVER_ERROR ", 13);
-					obuf_dup(out, e->errmsg, strlen(e->errmsg));
+					obuf_dup(out, e.errmsg(), strlen(e.errmsg()));
 					obuf_dup(out, "\r\n", 2);
 				}
 			}
 		}
 
 		action get {
-			@try {
+			try {
 				memcached_get(out, keys_count, keys, show_cas);
-			} @catch (ClientError *e) {
+			} catch (const ClientError& e) {
 				obuf_rollback_to_svp(out, &obuf_svp);
 				obuf_dup(out, "SERVER_ERROR ", 13);
-				obuf_dup(out, e->errmsg, strlen(e->errmsg));
+				obuf_dup(out, e.errmsg(), strlen(e.errmsg()));
 				obuf_dup(out, "\r\n", 2);
 			}
 		}
@@ -316,7 +316,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 			return -1;
 		}
 		char *r;
-		if ((r = memmem(p, pe - p, "\r\n", 2)) != NULL) {
+		if ((r = (char *) memmem(p, pe - p, "\r\n", 2)) != NULL) {
 			in->pos = r + 2;
 			obuf_dup(out, "CLIENT_ERROR bad command line format\r\n", 38);
 			return 1;

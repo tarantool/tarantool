@@ -30,9 +30,11 @@
 
 #include <stdlib.h>
 
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+} /* extern "C" */
 
 #include "ipc.h"
 #include "lua/init.h"
@@ -58,7 +60,7 @@ lbox_ipc_channel(struct lua_State *L)
 	if (!ch)
 		luaL_error(L, "box.channel: Not enough memory");
 
-	void **ptr = lua_newuserdata(L, sizeof(void *));
+	void **ptr = (void **) lua_newuserdata(L, sizeof(void *));
 	luaL_getmetatable(L, channel_lib);
 
 	lua_pushstring(L, "rid");	/* first object id */
@@ -73,7 +75,7 @@ lbox_ipc_channel(struct lua_State *L)
 static inline struct ipc_channel *
 lbox_check_channel(struct lua_State *L, int narg)
 {
-	return * (void **) luaL_checkudata(L, narg, channel_lib);
+	return *(struct ipc_channel **) luaL_checkudata(L, narg, channel_lib);
 }
 
 static int

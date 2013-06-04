@@ -48,7 +48,7 @@ struct chunk {
 	size_t free;
 	size_t size;
 
-	struct chunk_class *class;
+	struct chunk_class *clazz;
 	SLIST_ENTRY(chunk) busy_link;
 	SLIST_ENTRY(chunk) free_link;
 };
@@ -100,25 +100,25 @@ palloc_greatest_size(void)
 static struct chunk_class *
 class_init(size_t size)
 {
-	struct chunk_class *class;
+	struct chunk_class *clazz;
 
-	class = malloc(sizeof(struct chunk_class));
-	if (class == NULL)
+	clazz = (struct chunk_class *) malloc(sizeof(struct chunk_class));
+	if (clazz == NULL)
 		return NULL;
 
-	class->i = class_count++;
-	class->chunks_count = 0;
-	class->allocated_size = size;
-	SLIST_INIT(&class->chunks);
-	TAILQ_INSERT_TAIL(&classes, class, link);
+	clazz->i = class_count++;
+	clazz->chunks_count = 0;
+	clazz->allocated_size = size;
+	SLIST_INIT(&clazz->chunks);
+	TAILQ_INSERT_TAIL(&classes, clazz, link);
 
-	return class;
+	return clazz;
 }
 
 int
 palloc_init(void)
 {
-	struct chunk_class *class;
+	struct chunk_class *clazz;
 
 	class_count = 0;
 	TAILQ_INIT(&classes);
@@ -137,10 +137,10 @@ palloc_init(void)
 	if (class_init(palloc_greatest_size()) == NULL)
 		return 0;
 
-	if ((class = class_init(-1)) == NULL)
+	if ((clazz = class_init(-1)) == NULL)
 		return 0;
 
-	TAILQ_NEXT(class, link) = NULL;
+	TAILQ_NEXT(clazz, link) = NULL;
 
 	eter_pool = palloc_create_pool("eter_pool");
 	return 1;
@@ -155,9 +155,9 @@ palloc_free(void)
 
 	palloc_free_unused();
 
-	struct chunk_class *class, *class_next;
-	TAILQ_FOREACH_SAFE(class, &classes, link, class_next)
-		free(class);
+	struct chunk_class *clazz, *class_next;
+	TAILQ_FOREACH_SAFE(clazz, &classes, link, class_next)
+		free(clazz);
 }
 
 static void
@@ -174,47 +174,47 @@ static struct chunk *
 next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 {
 	struct chunk *restrict chunk = SLIST_FIRST(&pool->chunks);
-	struct chunk_class *restrict class;
+	struct chunk_class *restrict clazz;
 	size_t chunk_size;
 
 	if (chunk != NULL)
-		class = chunk->class;
+		clazz = chunk->clazz;
 	else
-		class = TAILQ_FIRST(&classes);
+		clazz = TAILQ_FIRST(&classes);
 
-	if (class->allocated_size == -1)
-		class = TAILQ_PREV(class, class_tailq_head, link);
+	if (clazz->allocated_size == -1)
+		clazz = TAILQ_PREV(clazz, class_tailq_head, link);
 
-	while (class != NULL && class->allocated_size < size + sizeof(struct chunk))
-		class = TAILQ_NEXT(class, link);
+	while (clazz != NULL && clazz->allocated_size < size + sizeof(struct chunk))
+		clazz = TAILQ_NEXT(clazz, link);
 
-	assert(class != NULL);
+	assert(clazz != NULL);
 
-	chunk = SLIST_FIRST(&class->chunks);
+	chunk = SLIST_FIRST(&clazz->chunks);
 	if (chunk != NULL) {
-		SLIST_REMOVE_HEAD(&class->chunks, free_link);
+		SLIST_REMOVE_HEAD(&clazz->chunks, free_link);
 		goto found;
 	}
 
 	if (size > palloc_greatest_size()) {
 		chunk_size = size + sizeof(struct chunk);
-		chunk = malloc(chunk_size);
+		chunk = (struct chunk *) malloc(chunk_size);
 		if (chunk == NULL)
 			return NULL;
 	} else {
-		chunk_size = class->allocated_size;
-		chunk = mmap(NULL, chunk_size,
+		chunk_size = clazz->allocated_size;
+		chunk = (struct chunk *) mmap(NULL, chunk_size,
 			     PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		if (chunk == MAP_FAILED)
 			return NULL;
 	}
 
-	class->chunks_count++;
+	clazz->chunks_count++;
 	chunk->magic = chunk_magic;
 	chunk->size = chunk_size;
 	chunk->free = chunk_size - sizeof(struct chunk);
-	chunk->brk = (void *)chunk + sizeof(struct chunk);
-	chunk->class = class;
+	chunk->brk = (char *)chunk + sizeof(struct chunk);
+	chunk->clazz = clazz;
       found:
 	assert(chunk != NULL && chunk->magic == chunk_magic);
 	SLIST_INSERT_HEAD(&pool->chunks, chunk, busy_link);
@@ -244,13 +244,13 @@ palloc_slow_path(struct palloc_pool *restrict pool, size_t size)
 	struct chunk *chunk;
 	chunk = next_chunk_for(pool, size);
 	if (chunk == NULL) {
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
 			  size, "palloc", "next chunk");
 	}
 
 	assert(chunk->free >= size);
 	void *ptr = chunk->brk;
-	chunk->brk += size;
+	chunk->brk = (char *) chunk->brk + size;
 	chunk->free -= size;
 	return ptr;
 }
@@ -266,15 +266,15 @@ palloc(struct palloc_pool *restrict pool, size_t size)
 
 	if (likely(chunk != NULL && chunk->free >= rz_size)) {
 		ptr = chunk->brk;
-		chunk->brk += rz_size;
+		chunk->brk = (char *) chunk->brk + rz_size;
 		chunk->free -= rz_size;
 	} else
 		ptr = palloc_slow_path(pool, rz_size);
 
-	assert(poisoned(ptr + PALLOC_REDZONE, size) == NULL);
-	(void) VALGRIND_MAKE_MEM_DEFINED(ptr + PALLOC_REDZONE, size);
+	assert(poisoned((char *) ptr + PALLOC_REDZONE, size) == NULL);
+	(void) VALGRIND_MAKE_MEM_DEFINED((char *) ptr + PALLOC_REDZONE, size);
 
-	return ptr + PALLOC_REDZONE;
+	return (char *) ptr + PALLOC_REDZONE;
 }
 
 void *__attribute__((regparm(2)))
@@ -302,8 +302,8 @@ chunk_free(struct chunk *chunk)
 {
 	if (chunk->size <= palloc_greatest_size()) {
 		chunk->free = chunk->size - sizeof(struct chunk);
-		chunk->brk = (void *)chunk + sizeof(struct chunk);
-		SLIST_INSERT_HEAD(&chunk->class->chunks, chunk, free_link);
+		chunk->brk = (char *)chunk + sizeof(struct chunk);
+		SLIST_INSERT_HEAD(&chunk->clazz->chunks, chunk, free_link);
 		poison_chunk(chunk);
 	} else {
 		free(chunk);
@@ -328,7 +328,7 @@ ptruncate(struct palloc_pool *pool, size_t new_size)
 				     sizeof(struct chunk));
 		if (chunk_used > cut_size) {
 			/* This is the last chunk to trim. */
-			chunk->brk -= cut_size;
+			chunk->brk = (char *) chunk->brk - cut_size;
 			chunk->free += cut_size;
 			(void) VALGRIND_MAKE_MEM_NOACCESS(chunk->brk, cut_size);
 			cut_size = 0;
@@ -365,7 +365,7 @@ palloc_reset(struct palloc_pool *pool)
 		pool->allocated -= chunk->size - sizeof(struct chunk) -
 				   chunk->free;
 		chunk->free = chunk->size - sizeof(struct chunk);
-		chunk->brk = (void *)chunk + sizeof(struct chunk);
+		chunk->brk = (char *)chunk + sizeof(struct chunk);
 	}
 }
 
@@ -379,9 +379,10 @@ prelease_after(struct palloc_pool *pool, size_t after)
 struct palloc_pool *
 palloc_create_pool(const char *name)
 {
-	struct palloc_pool *pool = calloc(sizeof(struct palloc_pool), 1);
+	struct palloc_pool *pool = (struct palloc_pool *)
+			calloc(sizeof(struct palloc_pool), 1);
 	if (pool == NULL) {
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE,
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
 			  sizeof(struct palloc_pool),
 			  "malloc", "palloc pool");
 	}
@@ -402,20 +403,20 @@ palloc_destroy_pool(struct palloc_pool *pool)
 void
 palloc_free_unused(void)
 {
-	struct chunk_class *class;
+	struct chunk_class *clazz;
 	struct chunk *chunk, *next_chunk;
 
-	TAILQ_FOREACH(class, &classes, link) {
-		SLIST_FOREACH_SAFE(chunk, &class->chunks, free_link, next_chunk)
-			munmap(chunk, class->allocated_size);
-		SLIST_INIT(&class->chunks);
+	TAILQ_FOREACH(clazz, &classes, link) {
+		SLIST_FOREACH_SAFE(chunk, &clazz->chunks, free_link, next_chunk)
+			munmap(chunk, clazz->allocated_size);
+		SLIST_INIT(&clazz->chunks);
 	}
 }
 
 void
 palloc_stat(struct tbuf *buf)
 {
-	struct chunk_class *class;
+	struct chunk_class *clazz;
 	struct chunk *chunk;
 	struct palloc_pool *pool;
 	int chunks[class_count];
@@ -433,26 +434,26 @@ palloc_stat(struct tbuf *buf)
 			tbuf_printf(buf, "      busy chunks:" CRLF);
 
 			SLIST_FOREACH(chunk, &pool->chunks, busy_link)
-			    chunks[chunk->class->i]++;
+			    chunks[chunk->clazz->i]++;
 
-			TAILQ_FOREACH(class, &classes, link) {
-				if (chunks[class->i] == 0)
+			TAILQ_FOREACH(clazz, &classes, link) {
+				if (chunks[clazz->i] == 0)
 					continue;
-				tbuf_printf(buf, "        - { size: %"PRIu32", used: %i }" CRLF,
-					    class->allocated_size, chunks[class->i]);
+				tbuf_printf(buf, "        - { size: %" PRIu32 ", used: %i }" CRLF,
+					    clazz->allocated_size, chunks[clazz->i]);
 			}
 		}
 	}
 	tbuf_printf(buf, "  classes:" CRLF);
-	TAILQ_FOREACH(class, &classes, link) {
+	TAILQ_FOREACH(clazz, &classes, link) {
 		int free_chunks = 0;
-		SLIST_FOREACH(chunk, &class->chunks, free_link)
+		SLIST_FOREACH(chunk, &clazz->chunks, free_link)
 			free_chunks++;
 
 		tbuf_printf(buf,
-			    "    - { size: %"PRIu32
-			    ", free_chunks: %- 6i, busy_chunks: %- 6i }" CRLF, class->allocated_size,
-			    free_chunks, class->chunks_count - free_chunks);
+			    "    - { size: %" PRIu32
+			    ", free_chunks: %- 6i, busy_chunks: %- 6i }" CRLF, clazz->allocated_size,
+			    free_chunks, clazz->chunks_count - free_chunks);
 	}
 	u64 palloc_total = 0;
 	u64 palloc_used = 0;
@@ -465,7 +466,7 @@ palloc_stat(struct tbuf *buf)
 			palloc_total += chunk->size;
 	}
 	tbuf_printf(buf, "  total:" CRLF);
-	tbuf_printf(buf, "    - { occupied: %"PRIu64", used: %"PRIu64" }"CRLF,
+	tbuf_printf(buf, "    - { occupied: %" PRIu64 ", used: %" PRIu64 " }" CRLF,
 		    palloc_total, palloc_used);
 
 }

@@ -1,4 +1,5 @@
 /*
+ *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
  * conditions are met:
@@ -27,12 +28,15 @@
  * SUCH DAMAGE.
  */
 #include "lua/stat.h"
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
+
 #include <string.h>
 #include <stat.h>
 
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+} /* extern "C" */
 
 static void
 fill_stat_item(struct lua_State *L, int rps, i64 total)
@@ -49,7 +53,7 @@ fill_stat_item(struct lua_State *L, int rps, i64 total)
 static int
 set_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
 {
-	struct lua_State *L = cb_ctx;
+	struct lua_State *L = (struct lua_State *) cb_ctx;
 
 	lua_pushstring(L, name);
 	lua_newtable(L);
@@ -68,7 +72,7 @@ set_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
 static int
 seek_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
 {
-	struct lua_State *L = cb_ctx;
+	struct lua_State *L = (struct lua_State *) cb_ctx;
 	if (strcmp(name, lua_tostring(L, -1)) != 0)
 		return 0;
 

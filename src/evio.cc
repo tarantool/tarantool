@@ -146,7 +146,7 @@ evio_bind_addrinfo(struct ev_io *evio, struct addrinfo *ai)
 	int fd = -1;
 	while (ai) {
 		struct sockaddr_in *addr = (struct sockaddr_in *)ai->ai_addr;
-		@try {
+		try {
 			fd = sio_socket(ai->ai_family, ai->ai_socktype,
 					ai->ai_protocol);
 			evio_setsockopt_tcpserver(fd);
@@ -155,16 +155,16 @@ evio_bind_addrinfo(struct ev_io *evio, struct addrinfo *ai)
 				return; /* success. */
 			}
 			assert(errno == EADDRINUSE);
-		} @catch (SocketError *e) {
+		} catch (const SocketError& e) {
 			if (ai->ai_next == NULL) {
 				close(fd);
-				@throw;
+				throw;
 			}
 		}
 		close(fd);
 		ai = ai->ai_next;
 	}
-	tnt_raise(SocketError, :evio->fd in:"evio_bind_addrinfo()");
+	tnt_raise(SocketError, evio->fd, "evio_bind_addrinfo()");
 }
 
 static inline int
@@ -182,10 +182,10 @@ static void
 evio_service_accept_cb(ev_io *watcher,
 		       int revents __attribute__((unused)))
 {
-	struct evio_service *service = watcher->data;
+	struct evio_service *service = (struct evio_service *) watcher->data;
 	int fd = -1;
 
-	@try {
+	try {
 		struct sockaddr_in addr;
 		socklen_t addrlen = sizeof(addr);
 		fd = sio_accept(service->ev.fd, &addr, &addrlen);
@@ -200,10 +200,10 @@ evio_service_accept_cb(ev_io *watcher,
 		 */
 		service->on_accept(service, fd, &addr);
 
-	} @catch (tnt_Exception *e) {
+	} catch (const Exception& e) {
 		if (fd >= 0)
 			close(fd);
-		[e log];
+		e.log();
 	}
 }
 
@@ -219,7 +219,7 @@ evio_service_bind_and_listen(struct evio_service *service)
 	/* Create a socket. */
 	int fd = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-	@try {
+	try {
 		evio_setsockopt_tcpserver(fd);
 
 		if (sio_bind(fd, &service->addr, sizeof(service->addr)) ||
@@ -234,9 +234,9 @@ evio_service_bind_and_listen(struct evio_service *service)
 		if (service->on_bind)
 			service->on_bind(service->on_bind_param);
 
-	} @catch (tnt_Exception *e) {
+	} catch (const Exception& e) {
 		close(fd);
-		@throw;
+		throw;
 	}
 	/* Register the socket in the event loop. */
 	ev_io_set(&service->ev, fd, EV_READ);
@@ -252,7 +252,7 @@ evio_service_bind_and_listen(struct evio_service *service)
 static void
 evio_service_timer_cb(ev_timer *watcher, int revents __attribute__((unused)))
 {
-	struct evio_service *service = watcher->data;
+	struct evio_service *service = (struct evio_service *) watcher->data;
 	assert(! ev_is_active(&service->ev));
 
 	if (evio_service_bind_and_listen(service) == 0)
@@ -274,7 +274,7 @@ evio_service_init(struct evio_service *service, const char *name,
 	if (strcmp(host, "INADDR_ANY") == 0) {
 		service->addr.sin_addr.s_addr = INADDR_ANY;
 	} else if (inet_aton(host, &service->addr.sin_addr) == 0) {
-		tnt_raise(SocketError, :"invalid address for bind: %s",
+		tnt_raise(SocketError, -1, "invalid address for bind: %s",
 			  host);
 	}
 	service->on_accept = on_accept;

@@ -37,7 +37,7 @@
 #include "tbuf.h"
 #include "errinj.h"
 
-#define ERRINJ_MEMBER(n, s) { .name = #n, .state = s },
+#define ERRINJ_MEMBER(n, s) { /* .name = */ #n, /* .state = */ s },
 
 struct errinj errinjs[errinj_enum_MAX] = {
 	ERRINJ_LIST(ERRINJ_MEMBER)

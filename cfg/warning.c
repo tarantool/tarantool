@@ -12,7 +12,7 @@ struct tbuf *cfg_out = NULL;
  */
 
 void
-out_warning(ConfettyError v, char *format, ...)
+out_warning(ConfettyError v, const char *format, ...)
 {
 	va_list ap;
 

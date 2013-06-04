@@ -27,17 +27,21 @@
  * SUCH DAMAGE.
  */
 #include "lua/slab.h"
+
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+} /* extern "C" */
+
 #include "lua/init.h"
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
 #include <salloc.h>
 
 /** A callback passed into salloc_stat() and invoked for every slab class. */
 static int
 salloc_stat_lua_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 {
-	struct lua_State *L = cb_ctx;
+	struct lua_State *L = (struct lua_State *) cb_ctx;
 
 	/*
 	 * Create a Lua table for every slab class. A class is

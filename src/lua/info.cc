@@ -30,9 +30,11 @@
 #include "lua/info.h"
 #include "lua/init.h"
 
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+} /* extern "C" */
 
 #include <say.h>
 #include <string.h>

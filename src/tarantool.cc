@@ -58,20 +58,21 @@
 #include <say.h>
 #include <stat.h>
 #include <limits.h>
-#include TARANTOOL_CONFIG
 #include <util.h>
-#include <third_party/gopt/gopt.h>
+extern "C" {
 #include <cfg/warning.h>
+#include <cfg/tarantool_box_cfg.h>
+#include <third_party/gopt/gopt.h>
+} /* extern "C" */
 #include "tarantool_pthread.h"
 #include "lua/init.h"
 #include "memcached.h"
 #include "session.h"
 #include "box/box.h"
+#include "scoped_guard.h"
 
 
 static pid_t master_pid;
-#define DEFAULT_CFG_FILENAME "tarantool.cfg"
-#define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
 const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
 char *binary_filename;
@@ -84,13 +85,14 @@ static ev_signal *sigs = NULL;
 
 int snapshot_pid = 0; /* snapshot processes pid */
 bool init_storage, booting = true;
+extern const void *opt_def;
 
 static int
 core_check_config(struct tarantool_cfg *conf)
 {
 	if (strindex(wal_mode_STRS, conf->wal_mode,
 		     WAL_MODE_MAX) == WAL_MODE_MAX) {
-		out_warning(0, "wal_mode %s is not recognized", conf->wal_mode);
+		out_warning(CNF_OK, "wal_mode %s is not recognized", conf->wal_mode);
 		return -1;
 	}
 	return 0;
@@ -110,8 +112,8 @@ title(const char *fmt, ...)
 			cfg.memcached_port, cfg.admin_port,
 			cfg.replication_port };
 	int *pptr = ports;
-	char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
-	char **nptr = names;
+	const char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
+	const char **nptr = names;
 
 	for (; *nptr; nptr++, pptr++)
 		if (*pptr)
@@ -135,7 +137,7 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 		f = fopen(cfg_filename, "r");
 
 	if (f == NULL) {
-		out_warning(0, "can't open config `%s'", cfg_filename);
+		out_warning(CNF_OK, "can't open config `%s'", cfg_filename);
 		return -1;
 	}
 
@@ -155,7 +157,7 @@ load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
 		return -1;
 
 	if (n_accepted == 0) {
-		out_warning(0, "empty configuration file '%s'", cfg_filename);
+		out_warning(CNF_OK, "empty configuration file '%s'", cfg_filename);
 		return -1;
 	}
 
@@ -182,7 +184,7 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 	if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode)) {
 		if (strcasecmp(old_conf->wal_mode, "fsync") == 0 ||
 		    strcasecmp(new_conf->wal_mode, "fsync") == 0) {
-			out_warning(0, "wal_mode cannot switch to/from fsync");
+			out_warning(CNF_OK, "wal_mode cannot switch to/from fsync");
 			return -1;
 		}
 		say_debug("%s: wal_mode [%s] -> [%s]",
@@ -215,61 +217,19 @@ reload_cfg(struct tbuf *out)
 	struct tarantool_cfg new_cfg, aux_cfg;
 
 	if (mutex == NULL) {
-		mutex = palloc(eter_pool, sizeof(*mutex));
+		mutex = (struct mutex *) palloc(eter_pool, sizeof(*mutex));
 		mutex_create(mutex);
 	}
 
 	if (mutex_trylock(mutex) == true) {
-		out_warning(0, "Could not reload configuration: it is being reloaded right now");
+		out_warning(CNF_OK, "Could not reload configuration: it is being reloaded right now");
 		tbuf_append(out, cfg_out->data, cfg_out->size);
 
 		return -1;
 	}
 
-	@try {
-		init_tarantool_cfg(&new_cfg);
-		init_tarantool_cfg(&aux_cfg);
 
-		/*
-		  Prepare a copy of the original config file
-		  for confetti, so that it can compare the new
-		  file with the old one when loading the new file.
-		  Load the new file and return an error if it
-		  contains a different value for some read-only
-		  parameter.
-		*/
-		if (dup_tarantool_cfg(&aux_cfg, &cfg) != 0 ||
-		    load_cfg(&aux_cfg, 1) != 0)
-			return -1;
-		/*
-		  Load the new configuration file, but
-		  skip the check for read only parameters.
-		  new_cfg contains only defaults and
-		  new settings.
-		*/
-		if (fill_default_tarantool_cfg(&new_cfg) != 0 ||
-		    load_cfg(&new_cfg, 0) != 0)
-			return -1;
-
-		/* Check that no default value has been changed. */
-		char *diff = cmp_tarantool_cfg(&aux_cfg, &new_cfg, 1);
-		if (diff != NULL) {
-			out_warning(0, "Could not accept read only '%s' option", diff);
-			return -1;
-		}
-
-		/* Process wal-writer-related changes. */
-		if (core_reload_config(&cfg, &new_cfg) != 0)
-			return -1;
-
-		/* Now pass the config to the module, to take action. */
-		if (box_reload_config(&cfg, &new_cfg) != 0)
-			return -1;
-		/* All OK, activate the config. */
-		swap_tarantool_cfg(&cfg, &new_cfg);
-		tarantool_lua_load_cfg(tarantool_L, &cfg);
-	}
-	@finally {
+	auto scoped_guard = make_scoped_guard([&] {
 		destroy_tarantool_cfg(&aux_cfg);
 		destroy_tarantool_cfg(&new_cfg);
 
@@ -277,7 +237,50 @@ reload_cfg(struct tbuf *out)
 			tbuf_append(out, cfg_out->data, cfg_out->size);
 
 		mutex_unlock(mutex);
+	});
+
+	init_tarantool_cfg(&new_cfg);
+	init_tarantool_cfg(&aux_cfg);
+
+	/*
+	  Prepare a copy of the original config file
+	   for confetti, so that it can compare the new
+	  file with the old one when loading the new file.
+	  Load the new file and return an error if it
+	  contains a different value for some read-only
+	  parameter.
+	*/
+	if (dup_tarantool_cfg(&aux_cfg, &cfg) != 0 ||
+	    load_cfg(&aux_cfg, 1) != 0)
+		return -1;
+	/*
+	  Load the new configuration file, but
+	  skip the check for read only parameters.
+	  new_cfg contains only defaults and
+	  new settings.
+	*/
+	if (fill_default_tarantool_cfg(&new_cfg) != 0 ||
+	    load_cfg(&new_cfg, 0) != 0)
+		return -1;
+
+	/* Check that no default value has been changed. */
+	char *diff = cmp_tarantool_cfg(&aux_cfg, &new_cfg, 1);
+	if (diff != NULL) {
+		out_warning(CNF_OK, "Could not accept read only '%s' option", diff);
+		return -1;
 	}
+
+	/* Process wal-writer-related changes. */
+	if (core_reload_config(&cfg, &new_cfg) != 0)
+		return -1;
+
+	/* Now pass the config to the module, to take action. */
+	if (box_reload_config(&cfg, &new_cfg) != 0)
+		return -1;
+	/* All OK, activate the config. */
+	swap_tarantool_cfg(&cfg, &new_cfg);
+	tarantool_lua_load_cfg(tarantool_L, &cfg);
+
 	return 0;
 }
 
@@ -351,8 +354,11 @@ snapshot(void)
 * Create snapshot from signal handler (SIGUSR1)
 */
 static void
-sig_snapshot(void)
+sig_snapshot(struct ev_signal *w, int revents)
 {
+	(void) w;
+	(void) revents;
+
 	if (snapshot_pid) {
 		say_warn("Snapshot process is already running,"
 			" the signal is ignored");
@@ -362,8 +368,11 @@ sig_snapshot(void)
 }
 
 static void
-signal_cb(void)
+signal_cb(struct ev_signal *w, int revents)
 {
+	(void) w;
+	(void) revents;
+
 	/* Terminate the main event loop */
 	ev_unloop(EV_A_ EVUNLOOP_ALL);
 }
@@ -485,15 +494,15 @@ signal_init(void)
 		exit(EX_OSERR);
 	}
 
-	sigs = palloc(eter_pool, sizeof(ev_signal) * 4);
+	sigs = (ev_signal *) palloc(eter_pool, sizeof(ev_signal) * 4);
 	memset(sigs, 0, sizeof(ev_signal) * 4);
-	ev_signal_init(&sigs[0], (void*)sig_snapshot, SIGUSR1);
+	ev_signal_init(&sigs[0], sig_snapshot, SIGUSR1);
 	ev_signal_start(&sigs[0]);
-	ev_signal_init(&sigs[1], (void*)signal_cb, SIGINT);
+	ev_signal_init(&sigs[1], signal_cb, SIGINT);
 	ev_signal_start(&sigs[1]);
-	ev_signal_init(&sigs[2], (void*)signal_cb, SIGTERM);
+	ev_signal_init(&sigs[2], signal_cb, SIGTERM);
 	ev_signal_start(&sigs[2]);
-	ev_signal_init(&sigs[3], (void*)signal_cb, SIGHUP);
+	ev_signal_init(&sigs[3], signal_cb, SIGHUP);
 	ev_signal_start(&sigs[3]);
 
 	atexit(signal_free);
@@ -641,29 +650,6 @@ main(int argc, char **argv)
 	main_argc = argc;
 	main_argv = argv;
 
-	const void *opt_def =
-		gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
-				       gopt_longs("cfg-get", "cfg_get"),
-				       "=KEY", "return a value from configuration file described by KEY"),
-			   gopt_option('k', 0, gopt_shorts(0),
-				       gopt_longs("check-config"),
-				       NULL, "Check configuration file for errors"),
-			   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
-				       gopt_longs("config"),
-				       "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
-			   gopt_option('I', 0, gopt_shorts(0),
-				       gopt_longs("init-storage", "init_storage"),
-				       NULL, "initialize storage (an empty snapshot file) and exit"),
-			   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
-				       NULL, "increase verbosity level in log messages"),
-			   gopt_option('B', 0, gopt_shorts('B'), gopt_longs("background"),
-				       NULL, "redirect input/output streams to a log file and run as daemon"),
-			   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
-				       NULL, "display this help and exit"),
-			   gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
-				       NULL, "print program version and exit")
-		);
-
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 	main_opt = opt;
 	binary_filename = argv[0];
@@ -674,6 +660,7 @@ main(int argc, char **argv)
 		printf("Build options: %s\n", BUILD_OPTIONS);
 		printf("Compiler: %s\n", COMPILER_INFO);
 		printf("C_FLAGS:%s\n", TARANTOOL_C_FLAGS);
+		printf("CXX_FLAGS:%s\n", TARANTOOL_CXX_FLAGS);
 		return 0;
 	}
 
@@ -710,7 +697,7 @@ main(int argc, char **argv)
 	}
 
 	if (cfg_filename[0] != '/') {
-		cfg_filename_fullpath = malloc(PATH_MAX);
+		cfg_filename_fullpath = (char *) malloc(PATH_MAX);
 		if (getcwd(cfg_filename_fullpath, PATH_MAX - strlen(cfg_filename) - 1) == NULL) {
 			say_syserror("getcwd");
 			exit(EX_OSERR);
@@ -826,9 +813,10 @@ main(int argc, char **argv)
 
 	/* init process title */
 	if (cfg.custom_proc_title == NULL) {
-		custom_proc_title = "";
+		custom_proc_title = (char *) palloc(eter_pool, 1);
+		custom_proc_title[0] = '\0';
 	} else {
-		custom_proc_title = palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
+		custom_proc_title = (char *) palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
 		strcpy(custom_proc_title, "@");
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
@@ -848,7 +836,7 @@ main(int argc, char **argv)
 	signal_init();
 
 
-	@try {
+	try {
 		tarantool_L = tarantool_lua_init();
 		box_init();
 		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
@@ -882,10 +870,11 @@ main(int argc, char **argv)
 		ev_now_update();
 		start_time = ev_now();
 		ev_loop(0);
-	} @catch (tnt_Exception *e) {
-		[e log];
+	} catch (const Exception& e) {
+		e.log();
 		panic("%s", "Fatal error, exiting loop");
 	}
+
 	say_crit("exiting loop");
 	/* freeing resources */
 	return 0;

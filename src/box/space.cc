@@ -29,8 +29,10 @@
 #include "space.h"
 #include <stdlib.h>
 #include <string.h>
-#include <cfg/tarantool_box_cfg.h>
+extern "C" {
 #include <cfg/warning.h>
+#include <cfg/tarantool_box_cfg.h>
+} /* extern "C" */
 #include <tarantool.h>
 #include <exception.h>
 #include "tuple.h"
@@ -52,10 +54,10 @@ space_create(u32 space_no, struct key_def *key_defs, u32 key_count, u32 arity)
 	struct space *space = space_by_n(space_no);
 	if (space)
 		panic("Space %d is already exists", space_no);
-	space = calloc(sizeof(struct space), 1);
+	space = (struct space *) calloc(sizeof(struct space), 1);
 	space->no = space_no;
 
-	const struct mh_i32ptr_node_t node = { .key = space->no, .val = space };
+	const struct mh_i32ptr_node_t node = { space->no, space };
 	mh_i32ptr_put(spaces, &node, NULL, NULL);
 
 	space->arity = arity;
@@ -70,11 +72,11 @@ space_create(u32 space_no, struct key_def *key_defs, u32 key_count, u32 arity)
 struct space *
 space_by_n(u32 n)
 {
-	const struct mh_i32ptr_node_t node = { .key = n };
+	const struct mh_i32ptr_node_t node = { n, NULL };
 	mh_int_t space = mh_i32ptr_get(spaces, &node, NULL);
 	if (space == mh_end(spaces))
 		return NULL;
-	return mh_i32ptr_node(spaces, space)->val;
+	return (struct space *) mh_i32ptr_node(spaces, space)->val;
 }
 
 /** Return the number of active indexes in a space. */
@@ -101,7 +103,8 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata) {
 
 	mh_int_t i;
 	mh_foreach(spaces, i) {
-		struct space *space = mh_i32ptr_node(spaces, i)->val;
+		struct space *space = (struct space *)
+				mh_i32ptr_node(spaces, i)->val;
 		func(space, udata);
 	}
 }
@@ -127,7 +130,7 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode)
 {
 	u32 i = 0;
-	@try {
+	try {
 		/* Update the primary key */
 		Index *pk = sp->index[0];
 		assert(pk->key_def->is_unique);
@@ -136,23 +139,23 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 		 * has to find and delete it, or raise an
 		 * error.
 		 */
-		old_tuple = [pk replace: old_tuple :new_tuple :mode];
+		old_tuple = pk->replace(old_tuple, new_tuple, mode);
 
 		assert(old_tuple || new_tuple);
 		u32 n = index_count(sp);
 		/* Update secondary keys */
 		for (i = i + 1; i < n; i++) {
 			Index *index = sp->index[i];
-			[index replace: old_tuple :new_tuple :DUP_INSERT];
+			index->replace(old_tuple, new_tuple, DUP_INSERT);
 		}
 		return old_tuple;
-	} @catch (tnt_Exception *e) {
+	} catch (const Exception& e) {
 		/* Rollback all changes */
 		for (; i > 0; i--) {
 			Index *index = sp->index[i-1];
-			[index replace: new_tuple: old_tuple: DUP_INSERT];
+			index->replace(new_tuple, old_tuple, DUP_INSERT);
 		}
-		@throw;
+		throw;
 	}
 
 	assert(false);
@@ -165,11 +168,11 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 	/* Check to see if the tuple has a sufficient number of fields. */
 	if (new_tuple->field_count < sp->max_fieldno)
 		tnt_raise(IllegalParams,
-			  :"tuple must have all indexed fields");
+			  "tuple must have all indexed fields");
 
 	if (sp->arity > 0 && sp->arity != new_tuple->field_count)
 		tnt_raise(IllegalParams,
-			  :"tuple field count must match space cardinality");
+			  "tuple field count must match space cardinality");
 
 	/* Sweep through the tuple and check the field sizes. */
 	const u8 *data = new_tuple->data;
@@ -183,11 +186,11 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 		 */
 		if (sp->field_types[f] == NUM) {
 			if (len != sizeof(u32))
-				tnt_raise(ClientError, :ER_KEY_FIELD_TYPE,
+				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
 					  "u32");
 		} else if (sp->field_types[f] == NUM64) {
 			if (len != sizeof(u64))
-				tnt_raise(ClientError, :ER_KEY_FIELD_TYPE,
+				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
 					  "u64");
 		}
 	}
@@ -199,12 +202,13 @@ space_free(void)
 	mh_int_t i;
 
 	mh_foreach(spaces, i) {
-		struct space *space = mh_i32ptr_node(spaces, i)->val;
+		struct space *space = (struct space *)
+				mh_i32ptr_node(spaces, i)->val;
 		mh_i32ptr_del(spaces, i, NULL);
 
 		for (u32 j = 0 ; j < space->key_count; j++) {
 			Index *index = space->index[j];
-			[index free];
+			delete index;
 			key_free(&space->key_defs[j]);
 		}
 
@@ -227,7 +231,7 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 
 	/* Calculate key part count and maximal field number. */
 	for (u32 k = 0; cfg_index->key_field[k] != NULL; ++k) {
-		typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
+		auto cfg_key = cfg_index->key_field[k];
 
 		if (cfg_key->fieldno == -1) {
 			/* last filled key reached */
@@ -239,14 +243,15 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 	}
 
 	/* init def array */
-	def->parts = malloc(sizeof(struct key_part) * def->part_count);
+	def->parts = (struct key_part *) malloc(sizeof(struct key_part) *
+						def->part_count);
 	if (def->parts == NULL) {
 		panic("can't allocate def parts array for index");
 	}
 
 	/* init compare order array */
 	def->max_fieldno++;
-	def->cmp_order = malloc(def->max_fieldno * sizeof(u32));
+	def->cmp_order = (u32 *) malloc(def->max_fieldno * sizeof(u32));
 	if (def->cmp_order == NULL) {
 		panic("can't allocate def cmp_order array for index");
 	}
@@ -256,7 +261,7 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 
 	/* fill fields and compare order */
 	for (u32 k = 0; cfg_index->key_field[k] != NULL; ++k) {
-		typeof(cfg_index->key_field[k]) cfg_key = cfg_index->key_field[k];
+		auto cfg_key = cfg_index->key_field[k];
 
 		if (cfg_key->fieldno == -1) {
 			/* last filled key reached */
@@ -295,7 +300,8 @@ space_init_field_types(struct space *space)
 
 	/* alloc & init field type info */
 	space->max_fieldno = max_fieldno;
-	space->field_types = calloc(max_fieldno, sizeof(enum field_data_type));
+	space->field_types = (enum field_data_type *)
+			     calloc(max_fieldno, sizeof(enum field_data_type));
 
 	/* extract field type info */
 	for (i = 0; i < key_count; i++) {
@@ -340,7 +346,7 @@ space_config()
 		if (space)
 			panic("space %u is already exists", i);
 
-		space = calloc(sizeof(struct space), 1);
+		space = (struct space *) calloc(sizeof(struct space), 1);
 		space->no = i;
 
 		space->arity = (cfg_space->cardinality != -1) ?
@@ -356,30 +362,29 @@ space_config()
 		}
 
 
-		space->key_defs = malloc(space->key_count *
-					    sizeof(struct key_def));
+		space->key_defs = (struct key_def *) malloc(space->key_count *
+							    sizeof(struct key_def));
 		if (space->key_defs == NULL) {
 			panic("can't allocate key def array");
 		}
 		for (u32 j = 0; cfg_space->index[j] != NULL; ++j) {
-			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
+			auto cfg_index = cfg_space->index[j];
 			key_init(&space->key_defs[j], cfg_index);
 		}
 		space_init_field_types(space);
 
 		/* fill space indexes */
 		for (u32 j = 0; cfg_space->index[j] != NULL; ++j) {
-			typeof(cfg_space->index[j]) cfg_index = cfg_space->index[j];
+			auto cfg_index = cfg_space->index[j];
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
 			struct key_def *key_def = &space->key_defs[j];
-			Index *index = [[Index alloc :type :key_def :space]
-					init :key_def :space];
+			Index *index = Index::factory(type, key_def, space);
 			assert (index != NULL);
 			space->index[j] = index;
 		}
 
 		const struct mh_i32ptr_node_t node =
-			{ .key = space->no, .val = space };
+			{ space->no, space };
 		mh_i32ptr_put(spaces, &node, NULL, NULL);
 		say_info("space %i successfully configured", i);
 	}
@@ -402,9 +407,10 @@ begin_build_primary_indexes(void)
 	mh_int_t i;
 
 	mh_foreach(spaces, i) {
-		struct space *space = mh_i32ptr_node(spaces, i)->val;
+		struct space *space = (struct space *)
+				mh_i32ptr_node(spaces, i)->val;
 		Index *index = space->index[0];
-		[index beginBuild];
+		index->beginBuild();
 	}
 }
 
@@ -413,9 +419,10 @@ end_build_primary_indexes(void)
 {
 	mh_int_t i;
 	mh_foreach(spaces, i) {
-		struct space *space = mh_i32ptr_node(spaces, i)->val;
+		struct space *space = (struct space *)
+				mh_i32ptr_node(spaces, i)->val;
 		Index *index = space->index[0];
-		[index endBuild];
+		index->endBuild();
 	}
 	primary_indexes_enabled = true;
 }
@@ -428,7 +435,8 @@ build_secondary_indexes(void)
 
 	mh_int_t i;
 	mh_foreach(spaces, i) {
-		struct space *space = mh_i32ptr_node(spaces, i)->val;
+		struct space *space = (struct space *)
+				mh_i32ptr_node(spaces, i)->val;
 
 		if (space->key_count <= 1)
 			continue; /* no secondary keys */
@@ -438,7 +446,7 @@ build_secondary_indexes(void)
 		Index *pk = space->index[0];
 		for (u32 j = 1; j < space->key_count; j++) {
 			Index *index = space->index[j];
-			[index build: pk];
+			index->build(pk);
 		}
 
 		say_info("Space %d: done", space->no);
@@ -457,10 +465,10 @@ check_spaces(struct tarantool_cfg *conf)
 	}
 
 	for (size_t i = 0; conf->space[i] != NULL; ++i) {
-		typeof(conf->space[i]) space = conf->space[i];
+		auto space = conf->space[i];
 
 		if (i >= BOX_SPACE_MAX) {
-			out_warning(0, "(space = %zu) invalid id, (maximum=%u)",
+			out_warning(CNF_OK, "(space = %zu) invalid id, (maximum=%u)",
 				    i, BOX_SPACE_MAX);
 			return -1;
 		}
@@ -476,7 +484,7 @@ check_spaces(struct tarantool_cfg *conf)
 		}
 
 		if (conf->memcached_port && i == conf->memcached_space) {
-			out_warning(0, "Space %zu is already used as "
+			out_warning(CNF_OK, "Space %zu is already used as "
 				    "memcached_space.", i);
 			return -1;
 		}
@@ -484,7 +492,7 @@ check_spaces(struct tarantool_cfg *conf)
 		/* at least one index in space must be defined
 		 * */
 		if (space->index == NULL) {
-			out_warning(0, "(space = %zu) "
+			out_warning(CNF_OK, "(space = %zu) "
 				    "at least one index must be defined", i);
 			return -1;
 		}
@@ -493,21 +501,21 @@ check_spaces(struct tarantool_cfg *conf)
 
 		/* check spaces indexes */
 		for (size_t j = 0; space->index[j] != NULL; ++j) {
-			typeof(space->index[j]) index = space->index[j];
+			auto index = space->index[j];
 			u32 key_part_count = 0;
 			enum index_type index_type;
 
 			/* check index bound */
 			if (j >= BOX_INDEX_MAX) {
 				/* maximum index in space reached */
-				out_warning(0, "(space = %zu index = %zu) "
+				out_warning(CNF_OK, "(space = %zu index = %zu) "
 					    "too many indexed (%u maximum)", i, j, BOX_INDEX_MAX);
 				return -1;
 			}
 
 			/* at least one key in index must be defined */
 			if (index->key_field == NULL) {
-				out_warning(0, "(space = %zu index = %zu) "
+				out_warning(CNF_OK, "(space = %zu index = %zu) "
 					    "at least one field must be defined", i, j);
 				return -1;
 			}
@@ -515,12 +523,12 @@ check_spaces(struct tarantool_cfg *conf)
 			/* check unique property */
 			if (index->unique == -1) {
 				/* unique property undefined */
-				out_warning(0, "(space = %zu index = %zu) "
+				out_warning(CNF_OK, "(space = %zu index = %zu) "
 					    "unique property is undefined", i, j);
 			}
 
 			for (size_t k = 0; index->key_field[k] != NULL; ++k) {
-				typeof(index->key_field[k]) key = index->key_field[k];
+				auto key = index->key_field[k];
 
 				if (key->fieldno == -1) {
 					/* last key reached */
@@ -529,7 +537,7 @@ check_spaces(struct tarantool_cfg *conf)
 
 				if (key->fieldno >= BOX_FIELD_MAX) {
 					/* maximum index in space reached */
-					out_warning(0, "(space = %zu index = %zu) "
+					out_warning(CNF_OK, "(space = %zu index = %zu) "
 						    "invalid field number (%u maximum)",
 						    i, j, BOX_FIELD_MAX);
 					return -1;
@@ -537,7 +545,7 @@ check_spaces(struct tarantool_cfg *conf)
 
 				/* key must has valid type */
 				if (STR2ENUM(field_data_type, key->type) == field_data_type_MAX) {
-					out_warning(0, "(space = %zu index = %zu) "
+					out_warning(CNF_OK, "(space = %zu index = %zu) "
 						    "unknown field data type: `%s'", i, j, key->type);
 					return -1;
 				}
@@ -551,7 +559,7 @@ check_spaces(struct tarantool_cfg *conf)
 
 			/* Check key part count. */
 			if (key_part_count == 0) {
-				out_warning(0, "(space = %zu index = %zu) "
+				out_warning(CNF_OK, "(space = %zu index = %zu) "
 					    "at least one field must be defined", i, j);
 				return -1;
 			}
@@ -560,14 +568,14 @@ check_spaces(struct tarantool_cfg *conf)
 
 			/* check index type */
 			if (index_type == index_type_MAX) {
-				out_warning(0, "(space = %zu index = %zu) "
+				out_warning(CNF_OK, "(space = %zu index = %zu) "
 					    "unknown index type '%s'", i, j, index->type);
 				return -1;
 			}
 
 			/* First index must be unique. */
 			if (j == 0 && index->unique == false) {
-				out_warning(0, "(space = %zu) space first index must be unique", i);
+				out_warning(CNF_OK, "(space = %zu) space first index must be unique", i);
 				return -1;
 			}
 
@@ -576,14 +584,14 @@ check_spaces(struct tarantool_cfg *conf)
 				/* check hash index */
 				/* hash index must has single-field key */
 				if (key_part_count != 1) {
-					out_warning(0, "(space = %zu index = %zu) "
-					            "hash index must has a single-field key", i, j);
+					out_warning(CNF_OK, "(space = %zu index = %zu) "
+						    "hash index must has a single-field key", i, j);
 					return -1;
 				}
 				/* hash index must be unique */
 				if (!index->unique) {
-					out_warning(0, "(space = %zu index = %zu) "
-					            "hash index must be unique", i, j);
+					out_warning(CNF_OK, "(space = %zu index = %zu) "
+						    "hash index must be unique", i, j);
 					return -1;
 				}
 				break;
@@ -594,13 +602,13 @@ check_spaces(struct tarantool_cfg *conf)
 				/* check bitset index */
 				/* bitset index must has single-field key */
 				if (key_part_count != 1) {
-					out_warning(0, "(space = %zu index = %zu) "
+					out_warning(CNF_OK, "(space = %zu index = %zu) "
 						    "bitset index must has a single-field key", i, j);
 					return -1;
 				}
 				/* bitset index must not be unique */
 				if (index->unique) {
-					out_warning(0, "(space = %zu index = %zu) "
+					out_warning(CNF_OK, "(space = %zu index = %zu) "
 						    "bitset index must be non-unique", i, j);
 					return -1;
 				}
@@ -612,12 +620,12 @@ check_spaces(struct tarantool_cfg *conf)
 
 		/* Check for index field type conflicts */
 		if (max_key_fieldno > 0) {
-			char *types = alloca(max_key_fieldno);
+			char *types = (char *) alloca(max_key_fieldno);
 			memset(types, 0, max_key_fieldno);
 			for (size_t j = 0; space->index[j] != NULL; ++j) {
-				typeof(space->index[j]) index = space->index[j];
+				auto index = space->index[j];
 				for (size_t k = 0; index->key_field[k] != NULL; ++k) {
-					typeof(index->key_field[k]) key = index->key_field[k];
+					auto key = index->key_field[k];
 					if (key->fieldno == -1)
 						break;
 
@@ -628,7 +636,7 @@ check_spaces(struct tarantool_cfg *conf)
 						if (types[f] == UNKNOWN) {
 							types[f] = t;
 						} else {
-							out_warning(0, "(space = %zu fieldno = %zu) "
+							out_warning(CNF_OK, "(space = %zu fieldno = %zu) "
 								    "index field type mismatch", i, f);
 							return -1;
 						}

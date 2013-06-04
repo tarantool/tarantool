@@ -37,6 +37,23 @@
 
 #include "say.h"
 
+SocketError::SocketError(const char *file, unsigned line, int fd,
+			 const char *format, ...)
+	: SystemError(file, line)
+{
+	int save_errno = errno;
+
+	char buf[TNT_ERRMSG_MAX];
+
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(buf, sizeof(buf), format, ap);
+	const char *socketname = sio_socketname(fd);
+	init("%s, called on %s", buf, socketname);
+	va_end(ap);
+	errno = save_errno;
+}
+
 /** Pretty print socket name and peer (for exceptions) */
 const char *
 sio_socketname(int fd)
@@ -60,28 +77,6 @@ sio_socketname(int fd)
 	}
 	return name;
 }
-
-@implementation SocketError
-- (id) init: (int) fd in: (const char *) format: (va_list) ap
-{
-	int save_errno = errno;
-	char buf[TNT_ERRMSG_MAX];
-	vsnprintf(buf, sizeof(buf), format, ap);
-	const char *socketname = sio_socketname(fd);
-	errno = save_errno;
-	self = [self init: "%s, called on %s", buf, socketname];
-	return self;
-}
-
-- (id) init: (int) fd in: (const char *) format, ...
-{
-	va_list ap;
-	va_start(ap, format);
-	self = [self init: fd in:format :ap];
-	va_end(ap);
-	return self;
-}
-@end
 
 /** Get a string representation of a socket option name,
  * for logging.
@@ -108,7 +103,7 @@ sio_shutdown(int fd, int how)
 {
 	int rc = shutdown(fd, how);
 	if (rc < 0)
-		tnt_raise(SocketError, :fd in:"shutdown");
+		tnt_raise(SocketError, fd, "shutdown");
 	return rc;
 }
 
@@ -139,7 +134,7 @@ sio_socket(int domain, int type, int protocol)
 {
 	int fd = socket(domain, type, protocol);
 	if (fd < 0)
-		tnt_raise(SocketError, :fd in:"socket");
+		tnt_raise(SocketError, fd, "socket");
 	return fd;
 }
 
@@ -149,7 +144,7 @@ sio_getfl(int fd)
 {
 	int flags = fcntl(fd, F_GETFL, 0);
 	if (flags < 0)
-		tnt_raise(SocketError, :fd in:"fcntl(..., F_GETFL, ...)");
+		tnt_raise(SocketError, fd, "fcntl(..., F_GETFL, ...)");
 	return flags;
 }
 
@@ -160,7 +155,7 @@ sio_setfl(int fd, int flag, int on)
 	int flags = sio_getfl(fd);
 	flags = fcntl(fd, F_SETFL, on ? flags | flag : flags & ~flag);
 	if (flags < 0)
-		tnt_raise(SocketError, :fd in:"fcntl(..., F_SETFL, ...)");
+		tnt_raise(SocketError, fd, "fcntl(..., F_SETFL, ...)");
 	return flags;
 }
 
@@ -171,7 +166,7 @@ sio_setsockopt(int fd, int level, int optname,
 {
 	int rc = setsockopt(fd, level, optname, optval, optlen);
 	if (rc) {
-		tnt_raise(SocketError, :fd in:"setsockopt(%s)",
+		tnt_raise(SocketError, fd, "setsockopt(%s)",
 			  sio_option_name(optname));
 	}
 }
@@ -183,7 +178,7 @@ sio_getsockopt(int fd, int level, int optname,
 {
 	int rc = getsockopt(fd, level, optname, optval, optlen);
 	if (rc) {
-		tnt_raise(SocketError, :fd in:"getsockopt(%s)",
+		tnt_raise(SocketError, fd, "getsockopt(%s)",
 			  sio_option_name(optname));
 	}
 }
@@ -195,7 +190,7 @@ sio_connect(int fd, struct sockaddr_in *addr, socklen_t addrlen)
 	/* Establish the connection. */
 	int rc = connect(fd, (struct sockaddr *) addr, addrlen);
 	if (rc < 0 && errno != EINPROGRESS) {
-		tnt_raise(SocketError, :fd in:"connect");
+		tnt_raise(SocketError, fd, "connect");
 	}
 	return rc;
 }
@@ -206,7 +201,7 @@ sio_bind(int fd, struct sockaddr_in *addr, socklen_t addrlen)
 {
 	int rc = bind(fd, (struct sockaddr *) addr, addrlen);
 	if (rc < 0 && errno != EADDRINUSE)
-		tnt_raise(SocketError, :fd in:"bind");
+		tnt_raise(SocketError, fd, "bind");
 	return rc;
 }
 
@@ -216,7 +211,7 @@ sio_listen(int fd)
 {
 	int rc = listen(fd, sio_listen_backlog());
 	if (rc < 0 && errno != EADDRINUSE)
-		tnt_raise(SocketError, :fd in:"listen");
+		tnt_raise(SocketError, fd, "listen");
 	return rc;
 }
 
@@ -227,7 +222,7 @@ sio_accept(int fd, struct sockaddr_in *addr, socklen_t *addrlen)
 	/* Accept a connection. */
 	int newfd = accept(fd, (struct sockaddr *) addr, addrlen);
 	if (newfd < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
-		tnt_raise(SocketError, :fd in:"accept");
+		tnt_raise(SocketError, fd, "accept");
 	return newfd;
 }
 
@@ -238,7 +233,7 @@ sio_read(int fd, void *buf, size_t count)
 	ssize_t n = read(fd, buf, count);
 	if (n < 0 && errno != EAGAIN &&
 	    errno != EWOULDBLOCK && errno != EINTR)
-			tnt_raise(SocketError, :fd in:"read(%zd)", count);
+			tnt_raise(SocketError, fd, "read(%zd)", count);
 	return n;
 }
 
@@ -249,7 +244,7 @@ sio_write(int fd, const void *buf, size_t count)
 	ssize_t n = write(fd, buf, count);
 	if (n < 0 && errno != EAGAIN &&
 	    errno != EWOULDBLOCK && errno != EINTR)
-			tnt_raise(SocketError, :fd in:"write(%zd)", count);
+			tnt_raise(SocketError, fd, "write(%zd)", count);
 	return n;
 }
 
@@ -261,7 +256,7 @@ sio_writev(int fd, const struct iovec *iov, int iovcnt)
 	ssize_t n = writev(fd, iov, cnt);
 	if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK &&
 	    errno != EINTR) {
-		tnt_raise(SocketError, :fd in:"writev(%d)", iovcnt);
+		tnt_raise(SocketError, fd, "writev(%d)", iovcnt);
 	}
 	return n;
 }
@@ -275,7 +270,7 @@ sio_sendto(int fd, const void *buf, size_t len, int flags,
 	                   addrlen);
 	if (n < 0 && errno != EAGAIN &&
 	    errno != EWOULDBLOCK && errno != EINTR)
-			tnt_raise(SocketError, :fd in:"sendto(%zd)", len);
+			tnt_raise(SocketError, fd, "sendto(%zd)", len);
 	return n;
 }
 
@@ -288,7 +283,7 @@ sio_recvfrom(int fd, void *buf, size_t len, int flags,
 	                     addrlen);
 	if (n < 0 && errno != EAGAIN &&
 	    errno != EWOULDBLOCK && errno != EINTR)
-			tnt_raise(SocketError, :fd in:"recvfrom(%zd)", len);
+			tnt_raise(SocketError, fd, "recvfrom(%zd)", len);
 	return n;
 }
 

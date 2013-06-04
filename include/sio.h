@@ -42,10 +42,11 @@
 
 enum { SERVICE_NAME_MAXLEN = 32 };
 
-@interface SocketError: SystemError
-- (id) init: (int) fd in: (const char *) format: (va_list) ap;
-- (id) init: (int) fd in: (const char *) format, ...;
-@end
+class SocketError: public SystemError {
+public:
+	SocketError(const char *file, unsigned line, int fd,
+		    const char *format, ...);
+};
 
 const char *sio_socketname(int fd);
 int sio_socket(int domain, int type, int protocol);
@@ -117,7 +118,7 @@ static inline void
 sio_add_to_iov(struct iovec *iov, ssize_t size)
 {
 	iov->iov_len += size;
-	iov->iov_base -= size;
+	iov->iov_base = (char *) iov->iov_base - size;
 }
 
 #endif /* TARANTOOL_SIO_H_INCLUDED */

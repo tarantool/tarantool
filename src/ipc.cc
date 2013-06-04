@@ -63,7 +63,7 @@ ipc_channel_new(unsigned size)
 {
 	if (!size)
 		size = 1;
-	struct ipc_channel *res =
+	struct ipc_channel *res = (struct ipc_channel *)
 		malloc(sizeof(struct ipc_channel) + sizeof(void *) * size);
 	if (res == NULL)
 		return NULL;

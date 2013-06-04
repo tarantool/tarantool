@@ -119,8 +119,9 @@ wait_lsn_set(struct wait_lsn *wait_lsn, int64_t lsn)
 static inline void
 wakeup_lsn_waiter(struct recovery_state *r)
 {
-	if (r->wait_lsn.waiter && r->confirmed_lsn >= r->wait_lsn.lsn)
+	if (r->wait_lsn.waiter && r->confirmed_lsn >= r->wait_lsn.lsn) {
 		fiber_wakeup(r->wait_lsn.waiter);
+	}
 }
 
 void
@@ -167,10 +168,12 @@ recovery_wait_lsn(struct recovery_state *r, int64_t lsn)
 {
 	while (lsn < r->confirmed_lsn) {
 		wait_lsn_set(&r->wait_lsn, lsn);
-		@try {
+		try {
 			fiber_yield();
-		} @finally {
 			wait_lsn_clear(&r->wait_lsn);
+		} catch(const Exception& e) {
+			wait_lsn_clear(&r->wait_lsn);
+			throw;
 		}
 	}
 }
@@ -202,7 +205,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	      int rows_per_wal, int flags)
 {
 	assert(recovery_state == NULL);
-	recovery_state = p0alloc(eter_pool, sizeof(struct recovery_state));
+	recovery_state = (struct recovery_state *) p0alloc(eter_pool, sizeof(struct recovery_state));
 	struct recovery_state *r = recovery_state;
 	recovery_update_mode(r, "none", 0);
 
@@ -226,7 +229,7 @@ void
 recovery_update_mode(struct recovery_state *r,
 		     const char *mode, double fsync_delay)
 {
-	r->wal_mode = strindex(wal_mode_STRS, mode, WAL_MODE_MAX);
+	r->wal_mode = (enum wal_mode) strindex(wal_mode_STRS, mode, WAL_MODE_MAX);
 	assert(r->wal_mode != WAL_MODE_MAX);
 	/* No mutex lock: let's not bother with whether
 	 * or not a WAL writer thread is present, and
@@ -384,6 +387,9 @@ recover_remaining_wals(struct recovery_state *r)
 	struct log_io *next_wal;
 	i64 current_lsn, wal_greatest_lsn;
 	size_t rows_before;
+	FILE *f;
+	char *filename;
+	enum log_suffix suffix;
 
 	current_lsn = r->confirmed_lsn + 1;
 	wal_greatest_lsn = greatest_lsn(r->wal_dir);
@@ -418,9 +424,8 @@ recover_remaining_wals(struct recovery_state *r)
 		 * .xlog, with no risk of a concurrent
 		 * inprogress_log_rename().
 		 */
-		FILE *f = NULL;
-		char *filename;
-		enum log_suffix suffix = INPROGRESS;
+		f = NULL;
+		suffix = INPROGRESS;
 		if (current_lsn == wal_greatest_lsn) {
 			/* Last WAL present at the time of rescan. */
 			filename = format_filename(r->wal_dir,
@@ -607,7 +612,7 @@ recovery_stop_file(struct wal_watcher *watcher)
 static void
 recovery_rescan_dir(ev_timer *w, int revents __attribute__((unused)))
 {
-	struct recovery_state *r = w->data;
+	struct recovery_state *r = (struct recovery_state *) w->data;
 	struct wal_watcher *watcher = r->watcher;
 	struct log_io *save_current_wal = r->current_wal;
 
@@ -625,7 +630,7 @@ recovery_rescan_dir(ev_timer *w, int revents __attribute__((unused)))
 static void
 recovery_rescan_file(ev_stat *w, int revents __attribute__((unused)))
 {
-	struct recovery_state *r = w->data;
+	struct recovery_state *r = (struct recovery_state *) w->data;
 	struct wal_watcher *watcher = r->watcher;
 	int result = recover_wal(r, r->current_wal);
 	if (result < 0)
@@ -767,9 +772,9 @@ wal_schedule_queue(struct wal_fifo *queue)
 }
 
 static void
-wal_schedule(ev_watcher *watcher, int event __attribute__((unused)))
+wal_schedule(ev_async *watcher, int event __attribute__((unused)))
 {
-	struct wal_writer *writer = watcher->data;
+	struct wal_writer *writer = (struct wal_writer *) watcher->data;
 	struct wal_fifo commit = STAILQ_HEAD_INITIALIZER(commit);
 	struct wal_fifo rollback = STAILQ_HEAD_INITIALIZER(rollback);
 
@@ -818,7 +823,7 @@ wal_writer_init(struct wal_writer *writer)
 	STAILQ_INIT(&writer->input);
 	STAILQ_INIT(&writer->commit);
 
-	ev_async_init(&writer->write_event, (void *)wal_schedule);
+	ev_async_init(&writer->write_event, wal_schedule);
 	writer->write_event.data = writer;
 
 	(void) tt_pthread_once(&wal_writer_once, wal_writer_init_once);
@@ -1059,7 +1064,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 static void *
 wal_writer_thread(void *worker_args)
 {
-	struct recovery_state *r = worker_args;
+	struct recovery_state *r = (struct recovery_state *) worker_args;
 	struct wal_writer *writer = r->writer;
 	struct wal_fifo input = STAILQ_HEAD_INITIALIZER(input);
 	struct wal_fifo commit = STAILQ_HEAD_INITIALIZER(commit);
@@ -1109,7 +1114,7 @@ wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 
 	struct wal_writer *writer = r->writer;
 
-	struct wal_write_request *req =
+	struct wal_write_request *req = (struct wal_write_request *)
 		palloc(fiber->gc_pool, sizeof(struct wal_write_request) +
 		       sizeof(op) + row_len);
 
@@ -1158,7 +1163,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
-	struct row_v11 *row = palloc(fiber->gc_pool,
+	struct row_v11 *row = (struct row_v11 *) palloc(fiber->gc_pool,
 				     sizeof(struct row_v11) +
 				     data_len + metadata_len);
 

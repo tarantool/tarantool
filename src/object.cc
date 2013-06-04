@@ -26,26 +26,5 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#import "object.h"
-#include <stdlib.h>
 
-@implementation tnt_Object
-+ (id) alloc
-{
-	return class_createInstance(self, 0);
-}
-- (id) init
-{
-	return self;
-}
-- (void) subclassResponsibility: (SEL) cmd
-{
-	(void) cmd;
-	abort();
-}
-
-- (void) free
-{
-	object_dispose(self);
-}
-@end
+#include "object.h"

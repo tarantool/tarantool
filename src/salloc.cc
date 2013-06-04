@@ -102,7 +102,7 @@ static struct arena arena;
 static struct slab *
 slab_header(void *ptr)
 {
-	struct slab *slab = SLAB_ALIGN_PTR(ptr);
+	struct slab *slab = (struct slab *) SLAB_ALIGN_PTR(ptr);
 	assert(slab->magic == SLAB_MAGIC);
 	return slab;
 }
@@ -196,7 +196,7 @@ format_slab(struct slab_cache *cache, struct slab *slab)
 	slab->cache = cache;
 	slab->items = 0;
 	slab->used = 0;
-	slab->brk = (void *)CACHEALIGN((void *)slab + sizeof(struct slab));
+	slab->brk = (char *)CACHEALIGN((char *)slab + sizeof(struct slab));
 
 	TAILQ_INSERT_HEAD(&cache->slabs, slab, cache_link);
 	TAILQ_INSERT_HEAD(&cache->free_slabs, slab, cache_free_link);
@@ -205,7 +205,7 @@ format_slab(struct slab_cache *cache, struct slab *slab)
 static bool
 fully_formatted(struct slab *slab)
 {
-	return slab->brk + slab->cache->item_size >= (void *)slab + SLAB_SIZE;
+	return (char *) slab->brk + slab->cache->item_size >= (char *)slab + SLAB_SIZE;
 }
 
 void
@@ -251,7 +251,7 @@ slab_of(struct slab_cache *cache)
 		return slab;
 	}
 
-	if ((slab = arena_alloc(&arena)) != NULL) {
+	if ((slab = (struct slab *) arena_alloc(&arena)) != NULL) {
 		format_slab(cache, slab);
 		SLIST_INSERT_HEAD(&arena.slabs, slab, link);
 		return slab;
@@ -264,8 +264,8 @@ slab_of(struct slab_cache *cache)
 static bool
 valid_item(struct slab *slab, void *item)
 {
-	return (void *)item >= (void *)(slab) + sizeof(struct slab) &&
-	    (void *)item < (void *)(slab) + sizeof(struct slab) + SLAB_SIZE;
+	return (char *)item >= (char *)(slab) + sizeof(struct slab) &&
+	    (char *)item < (char *)(slab) + sizeof(struct slab) + SLAB_SIZE;
 }
 #endif
 
@@ -279,15 +279,15 @@ salloc(size_t size, const char *what)
 	if ((cache = cache_for(size)) == NULL ||
 	    (slab = slab_of(cache)) == NULL) {
 
-		tnt_raise(LoggedError, :ER_MEMORY_ISSUE, size,
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE, size,
 			  "slab allocator", what);
 	}
 
 	if (slab->free == NULL) {
 		assert(valid_item(slab, slab->brk));
-		item = slab->brk;
-		memcpy((void *)item + cache->item_size, red_zone, sizeof(red_zone));
-		slab->brk += cache->item_size + sizeof(red_zone);
+		item = (struct slab_item *) slab->brk;
+		memcpy((char *)item + cache->item_size, red_zone, sizeof(red_zone));
+		slab->brk = (char *) slab->brk + cache->item_size + sizeof(red_zone);
 	} else {
 		assert(valid_item(slab, slab->free));
 		item = slab->free;
@@ -314,7 +314,7 @@ sfree(void *ptr)
 		return;
 	struct slab *slab = slab_header(ptr);
 	struct slab_cache *cache = slab->cache;
-	struct slab_item *item = ptr;
+	struct slab_item *item = (struct slab_item *) ptr;
 
 	if (fully_formatted(slab) && slab->free == NULL)
 		TAILQ_INSERT_TAIL(&cache->free_slabs, slab, cache_free_link);
@@ -341,17 +341,17 @@ size_t
 salloc_ptr_to_index(void *ptr)
 {
 	struct slab *slab = slab_header(ptr);
-	struct slab_item *item = ptr;
+	struct slab_item *item = (struct slab_item *) ptr;
 	struct slab_cache *clazz = slab->cache;
 
 	(void) item;
 	assert(valid_item(slab, item));
 
-	void *brk_start = (void *)CACHEALIGN((void *)slab+sizeof(struct slab));
-	ptrdiff_t item_no = (ptr - brk_start) / clazz->item_size;
+	void *brk_start = (char *)CACHEALIGN((char *)slab+sizeof(struct slab));
+	ptrdiff_t item_no = ((const char *) ptr - (const char *) brk_start) / clazz->item_size;
 	assert(item_no >= 0);
 
-	ptrdiff_t slab_no = ((void *) slab - (void *) arena.base) / SLAB_SIZE;
+	ptrdiff_t slab_no = ((const char *) slab - (const char *) arena.base) / SLAB_SIZE;
 	assert(slab_no >= 0);
 
 	size_t index = (size_t)slab_no * MAX_SLAB_ITEM_COUNT + (size_t) item_no;
@@ -371,8 +371,8 @@ salloc_ptr_from_index(size_t index)
 		(void *) ((size_t) arena.base + SLAB_SIZE * slab_no));
 	struct slab_cache *clazz = slab->cache;
 
-	void *brk_start = (void *)CACHEALIGN((void *)slab+sizeof(struct slab));
-	struct slab_item *item = brk_start + item_no * clazz->item_size;
+	void *brk_start = (char *)CACHEALIGN((char *)slab+sizeof(struct slab));
+	struct slab_item *item = (struct slab_item *)((char *) brk_start + item_no * clazz->item_size);
 	assert(valid_item(slab, item));
 
 	return (void *) item;

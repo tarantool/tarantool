@@ -27,10 +27,14 @@
  * SUCH DAMAGE.
  */
 #include "box_lua_space.h"
+
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+} /* extern "C" */
+
 #include "space.h"
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
 #include <say.h>
 
 /**
@@ -145,6 +149,12 @@ lbox_add_space(struct space *space, struct lua_State *L)
 	lua_settable(L, -3);
 }
 
+static void
+lbox_add_space_wrapper(struct space *space, void *param)
+{
+	lbox_add_space(space, (struct lua_State *) param);
+}
+
 /**
  * Make all spaces available in Lua via box.space
  * array.
@@ -155,7 +165,7 @@ box_lua_load_cfg(struct lua_State *L)
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "space");
 	lua_newtable(L);
-	space_foreach((void *)lbox_add_space, L);	/* fill box.space */
+	space_foreach(lbox_add_space_wrapper, L);	/* fill box.space */
 	lua_settable(L, -3);
 	lua_pop(L, 1);
 	assert(lua_gettop(L) == 0);
