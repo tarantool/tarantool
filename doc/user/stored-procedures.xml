@@ -73,8 +73,8 @@ localhost> lua "hello".." world"
   </para>
   <para>
     Lua procedures could also be called at the time of initialization
-    using a dedicated <emphasis xml:id="init.lua" xreflabel="init.lua">init.lua</emphasis> script,
-    located in <olink targetptr="work_dir" />.
+    using a dedicated <filename xml:id="init.lua" xreflabel="init.lua">init.lua</filename> script,
+    located in <olink targetptr="script_dir" />.
 
     An example of such a script is given below:
     <programlisting>

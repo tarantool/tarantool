@@ -1087,17 +1087,27 @@ static void
 tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
 __attribute__((sentinel));
 
+/**
+ * Prepend the variable list of arguments to the Lua
+ * package search path (or cpath, as defined in 'type').
+ */
 static void
 tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
 {
-	char path[1024];
+	char path[PATH_MAX];
 	va_list args;
 	va_start(args, type);
 	int off = 0;
 	const char *p;
-	while ((p = va_arg(args, const char*)))
-		if (*p != '\0')
-			off += snprintf(path + off, sizeof(path) - off, "%s;", p);
+	while ((p = va_arg(args, const char*))) {
+		/*
+		 * If LUA_SYSPATH or LUA_SYSCPATH is an empty
+		 * string, skip it.
+		 */
+		if (*p == '\0')
+			continue;
+		off += snprintf(path + off, sizeof(path) - off, "%s;", p);
+	}
 	va_end(args);
 	lua_getglobal(L, "package");
 	lua_getfield(L, -1, type);
@@ -1116,13 +1126,20 @@ tarantool_lua_init()
 	if (L == NULL)
 		return L;
 	luaL_openlibs(L);
-
+	/*
+	 * Search for Lua modules, apart from the standard
+	 * locations, in the server script_dir and in the
+	 * system-wide Tarantool paths. This way 3 types
+	 * of packages become available for use: standard Lua
+	 * packages, Tarantool-specific Lua libs and
+	 * instance-specific Lua scripts.
+	 */
 	tarantool_lua_setpath(L, "path", cfg.script_dir, LUA_LIBPATH,
 	                      LUA_SYSPATH, NULL);
 	tarantool_lua_setpath(L, "cpath", LUA_LIBCPATH,
 	                      LUA_SYSCPATH, NULL);
 
-	/* Loading 'ffi' extension and making it inaccessible */
+	/* Loadi 'ffi' extension and make it inaccessible */
 	lua_getglobal(L, "require");
 	lua_pushstring(L, "ffi");
 	if (lua_pcall(L, 1, 0, 0) != 0)
