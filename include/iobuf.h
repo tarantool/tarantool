@@ -172,10 +172,10 @@ obuf_dup(struct obuf *obuf, const void *data, size_t size);
 static inline struct obuf_svp
 obuf_create_svp(struct obuf *buf)
 {
-	struct obuf_svp svp = {
-		.pos = buf->pos, .iov_len = buf->iov[buf->pos].iov_len,
-		.size = buf->size
-	};
+	struct obuf_svp svp;
+	svp.pos = buf->pos;
+	svp.iov_len = buf->iov[buf->pos].iov_len;
+	svp.size = buf->size;
 	return svp;
 }
 
@@ -183,7 +183,7 @@ obuf_create_svp(struct obuf *buf)
 static inline void *
 obuf_svp_to_ptr(struct obuf *buf, struct obuf_svp *svp)
 {
-	return buf->iov[svp->pos].iov_base + svp->iov_len;
+	return (char *) buf->iov[svp->pos].iov_base + svp->iov_len;
 }
 
 /** Forget anything added to output buffer after the savepoint. */

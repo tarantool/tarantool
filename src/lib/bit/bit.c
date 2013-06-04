@@ -74,9 +74,9 @@ bswap_u32(uint32_t x);
 extern inline uint64_t
 bswap_u64(uint64_t x);
 
-#define BITINDEX_NAIVE(x, bitsize) {					\
+#define BITINDEX_NAIVE(type, x, bitsize) {				\
 	/* naive generic implementation, worst case */			\
-	typeof(x) bit = 1;						\
+	type bit = 1;							\
 	int i = 0;							\
 	for (int k = 0; k < bitsize; k++) {				\
 		if (x & bit) {						\
@@ -116,7 +116,7 @@ bit_index_u32(uint32_t x, int *indexes, int offset)
 	indexes[i] = 0;
 	return indexes + i;
 #else /* !defined(HAVE_BUILTIN_CTZ) */
-	BITINDEX_NAIVE(x, sizeof(uint32_t) * CHAR_BIT);
+	BITINDEX_NAIVE(uint32_t, x, sizeof(uint32_t) * CHAR_BIT);
 #endif
 }
 
@@ -146,7 +146,7 @@ bit_index_u64(uint64_t x, int *indexes, int offset) {
 	indexes[i] = 0;
 	return indexes + i;
 #else /* !defined(HAVE_CTZ) */
-	BITINDEX_NAIVE(x, sizeof(uint64_t) * CHAR_BIT);
+	BITINDEX_NAIVE(uint64_t, x, sizeof(uint64_t) * CHAR_BIT);
 #endif
 }
 

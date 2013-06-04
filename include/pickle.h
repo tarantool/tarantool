@@ -43,7 +43,7 @@
 static inline uint32_t
 load_u32(const void **data)
 {
-	const uint32_t *b = *data;
+	const uint32_t *b = (const uint32_t *) *data;
 	*data= b + 1;
 	return *b;
 }
@@ -52,27 +52,27 @@ static inline uint32_t
 load_varint32(const void **data)
 {
 	assert(data != NULL && *data != NULL);
-	const uint8_t *b = *data;
+	const uint8_t *b = (const uint8_t *) *data;
 
 	if (!(b[0] & 0x80)) {
-		*data += 1;
+		*data = (char *) *data + 1;
 		return (b[0] & 0x7f);
 	}
 	if (!(b[1] & 0x80)) {
-		*data += 2;
+		*data = (char *) *data + 2;
 		return (b[0] & 0x7f) << 7 | (b[1] & 0x7f);
 	}
 	if (!(b[2] & 0x80)) {
-		*data += 3;
+		*data = (char *) *data + 3;
 		return (b[0] & 0x7f) << 14 | (b[1] & 0x7f) << 7 | (b[2] & 0x7f);
 	}
 	if (!(b[3] & 0x80)) {
-		*data += 4;
+		*data = (char *) *data + 4;
 		return (b[0] & 0x7f) << 21 | (b[1] & 0x7f) << 14 |
 			(b[2] & 0x7f) << 7 | (b[3] & 0x7f);
 	}
 	if (!(b[4] & 0x80)) {
-		*data += 5;
+		*data = (char *) *data + 5;
 		return (b[0] & 0x7f) << 28 | (b[1] & 0x7f) << 21 |
 			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
@@ -84,63 +84,63 @@ static inline uint32_t
 pick_varint32(const void **data, const void *end)
 {
 	assert(data != NULL && *data != NULL);
-	const uint8_t *b = *data;
-	ssize_t size = end - *data;
+	const uint8_t *b = (const uint8_t *) *data;
+	ssize_t size = (const char *) end - (const char * )*data;
 
 	if (unlikely(size < 1))
-		tnt_raise(IllegalParams, :"varint is too short (expected 1+ bytes)");
+		tnt_raise(IllegalParams, "varint is too short (expected 1+ bytes)");
 
 	if (!(b[0] & 0x80)) {
-		*data += 1;
+		*data = (char *) *data + 1;
 		return (b[0] & 0x7f);
 	}
 
 	if (unlikely(size < 2))
-		tnt_raise(IllegalParams, :"varint is too short (expected 2+ bytes)");
+		tnt_raise(IllegalParams, "varint is too short (expected 2+ bytes)");
 
 	if (!(b[1] & 0x80)) {
-		*data += 2;
+		*data = (char *) *data + 2;
 		return (b[0] & 0x7f) << 7 | (b[1] & 0x7f);
 	}
 
 	if (unlikely(size < 3))
-		tnt_raise(IllegalParams, :"BER int is too short (expected 3+ bytes)");
+		tnt_raise(IllegalParams, "BER int is too short (expected 3+ bytes)");
 
 	if (!(b[2] & 0x80)) {
-		*data += 3;
+		*data = (char *) *data + 3;
 		return (b[0] & 0x7f) << 14 | (b[1] & 0x7f) << 7 | (b[2] & 0x7f);
 	}
 
 	if (unlikely(size < 4))
-		tnt_raise(IllegalParams, :"BER int is too short (expected 4+ bytes)");
+		tnt_raise(IllegalParams, "BER int is too short (expected 4+ bytes)");
 
 	if (!(b[3] & 0x80)) {
-		*data += 4;
+		*data = (char *) *data + 4;
 		return (b[0] & 0x7f) << 21 | (b[1] & 0x7f) << 14 |
 			(b[2] & 0x7f) << 7 | (b[3] & 0x7f);
 	}
 
 	if (unlikely(size < 5))
-		tnt_raise(IllegalParams, :"BER int is too short (expected 5+ bytes)");
+		tnt_raise(IllegalParams, "BER int is too short (expected 5+ bytes)");
 
 	if (!(b[4] & 0x80)) {
-		*data += 5;
+		*data = (char *) *data + 5;
 		return (b[0] & 0x7f) << 28 | (b[1] & 0x7f) << 21 |
 			(b[2] & 0x7f) << 14 | (b[3] & 0x7f) << 7 | (b[4] & 0x7f);
 	}
 
-	tnt_raise(IllegalParams, :"incorrect BER integer format");
+	tnt_raise(IllegalParams, "incorrect BER integer format");
 }
 
 #define pick_u(bits)						\
 static inline uint##bits##_t					\
 pick_u##bits(const void **begin, const void *end)		\
 {								\
-	if (end - *begin < (bits)/8)				\
+	if ((const char *) end - (const char *) *begin < (bits)/8)				\
 		tnt_raise(IllegalParams,			\
-			  :"packet too short (expected "#bits" bits)");\
+			  "packet too short (expected "#bits" bits)");\
 	uint##bits##_t r = *(uint##bits##_t *)*begin;		\
-	*begin += (bits)/8;					\
+	*begin = (const char *) *begin + (bits)/8;		\
 	return r;						\
 }
 
@@ -153,10 +153,10 @@ static inline const void *
 pick_str(const void **data, const void *end, uint32_t size)
 {
 	const void *str = *data;
-	if (str + size > end)
+	if ((const char *) str + size > (const char *) end)
 		tnt_raise(IllegalParams,
-			  :"packet too short (expected a field)");
-	*data += size;
+			  "packet too short (expected a field)");
+	*data = (char *) *data + size;
 	return str;
 }
 
@@ -183,7 +183,7 @@ pick_field_u32(const void **data, const void *end)
 	uint32_t size = pick_varint32(data, end);
 	if (size != sizeof(uint32_t))
 		tnt_raise(IllegalParams,
-			  :"incorrect packet format (expected a 32-bit int)");
+			  "incorrect packet format (expected a 32-bit int)");
 	return *(uint32_t *) pick_str(data, end, size);
 }
 
@@ -197,7 +197,7 @@ valid_tuple(const void *data, const void *end, uint32_t field_count)
 	for (int i = 0; i < field_count; i++)
 		pick_field(&data, end);
 
-	return data - start;
+	return (const char *) data - (const char *) start;
 }
 
 /**
@@ -211,9 +211,9 @@ tuple_range_size(const void **begin, const void *end, size_t count)
 	const void *start = *begin;
 	while (*begin < end && count-- > 0) {
 		size_t len = load_varint32(begin);
-		*begin += len;
+		*begin = (char *) *begin + len;
 	}
-	return *begin - start;
+	return (const char *) *begin - (const char *) start;
 }
 
 static inline size_t
@@ -234,7 +234,7 @@ varint32_sizeof(uint32_t value)
 static inline void *
 pack_varint32(void *buf, uint32_t value)
 {
-	uint8_t *target = buf;
+	uint8_t *target = (uint8_t *) buf;
 	if (value >= (1 << 7)) {
 		if (value >= (1 << 14)) {
 			if (value >= (1 << 21)) {
@@ -254,7 +254,7 @@ pack_varint32(void *buf, uint32_t value)
 static inline void *
 pack_lstr(void *buf, const void *str, uint32_t len)
 {
-	return memcpy(pack_varint32(buf, len), str, len) + len;
+	return (char *) memcpy(pack_varint32(buf, len), str, len) + len;
 }
 
 #endif /* TARANTOOL_PICKLE_H_INCLUDED */

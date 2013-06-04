@@ -28,95 +28,104 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#import "object.h"
+#include "object.h"
 #include <stdarg.h>
 #include "errcode.h"
 #include "say.h"
 
-/** The base class for all exceptions.
- *
- * Note: implements garbage collection (see +alloc
- * implementation).
- */
-@interface tnt_Exception: tnt_Object {
-	@public
-		const char *file;
-		unsigned line;
-}
-+ (id) alloc;
-- (void) log;
-- (const char *) errmsg;
-@end
+class Exception: public Object {
+public:
+	const char *
+	errmsg() const
+	{
+		return m_errmsg;
+	}
 
+	virtual void log() const = 0;
 
-/** Internal error resulting from a failed system call.
- */
-@interface SystemError: tnt_Exception {
-	@public
-		/* errno code */
-		int errnum;
-		/* error description */
-		char errmsg[TNT_ERRMSG_MAX];
-}
+protected:
+	Exception(const char *file, unsigned line);
+	/* The copy constructor is needed for C++ throw */
+	Exception(const Exception&);
 
-- (id) init: (const char *)msg, ...;
-- (id) init: (int)errnum_arg :(const char *)format :(va_list)ap;
-- (void) log;
-- (const char *) errmsg;
-@end
+	/* file name */
+	const char *m_file;
+	/* line number */
+	unsigned m_line;
 
+	/* error description */
+	char m_errmsg[TNT_ERRMSG_MAX];
+};
 
-/** Errors that should make it to the client.
- */
-@interface ClientError: tnt_Exception {
-	@public
-		uint32_t errcode;
-		char errmsg[TNT_ERRMSG_MAX];
-}
+class SystemError: public Exception {
+public:
 
-- (id) init: (uint32_t)errcode_, ...;
-- (id) init: (uint32_t)errcode_  :(const char *)msg;
-- (id) init: (uint32_t)errcode_ args :(va_list)ap;
-- (void) log;
-- (const char *) errmsg;
-@end
+	int
+	errnum() const
+	{
+		return m_errnum;
+	}
 
+	virtual void log() const;
 
-/** Additionally log this error in the log file. */
-@interface LoggedError: ClientError
-- (id) init: (uint32_t)errcode, ...;
-@end
+protected:
+	SystemError(const char *file, unsigned line);
 
+	void
+	init(const char *format, ...);
 
-/** A handy wrapper for ER_ILLEGAL_PARAMS, which is used very
- * often.
- */
-@interface IllegalParams: LoggedError
-- (id) init: (const char *)msg;
-@end
+	void
+	init(const char *format, va_list ap);
 
-/** ER_INJECTION wrapper. */
-@interface ErrorInjection: LoggedError
-- (id) init: (const char *)msg;
-@end
+private:
+	/* system errno */
+	int m_errnum;
+};
 
-/**
- * A helper macro to add __FILE__ and __LINE__ information to
- * raised exceptions.
- *
- * Usage:
- *
- * tnt_raise(tnt_Exception);
- * tnt_raise(LoggedError, :"invalid argument %d", argno);
- */
+class ClientError: public Exception {
+public:
+	virtual void log() const;
+
+	int
+	errcode() const
+	{
+		return m_errcode;
+	}
+
+	ClientError(const char *file, unsigned line, uint32_t errcode, ...);
+	/* A special constructor for lbox_raise */
+	ClientError(const char *file, unsigned line, const char *msg,
+		    uint32_t errcode);
+private:
+	/* client errno code */
+	int m_errcode;
+};
+
+class LoggedError: public ClientError {
+public:
+	template <typename ... Args>
+	LoggedError(const char *file, unsigned line, uint32_t errcode, Args ... args)
+		: ClientError(file, line, errcode, args...)
+	{
+		/* TODO: actually calls ClientError::log */
+		log();
+	}
+};
+
+class IllegalParams: public LoggedError {
+public:
+	IllegalParams(const char *file, unsigned line, const char *msg);
+};
+
+class ErrorInjection: public LoggedError {
+public:
+	ErrorInjection(const char *file, unsigned line, const char *msg);
+};
+
 #define tnt_raise(...) tnt_raise0(__VA_ARGS__)
 #define tnt_raise0(class, ...) do {					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
-	class *exception = [class alloc];				\
-	exception->file = __FILE__;					\
-	exception->line = __LINE__;					\
-	[exception init __VA_ARGS__];					\
-	@throw exception;						\
+	throw class(__FILE__, __LINE__, ##__VA_ARGS__);			\
 } while (0)
 
 #endif /* TARANTOOL_EXCEPTION_H_INCLUDED */

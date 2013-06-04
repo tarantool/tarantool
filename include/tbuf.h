@@ -34,13 +34,17 @@
 
 #include <util.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct tbuf {
 	/* Used space in the buffer. */
 	u32 size;
 	/* Total allocated buffer capacity. */
 	u32 capacity;
 	/* Allocated buffer. */
-	void *data;
+	char *data;
 	struct palloc_pool *pool;
 };
 
@@ -60,7 +64,7 @@ static inline void tbuf_append(struct tbuf *b, const void *data, size_t len)
 	tbuf_ensure(b, len + 1); /* +1 for trailing '\0' */
 	memcpy(b->data + b->size, data, len);
 	b->size += len;
-	*(((char *)b->data) + b->size) = '\0';
+	*((b->data) + b->size) = '\0';
 }
 
 static inline char *
@@ -94,4 +98,9 @@ void tbuf_printf(struct tbuf *b, const char *format, ...)
 	__attribute__ ((format(FORMAT_PRINTF, 2, 3)));
 
 char *tbuf_to_hex(const struct tbuf *x);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
 #endif /* TARANTOOL_TBUF_H_INCLUDED */

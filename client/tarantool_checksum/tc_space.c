@@ -128,7 +128,7 @@ tc_space_key_init(struct tc_space *s, tarantool_cfg_space *cs)
 
 	/* calculate primary key part count */
 	while (primary->key_field[s->pk.count]) {
-		typeof(primary->key_field[s->pk.count]) ck = primary->key_field[s->pk.count];
+		tarantool_cfg_space_index_key_field *ck = primary->key_field[s->pk.count];
 		if (ck->fieldno == -1)
 			break;
 		s->pk.count++;
@@ -147,7 +147,7 @@ tc_space_key_init(struct tc_space *s, tarantool_cfg_space *cs)
 	int kn = 0;
 	while (primary->key_field[kn]) {
 		struct tc_space_key_field *k = &s->pk.fields[kn];
-		typeof(primary->key_field[s->pk.count]) ck = primary->key_field[kn];
+		tarantool_cfg_space_index_key_field *ck = primary->key_field[kn];
 		if (ck->fieldno == -1)
 			break;
 		k->n = ck->fieldno;

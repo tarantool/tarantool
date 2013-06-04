@@ -44,6 +44,10 @@
 #endif /* defined(HAVE_FFSL) || defined(HAVE_FFSLL) */
 #include <limits.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** @cond false **/
 #define bit_likely(x)    __builtin_expect((x),1)
 #define bit_unlikely(x)  __builtin_expect((x),0)
@@ -470,5 +474,9 @@ bit_iterator_next(struct bit_iterator *it)
 
 #undef ITER_CTZ
 #undef ITER_UINT
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LIB_BIT_BIT_H_INCLUDED */

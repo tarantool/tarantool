@@ -40,22 +40,45 @@ SPTREE_DEF(index, realloc);
 
 typedef int (*tree_cmp_t)(const void *, const void *, void *);
 
-@interface TreeIndex: Index {
-@public
+class TreeIndex: public Index {
+public:
+	static TreeIndex *
+	factory(struct key_def *key_def, struct space *space);
+
+	virtual void beginBuild();
+	virtual void buildNext(struct tuple *tuple);
+	virtual void endBuild();
+	virtual void build(Index *pk);
+	virtual size_t size() const;
+	virtual struct tuple *min() const;
+	virtual struct tuple *max() const;
+	virtual struct tuple *random(u32 rnd) const;
+	virtual struct tuple *findByKey(const void *key, u32 part_count) const;
+	virtual struct tuple *findByTuple(struct tuple *tuple) const;
+	virtual struct tuple *replace(struct tuple *old_tuple,
+				      struct tuple *new_tuple,
+				      enum dup_replace_mode mode);
+
+	virtual struct iterator *allocIterator() const;
+	virtual void initIterator(struct iterator *iterator,
+				  enum iterator_type type,
+				  const void *key, u32 part_count) const;
+
+// protected:
+	/* Needed by iterators */
+	virtual size_t node_size() const = 0;
+	virtual tree_cmp_t node_cmp() const = 0;
+	virtual tree_cmp_t dup_node_cmp() const = 0;
+	virtual tree_cmp_t key_node_cmp() const= 0;
+
+	virtual void fold(void *node, struct tuple *tuple) const = 0;
+	virtual struct tuple *unfold(const void *node) const = 0;
+
 	sptree_index tree;
+
+protected:
+	TreeIndex(struct key_def *key_def, struct space *space);
+	virtual ~TreeIndex();
 };
-
-+ (struct index_traits *) traits;
-+ (Index *) alloc: (struct key_def *) key_def :(struct space *) space;
-
-/** To be defined in subclasses. */
-- (size_t) node_size;
-- (tree_cmp_t) node_cmp;
-- (tree_cmp_t) dup_node_cmp;
-- (tree_cmp_t) key_node_cmp;
-- (void) fold: (void *) node :(struct tuple *) tuple;
-- (struct tuple *) unfold: (const void *) node;
-
-@end
 
 #endif /* TARANTOOL_BOX_TREE_INDEX_H_INCLUDED */

@@ -114,6 +114,10 @@
 #include <lib/bitset/bitset.h>
 #include <lib/bitset/iterator.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /**
  * @brief BitsetIndex
  */
@@ -289,7 +293,7 @@ bitset_index_contains_value(struct bitset_index *index, size_t value);
  * @return number of pairs in \a index
  */
 inline size_t
-bitset_index_size(struct bitset_index *index)
+bitset_index_size(const struct bitset_index *index)
 {
 	return bitset_cardinality(index->bitsets[0]);
 }
@@ -298,5 +302,9 @@ bitset_index_size(struct bitset_index *index)
 void
 bitset_index_dump(struct bitset_index *index, int verbose, FILE *stream);
 #endif /* defined(DEBUG) */
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LIB_BITSET_INDEX_H_INCLUDED */

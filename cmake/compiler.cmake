@@ -1,10 +1,4 @@
 #
-# Check if ObjectiveC and ObjectiveC++ compilers work
-#
-include(CMakeTestOBJCCompiler)
-#include(CMakeTestOBJCXXCompiler)
-
-#
 # Check if the same compile family is used for both C and CXX
 #
 if (NOT (CMAKE_C_COMPILER_ID STREQUAL CMAKE_CXX_COMPILER_ID))
@@ -22,19 +16,23 @@ if (CMAKE_C_COMPILER_ID STREQUAL Clang)
     set(CMAKE_COMPILER_IS_GNUCXX OFF)
 endif()
 
-# Check GCC version:
-# GCC older than 4.6 is not supported.
-if (CMAKE_COMPILER_IS_GNUCC)
+# TODO: clang version is not checked
+if(CMAKE_COMPILER_IS_GNUCC)
+    # gcc and g++ >= 4.5 are supported
     execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
         OUTPUT_VARIABLE CC_VERSION)
-    if (CC_VERSION VERSION_GREATER 4.4.5 OR CC_VERSION VERSION_EQUAL 4.4.5)
-        message(STATUS
-            "${CMAKE_C_COMPILER} version >= 4.4.5 -- ${CC_VERSION}")
-    else()
+    if (CC_VERSION VERSION_LESS 4.5)
         message (FATAL_ERROR
-            "${CMAKE_C_COMPILER} version should be >= 4.4.5 -- ${CC_VERSION}")
+            "${CMAKE_C_COMPILER} version should be >= 4.5 -- ${CC_VERSION}")
+    endif()
+    execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
+        OUTPUT_VARIABLE CXX_VERSION)
+    if (CXX_VERSION VERSION_LESS 4.5)
+        message (FATAL_ERROR
+            "${CMAKE_CXX_COMPILER} version should be >= 4.5 -- ${CXX_VERSION}")
     endif()
 endif()
+
 
 #
 # Perform build type specific configuration.
@@ -121,8 +119,18 @@ macro(enable_tnt_compile_flags)
     # Additionally, compile it with more strict flags than the rest
     # of the code.
 
-    add_compile_flags("C;OBJC" "-std=gnu99")
-    add_compile_flags("CXX;OBJCXX" "-std=gnu++11 -fno-rtti")
+    # Set standard
+    if (CMAKE_COMPILER_IS_CLANG OR CC_VERSION VERSION_GREATER 4.7 OR
+        CC_VERSION VERSION_EQUAL 4.7)
+        add_compile_flags("C" "-std=c11")
+        add_compile_flags("CXX" "-std=c++11")
+    else()
+        add_compile_flags("C" "-std=gnu99")
+        add_compile_flags("CXX" "-std=c++0x")
+    endif()
+
+    # Disable Run-time type information
+    add_compile_flags("CXX" "-fno-rtti")
 
     add_compile_flags("C;CXX"
         "-Wall"
@@ -131,11 +139,22 @@ macro(enable_tnt_compile_flags)
         "-Wno-strict-aliasing"
     )
 
+    if (CMAKE_COMPILER_IS_GNUCXX)
+        # G++ bug. http://gcc.gnu.org/bugzilla/show_bug.cgi?id=31488
+        add_compile_flags("CXX"
+            "-Wno-invalid-offsetof"
+        )
+    endif()
+
+    add_definitions("-D__STDC_FORMAT_MACROS=1")
+    add_definitions("-D__STDC_LIMIT_MACROS=1")
+    add_definitions("-D__STDC_CONSTANT_MACROS=1")
+
     # Only add -Werror if it's a debug build, done by developers using GCC.
     # Community builds should not cause extra trouble.
-    if (${CMAKE_BUILD_TYPE} STREQUAL "Debug" AND CMAKE_COMPILER_IS_GNUCC)
-        add_compile_flags("C;CXX" "-Werror")
-    endif()
+   if (${CMAKE_BUILD_TYPE} STREQUAL "Debug" AND CMAKE_COMPILER_IS_GNUCC)
+       add_compile_flags("C;CXX" "-Werror")
+   endif()
 endmacro(enable_tnt_compile_flags)
 
 #
@@ -149,3 +168,38 @@ check_c_compiler_flag("-Wno-unused-value" CC_HAS_WNO_UNUSED_VALUE)
 check_c_compiler_flag("-fno-strict-aliasing" CC_HAS_FNO_STRICT_ALIASING)
 check_c_compiler_flag("-Wno-comment" CC_HAS_WNO_COMMENT)
 check_c_compiler_flag("-Wno-parentheses" CC_HAS_WNO_PARENTHESES)
+
+if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCC)
+    set(HAVE_BUILTIN_CTZ 1)
+    set(HAVE_BUILTIN_CTZLL 1)
+    set(HAVE_BUILTIN_CLZ 1)
+    set(HAVE_BUILTIN_CLZLL 1)
+    set(HAVE_BUILTIN_POPCOUNT 1)
+    set(HAVE_BUILTIN_POPCOUNTLL 1)
+    set(HAVE_BUILTIN_BSWAP32 1)
+    set(HAVE_BUILTIN_BSWAP64 1)
+else()
+    set(HAVE_BUILTIN_CTZ 0)
+    set(HAVE_BUILTIN_CTZLL 0)
+    set(HAVE_BUILTIN_CLZ 0)
+    set(HAVE_BUILTIN_CLZLL 0)
+    set(HAVE_BUILTIN_POPCOUNT 0)
+    set(HAVE_BUILTIN_POPCOUNTLL 0)
+    set(HAVE_BUILTIN_BSWAP32 0)
+    set(HAVE_BUILTIN_BSWAP64 0)
+endif()
+
+if (NOT HAVE_BUILTIN_CTZ OR NOT HAVE_BUILTIN_CTZLL)
+    # Check if -D_GNU_SOURCE has been defined and add this flag to
+    # CMAKE_REQUIRED_DEFINITIONS in order to get check_prototype_definition work
+    get_property(var DIRECTORY PROPERTY COMPILE_DEFINITIONS)
+    list(FIND var "_GNU_SOURCE" var)
+    if (NOT var EQUAL -1)
+        set(CMAKE_REQUIRED_FLAGS "-Wno-error")
+        set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
+        check_c_source_compiles("#include <string.h>\n#include <strings.h>\nint main(void) { return ffsl(0L); }"
+            HAVE_FFSL)
+        check_c_source_compiles("#include <string.h>\n#include <strings.h>\nint main(void) { return ffsll(0UL); }"
+            HAVE_FFSLL)
+    endif()
+endif()

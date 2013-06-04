@@ -258,6 +258,7 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **ret,
 	 mh_arg_t arg)
 {
 	mh_int_t x = mh_end(h);
+	int exist;
 	if (h->size == h->n_buckets)
 		/* no one free elements in the hash table */
 		goto put_done;
@@ -280,7 +281,7 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **ret,
 #endif
 
 	x = put_slot(h, node, arg);
-	int exist = mh_exist(h, x);
+	exist = mh_exist(h, x);
 
 	if (!exist) {
 		/* add new */
@@ -345,12 +346,12 @@ _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 struct _mh(t) *
 _mh(new)()
 {
-	struct _mh(t) *h = calloc(1, sizeof(*h));
-	h->shadow = calloc(1, sizeof(*h));
+	struct _mh(t) *h = (struct _mh(t) *) calloc(1, sizeof(*h));
+	h->shadow = (struct _mh(t) *) calloc(1, sizeof(*h));
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
-	h->p = calloc(h->n_buckets, sizeof(mh_node_t));
-	h->b = calloc(h->n_buckets / 16 + 1, sizeof(unsigned));
+	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
+	h->b = (mh_int_t *) calloc(h->n_buckets / 16 + 1, sizeof(unsigned));
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 	return h;
 }
@@ -361,7 +362,7 @@ _mh(clear)(struct _mh(t) *h)
 	free(h->p);
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
-	h->p = calloc(h->n_buckets, sizeof(mh_node_t));
+	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 }
 
@@ -437,10 +438,10 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 	s->n_buckets = __ac_prime_list[h->prime];
 	s->upper_bound = s->n_buckets * MH_DENSITY;
 	s->n_dirty = 0;
-	s->p = malloc(s->n_buckets * sizeof(mh_node_t));
+	s->p = (mh_node_t *) malloc(s->n_buckets * sizeof(mh_node_t));
 	if (s->p == NULL)
 		return -1;
-	s->b = calloc(s->n_buckets / 16 + 1, sizeof(unsigned));
+	s->b = (mh_int_t *) calloc(s->n_buckets / 16 + 1, sizeof(unsigned));
 	if (s->b == NULL) {
 		free(s->p);
 		s->p = NULL;
@@ -460,11 +461,11 @@ _mh(reserve)(struct _mh(t) *h, mh_int_t size,
 
 #ifndef mh_stat
 #define mh_stat(buf, h) ({						\
-                tbuf_printf(buf, "  n_buckets: %"PRIu32 CRLF		\
-			    "  n_dirty: %"PRIu32 CRLF			\
-			    "  size: %"PRIu32 CRLF			\
-			    "  resize_cnt: %"PRIu32 CRLF		\
-			    "  resize_position: %"PRIu32 CRLF,		\
+		tbuf_printf(buf, "  n_buckets: %" PRIu32 CRLF		\
+			    "  n_dirty: %" PRIu32 CRLF			\
+			    "  size: %" PRIu32 CRLF			\
+			    "  resize_cnt: %" PRIu32 CRLF		\
+			    "  resize_position: %" PRIu32 CRLF,		\
 			    h->n_buckets,				\
 			    h->n_dirty,					\
 			    h->size,					\

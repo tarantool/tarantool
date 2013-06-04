@@ -34,6 +34,10 @@
 
 #include <third_party/qsort_arg.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 #ifndef SPTREE_NODE_SELF
 /*
  * user could suggest pointer's storage himself
@@ -46,8 +50,8 @@ typedef struct sptree_node_pointers {
     u_int32_t    right;
 } sptree_node_pointers;
 
-#define GET_SPNODE_LEFT(snp)        ( (snp)->left ) 
-#define SET_SPNODE_LEFT(snp, v)     (snp)->left = (v) 
+#define GET_SPNODE_LEFT(snp)        ( (snp)->left )
+#define SET_SPNODE_LEFT(snp, v)     (snp)->left = (v)
 #define GET_SPNODE_RIGHT(snp)       ( (snp)->right )
 #define SET_SPNODE_RIGHT(snp, v)    (snp)->right = (v)
 
@@ -63,7 +67,7 @@ typedef struct sptree_node_pointers {
 #define    _GET_SPNODE_RIGHT(n)        GET_SPNODE_RIGHT( t->lrpointers + (n) )
 #define    _SET_SPNODE_RIGHT(n, v)     SET_SPNODE_RIGHT( t->lrpointers + (n), (v) )
 
-#define    ITHELEM(t, i)               ( (t)->members + (t)->elemsize * (i) )
+#define    ITHELEM(t, i)               ( (char *) (t)->members + (t)->elemsize * (i) )
 #define    ELEMIDX(t, e)               ( ((e) - (t)->members) / (t)->elemsize )
 
 /*
@@ -71,8 +75,8 @@ typedef struct sptree_node_pointers {
  * be unique across all definitions.
  *
  * Methods:
- *   void sptree_NAME_init(sptree_NAME *tree, size_t elemsize, void *array, 
- *                         spnode_t array_len, spnode_t array_size, 
+ *   void sptree_NAME_init(sptree_NAME *tree, size_t elemsize, void *array,
+ *                         spnode_t array_len, spnode_t array_size,
  *                         int (*compare)(const void *key, const void *elem, void *arg),
  *                         int (*elemcompare)(const void *e1, const void *e2, void *arg),
  *                         void *arg)
@@ -84,9 +88,9 @@ typedef struct sptree_node_pointers {
  *   spnode_t sptree_NAME_walk(sptree_NAME *t, void* array, spnode_t limit, spnode_t offset)
  *   void sptree_NAME_walk_cb(sptree_NAME *t, int (*cb)(void* cb_arg, void* elem), void *cb_arg)
  *
- *   sptree_NAME_iterator* sptree_NAME_iterator_init(sptree_NAME *t) 
+ *   sptree_NAME_iterator* sptree_NAME_iterator_init(sptree_NAME *t)
  *   void sptree_NAME_iterator_init_set(sptree_NAME *t, sptree_NAME_iterator **iterator, void *start)
- *   sptree_NAME_iterator* sptree_NAME_iterator_reverse_init(sptree_NAME *t) 
+ *   sptree_NAME_iterator* sptree_NAME_iterator_reverse_init(sptree_NAME *t)
  *   void sptree_NAME_iterator_reverse_init_set(sptree_NAME *t, sptree_NAME_iterator **iterator, void *start)
  *   void sptree_NAME_iterator_free(sptree_NAME_iterator *i)
  *
@@ -159,7 +163,8 @@ sptree_##name##_init(sptree_##name *t, size_t elemsize, void *m,                
         if (t->members == NULL)                                                           \
             t->members = realloc(NULL, elemsize * t->ntotal);                             \
     }                                                                                     \
-    t->lrpointers = realloc(NULL, sizeof(sptree_node_pointers) * t->ntotal);              \
+    t->lrpointers = (sptree_node_pointers *) realloc(NULL,                                \
+                                sizeof(sptree_node_pointers) * t->ntotal);                \
                                                                                           \
     if (t->nmember == 1) {                                                                \
         t->root = 0;                                                                      \
@@ -181,16 +186,16 @@ sptree_##name##_destroy(sptree_##name *t) {                                     
                                                                                           \
 /** Nodes in the garbage list have a loop on their right link. */                         \
 static inline bool                                                                        \
-sptree_##name##_node_is_deleted(sptree_##name *t, spnode_t node) {                        \
+sptree_##name##_node_is_deleted(const sptree_##name *t, spnode_t node) {                  \
                                                                                           \
     return _GET_SPNODE_RIGHT(node) == node;                                               \
 }                                                                                         \
                                                                                           \
 static inline void*                                                                       \
-sptree_##name##_find(sptree_##name *t, void *k) {                                         \
+sptree_##name##_find(const sptree_##name *t, void *k) {                                   \
     spnode_t    node = t->root;                                                           \
     while(node != SPNIL) {                                                                \
-        int r = t->compare(k, ITHELEM(t, node), t->arg);                                  \
+    int r = t->compare(k, ITHELEM(t, node), t->arg);                                  \
         if (r > 0) {                                                                      \
             node = _GET_SPNODE_RIGHT(node);                                               \
         } else if (r < 0) {                                                               \
@@ -203,7 +208,7 @@ sptree_##name##_find(sptree_##name *t, void *k) {                               
 }                                                                                         \
                                                                                           \
 static inline void*                                                                       \
-sptree_##name##_first(sptree_##name *t) {                                                 \
+sptree_##name##_first(const sptree_##name *t) {                                           \
     spnode_t    node = t->root;                                                           \
     spnode_t    first = SPNIL;                                                            \
     while (node != SPNIL) {                                                               \
@@ -216,7 +221,7 @@ sptree_##name##_first(sptree_##name *t) {                                       
 }                                                                                         \
                                                                                           \
 static inline void*                                                                       \
-sptree_##name##_last(sptree_##name *t) {                                                  \
+sptree_##name##_last(const sptree_##name *t) {                                            \
     spnode_t    node = t->root;                                                           \
     spnode_t    last = SPNIL;                                                             \
     while (node != SPNIL) {                                                               \
@@ -229,7 +234,7 @@ sptree_##name##_last(sptree_##name *t) {                                        
 }                                                                                         \
                                                                                           \
 static inline void*                                                                       \
-sptree_##name##_random(sptree_##name *t, spnode_t rnd) {                                  \
+sptree_##name##_random(const sptree_##name *t, spnode_t rnd) {                            \
     for (spnode_t i = 0; i < t->size; i++, rnd++) {                                       \
         rnd %= t->nmember;                                                                \
         if (!sptree_##name##_node_is_deleted(t, rnd))                                     \
@@ -258,7 +263,7 @@ sptree_##name##_get_place(sptree_##name *t) {                                   
         if (t->nmember >= t->ntotal) {                                                    \
             t->ntotal *= 2;                                                               \
             t->members = realloc(t->members, t->ntotal * t->elemsize);                    \
-            t->lrpointers = realloc(t->lrpointers,                                        \
+            t->lrpointers = (sptree_node_pointers *) realloc(t->lrpointers,               \
                                     t->ntotal * sizeof(sptree_node_pointers));            \
         }                                                                                 \
                                                                                           \
@@ -498,7 +503,7 @@ sptree_##name##_walk(sptree_##name *t, void* array, spnode_t limit, spnode_t off
     while( count < offset + limit && level >= 0 ) {                                       \
                                                                                           \
         if (count >= offset)                                                              \
-             memcpy(array + (count-offset) * t->elemsize,                                 \
+             memcpy((char *) array + (count-offset) * t->elemsize,                        \
                     ITHELEM(t, stack[level]), t->elemsize);                               \
         count++;                                                                          \
                                                                                           \
@@ -543,7 +548,7 @@ sptree_##name##_walk_cb(sptree_##name *t, int (*cb)(void*, void*), void *cb_arg 
 }                                                                                         \
                                                                                           \
 typedef struct sptree_##name##_iterator {                                                 \
-    sptree_##name        *t;                                                              \
+    const sptree_##name        *t;                                                        \
     int                  level;                                                           \
     int                  max_depth;                                                       \
     spnode_t             stack[0];                                                        \
@@ -551,7 +556,7 @@ typedef struct sptree_##name##_iterator {                                       
                                                                                           \
 static inline sptree_##name##_iterator *                                                  \
 sptree_##name##_iterator_alloc(sptree_##name *t) {                                        \
-    sptree_##name##_iterator *i =                                                         \
+    sptree_##name##_iterator *i = (sptree_##name##_iterator *)                            \
         realloc(NULL, sizeof(*i) + sizeof(spnode_t) * (t->max_depth + 1));                \
     i->t = t;                                                                             \
     i->level = 0;                                                                         \
@@ -576,13 +581,14 @@ sptree_##name##_iterator_init(sptree_##name *t) {                               
 }                                                                                         \
                                                                                           \
 static inline void                                                                        \
-sptree_##name##_iterator_init_set(sptree_##name *t, sptree_##name##_iterator **i,         \
+sptree_##name##_iterator_init_set(const sptree_##name *t, sptree_##name##_iterator **i,   \
                                   void *k) {                                              \
     spnode_t node;                                                                        \
     int      lastLevelEq = -1, cmp;                                                       \
                                                                                           \
     if ((*i) == NULL || t->max_depth > (*i)->max_depth)                                   \
-        *i = realloc(*i, sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 31));            \
+        *i = (sptree_##name##_iterator *) realloc(*i, sizeof(**i) +                       \
+                                       sizeof(spnode_t) * (t->max_depth + 31));           \
                                                                                           \
     (*i)->t = t;                                                                          \
     (*i)->level = -1;                                                                     \
@@ -633,13 +639,14 @@ sptree_##name##_iterator_reverse_init(sptree_##name *t) {                       
 }                                                                                         \
                                                                                           \
 static inline void                                                                        \
-sptree_##name##_iterator_reverse_init_set(sptree_##name *t, sptree_##name##_iterator **i, \
-                                          void *k) {                                      \
+sptree_##name##_iterator_reverse_init_set(const sptree_##name *t,                         \
+                                          sptree_##name##_iterator **i, void *k) {        \
     spnode_t node;                                                                        \
     int      lastLevelEq = -1, cmp;                                                       \
                                                                                           \
     if ((*i) == NULL || t->max_depth > (*i)->max_depth)                                   \
-        *i = realloc(*i, sizeof(**i) + sizeof(spnode_t) * (t->max_depth + 31));            \
+        *i = (sptree_##name##_iterator *) realloc(*i, sizeof(**i) +                       \
+                                      sizeof(spnode_t) * (t->max_depth + 31));            \
                                                                                           \
     (*i)->t = t;                                                                          \
     (*i)->level = -1;                                                                     \
@@ -699,7 +706,7 @@ sptree_##name##_iterator_next(sptree_##name##_iterator *i) {                    
                                                                                           \
     if (i == NULL)  return NULL;                                                          \
                                                                                           \
-    sptree_##name *t = i->t;                                                              \
+    const sptree_##name *t = i->t;                                                        \
     spnode_t returnNode = sptree_##name##_iterator_next_node(i);                          \
                                                                                           \
     if (returnNode == SPNIL) return NULL;                                                 \
@@ -719,7 +726,7 @@ sptree_##name##_iterator_reverse_next(sptree_##name##_iterator *i) {            
                                                                                           \
     if (i == NULL)  return NULL;                                                          \
                                                                                           \
-    sptree_##name *t = i->t;                                                              \
+    const sptree_##name *t = i->t;                                                        \
     spnode_t returnNode = sptree_##name##_iterator_next_node(i);                          \
                                                                                           \
     if (returnNode == SPNIL) return NULL;                                                 \
@@ -736,3 +743,7 @@ sptree_##name##_iterator_reverse_next(sptree_##name##_iterator *i) {            
  * vim: ts=4 sts=4 et
  */
 #endif
+
+#if defined(__cplusplus)
+}
+#endif /* defined(__cplusplus) */

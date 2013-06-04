@@ -41,10 +41,31 @@
 struct bitset_index;
 struct bitset_expr;
 
-@interface BitsetIndex: Index {
-	@private
+class BitsetIndex: public Index {
+public:
+	BitsetIndex(struct key_def *key_def, struct space *space);
+	virtual ~BitsetIndex();
+
+	virtual void beginBuild();
+	virtual void buildNext(struct tuple *tuple);
+	virtual void endBuild();
+	virtual void build(Index *pk);
+	virtual size_t size() const;
+	virtual struct tuple *min() const;
+	virtual struct tuple *max() const;
+	virtual struct tuple *random(u32 rnd) const;
+	virtual struct tuple *findByKey(const void *key, u32 part_count) const;
+	virtual struct tuple *findByTuple(struct tuple *tuple) const;
+	virtual struct tuple *replace(struct tuple *old_tuple,
+				      struct tuple *new_tuple,
+				      enum dup_replace_mode mode);
+
+	virtual struct iterator *allocIterator() const;
+	virtual void initIterator(struct iterator *iterator,
+				  enum iterator_type type,
+				  const void *key, u32 part_count) const;
+private:
 	struct bitset_index index;
-}
-@end
+};
 
 #endif /* TARANTOOL_BOX_INDEX_BITSET_H_INCLUDED */

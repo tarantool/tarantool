@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.6)
 
-project(tarantool)
+project(tarantool C CXX)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 set(CMAKE_INCLUDE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_INCLUDE_PATH})
@@ -13,7 +13,6 @@ include(CheckCSourceRuns)
 include(CheckCXXSourceRuns)
 include(TestBigEndian)
 include(CheckFunctionExists)
-include(CheckBuiltInFunctionExists)
 
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
@@ -261,33 +260,6 @@ add_custom_target(build_bundled_libs)
 include(luajit)
 
 #
-# LibOBJC
-#
-set (ENABLE_BUNDLED_LIBOBJC_DEFAULT ON)
-if (TARGET_OS_DARWIN)
-    set (ENABLE_BUNDLED_LIBOBJC_DEFAULT OFF)
-endif()
-option(ENABLE_BUNDLED_LIBOBJC "Enable building of the bundled libobjc" ${ENABLE_BUNDLED_LIBOBJC_DEFAULT})
-
-if (ENABLE_BUNDLED_LIBOBJC)
-    include(BuildLibOBJC)
-    libobjc_build()
-    add_dependencies(build_bundled_libs objc)
-    set(HAVE_LIBOBJC_BUNDLED ON)
-else()
-    if (CMAKE_COMPILER_IS_GNUCC)
-        # Use compiler's objc library
-        add_compile_flags("OBJC;OBJCXX" "-objc")
-        set(LIBOBJC_LIBRARIES objc)
-        message(STATUS "Use gcc Objective-C runtime")
-    else()
-        set(LIBOBJC_FIND_REQUIRED ON)
-        find_package(LibOBJC)
-    endif()
-endif()
-
-
-#
 # LibEV
 #
 
@@ -413,8 +385,6 @@ message (STATUS "C_COMPILER: ${TARANTOOL_C_COMPILER}")
 message (STATUS "CXX_COMPILER: ${TARANTOOL_CXX_COMPILER}")
 message (STATUS "C_FLAGS:${TARANTOOL_C_FLAGS}")
 message (STATUS "CXX_FLAGS:${TARANTOOL_CXX_FLAGS}")
-message (STATUS "OBJC_FLAGS:${TARANTOOL_OBJC_FLAGS}")
-message (STATUS "OBJCXX_FLAGS:${TARANTOOL_OBJCXX_FLAGS}")
 message (STATUS "PREFIX: ${CMAKE_INSTALL_PREFIX}")
 message (STATUS "MODULES: ${TARANTOOL_MODULES}")
 message (STATUS "ENABLE_STATIC: ${ENABLE_STATIC}")

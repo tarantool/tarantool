@@ -39,7 +39,7 @@
  */
 #define mh_name _i32ptr
 struct mh_i32ptr_node_t {
-	i32 key;
+	u32 key;
 	void *val;
 };
 
@@ -55,7 +55,7 @@ struct mh_i32ptr_node_t {
  */
 #define mh_name _i64ptr
 struct mh_i64ptr_node_t {
-	i64 key;
+	u64 key;
 	void *val;
 };
 
