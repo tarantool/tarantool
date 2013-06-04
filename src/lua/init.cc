@@ -665,18 +665,23 @@ box_lua_fiber_run_detached(va_list ap)
 {
 	int coro_ref = va_arg(ap, int);
 	struct lua_State *L = va_arg(ap, struct lua_State *);
-	@try {
+	auto cleanup = [=] {
+		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+	};
+	try {
 		lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
-	} @catch (FiberCancelException *e) {
-		@throw;
-	} @catch (tnt_Exception *e) {
-		[e log];
-	} @catch (id allOthers) {
+		cleanup();
+	} catch (const FiberCancelException &e) {
+		throw;
+		cleanup();
+	} catch (const Exception &e) {
+		e.log();
+		cleanup();
+	} catch (...) {
 		lua_settop(L, 1);
 		if (lua_tostring(L, -1) != NULL)
 			say_error("%s", lua_tostring(L, -1));
-	} @finally {
-		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
+		cleanup();
 	}
 }
 

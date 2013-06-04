@@ -92,7 +92,7 @@ void
 fiber_checkstack()
 {
 	if (sp + 1 - call_stack >= FIBER_CALL_STACK)
-		tnt_raise(ClientError, :ER_FIBER_STACK);
+		tnt_raise(ClientError, ER_FIBER_STACK);
 }
 
 /** Interrupt a synchronous wait of a fiber inside the event loop.

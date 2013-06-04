@@ -1713,10 +1713,10 @@ box_unpack_response(struct lua_State *L, const void *s, const void *end)
 		t->field_count = field_count;
 		memcpy(t->data, s, bsize);
 
-		s += bsize;
+		s = (const char *) s + bsize;
 		lbox_pushtuple(L, t);
 	}
-	return s;
+	return (const char *) s;
 }
 
 

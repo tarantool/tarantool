@@ -236,9 +236,9 @@ endif()
 # usable on a system which has only gcc 4.1, statically link with
 # builtin libgcc by default.
 #
-if (CMAKE_COMPILER_IS_GNUCC AND NOT CMAKE_COMPILER_IS_CLANG)
-    add_compile_flags("C;CXX;OBJC;OBJCXX" "-static-libgcc")
-endif()
+#if (CMAKE_COMPILER_IS_GNUCC AND NOT CMAKE_COMPILER_IS_CLANG)
+#    add_compile_flags("C;CXX;OBJC;OBJCXX" "-static-libgcc")
+#endif()
 
 ##
 ## Third-Party libraries

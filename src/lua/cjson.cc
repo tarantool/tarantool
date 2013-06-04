@@ -32,9 +32,9 @@ extern "C" {
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
+int luaopen_cjson(lua_State *l);
 }
 
-int luaopen_cjson(lua_State *l);
 
 int
 tarantool_lua_cjson_init(struct lua_State *L)
