@@ -31,7 +31,18 @@ endif()
 
 
 if(ENABLE_MYSQL)
-
+	include(FindMySQL)
+	if (MYSQL_FOUND)
+		message(STATUS
+			"box.net.sql(mysql) INC=${MYSQL_INCLUDE_DIR}")
+		message(STATUS
+			"box.net.sql(mysql) LIBS=mysqlclient_r")
+		add_compile_flags("C;CXX" "-I${MYSQL_INCLUDE_DIR}")
+		add_compile_flags("C;CXX" "-lmysqlclient_r")
+	else()
+		message(STATUS "MySQL client not found")
+		set(ENABLE_MYSQL OFF)
+	endif()
 endif()
 
 if (ENABLE_MYSQL)
