@@ -74,7 +74,6 @@ set (common_sources
      tbuf.c
      palloc.cc
      util.c
-     scoped_guard.cc
      sio.cc
      evio.cc
      coio.cc

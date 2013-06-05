@@ -1186,7 +1186,7 @@ port_add_lua_ret(struct port *port, struct lua_State *L, int index)
 
 		if (tuple->refs == 0)
 			tuple_free(tuple);
-	} catch(...) {
+	} catch (...) {
 		if (tuple->refs == 0)
 			tuple_free(tuple);
 
@@ -1284,7 +1284,7 @@ lbox_process(lua_State *L)
 		 * use fiber->cleanup and fiber->gc_pool.
 		 */
 		ptruncate(fiber->gc_pool, allocated_size);
-	} catch(const Exception& e) {
+	} catch (const Exception& e) {
 		ptruncate(fiber->gc_pool, allocated_size);
 		throw;
 	}

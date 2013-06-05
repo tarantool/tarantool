@@ -333,9 +333,7 @@ lbox_socket_connect(struct lua_State *L)
 		/* set coio reader socket */
 		s->io_r.fd = s->io_w.fd;
 	} catch (const SocketError& e) {
-		say_error("catch(SocketError&)");
 		freeaddrinfo(ai);
-
 		return bio_pushsockerror(L, s, errno);
 	}
 
@@ -746,7 +744,6 @@ lbox_socket_bind(struct lua_State *L)
 	} catch (const SocketError& e) {
 		/* case #2: error */
 		freeaddrinfo(ai);
-		say_error("socket SocketError&");
 		return bio_pusherror(L, s, errno);
 	}
 
@@ -880,7 +877,6 @@ lbox_socket_sendto(struct lua_State *L)
 		if (a) {
 			freeaddrinfo(a);
 		}
-		say_error("catch(SocketError&)");
 		return bio_pushsenderror(L, s, 0, errno);
 	}
 

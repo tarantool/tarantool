@@ -35,19 +35,12 @@ public:
 		/* Nothing */
 	}
 
-protected:
-	/*
-	 * Explicitly disable the copy constructor and the assignment operato
-	 */
-	Object(const Object&)
-	{
+	virtual ~Object() {
 		/* Nothing */
 	}
 
-	Object& operator=(const Object&)
-	{
-		return *this;
-	}
+	Object(const Object&) = delete;
+	Object& operator=(const Object&) = delete;
 };
 
 #endif /* TARANTOOL_OBJECT_H_INCLUDED */

@@ -221,7 +221,6 @@ getaddrinfo_cb(va_list ap)
 	struct addrinfo *hints = va_arg(ap, struct addrinfo *);
 	struct addrinfo **res = va_arg(ap, struct addrinfo **);
 
-	say_warn("Host: %s Port: %s, Hints: %p, Res: %p", host, port, hints, res);
 	int rc = getaddrinfo(host, port, hints, res);
 	/* getaddrinfo can return EAI_ADDRFAMILY on attempt
 	 * to resolve ::1, if machine has no public ipv6 addresses

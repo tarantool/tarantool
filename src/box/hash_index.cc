@@ -661,7 +661,7 @@ Hash64Index::initIterator(struct iterator *ptr, enum iterator_type type,
 		}
 		/* Fall through. */
 	case ITER_ALL:
-		it->h_pos = mh_begin(int_hash);
+		it->h_pos = mh_begin(int64_hash);
 		it->base.next = hash_iterator_i64_ge;
 		break;
 	case ITER_EQ:

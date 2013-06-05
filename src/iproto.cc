@@ -680,7 +680,7 @@ iproto_flush(struct iobuf *iobuf, int fd, struct obuf_svp *svp)
 		nwr = sio_writev(fd, iov, iovcnt);
 
 		sio_add_to_iov(iov, svp->iov_len);
-	} catch(const Exception&) {
+	} catch (const Exception&) {
 		sio_add_to_iov(iov, svp->iov_len);
 		throw;
 	}

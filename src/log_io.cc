@@ -219,7 +219,6 @@ format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
 
 /* {{{ struct log_io_cursor */
 
-/* TODO: wtf? */
 #define ROW_EOF (struct tbuf *) 1
 
 static struct tbuf *

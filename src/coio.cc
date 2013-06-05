@@ -37,8 +37,8 @@
 #include "scoped_guard.h"
 
 static inline void
-fiber_schedule_coio(ev_io *watcher, int event) {
-	say_warn("fiber schedule IO");
+fiber_schedule_coio(ev_io *watcher, int event)
+{
 	return fiber_schedule((ev_watcher *) watcher, event);
 }
 
@@ -374,7 +374,7 @@ coio_flush(int fd, struct iovec *iov, ssize_t offset, int iovcnt)
 		sio_add_to_iov(iov, -offset);
 		nwr = sio_writev(fd, iov, iovcnt);
 		sio_add_to_iov(iov, offset);
-	} catch(const Exception& e) {
+	} catch (const Exception& e) {
 		sio_add_to_iov(iov, offset);
 		throw;
 	}

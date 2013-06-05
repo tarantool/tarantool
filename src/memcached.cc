@@ -589,9 +589,10 @@ restart:
 		memcached_delete_expired_keys(keys_to_delete);
 		fiber_gc();
 		goto restart;
-	} catch(const Exception& e) {
+	} catch (const Exception& e) {
 		memcached_it->free(memcached_it);
 		memcached_it = NULL;
+		throw;
 	}
 }
 

@@ -40,7 +40,7 @@ Exception::Exception(const char *file, unsigned line)
 }
 
 Exception::Exception(const Exception& e)
-	: Object(e), m_file(e.m_file), m_line(e.m_line)
+	: Object(), m_file(e.m_file), m_line(e.m_line)
 {
 	memcpy(m_errmsg, e.m_errmsg, sizeof(m_errmsg));
 }

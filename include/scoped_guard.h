@@ -33,7 +33,7 @@
 #include "object.h"
 
 template <typename Functor>
-class ScopedGuard: public Object {
+class ScopedGuard {
 public:
 	explicit ScopedGuard(const Functor& fun)
 		: m_fun(fun), m_active(true) {
