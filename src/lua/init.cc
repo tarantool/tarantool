@@ -672,8 +672,8 @@ box_lua_fiber_run_detached(va_list ap)
 		lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
 		cleanup();
 	} catch (const FiberCancelException &e) {
-		throw;
 		cleanup();
+		throw;
 	} catch (const Exception &e) {
 		e.log();
 		cleanup();
