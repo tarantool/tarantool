@@ -693,7 +693,7 @@ tp_call(struct tp *p, uint32_t flags, const char *name, size_t name_len) {
  * char buf[64];
  * struct tp req;
  * tp_init(&req, buf, sizeof(buf), NULL, NULL);
- * tp_select(&req, 0, 0, 0, 0);
+ * tp_select(&req, 0, 0, 0, 100);
  * tp_tuple(&req);
  * tp_sz(&req, "key");
  */
