@@ -140,6 +140,8 @@ macro(luajit_build)
     endif()
     set (luajit_copt ${luajit_copt} -I${PROJECT_SOURCE_DIR}/libobjc)
     set (luajit_target_cc "${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS}")
+    # Use external unwind on all platforms.
+    set (luajit_target_cc "${luajit_target_cc} -DLUAJIT_UNWIND_EXTERNAL=1")
     if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
         # Regular mode - use CMake compiler for building host utils.
         set (luajit_host_cc ${CMAKE_C_COMPILER})
