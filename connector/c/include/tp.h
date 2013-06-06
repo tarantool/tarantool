@@ -334,7 +334,7 @@ tp_function_unused static char*
 tp_realloc(struct tp *p, size_t required, size_t *size) {
 	size_t toalloc = tp_size(p) * 2;
 	if (tp_unlikely(toalloc < required))
-		toalloc = required;
+		toalloc = tp_size(p) + required;
 	*size = toalloc;
 	return realloc(p->s, toalloc);
 }
