@@ -745,7 +745,7 @@ execute_select(struct request *request, struct port *port)
 		u32 key_part_count;
 		const void *key = read_key(reqpos, reqend, &key_part_count);
 
-		struct iterator *it = index->primaryIterator();
+		struct iterator *it = index->position();
 		index->initIterator(it, ITER_EQ, key, key_part_count);
 
 		struct tuple *tuple;

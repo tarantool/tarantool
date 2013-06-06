@@ -333,7 +333,7 @@ fiber_find(uint32_t fid)
 static void
 register_fid(struct fiber *fiber)
 {
-	struct mh_i32ptr_node_t node = { fiber -> fid, fiber };
+	struct mh_i32ptr_node_t node = { fiber->fid, fiber };
 	mh_i32ptr_put(fiber_registry, &node, NULL, NULL);
 }
 
@@ -383,12 +383,16 @@ fiber_loop(void *data __attribute__((unused)))
 		try {
 			fiber->f(fiber->f_data);
 		} catch (const FiberCancelException& e) {
-			say_info("fiber `%s' has been cancelled", fiber_name(fiber));
+			say_info("fiber `%s' has been cancelled",
+				 fiber_name(fiber));
 			say_info("fiber `%s': exiting", fiber_name(fiber));
 		} catch (const Exception& e) {
 			e.log();
 		} catch (...) {
-			/* TODO: this case should never happen */
+			/*
+			 * This can only happen in case of a bug
+			 * server bug.
+			 */
 			say_error("fiber `%s': unknown exception",
 				fiber_name(fiber));
 			panic("fiber `%s': exiting", fiber_name(fiber));

@@ -858,8 +858,8 @@ iproto_on_accept(struct evio_service *service, int fd,
 
 	struct iproto_session *session;
 
-	box_process_func *process_fun = reinterpret_cast<box_process_func*>(
-				service->on_accept_param);
+	box_process_func *process_fun =
+		(box_process_func*) service->on_accept_param;
 	session = iproto_session_create(name, fd, process_fun);
 	iproto_enqueue_request(&request_queue, session,
 			       session->iobuf[0], &dummy_header,

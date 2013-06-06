@@ -289,7 +289,7 @@ HashIndex::build(Index *pk)
 	say_info("Adding %" PRIu32 " keys to HASH index %"
 		 PRIu32 "...", n_tuples, index_n(this));
 
-	struct iterator *it = pk->primaryIterator();
+	struct iterator *it = pk->position();
 	struct tuple *tuple;
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
@@ -422,9 +422,9 @@ Hash32Index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			tnt_raise(LoggedError, ER_MEMORY_ISSUE, (ssize_t) pos,
 				  "int hash", "key");
 		}
-		struct tuple *dup_tuple = dup_node
-				? (struct tuple *) dup_node->val
-				: NULL;
+		struct tuple *dup_tuple = (dup_node ?
+					   (struct tuple *) dup_node->val
+					   : NULL);
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
 		if (errcode) {
@@ -568,9 +568,9 @@ Hash64Index::findByKey(const void *key, u32 part_count) const
 	mh_int_t k = mh_i64ptr_get(int64_hash, &node, NULL);
 	if (k != mh_end(int64_hash))
 		ret = (struct tuple *) mh_i64ptr_node(int64_hash, k)->val;
-	#ifdef DEBUG
+#ifdef DEBUG
 	say_debug("Hash64Index find(self:%p, key:%i) = %p", self, node.key, ret);
-	#endif
+#endif
 	return ret;
 }
 
@@ -585,7 +585,7 @@ Hash64Index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		struct mh_i64ptr_node_t *dup_node = &old_node;
 		new_node = int64_tuple_to_node(new_tuple, key_def);
 		mh_int_t pos = mh_i64ptr_put(int64_hash, &new_node,
-				 &dup_node, NULL);
+					     &dup_node, NULL);
 
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
@@ -597,9 +597,9 @@ Hash64Index::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			tnt_raise(LoggedError, ER_MEMORY_ISSUE, (ssize_t) pos,
 				  "int hash", "key");
 		}
-		struct tuple *dup_tuple = dup_node
-			? (struct tuple *) dup_node->val
-			: NULL;
+		struct tuple *dup_tuple = (dup_node ?
+					   (struct tuple *) dup_node->val :
+					   NULL);
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
 		if (errcode) {

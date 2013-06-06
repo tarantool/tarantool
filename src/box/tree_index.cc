@@ -1226,7 +1226,7 @@ TreeIndex::build(Index *pk)
 		}
 	}
 
-	struct iterator *it = pk->primaryIterator();
+	struct iterator *it = pk->position();
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	struct tuple *tuple;

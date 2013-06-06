@@ -576,8 +576,6 @@ lbox_checkiterator(struct lua_State *L, int i)
 	return *it;
 }
 
-
-
 static void
 lbox_pushiterator(struct lua_State *L, Index *index,
 		  struct iterator *it, enum iterator_type type,
@@ -923,7 +921,7 @@ lbox_index_count(struct lua_State *L)
 	}
 	u32 count = 0;
 	/* preparing index iterator */
-	struct iterator *it = index->primaryIterator();
+	struct iterator *it = index->position();
 	index->initIterator(it, ITER_EQ, key, key_part_count);
 	/* iterating over the index and counting tuples */
 	struct tuple *tuple;
