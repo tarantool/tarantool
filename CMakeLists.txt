@@ -311,6 +311,7 @@ else()
     add_definitions("-DCORO_SJLJ")
 endif()
 
+
 #
 # LibGOPT
 #
@@ -335,6 +336,20 @@ include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
 
+option(ENABLE_RPM "Enable install of a RPM specific files" OFF)
+
+# cpack config. called package.cmake to avoid
+# conflicts with the global CPack.cmake (On MacOS X
+# file names are case-insensitive)
+#
+include (cmake/package.cmake)
+#
+# RPM build environment
+# CPACK is only used for .tar.gz package generation.
+# To build an RPM we need a source package,
+# so rpm.cmake depends on package.cmake.
+#
+include (cmake/rpm.cmake)
 
 add_subdirectory(cfg)
 add_subdirectory(connector)
@@ -347,8 +362,7 @@ add_subdirectory(doc)
 install (FILES README.md LICENSE doc/box-protocol.txt
          DESTINATION share/doc/tarantool)
 
-include (cmake/package.cmake)
-
+#
 # tarantool info summary (used in server version output)
 #
 set(TARANTOOL_OPTIONS "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
