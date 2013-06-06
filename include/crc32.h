@@ -31,6 +31,10 @@
 #include <sys/types.h>
 #include <util.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 typedef u_int32_t (*crc32_func)(u_int32_t crc, const unsigned char *buf, unsigned int len);
 
 /*
@@ -40,5 +44,9 @@ typedef u_int32_t (*crc32_func)(u_int32_t crc, const unsigned char *buf, unsigne
 extern crc32_func crc32_calc;
 
 void crc32_init();
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_CRC32_H_INCLUDED */

@@ -49,6 +49,10 @@
 #include <lib/bitset/bitset.h>
 #include <lib/bitset/expr.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** @cond false **/
 struct bitset_iterator_conj;
 /** @endcond **/
@@ -128,5 +132,9 @@ bitset_iterator_rewind(struct bitset_iterator *it);
  */
 size_t
 bitset_iterator_next(struct bitset_iterator *it);
+
+#if defined(__cplusplus)
+}
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LIB_BITSET_ITERATOR_H_INCLUDED */

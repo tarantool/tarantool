@@ -16,16 +16,3 @@ add_executable(bitset_iterator_test bitset_iterator.c)
 target_link_libraries(bitset_iterator_test bitset)
 add_executable(bitset_index_test bitset_index.c)
 target_link_libraries(bitset_index_test bitset)
-
-add_executable(objc_finally objc_finally.m)
-include_directories(${LIBOBJC_INCLUDE_DIR})
-add_executable(objc_catchcxx objc_catchcxx.m)
-
-add_dependencies(objc_finally build_bundled_libs)
-add_dependencies(objc_catchcxx build_bundled_libs)
-
-target_link_libraries(objc_finally ${LIBOBJC_LIBRARIES} -lm -pthread)
-target_link_libraries(objc_catchcxx ${LIBOBJC_LIBRARIES} ${LUAJIT_LIB} -lm -pthread)
-if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
-    target_link_libraries(objc_catchcxx dl)
-endif()

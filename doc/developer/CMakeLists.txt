@@ -27,10 +27,5 @@ add_custom_target(dev-txt  DEPENDS ${PATH_DEVGUIDE_TXT})
 add_custom_target(doc-autogen-dev ALL
     DEPENDS ${PATH_DEVGUIDE_HTML} ${PATH_DEVGUIDE_TXT})
 
-if ("${CPACK_GENERATOR}" STREQUAL "RPM")
-    install (FILES ${PATH_DEVGUIDE_HTML}
-                   ${PATH_DEVGUIDE_TXT} DESTINATION /usr/local/doc/tarantool)
-else()
-    install (FILES ${PATH_DEVGUIDE_HTML}
-                   ${PATH_DEVGUIDE_TXT} DESTINATION share/doc/tarantool)
-endif()
+install (FILES ${PATH_DEVGUIDE_HTML}
+               ${PATH_DEVGUIDE_TXT} DESTINATION share/doc/tarantool)

@@ -52,4 +52,12 @@ mkdir ~/build/bin && ln -s /usr/bin/python26 ~/build/bin/python
 cd ~/build/tarantool/test
 PATH=~/build/bin:$PATH ./run
 
+8. Create RPM Packages
+-------------
+
+cmake .
+make rpm
+
+(packages are available from RPM/i386/ or RPM/x86_64/)
+
 -- EOF

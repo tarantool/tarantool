@@ -1,0 +1,147 @@
+%define _topdir @RPM_ROOT@
+%define _rpmdir @RPM_ROOT@
+
+BuildRoot: @RPM_BUILDROOT@
+
+Name: tarantool
+Version: @RPM_PACKAGE_VERSION@
+Release: @RPM_PACKAGE_RELEASE@
+Group: Applications/Databases
+Summary: Tarantool - an efficient in-memory data store
+License: BSD
+URL: http://tarantool.org
+Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
+%description
+Tarantool is a high performance in-memory NoSQL database. It supports
+replication, online backup, stored procedures in Lua.
+
+This package provides the server daemon and administration
+scripts.
+
+# Tarantool client spec
+
+%package client
+Summary: Tarantool command line client with history support
+Group: Applications/Databases
+Provides: tarantool-client
+Obsoletes: tarantool-client
+%description -n tarantool-client
+Tarantool is a high performance in-memory NoSQL database.
+It supports replication, online backup, stored procedures in Lua.
+
+This package provides a command line client for Tarantool
+with history support.
+
+# Tarantool dev spec
+
+%package dev
+Summary: Tarantool C connector and header files
+Group: Applications/Databases
+#Requires: /sbin/ldconfig
+Provides: tarantool-dev
+Obsoletes: tarantool-dev
+%description -n tarantool-dev
+Tarantool is a high performance in-memory NoSQL database.
+It supports replication, online backup, stored procedures in Lua.
+
+This package provides Tarantool client libraries.
+
+###
+
+%prep
+%setup -n @RPM_SOURCE_DIRECTORY_NAME@
+
+%build
+cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=ON -DENABLE_RPM=ON -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_SYSCONF_DIR=/etc -DCMAKE_MAN_DIR=/usr/share/man
+
+make %{?_smp_mflags}
+
+%install
+make DESTDIR=%{buildroot} install
+
+%post
+groupadd tarantool
+useradd -r -g tarantool tarantool
+# Performe a single instance setup
+/usr/bin/tarantool_deploy.sh --yes 1.1
+
+%preun
+
+%files
+%defattr(-,root,root,-)
+
+%dir "%{_datadir}/tarantool"
+"%{_datadir}/tarantool/00000000000000000001.snap"
+
+%dir "%{_datadir}/doc/tarantool"
+"%{_datadir}/doc/tarantool/README.md"
+"%{_datadir}/doc/tarantool/LICENSE"
+"%{_datadir}/doc/tarantool/box-protocol.txt"
+"%{_mandir}/man1/tarantool_box.1.gz"
+
+"%{_bindir}/tarantool_box"
+"%{_bindir}/tarantool_multi.sh"
+"%{_bindir}/tarantool_deploy.sh"
+"%{_initddir}/tarantool_box"
+
+%dir "%{_sysconfdir}/tarantool"
+%config(noreplace) "%{_sysconfdir}/tarantool/tarantool.cfg"
+
+%files dev
+%defattr(-,root,root,-)
+%dir "/usr/include/tarantool"
+"/usr/include/tarantool/tnt.h"
+"/usr/include/tarantool/tnt_buf.h"
+"/usr/include/tarantool/tnt_call.h"
+"/usr/include/tarantool/tnt_delete.h"
+"/usr/include/tarantool/tnt_dir.h"
+"/usr/include/tarantool/tnt_enc.h"
+"/usr/include/tarantool/tnt_insert.h"
+"/usr/include/tarantool/tnt_io.h"
+"/usr/include/tarantool/tnt_iob.h"
+"/usr/include/tarantool/tnt_iter.h"
+"/usr/include/tarantool/tnt_lex.h"
+"/usr/include/tarantool/tnt_log.h"
+"/usr/include/tarantool/tnt_mem.h"
+"/usr/include/tarantool/tnt_net.h"
+"/usr/include/tarantool/tnt_opt.h"
+"/usr/include/tarantool/tnt_ping.h"
+"/usr/include/tarantool/tnt_proto.h"
+"/usr/include/tarantool/tnt_queue.h"
+"/usr/include/tarantool/tnt_reply.h"
+"/usr/include/tarantool/tnt_request.h"
+"/usr/include/tarantool/tnt_rpl.h"
+"/usr/include/tarantool/tnt_select.h"
+"/usr/include/tarantool/tnt_snapshot.h"
+"/usr/include/tarantool/tnt_sql.h"
+"/usr/include/tarantool/tnt_stream.h"
+"/usr/include/tarantool/tnt_tuple.h"
+"/usr/include/tarantool/tnt_update.h"
+"/usr/include/tarantool/tnt_utf8.h"
+"/usr/include/tarantool/tnt_xlog.h"
+"/usr/lib/libtarantool.a"
+"/usr/lib/libtarantool.so"
+"/usr/lib/libtarantool.so.1"
+"/usr/lib/libtarantool.so.1.1"
+"/usr/lib/libtarantoolnet.a"
+"/usr/lib/libtarantoolnet.so"
+"/usr/lib/libtarantoolnet.so.1"
+"/usr/lib/libtarantoolnet.so.1.1"
+"/usr/lib/libtarantoolrpl.a"
+"/usr/lib/libtarantoolrpl.so"
+"/usr/lib/libtarantoolrpl.so.1"
+"/usr/lib/libtarantoolrpl.so.1.1"
+"/usr/lib/libtarantoolsql.a"
+"/usr/lib/libtarantoolsql.so"
+"/usr/lib/libtarantoolsql.so.1"
+"/usr/lib/libtarantoolsql.so.1.1"
+
+%files client
+%defattr(-,root,root,-)
+"%{_mandir}/man1/tarantool.1.gz"
+"%{_bindir}/tarantool"
+"%{_bindir}/tarantool_checksum"
+
+%changelog
+* Mon May 20 2013 Dmitry Simonenko <support@tarantool.org> 1.0-1
+- Initial version of the RPM spec

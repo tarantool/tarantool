@@ -17,41 +17,41 @@ if (CMAKE_COMPILER_IS_GNUCC)
 endif()
 
 #
-# Build admin.m from admin.rl, but only if admin.rl was changed.
-# The same applies to memcached.m/memcached.rl.
-# We track admin.m and memcached.m in revision control, and thus do not
+# Build admin.cc from admin.rl, but only if admin.rl was changed.
+# The same applies to memcached.cc/memcached.rl.
+# We track admin.cc and memcached.cc in revision control, and thus do not
 # require engineers who do not modify .rl files to have Ragel
 # installed.
 #
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/admin.m
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/admin.cc
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMAND ${RAGEL} -G2 src/admin.rl -o src/admin.m
+    COMMAND ${RAGEL} -G2 src/admin.rl -o src/admin.cc
     DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.rl)
 
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/memcached-grammar.m
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMAND ${RAGEL} -G2 src/memcached-grammar.rl
-                     -o src/memcached-grammar.m
+                     -o src/memcached-grammar.cc
     DEPENDS ${CMAKE_SOURCE_DIR}/src/memcached-grammar.rl)
 
-add_custom_target(generate_admin_m DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.m)
-add_custom_target(generate_memcached_grammar_m DEPENDS
-    ${CMAKE_SOURCE_DIR}/src/memcached-grammar.m)
+add_custom_target(generate_admin_m DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.cc)
+add_custom_target(generate_memcached_grammar_cc DEPENDS
+    ${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc)
 
-# do not randomly try to re-generate admin.m or memcached-grammar.m
+# do not randomly try to re-generate admin.cc or memcached-grammar.cc
 # after a fresh checkout/branch switch.
 execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
-    ${CMAKE_SOURCE_DIR}/src/admin.m
-    ${CMAKE_SOURCE_DIR}/src/memcached-grammar.m)
+    ${CMAKE_SOURCE_DIR}/src/admin.cc
+    ${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc)
 
-set_source_files_properties(${CMAKE_SOURCE_DIR}/src/memcached-grammar.m
+set_source_files_properties(${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc
     PROPERTIES HEADER_FILE_ONLY true)
 
-set_source_files_properties(memcached.m
+set_source_files_properties(memcached.cc
     PROPERTIES COMPILE_FLAGS "-Wno-uninitialized")
 
 #
-# Do not clean admin.m, memcached.m or other
+# Do not clean admin.cc, memcached.cc or other
 # generated files in 'make clean' -- they are under
 # revision control.
 #
@@ -61,64 +61,65 @@ set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
 # Used by modules.
 #
 set (recompiled_sources
-     ${CMAKE_SOURCE_DIR}/src/tarantool.m
-     ${CMAKE_SOURCE_DIR}/src/lua/init.m
-     ${CMAKE_SOURCE_DIR}/src/say.m
-     ${CMAKE_SOURCE_DIR}/src/assoc.m
-     ${CMAKE_SOURCE_DIR}/src/replication.m
-     ${CMAKE_SOURCE_DIR}/src/memcached.m
-     ${CMAKE_SOURCE_DIR}/src/fiber.m)
+     ${CMAKE_SOURCE_DIR}/src/tarantool.cc
+     ${CMAKE_SOURCE_DIR}/src/opts.c
+     ${CMAKE_SOURCE_DIR}/src/lua/init.cc
+     ${CMAKE_SOURCE_DIR}/src/say.cc
+     ${CMAKE_SOURCE_DIR}/src/assoc.cc
+     ${CMAKE_SOURCE_DIR}/src/replication.cc
+     ${CMAKE_SOURCE_DIR}/src/memcached.cc
+     ${CMAKE_SOURCE_DIR}/src/fiber.cc)
 
 set (common_sources
-     tbuf.m
-     palloc.m
-     util.m
-     sio.m
-     evio.m
-     coio.m
-     coeio.m
-     iobuf.m
-     coio_buf.m
-     salloc.m
-     pickle.m
-     coro.m
-     stat.m
-     log_io.m
-     recovery.m
-     admin.m
-     cpu_feature.m
-     replica.m
-     iproto.m
-     session.m
-     object.m
-     exception.m
+     tbuf.c
+     palloc.cc
+     util.c
+     sio.cc
+     evio.cc
+     coio.cc
+     coeio.cc
+     iobuf.cc
+     coio_buf.cc
+     salloc.cc
+     pickle.cc
+     coro.cc
+     stat.cc
+     log_io.cc
+     recovery.cc
+     admin.cc
+     cpu_feature.c
+     replica.cc
+     iproto.cc
+     session.cc
+     object.cc
+     exception.cc
      errcode.c
-     errinj.m
+     errinj.cc
      fio.c
      crc32.c
      rope.c
-     ipc.m
-     lua/info.m
-     lua/stat.m
-     lua/slab.m
-     lua/uuid.m
-     lua/lua_ipc.m
-     lua/lua_socket.m
-     lua/session.m
-     lua/cjson.m
-     lua/lua_sql.m
+     ipc.cc
+     lua/info.cc
+     lua/stat.cc
+     lua/slab.cc
+     lua/uuid.cc
+     lua/lua_ipc.cc
+     lua/lua_socket.cc
+     lua/session.cc
+     lua/cjson.cc
+     lua/lua_sql.cc
 )
 
 if (ENABLE_PSQL)
-    set (common_sources ${common_sources} lua/pg.m)
+    set (common_sources ${common_sources} lua/pg.cc)
 endif()
 
 if (ENABLE_MYSQL)
-    set (common_sources ${common_sources} lua/mysql.m)
+    set (common_sources ${common_sources} lua/mysql.cc)
 endif()
 
 if (ENABLE_TRACE)
-    set (common_sources ${common_sources} trace.m)
+    set (common_sources ${common_sources} trace.c)
 endif()
 
 set_source_files_compile_flags(${common_sources})
@@ -134,7 +135,6 @@ list(APPEND common_libraries
     ${LIBGOPT_LIBRARIES}
     ${LIBCJSON_LIBRARIES}
     ${LUAJIT_LIB}
-    ${LIBOBJC_LIBRARIES}
     misc
 )
 

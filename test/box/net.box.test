@@ -61,3 +61,6 @@ exec admin "lua box.time() - pstart < 0.5"
 exec admin "lua remote:close()"
 exec admin "lua remote:close()"
 exec admin "lua remote:ping()"
+
+exec admin "lua box.space[0]:truncate()"
+

@@ -34,6 +34,10 @@
 
 #include <util.h> /* for FORMAT_PRINTF */
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 enum say_level {
 	S_FATAL,		/* do not this value use directly */
 	S_ERROR,
@@ -67,5 +71,8 @@ void _say(int level, const char *filename, int line, const char *error,
 #define say_debug(...)			say(S_DEBUG, NULL, __VA_ARGS__)
 
 
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_SAY_H_INCLUDED */

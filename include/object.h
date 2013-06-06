@@ -28,14 +28,19 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <objc/runtime.h>
 
-@interface tnt_Object {
-	Class isa;
-}
-+ (id) alloc;
-- (id) init;
-- (void) free;
-- (void) subclassResponsibility: (SEL) cmd;
-@end
+class Object {
+public:
+	Object() {
+		/* Nothing */
+	}
+
+	virtual ~Object() {
+		/* Nothing */
+	}
+
+	Object(const Object&) = delete;
+	Object& operator=(const Object&) = delete;
+};
+
 #endif /* TARANTOOL_OBJECT_H_INCLUDED */

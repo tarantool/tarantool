@@ -214,7 +214,7 @@ space_find(u32 space_no)
 	if (s)
 		return s;
 
-	tnt_raise(ClientError, :ER_NO_SUCH_SPACE, space_no);
+	tnt_raise(ClientError, ER_NO_SUCH_SPACE, space_no);
 }
 
 
@@ -283,7 +283,7 @@ index_find(struct space *sp, u32 index_no)
 {
 	Index *idx = space_index(sp, index_no);
 	if (idx == NULL)
-		tnt_raise(LoggedError, :ER_NO_SUCH_INDEX, index_no,
+		tnt_raise(LoggedError, ER_NO_SUCH_INDEX, index_no,
 			  space_n(sp));
 	return idx;
 }

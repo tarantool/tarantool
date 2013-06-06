@@ -62,6 +62,10 @@
 
 #include "bitset.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /** @cond false **/
 struct bitset_expr_conj {
 	size_t size;
@@ -133,5 +137,9 @@ bitset_expr_add_conj(struct bitset_expr *expr);
  */
 int
 bitset_expr_add_param(struct bitset_expr *expr, size_t bitset_id, bool pre_not);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LIB_BITSET_EXPR_H_INCLUDED */

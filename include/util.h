@@ -34,6 +34,12 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+#define restrict __restrict__
+
 #ifndef NDEBUG
 #define TRASH(ptr) memset(ptr, '#', sizeof(*ptr))
 #else
@@ -48,11 +54,27 @@
 /* Macros to define enum and corresponding strings. */
 #define ENUM0_MEMBER(s, ...) s,
 #define ENUM_MEMBER(s, v, ...) s = v,
-#define ENUM_STRS_MEMBER(s, v, ...) [s] = #s,
 #define ENUM0(enum_name, enum_members) enum enum_name {enum_members(ENUM0_MEMBER) enum_name##_MAX}
 #define ENUM(enum_name, enum_members) enum enum_name {enum_members(ENUM_MEMBER) enum_name##_MAX}
+#if defined(__cplusplus)
+#define ENUM_STRS_MEMBER(s, v, ...) names[s] = #s;
+/* A special hack to emulate C99 designated initializers */
+#define STRS(enum_name, enum_members)					\
+	const char *enum_name##_strs[enum_name##_MAX];			\
+	namespace {							\
+		const struct enum_name##_strs_init {			\
+			enum_name##_strs_init(const char **names) {	\
+				memset(names, 0, sizeof(*names) *	\
+				       enum_name##_MAX);		\
+				enum_members(ENUM_STRS_MEMBER)		\
+			}						\
+		}  enum_name##_strs_init(enum_name##_strs);		\
+	}
+#else /* !defined(__cplusplus) */
+#define ENUM_STRS_MEMBER(s, v, ...) [s] = #s,
 #define STRS(enum_name, enum_members) \
-	const char *enum_name##_strs[enum_name##_MAX + 1] = {enum_members(ENUM_STRS_MEMBER) '\0'}
+	const char *enum_name##_strs[(unsigned) enum_name##_MAX + 1] = {enum_members(ENUM_STRS_MEMBER) 0}
+#endif
 #define STR2ENUM(enum_name, str) ((enum enum_name) strindex(enum_name##_strs, str, enum_name##_MAX))
 
 uint32_t
@@ -168,5 +190,9 @@ memmem(const void *block, size_t blen, const void *pat, size_t plen);
 void *
 memrchr(const void *s, int c, size_t n);
 #endif /* HAVE_MEMRCHR */
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_UTIL_H_INCLUDED */

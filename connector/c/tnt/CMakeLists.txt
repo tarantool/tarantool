@@ -74,7 +74,5 @@ set_target_properties(tnt_shared PROPERTIES OUTPUT_NAME "tarantool")
 # Install
 #----------------------------------------------------------------------------#
 
-# install static library
-install_targets(/${CMAKE_INSTALL_LIBDIR} tnt)
-# install shared library
-install_targets(/${CMAKE_INSTALL_LIBDIR} tnt_shared)
+install (TARGETS tnt ARCHIVE DESTINATION lib)
+install (TARGETS tnt_shared LIBRARY DESTINATION lib)

@@ -31,6 +31,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 typedef unsigned int rsize_t;
 typedef int rssize_t;
 typedef void *(*rope_split_func)(void *, size_t, size_t);
@@ -45,9 +49,9 @@ struct rope_node {
 	int height;
 	/** Subtree size. */
 	rsize_t tree_size;
-        /* Substring size. */
+	/* Substring size. */
 	rsize_t leaf_size;
-        /* Substring. */
+	/* Substring. */
 	void *data;
 	/* Left (0) and right (1) links */
 	struct rope_node *link[2];
@@ -210,8 +214,8 @@ rope_iter_create(struct rope_iter *it, struct rope *rope)
 static inline struct rope_iter *
 rope_iter_new(struct rope *rope)
 {
-	struct rope_iter *it = rope->alloc(rope->alloc_ctx,
-					     sizeof(struct rope_iter));
+	struct rope_iter *it = (struct rope_iter *)
+			rope->alloc(rope->alloc_ctx, sizeof(struct rope_iter));
 
 	if (it == NULL)
 		return NULL;
@@ -254,5 +258,9 @@ rope_check(struct rope *rope);
 /** Pretty print a rope. */
 void
 rope_pretty_print(struct rope *rope, void (*print_leaf)(void *, size_t));
+
+#if defined(__cplusplus)
+}
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_ROPE_H */

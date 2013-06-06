@@ -46,13 +46,8 @@ add_custom_target(txt  DEPENDS ${PATH_USERGUIDE_TXT})
 add_custom_target(doc-autogen ALL
     DEPENDS ${PATH_USERGUIDE_HTML} ${PATH_USERGUIDE_TXT})
 
-if ("${CPACK_GENERATOR}" STREQUAL "RPM")
-    install (FILES ${PATH_USERGUIDE_HTML}
-                   ${PATH_USERGUIDE_TXT} DESTINATION /usr/local/doc/tarantool)
-else()
-    install (FILES ${PATH_USERGUIDE_HTML}
-                   ${PATH_USERGUIDE_TXT} DESTINATION share/doc/tarantool)
-endif()
+install (FILES ${PATH_USERGUIDE_HTML}
+               ${PATH_USERGUIDE_TXT} DESTINATION share/doc/tarantool)
 
 add_custom_target(pdf
     COMMAND ${XSLTPROC} --nonet

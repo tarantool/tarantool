@@ -37,6 +37,10 @@
 #include <stdbool.h>
 #include <sys/uio.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct iovec;
 /**
  * Read up to N bytes from file into the buffer,
@@ -187,6 +191,10 @@ fio_batch_add(struct fio_batch *batch, void *row, ssize_t row_len);
  */
 int
 fio_batch_write(struct fio_batch *batch, int fd);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_FIO_H_INCLUDED */
 

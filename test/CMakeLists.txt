@@ -13,22 +13,16 @@ add_subdirectory(unit)
 add_subdirectory(box)
 add_subdirectory(connector_c)
 
-if ("${CPACK_GENERATOR}" STREQUAL "RPM")
+if (ENABLE_RPM)
     install (FILES ${CMAKE_SOURCE_DIR}/test/share/tarantool_rpm.cfg
-             DESTINATION etc
+             DESTINATION ${CMAKE_SYSCONF_DIR}/tarantool/
              RENAME "tarantool.cfg")
     install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
              DESTINATION share/tarantool)
 else()
-    if (NOT CPACK_GENERATOR OR "${CPACK_GENERATOR}" STREQUAL "TGZ")
-        install (FILES ${CMAKE_SOURCE_DIR}/test/share/tarantool_tgz.cfg
-                 DESTINATION "${CMAKE_SYSCONF_DIR}"
-                 RENAME "tarantool.cfg")
-    else()
-        install (FILES ${CMAKE_SOURCE_DIR}/test/share/tarantool.cfg
-                 DESTINATION "${CMAKE_SYSCONF_DIR}")
-    endif()
-
+    install (FILES ${CMAKE_SOURCE_DIR}/test/share/tarantool_tgz.cfg
+             DESTINATION "${CMAKE_SYSCONF_DIR}"
+             RENAME "tarantool.cfg")
     install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
              DESTINATION "${CMAKE_LOCALSTATE_DIR}/lib/tarantool")
 endif()
