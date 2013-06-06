@@ -217,7 +217,12 @@ public:
 				  enum iterator_type type,
 				  const void *key, u32 part_count) const = 0;
 
-	struct iterator *primaryIterator();
+	inline struct iterator *position()
+	{
+		if (m_position == NULL)
+			m_position = allocIterator();
+		return m_position;
+	}
 protected:
 	static void
 	check_key_parts(const struct key_def *key_def, u32 part_count,
@@ -233,7 +238,7 @@ private:
 	 * Pre-allocated iterator to speed up the main case of
 	 * box_process(). Should not be used elsewhere.
 	 */
-	struct iterator *position;
+	struct iterator *m_position;
 };
 
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */

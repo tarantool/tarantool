@@ -128,7 +128,7 @@ BitsetIndex::build(Index *pk)
 {
 	assert (!key_def->is_unique);
 
-	struct iterator *it = pk->primaryIterator();
+	struct iterator *it = pk->position();
 	struct tuple *tuple;
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
@@ -288,7 +288,6 @@ BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 				  0, "BitsetIndex", "iterator expression");
 		}
 
-		/* TODO: fix bitset_index_init_iterator to work with const obj*/
 		if (bitset_index_init_iterator((bitset_index *) &index,
 					       &it->bitset_it,
 					       &expr) != 0) {

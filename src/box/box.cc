@@ -370,7 +370,7 @@ snapshot_space(struct space *sp, void *udata)
 	struct tuple *tuple;
 	struct snapshot_space_param *ud = (struct snapshot_space_param *) udata;
 	Index *pk = space_index(sp, 0);
-	struct iterator *it = pk->primaryIterator();;
+	struct iterator *it = pk->position();;
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	while ((tuple = it->next(it)))

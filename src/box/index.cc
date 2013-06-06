@@ -110,24 +110,13 @@ Index::Index(struct key_def *key_def, struct space *space)
 {
 	this->key_def = key_def;
 	this->space = space;
-	this->position = NULL;
+	m_position = NULL;
 }
 
 Index::~Index()
 {
-	if (position != NULL) {
-		position->free(position);
-	}
-}
-
-struct iterator *
-Index::primaryIterator()
-{
-	if (position == NULL) {
-		position = allocIterator();
-	}
-
-	return position;
+	if (m_position != NULL)
+		m_position->free(m_position);
 }
 
 /* }}} */
