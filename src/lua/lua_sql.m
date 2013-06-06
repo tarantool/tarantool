@@ -43,6 +43,8 @@ lbox_net_sql_do_connect(struct lua_State *L)
 				"Use cmake with '-DENABLE_MYSQL=ON' option."
 			);
 		#endif
+
+	luaL_error(L, "Unknown driver '%s'", drv);
 	return 0;
 }
 

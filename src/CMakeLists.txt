@@ -113,6 +113,10 @@ if (ENABLE_PSQL)
     set (common_sources ${common_sources} lua/pg.m)
 endif()
 
+if (ENABLE_MYSQL)
+    set (common_sources ${common_sources} lua/mysql.m)
+endif()
+
 if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.m)
 endif()

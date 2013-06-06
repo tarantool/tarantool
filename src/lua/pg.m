@@ -24,7 +24,6 @@
 
 
 
-
 static PGconn *
 lua_check_pgconn(struct lua_State *L, int index)
 {
