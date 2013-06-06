@@ -130,7 +130,7 @@ message (STATUS "Use LuaJIT library: ${LUAJIT_LIB}")
 
 macro(luajit_build)
     set (luajit_buildoptions BUILDMODE=static)
-    set (luajit_copt ${CMAKE_C_FLAGS})
+    set (luajit_copt "")
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (luajit_buildoptions ${luajit_buildoptions} CCDEBUG=${CC_DEBUG_OPT})
         set (luajit_copt ${luajit_copt} -O1)
@@ -139,20 +139,35 @@ macro(luajit_build)
         set (luajit_copt ${luajit_copt} -O2)
     endif()
     set (luajit_copt ${luajit_copt} -I${PROJECT_SOURCE_DIR}/libobjc)
-    set (luajit_cc ${CMAKE_C_COMPILER})
-    if (NOT luajit_cc)
-        message (FATAL_ERROR "LuaJIT will not compile with default C compiler (cc)")
+    set (luajit_target_cc "${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS}")
+    # Use external unwind on all platforms.
+    set (luajit_target_cc "${luajit_target_cc} -DLUAJIT_UNWIND_EXTERNAL=1")
+    if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
+        # Regular mode - use CMake compiler for building host utils.
+        set (luajit_host_cc ${CMAKE_C_COMPILER})
+    else()
+        # Crosscompile mode - use a host CC compiler for building host utils.
+        # Since CMake does not support cross compilation properly
+        # we have to use system CC here.
+        set (luajit_host_cc "cc")
+    endif()
+    if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND
+            ${CMAKE_SIZEOF_VOID_P} EQUAL 4)
+        # The host compiler must have same pointer size as the target compiler.
+        set (luajit_host_cc "${luajit_host_cc} -m32")
     endif()
     set(luajit_ldflags "${CMAKE_SHARED_LINKER_FLAGS}")
     separate_arguments(luajit_copt)
     separate_arguments(luajit_ldflags)
-    set (luajit_buildoptions ${luajit_buildoptions} CC="${luajit_cc}" TARGET_CC="${luajit_cc}" CCOPT="${luajit_copt}")
+    separate_arguments(luajit_host_cc)
+    separate_arguments(luajit_target_cc)
+    set (luajit_buildoptions ${luajit_buildoptions} HOST_CC="${luajit_host_cc}" TARGET_CC="${luajit_target_cc}" CCOPT="${luajit_copt}")
     set (luajit_buildoptions ${luajit_buildoptions} Q='' LDFLAGS="${luajit_ldflags}")
     if (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND $(MAKE) clean
-            COMMAND $(MAKE) -C src ${luajit_buildoptions}
+            COMMAND $(MAKE) -C src ${luajit_buildoptions} libluajit.a
             DEPENDS ${CMAKE_SOURCE_DIR}/CMakeCache.txt
         )
     else()
@@ -163,7 +178,7 @@ macro(luajit_build)
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND cp -r ${PROJECT_SOURCE_DIR}/third_party/luajit/* .
             COMMAND $(MAKE) clean
-            COMMAND $(MAKE) -C src ${luajit_buildoptions}
+            COMMAND $(MAKE) -C src ${luajit_buildoptions} libluajit.a
             DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt ${PROJECT_BINARY_DIR}/third_party/luajit
         )
     endif()
