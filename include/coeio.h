@@ -41,7 +41,6 @@
 #include <util.h>
 #include <rlist.h>
 
-#include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>

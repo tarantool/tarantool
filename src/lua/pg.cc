@@ -1,13 +1,17 @@
-#include <postgres.h>
-#include <libpq-fe.h>
-#include <catalog/pg_type.h>
+extern "C" {
+	#include <postgres.h>
+	#include <libpq-fe.h>
+	#include <catalog/pg_type.h>
+	#undef PACKAGE_VERSION
+}
 
-#undef PACKAGE_VERSION
 
 #include "lua_pg.h"
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
+extern "C" {
+	#include <lua.h>
+	#include <lauxlib.h>
+	#include <lualib.h>
+}
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -18,10 +22,6 @@
 
 #include <lua/init.h>
 #include <say.h>
-
-
-#define CONSTR_MAXLEN	128
-
 
 
 static PGconn *
@@ -41,7 +41,7 @@ lua_check_pgconn(struct lua_State *L, int index)
 	if (!lua_isuserdata(L, index))
 		luaL_error(L, "Can't extract userdata from lua-stack");
 
-	PGconn *conn = *(void **)lua_touserdata(L, index);
+	PGconn *conn = *(PGconn **)lua_touserdata(L, index);
 	if (pop)
 		lua_pop(L, pop);
 	return conn;
@@ -181,10 +181,14 @@ lua_pg_execute(struct lua_State *L)
 	Oid *paramTypes = NULL;
 
 	if (count > 0) {
-		paramValues = alloca( count * sizeof(*paramValues) );
-		paramLengths = alloca( count * sizeof(*paramLengths) );
-		paramFormats = alloca( count * sizeof(*paramFormats) );
-		paramTypes = alloca( count * sizeof(*paramTypes) );
+		paramValues = (typeof(paramValues))
+			alloca( count * sizeof(*paramValues) );
+		paramLengths = (typeof(paramLengths))
+			alloca( count * sizeof(*paramLengths) );
+		paramFormats = (typeof(paramFormats))
+			alloca( count * sizeof(*paramFormats) );
+		paramTypes = (typeof(paramTypes))
+			alloca( count * sizeof(*paramTypes) );
 
 		for(int i = 0, idx = 3; i < count; i++, idx++) {
 			if (lua_isnil(L, idx)) {
@@ -326,14 +330,15 @@ lbox_net_pg_connect(struct lua_State *L)
 	lua_pop(L, 1);
 
 	if (PQstatus(conn) != CONNECTION_OK) {
-		char *msg = alloca(strlen(PQerrorMessage(conn)) + 1);
+		char *msg = (typeof(msg))
+			alloca(strlen(PQerrorMessage(conn)) + 1);
 		strcpy(msg, PQerrorMessage(conn));
 		PQfinish(conn);
 		luaL_error(L, constr);
 	}
 
 	lua_pushstring(L, "raw");
-	void **ptr = lua_newuserdata(L, sizeof(conn));
+	PGconn **ptr = (PGconn **)lua_newuserdata(L, sizeof(conn));
 	*ptr = conn;
 
 	lua_newtable(L);

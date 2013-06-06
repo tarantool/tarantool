@@ -1,7 +1,10 @@
 #include "lua_mysql.h"
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
+
+extern "C" {
+	#include <lua.h>
+	#include <lauxlib.h>
+	#include <lualib.h>
+}
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +36,7 @@ lua_check_mysql(struct lua_State *L, int index)
 	if (!lua_isuserdata(L, index))
 		luaL_error(L, "Can't extract userdata from lua-stack");
 
-	MYSQL *mysql = *(void **)lua_touserdata(L, index);
+	MYSQL *mysql = *(MYSQL **)lua_touserdata(L, index);
 	if (pop)
 		lua_pop(L, pop);
 	return mysql;
@@ -247,7 +250,7 @@ lua_mysql_execute(struct lua_State *L)
 
 		size_t l;
 		const char *s = lua_tolstring(L, idx++, &l);
-		char *nq = realloc(q, l * 2 + 1);
+		char *nq = (char *)realloc(q, l * 2 + 1);
 		if (!nq) {
 			free(q);
 			luaL_error(L, "Can't allocate memory for variable");
@@ -319,14 +322,14 @@ lbox_net_mysql_connect(struct lua_State *L)
 
 	if (*mysql_error(mysql)) {
 		const char *estr = mysql_error(mysql);
-		char *b = alloca(strlen(estr) + 1);
+		char *b = (char *)alloca(strlen(estr) + 1);
 		strcpy(b, estr);
 		mysql_close(mysql);
 		luaL_error(L, "%s", estr);
 	}
 
 	lua_pushstring(L, "raw");
-	void **ptr = lua_newuserdata(L, sizeof(mysql));
+	MYSQL **ptr = (MYSQL **)lua_newuserdata(L, sizeof(mysql));
 	*ptr = mysql;
 
 	lua_newtable(L);
