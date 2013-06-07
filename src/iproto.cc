@@ -48,7 +48,7 @@
 
 enum {
 	/** Maximal iproto package body length (2GiB) */
-	IPROTO_BODY_LEN_MAX = 2147483648,
+	IPROTO_BODY_LEN_MAX = 2147483648UL
 };
 
 /*
