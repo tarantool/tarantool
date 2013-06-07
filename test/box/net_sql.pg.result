@@ -89,3 +89,7 @@ lua c = box.net.sql.connect('abcd')
 ---
 error: '[string "-- sql.lua (internal file)..."]:61: Unknown driver ''abcd'''
 ...
+lua c:quote('abc"cde"def')
+---
+ - 'abc"cde"def'
+...

@@ -169,6 +169,11 @@ box.net.sql = {
         -- quote variable
         quote = function(self, variable)
             return self.raw:quote(variable)
+        end,
+        
+        -- quote identifier
+        quote_ident = function(self, variable)
+            return self.raw:quote_ident(variable)
         end
     }
 

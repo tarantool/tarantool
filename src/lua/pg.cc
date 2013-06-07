@@ -297,6 +297,54 @@ self_field(struct lua_State *L, const char *name, int index)
 
 
 /**
+ * quote variable
+ */
+static int
+lua_pg_quote(struct lua_State *L)
+{
+	if (lua_gettop(L) < 2) {
+		lua_pushnil(L);
+		return 1;
+	}
+	PGconn *conn = lua_check_pgconn(L, 1);
+	size_t len;
+	const char *s = lua_tolstring(L, -1, &len);
+
+	s = PQescapeLiteral(conn, s, len);
+
+	if (!s)
+		luaL_error(L, "Can't allocate memory");
+	lua_pushstring(L, s);
+	free((void *)s);
+	return 1;
+}
+
+
+/**
+ * quote identifier
+ */
+static int
+lua_pg_quote_ident(struct lua_State *L)
+{
+	if (lua_gettop(L) < 2) {
+		lua_pushnil(L);
+		return 1;
+	}
+	PGconn *conn = lua_check_pgconn(L, 1);
+	size_t len;
+	const char *s = lua_tolstring(L, -1, &len);
+
+	s = PQescapeIdentifier(conn, s, len);
+
+	if (!s)
+		luaL_error(L, "Can't allocate memory");
+	lua_pushstring(L, s);
+	free((void *)s);
+	return 1;
+}
+
+
+/**
  * connect to postgresql
  */
 int
@@ -352,7 +400,9 @@ lbox_net_pg_connect(struct lua_State *L)
 	lua_newtable(L);
 
 	static const struct luaL_reg meta [] = {
-		{"execute", lua_pg_execute},
+		{"execute",	lua_pg_execute},
+		{"quote",	lua_pg_quote},
+		{"quote_ident", lua_pg_quote_ident},
 		{NULL, NULL}
 	};
 	luaL_register(L, NULL, meta);

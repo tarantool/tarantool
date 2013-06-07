@@ -28,3 +28,5 @@ exec admin "lua c:execute('SELEC T')"
 
 exec admin "lua c = box.net.sql.connect('abcd')"
 
+
+exec admin "lua c:quote('abc\"cde\"def')"
