@@ -1,7 +1,17 @@
-lua dump = function(t) return box.cjson.encode(t) end
+lua c = box.net.sql.connect('abcd')
+---
+error: '[string "-- sql.lua (internal file)..."]:61: Unknown driver ''abcd'''
+...
+lua dump = function(v) return box.cjson.encode(v) end
 ---
 ...
-lua c = box.net.sql.connect('pg', 'localhost', 5432, 'tarantool', 'tarantool', 'tarantool')
+lua connect = {}
+---
+...
+lua for tk in string.gmatch(os.getenv('PG'), '[^:]+') do table.insert(connect, tk) end
+---
+...
+lua c = box.net.sql.connect('pg', unpack(connect))
 ---
 ...
 lua dump({c:execute('SELECT 123::text AS bla, 345')})
@@ -58,7 +68,7 @@ lua dump({c:select('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ...
 lua dump({c:single('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ---
-error: '[string "box.net.sql = {..."]:151: SQL request returned multiply rows'
+error: '[string "-- sql.lua (internal file)..."]:154: SQL request returned multiply rows'
 ...
 lua dump({c:single('SELECT * FROM (VALUES (1,2)) t')})
 ---
@@ -70,8 +80,12 @@ lua dump({c:perform('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ...
 lua c:execute('SELEC T')
 ---
-error: '[string "box.net.sql = {..."]:100: PG error: ERROR:  syntax error at or near "SELEC"
+error: '[string "-- sql.lua (internal file)..."]:102: ERROR:  syntax error at or near "SELEC"
 LINE 1: SELEC T
         ^
 '
+...
+lua c = box.net.sql.connect('abcd')
+---
+error: '[string "-- sql.lua (internal file)..."]:61: Unknown driver ''abcd'''
 ...
