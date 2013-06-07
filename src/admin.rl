@@ -53,7 +53,7 @@ extern "C" {
 
 #include "box/box.h"
 #include "session.h"
-#include "scoped_guard.h"
+#include <guard.h>
 
 static const char *help =
 	"available commands:" CRLF
@@ -338,7 +338,7 @@ admin_handler(va_list ap)
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 
-	auto scoped_guard = make_scoped_guard([&] {
+	GUARD([&] {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		evio_close(&coio);
 		iobuf_delete(iobuf);

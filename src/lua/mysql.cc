@@ -17,8 +17,12 @@ extern "C" {
 #include <lua/init.h>
 #include <say.h>
 #include <mysql.h>
+#include <guard.h>
 
 
+/**
+ * gets MYSQL connector from lua stack (or object)
+ */
 static MYSQL *
 lua_check_mysql(struct lua_State *L, int index)
 {
@@ -42,6 +46,10 @@ lua_check_mysql(struct lua_State *L, int index)
 	return mysql;
 }
 
+
+/**
+ * connect to MySQL server
+ */
 static ssize_t
 connect_mysql(va_list ap)
 {
@@ -65,16 +73,15 @@ connect_mysql(va_list ap)
 			iport = 3306;
 	}
 
-	say_info("host=%s user=%s password=%s db=%s iport=%d usocket=%s",
-		host, user, password, db, iport, usocket);
-
 	mysql_real_connect(mysql, host, user, password, db, iport, usocket,
 		CLIENT_MULTI_STATEMENTS | CLIENT_MULTI_RESULTS);
 	return 0;
 }
 
 
-/** returns self.field as C-string */
+/**
+ * returns self.field as C-string
+ */
 static const char *
 self_field(struct lua_State *L, const char *name, int index)
 {
@@ -88,6 +95,9 @@ self_field(struct lua_State *L, const char *name, int index)
 }
 
 
+/**
+ * execute request
+ */
 static ssize_t
 exec_mysql(va_list ap)
 {
@@ -102,6 +112,9 @@ exec_mysql(va_list ap)
 	return -2;
 }
 
+/**
+ * fetch one result from socket
+ */
 static ssize_t
 fetch_result(va_list ap)
 {
@@ -116,27 +129,35 @@ fetch_result(va_list ap)
 	return 0;
 }
 
+/**
+ * push results to lua stack
+ */
 int
 lua_push_mysql_result(struct lua_State *L, MYSQL *mysql,
 	MYSQL_RES *result, int resno)
 {
+	int tidx;
+
+	if (resno > 0) {
+		/* previous push is in already on stack */
+		tidx = lua_gettop(L) - 1;
+	} else {
+		lua_newtable(L);
+		tidx = lua_gettop(L);
+		lua_pushnumber(L, 0);
+	}
+
 	if (!result) {
 		if (mysql_field_count(mysql) == 0) {
-			lua_newtable(L);
-			lua_pushnumber(L, mysql_affected_rows(mysql));
+			double v = lua_tonumber(L, -1);
+			v += mysql_affected_rows(mysql);
+			lua_pop(L, 1);
+			lua_pushnumber(L, v);
 			return 2;
 		}
 		luaL_error(L, "%s", mysql_error(mysql));
 	}
 
-	int tidx;
-
-	if (resno > 0) {
-		tidx = lua_gettop(L) - 1;
-	} else {
-		lua_newtable(L);
-		tidx = lua_gettop(L);
-	}
 
 	MYSQL_ROW row;
 	MYSQL_FIELD * fields = mysql_fetch_fields(result);
@@ -148,6 +169,7 @@ lua_push_mysql_result(struct lua_State *L, MYSQL *mysql,
 
 		for (int i = 0; i < mysql_num_fields(result); i++) {
 			lua_pushstring(L, fields[i].name);
+
 
 			switch(fields[i].type) {
 				case MYSQL_TYPE_TINY:
@@ -191,20 +213,23 @@ lua_push_mysql_result(struct lua_State *L, MYSQL *mysql,
 			lua_settable(L, -3);
 		}
 
+
 		lua_settable(L, tidx);
 	}
 
-	if (resno > 0) {
-		double v = lua_tonumber(L, -1);
-		v += mysql_affected_rows(mysql);
-		lua_pop(L, 1);
-		lua_pushnumber(L, v);
-	} else {
-		lua_pushnumber(L, mysql_affected_rows(mysql));
-	}
+	/* sum(affected_rows) */
+	double v = lua_tonumber(L, -1);
+	v += mysql_affected_rows(mysql);
+	lua_pop(L, 1);
+	lua_pushnumber(L, v);
 	return 2;
 }
 
+
+
+/**
+ * mysql:execute() method
+ */
 int
 lua_mysql_execute(struct lua_State *L)
 {
@@ -269,6 +294,7 @@ lua_mysql_execute(struct lua_State *L)
 
 
 	int res = coeio_custom(exec_mysql, TIMEOUT_INFINITY, mysql, sql, len);
+	lua_pop(L, 1);
 	if (res == -1)
 		luaL_error(L, "%s", strerror(errno));
 
@@ -283,8 +309,8 @@ lua_mysql_execute(struct lua_State *L)
 		if (res == -1)
 			luaL_error(L, "%s", strerror(errno));
 
+		GUARD([&]{ mysql_free_result(result); });
 		lua_push_mysql_result(L, mysql, result, resno++);
-		mysql_free_result(result);
 
 	} while(mysql_more_results(mysql));
 
@@ -292,6 +318,9 @@ lua_mysql_execute(struct lua_State *L)
 }
 
 
+/**
+ * collect MYSQL object
+ */
 int
 lua_mysql_gc(struct lua_State *L)
 {
@@ -300,6 +329,34 @@ lua_mysql_gc(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * quote variable
+ */
+int
+lua_mysql_quote(struct lua_State *L)
+{
+	MYSQL *mysql = lua_check_mysql(L, 1);
+	if (lua_gettop(L) < 2) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	size_t len;
+	const char *s = lua_tolstring(L, -1, &len);
+	char *sout = (typeof(sout))malloc(len * 2 + 1);
+	if (!sout) {
+		luaL_error(L, "Can't allocate memory for variable");
+	}
+
+	len = mysql_real_escape_string(mysql, sout, s, len);
+	lua_pushlstring(L, sout, len);
+	free(sout);
+	return 1;
+}
+
+/**
+ * connect to MYSQL server (lua binding)
+ */
 int
 lbox_net_mysql_connect(struct lua_State *L)
 {
@@ -339,6 +396,7 @@ lbox_net_mysql_connect(struct lua_State *L)
 
 	static const struct luaL_reg meta [] = {
 		{"execute", lua_mysql_execute},
+		{"quote",   lua_mysql_quote},
 		{NULL, NULL}
 	};
 	luaL_register(L, NULL, meta);

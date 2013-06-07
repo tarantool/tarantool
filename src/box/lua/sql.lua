@@ -1,3 +1,5 @@
+-- sql.lua (internal file)
+
 box.net.sql = {
     -- constructor 
     -- box.net.sql.connect(
@@ -148,7 +150,11 @@ box.net.sql = {
         single = function(self, sql, ...)
             local res = self:execute(sql, ...)
             if #res > 1 then
-                error("SQL request returned multiply rows")
+                if self.raise then
+                    error("SQL request returned multiply rows")
+                else
+                    return {}, -1, "SQL request returned multiply rows"
+                end
             end
             return res[1]
         end,
@@ -157,6 +163,12 @@ box.net.sql = {
         perform = function(self, sql, ...)
             local res, affected, status = self:execute(sql, ...)
             return affected
+        end,
+
+
+        -- quote variable
+        quote = function(self, variable)
+            return self.raw:quote(variable)
         end
     }
 

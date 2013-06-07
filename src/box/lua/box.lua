@@ -1,3 +1,5 @@
+-- box.lua (internal file)
+
 box.flags = { BOX_RETURN_TUPLE = 0x01, BOX_ADD = 0x02, BOX_REPLACE = 0x04 }
 
 

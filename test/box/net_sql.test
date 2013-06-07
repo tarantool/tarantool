@@ -30,8 +30,10 @@ exec admin "lua c:execute('SEL ECT 1')"
 exec admin "lua dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})"
 
 exec admin "lua dump({c:execute('SELECT * FROM (SELECT ?) t WHERE 1 = 0', 2)})"
-exec admin "lua dump({c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS one; SELECT 2 AS two, 3 AS three; END')})"
+exec admin "lua dump({c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS One; SELECT 2 AS Two, 3 AS Three; END')})"
 exec admin "lua dump({c:execute('CALL p1')})"
 exec admin "lua dump({c:execute('DROP PROCEDURE p1')})"
 exec admin "lua dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2')})"
 exec admin "lua dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')})"
+
+exec admin "lua c:quote('test \"abc\" test')"

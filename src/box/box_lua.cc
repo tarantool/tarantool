@@ -48,7 +48,7 @@ extern "C" {
 #include "space.h"
 #include "port.h"
 #include "tbuf.h"
-#include "scoped_guard.h"
+#include <guard.h>
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
 extern char box_lua[], box_net_lua[], misc_lua[], sql_lua[];
@@ -1371,7 +1371,7 @@ box_lua_execute(struct request *request, struct port *port)
 	(void) (pick_u32(reqpos, reqend));
 
 	try {
-		auto scoped_guard = make_scoped_guard([=] {
+		GUARD([=] {
 			/*
 			 * Allow the used coro to be garbage collected.
 			 * @todo: cache and reuse it instead.

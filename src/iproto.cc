@@ -44,7 +44,7 @@
 #include "iobuf.h"
 #include "evio.h"
 #include "session.h"
-#include "scoped_guard.h"
+#include <guard.h>
 
 enum {
 	/** Maximal iproto package body length (2GiB) */
@@ -779,7 +779,7 @@ iproto_process_request(struct iproto_request *request)
 	struct iobuf *iobuf = request->iobuf;
 	struct port_iproto port;
 
-	auto scope_guard = make_scoped_guard([=]{
+	GUARD([=]{
 		iobuf->in.pos += sizeof(*header) + header->len;
 		if (iproto_session_is_idle(session))
 			iproto_session_destroy(session);

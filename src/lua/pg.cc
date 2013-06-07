@@ -22,6 +22,7 @@ extern "C" {
 
 #include <lua/init.h>
 #include <say.h>
+#include <guard.h>
 
 
 static PGconn *
@@ -86,24 +87,20 @@ lua_push_pgres(struct lua_State *L, PGresult *r)
 				lua_pushnumber(L, v);
 			}
 			lua_pushstring(L, PQcmdStatus(r));
-			PQclear(r);
 			return 3;
 
 		case PGRES_TUPLES_OK:
 			break;
 
 		case PGRES_BAD_RESPONSE:
-			PQclear(r);
-			luaL_error(L, "Broken postgrql rponse");
+			luaL_error(L, "Broken postgresql response");
 
 		case PGRES_FATAL_ERROR:
 		case PGRES_NONFATAL_ERROR:
 		case PGRES_EMPTY_QUERY:
-			PQclear(r);
-			luaL_error(L, "PG error: %s", PQresultErrorMessage(r));
+			luaL_error(L, "%s", PQresultErrorMessage(r));
 
 		default:
-			PQclear(r);
 			luaL_error(L, "box.net.sql.pg: internal error");
 	}
 
@@ -162,7 +159,6 @@ lua_push_pgres(struct lua_State *L, PGresult *r)
 		lua_pushnumber(L, v);
 	}
 	lua_pushstring(L, PQcmdStatus(r));
-	PQclear(r);
 	return 3;
 }
 
@@ -256,10 +252,13 @@ lua_pg_execute(struct lua_State *L)
 			strerror(errno));
 	}
 
+	GUARD([&]{ PQclear(res); });
 	return lua_push_pgres(L, res);
 }
 
-/** collect connection */
+/**
+ * collect connection
+ */
 static int
 lua_pg_gc(struct lua_State *L)
 {
@@ -269,7 +268,9 @@ lua_pg_gc(struct lua_State *L)
 }
 
 
-/** do connect to postgresql (is run in the other thread) */
+/**
+ * do connect to postgresql (is run in the other thread)
+ */
 static ssize_t
 pg_connect(va_list ap)
 {
@@ -279,7 +280,9 @@ pg_connect(va_list ap)
 	return 0;
 }
 
-/** returns self.field as C-string */
+/**
+ * returns self.field as C-string
+ */
 static const char *
 self_field(struct lua_State *L, const char *name, int index)
 {
@@ -293,7 +296,9 @@ self_field(struct lua_State *L, const char *name, int index)
 }
 
 
-/** connect to postgresql */
+/**
+ * connect to postgresql
+ */
 int
 lbox_net_pg_connect(struct lua_State *L)
 {

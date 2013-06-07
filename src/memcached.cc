@@ -46,7 +46,7 @@ extern "C" {
 #include "salloc.h"
 #include "pickle.h"
 #include "coio_buf.h"
-#include "scoped_guard.h"
+#include <guard.h>
 
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
@@ -418,7 +418,7 @@ memcached_handler(va_list ap)
 	stats.curr_connections++;
 
 	try {
-		auto scoped_guard = make_scoped_guard([&] {
+		GUARD([&] {
 			fiber_sleep(0.01);
 			stats.curr_connections--;
 			evio_close(&coio);
