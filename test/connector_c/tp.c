@@ -23,11 +23,54 @@ static void reply_print(struct tp *rep) {
 }
 
 static inline int
+test_check_read_reply(int fd) {
+	struct tp rep;
+	tp_init(&rep, NULL, 0, tp_realloc, NULL);
+	while (1) {
+		ssize_t to_read = tp_req(&rep);
+		if (to_read <= 0)
+			break;
+		ssize_t new_size = tp_ensure(&rep, to_read);
+		if (new_size == -1) {
+			// no memory (?)
+			return 1;
+		}
+		ssize_t res = read(fd, rep.p, to_read);
+		if (res == 0) {
+			// eof
+			return 1;
+		} else if (res < 0) {
+			// error
+			return 1;
+		}
+		tp_use(&rep, res);
+	}
+
+	ssize_t server_code = tp_reply(&rep);
+
+	if (server_code != 0) {
+		printf("error: %-.*s\n", tp_replyerrorlen(&rep),
+		   tp_replyerror(&rep));
+		tp_free(&rep);
+		return 1;
+	}
+	if (tp_replyop(&rep) == 17) { /* select */
+		reply_print(&rep);
+	} else
+	if (tp_replyop(&rep) == 13) { /* insert */
+	} else {
+		assert(0);
+	}
+	tp_free(&rep);
+	return 0;
+}
+
+static inline int
 test_check_read(void)
 {
-    int sock;
+    int fd;
     struct sockaddr_in tt;
-    if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+    if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
 		printf("Failed to create socket\n");
 		return 1;
     }
@@ -36,7 +79,7 @@ test_check_read(void)
     tt.sin_family = AF_INET;
     tt.sin_addr.s_addr = inet_addr("127.0.0.1");
     tt.sin_port = htons(33013);
-    if (connect(sock, (struct sockaddr *) &tt, sizeof(tt)) < 0) {
+    if (connect(fd, (struct sockaddr *) &tt, sizeof(tt)) < 0) {
 		printf("Failed to connect\n");
 		return 1;
     }
@@ -48,59 +91,17 @@ test_check_read(void)
 		tp_tuple(&req);
 		tp_sz(&req, "_i32");
 		tp_sz(&req, "0e72ae1a-d0be-4e49-aeb9-aebea074363c");
-		write(sock, tp_buf(&req), tp_used(&req));
-		tp_free(&req);
-    }
-
-    {
-		struct tp req;
-		tp_init(&req, NULL, 0, tp_realloc, NULL);
 		tp_select(&req, 0, 0, 0, 1);
 		tp_tuple(&req);
 		tp_sz(&req, "_i32");
-		write(sock, tp_buf(&req), tp_used(&req));
+		assert(write(fd, tp_buf(&req), tp_used(&req)) == tp_used(&req));
 		tp_free(&req);
     }
 
-    {
-		struct tp rep;
-		tp_init(&rep, NULL, 0, tp_realloc, NULL);
-		while (1) {
-			ssize_t to_read = tp_req(&rep);
-			if (to_read <= 0)
-				break;
-			ssize_t new_size = tp_ensure(&rep, to_read);
-			if (new_size == -1) {
-				// no memory (?)
-				return 1;
-			}
-			ssize_t res = read(sock, rep.p, to_read);
-			if (res == 0) {
-				// eof
-				return 1;
-			} else if (res < 0) {
-				// error
-				return 1;
-			}
-			tp_use(&rep, res);
-		}
+	assert(test_check_read_reply(fd) == 0);
+	assert(test_check_read_reply(fd) == 0);
 
-		ssize_t server_code = tp_reply(&rep);
-
-		printf("op:    %d\n", tp_replyop(&rep));
-		printf("count: %d\n", tp_replycount(&rep));
-		printf("code:  %zu\n", server_code);
-
-		if (server_code != 0) {
-			printf("error: %-.*s\n", tp_replyerrorlen(&rep),
-			   tp_replyerror(&rep));
-			tp_free(&rep);
-			return 1;
-		}
-		reply_print(&rep);
-		tp_free(&rep);
-    }
-
+	close(fd);
     return 0;
 }
 
@@ -122,57 +123,5 @@ main(int argc, char *argv[])
 
 	test_check_buffer_initialized();
 	assert(test_check_read() == 0);
-
-#if 0
-	if (argc == 2 && !strcmp(argv[1], "--reply"))
-		return reply();
-
-	char buf[128];
-	struct tp req;
-	tp_init(&req, buf, sizeof(buf), NULL, NULL);
-
-	/*
-	tp_insert(&req, 0, TP_FRET);
-	tp_tuple(&req);
-	tp_sz(&req, "key");
-	tp_sz(&req, "value");
-	*/
-
-	/*
-	tp_ping(&req);
-	*/
-
-	/*
-	tp_select(&req, 0, 1, 0, 10);
-	tp_tuple(&req);
-	tp_sz(&req, "key");
-	*/
-
-	/*
-	tp_update(&req, 0, 0);
-	tp_tuple(&req);
-	tp_sz(&req, "key");
-	tp_updatebegin(&req);
-	tp_op(&req, 1, TP_OPSET, "VALUE", 5);
-	*/
-
-	/*
-	char proc[] = "hello_proc";
-	tp_call(&req, 0, proc, sizeof(proc) - 1);
-	tp_tuple(&req);
-	tp_sz(&req, "arg1");
-	tp_sz(&req, "arg2");
-	*/
-
-	/*
-	tp_update(&req, 0, 0);
-	tp_tuple(&req);
-	tp_sz(&req, "key");
-	tp_updatebegin(&req);
-	tp_opsplice(&req, 1, 0, 2, "VAL", 3);
-	*/
-
-	fwrite(buf, tp_used(&req), 1, stdout);
-#endif
 	return 0;
 }
