@@ -267,6 +267,15 @@ lua_pg_gc(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * prints warnings from Postgresql into tarantool log
+ */
+static void
+pg_notice(void *arg, const char *message)
+{
+	say_info("Postgresql: %s", message);
+	(void)arg;
+}
 
 /**
  * do connect to postgresql (is run in the other thread)
@@ -277,6 +286,8 @@ pg_connect(va_list ap)
 	const char *constr = va_arg(ap, typeof(constr));
 	PGconn **conn = va_arg(ap, typeof(conn));
 	*conn = PQconnectdb(constr);
+	if (*conn)
+		PQsetNoticeProcessor(*conn, pg_notice, NULL);
 	return 0;
 }
 

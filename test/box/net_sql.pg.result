@@ -93,3 +93,23 @@ lua c:quote('abc"cde"def')
 ---
  - 'abc"cde"def'
 ...
+lua c:begin_work()
+---
+ - 0
+...
+lua c:rollback()
+---
+ - 0
+...
+lua c:begin_work()
+---
+ - 0
+...
+lua c:commit()
+---
+ - 0
+...
+lua c:txn(function(dbi) dbi:single('SELECT 1') end)
+---
+ - true
+...

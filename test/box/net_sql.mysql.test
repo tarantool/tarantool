@@ -20,3 +20,8 @@ exec admin "lua dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2')})"
 exec admin "lua dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')})"
 
 exec admin "lua c:quote('test \"abc\" test')"
+
+exec admin "lua c:begin_work()"
+exec admin "lua c:rollback()"
+exec admin "lua c:begin_work()"
+exec admin "lua c:commit()"

@@ -30,3 +30,11 @@ exec admin "lua c = box.net.sql.connect('abcd')"
 
 
 exec admin "lua c:quote('abc\"cde\"def')"
+
+
+exec admin "lua c:begin_work()"
+exec admin "lua c:rollback()"
+exec admin "lua c:begin_work()"
+exec admin "lua c:commit()"
+
+exec admin "lua c:txn(function(dbi) dbi:single('SELECT 1') end)"

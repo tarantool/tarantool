@@ -174,6 +174,40 @@ box.net.sql = {
         -- quote identifier
         quote_ident = function(self, variable)
             return self.raw:quote_ident(variable)
+        end,
+
+
+        -- begin transaction
+        begin_work = function(self)
+            return self:perform('BEGIN')
+        end,
+
+        -- commit transaction
+        commit  = function(self)
+            return self:perform('COMMIT')
+        end,
+
+        -- rollback transaction
+        rollback = function(self)
+            return self:perform('ROLLBACK')
+        end,
+
+        -- transaction
+        txn = function(self, proc)
+            local raise = self.raise
+            self.raise = true
+            self:begin_work()
+            local res = { pcall(proc, self) }
+
+            self.raise = raise
+            
+            if res[1] then
+                self:commit()
+                return true
+            end
+
+            self:rollback()
+            return false, res[2]
         end
     }
 

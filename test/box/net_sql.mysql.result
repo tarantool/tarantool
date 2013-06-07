@@ -63,3 +63,19 @@ lua c:quote('test "abc" test')
 ---
  - test \"abc\" test
 ...
+lua c:begin_work()
+---
+ - 0
+...
+lua c:rollback()
+---
+ - 0
+...
+lua c:begin_work()
+---
+ - 0
+...
+lua c:commit()
+---
+ - 0
+...
