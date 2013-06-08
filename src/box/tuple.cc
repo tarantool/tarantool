@@ -28,7 +28,6 @@
  */
 #include "tuple.h"
 
-#include <pickle.h>
 #include <salloc.h>
 #include "tbuf.h"
 

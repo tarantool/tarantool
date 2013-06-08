@@ -187,35 +187,6 @@ pick_field_u32(const void **data, const void *end)
 	return *(uint32_t *) pick_str(data, end, size);
 }
 
-
-
-static inline uint32_t
-valid_tuple(const void *data, const void *end, uint32_t field_count)
-{
-	const void *start = data;
-
-	for (int i = 0; i < field_count; i++)
-		pick_field(&data, end);
-
-	return (const char *) data - (const char *) start;
-}
-
-/**
- * Calculate size for a specified fields range
- *
- * @returns size of fields data including size of varint data
- */
-static inline size_t
-tuple_range_size(const void **begin, const void *end, size_t count)
-{
-	const void *start = *begin;
-	while (*begin < end && count-- > 0) {
-		size_t len = load_varint32(begin);
-		*begin = (char *) *begin + len;
-	}
-	return (const char *) *begin - (const char *) start;
-}
-
 static inline size_t
 varint32_sizeof(uint32_t value)
 {
