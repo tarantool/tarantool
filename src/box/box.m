@@ -47,6 +47,7 @@
 #include "port.h"
 #include "request.h"
 #include "txn.h"
+#include <third_party/base64.h>
 
 static void process_replica(struct port *port,
 			    u32 op, const void *reqdata, u32 reqlen);
@@ -249,6 +250,27 @@ recover_snap_row(const void *data)
 	assert(primary_indexes_enabled == false);
 
 	const struct box_snap_row *row = data;
+
+	if (valid_tuple(row->data, row->data + row->data_size,
+			row->tuple_size) != row->data_size) {
+		say_error("\n"
+			  "********************************************\n"
+		          "* Found a corrupted tuple in the snapshot! *\n"
+		          "* This can be either due to a memory       *\n"
+		          "* corruption or a bug in the server.       *\n"
+		          "* The tuple can not be loaded.             *\n"
+		          "********************************************\n"
+		          "Tuple data, BAS64 encoded:                  \n");
+
+		int base64_buflen = base64_bufsize(row->data_size);
+		char *base64_buf = (char *) malloc(base64_buflen);
+		int len = base64_encode((const char *) row->data, row->data_size,
+					base64_buf, base64_buflen);
+		write(STDERR_FILENO, base64_buf, len);
+		free(base64_buf);
+
+		tnt_raise(IllegalParams, :"invalid tuple length");
+	}
 
 	struct tuple *tuple = tuple_alloc(row->data_size);
 	memcpy(tuple->data, row->data, row->data_size);

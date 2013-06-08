@@ -22,6 +22,7 @@ test/connector_c/update
 test/connector_c/snap
 test/box/protocol
 test/box/connector
+test/unit/base64
 test/unit/queue
 test/unit/mhash
 test/unit/objc_finally

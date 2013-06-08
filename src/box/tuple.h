@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include <util.h>
+#include <pickle.h>
 
 struct tbuf;
 
@@ -93,5 +94,28 @@ static inline size_t tuple_len(struct tuple *tuple)
 }
 
 void tuple_free(struct tuple *tuple);
+
+/**
+ * Calculate size for a specified fields range
+ *
+ * @returns size of fields data including size of varint data
+ */
+static inline size_t
+tuple_range_size(const void **begin, const void *end, size_t count)
+{
+	const void *start = *begin;
+	while (*begin < end && count-- > 0) {
+		size_t len = load_varint32(begin);
+		*begin += len;
+	}
+	return *begin - start;
+}
+
+static inline uint32_t
+valid_tuple(const void *data, const void *end, uint32_t field_count)
+{
+	return tuple_range_size(&data, end, field_count);
+}
+
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

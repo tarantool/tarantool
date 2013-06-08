@@ -29,3 +29,5 @@ target_link_libraries(objc_catchcxx ${LIBOBJC_LIBRARIES} ${LUAJIT_LIB} -lm -pthr
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
     target_link_libraries(objc_catchcxx dl)
 endif()
+
+add_executable(base64 base64.c ${CMAKE_SOURCE_DIR}/third_party/base64.c)
