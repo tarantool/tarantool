@@ -1,8 +1,13 @@
 
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
 #include <tp.h>
 
-#if 0
 static void reply_print(struct tp *rep) {
 	while (tp_next(rep)) {
 		printf("tuple fields: %d\n", tp_tuplecount(rep));
@@ -17,47 +22,88 @@ static void reply_print(struct tp *rep) {
 	}
 }
 
-static int reply(void) {
+static inline int
+test_check_read_reply(int fd) {
 	struct tp rep;
 	tp_init(&rep, NULL, 0, tp_realloc, NULL);
-
 	while (1) {
 		ssize_t to_read = tp_req(&rep);
-		printf("to_read: %zu\n", to_read);
 		if (to_read <= 0)
 			break;
 		ssize_t new_size = tp_ensure(&rep, to_read);
-		printf("new_size: %zu\n", new_size);
-		if (new_size == -1)
-			return -1;
-		int rc = fread(rep.p, to_read, 1, stdin);
-		if (rc != 1)
+		if (new_size == -1) {
+			// no memory (?)
 			return 1;
-		tp_use(&rep, to_read);
+		}
+		ssize_t res = read(fd, rep.p, to_read);
+		if (res == 0) {
+			// eof
+			return 1;
+		} else if (res < 0) {
+			// error
+			return 1;
+		}
+		tp_use(&rep, res);
 	}
 
 	ssize_t server_code = tp_reply(&rep);
 
-	printf("op:    %d\n", tp_replyop(&rep));
-	printf("count: %d\n", tp_replycount(&rep));
-	printf("code:  %zu\n", server_code);
-
 	if (server_code != 0) {
 		printf("error: %-.*s\n", tp_replyerrorlen(&rep),
-		       tp_replyerror(&rep));
+		   tp_replyerror(&rep));
+		tp_free(&rep);
 		return 1;
 	}
-
-	reply_print(&rep);
-
-	/*
-	tp_rewind(&rep);
-	reply_print(&rep);
-	*/
-
+	if (tp_replyop(&rep) == 17) { /* select */
+		reply_print(&rep);
+	} else
+	if (tp_replyop(&rep) == 13) { /* insert */
+	} else {
+		assert(0);
+	}
+	tp_free(&rep);
 	return 0;
 }
-#endif
+
+static inline int
+test_check_read(void)
+{
+    int fd;
+    struct sockaddr_in tt;
+    if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+		printf("Failed to create socket\n");
+		return 1;
+    }
+
+    memset(&tt, 0, sizeof(tt));
+    tt.sin_family = AF_INET;
+    tt.sin_addr.s_addr = inet_addr("127.0.0.1");
+    tt.sin_port = htons(33013);
+    if (connect(fd, (struct sockaddr *) &tt, sizeof(tt)) < 0) {
+		printf("Failed to connect\n");
+		return 1;
+    }
+
+    {
+		struct tp req;
+		tp_init(&req, NULL, 0, tp_realloc, NULL);
+		tp_insert(&req, 0, 0);
+		tp_tuple(&req);
+		tp_sz(&req, "_i32");
+		tp_sz(&req, "0e72ae1a-d0be-4e49-aeb9-aebea074363c");
+		tp_select(&req, 0, 0, 0, 1);
+		tp_tuple(&req);
+		tp_sz(&req, "_i32");
+		assert(write(fd, tp_buf(&req), tp_used(&req)) == tp_used(&req));
+		tp_free(&req);
+    }
+
+	assert(test_check_read_reply(fd) == 0);
+	assert(test_check_read_reply(fd) == 0);
+
+	close(fd);
+    return 0;
+}
 
 static inline void
 test_check_buffer_initialized(void) {
@@ -76,57 +122,6 @@ main(int argc, char *argv[])
 	(void)argv;
 
 	test_check_buffer_initialized();
-
-#if 0
-	if (argc == 2 && !strcmp(argv[1], "--reply"))
-		return reply();
-
-	char buf[128];
-	struct tp req;
-	tp_init(&req, buf, sizeof(buf), NULL, NULL);
-
-	/*
-	tp_insert(&req, 0, TP_FRET);
-	tp_tuple(&req);
-	tp_sz(&req, "key");
-	tp_sz(&req, "value");
-	*/
-
-	/*
-	tp_ping(&req);
-	*/
-
-	/*
-	tp_select(&req, 0, 1, 0, 10);
-	tp_tuple(&req);
-	tp_sz(&req, "key");
-	*/
-
-	/*
-	tp_update(&req, 0, 0);
-	tp_tuple(&req);
-	tp_sz(&req, "key");
-	tp_updatebegin(&req);
-	tp_op(&req, 1, TP_OPSET, "VALUE", 5);
-	*/
-
-	/*
-	char proc[] = "hello_proc";
-	tp_call(&req, 0, proc, sizeof(proc) - 1);
-	tp_tuple(&req);
-	tp_sz(&req, "arg1");
-	tp_sz(&req, "arg2");
-	*/
-
-	/*
-	tp_update(&req, 0, 0);
-	tp_tuple(&req);
-	tp_sz(&req, "key");
-	tp_updatebegin(&req);
-	tp_opsplice(&req, 1, 0, 2, "VAL", 3);
-	*/
-
-	fwrite(buf, tp_used(&req), 1, stdout);
-#endif
+	assert(test_check_read() == 0);
 	return 0;
 }
