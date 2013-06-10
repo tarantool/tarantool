@@ -59,7 +59,7 @@ test_check_read_reply(int fd) {
 	} else
 	if (tp_replyop(&rep) == 13) { /* insert */
 	} else {
-		assert(0);
+		return 1;
 	}
 	tp_free(&rep);
 	return 0;
@@ -68,41 +68,46 @@ test_check_read_reply(int fd) {
 static inline int
 test_check_read(void)
 {
-    int fd;
-    struct sockaddr_in tt;
-    if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+	int fd;
+	struct sockaddr_in tt;
+	if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
 		printf("Failed to create socket\n");
 		return 1;
-    }
+	}
 
-    memset(&tt, 0, sizeof(tt));
-    tt.sin_family = AF_INET;
-    tt.sin_addr.s_addr = inet_addr("127.0.0.1");
-    tt.sin_port = htons(33013);
-    if (connect(fd, (struct sockaddr *) &tt, sizeof(tt)) < 0) {
+	memset(&tt, 0, sizeof(tt));
+	tt.sin_family = AF_INET;
+	tt.sin_addr.s_addr = inet_addr("127.0.0.1");
+	tt.sin_port = htons(33013);
+	if (connect(fd, (struct sockaddr *) &tt, sizeof(tt)) < 0) {
 		printf("Failed to connect\n");
 		return 1;
-    }
+	}
 
-    {
-		struct tp req;
-		tp_init(&req, NULL, 0, tp_realloc, NULL);
-		tp_insert(&req, 0, 0);
-		tp_tuple(&req);
-		tp_sz(&req, "_i32");
-		tp_sz(&req, "0e72ae1a-d0be-4e49-aeb9-aebea074363c");
-		tp_select(&req, 0, 0, 0, 1);
-		tp_tuple(&req);
-		tp_sz(&req, "_i32");
-		assert(write(fd, tp_buf(&req), tp_used(&req)) == tp_used(&req));
-		tp_free(&req);
-    }
+	struct tp req;
+	tp_init(&req, NULL, 0, tp_realloc, NULL);
+	tp_insert(&req, 0, 0);
+	tp_tuple(&req);
+	tp_sz(&req, "_i32");
+	tp_sz(&req, "0e72ae1a-d0be-4e49-aeb9-aebea074363c");
+	tp_select(&req, 0, 0, 0, 1);
+	tp_tuple(&req);
+	tp_sz(&req, "_i32");
+	int rc = write(fd, tp_buf(&req), tp_used(&req));
+	if (rc != tp_used(&req))
+		return 1;
 
-	assert(test_check_read_reply(fd) == 0);
-	assert(test_check_read_reply(fd) == 0);
+	tp_free(&req);
+
+	rc = test_check_read_reply(fd);
+	if (rc != 0)
+		return 1;
+	rc = test_check_read_reply(fd);
+	if (rc != 0)
+		return 1;
 
 	close(fd);
-    return 0;
+	return 0;
 }
 
 static inline void
@@ -120,8 +125,7 @@ main(int argc, char *argv[])
 {
 	(void)argc;
 	(void)argv;
-
 	test_check_buffer_initialized();
-	assert(test_check_read() == 0);
+	test_check_read();
 	return 0;
 }
