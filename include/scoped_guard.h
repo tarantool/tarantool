@@ -43,6 +43,7 @@ public:
 	ScopedGuard(ScopedGuard&& guard)
 		: m_fun(guard.m_fun), m_active(true) {
 		guard.m_active = false;
+		abort();
 	}
 
 	~ScopedGuard()
@@ -54,16 +55,16 @@ public:
 	}
 
 private:
-	ScopedGuard(const ScopedGuard&) = delete;
+	explicit ScopedGuard(const ScopedGuard&) = delete;
 	ScopedGuard& operator=(const ScopedGuard&) = delete;
 
-	const Functor& m_fun;
+	Functor m_fun;
 	bool m_active;
 };
 
 template <typename Functor>
 inline ScopedGuard<Functor>
-make_scoped_guard(const Functor& guard)
+make_scoped_guard(Functor guard)
 {
 	return ScopedGuard<Functor>(guard);
 }
