@@ -67,8 +67,8 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 
 		action add {
 			key = tbuf_read_field(keys);
-			struct tuple *tuple = find(key);
-			if (tuple != NULL && !expired(tuple))
+			struct tuple *tuple = memcached_find(key);
+			if (tuple != NULL && !memcached_is_expired(tuple))
 				obuf_dup(out, "NOT_STORED\r\n", 12);
 			else
 				STORE;
@@ -76,8 +76,8 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 
 		action replace {
 			key = tbuf_read_field(keys);
-			struct tuple *tuple = find(key);
-			if (tuple == NULL || expired(tuple))
+			struct tuple *tuple = memcached_find(key);
+			if (tuple == NULL || memcached_is_expired(tuple))
 				obuf_dup(out, "NOT_STORED\r\n", 12);
 			else
 				STORE;
@@ -85,10 +85,10 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 
 		action cas {
 			key = tbuf_read_field(keys);
-			struct tuple *tuple = find(key);
-			if (tuple == NULL || expired(tuple))
+			struct tuple *tuple = memcached_find(key);
+			if (tuple == NULL || memcached_is_expired(tuple))
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
-			else if (meta(tuple)->cas != cas)
+			else if (memcached_meta(tuple)->cas != cas)
 				obuf_dup(out, "EXISTS\r\n", 8);
 			else
 				STORE;
@@ -100,7 +100,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 			u32 value_len;
 
 			key = tbuf_read_field(keys);
-			struct tuple *tuple = find(key);
+			struct tuple *tuple = memcached_find(key);
 			if (tuple == NULL) {
 				obuf_dup(out, "NOT_STORED\r\n", 12);
 			} else {
@@ -129,16 +129,16 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 			u64 value;
 
 			key = tbuf_read_field(keys);
-			struct tuple *tuple = find(key);
-			if (tuple == NULL || expired(tuple)) {
+			struct tuple *tuple = memcached_find(key);
+			if (tuple == NULL || memcached_is_expired(tuple)) {
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			} else {
-				m = meta(tuple);
+				m = memcached_meta(tuple);
 				field = tuple_field(tuple, 3);
 				value_len = load_varint32(&field);
 
-				if (is_numeric(field, value_len)) {
-					value = natoq((const char *) field,
+				if (memcached_is_numeric(field, value_len)) {
+					value = memcached_natoq((const char *) field,
 						(const char *) field + value_len);
 
 					if (incr_sign > 0) {
@@ -160,7 +160,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 
 					stats.cmd_set++;
 					try {
-						store(key, exptime, flags, bytes, data);
+						memcached_store(key, exptime, flags, bytes, data);
 						stats.total_items++;
 						obuf_dup(out, b->data, b->size);
 						obuf_dup(out, "\r\n", 2);
@@ -178,8 +178,8 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 
 		action delete {
 			key = tbuf_read_field(keys);
-			struct tuple *tuple = find(key);
-			if (tuple == NULL || expired(tuple)) {
+			struct tuple *tuple = memcached_find(key);
+			if (tuple == NULL || memcached_is_expired(tuple)) {
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			} else {
 				try {
@@ -206,13 +206,14 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 		}
 
 		action flush_all {
-			struct fiber *f = fiber_new("flush_all", flush_all);
+			struct fiber *f = fiber_new("flush_all",
+						    memcached_flush_all);
 			fiber_call(f, flush_delay);
 			obuf_dup(out, "OK\r\n", 4);
 		}
 
 		action stats {
-			print_stats(out);
+			memcached_print_stats(out);
 		}
 
 		action quit {
@@ -236,17 +237,17 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 		key = printable >key_start ;
 
 		action exptime {
-			exptime = natoq(fstart, p);
+			exptime = memcached_natoq(fstart, p);
 			if (exptime > 0 && exptime <= 60*60*24*30)
 				exptime = exptime + ev_now();
 		}
 		exptime = digit+ >fstart %exptime;
 
-		flags = digit+ >fstart %{flags = natoq(fstart, p);};
-		bytes = digit+ >fstart %{bytes = natoq(fstart, p);};
-		cas_value = digit+ >fstart %{cas = natoq(fstart, p);};
-		incr_value = digit+ >fstart %{incr = natoq(fstart, p);};
-		flush_delay = digit+ >fstart %{flush_delay = natoq(fstart, p);};
+		flags = digit+ >fstart %{flags = memcached_natoq(fstart, p);};
+		bytes = digit+ >fstart %{bytes = memcached_natoq(fstart, p);};
+		cas_value = digit+ >fstart %{cas = memcached_natoq(fstart, p);};
+		incr_value = digit+ >fstart %{incr = memcached_natoq(fstart, p);};
+		flush_delay = digit+ >fstart %{flush_delay = memcached_natoq(fstart, p);};
 
 		action read_data {
 			size_t parsed = p - in->pos;

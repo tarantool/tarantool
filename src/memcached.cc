@@ -73,7 +73,7 @@ struct meta {
 } __packed__;
 
 static u64
-natoq(const char *start, const char *end)
+memcached_natoq(const char *start, const char *end)
 {
 	u64 num = 0;
 	while (start < end) {
@@ -119,7 +119,8 @@ tbuf_read_field(struct tbuf *buf)
 }
 
 static void
-store(const char *key, u32 exptime, u32 flags, u32 bytes, const char *data)
+memcached_store(const char *key, u32 exptime, u32 flags, u32 bytes,
+		const char *data)
 {
 	u32 box_flags = 0;
 	u32 field_count = 4;
@@ -171,27 +172,27 @@ memcached_delete(const char *key)
 }
 
 static struct tuple *
-find(const char *key)
+memcached_find(const char *key)
 {
 	return memcached_index->findByKey(key, 1);
 }
 
 static struct meta *
-meta(struct tuple *tuple)
+memcached_meta(struct tuple *tuple)
 {
 	const char *field = tuple_field(tuple, 1);
 	return (struct meta *) (field + 1);
 }
 
 static bool
-expired(struct tuple *tuple)
+memcached_is_expired(struct tuple *tuple)
 {
-	struct meta *m = meta(tuple);
+	struct meta *m = memcached_meta(tuple);
 	return m->exptime == 0 ? 0 : m->exptime < ev_now();
 }
 
 static bool
-is_numeric(const char *field, u32 value_len)
+memcached_is_numeric(const char *field, u32 value_len)
 {
 	for (int i = 0; i < value_len; i++)
 		if (*(field + i) < '0' || '9' < *(field + i))
@@ -228,7 +229,7 @@ salloc_stat_memcached_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 }
 
 static void
-print_stats(struct obuf *out)
+memcached_print_stats(struct obuf *out)
 {
 	struct tbuf *buf = tbuf_new(fiber->gc_pool);
 
@@ -278,7 +279,7 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 		u32 _l;
 
 		const char *key = tbuf_read_field(keys);
-		tuple = find(key);
+		tuple = memcached_find(key);
 		key_len = load_varint32(&key);
 
 		if (tuple == NULL) {
@@ -334,7 +335,7 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 }
 
 static void
-flush_all(va_list ap)
+memcached_flush_all(va_list ap)
 {
 	uintptr_t delay = va_arg(ap, uintptr_t);
 	fiber_sleep(delay - ev_now());
@@ -342,7 +343,7 @@ flush_all(va_list ap)
 	struct iterator *it = memcached_index->allocIterator();
 	memcached_index->initIterator(it, ITER_ALL, NULL, 0);
 	while ((tuple = it->next(it))) {
-	       meta(tuple)->exptime = 1;
+		memcached_meta(tuple)->exptime = 1;
 	}
 	it->free(it);
 }
@@ -354,7 +355,7 @@ do {										\
 		obuf_dup(out, "SERVER_ERROR object too large for cache\r\n", 41);\
 	} else {								\
 		try {								\
-			store(key, exptime, flags, bytes, data);		\
+			memcached_store(key, exptime, flags, bytes, data);	\
 			stats.total_items++;					\
 			obuf_dup(out, "STORED\r\n", 8);				\
 		}								\
@@ -580,7 +581,7 @@ restart:
 			if (tuple == NULL)
 				break;
 
-			if (!expired(tuple))
+			if (!memcached_is_expired(tuple))
 				continue;
 
 			say_debug("expire tuple %p", tuple);
