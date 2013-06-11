@@ -52,7 +52,7 @@ struct tuple
 	 * into a contiguous byte array. Each field is prefixed
 	 * with BER-packed field length.
 	 */
-	u8 data[0];
+	char data[0];
 } __attribute__((packed));
 
 /** Allocate a tuple
@@ -76,7 +76,7 @@ tuple_ref(struct tuple *tuple, int count);
  *
  * @returns field data if the field exists, or NULL
  */
-void *
+const char *
 tuple_field(struct tuple *tuple, u32 i);
 
 /**
@@ -84,7 +84,7 @@ tuple_field(struct tuple *tuple, u32 i);
  * key: { value, value, value }
  */
 void
-tuple_print(struct tbuf *buf, u32 field_count, const void *f);
+tuple_print(struct tbuf *buf, u32 field_count, const char *f);
 
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)
@@ -101,18 +101,18 @@ void tuple_free(struct tuple *tuple);
  * @returns size of fields data including size of varint data
  */
 static inline size_t
-tuple_range_size(const void **begin, const void *end, size_t count)
+tuple_range_size(const char **begin, const char *end, size_t count)
 {
-	const char *start = (const char *) *begin;
+	const char *start = *begin;
 	while (*begin < end && count-- > 0) {
 		size_t len = load_varint32(begin);
-		*begin = (const char *) *begin + len;
+		*begin += len;
 	}
-	return (const char*) *begin - start;
+	return *begin - start;
 }
 
 static inline uint32_t
-valid_tuple(const void *data, const void *end, uint32_t field_count)
+valid_tuple(const char *data, const char *end, uint32_t field_count)
 {
 	return tuple_range_size(&data, end, field_count);
 }

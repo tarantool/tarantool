@@ -54,7 +54,7 @@ header_v11_sign(struct header_v11 *header)
 
 void
 row_v11_fill(struct row_v11 *row, u64 lsn, u16 tag, u64 cookie,
-	     const void *metadata, size_t metadata_len, const void
+	     const char *metadata, size_t metadata_len, const char
 	     *data, size_t data_len)
 {
 	row->marker = row_marker_v11;

@@ -126,7 +126,7 @@ struct sparse_str
 {
 	union
 	{
-		u8 data[7];
+		char data[7];
 		u32 offset;
 	};
 	u8 length;
@@ -186,7 +186,7 @@ struct fixed_node {
  */
 struct key_data
 {
-	const u8 *data;
+	const char *data;
 	u32 part_count;
 	union sparse_part parts[];
 };
@@ -306,15 +306,15 @@ fold_with_sparse_parts(struct key_def *key_def, struct tuple *tuple, union spars
 {
 	assert (tuple->field_count >= key_def->max_fieldno);
 
-	const u8 *part_data = tuple->data;
+	const char *part_data = tuple->data;
 
 	memset(parts, 0, sizeof(parts[0]) * key_def->part_count);
 
 	for (u32 field = 0; field < key_def->max_fieldno; ++field) {
 		assert(field < tuple->field_count);
 
-		const u8 *data = part_data;
-		u32 len = load_varint32((const void**) &data);
+		const char *data = part_data;
+		u32 len = load_varint32(&data);
 
 		u32 part = key_def->cmp_order[field];
 		if (part != BOX_FIELD_MAX) {
@@ -347,15 +347,15 @@ fold_with_sparse_parts(struct key_def *key_def, struct tuple *tuple, union spars
 static void
 fold_with_key_parts(struct key_def *key_def, struct key_data *key_data)
 {
-	const u8 *part_data = key_data->data;
+	const char *part_data = key_data->data;
 	union sparse_part* parts = key_data->parts;
 
 	memset(parts, 0, sizeof(parts[0]) * key_def->part_count);
 
 	u32 part_count = MIN(key_def->part_count, key_data->part_count);
 	for (u32 part = 0; part < part_count; ++part) {
-		const u8 *data = part_data;
-		u32 len = load_varint32((const void**) &data);
+		const char *data = part_data;
+		u32 len = load_varint32(&data);
 
 		if (key_def->parts[part].type == NUM) {
 			if (len != sizeof parts[part].num32)
@@ -383,13 +383,13 @@ fold_with_key_parts(struct key_def *key_def, struct key_data *key_data)
 static u32
 fold_with_dense_offset(struct key_def *key_def, struct tuple *tuple)
 {
-	const u8 *tuple_data = tuple->data;
+	const char *tuple_data = tuple->data;
 
 	for (u32 field = 0; field < key_def->max_fieldno; ++field) {
 		assert(field < tuple->field_count);
 
-		const u8 *data = tuple_data;
-		u32 len = load_varint32((const void**) &data);
+		const char *data = tuple_data;
+		u32 len = load_varint32(&data);
 
 		u32 part = key_def->cmp_order[field];
 		if (part != BOX_FIELD_MAX) {
@@ -408,13 +408,13 @@ fold_with_dense_offset(struct key_def *key_def, struct tuple *tuple)
 static u32
 fold_with_num32_value(struct key_def *key_def, struct tuple *tuple)
 {
-	const u8 *tuple_data = tuple->data;
+	const char *tuple_data = tuple->data;
 
 	for (u32 field = 0; field < key_def->max_fieldno; ++field) {
 		assert(field < tuple->field_count);
 
-		const u8 *data = tuple_data;
-		u32 len = load_varint32((const void**) &data);
+		const char *data = tuple_data;
+		u32 len = load_varint32(&data);
 
 		u32 part = key_def->cmp_order[field];
 		if (part != BOX_FIELD_MAX) {
@@ -435,8 +435,8 @@ fold_with_num32_value(struct key_def *key_def, struct tuple *tuple)
  */
 static int
 sparse_part_compare(enum field_data_type type,
-		    const u8 *data_a, union sparse_part part_a,
-		    const u8 *data_b, union sparse_part part_b)
+		    const char *data_a, union sparse_part part_a,
+		    const char *data_b, union sparse_part part_b)
 {
 	if (type == NUM) {
 		return u32_cmp(part_a.num32, part_b.num32);
@@ -444,19 +444,19 @@ sparse_part_compare(enum field_data_type type,
 		return u64_cmp(part_a.num64, part_b.num64);
 	} else {
 		int cmp;
-		const u8 *ad, *bd;
+		const char *ad, *bd;
 		u32 al = part_a.str.length;
 		u32 bl = part_b.str.length;
 		if (al == BIG_LENGTH) {
 			ad = data_a + part_a.str.offset;
-			al = load_varint32((const void **) &ad);
+			al = load_varint32(&ad);
 		} else {
 			assert(al <= sizeof(part_a.str.data));
 			ad = part_a.str.data;
 		}
 		if (bl == BIG_LENGTH) {
 			bd = data_b + part_b.str.offset;
-			bl = load_varint32((const void **) &bd);
+			bl = load_varint32(&bd);
 		} else {
 			assert(bl <= sizeof(part_b.str.data));
 			bd = part_b.str.data;
@@ -519,8 +519,8 @@ sparse_key_node_compare(struct key_def *key_def,
  */
 static int
 dense_part_compare(enum field_data_type type,
-		   const u8 *ad, u32 al,
-		   const u8 *bd, u32 bl)
+		   const char *ad, u32 al,
+		   const char *bd, u32 bl)
 {
 	if (type == NUM) {
 		u32 an, bn;
@@ -563,11 +563,11 @@ dense_node_compare(struct key_def *key_def, u32 first_field,
 	off_a[0] = offset_a;
 	off_b[0] = offset_b;
 	if (part_count > 1) {
-		u8 *ad = tuple_a->data + offset_a;
-		u8 *bd = tuple_b->data + offset_b;
+		const char *ad = tuple_a->data + offset_a;
+		const char *bd = tuple_b->data + offset_b;
 		for (u32 i = 1; i < part_count; ++i) {
-			u32 al = load_varint32((const void**) &ad);
-			u32 bl = load_varint32((const void**) &bd);
+			u32 al = load_varint32(&ad);
+			u32 bl = load_varint32(&bd);
 			ad += al;
 			bd += bl;
 			off_a[i] = ad - tuple_a->data;
@@ -578,10 +578,10 @@ dense_node_compare(struct key_def *key_def, u32 first_field,
 	/* Compare key parts. */
 	for (u32 part = 0; part < part_count; ++part) {
 		u32 field = key_def->parts[part].fieldno;
-		u8 *ad = tuple_a->data + off_a[field - first_field];
-		u8 *bd = tuple_b->data + off_b[field - first_field];
-		u32 al = load_varint32((const void **) &ad);
-		u32 bl = load_varint32((const void **) &bd);
+		const char *ad = tuple_a->data + off_a[field - first_field];
+		const char *bd = tuple_b->data + off_b[field - first_field];
+		u32 al = load_varint32(&ad);
+		u32 bl = load_varint32(&bd);
 		int r = dense_part_compare(key_def->parts[part].type,
 					   ad, al, bd, bl);
 		if (r) {
@@ -605,11 +605,11 @@ linear_node_compare(struct key_def *key_def,
 	assert(first_field + part_count <= tuple_b->field_count);
 
 	/* Compare key parts. */
-	const u8 *ad = tuple_a->data + offset_a;
-	const u8 *bd = tuple_b->data + offset_b;
+	const char *ad = tuple_a->data + offset_a;
+	const char *bd = tuple_b->data + offset_b;
 	for (u32 part = 0; part < part_count; ++part) {
-		u32 al = load_varint32((const void**) &ad);
-		u32 bl = load_varint32((const void**) &bd);
+		u32 al = load_varint32(&ad);
+		u32 bl = load_varint32(&bd);
 		int r = dense_part_compare(key_def->parts[part].type,
 					   ad, al, bd, bl);
 		if (r) {
@@ -626,8 +626,8 @@ linear_node_compare(struct key_def *key_def,
  */
 static int
 dense_key_part_compare(enum field_data_type type,
-		       const u8 *data_a, union sparse_part part_a,
-		       const u8 *bd, u32 bl)
+		       const char *data_a, union sparse_part part_a,
+		       const char *bd, u32 bl)
 {
 	if (type == NUM) {
 		u32 an, bn;
@@ -643,11 +643,11 @@ dense_key_part_compare(enum field_data_type type,
 		return u64_cmp(an, bn);
 	} else {
 		int cmp;
-		const u8 *ad;
+		const char *ad;
 		u32 al = part_a.str.length;
 		if (al == BIG_LENGTH) {
 			ad = data_a + part_a.str.offset;
-			al = load_varint32((const void **) &ad);
+			al = load_varint32(&ad);
 		} else {
 			assert(al <= sizeof(part_a.str.data));
 			ad = part_a.str.data;
@@ -679,9 +679,9 @@ dense_key_node_compare(struct key_def *key_def,
 	/* Find field offsets. */
 	off[0] = offset;
 	if (part_count > 1) {
-		const u8 *data = tuple->data + offset;
+		const char *data = tuple->data + offset;
 		for (u32 i = 1; i < part_count; ++i) {
-			u32 len = load_varint32((const void**) &data);
+			u32 len = load_varint32(&data);
 			data += len;
 			off[i] = data - tuple->data;
 		}
@@ -692,8 +692,8 @@ dense_key_node_compare(struct key_def *key_def,
 		part_count = key_data->part_count;
 	for (u32 part = 0; part < part_count; ++part) {
 		u32 field = key_def->parts[part].fieldno;
-		const u8 *bd = tuple->data + off[field - first_field];
-		u32 bl = load_varint32((const void **) &bd);
+		const char *bd = tuple->data + off[field - first_field];
+		u32 bl = load_varint32(&bd);
 		int r = dense_key_part_compare(key_def->parts[part].type,
 					       key_data->data,
 					       key_data->parts[part],
@@ -721,9 +721,9 @@ linear_key_node_compare(struct key_def *key_def,
 	/* Compare key parts. */
 	if (part_count > key_data->part_count)
 		part_count = key_data->part_count;
-	u8 *bd = tuple->data + offset;
+	const char *bd = tuple->data + offset;
 	for (u32 part = 0; part < part_count; ++part) {
-		u32 bl = load_varint32((const void **) &bd);
+		u32 bl = load_varint32(&bd);
 		int r = dense_key_part_compare(key_def->parts[part].type,
 					       key_data->data,
 					       key_data->parts[part],
@@ -1012,7 +1012,7 @@ TreeIndex::random(u32 rnd) const
 }
 
 struct tuple *
-TreeIndex::findByKey(const void *key, u32 part_count) const
+TreeIndex::findByKey(const char *key, u32 part_count) const
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
@@ -1021,7 +1021,7 @@ TreeIndex::findByKey(const void *key, u32 part_count) const
 			alloca(sizeof(struct key_data) +
 			 _SIZEOF_SPARSE_PARTS(part_count));
 
-	key_data->data = (const u8 *) key;
+	key_data->data = key;
 	key_data->part_count = part_count;
 	fold_with_key_parts(key_def, key_data);
 
@@ -1101,7 +1101,7 @@ TreeIndex::allocIterator() const
 
 void
 TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
-			const void *key, u32 part_count) const
+			const char *key, u32 part_count) const
 {
 	struct tree_iterator *it = tree_iterator(iterator);
 
@@ -1116,7 +1116,7 @@ TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 		type = iterator_type_is_reverse(type) ? ITER_LE : ITER_GE;
 		key = NULL;
 	}
-	it->key_data.data = (const u8 *) key;
+	it->key_data.data = key;
 	it->key_data.part_count = part_count;
 
 	fold_with_key_parts(key_def, &it->key_data);
@@ -1185,7 +1185,7 @@ TreeIndex::buildNext(struct tuple *tuple)
 		}
 	}
 
-	void *node = ((u8 *) tree.members + tree.size * node_size);
+	void *node = ((char *) tree.members + tree.size * node_size);
 	fold(node, tuple);
 	tree.size++;
 }
@@ -1232,7 +1232,7 @@ TreeIndex::build(Index *pk)
 	struct tuple *tuple;
 
 	for (u32 i = 0; (tuple = it->next(it)) != NULL; ++i) {
-		void *node = ((u8 *) nodes + i * node_size);
+		void *node = ((char *) nodes + i * node_size);
 		fold(node, tuple);
 	}
 

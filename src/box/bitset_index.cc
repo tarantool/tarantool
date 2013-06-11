@@ -182,7 +182,7 @@ BitsetIndex::allocIterator() const
 }
 
 struct tuple *
-BitsetIndex::findByKey(const void *key, u32 part_count) const
+BitsetIndex::findByKey(const char *key, u32 part_count) const
 {
 	(void) key;
 	(void) part_count;
@@ -219,11 +219,11 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	}
 
 	if (new_tuple != NULL) {
-		const void *field = tuple_field(new_tuple,
+		const char *field = tuple_field(new_tuple,
 						key_def->parts[0].fieldno);
 		assert (field != NULL);
 		size_t bitset_key_size = (size_t) load_varint32(&field);
-		const void *bitset_key = field;
+		const char *bitset_key = field;
 
 		size_t value = tuple_to_value(new_tuple);
 		if (bitset_index_insert(&index, bitset_key,
@@ -238,7 +238,7 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 
 void
 BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
-			  const void *key, u32 part_count) const
+			  const char *key, u32 part_count) const
 {
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
@@ -249,7 +249,7 @@ BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 	if (type != ITER_ALL) {
 		check_key_parts(key_def, part_count,
 				bitset_index_traits.allows_partial_key);
-		const void *key2 = key;
+		const char *key2 = key;
 		bitset_key_size = (size_t) load_varint32(&key2);
 		bitset_key = key2;
 	}

@@ -52,11 +52,11 @@ extern "C" {
 #include <third_party/base64.h>
 
 static void process_replica(struct port *port,
-			    u32 op, const void *reqdata, u32 reqlen);
+			    u32 op, const char *reqdata, u32 reqlen);
 static void process_ro(struct port *port,
-		       u32 op, const void *reqdata, u32 reqlen);
+		       u32 op, const char *reqdata, u32 reqlen);
 static void process_rw(struct port *port,
-		       u32 op, const void *reqdata, u32 reqlen);
+		       u32 op, const char *reqdata, u32 reqlen);
 box_process_func box_process = process_ro;
 box_process_func box_process_ro = process_ro;
 
@@ -68,7 +68,7 @@ struct box_snap_row {
 	u32 space;
 	u32 tuple_size;
 	u32 data_size;
-	u8 data[];
+	char data[];
 } __attribute__((packed));
 
 void
@@ -80,7 +80,7 @@ port_send_tuple(struct port *port, struct txn *txn, u32 flags)
 }
 
 static void
-process_rw(struct port *port, u32 op, const void *reqdata, u32 reqlen)
+process_rw(struct port *port, u32 op, const char *reqdata, u32 reqlen)
 {
 	struct txn *txn = txn_begin();
 
@@ -99,7 +99,7 @@ process_rw(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 }
 
 static void
-process_replica(struct port *port, u32 op, const void *reqdata, u32 reqlen)
+process_replica(struct port *port, u32 op, const char *reqdata, u32 reqlen)
 {
 	if (!request_is_select(op)) {
 		tnt_raise(ClientError, ER_NONMASTER,
@@ -109,7 +109,7 @@ process_replica(struct port *port, u32 op, const void *reqdata, u32 reqlen)
 }
 
 static void
-process_ro(struct port *port, u32 op, const void *reqdata, u32 reqlen)
+process_ro(struct port *port, u32 op, const char *reqdata, u32 reqlen)
 {
 	if (!request_is_select(op))
 		tnt_raise(LoggedError, ER_SECONDARY);
@@ -136,7 +136,7 @@ recover_snap_row(const void *data)
 
 		int base64_buflen = base64_bufsize(row->data_size);
 		char *base64_buf = (char *) malloc(base64_buflen);
-		int len = base64_encode((const char *) row->data, row->data_size,
+		int len = base64_encode(row->data, row->data_size,
 					base64_buf, base64_buflen);
 		write(STDERR_FILENO, base64_buf, len);
 		free(base64_buf);
@@ -169,16 +169,15 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 	}
 
 	try {
-		const void *data = t->data;
-		const void *end = t->data + t->size;
+		const char *data = t->data;
+		const char *end = t->data + t->size;
 		u16 tag = pick_u16(&data, end);
 		(void) pick_u64(&data, end); /* drop cookie */
 		if (tag == SNAP) {
 			recover_snap_row(data);
 		} else if (tag == XLOG) {
 			u16 op = pick_u16(&data, end);
-			process_rw(&port_null, op, data,
-				   (const char *) end - (const char *) data);
+			process_rw(&port_null, op, data, end - data);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
@@ -376,7 +375,7 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 	header.tuple_size = tuple->field_count;
 	header.data_size = tuple->bsize;
 
-	snapshot_write_row(l, batch, (void *) &header, sizeof(header),
+	snapshot_write_row(l, batch, (const char *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);
 }
 
