@@ -13,7 +13,7 @@ install:
   - sudo apt-get -q install binutils-dev python-daemon python-yaml python-pexpect
 
 script:
-  - mkdir ./build && cd ./build && cmake .. -DCMAKE_BUILD_TYPE=Release
+  - mkdir ./build && cd ./build && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo
   - make -j8
   - make test
 
