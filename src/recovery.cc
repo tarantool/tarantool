@@ -1104,7 +1104,7 @@ wal_writer_thread(void *worker_args)
  */
 int
 wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
-	  u16 op, const void *row, u32 row_len)
+	  u16 op, const char *row, u32 row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
@@ -1120,8 +1120,8 @@ wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
 
 	req->fiber = fiber;
 	req->res = -1;
-	row_v11_fill(&req->row, lsn, XLOG, cookie, &op, sizeof(op),
-		     row, row_len);
+	row_v11_fill(&req->row, lsn, XLOG, cookie, (const char *) &op,
+		     sizeof(op), row, row_len);
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
 
@@ -1155,8 +1155,8 @@ snap_write_batch(struct fio_batch *batch, int fd)
 
 void
 snapshot_write_row(struct log_io *l, struct fio_batch *batch,
-		   const void *metadata, size_t metadata_len,
-		   const void *data, size_t data_len)
+		   const char *metadata, size_t metadata_len,
+		   const char *data, size_t data_len)
 {
 	static int rows;
 	static int bytes;

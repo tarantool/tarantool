@@ -103,11 +103,11 @@ struct request
 {
 	u32 type;
 	u32 flags;
-	const void *data;
+	const char *data;
 	u32 len;
 };
 
-struct request *request_create(u32 type, const void *data, u32 len);
+struct request *request_create(u32 type, const char *data, u32 len);
 
 void request_execute(struct request *request, struct txn *txn, struct port *port);
 

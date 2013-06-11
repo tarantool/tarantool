@@ -148,7 +148,7 @@ struct row_v11 {
 
 void
 row_v11_fill(struct row_v11 *row, u64 lsn, u16 tag, u64 cookie,
-	     const void *metadata, size_t metadata_len, const void
+	     const char *metadata, size_t metadata_len, const char
 	     *data, size_t data_len);
 
 static inline size_t

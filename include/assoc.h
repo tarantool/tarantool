@@ -69,7 +69,7 @@ struct mh_i64ptr_node_t {
 /*
  * Map: (char *) => (void *)
  */
-static inline int lstrcmp(const void *a, const void *b)
+static inline int lstrcmp(const char *a, const char *b)
 {
 	unsigned int al, bl;
 
@@ -83,7 +83,7 @@ static inline int lstrcmp(const void *a, const void *b)
 #include <third_party/PMurHash.h>
 #define mh_name _lstrptr
 struct mh_lstrptr_node_t {
-	const void *key;
+	const char *key;
 	void *val;
 };
 
@@ -93,7 +93,7 @@ struct mh_lstrptr_node_t {
 static inline u32
 mh_strptr_hash(const mh_node_t *a, mh_arg_t arg) {
 	(void) arg;
-	const void *_k = (a->key);
+	const char *_k = a->key;
 	const u32 l = load_varint32(&_k);
 	return PMurHash32(13, _k, l);
 }

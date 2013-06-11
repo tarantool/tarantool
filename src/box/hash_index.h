@@ -47,7 +47,7 @@ public:
 	virtual struct tuple *min() const;
 	virtual struct tuple *max() const;
 	virtual struct tuple *random(u32 rnd) const = 0;
-	virtual struct tuple *findByKey(const void *key, u32 part_count) const  = 0;
+	virtual struct tuple *findByKey(const char *key, u32 part_count) const  = 0;
 	virtual struct tuple *findByTuple(struct tuple *tuple) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
@@ -56,7 +56,7 @@ public:
 	virtual struct iterator *allocIterator() const = 0;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
-				  const void *key, u32 part_count) const  = 0;
+				  const char *key, u32 part_count) const  = 0;
 
 	virtual void reserve(u32 n_tuples) = 0;
 };

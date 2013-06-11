@@ -39,7 +39,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 	char *p, *pe;
 	char *fstart;
 	struct tbuf *keys = tbuf_new(fiber->gc_pool);
-	const void *key;
+	const char *key;
 	bool append, show_cas;
 	int incr_sign;
 	u64 cas, incr;
@@ -96,7 +96,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 
 		action append_prepend {
 			struct tbuf *b;
-			const void *value;
+			const char *value;
 			u32 value_len;
 
 			key = tbuf_read_field(keys);
@@ -124,7 +124,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 		action incr_decr {
 			struct meta *m;
 			struct tbuf *b;
-			const void *field;
+			const char *field;
 			u32 value_len;
 			u64 value;
 
@@ -183,7 +183,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			} else {
 				try {
-					remove(key);
+					memcached_delete(key);
 					obuf_dup(out, "DELETED\r\n", 9);
 				}
 				catch (const ClientError& e) {
