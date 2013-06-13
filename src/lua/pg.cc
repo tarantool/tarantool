@@ -22,7 +22,7 @@ extern "C" {
 
 #include <lua/init.h>
 #include <say.h>
-#include <guard.h>
+#include <scoped_guard.h>
 
 
 static PGconn *
@@ -252,7 +252,9 @@ lua_pg_execute(struct lua_State *L)
 			strerror(errno));
 	}
 
-	GUARD([&]{ PQclear(res); });
+	auto scope_guard = make_scoped_guard([&]{
+		PQclear(res);
+	});
 	return lua_push_pgres(L, res);
 }
 

@@ -46,7 +46,7 @@ extern "C" {
 #include "salloc.h"
 #include "pickle.h"
 #include "coio_buf.h"
-#include <guard.h>
+#include "scoped_guard.h"
 
 #define STAT(_)					\
         _(MEMC_GET, 1)				\
@@ -73,7 +73,7 @@ struct meta {
 } __packed__;
 
 static u64
-natoq(const char *start, const char *end)
+memcached_natoq(const char *start, const char *end)
 {
 	u64 num = 0;
 	while (start < end) {
@@ -84,18 +84,18 @@ natoq(const char *start, const char *end)
 }
 
 void
-tbuf_append_field(struct tbuf *b, const void *f)
+tbuf_append_field(struct tbuf *b, const char *f)
 {
-	const void *begin = f;
+	const char *begin = f;
 	u32 size = load_varint32(&f);
-	tbuf_append(b, begin, (const char *) f - (const char *) begin + size);
+	tbuf_append(b, begin, f - begin + size);
 }
 
 void
-tbuf_store_field(struct tbuf *b, const void *field, u32 len)
+tbuf_store_field(struct tbuf *b, const char *field, u32 len)
 {
 	char buf[sizeof(u32)+1];
-	char *bufend = (char *) pack_varint32(buf, len);
+	char *bufend = pack_varint32(buf, len);
 	tbuf_append(b, buf, bufend - buf);
 	tbuf_append(b, field, len);
 }
@@ -104,22 +104,23 @@ tbuf_store_field(struct tbuf *b, const void *field, u32 len)
  * Check that we have a valid field and return it.
  * Advances the buffer to point after the field as a side effect.
  */
-const void *
+const char *
 tbuf_read_field(struct tbuf *buf)
 {
-	const void *field = buf->data;
-	u32 field_len = pick_varint32((const void **) &buf->data,
+	const char *field = buf->data;
+	u32 field_len = pick_varint32((const char **) &buf->data,
 				      buf->data + buf->size);
-	if ((char *) buf->data + field_len > (char *) field + buf->size)
+	if (buf->data + field_len > field + buf->size)
 		tnt_raise(IllegalParams, "packet too short (expected a field)");
 	buf->data += field_len;
-	buf->size -= (const char *) buf->data - (const char *) field;
-	buf->capacity -= (const char *) buf->data - (const char *) field;
+	buf->size -= buf->data - field;
+	buf->capacity -= buf->data - field;
 	return field;
 }
 
 static void
-store(const void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
+memcached_store(const char *key, u32 exptime, u32 flags, u32 bytes,
+		const char *data)
 {
 	u32 box_flags = 0;
 	u32 field_count = 4;
@@ -137,7 +138,7 @@ store(const void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 	m.exptime = exptime;
 	m.flags = flags;
 	m.cas = cas++;
-	tbuf_store_field(req, &m, sizeof(m));
+	tbuf_store_field(req, (const char *) &m, sizeof(m));
 
 	char b[43];
 	sprintf(b, " %" PRIu32 " %" PRIu32 "\r\n", flags, bytes);
@@ -156,7 +157,7 @@ store(const void *key, u32 exptime, u32 flags, u32 bytes, const char *data)
 }
 
 static void
-remove(const void *key)
+memcached_delete(const char *key)
 {
 	u32 key_len = 1;
 	u32 box_flags = 0;
@@ -171,30 +172,30 @@ remove(const void *key)
 }
 
 static struct tuple *
-find(const void *key)
+memcached_find(const char *key)
 {
 	return memcached_index->findByKey(key, 1);
 }
 
 static struct meta *
-meta(struct tuple *tuple)
+memcached_meta(struct tuple *tuple)
 {
-	void *field = tuple_field(tuple, 1);
-	return (struct meta *) ((char *) field + 1);
+	const char *field = tuple_field(tuple, 1);
+	return (struct meta *) (field + 1);
 }
 
 static bool
-expired(struct tuple *tuple)
+memcached_is_expired(struct tuple *tuple)
 {
-	struct meta *m = meta(tuple);
+	struct meta *m = memcached_meta(tuple);
 	return m->exptime == 0 ? 0 : m->exptime < ev_now();
 }
 
 static bool
-is_numeric(const void *field, u32 value_len)
+memcached_is_numeric(const char *field, u32 value_len)
 {
 	for (int i = 0; i < value_len; i++)
-		if (*((u8 *)field + i) < '0' || '9' < *((u8 *)field + i))
+		if (*(field + i) < '0' || '9' < *(field + i))
 			return false;
 	return true;
 }
@@ -228,7 +229,7 @@ salloc_stat_memcached_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 }
 
 static void
-print_stats(struct obuf *out)
+memcached_print_stats(struct obuf *out)
 {
 	struct tbuf *buf = tbuf_new(fiber->gc_pool);
 
@@ -269,16 +270,16 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 	while (keys_count-- > 0) {
 		struct tuple *tuple;
 		const struct meta *m;
-		const void *field;
-		const void *value;
-		const void *suffix;
+		const char *field;
+		const char *value;
+		const char *suffix;
 		u32 key_len;
 		u32 value_len;
 		u32 suffix_len;
 		u32 _l;
 
-		const void *key = tbuf_read_field(keys);
-		tuple = find(key);
+		const char *key = tbuf_read_field(keys);
+		tuple = memcached_find(key);
 		key_len = load_varint32(&key);
 
 		if (tuple == NULL) {
@@ -291,17 +292,17 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 
 		/* skip key */
 		_l = load_varint32(&field);
-		field = (const char *) field + _l;
+		field = field + _l;
 
 		/* metainfo */
 		_l = load_varint32(&field);
 		m = (const struct meta *) field;
-		field = (const char *) field + _l;
+		field = field + _l;
 
 		/* suffix */
 		suffix_len = load_varint32(&field);
 		suffix = field;
-		field = (const char *) field + suffix_len;
+		field = field + suffix_len;
 
 		/* value */
 		value_len = load_varint32(&field);
@@ -334,7 +335,7 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 }
 
 static void
-flush_all(va_list ap)
+memcached_flush_all(va_list ap)
 {
 	uintptr_t delay = va_arg(ap, uintptr_t);
 	fiber_sleep(delay - ev_now());
@@ -342,7 +343,7 @@ flush_all(va_list ap)
 	struct iterator *it = memcached_index->allocIterator();
 	memcached_index->initIterator(it, ITER_ALL, NULL, 0);
 	while ((tuple = it->next(it))) {
-	       meta(tuple)->exptime = 1;
+		memcached_meta(tuple)->exptime = 1;
 	}
 	it->free(it);
 }
@@ -354,7 +355,7 @@ do {										\
 		obuf_dup(out, "SERVER_ERROR object too large for cache\r\n", 41);\
 	} else {								\
 		try {								\
-			store(key, exptime, flags, bytes, data);		\
+			memcached_store(key, exptime, flags, bytes, data);	\
 			stats.total_items++;					\
 			obuf_dup(out, "STORED\r\n", 8);				\
 		}								\
@@ -418,7 +419,7 @@ memcached_handler(va_list ap)
 	stats.curr_connections++;
 
 	try {
-		GUARD([&] {
+		auto scoped_guard = make_scoped_guard([&] {
 			fiber_sleep(0.01);
 			stats.curr_connections--;
 			evio_close(&coio);
@@ -538,7 +539,7 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 
 	while (keys_to_delete->size > 0) {
 		try {
-			remove(tbuf_read_field(keys_to_delete));
+			memcached_delete(tbuf_read_field(keys_to_delete));
 			expired_keys++;
 		}
 		catch (const ClientError& e) {
@@ -580,7 +581,7 @@ restart:
 			if (tuple == NULL)
 				break;
 
-			if (!expired(tuple))
+			if (!memcached_is_expired(tuple))
 				continue;
 
 			say_debug("expire tuple %p", tuple);

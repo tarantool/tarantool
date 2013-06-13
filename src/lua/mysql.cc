@@ -17,7 +17,7 @@ extern "C" {
 #include <lua/init.h>
 #include <say.h>
 #include <mysql.h>
-#include <guard.h>
+#include <scoped_guard.h>
 
 
 /**
@@ -309,7 +309,9 @@ lua_mysql_execute(struct lua_State *L)
 		if (res == -1)
 			luaL_error(L, "%s", strerror(errno));
 
-		GUARD([&]{ mysql_free_result(result); });
+		auto scope_guard = make_scoped_guard([&]{
+			mysql_free_result(result);
+		});
 		lua_push_mysql_result(L, mysql, result, resno++);
 
 	} while(mysql_more_results(mysql));

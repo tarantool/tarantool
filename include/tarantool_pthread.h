@@ -31,27 +31,7 @@
 
 #include "config.h"
 
-#if defined(HAVE_NON_C99_PTHREAD_H)
-/*
- * Old versions of glibc (pre-2006) use "extern __inline" for this function.
- * This definition, of course, does not work properly with C99 mode when
- * multiple compilation units are used.
- *
- * By defining "static inline" prototype we force GCC think that
- * this method is "static" and no global symbols must be produced for it.
- *
- * See http://gcc.gnu.org/ml/gcc-patches/2006-11/msg01030.html
- *     http://gcc.gnu.org/ml/gcc-patches/2008-07/msg02449.html
- */
-struct __pthread_cleanup_frame;
-static inline void
-__pthread_cleanup_routine(struct __pthread_cleanup_frame *__frame);
-
-#define __inline
-#endif /* HAVE_NON_C99_PTHREAD_H */
-
 #include <pthread.h>
-
 #include <util.h>
 #include <say.h>
 

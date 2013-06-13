@@ -1,0 +1,26 @@
+language: cpp
+compiler:
+  - clang
+  - gcc
+
+branches:
+  only:
+    - master
+    - stable
+
+install:
+  - sudo apt-get update > /dev/null
+  - sudo apt-get -q install binutils-dev python-daemon python-yaml python-pexpect
+
+script:
+  - mkdir ./build && cd ./build && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo
+  - make -j8
+  - make test
+
+notifications:
+  irc:
+    channels:
+      - irc.freenode.net#tarantool
+    on_success: change
+    on_failure: always
+  email: false

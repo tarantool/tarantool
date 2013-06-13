@@ -81,12 +81,12 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 	while (new_capacity < e->size + required)
 		new_capacity *= 2;
 
-	void *p = palloc(e->pool, new_capacity);
+	char *p = (char *) palloc(e->pool, new_capacity);
 
 	poison(p, new_capacity);
 	memcpy(p, e->data, e->size);
 	poison(e->data, e->size);
-	e->data = (char *) p;
+	e->data = p;
 	e->capacity = new_capacity;
 	tbuf_assert(e);
 }
@@ -109,7 +109,7 @@ tbuf_split(struct tbuf *orig, size_t at)
 	head->pool = orig->pool;
 	head->data = orig->data;
 	head->size = head->capacity = at;
-	orig->data = (char *) orig->data + at;
+	orig->data += at;
 	orig->capacity -= at;
 	orig->size -= at;
 	return head;
@@ -121,7 +121,7 @@ tbuf_peek(struct tbuf *b, size_t count)
 	void *p = b->data;
 	tbuf_assert(b);
 	if (count <= b->size) {
-		b->data = (char *) b->data + count;
+		b->data += count;
 		b->size -= count;
 		b->capacity -= count;
 		return p;
@@ -159,7 +159,7 @@ tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 	va_copy(ap_copy, ap);
 
 	tbuf_assert(b);
-	printed_len = vsnprintf(((char *)b->data) + b->size, free_len, format, ap);
+	printed_len = vsnprintf(b->data + b->size, free_len, format, ap);
 
 	/*
 	 * if buffer too short, resize buffer and
@@ -168,7 +168,7 @@ tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 	if (free_len <= printed_len) {
 		tbuf_ensure(b, printed_len + 1);
 		free_len = b->capacity - b->size - 1;
-		printed_len = vsnprintf(((char *)b->data) + b->size, free_len, format, ap_copy);
+		printed_len = vsnprintf(b->data + b->size, free_len, format, ap_copy);
 	}
 
 	b->size += printed_len;

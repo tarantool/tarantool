@@ -559,7 +559,7 @@ static int
 replication_relay_send_row(void *param, struct tbuf *t)
 {
 	int client_sock = (int) (intptr_t) param;
-	u8 *data = (u8 *) t->data;
+	const char *data = t->data;
 	ssize_t bytes, len = t->size;
 	while (len > 0) {
 		bytes = write(client_sock, data, len);

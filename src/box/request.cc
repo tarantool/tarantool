@@ -41,11 +41,11 @@
 STRS(requests, REQUESTS);
 STRS(update_op_codes, UPDATE_OP_CODES);
 
-static const void *
-read_key(const void **reqpos, const void *reqend, u32 *key_part_count)
+static const char *
+read_key(const char **reqpos, const char *reqend, u32 *key_part_count)
 {
 	*key_part_count = pick_u32(reqpos, reqend);
-	const void *key = *key_part_count ? *reqpos : NULL;
+	const char *key = *key_part_count ? *reqpos : NULL;
 	/* Advance remaining fields of a key */
 	for (u32 i = 0; i < *key_part_count; i++)
 		pick_field(reqpos, reqend);
@@ -53,7 +53,7 @@ read_key(const void **reqpos, const void *reqend, u32 *key_part_count)
 }
 
 static struct space *
-read_space(const void **reqpos, const void *reqend)
+read_space(const char **reqpos, const char *reqend)
 {
 	u32 space_no = pick_u32(reqpos, reqend);
 	return space_find(space_no);
@@ -71,8 +71,8 @@ static void
 execute_replace(struct request *request, struct txn *txn)
 {
 	txn_add_redo(txn, request->type, request->data, request->len);
-	const void **reqpos = &request->data;
-	const void *reqend = (const char *) request->data + request->len;
+	const char **reqpos = &request->data;
+	const char *reqend = request->data + request->len;
 	struct space *sp = read_space(reqpos, reqend);
 	request->flags |= (pick_u32(reqpos, reqend) &
 			   BOX_ALLOWED_REQUEST_FLAGS);
@@ -81,7 +81,7 @@ execute_replace(struct request *request, struct txn *txn)
 	if (field_count == 0)
 		tnt_raise(IllegalParams, "tuple field count is 0");
 
-	size_t tuple_len = (const char *) reqend - (const char *) *reqpos;
+	size_t tuple_len = reqend - *reqpos;
 	if (tuple_len != valid_tuple(*reqpos, reqend, field_count))
 		tnt_raise(IllegalParams, "incorrect tuple length");
 
@@ -165,7 +165,7 @@ execute_replace(struct request *request, struct txn *txn)
 /** Argument of SET operation. */
 struct op_set_arg {
 	u32 length;
-	const void *value;
+	const char *value;
 };
 
 /** Argument of ADD, AND, XOR, OR operations. */
@@ -181,7 +181,7 @@ struct op_arith_arg {
 struct op_splice_arg {
 	i32 offset;	   /** splice position */
 	i32 cut_length;    /** cut this many bytes. */
-	const void *paste; /** paste what? */
+	const char *paste; /** paste what? */
 	i32 paste_length;  /** paste this many bytes. */
 
 	/** Offset of the tail in the old field */
@@ -200,7 +200,7 @@ struct update_field;
 struct update_op;
 
 typedef void (*init_op_func)(struct rope *rope, struct update_op *op);
-typedef void (*do_op_func)(union update_op_arg *arg, const void *in, void *out);
+typedef void (*do_op_func)(union update_op_arg *arg, const char *in, char *out);
 
 /** A set of functions and properties to initialize and do an op. */
 struct update_op_meta {
@@ -229,9 +229,9 @@ struct update_field {
 	/** UPDATE operations against the first field in the range. */
 	struct op_list ops;
 	/** Points at start of field *data* in the old tuple. */
-	const void *old;
+	const char *old;
 	/** End of the old field. */
-	const void *tail;
+	const char *tail;
 	/**
 	 * Length of the "tail" in the old tuple from end
 	 * of old data to the beginning of the field in the
@@ -242,11 +242,11 @@ struct update_field {
 
 static void
 update_field_init(struct update_field *field,
-		  const void *old, u32 old_len, u32 tail_len)
+		  const char *old, u32 old_len, u32 tail_len)
 {
 	STAILQ_INIT(&field->ops);
 	field->old = old;
-	field->tail = (char *) old + old_len;
+	field->tail = old + old_len;
 	field->tail_len = tail_len;
 }
 
@@ -254,8 +254,7 @@ static inline u32
 update_field_len(struct update_field *f)
 {
 	struct update_op *last = STAILQ_LAST(&f->ops, update_op, next);
-	return last ? last->new_field_len
-		    : (const char *) f->tail - (const char *) f->old;
+	return last ? last->new_field_len : f->tail - f->old;
 }
 
 static inline void
@@ -276,14 +275,14 @@ op_adjust_field_no(struct update_op *op, u32 field_max)
 
 
 static void
-do_update_op_set(struct op_set_arg *arg, const void *in __attribute__((unused)),
-		 void *out)
+do_update_op_set(struct op_set_arg *arg, const char *in __attribute__((unused)),
+		 char *out)
 {
 	memcpy(out, arg->value, arg->length);
 }
 
 static void
-do_update_op_add(struct op_arith_arg *arg, const void *in, void *out)
+do_update_op_add(struct op_arith_arg *arg, const char *in, char *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in + arg->i32_val;
@@ -292,7 +291,7 @@ do_update_op_add(struct op_arith_arg *arg, const void *in, void *out)
 }
 
 static void
-do_update_op_subtract(struct op_arith_arg *arg, const void *in, void *out)
+do_update_op_subtract(struct op_arith_arg *arg, const char *in, char *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in - arg->i32_val;
@@ -301,7 +300,7 @@ do_update_op_subtract(struct op_arith_arg *arg, const void *in, void *out)
 }
 
 static void
-do_update_op_and(struct op_arith_arg *arg, const void *in, void *out)
+do_update_op_and(struct op_arith_arg *arg, const char *in, char *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in & arg->i32_val;
@@ -310,7 +309,7 @@ do_update_op_and(struct op_arith_arg *arg, const void *in, void *out)
 }
 
 static void
-do_update_op_xor(struct op_arith_arg *arg, const void *in, void *out)
+do_update_op_xor(struct op_arith_arg *arg, const char *in, char *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in ^ arg->i32_val;
@@ -319,7 +318,7 @@ do_update_op_xor(struct op_arith_arg *arg, const void *in, void *out)
 }
 
 static void
-do_update_op_or(struct op_arith_arg *arg, const void *in, void *out)
+do_update_op_or(struct op_arith_arg *arg, const char *in, char *out)
 {
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in | arg->i32_val;
@@ -328,19 +327,19 @@ do_update_op_or(struct op_arith_arg *arg, const void *in, void *out)
 }
 
 static void
-do_update_op_splice(struct op_splice_arg *arg, const void *in, void *out)
+do_update_op_splice(struct op_splice_arg *arg, const char *in, char *out)
 {
 	memcpy(out, in, arg->offset);           /* copy field head. */
-	out = (char *) out + arg->offset;
+	out = out + arg->offset;
 	memcpy(out, arg->paste, arg->paste_length); /* copy the paste */
-	out = (char *) out + arg->paste_length;
-	memcpy(out, (const char *) in + arg->tail_offset, arg->tail_length); /* copy tail */
+	out = out + arg->paste_length;
+	memcpy(out, in + arg->tail_offset, arg->tail_length); /* copy tail */
 }
 
 static void
 do_update_op_insert(struct op_set_arg *arg,
-		    const void *in __attribute__((unused)),
-		    void *out)
+		    const char *in __attribute__((unused)),
+		    char *out)
 {
 	memcpy(out, arg->value, arg->length);
 }
@@ -433,8 +432,8 @@ init_update_op_splice(struct rope *rope, struct update_op *op)
 	u32 field_len = update_field_len(field);
 
 	struct op_splice_arg *arg = &op->arg.splice;
-	const void *value = op->arg.set.value;
-	const void *end = (const char *) value + op->arg.set.length;
+	const char *value = op->arg.set.value;
+	const char *end = value + op->arg.set.length;
 
 	/* Read the offset. */
 	arg->offset = pick_field_u32(&value, end);
@@ -511,14 +510,13 @@ update_field_split(void *data, size_t size __attribute__((unused)),
 			palloc(fiber->gc_pool, sizeof(struct update_field));
 	assert(offset > 0 && prev->tail_len > 0);
 
-	const void *field = prev->tail;
-	const void *end = (const char *) field + prev->tail_len;
+	const char *field = prev->tail;
+	const char *end = field + prev->tail_len;
 
 	prev->tail_len = tuple_range_size(&field, end, offset - 1);
 	u32 field_len = load_varint32(&field);
 
-	update_field_init(next, field, field_len, (const char *) end -
-			  (const char *) field - field_len);
+	update_field_init(next, field, field_len, end - field - field_len);
 	return next;
 }
 
@@ -538,11 +536,11 @@ update_create_rope(struct update_op *op, struct update_op *op_end,
 
 	struct update_field *first = (struct update_field *)
 			palloc(fiber->gc_pool, sizeof(struct update_field));
-	const void *field = tuple->data;
-	const void *end = tuple->data + tuple->bsize;
+	const char *field = tuple->data;
+	const char *end = tuple->data + tuple->bsize;
 	u32 field_len = load_varint32(&field);
 	update_field_init(first, field, field_len,
-			  (const char *) end - (const char *) field - field_len);
+			  end - field - field_len);
 
 	rope_append(rope, first, tuple->field_count);
 
@@ -577,7 +575,7 @@ update_calc_new_tuple_length(struct rope *rope)
 static void
 do_update_ops(struct rope *rope, struct tuple *new_tuple)
 {
-	char *new_data = (char *) new_tuple->data;
+	char *new_data = new_tuple->data;
 	char *new_data_end = new_data + new_tuple->bsize;
 
 	new_tuple->field_count = 0;
@@ -593,11 +591,11 @@ do_update_ops(struct rope *rope, struct tuple *new_tuple)
 		u32 field_count = rope_leaf_size(node);
 		u32 field_len = update_field_len(field);
 
-		new_data = (char *) pack_varint32(new_data, field_len);
+		new_data = pack_varint32(new_data, field_len);
 
-		const void *old_field = field->old;
-		void *new_field = (STAILQ_EMPTY(&field->ops) ?
-				   (void*) old_field : new_data);
+		const char *old_field = field->old;
+		char *new_field = (STAILQ_EMPTY(&field->ops) ?
+					   (char *) old_field : new_data);
 		struct update_op *op;
 		STAILQ_FOREACH(op, &field->ops, next) {
 			/*
@@ -622,7 +620,7 @@ do_update_ops(struct rope *rope, struct tuple *new_tuple)
 				 * palloc a *new* buffer of sufficient
 				 * size.
 				 */
-				new_field = palloc(fiber->gc_pool,
+				new_field = (char *) palloc(fiber->gc_pool,
 						   op->new_field_len);
 			}
 			op->meta->do_op(&op->arg, old_field, new_field);
@@ -646,7 +644,7 @@ do_update_ops(struct rope *rope, struct tuple *new_tuple)
 }
 
 static struct update_op *
-update_read_ops(const void **reqpos, const void *reqend, u32 op_cnt)
+update_read_ops(const char **reqpos, const char *reqend, u32 op_cnt)
 {
 	if (op_cnt > BOX_UPDATE_OP_CNT_MAX)
 		tnt_raise(IllegalParams, "too many operations for update");
@@ -678,15 +676,15 @@ static void
 execute_update(struct request *request, struct txn *txn)
 {
 	txn_add_redo(txn, request->type, request->data, request->len);
-	const void **reqpos = &request->data;
-	const void *reqend = (const char *) request->data + request->len;
+	const char **reqpos = &request->data;
+	const char *reqend = request->data + request->len;
 	struct space *sp = read_space(reqpos, reqend);
 	request->flags |= (pick_u32(reqpos, reqend) &
 			   BOX_ALLOWED_REQUEST_FLAGS);
 	/* Parse UPDATE request. */
 	/** Search key  and key part count. */
 	u32 key_part_count;
-	const void *key = read_key(reqpos, reqend, &key_part_count);
+	const char *key = read_key(reqpos, reqend, &key_part_count);
 
 	Index *pk = space_index(sp, 0);
 	/* Try to find the tuple by primary key. */
@@ -720,8 +718,8 @@ execute_update(struct request *request, struct txn *txn)
 static void
 execute_select(struct request *request, struct port *port)
 {
-	const void **reqpos = &request->data;
-	const void *reqend = (const char *) request->data + request->len;
+	const char **reqpos = &request->data;
+	const char *reqend = request->data + request->len;
 	struct space *sp = read_space(reqpos, reqend);
 	u32 index_no = pick_u32(reqpos, reqend);
 	Index *index = index_find(sp, index_no);
@@ -743,7 +741,7 @@ execute_select(struct request *request, struct port *port)
 
 		/* read key */
 		u32 key_part_count;
-		const void *key = read_key(reqpos, reqend, &key_part_count);
+		const char *key = read_key(reqpos, reqend, &key_part_count);
 
 		struct iterator *it = index->position();
 		index->initIterator(it, ITER_EQ, key, key_part_count);
@@ -770,8 +768,8 @@ execute_delete(struct request *request, struct txn *txn)
 {
 	u32 type = request->type;
 	txn_add_redo(txn, type, request->data, request->len);
-	const void **reqpos = &request->data;
-	const void *reqend = (const char *) request->data + request->len;
+	const char **reqpos = &request->data;
+	const char *reqend = request->data + request->len;
 	struct space *sp = read_space(reqpos, reqend);
 	if (type == DELETE) {
 		request->flags |= pick_u32(reqpos, reqend) &
@@ -779,7 +777,7 @@ execute_delete(struct request *request, struct txn *txn)
 	}
 	/* read key */
 	u32 key_part_count;
-	const void *key = read_key(reqpos, reqend, &key_part_count);
+	const char *key = read_key(reqpos, reqend, &key_part_count);
 	/* Try to find tuple by primary key */
 	Index *pk = space_index(sp, 0);
 	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
@@ -811,7 +809,7 @@ request_name(u32 type)
 }
 
 struct request *
-request_create(u32 type, const void *data, u32 len)
+request_create(u32 type, const char *data, u32 len)
 {
 	if (request_check_type(type)) {
 		say_error("Unsupported request = %" PRIi32 "", type);

@@ -69,7 +69,7 @@ extern "C" {
 #include "memcached.h"
 #include "session.h"
 #include "box/box.h"
-#include <guard.h>
+#include "scoped_guard.h"
 
 
 static pid_t master_pid;
@@ -229,7 +229,7 @@ reload_cfg(struct tbuf *out)
 	}
 
 
-	GUARD([&] {
+	auto scoped_guard = make_scoped_guard([&] {
 		destroy_tarantool_cfg(&aux_cfg);
 		destroy_tarantool_cfg(&new_cfg);
 

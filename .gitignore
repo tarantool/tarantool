@@ -59,6 +59,7 @@ test/connector_c/update
 test/connector_c/xlog
 test/lib/*.pyc
 test/lib/*/*.pyc
+test/unit/base64
 test/unit/bit_test
 test/unit/bitset_basic_test
 test/unit/bitset_iterator_test

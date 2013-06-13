@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_GUARD_H_INCLUDED
-#define TARANTOOL_GUARD_H_INCLUDED
+#ifndef TARANTOOL_SCOPED_GUARD_H_INCLUDED
+#define TARANTOOL_SCOPED_GUARD_H_INCLUDED
 
 /*
  * Redistribution and use in source and binary forms, with or
@@ -33,19 +33,20 @@
 #include "object.h"
 
 template <typename Functor>
-class Guard {
+class ScopedGuard {
 public:
-	explicit Guard(const Functor& fun)
+	explicit ScopedGuard(const Functor& fun)
 		: m_fun(fun), m_active(true) {
 		/* nothing */
 	}
 
-	Guard(Guard&& guard)
+	ScopedGuard(ScopedGuard&& guard)
 		: m_fun(guard.m_fun), m_active(true) {
 		guard.m_active = false;
+		abort();
 	}
 
-	~Guard()
+	~ScopedGuard()
 	{
 		if (!m_active)
 			return;
@@ -53,32 +54,19 @@ public:
 		m_fun();
 	}
 
-	void
-	cancel(void)
-	{
-		m_active = false;
-	}
-
 private:
-	Guard(const Guard&) = delete;
-	Guard& operator=(const Guard&) = delete;
+	explicit ScopedGuard(const ScopedGuard&) = delete;
+	ScopedGuard& operator=(const ScopedGuard&) = delete;
 
-	const Functor& m_fun;
+	Functor m_fun;
 	bool m_active;
 };
 
 template <typename Functor>
-inline Guard<Functor>
-make_guard(const Functor& guard)
+inline ScopedGuard<Functor>
+make_scoped_guard(Functor guard)
 {
-	return Guard<Functor>(guard);
+	return ScopedGuard<Functor>(guard);
 }
 
-#define TOKENPASTE(x, y) x ## y
-#define TOKENPASTE2(x, y) TOKENPASTE(x, y)
-
-#define GUARD(lambda) \
-	auto TOKENPASTE2(guard, __LINE__) = make_guard(lambda);
-
-
-#endif /* TARANTOOL_GUARD_H_INCLUDED */
+#endif /* TARANTOOL_SCOPED_GUARD_H_INCLUDED */

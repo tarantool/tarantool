@@ -33,6 +33,7 @@ include /usr/share/cdbs/1/class/cmake.mk
 DEB_BUILDDIR := build-area
 
 tarball: clean
+	git describe > VERSION
 	cd .. && tar --exclude=.git --exclude=debian \
 		-czf tarantool_$(UVERSION).orig.tar.gz tarantool-$(UVERSION)
 

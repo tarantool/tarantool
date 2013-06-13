@@ -82,7 +82,7 @@ useradd -r -g tarantool tarantool
 "%{_bindir}/tarantool_box"
 "%{_bindir}/tarantool_multi.sh"
 "%{_bindir}/tarantool_deploy.sh"
-"%{_initddir}/tarantool_box"
+"/etc/init.d/tarantool_box"
 
 %dir "%{_sysconfdir}/tarantool"
 %config(noreplace) "%{_sysconfdir}/tarantool/tarantool.cfg"

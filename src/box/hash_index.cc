@@ -153,7 +153,7 @@ public:
 	random(u32 rnd) const;
 
 	virtual struct tuple *
-	findByKey(const void *key, u32 part_count) const;
+	findByKey(const char *key, u32 part_count) const;
 
 	virtual struct tuple *
 	replace(struct tuple *old_tuple, struct tuple *new_tuple,
@@ -164,7 +164,7 @@ public:
 
 	void
 	initIterator(struct iterator *iterator, enum iterator_type type,
-		     const void *key, u32 part_count) const;
+		     const char *key, u32 part_count) const;
 
 	virtual void
 	reserve(u32 n_tuples);
@@ -184,7 +184,7 @@ public:
 	random(u32 rnd) const;
 
 	virtual struct tuple *
-	findByKey(const void *key, u32 part_count) const;
+	findByKey(const char *key, u32 part_count) const;
 
 	virtual struct tuple *
 	replace(struct tuple *old_tuple, struct tuple *new_tuple,
@@ -195,7 +195,7 @@ public:
 
 	void
 	initIterator(struct iterator *iterator, enum iterator_type type,
-		     const void *key, u32 part_count) const;
+		     const char *key, u32 part_count) const;
 
 	virtual void
 	reserve(u32 n_tuples);
@@ -215,7 +215,7 @@ public:
 	random(u32 rnd) const;
 
 	virtual struct tuple *
-	findByKey(const void *key, u32 part_count) const;
+	findByKey(const char *key, u32 part_count) const;
 
 	virtual struct tuple *
 	replace(struct tuple *old_tuple, struct tuple *new_tuple,
@@ -226,7 +226,7 @@ public:
 
 	void
 	initIterator(struct iterator *iterator, enum iterator_type type,
-		     const void *key, u32 part_count) const;
+		     const char *key, u32 part_count) const;
 
 	virtual void
 	reserve(u32 n_tuples);
@@ -319,7 +319,7 @@ HashIndex::findByTuple(struct tuple *tuple) const
 		tnt_raise(IllegalParams, "tuple must have all indexed fields");
 
 	/* Hash index currently is always single-part. */
-	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
 	return findByKey(field, 1);
 }
 
@@ -328,7 +328,7 @@ HashIndex::findByTuple(struct tuple *tuple) const
 /* {{{ Hash32Index ************************************************/
 
 static inline struct mh_i32ptr_node_t
-int32_key_to_node(const void *key)
+int32_key_to_node(const char *key)
 {
 	u32 key_size = load_varint32(&key);
 	if (key_size != 4)
@@ -340,7 +340,7 @@ int32_key_to_node(const void *key)
 static inline struct mh_i32ptr_node_t
 int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 {
-	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
 	struct mh_i32ptr_node_t node = int32_key_to_node(field);
 	node.val = tuple;
 	return node;
@@ -381,7 +381,7 @@ Hash32Index::random(u32 rnd) const
 }
 
 struct tuple *
-Hash32Index::findByKey(const void *key, u32 part_count) const
+Hash32Index::findByKey(const char *key, u32 part_count) const
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
@@ -465,7 +465,7 @@ Hash32Index::allocIterator() const
 
 void
 Hash32Index::initIterator(struct iterator *ptr, enum iterator_type type,
-			  const void *key, u32 part_count) const
+			  const char *key, u32 part_count) const
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
@@ -505,7 +505,7 @@ Hash32Index::initIterator(struct iterator *ptr, enum iterator_type type,
 /* {{{ Hash64Index ************************************************/
 
 static inline struct mh_i64ptr_node_t
-int64_key_to_node(const void *key)
+int64_key_to_node(const char *key)
 {
 	u32 key_size = load_varint32(&key);
 	if (key_size != 8)
@@ -517,7 +517,7 @@ int64_key_to_node(const void *key)
 static inline struct mh_i64ptr_node_t
 int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 {
-	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
 	struct mh_i64ptr_node_t node = int64_key_to_node(field);
 	node.val = tuple;
 	return node;
@@ -556,7 +556,7 @@ Hash64Index::random(u32 rnd) const
 }
 
 struct tuple *
-Hash64Index::findByKey(const void *key, u32 part_count) const
+Hash64Index::findByKey(const char *key, u32 part_count) const
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
@@ -643,7 +643,7 @@ Hash64Index::allocIterator() const
 
 void
 Hash64Index::initIterator(struct iterator *ptr, enum iterator_type type,
-			  const void *key, u32 part_count) const
+			  const char *key, u32 part_count) const
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
@@ -685,7 +685,7 @@ Hash64Index::initIterator(struct iterator *ptr, enum iterator_type type,
 static inline struct mh_lstrptr_node_t
 lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 {
-	void *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
 	if (field == NULL)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD,
 			  key_def->parts[0].fieldno);
@@ -728,7 +728,7 @@ HashStrIndex::random(u32 rnd) const
 }
 
 struct tuple *
-HashStrIndex::findByKey(const void *key, u32 part_count) const
+HashStrIndex::findByKey(const char *key, u32 part_count) const
 {
 	assert(key_def->is_unique);
 	check_key_parts(key_def, part_count, false);
@@ -739,9 +739,9 @@ HashStrIndex::findByKey(const void *key, u32 part_count) const
 	if (k != mh_end(str_hash))
 		ret = (struct tuple *) mh_lstrptr_node(str_hash, k)->val;
 #ifdef DEBUG
-	u32 key_size = load_varint32((const void **) &key);
+	u32 key_size = load_varint32(&key);
 	say_debug("HashStrIndex find(self:%p, key:(%i)'%.*s') = %p",
-		  self, key_size, key_size, (u8 *)key, ret);
+		  self, key_size, key_size, key, ret);
 #endif
 	return ret;
 }
@@ -811,7 +811,7 @@ HashStrIndex::allocIterator() const
 
 void
 HashStrIndex::initIterator(struct iterator *ptr, enum iterator_type type,
-			   const void *key, u32 part_count) const
+			   const char *key, u32 part_count) const
 {
 	(void) part_count;
 

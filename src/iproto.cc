@@ -44,11 +44,11 @@
 #include "iobuf.h"
 #include "evio.h"
 #include "session.h"
-#include <guard.h>
+#include "scoped_guard.h"
 
 enum {
 	/** Maximal iproto package body length (2GiB) */
-	IPROTO_BODY_LEN_MAX = 2147483648,
+	IPROTO_BODY_LEN_MAX = 2147483648UL
 };
 
 /*
@@ -73,7 +73,7 @@ struct iproto_reply_header {
 const uint32_t msg_ping = 0xff00;
 
 static inline struct iproto_header *
-iproto(const void *pos)
+iproto(const char *pos)
 {
 	return (struct iproto_header *) pos;
 }
@@ -759,7 +759,7 @@ iproto_reply(struct port_iproto *port, box_process_func callback,
 		return iproto_reply_ping(out, header);
 
 	/* Make request body point to iproto data */
-	void *body = (char *) &header[1];
+	char *body = (char *) &header[1];
 	port_iproto_init(port, out, header);
 	try {
 		callback((struct port *) port, header->msg_code,
@@ -779,7 +779,7 @@ iproto_process_request(struct iproto_request *request)
 	struct iobuf *iobuf = request->iobuf;
 	struct port_iproto port;
 
-	GUARD([=]{
+	auto scope_guard = make_scoped_guard([=]{
 		iobuf->in.pos += sizeof(*header) + header->len;
 		if (iproto_session_is_idle(session))
 			iproto_session_destroy(session);

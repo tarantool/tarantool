@@ -28,7 +28,6 @@
  */
 #include "tuple.h"
 
-#include <pickle.h>
 #include <salloc.h>
 #include "tbuf.h"
 
@@ -77,11 +76,11 @@ tuple_ref(struct tuple *tuple, int count)
 }
 
 /** Get the next field from a tuple */
-static void *
-next_field(const void *f)
+static const char *
+next_field(const char *f)
 {
 	u32 size = load_varint32(&f);
-	return (u8 *)f + size;
+	return f + size;
 }
 
 /**
@@ -89,10 +88,10 @@ next_field(const void *f)
  *
  * @returns field data if field exists or NULL
  */
-void *
+const char *
 tuple_field(struct tuple *tuple, u32 i)
 {
-	void *field = tuple->data;
+	const char *field = tuple->data;
 
 	if (i >= tuple->field_count)
 		return NULL;
@@ -105,7 +104,7 @@ tuple_field(struct tuple *tuple, u32 i)
 
 /** print field to tbuf */
 static void
-print_field(struct tbuf *buf, const void *f)
+print_field(struct tbuf *buf, const char *f)
 {
 	uint32_t size = load_varint32(&f);
 	switch (size) {
@@ -126,7 +125,7 @@ print_field(struct tbuf *buf, const void *f)
 			} else {
 				tbuf_printf(buf, "\\x%02X", *(u8 *)f);
 			}
-			f = (char *) f + 1;
+			f++;
 		}
 		tbuf_printf(buf, "'");
 		break;
@@ -138,7 +137,7 @@ print_field(struct tbuf *buf, const void *f)
  * key: { value, value, value }
  */
 void
-tuple_print(struct tbuf *buf, u32 field_count, const void *f)
+tuple_print(struct tbuf *buf, u32 field_count, const char *f)
 {
 	if (field_count == 0) {
 		tbuf_printf(buf, "'': {}");

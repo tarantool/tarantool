@@ -48,7 +48,7 @@ extern "C" {
 #include "space.h"
 #include "port.h"
 #include "tbuf.h"
-#include <guard.h>
+#include "scoped_guard.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
 extern char box_lua[], box_net_lua[], misc_lua[], sql_lua[];
@@ -164,12 +164,12 @@ lbox_tuple_slice(struct lua_State *L)
 	if (end <= start)
 		luaL_error(L, "tuple.slice(): start must be less than end");
 
-	const char *field = (const char *) tuple->data;
+	const char *field = tuple->data;
 	u32 fieldno = 0;
 	u32 stop = end - 1;
 
-	while (field < (const char *) tuple->data + tuple->bsize) {
-		size_t len = load_varint32((const void **) &field);
+	while (field < tuple->data + tuple->bsize) {
+		size_t len = load_varint32(&field);
 		if (fieldno >= start) {
 			lua_pushlstring(L, field, len);
 			if (fieldno == stop)
@@ -202,8 +202,8 @@ transform_calculate(struct lua_State *L, struct tuple *tuple,
 		    size_t lr[2])
 {
 	/* calculate size of the new tuple */
-	const void *tuple_end = tuple->data + tuple->bsize;
-	const void *tuple_field = tuple->data;
+	const char *tuple_end = tuple->data + tuple->bsize;
+	const char *tuple_field = tuple->data;
 
 	lr[0] = tuple_range_size(&tuple_field, tuple_end, offset);
 
@@ -233,7 +233,7 @@ transform_calculate(struct lua_State *L, struct tuple *tuple,
 	tuple_range_size(&tuple_field, tuple_end, len);
 
 	/* calculate last part of the tuple fields */
-	lr[1] = (const char *) tuple_end - (const char *) tuple_field;
+	lr[1] = tuple_end - tuple_field;
 
 	return lr[0] + mid + lr[1];
 }
@@ -281,7 +281,7 @@ lbox_tuple_transform(struct lua_State *L)
 
 	/* construct tuple */
 	memcpy(dest->data, tuple->data, lr[0]);
-	void *ptr = dest->data + lr[0];
+	char *ptr = dest->data + lr[0];
 	for (int i = 4; i <= argc; i++) {
 		switch (lua_type(L, i)) {
 		case LUA_TNUMBER: {
@@ -330,9 +330,9 @@ tuple_find(struct lua_State *L, struct tuple *tuple, size_t offset,
 	int idx = offset;
 	if (idx >= tuple->field_count)
 		return 0;
-	const char *field = (const char *) tuple_field(tuple, idx);
-	while (field < (const char *) tuple->data + tuple->bsize) {
-		size_t len = load_varint32((const void **) &field);
+	const char *field = tuple_field(tuple, idx);
+	while (field < tuple->data + tuple->bsize) {
+		size_t len = load_varint32(&field);
 		if (len == key_size && (memcmp(field, key, len) == 0)) {
 			lua_pushinteger(L, idx);
 			if (!all)
@@ -398,12 +398,12 @@ static int
 lbox_tuple_unpack(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
-	const void *field = tuple->data;
+	const char *field = tuple->data;
 
-	while (field < (const char *) tuple->data + tuple->bsize) {
+	while (field < tuple->data + tuple->bsize) {
 		size_t len = load_varint32(&field);
-		lua_pushlstring(L, (const char *) field, len);
-		field = (const char *) field + len;
+		lua_pushlstring(L, field, len);
+		field = field + len;
 	}
 	assert(lua_gettop(L) == tuple->field_count + 1);
 	return tuple->field_count;
@@ -415,13 +415,13 @@ lbox_tuple_totable(struct lua_State *L)
 	struct tuple *tuple = lua_checktuple(L, 1);
 	lua_newtable(L);
 	int index = 1;
-	const void *field = tuple->data;
-	while (field < (const char *) tuple->data + tuple->bsize) {
+	const char *field = tuple->data;
+	while (field < tuple->data + tuple->bsize) {
 		size_t len = load_varint32(&field);
 		lua_pushnumber(L, index++);
-		lua_pushlstring(L, (const char *) field, len);
+		lua_pushlstring(L, field, len);
 		lua_rawset(L, -3);
-		field = (const char *) field + len;
+		field += len;
 	}
 	return 1;
 }
@@ -443,9 +443,9 @@ lbox_tuple_index(struct lua_State *L)
 		if (i >= tuple->field_count)
 			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
 				   tuplelib_name, i, tuple->field_count-1);
-		const void *field = tuple_field(tuple, i);
+		const char *field = tuple_field(tuple, i);
 		u32 len = load_varint32(&field);
-		lua_pushlstring(L, (const char *) field, len);
+		lua_pushlstring(L, field, len);
 		return 1;
 	}
 	/* If we got a string, try to find a method for it. */
@@ -471,7 +471,7 @@ lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
 	if (tuple) {
 		struct tuple **ptr = (struct tuple **)
-				lua_newuserdata(L, sizeof(void *));
+				lua_newuserdata(L, sizeof(*ptr));
 		luaL_getmetatable(L, tuplelib_name);
 		lua_setmetatable(L, -2);
 		*ptr = tuple;
@@ -491,22 +491,22 @@ lbox_tuple_next(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
-	const void *field = NULL;
+	const char *field = NULL;
 	size_t len;
 
 	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL))
 		field = tuple->data;
 	else if (argc == 1 && lua_islightuserdata(L, 2))
-		field = lua_touserdata(L, 2);
+		field = (char *) lua_touserdata(L, 2);
 	else
 		luaL_error(L, "tuple.next(): bad arguments");
 
 	(void)field;
-	assert(field >= (const void *) tuple->data);
-	if (field < (const char *) tuple->data + tuple->bsize) {
+	assert(field >= tuple->data);
+	if (field < tuple->data + tuple->bsize) {
 		len = load_varint32(&field);
-		lua_pushlightuserdata(L, (char *) field + len);
-		lua_pushlstring(L, (char *) field, len);
+		lua_pushlightuserdata(L, (void *) (field + len));
+		lua_pushlstring(L, field, len);
 		return 2;
 	}
 	lua_pushnil(L);
@@ -579,7 +579,7 @@ lbox_checkiterator(struct lua_State *L, int i)
 static void
 lbox_pushiterator(struct lua_State *L, Index *index,
 		  struct iterator *it, enum iterator_type type,
-		  const void *key, size_t size, int part_count)
+		  const char *key, size_t size, int part_count)
 {
 	struct lbox_iterator_holder {
 		struct iterator *it;
@@ -587,7 +587,7 @@ lbox_pushiterator(struct lua_State *L, Index *index,
 	};
 
 	struct lbox_iterator_holder *holder = (struct lbox_iterator_holder *)
-			lua_newuserdata(L, sizeof(void *) + size);
+			lua_newuserdata(L, sizeof(*holder) + size);
 	luaL_getmetatable(L, iteratorlib_name);
 	lua_setmetatable(L, -2);
 
@@ -725,8 +725,7 @@ void append_key_part(struct lua_State *L, int i,
 		str = luaL_checklstring(L, i, &size);
 	}
 	char varint_buf[sizeof(u32) + 1];
-	size_t pack_len = ((const char *) pack_varint32(varint_buf, size) -
-			   (const char *) varint_buf);
+	size_t pack_len = pack_varint32(varint_buf, size) - varint_buf;
 	tbuf_append(tbuf, varint_buf, pack_len);
 	tbuf_append(tbuf, str, size);
 }
@@ -768,7 +767,7 @@ lbox_create_iterator(struct lua_State *L)
 	/* Create a new iterator. */
 	enum iterator_type type = ITER_ALL;
 	u32 field_count = 0;
-	const void *key = NULL;
+	const char *key = NULL;
 	u32 key_size = 0;
 	if (argc == 1 || (argc == 2 && lua_type(L, 2) == LUA_TNIL)) {
 		/*
@@ -899,7 +898,7 @@ lbox_index_count(struct lua_State *L)
 
 	/* preparing single or multi-part key */
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
-	const void *key;
+	const char *key;
 	u32 key_part_count;
 	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 		/* Searching by tuple. */
@@ -1065,7 +1064,7 @@ lua_table_to_tuple(struct lua_State *L, int index)
 	 * the tuple is leaked.
 	 */
 	tuple->field_count = field_count;
-	void *pos = tuple->data;
+	char *pos = tuple->data;
 
 	/* Second go: store data in the tuple. */
 
@@ -1260,7 +1259,7 @@ lbox_process(lua_State *L)
 {
 	u32 op = lua_tointeger(L, 1); /* Get the first arg. */
 	size_t sz;
-	const void *req = luaL_checklstring(L, 2, &sz); /* Second arg. */
+	const char *req = luaL_checklstring(L, 2, &sz); /* Second arg. */
 	if (op == CALL) {
 		/*
 		 * We should not be doing a CALL from within a CALL.
@@ -1363,15 +1362,15 @@ lbox_call_loadproc(struct lua_State *L)
 void
 box_lua_execute(struct request *request, struct port *port)
 {
-	const void **reqpos = &request->data;
-	const void *reqend = (const char *) request->data + request->len;
+	const char **reqpos = &request->data;
+	const char *reqend = request->data + request->len;
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
 	/* Request flags: not used. */
 	(void) (pick_u32(reqpos, reqend));
 
 	try {
-		GUARD([=] {
+		auto scoped_guard = make_scoped_guard([=] {
 			/*
 			 * Allow the used coro to be garbage collected.
 			 * @todo: cache and reuse it instead.
@@ -1381,15 +1380,14 @@ box_lua_execute(struct request *request, struct port *port)
 
 		u32 field_len;
 		/* proc name */
-		const void *field = pick_field_str(reqpos, reqend, &field_len);
-		box_lua_find(L, (const char *) field,
-			     ((const char *) field + field_len));
+		const char *field = pick_field_str(reqpos, reqend, &field_len);
+		box_lua_find(L, field, field + field_len);
 		/* Push the rest of args (a tuple). */
 		u32 nargs = pick_u32(reqpos, reqend);
 		luaL_checkstack(L, nargs, "call: out of stack");
 		for (int i = 0; i < nargs; i++) {
 			field = pick_field_str(reqpos, reqend, &field_len);
-			lua_pushlstring(L, (const char *) field, field_len);
+			lua_pushlstring(L, field, field_len);
 		}
 		lua_call(L, nargs, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
@@ -1419,7 +1417,7 @@ static void
 luaL_addvarint32(luaL_Buffer *b, u32 value)
 {
 	char buf[sizeof(u32)+1];
-	char *bufend = (char *) pack_varint32(buf, value);
+	char *bufend = pack_varint32(buf, value);
 	luaL_addlstring(b, buf, bufend - buf);
 }
 
@@ -1696,7 +1694,7 @@ lbox_pack(struct lua_State *L)
 }
 
 const char *
-box_unpack_response(struct lua_State *L, const void *s, const void *end)
+box_unpack_response(struct lua_State *L, const char *s, const char *end)
 {
 	u32 tuple_count = pick_u32(&s, end);
 
@@ -1711,10 +1709,10 @@ box_unpack_response(struct lua_State *L, const void *s, const void *end)
 		t->field_count = field_count;
 		memcpy(t->data, s, bsize);
 
-		s = (const char *) s + bsize;
+		s = s + bsize;
 		lbox_pushtuple(L, t);
 	}
-	return (const char *) s;
+	return s;
 }
 
 
@@ -1727,7 +1725,7 @@ lbox_unpack(struct lua_State *L)
 
 	size_t str_size = 0;
 	const char *str =  luaL_checklstring(L, 2, &str_size);
-	const char *end = (const char *) str + str_size;
+	const char *end = str + str_size;
 	const char *s = str;
 
 	int save_stacksize = lua_gettop(L);
@@ -1768,7 +1766,7 @@ lbox_unpack(struct lua_State *L)
 			break;
 		case 'w':
 			/* pick_varint32 throws exception on error. */
-			u32buf = pick_varint32((const void **) &s, end);
+			u32buf = pick_varint32(&s, end);
 			lua_pushnumber(L, u32buf);
 			break;
 
@@ -1780,9 +1778,9 @@ lbox_unpack(struct lua_State *L)
 		case 'P':
 		case 'p':
 			/* pick_varint32 throws exception on error. */
-			u32buf = pick_varint32((const void **) &s, end);
+			u32buf = pick_varint32(&s, end);
 			CHECK_SIZE(s + u32buf - 1);
-			lua_pushlstring(L, (const char *) s, u32buf);
+			lua_pushlstring(L, s, u32buf);
 			s += u32buf;
 			break;
 		case '=':
@@ -1809,7 +1807,7 @@ lbox_unpack(struct lua_State *L)
 			u32buf = *(u32 *) s;
 
 			/* opcode */
-			charbuf = *(char *) (s + 4);
+			charbuf = *(s + 4);
 			charbuf = opcode_to_format(charbuf);
 			if (charbuf != *f) {
 				luaL_error(L, "box.unpack('%s'): "

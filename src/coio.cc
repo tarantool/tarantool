@@ -34,7 +34,7 @@
 #include "fiber.h"
 #include "iobuf.h"
 #include "sio.h"
-#include <guard.h>
+#include "scoped_guard.h"
 
 static inline void
 fiber_schedule_coio(ev_io *watcher, int event)
@@ -220,7 +220,9 @@ coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz,
 	ssize_t to_read = (ssize_t) sz;
 
 	{
-		GUARD([=] { ev_io_stop(coio); });
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
 
 		while (true) {
 			/*
@@ -319,7 +321,9 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 	evio_timeout_init(&start, &delay, timeout);
 
 	{
-		GUARD([=] { ev_io_stop(coio); });
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
 
 		while (true) {
 			/*
@@ -386,7 +390,9 @@ coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt,
 	struct iovec *end = iov + iovcnt;
 
 	{
-		GUARD([=] { ev_io_stop(coio); });
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
 
 		/* Avoid a syscall in case of 0 iovcnt. */
 		while (iov < end) {
@@ -436,7 +442,9 @@ coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
 	evio_timeout_init(&start, &delay, timeout);
 
 	{
-		GUARD([=] { ev_io_stop(coio); });
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
 
 		while (true) {
 			/*
@@ -484,7 +492,9 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 	evio_timeout_init(&start, &delay, timeout);
 
 	{
-		GUARD([=] { ev_io_stop(coio); });
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
 
 		while (true) {
 			/*
