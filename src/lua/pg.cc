@@ -396,11 +396,9 @@ lbox_net_pg_connect(struct lua_State *L)
 	lua_pop(L, 1);
 
 	if (PQstatus(conn) != CONNECTION_OK) {
-		char *msg = (typeof(msg))
-			alloca(strlen(PQerrorMessage(conn)) + 1);
-		strcpy(msg, PQerrorMessage(conn));
+		const char *msg = PQerrorMessage(conn);
 		PQfinish(conn);
-		luaL_error(L, constr);
+		luaL_error(L, "%s", msg);
 	}
 
 	lua_pushstring(L, "raw");

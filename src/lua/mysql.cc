@@ -381,8 +381,6 @@ lbox_net_mysql_connect(struct lua_State *L)
 
 	if (*mysql_error(mysql)) {
 		const char *estr = mysql_error(mysql);
-		char *b = (char *)alloca(strlen(estr) + 1);
-		strcpy(b, estr);
 		mysql_close(mysql);
 		luaL_error(L, "%s", estr);
 	}
