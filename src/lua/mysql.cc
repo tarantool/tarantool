@@ -380,9 +380,12 @@ lbox_net_mysql_connect(struct lua_State *L)
 	}
 
 	if (*mysql_error(mysql)) {
-		const char *estr = mysql_error(mysql);
+		luaL_Buffer b;
+		luaL_buffinit(L, &b);
+		luaL_addstring(&b, mysql_error(mysql));
+		luaL_pushresult(&b);
 		mysql_close(mysql);
-		luaL_error(L, "%s", estr);
+		lua_error(L);
 	}
 
 	lua_pushstring(L, "raw");
