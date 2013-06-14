@@ -99,6 +99,7 @@ macro(enable_tnt_compile_flags)
         "-Wextra"
         "-Wno-sign-compare"
         "-Wno-strict-aliasing"
+        "-Wno-error=deprecated-declarations"
     )
 
     if (CMAKE_COMPILER_IS_GNUCXX)

@@ -164,19 +164,17 @@ lbox_tuple_slice(struct lua_State *L)
 	if (end <= start)
 		luaL_error(L, "tuple.slice(): start must be less than end");
 
-	const char *field = tuple->data;
-	u32 fieldno = 0;
 	u32 stop = end - 1;
 
-	while (field < tuple->data + tuple->bsize) {
-		size_t len = load_varint32(&field);
-		if (fieldno >= start) {
-			lua_pushlstring(L, field, len);
-			if (fieldno == stop)
+	struct tuple_iterator it;
+	const char *fb, *fe;
+	tuple_seek(&it, tuple, 0, &fb, &fe);
+	for (uint32_t field_no = 0; tuple_next(&it); field_no++) {
+		if (field_no >= start) {
+			lua_pushlstring(L, fb, fe - fb);
+			if (field_no == stop)
 				break;
 		}
-		field += len;
-		fieldno += 1;
 	}
 	return end - start;
 }
@@ -306,7 +304,8 @@ lbox_tuple_transform(struct lua_State *L)
 			break;
 		}
 	}
-	memcpy(ptr, tuple_field(tuple, offset + len), lr[1]);
+
+	memcpy(ptr, tuple_field_old(tuple, offset + len), lr[1]);
 
 	lbox_pushtuple(L, dest);
 	return 1;
@@ -330,15 +329,17 @@ tuple_find(struct lua_State *L, struct tuple *tuple, size_t offset,
 	int idx = offset;
 	if (idx >= tuple->field_count)
 		return 0;
-	const char *field = tuple_field(tuple, idx);
-	while (field < tuple->data + tuple->bsize) {
-		size_t len = load_varint32(&field);
-		if (len == key_size && (memcmp(field, key, len) == 0)) {
+
+	struct tuple_iterator it;
+	const char *fb, *fe;
+	tuple_seek(&it, tuple, idx, &fb, &fe);
+	while (tuple_next(&it)) {
+		uint32_t len = fe - fb;
+		if (len == key_size && (memcmp(fb, key, len) == 0)) {
 			lua_pushinteger(L, idx);
 			if (!all)
 				break;
 		}
-		field += len;
 		idx++;
 	}
 	return lua_gettop(L) - top;
@@ -398,12 +399,12 @@ static int
 lbox_tuple_unpack(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
-	const char *field = tuple->data;
 
-	while (field < tuple->data + tuple->bsize) {
-		size_t len = load_varint32(&field);
-		lua_pushlstring(L, field, len);
-		field = field + len;
+	struct tuple_iterator it;
+	const char *fb, *fe;
+	tuple_seek(&it, tuple, 0, &fb, &fe);
+	while (tuple_next(&it)) {
+		lua_pushlstring(L, fb, fe - fb);
 	}
 	assert(lua_gettop(L) == tuple->field_count + 1);
 	return tuple->field_count;
@@ -415,13 +416,14 @@ lbox_tuple_totable(struct lua_State *L)
 	struct tuple *tuple = lua_checktuple(L, 1);
 	lua_newtable(L);
 	int index = 1;
-	const char *field = tuple->data;
-	while (field < tuple->data + tuple->bsize) {
-		size_t len = load_varint32(&field);
+
+	struct tuple_iterator it;
+	const char *fb, *fe;
+	tuple_seek(&it, tuple, 0, &fb, &fe);
+	while (tuple_next(&it)) {
 		lua_pushnumber(L, index++);
-		lua_pushlstring(L, field, len);
+		lua_pushlstring(L, fb, fe - fb);
 		lua_rawset(L, -3);
-		field += len;
 	}
 	return 1;
 }
@@ -443,9 +445,9 @@ lbox_tuple_index(struct lua_State *L)
 		if (i >= tuple->field_count)
 			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
 				   tuplelib_name, i, tuple->field_count-1);
-		const char *field = tuple_field(tuple, i);
-		u32 len = load_varint32(&field);
-		lua_pushlstring(L, field, len);
+		const char *fb, *fe;
+		tuple_field(tuple, i, &fb, &fe);
+		lua_pushlstring(L, fb, fe - fb);
 		return 1;
 	}
 	/* If we got a string, try to find a method for it. */
@@ -461,7 +463,7 @@ lbox_tuple_tostring(struct lua_State *L)
 	struct tuple *tuple = lua_checktuple(L, 1);
 	/* @todo: print the tuple */
 	struct tbuf *tbuf = tbuf_new(fiber->gc_pool);
-	tuple_print(tbuf, tuple->field_count, tuple->data);
+	tuple_print(tbuf, tuple);
 	lua_pushlstring(L, tbuf->data, tbuf->size);
 	return 1;
 }
@@ -491,26 +493,25 @@ lbox_tuple_next(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
-	const char *field = NULL;
-	size_t len;
 
+	u32 field_no;
 	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL))
-		field = tuple->data;
-	else if (argc == 1 && lua_islightuserdata(L, 2))
-		field = (char *) lua_touserdata(L, 2);
+		field_no = 0;
+	else if (argc == 1 && lua_type(L, 2) == LUA_TNUMBER)
+		field_no = lua_tointeger(L, 2);
 	else
-		luaL_error(L, "tuple.next(): bad arguments");
+		return luaL_error(L, "tuple.next(): bad arguments");
 
-	(void)field;
-	assert(field >= tuple->data);
-	if (field < tuple->data + tuple->bsize) {
-		len = load_varint32(&field);
-		lua_pushlightuserdata(L, (void *) (field + len));
-		lua_pushlstring(L, field, len);
-		return 2;
+	if (field_no >= tuple->field_count) {
+		lua_pushnil(L);
+		return 1;
 	}
-	lua_pushnil(L);
-	return  1;
+
+	const char *fb, *fe;
+	tuple_field(tuple, field_no, &fb, &fe);
+	lua_pushinteger(L, field_no + 1);
+	lua_pushlstring(L, fb, fe - fb);
+	return 2;
 }
 
 /** Iterator over tuple fields. Adapt lbox_tuple_next

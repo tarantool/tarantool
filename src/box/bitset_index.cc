@@ -219,11 +219,10 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	}
 
 	if (new_tuple != NULL) {
-		const char *field = tuple_field(new_tuple,
-						key_def->parts[0].fieldno);
-		assert (field != NULL);
-		size_t bitset_key_size = (size_t) load_varint32(&field);
-		const char *bitset_key = field;
+		const char *fb, *fe;
+		tuple_field(new_tuple, key_def->parts[0].fieldno, &fb, &fe);
+		size_t bitset_key_size = fe - fb;
+		const char *bitset_key = fb;
 
 		size_t value = tuple_to_value(new_tuple);
 		if (bitset_index_insert(&index, bitset_key,

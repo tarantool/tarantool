@@ -76,15 +76,79 @@ tuple_ref(struct tuple *tuple, int count);
  *
  * @returns field data if the field exists, or NULL
  */
-const char *
-tuple_field(struct tuple *tuple, u32 i);
+__attribute__((deprecated)) const char *
+tuple_field_old(struct tuple *tuple, u32 i);
 
 /**
- * Print a tuple in yaml-compatible mode to tbuf:
- * key: { value, value, value }
+ * @brief Return field data of the field
+ * @param tuple tuple
+ * @param field_no field number
+ * @param begin pointer where the start of field data will be stored
+ * @param end pointer where the end of field data + 1 will be stored
+ * @throws IllegalParams if \a field_no is out of range
  */
 void
-tuple_print(struct tbuf *buf, u32 field_count, const char *f);
+tuple_field(const struct tuple *tuple, uint32_t field_no,
+	    const char **begin, const char **end);
+
+/**
+ * @brief Tuple Interator
+ */
+struct tuple_iterator {
+	/** @cond false **/
+	/* Result */
+	const char **begin;
+	const char **end;
+	/* State */
+	const struct tuple *tuple;
+	const char *cur;
+	/** @endcond **/
+};
+
+/**
+ * @brief Seek tuple iterator to position \a field_no
+ *
+ * A workflow example:
+ * @code
+ * struct tuple_iterator it;
+ * const char *fb, *fe;
+ * tuple_seek(&it, tuple, 0, &fb, &fe);
+ * while (tuple_next(&it)) {
+ *      // field_data = fb
+ *	// field_size = fe-fb
+ *	lua_pushlstring(L, fb, fe - fb);
+ * }
+ * @endcode
+ *
+ * @param it tuple iterator
+ * @param tuple tuple
+ * @param field_no a field number to seek
+ * @param begin pointer where the start of field data will be stored
+ * @param end pointer where the end of field data + 1 will be stored
+ */
+void
+tuple_seek(struct tuple_iterator *it, const struct tuple *tuple,
+	   uint32_t field_no, const char **begin, const char **end);
+
+/**
+ * @brief Iterate to the next position
+ * @param it tuple iterator
+ * @retval \a it if the iterator has tuple
+ * @retval NULL if where is no more tuples (values of \a begin \a end
+ * are not specifed in this case)
+ */
+struct tuple_iterator *
+tuple_next(struct tuple_iterator *it);
+
+/**
+ * @brief Print a tuple in yaml-compatible mode to tbuf:
+ * key: { value, value, value }
+ *
+ * @param buf tbuf
+ * @param tuple tuple
+ */
+void
+tuple_print(struct tbuf *buf, const struct tuple *tuple);
 
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)

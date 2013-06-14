@@ -96,26 +96,24 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 
 		action append_prepend {
 			struct tbuf *b;
-			const char *value;
-			u32 value_len;
+			const char *fb, *fe;
 
 			key = tbuf_read_field(keys);
 			struct tuple *tuple = memcached_find(key);
 			if (tuple == NULL) {
 				obuf_dup(out, "NOT_STORED\r\n", 12);
 			} else {
-				value = tuple_field(tuple, 3);
-				value_len = load_varint32(&value);
+				tuple_field(tuple, 3, &fb, &fe);
 				b = tbuf_new(fiber->gc_pool);
 				if (append) {
-					tbuf_append(b, value, value_len);
+					tbuf_append(b, fb, fe - fb);
 					tbuf_append(b, data, bytes);
 				} else {
 					tbuf_append(b, data, bytes);
-					tbuf_append(b, value, value_len);
+					tbuf_append(b, fb, fe - fb);
 				}
 
-				bytes += value_len;
+				bytes += (fe - fb);
 				data = b->data;
 				STORE;
 			}
@@ -124,8 +122,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 		action incr_decr {
 			struct meta *m;
 			struct tbuf *b;
-			const char *field;
-			u32 value_len;
+			const char *fb, *fe;
 			u64 value;
 
 			key = tbuf_read_field(keys);
@@ -134,12 +131,10 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 				obuf_dup(out, "NOT_FOUND\r\n", 11);
 			} else {
 				m = memcached_meta(tuple);
-				field = tuple_field(tuple, 3);
-				value_len = load_varint32(&field);
+				tuple_field(tuple, 3, &fb, &fe);
 
-				if (memcached_is_numeric(field, value_len)) {
-					value = memcached_natoq((const char *) field,
-						(const char *) field + value_len);
+				if (memcached_is_numeric(fb, fe - fb)) {
+					value = memcached_natoq(fb, fe);
 
 					if (incr_sign > 0) {
 						value += incr;

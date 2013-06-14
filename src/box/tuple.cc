@@ -89,7 +89,7 @@ next_field(const char *f)
  * @returns field data if field exists or NULL
  */
 const char *
-tuple_field(struct tuple *tuple, u32 i)
+tuple_field_old(struct tuple *tuple, u32 i)
 {
 	const char *field = tuple->data;
 
@@ -102,11 +102,73 @@ tuple_field(struct tuple *tuple, u32 i)
 	return field;
 }
 
+void
+tuple_field(const struct tuple *tuple, uint32_t field_no,
+	    const char **begin, const char **end)
+{
+	const char *data = tuple->data;
+
+	if (field_no >= tuple->field_count)
+		tnt_raise(IllegalParams, "field_no is out of range");
+
+	while (field_no-- > 0)
+		data = next_field(data);
+
+	uint32_t len = load_varint32(&data);
+	*begin = data;
+	*end = data + len;
+}
+
+void
+tuple_seek(struct tuple_iterator *it, const struct tuple *tuple,
+	   uint32_t field_no, const char **begin, const char **end)
+{
+	const char *data = tuple->data;
+
+	if (field_no >= tuple->field_count)
+		tnt_raise(IllegalParams, "field_no is out of range");
+
+	while (field_no-- > 0)
+		data = next_field(data);
+
+	it->tuple = tuple;
+	it->cur = data;
+	it->begin = begin;
+	it->end = end;
+	*it->begin = NULL;
+	*it->end = NULL;
+}
+
+struct tuple_iterator *
+tuple_next(struct tuple_iterator *it)
+{
+	if (it->cur == it->tuple->data + it->tuple->bsize) {
+		/* No more fields in the tuple*/
+		it->cur = NULL;
+		return NULL;
+	} else if (it->cur == NULL) {
+		/* Sanity check: second call to next() is invalid */
+		tnt_raise(IllegalParams, "field_no is out of range");
+	}
+
+	uint32_t len = load_varint32(&it->cur);
+	*it->begin = it->cur;
+	*it->end = it->cur + len;
+	it->cur += len;
+
+	if (it->cur <= it->tuple->data + it->tuple->bsize) {
+		return it;
+	} else /* it->cur > it->tuple->data + it->tuple->bsize */ {
+		tnt_raise(IllegalParams, "invalid tuple");
+	}
+}
+
+
 /** print field to tbuf */
 static void
-print_field(struct tbuf *buf, const char *f)
+print_field(struct tbuf *buf, const char *f, const char *end)
 {
-	uint32_t size = load_varint32(&f);
+	uint32_t size = (end - f);
 	switch (size) {
 	case 2:
 		tbuf_printf(buf, "%hu", *(u16 *)f);
@@ -137,21 +199,28 @@ print_field(struct tbuf *buf, const char *f)
  * key: { value, value, value }
  */
 void
-tuple_print(struct tbuf *buf, u32 field_count, const char *f)
+tuple_print(struct tbuf *buf, const struct tuple *tuple)
 {
-	if (field_count == 0) {
+	if (tuple->field_count == 0) {
 		tbuf_printf(buf, "'': {}");
 		return;
 	}
 
-	print_field(buf, f);
+	struct tuple_iterator it;
+	const char *fb, *fe;
+	tuple_seek(&it, tuple, 0, &fb, &fe);
+	tuple_next(&it);
+	print_field(buf, fb, fe);
 	tbuf_printf(buf, ": {");
-	f = next_field(f);
 
-	for (u32 i = 1; i < field_count; i++, f = next_field(f)) {
-		print_field(buf, f);
-		if (likely(i + 1 < field_count))
+	uint32_t field_no = 1;
+	for (; tuple_next(&it); field_no++) {
+		print_field(buf, fb, fe);
+		if (likely(field_no + 1 < tuple->field_count)) {
 			tbuf_printf(buf, ", ");
+		}
 	}
+	assert (field_no == tuple->field_count);
+
 	tbuf_printf(buf, "}");
 }

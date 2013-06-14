@@ -319,7 +319,7 @@ HashIndex::findByTuple(struct tuple *tuple) const
 		tnt_raise(IllegalParams, "tuple must have all indexed fields");
 
 	/* Hash index currently is always single-part. */
-	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *field = tuple_field_old(tuple, key_def->parts[0].fieldno);
 	return findByKey(field, 1);
 }
 
@@ -340,7 +340,7 @@ int32_key_to_node(const char *key)
 static inline struct mh_i32ptr_node_t
 int32_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 {
-	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *field = tuple_field_old(tuple, key_def->parts[0].fieldno);
 	struct mh_i32ptr_node_t node = int32_key_to_node(field);
 	node.val = tuple;
 	return node;
@@ -517,7 +517,7 @@ int64_key_to_node(const char *key)
 static inline struct mh_i64ptr_node_t
 int64_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 {
-	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *field = tuple_field_old(tuple, key_def->parts[0].fieldno);
 	struct mh_i64ptr_node_t node = int64_key_to_node(field);
 	node.val = tuple;
 	return node;
@@ -685,7 +685,7 @@ Hash64Index::initIterator(struct iterator *ptr, enum iterator_type type,
 static inline struct mh_lstrptr_node_t
 lstrptr_tuple_to_node(struct tuple *tuple, struct key_def *key_def)
 {
-	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *field = tuple_field_old(tuple, key_def->parts[0].fieldno);
 	if (field == NULL)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD,
 			  key_def->parts[0].fieldno);

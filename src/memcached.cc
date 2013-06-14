@@ -180,8 +180,10 @@ memcached_find(const char *key)
 static struct meta *
 memcached_meta(struct tuple *tuple)
 {
-	const char *field = tuple_field(tuple, 1);
-	return (struct meta *) (field + 1);
+	const char *fb, *fe;
+	tuple_field(tuple, 1, &fb, &fe);
+	assert (fb + sizeof(struct meta) <= fe);
+	return (struct meta *) fb;
 }
 
 static bool
@@ -270,13 +272,11 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 	while (keys_count-- > 0) {
 		struct tuple *tuple;
 		const struct meta *m;
-		const char *field;
 		const char *value;
 		const char *suffix;
 		u32 key_len;
 		u32 value_len;
 		u32 suffix_len;
-		u32 _l;
 
 		const char *key = tbuf_read_field(keys);
 		tuple = memcached_find(key);
@@ -288,25 +288,27 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 			continue;
 		}
 
-		field = tuple->data;
-
+		const char *fb, *fe;
+		struct tuple_iterator it;
 		/* skip key */
-		_l = load_varint32(&field);
-		field = field + _l;
+		tuple_seek(&it, tuple, 1, &fb, &fe);
 
 		/* metainfo */
-		_l = load_varint32(&field);
-		m = (const struct meta *) field;
-		field = field + _l;
+		tuple_next(&it);
+		m = (const struct meta *) fb;
+		assert (fb + sizeof(struct meta *) < fe);
 
 		/* suffix */
-		suffix_len = load_varint32(&field);
-		suffix = field;
-		field = field + suffix_len;
+		tuple_next(&it);
+		suffix_len = fe - fb;
+		suffix = fb;
 
 		/* value */
-		value_len = load_varint32(&field);
-		value = field;
+		tuple_next(&it);
+		value_len = fe - fb;
+		value = fb;
+
+		assert (!tuple_next(&it));
 
 		if (m->exptime > 0 && m->exptime < ev_now()) {
 			stats.get_misses++;
