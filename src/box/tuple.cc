@@ -31,7 +31,10 @@
 #include <salloc.h>
 #include "tbuf.h"
 
-#include "exception.h"
+#include "tuple_update.h"
+#include <exception.h>
+#include <palloc.h>
+#include <fiber.h>
 
 /** Allocate a tuple */
 struct tuple *
@@ -154,4 +157,36 @@ tuple_print(struct tbuf *buf, u32 field_count, const char *f)
 			tbuf_printf(buf, ", ");
 	}
 	tbuf_printf(buf, "}");
+}
+
+static void *
+palloc_region_alloc(void *ctx, size_t size)
+{
+	return palloc((struct palloc_pool *) ctx, size);
+}
+
+struct tuple *
+tuple_update(const struct tuple *old_tuple, const char *expr,
+	     const char *expr_end)
+{
+	uint32_t new_size = 0;
+	uint32_t new_field_count = 0;
+	struct tuple_update *update =
+		tuple_update_prepare(palloc_region_alloc, fiber->gc_pool,
+				     expr, expr_end, old_tuple->data,
+				     old_tuple->data + old_tuple->bsize,
+				     old_tuple->field_count, &new_size,
+				     &new_field_count);
+
+	/* Allocate a new tuple. */
+	struct tuple *new_tuple = tuple_alloc(new_size);
+	new_tuple->field_count = new_field_count;
+
+	try {
+		tuple_update_execute(update, new_tuple->data);
+		return new_tuple;
+	} catch (const Exception&) {
+		tuple_free(new_tuple);
+		throw;
+	}
 }

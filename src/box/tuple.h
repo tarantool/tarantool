@@ -86,6 +86,10 @@ tuple_field(struct tuple *tuple, u32 i);
 void
 tuple_print(struct tbuf *buf, u32 field_count, const char *f);
 
+struct tuple *
+tuple_update(const struct tuple *old_tuple, const char *expr,
+	     const char *expr_end);
+
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)
 {

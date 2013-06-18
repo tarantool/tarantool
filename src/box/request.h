@@ -31,10 +31,6 @@
 #include <util.h>
 #include <stdbool.h>
 
-enum {
-	/** A limit on how many operations a single UPDATE can have. */
-	BOX_UPDATE_OP_CNT_MAX = 4000,
-};
 struct txn;
 struct port;
 
@@ -75,21 +71,6 @@ struct port;
 
 ENUM(requests, REQUESTS);
 extern const char *requests_strs[];
-
-/** UPDATE operation codes. */
-#define UPDATE_OP_CODES(_)			\
-	_(UPDATE_OP_SET, 0)			\
-	_(UPDATE_OP_ADD, 1)			\
-	_(UPDATE_OP_AND, 2)			\
-	_(UPDATE_OP_XOR, 3)			\
-	_(UPDATE_OP_OR, 4)			\
-	_(UPDATE_OP_SPLICE, 5)			\
-	_(UPDATE_OP_DELETE, 6)			\
-	_(UPDATE_OP_INSERT, 7)			\
-	_(UPDATE_OP_SUBTRACT, 8)		\
-	_(UPDATE_OP_MAX, 10)			\
-
-ENUM(update_op_codes, UPDATE_OP_CODES);
 
 static inline bool
 request_is_select(u32 type)
