@@ -111,4 +111,13 @@ tarantool_lua(struct lua_State *L,
  */
 int luaL_pushnumber64(struct lua_State *L, uint64_t val);
 
+
+
+/**
+ * show plugin statistics (for admin port)
+ */
+struct tbuf;
+void show_plugins_stat(struct tbuf *out);
+
+
 #endif /* INCLUDES_TARANTOOL_LUA_H */

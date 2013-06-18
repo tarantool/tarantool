@@ -1,3 +1,32 @@
+/*
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 extern "C" {
 	#include <postgres.h>
 	#include <libpq-fe.h>
@@ -5,13 +34,17 @@ extern "C" {
 	#undef PACKAGE_VERSION
 }
 
+#define PLUGIN_VERSION			1
+#define PLUGIN_NAME			"postgresql"
+#include <stddef.h>
 
-#include "lua_pg.h"
 extern "C" {
 	#include <lua.h>
 	#include <lauxlib.h>
 	#include <lualib.h>
 }
+#include <tarantool_plugin.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -360,7 +393,7 @@ lua_pg_quote_ident(struct lua_State *L)
 /**
  * connect to postgresql
  */
-int
+static int
 lbox_net_pg_connect(struct lua_State *L)
 {
 	PGconn     *conn = NULL;
@@ -434,3 +467,38 @@ lbox_net_pg_connect(struct lua_State *L)
 	lua_pushvalue(L, 1);
 	return 1;
 }
+
+
+static void
+init(struct lua_State *L)
+{
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");	/* stack: box */
+
+	lua_pushstring(L, "net");
+	lua_rawget(L, -2);		/* stack: box.net */
+
+	lua_pushstring(L, "sql");
+	lua_rawget(L, -2);		/* stack: box.net.sql */
+
+	lua_pushstring(L, "connectors");
+	lua_rawget(L, -2);		/* stack: box.net.sql.connectors */
+
+
+
+
+	/* stack: box, box.net.sql.connectors */
+	lua_pushstring(L, "pg");
+	lua_pushcfunction(L, lbox_net_pg_connect);
+	lua_rawset(L, -3);
+
+	/* alias for driver */
+	lua_pushstring(L, "postgresql");
+	lua_pushcfunction(L, lbox_net_pg_connect);
+	lua_rawset(L, -3);
+
+	/* cleanup stack */
+	lua_pop(L, 4);
+}
+
+
+DECLARE_PLUGIN(PLUGIN_NAME, PLUGIN_VERSION, init, NULL);

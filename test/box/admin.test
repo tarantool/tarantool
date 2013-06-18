@@ -8,6 +8,7 @@ exec admin "exit"
 exec admin "show stat"
 exec admin "help"
 exec admin "show configuration"
+exec admin "show plugins"
 exec admin "show stat"
 exec sql "insert into t0 values (1, 'tuple')"
 exec admin "save snapshot"
@@ -24,6 +25,8 @@ sys.stdout.push_filter(".*", "")
 exec admin "show fiber"
 exec admin "show slab"
 exec admin "show palloc"
+
+
 sys.stdout.clear_all_filters()
 
 # vim: syntax=python

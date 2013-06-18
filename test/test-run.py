@@ -26,8 +26,10 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 
 import argparse
 import os.path
+import os
 import time
 import sys
+import string
 from lib.test_suite import TestSuite
 
 #
@@ -139,11 +141,24 @@ class Options:
         if check_error:
             exit(-1)
 
+
+def setenv():
+    os.putenv("TARANTOOL_PLUGIN_DIR",
+        string.join(
+            (
+                os.path.join(os.getcwd(), '../src/plugins/mysql'),
+                os.path.join(os.getcwd(), '../src/plugins/pg')
+            ),
+            ':'
+        )
+    )
+
 #######################################################################
 # Program body
 #######################################################################
 
 def main():
+    setenv()
     options = Options()
     oldcwd = os.getcwd()
     # Change the current working directory to where all test

@@ -38,3 +38,4 @@ exec admin "lua c:begin_work()"
 exec admin "lua c:commit()"
 
 exec admin "lua c:txn(function(dbi) dbi:single('SELECT 1') end)"
+

@@ -25,6 +25,10 @@ box.net.sql = {
             driver = driver.driver
         end
 
+        if type(box.net.sql.connectors[driver]) ~= 'function' then
+            error(string.format("Unknown driver '%s'", driver))
+        end
+
         local self = {
             -- connection variables
             driver      = driver,
@@ -53,9 +57,8 @@ box.net.sql = {
 
         setmetatable(self, box.net.sql)
 
-        -- do_connect is written in C
         -- it add 'raw' field in the table
-        local s, c = pcall(box.net.sql.do_connect, self)
+        local s, c = pcall(box.net.sql.connectors[driver], self)
         if not s then
             if self.raise then
                 error(c)
@@ -70,7 +73,7 @@ box.net.sql = {
         return c
     end,
 
-
+    connectors = { },
 
     __index = {
         -- base method
@@ -210,5 +213,4 @@ box.net.sql = {
             return false, res[2]
         end
     }
-
 }

@@ -3,6 +3,9 @@
 #
 enable_tnt_compile_flags()
 
+
+add_subdirectory(plugins)
+
 include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
@@ -107,16 +110,7 @@ set (common_sources
      lua/lua_socket.cc
      lua/session.cc
      lua/cjson.cc
-     lua/lua_sql.cc
 )
-
-if (ENABLE_PSQL)
-    set (common_sources ${common_sources} lua/pg.cc)
-endif()
-
-if (ENABLE_MYSQL)
-    set (common_sources ${common_sources} lua/mysql.cc)
-endif()
 
 if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.c)

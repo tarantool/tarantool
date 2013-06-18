@@ -99,12 +99,6 @@
 #cmakedefine ENABLE_BUNDLED_LIBCORO 1
 
 /*
- * SQL clients
- */
-#define USE_PSQL_CLIENT		@USE_PSQL_CLIENT@
-#define USE_MYSQL_CLIENT	@USE_MYSQL_CLIENT@
-
-/*
  * predefined /etc directory prefix.
  */
 #define SYSCONF_DIR "@CMAKE_SYSCONF_DIR@"
@@ -121,6 +115,9 @@
 #define LUA_SYSCPATH "@LUA_SYSCPATH@"
 #define LUA_LIBPATH "@LUA_LIBPATH@"
 #define LUA_LIBCPATH "@LUA_LIBCPATH@"
+
+#define PLUGIN_DIR "@PLUGIN_DIR@"
+
 /*
  * vim: syntax=c
  */

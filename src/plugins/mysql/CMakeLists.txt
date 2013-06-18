@@ -1,0 +1,13 @@
+include(FindMySQL)
+if (MYSQL_FOUND)
+	message(STATUS "box.net.sql(mysql) INC=${MYSQL_INCLUDE_DIR}")
+	message(STATUS "box.net.sql(mysql) LIBS=mysqlclient_r")
+	
+	add_compile_flags("C;CXX" "-I${MYSQL_INCLUDE_DIR}")
+	add_compile_flags("C;CXX" "-lmysqlclient_r")
+	add_compile_flags("C;CXX" "-shared")
+	add_library(mysql SHARED mysql.cc)
+	install(TARGETS mysql LIBRARY DESTINATION ${PLUGIN_DIR})
+else()
+	message(STATUS "MySQL client not found")
+endif()

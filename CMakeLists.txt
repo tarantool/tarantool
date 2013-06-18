@@ -5,6 +5,7 @@ project(tarantool C CXX)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 set(CMAKE_INCLUDE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_INCLUDE_PATH})
 
+
 include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
@@ -50,6 +51,9 @@ endif()
 if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
   set(CMAKE_INSTALL_LIBDIR lib)
 endif(NOT DEFINED CMAKE_INSTALL_LIBDIR)
+
+set(PLUGIN_DIR
+	${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/tarantool/plugins)
 
 set(CMAKE_OBJC_FLAGS)
 set(CMAKE_OBJCXX_FLAGS)
@@ -135,6 +139,7 @@ endif()
 include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/include")
 include_directories("${PROJECT_BINARY_DIR}/include")
+include_directories("${PROJECT_SOURCE_DIR}/third_party")
 #
 # Specify prefixes
 #
@@ -238,11 +243,6 @@ add_custom_target(build_bundled_libs)
 # LibLUAJIT
 #
 include(luajit)
-
-#
-# MySQL & PgSQL
-#
-include(BuildSQL)
 
 
 #
