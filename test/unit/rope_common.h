@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 static inline void *
-str_getn(void *data, size_t size, size_t offset)
+str_getn(void *ctx, void *data, size_t size, size_t offset)
 {
+	(void) ctx;
 	return (char *) data + offset;
 }
 
@@ -32,7 +33,7 @@ mem_free(void *data, void *ptr)
 static inline struct rope *
 test_rope_new()
 {
-	return rope_new(str_getn, mem_alloc, mem_free, NULL);
+	return rope_new(str_getn, NULL, mem_alloc, mem_free, NULL);
 }
 
 static inline void

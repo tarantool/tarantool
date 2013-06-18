@@ -117,8 +117,8 @@ rope_node_split(struct rope *rope, struct rope_node *node, rsize_t offset)
 	rsize_t old_size = node->leaf_size;
 	node->leaf_size = offset;
 
-	return rope_node_new(rope, rope->split(node->data, old_size, offset),
-			     old_size - offset);
+	void *data = rope->split(rope->split_ctx, node->data, old_size, offset);
+	return rope_node_new(rope, data, old_size - offset);
 }
 
 static inline struct rope_node *
@@ -434,13 +434,15 @@ rope_erase(struct rope *rope, rsize_t offset)
 		/* Check if we can simply trim the node. */
 		if (offset == 0) {
 			/* Cut the head. */
-			node->data = rope->split(node->data, node->leaf_size, 1);
+			node->data = rope->split(rope->split_ctx, node->data,
+						 node->leaf_size, 1);
 			node->leaf_size -= 1;
 			return 0;
 		}
 		rsize_t size = node->leaf_size;
 		/* Cut the tail */
-		void *next = rope->split(node->data, node->leaf_size, offset);
+		void *next = rope->split(rope->split_ctx, node->data,
+					 node->leaf_size, offset);
 		node->leaf_size = offset;
 		if (offset == size - 1)
 			return 0; /* Trimmed the tail, nothing else to do */
@@ -448,7 +450,7 @@ rope_erase(struct rope *rope, rsize_t offset)
 		 * Offset falls inside a substring. Erase the
 		 * first field and insert the tail.
 		 */
-		next = rope->split(next, size - offset, 1);
+		next = rope->split(rope->split_ctx, next, size - offset, 1);
 		struct rope_node *new_node =
 			rope_node_new(rope, next, size - offset - 1);
 		if (new_node == NULL)

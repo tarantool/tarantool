@@ -37,7 +37,7 @@ extern "C" {
 
 typedef unsigned int rsize_t;
 typedef int rssize_t;
-typedef void *(*rope_split_func)(void *, size_t, size_t);
+typedef void *(*rope_split_func)(void *, void *, size_t, size_t);
 typedef void *(*rope_alloc_func)(void *, size_t);
 typedef void (*rope_free_func)(void *, void *);
 
@@ -63,7 +63,9 @@ struct rope {
 	/** Memory management context. */
 	void *alloc_ctx;
 	/** Get a sequence tail, given offset. */
-	void *(*split)(void *, size_t, size_t);
+	rope_split_func split;
+	/** Split function context. */
+	void *split_ctx;
 	/** Allocate memory (context, size). */
 	void *(*alloc)(void *, size_t);
 	/** Free memory (context, pointer) */
@@ -105,12 +107,13 @@ rope_size(struct rope *rope)
 
 /** Initialize an empty rope. */
 static inline void
-rope_create(struct rope *rope, rope_split_func split_func,
+rope_create(struct rope *rope, rope_split_func split_func, void *split_ctx,
 	    rope_alloc_func alloc_func, rope_free_func free_func,
 	    void *alloc_ctx)
 {
 	rope->root = NULL;
 	rope->split = split_func;
+	rope->split_ctx = split_ctx;
 	rope->alloc = alloc_func;
 	rope->free = free_func;
 	rope->alloc_ctx = alloc_ctx;
@@ -130,14 +133,14 @@ rope_create(struct rope *rope, rope_split_func split_func,
  *          to allocate memory
  */
 static inline struct rope *
-rope_new(rope_split_func split_func, rope_alloc_func alloc_func,
-	 rope_free_func free_func, void *alloc_ctx)
+rope_new(rope_split_func split_func, void *split_ctx,
+	 rope_alloc_func alloc_func, rope_free_func free_func, void *alloc_ctx)
 {
 	struct rope *rope= (struct rope *) alloc_func(alloc_ctx,
 						      sizeof(struct rope));
 	if (rope == NULL)
 		return NULL;
-	rope_create(rope, split_func, alloc_func, free_func, alloc_ctx);
+	rope_create(rope, split_func, split_ctx, alloc_func, free_func, alloc_ctx);
 	return rope;
 }
 

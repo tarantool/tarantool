@@ -153,6 +153,10 @@ tuple_next(struct tuple_iterator *it, uint32_t *len);
 void
 tuple_print(struct tbuf *buf, const struct tuple *tuple);
 
+struct tuple *
+tuple_update(const struct tuple *old_tuple, const char *expr,
+	     const char *expr_end);
+
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)
 {
