@@ -180,10 +180,10 @@ memcached_find(const char *key)
 static struct meta *
 memcached_meta(struct tuple *tuple)
 {
-	const char *fb, *fe;
-	tuple_field(tuple, 1, &fb, &fe);
-	assert (fb + sizeof(struct meta) <= fe);
-	return (struct meta *) fb;
+	uint32_t len;
+	const char *field = tuple_field(tuple, 1, &len);
+	assert (sizeof(struct meta) <= len);
+	return (struct meta *) field;
 }
 
 static bool
@@ -288,27 +288,23 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 			continue;
 		}
 
-		const char *fb, *fe;
+		uint32_t len;
 		struct tuple_iterator it;
+		tuple_rewind(&it, tuple);
 		/* skip key */
-		tuple_seek(&it, tuple, 1, &fb, &fe);
+		(void) tuple_next(&it, &len);
 
 		/* metainfo */
-		tuple_next(&it);
-		m = (const struct meta *) fb;
-		assert (fb + sizeof(struct meta *) < fe);
+		m = (const struct meta *) tuple_next(&it, &len);
+		assert(sizeof(struct meta) <= len);
 
 		/* suffix */
-		tuple_next(&it);
-		suffix_len = fe - fb;
-		suffix = fb;
+		suffix = tuple_next(&it, &suffix_len);
 
 		/* value */
-		tuple_next(&it);
-		value_len = fe - fb;
-		value = fb;
+		value = tuple_next(&it, &value_len);
 
-		assert (!tuple_next(&it));
+		assert(tuple_next(&it, &len) == NULL);
 
 		if (m->exptime > 0 && m->exptime < ev_now()) {
 			stats.get_misses++;

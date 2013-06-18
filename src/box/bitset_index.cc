@@ -219,14 +219,13 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	}
 
 	if (new_tuple != NULL) {
-		const char *fb, *fe;
-		tuple_field(new_tuple, key_def->parts[0].fieldno, &fb, &fe);
-		size_t bitset_key_size = fe - fb;
-		const char *bitset_key = fb;
+		uint32_t len;
+		const char *field;
+		field = tuple_field(new_tuple, key_def->parts[0].fieldno,
+				    &len);
 
 		size_t value = tuple_to_value(new_tuple);
-		if (bitset_index_insert(&index, bitset_key,
-					bitset_key_size, value) < 0) {
+		if (bitset_index_insert(&index, field, len, value) < 0) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE, 0,
 				  "BitsetIndex", "insert");
 		}

@@ -167,14 +167,17 @@ lbox_tuple_slice(struct lua_State *L)
 	u32 stop = end - 1;
 
 	struct tuple_iterator it;
-	const char *fb, *fe;
-	tuple_seek(&it, tuple, 0, &fb, &fe);
-	for (uint32_t field_no = 0; tuple_next(&it); field_no++) {
+	tuple_rewind(&it, tuple);
+	const char *field;
+	uint32_t len;
+	uint32_t field_no = 0;
+	while ((field = tuple_next(&it, &len))) {
 		if (field_no >= start) {
-			lua_pushlstring(L, fb, fe - fb);
+			lua_pushlstring(L, field, len);
 			if (field_no == stop)
 				break;
 		}
+		++field_no;
 	}
 	return end - start;
 }
@@ -327,15 +330,13 @@ tuple_find(struct lua_State *L, struct tuple *tuple, size_t offset,
 {
 	int top = lua_gettop(L);
 	int idx = offset;
-	if (idx >= tuple->field_count)
-		return 0;
 
 	struct tuple_iterator it;
-	const char *fb, *fe;
-	tuple_seek(&it, tuple, idx, &fb, &fe);
-	while (tuple_next(&it)) {
-		uint32_t len = fe - fb;
-		if (len == key_size && (memcmp(fb, key, len) == 0)) {
+	tuple_rewind(&it, tuple);
+	uint32_t len;
+	const char *field = tuple_seek(&it, idx, &len);
+	for (; field; field = tuple_next(&it, &len)) {
+		if (len == key_size && (memcmp(field, key, len) == 0)) {
 			lua_pushinteger(L, idx);
 			if (!all)
 				break;
@@ -401,11 +402,12 @@ lbox_tuple_unpack(struct lua_State *L)
 	struct tuple *tuple = lua_checktuple(L, 1);
 
 	struct tuple_iterator it;
-	const char *fb, *fe;
-	tuple_seek(&it, tuple, 0, &fb, &fe);
-	while (tuple_next(&it)) {
-		lua_pushlstring(L, fb, fe - fb);
-	}
+	tuple_rewind(&it, tuple);
+	const char *field;
+	uint32_t len;
+	while ((field = tuple_next(&it, &len)))
+		lua_pushlstring(L, field, len);
+
 	assert(lua_gettop(L) == tuple->field_count + 1);
 	return tuple->field_count;
 }
@@ -418,11 +420,12 @@ lbox_tuple_totable(struct lua_State *L)
 	int index = 1;
 
 	struct tuple_iterator it;
-	const char *fb, *fe;
-	tuple_seek(&it, tuple, 0, &fb, &fe);
-	while (tuple_next(&it)) {
+	tuple_rewind(&it, tuple);
+	const char *field;
+	uint32_t len;
+	while ((field = tuple_next(&it, &len))) {
 		lua_pushnumber(L, index++);
-		lua_pushlstring(L, fb, fe - fb);
+		lua_pushlstring(L, field, len);
 		lua_rawset(L, -3);
 	}
 	return 1;
@@ -445,9 +448,9 @@ lbox_tuple_index(struct lua_State *L)
 		if (i >= tuple->field_count)
 			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
 				   tuplelib_name, i, tuple->field_count-1);
-		const char *fb, *fe;
-		tuple_field(tuple, i, &fb, &fe);
-		lua_pushlstring(L, fb, fe - fb);
+		uint32_t len;
+		const char *field = tuple_field(tuple, i, &len);
+		lua_pushlstring(L, field, len);
 		return 1;
 	}
 	/* If we got a string, try to find a method for it. */
@@ -507,10 +510,10 @@ lbox_tuple_next(struct lua_State *L)
 		return 1;
 	}
 
-	const char *fb, *fe;
-	tuple_field(tuple, field_no, &fb, &fe);
+	uint32_t len;
+	const char *field = tuple_field(tuple, field_no, &len);
 	lua_pushinteger(L, field_no + 1);
-	lua_pushlstring(L, fb, fe - fb);
+	lua_pushlstring(L, field, len);
 	return 2;
 }
 

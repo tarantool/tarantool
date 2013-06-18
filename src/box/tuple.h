@@ -76,69 +76,72 @@ tuple_ref(struct tuple *tuple, int count);
  *
  * @returns field data if the field exists, or NULL
  */
-__attribute__((deprecated)) const char *
+const char *
 tuple_field_old(struct tuple *tuple, u32 i);
 
 /**
  * @brief Return field data of the field
  * @param tuple tuple
  * @param field_no field number
- * @param begin pointer where the start of field data will be stored
- * @param end pointer where the end of field data + 1 will be stored
+ * @param field pointer where the start of field data will be stored
+ * @param len pointer where the len of the field will be stored
  * @throws IllegalParams if \a field_no is out of range
  */
-void
-tuple_field(const struct tuple *tuple, uint32_t field_no,
-	    const char **begin, const char **end);
+const char *
+tuple_field(const struct tuple *tuple, uint32_t field_no, uint32_t *len);
 
 /**
  * @brief Tuple Interator
  */
 struct tuple_iterator {
 	/** @cond false **/
-	/* Result */
-	const char **begin;
-	const char **end;
 	/* State */
 	const struct tuple *tuple;
-	const char *cur;
+	/** Always points to the beginning of the next field. */
+	const char *pos;
 	/** @endcond **/
 };
 
 /**
- * @brief Seek tuple iterator to position \a field_no
+ * @brief Initialize an iterator over tuple fields
  *
  * A workflow example:
  * @code
  * struct tuple_iterator it;
- * const char *fb, *fe;
- * tuple_seek(&it, tuple, 0, &fb, &fe);
- * while (tuple_next(&it)) {
- *      // field_data = fb
- *	// field_size = fe-fb
- *	lua_pushlstring(L, fb, fe - fb);
- * }
+ * tuple_rewind(&it, tuple);
+ * const char *field;
+ * uint32_t len;
+ * while ((field = tuple_next(&it, &len)))
+ *	lua_pushlstring(L, field, len);
+ *
  * @endcode
  *
- * @param it tuple iterator
- * @param tuple tuple
- * @param field_no a field number to seek
- * @param begin pointer where the start of field data will be stored
- * @param end pointer where the end of field data + 1 will be stored
+ * @param[out] it tuple iterator
+ * @param[in]  tuple tuple
  */
-void
-tuple_seek(struct tuple_iterator *it, const struct tuple *tuple,
-	   uint32_t field_no, const char **begin, const char **end);
+static inline void
+tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
+{
+	it->tuple = tuple;
+	it->pos = tuple->data;
+}
 
 /**
- * @brief Iterate to the next position
- * @param it tuple iterator
- * @retval \a it if the iterator has tuple
- * @retval NULL if where is no more tuples (values of \a begin \a end
- * are not specifed in this case)
+ * @brief Position the iterator at a given field no.
+ *
+ * @retval field  if the iterator has the requested field
+ * @retval NULL   otherwise (iteration is out of range)
  */
-struct tuple_iterator *
-tuple_next(struct tuple_iterator *it);
+const char *
+tuple_seek(struct tuple_iterator *it, uint32_t field_no, uint32_t *len);
+
+/**
+ * @brief Iterate to the next field
+ * @param it tuple iterator
+ * @return next field or NULL if the iteration is out of range
+ */
+const char *
+tuple_next(struct tuple_iterator *it, uint32_t *len);
 
 /**
  * @brief Print a tuple in yaml-compatible mode to tbuf:

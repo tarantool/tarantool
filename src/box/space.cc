@@ -176,23 +176,27 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 
 	/* Sweep through the tuple and check the field sizes. */
 	struct tuple_iterator it;
-	const char *fb, *fe;
-	tuple_seek(&it, new_tuple, 0, &fb, &fe);
-	for (uint32_t f = 0; f < sp->max_fieldno && tuple_next(&it); f++) {
+	tuple_rewind(&it, new_tuple);
+	const char *field;
+	uint32_t len;
+	uint32_t fieldno = 0;
+	while ((field = tuple_next(&it, &len))) {
+		if (fieldno == sp->max_fieldno)
+			break;
 		/*
 		 * Check fixed size fields (NUM and NUM64) and
 		 * skip undefined size fields (STRING and UNKNOWN).
 		 */
-		uint32_t len = fe - fb;
-		if (sp->field_types[f] == NUM) {
+		if (sp->field_types[fieldno] == NUM) {
 			if (len != sizeof(u32))
 				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
 					  "u32");
-		} else if (sp->field_types[f] == NUM64) {
+		} else if (sp->field_types[fieldno] == NUM64) {
 			if (len != sizeof(u64))
 				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
 					  "u64");
 		}
+		fieldno++;
 	}
 }
 
