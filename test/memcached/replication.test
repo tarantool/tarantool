@@ -15,7 +15,7 @@ master = server
 master_memcached = master.memcached
 
 replica = TarantoolBoxServer()
-replica.deploy("repl-mem/cfg/replica.cfg",
+replica.deploy("memcached/cfg/replica.cfg",
 	       replica.find_exe(self.args.builddir),
 	       os.path.join(self.args.vardir, "replica"))
 replica_memcached = replica.memcached
@@ -29,7 +29,7 @@ time.sleep(0.5)
 exec replica_memcached "get 9\r\n"
 
 print """# make multiple cnanges with master"""
-answer = exec master_memcached "gets 9\r\n"
+answer = exec master_memcached silent "gets 9\r\n"
 cas = int(answer.split()[4])
 exec master_memcached silent "append 1 0 0 3\r\nafk\r\n"
 exec master_memcached silent "prepend 2 0 0 3\r\nkfa\r\n" 
@@ -54,6 +54,14 @@ print """# flush all k-v on master and try to get them from replica"""
 exec master_memcached silent "flush_all\r\n"
 time.sleep(1)
 exec replica_memcached "get 10\r\n"
+
+print """# check that expiration is working properly on replica"""
+exec master_memcached silent "set 1 0 2 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
+time.sleep(1)
+exec replica_memcached "get 1\r\n"
+time.sleep(2)
+exec replica_memcached "get 1\r\n"
+
 
 # resore default suite config
 replica.stop()

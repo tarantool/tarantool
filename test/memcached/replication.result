@@ -5,10 +5,6 @@ VALUE 9 0 5
 good9
 END
 # make multiple cnanges with master
-gets 9
-VALUE 9 0 5 51
-good9
-END
 # wait and get k-v's from replicas
 get 1 2 3 4 5 7 8 9 10
 VALUE 1 0 8
@@ -35,4 +31,11 @@ get 6
 END
 # flush all k-v on master and try to get them from replica
 get 10
+END
+# check that expiration is working properly on replica
+get 1
+VALUE 1 0 21
+The expense of spirit
+END
+get 1
 END

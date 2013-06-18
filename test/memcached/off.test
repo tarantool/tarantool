@@ -15,7 +15,7 @@ print """
 # stop current server
 server.stop()
 # start server with memcached off
-server.deploy("memcached/tarantool_memcached_off.cfg")
+server.deploy("memcached/cfg/tarantool_memcached_off.cfg")
 # check values
 exec admin "show configuration"
 
@@ -23,7 +23,7 @@ exec admin "show configuration"
 server.stop()
 # start server with memcached space conflict
 sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
-server.test_option("-c " + os.path.join(os.getcwd(), "memcached/tarantool_memcached_bad.cfg"))
+server.test_option("-c " + os.path.join(os.getcwd(), "memcached/cfg/tarantool_memcached_bad.cfg"))
 sys.stdout.pop_filter()
 
 # restore default server
