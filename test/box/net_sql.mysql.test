@@ -1,0 +1,28 @@
+# encoding: tarantool
+
+exec admin "lua c = box.net.sql.connect('abcd')"
+exec admin "lua dump = function(v) return box.cjson.encode(v) end"
+
+exec admin "lua connect = {}"
+exec admin "lua for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do table.insert(connect, tk) end"
+
+# mysql
+exec admin "lua c = box.net.sql.connect('mysql', unpack(connect))"
+exec admin "lua for k, v in pairs(c) do print(k, ': ', type(v)) end"
+exec admin "lua c:execute('SEL ECT 1')"
+exec admin "lua dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})"
+
+exec admin "lua dump({c:execute('SELECT * FROM (SELECT ?) t WHERE 1 = 0', 2)})"
+exec admin "lua dump({c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS One; SELECT 2 AS Two, 3 AS Three; END')})"
+exec admin "lua dump({c:execute('CALL p1')})"
+exec admin "lua dump({c:execute('DROP PROCEDURE p1')})"
+exec admin "lua dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2')})"
+exec admin "lua dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')})"
+
+exec admin "lua c:quote('test \"abc\" test')"
+
+exec admin "lua c:begin_work()"
+exec admin "lua c:rollback()"
+exec admin "lua c:begin_work()"
+exec admin "lua c:commit()"
+

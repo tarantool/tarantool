@@ -20,6 +20,7 @@ available commands:
  - show slab
  - show palloc
  - show stat
+ - show plugins
  - save coredump
  - save snapshot
  - lua command
