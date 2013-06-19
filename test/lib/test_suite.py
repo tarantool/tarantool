@@ -147,7 +147,7 @@ class Test:
             check_valgrind_log(server.valgrind_log) == False
 
         if self.skip:
-            print "[ runtime skip ]"
+            print "[ skip ]"
 
         elif self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
             print "[ pass ]"
@@ -303,11 +303,11 @@ class TestSuite:
 
             test_name = os.path.basename(test.name)
             if test_name in self.ini["disabled"]:
-                print "[ skip ]"
+                print "[ disabled ]"
             elif not server.debug and test_name in self.ini["release_disabled"]:
-                print "[ skip ]"
+                print "[ disabled ]"
             elif self.args.valgrind and test_name in self.ini["valgrind_disabled"]:
-                print "[ skip ]"
+                print "[ disabled ]"
             else:
                 test.run(server)
                 if not test.passed():
