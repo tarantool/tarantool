@@ -528,9 +528,6 @@ update_calc_new_tuple_length(struct tuple_update *update)
 	if (update->new_tuple_size > UINT32_MAX)
 		tnt_raise(ClientError, ER_TUPLE_IS_TOO_LONG,
 			  update->new_tuple_size);
-
-	if (update->new_tuple_size == 0)
-		tnt_raise(ClientError, ER_TUPLE_IS_EMPTY);
 }
 
 static void
