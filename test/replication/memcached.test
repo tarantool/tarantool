@@ -2,6 +2,7 @@
 import sys
 import time
 import os
+import yaml
 
 from lib.memcached_connection import MemcachedConnection
 from lib.tarantool_box_server import TarantoolBoxServer
@@ -16,16 +17,46 @@ master_memcached = master.memcached
 
 replica = TarantoolBoxServer()
 replica.deploy("memcached/cfg/replica.cfg",
-	       replica.find_exe(self.args.builddir),
-	       os.path.join(self.args.vardir, "replica"))
+           replica.find_exe(self.args.builddir),
+           os.path.join(self.args.vardir, "replica"))
 replica_memcached = replica.memcached
+
+###################################
+def wait_for_lsn(lsn, _server):
+    _server_admin = _server.admin
+    while True:
+        if get_lsn(_server) == lsn:
+            return lsn
+        time.sleep(0.5)
+
+def wait_for_next_lsn(lsn, _server):
+    _server_admin = _server.admin
+    while True:
+        if get_lsn(_server) != lsn:
+            return lsn
+        time.sleep(0.5)
+
+def get_lsn(_server):
+    _server_admin = _server.admin
+    resp = exec _server_admin silent "lua box.info.lsn"
+    return yaml.load(resp)[0]
+
+def wait(next = False, _server_master = master, _server_replica = replica):
+#    print get_lsn(_server_master), " ", get_lsn(_server_replica)
+    if next:
+        lsn = get_lsn(_server_replica)
+        return wait_for_next_lsn(lsn, _server_replica)
+    else:
+        lsn = get_lsn(_server_master)
+        return wait_for_lsn(lsn, _server_replica)
+###################################
 
 print """# set initial k-v pairs"""
 for i in xrange(10):
-	exec master_memcached silent "set %d 0 0 5\r\ngood%d\r\n" % (i, i)
-
+    exec master_memcached silent "set %d 0 0 5\r\ngood%d\r\n" % (i, i)
+time.sleep(1);
 print """# wait and get last k-v pair from replica"""
-time.sleep(0.5)
+wait()
 exec replica_memcached "get 9\r\n"
 
 print """# make multiple cnanges with master"""
@@ -43,8 +74,10 @@ exec master_memcached silent "add 10 0 0 %d\r\n%s\r\n" % (len(sonet[3]), sonet[3
 exec master_memcached silent "incr 3 15\r\n"
 exec master_memcached silent "decr 4 15\r\n"
 
+time.sleep(1)
+
 print """# wait and get k-v's from replicas"""
-time.sleep(0.5)
+wait()
 exec replica_memcached "get 1 2 3 4 5 7 8 9 10\r\n"
 
 print """# get deleted value"""
@@ -52,14 +85,23 @@ exec replica_memcached "get 6\r\n"
 
 print """# flush all k-v on master and try to get them from replica"""
 exec master_memcached silent "flush_all\r\n"
-time.sleep(1)
+wait(True)
 exec replica_memcached "get 10\r\n"
 
+
 print """# check that expiration is working properly on replica"""
-exec master_memcached silent "set 1 0 2 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
-time.sleep(1)
+exec master_memcached silent "set 1 0 3 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
+wait()
 exec replica_memcached "get 1\r\n"
-time.sleep(2)
+wait(True)
+exec replica_memcached "get 1\r\n"
+
+print """# check that expiration is working properly, when replica becomes master"""
+exec master_memcached silent "set 1 0 3 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
+replica.reconfigure("memcached/cfg/replica-to-master.cfg")
+wait()
+exec replica_memcached "get 1\r\n"
+wait(True)
 exec replica_memcached "get 1\r\n"
 
 

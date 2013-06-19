@@ -39,3 +39,14 @@ The expense of spirit
 END
 get 1
 END
+# check that expiration is working properly, when replica becomes master
+reload configuration
+---
+ok
+...
+get 1
+VALUE 1 0 21
+The expense of spirit
+END
+get 1
+END
