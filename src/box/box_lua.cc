@@ -32,6 +32,7 @@
 #include "box/box.h"
 #include "request.h"
 #include "txn.h"
+#include "tuple_update.h"
 
 extern "C" {
 #include <lua.h>
@@ -182,63 +183,6 @@ lbox_tuple_slice(struct lua_State *L)
 	return end - start;
 }
 
-
-/**
- * Given a tuple, range of fields to remove (start and end field
- * numbers), and a list of fields to paste, calculate the size of
- * the resulting tuple.
- *
- * @param L      lua stack, contains a list of arguments to paste
- * @param start  offset in the lua stack where paste arguments start
- * @param tuple  old tuple
- * @param offset cut field offset
- * @param len    how many fields to cut
- * @param[out]   sizes of the left and right part
- *
- * @return size of the new tuple
-*/
-static size_t
-transform_calculate(struct lua_State *L, struct tuple *tuple,
-		    int start, int argc, int offset, int len,
-		    size_t lr[2])
-{
-	/* calculate size of the new tuple */
-	const char *tuple_end = tuple->data + tuple->bsize;
-	const char *tuple_field = tuple->data;
-
-	lr[0] = tuple_range_size(&tuple_field, tuple_end, offset);
-
-	/* calculate sizes of supplied fields */
-	size_t mid = 0;
-	for (int i = start ; i <= argc ; i++) {
-		switch (lua_type(L, i)) {
-		case LUA_TNUMBER:
-			mid += varint32_sizeof(sizeof(u32)) + sizeof(u32);
-			break;
-		case LUA_TCDATA:
-			mid += varint32_sizeof(sizeof(u64)) + sizeof(u64);
-			break;
-		case LUA_TSTRING: {
-			size_t field_size = lua_objlen(L, i);
-			mid += varint32_sizeof(field_size) + field_size;
-			break;
-		}
-		default:
-			luaL_error(L, "tuple.transform(): unsupported field type '%s'",
-				   lua_typename(L, lua_type(L, i)));
-			break;
-		}
-	}
-
-	/* calculate size of the removed fields */
-	tuple_range_size(&tuple_field, tuple_end, len);
-
-	/* calculate last part of the tuple fields */
-	lr[1] = tuple_end - tuple_field;
-
-	return lr[0] + mid + lr[1];
-}
-
 /**
  * Tuple transforming function.
  *
@@ -256,8 +200,8 @@ lbox_tuple_transform(struct lua_State *L)
 	int argc = lua_gettop(L);
 	if (argc < 3)
 		luaL_error(L, "tuple.transform(): bad arguments");
-	int offset = lua_tointeger(L, 2);
-	int len = lua_tointeger(L, 3);
+	lua_Integer offset = lua_tointeger(L, 2);
+	lua_Integer len = lua_tointeger(L, 3);
 
 	/* validate offset and len */
 	if (offset < 0) {
@@ -272,45 +216,103 @@ lbox_tuple_transform(struct lua_State *L)
 	if (len > tuple->field_count - offset)
 		len = tuple->field_count - offset;
 
-	/* calculate size of the new tuple */
-	size_t lr[2]; /* left and right part sizes */
-	size_t size = transform_calculate(L, tuple, 4, argc, offset, len, lr);
+	assert ( ( (offset < tuple->field_count) &&
+		   (len >= 0 && offset + len <= tuple->field_count) ) ||
+		 (offset == tuple->field_count && len == 0));
 
-	/* allocate new tuple */
-	struct tuple *dest = tuple_alloc(size);
-	dest->field_count = (tuple->field_count - len) + (argc - 3);
-
-	/* construct tuple */
-	memcpy(dest->data, tuple->data, lr[0]);
-	char *ptr = dest->data + lr[0];
-	for (int i = 4; i <= argc; i++) {
-		switch (lua_type(L, i)) {
-		case LUA_TNUMBER: {
-			u32 v = lua_tonumber(L, i);
-			ptr = pack_lstr(ptr, &v, sizeof(v));
-			break;
-		}
-		case LUA_TCDATA: {
-			u64 v = tarantool_lua_tointeger64(L, i);
-			ptr = pack_lstr(ptr, &v, sizeof(v));
-			break;
-		}
-		case LUA_TSTRING: {
-			size_t field_size = 0;
-			const char *v = luaL_checklstring(L, i, &field_size);
-			ptr = pack_lstr(ptr, v, field_size);
-			break;
-		}
-		default:
-			/* default type check is done in transform_calculate()
-			 * function */
-			break;
-		}
+	/*
+	 * Calculate the number of operations and length of UPDATE expression
+	 */
+	uint32_t ops_cnt = 0;
+	size_t expr_len = 0;
+	expr_len += sizeof(uint32_t); /* ops_count */
+	if (offset < tuple->field_count) {
+		/* Remove `len` fields */
+		ops_cnt += len;
+		expr_len += len * sizeof(uint32_t);	/* Field */
+		expr_len += len * sizeof(uint8_t);	/* Operation */
+		expr_len += len * varint32_sizeof(0);	/* Ignored */
 	}
 
-	memcpy(ptr, tuple_field_old(tuple, offset + len), lr[1]);
+	for (int i = 4; i <= argc; i++) {
+		uint32_t field_len = 0;
+		switch (lua_type(L, i)) {
+		case LUA_TNUMBER:
+			field_len = sizeof(uint32_t);
+			break;
+		case LUA_TCDATA:
+			field_len = sizeof(uint64_t);
+			break;
+		case LUA_TSTRING:
+			field_len = lua_objlen(L, i);
+			break;
+		default:
+			luaL_error(L, "tuple.transform(): unsupported field type '%s'",
+				   lua_typename(L, lua_type(L, i)));
+			break;
+		}
 
-	lbox_pushtuple(L, dest);
+		/* Insert one field */
+		ops_cnt++;
+		expr_len += sizeof(uint32_t);		/* Field Number */
+		expr_len += sizeof(uint8_t);		/* Operation */
+		expr_len += varint32_sizeof(field_len) + field_len; /* Field */
+	}
+
+	if (ops_cnt == 0) {
+		/* Nothing to do */
+		lbox_pushtuple(L, tuple);
+		return 1;
+	}
+
+	/*
+	 * Prepare UPDATE expression
+	 */
+	char *expr = (char *) palloc(fiber->gc_pool, expr_len);
+	char *e = expr;
+	e = pack_u32(e, ops_cnt);
+	for (lua_Integer i = 0; i < len; i++) {
+		e = pack_u32(e, offset);
+		e = pack_u8(e, UPDATE_OP_DELETE);
+		e = pack_varint32(e, 0);
+	}
+
+	for (int i = argc ; i >= 4; i--) {
+		uint32_t field_u32;
+		uint64_t field_u64;
+		const char *field = NULL;
+		size_t field_len = 0;
+		switch (lua_type(L, i)) {
+		case LUA_TNUMBER:
+			field_u32 = lua_tonumber(L, i);
+			field = (const char *) &field_u32;
+			field_len = sizeof(uint32_t);
+			break;
+		case LUA_TCDATA:
+			field_u64 = tarantool_lua_tointeger64(L, i);
+			field = (const char *) &field_u64;
+			field_len = sizeof(uint64_t);
+			break;
+		case LUA_TSTRING:
+			field = luaL_checklstring(L, i, &field_len);
+			break;
+		default:
+			assert (false);
+			break;
+		}
+
+		assert (field_len <= UINT32_MAX);
+		/* Insert the field */
+		e = pack_u32(e, offset);		/* Field Number */
+		e = pack_u8(e, UPDATE_OP_INSERT);	/* Operation */
+		e = pack_lstr(e, field, field_len);	/* Field Value */
+	}
+
+	assert (e == expr + expr_len);
+
+	/* Execute tuple_update */
+	struct tuple *new_tuple = tuple_update(tuple, expr, expr + expr_len);
+	lbox_pushtuple(L, new_tuple);
 	return 1;
 }
 
