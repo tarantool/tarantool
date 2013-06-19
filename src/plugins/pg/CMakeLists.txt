@@ -7,7 +7,6 @@ if (PostgreSQL_FOUND)
 	add_compile_flags("C;CXX" "-I${PostgreSQL_INCLUDE_DIR}")
 	add_compile_flags("C;CXX" "-L${PostgreSQL_LIBRARY_DIR}")
 	add_compile_flags("C;CXX" "-l${PostgreSQL_LIBRARIES}")
-	add_compile_flags("C;CXX" "-shared")
 	add_library(pg SHARED pg.cc)
 	install(TARGETS pg LIBRARY DESTINATION ${PLUGIN_DIR})
 

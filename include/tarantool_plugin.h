@@ -49,14 +49,14 @@ struct tarantool_plugin {
         struct rlist list;
 };
 
-#define DECLARE_PLUGIN(__name, __version, __init, __stat)	\
+#define DECLARE_PLUGIN(name, version, init, stat)	        \
 	extern "C" {						\
 		struct tarantool_plugin plugin_meta = {		\
 			PLUGIN_API_VERSION,			\
-			__version,				\
-			__name,					\
-			__init,                                 \
-			__stat,                                 \
+			version,				\
+			name,					\
+			init,                                 \
+			stat,                                 \
 			{ NULL, NULL }				\
 		};						\
 	}
