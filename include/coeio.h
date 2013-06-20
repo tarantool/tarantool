@@ -29,7 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#include "config.h"
+#include "tarantool/config.h"
+#include "tarantool/util.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -38,7 +39,6 @@
 #include <tarantool_ev.h>
 #include <tarantool_eio.h>
 #include <coro.h>
-#include <util.h>
 #include <rlist.h>
 
 #include <sys/types.h>

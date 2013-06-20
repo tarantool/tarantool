@@ -27,14 +27,13 @@
  * SUCH DAMAGE.
  */
 #include "fiber.h"
-#include "config.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <say.h>
-#include <tarantool.h>
+#include "tarantool.h"
 extern "C" {
 #include <cfg/warning.h>
 #include <cfg/tarantool_box_cfg.h>

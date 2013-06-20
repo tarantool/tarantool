@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "exception.h"
-#include "util.h"
+#include "tarantool/util.h"
 
 struct errinj {
 	const char *name;

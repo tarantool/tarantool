@@ -30,7 +30,7 @@
  */
 #include <stdint.h>
 
-#include <util.h>
+#include "tarantool/util.h"
 
 struct errcode_record {
 	const char *errstr;

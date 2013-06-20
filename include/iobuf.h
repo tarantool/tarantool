@@ -30,7 +30,7 @@
  */
 #include <sys/uio.h>
 #include <stdbool.h>
-#include "util.h"
+#include "tarantool/util.h"
 #include "third_party/queue.h"
 
 struct ev_io;

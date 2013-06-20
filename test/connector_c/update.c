@@ -34,7 +34,7 @@
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_io.h>
 
-#include <util.h>
+#include "tarantool/util.h"
 #include <errcode.h>
 #include <unit.h>
 

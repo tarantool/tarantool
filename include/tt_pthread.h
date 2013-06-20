@@ -29,10 +29,10 @@
  * SUCH DAMAGE.
  */
 
-#include "config.h"
+#include "tarantool/config.h"
 
 #include <pthread.h>
-#include <util.h>
+#include "tarantool/util.h"
 #include <say.h>
 
 /**

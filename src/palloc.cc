@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  */
 #include "palloc.h"
+#include "tarantool/config.h"
 #include "third_party/valgrind/memcheck.h"
-#include "config.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>

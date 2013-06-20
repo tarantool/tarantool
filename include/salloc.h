@@ -30,7 +30,7 @@
  */
 #include <stddef.h>
 #include <stdbool.h>
-#include "util.h" /* for u64 */
+#include "tarantool/util.h" /* for u64 */
 
 struct tbuf;
 

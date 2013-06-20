@@ -32,7 +32,7 @@
 #include <stdarg.h>
 #include <errno.h>
 
-#include <util.h> /* for FORMAT_PRINTF */
+#include "tarantool/util.h" /* for FORMAT_PRINTF */
 
 #if defined(__cplusplus)
 extern "C" {

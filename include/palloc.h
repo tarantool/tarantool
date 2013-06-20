@@ -30,7 +30,7 @@
  */
 #include <stddef.h>
 #include <stdint.h>
-#include "util.h"
+#include "tarantool/util.h"
 
 #if defined(__cplusplus)
 extern "C" {

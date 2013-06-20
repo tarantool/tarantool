@@ -28,14 +28,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
+#include "tarantool/config.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <tarantool_ev.h>
 #include <coro.h>
-#include <util.h>
+#include <tarantool/util.h>
 #include "third_party/queue.h"
 
 #if defined(__cplusplus)

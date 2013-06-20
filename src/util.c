@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "util.h"
+#include "tarantool/util.h"
 
 #include <stdarg.h>
 #include <stdbool.h>

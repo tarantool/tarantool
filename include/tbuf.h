@@ -32,7 +32,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include <util.h>
+#include "tarantool/util.h"
 
 #if defined(__cplusplus)
 extern "C" {

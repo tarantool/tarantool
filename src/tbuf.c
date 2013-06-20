@@ -35,7 +35,6 @@
 #include <stdbool.h>
 
 #include <palloc.h>
-#include <util.h>
 
 #ifdef POISON
 #  define TBUF_POISON

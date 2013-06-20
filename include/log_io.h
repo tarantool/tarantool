@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <stdbool.h>
-#include "util.h"
+#include "tarantool/util.h"
 #include "tbuf.h"
 #include "tarantool_ev.h"
 

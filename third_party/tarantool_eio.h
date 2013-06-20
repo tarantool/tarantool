@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#include "config.h"
+#include "tarantool/config.h"
 
 #include <stdio.h>
 #include <fcntl.h> /* Definition of AT_* constants */

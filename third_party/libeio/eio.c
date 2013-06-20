@@ -38,7 +38,7 @@
  */
 
 #ifndef _WIN32
-# include "config.h"
+# include "tarantool/config.h"
 #endif
 
 #include "eio.h"

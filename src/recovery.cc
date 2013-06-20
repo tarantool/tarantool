@@ -32,7 +32,7 @@
 
 #include "log_io.h"
 #include "fiber.h"
-#include "tarantool_pthread.h"
+#include "tt_pthread.h"
 #include "fio.h"
 #include "errinj.h"
 

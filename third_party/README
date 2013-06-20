@@ -43,6 +43,8 @@ Note: we have two important changes to the stock libeio:
   A larger stack size is necessary to make getaddrinfo()
   work.
 
+- replace config.h with tarantool/config.h in eio.c
+
 Otherwise: cvs up
 
 How to update rb.h

@@ -28,7 +28,7 @@
  */
 #include "salloc.h"
 
-#include "config.h"
+#include "tarantool/config.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -38,7 +38,7 @@
 
 #include "third_party/valgrind/memcheck.h"
 #include <third_party/queue.h>
-#include <util.h>
+#include "tarantool/util.h"
 #include <tbuf.h>
 #include <say.h>
 #include "exception.h"

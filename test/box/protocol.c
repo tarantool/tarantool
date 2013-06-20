@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#include "util.h"
+#include "tarantool/util.h"
 #include "errcode.h"
 
 #include <tarantool/tnt.h>

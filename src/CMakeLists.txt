@@ -4,7 +4,7 @@
 enable_tnt_compile_flags()
 
 
-add_subdirectory(plugins)
+add_subdirectory(plugin)
 
 include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})

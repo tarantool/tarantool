@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include <tarantool.h>
-#include <util.h>
+#include "tarantool/util.h"
 
 /**
  * Check replication configuration.

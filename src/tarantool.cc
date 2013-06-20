@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "tarantool.h"
-#include "config.h"
+#include "tarantool/config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,13 +58,13 @@
 #include <say.h>
 #include <stat.h>
 #include <limits.h>
-#include <util.h>
+#include "tarantool/util.h"
 extern "C" {
 #include <cfg/warning.h>
 #include <cfg/tarantool_box_cfg.h>
 #include <third_party/gopt/gopt.h>
 } /* extern "C" */
-#include "tarantool_pthread.h"
+#include "tt_pthread.h"
 #include "lua/init.h"
 #include "memcached.h"
 #include "session.h"

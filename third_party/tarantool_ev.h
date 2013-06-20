@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#include "config.h"
+#include "tarantool/config.h"
 
 #include <time.h>
 #include <sys/types.h>

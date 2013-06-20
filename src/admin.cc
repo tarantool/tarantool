@@ -43,7 +43,7 @@
 #include "lua/init.h"
 #include <recovery.h>
 #include <tbuf.h>
-#include <util.h>
+#include "tarantool/util.h"
 #include <errinj.h>
 #include "coio_buf.h"
 

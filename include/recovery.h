@@ -31,7 +31,7 @@
 #include <stdbool.h>
 #include <netinet/in.h>
 
-#include "util.h"
+#include "tarantool/util.h"
 #include "tarantool_ev.h"
 
 #if defined(__cplusplus)

@@ -35,7 +35,7 @@ find_program(POD2MAN pod2man)
 set (TARANTOOL_PRODUCT "box")
 set (TARANTOOL_MODULES "box")
 set (TARANTOOL_CLIENTS "tarantool_checksum")
-# Define PACKAGE macro in config.h
+# Define PACKAGE macro in tarantool/config.h
 set (PACKAGE "Tarantool")
 
 #
@@ -53,7 +53,7 @@ if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
 endif(NOT DEFINED CMAKE_INSTALL_LIBDIR)
 
 set(PLUGIN_DIR
-	${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/tarantool/plugins)
+	${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/tarantool/plugin)
 
 set(CMAKE_OBJC_FLAGS)
 set(CMAKE_OBJCXX_FLAGS)
@@ -364,8 +364,8 @@ set(TARANTOOL_CXX_COMPILER ${CMAKE_CXX_COMPILER})
 # of the script to make sure all variables are set.
 #
 configure_file(
-    "${PROJECT_SOURCE_DIR}/include/config.h.cmake"
-    "${PROJECT_BINARY_DIR}/include/config.h"
+    "${PROJECT_SOURCE_DIR}/include/tarantool/config.h.cmake"
+    "${PROJECT_BINARY_DIR}/include/tarantool/config.h"
     )
 configure_file(
     "${PROJECT_SOURCE_DIR}/doc/tnt.ent.cmake"

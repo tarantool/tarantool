@@ -60,7 +60,7 @@ extern "C" {
 #include <dlfcn.h>
 #include <dirent.h>
 #include <stdio.h>
-#include <tarantool_plugin.h>
+#include "tarantool/plugin.h"
 
 static RLIST_HEAD(loaded_plugins);
 
