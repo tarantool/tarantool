@@ -56,7 +56,7 @@ Description: high performance key/value storage server
  This package provides tarantool server.
 
 Package: tarantool-plugins
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Architecture: all
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version}),
