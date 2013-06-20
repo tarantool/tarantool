@@ -14,19 +14,19 @@ DEB_DH_INSTALLINIT_ARGS := --name=tarantool
 
 DEB_CMAKE_INSTALL_PREFIX := /usr
 DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
-    -DCMAKE_C_FLAGS="$(CFLAGS)" \
-    -DCMAKE_CXX_FLAGS="$(CXXFLAGS)" \
-    -DCMAKE_CPP_FLAGS="$(CPPFLAGS)" \
-    -DCMAKE_LD_FLAGS="$(LDFLAGS)" \
     -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_VERBOSE_MAKEFILE=ON \
     -DCMAKE_SYSCONF_DIR=/etc/tarantool \
-    -DCMAKE_LOCALSTATE_DIR=/var	\
-    -DENABLE_MYSQL=ON -DENABLE_PSQL=ON
+    -DCMAKE_LOCALSTATE_DIR=/var
+#     -DCMAKE_C_FLAGS="$(CFLAGS)" \
+#     -DCMAKE_LD_FLAGS="$(LDFLAGS)" \
 #     -DENABLE_STATIC=ON
+#     -DCMAKE_CXX_FLAGS="$(CXXFLAGS)" \
+#     -DCMAKE_CPP_FLAGS="$(CPPFLAGS)" \
 #    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
 #    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
 
+DEB_SHLIBDEPS_INCLUDE := /usr/lib/tarantool/plugins
 
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk

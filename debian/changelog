@@ -1,3 +1,14 @@
+tarantool (1.4.9+20130620.1443-1) experimental; urgency=low
+
+  * New snapshot.
+   - Add postgresql-plugin package.
+   - Add mysql-plugin package.
+   - Add -plugins package (Now it depends on other plugin. Then it will
+     contain some internal tarantool plugins).
+   - Update debian/copyright.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 20 Jun 2013 14:42:48 +0400
+
 tarantool (1.4.9+20130611.2012-1) unstable; urgency=low
 
   * New snapshot, fix crash with gcc-4.7.3.
