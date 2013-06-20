@@ -160,7 +160,7 @@ int
 bitset_expr_add_param(struct bitset_expr *expr, size_t bitset_id,
 		      bool pre_not)
 {
-	assert (expr->size > 0);
+	assert(expr->size > 0);
 	struct bitset_expr_conj *conj = &expr->conjs[expr->size - 1];
 
 	if (bitset_expr_conj_reserve(expr, conj, conj->size + 1) != 0)

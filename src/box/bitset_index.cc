@@ -93,7 +93,7 @@ bitset_index_iterator_next(struct iterator *iterator)
 BitsetIndex::BitsetIndex(struct key_def *key_def, struct space *space)
 	: Index(key_def, space)
 {
-	assert (!key_def->is_unique);
+	assert(!key_def->is_unique);
 
 	if (bitset_index_create(&index, realloc) != 0)
 		panic_syserror("bitset_index_create");
@@ -126,7 +126,7 @@ BitsetIndex::endBuild()
 void
 BitsetIndex::build(Index *pk)
 {
-	assert (!key_def->is_unique);
+	assert(!key_def->is_unique);
 
 	struct iterator *it = pk->position();
 	struct tuple *tuple;
@@ -213,7 +213,7 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		if (bitset_index_contains_value(&index, value)) {
 			ret = old_tuple;
 
-			assert (old_tuple != new_tuple);
+			assert(old_tuple != new_tuple);
 			bitset_index_remove_value(&index, value);
 		}
 	}

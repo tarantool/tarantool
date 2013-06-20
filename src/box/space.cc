@@ -383,7 +383,7 @@ space_config()
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
 			struct key_def *key_def = &space->key_defs[j];
 			Index *index = Index::factory(type, key_def, space);
-			assert (index != NULL);
+			assert(index != NULL);
 			space->index[j] = index;
 		}
 

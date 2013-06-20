@@ -200,7 +200,7 @@ lbox_tuple_transform(struct lua_State *L)
 	int argc = lua_gettop(L);
 	if (argc < 3)
 		luaL_error(L, "tuple.transform(): bad arguments");
-	lua_Integer offset = lua_tointeger(L, 2);
+	lua_Integer offset = lua_tointeger(L, 2);  /* Can be negative and can be > INT_MAX */
 	lua_Integer len = lua_tointeger(L, 3);
 
 	/* validate offset and len */
@@ -216,22 +216,20 @@ lbox_tuple_transform(struct lua_State *L)
 	if (len > tuple->field_count - offset)
 		len = tuple->field_count - offset;
 
-	assert ( ( (offset < tuple->field_count) &&
-		   (len >= 0 && offset + len <= tuple->field_count) ) ||
-		 (offset == tuple->field_count && len == 0));
+	assert(offset + len <= tuple->field_count);
 
 	/*
 	 * Calculate the number of operations and length of UPDATE expression
 	 */
-	uint32_t ops_cnt = 0;
+	uint32_t op_cnt = 0;
 	size_t expr_len = 0;
-	expr_len += sizeof(uint32_t); /* ops_count */
+	expr_len += sizeof(uint32_t); /* op_count */
 	if (offset < tuple->field_count) {
-		/* Remove `len` fields */
-		ops_cnt += len;
+		/* Add an UPDATE operation for each removed field. */
+		op_cnt += len;
 		expr_len += len * sizeof(uint32_t);	/* Field */
-		expr_len += len * sizeof(uint8_t);	/* Operation */
-		expr_len += len * varint32_sizeof(0);	/* Ignored */
+		expr_len += len * sizeof(uint8_t);	/* UPDATE_OP_DELETE */
+		expr_len += len * varint32_sizeof(0);	/* Unused */
 	}
 
 	for (int i = 4; i <= argc; i++) {
@@ -253,14 +251,13 @@ lbox_tuple_transform(struct lua_State *L)
 		}
 
 		/* Insert one field */
-		ops_cnt++;
+		op_cnt++;
 		expr_len += sizeof(uint32_t);		/* Field Number */
-		expr_len += sizeof(uint8_t);		/* Operation */
+		expr_len += sizeof(uint8_t);		/* UPDATE_OP_SET */
 		expr_len += varint32_sizeof(field_len) + field_len; /* Field */
 	}
-
-	if (ops_cnt == 0) {
-		/* Nothing to do */
+	if (op_cnt == 0) {
+		/* tuple_upate() does not accept an empty operation list. */
 		lbox_pushtuple(L, tuple);
 		return 1;
 	}
@@ -269,12 +266,12 @@ lbox_tuple_transform(struct lua_State *L)
 	 * Prepare UPDATE expression
 	 */
 	char *expr = (char *) palloc(fiber->gc_pool, expr_len);
-	char *e = expr;
-	e = pack_u32(e, ops_cnt);
-	for (lua_Integer i = 0; i < len; i++) {
-		e = pack_u32(e, offset);
-		e = pack_u8(e, UPDATE_OP_DELETE);
-		e = pack_varint32(e, 0);
+	char *pos = expr;
+	pos = pack_u32(pos, op_cnt);
+	for (uint32_t i = 0; i < (uint32_t) len; i++) {
+		pos = pack_u32(pos, offset);
+		pos = pack_u8(pos, UPDATE_OP_DELETE);
+		pos = pack_varint32(pos, 0);
 	}
 
 	for (int i = argc ; i >= 4; i--) {
@@ -297,18 +294,18 @@ lbox_tuple_transform(struct lua_State *L)
 			field = luaL_checklstring(L, i, &field_len);
 			break;
 		default:
-			assert (false);
+			assert(false);
 			break;
 		}
 
-		assert (field_len <= UINT32_MAX);
+		assert(field_len <= UINT32_MAX);
 		/* Insert the field */
-		e = pack_u32(e, offset);		/* Field Number */
-		e = pack_u8(e, UPDATE_OP_INSERT);	/* Operation */
-		e = pack_lstr(e, field, field_len);	/* Field Value */
+		pos = pack_u32(pos, offset);		/* Field Number */
+		pos = pack_u8(pos, UPDATE_OP_INSERT);	/* Operation */
+		pos = pack_lstr(pos, field, field_len);	/* Field Value */
 	}
 
-	assert (e == expr + expr_len);
+	assert(pos == expr + expr_len);
 
 	/* Execute tuple_update */
 	struct tuple *new_tuple = tuple_update(tuple, expr, expr + expr_len);

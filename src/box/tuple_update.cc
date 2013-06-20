@@ -35,7 +35,7 @@
 #include <exception.h>
 #include <pickle.h>
 
-/** {{{ UPDATE request implementation.
+/** UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations, each
  * working with a single field. There also are operations which
  * add or remove fields. More than one operation on the same field
@@ -579,7 +579,7 @@ do_update_ops(struct tuple_update *update, char *new_data)
 				new_field = (char *) update->alloc(
 					update->alloc_ctx, op->new_field_len);
 			}
-			assert (op->meta != NULL);
+			assert(op->meta != NULL);
 			op->meta->do_op(&op->arg, old_field, new_field);
 			/* Next op uses previous op output as its input. */
 			old_field = new_field;
@@ -600,7 +600,7 @@ do_update_ops(struct tuple_update *update, char *new_data)
 		total_field_count += field_count;
 	}
 
-	assert (update->new_tuple_fcount == total_field_count);
+	assert(update->new_tuple_fcount == total_field_count);
 }
 
 static void
@@ -648,7 +648,7 @@ tuple_update_prepare(region_alloc_func alloc, void *alloc_ctx,
 
 	struct tuple_update *update = (struct tuple_update *)
 			alloc(alloc_ctx, sizeof(*update));
-	assert (update != NULL);
+	assert(update != NULL);
 	memset(update, 0, sizeof(*update));
 	update->alloc = alloc;
 	update->alloc_ctx = alloc_ctx;

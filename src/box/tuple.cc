@@ -188,7 +188,7 @@ tuple_print(struct tbuf *buf, const struct tuple *tuple)
 		if (likely(++field_no < tuple->field_count))
 			tbuf_printf(buf, ", ");
 	}
-	assert (field_no == tuple->field_count);
+	assert(field_no == tuple->field_count);
 
 	tbuf_printf(buf, "}");
 }
