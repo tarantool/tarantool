@@ -52,7 +52,7 @@ extern "C" {
 #include <mysql.h>
 #include <scoped_guard.h>
 
-#include <tarantool_plugin.h>
+#include <tarantool/plugin.h>
 
 
 /**
@@ -470,7 +470,7 @@ init(struct lua_State *L)
 
 	/* stack: box, box.net.sql.connectors */
 	lua_pushstring(L, "mysql");
-        lua_pushcfunction(L, lbox_net_mysql_connect);
+	lua_pushcfunction(L, lbox_net_mysql_connect);
 	lua_rawset(L, -3);
 
 	/* cleanup stack */
