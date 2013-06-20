@@ -1,13 +1,11 @@
 include(FindPostgreSQL)
 if (PostgreSQL_FOUND)
-	message(STATUS "box.net.sql(pg): INC=${PostgreSQL_INCLUDE_DIR}")
-	message(STATUS "box.net.sql(pg): LIBDIR=${PostgreSQL_LIBRARY_DIR}")
+	message(STATUS "box.net.sql(pg): INC=${PostgreSQL_INCLUDE_DIRS}")
 	message(STATUS "box.net.sql(pg): LIBS=${PostgreSQL_LIBRARIES}")
 
-	add_compile_flags("C;CXX" "-I${PostgreSQL_INCLUDE_DIR}")
-	add_compile_flags("C;CXX" "-L${PostgreSQL_LIBRARY_DIR}")
-	add_compile_flags("C;CXX" "-l${PostgreSQL_LIBRARIES}")
+	include_directories(${PostgreSQL_INCLUDE_DIRS})
 	add_library(pg SHARED pg.cc)
+	target_link_libraries(pg ${PostgreSQL_LIBRARIES})
 	install(TARGETS pg LIBRARY DESTINATION ${PLUGIN_DIR})
 
 else()
