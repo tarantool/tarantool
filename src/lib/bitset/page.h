@@ -151,7 +151,7 @@ bitset_page_and(struct bitset_page *dst, struct bitset_page *src)
 	bitset_word_t *d = (bitset_word_t *) bitset_page_data(dst);
 	bitset_word_t *s = (bitset_word_t *) bitset_page_data(src);
 
-	assert (BITSET_PAGE_DATA_SIZE % sizeof(bitset_word_t) == 0);
+	assert(BITSET_PAGE_DATA_SIZE % sizeof(bitset_word_t) == 0);
 	int cnt = BITSET_PAGE_DATA_SIZE / sizeof(bitset_word_t);
 	for (int i = 0; i < cnt; i++) {
 		*d++ &= *s++;
@@ -164,7 +164,7 @@ bitset_page_nand(struct bitset_page *dst, struct bitset_page *src)
 	bitset_word_t *d = (bitset_word_t *) bitset_page_data(dst);
 	bitset_word_t *s = (bitset_word_t *) bitset_page_data(src);
 
-	assert (BITSET_PAGE_DATA_SIZE % sizeof(bitset_word_t) == 0);
+	assert(BITSET_PAGE_DATA_SIZE % sizeof(bitset_word_t) == 0);
 	int cnt = BITSET_PAGE_DATA_SIZE / sizeof(bitset_word_t);
 	for (int i = 0; i < cnt; i++) {
 		*d++ &= ~*s++;
@@ -177,7 +177,7 @@ bitset_page_or(struct bitset_page *dst, struct bitset_page *src)
 	bitset_word_t *d = (bitset_word_t *) bitset_page_data(dst);
 	bitset_word_t *s = (bitset_word_t *) bitset_page_data(src);
 
-	assert (BITSET_PAGE_DATA_SIZE % sizeof(bitset_word_t) == 0);
+	assert(BITSET_PAGE_DATA_SIZE % sizeof(bitset_word_t) == 0);
 	int cnt = BITSET_PAGE_DATA_SIZE / sizeof(bitset_word_t);
 	for (int i = 0; i < cnt; i++) {
 		*d++ |= *s++;

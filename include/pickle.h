@@ -228,4 +228,17 @@ pack_lstr(char *buf, const void *str, uint32_t len)
 	return (char *) memcpy(pack_varint32(buf, len), str, len) + len;
 }
 
+#define pack_u(bits)						\
+static inline char *						\
+pack_u##bits(char *buf, uint##bits##_t val)			\
+{								\
+	*(uint##bits##_t *) buf = val;				\
+	return buf + sizeof(uint##bits##_t);			\
+}
+
+pack_u(8)
+pack_u(16)
+pack_u(32)
+pack_u(64)
+
 #endif /* TARANTOOL_PICKLE_H_INCLUDED */

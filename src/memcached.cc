@@ -182,7 +182,7 @@ memcached_meta(struct tuple *tuple)
 {
 	uint32_t len;
 	const char *field = tuple_field(tuple, 1, &len);
-	assert (sizeof(struct meta) <= len);
+	assert(sizeof(struct meta) <= len);
 	return (struct meta *) field;
 }
 
