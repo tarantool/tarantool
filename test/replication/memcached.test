@@ -16,7 +16,7 @@ master = server
 master_memcached = master.memcached
 
 replica = TarantoolBoxServer()
-replica.deploy("memcached/cfg/replica.cfg",
+replica.deploy("replication/cfg/replica.cfg",
            replica.find_exe(self.args.builddir),
            os.path.join(self.args.vardir, "replica"))
 replica_memcached = replica.memcached
@@ -27,14 +27,14 @@ def wait_for_lsn(lsn, _server):
     while True:
         if get_lsn(_server) == lsn:
             return lsn
-        time.sleep(0.5)
+        time.sleep(0.1)
 
 def wait_for_next_lsn(lsn, _server):
     _server_admin = _server.admin
     while True:
         if get_lsn(_server) != lsn:
             return lsn
-        time.sleep(0.5)
+        time.sleep(0.1)
 
 def get_lsn(_server):
     _server_admin = _server.admin
@@ -49,12 +49,26 @@ def wait(next = False, _server_master = master, _server_replica = replica):
     else:
         lsn = get_lsn(_server_master)
         return wait_for_lsn(lsn, _server_replica)
+
+def get_memcached_len(_server):
+    _server_admin = _server.admin
+    resp = exec _server_admin silent "lua box.space[box.cfg.memcached_space]:len()"
+    return yaml.load(resp)[0]
+	
+
+def wait_for_empty_space(_server):
+    _server_admin = _server.admin
+    while True:
+        if get_memcached_len(_server) == 0:
+            return
+        time.sleep(0.1)
+
 ###################################
 
 print """# set initial k-v pairs"""
 for i in xrange(10):
     exec master_memcached silent "set %d 0 0 5\r\ngood%d\r\n" % (i, i)
-time.sleep(1);
+
 print """# wait and get last k-v pair from replica"""
 wait()
 exec replica_memcached "get 9\r\n"
@@ -74,8 +88,6 @@ exec master_memcached silent "add 10 0 0 %d\r\n%s\r\n" % (len(sonet[3]), sonet[3
 exec master_memcached silent "incr 3 15\r\n"
 exec master_memcached silent "decr 4 15\r\n"
 
-time.sleep(1)
-
 print """# wait and get k-v's from replicas"""
 wait()
 exec replica_memcached "get 1 2 3 4 5 7 8 9 10\r\n"
@@ -85,7 +97,7 @@ exec replica_memcached "get 6\r\n"
 
 print """# flush all k-v on master and try to get them from replica"""
 exec master_memcached silent "flush_all\r\n"
-wait(True)
+wait_for_empty_space(replica)
 exec replica_memcached "get 10\r\n"
 
 
@@ -98,8 +110,7 @@ exec replica_memcached "get 1\r\n"
 
 print """# check that expiration is working properly, when replica becomes master"""
 exec master_memcached silent "set 1 0 3 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
-replica.reconfigure("memcached/cfg/replica-to-master.cfg")
-wait()
+replica.reconfigure("replication/cfg/replica_to_master.cfg")
 exec replica_memcached "get 1\r\n"
 wait(True)
 exec replica_memcached "get 1\r\n"
