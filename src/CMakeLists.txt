@@ -54,7 +54,7 @@ set_source_files_properties(memcached.cc
     PROPERTIES COMPILE_FLAGS "-Wno-uninitialized")
 
 #
-# Do not clean admin.cc, memcached.cc or other
+# # Do not clean admin.cc, memcached.cc or other
 # generated files in 'make clean' -- they are under
 # revision control.
 #
@@ -63,6 +63,7 @@ set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/lua)
 set(lua_sources)
+lua_source(lua_sources lua/uuid.lua)
 
 add_custom_target(generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
@@ -114,7 +115,6 @@ set (common_sources
      lua/info.cc
      lua/stat.cc
      lua/slab.cc
-     lua/uuid.cc
      lua/lua_ipc.cc
      lua/lua_socket.cc
      lua/session.cc
