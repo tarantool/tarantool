@@ -1704,16 +1704,12 @@ box_unpack_response(struct lua_State *L, const char *s, const char *end)
 	/* Unpack and push tuples. */
 	while (tuple_count--) {
 		u32 bsize = pick_u32(&s, end);
-		u32 field_count = pick_u32(&s, end);
-		if (valid_tuple(s, end, field_count) != bsize)
-			luaL_error(L, "box.unpack(): can't unpack tuple");
+		const char *tend = s + bsize + sizeof(uint32_t); /*field count*/
+		if (tend > end)
+			tnt_raise(IllegalParams, "incorrect packet length");
 
-		struct tuple *t = tuple_alloc(bsize);
-		t->field_count = field_count;
-		memcpy(t->data, s, bsize);
-
-		s = s + bsize;
-		lbox_pushtuple(L, t);
+		struct tuple *tuple = tuple_iproto_pick(&s, tend);
+		lbox_pushtuple(L, tuple);
 	}
 	return s;
 }

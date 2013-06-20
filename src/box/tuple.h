@@ -155,7 +155,10 @@ tuple_print(struct tbuf *buf, const struct tuple *tuple);
 
 struct tuple *
 tuple_update(const struct tuple *old_tuple, const char *expr,
-	     const char *expr_end);
+             const char *expr_end);
+
+struct tuple *
+tuple_iproto_pick(const char **data, const char *end);
 
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)
@@ -165,28 +168,6 @@ static inline size_t tuple_len(struct tuple *tuple)
 }
 
 void tuple_free(struct tuple *tuple);
-
-/**
- * Calculate size for a specified fields range
- *
- * @returns size of fields data including size of varint data
- */
-static inline size_t
-tuple_range_size(const char **begin, const char *end, size_t count)
-{
-	const char *start = *begin;
-	while (*begin < end && count-- > 0) {
-		size_t len = load_varint32(begin);
-		*begin += len;
-	}
-	return *begin - start;
-}
-
-static inline uint32_t
-valid_tuple(const char *data, const char *end, uint32_t field_count)
-{
-	return tuple_range_size(&data, end, field_count);
-}
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 
