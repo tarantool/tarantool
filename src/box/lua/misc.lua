@@ -1,3 +1,5 @@
+-- misc.lua (internal file)
+
 --
 -- Simple counter.
 --

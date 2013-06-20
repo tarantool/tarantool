@@ -115,6 +115,9 @@
 #define LUA_SYSCPATH "@LUA_SYSCPATH@"
 #define LUA_LIBPATH "@LUA_LIBPATH@"
 #define LUA_LIBCPATH "@LUA_LIBCPATH@"
+
+#define PLUGIN_DIR "@PLUGIN_DIR@"
+
 /*
  * vim: syntax=c
  */

@@ -1,3 +1,5 @@
+-- box_net.lua (internal file)
+
 box.net = {
 --
 -- The idea of box.net.box implementation is that

@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_COEIO_H_INCLUDED
-#define TARANTOOL_COEIO_H_INCLUDED
+#ifndef TARANTOOL_PLUGIN_H_INCLUDED
+#define TARANTOOL_PLUGIN_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,35 +29,37 @@
  * SUCH DAMAGE.
  */
 
-#include "config.h"
+#define PLUGIN_API_VERSION		1
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <tarantool_ev.h>
-#include <tarantool_eio.h>
-#include <coro.h>
-#include <util.h>
 #include <rlist.h>
+#include <tbuf.h>
+#include <stddef.h>
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
+struct lua_State;
 
-#define ERESOLVE -1
+typedef void(*plugin_init_cb)(struct lua_State *L);
+typedef void(*plugin_stat_cb)(struct tbuf *out);
 
-/**
- * Asynchronous IO Tasks (libeio wrapper)
- *
- * Yield the current fiber until a created task is complete.
- */
+struct tarantool_plugin {
+        int api_version;
+        int version;
+        const char *name;
+        plugin_init_cb init;
+        plugin_stat_cb stat;
+        struct rlist list;
+};
 
-void coeio_init(void);
-ssize_t coeio_custom(ssize_t (*f)(va_list ap), ev_tstamp timeout, ...);
+#define DECLARE_PLUGIN(name, version, init, stat)	        \
+	extern "C" {						\
+		struct tarantool_plugin plugin_meta = {		\
+			PLUGIN_API_VERSION,			\
+			version,				\
+			name,					\
+			init,                                 \
+			stat,                                 \
+			{ NULL, NULL }				\
+		};						\
+	}
 
-struct addrinfo *
-coeio_resolve(int socktype, const char *host, const char *port,
-              ev_tstamp timeout);
 
-#endif /* TARANTOOL_COEIO_H_INCLUDED */
+#endif /* TARANTOOL_PLUGIN_H_INCLUDED */

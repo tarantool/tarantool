@@ -173,11 +173,11 @@ lua remote:close()
 ...
 lua remote:close()
 ---
-error: '[string "box.net = {..."]:402: box.net.box: already closed'
+error: '[string "-- box_net.lua (internal file)..."]:404: box.net.box: already closed'
 ...
 lua remote:ping()
 ---
-error: '[string "box.net = {..."]:407: box.net.box: connection was closed'
+error: '[string "-- box_net.lua (internal file)..."]:409: box.net.box: connection was closed'
 ...
 lua box.space[0]:truncate()
 ---
