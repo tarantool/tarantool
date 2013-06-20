@@ -76,6 +76,9 @@ extern "C" {
 
 struct lua_State *tarantool_L;
 
+/* contents of src/lua/ files */
+static const char *lua_sources[] = { NULL };
+
 /**
  * Remember the output of the administrative console in the
  * registry, to use with 'print'.
@@ -1317,6 +1320,13 @@ tarantool_lua_init()
 	tarantool_lua_socket_init(L);
 	tarantool_lua_session_init(L);
 	tarantool_lua_error_init(L);
+
+	/* Load Lua extension */
+	for (const char **s = lua_sources; *s; s++) {
+		if (luaL_dostring(L, *s))
+			panic("Error loading Lua source %.160s...: %s",
+			      *s, lua_tostring(L, -1));
+	}
 
 	mod_lua_init(L);
 

@@ -45,6 +45,7 @@ extra/rpm.spec
 include/config.h
 install_manifest.txt
 lcov
+src/lua/*.lua.c
 src/box/lua/*.lua.c
 src/box/tarantool_box
 src/box/tarantool.cfg

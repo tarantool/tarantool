@@ -60,6 +60,15 @@ set_source_files_properties(memcached.cc
 #
 set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
 
+# Compile src/lua/*.lua files into src/lua/*.lua.c sources
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/lua)
+set(lua_sources)
+
+add_custom_target(generate_lua_sources
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
+    DEPENDS ${lua_sources})
+set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
+
 #
 # Used by modules.
 #
@@ -110,6 +119,7 @@ set (common_sources
      lua/lua_socket.cc
      lua/session.cc
      lua/cjson.cc
+     ${lua_sources}
 )
 
 if (ENABLE_TRACE)
