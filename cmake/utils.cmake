@@ -36,3 +36,22 @@ macro(set_source_files_compile_flags)
     unset(_file_ext)
     unset(_lang)
 endmacro(set_source_files_compile_flags)
+
+# A helper function to compile *.lua source into *.lua.c sources
+function(lua_source varname filename)
+    set (srcfile "${CMAKE_CURRENT_SOURCE_DIR}/${filename}")
+    set (tmpfile "${CMAKE_CURRENT_BINARY_DIR}/${filename}.new.c")
+    set (dstfile "${CMAKE_CURRENT_BINARY_DIR}/${filename}.c")
+    get_filename_component(module ${filename} NAME_WE)
+
+    ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
+        COMMAND ${ECHO} 'const char ${module}_lua[] =' > ${tmpfile}
+        COMMAND ${CMAKE_BINARY_DIR}/extra/txt2c ${srcfile} >> ${tmpfile}
+        COMMAND ${ECHO} '\;' >> ${tmpfile}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
+        COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
+        DEPENDS ${srcfile} txt2c)
+
+    set(var ${${varname}})
+    set(${varname} ${var} ${dstfile} PARENT_SCOPE)
+endfunction()

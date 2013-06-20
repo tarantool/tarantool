@@ -51,7 +51,6 @@ extern "C" {
 #include "lua/info.h"
 #include "lua/slab.h"
 #include "lua/stat.h"
-#include "lua/uuid.h"
 #include "lua/session.h"
 #include "lua/cjson.h"
 
@@ -75,6 +74,10 @@ extern "C" {
 #define TARANTOOL_LUA_INIT_SCRIPT "init.lua"
 
 struct lua_State *tarantool_L;
+
+/* contents of src/lua/ files */
+extern char uuid_lua[];
+static const char *lua_sources[] = { uuid_lua, NULL };
 
 /**
  * Remember the output of the administrative console in the
@@ -1313,10 +1316,16 @@ tarantool_lua_init()
 	tarantool_lua_slab_init(L);
 	tarantool_lua_stat_init(L);
 	tarantool_lua_ipc_init(L);
-	tarantool_lua_uuid_init(L);
 	tarantool_lua_socket_init(L);
 	tarantool_lua_session_init(L);
 	tarantool_lua_error_init(L);
+
+	/* Load Lua extension */
+	for (const char **s = lua_sources; *s; s++) {
+		if (luaL_dostring(L, *s))
+			panic("Error loading Lua source %.160s...: %s",
+			      *s, lua_tostring(L, -1));
+	}
 
 	mod_lua_init(L);
 
