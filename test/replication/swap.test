@@ -1,7 +1,7 @@
 # encoding: tarantool
 import os
 import time
-from lib.tarantool_box_server import TarantoolBoxServer
+from lib.tarantool_server import TarantoolServer
 
 REPEAT = 20
 ID_BEGIN = 0
@@ -23,7 +23,7 @@ def select_tuples(server, begin, end):
 master = server
 
 # replica server
-replica = TarantoolBoxServer()
+replica = TarantoolServer()
 replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"))

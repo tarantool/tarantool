@@ -2,7 +2,7 @@ import subprocess
 import sys
 import os
 
-from lib.tarantool_box_server import TarantoolBoxServer
+from lib.tarantool_server import TarantoolServer
 
 p = subprocess.Popen([os.path.join(builddir, "test/connector_c/xlog"),
 		              os.path.abspath("connector_c/connector.xlog")],

@@ -223,7 +223,6 @@ class TestSuite:
         self.ini = {}
 
         self.ini["core"] = "tarantool"
-        self.ini["module"] = "box"
 
         if os.access(suite_path, os.F_OK) == False:
             raise RuntimeError("Suite \"" + suite_path + \
@@ -269,11 +268,11 @@ class TestSuite:
         """For each file in the test suite, run client program
         assuming each file represents an individual test."""
         try:
-            server = Server(self.ini["core"], self.ini["module"])
+            server = Server(self.ini["core"])
         except Exception as e:
             print e
-            raise RuntimeError("Unknown server: core = {0}, module = {1}".format(
-                               self.ini["core"], self.ini["module"]))
+            raise RuntimeError("Unknown server: core = {0}".format(
+                               self.ini["core"]))
 
         if len(self.tests) == 0:
             # noting to test, exit

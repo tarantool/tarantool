@@ -57,14 +57,6 @@ class Options:
                 "box" suite. Default: run all tests in all specified suites.""")
 
         parser.add_argument(
-                "--module",
-                dest = 'modules',
-                metavar = "module",
-                nargs="*",
-                default = ["box"],
-                help = "List of modules to test. Default: \"box\"")
-
-        parser.add_argument(
                 "--suite",
                 dest = 'suites',
                 metavar = "suite",
@@ -160,13 +152,9 @@ def main():
             for root, dirs, names in os.walk(os.getcwd()):
                 if "suite.ini" in names:
                     suite_names.append(os.path.basename(root))
-        suites = []
-        for suite_name in suite_names:
-            suite = TestSuite(suite_name, options.args)
-            if suite.ini["module"] not in options.args.modules:
-                continue
-            suites.append(suite)
 
+        suites = [TestSuite(suite_name, options.args) for suite_name in suite_names]
+        
         for suite in suites:
             failed_tests += suite.run_all()
     except RuntimeError as e:

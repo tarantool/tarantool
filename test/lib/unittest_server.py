@@ -5,12 +5,12 @@ import os
 
 class UnittestServer(Server):
     """A dummy server implementation for unit test suite"""
-    def __new__(cls, core="unittest", module="dummy"):
+    def __new__(cls, core="unittest"):
         return Server.__new__(cls)
 
 
-    def __init__(self, core="unittest", module="dummy"):
-        Server.__init__(self, core, module)
+    def __init__(self, core="unittest"):
+        Server.__init__(self, core)
         self.debug = False
 
     def configure(self, config):
