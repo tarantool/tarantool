@@ -35,10 +35,6 @@
 
 /* {{{ Utilities. *************************************************/
 
-static struct index_traits tree_index_traits = {
-	/* .allows_partial_key = */ true,
-};
-
 /**
  * Unsigned 32-bit int comparison.
  */
@@ -1015,7 +1011,10 @@ struct tuple *
 TreeIndex::findByKey(const char *key, u32 part_count) const
 {
 	assert(key_def->is_unique);
-	check_key_parts(key_def, part_count, false);
+	if (part_count != key_def->part_count) {
+		tnt_raise(ClientError, ER_EXACT_MATCH,
+			key_def->part_count, part_count);
+	}
 
 	struct key_data *key_data = (struct key_data *)
 			alloca(sizeof(struct key_data) +
@@ -1103,12 +1102,11 @@ void
 TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			const char *key, u32 part_count) const
 {
+	assert ( (part_count >= 1 && key != NULL) ||
+		 (part_count == 0 && key == NULL));
 	struct tree_iterator *it = tree_iterator(iterator);
 
-	if (part_count != 0) {
-		check_key_parts(key_def, part_count,
-				tree_index_traits.allows_partial_key);
-	} else {
+	if (part_count == 0) {
 		/*
 		 * If no key is specified, downgrade equality
 		 * iterators to a full range.

@@ -38,10 +38,6 @@
 #include "pickle.h"
 #include <lib/bitset/index.h>
 
-static struct index_traits bitset_index_traits = {
-	/* .allows_partial_key = */ false,
-};
-
 static inline size_t
 tuple_to_value(struct tuple *tuple)
 {
@@ -239,14 +235,16 @@ BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			  const char *key, u32 part_count) const
 {
 	assert(iterator->free == bitset_index_iterator_free);
+	assert ( (part_count == 1 && key != NULL) ||
+		 (part_count == 0 && key == NULL));
+	(void) part_count;
+
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
 	const void *bitset_key = NULL;
 	size_t bitset_key_size = 0;
 
 	if (type != ITER_ALL) {
-		check_key_parts(key_def, part_count,
-				bitset_index_traits.allows_partial_key);
 		const char *key2 = key;
 		bitset_key_size = (size_t) load_varint32(&key2);
 		bitset_key = key2;

@@ -597,6 +597,7 @@ lbox_pushiterator(struct lua_State *L, Index *index,
 	holder->it = it;
 	memcpy(holder->key, key, size);
 
+	key_validate(index->key_def, type, (key ? holder->key : NULL), part_count);
 	index->initIterator(it, type, (key ? holder->key : NULL), part_count);
 }
 
@@ -924,6 +925,8 @@ lbox_index_count(struct lua_State *L)
 	u32 count = 0;
 	/* preparing index iterator */
 	struct iterator *it = index->position();
+
+	key_validate(index->key_def, ITER_EQ, key, key_part_count);
 	index->initIterator(it, ITER_EQ, key, key_part_count);
 	/* iterating over the index and counting tuples */
 	struct tuple *tuple;

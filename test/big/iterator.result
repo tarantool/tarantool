@@ -801,7 +801,7 @@ $pid_023$
 ...
 lua iterate(20, 4, 0, 1, box.index.EQ)
 ---
-error: 'Partial key in an exact match (key field count: 0, expected: 1)'
+error: 'Invalid key part count in an exact match (expected 1, got 0)'
 ...
 lua iterate(20, 4, 0, 1, box.index.GE)
 ---

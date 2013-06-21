@@ -97,9 +97,9 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 42 */_(ER_SPLICE,			2, "Field SPLICE error: %s") \
 	/* 43 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
 	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
-	/* 45 */_(ER_EXACT_MATCH,		2, "Partial key in an exact match (key field count: %u, expected: %u)") \
+	/* 45 */_(ER_EXACT_MATCH,		2, "Invalid key part count in an exact match (expected %u, got %u)") \
 	/* 46 */_(ER_UNUSED46,			2, "Unused46") \
-	/* 47 */_(ER_KEY_PART_COUNT,		2, "Key part count %u is greater than index part count %u") \
+	/* 47 */_(ER_KEY_PART_COUNT,		2, "Invalid key part count (expected [0..%u], got %u)") \
 	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist in index %u") \
 	/* 50 */_(ER_NO_SUCH_PROC,		2, "Procedure '%.*s' is not defined") \

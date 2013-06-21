@@ -20,7 +20,7 @@ Found 1 tuple:
 # https://bugs.launchpad.net/tarantool/+bug/904208
 #
 call box.select(1, 1, 'new', 'world', 'order')
-An error occurred: ER_KEY_PART_COUNT, 'Key part count 3 is greater than index part count 2'
+An error occurred: ER_KEY_PART_COUNT, 'Invalid key part count (expected [0..2], got 3)'
 call box.delete(1, 'brave')
 Found 1 tuple:
 ['brave', 'new', 'world']

@@ -35,10 +35,6 @@
 #include "assoc.h"
 #include "errinj.h"
 
-static struct index_traits hash_index_traits = {
-	/* .allows_partial_key = */ false,
-};
-
 /* {{{ HashIndex Iterators ****************************************/
 
 struct hash_i32_iterator {
@@ -384,9 +380,10 @@ struct tuple *
 Hash32Index::findByKey(const char *key, u32 part_count) const
 {
 	assert(key_def->is_unique);
-	check_key_parts(key_def, part_count, false);
-
-	(void) part_count;
+	if (part_count != key_def->part_count) {
+		tnt_raise(ClientError, ER_EXACT_MATCH,
+			key_def->part_count, part_count);
+	}
 
 	struct tuple *ret = NULL;
 	struct mh_i32ptr_node_t node = int32_key_to_node(key);
@@ -467,15 +464,17 @@ void
 Hash32Index::initIterator(struct iterator *ptr, enum iterator_type type,
 			  const char *key, u32 part_count) const
 {
+	assert ( (part_count == 1 && key != NULL) ||
+		 (part_count == 0 && key == NULL));
+	(void) part_count;
 	assert(ptr->free == hash_iterator_free);
+
 	struct hash_i32_iterator *it = (struct hash_i32_iterator *) ptr;
 	struct mh_i32ptr_node_t node;
 
 	switch (type) {
 	case ITER_GE:
 		if (key != NULL) {
-			check_key_parts(key_def, part_count,
-					hash_index_traits.allows_partial_key);
 			node = int32_key_to_node(key);
 			it->h_pos = mh_i32ptr_get(int_hash, &node, NULL);
 			it->base.next = hash_iterator_i32_ge;
@@ -487,8 +486,6 @@ Hash32Index::initIterator(struct iterator *ptr, enum iterator_type type,
 		it->base.next = hash_iterator_i32_ge;
 		break;
 	case ITER_EQ:
-		check_key_parts(key_def, part_count,
-				hash_index_traits.allows_partial_key);
 		node = int32_key_to_node(key);
 		it->h_pos = mh_i32ptr_get(int_hash, &node, NULL);
 		it->base.next = hash_iterator_i32_eq;
@@ -559,7 +556,10 @@ struct tuple *
 Hash64Index::findByKey(const char *key, u32 part_count) const
 {
 	assert(key_def->is_unique);
-	check_key_parts(key_def, part_count, false);
+	if (part_count != key_def->part_count) {
+		tnt_raise(ClientError, ER_EXACT_MATCH,
+			key_def->part_count, part_count);
+	}
 
 	(void) part_count;
 
@@ -645,6 +645,9 @@ void
 Hash64Index::initIterator(struct iterator *ptr, enum iterator_type type,
 			  const char *key, u32 part_count) const
 {
+	assert ( (part_count == 1 && key != NULL) ||
+		 (part_count == 0 && key == NULL));
+	(void) part_count;
 	assert(ptr->free == hash_iterator_free);
 	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
 	struct mh_i64ptr_node_t node;
@@ -652,8 +655,6 @@ Hash64Index::initIterator(struct iterator *ptr, enum iterator_type type,
 	switch (type) {
 	case ITER_GE:
 		if (key != NULL) {
-			check_key_parts(key_def, part_count,
-					hash_index_traits.allows_partial_key);
 			node = int64_key_to_node(key);
 			it->h_pos = mh_i64ptr_get(int64_hash, &node, NULL);
 			it->base.next = hash_iterator_i64_ge;
@@ -665,8 +666,6 @@ Hash64Index::initIterator(struct iterator *ptr, enum iterator_type type,
 		it->base.next = hash_iterator_i64_ge;
 		break;
 	case ITER_EQ:
-		check_key_parts(key_def, part_count,
-			hash_index_traits.allows_partial_key);
 		node = int64_key_to_node(key);
 		it->h_pos = mh_i64ptr_get(int64_hash, &node, NULL);
 		it->base.next = hash_iterator_i64_eq;
@@ -731,7 +730,10 @@ struct tuple *
 HashStrIndex::findByKey(const char *key, u32 part_count) const
 {
 	assert(key_def->is_unique);
-	check_key_parts(key_def, part_count, false);
+	if (part_count != key_def->part_count) {
+		tnt_raise(ClientError, ER_EXACT_MATCH,
+			key_def->part_count, part_count);
+	}
 
 	struct tuple *ret = NULL;
 	const struct mh_lstrptr_node_t node = { key, NULL };
@@ -813,6 +815,8 @@ void
 HashStrIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 			   const char *key, u32 part_count) const
 {
+	assert ( (part_count == 1 && key != NULL) ||
+		 (part_count == 0 && key == NULL));
 	(void) part_count;
 
 	assert(ptr->free == hash_iterator_free);
@@ -822,8 +826,6 @@ HashStrIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 	switch (type) {
 	case ITER_GE:
 		if (key != NULL) {
-			check_key_parts(key_def, part_count,
-					hash_index_traits.allows_partial_key);
 			node.key = key;
 			it->h_pos = mh_lstrptr_get(str_hash, &node, NULL);
 			it->base.next = hash_iterator_lstr_ge;
@@ -835,8 +837,6 @@ HashStrIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 		it->h_pos = mh_begin(str_hash);
 		break;
 	case ITER_EQ:
-		check_key_parts(key_def, part_count,
-				hash_index_traits.allows_partial_key);
 		node.key = key;
 		it->h_pos = mh_lstrptr_get(str_hash, &node, NULL);
 		it->base.next = hash_iterator_lstr_eq;

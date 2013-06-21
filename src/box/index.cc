@@ -42,15 +42,40 @@ STRS(iterator_type, ITERATOR_TYPE);
 /* {{{ Utilities. **********************************************/
 
 void
-Index::check_key_parts(const struct key_def *key_def,
-		u32 part_count, bool partial_key_allowed)
+key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
+	     uint32_t part_count)
 {
+	if (part_count == 0 && (type == ITER_ALL || key_def->type == TREE ||
+			 (key_def->type == HASH && type == ITER_GE))) {
+		assert(key == NULL);
+		return;
+	}
+
 	if (part_count > key_def->part_count)
 		tnt_raise(ClientError, ER_KEY_PART_COUNT,
-			  part_count, key_def->part_count);
-	if (!partial_key_allowed && part_count < key_def->part_count)
+			  key_def->part_count, part_count);
+
+	/* Check partial keys */
+	if ((key_def->type != TREE) && part_count < key_def->part_count) {
 		tnt_raise(ClientError, ER_EXACT_MATCH,
-			  part_count, key_def->part_count);
+			  key_def->part_count, part_count);
+	}
+
+	const char *key_data = key;
+	for (uint32_t part = 0; part < part_count; part++) {
+		uint32_t part_size = load_varint32(&key_data);
+
+		enum field_data_type part_type = key_def->parts[part].type;
+
+		if (part_type == NUM && part_size != sizeof(uint32_t))
+			tnt_raise(ClientError, ER_KEY_FIELD_TYPE, "u32");
+
+		if (part_type == NUM64 && part_size != sizeof(uint64_t) &&
+				part_size != sizeof(uint32_t))
+			tnt_raise(ClientError, ER_KEY_FIELD_TYPE, "u64");
+
+		key_data += part_size;
+	}
 }
 
 /**

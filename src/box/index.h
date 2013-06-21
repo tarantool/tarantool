@@ -130,11 +130,16 @@ struct key_def {
 	enum index_type type;
 };
 
-/** Descriptor of index features. */
-struct index_traits
-{
-	bool allows_partial_key;
-};
+/**
+ * @brief Check that the key has correct part count and correct part size
+ * @param key_def key definition
+ * @param type iterator type (see enum iterator_type)
+ * @param key BER-encoded key
+ * @param part_count number of parts in \a key
+ */
+void
+key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
+	     uint32_t part_count);
 
 /**
  * The manner in which replace in a unique index must treat
@@ -224,10 +229,6 @@ public:
 		return m_position;
 	}
 protected:
-	static void
-	check_key_parts(const struct key_def *key_def, u32 part_count,
-			bool partial_key_allowed);
-
 	static uint32_t
 	replace_check_dup(struct tuple *old_tuple,
 			  struct tuple *dup_tuple,
