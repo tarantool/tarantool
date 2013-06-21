@@ -139,8 +139,11 @@ def main():
     options = Options()
     oldcwd = os.getcwd()
     # Change the current working directory to where all test
-    # collections are supposed to reside.
-    os.chdir(os.path.dirname(sys.argv[0]))
+    # collections are supposed to reside
+    try:
+        os.chdir(os.path.dirname(sys.argv[0]))
+    except OSError:
+        pass
     failed_tests = 0
 
     try:

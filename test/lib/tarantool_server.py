@@ -1,16 +1,68 @@
 import os
+import sys
+import glob
 import time
 import yaml
 import shutil
 import pexpect
+import traceback
 import subprocess
 import ConfigParser
+import pprint
+
+import tarantool_preprocessor
 
 from server import Server
 from box_connection import BoxConnection
+from test_suite import FilteredStream, Test
 from admin_connection import AdminConnection
 from memcached_connection import MemcachedConnection
 
+
+class FuncTest(Test):
+    def __init__(self, name, args, suite_ini):
+        Test.__init__(self, name, args, suite_ini)
+        self.name = name
+        self.result = name.replace(".test", ".result")
+        self.skip_cond = name.replace(".test", ".skipcond")
+        self.tmp_result = os.path.join(self.args.vardir,
+                os.path.basename(self.result))
+        self.reject = "{0}/test/{1}".format(self.args.builddir, 
+                name.replace(".test", ".reject"))
+
+    def execute(self, server):
+        diagnostics = "unknown"
+        builddir = self.args.builddir
+        save_stdout = sys.stdout
+        try:
+            self.skip = 0
+            if os.path.exists(self.skip_cond):
+                sys.stdout = FilteredStream(self.tmp_result)
+                stdout_fileno = sys.stdout.stream.fileno()
+                execfile(self.skip_cond, dict(locals(), **server.__dict__))
+                sys.stdout.close()
+                sys.stdout = save_stdout
+            if not self.skip:
+                sys.stdout = FilteredStream(self.tmp_result)
+                stdout_fileno = sys.stdout.stream.fileno()
+                execfile(self.name, dict(locals(), **server.__dict__))
+            self.is_executed_ok = True
+        except Exception as e:
+            traceback.print_exc(e)
+            diagnostics = str(e)
+        finally:
+            if sys.stdout and sys.stdout != save_stdout:
+                sys.stdout.close()
+            sys.stdout = save_stdout; 
+        self.is_executed = True
+        
+    def __repr__(self):
+        return str([self.name, self.result, self.skip_cond, self.tmp_result,
+        self.reject])
+
+    __str__ = __repr__ 
+
+    
 class TarantoolConfigFile:
     """ConfigParser can't read files without sections, work it around"""
     def __init__(self, fp, section_name):
@@ -63,6 +115,13 @@ class TarantoolServer(Server):
         if self.memcached_port != 0:
             # Run memcached client
             self.memcached = MemcachedConnection('localhost', self.memcached_port)
+
+    def find_tests(self, test_suite, suite_path):
+        for test_name in glob.glob(os.path.join(suite_path, "*.test")):
+            for test_pattern in test_suite.args.tests:
+                if test_name.find(test_pattern) != -1:
+                    test_suite.tests.append(FuncTest(test_name, test_suite.args, test_suite.ini))
+        print "Found " + str(len(test_suite.tests)) + " tests."
 
     def reconfigure(self, config, silent=False):
         if config == None:
@@ -121,4 +180,4 @@ class TarantoolServer(Server):
             self.server.wait()
 
     def default_bin_name(self):
-        return "{0}".format(self.core)
+        return "{0}".format(self.core) 
