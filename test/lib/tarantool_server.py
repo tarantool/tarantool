@@ -121,7 +121,6 @@ class TarantoolServer(Server):
             for test_pattern in test_suite.args.tests:
                 if test_name.find(test_pattern) != -1:
                     test_suite.tests.append(FuncTest(test_name, test_suite.args, test_suite.ini))
-        print "Found " + str(len(test_suite.tests)) + " tests."
 
     def reconfigure(self, config, silent=False):
         if config == None:

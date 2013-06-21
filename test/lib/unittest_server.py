@@ -72,14 +72,8 @@ class UnittestServer(Server):
     def deploy(self, config=None, binary=None, vardir=None,
                mem=None, start_and_exit=None, gdb=None, valgrind=None,
                valgrind_sup=None, init_lua=None, silent=True, need_init=True):
-        self.vardir = vardir
-        def run_test(name):
-            p = subprocess.Popen([os.path.join(self.builddir, "test/", name)], stdout=subprocess.PIPE)
-            p.wait()
-            for line in p.stdout.readlines():
-                sys.stdout.write(line)
 
-        self.run_test = run_test
+        self.vardir = vardir
         if not os.access(self.vardir, os.F_OK):
             if (self.mem == True and check_tmpfs_exists() and
                 os.path.basename(self.vardir) == self.vardir):
@@ -106,8 +100,7 @@ class UnittestServer(Server):
                     regexp.match(test) and
                     os.access(os.path.join(suite_path, test), os.X_OK) and
                     os.path.isfile(os.path.join(suite_path, test)) and
-                    patterned(test)]) 
-        print "Found " + str(len(test_suite.tests)) + " tests."
+                    patterned(os.path.join(suite_path, test))]) 
 
     def init(self):
         pass
