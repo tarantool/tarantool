@@ -116,7 +116,7 @@ execute_update(struct request *request, struct txn *txn)
 
 	Index *pk = space_index(sp, 0);
 	/* Try to find the tuple by primary key. */
-	key_validate(pk->key_def, ITER_EQ, key, key_part_count);
+	primary_key_validate(pk->key_def, key, key_part_count);
 	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
 
 	if (old_tuple == NULL)
@@ -201,7 +201,7 @@ execute_delete(struct request *request, struct txn *txn)
 	const char *key = read_key(reqpos, reqend, &key_part_count);
 	/* Try to find tuple by primary key */
 	Index *pk = space_index(sp, 0);
-	key_validate(pk->key_def, ITER_EQ, key, key_part_count);
+	primary_key_validate(pk->key_def, key, key_part_count);
 	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
 
 	if (old_tuple == NULL)

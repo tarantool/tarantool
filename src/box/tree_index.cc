@@ -1010,11 +1010,7 @@ TreeIndex::random(u32 rnd) const
 struct tuple *
 TreeIndex::findByKey(const char *key, u32 part_count) const
 {
-	assert(key_def->is_unique);
-	if (part_count != key_def->part_count) {
-		tnt_raise(ClientError, ER_EXACT_MATCH,
-			key_def->part_count, part_count);
-	}
+	assert(key_def->is_unique && part_count == key_def->part_count);
 
 	struct key_data *key_data = (struct key_data *)
 			alloca(sizeof(struct key_data) +
@@ -1102,8 +1098,7 @@ void
 TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			const char *key, u32 part_count) const
 {
-	assert ( (part_count >= 1 && key != NULL) ||
-		 (part_count == 0 && key == NULL));
+	assert (key != NULL || part_count == 0);
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	if (part_count == 0) {

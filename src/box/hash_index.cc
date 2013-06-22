@@ -379,12 +379,7 @@ Hash32Index::random(u32 rnd) const
 struct tuple *
 Hash32Index::findByKey(const char *key, u32 part_count) const
 {
-	assert(key_def->is_unique);
-	if (part_count != key_def->part_count) {
-		tnt_raise(ClientError, ER_EXACT_MATCH,
-			key_def->part_count, part_count);
-	}
-
+	assert(key_def->is_unique && part_count == key_def->part_count);
 	struct tuple *ret = NULL;
 	struct mh_i32ptr_node_t node = int32_key_to_node(key);
 	mh_int_t k = mh_i32ptr_get(int_hash, &node, NULL);
@@ -464,8 +459,7 @@ void
 Hash32Index::initIterator(struct iterator *ptr, enum iterator_type type,
 			  const char *key, u32 part_count) const
 {
-	assert ( (part_count == 1 && key != NULL) ||
-		 (part_count == 0 && key == NULL));
+	assert ((part_count == 1 && key != NULL) || part_count == 0);
 	(void) part_count;
 	assert(ptr->free == hash_iterator_free);
 
@@ -555,12 +549,7 @@ Hash64Index::random(u32 rnd) const
 struct tuple *
 Hash64Index::findByKey(const char *key, u32 part_count) const
 {
-	assert(key_def->is_unique);
-	if (part_count != key_def->part_count) {
-		tnt_raise(ClientError, ER_EXACT_MATCH,
-			key_def->part_count, part_count);
-	}
-
+	assert(key_def->is_unique && part_count == key_def->part_count);
 	(void) part_count;
 
 	struct tuple *ret = NULL;
@@ -645,8 +634,7 @@ void
 Hash64Index::initIterator(struct iterator *ptr, enum iterator_type type,
 			  const char *key, u32 part_count) const
 {
-	assert ( (part_count == 1 && key != NULL) ||
-		 (part_count == 0 && key == NULL));
+	assert ((part_count == 1 && key != NULL) || part_count == 0);
 	(void) part_count;
 	assert(ptr->free == hash_iterator_free);
 	struct hash_i64_iterator *it = (struct hash_i64_iterator *) ptr;
@@ -729,11 +717,8 @@ HashStrIndex::random(u32 rnd) const
 struct tuple *
 HashStrIndex::findByKey(const char *key, u32 part_count) const
 {
-	assert(key_def->is_unique);
-	if (part_count != key_def->part_count) {
-		tnt_raise(ClientError, ER_EXACT_MATCH,
-			key_def->part_count, part_count);
-	}
+	assert(key_def->is_unique && part_count == key_def->part_count);
+	(void) part_count;
 
 	struct tuple *ret = NULL;
 	const struct mh_lstrptr_node_t node = { key, NULL };
@@ -815,8 +800,7 @@ void
 HashStrIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 			   const char *key, u32 part_count) const
 {
-	assert ( (part_count == 1 && key != NULL) ||
-		 (part_count == 0 && key == NULL));
+	assert ((part_count == 1 && key != NULL) || part_count == 0);
 	(void) part_count;
 
 	assert(ptr->free == hash_iterator_free);

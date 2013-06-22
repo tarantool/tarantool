@@ -41,29 +41,12 @@ STRS(iterator_type, ITERATOR_TYPE);
 
 /* {{{ Utilities. **********************************************/
 
-void
-key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
-	     uint32_t part_count)
+static inline void
+key_validate_parts(struct key_def *key_def,
+		   const char *key, uint32_t part_count)
 {
-	if (part_count == 0 && (type == ITER_ALL || key_def->type == TREE ||
-			 (key_def->type == HASH && type == ITER_GE))) {
-		assert(key == NULL);
-		return;
-	}
-
-	if (part_count > key_def->part_count)
-		tnt_raise(ClientError, ER_KEY_PART_COUNT,
-			  key_def->part_count, part_count);
-
-	/* Check partial keys */
-	if ((key_def->type != TREE) && part_count < key_def->part_count) {
-		tnt_raise(ClientError, ER_EXACT_MATCH,
-			  key_def->part_count, part_count);
-	}
-
-	const char *key_data = key;
 	for (uint32_t part = 0; part < part_count; part++) {
-		uint32_t part_size = load_varint32(&key_data);
+		uint32_t part_size = load_varint32(&key);
 
 		enum field_data_type part_type = key_def->parts[part].type;
 
@@ -71,11 +54,52 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 			tnt_raise(ClientError, ER_KEY_FIELD_TYPE, "u32");
 
 		if (part_type == NUM64 && part_size != sizeof(uint64_t) &&
-				part_size != sizeof(uint32_t))
+		    part_size != sizeof(uint32_t))
 			tnt_raise(ClientError, ER_KEY_FIELD_TYPE, "u64");
 
-		key_data += part_size;
+		key += part_size;
 	}
+}
+
+void
+key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
+	     uint32_t part_count)
+{
+	if (part_count == 0) {
+		assert(key == NULL);
+		/*
+		 * Zero key parts are allowed:
+		 * - for TREE index, all iterator types,
+		 * - ITERA_ALL iterator type, all index types
+		 * - ITER_GE iterator in HASH index (legacy)
+		 */
+		if (key_def->type == TREE || type == ITER_ALL ||
+		    (key_def->type == HASH && type == ITER_GE))
+			return;
+		/* Fall through. */
+	}
+
+	if (part_count > key_def->part_count)
+		tnt_raise(ClientError, ER_KEY_PART_COUNT,
+			  key_def->part_count, part_count);
+
+	/* Partial keys are allowed only for TREE index type. */
+	if (key_def->type != TREE && part_count < key_def->part_count) {
+		tnt_raise(ClientError, ER_EXACT_MATCH,
+			  key_def->part_count, part_count);
+	}
+	key_validate_parts(key_def, key, part_count);
+}
+
+void
+primary_key_validate(struct key_def *key_def, const char *key,
+		     uint32_t part_count)
+{
+	if (key_def->part_count != part_count) {
+		tnt_raise(ClientError, ER_EXACT_MATCH,
+			  key_def->part_count, part_count);
+	}
+	key_validate_parts(key_def, key, part_count);
 }
 
 /**

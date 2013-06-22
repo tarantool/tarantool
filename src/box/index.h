@@ -131,7 +131,9 @@ struct key_def {
 };
 
 /**
- * @brief Check that the key has correct part count and correct part size
+ * Check that the key has correct part count and correct part size
+ * for use in an index iterator.
+ *
  * @param key_def key definition
  * @param type iterator type (see enum iterator_type)
  * @param key BER-encoded key
@@ -140,6 +142,15 @@ struct key_def {
 void
 key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 	     uint32_t part_count);
+
+/**
+ * Check that the supplied key is valid for a search in a unique
+ * index (i.e. the key must be fully specified).
+ */
+void
+primary_key_validate(struct key_def *key_deff, const char *key,
+		     uint32_t part_count);
+
 
 /**
  * The manner in which replace in a unique index must treat

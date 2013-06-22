@@ -235,8 +235,7 @@ BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			  const char *key, u32 part_count) const
 {
 	assert(iterator->free == bitset_index_iterator_free);
-	assert ( (part_count == 1 && key != NULL) ||
-		 (part_count == 0 && key == NULL));
+	assert (part_count != 0 || key == NULL);
 	(void) part_count;
 
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);

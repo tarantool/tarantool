@@ -202,7 +202,7 @@ error: 'Invalid key part count in an exact match (expected 3, got 2)'
 ...
 lua box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')
 ---
-error: 'Invalid key part count (expected [0..3], got 4)'
+error: 'Invalid key part count in an exact match (expected 3, got 4)'
 ...
 lua box.update(9, {'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')
 ---
@@ -231,7 +231,7 @@ error: 'Invalid key part count in an exact match (expected 3, got 2)'
 ...
 lua box.update(9, {'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')
 ---
-error: 'Invalid key part count (expected [0..3], got 4)'
+error: 'Invalid key part count in an exact match (expected 3, got 4)'
 ...
 lua box.space[9]:len()
 ---
