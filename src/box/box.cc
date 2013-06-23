@@ -116,28 +116,6 @@ process_ro(struct port *port, u32 op, const char *reqdata, u32 reqlen)
 	return process_rw(port, op, reqdata, reqlen);
 }
 
-/**
- * Calculate size for a specified fields range
- *
- * @returns size of fields data including size of varint data
- */
-static inline size_t
-tuple_range_size(const char **begin, const char *end, size_t count)
-{
-	const char *start = *begin;
-	while (*begin < end && count-- > 0) {
-		size_t len = load_varint32(begin);
-		*begin += len;
-	}
-	return *begin - start;
-}
-
-static inline uint32_t
-valid_tuple(const char *data, const char *end, uint32_t field_count)
-{
-	return tuple_range_size(&data, end, field_count);
-}
-
 static void
 recover_snap_row(const void *data)
 {
@@ -145,8 +123,19 @@ recover_snap_row(const void *data)
 
 	const struct box_snap_row *row = (const struct box_snap_row *) data;
 
-	if (valid_tuple(row->data, row->data + row->data_size,
-			row->tuple_size) != row->data_size) {
+	struct space *space = space_find(row->space);
+	Index *index = space_index(space, 0);
+	/* Check to see if the tuple has a sufficient number of fields. */
+	if (unlikely(row->tuple_size < space->max_fieldno)) {
+		tnt_raise(IllegalParams,
+			  "tuple must have all indexed fields");
+	}
+	struct tuple *tuple;
+	try {
+		const char *tuple_data = row->data;
+		tuple = tuple_new(row->tuple_size, &tuple_data,
+				  tuple_data + row->data_size);
+	} catch (const ClientError &e) {
 		say_error("\n"
 			  "********************************************\n"
 		          "* Found a corrupted tuple in the snapshot! *\n"
@@ -162,19 +151,7 @@ recover_snap_row(const void *data)
 					base64_buf, base64_buflen);
 		write(STDERR_FILENO, base64_buf, len);
 		free(base64_buf);
-
-		tnt_raise(IllegalParams, "invalid tuple length");
-	}
-
-	struct tuple *tuple = tuple_alloc(row->data_size);
-	memcpy(tuple->data, row->data, row->data_size);
-	tuple->field_count = row->tuple_size;
-
-	struct space *space = space_find(row->space);
-	Index *index = space_index(space, 0);
-	/* Check to see if the tuple has a sufficient number of fields. */
-	if (unlikely(tuple->field_count < space->max_fieldno)) {
-		tnt_raise(IllegalParams, "tuple must have all indexed fields");
+		throw;
 	}
 	index->buildNext(tuple);
 	tuple_ref(tuple, 1);

@@ -64,6 +64,17 @@ struct tuple *
 tuple_alloc(size_t size);
 
 /**
+ * Create a new tuple from a sequence of BER-len encoded fields.
+ * tuple->refs is 0.
+ *
+ * @post *data is advanced to the length of tuple data
+ *
+ * Throws an exception if tuple format is incorrect.
+ */
+struct tuple *
+tuple_new(uint32_t field_count, const char **data, const char *end);
+
+/**
  * Change tuple reference counter. If it has reached zero, free the tuple.
  *
  * @pre tuple->refs + count >= 0
@@ -157,14 +168,22 @@ struct tuple *
 tuple_update(const struct tuple *old_tuple, const char *expr,
              const char *expr_end);
 
-struct tuple *
-tuple_iproto_pick(const char **data, const char *end);
-
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)
 {
 	return tuple->bsize + sizeof(tuple->bsize) +
 		sizeof(tuple->field_count);
+}
+
+static inline size_t
+tuple_range_size(const char **begin, const char *end, uint32_t count)
+{
+	const char *start = *begin;
+	while (*begin < end && count-- > 0) {
+		size_t len = load_varint32(begin);
+		*begin += len;
+	}
+	return *begin - start;
 }
 
 void tuple_free(struct tuple *tuple);

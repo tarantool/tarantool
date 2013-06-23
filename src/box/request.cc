@@ -75,8 +75,9 @@ execute_replace(struct request *request, struct txn *txn)
 	struct space *sp = read_space(reqpos, reqend);
 	request->flags |= (pick_u32(reqpos, reqend) &
 			   BOX_ALLOWED_REQUEST_FLAGS);
+	uint32_t field_count = pick_u32(reqpos, reqend);
 
-	struct tuple *new_tuple = tuple_iproto_pick(reqpos, reqend);
+	struct tuple *new_tuple = tuple_new(field_count, reqpos, reqend);
 	try {
 		space_validate_tuple(sp, new_tuple);
 		enum dup_replace_mode mode = dup_replace_mode(request->flags);

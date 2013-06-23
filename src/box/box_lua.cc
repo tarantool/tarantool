@@ -1704,11 +1704,12 @@ box_unpack_response(struct lua_State *L, const char *s, const char *end)
 	/* Unpack and push tuples. */
 	while (tuple_count--) {
 		u32 bsize = pick_u32(&s, end);
-		const char *tend = s + bsize + sizeof(uint32_t); /*field count*/
+		uint32_t field_count = pick_u32(&s, end);
+		const char *tend = s + bsize;
 		if (tend > end)
 			tnt_raise(IllegalParams, "incorrect packet length");
 
-		struct tuple *tuple = tuple_iproto_pick(&s, tend);
+		struct tuple *tuple = tuple_new(field_count, &s, tend);
 		lbox_pushtuple(L, tuple);
 	}
 	return s;

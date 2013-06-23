@@ -701,7 +701,7 @@ static void tt_tnt_net_call_na(struct tt_test *test) {
 	while (tnt_next(&i)) {
 		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code != 0);
-		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple field count is 0") == 0);
+		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple must have all indexed fields") == 0);
 	}
 	tnt_iter_free(&i);
 }

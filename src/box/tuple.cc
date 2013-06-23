@@ -232,30 +232,16 @@ tuple_update(const struct tuple *old_tuple, const char *expr,
 	}
 }
 
-static inline size_t
-tuple_range_size(const char **begin, const char *end, size_t count)
-{
-	const char *start = *begin;
-	while (*begin < end && count-- > 0) {
-		size_t len = load_varint32(begin);
-		*begin += len;
-	}
-	return *begin - start;
-}
-
 struct tuple *
-tuple_iproto_pick(const char **data, const char *end)
+tuple_new(uint32_t field_count, const char **data, const char *end)
 {
-	size_t field_count = pick_u32(data, end);
-
 	size_t tuple_len = end - *data;
-	const char *begin = *data;
-	if (tuple_len != tuple_range_size(&begin, end, field_count))
-		tnt_raise(IllegalParams, "incorrect tuple length");
+
+	if (tuple_len != tuple_range_size(data, end, field_count))
+		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
 
 	struct tuple *new_tuple = tuple_alloc(tuple_len);
 	new_tuple->field_count = field_count;
-	memcpy(new_tuple->data, *data, tuple_len);
-	*data += tuple_len;
+	memcpy(new_tuple->data, end - tuple_len, tuple_len);
 	return new_tuple;
 }
