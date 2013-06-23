@@ -583,13 +583,9 @@ restart:
 				continue;
 
 			say_debug("expire tuple %p", tuple);
-			uint32_t field_size = 0;
-			const char *field = tuple_field(tuple, 0, &field_size);
-			char bersize[5];
-			pack_varint32(bersize, field_size);
-			tbuf_append(keys_to_delete, bersize,
-						varint32_sizeof(field_size));
-			tbuf_append(keys_to_delete, field, field_size);
+			uint32_t len = 0;
+			const char *field = tuple_field(tuple, 0, &len);
+			tbuf_store_field(keys_to_delete, field, len);
 		}
 		memcached_delete_expired_keys(keys_to_delete);
 		fiber_gc();
