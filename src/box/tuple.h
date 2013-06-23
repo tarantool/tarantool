@@ -64,6 +64,17 @@ struct tuple *
 tuple_alloc(size_t size);
 
 /**
+ * Create a new tuple from a sequence of BER-len encoded fields.
+ * tuple->refs is 0.
+ *
+ * @post *data is advanced to the length of tuple data
+ *
+ * Throws an exception if tuple format is incorrect.
+ */
+struct tuple *
+tuple_new(uint32_t field_count, const char **data, const char *end);
+
+/**
  * Change tuple reference counter. If it has reached zero, free the tuple.
  *
  * @pre tuple->refs + count >= 0
@@ -155,7 +166,7 @@ tuple_print(struct tbuf *buf, const struct tuple *tuple);
 
 struct tuple *
 tuple_update(const struct tuple *old_tuple, const char *expr,
-	     const char *expr_end);
+             const char *expr_end);
 
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)
@@ -164,15 +175,8 @@ static inline size_t tuple_len(struct tuple *tuple)
 		sizeof(tuple->field_count);
 }
 
-void tuple_free(struct tuple *tuple);
-
-/**
- * Calculate size for a specified fields range
- *
- * @returns size of fields data including size of varint data
- */
 static inline size_t
-tuple_range_size(const char **begin, const char *end, size_t count)
+tuple_range_size(const char **begin, const char *end, uint32_t count)
 {
 	const char *start = *begin;
 	while (*begin < end && count-- > 0) {
@@ -182,11 +186,7 @@ tuple_range_size(const char **begin, const char *end, size_t count)
 	return *begin - start;
 }
 
-static inline uint32_t
-valid_tuple(const char *data, const char *end, uint32_t field_count)
-{
-	return tuple_range_size(&data, end, field_count);
-}
+void tuple_free(struct tuple *tuple);
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

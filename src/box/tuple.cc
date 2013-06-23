@@ -231,3 +231,17 @@ tuple_update(const struct tuple *old_tuple, const char *expr,
 		throw;
 	}
 }
+
+struct tuple *
+tuple_new(uint32_t field_count, const char **data, const char *end)
+{
+	size_t tuple_len = end - *data;
+
+	if (tuple_len != tuple_range_size(data, end, field_count))
+		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
+
+	struct tuple *new_tuple = tuple_alloc(tuple_len);
+	new_tuple->field_count = field_count;
+	memcpy(new_tuple->data, end - tuple_len, tuple_len);
+	return new_tuple;
+}

@@ -75,19 +75,9 @@ execute_replace(struct request *request, struct txn *txn)
 	struct space *sp = read_space(reqpos, reqend);
 	request->flags |= (pick_u32(reqpos, reqend) &
 			   BOX_ALLOWED_REQUEST_FLAGS);
-	size_t field_count = pick_u32(reqpos, reqend);
+	uint32_t field_count = pick_u32(reqpos, reqend);
 
-	if (field_count == 0)
-		tnt_raise(IllegalParams, "tuple field count is 0");
-
-	size_t tuple_len = reqend - *reqpos;
-	if (tuple_len != valid_tuple(*reqpos, reqend, field_count))
-		tnt_raise(IllegalParams, "incorrect tuple length");
-
-	struct tuple *new_tuple = tuple_alloc(tuple_len);
-	new_tuple->field_count = field_count;
-	memcpy(new_tuple->data, *reqpos, tuple_len);
-
+	struct tuple *new_tuple = tuple_new(field_count, reqpos, reqend);
 	try {
 		space_validate_tuple(sp, new_tuple);
 		enum dup_replace_mode mode = dup_replace_mode(request->flags);
