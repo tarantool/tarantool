@@ -38,12 +38,10 @@
  */
 SPTREE_DEF(index, realloc);
 
-typedef int (*tree_cmp_t)(const void *, const void *, void *);
-
 class TreeIndex: public Index {
 public:
-	static TreeIndex *
-	factory(struct key_def *key_def, struct space *space);
+	TreeIndex(struct key_def *key_def, struct space *space);
+	virtual ~TreeIndex();
 
 	virtual void beginBuild();
 	virtual void buildNext(struct tuple *tuple);
@@ -64,20 +62,7 @@ public:
 				  const char *key, u32 part_count) const;
 
 // protected:
-	/* Needed by iterators */
-	virtual size_t node_size() const = 0;
-	virtual tree_cmp_t node_cmp() const = 0;
-	virtual tree_cmp_t dup_node_cmp() const = 0;
-	virtual tree_cmp_t key_node_cmp() const= 0;
-
-	virtual void fold(void *node, struct tuple *tuple) const = 0;
-	virtual struct tuple *unfold(const void *node) const = 0;
-
 	sptree_index tree;
-
-protected:
-	TreeIndex(struct key_def *key_def, struct space *space);
-	virtual ~TreeIndex();
 };
 
 #endif /* TARANTOOL_BOX_TREE_INDEX_H_INCLUDED */
