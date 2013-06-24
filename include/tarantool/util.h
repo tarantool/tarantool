@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
+#include "tarantool/config.h"
 
 #include <string.h>
 #include <unistd.h>
