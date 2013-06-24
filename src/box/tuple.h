@@ -32,6 +32,7 @@
 #include <pickle.h>
 
 struct tbuf;
+struct key_def;
 
 /**
  * An atom of Tarantool/Box storage. Consists of a list of fields.
@@ -187,6 +188,47 @@ tuple_range_size(const char **begin, const char *end, uint32_t count)
 }
 
 void tuple_free(struct tuple *tuple);
+
+/**
+ * @brief Compare two tuples using field by field using key definition
+ * @param tuple_a tuple
+ * @param tuple_b tuple
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b)
+ * @retval <0 if key_fields(tuple_a) < key_fields(tuple_b)
+ * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
+ */
+int
+tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+	      const struct key_def *key_def);
+
+/**
+ * @brief Compare two tuples field by field for duplicate using key definition
+ * @param tuple_a tuple
+ * @param tuple_b tuple
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b) and
+ * tuple_a == tuple_b - tuple_a is the same object as tuple_b
+ * @retval <0 if key_fields(tuple_a) <= key_fields(tuple_b)
+ * @retval >0 if key_fields(tuple_a > key_fields(tuple_b)
+ */
+int
+tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
+		  const struct key_def *key_def);
+
+/**
+ * @brief Compare a tuple with a key field by field using key definition
+ * @param tuple_a tuple
+ * @param key BER-encoded key
+ * @param part_count number of parts in \a key
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == parts(key)
+ * @retval <0 if key_fields(tuple_a) < parts(key)
+ * @retval >0 if key_fields(tuple_a) > parts(key)
+ */
+int
+tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
+		       uint32_t part_count, const struct key_def *key_def);
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 
