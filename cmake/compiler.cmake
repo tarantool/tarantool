@@ -88,7 +88,7 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("CXX" "-std=c++11")
     else()
         add_compile_flags("C" "-std=gnu99")
-        add_compile_flags("CXX" "-std=c++0x")
+        add_compile_flags("CXX" "-std=gnu++0x")
     endif()
 
     # Disable Run-time type information
