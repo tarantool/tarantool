@@ -48,7 +48,6 @@ public:
 	virtual struct tuple *max() const;
 	virtual struct tuple *random(u32 rnd) const = 0;
 	virtual struct tuple *findByKey(const char *key, u32 part_count) const  = 0;
-	virtual struct tuple *findByTuple(struct tuple *tuple) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode)  = 0;

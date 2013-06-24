@@ -261,22 +261,22 @@ tuple_compare_field(const char *field_a, uint32_t size_a,
 	switch (type) {
 	case NUM:
 	{
-		assert (size_a == sizeof(uint32_t));
-		assert (size_b == sizeof(uint32_t));
+		assert(size_a == sizeof(uint32_t));
+		assert(size_b == sizeof(uint32_t));
 		uint32_t a = *(uint32_t *) field_a;
 		uint32_t b = *(uint32_t *) field_b;
 		return a < b ? -1 : (a > b);
 	}
 	case NUM64:
 	{
-		assert (size_a == sizeof(uint64_t));
+		assert(size_a == sizeof(uint64_t));
 		uint64_t a = *(uint64_t *) field_a;
 		uint64_t b;
 		/* Allow search in NUM64 indexes using NUM keys. */
 		if (size_b == sizeof(uint32_t)) {
 			b = *(uint32_t *) field_b;
 		} else {
-			assert (size_b == sizeof(uint64_t));
+			assert(size_b == sizeof(uint64_t));
 			b = *(uint64_t *) field_b;
 		}
 		return a < b ? -1 : (a > b);
@@ -296,7 +296,7 @@ tuple_compare_field(const char *field_a, uint32_t size_a,
 		}
 	}
 	default:
-		assert (false);
+		assert(false);
 	}
 }
 

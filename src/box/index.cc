@@ -168,4 +168,11 @@ Index::~Index()
 		m_position->free(m_position);
 }
 
+struct tuple *
+Index::findByTuple(struct tuple *tuple) const
+{
+	(void) tuple;
+	tnt_raise(ClientError, ER_UNSUPPORTED, "Index", "findByTuple()");
+	return NULL;
+}
 /* }}} */
