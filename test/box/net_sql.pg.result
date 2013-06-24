@@ -68,7 +68,7 @@ lua dump({c:select('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ...
 lua dump({c:single('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ---
-error: '[string "-- sql.lua (internal file)..."]:157: SQL request returned multiply rows'
+error: '[string "-- sql.lua (internal file)..."]:156: SQL request returned multiply rows'
 ...
 lua dump({c:single('SELECT * FROM (VALUES (1,2)) t')})
 ---

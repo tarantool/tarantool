@@ -153,11 +153,7 @@ box.net.sql = {
         single = function(self, sql, ...)
             local res = self:execute(sql, ...)
             if #res > 1 then
-                if self.raise then
-                    error("SQL request returned multiply rows")
-                else
-                    return {}, -1, "SQL request returned multiply rows"
-                end
+                error("SQL request returned multiply rows")
             end
             return res[1]
         end,
@@ -202,15 +198,24 @@ box.net.sql = {
             self:begin_work()
             local res = { pcall(proc, self) }
 
-            self.raise = raise
-            
+            -- commit transaction
             if res[1] then
-                self:commit()
-                return true
+                res = { pcall(function() self:commit() end) }
+                self.raise = raise
+                if res[1] then
+                    return true
+                end
+                return res[1], res[2]
             end
 
-            self:rollback()
-            return false, res[2]
+
+            local res_txn = { pcall(function() self:rollback() end) }
+
+            if not res_txn[1] then
+                res[2] = res[2] .. "\n" .. res_txn[2]
+            end
+            self.raise = raise
+            return res[1], res[2]
         end
     }
 }
