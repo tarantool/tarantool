@@ -81,6 +81,7 @@ static lua_State *root_L;
  */
 
 static const char *tuplelib_name = "box.tuple";
+static const char *tuple_iteratorlib_name = "box.tuple.iterator";
 
 static void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
@@ -550,22 +551,30 @@ lbox_tuple_next(struct lua_State *L)
 	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
 
-	u32 field_no;
-	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL))
-		field_no = 0;
-	else if (argc == 1 && lua_type(L, 2) == LUA_TNUMBER)
-		field_no = lua_tointeger(L, 2);
-	else
+	struct tuple_iterator *it = NULL;
+	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
+		it = (struct tuple_iterator *) lua_newuserdata(L, sizeof(*it));
+		assert (it != NULL);
+		luaL_getmetatable(L, tuple_iteratorlib_name);
+		lua_setmetatable(L, -2);
+		tuple_rewind(it, tuple);
+	} else if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
+		it = (struct tuple_iterator *)
+			luaL_checkudata(L, 2, tuple_iteratorlib_name);
+		assert (it != NULL);
+		lua_pushvalue(L, 2);
+	} else {
 		return luaL_error(L, "tuple.next(): bad arguments");
+	}
 
-	if (field_no >= tuple->field_count) {
+	uint32_t len;
+	const char *field = tuple_next(it, &len);
+	if (field == NULL) {
+		lua_pop(L, 1);
 		lua_pushnil(L);
 		return 1;
 	}
 
-	uint32_t len;
-	const char *field = tuple_field(tuple, field_no, &len);
-	lua_pushinteger(L, field_no + 1);
 	lua_pushlstring(L, field, len);
 	return 2;
 }
@@ -613,6 +622,10 @@ static const struct luaL_reg lbox_tuple_meta[] = {
 
 static const struct luaL_reg lbox_tuplelib[] = {
 	{"new", lbox_tuple_new},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg lbox_tuple_iterator_meta[] = {
 	{NULL, NULL}
 };
 
@@ -1860,6 +1873,8 @@ mod_lua_init(struct lua_State *L)
 	tarantool_lua_register_type(L, tuplelib_name, lbox_tuple_meta);
 	luaL_register(L, tuplelib_name, lbox_tuplelib);
 	lua_pop(L, 1);
+	tarantool_lua_register_type(L, tuple_iteratorlib_name,
+				    lbox_tuple_iterator_meta);
 	luaL_register(L, "box", boxlib);
 	lua_pop(L, 1);
 	/* box.index */
