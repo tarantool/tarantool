@@ -34,7 +34,7 @@ find_program(POD2MAN pod2man)
 #
 set (TARANTOOL_PRODUCT "box")
 set (TARANTOOL_MODULES "box")
-set (TARANTOOL_CLIENTS "tarantool_checksum")
+set (TARANTOOL_CLIENTS "tarantool_checksum" "tarantool_snap")
 # Define PACKAGE macro in tarantool/config.h
 set (PACKAGE "Tarantool")
 
