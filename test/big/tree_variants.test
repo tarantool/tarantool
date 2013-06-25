@@ -27,5 +27,14 @@ exec sql "delete from t6 where k0 = 7"
 exec sql "delete from t6 where k0 = 8"
 exec sql "delete from t6 where k0 = 9"
 
-exec admin "lua for k,v in box.space[6]:pairs() do print(v) end"
+exec admin "lua box.insert(6, 6, 6ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006 )"
+exec admin "lua box.insert(6, 7, 7ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007 )"
+exec admin "lua box.insert(6, 8, 8ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008 )"
+exec admin "lua box.insert(6, 9, 9ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009 )"
 
+exec admin "lua box.select(6, 1, 6ULL)"
+exec admin "lua box.select(6, 1, 6)"
+exec admin "lua box.select(6, 2, 400ULL)"
+exec admin "lua box.select(6, 2, 400)"
+
+exec admin "lua for k,v in box.space[6]:pairs() do print(v) end"

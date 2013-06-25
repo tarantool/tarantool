@@ -113,6 +113,50 @@ lua num == tonumber64('18446744073709551615')
 ---
  - true
 ...
+lua box.delete(8, 18446744073709551615ULL)
+---
+ - 18446744073709551615: {'magic'}
+...
+lua box.insert('8', 125ULL, 'magic')
+---
+ - 125: {'magic'}
+...
+lua tu = box.select('8', '0', 125)
+---
+...
+lua tu2 = box.select('8', '0', 125LL)
+---
+...
+lua num = box.unpack('l', tu[0])
+---
+...
+lua num2 = box.unpack('l', tu2[0])
+---
+...
+lua print(num)
+---
+125
+...
+lua print(num2)
+---
+125
+...
+lua type(num) == 'cdata'
+---
+ - true
+...
+lua type(num2) == 'cdata'
+---
+ - true
+...
+lua num == tonumber64('125')
+---
+ - true
+...
+lua num2 == tonumber64('125')
+---
+ - true
+...
 lua box.space[8]:truncate()
 ---
 ...
