@@ -143,7 +143,7 @@ Index::factory(enum index_type type, struct key_def *key_def, struct space *spac
 {
 	switch (type) {
 	case HASH:
-		return HashIndex::factory(key_def, space);
+		return new HashIndex(key_def, space);
 	case TREE:
 		return TreeIndex::factory(key_def, space);
 	case BITSET:
