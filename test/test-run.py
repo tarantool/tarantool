@@ -140,10 +140,13 @@ def main():
     oldcwd = os.getcwd()
     # Change the current working directory to where all test
     # collections are supposed to reside
-    try:
-        os.chdir(os.path.dirname(sys.argv[0]))
-    except OSError:
-        pass
+    # If script executed with (python test-run.py) dirname is ''
+    # so we need to make it .
+    path = os.path.dirname(sys.argv[0])
+    if not path:
+        path = '.'
+    os.chdir(path)
+
     failed_tests = 0
 
     try:

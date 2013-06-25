@@ -15,7 +15,7 @@ from test_suite import FilteredStream, Test
 class UnitTest(Test):
     def __init__(self, name, args, suite_ini):
         Test.__init__(self, name, args, suite_ini)
-        self.name = name
+        self.name = name + ".test"
         self.result = name + ".result"
         self.skip_cond = name + ".skipcond"
         self.tmp_result = os.path.join(self.args.vardir,
@@ -94,13 +94,14 @@ class UnittestServer(Server):
                     return True
             return False
 
-        regexp = re.compile('[a-zA-Z0-9_]*')
-        test_suite.tests.extend([UnitTest(os.path.join(suite_path, test), test_suite.args, test_suite.ini) 
-                for test in os.listdir(suite_path) if 
-                    regexp.match(test) and
-                    os.access(os.path.join(suite_path, test), os.X_OK) and
-                    os.path.isfile(os.path.join(suite_path, test)) and
-                    patterned(os.path.join(suite_path, test))]) 
+        regexp = re.compile('([a-zA-Z0-9_]*).test')
+        for f in sorted(os.listdir(suite_path)):
+            if regexp.match(f):
+                f = os.path.join(suite_path, regexp.match(f).groups()[0]) + '.test'
+                if os.access(f, os.X_OK) and os.path.isfile(f) and patterned(f):
+                    test_suite.tests.append(UnitTest(f[:-5], test_suite.args,
+                                test_suite.ini));
+                
 
     def init(self):
         pass
