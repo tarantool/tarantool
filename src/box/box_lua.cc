@@ -184,6 +184,60 @@ lbox_tuple_slice(struct lua_State *L)
 }
 
 /**
+ * Pack our BER integer into luaL_Buffer
+ */
+static void
+luaL_addvarint32(luaL_Buffer *b, u32 value)
+{
+	char buf[sizeof(u32)+1];
+	char *bufend = pack_varint32(buf, value);
+	luaL_addlstring(b, buf, bufend - buf);
+}
+
+/**
+ * Convert an element on Lua stack to a part of an index
+ * key.
+ *
+ * Lua type system has strings, numbers, booleans, tables,
+ * userdata objects. Tarantool indexes only support 32/64-bit
+ * integers and strings.
+ *
+ * Instead of considering each Tarantool <-> Lua type pair,
+ * here we follow the approach similar to one in lbox_pack()
+ * (see tarantool_lua.m):
+ *
+ * Lua numbers are converted to 32 or 64 bit integers,
+ * if key part is integer. In all other cases,
+ * Lua types are converted to Lua strings, and these
+ * strings are used as key parts.
+ */
+void
+append_key_part(struct lua_State *L, int i, luaL_Buffer *b,
+		enum field_data_type type)
+{
+	const char *str;
+	size_t size;
+	u32 v_u32;
+	u64 v_u64;
+
+	if (lua_type(L, i) == LUA_TNUMBER) {
+		if (type == NUM64) {
+			v_u64 = (u64) lua_tonumber(L, i);
+			str = (char *) &v_u64;
+			size = sizeof(u64);
+		} else {
+			v_u32 = (u32) lua_tointeger(L, i);
+			str = (char *) &v_u32;
+			size = sizeof(u32);
+		}
+	} else {
+		str = luaL_checklstring(L, i, &size);
+	}
+	luaL_addvarint32(b, size);
+	luaL_addlstring(b, str, size);
+}
+
+/**
  * Tuple transforming function.
  *
  * Remove the fields designated by 'offset' and 'len' from an tuple,
@@ -595,10 +649,12 @@ lbox_pushiterator(struct lua_State *L, Index *index,
 	lua_setmetatable(L, -2);
 
 	holder->it = it;
-	memcpy(holder->key, key, size);
-
-	key_validate(index->key_def, type, (key ? holder->key : NULL), part_count);
-	index->initIterator(it, type, (key ? holder->key : NULL), part_count);
+	if (key) {
+		memcpy(holder->key, key, size);
+		key = holder->key;
+	}
+	key_validate(index->key_def, type, key, part_count);
+	index->initIterator(it, type, key, part_count);
 }
 
 static int
@@ -689,50 +745,6 @@ lbox_index_random(struct lua_State *L)
 	return 1;
 }
 
-/**
- * Convert an element on Lua stack to a part of an index
- * key.
- *
- * Lua type system has strings, numbers, booleans, tables,
- * userdata objects. Tarantool indexes only support 32/64-bit
- * integers and strings.
- *
- * Instead of considering each Tarantool <-> Lua type pair,
- * here we follow the approach similar to one in lbox_pack()
- * (see tarantool_lua.m):
- *
- * Lua numbers are converted to 32 or 64 bit integers,
- * if key part is integer. In all other cases,
- * Lua types are converted to Lua strings, and these
- * strings are used as key parts.
- */
-
-void append_key_part(struct lua_State *L, int i,
-		     struct tbuf *tbuf, enum field_data_type type)
-{
-	const char *str;
-	size_t size;
-	u32 v_u32;
-	u64 v_u64;
-
-	if (lua_type(L, i) == LUA_TNUMBER) {
-		if (type == NUM64) {
-			v_u64 = (u64) lua_tonumber(L, i);
-			str = (char *) &v_u64;
-			size = sizeof(u64);
-		} else {
-			v_u32 = (u32) lua_tointeger(L, i);
-			str = (char *) &v_u32;
-			size = sizeof(u32);
-		}
-	} else {
-		str = luaL_checklstring(L, i, &size);
-	}
-	char varint_buf[sizeof(u32) + 1];
-	size_t pack_len = pack_varint32(varint_buf, size) - varint_buf;
-	tbuf_append(tbuf, varint_buf, pack_len);
-	tbuf_append(tbuf, str, size);
-}
 
 /*
  * Lua iterator over a Taratnool/Box index.
@@ -766,13 +778,11 @@ lbox_create_iterator(struct lua_State *L)
 	Index *index = lua_checkindex(L, 1);
 	int argc = lua_gettop(L);
 
-	size_t allocated_size = palloc_allocated(fiber->gc_pool);
-
 	/* Create a new iterator. */
 	enum iterator_type type = ITER_ALL;
-	u32 field_count = 0;
+	u32 key_part_count = 0;
 	const char *key = NULL;
-	u32 key_size = 0;
+	size_t key_size = 0;
 	if (argc == 1 || (argc == 2 && lua_type(L, 2) == LUA_TNIL)) {
 		/*
 		 * Nothing or nil on top of the stack,
@@ -780,48 +790,47 @@ lbox_create_iterator(struct lua_State *L)
 		 * beginning (ITER_ALL).
 		 */
 	} else {
-		 type = (enum iterator_type) luaL_checkint(L, 2);
-		 if (type < ITER_ALL || type >= iterator_type_MAX)
-			 luaL_error(L, "unknown iterator type: %d", type);
-		 /* What else do we have on the stack? */
-		 if (argc == 2 || (argc == 3 && lua_type(L, 3) == LUA_TNIL)) {
-			 /* Nothing */
-		 } else if (argc == 3 && lua_type(L, 3) == LUA_TUSERDATA) {
+		type = (enum iterator_type) luaL_checkint(L, 2);
+		if (type < ITER_ALL || type >= iterator_type_MAX)
+			luaL_error(L, "unknown iterator type: %d", type);
+		/* What else do we have on the stack? */
+		luaL_Buffer b;
+		luaL_buffinit(L, &b);
+		if (argc == 2 || (argc == 3 && lua_type(L, 3) == LUA_TNIL)) {
+			/* Nothing */
+		} else if (argc == 3 && lua_type(L, 3) == LUA_TUSERDATA) {
 			/* Tuple. */
 			struct tuple *tuple = lua_checktuple(L, 2);
-			field_count = tuple->field_count;
-			key = tuple->data;
-			key_size = tuple->bsize;
+			key_part_count = tuple->field_count;
+			luaL_addlstring(&b, tuple->data, tuple->bsize);
 		} else {
 			/* Single or multi- part key. */
-			field_count = argc - 2;
-			struct tbuf *data = tbuf_new(fiber->gc_pool);
-			for (u32 i = 0; i < field_count; i++) {
+			key_part_count = argc - 2;
+			for (u32 i = 0; i < key_part_count; i++) {
 				enum field_data_type type = UNKNOWN;
 				if (i < index->key_def->part_count) {
 					type = index->key_def->parts[i].type;
 				}
-				append_key_part(L, i + 3, data, type);
+				append_key_part(L, i + 3, &b, type);
 			}
-			key = data->data;
-			key_size = data->size;
 		}
 		/*
 		 * We allow partially specified keys for TREE
 		 * indexes. HASH indexes can only use single-part
 		 * keys.
 		*/
-		if (field_count > index->key_def->part_count)
+		if (key_part_count > index->key_def->part_count)
 			luaL_error(L, "Key part count %d"
 				   " is greater than index part count %d",
-				   field_count, index->key_def->part_count);
+				   key_part_count, index->key_def->part_count);
+		luaL_pushresult(&b);
+		key = lua_tolstring(L, -1, &key_size);
+		if (key_size == 0)
+			key = NULL;
 	}
 	struct iterator *it = index->allocIterator();
 	lbox_pushiterator(L, index, it, type, key, key_size,
-			  field_count);
-
-	/* truncate memory used by key construction */
-	ptruncate(fiber->gc_pool, allocated_size);
+			  key_part_count);
 	return it;
 }
 
@@ -901,42 +910,39 @@ lbox_index_count(struct lua_State *L)
 		luaL_error(L, "index.count(): one or more arguments expected");
 
 	/* preparing single or multi-part key */
-	size_t allocated_size = palloc_allocated(fiber->gc_pool);
-	const char *key;
+	luaL_Buffer b;
+	luaL_buffinit(L, &b);
 	u32 key_part_count;
 	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 		/* Searching by tuple. */
 		struct tuple *tuple = lua_checktuple(L, 2);
-		key = tuple->data;
+		luaL_addlstring(&b, tuple->data, tuple->bsize);
 		key_part_count = tuple->field_count;
 	} else {
 		/* Single or multi- part key. */
 		key_part_count = argc;
-		struct tbuf *data = tbuf_new(fiber->gc_pool);
 		for (u32 i = 0; i < argc; ++i) {
 			enum field_data_type type = UNKNOWN;
 			if (i < index->key_def->part_count) {
 				type = index->key_def->parts[i].type;
 			}
-			append_key_part(L, i + 2, data, type);
+			append_key_part(L, i + 2, &b, type);
 		}
-		key = data->data;
 	}
+	luaL_pushresult(&b);
+	const char *key = lua_tostring(L, -1);
 	u32 count = 0;
-	/* preparing index iterator */
-	struct iterator *it = index->position();
 
 	key_validate(index->key_def, ITER_EQ, key, key_part_count);
+	/* Prepare index iterator */
+	struct iterator *it = index->position();
 	index->initIterator(it, ITER_EQ, key, key_part_count);
-	/* iterating over the index and counting tuples */
+	/* Iterate over the index and count tuples. */
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL)
 		count++;
 
-	/* truncate memory used by key construction */
-	ptruncate(fiber->gc_pool, allocated_size);
-
-	/* returning subtree size */
+	/* Return subtree size */
 	lua_pushnumber(L, count);
 	return 1;
 }
@@ -1414,17 +1420,6 @@ box_index_init_iterator_types(struct lua_State *L, int idx)
 		/* cut ITER_ prefix from enum name */
 		lua_setfield(L, idx, iterator_type_strs[i] + 5);
 	}
-}
-
-/**
- * Pack our BER integer into luaL_Buffer
- */
-static void
-luaL_addvarint32(luaL_Buffer *b, u32 value)
-{
-	char buf[sizeof(u32)+1];
-	char *bufend = pack_varint32(buf, value);
-	luaL_addlstring(b, buf, bufend - buf);
 }
 
 /**

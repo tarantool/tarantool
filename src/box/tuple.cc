@@ -204,12 +204,6 @@ struct tuple *
 tuple_update(const struct tuple *old_tuple, const char *expr,
 	     const char *expr_end)
 {
-	size_t allocated_size = palloc_allocated(fiber->gc_pool);
-	auto scoped_guard = make_scoped_guard([=] {
-		/* truncate memory used by tuple_update */
-		ptruncate(fiber->gc_pool, allocated_size);
-	});
-
 	uint32_t new_size = 0;
 	uint32_t new_field_count = 0;
 	struct tuple_update *update =
@@ -225,11 +219,11 @@ tuple_update(const struct tuple *old_tuple, const char *expr,
 
 	try {
 		tuple_update_execute(update, new_tuple->data);
-		return new_tuple;
 	} catch (const Exception&) {
 		tuple_free(new_tuple);
 		throw;
 	}
+	return new_tuple;
 }
 
 struct tuple *
