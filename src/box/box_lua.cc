@@ -1176,17 +1176,11 @@ static void
 port_add_lua_ret(struct port *port, struct lua_State *L, int index)
 {
 	struct tuple *tuple = lua_totuple(L, index);
-	try {
-		port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
-
+	auto scoped_guard = make_scoped_guard([=] {
 		if (tuple->refs == 0)
 			tuple_free(tuple);
-	} catch (...) {
-		if (tuple->refs == 0)
-			tuple_free(tuple);
-
-		throw;
-	}
+	});
+	port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
 }
 
 /**
