@@ -19,7 +19,7 @@ VALUE foo 0 3
 new
 END
 # and the other form, specifying a flush_all time... 
-flush_all time + 2
+flush_all time + 1
 OK
 
 get foo
