@@ -88,15 +88,13 @@ class Server(object):
 
     def find_exe(self, builddir, silent=True):
         "Locate server executable in the build dir or in the PATH."
-        #TODO: Bad Style
-        exe_name = self.default_bin_name() + "_box"
         path = builddir + os.pathsep + os.environ["PATH"]
 
         if not silent:
             print "  Looking for server binary in {0} ...".format(path)
 
         for dir in path.split(os.pathsep):
-            exe = os.path.join(dir, exe_name)
+            exe = os.path.join(dir, self.default_bin_name)
             if os.access(exe, os.X_OK):
                 return exe
 

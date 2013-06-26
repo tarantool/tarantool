@@ -88,8 +88,8 @@ class Test:
         self.skip_cond = name.replace(".test", ".skipcond")
         self.tmp_result = os.path.join(self.args.vardir,
                                        os.path.basename(self.result))
-	self.reject = "{0}/test/{1}".format(self.args.builddir,
-			                    name.replace(".test", ".reject"))
+        self.reject = "{0}/test/{1}".format(self.args.builddir,
+                                            name.replace(".test", ".reject"))
         self.is_executed = False
         self.is_executed_ok = None
         self.is_equal_result = None
@@ -223,7 +223,7 @@ class TestSuite:
             print e
             raise RuntimeError("Unknown server: core = {0}".format(
                                self.ini["core"]))
-        
+
         print "Collecting tests in \"" + suite_path + "\": " +\
             self.ini["description"] + "."
         self.server.find_tests(self, suite_path);

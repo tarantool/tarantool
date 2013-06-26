@@ -27,7 +27,7 @@ class FuncTest(Test):
         self.skip_cond = name.replace(".test", ".skipcond")
         self.tmp_result = os.path.join(self.args.vardir,
                 os.path.basename(self.result))
-        self.reject = "{0}/test/{1}".format(self.args.builddir, 
+        self.reject = "{0}/test/{1}".format(self.args.builddir,
                 name.replace(".test", ".reject"))
 
     def execute(self, server):
@@ -53,16 +53,16 @@ class FuncTest(Test):
         finally:
             if sys.stdout and sys.stdout != save_stdout:
                 sys.stdout.close()
-            sys.stdout = save_stdout; 
+            sys.stdout = save_stdout;
         self.is_executed = True
-        
+
     def __repr__(self):
         return str([self.name, self.result, self.skip_cond, self.tmp_result,
         self.reject])
 
-    __str__ = __repr__ 
+    __str__ = __repr__
 
-    
+
 class TarantoolConfigFile:
     """ConfigParser can't read files without sections, work it around"""
     def __init__(self, fp, section_name):
@@ -83,6 +83,7 @@ class TarantoolServer(Server):
 
     def __init__(self, core="tarantool"):
         Server.__init__(self, core)
+        self.default_bin_name = "tarantool_box"
         self.default_config_name = "tarantool.cfg"
         self.default_init_lua_name = "init.lua"
         # append additional cleanup patterns
@@ -155,7 +156,7 @@ class TarantoolServer(Server):
             if (curr_lsn >= lsn):
                 break
             time.sleep(0.01)
-    
+
     def version(self):
         p = subprocess.Popen([self.binary, "--version"],
                              cwd = self.vardir,
@@ -177,6 +178,3 @@ class TarantoolServer(Server):
                 raise RuntimeError("'--gdb' and '--start-and-exit' can't be defined together")
             self.server = pexpect.spawn(args[0], args[1:], cwd = self.vardir)
             self.server.wait()
-
-    def default_bin_name(self):
-        return "{0}".format(self.core) 

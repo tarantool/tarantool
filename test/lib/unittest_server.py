@@ -47,14 +47,14 @@ class UnitTest(Test):
         finally:
             if sys.stdout and sys.stdout != save_stdout:
                 sys.stdout.close()
-            sys.stdout = save_stdout; 
+            sys.stdout = save_stdout;
         self.is_executed = True
 
     def __repr__(self):
         return str([self.name, self.result, self.skip_cond, self.tmp_result,
         self.reject])
 
-    __str__ = __repr__ 
+    __str__ = __repr__
 
 
 class UnittestServer(Server):
@@ -101,7 +101,7 @@ class UnittestServer(Server):
                 if os.access(f, os.X_OK) and os.path.isfile(f) and patterned(f):
                     test_suite.tests.append(UnitTest(f[:-5], test_suite.args,
                                 test_suite.ini));
-                
+
 
     def init(self):
         pass

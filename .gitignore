@@ -23,7 +23,7 @@ test/connector_c/snap
 test/connector_c/tp
 test/box/protocol
 test/box/connector
-test/unit/*\.test
+test/unit/*.test
 Makefile
 CMakeFiles
 CMakeCache.txt
@@ -71,18 +71,3 @@ connector/c/tntrpl/libtarantoolrpl.so.1.1
 src/box/00000000000000000001.snap
 src/box/tarantool.cfg
 VERSION
-test/unit/base64.test
-test/unit/bitset_basic.test
-test/unit/bitset_index.test
-test/unit/bitset_iterator.test
-test/unit/bit.test
-test/unit/lol.test
-test/unit/mhash.test
-test/unit/objc_catchcxx.test
-test/unit/objc_finally.test
-test/unit/queue.test
-test/unit/rlist.test
-test/unit/rope_avl.test
-test/unit/rope_basic.test
-test/unit/rope_stress.test
-test/unit/rope.test
