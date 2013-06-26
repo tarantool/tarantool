@@ -118,7 +118,7 @@ class TarantoolServer(Server):
             self.memcached = MemcachedConnection('localhost', self.memcached_port)
 
     def find_tests(self, test_suite, suite_path):
-        for test_name in glob.glob(os.path.join(suite_path, "*.test")):
+        for test_name in sorted(glob.glob(os.path.join(suite_path, "*.test"))):
             for test_pattern in test_suite.args.tests:
                 if test_name.find(test_pattern) != -1:
                     test_suite.tests.append(FuncTest(test_name, test_suite.args, test_suite.ini))

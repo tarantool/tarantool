@@ -126,7 +126,8 @@ class Test:
 
         if self.skip:
             print "[ skip ]"
-
+            if os.path.exists(self.tmp_result):
+                os.remove(self.tmp_result)
         elif self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
             print "[ pass ]"
             if os.path.exists(self.tmp_result):

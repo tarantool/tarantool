@@ -24,12 +24,14 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-import argparse
-import os.path
 import os
-import time
 import sys
+import time
 import string
+import shutil
+import os.path
+import argparse
+
 from lib.test_suite import TestSuite
 
 #
@@ -148,6 +150,9 @@ def setenv():
 #######################################################################
 # Program body
 #######################################################################
+def purge(vardir):
+    if os.path.exists(vardir):
+        shutil.rmtree(vardir)
 
 def main():
     setenv()
@@ -166,6 +171,7 @@ def main():
 
     try:
         print "Started", " ".join(sys.argv)
+        purge(options.args.vardir)
         suite_names = []
         if options.args.suites != []:
             suite_names = options.args.suites
@@ -174,7 +180,7 @@ def main():
                 if "suite.ini" in names:
                     suite_names.append(os.path.basename(root))
 
-        suites = [TestSuite(suite_name, options.args) for suite_name in suite_names]
+        suites = [TestSuite(suite_name, options.args) for suite_name in sorted(suite_names)]
         
         for suite in suites:
             failed_tests += suite.run_all()
