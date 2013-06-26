@@ -24,12 +24,14 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-import argparse
-import os.path
 import os
-import time
 import sys
+import time
 import string
+import shutil
+import os.path
+import argparse
+
 from lib.test_suite import TestSuite
 
 #
@@ -57,14 +59,6 @@ class Options:
                 e.g. "show" will run all tests that have "show" in their name in all
                 suites, "box/show" will only enable tests starting with "show" in
                 "box" suite. Default: run all tests in all specified suites.""")
-
-        parser.add_argument(
-                "--module",
-                dest = 'modules',
-                metavar = "module",
-                nargs="*",
-                default = ["box"],
-                help = "List of modules to test. Default: \"box\"")
 
         parser.add_argument(
                 "--suite",
@@ -162,8 +156,14 @@ def main():
     options = Options()
     oldcwd = os.getcwd()
     # Change the current working directory to where all test
-    # collections are supposed to reside.
-    os.chdir(os.path.dirname(sys.argv[0]))
+    # collections are supposed to reside
+    # If script executed with (python test-run.py) dirname is ''
+    # so we need to make it .
+    path = os.path.dirname(sys.argv[0])
+    if not path:
+        path = '.'
+    os.chdir(path)
+
     failed_tests = 0
 
     try:
@@ -175,13 +175,9 @@ def main():
             for root, dirs, names in os.walk(os.getcwd()):
                 if "suite.ini" in names:
                     suite_names.append(os.path.basename(root))
-        suites = []
-        for suite_name in suite_names:
-            suite = TestSuite(suite_name, options.args)
-            if suite.ini["module"] not in options.args.modules:
-                continue
-            suites.append(suite)
 
+        suites = [TestSuite(suite_name, options.args) for suite_name in sorted(suite_names)]
+        
         for suite in suites:
             failed_tests += suite.run_all()
     except RuntimeError as e:

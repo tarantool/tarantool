@@ -132,6 +132,12 @@ port_iproto_eof(struct port *ptr)
 	}
 }
 
+static inline void
+tuple_to_iproto(struct port_iproto *port, struct tuple *tuple)
+{
+	obuf_dup(port->buf, &tuple->bsize, tuple_len(tuple));
+}
+
 static void
 port_iproto_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
 {
@@ -141,7 +147,7 @@ port_iproto_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
 		port->svp = obuf_book(port->buf, sizeof(port->reply));
 	}
 	if (flags & BOX_RETURN_TUPLE) {
-		obuf_dup(port->buf, &tuple->bsize, tuple_len(tuple));
+		tuple_to_iproto(port, tuple);
 	}
 }
 
