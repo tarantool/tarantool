@@ -5,7 +5,7 @@ import os
 import yaml
 
 from lib.memcached_connection import MemcachedConnection
-from lib.tarantool_box_server import TarantoolBoxServer
+from lib.tarantool_server import TarantoolServer
 
 sonet = """The expense of spirit
 in a waste of shame
@@ -15,7 +15,7 @@ and till action, lust""".split('\n')
 master = server
 master_memcached = master.memcached
 
-replica = TarantoolBoxServer()
+replica = TarantoolServer()
 replica.deploy("replication/cfg/replica.cfg",
            replica.find_exe(self.args.builddir),
            os.path.join(self.args.vardir, "replica"))
