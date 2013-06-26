@@ -307,17 +307,7 @@ HashIndex::max() const
 	return NULL;
 }
 
-struct tuple *
-HashIndex::findByTuple(struct tuple *tuple) const
-{
-	assert(key_def->is_unique);
-	if (tuple->field_count < key_def->max_fieldno)
-		tnt_raise(IllegalParams, "tuple must have all indexed fields");
 
-	/* Hash index currently is always single-part. */
-	const char *field = tuple_field_old(tuple, key_def->parts[0].fieldno);
-	return findByKey(field, 1);
-}
 
 /* }}} */
 

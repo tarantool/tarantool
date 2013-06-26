@@ -145,7 +145,7 @@ Index::factory(enum index_type type, struct key_def *key_def, struct space *spac
 	case HASH:
 		return HashIndex::factory(key_def, space);
 	case TREE:
-		return TreeIndex::factory(key_def, space);
+		return new TreeIndex(key_def, space);
 	case BITSET:
 		return new BitsetIndex(key_def, space);
 	default:
@@ -168,4 +168,11 @@ Index::~Index()
 		m_position->free(m_position);
 }
 
+struct tuple *
+Index::findByTuple(struct tuple *tuple) const
+{
+	(void) tuple;
+	tnt_raise(ClientError, ER_UNSUPPORTED, "Index", "findByTuple()");
+	return NULL;
+}
 /* }}} */

@@ -31,6 +31,7 @@
 #include <salloc.h>
 #include "tbuf.h"
 
+#include "index.h"
 #include "tuple_update.h"
 #include <exception.h>
 #include <palloc.h>
@@ -238,4 +239,113 @@ tuple_new(uint32_t field_count, const char **data, const char *end)
 	new_tuple->field_count = field_count;
 	memcpy(new_tuple->data, end - tuple_len, tuple_len);
 	return new_tuple;
+}
+
+static inline int
+tuple_compare_field(const char *field_a, uint32_t size_a,
+		    const char *field_b, uint32_t size_b,
+		    enum field_data_type type)
+{
+	/*
+	 * field_a is always a tuple field.
+	 * field_b can be either a tuple field or a key part.
+	 * All tuple fields were validated before by space_validate_tuple().
+	 * All key parts were validated before by key_validate().
+	 */
+	switch (type) {
+	case NUM:
+	{
+		assert(size_a == sizeof(uint32_t));
+		assert(size_b == sizeof(uint32_t));
+		uint32_t a = *(uint32_t *) field_a;
+		uint32_t b = *(uint32_t *) field_b;
+		return a < b ? -1 : (a > b);
+	}
+	case NUM64:
+	{
+		assert(size_a == sizeof(uint64_t));
+		uint64_t a = *(uint64_t *) field_a;
+		uint64_t b;
+		/* Allow search in NUM64 indexes using NUM keys. */
+		if (size_b == sizeof(uint32_t)) {
+			b = *(uint32_t *) field_b;
+		} else {
+			assert(size_b == sizeof(uint64_t));
+			b = *(uint64_t *) field_b;
+		}
+		return a < b ? -1 : (a > b);
+	}
+	case STRING:
+	{
+		int cmp = memcmp(field_a, field_b, MIN(size_a, size_b));
+		if (cmp != 0)
+			return cmp;
+
+		if (size_a > size_b) {
+			return 1;
+		} else if (size_a < size_b){
+			return -1;
+		} else {
+			return 0;
+		}
+	}
+	default:
+		assert(false);
+	}
+}
+
+int
+tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+	      const struct key_def *key_def)
+{
+	for (uint32_t part = 0; part < key_def->part_count; part++) {
+		uint32_t field_no = key_def->parts[part].fieldno;
+		uint32_t size_a, size_b;
+		const char *field_a = tuple_field(tuple_a, field_no, &size_a);
+		const char *field_b = tuple_field(tuple_b, field_no, &size_b);
+
+		int r = tuple_compare_field(field_a, size_a, field_b, size_b,
+					    key_def->parts[part].type);
+		if (r != 0) {
+			return r;
+		}
+	}
+
+	return 0;
+}
+
+int
+tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
+		  const struct key_def *key_def)
+{
+	int r = tuple_compare(tuple_a, tuple_b, key_def);
+	if (r != 0) {
+		return r;
+	}
+
+	return tuple_a < tuple_b ? -1 : (tuple_a > tuple_b);
+}
+
+int
+tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
+		       uint32_t part_count, const struct key_def *key_def)
+{
+	part_count = MIN(part_count, key_def->part_count);
+	for (uint32_t part = 0; part < part_count; part++) {
+		uint32_t field_no = key_def->parts[part].fieldno;
+
+		uint32_t size_a;
+		const char *field_a = tuple_field(tuple_a, field_no, &size_a);
+
+		uint32_t key_size = load_varint32(&key);
+		int r = tuple_compare_field(field_a, size_a, key, key_size,
+					    key_def->parts[part].type);
+		if (r != 0) {
+			return r;
+		}
+
+		key += key_size;
+	}
+
+	return 0;
 }
