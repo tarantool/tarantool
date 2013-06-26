@@ -150,9 +150,6 @@ def setenv():
 #######################################################################
 # Program body
 #######################################################################
-def purge(vardir):
-    if os.path.exists(vardir):
-        shutil.rmtree(vardir)
 
 def main():
     setenv()
@@ -171,7 +168,6 @@ def main():
 
     try:
         print "Started", " ".join(sys.argv)
-        purge(options.args.vardir)
         suite_names = []
         if options.args.suites != []:
             suite_names = options.args.suites
