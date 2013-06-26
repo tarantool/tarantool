@@ -1,7 +1,7 @@
 # encoding: tarantool
+import os
 import sys
 import time
-import os
 import yaml
 
 from lib.memcached_connection import MemcachedConnection
@@ -101,14 +101,14 @@ exec replica_memcached "get 10\r\n"
 
 
 print """# check that expiration is working properly on replica"""
-exec master_memcached silent "set 1 0 3 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
+exec master_memcached silent "set 1 0 1 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
 wait()
 exec replica_memcached "get 1\r\n"
 wait(True)
 exec replica_memcached "get 1\r\n"
 
 print """# check that expiration is working properly, when replica becomes master"""
-exec master_memcached silent "set 1 0 3 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
+exec master_memcached silent "set 1 0 1 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
 replica.reconfigure("replication/cfg/replica_to_master.cfg")
 exec replica_memcached "get 1\r\n"
 wait(True)
