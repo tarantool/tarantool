@@ -142,7 +142,8 @@ lbox_tuple_slice(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
-	int start, end;
+	uint32_t start, end;
+	int offset;
 
 	/*
 	 * Prepare the range. The second argument is optional.
@@ -151,22 +152,30 @@ lbox_tuple_slice(struct lua_State *L)
 	 */
 	if (argc == 0 || argc > 2)
 		luaL_error(L, "tuple.slice(): bad arguments");
-	start = lua_tointeger(L, 2);
-	if (start < 0)
-		start += tuple->field_count;
+
+	offset = lua_tointeger(L, 2);
+	if (offset >= 0 && offset < tuple->field_count) {
+		start = offset;
+	} else if (offset < 0 && -offset <= tuple->field_count) {
+		start = offset + tuple->field_count;
+	} else {
+		luaL_error(L, "tuple.slice(): start >= field count");
+	}
+
 	if (argc == 2) {
-		end = lua_tointeger(L, 3);
-		if (end < 0)
-			end += tuple->field_count;
-		else if (end > tuple->field_count)
-			end = tuple->field_count;
+		offset = lua_tointeger(L, 3);
+		if (offset > 0 && offset <= tuple->field_count) {
+			end = offset;
+		} else if (offset < 0 && -offset < tuple->field_count) {
+			end = offset + tuple->field_count;
+		} else {
+			luaL_error(L, "tuple.slice(): end > field count");
+		}
 	} else {
 		end = tuple->field_count;
 	}
 	if (end <= start)
 		luaL_error(L, "tuple.slice(): start must be less than end");
-
-	u32 stop = end - 1;
 
 	struct tuple_iterator it;
 	tuple_rewind(&it, tuple);
@@ -174,10 +183,10 @@ lbox_tuple_slice(struct lua_State *L)
 	uint32_t len;
 	uint32_t field_no = 0;
 	while ((field = tuple_next(&it, &len))) {
+		if (field_no == end)
+			break;
 		if (field_no >= start) {
 			lua_pushlstring(L, field, len);
-			if (field_no == stop)
-				break;
 		}
 		++field_no;
 	}
