@@ -136,7 +136,8 @@ lbox_tuple_slice(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
 	int argc = lua_gettop(L) - 1;
-	int start, end;
+	uint32_t start, end;
+	int field_no;
 
 	/*
 	 * Prepare the range. The second argument is optional.
@@ -145,15 +146,25 @@ lbox_tuple_slice(struct lua_State *L)
 	 */
 	if (argc == 0 || argc > 2)
 		luaL_error(L, "tuple.slice(): bad arguments");
-	start = lua_tointeger(L, 2);
-	if (start < 0)
-		start += tuple->field_count;
+
+	field_no = lua_tointeger(L, 2);
+	if (field_no >= 0 && field_no < tuple->field_count) {
+		start = field_no;
+	} else if (field_no < 0 && -field_no <= tuple->field_count) {
+		start = field_no + tuple->field_count;
+	} else {
+		luaL_error(L, "tuple.slice(): start >= field count");
+	}
+
 	if (argc == 2) {
-		end = lua_tointeger(L, 3);
-		if (end < 0)
-			end += tuple->field_count;
-		else if (end > tuple->field_count)
-			end = tuple->field_count;
+		field_no = lua_tointeger(L, 3);
+		if (field_no > 0 && field_no <= tuple->field_count) {
+			end = field_no;
+		} else if (field_no < 0 && -field_no < tuple->field_count) {
+			end = field_no + tuple->field_count;
+		} else {
+			luaL_error(L, "tuple.slice(): end > field count");
+		}
 	} else {
 		end = tuple->field_count;
 	}
@@ -162,14 +173,13 @@ lbox_tuple_slice(struct lua_State *L)
 
 	const void *field = tuple->data;
 	u32 fieldno = 0;
-	u32 stop = end - 1;
 
 	while (field < (const void *) tuple->data + tuple->bsize) {
+		if (fieldno >= end)
+			break;
 		size_t len = load_varint32(&field);
 		if (fieldno >= start) {
 			lua_pushlstring(L, field, len);
-			if (fieldno == stop)
-				break;
 		}
 		field += len;
 		fieldno += 1;
