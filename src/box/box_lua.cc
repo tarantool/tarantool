@@ -183,6 +183,23 @@ lbox_tuple_slice(struct lua_State *L)
 	return end - start;
 }
 
+static enum field_data_type
+lua_type_to_field_type(lua_State *L, int i)
+{
+	switch (lua_type(L, i)) {
+	case LUA_TNUMBER:
+		return NUM;
+	case LUA_TCDATA:
+		return NUM64;
+	case LUA_TSTRING:
+		return STRING;
+	default:
+		luaL_error(L, "tuple.transform(): unsupported field type '%s'",
+			   lua_typename(L, lua_type(L, i)));
+		return STRING;                  /* Unreached. */
+	}
+}
+
 /**
  * Pack our BER integer into luaL_Buffer
  */
@@ -220,18 +237,28 @@ append_key_part(struct lua_State *L, int i, luaL_Buffer *b,
 	u32 v_u32;
 	u64 v_u64;
 
-	if (lua_type(L, i) == LUA_TNUMBER) {
-		if (type == NUM64) {
+	/* Compatibility with iproto call of a stored procedure. */
+	if (lua_type(L, i) == LUA_TSTRING)
+		goto string;
+
+	switch (type) {
+	case NUM:
+		v_u32 = (u32) lua_tointeger(L, i);
+		str = (char *) &v_u32;
+		size = sizeof(u32);
+		break;
+	case NUM64:
+		str = (char *) &v_u64;
+		size = sizeof(u64);
+		if (lua_type(L, i) == LUA_TCDATA)
+			v_u64 = tarantool_lua_tointeger64(L, i);
+		else
 			v_u64 = (u64) lua_tonumber(L, i);
-			str = (char *) &v_u64;
-			size = sizeof(u64);
-		} else {
-			v_u32 = (u32) lua_tointeger(L, i);
-			str = (char *) &v_u32;
-			size = sizeof(u32);
-		}
-	} else {
+		break;
+	default:
+string:
 		str = luaL_checklstring(L, i, &size);
+		break;
 	}
 	luaL_addvarint32(b, size);
 	luaL_addlstring(b, str, size);
@@ -255,7 +282,7 @@ lbox_tuple_transform(struct lua_State *L)
 	if (argc < 3)
 		luaL_error(L, "tuple.transform(): bad arguments");
 	lua_Integer offset = lua_tointeger(L, 2);  /* Can be negative and can be > INT_MAX */
-	lua_Integer len = lua_tointeger(L, 3);
+	lua_Integer field_count = lua_tointeger(L, 3);
 
 	/* validate offset and len */
 	if (offset < 0) {
@@ -265,53 +292,22 @@ lbox_tuple_transform(struct lua_State *L)
 	} else if (offset > tuple->field_count) {
 		offset = tuple->field_count;
 	}
-	if (len < 0)
+	if (field_count < 0)
 		luaL_error(L, "tuple.transform(): len is negative");
-	if (len > tuple->field_count - offset)
-		len = tuple->field_count - offset;
+	if (field_count > tuple->field_count - offset)
+		field_count = tuple->field_count - offset;
 
-	assert(offset + len <= tuple->field_count);
+	assert(offset + field_count <= tuple->field_count);
 
 	/*
 	 * Calculate the number of operations and length of UPDATE expression
 	 */
-	uint32_t op_cnt = 0;
-	size_t expr_len = 0;
-	expr_len += sizeof(uint32_t); /* op_count */
-	if (offset < tuple->field_count) {
-		/* Add an UPDATE operation for each removed field. */
-		op_cnt += len;
-		expr_len += len * sizeof(uint32_t);	/* Field */
-		expr_len += len * sizeof(uint8_t);	/* UPDATE_OP_DELETE */
-		expr_len += len * varint32_sizeof(0);	/* Unused */
-	}
+	uint32_t op_cnt = offset < tuple->field_count ? field_count : 0;
+	if (argc > 3)
+		op_cnt += argc - 3;
 
-	for (int i = 4; i <= argc; i++) {
-		uint32_t field_len = 0;
-		switch (lua_type(L, i)) {
-		case LUA_TNUMBER:
-			field_len = sizeof(uint32_t);
-			break;
-		case LUA_TCDATA:
-			field_len = sizeof(uint64_t);
-			break;
-		case LUA_TSTRING:
-			field_len = lua_objlen(L, i);
-			break;
-		default:
-			luaL_error(L, "tuple.transform(): unsupported field type '%s'",
-				   lua_typename(L, lua_type(L, i)));
-			break;
-		}
-
-		/* Insert one field */
-		op_cnt++;
-		expr_len += sizeof(uint32_t);		/* Field Number */
-		expr_len += sizeof(uint8_t);		/* UPDATE_OP_SET */
-		expr_len += varint32_sizeof(field_len) + field_len; /* Field */
-	}
 	if (op_cnt == 0) {
-		/* tuple_upate() does not accept an empty operation list. */
+		/* tuple_update() does not accept an empty operation list. */
 		lbox_pushtuple(L, tuple);
 		return 1;
 	}
@@ -319,47 +315,24 @@ lbox_tuple_transform(struct lua_State *L)
 	/*
 	 * Prepare UPDATE expression
 	 */
-	char *expr = (char *) palloc(fiber->gc_pool, expr_len);
-	char *pos = expr;
-	pos = pack_u32(pos, op_cnt);
-	for (uint32_t i = 0; i < (uint32_t) len; i++) {
-		pos = pack_u32(pos, offset);
-		pos = pack_u8(pos, UPDATE_OP_DELETE);
-		pos = pack_varint32(pos, 0);
+	luaL_Buffer b;
+	luaL_buffinit(L, &b);
+	luaL_addlstring(&b, (char *) &op_cnt, sizeof(op_cnt));
+	uint32_t offset_u32 = (uint32_t) offset;
+	for (uint32_t i = 0; i < (uint32_t) field_count; i++) {
+		luaL_addlstring(&b, (char *) &offset_u32, sizeof(offset_u32));
+		luaL_addchar(&b, UPDATE_OP_DELETE);
+		luaL_addvarint32(&b, 0); /* Unused. */
 	}
 
-	for (int i = argc ; i >= 4; i--) {
-		uint32_t field_u32;
-		uint64_t field_u64;
-		const char *field = NULL;
-		size_t field_len = 0;
-		switch (lua_type(L, i)) {
-		case LUA_TNUMBER:
-			field_u32 = lua_tonumber(L, i);
-			field = (const char *) &field_u32;
-			field_len = sizeof(uint32_t);
-			break;
-		case LUA_TCDATA:
-			field_u64 = tarantool_lua_tointeger64(L, i);
-			field = (const char *) &field_u64;
-			field_len = sizeof(uint64_t);
-			break;
-		case LUA_TSTRING:
-			field = luaL_checklstring(L, i, &field_len);
-			break;
-		default:
-			assert(false);
-			break;
-		}
-
-		assert(field_len <= UINT32_MAX);
-		/* Insert the field */
-		pos = pack_u32(pos, offset);		/* Field Number */
-		pos = pack_u8(pos, UPDATE_OP_INSERT);	/* Operation */
-		pos = pack_lstr(pos, field, field_len);	/* Field Value */
+	for (int i = argc ; i > 3; i--) {
+		luaL_addlstring(&b, (char *) &offset_u32, sizeof(offset_u32));
+		luaL_addchar(&b, UPDATE_OP_INSERT);
+		append_key_part(L, i, &b, lua_type_to_field_type(L, i));
 	}
-
-	assert(pos == expr + expr_len);
+	luaL_pushresult(&b);
+	size_t expr_len;
+	const char *expr = lua_tolstring(L, -1, &expr_len);
 
 	/* Execute tuple_update */
 	struct tuple *new_tuple = tuple_update(tuple, expr, expr + expr_len);
@@ -638,20 +611,20 @@ lbox_pushiterator(struct lua_State *L, Index *index,
 		  struct iterator *it, enum iterator_type type,
 		  const char *key, size_t size, int part_count)
 {
-	struct lbox_iterator_holder {
+	struct lbox_iterator_udata {
 		struct iterator *it;
 		char key[];
 	};
 
-	struct lbox_iterator_holder *holder = (struct lbox_iterator_holder *)
-			lua_newuserdata(L, sizeof(*holder) + size);
+	struct lbox_iterator_udata *udata = (struct lbox_iterator_udata *)
+		lua_newuserdata(L, sizeof(*udata) + size);
 	luaL_getmetatable(L, iteratorlib_name);
 	lua_setmetatable(L, -2);
 
-	holder->it = it;
+	udata->it = it;
 	if (key) {
-		memcpy(holder->key, key, size);
-		key = holder->key;
+		memcpy(udata->key, key, size);
+		key = udata->key;
 	}
 	key_validate(index->key_def, type, key, part_count);
 	index->initIterator(it, type, key, part_count);

@@ -106,7 +106,7 @@ struct tuple_update
 	void *alloc_ctx;
 	struct rope *rope;
 	struct update_op *ops;
-	uint32_t ops_count;
+	uint32_t op_count;
 	uint32_t new_tuple_size;
 	uint32_t new_tuple_fcount;
 };
@@ -502,7 +502,7 @@ update_create_rope(struct tuple_update *update,
 			  end - field - field_len);
 
 	rope_append(update->rope, first, field_count);
-	for (uint32_t i = 0; i < update->ops_count; i++) {
+	for (uint32_t i = 0; i < update->op_count; i++) {
 		update->ops[i].meta->init_op(update, &update->ops[i]);
 	}
 }
@@ -608,18 +608,18 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		const char *expr_end)
 {
 	/* number of operations */
-	update->ops_count = pick_u32(&expr, expr_end);
+	update->op_count = pick_u32(&expr, expr_end);
 
-	if (update->ops_count > BOX_UPDATE_OP_CNT_MAX)
+	if (update->op_count > BOX_UPDATE_OP_CNT_MAX)
 		tnt_raise(IllegalParams, "too many operations for update");
-	if (update->ops_count == 0)
+	if (update->op_count == 0)
 		tnt_raise(IllegalParams, "no operations for update");
 
 	/* Read update operations.  */
 	update->ops = (struct update_op *) update->alloc(update->alloc_ctx,
-				update->ops_count * sizeof(struct update_op));
+				update->op_count * sizeof(struct update_op));
 	struct update_op *op = update->ops;
-	struct update_op *ops_end = op + update->ops_count;
+	struct update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
 		/* Read operation */
 		op->field_no = pick_u32(&expr, expr_end);
