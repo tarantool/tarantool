@@ -181,15 +181,16 @@ lbox_tuple_slice(struct lua_State *L)
 	tuple_rewind(&it, tuple);
 	const char *field;
 	uint32_t len;
-	uint32_t field_no = 0;
-	while ((field = tuple_next(&it, &len))) {
-		if (field_no == end)
-			break;
-		if (field_no >= start) {
-			lua_pushlstring(L, field, len);
-		}
+
+	assert(start < tuple->field_count);
+	uint32_t field_no = start;
+	field = tuple_seek(&it, start, &len);
+	while (field && field_no < end) {
+		lua_pushlstring(L, field, len);
 		++field_no;
+		field = tuple_next(&it, &len);
 	}
+	assert(field_no == end);
 	return end - start;
 }
 
