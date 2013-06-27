@@ -8,7 +8,8 @@ box.flags = { BOX_RETURN_TUPLE = 0x01, BOX_ADD = 0x02, BOX_REPLACE = 0x04 }
 --
 --
 function box.select_limit(space, index, offset, limit, ...)
-    return box.net.self:select_limit(space, index, offset, limit, ...)
+    return box.net.self:select_limit(tonumber(space), tonumber(index), 
+        tonumber(offset), tonumber(limit), ...)
 end
 
 
@@ -16,7 +17,7 @@ end
 --
 --
 function box.select(space, index, ...)
-    return box.net.self:select(space, index, ...)
+    return box.net.self:select(tonumber(space), tonumber(index), ...)
 end
 
 --
@@ -25,7 +26,8 @@ end
 -- starts from the key.
 --
 function box.select_range(sno, ino, limit, ...)
-    return box.net.self:select_range(sno, ino, limit, ...)
+    return box.net.self:select_range(tonumber(sno), tonumber(ino),
+        tonumber(limit), ...)
 end
 
 --
@@ -34,7 +36,8 @@ end
 -- starts from the key.
 --
 function box.select_reverse_range(sno, ino, limit, ...)
-    return box.net.self:select_reverse_range(sno, ino, limit, ...)
+    return box.net.self:select_reverse_range(tonumber(sno), tonumber(ino),
+        tonumber(limit), ...)
 end
 
 --
@@ -42,22 +45,22 @@ end
 -- index is always 0. It doesn't accept compound keys
 --
 function box.delete(space, ...)
-    return box.net.self:delete(space, ...)
+    return box.net.self:delete(tonumber(space), ...)
 end
 
 -- insert or replace a tuple
 function box.replace(space, ...)
-    return box.net.self:replace(space, ...)
+    return box.net.self:replace(tonumber(space), ...)
 end
 
 -- insert a tuple (produces an error if the tuple already exists)
 function box.insert(space, ...)
-    return box.net.self:insert(space, ...)
+    return box.net.self:insert(tonumber(space), ...)
 end
 
 --
 function box.update(space, key, format, ...)
-    return box.net.self:update(space, key, format, ...)
+    return box.net.self:update(tonumber(space), key, format, ...)
 end
 
 

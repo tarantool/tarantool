@@ -674,7 +674,7 @@ static void tt_tnt_net_delete(struct tt_test *test) {
 static void tt_tnt_net_call(struct tt_test *test) {
 	struct tnt_tuple args;
 	tnt_tuple_init(&args);
-	tnt_tuple(&args, "%d%d%s%s", 0, 333, "B", "C");
+	tnt_tuple(&args, "%s%d%s%s", "0", 333, "B", "C");
 	TT_ASSERT(tnt_call(&net, 0, "box.insert", &args) > 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	tnt_tuple_free(&args);
@@ -701,7 +701,7 @@ static void tt_tnt_net_call_na(struct tt_test *test) {
 	while (tnt_next(&i)) {
 		struct tnt_reply *r = TNT_IREPLY_PTR(&i);
 		TT_ASSERT(r->code != 0);
-		TT_ASSERT(strcmp(r->error, "Illegal parameters, tuple must have all indexed fields") == 0);
+		TT_ASSERT(strstr(r->error, "box.pack") != NULL);
 	}
 	tnt_iter_free(&i);
 }
@@ -810,7 +810,7 @@ static void tt_tnt_lex_ws(struct tt_test *test) {
 /* lex integer */
 static void tt_tnt_lex_int(struct tt_test *test) {
 	unsigned char sz[] = "\f\r\n 123 34\n\t\r56 888L56 2147483646 2147483647 "
-		             "-2147483648 -2147483649 72057594037927935";
+			     "-2147483648 -2147483649 72057594037927935";
 	struct tnt_lex l;
 	tnt_lex_init(&l, tnt_sql_keywords, sz, sizeof(sz) - 1);
 	struct tnt_tk *tk;
@@ -1119,7 +1119,7 @@ static void tt_tnt_sql_delete(struct tt_test *test) {
 /* sql call */
 static void tt_tnt_sql_call(struct tt_test *test) {
 	char *e = NULL;
-	char q[] = "call box.insert(0, 454, 'abc', 'cba')";
+	char q[] = "call box.insert('0', 454, 'abc', 'cba')";
 	TT_ASSERT(tnt_query(&net, q, sizeof(q) - 1, &e) == 0);
 	TT_ASSERT(tnt_flush(&net) > 0);
 	struct tnt_iter i;
