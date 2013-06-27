@@ -170,6 +170,32 @@ _mh(next_slot)(mh_int_t slot, mh_int_t inc, mh_int_t size)
 	return slot >= size ? slot - size : slot;
 }
 
+#if defined(mh_hash_key) && defined(mh_eq_key)
+/**
+ * If it is necessary to search by something different
+ * than a hash node, define mh_hash_key and mh_eq_key
+ * and use mh_find().
+ */
+static inline mh_int_t
+_mh(find)(struct _mh(t) *h, mh_key_t key, mh_arg_t arg)
+{
+	(void) arg;
+
+	mh_int_t k = mh_hash_key(key, arg);
+	mh_int_t i = k % h->n_buckets;
+	mh_int_t inc = 1 + k % (h->n_buckets - 1);
+	for (;;) {
+		if ((mh_exist(h, i) && mh_eq_key(key, mh_node(h, i), arg)))
+			return i;
+
+		if (!mh_dirty(h, i))
+			return h->n_buckets;
+
+		i = _mh(next_slot)(i, inc, h->n_buckets);
+	}
+}
+#endif
+
 static inline mh_int_t
 _mh(get)(struct _mh(t) *h, const mh_node_t *node,
 	 mh_arg_t arg)
@@ -504,9 +530,12 @@ _mh(dump)(struct _mh(t) *h)
 #undef mh_int_t
 #undef mh_node_t
 #undef mh_arg_t
+#undef mh_key_t
 #undef mh_name
 #undef mh_hash
+#undef mh_hash_key
 #undef mh_eq
+#undef mh_eq_key
 #undef mh_node
 #undef mh_dirty
 #undef mh_place
