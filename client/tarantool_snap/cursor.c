@@ -23,6 +23,7 @@
 #include "space.h"
 #include "sha1.h"
 #include "ref.h"
+#include "region.h"
 #include "ts.h"
 #include "cursor.h"
 

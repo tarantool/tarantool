@@ -49,6 +49,12 @@ extern "C" {
 int sayfd = STDERR_FILENO;
 pid_t logger_pid;
 
+static void
+sayf(int level, const char *filename, int line, const char *error,
+     const char *format, ...);
+
+sayfunc_t _say = sayf;
+
 static char
 level_to_char(int level)
 {
@@ -179,8 +185,8 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 	}
 }
 
-void
-_say(int level, const char *filename, int line, const char *error, const char *format, ...)
+static void
+sayf(int level, const char *filename, int line, const char *error, const char *format, ...)
 {
 	int errsv = errno; /* Preserve the errno. */
 	if (cfg.log_level < level)

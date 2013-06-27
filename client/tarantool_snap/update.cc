@@ -51,21 +51,21 @@ extern "C" {
 #include "space.h"
 #include "sha1.h"
 #include "ref.h"
+#include "region.h"
 #include "ts.h"
 #include "indexate.h"
+
+extern struct ts tss;
 
 struct tnt_tuple*
 ts_update(struct tnt_request *r, struct tnt_tuple *old)
 {
-	(void)r;
-	(void)old;
-
 	uint32_t new_size = 0;
 	uint32_t new_count = 0;
 
 	char *data = old->data + sizeof(uint32_t);
 	struct tuple_update *u =
-		tuple_update_prepare(NULL, NULL,
+		tuple_update_prepare((region_alloc_func)ts_region_alloc, &tss.rup,
 		                     (const char*)(r->r.update.ops),
 		                     (const char*)(r->r.update.ops + r->r.update.ops_size),
 		                     (const char*)(data),
@@ -73,40 +73,34 @@ ts_update(struct tnt_request *r, struct tnt_tuple *old)
 		                     old->cardinality,
 		                     &new_size,
 		                     &new_count);
-	(void)u;
+	if (u == NULL)
+		return NULL;
 
-#if 0
-	const void *p = r->r.update.ops;
-	const void **reqpos = &p;
-	const void *reqend = r->r.update.ops + r->r.update.ops_size;
+	new_size += sizeof(uint32_t);
 
-	u32 op_cnt = r->r.update.opc;
-
-	struct update_op *ops = update_read_ops(reqpos, reqend, op_cnt);
-	struct rope *rope =
-		update_create_rope_from(ops, ops + op_cnt,
-		                        (u8*)old->data + sizeof(uint32_t),
-		                        old->cardinality,
-		                        old->size - sizeof(uint32_t));
-
-	size_t new_tuple_len = update_calc_new_tuple_length(rope);
-	struct tuple *new_tuple = tuple_alloc(new_tuple_len);
-
-	struct tnt_tuple *n = NULL;
-
-	@try {
-		update_do_ops(rope, new_tuple);
-
-		n = tnt_tuple_set(NULL, &new_tuple->field_count,
-                          new_tuple->bsize + sizeof(uint32_t));
-	} @catch (tnt_Exception *e) {
-		printf("update error\n");
-	} @finally {
-		tuple_free(new_tuple);
+	void *buf = tnt_mem_alloc(new_size);
+	if (buf == NULL) {
+		ts_region_reset(&tss.rup);
+		return NULL;
 	}
+
+	try {
+		tuple_update_execute(u, (char*)buf + sizeof(uint32_t));
+	} catch (const Exception&) {
+		free(buf);
+		ts_region_reset(&tss.rup);
+		return NULL;
+	}
+
+	ts_region_reset(&tss.rup);
+	struct tnt_tuple *n = tnt_tuple_set_as(NULL, buf, new_size, new_count);
+	if (n == NULL) {
+		free(buf);
+		return NULL;
+	}
+
+	free(buf);
 	return n;
-#endif
-	return NULL;
 }
 
 } // extern "C"

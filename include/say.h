@@ -51,12 +51,15 @@ extern int sayfd;
 extern pid_t logger_pid;
 
 void say_logger_init(int nonblock);
+
 void vsay(int level, const char *filename, int line, const char *error,
-	  const char *format, va_list ap)
-    __attribute__ ((format(FORMAT_PRINTF, 5, 0)));
-void _say(int level, const char *filename, int line, const char *error,
-	  const char *format, ...)
-    __attribute__ ((format(FORMAT_PRINTF, 5, 6)));
+          const char *format, va_list ap)
+          __attribute__ ((format(FORMAT_PRINTF, 5, 0)));
+
+typedef void (*sayfunc_t)(int level, const char *filename, int line, const char *error,
+                          const char *format, ...);
+
+extern sayfunc_t _say __attribute__ ((format(FORMAT_PRINTF, 5, 6)));
 
 #define say(level, ...) ({ _say(level, __FILE__, __LINE__, __VA_ARGS__); })
 

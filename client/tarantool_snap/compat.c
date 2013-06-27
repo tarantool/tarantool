@@ -36,29 +36,36 @@
 
 #include <cfg/prscfg.h>
 #include <cfg/tarantool_box_cfg.h>
+#include <say.h>
 
 #include "options.h"
 #include "config.h"
 
-int ts_config_load(struct ts_options *opts)
-{
-	FILE *f = fopen(opts->file_config, "r");
-	if (f == NULL) {
-		printf("failed to open config file: %s\n", opts->file_config);
-		return -1;
-	}
-	int accepted = 0,
-	    skipped = 0,
-	    optional = 0;
-	int rc = parse_cfg_file_tarantool_cfg(&opts->cfg, f, 0,
-	                                      &accepted,
-	                                      &skipped,
-	                                      &optional);
-	fclose(f);
-	if (rc == -1)
-		return -1;
-	rc = check_cfg_tarantool_cfg(&opts->cfg);
-	if (rc == -1)
-		return -1;
-	return 0;
+void out_warning(ConfettyError v, char *format, ...) {
+	(void)v;
+	va_list ap;
+	va_start(ap, format);
+	vprintf(format, ap);
+	printf("\n");
+	va_end(ap);
+}
+
+void say_snap(int level, const char *filename, int line, const char *error,
+              const char *format, ...) {
+	(void)level;
+	(void)filename;
+	(void)line;
+	(void)error;
+	(void)format;
+}
+
+sayfunc_t _say = say_snap;
+
+void assert_fail(const char *assertion, const char *file, unsigned int line,
+                 const char *function) {
+	(void)assertion;
+	(void)file;
+	(void)line;
+	(void)function;
+	exit(1);
 }

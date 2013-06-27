@@ -46,6 +46,7 @@
 #include "config.h"
 #include "space.h"
 #include "ref.h"
+#include "region.h"
 #include "ts.h"
 #include "indexate.h"
 #include "snapshot.h"
@@ -62,6 +63,7 @@ ts_init(void)
 	memset(&tss.s, 0, sizeof(tss.s));
 	tss.last_snap_lsn = 0;
 	tss.last_xlog_lsn = 0;
+	ts_region_init(&tss.rup);
 	return 0;
 }
 
@@ -71,6 +73,7 @@ ts_free(void)
 	ts_options_free(&tss.opts);
 	ts_space_free(&tss.s);
 	ts_reftable_free(&tss.rt);
+	ts_region_free(&tss.rup);
 }
 
 int main(int argc, char *argv[])
@@ -108,8 +111,6 @@ int main(int argc, char *argv[])
 	printf("snap_dir: %s\n", tss.opts.cfg.snap_dir);
 	printf("wal_dir:  %s\n", tss.opts.cfg.wal_dir);
 	printf("spaces:   %d\n", mh_size(tss.s.t));
-
-	/*tarantool_init(0.6);*/
 
 	/* indexate snapshot and xlog data */
 	rc = ts_indexate();
