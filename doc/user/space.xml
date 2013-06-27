@@ -94,8 +94,7 @@ please be aware of these restrictions:
     dynamically, currently you need to restart the server even to
     disable or enable a space,
   </simpara></listitem>
-  <listitem><simpara>HASH indexes may cover only one field and can
-    not be non-unique.
+  <listitem><simpara>HASH indexes can not be non-unique.
   </simpara></listitem>
 </itemizedlist>
 </para>
