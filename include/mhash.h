@@ -171,8 +171,13 @@ _mh(next_slot)(mh_int_t slot, mh_int_t inc, mh_int_t size)
 }
 
 #if defined(mh_hash_key) && defined(mh_eq_key)
+/**
+ * If it is necessary to search by something different
+ * than a hash node, define mh_hash_key and mh_eq_key
+ * and use mh_find().
+ */
 static inline mh_int_t
-_mh(find)(struct _mh(t) *h, const mh_key_t *key, mh_arg_t arg)
+_mh(find)(struct _mh(t) *h, mh_key_t key, mh_arg_t arg)
 {
 	(void) arg;
 
@@ -525,11 +530,12 @@ _mh(dump)(struct _mh(t) *h)
 #undef mh_int_t
 #undef mh_node_t
 #undef mh_arg_t
+#undef mh_key_t
 #undef mh_name
 #undef mh_hash
 #undef mh_hash_key
 #undef mh_eq
-#undef mh_eqKey
+#undef mh_eq_key
 #undef mh_node
 #undef mh_dirty
 #undef mh_place

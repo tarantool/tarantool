@@ -40,78 +40,40 @@ enum {
 	HASH_SEED = 13U
 };
 
-struct mh_index_node {
-	struct tuple *tuple;
-};
-
-struct mh_index_key_node
-{
-	const char *key;
-};
-
 static inline bool
-mh_index_eq(const struct mh_index_node *node_a,
-	    const struct mh_index_node *node_b, const struct key_def *key_def)
+mh_index_eq(struct tuple *const *tuple_a, struct tuple *const *tuple_b,
+	    const struct key_def *key_def)
 {
-	return (tuple_compare(node_a->tuple, node_b->tuple, key_def) == 0);
+	return tuple_compare(*tuple_a, *tuple_b, key_def) == 0;
 }
 
 static inline bool
-mh_index_eq_key(const struct mh_index_key_node *node_key,
-		const struct mh_index_node *node,
+mh_index_eq_key(const char *key, struct tuple *const *tuple,
 		const struct key_def *key_def)
 {
-	return (tuple_compare_with_key(node->tuple, node_key->key,
-				       key_def->part_count, key_def) == 0);
+	return tuple_compare_with_key(*tuple, key, key_def->part_count,
+				      key_def) == 0;
 }
 
-static inline uint32_t
-mh_index_hash_part(const char *field, uint32_t size, enum field_data_type type)
-{
-	switch (type) {
-	case NUM:
-		assert(size == sizeof(uint32_t));
-		return *(uint32_t *) field;
-	case NUM64:
-	{
-		/* Allow search in NUM64 indexes using NUM keys. */
-		uint64_t u64val;
-		if (size == sizeof(uint32_t)) {
-			u64val = *(uint32_t *) field;
-		} else {
-			assert(size == sizeof(uint64_t));
-			u64val = *(uint64_t *) field;
-		}
-		return ((uint32_t)((u64val)>>33^(u64val)^(u64val)<<11));
-	}
-	case STRING:
-		assert(size < INT32_MAX);
-		return PMurHash32(HASH_SEED, field, size);
-	default:
-		assert(false);
-	}
-}
 
 static inline uint32_t
-mh_index_hash(const struct mh_index_node *node, const struct key_def *key_def)
+mh_index_hash(struct tuple *const *tuple, const struct key_def *key_def)
 {
-	const char *field;
+	struct key_part *part = key_def->parts;
 	uint32_t size;
+	/*
+	 * Speed up the simplest case when we have a
+	 * single-part hash over an integer field.
+	 */
+	if (key_def->part_count == 1 && part->type == NUM)
+		return *(uint32_t *) tuple_field(*tuple, part->fieldno, &size);
 
-	if (key_def->part_count == 1) {
-		/* single-part */
-		uint32_t field_no = key_def->parts[0].fieldno;
-		field = tuple_field(node->tuple, field_no, &size);
-		return mh_index_hash_part(field, size, key_def->parts[0].type);
-	}
-
-	/* multi-part */
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
-	for (uint32_t part = 0; part < key_def->part_count; part++) {
-		uint32_t field_no = key_def->parts[part].fieldno;
-		field = tuple_field(node->tuple, field_no, &size);
+
+	for ( ; part < key_def->parts + key_def->part_count; part++) {
+		const char *field = tuple_field(*tuple, part->fieldno, &size);
 		assert(size < INT32_MAX);
 		PMurHash32_Process(&h, &carry, field, size);
 		total_size += size;
@@ -121,36 +83,31 @@ mh_index_hash(const struct mh_index_node *node, const struct key_def *key_def)
 }
 
 static inline uint32_t
-mh_index_hash_key(const struct mh_index_key_node *key_node,
-		  const struct key_def *key_def)
+mh_index_hash_key(const char *key, const struct key_def *key_def)
 {
-	const char *field = key_node->key;
-	uint32_t size;
+	struct key_part *part = key_def->parts;
 
-	if (key_def->part_count == 1) {
-		/* single part */
-		size = load_varint32(&field);
-		return mh_index_hash_part(field, size, key_def->parts[0].type);
+	if (key_def->part_count == 1 && part->type == NUM) {
+		(void) load_varint32(&key);
+		return *(uint32_t *) key;
 	}
-
-	/* multi-part */
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
-	for (uint32_t part = 0; part < key_def->part_count; part++) {
-		size = load_varint32(&field);
-		if (key_def->parts[part].type == NUM64 &&
-		    size == sizeof(uint32_t)) {
+
+	for ( ; part < key_def->parts + key_def->part_count; part++) {
+		uint32_t size = load_varint32(&key);
+		if (part->type == NUM64 && size == sizeof(uint32_t)) {
 			/* Allow search in NUM64 indexes using NUM keys. */
-			uint64_t u64 = *(uint32_t *) field;
+			uint64_t u64 = *(uint32_t *) key;
 			PMurHash32_Process(&h, &carry, &u64, sizeof(uint64_t));
 			total_size += sizeof(uint64_t);
 		} else {
 			assert(size < INT32_MAX);
-			PMurHash32_Process(&h, &carry, field, size);
+			PMurHash32_Process(&h, &carry, key, size);
 			total_size += size;
 		}
-		field += size;
+		key += size;
 	}
 
 	return PMurHash32_Result(h, carry, total_size);
@@ -164,8 +121,8 @@ mh_index_hash_key(const struct mh_index_key_node *key_node,
 #define mh_eq(a, b, arg) mh_index_eq(a, b, arg)
 #define mh_eq_key(a, b, arg) mh_index_eq_key(a, b, arg)
 
-#define mh_key_t struct mh_index_key_node
-#define mh_node_t struct mh_index_node
+#define mh_key_t const char *
+typedef struct tuple * mh_node_t;
 #define mh_name _index
 #define MH_SOURCE 1
 #include <mhash.h>
@@ -193,7 +150,7 @@ hash_iterator_ge(struct iterator *ptr)
 
 	while (it->h_pos < mh_end(it->hash)) {
 		if (mh_exist(it->hash, it->h_pos))
-			return mh_index_node(it->hash, it->h_pos++)->tuple;
+			return *mh_index_node(it->hash, it->h_pos++);
 		it->h_pos++;
 	}
 	return NULL;
@@ -300,7 +257,7 @@ HashIndex::random(u32 rnd) const
 {
 	uint32_t k = mh_index_random(hash, rnd);
 	if (k != mh_end(hash))
-		return mh_index_node(hash, k)->tuple;
+		return *mh_index_node(hash, k);
 	return NULL;
 }
 
@@ -310,11 +267,9 @@ HashIndex::findByKey(const char *key, u32 part_count) const
 	assert(key_def->is_unique && part_count == key_def->part_count);
 
 	struct tuple *ret = NULL;
-	struct mh_index_key_node key_node;
-	key_node.key = key;
-	uint32_t k = mh_index_find(hash, &key_node, key_def);
+	uint32_t k = mh_index_find(hash, key, key_def);
 	if (k != mh_end(hash))
-		ret = mh_index_node(hash, k)->tuple;
+		ret = *mh_index_node(hash, k);
 	return ret;
 }
 
@@ -322,13 +277,13 @@ struct tuple *
 HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		   enum dup_replace_mode mode)
 {
-	struct mh_index_node new_node, old_node;
 	uint32_t errcode;
 
 	if (new_tuple) {
-		struct mh_index_node *dup_node = &old_node;
-		new_node.tuple = new_tuple;
-		uint32_t pos = mh_index_put(hash, &new_node, &dup_node,key_def);
+		struct tuple *dup_tuple = NULL;
+		struct tuple **dup_node = &dup_tuple;
+		uint32_t pos = mh_index_put(hash, &new_tuple,
+					    &dup_node, key_def);
 
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
@@ -340,13 +295,12 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			tnt_raise(LoggedError, ER_MEMORY_ISSUE, (ssize_t) pos,
 				  "hash", "key");
 		}
-		struct tuple *dup_tuple = (dup_node ? dup_node->tuple : NULL);
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
 		if (errcode) {
-			mh_index_remove(hash, &new_node, key_def);
+			mh_index_remove(hash, &new_tuple, key_def);
 			if (dup_tuple) {
-				pos = mh_index_put(hash, dup_node, NULL,
+				pos = mh_index_put(hash, &dup_tuple, NULL,
 						   key_def);
 				if (pos == mh_end(hash)) {
 					panic("Failed to allocate memory in "
@@ -355,12 +309,13 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			}
 			tnt_raise(ClientError, errcode, index_n(this));
 		}
+
 		if (dup_tuple)
 			return dup_tuple;
 	}
+
 	if (old_tuple) {
-		old_node.tuple = old_tuple;
-		mh_index_remove(hash, &old_node, key_def);
+		mh_index_remove(hash, &old_tuple, key_def);
 	}
 	return old_tuple;
 }
@@ -391,12 +346,10 @@ HashIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 
-	struct mh_index_key_node key_node;
 	switch (type) {
 	case ITER_GE:
 		if (key != NULL) {
-			key_node.key = key;
-			it->h_pos = mh_index_find(hash, &key_node, key_def);
+			it->h_pos = mh_index_find(hash, key, key_def);
 			it->base.next = hash_iterator_ge;
 			break;
 		}
@@ -406,8 +359,7 @@ HashIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 		it->base.next = hash_iterator_ge;
 		break;
 	case ITER_EQ:
-		key_node.key = key;
-		it->h_pos = mh_index_find(hash, &key_node, key_def);
+		it->h_pos = mh_index_find(hash, key, key_def);
 		it->base.next = hash_iterator_eq;
 		break;
 	default:
