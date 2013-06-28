@@ -115,9 +115,11 @@ int tc_admin_reply(struct tc_admin *a, char **r, size_t *size)
 		ssize_t rxi = recv(a->fd, rx, sizeof(rx), 0);
 		if (rxi <= 0)
 			break;
-		char *bufn = realloc(buf, off + rxi + 1);
-		if (bufn == NULL)
+		char *bufn = (char *)realloc(buf, off + rxi + 1);
+		if (bufn == NULL) {
+			free(buf);
 			break;
+		}
 		buf = bufn;
 		memcpy(buf + off, rx, rxi);
 		off += rxi;

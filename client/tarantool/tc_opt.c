@@ -35,6 +35,7 @@
 
 #include "client/tarantool/tc_opt.h"
 
+
 #define TC_DEFAULT_HOST "localhost"
 #define TC_DEFAULT_PORT 33013
 #define TC_DEFAULT_PORT_ADMIN 33015
@@ -63,6 +64,14 @@ static const void *tc_options_def = gopt_start(
 		    gopt_longs("header"), NULL, "add file headers for the raw output"),
 	gopt_option('R', GOPT_ARG, gopt_shorts('R'),
 		    gopt_longs("rpl"), " <lsn>", "act as replica for the specified server"),
+	gopt_option('B', 0, gopt_shorts('B'),
+		    gopt_longs("bin"), NULL, "print STR in lua printer instead"
+		    " of NUM32 and NUM64, except arithmetic update arguments"),
+	gopt_option('D', GOPT_ARG, gopt_shorts('D'),
+		    gopt_longs("delim"), " <delim>",
+		    "if you use --cat, then it will add delim to an end of every line of your"
+		    "lua file, when used at CLI start of client, then it's replacement of "
+		    "setopt delim='<delim>' command"),
 	gopt_option('?', 0, gopt_shorts(0), gopt_longs("help"),
 		    NULL, "display this help and exit"),
 	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
@@ -147,6 +156,17 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	opt->raw_with_headers = 0;
 	if (gopt(tc_options, 'H'))
 		opt->raw_with_headers = 1;
+
+	/* string instead of num and num64 */
+	opt->str_instead_int = 0;
+	if (gopt(tc_options, 'B'))
+		opt->str_instead_int = 1;
+
+	/* set delimiter on start */
+	opt->delim = "";
+	opt->delim_len = 0;
+	if (gopt_arg(tc_options, 'D', &opt->delim))
+		opt->delim_len = strlen(opt->delim);
 
 	/* replica mode */
 	if (gopt_arg(tc_options, 'R', &arg)) {

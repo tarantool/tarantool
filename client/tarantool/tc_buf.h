@@ -1,5 +1,3 @@
-#ifndef TC_OPT_H_INCLUDED
-#define TC_OPT_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,49 +26,26 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#define TC_BUF_INIT_SIZE 4096
+#define TC_BUF_MULTIPLIER 2
 
-#define TC_VERSION_MAJOR "0"
-#define TC_VERSION_MINOR "2"
+size_t strip_end_ws(char *str);
 
-enum tc_opt_mode {
-	TC_OPT_USAGE,
-	TC_OPT_VERSION,
-	TC_OPT_RPL,
-	TC_OPT_WAL_CAT,
-	TC_OPT_WAL_PLAY,
-	TC_OPT_CMD,
-	TC_OPT_INTERACTIVE
+struct tc_buf {
+	size_t size;
+	size_t used;
+	char *data;
 };
 
-struct tc_opt {
-	enum tc_opt_mode mode;
-	const char *host;
-	int port;
-	int port_admin;
-	uint64_t lsn;
-	uint64_t lsn_from;
-	int lsn_from_set;
-	uint64_t lsn_to;
-	int lsn_to_set;
-	int space;
-	int space_set;
-	const char *format;
-	int raw;
-	int raw_with_headers;
-	int str_instead_int;
-	void *xlog_printer;
-	void *snap_printer;
-	const char *file;
-	char **cmdv;
-	int cmdc;
-	const char *delim;
-	size_t delim_len;
-};
+int tc_buf(struct tc_buf *buf);
+void *tc_buf_realloc(void *data, size_t size);
+int tc_buf_append(struct tc_buf *buf, void *str, size_t len);
+size_t tc_buf_delete(struct tc_buf *buf, size_t len);
+int tc_buf_isempty(struct tc_buf *buf);
+void tc_buf_clear(struct tc_buf *buf);
+void tc_buf_free(struct tc_buf *buf);
 
-void tc_opt_usage(void);
-void tc_opt_version(void);
-
-enum tc_opt_mode
-tc_opt_init(struct tc_opt *opt, int argc, char **argv);
-
-#endif /* TC_OPT_H_INCLUDED */
+int tc_buf_str(struct tc_buf *buf);
+int tc_buf_str_append(struct tc_buf *buf, char *str, size_t len);
+int tc_buf_str_stripws(struct tc_buf *buf);
+int tc_buf_str_isempty(struct tc_buf *buf);
