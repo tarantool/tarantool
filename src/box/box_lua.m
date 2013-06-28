@@ -153,7 +153,7 @@ lbox_tuple_slice(struct lua_State *L)
 	} else if (field_no < 0 && -field_no <= tuple->field_count) {
 		start = field_no + tuple->field_count;
 	} else {
-		luaL_error(L, "tuple.slice(): start >= field count");
+		return luaL_error(L, "tuple.slice(): start >= field count");
 	}
 
 	if (argc == 2) {
@@ -163,13 +163,13 @@ lbox_tuple_slice(struct lua_State *L)
 		} else if (field_no < 0 && -field_no < tuple->field_count) {
 			end = field_no + tuple->field_count;
 		} else {
-			luaL_error(L, "tuple.slice(): end > field count");
+			return luaL_error(L, "tuple.slice(): end > field count");
 		}
 	} else {
 		end = tuple->field_count;
 	}
 	if (end <= start)
-		luaL_error(L, "tuple.slice(): start must be less than end");
+		return luaL_error(L, "tuple.slice(): start must be less than end");
 
 	const void *field = tuple->data;
 	u32 fieldno = 0;

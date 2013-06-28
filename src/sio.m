@@ -62,7 +62,7 @@ sio_socketname(int fd)
 }
 
 @implementation SocketError
-- (id) init: (int) fd in: (const char *) format: (va_list) ap
+- (id) init: (int) fd in: (const char *) format :(va_list) ap
 {
 	int save_errno = errno;
 	char buf[TNT_ERRMSG_MAX];

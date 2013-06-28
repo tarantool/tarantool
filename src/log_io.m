@@ -507,7 +507,7 @@ log_io_sync(struct log_io *l)
 }
 
 static int
-log_io_write_header(struct log_io *l)
+	log_io_write_header(struct log_io *l)
 {
 	int ret = fprintf(l->f, "%s%s\n", l->dir->filetype, v11);
 
@@ -582,12 +582,16 @@ log_io_open(struct log_dir *dir, enum log_mode mode,
 	l->dir = dir;
 	l->is_inprogress = suffix == INPROGRESS;
 	if (mode == LOG_READ) {
-		if (log_io_verify_meta(l, &errmsg) != 0)
+		if (log_io_verify_meta(l, &errmsg) != 0) {
+			errmsg = strerror(errno);
 			goto error;
+		}
 	} else { /* LOG_WRITE */
 		setvbuf(l->f, NULL, _IONBF, 0);
-		if (log_io_write_header(l) != 0)
+		if (log_io_write_header(l) != 0) {
+			errmsg = strerror(errno);
 			goto error;
+		}
 	}
 	return l;
 error:

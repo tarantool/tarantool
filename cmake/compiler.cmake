@@ -108,7 +108,8 @@ endif()
 if (CMAKE_COMPILER_IS_CLANG)
     add_compile_flags("OBJC"
         "-fobjc-nonfragile-abi"
-        "-fno-objc-legacy-dispatch")
+        "-fno-objc-legacy-dispatch"
+        "-Wno-objc-root-class")
 endif()
 
 if (CMAKE_COMPILER_IS_CLANGXX)

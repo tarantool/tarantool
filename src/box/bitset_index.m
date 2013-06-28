@@ -235,8 +235,9 @@ bitset_index_iterator_next(struct iterator *iterator)
 	return ret;
 }
 
-- (void) initIterator: (struct iterator *) iterator:(enum iterator_type) type
-      :(const void *) key :(u32) part_count
+- (void) initIterator: (struct iterator *) iterator
+		     :(enum iterator_type) type
+		     :(const void *) key :(u32) part_count
 {
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);

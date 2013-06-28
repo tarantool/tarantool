@@ -43,7 +43,7 @@
 enum { SERVICE_NAME_MAXLEN = 32 };
 
 @interface SocketError: SystemError
-- (id) init: (int) fd in: (const char *) format: (va_list) ap;
+- (id) init: (int) fd in: (const char *) format :(va_list) ap;
 - (id) init: (int) fd in: (const char *) format, ...;
 @end
 
