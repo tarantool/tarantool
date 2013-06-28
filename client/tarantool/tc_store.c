@@ -44,6 +44,8 @@
 #include "client/tarantool/tc_admin.h"
 #include "client/tarantool/tc.h"
 #include "client/tarantool/tc_print.h"
+#include "client/tarantool/tc_print_xlog.h"
+#include "client/tarantool/tc_print_snap.h"
 #include "client/tarantool/tc_query.h"
 #include "client/tarantool/tc_store.h"
 
@@ -125,7 +127,7 @@ static int tc_store_printer(struct tnt_iter *i) {
 		return 0;
 	struct tnt_stream_xlog *s =
 		TNT_SXLOG_CAST(TNT_IREQUEST_STREAM(i));
-	((tc_printerf_t)tc.opt.printer)(&s->log.current.hdr, r);
+	((tc_printerf_xlog_t)tc.opt.xlog_printer)(&s->log.current.hdr, r);
 	return 0;
 }
 
@@ -133,21 +135,7 @@ static int tc_snapshot_printer(struct tnt_iter *i) {
 	struct tnt_tuple *tu = TNT_ISTORAGE_TUPLE(i);
 	struct tnt_stream_snapshot *ss =
 		TNT_SSNAPSHOT_CAST(TNT_ISTORAGE_STREAM(i));
-	if (tc.opt.raw) {
-		if (tc.opt.raw_with_headers) {
-			fwrite(&tnt_log_marker_v11,
-			       sizeof(tnt_log_marker_v11), 1, stdout);
-		}
-		fwrite(&ss->log.current.row_snap,
-		       sizeof(ss->log.current.row_snap), 1, stdout);
-		fwrite(tu->data, tu->size, 1, stdout);
-	} else {
-		tc_printf("tag: %"PRIu16", cookie: %"PRIu64", space: %"PRIu32"\n",
-			  ss->log.current.row_snap.tag,
-			  ss->log.current.row_snap.cookie,
-			  ss->log.current.row_snap.space);
-		tc_print_tuple(tu);
-	}
+	((tc_printerf_snap_t)tc.opt.snap_printer)(&ss->log.current.row_snap, tu);
 	return 0;
 }
 
@@ -200,6 +188,7 @@ int tc_store_cat(void)
 		fputs("\n", stdout);
 	}
 	int rc;
+
 	switch (type) {
 	case TNT_LOG_SNAPSHOT:
 		rc = tc_store_foreach_snapshot(tc_snapshot_printer);

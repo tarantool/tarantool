@@ -394,6 +394,7 @@ struct tnt_tuple *tnt_list_at(struct tnt_list *l, struct tnt_tuple *t) {
 	/* reallocating tuple data */
 	char *ndata = realloc(l->list, sizeof(struct tnt_list_ptr) * (l->count + 1));
 	if (ndata == NULL) {
+		free(l->list);
 		if (allocated)
 			tnt_tuple_free(t);
 		return NULL;
