@@ -23,11 +23,16 @@ if (CMAKE_C_COMPILER_ID STREQUAL Clang)
 endif()
 
 # Check GCC version:
-# GCC older than 4.6 is not supported.
 if (CMAKE_COMPILER_IS_GNUCC)
     execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
         OUTPUT_VARIABLE CC_VERSION)
-    if (CC_VERSION VERSION_GREATER 4.4.5 OR CC_VERSION VERSION_EQUAL 4.4.5)
+    if (CC_VERSION VERSION_GREATER 4.7 OR CC_VERSION VERSION_EQUAL 4.7)
+        message(FATAL_ERROR
+            "GNU GCC version >= 4.7 has well known problems with "
+            "GNUstep's libobjc2 runtime which is used by Tarantool. "
+            "The target binary will be unusable. Please you use CC=gcc-4.6 "
+            "or CC=clang or upgrade to Tarantool 1.5.x or later.")
+    elseif (CC_VERSION VERSION_GREATER 4.4.5 OR CC_VERSION VERSION_EQUAL 4.4.5)
         message(STATUS
             "${CMAKE_C_COMPILER} version >= 4.4.5 -- ${CC_VERSION}")
     else()
