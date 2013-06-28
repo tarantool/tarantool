@@ -32,6 +32,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
+#include <ctype.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -39,6 +40,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <errno.h>
+#include <wchar.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -58,8 +60,12 @@
 #include "client/tarantool/tc_query.h"
 #include "client/tarantool/tc_cli.h"
 #include "client/tarantool/tc_print.h"
+#include "client/tarantool/tc_buf.h"
 
 #define TC_DEFAULT_HISTORY_FILE ".tarantool_history"
+
+#define TC_ALLOCATION_ERROR "error: memory allocation failed for %zu bytes\n"
+#define TC_REALLOCATION_ERROR "error: memory reallocation failed for %zu bytes\n"
 
 extern struct tc tc;
 
@@ -89,7 +95,9 @@ enum tc_keywords {
 	TC_TEE,
 	TC_NOTEE,
 	TC_LOADFILE,
-	TC_HELP
+	TC_HELP,
+	TC_SETOPT,
+	TC_SETOPT_DELIM
 };
 
 static struct tnt_lex_keyword tc_lex_keywords[] =
@@ -106,6 +114,10 @@ static struct tnt_lex_keyword tc_lex_keywords[] =
 	{ "tee", 3, TC_TEE },
 	{ "notee", 5, TC_NOTEE },
 	{ "loadfile", 8, TC_LOADFILE },
+	{ "s", 1, TC_SETOPT},
+	{ "setopt", 6, TC_SETOPT},
+	{ "delim", 5, TC_SETOPT_DELIM},
+	{ "delimiter", 9, TC_SETOPT_DELIM},
 	{ NULL, 0, TNT_TK_NONE }
 };
 
@@ -125,6 +137,8 @@ tc_cmd_usage(void)
 		" - tee 'path'\n"
 		" - notee\n"
 		" - loadfile 'path'\n"
+		" - setopt key=val\n"
+		" - (possible pairs: delim=\'str\')\n"
 		"...\n";
 	tc_printf("%s", usage);
 }
@@ -194,9 +208,9 @@ tc_cmd_loadfile(char *path, int *reconnect)
 	int fd = open(path, O_RDONLY);
 	if (fd == -1)
 		return -1;
-	char *buf = malloc(st.st_size);
+	char *buf = (char *)malloc(st.st_size);
 	if (buf == NULL) {
-		tc_printf("error: memory allocation failed for %zu bytes\n",
+		tc_printf(TC_ALLOCATION_ERROR,
 			  st.st_size);
 		return -1;
 	}
@@ -251,6 +265,37 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 		}
 		if (tc_cmd_loadfile((char*)TNT_TK_S(tk)->data, reconnect) == -1)
 			rc = TC_CLI_ERROR;
+		goto done;
+	case TC_SETOPT:
+		switch (tnt_lex(&lex, &tk)) {
+		case TC_SETOPT_DELIM:
+			if (tnt_lex(&lex, &tk) == '=' &&
+			    tnt_lex(&lex, &tk) == TNT_TK_STRING) {
+				if (!TNT_TK_S(tk)->size) {
+					tc.opt.delim = "";
+					tc.opt.delim_len = 0;
+					goto done;
+				}
+				char * temp = (char *)malloc(TNT_TK_S(tk)->size);
+				if (temp == NULL)
+					tc_error(TC_ALLOCATION_ERROR,
+						 TNT_TK_S(tk)->size);
+				strncpy(temp,
+					(const char *)TNT_TK_S(tk)->data,
+					TNT_TK_S(tk)->size + 1);
+				tc.opt.delim = temp;
+				tc.opt.delim_len = strlen(tc.opt.delim);
+			} else {
+				tc_printf("---\n");
+				tc_printf(" - Expected delim='string'\n");
+				tc_printf("---\n");
+			}
+			break;
+		default:
+			tc_printf("---\n");
+			tc_printf(" - Unknown option to set\n");
+			tc_printf("---\n");
+		}
 		goto done;
 	}
 	*reconnect = tc_cli_admin(cmd, rc == TC_CLI_EXIT);
@@ -321,6 +366,56 @@ static void tc_cli_init(void) {
 		tc_error("signal initialization failed\n");
 }
 
+static char* tc_cli_readline_pipe() {
+	int size = 8192, pos = 0;
+	const size_t wcsize = sizeof(wchar_t);
+	char *str = (char *)malloc(size);
+	if (str == NULL)
+		tc_error(TC_ALLOCATION_ERROR, size);
+	wchar_t c;
+	while ((c = getwchar())) {
+		if (size < (pos + wcsize)) {
+			size *= 2;
+			char *nd = (char *)realloc(str, size);
+			if (nd == NULL)
+				tc_error(TC_REALLOCATION_ERROR, size);
+			str = nd;
+		}
+		if (c == '\r' || c == '\n' || c == WEOF) {
+			char c_t = (c != WEOF ? getchar() : '\n');
+			if (c_t != '\r' && c_t != '\n')
+				ungetc(c_t, stdin);
+			wctomb(str + pos++, 0);
+			break;
+		}
+		else
+			pos += wctomb(str + pos, c);
+	}
+	if (pos == 1 && c == WEOF) {
+		free(str);
+		return NULL;
+	}
+	return str;
+}
+
+
+
+static int check_delim(char* str, size_t len, size_t sep_len) {
+	const char *sep = tc.opt.delim;
+	len = strip_end_ws(str);
+	if (sep_len == 0)
+		return 1;
+	if (len < sep_len)
+		return 0;
+	size_t i;
+	for (i = len; sep_len > 0; --sep_len, --i)
+		if (str[i - 1] != sep[sep_len - 1])
+			return 0;
+	str[i] = '\0';
+	len = strip_end_ws(str);
+	return 1;
+}
+
 int tc_cli(void)
 {
 	/* initializing cli */
@@ -335,25 +430,62 @@ int tc_cli(void)
 
 	/* setting prompt */
 	char prompt[128];
-	snprintf(prompt, sizeof(prompt), "%s> ", tc.opt.host);
-
+	int prompt_len = snprintf(prompt, sizeof(prompt), "%s> ", tc.opt.host) - 2;
+	char prompt_delim[128];
 	/* interactive mode */
-	char *cmd;
-	while ((cmd = readline(prompt))) {
-		if (!cmd[0])
-			goto next;
-		int cmd_len = strlen(cmd);
-		tc_print_cmd2tee(prompt, cmd, cmd_len);
-		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd, cmd_len);
-		if (ret == TC_CLI_EXIT)
+	char *part_cmd;
+	struct tc_buf cmd;
+	if (tc_buf_str(&cmd))
+		tc_error(TC_REALLOCATION_ERROR,
+			 cmd.size);
+	while (1) {
+		if (isatty(STDIN_FILENO)) {
+			snprintf(prompt_delim, sizeof(prompt_delim),
+				 "%*s> ", prompt_len, "-");
+			part_cmd = readline(!tc_buf_str_isempty(&cmd) ? prompt_delim
+							   : prompt);
+		} else {
+			clearerr(stdin);
+			part_cmd = tc_cli_readline_pipe();
+		}
+		if (!part_cmd)
 			break;
-		add_history(cmd);
+		size_t part_cmd_len = strlen(part_cmd);
+		int delim_exists = check_delim(part_cmd,
+					       part_cmd_len,
+					       tc.opt.delim_len);
+		if (tc_buf_str_append(&cmd, part_cmd, strlen(part_cmd)))
+			tc_error(TC_REALLOCATION_ERROR,
+				 cmd.size);
+		free(part_cmd);
+		if (!delim_exists && !feof(stdin)) {
+			if (tc_buf_str_append(&cmd, " ", 1))
+				tc_error(TC_REALLOCATION_ERROR,
+					 cmd.size);
+			continue;
+		}
+		tc_buf_str_stripws(&cmd);
+		if (delim_exists && tc_buf_str_isempty(&cmd))
+			goto next;
+		tc_print_cmd2tee(cmd.used != 1 ? prompt_delim : prompt,
+				 cmd.data, cmd.used - 1);
+		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd.data,
+						     cmd.used - 1);
+		if (isatty(STDIN_FILENO))
+			add_history(cmd.data);
 next:
-		free(cmd);
-	}
+		tc_buf_clear(&cmd);
+		if (ret == TC_CLI_EXIT || feof(stdin)) {
+			tc_buf_free(&cmd);
+			break;
+		}
+}
 
 	/* updating history file */
 	write_history(history);
 	clear_history();
 	return 0;
 }
+
+#undef TC_ALLOCATION_ERROR
+#undef TC_REALLOCATION_ERROR

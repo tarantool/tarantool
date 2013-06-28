@@ -29,17 +29,19 @@
  * SUCH DAMAGE.
  */
 
-typedef void (*tc_printerf_t)(struct tnt_log_header_v11 *hdr,
-		              struct tnt_request *r);
-
 void tc_print_tee(char *buf, size_t size);
 void tc_print_cmd2tee(char *prompt, char *cmd, int size);
 void tc_printf(char *fmt, ...);
 void tc_print_buf(char *buf, size_t size);
 
+void tc_print_string(char *data, uint32_t size, char lua);
+
+void tc_print_fields(struct tnt_tuple *tu);
 void tc_print_tuple(struct tnt_tuple *tu);
 void tc_print_list(struct tnt_list *l);
 
-tc_printerf_t tc_print_getcb(const char *name);
+void tc_print_lua_field(char *data, uint32_t size, char string);
+void tc_print_lua_fields(struct tnt_tuple *tu);
+void tc_print_lua_tuple(struct tnt_tuple *tu);
 
 #endif /* TC_PRINT_H_INCLUDED */
