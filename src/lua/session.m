@@ -114,7 +114,11 @@ lbox_session_run_trigger(void *param)
 		lua_call(L, 0, 0);
 	} @catch (tnt_Exception *e) {
 		@throw;
+#if defined(__clang__)
+	} @catch (...) {
+#else /* !defined(__clang__) */
 	} @catch ( id allOthers ) {
+#endif
 		tnt_raise(ClientError, :ER_PROC_LUA,
 			  lua_tostring(L, -1));
 	} @finally {

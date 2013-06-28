@@ -8,7 +8,11 @@ int main()
 	luaL_openlibs(L);
 	@try {
 		luaL_error(L, "test");
+#if defined(__clang__)
+	} @catch (...) {
+#else /* !defined(__clang__) */
 	} @catch (id allOthers) {
+#endif
 		printf("exception handled\n");
 	}
 	lua_close(L);

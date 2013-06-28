@@ -977,7 +977,11 @@ port_lua_add_tuple(struct port *port, struct tuple *tuple,
 	lua_State *L = port_lua(port)->L;
 	@try {
 		lbox_pushtuple(L, tuple);
+#if defined(__clang__)
+	} @catch (...) {
+#else /* defined(__clang__) */
 	} @catch (id allOthers) {
+#endif
 		tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
 	}
 }
@@ -1316,7 +1320,11 @@ box_lua_execute(struct request *request, struct port *port)
 		port_add_lua_multret(port, L);
 	} @catch (tnt_Exception *e) {
 		@throw;
+#if defined(__clang__)
+	} @catch (...) {
+#else /* !defined(__clang__) */
 	} @catch (id allOthers) {
+#endif
 		tnt_raise(ClientError, :ER_PROC_LUA, lua_tostring(L, -1));
 	} @finally {
 		/*
