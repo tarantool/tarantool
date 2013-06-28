@@ -588,12 +588,16 @@ log_io_open(struct log_dir *dir, enum log_mode mode,
 	l->dir = dir;
 	l->is_inprogress = suffix == INPROGRESS;
 	if (mode == LOG_READ) {
-		if (log_io_verify_meta(l, &errmsg) != 0)
+		if (log_io_verify_meta(l, &errmsg) != 0) {
+			errmsg = strerror(errno);
 			goto error;
+		}
 	} else { /* LOG_WRITE */
 		setvbuf(l->f, NULL, _IONBF, 0);
-		if (log_io_write_header(l) != 0)
+		if (log_io_write_header(l) != 0) {
+			errmsg = strerror(errno);
 			goto error;
+		}
 	}
 	return l;
 error:
