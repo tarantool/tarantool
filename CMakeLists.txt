@@ -13,7 +13,6 @@ include(CheckCSourceRuns)
 include(CheckCXXSourceRuns)
 include(TestBigEndian)
 include(CheckFunctionExists)
-include(CheckBuiltInFunctionExists)
 
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
