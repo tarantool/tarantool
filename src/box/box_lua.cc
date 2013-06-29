@@ -194,6 +194,7 @@ lbox_tuple_slice(struct lua_State *L)
 	return end - start;
 }
 
+/** A single value on the Lua stack. */
 struct lua_field {
 	const char *data;
 	uint32_t len;
@@ -205,7 +206,7 @@ struct lua_field {
 };
 
 /**
- * Convert a value on the lua stack to a Tarantool data type
+ * Convert a value on the lua stack to a Tarantool data type.
  */
 static void
 lua_tofield(lua_State *L, int i, struct lua_field *field)
@@ -251,9 +252,7 @@ lua_tofield(lua_State *L, int i, struct lua_field *field)
 		return;
 	case LUA_TSTRING:
 		field->data = lua_tolstring(L, i, &size);
-		if (size >= UINT32_MAX)
-			tnt_raise(IllegalParams, "String is too long");
-		field->len = size;
+		field->len = (uint32_t) size;
 		field->type = STRING;
 		return;
 	default:
@@ -409,7 +408,9 @@ lbox_tuple_find_do(struct lua_State *L, bool all)
 	struct lua_field field;
 	lua_tofield(L, argc, &field);
 	if (field.type == UNKNOWN)
-		return luaL_error(L, "tuple.find(): bad field type");
+		return luaL_error(L, "tuple.find(): unsupported field "
+				  "type: %s",
+				  lua_typename(L, lua_type(L, argc)));
 
 	return tuple_find(L, tuple, offset, field.data, field.len, all);
 }
@@ -797,7 +798,7 @@ lbox_create_iterator(struct lua_State *L)
 			key_part_count = argc - 2;
 			struct lua_field field;
 			for (u32 i = 0; i < key_part_count; i++) {
-				lua_tofield(L, i+3, &field);
+				lua_tofield(L, i + 3, &field);
 				luaL_addvarint32(&b, field.len);
 				luaL_addlstring(&b, field.data, field.len);
 			}
@@ -1056,7 +1057,6 @@ lua_totuple(struct lua_State *L, int index)
 	struct tuple *tuple;
 	struct lua_field field;
 	lua_tofield(L, index, &field);
-	say_warn("Field_type: %u %u", field.type, field.len);
 	if (field.type != UNKNOWN) {
 		tuple = tuple_alloc(field.len + varint32_sizeof(field.len));
 		tuple->field_count = 1;
@@ -1487,7 +1487,6 @@ lbox_pack(struct lua_State *L)
 			break;
 		case 'S':
 		case 's':
-			say_warn("type =%u len = %u", field.type, field.len);
 			/* signed and unsigned 16-bit integers */
 			if (field.type != NUM || field.u32 > UINT16_MAX)
 				luaL_error(L, "box.pack: expected 16-bit int");
