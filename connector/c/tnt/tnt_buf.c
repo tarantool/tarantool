@@ -68,8 +68,10 @@ static char* tnt_buf_resize(struct tnt_stream *s, size_t size) {
 	size_t off = sb->size;
 	size_t nsize = off + size;
 	char *nd = realloc(sb->data, nsize);
-	if (nd == NULL)
+	if (nd == NULL) {
+		free(sb->data);
 		return NULL;
+	}
 	sb->data = nd;
 	sb->size = nsize;
 	return sb->data + off;

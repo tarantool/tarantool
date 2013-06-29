@@ -24,3 +24,6 @@ notifications:
     on_success: change
     on_failure: always
   email: false
+
+git:
+  depth: 500

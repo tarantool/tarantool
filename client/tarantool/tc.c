@@ -45,6 +45,8 @@
 #include "client/tarantool/tc.h"
 #include "client/tarantool/tc_cli.h"
 #include "client/tarantool/tc_print.h"
+#include "client/tarantool/tc_print_snap.h"
+#include "client/tarantool/tc_print_xlog.h"
 #include "client/tarantool/tc_store.h"
 
 struct tc tc;
@@ -103,10 +105,15 @@ static void tc_connect_admin(void)
 
 static void tc_validate(void)
 {
-	tc.opt.printer = tc_print_getcb(tc.opt.format);
-	if (tc.opt.printer == NULL)
-		return tc_error("unsupported output format '%s'",
+	tc.opt.xlog_printer = tc_print_getxlogcb(tc.opt.format);
+	tc.opt.snap_printer = tc_print_getsnapcb(tc.opt.format);
+	if (tc.opt.xlog_printer == NULL)
+		return tc_error("unsupported output xlog format '%s'",
 				tc.opt.format);
+	if (tc.opt.snap_printer == NULL)
+		return tc_error("unsupported output snap format '%s'",
+				tc.opt.format);
+	
 	if (tc.opt.format && strcmp(tc.opt.format, "raw") == 0)
 		tc.opt.raw = 1;
 }

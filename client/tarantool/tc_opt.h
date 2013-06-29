@@ -57,10 +57,14 @@ struct tc_opt {
 	const char *format;
 	int raw;
 	int raw_with_headers;
-	void *printer;
+	int str_instead_int;
+	void *xlog_printer;
+	void *snap_printer;
 	const char *file;
 	char **cmdv;
 	int cmdc;
+	const char *delim;
+	size_t delim_len;
 };
 
 void tc_opt_usage(void);

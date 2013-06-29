@@ -586,12 +586,6 @@ check_spaces(struct tarantool_cfg *conf)
 			switch (index_type) {
 			case HASH:
 				/* check hash index */
-				/* hash index must has single-field key */
-				if (key_part_count != 1) {
-					out_warning(CNF_OK, "(space = %zu index = %zu) "
-						    "hash index must has a single-field key", i, j);
-					return -1;
-				}
 				/* hash index must be unique */
 				if (!index->unique) {
 					out_warning(CNF_OK, "(space = %zu index = %zu) "

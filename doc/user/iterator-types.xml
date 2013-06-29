@@ -55,7 +55,7 @@
             </simpara>
             <simpara>
             Semantics of the match depends on the index.
-            A HASH and TREE index only supports exact match: all parts
+            A HASH index only supports exact match: all parts
             of a key participating in the index must be provided.
             In case of TREE index, only few parts of a key or a
             key prefix are accepted for search.
@@ -64,12 +64,10 @@
             criteria.
             </simpara>
             <simpara>
-            A non-unique HASH index returns tuples in unspecified
-            order.
             When a TREE index is not unique, or only part of a key
             is given as a search criteria, matching tuples are
             returned in ascending order.
-            BITSET indexes are always unique.
+            BITSET and HASH indexes are always unique.
             </simpara>
         </entry>
     </row>

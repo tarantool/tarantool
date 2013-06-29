@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_HASH_INDEX_H_INCLUDED
-#define TARANTOOL_BOX_HASH_INDEX_H_INCLUDED
+#ifndef TC_PRINT_SNAP_H_INCLUDED
+#define TC_PRINT_SNAP_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,37 +29,9 @@
  * SUCH DAMAGE.
  */
 
-#include "index.h"
+typedef void (*tc_printerf_snap_t)(struct tnt_log_row_snap_v11 *row,
+				   struct tnt_tuple *tu);
 
-struct mh_index_t;
+tc_printerf_snap_t tc_print_getsnapcb(const char *name);
 
-class HashIndex: public Index {
-public:
-	HashIndex(struct key_def *key_def, struct space *space);
-	~HashIndex();
-
-	virtual void beginBuild();
-	virtual void buildNext(struct tuple *tuple);
-	virtual void endBuild();
-	virtual void build(Index *pk);
-	virtual size_t size() const;
-	virtual struct tuple *min() const;
-	virtual struct tuple *max() const;
-	virtual struct tuple *random(u32 rnd) const;
-	virtual struct tuple *findByKey(const char *key, u32 part_count) const;
-	virtual struct tuple *replace(struct tuple *old_tuple,
-				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode);
-
-	virtual struct iterator *allocIterator() const;
-	virtual void initIterator(struct iterator *iterator,
-				  enum iterator_type type,
-				  const char *key, u32 part_count) const;
-
-	virtual void reserve(u32 n_tuples);
-
-protected:
-	struct mh_index_t *hash;
-};
-
-#endif /* TARANTOOL_BOX_HASH_INDEX_H_INCLUDED */
+#endif /* TC_PRINT_SNAP_H_INCLUDED */

@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_BOX_HASH_INDEX_H_INCLUDED
-#define TARANTOOL_BOX_HASH_INDEX_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,38 +26,26 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#define TC_BUF_INIT_SIZE 4096
+#define TC_BUF_MULTIPLIER 2
 
-#include "index.h"
+size_t strip_end_ws(char *str);
 
-struct mh_index_t;
-
-class HashIndex: public Index {
-public:
-	HashIndex(struct key_def *key_def, struct space *space);
-	~HashIndex();
-
-	virtual void beginBuild();
-	virtual void buildNext(struct tuple *tuple);
-	virtual void endBuild();
-	virtual void build(Index *pk);
-	virtual size_t size() const;
-	virtual struct tuple *min() const;
-	virtual struct tuple *max() const;
-	virtual struct tuple *random(u32 rnd) const;
-	virtual struct tuple *findByKey(const char *key, u32 part_count) const;
-	virtual struct tuple *replace(struct tuple *old_tuple,
-				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode);
-
-	virtual struct iterator *allocIterator() const;
-	virtual void initIterator(struct iterator *iterator,
-				  enum iterator_type type,
-				  const char *key, u32 part_count) const;
-
-	virtual void reserve(u32 n_tuples);
-
-protected:
-	struct mh_index_t *hash;
+struct tc_buf {
+	size_t size;
+	size_t used;
+	char *data;
 };
 
-#endif /* TARANTOOL_BOX_HASH_INDEX_H_INCLUDED */
+int tc_buf(struct tc_buf *buf);
+void *tc_buf_realloc(void *data, size_t size);
+int tc_buf_append(struct tc_buf *buf, void *str, size_t len);
+size_t tc_buf_delete(struct tc_buf *buf, size_t len);
+int tc_buf_isempty(struct tc_buf *buf);
+void tc_buf_clear(struct tc_buf *buf);
+void tc_buf_free(struct tc_buf *buf);
+
+int tc_buf_str(struct tc_buf *buf);
+int tc_buf_str_append(struct tc_buf *buf, char *str, size_t len);
+int tc_buf_str_stripws(struct tc_buf *buf);
+int tc_buf_str_isempty(struct tc_buf *buf);

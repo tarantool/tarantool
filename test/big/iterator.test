@@ -135,7 +135,7 @@ exec admin "lua iterate(20, 3, 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'key
 
 print """
 #-----------------------------------------------------------------------------#
-# Iterator: hash multi-part non-unique
+# Iterator: hash single-part unique
 #-----------------------------------------------------------------------------#
 """
 
@@ -147,6 +147,21 @@ exec admin "lua iterate(20, 4, 0, 1, box.index.EQ, 'pid_003')"
 exec admin "lua iterate(20, 4, 0, 1, box.index.EQ, 'pid_666')"
 exec admin "lua iterate(20, 4, 0, 1, box.index.GE, 'pid_001')"
 exec admin "lua iterate(20, 4, 0, 1, box.index.GE, 'pid_999')"
+
+print """
+#-----------------------------------------------------------------------------#
+# Iterator: hash multi-part unique
+#-----------------------------------------------------------------------------#
+"""
+exec admin "lua iterate(20, 5, 1, 3, box.index.ALL)"
+exec admin "lua iterate(20, 5, 1, 3, box.index.EQ)"
+exec admin "lua iterate(20, 5, 1, 3, box.index.EQ, 'sid_005')"
+exec admin "lua iterate(20, 5, 1, 3, box.index.GE)"
+exec admin "lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')"
+exec admin "lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')"
+exec admin "lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')"
+exec admin "lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')"
+exec admin "lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')"
 
 print """
 #-----------------------------------------------------------------------------#

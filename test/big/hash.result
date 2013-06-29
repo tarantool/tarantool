@@ -156,25 +156,41 @@ error: 'Invalid key part count in an exact match (expected 1, got 2)'
 
 # Insert valid fieds
 
-lua box.space[11]:insert('00000000', 'value1 v1.0', 'value2 v1.0')
+lua box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
 ---
- - 3472328296227680304: {'value1 v1.0', 'value2 v1.0'}
+ - 0: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[11]:insert('00000001', 'value1 v1.0', 'value2 v1.0')
+lua box.space[11]:insert(1ULL, 'value1 v1.0', 'value2 v1.0')
 ---
- - 3544385890265608240: {'value1 v1.0', 'value2 v1.0'}
+ - 1: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[11]:insert('00000002', 'value1 v1.0', 'value2 v1.0')
+lua box.space[11]:insert(2ULL, 'value1 v1.0', 'value2 v1.0')
 ---
- - 3616443484303536176: {'value1 v1.0', 'value2 v1.0'}
+ - 2: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[11]:insert('00000003', 'value1 v1.0', 'value2 v1.0')
+lua box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
 ---
- - 3688501078341464112: {'value1 v1.0', 'value2 v1.0'}
+ - 3: {'value1 v1.0', 'value2 v1.0'}
 ...
 
 # Insert invalid fields
 
+lua box.space[11]:insert(100, 'value1 v1.0', 'value2 v1.0')
+---
+error: 'Supplied key field type does not match index type: expected u64'
+...
+lua box.space[11]:insert(101, 'value1 v1.0', 'value2 v1.0')
+---
+error: 'Supplied key field type does not match index type: expected u64'
+...
+lua box.space[11]:insert(102, 'value1 v1.0', 'value2 v1.0')
+---
+error: 'Supplied key field type does not match index type: expected u64'
+...
+lua box.space[11]:insert(103, 'value1 v1.0', 'value2 v1.0')
+---
+error: 'Supplied key field type does not match index type: expected u64'
+...
 lua box.space[11]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
 error: 'Supplied key field type does not match index type: expected u64'
@@ -187,24 +203,36 @@ error: 'Supplied key field type does not match index type: expected u64'
 
 # Replace valid fieds
 
-lua box.space[11]:replace('00000003', 'value1 v1.31', 'value2 1.12')
+lua box.space[11]:replace(3ULL, 'value1 v1.31', 'value2 1.12')
 ---
- - 3688501078341464112: {'value1 v1.31', 'value2 1.12'}
+ - 3: {'value1 v1.31', 'value2 1.12'}
 ...
-lua box.space[11]:replace('00000001', 'value1 v1.32', 'value2 1.72')
+lua box.space[11]:replace(1ULL, 'value1 v1.32', 'value2 1.72')
 ---
- - 3544385890265608240: {'value1 v1.32', 'value2 1.72'}
+ - 1: {'value1 v1.32', 'value2 1.72'}
 ...
-lua box.space[11]:replace('00000002', 'value1 v1.43', 'value2 1.92')
+lua box.space[11]:replace(2ULL, 'value1 v1.43', 'value2 1.92')
 ---
- - 3616443484303536176: {'value1 v1.43', 'value2 1.92'}
+ - 2: {'value1 v1.43', 'value2 1.92'}
 ...
 
 # Replace invalid fields
 
-lua box.space[10]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
+lua box.space[11]:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+error: 'Supplied key field type does not match index type: expected u64'
+...
+lua box.space[11]:replace(1, 'value1 v1.32', 'value2 1.72')
+---
+error: 'Supplied key field type does not match index type: expected u64'
+...
+lua box.space[11]:replace(2, 'value1 v1.43', 'value2 1.92')
+---
+error: 'Supplied key field type does not match index type: expected u64'
+...
+lua box.space[11]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
+---
+error: 'Supplied key field type does not match index type: expected u64'
 ...
 
 #-----------------------------------------------------------------------------#
@@ -214,26 +242,51 @@ error: 'Supplied key field type does not match index type: expected u32'
 
 # select by valid keys
 
-lua box.space[11]:select(0, '00000000')
+lua box.space[11]:select(0, 0ULL)
 ---
- - 3472328296227680304: {'value1 v1.0', 'value2 v1.0'}
+ - 0: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[11]:select(0, '00000001')
+lua box.space[11]:select(0, 1ULL)
 ---
- - 3544385890265608240: {'value1 v1.32', 'value2 1.72'}
+ - 1: {'value1 v1.32', 'value2 1.72'}
 ...
-lua box.space[11]:select(0, '00000002')
+lua box.space[11]:select(0, 2ULL)
 ---
- - 3616443484303536176: {'value1 v1.43', 'value2 1.92'}
+ - 2: {'value1 v1.43', 'value2 1.92'}
 ...
-lua box.space[11]:select(0, '00000003')
+lua box.space[11]:select(0, 3ULL)
 ---
- - 3688501078341464112: {'value1 v1.31', 'value2 1.12'}
+ - 3: {'value1 v1.31', 'value2 1.12'}
 ...
-lua box.space[11]:select(0, '00000004')
+lua box.space[11]:select(0, 4ULL)
 ---
 ...
-lua box.space[11]:select(0, '00000005')
+lua box.space[11]:select(0, 5ULL)
+---
+...
+
+# select by valid NUM keys
+
+lua box.space[11]:select(0, 0)
+---
+ - 0: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:select(0, 1)
+---
+ - 1: {'value1 v1.32', 'value2 1.72'}
+...
+lua box.space[11]:select(0, 2)
+---
+ - 2: {'value1 v1.43', 'value2 1.92'}
+...
+lua box.space[11]:select(0, 3)
+---
+ - 3: {'value1 v1.31', 'value2 1.12'}
+...
+lua box.space[11]:select(0, 4)
+---
+...
+lua box.space[11]:select(0, 5)
 ---
 ...
 
@@ -255,26 +308,67 @@ error: 'Invalid key part count (expected [0..1], got 2)'
 
 # delete by valid keys
 
-lua box.space[11]:delete('00000000')
+lua box.space[11]:delete(0ULL)
 ---
- - 3472328296227680304: {'value1 v1.0', 'value2 v1.0'}
+ - 0: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[11]:delete('00000001')
+lua box.space[11]:delete(1ULL)
 ---
- - 3544385890265608240: {'value1 v1.32', 'value2 1.72'}
+ - 1: {'value1 v1.32', 'value2 1.72'}
 ...
-lua box.space[11]:delete('00000002')
+lua box.space[11]:delete(2ULL)
 ---
- - 3616443484303536176: {'value1 v1.43', 'value2 1.92'}
+ - 2: {'value1 v1.43', 'value2 1.92'}
 ...
-lua box.space[11]:delete('00000003')
+lua box.space[11]:delete(3ULL)
 ---
- - 3688501078341464112: {'value1 v1.31', 'value2 1.12'}
+ - 3: {'value1 v1.31', 'value2 1.12'}
 ...
-lua box.space[11]:delete('00000004')
+lua box.space[11]:delete(4ULL)
 ---
 ...
-lua box.space[11]:delete('00000005')
+lua box.space[11]:delete(5ULL)
+---
+...
+lua box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
+---
+ - 0: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:insert(1ULL, 'value1 v1.0', 'value2 v1.0')
+---
+ - 1: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:insert(2ULL, 'value1 v1.0', 'value2 v1.0')
+---
+ - 2: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
+---
+ - 3: {'value1 v1.0', 'value2 v1.0'}
+...
+
+# delete by valid NUM keys
+
+lua box.space[11]:delete(0)
+---
+ - 0: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:delete(1)
+---
+ - 1: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:delete(2)
+---
+ - 2: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:delete(3)
+---
+ - 3: {'value1 v1.0', 'value2 v1.0'}
+...
+lua box.space[11]:delete(4)
+---
+...
+lua box.space[11]:delete(5)
 ---
 ...
 
