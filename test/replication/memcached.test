@@ -22,38 +22,20 @@ replica.deploy("replication/cfg/replica.cfg",
 replica_memcached = replica.memcached
 
 ###################################
-def wait_for_lsn(lsn, serv):
-    serv_admin = serv.admin
-    while True:
-        if get_lsn(serv) == lsn:
-            return lsn
-        time.sleep(0.01)
-
-def wait_for_next_lsn(lsn, serv):
-    serv_admin = serv.admin
-    while True:
-        if get_lsn(serv) != lsn:
-            return lsn
-        time.sleep(0.01)
-
 def get_lsn(serv):
     serv_admin = serv.admin
     resp = exec serv_admin silent "lua box.info.lsn"
     return yaml.load(resp)[0]
 
-def wait(next = False, serv_master = master, serv_replica = replica):
-    if next:
-        lsn = get_lsn(serv_replica)
-        return wait_for_next_lsn(lsn, serv_replica)
-    else:
-        lsn = get_lsn(serv_master)
-        return wait_for_lsn(lsn, serv_replica)
+def wait(serv_master = master, serv_replica = replica):
+    lsn = get_lsn(serv_master)
+    serv_replica.wait_lsn(lsn)
+    return lsn
 
 def get_memcached_len(serv):
     serv_admin = serv.admin
     resp = exec serv_admin silent "lua box.space[box.cfg.memcached_space]:len()"
     return yaml.load(resp)[0]
-
 
 def wait_for_empty_space(serv):
     serv_admin = serv.admin
@@ -102,20 +84,21 @@ exec replica_memcached "get 10\r\n"
 
 print """# check that expiration is working properly on replica"""
 exec master_memcached silent "set 1 0 3 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
-wait()
+lsn = wait()
 exec replica_memcached "get 1\r\n"
-wait(True)
+replica.wait_lsn(lsn + 1)
 exec replica_memcached "get 1\r\n"
 
 print """# check that expiration is working properly, when replica becomes master"""
 exec master_memcached silent "set 1 0 3 %d\r\n%s\r\n" % (len(sonet[0]), sonet[0])
+lsn = wait()
 replica.reconfigure("replication/cfg/replica_to_master.cfg")
 exec replica_memcached "get 1\r\n"
-wait(True)
+replica.wait_lsn(lsn + 1)
 exec replica_memcached "get 1\r\n"
 
 
-# resore default suite config
+# restore default suite config
 replica.stop()
 replica.cleanup(True)
 master.stop()
