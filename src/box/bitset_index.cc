@@ -153,7 +153,7 @@ BitsetIndex::max() const
 }
 
 struct tuple *
-BitsetIndex::random(u32 rnd) const
+BitsetIndex::random(uint32_t rnd) const
 {
 	(void) rnd;
 	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "random()");
@@ -178,7 +178,7 @@ BitsetIndex::allocIterator() const
 }
 
 struct tuple *
-BitsetIndex::findByKey(const char *key, u32 part_count) const
+BitsetIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	(void) key;
 	(void) part_count;
@@ -232,7 +232,7 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 
 void
 BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
-			  const char *key, u32 part_count) const
+			  const char *key, uint32_t part_count) const
 {
 	assert(iterator->free == bitset_index_iterator_free);
 	assert (part_count != 0 || key == NULL);

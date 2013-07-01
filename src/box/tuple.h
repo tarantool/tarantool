@@ -45,9 +45,9 @@ struct tuple
 	/* see enum tuple_flags */
 	uint16_t flags;
 	/** length of the variable part of the tuple */
-	u32 bsize;
+	uint32_t bsize;
 	/** number of fields in the variable part. */
-	u32 field_count;
+	uint32_t field_count;
 	/**
 	 * Fields can have variable length, and thus are packed
 	 * into a contiguous byte array. Each field is prefixed
@@ -89,7 +89,7 @@ tuple_ref(struct tuple *tuple, int count);
  * @returns field data if the field exists, or NULL
  */
 const char *
-tuple_field_old(struct tuple *tuple, u32 i);
+tuple_field_old(struct tuple *tuple, uint32_t i);
 
 /**
  * @brief Return field data of the field

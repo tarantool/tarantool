@@ -52,11 +52,11 @@ extern "C" {
 #include <third_party/base64.h>
 
 static void process_replica(struct port *port,
-			    u32 op, const char *reqdata, u32 reqlen);
+			    uint32_t op, const char *reqdata, uint32_t reqlen);
 static void process_ro(struct port *port,
-		       u32 op, const char *reqdata, u32 reqlen);
+		       uint32_t op, const char *reqdata, uint32_t reqlen);
 static void process_rw(struct port *port,
-		       u32 op, const char *reqdata, u32 reqlen);
+		       uint32_t op, const char *reqdata, uint32_t reqlen);
 box_process_func box_process = process_ro;
 box_process_func box_process_ro = process_ro;
 
@@ -65,14 +65,14 @@ static char status[64] = "unknown";
 static int stat_base;
 
 struct box_snap_row {
-	u32 space;
-	u32 tuple_size;
-	u32 data_size;
+	uint32_t space;
+	uint32_t tuple_size;
+	uint32_t data_size;
 	char data[];
 } __attribute__((packed));
 
 void
-port_send_tuple(struct port *port, struct txn *txn, u32 flags)
+port_send_tuple(struct port *port, struct txn *txn, uint32_t flags)
 {
 	struct tuple *tuple;
 	if ((tuple = txn->new_tuple) || (tuple = txn->old_tuple))
@@ -80,7 +80,7 @@ port_send_tuple(struct port *port, struct txn *txn, u32 flags)
 }
 
 static void
-process_rw(struct port *port, u32 op, const char *reqdata, u32 reqlen)
+process_rw(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
 {
 	struct txn *txn = txn_begin();
 
@@ -99,7 +99,7 @@ process_rw(struct port *port, u32 op, const char *reqdata, u32 reqlen)
 }
 
 static void
-process_replica(struct port *port, u32 op, const char *reqdata, u32 reqlen)
+process_replica(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
 {
 	if (!request_is_select(op)) {
 		tnt_raise(ClientError, ER_NONMASTER,
@@ -109,7 +109,7 @@ process_replica(struct port *port, u32 op, const char *reqdata, u32 reqlen)
 }
 
 static void
-process_ro(struct port *port, u32 op, const char *reqdata, u32 reqlen)
+process_ro(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
 {
 	if (!request_is_select(op))
 		tnt_raise(LoggedError, ER_SECONDARY);
@@ -367,7 +367,7 @@ box_init(void)
 
 static void
 snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
-		     u32 n, struct tuple *tuple)
+		     uint32_t n, struct tuple *tuple)
 {
 	struct box_snap_row header;
 	header.space = n;

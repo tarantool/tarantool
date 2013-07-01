@@ -57,7 +57,7 @@ SLIST_HEAD(chunk_list_head, chunk);
 
 struct chunk_class {
 	int i;
-	u32 allocated_size;
+	uint32_t allocated_size;
 	int chunks_count;
 	struct chunk_list_head chunks;
 	 TAILQ_ENTRY(chunk_class) link;

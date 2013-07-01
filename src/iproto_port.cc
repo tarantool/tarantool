@@ -52,7 +52,7 @@ iproto_port_eof(struct port *ptr)
 }
 
 static inline void
-iproto_port_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
+iproto_port_add_tuple(struct port *ptr, struct tuple *tuple, uint32_t flags)
 {
 	struct iproto_port *port = iproto_port(ptr);
 	if (++port->reply.found == 1) {

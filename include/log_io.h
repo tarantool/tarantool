@@ -34,7 +34,7 @@
 #include "tarantool/util.h"
 #include "tarantool_ev.h"
 
-extern const u32 default_version;
+extern const uint32_t default_version;
 
 enum log_format { XLOG = 65534, SNAP = 65535 };
 
@@ -112,14 +112,14 @@ log_io_cursor_close(struct log_io_cursor *i);
 const char *
 log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen);
 
-typedef u32 log_magic_t;
+typedef uint32_t log_magic_t;
 
 struct header_v11 {
-	u32 header_crc32c;
+	uint32_t header_crc32c;
 	int64_t lsn;
 	double tm;
-	u32 len;
-	u32 data_crc32c;
+	uint32_t len;
+	uint32_t data_crc32c;
 } __attribute__((packed));
 
 static inline struct header_v11 *header_v11(const char *t)

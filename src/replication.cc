@@ -490,8 +490,8 @@ retry:
 	/* We'll wait for children no longer than 5 sec.  */
 	alarm(5);
 
-	say_info("sending signal %d to %" PRIu32 " children", kill_signo,
-		 (u32) spawner.child_count);
+	say_info("sending signal %d to %d children", kill_signo,
+		 (int) spawner.child_count);
 
 	kill(0, kill_signo);
 

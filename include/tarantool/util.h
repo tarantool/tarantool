@@ -121,8 +121,6 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 #define CACHEALIGN(LEN)			TYPEALIGN(32, (LEN))
 #endif
 
-typedef uint32_t u32;
-
 #define CRLF "\n"
 
 #ifdef GCC

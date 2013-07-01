@@ -36,7 +36,7 @@ null_port_eof(struct port *port __attribute__((unused)))
 static void
 null_port_add_tuple(struct port *port __attribute__((unused)),
 		    struct tuple *tuple __attribute__((unused)),
-		    u32 flags __attribute__((unused)))
+		    uint32_t flags __attribute__((unused)))
 {
 }
 

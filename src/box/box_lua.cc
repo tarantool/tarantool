@@ -267,9 +267,9 @@ lua_tofield(lua_State *L, int i, struct lua_field *field)
  * Pack our BER integer into luaL_Buffer
  */
 static void
-luaL_addvarint32(luaL_Buffer *b, u32 value)
+luaL_addvarint32(luaL_Buffer *b, uint32_t value)
 {
-	char buf[sizeof(u32)+1];
+	char buf[sizeof(uint32_t)+1];
 	char *bufend = pack_varint32(buf, value);
 	luaL_addlstring(b, buf, bufend - buf);
 }
@@ -730,7 +730,7 @@ lbox_index_random(struct lua_State *L)
 		luaL_error(L, "Usage: index:random((uint32) rnd)");
 
 	Index *index = lua_checkindex(L, 1);
-	u32 rnd = lua_tointeger(L, 2);
+	uint32_t rnd = lua_tointeger(L, 2);
 	lbox_pushtuple(L, index->random(rnd));
 	return 1;
 }
@@ -770,7 +770,7 @@ lbox_create_iterator(struct lua_State *L)
 
 	/* Create a new iterator. */
 	enum iterator_type type = ITER_ALL;
-	u32 key_part_count = 0;
+	uint32_t key_part_count = 0;
 	const char *key = NULL;
 	size_t key_size = 0;
 	if (argc == 1 || (argc == 2 && lua_type(L, 2) == LUA_TNIL)) {
@@ -797,7 +797,7 @@ lbox_create_iterator(struct lua_State *L)
 			/* Single or multi- part key. */
 			key_part_count = argc - 2;
 			struct lua_field field;
-			for (u32 i = 0; i < key_part_count; i++) {
+			for (uint32_t i = 0; i < key_part_count; i++) {
 				lua_tofield(L, i + 3, &field);
 				luaL_addvarint32(&b, field.len);
 				luaL_addlstring(&b, field.data, field.len);
@@ -901,7 +901,7 @@ lbox_index_count(struct lua_State *L)
 	/* preparing single or multi-part key */
 	luaL_Buffer b;
 	luaL_buffinit(L, &b);
-	u32 key_part_count;
+	uint32_t key_part_count;
 	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 		/* Searching by tuple. */
 		struct tuple *tuple = lua_checktuple(L, 2);
@@ -911,7 +911,7 @@ lbox_index_count(struct lua_State *L)
 		/* Single or multi- part key. */
 		key_part_count = argc;
 		struct lua_field field;
-		for (u32 i = 0; i < argc; ++i) {
+		for (uint32_t i = 0; i < argc; ++i) {
 			lua_tofield(L, i + 2, &field);
 			luaL_addvarint32(&b, field.len);
 			luaL_addlstring(&b, field.data, field.len);
@@ -919,7 +919,7 @@ lbox_index_count(struct lua_State *L)
 	}
 	luaL_pushresult(&b);
 	const char *key = lua_tostring(L, -1);
-	u32 count = 0;
+	uint32_t count = 0;
 
 	key_validate(index->key_def, ITER_EQ, key, key_part_count);
 	/* Prepare index iterator */
@@ -974,7 +974,7 @@ static inline struct port_lua *
 port_lua(struct port *port) { return (struct port_lua *) port; }
 
 /*
- * For addU32/dupU32 do nothing -- the only u32 Box can give
+ * For addU32/dupU32 do nothing -- the only uint32_t Box can give
  * us is tuple count, and we don't need it, since we intercept
  * everything into Lua stack first.
  * @sa port_add_lua_multret
@@ -982,7 +982,7 @@ port_lua(struct port *port) { return (struct port_lua *) port; }
 
 static void
 port_lua_add_tuple(struct port *port, struct tuple *tuple,
-		   u32 flags __attribute__((unused)))
+		   uint32_t flags __attribute__((unused)))
 {
 	lua_State *L = port_lua(port)->L;
 	try {
@@ -1014,8 +1014,8 @@ port_lua_create(struct lua_State *L)
 static struct tuple *
 lua_table_to_tuple(struct lua_State *L, int index)
 {
-	u32 field_count = 0;
-	u32 tuple_len = 0;
+	uint32_t field_count = 0;
+	uint32_t tuple_len = 0;
 	struct lua_field field;
 
 	/** First go: calculate tuple length. */
@@ -1160,7 +1160,7 @@ port_add_lua_multret(struct port *port, struct lua_State *L)
 static int
 lbox_process(lua_State *L)
 {
-	u32 op = lua_tointeger(L, 1); /* Get the first arg. */
+	uint32_t op = lua_tointeger(L, 1); /* Get the first arg. */
 	size_t sz;
 	const char *req = luaL_checklstring(L, 2, &sz); /* Second arg. */
 	if (op == CALL) {
@@ -1281,12 +1281,12 @@ box_lua_execute(struct request *request, struct port *port)
 			luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
 		});
 
-		u32 field_len;
+		uint32_t field_len;
 		/* proc name */
 		const char *field = pick_field_str(reqpos, reqend, &field_len);
 		box_lua_find(L, field, field + field_len);
 		/* Push the rest of args (a tuple). */
-		u32 nargs = pick_u32(reqpos, reqend);
+		uint32_t nargs = pick_u32(reqpos, reqend);
 		luaL_checkstack(L, nargs, "call: out of stack");
 		for (int i = 0; i < nargs; i++) {
 			field = pick_field_str(reqpos, reqend, &field_len);
@@ -1559,7 +1559,7 @@ lbox_pack(struct lua_State *L)
 			/* insert field */
 			/* field no */
 			uint32_t u32buf = (uint32_t) lua_tointeger(L, i);
-			luaL_addlstring(&b, (char *) &u32buf, sizeof(u32));
+			luaL_addlstring(&b, (char *) &u32buf, sizeof(uint32_t));
 			luaL_addchar(&b, format_to_opcode(*format));
 			break;
 		}
@@ -1577,11 +1577,11 @@ lbox_pack(struct lua_State *L)
 const char *
 box_unpack_response(struct lua_State *L, const char *s, const char *end)
 {
-	u32 tuple_count = pick_u32(&s, end);
+	uint32_t tuple_count = pick_u32(&s, end);
 
 	/* Unpack and push tuples. */
 	while (tuple_count--) {
-		u32 bsize = pick_u32(&s, end);
+		uint32_t bsize = pick_u32(&s, end);
 		uint32_t field_count = pick_u32(&s, end);
 		const char *tend = s + bsize;
 		if (tend > end)
@@ -1611,7 +1611,7 @@ lbox_unpack(struct lua_State *L)
 	char charbuf;
 	uint8_t  u8buf;
 	uint16_t u16buf;
-	u32 u32buf;
+	uint32_t u32buf;
 
 #define CHECK_SIZE(cur) if (unlikely((cur) >= end)) {	                \
 	luaL_error(L, "box.unpack('%c'): got %d bytes (expected: %d+)",	\
@@ -1633,7 +1633,7 @@ lbox_unpack(struct lua_State *L)
 			break;
 		case 'i':
 			CHECK_SIZE(s + 3);
-			u32buf = *(u32 *) s;
+			u32buf = *(uint32_t *) s;
 			lua_pushnumber(L, u32buf);
 			s += 4;
 			break;
@@ -1682,7 +1682,7 @@ lbox_unpack(struct lua_State *L)
 			CHECK_SIZE(s + 4);
 
 			/* field no */
-			u32buf = *(u32 *) s;
+			u32buf = *(uint32_t *) s;
 
 			/* opcode */
 			charbuf = *(s + 4);

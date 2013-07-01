@@ -41,12 +41,12 @@
 STRS(requests, REQUESTS);
 
 static const char *
-read_key(const char **reqpos, const char *reqend, u32 *key_part_count)
+read_key(const char **reqpos, const char *reqend, uint32_t *key_part_count)
 {
 	*key_part_count = pick_u32(reqpos, reqend);
 	const char *key = *key_part_count ? *reqpos : NULL;
 	/* Advance remaining fields of a key */
-	for (u32 i = 0; i < *key_part_count; i++)
+	for (uint32_t i = 0; i < *key_part_count; i++)
 		pick_field(reqpos, reqend);
 	return key;
 }
@@ -54,7 +54,7 @@ read_key(const char **reqpos, const char *reqend, u32 *key_part_count)
 static struct space *
 read_space(const char **reqpos, const char *reqend)
 {
-	u32 space_no = pick_u32(reqpos, reqend);
+	uint32_t space_no = pick_u32(reqpos, reqend);
 	return space_find(space_no);
 }
 
@@ -101,7 +101,7 @@ execute_update(struct request *request, struct txn *txn)
 			   BOX_ALLOWED_REQUEST_FLAGS);
 	/* Parse UPDATE request. */
 	/** Search key  and key part count. */
-	u32 key_part_count;
+	uint32_t key_part_count;
 	const char *key = read_key(reqpos, reqend, &key_part_count);
 
 	Index *pk = space_index(sp, 0);
@@ -131,26 +131,26 @@ execute_select(struct request *request, struct port *port)
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
 	struct space *sp = read_space(reqpos, reqend);
-	u32 index_no = pick_u32(reqpos, reqend);
+	uint32_t index_no = pick_u32(reqpos, reqend);
 	Index *index = index_find(sp, index_no);
-	u32 offset = pick_u32(reqpos, reqend);
-	u32 limit = pick_u32(reqpos, reqend);
-	u32 count = pick_u32(reqpos, reqend);
+	uint32_t offset = pick_u32(reqpos, reqend);
+	uint32_t limit = pick_u32(reqpos, reqend);
+	uint32_t count = pick_u32(reqpos, reqend);
 	if (count == 0)
 		tnt_raise(IllegalParams, "tuple count must be positive");
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
-	u32 found = 0;
+	uint32_t found = 0;
 
-	for (u32 i = 0; i < count; i++) {
+	for (uint32_t i = 0; i < count; i++) {
 
 		/* End the loop if reached the limit. */
 		if (limit == found)
 			return;
 
 		/* read key */
-		u32 key_part_count;
+		uint32_t key_part_count;
 		const char *key = read_key(reqpos, reqend, &key_part_count);
 
 		struct iterator *it = index->position();
@@ -177,7 +177,7 @@ execute_select(struct request *request, struct port *port)
 static void
 execute_delete(struct request *request, struct txn *txn)
 {
-	u32 type = request->type;
+	uint32_t type = request->type;
 	txn_add_redo(txn, type, request->data, request->len);
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
@@ -187,7 +187,7 @@ execute_delete(struct request *request, struct txn *txn)
 			BOX_ALLOWED_REQUEST_FLAGS;
 	}
 	/* read key */
-	u32 key_part_count;
+	uint32_t key_part_count;
 	const char *key = read_key(reqpos, reqend, &key_part_count);
 	/* Try to find tuple by primary key */
 	Index *pk = space_index(sp, 0);
@@ -205,7 +205,7 @@ execute_delete(struct request *request, struct txn *txn)
  * Check request type here for now.
  */
 static bool
-request_check_type(u32 type)
+request_check_type(uint32_t type)
 {
 	return (type != REPLACE && type != SELECT &&
 		type != UPDATE && type != DELETE_1_3 &&
@@ -213,7 +213,7 @@ request_check_type(u32 type)
 }
 
 const char *
-request_name(u32 type)
+request_name(uint32_t type)
 {
 	if (request_check_type(type))
 		return "unsupported";
@@ -221,7 +221,7 @@ request_name(u32 type)
 }
 
 struct request *
-request_create(u32 type, const char *data, u32 len)
+request_create(uint32_t type, const char *data, uint32_t len)
 {
 	if (request_check_type(type)) {
 		say_error("Unsupported request = %" PRIi32 "", type);

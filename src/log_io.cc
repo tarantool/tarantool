@@ -36,7 +36,7 @@
 #include "fio.h"
 #include "tarantool_eio.h"
 
-const u32 default_version = 11;
+const uint32_t default_version = 11;
 const log_magic_t row_marker_v11 = 0xba0babed;
 const log_magic_t eof_marker_v11 = 0x10adab1e;
 const char inprogress_suffix[] = ".inprogress";
@@ -226,7 +226,7 @@ row_reader_v11(FILE *f, uint32_t *rowlen)
 {
 	struct header_v11 m;
 
-	u32 header_crc, data_crc;
+	uint32_t header_crc, data_crc;
 
 	if (fread(&m, sizeof(m), 1, f) != 1)
 		return ROW_EOF;

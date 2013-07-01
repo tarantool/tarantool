@@ -239,14 +239,14 @@ TreeIndex::max() const
 }
 
 struct tuple *
-TreeIndex::random(u32 rnd) const
+TreeIndex::random(uint32_t rnd) const
 {
 	void *node = sptree_index_random(&tree, rnd);
 	return sptree_index_unfold(node);
 }
 
 struct tuple *
-TreeIndex::findByKey(const char *key, u32 part_count) const
+TreeIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(key_def->is_unique && part_count == key_def->part_count);
 
@@ -309,7 +309,7 @@ TreeIndex::allocIterator() const
 
 void
 TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
-			const char *key, u32 part_count) const
+			const char *key, uint32_t part_count) const
 {
 	assert (key != NULL || part_count == 0);
 	struct tree_iterator *it = tree_iterator(iterator);
@@ -397,8 +397,8 @@ TreeIndex::endBuild()
 {
 	assert(index_is_primary(this));
 
-	u32 n_tuples = tree.size;
-	u32 estimated_tuples = tree.max_size;
+	uint32_t n_tuples = tree.size;
+	uint32_t estimated_tuples = tree.max_size;
 	void *nodes = tree.members;
 
 	sptree_index_init(&tree, sizeof(struct tuple *),
@@ -411,8 +411,8 @@ TreeIndex::endBuild()
 void
 TreeIndex::build(Index *pk)
 {
-	u32 n_tuples = pk->size();
-	u32 estimated_tuples = n_tuples * 1.2;
+	uint32_t n_tuples = pk->size();
+	uint32_t estimated_tuples = n_tuples * 1.2;
 
 	void *nodes = NULL;
 	if (n_tuples) {
@@ -433,7 +433,7 @@ TreeIndex::build(Index *pk)
 
 	struct tuple *tuple;
 
-	for (u32 i = 0; (tuple = it->next(it)) != NULL; ++i) {
+	for (uint32_t i = 0; (tuple = it->next(it)) != NULL; ++i) {
 		struct sptree_index_node *node = (struct sptree_index_node *)
 				nodes + i;
 		sptree_index_fold(node, tuple);

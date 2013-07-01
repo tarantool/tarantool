@@ -207,7 +207,7 @@ HashIndex::endBuild()
 void
 HashIndex::build(Index *pk)
 {
-	u32 n_tuples = pk->size();
+	uint32_t n_tuples = pk->size();
 
 	if (n_tuples == 0)
 		return;
@@ -226,7 +226,7 @@ HashIndex::build(Index *pk)
 }
 
 void
-HashIndex::reserve(u32 n_tuples)
+HashIndex::reserve(uint32_t n_tuples)
 {
 	mh_index_reserve(hash, n_tuples, key_def);
 }
@@ -253,7 +253,7 @@ HashIndex::max() const
 }
 
 struct tuple *
-HashIndex::random(u32 rnd) const
+HashIndex::random(uint32_t rnd) const
 {
 	uint32_t k = mh_index_random(hash, rnd);
 	if (k != mh_end(hash))
@@ -262,7 +262,7 @@ HashIndex::random(u32 rnd) const
 }
 
 struct tuple *
-HashIndex::findByKey(const char *key, u32 part_count) const
+HashIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(key_def->is_unique && part_count == key_def->part_count);
 
@@ -338,7 +338,7 @@ HashIndex::allocIterator() const
 
 void
 HashIndex::initIterator(struct iterator *ptr, enum iterator_type type,
-			const char *key, u32 part_count) const
+			const char *key, uint32_t part_count) const
 {
 	assert (key != NULL || part_count == 0);
 	(void) part_count;

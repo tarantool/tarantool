@@ -87,7 +87,7 @@ tuple_ref(struct tuple *tuple, int count)
  * @returns field data if field exists or NULL
  */
 const char *
-tuple_field_old(struct tuple *tuple, u32 i)
+tuple_field_old(struct tuple *tuple, uint32_t i)
 {
 	const char *field = tuple->data;
 	const char *tuple_end = tuple->data + tuple->bsize;
@@ -143,7 +143,7 @@ print_field(struct tbuf *buf, const char *field, uint32_t len)
 		tbuf_printf(buf, "%hu", *(uint16_t *)field);
 		break;
 	case 4:
-		tbuf_printf(buf, "%u", *(u32 *)field);
+		tbuf_printf(buf, "%u", *(uint32_t *)field);
 		break;
 	case 8:
 		tbuf_printf(buf, "%" PRIu64, *(uint64_t *)field);

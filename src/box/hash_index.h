@@ -45,8 +45,8 @@ public:
 	virtual size_t size() const;
 	virtual struct tuple *min() const;
 	virtual struct tuple *max() const;
-	virtual struct tuple *random(u32 rnd) const;
-	virtual struct tuple *findByKey(const char *key, u32 part_count) const;
+	virtual struct tuple *random(uint32_t rnd) const;
+	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode);
@@ -54,9 +54,9 @@ public:
 	virtual struct iterator *allocIterator() const;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
-				  const char *key, u32 part_count) const;
+				  const char *key, uint32_t part_count) const;
 
-	virtual void reserve(u32 n_tuples);
+	virtual void reserve(uint32_t n_tuples);
 
 protected:
 	struct mh_index_t *hash;

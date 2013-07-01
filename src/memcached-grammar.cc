@@ -52,7 +52,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 	bool append, show_cas;
 	int incr_sign;
 	uint64_t cas, incr;
-	u32 flags, exptime, bytes;
+	uint32_t flags, exptime, bytes;
 	bool noreply = false;
 	char *data = NULL;
 	bool done = false;

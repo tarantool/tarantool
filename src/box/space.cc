@@ -48,7 +48,7 @@ bool secondary_indexes_enabled = false;
 bool primary_indexes_enabled = false;
 
 struct space *
-space_create(u32 space_no, struct key_def *key_defs, u32 key_count, u32 arity)
+space_create(uint32_t space_no, struct key_def *key_defs, uint32_t key_count, uint32_t arity)
 {
 
 	struct space *space = space_by_n(space_no);
@@ -70,7 +70,7 @@ space_create(u32 space_no, struct key_def *key_defs, u32 key_count, u32 arity)
 
 /* return space by its number */
 struct space *
-space_by_n(u32 n)
+space_by_n(uint32_t n)
 {
 	const struct mh_i32ptr_node_t node = { n, NULL };
 	mh_int_t space = mh_i32ptr_get(spaces, &node, NULL);
@@ -111,7 +111,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata) {
 
 /** Set index by index no */
 void
-space_set_index(struct space *sp, u32 index_no, Index *idx)
+space_set_index(struct space *sp, uint32_t index_no, Index *idx)
 {
 	assert(index_no < BOX_INDEX_MAX);
 	sp->index[index_no] = idx;
@@ -129,7 +129,7 @@ struct tuple *
 space_replace(struct space *sp, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode)
 {
-	u32 i = 0;
+	uint32_t i = 0;
 	try {
 		/* Update the primary key */
 		Index *pk = sp->index[0];
@@ -142,7 +142,7 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 		old_tuple = pk->replace(old_tuple, new_tuple, mode);
 
 		assert(old_tuple || new_tuple);
-		u32 n = index_count(sp);
+		uint32_t n = index_count(sp);
 		/* Update secondary keys */
 		for (i = i + 1; i < n; i++) {
 			Index *index = sp->index[i];
@@ -188,7 +188,7 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 		 * skip undefined size fields (STRING and UNKNOWN).
 		 */
 		if (sp->field_types[fieldno] == NUM) {
-			if (len != sizeof(u32))
+			if (len != sizeof(uint32_t))
 				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
 					  "NUM");
 		} else if (sp->field_types[fieldno] == NUM64) {
@@ -210,7 +210,7 @@ space_free(void)
 				mh_i32ptr_node(spaces, i)->val;
 		mh_i32ptr_del(spaces, i, NULL);
 
-		for (u32 j = 0 ; j < space->key_count; j++) {
+		for (uint32_t j = 0 ; j < space->key_count; j++) {
 			Index *index = space->index[j];
 			delete index;
 			key_free(&space->key_defs[j]);
@@ -234,7 +234,7 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 		panic("Wrong index type: %s", cfg_index->type);
 
 	/* Calculate key part count and maximal field number. */
-	for (u32 k = 0; cfg_index->key_field[k] != NULL; ++k) {
+	for (uint32_t k = 0; cfg_index->key_field[k] != NULL; ++k) {
 		auto cfg_key = cfg_index->key_field[k];
 
 		if (cfg_key->fieldno == -1) {
@@ -255,16 +255,16 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 
 	/* init compare order array */
 	def->max_fieldno++;
-	def->cmp_order = (u32 *) malloc(def->max_fieldno * sizeof(u32));
+	def->cmp_order = (uint32_t *) malloc(def->max_fieldno * sizeof(uint32_t));
 	if (def->cmp_order == NULL) {
 		panic("can't allocate def cmp_order array for index");
 	}
-	for (u32 fieldno = 0; fieldno < def->max_fieldno; fieldno++) {
+	for (uint32_t fieldno = 0; fieldno < def->max_fieldno; fieldno++) {
 		def->cmp_order[fieldno] = BOX_FIELD_MAX;
 	}
 
 	/* fill fields and compare order */
-	for (u32 k = 0; cfg_index->key_field[k] != NULL; ++k) {
+	for (uint32_t k = 0; cfg_index->key_field[k] != NULL; ++k) {
 		auto cfg_key = cfg_index->key_field[k];
 
 		if (cfg_key->fieldno == -1) {
@@ -292,8 +292,8 @@ key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 static void
 space_init_field_types(struct space *space)
 {
-	u32 i, max_fieldno;
-	u32 key_count = space->key_count;
+	uint32_t i, max_fieldno;
+	uint32_t key_count = space->key_count;
 	struct key_def *key_defs = space->key_defs;
 
 	/* find max max field no */
@@ -310,7 +310,7 @@ space_init_field_types(struct space *space)
 	/* extract field type info */
 	for (i = 0; i < key_count; i++) {
 		struct key_def *def = &key_defs[i];
-		for (u32 pi = 0; pi < def->part_count; pi++) {
+		for (uint32_t pi = 0; pi < def->part_count; pi++) {
 			struct key_part *part = &def->parts[pi];
 			assert(part->fieldno < max_fieldno);
 			space->field_types[part->fieldno] = part->type;
@@ -321,7 +321,7 @@ space_init_field_types(struct space *space)
 	/* validate field type info */
 	for (i = 0; i < key_count; i++) {
 		struct key_def *def = &key_defs[i];
-		for (u32 pi = 0; pi < def->part_count; pi++) {
+		for (uint32_t pi = 0; pi < def->part_count; pi++) {
 			struct key_part *part = &def->parts[pi];
 			assert(space->field_types[part->fieldno] == part->type);
 		}
@@ -338,7 +338,7 @@ space_config()
 	}
 
 	/* fill box spaces */
-	for (u32 i = 0; cfg.space[i] != NULL; ++i) {
+	for (uint32_t i = 0; cfg.space[i] != NULL; ++i) {
 		tarantool_cfg_space *cfg_space = cfg.space[i];
 
 		if (!CNF_STRUCT_DEFINED(cfg_space) || !cfg_space->enabled)
@@ -361,7 +361,7 @@ space_config()
 		 * indexes.
 		 */
 		space->key_count = 0;
-		for (u32 j = 0; cfg_space->index[j] != NULL; ++j) {
+		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
 			++space->key_count;
 		}
 
@@ -371,14 +371,14 @@ space_config()
 		if (space->key_defs == NULL) {
 			panic("can't allocate key def array");
 		}
-		for (u32 j = 0; cfg_space->index[j] != NULL; ++j) {
+		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
 			auto cfg_index = cfg_space->index[j];
 			key_init(&space->key_defs[j], cfg_index);
 		}
 		space_init_field_types(space);
 
 		/* fill space indexes */
-		for (u32 j = 0; cfg_space->index[j] != NULL; ++j) {
+		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
 			auto cfg_index = cfg_space->index[j];
 			enum index_type type = STR2ENUM(index_type, cfg_index->type);
 			struct key_def *key_def = &space->key_defs[j];
@@ -448,7 +448,7 @@ build_secondary_indexes(void)
 		say_info("Building secondary keys in space %d...", space->no);
 
 		Index *pk = space->index[0];
-		for (u32 j = 1; j < space->key_count; j++) {
+		for (uint32_t j = 1; j < space->key_count; j++) {
 			Index *index = space->index[j];
 			index->build(pk);
 		}
@@ -501,12 +501,12 @@ check_spaces(struct tarantool_cfg *conf)
 			return -1;
 		}
 
-		u32 max_key_fieldno = 0;
+		uint32_t max_key_fieldno = 0;
 
 		/* check spaces indexes */
 		for (size_t j = 0; space->index[j] != NULL; ++j) {
 			auto index = space->index[j];
-			u32 key_part_count = 0;
+			uint32_t key_part_count = 0;
 			enum index_type index_type;
 
 			/* check index bound */
@@ -627,7 +627,7 @@ check_spaces(struct tarantool_cfg *conf)
 					if (key->fieldno == -1)
 						break;
 
-					u32 f = key->fieldno;
+					uint32_t f = key->fieldno;
 					enum field_data_type t = STR2ENUM(field_data_type, key->type);
 					assert(t != field_data_type_MAX);
 					if (types[f] != t) {

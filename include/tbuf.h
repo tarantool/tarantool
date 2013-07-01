@@ -40,9 +40,9 @@ extern "C" {
 
 struct tbuf {
 	/* Used space in the buffer. */
-	u32 size;
+	uint32_t size;
 	/* Total allocated buffer capacity. */
-	u32 capacity;
+	uint32_t capacity;
 	/* Allocated buffer. */
 	char *data;
 	struct palloc_pool *pool;

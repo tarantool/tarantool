@@ -73,22 +73,22 @@ ENUM(requests, REQUESTS);
 extern const char *requests_strs[];
 
 static inline bool
-request_is_select(u32 type)
+request_is_select(uint32_t type)
 {
 	return type == SELECT || type == CALL;
 }
 
-const char *request_name(u32 type);
+const char *request_name(uint32_t type);
 
 struct request
 {
-	u32 type;
-	u32 flags;
+	uint32_t type;
+	uint32_t flags;
 	const char *data;
-	u32 len;
+	uint32_t len;
 };
 
-struct request *request_create(u32 type, const char *data, u32 len);
+struct request *request_create(uint32_t type, const char *data, uint32_t len);
 
 void request_execute(struct request *request, struct txn *txn, struct port *port);
 

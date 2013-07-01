@@ -113,13 +113,13 @@ struct tuple_update
 
 /** Argument of SET operation. */
 struct op_set_arg {
-	u32 length;
+	uint32_t length;
 	const char *value;
 };
 
 /** Argument of ADD, AND, XOR, OR operations. */
 struct op_arith_arg {
-	u32 val_size;
+	uint32_t val_size;
 	union {
 		int32_t i32_val;
 		int64_t i64_val;
@@ -163,8 +163,8 @@ struct update_op {
 	STAILQ_ENTRY(update_op) next;
 	struct update_op_meta *meta;
 	union update_op_arg arg;
-	u32 field_no;
-	u32 new_field_len;
+	uint32_t field_no;
+	uint32_t new_field_len;
 	uint8_t opcode;
 };
 
@@ -186,12 +186,12 @@ struct update_field {
 	 * of old data to the beginning of the field in the
 	 * next update_field structure.
 	 */
-	u32 tail_len;
+	uint32_t tail_len;
 };
 
 static void
 update_field_init(struct update_field *field,
-		  const char *old, u32 old_len, u32 tail_len)
+		  const char *old, uint32_t old_len, uint32_t tail_len)
 {
 	STAILQ_INIT(&field->ops);
 	field->old = old;
@@ -199,7 +199,7 @@ update_field_init(struct update_field *field,
 	field->tail_len = tail_len;
 }
 
-static inline u32
+static inline uint32_t
 update_field_len(struct update_field *f)
 {
 	struct update_op *last = STAILQ_LAST(&f->ops, update_op, next);
@@ -207,14 +207,14 @@ update_field_len(struct update_field *f)
 }
 
 static inline void
-op_check_field_no(u32 field_no, u32 field_max)
+op_check_field_no(uint32_t field_no, uint32_t field_max)
 {
 	if (field_no > field_max)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_no);
 }
 
 static inline void
-op_adjust_field_no(struct update_op *op, u32 field_max)
+op_adjust_field_no(struct update_op *op, uint32_t field_max)
 {
 	if (op->field_no == UINT32_MAX)
 		op->field_no = field_max;
@@ -333,7 +333,7 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 	struct update_field *field = (struct update_field *)
 			rope_extract(update->rope, op->field_no);
 	struct op_arith_arg *arg = &op->arg.arith;
-	u32 field_len = update_field_len(field);
+	uint32_t field_len = update_field_len(field);
 
 	switch (field_len) {
 	case sizeof(int32_t):
@@ -378,7 +378,7 @@ init_update_op_splice(struct tuple_update *update, struct update_op *op)
 	struct update_field *field = (struct update_field *)
 			rope_extract(update->rope, op->field_no);
 
-	u32 field_len = update_field_len(field);
+	uint32_t field_len = update_field_len(field);
 
 	struct op_splice_arg *arg = &op->arg.splice;
 	const char *value = op->arg.set.value;
@@ -408,7 +408,7 @@ init_update_op_splice(struct tuple_update *update, struct update_op *op)
 	}
 
 	/* Read the paste. */
-	arg->paste = pick_field_str(&value, end, (u32 *) &arg->paste_length);
+	arg->paste = pick_field_str(&value, end, (uint32_t *) &arg->paste_length);
 
 	/* Fill tail part */
 	arg->tail_offset = arg->offset + arg->cut_length;
@@ -465,7 +465,7 @@ update_field_split(void *split_ctx, void *data, size_t size __attribute__((unuse
 	const char *end = field + prev->tail_len;
 
 	prev->tail_len = tuple_range_size(&field, end, offset - 1);
-	u32 field_len = load_varint32(&field);
+	uint32_t field_len = load_varint32(&field);
 
 	update_field_init(next, field, field_len, end - field - field_len);
 	return next;
@@ -497,7 +497,7 @@ update_create_rope(struct tuple_update *update,
 			update->alloc(update->alloc_ctx, sizeof(*first));
 	const char *field = tuple_data;
 	const char *end = tuple_data_end;
-	u32 field_len = load_varint32(&field);
+	uint32_t field_len = load_varint32(&field);
 	update_field_init(first, field, field_len,
 			  end - field - field_len);
 
@@ -544,8 +544,8 @@ do_update_ops(struct tuple_update *update, char *new_data)
 
 		struct update_field *field = (struct update_field *)
 				rope_leaf_data(node);
-		u32 field_count = rope_leaf_size(node);
-		u32 field_len = update_field_len(field);
+		uint32_t field_count = rope_leaf_size(node);
+		uint32_t field_len = update_field_len(field);
 
 		new_data = pack_varint32(new_data, field_len);
 

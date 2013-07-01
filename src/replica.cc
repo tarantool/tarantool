@@ -76,7 +76,7 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	*err = "can't write version";
 	coio_write(coio, &initial_lsn, sizeof(initial_lsn));
 
-	u32 version;
+	uint32_t version;
 	*err = "can't read version";
 	coio_readn(coio, &version, sizeof(version));
 	*err = NULL;
