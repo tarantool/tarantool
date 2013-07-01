@@ -153,7 +153,7 @@ memcached_store(const char *key, u32 exptime, u32 flags, u32 bytes,
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
 	 */
-	box_process(&port_null, REPLACE, req->data, req->size);
+	box_process(&null_port, REPLACE, req->data, req->size);
 }
 
 static void
@@ -168,7 +168,7 @@ memcached_delete(const char *key)
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	box_process(&port_null, DELETE, req->data, req->size);
+	box_process(&null_port, DELETE, req->data, req->size);
 }
 
 static struct tuple *

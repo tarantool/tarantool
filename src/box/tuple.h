@@ -230,5 +230,15 @@ int
 tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
 		       uint32_t part_count, const struct key_def *key_def);
 
+/** These functions are implemented in tuple_convert.cc. */
+
+/* Store tuple in the output buffer in iproto format. */
+void
+tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
+
+/* Store tuple fields in the Lua buffer, BER-length-encoded. */
+void
+tuple_to_luabuf(struct tuple *tuple, struct luaL_Buffer *b);
+
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

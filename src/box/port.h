@@ -79,12 +79,12 @@ port_add_tuple(struct port *port, struct tuple *tuple, u32 flags)
 
 /** Reused in port_lua */
 void
-port_null_eof(struct port *port __attribute__((unused)));
+null_port_eof(struct port *port __attribute__((unused)));
 
 /**
  * This one does not have state currently, thus a single
  * instance is sufficient.
  */
-extern struct port port_null;
+extern struct port null_port;
 
 #endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

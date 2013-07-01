@@ -103,6 +103,7 @@ set (common_sources
      cpu_feature.c
      replica.cc
      iproto.cc
+     iproto_port.cc
      session.cc
      object.cc
      exception.cc

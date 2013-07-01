@@ -26,26 +26,44 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "port.h"
+#include "iproto_port.h"
 
-void
-null_port_eof(struct port *port __attribute__((unused)))
+static inline struct iproto_port *
+iproto_port(struct port *port)
 {
+	return (struct iproto_port *) port;
 }
 
-static void
-null_port_add_tuple(struct port *port __attribute__((unused)),
-		    struct tuple *tuple __attribute__((unused)),
-		    u32 flags __attribute__((unused)))
+static inline void
+iproto_port_eof(struct port *ptr)
 {
+	struct iproto_port *port = iproto_port(ptr);
+	/* found == 0 means add_tuple wasn't called at all. */
+	if (port->reply.found == 0) {
+		port->reply.hdr.len = sizeof(port->reply) -
+			sizeof(port->reply.hdr);
+		obuf_dup(port->buf, &port->reply, sizeof(port->reply));
+	} else {
+		port->reply.hdr.len = obuf_size(port->buf) - port->svp.size -
+			sizeof(port->reply.hdr);
+		memcpy(obuf_svp_to_ptr(port->buf, &port->svp),
+		       &port->reply, sizeof(port->reply));
+	}
 }
 
-static struct port_vtab null_port_vtab = {
-	null_port_add_tuple,
-	null_port_eof,
-};
+static inline void
+iproto_port_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
+{
+	struct iproto_port *port = iproto_port(ptr);
+	if (++port->reply.found == 1) {
+		/* Found the first tuple, add header. */
+		port->svp = obuf_book(port->buf, sizeof(port->reply));
+	}
+	if (flags & BOX_RETURN_TUPLE)
+		tuple_to_obuf(tuple, port->buf);
+}
 
-struct port null_port = {
-	/* .vtab = */ &null_port_vtab,
+struct port_vtab iproto_port_vtab = {
+	iproto_port_add_tuple,
+	iproto_port_eof,
 };
-

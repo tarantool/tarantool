@@ -15,8 +15,21 @@ add_custom_target(box_generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
-tarantool_module("box" tuple.cc index.cc hash_index.cc tree_index.cc space.cc
-    port.cc request.cc tuple_update.cc txn.cc box.cc ${lua_sources} box_lua.cc box_lua_space.cc
-    bitset_index.cc)
+tarantool_module("box"
+    tuple.cc
+    tuple_convert.cc
+    tuple_update.cc
+    index.cc
+    hash_index.cc
+    tree_index.cc
+    bitset_index.cc
+    space.cc
+    port.cc
+    request.cc
+    txn.cc
+    box.cc
+    ${lua_sources}
+    box_lua.cc
+    box_lua_space.cc)
 
 target_link_libraries(tarantool_box bitset)

@@ -26,26 +26,22 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "port.h"
+#include "tuple.h"
+#include "iobuf.h"
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+} /* extern "C" */
 
 void
-null_port_eof(struct port *port __attribute__((unused)))
+tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 {
+	obuf_dup(buf, &tuple->bsize, tuple_len(tuple));
 }
 
-static void
-null_port_add_tuple(struct port *port __attribute__((unused)),
-		    struct tuple *tuple __attribute__((unused)),
-		    u32 flags __attribute__((unused)))
+void
+tuple_to_luabuf(struct tuple *tuple, struct luaL_Buffer *b)
 {
+	luaL_addlstring(b, (char*)tuple->data, tuple->bsize);
 }
-
-static struct port_vtab null_port_vtab = {
-	null_port_add_tuple,
-	null_port_eof,
-};
-
-struct port null_port = {
-	/* .vtab = */ &null_port_vtab,
-};
-

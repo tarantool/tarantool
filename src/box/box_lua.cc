@@ -792,7 +792,7 @@ lbox_create_iterator(struct lua_State *L)
 			/* Tuple. */
 			struct tuple *tuple = lua_checktuple(L, 2);
 			key_part_count = tuple->field_count;
-			luaL_addlstring(&b, tuple->data, tuple->bsize);
+			tuple_to_luabuf(tuple, &b);
 		} else {
 			/* Single or multi- part key. */
 			key_part_count = argc - 2;
@@ -905,7 +905,7 @@ lbox_index_count(struct lua_State *L)
 	if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 		/* Searching by tuple. */
 		struct tuple *tuple = lua_checktuple(L, 2);
-		luaL_addlstring(&b, tuple->data, tuple->bsize);
+		tuple_to_luabuf(tuple, &b);
 		key_part_count = tuple->field_count;
 	} else {
 		/* Single or multi- part key. */
@@ -994,7 +994,7 @@ port_lua_add_tuple(struct port *port, struct tuple *tuple,
 
 struct port_vtab port_lua_vtab = {
 	port_lua_add_tuple,
-	port_null_eof,
+	null_port_eof,
 };
 
 static struct port *
@@ -1398,10 +1398,10 @@ luaL_packvalue(struct lua_State *L, luaL_Buffer *b, int index)
 	switch (lua_type(L, index)) {
 	case LUA_TUSERDATA:
 	{
-		struct tuple *tu = lua_istuple(L, index);
-		if (tu == NULL)
+		struct tuple *tuple = lua_istuple(L, index);
+		if (tuple == NULL)
 			luaL_error(L, "box.pack: unsupported type");
-		luaL_addlstring(b, (char*)tu->data, tu->bsize);
+		tuple_to_luabuf(tuple, b);
 		return;
 	}
 	case LUA_TTABLE:

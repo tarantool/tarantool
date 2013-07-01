@@ -176,7 +176,7 @@ recover_row(void *param __attribute__((unused)), struct tbuf *t)
 			recover_snap_row(data);
 		} else if (tag == XLOG) {
 			u16 op = pick_u16(&data, end);
-			process_rw(&port_null, op, data, end - data);
+			process_rw(&null_port, op, data, end - data);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
