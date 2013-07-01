@@ -539,7 +539,7 @@ static void
 replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
 {
 	int client_sock = (int) (intptr_t) w->data;
-	u8 data;
+	uint8_t data;
 
 	int rc = recv(client_sock, &data, sizeof(data), 0);
 

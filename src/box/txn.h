@@ -42,14 +42,14 @@ struct txn {
 	/* Redo info: binary packet */
 	const char *data;
 	u32 len;
-	u16 op;
+	uint16_t op;
 };
 
 struct txn *txn_begin();
 void txn_commit(struct txn *txn);
 void txn_finish(struct txn *txn);
 void txn_rollback(struct txn *txn);
-void txn_add_redo(struct txn *txn, u16 op, const char *data, u32 len);
+void txn_add_redo(struct txn *txn, uint16_t op, const char *data, u32 len);
 void txn_replace(struct txn *txn, struct space *space,
 		 struct tuple *old_tuple, struct tuple *new_tuple,
 		 enum dup_replace_mode mode);

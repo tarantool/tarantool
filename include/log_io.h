@@ -141,13 +141,13 @@ header_v11_sign(struct header_v11 *header);
 struct row_v11 {
 	log_magic_t marker;
 	struct header_v11 header;
-	u16 tag;
+	uint16_t tag;
 	u64 cookie;
-	u8 data[];
+	uint8_t data[];
 } __attribute__((packed));
 
 void
-row_v11_fill(struct row_v11 *row, u64 lsn, u16 tag, u64 cookie,
+row_v11_fill(struct row_v11 *row, u64 lsn, uint16_t tag, u64 cookie,
 	     const char *metadata, size_t metadata_len, const char
 	     *data, size_t data_len);
 

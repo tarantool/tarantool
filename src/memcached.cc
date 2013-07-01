@@ -77,7 +77,7 @@ memcached_natoq(const char *start, const char *end)
 {
 	u64 num = 0;
 	while (start < end) {
-		u8 code = *start++;
+		uint8_t code = *start++;
 		num = num * 10 + (code - '0');
 	}
 	return num;

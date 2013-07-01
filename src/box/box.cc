@@ -170,12 +170,12 @@ recover_row(void *param __attribute__((unused)), const char *row, uint32_t rowle
 	try {
 		const char *end = row + rowlen;
 		row += sizeof(struct header_v11);
-		u16 tag = pick_u16(&row, end);
+		uint16_t tag = pick_u16(&row, end);
 		(void) pick_u64(&row, end); /* drop cookie */
 		if (tag == SNAP) {
 			recover_snap_row(row);
 		} else if (tag == XLOG) {
-			u16 op = pick_u16(&row, end);
+			uint16_t op = pick_u16(&row, end);
 			process_rw(&null_port, op, row, end - row);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);

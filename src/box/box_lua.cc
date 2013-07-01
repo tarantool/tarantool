@@ -1609,8 +1609,8 @@ lbox_unpack(struct lua_State *L)
 	int save_stacksize = lua_gettop(L);
 
 	char charbuf;
-	u8  u8buf;
-	u16 u16buf;
+	uint8_t  u8buf;
+	uint16_t u16buf;
 	u32 u32buf;
 
 #define CHECK_SIZE(cur) if (unlikely((cur) >= end)) {	                \
@@ -1621,13 +1621,13 @@ lbox_unpack(struct lua_State *L)
 		switch (*f) {
 		case 'b':
 			CHECK_SIZE(s);
-			u8buf = *(u8 *) s;
+			u8buf = *(uint8_t *) s;
 			lua_pushnumber(L, u8buf);
 			s++;
 			break;
 		case 's':
 			CHECK_SIZE(s + 1);
-			u16buf = *(u16 *) s;
+			u16buf = *(uint16_t *) s;
 			lua_pushnumber(L, u16buf);
 			s += 2;
 			break;

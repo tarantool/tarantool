@@ -347,10 +347,10 @@ print_tuple(struct tnt_tuple *tuple)
 
 		switch(size) {
 		case 1:
-			printf("%"PRIi8" (0x%02"PRIx8")", *(i8 *)data, *(i8 *)data);
+			printf("%"PRIi8" (0x%02"PRIx8")", *(int8_t *)data, *(int8_t *)data);
 			break;
 		case 2:
-			printf("%"PRIi16" (0x%04"PRIx16")", *(i16 *)data, *(i16 *)data);
+			printf("%"PRIi16" (0x%04"PRIx16")", *(int16_t *)data, *(int16_t *)data);
 			break;
 		case 4:
 			printf("%"PRIi32" (0x%08"PRIx32")", *(i32 *)data, *(i32 *)data);

@@ -123,7 +123,7 @@ void recover_existing_wals(struct recovery_state *);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
 int wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
-	      u16 op, const char *data, u32 len);
+	      uint16_t op, const char *data, u32 len);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 

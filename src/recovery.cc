@@ -1106,7 +1106,7 @@ wal_writer_thread(void *worker_args)
  */
 int
 wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
-	  u16 op, const char *row, u32 row_len)
+	  uint16_t op, const char *row, u32 row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);

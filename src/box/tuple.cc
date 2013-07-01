@@ -140,7 +140,7 @@ print_field(struct tbuf *buf, const char *field, uint32_t len)
 {
 	switch (len) {
 	case 2:
-		tbuf_printf(buf, "%hu", *(u16 *)field);
+		tbuf_printf(buf, "%hu", *(uint16_t *)field);
 		break;
 	case 4:
 		tbuf_printf(buf, "%u", *(u32 *)field);
@@ -152,10 +152,10 @@ print_field(struct tbuf *buf, const char *field, uint32_t len)
 		tbuf_printf(buf, "'");
 		const char *field_end = field + len;
 		while (field < field_end) {
-			if (0x20 <= *(u8 *)field && *(u8 *)field < 0x7f) {
-				tbuf_printf(buf, "%c", *(u8 *) field);
+			if (0x20 <= *(uint8_t *)field && *(uint8_t *)field < 0x7f) {
+				tbuf_printf(buf, "%c", *(uint8_t *) field);
 			} else {
-				tbuf_printf(buf, "\\x%02X", *(u8 *)field);
+				tbuf_printf(buf, "\\x%02X", *(uint8_t *)field);
 			}
 			field++;
 		}

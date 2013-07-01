@@ -41,9 +41,9 @@ struct key_def;
 struct tuple
 {
 	/** reference counter */
-	u16 refs;
+	uint16_t refs;
 	/* see enum tuple_flags */
-	u16 flags;
+	uint16_t flags;
 	/** length of the variable part of the tuple */
 	u32 bsize;
 	/** number of fields in the variable part. */

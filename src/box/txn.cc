@@ -36,7 +36,7 @@
 #include "request.h" /* for request_name */
 
 void
-txn_add_redo(struct txn *txn, u16 op, const char *data, u32 len)
+txn_add_redo(struct txn *txn, uint16_t op, const char *data, u32 len)
 {
 	txn->op = op;
 	txn->data = data;

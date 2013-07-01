@@ -165,7 +165,7 @@ struct update_op {
 	union update_op_arg arg;
 	u32 field_no;
 	u32 new_field_len;
-	u8 opcode;
+	uint8_t opcode;
 };
 
 STAILQ_HEAD(op_list, update_op);
