@@ -40,7 +40,7 @@ static ev_timer timer;
 
 struct stats {
 	const char *name;
-	i64 value[SECS + 1];
+	int64_t value[SECS + 1];
 } *stats = NULL;
 static int stats_size = 0;
 static int stats_max = 0;
@@ -87,7 +87,7 @@ stat_register(const char **name, size_t max_idx)
 }
 
 void
-stat_collect(int base, int name, i64 value)
+stat_collect(int base, int name, int64_t value)
 {
 	stats[base + name].value[0] += value;
 	stats[base + name].value[SECS] += value;

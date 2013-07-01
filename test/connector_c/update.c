@@ -356,7 +356,7 @@ print_tuple(struct tnt_tuple *tuple)
 			printf("%"PRIi32" (0x%08"PRIx32")", *(i32 *)data, *(i32 *)data);
 			break;
 		case 8:
-			printf("%"PRIi64" (0x%016"PRIx64")", *(i64 *)data, *(i64 *)data);
+			printf("%"PRIi64" (0x%016"PRIx64")", *(int64_t *)data, *(int64_t *)data);
 			break;
 		default:
 			printf("'%.*s'", size, data);

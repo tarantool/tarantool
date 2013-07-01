@@ -87,19 +87,19 @@ struct log_dir wal_dir = {
 static int
 cmp_i64(const void *_a, const void *_b)
 {
-	const i64 *a = (const i64 *) _a, *b = (const i64 *) _b;
+	const int64_t *a = (const int64_t *) _a, *b = (const int64_t *) _b;
 	if (*a == *b)
 		return 0;
 	return (*a > *b) ? 1 : -1;
 }
 
 static ssize_t
-scan_dir(struct log_dir *dir, i64 **ret_lsn)
+scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 {
 	ssize_t result = -1;
 	size_t i = 0, size = 1024;
 	ssize_t ext_len = strlen(dir->filename_ext);
-	i64 *lsn = (i64 *) palloc(fiber->gc_pool, sizeof(i64) * size);
+	int64_t *lsn = (int64_t *) palloc(fiber->gc_pool, sizeof(int64_t) * size);
 	DIR *dh = opendir(dir->dirname);
 
 	if (lsn == NULL || dh == NULL)
@@ -143,16 +143,16 @@ scan_dir(struct log_dir *dir, i64 **ret_lsn)
 
 		i++;
 		if (i == size) {
-			i64 *n = (i64 *) palloc(fiber->gc_pool, sizeof(i64) * size * 2);
+			int64_t *n = (int64_t *) palloc(fiber->gc_pool, sizeof(int64_t) * size * 2);
 			if (n == NULL)
 				goto out;
-			memcpy(n, lsn, sizeof(i64) * size);
+			memcpy(n, lsn, sizeof(int64_t) * size);
 			lsn = n;
 			size = size * 2;
 		}
 	}
 
-	qsort(lsn, i, sizeof(i64), cmp_i64);
+	qsort(lsn, i, sizeof(int64_t), cmp_i64);
 
 	*ret_lsn = lsn;
 	result = i;
@@ -165,10 +165,10 @@ out:
 	return result;
 }
 
-i64
+int64_t
 greatest_lsn(struct log_dir *dir)
 {
-	i64 *lsn;
+	int64_t *lsn;
 	ssize_t count = scan_dir(dir, &lsn);
 
 	if (count <= 0)
@@ -177,10 +177,10 @@ greatest_lsn(struct log_dir *dir)
 	return lsn[count - 1];
 }
 
-i64
-find_including_file(struct log_dir *dir, i64 target_lsn)
+int64_t
+find_including_file(struct log_dir *dir, int64_t target_lsn)
 {
-	i64 *lsn;
+	int64_t *lsn;
 	ssize_t count = scan_dir(dir, &lsn);
 
 	if (count <= 0)
@@ -206,7 +206,7 @@ find_including_file(struct log_dir *dir, i64 target_lsn)
 }
 
 char *
-format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
+format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 {
 	static __thread char filename[PATH_MAX + 1];
 	const char *suffix_str = suffix == INPROGRESS ? inprogress_suffix : "";
@@ -609,7 +609,7 @@ error:
 }
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
+log_io_open_for_read(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 {
 	assert(lsn != 0);
 
@@ -623,7 +623,7 @@ log_io_open_for_read(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
  * and sets errno.
  */
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
+log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 {
 	char *filename;
 	FILE *f;

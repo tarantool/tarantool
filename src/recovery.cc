@@ -292,7 +292,7 @@ recover_snap(struct recovery_state *r)
 	say_info("recovery start");
 
 	struct log_io *snap;
-	i64 lsn;
+	int64_t lsn;
 
 	lsn = greatest_lsn(r->snap_dir);
 	if (lsn <= 0) {
@@ -353,7 +353,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 	const char *row;
 	uint32_t rowlen;
 	while ((row = log_io_cursor_next(&i, &rowlen))) {
-		i64 lsn = header_v11(row)->lsn;
+		int64_t lsn = header_v11(row)->lsn;
 		if (lsn <= r->confirmed_lsn) {
 			say_debug("skipping too young row");
 			continue;
@@ -387,7 +387,7 @@ recover_remaining_wals(struct recovery_state *r)
 {
 	int result = 0;
 	struct log_io *next_wal;
-	i64 current_lsn, wal_greatest_lsn;
+	int64_t current_lsn, wal_greatest_lsn;
 	size_t rows_before;
 	FILE *f;
 	char *filename;
@@ -510,8 +510,8 @@ recover_current_wal:
 void
 recover_existing_wals(struct recovery_state *r)
 {
-	i64 next_lsn = r->confirmed_lsn + 1;
-	i64 wal_lsn = find_including_file(r->wal_dir, next_lsn);
+	int64_t next_lsn = r->confirmed_lsn + 1;
+	int64_t wal_lsn = find_including_file(r->wal_dir, next_lsn);
 	if (wal_lsn <= 0) {
 		/* No WALs to recover from. */
 		goto out;
@@ -1105,7 +1105,7 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
+wal_write(struct recovery_state *r, int64_t lsn, u64 cookie,
 	  uint16_t op, const char *row, u32 row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);

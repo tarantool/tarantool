@@ -586,7 +586,7 @@ replication_relay_loop(int client_sock)
 {
 	char name[FIBER_NAME_MAXLEN];
 	struct sigaction sa;
-	i64 lsn;
+	int64_t lsn;
 	ssize_t r;
 
 	/* Set process title and fiber name.

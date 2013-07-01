@@ -36,9 +36,9 @@ void stat_cleanup(int base, size_t max_idx);
 int stat_register(const char **name, size_t count);
 extern int stat_max_name_len;
 
-void stat_collect(int base, int name, i64 value);
+void stat_collect(int base, int name, int64_t value);
 
-typedef int (*stat_cb)(const char *name, int rps, i64 total, void *cb_ctx);
+typedef int (*stat_cb)(const char *name, int rps, int64_t total, void *cb_ctx);
 
 int stat_foreach(stat_cb cb, void *cb_ctx);
 

@@ -63,12 +63,12 @@ struct log_dir {
 extern struct log_dir snap_dir;
 extern struct log_dir wal_dir;
 
-i64
+int64_t
 greatest_lsn(struct log_dir *dir);
 char *
-format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix);
-i64
-find_including_file(struct log_dir *dir, i64 target_lsn);
+format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
+int64_t
+find_including_file(struct log_dir *dir, int64_t target_lsn);
 
 struct log_io {
 	struct log_dir *dir;
@@ -83,9 +83,9 @@ struct log_io {
 };
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, i64 lsn, enum log_suffix suffix);
+log_io_open_for_read(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, i64 lsn, enum log_suffix suffix);
+log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
 struct log_io *
 log_io_open(struct log_dir *dir, enum log_mode mode,
 	    const char *filename, enum log_suffix suffix, FILE *file);
@@ -116,7 +116,7 @@ typedef u32 log_magic_t;
 
 struct header_v11 {
 	u32 header_crc32c;
-	i64 lsn;
+	int64_t lsn;
 	double tm;
 	u32 len;
 	u32 data_crc32c;

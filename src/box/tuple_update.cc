@@ -122,7 +122,7 @@ struct op_arith_arg {
 	u32 val_size;
 	union {
 		i32 i32_val;
-		i64 i64_val;
+		int64_t i64_val;
 	};
 };
 
@@ -236,7 +236,7 @@ do_update_op_add(struct op_arith_arg *arg, const char *in, char *out)
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in + arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in + arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in + arg->i64_val;
 }
 
 static void
@@ -245,7 +245,7 @@ do_update_op_subtract(struct op_arith_arg *arg, const char *in, char *out)
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in - arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in - arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in - arg->i64_val;
 }
 
 static void
@@ -254,7 +254,7 @@ do_update_op_and(struct op_arith_arg *arg, const char *in, char *out)
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in & arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in & arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in & arg->i64_val;
 }
 
 static void
@@ -263,7 +263,7 @@ do_update_op_xor(struct op_arith_arg *arg, const char *in, char *out)
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in ^ arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in ^ arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in ^ arg->i64_val;
 }
 
 static void
@@ -272,7 +272,7 @@ do_update_op_or(struct op_arith_arg *arg, const char *in, char *out)
 	if (arg->val_size == sizeof(i32))
 		*(i32 *)out = *(i32 *)in | arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in | arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in | arg->i64_val;
 }
 
 static void
@@ -346,7 +346,7 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 
 		arg->i32_val = *(i32 *)op->arg.set.value;
 		break;
-	case sizeof(i64):
+	case sizeof(int64_t):
 		/* 64-bit operation */
 		switch (op->arg.set.length) {
 		case sizeof(i32):
@@ -354,9 +354,9 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 			/* cast 32-bit operand to 64-bit */
 			arg->i64_val = *(i32 *)op->arg.set.value;
 			break;
-		case sizeof(i64):
+		case sizeof(int64_t):
 			/* 64-bit operand */
-			arg->i64_val = *(i64 *)op->arg.set.value;
+			arg->i64_val = *(int64_t *)op->arg.set.value;
 			break;
 		default:
 			tnt_raise(ClientError, ER_ARG_TYPE,

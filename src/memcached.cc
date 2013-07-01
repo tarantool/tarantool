@@ -216,8 +216,8 @@ static struct stats {
 } stats;
 
 struct salloc_stat_memcached_cb_ctx {
-	i64 bytes_used;
-	i64 items;
+	int64_t bytes_used;
+	int64_t items;
 };
 
 static int

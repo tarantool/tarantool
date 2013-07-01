@@ -66,7 +66,7 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf, uint32_t *rowlen)
 
 static void
 remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
-	       i64 initial_lsn, const char **err)
+	       int64_t initial_lsn, const char **err)
 {
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -143,7 +143,7 @@ pull_from_remote(va_list ap)
 static void
 remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlen)
 {
-	i64 lsn = header_v11(row)->lsn;
+	int64_t lsn = header_v11(row)->lsn;
 
 	assert(*(uint16_t*)(row + sizeof(struct header_v11)) == XLOG);
 

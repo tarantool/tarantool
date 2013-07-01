@@ -91,7 +91,7 @@ static const int admin_en_main = 1;
 
 
 struct salloc_stat_admin_cb_ctx {
-	i64 total_used;
+	int64_t total_used;
 	struct tbuf *out;
 };
 
@@ -186,7 +186,7 @@ tarantool_info(struct tbuf *out)
 }
 
 static int
-show_stat_item(const char *name, int rps, i64 total, void *ctx)
+show_stat_item(const char *name, int rps, int64_t total, void *ctx)
 {
 	struct tbuf *buf = (struct tbuf *) ctx;
 	int name_len = strlen(name);

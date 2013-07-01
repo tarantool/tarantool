@@ -51,11 +51,11 @@ typedef int (row_handler)(void *, const char *, uint32_t);
 
 struct wait_lsn {
 	struct fiber *waiter;
-	i64 lsn;
+	int64_t lsn;
 };
 
 void
-wait_lsn_set(struct wait_lsn *wait_lsn, i64 lsn);
+wait_lsn_set(struct wait_lsn *wait_lsn, int64_t lsn);
 
 inline static void
 wait_lsn_clear(struct wait_lsn *wait_lsn)
@@ -81,7 +81,7 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_FSYNC_DELAY, WAL_MODE_MA
 extern const char *wal_mode_STRS[];
 
 struct recovery_state {
-	i64 lsn, confirmed_lsn;
+	int64_t lsn, confirmed_lsn;
 	/* The WAL we're currently reading/writing from/to. */
 	struct log_io *current_wal;
 	struct log_dir *snap_dir;
@@ -122,7 +122,7 @@ void recover_snap(struct recovery_state *);
 void recover_existing_wals(struct recovery_state *);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
-int wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
+int wal_write(struct recovery_state *r, int64_t lsn, u64 cookie,
 	      uint16_t op, const char *data, u32 len);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
