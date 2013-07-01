@@ -23,7 +23,6 @@
 #include "space.h"
 #include "sha1.h"
 #include "ref.h"
-#include "region.h"
 #include "ts.h"
 #include "indexate.h"
 #include "snapshot.h"
@@ -55,7 +54,7 @@ ts_snapshot_write(FILE *snapshot, uint32_t space, uint64_t lsn, struct tnt_tuple
 			.cookie = 0,
 			.space = space,
 			.tuple_size = t->cardinality,
-			.data_size = t->size 
+			.data_size = t->size - sizeof(uint32_t)
 		}
 	};
 
@@ -173,14 +172,14 @@ int ts_snapshot_create(void)
 				struct ts_ref *r = ts_reftable_map(&tss.rt, k->file);
 
 				if (count % 10000 == 0) {
-					printf("(dump) %020llu.snap %.3fM processed\r",
+					printf("( >> ) %020llu.snap %.3fM processed\r",
 						   (unsigned long long) snap_lsn,
 						   (float)count / 1000000);
 					fflush(stdout);
 				}
 				count++;
 
-				/* first, check if key hash a data */
+				/* first, check if key has a data */
 				if (k->flags & TS_KEY_WITH_DATA) {
 					uint32_t size = *(uint32_t*)(k->key + space->key_size);
 

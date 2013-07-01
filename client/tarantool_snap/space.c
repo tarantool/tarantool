@@ -278,6 +278,7 @@ ts_space_keyalloc_sparse(struct ts_space *s, struct tnt_tuple *t, int fileid,
 	struct ts_key *k = malloc(size);
 	if (k == NULL)
 		return NULL;
+	memset(k, 0, size);
 	k->file = fileid;
 	k->offset = offset;
 	k->flags = 0;

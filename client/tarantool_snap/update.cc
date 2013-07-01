@@ -51,48 +51,54 @@ extern "C" {
 #include "space.h"
 #include "sha1.h"
 #include "ref.h"
-#include "region.h"
 #include "ts.h"
 #include "indexate.h"
 
 extern struct ts tss;
 
+static inline void*
+_alloc(void *arg, unsigned int size) {
+	(void)arg;
+	return malloc(size);
+}
+
 struct tnt_tuple*
 ts_update(struct tnt_request *r, struct tnt_tuple *old)
 {
+	void *buf = NULL;
 	uint32_t new_size = 0;
 	uint32_t new_count = 0;
-
-	char *data = old->data + sizeof(uint32_t);
-	struct tuple_update *u =
-		tuple_update_prepare((region_alloc_func)ts_region_alloc, &tss.rup,
-		                     (const char*)(r->r.update.ops),
-		                     (const char*)(r->r.update.ops + r->r.update.ops_size),
-		                     (const char*)(data),
-		                     (const char*)(data + old->size - sizeof(uint32_t)),
-		                     old->cardinality,
-		                     &new_size,
-		                     &new_count);
-	if (u == NULL)
-		return NULL;
-
-	new_size += sizeof(uint32_t);
-
-	void *buf = tnt_mem_alloc(new_size);
-	if (buf == NULL) {
-		ts_region_reset(&tss.rup);
-		return NULL;
-	}
-
 	try {
-		tuple_update_execute(u, (char*)buf + sizeof(uint32_t));
+		struct tuple_update *u =
+			tuple_update_prepare((region_alloc_func)_alloc, NULL,
+                                 (const char*)(r->r.update.ops),
+                                 (const char*)(r->r.update.ops + r->r.update.ops_size),
+                                 (const char*)(old->data + sizeof(uint32_t)),
+                                 (const char*)(old->data + sizeof(uint32_t) + old->size - sizeof(uint32_t)),
+                                 old->cardinality,
+                                 &new_size,
+                                 &new_count);
+		if (u == NULL)
+			return NULL;
+
+		buf = tnt_mem_alloc(new_size);
+		if (buf == NULL) {
+			/* reset pool */
+			return NULL;
+		}
+		memset(buf, 0, new_size);
+
+		tuple_update_execute(u, (char*)buf);
 	} catch (const Exception&) {
-		free(buf);
-		ts_region_reset(&tss.rup);
+		if (buf)
+			free(buf);
+		/* reset pool */
+		fflush(NULL);
+		printf("update failed\n");
 		return NULL;
 	}
 
-	ts_region_reset(&tss.rup);
+	/* reset pool */
 	struct tnt_tuple *n = tnt_tuple_set_as(NULL, buf, new_size, new_count);
 	if (n == NULL) {
 		free(buf);

@@ -309,7 +309,7 @@ tnt_request_update(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	/* initializing tuple */
 	if (tnt_tuple_set(&r->r.update.t, buf, ks) == NULL)
 		goto error;
-	size -= ks - 4;
+	size -= ks /*- 4 */;
 
 	/* ops data */
 	r->r.update.opc = *(uint32_t*)(buf + ks);
@@ -320,14 +320,14 @@ tnt_request_update(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	memset(r->r.update.opv, 0, sizeof(opvsz));
 
 	/* allocating ops buffer */
-	r->r.update.ops_size = 0;
+	r->r.update.ops_size = 4;
 	r->r.update.ops = tnt_mem_alloc(size);
 	if (r->r.update.ops == NULL)
 		goto error;
-	memcpy(r->r.update.ops, buf + ks + 4, size);
+	memcpy(r->r.update.ops, buf + ks /*+ 4*/, size);
 
 	/* parsing operations */
-	char *p = r->r.update.ops;
+	char *p = r->r.update.ops + 4;
 	for (i = 0 ; i < r->r.update.opc ; i++) {
 		struct tnt_request_update_op *op = &r->r.update.opv[i];
 		/* field */

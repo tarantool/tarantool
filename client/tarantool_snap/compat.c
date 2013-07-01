@@ -62,10 +62,10 @@ void say_snap(int level, const char *filename, int line, const char *error,
 sayfunc_t _say = say_snap;
 
 void assert_fail(const char *assertion, const char *file, unsigned int line,
-                 const char *function) {
-	(void)assertion;
-	(void)file;
-	(void)line;
+                 const char *function)
+{
 	(void)function;
+	fflush(NULL);
+	printf("assert: %s:%d %s\n", file, line, assertion);
 	exit(1);
 }
