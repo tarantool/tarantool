@@ -43,7 +43,7 @@ struct tbuf;
 
 #define RECOVER_READONLY 1
 
-typedef int (row_handler)(void *, struct tbuf *);
+typedef int (row_handler)(void *, const char *, uint32_t);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.

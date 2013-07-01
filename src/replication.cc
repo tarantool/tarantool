@@ -556,13 +556,12 @@ replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
 
 /** Send a single row to the client. */
 static int
-replication_relay_send_row(void *param, struct tbuf *t)
+replication_relay_send_row(void *param, const char *row, uint32_t rowlen)
 {
 	int client_sock = (int) (intptr_t) param;
-	const char *data = t->data;
-	ssize_t bytes, len = t->size;
+	ssize_t bytes, len = rowlen;
 	while (len > 0) {
-		bytes = write(client_sock, data, len);
+		bytes = write(client_sock, row, len);
 		if (bytes < 0) {
 			if (errno == EPIPE) {
 				/* socket closed on opposite site */
@@ -571,10 +570,9 @@ replication_relay_send_row(void *param, struct tbuf *t)
 			panic_syserror("write");
 		}
 		len -= bytes;
-		data += bytes;
+		row += bytes;
 	}
 
-	say_debug("send row: %" PRIu32 " bytes %s", t->size, tbuf_to_hex(t));
 	return 0;
 shutdown_handler:
 	say_info("the client has closed its replication socket, exiting");
@@ -588,7 +586,6 @@ replication_relay_loop(int client_sock)
 {
 	char name[FIBER_NAME_MAXLEN];
 	struct sigaction sa;
-	struct tbuf *ver;
 	i64 lsn;
 	ssize_t r;
 
@@ -629,9 +626,9 @@ replication_relay_loop(int client_sock)
 	}
 	say_info("starting replication from lsn: %" PRIi64, lsn);
 
-	ver = tbuf_new(fiber->gc_pool);
-	tbuf_append(ver, &default_version, sizeof(default_version));
-	replication_relay_send_row((void *)(intptr_t) client_sock, ver);
+	replication_relay_send_row((void *)(intptr_t) client_sock,
+				   (const char *) &default_version,
+				   sizeof(default_version));
 
 	/* init libev events handlers */
 	ev_default_loop(0);

@@ -309,9 +309,10 @@ recover_snap(struct recovery_state *r)
 
 	log_io_cursor_open(&i, snap);
 
-	struct tbuf *row;
-	while ((row = log_io_cursor_next(&i))) {
-		if (r->row_handler(r->row_handler_param, row) < 0) {
+	const char *row;
+	uint32_t rowlen;
+	while ((row = log_io_cursor_next(&i, &rowlen))) {
+		if (r->row_handler(r->row_handler_param, row, rowlen) < 0) {
 			say_error("can't apply row");
 			if (snap->dir->panic_if_error)
 				break;
@@ -349,8 +350,9 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 	log_io_cursor_open(&i, l);
 
-	struct tbuf *row = NULL;
-	while ((row = log_io_cursor_next(&i))) {
+	const char *row;
+	uint32_t rowlen;
+	while ((row = log_io_cursor_next(&i, &rowlen))) {
 		i64 lsn = header_v11(row)->lsn;
 		if (lsn <= r->confirmed_lsn) {
 			say_debug("skipping too young row");
@@ -360,7 +362,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		 * After handler(row) returned, row may be
 		 * modified, do not use it.
 		 */
-		if (r->row_handler(r->row_handler_param, row) < 0) {
+		if (r->row_handler(r->row_handler_param, row, rowlen) < 0) {
 			say_error("can't apply row");
 			if (l->dir->panic_if_error)
 				goto end;
@@ -1268,9 +1270,10 @@ read_log(const char *filename,
 	struct log_io_cursor i;
 
 	log_io_cursor_open(&i, l);
-	struct tbuf *row;
-	while ((row = log_io_cursor_next(&i)))
-		h(param, row);
+	const char *row;
+	uint32_t rowlen;
+	while ((row = log_io_cursor_next(&i, &rowlen)))
+		h(param, row, rowlen);
 
 	log_io_cursor_close(&i);
 	log_io_close(&l);

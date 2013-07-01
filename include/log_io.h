@@ -32,7 +32,6 @@
 #include <limits.h>
 #include <stdbool.h>
 #include "tarantool/util.h"
-#include "tbuf.h"
 #include "tarantool_ev.h"
 
 extern const u32 default_version;
@@ -109,8 +108,9 @@ void
 log_io_cursor_open(struct log_io_cursor *i, struct log_io *l);
 void
 log_io_cursor_close(struct log_io_cursor *i);
-struct tbuf *
-log_io_cursor_next(struct log_io_cursor *i);
+
+const char *
+log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen);
 
 typedef u32 log_magic_t;
 
@@ -122,9 +122,9 @@ struct header_v11 {
 	u32 data_crc32c;
 } __attribute__((packed));
 
-static inline struct header_v11 *header_v11(const struct tbuf *t)
+static inline struct header_v11 *header_v11(const char *t)
 {
-	return (struct header_v11 *)t->data;
+	return (struct header_v11 *)t;
 }
 
 static inline void

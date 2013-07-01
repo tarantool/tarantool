@@ -158,25 +158,25 @@ recover_snap_row(const void *data)
 }
 
 static int
-recover_row(void *param __attribute__((unused)), struct tbuf *t)
+recover_row(void *param __attribute__((unused)), const char *row, uint32_t rowlen)
 {
 	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL) {
+	if (rowlen < sizeof(struct header_v11)) {
 		say_error("incorrect row header: expected %zd, got %zd bytes",
-			  sizeof(struct header_v11), (size_t) t->size);
+			  sizeof(struct header_v11), (size_t) rowlen);
 		return -1;
 	}
 
 	try {
-		const char *data = t->data;
-		const char *end = t->data + t->size;
-		u16 tag = pick_u16(&data, end);
-		(void) pick_u64(&data, end); /* drop cookie */
+		const char *end = row + rowlen;
+		row += sizeof(struct header_v11);
+		u16 tag = pick_u16(&row, end);
+		(void) pick_u64(&row, end); /* drop cookie */
 		if (tag == SNAP) {
-			recover_snap_row(data);
+			recover_snap_row(row);
 		} else if (tag == XLOG) {
-			u16 op = pick_u16(&data, end);
-			process_rw(&null_port, op, data, end - data);
+			u16 op = pick_u16(&row, end);
+			process_rw(&null_port, op, row, end - row);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;

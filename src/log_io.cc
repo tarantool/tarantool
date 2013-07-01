@@ -219,44 +219,41 @@ format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
 
 /* {{{ struct log_io_cursor */
 
-#define ROW_EOF (struct tbuf *) 1
+static const char ROW_EOF[] = "";
 
-static struct tbuf *
-row_reader_v11(FILE *f, struct palloc_pool *pool)
+const char *
+row_reader_v11(FILE *f, uint32_t *rowlen)
 {
-	struct tbuf *m = tbuf_new(pool);
+	struct header_v11 m;
 
 	u32 header_crc, data_crc;
 
-	tbuf_ensure(m, sizeof(struct header_v11));
-	if (fread(m->data, sizeof(struct header_v11), 1, f) != 1)
+	if (fread(&m, sizeof(m), 1, f) != 1)
 		return ROW_EOF;
 
-	m->size = sizeof(struct header_v11);
-
 	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
-	header_crc = crc32_calc(0, (const unsigned char *) m->data + offsetof(struct header_v11, lsn),
-				sizeof(struct header_v11) - offsetof(struct header_v11, lsn));
+	header_crc = crc32_calc(0, (unsigned char *) &m + offsetof(struct header_v11, lsn),
+				sizeof(m) - offsetof(struct header_v11, lsn));
 
-	if (header_v11(m)->header_crc32c != header_crc) {
+	if (m.header_crc32c != header_crc) {
 		say_error("header crc32c mismatch");
 		return NULL;
 	}
+	char *row = (char *) palloc(fiber->gc_pool, sizeof(m) + m.len);
+	memcpy(row, &m, sizeof(m));
 
-	tbuf_ensure(m, m->size + header_v11(m)->len);
-	if (fread(m->data + sizeof(struct header_v11), header_v11(m)->len, 1, f) != 1)
+	if (fread(row + sizeof(m), m.len, 1, f) != 1)
 		return ROW_EOF;
 
-	m->size += header_v11(m)->len;
-
-	data_crc = crc32_calc(0, (const unsigned char *) m->data + sizeof(struct header_v11), header_v11(m)->len);
-	if (header_v11(m)->data_crc32c != data_crc) {
+	data_crc = crc32_calc(0, (unsigned char *) row + sizeof(m), m.len);
+	if (m.data_crc32c != data_crc) {
 		say_error("data crc32c mismatch");
 		return NULL;
 	}
 
-	say_debug("read row v11 success lsn:%lld", (long long)header_v11(m)->lsn);
-	return m;
+	say_debug("read row v11 success lsn:%lld", (long long) m.lsn);
+	*rowlen = m.len + sizeof(m);
+	return row;
 }
 
 void
@@ -290,11 +287,11 @@ log_io_cursor_close(struct log_io_cursor *i)
  * @param i	iterator object, encapsulating log specifics.
  *
  */
-struct tbuf *
-log_io_cursor_next(struct log_io_cursor *i)
+const char *
+log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen)
 {
 	struct log_io *l = i->log;
-	struct tbuf *row;
+	const char *row;
 	log_magic_t magic;
 	off_t marker_offset = 0;
 
@@ -333,7 +330,7 @@ restart:
 			(uintmax_t)i->good_offset);
 	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
 
-	row = row_reader_v11(l->f, fiber->gc_pool);
+	row = row_reader_v11(l->f, rowlen);
 	if (row == ROW_EOF)
 		goto eof;
 
