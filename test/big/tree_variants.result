@@ -119,3 +119,11 @@ lua for k,v in box.space[6]:pairs() do print(v) end
 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 ...
+insert into t6 VALUES('', '00000001', '00000002', '', '', '', '', '', 0)
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
+insert into t6 VALUES('xxxxxxxx', '00000001', '00000002', '', '', '', '', '', 0)
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
+insert into t6 VALUES(1, '', '00000002', '', '', '', '', '', 0)
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM64'
+insert into t6 VALUES(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM64'

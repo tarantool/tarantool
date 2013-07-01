@@ -38,3 +38,10 @@ exec admin "lua box.select(6, 2, 400ULL)"
 exec admin "lua box.select(6, 2, 400)"
 
 exec admin "lua for k,v in box.space[6]:pairs() do print(v) end"
+
+# Test incorrect keys - supplied key field type does not match index type
+# https://bugs.launchpad.net/tarantool/+bug/1072624
+exec sql "insert into t6 VALUES('', '00000001', '00000002', '', '', '', '', '', 0)"
+exec sql "insert into t6 VALUES('xxxxxxxx', '00000001', '00000002', '', '', '', '', '', 0)"
+exec sql "insert into t6 VALUES(1, '', '00000002', '', '', '', '', '', 0)"
+exec sql "insert into t6 VALUES(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)"

@@ -15,6 +15,13 @@ exec sql "select * from t2 where k0 = 3"
 exec sql "delete from t2 where k0 = 1"
 exec sql "delete from t2 where k0 = 2"
 exec sql "delete from t2 where k0 = 3"
+
+# Test incorrect keys - supplied key field type does not match index type
+# https://bugs.launchpad.net/tarantool/+bug/1072624
+exec sql "insert into t2 VALUES('xxxxxxx')"
+exec sql "insert into t2 VALUES('')"
+exec sql "insert into t2 VALUES('12')"
+
 # string keys
 exec sql "insert into t3 values ('identifier', 'tuple')"
 exec admin "save snapshot"
