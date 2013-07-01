@@ -70,12 +70,14 @@ extern box_process_func box_process_ro;
  * Check storage-layer related options in the
  * configuration file.
  */
-i32 box_check_config(struct tarantool_cfg *conf);
+int
+box_check_config(struct tarantool_cfg *conf);
 /*
  * Take into effect storage-layer related
  * changes in the server configuration.
  */
-i32 box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
+int
+box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
 void box_lua_load_cfg(struct lua_State *L);
 /**
  * Iterate over all spaces and save them to the

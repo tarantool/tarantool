@@ -123,11 +123,11 @@ title(const char *fmt, ...)
 	set_proc_title(buf);
 }
 
-static i32
-load_cfg(struct tarantool_cfg *conf, i32 check_rdonly)
+static int
+load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
 {
 	FILE *f;
-	i32 n_accepted, n_skipped, n_ignored;
+	int32_t n_accepted, n_skipped, n_ignored;
 
 	tbuf_reset(cfg_out);
 
@@ -210,7 +210,7 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 	return 0;
 }
 
-i32
+int
 reload_cfg(struct tbuf *out)
 {
 	static struct mutex *mutex = NULL;

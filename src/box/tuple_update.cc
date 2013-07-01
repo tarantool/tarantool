@@ -121,22 +121,22 @@ struct op_set_arg {
 struct op_arith_arg {
 	u32 val_size;
 	union {
-		i32 i32_val;
+		int32_t i32_val;
 		int64_t i64_val;
 	};
 };
 
 /** Argument of SPLICE. */
 struct op_splice_arg {
-	i32 offset;	   /** splice position */
-	i32 cut_length;    /** cut this many bytes. */
+	int32_t offset;	   /** splice position */
+	int32_t cut_length;    /** cut this many bytes. */
 	const char *paste; /** paste what? */
-	i32 paste_length;  /** paste this many bytes. */
+	int32_t paste_length;  /** paste this many bytes. */
 
 	/** Offset of the tail in the old field */
-	i32 tail_offset;
+	int32_t tail_offset;
 	/** Size of the tail. */
-	i32 tail_length;
+	int32_t tail_length;
 };
 
 union update_op_arg {
@@ -233,8 +233,8 @@ do_update_op_set(struct op_set_arg *arg, const char *in __attribute__((unused)),
 static void
 do_update_op_add(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in + arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in + arg->i32_val;
 	else
 		*(int64_t *)out = *(int64_t *)in + arg->i64_val;
 }
@@ -242,8 +242,8 @@ do_update_op_add(struct op_arith_arg *arg, const char *in, char *out)
 static void
 do_update_op_subtract(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in - arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in - arg->i32_val;
 	else
 		*(int64_t *)out = *(int64_t *)in - arg->i64_val;
 }
@@ -251,8 +251,8 @@ do_update_op_subtract(struct op_arith_arg *arg, const char *in, char *out)
 static void
 do_update_op_and(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in & arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in & arg->i32_val;
 	else
 		*(int64_t *)out = *(int64_t *)in & arg->i64_val;
 }
@@ -260,8 +260,8 @@ do_update_op_and(struct op_arith_arg *arg, const char *in, char *out)
 static void
 do_update_op_xor(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in ^ arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in ^ arg->i32_val;
 	else
 		*(int64_t *)out = *(int64_t *)in ^ arg->i64_val;
 }
@@ -269,8 +269,8 @@ do_update_op_xor(struct op_arith_arg *arg, const char *in, char *out)
 static void
 do_update_op_or(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in | arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in | arg->i32_val;
 	else
 		*(int64_t *)out = *(int64_t *)in | arg->i64_val;
 }
@@ -336,23 +336,23 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 	u32 field_len = update_field_len(field);
 
 	switch (field_len) {
-	case sizeof(i32):
+	case sizeof(int32_t):
 		/* 32-bit operation */
 
 		/* Check the operand type. */
-		if (op->arg.set.length != sizeof(i32))
+		if (op->arg.set.length != sizeof(int32_t))
 			tnt_raise(ClientError, ER_ARG_TYPE,
 				  "32-bit int");
 
-		arg->i32_val = *(i32 *)op->arg.set.value;
+		arg->i32_val = *(int32_t *)op->arg.set.value;
 		break;
 	case sizeof(int64_t):
 		/* 64-bit operation */
 		switch (op->arg.set.length) {
-		case sizeof(i32):
+		case sizeof(int32_t):
 			/* 32-bit operand */
 			/* cast 32-bit operand to 64-bit */
-			arg->i64_val = *(i32 *)op->arg.set.value;
+			arg->i64_val = *(int32_t *)op->arg.set.value;
 			break;
 		case sizeof(int64_t):
 			/* 64-bit operand */

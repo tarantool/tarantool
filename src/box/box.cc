@@ -226,7 +226,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	box_enter_master_or_replica_mode(&cfg);
 }
 
-i32
+int
 box_check_config(struct tarantool_cfg *conf)
 {
 	/* replication & hot standby modes can not work together */
@@ -286,7 +286,7 @@ box_check_config(struct tarantool_cfg *conf)
 	return 0;
 }
 
-i32
+int
 box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
 {
 	bool old_is_replica = old_conf->replication_source != NULL;

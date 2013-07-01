@@ -122,7 +122,6 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 #endif
 
 typedef uint32_t u32;
-typedef int32_t i32;
 
 #define CRLF "\n"
 
