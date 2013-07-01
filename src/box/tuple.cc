@@ -146,7 +146,7 @@ print_field(struct tbuf *buf, const char *field, uint32_t len)
 		tbuf_printf(buf, "%u", *(u32 *)field);
 		break;
 	case 8:
-		tbuf_printf(buf, "%" PRIu64, *(u64 *)field);
+		tbuf_printf(buf, "%" PRIu64, *(uint64_t *)field);
 		break;
 	default:
 		tbuf_printf(buf, "'");

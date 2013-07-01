@@ -100,7 +100,7 @@
 
 struct recovery_state *recovery_state;
 
-static const u64 snapshot_cookie = 0;
+static const uint64_t snapshot_cookie = 0;
 
 const char *wal_mode_STRS[] = { "none", "write", "fsync", "fsync_delay", NULL };
 
@@ -943,7 +943,8 @@ wal_writer_pop(struct wal_writer *writer, struct wal_fifo *input)
  * @return 0 in case of success, -1 on error.
  */
 static int
-wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir, u64 lsn)
+wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir,
+	       int64_t lsn)
 {
 	struct log_io *l = *wal, *wal_to_close = NULL;
 
@@ -1105,7 +1106,7 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, int64_t lsn, u64 cookie,
+wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 	  uint16_t op, const char *row, u32 row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);

@@ -69,13 +69,13 @@ static struct iterator *memcached_it;
 struct meta {
 	u32 exptime;
 	u32 flags;
-	u64 cas;
+	uint64_t cas;
 } __packed__;
 
-static u64
+static uint64_t
 memcached_natoq(const char *start, const char *end)
 {
-	u64 num = 0;
+	uint64_t num = 0;
 	while (start < end) {
 		uint8_t code = *start++;
 		num = num * 10 + (code - '0');
@@ -124,7 +124,7 @@ memcached_store(const char *key, u32 exptime, u32 flags, u32 bytes,
 {
 	u32 box_flags = 0;
 	u32 field_count = 4;
-	static u64 cas = 42;
+	static uint64_t cas = 42;
 	struct meta m;
 
 	struct tbuf *req = tbuf_new(fiber->gc_pool);
@@ -203,16 +203,16 @@ memcached_is_numeric(const char *field, u32 value_len)
 }
 
 static struct stats {
-	u64 total_items;
+	uint64_t total_items;
 	u32 curr_connections;
 	u32 total_connections;
-	u64 cmd_get;
-	u64 cmd_set;
-	u64 get_hits;
-	u64 get_misses;
-	u64 evictions;
-	u64 bytes_read;
-	u64 bytes_written;
+	uint64_t cmd_get;
+	uint64_t cmd_set;
+	uint64_t get_hits;
+	uint64_t get_misses;
+	uint64_t evictions;
+	uint64_t bytes_read;
+	uint64_t bytes_written;
 } stats;
 
 struct salloc_stat_memcached_cb_ctx {
@@ -257,7 +257,7 @@ memcached_print_stats(struct obuf *out)
 	tbuf_printf(buf, "STAT evictions %" PRIu64 "\r\n", stats.evictions);
 	tbuf_printf(buf, "STAT bytes_read %" PRIu64 "\r\n", stats.bytes_read);
 	tbuf_printf(buf, "STAT bytes_written %" PRIu64 "\r\n", stats.bytes_written);
-	tbuf_printf(buf, "STAT limit_maxbytes %" PRIu64 "\r\n", (u64)(cfg.slab_alloc_arena * (1 << 30)));
+	tbuf_printf(buf, "STAT limit_maxbytes %" PRIu64 "\r\n", (uint64_t)(cfg.slab_alloc_arena * (1 << 30)));
 	tbuf_printf(buf, "STAT threads 1\r\n");
 	tbuf_printf(buf, "END\r\n");
 	obuf_dup(out, buf->data, buf->size);

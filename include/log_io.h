@@ -128,7 +128,7 @@ static inline struct header_v11 *header_v11(const char *t)
 }
 
 static inline void
-header_v11_fill(struct header_v11 *header, u64 lsn, size_t data_len)
+header_v11_fill(struct header_v11 *header, int64_t lsn, size_t data_len)
 {
 	header->lsn = lsn;
 	header->tm = ev_now();
@@ -142,14 +142,14 @@ struct row_v11 {
 	log_magic_t marker;
 	struct header_v11 header;
 	uint16_t tag;
-	u64 cookie;
+	uint64_t cookie;
 	uint8_t data[];
 } __attribute__((packed));
 
 void
-row_v11_fill(struct row_v11 *row, u64 lsn, uint16_t tag, u64 cookie,
-	     const char *metadata, size_t metadata_len, const char
-	     *data, size_t data_len);
+row_v11_fill(struct row_v11 *row, int64_t lsn, uint16_t tag,
+	     uint64_t cookie, const char *metadata, size_t metadata_len,
+	     const char *data, size_t data_len);
 
 static inline size_t
 row_v11_size(struct row_v11 *row)

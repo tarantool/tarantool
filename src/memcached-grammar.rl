@@ -42,7 +42,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 	const char *key;
 	bool append, show_cas;
 	int incr_sign;
-	u64 cas, incr;
+	uint64_t cas, incr;
 	u32 flags, exptime, bytes;
 	bool noreply = false;
 	char *data = NULL;
@@ -125,7 +125,7 @@ memcached_dispatch(struct ev_io *coio, struct iobuf *iobuf)
 			struct tbuf *b;
 			const char *field;
 			uint32_t field_len;
-			u64 value;
+			uint64_t value;
 
 			key = tbuf_read_field(keys);
 			struct tuple *tuple = memcached_find(key);

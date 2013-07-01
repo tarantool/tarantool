@@ -190,11 +190,11 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 		if (sp->field_types[fieldno] == NUM) {
 			if (len != sizeof(u32))
 				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
-					  "u32");
+					  "NUM");
 		} else if (sp->field_types[fieldno] == NUM64) {
-			if (len != sizeof(u64))
+			if (len != sizeof(uint64_t))
 				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
-					  "u64");
+					  "NUM64");
 		}
 		fieldno++;
 	}

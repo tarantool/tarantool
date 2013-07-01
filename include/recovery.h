@@ -71,7 +71,7 @@ struct wal_watcher;
 struct remote {
 	struct sockaddr_in addr;
 	struct fiber *reader;
-	u64 cookie;
+	uint64_t cookie;
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
 };
 
@@ -122,7 +122,7 @@ void recover_snap(struct recovery_state *);
 void recover_existing_wals(struct recovery_state *);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
-int wal_write(struct recovery_state *r, int64_t lsn, u64 cookie,
+int wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 	      uint16_t op, const char *data, u32 len);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);

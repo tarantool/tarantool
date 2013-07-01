@@ -455,8 +455,8 @@ palloc_stat(struct tbuf *buf)
 			    ", free_chunks: %- 6i, busy_chunks: %- 6i }" CRLF, clazz->allocated_size,
 			    free_chunks, clazz->chunks_count - free_chunks);
 	}
-	u64 palloc_total = 0;
-	u64 palloc_used = 0;
+	uint64_t palloc_total = 0;
+	uint64_t palloc_used = 0;
 	SLIST_FOREACH(pool, &pools, link) {
 		SLIST_FOREACH(chunk, &pool->chunks, busy_link) {
 			palloc_total += chunk->size;

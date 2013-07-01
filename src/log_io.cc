@@ -53,7 +53,7 @@ header_v11_sign(struct header_v11 *header)
 }
 
 void
-row_v11_fill(struct row_v11 *row, u64 lsn, uint16_t tag, u64 cookie,
+row_v11_fill(struct row_v11 *row, int64_t lsn, uint16_t tag, uint64_t cookie,
 	     const char *metadata, size_t metadata_len, const char
 	     *data, size_t data_len)
 {

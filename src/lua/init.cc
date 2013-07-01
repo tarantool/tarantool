@@ -191,7 +191,7 @@ lbox_time(struct lua_State *L)
 static int
 lbox_time64(struct lua_State *L)
 {
-	luaL_pushnumber64(L, (u64) ( ev_now() * 1000000 + 0.5 ) );
+	luaL_pushnumber64(L, (uint64_t) ( ev_now() * 1000000 + 0.5 ) );
 	return 1;
 }
 

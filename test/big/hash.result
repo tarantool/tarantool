@@ -32,7 +32,7 @@ lua box.space[10]:insert(3, 'value1 v1.0', 'value2 v1.0')
 
 lua box.space[10]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+error: 'Supplied key field type does not match index type: expected NUM'
 ...
 
 #-----------------------------------------------------------------------------#
@@ -59,7 +59,7 @@ lua box.space[10]:replace(2, 'value1 v1.43', 'value2 1.92')
 
 lua box.space[10]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+error: 'Supplied key field type does not match index type: expected NUM'
 ...
 
 #-----------------------------------------------------------------------------#
@@ -177,23 +177,23 @@ lua box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
 
 lua box.space[11]:insert(100, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 lua box.space[11]:insert(101, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 lua box.space[11]:insert(102, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 lua box.space[11]:insert(103, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 lua box.space[11]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 
 #-----------------------------------------------------------------------------#
@@ -220,19 +220,19 @@ lua box.space[11]:replace(2ULL, 'value1 v1.43', 'value2 1.92')
 
 lua box.space[11]:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 lua box.space[11]:replace(1, 'value1 v1.32', 'value2 1.72')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 lua box.space[11]:replace(2, 'value1 v1.43', 'value2 1.92')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 lua box.space[11]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 
 #-----------------------------------------------------------------------------#
