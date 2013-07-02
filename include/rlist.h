@@ -97,8 +97,6 @@ rlist_del(struct rlist *item)
 inline static struct rlist *
 rlist_shift(struct rlist *head)
 {
-	if (head->next == head->prev)
-                return 0;
         struct rlist *shift = head->next;
         head->next = shift->next;
         shift->next->prev = head;
@@ -194,12 +192,16 @@ rlist_move_tail(struct rlist *to, struct rlist *item)
 #define rlist_first_entry(head, type, member)				\
 	rlist_entry(rlist_first(head), type, member)
 
-#define rlist_shift_entry(head, type, member) ({			\
-        struct rlist *_shift = rlist_shift(head);			\
-        _shift ? rlist_entry(_shift, type, member) : 0; })
+/**
+ * Remove one element from the list and return it
+ * @pre the list is not empty
+ */
+#define rlist_shift_entry(head, type, member)				\
+        rlist_entry(rlist_shift(head), type, member)			\
 
 /**
  * return last entry
+ * @pre the list is not empty
  */
 #define rlist_last_entry(head, type, member)				\
 	rlist_entry(rlist_last(head), type, member)
@@ -250,30 +252,35 @@ delete from one list and add_tail as another's head
  * foreach through list
  */
 #define rlist_foreach(item, head)					\
-	for(item = rlist_first(head); item != (head); item = rlist_next(item))
+	for (item = rlist_first(head); item != (head); item = rlist_next(item))
 
 /**
  * foreach backward through list
  */
 #define rlist_foreach_reverse(item, head)				\
-	for(item = rlist_last(head); item != (head); item = rlist_prev(item))
+	for (item = rlist_last(head); item != (head); item = rlist_prev(item))
 
 /**
  * foreach through all list entries
  */
 #define rlist_foreach_entry(item, head, member)				\
-	for(item = rlist_first_entry((head), typeof(*item), member); \
-		&item->member != (head); \
-		item = rlist_next_entry((item), member))
+	for (item = rlist_first_entry((head), typeof(*item), member);	\
+	     &item->member != (head);					\
+	     item = rlist_next_entry((item), member))
 
 /**
  * foreach backward through all list entries
  */
 #define rlist_foreach_entry_reverse(item, head, member)			\
-	for(item = rlist_last_entry((head), typeof(*item), member); \
-		&item->member != (head); \
-		item = rlist_prev_entry((item), member))
+	for (item = rlist_last_entry((head), typeof(*item), member);	\
+	     &item->member != (head);					\
+	     item = rlist_prev_entry((item), member))
 
+#define	rlist_foreach_entry_safe(item, head, member, tmp)		\
+	for ((item) = rlist_first_entry((head), typeof(*item), member);	\
+	     &item->member != (head) &&                                 \
+	     ((tmp) = rlist_next_entry((item), member));                \
+	     (item) = (tmp))
 
 #if defined(__cplusplus)
 } /* extern "C" */

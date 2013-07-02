@@ -187,9 +187,11 @@ iproto_queue_schedule(struct ev_async *watcher,
 	struct iproto_queue *i_queue = (struct iproto_queue *) watcher->data;
 	while (! iproto_queue_is_empty(i_queue)) {
 
-		struct fiber *f = rlist_shift_entry(&i_queue->fiber_cache,
-						    struct fiber, state);
-		if (f == NULL)
+		struct fiber *f;
+		if (! rlist_empty(&i_queue->fiber_cache))
+			f = rlist_shift_entry(&i_queue->fiber_cache,
+					      struct fiber, state);
+		else
 			f = fiber_new("iproto", i_queue->handler);
 		fiber_call(f, i_queue);
 	}
