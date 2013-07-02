@@ -226,7 +226,9 @@ class Server(object):
             return
 
         # kill process
-        os.kill(self.read_pidfile(), signal.SIGTERM)
+        pid = self.read_pidfile();
+        if pid != -1:
+            os.kill(pid, signal.SIGTERM)
         #self.process.kill(signal.SIGTERM)
         if self.gdb or self.valgrind:
             self.process.expect(pexpect.EOF, timeout = 1 << 30)
