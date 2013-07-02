@@ -133,7 +133,7 @@ lua s:error()
  - 0
  - Success
 ...
-lua n, status, error_code, error_str = s:send(string.rep('=', 200000), 0.0000001)
+lua n, status, error_code, error_str = s:send(string.rep('=', 8388608), 0.0000001)
 ---
 ...
 lua type(n)
