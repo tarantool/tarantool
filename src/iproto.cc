@@ -32,136 +32,18 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "iproto_port.h"
 #include "tarantool.h"
 #include "exception.h"
 #include "errcode.h"
 #include "fiber.h"
 #include "say.h"
-#include "box/box.h"
-#include "box/port.h"
-#include "box/tuple.h"
-#include "box/request.h"
-#include "iobuf.h"
 #include "evio.h"
 #include "session.h"
 #include "scoped_guard.h"
 
-enum {
-	/** Maximal iproto package body length (2GiB) */
-	IPROTO_BODY_LEN_MAX = 2147483648UL
-};
-
-/*
- * struct iproto_header and struct iproto_reply_header
- * share common prefix {msg_code, len, sync}
- */
-
-struct iproto_header {
-	uint32_t msg_code;
-	uint32_t len;
-	uint32_t sync;
-} __attribute__((packed));
-
 static struct iproto_header dummy_header = { 0, 0, 0 };
-
-struct iproto_reply_header {
-	struct iproto_header hdr;
-	uint32_t ret_code;
-	uint32_t found;
-}  __attribute__((packed));
-
 const uint32_t msg_ping = 0xff00;
-
-static inline struct iproto_header *
-iproto(const char *pos)
-{
-	return (struct iproto_header *) pos;
-}
-
-/* {{{ port_iproto */
-
-/**
- * struct port_iproto users need to be careful to:
- * - not unwind output of other fibers when
- *   rolling back to a savepoint (provided that
- *   multiple fibers work on the same session),
- * - not increment write position before there is a complete
- *   response, i.e. a response which will not be rolled back
- *   and which has a complete header.
- * - never increment write position without having
- *   a complete response. Otherwise a situation can occur
- *   when many requests started processing, but completed
- *   in a different order, and thus incomplete output is
- *   sent to the client.
- *
- * To ensure this, port_iproto must be used only in
- * atomic manner, i.e. once first port_add_tuple() is done,
- * there can be no yields until port_eof().
- */
-struct port_iproto
-{
-	struct port_vtab *vtab;
-	/** Output buffer. */
-	struct obuf *buf;
-	/** Reply header. */
-	struct iproto_reply_header reply;
-	/** A pointer in the reply buffer where the reply starts. */
-	struct obuf_svp svp;
-};
-
-static inline struct port_iproto *
-port_iproto(struct port *port)
-{
-	return (struct port_iproto *) port;
-}
-
-static void
-port_iproto_eof(struct port *ptr)
-{
-	struct port_iproto *port = port_iproto(ptr);
-	/* found == 0 means add_tuple wasn't called at all. */
-	if (port->reply.found == 0) {
-		port->reply.hdr.len = sizeof(port->reply) -
-			sizeof(port->reply.hdr);
-		obuf_dup(port->buf, &port->reply, sizeof(port->reply));
-	} else {
-		port->reply.hdr.len = obuf_size(port->buf) - port->svp.size -
-			sizeof(port->reply.hdr);
-		memcpy(obuf_svp_to_ptr(port->buf, &port->svp),
-		       &port->reply, sizeof(port->reply));
-	}
-}
-
-static void
-port_iproto_add_tuple(struct port *ptr, struct tuple *tuple, u32 flags)
-{
-	struct port_iproto *port = port_iproto(ptr);
-	if (++port->reply.found == 1) {
-		/* Found the first tuple, add header. */
-		port->svp = obuf_book(port->buf, sizeof(port->reply));
-	}
-	if (flags & BOX_RETURN_TUPLE) {
-		obuf_dup(port->buf, &tuple->bsize, tuple_len(tuple));
-	}
-}
-
-static struct port_vtab port_iproto_vtab = {
-	port_iproto_add_tuple,
-	port_iproto_eof,
-};
-
-static void
-port_iproto_init(struct port_iproto *port, struct obuf *buf,
-		 struct iproto_header *req)
-{
-	port->vtab = &port_iproto_vtab;
-	port->buf = buf;
-	port->reply.hdr = *req;
-	port->reply.found = 0;
-	port->reply.ret_code = 0;
-}
-
-/* }}} */
 
 /* {{{ iproto_queue */
 
@@ -305,9 +187,11 @@ iproto_queue_schedule(struct ev_async *watcher,
 	struct iproto_queue *i_queue = (struct iproto_queue *) watcher->data;
 	while (! iproto_queue_is_empty(i_queue)) {
 
-		struct fiber *f = rlist_shift_entry(&i_queue->fiber_cache,
-						    struct fiber, state);
-		if (f == NULL)
+		struct fiber *f;
+		if (! rlist_empty(&i_queue->fiber_cache))
+			f = rlist_shift_entry(&i_queue->fiber_cache,
+					      struct fiber, state);
+		else
 			f = fiber_new("iproto", i_queue->handler);
 		fiber_call(f, i_queue);
 	}
@@ -752,7 +636,7 @@ iproto_reply_error(struct obuf *out, struct iproto_header *req,
 
 /** Stack a reply to a single request to the fiber's io vector. */
 static inline void
-iproto_reply(struct port_iproto *port, box_process_func callback,
+iproto_reply(struct iproto_port *port, box_process_func callback,
 	     struct obuf *out, struct iproto_header *header)
 {
 	if (header->msg_code == msg_ping)
@@ -760,7 +644,7 @@ iproto_reply(struct port_iproto *port, box_process_func callback,
 
 	/* Make request body point to iproto data */
 	char *body = (char *) &header[1];
-	port_iproto_init(port, out, header);
+	iproto_port_init(port, out, header);
 	try {
 		callback((struct port *) port, header->msg_code,
 			 body, header->len);
@@ -777,7 +661,7 @@ iproto_process_request(struct iproto_request *request)
 	struct iproto_session *session = request->session;
 	struct iproto_header *header = request->header;
 	struct iobuf *iobuf = request->iobuf;
-	struct port_iproto port;
+	struct iproto_port port;
 
 	auto scope_guard = make_scoped_guard([=]{
 		iobuf->in.pos += sizeof(*header) + header->len;
@@ -844,7 +728,6 @@ iproto_process_disconnect(struct iproto_request *request)
 }
 
 /** }}} */
-
 
 /**
  * Create a session context and start input.

@@ -33,9 +33,29 @@
 struct tuple;
 struct port;
 
+/**
+ * A single port represents a destination of box_process output.
+ * One such destination can be a Lua stack, or the binary
+ * protocol.
+ * An instance of a port is usually short lived, as it is created
+ * for every server request. State of the instance is represented
+ * by the tuples added to it. E.g.:
+ *
+ * struct port_iproto *port = port_iproto_new(...)
+ * for (tuple in tuples)
+ *	port_add_tuple(tuple);
+ * port_eof(port);	// end of request
+ *
+ * Beginning with Tarantool 1.5, tuple can have different internal
+ * structure and port_add_tuple() requires a double
+ * dispatch: first, by the type of the port the tuple is being
+ * added to, second, by the type of the tuple format, since the
+ * format defines the internal structure of the tuple.
+ */
+
 struct port_vtab
 {
-	void (*add_tuple)(struct port *port, struct tuple *tuple, u32 flags);
+	void (*add_tuple)(struct port *port, struct tuple *tuple, uint32_t flags);
 	/** Must be called in the end of execution of a single request. */
 	void (*eof)(struct port *port);
 };
@@ -52,19 +72,19 @@ port_eof(struct port *port)
 }
 
 static inline void
-port_add_tuple(struct port *port, struct tuple *tuple, u32 flags)
+port_add_tuple(struct port *port, struct tuple *tuple, uint32_t flags)
 {
 	(port->vtab->add_tuple)(port, tuple, flags);
 }
 
 /** Reused in port_lua */
 void
-port_null_eof(struct port *port __attribute__((unused)));
+null_port_eof(struct port *port __attribute__((unused)));
 
 /**
  * This one does not have state currently, thus a single
  * instance is sufficient.
  */
-extern struct port port_null;
+extern struct port null_port;
 
 #endif /* INCLUDES_TARANTOOL_BOX_PORT_H */

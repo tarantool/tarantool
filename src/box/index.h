@@ -101,7 +101,7 @@ struct iterator {
 
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
-	u32 fieldno;
+	uint32_t fieldno;
 	enum field_data_type type;
 };
 
@@ -118,14 +118,14 @@ struct key_def {
 	 * max_fieldno is 5, and cmp_order array holds offsets of
 	 * field 3 and 5 in 'parts' array: -1, -1, 0, -1, 1.
 	 */
-	u32 *cmp_order;
+	uint32_t *cmp_order;
 	/* The size of the 'parts' array. */
-	u32 part_count;
+	uint32_t part_count;
 	/*
 	 * The size of 'cmp_order' array (= max fieldno in 'parts'
 	 * array).
 	 */
-	u32 max_fieldno;
+	uint32_t max_fieldno;
 	bool is_unique;
 	enum index_type type;
 };
@@ -218,9 +218,9 @@ public:
 	virtual size_t size() const = 0;
 	virtual struct tuple *min() const = 0;
 	virtual struct tuple *max() const = 0;
-	virtual struct tuple *random(u32 rnd) const = 0;
-	virtual struct tuple *findByKey(const char *key, u32 part_count) const = 0;
-	virtual struct tuple *findByTuple(struct tuple *tuple) const = 0;
+	virtual struct tuple *random(uint32_t rnd) const = 0;
+	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const = 0;
+	virtual struct tuple *findByTuple(struct tuple *tuple) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode) = 0;
@@ -231,7 +231,7 @@ public:
 	virtual struct iterator *allocIterator() const = 0;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
-				  const char *key, u32 part_count) const = 0;
+				  const char *key, uint32_t part_count) const = 0;
 
 	inline struct iterator *position()
 	{

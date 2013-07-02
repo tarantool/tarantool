@@ -106,37 +106,37 @@ struct tuple_update
 	void *alloc_ctx;
 	struct rope *rope;
 	struct update_op *ops;
-	uint32_t ops_count;
+	uint32_t op_count;
 	uint32_t new_tuple_size;
 	uint32_t new_tuple_fcount;
 };
 
 /** Argument of SET operation. */
 struct op_set_arg {
-	u32 length;
+	uint32_t length;
 	const char *value;
 };
 
 /** Argument of ADD, AND, XOR, OR operations. */
 struct op_arith_arg {
-	u32 val_size;
+	uint32_t val_size;
 	union {
-		i32 i32_val;
-		i64 i64_val;
+		int32_t i32_val;
+		int64_t i64_val;
 	};
 };
 
 /** Argument of SPLICE. */
 struct op_splice_arg {
-	i32 offset;	   /** splice position */
-	i32 cut_length;    /** cut this many bytes. */
+	int32_t offset;	   /** splice position */
+	int32_t cut_length;    /** cut this many bytes. */
 	const char *paste; /** paste what? */
-	i32 paste_length;  /** paste this many bytes. */
+	int32_t paste_length;  /** paste this many bytes. */
 
 	/** Offset of the tail in the old field */
-	i32 tail_offset;
+	int32_t tail_offset;
 	/** Size of the tail. */
-	i32 tail_length;
+	int32_t tail_length;
 };
 
 union update_op_arg {
@@ -163,9 +163,9 @@ struct update_op {
 	STAILQ_ENTRY(update_op) next;
 	struct update_op_meta *meta;
 	union update_op_arg arg;
-	u32 field_no;
-	u32 new_field_len;
-	u8 opcode;
+	uint32_t field_no;
+	uint32_t new_field_len;
+	uint8_t opcode;
 };
 
 STAILQ_HEAD(op_list, update_op);
@@ -186,12 +186,12 @@ struct update_field {
 	 * of old data to the beginning of the field in the
 	 * next update_field structure.
 	 */
-	u32 tail_len;
+	uint32_t tail_len;
 };
 
 static void
 update_field_init(struct update_field *field,
-		  const char *old, u32 old_len, u32 tail_len)
+		  const char *old, uint32_t old_len, uint32_t tail_len)
 {
 	STAILQ_INIT(&field->ops);
 	field->old = old;
@@ -199,7 +199,7 @@ update_field_init(struct update_field *field,
 	field->tail_len = tail_len;
 }
 
-static inline u32
+static inline uint32_t
 update_field_len(struct update_field *f)
 {
 	struct update_op *last = STAILQ_LAST(&f->ops, update_op, next);
@@ -207,14 +207,14 @@ update_field_len(struct update_field *f)
 }
 
 static inline void
-op_check_field_no(u32 field_no, u32 field_max)
+op_check_field_no(uint32_t field_no, uint32_t field_max)
 {
 	if (field_no > field_max)
 		tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_no);
 }
 
 static inline void
-op_adjust_field_no(struct update_op *op, u32 field_max)
+op_adjust_field_no(struct update_op *op, uint32_t field_max)
 {
 	if (op->field_no == UINT32_MAX)
 		op->field_no = field_max;
@@ -233,46 +233,46 @@ do_update_op_set(struct op_set_arg *arg, const char *in __attribute__((unused)),
 static void
 do_update_op_add(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in + arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in + arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in + arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in + arg->i64_val;
 }
 
 static void
 do_update_op_subtract(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in - arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in - arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in - arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in - arg->i64_val;
 }
 
 static void
 do_update_op_and(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in & arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in & arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in & arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in & arg->i64_val;
 }
 
 static void
 do_update_op_xor(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in ^ arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in ^ arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in ^ arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in ^ arg->i64_val;
 }
 
 static void
 do_update_op_or(struct op_arith_arg *arg, const char *in, char *out)
 {
-	if (arg->val_size == sizeof(i32))
-		*(i32 *)out = *(i32 *)in | arg->i32_val;
+	if (arg->val_size == sizeof(int32_t))
+		*(int32_t *)out = *(int32_t *)in | arg->i32_val;
 	else
-		*(i64 *)out = *(i64 *)in | arg->i64_val;
+		*(int64_t *)out = *(int64_t *)in | arg->i64_val;
 }
 
 static void
@@ -333,30 +333,30 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 	struct update_field *field = (struct update_field *)
 			rope_extract(update->rope, op->field_no);
 	struct op_arith_arg *arg = &op->arg.arith;
-	u32 field_len = update_field_len(field);
+	uint32_t field_len = update_field_len(field);
 
 	switch (field_len) {
-	case sizeof(i32):
+	case sizeof(int32_t):
 		/* 32-bit operation */
 
 		/* Check the operand type. */
-		if (op->arg.set.length != sizeof(i32))
+		if (op->arg.set.length != sizeof(int32_t))
 			tnt_raise(ClientError, ER_ARG_TYPE,
 				  "32-bit int");
 
-		arg->i32_val = *(i32 *)op->arg.set.value;
+		arg->i32_val = *(int32_t *)op->arg.set.value;
 		break;
-	case sizeof(i64):
+	case sizeof(int64_t):
 		/* 64-bit operation */
 		switch (op->arg.set.length) {
-		case sizeof(i32):
+		case sizeof(int32_t):
 			/* 32-bit operand */
 			/* cast 32-bit operand to 64-bit */
-			arg->i64_val = *(i32 *)op->arg.set.value;
+			arg->i64_val = *(int32_t *)op->arg.set.value;
 			break;
-		case sizeof(i64):
+		case sizeof(int64_t):
 			/* 64-bit operand */
-			arg->i64_val = *(i64 *)op->arg.set.value;
+			arg->i64_val = *(int64_t *)op->arg.set.value;
 			break;
 		default:
 			tnt_raise(ClientError, ER_ARG_TYPE,
@@ -378,7 +378,7 @@ init_update_op_splice(struct tuple_update *update, struct update_op *op)
 	struct update_field *field = (struct update_field *)
 			rope_extract(update->rope, op->field_no);
 
-	u32 field_len = update_field_len(field);
+	uint32_t field_len = update_field_len(field);
 
 	struct op_splice_arg *arg = &op->arg.splice;
 	const char *value = op->arg.set.value;
@@ -408,7 +408,7 @@ init_update_op_splice(struct tuple_update *update, struct update_op *op)
 	}
 
 	/* Read the paste. */
-	arg->paste = pick_field_str(&value, end, (u32 *) &arg->paste_length);
+	arg->paste = pick_field_str(&value, end, (uint32_t *) &arg->paste_length);
 
 	/* Fill tail part */
 	arg->tail_offset = arg->offset + arg->cut_length;
@@ -465,7 +465,7 @@ update_field_split(void *split_ctx, void *data, size_t size __attribute__((unuse
 	const char *end = field + prev->tail_len;
 
 	prev->tail_len = tuple_range_size(&field, end, offset - 1);
-	u32 field_len = load_varint32(&field);
+	uint32_t field_len = load_varint32(&field);
 
 	update_field_init(next, field, field_len, end - field - field_len);
 	return next;
@@ -497,12 +497,12 @@ update_create_rope(struct tuple_update *update,
 			update->alloc(update->alloc_ctx, sizeof(*first));
 	const char *field = tuple_data;
 	const char *end = tuple_data_end;
-	u32 field_len = load_varint32(&field);
+	uint32_t field_len = load_varint32(&field);
 	update_field_init(first, field, field_len,
 			  end - field - field_len);
 
 	rope_append(update->rope, first, field_count);
-	for (uint32_t i = 0; i < update->ops_count; i++) {
+	for (uint32_t i = 0; i < update->op_count; i++) {
 		update->ops[i].meta->init_op(update, &update->ops[i]);
 	}
 }
@@ -544,8 +544,8 @@ do_update_ops(struct tuple_update *update, char *new_data)
 
 		struct update_field *field = (struct update_field *)
 				rope_leaf_data(node);
-		u32 field_count = rope_leaf_size(node);
-		u32 field_len = update_field_len(field);
+		uint32_t field_count = rope_leaf_size(node);
+		uint32_t field_len = update_field_len(field);
 
 		new_data = pack_varint32(new_data, field_len);
 
@@ -608,18 +608,18 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		const char *expr_end)
 {
 	/* number of operations */
-	update->ops_count = pick_u32(&expr, expr_end);
+	update->op_count = pick_u32(&expr, expr_end);
 
-	if (update->ops_count > BOX_UPDATE_OP_CNT_MAX)
+	if (update->op_count > BOX_UPDATE_OP_CNT_MAX)
 		tnt_raise(IllegalParams, "too many operations for update");
-	if (update->ops_count == 0)
+	if (update->op_count == 0)
 		tnt_raise(IllegalParams, "no operations for update");
 
 	/* Read update operations.  */
 	update->ops = (struct update_op *) update->alloc(update->alloc_ctx,
-				update->ops_count * sizeof(struct update_op));
+				update->op_count * sizeof(struct update_op));
 	struct update_op *op = update->ops;
-	struct update_op *ops_end = op + update->ops_count;
+	struct update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
 		/* Read operation */
 		op->field_no = pick_u32(&expr, expr_end);

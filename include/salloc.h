@@ -30,7 +30,7 @@
  */
 #include <stddef.h>
 #include <stdbool.h>
-#include "tarantool/util.h" /* for u64 */
+#include "tarantool/util.h" /* for uint64_t */
 
 struct tbuf;
 
@@ -42,11 +42,11 @@ void slab_validate();
 
 /** Statistics on utilization of a single slab class. */
 struct slab_cache_stats {
-	i64 item_size;
-	i64 slabs;
-	i64 items;
-	i64 bytes_used;
-	i64 bytes_free;
+	int64_t item_size;
+	int64_t slabs;
+	int64_t items;
+	int64_t bytes_used;
+	int64_t bytes_free;
 };
 
 /** Statistics on utilization of the slab allocator. */

@@ -32,6 +32,7 @@
 #include <pickle.h>
 
 struct tbuf;
+struct key_def;
 
 /**
  * An atom of Tarantool/Box storage. Consists of a list of fields.
@@ -40,13 +41,13 @@ struct tbuf;
 struct tuple
 {
 	/** reference counter */
-	u16 refs;
+	uint16_t refs;
 	/* see enum tuple_flags */
-	u16 flags;
+	uint16_t flags;
 	/** length of the variable part of the tuple */
-	u32 bsize;
+	uint32_t bsize;
 	/** number of fields in the variable part. */
-	u32 field_count;
+	uint32_t field_count;
 	/**
 	 * Fields can have variable length, and thus are packed
 	 * into a contiguous byte array. Each field is prefixed
@@ -88,7 +89,7 @@ tuple_ref(struct tuple *tuple, int count);
  * @returns field data if the field exists, or NULL
  */
 const char *
-tuple_field_old(struct tuple *tuple, u32 i);
+tuple_field_old(struct tuple *tuple, uint32_t i);
 
 /**
  * @brief Return field data of the field
@@ -187,6 +188,57 @@ tuple_range_size(const char **begin, const char *end, uint32_t count)
 }
 
 void tuple_free(struct tuple *tuple);
+
+/**
+ * @brief Compare two tuples using field by field using key definition
+ * @param tuple_a tuple
+ * @param tuple_b tuple
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b)
+ * @retval <0 if key_fields(tuple_a) < key_fields(tuple_b)
+ * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
+ */
+int
+tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+	      const struct key_def *key_def);
+
+/**
+ * @brief Compare two tuples field by field for duplicate using key definition
+ * @param tuple_a tuple
+ * @param tuple_b tuple
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b) and
+ * tuple_a == tuple_b - tuple_a is the same object as tuple_b
+ * @retval <0 if key_fields(tuple_a) <= key_fields(tuple_b)
+ * @retval >0 if key_fields(tuple_a > key_fields(tuple_b)
+ */
+int
+tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
+		  const struct key_def *key_def);
+
+/**
+ * @brief Compare a tuple with a key field by field using key definition
+ * @param tuple_a tuple
+ * @param key BER-encoded key
+ * @param part_count number of parts in \a key
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == parts(key)
+ * @retval <0 if key_fields(tuple_a) < parts(key)
+ * @retval >0 if key_fields(tuple_a) > parts(key)
+ */
+int
+tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
+		       uint32_t part_count, const struct key_def *key_def);
+
+/** These functions are implemented in tuple_convert.cc. */
+
+/* Store tuple in the output buffer in iproto format. */
+void
+tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
+
+/* Store tuple fields in the Lua buffer, BER-length-encoded. */
+void
+tuple_to_luabuf(struct tuple *tuple, struct luaL_Buffer *b);
 
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

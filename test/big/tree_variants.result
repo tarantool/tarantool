@@ -68,6 +68,44 @@ delete from t6 where k0 = 8
 Delete OK, 1 row affected
 delete from t6 where k0 = 9
 Delete OK, 1 row affected
+lua box.insert(6, 6, 6ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006 )
+---
+ - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+...
+lua box.insert(6, 7, 7ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007 )
+---
+ - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+...
+lua box.insert(6, 8, 8ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008 )
+---
+ - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+...
+lua box.insert(6, 9, 9ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009 )
+---
+ - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+...
+lua box.select(6, 1, 6ULL)
+---
+ - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+...
+lua box.select(6, 1, 6)
+---
+ - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+...
+lua box.select(6, 2, 400ULL)
+---
+ - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+ - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+ - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+ - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+...
+lua box.select(6, 2, 400)
+---
+ - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+ - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+ - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+ - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+...
 lua for k,v in box.space[6]:pairs() do print(v) end
 ---
 0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
@@ -76,4 +114,16 @@ lua for k,v in box.space[6]:pairs() do print(v) end
 3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
 4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 ...
+insert into t6 VALUES('', '00000001', '00000002', '', '', '', '', '', 0)
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
+insert into t6 VALUES('xxxxxxxx', '00000001', '00000002', '', '', '', '', '', 0)
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
+insert into t6 VALUES(1, '', '00000002', '', '', '', '', '', 0)
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM64'
+insert into t6 VALUES(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM64'

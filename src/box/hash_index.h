@@ -31,34 +31,35 @@
 
 #include "index.h"
 
+struct mh_index_t;
 
 class HashIndex: public Index {
 public:
-	static HashIndex *
-	factory(struct key_def *key_def, struct space *space);
-
 	HashIndex(struct key_def *key_def, struct space *space);
+	~HashIndex();
 
 	virtual void beginBuild();
 	virtual void buildNext(struct tuple *tuple);
 	virtual void endBuild();
 	virtual void build(Index *pk);
-	virtual size_t size() const  = 0;
+	virtual size_t size() const;
 	virtual struct tuple *min() const;
 	virtual struct tuple *max() const;
-	virtual struct tuple *random(u32 rnd) const = 0;
-	virtual struct tuple *findByKey(const char *key, u32 part_count) const  = 0;
-	virtual struct tuple *findByTuple(struct tuple *tuple) const;
+	virtual struct tuple *random(uint32_t rnd) const;
+	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
-				      enum dup_replace_mode mode)  = 0;
+				      enum dup_replace_mode mode);
 
-	virtual struct iterator *allocIterator() const = 0;
+	virtual struct iterator *allocIterator() const;
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
-				  const char *key, u32 part_count) const  = 0;
+				  const char *key, uint32_t part_count) const;
 
-	virtual void reserve(u32 n_tuples) = 0;
+	virtual void reserve(uint32_t n_tuples);
+
+protected:
+	struct mh_index_t *hash;
 };
 
 #endif /* TARANTOOL_BOX_HASH_INDEX_H_INCLUDED */

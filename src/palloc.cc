@@ -57,7 +57,7 @@ SLIST_HEAD(chunk_list_head, chunk);
 
 struct chunk_class {
 	int i;
-	u32 allocated_size;
+	uint32_t allocated_size;
 	int chunks_count;
 	struct chunk_list_head chunks;
 	 TAILQ_ENTRY(chunk_class) link;
@@ -455,8 +455,8 @@ palloc_stat(struct tbuf *buf)
 			    ", free_chunks: %- 6i, busy_chunks: %- 6i }" CRLF, clazz->allocated_size,
 			    free_chunks, clazz->chunks_count - free_chunks);
 	}
-	u64 palloc_total = 0;
-	u64 palloc_used = 0;
+	uint64_t palloc_total = 0;
+	uint64_t palloc_used = 0;
 	SLIST_FOREACH(pool, &pools, link) {
 		SLIST_FOREACH(chunk, &pool->chunks, busy_link) {
 			palloc_total += chunk->size;

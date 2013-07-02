@@ -15,13 +15,20 @@ exec sql "select * from t2 where k0 = 3"
 exec sql "delete from t2 where k0 = 1"
 exec sql "delete from t2 where k0 = 2"
 exec sql "delete from t2 where k0 = 3"
+
+# Test incorrect keys - supplied key field type does not match index type
+# https://bugs.launchpad.net/tarantool/+bug/1072624
+exec sql "insert into t2 VALUES('xxxxxxx')"
+exec sql "insert into t2 VALUES('')"
+exec sql "insert into t2 VALUES('12')"
+
 # string keys
 exec sql "insert into t3 values ('identifier', 'tuple')"
 exec admin "save snapshot"
 exec sql "insert into t3 values ('second', 'tuple 2')"
 exec admin "save snapshot"
-exec sql "call box.select_range(3, 0, 100, 'second')"
-exec sql "call box.select_range(3, 0, 100, 'identifier')"
+exec sql "call box.select_range('3', '0', '100', 'second')"
+exec sql "call box.select_range('3', '0', '100', 'identifier')"
 
 exec sql "insert into t3 values ('third', 'tuple 3')"
 exec sql "select * from t3 where k0 = 'identifier'"
@@ -55,10 +62,10 @@ exec sql "insert into t2 values (1, 'tuple')"
 exec sql "insert into t3 values (1, 'tuple')"
 exec sql "insert into t3 values (2, 'tuple')"
 exec admin "lua " + lua.replace('\n', ' ')
-exec sql "call box.crossjoin(3, 3, 0)"
-exec sql "call box.crossjoin(3, 3, 5)"
-exec sql "call box.crossjoin(3, 3, 10000)"
-exec sql "call box.crossjoin(3, 2, 10000)"
+exec sql "call box.crossjoin('3', '3', '0')"
+exec sql "call box.crossjoin('3', '3', '5')"
+exec sql "call box.crossjoin('3', '3', '10000')"
+exec sql "call box.crossjoin('3', '2', '10000')"
 exec admin "lua box.space[3]:truncate()"
 
 # Bug #922520 - select missing keys

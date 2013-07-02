@@ -57,17 +57,16 @@ class Server(object):
     replication slaves. The server is started once at the beginning
     of each suite, and stopped at the end."""
 
-    def __new__(cls, core=None, module=None):
+    def __new__(cls, core=None):
         if core  == None:
             return super(Server, cls).__new__(cls)
         mdlname = "lib.{0}_server".format(core)
         clsname = "{0}Server".format(core.title())
         corecls = __import__(mdlname, fromlist=clsname).__dict__[clsname]
-        return corecls.__new__(corecls, core, module)
+        return corecls.__new__(corecls, core)
 
-    def __init__(self, core, module):
+    def __init__(self, core):
         self.core = core
-        self.module = module
         self.re_vardir_cleanup = ['*.core.*', 'core']
         self.process = None
         self.default_config_name = None
@@ -75,7 +74,7 @@ class Server(object):
         self.config = None
         self.vardir = None
         self.valgrind_log = "valgrind.log"
-        self.valgrind_sup = os.path.join("share/", "%s_%s.sup" % (core, module))
+        self.valgrind_sup = os.path.join("share/", "%s.sup" % (core))
         self.init_lua = None
         self.default_suppression_name = "valgrind.sup"
         self.pidfile = None
@@ -89,14 +88,13 @@ class Server(object):
 
     def find_exe(self, builddir, silent=True):
         "Locate server executable in the build dir or in the PATH."
-        exe_name = self.default_bin_name()
         path = builddir + os.pathsep + os.environ["PATH"]
 
         if not silent:
             print "  Looking for server binary in {0} ...".format(path)
 
         for dir in path.split(os.pathsep):
-            exe = os.path.join(dir, exe_name)
+            exe = os.path.join(dir, self.default_bin_name)
             if os.access(exe, os.X_OK):
                 return exe
 

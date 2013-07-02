@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
 #include <connector/c/include/tarantool/tnt_rpl.h>
@@ -48,6 +49,8 @@
 #include "client/tarantool/tc_query.h"
 
 extern struct tc tc;
+
+/*##################### Base printing functions #####################*/
 
 void tc_print_tee(char *buf, size_t size) {
 	if (tc.tee_fd == -1)
@@ -95,6 +98,8 @@ void tc_printf(char *fmt, ...) {
 	}
 }
 
+/*##################### string functions #####################*/
+
 static int tc_str_valid(char *data, uint32_t size) {
 	int length;
 	wchar_t dest;
@@ -111,19 +116,34 @@ static int tc_str_valid(char *data, uint32_t size) {
 	return 1;
 }
 
-static void tc_print_str(char *data, uint32_t size) {
+void tc_print_string(char *data, uint32_t size, char lua)
+{
 	if (tc_str_valid(data, size)) {
 		wchar_t dest;
 		int length;
 		mbtowc (NULL, NULL, 0);
 		while ((length = mbtowc(&dest, data, size)) > -1 && size > 0) {
 			if (dest >= 0x20) {
-				tc_printf ("%lc", dest);
+				if (lua)
+					switch (dest) {
+					case '\'':
+						tc_printf("\\\'");
+						break;
+					case '\\':
+						tc_printf("\\\\");
+						break;
+					default:
+						tc_printf ("%lc", dest);
+					}
+				else
+					tc_printf ("%lc", dest);
 			}
 			else {
 				switch (dest) {
 				case 0x00:
 					tc_printf("\\0");
+					length++;
+					/* Cause of mbtowc returns 0 when \0 */
 					break;
 				case 0x07:
 					tc_printf("\\a");
@@ -147,12 +167,10 @@ static void tc_print_str(char *data, uint32_t size) {
 					tc_printf("\\r");
 					break;
 				default:
-					tc_printf("\\x%02lX", 
+					tc_printf("\\x%02lX",
 						(unsigned long int)dest);
 					break;
 				}
-				if (length == 0) 
-					++length;
 			}
 			size -= length;
 			data += length;
@@ -166,7 +184,11 @@ static void tc_print_str(char *data, uint32_t size) {
 	}
 }
 
-static void tc_print_fields(struct tnt_tuple *tu) {
+/*##################### Tuple and Fields #####################*/
+/* tarantool */
+
+void tc_print_fields(struct tnt_tuple *tu)
+{
 	struct tnt_iter ifl;
 	tnt_iter(&ifl, tu);
 	while (tnt_next(&ifl)) {
@@ -183,7 +205,7 @@ static void tc_print_fields(struct tnt_tuple *tu) {
 			tc_printf("%"PRIu64, *((uint64_t*)data));
 			break;
 		default:
-			tc_print_str(data, size);
+			tc_print_string(data, size, 0);
 		}
 		tc_printf("'");
 	}
@@ -210,46 +232,46 @@ void tc_print_list(struct tnt_list *l)
 	tnt_iter_free(&it);
 }
 
-static void
-tc_printer_tarantool(struct tnt_log_header_v11 *hdr,
-		     struct tnt_request *r)
+/* lua */
+
+void tc_print_lua_field(char *data, uint32_t size, char string)
 {
-	tc_printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
-		  tc_query_type(r->h.type),
-		  hdr->lsn,
-		  hdr->tm,
-		  hdr->len);
-	switch (r->h.type) {
-	case TNT_OP_INSERT:
-		tc_print_tuple(&r->r.insert.t);
+	if (string)
+		goto _string;
+	switch (size){
+	case 4:
+		tc_printf("%"PRIu32, *((uint32_t*)data));
 		break;
-	case TNT_OP_DELETE:
-		tc_print_tuple(&r->r.del.t);
+	case 8:
+		tc_printf("%"PRIu64, *((uint64_t*)data));
 		break;
-	case TNT_OP_UPDATE:
-		tc_print_tuple(&r->r.update.t);
-		break;
+	default:
+_string:
+		tc_printf("\'");
+		tc_print_string(data, size, 1);
+		tc_printf("\'");
 	}
 }
 
-static void
-tc_printer_raw(struct tnt_log_header_v11 *hdr, struct tnt_request *r)
+void tc_print_lua_fields(struct tnt_tuple *tu)
 {
-	if (tc.opt.raw_with_headers) {
-		fwrite(&tnt_log_marker_v11,
-		       sizeof(tnt_log_marker_v11), 1, stdout);
+	struct tnt_iter ifl;
+	tnt_iter(&ifl, tu);
+	while (tnt_next(&ifl)) {
+		if ((TNT_IFIELD_IDX(&ifl)) != 0)
+			tc_printf(", ");
+		char *data = TNT_IFIELD_DATA(&ifl);
+		uint32_t size = TNT_IFIELD_SIZE(&ifl);
+		tc_print_lua_field(data, size, tc.opt.str_instead_int);
 	}
-	fwrite(hdr, sizeof(*hdr), 1, stdout);
-	fwrite(r->origin, r->origin_size, 1, stdout);
+	if (ifl.status == TNT_ITER_FAIL)
+		tc_printf("<parsing error>");
+	tnt_iter_free(&ifl);
 }
 
-tc_printerf_t tc_print_getcb(const char *name)
+void tc_print_lua_tuple(struct tnt_tuple *tu)
 {
-	if (name == NULL)
-		return tc_printer_tarantool;
-	if (!strcasecmp(name, "tarantool"))
-		return tc_printer_tarantool;
-	if (!strcasecmp(name, "raw"))
-		return tc_printer_raw;
-	return NULL;
+	tc_printf("{");
+	tc_print_lua_fields(tu);
+	tc_printf("}");
 }

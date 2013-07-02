@@ -27,6 +27,12 @@ delete from t2 where k0 = 2
 Delete OK, 1 row affected
 delete from t2 where k0 = 3
 Delete OK, 1 row affected
+insert into t2 VALUES('xxxxxxx')
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
+insert into t2 VALUES('')
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
+insert into t2 VALUES('12')
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
 insert into t3 values ('identifier', 'tuple')
 Insert OK, 1 row affected
 save snapshot
@@ -39,10 +45,10 @@ save snapshot
 ---
 ok
 ...
-call box.select_range(3, 0, 100, 'second')
+call box.select_range('3', '0', '100', 'second')
 Found 1 tuple:
 ['second', 'tuple 2']
-call box.select_range(3, 0, 100, 'identifier')
+call box.select_range('3', '0', '100', 'identifier')
 Found 2 tuples:
 ['identifier', 'tuple']
 ['second', 'tuple 2']
@@ -72,21 +78,21 @@ Insert OK, 1 row affected
 lua  function box.crossjoin(space0, space1, limit)   space0 = tonumber(space0)   space1 = tonumber(space1)   limit = tonumber(limit)   local result = {}   for k0, v0 in box.space[space0]:pairs() do     for k1, v1 in box.space[space1]:pairs() do       if limit <= 0 then         return unpack(result)       end       newtuple = {v0:unpack()}       for _, v in v1:pairs() do table.insert(newtuple, v) end       table.insert(result, newtuple)       limit = limit - 1     end   end   return unpack(result) end
 ---
 ...
-call box.crossjoin(3, 3, 0)
+call box.crossjoin('3', '3', '0')
 No match
-call box.crossjoin(3, 3, 5)
+call box.crossjoin('3', '3', '5')
 Found 4 tuples:
 [1, 'tuple', 1, 'tuple']
 [1, 'tuple', 2, 'tuple']
 [2, 'tuple', 1, 'tuple']
 [2, 'tuple', 2, 'tuple']
-call box.crossjoin(3, 3, 10000)
+call box.crossjoin('3', '3', '10000')
 Found 4 tuples:
 [1, 'tuple', 1, 'tuple']
 [1, 'tuple', 2, 'tuple']
 [2, 'tuple', 1, 'tuple']
 [2, 'tuple', 2, 'tuple']
-call box.crossjoin(3, 2, 10000)
+call box.crossjoin('3', '2', '10000')
 Found 2 tuples:
 [1, 'tuple', 1, 'tuple']
 [2, 'tuple', 1, 'tuple']

@@ -39,7 +39,7 @@ extern "C" {
 } /* extern "C" */
 
 static void
-fill_stat_item(struct lua_State *L, int rps, i64 total)
+fill_stat_item(struct lua_State *L, int rps, int64_t total)
 {
 	lua_pushstring(L, "rps");
 	lua_pushnumber(L, rps);
@@ -51,7 +51,7 @@ fill_stat_item(struct lua_State *L, int rps, i64 total)
 }
 
 static int
-set_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
+set_stat_item(const char *name, int rps, int64_t total, void *cb_ctx)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 
@@ -70,7 +70,7 @@ set_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
  * box.stats.DELETE.
  */
 static int
-seek_stat_item(const char *name, int rps, i64 total, void *cb_ctx)
+seek_stat_item(const char *name, int rps, int64_t total, void *cb_ctx)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 	if (strcmp(name, lua_tostring(L, -1)) != 0)

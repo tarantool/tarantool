@@ -32,10 +32,9 @@
 #include <limits.h>
 #include <stdbool.h>
 #include "tarantool/util.h"
-#include "tbuf.h"
 #include "tarantool_ev.h"
 
-extern const u32 default_version;
+extern const uint32_t default_version;
 
 enum log_format { XLOG = 65534, SNAP = 65535 };
 
@@ -64,12 +63,12 @@ struct log_dir {
 extern struct log_dir snap_dir;
 extern struct log_dir wal_dir;
 
-i64
+int64_t
 greatest_lsn(struct log_dir *dir);
 char *
-format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix);
-i64
-find_including_file(struct log_dir *dir, i64 target_lsn);
+format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
+int64_t
+find_including_file(struct log_dir *dir, int64_t target_lsn);
 
 struct log_io {
 	struct log_dir *dir;
@@ -84,9 +83,9 @@ struct log_io {
 };
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, i64 lsn, enum log_suffix suffix);
+log_io_open_for_read(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, i64 lsn, enum log_suffix suffix);
+log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
 struct log_io *
 log_io_open(struct log_dir *dir, enum log_mode mode,
 	    const char *filename, enum log_suffix suffix, FILE *file);
@@ -109,26 +108,27 @@ void
 log_io_cursor_open(struct log_io_cursor *i, struct log_io *l);
 void
 log_io_cursor_close(struct log_io_cursor *i);
-struct tbuf *
-log_io_cursor_next(struct log_io_cursor *i);
 
-typedef u32 log_magic_t;
+const char *
+log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen);
+
+typedef uint32_t log_magic_t;
 
 struct header_v11 {
-	u32 header_crc32c;
-	i64 lsn;
+	uint32_t header_crc32c;
+	int64_t lsn;
 	double tm;
-	u32 len;
-	u32 data_crc32c;
+	uint32_t len;
+	uint32_t data_crc32c;
 } __attribute__((packed));
 
-static inline struct header_v11 *header_v11(const struct tbuf *t)
+static inline struct header_v11 *header_v11(const char *t)
 {
-	return (struct header_v11 *)t->data;
+	return (struct header_v11 *)t;
 }
 
 static inline void
-header_v11_fill(struct header_v11 *header, u64 lsn, size_t data_len)
+header_v11_fill(struct header_v11 *header, int64_t lsn, size_t data_len)
 {
 	header->lsn = lsn;
 	header->tm = ev_now();
@@ -141,15 +141,15 @@ header_v11_sign(struct header_v11 *header);
 struct row_v11 {
 	log_magic_t marker;
 	struct header_v11 header;
-	u16 tag;
-	u64 cookie;
-	u8 data[];
+	uint16_t tag;
+	uint64_t cookie;
+	uint8_t data[];
 } __attribute__((packed));
 
 void
-row_v11_fill(struct row_v11 *row, u64 lsn, u16 tag, u64 cookie,
-	     const char *metadata, size_t metadata_len, const char
-	     *data, size_t data_len);
+row_v11_fill(struct row_v11 *row, int64_t lsn, uint16_t tag,
+	     uint64_t cookie, const char *metadata, size_t metadata_len,
+	     const char *data, size_t data_len);
 
 static inline size_t
 row_v11_size(struct row_v11 *row)

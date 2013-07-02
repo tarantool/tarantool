@@ -67,17 +67,17 @@ static struct iterator *memcached_it;
    <key, meta, data> */
 
 struct meta {
-	u32 exptime;
-	u32 flags;
-	u64 cas;
+	uint32_t exptime;
+	uint32_t flags;
+	uint64_t cas;
 } __packed__;
 
-static u64
+static uint64_t
 memcached_natoq(const char *start, const char *end)
 {
-	u64 num = 0;
+	uint64_t num = 0;
 	while (start < end) {
-		u8 code = *start++;
+		uint8_t code = *start++;
 		num = num * 10 + (code - '0');
 	}
 	return num;
@@ -87,14 +87,14 @@ void
 tbuf_append_field(struct tbuf *b, const char *f)
 {
 	const char *begin = f;
-	u32 size = load_varint32(&f);
+	uint32_t size = load_varint32(&f);
 	tbuf_append(b, begin, f - begin + size);
 }
 
 void
-tbuf_store_field(struct tbuf *b, const char *field, u32 len)
+tbuf_store_field(struct tbuf *b, const char *field, uint32_t len)
 {
-	char buf[sizeof(u32)+1];
+	char buf[sizeof(uint32_t)+1];
 	char *bufend = pack_varint32(buf, len);
 	tbuf_append(b, buf, bufend - buf);
 	tbuf_append(b, field, len);
@@ -108,7 +108,7 @@ const char *
 tbuf_read_field(struct tbuf *buf)
 {
 	const char *field = buf->data;
-	u32 field_len = pick_varint32((const char **) &buf->data,
+	uint32_t field_len = pick_varint32((const char **) &buf->data,
 				      buf->data + buf->size);
 	if (buf->data + field_len > field + buf->size)
 		tnt_raise(IllegalParams, "packet too short (expected a field)");
@@ -119,17 +119,17 @@ tbuf_read_field(struct tbuf *buf)
 }
 
 static void
-memcached_store(const char *key, u32 exptime, u32 flags, u32 bytes,
+memcached_store(const char *key, uint32_t exptime, uint32_t flags, uint32_t bytes,
 		const char *data)
 {
-	u32 box_flags = 0;
-	u32 field_count = 4;
-	static u64 cas = 42;
+	uint32_t box_flags = 0;
+	uint32_t field_count = 4;
+	static uint64_t cas = 42;
 	struct meta m;
 
 	struct tbuf *req = tbuf_new(fiber->gc_pool);
 
-	tbuf_append(req, &cfg.memcached_space, sizeof(u32));
+	tbuf_append(req, &cfg.memcached_space, sizeof(uint32_t));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
 	tbuf_append(req, &field_count, sizeof(field_count));
 
@@ -153,22 +153,22 @@ memcached_store(const char *key, u32 exptime, u32 flags, u32 bytes,
 	 * Use a box dispatch wrapper which handles correctly
 	 * read-only/read-write modes.
 	 */
-	box_process(&port_null, REPLACE, req->data, req->size);
+	box_process(&null_port, REPLACE, req->data, req->size);
 }
 
 static void
 memcached_delete(const char *key)
 {
-	u32 key_len = 1;
-	u32 box_flags = 0;
+	uint32_t key_len = 1;
+	uint32_t box_flags = 0;
 	struct tbuf *req = tbuf_new(fiber->gc_pool);
 
-	tbuf_append(req, &cfg.memcached_space, sizeof(u32));
+	tbuf_append(req, &cfg.memcached_space, sizeof(uint32_t));
 	tbuf_append(req, &box_flags, sizeof(box_flags));
 	tbuf_append(req, &key_len, sizeof(key_len));
 	tbuf_append_field(req, key);
 
-	box_process(&port_null, DELETE, req->data, req->size);
+	box_process(&null_port, DELETE, req->data, req->size);
 }
 
 static struct tuple *
@@ -194,7 +194,7 @@ memcached_is_expired(struct tuple *tuple)
 }
 
 static bool
-memcached_is_numeric(const char *field, u32 value_len)
+memcached_is_numeric(const char *field, uint32_t value_len)
 {
 	for (int i = 0; i < value_len; i++)
 		if (*(field + i) < '0' || '9' < *(field + i))
@@ -203,21 +203,21 @@ memcached_is_numeric(const char *field, u32 value_len)
 }
 
 static struct stats {
-	u64 total_items;
-	u32 curr_connections;
-	u32 total_connections;
-	u64 cmd_get;
-	u64 cmd_set;
-	u64 get_hits;
-	u64 get_misses;
-	u64 evictions;
-	u64 bytes_read;
-	u64 bytes_written;
+	uint64_t total_items;
+	uint32_t curr_connections;
+	uint32_t total_connections;
+	uint64_t cmd_get;
+	uint64_t cmd_set;
+	uint64_t get_hits;
+	uint64_t get_misses;
+	uint64_t evictions;
+	uint64_t bytes_read;
+	uint64_t bytes_written;
 } stats;
 
 struct salloc_stat_memcached_cb_ctx {
-	i64 bytes_used;
-	i64 items;
+	int64_t bytes_used;
+	int64_t items;
 };
 
 static int
@@ -239,9 +239,9 @@ memcached_print_stats(struct obuf *out)
 	memstats.bytes_used = memstats.items = 0;
 	salloc_stat(salloc_stat_memcached_cb, NULL, &memstats);
 
-	tbuf_printf(buf, "STAT pid %" PRIu32 "\r\n", (u32)getpid());
-	tbuf_printf(buf, "STAT uptime %" PRIu32 "\r\n", (u32)tarantool_uptime());
-	tbuf_printf(buf, "STAT time %" PRIu32 "\r\n", (u32)ev_now());
+	tbuf_printf(buf, "STAT pid %" PRIu32 "\r\n", (uint32_t)getpid());
+	tbuf_printf(buf, "STAT uptime %" PRIu32 "\r\n", (uint32_t)tarantool_uptime());
+	tbuf_printf(buf, "STAT time %" PRIu32 "\r\n", (uint32_t)ev_now());
 	tbuf_printf(buf, "STAT version 1.2.5 (tarantool/box)\r\n");
 	tbuf_printf(buf, "STAT pointer_size %" PRI_SZ "\r\n", sizeof(void *)*8);
 	tbuf_printf(buf, "STAT curr_items %" PRIu64 "\r\n", memstats.items);
@@ -257,7 +257,7 @@ memcached_print_stats(struct obuf *out)
 	tbuf_printf(buf, "STAT evictions %" PRIu64 "\r\n", stats.evictions);
 	tbuf_printf(buf, "STAT bytes_read %" PRIu64 "\r\n", stats.bytes_read);
 	tbuf_printf(buf, "STAT bytes_written %" PRIu64 "\r\n", stats.bytes_written);
-	tbuf_printf(buf, "STAT limit_maxbytes %" PRIu64 "\r\n", (u64)(cfg.slab_alloc_arena * (1 << 30)));
+	tbuf_printf(buf, "STAT limit_maxbytes %" PRIu64 "\r\n", (uint64_t)(cfg.slab_alloc_arena * (1 << 30)));
 	tbuf_printf(buf, "STAT threads 1\r\n");
 	tbuf_printf(buf, "END\r\n");
 	obuf_dup(out, buf->data, buf->size);
@@ -274,9 +274,9 @@ void memcached_get(struct obuf *out, size_t keys_count, struct tbuf *keys,
 		const struct meta *m;
 		const char *value;
 		const char *suffix;
-		u32 key_len;
-		u32 value_len;
-		u32 suffix_len;
+		uint32_t key_len;
+		uint32_t value_len;
+		uint32_t suffix_len;
 
 		const char *key = tbuf_read_field(keys);
 		tuple = memcached_find(key);
@@ -509,7 +509,7 @@ memcached_space_init()
 	key_def->type = HASH;
 
 	key_def->parts = (struct key_part *) malloc(sizeof(struct key_part));
-	key_def->cmp_order = (u32 *) malloc(sizeof(u32));
+	key_def->cmp_order = (uint32_t *) malloc(sizeof(uint32_t));
 
 	if (key_def->parts == NULL || key_def->cmp_order == NULL)
 		panic("out of memory when configuring memcached_space");

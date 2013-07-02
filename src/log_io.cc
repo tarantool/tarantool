@@ -36,7 +36,7 @@
 #include "fio.h"
 #include "tarantool_eio.h"
 
-const u32 default_version = 11;
+const uint32_t default_version = 11;
 const log_magic_t row_marker_v11 = 0xba0babed;
 const log_magic_t eof_marker_v11 = 0x10adab1e;
 const char inprogress_suffix[] = ".inprogress";
@@ -53,7 +53,7 @@ header_v11_sign(struct header_v11 *header)
 }
 
 void
-row_v11_fill(struct row_v11 *row, u64 lsn, u16 tag, u64 cookie,
+row_v11_fill(struct row_v11 *row, int64_t lsn, uint16_t tag, uint64_t cookie,
 	     const char *metadata, size_t metadata_len, const char
 	     *data, size_t data_len)
 {
@@ -87,19 +87,19 @@ struct log_dir wal_dir = {
 static int
 cmp_i64(const void *_a, const void *_b)
 {
-	const i64 *a = (const i64 *) _a, *b = (const i64 *) _b;
+	const int64_t *a = (const int64_t *) _a, *b = (const int64_t *) _b;
 	if (*a == *b)
 		return 0;
 	return (*a > *b) ? 1 : -1;
 }
 
 static ssize_t
-scan_dir(struct log_dir *dir, i64 **ret_lsn)
+scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 {
 	ssize_t result = -1;
 	size_t i = 0, size = 1024;
 	ssize_t ext_len = strlen(dir->filename_ext);
-	i64 *lsn = (i64 *) palloc(fiber->gc_pool, sizeof(i64) * size);
+	int64_t *lsn = (int64_t *) palloc(fiber->gc_pool, sizeof(int64_t) * size);
 	DIR *dh = opendir(dir->dirname);
 
 	if (lsn == NULL || dh == NULL)
@@ -143,16 +143,16 @@ scan_dir(struct log_dir *dir, i64 **ret_lsn)
 
 		i++;
 		if (i == size) {
-			i64 *n = (i64 *) palloc(fiber->gc_pool, sizeof(i64) * size * 2);
+			int64_t *n = (int64_t *) palloc(fiber->gc_pool, sizeof(int64_t) * size * 2);
 			if (n == NULL)
 				goto out;
-			memcpy(n, lsn, sizeof(i64) * size);
+			memcpy(n, lsn, sizeof(int64_t) * size);
 			lsn = n;
 			size = size * 2;
 		}
 	}
 
-	qsort(lsn, i, sizeof(i64), cmp_i64);
+	qsort(lsn, i, sizeof(int64_t), cmp_i64);
 
 	*ret_lsn = lsn;
 	result = i;
@@ -165,10 +165,10 @@ out:
 	return result;
 }
 
-i64
+int64_t
 greatest_lsn(struct log_dir *dir)
 {
-	i64 *lsn;
+	int64_t *lsn;
 	ssize_t count = scan_dir(dir, &lsn);
 
 	if (count <= 0)
@@ -177,10 +177,10 @@ greatest_lsn(struct log_dir *dir)
 	return lsn[count - 1];
 }
 
-i64
-find_including_file(struct log_dir *dir, i64 target_lsn)
+int64_t
+find_including_file(struct log_dir *dir, int64_t target_lsn)
 {
-	i64 *lsn;
+	int64_t *lsn;
 	ssize_t count = scan_dir(dir, &lsn);
 
 	if (count <= 0)
@@ -206,7 +206,7 @@ find_including_file(struct log_dir *dir, i64 target_lsn)
 }
 
 char *
-format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
+format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 {
 	static __thread char filename[PATH_MAX + 1];
 	const char *suffix_str = suffix == INPROGRESS ? inprogress_suffix : "";
@@ -219,44 +219,41 @@ format_filename(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
 
 /* {{{ struct log_io_cursor */
 
-#define ROW_EOF (struct tbuf *) 1
+static const char ROW_EOF[] = "";
 
-static struct tbuf *
-row_reader_v11(FILE *f, struct palloc_pool *pool)
+const char *
+row_reader_v11(FILE *f, uint32_t *rowlen)
 {
-	struct tbuf *m = tbuf_new(pool);
+	struct header_v11 m;
 
-	u32 header_crc, data_crc;
+	uint32_t header_crc, data_crc;
 
-	tbuf_ensure(m, sizeof(struct header_v11));
-	if (fread(m->data, sizeof(struct header_v11), 1, f) != 1)
+	if (fread(&m, sizeof(m), 1, f) != 1)
 		return ROW_EOF;
 
-	m->size = sizeof(struct header_v11);
-
 	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
-	header_crc = crc32_calc(0, (const unsigned char *) m->data + offsetof(struct header_v11, lsn),
-				sizeof(struct header_v11) - offsetof(struct header_v11, lsn));
+	header_crc = crc32_calc(0, (unsigned char *) &m + offsetof(struct header_v11, lsn),
+				sizeof(m) - offsetof(struct header_v11, lsn));
 
-	if (header_v11(m)->header_crc32c != header_crc) {
+	if (m.header_crc32c != header_crc) {
 		say_error("header crc32c mismatch");
 		return NULL;
 	}
+	char *row = (char *) palloc(fiber->gc_pool, sizeof(m) + m.len);
+	memcpy(row, &m, sizeof(m));
 
-	tbuf_ensure(m, m->size + header_v11(m)->len);
-	if (fread(m->data + sizeof(struct header_v11), header_v11(m)->len, 1, f) != 1)
+	if (fread(row + sizeof(m), m.len, 1, f) != 1)
 		return ROW_EOF;
 
-	m->size += header_v11(m)->len;
-
-	data_crc = crc32_calc(0, (const unsigned char *) m->data + sizeof(struct header_v11), header_v11(m)->len);
-	if (header_v11(m)->data_crc32c != data_crc) {
+	data_crc = crc32_calc(0, (unsigned char *) row + sizeof(m), m.len);
+	if (m.data_crc32c != data_crc) {
 		say_error("data crc32c mismatch");
 		return NULL;
 	}
 
-	say_debug("read row v11 success lsn:%lld", (long long)header_v11(m)->lsn);
-	return m;
+	say_debug("read row v11 success lsn:%lld", (long long) m.lsn);
+	*rowlen = m.len + sizeof(m);
+	return row;
 }
 
 void
@@ -290,11 +287,11 @@ log_io_cursor_close(struct log_io_cursor *i)
  * @param i	iterator object, encapsulating log specifics.
  *
  */
-struct tbuf *
-log_io_cursor_next(struct log_io_cursor *i)
+const char *
+log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen)
 {
 	struct log_io *l = i->log;
-	struct tbuf *row;
+	const char *row;
 	log_magic_t magic;
 	off_t marker_offset = 0;
 
@@ -333,7 +330,7 @@ restart:
 			(uintmax_t)i->good_offset);
 	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
 
-	row = row_reader_v11(l->f, fiber->gc_pool);
+	row = row_reader_v11(l->f, rowlen);
 	if (row == ROW_EOF)
 		goto eof;
 
@@ -588,12 +585,16 @@ log_io_open(struct log_dir *dir, enum log_mode mode,
 	l->dir = dir;
 	l->is_inprogress = suffix == INPROGRESS;
 	if (mode == LOG_READ) {
-		if (log_io_verify_meta(l, &errmsg) != 0)
+		if (log_io_verify_meta(l, &errmsg) != 0) {
+			errmsg = strerror(errno);
 			goto error;
+		}
 	} else { /* LOG_WRITE */
 		setvbuf(l->f, NULL, _IONBF, 0);
-		if (log_io_write_header(l) != 0)
+		if (log_io_write_header(l) != 0) {
+			errmsg = strerror(errno);
 			goto error;
+		}
 	}
 	return l;
 error:
@@ -608,7 +609,7 @@ error:
 }
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
+log_io_open_for_read(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 {
 	assert(lsn != 0);
 
@@ -622,7 +623,7 @@ log_io_open_for_read(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
  * and sets errno.
  */
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, i64 lsn, enum log_suffix suffix)
+log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 {
 	char *filename;
 	FILE *f;

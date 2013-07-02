@@ -29,23 +29,23 @@
 #include "port.h"
 
 void
-port_null_eof(struct port *port __attribute__((unused)))
+null_port_eof(struct port *port __attribute__((unused)))
 {
 }
 
 static void
-port_null_add_tuple(struct port *port __attribute__((unused)),
+null_port_add_tuple(struct port *port __attribute__((unused)),
 		    struct tuple *tuple __attribute__((unused)),
-		    u32 flags __attribute__((unused)))
+		    uint32_t flags __attribute__((unused)))
 {
 }
 
-static struct port_vtab port_null_vtab = {
-	port_null_add_tuple,
-	port_null_eof,
+static struct port_vtab null_port_vtab = {
+	null_port_add_tuple,
+	null_port_eof,
 };
 
-struct port port_null = {
-	/* .vtab = */ &port_null_vtab,
+struct port null_port = {
+	/* .vtab = */ &null_port_vtab,
 };
 

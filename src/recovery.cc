@@ -100,7 +100,7 @@
 
 struct recovery_state *recovery_state;
 
-static const u64 snapshot_cookie = 0;
+static const uint64_t snapshot_cookie = 0;
 
 const char *wal_mode_STRS[] = { "none", "write", "fsync", "fsync_delay", NULL };
 
@@ -292,7 +292,7 @@ recover_snap(struct recovery_state *r)
 	say_info("recovery start");
 
 	struct log_io *snap;
-	i64 lsn;
+	int64_t lsn;
 
 	lsn = greatest_lsn(r->snap_dir);
 	if (lsn <= 0) {
@@ -309,9 +309,10 @@ recover_snap(struct recovery_state *r)
 
 	log_io_cursor_open(&i, snap);
 
-	struct tbuf *row;
-	while ((row = log_io_cursor_next(&i))) {
-		if (r->row_handler(r->row_handler_param, row) < 0) {
+	const char *row;
+	uint32_t rowlen;
+	while ((row = log_io_cursor_next(&i, &rowlen))) {
+		if (r->row_handler(r->row_handler_param, row, rowlen) < 0) {
 			say_error("can't apply row");
 			if (snap->dir->panic_if_error)
 				break;
@@ -349,9 +350,10 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 	log_io_cursor_open(&i, l);
 
-	struct tbuf *row = NULL;
-	while ((row = log_io_cursor_next(&i))) {
-		i64 lsn = header_v11(row)->lsn;
+	const char *row;
+	uint32_t rowlen;
+	while ((row = log_io_cursor_next(&i, &rowlen))) {
+		int64_t lsn = header_v11(row)->lsn;
 		if (lsn <= r->confirmed_lsn) {
 			say_debug("skipping too young row");
 			continue;
@@ -360,7 +362,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		 * After handler(row) returned, row may be
 		 * modified, do not use it.
 		 */
-		if (r->row_handler(r->row_handler_param, row) < 0) {
+		if (r->row_handler(r->row_handler_param, row, rowlen) < 0) {
 			say_error("can't apply row");
 			if (l->dir->panic_if_error)
 				goto end;
@@ -385,7 +387,7 @@ recover_remaining_wals(struct recovery_state *r)
 {
 	int result = 0;
 	struct log_io *next_wal;
-	i64 current_lsn, wal_greatest_lsn;
+	int64_t current_lsn, wal_greatest_lsn;
 	size_t rows_before;
 	FILE *f;
 	char *filename;
@@ -508,8 +510,8 @@ recover_current_wal:
 void
 recover_existing_wals(struct recovery_state *r)
 {
-	i64 next_lsn = r->confirmed_lsn + 1;
-	i64 wal_lsn = find_including_file(r->wal_dir, next_lsn);
+	int64_t next_lsn = r->confirmed_lsn + 1;
+	int64_t wal_lsn = find_including_file(r->wal_dir, next_lsn);
 	if (wal_lsn <= 0) {
 		/* No WALs to recover from. */
 		goto out;
@@ -941,7 +943,8 @@ wal_writer_pop(struct wal_writer *writer, struct wal_fifo *input)
  * @return 0 in case of success, -1 on error.
  */
 static int
-wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir, u64 lsn)
+wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir,
+	       int64_t lsn)
 {
 	struct log_io *l = *wal, *wal_to_close = NULL;
 
@@ -1103,8 +1106,8 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, i64 lsn, u64 cookie,
-	  u16 op, const char *row, u32 row_len)
+wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
+	  uint16_t op, const char *row, uint32_t row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
@@ -1268,9 +1271,10 @@ read_log(const char *filename,
 	struct log_io_cursor i;
 
 	log_io_cursor_open(&i, l);
-	struct tbuf *row;
-	while ((row = log_io_cursor_next(&i)))
-		h(param, row);
+	const char *row;
+	uint32_t rowlen;
+	while ((row = log_io_cursor_next(&i, &rowlen)))
+		h(param, row, rowlen);
 
 	log_io_cursor_close(&i);
 	log_io_close(&l);

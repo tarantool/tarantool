@@ -104,7 +104,7 @@ struct fiber {
 	 */
 	void (*f) (va_list);
 	va_list f_data;
-	u32 flags;
+	uint32_t flags;
 	struct fiber *waiter;
 };
 

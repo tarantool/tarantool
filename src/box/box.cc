@@ -52,11 +52,11 @@ extern "C" {
 #include <third_party/base64.h>
 
 static void process_replica(struct port *port,
-			    u32 op, const char *reqdata, u32 reqlen);
+			    uint32_t op, const char *reqdata, uint32_t reqlen);
 static void process_ro(struct port *port,
-		       u32 op, const char *reqdata, u32 reqlen);
+		       uint32_t op, const char *reqdata, uint32_t reqlen);
 static void process_rw(struct port *port,
-		       u32 op, const char *reqdata, u32 reqlen);
+		       uint32_t op, const char *reqdata, uint32_t reqlen);
 box_process_func box_process = process_ro;
 box_process_func box_process_ro = process_ro;
 
@@ -65,14 +65,14 @@ static char status[64] = "unknown";
 static int stat_base;
 
 struct box_snap_row {
-	u32 space;
-	u32 tuple_size;
-	u32 data_size;
+	uint32_t space;
+	uint32_t tuple_size;
+	uint32_t data_size;
 	char data[];
 } __attribute__((packed));
 
 void
-port_send_tuple(struct port *port, struct txn *txn, u32 flags)
+port_send_tuple(struct port *port, struct txn *txn, uint32_t flags)
 {
 	struct tuple *tuple;
 	if ((tuple = txn->new_tuple) || (tuple = txn->old_tuple))
@@ -80,7 +80,7 @@ port_send_tuple(struct port *port, struct txn *txn, u32 flags)
 }
 
 static void
-process_rw(struct port *port, u32 op, const char *reqdata, u32 reqlen)
+process_rw(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
 {
 	struct txn *txn = txn_begin();
 
@@ -99,7 +99,7 @@ process_rw(struct port *port, u32 op, const char *reqdata, u32 reqlen)
 }
 
 static void
-process_replica(struct port *port, u32 op, const char *reqdata, u32 reqlen)
+process_replica(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
 {
 	if (!request_is_select(op)) {
 		tnt_raise(ClientError, ER_NONMASTER,
@@ -109,7 +109,7 @@ process_replica(struct port *port, u32 op, const char *reqdata, u32 reqlen)
 }
 
 static void
-process_ro(struct port *port, u32 op, const char *reqdata, u32 reqlen)
+process_ro(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
 {
 	if (!request_is_select(op))
 		tnt_raise(LoggedError, ER_SECONDARY);
@@ -158,25 +158,25 @@ recover_snap_row(const void *data)
 }
 
 static int
-recover_row(void *param __attribute__((unused)), struct tbuf *t)
+recover_row(void *param __attribute__((unused)), const char *row, uint32_t rowlen)
 {
 	/* drop wal header */
-	if (tbuf_peek(t, sizeof(struct header_v11)) == NULL) {
+	if (rowlen < sizeof(struct header_v11)) {
 		say_error("incorrect row header: expected %zd, got %zd bytes",
-			  sizeof(struct header_v11), (size_t) t->size);
+			  sizeof(struct header_v11), (size_t) rowlen);
 		return -1;
 	}
 
 	try {
-		const char *data = t->data;
-		const char *end = t->data + t->size;
-		u16 tag = pick_u16(&data, end);
-		(void) pick_u64(&data, end); /* drop cookie */
+		const char *end = row + rowlen;
+		row += sizeof(struct header_v11);
+		uint16_t tag = pick_u16(&row, end);
+		(void) pick_u64(&row, end); /* drop cookie */
 		if (tag == SNAP) {
-			recover_snap_row(data);
+			recover_snap_row(row);
 		} else if (tag == XLOG) {
-			u16 op = pick_u16(&data, end);
-			process_rw(&port_null, op, data, end - data);
+			uint16_t op = pick_u16(&row, end);
+			process_rw(&null_port, op, row, end - row);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
@@ -226,7 +226,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	box_enter_master_or_replica_mode(&cfg);
 }
 
-i32
+int
 box_check_config(struct tarantool_cfg *conf)
 {
 	/* replication & hot standby modes can not work together */
@@ -286,7 +286,7 @@ box_check_config(struct tarantool_cfg *conf)
 	return 0;
 }
 
-i32
+int
 box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
 {
 	bool old_is_replica = old_conf->replication_source != NULL;
@@ -367,7 +367,7 @@ box_init(void)
 
 static void
 snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
-		     u32 n, struct tuple *tuple)
+		     uint32_t n, struct tuple *tuple)
 {
 	struct box_snap_row header;
 	header.space = n;

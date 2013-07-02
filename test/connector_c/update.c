@@ -75,36 +75,36 @@ insert_tuple(struct tnt_tuple *tuple);
 
 /** select tuple by key */
 void
-select_tuple(i32 key);
+select_tuple(int32_t key);
 
 /** update fields */
 void
-update(i32 key, struct tnt_stream *stream);
+update(int32_t key, struct tnt_stream *stream);
 
 /** add update fields operation: set int32 */
 void
-update_set_i32(struct tnt_stream *stream, i32 field, i32 value);
+update_set_i32(struct tnt_stream *stream, int32_t field, int32_t value);
 
 /** add update fields operation: set string */
 void
-update_set_str(struct tnt_stream *stream, i32 field, char *str);
+update_set_str(struct tnt_stream *stream, int32_t field, char *str);
 
 /** add update fields operation: splice string */
 void
-update_splice_str(struct tnt_stream *stream, i32 field, i32 offset, i32 length,
+update_splice_str(struct tnt_stream *stream, int32_t field, int32_t offset, int32_t length,
 		  char *list);
 
 /** add update fields operation: delete field */
 void
-update_delete_field(struct tnt_stream *stream, i32 field);
+update_delete_field(struct tnt_stream *stream, int32_t field);
 
 /** add update fields operation: insert before int32 */
 void
-update_insert_i32(struct tnt_stream *stream, i32 field, i32 value);
+update_insert_i32(struct tnt_stream *stream, int32_t field, int32_t value);
 
 /** add update fields operation: insert before string */
 void
-update_insert_str(struct tnt_stream *stream, i32 field, char *str);
+update_insert_str(struct tnt_stream *stream, int32_t field, char *str);
 
 /** receive reply from server */
 void
@@ -226,7 +226,7 @@ insert_tuple(struct tnt_tuple *tuple)
 }
 
 void
-select_tuple(i32 key)
+select_tuple(int32_t key)
 {
 	struct tnt_list tuple_list;
 	tnt_list_init(&tuple_list);
@@ -241,7 +241,7 @@ select_tuple(i32 key)
 }
 
 void
-update(i32 key, struct tnt_stream *stream)
+update(int32_t key, struct tnt_stream *stream)
 {
 	struct tnt_tuple *k = tnt_tuple(NULL, "%d", key);
 	if (tnt_update(tnt, 0, TNT_FLAG_RETURN, k, stream) < 0)
@@ -253,7 +253,7 @@ update(i32 key, struct tnt_stream *stream)
 }
 
 void
-update_set_i32(struct tnt_stream *stream, i32 field, i32 value)
+update_set_i32(struct tnt_stream *stream, int32_t field, int32_t value)
 {
 	int result = tnt_update_assign(stream, field, (char *)&value, sizeof(value));
 	if (result < 0)
@@ -261,7 +261,7 @@ update_set_i32(struct tnt_stream *stream, i32 field, i32 value)
 }
 
 void
-update_set_str(struct tnt_stream *stream, i32 field, char *str)
+update_set_str(struct tnt_stream *stream, int32_t field, char *str)
 {
 	int result = tnt_update_assign(stream, field, str, strlen(str));
 	if (result < 0)
@@ -269,7 +269,7 @@ update_set_str(struct tnt_stream *stream, i32 field, char *str)
 }
 
 void
-update_splice_str(struct tnt_stream *stream, i32 field, i32 offset, i32 length,
+update_splice_str(struct tnt_stream *stream, int32_t field, int32_t offset, int32_t length,
 		  char *list)
 {
 	int result = tnt_update_splice(stream, field, offset, length, list,
@@ -279,7 +279,7 @@ update_splice_str(struct tnt_stream *stream, i32 field, i32 offset, i32 length,
 }
 
 void
-update_delete_field(struct tnt_stream *stream, i32 field)
+update_delete_field(struct tnt_stream *stream, int32_t field)
 {
 	int result = tnt_update_delete(stream, field);
 	if (result < 0)
@@ -287,7 +287,7 @@ update_delete_field(struct tnt_stream *stream, i32 field)
 }
 
 void
-update_insert_i32(struct tnt_stream *stream, i32 field, i32 value)
+update_insert_i32(struct tnt_stream *stream, int32_t field, int32_t value)
 {
 	int result = tnt_update_insert(stream, field, (char *)&value,
 				       sizeof(value));
@@ -296,7 +296,7 @@ update_insert_i32(struct tnt_stream *stream, i32 field, i32 value)
 }
 
 void
-update_insert_str(struct tnt_stream *stream, i32 field, char *str)
+update_insert_str(struct tnt_stream *stream, int32_t field, char *str)
 {
 	int result = tnt_update_insert(stream, field, str, strlen(str));
 	if (result < 0)
@@ -347,16 +347,16 @@ print_tuple(struct tnt_tuple *tuple)
 
 		switch(size) {
 		case 1:
-			printf("%"PRIi8" (0x%02"PRIx8")", *(i8 *)data, *(i8 *)data);
+			printf("%"PRIi8" (0x%02"PRIx8")", *(int8_t *)data, *(int8_t *)data);
 			break;
 		case 2:
-			printf("%"PRIi16" (0x%04"PRIx16")", *(i16 *)data, *(i16 *)data);
+			printf("%"PRIi16" (0x%04"PRIx16")", *(int16_t *)data, *(int16_t *)data);
 			break;
 		case 4:
-			printf("%"PRIi32" (0x%08"PRIx32")", *(i32 *)data, *(i32 *)data);
+			printf("%"PRIi32" (0x%08"PRIx32")", *(int32_t *)data, *(int32_t *)data);
 			break;
 		case 8:
-			printf("%"PRIi64" (0x%016"PRIx64")", *(i64 *)data, *(i64 *)data);
+			printf("%"PRIi64" (0x%016"PRIx64")", *(int64_t *)data, *(int64_t *)data);
 			break;
 		default:
 			printf("'%.*s'", size, data);

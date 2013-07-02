@@ -37,7 +37,7 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc
                      -o src/memcached-grammar.cc
     DEPENDS ${CMAKE_SOURCE_DIR}/src/memcached-grammar.rl)
 
-add_custom_target(generate_admin_m DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.cc)
+add_custom_target(generate_admin_cc DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.cc)
 add_custom_target(generate_memcached_grammar_cc DEPENDS
     ${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc)
 
@@ -103,6 +103,7 @@ set (common_sources
      cpu_feature.c
      replica.cc
      iproto.cc
+     iproto_port.cc
      session.cc
      object.cc
      exception.cc
@@ -205,7 +206,7 @@ function(tarantool_module mod)
     add_library(lt${mod} STATIC ${recompiled_sources})
     set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
         "-DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
-    add_dependencies(lt${mod} generate_headers generate_admin_m generate_memcached_grammar_m build_bundled_libs)
+    add_dependencies(lt${mod} generate_headers generate_admin_cc generate_memcached_grammar_cc build_bundled_libs)
 
     target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries})
 

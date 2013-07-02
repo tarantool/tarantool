@@ -1,21 +1,21 @@
 # encoding: tarantool
 import os
 import time
-from lib.tarantool_box_server import TarantoolBoxServer
+from lib.tarantool_server import TarantoolServer
 
 # master server
 master = server
 master_sql = master.sql
 
 # hot standby server
-hot_standby = TarantoolBoxServer()
+hot_standby = TarantoolServer()
 hot_standby.deploy("replication/cfg/hot_standby.cfg",
                    hot_standby.find_exe(self.args.builddir),
                    os.path.join(self.args.vardir, "hot_standby"), need_init=False)
 hot_standby_sql = hot_standby.sql
 
 # replica server
-replica = TarantoolBoxServer()
+replica = TarantoolServer()
 replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"))

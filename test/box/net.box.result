@@ -68,7 +68,7 @@ lua remote:select(0, 0, 345)
 ---
  - 345: {'test1', 'test2'}
 ...
-lua remote:call('box.select', 0, 0, 345)
+lua remote:call('box.select', '0', '0', 345)
 ---
  - 345: {'test1', 'test2'}
 ...

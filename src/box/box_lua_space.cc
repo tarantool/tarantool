@@ -92,7 +92,7 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 		lua_pushstring(L, "key_field");
 		lua_newtable(L);
 
-		for (u32 j = 0; j < space->key_defs[i].part_count; j++) {
+		for (uint32_t j = 0; j < space->key_defs[i].part_count; j++) {
 			lua_pushnumber(L, j);
 			lua_newtable(L);
 

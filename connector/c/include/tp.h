@@ -329,6 +329,12 @@ tp_unused(struct tp *p) {
  * data must be manually freed when the buffer is no longer
  * needed.
  * (eg. free(p->s));
+ * if realloc will return NULL, then you must destroy previous memory.
+ * (eg.
+ * if (tp_realloc(p, ..) == NULL) {
+ * 	free(p->s)
+ * 	return NULL;
+ * }
 */
 tp_function_unused static char*
 tp_realloc(struct tp *p, size_t required, size_t *size) {
