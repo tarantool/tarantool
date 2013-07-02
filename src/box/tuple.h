@@ -166,8 +166,9 @@ void
 tuple_print(struct tbuf *buf, const struct tuple *tuple);
 
 struct tuple *
-tuple_update(const struct tuple *old_tuple, const char *expr,
-             const char *expr_end);
+tuple_update(void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+	     const struct tuple *old_tuple,
+	     const char *expr, const char *expr_end);
 
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)

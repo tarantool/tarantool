@@ -113,7 +113,9 @@ execute_update(struct request *request, struct txn *txn)
 		return;
 
 	/* Update the tuple. */
-	struct tuple *new_tuple = tuple_update(old_tuple, *reqpos, reqend);
+	struct tuple *new_tuple = tuple_update(palloc_region_alloc,
+					       fiber->gc_pool,
+					       old_tuple, *reqpos, reqend);
 	try {
 		space_validate_tuple(sp, new_tuple);
 		txn_replace(txn, sp, old_tuple, new_tuple, DUP_INSERT);

@@ -61,6 +61,12 @@ size_t palloc_allocated(struct palloc_pool *);
 
 void palloc_stat(struct tbuf *buf);
 
+static inline void *
+palloc_region_alloc(void *ctx, size_t size)
+{
+	return palloc((struct palloc_pool *) ctx, size);
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

@@ -1560,3 +1560,10 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	*/
 	tarantool_lua_sandbox(tarantool_L);
 }
+
+void *
+lua_region_alloc(void *ctx, size_t size)
+{
+	struct lua_State *L = (struct lua_State *) ctx;
+	return lua_newuserdata(L, size);
+}

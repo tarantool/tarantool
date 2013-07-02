@@ -195,20 +195,15 @@ tuple_print(struct tbuf *buf, const struct tuple *tuple)
 	tbuf_printf(buf, "}");
 }
 
-static void *
-palloc_region_alloc(void *ctx, size_t size)
-{
-	return palloc((struct palloc_pool *) ctx, size);
-}
-
 struct tuple *
-tuple_update(const struct tuple *old_tuple, const char *expr,
+tuple_update(void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+	     const struct tuple *old_tuple, const char *expr,
 	     const char *expr_end)
 {
 	uint32_t new_size = 0;
 	uint32_t new_field_count = 0;
 	struct tuple_update *update =
-		tuple_update_prepare(palloc_region_alloc, fiber->gc_pool,
+		tuple_update_prepare(region_alloc, alloc_ctx,
 				     expr, expr_end, old_tuple->data,
 				     old_tuple->data + old_tuple->bsize,
 				     old_tuple->field_count, &new_size,

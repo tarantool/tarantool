@@ -353,7 +353,10 @@ lbox_tuple_transform(struct lua_State *L)
 	const char *expr = lua_tolstring(L, -1, &expr_len);
 
 	/* Execute tuple_update */
-	struct tuple *new_tuple = tuple_update(tuple, expr, expr + expr_len);
+	struct tuple *new_tuple = tuple_update(lua_region_alloc, L,
+					       tuple, expr, expr + expr_len);
+	/* Cleanup memory allocated by lua_region_alloc */
+	lua_settop(L, 0);
 	lbox_pushtuple(L, new_tuple);
 	return 1;
 }
