@@ -1381,7 +1381,9 @@ tarantool_lua_dofile(struct lua_State *L, const char *filename)
 {
 	lua_getglobal(L, "dofile");
 	lua_pushstring(L, filename);
-	return lua_pcall(L, 1, 1, 0);
+	lbox_pcall(L);
+	bool result = lua_toboolean(L, 1);
+	return result ? 0 : 1;
 }
 
 void
@@ -1503,6 +1505,9 @@ load_init_script(va_list ap)
 		/* Execute the init file. */
 		if (tarantool_lua_dofile(L, path))
 			panic("%s", lua_tostring(L, -1));
+
+		/* clear the stack from return values. */
+		lua_settop(L, 0);
 	}
 	/*
 	 * The file doesn't exist. It's OK, tarantool may
