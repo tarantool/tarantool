@@ -82,8 +82,8 @@ exec admin "lua type(s:connect('127.0.0.1', '30303'))"
 exec admin "lua s:send('ping')"
 exec admin "lua s:error()"
 
-# timedout
-exec admin "lua n, status, error_code, error_str = s:send(string.rep('=', 200000), 0.0000001)"
+# timedout - try to send 64MB (8388608 * 8 bytes) in 0.0000001 sec
+exec admin "lua n, status, error_code, error_str = s:send(string.rep('=', 8388608), 0.0000001)"
 exec admin "lua type(n)"
 exec admin "lua type(status)"
 exec admin "lua type(error_code)"
