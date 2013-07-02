@@ -39,6 +39,8 @@
 #include <cfg/prscfg.h>
 #include <cfg/tarantool_box_cfg.h>
 
+#include <lib/small/region.h>
+
 #define MH_SOURCE 1
 #include "key.h"
 #include "hash.h"
@@ -62,6 +64,8 @@ ts_init(void)
 	memset(&tss.s, 0, sizeof(tss.s));
 	tss.last_snap_lsn = 0;
 	tss.last_xlog_lsn = 0;
+	slab_cache_create(&tss.sc);
+	region_create(&tss.ra, &tss.sc);
 	return 0;
 }
 
@@ -71,6 +75,8 @@ ts_free(void)
 	ts_options_free(&tss.opts);
 	ts_space_free(&tss.s);
 	ts_reftable_free(&tss.rt);
+	region_free(&tss.ra);
+	slab_cache_destroy(&tss.sc);
 }
 
 int main(int argc, char *argv[])

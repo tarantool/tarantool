@@ -141,7 +141,7 @@ static inline void *
 slab_alloc(struct rslab *slab, size_t size)
 {
 	assert(size <= rslab_unused(slab));
-	void *ptr = rslab_data(slab) + slab->used;
+	char *ptr = (char*)rslab_data(slab) + slab->used;
 	slab->used += size;
 	return ptr;
 }

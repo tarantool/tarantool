@@ -15,6 +15,8 @@
 #include <cfg/prscfg.h>
 #include <cfg/tarantool_box_cfg.h>
 
+#include <lib/small/region.h>
+
 #include "key.h"
 #include "hash.h"
 #include "options.h"

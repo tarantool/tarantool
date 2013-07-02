@@ -24,6 +24,6 @@ set_source_files_properties(${util_snap_sources} PROPERTIES OBJECT_DEPENDS
 set_source_files_compile_flags(${util_snap_sources})
 add_executable(${util_snap} ${util_snap_sources})
 
-target_link_libraries (${util_snap} ${util_snap_libs} gopt)
+target_link_libraries (${util_snap} ${util_snap_libs} gopt small)
 
 install (TARGETS ${util_snap} DESTINATION bin)

@@ -42,6 +42,7 @@ extern "C" {
 
 #include <cfg/prscfg.h>
 #include <cfg/tarantool_box_cfg.h>
+#include <lib/small/region.h>
 
 #include <connector/c/include/tarantool/tnt.h>
 
@@ -59,7 +60,7 @@ extern struct ts tss;
 static inline void*
 _alloc(void *arg, unsigned int size) {
 	(void)arg;
-	return malloc(size);
+	return region_alloc(&tss.ra, size);
 }
 
 struct tnt_tuple*
@@ -83,7 +84,7 @@ ts_update(struct tnt_request *r, struct tnt_tuple *old)
 
 		buf = tnt_mem_alloc(new_size);
 		if (buf == NULL) {
-			/* reset pool */
+			region_reset(&tss.ra);
 			return NULL;
 		}
 		memset(buf, 0, new_size);
@@ -92,13 +93,13 @@ ts_update(struct tnt_request *r, struct tnt_tuple *old)
 	} catch (const Exception&) {
 		if (buf)
 			free(buf);
-		/* reset pool */
+		region_reset(&tss.ra);
 		fflush(NULL);
 		printf("update failed\n");
 		return NULL;
 	}
 
-	/* reset pool */
+	region_reset(&tss.ra);
 	struct tnt_tuple *n = tnt_tuple_set_as(NULL, buf, new_size, new_count);
 	if (n == NULL) {
 		free(buf);
