@@ -44,29 +44,80 @@ extern "C" {
 
 static struct mh_i32ptr_t *spaces;
 
-bool secondary_indexes_enabled = false;
-bool primary_indexes_enabled = false;
+/**
+ * Secondary indexes are built in bulk after all data is
+ * recovered. This flag indicates that the indexes are
+ * already built and ready for use.
+ */
+static bool secondary_indexes_enabled = false;
+/**
+ * Primary indexes are enabled only after reading the snapshot.
+ */
+static bool primary_indexes_enabled = false;
+
+static void
+space_init_field_types(struct space *space);
+
+static void
+space_create(struct space *space, uint32_t space_no,
+	     struct key_def *key_defs, uint32_t key_count,
+	     uint32_t arity)
+{
+	memset(space, 0, sizeof(struct space));
+	space->no = space_no;
+	space->arity = arity;
+	space->key_defs = key_defs;
+	space->key_count = key_count;
+	space_init_field_types(space);
+	/* fill space indexes */
+	for (uint32_t j = 0; j < key_count; ++j) {
+		struct key_def *key_def = &space->key_defs[j];
+		Index *index = Index::factory(key_def->type, key_def, space);
+		if (index == NULL) {
+			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+				  "class Index", "malloc");
+		}
+		space->index[j] = index;
+	}
+}
+
+static void
+space_destroy(struct space *space)
+{
+	for (uint32_t j = 0 ; j < space->key_count; j++) {
+		Index *index = space->index[j];
+		delete index;
+		key_def_destroy(&space->key_defs[j]);
+	}
+	free(space->key_defs);
+	free(space->field_types);
+}
 
 struct space *
-space_create(uint32_t space_no, struct key_def *key_defs, uint32_t key_count, uint32_t arity)
+space_new(uint32_t space_no, struct key_def *key_defs,
+	  uint32_t key_count, uint32_t arity)
 {
-
 	struct space *space = space_by_n(space_no);
 	if (space)
-		panic("Space %d is already exists", space_no);
-	space = (struct space *) calloc(sizeof(struct space), 1);
-	space->no = space_no;
+		tnt_raise(LoggedError, ER_SPACE_EXISTS, space_no);
+
+	space = (struct space *) malloc(sizeof(struct space));
+
+	space_create(space, space_no, key_defs, key_count, arity);
 
 	const struct mh_i32ptr_node_t node = { space->no, space };
 	mh_i32ptr_put(spaces, &node, NULL, NULL);
 
-	space->arity = arity;
-	space->key_defs = key_defs;
-	space->key_count = key_count;
-
 	return space;
 }
 
+static void
+space_delete(struct space *space)
+{
+	mh_i32ptr_del(spaces, space->no, NULL);
+	space_destroy(space);
+	free(space);
+}
 
 /* return space by its number */
 struct space *
@@ -107,14 +158,6 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata) {
 				mh_i32ptr_node(spaces, i)->val;
 		func(space, udata);
 	}
-}
-
-/** Set index by index no */
-void
-space_set_index(struct space *sp, uint32_t index_no, Index *idx)
-{
-	assert(index_no < BOX_INDEX_MAX);
-	sp->index[index_no] = idx;
 }
 
 struct tuple *
@@ -200,18 +243,9 @@ space_free(void)
 	mh_foreach(spaces, i) {
 		struct space *space = (struct space *)
 				mh_i32ptr_node(spaces, i)->val;
-		mh_i32ptr_del(spaces, i, NULL);
-
-		for (uint32_t j = 0 ; j < space->key_count; j++) {
-			Index *index = space->index[j];
-			delete index;
-			key_def_destroy(&space->key_defs[j]);
-		}
-
-		free(space->key_defs);
-		free(space->field_types);
-		free(space);
+		space_delete(space);
 	}
+
 
 }
 
@@ -280,50 +314,26 @@ space_config()
 
 		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
 
-		struct space *space = space_by_n(i);
-		if (space)
-			panic("space %u is already exists", i);
-
-		space = (struct space *) calloc(sizeof(struct space), 1);
-		space->no = i;
-
-		space->arity = (cfg_space->cardinality != -1) ?
-					cfg_space->cardinality : 0;
+		uint32_t arity = (cfg_space->cardinality != -1 ?
+				  cfg_space->cardinality : 0);
 		/*
 		 * Collect key/field info. We need aggregate
 		 * information on all keys before we can create
 		 * indexes.
 		 */
-		space->key_count = 0;
-		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
-			++space->key_count;
-		}
+		uint32_t key_count = 0;
+		while (cfg_space->index[key_count] != NULL)
+			key_count++;
 
+		struct key_def *key_defs = (struct key_def *)
+			malloc(key_count * sizeof(struct key_def));
 
-		space->key_defs = (struct key_def *) malloc(space->key_count *
-							    sizeof(struct key_def));
-		if (space->key_defs == NULL) {
-			panic("can't allocate key def array");
-		}
 		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
 			auto cfg_index = cfg_space->index[j];
-			key_def_create(&space->key_defs[j], cfg_index);
+			key_def_create(&key_defs[j], cfg_index);
 		}
-		space_init_field_types(space);
+		(void) space_new(i, key_defs, key_count, arity);
 
-		/* fill space indexes */
-		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
-			auto cfg_index = cfg_space->index[j];
-			enum index_type type = STR2ENUM(index_type, cfg_index->type);
-			struct key_def *key_def = &space->key_defs[j];
-			Index *index = Index::factory(type, key_def, space);
-			assert(index != NULL);
-			space->index[j] = index;
-		}
-
-		const struct mh_i32ptr_node_t node =
-			{ space->no, space };
-		mh_i32ptr_put(spaces, &node, NULL, NULL);
 		say_info("space %i successfully configured", i);
 	}
 }

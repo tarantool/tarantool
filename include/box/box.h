@@ -49,7 +49,7 @@ struct tarantool_cfg;
 struct lua_State;
 
 /** To be called at program start. */
-void box_init(void);
+void box_init(bool init_storage);
 /** To be called at program end. */
 void box_free(void);
 

@@ -84,7 +84,7 @@ struct tarantool_cfg cfg;
 static ev_signal *sigs = NULL;
 
 int snapshot_pid = 0; /* snapshot processes pid */
-bool init_storage, booting = true;
+bool booting = true;
 extern const void *opt_def;
 
 static int
@@ -622,6 +622,13 @@ initialize_minimal()
 	coeio_init();
 }
 
+/** Callback of snapshot_save() when doing --init-storage */
+void
+init_storage(struct log_io * /* l */, struct fio_batch * /* batch */)
+{
+	/* Nothing. */
+}
+
 int
 main(int argc, char **argv)
 {
@@ -790,11 +797,10 @@ main(int argc, char **argv)
 	}
 
 	if (gopt(opt, 'I')) {
-		init_storage = true;
 		initialize_minimal();
-		box_init();
+		box_init(true);
 		set_lsn(recovery_state, 1);
-		snapshot_save(recovery_state, box_snapshot);
+		snapshot_save(recovery_state, init_storage);
 		exit(EXIT_SUCCESS);
 	}
 
@@ -838,7 +844,7 @@ main(int argc, char **argv)
 
 	try {
 		tarantool_L = tarantool_lua_init();
-		box_init();
+		box_init(false);
 		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
 		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		/*

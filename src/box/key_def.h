@@ -79,7 +79,8 @@ struct key_def {
 struct tarantool_cfg_space_index;
 
 void
-key_def_create(struct key_def *def, struct tarantool_cfg_space_index *cfg_index);
+key_def_create(struct key_def *def,
+	       struct tarantool_cfg_space_index *cfg_index);
 
 void
 key_def_destroy(struct key_def *def);

@@ -119,8 +119,6 @@ process_ro(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
 static void
 recover_snap_row(const void *data)
 {
-	assert(primary_indexes_enabled == false);
-
 	const struct box_snap_row *row = (const struct box_snap_row *) data;
 
 	struct space *space = space_find(row->space);
@@ -323,7 +321,7 @@ box_free(void)
 }
 
 void
-box_init(void)
+box_init(bool init_storage)
 {
 	title("loading");
 	atexit(box_free);
@@ -400,10 +398,6 @@ snapshot_space(struct space *sp, void *udata)
 void
 box_snapshot(struct log_io *l, struct fio_batch *batch)
 {
-	/* --init-storage switch */
-	if (primary_indexes_enabled == false)
-		return;
-
 	struct snapshot_space_param ud = { l, batch };
 
 	space_foreach(snapshot_space, &ud);

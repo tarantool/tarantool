@@ -191,10 +191,6 @@ space_index(struct space *sp, uint32_t index_no)
 	return NULL;
 }
 
-/** Set index by index no. */
-void
-space_set_index(struct space *sp, uint32_t index_no, Index *idx);
-
 /**
  * Call a visitor function on every enabled space.
  */
@@ -218,7 +214,6 @@ space_find(uint32_t space_no)
 	tnt_raise(ClientError, ER_NO_SUCH_SPACE, space_no);
 }
 
-
 /** Get key_def ordinal number. */
 static inline uint32_t
 key_def_n(struct space *sp, struct key_def *kp)
@@ -227,21 +222,9 @@ key_def_n(struct space *sp, struct key_def *kp)
 	return kp - sp->key_defs;
 }
 
-static inline uint32_t
-space_max_fieldno(struct space *sp)
-{
-	return sp->max_fieldno;
-}
-
-static inline enum field_type
-space_field_type(struct space *sp, uint32_t no)
-{
-	return sp->field_types[no];
-}
-
-
 struct space *
-space_create(uint32_t space_no, struct key_def *key_defs, uint32_t key_count, uint32_t arity);
+space_new(uint32_t space_no, struct key_def *key_defs,
+	  uint32_t key_count, uint32_t arity);
 
 
 /** Get index ordinal number in space. */
@@ -258,17 +241,6 @@ index_is_primary(Index *index)
 	return index_n(index) == 0;
 }
 
-/**
- * Secondary indexes are built in bulk after all data is
- * recovered. This flag indicates that the indexes are
- * already built and ready for use.
- */
-extern bool secondary_indexes_enabled;
-/**
- * Primary indexes are enabled only after reading the snapshot.
- */
-extern bool primary_indexes_enabled;
-
 void space_init(void);
 void space_free(void);
 int
@@ -277,7 +249,6 @@ check_spaces(struct tarantool_cfg *conf);
 void begin_build_primary_indexes(void);
 void end_build_primary_indexes(void);
 void build_secondary_indexes(void);
-
 
 static inline Index *
 index_find(struct space *sp, uint32_t index_no)
