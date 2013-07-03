@@ -63,8 +63,6 @@ struct space {
 	 * field_count. If there are gaps, i.e. fields that do not
 	 * participate in any index and thus we cannot infer their
 	 * type, then respective array members have value UNKNOWN.
-	 * XXX: right now UNKNOWN is also set for fields which types
-	 * in two indexes contradict each other.
 	 */
 	enum field_type *field_types;
 

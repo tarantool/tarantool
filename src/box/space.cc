@@ -245,8 +245,6 @@ space_free(void)
 				mh_i32ptr_node(spaces, i)->val;
 		space_delete(space);
 	}
-
-
 }
 
 /**
@@ -283,19 +281,7 @@ space_init_field_types(struct space *space)
 			space->field_types[part->fieldno] = part->type;
 		}
 	}
-
-#ifndef NDEBUG
-	/* validate field type info */
-	for (i = 0; i < key_count; i++) {
-		struct key_def *def = &key_defs[i];
-		for (uint32_t pi = 0; pi < def->part_count; pi++) {
-			struct key_part *part = &def->parts[pi];
-			assert(space->field_types[part->fieldno] == part->type);
-		}
-	}
-#endif
 }
-
 
 static void
 space_config()
