@@ -19,6 +19,7 @@ tarantool_module("box"
     tuple.cc
     tuple_convert.cc
     tuple_update.cc
+    key_def.cc
     index.cc
     hash_index.cc
     tree_index.cc

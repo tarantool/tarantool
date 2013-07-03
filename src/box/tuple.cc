@@ -31,7 +31,7 @@
 #include <salloc.h>
 #include "tbuf.h"
 
-#include "index.h"
+#include "key_def.h"
 #include "tuple_update.h"
 #include <exception.h>
 #include <palloc.h>
@@ -239,7 +239,7 @@ tuple_new(uint32_t field_count, const char **data, const char *end)
 static inline int
 tuple_compare_field(const char *field_a, uint32_t size_a,
 		    const char *field_b, uint32_t size_b,
-		    enum field_data_type type)
+		    enum field_type type)
 {
 	/*
 	 * field_a is always a tuple field.

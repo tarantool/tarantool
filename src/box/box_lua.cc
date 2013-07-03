@@ -202,7 +202,7 @@ struct lua_field {
 		uint32_t u32;
 		uint64_t u64;
 	};
-	enum field_data_type type;
+	enum field_type type;
 };
 
 /**

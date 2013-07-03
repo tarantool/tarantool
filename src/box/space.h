@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "index.h"
+#include "key_def.h"
 #include <exception.h>
 
 #include <box/box.h>
@@ -65,7 +66,7 @@ struct space {
 	 * XXX: right now UNKNOWN is also set for fields which types
 	 * in two indexes contradict each other.
 	 */
-	enum field_data_type *field_types;
+	enum field_type *field_types;
 
 	/**
 	 * Max field no which participates in any of the space indexes.
@@ -232,7 +233,7 @@ space_max_fieldno(struct space *sp)
 	return sp->max_fieldno;
 }
 
-static inline enum field_data_type
+static inline enum field_type
 space_field_type(struct space *sp, uint32_t no)
 {
 	return sp->field_types[no];

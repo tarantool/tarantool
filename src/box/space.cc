@@ -117,14 +117,6 @@ space_set_index(struct space *sp, uint32_t index_no, Index *idx)
 	sp->index[index_no] = idx;
 }
 
-/** Free a key definition. */
-static void
-key_free(struct key_def *key_def)
-{
-	free(key_def->parts);
-	free(key_def->cmp_order);
-}
-
 struct tuple *
 space_replace(struct space *sp, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode)
@@ -213,7 +205,7 @@ space_free(void)
 		for (uint32_t j = 0 ; j < space->key_count; j++) {
 			Index *index = space->index[j];
 			delete index;
-			key_free(&space->key_defs[j]);
+			key_def_destroy(&space->key_defs[j]);
 		}
 
 		free(space->key_defs);
@@ -221,65 +213,6 @@ space_free(void)
 		free(space);
 	}
 
-}
-
-static void
-key_init(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
-{
-	def->max_fieldno = 0;
-	def->part_count = 0;
-
-	def->type = STR2ENUM(index_type, cfg_index->type);
-	if (def->type == index_type_MAX)
-		panic("Wrong index type: %s", cfg_index->type);
-
-	/* Calculate key part count and maximal field number. */
-	for (uint32_t k = 0; cfg_index->key_field[k] != NULL; ++k) {
-		auto cfg_key = cfg_index->key_field[k];
-
-		if (cfg_key->fieldno == -1) {
-			/* last filled key reached */
-			break;
-		}
-
-		def->max_fieldno = MAX(def->max_fieldno, cfg_key->fieldno);
-		def->part_count++;
-	}
-
-	/* init def array */
-	def->parts = (struct key_part *) malloc(sizeof(struct key_part) *
-						def->part_count);
-	if (def->parts == NULL) {
-		panic("can't allocate def parts array for index");
-	}
-
-	/* init compare order array */
-	def->max_fieldno++;
-	def->cmp_order = (uint32_t *) malloc(def->max_fieldno * sizeof(uint32_t));
-	if (def->cmp_order == NULL) {
-		panic("can't allocate def cmp_order array for index");
-	}
-	for (uint32_t fieldno = 0; fieldno < def->max_fieldno; fieldno++) {
-		def->cmp_order[fieldno] = BOX_FIELD_MAX;
-	}
-
-	/* fill fields and compare order */
-	for (uint32_t k = 0; cfg_index->key_field[k] != NULL; ++k) {
-		auto cfg_key = cfg_index->key_field[k];
-
-		if (cfg_key->fieldno == -1) {
-			/* last filled key reached */
-			break;
-		}
-
-		/* fill keys */
-		def->parts[k].fieldno = cfg_key->fieldno;
-		def->parts[k].type = STR2ENUM(field_data_type, cfg_key->type);
-		/* fill compare order */
-		if (def->cmp_order[cfg_key->fieldno] == BOX_FIELD_MAX)
-			def->cmp_order[cfg_key->fieldno] = k;
-	}
-	def->is_unique = cfg_index->unique;
 }
 
 /**
@@ -304,8 +237,8 @@ space_init_field_types(struct space *space)
 
 	/* alloc & init field type info */
 	space->max_fieldno = max_fieldno;
-	space->field_types = (enum field_data_type *)
-			     calloc(max_fieldno, sizeof(enum field_data_type));
+	space->field_types = (enum field_type *)
+			     calloc(max_fieldno, sizeof(enum field_type));
 
 	/* extract field type info */
 	for (i = 0; i < key_count; i++) {
@@ -328,6 +261,7 @@ space_init_field_types(struct space *space)
 	}
 #endif
 }
+
 
 static void
 space_config()
@@ -373,7 +307,7 @@ space_config()
 		}
 		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
 			auto cfg_index = cfg_space->index[j];
-			key_init(&space->key_defs[j], cfg_index);
+			key_def_create(&space->key_defs[j], cfg_index);
 		}
 		space_init_field_types(space);
 
@@ -548,7 +482,7 @@ check_spaces(struct tarantool_cfg *conf)
 				}
 
 				/* key must has valid type */
-				if (STR2ENUM(field_data_type, key->type) == field_data_type_MAX) {
+				if (STR2ENUM(field_type, key->type) == field_type_MAX) {
 					out_warning(CNF_OK, "(space = %zu index = %zu) "
 						    "unknown field data type: `%s'", i, j, key->type);
 					return -1;
@@ -628,8 +562,8 @@ check_spaces(struct tarantool_cfg *conf)
 						break;
 
 					uint32_t f = key->fieldno;
-					enum field_data_type t = STR2ENUM(field_data_type, key->type);
-					assert(t != field_data_type_MAX);
+					enum field_type t = STR2ENUM(field_type, key->type);
+					assert(t != field_type_MAX);
 					if (types[f] != t) {
 						if (types[f] == UNKNOWN) {
 							types[f] = t;
