@@ -1,20 +1,19 @@
 import os
-import stat
-import shutil
-import subprocess
-import pexpect
-import socket
-import sys
-import signal
-import time
-import daemon
-import glob
-import ConfigParser
 import re
+import sys
+import glob
+import stat
+import time
+import shlex
+import daemon
+import shutil
+import signal
+import socket
+import subprocess
+import ConfigParser
 
 def check_port(port):
     """Check if the port we're connecting to is available"""
-
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(("localhost", port))
@@ -22,18 +21,9 @@ def check_port(port):
         return
     raise RuntimeError("The server is already running on port {0}".format(port))
 
-def prepare_gdb(args):
+def prepare_gdb(binary, args):
     """Prepare server startup arguments to run under gdb."""
-
-    if "TERM" in os.environ:
-        term = os.environ["TERM"]
-    else:
-        term = "xterm"
-
-    if term not in ["xterm", "rxvt", "urxvt", "gnome-terminal", "konsole"]:
-        raise RuntimeError("--gdb: unsupported terminal {0}".format(term))
-
-    args = [ term, "-e", "gdb", "-ex", "break main", "-ex", "run" ] + args
+    args = shlex.split('screen -dmS tnt-gdb gdb %s -ex \'b main\' -ex run' % binary) + args 
     return args
 
 def prepare_valgrind(args, valgrind_log, valgrind_sup):
@@ -169,7 +159,7 @@ class Server(object):
             os.execvp(args[0], args)
 
     def prepare_args(self):
-        return [self.binary]
+        return []
 
     def start(self, start_and_exit=None, gdb=None, valgrind=None, silent=True):
         if start_and_exit != None: self.start_and_exit = start_and_exit
@@ -191,7 +181,7 @@ class Server(object):
         args = self.prepare_args()
 
         if self.gdb:
-            args = prepare_gdb(args)
+            args = prepare_gdb(self.binary, args)
         elif self.valgrind:
             args = prepare_valgrind(args, self.valgrind_log,
                                     os.path.abspath(os.path.join(self.vardir,
@@ -200,8 +190,8 @@ class Server(object):
         if self.start_and_exit:
             self._start_and_exit(args)
             return
-
-        self.process = pexpect.spawn(args[0], args[1:], cwd = self.vardir)
+        print args
+        self.process = subprocess.Popen(args, cwd = self.vardir)
 
         # wait until the server is connected
         self.wait_until_started()
@@ -231,10 +221,14 @@ class Server(object):
             os.kill(pid, signal.SIGTERM)
         #self.process.kill(signal.SIGTERM)
         if self.gdb or self.valgrind:
-            self.process.expect(pexpect.EOF, timeout = 1 << 30)
+            time = 0
+            while time < (1<<30) :
+                if self.process.poll() != None:
+                    break
+                time += 1
+                sleep(1)
         else:
-            self.process.expect(pexpect.EOF)
-        self.process.close()
+            self.process.wait()
 
         self.wait_until_stopped()
         # clean-up processs flags

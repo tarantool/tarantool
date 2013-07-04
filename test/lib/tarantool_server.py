@@ -176,5 +176,5 @@ class TarantoolServer(Server):
                 args.append("--background")
             else:
                 raise RuntimeError("'--gdb' and '--start-and-exit' can't be defined together")
-            self.server = pexpect.spawn(args[0], args[1:], cwd = self.vardir)
+            self.server = subprocess.Popen(args, cwd = self.vardir)
             self.server.wait()

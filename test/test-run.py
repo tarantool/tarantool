@@ -90,9 +90,9 @@ class Options:
                 dest = "gdb",
                 action = "store_true",
                 default = False,
-                help = """Start the server under 'gdb' debugger.
-                See also --start-and-exit. This option is mutually exclusive with
-                --valgrind. Default: false.""")
+                help = """Start the server under 'gdb' debugger in detached
+                Screen. See also --start-and-exit. This option is mutually 
+                exclusive with --valgrind. Default: false.""")
 
         parser.add_argument(
                 "--valgrind",
