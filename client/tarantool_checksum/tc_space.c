@@ -51,8 +51,9 @@ int tc_space_init(struct tc_spaces *s) {
 
 void tc_space_free(struct tc_spaces *s)
 {
-	mh_int_t i;
-	mh_foreach(s->t, i) {
+	while (mh_size(s->t) > 0) {
+		mh_int_t i = mh_first(s->t);
+
 		struct tc_space *space = mh_u32ptr_node(s->t, i)->val;
 		mh_u32ptr_del(s->t, i, NULL);
 
