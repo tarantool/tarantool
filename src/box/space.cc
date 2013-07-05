@@ -116,7 +116,10 @@ space_new(uint32_t space_no, struct key_def *key_defs,
 static void
 space_delete(struct space *space)
 {
-	mh_i32ptr_del(spaces, space->no, NULL);
+	const struct mh_i32ptr_node_t node = { space->no, NULL };
+	mh_int_t k = mh_i32ptr_get(spaces, &node, NULL);
+	assert(k != mh_end(spaces));
+	mh_i32ptr_del(spaces, k, NULL);
 	space_destroy(space);
 	free(space);
 }
@@ -240,9 +243,9 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 void
 space_free(void)
 {
-	mh_int_t i;
+	while (mh_size(spaces) > 0) {
+		mh_int_t i = mh_first(spaces);
 
-	mh_foreach(spaces, i) {
 		struct space *space = (struct space *)
 				mh_i32ptr_node(spaces, i)->val;
 		space_delete(space);
