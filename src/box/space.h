@@ -60,7 +60,7 @@ struct space {
 
 	/**
 	 * Field types of indexed fields. This is an array of size
-	 * field_count. If there are gaps, i.e. fields that do not
+	 * max_fieldno. If there are gaps, i.e. fields that do not
 	 * participate in any index and thus we cannot infer their
 	 * type, then respective array members have value UNKNOWN.
 	 */
@@ -69,12 +69,15 @@ struct space {
 	/**
 	 * Max field no which participates in any of the space indexes.
 	 * Each tuple in this space must have, therefore, at least
-	 * field_count fields.
+	 * max_fieldno fields.
 	 */
 	uint32_t max_fieldno;
 
 	/** Space number. */
 	uint32_t no;
+
+	/** Default tuple format used by this space */
+	struct tuple_format *format;
 };
 
 

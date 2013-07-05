@@ -69,6 +69,8 @@ space_create(struct space *space, uint32_t space_no,
 	space->key_defs = key_defs;
 	space->key_count = key_count;
 	space_init_field_types(space);
+	space->format = tuple_format_new(space->field_types,
+					 space->max_fieldno);
 	/* fill space indexes */
 	for (uint32_t j = 0; j < key_count; ++j) {
 		struct key_def *key_def = &space->key_defs[j];
@@ -245,6 +247,7 @@ space_free(void)
 				mh_i32ptr_node(spaces, i)->val;
 		space_delete(space);
 	}
+	tuple_free();
 }
 
 /**
@@ -328,6 +331,7 @@ void
 space_init(void)
 {
 	spaces = mh_i32ptr_new();
+	tuple_init();
 
 	/* configure regular spaces */
 	space_config();

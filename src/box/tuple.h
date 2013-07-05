@@ -29,10 +29,48 @@
  * SUCH DAMAGE.
  */
 #include "tarantool/util.h"
+#include "key_def.h"
 #include <pickle.h>
 
 struct tbuf;
-struct key_def;
+
+/**
+ * @brief In-memory tuple format
+ */
+struct tuple_format {
+	uint16_t id;
+	/**
+	 * Length of 'offset' array. Is usually the same as
+	 * space->max_fieldno (no need to store the offset of the
+	 * first field).
+	 */
+	uint32_t offset_count;
+};
+
+extern struct tuple_format **tuple_formats;
+/**
+ * Default format for a tuple which does not belong
+ * to any space and is stored in memory.
+ */
+extern struct tuple_format *tuple_format_ber;
+
+
+static inline uint32_t
+tuple_format_id(struct tuple_format *format)
+{
+	assert(tuple_formats[format->id] == format);
+	return format->id;
+}
+
+/**
+ * @brief Allocate, construct and register a new in-memory tuple
+ *	 format.
+ * @param space description
+ *
+ * @return tuple format
+ */
+struct tuple_format *
+tuple_format_new(const enum field_type *fields, uint32_t max_fieldno);
 
 /**
  * An atom of Tarantool/Box storage. Consists of a list of fields.
@@ -42,8 +80,8 @@ struct tuple
 {
 	/** reference counter */
 	uint16_t refs;
-	/* see enum tuple_flags */
-	uint16_t flags;
+	/** format identifier */
+	uint16_t format_id;
 	/** length of the variable part of the tuple */
 	uint32_t bsize;
 	/** number of fields in the variable part. */
@@ -62,7 +100,7 @@ struct tuple
  * @post tuple->refs = 1
  */
 struct tuple *
-tuple_alloc(size_t size);
+tuple_alloc(struct tuple_format *format, size_t size);
 
 /**
  * Create a new tuple from a sequence of BER-len encoded fields.
@@ -73,7 +111,8 @@ tuple_alloc(size_t size);
  * Throws an exception if tuple format is incorrect.
  */
 struct tuple *
-tuple_new(uint32_t field_count, const char **data, const char *end);
+tuple_new(struct tuple_format *format, uint32_t field_count,
+	  const char **data, const char *end);
 
 /**
  * Change tuple reference counter. If it has reached zero, free the tuple.
@@ -82,6 +121,19 @@ tuple_new(uint32_t field_count, const char **data, const char *end);
  */
 void
 tuple_ref(struct tuple *tuple, int count);
+
+/**
+* @brief Return a tuple format instance
+* @param tuple tuple
+* @return tuple format instance
+*/
+static inline struct tuple_format *
+tuple_format(const struct tuple *tuple)
+{
+	struct tuple_format *format = tuple_formats[tuple->format_id];
+	assert(tuple_format_id(format) == tuple->format_id);
+	return format;
+}
 
 /**
  * Get a field from tuple by index.
@@ -166,7 +218,8 @@ void
 tuple_print(struct tbuf *buf, const struct tuple *tuple);
 
 struct tuple *
-tuple_update(void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+tuple_update(struct tuple_format *new_format,
+	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
 	     const struct tuple *old_tuple,
 	     const char *expr, const char *expr_end);
 
@@ -241,5 +294,12 @@ tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
 void
 tuple_to_luabuf(struct tuple *tuple, struct luaL_Buffer *b);
 
+/** Initialize tuple library */
+void
+tuple_init();
+
+/** Cleanup tuple library */
+void
+tuple_free();
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

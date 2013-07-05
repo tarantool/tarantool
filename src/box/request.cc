@@ -72,16 +72,17 @@ execute_replace(struct request *request, struct txn *txn)
 	txn_add_redo(txn, request->type, request->data, request->len);
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
-	struct space *sp = read_space(reqpos, reqend);
+	struct space *space = read_space(reqpos, reqend);
 	request->flags |= (pick_u32(reqpos, reqend) &
 			   BOX_ALLOWED_REQUEST_FLAGS);
 	uint32_t field_count = pick_u32(reqpos, reqend);
 
-	struct tuple *new_tuple = tuple_new(field_count, reqpos, reqend);
+	struct tuple *new_tuple = tuple_new(space->format, field_count,
+					    reqpos, reqend);
 	try {
-		space_validate_tuple(sp, new_tuple);
+		space_validate_tuple(space, new_tuple);
 		enum dup_replace_mode mode = dup_replace_mode(request->flags);
-		txn_replace(txn, sp, NULL, new_tuple, mode);
+		txn_replace(txn, space, NULL, new_tuple, mode);
 
 	} catch (const Exception& e) {
 		tuple_free(new_tuple);
@@ -96,7 +97,7 @@ execute_update(struct request *request, struct txn *txn)
 	txn_add_redo(txn, request->type, request->data, request->len);
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
-	struct space *sp = read_space(reqpos, reqend);
+	struct space *space = read_space(reqpos, reqend);
 	request->flags |= (pick_u32(reqpos, reqend) &
 			   BOX_ALLOWED_REQUEST_FLAGS);
 	/* Parse UPDATE request. */
@@ -104,7 +105,7 @@ execute_update(struct request *request, struct txn *txn)
 	uint32_t key_part_count;
 	const char *key = read_key(reqpos, reqend, &key_part_count);
 
-	Index *pk = space_index(sp, 0);
+	Index *pk = space_index(space, 0);
 	/* Try to find the tuple by primary key. */
 	primary_key_validate(pk->key_def, key, key_part_count);
 	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
@@ -113,12 +114,13 @@ execute_update(struct request *request, struct txn *txn)
 		return;
 
 	/* Update the tuple. */
-	struct tuple *new_tuple = tuple_update(palloc_region_alloc,
+	struct tuple *new_tuple = tuple_update(space->format,
+					       palloc_region_alloc,
 					       fiber->gc_pool,
 					       old_tuple, *reqpos, reqend);
 	try {
-		space_validate_tuple(sp, new_tuple);
-		txn_replace(txn, sp, old_tuple, new_tuple, DUP_INSERT);
+		space_validate_tuple(space, new_tuple);
+		txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
 	} catch (const Exception& e) {
 		tuple_free(new_tuple);
 		throw;
@@ -132,9 +134,9 @@ execute_select(struct request *request, struct port *port)
 {
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
-	struct space *sp = read_space(reqpos, reqend);
+	struct space *space = read_space(reqpos, reqend);
 	uint32_t index_no = pick_u32(reqpos, reqend);
-	Index *index = index_find(sp, index_no);
+	Index *index = index_find(space, index_no);
 	uint32_t offset = pick_u32(reqpos, reqend);
 	uint32_t limit = pick_u32(reqpos, reqend);
 	uint32_t count = pick_u32(reqpos, reqend);
@@ -183,7 +185,7 @@ execute_delete(struct request *request, struct txn *txn)
 	txn_add_redo(txn, type, request->data, request->len);
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
-	struct space *sp = read_space(reqpos, reqend);
+	struct space *space = read_space(reqpos, reqend);
 	if (type == DELETE) {
 		request->flags |= pick_u32(reqpos, reqend) &
 			BOX_ALLOWED_REQUEST_FLAGS;
@@ -192,14 +194,14 @@ execute_delete(struct request *request, struct txn *txn)
 	uint32_t key_part_count;
 	const char *key = read_key(reqpos, reqend, &key_part_count);
 	/* Try to find tuple by primary key */
-	Index *pk = space_index(sp, 0);
+	Index *pk = space_index(space, 0);
 	primary_key_validate(pk->key_def, key, key_part_count);
 	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
 
 	if (old_tuple == NULL)
 		return;
 
-	txn_replace(txn, sp, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
 }
 
 /** To collects stats, we need a valid request type.

@@ -131,7 +131,8 @@ recover_snap_row(const void *data)
 	struct tuple *tuple;
 	try {
 		const char *tuple_data = row->data;
-		tuple = tuple_new(row->tuple_size, &tuple_data,
+		tuple = tuple_new(space->format,
+				  row->tuple_size, &tuple_data,
 				  tuple_data + row->data_size);
 	} catch (const ClientError &e) {
 		say_error("\n"

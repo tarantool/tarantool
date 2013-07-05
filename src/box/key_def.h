@@ -37,6 +37,15 @@
 enum field_type { UNKNOWN = 0, NUM, NUM64, STRING, field_type_MAX };
 extern const char *field_type_strs[];
 
+
+static inline uint32_t
+field_type_maxlen(enum field_type type)
+{
+	static const uint32_t maxlen[] =
+		{ UINT32_MAX, 4, 8, UINT32_MAX, UINT32_MAX };
+	return maxlen[type];
+}
+
 #define INDEX_TYPE(_)                                               \
 	_(HASH,    0)       /* HASH Index  */                       \
 	_(TREE,    1)       /* TREE Index  */                       \
@@ -62,7 +71,7 @@ struct key_def {
 	 * 'parts' array for such index contains data from
 	 * key_field[0] and key_field[1] respectively.
 	 * max_fieldno is 5, and cmp_order array holds offsets of
-	 * field 3 and 5 in 'parts' array: -1, -1, 0, -1, 1.
+	 * field 3 and 5 in 'parts' array: -1, -1, -1, 0, -1, 1.
 	 */
 	uint32_t *cmp_order;
 	/* The size of the 'parts' array. */

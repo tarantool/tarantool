@@ -38,15 +38,69 @@
 #include <fiber.h>
 #include "scoped_guard.h"
 
+/** Global table of tuple formats */
+struct tuple_format **tuple_formats;
+struct tuple_format *tuple_format_ber;
+
+static uint32_t formats_size, formats_capacity;
+
+static struct tuple_format *
+tuple_format_alloc_and_register(uint32_t offset_count)
+{
+	if (formats_size == formats_capacity) {
+		uint32_t new_capacity = formats_capacity ?
+			formats_capacity * 2 : 16;
+		if (new_capacity >= UINT16_MAX)
+			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+				  new_capacity, "tuple_formats", "resize");
+		struct tuple_format **formats = (struct tuple_format **)
+			realloc(tuple_formats,
+				new_capacity * sizeof(tuple_formats[0]));
+		if (formats == NULL)
+			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+				  new_capacity, "tuple_formats", "realloc");
+
+		formats_capacity = new_capacity;
+		tuple_formats = formats;
+	}
+
+	uint32_t total = sizeof(struct tuple_format) +
+		offset_count * sizeof(int32_t);
+
+	struct tuple_format *format = (struct tuple_format *) malloc(total);
+
+	if (format == NULL) {
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+			  total, "tuple format", "malloc");
+	}
+
+	format->id = formats_size++;
+	format->offset_count = offset_count;
+	tuple_formats[format->id] = format;
+	return format;
+}
+
+struct tuple_format *
+tuple_format_new(const enum field_type *fields, uint32_t max_fieldno)
+{
+	(void) max_fieldno;
+	(void) fields;
+	struct tuple_format *format =
+		tuple_format_alloc_and_register(0);
+
+	return format;
+}
+
 /** Allocate a tuple */
 struct tuple *
-tuple_alloc(size_t size)
+tuple_alloc(struct tuple_format *format, size_t size)
 {
 	size_t total = sizeof(struct tuple) + size;
 	struct tuple *tuple = (struct tuple *) salloc(total, "tuple");
 
-	tuple->flags = tuple->refs = 0;
+	tuple->refs = 0;
 	tuple->bsize = size;
+	tuple->format_id = tuple_format_id(format);
 
 	say_debug("tuple_alloc(%zu) = %p", size, tuple);
 	return tuple;
@@ -196,7 +250,8 @@ tuple_print(struct tbuf *buf, const struct tuple *tuple)
 }
 
 struct tuple *
-tuple_update(void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+tuple_update(struct tuple_format *format,
+	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
 	     const struct tuple *old_tuple, const char *expr,
 	     const char *expr_end)
 {
@@ -210,7 +265,7 @@ tuple_update(void *(*region_alloc)(void *, size_t), void *alloc_ctx,
 				     &new_field_count);
 
 	/* Allocate a new tuple. */
-	struct tuple *new_tuple = tuple_alloc(new_size);
+	struct tuple *new_tuple = tuple_alloc(format, new_size);
 	new_tuple->field_count = new_field_count;
 
 	try {
@@ -223,14 +278,15 @@ tuple_update(void *(*region_alloc)(void *, size_t), void *alloc_ctx,
 }
 
 struct tuple *
-tuple_new(uint32_t field_count, const char **data, const char *end)
+tuple_new(struct tuple_format *format, uint32_t field_count,
+	  const char **data, const char *end)
 {
 	size_t tuple_len = end - *data;
 
 	if (tuple_len != tuple_range_size(data, end, field_count))
 		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
 
-	struct tuple *new_tuple = tuple_alloc(tuple_len);
+	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
 	new_tuple->field_count = field_count;
 	memcpy(new_tuple->data, end - tuple_len, tuple_len);
 	return new_tuple;
@@ -330,7 +386,8 @@ tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
 		uint32_t field_no = key_def->parts[part].fieldno;
 
 		uint32_t size_a;
-		const char *field_a = tuple_field(tuple_a, field_no, &size_a);
+		const char *field_a = tuple_field(tuple_a, field_no,
+						  &size_a);
 
 		uint32_t key_size = load_varint32(&key);
 		int r = tuple_compare_field(field_a, size_a, key, key_size,
@@ -343,4 +400,20 @@ tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
 	}
 
 	return 0;
+}
+
+void
+tuple_init()
+{
+	tuple_format_ber = tuple_format_new(NULL, 0);
+}
+
+void
+tuple_free()
+{
+	for (struct tuple_format **format = tuple_formats;
+	     format < tuple_formats + formats_size;
+	     format++)
+		free(*format);
+	free(tuple_formats);
 }
