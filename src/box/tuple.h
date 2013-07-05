@@ -141,7 +141,7 @@ tuple_format(const struct tuple *tuple)
  * @returns field data if the field exists, or NULL
  */
 const char *
-tuple_field_old(struct tuple *tuple, uint32_t i);
+tuple_field_old(const struct tuple *tuple, uint32_t i);
 
 /**
  * @brief Return field data of the field
