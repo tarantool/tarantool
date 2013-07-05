@@ -98,7 +98,7 @@ ts_snapshot_xfer(FILE *snapshot, struct tnt_log *current,
 	struct tnt_tuple *t = NULL;
 
 	if (r->is_snap) {
-		t = &current->current.value->t;
+		t = &current->current_value.t;
 	} else {
 		struct tnt_request *rp = &current->current_value.r;
 		switch (rp->h.type) {

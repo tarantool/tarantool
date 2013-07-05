@@ -257,11 +257,12 @@ xlog_process_row(struct ts_spaces *s, int fileid, int offset, struct tnt_request
 
 		/* free old key */
 		struct tnt_tuple *n = ts_update(r, old);
-		if (n == NULL)
+		if (n == NULL) {
 			return -1;
+		}
 
 		/* free old tuple */
-		/*tnt_tuple_free(old);*/
+		tnt_tuple_free(old);
 
 		/* close file */
 		ts_cursor_close(&cursor);

@@ -62,7 +62,7 @@ ts_cursor_tuple(struct ts_cursor *c)
 	struct tnt_tuple *t = NULL;
 
 	if (c->r->is_snap) {
-		t = &c->current.current.value->t;
+		t = &c->current.current_value.t;
 	} else {
 		struct tnt_request *rp = &c->current.current_value.r;
 		switch (rp->h.type) {
@@ -89,7 +89,7 @@ ts_cursor_close(struct ts_cursor *c)
 	if (c->r == NULL)
 		return;
 	if (c->r->is_snap) {
-		tnt_tuple_free(&c->current.current.value->t);
+		tnt_tuple_free(&c->current.current_value.t);
 	} else {
 		tnt_request_free(&c->current.current_value.r);
 	}
