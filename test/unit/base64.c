@@ -9,7 +9,7 @@ base64_test(const char *str)
 	header();
 
 	int len = strlen(str);
-	int base64_buflen = len * 4/3 + 4;
+	int base64_buflen = base64_bufsize(len);
 	char *base64_buf = malloc(base64_buflen);
 	char *strbuf = malloc(len + 1);
 
