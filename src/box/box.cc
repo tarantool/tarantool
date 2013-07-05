@@ -124,7 +124,7 @@ recover_snap_row(const void *data)
 	struct space *space = space_find(row->space);
 	Index *index = space_index(space, 0);
 	/* Check to see if the tuple has a sufficient number of fields. */
-	if (unlikely(row->tuple_size < space->max_fieldno)) {
+	if (unlikely(row->tuple_size < space->max_fieldno + 1)) {
 		tnt_raise(IllegalParams,
 			  "tuple must have all indexed fields");
 	}

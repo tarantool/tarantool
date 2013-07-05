@@ -63,13 +63,12 @@ key_def_create(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
 	def->parts = (struct key_part *) malloc(sizeof(struct key_part) *
 						def->part_count);
 
+	uint32_t cmp_order_size = (def->max_fieldno + 1) * sizeof(uint32_t);
 	/* init compare order array */
-	def->max_fieldno++;
-	def->cmp_order = (uint32_t *) malloc(def->max_fieldno * sizeof(uint32_t));
+	def->cmp_order = (uint32_t *) malloc(cmp_order_size);
 
-	for (uint32_t fieldno = 0; fieldno < def->max_fieldno; fieldno++) {
+	for (uint32_t fieldno = 0; fieldno <= def->max_fieldno; fieldno++)
 		def->cmp_order[fieldno] = UINT32_MAX;
-	}
 
 	/* fill fields and compare order */
 	for (uint32_t k = 0; cfg_index->key_field[k] != NULL; ++k) {

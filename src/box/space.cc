@@ -206,7 +206,7 @@ void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
 	/* Check to see if the tuple has a sufficient number of fields. */
-	if (new_tuple->field_count < sp->max_fieldno)
+	if (new_tuple->field_count < sp->max_fieldno + 1)
 		tnt_raise(IllegalParams,
 			  "tuple must have all indexed fields");
 
@@ -221,8 +221,6 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 	uint32_t len;
 	uint32_t fieldno = 0;
 	while ((field = tuple_next(&it, &len))) {
-		if (fieldno == sp->max_fieldno)
-			break;
 		/*
 		 * Check fixed size fields (NUM and NUM64) and
 		 * skip undefined size fields (STRING and UNKNOWN).
@@ -236,6 +234,8 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
 					  "NUM64");
 		}
+		if (fieldno == sp->max_fieldno)
+			break;
 		fieldno++;
 	}
 }
@@ -276,14 +276,14 @@ space_init_field_types(struct space *space)
 	/* alloc & init field type info */
 	space->max_fieldno = max_fieldno;
 	space->field_types = (enum field_type *)
-			     calloc(max_fieldno, sizeof(enum field_type));
+			     calloc(max_fieldno + 1, sizeof(enum field_type));
 
 	/* extract field type info */
 	for (i = 0; i < key_count; i++) {
 		struct key_def *def = &key_defs[i];
 		for (uint32_t pi = 0; pi < def->part_count; pi++) {
 			struct key_part *part = &def->parts[pi];
-			assert(part->fieldno < max_fieldno);
+			assert(part->fieldno <= max_fieldno);
 			space->field_types[part->fieldno] = part->type;
 		}
 	}

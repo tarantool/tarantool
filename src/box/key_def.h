@@ -77,8 +77,8 @@ struct key_def {
 	/* The size of the 'parts' array. */
 	uint32_t part_count;
 	/*
-	 * The size of 'cmp_order' array (= max fieldno in 'parts'
-	 * array).
+	 * Max fieldno in 'parts' array. Defines the size of
+	 * cmp_order array (which is max_fieldno + 1).
 	 */
 	uint32_t max_fieldno;
 	bool is_unique;
