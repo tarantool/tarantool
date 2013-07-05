@@ -45,6 +45,21 @@ struct tuple_format {
 	 * first field).
 	 */
 	uint32_t offset_count;
+	/**
+	 * For each field participating in an index, the format
+	 * may either store the fixed offset of the field
+	 * (identical in all tuples with this format), or an
+	 * offset in the dynamic offset map (field_map), which,
+	 * in turn, stores the offset of the field (such offset is
+	 * varying between different tuples of the same format).
+	 * If an offset is fixed, it's positive, so that
+	 * tuple->data[format->offset[fieldno] gives the
+	 * start of the field.
+	 * If it is varying, it's negative, so that
+	 * tuple->data[((uint32_t *) * tuple)[format->offset[fieldno]]]
+	 * gives the start of the field.
+	 */
+	int32_t offset[0];
 };
 
 extern struct tuple_format **tuple_formats;
@@ -137,11 +152,12 @@ tuple_format(const struct tuple *tuple)
 
 /**
  * Get a field from tuple by index.
+ * Returns a pointer to BER-length prefixed field.
  *
- * @returns field data if the field exists, or NULL
  */
 const char *
-tuple_field_old(const struct tuple *tuple, uint32_t i);
+tuple_field_old(const struct tuple_format *format,
+		const struct tuple *tuple, uint32_t i);
 
 /**
  * @brief Return field data of the field
