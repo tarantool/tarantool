@@ -8,16 +8,22 @@ box.flags = { BOX_RETURN_TUPLE = 0x01, BOX_ADD = 0x02, BOX_REPLACE = 0x04 }
 --
 --
 function box.select_limit(space, index, offset, limit, ...)
-    return box.net.self:select_limit(tonumber(space), tonumber(index), 
-        tonumber(offset), tonumber(limit), ...)
+    local key_part_count = select('#', ...)
+    return box.process(17,
+        box.pack('iiiiiV',
+            tonumber(space),
+            tonumber(index),
+            tonumber(offset),
+            tonumber(limit),
+            1, -- key count
+            key_part_count, ...))
 end
-
 
 --
 --
 --
 function box.select(space, index, ...)
-    return box.net.self:select(tonumber(space), tonumber(index), ...)
+    return box.select_limit(space, index, 0, 4294967295, ...)
 end
 
 --
@@ -45,24 +51,46 @@ end
 -- index is always 0. It doesn't accept compound keys
 --
 function box.delete(space, ...)
-    return box.net.self:delete(tonumber(space), ...)
+    local key_part_count = select('#', ...)
+    return box.process(21,
+        box.pack('iiV',
+            tonumber(space),
+            box.flags.BOX_RETURN_TUPLE,  -- flags
+            key_part_count, ...))
 end
 
 -- insert or replace a tuple
 function box.replace(space, ...)
-    return box.net.self:replace(tonumber(space), ...)
+    local field_count = select('#', ...)
+    return box.process(13,
+        box.pack('iiV',
+            tonumber(space),
+            box.flags.BOX_RETURN_TUPLE,  -- flags
+            field_count, ...))
 end
 
 -- insert a tuple (produces an error if the tuple already exists)
 function box.insert(space, ...)
-    return box.net.self:insert(tonumber(space), ...)
+    local field_count = select('#', ...)
+    return box.process(13,
+        box.pack('iiV',
+            tonumber(space),
+            bit.bor(box.flags.BOX_RETURN_TUPLE,
+                box.flags.BOX_ADD),  -- flags
+            field_count, ...))
 end
 
 --
 function box.update(space, key, format, ...)
-    return box.net.self:update(tonumber(space), key, format, ...)
+    local op_count = select('#', ...)/2
+    return box.process(19,
+        box.pack('iiVi'..format,
+            tonumber(space),
+            box.flags.BOX_RETURN_TUPLE,
+            1, key,
+            op_count,
+            ...))
 end
-
 
 function box.dostring(s, ...)
     local chunk, message = loadstring(s)
