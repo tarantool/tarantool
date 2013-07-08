@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 import time
 import yaml
 
@@ -12,7 +12,7 @@ def wait_for_next_lsn(lsn, serv):
 
 def get_lsn(serv):
     serv_admin = serv.admin
-    resp = exec serv_admin silent "lua box.info.lsn"
+    resp = serv_admin("lua box.info.lsn", silent=True)
     return yaml.load(resp)[0]
 
 def wait(serv = server):
@@ -23,59 +23,59 @@ def wait(serv = server):
 print """# expire: after 1 second"""
 
 print """# set foo"""
-exec memcached "set foo 0 1 6\r\nfooval\r\n"
+memcached("set foo 0 1 6\r\nfooval\r\n")
 
 print """# foo shoud be exists"""
-exec memcached "get foo\r\n"
+memcached("get foo\r\n")
 
 wait()
 print """# foo shoud expired"""
-exec memcached "get foo\r\n"
+memcached("get foo\r\n")
 
 
 print """# expire: time - 1 second"""
 expire = time.time() - 1
 
 print """# set foo"""
-exec memcached silent "set foo 0 %d 6\r\nfooval\r\n" % expire
+memcached("set foo 0 %d 6\r\nfooval\r\n" % expire, silent=True)
 
 print """# foo shoud expired"""
-exec memcached "get foo\r\n"
+memcached("get foo\r\n")
 
 
 print """# expire: time + 1 second"""
 expire = time.time() + 1
 
 print """# set foo"""
-exec memcached silent "set foo 0 %d 6\r\nfooval\r\n" % expire
+memcached("set foo 0 %d 6\r\nfooval\r\n" % expire, silent=True)
 
 print """# foo shoud be exists"""
-exec memcached "get foo\r\n"
+memcached("get foo\r\n")
 
 wait()
 print """# foo shoud expired"""
-exec memcached "get foo\r\n"
+memcached("get foo\r\n")
 
 print """# expire: time - 20 second"""
 expire = time.time() - 20
 
 print """# set boo"""
-exec memcached silent "set boo 0 %d 6\r\nbooval\r\n" % expire
+memcached("set boo 0 %d 6\r\nbooval\r\n" % expire, silent=True)
 
 print """# foo shoud expired"""
-exec memcached "get boo\r\n"
+memcached("get boo\r\n")
 
 print """# expire: after 2 second"""
 
 print """# add add"""
-exec memcached "add add 0 1 6\r\naddval\r\n"
+memcached("add add 0 1 6\r\naddval\r\n")
 
 print """# readd add - shoud be fail"""
-exec memcached "add add 0 1 7\r\naddval1\r\n"
+memcached("add add 0 1 7\r\naddval1\r\n")
 
 wait()
 print """# readd add - shoud be success"""
-exec memcached "add add 0 1 7\r\naddval2\r\n"
+memcached("add add 0 1 7\r\naddval2\r\n")
 
 # resore default suite config
 server.stop()

@@ -1,73 +1,73 @@
-# encoding: tarantool
+# encoding: utf-8
 from lib.admin_connection import AdminConnection
 from lib.box_connection import BoxConnection
 
-exec admin "lua box.session.exists(box.session.id())"
-exec admin "lua box.session.exists()"
-exec admin "lua box.session.exists(1, 2, 3)"
-exec admin "lua box.session.exists(1234567890)"
+admin("lua box.session.exists(box.session.id())")
+admin("lua box.session.exists()")
+admin("lua box.session.exists(1, 2, 3)")
+admin("lua box.session.exists(1234567890)")
 
 # check session.id()
-exec admin "lua box.session.id() > 0"
-exec admin "lua f = box.fiber.create(function() box.fiber.detach() failed = box.session.id() ~= 0 end)"
-exec admin "lua box.fiber.resume(f)"
-exec admin "lua failed"
-exec admin "lua f1 = box.fiber.create(function() if box.session.id() == 0 then failed = true end end)"
-exec admin "lua box.fiber.resume(f1)"
-exec admin "lua failed"
-exec admin "lua box.session.peer() == box.session.peer(box.session.id())"
+admin("lua box.session.id() > 0")
+admin("lua f = box.fiber.create(function() box.fiber.detach() failed = box.session.id() ~= 0 end)")
+admin("lua box.fiber.resume(f)")
+admin("lua failed")
+admin("lua f1 = box.fiber.create(function() if box.session.id() == 0 then failed = true end end)")
+admin("lua box.fiber.resume(f1)")
+admin("lua failed")
+admin("lua box.session.peer() == box.session.peer(box.session.id())")
 
 # check on_connect/on_disconnect triggers
-exec admin "lua box.session.on_connect(function() end)"
-exec admin "lua box.session.on_disconnect(function() end)"
+admin("lua box.session.on_connect(function() end)")
+admin("lua box.session.on_disconnect(function() end)")
 
 # check it's possible to reset these triggers
 #
-exec admin "lua type(box.session.on_connect(function() error('hear') end))"
-exec admin "lua type(box.session.on_disconnect(function() error('hear') end))"
+admin("lua type(box.session.on_connect(function() error('hear') end))")
+admin("lua type(box.session.on_disconnect(function() error('hear') end))")
 
 # check on_connect/on_disconnect argument count and type
-exec admin "lua box.session.on_connect()"
-exec admin "lua box.session.on_disconnect()"
+admin("lua box.session.on_connect()")
+admin("lua box.session.on_disconnect()")
 
-exec admin "lua box.session.on_connect(function() end, function() end)"
-exec admin "lua box.session.on_disconnect(function() end, function() end)"
+admin("lua box.session.on_connect(function() end, function() end)")
+admin("lua box.session.on_disconnect(function() end, function() end)")
 
-exec admin "lua box.session.on_connect(1, 2)"
-exec admin "lua box.session.on_disconnect(1, 2)"
+admin("lua box.session.on_connect(1, 2)")
+admin("lua box.session.on_disconnect(1, 2)")
 
-exec admin "lua box.session.on_connect(1)"
-exec admin "lua box.session.on_disconnect(1)"
+admin("lua box.session.on_connect(1)")
+admin("lua box.session.on_disconnect(1)")
 
 # use of nil to clear the trigger
-exec admin "lua type(box.session.on_connect(nil))"
-exec admin "lua type(box.session.on_disconnect(nil))"
-exec admin "lua type(box.session.on_connect(nil))"
-exec admin "lua type(box.session.on_disconnect(nil))"
+admin("lua type(box.session.on_connect(nil))")
+admin("lua type(box.session.on_disconnect(nil))")
+admin("lua type(box.session.on_connect(nil))")
+admin("lua type(box.session.on_disconnect(nil))")
 
 # check how connect/disconnect triggers work
-exec admin "lua function inc() active_connections = active_connections + 1 end"
-exec admin "lua function dec() active_connections = active_connections - 1 end"
-exec admin "lua box.session.on_connect(inc)"
-exec admin "lua box.session.on_disconnect(dec)"
-exec admin "lua active_connections = 0"
+admin("lua function inc() active_connections = active_connections + 1 end")
+admin("lua function dec() active_connections = active_connections - 1 end")
+admin("lua box.session.on_connect(inc)")
+admin("lua box.session.on_disconnect(dec)")
+admin("lua active_connections = 0")
 con1 = AdminConnection('localhost', server.admin_port)
-exec con1 "lua active_connections"
+con1("lua active_connections")
 con2 = AdminConnection('localhost', server.admin_port)
-exec con2 "lua active_connections"
+con2("lua active_connections")
 con1.disconnect()
 con2.disconnect()
-exec admin "lua type(box.session.on_connect(nil))"
-exec admin "lua type(box.session.on_disconnect(nil))"
+admin("lua type(box.session.on_connect(nil))")
+admin("lua type(box.session.on_disconnect(nil))")
 
 # write audit trail of connect/disconnect into a space
-exec admin "lua box.session.on_connect(function() box.insert(0, box.session.id()) end)"
-exec admin "lua box.session.on_disconnect(function() box.delete(0, box.session.id()) end)"
-exec con1 "lua box.unpack('i', box.select(0, 0, box.session.id())[0]) == box.session.id()"
+admin("lua box.session.on_connect(function() box.insert(0, box.session.id()) end)")
+admin("lua box.session.on_disconnect(function() box.delete(0, box.session.id()) end)")
+con1("lua box.unpack('i', box.select(0, 0, box.session.id())[0]) == box.session.id()")
 con1.disconnect()
 
 # if on_connect() trigger raises an exception, the connection is dropped
-exec admin "lua type(box.session.on_connect(function() nosuchfunction() end))"
+admin("lua type(box.session.on_connect(function() nosuchfunction() end))")
 con1 = BoxConnection('localhost', server.primary_port)
 try:
     con1.execute("select * from t0 where k0=0")
@@ -77,8 +77,8 @@ except Exception as e:
 
 # cleanup
 
-exec admin "lua type(box.session.on_connect(nil))"
-exec admin "lua type(box.session.on_disconnect(nil))"
-exec admin "lua active_connections"
+admin("lua type(box.session.on_connect(nil))")
+admin("lua type(box.session.on_disconnect(nil))")
+admin("lua active_connections")
 
 # vim: syntax=python

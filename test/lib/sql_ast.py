@@ -81,7 +81,7 @@ ER = {
    53: "ER_NO_SUCH_INDEX"       ,
    54: "ER_NO_SUCH_FIELD"       ,
    55: "ER_TUPLE_FOUND"         ,
-   56: "ER_INDEX_VIOLATION"     ,
+   56: "ER_UNUSED"              ,
    57: "ER_NO_SUCH_SPACE"
 }
 

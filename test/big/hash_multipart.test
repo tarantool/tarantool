@@ -1,17 +1,17 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 
 # insert rows
-exec sql "insert into t27 values (0, 'foo', 0, '', 1)"
-exec sql "insert into t27 values (0, 'foo', 1, '', 1)"
-exec sql "insert into t27 values (1, 'foo', 0, '', 2)"
-exec sql "insert into t27 values (1, 'foo', 1, '', 2)"
-exec sql "insert into t27 values (0, 'bar', 0, '', 3)"
-exec sql "insert into t27 values (0, 'bar', 1, '', 3)"
-exec sql "insert into t27 values (1, 'bar', 0, '', 4)"
-exec sql "insert into t27 values (1, 'bar', 1, '', 4)"
+sql("insert into t27 values (0, 'foo', 0, '', 1)", silent=False)
+sql("insert into t27 values (0, 'foo', 1, '', 1)", silent=False)
+sql("insert into t27 values (1, 'foo', 0, '', 2)", silent=False)
+sql("insert into t27 values (1, 'foo', 1, '', 2)", silent=False)
+sql("insert into t27 values (0, 'bar', 0, '', 3)", silent=False)
+sql("insert into t27 values (0, 'bar', 1, '', 3)", silent=False)
+sql("insert into t27 values (1, 'bar', 0, '', 4)", silent=False)
+sql("insert into t27 values (1, 'bar', 1, '', 4)", silent=False)
 # try to insert a row with a duplicate key
-exec sql "insert into t27 values (1, 'bar', 1, '', 5)"
+sql("insert into t27 values (1, 'bar', 1, '', 5)", silent=False)
 
 # output all rows
 lua_code = """
@@ -24,30 +24,30 @@ function box.select_all(space)
     return unpack(result)
 end
 """
-exec admin "lua " + lua_code.replace('\n', ' ')
+admin("lua " + lua_code.replace('\n', ' '), silent=False)
 sql.sort = True
-exec sql "call box.select_all('27')"
+sql("call box.select_all('27')", silent=False)
 sql.sort = False
 
 # primary index select
-exec admin "lua box.select(27, 0, 1, 'foo', 0)"
-exec admin "lua box.select(27, 0, 1, 'bar', 0)"
+admin("lua box.select(27, 0, 1, 'foo', 0)", silent=False)
+admin("lua box.select(27, 0, 1, 'bar', 0)", silent=False)
 # primary index slect with missing part
-exec admin "lua box.select(27, 0, 1, 'foo')"
+admin("lua box.select(27, 0, 1, 'foo')", silent=False)
 # primary index slect with extra part
-exec admin "lua box.select(27, 0, 1, 'foo', 0, 0)"
+admin("lua box.select(27, 0, 1, 'foo', 0, 0)", silent=False)
 # primary index select with wrong type
-exec admin "lua box.select(27, 0, 1, 'foo', 'baz')"
+admin("lua box.select(27, 0, 1, 'foo', 'baz')", silent=False)
 
 # secondary index select
-exec admin "lua box.select(27, 1, 1, 4)"
+admin("lua box.select(27, 1, 1, 4)", silent=False)
 # secondary index select with no such key
-exec admin "lua box.select(27, 1, 1, 5)"
+admin("lua box.select(27, 1, 1, 5)", silent=False)
 # secondary index select with missing part
-exec admin "lua box.select(27, 1, 1)"
+admin("lua box.select(27, 1, 1)", silent=False)
 # secondary index select with wrong type
-exec admin "lua box.select(27, 1, 1, 'baz')"
+admin("lua box.select(27, 1, 1, 'baz')", silent=False)
 
 # cleanup
-exec admin "lua box.space[27]:truncate()"
-exec admin "lua box.space[27]:len()"
+admin("lua box.space[27]:truncate()", silent=False)
+admin("lua box.space[27]:len()", silent=False)

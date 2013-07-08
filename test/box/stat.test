@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 # clear statistics
 server.restart()
@@ -9,8 +9,8 @@ print """#
 #
 """
 for i in range(10):
-  exec sql "insert into t0 values ({0}, 'tuple')".format(i)
-exec admin "show stat"
+  sql("insert into t0 values ({0}, 'tuple')".format(i))
+admin("show stat")
 print """#
 # restart server
 #
@@ -20,10 +20,10 @@ print """#
 # statistics must be zero
 #
 """
-exec admin "show stat"
+admin("show stat")
 
 # cleanup
 for i in range(10):
-  exec sql "delete from t0 where k0 = {0}".format(i)
+  sql("delete from t0 where k0 = {0}".format(i))
 
 # vim: syntax=python

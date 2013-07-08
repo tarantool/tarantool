@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 
 import os
@@ -19,7 +19,7 @@ server.stop()
 # start server from config with holes in spaces
 server.deploy("box/tarantool_bug708685.cfg")
 # check connection
-exec admin "show configuration"
+admin("show configuration")
 
 print """
 # Bug #884768:
@@ -31,7 +31,7 @@ server.stop()
 # start server from config with different boolean represenation
 server.deploy("box/tarantool_bug884768.cfg")
 # check values
-exec admin "show configuration"
+admin("show configuration")
 
 print """
 # Bug #876541:
@@ -42,7 +42,7 @@ print """
 server.stop()
 server.deploy("box/tarantool_bug876541.cfg")
 # check values
-exec admin "lua box.cfg.wal_fsync_delay"
+admin("lua box.cfg.wal_fsync_delay")
 
 print """
 # Bug#928413 Lua malfunction on certain configuration
@@ -52,9 +52,9 @@ print """
 server.stop()
 server.deploy("box/tarantool_bug928413.cfg")
 # check values
-exec admin "lua box.cfg.wal_fsync_delay"
-exec admin "lua box.space[0].enabled"
-exec admin "reload configuration"
+admin("lua box.cfg.wal_fsync_delay")
+admin("lua box.space[0].enabled")
+admin("reload configuration")
 
 print """
 #  Test field type conflict in keys
@@ -73,7 +73,7 @@ shutil.copy("box/test_init.lua", os.path.join(script_dir_path, "init.lua"))
 
 server.stop()
 server.deploy("box/tarantool_scriptdir.cfg")
-exec admin "lua print_config()"
+admin("lua print_config()")
 
 
 # restore default server

@@ -1,13 +1,13 @@
-# encoding: tarantool
-exec admin "lua box.cfg.wal_mode"
-exec sql "insert into t0 values  (1)"
-exec sql "insert into t0 values  (2)"
-exec sql "insert into t0 values  (3)"
-exec sql "select * from t0 where k0 = 1"
-exec sql "select * from t0 where k0 = 2"
-exec sql "select * from t0 where k0 = 3"
-exec sql "select * from t0 where k0 = 4"
-exec admin "save snapshot"
-exec admin "save snapshot"
-exec admin "lua box.space[0]:truncate()"
-exec admin "save snapshot"
+# encoding: utf-8
+admin("lua box.cfg.wal_mode")
+sql("insert into t0 values  (1)")
+sql("insert into t0 values  (2)")
+sql("insert into t0 values  (3)")
+sql("select * from t0 where k0 = 1")
+sql("select * from t0 where k0 = 2")
+sql("select * from t0 where k0 = 3")
+sql("select * from t0 where k0 = 4")
+admin("save snapshot")
+admin("save snapshot")
+admin("lua box.space[0]:truncate()")
+admin("save snapshot")

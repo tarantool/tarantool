@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 import os
 import time
@@ -15,7 +15,7 @@ snapshot = os.path.join(vardir, "00000000000000000500.snap")
 os.symlink(os.path.abspath("box/00000000000000000500.snap"), snapshot)
 server.start()
 for i in range(0, 501):
-  exec sql "select * from t0 where k0={0}".format(i)
+  sql("select * from t0 where k0={0}".format(i))
 print "# Restore the default server..."
 server.stop()
 os.unlink(snapshot)
@@ -28,28 +28,28 @@ print """#
 # error that happens when saving snapshot is propagated
 # to the caller.
 """
-exec sql "insert into t0 values (1, 'first tuple')"
-exec admin "save snapshot"
+sql("insert into t0 values (1, 'first tuple')")
+admin("save snapshot")
 
 # In absence of data modifications, two consecutive
 # 'save snapshot' statements will try to write
 # into the same file, since file name is based
 # on LSN.
 #  Don't allow to overwrite snapshots.
-exec admin "save snapshot"
+admin("save snapshot")
 #
 # Increment LSN
-exec sql "insert into t0 values (2, 'second tuple')"
+sql("insert into t0 values (2, 'second tuple')")
 #
 # Check for other errors, e.g. "Permission denied".
 print "# Make 'var' directory read-only."
 os.chmod(vardir, 0555)
-exec admin "save snapshot"
+admin("save snapshot")
 
 # cleanup
 os.chmod(vardir, 0755)
-exec sql "delete from t0 where k0 = 1"
-exec sql "delete from t0 where k0 = 2"
+sql("delete from t0 where k0 = 1")
+sql("delete from t0 where k0 = 2")
 
 print """#
 # A test case for http://bugs.launchpad.net/bugs/727174
@@ -60,9 +60,9 @@ print """
 # Increment the lsn number, to make sure there is no such snapshot yet
 #"""
 
-exec sql "insert into t0 values (1, 'Test tuple')"
+sql("insert into t0 values (1, 'Test tuple')")
 
-result = exec admin silent "show info"
+result = admin("show info", silent=True)
 info = yaml.load(result)["info"]
 
 pid = info["pid"]
@@ -84,6 +84,6 @@ if iteration == 0 or iteration >= MAX_ITERATIONS:
 else:
   print "Snapshot exists."
 
-exec sql "delete from t0 where k0=1"
+sql("delete from t0 where k0=1")
 
 # vim: syntax=python spell

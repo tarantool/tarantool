@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 import os
 import shutil
@@ -7,92 +7,92 @@ for file in ("index_random_test.lua",):
     src_path = os.path.join("big/", file)
     dst_path = os.path.join(vardir, file)
     shutil.copy(src_path, dst_path)
-    exec admin "lua dofile('%s')" % (file)
+    admin("lua dofile('%s')" % (file), silent=False)
     os.unlink(dst_path);
 
-exec sql "insert into t1 values ('brave', 'new', 'world')"
-exec admin "lua box.space[1].index[1]:min()"
-exec admin "lua box.space[1].index[1]:max()"
-exec sql "call box.select('1', '1', 'new', 'world')"
+sql("insert into t1 values ('brave', 'new', 'world')", silent=False)
+admin("lua box.space[1].index[1]:min()", silent=False)
+admin("lua box.space[1].index[1]:max()", silent=False)
+sql("call box.select('1', '1', 'new', 'world')", silent=False)
 print """#
 # A test case for Bug #904208
 # "assert failed, when key cardinality is greater than index cardinality"
 # https://bugs.launchpad.net/tarantool/+bug/904208
 #"""
-exec sql "call box.select('1', '1', 'new', 'world', 'order')"
-exec sql "call box.delete('1', 'brave')"
+sql("call box.select('1', '1', 'new', 'world', 'order')", silent=False)
+sql("call box.delete('1', 'brave')", silent=False)
 
 print """#
 # A test case for Bug #902091
 # "Positioned iteration over a multipart index doesn't work"
 # https://bugs.launchpad.net/tarantool/+bug/902091
 #"""
-exec sql "insert into t1 values ('item 1', 'alabama', 'song')"
-exec admin "lua box.select(1, 1, 'alabama')"
-exec sql "insert into t1 values ('item 2', 'california', 'dreaming ')"
-exec sql "insert into t1 values ('item 3', 'california', 'uber alles')"
-exec sql "insert into t1 values ('item 4', 'georgia', 'on my mind')"
-exec admin "lua iter, tuple = box.space[1].index[1]:next('california')"
-exec admin "lua tuple"
-exec admin "lua iter, tuple = box.space[1].index[1]:next(iter)"
-exec admin "lua tuple"
-exec sql "call box.delete('1', 'item 1')"
-exec sql "call box.delete('1', 'item 2')"
-exec sql "call box.delete('1', 'item 3')"
-exec sql "call box.delete('1', 'item 4')"
+sql("insert into t1 values ('item 1', 'alabama', 'song')", silent=False)
+admin("lua box.select(1, 1, 'alabama')", silent=False)
+sql("insert into t1 values ('item 2', 'california', 'dreaming ')", silent=False)
+sql("insert into t1 values ('item 3', 'california', 'uber alles')", silent=False)
+sql("insert into t1 values ('item 4', 'georgia', 'on my mind')", silent=False)
+admin("lua iter, tuple = box.space[1].index[1]:next('california')", silent=False)
+admin("lua tuple", silent=False)
+admin("lua iter, tuple = box.space[1].index[1]:next(iter)", silent=False)
+admin("lua tuple", silent=False)
+sql("call box.delete('1', 'item 1')", silent=False)
+sql("call box.delete('1', 'item 2')", silent=False)
+sql("call box.delete('1', 'item 3')", silent=False)
+sql("call box.delete('1', 'item 4')", silent=False)
 
 #
 # Check range scan over multipart keys
 #
-exec sql "insert into t5 values ('01234567', 'new', 'world')"
-exec sql "insert into t5 values ('00000000', 'of', 'puppets')"
-exec sql "insert into t5 values ('00000001', 'of', 'might', 'and', 'magic')"
-exec sql "call box.select_range(5, 1, 2, 'of')"
-exec sql "call box.select_reverse_range(5, 1, 2, 'of')"
-exec admin "lua box.space[5]:truncate()"
+sql("insert into t5 values ('01234567', 'new', 'world')", silent=False)
+sql("insert into t5 values ('00000000', 'of', 'puppets')", silent=False)
+sql("insert into t5 values ('00000001', 'of', 'might', 'and', 'magic')", silent=False)
+sql("call box.select_range(5, 1, 2, 'of')", silent=False)
+sql("call box.select_reverse_range(5, 1, 2, 'of')", silent=False)
+admin("lua box.space[5]:truncate()", silent=False)
 
 #
 # Lua 64bit numbers support
 #
-exec admin "lua box.insert('8', tonumber64('18446744073709551615'), 'magic')"
-exec admin "lua tu = box.select('8', '0', tonumber64('18446744073709551615'))"
-exec admin "lua num = box.unpack('l', tu[0])"
-exec admin "lua print(num)"
-exec admin "lua type(num) == 'cdata'"
-exec admin "lua num == tonumber64('18446744073709551615')"
-exec admin "lua num = box.unpack('l', tu[0])"
-exec admin "lua num == tonumber64('18446744073709551615')"
-exec admin "lua box.delete(8, 18446744073709551615ULL)"
-exec admin "lua box.insert('8', 125ULL, 'magic')"
-exec admin "lua tu = box.select('8', '0', 125)"
-exec admin "lua tu2 = box.select('8', '0', 125LL)"
-exec admin "lua num = box.unpack('l', tu[0])"
-exec admin "lua num2 = box.unpack('l', tu2[0])"
-exec admin "lua print(num)"
-exec admin "lua print(num2)"
-exec admin "lua type(num) == 'cdata'"
-exec admin "lua type(num2) == 'cdata'"
-exec admin "lua num == tonumber64('125')"
-exec admin "lua num2 == tonumber64('125')"
-exec admin "lua box.space[8]:truncate()"
+admin("lua box.insert('8', tonumber64('18446744073709551615'), 'magic')", silent=False)
+admin("lua tu = box.select('8', '0', tonumber64('18446744073709551615'))", silent=False)
+admin("lua num = box.unpack('l', tu[0])", silent=False)
+admin("lua print(num)", silent=False)
+admin("lua type(num) == 'cdata'", silent=False)
+admin("lua num == tonumber64('18446744073709551615')", silent=False)
+admin("lua num = box.unpack('l', tu[0])", silent=False)
+admin("lua num == tonumber64('18446744073709551615')", silent=False)
+admin("lua box.delete(8, 18446744073709551615ULL)", silent=False)
+admin("lua box.insert('8', 125ULL, 'magic')", silent=False)
+admin("lua tu = box.select('8', '0', 125)", silent=False)
+admin("lua tu2 = box.select('8', '0', 125LL)", silent=False)
+admin("lua num = box.unpack('l', tu[0])", silent=False)
+admin("lua num2 = box.unpack('l', tu2[0])", silent=False)
+admin("lua print(num)", silent=False)
+admin("lua print(num2)", silent=False)
+admin("lua type(num) == 'cdata'", silent=False)
+admin("lua type(num2) == 'cdata'", silent=False)
+admin("lua num == tonumber64('125')", silent=False)
+admin("lua num2 == tonumber64('125')", silent=False)
+admin("lua box.space[8]:truncate()", silent=False)
 
 #
 # Lua select_reverse_range
 #
-exec admin "lua box.insert(14, 0, 0)"
-exec admin "lua box.insert(14, 1, 0)"
-exec admin "lua box.insert(14, 2, 0)"
-exec admin "lua box.insert(14, 3, 0)"
-exec admin "lua box.insert(14, 4, 0)"
-exec admin "lua box.insert(14, 5, 0)"
-exec admin "lua box.insert(14, 6, 0)"
-exec admin "lua box.insert(14, 7, 0)"
-exec admin "lua box.insert(14, 8, 0)"
-exec admin "lua box.insert(14, 9, 0)"
-exec admin "lua box.select_range(14, 1, 10)"
-exec admin "lua box.select_reverse_range(14, 1, 10)"
-exec admin "lua box.select_reverse_range(14, 1, 4)"
-exec admin "lua box.space[14]:truncate()"
+admin("lua box.insert(14, 0, 0)", silent=False)
+admin("lua box.insert(14, 1, 0)", silent=False)
+admin("lua box.insert(14, 2, 0)", silent=False)
+admin("lua box.insert(14, 3, 0)", silent=False)
+admin("lua box.insert(14, 4, 0)", silent=False)
+admin("lua box.insert(14, 5, 0)", silent=False)
+admin("lua box.insert(14, 6, 0)", silent=False)
+admin("lua box.insert(14, 7, 0)", silent=False)
+admin("lua box.insert(14, 8, 0)", silent=False)
+admin("lua box.insert(14, 9, 0)", silent=False)
+admin("lua box.select_range(14, 1, 10)", silent=False)
+admin("lua box.select_reverse_range(14, 1, 10)", silent=False)
+admin("lua box.select_reverse_range(14, 1, 4)", silent=False)
+admin("lua box.space[14]:truncate()", silent=False)
 
 print """
 #
@@ -103,102 +103,102 @@ pid = 1
 tid = 999
 for sid in [1, 2]:
     for i in range(1, 4):
-        exec admin "lua box.insert(16, 'pid_%d', 'sid_%d', 'tid_%d')" % (pid, sid, tid)
+        admin("lua box.insert(16, 'pid_%d', 'sid_%d', 'tid_%d')" % (pid, sid, tid), silent=False)
         pid += 1
         tid -= 1
 
-exec admin "lua for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(v) end"
-exec admin "lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(v) end"
-exec admin "lua box.space[16]:truncate()"
+admin("lua for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do print(v) end", silent=False)
+admin("lua for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do print(v) end", silent=False)
+admin("lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(v) end", silent=False)
+admin("lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(v) end", silent=False)
+admin("lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(v) end", silent=False)
+admin("lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(v) end", silent=False)
+admin("lua box.space[16]:truncate()", silent=False)
 
 #
 # Tests for lua idx:count()
 #
-exec admin "lua box.insert(17, 1, 1, 1)"
-exec admin "lua box.insert(17, 2, 2, 0)"
-exec admin "lua box.insert(17, 3, 2, 1)"
-exec admin "lua box.insert(17, 4, 3, 0)"
-exec admin "lua box.insert(17, 5, 3, 1)"
-exec admin "lua box.insert(17, 6, 3, 2)"
-exec admin "lua box.space[17].index[1]:count(1)"
-exec admin "lua box.space[17].index[1]:count(2)"
-exec admin "lua box.space[17].index[1]:count(2, 1)"
-exec admin "lua box.space[17].index[1]:count(2, 2)"
-exec admin "lua box.space[17].index[1]:count(3)"
-exec admin "lua box.space[17].index[1]:count(3, 3)"
-exec admin "lua box.space[17].index[1]:count()"
-exec admin "lua box.space[17]:truncate()"
+admin("lua box.insert(17, 1, 1, 1)", silent=False)
+admin("lua box.insert(17, 2, 2, 0)", silent=False)
+admin("lua box.insert(17, 3, 2, 1)", silent=False)
+admin("lua box.insert(17, 4, 3, 0)", silent=False)
+admin("lua box.insert(17, 5, 3, 1)", silent=False)
+admin("lua box.insert(17, 6, 3, 2)", silent=False)
+admin("lua box.space[17].index[1]:count(1)", silent=False)
+admin("lua box.space[17].index[1]:count(2)", silent=False)
+admin("lua box.space[17].index[1]:count(2, 1)", silent=False)
+admin("lua box.space[17].index[1]:count(2, 2)", silent=False)
+admin("lua box.space[17].index[1]:count(3)", silent=False)
+admin("lua box.space[17].index[1]:count(3, 3)", silent=False)
+admin("lua box.space[17].index[1]:count()", silent=False)
+admin("lua box.space[17]:truncate()", silent=False)
 
 #
 # Tests for lua box.auto_increment
 #
-exec admin "lua box.space[18]:truncate()"
-exec admin "lua box.auto_increment(18, 'a')"
-exec admin "lua box.insert(18, 5)"
-exec admin "lua box.auto_increment(18, 'b')"
-exec admin "lua box.auto_increment(18, 'c')"
-exec admin "lua box.space[18]:truncate()"
+admin("lua box.space[18]:truncate()", silent=False)
+admin("lua box.auto_increment(18, 'a')", silent=False)
+admin("lua box.insert(18, 5)", silent=False)
+admin("lua box.auto_increment(18, 'b')", silent=False)
+admin("lua box.auto_increment(18, 'c')", silent=False)
+admin("lua box.space[18]:truncate()", silent=False)
 
 #
 # Tests for lua box.auto_increment with NUM64 keys
 #
-exec admin "lua box.space[25]:truncate()"
-exec admin "lua box.auto_increment(25, 'a')"
-exec admin "lua box.insert(25, tonumber64(5))"
-exec admin "lua box.auto_increment(25, 'b')"
-exec admin "lua box.auto_increment(25, 'c')"
-exec admin "lua box.space[25]:truncate()"
+admin("lua box.space[25]:truncate()", silent=False)
+admin("lua box.auto_increment(25, 'a')", silent=False)
+admin("lua box.insert(25, tonumber64(5))", silent=False)
+admin("lua box.auto_increment(25, 'b')", silent=False)
+admin("lua box.auto_increment(25, 'c')", silent=False)
+admin("lua box.space[25]:truncate()", silent=False)
 
 #
 # Tests for lua tuple:transform()
 #
-exec admin "lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')"
-exec admin "lua t:transform(7, 0, '8', '9', '100')"
-exec admin "lua t:transform(0, 1)"
-exec admin "lua t:transform(1, 4)"
-exec admin "lua t:transform(-1, 1)"
-exec admin "lua t:transform(-3, 2)"
-exec admin "lua t:transform(0, 0, 'A')"
-exec admin "lua t:transform(-1, 0, 'A')"
-exec admin "lua t:transform(0, 1, 'A')"
-exec admin "lua t:transform(-1, 1, 'B')"
-exec admin "lua t:transform(0, 2, 'C')"
-exec admin "lua t:transform(2, 0, 'hello')"
-exec admin "lua t:transform(0, -1, 'C')"
-exec admin "lua t:transform(0, 100)"
-exec admin "lua t:transform(-100, 1)"
-exec admin "lua t:transform(0, 3, 1, 2, 3)"
-exec admin "lua t:transform(3, 1, tonumber64(4))"
-exec admin "lua t:transform(0, 1, {})"
+admin("lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')", silent=False)
+admin("lua t:transform(7, 0, '8', '9', '100')", silent=False)
+admin("lua t:transform(0, 1)", silent=False)
+admin("lua t:transform(1, 4)", silent=False)
+admin("lua t:transform(-1, 1)", silent=False)
+admin("lua t:transform(-3, 2)", silent=False)
+admin("lua t:transform(0, 0, 'A')", silent=False)
+admin("lua t:transform(-1, 0, 'A')", silent=False)
+admin("lua t:transform(0, 1, 'A')", silent=False)
+admin("lua t:transform(-1, 1, 'B')", silent=False)
+admin("lua t:transform(0, 2, 'C')", silent=False)
+admin("lua t:transform(2, 0, 'hello')", silent=False)
+admin("lua t:transform(0, -1, 'C')", silent=False)
+admin("lua t:transform(0, 100)", silent=False)
+admin("lua t:transform(-100, 1)", silent=False)
+admin("lua t:transform(0, 3, 1, 2, 3)", silent=False)
+admin("lua t:transform(3, 1, tonumber64(4))", silent=False)
+admin("lua t:transform(0, 1, {})", silent=False)
 
 #
 # Tests for lua tuple:find() and tuple:findall()
 #
-exec admin "lua t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')"
-exec admin "lua t:find('2')"
-exec admin "lua t:find('4')"
-exec admin "lua t:find('5')"
-exec admin "lua t:find('A')"
-exec admin "lua t:find('0')"
+admin("lua t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')", silent=False)
+admin("lua t:find('2')", silent=False)
+admin("lua t:find('4')", silent=False)
+admin("lua t:find('5')", silent=False)
+admin("lua t:find('A')", silent=False)
+admin("lua t:find('0')", silent=False)
 
-exec admin "lua t:findall('A')"
-exec admin "lua t:findall('2')"
-exec admin "lua t:findall('3')"
-exec admin "lua t:findall('0')"
+admin("lua t:findall('A')", silent=False)
+admin("lua t:findall('2')", silent=False)
+admin("lua t:findall('3')", silent=False)
+admin("lua t:findall('0')", silent=False)
 
-exec admin "lua t:find(2, '2')"
-exec admin "lua t:find(89, '2')"
-exec admin "lua t:findall(4, '3')"
+admin("lua t:find(2, '2')", silent=False)
+admin("lua t:find(89, '2')", silent=False)
+admin("lua t:findall(4, '3')", silent=False)
 
-exec admin "lua t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))"
-exec admin "lua t:find(2)"
-exec admin "lua t:find(tonumber64(2))"
-exec admin "lua t:find('2')"
-exec admin "lua box.space[12]:truncate()"
+admin("lua t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))", silent=False)
+admin("lua t:find(2)", silent=False)
+admin("lua t:find(tonumber64(2))", silent=False)
+admin("lua t:find('2')", silent=False)
+admin("lua box.space[12]:truncate()", silent=False)
 
 print """#
 # A test case for Bug #1038784
@@ -209,30 +209,30 @@ print """#
 push_lua_path = os.path.join(vardir, "push.lua")
 shutil.copy("big/push.lua", push_lua_path)
 
-exec admin "lua dofile('push.lua')"
+admin("lua dofile('push.lua')", silent=False)
 shutil.rmtree(push_lua_path, True)
 
-exec admin "lua push_collection(0, 1038784, 'hello')"
-exec admin "lua push_collection(0, 1038784, 'hello')"
-exec admin "lua push_collection(0, 1038784, 'hello')"
+admin("lua push_collection(0, 1038784, 'hello')", silent=False)
+admin("lua push_collection(0, 1038784, 'hello')", silent=False)
+admin("lua push_collection(0, 1038784, 'hello')", silent=False)
 
-exec admin "lua push_collection(1, 1038784, 'hi')"
-exec admin "lua push_collection(2, 1038784, 'hi')"
-exec admin "lua push_collection(2, 1038784, 'hi')"
+admin("lua push_collection(1, 1038784, 'hi')", silent=False)
+admin("lua push_collection(2, 1038784, 'hi')", silent=False)
+admin("lua push_collection(2, 1038784, 'hi')", silent=False)
 
-exec admin "lua push_collection(5, 1038784, 'hey')"
-exec admin "lua push_collection(5, 1038784, 'hey')"
-exec admin "lua push_collection(5, 1038784, 'hey')"
-exec admin "lua push_collection(5, 1038784, 'hey')"
+admin("lua push_collection(5, 1038784, 'hey')", silent=False)
+admin("lua push_collection(5, 1038784, 'hey')", silent=False)
+admin("lua push_collection(5, 1038784, 'hey')", silent=False)
+admin("lua push_collection(5, 1038784, 'hey')", silent=False)
 
 print """# A test case for Bug#1060967: truncation of 64-bit numbers"""
-exec admin "lua box.space[5]:insert(2^51, 'hello', 'world')"
-exec admin "lua box.space[5]:select(0, 2^51)"
-exec admin "lua box.space[5]:truncate()"
+admin("lua box.space[5]:insert(2^51, 'hello', 'world')", silent=False)
+admin("lua box.space[5]:select(0, 2^51)", silent=False)
+admin("lua box.space[5]:truncate()", silent=False)
 print """# Test that we print index number in error ER_INDEX_VIOLATION"""
-exec admin "lua box.space[1]:insert(1, 'hello', 'world')"
-exec admin "lua box.space[1]:insert(2, 'hello', 'world')"
-exec admin "lua box.space[1]:truncate()"
+admin("lua box.space[1]:insert(1, 'hello', 'world')", silent=False)
+admin("lua box.space[1]:insert(2, 'hello', 'world')", silent=False)
+admin("lua box.space[1]:truncate()", silent=False)
 
 print """#
 # A test case for Bug #1042798
@@ -241,15 +241,15 @@ print """#
 #"""
 
 # Print key fields in pk
-exec admin "lua for k, f in pairs(box.space[23].index[0].key_field) do print(k, ' => ', f.fieldno) end"
-exec admin "lua box.insert(23, 1, 2, 3, 4)"
-exec admin "lua box.insert(23, 10, 20, 30, 40)"
-exec admin "lua box.insert(23, 20, 30, 40, 50)"
-exec admin "lua for _k, v in box.space[23]:pairs() do print(v) end"
+admin("lua for k, f in pairs(box.space[23].index[0].key_field) do print(k, ' => ', f.fieldno) end", silent=False)
+admin("lua box.insert(23, 1, 2, 3, 4)", silent=False)
+admin("lua box.insert(23, 10, 20, 30, 40)", silent=False)
+admin("lua box.insert(23, 20, 30, 40, 50)", silent=False)
+admin("lua for _k, v in box.space[23]:pairs() do print(v) end", silent=False)
 # Truncate must not hang
-exec admin "lua box.space[23]:truncate()"
+admin("lua box.space[23]:truncate()", silent=False)
 # Empty result
-exec admin "lua for _k, v in box.space[23]:pairs() do print(v) end"
+admin("lua for _k, v in box.space[23]:pairs() do print(v) end", silent=False)
 
 print """
 #-----------------------------------------------------------------------------#
@@ -257,7 +257,7 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua index_random_test(26, 0)"
+admin("lua index_random_test(26, 0)", silent=False)
 
 print """
 #-----------------------------------------------------------------------------#
@@ -265,5 +265,5 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua index_random_test(26, 1)"
+admin("lua index_random_test(26, 1)", silent=False)
 

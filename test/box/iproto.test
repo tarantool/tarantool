@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 import os
 import sys
 import struct
@@ -21,7 +21,7 @@ print "# sending the package with invalid length"
 inval_request = struct.pack('<LLL', 17, 4294967290, 1)
 print s.send(inval_request)
 print "# checking what is server alive"
-exec sql "ping"
+sql("ping")
 
 # closing connection
 s.close()

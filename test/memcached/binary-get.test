@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 blobs_list = [ "mooo\0", "mumble\0\0\0\0\r\rblarg", "\0", "\r" ]
 
 for i in range(len(blobs_list)):
@@ -7,8 +7,8 @@ for i in range(len(blobs_list)):
     blob_len = len(blob)
 
     print "len is %d" % blob_len
-    exec memcached "set %s 0 0 %d\r\n%s\r\n" % (key, blob_len, blob)
-    exec memcached "get %s\r\n" % key
+    memcached("set %s 0 0 %d\r\n%s\r\n" % (key, blob_len, blob))
+    memcached("get %s\r\n" % key)
 
 # resore default suite config
 server.stop()

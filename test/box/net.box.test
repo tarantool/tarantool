@@ -1,66 +1,66 @@
-# encoding: tarantool
+# encoding: utf-8
 # vim: set ft=python :
 
 
-# exec admin "lua iotest()"
-# exec admin "lua iotest()"
-# exec admin "lua box.fiber.sleep(.5)"
+# admin("lua iotest()")
+# admin("lua iotest()")
+# admin("lua box.fiber.sleep(.5)")
 
 
 
-exec admin "lua remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')"
-exec admin "lua type(remote)"
-exec admin "lua remote:ping()"
-exec admin "lua remote:ping()"
-exec admin "lua box.net.box.ping(remote)"
-exec admin "lua box.insert(0, 123, 'test1', 'test2')"
-exec admin "lua box.select(0, 0, 123)"
-exec admin "lua tuple = remote:select(0, 0, 123)"
-exec admin "lua remote:call('box.select', '0', '0', 123)"
-exec admin "lua tuple"
-exec admin "lua type(tuple)"
-exec admin "lua #tuple"
+admin("lua remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')")
+admin("lua type(remote)")
+admin("lua remote:ping()")
+admin("lua remote:ping()")
+admin("lua box.net.box.ping(remote)")
+admin("lua box.insert(0, 123, 'test1', 'test2')")
+admin("lua box.select(0, 0, 123)")
+admin("lua tuple = remote:select(0, 0, 123)")
+admin("lua remote:call('box.select', '0', '0', 123)")
+admin("lua tuple")
+admin("lua type(tuple)")
+admin("lua #tuple")
 
-exec admin "lua box.update(0, 123, '=p', 1, 'test1-updated')"
-exec admin "lua remote:update(0, 123, '=p', 2, 'test2-updated')"
-
-
-exec admin "lua box.insert(0, 123, 'test1', 'test2')"
-exec admin "lua remote:insert(0, 123, 'test1', 'test2')"
-
-exec admin "lua remote:insert(0, 345, 'test1', 'test2')"
-exec admin "lua remote:select(0, 0, 345)"
-exec admin "lua remote:call('box.select', '0', '0', 345)"
-exec admin "lua box.select(0, 0, 345)"
+admin("lua box.update(0, 123, '=p', 1, 'test1-updated')")
+admin("lua remote:update(0, 123, '=p', 2, 'test2-updated')")
 
 
-exec admin "lua remote:replace(0, 345, 'test1-replaced', 'test2-replaced')"
-exec admin "lua box.select(0, 0, 345)"
-exec admin "lua remote:select_limit(0, 0, 0, 1000, 345)"
+admin("lua box.insert(0, 123, 'test1', 'test2')")
+admin("lua remote:insert(0, 123, 'test1', 'test2')")
 
-exec admin "lua box.select_range(0, 0, 1000)"
-exec admin "lua remote:select_range(0, 0, 1000)"
-exec admin "lua box.select(0, 0, 345)"
-exec admin "lua remote:select(0, 0, 345)"
-exec admin "lua remote:timeout(0.5):select(0, 0, 345)"
-
-exec admin "lua remote:call('box.fiber.sleep', '.01')"
-exec admin "lua remote:timeout(0.01):call('box.fiber.sleep', '10')"
+admin("lua remote:insert(0, 345, 'test1', 'test2')")
+admin("lua remote:select(0, 0, 345)")
+admin("lua remote:call('box.select', '0', '0', 345)")
+admin("lua box.select(0, 0, 345)")
 
 
-exec admin "lua pstart = box.time()"
-exec admin "lua parallel = {}"
-exec admin "lua function parallel_foo(id) box.fiber.sleep(math.random() * .05) return id end"
-exec admin "lua parallel_foo('abc')"
-exec admin "lua for i = 1, 20 do box.fiber.resume(box.fiber.create(function() box.fiber.detach() local s = string.format('%07d', i) local so = remote:call('parallel_foo', s) table.insert(parallel, tostring(s == so[0]) ) end)) end"
-exec admin "lua for i = 1, 20 do if #parallel == 20 then break end box.fiber.sleep(0.1) end"
-exec admin "lua unpack(parallel)"
-exec admin "lua #parallel"
-exec admin "lua box.time() - pstart < 0.5"
+admin("lua remote:replace(0, 345, 'test1-replaced', 'test2-replaced')")
+admin("lua box.select(0, 0, 345)")
+admin("lua remote:select_limit(0, 0, 0, 1000, 345)")
 
-exec admin "lua remote:close()"
-exec admin "lua remote:close()"
-exec admin "lua remote:ping()"
+admin("lua box.select_range(0, 0, 1000)")
+admin("lua remote:select_range(0, 0, 1000)")
+admin("lua box.select(0, 0, 345)")
+admin("lua remote:select(0, 0, 345)")
+admin("lua remote:timeout(0.5):select(0, 0, 345)")
 
-exec admin "lua box.space[0]:truncate()"
+admin("lua remote:call('box.fiber.sleep', '.01')")
+admin("lua remote:timeout(0.01):call('box.fiber.sleep', '10')")
+
+
+admin("lua pstart = box.time()")
+admin("lua parallel = {}")
+admin("lua function parallel_foo(id) box.fiber.sleep(math.random() * .05) return id end")
+admin("lua parallel_foo('abc')")
+admin("lua for i = 1, 20 do box.fiber.resume(box.fiber.create(function() box.fiber.detach() local s = string.format('%07d', i) local so = remote:call('parallel_foo', s) table.insert(parallel, tostring(s == so[0]) ) end)) end")
+admin("lua for i = 1, 20 do if #parallel == 20 then break end box.fiber.sleep(0.1) end")
+admin("lua unpack(parallel)")
+admin("lua #parallel")
+admin("lua box.time() - pstart < 0.5")
+
+admin("lua remote:close()")
+admin("lua remote:close()")
+admin("lua remote:ping()")
+
+admin("lua box.space[0]:truncate()")
 

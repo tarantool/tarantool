@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 
 import socket
 
@@ -8,22 +8,22 @@ import socket
 #                      #
 ########################
 
-exec admin "lua s = box.socket.udp()"
-exec admin "lua type(s)"
-exec admin "lua s:close()"
-exec admin "lua s = box.socket.tcp()"
-exec admin "lua type(s)"
+admin("lua s = box.socket.udp()")
+admin("lua type(s)")
+admin("lua s:close()")
+admin("lua s = box.socket.tcp()")
+admin("lua type(s)")
 
 ### socket:close()
 
 # close
-exec admin "lua s:close()"
+admin("lua s:close()")
 
 # close (on closed)
-exec admin "lua s:close()"
+admin("lua s:close()")
 
 # error
-exec admin "lua s:error()"
+admin("lua s:error()")
 
 ####################
 #                  #
@@ -31,36 +31,36 @@ exec admin "lua s:error()"
 #                  #
 ####################
 
-exec admin "lua s:connect('localhost', '30303')"
+admin("lua s:connect('localhost', '30303')")
 # Connection refused
-exec admin "lua s:error()"
+admin("lua s:error()")
 
-exec admin "lua s:connect('127.0.0.1', '30303')"
+admin("lua s:connect('127.0.0.1', '30303')")
 # Connection refused
-exec admin "lua s:error()"
+admin("lua s:error()")
 
-exec admin "lua s:connect('::1', '30303')"
+admin("lua s:connect('::1', '30303')")
 # connection refused
-exec admin "lua s:error()"
+admin("lua s:error()")
 
-exec admin "lua s:connect('127.0.0.1', '30303', 0.01)"
+admin("lua s:connect('127.0.0.1', '30303', 0.01)")
 # connection refused
-exec admin "lua s:error()"
+admin("lua s:error()")
 
 # bad args
-exec admin "lua s:connect('127.0.0.1')"
-exec admin "lua s:connect()"
-exec admin "lua s:connect(123)"
-exec admin "lua s:close()"
+admin("lua s:connect('127.0.0.1')")
+admin("lua s:connect()")
+admin("lua s:connect(123)")
+admin("lua s:close()")
 
-exec admin "lua s:close()"
-exec admin "lua sr, se = s:connect('somewhereelse', '30303', 0.0001)"
-exec admin "lua sr == nil and se == 'error' or se == 'timeout'"
+admin("lua s:close()")
+admin("lua sr, se = s:connect('somewhereelse', '30303', 0.0001)")
+admin("lua sr == nil and se == 'error' or se == 'timeout'")
 
 # timedout or hostname resolution failed
-exec admin "lua e = s:error()"
-exec admin "lua e == -1 or e == 110"
-exec admin "lua s:close()"
+admin("lua e = s:error()")
+admin("lua e == -1 or e == 110")
+admin("lua s:close()")
 
 #################
 #               #
@@ -69,30 +69,30 @@ exec admin "lua s:close()"
 #################
 
 # bad args
-exec admin "lua s:send()"
-exec admin "lua s:send(1)"
+admin("lua s:send()")
+admin("lua s:send(1)")
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30303))
 s.listen(1)
 
-exec admin "lua s = box.socket.tcp()"
-exec admin "lua type(s:connect('127.0.0.1', '30303'))"
-exec admin "lua s:send('ping')"
-exec admin "lua s:error()"
+admin("lua s = box.socket.tcp()")
+admin("lua type(s:connect('127.0.0.1', '30303'))")
+admin("lua s:send('ping')")
+admin("lua s:error()")
 
 # timedout - try to send 64MB (8388608 * 8 bytes) in 0.0000001 sec
-exec admin "lua n, status, error_code, error_str = s:send(string.rep('=', 8388608), 0.0000001)"
-exec admin "lua type(n)"
-exec admin "lua type(status)"
-exec admin "lua type(error_code)"
-exec admin "lua type(error_str)"
-exec admin "lua status"
-exec admin "lua error_code"
-exec admin "lua error_str"
+admin("lua n, status, error_code, error_str = s:send(string.rep('=', 8388608), 0.0000001)")
+admin("lua type(n)")
+admin("lua type(status)")
+admin("lua type(error_code)")
+admin("lua type(error_str)")
+admin("lua status")
+admin("lua error_code")
+admin("lua error_str")
 
-exec admin "lua s:error()"
+admin("lua s:error()")
 
 conn, addr = s.accept()
 print('connected')
@@ -101,10 +101,10 @@ conn.close()
 s.close()
 
 # connection reset by peer
-exec admin "lua s:send('ping')"
-exec admin "lua s:error()"
+admin("lua s:send('ping')")
+admin("lua s:error()")
 
-exec admin "lua s:close()"
+admin("lua s:close()")
 
 #################
 #               #
@@ -113,7 +113,7 @@ exec admin "lua s:close()"
 #################
 
 # bad args
-exec admin "lua s:recv()"
+admin("lua s:recv()")
 
 # test for case #1: successful recv
 #
@@ -121,13 +121,13 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30308))
 s.listen(1)
-exec admin "lua type(s:connect('127.0.0.1', '30308'))"
-exec admin "lua s:error()"
+admin("lua type(s:connect('127.0.0.1', '30308'))")
+admin("lua s:error()")
 conn, addr = s.accept()
 print(conn.send("Hello, World"))
-exec admin "lua s:recv(12)"
-exec admin "lua s:error()"
-exec admin "lua s:close()"
+admin("lua s:recv(12)")
+admin("lua s:error()")
+admin("lua s:close()")
 conn.close()
 s.close()
 
@@ -137,15 +137,15 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30308))
 s.listen(1)
-exec admin "lua type(s:connect('127.0.0.1', '30308'))"
-exec admin "lua s:error()"
+admin("lua type(s:connect('127.0.0.1', '30308'))")
+admin("lua s:error()")
 conn, addr = s.accept()
 print(conn.send("Hello World Oversized"))
-exec admin "lua s:recv(11)"
-exec admin "lua s:recv(5)"
-exec admin "lua s:recv(5)"
-exec admin "lua s:error()"
-exec admin "lua s:close()"
+admin("lua s:recv(11)")
+admin("lua s:recv(5)")
+admin("lua s:recv(5)")
+admin("lua s:error()")
+admin("lua s:close()")
 conn.close()
 s.close()
 
@@ -156,24 +156,24 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30308))
 s.listen(1)
 
-exec admin "lua type(s:connect('127.0.0.1', '30308'))"
-exec admin "lua s:error()"
+admin("lua type(s:connect('127.0.0.1', '30308'))")
+admin("lua s:error()")
 
 conn, addr = s.accept()
 print('connected')
 
 print(conn.send("pin"))
-exec admin "lua s:recv(4, 0.01)"
+admin("lua s:recv(4, 0.01)")
 # timedout
-exec admin "lua s:error()"
+admin("lua s:error()")
 
 conn.send("g")
 
 # ping
-exec admin "lua s:recv(4)"
-exec admin "lua s:error()"
+admin("lua s:recv(4)")
+admin("lua s:error()")
 
-exec admin "lua s:close()"
+admin("lua s:close()")
 conn.close()
 s.close()
 
@@ -184,17 +184,17 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30309))
 s.listen(1)
 
-exec admin "lua type(s:connect('127.0.0.1', '30309'))"
-exec admin "lua s:error()"
+admin("lua type(s:connect('127.0.0.1', '30309'))")
+admin("lua s:error()")
 
 conn, addr = s.accept()
 print('connected')
 
 print(conn.send("ping"))
 conn.close()
-exec admin "lua s:recv(6)"
-exec admin "lua s:error()"
-exec admin "lua s:close()"
+admin("lua s:recv(6)")
+admin("lua s:error()")
+admin("lua s:close()")
 s.close()
 
 # test for case #4: EOF (data is more then recv size)
@@ -204,8 +204,8 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30311))
 s.listen(1)
 
-exec admin "lua type(s:connect('127.0.0.1', '30311'))"
-exec admin "lua s:error()"
+admin("lua type(s:connect('127.0.0.1', '30311'))")
+admin("lua s:error()")
 
 conn, addr = s.accept()
 print('connected')
@@ -214,20 +214,20 @@ print(conn.send("ping ping ping ping end "))
 conn.close()
 
 # recv should not say EOF, even if it really happened
-exec admin "lua s:recv(5)"
-exec admin "lua s:recv(5)"
-exec admin "lua s:recv(5)"
-exec admin "lua s:recv(5)"
+admin("lua s:recv(5)")
+admin("lua s:recv(5)")
+admin("lua s:recv(5)")
+admin("lua s:recv(5)")
 
 # eof
-exec admin "lua s:recv(5)"
+admin("lua s:recv(5)")
 # eof (zero)
-exec admin "lua s:recv(5)"
+admin("lua s:recv(5)")
 # eof (zero)
-exec admin "lua s:recv(5)"
+admin("lua s:recv(5)")
 
-exec admin "lua s:error()"
-exec admin "lua s:close()"
+admin("lua s:error()")
+admin("lua s:close()")
 s.close()
 
 #####################
@@ -252,130 +252,130 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30305))
 s.listen(1)
-exec admin "lua type(s:connect('127.0.0.1', '30305'))"
-exec admin "lua s:error()"
+admin("lua type(s:connect('127.0.0.1', '30305'))")
+admin("lua s:error()")
 conn, addr = s.accept()
 
 # 1. readline() == readline(limit == inf, seplist == {'\n'}, timeout == inf)
 print(conn.send("Hello World\n"))
-exec admin "lua s:readline()"
-exec admin "lua s:error()"
+admin("lua s:readline()")
+admin("lua s:error()")
 
 # 2. readline(limit)
 print(conn.send("Hello World\n"))
-exec admin "lua s:readline(5)"
-exec admin "lua s:error()"
+admin("lua s:readline(5)")
+admin("lua s:error()")
 
 # 3. readline(limit, timeout) (just api check)
-exec admin "lua s:readline(5, 0.01)"
-exec admin "lua s:error()"
-exec admin "lua s:readline(6, 0.01)"
-exec admin "lua s:error()"
+admin("lua s:readline(5, 0.01)")
+admin("lua s:error()")
+admin("lua s:readline(6, 0.01)")
+admin("lua s:error()")
 
 # 4. readline({seplist})
 print(conn.send("AbcDefGhi"))
-exec admin "lua s:readline({'i', 'D'})"
-exec admin "lua s:error()"
-exec admin "lua s:readline({'i', 'G'})"
-exec admin "lua s:error()"
-exec admin "lua s:readline({'i'})"
-exec admin "lua s:error()"
+admin("lua s:readline({'i', 'D'})")
+admin("lua s:error()")
+admin("lua s:readline({'i', 'G'})")
+admin("lua s:error()")
+admin("lua s:readline({'i'})")
+admin("lua s:error()")
 
 print(conn.send("CatCowDogStar"))
-exec admin "lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})"
-exec admin "lua s:error()"
-exec admin "lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})"
-exec admin "lua s:error()"
-exec admin "lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})"
-exec admin "lua s:error()"
-exec admin "lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})"
-exec admin "lua s:error()"
+admin("lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})")
+admin("lua s:error()")
+admin("lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})")
+admin("lua s:error()")
+admin("lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})")
+admin("lua s:error()")
+admin("lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})")
+admin("lua s:error()")
 
 # 5. readline(limit, {seplist})
 print(conn.send("CatCoowDoggStar"))
-exec admin "lua s:readline(3, {'Cat', 'Coow'})"
-exec admin "lua s:error()"
-exec admin "lua s:readline(3, {'Cat', 'Coow'})"
-exec admin "lua s:error()"
-exec admin "lua s:readline(3, {'Dogg', 'Star'})"
-exec admin "lua s:error()"
-exec admin "lua s:readline(3, {'Dogg', 'Star'})"
-exec admin "lua s:error()"
+admin("lua s:readline(3, {'Cat', 'Coow'})")
+admin("lua s:error()")
+admin("lua s:readline(3, {'Cat', 'Coow'})")
+admin("lua s:error()")
+admin("lua s:readline(3, {'Dogg', 'Star'})")
+admin("lua s:error()")
+admin("lua s:readline(3, {'Dogg', 'Star'})")
+admin("lua s:error()")
 
 # read 'tar' part
-exec admin "lua s:readline(3)"
-exec admin "lua s:error()"
+admin("lua s:readline(3)")
+admin("lua s:error()")
 
 # 6. readline({seplist}, timeout)
 print(conn.send("KKongKingCezaCezarCrown"))
-exec admin "lua sl = {'Crown', 'King', 'Kong', 'Cezar'}"
-exec admin "lua s:readline(sl, 1.0)"
-exec admin "lua s:error()"
-exec admin "lua s:readline(sl, 1.0)"
-exec admin "lua s:error()"
-exec admin "lua s:readline(sl, 1.0)"
-exec admin "lua s:error()"
-exec admin "lua s:readline(sl, 1.0)"
-exec admin "lua s:error()"
+admin("lua sl = {'Crown', 'King', 'Kong', 'Cezar'}")
+admin("lua s:readline(sl, 1.0)")
+admin("lua s:error()")
+admin("lua s:readline(sl, 1.0)")
+admin("lua s:error()")
+admin("lua s:readline(sl, 1.0)")
+admin("lua s:error()")
+admin("lua s:readline(sl, 1.0)")
+admin("lua s:error()")
 
 # 7. readline(limit, {seplist}, timeout)
 print(conn.send("RoAgathaPopPoCornDriveRoad"))
-exec admin "lua sl = {'Agatha', 'Road', 'Corn', 'Drive', 'Pop'}"
-exec admin "lua s:readline(64, sl, 1.0)"
-exec admin "lua s:error()"
-exec admin "lua s:readline(64, sl, 1.0)"
-exec admin "lua s:error()"
-exec admin "lua s:readline(64, sl, 1.0)"
-exec admin "lua s:error()"
-exec admin "lua s:readline(64, sl, 1.0)"
-exec admin "lua s:error()"
+admin("lua sl = {'Agatha', 'Road', 'Corn', 'Drive', 'Pop'}")
+admin("lua s:readline(64, sl, 1.0)")
+admin("lua s:error()")
+admin("lua s:readline(64, sl, 1.0)")
+admin("lua s:error()")
+admin("lua s:readline(64, sl, 1.0)")
+admin("lua s:error()")
+admin("lua s:readline(64, sl, 1.0)")
+admin("lua s:error()")
 
 # test for case #2-3: timedout, errors
 #
 print(conn.send("AfricaCubaRomaniaCana"))
-exec admin "lua s:readline({'Canada'}, 0.01)"
+admin("lua s:readline({'Canada'}, 0.01)")
 # timedout
-exec admin "lua s:error()"
+admin("lua s:error()")
 
 print(conn.send("da"))
 # should read whole line
-exec admin "lua s:readline({'Canada'}, 0.01)"
-exec admin "lua s:error()"
+admin("lua s:readline({'Canada'}, 0.01)")
+admin("lua s:error()")
 
 # to ensure readahead pointer correctness
 print(conn.send("Canada"))
-exec admin "lua s:readline({'Canada'}, 0.01)"
-exec admin "lua s:error()"
+admin("lua s:readline({'Canada'}, 0.01)")
+admin("lua s:error()")
 
 # test for case #5: eof testing
 #
 print(conn.send("msg msg msg msg msg"))
 conn.close()
 
-exec admin "lua s:readline({'msg'})"
-exec admin "lua s:error()"
+admin("lua s:readline({'msg'})")
+admin("lua s:error()")
 
-exec admin "lua s:readline({'msg'})"
-exec admin "lua s:error()"
+admin("lua s:readline({'msg'})")
+admin("lua s:error()")
 
-exec admin "lua s:readline({'msg'})"
-exec admin "lua s:error()"
+admin("lua s:readline({'msg'})")
+admin("lua s:error()")
 
-exec admin "lua s:readline({'msg'})"
-exec admin "lua s:error()"
+admin("lua s:readline({'msg'})")
+admin("lua s:error()")
 
-exec admin "lua s:readline({'msg'})"
-exec admin "lua s:error()"
-
-# eof (zero)
-exec admin "lua s:readline({'msg'})"
-exec admin "lua s:error()"
+admin("lua s:readline({'msg'})")
+admin("lua s:error()")
 
 # eof (zero)
-exec admin "lua s:readline({'msg'})"
-exec admin "lua s:error()"
+admin("lua s:readline({'msg'})")
+admin("lua s:error()")
 
-exec admin "lua s:close()"
+# eof (zero)
+admin("lua s:readline({'msg'})")
+admin("lua s:error()")
+
+admin("lua s:close()")
 
 s.close()
 
@@ -386,18 +386,18 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30307))
 s.listen(1)
-exec admin "lua type(s:connect('127.0.0.1', '30307'))"
-exec admin "lua s:error()"
+admin("lua type(s:connect('127.0.0.1', '30307'))")
+admin("lua s:error()")
 conn, addr = s.accept()
 
 print(conn.send("SomelongLongStringStrinString"))
 conn.close()
 
 # should be returned with eof flag
-exec admin "lua s:readline({'Z'})"
-exec admin "lua s:error()"
+admin("lua s:readline({'Z'})")
+admin("lua s:error()")
 
-exec admin "lua s:close()"
+admin("lua s:close()")
 
 s.close()
 
@@ -415,47 +415,47 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30303))
 s.listen(1)
 
-exec admin "lua type(s:connect('localhost', '30303'))"
-exec admin "lua s:send('ping')"
+admin("lua type(s:connect('localhost', '30303'))")
+admin("lua s:send('ping')")
 
 conn, addr = s.accept()
 print('connected')
 data = conn.recv(4)
 conn.sendall(data)
 
-exec admin "lua s:recv(4)"
+admin("lua s:recv(4)")
 conn.close()
 s.close()
 
-exec admin "lua s:send('ping')"
-exec admin "lua s:error()"
+admin("lua s:send('ping')")
+admin("lua s:error()")
 
 # broken pipe
-exec admin "lua s:send('ping')"
-exec admin "lua s:error()"
+admin("lua s:send('ping')")
+admin("lua s:error()")
 
-exec admin "lua s:close()"
+admin("lua s:close()")
 
 # echo server (box is server) (TCP).
 #
 # connect from test to echo server implemented in
 # stored procedure and do send/recv.
 #
-exec admin "lua type(s:bind('127.0.0.1', '30303'))"
-exec admin "lua type(s:listen())"
+admin("lua type(s:bind('127.0.0.1', '30303'))")
+admin("lua type(s:listen())")
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.connect(('127.0.0.1', 30303))
 s.sendall('ping')
 
-exec admin "lua client, status, addr = s:accept()"
-exec admin "lua addr"
-exec admin "lua data = client:recv(4)"
-exec admin "lua data"
-exec admin "lua client:send(data, 4)"
-exec admin "lua client:close()"
-exec admin "lua s:close()"
+admin("lua client, status, addr = s:accept()")
+admin("lua addr")
+admin("lua data = client:recv(4)")
+admin("lua data")
+admin("lua client:send(data, 4)")
+admin("lua client:close()")
+admin("lua s:close()")
 
 data = s.recv(4)
 s.close()
@@ -471,44 +471,44 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.bind(('localhost', 30302))
 
 # SOCK_DGRAM
-exec admin "lua s = box.socket.udp()"
-exec admin "lua type(s:sendto('ping', '127.0.0.1', '30302'))"
-exec admin "lua s:error()"
+admin("lua s = box.socket.udp()")
+admin("lua type(s:sendto('ping', '127.0.0.1', '30302'))")
+admin("lua s:error()")
 
 data, addr = s.recvfrom(4)
 print(data)
 s.sendto(data, addr)
 
-exec admin "lua s:recv(4)"
+admin("lua s:recv(4)")
 
 s.close()
-exec admin "lua s:close()"
+admin("lua s:close()")
 
 # echo server (box is server) (UDP).
 #
 # connect from test to echo server implemented in
 # stored procedure and do send/recv.
 #
-exec admin "lua s = box.socket.udp()"
-exec admin "lua type(s:bind('127.0.0.1', '30301'))"
-exec admin "lua s:error()"
+admin("lua s = box.socket.udp()")
+admin("lua type(s:bind('127.0.0.1', '30301'))")
+admin("lua s:error()")
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.sendto('ping', ('127.0.0.1', 30301))
 
-exec admin "lua data, status, client, port = s:recvfrom(4)"
-exec admin "lua s:error()"
-exec admin "lua data"
-exec admin "lua client"
+admin("lua data, status, client, port = s:recvfrom(4)")
+admin("lua s:error()")
+admin("lua data")
+admin("lua client")
 
-exec admin "lua type(s:sendto(data, client, port))"
-exec admin "lua s:error()"
+admin("lua type(s:sendto(data, client, port))")
+admin("lua s:error()")
 
 data = s.recv(4)
 print(data)
 s.close()
 
-exec admin "lua s:close()"
+admin("lua s:close()")
 
 # Bug #1160869: incorrect fiber call order.
 # (https://bugs.launchpad.net/tarantool/+bug/1160869)
@@ -528,11 +528,11 @@ function bug1160869()
 	return s:send(box.pack('iii', 65280, 0, 1))
 end
 """
-exec admin "lua " + test.replace('\n', ' ')
-exec admin "lua bug1160869()"
-exec admin "lua bug1160869()"
-exec admin "lua bug1160869()"
-exec admin "lua replies"
+admin("lua " + test.replace('\n', ' '))
+admin("lua bug1160869()")
+admin("lua bug1160869()")
+admin("lua bug1160869()")
+admin("lua replies")
 
 test="""
 s = nil
@@ -559,8 +559,8 @@ function iotest()
 	return s:send(box.pack('iii', 65280, 0, syncno))
 end
 """
-exec admin "lua " + test.replace('\n', ' ')
-exec admin "lua iotest()"
-exec admin "lua iotest()"
-exec admin "lua iotest()"
-exec admin "lua reps"
+admin("lua " + test.replace('\n', ' '))
+admin("lua iotest()")
+admin("lua iotest()")
+admin("lua iotest()")
+admin("lua reps")

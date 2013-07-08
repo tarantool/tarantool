@@ -1,48 +1,48 @@
-# encoding: tarantool
+# encoding: utf-8
 print """# set foo (and should get it) """
-exec memcached "set foo 0 0 6\r\nfooval\r\n"
-exec memcached "get foo\r\n"
+memcached("set foo 0 0 6\r\nfooval\r\n")
+memcached("get foo\r\n")
 
 print """# add bar (and should get it)"""
-exec memcached "set bar 0 0 6\r\nbarval\r\n"
-exec memcached "get bar\r\n"
+memcached("set bar 0 0 6\r\nbarval\r\n")
+memcached("get bar\r\n")
 
 print """# add foo (but shouldn't get new value)"""
-exec memcached "add foo 0 0 5\r\nfoov2\r\n"
-exec memcached "get foo\r\n"
+memcached("add foo 0 0 5\r\nfoov2\r\n")
+memcached("get foo\r\n")
 
 print """# replace bar (should work)"""
-exec memcached "replace bar 0 0 6\r\nbarva2\r\n"
-exec memcached "get bar\r\n"
+memcached("replace bar 0 0 6\r\nbarva2\r\n")
+memcached("get bar\r\n")
 
 print """# replace notexist (shouldn't work)"""
-exec memcached "replace notexist 0 0 6\r\nbarva2\r\n"
-exec memcached "get notexist\r\n"
+memcached("replace notexist 0 0 6\r\nbarva2\r\n")
+memcached("get notexist\r\n")
 
 print """# delete foo"""
-exec memcached "delete foo\r\n"
-exec memcached "get foo\r\n"
+memcached("delete foo\r\n")
+memcached("get foo\r\n")
 
 print """# delete foo again. not found this time."""
-exec memcached "delete foo\r\n"
-exec memcached "get foo\r\n"
+memcached("delete foo\r\n")
+memcached("get foo\r\n")
 
 print """# add moo"""
-exec memcached "add moo 0 0 6\r\nmooval\r\n"
-exec memcached "get moo\r\n"
+memcached("add moo 0 0 6\r\nmooval\r\n")
+memcached("get moo\r\n")
 
 print """# check-and-set (cas) failure case, try to set value with incorrect cas unique val"""
-exec memcached "cas moo 0 0 6 0\r\nMOOVAL\r\n"
-exec memcached "get moo\r\n"
+memcached("cas moo 0 0 6 0\r\nMOOVAL\r\n")
+memcached("get moo\r\n")
 
-result = exec memcached silent "gets moo\r\n"
+result = memcached("gets moo\r\n", silent=True)
 unique_id = int(result.split()[4])
 
 print """# now test that we can store moo with the correct unique id"""
-exec memcached silent "cas moo 0 0 6 %d\r\nMOOVAL\r\n" % unique_id
-exec memcached "get moo\r\n"
+memcached("cas moo 0 0 6 %d\r\nMOOVAL\r\n" % unique_id, silent=True)
+memcached("get moo\r\n")
 
-exec memcached "set foo 0 0 6\r\nfooval\r\ndelete foo\r\nset foo 0 0 6\r\nfooval\r\ndelete foo\r\n"
+memcached("set foo 0 0 6\r\nfooval\r\ndelete foo\r\nset foo 0 0 6\r\nfooval\r\ndelete foo\r\n")
 
 len = 1024
 while len < (1024 * 1028):
@@ -50,32 +50,32 @@ while len < (1024 * 1028):
     if len > (1024 * 1024):
         print """# Ensure causing a memory overflow doesn't leave stale data."""
         print "# set small data: - should pass"
-        exec memcached "set foo_%d 0 0 3\r\nMOO\r\n" % (len)
-        exec memcached "get foo_%d\r\n" % (len)
+        memcached("set foo_%d 0 0 3\r\nMOO\r\n" % (len))
+        memcached("get foo_%d\r\n" % (len))
         print "# set big data: - should fail"
         print "set foo_%d 0 0 %d\r\n<big-data>\r\n" % (len, len)
-        print exec memcached silent "set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val)
+        print memcached("set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val), silent=True)
     else:
         print "# set big data: - should pass"
         print "set foo_%d 0 0 %d\r\n<big-data>\r\n" % (len, len)
-        print exec memcached silent "set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val)
+        print memcached("set foo_%d 0 0 %d\r\n%s\r\n" % (len, len, val), silent=True)
     len += 1024 * 512
 
 print """#
 # A test for Bug#898198 memcached protocol isn't case-insensitive"
 #"""
 
-exec memcached "SET foo 0 0 6\r\nfooval\r\n"
-exec memcached "GET foo\r\n"
-exec memcached "ADD foo 0 0 5\r\nfoov2\r\n"
-exec memcached "GET foo\r\n"
-exec memcached "REPLACE bar 0 0 6\r\nbarva2\r\n"
-exec memcached "GET bar\r\n"
-exec memcached "DELETE foo\r\n"
-exec memcached "GET foo\r\n"
-exec memcached "CAS moo 0 0 6 0\r\nMOOVAL\r\n"
-exec memcached "GET moo\r\n"
-exec memcached "GETS moo\r\n"
+memcached("SET foo 0 0 6\r\nfooval\r\n")
+memcached("GET foo\r\n")
+memcached("ADD foo 0 0 5\r\nfoov2\r\n")
+memcached("GET foo\r\n")
+memcached("REPLACE bar 0 0 6\r\nbarva2\r\n")
+memcached("GET bar\r\n")
+memcached("DELETE foo\r\n")
+memcached("GET foo\r\n")
+memcached("CAS moo 0 0 6 0\r\nMOOVAL\r\n")
+memcached("GET moo\r\n")
+memcached("GETS moo\r\n")
 
 # resore default suite config
 server.stop()

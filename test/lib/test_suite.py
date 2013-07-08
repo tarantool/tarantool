@@ -12,7 +12,6 @@ import shlex
 import time
 
 from server import Server
-import tarantool_preprocessor
 import re
 import cStringIO
 import string
