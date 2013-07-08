@@ -1381,7 +1381,9 @@ tarantool_lua_dofile(struct lua_State *L, const char *filename)
 {
 	lua_getglobal(L, "dofile");
 	lua_pushstring(L, filename);
-	return lua_pcall(L, 1, 1, 0);
+	lbox_pcall(L);
+	bool result = lua_toboolean(L, 1);
+	return result ? 0 : 1;
 }
 
 void
@@ -1503,6 +1505,9 @@ load_init_script(va_list ap)
 		/* Execute the init file. */
 		if (tarantool_lua_dofile(L, path))
 			panic("%s", lua_tostring(L, -1));
+
+		/* clear the stack from return values. */
+		lua_settop(L, 0);
 	}
 	/*
 	 * The file doesn't exist. It's OK, tarantool may
@@ -1554,4 +1559,11 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	 * allowed.
 	*/
 	tarantool_lua_sandbox(tarantool_L);
+}
+
+void *
+lua_region_alloc(void *ctx, size_t size)
+{
+	struct lua_State *L = (struct lua_State *) ctx;
+	return lua_newuserdata(L, size);
 }

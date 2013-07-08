@@ -31,22 +31,189 @@
 #include <salloc.h>
 #include "tbuf.h"
 
-#include "index.h"
+#include "key_def.h"
 #include "tuple_update.h"
 #include <exception.h>
 #include <palloc.h>
 #include <fiber.h>
 #include "scoped_guard.h"
+#include <stdio.h>
+
+/** Global table of tuple formats */
+struct tuple_format **tuple_formats;
+struct tuple_format *tuple_format_ber;
+
+static uint32_t formats_size, formats_capacity;
+
+/** Extract all available type info from keys. */
+void
+field_type_create(enum field_type *types, uint32_t field_count,
+		  struct key_def *key_def, uint32_t key_count)
+{
+	/* There may be fields between indexed fields (gaps). */
+	memset(types, 0, sizeof(*types) * field_count);
+
+	struct key_def *end = key_def + key_count;
+	/* extract field type info */
+	for (; key_def < end; key_def++) {
+		struct key_part *part = key_def->parts;
+		struct key_part *pend = part + key_def->part_count;
+		for (; part < pend; part++) {
+			assert(part->fieldno < field_count);
+			types[part->fieldno] = part->type;
+		}
+	}
+}
+
+static struct tuple_format *
+tuple_format_alloc_and_register(struct key_def *key_def,
+				uint32_t key_count)
+{
+	uint32_t total;
+	struct tuple_format *format;
+	struct key_def *end = key_def + key_count;
+	uint32_t max_fieldno = 0;
+	uint32_t field_count;
+
+	/* find max max field no */
+	for (; key_def < end; key_def++)
+		max_fieldno= MAX(max_fieldno, key_def->max_fieldno);
+
+	if (formats_size == formats_capacity) {
+		uint32_t new_capacity = formats_capacity ?
+			formats_capacity * 2 : 16;
+		struct tuple_format **formats;
+		if (new_capacity >= UINT16_MAX)
+			goto error;
+		 formats = (struct tuple_format **) realloc(tuple_formats,
+				new_capacity * sizeof(tuple_formats[0]));
+		if (formats == NULL)
+			goto error;
+
+		formats_capacity = new_capacity;
+		tuple_formats = formats;
+	}
+	field_count = key_count > 0 ? max_fieldno + 1 : 0;
+
+	total = sizeof(struct tuple_format) +
+		field_count * sizeof(int32_t) +
+		field_count * sizeof(enum field_type);
+
+	format = (struct tuple_format *) malloc(total);
+
+	if (format == NULL)
+		goto error;
+
+	format->id = formats_size++;
+	format->max_fieldno = max_fieldno;
+	format->field_count = field_count;
+	format->types = (enum field_type *)
+		((char *) format + sizeof(*format) +
+		field_count * sizeof(int32_t));
+	tuple_formats[format->id] = format;
+	return format;
+error:
+	tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+		  sizeof(struct tuple_format), "tuple format", "malloc");
+	return NULL;
+}
+
+struct tuple_format *
+tuple_format_new(struct key_def *key_def, uint32_t key_count)
+{
+	struct tuple_format *format =
+		tuple_format_alloc_and_register(key_def, key_count);
+
+	field_type_create(format->types, format->field_count,
+			  key_def, key_count);
+
+	int32_t i = 0;
+	uint32_t prev_offset = 0;
+	/*
+	 * In the format, store all offsets available,
+	 * they may be useful.
+	 */
+	for (; i < format->max_fieldno; i++) {
+		uint32_t maxlen = field_type_maxlen(format->types[i]);
+		if (maxlen == UINT32_MAX)
+			break;
+		format->offset[i] = (varint32_sizeof(maxlen) + maxlen +
+				     prev_offset);
+		assert(format->offset[i] > 0);
+		prev_offset = format->offset[i];
+	}
+	int j = 0;
+	for (; i < format->max_fieldno; i++) {
+		/*
+		 * In the tuple, store only offsets necessary to
+		 * quickly access indexed fields. Start from
+		 * field 1, not field 0, field 0 offset is 0.
+		 */
+		if (format->types[i + 1] == UNKNOWN)
+			format->offset[i] = INT32_MIN;
+		else
+			format->offset[i] = --j;
+	}
+	if (format->field_count > 0) {
+		/*
+		 * The last offset is always there and is unused,
+		 * to simplify the loop in tuple_init_field_map()
+		 */
+		format->offset[format->field_count - 1] = INT32_MIN;
+	}
+	format->field_map_size = -j * sizeof(uint32_t);
+	return format;
+}
+
+/*
+ * Validate a new tuple format and initialize tuple-local
+ * format data.
+ */
+static inline void
+tuple_init_field_map(struct tuple *tuple, struct tuple_format *format)
+{
+	/* Check to see if the tuple has a sufficient number of fields. */
+	if (tuple->field_count < format->field_count)
+		tnt_raise(IllegalParams,
+			  "tuple must have all indexed fields");
+
+	int32_t *offset = format->offset;
+	enum field_type *type = format->types;
+	enum field_type *end = format->types + format->field_count;
+	const char *pos = tuple->data;
+	uint32_t *field_map = (uint32_t *) tuple;
+
+	for (; type < end; offset++, type++) {
+		if (pos >= tuple->data + tuple->bsize)
+			tnt_raise(IllegalParams,
+				  "incorrect tuple format");
+		uint32_t len = load_varint32(&pos);
+		uint32_t type_maxlen = field_type_maxlen(*type);
+		/*
+		 * For fixed offsets, validate fields have
+		 * correct lengths.
+		 */
+		if (type_maxlen != UINT32_MAX && len != type_maxlen) {
+			tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
+				  field_type_strs[*type]);
+		}
+		pos += len;
+		if (*offset < 0 && *offset != INT32_MIN)
+			field_map[*offset] = pos - tuple->data;
+	}
+}
 
 /** Allocate a tuple */
 struct tuple *
-tuple_alloc(size_t size)
+tuple_alloc(struct tuple_format *format, size_t size)
 {
-	size_t total = sizeof(struct tuple) + size;
-	struct tuple *tuple = (struct tuple *) salloc(total, "tuple");
+	size_t total = sizeof(struct tuple) + size + format->field_map_size;
+	char *ptr = (char *) salloc(total, "tuple");
+	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
-	tuple->flags = tuple->refs = 0;
+	tuple->refs = 0;
 	tuple->bsize = size;
+	tuple->format_id = tuple_format_id(format);
 
 	say_debug("tuple_alloc(%zu) = %p", size, tuple);
 	return tuple;
@@ -61,7 +228,8 @@ tuple_free(struct tuple *tuple)
 {
 	say_debug("tuple_free(%p)", tuple);
 	assert(tuple->refs == 0);
-	sfree(tuple);
+	char *ptr = (char *) tuple - tuple_format(tuple)->field_map_size;
+	sfree(ptr);
 }
 
 /**
@@ -87,36 +255,39 @@ tuple_ref(struct tuple *tuple, int count)
  * @returns field data if field exists or NULL
  */
 const char *
-tuple_field_old(struct tuple *tuple, uint32_t i)
+tuple_field_old(const struct tuple_format *format,
+		const struct tuple *tuple, uint32_t i)
 {
 	const char *field = tuple->data;
-	const char *tuple_end = tuple->data + tuple->bsize;
+
+	if (i == 0)
+		return field;
+	i--;
+	if (i < format->max_fieldno) {
+		if (format->offset[i] > 0)
+			return field + format->offset[i];
+		if (format->offset[i] != INT32_MIN) {
+			uint32_t *field_map = (uint32_t *) tuple;
+			int32_t idx = format->offset[i];
+			return field + field_map[idx];
+		}
+	}
+	const char *tuple_end = field + tuple->bsize;
 
 	while (field < tuple_end) {
-		if (i == 0)
-			return field;
 		uint32_t len = load_varint32(&field);
 		field += len;
+		if (i == 0)
+			return field;
 		i--;
 	}
 	return tuple_end;
 }
 
 const char *
-tuple_field(const struct tuple *tuple, uint32_t field_no, uint32_t *len)
+tuple_seek(struct tuple_iterator *it, uint32_t i, uint32_t *len)
 {
-	const char *field = tuple_field_old((struct tuple *) tuple, field_no);
-	if (field < tuple->data + tuple->bsize) {
-		*len = load_varint32(&field);
-		return field;
-	}
-	return NULL;
-}
-
-const char *
-tuple_seek(struct tuple_iterator *it, uint32_t field_no, uint32_t *len)
-{
-	it->pos = tuple_field_old((struct tuple *) it->tuple, field_no);
+	it->pos = tuple_field_old(tuple_format(it->tuple), it->tuple, i);
 	return tuple_next(it, len);
 }
 
@@ -195,31 +366,28 @@ tuple_print(struct tbuf *buf, const struct tuple *tuple)
 	tbuf_printf(buf, "}");
 }
 
-static void *
-palloc_region_alloc(void *ctx, size_t size)
-{
-	return palloc((struct palloc_pool *) ctx, size);
-}
-
 struct tuple *
-tuple_update(const struct tuple *old_tuple, const char *expr,
+tuple_update(struct tuple_format *format,
+	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
+	     const struct tuple *old_tuple, const char *expr,
 	     const char *expr_end)
 {
 	uint32_t new_size = 0;
 	uint32_t new_field_count = 0;
 	struct tuple_update *update =
-		tuple_update_prepare(palloc_region_alloc, fiber->gc_pool,
+		tuple_update_prepare(region_alloc, alloc_ctx,
 				     expr, expr_end, old_tuple->data,
 				     old_tuple->data + old_tuple->bsize,
 				     old_tuple->field_count, &new_size,
 				     &new_field_count);
 
 	/* Allocate a new tuple. */
-	struct tuple *new_tuple = tuple_alloc(new_size);
+	struct tuple *new_tuple = tuple_alloc(format, new_size);
 	new_tuple->field_count = new_field_count;
 
 	try {
 		tuple_update_execute(update, new_tuple->data);
+		tuple_init_field_map(new_tuple, format);
 	} catch (const Exception&) {
 		tuple_free(new_tuple);
 		throw;
@@ -228,90 +396,76 @@ tuple_update(const struct tuple *old_tuple, const char *expr,
 }
 
 struct tuple *
-tuple_new(uint32_t field_count, const char **data, const char *end)
+tuple_new(struct tuple_format *format, uint32_t field_count,
+	  const char **data, const char *end)
 {
 	size_t tuple_len = end - *data;
 
 	if (tuple_len != tuple_range_size(data, end, field_count))
 		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
 
-	struct tuple *new_tuple = tuple_alloc(tuple_len);
+	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
 	new_tuple->field_count = field_count;
 	memcpy(new_tuple->data, end - tuple_len, tuple_len);
+	try {
+		tuple_init_field_map(new_tuple, format);
+	} catch (...) {
+		tuple_free(new_tuple);
+		throw;
+	}
 	return new_tuple;
 }
 
+/*
+ * Compare two tuple fields.
+ * Separate version exists since compare is a very
+ * often used operation, so any performance speed up
+ * in it can have dramatic impact on the overall
+ * server performance.
+ */
 static inline int
-tuple_compare_field(const char *field_a, uint32_t size_a,
-		    const char *field_b, uint32_t size_b,
-		    enum field_data_type type)
+tuple_compare_field(const char *field_a, const char *field_b,
+		    enum field_type type)
 {
-	/*
-	 * field_a is always a tuple field.
-	 * field_b can be either a tuple field or a key part.
-	 * All tuple fields were validated before by space_validate_tuple().
-	 * All key parts were validated before by key_validate().
-	 */
-	switch (type) {
-	case NUM:
-	{
-		assert(size_a == sizeof(uint32_t));
-		assert(size_b == sizeof(uint32_t));
-		uint32_t a = *(uint32_t *) field_a;
-		uint32_t b = *(uint32_t *) field_b;
-		return a < b ? -1 : (a > b);
+	if (type != STRING) {
+		assert(field_a[0] == field_b[0]);
+		/*
+		 * Little-endian unsigned int is memcmp
+		 * compatible.
+		 */
+		return memcmp(field_a + 1, field_b + 1, field_a[0]);
 	}
-	case NUM64:
-	{
-		assert(size_a == sizeof(uint64_t));
-		uint64_t a = *(uint64_t *) field_a;
-		uint64_t b;
-		/* Allow search in NUM64 indexes using NUM keys. */
-		if (size_b == sizeof(uint32_t)) {
-			b = *(uint32_t *) field_b;
-		} else {
-			assert(size_b == sizeof(uint64_t));
-			b = *(uint64_t *) field_b;
-		}
-		return a < b ? -1 : (a > b);
-	}
-	case STRING:
-	{
-		int cmp = memcmp(field_a, field_b, MIN(size_a, size_b));
-		if (cmp != 0)
-			return cmp;
-
-		if (size_a > size_b) {
-			return 1;
-		} else if (size_a < size_b){
-			return -1;
-		} else {
-			return 0;
-		}
-	}
-	default:
-		assert(false);
-	}
+	uint32_t size_a = load_varint32(&field_a);
+	uint32_t size_b = load_varint32(&field_b);
+	int r = memcmp(field_a, field_b, MIN(size_a, size_b));
+	if (r == 0)
+		r = size_a < size_b ? -1 : size_a > size_b;
+	return r;
 }
 
 int
 tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	      const struct key_def *key_def)
 {
-	for (uint32_t part = 0; part < key_def->part_count; part++) {
-		uint32_t field_no = key_def->parts[part].fieldno;
-		uint32_t size_a, size_b;
-		const char *field_a = tuple_field(tuple_a, field_no, &size_a);
-		const char *field_b = tuple_field(tuple_b, field_no, &size_b);
+	if (key_def->part_count == 1 && key_def->parts[0].fieldno == 0)
+		return tuple_compare_field(tuple_a->data, tuple_b->data,
+					   key_def->parts[0].type);
 
-		int r = tuple_compare_field(field_a, size_a, field_b, size_b,
-					    key_def->parts[part].type);
-		if (r != 0) {
-			return r;
-		}
+	struct key_part *part = key_def->parts;
+	struct key_part *end = part + key_def->part_count;
+	struct tuple_format *format_a = tuple_format(tuple_a);
+	struct tuple_format *format_b = tuple_format(tuple_b);
+	const char *field_a;
+	const char *field_b;
+	int r;
+
+	for (; part < end; part++) {
+		field_a = tuple_field_old(format_a, tuple_a, part->fieldno);
+		field_b = tuple_field_old(format_b, tuple_b, part->fieldno);
+		if ((r = tuple_compare_field(field_a, field_b, part->type)))
+			break;
 	}
-
-	return 0;
+	return r;
 }
 
 int
@@ -319,33 +473,67 @@ tuple_compare_dup(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		  const struct key_def *key_def)
 {
 	int r = tuple_compare(tuple_a, tuple_b, key_def);
-	if (r != 0) {
-		return r;
-	}
+	if (r == 0)
+		r = tuple_a < tuple_b ? -1 : tuple_a > tuple_b;
 
-	return tuple_a < tuple_b ? -1 : (tuple_a > tuple_b);
+	return r;
 }
 
 int
-tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
+tuple_compare_with_key(const struct tuple *tuple, const char *key,
 		       uint32_t part_count, const struct key_def *key_def)
 {
-	part_count = MIN(part_count, key_def->part_count);
-	for (uint32_t part = 0; part < part_count; part++) {
-		uint32_t field_no = key_def->parts[part].fieldno;
-
-		uint32_t size_a;
-		const char *field_a = tuple_field(tuple_a, field_no, &size_a);
-
-		uint32_t key_size = load_varint32(&key);
-		int r = tuple_compare_field(field_a, size_a, key, key_size,
-					    key_def->parts[part].type);
-		if (r != 0) {
-			return r;
+	struct key_part *part = key_def->parts;
+	struct key_part *end = part + MIN(part_count, key_def->part_count);
+	struct tuple_format *format = tuple_format(tuple);
+	const char *field;
+	uint32_t field_size;
+	uint32_t key_size;
+	int r = 0; /* Part count can be 0 in wildcard searches. */
+	for (; part < end; part++, key += key_size) {
+		field = tuple_field_old(format, tuple, part->fieldno);
+		field_size = load_varint32(&field);
+		key_size = load_varint32(&key);
+		switch (part->type) {
+		case NUM:
+			r = memcmp(field, key, sizeof(uint32_t));
+			break;
+		case NUM64:
+			if (key_size == sizeof(uint32_t)) {
+				/*
+				 * Allow search in NUM64 indexes
+				 * using NUM keys.
+				 */
+				uint64_t b = *(uint32_t *) key;
+				r = memcmp(field, &b, sizeof(uint64_t));
+			} else {
+				r = memcmp(field, key, sizeof(uint64_t));
+			}
+			break;
+		default:
+			r = memcmp(field, key, MIN(field_size, key_size));
+			if (r == 0)
+				r = field_size < key_size ? -1 : field_size > key_size;
+			break;
 		}
-
-		key += key_size;
+		if (r != 0)
+			break;
 	}
+	return r;
+}
 
-	return 0;
+void
+tuple_init()
+{
+	tuple_format_ber = tuple_format_new(NULL, 0);
+}
+
+void
+tuple_free()
+{
+	for (struct tuple_format **format = tuple_formats;
+	     format < tuple_formats + formats_size;
+	     format++)
+		free(*format);
+	free(tuple_formats);
 }

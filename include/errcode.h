@@ -55,8 +55,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/*  2 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  3 */_(ER_SECONDARY,			2, "Can't modify data upon a request on the secondary port.") \
 	/*  4 */_(ER_TUPLE_IS_RO,		1, "Tuple is marked as read-only") \
-	/*  5 */_(ER_UNUSED5,			2, "Unused5") \
-	/*  6 */_(ER_UNUSED6,			2, "Unused6") \
+	/*  5 */_(ER_INDEX_TYPE,		2, "Unsupported index type: %s") \
+	/*  6 */_(ER_SPACE_EXISTS,		2, "Space %u already exists") \
 	/*  7 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
 	/*  8 */_(ER_UNUSED8,			2, "Unused8") \
 	/*  9 */_(ER_INJECTION,			2, "Error injection '%s'") \

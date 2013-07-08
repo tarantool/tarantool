@@ -501,7 +501,6 @@ memcached_space_init()
         if (cfg.memcached_port == 0)
                 return;
 
-
 	/* Configure memcached index key. */
 	struct key_def *key_def = (struct key_def *) malloc(sizeof(struct key_def));
 	key_def->part_count = 1;
@@ -511,21 +510,13 @@ memcached_space_init()
 	key_def->parts = (struct key_part *) malloc(sizeof(struct key_part));
 	key_def->cmp_order = (uint32_t *) malloc(sizeof(uint32_t));
 
-	if (key_def->parts == NULL || key_def->cmp_order == NULL)
-		panic("out of memory when configuring memcached_space");
-
 	key_def->parts[0].fieldno = 0;
 	key_def->parts[0].type = STRING;
 
 	key_def->max_fieldno = 1;
 	key_def->cmp_order[0] = 0;
 
-
-	struct space *memc_s =
-		space_create(cfg.memcached_space, key_def, 1, 4);
-
-	Index *memc_index = Index::factory(HASH, key_def, memc_s);
-	space_set_index(memc_s, 0, memc_index);
+	(void) space_new(cfg.memcached_space, key_def, 1, 4);
 }
 
 /** Delete a bunch of expired keys. */

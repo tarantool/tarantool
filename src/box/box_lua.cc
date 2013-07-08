@@ -202,7 +202,7 @@ struct lua_field {
 		uint32_t u32;
 		uint64_t u64;
 	};
-	enum field_data_type type;
+	enum field_type type;
 };
 
 /**
@@ -353,7 +353,11 @@ lbox_tuple_transform(struct lua_State *L)
 	const char *expr = lua_tolstring(L, -1, &expr_len);
 
 	/* Execute tuple_update */
-	struct tuple *new_tuple = tuple_update(tuple, expr, expr + expr_len);
+	struct tuple *new_tuple = tuple_update(tuple_format_ber,
+					       lua_region_alloc, L,
+					       tuple, expr, expr + expr_len);
+	/* Cleanup memory allocated by lua_region_alloc */
+	lua_settop(L, 0);
 	lbox_pushtuple(L, new_tuple);
 	return 1;
 }
@@ -1031,7 +1035,7 @@ lua_table_to_tuple(struct lua_State *L, int index)
 		tuple_len += field.len + varint32_sizeof(field.len);
 		lua_pop(L, 1);
 	}
-	struct tuple *tuple = tuple_alloc(tuple_len);
+	struct tuple *tuple = tuple_alloc(tuple_format_ber, tuple_len);
 	/*
 	 * Important: from here and on if there is an exception,
 	 * the tuple is leaked.
@@ -1058,7 +1062,8 @@ lua_totuple(struct lua_State *L, int index)
 	struct lua_field field;
 	lua_tofield(L, index, &field);
 	if (field.type != UNKNOWN) {
-		tuple = tuple_alloc(field.len + varint32_sizeof(field.len));
+		tuple = tuple_alloc(tuple_format_ber,
+				    field.len + varint32_sizeof(field.len));
 		tuple->field_count = 1;
 		pack_lstr(tuple->data, field.data, field.len);
 		return tuple;
@@ -1587,7 +1592,8 @@ box_unpack_response(struct lua_State *L, const char *s, const char *end)
 		if (tend > end)
 			tnt_raise(IllegalParams, "incorrect packet length");
 
-		struct tuple *tuple = tuple_new(field_count, &s, tend);
+		struct tuple *tuple = tuple_new(tuple_format_ber,
+						field_count, &s, tend);
 		lbox_pushtuple(L, tuple);
 	}
 	return s;

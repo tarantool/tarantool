@@ -35,8 +35,6 @@
 #include "exception.h"
 #include "space.h"
 
-const char *field_data_type_strs[] = {"UNKNOWN", "NUM", "NUM64", "STR", "\0"};
-STRS(index_type, INDEX_TYPE);
 STRS(iterator_type, ITERATOR_TYPE);
 
 /* {{{ Utilities. **********************************************/
@@ -48,7 +46,7 @@ key_validate_parts(struct key_def *key_def,
 	for (uint32_t part = 0; part < part_count; part++) {
 		uint32_t part_size = load_varint32(&key);
 
-		enum field_data_type part_type = key_def->parts[part].type;
+		enum field_type part_type = key_def->parts[part].type;
 
 		if (part_type == NUM && part_size != sizeof(uint32_t))
 			tnt_raise(ClientError, ER_KEY_FIELD_TYPE, "u32");

@@ -32,25 +32,10 @@
 #include "tarantool/util.h"
 
 #include "object.h"
+#include "key_def.h"
 
 struct tuple;
 struct space;
-
-/*
- * Possible field data types. Can't use STRS/ENUM macros for them,
- * since there is a mismatch between enum name (STRING) and type
- * name literal ("STR"). STR is already used as Objective C type.
- */
-enum field_data_type { UNKNOWN = 0, NUM, NUM64, STRING, field_data_type_MAX };
-extern const char *field_data_type_strs[];
-
-#define INDEX_TYPE(_)                                               \
-	_(HASH,    0)       /* HASH Index  */                       \
-	_(TREE,    1)       /* TREE Index  */                       \
-	_(BITSET,  2)       /* BITSET Index  */                     \
-
-ENUM(index_type, INDEX_TYPE);
-extern const char *index_type_strs[];
 
 /**
  * @abstract Iterator type
@@ -99,37 +84,6 @@ struct iterator {
 	void (*free)(struct iterator *);
 };
 
-/** Descriptor of a single part in a multipart key. */
-struct key_part {
-	uint32_t fieldno;
-	enum field_data_type type;
-};
-
-/* Descriptor of a multipart key. */
-struct key_def {
-	/* Description of parts of a multipart index. */
-	struct key_part *parts;
-	/*
-	 * An array holding field positions in 'parts' array.
-	 * Imagine there is index[1] = { key_field[0].fieldno=5,
-	 * key_field[1].fieldno=3 }.
-	 * 'parts' array for such index contains data from
-	 * key_field[0] and key_field[1] respectively.
-	 * max_fieldno is 5, and cmp_order array holds offsets of
-	 * field 3 and 5 in 'parts' array: -1, -1, 0, -1, 1.
-	 */
-	uint32_t *cmp_order;
-	/* The size of the 'parts' array. */
-	uint32_t part_count;
-	/*
-	 * The size of 'cmp_order' array (= max fieldno in 'parts'
-	 * array).
-	 */
-	uint32_t max_fieldno;
-	bool is_unique;
-	enum index_type type;
-};
-
 /**
  * Check that the key has correct part count and correct part size
  * for use in an index iterator.
@@ -148,7 +102,7 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
  * index (i.e. the key must be fully specified).
  */
 void
-primary_key_validate(struct key_def *key_deff, const char *key,
+primary_key_validate(struct key_def *key_def, const char *key,
 		     uint32_t part_count);
 
 
@@ -174,7 +128,6 @@ enum dup_replace_mode {
 	 */
 	DUP_REPLACE
 };
-
 
 class Index: public Object {
 public:

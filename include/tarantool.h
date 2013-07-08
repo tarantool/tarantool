@@ -42,7 +42,7 @@ extern int snapshot_pid;
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern char *cfg_filename_fullpath;
-extern bool init_storage, booting;
+extern bool booting;
 extern char *binary_filename;
 extern char *custom_proc_title;
 int reload_cfg(struct tbuf *out);
