@@ -45,57 +45,96 @@ struct tuple_format *tuple_format_ber;
 
 static uint32_t formats_size, formats_capacity;
 
-static struct tuple_format *
-tuple_format_alloc_and_register(uint32_t offset_count)
+/** Extract all available type info from keys. */
+void
+field_type_create(enum field_type *types, uint32_t field_count,
+		  struct key_def *key_def, uint32_t key_count)
 {
+	/* There may be fields between indexed fields (gaps). */
+	memset(types, 0, sizeof(*types) * field_count);
+
+	struct key_def *end = key_def + key_count;
+	/* extract field type info */
+	for (; key_def < end; key_def++) {
+		struct key_part *part = key_def->parts;
+		struct key_part *pend = part + key_def->part_count;
+		for (; part < pend; part++) {
+			assert(part->fieldno < field_count);
+			types[part->fieldno] = part->type;
+		}
+	}
+}
+
+static struct tuple_format *
+tuple_format_alloc_and_register(struct key_def *key_def,
+				uint32_t key_count)
+{
+	uint32_t total;
+	struct tuple_format *format;
+	struct key_def *end = key_def + key_count;
+	uint32_t max_fieldno = 0;
+	uint32_t field_count;
+
+	/* find max max field no */
+	for (; key_def < end; key_def++)
+		max_fieldno= MAX(max_fieldno, key_def->max_fieldno);
+
 	if (formats_size == formats_capacity) {
 		uint32_t new_capacity = formats_capacity ?
 			formats_capacity * 2 : 16;
+		struct tuple_format **formats;
 		if (new_capacity >= UINT16_MAX)
-			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-				  new_capacity, "tuple_formats", "resize");
-		struct tuple_format **formats = (struct tuple_format **)
-			realloc(tuple_formats,
+			goto error;
+		 formats = (struct tuple_format **) realloc(tuple_formats,
 				new_capacity * sizeof(tuple_formats[0]));
 		if (formats == NULL)
-			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-				  new_capacity, "tuple_formats", "realloc");
+			goto error;
 
 		formats_capacity = new_capacity;
 		tuple_formats = formats;
 	}
+	field_count = key_count > 0 ? max_fieldno + 1 : 0;
 
-	uint32_t total = sizeof(struct tuple_format) +
-		offset_count * sizeof(int32_t);
+	total = sizeof(struct tuple_format) +
+		field_count * sizeof(int32_t) +
+		field_count * sizeof(enum field_type);
 
-	struct tuple_format *format = (struct tuple_format *) malloc(total);
+	format = (struct tuple_format *) malloc(total);
 
-	if (format == NULL) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  total, "tuple format", "malloc");
-	}
+	if (format == NULL)
+		goto error;
 
 	format->id = formats_size++;
-	format->offset_count = offset_count;
+	format->max_fieldno = max_fieldno;
+	format->field_count = field_count;
+	format->types = (enum field_type *)
+		((char *) format + sizeof(*format) +
+		field_count * sizeof(int32_t));
 	tuple_formats[format->id] = format;
 	return format;
+error:
+	tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+		  sizeof(struct tuple_format), "tuple format", "malloc");
+	return NULL;
 }
 
 struct tuple_format *
-tuple_format_new(const enum field_type *fields, uint32_t max_fieldno)
+tuple_format_new(struct key_def *key_def, uint32_t key_count)
 {
 	struct tuple_format *format =
-		tuple_format_alloc_and_register(max_fieldno);
+		tuple_format_alloc_and_register(key_def, key_count);
 
-	uint32_t i = 0;
+	field_type_create(format->types, format->field_count,
+			  key_def, key_count);
+
+	int32_t i = 0;
 	uint32_t prev_offset = 0;
-
 	/*
 	 * In the format, store all offsets available,
 	 * they may be useful.
 	 */
-	for (; i < max_fieldno; i++) {
-		uint32_t maxlen = field_type_maxlen(fields[i]);
+	for (; i < format->max_fieldno; i++) {
+		uint32_t maxlen = field_type_maxlen(format->types[i]);
 		if (maxlen == UINT32_MAX)
 			break;
 		format->offset[i] = (varint32_sizeof(maxlen) + maxlen +
@@ -103,19 +142,74 @@ tuple_format_new(const enum field_type *fields, uint32_t max_fieldno)
 		assert(format->offset[i] > 0);
 		prev_offset = format->offset[i];
 	}
-	for (; i < max_fieldno; i++)
-		format->offset[i] = INT32_MIN;
-
-
+	int j = 0;
+	for (; i < format->max_fieldno; i++) {
+		/*
+		 * In the tuple, store only offsets necessary to
+		 * quickly access indexed fields. Start from
+		 * field 1, not field 0, field 0 offset is 0.
+		 */
+		if (format->types[i + 1] == UNKNOWN)
+			format->offset[i] = INT32_MIN;
+		else
+			format->offset[i] = --j;
+	}
+	if (format->field_count > 0) {
+		/*
+		 * The last offset is always there and is unused,
+		 * to simplify the loop in tuple_init_field_map()
+		 */
+		format->offset[format->field_count - 1] = INT32_MIN;
+	}
+	format->field_map_size = -j * sizeof(uint32_t);
 	return format;
+}
+
+/*
+ * Validate a new tuple format and initialize tuple-local
+ * format data.
+ */
+static inline void
+tuple_init_field_map(struct tuple *tuple, struct tuple_format *format)
+{
+	/* Check to see if the tuple has a sufficient number of fields. */
+	if (tuple->field_count < format->field_count)
+		tnt_raise(IllegalParams,
+			  "tuple must have all indexed fields");
+
+	int32_t *offset = format->offset;
+	enum field_type *type = format->types;
+	enum field_type *end = format->types + format->field_count;
+	const char *pos = tuple->data;
+	uint32_t *field_map = (uint32_t *) tuple;
+
+	for (; type < end; offset++, type++) {
+		if (pos >= tuple->data + tuple->bsize)
+			tnt_raise(IllegalParams,
+				  "incorrect tuple format");
+		uint32_t len = load_varint32(&pos);
+		uint32_t type_maxlen = field_type_maxlen(*type);
+		/*
+		 * For fixed offsets, validate fields have
+		 * correct lengths.
+		 */
+		if (type_maxlen != UINT32_MAX && len != type_maxlen) {
+			tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
+				  field_type_strs[*type]);
+		}
+		pos += len;
+		if (*offset < 0 && *offset != INT32_MIN)
+			field_map[*offset] = pos - tuple->data;
+	}
 }
 
 /** Allocate a tuple */
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size)
 {
-	size_t total = sizeof(struct tuple) + size;
-	struct tuple *tuple = (struct tuple *) salloc(total, "tuple");
+	size_t total = sizeof(struct tuple) + size + format->field_map_size;
+	char *ptr = (char *) salloc(total, "tuple");
+	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
 	tuple->refs = 0;
 	tuple->bsize = size;
@@ -134,7 +228,8 @@ tuple_free(struct tuple *tuple)
 {
 	say_debug("tuple_free(%p)", tuple);
 	assert(tuple->refs == 0);
-	sfree(tuple);
+	char *ptr = (char *) tuple - tuple_format(tuple)->field_map_size;
+	sfree(ptr);
 }
 
 /**
@@ -168,9 +263,14 @@ tuple_field_old(const struct tuple_format *format,
 	if (i == 0)
 		return field;
 	i--;
-	if (i < format->offset_count) {
+	if (i < format->max_fieldno) {
 		if (format->offset[i] > 0)
 			return field + format->offset[i];
+		if (format->offset[i] != INT32_MIN) {
+			uint32_t *field_map = (uint32_t *) tuple;
+			int32_t idx = format->offset[i];
+			return field + field_map[idx];
+		}
 	}
 	const char *tuple_end = field + tuple->bsize;
 
@@ -182,17 +282,6 @@ tuple_field_old(const struct tuple_format *format,
 		i--;
 	}
 	return tuple_end;
-}
-
-const char *
-tuple_field(const struct tuple *tuple, uint32_t i, uint32_t *len)
-{
-	const char *field = tuple_field_old(tuple_format(tuple), tuple, i);
-	if (field < tuple->data + tuple->bsize) {
-		*len = load_varint32(&field);
-		return field;
-	}
-	return NULL;
 }
 
 const char *
@@ -298,6 +387,7 @@ tuple_update(struct tuple_format *format,
 
 	try {
 		tuple_update_execute(update, new_tuple->data);
+		tuple_init_field_map(new_tuple, format);
 	} catch (const Exception&) {
 		tuple_free(new_tuple);
 		throw;
@@ -317,6 +407,12 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
 	new_tuple->field_count = field_count;
 	memcpy(new_tuple->data, end - tuple_len, tuple_len);
+	try {
+		tuple_init_field_map(new_tuple, format);
+	} catch (...) {
+		tuple_free(new_tuple);
+		throw;
+	}
 	return new_tuple;
 }
 
@@ -332,7 +428,6 @@ tuple_compare_field(const char *field_a, const char *field_b,
 		    enum field_type type)
 {
 	if (type != STRING) {
-		printf("len: %d\n", field_a[0]);
 		assert(field_a[0] == field_b[0]);
 		/*
 		 * Little-endian unsigned int is memcmp

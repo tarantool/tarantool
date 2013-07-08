@@ -55,8 +55,6 @@ static bool secondary_indexes_enabled = false;
  */
 static bool primary_indexes_enabled = false;
 
-static void
-space_init_field_types(struct space *space);
 
 static void
 space_create(struct space *space, uint32_t space_no,
@@ -68,9 +66,7 @@ space_create(struct space *space, uint32_t space_no,
 	space->arity = arity;
 	space->key_defs = key_defs;
 	space->key_count = key_count;
-	space_init_field_types(space);
-	space->format = tuple_format_new(space->field_types,
-					 space->max_fieldno);
+	space->format = tuple_format_new(key_defs, key_count);
 	/* fill space indexes */
 	for (uint32_t j = 0; j < key_count; ++j) {
 		struct key_def *key_def = &space->key_defs[j];
@@ -92,7 +88,6 @@ space_destroy(struct space *space)
 		key_def_destroy(&space->key_defs[j]);
 	}
 	free(space->key_defs);
-	free(space->field_types);
 }
 
 struct space *
@@ -205,39 +200,10 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
-	/* Check to see if the tuple has a sufficient number of fields. */
-	if (new_tuple->field_count < sp->max_fieldno + 1)
-		tnt_raise(IllegalParams,
-			  "tuple must have all indexed fields");
-
 	if (sp->arity > 0 && sp->arity != new_tuple->field_count)
 		tnt_raise(IllegalParams,
 			  "tuple field count must match space cardinality");
 
-	/* Sweep through the tuple and check the field sizes. */
-	struct tuple_iterator it;
-	tuple_rewind(&it, new_tuple);
-	const char *field;
-	uint32_t len;
-	uint32_t fieldno = 0;
-	while ((field = tuple_next(&it, &len))) {
-		/*
-		 * Check fixed size fields (NUM and NUM64) and
-		 * skip undefined size fields (STRING and UNKNOWN).
-		 */
-		if (sp->field_types[fieldno] == NUM) {
-			if (len != sizeof(uint32_t))
-				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
-					  "NUM");
-		} else if (sp->field_types[fieldno] == NUM64) {
-			if (len != sizeof(uint64_t))
-				tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
-					  "NUM64");
-		}
-		if (fieldno == sp->max_fieldno)
-			break;
-		fieldno++;
-	}
 }
 
 void
@@ -253,41 +219,6 @@ space_free(void)
 	tuple_free();
 }
 
-/**
- * Extract all available field info from keys
- *
- * @param space		space to extract field info for
- * @param key_count	the number of keys
- * @param key_defs	key description array
- */
-static void
-space_init_field_types(struct space *space)
-{
-	uint32_t i, max_fieldno;
-	uint32_t key_count = space->key_count;
-	struct key_def *key_defs = space->key_defs;
-
-	/* find max max field no */
-	max_fieldno = 0;
-	for (i = 0; i < key_count; i++) {
-		max_fieldno= MAX(max_fieldno, key_defs[i].max_fieldno);
-	}
-
-	/* alloc & init field type info */
-	space->max_fieldno = max_fieldno;
-	space->field_types = (enum field_type *)
-			     calloc(max_fieldno + 1, sizeof(enum field_type));
-
-	/* extract field type info */
-	for (i = 0; i < key_count; i++) {
-		struct key_def *def = &key_defs[i];
-		for (uint32_t pi = 0; pi < def->part_count; pi++) {
-			struct key_part *part = &def->parts[pi];
-			assert(part->fieldno <= max_fieldno);
-			space->field_types[part->fieldno] = part->type;
-		}
-	}
-}
 
 static void
 space_config()

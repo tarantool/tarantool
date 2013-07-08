@@ -39,8 +39,8 @@ struct tarantool_cfg;
 struct space {
 	Index *index[BOX_INDEX_MAX];
 	/** If not set (is 0), any tuple in the
-	 * space can have any number of fields (but
-	 * @sa max_fieldno). If set, Each tuple
+	 * space can have any number of fields.
+	 * If set, each tuple
 	 * must have exactly this many fields.
 	 */
 	uint32_t arity;
@@ -57,21 +57,6 @@ struct space {
 	 * The descriptors for all indexes that belong to the space.
 	 */
 	struct key_def *key_defs;
-
-	/**
-	 * Field types of indexed fields. This is an array of size
-	 * max_fieldno. If there are gaps, i.e. fields that do not
-	 * participate in any index and thus we cannot infer their
-	 * type, then respective array members have value UNKNOWN.
-	 */
-	enum field_type *field_types;
-
-	/**
-	 * Max field no which participates in any of the space indexes.
-	 * Each tuple in this space must have, therefore, at least
-	 * max_fieldno fields.
-	 */
-	uint32_t max_fieldno;
 
 	/** Space number. */
 	uint32_t no;

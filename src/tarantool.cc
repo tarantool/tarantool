@@ -578,7 +578,7 @@ error:
 }
 
 void
-tarantool_free(void)
+tarantool_lua_free()
 {
 	/*
 	 * Got to be done prior to anything else, since GC
@@ -586,7 +586,13 @@ tarantool_free(void)
 	 */
 	if (tarantool_L)
 		tarantool_lua_close(tarantool_L);
+	tarantool_L = NULL;
+}
 
+
+void
+tarantool_free(void)
+{
 	recovery_free();
 	stat_free();
 
@@ -845,6 +851,7 @@ main(int argc, char **argv)
 	try {
 		tarantool_L = tarantool_lua_init();
 		box_init(false);
+		atexit(tarantool_lua_free);
 		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
 		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		/*

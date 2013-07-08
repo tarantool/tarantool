@@ -40,11 +40,33 @@ struct tbuf;
 struct tuple_format {
 	uint16_t id;
 	/**
-	 * Length of 'offset' array. Is usually the same as
-	 * space->max_fieldno (no need to store the offset of the
-	 * first field).
+	 * Max field no which participates in any of the space
+	 * indexes. Each tuple of this format must have,
+	 * therefore, at least max_fieldno fields.
+	 *
 	 */
-	uint32_t offset_count;
+	uint32_t max_fieldno;
+	/* Length of 'types' and 'offset' arrays. */
+	uint32_t field_count;
+	/**
+	 * Field types of indexed fields. This is an array of size
+	 * field_count. If there are gaps, i.e. fields that do not
+	 * participate in any index and thus we cannot infer their
+	 * type, then respective array members have value UNKNOWN.
+	 */
+	enum field_type *types;
+	/**
+	 * Each tuple has an area with field offsets. This area
+	 * is located in front of the tuple. It is used to quickly
+	 * find field start inside tuple data. This area only
+	 * stores offsets of fields preceded with fields of
+	 * dynamic length. If preceding fields have a fixed
+	 * length, field offset can be calculated once for all
+	 * tuples and thus is stored directly in the format object.
+	 * The variable below stores the size of field map in the
+	 * tuple, *in bytes*.
+	 */
+	uint32_t field_map_size;
 	/**
 	 * For each field participating in an index, the format
 	 * may either store the fixed offset of the field
@@ -85,7 +107,7 @@ tuple_format_id(struct tuple_format *format)
  * @return tuple format
  */
 struct tuple_format *
-tuple_format_new(const enum field_type *fields, uint32_t max_fieldno);
+tuple_format_new(struct key_def *key_def, uint32_t key_count);
 
 /**
  * An atom of Tarantool/Box storage. Consists of a list of fields.
@@ -163,12 +185,20 @@ tuple_field_old(const struct tuple_format *format,
  * @brief Return field data of the field
  * @param tuple tuple
  * @param field_no field number
- * @param field pointer where the start of field data will be stored
+ * @param field pointer where the start of field data will be stored,
+ *        or NULL if field is out of range
  * @param len pointer where the len of the field will be stored
- * @throws IllegalParams if \a field_no is out of range
  */
-const char *
-tuple_field(const struct tuple *tuple, uint32_t field_no, uint32_t *len);
+static inline const char *
+tuple_field(const struct tuple *tuple, uint32_t i, uint32_t *len)
+{
+	const char *field = tuple_field_old(tuple_format(tuple), tuple, i);
+	if (field < tuple->data + tuple->bsize) {
+		*len = load_varint32(&field);
+		return field;
+	}
+	return NULL;
+}
 
 /**
  * @brief Tuple Interator
