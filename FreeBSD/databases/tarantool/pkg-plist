@@ -1,5 +1,5 @@
 bin/tarantool_box
-bin/tarantool_checksum
+bin/tarancheck
 %%CLIENT%%bin/tarantool
 etc/tarantool.cfg.sample
 include/tarantool/tnt.h

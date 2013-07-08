@@ -63,8 +63,8 @@ void tc_options_free(struct tc_options *opts) {
 
 int tc_options_usage(void)
 {
-	printf("usage: tarantool_checksum <options> <tarantool_config>\n\n");
-	printf("tarantool checksum.\n");
+	printf("Tarantool checksum: checksum master and replica logs.\n");
+	printf("usage: tarancheck <options> <tarantool_config>\n\n");
 	gopt_help(opts_def);
 	return 1;
 }

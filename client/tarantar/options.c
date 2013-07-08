@@ -61,8 +61,8 @@ void ts_options_free(struct ts_options *opts) {
 
 int ts_options_usage(void)
 {
-	printf("usage: tarantool_snap <options> <tarantool_config>\n\n");
-	printf("tarantool snap.\n");
+	printf("Tarantool XLOG compression utility.\n");
+	printf("Usage: tarantar <options> <tarantool_config>\n\n");
 	gopt_help(opts_def);
 	return 1;
 }

@@ -140,7 +140,8 @@ useradd -r -g tarantool tarantool
 %defattr(-,root,root,-)
 "%{_mandir}/man1/tarantool.1.gz"
 "%{_bindir}/tarantool"
-"%{_bindir}/tarantool_checksum"
+"%{_bindir}/tarancheck"
+"%{_bindir}/tarantar"
 
 %changelog
 * Mon May 20 2013 Dmitry Simonenko <support@tarantool.org> 1.0-1
