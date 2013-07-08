@@ -32,8 +32,7 @@ end
 -- starts from the key.
 --
 function box.select_range(sno, ino, limit, ...)
-    return box.net.self:select_range(tonumber(sno), tonumber(ino),
-        tonumber(limit), ...)
+    return box.net.self:select_range(sno, ino, limit, ...)
 end
 
 --
@@ -42,8 +41,7 @@ end
 -- starts from the key.
 --
 function box.select_reverse_range(sno, ino, limit, ...)
-    return box.net.self:select_reverse_range(tonumber(sno), tonumber(ino),
-        tonumber(limit), ...)
+    return box.net.self:select_reverse_range(sno, ino, limit, ...)
 end
 
 --
