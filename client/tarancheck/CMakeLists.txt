@@ -1,6 +1,6 @@
 project(tnt_checksum)
 
-set (util_checksum "tarantool_checksum")
+set (util_checksum "tarancheck")
 set (util_checksum_sources tc_main.c tc_options.c tc_config.c tc_space.c tc_file.c tc_generate.c tc_verify.c)
 set (util_checksum_libs tntrpl tntnet tnt gopt)
 

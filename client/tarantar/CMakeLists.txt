@@ -1,6 +1,6 @@
 project(tnt_snap)
 
-set (util_snap "tarantool_snap")
+set (util_snap "tarantar")
 set (util_snap_sources sha1.c main.c config.c space.c options.c indexate.c ref.c cursor.c snapshot.c update.cc compat.c)
 set (util_snap_libs tntrpl tntnet tnt)
 

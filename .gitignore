@@ -20,7 +20,8 @@ RPM
 TAGS
 extra/txt2c
 client/tarantool/tarantool
-client/tarantool_checksum/tarantool_checksum
+client/tarancheck/tarancheck
+client/tarantar/tarantar
 cmake_install.cmake
 config.mk
 connector/c/tnt/libtarantool.so.1
