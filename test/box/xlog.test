@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 import os
 from os.path import abspath
@@ -16,11 +16,11 @@ wal_inprogress = os.path.join(vardir, "00000000000000000002.xlog.inprogress")
 wal = os.path.join(vardir, "00000000000000000002.xlog")
 
 server.start()
-exec sql "insert into t0 values (1, 'first tuple')"
+sql("insert into t0 values (1, 'first tuple')")
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress exists"
 
-exec sql "insert into t0 values (2, 'second tuple')"
+sql("insert into t0 values (2, 'second tuple')")
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress has been successfully renamed"
@@ -34,7 +34,7 @@ server.start()
 wal_inprogress = os.path.join(vardir, "00000000000000000004.xlog.inprogress")
 wal = os.path.join(vardir, "00000000000000000004.xlog")
 
-exec sql "insert into t0 values (3, 'third tuple')"
+sql("insert into t0 values (3, 'third tuple')")
 
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000004.xlog.inprogress exists"
@@ -119,9 +119,9 @@ shutil.copy(abspath("box/dup_key1.xlog"),
 shutil.copy(abspath("box/dup_key2.xlog"),
            os.path.join(vardir, "00000000000000000004.xlog"))
 server.start()
-exec admin "lua box.space[0]:select(0, 1)"
-exec admin "lua box.space[0]:select(0, 2)"
-exec admin "lua #box.space[0]"
+admin("lua box.space[0]:select(0, 1)")
+admin("lua box.space[0]:select(0, 2)")
+admin("lua #box.space[0]")
 
 # cleanup
 server.stop()

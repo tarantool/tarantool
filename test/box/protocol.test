@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 import subprocess
 import sys
@@ -10,5 +10,5 @@ p.wait()
 for line in p.stdout.readlines():
       sys.stdout.write(line)
 
-exec sql "delete from t0 where k0 = 1"
+sql("delete from t0 where k0 = 1")
 # vim: syntax=python

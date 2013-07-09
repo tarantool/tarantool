@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 import os
 import shutil
@@ -6,103 +6,103 @@ import shutil
 iterator_lua_path = os.path.join(vardir, "utils.lua")
 shutil.copy("big/utils.lua", iterator_lua_path)
 
-exec admin "lua dofile('utils.lua')"
+admin("lua dofile('utils.lua')")
 shutil.rmtree(iterator_lua_path, True)
 
-exec admin "lua box.insert(20, 'pid_001', 'sid_001', 'tid_998', 'a')"
-exec admin "lua box.insert(20, 'pid_002', 'sid_001', 'tid_997', 'a')"
-exec admin "lua box.insert(20, 'pid_003', 'sid_002', 'tid_997', 'b')"
-exec admin "lua box.insert(20, 'pid_005', 'sid_002', 'tid_996', 'b')"
-exec admin "lua box.insert(20, 'pid_007', 'sid_003', 'tid_996', 'a')"
-exec admin "lua box.insert(20, 'pid_011', 'sid_004', 'tid_996', 'c')"
-exec admin "lua box.insert(20, 'pid_013', 'sid_005', 'tid_996', 'b')"
-exec admin "lua box.insert(20, 'pid_017', 'sid_006', 'tid_996', 'a')"
-exec admin "lua box.insert(20, 'pid_019', 'sid_005', 'tid_995', 'a')"
-exec admin "lua box.insert(20, 'pid_023', 'sid_005', 'tid_994', 'a')"
+admin("lua box.insert(20, 'pid_001', 'sid_001', 'tid_998', 'a')")
+admin("lua box.insert(20, 'pid_002', 'sid_001', 'tid_997', 'a')")
+admin("lua box.insert(20, 'pid_003', 'sid_002', 'tid_997', 'b')")
+admin("lua box.insert(20, 'pid_005', 'sid_002', 'tid_996', 'b')")
+admin("lua box.insert(20, 'pid_007', 'sid_003', 'tid_996', 'a')")
+admin("lua box.insert(20, 'pid_011', 'sid_004', 'tid_996', 'c')")
+admin("lua box.insert(20, 'pid_013', 'sid_005', 'tid_996', 'b')")
+admin("lua box.insert(20, 'pid_017', 'sid_006', 'tid_996', 'a')")
+admin("lua box.insert(20, 'pid_019', 'sid_005', 'tid_995', 'a')")
+admin("lua box.insert(20, 'pid_023', 'sid_005', 'tid_994', 'a')")
 
 print """
 #-----------------------------------------------------------------------------#
 # Iterator: tree single-part unique
 #-----------------------------------------------------------------------------#
 """
-exec admin "lua iterate(20, 0, 0, 1)"
-exec admin "lua iterate(20, 0, 0, 1, box.index.ALL)"
-exec admin "lua iterate(20, 0, 0, 1, box.index.EQ)"
-exec admin "lua iterate(20, 0, 0, 1, box.index.REQ)"
-exec admin "lua iterate(20, 0, 0, 1, box.index.GE)"
-exec admin "lua iterate(20, 0, 0, 1, box.index.GT)"
-exec admin "lua iterate(20, 0, 0, 1, box.index.LE)"
-exec admin "lua iterate(20, 0, 0, 1, box.index.LT)"
-exec admin "lua iterate(20, 0, 0, 1, box.index.EQ, 'pid_003')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.REQ, 'pid_003')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.EQ, 'pid_666')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.REQ, 'pid_666')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.GE, 'pid_001')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.GT, 'pid_001')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.GE, 'pid_999')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.GT, 'pid_999')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.LE, 'pid_002')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.LT, 'pid_002')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.LE, 'pid_000')"
-exec admin "lua iterate(20, 0, 0, 1, box.index.LT, 'pid_000')"
+admin("lua iterate(20, 0, 0, 1)")
+admin("lua iterate(20, 0, 0, 1, box.index.ALL)")
+admin("lua iterate(20, 0, 0, 1, box.index.EQ)")
+admin("lua iterate(20, 0, 0, 1, box.index.REQ)")
+admin("lua iterate(20, 0, 0, 1, box.index.GE)")
+admin("lua iterate(20, 0, 0, 1, box.index.GT)")
+admin("lua iterate(20, 0, 0, 1, box.index.LE)")
+admin("lua iterate(20, 0, 0, 1, box.index.LT)")
+admin("lua iterate(20, 0, 0, 1, box.index.EQ, 'pid_003')")
+admin("lua iterate(20, 0, 0, 1, box.index.REQ, 'pid_003')")
+admin("lua iterate(20, 0, 0, 1, box.index.EQ, 'pid_666')")
+admin("lua iterate(20, 0, 0, 1, box.index.REQ, 'pid_666')")
+admin("lua iterate(20, 0, 0, 1, box.index.GE, 'pid_001')")
+admin("lua iterate(20, 0, 0, 1, box.index.GT, 'pid_001')")
+admin("lua iterate(20, 0, 0, 1, box.index.GE, 'pid_999')")
+admin("lua iterate(20, 0, 0, 1, box.index.GT, 'pid_999')")
+admin("lua iterate(20, 0, 0, 1, box.index.LE, 'pid_002')")
+admin("lua iterate(20, 0, 0, 1, box.index.LT, 'pid_002')")
+admin("lua iterate(20, 0, 0, 1, box.index.LE, 'pid_000')")
+admin("lua iterate(20, 0, 0, 1, box.index.LT, 'pid_000')")
 
 print """
 #-----------------------------------------------------------------------------#
 # Iterator: tree single-part non-unique
 #-----------------------------------------------------------------------------#
 """
-exec admin "lua iterate(20, 1, 1, 2, box.index.ALL)"
-exec admin "lua iterate(20, 1, 1, 2, box.index.EQ)"
-exec admin "lua iterate(20, 1, 1, 2, box.index.REQ)"
-exec admin "lua iterate(20, 1, 1, 2, box.index.GE)"
-exec admin "lua iterate(20, 1, 1, 2, box.index.GT)"
-exec admin "lua iterate(20, 1, 1, 2, box.index.LE)"
-exec admin "lua iterate(20, 1, 1, 2, box.index.LT)"
-exec admin "lua iterate(20, 1, 1, 2, box.index.EQ, 'sid_005')"
-exec admin "lua iterate(20, 1, 1, 2, box.index.REQ, 'sid_005')"
-exec admin "lua iterate(20, 1, 1, 2, box.index.GE, 'sid_005')"
-exec admin "lua iterate(20, 1, 1, 2, box.index.GT, 'sid_005')"
-exec admin "lua iterate(20, 1, 1, 2, box.index.GE, 'sid_999')"
-exec admin "lua iterate(20, 1, 1, 2, box.index.GT, 'sid_999')"
-exec admin "lua iterate(20, 1, 1, 2, box.index.LE, 'sid_005')"
-exec admin "lua iterate(20, 1, 1, 2, box.index.LT, 'sid_005')"
-exec admin "lua iterate(20, 1, 1, 2, box.index.LE, 'sid_000')"
-exec admin "lua iterate(20, 1, 1, 2, box.index.LT, 'sid_000')"
+admin("lua iterate(20, 1, 1, 2, box.index.ALL)")
+admin("lua iterate(20, 1, 1, 2, box.index.EQ)")
+admin("lua iterate(20, 1, 1, 2, box.index.REQ)")
+admin("lua iterate(20, 1, 1, 2, box.index.GE)")
+admin("lua iterate(20, 1, 1, 2, box.index.GT)")
+admin("lua iterate(20, 1, 1, 2, box.index.LE)")
+admin("lua iterate(20, 1, 1, 2, box.index.LT)")
+admin("lua iterate(20, 1, 1, 2, box.index.EQ, 'sid_005')")
+admin("lua iterate(20, 1, 1, 2, box.index.REQ, 'sid_005')")
+admin("lua iterate(20, 1, 1, 2, box.index.GE, 'sid_005')")
+admin("lua iterate(20, 1, 1, 2, box.index.GT, 'sid_005')")
+admin("lua iterate(20, 1, 1, 2, box.index.GE, 'sid_999')")
+admin("lua iterate(20, 1, 1, 2, box.index.GT, 'sid_999')")
+admin("lua iterate(20, 1, 1, 2, box.index.LE, 'sid_005')")
+admin("lua iterate(20, 1, 1, 2, box.index.LT, 'sid_005')")
+admin("lua iterate(20, 1, 1, 2, box.index.LE, 'sid_000')")
+admin("lua iterate(20, 1, 1, 2, box.index.LT, 'sid_000')")
 
 print """
 #-----------------------------------------------------------------------------#
 # Iterator: tree multi-part unique
 #-----------------------------------------------------------------------------#
 """
-exec admin "lua iterate(20, 2, 1, 3, box.index.ALL)"
-exec admin "lua iterate(20, 2, 1, 3, box.index.EQ)"
-exec admin "lua iterate(20, 2, 1, 3, box.index.REQ)"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GE)"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GT)"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LE)"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LT)"
-exec admin "lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.REQ, 'sid_005')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_995')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_999')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GT, 'sid_005')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GT, 'sid_005', 'tid_995')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GT, 'sid_005', 'tid_999')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GE, 'sid_999')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GT, 'sid_999')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LE, 'sid_005')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LT, 'sid_005')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LE, 'sid_005', 'tid_997')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LT, 'sid_005', 'tid_997')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LE, 'sid_005', 'tid_000')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LT, 'sid_005', 'tid_000')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LE, 'sid_000')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.LT, 'sid_000')"
+admin("lua iterate(20, 2, 1, 3, box.index.ALL)")
+admin("lua iterate(20, 2, 1, 3, box.index.EQ)")
+admin("lua iterate(20, 2, 1, 3, box.index.REQ)")
+admin("lua iterate(20, 2, 1, 3, box.index.GE)")
+admin("lua iterate(20, 2, 1, 3, box.index.GT)")
+admin("lua iterate(20, 2, 1, 3, box.index.LE)")
+admin("lua iterate(20, 2, 1, 3, box.index.LT)")
+admin("lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005')")
+admin("lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')")
+admin("lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')")
+admin("lua iterate(20, 2, 1, 3, box.index.REQ, 'sid_005')")
+admin("lua iterate(20, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_995')")
+admin("lua iterate(20, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_999')")
+admin("lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005')")
+admin("lua iterate(20, 2, 1, 3, box.index.GT, 'sid_005')")
+admin("lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')")
+admin("lua iterate(20, 2, 1, 3, box.index.GT, 'sid_005', 'tid_995')")
+admin("lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')")
+admin("lua iterate(20, 2, 1, 3, box.index.GT, 'sid_005', 'tid_999')")
+admin("lua iterate(20, 2, 1, 3, box.index.GE, 'sid_999')")
+admin("lua iterate(20, 2, 1, 3, box.index.GT, 'sid_999')")
+admin("lua iterate(20, 2, 1, 3, box.index.LE, 'sid_005')")
+admin("lua iterate(20, 2, 1, 3, box.index.LT, 'sid_005')")
+admin("lua iterate(20, 2, 1, 3, box.index.LE, 'sid_005', 'tid_997')")
+admin("lua iterate(20, 2, 1, 3, box.index.LT, 'sid_005', 'tid_997')")
+admin("lua iterate(20, 2, 1, 3, box.index.LE, 'sid_005', 'tid_000')")
+admin("lua iterate(20, 2, 1, 3, box.index.LT, 'sid_005', 'tid_000')")
+admin("lua iterate(20, 2, 1, 3, box.index.LE, 'sid_000')")
+admin("lua iterate(20, 2, 1, 3, box.index.LT, 'sid_000')")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -110,28 +110,28 @@ print """
 #-----------------------------------------------------------------------------#
 """
 
-exec admin "lua iterate(20, 3, 2, 4, box.index.ALL)"
-exec admin "lua iterate(20, 3, 2, 4, box.index.EQ)"
-exec admin "lua iterate(20, 3, 2, 4, box.index.REQ)"
-exec admin "lua iterate(20, 3, 2, 4, box.index.GE)"
-exec admin "lua iterate(20, 3, 2, 4, box.index.GT)"
-exec admin "lua iterate(20, 3, 2, 4, box.index.LE)"
-exec admin "lua iterate(20, 3, 2, 4, box.index.LT)"
-exec admin "lua iterate(20, 3, 2, 4, box.index.EQ, 'tid_996')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.EQ, 'tid_996', 'a')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.EQ, 'tid_996', 'z')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.REQ, 'tid_996')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.REQ, 'tid_996', 'a')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.REQ, 'tid_996', '0')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.GE, 'tid_997')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.GT, 'tid_997')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.GE, 'tid_998')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.GT, 'tid_998')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.LE, 'tid_997')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.LT, 'tid_997')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.LE, 'tid_000')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.LT, 'tid_000')"
-exec admin "lua iterate(20, 3, 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'keys')"
+admin("lua iterate(20, 3, 2, 4, box.index.ALL)")
+admin("lua iterate(20, 3, 2, 4, box.index.EQ)")
+admin("lua iterate(20, 3, 2, 4, box.index.REQ)")
+admin("lua iterate(20, 3, 2, 4, box.index.GE)")
+admin("lua iterate(20, 3, 2, 4, box.index.GT)")
+admin("lua iterate(20, 3, 2, 4, box.index.LE)")
+admin("lua iterate(20, 3, 2, 4, box.index.LT)")
+admin("lua iterate(20, 3, 2, 4, box.index.EQ, 'tid_996')")
+admin("lua iterate(20, 3, 2, 4, box.index.EQ, 'tid_996', 'a')")
+admin("lua iterate(20, 3, 2, 4, box.index.EQ, 'tid_996', 'z')")
+admin("lua iterate(20, 3, 2, 4, box.index.REQ, 'tid_996')")
+admin("lua iterate(20, 3, 2, 4, box.index.REQ, 'tid_996', 'a')")
+admin("lua iterate(20, 3, 2, 4, box.index.REQ, 'tid_996', '0')")
+admin("lua iterate(20, 3, 2, 4, box.index.GE, 'tid_997')")
+admin("lua iterate(20, 3, 2, 4, box.index.GT, 'tid_997')")
+admin("lua iterate(20, 3, 2, 4, box.index.GE, 'tid_998')")
+admin("lua iterate(20, 3, 2, 4, box.index.GT, 'tid_998')")
+admin("lua iterate(20, 3, 2, 4, box.index.LE, 'tid_997')")
+admin("lua iterate(20, 3, 2, 4, box.index.LT, 'tid_997')")
+admin("lua iterate(20, 3, 2, 4, box.index.LE, 'tid_000')")
+admin("lua iterate(20, 3, 2, 4, box.index.LT, 'tid_000')")
+admin("lua iterate(20, 3, 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'keys')")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -139,29 +139,29 @@ print """
 #-----------------------------------------------------------------------------#
 """
 
-exec admin "lua iterate(20, 4, 0, 1)"
-exec admin "lua iterate(20, 4, 0, 1, box.index.ALL)"
-exec admin "lua iterate(20, 4, 0, 1, box.index.EQ)"
-exec admin "lua iterate(20, 4, 0, 1, box.index.GE)"
-exec admin "lua iterate(20, 4, 0, 1, box.index.EQ, 'pid_003')"
-exec admin "lua iterate(20, 4, 0, 1, box.index.EQ, 'pid_666')"
-exec admin "lua iterate(20, 4, 0, 1, box.index.GE, 'pid_001')"
-exec admin "lua iterate(20, 4, 0, 1, box.index.GE, 'pid_999')"
+admin("lua iterate(20, 4, 0, 1)")
+admin("lua iterate(20, 4, 0, 1, box.index.ALL)")
+admin("lua iterate(20, 4, 0, 1, box.index.EQ)")
+admin("lua iterate(20, 4, 0, 1, box.index.GE)")
+admin("lua iterate(20, 4, 0, 1, box.index.EQ, 'pid_003')")
+admin("lua iterate(20, 4, 0, 1, box.index.EQ, 'pid_666')")
+admin("lua iterate(20, 4, 0, 1, box.index.GE, 'pid_001')")
+admin("lua iterate(20, 4, 0, 1, box.index.GE, 'pid_999')")
 
 print """
 #-----------------------------------------------------------------------------#
 # Iterator: hash multi-part unique
 #-----------------------------------------------------------------------------#
 """
-exec admin "lua iterate(20, 5, 1, 3, box.index.ALL)"
-exec admin "lua iterate(20, 5, 1, 3, box.index.EQ)"
-exec admin "lua iterate(20, 5, 1, 3, box.index.EQ, 'sid_005')"
-exec admin "lua iterate(20, 5, 1, 3, box.index.GE)"
-exec admin "lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')"
-exec admin "lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')"
+admin("lua iterate(20, 5, 1, 3, box.index.ALL)")
+admin("lua iterate(20, 5, 1, 3, box.index.EQ)")
+admin("lua iterate(20, 5, 1, 3, box.index.EQ, 'sid_005')")
+admin("lua iterate(20, 5, 1, 3, box.index.GE)")
+admin("lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')")
+admin("lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')")
+admin("lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')")
+admin("lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')")
+admin("lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -169,6 +169,6 @@ print """
 #-----------------------------------------------------------------------------#
 """
 
-exec admin "lua box.space[20].index[0]:iterator(-666)"
+admin("lua box.space[20].index[0]:iterator(-666)")
 
-exec admin "lua box.space[20]:truncate()"
+admin("lua box.space[20]:truncate()")

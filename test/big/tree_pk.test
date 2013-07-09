@@ -1,44 +1,44 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 # integer keys
-exec sql "insert into t2 values (1, 'tuple')"
-exec admin "save snapshot"
-exec sql "insert into t2 values (2, 'tuple 2')"
-exec admin "save snapshot"
+sql("insert into t2 values (1, 'tuple')")
+admin("save snapshot")
+sql("insert into t2 values (2, 'tuple 2')")
+admin("save snapshot")
 
-exec sql "insert into t2 values (3, 'tuple 3')"
-exec sql "select * from t2 where k0 = 1"
-exec sql "select * from t2 where k0 = 2"
-exec sql "select * from t2 where k0 = 3"
+sql("insert into t2 values (3, 'tuple 3')")
+sql("select * from t2 where k0 = 1")
+sql("select * from t2 where k0 = 2")
+sql("select * from t2 where k0 = 3")
 
 # Cleanup
-exec sql "delete from t2 where k0 = 1"
-exec sql "delete from t2 where k0 = 2"
-exec sql "delete from t2 where k0 = 3"
+sql("delete from t2 where k0 = 1")
+sql("delete from t2 where k0 = 2")
+sql("delete from t2 where k0 = 3")
 
 # Test incorrect keys - supplied key field type does not match index type
 # https://bugs.launchpad.net/tarantool/+bug/1072624
-exec sql "insert into t2 VALUES('xxxxxxx')"
-exec sql "insert into t2 VALUES('')"
-exec sql "insert into t2 VALUES('12')"
+sql("insert into t2 VALUES('xxxxxxx')")
+sql("insert into t2 VALUES('')")
+sql("insert into t2 VALUES('12')")
 
 # string keys
-exec sql "insert into t3 values ('identifier', 'tuple')"
-exec admin "save snapshot"
-exec sql "insert into t3 values ('second', 'tuple 2')"
-exec admin "save snapshot"
-exec sql "call box.select_range('3', '0', '100', 'second')"
-exec sql "call box.select_range('3', '0', '100', 'identifier')"
+sql("insert into t3 values ('identifier', 'tuple')")
+admin("save snapshot")
+sql("insert into t3 values ('second', 'tuple 2')")
+admin("save snapshot")
+sql("call box.select_range('3', '0', '100', 'second')")
+sql("call box.select_range('3', '0', '100', 'identifier')")
 
-exec sql "insert into t3 values ('third', 'tuple 3')"
-exec sql "select * from t3 where k0 = 'identifier'"
-exec sql "select * from t3 where k0 = 'second'"
-exec sql "select * from t3 where k0 = 'third'"
+sql("insert into t3 values ('third', 'tuple 3')")
+sql("select * from t3 where k0 = 'identifier'")
+sql("select * from t3 where k0 = 'second'")
+sql("select * from t3 where k0 = 'third'")
 
 # Cleanup
-exec sql "delete from t3 where k0 = 'identifier'"
-exec sql "delete from t3 where k0 = 'second'"
-exec sql "delete from t3 where k0 = 'third'"
+sql("delete from t3 where k0 = 'identifier'")
+sql("delete from t3 where k0 = 'second'")
+sql("delete from t3 where k0 = 'third'")
 lua = """
 function box.crossjoin(space0, space1, limit)
   space0 = tonumber(space0)
@@ -58,124 +58,124 @@ function box.crossjoin(space0, space1, limit)
   end
   return unpack(result)
 end"""
-exec sql "insert into t2 values (1, 'tuple')"
-exec sql "insert into t3 values (1, 'tuple')"
-exec sql "insert into t3 values (2, 'tuple')"
-exec admin "lua " + lua.replace('\n', ' ')
-exec sql "call box.crossjoin('3', '3', '0')"
-exec sql "call box.crossjoin('3', '3', '5')"
-exec sql "call box.crossjoin('3', '3', '10000')"
-exec sql "call box.crossjoin('3', '2', '10000')"
-exec admin "lua box.space[3]:truncate()"
+sql("insert into t2 values (1, 'tuple')")
+sql("insert into t3 values (1, 'tuple')")
+sql("insert into t3 values (2, 'tuple')")
+admin("lua "+ lua.replace('\n', ' ')) 
+sql("call box.crossjoin('3', '3', '0')")
+sql("call box.crossjoin('3', '3', '5')")
+sql("call box.crossjoin('3', '3', '10000')")
+sql("call box.crossjoin('3', '2', '10000')")
+admin("lua box.space[3]:truncate()")
 
 # Bug #922520 - select missing keys
-exec sql "insert into t2 values (200, 'select me!')"
-exec sql "select * from t2 where k0 = 200"
-exec sql "select * from t2 where k0 = 199"
-exec sql "select * from t2 where k0 = 201"
+sql("insert into t2 values (200, 'select me!')")
+sql("select * from t2 where k0 = 200")
+sql("select * from t2 where k0 = 199")
+sql("select * from t2 where k0 = 201")
 
 # Test partially specified keys in TREE indexes
-exec sql "insert into t15 values ('abcd')"
-exec sql "insert into t15 values ('abcda')"
-exec sql "insert into t15 values ('abcda_')"
-exec sql "insert into t15 values ('abcdb')"
-exec sql "insert into t15 values ('abcdb_')"
-exec sql "insert into t15 values ('abcdb__')"
-exec sql "insert into t15 values ('abcdb___')"
-exec sql "insert into t15 values ('abcdc')"
-exec sql "insert into t15 values ('abcdc_')"
-exec admin "lua box.space[15].index[0]:select_range(3, 'abcdb')"
-exec admin "lua box.space[15]:truncate()"
+sql("insert into t15 values ('abcd')")
+sql("insert into t15 values ('abcda')")
+sql("insert into t15 values ('abcda_')")
+sql("insert into t15 values ('abcdb')")
+sql("insert into t15 values ('abcdb_')")
+sql("insert into t15 values ('abcdb__')")
+sql("insert into t15 values ('abcdb___')")
+sql("insert into t15 values ('abcdc')")
+sql("insert into t15 values ('abcdc_')")
+admin("lua box.space[15].index[0]:select_range(3, 'abcdb')")
+admin("lua box.space[15]:truncate()")
 
 #
 # tree::replace tests
 #
 
-exec admin "lua box.space[22]:truncate()"
+admin("lua box.space[22]:truncate()")
 
-exec sql "insert into t22 values (0, 0, 0, 0)"
-exec sql "insert into t22 values (1, 1, 1, 1)"
-exec sql "insert into t22 values (2, 2, 2, 2)"
-
-# OK
-exec sql "replace into t22 values (1, 1, 1, 1)"
-exec sql "replace into t22 values (1, 10, 10, 10)"
-exec sql "replace into t22 values (1, 1, 1, 1)"
-exec sql "select * from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k1 = 10"
-exec sql "select * from t22 WHERE k2 = 10"
-exec sql "select * from t22 WHERE k3 = 10"
-exec sql "select * from t22 WHERE k0 = 1"
-exec sql "select * from t22 WHERE k1 = 1"
-exec sql "select * from t22 WHERE k2 = 1"
-exec sql "select * from t22 WHERE k3 = 1"
+sql("insert into t22 values (0, 0, 0, 0)")
+sql("insert into t22 values (1, 1, 1, 1)")
+sql("insert into t22 values (2, 2, 2, 2)")
 
 # OK
-exec sql "insert into t22 values (10, 10, 10, 10)"
-exec sql "delete from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k1 = 10"
-exec sql "select * from t22 WHERE k2 = 10"
-exec sql "select * from t22 WHERE k3 = 10"
+sql("replace into t22 values (1, 1, 1, 1)")
+sql("replace into t22 values (1, 10, 10, 10)")
+sql("replace into t22 values (1, 1, 1, 1)")
+sql("select * from t22 WHERE k0 = 10")
+sql("select * from t22 WHERE k1 = 10")
+sql("select * from t22 WHERE k2 = 10")
+sql("select * from t22 WHERE k3 = 10")
+sql("select * from t22 WHERE k0 = 1")
+sql("select * from t22 WHERE k1 = 1")
+sql("select * from t22 WHERE k2 = 1")
+sql("select * from t22 WHERE k3 = 1")
+
+# OK
+sql("insert into t22 values (10, 10, 10, 10)")
+sql("delete from t22 WHERE k0 = 10")
+sql("select * from t22 WHERE k0 = 10")
+sql("select * from t22 WHERE k1 = 10")
+sql("select * from t22 WHERE k2 = 10")
+sql("select * from t22 WHERE k3 = 10")
 
 
 # TupleFound (primary key)
-exec sql "insert into t22 values (1, 10, 10, 10)"
-exec sql "select * from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k1 = 10"
-exec sql "select * from t22 WHERE k2 = 10"
-exec sql "select * from t22 WHERE k3 = 10"
-exec sql "select * from t22 WHERE k0 = 1"
+sql("insert into t22 values (1, 10, 10, 10)")
+sql("select * from t22 WHERE k0 = 10")
+sql("select * from t22 WHERE k1 = 10")
+sql("select * from t22 WHERE k2 = 10")
+sql("select * from t22 WHERE k3 = 10")
+sql("select * from t22 WHERE k0 = 1")
 
 # TupleNotFound (primary key)
-exec sql "replace into t22 values (10, 10, 10, 10)"
-exec sql "select * from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k1 = 10"
-exec sql "select * from t22 WHERE k2 = 10"
-exec sql "select * from t22 WHERE k3 = 10"
+sql("replace into t22 values (10, 10, 10, 10)")
+sql("select * from t22 WHERE k0 = 10")
+sql("select * from t22 WHERE k1 = 10")
+sql("select * from t22 WHERE k2 = 10")
+sql("select * from t22 WHERE k3 = 10")
 
 # TupleFound (key #1)
-exec sql "insert into t22 values (10, 0, 10, 10)"
-exec sql "select * from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k1 = 10"
-exec sql "select * from t22 WHERE k2 = 10"
-exec sql "select * from t22 WHERE k3 = 10"
-exec sql "select * from t22 WHERE k1 = 0"
+sql("insert into t22 values (10, 0, 10, 10)")
+sql("select * from t22 WHERE k0 = 10")
+sql("select * from t22 WHERE k1 = 10")
+sql("select * from t22 WHERE k2 = 10")
+sql("select * from t22 WHERE k3 = 10")
+sql("select * from t22 WHERE k1 = 0")
 
 # TupleFound (key #1)
-exec sql "replace into t22 values (2, 0, 10, 10)"
-exec sql "select * from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k1 = 10"
-exec sql "select * from t22 WHERE k2 = 10"
-exec sql "select * from t22 WHERE k3 = 10"
-exec sql "select * from t22 WHERE k1 = 0"
+sql("replace into t22 values (2, 0, 10, 10)")
+sql("select * from t22 WHERE k0 = 10")
+sql("select * from t22 WHERE k1 = 10")
+sql("select * from t22 WHERE k2 = 10")
+sql("select * from t22 WHERE k3 = 10")
+sql("select * from t22 WHERE k1 = 0")
 
 # TupleFound (key #3)
-exec sql "insert into t22 values (10, 10, 10, 0)"
-exec sql "select * from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k1 = 10"
-exec sql "select * from t22 WHERE k2 = 10"
-exec sql "select * from t22 WHERE k3 = 10"
-exec sql "select * from t22 WHERE k3 = 0"
+sql("insert into t22 values (10, 10, 10, 0)")
+sql("select * from t22 WHERE k0 = 10")
+sql("select * from t22 WHERE k1 = 10")
+sql("select * from t22 WHERE k2 = 10")
+sql("select * from t22 WHERE k3 = 10")
+sql("select * from t22 WHERE k3 = 0")
 
 # TupleFound (key #3)
-exec sql "replace into t22 values (2, 10, 10, 0)"
-exec sql "select * from t22 WHERE k0 = 10"
-exec sql "select * from t22 WHERE k1 = 10"
-exec sql "select * from t22 WHERE k2 = 10"
-exec sql "select * from t22 WHERE k3 = 10"
-exec sql "select * from t22 WHERE k3 = 0"
+sql("replace into t22 values (2, 10, 10, 0)")
+sql("select * from t22 WHERE k0 = 10")
+sql("select * from t22 WHERE k1 = 10")
+sql("select * from t22 WHERE k2 = 10")
+sql("select * from t22 WHERE k3 = 10")
+sql("select * from t22 WHERE k3 = 0")
 
 sql.sort = True
 # Non-Uniq test (key #2)
-exec sql "insert into t22 values (4, 4, 0, 4)"
-exec sql "insert into t22 values (5, 5, 0, 5)"
-exec sql "insert into t22 values (6, 6, 0, 6)"
-exec sql "replace into t22 values (5, 5, 0, 5)"
-exec sql "select * from t22 WHERE k2 = 0"
-exec sql "delete from t22 WHERE k0 = 5"
-exec sql "select * from t22 WHERE k2 = 0"
+sql("insert into t22 values (4, 4, 0, 4)")
+sql("insert into t22 values (5, 5, 0, 5)")
+sql("insert into t22 values (6, 6, 0, 6)")
+sql("replace into t22 values (5, 5, 0, 5)")
+sql("select * from t22 WHERE k2 = 0")
+sql("delete from t22 WHERE k0 = 5")
+sql("select * from t22 WHERE k2 = 0")
 sql.sort = False
 
-exec admin "lua box.space[22]:truncate()"
+admin("lua box.space[22]:truncate()")
 

@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 import os
 import time
 from lib.tarantool_server import TarantoolServer
@@ -29,14 +29,14 @@ print """
 # Insert 10 tuples to master
 """
 for i in range(id, id + 10):
-    exec master_sql "insert into t0 values (%d, 'the tuple %d')" % (i, i)
+    master_sql("insert into t0 values (%d, 'the tuple %d')" % (i, i))
 
 
 print """
 # Select 10 tuples from master
 """
 for i in range(id, id + 10):
-    exec master_sql "select * from t0 where k0 = %d" % i
+    master_sql("select * from t0 where k0 = %d" % i)
 
 
 print """
@@ -44,7 +44,7 @@ print """
 """
 replica.wait_lsn(11)
 for i in range(id, id + 10):
-    exec replica_sql "select * from t0 where k0 = %d" % i
+    replica_sql("select * from t0 where k0 = %d" % i)
 
 
 print """
@@ -61,14 +61,14 @@ print """
 # Insert 10 tuples to hot_standby
 """
 for i in range(id, id + 10):
-    exec hot_standby_sql "insert into t0 values (%d, 'the tuple %d')" % (i, i)
+    hot_standby_sql("insert into t0 values (%d, 'the tuple %d')" % (i, i))
 
 
 print """
 # Select 10 tuples from hot_standby
 """
 for i in range(id, id + 10):
-    exec hot_standby_sql "select * from t0 where k0 = %d" % i
+    hot_standby_sql("select * from t0 where k0 = %d" % i)
 
 
 print """
@@ -76,7 +76,7 @@ print """
 """
 replica.wait_lsn(21)
 for i in range(id, id + 10):
-    exec replica_sql "select * from t0 where k0 = %d" % i
+    replica_sql("select * from t0 where k0 = %d" % i)
 
 
 # Cleanup.

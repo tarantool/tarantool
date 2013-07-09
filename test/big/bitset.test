@@ -1,4 +1,4 @@
-# encoding: tarantool
+# encoding: utf-8
 #
 
 import os
@@ -8,7 +8,7 @@ for file in ("utils.lua", "bitset.lua"):
     src_path = os.path.join("big/", file)
     dst_path = os.path.join(vardir, file)
     shutil.copy(src_path, dst_path)
-    exec admin "lua dofile('%s')" % (file)
+    admin("lua dofile('%s')" % (file)) 
     os.unlink(dst_path);
 
 print """
@@ -17,7 +17,7 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua test_insert_delete(128)"
+admin("lua test_insert_delete(128)")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -25,9 +25,9 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua clear()"
-exec admin "lua fill(1, 128)"
-exec admin "lua dump(box.index.BITS_ALL)"
+admin("lua clear()")
+admin("lua fill(1, 128)")
+admin("lua dump(box.index.BITS_ALL)")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -35,14 +35,14 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua dump(box.index.BITS_ALL_SET, 0)"
+admin("lua dump(box.index.BITS_ALL_SET, 0)")
 
-exec admin "lua dump(box.index.BITS_ALL_SET, 1)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 2)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 8)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 1073741824)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 2147483648)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 4294967296)"
+admin("lua dump(box.index.BITS_ALL_SET, 1)")
+admin("lua dump(box.index.BITS_ALL_SET, 2)")
+admin("lua dump(box.index.BITS_ALL_SET, 8)")
+admin("lua dump(box.index.BITS_ALL_SET, 1073741824)")
+admin("lua dump(box.index.BITS_ALL_SET, 2147483648)")
+admin("lua dump(box.index.BITS_ALL_SET, 4294967296)")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -50,15 +50,15 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua dump(box.index.BITS_ALL_SET, 3)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 7)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 31)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 5)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 10)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 27)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 341)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 2147483649)"
-exec admin "lua dump(box.index.BITS_ALL_SET, 4294967295)"
+admin("lua dump(box.index.BITS_ALL_SET, 3)")
+admin("lua dump(box.index.BITS_ALL_SET, 7)")
+admin("lua dump(box.index.BITS_ALL_SET, 31)")
+admin("lua dump(box.index.BITS_ALL_SET, 5)")
+admin("lua dump(box.index.BITS_ALL_SET, 10)")
+admin("lua dump(box.index.BITS_ALL_SET, 27)")
+admin("lua dump(box.index.BITS_ALL_SET, 341)")
+admin("lua dump(box.index.BITS_ALL_SET, 2147483649)")
+admin("lua dump(box.index.BITS_ALL_SET, 4294967295)")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -66,11 +66,11 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 0)"
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 0)")
 
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 2)"
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 8)"
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 4294967296)"
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 2)")
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 8)")
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 4294967296)")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -78,12 +78,12 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 3)"
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 7)"
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 10)"
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 27)"
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 85)"
-exec admin "lua dump(box.index.BITS_ALL_NOT_SET, 4294967295)"
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 3)")
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 7)")
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 10)")
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 27)")
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 85)")
+admin("lua dump(box.index.BITS_ALL_NOT_SET, 4294967295)")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -91,11 +91,11 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua dump(box.index.BITS_ANY_SET, 0)"
+admin("lua dump(box.index.BITS_ANY_SET, 0)")
 
-exec admin "lua dump(box.index.BITS_ANY_SET, 16)"
-exec admin "lua dump(box.index.BITS_ANY_SET, 128)"
-exec admin "lua dump(box.index.BITS_ANY_SET, 4294967296)"
+admin("lua dump(box.index.BITS_ANY_SET, 16)")
+admin("lua dump(box.index.BITS_ANY_SET, 128)")
+admin("lua dump(box.index.BITS_ANY_SET, 4294967296)")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -103,6 +103,6 @@ print """
 #-----------------------------------------------------------------------------#
 """;
 
-exec admin "lua dump(box.index.BITS_ANY_SET, 7)"
-exec admin "lua dump(box.index.BITS_ANY_SET, 84)"
-exec admin "lua dump(box.index.BITS_ANY_SET, 113)"
+admin("lua dump(box.index.BITS_ANY_SET, 7)")
+admin("lua dump(box.index.BITS_ANY_SET, 84)")
+admin("lua dump(box.index.BITS_ANY_SET, 113)")

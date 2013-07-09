@@ -6,7 +6,6 @@ import subprocess
 
 from subprocess import Popen, PIPE
 
-import tarantool_preprocessor
 
 from server import Server
 from test_suite import FilteredStream, Test

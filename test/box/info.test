@@ -1,29 +1,29 @@
-# encoding: tarantool
+# encoding: utf-8
 import os
 import sys
 # Test Lua from admin console. Whenever producing output,
 # make sure it's a valid YAML.
-exec admin "lua box.info.unknown_variable"
-exec admin "lua box.info[23]"
-exec admin "lua box.info['unknown_variable']"
-exec admin "lua string.match(box.info.version, '^[1-9]') ~= nil"
-exec admin "lua string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil"
-exec admin "lua string.match(box.info.logger_pid, '^[1-9][0-9]*$') ~= nil"
-# exec admin "lua box.info.lsn() > 0"
-# exec admin "lua box.info.recovery_lag()"
-# exec admin "lua box.info.recovery_last_update()"
-# exec admin "lua box.info.status()"
-exec admin "lua box.info.lsn > 0"
-exec admin "lua box.info.recovery_lag"
-exec admin "lua box.info.recovery_last_update"
-exec admin "lua box.info.status"
-exec admin "lua string.len(box.info.config) > 0"
-exec admin "lua string.len(box.info.build.target) > 0"
-exec admin "lua string.len(box.info.build.compiler) > 0"
-exec admin "lua string.len(box.info.build.flags) > 0"
-exec admin "lua string.len(box.info.build.options) > 0"
-exec admin "lua string.len(box.info.uptime) > 0"
-exec admin "lua string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil"
+admin("lua box.info.unknown_variable")
+admin("lua box.info[23]")
+admin("lua box.info['unknown_variable']")
+admin("lua string.match(box.info.version, '^[1-9]') ~= nil")
+admin("lua string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil")
+admin("lua string.match(box.info.logger_pid, '^[1-9][0-9]*$') ~= nil")
+# admin("lua box.info.lsn() > 0")
+# admin("lua box.info.recovery_lag()")
+# admin("lua box.info.recovery_last_update()")
+# admin("lua box.info.status()")
+admin("lua box.info.lsn > 0")
+admin("lua box.info.recovery_lag")
+admin("lua box.info.recovery_last_update")
+admin("lua box.info.status")
+admin("lua string.len(box.info.config) > 0")
+admin("lua string.len(box.info.build.target) > 0")
+admin("lua string.len(box.info.build.compiler) > 0")
+admin("lua string.len(box.info.build.flags) > 0")
+admin("lua string.len(box.info.build.options) > 0")
+admin("lua string.len(box.info.uptime) > 0")
+admin("lua string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil")
 
-exec admin "lua for k, v in pairs(box.info()) do print(k) end"
-exec admin "lua box.info.snapshot_pid"
+admin("lua for k, v in pairs(box.info()) do print(k) end")
+admin("lua box.info.snapshot_pid")

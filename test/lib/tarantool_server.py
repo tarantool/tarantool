@@ -10,8 +10,6 @@ import subprocess
 import ConfigParser
 import pprint
 
-import tarantool_preprocessor
-
 from server import Server
 from box_connection import BoxConnection
 from test_suite import FilteredStream, Test
