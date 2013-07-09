@@ -349,7 +349,7 @@ tuple_print(struct tbuf *buf, const struct tuple *tuple)
 
 	struct tuple_iterator it;
 	const char *field;
-	uint32_t len;
+	uint32_t len = 0;
 	tuple_rewind(&it, tuple);
 	field = tuple_next(&it, &len);
 	print_field(buf, field, len);
@@ -457,7 +457,7 @@ tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	struct tuple_format *format_b = tuple_format(tuple_b);
 	const char *field_a;
 	const char *field_b;
-	int r;
+	int r = 0;
 
 	for (; part < end; part++) {
 		field_a = tuple_field_old(format_a, tuple_a, part->fieldno);

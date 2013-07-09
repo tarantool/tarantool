@@ -1312,7 +1312,12 @@ typedef struct
 
 #else
 
-  EV_API_DECL ev_tstamp ev_rt_now = 0; /* needs to be initialised to make it a definition despite extern */
+#ifdef EV_API_STATIC
+  static ev_tstamp ev_rt_now = 0;
+#else
+  ev_tstamp ev_rt_now = 0;
+#endif
+
   #define VAR(name,decl) static decl;
     #include "ev_vars.h"
   #undef VAR

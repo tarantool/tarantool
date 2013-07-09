@@ -109,7 +109,7 @@ struct mslab {
 	 * - it makes it possible to iterate over all
 	 *   objects in a slab.
 	 */
-	mbitmap_t map[];
+	mbitmap_t map[0];
 };
 
 static inline size_t

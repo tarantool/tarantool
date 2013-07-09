@@ -483,7 +483,7 @@ lbox_tuple_index(struct lua_State *L)
 		if (i >= tuple->field_count)
 			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
 				   tuplelib_name, i, tuple->field_count-1);
-		uint32_t len;
+		uint32_t len = 0;
 		const char *field = tuple_field(tuple, i, &len);
 		lua_pushlstring(L, field, len);
 		return 1;

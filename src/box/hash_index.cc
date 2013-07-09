@@ -60,7 +60,7 @@ static inline uint32_t
 mh_index_hash(struct tuple *const *tuple, const struct key_def *key_def)
 {
 	struct key_part *part = key_def->parts;
-	uint32_t size;
+	uint32_t size = 0;
 	/*
 	 * Speed up the simplest case when we have a
 	 * single-part hash over an integer field.
@@ -265,6 +265,7 @@ struct tuple *
 HashIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(key_def->is_unique && part_count == key_def->part_count);
+	(void) part_count;
 
 	struct tuple *ret = NULL;
 	uint32_t k = mh_index_find(hash, key, key_def);

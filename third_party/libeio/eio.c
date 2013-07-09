@@ -2279,7 +2279,7 @@ static void
 eio_execute (etp_worker *self, eio_req *req)
 {
 #if HAVE_AT
-  int dirfd;
+  int dirfd = -1;
 #else
   const char *path;
 #endif
