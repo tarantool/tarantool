@@ -15,8 +15,8 @@ Build-Depends: cdbs, debhelper (>= 8),
 Section: database
 Standards-Version: 3.9.3
 Homepage: http://tarantool.org/
-VCS-Browser: https://github.com/mailru/tarantool
-VCS-Git: git://github.com/mailru/tarantool.git
+VCS-Browser: https://github.com/tarantool/tarantool
+VCS-Git: git://github.com/tarantool/tarantool.git
 
 Package: tarantool-common
 Architecture: all

@@ -62,7 +62,7 @@ A fast and customizable message queue server is up and running.
 
 - [YCSB benchmark results](benchmark.html)
 - [FAQ](faq.html)
-- [Source repository](http://github.com/mailru/tarantool)
+- [Source repository](http://github.com/tarantool/tarantool)
 - [Lua stored procedures repository]( http://github.com/mailru/tntlua)
 
 

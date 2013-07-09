@@ -155,8 +155,8 @@ to enable it:
 # Development branch
 
 In the same manner as for [the stable
-branch](http://github.com/mailru/tarantool/tree/stable), every push into [the master
-branch](http://github.com/mailru/tarantool) is [available
+branch](http://github.com/tarantool/tarantool/tree/stable), every push into [the master
+branch](http://github.com/tarantool/tarantool) is [available
 online](http://tarantool.org/dist/master).
 The server roadmap is maintained on [Launchpad](http://launchpad.net/tarantool).
 
@@ -164,12 +164,12 @@ The server roadmap is maintained on [Launchpad](http://launchpad.net/tarantool).
 
 - Perl driver, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.37/lib/DR/Tarantool.pm)
 - Java driver, [Maven repository](http://dgreenru.github.com/tarantool-java)
-- Ruby driver, [http://github.com/mailru/tarantool-ruby](https://github.com/mailru/tarantool-ruby)
+- Ruby driver, [http://github.com/tarantool/tarantool-ruby](https://github.com/tarantool/tarantool-ruby)
 - Python driver, [http://pypi.python.org/pypi/tarantool](http://pypi.python.org/pypi/tarantool)
-- PHP driver, [https://github.com/mailru/tarantool-php](https://github.com/mailru/tarantool-php)
+- PHP driver, [https://github.com/tarantool/tarantool-php](https://github.com/tarantool/tarantool-php)
 - node.js driver,
   [https://github.com/devgru/node-tarantool](https://github.com/devgru/node-tarantool)
-- C connector [is maintained in the server source tree](https://github.com/mailru/tarantool/blob/master/connector/c)
+- C connector [is maintained in the server source tree](https://github.com/tarantool/tarantool/blob/master/connector/c)
 
 {% page download ru %}
 
@@ -321,9 +321,9 @@ href="http://tarantool.org/dist">http://tarantool.org/dist</a>.
 ### Доступ из языков программирования
 
 - Perl driver [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.37/lib/DR/Tarantool.pm)
-- [Ruby driver](https://github.com/mailru/tarantool-ruby)
+- [Ruby driver](https://github.com/tarantool/tarantool-ruby)
 - Python driver, [hosted at pypi.python.org](http://pypi.python.org/pypi/tarantool)
-- PHP driver [https://github.com/mailru/tarantool-php](https://github.com/mailru/tarantool-php)
+- PHP driver [https://github.com/tarantool/tarantool-php](https://github.com/tarantool/tarantool-php)
 - Java driver, [Maven repository](http://dgreenru.github.com/tarantool-java)
 - node.js driver,
   [https://github.com/devgru/node-tarantool](https://github.com/devgru/node-tarantool)

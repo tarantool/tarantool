@@ -342,7 +342,7 @@ localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
                 <simplelist>
                     <member><code>op</code> &mdash; number, any
                     Tarantool command code, except 22 (CALL). See
-                    <link xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt">
+                    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt">
                     <filename>doc/box-protocol.txt</filename></link>.
                     </member>
                     <member><code>request</code> &mdash; command
@@ -955,7 +955,7 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
                 client as <constant>ER_PROC_LUA</constant>. This function
                 makes it possible to emulate any kind of native exception,
                 such as a unique constraint violation, no such space/index,
-                etc. A complete list of errors is present in <link xlink:href="https://github.com/mailru/tarantool/blob/master/include/errcode.h">errcode.h</link>
+                etc. A complete list of errors is present in <link xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h">errcode.h</link>
                 file in the source tree.
                 Lua constants which correspond to Tarantool errors
                 are defined in <code>box.error</code> module. The error
@@ -1239,7 +1239,7 @@ lua box.cjson.decode('{"hello": "world"}').hello
     functions. For example, instead of <code>box.insert(0, ...)</code>
     one can write <code>box.space[0]:insert(...)</code>.
     Package source code is available in file <filename
-    xlink:href="https://github.com/mailru/tarantool/blob/master/src/box/box.lua">src/box/box.lua</filename></para>
+    xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/box.lua">src/box/box.lua</filename></para>
     <para>A list of all <code>space</code> members follows.</para>
     <varlistentry>
         <term><emphasis role="lua">space.n</emphasis></term>

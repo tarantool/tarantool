@@ -26,7 +26,7 @@ We use Git for revision control. The latest development
 is happening in the 'master' branch. 
 Our git repository is hosted on github, and can be
 checked out with 
-git clone git://github.com/mailru/tarantool.git # anonymous
+git clone git://github.com/tarantool/tarantool.git # anonymous
 # read-only access
 
 If you have any questions about Tarantool internals,

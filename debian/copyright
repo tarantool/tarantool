@@ -2,7 +2,7 @@ Format: http://dep.debian.net/deps/dep5/
 Debianized-By: Dmitry E. Oboukhov <unera@debian.org>
 Upstream-Name: tarantool, tarantool-box
 Upstream-Contact: tarantool-developers@lists.launchpad.net
-Source: https://github.com/mailru/tarantool
+Source: https://github.com/tarantool/tarantool
 
 Files: third_party/libev/* third_party/coro/*
 Copyright: 2007,2008,2009 Marc Alexander Lehmann.

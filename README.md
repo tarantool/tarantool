@@ -1,4 +1,4 @@
-TARANTOOL/BOX, http://tarantool.org
+TARANTOOL, http://tarantool.org
 
 Tarantool is a framework for in-memory key/value storage and
 Box is a yet another in-memory key-value database.

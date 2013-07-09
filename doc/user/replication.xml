@@ -65,7 +65,7 @@
     necessary to enable <olink targetptr="replication_port"/> in
     the configuration file. An example configuration file can be
     found in <link
-    xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/cfg/master.cfg"><filename>test/box_replication/cfg/master.cfg</filename></link>. A master with enabled replication_port can accept connections
+    xlink:href="https://github.com/tarantool/tarantool/blob/master/test/box_replication/cfg/master.cfg"><filename>test/box_replication/cfg/master.cfg</filename></link>. A master with enabled replication_port can accept connections
     from as many replicas as necessary on that port. Each replica
     has its own replication state.
   </para>
@@ -91,7 +91,7 @@
     necessary to keep WAL files on the master host as long as
     there are replicas that haven't applied them yet. An example
     configuration can be found in <link
-    xlink:href="https://github.com/mailru/tarantool/blob/master/test/box_replication/cfg/replica.cfg"><filename>test/box_replication/cfg/replica.cfg</filename></link>.
+    xlink:href="https://github.com/tarantool/tarantool/blob/master/test/box_replication/cfg/replica.cfg"><filename>test/box_replication/cfg/replica.cfg</filename></link>.
   </para>
   <para>
     In absence of required WALs, a replica can be "re-seeded" at
