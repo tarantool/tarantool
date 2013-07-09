@@ -42,7 +42,8 @@ href="http://tarantool.org/dist/debian">http://tarantool.org/dist/debian</a> and
 href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/ubuntu</a> respectively.
 
 At the moment the repository contains builds for Debian "Sid", "Jessie",
-"Wheezy" and Ubuntu "Precise". It can be added to your apt sources list with:
+"Wheezy" and Ubuntu "Precise", "Quantal", "Raring", "Saucy".
+It can be added to your apt sources list with:
 
     wget http://tarantool.org/dist/public.key
     sudo apt-key add ./public.key
@@ -291,8 +292,8 @@ Tarantool использует стандартную схему нумеров�
 <a href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/ubuntu</a>.
 
 Репозитории содержат пакеты для Debian "Sid", "Jessy",
-"Wheezy" и Ubuntu "Precise". Для установки можно воспользоваться следующим
-скриптом:
+"Wheezy" и Ubuntu "Precise", "Quantal", "Raring", "Saucy".
+Для установки можно воспользоваться следующим скриптом:
 
     wget http://tarantool.org/dist/public.key
     sudo apt-key add ./public.key
