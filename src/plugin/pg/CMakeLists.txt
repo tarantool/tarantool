@@ -1,4 +1,6 @@
-include(FindPostgreSQL)
+# A special hack for buggy FindPostgreSQL.cmake in Debian/Ubuntu
+set(PostgreSQL_ROOT /usr/include/postgresql;/usr/include/postgres)
+find_package(PostgreSQL)
 if (PostgreSQL_FOUND)
 	message(STATUS "box.net.sql(pg): INC=${PostgreSQL_INCLUDE_DIRS}")
 	message(STATUS "box.net.sql(pg): LIBS=${PostgreSQL_LIBRARIES}")
