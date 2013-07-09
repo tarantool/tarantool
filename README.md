@@ -1,18 +1,24 @@
 TARANTOOL, http://tarantool.org
 
-Tarantool is a framework for in-memory key/value storage and
-Box is a yet another in-memory key-value database.
+Tarantool is an efficient in-memory NoSQL database and a
+Lua application server, blended.
 
-Key features of the pair include:
+Key features of the system:
+ * flexible data model
+ * multiple index types: HASH, TREE, BITSET
+ * optional persistency and strong data durability
  * log streaming replication
- * hot standby
- * a simple binary protocol, as well as emulation of memcached
-   protocol
- * extensibility and speed
+ * Lua functions, procedures, triggers, with
+   rich access to database API, JSON support,
+   inter-procedure and network communication libraries
+ * a command line client supporting simple SQL,
+   a native Lua console and Memcached text protocol.
 
-Caveats:
- * supported platforms are Linux/x86 and FreeBSD/x86
- * supported compilers are clang and gcc.
+Tarantool is ideal for data-enriched components of 
+scalable Web architecture: traditional database caches, queue
+servers, in-memory data store for hot data, and so on.
+
+Supported platforms are Linux/x86 and FreeBSD/x86, Mac OS X.
 
 COMPILATION AND INSTALL
 
@@ -59,7 +65,6 @@ simplest way to setup and start the server, but it requires a few
 additional Python modules:
  * daemon
  * pyyaml
- * pexpect.
 
 Once all pre-requisites are installed, try:
 
