@@ -215,7 +215,7 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	}
 
 	if (new_tuple != NULL) {
-		uint32_t len;
+		uint32_t len = 0;
 		const char *field;
 		field = tuple_field(new_tuple, key_def->parts[0].fieldno,
 				    &len);

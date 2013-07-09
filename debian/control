@@ -2,7 +2,6 @@ Source: tarantool
 Priority: optional
 Maintainer: Dmitry E. Oboukhov <unera@debian.org>
 Build-Depends: cdbs, debhelper (>= 8),
- gobjc,
  cmake,
  libreadline-dev,
  python-yaml,
