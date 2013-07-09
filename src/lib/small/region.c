@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "lib/small/region.h"
+#include <sys/types.h> /* ssize_t */
 
 void *
 region_alloc_slow(struct region *region, size_t size)
