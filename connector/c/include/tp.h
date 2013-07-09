@@ -6,7 +6,7 @@
  * (http://tarantool.org)
  *
  * protocol description:
- * https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt
+ * https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt
  * -------------------
  *
  * TP - a C library designed to create requests and process
@@ -35,7 +35,7 @@
  *
  * Before using the library, please get acquainted with
  * Tarnatool binary protocol, documented at
- * https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt
+ * https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt
  *
  * BASIC REQUEST STRUCTURE
  * -----------------------
@@ -138,7 +138,7 @@
  *
  * Note: the library itself doesn't contain #defines for server
  * error codes. They are defined in
- * https://github.com/mailru/tarantool/blob/master/include/errcode.h
+ * https://github.com/tarantool/tarantool/blob/master/include/errcode.h
  *
  * A server failure can be either transient or persistent. For
  * example, a failure to allocate memory is transient: as soon as
@@ -171,7 +171,7 @@
 
 /*
  * Copyright (c) 2012-2013 Tarantool AUTHORS
- * (https://github.com/mailru/tarantool/blob/master/AUTHORS)
+ * (https://github.com/tarantool/tarantool/blob/master/AUTHORS)
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following

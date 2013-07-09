@@ -134,11 +134,11 @@
   Linking C executable tarantool_box
   [100%] Built target tarantool_box</programlisting>
   A complete instruction for building from source is located
-  in the source tree, file <filename xlink:href="https://github.com/mailru/tarantool/blob/master/README.md">README.md</filename>. There
+  in the source tree, file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/README.md">README.md</filename>. There
   are also specialized build instructions for
-  <productname xlink:href="https://github.com/mailru/tarantool/blob/master/README.CentOS">CetnOS</productname>,
-  <productname xlink:href="https://github.com/mailru/tarantool/blob/master/README.FreeBSD">FreeBSD</productname>,
-  <productname xlink:href="https://github.com/mailru/tarantool/blob/master/README.MacOSX">OS
+  <productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.CentOS">CetnOS</productname>,
+  <productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.FreeBSD">FreeBSD</productname>,
+  <productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.MacOSX">OS
   X</productname>.
 </para>
 <para>

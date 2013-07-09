@@ -20,7 +20,7 @@ number of the first record this file contains.
 <para>Apart from a log sequence number and the data change request
 (its format is the same as in the binary protocol and is described
 in <link
-xlink:href="https://github.com/mailru/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>),
+xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>),
 each WAL record contains a checksum and a UNIX time stamp.
 </para>
 
