@@ -5,141 +5,141 @@
 # Insert test
 #
 
-sql("insert into t9 values ('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')", silent=False)
-sql("insert into t9 values ('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')", silent=False)
-sql("insert into t9 values ('Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.')", silent=False)
-sql("insert into t9 values ('Jules', 'Vincent', 1, 'Then what do they call it?')", silent=False)
-sql("insert into t9 values ('Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.')", silent=False)
-sql("insert into t9 values ('Jules', 'Vincent', 2, 'A `Royale` with cheese!')", silent=False)
-sql("insert into t9 values ('Vincent', 'Jules', 3, 'That`s right.')", silent=False)
-sql("insert into t9 values ('Jules', 'Vincent', 3, 'What do they call a Big Mac?')", silent=False)
-sql("insert into t9 values ('Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`')", silent=False)
-sql("insert into t9 values ('Jules', 'Vincent', 4, '`Le Big Mac!`')", silent=False)
-sql("insert into t9 values ('Vincent', 'Jules', 5, 'Ha, ha, ha.')", silent=False)
-sql("insert into t9 values ('Jules', 'Vincent', 5, 'What do they call a `Whopper`?')", silent=False)
-sql("insert into t9 values ('Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.')", silent=False)
+sql("insert into t9 values ('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')")
+sql("insert into t9 values ('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')")
+sql("insert into t9 values ('Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.')")
+sql("insert into t9 values ('Jules', 'Vincent', 1, 'Then what do they call it?')")
+sql("insert into t9 values ('Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.')")
+sql("insert into t9 values ('Jules', 'Vincent', 2, 'A `Royale` with cheese!')")
+sql("insert into t9 values ('Vincent', 'Jules', 3, 'That`s right.')")
+sql("insert into t9 values ('Jules', 'Vincent', 3, 'What do they call a Big Mac?')")
+sql("insert into t9 values ('Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`')")
+sql("insert into t9 values ('Jules', 'Vincent', 4, '`Le Big Mac!`')")
+sql("insert into t9 values ('Vincent', 'Jules', 5, 'Ha, ha, ha.')")
+sql("insert into t9 values ('Jules', 'Vincent', 5, 'What do they call a `Whopper`?')")
+sql("insert into t9 values ('Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.')")
 
-sql("insert into t9 values ('The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.')", silent=False)
-sql("insert into t9 values ('Vincent', 'The Wolf!', 0, 'A please would be nice.')", silent=False)
-sql("insert into t9 values ('The Wolf!', 'Vincent', 1, 'Come again?')", silent=False)
-sql("insert into t9 values ('Vincent', 'The Wolf!', 1, 'I said a please would be nice.')", silent=False)
-sql("insert into t9 values ('The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.')", silent=False)
-sql("insert into t9 values ('The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.')", silent=False)
-sql("insert into t9 values ('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.')", silent=False)
+sql("insert into t9 values ('The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.')")
+sql("insert into t9 values ('Vincent', 'The Wolf!', 0, 'A please would be nice.')")
+sql("insert into t9 values ('The Wolf!', 'Vincent', 1, 'Come again?')")
+sql("insert into t9 values ('Vincent', 'The Wolf!', 1, 'I said a please would be nice.')")
+sql("insert into t9 values ('The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.')")
+sql("insert into t9 values ('The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.')")
+sql("insert into t9 values ('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.')")
 
 #
 # Select test
 #
 
 # Select by one entry
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 0)", silent=False)
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 0)", silent=False)
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 1)", silent=False)
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 1)", silent=False)
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 2)", silent=False)
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 2)", silent=False)
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 3)", silent=False)
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 3)", silent=False)
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 4)", silent=False)
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 4)", silent=False)
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 5)", silent=False)
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 5)", silent=False)
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 6)", silent=False)
+admin("lua box.select(9, 0, 'Vincent', 'Jules', 0)")
+admin("lua box.select(9, 0, 'Jules', 'Vincent', 0)")
+admin("lua box.select(9, 0, 'Vincent', 'Jules', 1)")
+admin("lua box.select(9, 0, 'Jules', 'Vincent', 1)")
+admin("lua box.select(9, 0, 'Vincent', 'Jules', 2)")
+admin("lua box.select(9, 0, 'Jules', 'Vincent', 2)")
+admin("lua box.select(9, 0, 'Vincent', 'Jules', 3)")
+admin("lua box.select(9, 0, 'Jules', 'Vincent', 3)")
+admin("lua box.select(9, 0, 'Vincent', 'Jules', 4)")
+admin("lua box.select(9, 0, 'Jules', 'Vincent', 4)")
+admin("lua box.select(9, 0, 'Vincent', 'Jules', 5)")
+admin("lua box.select(9, 0, 'Jules', 'Vincent', 5)")
+admin("lua box.select(9, 0, 'Vincent', 'Jules', 6)")
 
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 0)", silent=False)
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!', 0)", silent=False)
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 1)", silent=False)
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!', 1)", silent=False)
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 2)", silent=False)
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 3)", silent=False)
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!', 2)", silent=False)
+admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 0)")
+admin("lua box.select(9, 0, 'Vincent', 'The Wolf!', 0)")
+admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 1)")
+admin("lua box.select(9, 0, 'Vincent', 'The Wolf!', 1)")
+admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 2)")
+admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 3)")
+admin("lua box.select(9, 0, 'Vincent', 'The Wolf!', 2)")
 
 # Select all messages from Vincent to Jules
-admin("lua box.select(9, 0, 'Vincent', 'Jules')", silent=False)
+admin("lua box.select(9, 0, 'Vincent', 'Jules')")
 
 # Select all messages from Jules to Vincent
-admin("lua box.select(9, 0, 'Jules', 'Vincent')", silent=False)
+admin("lua box.select(9, 0, 'Jules', 'Vincent')")
 
 # Select all messages from Vincent to The Wolf
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!')", silent=False)
+admin("lua box.select(9, 0, 'Vincent', 'The Wolf!')")
 
 # Select all messages from The Wolf to Vincent
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent')", silent=False)
+admin("lua box.select(9, 0, 'The Wolf!', 'Vincent')")
 
 # Select all Vincent messages
-admin("lua box.select(9, 0, 'Vincent')", silent=False)
+admin("lua box.select(9, 0, 'Vincent')")
 
 #
 # Delete test
 #
 
 # Delete some messages from the The Wolf and Vincent dialog
-admin("lua box.delete(9, 'The Wolf!', 'Vincent', 0)", silent=False)
-admin("lua box.delete(9, 'The Wolf!', 'Vincent', 3)", silent=False)
-admin("lua box.delete(9, 'Vincent', 'The Wolf!', 0)", silent=False)
+admin("lua box.delete(9, 'The Wolf!', 'Vincent', 0)")
+admin("lua box.delete(9, 'The Wolf!', 'Vincent', 3)")
+admin("lua box.delete(9, 'Vincent', 'The Wolf!', 0)")
 
-admin("lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')", silent=False)
-admin("lua box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')", silent=False)
+admin("lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')")
+admin("lua box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')")
 # Checking Vincent's last messages
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!')", silent=False)
+admin("lua box.select(9, 0, 'Vincent', 'The Wolf!')")
 # Checking The Wolf's last messages
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent')", silent=False)
+admin("lua box.select(9, 0, 'The Wolf!', 'Vincent')")
 
 # try to delete nonexistent message
-admin("lua box.delete(9, 'Vincent', 'The Wolf!', 3)", silent=False)
+admin("lua box.delete(9, 'Vincent', 'The Wolf!', 3)")
 # try to delete patrial defined key
-admin("lua box.delete(9, 'Vincent', 'The Wolf!')", silent=False)
+admin("lua box.delete(9, 'Vincent', 'The Wolf!')")
 # try to delete by invalid key
-admin("lua box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')", silent=False)
+admin("lua box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')")
 
 #
 # Update test
 #
-admin("lua box.update(9, {'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')", silent=False)
-admin("lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')", silent=False)
+admin("lua box.update(9, {'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')")
+admin("lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')")
 
 # Checking Vincent's last messages
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!')", silent=False)
+admin("lua box.select(9, 0, 'Vincent', 'The Wolf!')")
 # Checking The Wolf's last messages
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent')", silent=False)
+admin("lua box.select(9, 0, 'The Wolf!', 'Vincent')")
 
 # try to update a nonexistent message
-admin("lua box.update(9, {'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')", silent=False)
+admin("lua box.update(9, {'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')")
 # try to update patrial defined key
-admin("lua box.update(9, {'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')", silent=False)
+admin("lua box.update(9, {'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')")
 # try to update by invalid key
-admin("lua box.update(9, {'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')", silent=False)
-admin("lua box.space[9]:len()", silent=False)
-admin("lua box.space[9]:truncate()", silent=False)
-admin("lua box.space[9]:len()", silent=False)
+admin("lua box.update(9, {'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')")
+admin("lua box.space[9]:len()")
+admin("lua box.space[9]:truncate()")
+admin("lua box.space[9]:len()")
 
 print """ A test case for Bug#1051006 Tree iterators return garbage
 if an index is modified between calls"""
 
-admin("lua box.space[16]:insert('a', 'a', 'a')", silent=False)
-admin("lua box.space[16]:insert('d', 'd', 'd')", silent=False)
-admin("lua box.space[16]:insert('e', 'e', 'e')", silent=False)
-admin("lua box.space[16]:insert('b', 'b', 'b')", silent=False)
-admin("lua box.space[16]:insert('c', 'c', 'c')", silent=False)
-admin("lua k,v = box.space[16].index[1]:next(k)", silent=False)
-admin("lua print(v)", silent=False)
-admin("lua k,v = box.space[16].index[1]:next(k)", silent=False)
-admin("lua print(v)", silent=False)
-admin("lua box.space[16]:truncate()", silent=False)
-admin("lua print(v)", silent=False)
-admin("lua collectgarbage('collect')", silent=False)
-admin("lua print(v)", silent=False)
-admin("lua k,v = box.space[16].index[1]:next(k)", silent=False)
-admin("lua print(v)", silent=False)
-admin("lua collectgarbage('collect')", silent=False)
-admin("lua print(v)", silent=False)
-admin("lua k,v = box.space[16].index[1]:next(k)", silent=False)
-admin("lua print(v)", silent=False)
-admin("lua k,v = box.space[16].index[1]:next(k)", silent=False)
-admin("lua print(v)", silent=False)
-admin("lua k,v = box.space[16].index[1]:next(k)", silent=False)
-admin("lua print(v)", silent=False)
+admin("lua box.space[16]:insert('a', 'a', 'a')")
+admin("lua box.space[16]:insert('d', 'd', 'd')")
+admin("lua box.space[16]:insert('e', 'e', 'e')")
+admin("lua box.space[16]:insert('b', 'b', 'b')")
+admin("lua box.space[16]:insert('c', 'c', 'c')")
+admin("lua k,v = box.space[16].index[1]:next(k)")
+admin("lua print(v)")
+admin("lua k,v = box.space[16].index[1]:next(k)")
+admin("lua print(v)")
+admin("lua box.space[16]:truncate()")
+admin("lua print(v)")
+admin("lua collectgarbage('collect')")
+admin("lua print(v)")
+admin("lua k,v = box.space[16].index[1]:next(k)")
+admin("lua print(v)")
+admin("lua collectgarbage('collect')")
+admin("lua print(v)")
+admin("lua k,v = box.space[16].index[1]:next(k)")
+admin("lua print(v)")
+admin("lua k,v = box.space[16].index[1]:next(k)")
+admin("lua print(v)")
+admin("lua k,v = box.space[16].index[1]:next(k)")
+admin("lua print(v)")
 
 # Bug #1082356
-sql("insert into t19 values(1, 1)", silent=False)
-sql("replace into t19 values(1, 1)", silent=False)
+sql("insert into t19 values(1, 1)")
+sql("replace into t19 values(1, 1)")

@@ -16,15 +16,15 @@ print """
 print """
 # Insert valid fieds
 """
-admin("lua box.space[10]:insert(0, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[10]:insert(1, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[10]:insert(2, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[10]:insert(3, 'value1 v1.0', 'value2 v1.0')", silent=False)
+admin("lua box.space[10]:insert(0, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[10]:insert(1, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[10]:insert(2, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[10]:insert(3, 'value1 v1.0', 'value2 v1.0')")
 
 print """
 # Insert invalid fields
 """
-admin("lua box.space[10]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')", silent=False)
+admin("lua box.space[10]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')")
 
 
 print """
@@ -36,14 +36,14 @@ print """
 print """
 # Replace valid fieds
 """
-admin("lua box.space[10]:replace(3, 'value1 v1.31', 'value2 1.12')", silent=False)
-admin("lua box.space[10]:replace(1, 'value1 v1.32', 'value2 1.72')", silent=False)
-admin("lua box.space[10]:replace(2, 'value1 v1.43', 'value2 1.92')", silent=False)
+admin("lua box.space[10]:replace(3, 'value1 v1.31', 'value2 1.12')")
+admin("lua box.space[10]:replace(1, 'value1 v1.32', 'value2 1.72')")
+admin("lua box.space[10]:replace(2, 'value1 v1.43', 'value2 1.92')")
 
 print """
 # Replace invalid fields
 """
-admin("lua box.space[10]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')", silent=False)
+admin("lua box.space[10]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')")
 
 
 print """
@@ -55,18 +55,18 @@ print """
 print """
 # select by valid keys
 """
-admin("lua box.space[10]:select(0, 0)", silent=False)
-admin("lua box.space[10]:select(0, 1)", silent=False)
-admin("lua box.space[10]:select(0, 2)", silent=False)
-admin("lua box.space[10]:select(0, 3)", silent=False)
-admin("lua box.space[10]:select(0, 4)", silent=False)
-admin("lua box.space[10]:select(0, 5)", silent=False)
+admin("lua box.space[10]:select(0, 0)")
+admin("lua box.space[10]:select(0, 1)")
+admin("lua box.space[10]:select(0, 2)")
+admin("lua box.space[10]:select(0, 3)")
+admin("lua box.space[10]:select(0, 4)")
+admin("lua box.space[10]:select(0, 5)")
 
 print """
 # select by invalid keys
 """
-admin("lua box.space[10]:select(0, 'invalid key')", silent=False)
-admin("lua box.space[10]:select(0, 1, 2)", silent=False)
+admin("lua box.space[10]:select(0, 'invalid key')")
+admin("lua box.space[10]:select(0, 1, 2)")
 
 
 print """
@@ -78,18 +78,18 @@ print """
 print """
 # delete by valid keys
 """
-admin("lua box.space[10]:delete(0)", silent=False)
-admin("lua box.space[10]:delete(1)", silent=False)
-admin("lua box.space[10]:delete(2)", silent=False)
-admin("lua box.space[10]:delete(3)", silent=False)
-admin("lua box.space[10]:delete(4)", silent=False)
-admin("lua box.space[10]:delete(5)", silent=False)
+admin("lua box.space[10]:delete(0)")
+admin("lua box.space[10]:delete(1)")
+admin("lua box.space[10]:delete(2)")
+admin("lua box.space[10]:delete(3)")
+admin("lua box.space[10]:delete(4)")
+admin("lua box.space[10]:delete(5)")
 
 print """
 # delete by invalid keys
 """
-admin("lua box.space[10]:delete('invalid key')", silent=False)
-admin("lua box.space[10]:delete(1, 2)", silent=False)
+admin("lua box.space[10]:delete('invalid key')")
+admin("lua box.space[10]:delete(1, 2)")
 
 
 print """
@@ -107,19 +107,19 @@ print """
 print """
 # Insert valid fieds
 """
-admin("lua box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert(1ULL, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert(2ULL, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')", silent=False)
+admin("lua box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert(1ULL, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert(2ULL, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')")
 
 print """
 # Insert invalid fields
 """
-admin("lua box.space[11]:insert(100, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert(101, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert(102, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert(103, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')", silent=False)
+admin("lua box.space[11]:insert(100, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert(101, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert(102, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert(103, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -130,17 +130,17 @@ print """
 print """
 # Replace valid fieds
 """
-admin("lua box.space[11]:replace(3ULL, 'value1 v1.31', 'value2 1.12')", silent=False)
-admin("lua box.space[11]:replace(1ULL, 'value1 v1.32', 'value2 1.72')", silent=False)
-admin("lua box.space[11]:replace(2ULL, 'value1 v1.43', 'value2 1.92')", silent=False)
+admin("lua box.space[11]:replace(3ULL, 'value1 v1.31', 'value2 1.12')")
+admin("lua box.space[11]:replace(1ULL, 'value1 v1.32', 'value2 1.72')")
+admin("lua box.space[11]:replace(2ULL, 'value1 v1.43', 'value2 1.92')")
 
 print """
 # Replace invalid fields
 """
-admin("lua box.space[11]:replace(3, 'value1 v1.31', 'value2 1.12')", silent=False)
-admin("lua box.space[11]:replace(1, 'value1 v1.32', 'value2 1.72')", silent=False)
-admin("lua box.space[11]:replace(2, 'value1 v1.43', 'value2 1.92')", silent=False)
-admin("lua box.space[11]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')", silent=False)
+admin("lua box.space[11]:replace(3, 'value1 v1.31', 'value2 1.12')")
+admin("lua box.space[11]:replace(1, 'value1 v1.32', 'value2 1.72')")
+admin("lua box.space[11]:replace(2, 'value1 v1.43', 'value2 1.92')")
+admin("lua box.space[11]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -151,28 +151,28 @@ print """
 print """
 # select by valid keys
 """
-admin("lua box.space[11]:select(0, 0ULL)", silent=False)
-admin("lua box.space[11]:select(0, 1ULL)", silent=False)
-admin("lua box.space[11]:select(0, 2ULL)", silent=False)
-admin("lua box.space[11]:select(0, 3ULL)", silent=False)
-admin("lua box.space[11]:select(0, 4ULL)", silent=False)
-admin("lua box.space[11]:select(0, 5ULL)", silent=False)
+admin("lua box.space[11]:select(0, 0ULL)")
+admin("lua box.space[11]:select(0, 1ULL)")
+admin("lua box.space[11]:select(0, 2ULL)")
+admin("lua box.space[11]:select(0, 3ULL)")
+admin("lua box.space[11]:select(0, 4ULL)")
+admin("lua box.space[11]:select(0, 5ULL)")
 
 print """
 # select by valid NUM keys
 """
-admin("lua box.space[11]:select(0, 0)", silent=False)
-admin("lua box.space[11]:select(0, 1)", silent=False)
-admin("lua box.space[11]:select(0, 2)", silent=False)
-admin("lua box.space[11]:select(0, 3)", silent=False)
-admin("lua box.space[11]:select(0, 4)", silent=False)
-admin("lua box.space[11]:select(0, 5)", silent=False)
+admin("lua box.space[11]:select(0, 0)")
+admin("lua box.space[11]:select(0, 1)")
+admin("lua box.space[11]:select(0, 2)")
+admin("lua box.space[11]:select(0, 3)")
+admin("lua box.space[11]:select(0, 4)")
+admin("lua box.space[11]:select(0, 5)")
 
 print """
 # select by invalid keys
 """
-admin("lua box.space[11]:select(0, 'invalid key')", silent=False)
-admin("lua box.space[11]:select(0, '00000001', '00000002')", silent=False)
+admin("lua box.space[11]:select(0, 'invalid key')")
+admin("lua box.space[11]:select(0, '00000001', '00000002')")
 
 print """
 #-----------------------------------------------------------------------------#
@@ -183,33 +183,33 @@ print """
 print """
 # delete by valid keys
 """
-admin("lua box.space[11]:delete(0ULL)", silent=False)
-admin("lua box.space[11]:delete(1ULL)", silent=False)
-admin("lua box.space[11]:delete(2ULL)", silent=False)
-admin("lua box.space[11]:delete(3ULL)", silent=False)
-admin("lua box.space[11]:delete(4ULL)", silent=False)
-admin("lua box.space[11]:delete(5ULL)", silent=False)
+admin("lua box.space[11]:delete(0ULL)")
+admin("lua box.space[11]:delete(1ULL)")
+admin("lua box.space[11]:delete(2ULL)")
+admin("lua box.space[11]:delete(3ULL)")
+admin("lua box.space[11]:delete(4ULL)")
+admin("lua box.space[11]:delete(5ULL)")
 
-admin("lua box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert(1ULL, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert(2ULL, 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')", silent=False)
+admin("lua box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert(1ULL, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert(2ULL, 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')")
 
 print """
 # delete by valid NUM keys
 """
-admin("lua box.space[11]:delete(0)", silent=False)
-admin("lua box.space[11]:delete(1)", silent=False)
-admin("lua box.space[11]:delete(2)", silent=False)
-admin("lua box.space[11]:delete(3)", silent=False)
-admin("lua box.space[11]:delete(4)", silent=False)
-admin("lua box.space[11]:delete(5)", silent=False)
+admin("lua box.space[11]:delete(0)")
+admin("lua box.space[11]:delete(1)")
+admin("lua box.space[11]:delete(2)")
+admin("lua box.space[11]:delete(3)")
+admin("lua box.space[11]:delete(4)")
+admin("lua box.space[11]:delete(5)")
 
 print """
 # delete by invalid keys
 """
-admin("lua box.space[11]:delete('invalid key')", silent=False)
-admin("lua box.space[11]:delete('00000001', '00000002')", silent=False)
+admin("lua box.space[11]:delete('invalid key')")
+admin("lua box.space[11]:delete('00000001', '00000002')")
 
 
 print """
@@ -227,10 +227,10 @@ print """
 print """
 # Insert valid fieds
 """
-admin("lua box.space[12]:insert('key 0', 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[12]:insert('key 1', 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[12]:insert('key 2', 'value1 v1.0', 'value2 v1.0')", silent=False)
-admin("lua box.space[12]:insert('key 3', 'value1 v1.0', 'value2 v1.0')", silent=False)
+admin("lua box.space[12]:insert('key 0', 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[12]:insert('key 1', 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[12]:insert('key 2', 'value1 v1.0', 'value2 v1.0')")
+admin("lua box.space[12]:insert('key 3', 'value1 v1.0', 'value2 v1.0')")
 
 
 print """
@@ -242,9 +242,9 @@ print """
 print """
 # Replace valid fieds
 """
-admin("lua box.space[12]:replace('key 3', 'value1 v1.31', 'value2 1.12')", silent=False)
-admin("lua box.space[12]:replace('key 1', 'value1 v1.32', 'value2 1.72')", silent=False)
-admin("lua box.space[12]:replace('key 2', 'value1 v1.43', 'value2 1.92')", silent=False)
+admin("lua box.space[12]:replace('key 3', 'value1 v1.31', 'value2 1.12')")
+admin("lua box.space[12]:replace('key 1', 'value1 v1.32', 'value2 1.72')")
+admin("lua box.space[12]:replace('key 2', 'value1 v1.43', 'value2 1.92')")
 
 
 print """
@@ -256,17 +256,17 @@ print """
 print """
 # select by valid keys
 """
-admin("lua box.space[12]:select(0, 'key 0')", silent=False)
-admin("lua box.space[12]:select(0, 'key 1')", silent=False)
-admin("lua box.space[12]:select(0, 'key 2')", silent=False)
-admin("lua box.space[12]:select(0, 'key 3')", silent=False)
-admin("lua box.space[12]:select(0, 'key 4')", silent=False)
-admin("lua box.space[12]:select(0, 'key 5')", silent=False)
+admin("lua box.space[12]:select(0, 'key 0')")
+admin("lua box.space[12]:select(0, 'key 1')")
+admin("lua box.space[12]:select(0, 'key 2')")
+admin("lua box.space[12]:select(0, 'key 3')")
+admin("lua box.space[12]:select(0, 'key 4')")
+admin("lua box.space[12]:select(0, 'key 5')")
 
 print """
 # select by invalid keys
 """
-admin("lua box.space[12]:select(0, 'key 1', 'key 2')", silent=False)
+admin("lua box.space[12]:select(0, 'key 1', 'key 2')")
 
 
 print """
@@ -278,100 +278,100 @@ print """
 print """
 # delete by valid keys
 """
-admin("lua box.space[12]:delete('key 0')", silent=False)
-admin("lua box.space[12]:delete('key 1')", silent=False)
-admin("lua box.space[12]:delete('key 2')", silent=False)
-admin("lua box.space[12]:delete('key 3')", silent=False)
-admin("lua box.space[12]:delete('key 4')", silent=False)
-admin("lua box.space[12]:delete('key 5')", silent=False)
+admin("lua box.space[12]:delete('key 0')")
+admin("lua box.space[12]:delete('key 1')")
+admin("lua box.space[12]:delete('key 2')")
+admin("lua box.space[12]:delete('key 3')")
+admin("lua box.space[12]:delete('key 4')")
+admin("lua box.space[12]:delete('key 5')")
 print """
 # delete by invalid keys
 """
-admin("lua box.space[12]:delete('key 1', 'key 2')", silent=False)
+admin("lua box.space[12]:delete('key 1', 'key 2')")
 
 
 # clean-up
-admin("lua box.space[10]:truncate()", silent=False)
-admin("lua box.space[11]:truncate()", silent=False)
-admin("lua box.space[12]:truncate()", silent=False)
+admin("lua box.space[10]:truncate()")
+admin("lua box.space[11]:truncate()")
+admin("lua box.space[12]:truncate()")
 
 #
 # hash::replace tests
 #
 
-admin("lua box.space[21]:truncate()", silent=False)
+admin("lua box.space[21]:truncate()")
 
-sql("insert into t21 values (0, 0, 0, 0)", silent=False)
-sql("insert into t21 values (1, 1, 1, 1)", silent=False)
-sql("insert into t21 values (2, 2, 2, 2)", silent=False)
-
-# OK
-sql("replace into t21 values (1, 1, 1, 1)", silent=False)
-sql("replace into t21 values (1, 10, 10, 10)", silent=False)
-sql("replace into t21 values (1, 1, 1, 1)", silent=False)
-sql("select * from t21 WHERE k0 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 10", silent=False)
-sql("select * from t21 WHERE k2 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 10", silent=False)
-sql("select * from t21 WHERE k0 = 1", silent=False)
-sql("select * from t21 WHERE k1 = 1", silent=False)
-sql("select * from t21 WHERE k2 = 1", silent=False)
-sql("select * from t21 WHERE k3 = 1", silent=False)
+sql("insert into t21 values (0, 0, 0, 0)")
+sql("insert into t21 values (1, 1, 1, 1)")
+sql("insert into t21 values (2, 2, 2, 2)")
 
 # OK
-sql("insert into t21 values (10, 10, 10, 10)", silent=False)
-sql("delete from t21 WHERE k0 = 10", silent=False)
-sql("select * from t21 WHERE k0 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 10", silent=False)
-sql("select * from t21 WHERE k2 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 10", silent=False)
+sql("replace into t21 values (1, 1, 1, 1)")
+sql("replace into t21 values (1, 10, 10, 10)")
+sql("replace into t21 values (1, 1, 1, 1)")
+sql("select * from t21 WHERE k0 = 10")
+sql("select * from t21 WHERE k1 = 10")
+sql("select * from t21 WHERE k2 = 10")
+sql("select * from t21 WHERE k3 = 10")
+sql("select * from t21 WHERE k0 = 1")
+sql("select * from t21 WHERE k1 = 1")
+sql("select * from t21 WHERE k2 = 1")
+sql("select * from t21 WHERE k3 = 1")
+
+# OK
+sql("insert into t21 values (10, 10, 10, 10)")
+sql("delete from t21 WHERE k0 = 10")
+sql("select * from t21 WHERE k0 = 10")
+sql("select * from t21 WHERE k1 = 10")
+sql("select * from t21 WHERE k2 = 10")
+sql("select * from t21 WHERE k3 = 10")
 
 
 # TupleFound (primary key)
-sql("insert into t21 values (1, 10, 10, 10)", silent=False)
-sql("select * from t21 WHERE k0 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 10", silent=False)
-sql("select * from t21 WHERE k2 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 10", silent=False)
-sql("select * from t21 WHERE k0 = 1", silent=False)
+sql("insert into t21 values (1, 10, 10, 10)")
+sql("select * from t21 WHERE k0 = 10")
+sql("select * from t21 WHERE k1 = 10")
+sql("select * from t21 WHERE k2 = 10")
+sql("select * from t21 WHERE k3 = 10")
+sql("select * from t21 WHERE k0 = 1")
 
 # TupleNotFound (primary key)
-sql("replace into t21 values (10, 10, 10, 10)", silent=False)
-sql("select * from t21 WHERE k0 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 10", silent=False)
-sql("select * from t21 WHERE k2 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 10", silent=False)
+sql("replace into t21 values (10, 10, 10, 10)")
+sql("select * from t21 WHERE k0 = 10")
+sql("select * from t21 WHERE k1 = 10")
+sql("select * from t21 WHERE k2 = 10")
+sql("select * from t21 WHERE k3 = 10")
 
 # TupleFound (key #1)
-sql("insert into t21 values (10, 0, 10, 10)", silent=False)
-sql("select * from t21 WHERE k0 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 10", silent=False)
-sql("select * from t21 WHERE k2 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 0", silent=False)
+sql("insert into t21 values (10, 0, 10, 10)")
+sql("select * from t21 WHERE k0 = 10")
+sql("select * from t21 WHERE k1 = 10")
+sql("select * from t21 WHERE k2 = 10")
+sql("select * from t21 WHERE k3 = 10")
+sql("select * from t21 WHERE k1 = 0")
 
 # TupleFound (key #1)
-sql("replace into t21 values (2, 0, 10, 10)", silent=False)
-sql("select * from t21 WHERE k0 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 10", silent=False)
-sql("select * from t21 WHERE k2 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 0", silent=False)
+sql("replace into t21 values (2, 0, 10, 10)")
+sql("select * from t21 WHERE k0 = 10")
+sql("select * from t21 WHERE k1 = 10")
+sql("select * from t21 WHERE k2 = 10")
+sql("select * from t21 WHERE k3 = 10")
+sql("select * from t21 WHERE k1 = 0")
 
 # TupleFound (key #3)
-sql("insert into t21 values (10, 10, 10, 0)", silent=False)
-sql("select * from t21 WHERE k0 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 10", silent=False)
-sql("select * from t21 WHERE k2 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 0", silent=False)
+sql("insert into t21 values (10, 10, 10, 0)")
+sql("select * from t21 WHERE k0 = 10")
+sql("select * from t21 WHERE k1 = 10")
+sql("select * from t21 WHERE k2 = 10")
+sql("select * from t21 WHERE k3 = 10")
+sql("select * from t21 WHERE k3 = 0")
 
 # TupleFound (key #3)
-sql("replace into t21 values (2, 10, 10, 0)", silent=False)
-sql("select * from t21 WHERE k0 = 10", silent=False)
-sql("select * from t21 WHERE k1 = 10", silent=False)
-sql("select * from t21 WHERE k2 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 10", silent=False)
-sql("select * from t21 WHERE k3 = 0", silent=False)
+sql("replace into t21 values (2, 10, 10, 0)")
+sql("select * from t21 WHERE k0 = 10")
+sql("select * from t21 WHERE k1 = 10")
+sql("select * from t21 WHERE k2 = 10")
+sql("select * from t21 WHERE k3 = 10")
+sql("select * from t21 WHERE k3 = 0")
 
-admin("lua box.space[21]:truncate()", silent=False)
+admin("lua box.space[21]:truncate()")
