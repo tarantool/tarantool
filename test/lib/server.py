@@ -182,15 +182,19 @@ class Server(object):
 
         if self.gdb:
             args = prepare_gdb(self.binary, args)
+            print "You started the server in gdb mode."
+            print "To attach, use `screen -r tnt-gdb`"
         elif self.valgrind:
-            args = prepare_valgrind(args, self.valgrind_log,
+            args = prepare_valgrind([self.binary] + args, self.valgrind_log,
                                     os.path.abspath(os.path.join(self.vardir,
                                     self.default_suppression_name)))
+        else:
+            args = [self.binary] + args
 
         if self.start_and_exit:
             self._start_and_exit(args)
             return
-        print args
+
         self.process = subprocess.Popen(args, cwd = self.vardir)
 
         # wait until the server is connected
