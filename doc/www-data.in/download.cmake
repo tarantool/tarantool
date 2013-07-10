@@ -62,9 +62,9 @@ It can be added to your apt sources list with:
     sudo apt-get update
     sudo apt-get install tarantool tarantool-client
 
-### CentOS 5-6 GNU/Linux
+### CentOS 5-6 and RHEL 5-6
 
-CentOS GNU/Linux repository is available at
+CentOS repository is available at
 <a href="http://tarantool.org/dist/centos">http://tarantool.org/dist/centos</a>.
 
 Add the following section to your yum repository list (/etc/yum.repos.d/tarantool.repo)
@@ -76,47 +76,20 @@ to enable it:
     enabled=1
     gpgcheck=0
 
-### Standalone packages for RedHat, FreeBSD, Mac OS X
+### Gentoo Linux
+
+Tarantool is available from `tarantool` portage overlay. Use
+[layman](http://wiki.gentoo.org/wiki/Layman) to add the overlay to your system:
+
+    # layman -S
+    # layman -a tarantool
+    # emerge dev-db/tarantool -av
+
+### Other Linux distributions
 
 <table border=1 title="Download the latest build, @PACKAGE_VERSION@" width=100%>
-
-<!-- RPM -->
-
-  <th colspan=3>RedHat</th>
-
-  <tr>
-    <td>
-        RedHat <b>.rpm</b>
-    </td>
-
-    <td align=center>
-        <a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-i686.rpm">32-bit</a>
-    </td>
-
-    <td align=center>
-        <a
-        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64.rpm">64-bit</a>
-    </td>
-  </tr>
-
-  <tr>
-    <td>
-        RedHat <b>.rpm</b>, with debug info
-    </td>
-    <td align=center>
-        <a
-        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-i686-debug.rpm">32-bit</a>
-    </td>
-
-    <td align=center>
-        <a
-        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64-debug.rpm">64-bit</a>
-    </td>
-  </tr>
-
 <!-- .tar.gz -->
-  <th colspan=3>Other Linux distributions</th>
-
+  <th colspan=3>Static builds for Linux</th>
   <tr>
     <td>
         Binary tarball (<b>.tar.gz</b>)
@@ -129,30 +102,22 @@ to enable it:
         <a href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64.tar.gz">64-bit</a>
     </td>
   </tr>
-
-  <th colspan=3>FreeBSD</th>
-
-<!-- .tar.gz -->
-
-  <tr>
-    <td>
-        Binary tarball (<b>.tar.gz</b>)
-    </td>
-    <td align=center>
-        <a
-        href="http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-freebsd-i386.tar.gz">32-bit</a>
-    </td>
-
-    <td align=center>
-    </td>
-  </tr>
-  <th colspan=4>Mac OS X</th>
-  <tr>
-    <td align=center colspan=4>brew install http://tarantool.org/dist/tarantool.rb</td>
-  <tr>
-
 </table>
 
+### FreeBSD
+
+Tarantool is available from the FreeBSD Ports collection
+(`databases/tarantool`). 
+
+### OS X
+
+You can install Tarantool using homebrew:
+
+    $ brew install --use-clang http://tarantool.org/dist/tarantool.rb
+
+Please upgrade `clang` to version 3.2 or later using
+```Command Line Tools for Xcode``` disk image version 4.6+ from
+[Apple Developer](https://developer.apple.com/downloads/) web-site.
 
 # Development branch
 
@@ -171,6 +136,8 @@ The server roadmap is maintained on [Launchpad](http://launchpad.net/tarantool).
 - PHP driver, [https://github.com/tarantool/tarantool-php](https://github.com/tarantool/tarantool-php)
 - node.js driver,
   [https://github.com/devgru/node-tarantool](https://github.com/devgru/node-tarantool)
+- Erlang driver,
+  [https://github.com/rtsisyk/etarantool](https://github.com/rtsisyk/etarantool)
 - C connector [is maintained in the server source tree](https://github.com/tarantool/tarantool/blob/master/connector/c)
 
 {% page download ru %}
