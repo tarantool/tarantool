@@ -182,7 +182,7 @@ class Server(object):
 
         if self.gdb:
             args = prepare_gdb(self.binary, args)
-            print "You've start server in --gdb mode."
+            print "You started the server in gdb mode."
             print "To attach, use `screen -r tnt-gdb`"
         elif self.valgrind:
             args = prepare_valgrind([self.binary] + args, self.valgrind_log,
