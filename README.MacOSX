@@ -1,3 +1,11 @@
+OS X Readme
+===========
+
+This manual explains how to manually build tarantool from sources.
+If you just need a working binary, please use homebrew:
+
+        brew install http://tarantool.org/dist/tarantool.rb
+
 Target OS: MacOS X "Lion"
 
 First of all, make sure mac ports are available (to install packages from).
@@ -7,7 +15,13 @@ First of all, make sure mac ports are available (to install packages from).
 
 port install autoconf binutils cmake ncurses zlib readline
 
-2. Install necessary python modules: pexpect, pyYAML, daemon
+2. Upgrade clang to 3.2+
+
+Go to http://developer.apple.com/ to download and install the latest version
+of "Command Line Tools for Xcode". This package contains /usr/bin/clang and
+/usr/bin/clang++ binaries. Check that clang version is at least 3.2.
+
+3. Install necessary python modules: pyYAML, daemon
 -------------
 NB: it is recommended to install python modules through setup.py,
 using the default python (which should be >= 2.6.x and < 3.x);
@@ -16,10 +30,10 @@ tar -xzf module.tar.gz
 cd module-dir
 sudo python setup.py install
 
-where module is the name of the installed module and module-dir is the name of the directory
-the module's archive deflates into.
+where module is the name of the installed module and module-dir is the name of
+the directory the module's archive deflates into.
 
-3. Download & build tarantool source code:
+4. Download & build tarantool source code:
 -------------
 
 git clone git://github.com/tarantool/tarantool.git
@@ -27,7 +41,7 @@ git clone git://github.com/tarantool/tarantool.git
 cd tarantool
 CC=clang CXX=clang++ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
 
-4. Run tarantool test suite
+5. Run tarantool test suite
 -------------
 NB: the following tests are not runnable on MacOS X at this point:
 
