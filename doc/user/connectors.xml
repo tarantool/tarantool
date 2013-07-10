@@ -47,7 +47,7 @@
     <title>Python</title>
     <para>
        Please see <link
-       xlink:href="https://github.com/tarantool/tarantool-python"><filename>http://github.com/tarantool/tarantool-python</filename></link>.
+       xlink:href="https://github.com/mailru/tarantool-python"><filename>http://github.com/mailru/tarantool-python</filename></link>.
     </para>
   </section>
 
@@ -56,7 +56,7 @@
     <para>
        You need <emphasis role="strong">Ruby 1.9</emphasis> or later
        to use this connector. Connector sources are located in <link
-       xlink:href="https://github.com/tarantool/tarantool-ruby"><filename>http://github.com/tarantool/tarantool-ruby</filename></link>.
+       xlink:href="https://github.com/mailru/tarantool-ruby"><filename>http://github.com/mailru/tarantool-ruby</filename></link>.
     </para>
   </section>
 
