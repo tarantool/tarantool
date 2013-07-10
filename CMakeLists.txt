@@ -12,6 +12,8 @@ include(CheckCCompilerFlag)
 include(CheckSymbolExists)
 include(CheckCSourceRuns)
 include(CheckCXXSourceRuns)
+include(CheckCSourceCompiles)
+include(CheckCXXSourceCompiles)
 include(TestBigEndian)
 include(CheckFunctionExists)
 
