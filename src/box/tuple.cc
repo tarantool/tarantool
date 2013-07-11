@@ -427,20 +427,35 @@ static inline int
 tuple_compare_field(const char *field_a, const char *field_b,
 		    enum field_type type)
 {
-	if (type != STRING) {
+	switch (type) {
+	case NUM:
+	{
 		assert(field_a[0] == field_b[0]);
+		uint32_t a = *(uint32_t *) (field_a + 1);
+		uint32_t b = *(uint32_t *) (field_b + 1);
 		/*
 		 * Little-endian unsigned int is memcmp
 		 * compatible.
 		 */
-		return memcmp(field_a + 1, field_b + 1, field_a[0]);
+		return a < b ? -1 : a > b;
 	}
-	uint32_t size_a = load_varint32(&field_a);
-	uint32_t size_b = load_varint32(&field_b);
-	int r = memcmp(field_a, field_b, MIN(size_a, size_b));
-	if (r == 0)
-		r = size_a < size_b ? -1 : size_a > size_b;
-	return r;
+	case NUM64:
+	{
+		assert(field_a[0] == field_b[0]);
+		uint64_t a = *(uint64_t *) (field_a + 1);
+		uint64_t b = *(uint64_t *) (field_b + 1);
+		return a < b ? -1 : a > b;
+	}
+	default:
+	{
+		uint32_t size_a = load_varint32(&field_a);
+		uint32_t size_b = load_varint32(&field_b);
+		int r = memcmp(field_a, field_b, MIN(size_a, size_b));
+		if (r == 0)
+			r = size_a < size_b ? -1 : size_a > size_b;
+		return r;
+	} /* end case */
+	} /* end switch */
 }
 
 int
@@ -496,20 +511,28 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 		key_size = load_varint32(&key);
 		switch (part->type) {
 		case NUM:
-			r = memcmp(field, key, sizeof(uint32_t));
+		{
+			uint32_t a = *(uint32_t *) field;
+			uint32_t b = *(uint32_t *) key;
+			r = a < b ? - 1 : a > b;
 			break;
+		}
 		case NUM64:
+		{
+			uint64_t a = *(uint64_t *) field;
+			uint64_t b;
 			if (key_size == sizeof(uint32_t)) {
 				/*
 				 * Allow search in NUM64 indexes
 				 * using NUM keys.
 				 */
-				uint64_t b = *(uint32_t *) key;
-				r = memcmp(field, &b, sizeof(uint64_t));
+				b = *(uint32_t *) key;
 			} else {
-				r = memcmp(field, key, sizeof(uint64_t));
+				b = *(uint64_t *) key;
 			}
+			r = a < b ? -1 : a > b;
 			break;
+		}
 		default:
 			r = memcmp(field, key, MIN(field_size, key_size));
 			if (r == 0)
