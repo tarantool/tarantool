@@ -59,7 +59,7 @@ add_custom_target(pdf
 
 add_custom_target(relink
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMAND ${XSLTPROC}
+    COMMAND ${XSLTPROC} --nonet
         --stringparam collect.xref.targets "only"
         --xinclude tnt-html.xsl user.xml)
 
