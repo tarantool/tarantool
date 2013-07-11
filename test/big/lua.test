@@ -267,3 +267,14 @@ print """
 
 exec admin "lua index_random_test(26, 1)"
 
+print """
+#
+# A test case for Bug#1200228
+# https://bugs.launchpad.net/tarantool/+bug/1200228
+# box.auto_increment counter resets
+# Test for correct little-endian comparison of integer fields.
+# (unsigned)
+#"""
+exec admin "lua for i = 1, 300 do box.insert(2, i, i) print(box.space[2].index[0]:max()) end"
+exec admin "lua box.space[2]:select_range(0, 300)"
+exec admin "lua box.space[2]:truncate()"
