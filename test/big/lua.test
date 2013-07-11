@@ -275,6 +275,6 @@ print """
 # Test for correct little-endian comparison of integer fields.
 # (unsigned)
 #"""
-exec admin "lua for i = 1, 300 do box.insert(2, i, i) print(box.space[2].index[0]:max()) end"
-exec admin "lua box.space[2]:select_range(0, 300)"
-exec admin "lua box.space[2]:truncate()"
+admin("lua for i = 1, 300 do box.insert(2, i, i) print(box.space[2].index[0]:max()) end")
+admin("lua box.space[2]:select_range(0, 300)")
+admin("lua box.space[2]:truncate()")
