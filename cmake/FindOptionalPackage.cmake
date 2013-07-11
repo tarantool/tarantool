@@ -8,17 +8,24 @@ endif()
 
 macro (find_optional_package _package)
     string(TOUPPER ${_package} _packageUpper)
-    if (WITH_${_packageUpper})
-        # WITH_${_packageUpper} option requested by the user
-        set(${_packageUpper}_FIND_REQUIRED ON)
-    endif()
-    option(WITH_${_packageUpper} "Search for ${_package} package" ON)
-    if (WITH_${_packageUpper})
+    if (NOT DEFINED WITH_${_packageUpper})
+        # First run and WITH_${_packageUpper} option is not set by the user.
+        # Enable auto-mode and try to find package.
         find_package(${_package} ${ARGN})
-    else (WITH_${_packageUpper})
-        set(${_package}_FOUND OFF)
-        set(${_packageUpper}_FOUND OFF)
+    elseif (WITH_${_packageUpper})
+        # Non-first run or WITH_${_packageUpper} was set by the user.
+        # Force error if the package will not be found.
+        set(${_packageUpper}_FIND_REQUIRED ON)
+        find_package(${_package} ${ARGN})
     endif ()
+    if (${_package}_FOUND OR ${_packageUpper}_FOUND)
+        set(_default ON)
+    else()
+        set(_default OFF)
+    endif()
+    # Add the user option and (!) update the cache
+    option(WITH_${_packageUpper} "Search for ${_package} package" ${_default})
+    # Now ${WITH_${_packageUpper}} is either ON or OFF
     file(APPEND "${_OptionalPackagesFile}"
          "-- WITH_${_packageUpper}=${WITH_${_packageUpper}}\n")
 endmacro (find_optional_package)

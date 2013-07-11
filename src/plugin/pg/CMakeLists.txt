@@ -11,6 +11,6 @@ if (PostgreSQL_FOUND)
 	install(TARGETS pg LIBRARY DESTINATION ${PLUGIN_DIR})
 
 else()
-	message(STATUS "PostgreSQL client not found")
+	message(STATUS "PostgreSQL client not found, box.net.sql(pg) disabled")
 endif()
 
