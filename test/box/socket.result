@@ -50,18 +50,6 @@ lua s:error()
  - 111
  - Connection refused
 ...
-lua s:connect('::1', '30303')
----
- - nil
- - error
- - 111
- - Connection refused
-...
-lua s:error()
----
- - 111
- - Connection refused
-...
 lua s:connect('127.0.0.1', '30303', 0.01)
 ---
  - nil
