@@ -34,8 +34,6 @@ sys.stdout.push_filter("Target: .*", "Target: platform <build>")
 sys.stdout.push_filter("Build options: .*", "Build options: flags")
 sys.stdout.push_filter("C_FLAGS:.*", "C_FLAGS: flags")
 sys.stdout.push_filter("CXX_FLAGS:.*", "CXX_FLAGS: flags")
-sys.stdout.push_filter("OBJC_FLAGS:.*", "OBJC_FLAGS: flags")
-sys.stdout.push_filter("OBJCXX_FLAGS:.*", "OBJCXX_FLAGS: flags")
 sys.stdout.push_filter("Compiler: .*", "Compiler: cc")
 
 server.test_option("--version")
