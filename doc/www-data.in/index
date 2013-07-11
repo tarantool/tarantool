@@ -3,7 +3,7 @@
 {% text blurb en %}
 
 # Tarantool
-## A transactional NoSQL database
+## An in-memory NoSQL database
 ###[Overview](intro.html) &nbsp;  [Documentation](tarantool_user_guide.html) &nbsp;  [Download](download.html) &nbsp;  [Support](support.html)
 
 {% text blurb ru %}
