@@ -39,11 +39,8 @@ admin("lua s:connect('127.0.0.1', '30303')")
 # Connection refused
 admin("lua s:error()")
 
-admin("lua s:connect('::1', '30303')")
-# connection refused
-admin("lua s:error()")
-
 admin("lua s:connect('127.0.0.1', '30303', 0.01)")
+
 # connection refused
 admin("lua s:error()")
 

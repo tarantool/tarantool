@@ -11,9 +11,6 @@ include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
 include_directories(${LIBGOPT_INCLUDE_DIR})
-if (ENABLE_BUNDLED_LIBOBJC)
-    include_directories(${LIBOBJC_INCLUDE_DIR})
-endif()
 
 # Require pthread globally if compiling with GCC
 if (CMAKE_COMPILER_IS_GNUCC)
@@ -179,8 +176,6 @@ add_subdirectory(lib)
 # Save CMAKE_XXX_FLAGS from this directory for config.h (used in --version)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
-set(TARANTOOL_OBJC_FLAGS ${CMAKE_OBJC_FLAGS} PARENT_SCOPE)
-set(TARANTOOL_OBJCXX_FLAGS ${CMAKE_OBJCXX_FLAGS} PARENT_SCOPE)
 
 function(tarantool_module mod)
     set (module_sources ${ARGN})

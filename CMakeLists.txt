@@ -16,6 +16,7 @@ include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
 include(TestBigEndian)
 include(CheckFunctionExists)
+include(FindOptionalPackage)
 
 find_program(ECHO echo)
 find_program(XSLTPROC xsltproc)
@@ -55,9 +56,6 @@ if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
 endif(NOT DEFINED CMAKE_INSTALL_LIBDIR)
 
 set(PLUGIN_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/tarantool/plugins")
-
-set(CMAKE_OBJC_FLAGS)
-set(CMAKE_OBJCXX_FLAGS)
 
 include(cmake/utils.cmake)
 
@@ -215,16 +213,6 @@ option(ENABLE_STATIC "Perform static linking whenever possible." OFF)
 if (ENABLE_STATIC)
     add_compile_flags("C;CXX" "-static")
 endif()
-
-#
-# On CentOS the default gcc is way older than gcc 4.6, required
-# to compile Tarantool. To make the package compiled with gcc 4.6
-# usable on a system which has only gcc 4.1, statically link with
-# builtin libgcc by default.
-#
-#if (CMAKE_COMPILER_IS_GNUCC AND NOT CMAKE_COMPILER_IS_CLANG)
-#    add_compile_flags("C;CXX;OBJC;OBJCXX" "-static-libgcc")
-#endif()
 
 ##
 ## Third-Party libraries
@@ -397,11 +385,11 @@ message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
 message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE} (symbol resolve: ${HAVE_BFD})")
 message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
 message (STATUS "ENABLE_BUNDLED_LUAJIT: ${ENABLE_BUNDLED_LUAJIT}")
-message (STATUS "ENABLE_BUNDLED_LIBOBJC: ${ENABLE_BUNDLED_LIBOBJC}")
 message (STATUS "ENABLE_BUNDLED_LIBEV: ${ENABLE_BUNDLED_LIBEV}")
 message (STATUS "ENABLE_BUNDLED_LIBEIO: ${ENABLE_BUNDLED_LIBEIO}")
 message (STATUS "ENABLE_BUNDLED_LIBCORO: ${ENABLE_BUNDLED_LIBCORO}")
 message (STATUS "ENABLE_DOC: ${ENABLE_DOC}")
+list_optional_packages()
 message (STATUS "")
 message (STATUS "To view or modify configuration results, check out CMakeCache.txt.")
 message (STATUS "")
