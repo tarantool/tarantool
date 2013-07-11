@@ -287,7 +287,7 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 				tc.opt.delim_len = strlen(tc.opt.delim);
 			} else {
 				tc_printf("---\n");
-				tc_printf(" - Expected delim='string'\n");
+				tc_printf(" - Expected: setopt delim[iter]='string'\n");
 				tc_printf("---\n");
 			}
 			break;
