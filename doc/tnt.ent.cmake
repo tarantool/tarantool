@@ -5,8 +5,7 @@
 -->
 <!ENTITY tnt_version "@PACKAGE_VERSION@">
 <!-- Include the standard ISO 8879 publishing entities -->
-<!ENTITY % isopub PUBLIC "ISO 8879:1986//ENTITIES Publishing//EN//XML"
-                         "http://www.w3.org/2003/entities/iso8879/isopub.ent">
+<!ENTITY % isopub SYSTEM "file://@CMAKE_SOURCE_DIR@/doc/isopub.ent">
 %isopub;
 <!--
   vim: syntax=dtd
