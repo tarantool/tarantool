@@ -161,12 +161,17 @@ macro(luajit_build)
     separate_arguments(luajit_ldflags)
     separate_arguments(luajit_host_cc)
     separate_arguments(luajit_target_cc)
-    set (luajit_buildoptions ${luajit_buildoptions} HOST_CC="${luajit_host_cc}" TARGET_CC="${luajit_target_cc}" CCOPT="${luajit_copt}")
+    set (luajit_buildoptions ${luajit_buildoptions}
+        CFLAGS=""
+        CXXFLAGS=""
+        HOST_CC="${luajit_host_cc}"
+        TARGET_CC="${luajit_target_cc}"
+        CCOPT="${luajit_copt}")
     set (luajit_buildoptions ${luajit_buildoptions} Q='' LDFLAGS="${luajit_ldflags}")
     if (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
-            COMMAND $(MAKE) clean
+            COMMAND $(MAKE) ${luajit_buildoptions} clean
             COMMAND $(MAKE) -C src ${luajit_buildoptions} libluajit.a
             DEPENDS ${CMAKE_SOURCE_DIR}/CMakeCache.txt
         )
