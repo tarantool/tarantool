@@ -515,21 +515,17 @@ localhost> lua box.insert(0, 0, 'hello world')
 ...
 localhost> lua box.update(0, 0, '+p', 1, 1) -- add value 1 to field #1
 ---
-error: 'Illegal parameters, numeric operation on a field with length != 4'
+error: 'Field type does not match one required by operation: expected a 32-bit or 64-bit int'
 ...
-localhost> lua box.update(0, 0, '=p', 1, 1) -- assign field #1 to value 1
+localhost> lua box.update(0, 0, '+p', 0, 2) -- add value 2 to field 0
 ---
- - 0: {1}
-...
-localhost> lua box.update(0, 0, '+p', 1, 1)
----
- - 0: {2}
+ - 2: {'hello world'}
 ...
 localhost> lua box.update(0, 2, '!p', 1, 'Bienvenue tout le monde!')
 ---
- - 2: {'Bienvenue tout le monde!', 'Hello world!'}
+ - 2: {'Bienvenue tout le monde!', 'hello world'}
 ...
-localhost> lua box.update(0, 2, '#p', 2, 'Bienvenue tout le monde!')
+localhost> lua box.update(0, 2, '#p', 2, 1)
 ---
  - 2: {'Bienvenue tout le monde!'}
 ...
