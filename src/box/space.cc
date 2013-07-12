@@ -202,7 +202,7 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
 	if (sp->arity > 0 && sp->arity != new_tuple->field_count)
 		tnt_raise(IllegalParams,
-			  "tuple field count must match space cardinality");
+			  "tuple field count must match space arity");
 
 }
 
@@ -237,8 +237,8 @@ space_config()
 
 		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
 
-		uint32_t arity = (cfg_space->cardinality != -1 ?
-				  cfg_space->cardinality : 0);
+		uint32_t arity = (cfg_space->arity != -1 ?
+				  cfg_space->arity : 0);
 		/*
 		 * Collect key/field info. We need aggregate
 		 * information on all keys before we can create

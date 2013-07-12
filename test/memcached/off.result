@@ -45,7 +45,7 @@ configuration:
   memcached_expire_full_sweep: "3600"
   replication_source: (null)
   space[0].enabled: "true"
-  space[0].cardinality: "-1"
+  space[0].arity: "-1"
   space[0].estimated_rows: "0"
   space[0].index[0].type: "HASH"
   space[0].index[0].unique: "true"

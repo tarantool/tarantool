@@ -49,8 +49,8 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 {
 	lua_newtable(L);
 
-	/* space.cardinality */
-	lua_pushstring(L, "cardinality");
+	/* space.arity */
+	lua_pushstring(L, "arity");
 	lua_pushnumber(L, space->arity);
 	lua_settable(L, -3);
 

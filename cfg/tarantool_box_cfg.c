@@ -131,7 +131,7 @@ swap_tarantool_cfg(struct tarantool_cfg *c1, struct tarantool_cfg *c2) {
 static int
 acceptDefault_name__space(tarantool_cfg_space *c) {
 	c->enabled = -1;
-	c->cardinality = -1;
+	c->arity = -1;
 	c->estimated_rows = 0;
 	c->index = NULL;
 	return 0;
@@ -275,9 +275,9 @@ static NameAtom _name__space__enabled[] = {
 	{ "space", -1, _name__space__enabled + 1 },
 	{ "enabled", -1, NULL }
 };
-static NameAtom _name__space__cardinality[] = {
-	{ "space", -1, _name__space__cardinality + 1 },
-	{ "cardinality", -1, NULL }
+static NameAtom _name__space__arity[] = {
+	{ "space", -1, _name__space__arity + 1 },
+	{ "arity", -1, NULL }
 };
 static NameAtom _name__space__estimated_rows[] = {
 	{ "space", -1, _name__space__estimated_rows + 1 },
@@ -920,7 +920,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_RDONLY;
 		c->space[opt->name->index]->enabled = bln;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__space__cardinality) ) {
+	else if ( cmpNameAtoms( opt->name, _name__space__arity) ) {
 		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
 		ARRAYALLOC(c->space, opt->name->index + 1, _name__space, check_rdonly, CNF_FLAG_STRUCT_NEW | CNF_FLAG_STRUCT_NOTSET);
@@ -934,9 +934,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGINT;
 		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
 			return CNF_WRONGRANGE;
-		if (check_rdonly && c->space[opt->name->index]->cardinality != i32)
+		if (check_rdonly && c->space[opt->name->index]->arity != i32)
 			return CNF_RDONLY;
-		c->space[opt->name->index]->cardinality = i32;
+		c->space[opt->name->index]->arity = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__space__estimated_rows) ) {
 		if (opt->paramType != scalarType )
@@ -1237,7 +1237,7 @@ typedef enum IteratorState {
 	S_name__replication_source,
 	S_name__space,
 	S_name__space__enabled,
-	S_name__space__cardinality,
+	S_name__space__arity,
 	S_name__space__estimated_rows,
 	S_name__space__index,
 	S_name__space__index__type,
@@ -1682,7 +1682,7 @@ again:
 		case S_name__space:
 			i->state = S_name__space;
 		case S_name__space__enabled:
-		case S_name__space__cardinality:
+		case S_name__space__arity:
 		case S_name__space__estimated_rows:
 		case S_name__space__index:
 		case S_name__space__index__type:
@@ -1702,17 +1702,17 @@ again:
 						}
 						sprintf(*v, "%s", c->space[i->idx_name__space]->enabled == -1 ? "false" : c->space[i->idx_name__space]->enabled ? "true" : "false");
 						snprintf(buf, PRINTBUFLEN-1, "space[%d].enabled", i->idx_name__space);
-						i->state = S_name__space__cardinality;
+						i->state = S_name__space__arity;
 						return buf;
-					case S_name__space__cardinality:
+					case S_name__space__arity:
 						*v = malloc(32);
 						if (*v == NULL) {
 							free(i);
 							out_warning(CNF_NOMEMORY, "No memory to output value");
 							return NULL;
 						}
-						sprintf(*v, "%"PRId32, c->space[i->idx_name__space]->cardinality);
-						snprintf(buf, PRINTBUFLEN-1, "space[%d].cardinality", i->idx_name__space);
+						sprintf(*v, "%"PRId32, c->space[i->idx_name__space]->arity);
+						snprintf(buf, PRINTBUFLEN-1, "space[%d].arity", i->idx_name__space);
 						i->state = S_name__space__estimated_rows;
 						return buf;
 					case S_name__space__estimated_rows:
@@ -2026,7 +2026,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 
 			dst->space[i->idx_name__space]->__confetti_flags = src->space[i->idx_name__space]->__confetti_flags;
 			dst->space[i->idx_name__space]->enabled = src->space[i->idx_name__space]->enabled;
-			dst->space[i->idx_name__space]->cardinality = src->space[i->idx_name__space]->cardinality;
+			dst->space[i->idx_name__space]->arity = src->space[i->idx_name__space]->arity;
 			dst->space[i->idx_name__space]->estimated_rows = src->space[i->idx_name__space]->estimated_rows;
 
 			dst->space[i->idx_name__space]->index = NULL;
@@ -2380,8 +2380,8 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 			return diff;
 		}
-		if (c1->space[i1->idx_name__space]->cardinality != c2->space[i2->idx_name__space]->cardinality) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->cardinality");
+		if (c1->space[i1->idx_name__space]->arity != c2->space[i2->idx_name__space]->arity) {
+			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->space[]->arity");
 
 			return diff;
 		}

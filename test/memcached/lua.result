@@ -1,4 +1,4 @@
-lua box.space[box.cfg.memcached_space].cardinality
+lua box.space[box.cfg.memcached_space].arity
 ---
  - 4
 ...

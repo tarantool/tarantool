@@ -582,7 +582,7 @@ Call ERROR, Illegal parameters, key is not u32 (ER_ILLEGAL_PARAMS)
 <programlisting>localhost> show configuration
 ---
 ...
-  space[4].cardinality: "-1"
+  space[4].arity: "-1"
   space[4].estimated_rows: "0"
   space[4].index[0].type: "HASH"
   space[4].index[0].unique: "true"
@@ -652,7 +652,7 @@ localhost> lua box.select_range(4, 1, 2, '1')
 <programlisting>localhost> show configuration
 ---
 ...
-  space[4].cardinality: "-1"
+  space[4].arity: "-1"
   space[4].estimated_rows: "0"
   space[4].index[0].type: "HASH"
   space[4].index[0].unique: "true"
@@ -1230,7 +1230,7 @@ lua box.cjson.decode('{"hello": "world"}').hello
     <para>This package is a container for all
     configured spaces. A space object provides access to space
     attributes, such as id, whether or not a space is
-    enabled, space cardinality, estimated number of rows. It also
+    enabled, space arity, estimated number of rows. It also
     contains object-oriented versions of <code>box</code>
     functions. For example, instead of <code>box.insert(0, ...)</code>
     one can write <code>box.space[0]:insert(...)</code>.
@@ -1251,7 +1251,7 @@ lua box.cjson.decode('{"hello": "world"}').hello
 
     <varlistentry>
         <term>
-            <emphasis role="lua">space.cardinality</emphasis>
+            <emphasis role="lua">space.arity</emphasis>
         </term>
         <listitem><simpara>
             A limit on tuple field count for tuples in this space.
