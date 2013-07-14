@@ -49,48 +49,8 @@ def create_tmpfs_vardir(vardir):
     os.symlink(os.path.join("/dev/shm", vardir), vardir)
 
 class FuncTest(Test):
-    def __init__(self, name, args, suite_ini):
-        Test.__init__(self, name, args, suite_ini)
-        self.name = name
-        self.result = name.replace(".test", ".result")
-        self.skip_cond = name.replace(".test", ".skipcond")
-        self.tmp_result = os.path.join(self.args.vardir,
-                os.path.basename(self.result))
-        self.reject = "{0}/test/{1}".format(self.args.builddir,
-                name.replace(".test", ".reject"))
-
     def execute(self, server):
-        diagnostics = "unknown"
-        builddir = self.args.builddir
-        save_stdout = sys.stdout
-        try:
-            self.skip = 0
-            if os.path.exists(self.skip_cond):
-                sys.stdout = FilteredStream(self.tmp_result)
-                stdout_fileno = sys.stdout.stream.fileno()
-                execfile(self.skip_cond, dict(locals(), **server.__dict__))
-                sys.stdout.close()
-                sys.stdout = save_stdout
-            if not self.skip:
-                sys.stdout = FilteredStream(self.tmp_result)
-                stdout_fileno = sys.stdout.stream.fileno()
-                execfile(self.name, dict(locals(), **server.__dict__))
-            self.is_executed_ok = True
-        except Exception as e:
-            traceback.print_exc(e)
-            diagnostics = str(e)
-        finally:
-            if sys.stdout and sys.stdout != save_stdout:
-                sys.stdout.close()
-            sys.stdout = save_stdout;
-        self.is_executed = True
-
-    def __repr__(self):
-        return str([self.name, self.result, self.skip_cond, self.tmp_result,
-        self.reject])
-
-    __str__ = __repr__
-
+        execfile(self.name, dict(locals(), **server.__dict__))
 
 class TarantoolConfigFile:
     """ConfigParser can't read files without sections, work it around"""
@@ -140,10 +100,11 @@ class TarantoolServer(Server):
 
     def find_exe(self, builddir, silent=True):
         "Locate server executable in the build dir or in the PATH."
+        self.builddir = builddir
         builddir = os.path.join(builddir, "src/box")
         path = builddir + os.pathsep + os.environ["PATH"]
         if not silent:
-            print "  Looking for server binary in {0} ...".format(path)
+            print "Looking for server binary in {0} ...".format(path)
         for dir in path.split(os.pathsep):
             exe = os.path.join(dir, self.default_bin_name)
             if os.access(exe, os.X_OK):
@@ -179,30 +140,36 @@ class TarantoolServer(Server):
             else:
                 os.makedirs(self.vardir)
 
-        shutil.copy(self.config, os.path.join(self.vardir,
-                                              self.default_config_name))
+        shutil.copy(self.config, 
+                    os.path.join(self.vardir, self.default_config_name))
         shutil.copy(self.valgrind_sup,
                     os.path.join(self.vardir, self.default_suppression_name))
 
         var_init_lua = os.path.join(self.vardir, self.default_init_lua_name)
         if self.init_lua != None:
+            if os.path.exists(var_init_lua):
+                os.remove(var_init_lua)
             shutil.copy(self.init_lua, var_init_lua)
-        elif os.path.exists(var_init_lua):
-            # We must delete old init.lua if it exists
-            os.remove(var_init_lua)
+
 
     def configure(self, config):
+        def get_option(config, section, key):
+            value = config.get(section, key)
+            if value.isdigit():
+                value = int(value)
+            return value
+            config.get()
         self.config = os.path.abspath(config)
         # now read the server config, we need some properties from it
         with open(self.config) as fp:
             dummy_section_name = "tarantool"
             config = ConfigParser.ConfigParser()
             config.readfp(TarantoolConfigFile(fp, dummy_section_name))
-
-            self.pidfile = config.get(dummy_section_name, "pid_file")
-            self.primary_port = self.get_option_int(config, dummy_section_name, "primary_port")
-            self.admin_port = self.get_option_int(config, dummy_section_name, "admin_port")
-            self.memcached_port = self.get_option_int(config, dummy_section_name, "memcached_port")
+        
+            self.pidfile = get_option(config, dummy_section_name, "pid_file")
+            self.primary_port = get_option(config, dummy_section_name, "primary_port")
+            self.admin_port = get_option(config, dummy_section_name, "admin_port")
+            self.memcached_port = get_option(config, dummy_section_name, "memcached_port")
 
         self.port = self.admin_port
         self.admin = AdminConnection("localhost", self.admin_port)
@@ -240,9 +207,13 @@ class TarantoolServer(Server):
                               stderr = subprocess.PIPE)
 
     def get_param(self, param):
-        data = self.admin.execute("show info", silent = True)
-        info = yaml.load(data)["info"]
-        return info[param]
+        if param != None:
+            data = self.admin("show.info."+param)
+            info = yaml.load(data)
+        else:
+            data = self.admin.execute("show info", silent = True)
+            info = yaml.load(data)["info"]
+        return info
 
     def wait_lsn(self, lsn):
         while True:
@@ -265,7 +236,7 @@ class TarantoolServer(Server):
 
         if self.valgrind:
             with daemon.DaemonContext(working_directory = self.vardir):
-                subprocess.check_call(args)
+                subprocess.check_call(arg   s)
         else:
             if not self.gdb:
                 args.append("--background")
