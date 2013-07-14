@@ -1,48 +1,48 @@
-lua i = 1 while true do box.insert(0, box.space[0]:len(), string.rep('test', i)) i = i + 1 end
+i = 1 while true do box.insert(0, box.space[0]:len(), string.rep('test', i)) i = i + 1 end
 ---
 error: 'Failed to allocate 19436 bytes in slab allocator for tuple'
 ...
-lua box.space[0]:len()
+box.space[0]:len()
 ---
  - 4853
 ...
-lua i = 1 while true do box.insert(0, box.space[0]:len(), string.rep('test', i)) i = i + 1 end
+i = 1 while true do box.insert(0, box.space[0]:len(), string.rep('test', i)) i = i + 1 end
 ---
 error: 'Failed to allocate 4095 bytes in slab allocator for tuple'
 ...
-lua box.space[0]:len()
+box.space[0]:len()
 ---
  - 5871
 ...
-lua i = 1 while true do box.insert(0, box.space[0]:len(), string.rep('test', i)) i = i + 1 end
+i = 1 while true do box.insert(0, box.space[0]:len(), string.rep('test', i)) i = i + 1 end
 ---
 error: 'Failed to allocate 2051 bytes in slab allocator for tuple'
 ...
-lua box.space[0]:len()
+box.space[0]:len()
 ---
  - 6378
 ...
-lua box.space[0]:select(0, 0)
+box.space[0]:select(0, 0)
 ---
  - 0: {1953719668}
 ...
-lua box.space[0]:select(0, 5)
+box.space[0]:select(0, 5)
 ---
  - 5: {'testtesttesttesttesttest'}
 ...
-lua box.space[0]:select(0, 9)
+box.space[0]:select(0, 9)
 ---
  - 9: {'testtesttesttesttesttesttesttesttesttest'}
 ...
-lua box.space[0]:select(0, 11)
+box.space[0]:select(0, 11)
 ---
  - 11: {'testtesttesttesttesttesttesttesttesttesttesttest'}
 ...
-lua box.space[0]:select(0, 15)
+box.space[0]:select(0, 15)
 ---
  - 15: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
 ...
-lua i = 0 for k,v in box.space[0]:pairs() do print(v) i = i + 1 if i == 50 then break end end
+i = 0 for k,v in box.space[0]:pairs() do print(v) i = i + 1 if i == 50 then break end end
 ---
 0: {1953719668}
 1: {8391162081565697396}
@@ -95,13 +95,13 @@ lua i = 0 for k,v in box.space[0]:pairs() do print(v) i = i + 1 if i == 50 then 
 48: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
 49: {'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest'}
 ...
-lua box.space[0]:truncate()
+box.space[0]:truncate()
 ---
 ...
-lua box.space[0]:insert(0, 'test')
+box.space[0]:insert(0, 'test')
 ---
  - 0: {1953719668}
 ...
-lua box.space[0]:truncate()
+box.space[0]:truncate()
 ---
 ...

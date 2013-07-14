@@ -24,7 +24,7 @@ replica_memcached = replica.memcached
 ###################################
 def get_lsn(serv):
     serv_admin = serv.admin
-    resp = serv_admin("lua box.info.lsn", silent=True)
+    resp = serv_admin("box.info.lsn", silent=True)
     return yaml.load(resp)[0]
 
 def wait(serv_master = master, serv_replica = replica):
@@ -34,7 +34,7 @@ def wait(serv_master = master, serv_replica = replica):
 
 def get_memcached_len(serv):
     serv_admin = serv.admin
-    resp = serv_admin("lua box.space[box.cfg.memcached_space]:len()", silent=True)
+    resp = serv_admin("box.space[box.cfg.memcached_space]:len()", silent=True)
     return yaml.load(resp)[0]
 
 def wait_for_empty_space(serv):

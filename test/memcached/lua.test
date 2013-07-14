@@ -1,6 +1,6 @@
 # encoding: utf-8
-admin("lua box.space[box.cfg.memcached_space].arity")
-admin("lua box.space[box.cfg.memcached_space].estimated_rows")
-admin("lua box.space[box.cfg.memcached_space].n")
-admin("lua box.space[box.cfg.memcached_space].index[0].idx")
-admin("lua box.space[box.cfg.memcached_space].index[0].type")
+admin("box.space[box.cfg.memcached_space].arity")
+admin("box.space[box.cfg.memcached_space].estimated_rows")
+admin("box.space[box.cfg.memcached_space].n")
+admin("box.space[box.cfg.memcached_space].index[0].idx")
+admin("box.space[box.cfg.memcached_space].index[0].type")

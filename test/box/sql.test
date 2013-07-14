@@ -57,7 +57,7 @@ print """#
 sql("select * from t1 where k0 = 0")
 sql("select * from t65537 where k0 = 0")
 sql("select * from t4294967295 where k0 = 0")
-admin("lua box.space[0]:truncate()")
+admin("box.space[0]:truncate()")
 
 print """#
 # A test case for: http://bugs.launchpad.net/bugs/716683

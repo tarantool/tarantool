@@ -1,9 +1,9 @@
 # encoding: utf-8
 #
-admin("lua box.cfg.too_long_threshold")
+admin("box.cfg.too_long_threshold")
 # bad1
 server.reconfigure("box/tarantool_bad1.cfg")
-admin("lua box.cfg.too_long_threshold")
+admin("box.cfg.too_long_threshold")
 # bad2
 server.reconfigure("box/tarantool_bad2.cfg")
 # bad3
@@ -14,12 +14,12 @@ server.reconfigure("box/tarantool_bad4.cfg")
 server.reconfigure("box/tarantool_bad5.cfg")
 # good
 server.reconfigure("box/tarantool_good.cfg")
-admin("lua box.cfg.too_long_threshold")
-admin("lua box.cfg.snap_io_rate_limit")
-admin("lua box.cfg.io_collect_interval")
+admin("box.cfg.too_long_threshold")
+admin("box.cfg.snap_io_rate_limit")
+admin("box.cfg.io_collect_interval")
 # empty
 server.reconfigure("box/tarantool_empty.cfg")
-admin("lua box.cfg.too_long_threshold")
+admin("box.cfg.too_long_threshold")
 
 # no config
 server.reconfigure(None)
@@ -27,7 +27,7 @@ server.reconfigure(None)
 # cleanup
 # restore default
 server.reconfigure(self.suite_ini["config"])
-admin("lua box.cfg.too_long_threshold")
+admin("box.cfg.too_long_threshold")
 
 print """#
 # A test case for http://bugs.launchpad.net/bugs/712447:
@@ -44,6 +44,6 @@ sql("insert into t0 values (3, 'tuple 3')")
 admin("save snapshot")
 # Cleanup
 server.reconfigure(self.suite_ini["config"])
-admin("lua box.space[0]:truncate()")
+admin("box.space[0]:truncate()")
 
 # vim: syntax=python

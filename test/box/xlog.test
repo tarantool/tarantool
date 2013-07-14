@@ -119,9 +119,9 @@ shutil.copy(abspath("box/dup_key1.xlog"),
 shutil.copy(abspath("box/dup_key2.xlog"),
            os.path.join(vardir, "00000000000000000004.xlog"))
 server.start()
-admin("lua box.space[0]:select(0, 1)")
-admin("lua box.space[0]:select(0, 2)")
-admin("lua #box.space[0]")
+admin("box.space[0]:select(0, 1)")
+admin("box.space[0]:select(0, 2)")
+admin("#box.space[0]")
 
 # cleanup
 server.stop()

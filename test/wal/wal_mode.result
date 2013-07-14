@@ -1,4 +1,4 @@
-lua box.cfg.wal_mode
+box.cfg.wal_mode
 ---
  - none
 ...
@@ -27,7 +27,7 @@ save snapshot
 ---
 fail: can't save snapshot, errno 17 (File exists)
 ...
-lua box.space[0]:truncate()
+box.space[0]:truncate()
 ---
 ...
 save snapshot

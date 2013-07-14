@@ -32,113 +32,113 @@ sql("insert into t9 values ('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`
 #
 
 # Select by one entry
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 0)")
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 0)")
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 1)")
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 1)")
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 2)")
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 2)")
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 3)")
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 3)")
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 4)")
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 4)")
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 5)")
-admin("lua box.select(9, 0, 'Jules', 'Vincent', 5)")
-admin("lua box.select(9, 0, 'Vincent', 'Jules', 6)")
+admin("box.select(9, 0, 'Vincent', 'Jules', 0)")
+admin("box.select(9, 0, 'Jules', 'Vincent', 0)")
+admin("box.select(9, 0, 'Vincent', 'Jules', 1)")
+admin("box.select(9, 0, 'Jules', 'Vincent', 1)")
+admin("box.select(9, 0, 'Vincent', 'Jules', 2)")
+admin("box.select(9, 0, 'Jules', 'Vincent', 2)")
+admin("box.select(9, 0, 'Vincent', 'Jules', 3)")
+admin("box.select(9, 0, 'Jules', 'Vincent', 3)")
+admin("box.select(9, 0, 'Vincent', 'Jules', 4)")
+admin("box.select(9, 0, 'Jules', 'Vincent', 4)")
+admin("box.select(9, 0, 'Vincent', 'Jules', 5)")
+admin("box.select(9, 0, 'Jules', 'Vincent', 5)")
+admin("box.select(9, 0, 'Vincent', 'Jules', 6)")
 
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 0)")
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!', 0)")
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 1)")
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!', 1)")
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 2)")
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent', 3)")
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!', 2)")
+admin("box.select(9, 0, 'The Wolf!', 'Vincent', 0)")
+admin("box.select(9, 0, 'Vincent', 'The Wolf!', 0)")
+admin("box.select(9, 0, 'The Wolf!', 'Vincent', 1)")
+admin("box.select(9, 0, 'Vincent', 'The Wolf!', 1)")
+admin("box.select(9, 0, 'The Wolf!', 'Vincent', 2)")
+admin("box.select(9, 0, 'The Wolf!', 'Vincent', 3)")
+admin("box.select(9, 0, 'Vincent', 'The Wolf!', 2)")
 
 # Select all messages from Vincent to Jules
-admin("lua box.select(9, 0, 'Vincent', 'Jules')")
+admin("box.select(9, 0, 'Vincent', 'Jules')")
 
 # Select all messages from Jules to Vincent
-admin("lua box.select(9, 0, 'Jules', 'Vincent')")
+admin("box.select(9, 0, 'Jules', 'Vincent')")
 
 # Select all messages from Vincent to The Wolf
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!')")
+admin("box.select(9, 0, 'Vincent', 'The Wolf!')")
 
 # Select all messages from The Wolf to Vincent
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent')")
+admin("box.select(9, 0, 'The Wolf!', 'Vincent')")
 
 # Select all Vincent messages
-admin("lua box.select(9, 0, 'Vincent')")
+admin("box.select(9, 0, 'Vincent')")
 
 #
 # Delete test
 #
 
 # Delete some messages from the The Wolf and Vincent dialog
-admin("lua box.delete(9, 'The Wolf!', 'Vincent', 0)")
-admin("lua box.delete(9, 'The Wolf!', 'Vincent', 3)")
-admin("lua box.delete(9, 'Vincent', 'The Wolf!', 0)")
+admin("box.delete(9, 'The Wolf!', 'Vincent', 0)")
+admin("box.delete(9, 'The Wolf!', 'Vincent', 3)")
+admin("box.delete(9, 'Vincent', 'The Wolf!', 0)")
 
-admin("lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')")
-admin("lua box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')")
+admin("box.update(9, {'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')")
+admin("box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')")
 # Checking Vincent's last messages
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!')")
+admin("box.select(9, 0, 'Vincent', 'The Wolf!')")
 # Checking The Wolf's last messages
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent')")
+admin("box.select(9, 0, 'The Wolf!', 'Vincent')")
 
 # try to delete nonexistent message
-admin("lua box.delete(9, 'Vincent', 'The Wolf!', 3)")
+admin("box.delete(9, 'Vincent', 'The Wolf!', 3)")
 # try to delete patrial defined key
-admin("lua box.delete(9, 'Vincent', 'The Wolf!')")
+admin("box.delete(9, 'Vincent', 'The Wolf!')")
 # try to delete by invalid key
-admin("lua box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')")
+admin("box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')")
 
 #
 # Update test
 #
-admin("lua box.update(9, {'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')")
-admin("lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')")
+admin("box.update(9, {'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')")
+admin("box.update(9, {'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')")
 
 # Checking Vincent's last messages
-admin("lua box.select(9, 0, 'Vincent', 'The Wolf!')")
+admin("box.select(9, 0, 'Vincent', 'The Wolf!')")
 # Checking The Wolf's last messages
-admin("lua box.select(9, 0, 'The Wolf!', 'Vincent')")
+admin("box.select(9, 0, 'The Wolf!', 'Vincent')")
 
 # try to update a nonexistent message
-admin("lua box.update(9, {'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')")
+admin("box.update(9, {'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')")
 # try to update patrial defined key
-admin("lua box.update(9, {'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')")
+admin("box.update(9, {'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')")
 # try to update by invalid key
-admin("lua box.update(9, {'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')")
-admin("lua box.space[9]:len()")
-admin("lua box.space[9]:truncate()")
-admin("lua box.space[9]:len()")
+admin("box.update(9, {'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')")
+admin("box.space[9]:len()")
+admin("box.space[9]:truncate()")
+admin("box.space[9]:len()")
 
 print """ A test case for Bug#1051006 Tree iterators return garbage
 if an index is modified between calls"""
 
-admin("lua box.space[16]:insert('a', 'a', 'a')")
-admin("lua box.space[16]:insert('d', 'd', 'd')")
-admin("lua box.space[16]:insert('e', 'e', 'e')")
-admin("lua box.space[16]:insert('b', 'b', 'b')")
-admin("lua box.space[16]:insert('c', 'c', 'c')")
-admin("lua k,v = box.space[16].index[1]:next(k)")
-admin("lua print(v)")
-admin("lua k,v = box.space[16].index[1]:next(k)")
-admin("lua print(v)")
-admin("lua box.space[16]:truncate()")
-admin("lua print(v)")
-admin("lua collectgarbage('collect')")
-admin("lua print(v)")
-admin("lua k,v = box.space[16].index[1]:next(k)")
-admin("lua print(v)")
-admin("lua collectgarbage('collect')")
-admin("lua print(v)")
-admin("lua k,v = box.space[16].index[1]:next(k)")
-admin("lua print(v)")
-admin("lua k,v = box.space[16].index[1]:next(k)")
-admin("lua print(v)")
-admin("lua k,v = box.space[16].index[1]:next(k)")
-admin("lua print(v)")
+admin("box.space[16]:insert('a', 'a', 'a')")
+admin("box.space[16]:insert('d', 'd', 'd')")
+admin("box.space[16]:insert('e', 'e', 'e')")
+admin("box.space[16]:insert('b', 'b', 'b')")
+admin("box.space[16]:insert('c', 'c', 'c')")
+admin("k,v = box.space[16].index[1]:next(k)")
+admin("print(v)")
+admin("k,v = box.space[16].index[1]:next(k)")
+admin("print(v)")
+admin("box.space[16]:truncate()")
+admin("print(v)")
+admin("collectgarbage('collect')")
+admin("print(v)")
+admin("k,v = box.space[16].index[1]:next(k)")
+admin("print(v)")
+admin("collectgarbage('collect')")
+admin("print(v)")
+admin("k,v = box.space[16].index[1]:next(k)")
+admin("print(v)")
+admin("k,v = box.space[16].index[1]:next(k)")
+admin("print(v)")
+admin("k,v = box.space[16].index[1]:next(k)")
+admin("print(v)")
 
 # Bug #1082356
 sql("insert into t19 values(1, 1)")

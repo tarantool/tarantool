@@ -42,7 +42,7 @@ print """
 server.stop()
 server.deploy("box/tarantool_bug876541.cfg")
 # check values
-admin("lua box.cfg.wal_fsync_delay")
+admin("box.cfg.wal_fsync_delay")
 
 print """
 # Bug#928413 Lua malfunction on certain configuration
@@ -52,8 +52,8 @@ print """
 server.stop()
 server.deploy("box/tarantool_bug928413.cfg")
 # check values
-admin("lua box.cfg.wal_fsync_delay")
-admin("lua box.space[0].enabled")
+admin("box.cfg.wal_fsync_delay")
+admin("box.space[0].enabled")
 admin("reload configuration")
 
 print """
@@ -73,7 +73,7 @@ shutil.copy("box/test_init.lua", os.path.join(script_dir_path, "init.lua"))
 
 server.stop()
 server.deploy("box/tarantool_scriptdir.cfg")
-admin("lua print_config()")
+admin("print_config()")
 
 
 # restore default server

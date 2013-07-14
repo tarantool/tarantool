@@ -82,7 +82,7 @@ insert into t1 values ('key2', 'part1', 'part2_a')
 Insert OK, 1 row affected
 insert into t1 values ('key3', 'part1', 'part2_b')
 Insert OK, 1 row affected
-lua for k, v in box.space[1]:pairs() do print(v) end
+for k, v in box.space[1]:pairs() do print(v) end
 ---
 846816619: {'part1', 'part2_a'}
 863593835: {'part1', 'part2_b'}
@@ -126,7 +126,7 @@ insert into t5 values ('31234567', 'part1_a', 'part2')
 Insert OK, 1 row affected
 insert into t5 values ('41234567', 'part1_a', 'part2_a')
 Insert OK, 1 row affected
-lua for k, v in box.space[5]:pairs() do print(v) end
+for k, v in box.space[5]:pairs() do print(v) end
 ---
 3978425819141910832: {'part1', 'part2'}
 3978425819141910833: {'part1', 'part2'}
@@ -181,7 +181,7 @@ Found 1 tuple:
 select * from t7 where k1='world'
 Found 1 tuple:
 [4, 'world']
-lua box.space[7]:truncate()
+box.space[7]:truncate()
 ---
 ...
 select * from t1 where k0='key1'
@@ -221,7 +221,7 @@ delete from t5 where k0='31234567'
 Delete OK, 1 row affected
 delete from t5 where k0='41234567'
 Delete OK, 1 row affected
-lua for k, v in box.space[5]:pairs() do print(v) end
+for k, v in box.space[5]:pairs() do print(v) end
 ---
 ...
 
@@ -332,25 +332,25 @@ insert into t4 values(2, 'Bilimbi')
 Insert OK, 1 row affected
 insert into t4 values(3, 'Creature ')
 Insert OK, 1 row affected
-lua for k, v in box.space[4]:pairs() do print(v) end
+for k, v in box.space[4]:pairs() do print(v) end
 ---
 2: {'Bilimbi'}
 3: {'Creature '}
 1: {'Aardvark '}
 ...
-lua box.space[4].index[0].idx:min()
+box.space[4].index[0].idx:min()
 ---
 error: 'Hash index does not support min()'
 ...
-lua box.space[4].index[0].idx:max()
+box.space[4].index[0].idx:max()
 ---
 error: 'Hash index does not support max()'
 ...
-lua box.space[4].index[1].idx:min()
+box.space[4].index[1].idx:min()
 ---
  - 1: {'Aardvark '}
 ...
-lua box.space[4].index[1].idx:max()
+box.space[4].index[1].idx:max()
 ---
  - 3: {'Creature '}
 ...

@@ -1,64 +1,64 @@
-lua ch = box.ipc.channel()
+ch = box.ipc.channel()
 ---
 ...
-lua ch:is_full()
+ch:is_full()
 ---
  - false
 ...
-lua ch:is_empty()
+ch:is_empty()
 ---
  - true
 ...
-lua ch:get(.1)
+ch:get(.1)
 ---
  - nil
 ...
-lua ch:put()
+ch:put()
 ---
 error: 'usage: channel:put(var [, timeout])'
 ...
-lua ch:put('test')
+ch:put('test')
 ---
  - true
 ...
-lua ch:get()
+ch:get()
 ---
  - test
 ...
-lua ch:get('wrong timeout')
+ch:get('wrong timeout')
 ---
 error: 'timeout must be a number'
 ...
-lua ch:get(-10)
+ch:get(-10)
 ---
 error: 'wrong timeout'
 ...
-lua ch:put(234)
+ch:put(234)
 ---
  - true
 ...
-lua ch:put(345, .5)
+ch:put(345, .5)
 ---
  - false
 ...
-lua ch:is_full()
+ch:is_full()
 ---
  - true
 ...
-lua ch:is_empty()
+ch:is_empty()
 ---
  - false
 ...
-lua buffer = {}
+buffer = {}
 ---
 ...
-lua tfbr = box.fiber.create(function() box.fiber.detach() while true do table.insert(buffer, ch:get()) end end)
+tfbr = box.fiber.create(function() box.fiber.detach() while true do table.insert(buffer, ch:get()) end end)
 ---
 ...
-lua box.fiber.resume(tfbr)
+box.fiber.resume(tfbr)
 ---
 ...
-lua for i = 1, 10 do print(i, ' ', ch:put(i, 0.1)) end
+for i = 1, 10 do print(i, ' ', ch:put(i, 0.1)) end
 ---
 1 true
 2 true
@@ -71,42 +71,42 @@ lua for i = 1, 10 do print(i, ' ', ch:put(i, 0.1)) end
 9 true
 10 true
 ...
-lua ch:has_readers()
+ch:has_readers()
 ---
  - true
 ...
-lua ch:has_writers()
+ch:has_writers()
 ---
  - false
 ...
-lua box.fiber.cancel(tfbr)
+box.fiber.cancel(tfbr)
 ---
 ...
-lua ch:has_readers()
----
- - false
-...
-lua ch:has_writers()
+ch:has_readers()
 ---
  - false
 ...
-lua ch:put(box.info.pid)
+ch:has_writers()
+---
+ - false
+...
+ch:put(box.info.pid)
 ---
  - true
 ...
-lua ch:is_full()
+ch:is_full()
 ---
  - true
 ...
-lua ch:is_empty()
+ch:is_empty()
 ---
  - false
 ...
-lua ch:get(box.info.pid) == box.info.pid
+ch:get(box.info.pid) == box.info.pid
 ---
  - true
 ...
-lua for i, v in pairs(buffer) do print(v) end
+for i, v in pairs(buffer) do print(v) end
 ---
 234
 1
@@ -120,81 +120,81 @@ lua for i, v in pairs(buffer) do print(v) end
 9
 10
 ...
-lua ch:is_empty()
+ch:is_empty()
 ---
  - true
 ...
-lua ch:broadcast()
+ch:broadcast()
 ---
 error: 'usage: channel:broadcast(variable)'
 ...
-lua ch:broadcast(123)
+ch:broadcast(123)
 ---
  - true
 ...
-lua ch:get()
+ch:get()
 ---
  - 123
 ...
-lua ch:is_full()
+ch:is_full()
 ---
  - false
 ...
-lua ch:is_empty()
+ch:is_empty()
 ---
  - true
 ...
-lua tfbr = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr  - ' .. tostring(v)) end end)
+tfbr = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr  - ' .. tostring(v)) end end)
 ---
 ...
-lua box.fiber.resume(tfbr)
+box.fiber.resume(tfbr)
 ---
 ...
-lua tfbr2 = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr2 - ' .. tostring(v)) end end)
+tfbr2 = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr2 - ' .. tostring(v)) end end)
 ---
 ...
-lua box.fiber.resume(tfbr2)
+box.fiber.resume(tfbr2)
 ---
 ...
-lua buffer = {}
+buffer = {}
 ---
 ...
-lua for i, v in pairs(buffer) do print(v) end
+for i, v in pairs(buffer) do print(v) end
 ---
 ...
-lua ch:is_full()
+ch:is_full()
 ---
  - false
 ...
-lua ch:is_empty()
+ch:is_empty()
 ---
  - true
 ...
-lua ch:put(1)
+ch:put(1)
 ---
  - true
 ...
-lua ch:put(2)
+ch:put(2)
 ---
  - true
 ...
-lua ch:put(3)
+ch:put(3)
 ---
  - true
 ...
-lua ch:put(4)
+ch:put(4)
 ---
  - true
 ...
-lua ch:put(5)
+ch:put(5)
 ---
  - true
 ...
-lua ch:broadcast('broadcast message!')
+ch:broadcast('broadcast message!')
 ---
  - 2
 ...
-lua for i = 35, 45 do print(ch:put(i)) end
+for i = 35, 45 do print(ch:put(i)) end
 ---
 true
 true
@@ -208,7 +208,7 @@ true
 true
 true
 ...
-lua for i, v in pairs(buffer) do print(v) end
+for i, v in pairs(buffer) do print(v) end
 ---
 tfbr  - 1
 tfbr2 - 2

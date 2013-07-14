@@ -1,72 +1,72 @@
-lua box.info.unknown_variable
+box.info.unknown_variable
 ---
  - nil
 ...
-lua box.info[23]
+box.info[23]
 ---
  - nil
 ...
-lua box.info['unknown_variable']
+box.info['unknown_variable']
 ---
  - nil
 ...
-lua string.match(box.info.version, '^[1-9]') ~= nil
+string.match(box.info.version, '^[1-9]') ~= nil
 ---
  - true
 ...
-lua string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
+string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
 ---
  - true
 ...
-lua string.match(box.info.logger_pid, '^[1-9][0-9]*$') ~= nil
+string.match(box.info.logger_pid, '^[1-9][0-9]*$') ~= nil
 ---
  - true
 ...
-lua box.info.lsn > 0
+box.info.lsn > 0
 ---
  - true
 ...
-lua box.info.recovery_lag
+box.info.recovery_lag
 ---
  - 0
 ...
-lua box.info.recovery_last_update
+box.info.recovery_last_update
 ---
  - 0
 ...
-lua box.info.status
+box.info.status
 ---
  - primary
 ...
-lua string.len(box.info.config) > 0
+string.len(box.info.config) > 0
 ---
  - true
 ...
-lua string.len(box.info.build.target) > 0
+string.len(box.info.build.target) > 0
 ---
  - true
 ...
-lua string.len(box.info.build.compiler) > 0
+string.len(box.info.build.compiler) > 0
 ---
  - true
 ...
-lua string.len(box.info.build.flags) > 0
+string.len(box.info.build.flags) > 0
 ---
  - true
 ...
-lua string.len(box.info.build.options) > 0
+string.len(box.info.build.options) > 0
 ---
  - true
 ...
-lua string.len(box.info.uptime) > 0
+string.len(box.info.uptime) > 0
 ---
  - true
 ...
-lua string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
+string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
 ---
  - true
 ...
-lua for k, v in pairs(box.info()) do print(k) end
+for k, v in pairs(box.info()) do print(k) end
 ---
 version
 status
@@ -80,7 +80,7 @@ build
 logger_pid
 config
 ...
-lua box.info.snapshot_pid
+box.info.snapshot_pid
 ---
  - 0
 ...

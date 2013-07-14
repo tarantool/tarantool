@@ -23,7 +23,7 @@ sql("update t0 set k0=2 where k0=1")
 sql("select * from t0 where k0=1")
 sql("select * from t0 where k0=2")
 admin("set injection ERRINJ_WAL_IO off")
-admin("lua box.space[0]:truncate()")
+admin("box.space[0]:truncate()")
 
 # Check a failed log rotation.
 admin("set injection ERRINJ_WAL_ROTATE on")
@@ -40,7 +40,7 @@ sql("update t0 set k0=2 where k0=1")
 sql("select * from t0 where k0=1")
 sql("select * from t0 where k0=2")
 admin("set injection ERRINJ_WAL_ROTATE on")
-admin("lua box.space[0]:truncate()")
+admin("box.space[0]:truncate()")
 admin("set injection ERRINJ_WAL_ROTATE off")
-admin("lua box.space[0]:truncate()")
+admin("box.space[0]:truncate()")
 # vim: syntax=python

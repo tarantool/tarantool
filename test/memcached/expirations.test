@@ -12,7 +12,7 @@ def wait_for_next_lsn(lsn, serv):
 
 def get_lsn(serv):
     serv_admin = serv.admin
-    resp = serv_admin("lua box.info.lsn", silent=True)
+    resp = serv_admin("box.info.lsn", silent=True)
     return yaml.load(resp)[0]
 
 def wait(serv = server):

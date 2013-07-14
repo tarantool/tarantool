@@ -1,20 +1,20 @@
-lua c = box.net.sql.connect('abcd')
+c = box.net.sql.connect('abcd')
 ---
 error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
 ...
-lua dump = function(v) return box.cjson.encode(v) end
+dump = function(v) return box.cjson.encode(v) end
 ---
 ...
-lua connect = {}
+connect = {}
 ---
 ...
-lua for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do table.insert(connect, tk) end
+for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do table.insert(connect, tk) end
 ---
 ...
-lua c = box.net.sql.connect('mysql', unpack(connect))
+c = box.net.sql.connect('mysql', unpack(connect))
 ---
 ...
-lua for k, v in pairs(c) do print(k, ': ', type(v)) end
+for k, v in pairs(c) do print(k, ': ', type(v)) end
 ---
 raise: boolean
 processing: boolean
@@ -27,55 +27,55 @@ db: string
 user: string
 port: string
 ...
-lua c:execute('SEL ECT 1')
+c:execute('SEL ECT 1')
 ---
 error: '[string "-- sql.lua (internal file)..."]:105: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''SEL ECT 1'' at line 1'
 ...
-lua dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})
+dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})
 ---
  - [[{"bool2":0,"str":"abc","num":123,"bool1":1}],1]
 ...
-lua dump({c:execute('SELECT * FROM (SELECT ?) t WHERE 1 = 0', 2)})
+dump({c:execute('SELECT * FROM (SELECT ?) t WHERE 1 = 0', 2)})
 ---
  - [{},0]
 ...
-lua dump({c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS One; SELECT 2 AS Two, 3 AS Three; END')})
+dump({c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS One; SELECT 2 AS Two, 3 AS Three; END')})
 ---
  - [{},0]
 ...
-lua dump({c:execute('CALL p1')})
+dump({c:execute('CALL p1')})
 ---
  - [[{"One":1},{"Three":3,"Two":2}],2]
 ...
-lua dump({c:execute('DROP PROCEDURE p1')})
+dump({c:execute('DROP PROCEDURE p1')})
 ---
  - [{},0]
 ...
-lua dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2')})
+dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2')})
 ---
  - [[{"one":1},{"one":2}],2]
 ...
-lua dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')})
+dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')})
 ---
  - [[{"one":1},{"one":2},{"two":"abc"}],3]
 ...
-lua c:quote('test "abc" test')
+c:quote('test "abc" test')
 ---
  - test \"abc\" test
 ...
-lua c:begin_work()
+c:begin_work()
 ---
  - 0
 ...
-lua c:rollback()
+c:rollback()
 ---
  - 0
 ...
-lua c:begin_work()
+c:begin_work()
 ---
  - 0
 ...
-lua c:commit()
+c:commit()
 ---
  - 0
 ...

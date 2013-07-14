@@ -1,37 +1,37 @@
 cjson tests
-lua type(box.cjson)
+type(box.cjson)
 ---
  - table
 ...
-lua box.cjson.encode(123)
+box.cjson.encode(123)
 ---
  - 123
 ...
-lua box.cjson.encode({123})
+box.cjson.encode({123})
 ---
  - [123]
 ...
-lua box.cjson.encode({123, 234, 345})
+box.cjson.encode({123, 234, 345})
 ---
  - [123,234,345]
 ...
-lua box.cjson.encode({abc = 234, cde = 345})
+box.cjson.encode({abc = 234, cde = 345})
 ---
  - {"cde":345,"abc":234}
 ...
-lua box.cjson.encode({Метапеременная = { 'Метазначение' } })
+box.cjson.encode({Метапеременная = { 'Метазначение' } })
 ---
  - {"Метапеременная":["Метазначение"]}
 ...
-lua box.cjson.decode('123')
+box.cjson.decode('123')
 ---
  - 123
 ...
-lua box.cjson.decode('[123, "Кудыкины горы"]')[2]
+box.cjson.decode('[123, "Кудыкины горы"]')[2]
 ---
  - Кудыкины горы
 ...
-lua box.cjson.decode('{"test": "Результат"}').test
+box.cjson.decode('{"test": "Результат"}').test
 ---
  - Результат
 ...

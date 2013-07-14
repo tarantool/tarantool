@@ -1,7 +1,7 @@
-lua dofile('utils.lua')
+dofile('utils.lua')
 ---
 ...
-lua dofile('bitset.lua')
+dofile('bitset.lua')
 ---
 ...
 
@@ -9,7 +9,7 @@ lua dofile('bitset.lua')
 # BitsetIndex: insert/delete
 #-----------------------------------------------------------------------------#
 
-lua test_insert_delete(128)
+test_insert_delete(128)
 ---
 sorted output
 $       1$
@@ -19,13 +19,13 @@ $       1$
 # BitsetIndex: ALL
 #-----------------------------------------------------------------------------#
 
-lua clear()
+clear()
 ---
 ...
-lua fill(1, 128)
+fill(1, 128)
 ---
 ...
-lua dump(box.index.BITS_ALL)
+dump(box.index.BITS_ALL)
 ---
 sorted output
 $       1$
@@ -162,11 +162,11 @@ $     128$
 # BitsetIndex: BITS_ALL_SET (single bit)
 #-----------------------------------------------------------------------------#
 
-lua dump(box.index.BITS_ALL_SET, 0)
+dump(box.index.BITS_ALL_SET, 0)
 ---
 sorted output
 ...
-lua dump(box.index.BITS_ALL_SET, 1)
+dump(box.index.BITS_ALL_SET, 1)
 ---
 sorted output
 $       1$
@@ -234,7 +234,7 @@ $     123$
 $     125$
 $     127$
 ...
-lua dump(box.index.BITS_ALL_SET, 2)
+dump(box.index.BITS_ALL_SET, 2)
 ---
 sorted output
 $       2$
@@ -302,7 +302,7 @@ $     123$
 $     126$
 $     127$
 ...
-lua dump(box.index.BITS_ALL_SET, 8)
+dump(box.index.BITS_ALL_SET, 8)
 ---
 sorted output
 $       8$
@@ -370,15 +370,15 @@ $     125$
 $     126$
 $     127$
 ...
-lua dump(box.index.BITS_ALL_SET, 1073741824)
+dump(box.index.BITS_ALL_SET, 1073741824)
 ---
 sorted output
 ...
-lua dump(box.index.BITS_ALL_SET, 2147483648)
+dump(box.index.BITS_ALL_SET, 2147483648)
 ---
 sorted output
 ...
-lua dump(box.index.BITS_ALL_SET, 4294967296)
+dump(box.index.BITS_ALL_SET, 4294967296)
 ---
 error: 'Supplied key field type does not match index type: expected u32'
 ...
@@ -387,7 +387,7 @@ error: 'Supplied key field type does not match index type: expected u32'
 # BitsetIndex: BITS_ALL_SET (multiple bit)
 #-----------------------------------------------------------------------------#
 
-lua dump(box.index.BITS_ALL_SET, 3)
+dump(box.index.BITS_ALL_SET, 3)
 ---
 sorted output
 $       3$
@@ -423,7 +423,7 @@ $     119$
 $     123$
 $     127$
 ...
-lua dump(box.index.BITS_ALL_SET, 7)
+dump(box.index.BITS_ALL_SET, 7)
 ---
 sorted output
 $       7$
@@ -443,7 +443,7 @@ $     111$
 $     119$
 $     127$
 ...
-lua dump(box.index.BITS_ALL_SET, 31)
+dump(box.index.BITS_ALL_SET, 31)
 ---
 sorted output
 $      31$
@@ -451,7 +451,7 @@ $      63$
 $      95$
 $     127$
 ...
-lua dump(box.index.BITS_ALL_SET, 5)
+dump(box.index.BITS_ALL_SET, 5)
 ---
 sorted output
 $       5$
@@ -487,7 +487,7 @@ $     119$
 $     125$
 $     127$
 ...
-lua dump(box.index.BITS_ALL_SET, 10)
+dump(box.index.BITS_ALL_SET, 10)
 ---
 sorted output
 $      10$
@@ -523,7 +523,7 @@ $     123$
 $     126$
 $     127$
 ...
-lua dump(box.index.BITS_ALL_SET, 27)
+dump(box.index.BITS_ALL_SET, 27)
 ---
 sorted output
 $      27$
@@ -535,15 +535,15 @@ $      95$
 $     123$
 $     127$
 ...
-lua dump(box.index.BITS_ALL_SET, 341)
+dump(box.index.BITS_ALL_SET, 341)
 ---
 sorted output
 ...
-lua dump(box.index.BITS_ALL_SET, 2147483649)
+dump(box.index.BITS_ALL_SET, 2147483649)
 ---
 sorted output
 ...
-lua dump(box.index.BITS_ALL_SET, 4294967295)
+dump(box.index.BITS_ALL_SET, 4294967295)
 ---
 sorted output
 ...
@@ -552,7 +552,7 @@ sorted output
 # BitsetIndex: BITS_ALL_NOT_SET (single bit)
 #-----------------------------------------------------------------------------#
 
-lua dump(box.index.BITS_ALL_NOT_SET, 0)
+dump(box.index.BITS_ALL_NOT_SET, 0)
 ---
 sorted output
 $       1$
@@ -684,7 +684,7 @@ $     126$
 $     127$
 $     128$
 ...
-lua dump(box.index.BITS_ALL_NOT_SET, 2)
+dump(box.index.BITS_ALL_NOT_SET, 2)
 ---
 sorted output
 $       1$
@@ -752,7 +752,7 @@ $     124$
 $     125$
 $     128$
 ...
-lua dump(box.index.BITS_ALL_NOT_SET, 8)
+dump(box.index.BITS_ALL_NOT_SET, 8)
 ---
 sorted output
 $       1$
@@ -820,7 +820,7 @@ $     118$
 $     119$
 $     128$
 ...
-lua dump(box.index.BITS_ALL_NOT_SET, 4294967296)
+dump(box.index.BITS_ALL_NOT_SET, 4294967296)
 ---
 error: 'Supplied key field type does not match index type: expected u32'
 ...
@@ -829,7 +829,7 @@ error: 'Supplied key field type does not match index type: expected u32'
 # BitsetIndex: BITS_ALL_NOT_SET (multiple bit)
 #-----------------------------------------------------------------------------#
 
-lua dump(box.index.BITS_ALL_NOT_SET, 3)
+dump(box.index.BITS_ALL_NOT_SET, 3)
 ---
 sorted output
 $       4$
@@ -865,7 +865,7 @@ $     120$
 $     124$
 $     128$
 ...
-lua dump(box.index.BITS_ALL_NOT_SET, 7)
+dump(box.index.BITS_ALL_NOT_SET, 7)
 ---
 sorted output
 $       8$
@@ -885,7 +885,7 @@ $     112$
 $     120$
 $     128$
 ...
-lua dump(box.index.BITS_ALL_NOT_SET, 10)
+dump(box.index.BITS_ALL_NOT_SET, 10)
 ---
 sorted output
 $       1$
@@ -921,7 +921,7 @@ $     116$
 $     117$
 $     128$
 ...
-lua dump(box.index.BITS_ALL_NOT_SET, 27)
+dump(box.index.BITS_ALL_NOT_SET, 27)
 ---
 sorted output
 $       4$
@@ -933,7 +933,7 @@ $      96$
 $     100$
 $     128$
 ...
-lua dump(box.index.BITS_ALL_NOT_SET, 85)
+dump(box.index.BITS_ALL_NOT_SET, 85)
 ---
 sorted output
 $       2$
@@ -945,7 +945,7 @@ $      40$
 $      42$
 $     128$
 ...
-lua dump(box.index.BITS_ALL_NOT_SET, 4294967295)
+dump(box.index.BITS_ALL_NOT_SET, 4294967295)
 ---
 sorted output
 ...
@@ -954,11 +954,11 @@ sorted output
 # BitsetIndex: BITS_ANY_SET (single bit)
 #-----------------------------------------------------------------------------#
 
-lua dump(box.index.BITS_ANY_SET, 0)
+dump(box.index.BITS_ANY_SET, 0)
 ---
 sorted output
 ...
-lua dump(box.index.BITS_ANY_SET, 16)
+dump(box.index.BITS_ANY_SET, 16)
 ---
 sorted output
 $      16$
@@ -1026,12 +1026,12 @@ $     125$
 $     126$
 $     127$
 ...
-lua dump(box.index.BITS_ANY_SET, 128)
+dump(box.index.BITS_ANY_SET, 128)
 ---
 sorted output
 $     128$
 ...
-lua dump(box.index.BITS_ANY_SET, 4294967296)
+dump(box.index.BITS_ANY_SET, 4294967296)
 ---
 error: 'Supplied key field type does not match index type: expected u32'
 ...
@@ -1040,7 +1040,7 @@ error: 'Supplied key field type does not match index type: expected u32'
 # BitsetIndex: BITS_ANY_SET (multiple bit)
 #-----------------------------------------------------------------------------#
 
-lua dump(box.index.BITS_ANY_SET, 7)
+dump(box.index.BITS_ANY_SET, 7)
 ---
 sorted output
 $       1$
@@ -1156,7 +1156,7 @@ $     125$
 $     126$
 $     127$
 ...
-lua dump(box.index.BITS_ANY_SET, 84)
+dump(box.index.BITS_ANY_SET, 84)
 ---
 sorted output
 $       4$
@@ -1272,7 +1272,7 @@ $     125$
 $     126$
 $     127$
 ...
-lua dump(box.index.BITS_ANY_SET, 113)
+dump(box.index.BITS_ANY_SET, 113)
 ---
 sorted output
 $       1$

@@ -24,30 +24,30 @@ function box.select_all(space)
     return unpack(result)
 end
 """
-admin("lua " + lua_code.replace('\n', ' '))
+admin(lua_code.replace('\n', ' '))
 sql.sort = True
 sql("call box.select_all('27')")
 sql.sort = False
 
 # primary index select
-admin("lua box.select(27, 0, 1, 'foo', 0)")
-admin("lua box.select(27, 0, 1, 'bar', 0)")
+admin("box.select(27, 0, 1, 'foo', 0)")
+admin("box.select(27, 0, 1, 'bar', 0)")
 # primary index slect with missing part
-admin("lua box.select(27, 0, 1, 'foo')")
+admin("box.select(27, 0, 1, 'foo')")
 # primary index slect with extra part
-admin("lua box.select(27, 0, 1, 'foo', 0, 0)")
+admin("box.select(27, 0, 1, 'foo', 0, 0)")
 # primary index select with wrong type
-admin("lua box.select(27, 0, 1, 'foo', 'baz')")
+admin("box.select(27, 0, 1, 'foo', 'baz')")
 
 # secondary index select
-admin("lua box.select(27, 1, 1, 4)")
+admin("box.select(27, 1, 1, 4)")
 # secondary index select with no such key
-admin("lua box.select(27, 1, 1, 5)")
+admin("box.select(27, 1, 1, 5)")
 # secondary index select with missing part
-admin("lua box.select(27, 1, 1)")
+admin("box.select(27, 1, 1)")
 # secondary index select with wrong type
-admin("lua box.select(27, 1, 1, 'baz')")
+admin("box.select(27, 1, 1, 'baz')")
 
 # cleanup
-admin("lua box.space[27]:truncate()")
-admin("lua box.space[27]:len()")
+admin("box.space[27]:truncate()")
+admin("box.space[27]:len()")
