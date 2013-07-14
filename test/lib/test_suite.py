@@ -18,7 +18,6 @@ import string
 import traceback
 
 class FilteredStream:
-
     """Helper class to filter .result file output"""
     def __init__(self, filename):
         self.stream = open(filename, "w+")

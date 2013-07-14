@@ -86,7 +86,7 @@ class TarantoolServer(Server):
         self.config = None
         self.vardir = None
         self.valgrind_log = "valgrind.log"
-        self.valgrind_sup = os.path.join("share/", "%s.sup" % (core))
+        self.valgrind_sup = os.path.join("share/", "%s.sup" % ('tarantool'))
         self.init_lua = None
         self.default_suppression_name = "valgrind.sup"
         self.pidfile = None
@@ -154,11 +154,12 @@ class TarantoolServer(Server):
 
     def configure(self, config):
         def get_option(config, section, key):
+            if not config.has_option(section, key):
+                return None
             value = config.get(section, key)
             if value.isdigit():
                 value = int(value)
             return value
-            config.get()
         self.config = os.path.abspath(config)
         # now read the server config, we need some properties from it
         with open(self.config) as fp:
@@ -178,12 +179,6 @@ class TarantoolServer(Server):
             # Run memcached client
             self.memcached = MemcachedConnection('localhost', self.memcached_port)
 
-    def find_tests(self, test_suite, suite_path):
-        for test_name in sorted(glob.glob(os.path.join(suite_path, "*.test"))):
-            for test_pattern in test_suite.args.tests:
-                if test_name.find(test_pattern) != -1:
-                    test_suite.tests.append(FuncTest(test_name, test_suite.args, test_suite.ini))
-
     def reconfigure(self, config, silent=False):
         if config == None:
             os.unlink(os.path.join(self.vardir, self.default_config_name))
@@ -191,12 +186,6 @@ class TarantoolServer(Server):
             self.config = os.path.abspath(config)
             shutil.copy(self.config, os.path.join(self.vardir, self.default_config_name))
         self.admin.execute("reload configuration", silent=silent)
-
-    def get_option_int(self, config, section, option):
-        if config.has_option(section, option):
-            return config.getint(section, option)
-        else:
-            return 0
 
     def init(self):
         # init storage
@@ -207,13 +196,11 @@ class TarantoolServer(Server):
                               stderr = subprocess.PIPE)
 
     def get_param(self, param):
-        if param != None:
-            data = self.admin("show.info."+param)
-            info = yaml.load(data)
+        if param:
+            data = yaml.load(self.admin("box.info." + param, silent=True))[0]
         else:
-            data = self.admin.execute("show info", silent = True)
-            info = yaml.load(data)["info"]
-        return info
+            data = yaml.load(self.admin("show info", silent=True))[info]
+        return data
 
     def wait_lsn(self, lsn):
         while True:
@@ -236,7 +223,7 @@ class TarantoolServer(Server):
 
         if self.valgrind:
             with daemon.DaemonContext(working_directory = self.vardir):
-                subprocess.check_call(arg   s)
+                subprocess.check_call(args)
         else:
             if not self.gdb:
                 args.append("--background")
