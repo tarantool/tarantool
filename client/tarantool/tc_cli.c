@@ -237,7 +237,7 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 {
 	enum tc_cli_cmd_ret rc = TC_CLI_OK;
 	struct tnt_lex lex;
-	if (tnt_lex_init(&lex, tc_lex_keywords, (unsigned char*)cmd, size) == -1)
+	if (!tnt_lex_init(&lex, tc_lex_keywords, (unsigned char*)cmd, size))
 		return TC_CLI_ERROR;
 	struct tnt_tk *tk;
 	switch (tnt_lex(&lex, &tk)) {
