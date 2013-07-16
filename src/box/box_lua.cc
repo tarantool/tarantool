@@ -1182,7 +1182,9 @@ lbox_process(lua_State *L)
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	struct port *port_lua = port_lua_create(L);
 	try {
-		box_process(port_lua, op, req, sz);
+		struct request request;
+		request_create(&request, op, req, sz);
+		box_process(port_lua, &request);
 
 		/*
 		 * This only works as long as port_lua doesn't
@@ -1268,8 +1270,9 @@ lbox_call_loadproc(struct lua_State *L)
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_execute(struct request *request, struct port *port)
+box_lua_execute(struct request *request, struct txn *txn, struct port *port)
 {
+	(void) txn;
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
 	lua_State *L = lua_newthread(root_L);

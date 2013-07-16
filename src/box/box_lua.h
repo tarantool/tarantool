@@ -30,13 +30,13 @@
  */
 #include "request.h"
 struct lua_State;
-
+struct txn;
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_execute(struct request *request, struct port *port);
+box_lua_execute(struct request *request, struct txn *txn, struct port *port);
 
 /**
  * Create an instance of Lua interpreter in box.

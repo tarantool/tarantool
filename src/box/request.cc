@@ -67,8 +67,9 @@ dup_replace_mode(uint32_t flags)
 }
 
 static void
-execute_replace(struct request *request, struct txn *txn)
+execute_replace(struct request *request, struct txn *txn, struct port *port)
 {
+	(void) port;
 	txn_add_redo(txn, request->type, request->data, request->len);
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
@@ -92,8 +93,9 @@ execute_replace(struct request *request, struct txn *txn)
 
 
 static void
-execute_update(struct request *request, struct txn *txn)
+execute_update(struct request *request, struct txn *txn, struct port *port)
 {
+	(void) port;
 	txn_add_redo(txn, request->type, request->data, request->len);
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
@@ -130,8 +132,9 @@ execute_update(struct request *request, struct txn *txn)
 /** }}} */
 
 static void
-execute_select(struct request *request, struct port *port)
+execute_select(struct request *request, struct txn *txn, struct port *port)
 {
+	(void) txn;
 	const char **reqpos = &request->data;
 	const char *reqend = request->data + request->len;
 	struct space *space = read_space(reqpos, reqend);
@@ -179,8 +182,9 @@ execute_select(struct request *request, struct port *port)
 }
 
 static void
-execute_delete(struct request *request, struct txn *txn)
+execute_delete(struct request *request, struct txn *txn, struct port *port)
 {
+	(void) port;
 	uint32_t type = request->type;
 	txn_add_redo(txn, type, request->data, request->len);
 	const char **reqpos = &request->data;
@@ -224,47 +228,40 @@ request_name(uint32_t type)
 	return requests_strs[type];
 }
 
-struct request *
-request_create(uint32_t type, const char *data, uint32_t len)
+void
+request_create(struct request *request, uint32_t type, const char *data,
+	       uint32_t len)
 {
 	if (request_check_type(type)) {
 		say_error("Unsupported request = %" PRIi32 "", type);
 		tnt_raise(IllegalParams, "unsupported command code, "
 			  "check the error log");
 	}
-	request_check_type(type);
-	struct request *request = (struct request *)
-			palloc(fiber->gc_pool, sizeof(struct request));
+	memset(request, 0, sizeof(*request));
 	request->type = type;
 	request->data = data;
 	request->len = len;
 	request->flags = 0;
-	return request;
-}
 
-void
-request_execute(struct request *request, struct txn *txn, struct port *port)
-{
 	switch (request->type) {
 	case REPLACE:
-		execute_replace(request, txn);
+		request->execute = execute_replace;
 		break;
 	case SELECT:
-		execute_select(request, port);
+		request->execute = execute_select;
 		break;
 	case UPDATE:
-		execute_update(request, txn);
+		request->execute = execute_update;
 		break;
 	case DELETE_1_3:
 	case DELETE:
-		execute_delete(request, txn);
+		request->execute = execute_delete;
 		break;
 	case CALL:
-		box_lua_execute(request, port);
+		request->execute = box_lua_execute;
 		break;
 	default:
 		assert(false);
-		request_check_type(request->type);
 		break;
 	}
 }

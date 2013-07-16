@@ -51,12 +51,9 @@ extern "C" {
 #include "txn.h"
 #include <third_party/base64.h>
 
-static void process_replica(struct port *port,
-			    uint32_t op, const char *reqdata, uint32_t reqlen);
-static void process_ro(struct port *port,
-		       uint32_t op, const char *reqdata, uint32_t reqlen);
-static void process_rw(struct port *port,
-		       uint32_t op, const char *reqdata, uint32_t reqlen);
+static void process_replica(struct port *port, struct request *request);
+static void process_ro(struct port *port, struct request *request);
+static void process_rw(struct port *port, struct request *request);
 box_process_func box_process = process_ro;
 box_process_func box_process_ro = process_ro;
 
@@ -80,14 +77,13 @@ port_send_tuple(struct port *port, struct txn *txn, uint32_t flags)
 }
 
 static void
-process_rw(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
+process_rw(struct port *port, struct request *request)
 {
 	struct txn *txn = txn_begin();
 
 	try {
-		struct request *request = request_create(op, reqdata, reqlen);
-		stat_collect(stat_base, op, 1);
-		request_execute(request, txn, port);
+		stat_collect(stat_base, request->type, 1);
+		request->execute(request, txn, port);
 		txn_commit(txn);
 		port_send_tuple(port, txn, request->flags);
 		port_eof(port);
@@ -99,21 +95,21 @@ process_rw(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
 }
 
 static void
-process_replica(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
+process_replica(struct port *port, struct request *request)
 {
-	if (!request_is_select(op)) {
+	if (!request_is_select(request->type)) {
 		tnt_raise(ClientError, ER_NONMASTER,
 			  cfg.replication_source);
 	}
-	return process_rw(port, op, reqdata, reqlen);
+	return process_rw(port, request);
 }
 
 static void
-process_ro(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
+process_ro(struct port *port, struct request *request)
 {
-	if (!request_is_select(op))
+	if (!request_is_select(request->type))
 		tnt_raise(LoggedError, ER_SECONDARY);
-	return process_rw(port, op, reqdata, reqlen);
+	return process_rw(port, request);
 }
 
 static void
@@ -171,7 +167,9 @@ recover_row(void *param __attribute__((unused)), const char *row, uint32_t rowle
 			recover_snap_row(row);
 		} else if (tag == XLOG) {
 			uint16_t op = pick_u16(&row, end);
-			process_rw(&null_port, op, row, end - row);
+			struct request request;
+			request_create(&request, op, row, end - row);
+			process_rw(&null_port, &request);
 		} else {
 			say_error("unknown row tag: %i", (int)tag);
 			return -1;
