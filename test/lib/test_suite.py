@@ -9,6 +9,7 @@ import collections
 import difflib
 import filecmp
 import shlex
+import shutil
 import time
 
 from server import Server
@@ -230,6 +231,10 @@ class TestSuite:
             self.ini[i] = os.path.join(suite_path, self.ini[i]) if i in self.ini else None
         for i in ["disabled", "valgrind_disabled", "release_disabled"]:
             self.ini[i] = dict.fromkeys(self.ini[i].split()) if i in self.ini else dict()
+        for i in ["lua_libs"]:
+            self.ini[i] = map(lambda x: os.path.join(suite_path, x),
+                    dict.fromkeys(self.ini[i].split()) if i in self.ini else
+                    dict())
 
         try:
             self.server = Server(self.ini["core"])
@@ -257,6 +262,9 @@ class TestSuite:
                       self.args.vardir, self.args.mem, self.args.start_and_exit,
                       self.args.gdb, self.args.valgrind,
                       init_lua=self.ini["init_lua"], silent=False)
+        
+        for i in self.ini['lua_libs']:
+            shutil.copy(i, self.args.vardir) 
 
         if self.args.start_and_exit:
             print "  Start and exit requested, exiting..."
