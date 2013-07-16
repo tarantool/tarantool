@@ -11,7 +11,6 @@ import pexpect
 import traceback
 import subprocess
 import ConfigParser
-import pprint
 
 from server import Server
 from box_connection import BoxConnection

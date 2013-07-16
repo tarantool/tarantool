@@ -1,7 +1,6 @@
 import os
 import sys
 import glob
-from pprint import pprint
 
 from server import Server
 from test_suite import Test
@@ -9,7 +8,6 @@ from tarantool_server import TarantoolServer, FuncTest
 
 class LuaTest(FuncTest):
     def execute(self, server):
-        pprint('test lua',sys.stderr)
         for i in open(self.name, 'r').read().replace('\n\n', '\n').split(';\n'):
              server.admin(i)
 

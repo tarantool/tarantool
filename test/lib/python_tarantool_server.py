@@ -1,7 +1,6 @@
 import os
 import sys
 import glob
-from pprint import pprint
 
 from server import Server
 from test_suite import Test
