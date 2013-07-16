@@ -1,280 +1,252 @@
-# encoding: utf-8
-#
-import os
-import shutil
+dofile('index_random_test.lua');
 
-for file in ("index_random_test.lua",):
-    src_path = os.path.join("big/", file)
-    dst_path = os.path.join(vardir, file)
-    shutil.copy(src_path, dst_path)
-    admin("dofile('%s')" % (file))
-    os.unlink(dst_path);
+box.space[1]:insert('brave', 'new', 'world');
+box.space[1].index[1]:min();
+box.space[1].index[1]:max();
+box.select('1', '1', 'new', 'world');
 
-sql("insert into t1 values ('brave', 'new', 'world')")
-admin("box.space[1].index[1]:min()")
-admin("box.space[1].index[1]:max()")
-sql("call box.select('1', '1', 'new', 'world')")
-print """#
-# A test case for Bug #904208
-# "assert failed, when key cardinality is greater than index cardinality"
-# https://bugs.launchpad.net/tarantool/+bug/904208
-#"""
-sql("call box.select('1', '1', 'new', 'world', 'order')")
-sql("call box.delete('1', 'brave')")
+-- A test case for Bug #904208
+-- "assert failed, when key cardinality is greater than index cardinality"
+--  https://bugs.launchpad.net/tarantool/+bug/904208 ;
 
-print """#
-# A test case for Bug #902091
-# "Positioned iteration over a multipart index doesn't work"
-# https://bugs.launchpad.net/tarantool/+bug/902091
-#"""
-sql("insert into t1 values ('item 1', 'alabama', 'song')")
-admin("box.select(1, 1, 'alabama')")
-sql("insert into t1 values ('item 2', 'california', 'dreaming ')")
-sql("insert into t1 values ('item 3', 'california', 'uber alles')")
-sql("insert into t1 values ('item 4', 'georgia', 'on my mind')")
-admin("iter, tuple = box.space[1].index[1]:next('california')")
-admin("tuple")
-admin("iter, tuple = box.space[1].index[1]:next(iter)")
-admin("tuple")
-sql("call box.delete('1', 'item 1')")
-sql("call box.delete('1', 'item 2')")
-sql("call box.delete('1', 'item 3')")
-sql("call box.delete('1', 'item 4')")
+box.select('1', '1', 'new', 'world', 'order');
+box.delete('1', 'brave');
 
-#
-# Check range scan over multipart keys
-#
-sql("insert into t5 values ('01234567', 'new', 'world')")
-sql("insert into t5 values ('00000000', 'of', 'puppets')")
-sql("insert into t5 values ('00000001', 'of', 'might', 'and', 'magic')")
-sql("call box.select_range(5, 1, 2, 'of')")
-sql("call box.select_reverse_range(5, 1, 2, 'of')")
-admin("box.space[5]:truncate()")
+-- A test case for Bug #902091
+-- "Positioned iteration over a multipart index doesn't work"
+-- https://bugs.launchpad.net/tarantool/+bug/902091;
 
-#
-# Lua 64bit numbers support
-#
-admin("box.insert('8', tonumber64('18446744073709551615'), 'magic')")
-admin("tu = box.select('8', '0', tonumber64('18446744073709551615'))")
-admin("num = box.unpack('l', tu[0])")
-admin("print(num)")
-admin("type(num) == 'cdata'")
-admin("num == tonumber64('18446744073709551615')")
-admin("num = box.unpack('l', tu[0])")
-admin("num == tonumber64('18446744073709551615')")
-admin("box.delete(8, 18446744073709551615ULL)")
-admin("box.insert('8', 125ULL, 'magic')")
-admin("tu = box.select('8', '0', 125)")
-admin("tu2 = box.select('8', '0', 125LL)")
-admin("num = box.unpack('l', tu[0])")
-admin("num2 = box.unpack('l', tu2[0])")
-admin("print(num)")
-admin("print(num2)")
-admin("type(num) == 'cdata'")
-admin("type(num2) == 'cdata'")
-admin("num == tonumber64('125')")
-admin("num2 == tonumber64('125')")
-admin("box.space[8]:truncate()")
+box.space[1]:insert('item 1', 'alabama', 'song');
+box.select(1, 1, 'alabama');
+box.space[1]:insert('item 2', 'california', 'dreaming ');
+box.space[1]:insert('item 3', 'california', 'uber alles');
+box.space[1]:insert('item 4', 'georgia', 'on my mind');
+iter, tuple = box.space[1].index[1]:next('california');
+tuple;
+_, tuple = box.space[1].index[1]:next(iter);
+tuple;
+box.delete('1', 'item 1');
+box.delete('1', 'item 2');
+box.delete('1', 'item 3');
+box.delete('1', 'item 4');
 
-#
-# Lua select_reverse_range
-#
-admin("box.insert(14, 0, 0)")
-admin("box.insert(14, 1, 0)")
-admin("box.insert(14, 2, 0)")
-admin("box.insert(14, 3, 0)")
-admin("box.insert(14, 4, 0)")
-admin("box.insert(14, 5, 0)")
-admin("box.insert(14, 6, 0)")
-admin("box.insert(14, 7, 0)")
-admin("box.insert(14, 8, 0)")
-admin("box.insert(14, 9, 0)")
-admin("box.select_range(14, 1, 10)")
-admin("box.select_reverse_range(14, 1, 10)")
-admin("box.select_reverse_range(14, 1, 4)")
-admin("box.space[14]:truncate()")
+--
+-- Check range scan over multipart keys
+--;
+box.space[5]:insert('01234567', 'new', 'world');
+box.space[5]:insert('00000000', 'of', 'puppets');
+box.space[5]:insert('00000001', 'of', 'might', 'and', 'magic');
+box.select_range(5, 1, 2, 'of');
+box.select_reverse_range(5, 1, 2, 'of');
+box.space[5]:truncate();
 
-print """
-#
-# Tests for box.index iterators
-#
-"""
-pid = 1
-tid = 999
-for sid in [1, 2]:
-    for i in range(1, 4):
-        admin("box.insert(16, 'pid_%d', 'sid_%d', 'tid_%d')" % (pid, sid, tid))
-        pid += 1
-        tid -= 1
+--
+-- Lua 64bit numbers support
+--;
+box.insert('8', tonumber64('18446744073709551615'), 'magic');
+tu = box.select('8', '0', tonumber64('18446744073709551615'));
+num = box.unpack('l', tu[0]);
+num;
+type(num) == 'cdata';
+num == tonumber64('18446744073709551615');
+num = box.unpack('l', tu[0]);
+num == tonumber64('18446744073709551615');
+box.delete(8, 18446744073709551615ULL);
+box.insert('8', 125ULL, 'magic');
+tu = box.select('8', '0', 125);
+tu2 = box.select('8', '0', 125LL);
+num = box.unpack('l', tu[0]);
+num2 = box.unpack('l', tu2[0]);
+num, num2;
+type(num) == 'cdata';
+type(num2) == 'cdata';
+num == tonumber64('125');
+num2 == tonumber64('125');
+box.space[8]:truncate();
 
-admin("for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do print(v) end")
-admin("for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do print(v) end")
-admin("for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(v) end")
-admin("for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(v) end")
-admin("for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(v) end")
-admin("for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(v) end")
-admin("box.space[16]:truncate()")
+--
+-- Lua select_reverse_range
+--;
+box.insert(14, 0, 0);
+box.insert(14, 1, 0);
+box.insert(14, 2, 0);
+box.insert(14, 3, 0);
+box.insert(14, 4, 0);
+box.insert(14, 5, 0);
+box.insert(14, 6, 0);
+box.insert(14, 7, 0);
+box.insert(14, 8, 0);
+box.insert(14, 9, 0);
+box.select_range(14, 1, 10);
+box.select_reverse_range(14, 1, 10);
+box.select_reverse_range(14, 1, 4);
+box.space[14]:truncate();
 
-#
-# Tests for lua idx:count()
-#
-admin("box.insert(17, 1, 1, 1)")
-admin("box.insert(17, 2, 2, 0)")
-admin("box.insert(17, 3, 2, 1)")
-admin("box.insert(17, 4, 3, 0)")
-admin("box.insert(17, 5, 3, 1)")
-admin("box.insert(17, 6, 3, 2)")
-admin("box.space[17].index[1]:count(1)")
-admin("box.space[17].index[1]:count(2)")
-admin("box.space[17].index[1]:count(2, 1)")
-admin("box.space[17].index[1]:count(2, 2)")
-admin("box.space[17].index[1]:count(3)")
-admin("box.space[17].index[1]:count(3, 3)")
-admin("box.space[17].index[1]:count()")
-admin("box.space[17]:truncate()")
+--
+-- Tests for box.index iterators
+--;
+pid = 1;
+tid = 999;
+for sid = 1, 2 do
+    for i = 1, 3 do
+        box.space[16]:insert('pid_'..pid, 'sid_'..sid, 'tid_'..tid)
+        pid = pid + 1
+        tid = tid - 1
+    end
+end;
 
-#
-# Tests for lua box.auto_increment
-#
-admin("box.space[18]:truncate()")
-admin("box.auto_increment(18, 'a')")
-admin("box.insert(18, 5)")
-admin("box.auto_increment(18, 'b')")
-admin("box.auto_increment(18, 'c')")
-admin("box.space[18]:truncate()")
+for k, v in box.space[16].index[1].next,       box.space[16].index[1], 'sid_1' do print(' - ', v) end;
+for k, v in box.space[16].index[1].prev,       box.space[16].index[1], 'sid_2' do print(' - ', v) end;
+for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(' - ', v) end;
+for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(' - ', v) end;
+for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(' - ', v) end;
+for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(' - ', v) end;
+box.space[16]:truncate();
 
-#
-# Tests for lua box.auto_increment with NUM64 keys
-#
-admin("box.space[25]:truncate()")
-admin("box.auto_increment(25, 'a')")
-admin("box.insert(25, tonumber64(5))")
-admin("box.auto_increment(25, 'b')")
-admin("box.auto_increment(25, 'c')")
-admin("box.space[25]:truncate()")
+--
+-- Tests for lua idx:count()
+--;
+box.insert(17, 1, 1, 1);
+box.insert(17, 2, 2, 0);
+box.insert(17, 3, 2, 1);
+box.insert(17, 4, 3, 0);
+box.insert(17, 5, 3, 1);
+box.insert(17, 6, 3, 2);
+box.space[17].index[1]:count(1);
+box.space[17].index[1]:count(2);
+box.space[17].index[1]:count(2, 1);
+box.space[17].index[1]:count(2, 2);
+box.space[17].index[1]:count(3);
+box.space[17].index[1]:count(3, 3);
+box.space[17].index[1]:count();
+box.space[17]:truncate();
 
-#
-# Tests for lua tuple:transform()
-#
-admin("t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')")
-admin("t:transform(7, 0, '8', '9', '100')")
-admin("t:transform(0, 1)")
-admin("t:transform(1, 4)")
-admin("t:transform(-1, 1)")
-admin("t:transform(-3, 2)")
-admin("t:transform(0, 0, 'A')")
-admin("t:transform(-1, 0, 'A')")
-admin("t:transform(0, 1, 'A')")
-admin("t:transform(-1, 1, 'B')")
-admin("t:transform(0, 2, 'C')")
-admin("t:transform(2, 0, 'hello')")
-admin("t:transform(0, -1, 'C')")
-admin("t:transform(0, 100)")
-admin("t:transform(-100, 1)")
-admin("t:transform(0, 3, 1, 2, 3)")
-admin("t:transform(3, 1, tonumber64(4))")
-admin("t:transform(0, 1, {})")
+--
+-- Tests for lua box.auto_increment
+--;
+box.space[18]:truncate();
+box.auto_increment(18, 'a');
+box.insert(18, 5);
+box.auto_increment(18, 'b');
+box.auto_increment(18, 'c');
+box.space[18]:truncate();
 
-#
-# Tests for lua tuple:find() and tuple:findall()
-#
-admin("t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')")
-admin("t:find('2')")
-admin("t:find('4')")
-admin("t:find('5')")
-admin("t:find('A')")
-admin("t:find('0')")
+--
+-- Tests for lua box.auto_increment with NUM64 keys
+--;
+box.space[25]:truncate();
+box.auto_increment(25, 'a');
+box.insert(25, tonumber64(5));
+box.auto_increment(25, 'b');
+box.auto_increment(25, 'c');
+box.space[25]:truncate();
 
-admin("t:findall('A')")
-admin("t:findall('2')")
-admin("t:findall('3')")
-admin("t:findall('0')")
+--
+-- Tests for lua tuple:transform()
+--;
+t = box.insert(12, '1', '2', '3', '4', '5', '6', '7');
+t:transform(7, 0, '8', '9', '100');
+t:transform(0, 1);
+t:transform(1, 4);
+t:transform(-1, 1);
+t:transform(-3, 2);
+t:transform(0, 0, 'A');
+t:transform(-1, 0, 'A');
+t:transform(0, 1, 'A');
+t:transform(-1, 1, 'B');
+t:transform(0, 2, 'C');
+t:transform(2, 0, 'hello');
+t:transform(0, -1, 'C');
+t:transform(0, 100);
+t:transform(-100, 1);
+t:transform(0, 3, 1, 2, 3);
+t:transform(3, 1, tonumber64(4));
+t:transform(0, 1, {});
 
-admin("t:find(2, '2')")
-admin("t:find(89, '2')")
-admin("t:findall(4, '3')")
+--
+-- Tests for lua tuple:find() and tuple:findall()
+--;
+t = box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7');
+t:find('2');
+t:find('4');
+t:find('5');
+t:find('A');
+t:find('0');
 
-admin("t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))")
-admin("t:find(2)")
-admin("t:find(tonumber64(2))")
-admin("t:find('2')")
-admin("box.space[12]:truncate()")
+t:findall('A');
+t:findall('2');
+t:findall('3');
+t:findall('0');
 
-print """#
-# A test case for Bug #1038784
-# transform returns wrong tuple and put broken reply into socket
-# https://bugs.launchpad.net/tarantool/+bug/1038784
-#"""
+t:find(2, '2');
+t:find(89, '2');
+t:findall(4, '3');
 
-push_lua_path = os.path.join(vardir, "push.lua")
-shutil.copy("big/push.lua", push_lua_path)
+t = box.insert(12, 'Z', '2', 2, 3, tonumber64(2));
+t:find(2);
+t:find(tonumber64(2));
+t:find('2');
+box.space[12]:truncate();
 
-admin("dofile('push.lua')")
-shutil.rmtree(push_lua_path, True)
+-- A test case for Bug #1038784
+-- transform returns wrong tuple and put broken reply into socket
+-- https://bugs.launchpad.net/tarantool/+bug/1038784;
+dofile('push.lua');
 
-admin("push_collection(0, 1038784, 'hello')")
-admin("push_collection(0, 1038784, 'hello')")
-admin("push_collection(0, 1038784, 'hello')")
+push_collection(0, 1038784, 'hello');
+push_collection(0, 1038784, 'hello');
+push_collection(0, 1038784, 'hello');
 
-admin("push_collection(1, 1038784, 'hi')")
-admin("push_collection(2, 1038784, 'hi')")
-admin("push_collection(2, 1038784, 'hi')")
+push_collection(1, 1038784, 'hi');
+push_collection(2, 1038784, 'hi');
+push_collection(2, 1038784, 'hi');
 
-admin("push_collection(5, 1038784, 'hey')")
-admin("push_collection(5, 1038784, 'hey')")
-admin("push_collection(5, 1038784, 'hey')")
-admin("push_collection(5, 1038784, 'hey')")
+push_collection(5, 1038784, 'hey');
+push_collection(5, 1038784, 'hey');
+push_collection(5, 1038784, 'hey');
+push_collection(5, 1038784, 'hey');
 
-print """# A test case for Bug#1060967: truncation of 64-bit numbers"""
-admin("box.space[5]:insert(2^51, 'hello', 'world')")
-admin("box.space[5]:select(0, 2^51)")
-admin("box.space[5]:truncate()")
-print """# Test that we print index number in error ER_INDEX_VIOLATION"""
-admin("box.space[1]:insert(1, 'hello', 'world')")
-admin("box.space[1]:insert(2, 'hello', 'world')")
-admin("box.space[1]:truncate()")
+--
+-- A test case for Bug#1060967: truncation of 64-bit numbers
+--;
+box.space[5]:insert(2^51, 'hello', 'world');
+box.space[5]:select(0, 2^51);
+box.space[5]:truncate();
 
-print """#
-# A test case for Bug #1042798
-# Truncate hangs when primary key is not in linear or starts at the first field
-# https://bugs.launchpad.net/tarantool/+bug/1042798
-#"""
+--
+-- Test that we print index number in error ER_INDEX_VIOLATION;
+--;
+box.space[1]:insert(1, 'hello', 'world');
+box.space[1]:insert(2, 'hello', 'world');
+box.space[1]:truncate();
 
-# Print key fields in pk
-admin("for k, f in pairs(box.space[23].index[0].key_field) do print(k, ' => ', f.fieldno) end")
-admin("box.insert(23, 1, 2, 3, 4)")
-admin("box.insert(23, 10, 20, 30, 40)")
-admin("box.insert(23, 20, 30, 40, 50)")
-admin("for _k, v in box.space[23]:pairs() do print(v) end")
-# Truncate must not hang
-admin("box.space[23]:truncate()")
-# Empty result
-admin("for _k, v in box.space[23]:pairs() do print(v) end")
+-- A test case for Bug #1042798
+-- Truncate hangs when primary key is not in linear or starts at the first field
+-- https://bugs.launchpad.net/tarantool/+bug/1042798;
 
-print """
-#-----------------------------------------------------------------------------#
-# TreeIndex::random()
-#-----------------------------------------------------------------------------#
-""";
+-- Print key fields in pk;
+for k, f in pairs(box.space[23].index[0].key_field) do print(k,  ' => ', f.fieldno) end;
+box.insert(23, 1, 2, 3, 4);
+box.insert(23, 10, 20, 30, 40);
+box.insert(23, 20, 30, 40, 50);
+for _, v in box.space[23]:pairs() do print(' - ', v) end;
 
-admin("index_random_test(26, 0)")
+-- Truncate must not hang;
+box.space[23]:truncate();
 
-print """
-#-----------------------------------------------------------------------------#
-# HashIndex::random()
-#-----------------------------------------------------------------------------#
-""";
+-- Empty result;
+for _, v in box.space[23]:pairs() do print(' - ', v) end;
 
-admin("index_random_test(26, 1)")
+-------------------------------------------------------------------------------
+-- TreeIndex::random()
+-------------------------------------------------------------------------------;
 
-print """
-#
-# A test case for Bug#1200228
-# https://bugs.launchpad.net/tarantool/+bug/1200228
-# box.auto_increment counter resets
-# Test for correct little-endian comparison of integer fields.
-# (unsigned)
-#"""
-admin("for i = 1, 300 do box.insert(2, i, i) print(box.space[2].index[0]:max()) end")
-admin("box.space[2]:select_range(0, 300)")
-admin("box.space[2]:truncate()")
+index_random_test(26, 0);
+
+-------------------------------------------------------------------------------
+-- HashIndex::random()
+-------------------------------------------------------------------------------;
+
+index_random_test(26, 1);
+
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

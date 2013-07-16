@@ -1,43 +1,96 @@
-insert into t9 values ('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 1, 'Then what do they call it?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 2, 'A `Royale` with cheese!')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 3, 'That`s right.')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 3, 'What do they call a Big Mac?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 4, '`Le Big Mac!`')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 5, 'Ha, ha, ha.')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 5, 'What do they call a `Whopper`?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.')
-Insert OK, 1 row affected
-insert into t9 values ('The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'The Wolf!', 0, 'A please would be nice.')
-Insert OK, 1 row affected
-insert into t9 values ('The Wolf!', 'Vincent', 1, 'Come again?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'The Wolf!', 1, 'I said a please would be nice.')
-Insert OK, 1 row affected
-insert into t9 values ('The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.')
-Insert OK, 1 row affected
-insert into t9 values ('The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.')
-Insert OK, 1 row affected
+--
+-- Insert test
+--
+---
+...
+box.space[9]:insert('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
+---
+ - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
+...
+box.space[9]:insert('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')
+---
+ - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
+...
+box.space[9]:insert('Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.')
+---
+ - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
+...
+box.space[9]:insert('Jules', 'Vincent', 1, 'Then what do they call it?')
+---
+ - 'Jules': {'Vincent', 1, 'Then what do they call it?'}
+...
+box.space[9]:insert('Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.')
+---
+ - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
+...
+box.space[9]:insert('Jules', 'Vincent', 2, 'A `Royale` with cheese!')
+---
+ - 'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
+...
+box.space[9]:insert('Vincent', 'Jules', 3, 'That`s right.')
+---
+ - 'Vincent': {'Jules', 3, 'That`s right.'}
+...
+box.space[9]:insert('Jules', 'Vincent', 3, 'What do they call a Big Mac?')
+---
+ - 'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
+...
+box.space[9]:insert('Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`')
+---
+ - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
+...
+box.space[9]:insert('Jules', 'Vincent', 4, '`Le Big Mac!`')
+---
+ - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
+...
+box.space[9]:insert('Vincent', 'Jules', 5, 'Ha, ha, ha.')
+---
+ - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
+...
+box.space[9]:insert('Jules', 'Vincent', 5, 'What do they call a `Whopper`?')
+---
+ - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
+...
+box.space[9]:insert('Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.')
+---
+ - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+...
+box.space[9]:insert('The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.')
+---
+ - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+...
+box.space[9]:insert('Vincent', 'The Wolf!', 0, 'A please would be nice.')
+---
+ - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+...
+box.space[9]:insert('The Wolf!', 'Vincent', 1, 'Come again?')
+---
+ - 'The Wolf!': {'Vincent', 1, 'Come again?'}
+...
+box.space[9]:insert('Vincent', 'The Wolf!', 1, 'I said a please would be nice.')
+---
+ - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+...
+box.space[9]:insert('The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.')
+---
+ - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+...
+box.space[9]:insert('The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.')
+---
+ - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+...
+box.space[9]:insert('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.')
+---
+ - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+--
+-- Select test
+--
+---
+...
+-- Select by one entry
+---
+...
 box.select(9, 0, 'Vincent', 'Jules', 0)
 ---
  - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
@@ -118,6 +171,9 @@ box.select(9, 0, 'Vincent', 'The Wolf!', 2)
 ---
  - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
+-- Select all messages from Vincent to Jules
+---
+...
 box.select(9, 0, 'Vincent', 'Jules')
 ---
  - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
@@ -128,6 +184,9 @@ box.select(9, 0, 'Vincent', 'Jules')
  - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
  - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
 ...
+-- Select all messages from Jules to Vincent
+---
+...
 box.select(9, 0, 'Jules', 'Vincent')
 ---
  - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
@@ -137,11 +196,17 @@ box.select(9, 0, 'Jules', 'Vincent')
  - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
  - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
 ...
+-- Select all messages from Vincent to The Wolf
+---
+...
 box.select(9, 0, 'Vincent', 'The Wolf!')
 ---
  - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
  - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
  - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+-- Select all messages from The Wolf to Vincent
+---
 ...
 box.select(9, 0, 'The Wolf!', 'Vincent')
 ---
@@ -149,6 +214,9 @@ box.select(9, 0, 'The Wolf!', 'Vincent')
  - 'The Wolf!': {'Vincent', 1, 'Come again?'}
  - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
  - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+...
+-- Select all Vincent messages
+---
 ...
 box.select(9, 0, 'Vincent')
 ---
@@ -162,6 +230,14 @@ box.select(9, 0, 'Vincent')
  - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
  - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
  - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+--
+-- Delete test
+--
+---
+...
+-- Delete some messages from the The Wolf and Vincent dialog
+---
 ...
 box.delete(9, 'The Wolf!', 'Vincent', 0)
 ---
@@ -183,26 +259,46 @@ box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
 ---
  - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
 ...
+-- Checking Vincent's last messages
+---
+...
 box.select(9, 0, 'Vincent', 'The Wolf!')
 ---
  - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
  - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+-- Checking The Wolf's last messages
+---
 ...
 box.select(9, 0, 'The Wolf!', 'Vincent')
 ---
  - 'The Wolf!': {'Vincent', 1, 'Come again?'}
  - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
 ...
+-- try to delete nonexistent message
+---
+...
 box.delete(9, 'Vincent', 'The Wolf!', 3)
+---
+...
+-- try to delete patrial defined key
 ---
 ...
 box.delete(9, 'Vincent', 'The Wolf!')
 ---
 error: 'Invalid key part count in an exact match (expected 3, got 2)'
 ...
+-- try to delete by invalid key
+---
+...
 box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')
 ---
 error: 'Invalid key part count in an exact match (expected 3, got 4)'
+...
+--
+-- Update test
+--
+---
 ...
 box.update(9, {'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')
 ---
@@ -212,22 +308,37 @@ box.update(9, {'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')
 ---
  - 'Vincent': {'The Wolf!', 1, '<ooops>'}
 ...
+-- Checking Vincent's last messages
+---
+...
 box.select(9, 0, 'Vincent', 'The Wolf!')
 ---
  - 'Vincent': {'The Wolf!', 1, '<ooops>'}
  - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+...
+-- Checking The Wolf's last messages
+---
 ...
 box.select(9, 0, 'The Wolf!', 'Vincent')
 ---
  - 'The Wolf!': {'Vincent', 1, '<ooops>'}
  - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
 ...
+-- try to update a nonexistent message
+---
+...
 box.update(9, {'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')
+---
+...
+-- try to update patrial defined key
 ---
 ...
 box.update(9, {'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')
 ---
 error: 'Invalid key part count in an exact match (expected 3, got 2)'
+...
+-- try to update by invalid key
+---
 ...
 box.update(9, {'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')
 ---
@@ -244,8 +355,10 @@ box.space[9]:len()
 ---
  - 0
 ...
- A test case for Bug#1051006 Tree iterators return garbage
-if an index is modified between calls
+-- A test case for Bug#1051006 Tree iterators return garbage
+--if an index is modified between calls
+---
+...
 box.space[16]:insert('a', 'a', 'a')
 ---
  - 'a': {'a', 'a'}
@@ -266,72 +379,65 @@ box.space[16]:insert('c', 'c', 'c')
 ---
  - 'c': {'c', 'c'}
 ...
-k,v = box.space[16].index[1]:next(k)
+for i = 1, 2 do
+    k,v = box.space[16].index[1]:next(k)
+    print(' - ', v)
+end
 ---
-...
-print(v)
----
-'a': {'a', 'a'}
-...
-k,v = box.space[16].index[1]:next(k)
----
-...
-print(v)
----
-'b': {'b', 'b'}
+ - 'a': {'a', 'a'}
+ - 'b': {'b', 'b'}
 ...
 box.space[16]:truncate()
 ---
 ...
-print(v)
+v
 ---
-'b': {'b', 'b'}
+ - 'b': {'b', 'b'}
 ...
 collectgarbage('collect')
 ---
  - 0
 ...
-print(v)
+v
 ---
-'b': {'b', 'b'}
+ - 'b': {'b', 'b'}
 ...
 k,v = box.space[16].index[1]:next(k)
 ---
 ...
-print(v)
+v
 ---
-nil
+ - nil
 ...
 collectgarbage('collect')
 ---
  - 0
 ...
-print(v)
+v
 ---
-nil
+ - nil
 ...
-k,v = box.space[16].index[1]:next(k)
+for i = 1, 3 do
+    k,v = box.space[16].index[1]:next(k)
+    print(' - ', v)
+end
 ---
+ - nil
+ - nil
+ - nil
 ...
-print(v)
----
-nil
-...
-k,v = box.space[16].index[1]:next(k)
----
-...
-print(v)
----
-nil
-...
-k,v = box.space[16].index[1]:next(k)
+-- Bug #1082356
 ---
 ...
-print(v)
+box.space[19]:insert(1, 1)
 ---
-nil
+error: 'Illegal parameters, tuple must have all indexed fields'
 ...
-insert into t19 values(1, 1)
-An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
-replace into t19 values(1, 1)
-An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
+box.replace_if_exists(19, 1, 1)
+---
+error: 'Illegal parameters, tuple must have all indexed fields'
+...
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
+
+---
+...

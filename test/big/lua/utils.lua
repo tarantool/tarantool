@@ -80,3 +80,45 @@ function table.generate(iter)
 
 	return t;
 end
+
+-- sort all rows as strings(not for tables);
+function box.sort(tuples)
+    function compare_tables(t1, t2) 
+        return (tostring(t1) < tostring(t2))
+    end 
+    table.sort(tuples, compare_tables) 
+    return tuples
+end;
+
+-- return string tuple
+function box.tuple.to_string(tuple, yaml)
+    ans = '['
+    for i = 0, #tuple - 1 do
+        if #i == 4 then
+            ans = ans..box.unpack('i', i)
+        elseif #i == 8 then
+            ans = ans..box.unpack('l', i)
+        else
+            ans = ans..'\''..tostring(i)..'\''
+        end
+        if not #i == #tuple -1 then
+            ans = ans..', '
+        end
+    end
+    ans = ans..']'
+    if yaml then
+        ans = ' - '..ans
+    end
+    return ans
+end;
+
+--replace if tuple already presented func
+function box.replace_if_exists(space, ...)
+    local field_count = select('#', ...)
+        return box.process(13,
+            box.pack('iiV',
+                tonumber(space),
+                bit.bor(box.flags.BOX_RETURN_TUPLE,
+                    box.flags.BOX_REPLACE),
+                field_count, ...))
+end;

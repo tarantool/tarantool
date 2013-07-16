@@ -1,53 +1,50 @@
-# encoding: utf-8
-#
+dofile('utils.lua')
 
-# insert rows
-sql("insert into t27 values (0, 'foo', 0, '', 1)")
-sql("insert into t27 values (0, 'foo', 1, '', 1)")
-sql("insert into t27 values (1, 'foo', 0, '', 2)")
-sql("insert into t27 values (1, 'foo', 1, '', 2)")
-sql("insert into t27 values (0, 'bar', 0, '', 3)")
-sql("insert into t27 values (0, 'bar', 1, '', 3)")
-sql("insert into t27 values (1, 'bar', 0, '', 4)")
-sql("insert into t27 values (1, 'bar', 1, '', 4)")
-# try to insert a row with a duplicate key
-sql("insert into t27 values (1, 'bar', 1, '', 5)")
+-- insert rows;
+box.space[27]:insert(0, 'foo', 0, '', 1);
+box.space[27]:insert(0, 'foo', 1, '', 1);
+box.space[27]:insert(1, 'foo', 0, '', 2);
+box.space[27]:insert(1, 'foo', 1, '', 2);
+box.space[27]:insert(0, 'bar', 0, '', 3);
+box.space[27]:insert(0, 'bar', 1, '', 3);
+box.space[27]:insert(1, 'bar', 0, '', 4);
+box.space[27]:insert(1, 'bar', 1, '', 4);
 
-# output all rows
-lua_code = """
+-- try to insert a row with a duplicate key;
+box.space[27]:insert(1, 'bar', 1, '', 5);
+
+-- output all rows;
 function box.select_all(space)
-    space = tonumber(space)
     local result = {}
-        for k, v in box.space[space]:pairs() do
-            table.insert(result, v)
+    for k, v in box.space[space]:pairs() do
+        table.insert(result, v)
     end
-    return unpack(result)
-end
-"""
-admin(lua_code.replace('\n', ' '))
-sql.sort = True
-sql("call box.select_all('27')")
-sql.sort = False
+    return result
+end;
 
-# primary index select
-admin("box.select(27, 0, 1, 'foo', 0)")
-admin("box.select(27, 0, 1, 'bar', 0)")
-# primary index slect with missing part
-admin("box.select(27, 0, 1, 'foo')")
-# primary index slect with extra part
-admin("box.select(27, 0, 1, 'foo', 0, 0)")
-# primary index select with wrong type
-admin("box.select(27, 0, 1, 'foo', 'baz')")
+unpack(box.sort(box.select_all(27)))
 
-# secondary index select
-admin("box.select(27, 1, 1, 4)")
-# secondary index select with no such key
-admin("box.select(27, 1, 1, 5)")
-# secondary index select with missing part
-admin("box.select(27, 1, 1)")
-# secondary index select with wrong type
-admin("box.select(27, 1, 1, 'baz')")
+-- primary index select;
+box.space[27]:select(0, 1, 'foo', 0);
+box.space[27]:select(0, 1, 'bar', 0);
+-- primary index select with missing part;
+box.space[27]:select(0, 1, 'foo');
+-- primary index select with extra part;
+box.space[27]:select(0, 1, 'foo', 0, 0);
+-- primary index select with wrong type;
+box.space[27]:select(0, 1, 'foo', 'baz');
 
-# cleanup
-admin("box.space[27]:truncate()")
-admin("box.space[27]:len()")
+-- secondary index select;
+box.space[27]:select(1, 1, 4);
+-- secondary index select with no such key;
+box.space[27]:select(1, 1, 5);
+-- secondary index select with missing part;
+box.space[27]:select(1, 1);
+-- secondary index select with wrong type;
+box.space[27]:select(1, 1, 'baz');
+
+-- cleanup;
+box.space[27]:truncate();
+box.space[27]:len();
+
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

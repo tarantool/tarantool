@@ -1,8 +1,10 @@
 dofile('index_random_test.lua')
 ---
 ...
-insert into t1 values ('brave', 'new', 'world')
-Insert OK, 1 row affected
+box.space[1]:insert('brave', 'new', 'world')
+---
+ - 'brave': {'new', 'world'}
+...
 box.space[1].index[1]:min()
 ---
  - 'brave': {'new', 'world'}
@@ -11,36 +13,48 @@ box.space[1].index[1]:max()
 ---
  - 'brave': {'new', 'world'}
 ...
-call box.select('1', '1', 'new', 'world')
-Found 1 tuple:
-['brave', 'new', 'world']
-#
-# A test case for Bug #904208
-# "assert failed, when key cardinality is greater than index cardinality"
-# https://bugs.launchpad.net/tarantool/+bug/904208
-#
-call box.select('1', '1', 'new', 'world', 'order')
-An error occurred: ER_KEY_PART_COUNT, 'Invalid key part count (expected [0..2], got 3)'
-call box.delete('1', 'brave')
-Found 1 tuple:
-['brave', 'new', 'world']
-#
-# A test case for Bug #902091
-# "Positioned iteration over a multipart index doesn't work"
-# https://bugs.launchpad.net/tarantool/+bug/902091
-#
-insert into t1 values ('item 1', 'alabama', 'song')
-Insert OK, 1 row affected
+box.select('1', '1', 'new', 'world')
+---
+ - 'brave': {'new', 'world'}
+...
+-- A test case for Bug #904208
+-- "assert failed, when key cardinality is greater than index cardinality"
+--  https://bugs.launchpad.net/tarantool/+bug/904208 
+---
+...
+box.select('1', '1', 'new', 'world', 'order')
+---
+error: 'Invalid key part count (expected [0..2], got 3)'
+...
+box.delete('1', 'brave')
+---
+ - 'brave': {'new', 'world'}
+...
+-- A test case for Bug #902091
+-- "Positioned iteration over a multipart index doesn't work"
+-- https://bugs.launchpad.net/tarantool/+bug/902091
+---
+...
+box.space[1]:insert('item 1', 'alabama', 'song')
+---
+ - 'item 1': {'alabama', 1735290739}
+...
 box.select(1, 1, 'alabama')
 ---
  - 'item 1': {'alabama', 1735290739}
 ...
-insert into t1 values ('item 2', 'california', 'dreaming ')
-Insert OK, 1 row affected
-insert into t1 values ('item 3', 'california', 'uber alles')
-Insert OK, 1 row affected
-insert into t1 values ('item 4', 'georgia', 'on my mind')
-Insert OK, 1 row affected
+box.space[1]:insert('item 2', 'california', 'dreaming ')
+---
+ - 'item 2': {'california', 'dreaming '}
+...
+box.space[1]:insert('item 3', 'california', 'uber alles')
+---
+ - 'item 3': {'california', 'uber alles'}
+...
+box.space[1]:insert('item 4', 'georgia', 'on my mind')
+---
+ - 'item 4': {'georgia', 'on my mind'}
+...
 iter, tuple = box.space[1].index[1]:next('california')
 ---
 ...
@@ -48,40 +62,62 @@ tuple
 ---
  - 'item 2': {'california', 'dreaming '}
 ...
-iter, tuple = box.space[1].index[1]:next(iter)
+_, tuple = box.space[1].index[1]:next(iter)
 ---
 ...
 tuple
 ---
  - 'item 3': {'california', 'uber alles'}
 ...
-call box.delete('1', 'item 1')
-Found 1 tuple:
-['item 1', 'alabama', 1735290739]
-call box.delete('1', 'item 2')
-Found 1 tuple:
-['item 2', 'california', 'dreaming ']
-call box.delete('1', 'item 3')
-Found 1 tuple:
-['item 3', 'california', 'uber alles']
-call box.delete('1', 'item 4')
-Found 1 tuple:
-['item 4', 'georgia', 'on my mind']
-insert into t5 values ('01234567', 'new', 'world')
-Insert OK, 1 row affected
-insert into t5 values ('00000000', 'of', 'puppets')
-Insert OK, 1 row affected
-insert into t5 values ('00000001', 'of', 'might', 'and', 'magic')
-Insert OK, 1 row affected
-call box.select_range(5, 1, 2, 'of')
-Found 2 tuples:
-['00000001', 'of', 'might', 'and', 'magic']
-['00000000', 'of', 'puppets']
-call box.select_reverse_range(5, 1, 2, 'of')
-Found 2 tuples:
-['00000000', 'of', 'puppets']
-['00000001', 'of', 'might', 'and', 'magic']
+box.delete('1', 'item 1')
+---
+ - 'item 1': {'alabama', 1735290739}
+...
+box.delete('1', 'item 2')
+---
+ - 'item 2': {'california', 'dreaming '}
+...
+box.delete('1', 'item 3')
+---
+ - 'item 3': {'california', 'uber alles'}
+...
+box.delete('1', 'item 4')
+---
+ - 'item 4': {'georgia', 'on my mind'}
+...
+--
+-- Check range scan over multipart keys
+--
+---
+...
+box.space[5]:insert('01234567', 'new', 'world')
+---
+ - 3978425819141910832: {'new', 'world'}
+...
+box.space[5]:insert('00000000', 'of', 'puppets')
+---
+ - 3472328296227680304: {26223, 'puppets'}
+...
+box.space[5]:insert('00000001', 'of', 'might', 'and', 'magic')
+---
+ - 3544385890265608240: {26223, 'might', 'and', 'magic'}
+...
+box.select_range(5, 1, 2, 'of')
+---
+ - 3544385890265608240: {26223, 'might', 'and', 'magic'}
+ - 3472328296227680304: {26223, 'puppets'}
+...
+box.select_reverse_range(5, 1, 2, 'of')
+---
+ - 3472328296227680304: {26223, 'puppets'}
+ - 3544385890265608240: {26223, 'might', 'and', 'magic'}
+...
 box.space[5]:truncate()
+---
+...
+--
+-- Lua 64bit numbers support
+--
 ---
 ...
 box.insert('8', tonumber64('18446744073709551615'), 'magic')
@@ -94,9 +130,9 @@ tu = box.select('8', '0', tonumber64('18446744073709551615'))
 num = box.unpack('l', tu[0])
 ---
 ...
-print(num)
+num
 ---
-18446744073709551615
+ - 18446744073709551615
 ...
 type(num) == 'cdata'
 ---
@@ -133,13 +169,10 @@ num = box.unpack('l', tu[0])
 num2 = box.unpack('l', tu2[0])
 ---
 ...
-print(num)
+num, num2
 ---
-125
-...
-print(num2)
----
-125
+ - 125
+ - 125
 ...
 type(num) == 'cdata'
 ---
@@ -158,6 +191,11 @@ num2 == tonumber64('125')
  - true
 ...
 box.space[8]:truncate()
+---
+...
+--
+-- Lua select_reverse_range
+--
 ---
 ...
 box.insert(14, 0, 0)
@@ -236,78 +274,74 @@ box.select_reverse_range(14, 1, 4)
 box.space[14]:truncate()
 ---
 ...
-
-#
-# Tests for box.index iterators
-#
-
-box.insert(16, 'pid_1', 'sid_1', 'tid_999')
+--
+-- Tests for box.index iterators
+--
 ---
- - 'pid_1': {'sid_1', 'tid_999'}
 ...
-box.insert(16, 'pid_2', 'sid_1', 'tid_998')
+pid = 1
 ---
- - 'pid_2': {'sid_1', 'tid_998'}
 ...
-box.insert(16, 'pid_3', 'sid_1', 'tid_997')
+tid = 999
+---
+...
+for sid = 1, 2 do
+    for i = 1, 3 do
+        box.space[16]:insert('pid_'..pid, 'sid_'..sid, 'tid_'..tid)
+        pid = pid + 1
+        tid = tid - 1
+    end
+end
+---
+...
+for k, v in box.space[16].index[1].next,       box.space[16].index[1], 'sid_1' do print(' - ', v) end
 ---
  - 'pid_3': {'sid_1', 'tid_997'}
-...
-box.insert(16, 'pid_4', 'sid_2', 'tid_996')
----
+ - 'pid_2': {'sid_1', 'tid_998'}
+ - 'pid_1': {'sid_1', 'tid_999'}
+ - 'pid_6': {'sid_2', 'tid_994'}
+ - 'pid_5': {'sid_2', 'tid_995'}
  - 'pid_4': {'sid_2', 'tid_996'}
 ...
-box.insert(16, 'pid_5', 'sid_2', 'tid_995')
+for k, v in box.space[16].index[1].prev,       box.space[16].index[1], 'sid_2' do print(' - ', v) end
 ---
+ - 'pid_4': {'sid_2', 'tid_996'}
  - 'pid_5': {'sid_2', 'tid_995'}
+ - 'pid_6': {'sid_2', 'tid_994'}
+ - 'pid_1': {'sid_1', 'tid_999'}
+ - 'pid_2': {'sid_1', 'tid_998'}
+ - 'pid_3': {'sid_1', 'tid_997'}
 ...
-box.insert(16, 'pid_6', 'sid_2', 'tid_994')
+for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(' - ', v) end
+---
+ - 'pid_3': {'sid_1', 'tid_997'}
+ - 'pid_2': {'sid_1', 'tid_998'}
+ - 'pid_1': {'sid_1', 'tid_999'}
+...
+for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(' - ', v) end
+---
+ - 'pid_1': {'sid_1', 'tid_999'}
+ - 'pid_2': {'sid_1', 'tid_998'}
+ - 'pid_3': {'sid_1', 'tid_997'}
+...
+for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(' - ', v) end
 ---
  - 'pid_6': {'sid_2', 'tid_994'}
+ - 'pid_5': {'sid_2', 'tid_995'}
+ - 'pid_4': {'sid_2', 'tid_996'}
 ...
-for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do print(v) end
+for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(' - ', v) end
 ---
-'pid_3': {'sid_1', 'tid_997'}
-'pid_2': {'sid_1', 'tid_998'}
-'pid_1': {'sid_1', 'tid_999'}
-'pid_6': {'sid_2', 'tid_994'}
-'pid_5': {'sid_2', 'tid_995'}
-'pid_4': {'sid_2', 'tid_996'}
-...
-for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do print(v) end
----
-'pid_4': {'sid_2', 'tid_996'}
-'pid_5': {'sid_2', 'tid_995'}
-'pid_6': {'sid_2', 'tid_994'}
-'pid_1': {'sid_1', 'tid_999'}
-'pid_2': {'sid_1', 'tid_998'}
-'pid_3': {'sid_1', 'tid_997'}
-...
-for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(v) end
----
-'pid_3': {'sid_1', 'tid_997'}
-'pid_2': {'sid_1', 'tid_998'}
-'pid_1': {'sid_1', 'tid_999'}
-...
-for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(v) end
----
-'pid_1': {'sid_1', 'tid_999'}
-'pid_2': {'sid_1', 'tid_998'}
-'pid_3': {'sid_1', 'tid_997'}
-...
-for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(v) end
----
-'pid_6': {'sid_2', 'tid_994'}
-'pid_5': {'sid_2', 'tid_995'}
-'pid_4': {'sid_2', 'tid_996'}
-...
-for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(v) end
----
-'pid_4': {'sid_2', 'tid_996'}
-'pid_5': {'sid_2', 'tid_995'}
-'pid_6': {'sid_2', 'tid_994'}
+ - 'pid_4': {'sid_2', 'tid_996'}
+ - 'pid_5': {'sid_2', 'tid_995'}
+ - 'pid_6': {'sid_2', 'tid_994'}
 ...
 box.space[16]:truncate()
+---
+...
+--
+-- Tests for lua idx:count()
+--
 ---
 ...
 box.insert(17, 1, 1, 1)
@@ -365,6 +399,11 @@ error: 'index.count(): one or more arguments expected'
 box.space[17]:truncate()
 ---
 ...
+--
+-- Tests for lua box.auto_increment
+--
+---
+...
 box.space[18]:truncate()
 ---
 ...
@@ -385,6 +424,11 @@ box.auto_increment(18, 'c')
  - 7: {'c'}
 ...
 box.space[18]:truncate()
+---
+...
+--
+-- Tests for lua box.auto_increment with NUM64 keys
+--
 ---
 ...
 box.space[25]:truncate()
@@ -409,7 +453,12 @@ box.auto_increment(25, 'c')
 box.space[25]:truncate()
 ---
 ...
-t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')
+--
+-- Tests for lua tuple:transform()
+--
+---
+...
+t = box.insert(12, '1', '2', '3', '4', '5', '6', '7')
 ---
 ...
 t:transform(7, 0, '8', '9', '100')
@@ -480,7 +529,12 @@ t:transform(0, 1, {})
 ---
 error: 'tuple.transform(): unsupported field type ''table'''
 ...
-t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')
+--
+-- Tests for lua tuple:find() and tuple:findall()
+--
+---
+...
+t = box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')
 ---
 ...
 t:find('2')
@@ -532,7 +586,7 @@ t:findall(4, '3')
  - 4
  - 8
 ...
-t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))
+t = box.insert(12, 'Z', '2', 2, 3, tonumber64(2))
 ---
 ...
 t:find(2)
@@ -550,11 +604,11 @@ t:find('2')
 box.space[12]:truncate()
 ---
 ...
-#
-# A test case for Bug #1038784
-# transform returns wrong tuple and put broken reply into socket
-# https://bugs.launchpad.net/tarantool/+bug/1038784
-#
+-- A test case for Bug #1038784
+-- transform returns wrong tuple and put broken reply into socket
+-- https://bugs.launchpad.net/tarantool/+bug/1038784
+---
+...
 dofile('push.lua')
 ---
 ...
@@ -598,7 +652,11 @@ push_collection(5, 1038784, 'hey')
 ---
  - 1038784: {26984, 'hey', 'hey', 'hey', 'hey'}
 ...
-# A test case for Bug#1060967: truncation of 64-bit numbers
+--
+-- A test case for Bug#1060967: truncation of 64-bit numbers
+--
+---
+...
 box.space[5]:insert(2^51, 'hello', 'world')
 ---
  - 2251799813685248: {'hello', 'world'}
@@ -610,7 +668,13 @@ box.space[5]:select(0, 2^51)
 box.space[5]:truncate()
 ---
 ...
-# Test that we print index number in error ER_INDEX_VIOLATION
+--
+-- Test that we print index number in error ER_INDEX_VIOLATION
+---
+...
+--
+---
+...
 box.space[1]:insert(1, 'hello', 'world')
 ---
  - 1: {'hello', 'world'}
@@ -622,12 +686,15 @@ error: 'Duplicate key exists in unique index 1'
 box.space[1]:truncate()
 ---
 ...
-#
-# A test case for Bug #1042798
-# Truncate hangs when primary key is not in linear or starts at the first field
-# https://bugs.launchpad.net/tarantool/+bug/1042798
-#
-for k, f in pairs(box.space[23].index[0].key_field) do print(k, ' => ', f.fieldno) end
+-- A test case for Bug #1042798
+-- Truncate hangs when primary key is not in linear or starts at the first field
+-- https://bugs.launchpad.net/tarantool/+bug/1042798
+---
+...
+-- Print key fields in pk
+---
+...
+for k, f in pairs(box.space[23].index[0].key_field) do print(k,  ' => ', f.fieldno) end
 ---
 0 => 2
 1 => 1
@@ -644,652 +711,45 @@ box.insert(23, 20, 30, 40, 50)
 ---
  - 20: {30, 40, 50}
 ...
-for _k, v in box.space[23]:pairs() do print(v) end
+for _, v in box.space[23]:pairs() do print(' - ', v) end
 ---
-1: {2, 3, 4}
-10: {20, 30, 40}
-20: {30, 40, 50}
+ - 1: {2, 3, 4}
+ - 10: {20, 30, 40}
+ - 20: {30, 40, 50}
+...
+-- Truncate must not hang
+---
 ...
 box.space[23]:truncate()
 ---
 ...
-for _k, v in box.space[23]:pairs() do print(v) end
+-- Empty result
 ---
 ...
-
-#-----------------------------------------------------------------------------#
-# TreeIndex::random()
-#-----------------------------------------------------------------------------#
-
+for _, v in box.space[23]:pairs() do print(' - ', v) end
+---
+...
+-------------------------------------------------------------------------------
+-- TreeIndex::random()
+-------------------------------------------------------------------------------
+---
+...
 index_random_test(26, 0)
 ---
 all values have been found
  - true
 ...
-
-#-----------------------------------------------------------------------------#
-# HashIndex::random()
-#-----------------------------------------------------------------------------#
-
+-------------------------------------------------------------------------------
+-- HashIndex::random()
+-------------------------------------------------------------------------------
+---
+...
 index_random_test(26, 1)
 ---
 all values have been found
  - true
 ...
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
 
-#
-# A test case for Bug#1200228
-# https://bugs.launchpad.net/tarantool/+bug/1200228
-# box.auto_increment counter resets
-# Test for correct little-endian comparison of integer fields.
-# (unsigned)
-#
-for i = 1, 300 do box.insert(2, i, i) print(box.space[2].index[0]:max()) end
----
-1: {1}
-2: {2}
-3: {3}
-4: {4}
-5: {5}
-6: {6}
-7: {7}
-8: {8}
-9: {9}
-10: {10}
-11: {11}
-12: {12}
-13: {13}
-14: {14}
-15: {15}
-16: {16}
-17: {17}
-18: {18}
-19: {19}
-20: {20}
-21: {21}
-22: {22}
-23: {23}
-24: {24}
-25: {25}
-26: {26}
-27: {27}
-28: {28}
-29: {29}
-30: {30}
-31: {31}
-32: {32}
-33: {33}
-34: {34}
-35: {35}
-36: {36}
-37: {37}
-38: {38}
-39: {39}
-40: {40}
-41: {41}
-42: {42}
-43: {43}
-44: {44}
-45: {45}
-46: {46}
-47: {47}
-48: {48}
-49: {49}
-50: {50}
-51: {51}
-52: {52}
-53: {53}
-54: {54}
-55: {55}
-56: {56}
-57: {57}
-58: {58}
-59: {59}
-60: {60}
-61: {61}
-62: {62}
-63: {63}
-64: {64}
-65: {65}
-66: {66}
-67: {67}
-68: {68}
-69: {69}
-70: {70}
-71: {71}
-72: {72}
-73: {73}
-74: {74}
-75: {75}
-76: {76}
-77: {77}
-78: {78}
-79: {79}
-80: {80}
-81: {81}
-82: {82}
-83: {83}
-84: {84}
-85: {85}
-86: {86}
-87: {87}
-88: {88}
-89: {89}
-90: {90}
-91: {91}
-92: {92}
-93: {93}
-94: {94}
-95: {95}
-96: {96}
-97: {97}
-98: {98}
-99: {99}
-100: {100}
-101: {101}
-102: {102}
-103: {103}
-104: {104}
-105: {105}
-106: {106}
-107: {107}
-108: {108}
-109: {109}
-110: {110}
-111: {111}
-112: {112}
-113: {113}
-114: {114}
-115: {115}
-116: {116}
-117: {117}
-118: {118}
-119: {119}
-120: {120}
-121: {121}
-122: {122}
-123: {123}
-124: {124}
-125: {125}
-126: {126}
-127: {127}
-128: {128}
-129: {129}
-130: {130}
-131: {131}
-132: {132}
-133: {133}
-134: {134}
-135: {135}
-136: {136}
-137: {137}
-138: {138}
-139: {139}
-140: {140}
-141: {141}
-142: {142}
-143: {143}
-144: {144}
-145: {145}
-146: {146}
-147: {147}
-148: {148}
-149: {149}
-150: {150}
-151: {151}
-152: {152}
-153: {153}
-154: {154}
-155: {155}
-156: {156}
-157: {157}
-158: {158}
-159: {159}
-160: {160}
-161: {161}
-162: {162}
-163: {163}
-164: {164}
-165: {165}
-166: {166}
-167: {167}
-168: {168}
-169: {169}
-170: {170}
-171: {171}
-172: {172}
-173: {173}
-174: {174}
-175: {175}
-176: {176}
-177: {177}
-178: {178}
-179: {179}
-180: {180}
-181: {181}
-182: {182}
-183: {183}
-184: {184}
-185: {185}
-186: {186}
-187: {187}
-188: {188}
-189: {189}
-190: {190}
-191: {191}
-192: {192}
-193: {193}
-194: {194}
-195: {195}
-196: {196}
-197: {197}
-198: {198}
-199: {199}
-200: {200}
-201: {201}
-202: {202}
-203: {203}
-204: {204}
-205: {205}
-206: {206}
-207: {207}
-208: {208}
-209: {209}
-210: {210}
-211: {211}
-212: {212}
-213: {213}
-214: {214}
-215: {215}
-216: {216}
-217: {217}
-218: {218}
-219: {219}
-220: {220}
-221: {221}
-222: {222}
-223: {223}
-224: {224}
-225: {225}
-226: {226}
-227: {227}
-228: {228}
-229: {229}
-230: {230}
-231: {231}
-232: {232}
-233: {233}
-234: {234}
-235: {235}
-236: {236}
-237: {237}
-238: {238}
-239: {239}
-240: {240}
-241: {241}
-242: {242}
-243: {243}
-244: {244}
-245: {245}
-246: {246}
-247: {247}
-248: {248}
-249: {249}
-250: {250}
-251: {251}
-252: {252}
-253: {253}
-254: {254}
-255: {255}
-256: {256}
-257: {257}
-258: {258}
-259: {259}
-260: {260}
-261: {261}
-262: {262}
-263: {263}
-264: {264}
-265: {265}
-266: {266}
-267: {267}
-268: {268}
-269: {269}
-270: {270}
-271: {271}
-272: {272}
-273: {273}
-274: {274}
-275: {275}
-276: {276}
-277: {277}
-278: {278}
-279: {279}
-280: {280}
-281: {281}
-282: {282}
-283: {283}
-284: {284}
-285: {285}
-286: {286}
-287: {287}
-288: {288}
-289: {289}
-290: {290}
-291: {291}
-292: {292}
-293: {293}
-294: {294}
-295: {295}
-296: {296}
-297: {297}
-298: {298}
-299: {299}
-300: {300}
-...
-box.space[2]:select_range(0, 300)
----
- - 1: {1}
- - 2: {2}
- - 3: {3}
- - 4: {4}
- - 5: {5}
- - 6: {6}
- - 7: {7}
- - 8: {8}
- - 9: {9}
- - 10: {10}
- - 11: {11}
- - 12: {12}
- - 13: {13}
- - 14: {14}
- - 15: {15}
- - 16: {16}
- - 17: {17}
- - 18: {18}
- - 19: {19}
- - 20: {20}
- - 21: {21}
- - 22: {22}
- - 23: {23}
- - 24: {24}
- - 25: {25}
- - 26: {26}
- - 27: {27}
- - 28: {28}
- - 29: {29}
- - 30: {30}
- - 31: {31}
- - 32: {32}
- - 33: {33}
- - 34: {34}
- - 35: {35}
- - 36: {36}
- - 37: {37}
- - 38: {38}
- - 39: {39}
- - 40: {40}
- - 41: {41}
- - 42: {42}
- - 43: {43}
- - 44: {44}
- - 45: {45}
- - 46: {46}
- - 47: {47}
- - 48: {48}
- - 49: {49}
- - 50: {50}
- - 51: {51}
- - 52: {52}
- - 53: {53}
- - 54: {54}
- - 55: {55}
- - 56: {56}
- - 57: {57}
- - 58: {58}
- - 59: {59}
- - 60: {60}
- - 61: {61}
- - 62: {62}
- - 63: {63}
- - 64: {64}
- - 65: {65}
- - 66: {66}
- - 67: {67}
- - 68: {68}
- - 69: {69}
- - 70: {70}
- - 71: {71}
- - 72: {72}
- - 73: {73}
- - 74: {74}
- - 75: {75}
- - 76: {76}
- - 77: {77}
- - 78: {78}
- - 79: {79}
- - 80: {80}
- - 81: {81}
- - 82: {82}
- - 83: {83}
- - 84: {84}
- - 85: {85}
- - 86: {86}
- - 87: {87}
- - 88: {88}
- - 89: {89}
- - 90: {90}
- - 91: {91}
- - 92: {92}
- - 93: {93}
- - 94: {94}
- - 95: {95}
- - 96: {96}
- - 97: {97}
- - 98: {98}
- - 99: {99}
- - 100: {100}
- - 101: {101}
- - 102: {102}
- - 103: {103}
- - 104: {104}
- - 105: {105}
- - 106: {106}
- - 107: {107}
- - 108: {108}
- - 109: {109}
- - 110: {110}
- - 111: {111}
- - 112: {112}
- - 113: {113}
- - 114: {114}
- - 115: {115}
- - 116: {116}
- - 117: {117}
- - 118: {118}
- - 119: {119}
- - 120: {120}
- - 121: {121}
- - 122: {122}
- - 123: {123}
- - 124: {124}
- - 125: {125}
- - 126: {126}
- - 127: {127}
- - 128: {128}
- - 129: {129}
- - 130: {130}
- - 131: {131}
- - 132: {132}
- - 133: {133}
- - 134: {134}
- - 135: {135}
- - 136: {136}
- - 137: {137}
- - 138: {138}
- - 139: {139}
- - 140: {140}
- - 141: {141}
- - 142: {142}
- - 143: {143}
- - 144: {144}
- - 145: {145}
- - 146: {146}
- - 147: {147}
- - 148: {148}
- - 149: {149}
- - 150: {150}
- - 151: {151}
- - 152: {152}
- - 153: {153}
- - 154: {154}
- - 155: {155}
- - 156: {156}
- - 157: {157}
- - 158: {158}
- - 159: {159}
- - 160: {160}
- - 161: {161}
- - 162: {162}
- - 163: {163}
- - 164: {164}
- - 165: {165}
- - 166: {166}
- - 167: {167}
- - 168: {168}
- - 169: {169}
- - 170: {170}
- - 171: {171}
- - 172: {172}
- - 173: {173}
- - 174: {174}
- - 175: {175}
- - 176: {176}
- - 177: {177}
- - 178: {178}
- - 179: {179}
- - 180: {180}
- - 181: {181}
- - 182: {182}
- - 183: {183}
- - 184: {184}
- - 185: {185}
- - 186: {186}
- - 187: {187}
- - 188: {188}
- - 189: {189}
- - 190: {190}
- - 191: {191}
- - 192: {192}
- - 193: {193}
- - 194: {194}
- - 195: {195}
- - 196: {196}
- - 197: {197}
- - 198: {198}
- - 199: {199}
- - 200: {200}
- - 201: {201}
- - 202: {202}
- - 203: {203}
- - 204: {204}
- - 205: {205}
- - 206: {206}
- - 207: {207}
- - 208: {208}
- - 209: {209}
- - 210: {210}
- - 211: {211}
- - 212: {212}
- - 213: {213}
- - 214: {214}
- - 215: {215}
- - 216: {216}
- - 217: {217}
- - 218: {218}
- - 219: {219}
- - 220: {220}
- - 221: {221}
- - 222: {222}
- - 223: {223}
- - 224: {224}
- - 225: {225}
- - 226: {226}
- - 227: {227}
- - 228: {228}
- - 229: {229}
- - 230: {230}
- - 231: {231}
- - 232: {232}
- - 233: {233}
- - 234: {234}
- - 235: {235}
- - 236: {236}
- - 237: {237}
- - 238: {238}
- - 239: {239}
- - 240: {240}
- - 241: {241}
- - 242: {242}
- - 243: {243}
- - 244: {244}
- - 245: {245}
- - 246: {246}
- - 247: {247}
- - 248: {248}
- - 249: {249}
- - 250: {250}
- - 251: {251}
- - 252: {252}
- - 253: {253}
- - 254: {254}
- - 255: {255}
- - 256: {256}
- - 257: {257}
- - 258: {258}
- - 259: {259}
- - 260: {260}
- - 261: {261}
- - 262: {262}
- - 263: {263}
- - 264: {264}
- - 265: {265}
- - 266: {266}
- - 267: {267}
- - 268: {268}
- - 269: {269}
- - 270: {270}
- - 271: {271}
- - 272: {272}
- - 273: {273}
- - 274: {274}
- - 275: {275}
- - 276: {276}
- - 277: {277}
- - 278: {278}
- - 279: {279}
- - 280: {280}
- - 281: {281}
- - 282: {282}
- - 283: {283}
- - 284: {284}
- - 285: {285}
- - 286: {286}
- - 287: {287}
- - 288: {288}
- - 289: {289}
- - 290: {290}
- - 291: {291}
- - 292: {292}
- - 293: {293}
- - 294: {294}
- - 295: {295}
- - 296: {296}
- - 297: {297}
- - 298: {298}
- - 299: {299}
- - 300: {300}
-...
-box.space[2]:truncate()
 ---
 ...
