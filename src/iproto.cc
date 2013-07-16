@@ -646,8 +646,9 @@ iproto_reply(struct iproto_port *port, box_process_func callback,
 	char *body = (char *) &header[1];
 	iproto_port_init(port, out, header);
 	try {
-		callback((struct port *) port, header->msg_code,
-			 body, header->len);
+		struct request request;
+		request_create(&request, header->msg_code, body, header->len);
+		callback((struct port *) port, &request);
 	} catch (const ClientError& e) {
 		if (port->reply.found)
 			obuf_rollback_to_svp(out, &port->svp);

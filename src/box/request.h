@@ -84,12 +84,15 @@ struct request
 {
 	uint32_t type;
 	uint32_t flags;
+
 	const char *data;
 	uint32_t len;
+
+	void (*execute)(struct request *, struct txn *, struct port *);
 };
 
-struct request *request_create(uint32_t type, const char *data, uint32_t len);
-
-void request_execute(struct request *request, struct txn *txn, struct port *port);
+void
+request_create(struct request *request, uint32_t type, const char *data,
+	       uint32_t len);
 
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */
