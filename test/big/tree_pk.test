@@ -61,12 +61,12 @@ end"""
 sql("insert into t2 values (1, 'tuple')")
 sql("insert into t3 values (1, 'tuple')")
 sql("insert into t3 values (2, 'tuple')")
-admin("lua "+ lua.replace('\n', ' ')) 
+admin(lua.replace('\n', ' ')) 
 sql("call box.crossjoin('3', '3', '0')")
 sql("call box.crossjoin('3', '3', '5')")
 sql("call box.crossjoin('3', '3', '10000')")
 sql("call box.crossjoin('3', '2', '10000')")
-admin("lua box.space[3]:truncate()")
+admin("box.space[3]:truncate()")
 
 # Bug #922520 - select missing keys
 sql("insert into t2 values (200, 'select me!')")
@@ -84,14 +84,14 @@ sql("insert into t15 values ('abcdb__')")
 sql("insert into t15 values ('abcdb___')")
 sql("insert into t15 values ('abcdc')")
 sql("insert into t15 values ('abcdc_')")
-admin("lua box.space[15].index[0]:select_range(3, 'abcdb')")
-admin("lua box.space[15]:truncate()")
+admin("box.space[15].index[0]:select_range(3, 'abcdb')")
+admin("box.space[15]:truncate()")
 
 #
 # tree::replace tests
 #
 
-admin("lua box.space[22]:truncate()")
+admin("box.space[22]:truncate()")
 
 sql("insert into t22 values (0, 0, 0, 0)")
 sql("insert into t22 values (1, 1, 1, 1)")
@@ -177,5 +177,5 @@ sql("delete from t22 WHERE k0 = 5")
 sql("select * from t22 WHERE k2 = 0")
 sql.sort = False
 
-admin("lua box.space[22]:truncate()")
+admin("box.space[22]:truncate()")
 

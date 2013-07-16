@@ -5,7 +5,7 @@ import yaml
 ###################################
 def get_memcached_len(serv):
     serv_admin = serv.admin
-    resp = serv_admin("lua box.space[box.cfg.memcached_space]:len()", silent=True)
+    resp = serv_admin("box.space[box.cfg.memcached_space]:len()", silent=True)
     return yaml.load(resp)[0]
 
 def wait_for_empty_space(serv = server):

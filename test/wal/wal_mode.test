@@ -1,5 +1,5 @@
 # encoding: utf-8
-admin("lua box.cfg.wal_mode")
+admin("box.cfg.wal_mode")
 sql("insert into t0 values  (1)")
 sql("insert into t0 values  (2)")
 sql("insert into t0 values  (3)")
@@ -9,5 +9,5 @@ sql("select * from t0 where k0 = 3")
 sql("select * from t0 where k0 = 4")
 admin("save snapshot")
 admin("save snapshot")
-admin("lua box.space[0]:truncate()")
+admin("box.space[0]:truncate()")
 admin("save snapshot")

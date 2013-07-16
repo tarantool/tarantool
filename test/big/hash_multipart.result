@@ -16,7 +16,7 @@ insert into t27 values (1, 'bar', 1, '', 4)
 Insert OK, 1 row affected
 insert into t27 values (1, 'bar', 1, '', 5)
 An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 0'
-lua  function box.select_all(space)     space = tonumber(space)     local result = {}         for k, v in box.space[space]:pairs() do             table.insert(result, v)     end     return unpack(result) end 
+ function box.select_all(space)     space = tonumber(space)     local result = {}         for k, v in box.space[space]:pairs() do             table.insert(result, v)     end     return unpack(result) end 
 ---
 ...
 call box.select_all('27')
@@ -29,45 +29,45 @@ Found 8 tuples:
 [1, 'bar', 1, '', 4]
 [1, 'foo', 0, '', 2]
 [1, 'foo', 1, '', 2]
-lua box.select(27, 0, 1, 'foo', 0)
+box.select(27, 0, 1, 'foo', 0)
 ---
  - 1: {'foo', 0, '', 2}
 ...
-lua box.select(27, 0, 1, 'bar', 0)
+box.select(27, 0, 1, 'bar', 0)
 ---
  - 1: {'bar', 0, '', 4}
 ...
-lua box.select(27, 0, 1, 'foo')
+box.select(27, 0, 1, 'foo')
 ---
 error: 'Invalid key part count in an exact match (expected 3, got 2)'
 ...
-lua box.select(27, 0, 1, 'foo', 0, 0)
+box.select(27, 0, 1, 'foo', 0, 0)
 ---
 error: 'Invalid key part count (expected [0..3], got 4)'
 ...
-lua box.select(27, 0, 1, 'foo', 'baz')
+box.select(27, 0, 1, 'foo', 'baz')
 ---
 error: 'Supplied key field type does not match index type: expected u32'
 ...
-lua box.select(27, 1, 1, 4)
+box.select(27, 1, 1, 4)
 ---
  - 1: {'bar', 1, '', 4}
 ...
-lua box.select(27, 1, 1, 5)
+box.select(27, 1, 1, 5)
 ---
 ...
-lua box.select(27, 1, 1)
+box.select(27, 1, 1)
 ---
 error: 'Invalid key part count in an exact match (expected 2, got 1)'
 ...
-lua box.select(27, 1, 1, 'baz')
+box.select(27, 1, 1, 'baz')
 ---
 error: 'Supplied key field type does not match index type: expected u32'
 ...
-lua box.space[27]:truncate()
+box.space[27]:truncate()
 ---
 ...
-lua box.space[27]:len()
+box.space[27]:len()
 ---
  - 0
 ...

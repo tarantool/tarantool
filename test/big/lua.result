@@ -1,13 +1,13 @@
-lua dofile('index_random_test.lua')
+dofile('index_random_test.lua')
 ---
 ...
 insert into t1 values ('brave', 'new', 'world')
 Insert OK, 1 row affected
-lua box.space[1].index[1]:min()
+box.space[1].index[1]:min()
 ---
  - 'brave': {'new', 'world'}
 ...
-lua box.space[1].index[1]:max()
+box.space[1].index[1]:max()
 ---
  - 'brave': {'new', 'world'}
 ...
@@ -31,7 +31,7 @@ Found 1 tuple:
 #
 insert into t1 values ('item 1', 'alabama', 'song')
 Insert OK, 1 row affected
-lua box.select(1, 1, 'alabama')
+box.select(1, 1, 'alabama')
 ---
  - 'item 1': {'alabama', 1735290739}
 ...
@@ -41,17 +41,17 @@ insert into t1 values ('item 3', 'california', 'uber alles')
 Insert OK, 1 row affected
 insert into t1 values ('item 4', 'georgia', 'on my mind')
 Insert OK, 1 row affected
-lua iter, tuple = box.space[1].index[1]:next('california')
+iter, tuple = box.space[1].index[1]:next('california')
 ---
 ...
-lua tuple
+tuple
 ---
  - 'item 2': {'california', 'dreaming '}
 ...
-lua iter, tuple = box.space[1].index[1]:next(iter)
+iter, tuple = box.space[1].index[1]:next(iter)
 ---
 ...
-lua tuple
+tuple
 ---
  - 'item 3': {'california', 'uber alles'}
 ...
@@ -81,126 +81,126 @@ call box.select_reverse_range(5, 1, 2, 'of')
 Found 2 tuples:
 ['00000000', 'of', 'puppets']
 ['00000001', 'of', 'might', 'and', 'magic']
-lua box.space[5]:truncate()
+box.space[5]:truncate()
 ---
 ...
-lua box.insert('8', tonumber64('18446744073709551615'), 'magic')
+box.insert('8', tonumber64('18446744073709551615'), 'magic')
 ---
  - 18446744073709551615: {'magic'}
 ...
-lua tu = box.select('8', '0', tonumber64('18446744073709551615'))
+tu = box.select('8', '0', tonumber64('18446744073709551615'))
 ---
 ...
-lua num = box.unpack('l', tu[0])
+num = box.unpack('l', tu[0])
 ---
 ...
-lua print(num)
+print(num)
 ---
 18446744073709551615
 ...
-lua type(num) == 'cdata'
+type(num) == 'cdata'
 ---
  - true
 ...
-lua num == tonumber64('18446744073709551615')
+num == tonumber64('18446744073709551615')
 ---
  - true
 ...
-lua num = box.unpack('l', tu[0])
+num = box.unpack('l', tu[0])
 ---
 ...
-lua num == tonumber64('18446744073709551615')
+num == tonumber64('18446744073709551615')
 ---
  - true
 ...
-lua box.delete(8, 18446744073709551615ULL)
+box.delete(8, 18446744073709551615ULL)
 ---
  - 18446744073709551615: {'magic'}
 ...
-lua box.insert('8', 125ULL, 'magic')
+box.insert('8', 125ULL, 'magic')
 ---
  - 125: {'magic'}
 ...
-lua tu = box.select('8', '0', 125)
+tu = box.select('8', '0', 125)
 ---
 ...
-lua tu2 = box.select('8', '0', 125LL)
+tu2 = box.select('8', '0', 125LL)
 ---
 ...
-lua num = box.unpack('l', tu[0])
+num = box.unpack('l', tu[0])
 ---
 ...
-lua num2 = box.unpack('l', tu2[0])
+num2 = box.unpack('l', tu2[0])
 ---
 ...
-lua print(num)
----
-125
-...
-lua print(num2)
+print(num)
 ---
 125
 ...
-lua type(num) == 'cdata'
+print(num2)
+---
+125
+...
+type(num) == 'cdata'
 ---
  - true
 ...
-lua type(num2) == 'cdata'
+type(num2) == 'cdata'
 ---
  - true
 ...
-lua num == tonumber64('125')
+num == tonumber64('125')
 ---
  - true
 ...
-lua num2 == tonumber64('125')
+num2 == tonumber64('125')
 ---
  - true
 ...
-lua box.space[8]:truncate()
+box.space[8]:truncate()
 ---
 ...
-lua box.insert(14, 0, 0)
+box.insert(14, 0, 0)
 ---
  - 0: {0}
 ...
-lua box.insert(14, 1, 0)
+box.insert(14, 1, 0)
 ---
  - 1: {0}
 ...
-lua box.insert(14, 2, 0)
+box.insert(14, 2, 0)
 ---
  - 2: {0}
 ...
-lua box.insert(14, 3, 0)
+box.insert(14, 3, 0)
 ---
  - 3: {0}
 ...
-lua box.insert(14, 4, 0)
+box.insert(14, 4, 0)
 ---
  - 4: {0}
 ...
-lua box.insert(14, 5, 0)
+box.insert(14, 5, 0)
 ---
  - 5: {0}
 ...
-lua box.insert(14, 6, 0)
+box.insert(14, 6, 0)
 ---
  - 6: {0}
 ...
-lua box.insert(14, 7, 0)
+box.insert(14, 7, 0)
 ---
  - 7: {0}
 ...
-lua box.insert(14, 8, 0)
+box.insert(14, 8, 0)
 ---
  - 8: {0}
 ...
-lua box.insert(14, 9, 0)
+box.insert(14, 9, 0)
 ---
  - 9: {0}
 ...
-lua box.select_range(14, 1, 10)
+box.select_range(14, 1, 10)
 ---
  - 0: {0}
  - 1: {0}
@@ -213,7 +213,7 @@ lua box.select_range(14, 1, 10)
  - 8: {0}
  - 9: {0}
 ...
-lua box.select_reverse_range(14, 1, 10)
+box.select_reverse_range(14, 1, 10)
 ---
  - 9: {0}
  - 8: {0}
@@ -226,14 +226,14 @@ lua box.select_reverse_range(14, 1, 10)
  - 1: {0}
  - 0: {0}
 ...
-lua box.select_reverse_range(14, 1, 4)
+box.select_reverse_range(14, 1, 4)
 ---
  - 9: {0}
  - 8: {0}
  - 7: {0}
  - 6: {0}
 ...
-lua box.space[14]:truncate()
+box.space[14]:truncate()
 ---
 ...
 
@@ -241,31 +241,31 @@ lua box.space[14]:truncate()
 # Tests for box.index iterators
 #
 
-lua box.insert(16, 'pid_1', 'sid_1', 'tid_999')
+box.insert(16, 'pid_1', 'sid_1', 'tid_999')
 ---
  - 'pid_1': {'sid_1', 'tid_999'}
 ...
-lua box.insert(16, 'pid_2', 'sid_1', 'tid_998')
+box.insert(16, 'pid_2', 'sid_1', 'tid_998')
 ---
  - 'pid_2': {'sid_1', 'tid_998'}
 ...
-lua box.insert(16, 'pid_3', 'sid_1', 'tid_997')
+box.insert(16, 'pid_3', 'sid_1', 'tid_997')
 ---
  - 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua box.insert(16, 'pid_4', 'sid_2', 'tid_996')
+box.insert(16, 'pid_4', 'sid_2', 'tid_996')
 ---
  - 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua box.insert(16, 'pid_5', 'sid_2', 'tid_995')
+box.insert(16, 'pid_5', 'sid_2', 'tid_995')
 ---
  - 'pid_5': {'sid_2', 'tid_995'}
 ...
-lua box.insert(16, 'pid_6', 'sid_2', 'tid_994')
+box.insert(16, 'pid_6', 'sid_2', 'tid_994')
 ---
  - 'pid_6': {'sid_2', 'tid_994'}
 ...
-lua for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do print(v) end
+for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
@@ -274,7 +274,7 @@ lua for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do 
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do print(v) end
+for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do print(v) end
 ---
 'pid_4': {'sid_2', 'tid_996'}
 'pid_5': {'sid_2', 'tid_995'}
@@ -283,271 +283,271 @@ lua for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do 
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(v) end
+for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(v) end
 ---
 'pid_3': {'sid_1', 'tid_997'}
 'pid_2': {'sid_1', 'tid_998'}
 'pid_1': {'sid_1', 'tid_999'}
 ...
-lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(v) end
+for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(v) end
 ---
 'pid_1': {'sid_1', 'tid_999'}
 'pid_2': {'sid_1', 'tid_998'}
 'pid_3': {'sid_1', 'tid_997'}
 ...
-lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(v) end
+for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(v) end
 ---
 'pid_6': {'sid_2', 'tid_994'}
 'pid_5': {'sid_2', 'tid_995'}
 'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(v) end
+for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(v) end
 ---
 'pid_4': {'sid_2', 'tid_996'}
 'pid_5': {'sid_2', 'tid_995'}
 'pid_6': {'sid_2', 'tid_994'}
 ...
-lua box.space[16]:truncate()
+box.space[16]:truncate()
 ---
 ...
-lua box.insert(17, 1, 1, 1)
+box.insert(17, 1, 1, 1)
 ---
  - 1: {1, 1}
 ...
-lua box.insert(17, 2, 2, 0)
+box.insert(17, 2, 2, 0)
 ---
  - 2: {2, 0}
 ...
-lua box.insert(17, 3, 2, 1)
+box.insert(17, 3, 2, 1)
 ---
  - 3: {2, 1}
 ...
-lua box.insert(17, 4, 3, 0)
+box.insert(17, 4, 3, 0)
 ---
  - 4: {3, 0}
 ...
-lua box.insert(17, 5, 3, 1)
+box.insert(17, 5, 3, 1)
 ---
  - 5: {3, 1}
 ...
-lua box.insert(17, 6, 3, 2)
+box.insert(17, 6, 3, 2)
 ---
  - 6: {3, 2}
 ...
-lua box.space[17].index[1]:count(1)
+box.space[17].index[1]:count(1)
 ---
  - 1
 ...
-lua box.space[17].index[1]:count(2)
+box.space[17].index[1]:count(2)
 ---
  - 2
 ...
-lua box.space[17].index[1]:count(2, 1)
+box.space[17].index[1]:count(2, 1)
 ---
  - 1
 ...
-lua box.space[17].index[1]:count(2, 2)
+box.space[17].index[1]:count(2, 2)
 ---
  - 0
 ...
-lua box.space[17].index[1]:count(3)
+box.space[17].index[1]:count(3)
 ---
  - 3
 ...
-lua box.space[17].index[1]:count(3, 3)
+box.space[17].index[1]:count(3, 3)
 ---
  - 0
 ...
-lua box.space[17].index[1]:count()
+box.space[17].index[1]:count()
 ---
 error: 'index.count(): one or more arguments expected'
 ...
-lua box.space[17]:truncate()
+box.space[17]:truncate()
 ---
 ...
-lua box.space[18]:truncate()
+box.space[18]:truncate()
 ---
 ...
-lua box.auto_increment(18, 'a')
----
- - 1: {'a'}
-...
-lua box.insert(18, 5)
----
- - 5: {}
-...
-lua box.auto_increment(18, 'b')
----
- - 6: {'b'}
-...
-lua box.auto_increment(18, 'c')
----
- - 7: {'c'}
-...
-lua box.space[18]:truncate()
----
-...
-lua box.space[25]:truncate()
----
-...
-lua box.auto_increment(25, 'a')
+box.auto_increment(18, 'a')
 ---
  - 1: {'a'}
 ...
-lua box.insert(25, tonumber64(5))
+box.insert(18, 5)
 ---
  - 5: {}
 ...
-lua box.auto_increment(25, 'b')
+box.auto_increment(18, 'b')
 ---
  - 6: {'b'}
 ...
-lua box.auto_increment(25, 'c')
+box.auto_increment(18, 'c')
 ---
  - 7: {'c'}
 ...
-lua box.space[25]:truncate()
+box.space[18]:truncate()
 ---
 ...
-lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')
+box.space[25]:truncate()
 ---
 ...
-lua t:transform(7, 0, '8', '9', '100')
+box.auto_increment(25, 'a')
+---
+ - 1: {'a'}
+...
+box.insert(25, tonumber64(5))
+---
+ - 5: {}
+...
+box.auto_increment(25, 'b')
+---
+ - 6: {'b'}
+...
+box.auto_increment(25, 'c')
+---
+ - 7: {'c'}
+...
+box.space[25]:truncate()
+---
+...
+t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')
+---
+...
+t:transform(7, 0, '8', '9', '100')
 ---
  - '1': {'2', '3', '4', '5', '6', '7', '8', '9', '100'}
 ...
-lua t:transform(0, 1)
+t:transform(0, 1)
 ---
  - '2': {'3', '4', '5', '6', '7'}
 ...
-lua t:transform(1, 4)
+t:transform(1, 4)
 ---
  - '1': {'6', '7'}
 ...
-lua t:transform(-1, 1)
+t:transform(-1, 1)
 ---
  - '1': {'2', '3', '4', '5', '6'}
 ...
-lua t:transform(-3, 2)
+t:transform(-3, 2)
 ---
  - '1': {'2', '3', '4', '7'}
 ...
-lua t:transform(0, 0, 'A')
+t:transform(0, 0, 'A')
 ---
  - 'A': {'1', '2', '3', '4', '5', '6', '7'}
 ...
-lua t:transform(-1, 0, 'A')
+t:transform(-1, 0, 'A')
 ---
  - '1': {'2', '3', '4', '5', '6', 'A', '7'}
 ...
-lua t:transform(0, 1, 'A')
+t:transform(0, 1, 'A')
 ---
  - 'A': {'2', '3', '4', '5', '6', '7'}
 ...
-lua t:transform(-1, 1, 'B')
+t:transform(-1, 1, 'B')
 ---
  - '1': {'2', '3', '4', '5', '6', 'B'}
 ...
-lua t:transform(0, 2, 'C')
+t:transform(0, 2, 'C')
 ---
  - 'C': {'3', '4', '5', '6', '7'}
 ...
-lua t:transform(2, 0, 'hello')
+t:transform(2, 0, 'hello')
 ---
  - '1': {'2', 'hello', '3', '4', '5', '6', '7'}
 ...
-lua t:transform(0, -1, 'C')
+t:transform(0, -1, 'C')
 ---
 error: 'tuple.transform(): len is negative'
 ...
-lua t:transform(0, 100)
+t:transform(0, 100)
 ---
  - '': {}
 ...
-lua t:transform(-100, 1)
+t:transform(-100, 1)
 ---
 error: 'tuple.transform(): offset is out of bound'
 ...
-lua t:transform(0, 3, 1, 2, 3)
+t:transform(0, 3, 1, 2, 3)
 ---
  - 1: {2, 3, '4', '5', '6', '7'}
 ...
-lua t:transform(3, 1, tonumber64(4))
+t:transform(3, 1, tonumber64(4))
 ---
  - '1': {'2', '3', 4, '5', '6', '7'}
 ...
-lua t:transform(0, 1, {})
+t:transform(0, 1, {})
 ---
 error: 'tuple.transform(): unsupported field type ''table'''
 ...
-lua t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')
+t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')
 ---
 ...
-lua t:find('2')
+t:find('2')
 ---
  - 1
 ...
-lua t:find('4')
+t:find('4')
 ---
  - 3
 ...
-lua t:find('5')
+t:find('5')
 ---
  - 6
 ...
-lua t:find('A')
+t:find('A')
 ---
  - 0
 ...
-lua t:find('0')
+t:find('0')
 ---
 ...
-lua t:findall('A')
+t:findall('A')
 ---
  - 0
 ...
-lua t:findall('2')
+t:findall('2')
 ---
  - 1
  - 5
 ...
-lua t:findall('3')
+t:findall('3')
 ---
  - 2
  - 4
  - 8
 ...
-lua t:findall('0')
+t:findall('0')
 ---
 ...
-lua t:find(2, '2')
+t:find(2, '2')
 ---
  - 5
 ...
-lua t:find(89, '2')
+t:find(89, '2')
 ---
 ...
-lua t:findall(4, '3')
+t:findall(4, '3')
 ---
  - 4
  - 8
 ...
-lua t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))
+t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))
 ---
 ...
-lua t:find(2)
+t:find(2)
 ---
  - 2
 ...
-lua t:find(tonumber64(2))
+t:find(tonumber64(2))
 ---
  - 4
 ...
-lua t:find('2')
+t:find('2')
 ---
  - 1
 ...
-lua box.space[12]:truncate()
+box.space[12]:truncate()
 ---
 ...
 #
@@ -555,71 +555,71 @@ lua box.space[12]:truncate()
 # transform returns wrong tuple and put broken reply into socket
 # https://bugs.launchpad.net/tarantool/+bug/1038784
 #
-lua dofile('push.lua')
+dofile('push.lua')
 ---
 ...
-lua push_collection(0, 1038784, 'hello')
+push_collection(0, 1038784, 'hello')
 ---
  - 1038784: {'hello'}
 ...
-lua push_collection(0, 1038784, 'hello')
+push_collection(0, 1038784, 'hello')
 ---
  - 1038784: {}
 ...
-lua push_collection(0, 1038784, 'hello')
+push_collection(0, 1038784, 'hello')
 ---
  - 1038784: {}
 ...
-lua push_collection(1, 1038784, 'hi')
+push_collection(1, 1038784, 'hi')
 ---
  - 1038784: {26984}
 ...
-lua push_collection(2, 1038784, 'hi')
+push_collection(2, 1038784, 'hi')
 ---
  - 1038784: {26984, 26984}
 ...
-lua push_collection(2, 1038784, 'hi')
+push_collection(2, 1038784, 'hi')
 ---
  - 1038784: {26984, 26984}
 ...
-lua push_collection(5, 1038784, 'hey')
+push_collection(5, 1038784, 'hey')
 ---
  - 1038784: {26984, 26984, 'hey'}
 ...
-lua push_collection(5, 1038784, 'hey')
+push_collection(5, 1038784, 'hey')
 ---
  - 1038784: {26984, 26984, 'hey', 'hey'}
 ...
-lua push_collection(5, 1038784, 'hey')
+push_collection(5, 1038784, 'hey')
 ---
  - 1038784: {26984, 26984, 'hey', 'hey', 'hey'}
 ...
-lua push_collection(5, 1038784, 'hey')
+push_collection(5, 1038784, 'hey')
 ---
  - 1038784: {26984, 'hey', 'hey', 'hey', 'hey'}
 ...
 # A test case for Bug#1060967: truncation of 64-bit numbers
-lua box.space[5]:insert(2^51, 'hello', 'world')
+box.space[5]:insert(2^51, 'hello', 'world')
 ---
  - 2251799813685248: {'hello', 'world'}
 ...
-lua box.space[5]:select(0, 2^51)
+box.space[5]:select(0, 2^51)
 ---
  - 2251799813685248: {'hello', 'world'}
 ...
-lua box.space[5]:truncate()
+box.space[5]:truncate()
 ---
 ...
 # Test that we print index number in error ER_INDEX_VIOLATION
-lua box.space[1]:insert(1, 'hello', 'world')
+box.space[1]:insert(1, 'hello', 'world')
 ---
  - 1: {'hello', 'world'}
 ...
-lua box.space[1]:insert(2, 'hello', 'world')
+box.space[1]:insert(2, 'hello', 'world')
 ---
 error: 'Duplicate key exists in unique index 1'
 ...
-lua box.space[1]:truncate()
+box.space[1]:truncate()
 ---
 ...
 #
@@ -627,33 +627,33 @@ lua box.space[1]:truncate()
 # Truncate hangs when primary key is not in linear or starts at the first field
 # https://bugs.launchpad.net/tarantool/+bug/1042798
 #
-lua for k, f in pairs(box.space[23].index[0].key_field) do print(k, ' => ', f.fieldno) end
+for k, f in pairs(box.space[23].index[0].key_field) do print(k, ' => ', f.fieldno) end
 ---
 0 => 2
 1 => 1
 ...
-lua box.insert(23, 1, 2, 3, 4)
+box.insert(23, 1, 2, 3, 4)
 ---
  - 1: {2, 3, 4}
 ...
-lua box.insert(23, 10, 20, 30, 40)
+box.insert(23, 10, 20, 30, 40)
 ---
  - 10: {20, 30, 40}
 ...
-lua box.insert(23, 20, 30, 40, 50)
+box.insert(23, 20, 30, 40, 50)
 ---
  - 20: {30, 40, 50}
 ...
-lua for _k, v in box.space[23]:pairs() do print(v) end
+for _k, v in box.space[23]:pairs() do print(v) end
 ---
 1: {2, 3, 4}
 10: {20, 30, 40}
 20: {30, 40, 50}
 ...
-lua box.space[23]:truncate()
+box.space[23]:truncate()
 ---
 ...
-lua for _k, v in box.space[23]:pairs() do print(v) end
+for _k, v in box.space[23]:pairs() do print(v) end
 ---
 ...
 
@@ -661,7 +661,7 @@ lua for _k, v in box.space[23]:pairs() do print(v) end
 # TreeIndex::random()
 #-----------------------------------------------------------------------------#
 
-lua index_random_test(26, 0)
+index_random_test(26, 0)
 ---
 all values have been found
  - true
@@ -671,7 +671,7 @@ all values have been found
 # HashIndex::random()
 #-----------------------------------------------------------------------------#
 
-lua index_random_test(26, 1)
+index_random_test(26, 1)
 ---
 all values have been found
  - true
@@ -684,7 +684,7 @@ all values have been found
 # Test for correct little-endian comparison of integer fields.
 # (unsigned)
 #
-lua for i = 1, 300 do box.insert(2, i, i) print(box.space[2].index[0]:max()) end
+for i = 1, 300 do box.insert(2, i, i) print(box.space[2].index[0]:max()) end
 ---
 1: {1}
 2: {2}
@@ -987,7 +987,7 @@ lua for i = 1, 300 do box.insert(2, i, i) print(box.space[2].index[0]:max()) end
 299: {299}
 300: {300}
 ...
-lua box.space[2]:select_range(0, 300)
+box.space[2]:select_range(0, 300)
 ---
  - 1: {1}
  - 2: {2}
@@ -1290,6 +1290,6 @@ lua box.space[2]:select_range(0, 300)
  - 299: {299}
  - 300: {300}
 ...
-lua box.space[2]:truncate()
+box.space[2]:truncate()
 ---
 ...

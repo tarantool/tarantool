@@ -4,10 +4,10 @@ print """
 # box.raise
 #
 """
-admin("lua 1 + 1")
-admin("lua box.raise(123, 'test')")
-admin("lua box.raise(0, 'the other test')")
-admin("lua box.raise(12, 345)")
+admin("1 + 1")
+admin("box.raise(123, 'test')")
+admin("box.raise(0, 'the other test')")
+admin("box.raise(12, 345)")
 
 print """
 #
@@ -15,9 +15,9 @@ print """
 #
 """
 
-admin("lua for k, v in pairs(box.stat()) do print(k) end")
-admin("lua for k, v in pairs(box.stat().DELETE) do print(k) end")
-admin("lua for k, v in pairs(box.stat.DELETE) do print(k) end")
+admin("for k, v in pairs(box.stat()) do print(k) end")
+admin("for k, v in pairs(box.stat().DELETE) do print(k) end")
+admin("for k, v in pairs(box.stat.DELETE) do print(k) end")
 
 print """
 #
@@ -25,10 +25,10 @@ print """
 #
 """
 
-admin("lua type(box)")
-admin("lua type(box.space)")
-admin("lua box.cfg.memcached_space")
-admin("lua for i, v in pairs(box.space[0].index[0].key_field[0]) do print(i, ': ', v) end")
+admin("type(box)")
+admin("type(box.space)")
+admin("box.cfg.memcached_space")
+admin("for i, v in pairs(box.space[0].index[0].key_field[0]) do print(i, ': ', v) end")
 
 print """
 #
@@ -36,15 +36,15 @@ print """
 #
 """
 
-admin("lua string.match(tostring(box.slab), '^table:') ~= nil")
-admin("lua box.slab.arena_used >= 0")
-admin("lua box.slab.arena_size > 0")
-admin("lua string.match(tostring(box.slab.slabs), '^table:') ~= nil")
-admin("lua for k, v in pairs(box.slab()) do print(k) end")
+admin("string.match(tostring(box.slab), '^table:') ~= nil")
+admin("box.slab.arena_used >= 0")
+admin("box.slab.arena_size > 0")
+admin("string.match(tostring(box.slab.slabs), '^table:') ~= nil")
+admin("for k, v in pairs(box.slab()) do print(k) end")
 
 print """
 #
 # box.error
 #
 """
-admin("lua for k,v in pairs(box.error) do print('box.error.', k, ': ', v) end")
+admin("for k,v in pairs(box.error) do print('box.error.', k, ': ', v) end")

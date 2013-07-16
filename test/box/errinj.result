@@ -55,7 +55,7 @@ set injection ERRINJ_WAL_IO off
 ---
 ok
 ...
-lua box.space[0]:truncate()
+box.space[0]:truncate()
 ---
 ...
 set injection ERRINJ_WAL_ROTATE on
@@ -98,7 +98,7 @@ set injection ERRINJ_WAL_ROTATE on
 ---
 ok
 ...
-lua box.space[0]:truncate()
+box.space[0]:truncate()
 ---
 error: 'Failed to write to disk'
 ...
@@ -106,6 +106,6 @@ set injection ERRINJ_WAL_ROTATE off
 ---
 ok
 ...
-lua box.space[0]:truncate()
+box.space[0]:truncate()
 ---
 ...

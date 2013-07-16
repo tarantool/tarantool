@@ -18,7 +18,6 @@ import string
 import traceback
 
 class FilteredStream:
-
     """Helper class to filter .result file output"""
     def __init__(self, filename):
         self.stream = open(filename, "w+")
@@ -96,7 +95,6 @@ class Test:
 
     def passed(self):
         """Return true if this test was run successfully."""
-
         return self.is_executed and self.is_executed_ok and self.is_equal_result
 
     def run(self, server):
@@ -106,11 +104,28 @@ class Test:
         If there is a difference, print it to stdout and raise an
         exception. The exception is raised only if is_force flag is
         not set."""
-
-
         diagnostics = "unknown"
-        builddir = self.args.builddir
-        self.execute(server)
+        save_stdout = sys.stdout
+        try:
+            self.skip = 0
+            if os.path.exists(self.skip_cond):
+                sys.stdout = FilteredStream(self.tmp_result)
+                stdout_fileno = sys.stdout.stream.fileno()
+                execfile(self.skip_cond, dict(locals(), **server.__dict__))
+                sys.stdout.close()
+                sys.stdout = save_stdout
+            if not self.skip:
+                sys.stdout = FilteredStream(self.tmp_result)
+                stdout_fileno = sys.stdout.stream.fileno()
+                self.execute(server)
+            self.is_executed_ok = True
+        except Exception as e:
+            traceback.print_exc(e)
+            diagnostics = str(e)
+        finally:
+            if sys.stdout and sys.stdout != save_stdout:
+                sys.stdout.close()
+            sys.stdout = save_stdout;
         self.is_executed = True
 
         if not self.skip:
