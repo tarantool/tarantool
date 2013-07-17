@@ -40,7 +40,7 @@ SPTREE_DEF(index, realloc);
 
 class TreeIndex: public Index {
 public:
-	TreeIndex(struct key_def *key_def, struct space *space);
+	TreeIndex(struct key_def *key_def);
 	virtual ~TreeIndex();
 
 	virtual void beginBuild();

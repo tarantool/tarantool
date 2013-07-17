@@ -33,7 +33,6 @@
 #include "tuple.h"
 #include "say.h"
 #include "exception.h"
-#include "space.h"
 
 STRS(iterator_type, ITERATOR_TYPE);
 
@@ -100,52 +99,20 @@ primary_key_validate(struct key_def *key_def, const char *key,
 	key_validate_parts(key_def, key, part_count);
 }
 
-/**
- * Check if replacement of an old tuple with a new one is
- * allowed.
- */
-uint32_t
-Index::replace_check_dup(struct tuple *old_tuple,
-		  struct tuple *dup_tuple,
-		  enum dup_replace_mode mode)
-{
-	if (dup_tuple == NULL) {
-		if (mode == DUP_REPLACE) {
-			/*
-			 * dup_replace_mode is DUP_REPLACE, and
-			 * a tuple with the same key is not found.
-			 */
-			return ER_TUPLE_NOT_FOUND;
-		}
-	} else { /* dup_tuple != NULL */
-		if (dup_tuple != old_tuple &&
-		    (old_tuple != NULL || mode == DUP_INSERT)) {
-			/*
-			 * There is a duplicate of new_tuple,
-			 * and it's not old_tuple: we can't
-			 * possibly delete more than one tuple
-			 * at once.
-			 */
-			return ER_TUPLE_FOUND;
-		}
-	}
-	return 0;
-}
-
 /* }}} */
 
 /* {{{ Index -- base class for all indexes. ********************/
 
 Index *
-Index::factory(enum index_type type, struct key_def *key_def, struct space *space)
+Index::factory(struct key_def *key_def)
 {
-	switch (type) {
+	switch (key_def->type) {
 	case HASH:
-		return new HashIndex(key_def, space);
+		return new HashIndex(key_def);
 	case TREE:
-		return new TreeIndex(key_def, space);
+		return new TreeIndex(key_def);
 	case BITSET:
-		return new BitsetIndex(key_def, space);
+		return new BitsetIndex(key_def);
 	default:
 		assert(false);
 	}
@@ -153,10 +120,9 @@ Index::factory(enum index_type type, struct key_def *key_def, struct space *spac
 	return NULL;
 }
 
-Index::Index(struct key_def *key_def, struct space *space)
+Index::Index(struct key_def *key_def)
 {
 	this->key_def = key_def;
-	this->space = space;
 	m_position = NULL;
 }
 

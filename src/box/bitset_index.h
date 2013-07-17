@@ -43,7 +43,7 @@ struct bitset_expr;
 
 class BitsetIndex: public Index {
 public:
-	BitsetIndex(struct key_def *key_def, struct space *space);
+	BitsetIndex(struct key_def *key_def);
 	virtual ~BitsetIndex();
 
 	virtual void beginBuild();

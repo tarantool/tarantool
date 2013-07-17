@@ -62,6 +62,7 @@ struct key_part {
 
 /* Descriptor of a multipart key. */
 struct key_def {
+	uint32_t id;
 	/* Description of parts of a multipart index. */
 	struct key_part *parts;
 	/*
@@ -88,7 +89,7 @@ struct key_def {
 struct tarantool_cfg_space_index;
 
 void
-key_def_create(struct key_def *def,
+key_def_create(struct key_def *def, uint32_t id,
 	       struct tarantool_cfg_space_index *cfg_index);
 
 void

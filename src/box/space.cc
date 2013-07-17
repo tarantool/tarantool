@@ -70,7 +70,7 @@ space_create(struct space *space, uint32_t space_no,
 	/* fill space indexes */
 	for (uint32_t j = 0; j < key_count; ++j) {
 		struct key_def *key_def = &space->key_defs[j];
-		Index *index = Index::factory(key_def->type, key_def, space);
+		Index *index = Index::factory(key_def);
 		if (index == NULL) {
 			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
 				  "class Index", "malloc");
@@ -253,7 +253,7 @@ space_config()
 
 		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
 			auto cfg_index = cfg_space->index[j];
-			key_def_create(&key_defs[j], cfg_index);
+			key_def_create(&key_defs[j], j, cfg_index);
 		}
 		(void) space_new(i, key_defs, key_count, arity);
 

@@ -37,8 +37,10 @@ const char *field_type_strs[] = {"UNKNOWN", "NUM", "NUM64", "STR", "\0"};
 STRS(index_type, INDEX_TYPE);
 
 void
-key_def_create(struct key_def *def, struct tarantool_cfg_space_index *cfg_index)
+key_def_create(struct key_def *def, uint32_t id,
+	       struct tarantool_cfg_space_index *cfg_index)
 {
+	def->id = id;
 	def->max_fieldno = 0;
 	def->part_count = 0;
 

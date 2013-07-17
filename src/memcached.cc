@@ -506,6 +506,7 @@ memcached_space_init()
 
 	/* Configure memcached index key. */
 	struct key_def *key_def = (struct key_def *) malloc(sizeof(struct key_def));
+	key_def->id = 0;
 	key_def->part_count = 1;
 	key_def->is_unique = true;
 	key_def->type = HASH;

@@ -33,7 +33,6 @@
 
 #include "salloc.h"
 #include "tuple.h"
-#include "space.h"
 #include "exception.h"
 #include "pickle.h"
 #include <lib/bitset/index.h>
@@ -86,8 +85,8 @@ bitset_index_iterator_next(struct iterator *iterator)
 	return value_to_tuple(value);
 }
 
-BitsetIndex::BitsetIndex(struct key_def *key_def, struct space *space)
-	: Index(key_def, space)
+BitsetIndex::BitsetIndex(struct key_def *key_def)
+	: Index(key_def)
 {
 	assert(!key_def->is_unique);
 

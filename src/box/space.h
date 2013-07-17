@@ -200,32 +200,10 @@ space_find(uint32_t space_no)
 	tnt_raise(ClientError, ER_NO_SUCH_SPACE, space_no);
 }
 
-/** Get key_def ordinal number. */
-static inline uint32_t
-key_def_n(struct space *sp, struct key_def *kp)
-{
-	assert(kp >= sp->key_defs && kp < (sp->key_defs + sp->key_count));
-	return kp - sp->key_defs;
-}
-
 struct space *
 space_new(uint32_t space_no, struct key_def *key_defs,
 	  uint32_t key_count, uint32_t arity);
 
-
-/** Get index ordinal number in space. */
-static inline uint32_t
-index_n(Index *index)
-{
-	return key_def_n(index->space, index->key_def);
-}
-
-/** Check whether or not an index is primary in space.  */
-static inline bool
-index_is_primary(Index *index)
-{
-	return index_n(index) == 0;
-}
 
 void space_init(void);
 void space_free(void);

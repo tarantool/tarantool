@@ -207,8 +207,8 @@ tree_iterator_gt(struct iterator *iterator)
 
 /* {{{ TreeIndex  **********************************************************/
 
-TreeIndex::TreeIndex(struct key_def *key_def, struct space *space)
-	: Index(key_def, space)
+TreeIndex::TreeIndex(struct key_def *key_def)
+	: Index(key_def)
 {
 	memset(&tree, 0, sizeof tree);
 }
@@ -279,7 +279,7 @@ TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			sptree_index_delete(&tree, &new_node);
 			if (p_dup_node != NULL)
 				sptree_index_replace(&tree, p_dup_node, NULL);
-			tnt_raise(ClientError, errcode, index_n(this));
+			tnt_raise(ClientError, errcode, index_id(this));
 		}
 		if (dup_tuple)
 			return dup_tuple;
@@ -440,8 +440,8 @@ TreeIndex::build(Index *pk)
 	}
 
 	if (n_tuples) {
-		say_info("Sorting %" PRIu32 " keys in index %" PRIu32 "...", n_tuples,
-			 index_n(this));
+		say_info("Sorting %" PRIu32 " keys in index %" PRIu32 "...",
+			 n_tuples, index_id(this));
 	}
 
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */

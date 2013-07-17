@@ -12,7 +12,7 @@ box.space[box.cfg.memcached_space].n
 ...
 box.space[box.cfg.memcached_space].index[0].idx
 ---
- - index 0 in space 2
+ - index 0
 ...
 box.space[box.cfg.memcached_space].index[0].type
 ---

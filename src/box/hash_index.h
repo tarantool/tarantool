@@ -35,7 +35,7 @@ struct mh_index_t;
 
 class HashIndex: public Index {
 public:
-	HashIndex(struct key_def *key_def, struct space *space);
+	HashIndex(struct key_def *key_def);
 	~HashIndex();
 
 	virtual void beginBuild();

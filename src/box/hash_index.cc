@@ -31,7 +31,6 @@
 #include "tuple.h"
 #include "pickle.h"
 #include "exception.h"
-#include "space.h"
 #include "errinj.h"
 
 #include "third_party/PMurHash.h"
@@ -173,8 +172,8 @@ hash_iterator_eq(struct iterator *it)
 
 /* {{{ HashIndex -- base class for all hashes. ********************/
 
-HashIndex::HashIndex(struct key_def *key_def, struct space *space)
-	: Index(key_def, space)
+HashIndex::HashIndex(struct key_def *key_def)
+	: Index(key_def)
 {
 	hash = mh_index_new();
 	if (hash == NULL) {
@@ -215,7 +214,7 @@ HashIndex::build(Index *pk)
 	reserve(n_tuples);
 
 	say_info("Adding %" PRIu32 " keys to HASH index %"
-		 PRIu32 "...", n_tuples, index_n(this));
+		 PRIu32 "...", n_tuples, index_id(this));
 
 	struct iterator *it = pk->position();
 	struct tuple *tuple;
@@ -308,7 +307,7 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 					      "recover of int hash");
 				}
 			}
-			tnt_raise(ClientError, errcode, index_n(this));
+			tnt_raise(ClientError, errcode, index_id(this));
 		}
 
 		if (dup_tuple)
