@@ -64,12 +64,11 @@ space_create(struct space *space, uint32_t space_no,
 	memset(space, 0, sizeof(struct space));
 	space->no = space_no;
 	space->arity = arity;
-	space->key_defs = key_defs;
 	space->key_count = key_count;
 	space->format = tuple_format_new(key_defs, key_count);
 	/* fill space indexes */
 	for (uint32_t j = 0; j < key_count; ++j) {
-		struct key_def *key_def = &space->key_defs[j];
+		struct key_def *key_def = &key_defs[j];
 		Index *index = Index::factory(key_def);
 		if (index == NULL) {
 			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
@@ -85,9 +84,7 @@ space_destroy(struct space *space)
 	for (uint32_t j = 0 ; j < space->key_count; j++) {
 		Index *index = space->index[j];
 		delete index;
-		key_def_destroy(&space->key_defs[j]);
 	}
-	free(space->key_defs);
 }
 
 struct space *
@@ -168,7 +165,7 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 	try {
 		/* Update the primary key */
 		Index *pk = sp->index[0];
-		assert(pk->key_def->is_unique);
+		assert(pk->key_def.is_unique);
 		/*
 		 * If old_tuple is not NULL, the index
 		 * has to find and delete it, or raise an
@@ -256,6 +253,7 @@ space_config()
 			key_def_create(&key_defs[j], j, cfg_index);
 		}
 		(void) space_new(i, key_defs, key_count, arity);
+		free(key_defs);
 
 		say_info("space %i successfully configured", i);
 	}

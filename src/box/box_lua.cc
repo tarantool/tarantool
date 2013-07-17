@@ -647,7 +647,7 @@ lbox_pushiterator(struct lua_State *L, Index *index,
 		memcpy(udata->key, key, size);
 		key = udata->key;
 	}
-	key_validate(index->key_def, type, key, part_count);
+	key_validate(&index->key_def, type, key, part_count);
 	index->initIterator(it, type, key, part_count);
 }
 
@@ -706,7 +706,7 @@ static int
 lbox_index_part_count(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	lua_pushinteger(L, index->key_def->part_count);
+	lua_pushinteger(L, index->key_def.part_count);
 	return 1;
 }
 
@@ -811,10 +811,10 @@ lbox_create_iterator(struct lua_State *L)
 		 * indexes. HASH indexes can only use single-part
 		 * keys.
 		*/
-		if (key_part_count > index->key_def->part_count)
+		if (key_part_count > index->key_def.part_count)
 			luaL_error(L, "Key part count %d"
 				   " is greater than index part count %d",
-				   key_part_count, index->key_def->part_count);
+				   key_part_count, index->key_def.part_count);
 		luaL_pushresult(&b);
 		key = lua_tolstring(L, -1, &key_size);
 		if (key_size == 0)
@@ -924,7 +924,7 @@ lbox_index_count(struct lua_State *L)
 	const char *key = lua_tostring(L, -1);
 	uint32_t count = 0;
 
-	key_validate(index->key_def, ITER_EQ, key, key_part_count);
+	key_validate(&index->key_def, ITER_EQ, key, key_part_count);
 	/* Prepare index iterator */
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_EQ, key, key_part_count);

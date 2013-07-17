@@ -227,7 +227,7 @@ HashIndex::build(Index *pk)
 void
 HashIndex::reserve(uint32_t n_tuples)
 {
-	mh_index_reserve(hash, n_tuples, key_def);
+	mh_index_reserve(hash, n_tuples, &key_def);
 }
 
 size_t
@@ -263,11 +263,11 @@ HashIndex::random(uint32_t rnd) const
 struct tuple *
 HashIndex::findByKey(const char *key, uint32_t part_count) const
 {
-	assert(key_def->is_unique && part_count == key_def->part_count);
+	assert(key_def.is_unique && part_count == key_def.part_count);
 	(void) part_count;
 
 	struct tuple *ret = NULL;
-	uint32_t k = mh_index_find(hash, key, key_def);
+	uint32_t k = mh_index_find(hash, key, &key_def);
 	if (k != mh_end(hash))
 		ret = *mh_index_node(hash, k);
 	return ret;
@@ -283,11 +283,11 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		struct tuple *dup_tuple = NULL;
 		struct tuple **dup_node = &dup_tuple;
 		uint32_t pos = mh_index_put(hash, &new_tuple,
-					    &dup_node, key_def);
+					    &dup_node, &key_def);
 
 		ERROR_INJECT(ERRINJ_INDEX_ALLOC,
 		{
-			mh_index_del(hash, pos, key_def);
+			mh_index_del(hash, pos, &key_def);
 			pos = mh_end(hash);
 		});
 
@@ -298,10 +298,10 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
 		if (errcode) {
-			mh_index_remove(hash, &new_tuple, key_def);
+			mh_index_remove(hash, &new_tuple, &key_def);
 			if (dup_tuple) {
 				pos = mh_index_put(hash, &dup_tuple, NULL,
-						   key_def);
+						   &key_def);
 				if (pos == mh_end(hash)) {
 					panic("Failed to allocate memory in "
 					      "recover of int hash");
@@ -315,7 +315,7 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	}
 
 	if (old_tuple) {
-		mh_index_remove(hash, &old_tuple, key_def);
+		mh_index_remove(hash, &old_tuple, &key_def);
 	}
 	return old_tuple;
 }
@@ -349,7 +349,7 @@ HashIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 	switch (type) {
 	case ITER_GE:
 		if (key != NULL) {
-			it->h_pos = mh_index_find(hash, key, key_def);
+			it->h_pos = mh_index_find(hash, key, &key_def);
 			it->base.next = hash_iterator_ge;
 			break;
 		}
@@ -359,7 +359,7 @@ HashIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 		it->base.next = hash_iterator_ge;
 		break;
 	case ITER_EQ:
-		it->h_pos = mh_index_find(hash, key, key_def);
+		it->h_pos = mh_index_find(hash, key, &key_def);
 		it->base.next = hash_iterator_eq;
 		break;
 	default:

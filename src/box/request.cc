@@ -109,7 +109,7 @@ execute_update(struct request *request, struct txn *txn, struct port *port)
 
 	Index *pk = space_index(space, 0);
 	/* Try to find the tuple by primary key. */
-	primary_key_validate(pk->key_def, key, key_part_count);
+	primary_key_validate(&pk->key_def, key, key_part_count);
 	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
 
 	if (old_tuple == NULL)
@@ -161,7 +161,7 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 		const char *key = read_key(reqpos, reqend, &key_part_count);
 
 		struct iterator *it = index->position();
-		key_validate(index->key_def, ITER_EQ, key, key_part_count);
+		key_validate(&index->key_def, ITER_EQ, key, key_part_count);
 		index->initIterator(it, ITER_EQ, key, key_part_count);
 
 		struct tuple *tuple;
@@ -199,7 +199,7 @@ execute_delete(struct request *request, struct txn *txn, struct port *port)
 	const char *key = read_key(reqpos, reqend, &key_part_count);
 	/* Try to find tuple by primary key */
 	Index *pk = space_index(space, 0);
-	primary_key_validate(pk->key_def, key, key_part_count);
+	primary_key_validate(&pk->key_def, key, key_part_count);
 	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
 
 	if (old_tuple == NULL)

@@ -80,41 +80,30 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 		lua_pushnumber(L, i);
 		lua_newtable(L);		/* space.index[i] */
 
+		struct key_def *key_def = &space->index[i]->key_def;
 		lua_pushstring(L, "unique");
-		lua_pushboolean(L, space->key_defs[i].is_unique);
+		lua_pushboolean(L, key_def->is_unique);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "type");
 
-		lua_pushstring(L, index_type_strs[space->key_defs[i].type]);
+		lua_pushstring(L, index_type_strs[key_def->type]);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "key_field");
 		lua_newtable(L);
 
-		for (uint32_t j = 0; j < space->key_defs[i].part_count; j++) {
+		for (uint32_t j = 0; j < key_def->part_count; j++) {
 			lua_pushnumber(L, j);
 			lua_newtable(L);
 
 			lua_pushstring(L, "type");
-			switch (space->key_defs[i].parts[j].type) {
-			case NUM:
-				lua_pushstring(L, "NUM");
-				break;
-			case NUM64:
-				lua_pushstring(L, "NUM64");
-				break;
-			case STRING:
-				lua_pushstring(L, "STR");
-				break;
-			default:
-				lua_pushstring(L, "UNKNOWN");
-				break;
-			}
+			lua_pushstring(L,
+			       field_type_strs[key_def->parts[j].type]);
 			lua_settable(L, -3);
 
 			lua_pushstring(L, "fieldno");
-			lua_pushnumber(L, space->key_defs[i].parts[j].fieldno);
+			lua_pushnumber(L, key_def->parts[j].fieldno);
 			lua_settable(L, -3);
 
 			lua_settable(L, -3);

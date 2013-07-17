@@ -53,11 +53,6 @@ struct space {
 	 */
 	uint32_t key_count;
 
-	/**
-	 * The descriptors for all indexes that belong to the space.
-	 */
-	struct key_def *key_defs;
-
 	/** Space number. */
 	uint32_t no;
 

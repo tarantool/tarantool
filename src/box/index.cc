@@ -122,7 +122,7 @@ Index::factory(struct key_def *key_def)
 
 Index::Index(struct key_def *key_def)
 {
-	this->key_def = key_def;
+	this->key_def = *key_def;
 	m_position = NULL;
 }
 
@@ -130,6 +130,7 @@ Index::~Index()
 {
 	if (m_position != NULL)
 		m_position->free(m_position);
+	key_def_destroy(&key_def);
 }
 
 struct tuple *

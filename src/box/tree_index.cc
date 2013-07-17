@@ -71,7 +71,7 @@ sptree_index_node_compare(const void *node_a, const void *node_b, void *arg)
 	struct tuple *tuple_a = sptree_index_unfold(node_a);
 	struct tuple *tuple_b = sptree_index_unfold(node_b);
 
-	return tuple_compare(tuple_a, tuple_b, self->key_def);
+	return tuple_compare(tuple_a, tuple_b, &self->key_def);
 }
 
 static int
@@ -81,7 +81,7 @@ sptree_index_node_compare_dup(const void *node_a, const void *node_b, void *arg)
 	struct tuple *tuple_a = sptree_index_unfold(node_a);
 	struct tuple *tuple_b = sptree_index_unfold(node_b);
 
-	return tuple_compare_dup(tuple_a, tuple_b, self->key_def);
+	return tuple_compare_dup(tuple_a, tuple_b, &self->key_def);
 }
 
 static int
@@ -94,7 +94,7 @@ sptree_index_node_compare_with_key(const void *key, const void *node, void *arg)
 
 	/* the result is inverted because arguments are swapped */
 	return -tuple_compare_with_key(tuple, key_data->key,
-				       key_data->part_count, self->key_def);
+				       key_data->part_count, &self->key_def);
 }
 
 /* {{{ TreeIndex Iterators ****************************************/
@@ -248,7 +248,7 @@ TreeIndex::random(uint32_t rnd) const
 struct tuple *
 TreeIndex::findByKey(const char *key, uint32_t part_count) const
 {
-	assert(key_def->is_unique && part_count == key_def->part_count);
+	assert(key_def.is_unique && part_count == key_def.part_count);
 
 	struct sptree_index_key_data key_data;
 	key_data.key = key;
@@ -448,7 +448,7 @@ TreeIndex::build(Index *pk)
 	sptree_index_init(&tree, sizeof(struct sptree_index_node),
 			  nodes, n_tuples, estimated_tuples,
 			  sptree_index_node_compare_with_key,
-			  key_def->is_unique ? sptree_index_node_compare
-					     : sptree_index_node_compare_dup,
+			  key_def.is_unique ? sptree_index_node_compare
+					    : sptree_index_node_compare_dup,
 			  this);
 }
