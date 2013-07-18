@@ -62,28 +62,16 @@ struct key_part {
 
 /* Descriptor of a multipart key. */
 struct key_def {
+	/** Ordinal index number in the index array. */
 	uint32_t id;
-	/* Description of parts of a multipart index. */
-	struct key_part *parts;
-	/*
-	 * An array holding field positions in 'parts' array.
-	 * Imagine there is index[1] = { key_field[0].fieldno=5,
-	 * key_field[1].fieldno=3 }.
-	 * 'parts' array for such index contains data from
-	 * key_field[0] and key_field[1] respectively.
-	 * max_fieldno is 5, and cmp_order array holds offsets of
-	 * field 3 and 5 in 'parts' array: -1, -1, -1, 0, -1, 1.
-	 */
-	uint32_t *cmp_order;
-	/* The size of the 'parts' array. */
+	/** The size of the 'parts' array. */
 	uint32_t part_count;
-	/*
-	 * Max fieldno in 'parts' array. Defines the size of
-	 * cmp_order array (which is max_fieldno + 1).
-	 */
-	uint32_t max_fieldno;
-	bool is_unique;
+	/** Description of parts of a multipart index. */
+	struct key_part *parts;
+	/** Index type. */
 	enum index_type type;
+	/** Is this key unique. */
+	bool is_unique;
 };
 
 struct tarantool_cfg_space_index;

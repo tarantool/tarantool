@@ -57,12 +57,12 @@ static bool primary_indexes_enabled = false;
 
 
 static void
-space_create(struct space *space, uint32_t space_no,
+space_create(struct space *space, uint32_t id,
 	     struct key_def *key_defs, uint32_t key_count,
 	     uint32_t arity)
 {
 	memset(space, 0, sizeof(struct space));
-	space->no = space_no;
+	space->id = id;
 	space->arity = arity;
 	space->key_count = key_count;
 	space->format = tuple_format_new(key_defs, key_count);
@@ -88,18 +88,18 @@ space_destroy(struct space *space)
 }
 
 struct space *
-space_new(uint32_t space_no, struct key_def *key_defs,
+space_new(uint32_t id, struct key_def *key_defs,
 	  uint32_t key_count, uint32_t arity)
 {
-	struct space *space = space_by_n(space_no);
+	struct space *space = space_by_id(id);
 	if (space)
-		tnt_raise(LoggedError, ER_SPACE_EXISTS, space_no);
+		tnt_raise(LoggedError, ER_SPACE_EXISTS, id);
 
 	space = (struct space *) malloc(sizeof(struct space));
 
-	space_create(space, space_no, key_defs, key_count, arity);
+	space_create(space, id, key_defs, key_count, arity);
 
-	const struct mh_i32ptr_node_t node = { space->no, space };
+	const struct mh_i32ptr_node_t node = { space_id(space), space };
 	mh_i32ptr_put(spaces, &node, NULL, NULL);
 
 	return space;
@@ -108,7 +108,7 @@ space_new(uint32_t space_no, struct key_def *key_defs,
 static void
 space_delete(struct space *space)
 {
-	const struct mh_i32ptr_node_t node = { space->no, NULL };
+	const struct mh_i32ptr_node_t node = { space_id(space), NULL };
 	mh_int_t k = mh_i32ptr_get(spaces, &node, NULL);
 	assert(k != mh_end(spaces));
 	mh_i32ptr_del(spaces, k, NULL);
@@ -118,9 +118,9 @@ space_delete(struct space *space)
 
 /* return space by its number */
 struct space *
-space_by_n(uint32_t n)
+space_by_id(uint32_t id)
 {
-	const struct mh_i32ptr_node_t node = { n, NULL };
+	const struct mh_i32ptr_node_t node = { id, NULL };
 	mh_int_t space = mh_i32ptr_get(spaces, &node, NULL);
 	if (space == mh_end(spaces))
 		return NULL;
@@ -311,7 +311,8 @@ build_secondary_indexes(void)
 		if (space->key_count <= 1)
 			continue; /* no secondary keys */
 
-		say_info("Building secondary keys in space %d...", space->no);
+		say_info("Building secondary keys in space %d...",
+			 space_id(space));
 
 		Index *pk = space->index[0];
 		for (uint32_t j = 1; j < space->key_count; j++) {
@@ -319,7 +320,7 @@ build_secondary_indexes(void)
 			index->build(pk);
 		}
 
-		say_info("Space %d: done", space->no);
+		say_info("Space %d: done", space_id(space));
 	}
 
 	/* enable secondary indexes now */

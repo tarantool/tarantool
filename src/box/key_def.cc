@@ -41,7 +41,6 @@ key_def_create(struct key_def *def, uint32_t id,
 	       struct tarantool_cfg_space_index *cfg_index)
 {
 	def->id = id;
-	def->max_fieldno = 0;
 	def->part_count = 0;
 
 	def->type = STR2ENUM(index_type, cfg_index->type);
@@ -57,20 +56,12 @@ key_def_create(struct key_def *def, uint32_t id,
 			break;
 		}
 
-		def->max_fieldno = MAX(def->max_fieldno, cfg_key->fieldno);
 		def->part_count++;
 	}
 
 	/* init def array */
 	def->parts = (struct key_part *) malloc(sizeof(struct key_part) *
 						def->part_count);
-
-	uint32_t cmp_order_size = (def->max_fieldno + 1) * sizeof(uint32_t);
-	/* init compare order array */
-	def->cmp_order = (uint32_t *) malloc(cmp_order_size);
-
-	for (uint32_t fieldno = 0; fieldno <= def->max_fieldno; fieldno++)
-		def->cmp_order[fieldno] = UINT32_MAX;
 
 	/* fill fields and compare order */
 	for (uint32_t k = 0; cfg_index->key_field[k] != NULL; ++k) {
@@ -84,9 +75,6 @@ key_def_create(struct key_def *def, uint32_t id,
 		/* fill keys */
 		def->parts[k].fieldno = cfg_key->fieldno;
 		def->parts[k].type = STR2ENUM(field_type, cfg_key->type);
-		/* fill compare order */
-		if (def->cmp_order[cfg_key->fieldno] == UINT32_MAX)
-			def->cmp_order[cfg_key->fieldno] = k;
 	}
 	def->is_unique = cfg_index->unique;
 }
@@ -96,6 +84,5 @@ void
 key_def_destroy(struct key_def *key_def)
 {
 	free(key_def->parts);
-	free(key_def->cmp_order);
 }
 

@@ -487,7 +487,7 @@ memcached_init(const char *bind_ipaddr, int memcached_port)
 
 	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 
-	struct space *sp = space_by_n(cfg.memcached_space);
+	struct space *sp = space_by_id(cfg.memcached_space);
 	memcached_index = space_index(sp, 0);
 
 	/* run memcached server */
@@ -512,13 +512,9 @@ memcached_space_init()
 	key_def.type = HASH;
 
 	key_def.parts = (struct key_part *) malloc(sizeof(struct key_part));
-	key_def.cmp_order = (uint32_t *) malloc(sizeof(uint32_t));
 
 	key_def.parts[0].fieldno = 0;
 	key_def.parts[0].type = STRING;
-
-	key_def.max_fieldno = 1;
-	key_def.cmp_order[0] = 0;
 
 	(void) space_new(cfg.memcached_space, &key_def, 1, 4);
 }

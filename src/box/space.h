@@ -53,8 +53,8 @@ struct space {
 	 */
 	uint32_t key_count;
 
-	/** Space number. */
-	uint32_t no;
+	/** Space numeric id. */
+	uint32_t id;
 
 	/** Default tuple format used by this space */
 	struct tuple_format *format;
@@ -62,7 +62,7 @@ struct space {
 
 
 /** Get space ordinal number. */
-static inline uint32_t space_n(struct space *sp) { return sp->no; }
+static inline uint32_t space_id(struct space *space) { return space->id; }
 
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
@@ -183,20 +183,20 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
  *
  * @return NULL if space not found, otherwise space object.
  */
-struct space *space_by_n(uint32_t space_no);
+struct space *space_by_id(uint32_t id);
 
 static inline struct space *
-space_find(uint32_t space_no)
+space_find(uint32_t id)
 {
-	struct space *s = space_by_n(space_no);
-	if (s)
-		return s;
+	struct space *space = space_by_id(id);
+	if (space)
+		return space;
 
-	tnt_raise(ClientError, ER_NO_SUCH_SPACE, space_no);
+	tnt_raise(ClientError, ER_NO_SUCH_SPACE, id);
 }
 
 struct space *
-space_new(uint32_t space_no, struct key_def *key_defs,
+space_new(uint32_t id, struct key_def *key_defs,
 	  uint32_t key_count, uint32_t arity);
 
 
@@ -210,13 +210,13 @@ void end_build_primary_indexes(void);
 void build_secondary_indexes(void);
 
 static inline Index *
-index_find(struct space *sp, uint32_t index_no)
+index_find(struct space *space, uint32_t index_id)
 {
-	Index *idx = space_index(sp, index_no);
-	if (idx == NULL)
-		tnt_raise(LoggedError, ER_NO_SUCH_INDEX, index_no,
-			  space_n(sp));
-	return idx;
+	Index *index = space_index(space, index_id);
+	if (index == NULL)
+		tnt_raise(LoggedError, ER_NO_SUCH_INDEX, index_id,
+			  space_id(space));
+	return index;
 }
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */

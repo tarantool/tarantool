@@ -387,7 +387,7 @@ snapshot_space(struct space *sp, void *udata)
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	while ((tuple = it->next(it)))
-		snapshot_write_tuple(ud->l, ud->batch, space_n(sp), tuple);
+		snapshot_write_tuple(ud->l, ud->batch, space_id(sp), tuple);
 }
 
 void

@@ -76,8 +76,12 @@ tuple_format_alloc_and_register(struct key_def *key_def,
 	uint32_t field_count;
 
 	/* find max max field no */
-	for (; key_def < end; key_def++)
-		max_fieldno= MAX(max_fieldno, key_def->max_fieldno);
+	for (; key_def < end; key_def++) {
+		struct key_part *part = key_def->parts;
+		struct key_part *pend = part + key_def->part_count;
+		for (; part < pend; part++)
+			max_fieldno= MAX(max_fieldno, part->fieldno);
+	}
 
 	if (formats_size == formats_capacity) {
 		uint32_t new_capacity = formats_capacity ?

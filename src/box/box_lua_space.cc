@@ -56,7 +56,7 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 
 	/* space.n */
 	lua_pushstring(L, "n");
-	lua_pushnumber(L, space->no);
+	lua_pushnumber(L, space_id(space));
 	lua_settable(L, -3);
 
 	/* all exists spaces are enabled */
@@ -133,7 +133,7 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 static void
 lbox_add_space(struct space *space, struct lua_State *L)
 {
-	lua_pushnumber(L, space->no);
+	lua_pushnumber(L, space_id(space));
 	lbox_pushspace(L, space);
 	lua_settable(L, -3);
 }
