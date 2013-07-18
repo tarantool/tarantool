@@ -505,22 +505,22 @@ memcached_space_init()
                 return;
 
 	/* Configure memcached index key. */
-	struct key_def *key_def = (struct key_def *) malloc(sizeof(struct key_def));
-	key_def->id = 0;
-	key_def->part_count = 1;
-	key_def->is_unique = true;
-	key_def->type = HASH;
+	struct key_def key_def;
+	key_def.id = 0;
+	key_def.part_count = 1;
+	key_def.is_unique = true;
+	key_def.type = HASH;
 
-	key_def->parts = (struct key_part *) malloc(sizeof(struct key_part));
-	key_def->cmp_order = (uint32_t *) malloc(sizeof(uint32_t));
+	key_def.parts = (struct key_part *) malloc(sizeof(struct key_part));
+	key_def.cmp_order = (uint32_t *) malloc(sizeof(uint32_t));
 
-	key_def->parts[0].fieldno = 0;
-	key_def->parts[0].type = STRING;
+	key_def.parts[0].fieldno = 0;
+	key_def.parts[0].type = STRING;
 
-	key_def->max_fieldno = 1;
-	key_def->cmp_order[0] = 0;
+	key_def.max_fieldno = 1;
+	key_def.cmp_order[0] = 0;
 
-	(void) space_new(cfg.memcached_space, key_def, 1, 4);
+	(void) space_new(cfg.memcached_space, &key_def, 1, 4);
 }
 
 /** Delete a bunch of expired keys. */
