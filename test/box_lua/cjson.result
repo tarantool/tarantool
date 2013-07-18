@@ -1,4 +1,6 @@
-cjson tests
+-- cjson tests
+---
+...
 type(box.cjson)
 ---
  - table
@@ -27,11 +29,15 @@ box.cjson.decode('123')
 ---
  - 123
 ...
-box.cjson.decode('[123, "Кудыкины горы"]')[2]
+box.cjson.decode('[123, \"Кудыкины горы\"]')[2]
 ---
  - Кудыкины горы
 ...
-box.cjson.decode('{"test": "Результат"}').test
+box.cjson.decode('{\"test\": \"Результат\"}').test
 ---
  - Результат
+...
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
+
+---
 ...

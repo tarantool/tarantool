@@ -1,82 +1,94 @@
-# encoding: utf-8
-import sys
-# A test case for a race condition between ev_schedule
-# and wal_schedule fiber schedulers. 
-# The same fiber should not be scheduled by ev_schedule (e.g. 
-# due to cancellation) if it is within th wal_schedule queue.
-# The test case is dependent on rows_per_wal, since this is when
-# we reopen the .xlog file and thus wal_scheduler takes a long
-# pause.
-admin("box.cfg.rows_per_wal")
-sql("insert into t0 values (1, 'testing', 'lua rocks')")
-sql("delete from t0 where k0=1")
-sql("insert into t0 values (1, 'testing', 'lua rocks')")
-sql("delete from t0 where k0=1")
-# check delete:
-admin("box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, 1))")
-admin("box.process(22, box.pack('iii', 0, 0, 0))")
+-- A test case for a race condition between ev_schedule
+-- and wal_schedule fiber schedulers. 
+-- The same fiber should not be scheduled by ev_schedule (e.g. 
+-- due to cancellation) if it is within th wal_schedule queue.
+-- The test case is dependent on rows_per_wal, since this is when
+-- we reopen the .xlog file and thus wal_scheduler takes a long
+-- pause;
+box.cfg.rows_per_wal;
+box.space[0]:insert(1, 'testing', 'lua rocks');
+box.space[0]:delete(1);
+box.space[0]:insert(1, 'testing', 'lua rocks');
+box.space[0]:delete(1);
+-- check delete;
+box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, 1));
+box.process(22, box.pack('iii', 0, 0, 0));
 
-sql("insert into t0 values (1, 'test box delete')")
-sql("call box.delete('0', '\1\0\0\0')")
-sql("insert into t0 values (1, 'test box delete')")
-admin("box.delete(0, 1)")
-sql("insert into t0 values ('abcd', 'test box delete')")
-sql("call box.delete('0', 'abcd')")
-sql("insert into t0 values ('abcd', 'test box delete')")
-admin("box.delete(0, 'abcd')")
-sql("insert into t0 values ('abcd', 'test box.select()')")
-sql("call box.replace('0', 'abcd', 'hello', 'world')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'defc', 'goodbye', 'universe')")
-sql("call box.replace('0', 'abcd')")
-sql("call box.delete('0', 'abcd')")
-sql("call box.delete('0', 'defc')")
-sql("call box.insert('0', 'test', 'old', 'abcd')")
-# test that insert produces a duplicate key error
-sql("call box.insert('0', 'test', 'old', 'abcd')")
-sql("call box.update('0', 'test', '=p=p', 0, 'pass', 1, 'new')")
-sql("call box.update('0', 'miss', '+p', 2, '\1\0\0\0')")
-sql("call box.update('0', 'pass', '+p', 2, '\1\0\0\0')")
-sql("call box.update('0', 'pass', '-p', 2, '\1\0\0\0')")
-sql("call box.update('0', 'pass', '-p', 2, '\1\0\0\0')")
-admin("box.update(0, 'pass', '+p', 2, 1)")
-sql("call box.delete('0', 'pass')")
-admin("reload configuration")
-# must be read-only
+box.space[0]:insert(1, 'test box delete');
+box.delete('0', '\1\0\0\0');
+box.space[0]:insert(1, 'test box delete');
+box.delete(0, 1);
+box.space[0]:insert('abcd', 'test box delete');
+box.delete('0', 'abcd');
+box.space[0]:insert('abcd', 'test box delete');
+box.delete(0, 'abcd');
+box.space[0]:insert('abcd', 'test box.select()');
+box.replace('0', 'abcd', 'hello', 'world');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'defc', 'goodbye', 'universe');
+box.replace('0', 'abcd');
+box.delete('0', 'abcd');
+box.delete('0', 'defc');
+box.insert('0', 'test', 'old', 'abcd');
+-- test that insert produces a duplicate key error;
+box.insert('0', 'test', 'old', 'abcd');
+box.update('0', 'test', '=p=p', 0, 'pass', 1, 'new');
+box.update('0', 'miss', '+p', 2, '\1\0\0\0');
+box.update('0', 'pass', '+p', 2, '\1\0\0\0');
+box.update('0', 'pass', '-p', 2, '\1\0\0\0');
+box.update('0', 'pass', '-p', 2, '\1\0\0\0');
+box.update(0, 'pass', '+p', 2, 1);
+box.delete('0', 'pass');
+reload configuration;
+-- must be read-only;
 
-admin("box.insert(0, 'test')")
-admin("box.insert(0, 'abcd')")
-admin("box.delete(0, 'test')")
-admin("box.delete(0, 'abcd')")
-admin("box.space[0]:insert('test', 'hello world')")
-admin("box.space[0]:update('test', '=p', 1, 'bye, world')")
-admin("box.space[0]:delete('test')")
-# test tuple iterators
-admin("t=box.space[0]:insert('test')")
-admin("t=box.space[0]:replace('test', 'another field')")
-admin("t=box.space[0]:replace('test', 'another field', 'one more')")
-admin("box.space[0]:truncate()")
-# test passing arguments in and out created fiber
-admin("function y() print('started') box.fiber.detach() while true do box.replace(0, 'test', os.time()) box.fiber.sleep(0.001) end end")
-admin("f = box.fiber.create(y)")
-admin("box.fiber.resume(f)")
-admin("box.fiber.sleep(0.002)")
-admin("box.fiber.cancel(f)")
-admin("box.fiber.resume(f)")
-admin("for k=1, 1000, 1 do box.fiber.create(function() box.fiber.detach() end) end")
-admin("collectgarbage('collect')")
-# check that these newly created fibers are garbage collected
-admin("box.fiber.find(900)")
-admin("box.fiber.find(910)")
-admin("box.fiber.find(920)")
-admin("box.space[0]:truncate()")
+box.insert(0, 'test');
+box.insert(0, 'abcd');
+box.delete(0, 'test');
+box.delete(0, 'abcd');
+box.space[0]:insert('test', 'hello world');
+box.space[0]:update('test', '=p', 1, 'bye, world');
+box.space[0]:delete('test');
+-- test tuple iterators;
+t = box.space[0]:insert('test');
+t = box.space[0]:replace('test', 'another field');
+t = box.space[0]:replace('test', 'another field', 'one more');
+box.space[0]:truncate();
+-- test passing arguments in and out created fiber;
+function y() 
+    print('started') 
+    box.fiber.detach() 
+    while true do 
+        box.replace(0, 'test', os.time()) 
+        box.fiber.sleep(0.001) 
+    end 
+end;
+f = box.fiber.create(y);
+box.fiber.resume(f);
+box.fiber.sleep(0.002);
+box.fiber.cancel(f);
+box.fiber.resume(f);
+for k = 1, 1000, 1 do 
+    box.fiber.create(
+        function() 
+            box.fiber.detach() 
+        end
+    ) 
+end;
+collectgarbage('collect');
+-- check that these newly created fibers are garbage collected;
+box.fiber.find(900);
+box.fiber.find(910);
+box.fiber.find(920);
+box.space[0]:truncate();
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -52,24 +52,33 @@ ch:is_empty()
 buffer = {}
 ---
 ...
-tfbr = box.fiber.create(function() box.fiber.detach() while true do table.insert(buffer, ch:get()) end end)
+tfbr = box.fiber.create(
+    function() 
+        box.fiber.detach() 
+        while true do 
+            table.insert(buffer, ch:get()) 
+        end 
+    end
+)
 ---
 ...
 box.fiber.resume(tfbr)
 ---
 ...
-for i = 1, 10 do print(i, ' ', ch:put(i, 0.1)) end
+for i = 1, 10 do 
+    print(i, ' : ', ch:put(i, 0.1)) 
+end
 ---
-1 true
-2 true
-3 true
-4 true
-5 true
-6 true
-7 true
-8 true
-9 true
-10 true
+1 : true
+2 : true
+3 : true
+4 : true
+5 : true
+6 : true
+7 : true
+8 : true
+9 : true
+10 : true
 ...
 ch:has_readers()
 ---
@@ -106,7 +115,9 @@ ch:get(box.info.pid) == box.info.pid
 ---
  - true
 ...
-for i, v in pairs(buffer) do print(v) end
+for i, v in pairs(buffer) do 
+    print(v) 
+end
 ---
 234
 1
@@ -144,13 +155,29 @@ ch:is_empty()
 ---
  - true
 ...
-tfbr = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr  - ' .. tostring(v)) end end)
+tfbr = box.fiber.create(
+    function() 
+        box.fiber.detach() 
+        while true do 
+            local v = ch:get() 
+            table.insert(buffer, 'tfbr  - ' .. tostring(v)) 
+        end 
+    end
+)
 ---
 ...
 box.fiber.resume(tfbr)
 ---
 ...
-tfbr2 = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr2 - ' .. tostring(v)) end end)
+tfbr2 = box.fiber.create(
+    function() 
+        box.fiber.detach() 
+        while true do 
+            local v = ch:get()
+            table.insert(buffer, 'tfbr2 - ' .. tostring(v)) 
+        end 
+    end
+)
 ---
 ...
 box.fiber.resume(tfbr2)
@@ -159,7 +186,9 @@ box.fiber.resume(tfbr2)
 buffer = {}
 ---
 ...
-for i, v in pairs(buffer) do print(v) end
+for i, v in pairs(buffer) do 
+    print(' - ', v) 
+end
 ---
 ...
 ch:is_full()
@@ -194,38 +223,46 @@ ch:broadcast('broadcast message!')
 ---
  - 2
 ...
-for i = 35, 45 do print(ch:put(i)) end
+for i = 35, 45 do 
+    print(' - ', ch:put(i)) 
+end
 ---
-true
-true
-true
-true
-true
-true
-true
-true
-true
-true
-true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
 ...
-for i, v in pairs(buffer) do print(v) end
+for i, v in pairs(buffer) do 
+    print(' - "', v, '"') 
+end
 ---
-tfbr  - 1
-tfbr2 - 2
-tfbr  - 3
-tfbr2 - 4
-tfbr  - 5
-tfbr2 - broadcast message!
-tfbr  - broadcast message!
-tfbr2 - 35
-tfbr  - 36
-tfbr2 - 37
-tfbr  - 38
-tfbr2 - 39
-tfbr  - 40
-tfbr2 - 41
-tfbr  - 42
-tfbr2 - 43
-tfbr  - 44
-tfbr2 - 45
+ - "tfbr  - 1"
+ - "tfbr2 - 2"
+ - "tfbr  - 3"
+ - "tfbr2 - 4"
+ - "tfbr  - 5"
+ - "tfbr2 - broadcast message!"
+ - "tfbr  - broadcast message!"
+ - "tfbr2 - 35"
+ - "tfbr  - 36"
+ - "tfbr2 - 37"
+ - "tfbr  - 38"
+ - "tfbr2 - 39"
+ - "tfbr  - 40"
+ - "tfbr2 - 41"
+ - "tfbr  - 42"
+ - "tfbr2 - 43"
+ - "tfbr  - 44"
+ - "tfbr2 - 45"
+...
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
+
+---
 ...
