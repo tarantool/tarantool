@@ -506,7 +506,8 @@ memcached_space_init()
 
 	/* Configure memcached index key. */
 	struct key_def key_def;
-	key_def_create(&key_def, 0, HASH, true, 1, 0, STRING);
+	key_def_create(&key_def, 0, HASH, true, 1);
+	key_def_set_part(&key_def, 0, 0, STRING);
 
 	struct space_def space_def;
 	space_def.id = cfg.memcached_space;

@@ -223,6 +223,37 @@ space_free(void)
 	tuple_free();
 }
 
+void
+key_def_create_from_cfg(struct key_def *def, uint32_t id,
+	       struct tarantool_cfg_space_index *cfg_index)
+{
+	uint32_t part_count = 0;
+	enum index_type type = STR2ENUM(index_type, cfg_index->type);
+
+	if (type == index_type_MAX)
+		tnt_raise(LoggedError, ER_INDEX_TYPE, cfg_index->type);
+
+	/* Find out key part count. */
+	for (uint32_t k = 0; cfg_index->key_field[k] != NULL; ++k) {
+		auto cfg_key = cfg_index->key_field[k];
+
+		if (cfg_key->fieldno == -1) {
+			/* last filled key reached */
+			break;
+		}
+		part_count++;
+	}
+
+	key_def_create(def, id, type, cfg_index->unique, part_count);
+
+	for (uint32_t k = 0; k < part_count; k++) {
+		auto cfg_key = cfg_index->key_field[k];
+
+		key_def_set_part(def, k, cfg_key->fieldno,
+				 STR2ENUM(field_type, cfg_key->type));
+	}
+}
+
 
 static void
 space_config()

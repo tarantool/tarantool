@@ -73,18 +73,24 @@ struct key_def {
 	bool is_unique;
 };
 
-struct tarantool_cfg_space_index;
-
-/** Initialize a pre-allocated key_def from cfg_index. */
+/** Initialize a pre-allocated key_def. */
 void
-key_def_create_from_cfg(struct key_def *def, uint32_t id,
-			struct tarantool_cfg_space_index *cfg_index);
+key_def_create(struct key_def *def, uint32_t id,
+	       enum index_type type, bool is_unique,
+	       uint32_t part_count);
 
-/** Allocate and initialize a key_def */
-struct key_def *
-key_def_create(struct key_def *def,
-	       uint32_t i, enum index_type type, bool is_unique,
-	       uint32_t part_count, ...);
+/**
+ * Set a single key part in a key def.
+ * @pre part_no < part_count
+ */
+static inline void
+key_def_set_part(struct key_def *def, uint32_t part_no,
+		 uint32_t fieldno, enum field_type type)
+{
+	assert(part_no < def->part_count);
+	def->parts[part_no].fieldno = fieldno;
+	def->parts[part_no].type = type;
+}
 
 void
 key_def_destroy(struct key_def *def);
